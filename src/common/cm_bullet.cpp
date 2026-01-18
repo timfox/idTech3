@@ -693,4 +693,13 @@ void CM_Bullet_DestroyShape(btCollisionShape *shape) {
 	}
 }
 
+// ECS integration functions
+qboolean CM_Bullet_IsInitialized(void) {
+	return bspPhysicsInitialized;
+}
+
+btDiscreteDynamicsWorld* CM_Bullet_GetWorld(void) {
+	return bspWorld;
+}
+
 #endif // USE_BULLET

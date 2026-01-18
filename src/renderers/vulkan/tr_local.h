@@ -62,6 +62,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../../common/q_shared.h"
 #include "../../common/qfiles.h"
 #include "../../common/qcommon.h"
+#include "../../common/material_layer.h"
 #define TR_GLOBALS_DEFINED
 #include "../renderercommon/tr_public.h"
 #include "../renderercommon/tr_backend_iface.h"
@@ -576,6 +577,10 @@ typedef struct shader_s {
 	time_t lastModifiedTime;				// file modification time for hot-reload
 	qboolean supportsHotReload;				// whether this shader can be hot-reloaded
 	char shaderFilePath[MAX_QPATH];			// full path to shader file for monitoring
+
+	// Layered material support
+	struct layeredMaterial_t *layeredMaterial;	// associated layered material (NULL for traditional shaders)
+	struct materialInstance_t *materialInstance;	// runtime material instance
 
 	struct	shader_s	*next;
 } shader_t;

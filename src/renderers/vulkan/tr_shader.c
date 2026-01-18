@@ -25,6 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifdef USE_VULKAN
 #include "vk_shader_validation.h"
 #endif
+#include "../../common/material_layer.h"
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
 #include <sys/stat.h>  // For file modification time checking
@@ -4608,6 +4609,51 @@ shader_t *R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImag
 	}
 
 	//
+	// check for layered material file before falling back to image-based shader
+	//
+	{
+		char materialPath[MAX_QPATH];
+		Com_sprintf(materialPath, sizeof(materialPath), "materials/%s.material", strippedName);
+
+		// Try to load layered material
+		shader.layeredMaterial = Material_Load(materialPath);
+		if (shader.layeredMaterial) {
+			ri.Printf(PRINT_DEVELOPER, "Loaded layered material: %s\n", materialPath);
+
+			// Create material instance for runtime use
+			shader.materialInstance = MaterialInstance_Create(shader.layeredMaterial);
+			if (shader.materialInstance) {
+				// Compile the material instance
+				int shaderIndex = MaterialInstance_Compile(shader.materialInstance);
+				if (shaderIndex >= 0) {
+					shader.materialInstance->shaderIndex = shaderIndex;
+					shader.materialInstance->compiled = qtrue;
+				} else {
+					ri.Printf(PRINT_WARNING, "Failed to compile layered material: %s\n", materialPath);
+					MaterialInstance_Free(shader.materialInstance);
+					shader.materialInstance = NULL;
+					Material_Free(shader.layeredMaterial);
+					shader.layeredMaterial = NULL;
+					shader.defaultShader = qtrue;
+					return FinishShader();
+				}
+			} else {
+				ri.Printf(PRINT_WARNING, "Failed to create material instance: %s\n", materialPath);
+				Material_Free(shader.layeredMaterial);
+				shader.layeredMaterial = NULL;
+				shader.defaultShader = qtrue;
+				return FinishShader();
+			}
+
+			// For layered materials, we still need to create a basic shader structure
+			// but mark it as layered material based
+			shader.numUnfoggedPasses = 1; // Layered materials handle their own passes
+
+			return FinishShader();
+		}
+	}
+
+	//
 	// if not defined in the in-memory shader descriptions,
 	// look for a single supported image file
 	//
@@ -5006,6 +5052,9 @@ void R_InitShaders( void ) {
 
 	Com_Memset(hashTable, 0, sizeof(hashTable));
 
+	// Initialize material system
+	R_InitMaterialSystem();
+
 	CreateInternalShaders();
 
 	// Use safe shader loading system
@@ -5126,4 +5175,126 @@ const char *R_ShaderVersionString(shader_t *shader) {
 	Com_sprintf(versionStr, sizeof(versionStr), "v%u@%lu",
 		shader->shaderVersion, (unsigned long)shader->lastModifiedTime);
 	return versionStr;
+}
+
+/*
+===============================================================================
+
+MATERIAL INSTANCE MANAGEMENT
+
+===============================================================================
+*/
+
+// Material instance registry
+#define MAX_MATERIAL_INSTANCES 1024
+static materialInstance_t *materialInstances[MAX_MATERIAL_INSTANCES];
+static int numMaterialInstances = 0;
+
+/*
+===============
+R_RegisterMaterialInstance
+
+Registers a material instance with the renderer
+===============
+*/
+qhandle_t R_RegisterMaterialInstance(materialInstance_t *instance) {
+	if (!instance || numMaterialInstances >= MAX_MATERIAL_INSTANCES) {
+		return 0;
+	}
+
+	// Find empty slot
+	for (int i = 0; i < MAX_MATERIAL_INSTANCES; ++i) {
+		if (!materialInstances[i]) {
+			materialInstances[i] = instance;
+			numMaterialInstances++;
+			return i + 1; // Return handle (1-based)
+		}
+	}
+
+	return 0; // No slots available
+}
+
+/*
+===============
+R_UnregisterMaterialInstance
+
+Unregisters a material instance from the renderer
+===============
+*/
+void R_UnregisterMaterialInstance(qhandle_t handle) {
+	if (handle <= 0 || handle > MAX_MATERIAL_INSTANCES) {
+		return;
+	}
+
+	int index = handle - 1;
+	if (materialInstances[index]) {
+		materialInstances[index] = NULL;
+		numMaterialInstances--;
+	}
+}
+
+/*
+===============
+R_GetMaterialInstance
+
+Retrieves a material instance by handle
+===============
+*/
+materialInstance_t *R_GetMaterialInstance(qhandle_t handle) {
+	if (handle <= 0 || handle > MAX_MATERIAL_INSTANCES) {
+		return NULL;
+	}
+
+	return materialInstances[handle - 1];
+}
+
+/*
+===============
+R_UpdateMaterialInstance
+
+Updates a material instance (called when parameters change)
+===============
+*/
+qboolean R_UpdateMaterialInstance(qhandle_t handle) {
+	materialInstance_t *instance = R_GetMaterialInstance(handle);
+	if (!instance) {
+		return qfalse;
+	}
+
+	// Mark as needing recompilation
+	instance->compiled = qfalse;
+	instance->lastModifiedTime = ri.Milliseconds();
+
+	// Recompile if needed
+	return (MaterialInstance_Compile(instance) >= 0);
+}
+
+/*
+===============
+R_InitMaterialSystem
+
+Initializes the material instance management system
+===============
+*/
+void R_InitMaterialSystem(void) {
+	Com_Memset(materialInstances, 0, sizeof(materialInstances));
+	numMaterialInstances = 0;
+}
+
+/*
+===============
+R_ShutdownMaterialSystem
+
+Shuts down the material instance management system
+===============
+*/
+void R_ShutdownMaterialSystem(void) {
+	// Free all material instances
+	for (int i = 0; i < MAX_MATERIAL_INSTANCES; ++i) {
+		if (materialInstances[i]) {
+			MaterialInstance_Free(materialInstances[i]);
+			materialInstances[i] = NULL;
+		}
+	}
+	numMaterialInstances = 0;
 }

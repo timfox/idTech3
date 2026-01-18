@@ -120,12 +120,18 @@ struct TransformComponent {
 	}
 };
 
-// Physics Component - Velocity, acceleration, mass
+// Physics Component - Velocity, acceleration, mass, materials
 struct PhysicsComponent {
 	vec3_t velocity;
 	vec3_t acceleration;
 	float mass;
 	float friction;
+
+	// Material properties
+	float restitution;    // Bounciness (0.0 = no bounce, 1.0 = perfect bounce)
+	float density;        // Density for mass calculation
+	float linearDamping;  // Linear velocity damping
+	float angularDamping; // Angular velocity damping
 
 #ifdef USE_BULLET
 	// When true, this entity will be simulated by Bullet instead of the
@@ -170,7 +176,8 @@ struct PhysicsComponent {
 	}
 #endif
 
-	PhysicsComponent() : mass(1.0f), friction(0.0f)
+	PhysicsComponent() : mass(1.0f), friction(0.1f), restitution(0.0f), density(1.0f),
+		linearDamping(0.0f), angularDamping(0.0f)
 #ifdef USE_BULLET
 		, useBullet(qfalse), body(nullptr), shapeType(CollisionShapeType::BOX), collisionShape(nullptr), motionState(nullptr)
 #endif
@@ -527,6 +534,52 @@ struct FireteamComponent {
 		for (int i = 0; i < 8; i++) {
 			memberIds[i] = -1;
 		}
+	}
+};
+
+// Constraint types for rigid body joints
+enum class ConstraintType : uint8_t {
+	NONE = 0,
+	POINT_TO_POINT,     // Ball joint - allows rotation around all axes
+	HINGE,             // Hinge joint - allows rotation around one axis
+	SLIDER,            // Prismatic joint - allows translation along one axis
+	CONE_TWIST,        // Cone twist joint - allows rotation within a cone
+	GENERIC_6DOF,      // 6 degrees of freedom joint
+	FIXED,             // Fixed joint - no relative movement
+	SPRING             // Spring constraint
+};
+
+// Constraint Component - Defines joints between rigid bodies
+struct ConstraintComponent {
+	ConstraintType type;
+	int targetEntityId;       // Entity ID of the other body in the constraint
+	vec3_t pivotA;           // Pivot point in body A's local space
+	vec3_t pivotB;           // Pivot point in body B's local space
+	vec3_t axisA;            // Primary axis in body A's local space
+	vec3_t axisB;            // Primary axis in body B's local space
+
+	// Constraint-specific parameters
+	float lowerLimit;        // Lower angular/positional limit
+	float upperLimit;        // Upper angular/positional limit
+	float softness;          // Constraint softness (0 = rigid, 1 = soft)
+	float biasFactor;        // Bias factor for constraint solving
+	float relaxationFactor;  // Relaxation factor for constraint solving
+
+#ifdef USE_BULLET
+	btTypedConstraint *constraint;  // Bullet constraint object
+#endif
+
+	ConstraintComponent() : type(ConstraintType::NONE), targetEntityId(-1),
+		lowerLimit(0.0f), upperLimit(0.0f), softness(0.0f),
+		biasFactor(0.3f), relaxationFactor(1.0f)
+#ifdef USE_BULLET
+		, constraint(nullptr)
+#endif
+	{
+		VectorClear(pivotA);
+		VectorClear(pivotB);
+		VectorClear(axisA);
+		VectorClear(axisB);
 	}
 };
 

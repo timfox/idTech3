@@ -923,7 +923,9 @@ static const imageExtToLoaderMap_t imageLoaders[] =
 	{ "jpg",  R_LoadJPG },
 	{ "jpeg", R_LoadJPG },
 	{ "pcx",  R_LoadPCX },
-	{ "bmp",  R_LoadBMP }
+	{ "bmp",  R_LoadBMP },
+	{ "rgb9e5", R_LoadRGB9E5 },
+	{ "ktx2", R_LoadKTX2 }
 };
 
 static const int numImageLoaders = ARRAY_LEN( imageLoaders );

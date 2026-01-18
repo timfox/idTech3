@@ -183,7 +183,7 @@ public:
 	static BulletWorld s_bulletWorld;
 
 // Collision shape factory functions
-static btCollisionShape* CreateCollisionShape(CollisionShapeType type, const vec3_t dimensions) {
+static btCollisionShape* CreateCollisionShape(CollisionShapeType type, const vec3_t dimensions, const std::vector<btVector3>* vertices = nullptr, const std::vector<int>* indices = nullptr) {
 	switch (type) {
 		case CollisionShapeType::BOX:
 			return new btBoxShape(btVector3(dimensions[0], dimensions[1], dimensions[2]));
@@ -194,21 +194,51 @@ static btCollisionShape* CreateCollisionShape(CollisionShapeType type, const vec
 		case CollisionShapeType::CAPSULE:
 			return new btCapsuleShape(dimensions[0], dimensions[1]);  // radius, height
 
-		case CollisionShapeType::CONVEX_HULL:
-			// Placeholder - would need vertex data
-			return new btBoxShape(btVector3(dimensions[0], dimensions[1], dimensions[2]));
+		case CollisionShapeType::CONVEX_HULL: {
+			if (vertices && !vertices->empty()) {
+				auto* convexHull = new btConvexHullShape();
+				for (const auto& vertex : *vertices) {
+					convexHull->addPoint(vertex);
+				}
+				return convexHull;
+			} else {
+				// Fallback to box if no vertices provided
+				return new btBoxShape(btVector3(dimensions[0], dimensions[1], dimensions[2]));
+			}
+		}
 
-		case CollisionShapeType::MESH:
-			// Static triangle mesh - placeholder
-			return new btBoxShape(btVector3(dimensions[0], dimensions[1], dimensions[2]));
+		case CollisionShapeType::MESH: {
+			if (vertices && indices && !vertices->empty() && !indices->empty()) {
+				auto* triangleMesh = new btTriangleMesh();
+				for (size_t i = 0; i < indices->size(); i += 3) {
+					if (i + 2 < indices->size()) {
+						triangleMesh->addTriangle(
+							(*vertices)[(*indices)[i]],
+							(*vertices)[(*indices)[i + 1]],
+							(*vertices)[(*indices)[i + 2]]
+						);
+					}
+				}
+				return new btBvhTriangleMeshShape(triangleMesh, true);
+			} else {
+				// Fallback to box if no mesh data provided
+				return new btBoxShape(btVector3(dimensions[0], dimensions[1], dimensions[2]));
+			}
+		}
 
 		case CollisionShapeType::COMPOUND:
-			// Compound shape - placeholder
 			return new btCompoundShape();
 
 		default:
 			return new btBoxShape(btVector3(0.5f, 0.5f, 0.5f));  // fallback
 	}
+}
+
+// Create collision shape from model data
+btCollisionShape* CreateCollisionShapeFromModel(const char* modelName, CollisionShapeType preferredType) {
+	// This would load model geometry and create appropriate collision shape
+	// For now, return a default box shape
+	return new btBoxShape(btVector3(1.0f, 1.0f, 1.0f));
 }
 }
 
@@ -224,13 +254,20 @@ static void ECS_Bullet_Step(entt::registry &registry, float deltaTime) {
 	}
 
 	// Global enable switch for Bullet ECS physics
-	if (false) { // Bullet physics disabled by default
+	cvar_t *physics_bullet_enabled = Cvar_Get("physics_bullet_enabled", "1", CVAR_ARCHIVE | CVAR_LATCH);
+	Cvar_SetDescription(physics_bullet_enabled, "Enable Bullet physics simulation for ECS entities");
+
+	if (!physics_bullet_enabled->integer) {
 		return;
 	}
 	
 	s_bulletWorld.Init();
 
+	// Integrate with CM collision system for world geometry
+	ECS_IntegrateWithCMSystem(registry);
+
 	auto view = registry.view<TransformComponent, PhysicsComponent>();
+	auto constraintView = registry.view<ConstraintComponent>();
 
 	// Collect collision events
 	std::vector<CollisionEvent> collisionEvents;
@@ -271,8 +308,14 @@ static void ECS_Bullet_Step(entt::registry &registry, float deltaTime) {
 
 			btRigidBody *body = new btRigidBody(rbInfo);
 
-			// Approximate friction using the existing friction parameter
+			// Set material properties
 			body->setFriction(physics.friction);
+			body->setRestitution(physics.restitution);
+			body->setDamping(physics.linearDamping, physics.angularDamping);
+
+			// Set additional Bullet-specific properties
+			body->setSleepingThresholds(0.1f, 0.1f); // Prevent immediate sleeping
+			body->setActivationState(DISABLE_DEACTIVATION); // Keep bodies active
 
 			s_bulletWorld.world->addRigidBody(body);
 			physics.body = body;
@@ -288,7 +331,64 @@ static void ECS_Bullet_Step(entt::registry &registry, float deltaTime) {
 			physics.body->applyCentralForce(force);
 		}
 	}
-	
+
+	// Create and update constraints
+	for (auto entity : constraintView) {
+		auto &constraintComp = constraintView.get<ConstraintComponent>(entity);
+
+		if (constraintComp.targetEntityId < 0 || !constraintComp.constraint) {
+			// Create new constraint
+			auto bodyA = registry.try_get<PhysicsComponent>(entity);
+			auto bodyB = registry.try_get<PhysicsComponent>(static_cast<entt::entity>(constraintComp.targetEntityId));
+
+			if (bodyA && bodyB && bodyA->body && bodyB->body) {
+				btTypedConstraint *newConstraint = nullptr;
+
+				switch (constraintComp.type) {
+					case ConstraintType::POINT_TO_POINT: {
+						btVector3 pivotA(constraintComp.pivotA[0], constraintComp.pivotA[1], constraintComp.pivotA[2]);
+						btVector3 pivotB(constraintComp.pivotB[0], constraintComp.pivotB[1], constraintComp.pivotB[2]);
+						newConstraint = new btPoint2PointConstraint(*bodyA->body, *bodyB->body, pivotA, pivotB);
+						break;
+					}
+
+					case ConstraintType::HINGE: {
+						btVector3 pivotA(constraintComp.pivotA[0], constraintComp.pivotA[1], constraintComp.pivotA[2]);
+						btVector3 axisA(constraintComp.axisA[0], constraintComp.axisA[1], constraintComp.axisA[2]);
+						btVector3 pivotB(constraintComp.pivotB[0], constraintComp.pivotB[1], constraintComp.pivotB[2]);
+						btVector3 axisB(constraintComp.axisB[0], constraintComp.axisB[1], constraintComp.axisB[2]);
+						newConstraint = new btHingeConstraint(*bodyA->body, *bodyB->body, pivotA, pivotB, axisA, axisB);
+						break;
+					}
+
+					case ConstraintType::SLIDER: {
+						btTransform frameA, frameB;
+						frameA.setIdentity();
+						frameB.setIdentity();
+						newConstraint = new btSliderConstraint(*bodyA->body, *bodyB->body, frameA, frameB, true);
+						break;
+					}
+
+					case ConstraintType::FIXED: {
+						btTransform frameA, frameB;
+						frameA.setIdentity();
+						frameB.setIdentity();
+						newConstraint = new btFixedConstraint(*bodyA->body, *bodyB->body, frameA, frameB);
+						break;
+					}
+
+					default:
+						break;
+				}
+
+				if (newConstraint) {
+					s_bulletWorld.world->addConstraint(newConstraint, true); // disable collision between linked bodies
+					constraintComp.constraint = newConstraint;
+				}
+			}
+		}
+	}
+
 	// Step Bullet simulation
 	int maxSubSteps = 10; // Default max sub-steps
 	float fixedTimestep = 1.0f / 60.0f; // Default 60 FPS fixed timestep
@@ -325,17 +425,16 @@ static void ECS_Bullet_Step(entt::registry &registry, float deltaTime) {
 
 	// Process collision events (call user callbacks if registered)
 	for (const auto &event : collisionEvents) {
-		// TODO: Call user-registered collision callbacks.
-		// Implementation approach:
-		//   1. Maintain a registry of user-defined collision callback functions
-		//   2. When collision is detected, iterate through registered callbacks
-		//   3. Call each callback with collision information (entities, contact points, etc.)
-		//   4. Allow callbacks to modify collision response or trigger game events
-		// This enables modders to customize collision behavior without modifying core systems.
-		// For now, just log the collision
-		if (false) { // Debug drawing disabled by default
-			Com_Printf("Bullet collision: entity %d <-> entity %d, impulse %.2f\n",
-					  (int)event.entityA, (int)event.entityB, event.impulse);
+		// Call user-registered collision callbacks
+		ECS_ProcessCollisionEvent(registry, event);
+
+		// Log collision for debugging
+		cvar_t *physics_debug_collision = Cvar_Get("physics_debug_collision", "0", CVAR_CHEAT);
+		if (physics_debug_collision->integer) {
+			Com_Printf("Bullet collision: entity %d <-> entity %d at (%.2f,%.2f,%.2f), impulse %.2f\n",
+					  (int)event.entityA, (int)event.entityB,
+					  event.contactPoint[0], event.contactPoint[1], event.contactPoint[2],
+					  event.impulse);
 		}
 	}
 
@@ -367,6 +466,87 @@ static void ECS_Bullet_Step(entt::registry &registry, float deltaTime) {
 		if (auto net = registry.try_get<NetworkComponent>(entity)) {
 			net->needsSync = qtrue;
 		}
+	}
+}
+
+// Collision callback system
+using CollisionCallbackFunc = void(*)(entt::registry &registry, const CollisionEvent &event, void *userData);
+static std::vector<std::tuple<CollisionCallbackFunc, void*>> collisionCallbacks;
+
+// Physics debugging
+static void ECS_DebugDrawPhysics(entt::registry &registry) {
+	cvar_t *physics_debug_draw = Cvar_Get("physics_debug_draw", "0", CVAR_CHEAT);
+	if (!physics_debug_draw->integer) {
+		return;
+	}
+
+	auto view = registry.view<TransformComponent, PhysicsComponent>();
+	for (auto entity : view) {
+		auto &transform = view.get<TransformComponent>(entity);
+		auto &physics = view.get<PhysicsComponent>(entity);
+
+		// Draw velocity vector
+		if (VectorLength(physics.velocity) > 0.1f) {
+			Com_DPrintf("Physics entity %d: pos(%.2f,%.2f,%.2f) vel(%.2f,%.2f,%.2f)\n",
+					   (int)entity,
+					   transform.position[0], transform.position[1], transform.position[2],
+					   physics.velocity[0], physics.velocity[1], physics.velocity[2]);
+		}
+	}
+}
+
+// CM system integration - Add world geometry collision to Bullet world
+static void ECS_IntegrateWithCMSystem(entt::registry &registry) {
+	// Check if CM Bullet system is initialized
+	extern qboolean CM_Bullet_IsInitialized(void);
+	extern btDiscreteDynamicsWorld* CM_Bullet_GetWorld(void);
+
+	if (!CM_Bullet_IsInitialized()) {
+		return;
+	}
+
+	btDiscreteDynamicsWorld *cmWorld = CM_Bullet_GetWorld();
+	if (!cmWorld) {
+		return;
+	}
+
+	cvar_t *physics_world_collision = Cvar_Get("physics_world_collision", "1", CVAR_ARCHIVE);
+	Cvar_SetDescription(physics_world_collision, "Enable collision between ECS entities and world geometry");
+
+	if (!physics_world_collision->integer) {
+		return;
+	}
+
+	// Add ECS rigid bodies to CM world for world collision
+	auto view = registry.view<PhysicsComponent>();
+	for (auto entity : view) {
+		auto &physics = view.get<PhysicsComponent>(entity);
+
+		if (physics.useBullet && physics.body && physics.body->getWorldArrayIndex() < 0) {
+			// Body not in any world, add it to CM world for world collision
+			cmWorld->addRigidBody(physics.body);
+			Com_DPrintf("Added ECS entity to CM collision world\n");
+		}
+	}
+}
+
+// Register a collision callback function
+void ECS_RegisterCollisionCallback(CollisionCallbackFunc callback, void *userData) {
+	collisionCallbacks.emplace_back(callback, userData);
+}
+
+// Unregister collision callbacks (removes all with matching userData)
+void ECS_UnregisterCollisionCallback(void *userData) {
+	collisionCallbacks.erase(
+		std::remove_if(collisionCallbacks.begin(), collisionCallbacks.end(),
+			[userData](const auto &cb) { return std::get<1>(cb) == userData; }),
+		collisionCallbacks.end());
+}
+
+// Process a collision event by calling all registered callbacks
+static void ECS_ProcessCollisionEvent(entt::registry &registry, const CollisionEvent &event) {
+	for (const auto &[callback, userData] : collisionCallbacks) {
+		callback(registry, event, userData);
 	}
 }
 
@@ -481,6 +661,9 @@ void ECS_PhysicsSystem_Update(float deltaTime) {
 			net->needsSync = qtrue;
 		}
 	}
+
+	// Debug visualization
+	ECS_DebugDrawPhysics(registry);
 }
 
 /*

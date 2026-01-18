@@ -357,17 +357,337 @@ static float Procedural_VoronoiNoise(float x, float y, float* featurePointX, flo
 }
 
 //===============================================================================
-// Material Compilation (Stub)
+// Material Compilation
 //===============================================================================
 
+#define MAX_SHADER_SOURCE_SIZE 65536
+
+static void Material_GenerateVertexShader(const layeredMaterial_t* material, char* vertexShader, size_t maxSize) {
+	Q_strncpyz(vertexShader,
+		"#version 450\n"
+		"#extension GL_ARB_separate_shader_objects : enable\n"
+		"\n"
+		"layout(location = 0) in vec3 inPosition;\n"
+		"layout(location = 1) in vec3 inNormal;\n"
+		"layout(location = 2) in vec2 inTexCoord;\n"
+		"layout(location = 3) in vec4 inColor;\n"
+		"\n"
+		"layout(location = 0) out vec3 fragPosition;\n"
+		"layout(location = 1) out vec3 fragNormal;\n"
+		"layout(location = 2) out vec2 fragTexCoord;\n"
+		"layout(location = 3) out vec4 fragColor;\n", maxSize);
+
+	// Add UV coordinates for each layer
+	for (int i = 0; i < material->numLayers; ++i) {
+		char temp[256];
+		Com_sprintf(temp, sizeof(temp),
+			"layout(location = %d) out vec2 fragUV%d;\n",
+			4 + i, i);
+		Q_strcat(vertexShader, maxSize, temp);
+	}
+
+	// Add animation support if needed
+	qboolean hasAnimation = qfalse;
+	for (int i = 0; i < material->numLayers; ++i) {
+		const materialLayer_t* layer = &material->layers[i];
+		if (layer->scrollSpeedU != 0.0f || layer->scrollSpeedV != 0.0f ||
+			layer->rotationSpeed != 0.0f || layer->waveFrequency != 0.0f) {
+			hasAnimation = qtrue;
+			break;
+		}
+	}
+
+	if (hasAnimation) {
+		Q_strcat(vertexShader, maxSize,
+			"\n"
+			"layout(push_constant) uniform PushConstants {\n"
+			"    mat4 modelViewProj;\n"
+			"    float time;\n"
+			"} pushConstants;\n");
+	} else {
+		Q_strcat(vertexShader, maxSize,
+			"\n"
+			"layout(push_constant) uniform PushConstants {\n"
+			"    mat4 modelViewProj;\n"
+			"} pushConstants;\n");
+	}
+
+	Q_strcat(vertexShader, maxSize,
+		"\n"
+		"void main() {\n"
+		"    gl_Position = pushConstants.modelViewProj * vec4(inPosition, 1.0);\n"
+		"    fragPosition = inPosition;\n"
+		"    fragNormal = inNormal;\n"
+		"    fragTexCoord = inTexCoord;\n"
+		"    fragColor = inColor;\n");
+
+	// Generate UV coordinates for each layer
+	for (int i = 0; i < material->numLayers; ++i) {
+		const materialLayer_t* layer = &material->layers[i];
+
+		char temp[512];
+		Com_sprintf(temp, sizeof(temp),
+			"\n"
+			"    // Layer %d UV generation\n"
+			"    vec2 uv%d = inTexCoord;\n", i, i);
+
+		// Apply UV scaling
+		if (layer->uvScale[0] != 1.0f || layer->uvScale[1] != 1.0f) {
+			char scaleTemp[128];
+			Com_sprintf(scaleTemp, sizeof(scaleTemp),
+				"    uv%d *= vec2(%f, %f);\n", i, layer->uvScale[0], layer->uvScale[1]);
+			Q_strcat(temp, sizeof(temp), scaleTemp);
+		}
+
+		// Apply UV offset
+		if (layer->uvOffset[0] != 0.0f || layer->uvOffset[1] != 0.0f) {
+			char offsetTemp[128];
+			Com_sprintf(offsetTemp, sizeof(offsetTemp),
+				"    uv%d += vec2(%f, %f);\n", i, layer->uvOffset[0], layer->uvOffset[1]);
+			Q_strcat(temp, sizeof(temp), offsetTemp);
+		}
+
+		if (hasAnimation) {
+			// Apply scrolling
+			if (layer->scrollSpeedU != 0.0f || layer->scrollSpeedV != 0.0f) {
+				char scrollTemp[128];
+				Com_sprintf(scrollTemp, sizeof(scrollTemp),
+					"    uv%d += pushConstants.time * vec2(%f, %f);\n",
+					i, layer->scrollSpeedU, layer->scrollSpeedV);
+				Q_strcat(temp, sizeof(temp), scrollTemp);
+			}
+
+			// Apply rotation
+			if (layer->rotationSpeed != 0.0f) {
+				char rotationTemp[512];
+				Com_sprintf(rotationTemp, sizeof(rotationTemp),
+					"    // Rotation animation\n"
+					"    float rotTime = pushConstants.time * %.6f;\n"
+					"    float cosRot = cos(rotTime);\n"
+					"    float sinRot = sin(rotTime);\n"
+					"    mat2 rotMat = mat2(cosRot, -sinRot, sinRot, cosRot);\n"
+					"    uv%d = rotMat * (uv%d - vec2(0.5)) + vec2(0.5);\n",
+					layer->rotationSpeed, i, i);
+				Q_strcat(temp, sizeof(temp), rotationTemp);
+			}
+
+			// Apply wave distortion
+			if (layer->waveFrequency != 0.0f && layer->waveAmplitude != 0.0f) {
+				char waveTemp[128];
+				Com_sprintf(waveTemp, sizeof(waveTemp),
+					"    uv%d += vec2(sin(pushConstants.time * %f + uv%d.x * 10.0) * %f);\n",
+					i, layer->waveFrequency, i, layer->waveAmplitude);
+				Q_strcat(temp, sizeof(temp), waveTemp);
+			}
+		}
+
+		Com_sprintf(temp + strlen(temp), sizeof(temp) - strlen(temp),
+			"    fragUV%d = uv%d;\n", i, i);
+
+		Q_strcat(vertexShader, maxSize, temp);
+	}
+
+	Q_strcat(vertexShader, maxSize,
+		"}\n");
+}
+
+static void Material_GenerateFragmentShader(const layeredMaterial_t* material, char* fragmentShader, size_t maxSize) {
+	Q_strncpyz(fragmentShader,
+		"#version 450\n"
+		"#extension GL_ARB_separate_shader_objects : enable\n"
+		"\n", maxSize);
+
+	// Input declarations
+	Q_strcat(fragmentShader, maxSize,
+		"layout(location = 0) in vec3 fragPosition;\n"
+		"layout(location = 1) in vec3 fragNormal;\n"
+		"layout(location = 2) in vec2 fragTexCoord;\n"
+		"layout(location = 3) in vec4 fragColor;\n");
+
+	// Add UV inputs for each layer
+	for (int i = 0; i < material->numLayers; ++i) {
+		char temp[128];
+		Com_sprintf(temp, sizeof(temp),
+			"layout(location = %d) in vec2 fragUV%d;\n",
+			4 + i, i);
+		Q_strcat(fragmentShader, maxSize, temp);
+	}
+
+	// Output
+	Q_strcat(fragmentShader, maxSize,
+		"\n"
+		"layout(location = 0) out vec4 outColor;\n");
+
+	// Texture samplers for each layer
+	for (int i = 0; i < material->numLayers; ++i) {
+		const materialLayer_t* layer = &material->layers[i];
+		char temp[256];
+
+		if (layer->diffuseMap[0]) {
+			Com_sprintf(temp, sizeof(temp),
+				"layout(binding = %d) uniform sampler2D diffuseSampler%d;\n",
+				i * 4, i);
+			Q_strcat(fragmentShader, maxSize, temp);
+		}
+
+		if (layer->normalMap[0]) {
+			Com_sprintf(temp, sizeof(temp),
+				"layout(binding = %d) uniform sampler2D normalSampler%d;\n",
+				i * 4 + 1, i);
+			Q_strcat(fragmentShader, maxSize, temp);
+		}
+
+		if (layer->specularMap[0] || layer->metallicMap[0] || layer->roughnessMap[0]) {
+			Com_sprintf(temp, sizeof(temp),
+				"layout(binding = %d) uniform sampler2D pbrSampler%d;\n",
+				i * 4 + 2, i);
+			Q_strcat(fragmentShader, maxSize, temp);
+		}
+
+		if (layer->emissiveMap[0]) {
+			Com_sprintf(temp, sizeof(temp),
+				"layout(binding = %d) uniform sampler2D emissiveSampler%d;\n",
+				i * 4 + 3, i);
+			Q_strcat(fragmentShader, maxSize, temp);
+		}
+	}
+
+	// Material properties UBO
+	Q_strcat(fragmentShader, maxSize,
+		"\n"
+		"layout(binding = 32) uniform MaterialProperties {\n"
+		"    vec4 baseColors[16];\n"
+		"    vec4 pbrParams[16]; // metallic, roughness, emissive, normalStrength\n"
+		"    vec4 blendParams[16]; // opacity, unused, unused, unused\n"
+		"} materialProps;\n");
+
+	Q_strcat(fragmentShader, maxSize,
+		"\n"
+		"void main() {\n"
+		"    vec4 finalColor = vec4(0.0);\n"
+		"    vec3 finalNormal = fragNormal;\n"
+		"    float finalMetallic = 0.0;\n"
+		"    float finalRoughness = 0.5;\n"
+		"    vec3 finalEmissive = vec3(0.0);\n");
+
+	// Process each layer
+	for (int i = 0; i < material->numLayers; ++i) {
+		const materialLayer_t* layer = &material->layers[i];
+		char temp[1024];
+		Com_sprintf(temp, sizeof(temp),
+			"\n"
+			"    // Layer %d: %s\n", i, layer->name);
+
+		// Base color
+		Com_sprintf(temp + strlen(temp), sizeof(temp) - strlen(temp),
+			"    vec4 layer%dColor = materialProps.baseColors[%d];\n", i, i);
+
+		if (layer->diffuseMap[0]) {
+			Com_sprintf(temp + strlen(temp), sizeof(temp) - strlen(temp),
+				"    layer%dColor *= texture(diffuseSampler%d, fragUV%d);\n", i, i, i);
+		}
+
+		// Normal mapping
+		if (layer->normalMap[0]) {
+			Com_sprintf(temp + strlen(temp), sizeof(temp) - strlen(temp),
+				"    vec3 layer%dNormal = texture(normalSampler%d, fragUV%d).xyz * 2.0 - 1.0;\n"
+				"    layer%dNormal *= materialProps.pbrParams[%d].w;\n", i, i, i, i, i);
+		} else {
+			Com_sprintf(temp + strlen(temp), sizeof(temp) - strlen(temp),
+				"    vec3 layer%dNormal = vec3(0.0, 0.0, 1.0);\n", i);
+		}
+
+		// PBR parameters
+		if (layer->specularMap[0] || layer->metallicMap[0] || layer->roughnessMap[0]) {
+			Com_sprintf(temp + strlen(temp), sizeof(temp) - strlen(temp),
+				"    vec4 layer%dPBR = texture(pbrSampler%d, fragUV%d);\n", i, i, i);
+		}
+
+		// Apply blend mode
+		switch (layer->blendMode) {
+			case BLEND_OPAQUE:
+				Com_sprintf(temp + strlen(temp), sizeof(temp) - strlen(temp),
+					"    finalColor = layer%dColor;\n", i);
+				break;
+
+			case BLEND_ALPHA:
+				Com_sprintf(temp + strlen(temp), sizeof(temp) - strlen(temp),
+					"    finalColor = mix(finalColor, layer%dColor, layer%dColor.a * materialProps.blendParams[%d].x);\n",
+					i, i, i);
+				break;
+
+			case BLEND_ADDITIVE:
+				Com_sprintf(temp + strlen(temp), sizeof(temp) - strlen(temp),
+					"    finalColor += layer%dColor * materialProps.blendParams[%d].x;\n", i, i);
+				break;
+
+			case BLEND_MULTIPLY:
+				Com_sprintf(temp + strlen(temp), sizeof(temp) - strlen(temp),
+					"    finalColor *= layer%dColor * materialProps.blendParams[%d].x + vec4(1.0 - materialProps.blendParams[%d].x);\n",
+					i, i, i);
+				break;
+
+			case BLEND_OVERLAY:
+				Com_sprintf(temp + strlen(temp), sizeof(temp) - strlen(temp),
+					"    vec4 overlay%d = layer%dColor;\n"
+					"    finalColor = mix(finalColor * (1.0 - overlay%d.a) + overlay%d * overlay%d.a, finalColor, step(0.5, finalColor));\n",
+					i, i, i, i, i);
+				break;
+
+			default:
+				Com_sprintf(temp + strlen(temp), sizeof(temp) - strlen(temp),
+					"    finalColor = layer%dColor;\n", i);
+				break;
+		}
+
+		// Accumulate PBR properties (take from topmost layer)
+		if (i == material->numLayers - 1) {
+			Com_sprintf(temp + strlen(temp), sizeof(temp) - strlen(temp),
+				"    finalMetallic = materialProps.pbrParams[%d].x;\n"
+				"    finalRoughness = materialProps.pbrParams[%d].y;\n"
+				"    finalEmissive = materialProps.pbrParams[%d].z * layer%dColor.rgb;\n", i, i, i, i);
+		}
+
+		Q_strcat(fragmentShader, maxSize, temp);
+	}
+
+	// Apply global material properties
+	if (material->translucent) {
+		Q_strcat(fragmentShader, maxSize,
+			"    finalColor.a *= 0.5;\n");
+	}
+
+	Q_strcat(fragmentShader, maxSize,
+		"\n"
+		"    outColor = finalColor * fragColor;\n"
+		"}\n");
+}
+
 qboolean Material_Compile(const layeredMaterial_t* material, char* shaderName) {
-    if (!material || !shaderName) return qfalse;
+	if (!material || !shaderName) return qfalse;
 
-    // For now, just copy the material name
-    // A full implementation would generate shader code
-    Q_strncpyz(shaderName, material->name, MAX_QPATH);
+	// Generate shader name
+	Q_strncpyz(shaderName, material->name, MAX_QPATH);
 
-    return qtrue;
+	// Generate vertex shader
+	char vertexShader[MAX_SHADER_SOURCE_SIZE];
+	Material_GenerateVertexShader(material, vertexShader, sizeof(vertexShader));
+
+	// Generate fragment shader
+	char fragmentShader[MAX_SHADER_SOURCE_SIZE];
+	Material_GenerateFragmentShader(material, fragmentShader, sizeof(fragmentShader));
+
+	// TODO: Compile shaders with the renderer
+	// For now, just validate that shaders were generated
+	if (strlen(vertexShader) == 0 || strlen(fragmentShader) == 0) {
+		return qfalse;
+	}
+
+    Com_DPrintf("Generated shaders for layered material: %s\n", material->name);
+    Com_DPrintf("Vertex shader size: %d bytes\n", (int)strlen(vertexShader));
+    Com_DPrintf("Fragment shader size: %d bytes\n", (int)strlen(fragmentShader));
+
+	return qtrue;
 }
 
 //===============================================================================

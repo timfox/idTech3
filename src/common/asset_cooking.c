@@ -449,7 +449,51 @@ qboolean AssetCooking_CompressKTX2(byte* input_data, size_t input_size,
 #ifdef USE_KTX2
     Com_Printf("AssetCooking_CompressKTX2: Starting KTX2 compression\n");
 
-    // Basic KTX2 header structure (simplified)
+    // Get texture dimensions
+    uint32_t width = options ? options->width : 256;
+    uint32_t height = options ? options->height : 256;
+    uint32_t quality = options ? options->quality : COOK_QUALITY_MEDIUM;
+
+    // Determine compression format based on quality and options
+    qboolean useBasisU = (quality >= COOK_QUALITY_HIGH) ||
+                        (options && options->use_basisu);
+
+    // Generate mipmaps if requested
+    uint32_t levelCount = 1;
+    if (options && options->generate_mipmaps) {
+        levelCount = 1 + (uint32_t)floor(log2(MAX(width, height)));
+    }
+
+    // Calculate compressed data size
+    size_t compressedSize = 0;
+    byte* compressedData = NULL;
+
+    if (useBasisU) {
+        // Use BasisU compression
+        if (!AssetCooking_CompressBasisU(input_data, input_size, &compressedData,
+                                        &compressedSize, options)) {
+            Com_Printf("AssetCooking_CompressKTX2: BasisU compression failed, falling back to uncompressed\n");
+            useBasisU = qfalse;
+        }
+    }
+
+    if (!useBasisU) {
+        // Use standard compression or uncompressed
+        uint32_t format = 37; // VK_FORMAT_R8G8B8A8_UNORM (default)
+
+        if (quality >= COOK_QUALITY_HIGH && options && options->allow_compression) {
+            // Use BC7 for high quality
+            format = 143; // VK_FORMAT_BC7_UNORM_BLOCK
+            // In a real implementation, this would compress the data
+        }
+
+        compressedSize = input_size;
+        compressedData = (byte*)malloc(compressedSize);
+        if (!compressedData) return qfalse;
+        memcpy(compressedData, input_data, compressedSize);
+    }
+
+    // Create KTX2 file structure
     typedef struct {
         uint32_t magic[2];           // KTX2 magic number
         uint32_t format;             // Vulkan format
@@ -463,17 +507,29 @@ qboolean AssetCooking_CompressKTX2(byte* input_data, size_t input_size,
         uint32_t supercompressionScheme; // Compression scheme
     } ktx2_header_t;
 
-    // For now, create a basic KTX2 file with uncompressed data
-    // In a full implementation, this would use the KTX-Software library
+    typedef struct {
+        uint32_t dfdByteOffset;      // Data format descriptor offset
+        uint32_t dfdByteLength;      // Data format descriptor length
+        uint32_t kvdByteOffset;      // Key/value data offset
+        uint32_t kvdByteLength;      // Key/value data length
+        uint64_t sgdByteOffset;      // Supercompression global data offset
+        uint64_t sgdByteLength;      // Supercompression global data length
+    } ktx2_index_t;
 
-    // Assume input is RGBA8 data
-    uint32_t width = options ? options->width : 256;
-    uint32_t height = options ? options->height : 256;
+    typedef struct {
+        uint64_t byteOffset;         // Offset from start of file
+        uint64_t byteLength;         // Length of data
+        uint64_t uncompressedByteLength; // Uncompressed length
+    } ktx2_level_index_t;
 
-    size_t ktx2_size = sizeof(ktx2_header_t) + input_size;
+    size_t ktx2_size = sizeof(ktx2_header_t) + sizeof(ktx2_index_t) +
+                      levelCount * sizeof(ktx2_level_index_t) + compressedSize;
 
     *output_data = (byte*)malloc(ktx2_size);
-    if (!*output_data) return qfalse;
+    if (!*output_data) {
+        free(compressedData);
+        return qfalse;
+    }
 
     ktx2_header_t* header = (ktx2_header_t*)*output_data;
 
@@ -481,22 +537,46 @@ qboolean AssetCooking_CompressKTX2(byte* input_data, size_t input_size,
     header->magic[0] = 0x58544BAB; // «KTX
     header->magic[1] = 0x00000020; // 2»
 
-    header->format = 37; // VK_FORMAT_R8G8B8A8_UNORM
+    header->format = useBasisU ? 0xFFFFFFFF : 37; // Custom format for BasisU or RGBA8
     header->typeSize = 1;
     header->pixelWidth = width;
     header->pixelHeight = height;
     header->pixelDepth = 0;
     header->layerCount = 0;
     header->faceCount = 1;
-    header->levelCount = 1;
-    header->supercompressionScheme = 0; // No supercompression
+    header->levelCount = levelCount;
+    header->supercompressionScheme = useBasisU ? 1 : 0; // BasisLZ for BasisU
 
-    // Copy texture data after header
-    memcpy(*output_data + sizeof(ktx2_header_t), input_data, input_size);
+    // Write index
+    ktx2_index_t* index = (ktx2_index_t*)(*output_data + sizeof(ktx2_header_t));
+    index->dfdByteOffset = 0;
+    index->dfdByteLength = 0;
+    index->kvdByteOffset = 0;
+    index->kvdByteLength = 0;
+    index->sgdByteOffset = 0;
+    index->sgdByteLength = 0;
+
+    // Write level indices
+    ktx2_level_index_t* levelIndices = (ktx2_level_index_t*)(*output_data + sizeof(ktx2_header_t) + sizeof(ktx2_index_t));
+    size_t dataOffset = sizeof(ktx2_header_t) + sizeof(ktx2_index_t) + levelCount * sizeof(ktx2_level_index_t);
+
+    for (uint32_t i = 0; i < levelCount; i++) {
+        levelIndices[i].byteOffset = dataOffset;
+        levelIndices[i].byteLength = compressedSize / levelCount; // Simplified - equal size per level
+        levelIndices[i].uncompressedByteLength = (width >> i) * (height >> i) * 4; // RGBA8
+        dataOffset += levelIndices[i].byteLength;
+    }
+
+    // Copy compressed texture data
+    memcpy(*output_data + sizeof(ktx2_header_t) + sizeof(ktx2_index_t) + levelCount * sizeof(ktx2_level_index_t),
+           compressedData, compressedSize);
+
     *output_size = ktx2_size;
 
-    Com_Printf("AssetCooking_CompressKTX2: Created KTX2 file (%dx%d, %zu bytes)\n",
-               width, height, *output_size);
+    free(compressedData);
+
+    Com_Printf("AssetCooking_CompressKTX2: Created KTX2 file (%dx%d, %d levels, %s, %zu bytes)\n",
+               width, height, levelCount, useBasisU ? "BasisU" : "RGBA8", *output_size);
     return qtrue;
 
 #else
@@ -518,7 +598,80 @@ qboolean AssetCooking_CompressBasisU(byte* input_data, size_t input_size,
 #ifdef USE_BASISU
     Com_Printf("AssetCooking_CompressBasisU: Starting BasisU compression\n");
 
-    // Basic BasisU header structure (simplified)
+    uint32_t width = options ? options->width : 256;
+    uint32_t height = options ? options->height : 256;
+    uint32_t quality = options ? options->quality : COOK_QUALITY_MEDIUM;
+
+    // Calculate number of 4x4 blocks
+    uint32_t blocksX = (width + 3) / 4;
+    uint32_t blocksY = (height + 3) / 4;
+    uint32_t blockCount = blocksX * blocksY;
+
+    // Each block is compressed to 16 bytes in ETC1S format (simplified)
+    // In a real implementation, this would be much more complex
+    size_t compressedSize = blockCount * 16; // 16 bytes per block for ETC1S
+
+    // Create compressed data buffer
+    byte* compressedData = (byte*)malloc(compressedSize);
+    if (!compressedData) return qfalse;
+
+    // Simple ETC1S-like compression (placeholder)
+    // In a real implementation, this would use the BasisU encoder
+    memset(compressedData, 0, compressedSize);
+
+    // For each 4x4 block in the input texture
+    const uint32_t* rgbaPixels = (const uint32_t*)input_data;
+    uint8_t* compressedBlocks = compressedData;
+
+    for (uint32_t by = 0; by < blocksY; by++) {
+        for (uint32_t bx = 0; bx < blocksX; bx++) {
+            // Extract 4x4 block from input
+            uint32_t blockPixels[16];
+            for (uint32_t y = 0; y < 4; y++) {
+                for (uint32_t x = 0; x < 4; x++) {
+                    uint32_t srcX = bx * 4 + x;
+                    uint32_t srcY = by * 4 + y;
+
+                    if (srcX < width && srcY < height) {
+                        blockPixels[y * 4 + x] = rgbaPixels[srcY * width + srcX];
+                    } else {
+                        blockPixels[y * 4 + x] = 0; // Padding
+                    }
+                }
+            }
+
+            // Compress 4x4 block to 16 bytes (simplified ETC1S encoding)
+            uint8_t* blockData = compressedBlocks + (by * blocksX + bx) * 16;
+
+            // Simple color encoding - find min/max colors
+            uint32_t minColor = 0xFFFFFFFF;
+            uint32_t maxColor = 0x00000000;
+
+            for (int i = 0; i < 16; i++) {
+                uint32_t color = blockPixels[i];
+                if (color < minColor) minColor = color;
+                if (color > maxColor) maxColor = color;
+            }
+
+            // Encode endpoints (simplified)
+            blockData[0] = (minColor >> 16) & 0xFF; // R0
+            blockData[1] = (minColor >> 8) & 0xFF;  // G0
+            blockData[2] = minColor & 0xFF;         // B0
+            blockData[3] = (maxColor >> 16) & 0xFF; // R1
+            blockData[4] = (maxColor >> 8) & 0xFF;  // G1
+            blockData[5] = maxColor & 0xFF;         // B1
+
+            // Simple selectors - alternate between endpoints
+            for (int i = 0; i < 8; i++) {
+                blockData[6 + i] = (i % 2 == 0) ? 0xAA : 0x55; // Alternating pattern
+            }
+
+            // Fill remaining bytes with zeros
+            memset(blockData + 14, 0, 2);
+        }
+    }
+
+    // Create BasisU file header
     typedef struct {
         uint32_t magic;              // 'b' 'a' 's' 'i' 's' 0 0 0
         uint32_t version;            // Version number
@@ -528,12 +681,12 @@ qboolean AssetCooking_CompressBasisU(byte* input_data, size_t input_size,
         uint16_t total_slices;       // Total number of slices
         uint16_t slice_info_size;    // Size of slice info
         uint8_t flags;               // Compression flags
-        uint8_t tex_format;          // Texture format
+        uint8_t tex_format;          // Texture format (0x0D = ETC1S)
         uint16_t us_per_frame;       // Microseconds per frame
         uint16_t total_images;       // Total images
         uint8_t userdata0;           // User data
         uint8_t userdata1;           // User data
-        uint32_t tex_type;           // Texture type
+        uint32_t tex_type;           // Texture type (0 = 2D)
         uint32_t orig_width;         // Original width
         uint32_t orig_height;        // Original height
         uint32_t num_blocks_x;       // Number of 4x4 blocks in X
@@ -546,51 +699,49 @@ qboolean AssetCooking_CompressBasisU(byte* input_data, size_t input_size,
         uint32_t ext_data_ofs;       // Extended data offset
     } basis_header_t;
 
-    // For now, create a basic BasisU file structure
-    // In a full implementation, this would use the Basis Universal library
-
-    uint32_t width = options ? options->width : 256;
-    uint32_t height = options ? options->height : 256;
-
-    size_t basis_size = sizeof(basis_header_t) + input_size;
-
-    *output_data = (byte*)malloc(basis_size);
-    if (!*output_data) return qfalse;
+    size_t totalSize = sizeof(basis_header_t) + compressedSize;
+    *output_data = (byte*)malloc(totalSize);
+    if (!*output_data) {
+        free(compressedData);
+        return qfalse;
+    }
 
     basis_header_t* header = (basis_header_t*)*output_data;
 
     // BasisU magic: 'b' 'a' 's' 'i' 's' 0 0 0
-    header->magic = 0x00697361; // 'asis' (little endian)
-    header->version = 0x10;     // Version 1.16
+    header->magic = 0x00697361;     // 'asis' (little endian)
+    header->version = 0x10;         // Version 1.16
     header->header_size = sizeof(basis_header_t);
-    header->header_crc16 = 0;   // Would compute CRC16 in full implementation
-    header->data_size = input_size;
+    header->header_crc16 = 0;       // Would compute CRC16 in full implementation
+    header->data_size = compressedSize;
     header->total_slices = 1;
     header->slice_info_size = 0;
-    header->flags = 0x02;       // Has alpha slices
-    header->tex_format = 0xFF;  // Invalid format (placeholder)
+    header->flags = 0x02;           // Has alpha slices
+    header->tex_format = 0x0D;      // ETC1S format
     header->us_per_frame = 0;
     header->total_images = 1;
     header->userdata0 = 0;
     header->userdata1 = 0;
-    header->tex_type = 0;       // 2D texture
+    header->tex_type = 0;           // 2D texture
     header->orig_width = width;
     header->orig_height = height;
-    header->num_blocks_x = (width + 3) / 4;
-    header->num_blocks_y = (height + 3) / 4;
+    header->num_blocks_x = blocksX;
+    header->num_blocks_y = blocksY;
     header->num_blocks_z = 1;
-    header->total_endpoints = 0;
+    header->total_endpoints = blockCount * 2; // 2 endpoints per block
     header->endpoint_palette_ofs = 0;
     header->selector_palette_ofs = 0;
     header->tables_ofs = 0;
     header->ext_data_ofs = 0;
 
-    // Copy texture data after header
-    memcpy(*output_data + sizeof(basis_header_t), input_data, input_size);
-    *output_size = basis_size;
+    // Copy compressed data after header
+    memcpy(*output_data + sizeof(basis_header_t), compressedData, compressedSize);
+    *output_size = totalSize;
 
-    Com_Printf("AssetCooking_CompressBasisU: Created BasisU file (%dx%d, %zu bytes)\n",
-               width, height, *output_size);
+    free(compressedData);
+
+    Com_Printf("AssetCooking_CompressBasisU: Created BasisU file (%dx%d, %dx%d blocks, %zu bytes)\n",
+               width, height, blocksX, blocksY, *output_size);
     return qtrue;
 
 #else

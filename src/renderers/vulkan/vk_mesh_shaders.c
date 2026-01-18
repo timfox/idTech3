@@ -11,6 +11,14 @@ Mesh shaders provide GPU-driven rendering with meshlet-based culling and LOD.
 extern refimport_t ri;
 #include "vk.h"
 
+// Meshlet data structures
+typedef struct {
+	uint32_t firstIndex;      // First index in the index buffer
+	uint32_t indexCount;      // Number of indices in this meshlet
+	uint32_t vertexCount;     // Number of vertices in this meshlet
+	uint32_t padding;         // Padding for alignment
+} meshlet_info_t;
+
 #ifdef USE_VULKAN
 
 // Mesh shader function pointer types (VK_EXT_mesh_shader)
@@ -507,12 +515,113 @@ void vk_mesh_shaders_create_pipeline( void )
 	}
 }
 
+// Create mesh shader buffers
+qboolean vk_mesh_shaders_create_buffers( void *vertices, uint32_t vertexCount, void *indices, uint32_t indexCount )
+{
+	if ( !vertices || !indices || vertexCount == 0 || indexCount == 0 ) {
+		return qfalse;
+	}
+
+	// Create vertex buffer
+	VkBufferCreateInfo vertexBufferInfo = {
+		.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+		.size = vertexCount * sizeof(float) * 3, // Assume vec3 vertices
+		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		.sharingMode = VK_SHARING_MODE_EXCLUSIVE
+	};
+
+	VmaAllocationCreateInfo vertexAllocInfo = {
+		.usage = VMA_MEMORY_USAGE_GPU_ONLY
+	};
+
+	if ( vmaCreateBuffer( vk.vmaAllocator, &vertexBufferInfo, &vertexAllocInfo,
+						 &vk.mesh.vertexBuffer, &vk.mesh.vertexAllocation, NULL ) != VK_SUCCESS ) {
+		ri.Printf( PRINT_ERROR, "Mesh shaders: Failed to create vertex buffer\n" );
+		return qfalse;
+	}
+
+	// Create index buffer
+	VkBufferCreateInfo indexBufferInfo = {
+		.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+		.size = indexCount * sizeof(uint32_t),
+		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		.sharingMode = VK_SHARING_MODE_EXCLUSIVE
+	};
+
+	VmaAllocationCreateInfo indexAllocInfo = {
+		.usage = VMA_MEMORY_USAGE_GPU_ONLY
+	};
+
+	if ( vmaCreateBuffer( vk.vmaAllocator, &indexBufferInfo, &indexAllocInfo,
+						 &vk.mesh.indexBuffer, &vk.mesh.indexAllocation, NULL ) != VK_SUCCESS ) {
+		ri.Printf( PRINT_ERROR, "Mesh shaders: Failed to create index buffer\n" );
+		vmaDestroyBuffer( vk.vmaAllocator, vk.mesh.vertexBuffer, vk.mesh.vertexAllocation );
+		return qfalse;
+	}
+
+	// Create meshlet buffer
+	if ( vk.mesh.meshletCapacity > 0 ) {
+		VkBufferCreateInfo meshletBufferInfo = {
+			.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+			.size = vk.mesh.meshletCapacity * sizeof(meshlet_info_t),
+			.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+			.sharingMode = VK_SHARING_MODE_EXCLUSIVE
+		};
+
+		VmaAllocationCreateInfo meshletAllocInfo = {
+			.usage = VMA_MEMORY_USAGE_GPU_ONLY
+		};
+
+		if ( vmaCreateBuffer( vk.vmaAllocator, &meshletBufferInfo, &meshletAllocInfo,
+							 &vk.mesh.meshletBuffer, &vk.mesh.meshletAllocation, NULL ) != VK_SUCCESS ) {
+			ri.Printf( PRINT_ERROR, "Mesh shaders: Failed to create meshlet buffer\n" );
+			vmaDestroyBuffer( vk.vmaAllocator, vk.mesh.indexBuffer, vk.mesh.indexAllocation );
+			vmaDestroyBuffer( vk.vmaAllocator, vk.mesh.vertexBuffer, vk.mesh.vertexAllocation );
+			return qfalse;
+		}
+	}
+
+	// Upload data to GPU
+	// TODO: Implement staging buffer uploads for vertex, index, and meshlet data
+
+	vk.mesh.buffersCreated = qtrue;
+	return qtrue;
+}
+
+// Destroy mesh shader buffers
+void vk_mesh_shaders_destroy_buffers( void )
+{
+	if ( vk.mesh.meshletBuffer != VK_NULL_HANDLE ) {
+		vmaDestroyBuffer( vk.vmaAllocator, vk.mesh.meshletBuffer, vk.mesh.meshletAllocation );
+		vk.mesh.meshletBuffer = VK_NULL_HANDLE;
+	}
+
+	if ( vk.mesh.indexBuffer != VK_NULL_HANDLE ) {
+		vmaDestroyBuffer( vk.vmaAllocator, vk.mesh.indexBuffer, vk.mesh.indexAllocation );
+		vk.mesh.indexBuffer = VK_NULL_HANDLE;
+	}
+
+	if ( vk.mesh.vertexBuffer != VK_NULL_HANDLE ) {
+		vmaDestroyBuffer( vk.vmaAllocator, vk.mesh.vertexBuffer, vk.mesh.vertexAllocation );
+		vk.mesh.vertexBuffer = VK_NULL_HANDLE;
+	}
+
+	vk.mesh.buffersCreated = qfalse;
+}
+
 // Render using mesh shaders
 void vk_mesh_shaders_draw( uint32_t meshletCount )
 {
-	if ( vk_mesh_shaders_use_fallback() || meshletCount == 0 ) {
+	if ( vk_mesh_shaders_use_fallback() || meshletCount == 0 || !vk.mesh.buffersCreated ) {
 		return;
 	}
+
+	// Bind mesh shader pipeline
+	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.mesh.meshShaderPipeline );
+
+	// Bind descriptor sets
+	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+							 vk.mesh.meshShaderPipelineLayout, 0, 1, &vk.mesh.meshShaderDescriptorSet, 0, NULL );
 
 	// Draw meshlets using mesh shader
 	// Task shader culls meshlets, mesh shader generates vertices/primitives

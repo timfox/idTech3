@@ -34,6 +34,10 @@ btCollisionShape *CM_Bullet_CreateBoxShape(const vec3_t halfExtents);
 btCollisionShape *CM_Bullet_CreateSphereShape(float radius);
 btCollisionShape *CM_Bullet_CreateCapsuleShape(float radius, float height);
 void CM_Bullet_DestroyShape(btCollisionShape *shape);
+
+// ECS integration functions
+qboolean CM_Bullet_IsInitialized(void);
+btDiscreteDynamicsWorld* CM_Bullet_GetWorld(void);
 #endif
 
 #ifdef __cplusplus

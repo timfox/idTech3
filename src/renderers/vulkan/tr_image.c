@@ -1323,6 +1323,8 @@ static const imageExtToLoaderMap_t imageLoaders[] =
 	{ "jpg",  R_LoadJPG },
 	{ "jpeg", R_LoadJPG },
 	{ "pcx",  R_LoadPCX },
+	{ "rgb9e5", R_LoadRGB9E5 },
+	{ "ktx2", R_LoadKTX2 },
 	{ "bmp",  R_LoadBMP }
 };
 
