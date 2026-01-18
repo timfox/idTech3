@@ -318,7 +318,11 @@ void NORETURN Sys_Exit( int code )
 
     // #region agent log
     char data[256];
-    sprintf(data, "{\"exit_code\":%d,\"build_type\":\"%s\"}", code, NDEBUG ? "release" : "debug");
+#ifdef NDEBUG
+    sprintf(data, "{\"exit_code\":%d,\"build_type\":\"%s\"}", code, "release");
+#else
+    sprintf(data, "{\"exit_code\":%d,\"build_type\":\"%s\"}", code, "debug");
+#endif
     write_debug_log("unix/unix_main.c:Sys_Exit", "System exit called", data);
     // #endregion
 

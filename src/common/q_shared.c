@@ -26,6 +26,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // Modern C23/C++23 safety features
 #include <assert.h>
 
+// C++ standard library includes for modern features
+#ifdef __cplusplus
+#include <algorithm>
+#include <array>
+#include <memory>
+#include <string_view>
+#include <utility>
+#endif
+
 // Static assertions for compile-time safety
 static_assert(sizeof(float) == 4, "float must be 32-bit IEEE 754");
 static_assert(sizeof(double) == 8, "double must be 64-bit IEEE 754");
@@ -2762,3 +2771,136 @@ float Q_atof( const char *str ) {
     return value * sign;
 }
 
+//===============================================================================
+// Modern C++ Utility Functions
+//===============================================================================
+
+#ifdef __cplusplus
+
+// Modern string view utilities
+bool Q_IsValidStringView(std::string_view sv) noexcept {
+    return !sv.empty() && sv.data() != nullptr;
+}
+
+std::string_view Q_TrimStringView(std::string_view sv) noexcept {
+    // Trim leading whitespace
+    auto start = sv.find_first_not_of(" \t\r\n");
+    if (start == std::string_view::npos) {
+        return std::string_view();
+    }
+
+    // Trim trailing whitespace
+    auto end = sv.find_last_not_of(" \t\r\n");
+    return sv.substr(start, end - start + 1);
+}
+
+// Modern vector utilities with bounds checking
+bool Q_IsValidVec3(const vec3_t v) noexcept {
+    if (!v) return false;
+
+    // Check for NaN or infinite values
+    for (int i = 0; i < 3; ++i) {
+        if (std::isnan(v[i]) || std::isinf(v[i])) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool Q_IsValidVec4(const vec4_t v) noexcept {
+    if (!v) return false;
+
+    // Check for NaN or infinite values
+    for (int i = 0; i < 4; ++i) {
+        if (std::isnan(v[i]) || std::isinf(v[i])) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+// Modern color utilities
+bool Q_IsValidColor3(const color3_t c) noexcept {
+    if (!c) return false;
+
+    for (int i = 0; i < 3; ++i) {
+        if (std::isnan(c.r) || std::isnan(c.g) || std::isnan(c.b) ||
+            std::isinf(c.r) || std::isinf(c.g) || std::isinf(c.b)) {
+            return false;
+        }
+        if (c.r < 0.0f || c.g < 0.0f || c.b < 0.0f ||
+            c.r > 1.0f || c.g > 1.0f || c.b > 1.0f) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool Q_IsValidColor4(const color4_t c) noexcept {
+    if (!c) return false;
+
+    for (int i = 0; i < 4; ++i) {
+        float val = (&c.r)[i];
+        if (std::isnan(val) || std::isinf(val)) {
+            return false;
+        }
+        if (i < 3 && (val < 0.0f || val > 1.0f)) {
+            return false;
+        }
+        if (i == 3 && (val < 0.0f || val > 1.0f)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+// Modern bounds-checked array access
+float Q_GetVec3Component(const vec3_t v, int index) noexcept {
+    if (!v || index < 0 || index >= 3) {
+        return 0.0f;
+    }
+    return v[index];
+}
+
+void Q_SetVec3Component(vec3_t v, int index, float value) noexcept {
+    if (!v || index < 0 || index >= 3) {
+        return;
+    }
+    v[index] = value;
+}
+
+// Modern constexpr math functions
+constexpr float Q_Clamp(float value, float min_val, float max_val) noexcept {
+    return std::max(min_val, std::min(max_val, value));
+}
+
+constexpr int Q_Clamp(int value, int min_val, int max_val) noexcept {
+    return std::max(min_val, std::min(max_val, value));
+}
+
+constexpr float Q_Lerp(float a, float b, float t) noexcept {
+    return a + (b - a) * Q_Clamp(t, 0.0f, 1.0f);
+}
+
+constexpr Vec3 Q_Lerp(const Vec3& a, const Vec3& b, float t) noexcept {
+    return a + (b - a) * Q_Clamp(t, 0.0f, 1.0f);
+}
+
+// Modern hash functions for strings
+constexpr size_t Q_Fnv1aHash(std::string_view str) noexcept {
+    constexpr size_t FNV_OFFSET_BASIS = 14695981039346656037ULL;
+    constexpr size_t FNV_PRIME = 1099511628211ULL;
+
+    size_t hash = FNV_OFFSET_BASIS;
+    for (char c : str) {
+        hash ^= static_cast<size_t>(c);
+        hash *= FNV_PRIME;
+    }
+    return hash;
+}
+
+#endif // __cplusplus

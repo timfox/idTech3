@@ -473,9 +473,31 @@ qboolean Regression_SaveBaseline(void) {
 }
 
 qboolean Regression_ResetBaseline(const char* test_name) {
-    // Implementation would remove baseline data for specific test
-    Com_Printf("Baseline reset not yet implemented for test: %s\n", test_name);
-    return qfalse;
+    if (!test_name) {
+        Com_Printf("Regression_ResetBaseline: Invalid test name\n");
+        return qfalse;
+    }
+
+    // Find the test
+    performance_test_t* test = Regression_FindTest(test_name);
+    if (!test) {
+        Com_Printf("Regression_ResetBaseline: Test '%s' not found\n", test_name);
+        return qfalse;
+    }
+
+    // Reset baseline data
+    memset(&test->baseline, 0, sizeof(performance_measurement_t));
+    test->baseline.cpu_time = -1.0; // Mark as invalid
+    test->baseline.memory_usage = 0;
+    test->baseline.draw_calls = 0;
+    test->baseline.frame_time = 0.0f;
+    test->baseline_valid = qfalse;
+
+    // Save updated baselines
+    Regression_SaveBaselines();
+
+    Com_Printf("Regression_ResetBaseline: Reset baseline for test '%s'\n", test_name);
+    return qtrue;
 }
 
 static qboolean Regression_GetBaseline(const char* test_name, performance_measurement_t* baseline) {

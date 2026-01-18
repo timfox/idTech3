@@ -461,7 +461,7 @@ sndOpenALHandle_t SndOpenAL_PlaySound(const char *soundName, const sndOpenAL3DPr
 
 			// Air absorption for distant sounds (high frequency attenuation)
 			// This creates more realistic distance-based frequency filtering
-			float distance = sqrt(position[0]*position[0] + position[1]*position[1] + position[2]*position[2]);
+			float distance = sqrt(props->position[0]*props->position[0] + props->position[1]*props->position[1] + props->position[2]*props->position[2]);
 			float airAbsorptionFactor = 1.0f - (distance / maxDist);
 			airAbsorptionFactor = Com_Clamp(0.0f, 1.0f, airAbsorptionFactor);
 			alSourcef(source, AL_AIR_ABSORPTION_FACTOR, airAbsorptionFactor * 0.05f); // Subtle effect
@@ -640,10 +640,12 @@ void SndOpenAL_SetListenerPosition(const vec3_t position, const vec3_t forward, 
 	// Use inverse distance clamped model for realistic attenuation
 	alDistanceModel(AL_INVERSE_DISTANCE_CLAMPED);
 	alListenerf(AL_MAX_DISTANCE, s_openal_max_distance->value);
+	alListenerf(AL_ROLLOFF_FACTOR, s_openal_rolloff->value);
 
-	// Set global doppler factor for moving sounds
-	cvar_t *s_doppler = Cvar_Get("s_doppler", "1", CVAR_ARCHIVE);
-	alDopplerFactor(s_doppler->value);
+	// Set global doppler factor for moving sounds (use global variable)
+	if (s_doppler) {
+		alDopplerFactor(s_doppler->value);
+	}
 	alDopplerVelocity(343.3f); // Speed of sound in air (m/s)
 }
 

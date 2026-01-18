@@ -308,8 +308,71 @@ Console command to load LUA scripts
 */
 void Svcmd_LoadLua_f(void)
 {
-    // TODO: Implement script loading
-    Com_Printf("LUA script loading not yet implemented\n");
+    if (Cmd_Argc() < 2) {
+        Com_Printf("Usage: loadlua <script_name>\n");
+        return;
+    }
+
+    const char* script_name = Cmd_Argv(1);
+
+    // Load the script file
+    fileHandle_t file = FS_FOpenFileRead(script_name, NULL, qfalse);
+    if (!file) {
+        Com_Printf("Svcmd_LoadLua_f: Could not open script '%s'\n", script_name);
+        return;
+    }
+
+    // Read the script content
+    char* script_content = NULL;
+    int file_len = FS_ReadFile(script_name, (void**)&script_content);
+    if (file_len <= 0 || !script_content) {
+        FS_FCloseFile(file);
+        Com_Printf("Svcmd_LoadLua_f: Could not read script '%s'\n", script_name);
+        return;
+    }
+
+    FS_FCloseFile(file);
+
+    // Create a new LUA state for this script
+    lua_State* L = luaL_newstate();
+    if (!L) {
+        Com_Printf("Svcmd_LoadLua_f: Could not create LUA state for '%s'\n", script_name);
+        FS_FreeFile(script_content);
+        return;
+    }
+
+    // Open standard libraries
+    luaL_openlibs(L);
+
+    // Register game functions
+    G_LuaRegisterFunctions(L);
+
+    // Load and execute the script
+    if (luaL_loadbuffer(L, script_content, file_len, script_name) != LUA_OK) {
+        Com_Printf("Svcmd_LoadLua_f: Failed to load script '%s': %s\n",
+                  script_name, lua_tostring(L, -1));
+        lua_close(L);
+        FS_FreeFile(script_content);
+        return;
+    }
+
+    // Execute the script
+    if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
+        Com_Printf("Svcmd_LoadLua_f: Failed to execute script '%s': %s\n",
+                  script_name, lua_tostring(L, -1));
+        lua_close(L);
+        FS_FreeFile(script_content);
+        return;
+    }
+
+    // Store the script state (in a real implementation, this would be managed properly)
+    // For now, we'll just close it since we don't have script management yet
+    lua_close(L);
+
+    Com_Printf("Svcmd_LoadLua_f: Successfully loaded script '%s' (%d bytes)\n",
+              script_name, file_len);
+
+    FS_FreeFile(script_content);
 }
 
 /*
@@ -488,10 +551,53 @@ LUA function to get entity field values
 */
 int G_LuaGetEntityField(lua_State *L)
 {
-    // TODO: Implement entity field access
-    (void)L; // Suppress unused parameter warning
-    Com_Printf("G_LuaGetEntityField not yet implemented\n");
-    return 0;
+    // Get parameters: entity_index, field_name
+    int entity_index = luaL_checkinteger(L, 1);
+    const char* field_name = luaL_checkstring(L, 2);
+
+    // Validate entity index
+    if (entity_index < 0 || entity_index >= level.num_entities) {
+        luaL_error(L, "Invalid entity index: %d", entity_index);
+        return 0;
+    }
+
+    gentity_t* ent = &g_entities[entity_index];
+
+    // Handle common entity fields
+    if (strcmp(field_name, "classname") == 0) {
+        lua_pushstring(L, ent->classname);
+        return 1;
+    } else if (strcmp(field_name, "origin") == 0) {
+        lua_newtable(L);
+        vec3_t origin;
+        G_GetOrigin(ent, origin);
+        lua_pushnumber(L, origin[0]); lua_rawseti(L, -2, 1);
+        lua_pushnumber(L, origin[1]); lua_rawseti(L, -2, 2);
+        lua_pushnumber(L, origin[2]); lua_rawseti(L, -2, 3);
+        return 1;
+    } else if (strcmp(field_name, "angles") == 0) {
+        lua_newtable(L);
+        vec3_t angles;
+        G_GetAngles(ent, angles);
+        lua_pushnumber(L, angles[0]); lua_rawseti(L, -2, 1);
+        lua_pushnumber(L, angles[1]); lua_rawseti(L, -2, 2);
+        lua_pushnumber(L, angles[2]); lua_rawseti(L, -2, 3);
+        return 1;
+    } else if (strcmp(field_name, "health") == 0) {
+        if (ent->client) {
+            lua_pushinteger(L, ent->client->ps.stats[STAT_HEALTH]);
+        } else {
+            lua_pushinteger(L, ent->health);
+        }
+        return 1;
+    } else if (strcmp(field_name, "inuse") == 0) {
+        lua_pushboolean(L, ent->inuse);
+        return 1;
+    }
+
+    // Field not found
+    lua_pushnil(L);
+    return 1;
 }
 
 /*
@@ -503,10 +609,48 @@ LUA function to set entity field values
 */
 int G_LuaSetEntityField(lua_State *L)
 {
-    // TODO: Implement entity field modification
-    (void)L; // Suppress unused parameter warning
-    Com_Printf("G_LuaSetEntityField not yet implemented\n");
-    return 0;
+    // Get parameters: entity_index, field_name, value
+    int entity_index = luaL_checkinteger(L, 1);
+    const char* field_name = luaL_checkstring(L, 2);
+
+    // Validate entity index
+    if (entity_index < 0 || entity_index >= level.num_entities) {
+        luaL_error(L, "Invalid entity index: %d", entity_index);
+        return 0;
+    }
+
+    gentity_t* ent = &g_entities[entity_index];
+
+    // Handle common entity fields
+    if (strcmp(field_name, "origin") == 0) {
+        if (lua_istable(L, 3)) {
+            vec3_t origin;
+            lua_rawgeti(L, 3, 1); origin[0] = lua_tonumber(L, -1); lua_pop(L, 1);
+            lua_rawgeti(L, 3, 2); origin[1] = lua_tonumber(L, -1); lua_pop(L, 1);
+            lua_rawgeti(L, 3, 3); origin[2] = lua_tonumber(L, -1); lua_pop(L, 1);
+            G_SetOrigin(ent, origin);
+        }
+    } else if (strcmp(field_name, "angles") == 0) {
+        if (lua_istable(L, 3)) {
+            vec3_t angles;
+            lua_rawgeti(L, 3, 1); angles[0] = lua_tonumber(L, -1); lua_pop(L, 1);
+            lua_rawgeti(L, 3, 2); angles[1] = lua_tonumber(L, -1); lua_pop(L, 1);
+            lua_rawgeti(L, 3, 3); angles[2] = lua_tonumber(L, -1); lua_pop(L, 1);
+            G_SetAngles(ent, angles);
+        }
+    } else if (strcmp(field_name, "health") == 0) {
+        int health = luaL_checkinteger(L, 3);
+        if (ent->client) {
+            ent->client->ps.stats[STAT_HEALTH] = health;
+        } else {
+            ent->health = health;
+        }
+    } else if (strcmp(field_name, "classname") == 0) {
+        const char* classname = luaL_checkstring(L, 3);
+        Q_strncpyz(ent->classname, classname, sizeof(ent->classname));
+    }
+
+    return 0; // No return values
 }
 
 #endif // USE_LUA

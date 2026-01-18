@@ -1016,9 +1016,61 @@ qboolean PackageGenerator_SignPackage(const char* package_path,
                                     const char* certificate_path,
                                     const char* key_path,
                                     const char* passphrase) {
-    // Stub implementation - would use platform-specific signing tools
-    Com_Printf("Package signing not yet implemented\n");
-    return qfalse;
+    if (!package_path || !certificate_path || !key_path) {
+        Com_Printf("PackageGenerator_SignPackage: Invalid parameters\n");
+        return qfalse;
+    }
+
+    Com_Printf("PackageGenerator_SignPackage: Signing package '%s'\n", package_path);
+
+    // Create detached signature file
+    char sig_file[1024];
+    Com_sprintf(sig_file, sizeof(sig_file), "%s.sig", package_path);
+
+    // Use OpenSSL for signing (most common approach)
+    char command[2048];
+
+#ifdef _WIN32
+    // Windows: use signtool.exe or OpenSSL
+    if (strstr(certificate_path, ".pfx") || strstr(certificate_path, ".p12")) {
+        // Use Windows signtool for Authenticode signing
+        Com_sprintf(command, sizeof(command),
+                   "signtool.exe sign /f \"%s\" /p \"%s\" \"%s\"",
+                   certificate_path,
+                   passphrase ? passphrase : "",
+                   package_path);
+    } else {
+        // Use OpenSSL for generic signing
+        Com_sprintf(command, sizeof(command),
+                   "openssl dgst -sha256 -sign \"%s\" -out \"%s\" \"%s\"",
+                   key_path, sig_file, package_path);
+    }
+#else
+    // Unix-like systems: use OpenSSL or GPG
+    if (strstr(certificate_path, ".pem") || strstr(certificate_path, ".crt")) {
+        // Use OpenSSL for certificate-based signing
+        Com_sprintf(command, sizeof(command),
+                   "openssl dgst -sha256 -sign \"%s\" -out \"%s\" \"%s\"",
+                   key_path, sig_file, package_path);
+    } else {
+        // Use GPG for key-based signing
+        Com_sprintf(command, sizeof(command),
+                   "gpg --detach-sign --armor --output \"%s\" \"%s\"",
+                   sig_file, package_path);
+    }
+#endif
+
+    // Execute the signing command
+    int result = system(command);
+
+    if (result == 0) {
+        Com_Printf("PackageGenerator_SignPackage: Successfully signed package\n");
+        Com_Printf("  Signature file: %s\n", sig_file);
+        return qtrue;
+    } else {
+        Com_Printf("PackageGenerator_SignPackage: Failed to sign package (exit code %d)\n", result);
+        return qfalse;
+    }
 }
 
 /*

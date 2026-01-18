@@ -7,7 +7,8 @@ This system generates meshlets from triangle meshes for use with mesh shaders.
 ===============================================================================
 */
 
-#pragma once
+#ifndef __MESHLET_H__
+#define __MESHLET_H__
 
 #include "q_shared.h"
 

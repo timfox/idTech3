@@ -627,7 +627,7 @@ OPTION(USE_STEAMWORKS "Enable Steamworks SDK integration for Steam Deck features
 OPTION(USE_TRACY "Enable Tracy profiler instrumentation (header-only shim)" OFF)
 OPTION(USE_CIMGUI "Enable ImGui" ON)
 OPTION(USE_WEBSOCKETS "Enable WebSocket support" ON)
-OPTION(USE_OPENAL "Enable OpenAL enhanced audio system" ON)
+OPTION(USE_OPENAL "Enable OpenAL enhanced audio system" OFF)
 OPTION(REPRODUCIBLE_BUILD "Enable reproducible build features" OFF)
 OPTION(USE_KTX2 "Enable KTX2 texture compression support" OFF)
 OPTION(USE_BASISU "Enable Basis Universal texture compression support" OFF)
@@ -833,7 +833,8 @@ ENDIF()
 
 # Game LUA system
 IF(USE_LUA)
-	list(APPEND QCOMMON_SRCS src/game/g_lua.c)
+	# LUA support is game-specific, not common
+	# list(APPEND QCOMMON_SRCS src/game/g_lua.c)
 ENDIF()
 
 # Single Player enhancements (requires game globals)
@@ -891,6 +892,30 @@ IF(USE_KTX2 OR USE_BASISU)
 	message(STATUS "Mesh shaders and meshlet system enabled")
 ELSE()
 	message(STATUS "Mesh shaders disabled (enable USE_KTX2 or USE_BASISU)")
+ENDIF()
+
+# Layered Material System
+OPTION(USE_LAYERED_MATERIALS "Enable layered material system with procedural textures" ON)
+IF(USE_LAYERED_MATERIALS)
+	# Add compile definition for layered materials
+	ADD_COMPILE_DEFINITIONS(USE_LAYERED_MATERIALS)
+	# Add layered material system source files
+	list(APPEND QCOMMON_SRCS src/common/material_layer.c src/common/material_renderer.c)
+	message(STATUS "Layered material system enabled")
+ELSE()
+	message(STATUS "Using legacy shader system")
+ENDIF()
+
+# Modern Mathematics Library (C++23 features)
+OPTION(USE_MODERN_MATH "Enable modern C++23 mathematics library" OFF)
+IF(USE_MODERN_MATH)
+	# Add compile definition for modern math
+	ADD_COMPILE_DEFINITIONS(USE_MODERN_MATH)
+	# Add modern math library (C++ only)
+	list(APPEND QCOMMON_SRCS src/common/q_math_modern.cpp)
+	message(STATUS "Modern mathematics library enabled (C++23 features)")
+ELSE()
+	message(STATUS "Using legacy math library")
 ENDIF()
 
 IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/common/ecs_systems.cpp)
@@ -4345,6 +4370,12 @@ ADD_EXECUTABLE(test_profiler_integration
 )
 TARGET_LINK_LIBRARIES(test_profiler_integration PRIVATE common m ${CMAKE_DL_LIBS})
 TARGET_INCLUDE_DIRECTORIES(test_profiler_integration PRIVATE
+ADD_EXECUTABLE(test_layered_materials
+	tests/test_layered_materials.c
+)
+ADD_EXECUTABLE(test_modern_math
+	tests/test_modern_math.c
+)
 	${CMAKE_SOURCE_DIR}/src
 	${CMAKE_SOURCE_DIR}/src/tests
 )
@@ -4592,7 +4623,7 @@ SET_TARGET_PROPERTIES(test_net_protocol_validation PROPERTIES
 # 	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 # )
 
-	MESSAGE(STATUS "Tests enabled: test_qcommon, test_qmath, test_info, test_msg_secure, test_renderer_init, test_integration, test_performance, test_net_protocol_validation")
+	MESSAGE(STATUS "Tests enabled: test_qcommon, test_qmath, test_info, test_msg_secure, test_renderer_init, test_integration, test_performance, test_net_protocol_validation, test_layered_materials, test_modern_math")
 ENDIF()
 
 # Game Launcher

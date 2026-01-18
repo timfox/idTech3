@@ -10,6 +10,7 @@ stub loader that simply fails at runtime.
 ===========================================================================
 */
 
+#define Q_SHARED_NO_CPP_CLASSES
 #include "../../common/q_shared.h"
 #include "../renderercommon/tr_public.h"
 
