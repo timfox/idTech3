@@ -186,114 +186,9 @@ Performance Notes:
 ==================
 */
 static void Theora_YUVtoRGB(th_ycbcr_buffer ycbcr, byte *rgb, int width, int height) {
-	int x, y;
-	int Y, Cb, Cr;
-	int R, G, B;
-	byte *y_plane = ycbcr[0].data;
-	byte *u_plane = ycbcr[1].data;
-	byte *v_plane = ycbcr[2].data;
-	int y_stride = ycbcr[0].stride;
-	int u_stride = ycbcr[1].stride;
-	int v_stride = ycbcr[2].stride;
-
-	// Use the actual dimensions reported by Theora library
-	int chroma_width = ycbcr[1].width;
-	int chroma_height = ycbcr[1].height;
-
-	// Debug output and validation
-	static int debug_count = 0;
-	if (debug_count < 10) {  // Increased debug count to see more frames
-		int expected_rgb_size = width * height * 4;
-		Com_Printf("Theora_YUVtoRGB: %dx%d -> expected_rgb_size=%d, chroma %dx%d, strides Y:%d U:%d V:%d\n",
-			width, height, expected_rgb_size, chroma_width, chroma_height, y_stride, u_stride, v_stride);
-		debug_count++;
-	}
-
-	for (y = 0; y < height; y++) {
-		for (x = 0; x < width; x++) {
-			// Bounds checking for Y plane - ensure we don't exceed the valid data width
-			int y_idx = y * y_stride + x;
-			int y_max_idx = ycbcr[0].stride * ycbcr[0].height - 1;
-			if (y_idx < 0 || y_idx > y_max_idx || x >= ycbcr[0].width) {
-				Com_Printf("Theora_YUVtoRGB: Y plane bounds error y=%d x=%d idx=%d (max=%d, width=%d)\n",
-					y, x, y_idx, y_max_idx, ycbcr[0].width);
-				Y = 0;
-			} else {
-				Y = y_plane[y_idx];
-			}
-
-			// Calculate chroma coordinates based on actual buffer dimensions
-			int chroma_x, chroma_y;
-			if (chroma_width == width && chroma_height == height) {
-				// No subsampling - direct mapping
-				chroma_x = x;
-				chroma_y = y;
-			} else {
-				// Assume subsampling - scale coordinates
-				chroma_x = x * chroma_width / width;
-				chroma_y = y * chroma_height / height;
-			}
-
-			// Bounds checking for chroma coordinates before calculating indices
-			if (chroma_x < 0 || chroma_x >= chroma_width || chroma_y < 0 || chroma_y >= chroma_height) {
-				Com_Printf("Theora_YUVtoRGB: chroma coordinates out of bounds x=%d y=%d (max %dx%d)\n",
-						  chroma_x, chroma_y, chroma_width, chroma_height);
-				Cb = 0;
-				Cr = 0;
-			} else {
-				int u_idx = chroma_y * u_stride + chroma_x;
-				int v_idx = chroma_y * v_stride + chroma_x;
-
-				// Additional bounds checking for array access
-				int u_max_idx = ycbcr[1].stride * ycbcr[1].height - 1;
-				int v_max_idx = ycbcr[2].stride * ycbcr[2].height - 1;
-
-				if (u_idx < 0 || u_idx > u_max_idx) {
-					Com_Printf("Theora_YUVtoRGB: U plane bounds error idx=%d (max=%d)\n", u_idx, u_max_idx);
-					Cb = 0;
-				} else {
-					Cb = u_plane[u_idx] - 128;
-				}
-
-				if (v_idx < 0 || v_idx > v_max_idx) {
-					Com_Printf("Theora_YUVtoRGB: V plane bounds error idx=%d (max=%d)\n", v_idx, v_max_idx);
-					Cr = 0;
-				} else {
-					Cr = v_plane[v_idx] - 128;
-				}
-			}
-
-			// YUV to RGB conversion
-			R = Y + (int)(1.402f * Cr);
-			G = Y - (int)(0.344f * Cb + 0.714f * Cr);
-			B = Y + (int)(1.772f * Cb);
-
-			// Clamp values
-			if (R < 0) R = 0; else if (R > 255) R = 255;
-			if (G < 0) G = 0; else if (G > 255) G = 255;
-			if (B < 0) B = 0; else if (B > 255) B = 255;
-
-			// Bounds checking for RGB output buffer
-			int rgb_idx = (y * width + x) * 4;
-			int max_rgb_idx = width * height * 4;
-
-			if (rgb_idx < 0 || rgb_idx + 3 >= max_rgb_idx) {
-				Com_Printf("Theora_YUVtoRGB: RGB buffer bounds error y=%d x=%d idx=%d (max=%d)\n", y, x, rgb_idx, max_rgb_idx);
-				continue;
-			}
-
-			// Write RGBA (little-endian) - ensure we don't write beyond buffer
-			if (rgb_idx + 3 < max_rgb_idx) {
-				rgb[rgb_idx + 0] = R;
-				rgb[rgb_idx + 1] = G;
-				rgb[rgb_idx + 2] = B;
-				rgb[rgb_idx + 3] = 255;
-			} else {
-				Com_Printf("Theora_YUVtoRGB: RGB write would overflow buffer y=%d x=%d idx=%d (max=%d)\n", y, x, rgb_idx, max_rgb_idx);
-				continue; // Skip this pixel
-			}
-		}
-	}
+	// Do absolutely nothing to isolate the buffer overflow
+	Com_Printf("Theora_YUVtoRGB: called but doing nothing\n");
+	return;
 }
 
 /*
@@ -304,6 +199,9 @@ Initialize Theora decoder
 ==================
 */
 qboolean Theora_Init(int handle) {
+	// TEMP: Disable Theora to prevent buffer overflow issues
+	return qfalse;
+
 	theora_data_t *data;
 	// ogg_page ogg_page;
 	// ogg_packet ogg_packet;
@@ -559,9 +457,12 @@ e_status Theora_Run(int handle) {
 				}
 
 				// Convert YUV to RGB
+				Com_Printf("Theora_Run: about to call Theora_YUVtoRGB\n");
 				Theora_YUVtoRGB(ycbcr, cinTable[handle].buf,
 					cinTable[handle].CIN_WIDTH, cinTable[handle].CIN_HEIGHT);
+				Com_Printf("Theora_Run: Theora_YUVtoRGB completed\n");
 				cinTable[handle].dirty = qtrue;
+				Com_Printf("Theora_Run: set dirty flag\n");
 				
 				data->frame_count++;
 				data->last_frame_time = current_time;
