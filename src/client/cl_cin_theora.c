@@ -234,25 +234,33 @@ static void Theora_YUVtoRGB(th_ycbcr_buffer ycbcr, byte *rgb, int width, int hei
 				chroma_y = y * chroma_height / height;
 			}
 
-			int u_idx = chroma_y * u_stride + chroma_x;
-			int v_idx = chroma_y * v_stride + chroma_x;
-
-			// Bounds checking for U/V planes
-			int u_max_idx = ycbcr[1].stride * ycbcr[1].height - 1;
-			int v_max_idx = ycbcr[2].stride * ycbcr[2].height - 1;
-
-			if (u_idx < 0 || u_idx > u_max_idx) {
-				Com_Printf("Theora_YUVtoRGB: U plane bounds error idx=%d (max=%d)\n", u_idx, u_max_idx);
+			// Bounds checking for chroma coordinates before calculating indices
+			if (chroma_x < 0 || chroma_x >= chroma_width || chroma_y < 0 || chroma_y >= chroma_height) {
+				Com_Printf("Theora_YUVtoRGB: chroma coordinates out of bounds x=%d y=%d (max %dx%d)\n",
+						  chroma_x, chroma_y, chroma_width, chroma_height);
 				Cb = 0;
-			} else {
-				Cb = u_plane[u_idx] - 128;
-			}
-
-			if (v_idx < 0 || v_idx > v_max_idx) {
-				Com_Printf("Theora_YUVtoRGB: V plane bounds error idx=%d (max=%d)\n", v_idx, v_max_idx);
 				Cr = 0;
 			} else {
-				Cr = v_plane[v_idx] - 128;
+				int u_idx = chroma_y * u_stride + chroma_x;
+				int v_idx = chroma_y * v_stride + chroma_x;
+
+				// Additional bounds checking for array access
+				int u_max_idx = ycbcr[1].stride * ycbcr[1].height - 1;
+				int v_max_idx = ycbcr[2].stride * ycbcr[2].height - 1;
+
+				if (u_idx < 0 || u_idx > u_max_idx) {
+					Com_Printf("Theora_YUVtoRGB: U plane bounds error idx=%d (max=%d)\n", u_idx, u_max_idx);
+					Cb = 0;
+				} else {
+					Cb = u_plane[u_idx] - 128;
+				}
+
+				if (v_idx < 0 || v_idx > v_max_idx) {
+					Com_Printf("Theora_YUVtoRGB: V plane bounds error idx=%d (max=%d)\n", v_idx, v_max_idx);
+					Cr = 0;
+				} else {
+					Cr = v_plane[v_idx] - 128;
+				}
 			}
 
 			// YUV to RGB conversion
@@ -377,8 +385,9 @@ qboolean Theora_Init(int handle) {
 	data->fps = (double)data->theora_info.fps_numerator / data->theora_info.fps_denominator;
 	if (data->fps <= 0) data->fps = 30.0; // Default fallback
 
-	Com_Printf("Theora_Init: decoder created successfully (%dx%d @ %.2f fps)\n",
-		cinTable[handle].CIN_WIDTH, cinTable[handle].CIN_HEIGHT, data->fps);
+	// Debug: print pixel format information
+	Com_Printf("Theora_Init: decoder created successfully (%dx%d @ %.2f fps, pixel format: %d)\n",
+		cinTable[handle].CIN_WIDTH, cinTable[handle].CIN_HEIGHT, data->fps, data->theora_info.pixel_fmt);
 
 	// Re-allocate frame buffer with correct dimensions
 	if (cinTable[handle].buf) {
