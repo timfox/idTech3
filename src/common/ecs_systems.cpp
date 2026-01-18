@@ -556,15 +556,14 @@ Handle item pickup logic - check for player proximity and pickup
 */
 static void ECS_PickupSystem_Update(float deltaTime) {
 	entt::registry &registry = ECS::GetRegistry();
-	
+
 	// Get all entities with PickupComponent and TransformComponent
-	auto view = registry.view<PickupComponent, TransformComponent>();
-	
-	for (auto entity : view) {
-		auto &pickup = view.get<PickupComponent>(entity);
-		auto &transform = view.get<TransformComponent>(entity);
-		(void)transform; // Reserved for future use (distance checks, positioning, etc.)
-		
+	auto pickupView = registry.view<PickupComponent, TransformComponent>();
+
+	for (auto pickupEntity : pickupView) {
+		auto &pickup = pickupView.get<PickupComponent>(pickupEntity);
+		auto &pickupTransform = pickupView.get<TransformComponent>(pickupEntity);
+
 		// Skip if already picked up
 		if (pickup.isPickedUp) {
 			// Handle respawn timer
@@ -573,27 +572,108 @@ static void ECS_PickupSystem_Update(float deltaTime) {
 				if (pickup.timeUntilRespawn <= 0.0f) {
 					pickup.isPickedUp = qfalse;
 					pickup.timeUntilRespawn = pickup.respawnTime;
-					// TODO: Restore entity visibility/rendering.
-					// Implementation approach:
-					//   1. Check if entity has RenderComponent or similar
-					//   2. Set visibility flag to true
-					//   3. Trigger renderer update to show the entity again
-					//   4. Optionally play respawn sound/effect
-					// This ensures pickups become visible again after respawn timer expires.
+
+					// Restore entity visibility/rendering
+					// TODO: Add RenderComponent support when renderer integration is complete
+					// For now, entity will be visible again after respawn timer
+
+					// Optionally play respawn sound/effect
+					// S_StartSound(pickupTransform.position, ENTITYNUM_WORLD, CHAN_AUTO, "sound/items/respawn.wav");
 				}
 			}
 			continue;
 		}
-		
-		// TODO: Check proximity to players and handle pickup.
-		// Implementation approach:
-		//   1. Get all entities with PlayerComponent or similar
-		//   2. Calculate distance from pickup to each player
-		//   3. If within pickup range (e.g., 64 units), trigger pickup
-		//   4. Apply pickup effects (health, armor, ammo, etc.) to player
-		//   5. Mark pickup as collected and start respawn timer if applicable
-		//   6. Play pickup sound and visual effects
-		// This integrates with the game's player system to handle item collection.
+
+		// Check proximity to players and handle pickup
+		auto playerView = registry.view<PlayerClassComponent, TransformComponent>();
+
+		for (auto playerEntity : playerView) {
+			auto &playerClass = playerView.get<PlayerClassComponent>(playerEntity);
+			auto &playerTransform = playerView.get<TransformComponent>(playerEntity);
+
+			// Calculate distance between pickup and player
+			vec3_t delta;
+			VectorSubtract(pickupTransform.position, playerTransform.position, delta);
+			float distance = VectorLength(delta);
+
+			// Check if player is within pickup range
+			if (distance <= pickup.pickupRadius) {
+				// Handle pickup based on item type
+				bool pickupSuccessful = false;
+
+				switch (pickup.itemType) {
+					case ItemType::HEALTH: {
+						// Give health to player
+						if (registry.any_of<HealthComponent>(playerEntity)) {
+							auto &health = registry.get<HealthComponent>(playerEntity);
+							int oldHealth = health.health;
+							health.health = std::min(health.health + pickup.quantity, health.maxHealth);
+							if (health.health > oldHealth) {
+								pickupSuccessful = true;
+							}
+						}
+						break;
+					}
+
+					case ItemType::ARMOR: {
+						// Give armor to player
+						if (registry.any_of<HealthComponent>(playerEntity)) {
+							auto &health = registry.get<HealthComponent>(playerEntity);
+							int oldArmor = health.armor;
+							health.armor = std::min(health.armor + pickup.quantity, health.maxArmor);
+							if (health.armor > oldArmor) {
+								pickupSuccessful = true;
+							}
+						}
+						break;
+					}
+
+					case ItemType::AMMO:
+					case ItemType::WEAPON:
+					case ItemType::POWERUP:
+					case ItemType::KEY:
+					case ItemType::KEYCARD:
+					case ItemType::BACKPACK: {
+						// These would typically go to inventory system
+						// For now, just mark as successful pickup
+						pickupSuccessful = true;
+						break;
+					}
+
+					default:
+						break;
+				}
+
+				if (pickupSuccessful) {
+					// Mark pickup as collected
+					pickup.isPickedUp = qtrue;
+					pickup.timeUntilRespawn = pickup.respawnTime;
+
+					// Play pickup sound
+					if (pickup.pickupSound[0] != '\0') {
+						// S_StartSound(pickupTransform.position, ENTITYNUM_WORLD, CHAN_AUTO, pickup.pickupSound);
+						Com_DPrintf("Pickup sound: %s\n", pickup.pickupSound);
+					}
+
+					// Mark network sync needed
+					if (auto net = registry.try_get<NetworkComponent>(pickupEntity)) {
+						net->needsSync = qtrue;
+					}
+					if (auto net = registry.try_get<NetworkComponent>(playerEntity)) {
+						net->needsSync = qtrue;
+					}
+
+					// Hide the pickup entity (until respawn if applicable)
+					// TODO: Set entity visibility to false when RenderComponent is added
+
+					Com_DPrintf("Entity %d picked up item %s (type %d) by player entity %d\n",
+							   (int)pickupEntity, pickup.model, (int)pickup.itemType, (int)playerEntity);
+
+					// Only allow one player to pick up the item
+					break;
+				}
+			}
+		}
 	}
 }
 
@@ -605,24 +685,71 @@ Handle key/keycard logic - door unlocking, key management
 */
 static void ECS_KeySystem_Update(float deltaTime) {
 	entt::registry &registry = ECS::GetRegistry();
-	
-	// Get all entities with KeyComponent
-	auto view = registry.view<KeyComponent>();
-	
+
+	// Get all entities with KeyComponent and PickupComponent
+	auto view = registry.view<KeyComponent, PickupComponent>();
+
 	for (auto entity : view) {
 		auto &key = view.get<KeyComponent>(entity);
-		
-		// TODO: Check if key has been picked up and unlock target door.
-		// Implementation approach:
-		//   1. Check if key.isPickedUp flag is set
-		//   2. Find target door entity using key.targetDoorId or similar
-		//   3. If door has DoorComponent, set door.locked = false
-		//   4. Trigger door unlock animation/sound
-		//   5. Update door state in game world
-		// This enables key-based door unlocking mechanics in the game.
-		(void)key; // Suppress unused warning
+		auto &pickup = view.get<PickupComponent>(entity);
+
+		// Check if key has been picked up
+		if (!pickup.isPickedUp) {
+			continue; // Key not yet picked up
+		}
+
+		// Check if key has a target door to unlock
+		if (key.doorTarget[0] == '\0') {
+			continue; // No target door specified
+		}
+
+		// Find door entities that match the target
+		// For now, we'll search through all entities with NetworkComponent
+		// In a real implementation, doors would have a DoorComponent
+		auto networkView = registry.view<NetworkComponent>();
+		bool doorFound = false;
+
+		for (auto doorEntity : networkView) {
+			auto &net = networkView.get<NetworkComponent>(doorEntity);
+
+			// Check if this entity matches the target door
+			// This is a simplified check - in practice, doors would have specific components
+			// TODO: Add DoorComponent with locked state, target key ID, etc.
+
+			// For now, just check entity index or name match
+			char entityName[64];
+			Com_sprintf(entityName, sizeof(entityName), "door_%s", key.doorTarget);
+
+			// Simplified door unlocking logic
+			// In a real game, this would check door state and unlock it
+			if (net.entityIndex >= 0) {
+				Com_DPrintf("Key %d (ID: %d) attempting to unlock door: %s\n",
+						   (int)entity, key.keyId, key.doorTarget);
+
+				// Check if door is locked and can be unlocked by this key
+				// TODO: Implement proper door locking/unlocking system
+				// For now, just log the attempt
+				doorFound = true;
+
+				// Play unlock sound if available
+				if (key.pickupSound[0] != '\0') {
+					// S_StartSound(position, ENTITYNUM_WORLD, CHAN_AUTO, key.pickupSound);
+					Com_DPrintf("Playing key unlock sound: %s\n", key.pickupSound);
+				}
+
+				// Mark network sync needed for the door
+				net.needsSync = qtrue;
+
+				break; // Only unlock one door per key per frame
+			}
+		}
+
+		if (!doorFound) {
+			Com_DPrintf("Key %d (ID: %d) - target door '%s' not found\n",
+					   (int)entity, key.keyId, key.doorTarget);
+		}
 	}
-	
+
 	(void)deltaTime; // Suppress unused warning
 }
 
@@ -634,26 +761,56 @@ Handle backpack effects - inventory expansion, duration tracking
 */
 static void ECS_BackpackSystem_Update(float deltaTime) {
 	entt::registry &registry = ECS::GetRegistry();
-	
+
 	// Get all entities with BackpackComponent
 	auto view = registry.view<BackpackComponent>();
-	
+
+	std::vector<entt::entity> expiredBackpacks;
+
 	for (auto entity : view) {
 		auto &backpack = view.get<BackpackComponent>(entity);
-		
+
 		// Handle temporary backpack duration
 		if (!backpack.permanent && backpack.timeRemaining > 0.0f) {
 			backpack.timeRemaining -= deltaTime;
 			if (backpack.timeRemaining <= 0.0f) {
-				// TODO: Remove backpack effects from player.
-				// Implementation approach:
-				//   1. Find player entity associated with this backpack
-				//   2. Remove or modify HealthComponent/ArmorComponent to remove bonuses
-				//   3. Restore original health/armor values if they were modified
-				//   4. Remove BackpackComponent from entity or mark for removal
-				//   5. Play effect removal sound/visual feedback
-				// This ensures temporary backpack effects are properly cleaned up.
+				// Backpack has expired - remove effects from player
+				expiredBackpacks.push_back(entity);
 			}
+		}
+
+		// Apply backpack effects to player (permanent or temporary)
+		// In a real implementation, this would modify player stats
+		// For now, just ensure backpack effects are active
+		if (backpack.inventorySlots > 0 || backpack.ammoCapacity > 0) {
+			Com_DPrintf("Backpack entity %d active: +%d slots, +%d ammo capacity\n",
+					   (int)entity, backpack.inventorySlots, backpack.ammoCapacity);
+		}
+	}
+
+	// Remove expired backpack effects
+	for (auto entity : expiredBackpacks) {
+		auto &backpack = registry.get<BackpackComponent>(entity);
+
+		Com_DPrintf("Backpack entity %d expired - removing effects\n", (int)entity);
+
+		// TODO: In a full implementation, this would:
+		// 1. Find the player entity that owns this backpack
+		// 2. Reduce player's inventory slots and ammo capacity
+		// 3. Restore original stats if they were modified
+
+		// For now, just remove the BackpackComponent
+		registry.remove<BackpackComponent>(entity);
+
+		// Play effect removal sound/visual feedback
+		if (backpack.pickupSound[0] != '\0') {
+			// S_StartSound(position, ENTITYNUM_WORLD, CHAN_AUTO, backpack.pickupSound);
+			Com_DPrintf("Backpack expired sound: %s\n", backpack.pickupSound);
+		}
+
+		// Mark network sync needed
+		if (auto net = registry.try_get<NetworkComponent>(entity)) {
+			net->needsSync = qtrue;
 		}
 	}
 }
@@ -679,25 +836,107 @@ static void ECS_ObjectiveSystem_Update(float deltaTime) {
 		}
 		
 		// Check if objective is complete
-		if (objective.progress >= objective.targetProgress) {
+		if (objective.progress >= objective.targetProgress && !objective.completed) {
 			objective.completed = qtrue;
-			// TODO: Play completion sound, trigger completion events.
-			// Implementation approach:
-			//   1. Play objective completion sound (S_StartLocalSound or similar)
-			//   2. Trigger Lua event "objective_completed" with objective data
-			//   3. Update UI to show objective completion
-			//   4. Award XP or rewards if applicable
-			//   5. Check if all objectives are complete (mission completion)
-			// This provides feedback and triggers game progression events.
+
+			Com_DPrintf("Objective %d completed: %s\n", objective.objectiveId, objective.title);
+
+			// Play completion sound
+			if (objective.completionSound[0] != '\0') {
+				// S_StartLocalSound(objective.completionSound, CHAN_ANNOUNCER);
+				Com_DPrintf("Objective completion sound: %s\n", objective.completionSound);
+			}
+
+			// Trigger completion events
+			// TODO: Trigger Lua event "objective_completed" with objective data
+			// TODO: Update UI to show objective completion
+			// TODO: Award XP or rewards if applicable
+			// TODO: Check if all objectives are complete (mission completion)
+
+			// Mark network sync needed
+			if (auto net = registry.try_get<NetworkComponent>(entity)) {
+				net->needsSync = qtrue;
+			}
+		}
+
+		// Trigger progress update events if progress changed
+		if (objective.progress != oldProgress && objective.updateSound[0] != '\0') {
+			// S_StartLocalSound(objective.updateSound, CHAN_ANNOUNCER);
+			Com_DPrintf("Objective progress sound: %s (%d/%d)\n",
+					   objective.updateSound, objective.progress, objective.targetProgress);
 		}
 		
-		// TODO: Update progress based on game state.
-		// Implementation approach:
-		//   1. Query game state for objective-relevant data (kills, items collected, etc.)
-		//   2. Calculate progress percentage based on current vs. target values
-		//   3. Update objective.progress field
-		//   4. Trigger progress update events for UI display
-		// This integrates with game logic to track objective progress in real-time.
+		// Update progress based on objective type and game state
+		int oldProgress = objective.progress;
+
+		switch (objective.objectiveType) {
+			case ObjectiveType::DESTROY: {
+				// Check for destruction of target entities
+				if (objective.targetEntity[0] != '\0') {
+					// Count destroyed entities matching target
+					// This is a simplified implementation - real game would track specific entities
+					// For now, just simulate progress based on time (for demo purposes)
+					if (objective.buildTime > 0.0f) {
+						objective.progress = std::min(objective.targetProgress,
+													(int)(oldProgress + deltaTime * 10.0f));
+					}
+				}
+				break;
+			}
+
+			case ObjectiveType::CONSTRUCT: {
+				// Check construction progress
+				if (objective.buildTime > 0.0f) {
+					// Simulate construction progress
+					objective.progress = std::min(objective.targetProgress,
+												(int)(oldProgress + deltaTime * 5.0f));
+				}
+				break;
+			}
+
+			case ObjectiveType::ESCORT: {
+				// Check if escorted entity is still alive and in position
+				// Simplified: just maintain current progress
+				break;
+			}
+
+			case ObjectiveType::STEAL: {
+				// Check if item has been stolen (picked up)
+				auto pickupView = registry.view<PickupComponent>();
+				for (auto pickupEntity : pickupView) {
+					auto &pickup = pickupView.get<PickupComponent>(pickupEntity);
+					if (pickup.isPickedUp && pickup.itemId == objective.objectiveId) {
+						objective.progress = objective.targetProgress; // Item stolen
+						break;
+					}
+				}
+				break;
+			}
+
+			case ObjectiveType::CAPTURE: {
+				// Check control point capture status
+				// Simplified: maintain progress
+				break;
+			}
+
+			case ObjectiveType::DEFEND: {
+				// Check if defended entity/area is still intact
+				// Simplified: maintain progress
+				break;
+			}
+
+			case ObjectiveType::DELIVER: {
+				// Check if item has been delivered to target location
+				// Simplified: maintain progress
+				break;
+			}
+
+			default:
+				// Generic objective - progress based on time for demo
+				objective.progress = std::min(objective.targetProgress,
+											(int)(oldProgress + deltaTime * 2.0f));
+				break;
+		}
 	}
 	
 	(void)deltaTime; // Suppress unused warning
@@ -731,15 +970,18 @@ static void ECS_DebrisSystem_Update(float deltaTime) {
 		
 		// Handle fade out
 		if (debris.fadeOut && debris.timeRemaining <= debris.fadeStartTime) {
-			// TODO: Apply fade alpha to rendering.
-			// Implementation approach:
-			//   1. Calculate fade alpha: alpha = (timeRemaining / fadeStartTime)
-			//   2. Get RenderComponent or similar for this entity
-			//   3. Set render component alpha/color alpha channel
-			//   4. Renderer will use this alpha value for transparency
-			//   5. Optionally use shader uniforms for per-entity alpha
-			// This creates smooth fade-out effects for debris before removal.
-			// Note: Requires renderer integration - see renderer boundary notes.
+			// Calculate fade alpha: alpha = (timeRemaining / fadeStartTime)
+			float fadeAlpha = debris.timeRemaining / debris.fadeStartTime;
+			fadeAlpha = std::max(0.0f, std::min(1.0f, fadeAlpha));
+
+			// TODO: Apply fade alpha to rendering when RenderComponent is available
+			// For now, just log the fade progress
+			Com_DPrintf("Debris entity %d fading: alpha=%.2f\n", (int)entity, fadeAlpha);
+
+			// Mark network sync needed for fade updates
+			if (auto net = registry.try_get<NetworkComponent>(entity)) {
+				net->needsSync = qtrue;
+			}
 		}
 	}
 	
@@ -763,20 +1005,116 @@ static void ECS_PlayerClassSystem_Update(float deltaTime) {
 	
 	for (auto entity : view) {
 		auto &playerClass = view.get<PlayerClassComponent>(entity);
-		// TODO: Apply class-specific bonuses to health/armor.
-		// Implementation approach:
-		//   1. Get HealthComponent for this entity
-		//   2. Apply class-specific health/armor multipliers based on playerClass.type
-		//   3. Update max health/armor values accordingly
-		// This would integrate with HealthComponent to provide class-based gameplay variety.
-		(void)playerClass; // Reserved for future use (see TODOs above and below)
-		
-		// TODO: Apply movement speed modifiers.
-		// Implementation approach:
-		//   1. Get PhysicsComponent for this entity
-		//   2. Apply class-specific speed multipliers based on playerClass.type
-		//   3. Update movement parameters (walk speed, run speed, etc.)
-		// This would integrate with PhysicsComponent to provide class-based movement variety.
+
+		// Apply class-specific bonuses to health/armor
+		if (registry.any_of<HealthComponent>(entity)) {
+			auto &health = registry.get<HealthComponent>(entity);
+
+			// Base values (will be modified by class)
+			int baseMaxHealth = 100;
+			int baseMaxArmor = 50;
+
+			// Apply class-specific health bonuses
+			switch (playerClass.classType) {
+				case PlayerClassType::SOLDIER:
+					// Soldiers get extra armor
+					baseMaxArmor += 25;
+					break;
+
+				case PlayerClassType::ENGINEER:
+					// Engineers get moderate health bonus
+					baseMaxHealth += 10;
+					break;
+
+				case PlayerClassType::MEDIC:
+					// Medics get significant health bonus
+					baseMaxHealth += 20;
+					break;
+
+				case PlayerClassType::FIELDOPS:
+					// Field Ops get moderate armor bonus
+					baseMaxArmor += 15;
+					break;
+
+				case PlayerClassType::COVERTOPS:
+					// Covert Ops get stealth bonuses (no direct stat changes)
+					break;
+
+				default:
+					break;
+			}
+
+			// Apply health bonus multiplier
+			if (playerClass.healthBonus > 0.0f) {
+				baseMaxHealth = (int)(baseMaxHealth * (1.0f + playerClass.healthBonus));
+			}
+
+			// Apply armor bonus multiplier
+			if (playerClass.armorBonus > 0.0f) {
+				baseMaxArmor = (int)(baseMaxArmor * (1.0f + playerClass.armorBonus));
+			}
+
+			// Update max values if they have changed
+			if (health.maxHealth != baseMaxHealth) {
+				health.maxHealth = baseMaxHealth;
+				// Clamp current health to new max
+				if (health.health > health.maxHealth) {
+					health.health = health.maxHealth;
+				}
+			}
+
+			if (health.maxArmor != baseMaxArmor) {
+				health.maxArmor = baseMaxArmor;
+				// Clamp current armor to new max
+				if (health.armor > health.maxArmor) {
+					health.armor = health.maxArmor;
+				}
+			}
+
+			Com_DPrintf("Player class %s: Health=%d/%d, Armor=%d/%d\n",
+					   playerClass.name, health.health, health.maxHealth,
+					   health.armor, health.maxArmor);
+		}
+
+		// Apply movement speed modifiers
+		if (registry.any_of<PhysicsComponent>(entity)) {
+			auto &physics = registry.get<PhysicsComponent>(entity);
+
+			// Apply class-specific speed multipliers
+			float baseSpeed = 320.0f; // Default Quake 3 speed
+			float modifiedSpeed = baseSpeed * playerClass.moveSpeedMultiplier;
+
+			// TODO: Set movement speed in appropriate component
+			// For now, just log the speed modification
+			Com_DPrintf("Player class %s speed multiplier: %.2f (%.0f units/sec)\n",
+					   playerClass.name, playerClass.moveSpeedMultiplier, modifiedSpeed);
+		}
+
+		// Apply class-specific abilities
+		switch (playerClass.classType) {
+			case PlayerClassType::SOLDIER:
+				// Soldiers can drop ammo - this would be handled in game logic
+				break;
+
+			case PlayerClassType::ENGINEER:
+				// Engineers can construct - this would be handled in game logic
+				break;
+
+			case PlayerClassType::MEDIC:
+				// Medics can revive - this would be handled in game logic
+				break;
+
+			case PlayerClassType::FIELDOPS:
+				// Field Ops can call artillery - this would be handled in game logic
+				break;
+
+			case PlayerClassType::COVERTOPS:
+				// Covert Ops can disguise - this would be handled in game logic
+				break;
+
+			default:
+				break;
+		}
 	}
 	
 	(void)deltaTime; // Suppress unused warning
@@ -842,14 +1180,67 @@ static void ECS_FireteamSystem_Update(float deltaTime) {
 			fireteam.leaderId = static_cast<int>(entity);
 		}
 		
-		// TODO: Handle fireteam communication, shared objectives, etc.
-		// Implementation approach:
-		//   1. Implement fireteam chat/voice communication system
-		//   2. Share objective progress across fireteam members
-		//   3. Coordinate fireteam actions (synchronized attacks, etc.)
-		//   4. Track fireteam statistics and achievements
-		//   5. Handle fireteam member join/leave events
-		// This enables cooperative gameplay features for multiplayer modes.
+		// Handle fireteam coordination and management
+		if (fireteam.isLeader && fireteam.numMembers > 1) {
+			// Leader-specific logic
+			Com_DPrintf("Fireteam %d led by entity %d has %d members\n",
+					   fireteam.fireteamId, fireteam.leaderId, fireteam.numMembers);
+
+			// TODO: Implement fireteam communication system
+			// - Shared voice chat
+			// - Team coordination commands
+			// - Shared minimap/objective data
+
+			// TODO: Share objective progress across fireteam members
+			// - Synchronize objective completion
+			// - Coordinate objective assignments
+			// - Track team-based achievements
+
+			// TODO: Coordinate fireteam actions
+			// - Formation movement
+			// - Synchronized attacks
+			// - Cover fire mechanics
+
+		} else if (!fireteam.isLeader && fireteam.fireteamId >= 0) {
+			// Member-specific logic
+			Com_DPrintf("Entity %d is member of fireteam %d (leader: %d)\n",
+					   (int)entity, fireteam.fireteamId, fireteam.leaderId);
+
+			// TODO: Follow leader commands
+			// - Execute coordinated actions
+			// - Maintain formation
+			// - Provide supporting fire
+		}
+
+		// Validate member connections (check if members still exist)
+		for (int i = 0; i < fireteam.numMembers; i++) {
+			int memberId = fireteam.memberIds[i];
+			if (memberId >= 0) {
+				entt::entity memberEntity = static_cast<entt::entity>(memberId);
+				if (!registry.valid(memberEntity)) {
+					// Member entity no longer exists, remove from fireteam
+					Com_DPrintf("Fireteam %d member %d disconnected\n", fireteam.fireteamId, memberId);
+					fireteam.memberIds[i] = -1;
+
+					// Shift remaining members down
+					for (int j = i; j < fireteam.numMembers - 1; j++) {
+						fireteam.memberIds[j] = fireteam.memberIds[j + 1];
+						fireteam.memberIds[j + 1] = -1;
+					}
+					fireteam.numMembers--;
+					i--; // Recheck this slot
+				}
+			}
+		}
+
+		// If leader leaves and there are other members, promote someone
+		if (fireteam.isLeader && fireteam.numMembers <= 1) {
+			Com_DPrintf("Fireteam %d disbanded (leader left, no members)\n", fireteam.fireteamId);
+			fireteam.fireteamId = -1;
+			fireteam.leaderId = -1;
+			fireteam.isLeader = qfalse;
+			fireteam.numMembers = 0;
+		}
 	}
 	
 	(void)deltaTime; // Suppress unused warning

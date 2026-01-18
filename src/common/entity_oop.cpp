@@ -131,12 +131,52 @@ void BaseEntity::FreeEntity() {
 }
 
 void BaseEntity::LinkEntity() {
-    // TODO: Implement entity linking for collision detection
-    Com_DPrintf("Entity %d linked\n", entityIndex);
+    vec3_t mins, maxs;
+
+    // If already linked, unlink first
+    if (r.linked) {
+        UnlinkEntity();
+    }
+
+    // Set default bounding box if not specified
+    if (!r.bmodel) {
+        // For non-brush models, use a default bounding box
+        // This should be overridden by specific entity types
+        VectorSet(mins, -8, -8, -8);
+        VectorSet(maxs, 8, 8, 8);
+    } else {
+        // For brush models, mins/maxs are already set
+        VectorCopy(r.mins, mins);
+        VectorCopy(r.maxs, maxs);
+    }
+
+    // Calculate absolute bounding box
+    VectorAdd(r.currentOrigin, mins, r.absmin);
+    VectorAdd(r.currentOrigin, maxs, r.absmax);
+
+    // Mark as linked
+    r.linked = qtrue;
+    r.linkcount++;
+
+    Com_DPrintf("Entity %d linked: origin=(%.2f,%.2f,%.2f) bounds=(%.2f,%.2f,%.2f)-(%.2f,%.2f,%.2f)\n",
+                entityIndex,
+                r.currentOrigin[0], r.currentOrigin[1], r.currentOrigin[2],
+                r.absmin[0], r.absmin[1], r.absmin[2],
+                r.absmax[0], r.absmax[1], r.absmax[2]);
 }
 
 void BaseEntity::UnlinkEntity() {
-    // TODO: Implement entity unlinking
+    if (!r.linked) {
+        return; // Already unlinked
+    }
+
+    // Clear bounding box
+    VectorClear(r.absmin);
+    VectorClear(r.absmax);
+
+    // Mark as unlinked
+    r.linked = qfalse;
+
     Com_DPrintf("Entity %d unlinked\n", entityIndex);
 }
 
