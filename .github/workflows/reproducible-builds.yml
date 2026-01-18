@@ -1,0 +1,122 @@
+name: Reproducible Builds Verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_ref:
+        description: 'Base git reference for reproducibility check'
+        required: true
+        default: 'HEAD~1'
+      target_ref:
+        description: 'Target git reference for reproducibility check'
+        required: true
+        default: 'HEAD'
+  schedule:
+    # Weekly reproducibility check
+    - cron: '0 2 * * 1'
+
+jobs:
+  reproducible-check:
+    name: Reproducible Build Check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: [gcc, clang]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake pkg-config python3 \
+            libsdl2-dev libcurl4-openssl-dev \
+            libssl-dev libjpeg-dev \
+            libvorbis-dev libogg-dev \
+            libfreetype6-dev libsqlite3-dev \
+            liblua5.4-dev libwebsockets-dev \
+            libzstd-dev libopenal-dev \
+            libvulkan-dev libtheora-dev \
+            libvpx-dev libdav1d-dev \
+            libopenexr-dev libassimp-dev \
+            libbullet-dev diffoscope
+
+          if [ "${{ matrix.compiler }}" = "clang" ]; then
+            sudo apt-get install -y clang lld
+          fi
+
+      - name: Build reference (base)
+        run: |
+          git checkout ${{ github.event.inputs.base_ref || 'HEAD~1' }}
+          mkdir -p build-base
+          cd build-base
+          export SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+          if [ "${{ matrix.compiler }}" = "clang" ]; then
+            export CC=clang CXX=clang++
+          fi
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DREPRODUCIBLE_BUILD=ON \
+            -DCMAKE_C_FLAGS="-O2 -DNDEBUG" \
+            -DCMAKE_CXX_FLAGS="-O2 -DNDEBUG"
+          make -j$(nproc)
+          cd ..
+          cp build-base/idtech3.x86_64 idtech3-base
+
+      - name: Build target
+        run: |
+          git checkout ${{ github.event.inputs.target_ref || 'HEAD' }}
+          mkdir -p build-target
+          cd build-target
+          export SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+          if [ "${{ matrix.compiler }}" = "clang" ]; then
+            export CC=clang CXX=clang++
+          fi
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DREPRODUCIBLE_BUILD=ON \
+            -DCMAKE_C_FLAGS="-O2 -DNDEBUG" \
+            -DCMAKE_CXX_FLAGS="-O2 -DNDEBUG"
+          make -j$(nproc)
+          cd ..
+          cp build-target/idtech3.x86_64 idtech3-target
+
+      - name: Compare builds
+        run: |
+          echo "Comparing builds..."
+          sha256sum idtech3-base idtech3-target
+
+          if cmp -s idtech3-base idtech3-target; then
+            echo "✅ Builds are identical - reproducible!"
+            echo "REPRODUCIBLE=true" >> $GITHUB_ENV
+          else
+            echo "❌ Builds differ - not reproducible"
+            echo "REPRODUCIBLE=false" >> $GITHUB_ENV
+
+            # Use diffoscope for detailed comparison
+            diffoscope idtech3-base idtech3-target > build_diff.txt || true
+            echo "Detailed diff saved to build_diff.txt"
+          fi
+
+      - name: Upload comparison results
+        uses: actions/upload-artifact@v4
+        with:
+          name: reproducible-check-${{ matrix.compiler }}
+          path: |
+            build_diff.txt
+            idtech3-base
+            idtech3-target
+          retention-days: 30
+
+      - name: Report results
+        run: |
+          if [ "$REPRODUCIBLE" = "true" ]; then
+            echo "🎉 Reproducible build verification PASSED"
+          else
+            echo "⚠️  Reproducible build verification FAILED"
+            echo "Builds are not reproducible - check build_diff.txt for details"
+            exit 1
+          fi

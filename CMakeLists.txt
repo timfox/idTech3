@@ -56,6 +56,32 @@ add_compile_definitions(BUILD_DATE="${BUILD_DATE}")
 message(STATUS "Build ID: ${BUILD_ID}")
 message(STATUS "Build Date: ${BUILD_DATE}")
 
+# Reproducible build setup
+if(REPRODUCIBLE_BUILD)
+    message(STATUS "Enabling reproducible build features")
+
+    # Run reproducible build setup script
+    execute_process(
+        COMMAND "${CMAKE_SOURCE_DIR}/tools/reproducible-build-setup.sh"
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        RESULT_VARIABLE SETUP_RESULT
+    )
+
+    if(NOT SETUP_RESULT EQUAL 0)
+        message(WARNING "Reproducible build setup failed")
+    endif()
+
+    # Add deterministic build flags
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -frandom-seed=0x12345678")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -frandom-seed=0x12345678")
+
+    # Ensure consistent file ordering
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fdebug-prefix-map=${CMAKE_SOURCE_DIR}=.")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdebug-prefix-map=${CMAKE_SOURCE_DIR}=.")
+
+    add_compile_definitions(REPRODUCIBLE_BUILD=1)
+endif()
+
 include("${CMAKE_SOURCE_DIR}/cmake/backend_select.cmake" NO_POLICY_SCOPE)
 include("${CMAKE_SOURCE_DIR}/cmake/moltenvk_setup.cmake" NO_POLICY_SCOPE)
 
@@ -601,6 +627,7 @@ OPTION(USE_TRACY "Enable Tracy profiler instrumentation (header-only shim)" OFF)
 OPTION(USE_CIMGUI "Enable ImGui" ON)
 OPTION(USE_WEBSOCKETS "Enable WebSocket support" ON)
 OPTION(USE_OPENAL "Enable OpenAL enhanced audio system" ON)
+OPTION(REPRODUCIBLE_BUILD "Enable reproducible build features" OFF)
 OPTION(USE_BULLET "Enable Bullet Physics library for rigid body simulation" ON)
 OPTION(USE_JOBSYSTEM "Enable multi-threaded job system for parallel execution" ON)
 OPTION(USE_THEORA "Enable Theora (Ogg Theora) video codec support" ON)
