@@ -622,6 +622,7 @@ OPTION(USE_BROTLI "" ON)
 OPTION(USE_OPENSSL "" ON)
 OPTION(USE_AIML "Enable AIML 2.1 parser/interpreter support" ON)
 OPTION(USE_ENTT "Enable EnTT ECS system" ON)
+OPTION(USE_OOP_ENTITIES "Enable OOP entity architecture (replaces gentity_t)" OFF)
 OPTION(USE_STEAMWORKS "Enable Steamworks SDK integration for Steam Deck features" OFF)
 OPTION(USE_TRACY "Enable Tracy profiler instrumentation (header-only shim)" OFF)
 OPTION(USE_CIMGUI "Enable ImGui" ON)
@@ -867,6 +868,20 @@ IF(USE_ENTT)
 		message(WARNING "USE_ENTT enabled but g_local.h is missing; skipping ECS game integration sources.")
 	ENDIF()
 ENDIF()
+
+# OOP Entity Architecture
+IF(USE_OOP_ENTITIES)
+	# Add compile definition
+	ADD_COMPILE_DEFINITIONS(USE_OOP_ENTITIES)
+	# Add C++ source files for OOP entities
+	list(APPEND QCOMMON_SRCS src/common/entity_oop.cpp)
+	# Add header include path
+	INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/src/common)
+	message(STATUS "OOP Entity Architecture enabled")
+ELSE()
+	message(STATUS "Using legacy gentity_t (USE_OOP_ENTITIES=OFF)")
+ENDIF()
+
 IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/common/ecs_systems.cpp)
 		list(APPEND QCOMMON_SRCS src/common/ecs_systems.cpp)
 ENDIF()
