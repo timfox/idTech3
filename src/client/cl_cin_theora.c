@@ -66,7 +66,7 @@ static qboolean Theora_ParseHeaders(int handle) {
 				return qfalse;
 			}
 			stream_initialized = qtrue;
-			Com_Printf("Theora_ParseHeaders: initialized OGG stream with serial %d\n", ogg_page_serialno(&page));
+			Com_DPrintf("Theora_ParseHeaders: initialized OGG stream with serial %d\n", ogg_page_serialno(&page));
 		}
 
 		// Submit page to stream state
@@ -118,7 +118,7 @@ static qboolean Theora_ParseHeaders(int handle) {
 		return qfalse;
 	}
 
-	Com_Printf("Theora_ParseHeaders: successfully parsed %d Theora headers\n", theora_header_count);
+	Com_DPrintf("Theora_ParseHeaders: successfully parsed %d Theora headers\n", theora_header_count);
 	return qtrue;
 }
 
@@ -228,14 +228,9 @@ static void Theora_YUVtoRGB(th_ycbcr_buffer ycbcr, byte *rgb, int width, int hei
 		return;
 	}
 
-	// Debug output and validation
-	static int debug_count = 0;
-	if (debug_count < 10) {  // Increased debug count to see more frames
-		int expected_rgb_size = width * height * 4;
-		Com_Printf("Theora_YUVtoRGB: %dx%d -> expected_rgb_size=%d, chroma %dx%d, strides Y:%d U:%d V:%d\n",
-			width, height, expected_rgb_size, chroma_width, chroma_height, y_stride, u_stride, v_stride);
-		debug_count++;
-	}
+	// Debug output (only in debug builds)
+	Com_DPrintf("Theora_YUVtoRGB: %dx%d, chroma %dx%d, strides Y:%d U:%d V:%d\n",
+		width, height, chroma_width, chroma_height, y_stride, u_stride, v_stride);
 
 	for (y = 0; y < height; y++) {
 		for (x = 0; x < width; x++) {
@@ -315,7 +310,7 @@ qboolean Theora_Init(int handle) {
 
 	Com_Memset(data, 0, sizeof(theora_data_t));
 	cinTable[handle].codecData = data;
-	Com_Printf("Theora_Init: allocated data at %p\n", (void*)data);
+	Com_DPrintf("Theora_Init: allocated data at %p\n", (void*)data);
 
 	// Initialize Theora library structures
 	th_info_init(&data->theora_info);
@@ -379,7 +374,7 @@ qboolean Theora_Init(int handle) {
 	if (data->fps <= 0) data->fps = 30.0; // Default fallback
 
 	// Debug: print pixel format information
-	Com_Printf("Theora_Init: decoder created successfully (%dx%d @ %.2f fps, pixel format: %d)\n",
+	Com_DPrintf("Theora_Init: decoder created successfully (%dx%d @ %.2f fps, pixel format: %d)\n",
 		cinTable[handle].CIN_WIDTH, cinTable[handle].CIN_HEIGHT, data->fps, data->theora_info.pixel_fmt);
 
 	// Re-allocate frame buffer with correct dimensions
@@ -456,7 +451,6 @@ e_status Theora_Run(int handle) {
 	int ret;
 	int current_time;
 	int frame_delay;
-	static int debug_count = 0;
 
 	Com_Memset(&ycbcr, 0, sizeof(th_ycbcr_buffer));
 
@@ -528,14 +522,11 @@ e_status Theora_Run(int handle) {
 				}
 
 				// Debug: check what dimensions Theora library reports
-				if (debug_count < 3) {
-					Com_Printf("Theora_Run: YUV buffer info - Y:%dx%d U:%dx%d V:%dx%d strides Y:%d U:%d V:%d\n",
-						ycbcr[0].width, ycbcr[0].height,
-						ycbcr[1].width, ycbcr[1].height,
-						ycbcr[2].width, ycbcr[2].height,
-						ycbcr[0].stride, ycbcr[1].stride, ycbcr[2].stride);
-					debug_count++;
-				}
+				Com_DPrintf("Theora_Run: YUV buffer info - Y:%dx%d U:%dx%d V:%dx%d strides Y:%d U:%d V:%d\n",
+					ycbcr[0].width, ycbcr[0].height,
+					ycbcr[1].width, ycbcr[1].height,
+					ycbcr[2].width, ycbcr[2].height,
+					ycbcr[0].stride, ycbcr[1].stride, ycbcr[2].stride);
 
 				// Validate YUV buffer dimensions and strides - handle both 4:4:4 and 4:2:0 subsampling
 				int min_u_stride = (ycbcr[1].width == ycbcr[0].width) ? cinTable[handle].CIN_WIDTH : cinTable[handle].CIN_WIDTH / 2;
@@ -552,12 +543,9 @@ e_status Theora_Run(int handle) {
 				}
 
 				// Convert YUV to RGB
-				Com_Printf("Theora_Run: about to call Theora_YUVtoRGB\n");
 				Theora_YUVtoRGB(ycbcr, cinTable[handle].buf,
 					cinTable[handle].CIN_WIDTH, cinTable[handle].CIN_HEIGHT);
-				Com_Printf("Theora_Run: Theora_YUVtoRGB completed\n");
 				cinTable[handle].dirty = qtrue;
-				Com_Printf("Theora_Run: set dirty flag\n");
 				
 				data->frame_count++;
 				data->last_frame_time = current_time;
