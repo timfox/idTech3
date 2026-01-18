@@ -64,5 +64,9 @@ void		SndOpenAL_UpdateEnvironmentalAudio(void);
 void		SndOpenAL_SetSoundCone(sndOpenALHandle_t handle, float innerAngle, float outerAngle, float outerGain);
 void		SndOpenAL_SetSoundDirectivity(sndOpenALHandle_t handle, float directivity, float directivitySharpness);
 
+// Main sound system integration
+void		SndOpenAL_Frame(void);	// Called every frame to update streaming and effects
+qboolean	SndOpenAL_IsEnabled(void); // Check if OpenAL is available and enabled
+
 #endif // __SND_OPENAL_H__
 

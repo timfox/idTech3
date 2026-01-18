@@ -46,12 +46,34 @@ typedef struct {
 	int					channel;
 } openalSound_t;
 
+typedef struct {
+	sndOpenALHandle_t	handle;
+	ALuint				source;
+	ALuint				buffers[4];		// Streaming buffers (quad-buffered for smooth playback)
+	fileHandle_t		fileHandle;
+	int					channels;
+	int					sampleRate;
+	int					bitsPerSample;
+	qboolean			playing;
+	qboolean			looping;
+	qboolean			streaming;
+	size_t				bufferSize;
+	char				filename[MAX_QPATH];
+} openalStream_t;
+
 static openalSound_t openalSounds[MAX_OPENAL_SOURCES];
+static openalStream_t openalStreams[MAX_OPENAL_STREAMS];
 
 static qboolean SndOpenAL_CreateBufferFromSfx( sfxHandle_t sfxHandle, ALuint *outBuffer );
 static qboolean SndOpenAL_AttachBufferToSource( ALuint source, ALuint buffer );
 static void SndOpenAL_InitEfx(void);
 static void SndOpenAL_ShutdownEfx(void);
+
+// Streaming functions
+static qboolean SndOpenAL_InitStream(openalStream_t *stream, const char *filename, qboolean looping);
+static void SndOpenAL_ShutdownStream(openalStream_t *stream);
+static qboolean SndOpenAL_UpdateStream(openalStream_t *stream);
+static qboolean SndOpenAL_LoadWAVData(const char *filename, int *channels, int *sampleRate, int *bitsPerSample, void **data, size_t *size);
 
 /*
 =================
@@ -89,17 +111,16 @@ qboolean SndOpenAL_Init(void)
 	if (!s_openal_enabled->integer) {
 		return qfalse;
 	}
-	
+
 	// Open default device
 	deviceName = alcGetString(NULL, ALC_DEFAULT_DEVICE_SPECIFIER);
 
 	// Try to enable HRTF if requested
 	ALCint contextAttrs[5] = {0};
 	int attrIndex = 0;
-
-	cvar_t *s_openal_hrtf = Cvar_Get("s_openal_hrtf", "1", CVAR_ARCHIVE);
 	if (s_openal_hrtf->integer) {
-		// Check if HRTF is supported
+		// Check if HRTF is supported (OpenAL Soft extension)
+#ifdef ALC_HRTF_SOFT
 		ALCint hrtfStatus = 0;
 		alcGetIntegerv(NULL, ALC_HRTF_STATUS_SOFT, 1, &hrtfStatus);
 		if (hrtfStatus == ALC_HRTF_ENABLED_SOFT || hrtfStatus == ALC_HRTF_HEADPHONES_DETECTED_SOFT) {
@@ -109,6 +130,9 @@ qboolean SndOpenAL_Init(void)
 		} else {
 			LOG_SOUND_INFO("OpenAL: HRTF not supported by audio device");
 		}
+#else
+		LOG_SOUND_INFO("OpenAL: HRTF not supported by OpenAL implementation");
+#endif
 	}
 
 	openalDevice = alcOpenDevice(deviceName);
@@ -338,7 +362,7 @@ static void SndOpenAL_InitEfx(void) {
 	alEffectf(openalReverbEffect, AL_REVERB_LATE_REVERB_DELAY, 0.011f);
 	alEffectf(openalReverbEffect, AL_REVERB_ROOM_ROLLOFF_FACTOR, 0.0f);
 	alEffectf(openalReverbEffect, AL_REVERB_AIR_ABSORPTION_GAINHF, 0.994f);
-	alEffectf(openalReverbEffect, AL_REVERB_HFREFERENCE, 5000.0f);
+	alEffectf(openalReverbEffect, AL_EAXREVERB_HFREFERENCE, 5000.0f);
 
 	alGenAuxiliaryEffectSlots(1, &openalReverbSlot);
 	if (alGetError() != AL_NO_ERROR) {
@@ -852,13 +876,48 @@ Start streaming audio
 */
 sndOpenALHandle_t SndOpenAL_StartStream(const char *streamName, qboolean looping)
 {
-	// TODO: Implement audio streaming with OpenAL
-	// For now, use standard background track system
-	if (streamName && *streamName) {
-		S_StartBackgroundTrack(streamName, looping ? streamName : NULL);
-		return 0;
+	int slot;
+	openalStream_t *stream;
+
+	if (!s_openal_enabled || !s_openal_enabled->integer || !openalContext) {
+		// Fallback to legacy system
+		if (streamName && *streamName) {
+			S_StartBackgroundTrack(streamName, looping ? streamName : NULL);
+			return 0;
+		}
+		return SND_OPENAL_INVALID_HANDLE;
 	}
-	return SND_OPENAL_INVALID_HANDLE;
+
+	if (!streamName || !*streamName) {
+		return SND_OPENAL_INVALID_HANDLE;
+	}
+
+	// Find free stream slot
+	for (slot = 0; slot < MAX_OPENAL_STREAMS; slot++) {
+		if (!openalStreams[slot].playing) {
+			break;
+		}
+	}
+
+	if (slot >= MAX_OPENAL_STREAMS) {
+		Com_Printf("SndOpenAL_StartStream: no free stream slots\n");
+		return SND_OPENAL_INVALID_HANDLE;
+	}
+
+	stream = &openalStreams[slot];
+
+	// Initialize the stream
+	if (!SndOpenAL_InitStream(stream, streamName, looping)) {
+		Com_Printf("SndOpenAL_StartStream: failed to initialize stream for %s\n", streamName);
+		return SND_OPENAL_INVALID_HANDLE;
+	}
+
+	stream->handle = slot;
+	stream->playing = qtrue;
+	stream->streaming = qtrue;
+
+	Com_DPrintf("Started OpenAL stream: %s (slot %d)\n", streamName, slot);
+	return stream->handle;
 }
 
 /*
@@ -870,9 +929,32 @@ Stop streaming audio
 */
 void SndOpenAL_StopStream(sndOpenALHandle_t handle)
 {
-	(void)handle; // Unused parameter - kept for API compatibility
-	// TODO: Implement stream stopping
-	S_StopBackgroundTrack();
+	openalStream_t *stream;
+
+	if (handle < 0 || handle >= MAX_OPENAL_STREAMS) {
+		return;
+	}
+
+	stream = &openalStreams[handle];
+
+	if (!stream->playing) {
+		return;
+	}
+
+	// Stop the source
+	if (stream->source) {
+		alSourceStop(stream->source);
+		alSourcei(stream->source, AL_BUFFER, 0); // Unqueue all buffers
+	}
+
+	// Clean up the stream
+	SndOpenAL_ShutdownStream(stream);
+
+	stream->playing = qfalse;
+	stream->streaming = qfalse;
+	stream->handle = SND_OPENAL_INVALID_HANDLE;
+
+	Com_DPrintf("Stopped OpenAL stream (slot %d)\n", (int)handle);
 }
 
 /*
@@ -914,9 +996,79 @@ Update environmental audio effects based on listener position
 */
 void SndOpenAL_UpdateEnvironmentalAudio(void)
 {
-	// This would be called regularly to update environmental effects
-	// based on the player's current environment (indoor/outdoor, room size, etc.)
-	// For now, this is a placeholder for future environmental audio features
+	if (!s_openal_reverb || !s_openal_reverb->integer || !openalEfxAvailable)
+		return;
+
+	// TODO: This should query the game world for environmental information
+	// For now, we'll use simplified environmental detection based on player position
+
+	// Get player position and orientation (would come from game state)
+	vec3_t playerPos = {0, 0, 0}; // Placeholder - should come from cl.snap.ps.origin
+	vec3_t playerForward = {0, 0, 0}; // Placeholder - should come from view angles
+
+	// Simple environmental detection - this should be replaced with proper BSP/occlusion queries
+	// For demonstration, we'll use a basic height-based system:
+	// - Above ground = outdoor (less reverb)
+	// - Below ground = indoor/cave (more reverb)
+
+	qboolean isIndoor = qfalse;
+	float roomSize = 1.0f; // Normalized room size (0.0 = small, 1.0 = large)
+
+	// Placeholder environmental detection - should be replaced with proper world queries
+	if (playerPos[2] < 0.0f) { // Below ground level
+		isIndoor = qtrue;
+		roomSize = 0.5f; // Smaller room
+	} else {
+		isIndoor = qfalse;
+		roomSize = 0.8f; // Larger outdoor space
+	}
+
+	// Update reverb settings based on environment
+	if (openalReverbEffect && openalReverbSlot) {
+		alGetError(); // Clear any previous errors
+
+		if (isIndoor) {
+			// Indoor environment - more reverb
+			alEffectf(openalReverbEffect, AL_REVERB_DENSITY, 1.0f);
+			alEffectf(openalReverbEffect, AL_REVERB_DIFFUSION, 0.8f);
+			alEffectf(openalReverbEffect, AL_REVERB_GAIN, 0.4f);
+			alEffectf(openalReverbEffect, AL_REVERB_GAINHF, 0.8f);
+			alEffectf(openalReverbEffect, AL_REVERB_DECAY_TIME, roomSize * 2.0f);
+			alEffectf(openalReverbEffect, AL_REVERB_DECAY_HFRATIO, 0.7f);
+			alEffectf(openalReverbEffect, AL_REVERB_REFLECTIONS_GAIN, 0.1f);
+			alEffectf(openalReverbEffect, AL_REVERB_REFLECTIONS_DELAY, 0.01f);
+			alEffectf(openalReverbEffect, AL_REVERB_LATE_REVERB_GAIN, roomSize * 1.5f);
+			alEffectf(openalReverbEffect, AL_REVERB_LATE_REVERB_DELAY, 0.02f);
+		} else {
+			// Outdoor environment - less reverb
+			alEffectf(openalReverbEffect, AL_REVERB_DENSITY, 0.3f);
+			alEffectf(openalReverbEffect, AL_REVERB_DIFFUSION, 0.9f);
+			alEffectf(openalReverbEffect, AL_REVERB_GAIN, 0.1f);
+			alEffectf(openalReverbEffect, AL_REVERB_GAINHF, 0.9f);
+			alEffectf(openalReverbEffect, AL_REVERB_DECAY_TIME, 0.5f);
+			alEffectf(openalReverbEffect, AL_REVERB_DECAY_HFRATIO, 0.9f);
+			alEffectf(openalReverbEffect, AL_REVERB_REFLECTIONS_GAIN, 0.02f);
+			alEffectf(openalReverbEffect, AL_REVERB_REFLECTIONS_DELAY, 0.005f);
+			alEffectf(openalReverbEffect, AL_REVERB_LATE_REVERB_GAIN, 0.3f);
+			alEffectf(openalReverbEffect, AL_REVERB_LATE_REVERB_DELAY, 0.01f);
+		}
+
+		// Update the effect slot
+		alAuxiliaryEffectSloti(openalReverbSlot, AL_EFFECTSLOT_EFFECT, openalReverbEffect);
+
+		if (alGetError() != AL_NO_ERROR) {
+			Com_DPrintf("Failed to update environmental reverb settings\n");
+		} else {
+			Com_DPrintf("Updated environmental audio: %s, room size %.2f\n",
+					   isIndoor ? "indoor" : "outdoor", roomSize);
+		}
+	}
+
+	// TODO: Additional environmental processing:
+	// - Occlusion detection for individual sounds
+	// - Dynamic obstruction based on geometry
+	// - Weather effects (rain, wind)
+	// - Material-based sound reflection
 }
 
 /*
@@ -980,6 +1132,39 @@ void SndOpenAL_SetSoundDirectivity(sndOpenALHandle_t handle, float directivity, 
 	SndOpenAL_SetSoundCone(handle, innerAngle, outerAngle, outerGain);
 }
 
+/*
+=================
+SndOpenAL_Frame
+Called every frame to update OpenAL state
+=================
+*/
+void SndOpenAL_Frame(void)
+{
+	if (!s_openal_enabled || !s_openal_enabled->integer || !openalContext)
+		return;
+
+	// Update all active streams
+	for (int i = 0; i < MAX_OPENAL_STREAMS; i++) {
+		if (openalStreams[i].playing) {
+			SndOpenAL_UpdateStream(&openalStreams[i]);
+		}
+	}
+
+	// Update environmental audio effects
+	SndOpenAL_UpdateEnvironmentalAudio();
+}
+
+/*
+=================
+SndOpenAL_IsEnabled
+Check if OpenAL is available and enabled
+=================
+*/
+qboolean SndOpenAL_IsEnabled(void)
+{
+	return (s_openal_enabled && s_openal_enabled->integer && openalContext) ? qtrue : qfalse;
+}
+
 #else // !USE_OPENAL
 
 // Stub implementations when OpenAL is not available
@@ -1001,7 +1186,213 @@ void SndOpenAL_StopStream(sndOpenALHandle_t handle) { (void)handle; }
 void SndOpenAL_SetEnvironmentReverb(float roomSize, float dampening, float wetness, float dryMix) { (void)roomSize; (void)dampening; (void)wetness; (void)dryMix; }
 void SndOpenAL_UpdateEnvironmentalAudio(void) {}
 void SndOpenAL_SetSoundCone(sndOpenALHandle_t handle, float innerAngle, float outerAngle, float outerGain) { (void)handle; (void)innerAngle; (void)outerAngle; (void)outerGain; }
-void SndOpenAL_SetSoundDirectivity(sndOpenALHandle_t handle, float directivity, float directivitySharpness) { (void)handle; (void)directivity; (void)directivitySharpness; }
+void 	SndOpenAL_SetSoundDirectivity(sndOpenALHandle_t handle, float directivity, float directivitySharpness) { (void)handle; (void)directivity; (void)directivitySharpness; }
+void SndOpenAL_Frame(void) {}
+qboolean SndOpenAL_IsEnabled(void) { return qfalse; }
+
+#endif // USE_OPENAL
+
+#ifdef USE_OPENAL
+
+/*
+=================
+SndOpenAL_InitStream
+Initialize a streaming audio source
+=================
+*/
+static qboolean SndOpenAL_InitStream(openalStream_t *stream, const char *filename, qboolean looping)
+{
+	int channels, sampleRate, bitsPerSample;
+	void *wavData;
+	size_t dataSize;
+	ALenum format;
+	ALuint buffers[4];
+
+	Com_Memset(stream, 0, sizeof(*stream));
+	Q_strncpyz(stream->filename, filename, sizeof(stream->filename));
+	stream->looping = looping;
+	stream->bufferSize = 4096; // 4KB buffer size
+
+	// Load WAV file data
+	if (!SndOpenAL_LoadWAVData(filename, &channels, &sampleRate, &bitsPerSample, &wavData, &dataSize)) {
+		Com_Printf("SndOpenAL_InitStream: failed to load WAV data for %s\n", filename);
+		return qfalse;
+	}
+
+	stream->channels = channels;
+	stream->sampleRate = sampleRate;
+	stream->bitsPerSample = bitsPerSample;
+
+	// Determine OpenAL format
+	if (channels == 1) {
+		format = (bitsPerSample == 16) ? AL_FORMAT_MONO16 : AL_FORMAT_MONO8;
+	} else {
+		format = (bitsPerSample == 16) ? AL_FORMAT_STEREO16 : AL_FORMAT_STEREO8;
+	}
+
+	// Generate source
+	alGenSources(1, &stream->source);
+	if (alGetError() != AL_NO_ERROR) {
+		Z_Free(wavData);
+		return qfalse;
+	}
+
+	// Generate buffers
+	alGenBuffers(4, buffers);
+	if (alGetError() != AL_NO_ERROR) {
+		alDeleteSources(1, &stream->source);
+		Z_Free(wavData);
+		return qfalse;
+	}
+
+	// Copy buffers to stream struct
+	Com_Memcpy(stream->buffers, buffers, sizeof(buffers));
+
+	// Fill initial buffers
+	size_t bytesPerSample = (bitsPerSample / 8) * channels;
+	size_t samplesPerBuffer = stream->bufferSize / bytesPerSample;
+	size_t dataOffset = 0;
+
+	for (int i = 0; i < 4; i++) {
+		size_t copySize = samplesPerBuffer * bytesPerSample;
+		if (dataOffset + copySize > dataSize) {
+			copySize = dataSize - dataOffset;
+		}
+
+		if (copySize > 0) {
+			alBufferData(stream->buffers[i], format, (char*)wavData + dataOffset, (ALsizei)copySize, sampleRate);
+			dataOffset += copySize;
+		}
+	}
+
+	// Queue buffers to source
+	alSourceQueueBuffers(stream->source, 4, stream->buffers);
+
+	// Set source properties
+	alSourcei(stream->source, AL_LOOPING, AL_FALSE); // We handle looping manually
+	alSourcef(stream->source, AL_GAIN, 1.0f);
+	alSourcePlay(stream->source);
+
+	Z_Free(wavData);
+	return (alGetError() == AL_NO_ERROR);
+}
+
+/*
+=================
+SndOpenAL_ShutdownStream
+Clean up a streaming audio source
+=================
+*/
+static void SndOpenAL_ShutdownStream(openalStream_t *stream)
+{
+	if (stream->source) {
+		alSourceStop(stream->source);
+		alDeleteSources(1, &stream->source);
+		stream->source = 0;
+	}
+
+	if (stream->buffers[0]) {
+		alDeleteBuffers(4, stream->buffers);
+		Com_Memset(stream->buffers, 0, sizeof(stream->buffers));
+	}
+
+	if (stream->fileHandle != FS_INVALID_HANDLE) {
+		FS_FCloseFile(stream->fileHandle);
+		stream->fileHandle = FS_INVALID_HANDLE;
+	}
+}
+
+/*
+=================
+SndOpenAL_UpdateStream
+Update streaming buffers (should be called regularly)
+=================
+*/
+static qboolean SndOpenAL_UpdateStream(openalStream_t *stream)
+{
+	ALint processed;
+	ALint state;
+
+	if (!stream->playing || !stream->source) {
+		return qfalse;
+	}
+
+	// Check if source is still playing
+	alGetSourcei(stream->source, AL_SOURCE_STATE, &state);
+	if (state != AL_PLAYING) {
+		// Source stopped - check if we need to loop or end
+		if (stream->looping) {
+			alSourcePlay(stream->source);
+		} else {
+			stream->playing = qfalse;
+			return qfalse;
+		}
+	}
+
+	// Unqueue processed buffers and refill them
+	alGetSourcei(stream->source, AL_BUFFERS_PROCESSED, &processed);
+
+	for (ALint i = 0; i < processed; i++) {
+		ALuint buffer;
+		alSourceUnqueueBuffers(stream->source, 1, &buffer);
+
+		// TODO: Refill buffer with next chunk of audio data
+		// For now, just re-queue the same buffer (simple implementation)
+		alSourceQueueBuffers(stream->source, 1, &buffer);
+	}
+
+	return qtrue;
+}
+
+/*
+=================
+SndOpenAL_LoadWAVData
+Load WAV file data for streaming
+=================
+*/
+static qboolean SndOpenAL_LoadWAVData(const char *filename, int *channels, int *sampleRate, int *bitsPerSample, void **data, size_t *size)
+{
+	fileHandle_t file;
+	int fileSize;
+	byte *fileData;
+
+	fileSize = FS_FOpenFileRead(filename, &file, qfalse);
+	if (fileSize <= 0) {
+		return qfalse;
+	}
+
+	fileData = Z_Malloc(fileSize);
+	FS_Read(fileData, fileSize, file);
+	FS_FCloseFile(file);
+
+	// Simple WAV header parsing (very basic implementation)
+	if (fileSize < 44 || memcmp(fileData, "RIFF", 4) != 0 || memcmp(fileData + 8, "WAVE", 4) != 0) {
+		Z_Free(fileData);
+		return qfalse;
+	}
+
+	// Extract format information
+	*channels = *(short*)(fileData + 22);
+	*sampleRate = *(int*)(fileData + 24);
+	*bitsPerSample = *(short*)(fileData + 34);
+
+	// Extract data
+	int dataChunkOffset = 36;
+	while (dataChunkOffset < fileSize - 8) {
+		if (memcmp(fileData + dataChunkOffset, "data", 4) == 0) {
+			int dataSize = *(int*)(fileData + dataChunkOffset + 4);
+			*data = Z_Malloc(dataSize);
+			Com_Memcpy(*data, fileData + dataChunkOffset + 8, dataSize);
+			*size = dataSize;
+			Z_Free(fileData);
+			return qtrue;
+		}
+		dataChunkOffset += 8 + *(int*)(fileData + dataChunkOffset + 4);
+	}
+
+	Z_Free(fileData);
+	return qfalse;
+}
 
 #endif // USE_OPENAL
 

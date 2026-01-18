@@ -32,6 +32,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "snd_local.h"
 #include "snd_codec.h"
 #include "snd_audio_thread.h"
+#include "snd_openal.h"
 #include "client.h"
 
 static void S_Update_( int msec );
@@ -1291,6 +1292,11 @@ static void S_Update_( int msec ) {
 	}
 
 	SNDDMA_Submit();
+
+	// Update OpenAL system if available
+	if (SndOpenAL_IsEnabled()) {
+		SndOpenAL_Frame();
+	}
 
 	lastTime = thisTime;
 }
