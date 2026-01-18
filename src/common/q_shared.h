@@ -1623,14 +1623,18 @@ static inline qboolean Q_strncpyz_safe(char *dest, size_t dest_size, const char 
         dest[0] = '\0';
         return qtrue;
     }
-    Q_strncpyz(dest, src, dest_size);
+    // Safe cast: ensure dest_size fits in int range
+    int safe_size = (dest_size > INT_MAX) ? INT_MAX : (int)dest_size;
+    Q_strncpyz(dest, src, safe_size);
     return qtrue;
 }
 
 static inline qboolean Q_strcat_safe(char *dest, size_t dest_size, const char *src) {
     if (!dest || dest_size == 0) return qfalse;
     if (!src) return qtrue;
-    Q_strcat(dest, dest_size, src);
+    // Safe cast: ensure dest_size fits in int range
+    int safe_size = (dest_size > INT_MAX) ? INT_MAX : (int)dest_size;
+    Q_strcat(dest, safe_size, src);
     return qtrue;
 }
 
@@ -1680,7 +1684,9 @@ static inline char* Q_stradd_safe(char *dst, size_t dst_size, const char *src) {
 static inline char* Q_strncpy_safe(char *dest, size_t dest_size, const char *src, size_t src_len) {
     if (!dest || !src || dest_size == 0) return dest;
     size_t copy_len = (src_len < dest_size - 1) ? src_len : dest_size - 1;
-    return Q_strncpy(dest, src, copy_len);
+    // Safe cast: ensure copy_len fits in int range
+    int safe_len = (copy_len > INT_MAX) ? INT_MAX : (int)copy_len;
+    return Q_strncpy(dest, src, safe_len);
 }
 
 // Safe integer parsing functions (replacement for atoi/atol)
@@ -2629,7 +2635,9 @@ static inline qboolean SAFE_STRCPY(char *dest, const char *src, size_t dest_size
 
     size_t src_len = strlen(src);
     if (src_len >= dest_size) {
-        Q_strncpyz(dest, src, dest_size);
+        // Safe cast: ensure dest_size fits in int range
+        int safe_size = (dest_size > INT_MAX) ? INT_MAX : (int)dest_size;
+        Q_strncpyz(dest, src, safe_size);
         return qfalse; // Truncated
     } else {
         strcpy(dest, src);

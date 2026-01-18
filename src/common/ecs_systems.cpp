@@ -24,6 +24,10 @@ extern "C" {
 }
 #endif
 
+// Forward declarations for internal functions
+static void ECS_IntegrateWithCMSystem(entt::registry &registry);
+static void ECS_ProcessCollisionEvent(entt::registry &registry, const CollisionEvent &event);
+
 #ifdef USE_BULLET
 #include <btBulletDynamicsCommon.h>
 
@@ -119,7 +123,7 @@ struct CollisionContactResultCallback : public btCollisionWorld::ContactResultCa
 			event.normal[1] = cp.m_normalWorldOnB.y();
 			event.normal[2] = cp.m_normalWorldOnB.z();
 			event.impulse = cp.getAppliedImpulse();
-                        event.timestamp = (uint64_t)time(NULL); // Use current time as timestamp
+                        event.timestamp = static_cast<uint64_t>(time(NULL)); // Use current time as timestamp
 
 			events.push_back(event);
 		}
@@ -155,9 +159,9 @@ public:
 
 		// Convert Euler angles to quaternion (simplified - assumes ZYX order)
 		btQuaternion rot;
-		rot.setEulerZYX(transform->rotation[2] * M_PI / 180.0f,
-					   transform->rotation[1] * M_PI / 180.0f,
-					   transform->rotation[0] * M_PI / 180.0f);
+                rot.setEulerZYX(transform->rotation[2] * static_cast<float>(M_PI) / 180.0f,
+                                transform->rotation[1] * static_cast<float>(M_PI) / 180.0f,
+                                transform->rotation[0] * static_cast<float>(M_PI) / 180.0f);
 
 		worldTrans.setOrigin(pos);
 		worldTrans.setRotation(rot);
@@ -174,9 +178,9 @@ public:
 		btQuaternion rot = worldTrans.getRotation();
 		btScalar yaw, pitch, roll;
 		rot.getEulerZYX(yaw, pitch, roll);
-		transform->rotation[0] = yaw * 180.0f / M_PI;
-		transform->rotation[1] = pitch * 180.0f / M_PI;
-		transform->rotation[2] = roll * 180.0f / M_PI;
+                transform->rotation[0] = yaw * 180.0f / static_cast<float>(M_PI);
+                transform->rotation[1] = pitch * 180.0f / static_cast<float>(M_PI);
+                transform->rotation[2] = roll * 180.0f / static_cast<float>(M_PI);
 	}
 };
 
@@ -236,6 +240,10 @@ static btCollisionShape* CreateCollisionShape(CollisionShapeType type, const vec
 
 // Create collision shape from model data
 btCollisionShape* CreateCollisionShapeFromModel(const char* modelName, CollisionShapeType preferredType) {
+	// Suppress unused parameter warnings
+	(void)modelName;
+	(void)preferredType;
+
 	// This would load model geometry and create appropriate collision shape
 	// For now, return a default box shape
 	return new btBoxShape(btVector3(1.0f, 1.0f, 1.0f));
@@ -432,7 +440,7 @@ static void ECS_Bullet_Step(entt::registry &registry, float deltaTime) {
 		cvar_t *physics_debug_collision = Cvar_Get("physics_debug_collision", "0", CVAR_CHEAT);
 		if (physics_debug_collision->integer) {
 			Com_Printf("Bullet collision: entity %d <-> entity %d at (%.2f,%.2f,%.2f), impulse %.2f\n",
-					  (int)event.entityA, (int)event.entityB,
+                                           static_cast<int>(event.entityA), static_cast<int>(event.entityB),
 					  event.contactPoint[0], event.contactPoint[1], event.contactPoint[2],
 					  event.impulse);
 		}
@@ -488,7 +496,7 @@ static void ECS_DebugDrawPhysics(entt::registry &registry) {
 		// Draw velocity vector
 		if (VectorLength(physics.velocity) > 0.1f) {
 			Com_DPrintf("Physics entity %d: pos(%.2f,%.2f,%.2f) vel(%.2f,%.2f,%.2f)\n",
-					   (int)entity,
+                                            static_cast<int>(entity),
 					   transform.position[0], transform.position[1], transform.position[2],
 					   physics.velocity[0], physics.velocity[1], physics.velocity[2]);
 		}
@@ -771,7 +779,7 @@ static void ECS_PickupSystem_Update(float deltaTime) {
 		auto playerView = registry.view<PlayerClassComponent, TransformComponent>();
 
 		for (auto playerEntity : playerView) {
-			auto &playerClass = playerView.get<PlayerClassComponent>(playerEntity);
+                        (void)playerView; // Suppress unused variable warning
 			auto &playerTransform = playerView.get<TransformComponent>(playerEntity);
 
 			// Calculate distance between pickup and player
@@ -850,7 +858,7 @@ static void ECS_PickupSystem_Update(float deltaTime) {
 					// TODO: Set entity visibility to false when RenderComponent is added
 
 					Com_DPrintf("Entity %d picked up item %s (type %d) by player entity %d\n",
-							   (int)pickupEntity, pickup.model, (int)pickup.itemType, (int)playerEntity);
+                                                            static_cast<int>(pickupEntity), pickup.model, static_cast<int>(pickup.itemType), static_cast<int>(playerEntity));
 
 					// Only allow one player to pick up the item
 					break;
@@ -907,7 +915,7 @@ static void ECS_KeySystem_Update(float deltaTime) {
 			// In a real game, this would check door state and unlock it
 			if (net.entityIndex >= 0) {
 				Com_DPrintf("Key %d (ID: %d) attempting to unlock door: %s\n",
-						   (int)entity, key.keyId, key.doorTarget);
+                                            static_cast<int>(entity), key.keyId, key.doorTarget);
 
 				// Check if door is locked and can be unlocked by this key
 				// TODO: Implement proper door locking/unlocking system
@@ -929,7 +937,7 @@ static void ECS_KeySystem_Update(float deltaTime) {
 
 		if (!doorFound) {
 			Com_DPrintf("Key %d (ID: %d) - target door '%s' not found\n",
-					   (int)entity, key.keyId, key.doorTarget);
+                                            static_cast<int>(entity), key.keyId, key.doorTarget);
 		}
 	}
 
@@ -967,7 +975,7 @@ static void ECS_BackpackSystem_Update(float deltaTime) {
 		// For now, just ensure backpack effects are active
 		if (backpack.inventorySlots > 0 || backpack.ammoCapacity > 0) {
 			Com_DPrintf("Backpack entity %d active: +%d slots, +%d ammo capacity\n",
-					   (int)entity, backpack.inventorySlots, backpack.ammoCapacity);
+                                            static_cast<int>(entity), backpack.inventorySlots, backpack.ammoCapacity);
 		}
 	}
 
@@ -975,7 +983,7 @@ static void ECS_BackpackSystem_Update(float deltaTime) {
 	for (auto entity : expiredBackpacks) {
 		auto &backpack = registry.get<BackpackComponent>(entity);
 
-		Com_DPrintf("Backpack entity %d expired - removing effects\n", (int)entity);
+		Com_DPrintf("Backpack entity %d expired - removing effects\n", static_cast<int>(entity));
 
 		// TODO: In a full implementation, this would:
 		// 1. Find the player entity that owns this backpack
@@ -1042,15 +1050,10 @@ static void ECS_ObjectiveSystem_Update(float deltaTime) {
 			}
 		}
 
-		// Trigger progress update events if progress changed
-		if (objective.progress != oldProgress && objective.updateSound[0] != '\0') {
-			// S_StartLocalSound(objective.updateSound, CHAN_ANNOUNCER);
-			Com_DPrintf("Objective progress sound: %s (%d/%d)\n",
-					   objective.updateSound, objective.progress, objective.targetProgress);
-		}
-		
-		// Update progress based on objective type and game state
+		// Store old progress for comparison
 		int oldProgress = objective.progress;
+
+		// Update progress based on objective type and game state
 
 		switch (objective.objectiveType) {
 			case ObjectiveType::DESTROY: {
@@ -1061,7 +1064,7 @@ static void ECS_ObjectiveSystem_Update(float deltaTime) {
 					// For now, just simulate progress based on time (for demo purposes)
 					if (objective.buildTime > 0.0f) {
 						objective.progress = std::min(objective.targetProgress,
-													(int)(oldProgress + deltaTime * 10.0f));
+													static_cast<int>(oldProgress + deltaTime * 10.0f));
 					}
 				}
 				break;
@@ -1072,7 +1075,7 @@ static void ECS_ObjectiveSystem_Update(float deltaTime) {
 				if (objective.buildTime > 0.0f) {
 					// Simulate construction progress
 					objective.progress = std::min(objective.targetProgress,
-												(int)(oldProgress + deltaTime * 5.0f));
+												static_cast<int>(oldProgress + deltaTime * 5.0f));
 				}
 				break;
 			}
@@ -1117,7 +1120,7 @@ static void ECS_ObjectiveSystem_Update(float deltaTime) {
 			default:
 				// Generic objective - progress based on time for demo
 				objective.progress = std::min(objective.targetProgress,
-											(int)(oldProgress + deltaTime * 2.0f));
+											static_cast<int>(oldProgress + deltaTime * 2.0f));
 				break;
 		}
 	}
@@ -1159,7 +1162,7 @@ static void ECS_DebrisSystem_Update(float deltaTime) {
 
 			// TODO: Apply fade alpha to rendering when RenderComponent is available
 			// For now, just log the fade progress
-			Com_DPrintf("Debris entity %d fading: alpha=%.2f\n", (int)entity, fadeAlpha);
+			Com_DPrintf("Debris entity %d fading: alpha=%.2f\n", static_cast<int>(entity), fadeAlpha);
 
 			// Mark network sync needed for fade updates
 			if (auto net = registry.try_get<NetworkComponent>(entity)) {
@@ -1229,12 +1232,12 @@ static void ECS_PlayerClassSystem_Update(float deltaTime) {
 
 			// Apply health bonus multiplier
 			if (playerClass.healthBonus > 0.0f) {
-				baseMaxHealth = (int)(baseMaxHealth * (1.0f + playerClass.healthBonus));
+				baseMaxHealth = static_cast<int>(baseMaxHealth * (1.0f + playerClass.healthBonus));
 			}
 
 			// Apply armor bonus multiplier
 			if (playerClass.armorBonus > 0.0f) {
-				baseMaxArmor = (int)(baseMaxArmor * (1.0f + playerClass.armorBonus));
+				baseMaxArmor = static_cast<int>(baseMaxArmor * (1.0f + playerClass.armorBonus));
 			}
 
 			// Update max values if they have changed
@@ -1261,7 +1264,7 @@ static void ECS_PlayerClassSystem_Update(float deltaTime) {
 
 		// Apply movement speed modifiers
 		if (registry.any_of<PhysicsComponent>(entity)) {
-			auto &physics = registry.get<PhysicsComponent>(entity);
+                        // Physics component accessed but not used directly
 
 			// Apply class-specific speed multipliers
 			float baseSpeed = 320.0f; // Default Quake 3 speed
@@ -1387,7 +1390,7 @@ static void ECS_FireteamSystem_Update(float deltaTime) {
 		} else if (!fireteam.isLeader && fireteam.fireteamId >= 0) {
 			// Member-specific logic
 			Com_DPrintf("Entity %d is member of fireteam %d (leader: %d)\n",
-					   (int)entity, fireteam.fireteamId, fireteam.leaderId);
+                                            static_cast<int>(entity), fireteam.fireteamId, fireteam.leaderId);
 
 			// TODO: Follow leader commands
 			// - Execute coordinated actions

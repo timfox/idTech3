@@ -330,10 +330,10 @@ int AAS_VectorForBSPEpairKey(int ent, const char *key, vec3_t v)
 int AAS_FloatForBSPEpairKey(int ent, const char *key, float *value)
 {
 	char buf[MAX_EPAIRKEY];
-	
+
 	*value = 0;
 	if (!AAS_ValueForBSPEpairKey(ent, key, buf, sizeof( buf ))) return qfalse;
-	*value = atof(buf);
+	*value = (float)atof(buf);  // Explicit cast to suppress warning
 	return qtrue;
 } //end of the function AAS_FloatForBSPEpairKey
 //===========================================================================
@@ -486,7 +486,10 @@ void AAS_DumpBSPData(void)
 int AAS_LoadBSPFile(void)
 {
 	AAS_DumpBSPData();
-	bspworld.entdatasize = strlen(botimport.BSPEntityData()) + 1;
+	{
+		size_t data_size = strlen(botimport.BSPEntityData()) + 1;
+		bspworld.entdatasize = (data_size > INT_MAX) ? INT_MAX : (int)data_size;
+	}
 	bspworld.dentdata = (char *) GetClearedHunkMemory(bspworld.entdatasize);
 	Com_Memcpy(bspworld.dentdata, botimport.BSPEntityData(), bspworld.entdatasize);
 	AAS_ParseBSPEntities();

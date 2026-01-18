@@ -14,6 +14,7 @@ Provides:
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <limits.h>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -309,7 +310,8 @@ int main(int argc, char **argv) {
 		lastSep = strrchr(execPath, PATH_SEPARATOR == '\\' ? '/' : '\\');
 	}
 	if (lastSep) {
-		int len = lastSep - execPath;
+		long int path_diff = lastSep - execPath;
+		int len = (path_diff > INT_MAX) ? INT_MAX : (int)path_diff;
 #ifdef _WIN32
 		snprintf(enginePath, sizeof(enginePath), "%.*s\\idtech3.x86_64.exe", len, execPath);
 #else
