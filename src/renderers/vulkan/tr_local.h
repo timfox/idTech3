@@ -579,8 +579,8 @@ typedef struct shader_s {
 	char shaderFilePath[MAX_QPATH];			// full path to shader file for monitoring
 
 	// Layered material support
-	struct layeredMaterial_t *layeredMaterial;	// associated layered material (NULL for traditional shaders)
-	struct materialInstance_t *materialInstance;	// runtime material instance
+	layeredMaterial_t *layeredMaterial;	// associated layered material (NULL for traditional shaders)
+	materialInstance_t *materialInstance;	// runtime material instance
 
 	struct	shader_s	*next;
 } shader_t;

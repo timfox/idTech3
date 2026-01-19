@@ -28,6 +28,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../../common/material_layer.h"
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
+
+// Forward declarations
+void R_InitMaterialSystem(void);
 #include <sys/stat.h>  // For file modification time checking
 
 // tr_shader.c -- this file deals with the parsing and definition of shaders

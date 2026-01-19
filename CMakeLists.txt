@@ -1949,6 +1949,8 @@ IF(USE_STB_TRUETYPE)
 ENDIF()
 # Always include tr_services.c for safe shader loading
 list(APPEND RENDERER_COMMON_SRCS src/renderers/renderercommon/tr_services.c)
+# Always include renderer_features.c for feature management
+list(APPEND RENDERER_COMMON_SRCS src/renderers/renderer_features.c)
 # Note: FreeType-dependent files are included when USE_FREETYPE is defined
 # They have proper guards to compile to empty implementations when FreeType is not available
 AUX_SOURCE_DIRECTORY(src/renderers/opengl RENDERER_GL_SRCS)

@@ -33,12 +33,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 // imgFlags_t is now defined in tr_public.h
 
-typedef enum {
-	CT_FRONT_SIDED = 0,
-	CT_BACK_SIDED,
-	CT_TWO_SIDED
-} cullType_t;
-
 typedef struct image_s image_t;
 
 #ifdef __cplusplus

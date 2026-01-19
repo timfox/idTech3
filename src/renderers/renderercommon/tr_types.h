@@ -86,7 +86,7 @@ STATIC_ASSERT((int)RF_TRANSLUCENT == 0x4000, "RF_TRANSLUCENT value mismatch");
 #define RF_BLINK			((renderFxFlags_t)0x0800)
 #define RF_FORCENOLOD		((renderFxFlags_t)0x1000)
 #define RF_ADDITIVE			((renderFxFlags_t)0x2000)
-#define RF_TRANSLUCENT		((renderFxFlags_t)0x4000)
+// RF_TRANSLUCENT is defined in the enum above
 
 // refdef flags
 #define RDF_NOWORLDMODEL	0x0001		// used for player configuration screen

@@ -10,6 +10,10 @@ Centralized feature toggles and configuration for all renderers.
 
 #include "renderer_features.h"
 #include "../common/qcommon.h"
+#include "renderercommon/tr_public.h"
+
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
 
 //==============================================================================
 // GLOBAL STATE
@@ -91,7 +95,7 @@ void R_RegisterFeatureCvars(const renderer_feature_t *features, int count) {
 
         // Set description if supported
         if (cvar && feature->description) {
-            Cvar_SetDescription(cvar, feature->description);
+            ri.Cvar_SetDescription(cvar, feature->description);
         }
 
         // Apply safe mode restrictions (only if cvar was successfully created)
@@ -107,7 +111,7 @@ void R_RegisterFeatureCvars(const renderer_feature_t *features, int count) {
             if (safe_value && Q_stricmp(cvar->string, safe_value) != 0) {
                 Com_Printf(S_COLOR_CYAN "Safe mode: %s forced to %s (%s)\n",
                           feature->name, safe_value, feature->description);
-                Cvar_Set(feature->name, safe_value);
+                ri.Cvar_Set(feature->name, safe_value);
             }
         }
     }
@@ -145,13 +149,13 @@ void R_ApplySafeMode(void) {
     Com_Printf(S_COLOR_YELLOW "Applying safe mode restrictions...\n");
 
     // Force conservative settings for stability
-    Cvar_Set("r_vulkan_validation", "0");  // Disable validation layers
-    Cvar_Set("r_vk_bindlessTextures", "0"); // Disable experimental features
-    Cvar_Set("r_vrs", "0");                 // Disable VRS
-    Cvar_Set("r_vk_raytracing", "0");      // Disable ray tracing
-    Cvar_Set("r_ext_multisample", "0");    // Disable MSAA
-    Cvar_Set("r_ext_supersample", "0");    // Disable SSAA
-    Cvar_Set("developer", "0");            // Disable developer mode
+    ri.Cvar_Set("r_vulkan_validation", "0");  // Disable validation layers
+    ri.Cvar_Set("r_vk_bindlessTextures", "0"); // Disable experimental features
+    ri.Cvar_Set("r_vrs", "0");                 // Disable VRS
+    ri.Cvar_Set("r_vk_raytracing", "0");      // Disable ray tracing
+    ri.Cvar_Set("r_ext_multisample", "0");    // Disable MSAA
+    ri.Cvar_Set("r_ext_supersample", "0");    // Disable SSAA
+    ri.Cvar_Set("developer", "0");            // Disable developer mode
 
     Com_Printf(S_COLOR_YELLOW "Safe mode restrictions applied\n");
 }
@@ -178,7 +182,7 @@ R_IsFeatureEnabled
 */
 qboolean R_IsFeatureEnabled(const char *feature_name) {
     // Always check actual cvar value first when available (after initialization)
-    cvar_t *cvar = Cvar_FindVar(feature_name);
+    cvar_t *cvar = ri.Cvar_Get(feature_name, "0", 0);
     if (cvar) {
         // Cvar exists, return its actual value - this reflects user settings and safe mode overrides
         return atoi(cvar->string) != 0;
@@ -205,8 +209,8 @@ qboolean R_IsExperimentalFeature(const char *feature_name) {
     const renderer_feature_t *all_features[] = { common_features, vulkan_features, opengl_features };
     int counts[] = { ARRAY_LEN(common_features), ARRAY_LEN(vulkan_features), ARRAY_LEN(opengl_features) };
 
-    for (int i = 0; i < ARRAY_LEN(all_features); i++) {
-        for (int j = 0; j < counts[i]; j++) {
+    for (size_t i = 0; i < ARRAY_LEN(all_features); i++) {
+        for (size_t j = 0; j < (size_t)counts[i]; j++) {
             if (Q_stricmp(all_features[i][j].name, feature_name) == 0) {
                 return (all_features[i][j].category == FEATURE_EXPERIMENTAL);
             }
@@ -226,8 +230,8 @@ qboolean R_IsDebugFeature(const char *feature_name) {
     const renderer_feature_t *all_features[] = { common_features, vulkan_features, opengl_features };
     int counts[] = { ARRAY_LEN(common_features), ARRAY_LEN(vulkan_features), ARRAY_LEN(opengl_features) };
 
-    for (int i = 0; i < ARRAY_LEN(all_features); i++) {
-        for (int j = 0; j < counts[i]; j++) {
+    for (size_t i = 0; i < ARRAY_LEN(all_features); i++) {
+        for (size_t j = 0; j < (size_t)counts[i]; j++) {
             if (Q_stricmp(all_features[i][j].name, feature_name) == 0) {
                 return (all_features[i][j].category == FEATURE_DEBUG);
             }
@@ -273,8 +277,8 @@ void R_LogFeatureStatus(void) {
     const renderer_feature_t *all_features[] = { common_features, vulkan_features, opengl_features };
     int counts[] = { ARRAY_LEN(common_features), ARRAY_LEN(vulkan_features), ARRAY_LEN(opengl_features) };
 
-    for (int i = 0; i < ARRAY_LEN(all_features); i++) {
-        for (int j = 0; j < counts[i]; j++) {
+    for (size_t i = 0; i < ARRAY_LEN(all_features); i++) {
+        for (size_t j = 0; j < (size_t)counts[i]; j++) {
             const renderer_feature_t *feature = &all_features[i][j];
             if (feature->category == FEATURE_EXPERIMENTAL && R_IsFeatureEnabled(feature->name)) {
                 Com_Printf(S_COLOR_YELLOW "  %s: ENABLED (%s)\n", feature->name, feature->description);
@@ -291,8 +295,8 @@ void R_LogFeatureStatus(void) {
     Com_Printf("Debug Features:\n");
     qboolean has_debug = qfalse;
 
-    for (int i = 0; i < ARRAY_LEN(all_features); i++) {
-        for (int j = 0; j < counts[i]; j++) {
+    for (size_t i = 0; i < ARRAY_LEN(all_features); i++) {
+        for (size_t j = 0; j < (size_t)counts[i]; j++) {
             const renderer_feature_t *feature = &all_features[i][j];
             if (feature->category == FEATURE_DEBUG && R_IsFeatureEnabled(feature->name)) {
                 Com_Printf(S_COLOR_MAGENTA "  %s: ENABLED (%s)\n", feature->name, feature->description);
@@ -330,8 +334,8 @@ void R_LogFeatureSummary(void) {
     const renderer_feature_t *all_features[] = { common_features, vulkan_features, opengl_features };
     int counts[] = { ARRAY_LEN(common_features), ARRAY_LEN(vulkan_features), ARRAY_LEN(opengl_features) };
 
-    for (int i = 0; i < ARRAY_LEN(all_features); i++) {
-        for (int j = 0; j < counts[i]; j++) {
+    for (size_t i = 0; i < ARRAY_LEN(all_features); i++) {
+        for (size_t j = 0; j < (size_t)counts[i]; j++) {
             const renderer_feature_t *feature = &all_features[i][j];
             if (R_IsFeatureEnabled(feature->name)) {
                 enabled_features++;

@@ -5565,7 +5565,7 @@ static void CL_LocalServers_f( void ) {
 		// we support multiple server ports so a single machine
 		// can nicely run multiple servers
 		for ( j = 0 ; j < NUM_SERVER_PORTS ; j++ ) {
-			to.port = BigShort( (short)(PORT_SERVER + j) );
+			to.port = BigShort( (unsigned short)(PORT_SERVER + j) );
 
 			to.type = NA_BROADCAST;
 			NET_SendPacket( NS_CLIENT, n, message, &to );
@@ -5642,7 +5642,7 @@ static void CL_GlobalServers_f( void ) {
 		return;
 	}
 	else if ( i == 2 )
-		to.port = BigShort( (short)PORT_MASTER );
+		to.port = BigShort( (unsigned short)PORT_MASTER );
 
 	Com_Printf( "Requesting servers from %s (%s)...\n", masteraddress, NET_AdrToStringwPort( &to ) );
 

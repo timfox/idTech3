@@ -2608,7 +2608,7 @@ static uint32_t finish_sx( uint32_t pref, uint32_t reg ) {
 			flush_items( TYPE_SX, reg );
 		} else {
 			// must be copied
-			int sx = alloc_sx( R_XMM2 );
+			uint32_t sx = alloc_sx( R_XMM2 );
 			emit_mov_sx( sx, reg );
 			unmask_sx( reg );
 			return sx;
@@ -3493,7 +3493,7 @@ static qboolean ConstOptimize( vm_t *vm, instruction_t *ci, instruction_t *ni )
 				var.size = 4;
 				wipe_var_range( &var );
 			} else {
-				int rx = load_rx_opstack( R_EAX | RCONST ); dec_opstack(); // eax = *opstack; opstack -= 4
+				uint32_t rx = load_rx_opstack( R_EAX | RCONST ); dec_opstack(); // eax = *opstack; opstack -= 4
 				emit_CheckReg( vm, rx, FUNC_DATW );
 				emit_store_imm32_index( ci->value, R_DATABASE, rx ); // (dword*)dataBase[ eax ] = 0x12345678
 				unmask_rx( rx );
@@ -3513,7 +3513,7 @@ static qboolean ConstOptimize( vm_t *vm, instruction_t *ci, instruction_t *ni )
 				var.size = 2;
 				wipe_var_range( &var );
 			} else {
-				int rx = load_rx_opstack( R_EAX | RCONST ); dec_opstack(); // eax = *opstack; opstack -= 4
+				uint32_t rx = load_rx_opstack( R_EAX | RCONST ); dec_opstack(); // eax = *opstack; opstack -= 4
 				emit_CheckReg( vm, rx, FUNC_DATW );
 				emit_store2_imm16_index( ci->value, R_DATABASE, rx ); // (word*)dataBase[ eax ] = 0x12345678
 				unmask_rx( rx );
@@ -3533,7 +3533,7 @@ static qboolean ConstOptimize( vm_t *vm, instruction_t *ci, instruction_t *ni )
 				var.size = 1;
 				wipe_var_range( &var );
 			} else {
-				int rx = load_rx_opstack( R_EAX | RCONST ); dec_opstack(); // eax = *opstack; opstack -= 4
+				uint32_t rx = load_rx_opstack( R_EAX | RCONST ); dec_opstack(); // eax = *opstack; opstack -= 4
 				emit_CheckReg( vm, rx, FUNC_DATW );
 				emit_store1_imm8_index( ci->value, R_DATABASE, rx ); // (char*)dataBase[ eax ] = 0x12345678
 				unmask_rx( rx );
@@ -3544,7 +3544,7 @@ static qboolean ConstOptimize( vm_t *vm, instruction_t *ci, instruction_t *ni )
 		}
 
 		case OP_ADD: {
-			int rx = load_rx_opstack( R_EAX );				// eax = *opstack
+			uint32_t rx = load_rx_opstack( R_EAX );				// eax = *opstack
 			if ( ci->value == 128 ) {
 				// small trick to use 1-byte immediate value :P
 				emit_op_rx_imm32( X_SUB, rx, -128 );		// sub eax, -128
@@ -3557,7 +3557,7 @@ static qboolean ConstOptimize( vm_t *vm, instruction_t *ci, instruction_t *ni )
 		}
 
 		case OP_SUB: {
-			int rx = load_rx_opstack( R_EAX );			// eax = *opstack
+			uint32_t rx = load_rx_opstack( R_EAX );			// eax = *opstack
 			emit_op_rx_imm32( X_SUB, rx, ci->value );	// sub eax, 0x12345678
 			store_rx_opstack( rx );						// *opstack = eax
 			ip += 1; // OP_SUB
@@ -3566,7 +3566,7 @@ static qboolean ConstOptimize( vm_t *vm, instruction_t *ci, instruction_t *ni )
 
 		case OP_MULI:
 		case OP_MULU: {
-			int rx = load_rx_opstack( R_EAX );		// eax = *opstack
+			uint32_t rx = load_rx_opstack( R_EAX );		// eax = *opstack
 			emit_mul_rx_imm( rx, ci->value );		// imul eax, eax, 0x12345678
 			store_rx_opstack( rx );					// *opstack = eax
 			ip += 1; // OP_MUL
@@ -3574,7 +3574,7 @@ static qboolean ConstOptimize( vm_t *vm, instruction_t *ci, instruction_t *ni )
 		}
 
 		case OP_BAND: {
-			int rx = load_rx_opstack( R_EAX );			// eax = *opstack
+			uint32_t rx = load_rx_opstack( R_EAX );			// eax = *opstack
 			if ( !(ni+1)->jused && (ni+1)->op == OP_CONST && (ni+1)->value == 0 && ops[(ni+2)->op].flags & JUMP ) {
 				if ( (ni+2)->op == OP_EQ || (ni+2)->op == OP_NE ) {
 					dec_opstack();
@@ -3592,7 +3592,7 @@ static qboolean ConstOptimize( vm_t *vm, instruction_t *ci, instruction_t *ni )
 		}
 
 		case OP_BOR: {
-			int rx = load_rx_opstack( R_EAX );			// eax = *opstack
+			uint32_t rx = load_rx_opstack( R_EAX );			// eax = *opstack
 			emit_op_rx_imm32( X_OR, rx, ci->value );	// or eax, 0x12345678
 			store_rx_opstack( rx );						// *opstack = eax
 			ip += 1; // OP_BOR
@@ -3600,7 +3600,7 @@ static qboolean ConstOptimize( vm_t *vm, instruction_t *ci, instruction_t *ni )
 		}
 
 		case OP_BXOR: {
-			int rx = load_rx_opstack( R_EAX );			// eax = *opstack
+			uint32_t rx = load_rx_opstack( R_EAX );			// eax = *opstack
 			emit_op_rx_imm32( X_XOR, rx, ci->value );	// xor eax, 0x12345678
 			store_rx_opstack( rx );						// *opstack = eax
 			ip += 1; // OP_BXOR
@@ -3611,8 +3611,8 @@ static qboolean ConstOptimize( vm_t *vm, instruction_t *ci, instruction_t *ni )
 			if ( ci->value < 0 || ci->value > 31 )
 				break; // undefined behavior
 			if ( ci->value ) {
-				int rx = load_rx_opstack( R_EAX );		// eax = *opstack
-				emit_shl_rx_imm( rx, ci->value );		// eax = (unsigned)eax << x
+				uint32_t rx = load_rx_opstack( R_EAX );		// eax = *opstack
+				emit_shl_rx_imm( rx, (int8_t)ci->value );		// eax = (unsigned)eax << x
 				store_rx_opstack( rx );					// *opstack = eax
 			}
 			ip += 1; // OP_LSH
@@ -3622,8 +3622,8 @@ static qboolean ConstOptimize( vm_t *vm, instruction_t *ci, instruction_t *ni )
 			if ( ci->value < 0 || ci->value > 31 )
 				break; // undefined behavior
 			if ( ci->value ) {
-				int rx = load_rx_opstack( R_EAX );		// eax = *opstack
-				emit_sar_rx_imm( rx, ci->value );		// eax = eax >> x
+				uint32_t rx = load_rx_opstack( R_EAX );		// eax = *opstack
+				emit_sar_rx_imm( rx, (int8_t)ci->value );		// eax = eax >> x
 				store_rx_opstack( rx );					// *opstack = eax
 			}
 			ip += 1; // OP_RSHI
@@ -3633,8 +3633,8 @@ static qboolean ConstOptimize( vm_t *vm, instruction_t *ci, instruction_t *ni )
 			if ( ci->value < 0 || ci->value > 31 )
 				break; // undefined behavior
 			if ( ci->value ) {
-				int rx = load_rx_opstack( R_EAX );		// eax = *opstack
-				emit_shr_rx_imm( rx, ci->value );		// eax = (unsigned)eax >> x
+				uint32_t rx = load_rx_opstack( R_EAX );		// eax = *opstack
+				emit_shr_rx_imm( rx, (int8_t)ci->value );		// eax = (unsigned)eax >> x
 				store_rx_opstack( rx );					// *opstack = eax
 			}
 			ip += 1; // OP_RSHU
@@ -3645,7 +3645,7 @@ static qboolean ConstOptimize( vm_t *vm, instruction_t *ci, instruction_t *ni )
 
 			if ( HasSSEFP() ) {
 				if ( ci->value == ~TRAP_SQRT ) {
-					int sx = alloc_sx( R_XMM0 );
+					uint32_t sx = alloc_sx( R_XMM0 );
 					emit_sqrt( sx, R_PROCBASE, 8 );		// sqrtss xmm0, dword ptr [ebp + 8]
 					store_sx_opstack( sx );				// *opstack = xmm0
 					ip += 1; // OP_CALL
@@ -3653,7 +3653,7 @@ static qboolean ConstOptimize( vm_t *vm, instruction_t *ci, instruction_t *ni )
 				}
 
 				if ( IsFloorTrap( vm, ci->value ) && ( CPU_Flags & CPU_SSE41 ) ) {
-					int sx = alloc_sx( R_XMM0 );
+					uint32_t sx = alloc_sx( R_XMM0 );
 					emit_floor( sx, R_PROCBASE, 8 );	// roundss xmm0, dword ptr [ebp + 8], 1
 					store_sx_opstack( sx );				// *opstack = xmm0
 					ip += 1; // OP_CALL
@@ -3661,7 +3661,7 @@ static qboolean ConstOptimize( vm_t *vm, instruction_t *ci, instruction_t *ni )
 				}
 
 				if ( IsCeilTrap( vm, ci->value ) && ( CPU_Flags & CPU_SSE41 ) ) {
-					int sx = alloc_sx( R_XMM0 );
+					uint32_t sx = alloc_sx( R_XMM0 );
 					emit_ceil( sx, R_PROCBASE, 8 );		// roundss xmm0, dword ptr [ebp + 8], 2
 					store_sx_opstack( sx );				// *opstack = xmm0
 					ip += 1; // OP_CALL
@@ -3713,7 +3713,7 @@ static qboolean ConstOptimize( vm_t *vm, instruction_t *ci, instruction_t *ni )
 		case OP_LEU:
 		case OP_LEI:
 		case OP_LTI: {
-			int rx = load_rx_opstack( R_EAX | RCONST ); dec_opstack(); // eax = *opstack; opstack -= 4
+			uint32_t rx = load_rx_opstack( R_EAX | RCONST ); dec_opstack(); // eax = *opstack; opstack -= 4
 			if ( ci->value == 0 && ( ni->op == OP_EQ || ni->op == OP_NE ) ) {
 				emit_test_rx( rx, rx );						// test eax, eax
 			} else{

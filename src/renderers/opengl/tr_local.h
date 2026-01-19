@@ -44,6 +44,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../../common/qcommon.h"
 #include "../renderercommon/tr_backend_iface.h"
 #include "tr_common.h"
+#include "../../common/material_layer.h"
 #include "iqm.h"
 #include "tr_tiki.h"
 #include "qgl.h"

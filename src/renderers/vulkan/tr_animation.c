@@ -48,7 +48,8 @@ R_MDRCullModel
 static int R_MDRCullModel( mdrHeader_t *header, const trRefEntity_t *ent ) {
 	vec3_t		bounds[2];
 	mdrFrame_t	*oldFrame, *newFrame;
-	int			i, frameSize;
+	int			i;
+	size_t		frameSize;
 
 	frameSize = (size_t)( &((mdrFrame_t *)0)->bones[ header->numBones ] );
 	
@@ -142,7 +143,7 @@ static int R_MDRComputeFogNum( mdrHeader_t *header, const trRefEntity_t *ent ) {
 	const fog_t			*fog;
 	mdrFrame_t		*mdrFrame;
 	vec3_t			localOrigin;
-	int frameSize;
+	size_t frameSize;
 
 	if ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) {
 		return 0;
@@ -367,7 +368,7 @@ void RB_MDRSurfaceAnim( mdrSurface_t *surface )
 	// Set up all triangles.
 	for (j = 0 ; j < indexes ; j++) 
 	{
-		tess.indexes[baseIndex + j] = baseVertex + triangles[j];
+		tess.indexes[baseIndex + j] = (glIndex_t)(baseVertex + triangles[j]);
 	}
 	tess.numIndexes += indexes;
 

@@ -108,7 +108,7 @@ extern "C" void R_LoadEXR( const char *filename, byte **pic, int *width, int *he
 
 		// Allocate engine-side 8-bit RGBA buffer
 		const size_t numPixels = static_cast<size_t>( w ) * static_cast<size_t>( h );
-		byte *out = (byte *)ri.Malloc( numPixels * 4 );
+		byte *out = (byte *)ri.Malloc( (int)(numPixels * 4) );
 		if ( !out ) {
 			return;
 		}

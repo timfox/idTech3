@@ -36,7 +36,22 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifdef USE_VMA
 #include <vk_mem_alloc.h>
 #else
+// Stub definitions when VMA is not available
 typedef struct VmaAllocator_T* VmaAllocator;
+typedef struct VmaAllocation_T* VmaAllocation;
+typedef struct VmaAllocationInfo_T* VmaAllocationInfo;
+typedef struct VmaAllocationCreateInfo_T* VmaAllocationCreateInfo;
+typedef struct VmaPool_T* VmaPool;
+
+// Stub function declarations when VMA is not available
+#define VMA_MEMORY_USAGE_GPU_ONLY 0
+static inline VkResult vmaCreateBuffer(VmaAllocator allocator, const VkBufferCreateInfo* pBufferCreateInfo, const VmaAllocationCreateInfo* pAllocationCreateInfo, VkBuffer* pBuffer, VmaAllocation* pAllocation, VmaAllocationInfo* pAllocationInfo) {
+    (void)allocator; (void)pBufferCreateInfo; (void)pAllocationCreateInfo; (void)pBuffer; (void)pAllocation; (void)pAllocationInfo;
+    return VK_ERROR_FEATURE_NOT_PRESENT;
+}
+static inline void vmaDestroyBuffer(VmaAllocator allocator, VkBuffer buffer, VmaAllocation allocation) {
+    (void)allocator; (void)buffer; (void)allocation;
+}
 #endif
 
 #include "vk_memory.h"

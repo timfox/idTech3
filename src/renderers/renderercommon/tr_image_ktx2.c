@@ -65,24 +65,6 @@ typedef struct {
     uint32_t selectors[2];       // Selector values
 } basisu_block_t;
 
-// Convert Vulkan format to internal format
-static int VkFormatToInternal(uint32_t vkFormat) {
-    switch (vkFormat) {
-        case 37:  return GL_RGBA8;           // VK_FORMAT_R8G8B8A8_UNORM
-        case 43:  return GL_RGBA8;           // VK_FORMAT_R8G8B8A8_SRGB
-        case 23:  return GL_RGB8;            // VK_FORMAT_R8G8B8_UNORM
-        case 29:  return GL_RGB8;            // VK_FORMAT_R8G8B8_SRGB
-        case 10:  return GL_R8;              // VK_FORMAT_R8_UNORM
-        case 124: return GL_COMPRESSED_RGBA_S3TC_DXT5_EXT; // BC3
-        case 134: return GL_COMPRESSED_RGBA_S3TC_DXT1_EXT; // BC1
-        case 135: return GL_COMPRESSED_RGBA_S3TC_DXT3_EXT; // BC2
-        case 137: return GL_COMPRESSED_RGB_S3TC_DXT1_EXT;  // BC1 RGB
-        case 142: return GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT_EXT; // BC6H unsigned
-        case 143: return GL_COMPRESSED_RGBA_BPTC_UNORM_EXT; // BC7
-        default:  return GL_RGBA8;
-    }
-}
-
 // BasisU block decompression (simplified)
 static void DecompressBasisUBlock(const basisu_block_t* block, uint8_t* output, int blockX, int blockY) {
     // This is a simplified BasisU decompression
@@ -356,7 +338,7 @@ qboolean R_SaveKTX2(const char *name, const unsigned char *rgbaData,
     memcpy(fileData + levelIndex.byteOffset, compressedData, dataSize);
 
     // Save file
-    ri.FS_WriteFile(name, fileData, totalSize);
+    ri.FS_WriteFile(name, fileData, (int)totalSize);
 
     ri.Free(fileData);
     ri.Free(compressedData);

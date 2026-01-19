@@ -11,13 +11,7 @@ Mesh shaders provide GPU-driven rendering with meshlet-based culling and LOD.
 extern refimport_t ri;
 #include "vk.h"
 
-// Meshlet data structures
-typedef struct {
-	uint32_t firstIndex;      // First index in the index buffer
-	uint32_t indexCount;      // Number of indices in this meshlet
-	uint32_t vertexCount;     // Number of vertices in this meshlet
-	uint32_t padding;         // Padding for alignment
-} meshlet_info_t;
+// meshlet_info_t is defined in vk.h
 
 #ifdef USE_VULKAN
 

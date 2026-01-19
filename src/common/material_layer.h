@@ -20,6 +20,10 @@ extern "C" {
 // Basic Types (from renderer)
 //===============================================================================
 
+// cullType_t is defined in renderer headers
+// This header assumes cullType_t is defined by including renderer headers
+
+// Define cullType_t as an enum to match renderer expectations
 typedef enum {
     CT_FRONT_SIDED,
     CT_BACK_SIDED,

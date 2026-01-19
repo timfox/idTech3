@@ -16,7 +16,7 @@ int main(void) {
     printf("Test 1: Checking renderer library availability\n");
     for (int i = 0; i < 3; i++) {
         char lib_path[256];
-        snprintf(lib_path, sizeof(lib_path), "./idtech3_%s_x86_64.so", renderers[i]);
+        snprintf(lib_path, sizeof(lib_path), "../release/idtech3_%s_x86_64.so", renderers[i]);
 
         void *lib = dlopen(lib_path, RTLD_LAZY);
         if (!lib) {
@@ -70,7 +70,7 @@ int main(void) {
     int available_renderers = 0;
     for (int i = 0; i < 3; i++) {
         char lib_path[256];
-        snprintf(lib_path, sizeof(lib_path), "./idtech3_%s_x86_64.so", renderers[i]);
+        snprintf(lib_path, sizeof(lib_path), "../release/idtech3_%s_x86_64.so", renderers[i]);
         void *lib = dlopen(lib_path, RTLD_LAZY);
         if (lib) {
             available_renderers++;

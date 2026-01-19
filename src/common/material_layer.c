@@ -122,10 +122,10 @@ static float gradientNoise(float x, float y, uint32_t seed) {
     float fy = y - iy;
 
     // Corner gradients
-    uint32_t h00 = hash(ix, iy, seed);
-    uint32_t h10 = hash(ix + 1, iy, seed);
-    uint32_t h01 = hash(ix, iy + 1, seed);
-    uint32_t h11 = hash(ix + 1, iy + 1, seed);
+    uint32_t h00 = hash((uint32_t)ix, (uint32_t)iy, seed);
+    uint32_t h10 = hash((uint32_t)(ix + 1), (uint32_t)iy, seed);
+    uint32_t h01 = hash((uint32_t)ix, (uint32_t)(iy + 1), seed);
+    uint32_t h11 = hash((uint32_t)(ix + 1), (uint32_t)(iy + 1), seed);
 
     // Convert to gradients (-1 to 1)
     float g00 = (h00 % 256) / 127.5f - 1.0f;
@@ -163,7 +163,7 @@ float Procedural_GetValue(float x, float y, const proceduralParams_t* params) {
     switch (params->type) {
         case PROC_NOISE_PERLIN:
             for (int i = 0; i < params->octaves; ++i) {
-                value += gradientNoise(x * frequency, y * frequency, params->seed + i) * amplitude;
+                value += gradientNoise(x * frequency, y * frequency, (uint32_t)(params->seed + i)) * amplitude;
                 amplitude *= params->persistence;
                 frequency *= params->lacunarity;
             }
@@ -234,7 +234,7 @@ float Procedural_GetValue(float x, float y, const proceduralParams_t* params) {
         case PROC_FRACTAL:
             // Fractal noise (multiple octaves of perlin)
             for (int i = 0; i < params->octaves; ++i) {
-                value += gradientNoise(x * frequency, y * frequency, params->seed + i) * amplitude;
+                value += gradientNoise(x * frequency, y * frequency, (uint32_t)(params->seed + i)) * amplitude;
                 amplitude *= params->persistence;
                 frequency *= params->lacunarity;
             }
@@ -307,7 +307,7 @@ static float Procedural_Noise(float x, float y) {
     int iy = (int)floorf(y);
 
     uint32_t h = hash((uint32_t)ix, (uint32_t)iy, 0);
-    return (h % 256) / 255.0f;
+    return (float)(h % 256) / 255.0f;
 }
 
 static float Procedural_PerlinNoise(float x, float y) {
@@ -335,8 +335,8 @@ static float Procedural_VoronoiNoise(float x, float y, float* featurePointX, flo
 
             // Get feature point for this cell
             uint32_t h = hash((uint32_t)cx, (uint32_t)cy, 0);
-            float fx = cx + (h % 256) / 255.0f;
-            float fy = cy + ((h >> 8) % 256) / 255.0f;
+            float fx = cx + (float)(h % 256) / 255.0f;
+            float fy = cy + (float)((h >> 8) % 256) / 255.0f;
 
             float dx = fx - x;
             float dy = fy - y;
@@ -380,7 +380,7 @@ static void Material_GenerateVertexShader(const layeredMaterial_t* material, cha
 	// Add UV coordinates for each layer
 	for (int i = 0; i < material->numLayers; ++i) {
 		char temp[256];
-		Com_sprintf(temp, sizeof(temp),
+		Com_sprintf(temp, (int)sizeof(temp),
 			"layout(location = %d) out vec2 fragUV%d;\n",
 			4 + i, i);
 		Q_strcat(vertexShader, maxSize, temp);
@@ -426,7 +426,7 @@ static void Material_GenerateVertexShader(const layeredMaterial_t* material, cha
 		const materialLayer_t* layer = &material->layers[i];
 
 		char temp[512];
-		Com_sprintf(temp, sizeof(temp),
+		Com_sprintf(temp, (int)sizeof(temp),
 			"\n"
 			"    // Layer %d UV generation\n"
 			"    vec2 uv%d = inTexCoord;\n", i, i);
@@ -434,7 +434,7 @@ static void Material_GenerateVertexShader(const layeredMaterial_t* material, cha
 		// Apply UV scaling
 		if (layer->uvScale[0] != 1.0f || layer->uvScale[1] != 1.0f) {
 			char scaleTemp[128];
-			Com_sprintf(scaleTemp, sizeof(scaleTemp),
+			Com_sprintf(scaleTemp, (int)sizeof(scaleTemp),
 				"    uv%d *= vec2(%f, %f);\n", i, layer->uvScale[0], layer->uvScale[1]);
 			Q_strcat(temp, sizeof(temp), scaleTemp);
 		}
@@ -442,7 +442,7 @@ static void Material_GenerateVertexShader(const layeredMaterial_t* material, cha
 		// Apply UV offset
 		if (layer->uvOffset[0] != 0.0f || layer->uvOffset[1] != 0.0f) {
 			char offsetTemp[128];
-			Com_sprintf(offsetTemp, sizeof(offsetTemp),
+			Com_sprintf(offsetTemp, (int)sizeof(offsetTemp),
 				"    uv%d += vec2(%f, %f);\n", i, layer->uvOffset[0], layer->uvOffset[1]);
 			Q_strcat(temp, sizeof(temp), offsetTemp);
 		}
@@ -451,7 +451,7 @@ static void Material_GenerateVertexShader(const layeredMaterial_t* material, cha
 			// Apply scrolling
 			if (layer->scrollSpeedU != 0.0f || layer->scrollSpeedV != 0.0f) {
 				char scrollTemp[128];
-				Com_sprintf(scrollTemp, sizeof(scrollTemp),
+				Com_sprintf(scrollTemp, (int)sizeof(scrollTemp),
 					"    uv%d += pushConstants.time * vec2(%f, %f);\n",
 					i, layer->scrollSpeedU, layer->scrollSpeedV);
 				Q_strcat(temp, sizeof(temp), scrollTemp);
@@ -460,7 +460,7 @@ static void Material_GenerateVertexShader(const layeredMaterial_t* material, cha
 			// Apply rotation
 			if (layer->rotationSpeed != 0.0f) {
 				char rotationTemp[512];
-				Com_sprintf(rotationTemp, sizeof(rotationTemp),
+				Com_sprintf(rotationTemp, (int)sizeof(rotationTemp),
 					"    // Rotation animation\n"
 					"    float rotTime = pushConstants.time * %.6f;\n"
 					"    float cosRot = cos(rotTime);\n"
@@ -474,14 +474,14 @@ static void Material_GenerateVertexShader(const layeredMaterial_t* material, cha
 			// Apply wave distortion
 			if (layer->waveFrequency != 0.0f && layer->waveAmplitude != 0.0f) {
 				char waveTemp[128];
-				Com_sprintf(waveTemp, sizeof(waveTemp),
+				Com_sprintf(waveTemp, (int)sizeof(waveTemp),
 					"    uv%d += vec2(sin(pushConstants.time * %f + uv%d.x * 10.0) * %f);\n",
 					i, layer->waveFrequency, i, layer->waveAmplitude);
 				Q_strcat(temp, sizeof(temp), waveTemp);
 			}
 		}
 
-		Com_sprintf(temp + strlen(temp), sizeof(temp) - strlen(temp),
+		Com_sprintf(temp + strlen(temp), (int)(sizeof(temp) - strlen(temp)),
 			"    fragUV%d = uv%d;\n", i, i);
 
 		Q_strcat(vertexShader, maxSize, temp);
@@ -507,7 +507,7 @@ static void Material_GenerateFragmentShader(const layeredMaterial_t* material, c
 	// Add UV inputs for each layer
 	for (int i = 0; i < material->numLayers; ++i) {
 		char temp[128];
-		Com_sprintf(temp, sizeof(temp),
+		Com_sprintf(temp, (int)sizeof(temp),
 			"layout(location = %d) in vec2 fragUV%d;\n",
 			4 + i, i);
 		Q_strcat(fragmentShader, maxSize, temp);
@@ -524,28 +524,28 @@ static void Material_GenerateFragmentShader(const layeredMaterial_t* material, c
 		char temp[256];
 
 		if (layer->diffuseMap[0]) {
-			Com_sprintf(temp, sizeof(temp),
+			Com_sprintf(temp, (int)sizeof(temp),
 				"layout(binding = %d) uniform sampler2D diffuseSampler%d;\n",
 				i * 4, i);
 			Q_strcat(fragmentShader, maxSize, temp);
 		}
 
 		if (layer->normalMap[0]) {
-			Com_sprintf(temp, sizeof(temp),
+			Com_sprintf(temp, (int)sizeof(temp),
 				"layout(binding = %d) uniform sampler2D normalSampler%d;\n",
 				i * 4 + 1, i);
 			Q_strcat(fragmentShader, maxSize, temp);
 		}
 
 		if (layer->specularMap[0] || layer->metallicMap[0] || layer->roughnessMap[0]) {
-			Com_sprintf(temp, sizeof(temp),
+			Com_sprintf(temp, (int)sizeof(temp),
 				"layout(binding = %d) uniform sampler2D pbrSampler%d;\n",
 				i * 4 + 2, i);
 			Q_strcat(fragmentShader, maxSize, temp);
 		}
 
 		if (layer->emissiveMap[0]) {
-			Com_sprintf(temp, sizeof(temp),
+			Com_sprintf(temp, (int)sizeof(temp),
 				"layout(binding = %d) uniform sampler2D emissiveSampler%d;\n",
 				i * 4 + 3, i);
 			Q_strcat(fragmentShader, maxSize, temp);
@@ -574,75 +574,75 @@ static void Material_GenerateFragmentShader(const layeredMaterial_t* material, c
 	for (int i = 0; i < material->numLayers; ++i) {
 		const materialLayer_t* layer = &material->layers[i];
 		char temp[1024];
-		Com_sprintf(temp, sizeof(temp),
+		Com_sprintf(temp, (int)sizeof(temp),
 			"\n"
 			"    // Layer %d: %s\n", i, layer->name);
 
 		// Base color
-		Com_sprintf(temp + strlen(temp), sizeof(temp) - strlen(temp),
+		Com_sprintf(temp + strlen(temp), (int)(sizeof(temp) - strlen(temp)),
 			"    vec4 layer%dColor = materialProps.baseColors[%d];\n", i, i);
 
 		if (layer->diffuseMap[0]) {
-			Com_sprintf(temp + strlen(temp), sizeof(temp) - strlen(temp),
+			Com_sprintf(temp + strlen(temp), (int)(sizeof(temp) - strlen(temp)),
 				"    layer%dColor *= texture(diffuseSampler%d, fragUV%d);\n", i, i, i);
 		}
 
 		// Normal mapping
 		if (layer->normalMap[0]) {
-			Com_sprintf(temp + strlen(temp), sizeof(temp) - strlen(temp),
+			Com_sprintf(temp + strlen(temp), (int)(sizeof(temp) - strlen(temp)),
 				"    vec3 layer%dNormal = texture(normalSampler%d, fragUV%d).xyz * 2.0 - 1.0;\n"
 				"    layer%dNormal *= materialProps.pbrParams[%d].w;\n", i, i, i, i, i);
 		} else {
-			Com_sprintf(temp + strlen(temp), sizeof(temp) - strlen(temp),
+			Com_sprintf(temp + strlen(temp), (int)(sizeof(temp) - strlen(temp)),
 				"    vec3 layer%dNormal = vec3(0.0, 0.0, 1.0);\n", i);
 		}
 
 		// PBR parameters
 		if (layer->specularMap[0] || layer->metallicMap[0] || layer->roughnessMap[0]) {
-			Com_sprintf(temp + strlen(temp), sizeof(temp) - strlen(temp),
+			Com_sprintf(temp + strlen(temp), (int)(sizeof(temp) - strlen(temp)),
 				"    vec4 layer%dPBR = texture(pbrSampler%d, fragUV%d);\n", i, i, i);
 		}
 
 		// Apply blend mode
 		switch (layer->blendMode) {
 			case BLEND_OPAQUE:
-				Com_sprintf(temp + strlen(temp), sizeof(temp) - strlen(temp),
+				Com_sprintf(temp + strlen(temp), (int)(sizeof(temp) - strlen(temp)),
 					"    finalColor = layer%dColor;\n", i);
 				break;
 
 			case BLEND_ALPHA:
-				Com_sprintf(temp + strlen(temp), sizeof(temp) - strlen(temp),
+				Com_sprintf(temp + strlen(temp), (int)(sizeof(temp) - strlen(temp)),
 					"    finalColor = mix(finalColor, layer%dColor, layer%dColor.a * materialProps.blendParams[%d].x);\n",
 					i, i, i);
 				break;
 
 			case BLEND_ADDITIVE:
-				Com_sprintf(temp + strlen(temp), sizeof(temp) - strlen(temp),
+				Com_sprintf(temp + strlen(temp), (int)(sizeof(temp) - strlen(temp)),
 					"    finalColor += layer%dColor * materialProps.blendParams[%d].x;\n", i, i);
 				break;
 
 			case BLEND_MULTIPLY:
-				Com_sprintf(temp + strlen(temp), sizeof(temp) - strlen(temp),
+				Com_sprintf(temp + strlen(temp), (int)(sizeof(temp) - strlen(temp)),
 					"    finalColor *= layer%dColor * materialProps.blendParams[%d].x + vec4(1.0 - materialProps.blendParams[%d].x);\n",
 					i, i, i);
 				break;
 
 			case BLEND_OVERLAY:
-				Com_sprintf(temp + strlen(temp), sizeof(temp) - strlen(temp),
+				Com_sprintf(temp + strlen(temp), (int)(sizeof(temp) - strlen(temp)),
 					"    vec4 overlay%d = layer%dColor;\n"
 					"    finalColor = mix(finalColor * (1.0 - overlay%d.a) + overlay%d * overlay%d.a, finalColor, step(0.5, finalColor));\n",
 					i, i, i, i, i);
 				break;
 
 			default:
-				Com_sprintf(temp + strlen(temp), sizeof(temp) - strlen(temp),
+				Com_sprintf(temp + strlen(temp), (int)(sizeof(temp) - strlen(temp)),
 					"    finalColor = layer%dColor;\n", i);
 				break;
 		}
 
 		// Accumulate PBR properties (take from topmost layer)
 		if (i == material->numLayers - 1) {
-			Com_sprintf(temp + strlen(temp), sizeof(temp) - strlen(temp),
+			Com_sprintf(temp + strlen(temp), (int)(sizeof(temp) - strlen(temp)),
 				"    finalMetallic = materialProps.pbrParams[%d].x;\n"
 				"    finalRoughness = materialProps.pbrParams[%d].y;\n"
 				"    finalEmissive = materialProps.pbrParams[%d].z * layer%dColor.rgb;\n", i, i, i, i);
@@ -977,13 +977,13 @@ qboolean Material_Save(const layeredMaterial_t* material, const char* filename) 
 
     // Write material header
     FS_Write("material = ", 11, file);
-    FS_Write(material->name, strlen(material->name), file);
+    FS_Write(material->name, (int)strlen(material->name), file);
     FS_Write("\n", 1, file);
 
     FS_Write("version = ", 10, file);
     char versionStr[32];
     sprintf(versionStr, "%d", material->version);
-    FS_Write(versionStr, strlen(versionStr), file);
+    FS_Write(versionStr, (int)strlen(versionStr), file);
     FS_Write("\n", 1, file);
 
     // Write global properties
@@ -999,7 +999,7 @@ qboolean Material_Save(const layeredMaterial_t* material, const char* filename) 
     const char* cullModeStr = "front";
     if (material->cullMode == CT_BACK_SIDED) cullModeStr = "back";
     else if (material->cullMode == CT_TWO_SIDED) cullModeStr = "none";
-    FS_Write(cullModeStr, strlen(cullModeStr), file);
+    FS_Write(cullModeStr, (int)strlen(cullModeStr), file);
     FS_Write("\n", 1, file);
 
     FS_Write("depthwrite = ", 13, file);
@@ -1023,7 +1023,7 @@ qboolean Material_Save(const layeredMaterial_t* material, const char* filename) 
         const materialLayer_t* layer = &material->layers[i];
 
         FS_Write("layer = ", 8, file);
-        FS_Write(layer->name, strlen(layer->name), file);
+        FS_Write(layer->name, (int)strlen(layer->name), file);
         FS_Write("\n", 1, file);
 
         FS_Write("enabled = ", 10, file);
@@ -1039,72 +1039,72 @@ qboolean Material_Save(const layeredMaterial_t* material, const char* filename) 
             case BLEND_OVERLAY: blendModeStr = "overlay"; break;
             default: break;
         }
-        FS_Write(blendModeStr, strlen(blendModeStr), file);
+        FS_Write(blendModeStr, (int)strlen(blendModeStr), file);
         FS_Write("\n", 1, file);
 
         char floatStr[64];
         sprintf(floatStr, "opacity = %f\n", layer->opacity);
-        FS_Write(floatStr, strlen(floatStr), file);
+        FS_Write(floatStr, (int)strlen(floatStr), file);
 
         sprintf(floatStr, "uvoffset = %f %f\n", layer->uvOffset[0], layer->uvOffset[1]);
-        FS_Write(floatStr, strlen(floatStr), file);
+        FS_Write(floatStr, (int)strlen(floatStr), file);
 
         sprintf(floatStr, "uvscale = %f %f\n", layer->uvScale[0], layer->uvScale[1]);
-        FS_Write(floatStr, strlen(floatStr), file);
+        FS_Write(floatStr, (int)strlen(floatStr), file);
 
         sprintf(floatStr, "uvrotation = %f\n", layer->uvRotation);
-        FS_Write(floatStr, strlen(floatStr), file);
+        FS_Write(floatStr, (int)strlen(floatStr), file);
 
         sprintf(floatStr, "basecolor = %f %f %f\n",
                 layer->baseColor[0], layer->baseColor[1], layer->baseColor[2]);
-        FS_Write(floatStr, strlen(floatStr), file);
+        FS_Write(floatStr, (int)strlen(floatStr), file);
 
         sprintf(floatStr, "metallic = %f\n", layer->metallic);
-        FS_Write(floatStr, strlen(floatStr), file);
+        FS_Write(floatStr, (int)strlen(floatStr), file);
 
         sprintf(floatStr, "roughness = %f\n", layer->roughness);
-        FS_Write(floatStr, strlen(floatStr), file);
+        FS_Write(floatStr, (int)strlen(floatStr), file);
 
         sprintf(floatStr, "emissive = %f\n", layer->emissiveIntensity);
-        FS_Write(floatStr, strlen(floatStr), file);
+        FS_Write(floatStr, (int)strlen(floatStr), file);
 
         sprintf(floatStr, "normalstrength = %f\n", layer->normalStrength);
-        FS_Write(floatStr, strlen(floatStr), file);
+        FS_Write(floatStr, (int)strlen(floatStr), file);
 
         // Write texture maps
         if (layer->diffuseMap[0]) {
             FS_Write("diffusemap = ", 13, file);
-            FS_Write(layer->diffuseMap, strlen(layer->diffuseMap), file);
+            FS_Write(layer->diffuseMap, (int)strlen(layer->diffuseMap), file);
             FS_Write("\n", 1, file);
         }
 
         if (layer->normalMap[0]) {
             FS_Write("normalmap = ", 12, file);
-            FS_Write(layer->normalMap, strlen(layer->normalMap), file);
+            FS_Write(layer->normalMap, (int)strlen(layer->normalMap), file);
             FS_Write("\n", 1, file);
         }
 
         if (layer->specularMap[0]) {
             FS_Write("specularmap = ", 14, file);
-            FS_Write(layer->specularMap, strlen(layer->specularMap), file);
+            FS_Write(layer->specularMap, (int)strlen(layer->specularMap), file);
             FS_Write("\n", 1, file);
         }
 
         if (layer->metallicMap[0]) {
             FS_Write("metallicmap = ", 14, file);
-            FS_Write(layer->metallicMap, strlen(layer->metallicMap), file);
+            FS_Write(layer->metallicMap, (int)strlen(layer->metallicMap), file);
             FS_Write("\n", 1, file);
         }
 
         if (layer->roughnessMap[0]) {
             FS_Write("roughnessmap = ", 15, file);
-            FS_Write(layer->roughnessMap, strlen(layer->roughnessMap), file);
+            FS_Write(layer->roughnessMap, (int)strlen(layer->roughnessMap), file);
             FS_Write("\n", 1, file);
         }
 
         if (layer->emissiveMap[0]) {
             FS_Write("emissivemap = ", 14, file);
-            FS_Write(layer->emissiveMap, strlen(layer->emissiveMap), file);
+            FS_Write(layer->emissiveMap, (int)strlen(layer->emissiveMap), file);
             FS_Write("\n", 1, file);
         }
 

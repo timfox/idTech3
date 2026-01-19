@@ -4714,9 +4714,9 @@ VKAPI_ATTR void VKAPI_CALL vkCmdExecuteCommands(
 #endif
 
 
-#define VK_VERSION_1_1 1
+#define VK_VERSION_1_4 1
 // Vulkan 1.1 version number
-#define VK_API_VERSION_1_1 VK_MAKE_API_VERSION(0, 1, 1, 0)// Patch version should always be set to 0
+#define VK_API_VERSION_1_4 VK_MAKE_API_VERSION(0, 1, 4, 0)// Patch version should always be set to 0
 
 VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkSamplerYcbcrConversion)
 VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkDescriptorUpdateTemplate)
