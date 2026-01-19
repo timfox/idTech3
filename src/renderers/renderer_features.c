@@ -94,8 +94,8 @@ void R_RegisterFeatureCvars(const renderer_feature_t *features, int count) {
             Cvar_SetDescription(cvar, feature->description);
         }
 
-        // Apply safe mode restrictions
-        if (g_safe_mode.enabled) {
+        // Apply safe mode restrictions (only if cvar was successfully created)
+        if (cvar && g_safe_mode.enabled) {
             const char *safe_value = NULL;
 
             if (feature->category == FEATURE_EXPERIMENTAL && g_safe_mode.disable_experimental) {
