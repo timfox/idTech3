@@ -89,6 +89,9 @@ touch logs/enable_vulkan_patch1_tiny.flag
 # Quick 10-second smoke test (recommended for basic validation)
 ./scripts/smoke_test.sh
 
+# Safe mode launcher (disables experimental features)
+./scripts/run_safe_mode.sh
+
 # Run full test suite (recommended before production use)
 ./scripts/test_engine.sh
 
@@ -104,6 +107,35 @@ touch logs/enable_vulkan_patch1_tiny.flag
 # - Mod loading compatibility
 # - Performance monitoring tools
 ```
+
+### **Safe Mode & Feature Management**
+The engine includes a comprehensive feature management system to prevent "mystery state":
+
+```bash
+# Launch in safe mode (disables experimental features)
+./scripts/run_safe_mode.sh
+
+# Command line safe mode options
+./idtech3.x86_64 -safe
+./idtech3.x86_64 -safemode
+
+# Create safe mode flag file (persistent)
+touch logs/safe_mode.flag
+```
+
+**Safe Mode Features:**
+- ✅ Disables experimental renderer features (VRS, bindless textures, etc.)
+- ✅ Forces conservative graphics settings
+- ✅ Disables Vulkan validation layers
+- ✅ Clear startup logging shows active restrictions
+- ✅ Automatic fallback to stable configurations
+
+**Startup Logging:**
+The engine now provides clear, standardized logging:
+- Renderer selection and fallback information
+- Active experimental features warning
+- Safe mode status and applied restrictions
+- Feature summary with counts
 
 ## **Building from Source**
 

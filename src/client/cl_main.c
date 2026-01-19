@@ -27,6 +27,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../common/q_fallback_assets.h"
 #include "../common/input_validation.h"
 #include "../common/q_asset_loaders.h"
+#include "../renderers/renderer_features.h"
 
 // Debug command functions are registered with Cmd_AddCommand but may appear unused to the compiler
 
@@ -3565,6 +3566,19 @@ CL_InitRenderer
 ============
 */
 static void CL_InitRenderer( void ) {
+	// Detect and initialize safe mode early in renderer initialization
+	qboolean safe_mode_detected = R_DetectSafeMode();
+
+	// Also check command line arguments for safe mode
+	if (COM_CheckParm("-safe") || COM_CheckParm("-safemode")) {
+		safe_mode_detected = qtrue;
+		Com_Printf("Safe mode activated: command line argument\n");
+	}
+
+	if (safe_mode_detected) {
+		R_SetSafeMode(qtrue, "command line argument or safe mode flag");
+	}
+
 #ifdef USE_RENDERER_DLOPEN
 	// Initialize cl_renderer early so renderer loading knows which renderer to use
 	if (!cl_renderer) {
@@ -3920,12 +3934,13 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 					GetRefAPI = testGetRefAPI;
 					Com_Printf( S_COLOR_GREEN "Successfully loaded renderer: %s\n", tryRenderer );
 
-					// Provide additional info about the selected renderer
+					// Log standardized renderer information
 					if (Q_stricmp(tryRenderer, "vulkan") == 0) {
-						Com_Printf( S_COLOR_GREEN "  Vulkan renderer: RTX hardware acceleration enabled\n" );
-						Com_Printf( S_COLOR_GREEN "  imGUI performance monitoring available\n" );
+						R_LogRendererInfo("Vulkan Renderer", "1.4 RTX");
 					} else if (Q_stricmp(tryRenderer, "opengl") == 0) {
-						Com_Printf( S_COLOR_GREEN "  OpenGL renderer: Reliable fallback renderer\n" );
+						R_LogRendererInfo("OpenGL Renderer", "3.3+");
+					} else {
+						R_LogRendererInfo(tryRenderer, "Unknown version");
 					}
 
 					Com_Printf( "Renderer startup final path: %s\n", tryRenderer );
@@ -3951,7 +3966,7 @@ fprintf(stderr, "About to enter renderer loading logic\n");
             }
             Com_Printf( S_COLOR_YELLOW "  Path attempted: %s\n", ospath );
 			if (i == 0) { // Only print this if it's the first attempt (requested renderer)
-				Com_Printf( "Requested renderer %s failed to load, trying fallbacks\n", rendererName );
+				R_LogFallbackInfo(rendererName, "next available", "renderer failed to load");
 			}
 		}
 	}

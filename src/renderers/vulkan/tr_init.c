@@ -25,6 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../renderercommon/tr_backend_iface.h"
 #include "../../common/q_shared.h"
 #include "vk.h"
+#include "../renderer_features.h"
 #include <stdarg.h>
 #include <string.h>
 #include <stdio.h>
@@ -347,6 +348,19 @@ R_Register
 ================
 */
 void R_Register( void ) {
+    // Initialize centralized renderer feature system
+    R_InitFeatures();
+
+    // Register common features
+    R_RegisterFeatureCvars(common_features, ARRAY_LEN(common_features));
+
+    // Register Vulkan-specific features
+    R_RegisterFeatureCvars(vulkan_features, ARRAY_LEN(vulkan_features));
+
+    // Apply safe mode restrictions
+    R_ApplySafeMode();
+
+    // Legacy cvar registration (keeping existing behavior for compatibility)
     r_subdivisions = ri.Cvar_Get( "r_subdivisions", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
     ri.Cvar_SetDescription( r_subdivisions, "Distance to subdivide bezier curved surfaces." );
 
@@ -677,6 +691,10 @@ void R_Init( void ) {
     R_InitShaders();
 
     R_ModelInit();
+
+    // Log renderer initialization with feature status
+    R_LogRendererInfo("Vulkan Renderer", "1.4 RTX");
+    R_LogFeatureSummary();
 }
 
 /*
