@@ -1,0 +1,3 @@
+/home/tim/Desktop/idtech3/platform/android/app/.cxx/cmake/debug/x86_64/CMakeFiles/rebuild_cache.dir
+/home/tim/Desktop/idtech3/platform/android/app/.cxx/cmake/debug/x86_64/CMakeFiles/edit_cache.dir
+/home/tim/Desktop/idtech3/platform/android/app/.cxx/cmake/debug/x86_64/CMakeFiles/native-lib.dir
