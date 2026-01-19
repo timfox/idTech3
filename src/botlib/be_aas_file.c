@@ -294,7 +294,7 @@ static char *AAS_LoadAASLump(fileHandle_t fp, int offset, int length, int *lasto
 	if (!length)
 	{
 		//just alloc a dummy
-		return (char *) GetClearedHunkMemory(size+1);
+		return (char *) GetClearedHunkMemory((unsigned long)(size+1));
 	} //end if
 	//seek to the data
 	if (offset != *lastoffset)
@@ -309,7 +309,7 @@ static char *AAS_LoadAASLump(fileHandle_t fp, int offset, int length, int *lasto
 		} //end if
 	} //end if
 	//allocate memory
-	buf = (char *) GetClearedHunkMemory(length+1);
+	buf = (char *) GetClearedHunkMemory((unsigned long)(length+1));
 	//read the data
 	//if (length)
 	{
@@ -394,49 +394,49 @@ int AAS_LoadAASFile(char *filename)
 	offset = LittleLong(header.lumps[AASLUMP_BBOXES].fileofs);
 	length = LittleLong(header.lumps[AASLUMP_BBOXES].filelen);
 	aasworld.bboxes = (aas_bbox_t *) AAS_LoadAASLump(fp, offset, length, &lastoffset, sizeof(aas_bbox_t));
-	aasworld.numbboxes = length / sizeof(aas_bbox_t);
+	aasworld.numbboxes = (int)(length / sizeof(aas_bbox_t));
 	if (aasworld.numbboxes && !aasworld.bboxes) return BLERR_CANNOTREADAASLUMP;
 	//vertexes
 	offset = LittleLong(header.lumps[AASLUMP_VERTEXES].fileofs);
 	length = LittleLong(header.lumps[AASLUMP_VERTEXES].filelen);
 	aasworld.vertexes = (aas_vertex_t *) AAS_LoadAASLump(fp, offset, length, &lastoffset, sizeof(aas_vertex_t));
-	aasworld.numvertexes = length / sizeof(aas_vertex_t);
+	aasworld.numvertexes = (int)(length / sizeof(aas_vertex_t));
 	if (aasworld.numvertexes && !aasworld.vertexes) return BLERR_CANNOTREADAASLUMP;
 	//planes
 	offset = LittleLong(header.lumps[AASLUMP_PLANES].fileofs);
 	length = LittleLong(header.lumps[AASLUMP_PLANES].filelen);
 	aasworld.planes = (aas_plane_t *) AAS_LoadAASLump(fp, offset, length, &lastoffset, sizeof(aas_plane_t));
-	aasworld.numplanes = length / sizeof(aas_plane_t);
+	aasworld.numplanes = (int)(length / sizeof(aas_plane_t));
 	if (aasworld.numplanes && !aasworld.planes) return BLERR_CANNOTREADAASLUMP;
 	//edges
 	offset = LittleLong(header.lumps[AASLUMP_EDGES].fileofs);
 	length = LittleLong(header.lumps[AASLUMP_EDGES].filelen);
 	aasworld.edges = (aas_edge_t *) AAS_LoadAASLump(fp, offset, length, &lastoffset, sizeof(aas_edge_t));
-	aasworld.numedges = length / sizeof(aas_edge_t);
+	aasworld.numedges = (int)(length / sizeof(aas_edge_t));
 	if (aasworld.numedges && !aasworld.edges) return BLERR_CANNOTREADAASLUMP;
 	//edgeindex
 	offset = LittleLong(header.lumps[AASLUMP_EDGEINDEX].fileofs);
 	length = LittleLong(header.lumps[AASLUMP_EDGEINDEX].filelen);
 	aasworld.edgeindex = (aas_edgeindex_t *) AAS_LoadAASLump(fp, offset, length, &lastoffset, sizeof(aas_edgeindex_t));
-	aasworld.edgeindexsize = length / sizeof(aas_edgeindex_t);
+	aasworld.edgeindexsize = (int)(length / sizeof(aas_edgeindex_t));
 	if (aasworld.edgeindexsize && !aasworld.edgeindex) return BLERR_CANNOTREADAASLUMP;
 	//faces
 	offset = LittleLong(header.lumps[AASLUMP_FACES].fileofs);
 	length = LittleLong(header.lumps[AASLUMP_FACES].filelen);
 	aasworld.faces = (aas_face_t *) AAS_LoadAASLump(fp, offset, length, &lastoffset, sizeof(aas_face_t));
-	aasworld.numfaces = length / sizeof(aas_face_t);
+	aasworld.numfaces = (int)(length / sizeof(aas_face_t));
 	if (aasworld.numfaces && !aasworld.faces) return BLERR_CANNOTREADAASLUMP;
 	//faceindex
 	offset = LittleLong(header.lumps[AASLUMP_FACEINDEX].fileofs);
 	length = LittleLong(header.lumps[AASLUMP_FACEINDEX].filelen);
 	aasworld.faceindex = (aas_faceindex_t *) AAS_LoadAASLump(fp, offset, length, &lastoffset, sizeof(aas_faceindex_t));
-	aasworld.faceindexsize = length / sizeof(aas_faceindex_t);
+	aasworld.faceindexsize = (int)(length / sizeof(aas_faceindex_t));
 	if (aasworld.faceindexsize && !aasworld.faceindex) return BLERR_CANNOTREADAASLUMP;
 	//convex areas
 	offset = LittleLong(header.lumps[AASLUMP_AREAS].fileofs);
 	length = LittleLong(header.lumps[AASLUMP_AREAS].filelen);
 	aasworld.areas = (aas_area_t *) AAS_LoadAASLump(fp, offset, length, &lastoffset, sizeof(aas_area_t));
-	aasworld.numareas = length / sizeof(aas_area_t);
+	aasworld.numareas = (int)(length / sizeof(aas_area_t));
 	if (aasworld.numareas && !aasworld.areas) return BLERR_CANNOTREADAASLUMP;
 	//area settings
 	offset = LittleLong(header.lumps[AASLUMP_AREASETTINGS].fileofs);

@@ -1690,9 +1690,18 @@ IF(USE_CIMGUI)
 		target_compile_features(imgui_shared PUBLIC cxx_std_17)
 		set_target_properties(imgui_shared PROPERTIES OUTPUT_NAME "imgui_shared")
 		# Suppress clang pragma warnings for cimgui (GCC doesn't recognize clang pragmas)
+		# Also suppress old-style cast and conversion warnings from ImGui
 		target_compile_options(imgui_shared PRIVATE
 			$<$<C_COMPILER_ID:GNU>:-Wno-unknown-pragmas>
 			$<$<CXX_COMPILER_ID:GNU>:-Wno-unknown-pragmas>
+			$<$<C_COMPILER_ID:GNU>:-Wno-old-style-cast>
+			$<$<CXX_COMPILER_ID:GNU>:-Wno-old-style-cast>
+			$<$<C_COMPILER_ID:Clang>:-Wno-old-style-cast>
+			$<$<CXX_COMPILER_ID:Clang>:-Wno-old-style-cast>
+			$<$<C_COMPILER_ID:GNU>:-Wno-conversion>
+			$<$<CXX_COMPILER_ID:GNU>:-Wno-conversion>
+			$<$<C_COMPILER_ID:Clang>:-Wno-conversion>
+			$<$<CXX_COMPILER_ID:Clang>:-Wno-conversion>
 		)
 		list(APPEND CLIENT_SRCS ${CIMGUI_DIR}/cimgui_impl.cpp)
 		# Only include SDL backend when SDL is enabled (CI may build with USE_SDL=0).

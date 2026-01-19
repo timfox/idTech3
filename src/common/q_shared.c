@@ -140,7 +140,7 @@ void COM_StripExtension( const char *restrict in, char *restrict out, int destsi
 	const char *dot = strrchr(in, '.'), *slash;
 
 	if (dot && ((slash = strrchr(in, '/')) == NULL || slash < dot))
-		destsize = (destsize < dot-in+1 ? destsize : dot-in+1);
+		destsize = (destsize < (int)(dot-in+1) ? destsize : (int)(dot-in+1));
 
 	if ( in == out && destsize > 1 )
 		out[destsize-1] = '\0';
@@ -160,8 +160,8 @@ qboolean COM_CompareExtension(const char *in, const char *ext)
 {
 	int inlen, extlen;
 	
-	inlen = strlen(in);
-	extlen = strlen(ext);
+	inlen = (int)strlen(in);
+	extlen = (int)strlen(ext);
 	
 	if(extlen <= inlen)
 	{
@@ -251,7 +251,7 @@ unsigned long Com_GenerateHashValue( const char *fname, const unsigned int size 
 	}
 	
 	hash = (hash ^ (hash >> 10) ^ (hash >> 20));
-	hash &= (size-1);
+	hash &= (unsigned long)(size-1);
 
 	return hash;
 }
@@ -294,7 +294,7 @@ int Com_Split( char *in, char **out, int outsz, int delim )
 	while( (c = *in) != '\0' && c != delim )
 		in++; 
 	*in = '\0';
-	c = out - o;
+	c = (int)(out - o);
 	// set remaining out pointers
 	while( out < end ) {
 		*out = in; out++;
@@ -321,7 +321,7 @@ unsigned int crc32_buffer( const byte *buf, unsigned int len ) {
 
 		for (i = 0; i < 256; i++)
 		{
-			c = i;
+			c = (unsigned int)i;
 			for ( j = 0; j < 8; j++ )
 				c = (c & 1) ? (c >> 1) ^ 0xEDB88320UL : c >> 1;
 			crc32_table[i] = c;
@@ -389,8 +389,8 @@ short   ShortSwap (short l)
 {
 	byte    b1,b2;
 
-	b1 = l&255;
-	b2 = (l>>8)&255;
+	b1 = (byte)(l&255);
+	b2 = (byte)((l>>8)&255);
 
 	return (b1<<8) + b2;
 }
@@ -404,10 +404,10 @@ int    LongSwap (int l)
 {
 	byte    b1,b2,b3,b4;
 
-	b1 = l&255;
-	b2 = (l>>8)&255;
-	b3 = (l>>16)&255;
-	b4 = (l>>24)&255;
+	b1 = (byte)(l&255);
+	b2 = (byte)((l>>8)&255);
+	b3 = (byte)((l>>16)&255);
+	b4 = (byte)((l>>24)&255);
 
 	return ((int)b1<<24) + ((int)b2<<16) + ((int)b3<<8) + b4;
 }

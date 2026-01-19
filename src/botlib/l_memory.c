@@ -346,7 +346,7 @@ void *GetMemory(unsigned long size)
 	void *ptr;
 	unsigned long int *memid;
 
-	ptr = botimport.GetMemory(size + sizeof(unsigned long int));
+	ptr = botimport.GetMemory((int)(size + sizeof(unsigned long int)));
 	if (!ptr) return NULL;
 	memid = (unsigned long int *) ptr;
 	*memid = MEM_ID;

@@ -519,6 +519,13 @@ static void ECS_DebugDrawPhysics(entt::registry &registry) {
 #ifdef USE_BULLET
 // CM system integration - Add world geometry collision to Bullet world
 static void ECS_IntegrateWithCMSystem(entt::registry &registry) {
+	// TODO: Integrate with CM Bullet system when available
+	// For now, this functionality is disabled as the CM Bullet functions are not implemented
+	(void)registry;
+	return;
+
+	// Original code (disabled until CM integration is complete):
+	/*
 	// Check if CM Bullet system is initialized
 	extern qboolean CM_Bullet_IsInitialized(void);
 	extern btDiscreteDynamicsWorld* CM_Bullet_GetWorld(void);
@@ -531,6 +538,7 @@ static void ECS_IntegrateWithCMSystem(entt::registry &registry) {
 	if (!cmWorld) {
 		return;
 	}
+	*/
 
 	cvar_t *physics_world_collision = Cvar_Get("physics_world_collision", "1", CVAR_ARCHIVE);
 	Cvar_SetDescription(physics_world_collision, "Enable collision between ECS entities and world geometry");

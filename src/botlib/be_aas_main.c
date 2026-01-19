@@ -298,7 +298,7 @@ int AAS_Setup(void)
 	saveroutingcache = LibVar("saveroutingcache", "0");
 	//allocate memory for the entities
 	if (aasworld.entities) FreeMemory(aasworld.entities);
-	aasworld.entities = (aas_entity_t *) GetClearedHunkMemory(aasworld.maxentities * sizeof(aas_entity_t));
+	aasworld.entities = (aas_entity_t *) GetClearedHunkMemory((unsigned long)(aasworld.maxentities * sizeof(aas_entity_t)));
 	//invalidate all the entities
 	AAS_InvalidateEntities();
 	//force some recalculations

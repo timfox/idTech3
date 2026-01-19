@@ -133,7 +133,7 @@ static qboolean CM_PlaneFromPoints( vec4_t plane, const vec3_t a, const vec3_t b
 	if ( VectorNormalizeDP( plane ) == 0.0 )
 		return qfalse;
 
-	plane[3] = DotProductDPf( a, plane );
+	plane[3] = (vec_t)DotProductDPf( a, plane );
 	return qtrue;
 }
 
@@ -163,12 +163,12 @@ static qboolean	CM_NeedsSubdivision( const vec3_t a, const vec3_t b, const vec3_
 
 	// calculate the linear midpoint
 	for ( i = 0 ; i < 3 ; i++ ) {
-		lmid[i] = 0.5*(a[i] + c[i]);
+		lmid[i] = (vec_t)(0.5*(a[i] + c[i]));
 	}
 
 	// calculate the exact curve midpoint
 	for ( i = 0 ; i < 3 ; i++ ) {
-		cmid[i] = 0.5 * ( 0.5*(a[i] + b[i]) + 0.5*(b[i] + c[i]) );
+		cmid[i] = (vec_t)(0.5 * ( 0.5*(a[i] + b[i]) + 0.5*(b[i] + c[i]) ));
 	}
 
 	// see if the curve is far enough away from the linear mid
@@ -191,9 +191,9 @@ static void CM_Subdivide( const vec3_t a, const vec3_t b, const vec3_t c, vec3_t
 	int		i;
 
 	for ( i = 0 ; i < 3 ; i++ ) {
-		out1[i] = 0.5 * (a[i] + b[i]);
-		out3[i] = 0.5 * (b[i] + c[i]);
-		out2[i] = 0.5 * (out1[i] + out3[i]);
+		out1[i] = (vec_t)(0.5 * (a[i] + b[i]));
+		out3[i] = (vec_t)(0.5 * (b[i] + c[i]));
+		out2[i] = (vec_t)(0.5 * (out1[i] + out3[i]));
 	}
 }
 
@@ -874,7 +874,7 @@ static void CM_AddFacetBevels( facet_t *facet ) {
 		for ( dir = -1 ; dir <= 1 ; dir += 2, order++ )
 		{
 			VectorClear(plane);
-			plane[axis] = dir;
+			plane[axis] = (vec_t)dir;
 			if (dir == 1) {
 				plane[3] = maxs[axis];
 			}

@@ -107,7 +107,7 @@ void AAS_InitAASLinkHeap(void)
 #endif
 		if (max_aaslinks < 0) max_aaslinks = 0;
 		aasworld.linkheapsize = max_aaslinks;
-		aasworld.linkheap = (aas_link_t *) GetHunkMemory(max_aaslinks * sizeof(aas_link_t));
+		aasworld.linkheap = (aas_link_t *) GetHunkMemory((unsigned long)(max_aaslinks * sizeof(aas_link_t)));
 	} //end if
 	//link the links on the heap
 	aasworld.linkheap[0].prev_ent = NULL;
@@ -189,7 +189,7 @@ void AAS_InitAASLinkedEntities(void)
 	if (!aasworld.loaded) return;
 	if (aasworld.arealinkedentities) FreeMemory(aasworld.arealinkedentities);
 	aasworld.arealinkedentities = (aas_link_t **) GetClearedHunkMemory(
-						aasworld.numareas * sizeof(aas_link_t *));
+						(unsigned long)(aasworld.numareas * sizeof(aas_link_t *)));
 } //end of the function AAS_InitAASLinkedEntities
 //===========================================================================
 //
@@ -672,8 +672,8 @@ aas_trace_t AAS_TraceClientBBox(vec3_t start, vec3_t end, int presencetype,
 			if ( front == back ) front -= 0.001f; // bk0101022 - hack/FPE 
                 	//calculate the hitpoint with the node (split point of the line)
 			//put the crosspoint TRACEPLANE_EPSILON pixels on the near side
-			if (front < 0) frac = (front + TRACEPLANE_EPSILON)/(front-back);
-			else frac = (front - TRACEPLANE_EPSILON)/(front-back); // bk010221
+			if (front < 0) frac = (front + (float)TRACEPLANE_EPSILON)/(front-back);
+			else frac = (front - (float)TRACEPLANE_EPSILON)/(front-back); // bk010221
 			//
 			if (frac < 0)
 				frac = 0.001f; //0

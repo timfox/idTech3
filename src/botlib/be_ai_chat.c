@@ -253,8 +253,8 @@ static void InitConsoleMessageHeap(void)
 	if (consolemessageheap) FreeMemory(consolemessageheap);
 	//
 	max_messages = (int) LibVarValue("max_messages", "1024");
-	consolemessageheap = (bot_consolemessage_t *) GetClearedHunkMemory(max_messages *
-												sizeof(bot_consolemessage_t));
+	consolemessageheap = (bot_consolemessage_t *) GetClearedHunkMemory((unsigned long)(max_messages *
+												sizeof(bot_consolemessage_t)));
 	consolemessageheap[0].prev = NULL;
 	consolemessageheap[0].next = &consolemessageheap[1];
 	for (i = 1; i < max_messages-1; i++)
@@ -489,7 +489,7 @@ int StringContains( const char *str1, const char *str2, int casesensitive )
 
 	if (str1 == NULL || str2 == NULL) return -1;
 
-	len = strlen(str1) - strlen(str2);
+	len = (int)(strlen(str1) - strlen(str2));
 	index = 0;
 	for (i = 0; i <= len; i++, str1++, index++)
 	{
@@ -518,7 +518,7 @@ static const char *StringContainsWord( const char *str1, const char *str2 )
 {
 	int len, i, j;
 
-	len = strlen( str1 ) - strlen( str2 );
+	len = (int)(strlen( str1 ) - strlen( str2 ));
 	for ( i = 0; i <= len; i++, str1++ )
 	{
 		//if not at the start of the string
@@ -585,7 +585,7 @@ static void StringReplaceWords( char *string, int size, const char *synonym, con
 
 		if ( !str2 )
 		{
-			memmove( str + replen, str + synlen, strlen( str + synlen ) + 1 );
+			memmove( str + replen, str + synlen, (size_t)(strlen( str + synlen ) + 1) );
 			//append the synonym replacement
 			Com_Memcpy( str, replacement, replen );
 		}
@@ -645,7 +645,7 @@ static bot_synonymlist_t *BotLoadSynonyms( const char *filename )
 	for (pass = 0; pass < 2; pass++)
 	{
 		//
-		if (pass && size) ptr = (char *) GetClearedHunkMemory(size);
+		if (pass && size) ptr = (char *) GetClearedHunkMemory((unsigned long)size);
 		//
 		PC_SetBaseFolder(BOTFILESBASEFOLDER);
 		source = LoadSourceFile(filename);
@@ -1045,7 +1045,7 @@ static bot_randomlist_t *BotLoadRandomStrings( const char *filename )
 	for (pass = 0; pass < 2; pass++)
 	{
 		//
-		if (pass && size) ptr = (char *) GetClearedHunkMemory(size);
+		if (pass && size) ptr = (char *) GetClearedHunkMemory((unsigned long)size);
 		//
 		PC_SetBaseFolder(BOTFILESBASEFOLDER);
 		source = LoadSourceFile(filename);
