@@ -460,7 +460,7 @@ All significant changes require architectural review:
 
 ---
 
-## 📝 AMENDMENT PROCESS
+## AMENDMENT PROCESS
 
 This constitution can be amended through:
 1. **Community Consensus**: Discussion and agreement
@@ -469,6 +469,47 @@ This constitution can be amended through:
 4. **Version Bumping**: Constitution version incremented
 
 **Rationale**: Project constraints evolve, but changes must be deliberate and well-considered.
+
+---
+
+## USER RULES (Personal Defaults)
+
+These are my personal rules that apply to **all changes I make**, regardless of project. They prevent "AI drift" and keep modifications focused and safe.
+
+### Core Principles
+- **Never change gameplay behavior unless explicitly requested**
+- **Keep C ABI stable; wrap C++ in `#ifdef __cplusplus` guards only**
+- **No new dependencies without explicit justification and approval**
+- **Every new feature must include a toggle and startup log line**
+- **Prefer small, reviewable commits over large refactoring**
+
+### Implementation Rules
+- **Preserve existing APIs and interfaces**
+- **Add logging for all new code paths**
+- **Include error handling for edge cases**
+- **Test changes before committing**
+- **Document non-obvious design decisions**
+
+### Quality Standards
+- **No code without tests (where applicable)**
+- **No features without documentation**
+- **No changes without backward compatibility**
+- **No complexity without justification**
+- **No "cleanup" commits without clear benefit**
+
+### Communication Rules
+- **Explain reasoning for non-obvious changes**
+- **Ask before making architectural changes**
+- **Flag when I'm unsure about approach**
+- **Provide context for design decisions**
+- **Be explicit about tradeoffs and alternatives**
+
+### Boundaries
+- **Don't rewrite working code "because it's ugly"**
+- **Don't add features "because they're cool"**
+- **Don't change patterns "to be more modern"**
+- **Don't optimize "just in case"**
+- **Don't abstract "for future flexibility"**
 
 ---
 
