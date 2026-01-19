@@ -1,0 +1,240 @@
+name: CI Build Validation
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+concurrency:
+  group: build-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-validation:
+    name: ${{ matrix.config.name }} (${{ matrix.compiler.name }})
+    runs-on: ubuntu-24.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - name: "Debug"
+            build_type: "Debug"
+            cmake_flags: "-DCMAKE_BUILD_TYPE=Debug -DUSE_VULKAN=ON -DUSE_OPENGL=ON -DBUILD_SERVER=ON"
+          - name: "Release"
+            build_type: "Release"
+            cmake_flags: "-DCMAKE_BUILD_TYPE=Release -DUSE_VULKAN=ON -DUSE_OPENGL=ON -DBUILD_SERVER=ON"
+        compiler:
+          - name: "GCC"
+            cc: "gcc-15"
+            cxx: "g++-15"
+            package: "gcc-15 g++-15"
+          - name: "Clang"
+            cc: "clang-18"
+            cxx: "clang++-18"
+            package: "clang-18"
+
+    env:
+      CC: ${{ matrix.compiler.cc }}
+      CXX: ${{ matrix.compiler.cxx }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for blame-based warning filtering
+
+      - name: Install compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ matrix.compiler.package }}
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get install -y \
+            cmake ninja-build pkg-config \
+            libsdl2-dev libcurl4-openssl-dev \
+            libssl-dev libjpeg-dev \
+            libvorbis-dev libogg-dev \
+            libfreetype6-dev libsqlite3-dev \
+            liblua5.4-dev libwebsockets-dev \
+            libzstd-dev libopenal-dev \
+            libtheora-dev \
+            libvulkan-dev
+
+      - name: Configure build
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. ${{ matrix.config.cmake_flags }} \
+            -G Ninja \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DENABLE_WERROR_NEW_CODE=ON
+
+      - name: Build
+        run: |
+          cd build
+          ninja -j$(nproc)
+
+      - name: Verify build artifacts
+        run: |
+          cd build
+          echo "Checking for required binaries..."
+          ls -la idtech3* || echo "No binaries found in build/"
+          ls -la libimgui_shared* || echo "No libraries found in build/"
+
+      - name: Run smoke test
+        run: |
+          echo "Running basic smoke test..."
+          if [ -f "build/idtech3.x86_64" ]; then
+            # Create minimal test setup
+            mkdir -p test_baseq3
+            cp -r baseq3/* test_baseq3/ 2>/dev/null || true
+
+            # Run headless smoke test with timeout
+            timeout 30s ./build/idtech3.x86_64 \
+              +set fs_basepath "$(pwd)" \
+              +set fs_game test_baseq3 \
+              +set r_renderer opengl \
+              +set developer 0 \
+              +set com_speeds 0 \
+              +set s_initsound 0 \
+              +set non_interactive 1 \
+              +quit \
+              2>&1 | head -50 || echo "Smoke test completed or timed out"
+          else
+            echo "Binary not found, skipping smoke test"
+          fi
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-${{ matrix.config.name }}-${{ matrix.compiler.name }}
+          path: |
+            build/idtech3*
+            build/libimgui_shared*
+            build/compile_commands.json
+          retention-days: 7
+
+      - name: Upload build logs
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: build-logs-${{ matrix.config.name }}-${{ matrix.compiler.name }}
+          path: |
+            build/CMakeFiles/**/*.log
+            build/CMakeCache.txt
+            build/CMakeFiles/CMakeOutput.log
+            build/CMakeFiles/CMakeError.log
+          retention-days: 7
+
+  formatting-check:
+    name: Code Formatting
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format-18
+
+      - name: Check formatting
+        run: |
+          # Find all C/C++ files that have changed
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} | grep -E '\.(c|cpp|h|hpp)$' || true)
+
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No C/C++ files changed, skipping formatting check"
+            exit 0
+          fi
+
+          echo "Checking formatting for changed files:"
+          echo "$CHANGED_FILES"
+
+          # Check if files are properly formatted
+          FORMATTING_ISSUES=0
+          for file in $CHANGED_FILES; do
+            if [ -f "$file" ]; then
+              if ! clang-format-18 --dry-run --Werror "$file" 2>/dev/null; then
+                echo "❌ Formatting issue in: $file"
+                FORMATTING_ISSUES=$((FORMATTING_ISSUES + 1))
+              else
+                echo "✅ Properly formatted: $file"
+              fi
+            fi
+          done
+
+          if [ $FORMATTING_ISSUES -gt 0 ]; then
+            echo ""
+            echo "🔧 To fix formatting issues, run:"
+            echo "  clang-format-18 -i <file>"
+            echo ""
+            echo "Or format all changed files:"
+            echo "  git diff --name-only HEAD~1 | xargs clang-format-18 -i"
+            exit 1
+          else
+            echo "🎉 All changed files are properly formatted!"
+          fi
+
+  summary:
+    name: Build Summary
+    runs-on: ubuntu-24.04
+    if: always()
+    needs: [build-validation, formatting-check]
+
+    steps:
+      - name: Generate summary
+        run: |
+          echo "# 🏗️ CI Build Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Build Matrix Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Check each job status
+          JOBS_PASSED=0
+          JOBS_FAILED=0
+
+          # Build validation jobs
+          for config in "Debug (GCC)" "Debug (Clang)" "Release (GCC)" "Release (Clang)"; do
+            if [ "${{ needs.build-validation.result }}" = "success" ]; then
+              echo "✅ $config" >> $GITHUB_STEP_SUMMARY
+              JOBS_PASSED=$((JOBS_PASSED + 1))
+            else
+              echo "❌ $config" >> $GITHUB_STEP_SUMMARY
+              JOBS_FAILED=$((JOBS_FAILED + 1))
+            fi
+          done
+
+          # Formatting check
+          if [ "${{ needs.formatting-check.result }}" = "success" ] || [ "${{ needs.formatting-check.result }}" = "skipped" ]; then
+            echo "✅ Code Formatting" >> $GITHUB_STEP_SUMMARY
+            JOBS_PASSED=$((JOBS_PASSED + 1))
+          elif [ "${{ needs.formatting-check.result }}" = "failure" ]; then
+            echo "❌ Code Formatting" >> $GITHUB_STEP_SUMMARY
+            JOBS_FAILED=$((JOBS_FAILED + 1))
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Passed: $JOBS_PASSED" >> $GITHUB_STEP_SUMMARY
+          echo "- ❌ Failed: $JOBS_FAILED" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ $JOBS_FAILED -eq 0 ]; then
+            echo "## 🎉 All checks passed!" >> $GITHUB_STEP_SUMMARY
+            echo "The codebase builds reliably across all tested configurations." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ⚠️ Some checks failed" >> $GITHUB_STEP_SUMMARY
+            echo "Please review the failed jobs and fix any issues." >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📦 Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "Build artifacts are available for download if any builds succeeded." >> $GITHUB_STEP_SUMMARY

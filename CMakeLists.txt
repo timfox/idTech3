@@ -357,6 +357,106 @@ ENDIF()
 # Dependency graph generation (optional)
 OPTION(ENABLE_DEPENDENCY_GRAPH "Generate a Graphviz dependency graph" ON)
 
+# Warnings as errors for new/changed code only
+OPTION(ENABLE_WERROR_NEW_CODE "Treat warnings as errors only for new/changed code" OFF)
+
+# Function to determine if a file has been modified recently
+function(get_recently_modified_files OUTPUT_VAR DAYS_THRESHOLD)
+    # Get list of files modified in the last N days
+    execute_process(
+        COMMAND git log --since="${DAYS_THRESHOLD} days ago" --name-only --pretty=format:
+        COMMAND sort -u
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_VARIABLE MODIFIED_FILES
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+
+    # Filter to only C/C++ source files
+    string(REGEX REPLACE "\n" ";" MODIFIED_FILES "${MODIFIED_FILES}")
+    set(FILTERED_FILES "")
+    foreach(FILE ${MODIFIED_FILES})
+        if(FILE MATCHES "\\.(c|cpp|h|hpp)$")
+            list(APPEND FILTERED_FILES "${CMAKE_SOURCE_DIR}/${FILE}")
+        endif()
+    endforeach()
+
+    set(${OUTPUT_VAR} "${FILTERED_FILES}" PARENT_SCOPE)
+endfunction()
+
+# Function to determine if a file is new (not in git history)
+function(get_new_files OUTPUT_VAR)
+    # Get list of tracked files
+    execute_process(
+        COMMAND git ls-files
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_VARIABLE TRACKED_FILES
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+
+    # Get initial commit files (files that existed at project start)
+    execute_process(
+        COMMAND git log --pretty=format: --name-only --diff-filter=A | sort -u
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_VARIABLE INITIAL_FILES
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+
+    string(REGEX REPLACE "\n" ";" TRACKED_FILES "${TRACKED_FILES}")
+    string(REGEX REPLACE "\n" ";" INITIAL_FILES "${INITIAL_FILES}")
+
+    set(NEW_FILES "")
+    foreach(FILE ${TRACKED_FILES})
+        if(FILE MATCHES "\\.(c|cpp|h|hpp)$")
+            list(FIND INITIAL_FILES "${FILE}" INDEX)
+            if(INDEX EQUAL -1)
+                # File not in initial commit = new file
+                list(APPEND NEW_FILES "${CMAKE_SOURCE_DIR}/${FILE}")
+            endif()
+        endif()
+    endforeach()
+
+    set(${OUTPUT_VAR} "${NEW_FILES}" PARENT_SCOPE)
+endfunction()
+
+# Apply selective warnings as errors
+if(ENABLE_WERROR_NEW_CODE)
+    message(STATUS "Warnings as errors enabled for new/changed code")
+
+    # Get recently modified files (last 30 days)
+    get_recently_modified_files(RECENT_FILES 30)
+
+    # Get new files (never committed before)
+    get_new_files(NEW_FILES)
+
+    # Combine lists
+    set(STRICT_WARNING_FILES ${RECENT_FILES} ${NEW_FILES})
+    list(REMOVE_DUPLICATES STRICT_WARNING_FILES)
+
+    if(STRICT_WARNING_FILES)
+        message(STATUS "Applying strict warnings to ${CMAKE_SOURCE_DIR} files:")
+        foreach(FILE ${STRICT_WARNING_FILES})
+            file(RELATIVE_PATH REL_FILE ${CMAKE_SOURCE_DIR} ${FILE})
+            message(STATUS "  ${REL_FILE}")
+        endforeach()
+
+        # Apply strict warnings to these files
+        if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+            set_source_files_properties(${STRICT_WARNING_FILES} PROPERTIES
+                COMPILE_OPTIONS "-Werror"
+            )
+        elseif(MSVC)
+            set_source_files_properties(${STRICT_WARNING_FILES} PROPERTIES
+                COMPILE_OPTIONS "/WX"
+            )
+        endif()
+    else()
+        message(STATUS "No new/changed files found for strict warnings")
+    endif()
+endif()
+
 # Enable modern compiler warnings for better code quality
 IF(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
 	ADD_COMPILE_OPTIONS(
