@@ -4,7 +4,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath "com.android.tools.build:gradle:8.1.4"
+        classpath "com.android.tools.build:gradle:3.6.4"
     }
 }
 
@@ -19,13 +19,12 @@ apply plugin: 'com.android.application'
 
 android {
     compileSdkVersion 33
-    namespace "com.idtech3"
-    
+
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
     }
-    
+
     defaultConfig {
         applicationId "com.idtech3"
         minSdkVersion 24  // Android 7.0 - required for Vulkan support
