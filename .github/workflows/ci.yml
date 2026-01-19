@@ -281,8 +281,8 @@ jobs:
         run: |
           echo "Running 10-second smoke test..."
           cd build
-          # Copy demo assets for smoke test
-          cp -r ../mods/demo ../release/ 2>/dev/null || true
+          # Copy demo assets for smoke test (engine looks in its own directory)
+          cp -r ../mods/demo ./ 2>/dev/null || true
           # Run the smoke test
           ENGINE_BIN="./idtech3.x86_64" TIMEOUT=10 ../scripts/smoke_test.sh
 

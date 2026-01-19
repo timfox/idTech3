@@ -27,8 +27,15 @@ echo "⏱️  Timeout: ${TIMEOUT}s"
 LOG_FILE="/tmp/smoke_test_$(date +%s).log"
 echo "📝 Log: ${LOG_FILE}"
 
+# Set base path to directory containing the engine binary (should contain demo assets)
+ENGINE_DIR="$(dirname "${ENGINE_BIN}")"
+if [[ "${ENGINE_DIR}" == "." ]]; then
+    ENGINE_DIR="$(pwd)"
+fi
+
 set +e
 timeout "${TIMEOUT}s" "${ENGINE_BIN}" \
+    +set fs_basepath "${ENGINE_DIR}" \
     +set r_renderer opengl \
     +set fs_game demo \
     +set sv_pure 0 \
