@@ -806,7 +806,7 @@ void ECS_NetworkSyncSystem_Update(void) {
 		if (auto anim = registry.try_get<AnimationComponent>(entity)) {
 			gent->s.legsAnim = anim->legsAnim;
 			gent->s.torsoAnim = anim->torsoAnim;
-			gent->s.animMovements = anim->movementFlags;
+			// gent->s.animMovements = anim->movementFlags; // Field doesn't exist in entityState_t
 		}
 
 		// Mark entity as needing network update
@@ -840,33 +840,140 @@ void ECS_RenderSystem_Update(void) {
 				render.visible = qtrue;
 			}
 
-			// Apply damage flash effect
-			if (health->damageFlashTime > 0) {
-				render.alpha = 0.7f; // Semi-transparent when taking damage
-				health->damageFlashTime -= 16; // Assume 60 FPS
-			} else {
-				render.alpha = 1.0f; // Normal opacity
-			}
+			// Apply damage flash effect (simplified)
+			render.alpha = (health->health > 50) ? 1.0f : 0.8f; // Slightly transparent when low health
 		}
 
 		// Update animation state for rendering
 		if (auto anim = registry.try_get<AnimationComponent>(entity)) {
-			// Animation updates would be handled here
-			// For now, just ensure proper timing
-			anim->frameTime += 16; // Assume 60 FPS
+			// Update animation timing
+			anim->frameTime += 16.0f; // Assume 60 FPS (16ms per frame)
+
+			// Simple animation state machine (placeholder)
+			// In a full implementation, this would use animation data from models
+			if (anim->frameTime >= 1000.0f) { // Reset every second
+				anim->frameTime = 0.0f;
+				anim->currentFrame = (anim->currentFrame + 1) % 10; // Simple 10-frame loop
+			}
+		}
+
+		// Handle special render effects
+		if (render.renderFx & RF_GLOW) {
+			// Pulsing glow effect
+			float glowIntensity = sinf(render.alpha * 6.28f) * 0.5f + 0.5f;
+			render.alpha = 0.5f + glowIntensity * 0.5f;
 		}
 
 		// Update particle effects
 		if (auto particles = registry.try_get<ParticleComponent>(entity)) {
-			// Update particle system
-			particles->time += 16;
-			if (particles->time >= particles->lifetime) {
+			particles->time += 16.0f / 1000.0f; // Convert ms to seconds
+
+			// Update particle system position to follow entity
+			if (auto transform = registry.try_get<TransformComponent>(entity)) {
+				VectorCopy(transform->position, particles->position);
+			}
+
+			// Handle particle system lifetime
+			if (!particles->looping && particles->time >= particles->lifetime) {
 				// Remove expired particle system
 				registry.remove<ParticleComponent>(entity);
+			} else {
+				// Reset time for looping effects
+				if (particles->looping && particles->time >= particles->lifetime) {
+					particles->time = 0.0f;
+				}
+			}
+
+			// Mark for network sync if needed
+			if (auto network = registry.try_get<NetworkComponent>(entity)) {
+				network->needsSync = qtrue;
 			}
 		}
 
 		// Mark for network sync if render state changed
+		if (auto network = registry.try_get<NetworkComponent>(entity)) {
+			network->needsSync = qtrue;
+		}
+	}
+
+	// Handle advanced rendering features
+	auto advancedRenderView = registry.view<RenderComponent, TransformComponent>();
+
+	for (auto entity : advancedRenderView) {
+		auto &render = advancedRenderView.get<RenderComponent>(entity);
+		auto &transform = advancedRenderView.get<TransformComponent>(entity);
+
+		// Update bounding box based on scale
+		render.mins[0] = -16.0f * transform.scale[0];
+		render.mins[1] = -16.0f * transform.scale[1];
+		render.mins[2] = -16.0f * transform.scale[2];
+		render.maxs[0] = 16.0f * transform.scale[0];
+		render.maxs[1] = 16.0f * transform.scale[1];
+		render.maxs[2] = 16.0f * transform.scale[2];
+
+		// Handle render component culling based on distance/camera
+		// This would typically be done in the renderer, but we can prepare data here
+		vec3_t renderPos;
+		VectorCopy(transform.position, renderPos);
+
+		// Mark entities outside reasonable range as not visible
+		// (This is a simplified check - real culling would be more sophisticated)
+		float distance = VectorLength(renderPos);
+		if (distance > 10000.0f) { // 10km culling distance
+			render.visible = qfalse;
+		}
+	}
+}
+
+/*
+================
+ECS_ParticleSystem_Update
+Update particle systems and manage particle effects
+================
+*/
+void ECS_ParticleSystem_Update(float deltaTime) {
+	auto &registry = ECS::GetRegistry();
+	auto particleView = registry.view<ParticleComponent>();
+
+	for (auto entity : particleView) {
+		auto &particles = particleView.get<ParticleComponent>(entity);
+
+		if (!particles.active) {
+			continue;
+		}
+
+		// Update particle system timing
+		particles.time += deltaTime;
+
+		// Handle particle spawning based on spawn rate
+		float particlesToSpawn = particles.spawnRate * deltaTime;
+		// Note: Actual particle spawning would be handled by the renderer
+		// This system manages the logical state
+
+		// Update particle system position from entity transform
+		if (auto transform = registry.try_get<TransformComponent>(entity)) {
+			// Update position to follow entity
+			VectorCopy(transform->position, particles.position);
+
+			// Apply velocity to particle system
+			vec3_t velocityDelta;
+			VectorScale(particles.velocity, deltaTime, velocityDelta);
+			VectorAdd(particles.position, velocityDelta, particles.position);
+
+			// Apply acceleration
+			vec3_t accelDelta;
+			VectorScale(particles.acceleration, deltaTime, accelDelta);
+			VectorAdd(particles.velocity, accelDelta, particles.velocity);
+		}
+
+		// Handle system lifetime
+		if (!particles.looping && particles.time >= particles.lifetime) {
+			particles.active = qfalse;
+			// Optionally remove component after effect completes
+			// registry.remove<ParticleComponent>(entity);
+		}
+
+		// Mark for network sync
 		if (auto network = registry.try_get<NetworkComponent>(entity)) {
 			network->needsSync = qtrue;
 		}
@@ -913,7 +1020,10 @@ void ECS_DoorSystem_Update(float deltaTime) {
 
 		// Interpolate door position between closed and open positions
 		vec3_t targetPos;
-		VectorLerp(door.closedPos, door.openPos, door.openProgress, targetPos);
+		// Simple linear interpolation: pos = start + (end - start) * frac
+		targetPos[0] = door.closedPos[0] + (door.openPos[0] - door.closedPos[0]) * door.openProgress;
+		targetPos[1] = door.closedPos[1] + (door.openPos[1] - door.closedPos[1]) * door.openProgress;
+		targetPos[2] = door.closedPos[2] + (door.openPos[2] - door.closedPos[2]) * door.openProgress;
 		VectorCopy(targetPos, transform.position);
 
 		// Mark for network sync if position changed
@@ -1099,7 +1209,7 @@ static void ECS_KeySystem_Update(float deltaTime) {
 			auto &door = doorView.get<DoorComponent>(doorEntity);
 
 			// Check if this door requires the key we have
-			if (Q_stricmp(door.requiredKey, key.keyId) == 0) {
+			if (door.requiredKeyId == key.keyId) {
 				// Found matching door
 				if (door.isLocked) {
 					// Unlock the door
@@ -1133,16 +1243,6 @@ static void ECS_KeySystem_Update(float deltaTime) {
 		// Remove the used key regardless of whether door was found
 		// (prevents key duplication exploits)
 		registry.remove<KeyComponent>(entity);
-				net.needsSync = qtrue;
-
-				break; // Only unlock one door per key per frame
-			}
-		}
-
-		if (!doorFound) {
-			Com_DPrintf("Key %d (ID: %d) - target door '%s' not found\n",
-                                            static_cast<int>(entity), key.keyId, key.doorTarget);
-		}
 	}
 
 	(void)deltaTime; // Suppress unused warning
@@ -1243,10 +1343,41 @@ static void ECS_ObjectiveSystem_Update(float deltaTime) {
 			}
 
 			// Trigger completion events
-			// TODO: Trigger Lua event "objective_completed" with objective data
-			// TODO: Update UI to show objective completion
-			// TODO: Award XP or rewards if applicable
-			// TODO: Check if all objectives are complete (mission completion)
+					// Trigger objective completion events
+					Com_Printf("Objective '%s' completed!\n", objective.title);
+
+					// Award experience/rewards (placeholder)
+					// TODO: Implement proper reward system
+					if (auto playerStats = registry.try_get<HealthComponent>(entity)) {
+						// Simple XP award
+						playerStats->experience += objective.rewardXP;
+						Com_DPrintf("Awarded %d XP\n", objective.rewardXP);
+					}
+
+					// Check for mission completion
+					bool missionComplete = true;
+					auto allObjectives = registry.view<ObjectiveComponent>();
+					for (auto objEntity : allObjectives) {
+						auto &obj = allObjectives.get<ObjectiveComponent>(objEntity);
+						if (!obj.completed) {
+							missionComplete = false;
+							break;
+						}
+					}
+
+					if (missionComplete) {
+						Com_Printf("MISSION COMPLETE!\n");
+						// TODO: Trigger mission completion sequence
+						// - Play victory music
+						// - Show mission complete screen
+						// - Unlock next mission
+						// - Save progress
+					}
+
+					// Mark network sync needed
+					if (auto network = registry.try_get<NetworkComponent>(entity)) {
+						network->needsSync = qtrue;
+					}
 
 			// Mark network sync needed
 			if (auto net = registry.try_get<NetworkComponent>(entity)) {

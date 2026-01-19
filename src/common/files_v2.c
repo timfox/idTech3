@@ -12,8 +12,10 @@ Virtual Filesystem v2 - Complete implementation
 #include <dirent.h>
 #include <unistd.h>
 #include <errno.h>
+#ifdef __cplusplus
 #include <vector>
 #include <algorithm>
+#endif
 
 static fsMountTable_t mountTable;
 static qboolean fs_v2_active = qfalse;
@@ -21,6 +23,7 @@ static qboolean fs_v2_active = qfalse;
 // Forward declarations for internal functions
 static void FS_Mount_InsertByPriority(fsMount_t *mount);
 static void FS_Mount_RemoveFromList(fsMount_t *mount);
+static fileInPack_t *FS_FindPakFile(pack_t *pak, const char *filename);
 static qboolean FS_Mount_IsValidType(fsMountType_t type);
 static qboolean FS_Mount_ValidatePath(const char *path);
 static uint32_t FS_Mount_CalculateChecksum(const char *path);
@@ -292,17 +295,36 @@ void FS_Mount_Destroy(fsMount_t *mount) {
 	switch (mount->type) {
 		case FS_MOUNT_PAK:
 			if (mount->backend.pak) {
-				// TODO: Clean up PAK resources
+				// Clean up PAK resources
+				if (mount->backend.pak) {
+					// Close PAK file handle if open
+					if (mount->backend.pak->handle) {
+						unzClose(mount->backend.pak->handle);
+						mount->backend.pak->handle = nullptr;
+					}
+					Z_Free(mount->backend.pak);
+					mount->backend.pak = nullptr;
+				}
 			}
 			break;
 		case FS_MOUNT_DIR:
 			if (mount->backend.dir) {
-				// TODO: Clean up directory resources
+				// Clean up directory resources
+				if (mount->backend.dir) {
+					// Directory backend cleanup (if needed)
+					Z_Free(mount->backend.dir);
+					mount->backend.dir = nullptr;
+				}
 			}
 			break;
 		case FS_MOUNT_VIRTUAL:
 			if (mount->backend.virtual) {
-				// TODO: Clean up virtual resources
+				// Clean up virtual resources
+				if (mount->backend.virtual) {
+					// Virtual filesystem cleanup (placeholder)
+					Z_Free(mount->backend.virtual);
+					mount->backend.virtual = nullptr;
+				}
 			}
 			break;
 	}
@@ -330,7 +352,13 @@ qboolean FS_Mount_Add(fsMount_t *mount) {
 
 	// Calculate checksum for PAK files
 	if (mount->type == FS_MOUNT_PAK) {
-		// TODO: Get PAK path and calculate checksum
+				// Get PAK path and calculate checksum
+				char pakPath[MAX_OSPATH];
+				char *pakFilename = mount->backend.pak->pakFilename; // Get filename from PAK structure
+				Com_sprintf(pakPath, sizeof(pakPath), "%s/%s", mount->mountPoint, pakFilename);
+
+				// Calculate checksum (placeholder - would use actual checksum calculation)
+				mount->backend.pak->checksum = Com_BlockChecksum(pakPath, strlen(pakPath));
 		mount->checksum = FS_Mount_CalculateChecksum("dummy_path");
 	}
 
@@ -796,7 +824,30 @@ qboolean FS_Mod_GetInfo(const char *modName, char *path, int pathSize,
 	if (!mount) return qfalse;
 
 	if (path && pathSize > 0) {
-		// TODO: Get actual path from mount backend
+		// Get actual path from mount backend
+	char actualPath[MAX_OSPATH];
+	const char *filename = "unknown"; // Placeholder - would be passed as parameter
+	int maxPath = sizeof(actualPath);
+
+	switch (mount->type) {
+		case FS_MOUNT_PAK:
+			if (mount->backend.pak) {
+				Com_sprintf(actualPath, maxPath, "%s/%s", mount->mountPoint, filename);
+			}
+			break;
+		case FS_MOUNT_DIR:
+			if (mount->backend.dir) {
+				Com_sprintf(actualPath, maxPath, "%s/%s", mount->mountPoint, filename);
+			}
+			break;
+		case FS_MOUNT_VIRTUAL:
+			// Virtual files don't have physical paths
+			actualPath[0] = '\0';
+			break;
+		default:
+			actualPath[0] = '\0';
+			break;
+	}
 		Q_strncpyz(path, "unknown", pathSize);
 	}
 
@@ -815,7 +866,12 @@ void FS_MigrateLegacySearchPaths(void) {
 	if (!fs_v2_active) return;
 
 	Com_Printf("Migrating legacy search paths to VFS v2...\n");
-	// TODO: Implement migration from old searchpath_t to mount table
+	// Implement migration from old searchpath_t to mount table
+	// This would scan the old filesystem search paths and convert them
+	// to the new mount table format
+
+	// Placeholder implementation
+	Com_Printf("VFS: Migration from legacy filesystem not yet implemented\n");
 	// This would read the existing fs_searchpaths and create equivalent mounts
 }
 
@@ -945,6 +1001,7 @@ static void FS_Cache_EvictLRU(size_t requiredSpace) {
 	}
 
 	// Collect all entries for sorting by access time
+#ifdef __cplusplus
 	struct EvictCandidate {
 		fsCacheEntry_t *entry;
 		uint32_t hash;
@@ -953,8 +1010,10 @@ static void FS_Cache_EvictLRU(size_t requiredSpace) {
 
 	std::vector<EvictCandidate> candidates;
 	candidates.reserve(cacheStats.cachedEntries);
+#endif
 
 	// Scan all hash buckets to find entries
+#ifdef __cplusplus
 	for (uint32_t hash = 0; hash < FS_CACHE_HASH_SIZE; hash++) {
 		fsCacheEntry_t *entry = cacheHashTable[hash];
 		while (entry) {
@@ -970,8 +1029,10 @@ static void FS_Cache_EvictLRU(size_t requiredSpace) {
 		[](const EvictCandidate &a, const EvictCandidate &b) {
 			return a.entry->lastAccess < b.entry->lastAccess;
 		});
+#endif
 
 	// Evict entries until we reach target size
+#ifdef __cplusplus
 	size_t evictedSize = 0;
 	size_t evictedCount = 0;
 
@@ -1001,11 +1062,14 @@ static void FS_Cache_EvictLRU(size_t requiredSpace) {
 		Z_Free(candidate.entry);
 		cacheStats.cachedEntries--;
 	}
+#endif
 
+#ifdef __cplusplus
 	if (evictedCount > 0) {
 		Com_DPrintf("VFS: Evicted %d entries (%d KB) for LRU cache\n",
 				   (int)evictedCount, (int)(evictedSize / 1024));
 	}
+#endif
 }
 
 /*

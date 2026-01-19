@@ -196,9 +196,11 @@ struct HealthComponent {
 	int maxHealth;
 	int armor;
 	int maxArmor;
-	
-	HealthComponent() : health(100), maxHealth(100), armor(0), maxArmor(0) {}
-	HealthComponent(int hp, int maxHP) : health(hp), maxHealth(maxHP), armor(0), maxArmor(0) {}
+	int experience;               // Player experience points
+	int level;                    // Player level
+
+	HealthComponent() : health(100), maxHealth(100), armor(0), maxArmor(0), experience(0), level(1) {}
+	HealthComponent(int hp, int maxHP) : health(hp), maxHealth(maxHP), armor(0), maxArmor(0), experience(0), level(1) {}
 };
 
 // Network Component - Links ECS entity to engine entity structures
@@ -235,7 +237,7 @@ struct RenderComponent {
 // Door Component - Controls door behavior and locking mechanics
 struct DoorComponent {
 	char doorId[MAX_QPATH];       // Unique door identifier
-	char requiredKey[MAX_QPATH];  // Required key/keycard name
+	int requiredKeyId;            // Required key ID (matches KeyComponent.keyId)
 	qboolean isLocked;            // Whether door is currently locked
 	qboolean isOpen;              // Whether door is currently open
 	float openProgress;           // 0.0 = closed, 1.0 = fully open
@@ -245,10 +247,9 @@ struct DoorComponent {
 	int autoCloseTime;            // Time in ms before auto-closing (0 = manual only)
 	int lastUsedTime;             // When door was last opened/closed
 
-	DoorComponent() : isLocked(qfalse), isOpen(qfalse), openProgress(0.0f),
+	DoorComponent() : requiredKeyId(0), isLocked(qfalse), isOpen(qfalse), openProgress(0.0f),
 	                  openSpeed(1.0f), autoCloseTime(0), lastUsedTime(0) {
 		doorId[0] = '\0';
-		requiredKey[0] = '\0';
 		VectorClear(closedPos);
 		VectorClear(openPos);
 	}
@@ -265,6 +266,46 @@ struct AnimationComponent {
 	AnimationComponent() : legsAnim(0), torsoAnim(0), movementFlags(0),
 	                      frameTime(0.0f), currentFrame(0) {}
 };
+
+// Particle Component - Controls particle effect systems
+struct ParticleComponent {
+	char effectName[MAX_QPATH];   // Name of particle effect
+	vec3_t position;              // Particle system position
+	vec3_t velocity;              // Initial velocity
+	vec3_t acceleration;          // Acceleration over time
+	float lifetime;               // How long particles live (seconds)
+	float spawnRate;              // Particles per second
+	int maxParticles;             // Maximum number of particles
+	float time;                   // Current time in effect
+	qboolean looping;             // Whether effect loops
+	qboolean active;              // Whether system is active
+
+	// Particle appearance
+	vec4_t startColor;            // RGBA start color
+	vec4_t endColor;              // RGBA end color
+	float startSize;              // Initial particle size
+	float endSize;                // Final particle size
+	float startAlpha;             // Initial alpha
+	float endAlpha;               // Final alpha
+
+	// Physics
+	float gravity;                // Gravity effect
+	float drag;                   // Air resistance
+	float spread;                 // Initial spread angle
+
+	ParticleComponent() : lifetime(1.0f), spawnRate(10.0f), maxParticles(100),
+	                     time(0.0f), looping(qfalse), active(qtrue),
+	                     startSize(1.0f), endSize(0.0f), startAlpha(1.0f), endAlpha(0.0f),
+	                     gravity(0.0f), drag(0.0f), spread(0.0f) {
+		effectName[0] = '\0';
+		VectorClear(position);
+		VectorClear(velocity);
+		VectorClear(acceleration);
+		startColor[0] = 1.0f; startColor[1] = 1.0f; startColor[2] = 1.0f; startColor[3] = 1.0f;
+		endColor[0] = 1.0f; endColor[1] = 1.0f; endColor[2] = 1.0f; endColor[3] = 0.0f;
+	}
+};
+
 
 // Collision callback types
 #ifdef USE_BULLET
@@ -442,13 +483,14 @@ struct ObjectiveComponent {
 	qboolean isSequential;         // Must complete previous objectives first
 	int prerequisiteObjectiveId;   // ID of prerequisite objective (-1 = none)
 	int team;                      // Team that can complete (0=red, 1=blue, -1=any)
+	int rewardXP;                  // Experience points awarded on completion
 
 	ObjectiveComponent() : objectiveId(0), completed(qfalse),
 		required(qtrue), progress(0), targetProgress(100),
 		showOnHUD(qtrue), objectiveType(ObjectiveType::NONE),
 		requiredClass(-1), buildTime(0.0f), plantTime(0.0f),
 		defuseTime(0.0f), isSequential(qfalse),
-		prerequisiteObjectiveId(-1), team(-1) {
+		prerequisiteObjectiveId(-1), team(-1), rewardXP(100) {
 		title[0] = '\0';
 		description[0] = '\0';
 		targetEntity[0] = '\0';
