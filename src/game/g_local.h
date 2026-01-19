@@ -32,8 +32,20 @@ struct gentity_t {
 };
 
 // Basic constants needed for ECS
+#ifndef MAX_GENTITIES
 #define MAX_GENTITIES 1024
+#endif
+
+#ifndef MAX_CLIENTS
 #define MAX_CLIENTS 128
+#endif
+
+// Level structure for game state
+typedef struct {
+	int num_entities;
+	// Add other level fields as needed
+} level_locals_t;
 
 // External references needed by ECS
 extern struct gentity_t g_entities[MAX_GENTITIES];
+extern level_locals_t level;

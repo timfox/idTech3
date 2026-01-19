@@ -97,7 +97,7 @@ static void CMod_LoadShaders( const lump_t *l ) {
 		Com_Error (ERR_DROP, "%s: funny lump size", __func__ );
 	}
 
-	count = l->filelen / sizeof(*in);
+	count = (size_t)l->filelen / sizeof(*in);
 	if ( count < 1 )
 		Com_Error (ERR_DROP, "%s: map with no shaders", __func__ );
 
@@ -129,7 +129,7 @@ static void CMod_LoadSubmodels( const lump_t *l ) {
 	if (l->filelen % sizeof(*in))
 		Com_Error( ERR_DROP, "%s: funny lump size", __func__ );
 
-	count = l->filelen / sizeof(*in);
+	count = (size_t)l->filelen / sizeof(*in);
 	if ( count < 1 )
 		Com_Error( ERR_DROP, "%s: map with no models", __func__ );
 
@@ -156,14 +156,14 @@ static void CMod_LoadSubmodels( const lump_t *l ) {
 		// make a "leaf" just to hold the model's brushes and surfaces
 		out->leaf.numLeafBrushes = LittleLong( in->numBrushes );
 		indexes = Hunk_Alloc( out->leaf.numLeafBrushes * 4, h_high );
-		out->leaf.firstLeafBrush = indexes - cm.leafbrushes;
+		out->leaf.firstLeafBrush = (int)(indexes - cm.leafbrushes);
 		for ( j = 0 ; j < out->leaf.numLeafBrushes ; j++ ) {
 			indexes[j] = LittleLong( in->firstBrush ) + j;
 		}
 
 		out->leaf.numLeafSurfaces = LittleLong( in->numSurfaces );
 		indexes = Hunk_Alloc( out->leaf.numLeafSurfaces * 4, h_high );
-		out->leaf.firstLeafSurface = indexes - cm.leafsurfaces;
+		out->leaf.firstLeafSurface = (int)(indexes - cm.leafsurfaces);
 		for ( j = 0 ; j < out->leaf.numLeafSurfaces ; j++ ) {
 			indexes[j] = LittleLong( in->firstSurface ) + j;
 		}
@@ -187,7 +187,7 @@ static void CMod_LoadNodes( const lump_t *l ) {
 	if (l->filelen % sizeof(*in))
 		Com_Error( ERR_DROP, "%s: funny lump size", __func__ );
 
-	count = l->filelen / sizeof(*in);
+	count = (size_t)l->filelen / sizeof(*in);
 	if ( count < 1 )
 		Com_Error( ERR_DROP, "%s: map has no nodes", __func__ );
 
@@ -241,7 +241,7 @@ static void CMod_LoadBrushes( const lump_t *l ) {
 	if ( l->filelen % sizeof(*in) )
 		Com_Error( ERR_DROP, "%s: funny lump size", __func__ );
 
-	count = l->filelen / sizeof(*in);
+	count = (size_t)l->filelen / sizeof(*in);
 
 	cm.brushes = Hunk_Alloc( ( BOX_BRUSHES + count ) * sizeof( *cm.brushes ), h_high );
 	cm.numBrushes = count;
@@ -280,7 +280,7 @@ static void CMod_LoadLeafs( const lump_t *l )
 	if ( l->filelen % sizeof(*in) )
 		Com_Error( ERR_DROP, "%s: funny lump size", __func__ );
 
-	count = l->filelen / sizeof(*in);
+	count = (size_t)l->filelen / sizeof(*in);
 	if ( count < 1 )
 		Com_Error( ERR_DROP, "%s: map with no leafs", __func__ );
 
@@ -325,7 +325,7 @@ static void CMod_LoadPlanes( const lump_t *l )
 	if ( l->filelen % sizeof(*in) )
 		Com_Error( ERR_DROP, "%s: funny lump size", __func__ );
 
-	count = l->filelen / sizeof(*in);
+	count = (size_t)l->filelen / sizeof(*in);
 	if ( count < 1 )
 		Com_Error( ERR_DROP, "%s: map with no planes", __func__ );
 
@@ -367,7 +367,7 @@ static void CMod_LoadLeafBrushes( const lump_t *l )
 	if ( l->filelen % sizeof(*in) )
 		Com_Error( ERR_DROP, "%s: funny lump size", __func__ );
 
-	count = l->filelen / sizeof(*in);
+	count = (size_t)l->filelen / sizeof(*in);
 
 	cm.leafbrushes = Hunk_Alloc( (count + BOX_BRUSHES) * sizeof( *cm.leafbrushes ), h_high );
 	cm.numLeafBrushes = count;
@@ -396,7 +396,7 @@ static void CMod_LoadLeafSurfaces( const lump_t *l )
 	if ( l->filelen % sizeof(*in) )
 		Com_Error( ERR_DROP, "%s: funny lump size", __func__ );
 
-	count = l->filelen / sizeof(*in);
+	count = (size_t)l->filelen / sizeof(*in);
 
 	cm.leafsurfaces = Hunk_Alloc( count * sizeof( *cm.leafsurfaces ), h_high );
 	cm.numLeafSurfaces = count;
@@ -444,7 +444,7 @@ static void CMod_LoadBrushSides( const lump_t *l )
 	if ( l->filelen % sizeof(*in) ) {
 		Com_Error( ERR_DROP, "%s: funny lump size", __func__ );
 	}
-	count = l->filelen / sizeof(*in);
+	count = (size_t)l->filelen / sizeof(*in);
 
 	cm.brushsides = Hunk_Alloc( ( BOX_SIDES + count ) * sizeof( *cm.brushsides ), h_high );
 	cm.numBrushSides = count;

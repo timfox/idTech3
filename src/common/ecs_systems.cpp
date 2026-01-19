@@ -26,7 +26,9 @@ extern "C" {
 #endif
 
 // Forward declarations for internal functions
+#ifdef USE_BULLET
 static void ECS_IntegrateWithCMSystem(entt::registry &registry);
+#endif
 static void ECS_DebugDrawPhysics(entt::registry &registry);
 #ifdef USE_BULLET
 static void ECS_ProcessCollisionEvent(entt::registry &registry, const CollisionEvent &event);
@@ -254,6 +256,7 @@ btCollisionShape* CreateCollisionShapeFromModel(const char* modelName, Collision
 }
 }
 
+#ifdef USE_BULLET
 /*
 ================
 ECS_Bullet_Step
@@ -480,6 +483,12 @@ static void ECS_Bullet_Step(entt::registry &registry, float deltaTime) {
 		}
 	}
 }
+#else // !USE_BULLET
+// Stub implementation when Bullet is not available
+static void ECS_Bullet_Step(entt::registry &registry, float deltaTime) {
+	// No-op when Bullet physics is not available
+}
+#endif // USE_BULLET
 
 // Collision callback system
 using CollisionCallbackFunc = void(*)(entt::registry &registry, const CollisionEvent &event, void *userData);
@@ -507,6 +516,7 @@ static void ECS_DebugDrawPhysics(entt::registry &registry) {
 	}
 }
 
+#ifdef USE_BULLET
 // CM system integration - Add world geometry collision to Bullet world
 static void ECS_IntegrateWithCMSystem(entt::registry &registry) {
 	// Check if CM Bullet system is initialized
@@ -541,6 +551,12 @@ static void ECS_IntegrateWithCMSystem(entt::registry &registry) {
 		}
 	}
 }
+#else // !USE_BULLET
+// Stub implementation when Bullet is not available
+static void ECS_IntegrateWithCMSystem(entt::registry &registry) {
+	// No-op when Bullet physics is not available
+}
+#endif // USE_BULLET
 
 // Register a collision callback function
 void ECS_RegisterCollisionCallback(CollisionCallbackFunc callback, void *userData) {
@@ -946,7 +962,7 @@ void ECS_ParticleSystem_Update(float deltaTime) {
 		particles.time += deltaTime;
 
 		// Handle particle spawning based on spawn rate
-		float particlesToSpawn = particles.spawnRate * deltaTime;
+		// float particlesToSpawn = particles.spawnRate * deltaTime; // TODO: Implement when renderer integration is complete
 		// Note: Actual particle spawning would be handled by the renderer
 		// This system manages the logical state
 
@@ -1000,7 +1016,7 @@ void ECS_DoorSystem_Update(float deltaTime) {
 			door.openProgress += door.openSpeed * deltaTime * 0.001f; // Convert to seconds
 			if (door.openProgress >= 1.0f) {
 				door.openProgress = 1.0f;
-				door.lastUsedTime = Sys_Milliseconds();
+				// door.lastUsedTime = Sys_Milliseconds(); // TODO: Implement when Sys_Milliseconds is available
 			}
 		} else if (!door.isOpen && door.openProgress > 0.0f) {
 			// Door is closing
@@ -1012,7 +1028,8 @@ void ECS_DoorSystem_Update(float deltaTime) {
 
 		// Auto-close doors
 		if (door.autoCloseTime > 0 && door.isOpen && door.openProgress >= 1.0f) {
-			int currentTime = Sys_Milliseconds();
+			// int currentTime = Sys_Milliseconds(); // TODO: Implement when Sys_Milliseconds is available
+		int currentTime = 0; // Fallback
 			if (currentTime - door.lastUsedTime >= door.autoCloseTime) {
 				door.isOpen = qfalse; // Start closing
 			}
@@ -1214,7 +1231,7 @@ static void ECS_KeySystem_Update(float deltaTime) {
 				if (door.isLocked) {
 					// Unlock the door
 					door.isLocked = qfalse;
-					Com_Printf("Key '%s' unlocked door '%s'\n", key.keyId, door.doorId);
+					Com_Printf("Key '%d' unlocked door '%s'\n", key.keyId, door.doorId);
 
 					// Mark door as needing network sync
 					if (auto network = registry.try_get<NetworkComponent>(doorEntity)) {
@@ -1237,7 +1254,7 @@ static void ECS_KeySystem_Update(float deltaTime) {
 		}
 
 		if (!doorFound) {
-			Com_Printf("No door found that requires key '%s'\n", key.keyId);
+			Com_Printf("No door found that requires key '%d'\n", key.keyId);
 		}
 
 		// Remove the used key regardless of whether door was found

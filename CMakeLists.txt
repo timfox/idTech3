@@ -963,6 +963,14 @@ IF(USE_ENTT)
 	ELSE()
 		message(WARNING "USE_ENTT enabled but g_local.h is missing; skipping ECS game integration sources.")
 	ENDIF()
+
+	# Add ECS systems
+	IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/common/ecs_systems.cpp)
+		list(APPEND QCOMMON_SRCS src/common/ecs_systems.cpp)
+	ENDIF()
+	IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/server/sv_ecs_systems.cpp)
+		list(APPEND SERVER_SRCS src/server/sv_ecs_systems.cpp)
+	ENDIF()
 ENDIF()
 
 # OOP Entity Architecture
@@ -1013,15 +1021,9 @@ ELSE()
 	message(STATUS "Using legacy math library")
 ENDIF()
 
-IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/common/ecs_systems.cpp)
-		list(APPEND QCOMMON_SRCS src/common/ecs_systems.cpp)
+IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/server/sv_ecs.cpp)
+	list(APPEND SERVER_SRCS src/server/sv_ecs.cpp)
 ENDIF()
-	IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/server/sv_ecs.cpp)
-		list(APPEND SERVER_SRCS src/server/sv_ecs.cpp)
-	ENDIF()
-	IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/server/sv_ecs_systems.cpp)
-		list(APPEND SERVER_SRCS src/server/sv_ecs_systems.cpp)
-	ENDIF()
 
 IF(USE_BULLET)
 	# Try CMake's config package first (common when Bullet is installed from source or via vcpkg)

@@ -50,9 +50,9 @@ static ID_INLINE void CrossProductDP( const vec3_t v1, const vec3_t v2, vec3_t c
 	double d1[3], d2[3];
 	d1[0] = v1[0]; d1[1] = v1[1]; d1[2] = v1[2];
 	d2[0] = v2[0]; d2[1] = v2[1]; d2[2] = v2[2];
-	cross[0] = d1[1]*d2[2] - d1[2]*d2[1];
-	cross[1] = d1[2]*d2[0] - d1[0]*d2[2];
-	cross[2] = d1[0]*d2[1] - d1[1]*d2[0];
+	cross[0] = (vec_t)(d1[1]*d2[2] - d1[2]*d2[1]);
+	cross[1] = (vec_t)(d1[2]*d2[0] - d1[0]*d2[2]);
+	cross[2] = (vec_t)(d1[0]*d2[1] - d1[1]*d2[0]);
 }
 
 
@@ -67,9 +67,9 @@ static ID_INLINE vec_t VectorNormalizeDP( vec3_t v ) {
 		ilength = 1.0/(double)sqrt( length );
 		/* sqrt(length) = length * (1 / sqrt(length)) */
 		length *= ilength;
-		v[0] = d[0] * ilength;
-		v[1] = d[1] * ilength;
-		v[2] = d[2] * ilength;
+		v[0] = (vec_t)(d[0] * ilength);
+		v[1] = (vec_t)(d[1] * ilength);
+		v[2] = (vec_t)(d[2] * ilength);
 	}
 
 	return length;

@@ -8,6 +8,18 @@ Virtual Filesystem v2 - Complete implementation
 #include "qcommon.h"
 #include "files_v2.h"
 #include "files_internal.h"
+
+// Stub implementations for missing filesystem functions
+void FS_Mount_RegisterCommands(void) {
+	// TODO: Register mount-related console commands
+	Com_Printf("VFS: Mount commands not implemented\n");
+}
+
+qboolean FS_Sandbox_ValidateOperation(const char *qpath, fsMount_t *mount, qboolean isWrite) {
+	// TODO: Implement sandbox validation
+	// For now, allow all operations
+	return qtrue;
+}
 #include <sys/stat.h>
 #include <dirent.h>
 #include <unistd.h>

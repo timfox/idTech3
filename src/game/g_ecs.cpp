@@ -18,6 +18,12 @@ Modern ECS implementation using entt library.
 #define MAX_GENTITIES 1024
 #endif
 
+// Define the global entity array
+struct gentity_t g_entities[MAX_GENTITIES];
+
+// Define the global level structure
+level_locals_t level;
+
 // Global ECS registry
 static ECSRegistry* g_ecsRegistry = NULL;
 
@@ -133,11 +139,12 @@ void G_ECS_Update(float deltaTime)
     // Update trigger system
     auto triggerView = g_ecsRegistry->view<TriggerComponent, TransformComponent>();
     for (auto entity : triggerView) {
-        auto& trigger = triggerView.get<TriggerComponent>(entity);
-        auto& transform = triggerView.get<TransformComponent>(entity);
-        
+        // auto& trigger = triggerView.get<TriggerComponent>(entity); // TODO: Implement trigger logic
+        // auto& transform = triggerView.get<TransformComponent>(entity); // TODO: Implement trigger logic
+
         // Trigger logic would go here
         // Check for player proximity, etc.
+        (void)entity; // Suppress unused variable warning
     }
 }
 
