@@ -92,6 +92,9 @@ touch logs/enable_vulkan_patch1_tiny.flag
 # Safe mode launcher (disables experimental features)
 ./scripts/run_safe_mode.sh
 
+# CI build validation (test all configurations locally)
+./scripts/validate_ci_build.sh
+
 # Run full test suite (recommended before production use)
 ./scripts/test_engine.sh
 
@@ -107,6 +110,26 @@ touch logs/enable_vulkan_patch1_tiny.flag
 # - Mod loading compatibility
 # - Performance monitoring tools
 ```
+
+### **CI/CD Build Validation**
+The repository includes comprehensive CI that proves builds work reliably:
+
+```bash
+# GitHub Actions automatically validates:
+# ✅ Linux builds (Debug + Release)
+# ✅ GCC 15 + Clang 18 compilers
+# ✅ Warnings as errors (new/changed code only)
+# ✅ Artifact uploads (binaries + logs)
+# ✅ Code formatting validation
+# ✅ Smoke tests (basic functionality)
+```
+
+**Key CI Features:**
+- **Social Proof**: Demonstrates the codebase builds reliably
+- **Cross-Compiler**: Validates with both GCC and Clang
+- **Legacy-Friendly**: Warnings as errors only for new/modified code
+- **Artifact Sharing**: Build outputs available for testing
+- **Format Enforcement**: clang-format validation on changed files
 
 ### **Safe Mode & Feature Management**
 The engine includes a comprehensive feature management system to prevent "mystery state":
