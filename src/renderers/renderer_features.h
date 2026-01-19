@@ -268,6 +268,7 @@ void R_SetSafeMode(qboolean enable, const char *reason);
 feature_state_t R_GetFeatureState(const char *feature_name);
 qboolean R_IsFeatureEnabled(const char *feature_name);
 qboolean R_IsExperimentalFeature(const char *feature_name);
+qboolean R_IsDebugFeature(const char *feature_name);
 
 // Startup logging
 void R_LogRendererInfo(const char *renderer_name, const char *version);

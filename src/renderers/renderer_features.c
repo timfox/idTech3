@@ -179,7 +179,11 @@ R_IsFeatureEnabled
 qboolean R_IsFeatureEnabled(const char *feature_name) {
     // This function is used during initialization when cvars may not be accessible
     // Assume features are enabled by default unless safe mode restricts them
-    return !g_safe_mode.enabled || !R_IsExperimentalFeature(feature_name);
+    if (g_safe_mode.enabled) {
+        // In safe mode, disable both experimental and debug features
+        return !R_IsExperimentalFeature(feature_name) && !R_IsDebugFeature(feature_name);
+    }
+    return qtrue;
 }
 
 /*
@@ -196,6 +200,27 @@ qboolean R_IsExperimentalFeature(const char *feature_name) {
         for (int j = 0; j < counts[i]; j++) {
             if (Q_stricmp(all_features[i][j].name, feature_name) == 0) {
                 return (all_features[i][j].category == FEATURE_EXPERIMENTAL);
+            }
+        }
+    }
+
+    return qfalse;
+}
+
+/*
+===============
+R_IsDebugFeature
+===============
+*/
+qboolean R_IsDebugFeature(const char *feature_name) {
+    // Check all feature arrays
+    const renderer_feature_t *all_features[] = { common_features, vulkan_features, opengl_features };
+    int counts[] = { ARRAY_LEN(common_features), ARRAY_LEN(vulkan_features), ARRAY_LEN(opengl_features) };
+
+    for (int i = 0; i < ARRAY_LEN(all_features); i++) {
+        for (int j = 0; j < counts[i]; j++) {
+            if (Q_stricmp(all_features[i][j].name, feature_name) == 0) {
+                return (all_features[i][j].category == FEATURE_DEBUG);
             }
         }
     }
