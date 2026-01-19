@@ -17,6 +17,7 @@ echo ""
 
 # Create safe mode flag
 echo "Creating safe mode flag..."
+mkdir -p "$ROOT/logs"
 touch "$ROOT/logs/safe_mode.flag"
 echo "Safe mode flag created at: $ROOT/logs/safe_mode.flag"
 echo ""
