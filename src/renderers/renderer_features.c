@@ -177,7 +177,14 @@ R_IsFeatureEnabled
 ===============
 */
 qboolean R_IsFeatureEnabled(const char *feature_name) {
-    // This function is used during initialization when cvars may not be accessible
+    // Try to get the actual cvar value first (available after initialization)
+    cvar_t *cvar = Cvar_FindVar(feature_name);
+    if (cvar) {
+        // Cvar exists, check its actual value
+        return atoi(cvar->string) != 0;
+    }
+
+    // Cvar not available (during early initialization), use assumptions
     // Assume features are enabled by default unless safe mode restricts them
     if (g_safe_mode.enabled) {
         // In safe mode, disable both experimental and debug features

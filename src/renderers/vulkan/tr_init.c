@@ -351,9 +351,6 @@ void R_Register( void ) {
     // Initialize centralized renderer feature system
     R_InitFeatures();
 
-    // Register common features
-    R_RegisterFeatureCvars(common_features, ARRAY_LEN(common_features));
-
     // Register Vulkan-specific features
     R_RegisterFeatureCvars(vulkan_features, ARRAY_LEN(vulkan_features));
 

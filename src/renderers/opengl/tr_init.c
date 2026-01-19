@@ -27,6 +27,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../renderercommon/tr_backend_iface.h"
 #include "gl_shader.h"
 #include "gl_vertex.h"
+#include "../renderer_features.h"
 #include <unistd.h>
 
 extern refimport_t ri;
@@ -2632,6 +2633,15 @@ R_Register
 */
 static void R_Register( void )
 {
+	// Initialize centralized renderer feature system
+	R_InitFeatures();
+
+	// Register OpenGL-specific features
+	R_RegisterFeatureCvars(opengl_features, ARRAY_LEN(opengl_features));
+
+	// Apply safe mode restrictions
+	R_ApplySafeMode();
+
 	// make sure all the commands added here are also removed in R_Shutdown
 	ri.Cmd_AddCommand( "imagelist", R_ImageList_f );
 	ri.Cmd_AddCommand( "shaderlist", R_ShaderList_f );
