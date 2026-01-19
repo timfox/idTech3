@@ -86,6 +86,9 @@ touch logs/enable_vulkan_patch1_tiny.flag
 
 ### **Automated Testing & Quality Assurance**
 ```bash
+# Quick 10-second smoke test (recommended for basic validation)
+./scripts/smoke_test.sh
+
 # Run full test suite (recommended before production use)
 ./scripts/test_engine.sh
 

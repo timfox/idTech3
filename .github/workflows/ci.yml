@@ -275,6 +275,17 @@ jobs:
             exit 1
           fi
 
+      - name: Run smoke test
+        shell: bash
+        if: matrix.os == 'linux' && matrix.compiler == 'gcc'
+        run: |
+          echo "Running 10-second smoke test..."
+          cd build
+          # Copy demo assets for smoke test
+          cp -r ../mods/demo ../release/ 2>/dev/null || true
+          # Run the smoke test
+          ENGINE_BIN="./idtech3.x86_64" TIMEOUT=10 ../scripts/smoke_test.sh
+
       - name: Test asset cooking pipeline
         shell: bash
         if: matrix.os == 'linux' && matrix.compiler == 'gcc'
