@@ -244,16 +244,6 @@ static btCollisionShape* CreateCollisionShape(CollisionShapeType type, const vec
 	}
 }
 
-// Create collision shape from model data
-static btCollisionShape* CreateCollisionShapeFromModel(const char* modelName, CollisionShapeType preferredType) {
-	// Suppress unused parameter warnings
-	(void)modelName;
-	(void)preferredType;
-
-	// This would load model geometry and create appropriate collision shape
-	// For now, return a default box shape
-	return new btBoxShape(btVector3(1.0f, 1.0f, 1.0f));
-}
 }
 
 #ifdef USE_BULLET
@@ -538,7 +528,6 @@ static void ECS_IntegrateWithCMSystem(entt::registry &registry) {
 	if (!cmWorld) {
 		return;
 	}
-	*/
 
 	cvar_t *physics_world_collision = Cvar_Get("physics_world_collision", "1", CVAR_ARCHIVE);
 	Cvar_SetDescription(physics_world_collision, "Enable collision between ECS entities and world geometry");
