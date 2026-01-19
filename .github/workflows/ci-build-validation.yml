@@ -131,6 +131,9 @@ jobs:
             build/CMakeFiles/CMakeError.log
           retention-days: 7
 
+    outputs:
+      result-${{ matrix.config.name }}-${{ matrix.compiler.name }}: ${{ job.status }}
+
   formatting-check:
     name: Code Formatting
     runs-on: ubuntu-24.04
@@ -201,16 +204,38 @@ jobs:
           JOBS_PASSED=0
           JOBS_FAILED=0
 
-          # Build validation jobs
-          for config in "Debug (GCC)" "Debug (Clang)" "Release (GCC)" "Release (Clang)"; do
-            if [ "${{ needs.build-validation.result }}" = "success" ]; then
-              echo "✅ $config" >> $GITHUB_STEP_SUMMARY
-              JOBS_PASSED=$((JOBS_PASSED + 1))
-            else
-              echo "❌ $config" >> $GITHUB_STEP_SUMMARY
-              JOBS_FAILED=$((JOBS_FAILED + 1))
-            fi
-          done
+          # Build validation jobs - check individual matrix outputs
+          if [ "${{ needs.build-validation.outputs.result-Debug-GCC }}" = "success" ]; then
+            echo "✅ Debug (GCC)" >> $GITHUB_STEP_SUMMARY
+            JOBS_PASSED=$((JOBS_PASSED + 1))
+          else
+            echo "❌ Debug (GCC)" >> $GITHUB_STEP_SUMMARY
+            JOBS_FAILED=$((JOBS_FAILED + 1))
+          fi
+
+          if [ "${{ needs.build-validation.outputs.result-Debug-Clang }}" = "success" ]; then
+            echo "✅ Debug (Clang)" >> $GITHUB_STEP_SUMMARY
+            JOBS_PASSED=$((JOBS_PASSED + 1))
+          else
+            echo "❌ Debug (Clang)" >> $GITHUB_STEP_SUMMARY
+            JOBS_FAILED=$((JOBS_FAILED + 1))
+          fi
+
+          if [ "${{ needs.build-validation.outputs.result-Release-GCC }}" = "success" ]; then
+            echo "✅ Release (GCC)" >> $GITHUB_STEP_SUMMARY
+            JOBS_PASSED=$((JOBS_PASSED + 1))
+          else
+            echo "❌ Release (GCC)" >> $GITHUB_STEP_SUMMARY
+            JOBS_FAILED=$((JOBS_FAILED + 1))
+          fi
+
+          if [ "${{ needs.build-validation.outputs.result-Release-Clang }}" = "success" ]; then
+            echo "✅ Release (Clang)" >> $GITHUB_STEP_SUMMARY
+            JOBS_PASSED=$((JOBS_PASSED + 1))
+          else
+            echo "❌ Release (Clang)" >> $GITHUB_STEP_SUMMARY
+            JOBS_FAILED=$((JOBS_FAILED + 1))
+          fi
 
           # Formatting check
           if [ "${{ needs.formatting-check.result }}" = "success" ] || [ "${{ needs.formatting-check.result }}" = "skipped" ]; then
