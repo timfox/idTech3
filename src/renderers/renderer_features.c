@@ -177,19 +177,21 @@ R_IsFeatureEnabled
 ===============
 */
 qboolean R_IsFeatureEnabled(const char *feature_name) {
-    // Try to get the actual cvar value first (available after initialization)
+    // Always check actual cvar value first when available (after initialization)
     cvar_t *cvar = Cvar_FindVar(feature_name);
     if (cvar) {
-        // Cvar exists, check its actual value
+        // Cvar exists, return its actual value - this reflects user settings and safe mode overrides
         return atoi(cvar->string) != 0;
     }
 
-    // Cvar not available (during early initialization), use assumptions
-    // Assume features are enabled by default unless safe mode restricts them
+    // Cvar not registered yet (during early initialization), use safe mode assumptions
     if (g_safe_mode.enabled) {
-        // In safe mode, disable both experimental and debug features
+        // In safe mode, assume experimental and debug features are disabled by default
+        // (they will be overridden later when cvars are actually registered)
         return !R_IsExperimentalFeature(feature_name) && !R_IsDebugFeature(feature_name);
     }
+
+    // Normal mode, assume features are enabled by default
     return qtrue;
 }
 
