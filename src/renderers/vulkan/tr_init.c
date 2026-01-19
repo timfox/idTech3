@@ -689,9 +689,7 @@ void R_Init( void ) {
 
     R_ModelInit();
 
-    // Log renderer initialization with feature status
-    R_LogRendererInfo("Vulkan Renderer", "1.4 RTX");
-    R_LogFeatureSummary();
+    // TODO: Log renderer initialization with feature status
 }
 
 /*

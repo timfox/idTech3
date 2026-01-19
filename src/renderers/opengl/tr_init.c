@@ -3248,9 +3248,7 @@ void R_Init( void ) {
 	// Install the GL backend interface for graph/driver-agnostic callers.
 	RB_SetBackendInterface( RB_GL_GetBackendInterface() );
 
-	// Log renderer initialization with feature status
-	R_LogRendererInfo("OpenGL Renderer", "3.3+");
-	R_LogFeatureSummary();
+	// TODO: Log renderer initialization with feature status
 
 	ri.Printf( PRINT_ALL, "----- finished R_Init -----\n" );
 }

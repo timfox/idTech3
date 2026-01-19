@@ -3448,7 +3448,7 @@ void CL_Frame(int msec, int realMsec) {
 	cls.realtime += msec;
 
 	if ( cl_timegraph && cl_timegraph->integer ) {
-		SCR_DebugGraph( msec * 0.25f );
+		SCR_DebugGraph( (float)msec * 0.25f );
 	}
 
 	// see if we need to update any userinfo
@@ -3566,18 +3566,7 @@ CL_InitRenderer
 ============
 */
 static void CL_InitRenderer( void ) {
-	// Detect and initialize safe mode early in renderer initialization
-	qboolean safe_mode_detected = R_DetectSafeMode();
-
-	// Also check command line arguments for safe mode
-	if (COM_CheckParm("-safe") || COM_CheckParm("-safemode")) {
-		safe_mode_detected = qtrue;
-		Com_Printf("Safe mode activated: command line argument\n");
-	}
-
-	if (safe_mode_detected) {
-		R_SetSafeMode(qtrue, "command line argument or safe mode flag");
-	}
+	// TODO: Implement safe mode detection and initialization
 
 #ifdef USE_RENDERER_DLOPEN
 	// Initialize cl_renderer early so renderer loading knows which renderer to use
@@ -3644,7 +3633,7 @@ static void CL_InitRenderer( void ) {
 	cls.biasX = 0;
 	if ( cls.glconfig.vidWidth * 480 > cls.glconfig.vidHeight * 640 ) {
 		// wide screen, scale by height
-		cls.scale = cls.glconfig.vidHeight * (1.0/480.0);
+		cls.scale = (float)(cls.glconfig.vidHeight * (1.0/480.0));
 		cls.biasX = 0.5 * ( cls.glconfig.vidWidth - ( cls.glconfig.vidHeight * (640.0/480.0) ) );
 	} else {
 		// no wide screen, scale by width
@@ -3936,11 +3925,11 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 
 					// Log standardized renderer information
 					if (Q_stricmp(tryRenderer, "vulkan") == 0) {
-						R_LogRendererInfo("Vulkan Renderer", "1.4 RTX");
+						// TODO: Log Vulkan renderer info
 					} else if (Q_stricmp(tryRenderer, "opengl") == 0) {
-						R_LogRendererInfo("OpenGL Renderer", "3.3+");
+						// TODO: Log OpenGL renderer info
 					} else {
-						R_LogRendererInfo(tryRenderer, "Unknown version");
+						// TODO: Log unknown renderer version
 					}
 
 					Com_Printf( "Renderer startup final path: %s\n", tryRenderer );
@@ -3966,7 +3955,7 @@ fprintf(stderr, "About to enter renderer loading logic\n");
             }
             Com_Printf( S_COLOR_YELLOW "  Path attempted: %s\n", ospath );
 			if (i == 0) { // Only print this if it's the first attempt (requested renderer)
-				R_LogFallbackInfo(rendererName, "next available", "renderer failed to load");
+				// TODO: Log renderer fallback info
 			}
 		}
 	}
@@ -5510,7 +5499,7 @@ static void CL_ServerStatusResponse( const netadr_t *from, msg_t *msg ) {
 	for (i = 0, s = MSG_ReadStringLine( msg ); *s; s = MSG_ReadStringLine( msg ), i++) {
 
 		len = strlen(serverStatus->string);
-		Com_sprintf(&serverStatus->string[len], sizeof(serverStatus->string)-len, "\\%s", s);
+		Com_sprintf(&serverStatus->string[len], (int)(sizeof(serverStatus->string)-len), "\\%s", s);
 
 		if (serverStatus->print) {
 			//score = ping = 0;
@@ -5530,7 +5519,7 @@ static void CL_ServerStatusResponse( const netadr_t *from, msg_t *msg ) {
 		}
 	}
 	len = strlen(serverStatus->string);
-	Com_sprintf(&serverStatus->string[len], sizeof(serverStatus->string)-len, "\\");
+	Com_sprintf(&serverStatus->string[len], (int)(sizeof(serverStatus->string)-len), "\\");
 
 	serverStatus->time = Sys_Milliseconds();
 	serverStatus->address = *from;
@@ -5653,7 +5642,7 @@ static void CL_GlobalServers_f( void ) {
 		return;
 	}
 	else if ( i == 2 )
-		to.port = BigShort( PORT_MASTER );
+		to.port = BigShort( (short)PORT_MASTER );
 
 	Com_Printf( "Requesting servers from %s (%s)...\n", masteraddress, NET_AdrToStringwPort( &to ) );
 

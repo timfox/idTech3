@@ -9576,8 +9576,8 @@ void vk_vrs_generate_image( VkCommandBuffer cmdBuffer ) {
 		vk.vrs.mode = Com_Clamp( 0, 3, r_vrs_mode ? r_vrs_mode->integer : 1 );
 		vk.vrs.centerRadius = Com_Clamp( 0.0f, 1.0f, r_vrs_center_radius ? r_vrs_center_radius->value : 0.6f );
 		vk.vrs.falloffStart = Com_Clamp( 0.0f, 1.0f, r_vrs_falloff_start ? r_vrs_falloff_start->value : 0.7f );
-		vk.vrs.minRate = Com_Clamp( 1, 4, r_vrs_min_rate ? r_vrs_min_rate->integer : 1 );
-		vk.vrs.maxRate = Com_Clamp( 1, 4, r_vrs_max_rate ? r_vrs_max_rate->integer : 4 );
+		vk.vrs.minRate = (int)Com_Clamp( 1, 4, r_vrs_min_rate ? r_vrs_min_rate->integer : 1 );
+		vk.vrs.maxRate = (int)Com_Clamp( 1, 4, r_vrs_max_rate ? r_vrs_max_rate->integer : 4 );
 	} else {
 		vk.vrs.enabled = qfalse;
 	}
@@ -10421,7 +10421,7 @@ void vk_analyze_pipeline_executable(VkPipeline pipeline, const char *pipeline_na
 	}
 
 	VkPipelineExecutablePropertiesKHR *executables = (VkPipelineExecutablePropertiesKHR*)
-		ri.Malloc(executable_count * sizeof(VkPipelineExecutablePropertiesKHR));
+		ri.Malloc((int)(executable_count * sizeof(VkPipelineExecutablePropertiesKHR)));
 
 	for (uint32_t i = 0; i < executable_count; i++) {
 		executables[i].sType = VK_STRUCTURE_TYPE_PIPELINE_EXECUTABLE_PROPERTIES_KHR;
@@ -10451,7 +10451,7 @@ void vk_analyze_pipeline_executable(VkPipeline pipeline, const char *pipeline_na
 
 		if (result == VK_SUCCESS && stat_count > 0) {
 			VkPipelineExecutableStatisticKHR *stats = (VkPipelineExecutableStatisticKHR*)
-				ri.Malloc(stat_count * sizeof(VkPipelineExecutableStatisticKHR));
+				ri.Malloc((int)(stat_count * sizeof(VkPipelineExecutableStatisticKHR)));
 
 			for (uint32_t j = 0; j < stat_count; j++) {
 				stats[j].sType = VK_STRUCTURE_TYPE_PIPELINE_EXECUTABLE_STATISTIC_KHR;

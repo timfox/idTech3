@@ -480,10 +480,6 @@ static void ECS_Bullet_Step(entt::registry &registry, float deltaTime) {
 }
 #endif // USE_BULLET
 
-// Collision callback system
-using CollisionCallbackFunc = void(*)(entt::registry &registry, const CollisionEvent &event, void *userData);
-static std::vector<std::tuple<CollisionCallbackFunc, void*>> collisionCallbacks;
-
 // Physics debugging
 static void ECS_DebugDrawPhysics(entt::registry &registry) {
 	cvar_t *physics_debug_draw = Cvar_Get("physics_debug_draw", "0", CVAR_CHEAT);
@@ -506,6 +502,10 @@ static void ECS_DebugDrawPhysics(entt::registry &registry) {
 	}
 }
 
+// Collision callback system
+using CollisionCallbackFunc = void(*)(entt::registry &registry, const CollisionEvent &event, void *userData);
+static std::vector<std::tuple<CollisionCallbackFunc, void*>> collisionCallbacks;
+
 #ifdef USE_BULLET
 // CM system integration - Add world geometry collision to Bullet world
 static void ECS_IntegrateWithCMSystem(entt::registry &registry) {
@@ -513,6 +513,7 @@ static void ECS_IntegrateWithCMSystem(entt::registry &registry) {
 	// For now, this functionality is disabled as the CM Bullet functions are not implemented
 	(void)registry;
 	return;
+}
 
 	// Original code (disabled until CM integration is complete):
 	/*
@@ -548,6 +549,7 @@ static void ECS_IntegrateWithCMSystem(entt::registry &registry) {
 		}
 	}
 }
+*/
 #else // !USE_BULLET
 // Stub implementation when Bullet is not available
 static void ECS_IntegrateWithCMSystem(entt::registry &registry) {
@@ -687,8 +689,10 @@ void ECS_PhysicsSystem_Update(float deltaTime) {
 		}
 	}
 
-	// Debug visualization
+	// Debug visualization (only on client, not dedicated server)
+#ifndef DEDICATED
 	ECS_DebugDrawPhysics(registry);
+#endif
 }
 
 /*
