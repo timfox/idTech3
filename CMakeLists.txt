@@ -4886,7 +4886,8 @@ SET_TARGET_PROPERTIES(test_net_protocol_validation PROPERTIES
 # 	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 # )
 
-	MESSAGE(STATUS "Tests enabled: test_qcommon, test_qmath, test_info, test_msg_secure, test_renderer_init, test_integration, test_performance, test_net_protocol_validation, test_layered_materials, test_modern_math")
+	# Note: test_integration is temporarily disabled due to test framework issues (see lines 4697-4708)
+	MESSAGE(STATUS "Tests enabled: test_qcommon, test_qmath, test_info, test_msg_secure, test_renderer_init, test_performance, test_net_protocol_validation, test_layered_materials, test_modern_math")
 ENDIF()
 
 # Game Launcher
