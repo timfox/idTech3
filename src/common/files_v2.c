@@ -16,6 +16,9 @@ void FS_Mount_RegisterCommands(void) {
 }
 
 qboolean FS_Sandbox_ValidateOperation(const char *qpath, fsMount_t *mount, qboolean isWrite) {
+	(void)qpath;
+	(void)mount;
+	(void)isWrite;
 	// TODO: Implement sandbox validation
 	// For now, allow all operations
 	return qtrue;
@@ -151,7 +154,7 @@ void FS_MountTable_Stats(void) {
 	Com_Printf("Total access: %u\n", totalAccess);
 	Com_Printf("Total hits: %u\n", totalHits);
 	Com_Printf("Hit rate: %.1f%%\n",
-			  totalAccess > 0 ? (float)totalHits / totalAccess * 100.0f : 0.0f);
+			  totalAccess > 0 ? (float)totalHits / (float)totalAccess * 100.0f : 0.0f);
 }
 
 /*
@@ -367,10 +370,10 @@ qboolean FS_Mount_Add(fsMount_t *mount) {
 				// Get PAK path and calculate checksum
 				char pakPath[MAX_OSPATH];
 				char *pakFilename = mount->backend.pak->pakFilename; // Get filename from PAK structure
-				Com_sprintf(pakPath, sizeof(pakPath), "%s/%s", mount->mountPoint, pakFilename);
+				Com_sprintf(pakPath, (int)sizeof(pakPath), "%s/%s", mount->mountPoint, pakFilename);
 
 				// Calculate checksum (placeholder - would use actual checksum calculation)
-				mount->backend.pak->checksum = Com_BlockChecksum(pakPath, strlen(pakPath));
+				mount->backend.pak->checksum = Com_BlockChecksum(pakPath, (int)strlen(pakPath));
 		mount->checksum = FS_Mount_CalculateChecksum("dummy_path");
 	}
 
@@ -498,7 +501,7 @@ int FS_Mount_FindFile(const char *qpath, fileHandle_t *file, fsMount_t **outMoun
 						if (file) {
 							return FS_OpenFileInPak(file, mount->backend.pak, pakFile, qtrue);
 						}
-						return pakFile->size;
+						return (int)pakFile->size;
 					}
 				}
 				break;
@@ -561,9 +564,9 @@ fileInPack_t *FS_FindPakFile(pack_t *pak, const char *filename) {
 	// Hash the filename to find the right bucket
 	unsigned int hash = 0;
 	for (const char *c = filename; *c; c++) {
-		hash = (hash * 31) + *c;
+		hash = (hash * 31u) + (unsigned char)*c;
 	}
-	hash &= (pak->hashSize - 1);
+	hash &= (unsigned int)(pak->hashSize - 1);
 
 	// Search through the hash chain
 	fileInPack_t *pakFile = pak->hashTable[hash];
@@ -1372,7 +1375,7 @@ void FS_Monitor_Update(void) {
 					changeType = FS_CHANGE_MODIFIED;
 				}
 
-				monitoredPathTimes[i] = st.st_mtime;
+				monitoredPathTimes[i] = (uint32_t)st.st_mtime;
 
 				// Notify callbacks
 				fsChangeEvent_t event;

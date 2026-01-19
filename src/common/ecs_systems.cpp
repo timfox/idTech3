@@ -245,7 +245,7 @@ static btCollisionShape* CreateCollisionShape(CollisionShapeType type, const vec
 }
 
 // Create collision shape from model data
-btCollisionShape* CreateCollisionShapeFromModel(const char* modelName, CollisionShapeType preferredType) {
+static btCollisionShape* CreateCollisionShapeFromModel(const char* modelName, CollisionShapeType preferredType) {
 	// Suppress unused parameter warnings
 	(void)modelName;
 	(void)preferredType;
@@ -1416,7 +1416,7 @@ static void ECS_ObjectiveSystem_Update(float deltaTime) {
 					// For now, just simulate progress based on time (for demo purposes)
 					if (objective.buildTime > 0.0f) {
 						objective.progress = std::min(objective.targetProgress,
-													static_cast<int>(oldProgress + deltaTime * 10.0f));
+													static_cast<int>(static_cast<float>(oldProgress) + deltaTime * 10.0f));
 					}
 				}
 				break;
@@ -1427,7 +1427,7 @@ static void ECS_ObjectiveSystem_Update(float deltaTime) {
 				if (objective.buildTime > 0.0f) {
 					// Simulate construction progress
 					objective.progress = std::min(objective.targetProgress,
-												static_cast<int>(oldProgress + deltaTime * 5.0f));
+												static_cast<int>(static_cast<float>(oldProgress) + deltaTime * 5.0f));
 				}
 				break;
 			}
@@ -1472,7 +1472,7 @@ static void ECS_ObjectiveSystem_Update(float deltaTime) {
 			default:
 				// Generic objective - progress based on time for demo
 				objective.progress = std::min(objective.targetProgress,
-											static_cast<int>(oldProgress + deltaTime * 2.0f));
+											static_cast<int>(static_cast<float>(oldProgress) + deltaTime * 2.0f));
 				break;
 		}
 	}
@@ -1584,12 +1584,12 @@ static void ECS_PlayerClassSystem_Update(float deltaTime) {
 
 			// Apply health bonus multiplier
 			if (playerClass.healthBonus > 0.0f) {
-				baseMaxHealth = static_cast<int>(baseMaxHealth * (1.0f + playerClass.healthBonus));
+				baseMaxHealth = static_cast<int>(static_cast<float>(baseMaxHealth) * (1.0f + playerClass.healthBonus));
 			}
 
 			// Apply armor bonus multiplier
 			if (playerClass.armorBonus > 0.0f) {
-				baseMaxArmor = static_cast<int>(baseMaxArmor * (1.0f + playerClass.armorBonus));
+				baseMaxArmor = static_cast<int>(static_cast<float>(baseMaxArmor) * (1.0f + playerClass.armorBonus));
 			}
 
 			// Update max values if they have changed
