@@ -24,7 +24,7 @@ echo ""
 
 # Launch with safe mode enabled
 echo -e "${GREEN}Launching engine with safe mode...${NC}"
-echo "Command: $ENGINE_BIN +set developer 1 +set fs_game mymod"
+echo "Command: $ENGINE_BIN +set fs_game mymod"
 echo ""
 
-exec "$ENGINE_BIN" +set developer 1 +set fs_game mymod "$@"
+exec "$ENGINE_BIN" +set fs_game mymod "$@"

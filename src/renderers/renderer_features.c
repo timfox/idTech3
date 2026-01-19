@@ -103,9 +103,9 @@ void R_RegisterFeatureCvars(const renderer_feature_t *features, int count) {
             const char *safe_value = NULL;
 
             if (feature->category == FEATURE_EXPERIMENTAL && g_safe_mode.disable_experimental) {
-                safe_value = (feature->safe_mode_state == FEATURE_DISABLED) ? "0" : "1";
+                safe_value = (feature->safe_mode_state == FEATURE_ENABLED) ? "1" : "0";
             } else if (feature->category == FEATURE_DEBUG && g_safe_mode.disable_debug) {
-                safe_value = (feature->safe_mode_state == FEATURE_DISABLED) ? "0" : "1";
+                safe_value = (feature->safe_mode_state == FEATURE_ENABLED) ? "1" : "0";
             }
 
             if (safe_value && Q_stricmp(cvar->string, safe_value) != 0) {
