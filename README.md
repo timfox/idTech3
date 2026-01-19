@@ -238,12 +238,20 @@ src/
 - **imGUI Integration**: Professional debugging interface
 - **Memory Safety**: Comprehensive corruption detection
 - **Error Handling**: Graceful failure recovery
+- **Feature Management**: Centralized toggles with safe mode
 
 ### **Contributing**
 1. Follow existing code style and patterns
 2. Add comprehensive error checking
 3. Include performance monitoring
 4. Test with both Vulkan and OpenGL renderers
+
+### **Documentation**
+- **[ARCHITECTURE.md](docs/ARCHITECTURE.md)**: High-level architectural overview and intentional design philosophy
+- **[RENDERERS.md](docs/RENDERERS.md)**: Renderer architecture, feature flags, and safe mode
+- **[ASSET_PIPELINE.md](docs/ASSET_PIPELINE.md)**: Asset loading, PK3 compatibility, and modern formats
+- **[BRANCHES.md](docs/BRANCHES.md)**: Vanilla/Chocolate/Layercake development philosophy
+- **[ROADMAP.md](docs/ROADMAP.md)**: Next 10 development priorities in order
 
 ## **System Requirements**
 
