@@ -1,0 +1,376 @@
+{
+    "tasks": {
+        "version": "2.0.0",
+        "tasks": [
+            {
+                "label": "build_release_vulkan",
+                "type": "shell",
+                "command": "./scripts/compile_engine.sh",
+                "args": ["vulkan"],
+                "group": {
+                    "kind": "build",
+                    "isDefault": false
+                },
+                "presentation": {
+                    "echo": true,
+                    "reveal": "always",
+                    "focus": false,
+                    "panel": "shared",
+                    "showReuseMessage": true,
+                    "clear": false
+                },
+                "problemMatcher": [
+                    {
+                        "owner": "cpp",
+                        "source": "gcc",
+                        "fileLocation": "relative",
+                        "pattern": {
+                            "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                            "file": 1,
+                            "line": 2,
+                            "column": 3,
+                            "severity": 4,
+                            "message": 5
+                        }
+                    }
+                ]
+            },
+            {
+                "label": "build_debug_opengl",
+                "type": "shell",
+                "command": "./scripts/compile_engine.sh",
+                "args": ["opengl", "debug"],
+                "group": "build",
+                "presentation": {
+                    "echo": true,
+                    "reveal": "always",
+                    "focus": false,
+                    "panel": "shared",
+                    "showReuseMessage": true,
+                    "clear": false
+                },
+                "problemMatcher": [
+                    {
+                        "owner": "cpp",
+                        "source": "gcc",
+                        "fileLocation": "relative",
+                        "pattern": {
+                            "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                            "file": 1,
+                            "line": 2,
+                            "column": 3,
+                            "severity": 4,
+                            "message": 5
+                        }
+                    }
+                ]
+            },
+            {
+                "label": "build_release_full",
+                "type": "shell",
+                "command": "./scripts/compile_both.sh",
+                "group": "build",
+                "presentation": {
+                    "echo": true,
+                    "reveal": "always",
+                    "focus": false,
+                    "panel": "shared",
+                    "showReuseMessage": true,
+                    "clear": false
+                }
+            },
+            {
+                "label": "format_changed_files",
+                "type": "shell",
+                "command": "git",
+                "args": [
+                    "diff",
+                    "--name-only",
+                    "HEAD~1",
+                    "--",
+                    "*.c",
+                    "*.cpp",
+                    "*.h",
+                    "*.hpp"
+                ],
+                "presentation": {
+                    "echo": true,
+                    "reveal": "always",
+                    "focus": false,
+                    "panel": "shared"
+                }
+            },
+            {
+                "label": "format_all_changed_files",
+                "type": "shell",
+                "command": "bash",
+                "args": [
+                    "-c",
+                    "git diff --name-only HEAD~1 -- '*.c' '*.cpp' '*.h' '*.hpp' | xargs -r clang-format -i && echo '✅ Formatted changed C/C++ files'"
+                ],
+                "presentation": {
+                    "echo": true,
+                    "reveal": "always",
+                    "focus": false,
+                    "panel": "shared"
+                }
+            },
+            {
+                "label": "run_clang_tidy_changed",
+                "type": "shell",
+                "command": "./scripts/run_clang_tidy.sh",
+                "args": ["--changed-only"],
+                "presentation": {
+                    "echo": true,
+                    "reveal": "always",
+                    "focus": false,
+                    "panel": "shared",
+                    "showReuseMessage": true,
+                    "clear": false
+                },
+                "problemMatcher": [
+                    {
+                        "owner": "cpp",
+                        "source": "clang-tidy",
+                        "fileLocation": "relative",
+                        "pattern": [
+                            {
+                                "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error|note|info):\\s+(.*)\\s+\\[([^\\]]+)\\]$",
+                                "file": 1,
+                                "line": 2,
+                                "column": 3,
+                                "severity": 4,
+                                "message": 5,
+                                "code": 6
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "label": "run_cppcheck",
+                "type": "shell",
+                "command": "./scripts/run_cppcheck.sh",
+                "presentation": {
+                    "echo": true,
+                    "reveal": "always",
+                    "focus": false,
+                    "panel": "shared",
+                    "showReuseMessage": true,
+                    "clear": false
+                },
+                "problemMatcher": [
+                    {
+                        "owner": "cpp",
+                        "source": "cppcheck",
+                        "fileLocation": "relative",
+                        "pattern": [
+                            {
+                                "regexp": "^(.*):(\\d+):\\s+(warning|error|style|performance|portability|information):\\s+(.*)$",
+                                "file": 1,
+                                "line": 2,
+                                "severity": 3,
+                                "message": 4
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "label": "run_memory_safety_tests",
+                "type": "shell",
+                "command": "./scripts/run_memory_safety_tests.sh",
+                "presentation": {
+                    "echo": true,
+                    "reveal": "always",
+                    "focus": false,
+                    "panel": "shared",
+                    "showReuseMessage": true,
+                    "clear": false
+                }
+            },
+            {
+                "label": "run_performance_tests",
+                "type": "shell",
+                "command": "./scripts/run_performance_tests.sh",
+                "presentation": {
+                    "echo": true,
+                    "reveal": "always",
+                    "focus": false,
+                    "panel": "shared",
+                    "showReuseMessage": true,
+                    "clear": false
+                }
+            },
+            {
+                "label": "package_release",
+                "type": "shell",
+                "command": "./scripts/package_release.sh",
+                "presentation": {
+                    "echo": true,
+                    "reveal": "always",
+                    "focus": false,
+                    "panel": "shared",
+                    "showReuseMessage": true,
+                    "clear": false
+                }
+            },
+            {
+                "label": "run_minimal_smoke_test",
+                "type": "shell",
+                "command": "./scripts/smoke_test.sh",
+                "presentation": {
+                    "echo": true,
+                    "reveal": "always",
+                    "focus": false,
+                    "panel": "shared",
+                    "showReuseMessage": true,
+                    "clear": false
+                }
+            },
+            {
+                "label": "run_full_test_suite",
+                "type": "shell",
+                "command": "./scripts/test_engine.sh",
+                "presentation": {
+                    "echo": true,
+                    "reveal": "always",
+                    "focus": false,
+                    "panel": "shared",
+                    "showReuseMessage": true,
+                    "clear": false
+                }
+            },
+            {
+                "label": "run_safe_mode_test",
+                "type": "shell",
+                "command": "./scripts/run_safe_mode.sh",
+                "presentation": {
+                    "echo": true,
+                    "reveal": "always",
+                    "focus": false,
+                    "panel": "shared",
+                    "showReuseMessage": true,
+                    "clear": false
+                }
+            },
+            {
+                "label": "validate_ci_build",
+                "type": "shell",
+                "command": "./scripts/validate_ci_build.sh",
+                "presentation": {
+                    "echo": true,
+                    "reveal": "always",
+                    "focus": false,
+                    "panel": "shared",
+                    "showReuseMessage": true,
+                    "clear": false
+                }
+            },
+            {
+                "label": "run_performance_benchmarks",
+                "type": "shell",
+                "command": "./scripts/benchmark_engine.sh",
+                "args": ["--quick"],
+                "presentation": {
+                    "echo": true,
+                    "reveal": "always",
+                    "focus": false,
+                    "panel": "shared",
+                    "showReuseMessage": true,
+                    "clear": false
+                }
+            },
+            {
+                "label": "cook_assets",
+                "type": "shell",
+                "command": "./scripts/cook_assets.sh",
+                "presentation": {
+                    "echo": true,
+                    "reveal": "always",
+                    "focus": false,
+                    "panel": "shared",
+                    "showReuseMessage": true,
+                    "clear": false
+                }
+            },
+            {
+                "label": "validate_assets",
+                "type": "shell",
+                "command": "./scripts/validate_assets.sh",
+                "args": ["mymod"],
+                "presentation": {
+                    "echo": true,
+                    "reveal": "always",
+                    "focus": false,
+                    "panel": "shared",
+                    "showReuseMessage": true,
+                    "clear": false
+                }
+            },
+            {
+                "label": "generate_documentation",
+                "type": "shell",
+                "command": "find",
+                "args": [
+                    "docs",
+                    "-name",
+                    "*.md",
+                    "-exec",
+                    "echo",
+                    "📄",
+                    "{}",
+                    ";"
+                ],
+                "presentation": {
+                    "echo": true,
+                    "reveal": "always",
+                    "focus": false,
+                    "panel": "shared"
+                }
+            },
+            {
+                "label": "clean_build_artifacts",
+                "type": "shell",
+                "command": "rm",
+                "args": [
+                    "-rf",
+                    "build",
+                    "build-*",
+                    "release/idtech3*",
+                    "logs/*.log"
+                ],
+                "presentation": {
+                    "echo": true,
+                    "reveal": "always",
+                    "focus": false,
+                    "panel": "shared"
+                }
+            }
+        ]
+    },
+    "cmake.configureOnOpen": true,
+    "cmake.buildDirectory": "${workspaceFolder}/build",
+    "C_Cpp.default.compilerPath": "gcc",
+    "C_Cpp.default.cStandard": "c23",
+    "C_Cpp.default.cppStandard": "c++23",
+    "C_Cpp.default.includePath": [
+        "${workspaceFolder}/src/common",
+        "${workspaceFolder}/src/client",
+        "${workspaceFolder}/src/renderers",
+        "${workspaceFolder}/external/include"
+    ],
+    "files.associations": {
+        "*.c": "c",
+        "*.h": "c",
+        "*.cpp": "cpp",
+        "*.hpp": "cpp",
+        "*.shader": "glsl",
+        "*.vert": "glsl",
+        "*.frag": "glsl",
+        "*.comp": "glsl"
+    },
+    "editor.formatOnSave": false,
+    "clang-format.executable": "clang-format-18",
+    "clang-tidy.executable": "clang-tidy-18"
+}

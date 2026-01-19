@@ -1,0 +1,38 @@
+[
+    {
+        "key": "ctrl+shift+b",
+        "command": "workbench.action.tasks.runTask",
+        "args": "build_release_vulkan",
+        "when": "workspaceFolderCount == 1"
+    },
+    {
+        "key": "ctrl+shift+d",
+        "command": "workbench.action.tasks.runTask",
+        "args": "build_debug_opengl",
+        "when": "workspaceFolderCount == 1"
+    },
+    {
+        "key": "ctrl+shift+t",
+        "command": "workbench.action.tasks.runTask",
+        "args": "run_minimal_smoke_test",
+        "when": "workspaceFolderCount == 1"
+    },
+    {
+        "key": "ctrl+shift+f",
+        "command": "workbench.action.tasks.runTask",
+        "args": "format_all_changed_files",
+        "when": "workspaceFolderCount == 1"
+    },
+    {
+        "key": "ctrl+shift+c",
+        "command": "workbench.action.tasks.runTask",
+        "args": "run_clang_tidy_changed",
+        "when": "workspaceFolderCount == 1"
+    },
+    {
+        "key": "ctrl+shift+v",
+        "command": "workbench.action.tasks.runTask",
+        "args": "validate_ci_build",
+        "when": "workspaceFolderCount == 1"
+    }
+]

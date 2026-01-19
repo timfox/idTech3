@@ -275,6 +275,7 @@ src/
 - **[ASSET_PIPELINE.md](docs/ASSET_PIPELINE.md)**: Asset loading, PK3 compatibility, and modern formats
 - **[BRANCHES.md](docs/BRANCHES.md)**: Vanilla/Chocolate/Layercake development philosophy
 - **[ROADMAP.md](docs/ROADMAP.md)**: Next 10 development priorities in order
+- **[DEVELOPMENT_SETUP.md](docs/DEVELOPMENT_SETUP.md)**: Cursor/VS Code project commands and keyboard shortcuts
 
 ## **System Requirements**
 
