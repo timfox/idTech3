@@ -6,6 +6,8 @@
 
 This enhanced version of the id Tech 3 engine features a complete Vulkan renderer implementation with RTX hardware acceleration, professional debugging tools, and robust error handling.
 
+> 📋 **[Project Constitution](CLAUDE.md)** - Read this first. It defines our goals, constraints, and development principles.
+
 ## **Key Features**
 
 ### **Advanced Rendering**
