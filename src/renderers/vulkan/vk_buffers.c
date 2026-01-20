@@ -293,16 +293,16 @@ qboolean vk_alloc_vbo(const byte *vbo_data, int vbo_size) {
     VkDeviceSize allocationSize;
     uint32_t memory_type_bits;
 
-    desc.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    desc.pNext = NULL;
-    desc.flags = 0;
-    desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    desc.queueFamilyIndexCount = 0;
-    desc.pQueueFamilyIndices = NULL;
-
-    // device-local buffer
-    desc.size = vbo_size;
-    desc.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+    VkBufferCreateInfo desc = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0,
+        .size = vbo_size,
+        .usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 0,
+        .pQueueFamilyIndices = NULL
+    };
     VK_CHECK(qvkCreateBuffer(vk.device, &desc, NULL, &vk.vbo.vertex_buffer));
 
     // memory requirements

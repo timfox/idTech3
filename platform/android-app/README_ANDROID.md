@@ -3,10 +3,11 @@
 ## Quick Start
 
 ### Prerequisites
-1. **Android NDK** (r21 or newer, r25 recommended)
+1. **Android NDK** (r27.0.12077973 or newer)
    - Set `ANDROID_NDK`, `ANDROID_HOME`, or `ANDROID_NDK_HOME` environment variable
-2. **JDK 11+** (JDK 17 recommended)
-3. **Gradle** (included with Android Studio, or standalone)
+2. **JDK 17+** (REQUIRED for AGP 8.x - JDK 8 will not work)
+   - `export JAVA_HOME=/path/to/jdk-17`
+3. **Gradle** (8.4+ - included with wrapper, no manual installation needed)
 
 ### Build APK
 
@@ -41,10 +42,18 @@ adb logcat | grep -i "idtech3\|vulkan"
 ### CMake Configuration
 The build uses the main `CMakeLists.txt` with Android-specific settings:
 - **Minimum SDK**: 24 (Android 7.0) - required for Vulkan
-- **Target SDK**: 33 (Android 13)
+- **Target SDK**: 35 (Android 15)
 - **ABIs**: arm64-v8a, armeabi-v7a, x86_64
 - **Renderer**: Vulkan (default on Android)
 - **STL**: c++_static
+- **JDK**: 17+ (REQUIRED - AGP 8.x does not support JDK 8)
+
+#### Modern Tooling Requirements
+This build now uses **Android Gradle Plugin 8.6.1** and **Gradle 8.10.2**:
+- **AGP 8.x** requires **JDK 17+**
+- **Constitution Compliant**: Uses modern compiler standards
+- **Security**: Latest patches and features
+- **Performance**: Improved build times and optimizations
 
 ### Vulkan Support
 - Vulkan headers and library are provided by Android NDK

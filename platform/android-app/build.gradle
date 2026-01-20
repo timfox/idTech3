@@ -4,11 +4,10 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        // CRITICAL: Android Gradle Plugin 3.6.4 is deprecated and unmaintained
-        // TODO: Upgrade to AGP 8.x when Java 17+ is available in build environment
-        // Current constraint: Build environment only has Java 8, AGP 8.x requires Java 11+
-        // This violates project constitution modern compiler requirements
-        classpath "com.android.tools.build:gradle:3.6.4"
+        // Modern Android Gradle Plugin 8.x - latest stable version
+        // Requires Java 17+ and Gradle 8.4+
+        // Compliant with project constitution modern compiler requirements
+        classpath "com.android.tools.build:gradle:8.6.1"
     }
 }
 
@@ -22,21 +21,21 @@ allprojects {
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 33
+    compileSdkVersion 35
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 
     defaultConfig {
         applicationId "com.idtech3"
         minSdkVersion 24  // Android 7.0 - required for Vulkan support
-        targetSdkVersion 33
+        targetSdkVersion 35
         versionCode 1
         versionName "0.1"
-        // Use explicit NDK version to avoid ANDROID_NDK_HOME deprecation warning
-        ndkVersion "21.4.7075529"
+        // Use latest stable NDK version compatible with AGP 8.x
+        ndkVersion "27.0.12077973"
         ndk {
             abiFilters "arm64-v8a", "armeabi-v7a", "x86_64"
         }
@@ -74,12 +73,11 @@ android {
         }
     }
     
-    // Ensure native libraries are packaged correctly (AGP 3.x syntax)
-    packagingOptions {
-        doNotStrip "*/armeabi-v7a/*.so"
-        doNotStrip "*/arm64-v8a/*.so"
-        doNotStrip "*/x86/*.so"
-        doNotStrip "*/x86_64/*.so"
+    // Ensure native libraries are packaged correctly (AGP 8.x syntax)
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
     }
     
     signingConfigs {
