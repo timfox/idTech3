@@ -12,6 +12,10 @@
 
 #include "vk_pbo.h"
 
+#ifdef USE_VMA
+#include "vk_mem_alloc.h"
+#endif
+
 // ImGui types are now available through cimgui
 
 // Forward declarations for functions used from vk.c
@@ -403,6 +407,14 @@ void vk_shutdown_resource_pool(void) {
 }
 
 void vk_clean_staging_buffer(void) {
+#ifdef USE_VMA
+	if (vk_staging_buffer_allocation != VK_NULL_HANDLE) {
+		vmaDestroyBuffer(vk.allocator, vk.staging_buffer.handle, vk_staging_buffer_allocation);
+		vk_staging_buffer_allocation = VK_NULL_HANDLE;
+		vk.staging_buffer.handle = VK_NULL_HANDLE;
+		vk.staging_buffer.memory = VK_NULL_HANDLE; // Not used with VMA
+	}
+#else
 	if (vk.staging_buffer.handle != VK_NULL_HANDLE) {
 		qvkDestroyBuffer(vk.device, vk.staging_buffer.handle, NULL);
 		vk.staging_buffer.handle = VK_NULL_HANDLE;
@@ -412,6 +424,7 @@ void vk_clean_staging_buffer(void) {
 		qvkFreeMemory(vk.device, vk.staging_buffer.memory, NULL);
 		vk.staging_buffer.memory = VK_NULL_HANDLE;
 	}
+#endif
 
 	vk.staging_buffer.ptr = nullptr;
 	vk.staging_buffer.size = 0;
@@ -484,12 +497,6 @@ void vk_flush_staging_buffer(__attribute__((unused)) qboolean final) {
 }
 
 void vk_alloc_staging_buffer(VkDeviceSize size) {
-	VkBufferCreateInfo buffer_desc;
-	VkMemoryRequirements memory_requirements;
-	VkMemoryAllocateInfo alloc_info;
-	uint32_t memory_type;
-	void *data;
-
 	if (size == 0) {
 		ri.Printf(PRINT_ERROR, "vk_alloc_staging_buffer: requested size is 0!\n");
 		return;
@@ -505,6 +512,48 @@ void vk_alloc_staging_buffer(VkDeviceSize size) {
 
 	vk.staging_buffer.size = MAX(size, 16 * 1024 * 1024); // 16MB staging buffer
 	vk.staging_buffer.size = PAD(vk.staging_buffer.size, 1024 * 1024);
+
+#ifdef USE_VMA
+	// Use VMA for better memory management
+	VkBufferCreateInfo buffer_desc = {
+		.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+		.pNext = NULL,
+		.flags = 0,
+		.size = vk.staging_buffer.size,
+		.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+		.queueFamilyIndexCount = 0,
+		.pQueueFamilyIndices = NULL
+	};
+
+	VmaAllocationCreateInfo allocCreateInfo = {
+		.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
+		.usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST,
+		.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+	};
+
+	VmaAllocationInfo allocInfo;
+	VkResult res = vmaCreateBuffer(vk.allocator, &buffer_desc, &allocCreateInfo,
+		&vk.staging_buffer.handle, &vk_staging_buffer_allocation, &allocInfo);
+
+	if (res != VK_SUCCESS) {
+		ri.Error(ERR_FATAL, "VMA: Failed to create staging buffer: %s", vk_result_string(res));
+	}
+
+	vk.staging_buffer.ptr = (byte*)allocInfo.pMappedData;
+	vk.staging_buffer.memory = VK_NULL_HANDLE; // Not used with VMA
+
+#ifdef USE_UPLOAD_QUEUE
+	vk.staging_buffer.offset = 0;
+#endif
+	SET_OBJECT_NAME(vk.staging_buffer.handle, "staging buffer (VMA)", VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT);
+
+#else
+	VkBufferCreateInfo buffer_desc;
+	VkMemoryRequirements memory_requirements;
+	VkMemoryAllocateInfo alloc_info;
+	uint32_t memory_type;
+	void *data;
 
 	buffer_desc.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	buffer_desc.pNext = NULL;
@@ -535,6 +584,7 @@ void vk_alloc_staging_buffer(VkDeviceSize size) {
 #endif
 	SET_OBJECT_NAME(vk.staging_buffer.handle, "staging buffer", VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT);
 	SET_OBJECT_NAME(vk.staging_buffer.memory, "staging buffer memory", VK_DEBUG_REPORT_OBJECT_TYPE_DEVICE_MEMORY_EXT);
+#endif
 }
 
 // Hierarchical Memory Pool System Implementation

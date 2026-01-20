@@ -233,7 +233,7 @@ GitHub Actions workflows should test:
 
 - Android NDK 25.1+
 - Android API level 21+
-- See `platform/android/README_ANDROID.md`
+- See `platform/android-app/README_ANDROID.md`
 
 ## Recommendations for Future Improvements
 
@@ -281,7 +281,7 @@ GitHub Actions workflows should test:
 - Compatibility tests: `src/common/compatibility_test.c`
 - Build documentation: `docs/BUILD_PLATFORM.md`
 - iOS/macOS: `docs/IOS_BUILD_STATUS.md`
-- Android: `platform/android/README_ANDROID.md`
+- Android: `platform/android-app/README_ANDROID.md`
 
 ---
 

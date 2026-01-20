@@ -64,10 +64,6 @@ static void vk_allocate_image_descriptor(image_t *image) {
 extern "C" void vk_create_image(image_t *image, int width, int height, int mip_levels) {
     VkFormat format = (VkFormat)image->internalFormat;
     VkImageCreateInfo desc;
-    VkMemoryRequirements memory_requirements;
-    VkMemoryAllocateInfo alloc_info;
-    uint32_t memory_type;
-    VkDeviceMemory memory;
 
     if (!vk_validate_handle(vk.device, "device")) {
         return;
@@ -90,6 +86,28 @@ extern "C" void vk_create_image(image_t *image, int width, int height, int mip_l
     desc.queueFamilyIndexCount = 0;
     desc.pQueueFamilyIndices = NULL;
     desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+#ifdef USE_VMA
+    // Use VMA for better memory management
+    VmaAllocationCreateInfo allocCreateInfo = {
+        .usage = VMA_MEMORY_USAGE_GPU_ONLY  // Device-local for textures
+    };
+
+    VkResult res = vmaCreateImage(vk.allocator, &desc, &allocCreateInfo,
+        &image->handle, &image->vmaAllocation, NULL);
+
+    if (res != VK_SUCCESS) {
+        ri.Error(ERR_FATAL, "VMA: Failed to create image '%s': %s", image->imgName, vk_result_string(res));
+    }
+
+    image->memory = VK_NULL_HANDLE; // Not used with VMA
+    vk_track_allocation(0); // VMA handles tracking internally
+
+#else
+    VkMemoryRequirements memory_requirements;
+    VkMemoryAllocateInfo alloc_info;
+    uint32_t memory_type;
+    VkDeviceMemory memory;
 
     VK_CHECK(qvkCreateImage(vk.device, &desc, NULL, &image->handle));
 
@@ -115,10 +133,15 @@ extern "C" void vk_create_image(image_t *image, int width, int height, int mip_l
     VK_CHECK(qvkBindImageMemory(vk.device, image->handle, memory, 0));
 
     image->memory = memory;
+    image->vmaAllocation = VK_NULL_HANDLE; // Not used without VMA
+#endif
+
     image->mip_levels = mip_levels;
 
     SET_OBJECT_NAME(image->handle, image->imgName, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT);
+#ifndef USE_VMA
     SET_OBJECT_NAME(image->memory, va("%s memory", image->imgName), VK_DEBUG_REPORT_OBJECT_TYPE_DEVICE_MEMORY_EXT);
+#endif
 }
 
 // Create image view

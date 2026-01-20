@@ -652,7 +652,8 @@ typedef struct image_s {
 	uint32_t	mip_levels;
 	VkImage		handle;
 	VkImageView	view;
-	VkDeviceMemory memory;		// Allocated device memory for the image
+	VkDeviceMemory memory;		// Allocated device memory for the image (NULL when using VMA)
+	VmaAllocation vmaAllocation;	// VMA allocation handle (when using VMA)
 	// Descriptor set that contains single descriptor used to access the given image.
 	// It is updated only once during image initialization.
 	VkDescriptorSet descriptor;

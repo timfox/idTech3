@@ -1,4 +1,0 @@
-rootProject.name = "idtech3"
-
-include(":app")
-project(":app").projectDir = file("app")

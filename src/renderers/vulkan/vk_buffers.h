@@ -23,6 +23,9 @@ typedef struct {
 
 extern VmaBufferAllocation vk_geometry_buffer_vma[NUM_COMMAND_BUFFERS];
 extern VmaAllocation vk_geometry_buffer_memory_vma;
+extern VmaAllocation vk_storage_buffer_allocation;
+extern VmaAllocation vk_staging_buffer_allocation;
+extern VmaAllocation vk_vbo_allocation;
 #endif
 
 // Buffer management function declarations

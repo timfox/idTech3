@@ -1,1 +1,0 @@
-/home/tim/Desktop/idtech3/platform/android/app/build/intermediates/cmake/debug/obj/arm64-v8a

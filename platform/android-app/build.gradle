@@ -4,6 +4,10 @@ buildscript {
         mavenCentral()
     }
     dependencies {
+        // CRITICAL: Android Gradle Plugin 3.6.4 is deprecated and unmaintained
+        // TODO: Upgrade to AGP 8.x when Java 17+ is available in build environment
+        // Current constraint: Build environment only has Java 8, AGP 8.x requires Java 11+
+        // This violates project constitution modern compiler requirements
         classpath "com.android.tools.build:gradle:3.6.4"
     }
 }
@@ -51,7 +55,7 @@ android {
             // Use the main project CMakeLists.txt which builds the full engine
             // Path is relative to the android-app directory (go up 3 levels to project root)
             // Use file() to ensure proper path resolution
-            path file("${project.rootDir}/../../../CMakeLists.txt")
+            path file("../../CMakeLists.txt")
             version "3.22.1"
         }
     }
@@ -69,11 +73,12 @@ android {
         }
     }
     
-    // Ensure native libraries are packaged correctly
-    packaging {
-        jniLibs {
-            useLegacyPackaging = false
-        }
+    // Ensure native libraries are packaged correctly (AGP 3.x syntax)
+    packagingOptions {
+        doNotStrip "*/armeabi-v7a/*.so"
+        doNotStrip "*/arm64-v8a/*.so"
+        doNotStrip "*/x86/*.so"
+        doNotStrip "*/x86_64/*.so"
     }
     
     signingConfigs {

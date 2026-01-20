@@ -15,6 +15,9 @@ extern refimport_t ri;
 // VMA buffer allocation structures
 VmaBufferAllocation vk_geometry_buffer_vma[NUM_COMMAND_BUFFERS];
 VmaAllocation vk_geometry_buffer_memory_vma = VK_NULL_HANDLE;
+VmaAllocation vk_storage_buffer_allocation = VK_NULL_HANDLE;
+VmaAllocation vk_staging_buffer_allocation = VK_NULL_HANDLE;
+VmaAllocation vk_vbo_allocation = VK_NULL_HANDLE;
 #endif
 
 // Forward declarations for functions used from vk.c
@@ -155,6 +158,41 @@ void vk_create_geometry_buffers(VkDeviceSize size) {
 }
 
 void vk_create_storage_buffer(uint32_t size) {
+#ifdef USE_VMA
+    // Use VMA for better memory management
+    VkBufferCreateInfo desc = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0,
+        .size = size,
+        .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 0,
+        .pQueueFamilyIndices = NULL
+    };
+
+    VmaAllocationCreateInfo allocCreateInfo = {
+        .flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
+        .usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST,
+        .requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+    };
+
+    VkResult res = vmaCreateBuffer(vk.allocator, &desc, &allocCreateInfo,
+        &vk.storage.buffer, &vk_storage_buffer_allocation, NULL);
+
+    if (res != VK_SUCCESS) {
+        ri.Error(ERR_FATAL, "VMA: Failed to create storage buffer: %s", vk_result_string(res));
+    }
+
+    vk.storage.buffer_ptr = (void*)((VmaAllocationInfo*)vk_storage_buffer_allocation)->pMappedData;
+    vk.storage.memory = VK_NULL_HANDLE; // Not used with VMA
+
+    Com_Memset(vk.storage.buffer_ptr, 0, size);
+
+    SET_OBJECT_NAME(vk.storage.buffer, "storage buffer (VMA)", VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT);
+    SET_OBJECT_NAME(vk.storage.descriptor, "storage buffer descriptor", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT);
+
+#else
     VkMemoryRequirements memory_requirements;
     VkMemoryAllocateInfo alloc_info;
     VkBufferCreateInfo desc;
@@ -194,9 +232,18 @@ void vk_create_storage_buffer(uint32_t size) {
     SET_OBJECT_NAME(vk.storage.buffer, "storage buffer", VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT);
     SET_OBJECT_NAME(vk.storage.descriptor, "storage buffer", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT);
     SET_OBJECT_NAME(vk.storage.memory, "storage buffer memory", VK_DEBUG_REPORT_OBJECT_TYPE_DEVICE_MEMORY_EXT);
+#endif
 }
 
 void vk_release_vbo(void) {
+#ifdef USE_VMA
+    if (vk_vbo_allocation != VK_NULL_HANDLE) {
+        vmaDestroyBuffer(vk.allocator, vk.vbo.vertex_buffer, vk_vbo_allocation);
+        vk_vbo_allocation = VK_NULL_HANDLE;
+    }
+    vk.vbo.vertex_buffer = VK_NULL_HANDLE;
+    vk.vbo.buffer_memory = VK_NULL_HANDLE; // Not used with VMA
+#else
     if (vk.vbo.vertex_buffer)
         qvkDestroyBuffer(vk.device, vk.vbo.vertex_buffer, NULL);
     vk.vbo.vertex_buffer = VK_NULL_HANDLE;
@@ -204,19 +251,47 @@ void vk_release_vbo(void) {
     if (vk.vbo.buffer_memory)
         qvkFreeMemory(vk.device, vk.vbo.buffer_memory, NULL);
     vk.vbo.buffer_memory = VK_NULL_HANDLE;
+#endif
 }
 
 qboolean vk_alloc_vbo(const byte *vbo_data, int vbo_size) {
-    VkMemoryRequirements vb_mem_reqs;
-    VkMemoryAllocateInfo alloc_info;
-    VkBufferCreateInfo desc;
-    VkDeviceSize vertex_buffer_offset;
-    VkDeviceSize allocationSize;
-    uint32_t memory_type_bits;
     VkCommandBuffer command_buffer;
     VkBufferCopy copyRegion[1];
 
     vk_release_vbo();
+
+#ifdef USE_VMA
+    // Use VMA for better memory management
+    VkBufferCreateInfo desc = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0,
+        .size = vbo_size,
+        .usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 0,
+        .pQueueFamilyIndices = NULL
+    };
+
+    VmaAllocationCreateInfo allocCreateInfo = {
+        .usage = VMA_MEMORY_USAGE_GPU_ONLY  // Device-local for VBO
+    };
+
+    VkResult res = vmaCreateBuffer(vk.allocator, &desc, &allocCreateInfo,
+        &vk.vbo.vertex_buffer, &vk_vbo_allocation, NULL);
+
+    if (res != VK_SUCCESS) {
+        ri.Error(ERR_FATAL, "VMA: Failed to create VBO buffer: %s", vk_result_string(res));
+    }
+
+    vk.vbo.buffer_memory = VK_NULL_HANDLE; // Not used with VMA
+
+#else
+    VkMemoryRequirements vb_mem_reqs;
+    VkMemoryAllocateInfo alloc_info;
+    VkDeviceSize vertex_buffer_offset;
+    VkDeviceSize allocationSize;
+    uint32_t memory_type_bits;
 
     desc.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     desc.pNext = NULL;
@@ -242,6 +317,7 @@ qboolean vk_alloc_vbo(const byte *vbo_data, int vbo_size) {
     alloc_info.memoryTypeIndex = find_memory_type(memory_type_bits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     VK_CHECK(qvkAllocateMemory(vk.device, &alloc_info, NULL, &vk.vbo.buffer_memory));
     qvkBindBufferMemory(vk.device, vk.vbo.vertex_buffer, vk.vbo.buffer_memory, vertex_buffer_offset);
+#endif
 
     // copy data directly to staging buffer
     if ((VkDeviceSize)vbo_size > vk.staging_buffer.size) {
@@ -261,8 +337,10 @@ qboolean vk_alloc_vbo(const byte *vbo_data, int vbo_size) {
 
     end_command_buffer(command_buffer, __func__);
 
-    SET_OBJECT_NAME(vk.vbo.vertex_buffer, "VBO vertex buffer", VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT);
+    SET_OBJECT_NAME(vk.vbo.vertex_buffer, "VBO vertex buffer (VMA)", VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT);
+#ifndef USE_VMA
     SET_OBJECT_NAME(vk.vbo.buffer_memory, "VBO buffer memory", VK_DEBUG_REPORT_OBJECT_TYPE_DEVICE_MEMORY_EXT);
+#endif
 
     return qtrue;
 }
