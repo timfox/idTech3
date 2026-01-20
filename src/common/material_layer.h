@@ -81,6 +81,13 @@ typedef enum {
     PROC_MARBLE,
     PROC_WOOD,
     PROC_CLOUDS,
+    PROC_CRACKED,       // Cracked/dried mud effect
+    PROC_TURBULENCE,    // Turbulence distortion
+    PROC_RIDGED,        // Ridged multifractal
+    PROC_TERRAIN,       // Terrain heightmap
+    PROC_FIRE,          // Fire/flame effect
+    PROC_WATER,         // Water surface
+    PROC_SMOKE,         // Smoke/cloud effect
 } proceduralType_t;
 
 // Material parameter definition

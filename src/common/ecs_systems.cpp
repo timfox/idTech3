@@ -16,8 +16,11 @@ Core system implementations for physics, health, and network sync.
 #include "../game/g_local.h"
 #include <entt/entt.hpp>
 #include <vector>
+#include <memory>
 #include <ctime>
 #include <cstring>
+#include <optional>
+#include <utility>
 
 #ifdef USE_LUA
 extern "C" {
@@ -39,61 +42,54 @@ static void ECS_ProcessCollisionEvent(entt::registry &registry, const CollisionE
 
 // Bullet physics uses hardcoded values for now
 
-// Simple Bullet world wrapper used by the ECS physics system. This keeps
-// Bullet usage contained to ECS-driven entities.
+// Modernized Bullet world wrapper using C++23 smart pointers and RAII
 namespace {
 	struct BulletWorld {
-		btBroadphaseInterface					*broadphase		= nullptr;
-		btDefaultCollisionConfiguration			*config			= nullptr;
-		btCollisionDispatcher					*dispatcher		= nullptr;
-		btSequentialImpulseConstraintSolver		*solver			= nullptr;
-		btDiscreteDynamicsWorld					*world			= nullptr;
-		bool									 initialized		= false;
-		
+		std::unique_ptr<btBroadphaseInterface> broadphase;
+		std::unique_ptr<btDefaultCollisionConfiguration> config;
+		std::unique_ptr<btCollisionDispatcher> dispatcher;
+		std::unique_ptr<btSequentialImpulseConstraintSolver> solver;
+		std::unique_ptr<btDiscreteDynamicsWorld> world;
+		bool initialized = false;
+
 		void Init() {
 			if (initialized) {
 				return;
 			}
-			
-			broadphase = new btDbvtBroadphase();
-			config = new btDefaultCollisionConfiguration();
-			dispatcher = new btCollisionDispatcher(config);
-			solver = new btSequentialImpulseConstraintSolver();
-			world = new btDiscreteDynamicsWorld(dispatcher, broadphase, solver, config);
-			
+
+			// Use smart pointers for automatic resource management
+			broadphase = std::make_unique<btDbvtBroadphase>();
+			config = std::make_unique<btDefaultCollisionConfiguration>();
+			dispatcher = std::make_unique<btCollisionDispatcher>(config.get());
+			solver = std::make_unique<btSequentialImpulseConstraintSolver>();
+			world = std::make_unique<btDiscreteDynamicsWorld>(dispatcher.get(), broadphase.get(), solver.get(), config.get());
+
 			// Basic gravity; game code can still apply its own forces via acceleration
-			world->setGravity(btVector3(0.0f, 0.0f, -9.81f));
-			
+			constexpr btVector3 gravity{0.0f, 0.0f, -9.81f};
+			world->setGravity(gravity);
+
 			initialized = true;
 		}
-		
+
 		~BulletWorld() {
 			if (!initialized) {
 				return;
 			}
-			
-			// Clean up rigid bodies (shapes/motion states are owned by the caller).
-			for (int i = world->getNumCollisionObjects() - 1; i >= 0; --i) {
-				btCollisionObject *obj = world->getCollisionObjectArray()[i];
-				btRigidBody *body = btRigidBody::upcast(obj);
+
+			// Clean up rigid bodies using modern range-based for loop
+			// Note: shapes/motion states are owned by the caller, so we only clean up motion states
+			const auto numObjects = world->getNumCollisionObjects();
+			for (int i = numObjects - 1; i >= 0; --i) {
+				auto* obj = world->getCollisionObjectArray()[i];
+				auto* body = btRigidBody::upcast(obj);
 				if (body && body->getMotionState()) {
 					delete body->getMotionState();
 				}
 				world->removeCollisionObject(obj);
 				delete obj;
 			}
-			
-			delete world;
-			delete solver;
-			delete dispatcher;
-			delete config;
-			delete broadphase;
-			
-			world = nullptr;
-			solver = nullptr;
-			dispatcher = nullptr;
-			config = nullptr;
-			broadphase = nullptr;
+
+			// Smart pointers automatically clean up everything else
 			initialized = false;
 		}
 	};
@@ -193,54 +189,64 @@ public:
 	static BulletWorld s_bulletWorld;
 
 // Collision shape factory functions
-static btCollisionShape* CreateCollisionShape(CollisionShapeType type, const vec3_t dimensions, const std::vector<btVector3>* vertices = nullptr, const std::vector<int>* indices = nullptr) {
+// Modernized collision shape creation using C++23 features
+static std::unique_ptr<btCollisionShape> CreateCollisionShape(
+	CollisionShapeType type,
+	const vec3_t dimensions,
+	const std::vector<btVector3>* vertices = nullptr,
+	const std::vector<int>* indices = nullptr)
+{
+	// Use structured bindings for dimensions
+	const auto [width, height, depth] = std::make_tuple(dimensions[0], dimensions[1], dimensions[2]);
+
 	switch (type) {
 		case CollisionShapeType::BOX:
-			return new btBoxShape(btVector3(dimensions[0], dimensions[1], dimensions[2]));
+			return std::make_unique<btBoxShape>(btVector3(width, height, depth));
 
 		case CollisionShapeType::SPHERE:
-			return new btSphereShape(dimensions[0]);  // radius
+			return std::make_unique<btSphereShape>(width);  // radius
 
 		case CollisionShapeType::CAPSULE:
-			return new btCapsuleShape(dimensions[0], dimensions[1]);  // radius, height
+			return std::make_unique<btCapsuleShape>(width, height);  // radius, height
 
 		case CollisionShapeType::CONVEX_HULL: {
 			if (vertices && !vertices->empty()) {
-				auto* convexHull = new btConvexHullShape();
+				auto convexHull = std::make_unique<btConvexHullShape>();
+				// Use range-based for loop with structured bindings
 				for (const auto& vertex : *vertices) {
 					convexHull->addPoint(vertex);
 				}
 				return convexHull;
 			} else {
 				// Fallback to box if no vertices provided
-				return new btBoxShape(btVector3(dimensions[0], dimensions[1], dimensions[2]));
+				return std::make_unique<btBoxShape>(btVector3(width, height, depth));
 			}
 		}
 
 		case CollisionShapeType::MESH: {
 			if (vertices && indices && !vertices->empty() && !indices->empty()) {
-				auto* triangleMesh = new btTriangleMesh();
+				auto triangleMesh = std::make_unique<btTriangleMesh>();
+				// Modern range-based processing with structured bindings
 				for (size_t i = 0; i < indices->size(); i += 3) {
 					if (i + 2 < indices->size()) {
-						triangleMesh->addTriangle(
-							(*vertices)[(*indices)[i]],
-							(*vertices)[(*indices)[i + 1]],
-							(*vertices)[(*indices)[i + 2]]
-						);
+						const auto [idx0, idx1, idx2] = std::make_tuple((*indices)[i], (*indices)[i + 1], (*indices)[i + 2]);
+						triangleMesh->addTriangle((*vertices)[idx0], (*vertices)[idx1], (*vertices)[idx2]);
 					}
 				}
-				return new btBvhTriangleMeshShape(triangleMesh, true);
+				return std::make_unique<btBvhTriangleMeshShape>(triangleMesh.release(), true);
 			} else {
 				// Fallback to box if no mesh data provided
-				return new btBoxShape(btVector3(dimensions[0], dimensions[1], dimensions[2]));
+				return std::make_unique<btBoxShape>(btVector3(width, height, depth));
 			}
 		}
 
 		case CollisionShapeType::COMPOUND:
-			return new btCompoundShape();
+			return std::make_unique<btCompoundShape>();
 
 		default:
-			return new btBoxShape(btVector3(0.5f, 0.5f, 0.5f));  // fallback
+			// Use constexpr for fallback dimensions
+			constexpr btVector3 fallbackHalfExtents{0.5f, 0.5f, 0.5f};
+			return std::make_unique<btBoxShape>(fallbackHalfExtents);
 	}
 }
 
@@ -288,9 +294,9 @@ static void ECS_Bullet_Step(entt::registry &registry, float deltaTime) {
 		
 		// Lazily create a Bullet rigid body for this entity
 		if (!physics.body) {
-			// Create collision shape based on configured type
+			// Create collision shape based on configured type using modern smart pointers
 			if (!physics.collisionShape) {
-				physics.collisionShape = CreateCollisionShape(physics.shapeType, physics.shapeDimensions);
+				physics.collisionShape = CreateCollisionShape(physics.shapeType, physics.shapeDimensions).release();
 			}
 
 			const bool isDynamic = (physics.mass > 0.0f);

@@ -1,0 +1,143 @@
+name: Performance Benchmark
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake ninja-build clang-18 gcc-13 python3-matplotlib python3-seaborn python3-pandas python3-numpy jq
+
+    - name: Configure CMake
+      run: |
+        mkdir -p build
+        cd build
+        cmake .. -G Ninja \
+          -DCMAKE_C_COMPILER=clang-18 \
+          -DCMAKE_CXX_COMPILER=clang++-18 \
+          -DBUILD_BENCHMARKS=ON \
+          -DBUILD_TESTS=OFF \
+          -DBUILD_SERVER=OFF \
+          -DBUILD_RADIANT=OFF
+
+    - name: Build benchmarks
+      run: |
+        cd build
+        ninja renderer_bench
+
+    - name: Run enhanced benchmarks
+      run: |
+        ./scripts/ci_benchmark.sh
+
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v4
+      with:
+        name: benchmark-results-${{ github.run_number }}
+        path: |
+          tests/benchmarks/
+          bench_reports/
+          bench_results.json
+        retention-days: 30
+
+    - name: Upload benchmark report
+      uses: actions/upload-artifact@v4
+      with:
+        name: benchmark-report-${{ github.run_number }}
+        path: bench_reports/benchmark_report.html
+        retention-days: 30
+
+    - name: Comment PR with benchmark results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+
+          // Read benchmark summary
+          let summary = {};
+          try {
+            const summaryPath = path.join(process.cwd(), 'bench_results.json');
+            if (fs.existsSync(summaryPath)) {
+              summary = JSON.parse(fs.readFileSync(summaryPath, 'utf8'));
+            }
+          } catch (e) {
+            console.log('Could not read benchmark results:', e);
+          }
+
+          // Generate comment
+          let comment = '## 🚀 Performance Benchmark Results\n\n';
+
+          if (summary.summary) {
+            const data = summary.summary;
+            comment += `**Duration:** ${data.duration_seconds?.toFixed(2) || 'N/A'}s\n`;
+            comment += `**Peak Memory:** ${data.memory_end_mb?.toFixed(1) || 'N/A'}MB\n\n`;
+
+            const operations = ['pathTracer', 'rtx', 'denoiser', 'fsr'];
+            comment += '| Operation | Avg Time | Min | Max | P95 | Stability |\n';
+            comment += '|-----------|----------|-----|-----|-----|-----------|\n';
+
+            operations.forEach(op => {
+              if (data[op]) {
+                const opData = data[op];
+                const avg = opData.avg_ms?.toFixed(3) || 'N/A';
+                const min = opData.min_ms?.toFixed(3) || 'N/A';
+                const max = opData.max_ms?.toFixed(3) || 'N/A';
+                const p95 = opData.p95_ms?.toFixed(3) || 'N/A';
+                const stddev = opData.stddev_ms || 0;
+                const cv = avg !== 'N/A' ? ((stddev / parseFloat(avg)) * 100).toFixed(1) : 'N/A';
+                const stability = cv !== 'N/A' ? (parseFloat(cv) < 10 ? '🟢' : parseFloat(cv) < 25 ? '🟡' : '🔴') : '❓';
+
+                comment += `| ${op} | ${avg}ms | ${min}ms | ${max}ms | ${p95}ms | ${stability} ${cv}% |\n`;
+              }
+            });
+          }
+
+          if (summary.regressions && summary.regressions.length > 0) {
+            comment += '\n### ⚠️ Performance Regressions Detected\n\n';
+            summary.regressions.forEach(reg => {
+              comment += `🔴 **${reg.operation}**: +${reg.regression_percent?.toFixed(1) || 'N/A'}% slower\n`;
+            });
+          } else {
+            comment += '\n✅ **No performance regressions detected**\n';
+          }
+
+          comment += '\n📊 [Detailed Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) (download artifacts)\n';
+
+          // Post comment
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+
+    - name: Fail on performance regression
+      if: github.event_name == 'pull_request'
+      run: |
+        if [ -f "bench_results.json" ]; then
+          if jq -e '.regressions | length > 0' bench_results.json > /dev/null; then
+            echo "Performance regression detected!"
+            jq '.regressions' bench_results.json
+            exit 1
+          else
+            echo "No performance regressions detected."
+          fi
+        fi

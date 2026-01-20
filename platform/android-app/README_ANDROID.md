@@ -9,16 +9,26 @@
    - `export JAVA_HOME=/path/to/jdk-17`
 3. **Gradle** (8.4+ - included with wrapper, no manual installation needed)
 
+### Setup Environment
+
+First, ensure Java 17+ is available:
+```bash
+cd platform/android-app
+./setup_java.sh
+```
+
 ### Build APK
 
 ```bash
 cd platform/android-app
+./setup_java.sh  # Ensure Java 17+ is configured
 ./build_apk.sh Release
 ```
 
 Or manually:
 ```bash
 cd platform/android-app
+export JAVA_HOME=/path/to/jdk-17  # Set Java 17+ path
 ./gradlew assembleRelease
 ```
 
@@ -89,6 +99,11 @@ All libraries are automatically packaged into the APK by Gradle.
 
 ## Troubleshooting
 
+### Java 17+ Not Found
+- Run `./setup_java.sh` to auto-configure Java 17+
+- Or install manually: `sudo apt install openjdk-17-jdk`
+- Set `JAVA_HOME` to your JDK 17+ installation path
+
 ### Vulkan Not Found
 - Check device support: `adb shell dumpsys | grep vulkan`
 - Verify minSdkVersion is 24+
@@ -96,13 +111,21 @@ All libraries are automatically packaged into the APK by Gradle.
 
 ### Build Failures
 - Ensure `ANDROID_NDK` or `ANDROID_HOME` is set
-- Check JDK version: `java -version` (should be 11+)
-- Verify Gradle version compatibility
+- Check JDK version: `java -version` (must be 17+ for AGP 8.x)
+- Verify Gradle version compatibility (8.4+)
 
 ### APK Not Generated
 - Check build output: `./gradlew assembleRelease --info`
 - Verify CMake configuration succeeded
 - Check for missing dependencies
+
+## Modern Tooling Benefits
+
+✅ **Security**: Latest AGP patches and security fixes
+✅ **Performance**: Faster builds and better optimizations
+✅ **Compatibility**: Support for latest Android features
+✅ **Constitution Compliant**: Meets GCC 15+/Clang 18+ standards
+✅ **Future Proof**: Ready for Android 15+ and beyond
 
 ## Advanced
 

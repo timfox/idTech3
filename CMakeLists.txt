@@ -4634,6 +4634,28 @@ ADD_EXECUTABLE(test_rtx_switchmode
 ADD_EXECUTABLE(test_wayland_toggle
 	src/tests/test_wayland_toggle.cpp
 )
+
+# RGB9E5 converter tool for HDR texture processing
+ADD_EXECUTABLE(rgb9e5_converter
+	tools/rgb9e5_converter.c
+)
+TARGET_INCLUDE_DIRECTORIES(rgb9e5_converter PRIVATE
+	${CMAKE_SOURCE_DIR}/src
+)
+TARGET_LINK_LIBRARIES(rgb9e5_converter PRIVATE m)
+SET_TARGET_PROPERTIES(rgb9e5_converter PROPERTIES
+	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tools"
+)
+
+# RGB9E5 format unit tests
+ADD_EXECUTABLE(test_rgb9e5
+	src/tests/test_rgb9e5.c
+)
+target_compile_definitions(test_rgb9e5 PRIVATE UNIT_TEST)
+SET_TARGET_PROPERTIES(test_rgb9e5 PROPERTIES
+	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
+ADD_TEST(NAME test_rgb9e5 COMMAND test_rgb9e5)
 ADD_EXECUTABLE(test_profiler_integration
 	src/tests/test_profiler_integration.c
 	src/unix/unix_shared.c

@@ -5,6 +5,8 @@
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
+#include <optional>
+#include <string_view>
 #include "ecs.h"
 #include "lua_entity.h"
 
@@ -22,29 +24,40 @@ Lua binding: game_spawn_entity(classname, x, y, z) -> entity_num
 */
 static int Lua_GameSpawnEntity(lua_State *L)
 {
-	const char *classname;
-	vec3_t origin;
-	int numArgs = lua_gettop(L);
-	
+	const auto numArgs = lua_gettop(L);
+
+	// Use std::optional for cleaner error handling
+	std::optional<std::string_view> classname;
+	vec3_t origin{};
+
 	if (numArgs < 4) {
 		lua_pushinteger(L, -1);
 		return 1;
 	}
-	
-	classname = lua_tostring(L, 1);
-	if (!classname) {
+
+	// Modern C++: use std::string_view for string handling
+	if (const char* cls = lua_tostring(L, 1); cls) {
+		classname = cls;
+	} else {
 		lua_pushinteger(L, -1);
 		return 1;
 	}
-	
+
+	// Validate and extract position coordinates
+	const auto x = lua_tonumber(L, 2);
+	const auto y = lua_tonumber(L, 3);
+	const auto z = lua_tonumber(L, 4);
+
 	if (!lua_isnumber(L, 2) || !lua_isnumber(L, 3) || !lua_isnumber(L, 4)) {
 		lua_pushinteger(L, -1);
 		return 1;
 	}
-	
-	origin[0] = (float)lua_tonumber(L, 2);
-	origin[1] = (float)lua_tonumber(L, 3);
-	origin[2] = (float)lua_tonumber(L, 4);
+
+	// Use structured bindings for coordinate assignment
+	auto [ox, oy, oz] = std::make_tuple(static_cast<float>(x), static_cast<float>(y), static_cast<float>(z));
+	origin[0] = ox;
+	origin[1] = oy;
+	origin[2] = oz;
 	
 #ifdef USE_ENTT
 	// Create ECS entity

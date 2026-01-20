@@ -23,6 +23,17 @@ if [ "$JAVA_VERSION" -lt 17 ]; then
     exit 1
 fi
 
+# Check for Java 17+ (required for AGP 8.x)
+JAVA_VERSION=$(java -version 2>&1 | head -n 1 | cut -d'"' -f2 | cut -d'.' -f1)
+if [ "$JAVA_VERSION" -lt 17 ]; then
+    echo "ERROR: Java 17+ is required for Android Gradle Plugin 8.x"
+    echo "Current Java version: $(java -version 2>&1 | head -n 1)"
+    echo ""
+    echo "Please run: ./setup_java.sh"
+    echo "Or install Java 17+: sudo apt install openjdk-17-jdk"
+    exit 1
+fi
+
 # Check for required environment variables
 if [ -z "$ANDROID_NDK" ] && [ -z "$ANDROID_HOME" ] && [ -z "$ANDROID_NDK_HOME" ]; then
     echo "ERROR: ANDROID_NDK, ANDROID_HOME, or ANDROID_NDK_HOME must be set"

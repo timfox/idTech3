@@ -4611,6 +4611,7 @@ shader_t *R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImag
 		return FinishShader();
 	}
 
+#ifndef USE_RENDERER_DLOPEN
 	//
 	// check for layered material file before falling back to image-based shader
 	//
@@ -4655,6 +4656,7 @@ shader_t *R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImag
 			return FinishShader();
 		}
 	}
+#endif
 
 	//
 	// if not defined in the in-memory shader descriptions,
@@ -5269,7 +5271,11 @@ qboolean R_UpdateMaterialInstance(qhandle_t handle) {
 	instance->lastModifiedTime = ri.Milliseconds();
 
 	// Recompile if needed
+#ifndef USE_RENDERER_DLOPEN
 	return (MaterialInstance_Compile(instance) >= 0);
+#else
+	return qfalse;
+#endif
 }
 
 /*
@@ -5293,11 +5299,13 @@ Shuts down the material instance management system
 */
 void R_ShutdownMaterialSystem(void) {
 	// Free all material instances
+#ifndef USE_RENDERER_DLOPEN
 	for (int i = 0; i < MAX_MATERIAL_INSTANCES; ++i) {
 		if (materialInstances[i]) {
 			MaterialInstance_Free(materialInstances[i]);
 			materialInstances[i] = NULL;
 		}
 	}
+#endif
 	numMaterialInstances = 0;
 }

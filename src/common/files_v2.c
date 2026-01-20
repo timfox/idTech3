@@ -9,19 +9,89 @@ Virtual Filesystem v2 - Complete implementation
 #include "files_v2.h"
 #include "files_internal.h"
 
-// Stub implementations for missing filesystem functions
+// Console command implementations
+static void FS_Mount_List_f(void);
+static void FS_Mount_Add_f(void);
+static void FS_Mount_Remove_f(void);
+static void FS_Mount_Enable_f(void);
+static void FS_Mount_Disable_f(void);
+static void FS_Mount_WriteMount_f(void);
+static void FS_Mount_Stats_f(void);
+static void FS_Cache_Stats_f(void);
+static void FS_Sandbox_Status_f(void);
+
+/*
+===============
+FS_Mount_RegisterCommands
+===============
+*/
 void FS_Mount_RegisterCommands(void) {
-	// TODO: Register mount-related console commands
-	Com_Printf("VFS: Mount commands not implemented\n");
+	Cmd_AddCommand("fs_mount_list", FS_Mount_List_f);
+	Cmd_AddCommand("fs_mount_add", FS_Mount_Add_f);
+	Cmd_AddCommand("fs_mount_remove", FS_Mount_Remove_f);
+	Cmd_AddCommand("fs_mount_enable", FS_Mount_Enable_f);
+	Cmd_AddCommand("fs_mount_disable", FS_Mount_Disable_f);
+	Cmd_AddCommand("fs_mount_write", FS_Mount_WriteMount_f);
+	Cmd_AddCommand("fs_mount_stats", FS_Mount_Stats_f);
+	Cmd_AddCommand("fs_cache_stats", FS_Cache_Stats_f);
+	Cmd_AddCommand("fs_sandbox_status", FS_Sandbox_Status_f);
+
+	Com_Printf("Virtual Filesystem v2 commands registered\n");
 }
 
+/*
+===============
+FS_Sandbox_ValidateOperation
+===============
+*/
 qboolean FS_Sandbox_ValidateOperation(const char *qpath, fsMount_t *mount, qboolean isWrite) {
-	(void)qpath;
-	(void)mount;
-	(void)isWrite;
-	// TODO: Implement sandbox validation
-	// For now, allow all operations
-	return qtrue;
+	if (!mountTable.sandboxEnabled) {
+		return qtrue; // Sandbox disabled, allow all operations
+	}
+
+	const fsSandboxRules_t *rules = &mount->sandbox;
+
+	// Check executables
+	if (rules->allowExecutables == qfalse && FS_Sandbox_IsExecutable(qpath)) {
+		return qfalse;
+	}
+
+	// Check config files
+	if (rules->allowConfig == qfalse) {
+		const char *ext = COM_GetExtension(qpath);
+		if (Q_stricmp(ext, "cfg") == 0 || Q_stricmp(ext, "config") == 0) {
+			return qfalse;
+		}
+	}
+
+	// Check save files
+	if (rules->allowSaves == qfalse) {
+		if (Q_stristr(qpath, "save") || Q_stristr(qpath, "autosave")) {
+			return qfalse;
+		}
+	}
+
+	// Check allowed paths (whitelist)
+	if (rules->numAllowedPaths > 0) {
+		qboolean pathAllowed = qfalse;
+		for (int i = 0; i < rules->numAllowedPaths; i++) {
+			if (Q_stristr(qpath, rules->allowedPaths[i])) {
+				pathAllowed = qtrue;
+				break;
+			}
+		}
+		if (!pathAllowed) {
+			return qfalse;
+		}
+	}
+
+	// Write-specific checks
+	if (isWrite) {
+		// For write operations, additional validation can be added here
+		// For example, check file size limits, prevent overwriting system files, etc.
+	}
+
+	return qtrue; // Operation allowed
 }
 #include <sys/stat.h>
 #include <dirent.h>
@@ -1415,6 +1485,236 @@ void FS_Monitor_Update(void) {
 
 			// Reset timestamp to detect if file is recreated
 			monitoredPathTimes[i] = 0;
+		}
+	}
+}
+
+// ============================================================================
+// Console Command Implementations
+// ============================================================================
+
+/*
+===============
+FS_Mount_List_f
+===============
+*/
+static void FS_Mount_List_f(void) {
+	if (!fs_v2_active) {
+		Com_Printf("Virtual Filesystem v2 not active\n");
+		return;
+	}
+
+	Com_Printf("Mounted filesystems:\n");
+	Com_Printf("%-20s %-8s %-8s %-8s %-8s %-s\n",
+	          "Mount Point", "Type", "Priority", "Enabled", "Write", "Display Name");
+
+	fsMount_t *mount = mountTable.mounts;
+	int count = 0;
+	while (mount) {
+		const char *typeStr = (mount->type == FS_MOUNT_PAK) ? "PAK" :
+		                     (mount->type == FS_MOUNT_DIR) ? "DIR" : "VIRTUAL";
+		const char *enabledStr = mount->enabled ? "Yes" : "No";
+		const char *writeStr = (mountTable.writeMount == mount) ? "Yes" : "No";
+
+		Com_Printf("%-20s %-8s %-8d %-8s %-8s %s\n",
+		          mount->mountPoint, typeStr, mount->priority,
+		          enabledStr, writeStr, mount->displayName);
+
+		mount = mount->next;
+		count++;
+	}
+
+	if (count == 0) {
+		Com_Printf("No mounts registered\n");
+	} else {
+		Com_Printf("\nTotal mounts: %d\n", count);
+	}
+}
+
+/*
+===============
+FS_Mount_Add_f
+===============
+*/
+static void FS_Mount_Add_f(void) {
+	if (Cmd_Argc() < 4) {
+		Com_Printf("Usage: fs_mount_add <mount_point> <path> <priority>\n");
+		Com_Printf("Priorities: system=%d, mod=%d, game=%d, cd=%d, fallback=%d\n",
+		          FS_PRIORITY_SYSTEM, FS_PRIORITY_MOD, FS_PRIORITY_GAME,
+		          FS_PRIORITY_CD, FS_PRIORITY_FALLBACK);
+		return;
+	}
+
+	const char *mountPoint = Cmd_Argv(1);
+	const char *path = Cmd_Argv(2);
+	const char *priorityStr = Cmd_Argv(3);
+
+	fsMountPriority_t priority = (fsMountPriority_t)atoi(priorityStr);
+
+	if (!FS_Mod_Mount(mountPoint, path, priority)) {
+		Com_Printf("Failed to mount '%s' at '%s'\n", path, mountPoint);
+	} else {
+		Com_Printf("Successfully mounted '%s' at '%s'\n", path, mountPoint);
+	}
+}
+
+/*
+===============
+FS_Mount_Remove_f
+===============
+*/
+static void FS_Mount_Remove_f(void) {
+	if (Cmd_Argc() < 2) {
+		Com_Printf("Usage: fs_mount_remove <mount_point>\n");
+		return;
+	}
+
+	const char *mountPoint = Cmd_Argv(1);
+
+	if (!FS_Mount_Remove(mountPoint)) {
+		Com_Printf("Failed to remove mount '%s'\n", mountPoint);
+	} else {
+		Com_Printf("Successfully removed mount '%s'\n", mountPoint);
+	}
+}
+
+/*
+===============
+FS_Mount_Enable_f
+===============
+*/
+static void FS_Mount_Enable_f(void) {
+	if (Cmd_Argc() < 2) {
+		Com_Printf("Usage: fs_mount_enable <mount_point>\n");
+		return;
+	}
+
+	const char *mountPoint = Cmd_Argv(1);
+
+	if (!FS_Mount_SetEnabled(mountPoint, qtrue)) {
+		Com_Printf("Failed to enable mount '%s'\n", mountPoint);
+	} else {
+		Com_Printf("Successfully enabled mount '%s'\n", mountPoint);
+	}
+}
+
+/*
+===============
+FS_Mount_Disable_f
+===============
+*/
+static void FS_Mount_Disable_f(void) {
+	if (Cmd_Argc() < 2) {
+		Com_Printf("Usage: fs_mount_disable <mount_point>\n");
+		return;
+	}
+
+	const char *mountPoint = Cmd_Argv(1);
+
+	if (!FS_Mount_SetEnabled(mountPoint, qfalse)) {
+		Com_Printf("Failed to disable mount '%s'\n", mountPoint);
+	} else {
+		Com_Printf("Successfully disabled mount '%s'\n", mountPoint);
+	}
+}
+
+/*
+===============
+FS_Mount_WriteMount_f
+===============
+*/
+static void FS_Mount_WriteMount_f(void) {
+	if (Cmd_Argc() < 2) {
+		Com_Printf("Usage: fs_mount_write <mount_point>\n");
+		return;
+	}
+
+	const char *mountPoint = Cmd_Argv(1);
+
+	if (!FS_Mount_SetWriteMount(mountPoint)) {
+		Com_Printf("Failed to set write mount to '%s'\n", mountPoint);
+	} else {
+		Com_Printf("Successfully set write mount to '%s'\n", mountPoint);
+	}
+}
+
+/*
+===============
+FS_Mount_Stats_f
+===============
+*/
+static void FS_Mount_Stats_f(void) {
+	if (!fs_v2_active) {
+		Com_Printf("Virtual Filesystem v2 not active\n");
+		return;
+	}
+
+	Com_Printf("Virtual Filesystem v2 Statistics:\n");
+	Com_Printf("Total mounts: %d\n", mountTable.numMounts);
+	Com_Printf("Write base path: %s\n", mountTable.writeBasePath);
+
+	if (mountTable.writeMount) {
+		Com_Printf("Write mount: %s (%s)\n",
+		          mountTable.writeMount->mountPoint,
+		          mountTable.writeMount->displayName);
+	} else {
+		Com_Printf("Write mount: None\n");
+	}
+
+	Com_Printf("Sandbox enabled: %s\n", mountTable.sandboxEnabled ? "Yes" : "No");
+
+	// Show mount statistics
+	fsMount_t *mount = mountTable.mounts;
+	while (mount) {
+		Com_Printf("Mount '%s': %u accesses, %u hits\n",
+		          mount->mountPoint, mount->accessCount, mount->hitCount);
+		mount = mount->next;
+	}
+}
+
+/*
+===============
+FS_Cache_Stats_f
+===============
+*/
+static void FS_Cache_Stats_f(void) {
+	fsCacheStats_t stats;
+	FS_Cache_GetStats(&stats);
+
+	Com_Printf("File Cache Statistics:\n");
+	Com_Printf("Total entries: %u\n", stats.totalEntries);
+	Com_Printf("Cached entries: %u\n", stats.cachedEntries);
+	Com_Printf("Cache size: %.2f MB\n", (float)stats.cacheSizeBytes / (1024.0f * 1024.0f));
+	Com_Printf("Max cache size: %.2f MB\n", (float)stats.maxCacheSizeBytes / (1024.0f * 1024.0f));
+	Com_Printf("Evictions: %u\n", stats.evictions);
+	Com_Printf("Hits: %u\n", stats.hits);
+	Com_Printf("Misses: %u\n", stats.misses);
+	Com_Printf("Hit rate: %.1f%%\n", stats.hitRate * 100.0f);
+}
+
+/*
+===============
+FS_Sandbox_Status_f
+===============
+*/
+static void FS_Sandbox_Status_f(void) {
+	if (!fs_v2_active) {
+		Com_Printf("Virtual Filesystem v2 not active\n");
+		return;
+	}
+
+	Com_Printf("Sandbox Status:\n");
+	Com_Printf("Enabled: %s\n", mountTable.sandboxEnabled ? "Yes" : "No");
+
+	if (mountTable.sandboxEnabled) {
+		const fsSandboxRules_t *rules = &mountTable.globalSandbox;
+		Com_Printf("Allow executables: %s\n", rules->allowExecutables ? "Yes" : "No");
+		Com_Printf("Allow config files: %s\n", rules->allowConfig ? "Yes" : "No");
+		Com_Printf("Allow save files: %s\n", rules->allowSaves ? "Yes" : "No");
+		Com_Printf("Allowed paths: %d\n", rules->numAllowedPaths);
+
+		for (int i = 0; i < rules->numAllowedPaths; i++) {
+			Com_Printf("  %s\n", rules->allowedPaths[i]);
 		}
 	}
 }

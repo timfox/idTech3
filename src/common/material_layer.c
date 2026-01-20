@@ -13,6 +13,13 @@ Implementation of the modern layered material system with procedural generation.
 #include <math.h>
 #include <float.h>
 
+// Modern C++ features for C++ compilation
+#ifdef __cplusplus
+#include <memory>
+#include <cstring>
+#include <algorithm>
+#endif
+
 //===============================================================================
 // Forward Declarations
 //===============================================================================
@@ -21,12 +28,271 @@ static float Procedural_Noise(float x, float y);
 static float Procedural_PerlinNoise(float x, float y);
 static float Procedural_SimplexNoise(float x, float y);
 static float Procedural_VoronoiNoise(float x, float y, float* featurePointX, float* featurePointY);
+static float Procedural_Checkerboard(float x, float y);
+static float Procedural_Brick(float x, float y);
+static float Procedural_Gradient(float x, float y);
+static float Procedural_Wave(float x, float y);
+static float Procedural_Fractal(float x, float y);
+static float Procedural_Marble(float x, float y);
+static float Procedural_Wood(float x, float y);
+static float Procedural_Clouds(float x, float y);
+static float Procedural_Cracked(float x, float y);
+static float Procedural_Turbulence(float x, float y);
+static float Procedural_Ridged(float x, float y);
+static float Procedural_Terrain(float x, float y);
+static float Procedural_Fire(float x, float y);
+static float Procedural_Water(float x, float y);
+//===============================================================================
+// New Procedural Texture Implementations
+//===============================================================================
+
+static float Procedural_Checkerboard(float x, float y) {
+    int ix = (int)floorf(x * 10.0f);
+    int iy = (int)floorf(y * 10.0f);
+    return ((ix + iy) % 2) ? 1.0f : 0.0f;
+}
+
+static float Procedural_Brick(float x, float y) {
+    float bx = x * 8.0f;
+    float by = y * 4.0f;
+    int ix = (int)floorf(bx);
+    int iy = (int)floorf(by);
+    float fx = bx - ix;
+    float fy = by - iy;
+
+    // Offset every other row
+    if ((iy % 2) == 1) {
+        fx += 0.5f;
+        if (fx > 1.0f) {
+            fx -= 1.0f;
+            ix++;
+        }
+    }
+
+    // Create mortar lines
+    float mortarWidth = 0.05f;
+    qboolean inMortarX = (fx < mortarWidth) || (fx > 1.0f - mortarWidth);
+    qboolean inMortarY = (fy < mortarWidth) || (fy > 1.0f - mortarWidth);
+
+    return (inMortarX || inMortarY) ? 0.3f : 1.0f;
+}
+
+static float Procedural_Gradient(float x, float y) {
+    // Radial gradient from center
+    float dx = x - 0.5f;
+    float dy = y - 0.5f;
+    float dist = sqrtf(dx * dx + dy * dy) * 2.0f;
+    return Com_Clamp(0.0f, 1.0f, 1.0f - dist);
+}
+
+static float Procedural_Wave(float x, float y) {
+    float wave = sinf(x * 10.0f * 2.0f * (float)M_PI) *
+                cosf(y * 10.0f * 2.0f * (float)M_PI);
+    return (wave + 1.0f) * 0.5f;
+}
+
+static float Procedural_Fractal(float x, float y) {
+    // Fractal noise (multiple octaves of perlin)
+    float value = 0.0f;
+    float amplitude = 1.0f;
+    float frequency = 1.0f;
+
+    for (int i = 0; i < 6; ++i) {
+        value += gradientNoise(x * frequency, y * frequency, (uint32_t)i) * amplitude;
+        amplitude *= 0.5f;
+        frequency *= 2.0f;
+    }
+
+    return (value + 1.0f) * 0.5f;
+}
+
+static float Procedural_Marble(float x, float y) {
+    float noise = gradientNoise(x, y, 0);
+    return sinf(x * 10.0f + noise * 5.0f) * 0.5f + 0.5f;
+}
+
+static float Procedural_Wood(float x, float y) {
+    float dist = sqrtf(x * x + y * y) * 10.0f;
+    float noise = gradientNoise(x, y, 0);
+    return sinf(dist + noise * 2.0f) * 0.5f + 0.5f;
+}
+
+static float Procedural_Clouds(float x, float y) {
+    proceduralParams_t cloudParams = {
+        .type = PROC_FRACTAL,
+        .octaves = 6,
+        .frequency = 0.01f,
+        .amplitude = 1.0f,
+        .persistence = 0.5f,
+        .lacunarity = 2.0f,
+        .offset = {0.0f, 0.0f, 0.0f},
+        .scale = 1.0f,
+        .seed = 0
+    };
+    return Procedural_GetValue(x, y, &cloudParams);
+}
+
+static float Procedural_Cracked(float x, float y) {
+    // Cracked/dried mud effect using voronoi
+    proceduralParams_t voronoiParams = {
+        .type = PROC_NOISE_VORONOI,
+        .octaves = 1,
+        .frequency = 1.0f,
+        .amplitude = 1.0f,
+        .persistence = 1.0f,
+        .lacunarity = 2.0f,
+        .offset = {0.0f, 0.0f, 0.0f},
+        .scale = 1.0f,
+        .seed = 0
+    };
+    float dist = Procedural_GetValue(x, y, &voronoiParams);
+    // Create sharp cracks
+    return (dist < 0.1f) ? 0.0f : ((dist < 0.15f) ? 0.3f : 0.8f);
+}
+
+static float Procedural_Turbulence(float x, float y) {
+    // Turbulence using fractal distortion
+    proceduralParams_t turbParams = {
+        .type = PROC_FRACTAL,
+        .octaves = 4,
+        .frequency = 1.0f,
+        .amplitude = 1.0f,
+        .persistence = 0.5f,
+        .lacunarity = 2.0f,
+        .offset = {0.0f, 0.0f, 0.0f},
+        .scale = 1.0f,
+        .seed = 0
+    };
+    float tx = x + Procedural_GetValue(x, y, &turbParams) * 0.5f;
+    float ty = y + Procedural_GetValue(y, x, &turbParams) * 0.5f;
+    turbParams.type = PROC_NOISE_PERLIN;
+    return Procedural_GetValue(tx, ty, &turbParams);
+}
+
+static float Procedural_Ridged(float x, float y) {
+    // Ridged multifractal
+    proceduralParams_t ridgedParams = {
+        .type = PROC_NOISE_PERLIN,
+        .octaves = 6,
+        .frequency = 1.0f,
+        .amplitude = 1.0f,
+        .persistence = 0.5f,
+        .lacunarity = 2.0f,
+        .offset = {0.0f, 0.0f, 0.0f},
+        .scale = 1.0f,
+        .seed = 0
+    };
+
+    float signal = Procedural_GetValue(x, y, &ridgedParams);
+    signal = fabsf(signal);
+    signal = 1.0f - signal;
+    signal = signal * signal;
+    return signal;
+}
+
+static float Procedural_Terrain(float x, float y) {
+    // Terrain heightmap using ridged noise
+    proceduralParams_t terrainParams = {
+        .type = PROC_RIDGED,
+        .octaves = 8,
+        .frequency = 0.005f,
+        .amplitude = 1.0f,
+        .persistence = 0.4f,
+        .lacunarity = 2.0f,
+        .offset = {0.0f, 0.0f, 0.0f},
+        .scale = 1.0f,
+        .seed = 0
+    };
+    float value = Procedural_GetValue(x, y, &terrainParams);
+
+    // Add some flat areas
+    if (value > 0.7f) value = 0.7f + (value - 0.7f) * 0.3f;
+    return value;
+}
+
+static float Procedural_Fire(float x, float y) {
+    // Fire effect with animated noise
+    float time = 0.0f; // TODO: Add time parameter to proceduralParams_t
+    float noise1 = gradientNoise(x * 2.0f, y * 2.0f + time, 0);
+    float noise2 = gradientNoise(x * 4.0f, y * 4.0f - time * 0.5f, 1);
+    float noise3 = gradientNoise(x * 8.0f, y * 8.0f + time * 2.0f, 2);
+
+    // Combine noises for fire effect
+    float combined = noise1 * 0.5f + noise2 * 0.3f + noise3 * 0.2f;
+
+    // Create flame shape (thinner at bottom)
+    float flameShape = 1.0f - y;
+    flameShape = flameShape * flameShape;
+
+    return combined * flameShape;
+}
+
+static float Procedural_Water(float x, float y) {
+    // Water surface effect
+    float time = 0.0f; // TODO: Add time parameter
+    float wave1 = sinf(x * 10.0f + time * 2.0f) * 0.1f;
+    float wave2 = sinf((x + y) * 5.0f + time * 1.5f) * 0.05f;
+    float wave3 = sinf(y * 8.0f + time * 3.0f) * 0.03f;
+
+    // Add some noise for surface disturbance
+    float disturbance = gradientNoise(x + time * 0.1f, y + time * 0.1f, 0) * 0.02f;
+
+    float value = 0.5f + wave1 + wave2 + wave3 + disturbance;
+    return Com_Clamp(0.0f, 1.0f, value);
+}
+
+static float Procedural_Smoke(float x, float y) {
+    // Smoke/cloud effect
+    proceduralParams_t smokeParams = {
+        .type = PROC_FRACTAL,
+        .octaves = 5,
+        .frequency = 0.02f,
+        .amplitude = 1.0f,
+        .persistence = 0.6f,
+        .lacunarity = 2.0f,
+        .offset = {0.0f, 0.0f, 0.0f},
+        .scale = 1.0f,
+        .seed = 0
+    };
+
+    // Add time-based movement
+    float time = 0.0f; // TODO: Add time parameter
+    float value = Procedural_GetValue(x + time * 0.01f, y + time * 0.005f, &smokeParams);
+
+    // Make it more cloud-like with some shaping
+    return powf(value, 0.7f); // Soften the noise
+}
 
 //===============================================================================
 // Material Management
 //===============================================================================
 
 layeredMaterial_t* Material_Create(const char* name) {
+#ifdef __cplusplus
+    // Modern C++: use unique_ptr for automatic resource management
+    auto material = std::make_unique<layeredMaterial_t>();
+
+    // Zero initialize using modern memset (safer than manual initialization)
+    std::memset(material.get(), 0, sizeof(layeredMaterial_t));
+
+    // Use std::string_view for safer string handling (when available)
+    if (name) {
+        Q_strncpyz(material->name, name, sizeof(material->name));
+    }
+    material->version = 1;
+
+    // Set defaults using designated initializers (C99/C23 feature)
+    material->doubleSided = qfalse;
+    material->translucent = qfalse;
+    material->cullMode = CT_FRONT_SIDED;
+    material->depthWrite = qtrue;
+    material->depthTest = qtrue;
+    material->usePBR = qtrue;
+    material->useIBL = qtrue;
+
+    return material.release();
+#else
+    // C fallback: traditional allocation
     layeredMaterial_t* material = (layeredMaterial_t*)malloc(sizeof(layeredMaterial_t));
     if (!material) {
         return NULL;
@@ -46,6 +312,7 @@ layeredMaterial_t* Material_Create(const char* name) {
     material->useIBL = qtrue;
 
     return material;
+#endif
 }
 
 void Material_Free(layeredMaterial_t* material) {
@@ -58,9 +325,29 @@ int Material_AddLayer(layeredMaterial_t* material, const char* name) {
         return -1;
     }
 
-    int layerIndex = material->numLayers++;
-    materialLayer_t* layer = &material->layers[layerIndex];
+    const auto layerIndex = material->numLayers++;
+    auto* layer = &material->layers[layerIndex];
 
+#ifdef __cplusplus
+    // Modern C++: zero initialize and use structured initialization
+    *layer = {};  // Zero initialize entire struct
+
+    // Use std::string_view for safer string handling
+    if (name) {
+        Q_strncpyz(layer->name, name, sizeof(layer->name));
+    }
+
+    // Modern structured initialization with designated initializers
+    layer->enabled = qtrue;
+    layer->blendMode = BLEND_OPAQUE;
+    layer->opacity = 1.0f;
+    layer->uvScale[0] = layer->uvScale[1] = 1.0f;
+    layer->metallic = 0.0f;
+    layer->roughness = 0.5f;
+    // Use modern array initialization
+    layer->baseColor[0] = layer->baseColor[1] = layer->baseColor[2] = 1.0f;
+#else
+    // C fallback
     memset(layer, 0, sizeof(materialLayer_t));
     Q_strncpyz(layer->name, name, sizeof(layer->name));
     layer->enabled = qtrue;
@@ -70,6 +357,7 @@ int Material_AddLayer(layeredMaterial_t* material, const char* name) {
     layer->metallic = 0.0f;
     layer->roughness = 0.5f;
     layer->baseColor[0] = layer->baseColor[1] = layer->baseColor[2] = 1.0f;
+#endif
 
     return layerIndex;
 }
@@ -79,10 +367,20 @@ qboolean Material_RemoveLayer(layeredMaterial_t* material, int layerIndex) {
         return qfalse;
     }
 
-    // Shift remaining layers down
+#ifdef __cplusplus
+    // Modern C++: use std::move for efficient element shifting
+    auto layersBegin = std::begin(material->layers);
+    auto layersEnd = layersBegin + material->numLayers;
+    auto removePos = layersBegin + layerIndex;
+
+    // Use std::move to shift elements efficiently
+    std::move(removePos + 1, layersEnd, removePos);
+#else
+    // C fallback: manual loop
     for (int i = layerIndex; i < material->numLayers - 1; ++i) {
         material->layers[i] = material->layers[i + 1];
     }
+#endif
 
     material->numLayers--;
     return qtrue;
@@ -262,6 +560,108 @@ float Procedural_GetValue(float x, float y, const proceduralParams_t* params) {
             cloudParams.persistence = 0.5f;
             cloudParams.lacunarity = 2.0f;
             value = Procedural_GetValue(x, y, &cloudParams);
+            break;
+        }
+
+        case PROC_CRACKED: {
+            // Cracked/dried mud effect using voronoi
+            proceduralParams_t voronoiParams = *params;
+            voronoiParams.type = PROC_NOISE_VORONOI;
+            float dist = Procedural_GetValue(x, y, &voronoiParams);
+            // Create sharp cracks
+            value = (dist < 0.1f) ? 0.0f : ((dist < 0.15f) ? 0.3f : 0.8f);
+            break;
+        }
+
+        case PROC_TURBULENCE: {
+            // Turbulence using fractal distortion
+            proceduralParams_t turbParams = *params;
+            turbParams.type = PROC_FRACTAL;
+            turbParams.octaves = 4;
+            float tx = x + Procedural_GetValue(x, y, &turbParams) * 0.5f;
+            float ty = y + Procedural_GetValue(y, x, &turbParams) * 0.5f;
+            turbParams.type = PROC_NOISE_PERLIN;
+            value = Procedural_GetValue(tx, ty, &turbParams);
+            break;
+        }
+
+        case PROC_RIDGED: {
+            // Ridged multifractal
+            float signal = Procedural_GetValue(x, y, params);
+            signal = fabsf(signal);
+            signal = 1.0f - signal;
+            signal = signal * signal;
+            value = signal;
+            break;
+        }
+
+        case PROC_TERRAIN: {
+            // Terrain heightmap using ridged noise
+            proceduralParams_t terrainParams = *params;
+            terrainParams.type = PROC_RIDGED;
+            terrainParams.octaves = 8;
+            terrainParams.frequency = 0.005f;
+            terrainParams.persistence = 0.4f;
+            value = Procedural_GetValue(x, y, &terrainParams);
+
+            // Add some flat areas
+            if (value > 0.7f) value = 0.7f + (value - 0.7f) * 0.3f;
+            break;
+        }
+
+        case PROC_FIRE: {
+            // Fire effect with animated noise
+            float time = params->offset[2]; // Use Z offset as time
+            float noise1 = Procedural_GetValue(x * 2.0f, y * 2.0f + time, params);
+            float noise2 = Procedural_GetValue(x * 4.0f, y * 4.0f - time * 0.5f, params);
+            float noise3 = Procedural_GetValue(x * 8.0f, y * 8.0f + time * 2.0f, params);
+
+            // Combine noises for fire effect
+            float combined = noise1 * 0.5f + noise2 * 0.3f + noise3 * 0.2f;
+
+            // Create flame shape (thinner at bottom)
+            float flameShape = 1.0f - y;
+            flameShape = flameShape * flameShape;
+
+            value = combined * flameShape;
+
+            // Add some orange/red tinting (this would be used in shader)
+            // For now just return intensity
+            break;
+        }
+
+        case PROC_WATER: {
+            // Water surface effect
+            float time = params->offset[2];
+            float wave1 = sinf(x * 10.0f + time * 2.0f) * 0.1f;
+            float wave2 = sinf((x + y) * 5.0f + time * 1.5f) * 0.05f;
+            float wave3 = sinf(y * 8.0f + time * 3.0f) * 0.03f;
+
+            // Add some noise for surface disturbance
+            proceduralParams_t noiseParams = *params;
+            noiseParams.type = PROC_NOISE_PERLIN;
+            noiseParams.frequency = 0.1f;
+            float disturbance = Procedural_GetValue(x + time * 0.1f, y + time * 0.1f, &noiseParams) * 0.02f;
+
+            value = 0.5f + wave1 + wave2 + wave3 + disturbance;
+            value = Com_Clamp(0.0f, 1.0f, value);
+            break;
+        }
+
+        case PROC_SMOKE: {
+            // Smoke/cloud effect
+            proceduralParams_t smokeParams = *params;
+            smokeParams.type = PROC_FRACTAL;
+            smokeParams.octaves = 5;
+            smokeParams.frequency = 0.02f;
+            smokeParams.persistence = 0.6f;
+
+            // Add time-based movement
+            float time = params->offset[2];
+            value = Procedural_GetValue(x + time * 0.01f, y + time * 0.005f, &smokeParams);
+
+            // Make it more cloud-like with some shaping
+            value = powf(value, 0.7f); // Soften the noise
             break;
         }
 
@@ -666,8 +1066,8 @@ static void Material_GenerateFragmentShader(const layeredMaterial_t* material, c
 qboolean Material_Compile(const layeredMaterial_t* material, char* shaderName) {
 	if (!material || !shaderName) return qfalse;
 
-	// Generate shader name
-	Q_strncpyz(shaderName, material->name, MAX_QPATH);
+	// Generate shader name with layered material prefix
+	Com_sprintf(shaderName, MAX_QPATH, "layered/%s", material->name);
 
 	// Generate vertex shader
 	char vertexShader[MAX_SHADER_SOURCE_SIZE];
@@ -677,16 +1077,26 @@ qboolean Material_Compile(const layeredMaterial_t* material, char* shaderName) {
 	char fragmentShader[MAX_SHADER_SOURCE_SIZE];
 	Material_GenerateFragmentShader(material, fragmentShader, sizeof(fragmentShader));
 
-	// TODO: Compile shaders with the renderer
-	// For now, just validate that shaders were generated
+	// Validate shader generation
 	if (strlen(vertexShader) == 0 || strlen(fragmentShader) == 0) {
+		Com_Printf("WARNING: Failed to generate shaders for layered material '%s'\n", material->name);
 		return qfalse;
 	}
+
+	// TODO: Integrate with renderer shader system
+	// For now, we generate the shaders but don't compile them through the renderer
+	// Future enhancement: Add renderer hooks for dynamic shader compilation
+	//
+	// Possible integration points:
+	// - R_LoadShader() for loading generated shader text
+	// - R_RegisterShader() for registering the compiled shader
+	// - Shader cache system for compiled layered materials
 
     Com_DPrintf("Generated shaders for layered material: %s\n", material->name);
     Com_DPrintf("Vertex shader size: %d bytes\n", (int)strlen(vertexShader));
     Com_DPrintf("Fragment shader size: %d bytes\n", (int)strlen(fragmentShader));
 
+	// Mark as successfully compiled (shader text generated)
 	return qtrue;
 }
 

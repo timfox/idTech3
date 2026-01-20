@@ -12,6 +12,14 @@ Centralized feature toggles and configuration for all renderers.
 #include "../common/qcommon.h"
 #include "renderercommon/tr_public.h"
 
+// Modern C/C++ features
+#ifdef __cplusplus
+#include <array>
+#include <vector>
+#include <algorithm>
+#include <span>
+#endif
+
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
 
@@ -37,7 +45,27 @@ R_DetectSafeMode
 ===============
 */
 qboolean R_DetectSafeMode(void) {
-    // Check for safe mode flag files
+    // Modern C++: use std::array for safer bounds checking
+#ifdef __cplusplus
+    constexpr std::array<const char*, 3> safe_mode_paths = {{
+        "safe_mode.flag",                    // Current directory
+        "logs/safe_mode.flag",               // logs subdirectory
+        nullptr                              // Sentinel value
+    }};
+
+    // Range-based for loop with modern file handling
+    for (const auto* path : safe_mode_paths) {
+        if (!path) break;  // Handle sentinel
+
+        // Use RAII for file handling (modern resource management)
+        if (FILE* f = fopen(path, "r"); f) {
+            fclose(f);
+            Com_Printf("Safe mode detected: flag file '%s' found\n", path);
+            return qtrue;
+        }
+    }
+#else
+    // Fallback for C compilation
     const char *safe_mode_paths[] = {
         "safe_mode.flag",                    // Current directory
         "logs/safe_mode.flag",               // logs subdirectory
@@ -52,6 +80,7 @@ qboolean R_DetectSafeMode(void) {
             return qtrue;
         }
     }
+#endif
 
     // Note: Command line argument detection is handled in client code
     // This function focuses on file-based detection for renderer-level safe mode
@@ -86,6 +115,24 @@ R_RegisterFeatureCvars
 ===============
 */
 void R_RegisterFeatureCvars(const renderer_feature_t *features, int count) {
+#ifdef __cplusplus
+    // Modern C++: use range-based for loop with iterators
+    for (const auto& feature : std::span(features, static_cast<size_t>(count))) {
+        // Use structured bindings for cleaner access
+        auto [name, description, default_value, flags, requires_restart] = feature;
+
+        // Get or create the cvar with modern conditional expression
+        const auto cvar_flags = flags | (requires_restart ? CVAR_LATCH : 0);
+        cvar_t *cvar = Cvar_Get(name, default_value, cvar_flags);
+
+        // Set description if supported (modern optional chaining style)
+        if (cvar && description) {
+            ri.Cvar_SetDescription(cvar, description);
+        }
+    }
+#endif
+#else
+    // Fallback for C compilation
     for (int i = 0; i < count; i++) {
         const renderer_feature_t *feature = &features[i];
 
@@ -97,6 +144,7 @@ void R_RegisterFeatureCvars(const renderer_feature_t *features, int count) {
         if (cvar && feature->description) {
             ri.Cvar_SetDescription(cvar, feature->description);
         }
+#endif
 
         // Apply safe mode restrictions (only if cvar was successfully created)
         if (cvar && g_safe_mode.enabled) {
