@@ -7,10 +7,7 @@
         android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     
-    <!-- Vulkan support -->
-    <uses-feature android:name="android.hardware.vulkan.level" android:required="false" />
-    <uses-feature android:name="android.hardware.vulkan.version" android:required="false" />
-    <!-- Require Vulkan 1.0 support (Android 7.0+) -->
+    <!-- Vulkan support - Require Vulkan 1.0 support (Android 7.0+) -->
     <uses-feature android:name="android.hardware.vulkan.level" android:version="0" android:required="false" />
     <uses-feature android:name="android.hardware.vulkan.version" android:version="4194307" android:required="false" />
     
