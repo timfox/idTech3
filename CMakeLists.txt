@@ -21,6 +21,7 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
         OUTPUT_VARIABLE GIT_DESCRIBE
         OUTPUT_STRIP_TRAILING_WHITESPACE
         ERROR_QUIET
+    )
     if(GIT_DESCRIBE)
         set(BUILD_ID "${GIT_DESCRIBE}")
     else()
@@ -37,12 +38,14 @@ if(DEFINED ENV{SOURCE_DATE_EPOCH})
         COMMAND date -u -d "@$ENV{SOURCE_DATE_EPOCH}" "+%Y-%m-%d %H:%M:%S UTC"
         OUTPUT_VARIABLE BUILD_DATE
         OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
 else()
     # Use current date/time
     execute_process(
         COMMAND date "+%Y-%m-%d %H:%M:%S %Z"
         OUTPUT_VARIABLE BUILD_DATE
         OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
 endif()
 
 # Make build info available to source code
@@ -61,6 +64,7 @@ if(REPRODUCIBLE_BUILD)
         COMMAND "${CMAKE_SOURCE_DIR}/tools/reproducible-build-setup.sh"
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
         RESULT_VARIABLE SETUP_RESULT
+    )
 
     if(NOT SETUP_RESULT EQUAL 0)
         message(WARNING "Reproducible build setup failed")
@@ -166,6 +170,7 @@ if(USE_LUA)
                         INTERFACE_INCLUDE_DIRECTORIES "${LUA_PC_INCLUDE_DIRS}"
                         INTERFACE_LINK_LIBRARIES "${LUA_PC_LIBRARIES}"
                         INTERFACE_LINK_OPTIONS "${LUA_PC_LDFLAGS_OTHER}"
+                    )
                     message(STATUS "Created Lua::lua imported target using pkg-config: includes=${LUA_PC_INCLUDE_DIRS}, libs=${LUA_PC_LIBRARIES}")
                 endif()
             else()
@@ -175,6 +180,7 @@ if(USE_LUA)
                     set_target_properties(Lua::lua PROPERTIES
                         INTERFACE_INCLUDE_DIRECTORIES "${LUA_INCLUDE_DIR}"
                         INTERFACE_LINK_LIBRARIES "${LUA_LIBRARY};${LUA_MATH_LIBRARY}"
+                    )
                     message(STATUS "Created Lua::lua imported target with CMake FindLua: includes=${LUA_INCLUDE_DIR}, libs=${LUA_LIBRARY}")
                 endif()
             endif()
@@ -185,6 +191,7 @@ if(USE_LUA)
                 set_target_properties(Lua::lua PROPERTIES
                     INTERFACE_INCLUDE_DIRECTORIES "${LUA_INCLUDE_DIR}"
                     INTERFACE_LINK_LIBRARIES "${LUA_LIBRARY};${LUA_MATH_LIBRARY}"
+                )
                 message(STATUS "Created Lua::lua imported target with CMake FindLua (no pkg-config): includes=${LUA_INCLUDE_DIR}, libs=${LUA_LIBRARY}")
             endif()
         endif()
@@ -322,6 +329,7 @@ IF(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     ADD_COMPILE_OPTIONS(
         "$<$<COMPILE_LANGUAGE:C>:-Wpedantic;-Wall;-Wextra;-Wshadow;-Wconversion>"
         "$<$<COMPILE_LANGUAGE:CXX>:-Wpedantic;-Wall;-Wextra;-Wshadow;-Wconversion;-Wold-style-cast;-Woverloaded-virtual>"
+    )
 
     # Address sanitizer for debug builds
     IF(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -339,6 +347,7 @@ ELSEIF(MSVC)
         /permissive-  # Standards conforming mode
         /Zc:__cplusplus  # Correct __cplusplus value
         /Zc:preprocessor  # Standards conforming preprocessor
+    )
 
     # Modern warning level
     ADD_COMPILE_OPTIONS(/W4)
@@ -365,6 +374,7 @@ function(get_recently_modified_files OUTPUT_VAR DAYS_THRESHOLD)
         OUTPUT_VARIABLE MODIFIED_FILES
         OUTPUT_STRIP_TRAILING_WHITESPACE
         ERROR_QUIET
+    )
 
     # Filter to only C/C++ source files
     string(REGEX REPLACE "\n" ";" MODIFIED_FILES "${MODIFIED_FILES}")
@@ -387,6 +397,7 @@ function(get_new_files OUTPUT_VAR)
         OUTPUT_VARIABLE TRACKED_FILES
         OUTPUT_STRIP_TRAILING_WHITESPACE
         ERROR_QUIET
+    )
 
     # Get initial commit files (files that existed at project start)
     execute_process(
@@ -395,6 +406,7 @@ function(get_new_files OUTPUT_VAR)
         OUTPUT_VARIABLE INITIAL_FILES
         OUTPUT_STRIP_TRAILING_WHITESPACE
         ERROR_QUIET
+    )
 
     string(REGEX REPLACE "\n" ";" TRACKED_FILES "${TRACKED_FILES}")
     string(REGEX REPLACE "\n" ";" INITIAL_FILES "${INITIAL_FILES}")
@@ -438,9 +450,11 @@ if(ENABLE_WERROR_NEW_CODE)
         if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
             set_source_files_properties(${STRICT_WARNING_FILES} PROPERTIES
                 COMPILE_OPTIONS "-Werror"
+            )
         elseif(MSVC)
             set_source_files_properties(${STRICT_WARNING_FILES} PROPERTIES
                 COMPILE_OPTIONS "/WX"
+            )
         endif()
     else()
         message(STATUS "No new/changed files found for strict warnings")
@@ -452,6 +466,7 @@ IF(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
 	ADD_COMPILE_OPTIONS(
 		$<$<COMPILE_LANGUAGE:C>:-Wstrict-prototypes>
 		$<$<COMPILE_LANGUAGE:C>:-Wmissing-prototypes>
+	)
 ELSEIF(MSVC)
 	ADD_COMPILE_OPTIONS(/W4)
 ENDIF()
@@ -619,16 +634,19 @@ IF(ENABLE_COVERAGE)
 				COMMAND ${CTEST_EXE} --output-on-failure
 				WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 				COMMENT "Running tests to generate coverage data"
+			)
 		ELSE()
 			ADD_CUSTOM_TARGET(coverage_run_tests
 				COMMAND ${CMAKE_COMMAND} -E echo "Warning: ctest not found, skipping test execution"
 				COMMENT "Skipping test execution (ctest not found)"
+			)
 		ENDIF()
 	ELSE()
 		# If tests aren't built, create a dummy target
 		ADD_CUSTOM_TARGET(coverage_run_tests
 			COMMAND ${CMAKE_COMMAND} -E echo "Warning: BUILD_TESTS is OFF, no tests to run"
 			COMMENT "Skipping test execution (BUILD_TESTS=OFF)"
+		)
 	ENDIF()
 
 	# gcovr-based coverage report (preferred)
@@ -648,6 +666,7 @@ IF(ENABLE_COVERAGE)
 				--txt -o coverage.txt
 			WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 			COMMENT "Generating coverage report with gcovr"
+		)
 		MESSAGE(STATUS "Coverage: gcovr found - 'coverage' target available")
 	ELSE()
 		MESSAGE(WARNING "gcovr not found; install with: sudo apt install gcovr")
@@ -662,6 +681,7 @@ IF(ENABLE_COVERAGE)
 			COMMAND ${GENHTML_EXE} coverage.info --output-directory coverage_lcov --legend --show-details
 			WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 			COMMENT "Generating coverage report with lcov"
+		)
 		MESSAGE(STATUS "Coverage: lcov/genhtml found - 'coverage_lcov' target available")
 	ELSEIF(ENABLE_COVERAGE AND NOT LCOV_EXE)
 		MESSAGE(STATUS "Coverage: lcov not found (optional) - install with: sudo apt install lcov")
@@ -928,6 +948,7 @@ SET(QCOMMON_SRCS
     src/common/vm_interpreted.c
     src/common/vm_x86.c
     src/common/zstd_compress.c
+)
 # exclude platform-dependent QVM bytecode compilers
 list(FILTER QCOMMON_SRCS EXCLUDE REGEX ".*vm_[alx].*.c")
 # Add structured logging system
@@ -994,6 +1015,7 @@ IF(USE_AIML)
 		src/common/aiml/aiml_parser.cpp
 		src/common/aiml/aiml_interpreter.cpp
 		src/common/aiml/aiml_c_api.cpp
+	)
 	add_definitions(-DUSE_AIML)
 ENDIF()
 
@@ -4047,6 +4069,12 @@ IF(USE_CIMGUI)
 	set_property(TARGET ${CNAME}${BINEXT} PROPERTY LINKER_LANGUAGE CXX)
 ENDIF()
 IF(UNIX AND NOT ANDROID)
+	# Export symbols for dynamically loaded libraries (Unix only)
+	IF(CMAKE_VERSION VERSION_LESS "3.13")
+		SET_TARGET_PROPERTIES(${CNAME}${BINEXT} PROPERTIES LINK_FLAGS "-rdynamic")
+	ELSE()
+		TARGET_LINK_OPTIONS(${CNAME}${BINEXT} PRIVATE -rdynamic)
+	ENDIF()
 ENDIF()
 
 IF(USE_SDL)
@@ -4725,12 +4753,14 @@ if(NOT ANDROID)
 		COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/release"
 		COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:${CNAME}${BINEXT}>" "${CMAKE_SOURCE_DIR}/release/"
 		COMMENT "Copying ${CNAME}${BINEXT} to release directory"
+	)
 
 	if(BUILD_SERVER AND TARGET ${DNAME}${BINEXT})
 		add_custom_command(TARGET ${DNAME}${BINEXT} POST_BUILD
 			COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/release"
 			COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:${DNAME}${BINEXT}>" "${CMAKE_SOURCE_DIR}/release/"
 			COMMENT "Copying ${DNAME}${BINEXT} to release directory"
+		)
 	endif()
 
 	# Copy renderer libraries
@@ -4740,30 +4770,35 @@ if(NOT ANDROID)
 				COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/release"
 				COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:${RENDERER_PREFIX}_vulkan${RENDEXT}>" "${CMAKE_SOURCE_DIR}/release/"
 				COMMENT "Copying Vulkan renderer to release directory"
+			)
 		endif()
 		if(TARGET ${RENDERER_PREFIX}_opengl${RENDEXT})
 			add_custom_command(TARGET ${RENDERER_PREFIX}_opengl${RENDEXT} POST_BUILD
 				COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/release"
 				COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:${RENDERER_PREFIX}_opengl${RENDEXT}>" "${CMAKE_SOURCE_DIR}/release/"
 				COMMENT "Copying OpenGL renderer to release directory"
+			)
 		endif()
 		if(TARGET ${RENDERER_PREFIX}_rtx${RENDEXT})
 			add_custom_command(TARGET ${RENDERER_PREFIX}_rtx${RENDEXT} POST_BUILD
 				COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/release"
 				COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:${RENDERER_PREFIX}_rtx${RENDEXT}>" "${CMAKE_SOURCE_DIR}/release/"
 				COMMENT "Copying RTX renderer to release directory"
+			)
 		endif()
 		if(TARGET idtech3_launcher)
 			add_custom_command(TARGET idtech3_launcher POST_BUILD
 				COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/release"
 				COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:idtech3_launcher>" "${CMAKE_SOURCE_DIR}/release/"
 				COMMENT "Copying launcher to release directory"
+			)
 		endif()
 		if(BUILD_DEDICATED AND TARGET idtech3.ded${BINEXT})
 			add_custom_command(TARGET idtech3.ded${BINEXT} POST_BUILD
 				COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/release"
 				COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:idtech3.ded${BINEXT}>" "${CMAKE_SOURCE_DIR}/release/"
 				COMMENT "Copying dedicated server to release directory"
+			)
 		endif()
 	endif()
 endif()

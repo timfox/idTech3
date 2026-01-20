@@ -137,7 +137,7 @@ jobs:
   formatting-check:
     name: Code Formatting
     runs-on: ubuntu-24.04
-    if: github.event_name == 'pull_request'
+    # Always run this job so summary can depend on it, but only check formatting on PRs
 
     steps:
       - name: Checkout code
@@ -150,6 +150,12 @@ jobs:
 
       - name: Check formatting
         run: |
+          # Skip formatting check for non-PR events (push, manual, etc.)
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "⏭️ Skipping formatting check for ${{ github.event_name }} event"
+            exit 0
+          fi
+
           # Find all C/C++ files that have changed
           CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} | grep -E '\.(c|cpp|h|hpp)$' || true)
 
