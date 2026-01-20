@@ -798,6 +798,12 @@ int MaterialInstance_Compile(materialInstance_t* instance) {
 //===============================================================================
 
 layeredMaterial_t* Material_Load(const char* filename) {
+#ifdef USE_RENDERER_DLOPEN
+    // Material loading not available in renderer shared libraries
+    (void)filename;
+    return NULL;
+#endif
+
     if (!filename) return NULL;
 
     // Open the material file
@@ -966,6 +972,12 @@ layeredMaterial_t* Material_Load(const char* filename) {
 }
 
 qboolean Material_Save(const layeredMaterial_t* material, const char* filename) {
+#ifdef USE_RENDERER_DLOPEN
+    // Material saving not available in renderer shared libraries
+    (void)material; (void)filename;
+    return qfalse;
+#endif
+
     if (!material || !filename) return qfalse;
 
     // Open file for writing

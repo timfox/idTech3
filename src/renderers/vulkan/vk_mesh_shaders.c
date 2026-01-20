@@ -528,7 +528,7 @@ qboolean vk_mesh_shaders_create_buffers( void *vertices, uint32_t vertexCount, v
 		.usage = VMA_MEMORY_USAGE_GPU_ONLY
 	};
 
-	if ( vmaCreateBuffer( vk.vmaAllocator, &vertexBufferInfo, &vertexAllocInfo,
+	if ( vmaCreateBuffer( vk.allocator, &vertexBufferInfo, &vertexAllocInfo,
 						 &vk.mesh.vertexBuffer, &vk.mesh.vertexAllocation, NULL ) != VK_SUCCESS ) {
 		ri.Printf( PRINT_ERROR, "Mesh shaders: Failed to create vertex buffer\n" );
 		return qfalse;
@@ -546,10 +546,10 @@ qboolean vk_mesh_shaders_create_buffers( void *vertices, uint32_t vertexCount, v
 		.usage = VMA_MEMORY_USAGE_GPU_ONLY
 	};
 
-	if ( vmaCreateBuffer( vk.vmaAllocator, &indexBufferInfo, &indexAllocInfo,
+	if ( vmaCreateBuffer( vk.allocator, &indexBufferInfo, &indexAllocInfo,
 						 &vk.mesh.indexBuffer, &vk.mesh.indexAllocation, NULL ) != VK_SUCCESS ) {
 		ri.Printf( PRINT_ERROR, "Mesh shaders: Failed to create index buffer\n" );
-		vmaDestroyBuffer( vk.vmaAllocator, vk.mesh.vertexBuffer, vk.mesh.vertexAllocation );
+		vmaDestroyBuffer( vk.allocator, vk.mesh.vertexBuffer, vk.mesh.vertexAllocation );
 		return qfalse;
 	}
 
@@ -566,11 +566,11 @@ qboolean vk_mesh_shaders_create_buffers( void *vertices, uint32_t vertexCount, v
 			.usage = VMA_MEMORY_USAGE_GPU_ONLY
 		};
 
-		if ( vmaCreateBuffer( vk.vmaAllocator, &meshletBufferInfo, &meshletAllocInfo,
+		if ( vmaCreateBuffer( vk.allocator, &meshletBufferInfo, &meshletAllocInfo,
 							 &vk.mesh.meshletBuffer, &vk.mesh.meshletAllocation, NULL ) != VK_SUCCESS ) {
 			ri.Printf( PRINT_ERROR, "Mesh shaders: Failed to create meshlet buffer\n" );
-			vmaDestroyBuffer( vk.vmaAllocator, vk.mesh.indexBuffer, vk.mesh.indexAllocation );
-			vmaDestroyBuffer( vk.vmaAllocator, vk.mesh.vertexBuffer, vk.mesh.vertexAllocation );
+			vmaDestroyBuffer( vk.allocator, vk.mesh.indexBuffer, vk.mesh.indexAllocation );
+			vmaDestroyBuffer( vk.allocator, vk.mesh.vertexBuffer, vk.mesh.vertexAllocation );
 			return qfalse;
 		}
 	}
@@ -586,17 +586,17 @@ qboolean vk_mesh_shaders_create_buffers( void *vertices, uint32_t vertexCount, v
 void vk_mesh_shaders_destroy_buffers( void )
 {
 	if ( vk.mesh.meshletBuffer != VK_NULL_HANDLE ) {
-		vmaDestroyBuffer( vk.vmaAllocator, vk.mesh.meshletBuffer, vk.mesh.meshletAllocation );
+		vmaDestroyBuffer( vk.allocator, vk.mesh.meshletBuffer, vk.mesh.meshletAllocation );
 		vk.mesh.meshletBuffer = VK_NULL_HANDLE;
 	}
 
 	if ( vk.mesh.indexBuffer != VK_NULL_HANDLE ) {
-		vmaDestroyBuffer( vk.vmaAllocator, vk.mesh.indexBuffer, vk.mesh.indexAllocation );
+		vmaDestroyBuffer( vk.allocator, vk.mesh.indexBuffer, vk.mesh.indexAllocation );
 		vk.mesh.indexBuffer = VK_NULL_HANDLE;
 	}
 
 	if ( vk.mesh.vertexBuffer != VK_NULL_HANDLE ) {
-		vmaDestroyBuffer( vk.vmaAllocator, vk.mesh.vertexBuffer, vk.mesh.vertexAllocation );
+		vmaDestroyBuffer( vk.allocator, vk.mesh.vertexBuffer, vk.mesh.vertexAllocation );
 		vk.mesh.vertexBuffer = VK_NULL_HANDLE;
 	}
 

@@ -1103,7 +1103,7 @@ IF(USE_LAYERED_MATERIALS)
 	# Add compile definition for layered materials
 	ADD_COMPILE_DEFINITIONS(USE_LAYERED_MATERIALS)
 	# Add layered material system source files
-	list(APPEND QCOMMON_SRCS src/common/material_layer.c src/common/material_renderer.c)
+	list(APPEND RENDERER_COMMON_SRCS src/common/material_layer.c src/common/material_renderer.c)
 	message(STATUS "Layered material system enabled")
 ELSE()
 	message(STATUS "Using legacy shader system")

@@ -40,8 +40,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 typedef struct VmaAllocator_T* VmaAllocator;
 typedef struct VmaAllocation_T* VmaAllocation;
 typedef struct VmaAllocationInfo_T* VmaAllocationInfo;
-typedef struct VmaAllocationCreateInfo_T* VmaAllocationCreateInfo;
 typedef struct VmaPool_T* VmaPool;
+
+// Stub struct definition for VmaAllocationCreateInfo
+typedef struct VmaAllocationCreateInfo {
+    uint32_t usage;
+} VmaAllocationCreateInfo;
 
 // Stub function declarations when VMA is not available
 #define VMA_MEMORY_USAGE_GPU_ONLY 0
