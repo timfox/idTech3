@@ -56,7 +56,7 @@ END
 #ifndef __MINGW32__
 IDI_ICON1               ICON    DISCARDABLE     "qe3.ico"
 #else
-IDI_ICON1               ICON    DISCARDABLE     "code/win32/qe3.ico"
+IDI_ICON1               ICON    DISCARDABLE     "src/win32/qe3.ico"
 #endif
 
 
@@ -80,5 +80,5 @@ END
 #ifndef __MINGW32__
 1 RT_MANIFEST "q3.manifest"
 #else
-1 RT_MANIFEST "code/win32/q3.manifest"
+1 RT_MANIFEST "src/win32/q3.manifest"
 #endif
