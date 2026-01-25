@@ -90,34 +90,29 @@ AUX_SOURCE_DIRECTORY(src/client CLIENT_SRCS)
 # Only include x86/x86_64 assembly files on x86/x86_64 architectures on Unix-like systems
 # Assembly is disabled on Windows due to preprocessor macro issues with MSYS2/MinGW
 IF(UNIX AND CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64|x86|i.86|x86_64|X86_64")
-  file(GLOB ASM_SRCS "src/asm/*.S" "src/asm/*.s")
-  # If building a 32-bit target, exclude x86_64/x64-specific assembly files
-  if(CMAKE_SIZEOF_VOID_P EQUAL 4)
-    foreach(_asm ${ASM_SRCS})
-      if(_asm MATCHES "x86_64|_x64")
-        list(REMOVE_ITEM ASM_SRCS ${_asm})
+  # Only enable handwritten x86/x86_64 assembly when building a 64-bit target.
+  # 32-bit builds will use the portable C fallbacks to avoid assembler/arch mismatches.
+  if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    file(GLOB ASM_SRCS "src/asm/*.S" "src/asm/*.s")
+    list(APPEND CLIENT_SRCS ${ASM_SRCS})
+    # Ensure CMake knows how to compile assembly sources
+    enable_language(ASM)
+    if(ASM_SRCS)
+      set_source_files_properties(${ASM_SRCS} PROPERTIES LANGUAGE ASM)
+      # run assembler sources through the C preprocessor and use Intel syntax
+      # Note: -masm=intel is GCC-specific; Clang uses Intel syntax by default for .s files
+      set(ASM_FLAGS "-x assembler-with-cpp")
+      if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+        set(ASM_FLAGS "${ASM_FLAGS} -masm=intel")
       endif()
-    endforeach()
-  endif()
-  list(APPEND CLIENT_SRCS ${ASM_SRCS})
-  # Ensure CMake knows how to compile assembly sources
-  enable_language(ASM)
-  if(ASM_SRCS)
-    set_source_files_properties(${ASM_SRCS} PROPERTIES LANGUAGE ASM)
-    # run assembler sources through the C preprocessor and use Intel syntax
-    # Note: -masm=intel is GCC-specific; Clang uses Intel syntax by default for .s files
-    set(ASM_FLAGS "-x assembler-with-cpp")
-    if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
-      set(ASM_FLAGS "${ASM_FLAGS} -masm=intel")
+      set_source_files_properties(${ASM_SRCS} PROPERTIES COMPILE_FLAGS "${ASM_FLAGS}")
     endif()
-    # If building 32-bit, ensure assembler is invoked for 32-bit generation
-    if(CMAKE_SIZEOF_VOID_P EQUAL 4)
-      set(ASM_FLAGS "-m32 ${ASM_FLAGS}")
-    endif()
-    set_source_files_properties(${ASM_SRCS} PROPERTIES COMPILE_FLAGS "${ASM_FLAGS}")
+    # Define USE_ASM to tell the code that assembly optimizations are available
+    ADD_COMPILE_DEFINITIONS(USE_ASM)
+  else()
+    # 32-bit: do not compile asm sources; rely on C implementations.
+    set(ASM_SRCS "")
   endif()
-  # Define USE_ASM to tell the code that assembly optimizations are available
-  ADD_COMPILE_DEFINITIONS(USE_ASM)
 ENDIF()
 IF(NOT USE_CURL)
 	list(REMOVE_ITEM CLIENT_SRCS src/client/cl_curl.c)
