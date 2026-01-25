@@ -261,6 +261,11 @@ ADD_EXECUTABLE(${CNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
 TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} qcommon botlib client q3ui)
 #TARGET_LINK_OPTIONS(${CNAME} PRIVATE -fno-pie) # v3.13+
 
+if(UNIX AND NOT MSVC)
+  # Ensure main executable exports symbols so dlopen'd renderer plugins can resolve engine symbols.
+  target_link_options(${CNAME}${BINEXT} PRIVATE "-Wl,--export-dynamic")
+endif()
+
 IF(NOT USE_RENDERER_DLOPEN)
 	IF(USE_VULKAN)
 		TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} ${RENDERER_PREFIX}_vulkan)
@@ -274,6 +279,10 @@ ENDIF()
 ADD_EXECUTABLE(${DNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
 TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} qcommon_ded botlib)
 #TARGET_LINK_OPTIONS(${DNAME} PRIVATE -fno-pie) # v3.13+
+
+if(UNIX AND NOT MSVC)
+  target_link_options(${DNAME}${BINEXT} PRIVATE "-Wl,--export-dynamic")
+endif()
 
 IF(WIN32)
 	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} winmm comctl32 ws2_32)

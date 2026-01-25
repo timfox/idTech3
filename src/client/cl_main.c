@@ -3373,13 +3373,41 @@ static void CL_InitRef( void ) {
 #define REND_ARCH_STRING ARCH_STRING
 #endif
 
-	Com_sprintf( dllName, sizeof( dllName ), RENDERER_PREFIX "_%s_" REND_ARCH_STRING DLL_EXT, cl_renderer->string );
+	{
+		/* sanitize renderer name: strip surrounding single/double quotes if present */
+		const char *raw = cl_renderer->string;
+		char clean[64];
+		size_t rawlen = strlen(raw);
+		if ( rawlen >= 2 && ((raw[0] == '\"' && raw[rawlen-1] == '\"') || (raw[0] == '\'' && raw[rawlen-1] == '\'')) ) {
+			size_t n = rawlen - 2;
+			if ( n >= sizeof(clean) ) n = sizeof(clean) - 1;
+			memcpy(clean, raw + 1, n);
+			clean[n] = '\0';
+		} else {
+			Q_strncpyz(clean, raw, sizeof(clean));
+		}
+		Com_sprintf( dllName, sizeof( dllName ), RENDERER_PREFIX "_%s_" REND_ARCH_STRING DLL_EXT, clean );
+	}
 	ospath = FS_BuildOSPath( Sys_DefaultBasePath(), dllName, NULL );
 	rendererLib = Sys_LoadLibrary( ospath );
 	if ( !rendererLib )
 	{
 		Cvar_ForceReset( "cl_renderer" );
-		Com_sprintf( dllName, sizeof( dllName ), RENDERER_PREFIX "_%s_" REND_ARCH_STRING DLL_EXT, cl_renderer->string );
+		/* sanitize renderer name for the retry as well */
+		{
+			const char *raw = cl_renderer->string;
+			char clean[64];
+			size_t rawlen = strlen(raw);
+			if ( rawlen >= 2 && ((raw[0] == '\"' && raw[rawlen-1] == '\"') || (raw[0] == '\'' && raw[rawlen-1] == '\'')) ) {
+				size_t n = rawlen - 2;
+				if ( n >= sizeof(clean) ) n = sizeof(clean) - 1;
+				memcpy(clean, raw + 1, n);
+				clean[n] = '\0';
+			} else {
+				Q_strncpyz(clean, raw, sizeof(clean));
+			}
+			Com_sprintf( dllName, sizeof( dllName ), RENDERER_PREFIX "_%s_" REND_ARCH_STRING DLL_EXT, clean );
+		}
 		ospath = FS_BuildOSPath( Sys_DefaultBasePath(), dllName, NULL );
 		rendererLib = Sys_LoadLibrary( ospath );
 		if ( !rendererLib )
