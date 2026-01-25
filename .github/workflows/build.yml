@@ -66,6 +66,8 @@ jobs:
 
     - name: Build
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
+      env:
+        CFLAGS: "-DSKIP_IDPAK_CHECK=1"
       run: |
         make ${{ matrix.rule }} -j$(nproc) ARCH=${{ matrix.arch }} COMPILE_ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=idtech3-vulkan BUILD_SERVER=0
         make clean ARCH=${{ matrix.arch }}
@@ -118,6 +120,8 @@ jobs:
     - name: Build
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
       shell: cmd
+      env:
+        CFLAGS: "-DSKIP_IDPAK_CHECK=1"
       run: |
         make ${{ matrix.rule }} ARCH=${{ matrix.arch }} DESTDIR=bin USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=idtech3-vulkan BUILD_SERVER=0
         make clean ARCH=${{ matrix.arch }}
@@ -233,6 +237,8 @@ jobs:
 
     - name: Build
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip in Release builds
+      env:
+        CFLAGS: "-DSKIP_IDPAK_CHECK=1"
       run: |
         make ${{ matrix.rule }} -j$(nproc) ARCH=${{ matrix.arch }} COMPILE_ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin ${{ matrix.use_sdl }} USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=idtech3-vulkan BUILD_SERVER=0
         make clean ARCH=${{ matrix.arch }} 
@@ -326,6 +332,8 @@ jobs:
 
     - name: Build
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
+      env:
+        CFLAGS: "-DSKIP_IDPAK_CHECK=1"
       run: |
           make ${{ matrix.rule }} -j$(nproc) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=idtech3-vulkan BUILD_SERVER=0
           make clean ARCH=${{ matrix.arch }} 
@@ -366,6 +374,8 @@ jobs:
 
     - name: Build
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
+      env:
+        CFLAGS: "-DSKIP_IDPAK_CHECK=1"
       run: |
         make ${{ matrix.rule }} -j$(sysctl -n hw.logicalcpu) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin INSTALL=ginstall USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=idtech3-vulkan BUILD_SERVER=0 STRIP=echo
         make clean ARCH=${{ matrix.arch }} 
