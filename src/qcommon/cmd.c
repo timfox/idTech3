@@ -19,10 +19,12 @@ along with Quake III Arena source code; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
-// cmd.c -- Quake script command processing module
-
 #include "q_shared.h"
 #include "qcommon.h"
+
+#ifdef USE_LUA
+#include "lua_debug.h"
+#endif
 
 #define MAX_CMD_BUFFER  65536
 
@@ -408,13 +410,15 @@ static void Cmd_Exec_f( void ) {
 
 	Cbuf_InsertText( f.c );
 
+	// Note: File buffer is intentionally not freed here
+	// Config files remain loaded in memory for the duration of the session
+	// FS_LoadStack will be checked later during hunk initialization
+
 #ifdef DELAY_WRITECONFIG
 	if ( !Q_stricmp( filename, Q3CONFIG_CFG ) ) {
 		Com_WriteConfiguration(); // to avoid loading outdated values
 	}
 #endif
-
-	FS_FreeFile( f.v );
 }
 
 
@@ -440,7 +444,7 @@ static void Cmd_Vstr_f( void ) {
 
 /*
 ===============
-Cmd_Echo_f
+Cmd_f
 
 Just prints the rest of the line to the console
 ===============
@@ -502,7 +506,7 @@ Cmd_Argv
 ============
 */
 const char *Cmd_Argv( int arg ) {
-	if ( (unsigned)arg >= cmd_argc ) {
+	if ( arg < 0 || arg >= cmd_argc ) {
 		return "";
 	}
 	return cmd_argv[arg];
@@ -532,15 +536,60 @@ Returns a single string containing argv(arg) to argv(argc()-1)
 char *Cmd_ArgsFrom( int arg ) {
 	static char cmd_args[BIG_INFO_STRING], *s;
 	int i;
+	size_t remaining;
+
+	// Input validation
+	if (arg < 0) {
+		arg = 0;
+	}
+	if (arg >= cmd_argc) {
+		cmd_args[0] = '\0';
+		return cmd_args;
+	}
 
 	s = cmd_args;
 	*s = '\0';
-	if (arg < 0)
-		arg = 0;
+	remaining = sizeof(cmd_args);
+
 	for ( i = arg ; i < cmd_argc ; i++ ) {
+		// Validate argument pointer
+		if (!cmd_argv[i]) {
+			Com_Printf( S_COLOR_RED "Cmd_ArgsFrom: NULL argument at index %d\n", i );
+			break;
+		}
+
+		size_t arg_len = strlen(cmd_argv[i]);
+
+		// Validate argument length
+		if (arg_len >= MAX_STRING_CHARS) {
+			Com_Printf( S_COLOR_RED "Cmd_ArgsFrom: Argument %d too long (%d >= %d), truncating\n",
+				i, (int)arg_len, MAX_STRING_CHARS );
+			arg_len = MAX_STRING_CHARS - 1;
+		}
+
+		// Check if we can fit this argument (+ space/null terminator)
+		size_t needed_space = arg_len + 1; // +1 for space or null
+		if (i != cmd_argc-1) {
+			needed_space += 1; // extra space for separator
+		}
+
+		if (needed_space >= remaining) {
+			Com_Printf( S_COLOR_RED "Cmd_ArgsFrom: Buffer full, truncating at argument %d\n", i );
+			break;
+		}
+
+		// Add the argument
 		s = Q_stradd( s, cmd_argv[i] );
+		remaining -= arg_len;
+
+		// Add space between arguments
 		if ( i != cmd_argc-1 ) {
+			if (remaining < 2) {  // need space for " " and null
+				Com_Printf( S_COLOR_RED "Cmd_ArgsFrom: Buffer full after argument %d\n", i );
+				break;
+			}
 			s = Q_stradd( s, " " );
+			remaining -= 1;
 		}
 	}
 
@@ -610,12 +659,44 @@ will point into this temporary buffer.
 */
 // NOTE TTimo define that to track tokenization issues
 //#define TKN_DBG
+/*
+=================
+Cmd_SanitizeInput
+Sanitize command input to prevent malicious characters and buffer issues
+=================
+*/
+static void Cmd_SanitizeInput(char *input, int maxLength) {
+	if (!input || maxLength <= 0) {
+		return;
+	}
+
+	char *dst = input;
+	const char *src = input;
+	int count = 0;
+
+	// Sanitize input: remove control characters, limit length
+	while (*src && count < maxLength - 1) {
+		// Allow printable ASCII characters, spaces, and common symbols
+		if ((*src >= 32 && *src <= 126) || *src == '\t' || *src == '\n') {
+			*dst++ = *src;
+			count++;
+		}
+		src++;
+	}
+
+	// Null terminate
+	*dst = '\0';
+}
+
 static void Cmd_TokenizeString2( const char *text_in, qboolean ignoreQuotes ) {
 	const char *text;
 	char *textOut;
+	char sanitizedInput[MAX_CMD_BUFFER];
 
 #ifdef TKN_DBG
-	// FIXME TTimo blunt hook to try to find the tokenization of userinfo
+	// FIXME: Debug hook for tokenization - this is a temporary debugging aid.
+	// Consider implementing proper tokenization debugging with structured output
+	// (token boundaries, types, etc.) rather than just printing the input string.
 	Com_DPrintf("Cmd_TokenizeString: %s\n", text_in);
 #endif
 
@@ -627,14 +708,26 @@ static void Cmd_TokenizeString2( const char *text_in, qboolean ignoreQuotes ) {
 		return;
 	}
 
-	Q_strncpyz( cmd_cmd, text_in, sizeof( cmd_cmd ) );
+	// Sanitize input to prevent malicious characters
+	Q_strncpyz(sanitizedInput, text_in, sizeof(sanitizedInput));
+	Cmd_SanitizeInput(sanitizedInput, sizeof(sanitizedInput));
+
+	Q_strncpyz( cmd_cmd, sanitizedInput, sizeof( cmd_cmd ) );
 
 	text = cmd_cmd; // read from safe-length buffer
 	textOut = cmd_tokenized;
 
 	while ( 1 ) {
-		if ( cmd_argc >= ARRAY_LEN( cmd_argv ) ) {
+		if ( cmd_argc >= MAX_STRING_TOKENS ) {
+			Com_Printf( S_COLOR_RED "Cmd_TokenizeString: Too many tokens (%d >= %d), truncating\n", cmd_argc, MAX_STRING_TOKENS );
 			return;			// this is usually something malicious
+		}
+
+		// Check if we have enough space left in the tokenized buffer (reserve space for current token + null terminator)
+		if ( textOut - cmd_tokenized >= (int)sizeof( cmd_tokenized ) - MAX_STRING_CHARS - 1 ) {
+			Com_Printf( S_COLOR_RED "Cmd_TokenizeString: Tokenized buffer nearly full (%d/%d bytes), truncating command\n",
+				(int)(textOut - cmd_tokenized), (int)sizeof(cmd_tokenized) );
+			return;			// prevent buffer overflow
 		}
 
 		while ( 1 ) {
@@ -674,14 +767,26 @@ static void Cmd_TokenizeString2( const char *text_in, qboolean ignoreQuotes ) {
 			cmd_argv[cmd_argc] = textOut;
 			cmd_argc++;
 			text++;
+
+			// Parse quoted string with bounds checking
 			while ( *text && *text != '"' ) {
+				// Check bounds before adding character
+				if ( textOut - cmd_tokenized >= (int)sizeof( cmd_tokenized ) - 2 ) {
+					Com_Printf( S_COLOR_RED "Cmd_TokenizeString: Quoted string too long, truncating\n" );
+					break;
+				}
 				*textOut++ = *text++;
 			}
+
 			*textOut++ = '\0';
-			if ( !*text ) {
-				return;		// all tokens parsed
+
+			// Skip closing quote if present, warn if missing
+			if ( *text == '"' ) {
+				text++;
+			} else if ( *text ) {
+				Com_DPrintf( "Cmd_TokenizeString: Missing closing quote in command\n" );
 			}
-			text++;
+
 			continue;
 		}
 
@@ -704,6 +809,12 @@ static void Cmd_TokenizeString2( const char *text_in, qboolean ignoreQuotes ) {
 
 			// skip /* */ comments
 			if ( text[0] == '/' && text[1] =='*' ) {
+				break;
+			}
+
+			// Bounds check before adding character
+			if ( textOut - cmd_tokenized >= (int)sizeof( cmd_tokenized ) - 2 ) {
+				Com_Printf( S_COLOR_RED "Cmd_TokenizeString: Token too long, truncating\n" );
 				break;
 			}
 
@@ -1011,6 +1122,7 @@ Cmd_CompleteCfgName
 ==================
 */
 static void Cmd_CompleteCfgName( const char *args, int argNum ) {
+	(void)args;  // Suppress unused parameter warning
 	if ( argNum == 2 ) {
 		Field_CompleteFilename( "", "cfg", qfalse, FS_MATCH_ANY | FS_MATCH_STICK | FS_MATCH_SUBDIRS );
 	}
@@ -1023,6 +1135,7 @@ Cmd_CompleteWriteCfgName
 ==================
 */
 void Cmd_CompleteWriteCfgName( const char *args, int argNum ) {
+	(void)args;  // Suppress unused parameter warning
 	if( argNum == 2 ) {
 		Field_CompleteFilename( "", "cfg", qfalse, FS_MATCH_EXTERN | FS_MATCH_STICK );
 	}
@@ -1044,4 +1157,14 @@ void Cmd_Init( void ) {
 	Cmd_SetCommandCompletionFunc( "vstr", Cvar_CompleteCvarName );
 	Cmd_AddCommand ("echo",Cmd_Echo_f);
 	Cmd_AddCommand ("wait", Cmd_Wait_f);
+
+#ifdef USE_LUA
+	// Script debugging commands
+	extern void Cmd_ScriptReload_f(void);
+	extern void Cmd_ScriptList_f(void);
+	extern void Cmd_ScriptDump_f(void);
+	Cmd_AddCommand("script_reload", Cmd_ScriptReload_f);
+	Cmd_AddCommand("script_list", Cmd_ScriptList_f);
+	Cmd_AddCommand("script_dump", Cmd_ScriptDump_f);
+#endif
 }
