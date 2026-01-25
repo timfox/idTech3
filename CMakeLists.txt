@@ -87,16 +87,23 @@ endif()
 # client sources
 AUX_SOURCE_DIRECTORY(src/client CLIENT_SRCS)
 # include architecture-specific assembly implementations (snd_mix etc)
-# AUX_SOURCE_DIRECTORY may not pick up .s/.asm files, glob them explicitly
-file(GLOB ASM_SRCS "src/asm/*.S" "src/asm/*.s")
-list(APPEND CLIENT_SRCS ${ASM_SRCS})
-# Ensure CMake knows how to compile assembly sources
-enable_language(ASM)
-if(ASM_SRCS)
-  set_source_files_properties(${ASM_SRCS} PROPERTIES LANGUAGE ASM)
-  # run assembler sources through the C preprocessor and use Intel syntax
-  set_source_files_properties(${ASM_SRCS} PROPERTIES COMPILE_FLAGS "-x assembler-with-cpp -masm=intel")
-endif()
+# Only include x86/x86_64 assembly files on x86/x86_64 architectures
+IF(CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64|x86|i.86|x86_64|X86_64")
+  file(GLOB ASM_SRCS "src/asm/*.S" "src/asm/*.s")
+  list(APPEND CLIENT_SRCS ${ASM_SRCS})
+  # Ensure CMake knows how to compile assembly sources
+  enable_language(ASM)
+  if(ASM_SRCS)
+    set_source_files_properties(${ASM_SRCS} PROPERTIES LANGUAGE ASM)
+    # run assembler sources through the C preprocessor and use Intel syntax
+    # Note: -masm=intel is GCC-specific; Clang uses Intel syntax by default for .s files
+    if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+      set_source_files_properties(${ASM_SRCS} PROPERTIES COMPILE_FLAGS "-x assembler-with-cpp -masm=intel")
+    else()
+      set_source_files_properties(${ASM_SRCS} PROPERTIES COMPILE_FLAGS "-x assembler-with-cpp")
+    endif()
+  endif()
+ENDIF()
 IF(NOT USE_CURL)
 	list(REMOVE_ITEM CLIENT_SRCS src/client/cl_curl.c)
 ENDIF()

@@ -454,10 +454,13 @@ jobs:
       env:
         CFLAGS: "-DSKIP_IDPAK_CHECK=1"
       run: |
+        # Set SDL2 path for Homebrew (Apple Silicon uses /opt/homebrew, Intel uses /usr/local)
+        SDL2_PREFIX=$(brew --prefix sdl2)
         mkdir -p build-vk-${{ matrix.btype }}
         cmake -S . -B build-vk-${{ matrix.btype }} \
           -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
           -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch == 'aarch64' && 'arm64' || matrix.arch }} \
+          -DSDL2_PATH="${SDL2_PREFIX}" \
           -DUSE_STB_TRUETYPE=ON \
           -DENABLE_FORTIFY_SOURCE=OFF \
           -DENABLE_ASAN=OFF \
@@ -475,10 +478,13 @@ jobs:
       env:
         CFLAGS: "-DSKIP_IDPAK_CHECK=1"
       run: |
+        # Set SDL2 path for Homebrew (Apple Silicon uses /opt/homebrew, Intel uses /usr/local)
+        SDL2_PREFIX=$(brew --prefix sdl2)
         mkdir -p build-gl-${{ matrix.btype }}
         cmake -S . -B build-gl-${{ matrix.btype }} \
           -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
           -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch == 'aarch64' && 'arm64' || matrix.arch }} \
+          -DSDL2_PATH="${SDL2_PREFIX}" \
           -DUSE_STB_TRUETYPE=ON \
           -DENABLE_FORTIFY_SOURCE=OFF \
           -DENABLE_ASAN=OFF \
