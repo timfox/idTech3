@@ -460,7 +460,6 @@ jobs:
           7z a -r idtech3-windows-gcc-x86.zip      ./windows-gcc-x86/*
           7z a -r idtech3-windows-gcc-x86_64.zip   ./windows-gcc-x86_64/*
           7z a -r idtech3-windows-msvc-arm64.zip   ./windows-msvc-arm64/*
-          7z a -r idtech3-macos-x86_64.zip         ./macos-x86_64/*
           7z a -r idtech3-macos-aarch64.zip        ./macos-aarch64/*
 #         7z a -r idtech3-linux-aarch64.zip        ./linux-aarch64/*
 #         7z a -r idtech3-linux-armv7.zip          ./linux-armv7/*
