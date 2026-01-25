@@ -87,8 +87,9 @@ endif()
 # client sources
 AUX_SOURCE_DIRECTORY(src/client CLIENT_SRCS)
 # include architecture-specific assembly implementations (snd_mix etc)
-# Only include x86/x86_64 assembly files on x86/x86_64 architectures
-IF(CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64|x86|i.86|x86_64|X86_64")
+# Only include x86/x86_64 assembly files on x86/x86_64 architectures on Unix-like systems
+# Assembly is disabled on Windows due to preprocessor macro issues with MSYS2/MinGW
+IF(UNIX AND CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64|x86|i.86|x86_64|X86_64")
   file(GLOB ASM_SRCS "src/asm/*.S" "src/asm/*.s")
   list(APPEND CLIENT_SRCS ${ASM_SRCS})
   # Ensure CMake knows how to compile assembly sources
