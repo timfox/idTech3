@@ -91,6 +91,14 @@ AUX_SOURCE_DIRECTORY(src/client CLIENT_SRCS)
 # Assembly is disabled on Windows due to preprocessor macro issues with MSYS2/MinGW
 IF(UNIX AND CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64|x86|i.86|x86_64|X86_64")
   file(GLOB ASM_SRCS "src/asm/*.S" "src/asm/*.s")
+  # If building a 32-bit target, exclude x86_64/x64-specific assembly files
+  if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+    foreach(_asm ${ASM_SRCS})
+      if(_asm MATCHES "x86_64|_x64")
+        list(REMOVE_ITEM ASM_SRCS ${_asm})
+      endif()
+    endforeach()
+  endif()
   list(APPEND CLIENT_SRCS ${ASM_SRCS})
   # Ensure CMake knows how to compile assembly sources
   enable_language(ASM)
@@ -98,11 +106,15 @@ IF(UNIX AND CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64|x86|i.86|x86_64|X86_64")
     set_source_files_properties(${ASM_SRCS} PROPERTIES LANGUAGE ASM)
     # run assembler sources through the C preprocessor and use Intel syntax
     # Note: -masm=intel is GCC-specific; Clang uses Intel syntax by default for .s files
+    set(ASM_FLAGS "-x assembler-with-cpp")
     if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
-      set_source_files_properties(${ASM_SRCS} PROPERTIES COMPILE_FLAGS "-x assembler-with-cpp -masm=intel")
-    else()
-      set_source_files_properties(${ASM_SRCS} PROPERTIES COMPILE_FLAGS "-x assembler-with-cpp")
+      set(ASM_FLAGS "${ASM_FLAGS} -masm=intel")
     endif()
+    # If building 32-bit, ensure assembler is invoked for 32-bit generation
+    if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+      set(ASM_FLAGS "-m32 ${ASM_FLAGS}")
+    endif()
+    set_source_files_properties(${ASM_SRCS} PROPERTIES COMPILE_FLAGS "${ASM_FLAGS}")
   endif()
   # Define USE_ASM to tell the code that assembly optimizations are available
   ADD_COMPILE_DEFINITIONS(USE_ASM)
