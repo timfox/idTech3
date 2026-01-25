@@ -33,4 +33,3 @@ void S_WriteLinearBlastStereo16_SSE_x64(int *p, short *out, int count)
     snd_out = old_out;
     snd_linear_count = old_count;
 }
-
