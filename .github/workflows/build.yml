@@ -39,12 +39,6 @@ jobs:
             msystem: MINGW64
             prefix: mingw-w64-x86_64
 
-          - btype: Release
-            rule: install
-
-          - btype: Debug
-            rule: debug
-
     defaults:
       run:
         shell: msys2 {0}
@@ -53,7 +47,7 @@ jobs:
 
     - uses: msys2/setup-msys2@v2
       with:
-        install: base-devel ${{ matrix.prefix }}-binutils ${{ matrix.prefix }}-make ${{ matrix.prefix }}-${{ matrix.cc }}
+        install: base-devel ${{ matrix.prefix }}-binutils ${{ matrix.prefix }}-make ${{ matrix.prefix }}-${{ matrix.cc }} ${{ matrix.prefix }}-cmake ${{ matrix.prefix }}-ninja
         msystem: ${{ matrix.msystem }}
         path-type: minimal
         release: false
@@ -64,14 +58,44 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Build
+    - name: Build Vulkan
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
       env:
         CFLAGS: "-DSKIP_IDPAK_CHECK=1"
       run: |
-        make ${{ matrix.rule }} -j$(nproc) ARCH=${{ matrix.arch }} COMPILE_ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin MOUNT_DIR=src USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=idtech3-vulkan BUILD_SERVER=0
-        make clean ARCH=${{ matrix.arch }}
-        make ${{ matrix.rule }} -j$(nproc) ARCH=${{ matrix.arch }} COMPILE_ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin MOUNT_DIR=src USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=opengl
+        mkdir -p build-vk-${{ matrix.btype }}
+        cmake -S . -B build-vk-${{ matrix.btype }} -G Ninja \
+          -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
+          -DUSE_STB_TRUETYPE=ON \
+          -DENABLE_FORTIFY_SOURCE=OFF \
+          -DENABLE_ASAN=OFF \
+          -DBUILD_SERVER=OFF \
+          -DUSE_VULKAN=ON \
+          -DRENDERER_DEFAULT=vulkan \
+          -DSKIP_IDPAK_CHECK=ON \
+          -Wno-dev
+        cmake --build build-vk-${{ matrix.btype }} -j$(nproc)
+        mkdir -p bin
+        cp -f build-vk-${{ matrix.btype }}/idtech3* bin/ || true
+
+    - name: Build OpenGL
+      if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
+      env:
+        CFLAGS: "-DSKIP_IDPAK_CHECK=1"
+      run: |
+        mkdir -p build-gl-${{ matrix.btype }}
+        cmake -S . -B build-gl-${{ matrix.btype }} -G Ninja \
+          -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
+          -DUSE_STB_TRUETYPE=ON \
+          -DENABLE_FORTIFY_SOURCE=OFF \
+          -DENABLE_ASAN=OFF \
+          -DBUILD_SERVER=OFF \
+          -DUSE_VULKAN=ON \
+          -DRENDERER_DEFAULT=opengl \
+          -DSKIP_IDPAK_CHECK=ON \
+          -Wno-dev
+        cmake --build build-gl-${{ matrix.btype }} -j$(nproc)
+        cp -f build-gl-${{ matrix.btype }}/idtech3* bin/ || true
 
     - uses: actions/upload-artifact@v4
       if: matrix.cc == 'gcc' && matrix.btype == 'Release'
@@ -88,14 +112,7 @@ jobs:
       fail-fast: false
       matrix:
         arch: [x86, x86_64]
-#       btype: [Release, Debug]
         btype: [Release]
-        include:
-          - btype: Release
-            rule: install
-
-#         - btype: Debug
-#           rule: debug
 
     steps:
     - name: Checkout current repo
@@ -117,15 +134,32 @@ jobs:
            echo "PATH=$GITHUB_WORKSPACE/msys/mingw/bin;$GITHUB_WORKSPACE/msys/bin;$GITHUB_WORKSPACE/msys" >> $GITHUB_ENV
       shell: bash
 
-    - name: Build
+    - name: Build Vulkan
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
       shell: cmd
       env:
         CFLAGS: "-DSKIP_IDPAK_CHECK=1"
       run: |
-        make ${{ matrix.rule }} ARCH=${{ matrix.arch }} DESTDIR=bin MOUNT_DIR=src USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=idtech3-vulkan BUILD_SERVER=0
-        make clean ARCH=${{ matrix.arch }}
-        make ${{ matrix.rule }} ARCH=${{ matrix.arch }} DESTDIR=bin MOUNT_DIR=src USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=opengl
+        mkdir build-vk-${{ matrix.btype }}
+        cd build-vk-${{ matrix.btype }}
+        cmake -S .. -B . -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=${{ matrix.btype }} -DUSE_STB_TRUETYPE=ON -DENABLE_FORTIFY_SOURCE=OFF -DENABLE_ASAN=OFF -DBUILD_SERVER=OFF -DUSE_VULKAN=ON -DRENDERER_DEFAULT=vulkan -DSKIP_IDPAK_CHECK=ON -Wno-dev
+        cmake --build . -j4
+        cd ..
+        mkdir bin
+        copy build-vk-${{ matrix.btype }}\idtech3* bin\ || echo "Some files not found"
+
+    - name: Build OpenGL
+      if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
+      shell: cmd
+      env:
+        CFLAGS: "-DSKIP_IDPAK_CHECK=1"
+      run: |
+        mkdir build-gl-${{ matrix.btype }}
+        cd build-gl-${{ matrix.btype }}
+        cmake -S .. -B . -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=${{ matrix.btype }} -DUSE_STB_TRUETYPE=ON -DENABLE_FORTIFY_SOURCE=OFF -DENABLE_ASAN=OFF -DBUILD_SERVER=OFF -DUSE_VULKAN=ON -DRENDERER_DEFAULT=opengl -DSKIP_IDPAK_CHECK=ON -Wno-dev
+        cmake --build . -j4
+        cd ..
+        copy build-gl-${{ matrix.btype }}\idtech3* bin\ || echo "Some files not found"
 
     - uses: actions/upload-artifact@v4
       if: matrix.btype == 'Release'
@@ -205,18 +239,11 @@ jobs:
         cc: [gcc]
         btype: [Release, Debug]
         include:
-          - btype: Release
-            rule: install
-
-          - btype: Debug
-            if: ${{ github.event_name != 'release' }}
-            rule: debug
-
           - arch: x86
-            use_sdl: USE_SDL=0
+            cmake_arch: i686
 
           - arch: x86_64
-            use_sdl: USE_SDL=1
+            cmake_arch: x86_64
 
     steps:
 
@@ -225,24 +252,56 @@ jobs:
         if [ ${{ matrix.arch }} == "x86" ]; then
           sudo dpkg --add-architecture i386
           sudo apt-get -qq update
-          sudo apt-get -y install gcc-multilib libcurl4-openssl-dev:i386 mesa-common-dev:i386 libxxf86dga-dev:i386 libxrandr-dev:i386 libxxf86vm-dev:i386 libasound-dev:i386
+          sudo apt-get -y install gcc-multilib g++-multilib cmake ninja-build libcurl4-openssl-dev:i386 mesa-common-dev:i386 libxxf86dga-dev:i386 libxrandr-dev:i386 libxxf86vm-dev:i386 libasound-dev:i386
         else
           sudo apt-get -qq update
-          sudo apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev
+          sudo apt-get -y install cmake ninja-build libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev
         fi
 
     - uses: actions/checkout@v4
       with:
         submodules: recursive
 
-    - name: Build
+    - name: Build Vulkan
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip in Release builds
       env:
-        CFLAGS: "-DSKIP_IDPAK_CHECK=1"
+        CFLAGS: "-DSKIP_IDPAK_CHECK=1 ${{ matrix.arch == 'x86' && '-m32' || '' }}"
+        CXXFLAGS: "-DSKIP_IDPAK_CHECK=1 ${{ matrix.arch == 'x86' && '-m32' || '' }}"
       run: |
-        make ${{ matrix.rule }} -j$(nproc) ARCH=${{ matrix.arch }} COMPILE_ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin MOUNT_DIR=src ${{ matrix.use_sdl }} USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=idtech3-vulkan BUILD_SERVER=0
-        make clean ARCH=${{ matrix.arch }} 
-        make ${{ matrix.rule }} -j$(nproc) ARCH=${{ matrix.arch }} COMPILE_ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin MOUNT_DIR=src ${{ matrix.use_sdl }} USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=opengl
+        mkdir -p build-vk-${{ matrix.btype }}
+        cmake -S . -B build-vk-${{ matrix.btype }} \
+          -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
+          -DUSE_STB_TRUETYPE=ON \
+          -DENABLE_FORTIFY_SOURCE=OFF \
+          -DENABLE_ASAN=OFF \
+          -DBUILD_SERVER=OFF \
+          -DUSE_VULKAN=ON \
+          -DRENDERER_DEFAULT=vulkan \
+          -DSKIP_IDPAK_CHECK=ON \
+          -Wno-dev
+        cmake --build build-vk-${{ matrix.btype }} -j$(nproc)
+        mkdir -p bin
+        cp -f build-vk-${{ matrix.btype }}/idtech3* bin/ || true
+
+    - name: Build OpenGL
+      if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip in Release builds
+      env:
+        CFLAGS: "-DSKIP_IDPAK_CHECK=1 ${{ matrix.arch == 'x86' && '-m32' || '' }}"
+        CXXFLAGS: "-DSKIP_IDPAK_CHECK=1 ${{ matrix.arch == 'x86' && '-m32' || '' }}"
+      run: |
+        mkdir -p build-gl-${{ matrix.btype }}
+        cmake -S . -B build-gl-${{ matrix.btype }} \
+          -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
+          -DUSE_STB_TRUETYPE=ON \
+          -DENABLE_FORTIFY_SOURCE=OFF \
+          -DENABLE_ASAN=OFF \
+          -DBUILD_SERVER=OFF \
+          -DUSE_VULKAN=ON \
+          -DRENDERER_DEFAULT=opengl \
+          -DSKIP_IDPAK_CHECK=ON \
+          -Wno-dev
+        cmake --build build-gl-${{ matrix.btype }} -j$(nproc)
+        cp -f build-gl-${{ matrix.btype }}/idtech3* bin/ || true
 
     - uses: actions/upload-artifact@v4
       if: matrix.cc == 'gcc' && matrix.btype == 'Release'
@@ -311,33 +370,57 @@ jobs:
         arch: [arm64]
         cc: [gcc]
         btype: [Release, Debug]
-        include:
-          - btype: Release
-            rule: install
-
-          - btype: Debug
-            rule: debug
 
     steps:
 
     - name: Install tools
       run: |
         sudo apt-get -qq update
-        sudo apt-get install -y make gcc g++
+        sudo apt-get install -y make gcc g++ cmake ninja-build
         sudo apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev
 
     - uses: actions/checkout@v4
       with:
         submodules: recursive
 
-    - name: Build
+    - name: Build Vulkan
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
       env:
         CFLAGS: "-DSKIP_IDPAK_CHECK=1"
       run: |
-          make ${{ matrix.rule }} -j$(nproc) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin MOUNT_DIR=src USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=idtech3-vulkan BUILD_SERVER=0
-          make clean ARCH=${{ matrix.arch }} 
-          make ${{ matrix.rule }} -j$(nproc) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin MOUNT_DIR=src USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=opengl
+        mkdir -p build-vk-${{ matrix.btype }}
+        cmake -S . -B build-vk-${{ matrix.btype }} \
+          -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
+          -DUSE_STB_TRUETYPE=ON \
+          -DENABLE_FORTIFY_SOURCE=OFF \
+          -DENABLE_ASAN=OFF \
+          -DBUILD_SERVER=OFF \
+          -DUSE_VULKAN=ON \
+          -DRENDERER_DEFAULT=vulkan \
+          -DSKIP_IDPAK_CHECK=ON \
+          -Wno-dev
+        cmake --build build-vk-${{ matrix.btype }} -j$(nproc)
+        mkdir -p bin
+        cp -f build-vk-${{ matrix.btype }}/idtech3* bin/ || true
+
+    - name: Build OpenGL
+      if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
+      env:
+        CFLAGS: "-DSKIP_IDPAK_CHECK=1"
+      run: |
+        mkdir -p build-gl-${{ matrix.btype }}
+        cmake -S . -B build-gl-${{ matrix.btype }} \
+          -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
+          -DUSE_STB_TRUETYPE=ON \
+          -DENABLE_FORTIFY_SOURCE=OFF \
+          -DENABLE_ASAN=OFF \
+          -DBUILD_SERVER=OFF \
+          -DUSE_VULKAN=ON \
+          -DRENDERER_DEFAULT=opengl \
+          -DSKIP_IDPAK_CHECK=ON \
+          -Wno-dev
+        cmake --build build-gl-${{ matrix.btype }} -j$(nproc)
+        cp -f build-gl-${{ matrix.btype }}/idtech3* bin/ || true
 
     - uses: actions/upload-artifact@v4
       if: matrix.cc == 'gcc' && matrix.btype == 'Release'
@@ -356,30 +439,56 @@ jobs:
         arch: [x86_64, aarch64]
         cc: [clang]
         btype: [Release, Debug]
-        include:
-          - btype: Release
-            rule: install
-
-          - btype: Debug
-            rule: debug
 
     steps:
 
     - name: Install tools
-      run: brew install coreutils sdl2 # pkg-config
+      run: brew install coreutils sdl2 cmake ninja
 
     - uses: actions/checkout@v4
       with:
         submodules: recursive
 
-    - name: Build
+    - name: Build Vulkan
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
       env:
         CFLAGS: "-DSKIP_IDPAK_CHECK=1"
       run: |
-        make ${{ matrix.rule }} -j$(sysctl -n hw.logicalcpu) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin MOUNT_DIR=src INSTALL=ginstall USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=idtech3-vulkan BUILD_SERVER=0 STRIP=echo
-        make clean ARCH=${{ matrix.arch }} 
-        make ${{ matrix.rule }} -j$(sysctl -n hw.logicalcpu) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin MOUNT_DIR=src INSTALL=ginstall USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=opengl STRIP=echo
+        mkdir -p build-vk-${{ matrix.btype }}
+        cmake -S . -B build-vk-${{ matrix.btype }} \
+          -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
+          -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch == 'aarch64' && 'arm64' || matrix.arch }} \
+          -DUSE_STB_TRUETYPE=ON \
+          -DENABLE_FORTIFY_SOURCE=OFF \
+          -DENABLE_ASAN=OFF \
+          -DBUILD_SERVER=OFF \
+          -DUSE_VULKAN=ON \
+          -DRENDERER_DEFAULT=vulkan \
+          -DSKIP_IDPAK_CHECK=ON \
+          -Wno-dev
+        cmake --build build-vk-${{ matrix.btype }} -j$(sysctl -n hw.logicalcpu)
+        mkdir -p bin
+        cp -f build-vk-${{ matrix.btype }}/idtech3* bin/ || true
+
+    - name: Build OpenGL
+      if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
+      env:
+        CFLAGS: "-DSKIP_IDPAK_CHECK=1"
+      run: |
+        mkdir -p build-gl-${{ matrix.btype }}
+        cmake -S . -B build-gl-${{ matrix.btype }} \
+          -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
+          -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch == 'aarch64' && 'arm64' || matrix.arch }} \
+          -DUSE_STB_TRUETYPE=ON \
+          -DENABLE_FORTIFY_SOURCE=OFF \
+          -DENABLE_ASAN=OFF \
+          -DBUILD_SERVER=OFF \
+          -DUSE_VULKAN=ON \
+          -DRENDERER_DEFAULT=opengl \
+          -DSKIP_IDPAK_CHECK=ON \
+          -Wno-dev
+        cmake --build build-gl-${{ matrix.btype }} -j$(sysctl -n hw.logicalcpu)
+        cp -f build-gl-${{ matrix.btype }}/idtech3* bin/ || true
 
     - uses: actions/upload-artifact@v4
       if: matrix.cc == 'clang' && matrix.btype == 'Release'
