@@ -47,6 +47,7 @@ void *S_MP3_CodecLoad(const char *filename, snd_info_t *info)
 	int unpackSize = 0;
 	byte *outbuf = NULL;
 	int stereoDesired = (dma.channels == 2) ? 1 : 0;
+	int maxSoundBytes;
 
 	if (!filename || !info) return NULL;
 
@@ -56,7 +57,7 @@ void *S_MP3_CodecLoad(const char *filename, snd_info_t *info)
 	}
 
 	// read file into temp buffer
-	filebuf = Hunk_AllocateTempMemory(length);
+	filebuf = Z_Malloc(length);
 	if (!filebuf) {
 		FS_FCloseFile(f);
 		return NULL;
@@ -69,11 +70,11 @@ void *S_MP3_CodecLoad(const char *filename, snd_info_t *info)
 		int rate=0, width=0, channels=0;
 		err = C_MP3_GetHeaderData(filebuf, length, &rate, &width, &channels, stereoDesired);
 		if (err) {
-			Hunk_FreeTempMemory(filebuf);
+			Z_Free(filebuf);
 			return NULL;
 		}
 		info->rate = rate;
-		info->width = width / 8;
+		info->width = width;
 		info->channels = channels;
 	}
 
@@ -81,19 +82,29 @@ void *S_MP3_CodecLoad(const char *filename, snd_info_t *info)
 	err = C_MP3_GetUnpackedSize(filebuf, length, &unpackSize, stereoDesired);
 	if (err || unpackSize <= 0) {
 		// fallback: free and fail
-		Hunk_FreeTempMemory(filebuf);
+		Z_Free(filebuf);
+		return NULL;
+	}
+	maxSoundBytes = Cvar_VariableIntegerValue("com_soundMegs") * 1024 * 1024;
+	if (maxSoundBytes <= 0) {
+		maxSoundBytes = 8 * 1024 * 1024;
+	}
+	if (unpackSize > maxSoundBytes) {
+		Com_Printf(S_COLOR_YELLOW "WARNING: MP3 %s is too large for SFX (%d bytes). Use music instead.\n",
+			filename, unpackSize);
+		Z_Free(filebuf);
 		return NULL;
 	}
 
 	outbuf = Hunk_AllocateTempMemory(unpackSize);
 	if (!outbuf) {
-		Hunk_FreeTempMemory(filebuf);
+		Z_Free(filebuf);
 		return NULL;
 	}
 
 	err = C_MP3_UnpackRawPCM(filebuf, length, &unpackSize, outbuf, stereoDesired);
 	if (err) {
-		Hunk_FreeTempMemory(filebuf);
+		Z_Free(filebuf);
 		Hunk_FreeTempMemory(outbuf);
 		return NULL;
 	}
@@ -103,7 +114,7 @@ void *S_MP3_CodecLoad(const char *filename, snd_info_t *info)
 	info->dataofs = 0;
 
 	// free file buffer
-	Hunk_FreeTempMemory(filebuf);
+	Z_Free(filebuf);
 
 	return outbuf;
 }
@@ -132,7 +143,7 @@ snd_stream_t *S_MP3_CodecOpenStream(const char *filename)
 
 	// read entire compressed file into temp memory for the MP3 decoder
 	length = stream->length;
-	filebuf = Hunk_AllocateTempMemory(length);
+	filebuf = Z_Malloc(length);
 	if (!filebuf) {
 		S_CodecUtilClose(&stream);
 		return NULL;
@@ -144,7 +155,7 @@ snd_stream_t *S_MP3_CodecOpenStream(const char *filename)
 	// allocate context
 	ctx = Z_Malloc(sizeof(*ctx));
 	if (!ctx) {
-		Hunk_FreeTempMemory(filebuf);
+		Z_Free(filebuf);
 		S_CodecUtilClose(&stream);
 		return NULL;
 	}
@@ -155,7 +166,7 @@ snd_stream_t *S_MP3_CodecOpenStream(const char *filename)
 	err = C_MP3Stream_DecodeInit(&ctx->mp3, ctx->data, ctx->length, dma.speed, dma.samplebits, stereoDesired);
 	if (err) {
 		Z_Free(ctx);
-		Hunk_FreeTempMemory(filebuf);
+		Z_Free(filebuf);
 		S_CodecUtilClose(&stream);
 		return NULL;
 	}
@@ -187,6 +198,7 @@ int S_MP3_CodecReadStream(snd_stream_t *stream, int bytes, void *buffer)
 	mp3_stream_ctx_t *ctx;
 	int bytesRead = 0;
 	char *bufPtr;
+	int bytesAvailable;
 	unsigned int out;
 
 	if (!stream || !buffer || bytes <= 0) return 0;
@@ -196,16 +208,23 @@ int S_MP3_CodecReadStream(snd_stream_t *stream, int bytes, void *buffer)
 	bufPtr = buffer;
 
 	while (bytesRead < bytes) {
-		out = C_MP3Stream_Decode(&ctx->mp3);
-		if (out == 0) {
-			// finished
-			break;
+		bytesAvailable = ctx->mp3.iBytesDecodedThisPacket - ctx->mp3.iCopyOffset;
+		if (bytesAvailable <= 0) {
+			out = C_MP3Stream_Decode(&ctx->mp3);
+			if (out == 0) {
+				break;
+			}
+			ctx->mp3.iCopyOffset = 0;
+			bytesAvailable = ctx->mp3.iBytesDecodedThisPacket;
 		}
 		// copy decoded data
-		int copy = out;
-		if (copy + bytesRead > bytes) copy = bytes - bytesRead;
-		memcpy(bufPtr + bytesRead, ctx->mp3.bDecodeBuffer, copy);
-		bytesRead += copy;
+		{
+			int copy = bytesAvailable;
+			if (copy + bytesRead > bytes) copy = bytes - bytesRead;
+			memcpy(bufPtr + bytesRead, ctx->mp3.bDecodeBuffer + ctx->mp3.iCopyOffset, copy);
+			ctx->mp3.iCopyOffset += copy;
+			bytesRead += copy;
+		}
 	}
 
 	return bytesRead;
@@ -223,7 +242,7 @@ void S_MP3_CodecCloseStream(snd_stream_t *stream)
 	ctx = (mp3_stream_ctx_t *) stream->ptr;
 	if (ctx) {
 		if (ctx->data) {
-			Hunk_FreeTempMemory(ctx->data);
+			Z_Free(ctx->data);
 		}
 		Z_Free(ctx);
 		stream->ptr = NULL;

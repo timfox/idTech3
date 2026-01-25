@@ -131,8 +131,17 @@ void S_CodecInit( void )
 	S_CodecRegister( &ogg_codec );
 #endif
 #ifdef USE_MP3
-	/* MP3 support */
-	S_CodecRegister( &mp3_codec );
+	{
+		cvar_t *s_enableMp3 = Cvar_Get( "s_enableMp3", "1", CVAR_ARCHIVE );
+		Cvar_CheckRange( s_enableMp3, "0", "1", CV_INTEGER );
+		Cvar_SetDescription( s_enableMp3, "Enable MP3 codec support for loading and streaming audio." );
+		if ( s_enableMp3->integer ) {
+			Com_Printf( "MP3 codec enabled.\n" );
+			S_CodecRegister( &mp3_codec );
+		} else {
+			Com_Printf( "MP3 codec disabled.\n" );
+		}
+	}
 #endif
 
 	// Register wav codec last so that it is always tried first when a file extension was not found
