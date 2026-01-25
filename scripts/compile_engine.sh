@@ -145,11 +145,11 @@ if [ -f "$BUILD_DIR/idtech3.x86_64" ]; then
 fi
 
 # Server
-if [ -f "$BUILD_DIR/idtech3.server.x86_64" ]; then
-  cp -f "$BUILD_DIR/idtech3.server.x86_64" "$RELEASE_DIR/${GAME_NAME}.server.x86_64"
-  cp -f "$BUILD_DIR/idtech3.server.x86_64" "$RELEASE_DIR/${GAME_NAME}.ded.x86_64"
-  echo "Copied server -> $RELEASE_DIR/${GAME_NAME}.server.x86_64 (alias *.ded.x86_64)"
+if [ -f "$BUILD_DIR/idtech3_server.x86_64" ]; then
+  cp -f "$BUILD_DIR/idtech3_server.x86_64" "$RELEASE_DIR/${GAME_NAME}_server.x86_64"
+  echo "Copied server -> $RELEASE_DIR/${GAME_NAME}_server.x86_64"
 fi
+
 
 # Renderers
 shopt -s nullglob
