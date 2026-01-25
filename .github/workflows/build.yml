@@ -454,13 +454,13 @@ jobs:
 
       - name: Create binary archives
         run: |
-          7z a -r idtech3-linux-x86.zip            ./linux-x86/*
-          7z a -r idtech3-linux-x86_64.zip         ./linux-x86_64/*
-          7z a -r idtech3-linux-arm64.zip          ./linux-arm64/*
-          7z a -r idtech3-windows-gcc-x86.zip      ./windows-gcc-x86/*
-          7z a -r idtech3-windows-gcc-x86_64.zip   ./windows-gcc-x86_64/*
-          7z a -r idtech3-windows-msvc-arm64.zip   ./windows-msvc-arm64/*
-          7z a -r idtech3-macos-aarch64.zip        ./macos-aarch64/*
+          if [ -d ./linux-x86 ]; then 7z a -r idtech3-linux-x86.zip            ./linux-x86/*; else echo "skip linux-x86"; fi
+          if [ -d ./linux-x86_64 ]; then 7z a -r idtech3-linux-x86_64.zip         ./linux-x86_64/*; else echo "skip linux-x86_64"; fi
+          if [ -d ./linux-arm64 ]; then 7z a -r idtech3-linux-arm64.zip          ./linux-arm64/*; else echo "skip linux-arm64"; fi
+          if [ -d ./windows-gcc-x86 ]; then 7z a -r idtech3-windows-gcc-x86.zip      ./windows-gcc-x86/*; else echo "skip windows-gcc-x86"; fi
+          if [ -d ./windows-gcc-x86_64 ]; then 7z a -r idtech3-windows-gcc-x86_64.zip   ./windows-gcc-x86_64/*; else echo "skip windows-gcc-x86_64"; fi
+          if [ -d ./windows-msvc-arm64 ]; then 7z a -r idtech3-windows-msvc-arm64.zip   ./windows-msvc-arm64/*; else echo "skip windows-msvc-arm64"; fi
+          if [ -d ./macos-aarch64 ]; then 7z a -r idtech3-macos-aarch64.zip        ./macos-aarch64/*; else echo "skip macos-aarch64"; fi
 #         7z a -r idtech3-linux-aarch64.zip        ./linux-aarch64/*
 #         7z a -r idtech3-linux-armv7.zip          ./linux-armv7/*
 #         7z a -r idtech3-windows-msvc-x86.zip     ./windows-msvc-x86/*
