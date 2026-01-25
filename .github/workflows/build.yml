@@ -67,7 +67,7 @@ jobs:
     - name: Build
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
       run: |
-        make ${{ matrix.rule }} -j$(nproc) ARCH=${{ matrix.arch }} COMPILE_ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=quake3e-vulkan BUILD_SERVER=0
+        make ${{ matrix.rule }} -j$(nproc) ARCH=${{ matrix.arch }} COMPILE_ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=idtech3-vulkan BUILD_SERVER=0
         make clean ARCH=${{ matrix.arch }}
         make ${{ matrix.rule }} -j$(nproc) ARCH=${{ matrix.arch }} COMPILE_ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=opengl
 
@@ -119,7 +119,7 @@ jobs:
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
       shell: cmd
       run: |
-        make ${{ matrix.rule }} ARCH=${{ matrix.arch }} DESTDIR=bin USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=quake3e-vulkan BUILD_SERVER=0
+        make ${{ matrix.rule }} ARCH=${{ matrix.arch }} DESTDIR=bin USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=idtech3-vulkan BUILD_SERVER=0
         make clean ARCH=${{ matrix.arch }}
         make ${{ matrix.rule }} ARCH=${{ matrix.arch }} DESTDIR=bin USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=opengl
 
@@ -167,21 +167,21 @@ jobs:
       run: |
         mkdir bin
 
-        msbuild code\win32\msvc2017\quake3e-ded.vcxproj -p:TargetName=quake3e.ded,Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }} /p:PlatformToolset=v143
-        copy code\win32\msvc2017\output\quake3e.ded.exe bin\quake3e.ded${{ matrix.suffix }}.exe
-        msbuild code\win32\msvc2017\quake3e-ded.vcxproj -p:TargetName=quake3e.ded,Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }} -t:Clean
+        msbuild code\win32\msvc2017\idtech3-ded.vcxproj -p:TargetName=idtech3.ded,Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }} /p:PlatformToolset=v143
+        copy code\win32\msvc2017\output\idtech3.ded.exe bin\idtech3.ded${{ matrix.suffix }}.exe
+        msbuild code\win32\msvc2017\idtech3-ded.vcxproj -p:TargetName=idtech3.ded,Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }} -t:Clean
 
         msbuild code\win32\msvc2017\renderer.vcxproj -p:Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }} /p:PlatformToolset=v143
-        msbuild code\win32\msvc2017\quake3e.vcxproj -p:TargetName=quake3e,Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }},UseWasapi=USE_WASAPI=0 /p:PlatformToolset=v143
-        copy code\win32\msvc2017\output\quake3e.exe bin\quake3e${{ matrix.suffix }}.exe
+        msbuild code\win32\msvc2017\idtech3.vcxproj -p:TargetName=idtech3,Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }},UseWasapi=USE_WASAPI=0 /p:PlatformToolset=v143
+        copy code\win32\msvc2017\output\idtech3.exe bin\idtech3${{ matrix.suffix }}.exe
         msbuild code\win32\msvc2017\renderer.vcxproj -p:Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }} -t:Clean
-        msbuild code\win32\msvc2017\quake3e.vcxproj -p:TargetName=quake3e,Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }},UseWasapi=USE_WASAPI=0 -t:Clean
+        msbuild code\win32\msvc2017\idtech3.vcxproj -p:TargetName=idtech3,Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }},UseWasapi=USE_WASAPI=0 -t:Clean
 
         msbuild code\win32\msvc2017\renderervk.vcxproj -p:Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }} /p:PlatformToolset=v143
-        msbuild code\win32\msvc2017\quake3e.vcxproj -p:TargetName=quake3e,Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }},UseWasapi=USE_WASAPI=0 /p:PlatformToolset=v143
-        copy code\win32\msvc2017\output\quake3e.exe bin\quake3e-vulkan${{ matrix.suffix }}.exe
+        msbuild code\win32\msvc2017\idtech3.vcxproj -p:TargetName=idtech3,Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }},UseWasapi=USE_WASAPI=0 /p:PlatformToolset=v143
+        copy code\win32\msvc2017\output\idtech3.exe bin\idtech3-vulkan${{ matrix.suffix }}.exe
         msbuild code\win32\msvc2017\renderervk.vcxproj -p:Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }} -t:Clean
-        msbuild code\win32\msvc2017\quake3e.vcxproj -p:TargetName=quake3e,Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }},UseWasapi=USE_WASAPI=0 -t:Clean
+        msbuild code\win32\msvc2017\idtech3.vcxproj -p:TargetName=idtech3,Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }},UseWasapi=USE_WASAPI=0 -t:Clean
 
     - uses: actions/upload-artifact@v4
       if: ${{ matrix.btype == 'Release' }}
@@ -234,7 +234,7 @@ jobs:
     - name: Build
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip in Release builds
       run: |
-        make ${{ matrix.rule }} -j$(nproc) ARCH=${{ matrix.arch }} COMPILE_ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin ${{ matrix.use_sdl }} USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=quake3e-vulkan BUILD_SERVER=0
+        make ${{ matrix.rule }} -j$(nproc) ARCH=${{ matrix.arch }} COMPILE_ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin ${{ matrix.use_sdl }} USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=idtech3-vulkan BUILD_SERVER=0
         make clean ARCH=${{ matrix.arch }} 
         make ${{ matrix.rule }} -j$(nproc) ARCH=${{ matrix.arch }} COMPILE_ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin ${{ matrix.use_sdl }} USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=opengl
 
@@ -283,7 +283,7 @@ jobs:
           apt-get install -y make gcc g++
           apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev
 
-          make ${{ matrix.rule }} -j$(nproc) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=quake3e-vulkan BUILD_SERVER=0
+          make ${{ matrix.rule }} -j$(nproc) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=idtech3-vulkan BUILD_SERVER=0
           make clean ARCH=${{ matrix.arch }} 
           make ${{ matrix.rule }} -j$(nproc) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=opengl
 
@@ -327,7 +327,7 @@ jobs:
     - name: Build
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
       run: |
-          make ${{ matrix.rule }} -j$(nproc) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=quake3e-vulkan BUILD_SERVER=0
+          make ${{ matrix.rule }} -j$(nproc) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=idtech3-vulkan BUILD_SERVER=0
           make clean ARCH=${{ matrix.arch }} 
           make ${{ matrix.rule }} -j$(nproc) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=opengl
 
@@ -367,7 +367,7 @@ jobs:
     - name: Build
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
       run: |
-        make ${{ matrix.rule }} -j$(sysctl -n hw.logicalcpu) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin INSTALL=ginstall USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=quake3e-vulkan BUILD_SERVER=0 STRIP=echo
+        make ${{ matrix.rule }} -j$(sysctl -n hw.logicalcpu) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin INSTALL=ginstall USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=idtech3-vulkan BUILD_SERVER=0 STRIP=echo
         make clean ARCH=${{ matrix.arch }} 
         make ${{ matrix.rule }} -j$(sysctl -n hw.logicalcpu) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin INSTALL=ginstall USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=opengl STRIP=echo
 
@@ -389,18 +389,18 @@ jobs:
 
       - name: Create binary archives
         run: |
-          7z a -r quake3e-linux-x86.zip            ./linux-x86/*
-          7z a -r quake3e-linux-x86_64.zip         ./linux-x86_64/*
-          7z a -r quake3e-linux-arm64.zip          ./linux-arm64/*
-          7z a -r quake3e-windows-mingw-x86.zip    ./windows-mingw-x86/*
-          7z a -r quake3e-windows-mingw-x86_64.zip ./windows-mingw-x86_64/*
-          7z a -r quake3e-windows-msvc-arm64.zip   ./windows-msvc-arm64/*
-          7z a -r quake3e-macos-x86_64.zip         ./macos-x86_64/*
-          7z a -r quake3e-macos-aarch64.zip        ./macos-aarch64/*
-#         7z a -r quake3e-linux-aarch64.zip        ./linux-aarch64/*
-#         7z a -r quake3e-linux-armv7.zip          ./linux-armv7/*
-#         7z a -r quake3e-windows-msvc-x86.zip     ./windows-msvc-x86/*
-#         7z a -r quake3e-windows-msvc-x86_64.zip  ./windows-msvc-x86_64/*
+          7z a -r idtech3-linux-x86.zip            ./linux-x86/*
+          7z a -r idtech3-linux-x86_64.zip         ./linux-x86_64/*
+          7z a -r idtech3-linux-arm64.zip          ./linux-arm64/*
+          7z a -r idtech3-windows-mingw-x86.zip    ./windows-mingw-x86/*
+          7z a -r idtech3-windows-mingw-x86_64.zip ./windows-mingw-x86_64/*
+          7z a -r idtech3-windows-msvc-arm64.zip   ./windows-msvc-arm64/*
+          7z a -r idtech3-macos-x86_64.zip         ./macos-x86_64/*
+          7z a -r idtech3-macos-aarch64.zip        ./macos-aarch64/*
+#         7z a -r idtech3-linux-aarch64.zip        ./linux-aarch64/*
+#         7z a -r idtech3-linux-armv7.zip          ./linux-armv7/*
+#         7z a -r idtech3-windows-msvc-x86.zip     ./windows-msvc-x86/*
+#         7z a -r idtech3-windows-msvc-x86_64.zip  ./windows-msvc-x86_64/*
 
       - name: Create latest build
         uses: czietz/action-automatic-releases@latest
@@ -421,34 +421,34 @@ jobs:
       matrix:
         include:
 #         - artifact_dir: linux-aarch64
-#           artifact_name: quake3e-linux-aarch64.zip
+#           artifact_name: idtech3-linux-aarch64.zip
 
 #         - artifact_dir: linux-armv7
-#           artifact_name: quake3e-linux-armv7.zip
+#           artifact_name: idtech3-linux-armv7.zip
 
           - artifact_dir: linux-x86
-            artifact_name: quake3e-linux-x86.zip
+            artifact_name: idtech3-linux-x86.zip
 
           - artifact_dir: linux-x86_64
-            artifact_name: quake3e-linux-x86_64.zip
+            artifact_name: idtech3-linux-x86_64.zip
 
           - artifact_dir: linux-arm64
-            artifact_name: quake3e-linux-arm64.zip
+            artifact_name: idtech3-linux-arm64.zip
 
           - artifact_dir: windows-mingw-x86
-            artifact_name: quake3e-windows-x86.zip 
+            artifact_name: idtech3-windows-x86.zip 
 
           - artifact_dir: windows-mingw-x86_64
-            artifact_name: quake3e-windows-x86_64.zip
+            artifact_name: idtech3-windows-x86_64.zip
 
           - artifact_dir: windows-msvc-arm64
-            artifact_name: quake3e-windows-arm64.zip
+            artifact_name: idtech3-windows-arm64.zip
 
           - artifact_dir: macos-x86_64
-            artifact_name: quake3e-macos-x86_64.zip
+            artifact_name: idtech3-macos-x86_64.zip
 
           - artifact_dir: macos-aarch64
-            artifact_name: quake3e-macos-aarch64.zip
+            artifact_name: idtech3-macos-aarch64.zip
 
     steps:
       - name: Download Artifacts
