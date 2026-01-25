@@ -105,71 +105,7 @@ jobs:
         if-no-files-found: error
         retention-days: 5
 
-  windows-msys32:
-    name: ${{ matrix.btype }} Windows-msys32 ${{ matrix.arch }}
-    runs-on: windows-latest
-    # Disabled: Legacy MSYS32 environment doesn't have CMake. Use windows-msys instead.
-    if: false
-    strategy:
-      fail-fast: false
-      matrix:
-        arch: [x86, x86_64]
-        btype: [Release]
-
-    steps:
-    - name: Checkout current repo
-      uses: actions/checkout@v4
-
-    - name: Checkout msys32 tools from sibling repo
-      uses: actions/checkout@v4
-      with:
-        repository: ec-/msys32
-        path: msys
-
-    - name: Extract msys32.7z
-      run: |
-        7z x %GITHUB_WORKSPACE%/msys/msys32.7z -o%GITHUB_WORKSPACE%/msys
-      shell: cmd
-
-    - name: Prepend msys/bin to PATH
-      run: |
-           echo "PATH=$GITHUB_WORKSPACE/msys/mingw/bin;$GITHUB_WORKSPACE/msys/bin;$GITHUB_WORKSPACE/msys" >> $GITHUB_ENV
-      shell: bash
-
-    - name: Build Vulkan
-      if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
-      shell: cmd
-      env:
-        CFLAGS: "-DSKIP_IDPAK_CHECK=1"
-      run: |
-        mkdir build-vk-${{ matrix.btype }}
-        cd build-vk-${{ matrix.btype }}
-        cmake -S .. -B . -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=${{ matrix.btype }} -DUSE_STB_TRUETYPE=ON -DENABLE_FORTIFY_SOURCE=OFF -DENABLE_ASAN=OFF -DBUILD_SERVER=OFF -DUSE_VULKAN=ON -DRENDERER_DEFAULT=vulkan -DSKIP_IDPAK_CHECK=ON -Wno-dev
-        cmake --build . -j4
-        cd ..
-        mkdir bin
-        copy build-vk-${{ matrix.btype }}\idtech3* bin\ || echo "Some files not found"
-
-    - name: Build OpenGL
-      if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
-      shell: cmd
-      env:
-        CFLAGS: "-DSKIP_IDPAK_CHECK=1"
-      run: |
-        mkdir build-gl-${{ matrix.btype }}
-        cd build-gl-${{ matrix.btype }}
-        cmake -S .. -B . -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=${{ matrix.btype }} -DUSE_STB_TRUETYPE=ON -DENABLE_FORTIFY_SOURCE=OFF -DENABLE_ASAN=OFF -DBUILD_SERVER=OFF -DUSE_VULKAN=ON -DRENDERER_DEFAULT=opengl -DSKIP_IDPAK_CHECK=ON -Wno-dev
-        cmake --build . -j4
-        cd ..
-        copy build-gl-${{ matrix.btype }}\idtech3* bin\ || echo "Some files not found"
-
-    - uses: actions/upload-artifact@v4
-      if: matrix.btype == 'Release'
-      with:
-        name: windows-mingw-${{ matrix.arch }}
-        path: bin
-        if-no-files-found: error
-        retention-days: 5
+ 
 
   windows-msvc:
     name: ${{ matrix.btype }} Windows-MSVC ${{ matrix.arch }}
