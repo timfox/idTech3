@@ -1,12 +1,12 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 3.12)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.24)
 
-PROJECT(quake3e)
+PROJECT(idtech3)
 
-SET(CNAME "quake3e")
-SET(DNAME "quake3e.ded")
+SET(CNAME "idtech3")
+SET(DNAME "idtech3.server")
 
 SET(RENDERER_PREFIX ${CNAME})
-SET(RENDERER_DEFAULT opengl) # valid options: opengl, vulkan, opengl2
+SET(RENDERER_DEFAULT vulkan) # valid options: opengl, vulkan, opengl2
 
 OPTION(USE_SDL "" ON)
 OPTION(USE_CURL "" ON)
