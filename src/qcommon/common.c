@@ -207,10 +207,10 @@ void FORMAT_PRINTF(1, 2) QDECL Com_Printf( const char *fmt, ... ) {
 
 	// logfile
 	if ( com_logfile && com_logfile->integer ) {
-		// TTimo: only open the qconsole.log if the filesystem is in an initialized state
-		//   also, avoid recursing in the qconsole.log opening (i.e. if fs_debug is on)
+		// TTimo: only open the console.log if the filesystem is in an initialized state
+		//   also, avoid recursing in the console.log opening (i.e. if fs_debug is on)
 		if ( logfile == FS_INVALID_HANDLE && FS_Initialized() && !opening_qconsole ) {
-			const char *logName = "qconsole.log";
+			const char *logName = "console.log";
 			int mode;
 
 			opening_qconsole = qtrue;
