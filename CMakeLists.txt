@@ -143,7 +143,6 @@ IF(USE_RENDERER_DLOPEN)
 		src/qcommon/q_shared.c
 		src/qcommon/puff.c
 		src/qcommon/q_math.c
-		src/qcommon/common.c
 	)
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_RENDERER_DLOPEN RENDERER_PREFIX="${RENDERER_PREFIX}" RENDERER_DEFAULT="${RENDERER_DEFAULT}")
 
