@@ -15,7 +15,7 @@ idtech3pbr/
 q3ios/
 logs/
 reference/
-mods/mymod/vm/*.so
+mods/mymod/
 mods/base/
 mods/baseq3/
 base/
