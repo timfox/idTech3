@@ -413,6 +413,13 @@ static void Cmd_Exec_f( void ) {
 	// Note: File buffer is intentionally not freed here
 	// Config files remain loaded in memory for the duration of the session
 	// FS_LoadStack will be checked later during hunk initialization
+	//
+	// The inserted text has been copied into the command buffer by
+	// Cbuf_InsertText, so it's safe to free the file memory now. Leaving
+	// these buffers allocated can cause fs_loadStack to be non-zero at
+	// hunk initialization and trigger fatal errors. Freeing here keeps
+	// memory accounting balanced while preserving behavior.
+	FS_FreeFile( f.v );
 
 #ifdef DELAY_WRITECONFIG
 	if ( !Q_stricmp( filename, Q3CONFIG_CFG ) ) {
