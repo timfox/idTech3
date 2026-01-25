@@ -16,9 +16,6 @@ q3ios/
 logs/
 reference/
 mods/mymod/vm/
-mods/mymod/vm/game.x86_64.so
-mods/mymod/vm/ui.x86_64.so
-mods/mymod/vm/cgame.x86_64.so
 mods/base/
 mods/baseq3/
 base/
