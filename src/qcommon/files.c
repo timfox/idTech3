@@ -4924,8 +4924,7 @@ static void FS_CheckIdPaks( void )
 					Com_Printf("\n\n"
 						"**************************************************\n"
 						"ERROR: pak0.pk3 is present but its checksum (%u)\n"
-						"is not correct. Please re-copy pak0.pk3 from your\n"
-						"legitimate Q3 CDROM.\n"
+						"is not correct.\n"
 						"**************************************************\n\n\n",
 						path->pack->checksum );
 				}
@@ -4934,8 +4933,7 @@ static void FS_CheckIdPaks( void )
 					Com_Printf("\n\n"
 						"**************************************************\n"
 						"ERROR: pak%d.pk3 is present but its checksum (%u)\n"
-						"is not correct. Please re-install Quake 3 Arena \n"
-						"Point Release v1.32 pk3 files\n"
+						"is not correct.\n"
 						"**************************************************\n\n\n",
 						pakBasename[3]-'0', path->pack->checksum );
 				}
@@ -4953,15 +4951,13 @@ static void FS_CheckIdPaks( void )
 		if((foundPak&1) != 1 )
 		{
 			Com_Printf("\n\n"
-			"pak0.pk3 is missing. Please copy it\n"
-			"from your legitimate Q3 CDROM.\n");
+			"pak0.pk3 is missing.\n");
 		}
 
 		if((foundPak&0x1fe) != 0x1fe )
 		{
 			Com_Printf("\n\n"
-			"Point Release files are missing. Please\n"
-			"re-install the 1.32 point release.\n");
+			"Point Release files are missing.\n");
 		}
 
 		Com_Printf("\n\n"
