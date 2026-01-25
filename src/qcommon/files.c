@@ -4836,10 +4836,12 @@ static void FS_Startup( void ) {
 
 	fs_gamedirvar->modified = qfalse; // We just loaded, it's not modified
 
-	// check original q3a files
+	// check original q3a files (can be disabled via SKIP_IDPAK_CHECK)
+#ifndef SKIP_IDPAK_CHECK
 	if ( FS_IsBaseGame( BASEGAME ) || FS_IsBaseGame( BASEDEMO ) ) {
 		FS_CheckIdPaks();
 	}
+#endif
 
 #ifdef FS_MISSING
 	if (missingFiles == NULL) {
