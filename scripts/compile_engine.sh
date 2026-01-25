@@ -144,10 +144,22 @@ if [ -f "$BUILD_DIR/idtech3.x86_64" ]; then
   echo "Copied client -> $RELEASE_DIR/${GAME_NAME}.x86_64"
 fi
 
+
+if [ -f "$BUILD_DIR/idtech3" ]; then
+  cp -f "$BUILD_DIR/idtech3" "$RELEASE_DIR/${GAME_NAME}"
+  echo "Copied client -> $RELEASE_DIR/${GAME_NAME}"
+fi
+
 # Server
 if [ -f "$BUILD_DIR/idtech3_server.x86_64" ]; then
   cp -f "$BUILD_DIR/idtech3_server.x86_64" "$RELEASE_DIR/${GAME_NAME}_server.x86_64"
   echo "Copied server -> $RELEASE_DIR/${GAME_NAME}_server.x86_64"
+fi
+
+
+if [ -f "$BUILD_DIR/idtech3_server" ]; then
+  cp -f "$BUILD_DIR/idtech3_server" "$RELEASE_DIR/${GAME_NAME}_server"
+  echo "Copied server -> $RELEASE_DIR/${GAME_NAME}_server"
 fi
 
 
