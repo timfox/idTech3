@@ -297,6 +297,16 @@ IF(USE_MP3)
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_MP3)
 ENDIF()
 
+# Ensure GNU-style --export-dynamic is not present in global linker flags on macOS
+if(APPLE)
+  if(DEFINED CMAKE_EXE_LINKER_FLAGS)
+    string(REPLACE "-Wl,--export-dynamic" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
+  endif()
+  if(DEFINED CMAKE_SHARED_LINKER_FLAGS)
+    string(REPLACE "-Wl,--export-dynamic" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
+  endif()
+endif()
+
 # client executable
 
 ADD_EXECUTABLE(${CNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
