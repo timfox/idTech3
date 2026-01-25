@@ -4,9 +4,9 @@
 
 Install Visual Studio Community Edition 2017 or later and compile `quake3e` project from solution
 
-`code/win32/msvc2017/quake3e.sln`
+`src/win32/msvc2017/quake3e.sln`
 
-Copy resulting exe from `code/win32/msvc2017/output` directory
+Copy resulting exe from `src/win32/msvc2017/output` directory
 
 To compile with Vulkan backend - clean solution, right click on `quake3e` project, find `Project Dependencies` and select `renderervk` instead of `renderer`
 

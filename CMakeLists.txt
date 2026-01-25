@@ -217,6 +217,12 @@ ELSEIF(WIN32)
 		src/win32/win_shared.c
 		src/win32/win_syscon.c
 		src/win32/win_resource.rc)
+	
+	# Set include directory for resource compiler to find icon and manifest files
+	if(MINGW)
+		set_source_files_properties(src/win32/win_resource.rc PROPERTIES
+			COMPILE_FLAGS "-I${CMAKE_CURRENT_SOURCE_DIR}/src/win32")
+	endif()
 
 	SET(Q3_UI_SRCS
 		src/win32/win_gamma.c
