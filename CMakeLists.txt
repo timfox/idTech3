@@ -291,8 +291,9 @@ ADD_EXECUTABLE(${CNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
 TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} qcommon botlib client q3ui)
 #TARGET_LINK_OPTIONS(${CNAME} PRIVATE -fno-pie) # v3.13+
 
-if(UNIX AND NOT MSVC)
+if(UNIX AND NOT MSVC AND NOT APPLE)
   # Ensure main executable exports symbols so dlopen'd renderer plugins can resolve engine symbols.
+  # --export-dynamic is a GNU ld option and should not be used on macOS (Darwin) where the linker rejects it.
   target_link_options(${CNAME}${BINEXT} PRIVATE "-Wl,--export-dynamic")
 endif()
 
@@ -310,7 +311,7 @@ ADD_EXECUTABLE(${DNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
 TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} qcommon_ded botlib)
 #TARGET_LINK_OPTIONS(${DNAME} PRIVATE -fno-pie) # v3.13+
 
-if(UNIX AND NOT MSVC)
+if(UNIX AND NOT MSVC AND NOT APPLE)
   target_link_options(${DNAME}${BINEXT} PRIVATE "-Wl,--export-dynamic")
 endif()
 
