@@ -39,12 +39,22 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "vm_local.h"
 
-// Declare __clear_cache builtin for ARM64 cache flushing
-// This is needed on macOS/Clang where it's not automatically declared
-#if defined(__aarch64__) || defined(__arm64__)
+// Provide portable icache-clear wrapper for non-Windows platforms
 #ifndef _WIN32
+#  if defined(__clang__) || defined(__GNUC__)
+static inline void vm_clear_icache(void *start, void *end)
+{
+    /* Clang/GCC builtin for clearing the instruction cache */
+    __builtin___clear_cache((char*)start, (char*)end);
+}
+#  else
+/* Fallback: declare platform-specific symbol if available */
 extern void __clear_cache(void* start, void* end);
-#endif
+static inline void vm_clear_icache(void *start, void *end)
+{
+    __clear_cache(start, end);
+}
+#  endif
 #endif
 
 #define NUM_PASSES 1
@@ -3491,7 +3501,7 @@ __recompile:
 	}
 
 	// clear icache, http://blogs.arm.com/software-enablement/141-caches-and-self-modifying-code/
-	__clear_cache( vm->codeBase.ptr, vm->codeBase.ptr + vm->codeLength );
+	vm_clear_icache( vm->codeBase.ptr, (char*)vm->codeBase.ptr + vm->codeLength );
 #endif
 
 	vm->destroy = VM_Destroy_Compiled;
