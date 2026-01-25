@@ -3,7 +3,7 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.24)
 PROJECT(idtech3)
 
 SET(CNAME "idtech3")
-SET(DNAME "idtech3.server")
+SET(DNAME "idtech3_server")
 
 SET(RENDERER_PREFIX ${CNAME})
 SET(RENDERER_DEFAULT vulkan) # valid options: opengl, vulkan, opengl2
