@@ -438,7 +438,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86_64, aarch64]
+        # Build only the native Apple Silicon architecture on macOS runners to avoid cross-arch Homebrew issues.
+        # Apple-provided runners are arm64 (aarch64); building x86_64 here pulls arm64 Homebrew libs and causes linker mismatches.
+        arch: [aarch64]
         cc: [clang]
         btype: [Release, Debug]
 
