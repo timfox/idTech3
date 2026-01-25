@@ -268,7 +268,7 @@ of a forced fallback of a player specific sound
 qboolean S_LoadSound( sfx_t *sfx )
 {
 	byte	*data;
-	short	*samples;
+	short	*samples = NULL;
 	snd_info_t	info;
 //	int		size;
 
@@ -285,8 +285,6 @@ qboolean S_LoadSound( sfx_t *sfx )
 		Com_DPrintf(S_COLOR_YELLOW "WARNING: %s is not a 22kHz audio file\n", sfx->soundName);
 	}
 
-	samples = Hunk_AllocateTempMemory(info.samples * sizeof(short) * 2);
-
 	sfx->lastTimeUsed = s_soundtime + 1; // Com_Milliseconds()+1
 
 	// each of these compression schemes works just fine
@@ -296,6 +294,7 @@ qboolean S_LoadSound( sfx_t *sfx )
 	// sound in as needed
 
 	if( info.channels == 1 && sfx->soundCompressed == qtrue) {
+		samples = Hunk_AllocateTempMemory(info.samples * sizeof(short) * 2);
 		sfx->soundCompressionMethod = 1;
 		sfx->soundData = NULL;
 		sfx->soundLength = ResampleSfxRaw( samples, info.channels, info.rate, info.width, info.samples, data + info.dataofs );
@@ -320,7 +319,9 @@ qboolean S_LoadSound( sfx_t *sfx )
 
 	sfx->soundChannels = info.channels;
 	
-	Hunk_FreeTempMemory(samples);
+	if ( samples ) {
+		Hunk_FreeTempMemory(samples);
+	}
 	Hunk_FreeTempMemory(data);
 
 	return qtrue;
