@@ -10,6 +10,7 @@ set -euo pipefail
 
 VULKAN=0
 OPENGL=0
+SKIP_IDPAK=0
 
 GAME_NAME="idtech3"
 BUILD_TYPE="Release"
@@ -50,6 +51,7 @@ for arg in "$@"; do
     coverage|cov) COVERAGE=1 ;;
     quiet|-q|--quiet|q|silent|-s|--silent) QUIET=1 ;;
     vulkan) VULKAN=1 ;;
+    skip-idpak-check|skip_idpak_check|skip-pak|skip-paks) SKIP_IDPAK=1 ;;
     opengl) OPENGL=1 ;;
     *) GAME_NAME="$arg" ;;
   esac
@@ -109,6 +111,11 @@ if [ "$VULKAN" -eq 1 ]; then
   CMAKE_FLAGS+=("-DRENDERER_DEFAULT=vulkan")
 else
   CMAKE_FLAGS+=("-DRENDERER_DEFAULT=opengl")
+fi
+
+if [ "$SKIP_IDPAK" -eq 1 ]; then
+  CMAKE_FLAGS+=("-DSKIP_IDPAK_CHECK=ON")
+  echo "CMake: SKIP_IDPAK_CHECK=ON"
 fi
 
 echo "Running CMake configuration..."
