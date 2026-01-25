@@ -39,6 +39,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "vm_local.h"
 
+// Declare __clear_cache builtin for ARM64 cache flushing
+// This is needed on macOS/Clang where it's not automatically declared
+#if defined(__aarch64__) || defined(__arm64__)
+#ifndef _WIN32
+extern void __clear_cache(void* start, void* end);
+#endif
+#endif
+
 #define NUM_PASSES 1
 
 // additional integrity checks
