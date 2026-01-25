@@ -104,6 +104,8 @@ IF(UNIX AND CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64|x86|i.86|x86_64|X86_64")
       set_source_files_properties(${ASM_SRCS} PROPERTIES COMPILE_FLAGS "-x assembler-with-cpp")
     endif()
   endif()
+  # Define USE_ASM to tell the code that assembly optimizations are available
+  ADD_COMPILE_DEFINITIONS(USE_ASM)
 ENDIF()
 IF(NOT USE_CURL)
 	list(REMOVE_ITEM CLIENT_SRCS src/client/cl_curl.c)
