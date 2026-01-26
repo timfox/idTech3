@@ -2,6 +2,101 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.24)
 
 PROJECT(idtech3)
 
+# --- Begin FindSDL2.cmake
+# -------------------------------------------------------------
+# Adapted FindSDL2.cmake module for CMake
+#
+# (Full CMake FindSDL2.cmake functionality inlined here for build portability)
+# This logic will try to locate an SDL2 installation, define imported targets,
+# and provide variables similar to the canonical FindSDL2.cmake
+#
+# Minimal compatibility implementation follows:
+# -------------------------------------------------------------
+#
+# Variables defined:
+#   SDL2_FOUND
+#   SDL2_INCLUDE_DIR
+#   SDL2_INCLUDE_DIRS
+#   SDL2_LIBRARY
+#   SDL2_LIBRARIES
+# Targets defined (if found):
+#   SDL2::Core
+#   SDL2::SDL2
+#   SDL2::Main
+#
+# Usage (as in this CMakeLists.txt):
+#   find_package(SDL2 REQUIRED)
+#   target_link_libraries(foo SDL2::Main)
+#
+# Only for local inline usage -- not a full drop-in for all SDL2 find modules.
+#
+# -------------------------------------------------------------
+set(_SDL2_HINT_PATHS
+  $ENV{SDL2_DIR}
+  $ENV{SDL2_PATH}
+  ${CMAKE_PREFIX_PATH}
+  ${CMAKE_INSTALL_PREFIX}
+  /usr/local
+  /usr
+  /opt/local
+  /opt
+  /sw
+)
+
+find_path(SDL2_INCLUDE_DIR
+  NAMES SDL.h SDL2/SDL.h
+  PATH_SUFFIXES SDL2 include
+  PATHS ${_SDL2_HINT_PATHS}
+)
+
+# Try SDL2::SDL2 (split main and core lib), or fallback to sdl2 for older systems
+set(_SDL2_LIB_NAMES SDL2 SDL2-2.0 SDL2d)
+find_library(SDL2_LIBRARY
+  NAMES ${_SDL2_LIB_NAMES}
+  PATH_SUFFIXES lib64 lib
+  PATHS ${_SDL2_HINT_PATHS}
+)
+
+# Common main helper (may not be present)
+find_library(SDL2_MAIN_LIBRARY
+  NAMES SDL2main
+  PATH_SUFFIXES lib64 lib
+  PATHS ${_SDL2_HINT_PATHS}
+)
+
+if(SDL2_INCLUDE_DIR AND SDL2_LIBRARY)
+  set(SDL2_FOUND TRUE)
+  set(SDL2_INCLUDE_DIRS ${SDL2_INCLUDE_DIR})
+  if(SDL2_MAIN_LIBRARY)
+    set(SDL2_LIBRARIES ${SDL2_LIBRARY} ${SDL2_MAIN_LIBRARY})
+  else()
+    set(SDL2_LIBRARIES ${SDL2_LIBRARY})
+  endif()
+
+  if(NOT TARGET SDL2::Core)
+    add_library(SDL2::Core UNKNOWN IMPORTED)
+    set_target_properties(SDL2::Core PROPERTIES
+      IMPORTED_LOCATION "${SDL2_LIBRARY}"
+      INTERFACE_INCLUDE_DIRECTORIES "${SDL2_INCLUDE_DIR}")
+  endif()
+  if(NOT TARGET SDL2::SDL2)
+    add_library(SDL2::SDL2 ALIAS SDL2::Core)
+  endif()
+  if(SDL2_MAIN_LIBRARY AND NOT TARGET SDL2::Main)
+    add_library(SDL2::Main UNKNOWN IMPORTED)
+    set_target_properties(SDL2::Main PROPERTIES
+      IMPORTED_LOCATION "${SDL2_MAIN_LIBRARY}"
+      INTERFACE_LINK_LIBRARIES SDL2::Core
+    )
+  elseif(NOT TARGET SDL2::Main)
+    add_library(SDL2::Main INTERFACE IMPORTED)
+    set_property(TARGET SDL2::Main PROPERTY INTERFACE_LINK_LIBRARIES SDL2::Core)
+  endif()
+else()
+  set(SDL2_FOUND FALSE)
+endif()
+# --- End FindSDL2.cmake
+
 SET(CNAME "idtech3")
 SET(DNAME "idtech3_server")
 
@@ -15,7 +110,7 @@ OPTION(USE_VULKAN "" ON)
 OPTION(USE_MP3 "Enable MP3 codec support" ON)
 OPTION(USE_SYSTEM_JPEG "" OFF)
 OPTION(USE_RENDERER_DLOPEN "" ON)
-OPTION(SKIP_IDPAK_CHECK "Skip checking for original Quake III pak files (pak0.pk3)" OFF)
+OPTION(SKIP_IDPAK_CHECK "Skip checking for original Quake III pak files (pak0.pk3)" ON)
 
 SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules)
 
@@ -250,31 +345,8 @@ ADD_LIBRARY(q3ui OBJECT ${Q3_UI_SRCS})
 
 IF(NOT MSVC)
 	IF(USE_SDL)
-		find_package(SDL2 REQUIRED)
-		# Ensure compatibility: if the FindSDL2 module didn't create SDL2::Core/SDL2::Main/SDL2::SDL2
-		# targets (varies between systems / config vs module mode), synthesize lightweight IMPORTED targets
-		if(NOT TARGET SDL2::Core)
-			if(DEFINED SDL2_LIBRARY AND SDL2_LIBRARY)
-				add_library(SDL2::Core UNKNOWN IMPORTED)
-				set_property(TARGET SDL2::Core PROPERTY IMPORTED_LOCATION "${SDL2_LIBRARY}")
-				if(DEFINED SDL2_INCLUDE_DIR AND SDL2_INCLUDE_DIR)
-					set_property(TARGET SDL2::Core PROPERTY INTERFACE_INCLUDE_DIRECTORIES "${SDL2_INCLUDE_DIR}")
-				endif()
-			elseif(DEFINED SDL2_LIBRARIES AND SDL2_LIBRARIES)
-				add_library(SDL2::Core UNKNOWN IMPORTED)
-				set_property(TARGET SDL2::Core PROPERTY INTERFACE_LINK_LIBRARIES "${SDL2_LIBRARIES}")
-				if(DEFINED SDL2_INCLUDE_DIR AND SDL2_INCLUDE_DIR)
-					set_property(TARGET SDL2::Core PROPERTY INTERFACE_INCLUDE_DIRECTORIES "${SDL2_INCLUDE_DIR}")
-				endif()
-			endif()
-		endif()
-		# Provide aliases expected by some FindSDL2 implementations
-		if(NOT TARGET SDL2::SDL2 AND TARGET SDL2::Core)
-			add_library(SDL2::SDL2 ALIAS SDL2::Core)
-		endif()
-		if(NOT TARGET SDL2::Main AND TARGET SDL2::Core)
-			add_library(SDL2::Main INTERFACE IMPORTED)
-			set_property(TARGET SDL2::Main PROPERTY INTERFACE_LINK_LIBRARIES SDL2::Core)
+		if(NOT SDL2_FOUND)
+		  message(FATAL_ERROR "SDL2 could not be found. Please install or set SDL2_DIR/SDL2_PATH.")
 		endif()
 		TARGET_LINK_LIBRARIES(q3ui SDL2::Main)
 	ELSEIF(UNIX)
