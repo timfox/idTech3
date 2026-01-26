@@ -1,8 +1,8 @@
 # id Tech 3
 
-[![build](../../workflows/build/badge.svg)](../../actions?query=workflow%3Abuild) * <a href="https://discord.com/invite/X3Exs4C"><img src="https://img.shields.io/discord/314456230649135105?color=7289da&logo=discord&logoColor=white" alt="Discord server" /></a>
+[![build](../../workflows/build/badge.svg)](../../actions?query=workflow%3Abuild)
 
-This is a modernized id Tech 3 engine aimed to be fast, secure and compatible with all existing Q3A mods.
+This is a modernized id Tech 3 engine.
 
 Go to [Releases](../../releases) section to download latest binaries for your platform or follow [Build Instructions](#build-instructions)
 
@@ -52,8 +52,6 @@ Based on [Quake-III-Arena-Kenny-Edition](https://github.com/kennyalive/Quake-III
 
 In general, not counting offscreen rendering features you might expect from 10% to 200%+ FPS increase comparing to KE's original version
 
-Highly recommended to use on modern systems
-
 ## OpenGL renderer
 
 Based on classic OpenGL renderers from [idq3](https://github.com/id-Software/Quake-III-Arena)/[ioquake3](https://github.com/ioquake/ioq3)/[cnq3](https://bitbucket.org/CPMADevs/cnq3)/[openarena](https://github.com/OpenArena/engine), features:
@@ -65,22 +63,13 @@ Based on classic OpenGL renderers from [idq3](https://github.com/id-Software/Qua
 * all set of offscreen rendering features mentioned in Vulkan renderer, plus:
 * bloom reflection post-processing effect
 
-Performance is usually greater or equal to other opengl1 renderers
-
-## OpenGL2 renderer
-
-Original ioquake3 renderer, performance is very poor on non-nvidia systems, unmaintained
-
-## [Build Instructions](BUILD.md)
-
-## Contacts
-
-Discord channel: https://discordapp.com/invite/X3Exs4C
-
 ## Links
 
+* https://idtech3.com
 * https://bitbucket.org/CPMADevs/cnq3
 * https://github.com/ioquake/ioq3
 * https://github.com/kennyalive/Quake-III-Arena-Kenny-Edition
 * https://github.com/OpenArena/engine
+
+
 
