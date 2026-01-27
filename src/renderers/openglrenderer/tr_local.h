@@ -23,80 +23,27 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef TR_LOCAL_H
 #define TR_LOCAL_H
 
-#define USE_VK_PBR
-
-#ifdef USE_VK_PBR
-#define VK_PBR_BRDFLUT		// for inspecting codebase, does not toggle brdflut. 
-#define VK_CUBEMAP	
-
-#ifdef VK_CUBEMAP
-	#define REF_CUBEMAP_IRRADIANCE_SIZE		64
-	#define REF_CUBEMAP_SIZE				256
-#endif
-#endif
-
-#define USE_VBO				// store static world geometry in VBO
-#define USE_FOG_ONLY
-#define USE_FOG_COLLAPSE	// not compatible with legacy dlights
-#if defined (USE_VBO) && !defined(USE_FOG_ONLY)
-#define USE_FOG_ONLY
-#endif
 #define USE_LEGACY_DLIGHTS	// vq3 dynamic lights
 #define USE_PMLIGHT			// promode dynamic lights via \r_dlightMode 1|2
 #define MAX_REAL_DLIGHTS	(MAX_DLIGHTS*2)
 #define MAX_LITSURFS		(MAX_DRAWSURFS)
-#define	MAX_FLARES			256
 
 #define MAX_TEXTURE_SIZE	2048 // must be less or equal to 32768
 
-#define USE_BUFFER_CLEAR	/* clear attachments on render pass begin */
-
-//#define USE_TESS_NEEDS_NORMAL
+#define USE_VBO
+#define USE_TESS_NEEDS_NORMAL
 //#define USE_TESS_NEEDS_ST2
+#define USE_FBO
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qfiles.h"
-#include "../qcommon/qcommon.h"
-#include "../renderercommon/tr_public.h"
+#include "../../qcommon/q_shared.h"
+#include "../../qcommon/qfiles.h"
+#include "../../qcommon/qcommon.h"
+#include "../rendercommon/tr_public.h"
 #include "tr_common.h"
 #include "iqm.h"
+#include "qgl.h"
 
-
-#ifdef USE_VULKAN
-#include "vk.h"
-// GL constants substitutions
-typedef enum {
-	GL_NEAREST,
-	GL_LINEAR,
-	GL_NEAREST_MIPMAP_NEAREST,
-	GL_LINEAR_MIPMAP_NEAREST,
-	GL_NEAREST_MIPMAP_LINEAR,
-	GL_LINEAR_MIPMAP_LINEAR,
-	GL_MODULATE,
-	GL_ADD,
-	GL_ADD_NONIDENTITY,
-
-	GL_BLEND_MODULATE,
-	GL_BLEND_ADD,
-	GL_BLEND_ALPHA,
-	GL_BLEND_ONE_MINUS_ALPHA,
-	GL_BLEND_MIX_ALPHA, // SRC_ALPHA + ONE_MINUS_SRC_ALPHA
-	GL_BLEND_MIX_ONE_MINUS_ALPHA, // ONE_MINUS_SRC_ALPHA + SRC_ALPHA
-
-	GL_BLEND_DST_COLOR_SRC_ALPHA, // GLS_SRCBLEND_DST_COLOR + GLS_DSTBLEND_SRC_ALPHA
-
-	GL_DECAL,
-	GL_BACK_LEFT,
-	GL_BACK_RIGHT
-} glCompat;
-
-#define GL_INDEX_TYPE		uint32_t
-#define GLint				int
-#define GLuint				unsigned int
-#define GLboolean			VkBool32
-#else
 #define GL_INDEX_TYPE		GL_UNSIGNED_INT
-#endif
 
 typedef uint32_t glIndex_t;
 
@@ -158,7 +105,6 @@ typedef struct {
 	vec3_t		axis[3];		// orientation in world
 	vec3_t		viewOrigin;		// viewParms->or.origin in local coordinates
 	float		modelMatrix[16];
-	float		modelViewMatrix[16];
 } orientationr_t;
 
 //===============================================================================
@@ -362,16 +308,6 @@ typedef struct {
 	int				numTexMods;
 	texModInfo_t	*texMods;
 
-	waveForm_t		rgbWave;
-	colorGen_t		rgbGen;
-
-	waveForm_t		alphaWave;
-	alphaGen_t		alphaGen;
-
-	color4ub_t		constantColor;			// for CGEN_CONST and AGEN_CONST
-
-	acff_t			adjustColorsForFog;
-
 	int				videoMapHandle;
 	int				lightmap;				// LIGHTMAP_INDEX_NONE, LIGHTMAP_INDEX_SHADER, LIGHTMAP_INDEX_OFFSET
 	qboolean		isVideoMap;
@@ -379,51 +315,41 @@ typedef struct {
 	unsigned int 	dlight : 1;
 } textureBundle_t;
 
-#ifdef USE_VULKAN
-#define NUM_TEXTURE_BUNDLES 3
-#else
 #define NUM_TEXTURE_BUNDLES 2
-#endif
+
+#define TESS_ST0	1<<0
+#define TESS_ST1	1<<1
+#define TESS_ENV0	1<<2
+#define TESS_ENV1	1<<3
 
 typedef struct {
 	qboolean		active;
 	
 	textureBundle_t	bundle[NUM_TEXTURE_BUNDLES];
 
+	waveForm_t		rgbWave;
+	colorGen_t		rgbGen;
+
+	waveForm_t		alphaWave;
+	alphaGen_t		alphaGen;
+
+	color4ub_t		constantColor;				// for CGEN_CONST and AGEN_CONST
+
 	unsigned		stateBits;					// GLS_xxxx mask
 	GLint			mtEnv;						// 0, GL_MODULATE, GL_ADD, GL_DECAL
-	GLint			mtEnv3;						// 0, GL_MODULATE, GL_ADD, GL_DECAL
+
+	acff_t			adjustColorsForFog;
 
 	qboolean		isDetail;
 	qboolean		depthFragment;
 
-#ifdef USE_VULKAN
+	short			vboVPindex[3];		// normal, eye-in, eye-out
+	short			vboFPindex[2];		// normal, fog-blend
+	
+	uint32_t		color_offset;		// within current shader
+	uint32_t		tex_offset[2];		// within current shader
+
 	uint32_t		tessFlags;
-	uint32_t		numTexBundles;
-
-	uint32_t		vk_pipeline[2]; // normal,fogged
-	uint32_t		vk_mirror_pipeline[2];
-
-	uint32_t		vk_pipeline_df; // depthFragment
-	uint32_t		vk_mirror_pipeline_df;
-#ifdef USE_VK_PBR
-	uint32_t		vk_pbr_flags;
-	image_t			*normalMap;
-	image_t			*physicalMap;
-
-	uint32_t		normalMapType;
-	uint32_t		physicalMapType;
-
-	vec4_t normalScale;
-	vec4_t specularScale;
-	float  parallaxBias;
-#endif
-#endif
-
-#ifdef USE_VBO
-	uint32_t		rgb_offset[NUM_TEXTURE_BUNDLES]; // within current shader
-	uint32_t		tex_offset[NUM_TEXTURE_BUNDLES]; // within current shader
-#endif
 
 } shaderStage_t;
 
@@ -503,11 +429,6 @@ typedef struct shader_s {
 	int			lightingStage;
 	int			lightingBundle;
 #endif
-	qboolean	fogCollapse;
-	int			tessFlags;
-
-#ifdef USE_VBO
-	// VBO structures
 	qboolean	isStaticShader;
 	int			svarsSize;
 	int			iboOffset;
@@ -517,16 +438,8 @@ typedef struct shader_s {
 	int			numVertexes;
 	int			curVertexes;
 	int			curIndexes;
-#ifdef USE_VK_PBR
-	int			qtangentOffset;
-	int			lightdirOffset;
-#endif
-#endif
 
 	int			hasScreenMap;
-#ifdef USE_VK_PBR
-	qboolean	hasPBR;
-#endif
 
 	void	(*optimalStageIteratorFunc)( void );
 
@@ -576,10 +489,6 @@ typedef struct {
 	int			numLitSurfs;
 	struct litSurf_s	*litSurfs;
 #endif
-#ifdef USE_VULKAN
-	qboolean	switchRenderPass;
-	qboolean	needScreenMap;
-#endif
 } trRefdef_t;
 
 
@@ -591,34 +500,15 @@ typedef struct image_s {
 	int			uploadWidth;		// after power of two and picmip but not including clamp to MAX_TEXTURE_SIZE
 	int			uploadHeight;
 	imgFlags_t	flags;
+	GLuint		texnum;				// gl texture binding
+
 	int			frameUsed;			// for texture usage in frame statistics
 
-#ifdef USE_VULKAN
-	int			internalFormat;
-
-	VkSamplerAddressMode wrapClampMode;
-	uint32_t	type;
-	uint32_t	layers;
-	VkImage		handle;
-	VkImageView	view;
-	// Descriptor set that contains single descriptor used to access the given image.
-	// It is updated only once during image initialization.
-	VkDescriptorSet descriptor;
-#else
-	GLuint		texnum;				// gl texture binding
 	GLint		internalFormat;
 	int			TMU;				// only needed for voodoo2
-#endif
 
 } image_t;
 
-typedef struct cubemap_s {
-	char		name[MAX_QPATH];
-	vec3_t		origin;
-	float		parallaxRadius;
-	image_t		*prefiltered_image;
-	image_t		*irradiance_image;
-} cubemap_t;
 
 //=================================================================================
 
@@ -691,8 +581,6 @@ typedef struct {
 	unsigned int num_dlights;
 	struct dlight_s	*dlights;
 #endif
-	cubemap_t		*targetCube;
-	int				targetCubeLayer;
 } viewParms_t;
 
 /*
@@ -775,23 +663,20 @@ typedef struct srfGridMesh_s {
 	float			lodRadius;
 	int				lodFixed;
 	int				lodStitched;
-#ifdef USE_VBO
+
 	int				vboItemIndex;
 	int				vboExpectIndices;
 	int				vboExpectVertices;
-#endif
+
 	// vertexes
 	int				width, height;
 	float			*widthLodError;
 	float			*heightLodError;
-	srfVert_t		verts[1];		// variable sized
+	drawVert_t		verts[1];		// variable sized
 } srfGridMesh_t;
 
-#ifdef USE_VK_PBR
-	#define	VERTEXSIZE	11
-#else
-	#define	VERTEXSIZE	8
-#endif
+
+#define	VERTEXSIZE	8
 typedef struct {
 	surfaceType_t	surfaceType;
 	cplane_t	plane;
@@ -800,14 +685,8 @@ typedef struct {
 #ifdef USE_LEGACY_DLIGHTS
 	int			dlightBits;
 #endif
-#ifdef USE_VBO
 	int			vboItemIndex;
-#endif
 	float		*normals;
-#ifdef USE_VK_PBR
-	float			*qtangents;
-	float			*lightdir;
-#endif
 
 	// triangle definitions (no normals at points)
 	int			numPoints;
@@ -826,9 +705,7 @@ typedef struct {
 #ifdef USE_LEGACY_DLIGHTS
 	int				dlightBits;
 #endif
-#ifdef USE_VBO
 	int				vboItemIndex;
-#endif
 
 	// culling information (FIXME: use this!)
 	vec3_t			bounds[2];
@@ -840,7 +717,7 @@ typedef struct {
 	int				*indexes;
 
 	int				numVerts;
-	srfVert_t		*verts;
+	drawVert_t		*verts;
 } srfTriangles_t;
 
 typedef struct {
@@ -1178,6 +1055,7 @@ typedef struct {
 
 	qboolean	projection2D;	// if qtrue, drawstretchpic doesn't need to change modes
 	color4ub_t	color2D;
+	qboolean	doneBloom;		// done bloom this frame
 	qboolean	doneSurfaces;   // done any 3d surfaces already
 	trRefEntity_t	entity2D;	// currentEntity will point at this when doing 2D rendering
 
@@ -1194,18 +1072,7 @@ typedef struct {
 	qboolean drawConsole;
 	qboolean doneShadows;
 
-	qboolean screenMapDone;
-	qboolean doneBloom;
-
 } backEndState_t;
-
-typedef struct drawSurfsCommand_s drawSurfsCommand_t;
-
-typedef struct convolveCubemapCommand_s {
-	int			commandId;
-	cubemap_t	*cubemap;
-	int			cubemapId;
-} convolveCubemapCommand_t;
 
 /*
 ** trGlobals_t 
@@ -1240,17 +1107,8 @@ typedef struct {
 	image_t					*fogImage;
 	image_t					*dlightImage;	// inverse-quare highlight for projective adding
 	image_t					*flareImage;
-	image_t					*blackImage;
 	image_t					*whiteImage;			// full of 0xff
 	image_t					*identityLightImage;	// full of tr.identityLightByte
-#ifdef USE_VK_PBR
-	image_t					*emptyImage;		// full of 0xff
-#endif
-#ifdef VK_CUBEMAP
-	image_t					*emptyCubemap;
-	int                     numCubemaps;
-	cubemap_t               *cubemaps;
-#endif
 
 	shader_t				*defaultShader;
 	shader_t				*whiteShader;
@@ -1323,33 +1181,24 @@ typedef struct {
 	float					fogTable[FOG_TABLE_SIZE];
 
 	qboolean				mapLoading;
-
-	int						needScreenMap;
-#ifdef USE_VULKAN
-	drawSurfsCommand_t		*drawSurfCmd;
-	int						numDrawSurfCmds;
-	int						lastRenderCommand;
-	int						numFogs; // read before parsing shaders
-#endif
+	qboolean				needScreenMap;
 
 	qboolean				vertexLightingAllowed;
-} trGlobals_t;
 
+} trGlobals_t;
 
 extern backEndState_t	backEnd;
 extern trGlobals_t	tr;
 
-extern int	gl_clamp_mode;
+extern int					gl_clamp_mode;
 
 extern glstate_t	glState;		// outside of TR since it shouldn't be cleared during ref re-init
 
 extern glstatic_t gls;
 
-extern void myGlMultMatrix(const float *a, const float *b, float *out);
-
-#ifdef USE_VULKAN
-extern Vk_Instance	vk;				// shouldn't be cleared during ref re-init
-extern Vk_World		vk_world;		// this data is cleared during ref re-init
+#ifdef USE_FBO
+extern	qboolean			windowAdjusted;
+extern	qboolean			superSampled;
 #endif
 
 //
@@ -1379,41 +1228,32 @@ extern cvar_t	*r_dynamiclight;		// dynamic lights enabled/disabled
 extern cvar_t	*r_mergeLightmaps;
 #ifdef USE_PMLIGHT
 extern cvar_t	*r_dlightMode;			// 0 - vq3, 1 - pmlight
-//extern cvar_t	*r_dlightSpecPower;		// 1 - 32
-//extern cvar_t	*r_dlightSpecColor;		// -1.0 - 1.0
+extern cvar_t	*r_dlightSpecPower;		// 1 - 32
+extern cvar_t	*r_dlightSpecColor;		// -1.0 - 1.0
 extern cvar_t	*r_dlightScale;			// 0.1 - 1.0
 extern cvar_t	*r_dlightIntensity;		// 0.1 - 1.0
 #endif
 extern cvar_t	*r_dlightSaturation;	// 0.0 - 1.0
-#ifdef USE_VULKAN
-extern cvar_t	*r_device;
 #ifdef USE_VBO
 extern cvar_t	*r_vbo;
 #endif
-#ifdef USE_VK_PBR
-extern cvar_t	*r_pbr;
-extern cvar_t	*r_baseNormalX;
-extern cvar_t	*r_baseNormalY;
-extern cvar_t	*r_baseParallax;
-extern cvar_t	*r_baseSpecular;
-#ifdef VK_CUBEMAP
-extern cvar_t	*r_cubeMapping;
-#endif
-#endif
+#ifdef USE_FBO
 extern cvar_t	*r_fbo;
 extern cvar_t	*r_hdr;
 extern cvar_t	*r_bloom;
 extern cvar_t	*r_bloom_threshold;
-extern cvar_t	*r_bloom_intensity;
 extern cvar_t	*r_bloom_threshold_mode;
 extern cvar_t	*r_bloom_modulate;
-extern cvar_t	*r_ext_multisample;
-extern cvar_t	*r_ext_supersample;
-//extern cvar_t	*r_ext_alpha_to_coverage;
+extern cvar_t	*r_bloom_passes;
+extern cvar_t	*r_bloom_blend_base;
+extern cvar_t	*r_bloom_intensity;
+extern cvar_t	*r_bloom_filter_size;
+extern cvar_t	*r_bloom_reflection;
+
 extern cvar_t	*r_renderWidth;
 extern cvar_t	*r_renderHeight;
 extern cvar_t	*r_renderScale;
-#endif
+#endif // USE_FBO
 
 extern cvar_t	*r_dlightBacks;			// dlight non-facing surfaces for continuity
 
@@ -1463,9 +1303,9 @@ extern	cvar_t	*r_subdivisions;
 extern	cvar_t	*r_lodCurveError;
 extern	cvar_t	*r_skipBackEnd;
 
+extern	cvar_t	*r_anaglyphMode;
+
 extern	cvar_t	*r_greyscale;
-extern	cvar_t	*r_dither;
-extern	cvar_t	*r_presentBits;
 
 extern	cvar_t	*r_ignoreGLErrors;
 
@@ -1525,15 +1365,15 @@ void R_RotateForEntity( const trRefEntity_t *ent, const viewParms_t *viewParms, 
 */
 const float *GL_Ortho( const float left, const float right, const float bottom, const float top, const float znear, const float zfar );
 void	GL_Bind( image_t *image );
+void	GL_BindTexNum( GLuint texnum );
 void	GL_SelectTexture( int unit );
+void	GL_BindTexture( int unit, GLuint texnum );
 void	GL_TextureMode( const char *string );
 void	GL_CheckErrors( void );
 void	GL_State( unsigned stateVector );
 void	GL_ClientState( int unit, unsigned stateVector );
-#ifndef USE_VULKAN
 void	GL_TexEnv( GLint env );
 void	GL_Cull( cullType_t cullType );
-#endif
 
 #define GLS_SRCBLEND_ZERO						0x00000001
 #define GLS_SRCBLEND_ONE						0x00000002
@@ -1627,10 +1467,6 @@ void		R_InitShaders( void );
 void		R_ShaderList_f( void );
 void		RE_RemapShader(const char *oldShader, const char *newShader, const char *timeOffset);
 
-#ifdef USE_VK_PBR
-qboolean vk_create_phyisical_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
-qboolean vk_create_normal_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
-#endif
 
 //
 // tr_surface.c
@@ -1647,7 +1483,7 @@ TESSELATOR/SHADER DECLARATIONS
 
 typedef struct stageVars
 {
-	color4ub_t	colors[NUM_TEXTURE_BUNDLES][SHADER_MAX_VERTEXES]; // we need at least 2xSHADER_MAX_VERTEXES for shadows and normals
+	color4ub_t	colors[SHADER_MAX_VERTEXES];
 	vec2_t		texcoords[NUM_TEXTURE_BUNDLES][SHADER_MAX_VERTEXES];
 	vec2_t		*texcoordPtr[NUM_TEXTURE_BUNDLES];
 } stageVars_t;
@@ -1658,10 +1494,6 @@ typedef struct shaderCommands_s
 	glIndex_t	indexes[SHADER_MAX_INDEXES] QALIGN(16);
 	vec4_t		xyz[SHADER_MAX_VERTEXES*2] QALIGN(16); // 2x needed for shadows
 	vec4_t		normal[SHADER_MAX_VERTEXES] QALIGN(16);
-#ifdef USE_VK_PBR
-	vec4_t		qtangent[SHADER_MAX_VERTEXES]					QALIGN(16);
-	vec4_t		lightdir[SHADER_MAX_VERTEXES]					QALIGN(16);
-#endif
 	vec2_t		texCoords[2][SHADER_MAX_VERTEXES] QALIGN(16);
 	vec2_t		texCoords00[SHADER_MAX_VERTEXES] QALIGN(16);
 	color4ub_t	vertexColors[SHADER_MAX_VERTEXES] QALIGN(16);
@@ -1673,12 +1505,9 @@ typedef struct shaderCommands_s
 	color4ub_t	constantColor255[SHADER_MAX_VERTEXES] QALIGN(16);
 #pragma pack(pop)
 
-#ifdef USE_VBO
 	surfaceType_t	surfType;
 	int			vboIndex;
-	int			vboStage;
 	qboolean	allowVBO;
-#endif
 
 	shader_t	*shader;
 	double		shaderTime;	// -EC- set to double for frameloss fix
@@ -1693,10 +1522,7 @@ typedef struct shaderCommands_s
 	const dlight_t* light;
 	qboolean	dlightPass;
 	qboolean	dlightUpdateParams;
-#endif
-
-#ifdef USE_VULKAN
-	Vk_Depth_Range depthRange;
+	cullType_t	cullType;
 #endif
 
 	// info extracted from current shader
@@ -1767,17 +1593,41 @@ void R_DlightBmodel( bmodel_t *bmodel );
 void R_SetupEntityLighting( const trRefdef_t *refdef, trRefEntity_t *ent );
 void R_TransformDlights( int count, dlight_t *dl, orientationr_t *or );
 int R_LightForPoint( vec3_t point, vec3_t ambientLight, vec3_t directedLight, vec3_t lightDir );
-#ifdef USE_VK_PBR
-int R_LightDirForPoint( vec3_t point, vec3_t lightDir, vec3_t normal, world_t *world );
-#endif
+
 #ifdef USE_PMLIGHT
-void VK_LightingPass( void );
+void ARB_SetupLightParams( void );
+void ARB_LightingPass( void );
 qboolean R_LightCullBounds( const dlight_t* dl, const vec3_t mins, const vec3_t maxs );
 #endif // USE_PMLIGHT
 
+void R_BindAnimatedImage( const textureBundle_t *bundle );
 void R_DrawElements( int numIndexes, const glIndex_t *indexes );
-void R_ComputeColors( const int bundle, color4ub_t *dest, const shaderStage_t *pStage );
+void R_ComputeColors( const shaderStage_t *pStage );
 void R_ComputeTexCoords( const int b, const textureBundle_t *bundle );
+
+void QGL_InitARB( void );
+void QGL_DoneARB( void );
+#ifdef USE_FBO
+void QGL_InitFBO( void );
+#endif
+qboolean ARB_UpdatePrograms( void );
+
+qboolean GL_ProgramAvailable( void );
+void GL_ProgramDisable( void );
+void GL_ProgramEnable( void );
+
+#ifdef USE_FBO
+extern qboolean		fboEnabled;
+extern qboolean		blitMSfbo;
+
+void FBO_BindMain( void );
+void FBO_PostProcess( void );
+void FBO_BlitMS( qboolean depthOnly );
+void FBO_BlitSS( void );
+qboolean FBO_Bloom( const float gamma, const float obScale, qboolean finalPass );
+void FBO_CopyScreen( void );
+GLuint FBO_ScreenTexture( void );
+#endif //  USE_FBO
 
 /*
 ============================================================
@@ -1814,7 +1664,7 @@ CURVE TESSELATION
 #define PATCH_STITCHING
 
 srfGridMesh_t *R_SubdividePatchToGrid( int width, int height,
-								srfVert_t points[MAX_PATCH_SIZE*MAX_PATCH_SIZE] );
+								drawVert_t points[MAX_PATCH_SIZE*MAX_PATCH_SIZE] );
 srfGridMesh_t *R_GridInsertColumn( srfGridMesh_t *grid, int column, int row, vec3_t point, float loderror );
 srfGridMesh_t *R_GridInsertRow( srfGridMesh_t *grid, int row, int column, vec3_t point, float loderror );
 void R_FreeSurfaceGridMesh( srfGridMesh_t *grid );
@@ -1849,8 +1699,7 @@ void RE_AddAdditiveLightToScene( const vec3_t org, float intensity, float r, flo
 void RE_AddLinearLightToScene( const vec3_t start, const vec3_t end, float intensity, float r, float g, float b );
 
 void RE_RenderScene( const refdef_t *fd );
-void RE_BeginScene( const refdef_t *fd );
-void RE_EndScene( void );
+
 /*
 =============================================================
 
@@ -1891,14 +1740,14 @@ int R_IQMLerpTag( orientation_t *tag, iqmData_t *data,
 =============================================================
 =============================================================
 */
-void	R_TransformModelToClip( const vec3_t src, const float *modelViewMatrix, const float *projectionMatrix,
+void	R_TransformModelToClip( const vec3_t src, const float *modelMatrix, const float *projectionMatrix,
 							vec4_t eye, vec4_t dst );
 void	R_TransformClipToWindow( const vec4_t clip, const viewParms_t *view, vec4_t normalized, vec4_t window );
 
 void	RB_DeformTessGeometry( void );
 
 void	RB_CalcEnvironmentTexCoords( float *dstTexCoords );
-void	RB_CalcEnvironmentTexCoordsFP( float *dstTexCoords, int screenMap );
+void	RB_CalcEnvironmentTexCoordsFP( float *dstTexCoords, qboolean screenMap );
 void	RB_CalcFogTexCoords( float *dstTexCoords );
 const fogProgramParms_t *RB_CalcFogProgramParms( void );
 void	RB_CalcScrollTexCoords( const float scroll[2], float *srcTexCoords, float *dstTexCoords );
@@ -1979,7 +1828,7 @@ typedef struct {
 	float	s2, t2;
 } stretchPicCommand_t;
 
-typedef struct drawSurfsCommand_s {
+typedef struct {
 	int		commandId;
 	trRefdef_t	refdef;
 	viewParms_t	viewParms;
@@ -2002,6 +1851,9 @@ typedef struct
 typedef struct
 {
 	int commandId;
+	qboolean fullscreen;
+	qboolean frontAndBack;
+	qboolean colorMask;
 } clearColorCommand_t;
 
 typedef enum {
@@ -2011,11 +1863,12 @@ typedef enum {
 	RC_DRAW_SURFS,
 	RC_DRAW_BUFFER,
 	RC_SWAP_BUFFERS,
+#ifdef USE_FBO
 	RC_FINISHBLOOM,
+#endif
 	RC_COLORMASK,
 	RC_CLEARDEPTH,
-	RC_CLEARCOLOR,
-	RC_CONVOLVECUBEMAP
+	RC_CLEARCOLOR
 } renderCommand_t;
 
 
@@ -2052,6 +1905,8 @@ void RB_TakeScreenshot( int x, int y, int width, int height, const char *fileNam
 void RB_TakeScreenshotJPEG( int x, int y, int width, int height, const char *fileName );
 void RB_TakeScreenshotBMP( int x, int y, int width, int height, const char *fileName, int clipboard );
 
+void R_IssuePendingRenderCommands( void );
+
 void R_AddDrawSurfCmd( drawSurf_t *drawSurfs, int numDrawSurfs );
 
 void RE_SetColor( const float *rgba );
@@ -2068,38 +1923,94 @@ qboolean RE_CanMinimize( void );
 const glconfig_t *RE_GetConfig( void );
 void RE_VertexLighting( qboolean allowed );
 
-#ifndef USE_VULKAN
+
+//Bloom Stuff
+
+#define MAX_FILTER_SIZE 20
+#define MIN_FILTER_SIZE 1
+#define MAX_BLUR_PASSES MAX_TEXTURE_UNITS
+
+void R_BloomScreen( void );
+
 #define GLE( ret, name, ... ) extern ret ( APIENTRY * q##name )( __VA_ARGS__ );
 	QGL_Core_PROCS;
 	QGL_Ext_PROCS;
+	QGL_ARB_PROGRAM_PROCS;
+	QGL_VBO_PROCS;
+	QGL_FBO_PROCS;
+	QGL_FBO_OPT_PROCS;
 #undef GLE
 
-#endif
-
-#ifdef USE_VK_PBR
-// pbr
-void		R_CalcTangents( vec3_t tangent, vec3_t binormal,
-				const vec3_t v0, const vec3_t v1, const vec3_t v2,
-				const vec2_t t0, const vec2_t t1, const vec2_t t2 );
-void		R_TBNtoQtangents( const vec3_t tangent, const vec3_t binormal,
-		       const vec3_t normal, vec4_t qtangent );
-void		R_AddConvolveCubemapCmd( cubemap_t *cubemap , int cubemapId );
-void		vk_generate_cubemaps( cubemap_t *cube );
-void		R_IssueRenderCommands( void );
-#endif
-
-#ifdef USE_VBO
 // VBO functions
+#ifdef USE_VBO
+extern void RB_StageIteratorVBO( void );
 extern void R_BuildWorldVBO( msurface_t *surf, int surfCount );
 
 extern void VBO_PushData( int itemIndex, shaderCommands_t *input );
 extern void VBO_UnBind( void );
+extern int VBO_Active( void );
 
 extern void VBO_Cleanup( void );
 extern void VBO_QueueItem( int itemIndex );
 extern void VBO_ClearQueue( void );
 extern void VBO_Flush( void );
 #endif
+
+// ARB shaders definitions
+
+typedef enum {
+	Vertex,
+	Fragment
+} programType;
+
+typedef enum {
+	DEFAULT_VERTEX,
+	DEFAULT_FRAGMENT,
+
+	PROGRAM_BASE,
+
+	DUMMY_VERTEX = PROGRAM_BASE,
+
+	// locate all fog programs in predefined order (sequentially after non-fogged ones)
+	// so we can easy switch/adjust them without many if() statements
+#ifdef USE_PMLIGHT
+	DLIGHT_VERTEX,
+	DLIGHT_VERTEX_FOG_IN,
+	DLIGHT_VERTEX_FOG_OUT,
+
+	DLIGHT_FRAGMENT,
+	DLIGHT_FRAGMENT_FOG,
+
+	DLIGHT_ABS_FRAGMENT,
+	DLIGHT_ABS_FRAGMENT_FOG,
+
+	DLIGHT_LINEAR_FRAGMENT,
+	DLIGHT_LINEAR_FRAGMENT_FOG,
+
+	DLIGHT_LINEAR_ABS_FRAGMENT,
+	DLIGHT_LINEAR_ABS_FRAGMENT_FOG,
+#endif
+	SPRITE_FRAGMENT,
+#ifdef USE_FBO
+	GAMMA_FRAGMENT,
+	BLOOM_EXTRACT_FRAGMENT,
+	BLUR_FRAGMENT,
+	BLUR2_FRAGMENT,
+	BLENDX_FRAGMENT,
+	BLEND2_FRAGMENT,
+	BLEND2_GAMMA_FRAGMENT,
+#endif
+	PROGRAM_COUNT
+
+} programNum;
+
+extern const char *fogOutVPCode;
+extern const char *fogInVPCode;
+
+qboolean ARB_CompileProgram( programType ptype, const char *text, GLuint program );
+void ARB_ProgramEnableExt( GLuint vertexProgram, GLuint fragmentProgram );
+
+void QGL_SetRenderScale( qboolean verbose );
 
 int R_GetLightmapCoords( const int lightmapIndex, float *x, float *y );
 
