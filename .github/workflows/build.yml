@@ -187,6 +187,8 @@ jobs:
 
     - name: Install tools
       run: |
+        sudo rm -f /etc/apt/sources.list.d/azure-cli.list
+        sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list
         if [ ${{ matrix.arch }} == "x86" ]; then
           sudo dpkg --add-architecture i386
           sudo apt-get -qq update
@@ -313,6 +315,8 @@ jobs:
 
     - name: Install tools
       run: |
+        sudo rm -f /etc/apt/sources.list.d/azure-cli.list
+        sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list
         sudo apt-get -qq update
         sudo apt-get install -y make gcc g++ cmake ninja-build
         sudo apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev
