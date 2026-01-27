@@ -54,7 +54,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "unix_glw.h"
 
 #ifdef USE_OPENGL_API
-#include "../renderer/qgl.h"
+#include "../renderers/openglrenderer/qgl.h"
 #endif
 
 #include <X11/Xlib.h>
