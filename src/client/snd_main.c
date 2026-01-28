@@ -31,6 +31,11 @@ cvar_t *s_musicVolume;
 cvar_t *s_doppler;
 cvar_t *s_muteWhenMinimized;
 cvar_t *s_muteWhenUnfocused;
+#ifdef USE_OPENAL
+cvar_t *s_openal;
+cvar_t *s_openalDevice;
+cvar_t *s_openalHrtf;
+#endif
 
 static soundInterface_t si;
 
@@ -426,6 +431,17 @@ void S_Init( void )
 	Cvar_CheckRange( s_muteWhenMinimized, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( s_muteWhenMinimized, "Mutes all audio while game is minimized." );
 
+#ifdef USE_OPENAL
+	s_openal = Cvar_Get( "s_openal", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	Cvar_CheckRange( s_openal, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( s_openal, "Enables the OpenAL audio backend (requires restart)." );
+	s_openalDevice = Cvar_Get( "s_openalDevice", "default", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	Cvar_SetDescription( s_openalDevice, "OpenAL device name (\"default\" uses the system default)." );
+	s_openalHrtf = Cvar_Get( "s_openalHrtf", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	Cvar_CheckRange( s_openalHrtf, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( s_openalHrtf, "Enable OpenAL HRTF if supported by the device." );
+#endif
+
 	cv = Cvar_Get( "s_initsound", "1", 0 );
 	Cvar_SetDescription( cv, "Whether or not to startup the sound system." );
 	if ( !cv->integer ) {
@@ -441,6 +457,17 @@ void S_Init( void )
 		Cmd_AddCommand( "s_stop", S_StopAllSounds );
 		Cmd_AddCommand( "s_info", S_SoundInfo );
 
+#ifdef USE_OPENAL
+		if ( s_openal->integer ) {
+			Com_Printf( "OpenAL backend requested.\n" );
+			started = S_AL_Init( &si );
+			if ( !started ) {
+				Com_Printf( S_COLOR_YELLOW "OpenAL init failed, falling back to default backend.\n" );
+			}
+		} else {
+			Com_Printf( "OpenAL backend disabled (s_openal=0).\n" );
+		}
+#endif
 		if ( !started ) {
 			started = S_Base_Init( &si );
 		}

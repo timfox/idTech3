@@ -195,9 +195,30 @@ extern cvar_t *s_doppler;
 extern cvar_t *s_muteWhenUnfocused;
 extern cvar_t *s_muteWhenMinimized;
 
+#ifdef USE_OPENAL
+extern cvar_t *s_openal;
+extern cvar_t *s_openalDevice;
+extern cvar_t *s_openalHrtf;
+#endif
+
 extern cvar_t *s_testsound;
+extern cvar_t *s_khz;
+
+extern sfx_t s_knownSfx[];
+extern int s_numSfx;
+extern qboolean s_soundStarted;
+extern qboolean s_soundMuted;
 
 qboolean S_LoadSound( sfx_t *sfx );
+
+// Reusable base sound registration helpers
+void S_Base_BeginRegistration( void );
+sfxHandle_t S_Base_RegisterSound( const char *name, qboolean compressed );
+void S_Base_SoundList( void );
+
+#ifdef USE_OPENAL
+qboolean S_AL_Init( soundInterface_t *si );
+#endif
 
 void		SND_free(sndBuffer *v);
 sndBuffer*	SND_malloc( void );
