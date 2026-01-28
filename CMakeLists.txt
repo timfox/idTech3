@@ -322,7 +322,11 @@ IF(UNIX)
 		src/unix/linux_signals.c)
 
 	IF(USE_SDL)
-		AUX_SOURCE_DIRECTORY(src/sdl Q3_UI_SRCS)
+		AUX_SOURCE_DIRECTORY(src/audio/backends/sdl Q3_UI_SRCS)
+		list(APPEND Q3_UI_SRCS
+			src/platform/sdl/sdl_gamma.c
+			src/platform/sdl/sdl_glimp.c
+			src/platform/sdl/sdl_input.c)
 	ELSE()
 		SET(Q3_UI_SRCS
 			src/unix/linux_glimp.c
@@ -376,7 +380,7 @@ ELSEIF(WIN32)
 ENDIF(UNIX)
 
 IF(USE_OPENAL)
-	list(APPEND Q3_UI_SRCS src/openal/openal_snd.c)
+	list(APPEND Q3_UI_SRCS src/audio/backends/openal/openal_snd.c)
 ENDIF()
 
 ADD_LIBRARY(q3ui OBJECT ${Q3_UI_SRCS})
