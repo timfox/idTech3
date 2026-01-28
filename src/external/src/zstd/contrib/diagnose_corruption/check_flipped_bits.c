@@ -18,6 +18,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 typedef struct {
   char *input;
@@ -75,25 +76,35 @@ static void print_summary(stuff_t* stuff) {
 static char* readFile(const char* filename, size_t* size) {
   struct stat statbuf;
   int ret;
+  int fd;
   FILE* f;
   char *buf;
   size_t bytes_read;
 
-  ret = stat(filename, &statbuf);
-  if (ret != 0) {
-    fprintf(stderr, "stat failed: %m\n");
+  fd = open(filename, O_RDONLY);
+  if (fd == -1) {
+    fprintf(stderr, "open failed: %m\n");
     return NULL;
   }
-  if ((statbuf.st_mode & S_IFREG) != S_IFREG) {
+
+  ret = fstat(fd, &statbuf);
+  if (ret != 0) {
+    fprintf(stderr, "fstat failed: %m\n");
+    close(fd);
+    return NULL;
+  }
+  if (!S_ISREG(statbuf.st_mode)) {
     fprintf(stderr, "Input must be regular file\n");
+    close(fd);
     return NULL;
   }
 
   *size = statbuf.st_size;
 
-  f = fopen(filename, "r");
+  f = fdopen(fd, "r");
   if (f == NULL) {
-    fprintf(stderr, "fopen failed: %m\n");
+    fprintf(stderr, "fdopen failed: %m\n");
+    close(fd);
     return NULL;
   }
 

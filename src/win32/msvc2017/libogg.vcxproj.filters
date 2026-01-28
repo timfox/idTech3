@@ -11,21 +11,21 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\src\external\src\ogg\src\bitwise.c">
+    <ClCompile Include="..\..\external\src\ogg\src\bitwise.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\external\src\ogg\src\framing.c">
+    <ClCompile Include="..\..\external\src\ogg\src\framing.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\src\external\src\ogg\include\ogg\ogg.h">
+    <ClInclude Include="..\..\external\src\ogg\include\ogg\ogg.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\external\src\ogg\include\ogg\os_types.h">
+    <ClInclude Include="..\..\external\src\ogg\include\ogg\os_types.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\external\src\ogg\src\crctable.h">
+    <ClInclude Include="..\..\external\src\ogg\src\crctable.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

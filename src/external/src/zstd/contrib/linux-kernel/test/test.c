@@ -192,7 +192,7 @@ static void __attribute__((noinline)) fill_stack(void) {
 
 static void __attribute__((noinline)) set_stack(void) {
 
-  char stack[8192];
+  static char stack[8192];
   g_stack = stack;
   use(g_stack);
 }

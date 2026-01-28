@@ -11,138 +11,138 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\src\external\src\vorbis\lib\analysis.c">
+    <ClCompile Include="..\..\external\src\vorbis\lib\analysis.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\external\src\vorbis\lib\bitrate.c">
+    <ClCompile Include="..\..\external\src\vorbis\lib\bitrate.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\external\src\vorbis\lib\block.c">
+    <ClCompile Include="..\..\external\src\vorbis\lib\block.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\external\src\vorbis\lib\codebook.c">
+    <ClCompile Include="..\..\external\src\vorbis\lib\codebook.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\external\src\vorbis\lib\envelope.c">
+    <ClCompile Include="..\..\external\src\vorbis\lib\envelope.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\external\src\vorbis\lib\floor0.c">
+    <ClCompile Include="..\..\external\src\vorbis\lib\floor0.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\external\src\vorbis\lib\floor1.c">
+    <ClCompile Include="..\..\external\src\vorbis\lib\floor1.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\external\src\vorbis\lib\info.c">
+    <ClCompile Include="..\..\external\src\vorbis\lib\info.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\external\src\vorbis\lib\lookup.c">
+    <ClCompile Include="..\..\external\src\vorbis\lib\lookup.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\external\src\vorbis\lib\lpc.c">
+    <ClCompile Include="..\..\external\src\vorbis\lib\lpc.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\external\src\vorbis\lib\lsp.c">
+    <ClCompile Include="..\..\external\src\vorbis\lib\lsp.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\external\src\vorbis\lib\mapping0.c">
+    <ClCompile Include="..\..\external\src\vorbis\lib\mapping0.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\external\src\vorbis\lib\mdct.c">
+    <ClCompile Include="..\..\external\src\vorbis\lib\mdct.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\external\src\vorbis\lib\psy.c">
+    <ClCompile Include="..\..\external\src\vorbis\lib\psy.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\external\src\vorbis\lib\registry.c">
+    <ClCompile Include="..\..\external\src\vorbis\lib\registry.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\external\src\vorbis\lib\res0.c">
+    <ClCompile Include="..\..\external\src\vorbis\lib\res0.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\external\src\vorbis\lib\sharedbook.c">
+    <ClCompile Include="..\..\external\src\vorbis\lib\sharedbook.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\external\src\vorbis\lib\smallft.c">
+    <ClCompile Include="..\..\external\src\vorbis\lib\smallft.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\external\src\vorbis\lib\synthesis.c">
+    <ClCompile Include="..\..\external\src\vorbis\lib\synthesis.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\external\src\vorbis\lib\vorbisfile.c">
+    <ClCompile Include="..\..\external\src\vorbis\lib\vorbisfile.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\external\src\vorbis\lib\window.c">
+    <ClCompile Include="..\..\external\src\vorbis\lib\window.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\src\external\src\vorbis\lib\backends.h">
+    <ClInclude Include="..\..\external\src\vorbis\lib\backends.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\external\src\vorbis\lib\bitrate.h">
+    <ClInclude Include="..\..\external\src\vorbis\lib\bitrate.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\external\src\vorbis\lib\codebook.h">
+    <ClInclude Include="..\..\external\src\vorbis\lib\codebook.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\external\src\vorbis\lib\codec_internal.h">
+    <ClInclude Include="..\..\external\src\vorbis\lib\codec_internal.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\external\src\vorbis\lib\envelope.h">
+    <ClInclude Include="..\..\external\src\vorbis\lib\envelope.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\external\src\vorbis\lib\highlevel.h">
+    <ClInclude Include="..\..\external\src\vorbis\lib\highlevel.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\external\src\vorbis\lib\lookup.h">
+    <ClInclude Include="..\..\external\src\vorbis\lib\lookup.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\external\src\vorbis\lib\lookup_data.h">
+    <ClInclude Include="..\..\external\src\vorbis\lib\lookup_data.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\external\src\vorbis\lib\lpc.h">
+    <ClInclude Include="..\..\external\src\vorbis\lib\lpc.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\external\src\vorbis\lib\lsp.h">
+    <ClInclude Include="..\..\external\src\vorbis\lib\lsp.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\external\src\vorbis\lib\masking.h">
+    <ClInclude Include="..\..\external\src\vorbis\lib\masking.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\external\src\vorbis\lib\mdct.h">
+    <ClInclude Include="..\..\external\src\vorbis\lib\mdct.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\external\src\vorbis\lib\misc.h">
+    <ClInclude Include="..\..\external\src\vorbis\lib\misc.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\external\src\vorbis\lib\os.h">
+    <ClInclude Include="..\..\external\src\vorbis\lib\os.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\external\src\vorbis\lib\psy.h">
+    <ClInclude Include="..\..\external\src\vorbis\lib\psy.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\external\src\vorbis\lib\registry.h">
+    <ClInclude Include="..\..\external\src\vorbis\lib\registry.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\external\src\vorbis\lib\scales.h">
+    <ClInclude Include="..\..\external\src\vorbis\lib\scales.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\external\src\vorbis\lib\smallft.h">
+    <ClInclude Include="..\..\external\src\vorbis\lib\smallft.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\external\src\vorbis\lib\window.h">
+    <ClInclude Include="..\..\external\src\vorbis\lib\window.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\external\src\vorbis\lib\books\coupled\res_books_51.h">
+    <ClInclude Include="..\..\external\src\vorbis\lib\books\coupled\res_books_51.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\external\src\vorbis\lib\books\coupled\res_books_stereo.h">
+    <ClInclude Include="..\..\external\src\vorbis\lib\books\coupled\res_books_stereo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\external\src\vorbis\lib\books\floor\floor_books.h">
+    <ClInclude Include="..\..\external\src\vorbis\lib\books\floor\floor_books.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\external\src\vorbis\lib\books\uncoupled\res_books_uncoupled.h">
+    <ClInclude Include="..\..\external\src\vorbis\lib\books\uncoupled\res_books_uncoupled.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
