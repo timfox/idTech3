@@ -127,10 +127,10 @@ SET(CNAME "idtech3")
 SET(DNAME "idtech3_server")
 
 SET(RENDERER_PREFIX ${CNAME})
-SET(RENDERER_DEFAULT vulkan) # valid options: opengl, vulkan, opengl2
+SET(RENDERER_DEFAULT vulkan) # valid options: opengl, vulkan
 
 OPTION(USE_SDL "" ON)
-OPTION(USE_OPENAL "Enable OpenAL audio backend" OFF)
+OPTION(USE_OPENAL "Enable OpenAL audio backend" ON)
 OPTION(USE_CURL "" ON)
 OPTION(USE_LOCAL_HEADERS "" ON)
 OPTION(USE_VULKAN "" ON)
