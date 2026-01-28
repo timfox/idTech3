@@ -32,6 +32,10 @@
     <RootNamespace>libogg</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
+  <PropertyGroup>
+    <ExternalRoot>..\..\src\external</ExternalRoot>
+    <LibOggRoot>$(ExternalRoot)\src\ogg</LibOggRoot>
+  </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
@@ -81,32 +85,32 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>.\build\$(ProjectName)_$(Configuration)_$(PlatformTarget)\</OutDir>
     <IntDir>.\build\$(ProjectName)_$(Configuration)_$(PlatformTarget)\</IntDir>
-    <IncludePath>$(ProjectDir)..\..\$(ProjectName)\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(LibOggRoot)\include;$(ProjectDir)..\..\$(ProjectName)\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>.\build\$(ProjectName)_$(Configuration)_$(PlatformTarget)\</OutDir>
     <IntDir>.\build\$(ProjectName)_$(Configuration)_$(PlatformTarget)\</IntDir>
-    <IncludePath>$(ProjectDir)..\..\$(ProjectName)\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(LibOggRoot)\include;$(ProjectDir)..\..\$(ProjectName)\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <OutDir>.\build\$(ProjectName)_$(Configuration)_$(PlatformTarget)\</OutDir>
     <IntDir>.\build\$(ProjectName)_$(Configuration)_$(PlatformTarget)\</IntDir>
-    <IncludePath>$(ProjectDir)..\..\$(ProjectName)\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(LibOggRoot)\include;$(ProjectDir)..\..\$(ProjectName)\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>.\build\$(ProjectName)_$(Configuration)_$(PlatformTarget)\</OutDir>
     <IntDir>.\build\$(ProjectName)_$(Configuration)_$(PlatformTarget)\</IntDir>
-    <IncludePath>$(ProjectDir)..\..\$(ProjectName)\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(LibOggRoot)\include;$(ProjectDir)..\..\$(ProjectName)\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <OutDir>.\build\$(ProjectName)_$(Configuration)_$(PlatformTarget)\</OutDir>
     <IntDir>.\build\$(ProjectName)_$(Configuration)_$(PlatformTarget)\</IntDir>
-    <IncludePath>$(ProjectDir)..\..\$(ProjectName)\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(LibOggRoot)\include;$(ProjectDir)..\..\$(ProjectName)\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <OutDir>.\build\$(ProjectName)_$(Configuration)_$(PlatformTarget)\</OutDir>
     <IntDir>.\build\$(ProjectName)_$(Configuration)_$(PlatformTarget)\</IntDir>
-    <IncludePath>$(ProjectDir)..\..\$(ProjectName)\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(LibOggRoot)\include;$(ProjectDir)..\..\$(ProjectName)\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -178,13 +182,13 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\libogg\src\bitwise.c" />
-    <ClCompile Include="..\..\libogg\src\framing.c" />
+    <ClCompile Include="$(LibOggRoot)\src\bitwise.c" />
+    <ClCompile Include="$(LibOggRoot)\src\framing.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\libogg\include\ogg\ogg.h" />
-    <ClInclude Include="..\..\libogg\include\ogg\os_types.h" />
-    <ClInclude Include="..\..\libogg\src\crctable.h" />
+    <ClInclude Include="$(LibOggRoot)\include\ogg\ogg.h" />
+    <ClInclude Include="$(LibOggRoot)\include\ogg\os_types.h" />
+    <ClInclude Include="$(LibOggRoot)\src\crctable.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

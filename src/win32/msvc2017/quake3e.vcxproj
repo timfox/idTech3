@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|ARM64">
@@ -30,6 +30,13 @@
     <ProjectGuid>{81CB51C4-B434-4E12-B69B-BAEE102F2852}</ProjectGuid>
     <ProjectName>quake3e</ProjectName>
     <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ExternalRoot>..\..\src\external</ExternalRoot>
+    <LibOggInclude>$(ExternalRoot)\src\ogg\include</LibOggInclude>
+    <LibVorbisInclude>$(ExternalRoot)\src\vorbis\include</LibVorbisInclude>
+    <LibCurlInclude>$(ExternalRoot)\src\curl\windows\include</LibCurlInclude>
+    <LibCurlVS2017>$(ExternalRoot)\src\curl\windows\vs2017</LibCurlVS2017>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
@@ -77,7 +84,7 @@
     <LinkIncremental>true</LinkIncremental>
     <EmbedManifest>false</EmbedManifest>
     <TargetName>quake3e-debug</TargetName>
-    <IncludePath>$(ProjectDir)..\..\libogg\include;$(ProjectDir)..\..\libvorbis\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(LibOggInclude);$(LibVorbisInclude);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>.\output\</OutDir>
@@ -85,7 +92,7 @@
     <LinkIncremental>true</LinkIncremental>
     <EmbedManifest>false</EmbedManifest>
     <TargetName>quake3e-debug.x64</TargetName>
-    <IncludePath>$(ProjectDir)..\..\libogg\include;$(ProjectDir)..\..\libvorbis\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(LibOggInclude);$(LibVorbisInclude);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <LinkIncremental>true</LinkIncremental>
@@ -93,32 +100,32 @@
     <OutDir>.\output\</OutDir>
     <IntDir>.\build\$(ProjectName)_$(Configuration)_$(PlatformTarget)\</IntDir>
     <TargetName>quake3e-debug.arm64</TargetName>
-    <IncludePath>$(ProjectDir)..\..\libogg\include;$(ProjectDir)..\..\libvorbis\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(LibOggInclude);$(LibVorbisInclude);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>.\output\</OutDir>
     <IntDir>.\build\$(ProjectName)_$(Configuration)_$(PlatformTarget)\</IntDir>
     <EmbedManifest>false</EmbedManifest>
     <TargetName>quake3e</TargetName>
-    <IncludePath>$(ProjectDir)..\..\libogg\include;$(ProjectDir)..\..\libvorbis\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(LibOggInclude);$(LibVorbisInclude);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>.\output\</OutDir>
     <IntDir>.\build\$(ProjectName)_$(Configuration)_$(PlatformTarget)\</IntDir>
     <EmbedManifest>false</EmbedManifest>
     <TargetName>quake3e.x64</TargetName>
-    <IncludePath>$(ProjectDir)..\..\libogg\include;$(ProjectDir)..\..\libvorbis\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(LibOggInclude);$(LibVorbisInclude);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <EmbedManifest>false</EmbedManifest>
     <OutDir>.\output\</OutDir>
     <IntDir>.\build\$(ProjectName)_$(Configuration)_$(PlatformTarget)\</IntDir>
     <TargetName>quake3e.arm64</TargetName>
-    <IncludePath>$(ProjectDir)..\..\libogg\include;$(ProjectDir)..\..\libvorbis\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(LibOggInclude);$(LibVorbisInclude);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>..\..\libcurl\windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(LibCurlInclude);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_CURL;CURL_STATICLIB;USE_OPENGL_API;USE_VULKAN_API;USE_OGG_VORBIS;USE_WIN32_ASM;$(UseWASAPI);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -132,7 +139,7 @@
     </ClCompile>
     <ResourceCompile />
     <Link>
-      <AdditionalDependencies>comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;..\..\libcurl\windows\vs2017\lib32\libcurl_a_debug.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;$(LibCurlVS2017)\lib32\libcurl_a_debug.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <ProgramDatabaseFile>$(IntDir)quake3e-debug.pdb</ProgramDatabaseFile>
       <GenerateMapFile>true</GenerateMapFile>
@@ -145,7 +152,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\libcurl\windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(LibCurlInclude);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_CURL;CURL_STATICLIB;USE_OPENGL_API;USE_VULKAN_API;USE_OGG_VORBIS;USE_WIN32_ASM;$(UseWASAPI);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -156,7 +163,7 @@
     </ClCompile>
     <ResourceCompile />
     <Link>
-      <AdditionalDependencies>comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;..\..\libcurl\windows\vs2017\lib64\libcurl_a_debug.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;$(LibCurlVS2017)\lib64\libcurl_a_debug.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <ProgramDatabaseFile>$(IntDir)quake3e-debug.x64.pdb</ProgramDatabaseFile>
       <GenerateMapFile>true</GenerateMapFile>
@@ -168,7 +175,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\libcurl\windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(LibCurlInclude);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_OPENGL_API;USE_VULKAN_API;USE_OGG_VORBIS;$(UseWASAPI);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -192,7 +199,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>..\..\libcurl\windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(LibCurlInclude);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_WIN32;NDEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_SKIPIDLOGO;USE_CURL;CURL_STATICLIB;USE_OPENGL_API;USE_VULKAN_API;USE_OGG_VORBIS;USE_WIN32_ASM;$(UseWASAPI);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>Level4</WarningLevel>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
@@ -200,7 +207,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;..\..\libcurl\windows\vs2017\lib32\libcurl_a.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;$(LibCurlVS2017)\lib32\libcurl_a.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <GenerateMapFile>true</GenerateMapFile>
       <MapFileName>$(IntDir)quake3e.map</MapFileName>
@@ -218,7 +225,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>..\..\libcurl\windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(LibCurlInclude);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_WIN32;NDEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_SKIPIDLOGO;USE_CURL;CURL_STATICLIB;USE_OPENGL_API;USE_VULKAN_API;USE_OGG_VORBIS;USE_WIN32_ASM;$(UseWASAPI);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>Level4</WarningLevel>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
@@ -227,7 +234,7 @@
     </ClCompile>
     <Link>
       <AdditionalOptions>/DYNAMICBASE %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;..\..\libcurl\windows\vs2017\lib64\libcurl_a.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;$(LibCurlVS2017)\lib64\libcurl_a.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <GenerateMapFile>true</GenerateMapFile>
       <MapFileName>$(IntDir)quake3e.x64.map</MapFileName>
@@ -244,7 +251,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>..\..\libcurl\windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(LibCurlInclude);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_WIN32;NDEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_SKIPIDLOGO;USE_OPENGL_API;USE_VULKAN_API;USE_OGG_VORBIS;$(UseWASAPI);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>Level4</WarningLevel>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
