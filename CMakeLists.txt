@@ -114,6 +114,13 @@ OPTION(SKIP_IDPAK_CHECK "Skip checking for original Quake III pak files (pak0.pk
 
 SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules)
 
+set(EXTERNAL_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/src/external")
+set(EXTERNAL_SRC "${EXTERNAL_ROOT}/src")
+set(EXTERNAL_INCLUDE "${EXTERNAL_ROOT}/include")
+set(EXTERNAL_SDL_INCLUDE_DIR "${EXTERNAL_SRC}/sdl/include/SDL2")
+set(EXTERNAL_CURL_WINDOWS_INCLUDE_DIR "${EXTERNAL_SRC}/curl/windows/include")
+set(EXTERNAL_JPEG_SRC_DIR "${EXTERNAL_SRC}/jpeg")
+
 AUX_SOURCE_DIRECTORY(src/qcommon QCOMMON_SRCS)
 # exclude platform-dependent QVM bytecode compilers
 list(FILTER QCOMMON_SRCS EXCLUDE REGEX ".*vm_[alx].*.c")
@@ -229,12 +236,12 @@ IF(USE_SYSTEM_JPEG)
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE -DUSE_SYSTEM_JPEG)
 	TARGET_LINK_LIBRARIES(client ${JPEG_LIBRARIES})
 ELSE()
-	AUX_SOURCE_DIRECTORY(src/libjpeg JPEG_SRCS)
+	AUX_SOURCE_DIRECTORY(${EXTERNAL_JPEG_SRC_DIR} JPEG_SRCS)
 	#ADD_LIBRARY(jpeg ${JPEG_SRCS})
 	#TARGET_LINK_LIBRARIES(client jpeg)
 	ADD_LIBRARY(client OBJECT ${CLIENT_SRCS} ${JPEG_SRCS})
 	# Ensure client can find qcommon headers needed by some client-side modules (eg. mp3)
-	target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR}/src/qcommon)
+	target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR}/src/qcommon ${EXTERNAL_JPEG_SRC_DIR})
 ENDIF()
 
 # renderers
@@ -342,6 +349,13 @@ ELSEIF(WIN32)
 ENDIF(UNIX)
 
 ADD_LIBRARY(q3ui OBJECT ${Q3_UI_SRCS})
+
+if(USE_LOCAL_HEADERS)
+	target_include_directories(q3ui PRIVATE ${EXTERNAL_SDL_INCLUDE_DIR})
+endif()
+if(USE_LOCAL_HEADERS AND WIN32)
+	target_include_directories(client PRIVATE ${EXTERNAL_CURL_WINDOWS_INCLUDE_DIR})
+endif()
 
 IF(NOT MSVC)
 	IF(USE_SDL)
