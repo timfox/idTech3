@@ -995,6 +995,12 @@ static void S_Base_RawSamples( int samples, int rate, int width, int n_channels,
 	}
 }
 
+static void S_Base_VoipSamples( int entityNum, const vec3_t origin, int samples, int rate, int width, int n_channels, const byte *data, float volume ) {
+	(void)entityNum;
+	(void)origin;
+	S_Base_RawSamples( samples, rate, width, n_channels, data, volume );
+}
+
 //=============================================================================
 
 /*
@@ -1550,6 +1556,7 @@ qboolean S_Base_Init( soundInterface_t *si ) {
 	si->StartBackgroundTrack = S_Base_StartBackgroundTrack;
 	si->StopBackgroundTrack = S_Base_StopBackgroundTrack;
 	si->RawSamples = S_Base_RawSamples;
+	si->VoipSamples = S_Base_VoipSamples;
 	si->StopAllSounds = S_Base_StopAllSounds;
 	si->ClearLoopingSounds = S_Base_ClearLoopingSounds;
 	si->AddLoopingSound = S_Base_AddLoopingSound;

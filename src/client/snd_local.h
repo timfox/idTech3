@@ -132,6 +132,7 @@ typedef struct
 	void (*StartBackgroundTrack)( const char *intro, const char *loop );
 	void (*StopBackgroundTrack)( void );
 	void (*RawSamples)(int samples, int rate, int width, int channels, const byte *data, float volume);
+	void (*VoipSamples)(int entityNum, const vec3_t origin, int samples, int rate, int width, int channels, const byte *data, float volume);
 	void (*StopAllSounds)( void );
 	void (*ClearLoopingSounds)( qboolean killall );
 	void (*AddLoopingSound)( int entityNum, const vec3_t origin, const vec3_t velocity, sfxHandle_t sfx );
@@ -191,6 +192,10 @@ extern	portable_samplepair_t	s_rawsamples[MAX_RAW_SAMPLES];
 
 extern cvar_t *s_volume;
 extern cvar_t *s_musicVolume;
+extern cvar_t *s_musicLayer;
+extern cvar_t *s_musicLayerEnabled;
+extern cvar_t *s_musicLayerVolume;
+extern cvar_t *s_musicIntensity;
 extern cvar_t *s_doppler;
 extern cvar_t *s_muteWhenUnfocused;
 extern cvar_t *s_muteWhenMinimized;
@@ -199,6 +204,21 @@ extern cvar_t *s_muteWhenMinimized;
 extern cvar_t *s_openal;
 extern cvar_t *s_openalDevice;
 extern cvar_t *s_openalHrtf;
+extern cvar_t *s_openalEfx;
+extern cvar_t *s_openalEfxPreset;
+extern cvar_t *s_openalCapture;
+extern cvar_t *s_openalDopplerFactor;
+extern cvar_t *s_openalDopplerSpeed;
+extern cvar_t *s_openalRolloff;
+extern cvar_t *s_openalMaxDistance;
+extern cvar_t *s_openalLowpass;
+extern cvar_t *s_openalLowpassHf;
+extern cvar_t *s_openalOcclusion;
+extern cvar_t *s_openalOcclusionGain;
+extern cvar_t *s_openalOcclusionHf;
+extern cvar_t *s_openalVoipSpatial;
+extern cvar_t *s_openalVoipGain;
+extern cvar_t *s_openalDebug;
 #endif
 
 extern cvar_t *s_testsound;

@@ -36,6 +36,10 @@ void S_StopBackgroundTrack( void );
 void S_RawSamples (int samples, int rate, int width, int channels, 
 				   const byte *data, float volume);
 
+// positional voice-over-network samples (per entity)
+void S_VoipSamples( int entityNum, const vec3_t origin, int samples, int rate,
+					int width, int channels, const byte *data, float volume );
+
 // stop all sounds and the background track
 void S_StopAllSounds( void );
 
