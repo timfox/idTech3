@@ -199,6 +199,13 @@ extern cvar_t *s_muteWhenMinimized;
 extern cvar_t *s_openal;
 extern cvar_t *s_openalDevice;
 extern cvar_t *s_openalHrtf;
+extern cvar_t *s_openalEfx;
+extern cvar_t *s_openalCapture;
+extern cvar_t *s_openalDopplerFactor;
+extern cvar_t *s_openalDopplerSpeed;
+extern cvar_t *s_openalRolloff;
+extern cvar_t *s_openalMaxDistance;
+extern cvar_t *s_openalDebug;
 #endif
 
 extern cvar_t *s_testsound;

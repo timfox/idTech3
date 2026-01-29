@@ -59,7 +59,69 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define ALC_HRTF_UNSUPPORTED_FORMAT_SOFT 0x1999
 #endif
 
+#ifndef ALC_ALL_DEVICES_SPECIFIER
+#define ALC_ALL_DEVICES_SPECIFIER 0x1013
+#endif
+
+#ifndef ALC_CAPTURE_DEVICE_SPECIFIER
+#define ALC_CAPTURE_DEVICE_SPECIFIER 0x310
+#endif
+#ifndef ALC_CAPTURE_DEFAULT_DEVICE_SPECIFIER
+#define ALC_CAPTURE_DEFAULT_DEVICE_SPECIFIER 0x311
+#endif
+#ifndef ALC_CAPTURE_SAMPLES
+#define ALC_CAPTURE_SAMPLES 0x312
+#endif
+
+// EFX definitions
+#ifndef AL_EFFECT_TYPE
+#define AL_EFFECT_TYPE 0x8001
+#endif
+#ifndef AL_EFFECT_REVERB
+#define AL_EFFECT_REVERB 0x0001
+#endif
+#ifndef AL_EFFECT_EAXREVERB
+#define AL_EFFECT_EAXREVERB 0x8000
+#endif
+#ifndef AL_EFFECTSLOT_EFFECT
+#define AL_EFFECTSLOT_EFFECT 0x0001
+#endif
+#ifndef AL_EFFECTSLOT_GAIN
+#define AL_EFFECTSLOT_GAIN 0x0002
+#endif
+#ifndef AL_AUXILIARY_SEND_FILTER
+#define AL_AUXILIARY_SEND_FILTER 0x20006
+#endif
+
 typedef ALCboolean (ALC_APIENTRY *alcResetDeviceSOFTProc)(ALCdevice *device, const ALCint *attribs);
+
+// EFX function pointer types
+typedef void (AL_APIENTRY *LPALGENEFFECTS)(ALsizei, ALuint*);
+typedef void (AL_APIENTRY *LPALDELETEEFFECTS)(ALsizei, const ALuint*);
+typedef ALboolean (AL_APIENTRY *LPALISEFFECT)(ALuint);
+typedef void (AL_APIENTRY *LPALEFFECTI)(ALuint, ALenum, ALint);
+typedef void (AL_APIENTRY *LPALEFFECTIV)(ALuint, ALenum, const ALint*);
+typedef void (AL_APIENTRY *LPALEFFECTF)(ALuint, ALenum, ALfloat);
+typedef void (AL_APIENTRY *LPALEFFECTFV)(ALuint, ALenum, const ALfloat*);
+
+typedef void (AL_APIENTRY *LPALGENAUXILIARYEFFECTSLOTS)(ALsizei, ALuint*);
+typedef void (AL_APIENTRY *LPALDELETEAUXILIARYEFFECTSLOTS)(ALsizei, const ALuint*);
+typedef ALboolean (AL_APIENTRY *LPALISAUXILIARYEFFECTSLOT)(ALuint);
+typedef void (AL_APIENTRY *LPALAUXILIARYEFFECTSLOTI)(ALuint, ALenum, ALint);
+typedef void (AL_APIENTRY *LPALAUXILIARYEFFECTSLOTF)(ALuint, ALenum, ALfloat);
+
+// EFX function pointers
+static LPALGENEFFECTS alGenEffects;
+static LPALDELETEEFFECTS alDeleteEffects;
+static LPALISEFFECT alIsEffect;
+static LPALEFFECTI alEffecti;
+static LPALEFFECTF alEffectf;
+
+static LPALGENAUXILIARYEFFECTSLOTS alGenAuxiliaryEffectSlots;
+static LPALDELETEAUXILIARYEFFECTSLOTS alDeleteAuxiliaryEffectSlots;
+static LPALISAUXILIARYEFFECTSLOT alIsAuxiliaryEffectSlot;
+static LPALAUXILIARYEFFECTSLOTI alAuxiliaryEffectSloti;
+static LPALAUXILIARYEFFECTSLOTF alAuxiliaryEffectSlotf;
 
 #define AL_MUSIC_BUFFER_COUNT 4
 #define AL_RAW_BUFFER_COUNT 8
@@ -83,13 +145,22 @@ static qboolean alInited;
 static qboolean alHrtfAvailable;
 static qboolean alHrtfEnabled;
 
+static ALCdevice *alCaptureDevice;
+static qboolean alCaptureAvailable;
+
+static qboolean alEfxAvailable;
+static ALuint alReverbEffect;
+static ALuint alReverbSlot;
+
 static al_channel_t alChannels[MAX_CHANNELS];
 static loopSound_t alLoopSounds[MAX_GENTITIES];
 static vec3_t alEntityPositions[MAX_GENTITIES];
+static vec3_t alEntityVelocities[MAX_GENTITIES];
 static qboolean alEntityPosValid[MAX_GENTITIES];
 static int alListenerEntity = -1;
 static vec3_t alListenerOrigin;
 static vec3_t alListenerAxis[3];
+static vec3_t alListenerVelocity;
 
 static ALuint *alBufferTable;
 static int alBufferCapacity;
@@ -103,6 +174,12 @@ static char alBackgroundLoop[MAX_QPATH];
 static ALuint alRawSource;
 static ALuint alRawBuffers[AL_RAW_BUFFER_COUNT];
 static int alRawNextBuffer;
+static qboolean alRawBufferQueued[AL_RAW_BUFFER_COUNT];
+
+// Performance metrics
+static int alTotalSources;
+static int alActiveSources;
+static int alBuffersCreated;
 
 static qboolean S_AL_CheckError( const char *label ) {
 	ALenum error = alGetError();
@@ -111,6 +188,80 @@ static qboolean S_AL_CheckError( const char *label ) {
 		return qtrue;
 	}
 	return qfalse;
+}
+
+static void S_AL_ListDevices_f( void ) {
+	const ALCchar *devices;
+	const ALCchar *ptr;
+	int count = 0;
+
+	Com_Printf( "----- OpenAL Devices -----\n" );
+
+	if ( alcIsExtensionPresent( NULL, "ALC_ENUMERATE_ALL_EXT" ) == ALC_TRUE ) {
+		devices = alcGetString( NULL, ALC_ALL_DEVICES_SPECIFIER );
+	} else {
+		devices = alcGetString( NULL, ALC_DEVICE_SPECIFIER );
+	}
+
+	if ( !devices || !devices[0] ) {
+		Com_Printf( "No devices found.\n" );
+		Com_Printf( "--------------------------\n" );
+		return;
+	}
+
+	ptr = devices;
+	while ( ptr && *ptr ) {
+		Com_Printf( "  %d: %s\n", count++, ptr );
+		ptr += strlen( ptr ) + 1;
+	}
+
+	if ( alDevice ) {
+		const ALCchar *currentDevice = alcGetString( alDevice, ALC_DEVICE_SPECIFIER );
+		Com_Printf( "\nCurrent device: %s\n", currentDevice ? currentDevice : "unknown" );
+	}
+
+	Com_Printf( "--------------------------\n" );
+}
+
+static void S_AL_DeviceInfo_f( void ) {
+	const ALCchar *deviceName;
+	ALCint alcMajor, alcMinor;
+	const ALchar *vendor, *version, *renderer;
+	const ALchar *extensions;
+
+	Com_Printf( "----- OpenAL Device Info -----\n" );
+
+	if ( !alInited || !alDevice ) {
+		Com_Printf( "OpenAL not initialized.\n" );
+		Com_Printf( "------------------------------\n" );
+		return;
+	}
+
+	alcGetIntegerv( alDevice, ALC_MAJOR_VERSION, 1, &alcMajor );
+	alcGetIntegerv( alDevice, ALC_MINOR_VERSION, 1, &alcMinor );
+
+	deviceName = alcGetString( alDevice, ALC_DEVICE_SPECIFIER );
+	vendor = alGetString( AL_VENDOR );
+	version = alGetString( AL_VERSION );
+	renderer = alGetString( AL_RENDERER );
+	extensions = alGetString( AL_EXTENSIONS );
+
+	Com_Printf( "Device: %s\n", deviceName ? deviceName : "unknown" );
+	Com_Printf( "ALC Version: %d.%d\n", alcMajor, alcMinor );
+	Com_Printf( "Vendor: %s\n", vendor ? vendor : "unknown" );
+	Com_Printf( "Version: %s\n", version ? version : "unknown" );
+	Com_Printf( "Renderer: %s\n", renderer ? renderer : "unknown" );
+	Com_Printf( "HRTF: %s\n", alHrtfEnabled ? "enabled" : ( alHrtfAvailable ? "available but disabled" : "not available" ) );
+	Com_Printf( "EFX: %s\n", alEfxAvailable ? "available" : "not available" );
+	Com_Printf( "Capture: %s\n", alCaptureAvailable ? "available" : "not available" );
+	Com_Printf( "\nActive sources: %d/%d\n", alActiveSources, alTotalSources );
+	Com_Printf( "Buffers created: %d\n", alBuffersCreated );
+
+	if ( extensions ) {
+		Com_Printf( "\nExtensions: %s\n", extensions );
+	}
+
+	Com_Printf( "------------------------------\n" );
 }
 
 static void S_AL_ClearSources( void ) {
@@ -177,8 +328,16 @@ static qboolean S_AL_CreateBuffer( int handle, sfx_t *sfx ) {
 		return qfalse;
 	}
 
+	if ( sfx->soundChannels <= 0 || sfx->soundChannels > 2 ) {
+		Com_Printf( S_COLOR_YELLOW "OpenAL: invalid channel count %d for %s\n", sfx->soundChannels, sfx->soundName );
+		return qfalse;
+	}
+
 	format = S_AL_Format( sfx->soundChannels, 2 );
 	sampleCount = sfx->soundLength * sfx->soundChannels;
+	if ( sampleCount <= 0 ) {
+		return qfalse;
+	}
 	samples = malloc( sampleCount * sizeof( *samples ) );
 	if ( !samples ) {
 		Com_Printf( S_COLOR_RED "OpenAL: failed to allocate sample buffer for %s\n", sfx->soundName );
@@ -194,16 +353,28 @@ static qboolean S_AL_CreateBuffer( int handle, sfx_t *sfx ) {
 		remaining -= toCopy;
 	}
 
+	alGetError();
 	alGenBuffers( 1, &buffer );
+	if ( buffer == 0 || S_AL_CheckError( "alGenBuffers" ) ) {
+		free( samples );
+		return qfalse;
+	}
 	alBufferData( buffer, format, samples, sampleCount * sizeof( *samples ), dma.speed );
 	free( samples );
 
-	if ( S_AL_CheckError( "alBufferData" ) ) {
+	if ( S_AL_CheckError( "alBufferData(sfx)" ) ) {
 		alDeleteBuffers( 1, &buffer );
 		return qfalse;
 	}
 
 	alBufferTable[handle] = buffer;
+	alBuffersCreated++;
+
+	if ( s_openalDebug && s_openalDebug->integer >= 1 ) {
+		Com_Printf( "OpenAL: Created buffer %d for %s (%d samples, %d channels)\n", 
+			buffer, sfx->soundName, sfx->soundLength, sfx->soundChannels );
+	}
+
 	return qtrue;
 }
 
@@ -243,6 +414,7 @@ static void S_AL_SetSourcePosition( ALuint source, qboolean relative, const vec3
 
 static void S_AL_UpdateListener( void ) {
 	ALfloat orientation[6];
+	float dopplerFactor = 0.0f;
 
 	orientation[0] = alListenerAxis[0][0];
 	orientation[1] = alListenerAxis[0][1];
@@ -252,26 +424,77 @@ static void S_AL_UpdateListener( void ) {
 	orientation[5] = alListenerAxis[2][2];
 
 	alListener3f( AL_POSITION, alListenerOrigin[0], alListenerOrigin[1], alListenerOrigin[2] );
-	alListener3f( AL_VELOCITY, 0.0f, 0.0f, 0.0f );
+	alListener3f( AL_VELOCITY, alListenerVelocity[0], alListenerVelocity[1], alListenerVelocity[2] );
 	alListenerfv( AL_ORIENTATION, orientation );
 	alListenerf( AL_GAIN, s_volume ? s_volume->value : 1.0f );
 
-	alDopplerFactor( ( s_doppler && s_doppler->integer ) ? 1.0f : 0.0f );
+	// Update doppler settings
+	if ( s_doppler && s_doppler->integer ) {
+		dopplerFactor = s_openalDopplerFactor ? s_openalDopplerFactor->value : 1.0f;
+	}
+	alDopplerFactor( dopplerFactor );
+	if ( s_openalDopplerSpeed ) {
+		alDopplerVelocity( s_openalDopplerSpeed->value );
+	}
 }
 
 static int S_AL_FindFreeChannel( int now ) {
 	int i;
 	int oldest = now;
 	int oldestIndex = -1;
+	int lowestPriority = 999;
+	int lowestPriorityIndex = -1;
+	ALint state = 0;
 
+	// First pass: find truly free channel
 	for ( i = 0; i < MAX_CHANNELS; ++i ) {
 		if ( !alChannels[i].inUse ) {
 			return i;
 		}
 	}
 
+	// Second pass: find stopped sources that are marked inUse
 	for ( i = 0; i < MAX_CHANNELS; ++i ) {
-		if ( alChannels[i].startTime < oldest ) {
+		if ( alChannels[i].inUse && !alChannels[i].looping ) {
+			alGetSourcei( alChannels[i].source, AL_SOURCE_STATE, &state );
+			if ( state != AL_PLAYING ) {
+				alChannels[i].inUse = qfalse;
+				return i;
+			}
+		}
+	}
+
+	// Third pass: prioritize by entity (listener sounds are lowest priority for reuse)
+	for ( i = 0; i < MAX_CHANNELS; ++i ) {
+		int priority = 0;
+		if ( alChannels[i].looping ) {
+			continue; // Never steal looping sounds
+		}
+		if ( alChannels[i].entnum == alListenerEntity ) {
+			priority = 0; // Lowest priority - listener sounds
+		} else if ( alChannels[i].fixed_origin ) {
+			priority = 5; // Medium priority - fixed position sounds
+		} else {
+			priority = 10; // Highest priority - entity-attached sounds
+		}
+
+		if ( priority < lowestPriority || 
+		     (priority == lowestPriority && alChannels[i].startTime < oldest) ) {
+			lowestPriority = priority;
+			oldest = alChannels[i].startTime;
+			lowestPriorityIndex = i;
+		}
+	}
+
+	if ( lowestPriorityIndex >= 0 ) {
+		return lowestPriorityIndex;
+	}
+
+	// Final fallback: oldest non-looping channel
+	oldest = now;
+	oldestIndex = -1;
+	for ( i = 0; i < MAX_CHANNELS; ++i ) {
+		if ( !alChannels[i].looping && alChannels[i].startTime < oldest ) {
 			oldest = alChannels[i].startTime;
 			oldestIndex = i;
 		}
@@ -355,7 +578,13 @@ static void S_AL_UpdateLoopingSounds( void ) {
 		alSourcei( alChannels[channel].source, AL_LOOPING, AL_TRUE );
 		alSourcef( alChannels[channel].source, AL_GAIN, 1.0f );
 		alSourcef( alChannels[channel].source, AL_REFERENCE_DISTANCE, 80.0f );
-		alSourcef( alChannels[channel].source, AL_ROLLOFF_FACTOR, 1.0f );
+		alSourcef( alChannels[channel].source, AL_ROLLOFF_FACTOR, s_openalRolloff ? s_openalRolloff->value : 1.0f );
+		alSourcef( alChannels[channel].source, AL_MAX_DISTANCE, s_openalMaxDistance ? s_openalMaxDistance->value : 2000.0f );
+
+		// Attach EFX reverb if available
+		if ( alEfxAvailable && alReverbSlot ) {
+			alSource3i( alChannels[channel].source, AL_AUXILIARY_SEND_FILTER, alReverbSlot, 0, 0 );
+		}
 
 		if ( ent == alListenerEntity ) {
 			VectorClear( pos );
@@ -375,14 +604,17 @@ static void S_AL_UpdateLoopingSounds( void ) {
 	}
 }
 
-static void S_AL_StreamUnqueue( ALuint source ) {
+static int S_AL_StreamUnqueue( ALuint source, ALuint *buffers, int max) {
 	ALint processed = 0;
-	ALuint buffer = 0;
+	int count = 0;
 
 	alGetSourcei( source, AL_BUFFERS_PROCESSED, &processed );
-	while ( processed-- > 0 ) {
-		alSourceUnqueueBuffers( source, 1, &buffer );
+	while ( processed-- > 0 && count < max ) {
+		alSourceUnqueueBuffers( source, 1, &buffers[count] );
+		count++;
 	}
+
+	return count;
 }
 
 static qboolean S_AL_StreamFill( ALuint buffer, snd_stream_t *stream ) {
@@ -395,6 +627,13 @@ static qboolean S_AL_StreamFill( ALuint buffer, snd_stream_t *stream ) {
 		return qfalse;
 	}
 
+	if ( stream->info.channels <= 0 || stream->info.channels > 2 ) {
+		return qfalse;
+	}
+	if ( stream->info.width != 1 && stream->info.width != 2 ) {
+		return qfalse;
+	}
+
 	bytes = AL_MUSIC_BUFFER_BYTES;
 	r = S_CodecReadStream( stream, bytes, raw );
 	if ( r <= 0 ) {
@@ -402,6 +641,7 @@ static qboolean S_AL_StreamFill( ALuint buffer, snd_stream_t *stream ) {
 	}
 
 	format = S_AL_Format( stream->info.channels, stream->info.width );
+	alGetError();
 	alBufferData( buffer, format, raw, r, stream->info.rate );
 	return !S_AL_CheckError( "alBufferData(stream)" );
 }
@@ -411,35 +651,33 @@ static void S_AL_UpdateMusic( void ) {
 	ALint state = 0;
 	int refillCount;
 	int i;
+	ALuint buffers[AL_MUSIC_BUFFER_COUNT];
+	int unqueued = 0;
 
 	if ( !alBackgroundStream || !alMusicSource ) {
 		return;
 	}
 
 	alSourcef( alMusicSource, AL_GAIN, s_musicVolume ? s_musicVolume->value : 1.0f );
-	S_AL_StreamUnqueue( alMusicSource );
-
-	alGetSourcei( alMusicSource, AL_BUFFERS_QUEUED, &queued );
-	refillCount = AL_MUSIC_BUFFER_COUNT - queued;
-	for ( i = 0; i < refillCount; ++i ) {
-		ALuint buffer = alMusicBuffers[alMusicNextBuffer];
+	unqueued = S_AL_StreamUnqueue( alMusicSource, buffers, AL_MUSIC_BUFFER_COUNT );
+	for ( i = 0; i < unqueued; ++i ) {
+		ALuint buffer = buffers[i];
 		if ( !S_AL_StreamFill( buffer, alBackgroundStream ) ) {
 			if ( alBackgroundLoop[0] ) {
 				S_CodecCloseStream( alBackgroundStream );
 				alBackgroundStream = S_CodecOpenStream( alBackgroundLoop );
 				if ( !alBackgroundStream ) {
-					break;
+					continue;
 				}
 				if ( !S_AL_StreamFill( buffer, alBackgroundStream ) ) {
-					break;
+					continue;
 				}
 			} else {
-				break;
+				continue;
 			}
 		}
 
 		alSourceQueueBuffers( alMusicSource, 1, &buffer );
-		alMusicNextBuffer = ( alMusicNextBuffer + 1 ) % AL_MUSIC_BUFFER_COUNT;
 	}
 
 	alGetSourcei( alMusicSource, AL_SOURCE_STATE, &state );
@@ -450,19 +688,37 @@ static void S_AL_UpdateMusic( void ) {
 
 static void S_AL_UpdateRaw( void ) {
 	ALint state = 0;
+	ALuint buffers[AL_RAW_BUFFER_COUNT];
+	int unqueued;
+	int i;
+	int j;
 
 	if ( !alRawSource ) {
 		return;
 	}
 
-	S_AL_StreamUnqueue( alRawSource );
+	unqueued = S_AL_StreamUnqueue( alRawSource, buffers, AL_RAW_BUFFER_COUNT );
+	for ( i = 0; i < unqueued; ++i ) {
+		for ( j = 0; j < AL_RAW_BUFFER_COUNT; ++j ) {
+			if ( buffers[i] == alRawBuffers[j] ) {
+				alRawBufferQueued[j] = qfalse;
+				break;
+			}
+		}
+	}
 	alGetSourcei( alRawSource, AL_SOURCE_STATE, &state );
 	if ( state != AL_PLAYING ) {
-		alSourcePlay( alRawSource );
+		ALint queued = 0;
+		alGetSourcei( alRawSource, AL_BUFFERS_QUEUED, &queued );
+		if ( queued > 0 ) {
+			alSourcePlay( alRawSource );
+		}
 	}
 }
 
 static void S_AL_StopBackgroundTrack( void ) {
+	ALuint buffers[AL_MUSIC_BUFFER_COUNT];
+
 	if ( alBackgroundStream ) {
 		S_CodecCloseStream( alBackgroundStream );
 		alBackgroundStream = NULL;
@@ -470,7 +726,7 @@ static void S_AL_StopBackgroundTrack( void ) {
 
 	if ( alMusicSource ) {
 		alSourceStop( alMusicSource );
-		S_AL_StreamUnqueue( alMusicSource );
+		S_AL_StreamUnqueue( alMusicSource, buffers, AL_MUSIC_BUFFER_COUNT );
 	}
 
 	alBackgroundLoop[0] = '\0';
@@ -521,26 +777,76 @@ static void S_AL_StartBackgroundTrack( const char *intro, const char *loop ) {
 static void S_AL_RawSamples( int samples, int rate, int width, int channels, const byte *data, float volume ) {
 	ALint queued = 0;
 	ALuint buffer;
+	ALuint buffers[AL_RAW_BUFFER_COUNT];
 	ALenum format;
 	int bytes;
+	int unqueued;
+	int i;
+	int j;
+	int bufferIndex = -1;
 
 	if ( !alRawSource ) {
 		return;
 	}
 
-	S_AL_StreamUnqueue( alRawSource );
+	if ( !data || samples <= 0 ) {
+		return;
+	}
+	if ( channels <= 0 || channels > 2 ) {
+		return;
+	}
+	if ( width != 1 && width != 2 ) {
+		return;
+	}
+
+	unqueued = S_AL_StreamUnqueue( alRawSource, buffers, AL_RAW_BUFFER_COUNT );
+	for ( i = 0; i < unqueued; ++i ) {
+		for ( j = 0; j < AL_RAW_BUFFER_COUNT; ++j ) {
+			if ( buffers[i] == alRawBuffers[j] ) {
+				alRawBufferQueued[j] = qfalse;
+				break;
+			}
+		}
+	}
 	alGetSourcei( alRawSource, AL_BUFFERS_QUEUED, &queued );
 	if ( queued >= AL_RAW_BUFFER_COUNT ) {
 		return;
 	}
 
-	buffer = alRawBuffers[alRawNextBuffer];
+	if ( unqueued > 0 ) {
+		buffer = buffers[0];
+		for ( j = 0; j < AL_RAW_BUFFER_COUNT; ++j ) {
+			if ( buffer == alRawBuffers[j] ) {
+				bufferIndex = j;
+				break;
+			}
+		}
+	} else {
+		for ( i = 0; i < AL_RAW_BUFFER_COUNT; ++i ) {
+			int idx = ( alRawNextBuffer + i ) % AL_RAW_BUFFER_COUNT;
+			if ( !alRawBufferQueued[idx] ) {
+				buffer = alRawBuffers[idx];
+				bufferIndex = idx;
+				break;
+			}
+		}
+	}
+
+	if ( bufferIndex < 0 ) {
+		return;
+	}
+
 	format = S_AL_Format( channels, width );
 	bytes = samples * channels * width;
+	alGetError();
 	alBufferData( buffer, format, data, bytes, rate );
+	if ( S_AL_CheckError( "alBufferData(raw)" ) ) {
+		return;
+	}
 	alSourceQueueBuffers( alRawSource, 1, &buffer );
 	alSourcef( alRawSource, AL_GAIN, volume );
-	alRawNextBuffer = ( alRawNextBuffer + 1 ) % AL_RAW_BUFFER_COUNT;
+	alRawBufferQueued[bufferIndex] = qtrue;
+	alRawNextBuffer = ( bufferIndex + 1 ) % AL_RAW_BUFFER_COUNT;
 }
 
 static void S_AL_StopAllSounds( void ) {
@@ -651,6 +957,8 @@ static void S_AL_AddRealLoopingSound( int entityNum, const vec3_t origin, const 
 
 static void S_AL_Respatialize( int entityNum, const vec3_t origin, vec3_t axis[3], int inwater ) {
 	int i;
+	static vec3_t lastListenerOrigin;
+	static qboolean firstRespatialize = qtrue;
 
 	if ( !s_soundStarted || s_soundMuted ) {
 		return;
@@ -659,6 +967,18 @@ static void S_AL_Respatialize( int entityNum, const vec3_t origin, vec3_t axis[3
 	(void)inwater;
 
 	alListenerEntity = entityNum;
+
+	// Calculate listener velocity for doppler
+	if ( !firstRespatialize && cls.frametime > 0 ) {
+		vec3_t delta;
+		VectorSubtract( origin, lastListenerOrigin, delta );
+		VectorScale( delta, 1000.0f / cls.frametime, alListenerVelocity );
+	} else {
+		VectorClear( alListenerVelocity );
+		firstRespatialize = qfalse;
+	}
+
+	VectorCopy( origin, lastListenerOrigin );
 	VectorCopy( origin, alListenerOrigin );
 	VectorCopy( axis[0], alListenerAxis[0] );
 	VectorCopy( axis[1], alListenerAxis[1] );
@@ -677,13 +997,28 @@ static void S_AL_Respatialize( int entityNum, const vec3_t origin, vec3_t axis[3
 			S_AL_SetSourcePosition( alChannels[i].source, qtrue, zero );
 		} else if ( alChannels[i].entnum >= 0 && alChannels[i].entnum < MAX_GENTITIES && alEntityPosValid[alChannels[i].entnum] ) {
 			S_AL_SetSourcePosition( alChannels[i].source, qfalse, alEntityPositions[alChannels[i].entnum] );
+			// Update velocity for doppler
+			alSource3f( alChannels[i].source, AL_VELOCITY, 
+				alEntityVelocities[alChannels[i].entnum][0],
+				alEntityVelocities[alChannels[i].entnum][1],
+				alEntityVelocities[alChannels[i].entnum][2] );
 		}
 	}
 }
 
 static void S_AL_UpdateEntityPosition( int entityNum, const vec3_t origin ) {
+	vec3_t velocity;
+
 	if ( entityNum < 0 || entityNum >= MAX_GENTITIES ) {
 		Com_Error( ERR_DROP, "S_UpdateEntityPosition: bad entitynum %i", entityNum );
+	}
+
+	// Calculate velocity for doppler
+	if ( alEntityPosValid[entityNum] ) {
+		VectorSubtract( origin, alEntityPositions[entityNum], velocity );
+		VectorScale( velocity, 1000.0f / cls.frametime, alEntityVelocities[entityNum] );
+	} else {
+		VectorClear( alEntityVelocities[entityNum] );
 	}
 
 	VectorCopy( origin, alEntityPositions[entityNum] );
@@ -734,7 +1069,13 @@ static void S_AL_StartSound( const vec3_t origin, int entityNum, int entchannel,
 	alSourcei( ch->source, AL_LOOPING, AL_FALSE );
 	alSourcef( ch->source, AL_GAIN, 1.0f );
 	alSourcef( ch->source, AL_REFERENCE_DISTANCE, 80.0f );
-	alSourcef( ch->source, AL_ROLLOFF_FACTOR, 1.0f );
+	alSourcef( ch->source, AL_ROLLOFF_FACTOR, s_openalRolloff ? s_openalRolloff->value : 1.0f );
+	alSourcef( ch->source, AL_MAX_DISTANCE, s_openalMaxDistance ? s_openalMaxDistance->value : 2000.0f );
+
+	// Attach EFX reverb if available
+	if ( alEfxAvailable && alReverbSlot ) {
+		alSource3i( ch->source, AL_AUXILIARY_SEND_FILTER, alReverbSlot, 0, 0 );
+	}
 
 	if ( origin ) {
 		VectorCopy( origin, ch->origin );
@@ -781,6 +1122,8 @@ static void S_AL_Update( int msec ) {
 
 	s_soundtime = Sys_Milliseconds();
 
+	// Update performance metrics
+	alActiveSources = 0;
 	for ( i = 0; i < MAX_CHANNELS; ++i ) {
 		if ( !alChannels[i].inUse || alChannels[i].looping ) {
 			continue;
@@ -788,7 +1131,14 @@ static void S_AL_Update( int msec ) {
 		alGetSourcei( alChannels[i].source, AL_SOURCE_STATE, &state );
 		if ( state != AL_PLAYING ) {
 			alChannels[i].inUse = qfalse;
+		} else {
+			alActiveSources++;
 		}
+	}
+
+	// Debug output
+	if ( s_openalDebug && s_openalDebug->integer >= 2 ) {
+		Com_Printf( "OpenAL: %d active sources\n", alActiveSources );
 	}
 
 	S_AL_UpdateMusic();
@@ -798,6 +1148,9 @@ static void S_AL_Update( int msec ) {
 
 static void S_AL_SoundInfo( void ) {
 	const ALCchar *deviceName;
+	int activeCount = 0;
+	int loopingCount = 0;
+	int i;
 
 	Com_Printf( "----- Sound Info -----\n" );
 	if ( !s_soundStarted ) {
@@ -806,6 +1159,27 @@ static void S_AL_SoundInfo( void ) {
 		deviceName = alcGetString( alDevice, ALC_DEVICE_SPECIFIER );
 		Com_Printf( "Using OpenAL device: %s\n", deviceName ? deviceName : "unknown" );
 		Com_Printf( "HRTF: %s\n", alHrtfEnabled ? "enabled" : "disabled" );
+		Com_Printf( "EFX: %s\n", alEfxAvailable ? "enabled" : "disabled" );
+		Com_Printf( "Capture: %s\n", alCaptureAvailable ? "enabled" : "disabled" );
+		
+		for ( i = 0; i < MAX_CHANNELS; ++i ) {
+			if ( alChannels[i].inUse ) {
+				activeCount++;
+				if ( alChannels[i].looping ) {
+					loopingCount++;
+				}
+			}
+		}
+		
+		Com_Printf( "Active sources: %d (looping: %d)\n", activeCount, loopingCount );
+		Com_Printf( "Total buffers: %d\n", alBuffersCreated );
+		Com_Printf( "Sample rate: %d Hz\n", dma.speed );
+		Com_Printf( "Doppler: factor=%.2f speed=%.1f\n", 
+			s_openalDopplerFactor ? s_openalDopplerFactor->value : 1.0f,
+			s_openalDopplerSpeed ? s_openalDopplerSpeed->value : 9000.0f );
+		Com_Printf( "Distance: rolloff=%.2f max=%.1f\n",
+			s_openalRolloff ? s_openalRolloff->value : 1.0f,
+			s_openalMaxDistance ? s_openalMaxDistance->value : 2000.0f );
 	}
 	Com_Printf( "----------------------\n" );
 }
@@ -816,6 +1190,10 @@ static void S_AL_Shutdown( void ) {
 	if ( !alInited ) {
 		return;
 	}
+
+	// Remove console commands
+	Cmd_RemoveCommand( "s_aldevices" );
+	Cmd_RemoveCommand( "s_alinfo" );
 
 	S_AL_StopBackgroundTrack();
 
@@ -852,6 +1230,27 @@ static void S_AL_Shutdown( void ) {
 
 	alDeleteBuffers( AL_MUSIC_BUFFER_COUNT, alMusicBuffers );
 	alDeleteBuffers( AL_RAW_BUFFER_COUNT, alRawBuffers );
+
+	// Clean up EFX
+	if ( alEfxAvailable ) {
+		if ( alReverbSlot && alDeleteAuxiliaryEffectSlots ) {
+			alDeleteAuxiliaryEffectSlots( 1, &alReverbSlot );
+			alReverbSlot = 0;
+		}
+		if ( alReverbEffect && alDeleteEffects ) {
+			alDeleteEffects( 1, &alReverbEffect );
+			alReverbEffect = 0;
+		}
+		alEfxAvailable = qfalse;
+	}
+
+	// Clean up capture
+	if ( alCaptureDevice ) {
+		alcCaptureStop( alCaptureDevice );
+		alcCaptureCloseDevice( alCaptureDevice );
+		alCaptureDevice = NULL;
+		alCaptureAvailable = qfalse;
+	}
 
 	if ( alContext ) {
 		alcMakeContextCurrent( NULL );
@@ -905,28 +1304,69 @@ qboolean S_AL_Init( soundInterface_t *si ) {
 	dma.isfloat = qfalse;
 	dma.driver = "OpenAL";
 
+	// Enumerate available devices if debugging
+	if ( s_openalDebug && s_openalDebug->integer >= 1 ) {
+		const ALCchar *devices;
+		const ALCchar *ptr;
+		int count = 0;
+
+		Com_Printf( "Available OpenAL devices:\n" );
+		if ( alcIsExtensionPresent( NULL, "ALC_ENUMERATE_ALL_EXT" ) == ALC_TRUE ) {
+			devices = alcGetString( NULL, ALC_ALL_DEVICES_SPECIFIER );
+		} else {
+			devices = alcGetString( NULL, ALC_DEVICE_SPECIFIER );
+		}
+
+		if ( devices && devices[0] ) {
+			ptr = devices;
+			while ( ptr && *ptr ) {
+				Com_Printf( "  %d: %s\n", count++, ptr );
+				ptr += strlen( ptr ) + 1;
+			}
+		}
+	}
+
 	requestedDevice = ( s_openalDevice && s_openalDevice->string && s_openalDevice->string[0] && Q_stricmp( s_openalDevice->string, "default" ) )
 		? s_openalDevice->string
 		: NULL;
 
 	alDevice = alcOpenDevice( requestedDevice );
 	if ( !alDevice ) {
-		Com_Printf( S_COLOR_RED "OpenAL: failed to open device\n" );
+		Com_Printf( S_COLOR_RED "OpenAL: failed to open device '%s'\n", requestedDevice ? requestedDevice : "default" );
 		return qfalse;
 	}
 
 	alHrtfAvailable = ( alcIsExtensionPresent( alDevice, "ALC_SOFT_HRTF" ) == ALC_TRUE );
 	alHrtfEnabled = qfalse;
 
+	if ( s_openalDebug && s_openalDebug->integer >= 1 ) {
+		Com_Printf( "OpenAL HRTF extension: %s\n", alHrtfAvailable ? "available" : "not available" );
+	}
+
 	resetDevice = (alcResetDeviceSOFTProc)alcGetProcAddress( alDevice, "alcResetDeviceSOFT" );
-	if ( alHrtfAvailable && resetDevice ) {
+	if ( alHrtfAvailable && resetDevice && s_openalHrtf && s_openalHrtf->integer ) {
 		hrtfAttrs[0] = ALC_HRTF_SOFT;
-		hrtfAttrs[1] = ( s_openalHrtf && s_openalHrtf->integer ) ? ALC_TRUE : ALC_FALSE;
+		hrtfAttrs[1] = ALC_TRUE;
 		hrtfAttrs[2] = 0;
 		if ( resetDevice( alDevice, hrtfAttrs ) == ALC_TRUE ) {
 			ALCint status = 0;
 			alcGetIntegerv( alDevice, ALC_HRTF_STATUS_SOFT, 1, &status );
 			alHrtfEnabled = ( status == ALC_HRTF_ENABLED_SOFT );
+			
+			if ( s_openalDebug && s_openalDebug->integer >= 1 ) {
+				const char *statusStr = "unknown";
+				switch ( status ) {
+					case ALC_HRTF_DISABLED_SOFT: statusStr = "disabled"; break;
+					case ALC_HRTF_ENABLED_SOFT: statusStr = "enabled"; break;
+					case ALC_HRTF_DENIED_SOFT: statusStr = "denied"; break;
+					case ALC_HRTF_REQUIRED_SOFT: statusStr = "required"; break;
+					case ALC_HRTF_HEADPHONES_DETECTED_SOFT: statusStr = "headphones detected"; break;
+					case ALC_HRTF_UNSUPPORTED_FORMAT_SOFT: statusStr = "unsupported format"; break;
+				}
+				Com_Printf( "OpenAL HRTF status: %s (0x%x)\n", statusStr, status );
+			}
+		} else if ( s_openalDebug && s_openalDebug->integer >= 1 ) {
+			Com_Printf( S_COLOR_YELLOW "OpenAL: failed to enable HRTF\n" );
 		}
 	}
 
@@ -944,9 +1384,73 @@ qboolean S_AL_Init( soundInterface_t *si ) {
 
 	alDistanceModel( AL_INVERSE_DISTANCE_CLAMPED );
 
+	// Set doppler parameters
+	if ( s_openalDopplerFactor ) {
+		alDopplerFactor( s_openalDopplerFactor->value );
+	}
+	if ( s_openalDopplerSpeed ) {
+		alDopplerVelocity( s_openalDopplerSpeed->value );
+	}
+
+	// Initialize EFX if available and requested
+	alEfxAvailable = qfalse;
+	alReverbEffect = 0;
+	alReverbSlot = 0;
+	if ( s_openalEfx && s_openalEfx->integer && alcIsExtensionPresent( alDevice, "ALC_EXT_EFX" ) == ALC_TRUE ) {
+		alGenEffects = (LPALGENEFFECTS)alGetProcAddress( "alGenEffects" );
+		alDeleteEffects = (LPALDELETEEFFECTS)alGetProcAddress( "alDeleteEffects" );
+		alIsEffect = (LPALISEFFECT)alGetProcAddress( "alIsEffect" );
+		alEffecti = (LPALEFFECTI)alGetProcAddress( "alEffecti" );
+		alEffectf = (LPALEFFECTF)alGetProcAddress( "alEffectf" );
+		alGenAuxiliaryEffectSlots = (LPALGENAUXILIARYEFFECTSLOTS)alGetProcAddress( "alGenAuxiliaryEffectSlots" );
+		alDeleteAuxiliaryEffectSlots = (LPALDELETEAUXILIARYEFFECTSLOTS)alGetProcAddress( "alDeleteAuxiliaryEffectSlots" );
+		alIsAuxiliaryEffectSlot = (LPALISAUXILIARYEFFECTSLOT)alGetProcAddress( "alIsAuxiliaryEffectSlot" );
+		alAuxiliaryEffectSloti = (LPALAUXILIARYEFFECTSLOTI)alGetProcAddress( "alAuxiliaryEffectSloti" );
+		alAuxiliaryEffectSlotf = (LPALAUXILIARYEFFECTSLOTF)alGetProcAddress( "alAuxiliaryEffectSlotf" );
+
+		if ( alGenEffects && alGenAuxiliaryEffectSlots ) {
+			alGenEffects( 1, &alReverbEffect );
+			if ( !S_AL_CheckError( "alGenEffects" ) ) {
+				alEffecti( alReverbEffect, AL_EFFECT_TYPE, AL_EFFECT_REVERB );
+				if ( !S_AL_CheckError( "alEffecti(AL_EFFECT_TYPE)" ) ) {
+					alGenAuxiliaryEffectSlots( 1, &alReverbSlot );
+					if ( !S_AL_CheckError( "alGenAuxiliaryEffectSlots" ) ) {
+						alAuxiliaryEffectSloti( alReverbSlot, AL_EFFECTSLOT_EFFECT, alReverbEffect );
+						alEfxAvailable = !S_AL_CheckError( "alAuxiliaryEffectSloti" );
+						if ( alEfxAvailable ) {
+							Com_Printf( "OpenAL EFX: enabled\n" );
+						}
+					}
+				}
+			}
+			
+			if ( !alEfxAvailable && s_openalDebug && s_openalDebug->integer >= 1 ) {
+				Com_Printf( S_COLOR_YELLOW "OpenAL EFX: initialization failed\n" );
+			}
+		}
+	}
+
+	// Initialize capture if available and requested
+	alCaptureAvailable = qfalse;
+	alCaptureDevice = NULL;
+	if ( s_openalCapture && s_openalCapture->integer ) {
+		const ALCchar *captureDeviceName = alcGetString( NULL, ALC_CAPTURE_DEFAULT_DEVICE_SPECIFIER );
+		if ( captureDeviceName ) {
+			alCaptureDevice = alcCaptureOpenDevice( captureDeviceName, 48000, AL_FORMAT_MONO16, 4096 );
+			if ( alCaptureDevice ) {
+				alCaptureAvailable = qtrue;
+				Com_Printf( "OpenAL capture: enabled (%s)\n", captureDeviceName );
+			}
+		}
+	}
+
 	deviceName = alcGetString( alDevice, ALC_DEVICE_SPECIFIER );
 	Com_Printf( "OpenAL device: %s\n", deviceName ? deviceName : "unknown" );
 	Com_Printf( "OpenAL HRTF: %s\n", alHrtfEnabled ? "enabled" : ( alHrtfAvailable ? "disabled" : "unsupported" ) );
+
+	// Register console commands
+	Cmd_AddCommand( "s_aldevices", S_AL_ListDevices_f );
+	Cmd_AddCommand( "s_alinfo", S_AL_DeviceInfo_f );
 
 	alGenSources( 1, &alMusicSource );
 	alSourcei( alMusicSource, AL_SOURCE_RELATIVE, AL_TRUE );
@@ -969,8 +1473,16 @@ qboolean S_AL_Init( soundInterface_t *si ) {
 	alGenBuffers( AL_RAW_BUFFER_COUNT, alRawBuffers );
 
 	Com_Memset( alEntityPosValid, 0, sizeof( alEntityPosValid ) );
+	Com_Memset( alEntityVelocities, 0, sizeof( alEntityVelocities ) );
 	Com_Memset( alLoopSounds, 0, sizeof( alLoopSounds ) );
+	VectorClear( alListenerVelocity );
+	Com_Memset( alRawBufferQueued, 0, sizeof( alRawBufferQueued ) );
 	S_AL_ClearSources();
+
+	// Initialize metrics
+	alTotalSources = MAX_CHANNELS;
+	alActiveSources = 0;
+	alBuffersCreated = 0;
 
 	s_soundStarted = qtrue;
 	s_soundMuted = qfalse;
@@ -1000,3 +1512,49 @@ qboolean S_AL_Init( soundInterface_t *si ) {
 	Com_Printf( "OpenAL audio initialized.\n" );
 	return qtrue;
 }
+
+// VOIP Capture Support
+#ifdef USE_VOIP
+void SNDDMA_StartCapture( void ) {
+	if ( !alCaptureDevice ) {
+		return;
+	}
+	alcCaptureStart( alCaptureDevice );
+	if ( s_openalDebug && s_openalDebug->integer >= 1 ) {
+		Com_Printf( "OpenAL: capture started\n" );
+	}
+}
+
+int SNDDMA_AvailableCaptureSamples( void ) {
+	ALCint samples = 0;
+	
+	if ( !alCaptureDevice ) {
+		return 0;
+	}
+	
+	alcGetIntegerv( alCaptureDevice, ALC_CAPTURE_SAMPLES, 1, &samples );
+	return samples;
+}
+
+void SNDDMA_Capture( int samples, byte *data ) {
+	if ( !alCaptureDevice || samples <= 0 ) {
+		return;
+	}
+	
+	alcCaptureSamples( alCaptureDevice, data, samples );
+	
+	if ( s_openalDebug && s_openalDebug->integer >= 2 ) {
+		Com_Printf( "OpenAL: captured %d samples\n", samples );
+	}
+}
+
+void SNDDMA_StopCapture( void ) {
+	if ( !alCaptureDevice ) {
+		return;
+	}
+	alcCaptureStop( alCaptureDevice );
+	if ( s_openalDebug && s_openalDebug->integer >= 1 ) {
+		Com_Printf( "OpenAL: capture stopped\n" );
+	}
+}
+#endif

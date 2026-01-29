@@ -129,16 +129,45 @@ Example:
 
 ### OpenAL audio backend
 
-OpenAL is optional and disabled by default. When using CMake, enable it with:
+OpenAL provides true 3D spatial audio with HRTF, environmental effects, and VOIP capture support.
+
+#### Build-time
+
+OpenAL is optional and disabled by default. Enable it with:
 
 `cmake -DUSE_OPENAL=ON ..`
 
-At runtime, enable the OpenAL backend with:
+#### Runtime
+
+Enable the OpenAL backend (requires engine restart):
 
 `+set s_openal 1`
 
-Optional OpenAL runtime cvars:
+#### Console commands
 
-`s_openalDevice` - device name (`"default"` uses the system default)
+`s_aldevices` - list all available OpenAL devices
 
-`s_openalHrtf` - enable HRTF if supported (0/1)
+`s_alinfo` - show detailed OpenAL device information and statistics
+
+#### Configuration cvars
+
+**Device selection:**
+- `s_openalDevice` - device name (`"default"` uses the system default)
+
+**Spatial audio:**
+- `s_openalHrtf` - enable HRTF if supported (0/1, default: 1)
+- `s_openalEfx` - enable EFX environmental audio effects (0/1, default: 1)
+
+**Doppler effect:**
+- `s_openalDopplerFactor` - doppler strength (0=off, 1=normal, higher=exaggerated, default: 1.0)
+- `s_openalDopplerSpeed` - speed of sound in units/second (default: 9000)
+
+**Distance attenuation:**
+- `s_openalRolloff` - distance attenuation rolloff factor (default: 1.0)
+- `s_openalMaxDistance` - maximum distance for sound attenuation (default: 2000)
+
+**VOIP:**
+- `s_openalCapture` - enable audio capture for VOIP (0/1, default: 1)
+
+**Debugging:**
+- `s_openalDebug` - debugging output level (0=off, 1=basic, 2=verbose, default: 0)
