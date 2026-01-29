@@ -16,6 +16,13 @@
     <Filter Include="Source Files\Shaders">
       <UniqueIdentifier>{0c40e947-296a-490b-a040-5236d38c51f4}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\utils">
+      <UniqueIdentifier>{6f64cf82-313f-49dd-8262-82a9907f2f1b}</UniqueIdentifier>
+      <Extensions>h;c</Extensions>
+    </Filter>
+    <Filter Include="Source Files\utils\mikktspace">
+      <UniqueIdentifier>{cc8e2e3a-2f7c-46a2-a531-fd102d6c578e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\renderervk\tr_animation.c">
@@ -111,6 +118,12 @@
     <ClCompile Include="..\..\renderervk\vk_vbo.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\renderervk\vk_mikktspace.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\renderervk\utils\mikktspace\mikktspace.c">
+      <Filter>Source Files\utils\mikktspace</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\renderervk\iqm.h">
@@ -130,6 +143,9 @@
     </ClInclude>
     <ClInclude Include="..\..\renderervk\vk.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\renderervk\utils\mikktspace\mikktspace.h">
+      <Filter>Source Files\utils\mikktspace</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

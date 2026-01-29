@@ -2078,11 +2078,10 @@ void RE_VertexLighting( qboolean allowed );
 
 #ifdef USE_VK_PBR
 // pbr
-void		R_CalcTangents( vec3_t tangent, vec3_t binormal,
-				const vec3_t v0, const vec3_t v1, const vec3_t v2,
-				const vec2_t t0, const vec2_t t1, const vec2_t t2 );
-void		R_TBNtoQtangents( const vec3_t tangent, const vec3_t binormal,
-		       const vec3_t normal, vec4_t qtangent );
+// mikktspace
+void		vk_mikkt_bsp_tri_generate( srfTriangles_t *tri );
+void		vk_mikkt_bsp_face_generate( srfSurfaceFace_t *face );
+
 void		R_AddConvolveCubemapCmd( cubemap_t *cubemap , int cubemapId );
 void		vk_generate_cubemaps( cubemap_t *cube );
 void		R_IssueRenderCommands( void );

@@ -6846,6 +6846,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	// Vertex input
 	//
 	num_binds = num_attrs = 0;
+	qboolean has_normal = qfalse;
+
 	switch ( def->shader_type ) {
 
 		case TYPE_FOG_ONLY:
@@ -6890,6 +6892,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			push_attr( 1, 1, VK_FORMAT_R8G8B8A8_UNORM );
 			//push_attr( 2, 2, VK_FORMAT_R8G8B8A8_UNORM );
 			push_attr( 5, 5, VK_FORMAT_R32G32B32A32_SFLOAT );
+
+			has_normal = qtrue;
 			break;
 
 		case TYPE_SIGNLE_TEXTURE_IDENTITY_ENV:
@@ -6899,6 +6903,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			push_bind( 5, sizeof( vec4_t ) );					// normals
 			push_attr( 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT );
 			push_attr( 5, 5, VK_FORMAT_R32G32B32A32_SFLOAT );
+
+			has_normal = qtrue;
 			break;
 
 		case TYPE_SIGNLE_TEXTURE_LIGHTING:
@@ -6933,6 +6939,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			push_attr( 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT );
 			push_attr( 3, 3, VK_FORMAT_R32G32_SFLOAT );
 			push_attr( 5, 5, VK_FORMAT_R32G32B32A32_SFLOAT );
+
+			has_normal = qtrue;
 			break;
 
 		case TYPE_MULTI_TEXTURE_MUL2:
@@ -6961,6 +6969,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			//push_attr( 2, 2, VK_FORMAT_R32G32_SFLOAT );
 			push_attr( 3, 3, VK_FORMAT_R32G32_SFLOAT );
 			push_attr( 5, 5, VK_FORMAT_R32G32B32A32_SFLOAT );
+
+			has_normal = qtrue;
 			break;
 
 		case TYPE_MULTI_TEXTURE_MUL3:
@@ -6993,6 +7003,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			push_attr( 3, 3, VK_FORMAT_R32G32_SFLOAT );
 			push_attr( 4, 4, VK_FORMAT_R32G32_SFLOAT );
 			push_attr( 5, 5, VK_FORMAT_R32G32B32A32_SFLOAT );
+
+			has_normal = qtrue;
 			break;
 
 		case TYPE_BLEND2_ADD:
@@ -7033,6 +7045,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			push_attr( 3, 3, VK_FORMAT_R32G32_SFLOAT );
 			push_attr( 5, 5, VK_FORMAT_R32G32B32A32_SFLOAT );
 			push_attr( 6, 6, VK_FORMAT_R8G8B8A8_UNORM );
+
+			has_normal = qtrue;
 			break;
 
 		case TYPE_BLEND3_ADD:
@@ -7081,6 +7095,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			push_attr( 5, 5, VK_FORMAT_R32G32B32A32_SFLOAT );
 			push_attr( 6, 6, VK_FORMAT_R8G8B8A8_UNORM );
 			push_attr( 7, 7, VK_FORMAT_R8G8B8A8_UNORM );
+
+			has_normal = qtrue;
 			break;
 
 		default:
@@ -7089,8 +7105,15 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	}
 
  #ifdef USE_VK_PBR  
-    if( def->vk_pbr_flags ){    
-        push_bind( 8, sizeof( vec4_t ) );						// qtangent
+    if( def->vk_pbr_flags ){   
+
+		if ( !has_normal )
+		{
+			push_bind( 5, sizeof( vec4_t ) );					// normals
+			push_attr( 5, 5, VK_FORMAT_R32G32B32A32_SFLOAT );
+		}
+
+        push_bind( 8, sizeof( vec4_t ) );						// tangent
         push_attr( 8, 8, VK_FORMAT_R32G32B32A32_SFLOAT );
 
         push_bind( 9, sizeof(vec4_t) );							// lightdir
@@ -7797,6 +7820,9 @@ void vk_bind_geometry( uint32_t flags )
 		}
 #ifdef USE_VK_PBR
 		if (flags & TESS_PBR) {
+			vk.cmd->vbo_offset[5] = tess.shader->normalOffset;
+			vk_bind_index_attr( 5 );
+
 			vk.cmd->vbo_offset[8] = tess.shader->qtangentOffset;
 			vk_bind_index_attr(8);
 
@@ -7849,6 +7875,7 @@ void vk_bind_geometry( uint32_t flags )
 		}
 #ifdef USE_VK_PBR
 		if (flags & TESS_PBR) {
+			vk_bind_attr(5, sizeof(tess.normal[0]), tess.normal);
 			vk_bind_attr(8, sizeof(tess.qtangent[0]), tess.qtangent);
 			vk_bind_attr(9, sizeof(tess.lightdir[0]), tess.lightdir);
 		}
