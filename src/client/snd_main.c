@@ -35,7 +35,27 @@ cvar_t *s_muteWhenUnfocused;
 cvar_t *s_openal;
 cvar_t *s_openalDevice;
 cvar_t *s_openalHrtf;
+cvar_t *s_openalEfx;
+cvar_t *s_openalEfxPreset;
+cvar_t *s_openalCapture;
+cvar_t *s_openalDopplerFactor;
+cvar_t *s_openalDopplerSpeed;
+cvar_t *s_openalRolloff;
+cvar_t *s_openalMaxDistance;
+cvar_t *s_openalLowpass;
+cvar_t *s_openalLowpassHf;
+cvar_t *s_openalOcclusion;
+cvar_t *s_openalOcclusionGain;
+cvar_t *s_openalOcclusionHf;
+cvar_t *s_openalVoipSpatial;
+cvar_t *s_openalVoipGain;
+cvar_t *s_openalDebug;
 #endif
+
+cvar_t *s_musicLayer;
+cvar_t *s_musicLayerEnabled;
+cvar_t *s_musicLayerVolume;
+cvar_t *s_musicIntensity;
 
 static soundInterface_t si;
 
@@ -132,6 +152,21 @@ void S_RawSamples (int samples, int rate, int width, int channels,
 		   const byte *data, float volume)
 {
 	if( si.RawSamples ) {
+		si.RawSamples( samples, rate, width, channels, data, volume );
+	}
+}
+
+/*
+=================
+S_VoipSamples
+=================
+*/
+void S_VoipSamples( int entityNum, const vec3_t origin, int samples, int rate,
+		    int width, int channels, const byte *data, float volume )
+{
+	if ( si.VoipSamples ) {
+		si.VoipSamples( entityNum, origin, samples, rate, width, channels, data, volume );
+	} else if ( si.RawSamples ) {
 		si.RawSamples( samples, rate, width, channels, data, volume );
 	}
 }
@@ -435,12 +470,89 @@ void S_Init( void )
 	s_openal = Cvar_Get( "s_openal", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	Cvar_CheckRange( s_openal, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( s_openal, "Enables the OpenAL audio backend (requires restart)." );
+	
 	s_openalDevice = Cvar_Get( "s_openalDevice", "default", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	Cvar_SetDescription( s_openalDevice, "OpenAL device name (\"default\" uses the system default)." );
+	
 	s_openalHrtf = Cvar_Get( "s_openalHrtf", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	Cvar_CheckRange( s_openalHrtf, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( s_openalHrtf, "Enable OpenAL HRTF if supported by the device." );
+	
+	s_openalEfx = Cvar_Get( "s_openalEfx", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	Cvar_CheckRange( s_openalEfx, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( s_openalEfx, "Enable OpenAL EFX environmental audio effects." );
+
+	s_openalEfxPreset = Cvar_Get( "s_openalEfxPreset", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	Cvar_CheckRange( s_openalEfxPreset, "0", "4", CV_INTEGER );
+	Cvar_SetDescription( s_openalEfxPreset, "OpenAL EFX reverb preset (0=off, 1=generic, 2=hall, 3=cave, 4=underwater)." );
+	
+	s_openalCapture = Cvar_Get( "s_openalCapture", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	Cvar_CheckRange( s_openalCapture, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( s_openalCapture, "Enable OpenAL audio capture for VOIP." );
+	
+	s_openalDopplerFactor = Cvar_Get( "s_openalDopplerFactor", "1.0", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_openalDopplerFactor, "0", "10", CV_FLOAT );
+	Cvar_SetDescription( s_openalDopplerFactor, "OpenAL doppler effect strength (0=off, 1=normal, higher=exaggerated)." );
+	
+	s_openalDopplerSpeed = Cvar_Get( "s_openalDopplerSpeed", "9000", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_openalDopplerSpeed, "1", "100000", CV_FLOAT );
+	Cvar_SetDescription( s_openalDopplerSpeed, "Speed of sound for doppler effect (units/second)." );
+	
+	s_openalRolloff = Cvar_Get( "s_openalRolloff", "1.0", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_openalRolloff, "0", "10", CV_FLOAT );
+	Cvar_SetDescription( s_openalRolloff, "OpenAL distance attenuation rolloff factor." );
+	
+	s_openalMaxDistance = Cvar_Get( "s_openalMaxDistance", "2000", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_openalMaxDistance, "100", "10000", CV_FLOAT );
+	Cvar_SetDescription( s_openalMaxDistance, "Maximum distance for sound attenuation." );
+
+	s_openalLowpass = Cvar_Get( "s_openalLowpass", "0.0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	Cvar_CheckRange( s_openalLowpass, "0", "1", CV_FLOAT );
+	Cvar_SetDescription( s_openalLowpass, "Enable global OpenAL low-pass filter (0=off, 1=full) requires restart." );
+
+	s_openalLowpassHf = Cvar_Get( "s_openalLowpassHf", "0.5", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	Cvar_CheckRange( s_openalLowpassHf, "0.05", "1", CV_FLOAT );
+	Cvar_SetDescription( s_openalLowpassHf, "OpenAL low-pass high-frequency gain (0.05-1.0). Requires restart." );
+
+	s_openalOcclusion = Cvar_Get( "s_openalOcclusion", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	Cvar_CheckRange( s_openalOcclusion, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( s_openalOcclusion, "Enable OpenAL per-source occlusion/obstruction (requires restart)." );
+
+	s_openalOcclusionGain = Cvar_Get( "s_openalOcclusionGain", "0.5", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_openalOcclusionGain, "0.05", "1", CV_FLOAT );
+	Cvar_SetDescription( s_openalOcclusionGain, "Occluded direct gain multiplier for OpenAL sources." );
+
+	s_openalOcclusionHf = Cvar_Get( "s_openalOcclusionHf", "0.2", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_openalOcclusionHf, "0.05", "1", CV_FLOAT );
+	Cvar_SetDescription( s_openalOcclusionHf, "Occluded high-frequency gain for OpenAL low-pass filter." );
+
+	s_openalVoipSpatial = Cvar_Get( "s_openalVoipSpatial", "1", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_openalVoipSpatial, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( s_openalVoipSpatial, "Route VOIP through spatial OpenAL sources." );
+
+	s_openalVoipGain = Cvar_Get( "s_openalVoipGain", "1.0", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_openalVoipGain, "0", "2", CV_FLOAT );
+	Cvar_SetDescription( s_openalVoipGain, "VOIP gain multiplier for OpenAL sources." );
+	
+	s_openalDebug = Cvar_Get( "s_openalDebug", "0", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_openalDebug, "0", "2", CV_INTEGER );
+	Cvar_SetDescription( s_openalDebug, "OpenAL debugging output level (0=off, 1=basic, 2=verbose)." );
 #endif
+
+	s_musicLayer = Cvar_Get( "s_musicLayer", "", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	Cvar_SetDescription( s_musicLayer, "Optional secondary music layer track (path). Requires restart." );
+
+	s_musicLayerEnabled = Cvar_Get( "s_musicLayerEnabled", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	Cvar_CheckRange( s_musicLayerEnabled, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( s_musicLayerEnabled, "Enable dynamic music layering (requires restart)." );
+
+	s_musicLayerVolume = Cvar_Get( "s_musicLayerVolume", "1.0", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_musicLayerVolume, "0", "2", CV_FLOAT );
+	Cvar_SetDescription( s_musicLayerVolume, "Base volume multiplier for the secondary music layer." );
+
+	s_musicIntensity = Cvar_Get( "s_musicIntensity", "0.0", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_musicIntensity, "0", "1", CV_FLOAT );
+	Cvar_SetDescription( s_musicIntensity, "Music intensity value for dynamic layers (0-1)." );
 
 	cv = Cvar_Get( "s_initsound", "1", 0 );
 	Cvar_SetDescription( cv, "Whether or not to startup the sound system." );

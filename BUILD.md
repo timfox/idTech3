@@ -129,16 +129,61 @@ Example:
 
 ### OpenAL audio backend
 
-OpenAL is optional and disabled by default. When using CMake, enable it with:
+OpenAL provides true 3D spatial audio with HRTF, environmental effects, and VOIP capture support.
+
+#### Build-time
+
+OpenAL is optional and disabled by default. Enable it with:
 
 `cmake -DUSE_OPENAL=ON ..`
 
-At runtime, enable the OpenAL backend with:
+#### Runtime
+
+Enable the OpenAL backend (requires engine restart):
 
 `+set s_openal 1`
 
-Optional OpenAL runtime cvars:
+#### Console commands
 
-`s_openalDevice` - device name (`"default"` uses the system default)
+`s_aldevices` - list all available OpenAL devices
 
-`s_openalHrtf` - enable HRTF if supported (0/1)
+`s_alinfo` - show detailed OpenAL device information and statistics
+
+#### Configuration cvars
+
+**Device selection:**
+- `s_openalDevice` - device name (`"default"` uses the system default)
+
+**Spatial audio:**
+- `s_openalHrtf` - enable HRTF if supported (0/1, default: 1)
+- `s_openalEfx` - enable EFX environmental audio effects (0/1, default: 1)
+- `s_openalEfxPreset` - reverb preset (0=off, 1=generic, 2=hall, 3=cave, 4=underwater)
+
+**Doppler effect:**
+- `s_openalDopplerFactor` - doppler strength (0=off, 1=normal, higher=exaggerated, default: 1.0)
+- `s_openalDopplerSpeed` - speed of sound in units/second (default: 9000)
+
+**Distance attenuation:**
+- `s_openalRolloff` - distance attenuation rolloff factor (default: 1.0)
+- `s_openalMaxDistance` - maximum distance for sound attenuation (default: 2000)
+
+**Occlusion/muffling:**
+- `s_openalLowpass` - enable global low-pass filter (0=off, 1=full, default: 0.0)
+- `s_openalLowpassHf` - low-pass high-frequency gain (0.05-1.0, default: 0.5)
+- `s_openalOcclusion` - enable per-source occlusion tracing (0/1, default: 0)
+- `s_openalOcclusionGain` - occluded direct gain multiplier (default: 0.5)
+- `s_openalOcclusionHf` - occluded high-frequency gain (default: 0.2)
+
+**VOIP:**
+- `s_openalCapture` - enable audio capture for VOIP (0/1, default: 1)
+- `s_openalVoipSpatial` - route VOIP through spatial sources (0/1, default: 1)
+- `s_openalVoipGain` - VOIP gain multiplier (default: 1.0)
+
+**Debugging:**
+- `s_openalDebug` - debugging output level (0=off, 1=basic, 2=verbose, default: 0)
+
+**Dynamic music layers:**
+- `s_musicLayerEnabled` - enable secondary music layer (0/1, default: 0)
+- `s_musicLayer` - secondary music layer track path (requires restart)
+- `s_musicLayerVolume` - secondary layer volume multiplier (default: 1.0)
+- `s_musicIntensity` - intensity value (0-1) for layer blending (default: 0.0)
