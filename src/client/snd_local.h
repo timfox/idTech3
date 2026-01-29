@@ -253,6 +253,8 @@ void S_Spatialize(channel_t *ch);
 // adpcm functions
 int  S_AdpcmMemoryNeeded( const wavinfo_t *info );
 void S_AdpcmEncodeSound( sfx_t *sfx, short *samples );
+void S_AdpcmEncode( short indata[], char outdata[], int len, struct adpcm_state *state );
+void S_AdpcmDecode( const char indata[], short outdata[], int len, struct adpcm_state *state );
 void S_AdpcmGetSamples(sndBuffer *chunk, short *to);
 
 // wavelet function
@@ -275,3 +277,11 @@ extern sfx_t *sfxScratchPointer;
 extern int	   sfxScratchIndex;
 
 qboolean S_Base_Init( soundInterface_t *si );
+void S_Base_StopLoopingSound( int entityNum );
+void S_Base_ClearLoopingSounds( qboolean killall );
+void S_Base_AddLoopingSound( int entityNum, const vec3_t origin, const vec3_t velocity, sfxHandle_t sfxHandle );
+void S_Base_AddRealLoopingSound( int entityNum, const vec3_t origin, const vec3_t velocity, sfxHandle_t sfxHandle );
+void S_Base_UpdateEntityPosition( int entityNum, const vec3_t origin );
+void S_Base_Respatialize( int entityNum, const vec3_t head, vec3_t axis[3], int inwater );
+void S_AddLoopSounds( void );
+portable_samplepair_t *S_GetRawSamplePointer( void );

@@ -255,7 +255,7 @@ void MSG_WriteByte( msg_t *sb, int c ) {
 void MSG_WriteData( msg_t *buf, const void *data, int length ) {
 	int i;
 	for(i=0;i<length;i++) {
-		MSG_WriteByte(buf, ((byte *)data)[i]);
+		MSG_WriteByte(buf, ((const byte *)data)[i]);
 	}
 }
 
@@ -322,9 +322,11 @@ void MSG_WriteBigString( msg_t *sb, const char *s ) {
 	MSG_WriteChar( sb, '\0' );
 }
 
-void MSG_WriteAngle( msg_t *sb, float f ) {
+#if 0
+static void MSG_WriteAngle( msg_t *sb, float f ) {
 	MSG_WriteByte (sb, (int)(f*256/360) & 255);
 }
+#endif
 
 void MSG_WriteAngle16( msg_t *sb, float f ) {
 	MSG_WriteShort (sb, ANGLE2SHORT(f));
@@ -400,7 +402,7 @@ const char *MSG_ReadString( msg_t *msg ) {
 	l = 0;
 	do {
 		c = MSG_ReadByte( msg ); // use ReadByte so -1 is out of bounds
-		if ( c <= 0 /*c == -1 || c == 0 */ || l >= sizeof(string)-1 ) {
+		if ( c <= 0 /*c == -1 || c == 0 */ || (size_t) l >= sizeof(string)-1 ) {
 			break;
 		}
 		// translate all fmt spec to avoid crash bugs
@@ -427,7 +429,7 @@ const char *MSG_ReadBigString( msg_t *msg ) {
 	l = 0;
 	do {
 		c = MSG_ReadByte( msg ); // use ReadByte so -1 is out of bounds
-		if ( c <= 0 /*c == -1 || c == 0*/ || l >= sizeof(string)-1 ) {
+		if ( c <= 0 /*c == -1 || c == 0*/ || (size_t) l >= (size_t)(sizeof(string)-1) ) {
 			break;
 		}
 		// translate all fmt spec to avoid crash bugs
@@ -454,7 +456,7 @@ const char *MSG_ReadStringLine( msg_t *msg ) {
 	l = 0;
 	do {
 		c = MSG_ReadByte( msg ); // use ReadByte so -1 is out of bounds
-		if ( c <= 0 /*c == -1 || c == 0*/ || c == '\n' || l >= sizeof(string)-1 ) {
+		if ( c <= 0 /*c == -1 || c == 0*/ || c == '\n' || (size_t) l >= sizeof(string)-1 ) {
 			break;
 		}
 		// translate all fmt spec to avoid crash bugs
@@ -782,8 +784,8 @@ void MSG_WriteDeltaEntity( msg_t *msg, const entityState_t *from, const entitySt
 	lc = 0;
 	// build the change vector as bytes so it is endian independent
 	for ( i = 0, field = entityStateFields ; i < numFields ; i++, field++ ) {
-		fromF = (int *)( (byte *)from + field->offset );
-		toF = (int *)( (byte *)to + field->offset );
+		fromF = (const int *)(uintptr_t)( (const byte *)from + field->offset );
+		toF = (const int *)(uintptr_t)( (const byte *)to + field->offset );
 		if ( *fromF != *toF ) {
 			lc = i+1;
 		}
@@ -808,8 +810,8 @@ void MSG_WriteDeltaEntity( msg_t *msg, const entityState_t *from, const entitySt
 	MSG_WriteByte( msg, lc );	// # of changes
 
 	for ( i = 0, field = entityStateFields ; i < lc ; i++, field++ ) {
-		fromF = (int *)( (byte *)from + field->offset );
-		toF = (int *)( (byte *)to + field->offset );
+		fromF = (const int *)(uintptr_t)( (const byte *)from + field->offset );
+		toF = (const int *)(uintptr_t)( (const byte *)to + field->offset );
 
 		if ( *fromF == *toF ) {
 			MSG_WriteBits( msg, 0, 1 );	// no change
@@ -924,8 +926,8 @@ void MSG_ReadDeltaEntity( msg_t *msg, const entityState_t *from, entityState_t *
 #endif
 
 	for ( i = 0, field = entityStateFields ; i < lc ; i++, field++ ) {
-		fromF = (const int *)( (const byte *)from + field->offset );
-		toF = (int *)( (byte *)to + field->offset );
+		fromF = (const int *)(uintptr_t)( (const byte *)from + field->offset );
+		toF = (int *)(uintptr_t)( (const byte *)to + field->offset );
 
 		if ( ! MSG_ReadBits( msg, 1 ) ) {
 			// no change
@@ -968,8 +970,8 @@ void MSG_ReadDeltaEntity( msg_t *msg, const entityState_t *from, entityState_t *
 		}
 	}
 	for ( i = lc, field = &entityStateFields[lc] ; i < numFields ; i++, field++ ) {
-		fromF = (int *)( (byte *)from + field->offset );
-		toF = (int *)( (byte *)to + field->offset );
+		fromF = (const int *)(uintptr_t)( (const byte *)from + field->offset );
+		toF = (int *)(uintptr_t)( (const byte *)to + field->offset );
 		// no change
 		*toF = *fromF;
 	}
@@ -1075,8 +1077,8 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, const playerState_t *from, const pla
 
 	lc = 0;
 	for ( i = 0, field = playerStateFields ; i < numFields ; i++, field++ ) {
-		fromF = (const int *)( (byte *)from + field->offset );
-		toF = (const int *)( (byte *)to + field->offset );
+		fromF = (const int *)(uintptr_t)( (const byte *)from + field->offset );
+		toF = (const int *)(uintptr_t)( (const byte *)to + field->offset );
 		if ( *fromF != *toF ) {
 			lc = i+1;
 		}
@@ -1085,8 +1087,8 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, const playerState_t *from, const pla
 	MSG_WriteByte( msg, lc );	// # of changes
 
 	for ( i = 0, field = playerStateFields ; i < lc ; i++, field++ ) {
-		fromF = (const int *)( (byte *)from + field->offset );
-		toF = (const int *)( (byte *)to + field->offset );
+		fromF = (const int *)(uintptr_t)( (const byte *)from + field->offset );
+		toF = (const int *)(uintptr_t)( (const byte *)to + field->offset );
 
 		if ( *fromF == *toF ) {
 			MSG_WriteBits( msg, 0, 1 );	// no change
@@ -1247,8 +1249,8 @@ void MSG_ReadDeltaPlayerstate( msg_t *msg, const playerState_t *from, playerStat
 	}
 
 	for ( i = 0, field = playerStateFields ; i < lc ; i++, field++ ) {
-		fromF = (int *)( (byte *)from + field->offset );
-		toF = (int *)( (byte *)to + field->offset );
+		fromF = (const int *)(uintptr_t)( (const byte *)from + field->offset );
+		toF = (int *)(uintptr_t)( (const byte *)to + field->offset );
 
 		if ( ! MSG_ReadBits( msg, 1 ) ) {
 			// no change
@@ -1282,8 +1284,8 @@ void MSG_ReadDeltaPlayerstate( msg_t *msg, const playerState_t *from, playerStat
 		}
 	}
 	for ( i=lc,field = &playerStateFields[lc];i<numFields; i++, field++) {
-		fromF = (int *)( (byte *)from + field->offset );
-		toF = (int *)( (byte *)to + field->offset );
+		fromF = (const int *)(uintptr_t)( (const byte *)from + field->offset );
+		toF = (int *)(uintptr_t)( (const byte *)to + field->offset );
 		// no change
 		*toF = *fromF;
 	}

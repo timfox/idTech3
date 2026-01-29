@@ -31,7 +31,7 @@ ____________________________________________________________________________*/
 #define HAVE_IO_H 1
 #define HAVE_ERRNO_H 1
 
-#if HAVE_UNISTD_H
+#if defined(HAVE_UNISTD_H) && HAVE_UNISTD_H
 #define RD_BNRY_FLAGS O_RDONLY
 #elif HAVE_IO_H
 #define RD_BNRY_FLAGS O_RDONLY | O_BINARY

@@ -77,8 +77,9 @@ typedef struct optimized_s
 //===========================================================================
 static int AAS_KeepEdge(aas_edge_t *edge)
 {
+	(void)edge;
 	return 1;
-} //end of the function AAS_KeepFace
+} //end of the function AAS_KeepEdge
 //===========================================================================
 //
 // Parameter:				-

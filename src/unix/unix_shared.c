@@ -35,8 +35,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
+#include "linux_local.h"
 
 //=============================================================================
+
+STATIC_ASSERT(sizeof(byte) == 1, "byte size must be 1");
 
 /*
 ================
@@ -93,6 +96,7 @@ Sys_RandomBytes
 qboolean Sys_RandomBytes( byte *string, int len )
 {
 	FILE *fp;
+	size_t read;
 
 	fp = fopen( "/dev/urandom", "r" );
 	if( !fp )
@@ -100,7 +104,8 @@ qboolean Sys_RandomBytes( byte *string, int len )
 
 	setvbuf( fp, NULL, _IONBF, 0 ); // don't buffer reads from /dev/urandom
 
-	if ( fread( string, sizeof( byte ), len, fp ) != len ) {
+	read = fread( string, sizeof( byte ), len, fp );
+	if ( UNLIKELY( read != (size_t) len ) ) {
 		fclose( fp );
 		return qfalse;
 	}
@@ -346,6 +351,7 @@ Sys_ResetReadOnlyAttribute
 */
 qboolean Sys_ResetReadOnlyAttribute( const char *ospath )
 {
+	(void)ospath;
 	return qfalse;
 }
 
@@ -447,6 +453,8 @@ Sys_ShowConsole
 */
 void Sys_ShowConsole( int visLevel, qboolean quitOnClose )
 {
+	(void)visLevel;
+	(void)quitOnClose;
 	// not implemented
 }
 
@@ -560,7 +568,8 @@ uint64_t Sys_GetAffinityMask( void )
 	if ( sched_getaffinity( getpid(), sizeof( cpu_set ), &cpu_set ) == 0 ) {
 		uint64_t mask = 0;
 		int cpu;
-		for ( cpu = 0; cpu < sizeof( mask ) * 8; cpu++ ) {
+		const int maxCpu = (int)(sizeof( mask ) * 8);
+		for ( cpu = 0; cpu < maxCpu; cpu++ ) {
 			if ( CPU_ISSET( cpu, &cpu_set ) ) {
 				mask |= (1ULL << cpu);
 			}
@@ -581,9 +590,10 @@ qboolean Sys_SetAffinityMask( const uint64_t mask )
 {
 	cpu_set_t cpu_set;
 	int cpu;
+	const int maxCpu = (int)(sizeof( mask ) * 8);
 
 	CPU_ZERO( &cpu_set );
-	for ( cpu = 0; cpu < sizeof( mask ) * 8; cpu++ ) {
+	for ( cpu = 0; cpu < maxCpu; cpu++ ) {
 		if ( mask & (1ULL << cpu) ) {
 			CPU_SET( cpu, &cpu_set );
 		}

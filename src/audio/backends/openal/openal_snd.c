@@ -330,6 +330,14 @@ static void S_AL_UpdateOcclusion( ALuint source, const vec3_t sourcePos, float b
 		return;
 	}
 
+	// Occlusion traces require a loaded collision model. During early startup (UI/menu)
+	// or during restarts, CM may be cleared (CM_NumInlineModels() == 0); avoid a fatal
+	// CM_ClipHandleToModel() error in that case.
+	if ( CM_NumInlineModels() <= 0 ) {
+		S_AL_ApplyDirectFilter( source, qfalse, baseGain );
+		return;
+	}
+
 	CM_BoxTrace( &trace, alListenerOrigin, sourcePos, mins, maxs, 0, MASK_SOLID, qfalse );
 	S_AL_ApplyDirectFilter( source, trace.fraction < 1.0f, baseGain );
 }
@@ -802,6 +810,8 @@ static void S_AL_UpdateStreamSource( ALuint source, ALuint *buffers, int bufferC
 	int i;
 	ALuint unqueueBuffers[AL_MUSIC_BUFFER_COUNT];
 	int unqueued = 0;
+
+	(void)buffers;
 
 	if ( !stream || !*stream || !source ) {
 		return;
@@ -1753,7 +1763,10 @@ qboolean S_AL_Init( soundInterface_t *si ) {
 		Com_Printf( "OpenAL HRTF extension: %s\n", alHrtfAvailable ? "available" : "not available" );
 	}
 
-	resetDevice = (alcResetDeviceSOFTProc)alcGetProcAddress( alDevice, "alcResetDeviceSOFT" );
+	{
+		void *sym = alcGetProcAddress( alDevice, "alcResetDeviceSOFT" );
+		Com_Memcpy( &resetDevice, &sym, sizeof( resetDevice ) );
+	}
 	if ( alHrtfAvailable && resetDevice && s_openalHrtf && s_openalHrtf->integer ) {
 		hrtfAttrs[0] = ALC_HRTF_SOFT;
 		hrtfAttrs[1] = ALC_TRUE;
@@ -1811,21 +1824,40 @@ qboolean S_AL_Init( soundInterface_t *si ) {
 	alOcclusionAvailable = qfalse;
 	alOcclusionFilter = 0;
 	if ( s_openalEfx && s_openalEfx->integer && alcIsExtensionPresent( alDevice, "ALC_EXT_EFX" ) == ALC_TRUE ) {
-		alGenEffects = (LPALGENEFFECTS)alGetProcAddress( "alGenEffects" );
-		alDeleteEffects = (LPALDELETEEFFECTS)alGetProcAddress( "alDeleteEffects" );
-		alIsEffect = (LPALISEFFECT)alGetProcAddress( "alIsEffect" );
-		alEffecti = (LPALEFFECTI)alGetProcAddress( "alEffecti" );
-		alEffectf = (LPALEFFECTF)alGetProcAddress( "alEffectf" );
-		alGenAuxiliaryEffectSlots = (LPALGENAUXILIARYEFFECTSLOTS)alGetProcAddress( "alGenAuxiliaryEffectSlots" );
-		alDeleteAuxiliaryEffectSlots = (LPALDELETEAUXILIARYEFFECTSLOTS)alGetProcAddress( "alDeleteAuxiliaryEffectSlots" );
-		alIsAuxiliaryEffectSlot = (LPALISAUXILIARYEFFECTSLOT)alGetProcAddress( "alIsAuxiliaryEffectSlot" );
-		alAuxiliaryEffectSloti = (LPALAUXILIARYEFFECTSLOTI)alGetProcAddress( "alAuxiliaryEffectSloti" );
-		alAuxiliaryEffectSlotf = (LPALAUXILIARYEFFECTSLOTF)alGetProcAddress( "alAuxiliaryEffectSlotf" );
-		alGenFilters = (LPALGENFILTERS)alGetProcAddress( "alGenFilters" );
-		alDeleteFilters = (LPALDELETEFILTERS)alGetProcAddress( "alDeleteFilters" );
-		alIsFilter = (LPALISFILTER)alGetProcAddress( "alIsFilter" );
-		alFilteri = (LPALFILTERI)alGetProcAddress( "alFilteri" );
-		alFilterf = (LPALFILTERF)alGetProcAddress( "alFilterf" );
+		{
+			void *sym;
+
+			sym = alGetProcAddress( "alGenEffects" );
+			Com_Memcpy( &alGenEffects, &sym, sizeof( alGenEffects ) );
+			sym = alGetProcAddress( "alDeleteEffects" );
+			Com_Memcpy( &alDeleteEffects, &sym, sizeof( alDeleteEffects ) );
+			sym = alGetProcAddress( "alIsEffect" );
+			Com_Memcpy( &alIsEffect, &sym, sizeof( alIsEffect ) );
+			sym = alGetProcAddress( "alEffecti" );
+			Com_Memcpy( &alEffecti, &sym, sizeof( alEffecti ) );
+			sym = alGetProcAddress( "alEffectf" );
+			Com_Memcpy( &alEffectf, &sym, sizeof( alEffectf ) );
+			sym = alGetProcAddress( "alGenAuxiliaryEffectSlots" );
+			Com_Memcpy( &alGenAuxiliaryEffectSlots, &sym, sizeof( alGenAuxiliaryEffectSlots ) );
+			sym = alGetProcAddress( "alDeleteAuxiliaryEffectSlots" );
+			Com_Memcpy( &alDeleteAuxiliaryEffectSlots, &sym, sizeof( alDeleteAuxiliaryEffectSlots ) );
+			sym = alGetProcAddress( "alIsAuxiliaryEffectSlot" );
+			Com_Memcpy( &alIsAuxiliaryEffectSlot, &sym, sizeof( alIsAuxiliaryEffectSlot ) );
+			sym = alGetProcAddress( "alAuxiliaryEffectSloti" );
+			Com_Memcpy( &alAuxiliaryEffectSloti, &sym, sizeof( alAuxiliaryEffectSloti ) );
+			sym = alGetProcAddress( "alAuxiliaryEffectSlotf" );
+			Com_Memcpy( &alAuxiliaryEffectSlotf, &sym, sizeof( alAuxiliaryEffectSlotf ) );
+			sym = alGetProcAddress( "alGenFilters" );
+			Com_Memcpy( &alGenFilters, &sym, sizeof( alGenFilters ) );
+			sym = alGetProcAddress( "alDeleteFilters" );
+			Com_Memcpy( &alDeleteFilters, &sym, sizeof( alDeleteFilters ) );
+			sym = alGetProcAddress( "alIsFilter" );
+			Com_Memcpy( &alIsFilter, &sym, sizeof( alIsFilter ) );
+			sym = alGetProcAddress( "alFilteri" );
+			Com_Memcpy( &alFilteri, &sym, sizeof( alFilteri ) );
+			sym = alGetProcAddress( "alFilterf" );
+			Com_Memcpy( &alFilterf, &sym, sizeof( alFilterf ) );
+		}
 
 		if ( alGenEffects && alGenAuxiliaryEffectSlots ) {
 			alGenEffects( 1, &alReverbEffect );

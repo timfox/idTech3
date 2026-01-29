@@ -138,15 +138,15 @@ typedef struct iteminfo_s
 
 static const fielddef_t iteminfo_fields[] =
 {
-{"name", ITEMINFO_OFS(name), FT_STRING},
-{"model", ITEMINFO_OFS(model), FT_STRING},
-{"modelindex", ITEMINFO_OFS(modelindex), FT_INT},
-{"type", ITEMINFO_OFS(type), FT_INT},
-{"index", ITEMINFO_OFS(index), FT_INT},
-{"respawntime", ITEMINFO_OFS(respawntime), FT_FLOAT},
-{"mins", ITEMINFO_OFS(mins), FT_FLOAT|FT_ARRAY, 3},
-{"maxs", ITEMINFO_OFS(maxs), FT_FLOAT|FT_ARRAY, 3},
-{NULL, 0, 0}
+{"name", ITEMINFO_OFS(name), FT_STRING, 0, 0, 0, NULL},
+{"model", ITEMINFO_OFS(model), FT_STRING, 0, 0, 0, NULL},
+{"modelindex", ITEMINFO_OFS(modelindex), FT_INT, 0, 0, 0, NULL},
+{"type", ITEMINFO_OFS(type), FT_INT, 0, 0, 0, NULL},
+{"index", ITEMINFO_OFS(index), FT_INT, 0, 0, 0, NULL},
+{"respawntime", ITEMINFO_OFS(respawntime), FT_FLOAT, 0, 0, 0, NULL},
+{"mins", ITEMINFO_OFS(mins), FT_FLOAT|FT_ARRAY, 3, 0, 0, NULL},
+{"maxs", ITEMINFO_OFS(maxs), FT_FLOAT|FT_ARRAY, 3, 0, 0, NULL},
+{NULL, 0, 0, 0, 0, 0, NULL}
 };
 
 static const structdef_t iteminfo_struct =
@@ -199,7 +199,7 @@ static libvar_t *droppedweight = NULL;
 // Returns:					-
 // Changes Globals:		-
 //========================================================================
-bot_goalstate_t *BotGoalStateFromHandle(int handle)
+static bot_goalstate_t *BotGoalStateFromHandle(int handle)
 {
 	if (handle <= 0 || handle > MAX_CLIENTS)
 	{
@@ -241,6 +241,8 @@ void BotInterbreedGoalFuzzyLogic(int parent1, int parent2, int child)
 //===========================================================================
 void BotSaveGoalFuzzyLogic(int goalstate, const char *filename)
 {
+	(void)goalstate;
+	(void)filename;
 	//bot_goalstate_t *gs;
 
 	//gs = BotGoalStateFromHandle(goalstate);
@@ -256,6 +258,7 @@ void BotSaveGoalFuzzyLogic(int goalstate, const char *filename)
 //===========================================================================
 void BotMutateGoalFuzzyLogic(int goalstate, float range)
 {
+	(void)range;
 	bot_goalstate_t *gs;
 
 	gs = BotGoalStateFromHandle(goalstate);
@@ -1647,6 +1650,7 @@ int BotTouchingGoal(const vec3_t origin, const bot_goal_t *goal)
 //===========================================================================
 int BotItemGoalInVisButNotVisible(int viewer, vec3_t eye, vec3_t viewangles, bot_goal_t *goal)
 {
+	(void)viewangles;
 	aas_entityinfo_t entinfo;
 	bsp_trace_t trace;
 	vec3_t middle;

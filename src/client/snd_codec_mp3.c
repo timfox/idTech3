@@ -129,7 +129,6 @@ Open MP3 file and prepare decoder for streaming
 snd_stream_t *S_MP3_CodecOpenStream(const char *filename)
 {
 	snd_stream_t *stream;
-	fileHandle_t f;
 	int length;
 	byte *filebuf = NULL;
 	mp3_stream_ctx_t *ctx = NULL;

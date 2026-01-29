@@ -142,7 +142,7 @@ void AAS_FreeAASLinkHeap(void)
 // Returns:					-
 // Changes Globals:		-
 //===========================================================================
-aas_link_t *AAS_AllocAASLink(void)
+static aas_link_t *AAS_AllocAASLink(void)
 {
 	aas_link_t *link;
 

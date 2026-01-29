@@ -182,7 +182,7 @@ unsigned long Com_GenerateHashValue( const char *fname, const unsigned int size 
 	unsigned long hash;
 	int		c;
 
-	s = (byte*)fname;
+	s = (const byte *)fname;
 	hash = 0;
 	
 	while ( (c = hash_locase[(byte)*s++]) != '\0' ) {
@@ -683,7 +683,7 @@ const char *COM_ParseExt( const char **data_p, qboolean allowLineBreaks )
 			{
 				com_lines++;
 			}
-			if ( len < ARRAY_LEN( com_token )-1 )
+			if ( (size_t) len < ARRAY_LEN( com_token )-1 )
 			{
 				com_token[ len ] = c;
 				len++;
@@ -694,7 +694,7 @@ const char *COM_ParseExt( const char **data_p, qboolean allowLineBreaks )
 	// parse a regular word
 	do
 	{
-		if ( len < ARRAY_LEN( com_token )-1 )
+		if ( (size_t) len < ARRAY_LEN( com_token )-1 )
 		{
 			com_token[ len ] = c;
 			len++;
@@ -740,7 +740,7 @@ char *COM_ParseComplex( const char **data_p, qboolean allowLineBreaks )
 	int c, len, shift;
 	const byte *str;
 
-	str = (byte*)*data_p;
+	str = (const byte *)*data_p;
 	len = 0; 
 	shift = 0; // token line shift relative to com_lines
 	com_tokentype = TK_GENEGIC;
@@ -927,7 +927,7 @@ __reswitch:
 
 	com_tokenline = com_lines - shift;
 	com_token[ len ] = '\0';
-	*data_p = ( char * )str;
+	*data_p = ( const char * )str;
 	return com_token;
 }
 
@@ -1313,9 +1313,10 @@ Q_strncpy
 allows src and dest to be overlapped for QVM compatibility purposes
 =============
 */
-char *Q_strncpy( char *dest, char *src, int destsize )
+char *Q_strncpy( char *dest, const char *src, int destsize )
 {
-	char *s = src, *start = dest;
+	const char *s = src;
+	char *start = dest;
 	int src_len;
 
 	while ( *s != '\0' )
@@ -1729,7 +1730,7 @@ int QDECL Com_sprintf( char *dest, int size, const char *fmt, ...)
 	len = vsprintf( bigbuffer, fmt, argptr );
 	va_end( argptr );
 
-	if ( len >= sizeof( bigbuffer ) || len < 0 ) 
+	if ( (size_t) len >= sizeof( bigbuffer ) || len < 0 ) 
 	{
 		Com_Error( ERR_FATAL, "Com_sprintf: overflowed bigbuffer" );
 #if	defined(_DEBUG) && defined(_WIN32)

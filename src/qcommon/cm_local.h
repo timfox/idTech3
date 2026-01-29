@@ -197,6 +197,8 @@ typedef struct
 	vec3_t		offset;
 } sphere_t;
 
+void CM_FloodAreaConnections( void );
+
 typedef struct {
 	vec3_t		start;
 	vec3_t		end;

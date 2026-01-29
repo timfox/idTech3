@@ -353,6 +353,11 @@ void SV_SpawnServer( const char *mapname, qboolean killBots );
 
 
 //
+// sv_main.c
+//
+int SV_Strlen( const char *str );
+
+//
 // sv_client.c
 //
 void SV_GetChallenge( const netadr_t *from );

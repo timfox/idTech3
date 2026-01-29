@@ -86,7 +86,7 @@ int Sys_MilliSeconds(void)
 //===========================================================================
 static qboolean ValidEntityNumber(int num, const char *str)
 {
-	if ( /*num < 0 || */ (unsigned)num > botlibglobals.maxentities )
+	if ( /*num < 0 || */ (unsigned)num > (unsigned)botlibglobals.maxentities )
 	{
 		botimport.Print(PRT_ERROR, "%s: invalid entity number %d, [0, %d]\n",
 										str, num, botlibglobals.maxentities);
@@ -305,8 +305,12 @@ float BotGapDistance(vec3_t origin, vec3_t hordir, int entnum);
 
 void AAS_FloodAreas(vec3_t origin);
 
-int BotExportTest(int parm0, char *parm1, vec3_t parm2, vec3_t parm3)
+static int BotExportTest(int parm0, char *parm1, vec3_t parm2, vec3_t parm3)
 {
+	(void)parm0;
+	(void)parm1;
+	(void)parm2;
+	(void)parm3;
 
 //	return AAS_PointLight(parm2, NULL, NULL, NULL);
 

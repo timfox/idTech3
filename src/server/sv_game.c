@@ -263,14 +263,14 @@ static void SV_LocateGameData( sharedEntity_t *gEnts, int numGEntities, int size
 		if ( numGEntities > MAX_GENTITIES ) {
 			Com_Error( ERR_DROP, "%s: bad entity count %i", __func__, numGEntities );
 		} else {
-			if ( sizeofGEntity_t > gvm->exactDataLength / numGEntities ) {
+			if ( (uint32_t) sizeofGEntity_t > gvm->exactDataLength / (uint32_t) numGEntities ) {
 				Com_Error( ERR_DROP, "%s: bad entity size %i", __func__, sizeofGEntity_t );	
 			} else if ( (byte*)gEnts + (numGEntities * sizeofGEntity_t) > (gvm->dataBase + gvm->exactDataLength) ) {
 				Com_Error( ERR_DROP, "%s: entities located out of data segment", __func__ );
 			}
 		}
 
-		if ( sizeofGameClient > gvm->exactDataLength / MAX_CLIENTS ) {
+		if ( (uint32_t) sizeofGameClient > gvm->exactDataLength / MAX_CLIENTS ) {
 			Com_Error( ERR_DROP, "%s: bad game client size %i", __func__, sizeofGameClient );	
 		} else if ( (byte*)clients + (sizeofGameClient * MAX_CLIENTS) > gvm->dataBase + gvm->exactDataLength ) {
 			Com_Error( ERR_DROP, "%s: clients located out of data segment", __func__ );
@@ -292,7 +292,7 @@ SV_GetUsercmd
 ===============
 */
 static void SV_GetUsercmd( int clientNum, usercmd_t *cmd ) {
-	if ( (unsigned) clientNum < sv.maxclients ) {
+	if ( (unsigned) clientNum < (unsigned) sv.maxclients ) {
 		*cmd = svs.clients[ clientNum ].lastUsercmd;
 	} else {
 		Com_Error( ERR_DROP, "%s(): bad clientNum: %i", __func__, clientNum );
@@ -493,7 +493,7 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 		return 0;
 	case G_GET_ENTITY_TOKEN:
 		{
-			char *s = (char*)COM_Parse( &sv.entityParsePoint );
+			const char *s = COM_Parse( (const char **)&sv.entityParsePoint );
 			VM_CHECKBOUNDS( gvm, args[1], args[2] );
 			//Q_strncpyz( VMA(1), s, args[2] );
 			// we can't use our optimized Q_strncpyz() function
@@ -565,7 +565,7 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 	case BOTLIB_USER_COMMAND:
 		{
 			unsigned clientNum = args[1];
-			if ( clientNum < sv.maxclients )
+			if ( clientNum < (unsigned) sv.maxclients )
 			{
 				SV_ClientThink( &svs.clients[ clientNum ], VMA(2) );
 			}
@@ -984,7 +984,7 @@ static intptr_t QDECL SV_DllSyscall( intptr_t arg, ... ) {
 
 	args[0] = arg;
 	va_start( ap, arg );
-	for (i = 1; i < ARRAY_LEN( args ); i++ )
+	for (i = 1; (size_t) i < ARRAY_LEN( args ); i++ )
 		args[ i ] = va_arg( ap, intptr_t );
 	va_end( ap );
 

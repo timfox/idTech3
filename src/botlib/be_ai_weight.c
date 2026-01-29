@@ -796,6 +796,7 @@ void ScaleWeight(weightconfig_t *config, char *name, float scale)
 // Returns:					-
 // Changes Globals:		-
 //===========================================================================
+#if 0
 static void ScaleFuzzySeperatorBalanceRange_r(fuzzyseperator_t *fs, float scale)
 {
 	if (fs->child)
@@ -815,13 +816,15 @@ static void ScaleFuzzySeperatorBalanceRange_r(fuzzyseperator_t *fs, float scale)
 	} //end else if
 	if (fs->next) ScaleFuzzySeperatorBalanceRange_r(fs->next, scale);
 } //end of the function ScaleFuzzySeperatorBalanceRange_r
+#endif
 //===========================================================================
 //
 // Parameter:				-
 // Returns:					-
 // Changes Globals:		-
 //===========================================================================
-void ScaleFuzzyBalanceRange(weightconfig_t *config, float scale)
+#if 0
+static void ScaleFuzzyBalanceRange(weightconfig_t *config, float scale)
 {
 	int i;
 
@@ -832,6 +835,7 @@ void ScaleFuzzyBalanceRange(weightconfig_t *config, float scale)
 		ScaleFuzzySeperatorBalanceRange_r(config->weights[i].firstseperator, scale);
 	} //end for
 } //end of the function ScaleFuzzyBalanceRange
+#endif
 //===========================================================================
 //
 // Parameter:				-

@@ -18,6 +18,11 @@ Go to [Releases](../../releases) section to download latest binaries for your pl
 **Audio**:
 * OpenAL backend with HRTF for true 3D positional audio.
 
+### Standards
+
+- Engine code targets **C23**, with incremental modernization for safety and portability.
+- Engine-internal code prefers native C `bool`; legacy `qboolean` is retained where required for compatibility.
+
 ### Links
 
 * https://idtech3.com

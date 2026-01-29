@@ -27,7 +27,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define C2 0.2241438680420134
 #define C3 -0.1294095225512604
 
-void daub4(float b[], unsigned long n, int isign)
+static void daub4(float b[], unsigned long n, int isign)
 {
 	float wksp[4097] = { 0.0f };
 #define a(x) b[(x)-1]					// numerical recipes so a[1] = b[0]
@@ -58,10 +58,10 @@ void daub4(float b[], unsigned long n, int isign)
 #undef a
 }
 
-void wt1(float a[], unsigned long n, int isign)
+static void wt1(float a[], unsigned long n, int isign)
 {
 	unsigned long nn;
-	int inverseStartLength = n/4;
+	unsigned long inverseStartLength = n/4;
 	if (n < inverseStartLength) return;
 	if (isign >= 0) {
 		for (nn=n;nn>=inverseStartLength;nn>>=1) daub4(a,nn,isign);
@@ -82,7 +82,7 @@ static unsigned char numBits[] = {
    8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,
 };
 
-byte MuLawEncode(short s) {
+static byte MuLawEncode(short s) {
 	unsigned long adjusted;
 	byte sign, exponent, mantissa;
 
@@ -97,7 +97,7 @@ byte MuLawEncode(short s) {
 	return ~(sign | (exponent<<4) | mantissa);
 }
 
-short MuLawDecode(byte uLaw) {
+static short MuLawDecode(byte uLaw) {
 	signed long adjusted;
 	byte exponent, mantissa;
 
@@ -111,13 +111,6 @@ short MuLawDecode(byte uLaw) {
 
 short mulawToShort[256];
 static qboolean madeTable = qfalse;
-
-static	int	NXStreamCount;
-
-void NXPutc(NXStream *stream, char out) {
-	stream[NXStreamCount++] = out;
-}
-
 
 void encodeWavelet( sfx_t *sfx, short *packets) {
 	float	wksp[4097] = {0}, temp;
@@ -236,17 +229,4 @@ void encodeMuLaw( sfx_t *sfx, short *packets) {
 		samples -= size;
 	}
 }
-
-void decodeMuLaw(sndBuffer *chunk, short *to) {
-	int				i;
-	byte			*out;
-
-	int size = chunk->size;
-	
-	out = (byte *)chunk->sndChunk;
-	for(i=0;i<size;i++) {
-		to[i] = mulawToShort[out[i]];
-	}
-}
-
 

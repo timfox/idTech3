@@ -905,6 +905,8 @@ static void S_Base_RawSamples( int samples, int rate, int width, int n_channels,
 	int		src, dst;
 	float	scale;
 	int		intVolume;
+	const short	*sdata;
+	const char	*cdata;
 
 	if ( !s_soundStarted || s_soundMuted ) {
 		return;
@@ -922,14 +924,15 @@ static void S_Base_RawSamples( int samples, int rate, int width, int n_channels,
 	//Com_Printf ("%i < %i < %i\n", s_soundtime, s_paintedtime, s_rawend);
 	if (n_channels == 2 && width == 2)
 	{
+		sdata = (const short *)data;
 		if (scale == 1.0)
 		{	// optimized case
 			for (i=0 ; i<samples ; i++)
 			{
 				dst = s_rawend&(MAX_RAW_SAMPLES-1);
 				s_rawend++;
-				s_rawsamples[dst].left = ((short *)data)[i*2] * intVolume;
-				s_rawsamples[dst].right = ((short *)data)[i*2+1] * intVolume;
+				s_rawsamples[dst].left = sdata[i*2] * intVolume;
+				s_rawsamples[dst].right = sdata[i*2+1] * intVolume;
 			}
 		}
 		else
@@ -941,13 +944,14 @@ static void S_Base_RawSamples( int samples, int rate, int width, int n_channels,
 					break;
 				dst = s_rawend&(MAX_RAW_SAMPLES-1);
 				s_rawend++;
-				s_rawsamples[dst].left = ((short *)data)[src*2] * intVolume;
-				s_rawsamples[dst].right = ((short *)data)[src*2+1] * intVolume;
+				s_rawsamples[dst].left = sdata[src*2] * intVolume;
+				s_rawsamples[dst].right = sdata[src*2+1] * intVolume;
 			}
 		}
 	}
 	else if (n_channels == 1 && width == 2)
 	{
+		sdata = (const short *)data;
 		for (i=0 ; ; i++)
 		{
 			src = i*scale;
@@ -955,13 +959,14 @@ static void S_Base_RawSamples( int samples, int rate, int width, int n_channels,
 				break;
 			dst = s_rawend&(MAX_RAW_SAMPLES-1);
 			s_rawend++;
-			s_rawsamples[dst].left = ((short *)data)[src] * intVolume;
-			s_rawsamples[dst].right = ((short *)data)[src] * intVolume;
+			s_rawsamples[dst].left = sdata[src] * intVolume;
+			s_rawsamples[dst].right = sdata[src] * intVolume;
 		}
 	}
 	else if (n_channels == 2 && width == 1)
 	{
 		intVolume *= 256;
+		cdata = (const char *)data;
 
 		for (i=0 ; ; i++)
 		{
@@ -970,8 +975,8 @@ static void S_Base_RawSamples( int samples, int rate, int width, int n_channels,
 				break;
 			dst = s_rawend&(MAX_RAW_SAMPLES-1);
 			s_rawend++;
-			s_rawsamples[dst].left = ((char *)data)[src*2] * intVolume;
-			s_rawsamples[dst].right = ((char *)data)[src*2+1] * intVolume;
+			s_rawsamples[dst].left = cdata[src*2] * intVolume;
+			s_rawsamples[dst].right = cdata[src*2+1] * intVolume;
 		}
 	}
 	else if (n_channels == 1 && width == 1)
@@ -985,8 +990,8 @@ static void S_Base_RawSamples( int samples, int rate, int width, int n_channels,
 				break;
 			dst = s_rawend&(MAX_RAW_SAMPLES-1);
 			s_rawend++;
-			s_rawsamples[dst].left = (((byte *)data)[src]-128) * intVolume;
-			s_rawsamples[dst].right = (((byte *)data)[src]-128) * intVolume;
+			s_rawsamples[dst].left = (data[src] - 128) * intVolume;
+			s_rawsamples[dst].right = (data[src] - 128) * intVolume;
 		}
 	}
 
@@ -1029,6 +1034,7 @@ void S_Base_Respatialize( int entityNum, const vec3_t head, vec3_t axis[3], int 
 	int			i;
 	channel_t	*ch;
 	vec3_t		origin;
+	(void)inwater;
 
 	if ( !s_soundStarted || s_soundMuted ) {
 		return;
@@ -1192,7 +1198,7 @@ static void S_GetSoundtime( void )
 
 
 static void S_Update_( int msec ) {
-	unsigned		endtime;
+	int				endtime;
 	int				mixAhead[2];
 	int				thisTime, sane;
 	static int		ot = -1;
@@ -1367,8 +1373,8 @@ static void S_UpdateBackgroundTrack( void ) {
 
 		// our max buffer size
 		fileBytes = fileSamples * (s_backgroundStream->info.width * s_backgroundStream->info.channels);
-		if ( fileBytes > sizeof(raw) ) {
-			fileBytes = sizeof(raw);
+		if ( (size_t) fileBytes > sizeof( raw ) ) {
+			fileBytes = (int)sizeof( raw );
 			fileSamples = fileBytes / (s_backgroundStream->info.width * s_backgroundStream->info.channels);
 		}
 

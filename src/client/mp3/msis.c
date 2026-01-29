@@ -48,6 +48,7 @@ is_process does ms or stereo in "forbidded sf regions"
 #include "l3.h"
 
 #include "mp3struct.h"
+#include "mp3_local.h"
 
 typedef float ARRAY2[2];
 typedef float ARRAY8_2[8][2];

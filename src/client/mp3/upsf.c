@@ -38,6 +38,7 @@ Layer III
 #include <float.h>
 #include <math.h>
 #include "l3.h"
+#include "mp3_local.h"
 
 unsigned int bitget(int n);
 

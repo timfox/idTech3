@@ -58,6 +58,7 @@ TO DO: Test mixed blocks (mixed long/short)
 #include "jdw.h"
 
 #include "mp3struct.h"
+#include "mp3_local.h"
 
 #if !defined(min)
 #	define min(a, b) ((a) < (b) ? (a) : (b))
@@ -155,38 +156,6 @@ IN_OUT L3audio_decode_MPEG2(unsigned char *bs, unsigned char *pcm);
 ////@@@@typedef IN_OUT(*DECODE_FUNCTION) (unsigned char *bs, unsigned char *pcm);
 ////@@@@static DECODE_FUNCTION decode_function = L3audio_decode_MPEG1;		<------------------ needs streaming, ditto above!!!
 
-
-/*====================================================================*/
-int hybrid(void *xin, void *xprev, float *y,
-	   int btype, int nlong, int ntot, int nprev);
-int hybrid_sum(void *xin, void *xin_left, float *y,
-	       int btype, int nlong, int ntot);
-void sum_f_bands(void *a, void *b, int n);
-void FreqInvert(float *y, int n);
-void antialias(void *x, int n);
-void ms_process(void *x, int n);	/* sum-difference stereo */
-void is_process_MPEG1(void *x,	/* intensity stereo */
-		      SCALEFACT * sf,
-		      CB_INFO cb_info[2],	/* [ch] */
-		      int nsamp, int ms_mode);
-void is_process_MPEG2(void *x,	/* intensity stereo */
-		      SCALEFACT * sf,
-		      CB_INFO cb_info[2],	/* [ch] */
-		      IS_SF_INFO * is_sf_info,
-		      int nsamp, int ms_mode);
-
-void unpack_huff(void *xy, int n, int ntable);
-int unpack_huff_quad(void *vwxy, int n, int nbits, int ntable);
-void dequant(SAMPLE sample[], int *nsamp,
-	     SCALEFACT * sf,
-	     GR * gr,
-	     CB_INFO * cb_info, int ncbl_mixed);
-void unpack_sf_sub_MPEG1(SCALEFACT * scalefac, GR * gr,
-			 int scfsi,	/* bit flag */
-			 int igr);
-void unpack_sf_sub_MPEG2(SCALEFACT sf[],	/* return intensity scale */
-			 GR * grdat,
-			 int is_and_ch, IS_SF_INFO * is_sf_info);
 
 /*====================================================================*/
 /* get bits from bitstream in endian independent way */
@@ -289,9 +258,9 @@ static void Xform_mono(void *pcm, int igr)
       n2 = pMP3Stream->band_limit;
    igr_prev = igr ^ 1;
 
-   nsamp[igr][0] = hybrid(pMP3Stream->sample[0][igr], pMP3Stream->sample[0][igr_prev],
-	 yout, side_info.gr[igr][0].block_type, n1, n2, nsamp[igr_prev][0]);
-   FreqInvert(yout, nsamp[igr][0]);
+   nsamp[igr][0] = hybrid((float *)pMP3Stream->sample[0][igr], (float *)pMP3Stream->sample[0][igr_prev],
+	 (float (*)[32])yout, side_info.gr[igr][0].block_type, n1, n2, nsamp[igr_prev][0]);
+   FreqInvert((float (*)[32])yout, nsamp[igr][0]);
    pMP3Stream->sbt_L3(yout, pcm, 0);
 
 }
@@ -313,9 +282,9 @@ static void Xform_dual_right(void *pcm, int igr)
    if (n2 > pMP3Stream->band_limit)
       n2 = pMP3Stream->band_limit;
    igr_prev = igr ^ 1;
-   nsamp[igr][1] = hybrid(pMP3Stream->sample[1][igr], pMP3Stream->sample[1][igr_prev],
-	 yout, side_info.gr[igr][1].block_type, n1, n2, nsamp[igr_prev][1]);
-   FreqInvert(yout, nsamp[igr][1]);
+   nsamp[igr][1] = hybrid((float *)pMP3Stream->sample[1][igr], (float *)pMP3Stream->sample[1][igr_prev],
+	 (float (*)[32])yout, side_info.gr[igr][1].block_type, n1, n2, nsamp[igr_prev][1]);
+   FreqInvert((float (*)[32])yout, nsamp[igr][1]);
    pMP3Stream->sbt_L3(yout, pcm, 0);
 
 }
@@ -340,9 +309,9 @@ static void Xform_dual(void *pcm, int igr)
 	 n1 = pMP3Stream->band_limit;
       if (n2 > pMP3Stream->band_limit)
 	 n2 = pMP3Stream->band_limit;
-      nsamp[igr][ch] = hybrid(pMP3Stream->sample[ch][igr], pMP3Stream->sample[ch][igr_prev],
-       yout, side_info.gr[igr][ch].block_type, n1, n2, nsamp[igr_prev][ch]);
-      FreqInvert(yout, nsamp[igr][ch]);
+      nsamp[igr][ch] = hybrid((float *)pMP3Stream->sample[ch][igr], (float *)pMP3Stream->sample[ch][igr_prev],
+       (float (*)[32])yout, side_info.gr[igr][ch].block_type, n1, n2, nsamp[igr_prev][ch]);
+      FreqInvert((float (*)[32])yout, nsamp[igr][ch]);
       pMP3Stream->sbt_L3(yout, pcm, ch);
    }
 
@@ -367,9 +336,9 @@ static void Xform_dual_mono(void *pcm, int igr)
       n1 = n2;			/* n1 = number long bands */
       if (side_info.gr[igr][0].block_type == 2)
 	 n1 = 0;
-      sum_f_bands(pMP3Stream->sample[0][igr], pMP3Stream->sample[1][igr], n2);
-      n3 = nsamp[igr][0] = hybrid(pMP3Stream->sample[0][igr], pMP3Stream->sample[0][igr_prev],
-	 yout, side_info.gr[igr][0].block_type, n1, n2, nsamp[igr_prev][0]);
+      sum_f_bands((float *)pMP3Stream->sample[0][igr], (float *)pMP3Stream->sample[1][igr], n2);
+      n3 = nsamp[igr][0] = hybrid((float *)pMP3Stream->sample[0][igr], (float *)pMP3Stream->sample[0][igr_prev],
+	 (float (*)[32])yout, side_info.gr[igr][0].block_type, n1, n2, nsamp[igr_prev][0]);
    }
    else
    {				/* transform and then sum (not tested - never happens in test) */
@@ -381,8 +350,8 @@ static void Xform_dual_mono(void *pcm, int igr)
 	 if (side_info.gr[igr][0].mixed_block_flag)
 	    n1 = pMP3Stream->sfBandIndex[0][pMP3Stream->ncbl_mixed - 1];
       }
-      n3 = nsamp[igr][0] = hybrid(pMP3Stream->sample[0][igr], pMP3Stream->sample[0][igr_prev],
-	 yout, side_info.gr[igr][0].block_type, n1, n2, nsamp[igr_prev][0]);
+      n3 = nsamp[igr][0] = hybrid((float *)pMP3Stream->sample[0][igr], (float *)pMP3Stream->sample[0][igr_prev],
+	 (float (*)[32])yout, side_info.gr[igr][0].block_type, n1, n2, nsamp[igr_prev][0]);
 /*-- right chan --*/
       n1 = n2 = nsamp[igr][1];	/* total number bands */
       if (side_info.gr[igr][1].block_type == 2)
@@ -391,14 +360,14 @@ static void Xform_dual_mono(void *pcm, int igr)
 	 if (side_info.gr[igr][1].mixed_block_flag)
 	    n1 = pMP3Stream->sfBandIndex[0][pMP3Stream->ncbl_mixed - 1];
       }
-      nsamp[igr][1] = hybrid_sum(pMP3Stream->sample[1][igr], pMP3Stream->sample[0][igr],
-			     yout, side_info.gr[igr][1].block_type, n1, n2);
+      nsamp[igr][1] = hybrid_sum((float *)pMP3Stream->sample[1][igr], (float *)pMP3Stream->sample[0][igr],
+			     (float (*)[32])yout, side_info.gr[igr][1].block_type, n1, n2);
       if (n3 < nsamp[igr][1])
 	 n1 = nsamp[igr][1];
    }
 
 /*--------*/
-   FreqInvert(yout, n3);
+   FreqInvert((float (*)[32])yout, n3);
    pMP3Stream->sbt_L3(yout, pcm, 0);
 
 }
@@ -683,11 +652,11 @@ static void unpack_main(unsigned char *pcm, int igr)
 	 n1 = n3;
       nn3 = n3 - n2;
       nn2 = n2 - n1;
-      unpack_huff(pMP3Stream->sample[ch][igr], n1, side_info.gr[igr][ch].table_select[0]);
-      unpack_huff(pMP3Stream->sample[ch][igr] + n1, nn2, side_info.gr[igr][ch].table_select[1]);
-      unpack_huff(pMP3Stream->sample[ch][igr] + n2, nn3, side_info.gr[igr][ch].table_select[2]);
+      unpack_huff((int (*)[2])pMP3Stream->sample[ch][igr], n1, side_info.gr[igr][ch].table_select[0]);
+      unpack_huff((int (*)[2])(pMP3Stream->sample[ch][igr] + n1), nn2, side_info.gr[igr][ch].table_select[1]);
+      unpack_huff((int (*)[2])(pMP3Stream->sample[ch][igr] + n2), nn3, side_info.gr[igr][ch].table_select[2]);
       qbits = side_info.gr[igr][ch].part2_3_length - (bitget_bits_used() - bit0);
-      nn4 = unpack_huff_quad(pMP3Stream->sample[ch][igr] + n3, pMP3Stream->band_limit - n3, qbits,
+      nn4 = unpack_huff_quad((int (*)[4])(pMP3Stream->sample[ch][igr] + n3), pMP3Stream->band_limit - n3, qbits,
 			     side_info.gr[igr][ch].count1table_select);
       n4 = n3 + nn4;
       nsamp[igr][ch] = n4;
@@ -729,17 +698,17 @@ static void unpack_main(unsigned char *pcm, int igr)
       {				/* process to last cb in right */
 	 m0 = pMP3Stream->sfBandIndex[cb_info[igr][1].cbtype][cb_info[igr][1].cbmax];
       }
-      ms_process(pMP3Stream->sample[0][igr], m0);
+      ms_process((float (*)[1152])pMP3Stream->sample[0][igr], m0);
    }
 
 /*--- is stereo processing  ---*/
    if (pMP3Stream->is_mode)
    {
       if (pMP3Stream->id)
-	 is_process_MPEG1(pMP3Stream->sample[0][igr], &sf[igr][1],
+	 is_process_MPEG1((float (*)[1152])pMP3Stream->sample[0][igr], &sf[igr][1],
 			  cb_info[igr], nsamp[igr][0], pMP3Stream->ms_mode);
       else
-	 is_process_MPEG2(pMP3Stream->sample[0][igr], &sf[igr][1],
+	 is_process_MPEG2((float (*)[1152])pMP3Stream->sample[0][igr], &sf[igr][1],
 			  cb_info[igr], &is_sf_info,
 			  nsamp[igr][0], pMP3Stream->ms_mode);
    }
@@ -764,7 +733,7 @@ static void unpack_main(unsigned char *pcm, int igr)
 	 n1 = (nsamp[igr][ch] + 7) / 18;
       if (n1 > 31)
 	 n1 = 31;
-      antialias(pMP3Stream->sample[ch][igr], n1);
+      antialias((float *)pMP3Stream->sample[ch][igr], n1);
       n1 = 18 * n1 + 8;		/* update number of samples */
       if (n1 > nsamp[igr][ch])
 	 nsamp[igr][ch] = n1;

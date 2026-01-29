@@ -291,7 +291,7 @@ typedef struct textureMapType_s {
 } textureMapType_t;
 
 static const textureMapType_t textureMapTypes[] = {
-	{ (uint32_t)NULL,				"",			{ VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, } },
+	{ 0,				"",			{ VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, } },
 #ifdef USE_VK_PBR
 	{ (uint32_t)PHYS_RMO,			"_rmo",		{ VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_ONE,	} },
 	{ (uint32_t)PHYS_RMOS,			"_rmos",	{ VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_A, } },
@@ -332,6 +332,7 @@ void vk_create_image( image_t *image, int width, int height, int mip_levels );
 void vk_upload_image_data( image_t *image, int x, int y, int width, int height, int miplevels, byte *pixels, int size, qboolean update );
 void vk_update_descriptor_set( image_t *image, qboolean mipmap );
 void vk_destroy_image_resources( VkImage *image, VkImageView *imageView );
+void vk_bind_generated_shaders( void );
 void vk_update_attachment_descriptors( void );
 void vk_destroy_samplers( void );
 
@@ -353,6 +354,9 @@ void vk_present_frame( void );
 
 void vk_end_render_pass( void );
 void vk_begin_main_render_pass( void );
+void vk_begin_post_bloom_render_pass( void );
+void vk_begin_bloom_extract_render_pass( void );
+void vk_begin_blur_render_pass( uint32_t index );
 
 void vk_bind_pipeline( uint32_t pipeline );
 void vk_bind_index( void );
@@ -376,6 +380,7 @@ void vk_draw_indexed( uint32_t indexCount, uint32_t firstIndex );
 void vk_reset_descriptor( int index );
 void vk_update_descriptor( int index, VkDescriptorSet descriptor );
 void vk_update_descriptor_offset( int index, uint32_t offset );
+void vk_bind_descriptor_sets( void );
 
 void vk_update_post_process_pipelines( void );
 

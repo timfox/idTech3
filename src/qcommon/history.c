@@ -179,13 +179,13 @@ static void Con_LoadHistory( void )
 
 			numChars = atoi( token );
 			text_p++;
-			if ( numChars > ( consoleSaveBufferSize - ( text_p - consoleSaveBuffer ) ) || numChars >= sizeof( edit->buffer ) )
+			if ( (size_t) numChars > (size_t)( consoleSaveBufferSize - ( text_p - consoleSaveBuffer ) ) || (size_t) numChars >= sizeof( edit->buffer ) )
 			{
 				Com_DPrintf( S_COLOR_YELLOW "WARNING: probable corrupt history\n" );
 				break;
 			}
 
-			if ( edit->cursor > sizeof( edit->buffer ) - 1 )
+			if ( (size_t) edit->cursor > sizeof( edit->buffer ) - 1 )
 				edit->cursor = sizeof( edit->buffer ) - 1;
 			else if ( edit->cursor < 0 )
 				edit->cursor = 0;

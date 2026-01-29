@@ -43,6 +43,8 @@ inplace ok.
 #include <float.h>
 #include <math.h>
 
+#include "mp3_local.h"
+
 
 /*------ 18 point xform -------*/
 float mdct18w[18];		// effectively constant
@@ -52,14 +54,6 @@ float coef[9][4];		//  "  "
 float mdct6_3v[6];		//  "  "
 float mdct6_3v2[3];		//  "  "
 float coef87;			//  "  "
-
-typedef struct
-{
-   float *w;
-   float *w2;
-   void *coef;
-}
-IMDCT_INIT_BLOCK;
 
 static const IMDCT_INIT_BLOCK imdct_info_18 =
 {mdct18w, mdct18w2, coef};
