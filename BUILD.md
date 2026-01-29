@@ -44,6 +44,7 @@ You may need to run the following commands to install packages (using fresh ubun
 * sudo apt install make gcc libcurl4-openssl-dev mesa-common-dev
 * sudo apt install libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev
 * sudo apt install libsdl2-dev
+* sudo apt install libopenal-dev
 
 Build with: `make`
 
@@ -123,3 +124,21 @@ Several Makefile options are available for linux/mingw/macos builds:
 Example:
 
 `make BUILD_SERVER=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan` - which means do not build dedicated binary, build client with single static vulkan renderer
+
+---
+
+### OpenAL audio backend
+
+OpenAL is optional and disabled by default. When using CMake, enable it with:
+
+`cmake -DUSE_OPENAL=ON ..`
+
+At runtime, enable the OpenAL backend with:
+
+`+set s_openal 1`
+
+Optional OpenAL runtime cvars:
+
+`s_openalDevice` - device name (`"default"` uses the system default)
+
+`s_openalHrtf` - enable HRTF if supported (0/1)
