@@ -1,6 +1,6 @@
 # id Tech 3
 
-[![build](../../workflows/build/badge.svg)](../../actions?query=workflow%3Abuild)[![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](LICENSE.md)[![Stars](https://img.shields.io/github/stars/timfox/idTech3?style=social)](https://github.com/timfox/idTech3)[![Forks](https://img.shields.io/github/forks/timfox/idTech3?style=social)](https://github.com/timfox/idTech3/forks)
+[![build](../../workflows/build/badge.svg)](../../actions?query=workflow%3Abuild) [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](LICENSE.md) [![Stars](https://img.shields.io/github/stars/timfox/idTech3?style=social)](https://github.com/timfox/idTech3) [![Forks](https://img.shields.io/github/forks/timfox/idTech3?style=social)](https://github.com/timfox/idTech3/forks)
 
 This is a modernized id Tech 3 engine.
 
@@ -10,12 +10,12 @@ Go to [Releases](../../releases) section to download latest binaries for your pl
 
 ### Features
 
-- **Rendering**:
+**Rendering**:
 * OpenGL renderer
 * Vulkan renderer
 * Physical Based Rendering
 
-- **Audio**:
+**Audio**:
 * OpenAL backend with HRTF for true 3D positional audio.
 
 ### Links
