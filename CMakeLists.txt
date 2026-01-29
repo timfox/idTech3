@@ -97,13 +97,40 @@ else()
 endif()
 # --- End FindSDL2.cmake
 
+# --- Begin FindOpenAL.cmake
+find_path(OPENAL_INCLUDE_DIR
+  NAMES AL/al.h OpenAL/al.h
+  PATH_SUFFIXES include
+  PATHS ${CMAKE_PREFIX_PATH} /usr/local /usr /opt/local /opt
+)
+
+find_library(OPENAL_LIBRARY
+  NAMES openal OpenAL32
+  PATH_SUFFIXES lib64 lib
+  PATHS ${CMAKE_PREFIX_PATH} /usr/local /usr /opt/local /opt
+)
+
+if(OPENAL_INCLUDE_DIR AND OPENAL_LIBRARY)
+  set(OPENAL_FOUND TRUE)
+  if(NOT TARGET OpenAL::OpenAL)
+    add_library(OpenAL::OpenAL UNKNOWN IMPORTED)
+    set_target_properties(OpenAL::OpenAL PROPERTIES
+      IMPORTED_LOCATION "${OPENAL_LIBRARY}"
+      INTERFACE_INCLUDE_DIRECTORIES "${OPENAL_INCLUDE_DIR}")
+  endif()
+else()
+  set(OPENAL_FOUND FALSE)
+endif()
+# --- End FindOpenAL.cmake
+
 SET(CNAME "idtech3")
 SET(DNAME "idtech3_server")
 
 SET(RENDERER_PREFIX ${CNAME})
-SET(RENDERER_DEFAULT vulkan) # valid options: opengl, vulkan, opengl2
+SET(RENDERER_DEFAULT vulkan) # valid options: opengl, vulkan
 
 OPTION(USE_SDL "" ON)
+OPTION(USE_OPENAL "Enable OpenAL audio backend" ON)
 OPTION(USE_CURL "" ON)
 OPTION(USE_LOCAL_HEADERS "" ON)
 OPTION(USE_VULKAN "" ON)
@@ -295,7 +322,11 @@ IF(UNIX)
 		src/unix/linux_signals.c)
 
 	IF(USE_SDL)
-		AUX_SOURCE_DIRECTORY(src/sdl Q3_UI_SRCS)
+		AUX_SOURCE_DIRECTORY(src/audio/backends/sdl Q3_UI_SRCS)
+		list(APPEND Q3_UI_SRCS
+			src/platform/sdl/sdl_gamma.c
+			src/platform/sdl/sdl_glimp.c
+			src/platform/sdl/sdl_input.c)
 	ELSE()
 		SET(Q3_UI_SRCS
 			src/unix/linux_glimp.c
@@ -348,6 +379,10 @@ ELSEIF(WIN32)
 	ENDIF()
 ENDIF(UNIX)
 
+IF(USE_OPENAL)
+	list(APPEND Q3_UI_SRCS src/audio/backends/openal/openal_snd.c)
+ENDIF()
+
 ADD_LIBRARY(q3ui OBJECT ${Q3_UI_SRCS})
 
 if(USE_LOCAL_HEADERS)
@@ -367,6 +402,15 @@ IF(NOT MSVC)
 		find_package (X11 REQUIRED)
 		TARGET_LINK_LIBRARIES(q3ui ${X11_LIBRARIES})
 	ENDIF()
+ENDIF()
+
+IF(USE_OPENAL)
+	if(NOT OPENAL_FOUND)
+	  message(FATAL_ERROR "OpenAL could not be found. Please install or set OPENAL paths.")
+	endif()
+	TARGET_COMPILE_DEFINITIONS(q3ui PRIVATE USE_OPENAL)
+	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_OPENAL)
+	target_include_directories(q3ui PRIVATE ${OPENAL_INCLUDE_DIR})
 ENDIF()
 
 IF(USE_VULKAN)
@@ -392,6 +436,10 @@ endif()
 
 ADD_EXECUTABLE(${CNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
 TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} qcommon botlib client q3ui)
+# Link OpenAL only when enabled
+IF(USE_OPENAL)
+	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} OpenAL::OpenAL)
+ENDIF()
 #TARGET_LINK_OPTIONS(${CNAME} PRIVATE -fno-pie) # v3.13+
 
 if(UNIX AND NOT MSVC AND NOT APPLE)

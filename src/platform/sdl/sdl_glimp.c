@@ -32,8 +32,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #endif
 #endif
 
-#include "../client/client.h"
-#include "../renderers/rendercommon/tr_public.h"
+#include "../../client/client.h"
+#include "../../renderers/rendercommon/tr_public.h"
 #include "sdl_glw.h"
 #include "sdl_icon.h"
 

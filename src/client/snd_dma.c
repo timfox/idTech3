@@ -63,8 +63,8 @@ channel_t   s_channels[MAX_CHANNELS];
 channel_t   loop_channels[MAX_CHANNELS];
 int			numLoopChannels;
 
-static		qboolean	s_soundStarted;
-static		qboolean	s_soundMuted;
+qboolean	s_soundStarted;
+qboolean	s_soundMuted;
 
 dma_t		dma;
 
@@ -78,8 +78,8 @@ int   		s_paintedtime; 		// sample PAIRS
 // MAX_SFX may be larger than MAX_SOUNDS because
 // of custom player sounds
 #define MAX_SFX			4096
-static sfx_t s_knownSfx[MAX_SFX];
-static int s_numSfx = 0;
+sfx_t s_knownSfx[MAX_SFX];
+int s_numSfx = 0;
 
 #define LOOP_HASH		128
 static sfx_t *sfxHash[LOOP_HASH];
@@ -135,7 +135,7 @@ static void S_Base_SoundInfo( void ) {
 S_Base_SoundList
 =================
 */
-static void S_Base_SoundList( void ) {
+void S_Base_SoundList( void ) {
 	int		i;
 	const sfx_t *sfx;
 	int		size, total;
@@ -311,7 +311,7 @@ S_RegisterSound
 Creates a default buzz sound if the file can't be loaded
 ==================
 */
-static sfxHandle_t S_Base_RegisterSound( const char *name, qboolean compressed ) {
+sfxHandle_t S_Base_RegisterSound( const char *name, qboolean compressed ) {
 	sfx_t	*sfx;
 
 	compressed = qfalse;
@@ -356,7 +356,7 @@ static sfxHandle_t S_Base_RegisterSound( const char *name, qboolean compressed )
 S_BeginRegistration
 =====================
 */
-static void S_Base_BeginRegistration( void ) {
+void S_Base_BeginRegistration( void ) {
 	s_soundMuted = qfalse;		// we can play again
 
 	if ( s_numSfx )
