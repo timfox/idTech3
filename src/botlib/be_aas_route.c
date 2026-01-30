@@ -233,7 +233,7 @@ static void AAS_LinkCache(aas_routingcache_t *cache)
 // Returns:				-
 // Changes Globals:		-
 //===========================================================================
-void AAS_FreeRoutingCache(aas_routingcache_t *cache)
+static void AAS_FreeRoutingCache(aas_routingcache_t *cache)
 {
 	AAS_UnlinkCache(cache);
 	routingcachesize -= cache->size;
@@ -2070,6 +2070,8 @@ int AAS_RandomGoalArea(int areanum, int travelflags, int *goalareanum, vec3_t go
 //===========================================================================
 static int AAS_AreaVisible(int srcarea, int destarea)
 {
+	(void)srcarea;
+	(void)destarea;
 	return qfalse;
 } //end of the function AAS_AreaVisible
 #if 0
@@ -2096,6 +2098,8 @@ float DistancePointToLine(vec3_t v1, vec3_t v2, vec3_t point)
 //===========================================================================
 int AAS_NearestHideArea(int srcnum, vec3_t origin, int areanum, int enemynum, vec3_t enemyorigin, int enemyareanum, int travelflags)
 {
+	(void)srcnum;
+	(void)enemynum;
 	int i, j, nextareanum, badtravelflags, numreach, bestarea;
 	unsigned short int t, besttraveltime;
 	static unsigned short int *hidetraveltimes;

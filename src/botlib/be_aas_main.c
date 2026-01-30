@@ -107,7 +107,7 @@ static void AAS_SetInitialized(void)
 // Returns:					-
 // Changes Globals:		-
 //===========================================================================
-void AAS_ContinueInit(float time)
+static void AAS_ContinueInit(float time)
 {
 	//if no AAS file loaded
 	if (!aasworld.loaded) return;

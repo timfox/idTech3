@@ -544,6 +544,7 @@ void AAS_DrawCross(vec3_t origin, float size, int color)
 //===========================================================================
 void AAS_PrintTravelType(int traveltype)
 {
+	(void)traveltype;
 #ifdef DEBUG
 	char *str;
 	//

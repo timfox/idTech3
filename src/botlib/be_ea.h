@@ -33,6 +33,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //ClientCommand elementary actions
 void EA_Say(int client, const char *str);
 void EA_SayTeam(int client, const char *str);
+void EA_Tell(int client, int clientto, const char *str);
 void EA_Command(int client, const char *command );
 
 void EA_Action(int client, int action);
@@ -49,6 +50,10 @@ void EA_Respawn(int client);
 void EA_Talk(int client);
 void EA_Gesture(int client);
 void EA_Use(int client);
+void EA_UseItem(int client, const char *it);
+void EA_DropItem(int client, const char *it);
+void EA_UseInv(int client, const char *inv);
+void EA_DropInv(int client, const char *inv);
 
 //regular elementary actions
 void EA_SelectWeapon(int client, int weapon);

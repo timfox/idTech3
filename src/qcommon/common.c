@@ -787,7 +787,7 @@ qboolean Com_FilterExt( const char *filter, const char *name )
 	while ( *filter ) {
 		if ( *filter == '*' ) {
 			filter++;
-			for ( i = 0; *filter != '\0' && i < sizeof(buf)-1; i++ ) {
+			for ( i = 0; *filter != '\0' && (size_t) i < sizeof(buf)-1; i++ ) {
 				if ( *filter == '*' || *filter == '?' )
 					break;
 				buf[i] = *filter++;
@@ -1203,7 +1203,7 @@ static memblock_t *SearchFree( memzone_t *zone, int size )
 			}
 #endif
 		}
-		base = (memblock_t*)( (byte*) fb - sizeof( *base ) );
+		base = (memblock_t*)( (byte*)(uintptr_t) fb - sizeof( *base ) );
 		fb = fb->DIRECTION;
 		if ( base->size >= size ) {
 			return base;
@@ -1220,6 +1220,8 @@ Z_ClearZone
 ========================
 */
 static void Z_ClearZone( memzone_t *zone, memzone_t *head, int size, int segnum ) {
+	(void)head;
+	(void)segnum;
 	memblock_t	*block;
 	int min_fragment;
 
@@ -1276,6 +1278,7 @@ Z_AvailableZoneMemory
 ========================
 */
 static int Z_AvailableZoneMemory( const memzone_t *zone ) {
+	(void)zone;
 #ifdef USE_MULTI_SEGMENT
 	return (1024*1024*1024); // unlimited
 #else
@@ -1460,7 +1463,7 @@ void *Z_TagMalloc( int size, memtag_t tag ) {
 #endif
 
 #ifdef USE_MULTI_SEGMENT
-	if ( size < (sizeof( freeblock_t ) ) ) {
+	if ( (size_t) size < (sizeof( freeblock_t ) ) ) {
 		size = (sizeof( freeblock_t ) );
 	}
 #endif
@@ -1606,7 +1609,7 @@ static void Z_CheckHeap( void ) {
 		if ( block->next == &zone->blocklist ) {
 			break;	// all blocks have been hit
 		}
-		if ( (byte *)block + block->size != (byte *)block->next) {
+		if ( (const byte *)block + block->size != (const byte *)block->next) {
 #ifdef USE_MULTI_SEGMENT
 			const memblock_t *next = block->next;
 			if ( next->size == 0 && next->id == -ZONEID && next->tag == TAG_GENERAL ) {
@@ -1739,10 +1742,10 @@ char *CopyString( const char *in ) {
 	char *out;
 #ifdef USE_STATIC_TAGS
 	if ( in[0] == '\0' ) {
-		return ((char *)&emptystring) + sizeof(memblock_t);
+		return (char *)(uintptr_t)((const char *)&emptystring + sizeof(memblock_t));
 	}
 	else if ( in[0] >= '0' && in[0] <= '9' && in[1] == '\0' ) {
-		return ((char *)&numberstring[in[0]-'0']) + sizeof(memblock_t);
+		return (char *)(uintptr_t)((const char *)&numberstring[in[0]-'0'] + sizeof(memblock_t));
 	}
 #endif
 	out = S_Malloc( strlen( in ) + 1 );
@@ -1863,7 +1866,7 @@ static void Zone_Stats( const char *name, const memzone_t *z, qboolean printDeta
 	for ( block = zone->blocklist.next ; ; ) {
 		if ( printDetails ) {
 			int tag = block->tag;
-			Com_Printf( "block:%p  size:%8i  tag: %s\n", (void *)block, block->size,
+			Com_Printf( "block:%p  size:%8i  tag: %s\n", (const void *)block, block->size,
 				(unsigned)tag < TAG_COUNT ? tagName[ tag ] : va( "%i", tag ) );
 		}
 		if ( block->tag != TAG_FREE ) {
@@ -1885,7 +1888,7 @@ static void Zone_Stats( const char *name, const memzone_t *z, qboolean printDeta
 		if ( block->next == &zone->blocklist ) {
 			break; // all blocks have been hit
 		}
-		if ( (byte *)block + block->size != (byte *)block->next) {
+		if ( (const byte *)block + block->size != (const byte *)block->next) {
 #ifdef USE_MULTI_SEGMENT
 			const memblock_t *next = block->next;
 			if ( next->size == 0 && next->id == -ZONEID && next->tag == TAG_GENERAL ) {
@@ -2010,7 +2013,7 @@ unsigned int Com_TouchMemory( void ) {
 		if ( block->tag != TAG_FREE ) {
 			j = block->size >> 2;
 			for ( i = 0 ; i < j ; i+=64 ) {				// only need to touch each page
-				sum += ((unsigned int *)block)[i];
+				sum += ((const unsigned int *)block)[i];
 			}
 		}
 		if ( block->next == &zone->blocklist ) {
@@ -3014,6 +3017,10 @@ void Com_GameRestart( int checksumFeed, qboolean clientRestart )
 {
 	static qboolean com_gameRestarting = qfalse;
 
+#ifdef DEDICATED
+	(void)clientRestart;
+#endif
+
 	// make sure no recursion can be triggered
 	if ( !com_gameRestarting && com_fullyInitialized )
 	{
@@ -3682,15 +3689,18 @@ static const char *parseAffinityMask( const char *str, uint64_t *outv, int level
 			++str;
 			continue;
 		}
-		else if ( *str == '0' && (str[1] == 'x' || str[1] == 'X') && (v = hex_code( str[2] )) >= 0 ) {
-			int hex;
-			str += 3; // 0xH
-			while ( (hex = hex_code( *str )) >= 0 ) {
-				v = v * 16 + hex;
-				str++;
+		else if ( *str == '0' && (str[1] == 'x' || str[1] == 'X') ) {
+			int hex = hex_code( str[2] );
+			if ( hex >= 0 ) {
+				v = hex;
+				str += 3; // 0xH
+				while ( (hex = hex_code( *str )) >= 0 ) {
+					v = v * 16 + hex;
+					str++;
+				}
+				mask = v;
+				continue;
 			}
-			mask = v;
-			continue;
 		}
 		else if ( *str >= '0' && *str <= '9' ) {
 			mask = *str++ - '0';
@@ -4656,13 +4666,13 @@ void Field_CompleteKeyBind( int key )
 	blen = (int)strlen( completionField->buffer );
 	vlen = (int)strlen( value );
 
-	if ( Field_FindFirstSeparator( (char*)value ) )
+	if ( Field_FindFirstSeparator( value ) )
 	{
 		value = va( "\"%s\"", value );
 		vlen += 2;
 	}
 
-	if ( vlen + blen > sizeof( completionField->buffer ) - 1 )
+	if ( (size_t) vlen + blen > sizeof( completionField->buffer ) - 1 )
 	{
 		//vlen = sizeof( completionField->buffer ) - 1 - blen;
 		return;
@@ -4702,13 +4712,13 @@ static void Field_CompleteCvarValue( const char *value, const char *current )
 		}
 	}
 
-	if ( Field_FindFirstSeparator( (char*)value ) )
+	if ( Field_FindFirstSeparator( value ) )
 	{
 		value = va( "\"%s\"", value );
 		vlen += 2;
 	}
 
-	if ( vlen + blen > sizeof( completionField->buffer ) - 1 )
+	if ( (size_t) vlen + blen > sizeof( completionField->buffer ) - 1 )
 	{
 		//vlen = sizeof( completionField->buffer ) - 1 - blen;
 		return;

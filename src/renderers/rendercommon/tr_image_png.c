@@ -20,6 +20,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
 #include "../../qcommon/q_shared.h"
+#include "tr_image_loaders.h"
+#include "tr_fs_compat.h"
 #include "tr_public.h"
 #include "../../qcommon/puff.h"
 
@@ -252,7 +254,7 @@ static struct BufferedFile *ReadBufferedFile(const char *name)
 	 *  Read the file.
 	 */
 
-	BF->Length = ri.FS_ReadFile((char *) name, &buffer.v);
+	BF->Length = FS_ReadFileConst( name, &buffer.v );
 	BF->Buffer = buffer.b;
 
 	/*

@@ -29,6 +29,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  *****************************************************************************/
 
 
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+
+#include <stdio.h>
+
 #include "q_shared.h"
 #include "qcommon.h"
 #include "unzip.h"
@@ -199,6 +205,7 @@ or configs will never get loaded from disk!
 // every time a new demo pk3 file is built, this checksum must be updated.
 // the easiest way to get it is to just run the game and see what it spits out
 #define	DEMO_PAK0_CHECKSUM	2985612116u
+#if 0
 static const unsigned pak_checksums[] = {
 	1566731103u,
 	298122907u,
@@ -210,6 +217,7 @@ static const unsigned pak_checksums[] = {
 	908855077u,
 	977125798u
 };
+#endif
 
 // if this is defined, the executable positively won't work with any paks other
 // than the demo pak, even if productid is present.  This is only used for our
@@ -378,7 +386,9 @@ void Com_AppendCDKey( const char *filename );
 void Com_ReadCDKey( const char *filename );
 
 static int FS_GetModList( char *listbuf, int bufsize );
+#if 0
 static void FS_CheckIdPaks( void );
+#endif
 void FS_Reload( void );
 
 
@@ -398,6 +408,7 @@ FS_PakIsPure
 =================
 */
 static qboolean FS_PakIsPure( const pack_t *pack ) {
+	(void)pack;
 #ifndef DEDICATED
 	int i;
 	if ( fs_numServerPaks ) {
@@ -1858,7 +1869,7 @@ Properly handles partial writes
 int FS_Write( const void *buffer, int len, fileHandle_t h ) {
 	int		block, remaining;
 	int		written;
-	byte	*buf;
+	const byte	*buf;
 	int		tries;
 	FILE	*f;
 
@@ -1871,7 +1882,7 @@ int FS_Write( const void *buffer, int len, fileHandle_t h ) {
 	//}
 
 	f = FS_FileForHandle(h);
-	buf = (byte *)buffer;
+	buf = (const byte *)buffer;
 
 	remaining = len;
 	tries = 0;
@@ -2477,7 +2488,7 @@ static void FS_InsertPK3ToCache( pack_t *pak )
 static void FS_ResetCacheReferences( void )
 {
 	pack_t *pak;
-	int i;
+	size_t i;
 	for ( i = 0; i < ARRAY_LEN( pakHashTable ); i++ )
 	{
 		pak = pakHashTable[ i ];
@@ -2494,7 +2505,7 @@ static void FS_ResetCacheReferences( void )
 static void FS_FreeUnusedCache( void )
 {
 	pack_t *next, *pak;
-	int i;
+	size_t i;
 
 	for ( i = 0; i < ARRAY_LEN( pakHashTable ); i++ )
 	{
@@ -2646,7 +2657,7 @@ static qboolean FS_LoadPakFromFile( FILE *f )
 
 	// validate header data
 
-	if ( pk.pakNameLen > sizeof( pakName ) || pk.pakNameLen & 3 || pk.pakNameLen == 0 )
+	if ( (size_t) pk.pakNameLen > sizeof( pakName ) || pk.pakNameLen & 3 || pk.pakNameLen == 0 )
 	{
 		//Com_Printf( "bad pakNameLen: %08X\n", pk.pakNameLen );
 		return qfalse;
@@ -2765,7 +2776,7 @@ static qboolean FS_LoadPakFromFile( FILE *f )
 			//Com_Printf( "error reading file item[%i]\n", i );
 			goto __error;
 		}
-		if ( it.name >= pk.namesLen )
+		if ( (int) it.name >= pk.namesLen )
 		{
 			//Com_Printf( "bad name offset: %i (expecting less than %i)\n", it.name, pk.namesLen );
 			goto __error;
@@ -3778,7 +3789,7 @@ static int FS_GetModList( char *listbuf, int bufsize ) {
 	nMods = nTotal = 0;
 
 	// iterate through paths and get list of potential mods
-	for (i = 0; i < ARRAY_LEN( paths ); i++) {
+	for (i = 0; (size_t) i < ARRAY_LEN( paths ); i++) {
 		if ( !*paths[ i ] || !(*paths[i])->string[0] )
 			continue;
 		pFiles0 = Sys_ListFiles( (*paths[i])->string, "/", NULL, &dummy, 1 );
@@ -3820,7 +3831,7 @@ static int FS_GetModList( char *listbuf, int bufsize ) {
 		// we didn't keep the information when we merged the directory names, as to what OS Path it was found under
 		// so we will try each of them here
 		nPaks = nPakDirs = 0;
-		for ( j = 0; j < ARRAY_LEN( paths ); j++ ) {
+		for ( j = 0; (size_t) j < ARRAY_LEN( paths ); j++ ) {
 			if ( !*paths[ j ] || !(*paths[ j ])->string[0] )
 				break;
 			path = FS_BuildOSPath( (*paths[j])->string, name, NULL );
@@ -4024,6 +4035,8 @@ FS_CompleteFileName
 ============
 */
 static void FS_CompleteFileName( const char *args, int argNum ) {
+	(void)args;
+	(void)argNum;
 	if( argNum == 2 ) {
 		Field_CompleteFilename( "", "", qfalse, FS_MATCH_ANY );
 	}
@@ -4414,7 +4427,7 @@ qboolean FS_ComparePaks( char *neededpaks, int len, qboolean dlstring ) {
         
         // Find out whether it might have overflowed the buffer and don't add this file to the
         // list if that is the case.
-        if(strlen(origpos) + (origpos - neededpaks) >= len - 1)
+	if(strlen(origpos) + (origpos - neededpaks) >= (size_t) len - 1)
 	{
 		*origpos = '\0';
 		break;
@@ -4645,7 +4658,7 @@ static void FS_LoadedPakPureChecksums( void )
 	fs_numPureChecksums = 0;
 	for ( search = fs_searchpaths ; search ; search = search->next ) {
 		if ( search->pack ) {
-			if ( fs_numPureChecksums >= ARRAY_LEN( fs_pureChecksum ) ) {
+			if ( (size_t) fs_numPureChecksums >= ARRAY_LEN( fs_pureChecksum ) ) {
 				Com_DPrintf( "WARNING: pure checksums overflowed\n" );
 				fs_numPureChecksums = 0;
 				return;
@@ -4858,6 +4871,7 @@ static void FS_Startup( void ) {
 }
 
 
+#if 0
 static void FS_PrintSearchPaths( void )
 {
 	const searchpath_t *path = fs_searchpaths;
@@ -4872,6 +4886,7 @@ static void FS_PrintSearchPaths( void )
 		path = path->next;
 	}
 }
+#endif
 
 
 /*
@@ -4883,6 +4898,7 @@ Note: If you're building a game that doesn't depend on the
 Q3 media pak0.pk3, you'll want to remove this function
 ===================
 */
+#if 0
 static void FS_CheckIdPaks( void )
 {
 	const searchpath_t *path;
@@ -4902,7 +4918,7 @@ static void FS_CheckIdPaks( void )
 		{
 			founddemo = qtrue;
 
-			if( path->pack->checksum == DEMO_PAK0_CHECKSUM )
+			if( (unsigned int) path->pack->checksum == DEMO_PAK0_CHECKSUM )
 			{
 				Com_Printf( "\n\n"
 						"**************************************************\n"
@@ -4973,6 +4989,7 @@ static void FS_CheckIdPaks( void )
 			Com_Error(ERR_FATAL, "\n*** you need to install Quake III Arena in order to play ***");
 	}
 }
+#endif
 
 
 /*
@@ -5280,7 +5297,7 @@ void FS_PureServerSetLoadedPaks( const char *pakSums, const char *pakNames ) {
 	Cmd_TokenizeString( pakSums );
 
 	c = Cmd_Argc();
-	if ( c > ARRAY_LEN( fs_serverPaks ) ) {
+	if ( (size_t) c > ARRAY_LEN( fs_serverPaks ) ) {
 		c = ARRAY_LEN( fs_serverPaks );
 	}
 
@@ -5307,7 +5324,7 @@ void FS_PureServerSetLoadedPaks( const char *pakSums, const char *pakNames ) {
 		}
 	}
 
-	for ( i = 0 ; i < ARRAY_LEN( fs_serverPakNames ) ; i++ ) {
+	for ( i = 0 ; (size_t) i < ARRAY_LEN( fs_serverPakNames ) ; i++ ) {
 		if ( fs_serverPakNames[i] ) {
 			Z_Free( fs_serverPakNames[i] );
 		}
@@ -5318,7 +5335,7 @@ void FS_PureServerSetLoadedPaks( const char *pakSums, const char *pakNames ) {
 		Cmd_TokenizeString( pakNames );
 
 		d = Cmd_Argc();
-		if ( d > ARRAY_LEN( fs_serverPakNames ) ) {
+		if ( (size_t) d > ARRAY_LEN( fs_serverPakNames ) ) {
 			d = ARRAY_LEN( fs_serverPakNames );
 		}
 
@@ -5344,7 +5361,7 @@ void FS_PureServerSetReferencedPaks( const char *pakSums, const char *pakNames )
 	Cmd_TokenizeString( pakSums );
 
 	c = Cmd_Argc();
-	if ( c > ARRAY_LEN( fs_serverReferencedPaks ) ) {
+	if ( (size_t) c > ARRAY_LEN( fs_serverReferencedPaks ) ) {
 		c = ARRAY_LEN( fs_serverReferencedPaks );
 	}
 
@@ -5352,7 +5369,7 @@ void FS_PureServerSetReferencedPaks( const char *pakSums, const char *pakNames )
 		fs_serverReferencedPaks[i] = atoi( Cmd_Argv( i ) );
 	}
 
-	for ( i = 0 ; i < ARRAY_LEN( fs_serverReferencedPakNames ); i++ ) {
+	for ( i = 0 ; (size_t) i < ARRAY_LEN( fs_serverReferencedPakNames ); i++ ) {
 		if ( fs_serverReferencedPakNames[i] )
 			Z_Free( fs_serverReferencedPakNames[i] );
 		fs_serverReferencedPakNames[i] = NULL;
@@ -5544,6 +5561,7 @@ int	FS_FOpenFileByMode( const char *qpath, fileHandle_t *f, fsMode_t mode ) {
 		break;
 	case FS_APPEND_SYNC:
 		sync = qtrue;
+		FALLTHROUGH;
 	case FS_APPEND:
 		if ( f == NULL )
 			return -1;

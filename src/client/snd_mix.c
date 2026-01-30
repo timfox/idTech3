@@ -32,6 +32,8 @@ int		*snd_p;
 int		snd_linear_count;
 short	*snd_out;
 
+void S_WriteLinearBlastStereo16( void );
+
 void S_WriteLinearBlastStereo16( void )
 {
 	int		i;
@@ -269,7 +271,7 @@ LExit:
 void S_WriteLinearBlastStereo16_SSE_x64( int*, short*, int );
 #endif
 
-void S_TransferStereo16( unsigned long *pbuf, int endtime )
+static void S_TransferStereo16( unsigned long *pbuf, int endtime )
 {
 	int		lpos;
 	int		ls_paintedtime;
@@ -402,8 +404,8 @@ static void S_TransferPaintBuffer( int endtime, byte *buffer )
 		out_idx = ( s_paintedtime * dma.channels ) % dma.samples;
 		while ( count > 0 ) {
 			int n = count;
-			if ( n + out_idx > dma.samples )
-				n = dma.samples - out_idx;
+			if ( (unsigned)( n + out_idx ) > dma.samples )
+				n = (int)dma.samples - out_idx;
 			CL_WriteAVIAudioFrame( buffer + out_idx * dma.samplebits / 8, n * dma.samplebits / 8 );
 			out_idx = (out_idx + n) % dma.samples;
 			count -= n;

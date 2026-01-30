@@ -711,6 +711,8 @@ static void CM_SetBorderInward( facet_t *facet, const cGrid_t *grid, int gridPla
 	const float *points[4];
 	int		numPoints;
 
+	(void)gridPlanes;
+
 	switch ( which ) {
 	case -1:
 		points[0] = grid->points[i][j];
@@ -1664,9 +1666,6 @@ CM_DrawDebugSurface
 Called from the renderer
 ==================
 */
-#ifndef BSPC
-void BotDrawDebugPolygons(void (*drawPoly)(int color, int numPoints, float *points), int value);
-#endif
 
 void CM_DrawDebugSurface( void (*drawPoly)(int color, int numPoints, float *points) ) {
 	static cvar_t	*cv;

@@ -37,6 +37,7 @@ hybrid window/filter
 #include <math.h>
 
 #include "mp3struct.h"
+#include "mp3_local.h"
 ////@@@@extern int band_limit_nsb;
 
 typedef float ARRAY36[36];
@@ -44,11 +45,6 @@ typedef float ARRAY36[36];
 /*-- windows by block type --*/
 static float win[4][36];	// effectively a constant
 
-
-/*====================================================================*/
-void imdct18(float f[]);	/* 18 point */
-void imdct6_3(float f[]);	/* 6 point */
-ARRAY36 *hwin_init_addr(void);
 
 /*====================================================================*/
 ARRAY36 *hwin_init_addr()

@@ -22,6 +22,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "../../qcommon/q_shared.h"
+#include "tr_image_loaders.h"
+#include "tr_fs_compat.h"
 #include "tr_public.h"
 
 /*
@@ -75,7 +77,7 @@ void R_LoadPCX ( const char *filename, byte **pic, int *width, int *height)
 	//
 	// load the file
 	//
-	len = ri.FS_ReadFile( ( char * ) filename, &raw.v);
+	len = FS_ReadFileConst( filename, &raw.v );
 	if (!raw.b || len < 0) {
 		return;
 	}

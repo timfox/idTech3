@@ -63,5 +63,7 @@ int AAS_AreaTravelTimeToGoalArea(int areanum, vec3_t origin, int goalareanum, in
 int AAS_PredictRoute(struct aas_predictroute_s *route, int areanum, vec3_t origin,
 							int goalareanum, int travelflags, int maxareas, int maxtime,
 							int stopevent, int stopcontents, int stoptfl, int stopareanum);
+//find the nearest hide area
+int AAS_NearestHideArea(int srcnum, vec3_t origin, int areanum, int enemynum, vec3_t enemyorigin, int enemyareanum, int travelflags);
 
 

@@ -19,6 +19,13 @@ along with Quake III Arena source code; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
+#if !defined(_GNU_SOURCE)
+#	define _GNU_SOURCE
+#endif
+#if !defined(_POSIX_C_SOURCE)
+#	define _POSIX_C_SOURCE 200809L
+#endif
+
 #include <unistd.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -63,6 +70,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef DEDICATED
 #include "../client/client.h"
 #endif
+
+NORETURN void Sys_Exit( int code );
 
 unsigned sys_frame_time;
 
@@ -163,7 +172,7 @@ static void tty_Back( void )
 
 // clear the display of the line currently edited
 // bring cursor back to beginning of line
-void tty_Hide( void )
+static void tty_Hide( void )
 {
 	int i;
 
@@ -190,7 +199,7 @@ void tty_Hide( void )
 
 // show the current line
 // FIXME TTimo need to position the cursor if needed??
-void tty_Show( void )
+static void tty_Show( void )
 {
 	if ( !ttycon_on )
 		return;
@@ -212,7 +221,7 @@ void tty_Show( void )
 
 
 // never exit without calling this, or your terminal will be left in a pretty bad state
-void Sys_ConsoleInputShutdown( void )
+static void Sys_ConsoleInputShutdown( void )
 {
 	if ( ttycon_on )
 	{
@@ -243,14 +252,16 @@ Reinitialize console input after receiving SIGCONT, as on Linux the terminal see
 set attributes if user did CTRL+Z and then does fg again.
 ==================
 */
-void CON_SigCont( int signum )
+static void CON_SigCont( int signum )
 {
+	(void)signum;
 	Sys_ConsoleInputInit();
 }
 
 
-void CON_SigTStp( int signum )
+static void CON_SigTStp( int signum )
 {
+	(void)signum;
 	sigset_t mask;
 
 	tty_FlushIn();
@@ -338,8 +349,9 @@ void NORETURN FORMAT_PRINTF(1, 2) QDECL Sys_Error( const char *format, ... )
 }
 
 
-void floating_point_exception_handler( int whatever )
+static void floating_point_exception_handler( int whatever )
 {
+	(void)whatever;
 	signal( SIGFPE, floating_point_exception_handler );
 }
 
@@ -524,7 +536,7 @@ char *Sys_ConsoleInput( void )
 
 				if ( key == 12 ) // clear teaminal
 				{
-					write( STDOUT_FILENO, "\ec]", 3 );
+					write( STDOUT_FILENO, "\x1b" "c]", 3 );
 					if ( tty_con.cursor )
 					{
 						write( STDOUT_FILENO, tty_con.buffer, tty_con.cursor );
@@ -537,7 +549,7 @@ char *Sys_ConsoleInput( void )
 				tty_FlushIn();
 				return NULL;
 			}
-			if ( tty_con.cursor >= sizeof( text ) - 1 )
+						if ( (size_t)tty_con.cursor >= sizeof( text ) - 1 )
 				return NULL;
 			// push regular character
 			tty_con.buffer[ tty_con.cursor ] = key;
@@ -673,7 +685,7 @@ static const struct Q3ToAnsiColorTable_s
 
 
 static const char *getANSIcolor( char Q3color ) {
-	int i;
+	size_t i;
 	for ( i = 0; i < ARRAY_LEN( tty_colorTable ); i++ ) {
 		if ( Q3color == tty_colorTable[ i ].Q3color ) {
 			return tty_colorTable[ i ].ANSIcolor;
@@ -691,7 +703,7 @@ static qboolean printableChar( char c ) {
 }
 
 
-void Sys_ANSIColorify( const char *msg, char *buffer, int bufferSize )
+static void Sys_ANSIColorify( const char *msg, char *buffer, int bufferSize )
 {
   int   msgLength;
   int   i;
@@ -769,11 +781,12 @@ void Sys_Print( const char *msg )
 
 void QDECL Sys_SetStatus( const char *format, ... )
 {
+	(void)format;
 	return;
 }
 
 
-void Sys_ConfigureFPU( void )  // bk001213 - divide by zero
+static void Sys_ConfigureFPU( void )  // bk001213 - divide by zero
 {
 #ifdef __linux__
 #ifdef __i386
@@ -802,7 +815,7 @@ void Sys_ConfigureFPU( void )  // bk001213 - divide by zero
 }
 
 
-void Sys_PrintBinVersion( const char* name )
+static void Sys_PrintBinVersion( const char* name )
 {
 	const char *date = __DATE__;
 	const char *time = __TIME__;
@@ -930,7 +943,7 @@ to symlink to binaries and /not/ have the links resolved.
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
 #endif
-const char *Sys_BinName( const char *arg0 )
+static const char *Sys_BinName( const char *arg0 )
 {
 	static char dst[ PATH_MAX ];
 

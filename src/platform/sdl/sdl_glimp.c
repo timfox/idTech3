@@ -37,6 +37,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "sdl_glw.h"
 #include "sdl_icon.h"
 
+void GLimp_Init( glconfig_t *config );
+void GLimp_EndFrame( void );
+void *GL_GetProcAddress( const char *symbol );
+void GLW_HideFullscreenWindow( void );
+
 typedef enum {
 	RSERR_OK,
 	RSERR_INVALID_FULLSCREEN,
@@ -732,7 +737,10 @@ void VKimp_Init( glconfig_t *config )
 		}
 	}
 
-	qvkGetInstanceProcAddr = SDL_Vulkan_GetVkGetInstanceProcAddr();
+	{
+		void *sym = SDL_Vulkan_GetVkGetInstanceProcAddr();
+		Com_Memcpy( &qvkGetInstanceProcAddr, &sym, sizeof( qvkGetInstanceProcAddr ) );
+	}
 
 	if ( qvkGetInstanceProcAddr == NULL )
 	{
@@ -760,7 +768,12 @@ VK_GetInstanceProcAddr
 */
 void *VK_GetInstanceProcAddr( VkInstance instance, const char *name )
 {
-	return qvkGetInstanceProcAddr( instance, name );
+	PFN_vkVoidFunction fn;
+	void *addr = NULL;
+
+	fn = qvkGetInstanceProcAddr( instance, name );
+	Com_Memcpy( &addr, &fn, sizeof( addr ) );
+	return addr;
 }
 
 

@@ -80,7 +80,7 @@ static float LibVarStringValue( const char *string )
 // Returns:					-
 // Changes Globals:		-
 //===========================================================================
-libvar_t *LibVarAlloc( const char *var_name )
+static libvar_t *LibVarAlloc( const char *var_name )
 {
 	libvar_t *v;
 
@@ -99,7 +99,7 @@ libvar_t *LibVarAlloc( const char *var_name )
 // Returns:					-
 // Changes Globals:		-
 //===========================================================================
-void LibVarDeAlloc( libvar_t *v )
+static void LibVarDeAlloc( libvar_t *v )
 {
 	if ( v->string )
 		FreeMemory( v->string );

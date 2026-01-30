@@ -174,6 +174,8 @@ static int ResampleSfx( sfx_t *sfx, int channels, int inrate, int inwidth, int s
 	int		sample, samplefrac, fracstep;
 	int			part;
 	sndBuffer	*chunk;
+
+	(void)compressed;
 	
 	stepscale = (float)inrate / dma.speed;	// this is usually 0.5, 1, or 2
 

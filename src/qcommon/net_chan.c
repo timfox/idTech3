@@ -446,7 +446,7 @@ qboolean Netchan_Process( netchan_t *chan, msg_t *msg ) {
 
 		// copy the fragment to the fragment buffer
 		if ( fragmentLength < 0 || msg->readcount + fragmentLength > msg->cursize ||
-			chan->fragmentLength + fragmentLength > sizeof( chan->fragmentBuffer ) ) {
+			(size_t) chan->fragmentLength + fragmentLength > sizeof( chan->fragmentBuffer ) ) {
 			if ( showdrop->integer || showpackets->integer ) {
 				Com_Printf ("%s:illegal fragment length\n"
 				, NET_AdrToString( &chan->remoteAddress ) );
@@ -682,7 +682,7 @@ void NET_FlushPacketQueue( int time_diff )
 void NET_SendPacket( netsrc_t sock, int length, const void *data, const netadr_t *to ) {
 
 	// sequenced packets are shown in netchan, so just show oob
-	if ( showpackets->integer && *(int32_t *)data == -1 ) {
+	if ( showpackets->integer && *(const int32_t *)data == -1 ) {
 		Com_Printf ("send packet %4i\n", length);
 	}
 

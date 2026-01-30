@@ -35,26 +35,18 @@ ____________________________________________________________________________*/
 #include <float.h>
 #include <math.h>
 #include "l3.h"
+#include "mp3_local.h"
 
 /*---------- quant ---------------------------------*/
 /* 8 bit lookup x = pow(2.0, 0.25*(global_gain-210)) */
-float *quant_init_global_addr();
-
 
 /* x = pow(2.0, -0.5*(1+scalefact_scale)*scalefac + preemp) */
 typedef float LS[4][32];
-LS *quant_init_scale_addr();
-
-
-float *quant_init_pow_addr();
-float *quant_init_subblock_addr();
 
 typedef int iARRAY22[22];
-iARRAY22 *quant_init_band_addr();
 
 /*---------- antialias ---------------------------------*/
 typedef float PAIR[2];
-PAIR *alias_init_addr();
 
 static const float Ci[8] =
 {
@@ -63,14 +55,6 @@ static const float Ci[8] =
 
 void hwin_init();		/* hybrid windows -- */
 void imdct_init();
-typedef struct
-{
-   float *w;
-   float *w2;
-   void *coef;
-}
-IMDCT_INIT_BLOCK;
-
 void msis_init();
 void msis_init_MPEG2();
 
@@ -222,8 +206,6 @@ void hwin_init()
 }
 /*=============================================================*/
 typedef float ARRAY4[4];
-const IMDCT_INIT_BLOCK *imdct_init_addr_18();
-const IMDCT_INIT_BLOCK *imdct_init_addr_6();
 
 /*-------------------------------------------------------------*/
 void imdct_init()

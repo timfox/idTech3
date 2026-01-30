@@ -653,14 +653,14 @@ void CM_LoadMap( const char *name, qboolean clientload, int *checksum ) {
 	if ( !buf ) {
 		Com_Error( ERR_DROP, "%s: couldn't load %s", __func__, name );
 	}
-	if ( length < sizeof( dheader_t ) ) {
+	if ( (size_t) length < sizeof( dheader_t ) ) {
 		Com_Error( ERR_DROP, "%s: %s has truncated header", __func__, name );
 	}
 
 	*checksum = cm.checksum = LittleLong( Com_BlockChecksum( buf, length ) );
 
 	header = *(dheader_t *)buf;
-	for ( i = 0; i < sizeof( dheader_t ) / sizeof( int32_t ); i++ ) {
+	for ( i = 0; (size_t) i < sizeof( dheader_t ) / sizeof( int32_t ); i++ ) {
 		( (int32_t *)&header )[i] = LittleLong( ( (int32_t *)&header )[i] );
 	}
 

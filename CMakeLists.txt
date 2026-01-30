@@ -1,6 +1,43 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.24)
 
-PROJECT(idtech3)
+PROJECT(idtech3 LANGUAGES C)
+
+set(CMAKE_C_STANDARD 23)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS OFF)
+
+option(C_STANDARD_STRICT "Enable the stricter warning set for engine builds" ON)
+option(CI_BUILD "Enable CI-specific behaviors such as warnings-as-errors" OFF)
+
+if(C_STANDARD_STRICT)
+  if(MSVC)
+    add_compile_options(/W4)
+  else()
+    set(C_STRICT_WARNINGS
+      -Wall
+      -Wextra
+      -Wpedantic
+      -Wshadow
+      -Wstrict-prototypes
+      -Wmissing-prototypes
+      -Wold-style-definition
+      -Wformat=2
+      -Wundef
+      -Wcast-qual
+      -Wpointer-arith
+      -Wvla
+    )
+    add_compile_options(${C_STRICT_WARNINGS})
+  endif()
+endif()
+
+if(CI_BUILD)
+  if(MSVC)
+    add_compile_options(/WX)
+  else()
+    add_compile_options(-Werror)
+  endif()
+endif()
 
 # --- Begin FindSDL2.cmake
 # -------------------------------------------------------------

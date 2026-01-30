@@ -1248,7 +1248,7 @@ extern  int unzStringFileNameCompare (const char* fileName1,const char* fileName
   Locate the Central directory of a zipfile (at the end, just before
     the global comment)
 */
-extern uLong unzlocal_SearchCentralDir(FILE *fin)
+static uLong unzlocal_SearchCentralDir(FILE *fin)
 {
 	unsigned char buf[BUFREADCOMMENT+4];
 	uLong uSizeFile;
@@ -2838,6 +2838,7 @@ int inflate_blocks(inflate_blocks_statef *s, z_streamp z, int r)
       }
 	  ZFREE(z, s->sub.trees.blens);
       s->mode = CODES;
+      FALLTHROUGH;
     case CODES:
       UPDATE
       if ((r = inflate_codes(s, z, r)) != Z_STREAM_END)
@@ -2854,11 +2855,13 @@ int inflate_blocks(inflate_blocks_statef *s, z_streamp z, int r)
         break;
       }
       s->mode = DRY;
+      FALLTHROUGH;
     case DRY:
       FLUSH
       if (s->read != s->write)
         LEAVE
       s->mode = DONE;
+      FALLTHROUGH;
     case DONE:
       r = Z_STREAM_END;
       LEAVE
@@ -3077,7 +3080,7 @@ static int huft_build(uInt *b, uInt n, uInt s, const uInt *d, const uInt *e, inf
   uInt mask;                    /* (1 << w) - 1, to avoid cc -O bug on HP */
   register uInt *p;            /* pointer into c[], b[], or v[] */
   inflate_huft *q;              /* points to current table */
-  struct inflate_huft_s r = {{{0, 0}}};      /* table entry for structure assignment */
+  struct inflate_huft_s r = {0};      /* table entry for structure assignment */
   inflate_huft *u[BMAX];        /* table stack */
   register int w;               /* bits before this table == (l * h) */
   uInt x[BMAX+1];               /* bit offsets, then code stack */
@@ -3171,7 +3174,7 @@ static int huft_build(uInt *b, uInt n, uInt s, const uInt *d, const uInt *e, inf
 
         /* compute minimum size table less than or equal to l bits */
         z = g - w;
-        z = z > (uInt)l ? l : z;        /* table size upper limit */
+        z = z > (uInt)l ? (uInt)l : z;        /* table size upper limit */
         if ((f = 1 << (j = k - w)) > a + 1)     /* try a k-w bit table */
         {                       /* too few codes for k-w bit table */
           f -= a + 1;           /* deduct codes from patterns left */
@@ -3491,12 +3494,8 @@ static const inflate_huft fixed_td[] = {
   };
 
 int inflate_trees_fixed(uInt *bl, uInt *bd, const inflate_huft * *tl, const inflate_huft * *td, z_streamp z)
-//uInt *bl;               /* literal desired/actual bit depth */
-//uInt *bd;               /* distance desired/actual bit depth */
-//inflate_huft * *tl;  /* literal/length tree result */
-//inflate_huft * *td;  /* distance tree result */
-//z_streamp z;             /* for memory allocation */
 {
+  (void)z;
   *bl = fixed_bl;
   *bd = fixed_bd;
   *tl = fixed_tl;
@@ -3775,6 +3774,7 @@ int inflate_codes(inflate_blocks_statef *s, z_streamp z, int r)
       c->sub.code.need = c->lbits;
       c->sub.code.tree = c->ltree;
       c->mode = LEN;
+      FALLTHROUGH;
     case LEN:           /* i: get length/literal/eob next */
       j = c->sub.code.need;
       NEEDBITS(j)
@@ -3822,6 +3822,7 @@ int inflate_codes(inflate_blocks_statef *s, z_streamp z, int r)
       c->sub.code.tree = c->dtree;
       Tracevv(("inflate:         length %u\n", c->len));
       c->mode = DIST;
+      FALLTHROUGH;
     case DIST:          /* i: get distance next */
       j = c->sub.code.need;
       NEEDBITS(j)
@@ -3852,6 +3853,7 @@ int inflate_codes(inflate_blocks_statef *s, z_streamp z, int r)
       DUMPBITS(j)
       Tracevv(("inflate:         distance %u\n", c->sub.copy.dist));
       c->mode = COPY;
+      FALLTHROUGH;
     case COPY:          /* o: copying bytes in window, waiting for space */
       f = q - c->sub.copy.dist;
       while (f < s->window)             /* modulo window size-"while" instead */
@@ -3883,6 +3885,7 @@ int inflate_codes(inflate_blocks_statef *s, z_streamp z, int r)
       if (s->read != s->write)
         LEAVE
       c->mode = END;
+      FALLTHROUGH;
     case END:
       r = Z_STREAM_END;
       LEAVE
@@ -4151,6 +4154,7 @@ int inflate(z_streamp z, int f)
         break;
       }
       z->state->mode = imFLAG;
+      FALLTHROUGH;
     case imFLAG:
       iNEEDBYTE
       b = iNEXTBYTE;
@@ -4168,18 +4172,22 @@ int inflate(z_streamp z, int f)
         break;
       }
       z->state->mode = imDICT4;
+      FALLTHROUGH;
     case imDICT4:
       iNEEDBYTE
       z->state->sub.check.need = (uLong)iNEXTBYTE << 24;
       z->state->mode = imDICT3;
+      /* fallthrough */
     case imDICT3:
       iNEEDBYTE
       z->state->sub.check.need += (uLong)iNEXTBYTE << 16;
       z->state->mode = imDICT2;
+      /* fallthrough */
     case imDICT2:
       iNEEDBYTE
       z->state->sub.check.need += (uLong)iNEXTBYTE << 8;
       z->state->mode = imDICT1;
+      /* fallthrough */
     case imDICT1:
       iNEEDBYTE
       z->state->sub.check.need += (uLong)iNEXTBYTE;
@@ -4211,18 +4219,22 @@ int inflate(z_streamp z, int f)
         break;
       }
       z->state->mode = imCHECK4;
+      /* fallthrough */
     case imCHECK4:
       iNEEDBYTE
       z->state->sub.check.need = (uLong)iNEXTBYTE << 24;
       z->state->mode = imCHECK3;
+      /* fallthrough */
     case imCHECK3:
       iNEEDBYTE
       z->state->sub.check.need += (uLong)iNEXTBYTE << 16;
       z->state->mode = imCHECK2;
+      /* fallthrough */
     case imCHECK2:
       iNEEDBYTE
       z->state->sub.check.need += (uLong)iNEXTBYTE << 8;
       z->state->mode = imCHECK1;
+      /* fallthrough */
     case imCHECK1:
       iNEEDBYTE
       z->state->sub.check.need += (uLong)iNEXTBYTE;
@@ -4236,6 +4248,7 @@ int inflate(z_streamp z, int f)
       }
       Tracev(("inflate: zlib check ok\n"));
       z->state->mode = imDONE;
+      /* fallthrough */
     case imDONE:
       return Z_STREAM_END;
     case imBAD:
