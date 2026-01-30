@@ -232,23 +232,22 @@ static void emit_load_rx_offset( uint32_t reg, int32_t offset );
 static void emit_pushad( void );
 static void emit_popad( void );
 
+// DROP is used with and without variadic args.
+// Prefer C23 __VA_OPT__ when available, otherwise fall back to widely-supported
+// '##__VA_ARGS__' extension (MSVC/GCC/Clang) to swallow the comma on empty args.
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202311L)
 #define DROP( reason, ... ) \
 	do { \
 		VM_FreeBuffers(); \
-<<<<<<< HEAD
-		Com_Error( ERR_DROP, "%s: " reason, __func__ , ##__VA_ARGS__ ); \
-	} while(0)
-=======
 		Com_Error( ERR_DROP, "%s: " reason, __func__ __VA_OPT__(,) __VA_ARGS__ ); \
 	} while(0)
 #else
 #define DROP( reason, ... ) \
 	do { \
 		VM_FreeBuffers(); \
-		Com_Error( ERR_DROP, "%s: " reason, __func__ __VA_OPT__(,) __VA_ARGS__ ); \
+		Com_Error( ERR_DROP, "%s: " reason, __func__, ##__VA_ARGS__ ); \
 	} while(0)
 #endif
->>>>>>> origin/main
 
 #define SWAP_INT( X, Y ) do { int T = X; X = Y; Y = T; } while ( 0 )
 
