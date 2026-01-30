@@ -82,13 +82,28 @@ static qboolean	winsockInitialized = qfalse;
 #		define _BSD_SOCKLEN_T_
 #	endif
 
+#ifndef IFF_UP
+#define IFF_UP 0x1
+#endif
+
+#ifdef USE_IPV6
+// Provide a fallback only when the system headers lack the IPv6 struct.
+// On macOS, <netinet/in.h> should provide struct ipv6_mreq.
+#if !defined(__APPLE__) && !defined(IPV6_JOIN_GROUP)
+#ifndef IPV6_MREQ_DEFINED
+#define IPV6_MREQ_DEFINED
+struct ipv6_mreq {
+	struct in6_addr ipv6mr_multiaddr;
+	unsigned int ipv6mr_interface;
+};
+#endif
+#endif
+#endif
+
 #	include <sys/socket.h>
 #	include <errno.h>
 #	include <netdb.h>
 #	include <netinet/in.h>
-#	if defined(__APPLE__)
-#		include <netinet6/in6.h>
-#	endif
 #	include <arpa/inet.h>
 #	include <net/if.h>
 #	include <sys/ioctl.h>
