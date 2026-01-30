@@ -912,7 +912,16 @@ static void S_Base_RawSamples( int samples, int rate, int width, int n_channels,
 		return;
 	}
 
-	intVolume = 256 * volume;
+	float clampedVolume = volume;
+
+	/* Clamp volume into [0,1] so intVolume cannot overflow later math. */
+	if ( clampedVolume < 0.0f ) {
+		clampedVolume = 0.0f;
+	} else if ( clampedVolume > 1.0f ) {
+		clampedVolume = 1.0f;
+	}
+
+	intVolume = (int)( 256.0f * clampedVolume );
 
 	if ( s_rawend - s_soundtime < 0 ) {
 		Com_DPrintf( "S_RawSamples: resetting minimum: %i < %i\n", s_rawend, s_soundtime );

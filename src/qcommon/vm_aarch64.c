@@ -30,11 +30,21 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #pragma warning( disable : 4146 ) // unary minus operator applied to unsigned type, result still unsigned
 #else
 #include <sys/types.h>
-#include <sys/stat.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <math.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#endif
+
+#ifndef IPV6_JOIN_GROUP
+struct ipv6_mreq {
+	struct in6_addr ipv6mr_multiaddr;
+	unsigned int ipv6mr_interface;
+};
 #endif
 
 #include "vm_local.h"
@@ -236,10 +246,10 @@ static int VM_SearchLiteral( const uint32_t value )
 		Com_Error( ERR_DROP, "%s: " reason, __func__, __VA_ARGS__ ); \
 	} while(0)
 #else
-#define DROP( reason, args... ) \
+#define DROP( reason, ... ) \
 	do { \
 		VM_FreeBuffers(); \
-		Com_Error( ERR_DROP, "%s: " reason, __func__, ##args ); \
+		Com_Error( ERR_DROP, "%s: " reason __VA_OPT__(, __VA_ARGS__), __func__ ); \
 	} while(0)
 #endif
 
@@ -596,7 +606,7 @@ static qboolean can_encode_imm12( const uint32_t imm12, const uint32_t scale )
 {
 	const uint32_t mask = (1<<scale) - 1;
 
-	if ( imm12 & mask || imm12 >= 4096 * (1 << scale) )
+	if ( imm12 & mask || imm12 >= (uint32_t)(4096 * (1 << scale)) )
 		return qfalse;
 
 	return qtrue;
@@ -607,7 +617,7 @@ static uint32_t imm12_scale( const uint32_t imm12, const uint32_t scale )
 {
 	const uint32_t mask = (1<<scale) - 1;
 
-	if ( imm12 & mask || imm12 >= 4096 * (1 << scale) )
+	if ( imm12 & mask || imm12 >= (uint32_t)(4096 * (1 << scale)) )
 		DROP( "can't encode offset %i with scale %i", imm12, (1 << scale) );
 
 	return imm12 >> scale;
@@ -902,7 +912,7 @@ static int32_t sx_mask[NUM_SX_REGS];
 static qboolean find_free_rx( void ) {
 	uint32_t i, n;
 
-	for ( i = 0; i < ARRAY_LEN( rx_list_alloc ); i++ ) {
+	for ( i = 0; i < (int)ARRAY_LEN( rx_list_alloc ); i++ ) {
 		n = rx_list_alloc[i];
 		if ( rx_regs[n].type_mask == RTYPE_UNUSED ) {
 			return qtrue;
@@ -916,7 +926,7 @@ static qboolean find_free_rx( void ) {
 static qboolean find_free_sx( void ) {
 	uint32_t i, n;
 
-	for ( i = 0; i < ARRAY_LEN( sx_list_alloc ); i++ ) {
+	for ( i = 0; i < (int)ARRAY_LEN( sx_list_alloc ); i++ ) {
 		n = sx_list_alloc[i];
 		if ( sx_regs[n].type_mask == RTYPE_UNUSED ) {
 			return qtrue;
@@ -962,10 +972,10 @@ static void wipe_var_range( const var_addr_t *v )
 		DROP( "incorrect variable setup" );
 #endif
 	// wipe all types of overlapping variables
-	for ( i = 0; i < ARRAY_LEN( rx_regs ); i++ ) {
+	for ( i = 0; i < (int)ARRAY_LEN( rx_regs ); i++ ) {
 		wipe_reg_range( &rx_regs[i], v );
 	}
-	for ( i = 0; i < ARRAY_LEN( sx_regs ); i++ ) {
+	for ( i = 0; i < (int)ARRAY_LEN( sx_regs ); i++ ) {
 		wipe_reg_range( &sx_regs[i], v );
 	}
 #endif
@@ -1033,7 +1043,7 @@ static void set_sx_var( uint32_t reg, const var_addr_t *v ) {
 static reg_t *find_rx_var( uint32_t *reg, const var_addr_t *v ) {
 #ifdef LOAD_OPTIMIZE
 	uint32_t i;
-	for ( i = 0; i < ARRAY_LEN( rx_regs ); i++ ) {
+	for ( i = 0; i < (int)ARRAY_LEN( rx_regs ); i++ ) {
 		reg_t *r = &rx_regs[i];
 		if ( r->type_mask & RTYPE_VAR ) {
 			uint32_t n;
@@ -1055,7 +1065,7 @@ static reg_t *find_rx_var( uint32_t *reg, const var_addr_t *v ) {
 static qboolean find_sx_var( uint32_t *reg, const var_addr_t *v ) {
 #ifdef LOAD_OPTIMIZE
 	uint32_t i;
-	for ( i = 0; i < ARRAY_LEN( sx_regs ); i++ ) {
+	for ( i = 0; i < (int)ARRAY_LEN( sx_regs ); i++ ) {
 		reg_t *r = &sx_regs[i];
 		if ( r->type_mask & RTYPE_VAR ) {
 			uint32_t n;
@@ -1076,7 +1086,7 @@ static qboolean find_sx_var( uint32_t *reg, const var_addr_t *v ) {
 
 static void reduce_map_size( reg_t *reg, uint32_t size ) {
 	int i;
-	for ( i = 0; i < ARRAY_LEN( reg->vars.map ); i++ ) {
+	for ( i = 0; i < (int)ARRAY_LEN( reg->vars.map ); i++ ) {
 		if ( reg->vars.map[i].size > size ) {
 			reg->vars.map[i].size = size;
 		}
@@ -1100,13 +1110,13 @@ static void wipe_vars( void )
 	uint32_t i;
 	reg_t *r;
 
-	for ( i = 0; i < ARRAY_LEN( rx_regs ); i++ ) {
+	for ( i = 0; i < (int)ARRAY_LEN( rx_regs ); i++ ) {
 		r = &rx_regs[i];
 		memset( &r->vars, 0, sizeof( r->vars ) );
 		r->type_mask &= ~RTYPE_VAR;
 		r->ext = Z_NONE;
 	}
-	for ( i = 0; i < ARRAY_LEN( sx_regs ); i++ ) {
+	for ( i = 0; i < (int)ARRAY_LEN( sx_regs ); i++ ) {
 		r = &sx_regs[i];
 		memset( &r->vars, 0, sizeof( r->vars ) );
 		r->type_mask &= ~RTYPE_VAR;
@@ -1118,7 +1128,7 @@ static void wipe_vars( void )
 
 static qboolean search_opstack( opstack_value_t type, uint32_t value ) {
 	int i;
-	for ( i = 1; i <= opstack; i++ ) {
+	for ( i = 1; i <= (uint32_t)opstack; i++ ) {
 		if ( opstackv[i].type == type && opstackv[i].value == value ) {
 			return qtrue;
 		}
@@ -1271,7 +1281,7 @@ static void flush_item( opstack_t *it )
 static void flush_items( opstack_value_t type, uint32_t value ) {
 	int i;
 
-	for ( i = 0; i <= opstack; i++ ) {
+	for ( i = 0; i <= (uint32_t)opstack; i++ ) {
 		opstack_t *it = opstackv + i;
 		if ( it->type == type && it->value == value ) {
 			flush_item( it );
@@ -1407,7 +1417,7 @@ static uint32_t build_opstack_mask( opstack_value_t reg_type )
 {
 	uint32_t mask = 0;
 	int i;
-	for ( i = 0; i <= opstack; i++ ) {
+	for ( i = 0; i <= (uint32_t)opstack; i++ ) {
 		opstack_t *it = opstackv + i;
 		if ( it->type == reg_type ) {
 			mask |= ( 1 << it->value );
@@ -1420,7 +1430,7 @@ static uint32_t build_opstack_mask( opstack_value_t reg_type )
 static uint32_t build_rx_mask( void )
 {
 	uint32_t i, mask = 0;
-	for ( i = 0; i < ARRAY_LEN( rx_mask ); i++ ) {
+	for ( i = 0; i < (int)ARRAY_LEN( rx_mask ); i++ ) {
 		if ( rx_mask[i] ) {
 			mask |= 1 << i;
 		}
@@ -1432,7 +1442,7 @@ static uint32_t build_rx_mask( void )
 static uint32_t build_sx_mask( void )
 {
 	uint32_t i, mask = 0;
-	for ( i = 0; i < ARRAY_LEN( sx_mask ); i++ ) {
+	for ( i = 0; i < (int)ARRAY_LEN( sx_mask ); i++ ) {
 		if ( sx_mask[i] ) {
 			mask |= 1 << i;
 		}
@@ -1458,7 +1468,7 @@ static qboolean find_rx_const( uint32_t imm )
 	uint32_t mask = build_rx_mask() | build_opstack_mask( TYPE_RX );
 	int i;
 
-	for ( i = 0; i < ARRAY_LEN( rx_list_cache ); i++ ) {
+	for ( i = 0; i < (int)ARRAY_LEN( rx_list_cache ); i++ ) {
 		reg_t *r;
 		uint32_t n = rx_list_cache[ i ];
 		if ( mask & ( 1 << n ) ) {
@@ -1509,7 +1519,7 @@ static uint32_t alloc_rx_const( uint32_t pref, uint32_t imm )
 			}
 		}
 
-		for ( i = 0; i < ARRAY_LEN( rx_list_cache ); i++ ) {
+		for ( i = 0; i < (int)ARRAY_LEN( rx_list_cache ); i++ ) {
 			n = rx_list_cache[i];
 			if ( mask & ( 1 << n ) ) {
 				// target register must be unmasked and not present on the opStack
@@ -1600,7 +1610,7 @@ static uint32_t alloc_sx_const( uint32_t pref, uint32_t imm )
 			}
 		}
 
-		for ( i = 0; i < ARRAY_LEN( sx_list_cache ); i++ ) {
+		for ( i = 0; i < (int)ARRAY_LEN( sx_list_cache ); i++ ) {
 			n = sx_list_cache[i];
 			if ( mask & ( 1 << n ) ) {
 				// target register must be unmasked and not present on the opStack
@@ -1668,7 +1678,7 @@ static uint32_t dyn_alloc_rx( uint32_t pref )
 	uint32_t i, n;
 
 	// try to bypass registers with metadata
-	for ( i = 0; i < ARRAY_LEN( rx_list_alloc ); i++ ) {
+	for ( i = 0; i < (int)ARRAY_LEN( rx_list_alloc ); i++ ) {
 		n = rx_list_alloc[i];
 		if ( mask & ( 1 << n ) ) {
 			continue;
@@ -1695,7 +1705,7 @@ static uint32_t dyn_alloc_rx( uint32_t pref )
 	}
 
 	// no free registers, flush bottom of the opStack
-	for ( i = 0; i <= opstack; i++ ) {
+	for ( i = 0; i <= (uint32_t)opstack; i++ ) {
 		opstack_t *it = opstackv + i;
 		if ( it->type == TYPE_RX ) {
 			n = it->value;
@@ -1756,7 +1766,7 @@ static uint32_t dyn_alloc_sx( uint32_t pref )
 	uint32_t i, n;
 
 	// try to bypass registers with metadata
-	for ( i = 0; i < ARRAY_LEN( sx_list_alloc ); i++ ) {
+	for ( i = 0; i < (int)ARRAY_LEN( sx_list_alloc ); i++ ) {
 		n = sx_list_alloc[i];
 		if ( mask & ( 1 << n ) ) {
 			continue;
@@ -1783,7 +1793,7 @@ static uint32_t dyn_alloc_sx( uint32_t pref )
 	}
 
 	// no free registers, flush bottom of the opStack
-	for ( i = 0; i <= opstack; i++ ) {
+	for ( i = 0; i <= (uint32_t)opstack; i++ ) {
 		opstack_t *it = opstackv + i;
 		if ( it->type == TYPE_SX ) {
 			n = it->value;
@@ -1848,7 +1858,7 @@ static void flush_volatile( void )
 {
 	int i;
 
-	for ( i = 0; i <= opstack; i++ ) {
+	for ( i = 0; i <= (uint32_t)opstack; i++ ) {
 		opstack_t *it = opstackv + i;
 		if ( it->type == TYPE_RX || it->type == TYPE_SX ) {
 			flush_item( it );
@@ -2268,6 +2278,7 @@ static void emitAlign( const uint32_t align )
 
 static void emitFuncOffset( vm_t *vm, offset_t func )
 {
+	(void)vm;
 	uint32_t offset = savedOffset[ func ] - compiledOfs;
 
 	emit( BL( offset ) );
@@ -2424,6 +2435,7 @@ savedOffset[ FUNC_SYSF ] = compiledOfs; // to jump from ConstOptimize()
 // R0 - src, R1 - dst, R2 - count, R3 - scratch
 static void emitBlockCopyFunc( vm_t *vm )
 {
+	(void)vm;
 	// adjust R2 if needed
 	emit(AND32(R0, R0, rDATAMASK)); // r0 &= dataMask
 	emit(AND32(R1, R1, rDATAMASK)); // r1 &= dataMask
@@ -2828,7 +2840,7 @@ __recompile:
 
 	savedOffset[ FUNC_ENTR ] = compiledOfs; // offset to vmMain() entry point
 
-	while ( ip < header->instructionCount ) {
+	while ( (uint32_t)ip < header->instructionCount ) {
 
 		ci = &inst[ ip + 0 ];
 

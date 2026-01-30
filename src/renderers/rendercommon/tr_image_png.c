@@ -205,9 +205,9 @@ struct PNG_ZlibHeader
 struct BufferedFile
 {
 	byte *Buffer;
-	int   Length;
+	unsigned Length;
 	byte *Ptr;
-	int   BytesLeft;
+	unsigned BytesLeft;
 };
 
 /*
