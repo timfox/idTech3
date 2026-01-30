@@ -237,19 +237,7 @@ void QDECL ScriptError(script_t *script, const char *fmt, ...)
 	if (script->flags & SCFL_NOERRORS) return;
 
 	va_start(ap, fmt);
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wformat-nonliteral"
-#elif defined(_MSC_VER)
-#pragma warning(push)
-#pragma warning(disable: 4774) // format string expected in argument is not a string literal
-#endif
 	Q_vsnprintf(text, sizeof(text), fmt, ap);
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#elif defined(_MSC_VER)
-#pragma warning(pop)
-#endif
 	va_end(ap);
 #ifdef BOTLIB
 	botimport.Print(PRT_ERROR, "file %s, line %d: %s\n", script->filename, script->line, text);
@@ -276,19 +264,7 @@ static void QDECL ScriptWarning(script_t *script, const char *fmt, ...)
 	if (script->flags & SCFL_NOWARNINGS) return;
 
 	va_start(ap, fmt);
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wformat-nonliteral"
-#elif defined(_MSC_VER)
-#pragma warning(push)
-#pragma warning(disable: 4774) // format string expected in argument is not a string literal
-#endif
 	Q_vsnprintf(text, sizeof(text), fmt, ap);
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#elif defined(_MSC_VER)
-#pragma warning(pop)
-#endif
 	va_end(ap);
 #ifdef BOTLIB
 	botimport.Print(PRT_WARNING, "file %s, line %d: %s\n", script->filename, script->line, text);

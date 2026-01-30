@@ -4849,7 +4849,7 @@ static void FS_Startup( void ) {
 	// check original q3a files (can be disabled via SKIP_IDPAK_CHECK)
 #ifndef SKIP_IDPAK_CHECK
 	if ( FS_IsBaseGame( BASEGAME ) || FS_IsBaseGame( BASEDEMO ) ) {
-		FS_CheckIdPaks();
+		// FS_CheckIdPaks(); // Disabled - function removed
 	}
 #endif
 
@@ -4886,106 +4886,6 @@ static void FS_PrintSearchPaths( void )
 #endif
 
 
-/*
-===================
-FS_CheckIdPaks
-
-Checks that pak0.pk3 is present and its checksum is correct
-Note: If you're building a game that doesn't depend on the
-Q3 media pak0.pk3, you'll want to remove this function
-===================
-*/
-#if 0
-static void FS_CheckIdPaks( void )
-{
-	const searchpath_t *path;
-	const char* pakBasename;
-	qboolean founddemo = qfalse;
-	unsigned foundPak = 0;
-
-	for ( path = fs_searchpaths; path; path = path->next )
-	{
-		if ( !path->pack )
-			continue;
-
-		pakBasename = path->pack->pakBasename;
-
-		if(!Q_stricmpn( path->pack->pakGamename, BASEDEMO, MAX_OSPATH )
-		   && !Q_stricmpn( pakBasename, "pak0", MAX_OSPATH ))
-		{
-			founddemo = qtrue;
-
-			if( (unsigned int) path->pack->checksum == DEMO_PAK0_CHECKSUM )
-			{
-				Com_Printf( "\n\n"
-						"**************************************************\n"
-						"WARNING: It looks like you're using pak0.pk3\n"
-						"from the demo. This may work fine, but it is not\n"
-						"guaranteed or supported.\n"
-						"**************************************************\n\n\n" );
-			}
-		}
-
-		else if(!Q_stricmpn( path->pack->pakGamename, BASEGAME, MAX_OSPATH )
-			&& strlen(pakBasename) == 4 && !Q_stricmpn( pakBasename, "pak", 3 )
-			&& pakBasename[3] >= '0' && pakBasename[3] <= '8')
-		{
-			if( (unsigned int)path->pack->checksum != pak_checksums[pakBasename[3]-'0'] )
-			{
-				FS_PrintSearchPaths();
-
-				if(pakBasename[3] == '0')
-				{
-					Com_Printf("\n\n"
-						"**************************************************\n"
-						"ERROR: pak0.pk3 is present but its checksum (%u)\n"
-						"is not correct.\n"
-						"**************************************************\n\n\n",
-						path->pack->checksum );
-				}
-				else
-				{
-					Com_Printf("\n\n"
-						"**************************************************\n"
-						"ERROR: pak%d.pk3 is present but its checksum (%u)\n"
-						"is not correct.\n"
-						"**************************************************\n\n\n",
-						pakBasename[3]-'0', path->pack->checksum );
-				}
-				Com_Error(ERR_FATAL, "\n* You need to install correct Quake III Arena files in order to play *");
-			}
-
-			foundPak |= 1<<(pakBasename[3]-'0');
-		}
-	}
-
-	if(!founddemo && (foundPak & 0x1ff) != 0x1ff )
-	{
-		FS_PrintSearchPaths();
-
-		if((foundPak&1) != 1 )
-		{
-			Com_Printf("\n\n"
-			"pak0.pk3 is missing.\n");
-		}
-
-		if((foundPak&0x1fe) != 0x1fe )
-		{
-			Com_Printf("\n\n"
-			"Point Release files are missing.\n");
-		}
-
-		Com_Printf("\n\n"
-			"Also check that your Q3 executable is in\n"
-			"the correct place and that every file\n"
-			"in the %s directory is present and readable.\n", BASEGAME);
-
-		if(!fs_gamedirvar->string[0]
-		|| !Q_stricmp( fs_gamedirvar->string, BASEGAME )
-		|| !Q_stricmp( fs_gamedirvar->string, BASETA ))
-			Com_Error(ERR_FATAL, "\n*** you need to install Quake III Arena in order to play ***");
-}
-#endif
 
 /*
 =====================
