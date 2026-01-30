@@ -5,8 +5,14 @@
 #define Q_STATIC_ASSERT_CONCAT(a, b) Q_STATIC_ASSERT_CONCAT_IMPL(a, b)
 
 #ifndef _Static_assert
-#  if defined(static_assert)
-#    define _Static_assert(cond, msg) static_assert((cond), msg)
+#  if defined(_MSC_VER)
+#    include <assert.h>
+#    if defined(static_assert)
+#      define _Static_assert(cond, msg) static_assert((cond), msg)
+#    else
+#      define _Static_assert(cond, msg) \
+        typedef char Q_STATIC_ASSERT_CONCAT(q_static_assert_line_, __LINE__)[(cond) ? 1 : -1]
+#    endif
 #  else
 #    define _Static_assert(cond, msg) \
       typedef char Q_STATIC_ASSERT_CONCAT(q_static_assert_line_, __LINE__)[(cond) ? 1 : -1]
