@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #	ifndef _DARWIN_C_SOURCE
 #		define _DARWIN_C_SOURCE
 #	endif
+#	undef _POSIX_C_SOURCE
 #endif
 
 #if !defined(_GNU_SOURCE)
@@ -90,13 +91,13 @@ static qboolean	winsockInitialized = qfalse;
 
 #	include <sys/types.h>
 #	include <sys/socket.h>
+#	include <sys/time.h>
+#	include <sys/ioctl.h>
 #	include <errno.h>
 #	include <netdb.h>
 #	include <netinet/in.h>
 #	include <arpa/inet.h>
 #	include <net/if.h>
-#	include <sys/ioctl.h>
-#	include <sys/time.h>
 #	include <unistd.h>
 #	if !defined(__sun) && !defined(__sgi)
 #		include <ifaddrs.h>
@@ -107,11 +108,16 @@ static qboolean	winsockInitialized = qfalse;
 #endif
 
 #ifdef USE_IPV6
-#ifndef IPV6_JOIN_GROUP
+// If struct ipv6_mreq is not defined by system headers, provide a fallback.
+// Use a macro check or platform check.
+#if defined(__APPLE__) || !defined(IPV6_JOIN_GROUP)
+#ifndef IPV6_MREQ_DEFINED
+#define IPV6_MREQ_DEFINED
 struct ipv6_mreq {
 	struct in6_addr ipv6mr_multiaddr;
 	unsigned int ipv6mr_interface;
 };
+#endif
 #endif
 #endif
 
