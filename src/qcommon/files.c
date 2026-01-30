@@ -386,9 +386,7 @@ void Com_AppendCDKey( const char *filename );
 void Com_ReadCDKey( const char *filename );
 
 static int FS_GetModList( char *listbuf, int bufsize );
-#if 0
 static void FS_CheckIdPaks( void );
-#endif
 void FS_Reload( void );
 
 
@@ -4988,9 +4986,9 @@ static void FS_CheckIdPaks( void )
 		|| !Q_stricmp( fs_gamedirvar->string, BASETA ))
 			Com_Error(ERR_FATAL, "\n*** you need to install Quake III Arena in order to play ***");
 	}
-}
+#else
+static void FS_CheckIdPaks( void ) {}
 #endif
-
 
 /*
 =====================

@@ -86,6 +86,9 @@ static qboolean	winsockInitialized = qfalse;
 #	include <errno.h>
 #	include <netdb.h>
 #	include <netinet/in.h>
+#	if defined(__APPLE__)
+#		include <netinet6/in6.h>
+#	endif
 #	include <arpa/inet.h>
 #	include <net/if.h>
 #	include <sys/ioctl.h>
