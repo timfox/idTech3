@@ -20,34 +20,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 
-#ifdef __APPLE__
-#	ifndef _DARWIN_C_SOURCE
-#		define _DARWIN_C_SOURCE
-#	endif
-#	undef _POSIX_C_SOURCE
-#endif
-
 #if !defined(_GNU_SOURCE)
 #	define _GNU_SOURCE
 #endif
-
-#ifndef _WIN32
-#	include <sys/types.h>
-#	include <sys/socket.h>
-#	include <sys/time.h>
-#	include <sys/ioctl.h>
-#	include <errno.h>
-#	include <netdb.h>
-#	include <netinet/in.h>
-#	include <arpa/inet.h>
-#	include <net/if.h>
-#	include <unistd.h>
-#	if !defined(__sun) && !defined(__sgi)
-#		include <ifaddrs.h>
-#	endif
-#endif
-
-#if !defined(_POSIX_C_SOURCE) && !defined(__APPLE__)
+#if !defined(_POSIX_C_SOURCE)
 #	define _POSIX_C_SOURCE 200809L
 #endif
 
@@ -106,23 +82,22 @@ static qboolean	winsockInitialized = qfalse;
 #		define _BSD_SOCKLEN_T_
 #	endif
 
-#ifndef IFF_UP
-#define IFF_UP 0x1
-#endif
-
-#ifdef USE_IPV6
-// Provide a fallback only when the system headers lack the IPv6 struct.
-// On macOS, <netinet/in.h> (already included above) provides struct ipv6_mreq.
-#if !defined(__APPLE__) && !defined(IPV6_JOIN_GROUP)
-#ifndef IPV6_MREQ_DEFINED
-#define IPV6_MREQ_DEFINED
-struct ipv6_mreq {
-	struct in6_addr ipv6mr_multiaddr;
-	unsigned int ipv6mr_interface;
-};
-#endif
-#endif
-#endif
+#	include <sys/socket.h>
+#	include <errno.h>
+#	include <netdb.h>
+#	include <netinet/in.h>
+#	if defined(__APPLE__)
+#		include <netinet6/in6.h>
+#	endif
+#	include <arpa/inet.h>
+#	include <net/if.h>
+#	include <sys/ioctl.h>
+#	include <sys/types.h>
+#	include <sys/time.h>
+#	include <unistd.h>
+#	if !defined(__sun) && !defined(__sgi)
+#		include <ifaddrs.h>
+#	endif
 
 #	ifdef __sun
 #		include <sys/filio.h>
@@ -451,10 +426,7 @@ static qboolean Sys_StringToSockaddr( const char *s, sockaddr_t *sadr, int sadr_
 
 		if ( search )
 		{
-			size_t addrlen = search->ai_addrlen;
-			if ( addrlen > (size_t)sadr_len ) {
-				addrlen = (size_t)sadr_len;
-			}
+			size_t addrlen = MIN( search->ai_addrlen, (socklen_t) sadr_len );
 
 			memcpy ( sadr, search->ai_addr, addrlen );
 			freeaddrinfo( res );
@@ -537,8 +509,7 @@ Compare without port, and up to the bit number given in netmask.
 */
 qboolean NET_CompareBaseAdrMask( const netadr_t *a, const netadr_t *b, unsigned int netmask )
 {
-	byte cmpmask;
-	const byte *addra, *addrb;
+	byte cmpmask, *addra, *addrb;
 	int curbyte;
 
 	if (a->type != b->type)
@@ -549,8 +520,8 @@ qboolean NET_CompareBaseAdrMask( const netadr_t *a, const netadr_t *b, unsigned 
 
 	if (a->type == NA_IP)
 	{
-		addra = (const byte *)&a->ipv._4;
-		addrb = (const byte *)&b->ipv._4;
+		addra = (byte *) &a->ipv._4;
+		addrb = (byte *) &b->ipv._4;
 		
 		if (netmask > 32)
 			netmask = 32;
@@ -558,8 +529,8 @@ qboolean NET_CompareBaseAdrMask( const netadr_t *a, const netadr_t *b, unsigned 
 #ifdef USE_IPV6
 	else if (a->type == NA_IP6)
 	{
-		addra = (const byte *)&a->ipv._6;
-		addrb = (const byte *)&b->ipv._6;
+		addra = (byte *) &a->ipv._6;
+		addrb = (byte *) &b->ipv._6;
 		
 		if (netmask > 128)
 			netmask = 128;
@@ -1477,7 +1448,7 @@ static void NET_GetLocalAddress( void )
 		for( search = ifap; search; search = search->ifa_next )
 		{
 			// Only add interfaces that are up.
-			if ( search->ifa_flags & IFF_UP )
+			if ( ifap->ifa_flags & IFF_UP )
 				NET_AddLocalAddress( search->ifa_name, search->ifa_addr, search->ifa_netmask );
 		}
 	

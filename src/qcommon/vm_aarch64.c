@@ -35,15 +35,16 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <fcntl.h>
 #include <unistd.h>
 #include <math.h>
-
-// MAP_ANONYMOUS is MAP_ANON on some platforms (e.g. Darwin/BSDs).
-#ifndef MAP_ANONYMOUS
-#  ifdef MAP_ANON
-#    define MAP_ANONYMOUS MAP_ANON
-#  else
-#    error "MAP_ANONYMOUS and MAP_ANON are both undefined. This platform may not support anonymous memory mapping."
-#  endif
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
 #endif
+
+#ifndef IPV6_JOIN_GROUP
+struct ipv6_mreq {
+	struct in6_addr ipv6mr_multiaddr;
+	unsigned int ipv6mr_interface;
+};
 #endif
 
 #include "vm_local.h"
@@ -238,21 +239,18 @@ static int VM_SearchLiteral( const uint32_t value )
 #endif // USE_LITERAL_POOL
 
 
-// DROP is used with and without variadic args.
-// Prefer C23 __VA_OPT__ when available, otherwise fall back to widely-supported
-// '##__VA_ARGS__' extension (MSVC/GCC/Clang) to swallow the comma on empty args.
-#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202311L)
+#ifdef _MSC_VER
 #define DROP( reason, ... ) \
 	do { \
 		VM_FreeBuffers(); \
-		Com_Error( ERR_DROP, "%s: " reason, __func__ __VA_OPT__(,) __VA_ARGS__ ); \
-	} while (0)
+		Com_Error( ERR_DROP, "%s: " reason, __func__, __VA_ARGS__ ); \
+	} while(0)
 #else
 #define DROP( reason, ... ) \
 	do { \
 		VM_FreeBuffers(); \
-		Com_Error( ERR_DROP, "%s: " reason, __func__, ##__VA_ARGS__ ); \
-	} while (0)
+		Com_Error( ERR_DROP, "%s: " reason __VA_OPT__(, __VA_ARGS__), __func__ ); \
+	} while(0)
 #endif
 
 
