@@ -4896,9 +4896,6 @@ Q3 media pak0.pk3, you'll want to remove this function
 ===================
 */
 #if 0
-#ifndef SKIP_IDPAK_CHECK
-static void FS_CheckIdPaks( void );
-#endif
 static void FS_CheckIdPaks( void )
 {
 	const searchpath_t *path;
