@@ -4,8 +4,7 @@
 #define Q_STATIC_ASSERT_CONCAT_IMPL(a, b) a##b
 #define Q_STATIC_ASSERT_CONCAT(a, b) Q_STATIC_ASSERT_CONCAT_IMPL(a, b)
 
-#if defined(_MSC_VER) && !defined(_Static_assert)
-#  include <assert.h>
+#ifndef _Static_assert
 #  if defined(static_assert)
 #    define _Static_assert(cond, msg) static_assert((cond), msg)
 #  else
