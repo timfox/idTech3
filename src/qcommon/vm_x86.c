@@ -370,13 +370,7 @@ static void emit_rex1( const uint32_t base )
 }
 #endif
 
-<<<<<<< HEAD
 #if 1
-#if 1
-=======
-#if 0
-#if 0
->>>>>>> origin/main
  // reg <-> [offset]
 static void emit_modrm_offset( uint32_t reg, int32_t offset )
 {
@@ -389,8 +383,6 @@ static void emit_modrm_offset( uint32_t reg, int32_t offset )
 	Emit1( modrm.v );
 	Emit4( offset );
 }
-#endif
-#endif
 
  // reg <-> [base + offset]
 static void emit_modrm_base_offset( uint32_t reg, uint32_t base, int32_t offset )
@@ -496,11 +488,8 @@ static void emit_op_reg( int prefix, int opcode, uint32_t base, uint32_t reg )
 	emit_modrm_reg( base, reg );
 }
 
-<<<<<<< HEAD
 #if 1
-=======
-#if 0
->>>>>>> origin/main
+
 // offset is RIP-related in 64-bit mode
 static void emit_op_reg_offset( int prefix, int opcode, uint32_t reg, int32_t offset )
 {
@@ -572,11 +561,8 @@ static void emit_op_reg_base_index( int prefix, int opcode, uint32_t reg, uint32
 }
 
 
-<<<<<<< HEAD
 #if 1
-=======
-#if 0
->>>>>>> origin/main
+
 static void emit_op_reg_index_offset( int opcode, uint32_t reg, uint32_t index, int scale, int32_t offset )
 {
 	modrm_t modrm;
@@ -621,7 +607,7 @@ static void emit_lea_base_index( uint32_t reg, uint32_t base, uint32_t index )
 	emit_op_reg_base_index( 0, 0x8D, reg, base, index, 1, 0 );
 }
 
-#if 0
+
 static void emit_lea_index_scale( uint32_t reg, uint32_t index, int scale, int32_t offset )
 {
 	emit_op_reg_index_offset( 0x8D, reg, index, scale, offset );
@@ -681,11 +667,8 @@ static void emit_cmp_rx( uint32_t base, uint32_t reg )
 	emit_op_reg( 0, 0x39, base, reg );
 }
 
-<<<<<<< HEAD
 #if 1
-=======
-#if 0
->>>>>>> origin/main
+
 static void emit_cmp_rx_mem( uint32_t reg, int32_t offset )
 {
 	emit_op_reg_offset( 0, 0x3B, reg, offset );
@@ -822,11 +805,8 @@ static void emit_load4( uint32_t reg, uint32_t base, int32_t offset )
 	emit_op_reg_base_offset( 0, 0x8B, reg, base, offset );
 }
 
-<<<<<<< HEAD
 #if 1
-=======
-#if 0
->>>>>>> origin/main
+
 static void emit_load_rx_offset( uint32_t reg, int32_t offset )
 {
 	emit_op_reg_offset( 0, 0x8B, reg, offset );
@@ -858,7 +838,7 @@ static void emit_load4_index( uint32_t reg, uint32_t base, uint32_t index )
 	emit_op_reg_base_index( 0, 0x8B, reg, base, index, 1, 0 );
 }
 
-#if 0
+
 static void emit_load4_index_offset( uint32_t reg, uint32_t base, uint32_t index, int scale, int32_t offset )
 {
 	emit_op_reg_base_index( 0, 0x8B, reg, base, index, scale, offset );
@@ -871,11 +851,8 @@ static void emit_store_rx( uint32_t reg, uint32_t base, int32_t offset )
 	emit_op_reg_base_offset( 0, 0x89, reg, base, offset );
 }
 
-<<<<<<< HEAD
 #if 1
-=======
-#if 0
->>>>>>> origin/main
+
 static void emit_store_rx_offset( uint32_t reg, int32_t offset )
 {
 	emit_op_reg_offset( 0, 0x89, reg, offset );
@@ -1163,7 +1140,7 @@ static void emit_sar_rx( uint32_t reg )
 	Emit1( 0xF8 + ( reg & 7 ) );
 }
 
-#if 0
+
 static void emit_xchg_rx( uint32_t reg1, uint32_t reg2 )
 {
 	emit_op_reg( 0, 0x87, reg2, reg1 );
@@ -1216,7 +1193,7 @@ static void emit_load_sx_index( uint32_t reg, uint32_t base, uint32_t index )
 	emit_op_reg_base_index( 0x0F, 0x10, reg, base, index, 1, 0 );
 }
 
-#if 0
+
 static void emit_load_sx_index_offset( uint32_t reg, uint32_t base, uint32_t index, int scale, int32_t offset )
 {
 	Emit1( 0xF3 );
@@ -1256,7 +1233,7 @@ static void emit_div_sx( uint32_t dst, uint32_t src )
 	emit_op_reg( 0x0F, 0x5E, src, dst );
 }
 
-#if 0
+
 static void emit_add_sx_mem( uint32_t reg, uint32_t base, int32_t offset )
 {
 	Emit1( 0xF3 );
@@ -1901,7 +1878,7 @@ static void discard_top( void )
 	it->safe_arg = 0;
 }
 
-#if 0
+
 static int is_safe_arg( void )
 {
 #ifdef DEBUG_VM
@@ -2640,7 +2617,7 @@ static uint32_t load_rx_opstack( uint32_t pref )
 
 static void load_rx_opstack2( uint32_t *dst, uint32_t dst_pref, uint32_t *src, uint32_t src_pref )
 {
-#if 0
+
 	*dst = *src = load_rx_opstack( src_pref & ~RCONST ); // source, target = *opstack
 #else
 	*dst = *src = load_rx_opstack( src_pref | RCONST ); // source, target = *opstack
