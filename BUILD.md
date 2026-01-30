@@ -1,5 +1,10 @@
 ## Build Instructions
 
+## Toolchain Notes
+
+- CMake builds target C23 by default; use a modern compiler (GCC 15+, Clang 18+, or MSVC 2022).
+- Set `C_STANDARD_STRICT=OFF` to disable the strict warning set locally. CI uses strict warnings with warnings-as-errors.
+
 ### windows/msvc
 
 Install Visual Studio Community Edition 2017 or later and compile `quake3e` project from solution

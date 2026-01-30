@@ -37,6 +37,7 @@ Layer 3 audio
 #include <math.h>
 
 #include "l3.h"
+#include "mp3_local.h"
 
 /*===============================================================*/
 

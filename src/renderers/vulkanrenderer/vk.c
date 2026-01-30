@@ -276,9 +276,9 @@ static const char *vk_result_string( VkResult code ) {
 #undef CASE_STR
 
 #define VK_CHECK( function_call ) { \
-	VkResult res = function_call; \
-	if ( res < 0 ) { \
-		ri.Error( ERR_FATAL, "Vulkan: %s returned %s", #function_call, vk_result_string( res ) ); \
+	VkResult _res_ = function_call; \
+	if ( _res_ < 0 ) { \
+		ri.Error( ERR_FATAL, "Vulkan: %s returned %s", #function_call, vk_result_string( _res_ ) ); \
 	} \
 }
 
@@ -331,6 +331,7 @@ static VkCommandBuffer begin_command_buffer( void )
 
 static void end_command_buffer( VkCommandBuffer command_buffer, const char *location )
 {
+	(void)location;
 #ifdef USE_UPLOAD_QUEUE
 	const VkPipelineStageFlags wait_dst_stage_mask = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
 	VkSemaphore waits;
@@ -374,6 +375,7 @@ static void end_command_buffer( VkCommandBuffer command_buffer, const char *loca
 
 static void record_image_layout_transition( VkCommandBuffer command_buffer, VkImage image, VkImageAspectFlags image_aspect_flags, 
 	VkImageLayout old_layout, VkImageLayout new_layout, uint32_t src_stage_override, uint32_t dst_stage_override ) {
+	(void)dst_stage_override;
 	VkImageMemoryBarrier barrier;
 	uint32_t src_stage, dst_stage;
 
@@ -608,7 +610,7 @@ static void vk_create_swapchain( VkPhysicalDevice physical_device, VkDevice devi
 	vk.swapchain_image_count = MIN( vk.swapchain_image_count, MAX_SWAPCHAIN_IMAGES );
 	VK_CHECK( qvkGetSwapchainImagesKHR( vk.device, vk.swapchain, &vk.swapchain_image_count, vk.swapchain_images ) );
 
-	for ( i = 0; i < vk.swapchain_image_count; i++ ) {
+	for ( i = 0; (uint32_t) i < vk.swapchain_image_count; i++ ) {
 		view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 		view.pNext = NULL;
 		view.flags = 0;
@@ -631,7 +633,7 @@ static void vk_create_swapchain( VkPhysicalDevice physical_device, VkDevice devi
 		SET_OBJECT_NAME( vk.swapchain_image_views[i], va( "swapchain image %i", i ), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 	}
 
-	for ( i = 0; i < vk.swapchain_image_count; i++ ) {
+	for ( i = 0; (uint32_t) i < vk.swapchain_image_count; i++ ) {
 		VkSemaphoreCreateInfo s;
 		s.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 		s.pNext = NULL;
@@ -643,7 +645,7 @@ static void vk_create_swapchain( VkPhysicalDevice physical_device, VkDevice devi
 	if ( vk.initSwapchainLayout != VK_IMAGE_LAYOUT_UNDEFINED ) {
 		VkCommandBuffer command_buffer = begin_command_buffer();
 
-		for ( i = 0; i < vk.swapchain_image_count; i++ ) {
+		for ( i = 0; (uint32_t) i < vk.swapchain_image_count; i++ ) {
 			record_image_layout_transition( command_buffer, vk.swapchain_images[i],
 				VK_IMAGE_ASPECT_COLOR_BIT,
 				VK_IMAGE_LAYOUT_UNDEFINED, vk.initSwapchainLayout, 0, 0 );
@@ -1490,7 +1492,7 @@ static VkFormat get_depth_format( VkPhysicalDevice physical_device ) {
 		formats[1] = VK_FORMAT_D32_SFLOAT;
 	}
 
-	for ( i = 0; i < ARRAY_LEN( formats ); i++ ) {
+	for ( i = 0; (size_t) i < ARRAY_LEN( formats ); i++ ) {
 		qvkGetPhysicalDeviceFormatProperties( physical_device, formats[i], &props );
 		if ( ( props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT ) != 0 ) {
 			return formats[i];
@@ -1555,7 +1557,7 @@ static void get_present_format( int present_bits, VkFormat *bgr, VkFormat *rgb )
 
 	sel = NULL;
 	pf = present_formats;
-	for ( i = 0; i < ARRAY_LEN( present_formats ); i++, pf++ ) {
+	for ( i = 0; (size_t) i < ARRAY_LEN( present_formats ); i++, pf++ ) {
 		if ( pf->bits <= present_bits  ) {
 			sel = pf;
 		}
@@ -1946,23 +1948,35 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 
 
 #define INIT_INSTANCE_FUNCTION(func) \
-	q##func = /*(PFN_ ## func)*/ ri.VK_GetInstanceProcAddr(vk_instance, #func); \
-	if (q##func == NULL) {											\
-		ri.Error(ERR_FATAL, "Failed to find entrypoint %s", #func);	\
-	}
+	do { \
+		void *_sym = ri.VK_GetInstanceProcAddr( vk_instance, #func ); \
+		Com_Memcpy( &q##func, &_sym, sizeof( q##func ) ); \
+		if ( q##func == NULL ) { \
+			ri.Error( ERR_FATAL, "Failed to find entrypoint %s", #func ); \
+		} \
+	} while ( 0 );
 
 #define INIT_INSTANCE_FUNCTION_EXT(func) \
-	q##func = /*(PFN_ ## func)*/ ri.VK_GetInstanceProcAddr(vk_instance, #func);
+	do { \
+		void *_sym = ri.VK_GetInstanceProcAddr( vk_instance, #func ); \
+		Com_Memcpy( &q##func, &_sym, sizeof( q##func ) ); \
+	} while ( 0 );
 
 
 #define INIT_DEVICE_FUNCTION(func) \
-	q##func = (PFN_ ## func) qvkGetDeviceProcAddr(vk.device, #func);\
-	if (q##func == NULL) {											\
-		ri.Error(ERR_FATAL, "Failed to find entrypoint %s", #func);	\
-	}
+	do { \
+		PFN_vkVoidFunction _sym = qvkGetDeviceProcAddr( vk.device, #func ); \
+		Com_Memcpy( &q##func, &_sym, sizeof( q##func ) ); \
+		if ( q##func == NULL ) { \
+			ri.Error( ERR_FATAL, "Failed to find entrypoint %s", #func ); \
+		} \
+	} while ( 0 );
 
 #define INIT_DEVICE_FUNCTION_EXT(func) \
-	q##func = (PFN_ ## func) qvkGetDeviceProcAddr(vk.device, #func);
+	do { \
+		PFN_vkVoidFunction _sym = qvkGetDeviceProcAddr( vk.device, #func ); \
+		Com_Memcpy( &q##func, &_sym, sizeof( q##func ) ); \
+	} while ( 0 );
 
 
 static void vk_destroy_instance( void ) {
@@ -2072,7 +2086,7 @@ static void init_vulkan_library( void )
 	device_index = r_device->integer;
 
 	ri.Printf( PRINT_ALL, ".......................\nAvailable physical devices:\n" );
-	for ( i = 0; i < device_count; i++ ) {
+	for ( i = 0; (uint32_t) i < device_count; i++ ) {
 		qvkGetPhysicalDeviceProperties( physical_devices[ i ], &props );
 		ri.Printf( PRINT_ALL, " %i: %s\n", i, renderer_name( &props ) );
 		if ( device_index == -1 && props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ) {
@@ -2084,8 +2098,8 @@ static void init_vulkan_library( void )
 	ri.Printf( PRINT_ALL, ".......................\n" );
 
 	vk.physical_device = VK_NULL_HANDLE;
-	for ( i = 0; i < device_count; i++, device_index++ ) {
-		if ( device_index >= device_count || device_index < 0 ) {
+	for ( i = 0; (uint32_t) i < device_count; i++, device_index++ ) {
+		if ( device_index < 0 || (uint32_t)device_index >= device_count ) {
 			device_index = 0;
 		}
 		if ( vk_create_device( physical_devices[ device_index ], device_index ) ) {
@@ -2396,7 +2410,7 @@ static void vk_write_uniform_descriptor( VkWriteDescriptorSet *desc, VkDescripto
 	desc[binding].pTexelBufferView = NULL;
 }
 
-void vk_update_uniform_descriptor( VkDescriptorSet descriptor, VkBuffer buffer )
+static void vk_update_uniform_descriptor( VkDescriptorSet descriptor, VkBuffer buffer )
 {
 	VkDescriptorBufferInfo info[VK_DESC_UNIFORM_COUNT];
 	VkWriteDescriptorSet desc[VK_DESC_UNIFORM_COUNT];
@@ -2800,7 +2814,7 @@ static void vk_create_storage_buffer( uint32_t size )
 
 
 #ifdef USE_VBO
-void vk_release_vbo( void )
+static void vk_release_vbo( void )
 {
 	if ( vk.vbo.vertex_buffer )
 		qvkDestroyBuffer( vk.device, vk.vbo.vertex_buffer, NULL );
@@ -2858,10 +2872,10 @@ qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size )
 #endif
 	// utilize existing staging buffer
 	uploadDone = 0;
-	while ( uploadDone < vbo_size ) {
+	while ( uploadDone < (VkDeviceSize) vbo_size ) {
 		VkDeviceSize uploadSize = vk.staging_buffer.size;
-		if ( uploadDone + uploadSize > vbo_size ) {
-			uploadSize = vbo_size - uploadDone;
+		if ( uploadDone + uploadSize > (VkDeviceSize) vbo_size ) {
+			uploadSize = (VkDeviceSize) vbo_size - uploadDone;
 		}
 		memcpy(vk.staging_buffer.ptr + 0, vbo_data + uploadDone, uploadSize);
 		command_buffer = begin_command_buffer();
@@ -3803,17 +3817,17 @@ static void vk_create_attachments( void )
 
 static void vk_create_framebuffers( void )
 {
-	VkImageView attachments[3];
+	VkImageView framebuffer_attachments[3];
 	VkFramebufferCreateInfo desc;
 	uint32_t n;
 
 	desc.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 	desc.pNext = NULL;
 	desc.flags = 0;
-	desc.pAttachments = attachments;
+	desc.pAttachments = framebuffer_attachments;
 	desc.layers = 1;
 
-	for ( n = 0; n < vk.swapchain_image_count; n++ )
+	for ( n = 0; (uint32_t) n < vk.swapchain_image_count; n++ )
 	{
 		desc.renderPass = vk.render_pass.main;
 		desc.attachmentCount = 2;
@@ -3821,8 +3835,8 @@ static void vk_create_framebuffers( void )
 		{
 			desc.width = gls.windowWidth;
 			desc.height = gls.windowHeight;
-			attachments[0] = vk.swapchain_image_views[n];
-			attachments[1] = vk.depth_image_view;
+			framebuffer_attachments[0] = vk.swapchain_image_views[n];
+			framebuffer_attachments[1] = vk.depth_image_view;
 			VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.main[n] ) );
 
 			SET_OBJECT_NAME( vk.framebuffers.main[n], va( "framebuffer - main %i", n ), VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
@@ -3834,12 +3848,12 @@ static void vk_create_framebuffers( void )
 			{
 				desc.width = glConfig.vidWidth;
 				desc.height = glConfig.vidHeight;
-				attachments[0] = vk.color_image_view;
-				attachments[1] = vk.depth_image_view;
+				framebuffer_attachments[0] = vk.color_image_view;
+				framebuffer_attachments[1] = vk.depth_image_view;
 				if ( vk.msaaActive )
 				{
 					desc.attachmentCount = 3;
-					attachments[2] = vk.msaa_image_view;
+					framebuffer_attachments[2] = vk.msaa_image_view;
 				}
 				VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.main[n] ) );
 				SET_OBJECT_NAME( vk.framebuffers.main[n], "framebuffer - main", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
@@ -3854,7 +3868,7 @@ static void vk_create_framebuffers( void )
 			desc.attachmentCount = 1;
 			desc.width = gls.windowWidth;
 			desc.height = gls.windowHeight;
-			attachments[0] = vk.swapchain_image_views[n];
+			framebuffer_attachments[0] = vk.swapchain_image_views[n];
 			VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.gamma[n] ) );
 
 			SET_OBJECT_NAME( vk.framebuffers.gamma[n], "framebuffer - gamma-correction", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
@@ -3868,108 +3882,108 @@ static void vk_create_framebuffers( void )
 		desc.attachmentCount = 2;
 		desc.width = vk.screenMapWidth;
 		desc.height = vk.screenMapHeight;
-		attachments[0] = vk.screenMap.color_image_view;
-		attachments[1] = vk.screenMap.depth_image_view;
+		framebuffer_attachments[0] = vk.screenMap.color_image_view;
+		framebuffer_attachments[1] = vk.screenMap.depth_image_view;
 		if ( vk.screenMapSamples > VK_SAMPLE_COUNT_1_BIT )
 		{
 			desc.attachmentCount = 3;
-			attachments[2] = vk.screenMap.color_image_view_msaa;
+			framebuffer_attachments[2] = vk.screenMap.color_image_view_msaa;
 		}
 		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.screenmap ) );
 		SET_OBJECT_NAME( vk.framebuffers.screenmap, "framebuffer - screenmap", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
 
-#ifdef VK_CUBEMAP
-        if ( vk.cubemapActive )
-        {
-            // cubemap
-            desc.renderPass = vk.render_pass.cubemap;
-            desc.attachmentCount = 2;
-            desc.width = REF_CUBEMAP_SIZE;
-            desc.height = REF_CUBEMAP_SIZE;
-        
-            attachments[1] = vk.cubeMap.depth_image_view;
+	#ifdef VK_CUBEMAP
+	if ( vk.cubemapActive )
+	{
+		// cubemap
+		desc.renderPass = vk.render_pass.cubemap;
+		desc.attachmentCount = 2;
+		desc.width = REF_CUBEMAP_SIZE;
+		desc.height = REF_CUBEMAP_SIZE;
 
-            if ( vk.msaaActive )
-                desc.attachmentCount = 3;
+		framebuffer_attachments[1] = vk.cubeMap.depth_image_view;
 
-            for ( int j = 0; j < 6; j++  ) 
-            {
-                attachments[0] = vk.cubeMap.color_image_view[j+1];
+		if ( vk.msaaActive )
+			desc.attachmentCount = 3;
 
-                if ( vk.msaaActive ) {
-                    attachments[2] = vk.cubeMap.color_image_view_msaa[0];
-                }
-
-                VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.cubemap[j] ) );
-                SET_OBJECT_NAME( vk.framebuffers.cubemap[j], va( "framebuffer - cubemap face %d", j ), VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
-            } 
-        }
-#endif
-
-		if ( vk.capture.image != VK_NULL_HANDLE )
+		for ( int j = 0; j < 6; j++  ) 
 		{
-			attachments[0] = vk.capture.image_view;
+			framebuffer_attachments[0] = vk.cubeMap.color_image_view[j+1];
 
-			desc.renderPass = vk.render_pass.capture;
-			desc.pAttachments = attachments;
-			desc.attachmentCount = 1;
-			desc.width = gls.captureWidth;
-			desc.height = gls.captureHeight;
+			if ( vk.msaaActive ) {
+				framebuffer_attachments[2] = vk.cubeMap.color_image_view_msaa[0];
+			}
 
-			VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.capture ) );
-			SET_OBJECT_NAME( vk.framebuffers.capture, "framebuffer - capture", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
-		}
+			VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.cubemap[j] ) );
+			SET_OBJECT_NAME( vk.framebuffers.cubemap[j], va( "framebuffer - cubemap face %d", j ), VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+		} 
+	}
+	#endif
 
-		if ( r_bloom->integer )
+	if ( vk.capture.image != VK_NULL_HANDLE )
+	{
+		framebuffer_attachments[0] = vk.capture.image_view;
+
+		desc.renderPass = vk.render_pass.capture;
+		desc.pAttachments = framebuffer_attachments;
+		desc.attachmentCount = 1;
+		desc.width = gls.captureWidth;
+		desc.height = gls.captureHeight;
+
+		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.capture ) );
+		SET_OBJECT_NAME( vk.framebuffers.capture, "framebuffer - capture", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+	}
+
+	if ( r_bloom->integer )
+	{
+		uint32_t width = gls.captureWidth;
+		uint32_t height = gls.captureHeight;
+
+		// bloom color extraction
+		desc.renderPass = vk.render_pass.bloom_extract;
+		desc.width = width;
+		desc.height = height;
+
+		desc.attachmentCount = 1;
+		framebuffer_attachments[0] = vk.bloom_image_view[0];
+
+		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.bloom_extract ) );
+
+		SET_OBJECT_NAME( vk.framebuffers.bloom_extract, "framebuffer - bloom extraction", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+
+		for ( n = 0; n < ARRAY_LEN( vk.framebuffers.blur ); n += 2 )
 		{
-			uint32_t width = gls.captureWidth;
-			uint32_t height = gls.captureHeight;
+			width /= 2;
+			height /= 2;
 
-			// bloom color extraction
-			desc.renderPass = vk.render_pass.bloom_extract;
+			desc.renderPass = vk.render_pass.blur[n];
 			desc.width = width;
 			desc.height = height;
 
 			desc.attachmentCount = 1;
-			attachments[0] = vk.bloom_image_view[0];
 
-			VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.bloom_extract ) );
+			framebuffer_attachments[0] = vk.bloom_image_view[n+0+1];
+			VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.blur[n+0] ) );
 
-			SET_OBJECT_NAME( vk.framebuffers.bloom_extract, "framebuffer - bloom extraction", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+			framebuffer_attachments[0] = vk.bloom_image_view[n+1+1];
+			VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.blur[n+1] ) );
 
-			for ( n = 0; n < ARRAY_LEN( vk.framebuffers.blur ); n += 2 )
-			{
-				width /= 2;
-				height /= 2;
-
-				desc.renderPass = vk.render_pass.blur[n];
-				desc.width = width;
-				desc.height = height;
-
-				desc.attachmentCount = 1;
-
-				attachments[0] = vk.bloom_image_view[n+0+1];
-				VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.blur[n+0] ) );
-
-				attachments[0] = vk.bloom_image_view[n+1+1];
-				VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.blur[n+1] ) );
-
-				SET_OBJECT_NAME( vk.framebuffers.blur[n+0], va( "framebuffer - blur %i", n+0 ), VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
-				SET_OBJECT_NAME( vk.framebuffers.blur[n+1], va( "framebuffer - blur %i", n+1 ), VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
-			}
+			SET_OBJECT_NAME( vk.framebuffers.blur[n+0], va( "framebuffer - blur %i", n+0 ), VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+			SET_OBJECT_NAME( vk.framebuffers.blur[n+1], va( "framebuffer - blur %i", n+1 ), VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
 		}
+	}
 
-#ifdef VK_PBR_BRDFLUT
-        if( vk.pbrActive )
-		{
-            desc.renderPass = vk.render_pass.brdflut;
-            desc.width = desc.height = 512;  
-            desc.attachmentCount = 1;
-            attachments[0] = vk.brdflut_image_view;
-            VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.brdflut ) );
-            SET_OBJECT_NAME( vk.framebuffers.brdflut, va( "framebuffer - brdf LUT" ), VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
-        }
-#endif
+	#ifdef VK_PBR_BRDFLUT
+	if( vk.pbrActive )
+	{
+		desc.renderPass = vk.render_pass.brdflut;
+		desc.width = desc.height = 512;  
+		desc.attachmentCount = 1;
+		framebuffer_attachments[0] = vk.brdflut_image_view;
+		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.brdflut ) );
+		SET_OBJECT_NAME( vk.framebuffers.brdflut, va( "framebuffer - brdf LUT" ), VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+	}
+	#endif
 	}
 }
 
@@ -4116,7 +4130,7 @@ static void vk_destroy_framebuffers( void ) {
 static void vk_destroy_swapchain( void ) {
 	uint32_t i;
 
-	for ( i = 0; i < vk.swapchain_image_count; i++ ) {
+	for ( i = 0; (uint32_t) i < vk.swapchain_image_count; i++ ) {
 		if ( vk.swapchain_image_views[i] != VK_NULL_HANDLE ) {
 			qvkDestroyImageView( vk.device, vk.swapchain_image_views[i], NULL );
 			vk.swapchain_image_views[i] = VK_NULL_HANDLE;
@@ -4136,6 +4150,7 @@ static void vk_destroy_pipelines( qboolean resetCount );
 
 static void vk_restart_swapchain( const char *funcname, VkResult res )
 {
+	(void)res;
 	uint32_t i;
 
 #ifdef _DEBUG
@@ -4282,7 +4297,7 @@ void vk_initialize( void )
 	if ( /*vk.fboActive &&*/ vk.msaaActive ) {
 		VkSampleCountFlags mask = vkMaxSamples;
 		vkSamples = MAX( log2pad( r_ext_multisample->integer, 1 ), VK_SAMPLE_COUNT_2_BIT );
-		while ( vkSamples > mask )
+		while ( (VkSampleCountFlags)vkSamples > mask )
 				vkSamples >>= 1;
 		ri.Printf( PRINT_ALL, "...using %ix MSAA\n", vkSamples );
 	} else {
@@ -4304,25 +4319,25 @@ void vk_initialize( void )
 
 	// get memory size & defaults
 	{
-		VkPhysicalDeviceMemoryProperties props;
+		VkPhysicalDeviceMemoryProperties mem_props;
 		VkDeviceSize maxDedicatedSize = 0;
 		VkDeviceSize maxBARSize = 0;
-		qvkGetPhysicalDeviceMemoryProperties( vk.physical_device, &props );
-		for ( i = 0; i < props.memoryTypeCount; i++ ) {
-			if ( props.memoryTypes[i].propertyFlags == VK_MEMORY_HEAP_DEVICE_LOCAL_BIT ) {
-				maxDedicatedSize = props.memoryHeaps[props.memoryTypes[i].heapIndex].size;
+		qvkGetPhysicalDeviceMemoryProperties( vk.physical_device, &mem_props );
+		for ( i = 0; i < mem_props.memoryTypeCount; i++ ) {
+			if ( mem_props.memoryTypes[i].propertyFlags == VK_MEMORY_HEAP_DEVICE_LOCAL_BIT ) {
+				maxDedicatedSize = mem_props.memoryHeaps[mem_props.memoryTypes[i].heapIndex].size;
 			}
-			else if ( props.memoryTypes[i].propertyFlags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT ) {
-				if ( maxDedicatedSize == 0 || props.memoryHeaps[props.memoryTypes[i].heapIndex].size > maxDedicatedSize ) {
-					maxDedicatedSize = props.memoryHeaps[props.memoryTypes[i].heapIndex].size;
+			else if ( mem_props.memoryTypes[i].propertyFlags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT ) {
+				if ( maxDedicatedSize == 0 || mem_props.memoryHeaps[mem_props.memoryTypes[i].heapIndex].size > maxDedicatedSize ) {
+					maxDedicatedSize = mem_props.memoryHeaps[mem_props.memoryTypes[i].heapIndex].size;
 				}
 			}
-			if ( props.memoryTypes[i].propertyFlags == (VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) ) {
-				maxBARSize = props.memoryHeaps[props.memoryTypes[i].heapIndex].size;
+			if ( mem_props.memoryTypes[i].propertyFlags == (VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) ) {
+				maxBARSize = mem_props.memoryHeaps[mem_props.memoryTypes[i].heapIndex].size;
 			}
-			else if ( (props.memoryTypes[i].propertyFlags & (VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) == (VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) ) {
+			else if ( (mem_props.memoryTypes[i].propertyFlags & (VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) == (VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) ) {
 				if ( maxBARSize == 0 ) {
-					maxBARSize = props.memoryHeaps[props.memoryTypes[i].heapIndex].size;
+					maxBARSize = mem_props.memoryHeaps[mem_props.memoryTypes[i].heapIndex].size;
 				}
 			}
 		}
@@ -4508,7 +4523,7 @@ void vk_initialize( void )
 	{
 		VkDescriptorPoolSize pool_size[3];
 		VkDescriptorPoolCreateInfo desc;
-		uint32_t i, maxSets;
+		uint32_t j, maxSets;
 
 		pool_size[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		pool_size[0].descriptorCount = MAX_DRAWIMAGES + 1 + 1 + 1 + VK_NUM_BLOOM_PASSES * 2; // color, screenmap, bloom descriptors
@@ -4530,8 +4545,8 @@ void vk_initialize( void )
 		pool_size[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
 		pool_size[2].descriptorCount = 1;
 
-		for ( i = 0, maxSets = 0; i < ARRAY_LEN( pool_size ); i++ ) {
-			maxSets += pool_size[i].descriptorCount;
+		for ( j = 0, maxSets = 0; j < ARRAY_LEN( pool_size ); j++ ) {
+			maxSets += pool_size[j].descriptorCount;
 		}
 
 		desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -4941,11 +4956,11 @@ void vk_shutdown( refShutdownCode_t code )
 	vk_destroy_image_resources( &img->handle, &img->view );
 
 	for ( i = 0; i < tr.numCubemaps; i++ ) {
-		image_t *img = tr.cubemaps[ i ].prefiltered_image;
-		vk_destroy_image_resources( &img->handle, &img->view );
+		image_t *cubemap_img = tr.cubemaps[ i ].prefiltered_image;
+		vk_destroy_image_resources( &cubemap_img->handle, &cubemap_img->view );
 
-		img = tr.cubemaps[ i ].irradiance_image;
-		vk_destroy_image_resources( &img->handle, &img->view );
+		cubemap_img = tr.cubemaps[ i ].irradiance_image;
+		vk_destroy_image_resources( &cubemap_img->handle, &cubemap_img->view );
 
 		Com_Memset( &tr.cubemaps[ i ], 0, sizeof(cubemap_t) );
 	}
@@ -5174,14 +5189,14 @@ void vk_release_resources( void ) {
 
 	vk_wait_idle();
 
-	for (i = 0; i < vk_world.num_image_chunks; i++)
-		qvkFreeMemory(vk.device, vk_world.image_chunks[i].memory, NULL);
+	for ( i = 0; i < vk_world.num_image_chunks; i++ )
+		qvkFreeMemory( vk.device, vk_world.image_chunks[i].memory, NULL );
 
 	vk_clean_staging_buffer();
 
 	// vk_destroy_samplers();
 
-	for ( i = vk.pipelines_world_base; i < vk.pipelines_count; i++ ) {
+	for ( i = vk.pipelines_world_base; (uint32_t) i < vk.pipelines_count; i++ ) {
 		for ( j = 0; j < RENDER_PASS_COUNT; j++ ) {
 			if ( vk.pipelines[i].handle[j] != VK_NULL_HANDLE ) {
 				qvkDestroyPipeline( vk.device, vk.pipelines[i].handle[j], NULL );
@@ -5432,7 +5447,7 @@ void vk_upload_image_data( image_t *image, int x, int y, int width, int height, 
 
 		buffer_size += width * height * n;
 
-		if ( num_regions >= mipmaps || (width == 1 && height == 1) || num_regions >= ARRAY_LEN( regions ) )
+		if ( num_regions >= mipmaps || (width == 1 && height == 1) || (size_t) num_regions >= ARRAY_LEN( regions ) )
 			break;
 
 		x >>= 1;
@@ -5491,7 +5506,7 @@ void vk_upload_image_data( image_t *image, int x, int y, int width, int height, 
 	// final transition after upload comleted
 	record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
 #else
-	if ( vk.staging_buffer.size < buffer_size ) {
+	if ( vk.staging_buffer.size < (VkDeviceSize) buffer_size ) {
 		vk_alloc_staging_buffer( buffer_size );
 	}
 
@@ -7190,7 +7205,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	multisample_state.pNext = NULL;
 	multisample_state.flags = 0;
 
-	multisample_state.rasterizationSamples = (renderPassIndex == RENDER_PASS_SCREENMAP) ? vk.screenMapSamples : vkSamples;
+	multisample_state.rasterizationSamples = (renderPassIndex == RENDER_PASS_SCREENMAP) ? vk.screenMapSamples : (VkSampleCountFlagBits)vkSamples;
 
 	multisample_state.sampleShadingEnable = VK_FALSE;
 	multisample_state.minSampleShading = 1.0f;
@@ -7399,7 +7414,7 @@ static uint32_t vk_alloc_pipeline( const Vk_Pipeline_Def *def ) {
 }
 
 
-VkPipeline vk_gen_pipeline( uint32_t index ) {
+static VkPipeline vk_gen_pipeline( uint32_t index ) {
 	if ( index < vk.pipelines_count ) {
 		VK_Pipeline_t *pipeline = vk.pipelines + index;
 		const renderPass_t pass = vk.renderPassIndex;
@@ -7530,10 +7545,10 @@ static void get_scissor_rect(VkRect2D *r) {
 		if (r->offset.y < 0)
 			r->offset.y = 0;
 
-		if (r->offset.x + r->extent.width > glConfig.vidWidth)
-			r->extent.width = glConfig.vidWidth - r->offset.x;
-		if (r->offset.y + r->extent.height > glConfig.vidHeight)
-			r->extent.height = glConfig.vidHeight - r->offset.y;
+		if ( (uint32_t)r->offset.x + r->extent.width > (uint32_t)glConfig.vidWidth )
+			r->extent.width = (uint32_t)glConfig.vidWidth - r->offset.x;
+		if ( (uint32_t)r->offset.y + r->extent.height > (uint32_t)glConfig.vidHeight )
+			r->extent.height = (uint32_t)glConfig.vidHeight - r->offset.y;
 	}
 }
 
@@ -7899,8 +7914,8 @@ void vk_reset_descriptor( int index )
 void vk_update_descriptor( int index, VkDescriptorSet descriptor )
 {
 	if ( vk.cmd->descriptor_set.current[ index ] != descriptor ) {
-		vk.cmd->descriptor_set.start = ( index < vk.cmd->descriptor_set.start ) ? index : vk.cmd->descriptor_set.start;
-		vk.cmd->descriptor_set.end = ( index > vk.cmd->descriptor_set.end ) ? index : vk.cmd->descriptor_set.end;
+		vk.cmd->descriptor_set.start = ( (uint32_t)index < vk.cmd->descriptor_set.start ) ? (uint32_t)index : vk.cmd->descriptor_set.start;
+		vk.cmd->descriptor_set.end = ( (uint32_t)index > vk.cmd->descriptor_set.end ) ? (uint32_t)index : vk.cmd->descriptor_set.end;
 	}
 	vk.cmd->descriptor_set.current[ index ] = descriptor;
 }
@@ -8640,7 +8655,7 @@ void vk_read_pixels( byte *buffer, uint32_t width, uint32_t height )
 	// host_cached bit is desirable for fast reads
 	memory_reqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
 	alloc_info.memoryTypeIndex = find_memory_type2( memory_requirements.memoryTypeBits, memory_reqs, &memory_flags );
-	if ( alloc_info.memoryTypeIndex == ~0 ) {
+	if ( alloc_info.memoryTypeIndex == ~0U ) {
 		// try less explicit flags, without host_coherent
 		memory_reqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
 		alloc_info.memoryTypeIndex = find_memory_type2( memory_requirements.memoryTypeBits, memory_reqs, &memory_flags );
@@ -9323,7 +9338,7 @@ void vk_generate_cubemaps( cubemap_t *cube )
 	VkClearValue			clear_values[1];
 	VkCommandBuffer			command_buffer;
 
-	image_t		*cubemap;
+	image_t		*cubemap = NULL;
 	uint32_t	i, j;
 	filterDef	*def;
 
@@ -9342,7 +9357,12 @@ void vk_generate_cubemaps( cubemap_t *cube )
 		switch ( def->target ) {
 			case IRRADIANCE: cubemap = cube->irradiance_image; break;
 			case PREFILTEREDENV: cubemap = cube->prefiltered_image; break;
+			default: cubemap = NULL; break;
 		};
+		if ( !cubemap ) {
+			ri.Printf( PRINT_WARNING, "vk_generate_cubemaps: unknown target %d\n", def->target );
+			continue;
+		}
 
 		Com_Memset( clear_values, 0, sizeof( clear_values ) );
 		clear_values[0].color.float32[0] = 0.75f;

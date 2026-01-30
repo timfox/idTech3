@@ -153,7 +153,7 @@ void S_AdpcmEncode( short indata[], char outdata[], int len, struct adpcm_state 
 
 
 /* static */ void S_AdpcmDecode( const char indata[], short *outdata, int len, struct adpcm_state *state ) {
-    signed char *inp;		/* Input buffer pointer */
+    const signed char *inp;		/* Input buffer pointer */
     int outp;			/* output buffer pointer */
     int sign;			/* Current adpcm sign bit */
     int delta;			/* Current adpcm output value */
@@ -165,7 +165,7 @@ void S_AdpcmEncode( short indata[], char outdata[], int len, struct adpcm_state 
     int bufferstep;		/* toggle between inputbuffer/input */
 
     outp = 0;
-    inp = (signed char *)indata;
+    inp = (const signed char *)indata;
 
     valpred = state->sample;
     index = state->index;

@@ -83,7 +83,7 @@ static const char *SV_ExpandNewlines( const char *in ) {
 	int		l;
 
 	l = 0;
-	while ( *in && l < sizeof(string) - 3 ) {
+	while ( *in && (size_t) l < sizeof(string) - 3 ) {
 		if ( *in == '\n' ) {
 			string[l++] = '\\';
 			string[l++] = 'n';
@@ -426,6 +426,7 @@ Find or allocate a bucket for an address
 ================
 */
 static leakyBucket_t *SVC_BucketForAddress( const netadr_t *address, int burst, int period ) {
+	(void)burst;
 	static leakyBucket_t dummy = { 0 };
 	static int		start = 0;
 	const int		hash = SVC_HashForAddress( address );
@@ -467,7 +468,7 @@ static leakyBucket_t *SVC_BucketForAddress( const netadr_t *address, int burst, 
 		interval = now - bucket->rate.lastTime;
 
 		// Reclaim expired buckets
-		if ( bucket->type != NA_BAD && (unsigned)interval > ( bucket->rate.burst * period ) ) {
+		if ( bucket->type != NA_BAD && (unsigned)interval > (unsigned)( bucket->rate.burst * period ) ) {
 			if ( bucket->prev != NULL ) {
 				bucket->prev->next = bucket->next;
 			} else {

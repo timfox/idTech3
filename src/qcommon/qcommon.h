@@ -976,6 +976,8 @@ void		Com_MD5Init( void );
 int			Com_MD5Addr( const netadr_t *addr, int timestamp );
 
 qboolean	Com_CDKeyValidate( const char *key, const char *checksum );
+void		Com_ReadCDKey( const char *filename );
+void		Com_AppendCDKey( const char *filename );
 qboolean	Com_EarlyParseCmdLine( char *commandLine, char *con_title, int title_size, int *vid_xpos, int *vid_ypos );
 int			Com_Split( char *in, char **out, int outsz, int delim );
 
@@ -1142,6 +1144,10 @@ CLIENT / SERVER SYSTEMS
 //
 // client interface
 //
+int SV_Strlen( const char *str );
+void BotDrawDebugPolygons(void (*drawPoly)(int color, int numPoints, float *points), int value);
+
+int			CL_ScaledMilliseconds( void );
 void CL_Init( void );
 qboolean CL_Disconnect( qboolean showMainMenu );
 void CL_ResetOldGame( void );

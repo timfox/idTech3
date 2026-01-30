@@ -414,7 +414,7 @@ static const char *SV_FindCountry( const char *tld ) {
 	if ( *tld == '\0' )
 		return "Unknown Location";
 
-	for ( i = 0; i < ARRAY_LEN( tld_info ); i++ ) {
+	for ( i = 0; (size_t) i < ARRAY_LEN( tld_info ); i++ ) {
 		if ( !strcmp( tld, tld_info[i].tld ) ) {
 			return tld_info[i].country;
 		}
@@ -1617,7 +1617,7 @@ static void SV_VerifyPaks_f( client_t *cl ) {
 
 		nClientPaks = Cmd_Argc();
 
-		if ( nClientPaks > ARRAY_LEN( nClientChkSum ) )
+		if ( (size_t) nClientPaks > ARRAY_LEN( nClientChkSum ) )
 			nClientPaks = ARRAY_LEN( nClientChkSum );
 
 		// start at arg 2 ( skip serverId cl_paks )
@@ -1875,7 +1875,6 @@ static void SV_UpdateUserinfo_f( client_t *cl ) {
 	VM_Call( gvm, 1, GAME_CLIENT_USERINFO_CHANGED, cl - svs.clients );
 }
 
-extern int SV_Strlen( const char *str );
 
 /*
 ==================
@@ -1931,7 +1930,7 @@ void SV_PrintLocations_f( client_t *client ) {
 		len = Com_sprintf( line, sizeof( line ), "%2i %s%-*s" S_COLOR_WHITE " %2s %s\n",
 			i, cl->name, max_namelength-SV_Strlen(cl->name), "", cl->tld, cl->country );
 
-		if ( s - buf + len >= sizeof( buf )-1 ) // flush accumulated buffer
+		if ( (size_t)( s - buf + len ) >= sizeof( buf )-1 ) // flush accumulated buffer
 		{
 			if ( client )
 				NET_OutOfBandPrint( NS_SERVER, &client->netchan.remoteAddress, "print\n%s", buf );

@@ -36,7 +36,8 @@ SV_Netchan_Encode
 static void SV_Netchan_Encode(client_t *client, msg_t *msg, const char *clientCommandString)
 {
 	long i, index;
-	byte key, *string;
+	byte key;
+	const byte *string;
 	int	srdc, sbit;
 	qboolean soob;
 
@@ -58,7 +59,7 @@ static void SV_Netchan_Encode(client_t *client, msg_t *msg, const char *clientCo
 	msg->bit = sbit;
 	msg->readcount = srdc;
 
-	string = (byte *) clientCommandString;
+	string = (const byte *) clientCommandString;
 	index = 0;
 	// xor the client challenge with the netchan sequence number
 	key = client->challenge ^ client->netchan.outgoingSequence;

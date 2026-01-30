@@ -30,6 +30,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef SVN_VERSION
   #define SVN_VERSION Q3_VERSION
 #endif
+
+#include "q_compat.h"
 #define CLIENT_WINDOW_TITLE   "id Tech 3"
 #define CONSOLE_WINDOW_TITLE  "id Tech 3 Console"
 // 1.32 released 7-10-2002
@@ -98,7 +100,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define Q_EXPORT __declspec(dllexport)
 #elif (defined __SUNPRO_C)
 #define Q_EXPORT __global
-#elif ((__GNUC__ >= 3) && (!__EMX__) && (!sun))
+#elif ((__GNUC__ >= 3) && !defined(__EMX__) && !defined(sun))
 #define Q_EXPORT __attribute__((visibility("default")))
 #else
 #define Q_EXPORT
@@ -255,7 +257,6 @@ typedef int		clipHandle_t;
 
 #define	MAX_UINT			((unsigned)(~0))
 
-#define ARRAY_LEN(x)		(sizeof(x) / sizeof(*(x)))
 #define STRARRAY_LEN(x)		(ARRAY_LEN(x) - 1)
 
 // angle indexes
@@ -848,7 +849,7 @@ void	Q_strcat( char *dest, int size, const char *src );
 int     Q_replace( const char *str1, const char *str2, char *src, int max_len );
 
 char	*Q_stradd( char *dst, const char *src );
-char	*Q_strncpy( char *dest, char *src, int destsize );
+char	*Q_strncpy( char *dest, const char *src, int destsize );
 
 // strlen that discounts Quake color sequences
 int Q_PrintStrlen( const char *string );
@@ -872,6 +873,21 @@ typedef struct
 	byte	b6;
 	byte	b7;
 } qint64;
+
+void CopyShortSwap( void *dest, void *src );
+void CopyLongSwap( void *dest, void *src );
+
+short ShortNoSwap( short l );
+int LongNoSwap( int l );
+qint64 Long64Swap( qint64 ll );
+qint64 Long64NoSwap( qint64 ll );
+float FloatNoSwap( const float *f );
+
+unsigned int crc32_buffer( const byte *buf, unsigned int len );
+
+int Com_Split( char *in, char **out, int outsz, int delim );
+int Com_HexStrToInt( const char *str );
+qboolean Com_GetHashColor( const char *str, byte *color );
 
 //=============================================
 /*

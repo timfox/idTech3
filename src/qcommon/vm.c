@@ -563,6 +563,8 @@ intptr_t QDECL VM_DllSyscall( intptr_t arg, ... ) {
 
 static void VM_SwapLongs( void *data, int length )
 {
+	(void)data;
+	(void)length;
 #ifndef Q3_LITTLE_ENDIAN
 	int32_t *ptr;
 	int i;
@@ -600,7 +602,7 @@ static int Load_JTS( vm_t *vm, uint32_t crc32, void *data, int vmPakIndex ) {
 		return -1;
 	}
 
-	if ( length < sizeof( header ) ) {
+	if ( (size_t) length < sizeof( header ) ) {
 		if ( data )
 			Com_Printf( " bad filesize %i for %s.\n", length, filename );
 		FS_FCloseFile( fh );
@@ -660,7 +662,7 @@ static char *VM_ValidateHeader( vmHeader_t *header, int fileSize )
 	int n;
 
 	// truncated
-	if ( fileSize < ( sizeof( vmHeader_t ) - sizeof( int32_t ) ) ) {
+	if ( (size_t) fileSize < ( sizeof( vmHeader_t ) - sizeof( int32_t ) ) ) {
 		sprintf( errMsg, "truncated image header (%i bytes long)", fileSize );
 		return errMsg;
 	}
@@ -672,7 +674,7 @@ static char *VM_ValidateHeader( vmHeader_t *header, int fileSize )
 	}
 
 	// truncated
-	if ( fileSize < sizeof( vmHeader_t ) && LittleLong( header->vmMagic ) != VM_MAGIC_VER2 ) {
+	if ( (size_t) fileSize < sizeof( vmHeader_t ) && LittleLong( header->vmMagic ) != VM_MAGIC_VER2 ) {
 		sprintf( errMsg, "truncated image header (%i bytes long)", fileSize );
 		return errMsg;
 	}
@@ -1113,10 +1115,10 @@ const char *VM_LoadInstructions( const byte *code_pos, int codeLength, int instr
 		code_pos++;
 		ci->op = op0;
 		if ( n == 4 ) {
-			ci->value = LittleLong( *((int32_t*)code_pos) );
+			ci->value = LittleLong( *((const int32_t*)code_pos) );
 			code_pos += 4;
 		} else if ( n == 1 ) {
-			ci->value = *((unsigned char*)code_pos);
+			ci->value = *((const unsigned char*)code_pos);
 			code_pos += 1;
 		} else {
 			ci->value = 0;
@@ -1705,6 +1707,8 @@ static void * QDECL VM_LoadDll( const char *name, vmMainFunc_t *entryPoint, dllS
 	char		filename[ MAX_QPATH ];
 	void		*libHandle;
 	dllEntry_t	dllEntry;
+	void		*sym;
+	void		*vmMainAddr;
 
 	Com_sprintf( filename, sizeof( filename ), "%s" ARCH_STRING DLL_EXT, name );
 
@@ -1717,14 +1721,19 @@ static void * QDECL VM_LoadDll( const char *name, vmMainFunc_t *entryPoint, dllS
 
 	Com_Printf( "VM_LoadDLL '%s' ok\n", filename );
 
-	dllEntry = /* ( dllEntry_t ) */ Sys_LoadFunction( libHandle, "dllEntry" );
-	*entryPoint = /* ( dllSyscall_t ) */ Sys_LoadFunction( libHandle, "vmMain" );
+	sym = Sys_LoadFunction( libHandle, "dllEntry" );
+	Com_Memcpy( &dllEntry, &sym, sizeof( dllEntry ) );
+
+	sym = Sys_LoadFunction( libHandle, "vmMain" );
+	Com_Memcpy( entryPoint, &sym, sizeof( *entryPoint ) );
 	if ( !*entryPoint || !dllEntry ) {
 		Sys_UnloadLibrary( libHandle );
 		return NULL;
 	}
 
-	Com_Printf( "VM_LoadDll(%s) found **vmMain** at %p\n", name, *entryPoint );
+	vmMainAddr = NULL;
+	Com_Memcpy( &vmMainAddr, entryPoint, sizeof( vmMainAddr ) );
+	Com_Printf( "VM_LoadDll(%s) found **vmMain** at %p\n", name, vmMainAddr );
 	dllEntry( systemcalls );
 	Com_Printf( "VM_LoadDll(%s) succeeded!\n", name );
 
@@ -2003,10 +2012,10 @@ intptr_t QDECL VM_Call( vm_t *vm, int nargs, int callnum, ... )
 //=================================================================
 
 static int QDECL VM_ProfileSort( const void *a, const void *b ) {
-	vmSymbol_t	*sa, *sb;
+	const vmSymbol_t	*sa, *sb;
 
-	sa = *(vmSymbol_t **)a;
-	sb = *(vmSymbol_t **)b;
+	sa = *(const vmSymbol_t * const *)a;
+	sb = *(const vmSymbol_t * const *)b;
 
 	if ( sa->profileCount < sb->profileCount ) {
 		return -1;
@@ -2139,6 +2148,7 @@ Insert calls to this while debugging the vm compiler
 ===============
 */
 void VM_LogSyscalls( int *args ) {
+	(void)args;
 #if 0
 	static	int		callnum;
 	static	FILE	*f;

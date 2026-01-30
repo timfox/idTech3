@@ -4371,6 +4371,7 @@ static void AAS_StoreReachability(void)
 //===========================================================================
 int AAS_ContinueInitReachability(float time)
 {
+	(void)time;
 	int i, j, todo, start_time;
 	static float framereachability, reachability_delay;
 	static int lastpercentage;

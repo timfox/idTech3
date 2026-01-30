@@ -301,7 +301,7 @@ char *Com_MD5File( const char *fn, int length, const char *prefix, int prefix_le
 	MD5Init( &md5 );
 
 	if ( prefix_len && *prefix )
-		MD5Update( &md5, (unsigned char *)prefix, prefix_len );
+		MD5Update( &md5, (const unsigned char *)prefix, prefix_len );
 
 	for ( ;; ) {
 		r = FS_Read( buffer, sizeof( buffer ), f );
@@ -311,14 +311,14 @@ char *Com_MD5File( const char *fn, int length, const char *prefix, int prefix_le
 			r = length - total;
 		total += r;
 		MD5Update( &md5 , buffer, r );
-		if ( r < sizeof( buffer ) || total >= length )
+		if ( (size_t) r < sizeof( buffer ) || total >= length )
 			break;
 	}
 	FS_FCloseFile( f );
 	MD5Final( &md5, digest );
 
 	final[0] = '\0';
-	for ( i = 0; i < sizeof( digest ); i++ ) {
+	for ( i = 0; (size_t) i < sizeof( digest ); i++ ) {
 		Q_strcat( final, sizeof( final ), va( "%02X", digest[i] & 0xFF ) );
 	}
 
@@ -336,15 +336,15 @@ char *Com_MD5Buf( const char *data, int length, const char *data2, int length2 )
 	MD5Init( &md5 );
 
 	if ( data && length > 0 )
-		MD5Update( &md5 , (unsigned char *)data, length );
+		MD5Update( &md5 , (const unsigned char *)data, length );
 
 	if (data2 && length2 > 0)
-		MD5Update( &md5 , (unsigned char *)data2, length2 );
+		MD5Update( &md5 , (const unsigned char *)data2, length2 );
 
 	MD5Final( &md5, digest );
 
 	final_buf[0] = '\0';
-	for ( i = 0; i < sizeof( digest ); i++ ) {
+	for ( i = 0; (size_t) i < sizeof( digest ); i++ ) {
 		Q_strcat( final_buf, sizeof( final_buf ), va( "%02X", digest[i] & 0xFF ) );
 	}
 
@@ -404,7 +404,7 @@ int Com_MD5Addr( const netadr_t *addr, int timestamp )
 			break;
 	}
 
-	MD5Update( &ctx_in, (byte*)&addr->port, sizeof( addr->port ) );
+	MD5Update( &ctx_in, (const byte*)&addr->port, sizeof( addr->port ) );
 	MD5Update( &ctx_in, (byte*)&timestamp, sizeof( timestamp ) );
 	MD5Final( &ctx_in, digest.b );
 

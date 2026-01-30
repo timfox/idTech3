@@ -1,0 +1,38 @@
+#ifndef Q_COMPAT_H
+#define Q_COMPAT_H
+
+#ifndef Q3_VM
+#include <stdbool.h>
+#include <stddef.h>
+#endif
+
+#ifndef STATIC_ASSERT
+#  define STATIC_ASSERT(cond, msg) _Static_assert((cond), msg)
+#endif
+
+#ifndef ARRAY_LEN
+#  define ARRAY_LEN(x) (sizeof(x) / sizeof((x)[0]))
+#endif
+
+#if defined(__has_attribute)
+#  if __has_attribute(fallthrough)
+#    define FALLTHROUGH __attribute__((fallthrough))
+#  else
+#    define FALLTHROUGH ((void)0)
+#  endif
+#else
+#  define FALLTHROUGH ((void)0)
+#endif
+
+#if defined(__GNUC__) || defined(__clang__)
+#  define LIKELY(x) (__builtin_expect(!!(x), 1))
+#  define UNLIKELY(x) (__builtin_expect(!!(x), 0))
+#else
+#  define LIKELY(x) (x)
+#  define UNLIKELY(x) (x)
+#endif
+
+#define Q_MIN(a, b) ((a) < (b) ? (a) : (b))
+#define Q_MAX(a, b) ((a) > (b) ? (a) : (b))
+
+#endif // Q_COMPAT_H

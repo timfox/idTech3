@@ -470,7 +470,7 @@ static int PC_StringizeTokens( const token_t *tokens, token_t *token )
 	for (t = tokens; t; t = t->next)
 	{
 		len = (int)strlen( t->string );
-		if ( len + total >= sizeof( token->string ) - 1 ) // reserve space for '"' and '\0'
+		if ( (size_t) len + total >= sizeof( token->string ) - 1 ) // reserve space for '"' and '\0'
 			return qfalse;
 		strcpy( token->string + total, t->string );
 		total += len;
@@ -1462,6 +1462,7 @@ void PC_RemoveAllGlobalDefines(void)
 //============================================================================
 static define_t *PC_CopyDefine(source_t *source, const define_t *define)
 {
+	(void)source;
 	define_t *newdefine;
 	token_t *token, *newtoken, *lasttoken;
 
@@ -1881,6 +1882,7 @@ static int PC_EvaluateTokens(source_t *source, token_t *tokens, int *intvalue, f
 							negativevalue = 1;
 							break;
 						} //end if
+						FALLTHROUGH;
 					} //end case
 					
 					case P_MUL:

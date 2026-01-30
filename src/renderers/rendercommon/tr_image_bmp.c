@@ -21,6 +21,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "../../qcommon/q_shared.h"
+#include "tr_image_loaders.h"
+#include "tr_fs_compat.h"
 #include "tr_public.h"
 
 typedef struct
@@ -70,7 +72,7 @@ void R_LoadBMP( const char *name, byte **pic, int *width, int *height )
 	//
 	// load the file
 	//
-	length = ri.FS_ReadFile( ( char * ) name, &buffer.v);
+	length = FS_ReadFileConst( name, &buffer.v );
 	if (!buffer.b || length < 0) {
 		return;
 	}

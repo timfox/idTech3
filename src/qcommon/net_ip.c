@@ -20,6 +20,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 
+#if !defined(_GNU_SOURCE)
+#	define _GNU_SOURCE
+#endif
+#if !defined(_POSIX_C_SOURCE)
+#	define _POSIX_C_SOURCE 200809L
+#endif
+
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
 
@@ -70,7 +77,7 @@ static qboolean	winsockInitialized = qfalse;
 
 #else // !_WIN32
 
-#	if MAC_OS_X_VERSION_MIN_REQUIRED == 1020
+#	if defined(__APPLE__) && defined(MAC_OS_X_VERSION_MIN_REQUIRED) && MAC_OS_X_VERSION_MIN_REQUIRED == 1020
 		// needed for socklen_t on OSX 10.2
 #		define _BSD_SOCKLEN_T_
 #	endif
@@ -156,7 +163,7 @@ typedef union socks5_udp_request_s {
 
 
 static qboolean usingSocks = qfalse;
-static int networkingEnabled = 0;
+static qboolean networkingEnabled = qfalse;
 
 static cvar_t	*net_enabled;
 
@@ -416,7 +423,7 @@ static qboolean Sys_StringToSockaddr( const char *s, sockaddr_t *sadr, int sadr_
 
 		if ( search )
 		{
-			size_t addrlen = MIN( search->ai_addrlen, sadr_len );
+			size_t addrlen = MIN( search->ai_addrlen, (socklen_t) sadr_len );
 
 			memcpy ( sadr, search->ai_addr, addrlen );
 			freeaddrinfo( res );
@@ -801,7 +808,7 @@ void Sys_SendPacket( int length, const void *data, const netadr_t *to ) {
 	if ( usingSocks && to->type == NA_IP ) {
 		socks5_udp_request_t cmd;
 
-		if ( length <= sizeof( cmd.s.u.v4.data ) ) {
+		if ( (size_t) length <= sizeof( cmd.s.u.v4.data ) ) {
 			cmd.s.reserved[0] = 0;
 			cmd.s.reserved[1] = 0;
 			cmd.s.fragnum = 0;  // not fragmented

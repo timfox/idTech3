@@ -23,7 +23,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vm_local.h"
 
 
-char *VM_Indent( vm_t *vm ) {
+#if 0
+static char *VM_Indent( vm_t *vm ) {
 	static char	*string = "                                        ";
 	if ( vm->callLevel > 20 ) {
 		return string;
@@ -32,7 +33,7 @@ char *VM_Indent( vm_t *vm ) {
 }
 
 
-void VM_StackTrace( vm_t *vm, int programCounter, int programStack ) {
+static void VM_StackTrace( vm_t *vm, int programCounter, int programStack ) {
 	int		count;
 
 	count = 0;
@@ -43,6 +44,7 @@ void VM_StackTrace( vm_t *vm, int programCounter, int programStack ) {
 	} while ( programCounter != -1 && ++count < 32 );
 
 }
+#endif
 
 // macro opcode sequences
 typedef enum {
@@ -239,7 +241,7 @@ nextInstruction2:
 			// check for leaving the VM
 			if ( v1 == -1 ) {
 				goto done;
-			} else if ( (unsigned)v1 >= vm->instructionCount ) {
+			} else if ( (unsigned)v1 >= (unsigned)vm->instructionCount ) {
 				Com_Error( ERR_DROP, "VM program counter out of range in OP_LEAVE" );
 			}
 			ci = inst + v1;
@@ -262,7 +264,7 @@ nextInstruction2:
 					// longs so we have to convert it
 					intptr_t argarr[16];
 					int argn;
-					for ( argn = 0; argn < ARRAY_LEN( argarr ); ++argn ) {
+					for ( argn = 0; (size_t) argn < ARRAY_LEN( argarr ); ++argn ) {
 						argarr[ argn ] = *(int32_t*)&image[ programStack + 4 + 4*argn ];
 					}
 					v0 = vm->systemCall( &argarr[0] );
@@ -275,7 +277,7 @@ nextInstruction2:
 				//opStack++;
 				ci = inst + *(int32_t *)&image[ programStack ];
 				*opStack = v0;
-			} else if ( r0.u < vm->instructionCount ) {
+			} else if ( r0.u < (unsigned)vm->instructionCount ) {
 				// vm call
 				ci = inst + r0.i;
 				opStack--;
@@ -306,7 +308,7 @@ nextInstruction2:
 			goto nextInstruction2;
 
 		case OP_JUMP:
-			if ( r0.u >= vm->instructionCount ) {
+			if ( r0.u >= (unsigned)vm->instructionCount ) {
 				Com_Error( ERR_DROP, "VM program counter out of range in OP_JUMP" );
 			}
 			ci = inst + r0.i;

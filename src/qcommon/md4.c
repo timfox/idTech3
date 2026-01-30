@@ -121,7 +121,7 @@ static void copy4(byte *out,uint32_t x)
 	out[3] = (x>>24)&0xFF;
 }
 
-void mdfour_begin(struct mdfour *md)
+static void mdfour_begin(struct mdfour *md)
 {
 	md->A = 0x67452301;
 	md->B = 0xefcdab89;
@@ -201,7 +201,7 @@ unsigned Com_BlockChecksum (const void *buffer, int length)
 	int				digest[4];
 	unsigned	val;
 
-	mdfour( (byte *)digest, (byte *)buffer, length );
+	mdfour( (byte *)digest, (const byte *)buffer, length );
 	
 	val = digest[0] ^ digest[1] ^ digest[2] ^ digest[3];
 

@@ -215,6 +215,7 @@ static qboolean ReadChar(source_t *source, const fielddef_t *fd, void *p)
 //===========================================================================
 static int ReadString(source_t *source, const fielddef_t *fd, void *p)
 {
+	(void)fd;
 	token_t token;
 
 	if (!PC_ExpectTokenType(source, TT_STRING, 0, &token)) return 0;
@@ -369,7 +370,7 @@ int WriteFloat(FILE *fp, float value)
 static int WriteStructWithIndent(FILE *fp, const structdef_t *def, const char *structure, int indent)
 {
 	int i, num;
-	void *p;
+	const void *p;
 	const fielddef_t *fd;
 
 	if (!WriteIndent(fp, indent)) return qfalse;
@@ -381,7 +382,7 @@ static int WriteStructWithIndent(FILE *fp, const structdef_t *def, const char *s
 		fd = &def->fields[i];
 		if (!WriteIndent(fp, indent)) return qfalse;
 		if (fprintf(fp, "%s\t", fd->name) < 0) return qfalse;
-		p = (void *)(structure + fd->offset);
+		p = (const void *)(structure + fd->offset);
 		if (fd->type & FT_ARRAY)
 		{
 			num = fd->maxarray;
@@ -397,32 +398,32 @@ static int WriteStructWithIndent(FILE *fp, const structdef_t *def, const char *s
 			{
 				case FT_CHAR:
 				{
-					if (fprintf(fp, "%d", *(char *) p) < 0) return qfalse;
-					p = (char *) p + sizeof(char);
+					if (fprintf(fp, "%d", *(const char *) p) < 0) return qfalse;
+					p = (const char *) p + sizeof(char);
 					break;
 				} //end case
 				case FT_INT:
 				{
-					if (fprintf(fp, "%d", *(int *) p) < 0) return qfalse;
-					p = (char *) p + sizeof(int);
+					if (fprintf(fp, "%d", *(const int *) p) < 0) return qfalse;
+					p = (const char *) p + sizeof(int);
 					break;
 				} //end case
 				case FT_FLOAT:
 				{
-					if (!WriteFloat(fp, *(float *)p)) return qfalse;
-					p = (char *) p + sizeof(float);
+					if (!WriteFloat(fp, *(const float *)p)) return qfalse;
+					p = (const char *) p + sizeof(float);
 					break;
 				} //end case
 				case FT_STRING:
 				{
-					if (fprintf(fp, "\"%s\"", (char *) p) < 0) return qfalse;
-					p = (char *) p + MAX_STRINGFIELD;
+					if (fprintf(fp, "\"%s\"", (const char *) p) < 0) return qfalse;
+					p = (const char *) p + MAX_STRINGFIELD;
 					break;
 				} //end case
 				case FT_STRUCT:
 				{
 					if (!WriteStructWithIndent(fp, fd->substruct, structure, indent)) return qfalse;
-					p = (char *) p + fd->substruct->size;
+					p = (const char *) p + fd->substruct->size;
 					break;
 				} //end case
 			} //end switch

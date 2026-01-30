@@ -29,6 +29,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../../client/client.h"
 #include "sdl_glw.h"
 
+void IN_Frame( void );
+
 static cvar_t *in_keyboardDebug;
 static cvar_t *in_forceCharset;
 

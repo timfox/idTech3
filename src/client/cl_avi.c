@@ -375,7 +375,6 @@ qboolean CL_OpenAVIForWriting( const char *fileName, qboolean pipe, qboolean reo
 	if ( pipe )
 	{
 		char cmd[MAX_OSPATH * 4];
-		const char *cmd_fmt = "ffmpeg -f avi -i - -threads 0 -y %s \"%s\" 2> \"%s-log.txt\"";
 		const char *ospath;
 
 		if ( !CL_ValidatePipeFormat( cl_aviPipeFormat->string ) ) {
@@ -384,7 +383,8 @@ qboolean CL_OpenAVIForWriting( const char *fileName, qboolean pipe, qboolean reo
 		}
 
 		ospath = FS_BuildOSPath( Cvar_VariableString( "fs_homepath" ), "", fileName );
-		Com_sprintf( cmd, sizeof( cmd ), cmd_fmt, cl_aviPipeFormat->string, ospath, ospath );
+		Com_sprintf( cmd, sizeof( cmd ), "ffmpeg -f avi -i - -threads 0 -y %s \"%s\" 2> \"%s-log.txt\"",
+			cl_aviPipeFormat->string, ospath, ospath );
 		if ( (afd.f = FS_PipeOpenWrite( cmd, fileName )) == FS_INVALID_HANDLE )
 			return qfalse;
 	}
