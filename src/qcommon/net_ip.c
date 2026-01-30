@@ -429,7 +429,7 @@ static qboolean Sys_StringToSockaddr( const char *s, sockaddr_t *sadr, int sadr_
 
 		if ( search )
 		{
-			size_t addrlen = MIN( search->ai_addrlen, (socklen_t) sadr_len );
+			size_t addrlen = MIN( (size_t)search->ai_addrlen, (size_t)sadr_len );
 
 			memcpy ( sadr, search->ai_addr, addrlen );
 			freeaddrinfo( res );

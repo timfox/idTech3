@@ -4990,8 +4990,6 @@ static void FS_CheckIdPaks( void )
 }
 #endif
 
-static void FS_CheckIdPaks( void ) {}
-
 /*
 =====================
 FS_LoadedPakChecksums
