@@ -82,23 +82,7 @@ static qboolean	winsockInitialized = qfalse;
 #		define _BSD_SOCKLEN_T_
 #	endif
 
-#ifndef IFF_UP
-#define IFF_UP 0x1
-#endif
 
-#ifdef USE_IPV6
-// Provide fallback for ipv6_mreq struct on systems that lack it
-// Use a guard to prevent redefinition if already provided by system headers
-#if defined(__sun) || defined(__sgi) || (defined(__linux__) && !defined(IPV6_JOIN_GROUP))
-#ifndef IPV6_MREQ_DEFINED
-#define IPV6_MREQ_DEFINED
-struct ipv6_mreq {
-	struct in6_addr ipv6mr_multiaddr;
-	unsigned int ipv6mr_interface;
-};
-#endif
-#endif
-#endif
 
 #	include <sys/socket.h>
 #	include <errno.h>
@@ -117,6 +101,10 @@ struct ipv6_mreq {
 #	ifdef __sun
 #		include <sys/filio.h>
 #	endif
+
+#ifndef IFF_UP
+#define IFF_UP 0x1
+#endif
 
 typedef int SOCKET;
 #	define INVALID_SOCKET		-1
