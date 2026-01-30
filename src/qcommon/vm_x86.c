@@ -384,7 +384,6 @@ static void emit_modrm_offset( uint32_t reg, int32_t offset )
 	Emit4( offset );
 }
 #endif
-#endif
 
  // reg <-> [base + offset]
 static void emit_modrm_base_offset( uint32_t reg, uint32_t base, int32_t offset )
