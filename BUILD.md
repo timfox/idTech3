@@ -2,8 +2,28 @@
 
 ## Toolchain Notes
 
-- CMake builds target C23 by default; use a modern compiler (GCC 15+, Clang 18+, or MSVC 2022).
-- Set `C_STANDARD_STRICT=OFF` to disable the strict warning set locally. CI uses strict warnings with warnings-as-errors.
+### C23 Modernization
+
+This engine has been modernized to use C23 language features while maintaining full backward compatibility. See `docs/C23.md` for detailed information about C23 features, compatibility requirements, and migration strategy.
+
+**C23 Compiler Requirements:**
+- **GCC**: 15.0+ with C23 support (`-std=c23`)
+- **Clang**: 18.0+ with C23 support (`-std=c23`)
+- **MSVC**: 2022+ (Visual Studio 17.0+) with C23 features
+
+**Key C23 Features Used:**
+- Static assertions (`_Static_assert`)
+- Modern variadic macros (`__VA_OPT__`)
+- Boolean types (`<stdbool.h>`)
+- Designated initializers
+- Enhanced error checking and safety
+
+### Build Configuration
+
+- CMake builds target C23 by default with strict warning enforcement
+- Set `C_STANDARD_STRICT=OFF` to disable strict warnings locally
+- CI uses strict warnings with `-Werror` (warnings as errors)
+- All builds include comprehensive compatibility fallbacks
 
 ### windows/msvc
 
