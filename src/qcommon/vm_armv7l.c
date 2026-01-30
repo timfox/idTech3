@@ -161,13 +161,13 @@ void __aeabi_uidivmod(void);
 #define DROP( reason, ... ) \
 	do { \
 		VM_FreeBuffers(); \
-		Com_Error( ERR_DROP, "%s: " reason, __func__, __VA_ARGS__ ); \
+		Com_Error( ERR_DROP, "%s: " reason, __func__, ##__VA_ARGS__ ); \
 	} while(0)
 #else
-#define DROP( reason, args... ) \
+#define DROP( reason, ... ) \
 	do { \
 		VM_FreeBuffers(); \
-		Com_Error( ERR_DROP, "%s: " reason, __func__, ##args ); \
+		Com_Error( ERR_DROP, "%s: " reason, __func__, ##__VA_ARGS__ ); \
 	} while(0)
 #endif
 

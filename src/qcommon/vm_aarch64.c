@@ -47,6 +47,15 @@ struct ipv6_mreq {
 };
 #endif
 
+// MAP_ANONYMOUS is MAP_ANON on some platforms (e.g. Darwin/BSDs).
+#ifndef MAP_ANONYMOUS
+#  ifdef MAP_ANON
+#    define MAP_ANONYMOUS MAP_ANON
+#  else
+#    define MAP_ANONYMOUS 0x1000
+#  endif
+#endif
+
 #include "vm_local.h"
 
 // Provide portable icache-clear wrapper for non-Windows platforms
@@ -243,13 +252,13 @@ static int VM_SearchLiteral( const uint32_t value )
 #define DROP( reason, ... ) \
 	do { \
 		VM_FreeBuffers(); \
-		Com_Error( ERR_DROP, "%s: " reason, __func__, __VA_ARGS__ ); \
+		Com_Error( ERR_DROP, "%s: " reason, __func__, ##__VA_ARGS__ ); \
 	} while(0)
 #else
 #define DROP( reason, ... ) \
 	do { \
 		VM_FreeBuffers(); \
-		Com_Error( ERR_DROP, "%s: " reason __VA_OPT__(, __VA_ARGS__), __func__ ); \
+		Com_Error( ERR_DROP, "%s: " reason, __func__ __VA_OPT__(,) __VA_ARGS__ ); \
 	} while(0)
 #endif
 

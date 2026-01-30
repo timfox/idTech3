@@ -111,7 +111,7 @@ static int R_MDRCullModel( mdrHeader_t *header, const trRefEntity_t *ent ) {
 		bounds[1][i] = oldFrame->bounds[1][i] > newFrame->bounds[1][i] ? oldFrame->bounds[1][i] : newFrame->bounds[1][i];
 	}
 
-	switch ( R_CullLocalBox( bounds ) )
+	switch ( R_CullLocalBox( (const vec3_t *)bounds ) )
 	{
 		case CULL_IN:
 			tr.pc.c_box_cull_md3_in++;
