@@ -20,10 +20,16 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 
+#ifdef __APPLE__
+#	ifndef _DARWIN_C_SOURCE
+#		define _DARWIN_C_SOURCE
+#	endif
+#endif
+
 #if !defined(_GNU_SOURCE)
 #	define _GNU_SOURCE
 #endif
-#if !defined(_POSIX_C_SOURCE)
+#if !defined(_POSIX_C_SOURCE) && !defined(__APPLE__)
 #	define _POSIX_C_SOURCE 200809L
 #endif
 
@@ -82,6 +88,7 @@ static qboolean	winsockInitialized = qfalse;
 #		define _BSD_SOCKLEN_T_
 #	endif
 
+#	include <sys/types.h>
 #	include <sys/socket.h>
 #	include <errno.h>
 #	include <netdb.h>
@@ -89,12 +96,24 @@ static qboolean	winsockInitialized = qfalse;
 #	include <arpa/inet.h>
 #	include <net/if.h>
 #	include <sys/ioctl.h>
-#	include <sys/types.h>
 #	include <sys/time.h>
 #	include <unistd.h>
 #	if !defined(__sun) && !defined(__sgi)
 #		include <ifaddrs.h>
 #	endif
+
+#ifndef IFF_UP
+#define IFF_UP 0x1
+#endif
+
+#ifdef USE_IPV6
+#ifndef IPV6_JOIN_GROUP
+struct ipv6_mreq {
+	struct in6_addr ipv6mr_multiaddr;
+	unsigned int ipv6mr_interface;
+};
+#endif
+#endif
 
 #	ifdef __sun
 #		include <sys/filio.h>

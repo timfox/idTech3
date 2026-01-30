@@ -228,6 +228,7 @@ const char *PunctuationFromNum(script_t *script, int num)
 // Returns:					-
 // Changes Globals:		-
 //===========================================================================
+void QDECL ScriptError(script_t *script, const char *fmt, ...) __attribute__ ((format(printf, 2, 3)));
 void QDECL ScriptError(script_t *script, const char *fmt, ...)
 {
 	char text[1024];
@@ -254,6 +255,7 @@ void QDECL ScriptError(script_t *script, const char *fmt, ...)
 // Returns:					-
 // Changes Globals:		-
 //===========================================================================
+static void QDECL ScriptWarning(script_t *script, const char *fmt, ...) __attribute__ ((format(printf, 2, 3)));
 static void QDECL ScriptWarning(script_t *script, const char *fmt, ...)
 {
 	char text[1024];
