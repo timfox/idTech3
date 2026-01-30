@@ -529,7 +529,7 @@ void R_AddBrushModelSurfaces ( trRefEntity_t *ent ) {
 
 	bmodel = pModel->bmodel;
 
-	clip = R_CullLocalBox( bmodel->bounds );
+	clip = R_CullLocalBox( (const vec3_t *)bmodel->bounds );
 	if ( clip == CULL_OUT ) {
 		return;
 	}

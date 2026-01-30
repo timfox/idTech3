@@ -664,6 +664,7 @@ CLUI_GetCDKey
 ====================
 */
 static void CLUI_GetCDKey( char *buf, int buflen ) {
+	(void)buflen;
 #ifndef STANDALONE
 	const char *gamedir;
 	gamedir = Cvar_VariableString( "fs_game" );

@@ -706,7 +706,7 @@ static void CL_ParseDownload( msg_t *msg ) {
 	}
 
 	size = MSG_ReadShort ( msg );
-	if (size < 0 || size > sizeof(data))
+	if (size < 0 || (size_t)size > sizeof(data))
 	{
 		Com_Error(ERR_DROP, "CL_ParseDownload: Invalid size %d for download chunk", size);
 		return;
