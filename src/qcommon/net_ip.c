@@ -82,13 +82,12 @@ static qboolean	winsockInitialized = qfalse;
 #		define _BSD_SOCKLEN_T_
 #	endif
 
+
+
 #	include <sys/socket.h>
 #	include <errno.h>
 #	include <netdb.h>
 #	include <netinet/in.h>
-#	if defined(__APPLE__)
-#		include <netinet6/in6.h>
-#	endif
 #	include <arpa/inet.h>
 #	include <net/if.h>
 #	include <sys/ioctl.h>
@@ -102,6 +101,10 @@ static qboolean	winsockInitialized = qfalse;
 #	ifdef __sun
 #		include <sys/filio.h>
 #	endif
+
+#ifndef IFF_UP
+#define IFF_UP 0x1
+#endif
 
 typedef int SOCKET;
 #	define INVALID_SOCKET		-1
@@ -194,6 +197,14 @@ static SOCKET	socks_socket = INVALID_SOCKET;
 #ifdef USE_IPV6
 static SOCKET	ip6_socket = INVALID_SOCKET;
 static SOCKET	multicast6_socket = INVALID_SOCKET;
+
+// Provide ipv6_mreq on macOS because the bundled headers hide it.
+#if defined(__APPLE__)
+struct ipv6_mreq {
+	struct in6_addr ipv6mr_multiaddr;
+	unsigned int ipv6mr_interface;
+};
+#endif
 
 // Keep track of currently joined multicast group.
 static struct ipv6_mreq curgroup;
@@ -426,7 +437,7 @@ static qboolean Sys_StringToSockaddr( const char *s, sockaddr_t *sadr, int sadr_
 
 		if ( search )
 		{
-			size_t addrlen = MIN( search->ai_addrlen, (socklen_t) sadr_len );
+			size_t addrlen = MIN( (size_t)search->ai_addrlen, (size_t)sadr_len );
 
 			memcpy ( sadr, search->ai_addr, addrlen );
 			freeaddrinfo( res );
@@ -509,7 +520,8 @@ Compare without port, and up to the bit number given in netmask.
 */
 qboolean NET_CompareBaseAdrMask( const netadr_t *a, const netadr_t *b, unsigned int netmask )
 {
-	byte cmpmask, *addra, *addrb;
+	byte cmpmask;
+	const byte *addra, *addrb;
 	int curbyte;
 
 	if (a->type != b->type)
@@ -520,8 +532,8 @@ qboolean NET_CompareBaseAdrMask( const netadr_t *a, const netadr_t *b, unsigned 
 
 	if (a->type == NA_IP)
 	{
-		addra = (byte *) &a->ipv._4;
-		addrb = (byte *) &b->ipv._4;
+		addra = (const byte *) &a->ipv._4;
+		addrb = (const byte *) &b->ipv._4;
 		
 		if (netmask > 32)
 			netmask = 32;
@@ -529,8 +541,8 @@ qboolean NET_CompareBaseAdrMask( const netadr_t *a, const netadr_t *b, unsigned 
 #ifdef USE_IPV6
 	else if (a->type == NA_IP6)
 	{
-		addra = (byte *) &a->ipv._6;
-		addrb = (byte *) &b->ipv._6;
+		addra = (const byte *) &a->ipv._6;
+		addrb = (const byte *) &b->ipv._6;
 		
 		if (netmask > 128)
 			netmask = 128;

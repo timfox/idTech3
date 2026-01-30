@@ -664,7 +664,7 @@ void CrossProduct( const vec3_t v1, const vec3_t v2, vec3_t cross );
 vec_t VectorNormalize (vec3_t v);		// returns vector length
 vec_t VectorNormalize2( const vec3_t v, vec3_t out );
 void Vector4Scale( const vec4_t in, vec_t scale, vec4_t out );
-void VectorRotate( const vec3_t in, const vec3_t matrix[3], vec3_t out );
+void VectorRotate( const vec3_t in, const vec3_t *matrix, vec3_t out );
 int Q_log2(int val);
 
 float Q_acos(float c);

@@ -322,5 +322,5 @@ void sbtB8_dual_L3(float *sample, unsigned char *pcm, int ch)
 
 #ifndef COMPILE_ME
 // Dummy function to suppress empty translation unit warning
-static void csbtl3_dummy(void) {}
+static void __attribute__((unused)) csbtl3_dummy(void) {}
 #endif

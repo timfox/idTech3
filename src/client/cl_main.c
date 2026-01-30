@@ -657,6 +657,7 @@ CL_CompleteRecordName
 */
 static void CL_CompleteRecordName(const char *args, int argNum )
 {
+	(void)args;
 	if ( argNum == 2 )
 	{
 		char demoExt[ 16 ];
@@ -826,6 +827,7 @@ CL_CompleteDemoName
 */
 static void CL_CompleteDemoName(const char *args, int argNum )
 {
+	(void)args;
 	if ( argNum == 2 )
 	{
 		FS_SetFilenameCallback( CL_DemoNameCallback_f );
@@ -3248,14 +3250,13 @@ void CL_StartHunkUsers( void ) {
 		const char *info = cl.gameState.stringData + cl.gameState.stringOffsets[ CS_SERVERINFO ];
 		const char *mapname = Info_ValueForKey( info, "mapname" );
 		if ( mapname && *mapname != '\0' ) {
-			const char *fmt = "cl_mapConfig_%s";
-			const char *cmd = Cvar_VariableString( va( fmt, mapname ) );
+			const char *cmd = Cvar_VariableString( va( "cl_mapConfig_%s", mapname ) );
 			if ( cmd && *cmd != '\0' ) {
 				Cbuf_AddText( cmd );
 				Cbuf_AddText( "\n" );
 			} else {
 				// apply mapname "default" if present
-				cmd = Cvar_VariableString( va( fmt, "default" ) );
+				cmd = Cvar_VariableString( va( "cl_mapConfig_%s", "default" ) );
 				if ( cmd && *cmd != '\0' ) {
 					Cbuf_AddText( cmd );
 					Cbuf_AddText( "\n" );
@@ -3357,7 +3358,7 @@ static void CL_InitRef( void ) {
 	refimport_t	rimp;
 	refexport_t	*ret;
 #ifdef USE_RENDERER_DLOPEN
-	GetRefAPI_t		GetRefAPI;
+	GetRefAPI_t		getRefAPI;
 	char			dllName[ MAX_OSPATH ], *ospath;
 #endif
 
@@ -3418,9 +3419,9 @@ static void CL_InitRef( void ) {
 
 	{
 		void *sym = Sys_LoadFunction( rendererLib, "GetRefAPI" );
-		Com_Memcpy( &GetRefAPI, &sym, sizeof( GetRefAPI ) );
+		Com_Memcpy( &getRefAPI, &sym, sizeof( getRefAPI ) );
 	}
-	if( !GetRefAPI )
+	if( !getRefAPI )
 	{
 		Com_Error( ERR_FATAL, "Can't load symbol GetRefAPI" );
 		return;
@@ -3512,7 +3513,11 @@ static void CL_InitRef( void ) {
 	rimp.VK_CreateSurface = VK_CreateSurface;
 #endif
 
+#ifdef USE_RENDERER_DLOPEN
+	ret = getRefAPI( REF_API_VERSION, &rimp );
+#else
 	ret = GetRefAPI( REF_API_VERSION, &rimp );
+#endif
 
 	Com_Printf( "-------------------------------\n");
 
@@ -3642,6 +3647,7 @@ CL_CompleteRecordName
 */
 static void CL_CompleteVideoName(const char *args, int argNum )
 {
+	(void)args;
 	if ( argNum == 2 )
 	{
 		Field_CompleteFilename( "videos", ".avi", qtrue, FS_MATCH_EXTERN | FS_MATCH_STICK );

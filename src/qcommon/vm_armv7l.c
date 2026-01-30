@@ -42,6 +42,14 @@ ARMv7-A_ARMv7-R_DDI0406_2007.pdf
 #include <fcntl.h>
 #include <unistd.h>
 #include <math.h>
+// MAP_ANONYMOUS is MAP_ANON on some platforms (e.g. Darwin/BSDs).
+#ifndef MAP_ANONYMOUS
+#  ifdef MAP_ANON
+#    define MAP_ANONYMOUS MAP_ANON
+#  else
+#    error "MAP_ANONYMOUS and MAP_ANON are both undefined. This platform may not support anonymous memory mapping."
+#  endif
+#endif
 #endif
 
 #include "vm_local.h"
@@ -153,13 +161,13 @@ void __aeabi_uidivmod(void);
 #define DROP( reason, ... ) \
 	do { \
 		VM_FreeBuffers(); \
-		Com_Error( ERR_DROP, "%s: " reason, __func__, __VA_ARGS__ ); \
+		Com_Error( ERR_DROP, "%s: " reason, __func__, ##__VA_ARGS__ ); \
 	} while(0)
 #else
-#define DROP( reason, args... ) \
+#define DROP( reason, ... ) \
 	do { \
 		VM_FreeBuffers(); \
-		Com_Error( ERR_DROP, "%s: " reason, __func__, ##args ); \
+		Com_Error( ERR_DROP, "%s: " reason, __func__, ##__VA_ARGS__ ); \
 	} while(0)
 #endif
 

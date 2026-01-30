@@ -199,7 +199,7 @@ void RE_AddPolyToScene( qhandle_t hShader, int numVerts, const polyVert_t *verts
 
 static int isnan_fp( const float *f )
 {
-	uint32_t u = *( (uint32_t*) f );
+	uint32_t u = *( (const uint32_t*) f );
 	u = 0x7F800000 - ( u & 0x7FFFFFFF );
 	return (int)( u >> 31 );
 }

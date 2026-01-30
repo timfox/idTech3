@@ -295,5 +295,5 @@ void sbtB8_dual_right(float *sample, unsigned char *pcm, int n)
 
 #ifndef COMPILE_ME
 // Dummy function to suppress empty translation unit warning
-static void csbtb_dummy(void) {}
+static void __attribute__((unused)) csbtb_dummy(void) {}
 #endif

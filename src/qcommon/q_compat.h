@@ -1,6 +1,24 @@
 #ifndef Q_COMPAT_H
 #define Q_COMPAT_H
 
+#define Q_STATIC_ASSERT_CONCAT_IMPL(a, b) a##b
+#define Q_STATIC_ASSERT_CONCAT(a, b) Q_STATIC_ASSERT_CONCAT_IMPL(a, b)
+
+#ifndef _Static_assert
+#  if defined(_MSC_VER)
+#    include <assert.h>
+#    if defined(static_assert)
+#      define _Static_assert(cond, msg) static_assert((cond), msg)
+#    else
+#      define _Static_assert(cond, msg) \
+        typedef char Q_STATIC_ASSERT_CONCAT(q_static_assert_line_, __LINE__)[(cond) ? 1 : -1]
+#    endif
+#  else
+#    define _Static_assert(cond, msg) \
+      typedef char Q_STATIC_ASSERT_CONCAT(q_static_assert_line_, __LINE__)[(cond) ? 1 : -1]
+#  endif
+#endif
+
 #ifndef Q3_VM
 #include <stdbool.h>
 #include <stddef.h>

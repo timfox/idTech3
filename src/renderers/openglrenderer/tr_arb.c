@@ -1073,7 +1073,7 @@ qboolean ARB_UpdatePrograms( void )
 
 static void FBO_Bind( GLuint target, GLuint buffer );
 
-void FBO_Clean( frameBuffer_t *fb )
+static void FBO_Clean( frameBuffer_t *fb )
 {
 	if ( fb->fbo )
 	{
@@ -2102,7 +2102,7 @@ void QGL_SetRenderScale( qboolean verbose )
 }
 
 
-void QGL_DoneFBO( void )
+static void QGL_DoneFBO( void )
 {
 	if ( qglGenFramebuffers )
 	{

@@ -117,7 +117,7 @@ void CL_LoadJPG( const char *filename, unsigned char **pic, int *width, int *hei
 	 * requires it in order to read binary files.
 	*/
 
-	len = FS_ReadFile( ( char * ) filename, &fbuffer.v );
+	len = FS_ReadFile( va( "%s", filename ), &fbuffer.v );
 	if ( !fbuffer.b || len < 0 ) {
 		return;
 	}
@@ -342,6 +342,7 @@ static boolean empty_output_buffer( j_compress_ptr cinfo )
 
 static void term_destination(j_compress_ptr cinfo)
 {
+	(void)cinfo;
 }
 
 

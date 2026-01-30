@@ -1081,12 +1081,12 @@ static XFORM_FUNCTION xform_table[5] =
    Xform_mono,			/* left */
    Xform_dual_right,
 };
-int L3table_init();
-void msis_init();
-void sbt_init();
+int L3table_init(void);
+void msis_init(void);
+void sbt_init(void);
 typedef int iARRAY22[22];
-iARRAY22 *quant_init_band_addr();
-iARRAY22 *msis_init_band_addr();
+iARRAY22 *quant_init_band_addr(void);
+iARRAY22 *msis_init_band_addr(void);
 
 /*---------------------------------------------------------*/
 /* mpeg_head defined in mhead.h  frame bytes is without pMP3Stream->pad */
