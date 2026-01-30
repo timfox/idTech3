@@ -199,7 +199,7 @@ static SOCKET	ip6_socket = INVALID_SOCKET;
 static SOCKET	multicast6_socket = INVALID_SOCKET;
 
 // Ensure ipv6_mreq is defined for multicast operations on systems lacking it.
-#if !defined(_WIN32) && !defined(__linux__) && !defined(__APPLE__)
+#if !defined(_WIN32) && !defined(__linux__)
 #  ifndef IPV6_JOIN_GROUP
 struct ipv6_mreq {
 	struct in6_addr ipv6mr_multiaddr;
