@@ -3248,14 +3248,13 @@ void CL_StartHunkUsers( void ) {
 		const char *info = cl.gameState.stringData + cl.gameState.stringOffsets[ CS_SERVERINFO ];
 		const char *mapname = Info_ValueForKey( info, "mapname" );
 		if ( mapname && *mapname != '\0' ) {
-			const char *fmt = "cl_mapConfig_%s";
-			const char *cmd = Cvar_VariableString( va( fmt, mapname ) );
+			const char *cmd = Cvar_VariableString( va( "cl_mapConfig_%s", mapname ) );
 			if ( cmd && *cmd != '\0' ) {
 				Cbuf_AddText( cmd );
 				Cbuf_AddText( "\n" );
 			} else {
 				// apply mapname "default" if present
-				cmd = Cvar_VariableString( va( fmt, "default" ) );
+				cmd = Cvar_VariableString( va( "cl_mapConfig_%s", "default" ) );
 				if ( cmd && *cmd != '\0' ) {
 					Cbuf_AddText( cmd );
 					Cbuf_AddText( "\n" );

@@ -92,7 +92,7 @@ static void R_CalcShadowEdges( void ) {
 			// if it doesn't share the edge with another front facing
 			// triangle, it is a sil edge
 			if ( sil_edge ) {
-				if ( tess.numIndexes > ARRAY_LEN( tess.indexes ) - 6 ) {
+				if ( (size_t)tess.numIndexes > ARRAY_LEN( tess.indexes ) - 6 ) {
 					i = tess.numVertexes;
 					break;
 				}

@@ -312,14 +312,14 @@ static void R_InitExtensions( void )
 	}
 
 	// get our config strings
-	Q_strncpyz( glConfig.vendor_string, (char *)qglGetString (GL_VENDOR), sizeof( glConfig.vendor_string ) );
-	Q_strncpyz( glConfig.renderer_string, (char *)qglGetString (GL_RENDERER), sizeof( glConfig.renderer_string ) );
+	Q_strncpyz( glConfig.vendor_string, (const char *)qglGetString (GL_VENDOR), sizeof( glConfig.vendor_string ) );
+	Q_strncpyz( glConfig.renderer_string, (const char *)qglGetString (GL_RENDERER), sizeof( glConfig.renderer_string ) );
 	len = strlen( glConfig.renderer_string );
 	if ( len && glConfig.renderer_string[ len - 1 ] == '\n' )
 		glConfig.renderer_string[ len - 1 ] = '\0';
-	Q_strncpyz( glConfig.version_string, (char *)qglGetString( GL_VERSION ), sizeof( glConfig.version_string ) );
+	Q_strncpyz( glConfig.version_string, (const char *)qglGetString( GL_VERSION ), sizeof( glConfig.version_string ) );
 
-	Q_strncpyz( gl_extensions, (char *)qglGetString( GL_EXTENSIONS ), sizeof( gl_extensions ) );
+	Q_strncpyz( gl_extensions, (const char *)qglGetString( GL_EXTENSIONS ), sizeof( gl_extensions ) );
 	Q_strncpyz( glConfig.extensions_string, gl_extensions, sizeof( glConfig.extensions_string ) );
 
 	version = Q_atof( (const char *)qglGetString( GL_VERSION ) );

@@ -30,6 +30,23 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #if !defined(_GNU_SOURCE)
 #	define _GNU_SOURCE
 #endif
+
+#ifndef _WIN32
+#	include <sys/types.h>
+#	include <sys/socket.h>
+#	include <sys/time.h>
+#	include <sys/ioctl.h>
+#	include <errno.h>
+#	include <netdb.h>
+#	include <netinet/in.h>
+#	include <arpa/inet.h>
+#	include <net/if.h>
+#	include <unistd.h>
+#	if !defined(__sun) && !defined(__sgi)
+#		include <ifaddrs.h>
+#	endif
+#endif
+
 #if !defined(_POSIX_C_SOURCE) && !defined(__APPLE__)
 #	define _POSIX_C_SOURCE 200809L
 #endif
@@ -87,20 +104,6 @@ static qboolean	winsockInitialized = qfalse;
 #	if defined(__APPLE__) && defined(MAC_OS_X_VERSION_MIN_REQUIRED) && MAC_OS_X_VERSION_MIN_REQUIRED == 1020
 		// needed for socklen_t on OSX 10.2
 #		define _BSD_SOCKLEN_T_
-#	endif
-
-#	include <sys/types.h>
-#	include <sys/socket.h>
-#	include <sys/time.h>
-#	include <sys/ioctl.h>
-#	include <errno.h>
-#	include <netdb.h>
-#	include <netinet/in.h>
-#	include <arpa/inet.h>
-#	include <net/if.h>
-#	include <unistd.h>
-#	if !defined(__sun) && !defined(__sgi)
-#		include <ifaddrs.h>
 #	endif
 
 #ifndef IFF_UP

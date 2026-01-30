@@ -50,7 +50,7 @@ R_CullLocalBox
 Returns CULL_IN, CULL_CLIP, or CULL_OUT
 =================
 */
-int R_CullLocalBox( const vec3_t bounds[2] ) {
+int R_CullLocalBox( const vec3_t *bounds ) {
 	int		i, j;
 	vec3_t	transformed[8];
 	float	dists[8];
@@ -701,9 +701,9 @@ R_PlaneForSurface
 =============
 */
 static void R_PlaneForSurface( const surfaceType_t *surfType, cplane_t *plane ) {
-	srfTriangles_t	*tri;
-	srfPoly_t		*poly;
-	drawVert_t		*v1, *v2, *v3;
+	const srfTriangles_t	*tri;
+	const srfPoly_t		*poly;
+	const drawVert_t		*v1, *v2, *v3;
 	vec4_t			plane4;
 
 	if (!surfType) {
@@ -713,10 +713,10 @@ static void R_PlaneForSurface( const surfaceType_t *surfType, cplane_t *plane ) 
 	}
 	switch (*surfType) {
 	case SF_FACE:
-		*plane = ((srfSurfaceFace_t *)surfType)->plane;
+		*plane = ((const srfSurfaceFace_t *)surfType)->plane;
 		return;
 	case SF_TRIANGLES:
-		tri = (srfTriangles_t *)surfType;
+		tri = (const srfTriangles_t *)surfType;
 		v1 = tri->verts + tri->indexes[0];
 		v2 = tri->verts + tri->indexes[1];
 		v3 = tri->verts + tri->indexes[2];
@@ -725,7 +725,7 @@ static void R_PlaneForSurface( const surfaceType_t *surfType, cplane_t *plane ) 
 		plane->dist = plane4[3];
 		return;
 	case SF_POLY:
-		poly = (srfPoly_t *)surfType;
+		poly = (const srfPoly_t *)surfType;
 		PlaneFromPoints( plane4, poly->verts[0].xyz, poly->verts[1].xyz, poly->verts[2].xyz );
 		VectorCopy( plane4, plane->normal ); 
 		plane->dist = plane4[3];
@@ -1237,7 +1237,7 @@ DRAWSURF SORTING
 R_Radix
 ===============
 */
-static ID_INLINE void R_Radix( int byte, int size, const drawSurf_t *source, drawSurf_t *dest )
+static ID_INLINE void R_Radix( int byteIdx, int size, const drawSurf_t *source, drawSurf_t *dest )
 {
   int           count[ 256 ] = { 0 };
   int           index[ 256 ];
@@ -1245,7 +1245,7 @@ static ID_INLINE void R_Radix( int byte, int size, const drawSurf_t *source, dra
   unsigned char *sortKey;
   unsigned char *end;
 
-  sortKey = ( (unsigned char *)&source[ 0 ].sort ) + byte;
+  sortKey = ( (unsigned char *)&source[ 0 ].sort ) + byteIdx;
   end = sortKey + ( size * sizeof( drawSurf_t ) );
   for( ; sortKey < end; sortKey += sizeof( drawSurf_t ) )
     ++count[ *sortKey ];
@@ -1255,7 +1255,7 @@ static ID_INLINE void R_Radix( int byte, int size, const drawSurf_t *source, dra
   for( i = 1; i < 256; ++i )
     index[ i ] = index[ i - 1 ] + count[ i - 1 ];
 
-  sortKey = ( (unsigned char *)&source[ 0 ].sort ) + byte;
+  sortKey = ( (unsigned char *)&source[ 0 ].sort ) + byteIdx;
   for( i = 0; i < size; ++i, sortKey += sizeof( drawSurf_t ) )
     dest[ index[ *sortKey ]++ ] = source[ i ];
 }
