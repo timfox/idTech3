@@ -40,7 +40,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <sys/socket.h>
 #endif
 
-#ifndef IPV6_JOIN_GROUP
+#if defined(USE_IPV6) && !defined(IPV6_JOIN_GROUP) && !defined(_WIN32)
 struct ipv6_mreq {
 	struct in6_addr ipv6mr_multiaddr;
 	unsigned int ipv6mr_interface;

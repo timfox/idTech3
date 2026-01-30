@@ -386,7 +386,7 @@ void Com_AppendCDKey( const char *filename );
 void Com_ReadCDKey( const char *filename );
 
 static int FS_GetModList( char *listbuf, int bufsize );
-#if 0
+#ifndef SKIP_IDPAK_CHECK
 static void FS_CheckIdPaks( void );
 #endif
 void FS_Reload( void );
