@@ -111,10 +111,9 @@ static qboolean	winsockInitialized = qfalse;
 #endif
 
 #ifdef USE_IPV6
-#if defined(__APPLE__)
-#	include <netinet6/in6.h>
-#elif !defined(IPV6_JOIN_GROUP)
 // Provide a fallback only when the system headers lack the IPv6 struct.
+// On macOS, <netinet/in.h> (already included above) provides struct ipv6_mreq.
+#if !defined(__APPLE__) && !defined(IPV6_JOIN_GROUP)
 #ifndef IPV6_MREQ_DEFINED
 #define IPV6_MREQ_DEFINED
 struct ipv6_mreq {
