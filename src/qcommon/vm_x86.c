@@ -39,6 +39,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #ifndef _WIN32
 #include <sys/mman.h> // for PROT_ stuff
+// MAP_ANONYMOUS is MAP_ANON on some platforms (e.g. Darwin/BSDs).
+#ifndef MAP_ANONYMOUS
+#  ifdef MAP_ANON
+#    define MAP_ANONYMOUS MAP_ANON
+#  else
+#    error "MAP_ANONYMOUS and MAP_ANON are both undefined. This platform may not support anonymous memory mapping."
+#  endif
+#endif
 #endif
 
 /* need this on NX enabled systems (i386 with PAE kernel or noexec32=on x86_64) */

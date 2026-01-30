@@ -35,16 +35,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <fcntl.h>
 #include <unistd.h>
 #include <math.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
 
 // MAP_ANONYMOUS is MAP_ANON on some platforms (e.g. Darwin/BSDs).
 #ifndef MAP_ANONYMOUS
 #  ifdef MAP_ANON
 #    define MAP_ANONYMOUS MAP_ANON
 #  else
-#    define MAP_ANONYMOUS 0x1000
+#    error "MAP_ANONYMOUS and MAP_ANON are both undefined. This platform may not support anonymous memory mapping."
 #  endif
 #endif
 #endif

@@ -42,6 +42,14 @@ ARMv7-A_ARMv7-R_DDI0406_2007.pdf
 #include <fcntl.h>
 #include <unistd.h>
 #include <math.h>
+// MAP_ANONYMOUS is MAP_ANON on some platforms (e.g. Darwin/BSDs).
+#ifndef MAP_ANONYMOUS
+#  ifdef MAP_ANON
+#    define MAP_ANONYMOUS MAP_ANON
+#  else
+#    error "MAP_ANONYMOUS and MAP_ANON are both undefined. This platform may not support anonymous memory mapping."
+#  endif
+#endif
 #endif
 
 #include "vm_local.h"
