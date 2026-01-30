@@ -371,7 +371,7 @@ static void emit_rex1( const uint32_t base )
 #endif
 
 #if 1
-// reg <-> [offset]
+// reg <-> [offset] - C23 modernized
 static void emit_modrm_offset( uint32_t reg, int32_t offset )
 {
 	modrm_t modrm;
