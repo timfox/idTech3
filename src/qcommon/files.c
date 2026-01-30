@@ -3667,6 +3667,10 @@ static void FS_GetModDescription( const char *modDir, char *description, int des
 }
 
 
+#ifndef SKIP_IDPAK_CHECK
+static void FS_CheckIdPaks( void );
+#endif
+
 /*
 ================
 FS_IsBaseGame

@@ -47,13 +47,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #endif
 #endif
 
-#ifndef IPV6_JOIN_GROUP
-struct ipv6_mreq {
-	struct in6_addr ipv6mr_multiaddr;
-	unsigned int ipv6mr_interface;
-};
-#endif
-
 #include "vm_local.h"
 
 // Provide portable icache-clear wrapper for non-Windows platforms
