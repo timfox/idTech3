@@ -110,8 +110,8 @@ added to the sorting list.
 This will also allow mirrors on both sides of a model without recursion.
 ================
 */
-static qboolean	R_CullSurface( const surfaceType_t *surface, shader_t *shader ) {
-	srfSurfaceFace_t *sface;
+	static qboolean	R_CullSurface( const surfaceType_t *surface, shader_t *shader ) {
+	const srfSurfaceFace_t *sface;
 	float			d;
 
 	if ( r_nocull->integer ) {
@@ -119,11 +119,11 @@ static qboolean	R_CullSurface( const surfaceType_t *surface, shader_t *shader ) 
 	}
 
 	if ( *surface == SF_GRID ) {
-		return R_CullGrid( (srfGridMesh_t *)surface );
+		return R_CullGrid( (const srfGridMesh_t *)surface );
 	}
 
 	if ( *surface == SF_TRIANGLES ) {
-		return R_CullTriSurf( (srfTriangles_t *)surface );
+		return R_CullTriSurf( (const srfTriangles_t *)surface );
 	}
 
 	if ( *surface != SF_FACE ) {
@@ -139,7 +139,7 @@ static qboolean	R_CullSurface( const surfaceType_t *surface, shader_t *shader ) 
 		return qfalse;
 	}
 
-	sface = ( srfSurfaceFace_t * ) surface;
+	sface = ( const srfSurfaceFace_t * ) surface;
 	d = DotProduct (tr.or.viewOrigin, sface->plane.normal);
 
 	// don't cull exactly on the plane, because there are levels of rounding
@@ -247,7 +247,7 @@ static int R_DlightFace( srfSurfaceFace_t *face, int dlightBits ) {
 	int			i;
 	const dlight_t	*dl;
 
-	for ( i = 0; i < tr.refdef.num_dlights; i++ ) {
+	for ( i = 0; i < (int)tr.refdef.num_dlights; i++ ) {
 		if ( ! ( dlightBits & ( 1 << i ) ) ) {
 			continue;
 		}
@@ -272,7 +272,7 @@ static int R_DlightGrid( srfGridMesh_t *grid, int dlightBits ) {
 	int			i;
 	const dlight_t	*dl;
 
-	for ( i = 0 ; i < tr.refdef.num_dlights ; i++ ) {
+	for ( i = 0 ; i < (int)tr.refdef.num_dlights ; i++ ) {
 		if ( ! ( dlightBits & ( 1 << i ) ) ) {
 			continue;
 		}
@@ -305,7 +305,7 @@ static int R_DlightTrisurf( srfTriangles_t *surf, int dlightBits ) {
 	int			i;
 	const dlight_t	*dl;
 
-	for ( i = 0 ; i < tr.refdef.num_dlights ; i++ ) {
+	for ( i = 0 ; i < (int)tr.refdef.num_dlights ; i++ ) {
 		if ( ! ( dlightBits & ( 1 << i ) ) ) {
 			continue;
 		}
@@ -529,7 +529,7 @@ void R_AddBrushModelSurfaces ( trRefEntity_t *ent ) {
 
 	bmodel = pModel->bmodel;
 
-	clip = R_CullLocalBox( bmodel->bounds );
+	clip = R_CullLocalBox( (const vec3_t *)bmodel->bounds );
 	if ( clip == CULL_OUT ) {
 		return;
 	}
@@ -550,7 +550,7 @@ void R_AddBrushModelSurfaces ( trRefEntity_t *ent ) {
 		
 		R_TransformDlights( tr.viewParms.num_dlights, tr.viewParms.dlights, &tr.or );
 
-		for ( i = 0; i < tr.viewParms.num_dlights; i++ ) {
+		for ( i = 0; i < (int)tr.viewParms.num_dlights; i++ ) {
 			dl = &tr.viewParms.dlights[i];
 			if ( !R_LightCullBounds( dl, bmodel->bounds[0], bmodel->bounds[1] ) ) {
 				tr.lightCount++;
@@ -664,7 +664,7 @@ static void R_RecursiveWorldNode( mnode_t *node, unsigned int planeBits, unsigne
 		if ( dlightBits ) {
 			int	i;
 
-			for ( i = 0 ; i < tr.refdef.num_dlights ; i++ ) {
+			for ( i = 0 ; i < (int)tr.refdef.num_dlights ; i++ ) {
 				const dlight_t	*dl;
 				float		dist;
 
@@ -925,7 +925,7 @@ void R_AddWorldSurfaces( void ) {
 	// instead of having copypasted versions for both world and local cases
 
 	R_TransformDlights( tr.viewParms.num_dlights, tr.viewParms.dlights, &tr.viewParms.world );
-	for ( i = 0; i < tr.viewParms.num_dlights; i++ ) 
+	for ( i = 0; i < (int)tr.viewParms.num_dlights; i++ ) 
 	{
 		dl = &tr.viewParms.dlights[i];	
 		dl->head = dl->tail = NULL;

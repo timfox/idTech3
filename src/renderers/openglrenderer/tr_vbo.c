@@ -225,7 +225,7 @@ static const char *BuildVP( int multitexture, int fogmode, int texgen )
 }
 
 
-const char *BuildFP( int multitexture, int alphatest, int fogMode )
+static const char *BuildFP( int multitexture, int alphatest, int fogMode )
 {
 	static char buf[1024];
 

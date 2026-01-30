@@ -477,5 +477,5 @@ void window8_dual(float *vbuf, int vb_ptr, short *pcm)
 
 #ifndef COMPILE_ME
 // Dummy function to suppress empty translation unit warning
-static void cwin_dummy(void) {}
+static void __attribute__((unused)) cwin_dummy(void) {}
 #endif

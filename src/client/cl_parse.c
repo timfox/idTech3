@@ -260,7 +260,7 @@ static void CL_ParseSnapshot( msg_t *msg ) {
 	// read areamask
 	newSnap.areabytes = MSG_ReadByte( msg );
 
-	if ( newSnap.areabytes > sizeof(newSnap.areamask) )
+	if ( newSnap.areabytes > (int)sizeof(newSnap.areamask) )
 	{
 		Com_Error( ERR_DROP,"CL_ParseSnapshot: Invalid size %d for areamask", newSnap.areabytes );
 		return;
@@ -432,7 +432,7 @@ void CL_SystemInfoChanged( qboolean onlyGame ) {
 			continue; // already processed
 		}
 
-		if ( ( cvar_flags = Cvar_Flags( key ) ) == CVAR_NONEXISTENT )
+		if ( ( cvar_flags = (int)Cvar_Flags( key ) ) == (int)CVAR_NONEXISTENT )
 			Cvar_Get( key, value, CVAR_SERVER_CREATED | CVAR_ROM );
 		else
 		{
@@ -706,7 +706,7 @@ static void CL_ParseDownload( msg_t *msg ) {
 	}
 
 	size = MSG_ReadShort ( msg );
-	if (size < 0 || size > sizeof(data))
+	if (size < 0 || (size_t)size > sizeof(data))
 	{
 		Com_Error(ERR_DROP, "CL_ParseDownload: Invalid size %d for download chunk", size);
 		return;

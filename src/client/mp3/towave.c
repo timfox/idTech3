@@ -33,6 +33,7 @@ ____________________________________________________________________________*/
         file. There is no need to flatten the beavers, either.
 
       NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
+*/
 
 /*---- towave.c --------------------------------------------*/
 /*

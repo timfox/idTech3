@@ -303,6 +303,9 @@ static glyphInfo_t *RE_ConstructGlyphInfo(unsigned char *imageOut, int *xOut, in
 }
 #endif
 
+static int readInt( void );
+static float readFloat( void );
+
 static int fdOffset;
 static byte	*fdFile;
 
@@ -317,7 +320,7 @@ typedef union {
 	float	ffred;
 } poor;
 
-float readFloat( void ) {
+static float readFloat( void ) {
 	poor	me;
 #if defined Q3_BIG_ENDIAN
 	me.fred[0] = fdFile[fdOffset+3];

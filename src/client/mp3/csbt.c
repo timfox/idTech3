@@ -80,10 +80,10 @@ void sbt8_dual_right(float *sample, short *pcm, int n);
 ////static float pMP3Stream->vbuf[512];		// !!!!!!!!!!!!!
 ////static float vbuf2[512];	// !!!!!!!!!!!!!
 
-float *dct_coef_addr();
+float *dct_coef_addr(void);
 
 /*======================================================================*/
-static void gencoef()		/* gen coef for N=32 (31 coefs) */
+static void gencoef(void)		/* gen coef for N=32 (31 coefs) */
 {
 	static int iOnceOnly = 0;
    int p, n, i, k;
@@ -109,7 +109,7 @@ static void gencoef()		/* gen coef for N=32 (31 coefs) */
    }
 }
 /*------------------------------------------------------------*/
-void sbt_init()
+void sbt_init(void)
 {
    int i;
    static int first_pass = 1;

@@ -181,7 +181,7 @@ static const int out_chans[5] =
 int audio_decode_initL1(MPEG_HEAD * h, int framebytes_arg,
 		   int reduction_code, int transform_code, int convert_code,
 			int freq_limit);
-void sbt_init();
+void sbt_init(void);
 void decode_table_init(void);
 
 

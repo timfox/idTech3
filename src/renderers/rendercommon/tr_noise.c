@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../../qcommon/q_shared.h"
 #include "tr_public.h"
+#include "tr_noise.h"
 
 #define NOISE_SIZE 256
 #define NOISE_MASK ( NOISE_SIZE - 1 )

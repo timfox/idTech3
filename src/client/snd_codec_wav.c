@@ -109,7 +109,7 @@ If raw data has been loaded in little endian binary form, this must be done.
 If raw data was calculated, as with ADPCM, this should not be called.
 =================
 */
-static void S_ByteSwapRawSamples( int samples, int width, int s_channels, const byte *data ) {
+static void S_ByteSwapRawSamples( int samples, int width, int s_channels, byte *data ) {
 	int		i;
 
 	if ( width != 2 ) {
