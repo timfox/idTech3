@@ -386,7 +386,7 @@ void Com_AppendCDKey( const char *filename );
 void Com_ReadCDKey( const char *filename );
 
 static int FS_GetModList( char *listbuf, int bufsize );
-#if 0
+#ifndef SKIP_IDPAK_CHECK
 static void FS_CheckIdPaks( void );
 #endif
 void FS_Reload( void );
@@ -4993,7 +4993,6 @@ static void FS_CheckIdPaks( void )
 			Com_Error(ERR_FATAL, "\n*** you need to install Quake III Arena in order to play ***");
 }
 #endif
-// If the check is compiled out, don't emit an unused stub.
 #ifndef SKIP_IDPAK_CHECK
 static void FS_CheckIdPaks( void ) {}
 #endif
