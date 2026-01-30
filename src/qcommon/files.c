@@ -4989,8 +4989,10 @@ static void FS_CheckIdPaks( void )
 			Com_Error(ERR_FATAL, "\n*** you need to install Quake III Arena in order to play ***");
 }
 #endif
-
+// If the check is compiled out, don't emit an unused stub.
+#ifndef SKIP_IDPAK_CHECK
 static void FS_CheckIdPaks( void ) {}
+#endif
 
 /*
 =====================

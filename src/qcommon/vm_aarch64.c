@@ -38,6 +38,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+
+// MAP_ANONYMOUS is MAP_ANON on some platforms (e.g. Darwin/BSDs).
+#ifndef MAP_ANONYMOUS
+#  ifdef MAP_ANON
+#    define MAP_ANONYMOUS MAP_ANON
+#  endif
+#endif
 #endif
 
 #ifndef IPV6_JOIN_GROUP
@@ -239,18 +246,21 @@ static int VM_SearchLiteral( const uint32_t value )
 #endif // USE_LITERAL_POOL
 
 
-#ifdef _MSC_VER
+// DROP is used with and without variadic args.
+// Prefer C23 __VA_OPT__ when available, otherwise fall back to widely-supported
+// '##__VA_ARGS__' extension (MSVC/GCC/Clang) to swallow the comma on empty args.
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202311L)
 #define DROP( reason, ... ) \
 	do { \
 		VM_FreeBuffers(); \
-		Com_Error( ERR_DROP, "%s: " reason, __func__, __VA_ARGS__ ); \
-	} while(0)
+		Com_Error( ERR_DROP, "%s: " reason, __func__ __VA_OPT__(,) __VA_ARGS__ ); \
+	} while (0)
 #else
 #define DROP( reason, ... ) \
 	do { \
 		VM_FreeBuffers(); \
-		Com_Error( ERR_DROP, "%s: " reason __VA_OPT__(, __VA_ARGS__), __func__ ); \
-	} while(0)
+		Com_Error( ERR_DROP, "%s: " reason, __func__, ##__VA_ARGS__ ); \
+	} while (0)
 #endif
 
 

@@ -86,9 +86,6 @@ static qboolean	winsockInitialized = qfalse;
 #	include <errno.h>
 #	include <netdb.h>
 #	include <netinet/in.h>
-#	if defined(__APPLE__)
-#		include <netinet6/in6.h>
-#	endif
 #	include <arpa/inet.h>
 #	include <net/if.h>
 #	include <sys/ioctl.h>
@@ -426,7 +423,10 @@ static qboolean Sys_StringToSockaddr( const char *s, sockaddr_t *sadr, int sadr_
 
 		if ( search )
 		{
-			size_t addrlen = MIN( search->ai_addrlen, (socklen_t) sadr_len );
+			size_t addrlen = search->ai_addrlen;
+			if ( addrlen > (size_t)sadr_len ) {
+				addrlen = (size_t)sadr_len;
+			}
 
 			memcpy ( sadr, search->ai_addr, addrlen );
 			freeaddrinfo( res );
@@ -509,7 +509,8 @@ Compare without port, and up to the bit number given in netmask.
 */
 qboolean NET_CompareBaseAdrMask( const netadr_t *a, const netadr_t *b, unsigned int netmask )
 {
-	byte cmpmask, *addra, *addrb;
+	byte cmpmask;
+	const byte *addra, *addrb;
 	int curbyte;
 
 	if (a->type != b->type)
@@ -520,8 +521,8 @@ qboolean NET_CompareBaseAdrMask( const netadr_t *a, const netadr_t *b, unsigned 
 
 	if (a->type == NA_IP)
 	{
-		addra = (byte *) &a->ipv._4;
-		addrb = (byte *) &b->ipv._4;
+		addra = (const byte *)&a->ipv._4;
+		addrb = (const byte *)&b->ipv._4;
 		
 		if (netmask > 32)
 			netmask = 32;
@@ -529,8 +530,8 @@ qboolean NET_CompareBaseAdrMask( const netadr_t *a, const netadr_t *b, unsigned 
 #ifdef USE_IPV6
 	else if (a->type == NA_IP6)
 	{
-		addra = (byte *) &a->ipv._6;
-		addrb = (byte *) &b->ipv._6;
+		addra = (const byte *)&a->ipv._6;
+		addrb = (const byte *)&b->ipv._6;
 		
 		if (netmask > 128)
 			netmask = 128;
@@ -1448,7 +1449,7 @@ static void NET_GetLocalAddress( void )
 		for( search = ifap; search; search = search->ifa_next )
 		{
 			// Only add interfaces that are up.
-			if ( ifap->ifa_flags & IFF_UP )
+			if ( search->ifa_flags & IFF_UP )
 				NET_AddLocalAddress( search->ifa_name, search->ifa_addr, search->ifa_netmask );
 		}
 	
