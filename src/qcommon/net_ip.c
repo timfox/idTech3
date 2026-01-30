@@ -198,6 +198,16 @@ static SOCKET	socks_socket = INVALID_SOCKET;
 static SOCKET	ip6_socket = INVALID_SOCKET;
 static SOCKET	multicast6_socket = INVALID_SOCKET;
 
+#ifdef USE_IPV6
+// Ensure ipv6_mreq is defined for multicast operations
+#ifndef _WIN32
+struct ipv6_mreq {
+	struct in6_addr ipv6mr_multiaddr;
+	unsigned int ipv6mr_interface;
+};
+#endif
+#endif
+
 // Keep track of currently joined multicast group.
 static struct ipv6_mreq curgroup;
 // And the currently bound address.
@@ -512,7 +522,8 @@ Compare without port, and up to the bit number given in netmask.
 */
 qboolean NET_CompareBaseAdrMask( const netadr_t *a, const netadr_t *b, unsigned int netmask )
 {
-	byte cmpmask, *addra, *addrb;
+	byte cmpmask;
+	const byte *addra, *addrb;
 	int curbyte;
 
 	if (a->type != b->type)
@@ -523,8 +534,8 @@ qboolean NET_CompareBaseAdrMask( const netadr_t *a, const netadr_t *b, unsigned 
 
 	if (a->type == NA_IP)
 	{
-		addra = (byte *) &a->ipv._4;
-		addrb = (byte *) &b->ipv._4;
+		addra = (const byte *) &a->ipv._4;
+		addrb = (const byte *) &b->ipv._4;
 		
 		if (netmask > 32)
 			netmask = 32;
@@ -532,8 +543,8 @@ qboolean NET_CompareBaseAdrMask( const netadr_t *a, const netadr_t *b, unsigned 
 #ifdef USE_IPV6
 	else if (a->type == NA_IP6)
 	{
-		addra = (byte *) &a->ipv._6;
-		addrb = (byte *) &b->ipv._6;
+		addra = (const byte *) &a->ipv._6;
+		addrb = (const byte *) &b->ipv._6;
 		
 		if (netmask > 128)
 			netmask = 128;
