@@ -1451,6 +1451,84 @@ qboolean vk_create_normal_texture( shaderStage_t *stage, const char *name, imgFl
 	return qtrue;
 }
 
+qboolean vk_create_emissive_texture( shaderStage_t *stage, const char *name, imgFlags_t flags )
+{
+	if ( stage->emissiveMapType != PHYS_EMISSIVE )
+		return qfalse;
+
+	stage->emissiveMap = R_FindImageFile( name, flags, stage->emissiveMapType );
+	if ( !stage->emissiveMap )
+		return qfalse;
+
+	stage->vk_pbr_flags |= PBR_HAS_EMISSIVE;
+	return qtrue;
+}
+
+qboolean vk_create_clearcoat_texture( shaderStage_t *stage, const char *name, imgFlags_t flags )
+{
+	if ( stage->clearcoatMapType != PHYS_CLEARCOAT )
+		return qfalse;
+
+	stage->clearcoatMap = R_FindImageFile( name, flags, stage->clearcoatMapType );
+	if ( !stage->clearcoatMap )
+		return qfalse;
+
+	stage->vk_pbr_flags |= PBR_HAS_CLEARCOAT;
+	return qtrue;
+}
+
+qboolean vk_create_sheen_texture( shaderStage_t *stage, const char *name, imgFlags_t flags )
+{
+	if ( stage->sheenMapType != PHYS_SHEEN )
+		return qfalse;
+
+	stage->sheenMap = R_FindImageFile( name, flags, stage->sheenMapType );
+	if ( !stage->sheenMap )
+		return qfalse;
+
+	stage->vk_pbr_flags |= PBR_HAS_SHEEN;
+	return qtrue;
+}
+
+qboolean vk_create_anisotropy_texture( shaderStage_t *stage, const char *name, imgFlags_t flags )
+{
+	if ( stage->anisotropyMapType != PHYS_ANISOTROPY )
+		return qfalse;
+
+	stage->anisotropyMap = R_FindImageFile( name, flags, stage->anisotropyMapType );
+	if ( !stage->anisotropyMap )
+		return qfalse;
+
+	stage->vk_pbr_flags |= PBR_HAS_ANISOTROPY;
+	return qtrue;
+}
+
+qboolean vk_create_transmission_texture( shaderStage_t *stage, const char *name, imgFlags_t flags )
+{
+	if ( stage->transmissionMapType != PHYS_TRANSMISSION )
+		return qfalse;
+
+	stage->transmissionMap = R_FindImageFile( name, flags, stage->transmissionMapType );
+	if ( !stage->transmissionMap )
+		return qfalse;
+
+	stage->vk_pbr_flags |= PBR_HAS_TRANSMISSION;
+	return qtrue;
+}
+
+qboolean vk_create_subsurface_texture( shaderStage_t *stage, const char *name, imgFlags_t flags )
+{
+	if ( stage->subsurfaceMapType != PHYS_SUBSURFACE )
+		return qfalse;
+
+	stage->subsurfaceMap = R_FindImageFile( name, flags, stage->subsurfaceMapType );
+	if ( !stage->subsurfaceMap )
+		return qfalse;
+
+	stage->vk_pbr_flags |= PBR_HAS_SUBSURFACE;
+	return qtrue;
+}
+
 qboolean vk_create_phyisical_texture( shaderStage_t *stage, const char *name, imgFlags_t flags )
 {
 	char	packedName[MAX_QPATH];

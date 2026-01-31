@@ -4579,7 +4579,7 @@ void vk_initialize( void )
 		pool_size[0].descriptorCount = MAX_DRAWIMAGES + 1 + 1 + 1 + VK_NUM_BLOOM_PASSES * 2; // color, screenmap, bloom descriptors
 #ifdef USE_VK_PBR
         if ( vk.pbrActive )
-            pool_size[0].descriptorCount += 1 + ( MAX_DRAWIMAGES * 2 ); // + 1:  brdf-lut | MAX_DRAWIMAGES * (physical + normal)
+            pool_size[0].descriptorCount += 2 + ( MAX_DRAWIMAGES * 8 ); // brdf-lut + irradiance | MAX_DRAWIMAGES * (physical, normal, emissive, clearcoat, sheen, anisotropy, transmission, subsurface)
 #endif
 
 		pool_size[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
@@ -4641,6 +4641,13 @@ void vk_initialize( void )
 		set_layouts[6] = vk.set_layout_sampler; // normalMap
 		set_layouts[7] = vk.set_layout_sampler; // physicalMap
 		set_layouts[8] = vk.set_layout_sampler; // prefiltered envmap
+		set_layouts[9] = vk.set_layout_sampler; // irradiance
+		set_layouts[10] = vk.set_layout_sampler; // emissive
+		set_layouts[11] = vk.set_layout_sampler; // clearcoat
+		set_layouts[12] = vk.set_layout_sampler; // sheen
+		set_layouts[13] = vk.set_layout_sampler; // anisotropy
+		set_layouts[14] = vk.set_layout_sampler; // transmission
+		set_layouts[15] = vk.set_layout_sampler; // subsurface
 #endif
 		desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		desc.pNext = NULL;
@@ -6203,11 +6210,18 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
         int32_t physical_texture_set;
         int32_t env_texture_set;
         int32_t lightmap_texture_set;
+        int32_t irradiance_texture_set;
+        int32_t emissive_texture_set;
+        int32_t clearcoat_texture_set;
+        int32_t sheen_texture_set;
+        int32_t anisotropy_texture_set;
+        int32_t transmission_texture_set;
+        int32_t subsurface_texture_set;
 #endif
     } frag_spec_data; 
 
 #ifdef USE_VK_PBR
-    VkSpecializationMapEntry spec_entries[24];
+    VkSpecializationMapEntry spec_entries[32];
 #else
     VkSpecializationMapEntry spec_entries[12];
 #endif
@@ -6820,7 +6834,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	frag_spec_info.mapEntryCount = 11;
 #ifdef USE_VK_PBR   
 {
-        frag_spec_info.mapEntryCount += 12;
+        frag_spec_info.mapEntryCount += 19;
 
         {
             spec_entries[12].constantID = 11;
@@ -6873,6 +6887,34 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
         spec_entries[23].constantID = 22;
         spec_entries[23].offset = offsetof(struct FragSpecData, lightmap_texture_set);
         spec_entries[23].size = sizeof(frag_spec_data.lightmap_texture_set);
+
+        spec_entries[24].constantID = 23;
+        spec_entries[24].offset = offsetof(struct FragSpecData, irradiance_texture_set);
+        spec_entries[24].size = sizeof(frag_spec_data.irradiance_texture_set);
+
+        spec_entries[25].constantID = 24;
+        spec_entries[25].offset = offsetof(struct FragSpecData, emissive_texture_set);
+        spec_entries[25].size = sizeof(frag_spec_data.emissive_texture_set);
+
+        spec_entries[26].constantID = 25;
+        spec_entries[26].offset = offsetof(struct FragSpecData, clearcoat_texture_set);
+        spec_entries[26].size = sizeof(frag_spec_data.clearcoat_texture_set);
+
+        spec_entries[27].constantID = 26;
+        spec_entries[27].offset = offsetof(struct FragSpecData, sheen_texture_set);
+        spec_entries[27].size = sizeof(frag_spec_data.sheen_texture_set);
+
+        spec_entries[28].constantID = 27;
+        spec_entries[28].offset = offsetof(struct FragSpecData, anisotropy_texture_set);
+        spec_entries[28].size = sizeof(frag_spec_data.anisotropy_texture_set);
+
+        spec_entries[29].constantID = 28;
+        spec_entries[29].offset = offsetof(struct FragSpecData, transmission_texture_set);
+        spec_entries[29].size = sizeof(frag_spec_data.transmission_texture_set);
+
+        spec_entries[30].constantID = 29;
+        spec_entries[30].offset = offsetof(struct FragSpecData, subsurface_texture_set);
+        spec_entries[30].size = sizeof(frag_spec_data.subsurface_texture_set);
         
         // only use w value, specgloss maps are not supported
         frag_spec_data.specularScale_x = def->specularScale[0];
@@ -6884,6 +6926,18 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
         frag_spec_data.normalScale_y = def->normalScale[1];
         frag_spec_data.normalScale_z = def->normalScale[2];
         frag_spec_data.normalScale_w = def->normalScale[3];
+
+        frag_spec_data.normal_texture_set = 0;
+        frag_spec_data.physical_texture_set = 0;
+        frag_spec_data.env_texture_set = 0;
+        frag_spec_data.lightmap_texture_set = 0;
+        frag_spec_data.irradiance_texture_set = 0;
+        frag_spec_data.emissive_texture_set = 0;
+        frag_spec_data.clearcoat_texture_set = 0;
+        frag_spec_data.sheen_texture_set = 0;
+        frag_spec_data.anisotropy_texture_set = 0;
+        frag_spec_data.transmission_texture_set = 0;
+        frag_spec_data.subsurface_texture_set = 0;
 
 	    if ( ( def->vk_pbr_flags & PBR_HAS_NORMALMAP ) == 0 )
             frag_spec_data.normal_texture_set = -1;
@@ -6899,6 +6953,27 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 
         if ( ( def->vk_pbr_flags & PBR_HAS_LIGHTMAP ) == 0 )
             frag_spec_data.lightmap_texture_set = -1;
+
+        if ( !vk.cubemapActive )
+            frag_spec_data.irradiance_texture_set = -1;
+
+        if ( ( def->vk_pbr_flags & PBR_HAS_EMISSIVE ) == 0 )
+            frag_spec_data.emissive_texture_set = -1;
+
+        if ( ( def->vk_pbr_flags & PBR_HAS_CLEARCOAT ) == 0 )
+            frag_spec_data.clearcoat_texture_set = -1;
+
+        if ( ( def->vk_pbr_flags & PBR_HAS_SHEEN ) == 0 )
+            frag_spec_data.sheen_texture_set = -1;
+
+        if ( ( def->vk_pbr_flags & PBR_HAS_ANISOTROPY ) == 0 )
+            frag_spec_data.anisotropy_texture_set = -1;
+
+        if ( ( def->vk_pbr_flags & PBR_HAS_TRANSMISSION ) == 0 )
+            frag_spec_data.transmission_texture_set = -1;
+
+        if ( ( def->vk_pbr_flags & PBR_HAS_SUBSURFACE ) == 0 )
+            frag_spec_data.subsurface_texture_set = -1;
     }
 #endif
 	frag_spec_info.pMapEntries = spec_entries + 1;

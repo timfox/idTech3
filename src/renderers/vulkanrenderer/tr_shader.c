@@ -586,9 +586,46 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 	qboolean			physicalAlbedo = qfalse;
 	char				bufferNormalTextureName[MAX_QPATH];
 	char				bufferPackedTextureName[MAX_QPATH];
+	char				bufferEmissiveTextureName[MAX_QPATH];
+	char				bufferClearcoatTextureName[MAX_QPATH];
+	char				bufferSheenTextureName[MAX_QPATH];
+	char				bufferAnisotropyTextureName[MAX_QPATH];
+	char				bufferTransmissionTextureName[MAX_QPATH];
+	char				bufferSubsurfaceTextureName[MAX_QPATH];
 #endif
 
 	stage->active = qfalse;
+
+#ifdef USE_VK_PBR
+	stage->normalMapType = PHYS_NONE;
+	stage->physicalMapType = PHYS_NONE;
+	stage->emissiveMapType = PHYS_NONE;
+	stage->clearcoatMapType = PHYS_NONE;
+	stage->sheenMapType = PHYS_NONE;
+	stage->anisotropyMapType = PHYS_NONE;
+	stage->transmissionMapType = PHYS_NONE;
+	stage->subsurfaceMapType = PHYS_NONE;
+
+	stage->normalMap = NULL;
+	stage->physicalMap = NULL;
+	stage->emissiveMap = NULL;
+	stage->clearcoatMap = NULL;
+	stage->sheenMap = NULL;
+	stage->anisotropyMap = NULL;
+	stage->transmissionMap = NULL;
+	stage->subsurfaceMap = NULL;
+
+	Vector4Set( stage->emissiveScale, 1.0f, 1.0f, 1.0f, 1.0f );
+	Vector4Set( stage->clearcoatScale, 1.0f, 1.0f, 1.0f, 1.0f );
+	Vector4Set( stage->sheenScale, 1.0f, 1.0f, 1.0f, 1.0f );
+	Vector4Set( stage->anisotropyScale, 0.0f, 0.0f, 0.0f, 0.0f );
+	Vector4Set( stage->transmissionScale, 0.0f, 0.0f, 0.0f, 0.0f );
+	Vector4Set( stage->subsurfaceColor, 1.0f, 1.0f, 1.0f, 1.0f );
+	Vector4Set( stage->subsurfaceParams, 0.0f, 0.0f, 0.0f, 0.0f );
+	for ( i = 0; i < 9; i++ ) {
+		Vector4Set( stage->shCoeffs[i], 0.0f, 0.0f, 0.0f, 0.0f );
+	}
+#endif
 
 	while ( 1 )
 	{
@@ -752,6 +789,108 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 				continue;
 			}			
 			Q_strncpyz( bufferPackedTextureName, token, sizeof(bufferPackedTextureName) );
+		}
+		else if ( !Q_stricmp( token, "emissiveMap" ) )
+		{
+			token = COM_ParseExt( text, qfalse );
+			if ( !token[0] )
+			{
+				ri.Printf(PRINT_WARNING, "WARNING: missing parameter for 'emissiveMap' keyword in shader '%s'\n", shader.name);
+				return qfalse;
+			}
+			stage->emissiveMapType = PHYS_EMISSIVE;
+			if ( !Q_stricmp( token, "$whiteimage" ) )
+			{
+				stage->emissiveMap = tr.whiteImage;
+				stage->vk_pbr_flags |= PBR_HAS_EMISSIVE;
+				continue;
+			}
+			Q_strncpyz( bufferEmissiveTextureName, token, sizeof(bufferEmissiveTextureName) );
+		}
+		else if ( !Q_stricmp( token, "clearcoatMap" ) )
+		{
+			token = COM_ParseExt( text, qfalse );
+			if ( !token[0] )
+			{
+				ri.Printf(PRINT_WARNING, "WARNING: missing parameter for 'clearcoatMap' keyword in shader '%s'\n", shader.name);
+				return qfalse;
+			}
+			stage->clearcoatMapType = PHYS_CLEARCOAT;
+			if ( !Q_stricmp( token, "$whiteimage" ) )
+			{
+				stage->clearcoatMap = tr.whiteImage;
+				stage->vk_pbr_flags |= PBR_HAS_CLEARCOAT;
+				continue;
+			}
+			Q_strncpyz( bufferClearcoatTextureName, token, sizeof(bufferClearcoatTextureName) );
+		}
+		else if ( !Q_stricmp( token, "sheenMap" ) )
+		{
+			token = COM_ParseExt( text, qfalse );
+			if ( !token[0] )
+			{
+				ri.Printf(PRINT_WARNING, "WARNING: missing parameter for 'sheenMap' keyword in shader '%s'\n", shader.name);
+				return qfalse;
+			}
+			stage->sheenMapType = PHYS_SHEEN;
+			if ( !Q_stricmp( token, "$whiteimage" ) )
+			{
+				stage->sheenMap = tr.whiteImage;
+				stage->vk_pbr_flags |= PBR_HAS_SHEEN;
+				continue;
+			}
+			Q_strncpyz( bufferSheenTextureName, token, sizeof(bufferSheenTextureName) );
+		}
+		else if ( !Q_stricmp( token, "anisotropyMap" ) )
+		{
+			token = COM_ParseExt( text, qfalse );
+			if ( !token[0] )
+			{
+				ri.Printf(PRINT_WARNING, "WARNING: missing parameter for 'anisotropyMap' keyword in shader '%s'\n", shader.name);
+				return qfalse;
+			}
+			stage->anisotropyMapType = PHYS_ANISOTROPY;
+			if ( !Q_stricmp( token, "$whiteimage" ) )
+			{
+				stage->anisotropyMap = tr.whiteImage;
+				stage->vk_pbr_flags |= PBR_HAS_ANISOTROPY;
+				continue;
+			}
+			Q_strncpyz( bufferAnisotropyTextureName, token, sizeof(bufferAnisotropyTextureName) );
+		}
+		else if ( !Q_stricmp( token, "transmissionMap" ) )
+		{
+			token = COM_ParseExt( text, qfalse );
+			if ( !token[0] )
+			{
+				ri.Printf(PRINT_WARNING, "WARNING: missing parameter for 'transmissionMap' keyword in shader '%s'\n", shader.name);
+				return qfalse;
+			}
+			stage->transmissionMapType = PHYS_TRANSMISSION;
+			if ( !Q_stricmp( token, "$whiteimage" ) )
+			{
+				stage->transmissionMap = tr.whiteImage;
+				stage->vk_pbr_flags |= PBR_HAS_TRANSMISSION;
+				continue;
+			}
+			Q_strncpyz( bufferTransmissionTextureName, token, sizeof(bufferTransmissionTextureName) );
+		}
+		else if ( !Q_stricmp( token, "subsurfaceMap" ) )
+		{
+			token = COM_ParseExt( text, qfalse );
+			if ( !token[0] )
+			{
+				ri.Printf(PRINT_WARNING, "WARNING: missing parameter for 'subsurfaceMap' keyword in shader '%s'\n", shader.name);
+				return qfalse;
+			}
+			stage->subsurfaceMapType = PHYS_SUBSURFACE;
+			if ( !Q_stricmp( token, "$whiteimage" ) )
+			{
+				stage->subsurfaceMap = tr.whiteImage;
+				stage->vk_pbr_flags |= PBR_HAS_SUBSURFACE;
+				continue;
+			}
+			Q_strncpyz( bufferSubsurfaceTextureName, token, sizeof(bufferSubsurfaceTextureName) );
 		}
 #endif
 		//
@@ -1104,6 +1243,199 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 
 			stage->specularScale[3] = atof( token );
 		}
+#ifdef USE_VK_PBR
+		else if ( !Q_stricmp( token, "emissivescale" ) )
+		{
+			token = COM_ParseExt( text, qfalse );
+			if ( token[0] == 0 )
+			{
+				ri.Printf( PRINT_WARNING, "WARNING: missing parameter for emissiveScale in shader '%s'\n", shader.name );
+				continue;
+			}
+			stage->emissiveScale[0] = atof( token );
+			token = COM_ParseExt( text, qfalse );
+			if ( token[0] == 0 )
+			{
+				stage->emissiveScale[1] = stage->emissiveScale[0];
+				stage->emissiveScale[2] = stage->emissiveScale[0];
+				stage->vk_pbr_flags |= PBR_HAS_EMISSIVE;
+				continue;
+			}
+			stage->emissiveScale[1] = atof( token );
+			token = COM_ParseExt( text, qfalse );
+			if ( token[0] == 0 )
+			{
+				stage->emissiveScale[2] = stage->emissiveScale[0];
+				stage->vk_pbr_flags |= PBR_HAS_EMISSIVE;
+				continue;
+			}
+			stage->emissiveScale[2] = atof( token );
+			stage->vk_pbr_flags |= PBR_HAS_EMISSIVE;
+		}
+		else if ( !Q_stricmp( token, "clearcoatscale" ) )
+		{
+			token = COM_ParseExt( text, qfalse );
+			if ( token[0] == 0 )
+			{
+				ri.Printf( PRINT_WARNING, "WARNING: missing parameter for clearcoatScale in shader '%s'\n", shader.name );
+				continue;
+			}
+			stage->clearcoatScale[0] = atof( token );
+			token = COM_ParseExt( text, qfalse );
+			if ( token[0] == 0 )
+			{
+				stage->vk_pbr_flags |= PBR_HAS_CLEARCOAT;
+				continue;
+			}
+			stage->clearcoatScale[1] = atof( token );
+			stage->vk_pbr_flags |= PBR_HAS_CLEARCOAT;
+		}
+		else if ( !Q_stricmp( token, "sheenscale" ) )
+		{
+			token = COM_ParseExt( text, qfalse );
+			if ( token[0] == 0 )
+			{
+				ri.Printf( PRINT_WARNING, "WARNING: missing parameter for sheenScale in shader '%s'\n", shader.name );
+				continue;
+			}
+			stage->sheenScale[0] = atof( token );
+			token = COM_ParseExt( text, qfalse );
+			if ( token[0] == 0 )
+			{
+				stage->sheenScale[1] = stage->sheenScale[0];
+				stage->sheenScale[2] = stage->sheenScale[0];
+				stage->vk_pbr_flags |= PBR_HAS_SHEEN;
+				continue;
+			}
+			stage->sheenScale[1] = atof( token );
+			token = COM_ParseExt( text, qfalse );
+			if ( token[0] == 0 )
+			{
+				stage->sheenScale[2] = stage->sheenScale[0];
+				stage->vk_pbr_flags |= PBR_HAS_SHEEN;
+				continue;
+			}
+			stage->sheenScale[2] = atof( token );
+			stage->vk_pbr_flags |= PBR_HAS_SHEEN;
+		}
+		else if ( !Q_stricmp( token, "anisotropyscale" ) )
+		{
+			token = COM_ParseExt( text, qfalse );
+			if ( token[0] == 0 )
+			{
+				ri.Printf( PRINT_WARNING, "WARNING: missing parameter for anisotropyScale in shader '%s'\n", shader.name );
+				continue;
+			}
+			stage->anisotropyScale[0] = atof( token );
+			token = COM_ParseExt( text, qfalse );
+			if ( token[0] == 0 )
+			{
+				stage->vk_pbr_flags |= PBR_HAS_ANISOTROPY;
+				continue;
+			}
+			stage->anisotropyScale[1] = atof( token );
+			stage->vk_pbr_flags |= PBR_HAS_ANISOTROPY;
+		}
+		else if ( !Q_stricmp( token, "transmissionscale" ) )
+		{
+			token = COM_ParseExt( text, qfalse );
+			if ( token[0] == 0 )
+			{
+				ri.Printf( PRINT_WARNING, "WARNING: missing parameter for transmissionScale in shader '%s'\n", shader.name );
+				continue;
+			}
+			stage->transmissionScale[0] = atof( token );
+			token = COM_ParseExt( text, qfalse );
+			if ( token[0] == 0 )
+			{
+				stage->vk_pbr_flags |= PBR_HAS_TRANSMISSION;
+				continue;
+			}
+			stage->transmissionScale[1] = atof( token );
+			token = COM_ParseExt( text, qfalse );
+			if ( token[0] == 0 )
+			{
+				stage->vk_pbr_flags |= PBR_HAS_TRANSMISSION;
+				continue;
+			}
+			stage->transmissionScale[2] = atof( token );
+			stage->vk_pbr_flags |= PBR_HAS_TRANSMISSION;
+		}
+		else if ( !Q_stricmp( token, "subsurfacecolor" ) )
+		{
+			token = COM_ParseExt( text, qfalse );
+			if ( token[0] == 0 )
+			{
+				ri.Printf( PRINT_WARNING, "WARNING: missing parameter for subsurfaceColor in shader '%s'\n", shader.name );
+				continue;
+			}
+			stage->subsurfaceColor[0] = atof( token );
+			token = COM_ParseExt( text, qfalse );
+			if ( token[0] == 0 )
+			{
+				stage->vk_pbr_flags |= PBR_HAS_SUBSURFACE;
+				continue;
+			}
+			stage->subsurfaceColor[1] = atof( token );
+			token = COM_ParseExt( text, qfalse );
+			if ( token[0] == 0 )
+			{
+				stage->vk_pbr_flags |= PBR_HAS_SUBSURFACE;
+				continue;
+			}
+			stage->subsurfaceColor[2] = atof( token );
+			stage->vk_pbr_flags |= PBR_HAS_SUBSURFACE;
+		}
+		else if ( !Q_stricmp( token, "subsurfaceparams" ) )
+		{
+			token = COM_ParseExt( text, qfalse );
+			if ( token[0] == 0 )
+			{
+				ri.Printf( PRINT_WARNING, "WARNING: missing parameter for subsurfaceParams in shader '%s'\n", shader.name );
+				continue;
+			}
+			stage->subsurfaceParams[0] = atof( token );
+			token = COM_ParseExt( text, qfalse );
+			if ( token[0] == 0 )
+			{
+				stage->vk_pbr_flags |= PBR_HAS_SUBSURFACE;
+				continue;
+			}
+			stage->subsurfaceParams[1] = atof( token );
+			token = COM_ParseExt( text, qfalse );
+			if ( token[0] == 0 )
+			{
+				stage->vk_pbr_flags |= PBR_HAS_SUBSURFACE;
+				continue;
+			}
+			stage->subsurfaceParams[2] = atof( token );
+			token = COM_ParseExt( text, qfalse );
+			if ( token[0] == 0 )
+			{
+				stage->vk_pbr_flags |= PBR_HAS_SUBSURFACE;
+				continue;
+			}
+			stage->subsurfaceParams[3] = atof( token );
+			stage->vk_pbr_flags |= PBR_HAS_SUBSURFACE;
+		}
+		else if ( !Q_stricmp( token, "shcoeffs" ) )
+		{
+			int coeffIndex;
+			for ( coeffIndex = 0; coeffIndex < 9; coeffIndex++ ) {
+				int component;
+				for ( component = 0; component < 3; component++ ) {
+					token = COM_ParseExt( text, qfalse );
+					if ( token[0] == 0 ) {
+						ri.Printf( PRINT_WARNING, "WARNING: missing parameter for shCoeffs in shader '%s'\n", shader.name );
+						return qfalse;
+					}
+					stage->shCoeffs[coeffIndex][component] = atof( token );
+				}
+				stage->shCoeffs[coeffIndex][3] = 0.0f;
+			}
+			stage->vk_pbr_flags |= PBR_HAS_IRRADIANCE;
+		}
+#endif
 		//
 		// rgbGen
 		//
@@ -1360,6 +1692,14 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 		// scan for a potential physical map
 		if ( !stage->physicalMap && physicalAlbedo ) {
 			for ( i = 0; i < ARRAY_LEN( textureMapTypes ); i++ ) {
+				if ( textureMapTypes[i].type != PHYS_RMO &&
+					textureMapTypes[i].type != PHYS_RMOS &&
+					textureMapTypes[i].type != PHYS_MOXR &&
+					textureMapTypes[i].type != PHYS_MOSR &&
+					textureMapTypes[i].type != PHYS_ORM &&
+					textureMapTypes[i].type != PHYS_ORMS ) {
+					continue;
+				}
 				COM_StripExtension( physicalAlbedoName, bufferPackedTextureName, MAX_QPATH );
 				
 				Q_strcat( bufferPackedTextureName, MAX_QPATH, textureMapTypes[i].suffix );
@@ -1380,6 +1720,10 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 		// scan for a potential normal map
 		if ( !stage->normalMap && physicalAlbedo ) {
 			for ( i = 0; i < ARRAY_LEN( textureMapTypes ); i++ ) {
+				if ( textureMapTypes[i].type != PHYS_NORMAL &&
+					textureMapTypes[i].type != PHYS_NORMALHEIGHT ) {
+					continue;
+				}
 				COM_StripExtension( physicalAlbedoName, bufferNormalTextureName, MAX_QPATH );
 				
 				Q_strcat( bufferNormalTextureName, MAX_QPATH, textureMapTypes[i].suffix );
@@ -1389,6 +1733,78 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 					break;
 				}
 			}
+		}
+
+		// load defined emissive map
+		if ( stage->emissiveMapType != PHYS_NONE )
+			vk_create_emissive_texture( stage, bufferEmissiveTextureName, flags );
+
+		// scan for a potential emissive map
+		if ( !stage->emissiveMap && physicalAlbedo ) {
+			COM_StripExtension( physicalAlbedoName, bufferEmissiveTextureName, MAX_QPATH );
+			Q_strcat( bufferEmissiveTextureName, MAX_QPATH, "_emissive" );
+			stage->emissiveMapType = PHYS_EMISSIVE;
+			vk_create_emissive_texture( stage, bufferEmissiveTextureName, flags );
+		}
+
+		// load defined clearcoat map
+		if ( stage->clearcoatMapType != PHYS_NONE )
+			vk_create_clearcoat_texture( stage, bufferClearcoatTextureName, flags );
+
+		// scan for a potential clearcoat map
+		if ( !stage->clearcoatMap && physicalAlbedo ) {
+			COM_StripExtension( physicalAlbedoName, bufferClearcoatTextureName, MAX_QPATH );
+			Q_strcat( bufferClearcoatTextureName, MAX_QPATH, "_clearcoat" );
+			stage->clearcoatMapType = PHYS_CLEARCOAT;
+			vk_create_clearcoat_texture( stage, bufferClearcoatTextureName, flags );
+		}
+
+		// load defined sheen map
+		if ( stage->sheenMapType != PHYS_NONE )
+			vk_create_sheen_texture( stage, bufferSheenTextureName, flags );
+
+		// scan for a potential sheen map
+		if ( !stage->sheenMap && physicalAlbedo ) {
+			COM_StripExtension( physicalAlbedoName, bufferSheenTextureName, MAX_QPATH );
+			Q_strcat( bufferSheenTextureName, MAX_QPATH, "_sheen" );
+			stage->sheenMapType = PHYS_SHEEN;
+			vk_create_sheen_texture( stage, bufferSheenTextureName, flags );
+		}
+
+		// load defined anisotropy map
+		if ( stage->anisotropyMapType != PHYS_NONE )
+			vk_create_anisotropy_texture( stage, bufferAnisotropyTextureName, flags );
+
+		// scan for a potential anisotropy map
+		if ( !stage->anisotropyMap && physicalAlbedo ) {
+			COM_StripExtension( physicalAlbedoName, bufferAnisotropyTextureName, MAX_QPATH );
+			Q_strcat( bufferAnisotropyTextureName, MAX_QPATH, "_aniso" );
+			stage->anisotropyMapType = PHYS_ANISOTROPY;
+			vk_create_anisotropy_texture( stage, bufferAnisotropyTextureName, flags );
+		}
+
+		// load defined transmission map
+		if ( stage->transmissionMapType != PHYS_NONE )
+			vk_create_transmission_texture( stage, bufferTransmissionTextureName, flags );
+
+		// scan for a potential transmission map
+		if ( !stage->transmissionMap && physicalAlbedo ) {
+			COM_StripExtension( physicalAlbedoName, bufferTransmissionTextureName, MAX_QPATH );
+			Q_strcat( bufferTransmissionTextureName, MAX_QPATH, "_transmission" );
+			stage->transmissionMapType = PHYS_TRANSMISSION;
+			vk_create_transmission_texture( stage, bufferTransmissionTextureName, flags );
+		}
+
+		// load defined subsurface map
+		if ( stage->subsurfaceMapType != PHYS_NONE )
+			vk_create_subsurface_texture( stage, bufferSubsurfaceTextureName, flags );
+
+		// scan for a potential subsurface map
+		if ( !stage->subsurfaceMap && physicalAlbedo ) {
+			COM_StripExtension( physicalAlbedoName, bufferSubsurfaceTextureName, MAX_QPATH );
+			Q_strcat( bufferSubsurfaceTextureName, MAX_QPATH, "_subsurface" );
+			stage->subsurfaceMapType = PHYS_SUBSURFACE;
+			vk_create_subsurface_texture( stage, bufferSubsurfaceTextureName, flags );
 		}
 	}
 #endif

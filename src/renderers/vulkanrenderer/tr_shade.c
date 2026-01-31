@@ -936,12 +936,72 @@ static qboolean vk_is_valid_pbr_surface( const qboolean hasPBR ) {
 	if ( backEnd.viewParms.portalView == PV_MIRROR )
 		return qfalse;
 
-	if ( backEnd.currentEntity ) {
-		if ( backEnd.currentEntity != &tr.worldEntity )
-			return qfalse;
-	}
+	// PBR is now supported for both world surfaces and models (entities)
+	// The check for worldEntity was removed to allow models to use PBR materials
 
 	return qtrue;
+}
+
+static void R_GetPBRSurfacePosition( vec3_t outPos ) {
+	int i;
+
+	if ( backEnd.currentEntity && backEnd.currentEntity != &tr.worldEntity ) {
+		VectorCopy( backEnd.currentEntity->e.origin, outPos );
+		return;
+	}
+
+	VectorClear( outPos );
+	if ( tess.numVertexes <= 0 ) {
+		return;
+	}
+
+	for ( i = 0; i < tess.numVertexes; i++ ) {
+		outPos[0] += tess.xyz[i][0];
+		outPos[1] += tess.xyz[i][1];
+		outPos[2] += tess.xyz[i][2];
+	}
+
+	outPos[0] /= tess.numVertexes;
+	outPos[1] /= tess.numVertexes;
+	outPos[2] /= tess.numVertexes;
+}
+
+static int R_SelectCubemapIndexForPBR( void ) {
+	int i;
+	int bestIndex = -1;
+	int bestInRadius = -1;
+	float bestDistSq = 0.0f;
+	float bestInRadiusDistSq = 0.0f;
+	vec3_t pos;
+
+	if ( tr.numCubemaps <= 0 )
+		return -1;
+
+	R_GetPBRSurfacePosition( pos );
+
+	for ( i = 0; i < tr.numCubemaps; i++ ) {
+		float distSq;
+		vec3_t delta;
+		const cubemap_t *cube = &tr.cubemaps[i];
+
+		VectorSubtract( pos, cube->origin, delta );
+		distSq = VectorLengthSquared( delta );
+
+		if ( bestIndex == -1 || distSq < bestDistSq ) {
+			bestIndex = i;
+			bestDistSq = distSq;
+		}
+
+		if ( cube->parallaxRadius > 0.0f && distSq > ( cube->parallaxRadius * cube->parallaxRadius ) )
+			continue;
+
+		if ( bestInRadius == -1 || distSq < bestInRadiusDistSq ) {
+			bestInRadius = i;
+			bestInRadiusDistSq = distSq;
+		}
+	}
+
+	return ( bestInRadius != -1 ) ? bestInRadius : bestIndex;
 }
 
 /*
@@ -998,9 +1058,6 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		Com_Memcpy( &uniform_camera.viewOrigin, backEnd.refdef.vieworg, sizeof( vec3_t) );
 		uniform_camera.viewOrigin[3] = 0.0;
 
-		//VectorCopy4( pStage->normalScale, uniform_global.normalScale );
-		//VectorCopy4( pStage->specularScale, uniform_global.specularScale );
-
 		vk.cmd->camera_ubo_offset = vk_append_uniform( &uniform_camera, sizeof(uniform_camera), vk.uniform_camera_item_size );
 
 		pushUniform = qtrue;
@@ -1055,6 +1112,16 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 
 #ifdef USE_VK_PBR
 		if ( is_pbr_surface && pStage->vk_pbr_flags ) {
+			Vector4Copy( pStage->emissiveScale, uniform.pbrEmissiveScale );
+			Vector4Copy( pStage->clearcoatScale, uniform.pbrClearcoatScale );
+			Vector4Copy( pStage->sheenScale, uniform.pbrSheenScale );
+			Vector4Copy( pStage->anisotropyScale, uniform.pbrAnisotropyScale );
+			Vector4Copy( pStage->transmissionScale, uniform.pbrTransmissionScale );
+			Vector4Copy( pStage->subsurfaceColor, uniform.pbrSubsurfaceColor );
+			Vector4Copy( pStage->subsurfaceParams, uniform.pbrSubsurfaceParams );
+			Com_Memcpy( uniform.pbrShCoeffs, pStage->shCoeffs, sizeof( pStage->shCoeffs ) );
+			pushUniform = qtrue;
+
 			vk_update_descriptor( VK_DESC_PBR_BRDFLUT, vk.brdflut_image_descriptor );
 				
 			if ( pStage->vk_pbr_flags & PBR_HAS_NORMALMAP )
@@ -1063,14 +1130,40 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			if ( pStage->vk_pbr_flags & PBR_HAS_PHYSICALMAP || pStage->vk_pbr_flags & PBR_HAS_SPECULARMAP )
 				vk_update_descriptor( VK_DESC_PBR_PHYSICAL, pStage->physicalMap->descriptor );
 			
+			if ( pStage->vk_pbr_flags & PBR_HAS_EMISSIVE )
+				vk_update_descriptor( VK_DESC_PBR_EMISSIVE, pStage->emissiveMap->descriptor );
+
+			if ( pStage->vk_pbr_flags & PBR_HAS_CLEARCOAT )
+				vk_update_descriptor( VK_DESC_PBR_CLEARCOAT, pStage->clearcoatMap->descriptor );
+
+			if ( pStage->vk_pbr_flags & PBR_HAS_SHEEN )
+				vk_update_descriptor( VK_DESC_PBR_SHEEN, pStage->sheenMap->descriptor );
+
+			if ( pStage->vk_pbr_flags & PBR_HAS_ANISOTROPY )
+				vk_update_descriptor( VK_DESC_PBR_ANISOTROPY, pStage->anisotropyMap->descriptor );
+
+			if ( pStage->vk_pbr_flags & PBR_HAS_TRANSMISSION )
+				vk_update_descriptor( VK_DESC_PBR_TRANSMISSION, pStage->transmissionMap->descriptor );
+
+			if ( pStage->vk_pbr_flags & PBR_HAS_SUBSURFACE )
+				vk_update_descriptor( VK_DESC_PBR_SUBSURFACE, pStage->subsurfaceMap->descriptor );
+			
 			if ( !tr.numCubemaps || backEnd.viewParms.targetCube != NULL ) {
 				vk_update_descriptor( VK_DESC_PBR_CUBEMAP, tr.emptyCubemap->descriptor );
-				//vk_update_descriptor( 10, tr.emptyCubemap->descriptor ); // irradiance is currently unused
+				vk_update_descriptor( VK_DESC_PBR_IRRADIANCE, tr.emptyCubemap->descriptor );
 			}
 			else { 
-				// use the first cubemap index, indexes are not assigned per surface yet
-				vk_update_descriptor( VK_DESC_PBR_CUBEMAP, tr.cubemaps[0].prefiltered_image->descriptor );
-				//vk_update_descriptor( 10, tr.cubemaps[0].irradiance_image->descriptor ); // irradiance is currently unused
+				int cubemapIndex = R_SelectCubemapIndexForPBR();
+				if ( cubemapIndex < 0 ) {
+					vk_update_descriptor( VK_DESC_PBR_CUBEMAP, tr.emptyCubemap->descriptor );
+					vk_update_descriptor( VK_DESC_PBR_IRRADIANCE, tr.emptyCubemap->descriptor );
+				} else {
+					vk_update_descriptor( VK_DESC_PBR_CUBEMAP, tr.cubemaps[cubemapIndex].prefiltered_image->descriptor );
+					if ( tr.cubemaps[cubemapIndex].irradiance_image )
+						vk_update_descriptor( VK_DESC_PBR_IRRADIANCE, tr.cubemaps[cubemapIndex].irradiance_image->descriptor );
+					else
+						vk_update_descriptor( VK_DESC_PBR_IRRADIANCE, tr.emptyCubemap->descriptor );
+				}
 			}
 		}
 #endif
