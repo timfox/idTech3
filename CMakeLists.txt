@@ -138,13 +138,13 @@ endif()
 find_path(OPENAL_INCLUDE_DIR
   NAMES AL/al.h OpenAL/al.h
   PATH_SUFFIXES include
-  PATHS ${CMAKE_PREFIX_PATH} /usr/local /usr /opt/local /opt
+  PATHS ${CMAKE_PREFIX_PATH} /usr/local /usr /opt/local /opt /opt/homebrew
 )
 
 find_library(OPENAL_LIBRARY
   NAMES openal OpenAL32
   PATH_SUFFIXES lib64 lib
-  PATHS ${CMAKE_PREFIX_PATH} /usr/local /usr /opt/local /opt
+  PATHS ${CMAKE_PREFIX_PATH} /usr/local /usr /opt/local /opt /opt/homebrew
 )
 
 if(OPENAL_INCLUDE_DIR AND OPENAL_LIBRARY)
@@ -310,6 +310,7 @@ ENDIF()
 
 # renderers
 AUX_SOURCE_DIRECTORY(src/renderers/rendercommon RENDERER_COMMON_SRCS)
+list(APPEND RENDERER_COMMON_SRCS src/renderers/rendercommon/tr_font_stub.c)
 AUX_SOURCE_DIRECTORY(src/renderers/openglrenderer RENDERER_GL_SRCS)
 AUX_SOURCE_DIRECTORY(src/renderers/vulkanrenderer RENDERER_VK_SRCS)
 
@@ -417,7 +418,10 @@ ELSEIF(WIN32)
 ENDIF(UNIX)
 
 IF(USE_OPENAL)
-	list(APPEND Q3_UI_SRCS src/audio/backends/openal/openal_snd.c)
+	list(APPEND Q3_UI_SRCS
+		src/audio/backends/openal/openal_snd.c
+		src/audio/acoustics/s_acoustics.c
+	)
 ENDIF()
 
 ADD_LIBRARY(q3ui OBJECT ${Q3_UI_SRCS})
@@ -447,7 +451,9 @@ IF(USE_OPENAL)
 	endif()
 	TARGET_COMPILE_DEFINITIONS(q3ui PRIVATE USE_OPENAL)
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_OPENAL)
+	TARGET_COMPILE_DEFINITIONS(q3ui PRIVATE USE_OPENAL_EFX)
 	target_include_directories(q3ui PRIVATE ${OPENAL_INCLUDE_DIR})
+	target_include_directories(client PRIVATE ${OPENAL_INCLUDE_DIR})
 ENDIF()
 
 IF(USE_VULKAN)
