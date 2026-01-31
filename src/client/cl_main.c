@@ -161,6 +161,20 @@ void CL_CDDialog( void ) {
 
 
 /*
+==================
+CL_SetPlayerName_f
+==================
+*/
+static void CL_SetPlayerName_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "usage: %s <name>\n", Cmd_Argv( 0 ) );
+		return;
+	}
+
+	Cvar_Set( "name", Cmd_ArgsFrom( 1 ) );
+}
+
+/*
 =======================================================================
 
 CLIENT RELIABLE COMMAND COMMUNICATION
@@ -4069,6 +4083,8 @@ void CL_Init( void ) {
 	Cmd_AddCommand ("stopvideo", CL_StopVideo_f );
 	Cmd_AddCommand ("serverinfo", CL_Serverinfo_f );
 	Cmd_AddCommand ("systeminfo", CL_Systeminfo_f );
+	Cmd_AddCommand ("playername", CL_SetPlayerName_f );
+	Cmd_AddCommand ("setname", CL_SetPlayerName_f );
 
 #ifdef USE_CURL
 	Cmd_AddCommand( "download", CL_Download_f );

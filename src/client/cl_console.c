@@ -73,6 +73,7 @@ cvar_t		*con_conspeed;
 cvar_t		*con_autoclear;
 cvar_t		*con_notifytime;
 cvar_t		*con_scale;
+cvar_t		*con_inputMode;
 
 int			g_console_field_width;
 
@@ -403,6 +404,15 @@ void Con_Init( void )
 	con_scale = Cvar_Get( "con_scale", "1", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( con_scale, "0.5", "8", CV_FLOAT );
 	Cvar_SetDescription( con_scale, "Console font size scale." );
+	con_inputMode = Cvar_Get( "con_inputMode", "0", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( con_inputMode, "0", "3", CV_INTEGER );
+	Cvar_SetDescription( con_inputMode,
+		"Console input mode selector:\n"
+		" 0 - legacy (bare text is chat while connected, commands otherwise)\n"
+		" 1 - command-first (bare text always runs commands; chat requires a prefix)\n"
+		" 2 - chat-first (bare text always chat; commands require \\ or /)\n"
+		" 3 - smart (bare text becomes a command only if it matches a registered command)"
+	);
 
 	Field_Clear( &g_consoleField );
 	g_consoleField.widthInChars = g_console_field_width;
