@@ -1706,7 +1706,7 @@ Used to load a development dll instead of a virtual machine
 TTimo: added some verbosity in debug
 =================
 */
-static void * QDECL VM_LoadDll( const char *name, vmMainFunc_t *entryPoint, dllSyscall_t systemcalls ) {
+static void * QDECL loadNative( const char *name, vmMainFunc_t *entryPoint, dllSyscall_t systemcalls ) {
 
 	char		filename[ MAX_QPATH ];
 	void		*libHandle;
@@ -1719,11 +1719,11 @@ static void * QDECL VM_LoadDll( const char *name, vmMainFunc_t *entryPoint, dllS
 	libHandle = FS_LoadLibrary( filename );
 
 	if ( !libHandle ) {
-		Com_Printf( "VM_LoadDLL '%s' failed\n", filename );
+		Com_Printf( "loadNative '%s' failed\n", filename );
 		return NULL;
 	}
 
-	Com_Printf( "VM_LoadDLL '%s' ok\n", filename );
+	Com_Printf( "loadNative '%s' ok\n", filename );
 
 	sym = Sys_LoadFunction( libHandle, "dllEntry" );
 	Com_Memcpy( &dllEntry, &sym, sizeof( dllEntry ) );
@@ -1737,9 +1737,9 @@ static void * QDECL VM_LoadDll( const char *name, vmMainFunc_t *entryPoint, dllS
 
 	vmMainAddr = NULL;
 	Com_Memcpy( &vmMainAddr, entryPoint, sizeof( vmMainAddr ) );
-	Com_Printf( "VM_LoadDll(%s) found **vmMain** at %p\n", name, vmMainAddr );
+	Com_Printf( "loadNative(%s) found **vmMain** at %p\n", name, vmMainAddr );
 	dllEntry( systemcalls );
-	Com_Printf( "VM_LoadDll(%s) succeeded!\n", name );
+	Com_Printf( "loadNative(%s) succeeded!\n", name );
 
 	return libHandle;
 }
@@ -1792,8 +1792,8 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 	// Always try native DLLs first, regardless of interpret setting
 	// (unless fs_restrict is set, which disables native DLLs for demos)
 	if ( !Cvar_VariableIntegerValue( "fs_restrict" ) ) {
-		Com_Printf( "Loading dll file %s.\n", name );
-		vm->dllHandle = VM_LoadDll( name, &vm->entryPoint, dllSyscalls );
+		Com_Printf( "Loading native %s.\n", name );
+		vm->dllHandle = loadNative( name, &vm->entryPoint, dllSyscalls );
 		if ( vm->dllHandle ) {
 			vm->privateFlag = 0; // allow reading private cvars
 			vm->dataAlloc = ~0U;
