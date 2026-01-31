@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: ./compile_engine.sh [game_name] [Debug|Release] [clean] [quiet] [coverage] [vulkan] [opengl]
+# Usage: ./compile_engine.sh [game_name] [Debug|Release] [clean] [quiet] [coverage] [vulkan] [opengl] [freetype]
 # Notes:
 # - build type defaults to Release
 # - vulkan and opengl are mutually exclusive
@@ -11,6 +11,7 @@ set -euo pipefail
 VULKAN=0
 OPENGL=0
 SKIP_IDPAK=0
+FREETYPE=0
 
 GAME_NAME="idtech3"
 BUILD_TYPE="Release"
@@ -53,6 +54,7 @@ for arg in "$@"; do
     vulkan) VULKAN=1 ;;
     skip-idpak-check|skip_idpak_check|skip-pak|skip-paks) SKIP_IDPAK=1 ;;
     opengl) OPENGL=1 ;;
+    freetype) FREETYPE=1 ;;
     *) GAME_NAME="$arg" ;;
   esac
 done
@@ -106,6 +108,11 @@ CMAKE_FLAGS=(
   "-DUSE_VULKAN=ON"
   "-Wno-dev"
 )
+
+if [ "$FREETYPE" -eq 1 ]; then
+  CMAKE_FLAGS+=("-DBUILD_FREETYPE=ON")
+  echo "CMake: BUILD_FREETYPE=ON"
+fi
 
 if [ "$VULKAN" -eq 1 ]; then
   CMAKE_FLAGS+=("-DRENDERER_DEFAULT=vulkan")

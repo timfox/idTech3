@@ -48,7 +48,14 @@
 	#define VK_DESC_PBR_NORMAL				6
 	#define VK_DESC_PBR_PHYSICAL			7
 	#define VK_DESC_PBR_CUBEMAP				8
-	#define VK_DESC_COUNT	9
+	#define VK_DESC_PBR_IRRADIANCE			9
+	#define VK_DESC_PBR_EMISSIVE			10
+	#define VK_DESC_PBR_CLEARCOAT			11
+	#define VK_DESC_PBR_SHEEN				12
+	#define VK_DESC_PBR_ANISOTROPY			13
+	#define VK_DESC_PBR_TRANSMISSION		14
+	#define VK_DESC_PBR_SUBSURFACE			15
+	#define VK_DESC_COUNT	16
 #else
 	#define VK_DESC_COUNT   5
 #endif
@@ -236,6 +243,17 @@ typedef struct vkUniform_s {
 	vec4_t fogDepthVector;		// vertex
 	vec4_t fogEyeT;				// vertex
 	vec4_t fogColor;			// fragment
+
+#ifdef USE_VK_PBR
+	vec4_t pbrEmissiveScale;
+	vec4_t pbrClearcoatScale;
+	vec4_t pbrSheenScale;
+	vec4_t pbrAnisotropyScale;
+	vec4_t pbrTransmissionScale;
+	vec4_t pbrSubsurfaceColor;
+	vec4_t pbrSubsurfaceParams;
+	vec4_t pbrShCoeffs[9];
+#endif
 } vkUniform_t;
 
 typedef struct vkUniformCamera_s {
@@ -265,6 +283,13 @@ typedef struct vkUniformCamera_s {
 #define PBR_HAS_PHYSICALMAP		( 2 )
 #define PBR_HAS_SPECULARMAP		( 4 )
 #define PBR_HAS_LIGHTMAP		( 8 )
+#define PBR_HAS_EMISSIVE		( 16 )
+#define PBR_HAS_CLEARCOAT		( 32 )
+#define PBR_HAS_SHEEN			( 64 )
+#define PBR_HAS_ANISOTROPY		( 128 )
+#define PBR_HAS_TRANSMISSION	( 256 )
+#define PBR_HAS_SUBSURFACE		( 512 )
+#define PBR_HAS_IRRADIANCE		( 1024 )
 
 #define PHYS_NONE				( 1 )
 #define PHYS_RMO				( 2 )
@@ -275,7 +300,13 @@ typedef struct vkUniformCamera_s {
 #define PHYS_ORMS   			( 64 )	
 #define PHYS_NORMAL   			( 128 )	
 #define PHYS_NORMALHEIGHT		( 256 )	
-#define PHYS_SPECGLOSS					( 512 )	
+#define PHYS_SPECGLOSS			( 512 )
+#define PHYS_EMISSIVE			( 1024 )
+#define PHYS_CLEARCOAT			( 2048 )
+#define PHYS_SHEEN				( 4096 )
+#define PHYS_ANISOTROPY			( 8192 )
+#define PHYS_TRANSMISSION		( 16384 )
+#define PHYS_SUBSURFACE			( 32768 )
 
 #define ByteToFloat(a)			((float)(a) * 1.0f/255.0f)
 #define FloatToByte(a)			(byte)((a) * 255.0f)
@@ -301,6 +332,12 @@ static const textureMapType_t textureMapTypes[] = {
 	{ (uint32_t)PHYS_ORMS,			"_orms",	{ VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY } },
 	{ (uint32_t)PHYS_NORMAL,		"_n",		{ VK_COMPONENT_SWIZZLE_A, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_R } },
 	{ (uint32_t)PHYS_NORMALHEIGHT,	"_nh",		{ VK_COMPONENT_SWIZZLE_A, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_R } },
+	{ (uint32_t)PHYS_EMISSIVE,		"_emissive", { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY } },
+	{ (uint32_t)PHYS_CLEARCOAT,		"_clearcoat", { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY } },
+	{ (uint32_t)PHYS_SHEEN,			"_sheen",	{ VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY } },
+	{ (uint32_t)PHYS_ANISOTROPY,	"_aniso",	{ VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY } },
+	{ (uint32_t)PHYS_TRANSMISSION,	"_transmission", { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY } },
+	{ (uint32_t)PHYS_SUBSURFACE,	"_subsurface", { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY } },
 #endif
 };
 

@@ -85,6 +85,15 @@ cvar_t	*r_vbo;
 #endif
 #ifdef USE_VK_PBR
 cvar_t	*r_pbr;
+cvar_t	*r_pbr_shExtract;
+cvar_t	*r_pbr_debug;
+cvar_t	*r_pbr_packedPreferred;
+#ifdef VK_CUBEMAP
+cvar_t	*r_pbr_iblIrradianceSize;
+cvar_t	*r_pbr_iblPrefilterSize;
+cvar_t	*r_pbr_showCubemap;
+cvar_t	*r_pbr_cubemapInfo;
+#endif
 cvar_t  *r_baseNormalX;
 cvar_t  *r_baseNormalY;
 cvar_t  *r_baseParallax;
@@ -204,8 +213,8 @@ Vk_World	vk_world;
 static char gl_extensions[ 32768 ];
 
 #define GLE( ret, name, ... ) ret ( APIENTRY * q##name )( __VA_ARGS__ );
-	QGL_Core_PROCS;
-	QGL_Ext_PROCS;
+	QGL_Core_PROCS
+	QGL_Ext_PROCS
 #undef GLE
 
 typedef struct {
@@ -714,6 +723,10 @@ static byte *RB_ReadPixels(int x, int y, int width, int height, size_t *offset, 
 	int linelen;
 	int	bufAlign;
 	int packAlign = 1;
+
+	(void)x;
+	(void)y;
+	(void)lineAlign;
 
 	linelen = width * 3;
 
@@ -1430,6 +1443,12 @@ static void VarInfo( void )
 	if ( r_vertexLight->integer ) {
 		ri.Printf( PRINT_ALL, "HACK: using vertex lightmap approximation\n" );
 	}
+#if defined (USE_VK_PBR)
+	ri.Printf( PRINT_ALL, "PBR SH extraction: %s\n", r_pbr_shExtract->integer ? "enabled" : "disabled" );
+	if ( r_pbr_debug->integer ) {
+		ri.Printf( PRINT_ALL, "PBR debug view: mode %d\n", r_pbr_debug->integer );
+	}
+#endif
 #else
 	if ( r_vertexLight->integer || glConfig.hardwareType == GLHW_PERMEDIA2 ) {
 		ri.Printf( PRINT_ALL, "HACK: using vertex lightmap approximation\n" );
@@ -1555,14 +1574,55 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_vbo, "Use Vertex Buffer Objects to cache static map geometry, may improve FPS on modern GPUs, increases hunk memory usage by 15-30MB (map-dependent)." );
 #endif
 #if defined (USE_VULKAN) && defined (USE_VK_PBR)
-	r_pbr = ri.Cvar_Get("r_pbr", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	r_pbr = ri.Cvar_Get("r_pbr", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_pbr, "Enables Physically Based Rendering. \nRequires " S_COLOR_CYAN "\\r_fbo 1 \n" S_COLOR_GREEN "Advised " S_COLOR_CYAN "\\r_vbo 1 " S_COLOR_GREEN "for static world geometry " S_COLOR_WHITE "*optional" );
+
+	r_pbr_shExtract = ri.Cvar_Get( "r_pbr_shExtract", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_pbr_shExtract, "Extract SH coefficients from generated irradiance cubemaps for PBR." );
+
+	r_pbr_debug = ri.Cvar_Get( "r_pbr_debug", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbr_debug, "0", "4", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pbr_debug,
+		"PBR debug view override (Vulkan PBR only):\n"
+		" 0 - off (normal PBR)\n"
+		" 1 - show base/albedo (texture0)\n"
+		" 2 - show normal map (RGB)\n"
+		" 3 - show physical map (packed)\n"
+		" 4 - show emissive map (RGB)\n" );
+
+	r_pbr_packedPreferred = ri.Cvar_Get( "r_pbr_packedPreferred", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_pbr_packedPreferred, "0", "6", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pbr_packedPreferred,
+		"Preferred packed PBR physical map format for auto-discovery:\n"
+		" 0 - auto (legacy order)\n"
+		" 1 - ORM (recommended)\n"
+		" 2 - RMO\n"
+		" 3 - MOXR\n"
+		" 4 - ORMS\n"
+		" 5 - RMOS\n"
+		" 6 - MOSR\n"
+		"Auto-discovery still falls back to other formats if the preferred suffix is not found." );
 
 	r_baseNormalX	= ri.Cvar_Get("r_baseNormalX",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );
 	r_baseNormalY	= ri.Cvar_Get("r_baseNormalY",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );
 	r_baseParallax	= ri.Cvar_Get("r_baseParallax",		"0.05",	CVAR_ARCHIVE | CVAR_LATCH );
 	r_baseSpecular	= ri.Cvar_Get( "r_baseSpecular",	"0.04",	CVAR_ARCHIVE | CVAR_LATCH );
 #ifdef VK_CUBEMAP
+	r_pbr_iblIrradianceSize = ri.Cvar_Get( "r_pbr_iblIrradianceSize", "64", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_pbr_iblIrradianceSize, "16", "1024", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pbr_iblIrradianceSize, "IBL irradiance cubemap size (resolution per face). Power-of-two recommended. Requires renderer restart." );
+
+	r_pbr_iblPrefilterSize = ri.Cvar_Get( "r_pbr_iblPrefilterSize", "256", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_pbr_iblPrefilterSize, "32", "2048", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pbr_iblPrefilterSize, "IBL prefiltered environment cubemap size (resolution per face). Power-of-two recommended. Requires renderer restart." );
+
+	r_pbr_showCubemap = ri.Cvar_Get( "r_pbr_showCubemap", "0", CVAR_TEMP );
+	ri.Cvar_CheckRange( r_pbr_showCubemap, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pbr_showCubemap, "Show current PBR cubemap selection overlay (updates a debug string cvar)." );
+
+	r_pbr_cubemapInfo = ri.Cvar_Get( "r_pbr_cubemapInfo", "", CVAR_TEMP );
+	ri.Cvar_SetDescription( r_pbr_cubemapInfo, "Read-only-ish debug string updated by renderer when r_pbr_showCubemap is enabled." );
+
 	r_cubeMapping = ri.Cvar_Get( "r_cubeMapping", "0", CVAR_ARCHIVE | CVAR_LATCH );
 #endif
 #endif
@@ -1802,7 +1862,7 @@ static void R_Register( void )
 		" -2 - first integrated GPU" );
 	r_device->modified = qfalse;
 
-	r_fbo = ri.Cvar_Get( "r_fbo", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	r_fbo = ri.Cvar_Get( "r_fbo", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_fbo, "Use framebuffer objects, enables gamma correction in windowed mode and allows arbitrary video size and screenshot/video capture.\n Required for bloom, HDR rendering, anti-aliasing and greyscale effects." );
 	r_hdr = ri.Cvar_Get( "r_hdr", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription(r_hdr, "Enables high dynamic range frame buffer texture format. Requires \\r_fbo 1.\n -1: 4-bit, for testing purposes, heavy color banding, might not work on all systems\n  0: 8 bit, default, moderate color banding with multi-stage shaders\n  1: 16 bit, enhanced blending precision, no color banding, might decrease performance on AMD / Intel GPUs\n" );

@@ -581,6 +581,16 @@ static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 #ifdef USE_VOIP
 			SCR_DrawVoipMeter();
 #endif
+			// PBR cubemap selection overlay (renderer-updated cvar string).
+			if ( Cvar_VariableIntegerValue( "r_pbr_showCubemap" ) ) {
+				const char *info = Cvar_VariableString( "r_pbr_cubemapInfo" );
+				if ( info && info[0] ) {
+					SCR_DrawSmallString( 8, 64, info, (int)strlen( info ) );
+				} else {
+					const char *fallback = "PBR cubemap: (no data)";
+					SCR_DrawSmallString( 8, 64, fallback, (int)strlen( fallback ) );
+				}
+			}
 			break;
 		}
 	}

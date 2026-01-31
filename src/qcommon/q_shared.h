@@ -315,6 +315,20 @@ typedef enum {
 	PRINT_ERROR
 } printParm_t;
 
+// Log categories for structured logging
+typedef enum {
+	LOG_SYS,		// System/engine core
+	LOG_FS,			// Filesystem
+	LOG_SND,		// Audio/sound
+	LOG_VK,			// Vulkan renderer
+	LOG_GL,			// OpenGL renderer
+	LOG_NET,		// Network
+	LOG_CL,			// Client
+	LOG_SV,			// Server
+	LOG_VM,			// Virtual machine
+	LOG_COUNT
+} logCategory_t;
+
 
 #ifdef ERR_FATAL
 #undef ERR_FATAL			// this is be defined in malloc.h
@@ -926,6 +940,33 @@ int Info_RemoveKey( char *s, const char *key );
 void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error( errorParm_t level, const char *fmt, ... );
 void FORMAT_PRINTF(1, 2) QDECL Com_Printf( const char *msg, ... );
 
+// Structured logging helpers
+extern const char *logCategoryNames[LOG_COUNT];
+int Com_LogVerbosity( void );
+qboolean Com_ShouldLog( logCategory_t category, int verbosity );
+void Com_LogCategory( logCategory_t category, int verbosity, const char *fmt, ... );
+
+// Structured logging macros
+#define LOG_SYS_V(verbosity, ...) do { if (Com_ShouldLog(LOG_SYS, verbosity)) Com_LogCategory(LOG_SYS, verbosity, __VA_ARGS__); } while(0)
+#define LOG_FS_V(verbosity, ...) do { if (Com_ShouldLog(LOG_FS, verbosity)) Com_LogCategory(LOG_FS, verbosity, __VA_ARGS__); } while(0)
+#define LOG_SND_V(verbosity, ...) do { if (Com_ShouldLog(LOG_SND, verbosity)) Com_LogCategory(LOG_SND, verbosity, __VA_ARGS__); } while(0)
+#define LOG_VK_V(verbosity, ...) do { if (Com_ShouldLog(LOG_VK, verbosity)) Com_LogCategory(LOG_VK, verbosity, __VA_ARGS__); } while(0)
+#define LOG_GL_V(verbosity, ...) do { if (Com_ShouldLog(LOG_GL, verbosity)) Com_LogCategory(LOG_GL, verbosity, __VA_ARGS__); } while(0)
+#define LOG_NET_V(verbosity, ...) do { if (Com_ShouldLog(LOG_NET, verbosity)) Com_LogCategory(LOG_NET, verbosity, __VA_ARGS__); } while(0)
+#define LOG_CL_V(verbosity, ...) do { if (Com_ShouldLog(LOG_CL, verbosity)) Com_LogCategory(LOG_CL, verbosity, __VA_ARGS__); } while(0)
+#define LOG_SV_V(verbosity, ...) do { if (Com_ShouldLog(LOG_SV, verbosity)) Com_LogCategory(LOG_SV, verbosity, __VA_ARGS__); } while(0)
+#define LOG_VM_V(verbosity, ...) do { if (Com_ShouldLog(LOG_VM, verbosity)) Com_LogCategory(LOG_VM, verbosity, __VA_ARGS__); } while(0)
+
+// Convenience macros for common verbosity levels (1=startup+warnings, 2=subsystem detail)
+#define LOG_SYS(...) LOG_SYS_V(1, __VA_ARGS__)
+#define LOG_FS(...) LOG_FS_V(1, __VA_ARGS__)
+#define LOG_SND(...) LOG_SND_V(1, __VA_ARGS__)
+#define LOG_VK(...) LOG_VK_V(1, __VA_ARGS__)
+#define LOG_GL(...) LOG_GL_V(1, __VA_ARGS__)
+#define LOG_NET(...) LOG_NET_V(1, __VA_ARGS__)
+#define LOG_CL(...) LOG_CL_V(1, __VA_ARGS__)
+#define LOG_SV(...) LOG_SV_V(1, __VA_ARGS__)
+#define LOG_VM(...) LOG_VM_V(1, __VA_ARGS__)
 
 /*
 ==========================================================

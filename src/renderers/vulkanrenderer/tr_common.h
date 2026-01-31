@@ -89,6 +89,7 @@ extern cvar_t *r_ext_texture_env_add;
 
 extern cvar_t *r_ext_texture_filter_anisotropic;
 extern cvar_t *r_ext_max_anisotropy;
+extern cvar_t *r_saveFontData;
 
 float R_NoiseGet4f( float x, float y, float z, double t );
 void  R_NoiseInit( void );

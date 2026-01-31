@@ -2551,6 +2551,29 @@ static void R_LoadEnvironmentJson( const char *baseName )
 		keyValueJson = JSON_ObjectGetNamedValue( cubemapJson, bufferEnd, "Radius" );
 		if (keyValueJson)
 			cubemap->parallaxRadius = JSON_ValueGetFloat( keyValueJson, bufferEnd );
+		cubemap->hasSHCoeffs = qfalse;
+		keyValueJson = JSON_ObjectGetNamedValue( cubemapJson, bufferEnd, "SHCoeffs" );
+		if ( keyValueJson && JSON_ValueGetType( keyValueJson, bufferEnd ) == JSONTYPE_ARRAY )
+		{
+			int coeffIndex;
+			for ( coeffIndex = 0; coeffIndex < 9; coeffIndex++ )
+			{
+				const char *coeffJson = JSON_ArrayGetValue( keyValueJson, bufferEnd, coeffIndex );
+				if ( !coeffJson )
+					break;
+				const char *component[3];
+				if ( JSON_ArrayGetIndex( coeffJson, bufferEnd, component, 3 ) != 3 )
+					break;
+				cubemap->shCoeffs[coeffIndex][0] = JSON_ValueGetFloat( component[0], bufferEnd );
+				cubemap->shCoeffs[coeffIndex][1] = JSON_ValueGetFloat( component[1], bufferEnd );
+				cubemap->shCoeffs[coeffIndex][2] = JSON_ValueGetFloat( component[2], bufferEnd );
+				cubemap->shCoeffs[coeffIndex][3] = 0.0f;
+			}
+			if ( coeffIndex == 9 )
+			{
+				cubemap->hasSHCoeffs = qtrue;
+			}
+		}
 	}
 	ri.FS_FreeFile(buffer.v);
 }
@@ -2839,5 +2862,8 @@ void RE_LoadWorldMap( const char *name ) {
 	// Render all cubemaps
 	if ( vk.cubemapActive && tr.numCubemaps )
 		R_RenderAllCubemaps();
+	else if ( vk.cubemapActive && vk.pbrActive && !tr.numCubemaps ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "PBR IBL: no cubemaps found (env.json or cubemap entities). Reflections will look generic.\n" S_COLOR_WHITE );
+	}
 #endif
 }
