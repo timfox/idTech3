@@ -293,7 +293,7 @@ static float S_Acoustics_Smooth( float current, float target, int dtMs ) {
 
 static void S_Acoustics_BuildRayDirs( void ) {
 	int i = 0;
-	vec3_t dirs[S_ACOUSTICS_MAX_RAYS] = {
+	vec3_t dirs[] = {
 		{ 1.0f, 0.0f, 0.0f },   { -1.0f, 0.0f, 0.0f },
 		{ 0.0f, 1.0f, 0.0f },   { 0.0f, -1.0f, 0.0f },
 		{ 0.0f, 0.0f, 1.0f },   { 0.0f, 0.0f, -1.0f },
@@ -313,8 +313,12 @@ static void S_Acoustics_BuildRayDirs( void ) {
 		{ 0.0f, 0.5f, -0.5f },  { 0.0f, -0.5f, -0.5f }
 	};
 
-	s_acoustics.rayDirCount = S_ACOUSTICS_MAX_RAYS;
-	for ( i = 0; i < S_ACOUSTICS_MAX_RAYS; ++i ) {
+	int avail = sizeof( dirs ) / sizeof( dirs[0] );
+	if ( avail > S_ACOUSTICS_MAX_RAYS ) {
+		avail = S_ACOUSTICS_MAX_RAYS;
+	}
+	s_acoustics.rayDirCount = avail;
+	for ( i = 0; i < avail; ++i ) {
 		VectorNormalize2( dirs[i], s_acoustics.rayDirs[i] );
 	}
 }
@@ -505,7 +509,7 @@ static void S_Acoustics_SelectPresets( void ) {
 static void S_Acoustics_UpdatePreset( void ) {
 	s_acoustics_preset_t blended;
 
-	if ( !s_acoustics.efxAvailable || s_acoustics_bypass && s_acoustics_bypass->integer ) {
+	if ( !s_acoustics.efxAvailable || ( s_acoustics_bypass && s_acoustics_bypass->integer ) ) {
 		return;
 	}
 	if ( s_acoustics_efx_enable && !s_acoustics_efx_enable->integer ) {
