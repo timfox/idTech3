@@ -410,12 +410,32 @@ typedef struct {
 	uint32_t		vk_pbr_flags;
 	image_t			*normalMap;
 	image_t			*physicalMap;
+	image_t			*emissiveMap;
+	image_t			*clearcoatMap;
+	image_t			*sheenMap;
+	image_t			*anisotropyMap;
+	image_t			*transmissionMap;
+	image_t			*subsurfaceMap;
 
 	uint32_t		normalMapType;
 	uint32_t		physicalMapType;
+	uint32_t		emissiveMapType;
+	uint32_t		clearcoatMapType;
+	uint32_t		sheenMapType;
+	uint32_t		anisotropyMapType;
+	uint32_t		transmissionMapType;
+	uint32_t		subsurfaceMapType;
 
 	vec4_t normalScale;
 	vec4_t specularScale;
+	vec4_t emissiveScale;
+	vec4_t clearcoatScale;
+	vec4_t sheenScale;
+	vec4_t anisotropyScale;
+	vec4_t transmissionScale;
+	vec4_t subsurfaceColor;
+	vec4_t subsurfaceParams;
+	vec4_t shCoeffs[9];
 	float  parallaxBias;
 #endif
 #endif
@@ -618,7 +638,22 @@ typedef struct cubemap_s {
 	float		parallaxRadius;
 	image_t		*prefiltered_image;
 	image_t		*irradiance_image;
+	vec4_t		shCoeffs[9];
+	qboolean	hasSHCoeffs;
 } cubemap_t;
+
+static inline void R_ResetCubemapSH( cubemap_t *cube ) {
+	int i;
+
+	if ( !cube ) {
+		return;
+	}
+
+	for ( i = 0; i < 9; i++ ) {
+		Vector4Set( cube->shCoeffs[i], 0.0f, 0.0f, 0.0f, 0.0f );
+	}
+	cube->hasSHCoeffs = qfalse;
+}
 
 //=================================================================================
 
@@ -1392,6 +1427,15 @@ extern cvar_t	*r_vbo;
 #endif
 #ifdef USE_VK_PBR
 extern cvar_t	*r_pbr;
+extern cvar_t	*r_pbr_shExtract;
+extern cvar_t	*r_pbr_debug;
+extern cvar_t	*r_pbr_packedPreferred;
+#ifdef VK_CUBEMAP
+extern cvar_t	*r_pbr_iblIrradianceSize;
+extern cvar_t	*r_pbr_iblPrefilterSize;
+extern cvar_t	*r_pbr_showCubemap;
+extern cvar_t	*r_pbr_cubemapInfo;
+#endif
 extern cvar_t	*r_baseNormalX;
 extern cvar_t	*r_baseNormalY;
 extern cvar_t	*r_baseParallax;
@@ -1630,6 +1674,13 @@ void		RE_RemapShader(const char *oldShader, const char *newShader, const char *t
 #ifdef USE_VK_PBR
 qboolean vk_create_phyisical_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
 qboolean vk_create_normal_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
+qboolean vk_create_emissive_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
+qboolean vk_create_clearcoat_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
+qboolean vk_create_sheen_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
+qboolean vk_create_anisotropy_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
+qboolean vk_create_transmission_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
+qboolean vk_create_subsurface_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
+image_t *vk_create_pbr_albedo_srgb( const char *albedoMapName, imgFlags_t flags );
 #endif
 
 //

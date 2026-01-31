@@ -770,6 +770,41 @@ void S_Init( void )
 
 			S_SoundInfo();
 			Com_Printf( "Sound initialization successful.\n" );
+			
+			// Structured audio logging
+			if ( Com_LogVerbosity() >= 1 ) {
+				LOG_SND( "S_Init\n" );
+#ifdef USE_OPENAL
+				if ( s_openal && s_openal->integer ) {
+					LOG_SND_V( 2, "  Backend     : OpenAL\n" );
+					if ( s_openalDevice && s_openalDevice->string[0] && Q_stricmp( s_openalDevice->string, "default" ) ) {
+						LOG_SND_V( 2, "  Device      : %s\n", s_openalDevice->string );
+					} else {
+						LOG_SND_V( 2, "  Device      : default\n" );
+					}
+					LOG_SND_V( 2, "  Frequency   : %d Hz\n", dma.speed );
+					LOG_SND_V( 2, "  Channels    : %d\n", dma.channels );
+					if ( s_openalEfx && s_openalEfx->integer ) {
+						LOG_SND_V( 2, "  EFX         : enabled\n" );
+					} else {
+						LOG_SND_V( 2, "  EFX         : disabled\n" );
+					}
+					if ( s_acoustics_enable && s_acoustics_enable->integer ) {
+						LOG_SND_V( 2, "  Acoustics   : enabled (heuristic)\n" );
+					} else {
+						LOG_SND_V( 2, "  Acoustics   : disabled\n" );
+					}
+				} else {
+					LOG_SND_V( 2, "  Backend     : SDL/Base\n" );
+					LOG_SND_V( 2, "  Frequency   : %d Hz\n", dma.speed );
+					LOG_SND_V( 2, "  Channels    : %d\n", dma.channels );
+				}
+#else
+				LOG_SND_V( 2, "  Backend     : SDL/Base\n" );
+				LOG_SND_V( 2, "  Frequency   : %d Hz\n", dma.speed );
+				LOG_SND_V( 2, "  Channels    : %d\n", dma.channels );
+#endif
+			}
 		} else {
 			Com_Printf( "Sound initialization failed.\n" );
 		}

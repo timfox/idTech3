@@ -2323,6 +2323,7 @@ static void FS_ConvertFilename( char *name )
 #define PK3_HASH_SIZE 512
 
 static void FS_FreePak( pack_t *pak );
+static void FS_ParseGameInfo( void );
 
 static pack_t *pakHashTable[ PK3_HASH_SIZE ];
 
@@ -4844,7 +4845,28 @@ static void FS_Startup( void ) {
 	Com_Printf( "----------------------\n" );
 	Com_Printf( "%d files in %d pk3 files\n", fs_packFiles, fs_packCount );
 
+	// Structured filesystem logging
+	if ( Com_LogVerbosity() >= 1 ) {
+		LOG_FS( "FS_Init\n" );
+		LOG_FS_V( 2, "  Base Path   : %s\n", fs_basepath->string );
+		LOG_FS_V( 2, "  Home Path   : %s\n", fs_homepath->string );
+		if ( fs_gamedirvar->string[0] != '\0' ) {
+			LOG_FS_V( 2, "  Game Path   : %s\n", fs_gamedirvar->string );
+		} else {
+			LOG_FS_V( 2, "  Game Path   : %s (default)\n", fs_basegame->string );
+		}
+		LOG_FS_V( 2, "  Pak Files   : %d loaded", fs_packCount );
+		if ( fs_packFiles > 0 ) {
+			LOG_FS_V( 2, " (%d files)\n", fs_packFiles );
+		} else {
+			LOG_FS_V( 2, "\n" );
+		}
+	}
+
 	fs_gamedirvar->modified = qfalse; // We just loaded, it's not modified
+
+	// Parse gameinfo.txt to get game title for window
+	FS_ParseGameInfo();
 
 	// check original q3a files (can be disabled via SKIP_IDPAK_CHECK)
 #ifndef SKIP_IDPAK_CHECK
@@ -4865,6 +4887,92 @@ static void FS_Startup( void ) {
 	FS_SaveCache();
 #endif
 #endif
+}
+
+/*
+=====================
+FS_ParseGameInfo
+
+Parses gameinfo.txt (Source Engine style) from the game root directory
+and extracts the title field to set the window title.
+=====================
+*/
+static void FS_ParseGameInfo( void )
+{
+	char *buffer;
+	int len;
+	const char *gameDir;
+	char gameInfoPath[MAX_OSPATH];
+	
+	// Determine game directory (fs_game if set, otherwise fs_basegame)
+	if ( fs_gamedirvar->string[0] != '\0' ) {
+		gameDir = fs_gamedirvar->string;
+	} else {
+		gameDir = fs_basegame->string;
+	}
+	
+	// Try to find gameinfo.txt in the game directory
+	// Check in basepath first
+	Com_sprintf( gameInfoPath, sizeof( gameInfoPath ), "%s/%s/gameinfo.txt", fs_basepath->string, gameDir );
+	len = FS_ReadFile( gameInfoPath, (void **)&buffer );
+	
+	// If not found in basepath, try homepath
+	if ( !buffer && fs_homepath->string[0] && Q_stricmp( fs_homepath->string, fs_basepath->string ) ) {
+		Com_sprintf( gameInfoPath, sizeof( gameInfoPath ), "%s/%s/gameinfo.txt", fs_homepath->string, gameDir );
+		len = FS_ReadFile( gameInfoPath, (void **)&buffer );
+	}
+	
+	if ( !buffer || len <= 0 ) {
+		// gameinfo.txt not found, use default title
+		return;
+	}
+	
+	// Simple parser: look for "title" followed by quoted string
+	const char *p = buffer;
+	const char *end = buffer + len;
+	const char *titleStart = NULL;
+	const char *titleEnd = NULL;
+	
+	// Find "title" keyword
+	while ( p < end - 5 ) {
+		if ( Q_strncmp( p, "title", 5 ) == 0 ) {
+			// Skip whitespace after "title"
+			p += 5;
+			while ( p < end && ( *p == ' ' || *p == '\t' ) ) {
+				p++;
+			}
+			// Look for opening quote
+			if ( p < end && *p == '"' ) {
+				p++; // Skip opening quote
+				titleStart = p;
+				// Find closing quote
+				while ( p < end && *p != '"' && *p != '\n' && *p != '\r' ) {
+					p++;
+				}
+				if ( p < end && *p == '"' ) {
+					titleEnd = p;
+					break;
+				}
+			}
+		}
+		p++;
+	}
+	
+	if ( titleStart && titleEnd && titleEnd > titleStart ) {
+		int titleLen = titleEnd - titleStart;
+		if ( titleLen > 0 && titleLen < MAX_CVAR_VALUE_STRING ) {
+			// Extract title and update cl_title
+			char title[MAX_CVAR_VALUE_STRING];
+			Q_strncpyz( title, titleStart, titleLen + 1 );
+			Q_strncpyz( cl_title, title, sizeof( cl_title ) );
+			
+			if ( Com_LogVerbosity() >= 1 ) {
+				LOG_FS( "Parsed gameinfo.txt: title = \"%s\"\n", title );
+			}
+		}
+	}
+	
+	FS_FreeFile( buffer );
 }
 
 
@@ -5712,14 +5820,51 @@ void *FS_LoadLibrary( const char *name )
 {
 	const searchpath_t *sp = fs_searchpaths;
 	void *libHandle = NULL;
+	char vmPath[MAX_OSPATH];
+	char dottedName[MAX_QPATH];
+	int nameLen = strlen(name);
 
 	while ( !libHandle && sp ) {
 		while ( sp && ( sp->policy != DIR_STATIC || !sp->dir ) ) {
 			sp = sp->next;
 		}
 		if ( sp ) {
-			const char *fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, name );
-			libHandle = Sys_LoadLibrary( fn );
+			// Try both naming conventions: "uix86_64.so" and "ui.x86_64.so"
+			// Check if name matches pattern like "uiARCH.so" and try "ui.ARCH.so"
+			if ( nameLen > 7 && nameLen < MAX_QPATH - 1 ) {
+				if ( Q_strncmp(name, "ui", 2) == 0 && Q_strncmp(name + nameLen - 3, ".so", 3) == 0 ) {
+					// Convert "uix86_64.so" -> "ui.x86_64.so"
+					Com_sprintf( dottedName, sizeof( dottedName ), "ui.%s", name + 2 );
+					Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", dottedName );
+					const char *fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath );
+					libHandle = Sys_LoadLibrary( fn );
+				} else if ( Q_strncmp(name, "cgame", 5) == 0 && Q_strncmp(name + nameLen - 3, ".so", 3) == 0 ) {
+					// Convert "cgamex86_64.so" -> "cgame.x86_64.so"
+					Com_sprintf( dottedName, sizeof( dottedName ), "cgame.%s", name + 5 );
+					Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", dottedName );
+					const char *fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath );
+					libHandle = Sys_LoadLibrary( fn );
+				} else if ( Q_strncmp(name, "qagame", 6) == 0 && Q_strncmp(name + nameLen - 3, ".so", 3) == 0 ) {
+					// Convert "qagamex86_64.so" -> "qagame.x86_64.so"
+					Com_sprintf( dottedName, sizeof( dottedName ), "qagame.%s", name + 6 );
+					Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", dottedName );
+					const char *fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath );
+					libHandle = Sys_LoadLibrary( fn );
+				}
+			}
+			
+			// Try vm/ subdirectory with original name
+			if ( !libHandle ) {
+				Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", name );
+				const char *fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath );
+				libHandle = Sys_LoadLibrary( fn );
+			}
+			
+			// Finally try directly in gamedir (legacy location)
+			if ( !libHandle ) {
+				const char *fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, name );
+				libHandle = Sys_LoadLibrary( fn );
+			}
 			sp = sp->next;
 		}
 	}

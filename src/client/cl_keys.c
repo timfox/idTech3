@@ -32,6 +32,7 @@ field_t		chatField;
 qboolean	chat_team;
 
 int			chat_playerNum;
+extern cvar_t	*con_inputMode;
 
 static void Field_CharEvent( field_t *edit, int ch );
 
@@ -376,6 +377,28 @@ CONSOLE LINE EDITING
 ==============================================================================
 */
 
+static qboolean Con_IsKnownCommand( const char *input ) {
+	char token[MAX_TOKEN_CHARS];
+	const char *ptr = input;
+	int i = 0;
+
+	while ( *ptr && *ptr <= ' ' ) {
+		ptr++;
+	}
+
+	while ( *ptr && *ptr > ' ' && i < (int)sizeof( token ) - 1 ) {
+		token[i++] = *ptr++;
+	}
+
+	token[i] = '\0';
+
+	if ( !token[0] ) {
+		return qfalse;
+	}
+
+	return Cmd_CommandExists( token );
+}
+
 /*
 ====================
 Console_Key
@@ -393,32 +416,54 @@ static void Console_Key( int key ) {
 	// enter finishes the line
 	if ( key == K_ENTER || key == K_KP_ENTER ) {
 		// if not in the game explicitly prepend a slash if needed
+		qboolean explicitCommand = ( g_consoleField.buffer[0] == '\\' || g_consoleField.buffer[0] == '/' );
 		if ( cls.state != CA_ACTIVE
 			&& g_consoleField.buffer[0] != '\0'
-			&& g_consoleField.buffer[0] != '\\'
-			&& g_consoleField.buffer[0] != '/' ) {
+			&& !explicitCommand ) {
 			char	temp[MAX_EDIT_LINE-1];
 
 			Q_strncpyz( temp, g_consoleField.buffer, sizeof( temp ) );
 			Com_sprintf( g_consoleField.buffer, sizeof( g_consoleField.buffer ), "\\%s", temp );
 			g_consoleField.cursor++;
+			explicitCommand = qtrue;
 		}
 
 		Com_Printf( "]%s\n", g_consoleField.buffer );
 
-		// leading slash is an explicit command
-		if ( g_consoleField.buffer[0] == '\\' || g_consoleField.buffer[0] == '/' ) {
-			Cbuf_AddText( g_consoleField.buffer+1 );	// valid command
+		if ( !g_consoleField.buffer[0] ) {
+			return;	// empty lines just scroll the console without adding to history
+		}
+
+		qboolean treatAsCommand = explicitCommand;
+		if ( !treatAsCommand ) {
+			if ( cls.state != CA_ACTIVE ) {
+				treatAsCommand = qtrue;
+			} else {
+				const int mode = con_inputMode ? con_inputMode->integer : 0;
+				switch ( mode ) {
+					case 1:
+						treatAsCommand = qtrue;
+						break;
+					case 3:
+						treatAsCommand = Con_IsKnownCommand( g_consoleField.buffer );
+						break;
+					default:
+						break;
+				}
+			}
+		}
+
+		if ( treatAsCommand ) {
+			const char *command = g_consoleField.buffer;
+			if ( command[0] == '\\' || command[0] == '/' ) {
+				command++;
+			}
+			Cbuf_AddText( command );
 			Cbuf_AddText( "\n" );
 		} else {
-			// other text will be chat messages
-			if ( !g_consoleField.buffer[0] ) {
-				return;	// empty lines just scroll the console without adding to history
-			} else {
-				Cbuf_AddText( "cmd say " );
-				Cbuf_AddText( g_consoleField.buffer );
-				Cbuf_AddText( "\n" );
-			}
+			Cbuf_AddText( "cmd say " );
+			Cbuf_AddText( g_consoleField.buffer );
+			Cbuf_AddText( "\n" );
 		}
 
 		// copy line to history buffer

@@ -782,12 +782,16 @@ static void upload_vk_image( image_t *image, byte *pic ) {
 	w = upload_data.base_level_width;
 	h = upload_data.base_level_height;
 
-	if ( r_texturebits->integer > 16 || r_texturebits->integer == 0 || ( image->flags & IMGFLAG_LIGHTMAP ) ) {
-		image->internalFormat = VK_FORMAT_R8G8B8A8_UNORM;
-		//image->internalFormat = VK_FORMAT_B8G8R8A8_UNORM;
-	} else {
-		qboolean has_alpha = RawImage_HasAlpha( upload_data.buffer, w * h );
-		image->internalFormat = has_alpha ? VK_FORMAT_B4G4R4A4_UNORM_PACK16 : VK_FORMAT_A1R5G5B5_UNORM_PACK16;
+	// Respect explicit formats passed to R_CreateImage (e.g. sRGB albedo for PBR).
+	// Otherwise, auto-select based on r_texturebits and alpha usage.
+	if ( image->internalFormat == 0 ) {
+		if ( r_texturebits->integer > 16 || r_texturebits->integer == 0 || ( image->flags & IMGFLAG_LIGHTMAP ) ) {
+			image->internalFormat = VK_FORMAT_R8G8B8A8_UNORM;
+			//image->internalFormat = VK_FORMAT_B8G8R8A8_UNORM;
+		} else {
+			qboolean has_alpha = RawImage_HasAlpha( upload_data.buffer, w * h );
+			image->internalFormat = has_alpha ? VK_FORMAT_B4G4R4A4_UNORM_PACK16 : VK_FORMAT_A1R5G5B5_UNORM_PACK16;
+		}
 	}
 
 	image->uploadWidth = w;
@@ -1432,6 +1436,45 @@ image_t *R_BuildSDRSpecGlossImage(shaderStage_t *stage, const char *specImageNam
 	return R_CreateImage( sdrName, NULL, sdrSpecPic, specWidth, specHeight, flags, 0, stage->physicalMapType );
 }
 
+/*
+=================
+vk_create_pbr_albedo_srgb
+
+Create (or reuse) an sRGB albedo image for Vulkan PBR.
+This avoids mixing classic (legacy lightscale) behavior with PBR basecolor usage.
+=================
+*/
+image_t *vk_create_pbr_albedo_srgb( const char *albedoMapName, imgFlags_t flags )
+{
+	char	srgbName[MAX_QPATH];
+	int		width, height;
+	byte	*pic;
+	image_t	*image;
+	const char *localName;
+
+	if ( !albedoMapName || !albedoMapName[0] )
+		return NULL;
+
+	COM_StripExtension( albedoMapName, srgbName, sizeof( srgbName ) );
+	Q_strcat( srgbName, sizeof( srgbName ), "_PBR_SRGB" );
+
+	// PBR albedo should not be lightscaled; use separate cached name to avoid collisions.
+	flags |= IMGFLAG_NOLIGHTSCALE;
+
+	image = R_GetLoadedImage( srgbName, flags );
+	if ( image != NULL )
+		return image;
+
+	localName = R_LoadImage( albedoMapName, &pic, &width, &height );
+	if ( pic == NULL )
+		return NULL;
+
+	image = R_CreateImage( srgbName, localName, pic, width, height, flags, VK_FORMAT_R8G8B8A8_SRGB, 0 );
+	ri.Free( pic );
+
+	return image;
+}
+
 qboolean vk_create_normal_texture( shaderStage_t *stage, const char *name, imgFlags_t flags )
 {
 	switch ( stage->normalMapType ) {
@@ -1448,6 +1491,84 @@ qboolean vk_create_normal_texture( shaderStage_t *stage, const char *name, imgFl
 		return qfalse;
 
 	stage->vk_pbr_flags |= PBR_HAS_NORMALMAP;
+	return qtrue;
+}
+
+qboolean vk_create_emissive_texture( shaderStage_t *stage, const char *name, imgFlags_t flags )
+{
+	if ( stage->emissiveMapType != PHYS_EMISSIVE )
+		return qfalse;
+
+	stage->emissiveMap = R_FindImageFile( name, flags, stage->emissiveMapType );
+	if ( !stage->emissiveMap )
+		return qfalse;
+
+	stage->vk_pbr_flags |= PBR_HAS_EMISSIVE;
+	return qtrue;
+}
+
+qboolean vk_create_clearcoat_texture( shaderStage_t *stage, const char *name, imgFlags_t flags )
+{
+	if ( stage->clearcoatMapType != PHYS_CLEARCOAT )
+		return qfalse;
+
+	stage->clearcoatMap = R_FindImageFile( name, flags, stage->clearcoatMapType );
+	if ( !stage->clearcoatMap )
+		return qfalse;
+
+	stage->vk_pbr_flags |= PBR_HAS_CLEARCOAT;
+	return qtrue;
+}
+
+qboolean vk_create_sheen_texture( shaderStage_t *stage, const char *name, imgFlags_t flags )
+{
+	if ( stage->sheenMapType != PHYS_SHEEN )
+		return qfalse;
+
+	stage->sheenMap = R_FindImageFile( name, flags, stage->sheenMapType );
+	if ( !stage->sheenMap )
+		return qfalse;
+
+	stage->vk_pbr_flags |= PBR_HAS_SHEEN;
+	return qtrue;
+}
+
+qboolean vk_create_anisotropy_texture( shaderStage_t *stage, const char *name, imgFlags_t flags )
+{
+	if ( stage->anisotropyMapType != PHYS_ANISOTROPY )
+		return qfalse;
+
+	stage->anisotropyMap = R_FindImageFile( name, flags, stage->anisotropyMapType );
+	if ( !stage->anisotropyMap )
+		return qfalse;
+
+	stage->vk_pbr_flags |= PBR_HAS_ANISOTROPY;
+	return qtrue;
+}
+
+qboolean vk_create_transmission_texture( shaderStage_t *stage, const char *name, imgFlags_t flags )
+{
+	if ( stage->transmissionMapType != PHYS_TRANSMISSION )
+		return qfalse;
+
+	stage->transmissionMap = R_FindImageFile( name, flags, stage->transmissionMapType );
+	if ( !stage->transmissionMap )
+		return qfalse;
+
+	stage->vk_pbr_flags |= PBR_HAS_TRANSMISSION;
+	return qtrue;
+}
+
+qboolean vk_create_subsurface_texture( shaderStage_t *stage, const char *name, imgFlags_t flags )
+{
+	if ( stage->subsurfaceMapType != PHYS_SUBSURFACE )
+		return qfalse;
+
+	stage->subsurfaceMap = R_FindImageFile( name, flags, stage->subsurfaceMapType );
+	if ( !stage->subsurfaceMap )
+		return qfalse;
+
+	stage->vk_pbr_flags |= PBR_HAS_SUBSURFACE;
 	return qtrue;
 }
 

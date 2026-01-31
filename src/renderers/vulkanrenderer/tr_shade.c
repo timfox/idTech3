@@ -545,9 +545,34 @@ static void ProjectDlightTexture( void ) {
 
 uint32_t vk_append_uniform( const void *uniform, size_t size, uint32_t min_offset );
 uint32_t vk_push_uniform( const vkUniform_t *uniform );
+static uint32_t vk_push_uniform_cached( const vkUniform_t *u );
 void VK_SetFogParams( vkUniform_t *uniform, int *fogStage );
 static vkUniform_t uniform;
 static vkUniformCamera_t uniform_camera;
+
+#ifdef USE_VK_PBR
+typedef struct vkPbrUniformBlock_s {
+	vec4_t emissiveScale;
+	vec4_t clearcoatScale;
+	vec4_t sheenScale;
+	vec4_t anisotropyScale;
+	vec4_t transmissionScale;
+	vec4_t subsurfaceColor;
+	vec4_t subsurfaceParams;
+	vec4_t shCoeffs[9];
+} vkPbrUniformBlock_t;
+#endif
+
+#ifdef USE_VULKAN
+static inline void vk_update_descriptor_if_changed( int index, VkDescriptorSet descriptor )
+{
+	// vk_update_descriptor() already no-ops if the descriptor matches; this avoids the call entirely
+	// in hot loops when nothing changes.
+	if ( vk.cmd && vk.cmd->descriptor_set.current[index] != descriptor ) {
+		vk_update_descriptor( index, descriptor );
+	}
+}
+#endif
 
 /*
 ===================
@@ -936,12 +961,113 @@ static qboolean vk_is_valid_pbr_surface( const qboolean hasPBR ) {
 	if ( backEnd.viewParms.portalView == PV_MIRROR )
 		return qfalse;
 
-	if ( backEnd.currentEntity ) {
-		if ( backEnd.currentEntity != &tr.worldEntity )
-			return qfalse;
-	}
+	// PBR is now supported for both world surfaces and models (entities)
+	// The check for worldEntity was removed to allow models to use PBR materials
 
 	return qtrue;
+}
+
+// Note: we no longer copy cubemap SH into stage/uniform directly here.
+// RB_IterateStagesGeneric builds the final PBR uniform block (including optional cubemap SH)
+// and only pushes it when it actually changes.
+
+static void R_GetPBRSurfacePosition( vec3_t outPos ) {
+	int i;
+
+	if ( backEnd.currentEntity && backEnd.currentEntity != &tr.worldEntity ) {
+		VectorCopy( backEnd.currentEntity->e.origin, outPos );
+		return;
+	}
+
+	VectorClear( outPos );
+	if ( tess.numVertexes <= 0 ) {
+		return;
+	}
+
+	for ( i = 0; i < tess.numVertexes; i++ ) {
+		outPos[0] += tess.xyz[i][0];
+		outPos[1] += tess.xyz[i][1];
+		outPos[2] += tess.xyz[i][2];
+	}
+
+	outPos[0] /= tess.numVertexes;
+	outPos[1] /= tess.numVertexes;
+	outPos[2] /= tess.numVertexes;
+}
+
+static int R_SelectCubemapIndexForPBR( void ) {
+	int i;
+	int bestIndex = -1;
+	int bestInRadius = -1;
+	float bestDistSq = 0.0f;
+	float bestInRadiusDistSq = 0.0f;
+	vec3_t pos;
+
+	if ( tr.numCubemaps <= 0 )
+		return -1;
+
+	R_GetPBRSurfacePosition( pos );
+
+	for ( i = 0; i < tr.numCubemaps; i++ ) {
+		float distSq;
+		vec3_t delta;
+		const cubemap_t *cube = &tr.cubemaps[i];
+
+		VectorSubtract( pos, cube->origin, delta );
+		distSq = VectorLengthSquared( delta );
+
+		if ( bestIndex == -1 || distSq < bestDistSq ) {
+			bestIndex = i;
+			bestDistSq = distSq;
+		}
+
+		if ( cube->parallaxRadius > 0.0f && distSq > ( cube->parallaxRadius * cube->parallaxRadius ) )
+			continue;
+
+		if ( bestInRadius == -1 || distSq < bestInRadiusDistSq ) {
+			bestInRadius = i;
+			bestInRadiusDistSq = distSq;
+		}
+	}
+
+	return ( bestInRadius != -1 ) ? bestInRadius : bestIndex;
+}
+
+static void R_UpdatePBRCubemapDebugCvar( int cubemapIndex, const vec3_t pos )
+{
+#ifdef VK_CUBEMAP
+	static int lastIndex = -9999;
+	static vec3_t lastPos = { 0.0f, 0.0f, 0.0f };
+	int now = ri.Milliseconds();
+	static int lastUpdateMs = 0;
+
+	if ( !r_pbr_showCubemap || !r_pbr_showCubemap->integer ) {
+		return;
+	}
+	if ( !r_pbr_cubemapInfo ) {
+		return;
+	}
+
+	// Rate-limit updates to avoid spamming cvar system.
+	if ( cubemapIndex == lastIndex && VectorCompare( pos, lastPos ) ) {
+		return;
+	}
+	if ( now - lastUpdateMs < 100 ) {
+		return;
+	}
+	lastUpdateMs = now;
+	lastIndex = cubemapIndex;
+	VectorCopy( pos, lastPos );
+
+	if ( cubemapIndex < 0 || cubemapIndex >= tr.numCubemaps ) {
+		ri.Cvar_Set( "r_pbr_cubemapInfo", va( "PBR cubemap: none (pos %.0f %.0f %.0f)", pos[0], pos[1], pos[2] ) );
+		return;
+	}
+
+	const cubemap_t *cube = &tr.cubemaps[cubemapIndex];
+	ri.Cvar_Set( "r_pbr_cubemapInfo", va( "PBR cubemap: %d '%s' (pos %.0f %.0f %.0f r=%.0f)",
+		cubemapIndex, cube->name, pos[0], pos[1], pos[2], cube->parallaxRadius ) );
+#endif
 }
 
 /*
@@ -993,13 +1119,17 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 #ifdef USE_VK_PBR
 	is_pbr_surface = vk_is_valid_pbr_surface( tess.shader->hasPBR );
 
+	// Debug view: render a non-PBR pass and optionally override texture0 binding.
+	// Keeps runtime inspection simple without requiring extra shader variants.
+	const int pbr_debug = ( r_pbr_debug != NULL ) ? r_pbr_debug->integer : 0;
+	if ( pbr_debug ) {
+		is_pbr_surface = qfalse;
+	}
+
 	if ( is_pbr_surface ) {
 		Com_Memcpy( &uniform_camera.modelMatrix, backEnd.or.modelMatrix, sizeof(float) * 16 );
 		Com_Memcpy( &uniform_camera.viewOrigin, backEnd.refdef.vieworg, sizeof( vec3_t) );
 		uniform_camera.viewOrigin[3] = 0.0;
-
-		//VectorCopy4( pStage->normalScale, uniform_global.normalScale );
-		//VectorCopy4( pStage->specularScale, uniform_global.specularScale );
 
 		vk.cmd->camera_ubo_offset = vk_append_uniform( &uniform_camera, sizeof(uniform_camera), vk.uniform_camera_item_size );
 
@@ -1043,7 +1173,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 
 		if ( pushUniform ) {
 			pushUniform = qfalse;
-			vk_push_uniform( &uniform );
+			vk_push_uniform_cached( &uniform );
 		}
 
 		GL_SelectTexture( 0 );
@@ -1054,23 +1184,128 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		}
 
 #ifdef USE_VK_PBR
+		if ( pbr_debug && pStage->vk_pbr_flags ) {
+			switch ( pbr_debug ) {
+				default:
+				case 1: // base/albedo (already bound)
+					break;
+				case 2: // normal map
+					if ( pStage->normalMap ) {
+						GL_Bind( pStage->normalMap );
+					}
+					break;
+				case 3: // packed physical map
+					if ( pStage->physicalMap ) {
+						GL_Bind( pStage->physicalMap );
+					}
+					break;
+				case 4: // emissive map
+					if ( pStage->emissiveMap ) {
+						GL_Bind( pStage->emissiveMap );
+					}
+					break;
+			}
+		}
+#endif
+
+#ifdef USE_VK_PBR
 		if ( is_pbr_surface && pStage->vk_pbr_flags ) {
-			vk_update_descriptor( VK_DESC_PBR_BRDFLUT, vk.brdflut_image_descriptor );
+			static VkCommandBuffer lastCmdBuf = VK_NULL_HANDLE;
+			static qboolean lastValid = qfalse;
+			static vkPbrUniformBlock_t lastBlock;
+
+			vkPbrUniformBlock_t block;
+			Vector4Copy( pStage->emissiveScale, block.emissiveScale );
+			Vector4Copy( pStage->clearcoatScale, block.clearcoatScale );
+			Vector4Copy( pStage->sheenScale, block.sheenScale );
+			Vector4Copy( pStage->anisotropyScale, block.anisotropyScale );
+			Vector4Copy( pStage->transmissionScale, block.transmissionScale );
+			Vector4Copy( pStage->subsurfaceColor, block.subsurfaceColor );
+			Vector4Copy( pStage->subsurfaceParams, block.subsurfaceParams );
+
+			vk_update_descriptor_if_changed( VK_DESC_PBR_BRDFLUT, vk.brdflut_image_descriptor );
 				
 			if ( pStage->vk_pbr_flags & PBR_HAS_NORMALMAP )
-				vk_update_descriptor( VK_DESC_PBR_NORMAL, pStage->normalMap->descriptor );
+				vk_update_descriptor_if_changed( VK_DESC_PBR_NORMAL, pStage->normalMap->descriptor );
 
 			if ( pStage->vk_pbr_flags & PBR_HAS_PHYSICALMAP || pStage->vk_pbr_flags & PBR_HAS_SPECULARMAP )
-				vk_update_descriptor( VK_DESC_PBR_PHYSICAL, pStage->physicalMap->descriptor );
+				vk_update_descriptor_if_changed( VK_DESC_PBR_PHYSICAL, pStage->physicalMap->descriptor );
 			
+			if ( pStage->vk_pbr_flags & PBR_HAS_EMISSIVE )
+				vk_update_descriptor_if_changed( VK_DESC_PBR_EMISSIVE, pStage->emissiveMap->descriptor );
+
+			if ( pStage->vk_pbr_flags & PBR_HAS_CLEARCOAT )
+				vk_update_descriptor_if_changed( VK_DESC_PBR_CLEARCOAT, pStage->clearcoatMap->descriptor );
+
+			if ( pStage->vk_pbr_flags & PBR_HAS_SHEEN )
+				vk_update_descriptor_if_changed( VK_DESC_PBR_SHEEN, pStage->sheenMap->descriptor );
+
+			if ( pStage->vk_pbr_flags & PBR_HAS_ANISOTROPY )
+				vk_update_descriptor_if_changed( VK_DESC_PBR_ANISOTROPY, pStage->anisotropyMap->descriptor );
+
+			if ( pStage->vk_pbr_flags & PBR_HAS_TRANSMISSION )
+				vk_update_descriptor_if_changed( VK_DESC_PBR_TRANSMISSION, pStage->transmissionMap->descriptor );
+
+			if ( pStage->vk_pbr_flags & PBR_HAS_SUBSURFACE )
+				vk_update_descriptor_if_changed( VK_DESC_PBR_SUBSURFACE, pStage->subsurfaceMap->descriptor );
+			
+			int cubemapIndex = -1;
 			if ( !tr.numCubemaps || backEnd.viewParms.targetCube != NULL ) {
-				vk_update_descriptor( VK_DESC_PBR_CUBEMAP, tr.emptyCubemap->descriptor );
-				//vk_update_descriptor( 10, tr.emptyCubemap->descriptor ); // irradiance is currently unused
+				vk_update_descriptor_if_changed( VK_DESC_PBR_CUBEMAP, tr.emptyCubemap->descriptor );
+				vk_update_descriptor_if_changed( VK_DESC_PBR_IRRADIANCE, tr.emptyCubemap->descriptor );
+				if ( backEnd.viewParms.targetCube == NULL ) {
+					vec3_t dbgPos;
+					R_GetPBRSurfacePosition( dbgPos );
+					R_UpdatePBRCubemapDebugCvar( -1, dbgPos );
+				}
+
+				// Use stage-provided SH when no cubemap is available.
+				Com_Memcpy( block.shCoeffs, pStage->shCoeffs, sizeof( block.shCoeffs ) );
 			}
 			else { 
-				// use the first cubemap index, indexes are not assigned per surface yet
-				vk_update_descriptor( VK_DESC_PBR_CUBEMAP, tr.cubemaps[0].prefiltered_image->descriptor );
-				//vk_update_descriptor( 10, tr.cubemaps[0].irradiance_image->descriptor ); // irradiance is currently unused
+				vec3_t dbgPos;
+				R_GetPBRSurfacePosition( dbgPos );
+				cubemapIndex = R_SelectCubemapIndexForPBR();
+				R_UpdatePBRCubemapDebugCvar( cubemapIndex, dbgPos );
+				if ( cubemapIndex < 0 ) {
+					vk_update_descriptor_if_changed( VK_DESC_PBR_CUBEMAP, tr.emptyCubemap->descriptor );
+					vk_update_descriptor_if_changed( VK_DESC_PBR_IRRADIANCE, tr.emptyCubemap->descriptor );
+					Com_Memcpy( block.shCoeffs, pStage->shCoeffs, sizeof( block.shCoeffs ) );
+				} else {
+					vk_update_descriptor_if_changed( VK_DESC_PBR_CUBEMAP, tr.cubemaps[cubemapIndex].prefiltered_image->descriptor );
+					if ( tr.cubemaps[cubemapIndex].irradiance_image )
+						vk_update_descriptor_if_changed( VK_DESC_PBR_IRRADIANCE, tr.cubemaps[cubemapIndex].irradiance_image->descriptor );
+					else
+						vk_update_descriptor_if_changed( VK_DESC_PBR_IRRADIANCE, tr.emptyCubemap->descriptor );
+
+					// Prefer cubemap SH coefficients when present, otherwise fall back to stage SH.
+					if ( tr.cubemaps[cubemapIndex].hasSHCoeffs ) {
+						Com_Memcpy( block.shCoeffs, tr.cubemaps[cubemapIndex].shCoeffs, sizeof( block.shCoeffs ) );
+					} else {
+						Com_Memcpy( block.shCoeffs, pStage->shCoeffs, sizeof( block.shCoeffs ) );
+					}
+				}
+			}
+
+			// Only push uniforms when the PBR block has actually changed for this command buffer.
+			if ( vk.cmd && vk.cmd->command_buffer != lastCmdBuf ) {
+				lastCmdBuf = vk.cmd->command_buffer;
+				lastValid = qfalse;
+			}
+			if ( !lastValid || memcmp( &lastBlock, &block, sizeof( block ) ) != 0 ) {
+				lastBlock = block;
+				lastValid = qtrue;
+
+				Vector4Copy( block.emissiveScale, uniform.pbrEmissiveScale );
+				Vector4Copy( block.clearcoatScale, uniform.pbrClearcoatScale );
+				Vector4Copy( block.sheenScale, uniform.pbrSheenScale );
+				Vector4Copy( block.anisotropyScale, uniform.pbrAnisotropyScale );
+				Vector4Copy( block.transmissionScale, uniform.pbrTransmissionScale );
+				Vector4Copy( block.subsurfaceColor, uniform.pbrSubsurfaceColor );
+				Vector4Copy( block.subsurfaceParams, uniform.pbrSubsurfaceParams );
+				Com_Memcpy( uniform.pbrShCoeffs, block.shCoeffs, sizeof( uniform.pbrShCoeffs ) );
+
+				vk_push_uniform_cached( &uniform );
 			}
 		}
 #endif
@@ -1153,7 +1388,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 
 #ifdef USE_VULKAN
 	if ( pushUniform ) {
-		vk_push_uniform( &uniform );
+		vk_push_uniform_cached( &uniform );
 	}
 	if ( tess_flags ) // fog-only shaders?
 		vk_bind_geometry( tess_flags );
@@ -1227,6 +1462,34 @@ uint32_t vk_append_uniform( const void *uniform, size_t size, uint32_t min_offse
 	vk.cmd->vertex_buffer_offset = offset + min_offset;
 
 	return offset;
+}
+
+static uint32_t vk_push_uniform_cached( const vkUniform_t *u )
+{
+	static VkCommandBuffer last_cmd_buf = VK_NULL_HANDLE;
+	static uint32_t last_camera_offset = ~0U;
+	static uint32_t last_uniform_offset = ~0U;
+	static vkUniform_t last_uniform;
+
+	// Reset cache when we move to a new command buffer.
+	if ( vk.cmd == NULL || vk.cmd->command_buffer != last_cmd_buf ) {
+		last_cmd_buf = ( vk.cmd != NULL ) ? vk.cmd->command_buffer : VK_NULL_HANDLE;
+		last_camera_offset = ~0U;
+		last_uniform_offset = ~0U;
+		Com_Memset( &last_uniform, 0, sizeof( last_uniform ) );
+	}
+
+	if ( last_uniform_offset != ~0U &&
+		last_camera_offset == vk.cmd->camera_ubo_offset &&
+		memcmp( &last_uniform, u, sizeof( *u ) ) == 0 ) {
+		return last_uniform_offset;
+	}
+
+	Com_Memcpy( &last_uniform, u, sizeof( *u ) );
+	last_camera_offset = vk.cmd->camera_ubo_offset;
+	last_uniform_offset = vk_push_uniform( u );
+
+	return last_uniform_offset;
 }
 
 uint32_t vk_push_uniform( const vkUniform_t *uniform ) {

@@ -192,3 +192,21 @@ Enable the OpenAL backend (requires engine restart):
 - `s_musicLayer` - secondary music layer track path (requires restart)
 - `s_musicLayerVolume` - secondary layer volume multiplier (default: 1.0)
 - `s_musicIntensity` - intensity value (0-1) for layer blending (default: 0.0)
+
+---
+
+### FreeType font rendering
+
+FreeType font generation is disabled by default to keep the dependencies minimal. Enable it when you need the TrueType pipeline by passing `BUILD_FREETYPE=ON` to CMake:
+
+```
+cmake -S . -B build -DBUILD_FREETYPE=ON ...
+```
+
+Or let the helper script do it:
+
+```
+./scripts/compile_engine.sh freetype vulkan
+```
+
+The flag targets the renderer code under `src/renderers/rendercommon/tr_font.c`, links with your platform’s FreeType library, and defines `BUILD_FREETYPE` for the build. Make sure the FreeType headers/libraries (`libfreetype6-dev`, `freetype-devel`, etc.) are installed before you configure the project.

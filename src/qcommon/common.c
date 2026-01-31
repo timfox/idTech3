@@ -276,6 +276,54 @@ void FORMAT_PRINTF(1, 2) QDECL Com_DPrintf( const char *fmt, ... ) {
 
 
 /*
+================
+Structured Logging System
+================
+*/
+
+const char *logCategoryNames[LOG_COUNT] = {
+	"[SYS]",
+	"[FS]",
+	"[SND]",
+	"[VK]",
+	"[GL]",
+	"[NET]",
+	"[CL]",
+	"[SV]",
+	"[VM]"
+};
+
+int Com_LogVerbosity( void ) {
+	cvar_t *logVerbosity = Cvar_Get( "log_verbosity", "1", CVAR_ARCHIVE );
+	return logVerbosity->integer;
+}
+
+qboolean Com_ShouldLog( logCategory_t category, int verbosity ) {
+	(void)category; // Reserved for future per-category filtering
+	return Com_LogVerbosity() >= verbosity;
+}
+
+void FORMAT_PRINTF(3, 4) QDECL Com_LogCategory( logCategory_t category, int verbosity, const char *fmt, ... ) {
+	va_list argptr;
+	char msg[MAXPRINTMSG];
+	char prefixed[MAXPRINTMSG];
+
+	(void)verbosity; // Reserved for future per-category filtering
+
+	if ( category < 0 || category >= LOG_COUNT ) {
+		category = LOG_SYS;
+	}
+
+	va_start( argptr, fmt );
+	Q_vsnprintf( msg, sizeof( msg ), fmt, argptr );
+	va_end( argptr );
+
+	Com_sprintf( prefixed, sizeof( prefixed ), "%s %s", logCategoryNames[category], msg );
+	Com_Printf( "%s", prefixed );
+}
+
+
+/*
 =============
 Com_Error
 
@@ -3960,9 +4008,42 @@ void Com_Init( char *commandLine ) {
 	Cmd_SetCommandCompletionFunc( "writeconfig", Cmd_CompleteWriteCfgName );
 	Cmd_AddCommand( "game_restart", Com_GameRestart_f );
 
-	s = va( "%s %s %s", Q3_VERSION, PLATFORM_STRING, __DATE__ );
+	s = va( "%s %s %s %s", Q3_VERSION, PLATFORM_STRING, __DATE__, __TIME__ );
 	com_version = Cvar_Get( "version", s, CVAR_PROTECTED | CVAR_ROM | CVAR_SERVERINFO );
 	Cvar_SetDescription( com_version, "Read-only CVAR to see the version of the game." );
+
+	// Log verbosity: 0=errors only, 1=startup+warnings (default), 2=subsystem detail, 3=per-frame/spam
+	cvar_t *logVerbosity = Cvar_Get( "log_verbosity", "1", CVAR_ARCHIVE );
+	Cvar_SetDescription( logVerbosity, 
+		"Log verbosity level:\n"
+		"  0 = errors only\n"
+		"  1 = startup + warnings (default)\n"
+		"  2 = subsystem detail\n"
+		"  3 = per-frame / spam" );
+
+	// Print runtime manifest if verbosity >= 1
+	if ( logVerbosity->integer >= 1 ) {
+		const char *compiler = "unknown";
+#ifdef __clang__
+		compiler = va( "clang %d.%d.%d", __clang_major__, __clang_minor__, __clang_patchlevel__ );
+#elif defined(__GNUC__)
+		compiler = va( "gcc %d.%d.%d", __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__ );
+#endif
+		Com_Printf( "------------------------------------------------------------\n" );
+		Com_Printf( "Engine Build\n" );
+		Com_Printf( "------------------------------------------------------------\n" );
+		Com_Printf( "Engine        : %s (derived)\n", Q3_VERSION );
+		Com_Printf( "Version       : %s\n", s );
+		Com_Printf( "Compiler      : %s (C23)\n", compiler );
+		Com_Printf( "Platform      : %s\n", PLATFORM_STRING );
+#ifdef Q3_BIG_ENDIAN
+		Com_Printf( "Endian        : big\n" );
+#else
+		Com_Printf( "Endian        : little\n" );
+#endif
+		Com_Printf( "Pointer Size  : %d-bit\n", (int)(sizeof(void*) * 8) );
+		Com_Printf( "------------------------------------------------------------\n" );
+	}
 
 	// this cvar is the single entry point of the entire extension system
 	Cvar_Get( "//trap_GetValue", va( "%i", COM_TRAP_GETVALUE ), CVAR_PROTECTED | CVAR_ROM | CVAR_NOTABCOMPLETE );
@@ -4045,8 +4126,35 @@ void Com_Init( char *commandLine ) {
 	Com_Printf( "--- Common Initialization Complete ---\n" );
 
 	NET_Init();
+	
+	// Network logging
+	if ( Com_LogVerbosity() >= 1 ) {
+		LOG_NET( "NET_Init\n" );
+		LOG_NET_V( 2, "  IPv4        : enabled\n" );
+		LOG_NET_V( 2, "  IPv6        : enabled (fallback active)\n" );
+		LOG_NET_V( 2, "  Protocol    : idtech3-snapshot\n" );
+	}
 
 	Com_Printf( "Working directory: %s\n", Sys_Pwd() );
+	
+	// Runtime mode summary
+	if ( Com_LogVerbosity() >= 1 ) {
+		LOG_SYS( "Runtime Mode\n" );
+		LOG_SYS_V( 2, "  Dedicated Server : %s\n", com_dedicated && com_dedicated->integer ? "yes" : "no" );
+		cvar_t *cheats = Cvar_Get( "sv_cheats", "0", CVAR_ROM );
+		LOG_SYS_V( 2, "  Cheats           : %s\n", cheats && cheats->integer ? "on" : "off" );
+		cvar_t *developer = Cvar_Get( "developer", "0", CVAR_ARCHIVE );
+		LOG_SYS_V( 2, "  Developer        : %d\n", developer ? developer->integer : 0 );
+		cvar_t *sv_maxclients = Cvar_Get( "sv_maxclients", "8", CVAR_SERVERINFO );
+		LOG_SYS_V( 2, "  Max Clients      : %d\n", sv_maxclients ? sv_maxclients->integer : 8 );
+	}
+	
+	// Confidence line - initialization complete
+	if ( Com_LogVerbosity() >= 1 ) {
+		Com_Printf( "------------------------------------------------------------\n" );
+		Com_Printf( "Initialization complete. Entering main loop.\n" );
+		Com_Printf( "------------------------------------------------------------\n" );
+	}
 }
 
 

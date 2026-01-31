@@ -59,6 +59,7 @@ static PFN_vkCmdClearAttachments						qvkCmdClearAttachments;
 static PFN_vkCmdCopyBuffer								qvkCmdCopyBuffer;
 static PFN_vkCmdCopyBufferToImage						qvkCmdCopyBufferToImage;
 static PFN_vkCmdCopyImage								qvkCmdCopyImage;
+static PFN_vkCmdCopyImageToBuffer						qvkCmdCopyImageToBuffer;
 static PFN_vkCmdDraw									qvkCmdDraw;
 static PFN_vkCmdDrawIndexed								qvkCmdDrawIndexed;
 static PFN_vkCmdEndRenderPass							qvkCmdEndRenderPass;
@@ -2134,6 +2135,7 @@ static void init_vulkan_library( void )
 	INIT_DEVICE_FUNCTION(vkCmdCopyBuffer)
 	INIT_DEVICE_FUNCTION(vkCmdCopyBufferToImage)
 	INIT_DEVICE_FUNCTION(vkCmdCopyImage)
+	INIT_DEVICE_FUNCTION(vkCmdCopyImageToBuffer)
 	INIT_DEVICE_FUNCTION(vkCmdDraw)
 	INIT_DEVICE_FUNCTION(vkCmdDrawIndexed)
 	INIT_DEVICE_FUNCTION(vkCmdEndRenderPass)
@@ -2266,6 +2268,7 @@ static void deinit_device_functions( void )
 	qvkCmdCopyBuffer							= NULL;
 	qvkCmdCopyBufferToImage						= NULL;
 	qvkCmdCopyImage								= NULL;
+	qvkCmdCopyImageToBuffer						= NULL;
 	qvkCmdDraw									= NULL;
 	qvkCmdDrawIndexed							= NULL;
 	qvkCmdEndRenderPass							= NULL;
@@ -4382,8 +4385,21 @@ void vk_initialize( void )
 	vk.maxBoundDescriptorSets = props.limits.maxBoundDescriptorSets;
 
 #ifdef USE_VK_PBR
-	if( vk.fboActive && r_pbr->integer && vk.maxBoundDescriptorSets >= 10 )
-		vk.pbrActive = qtrue;
+	// Decide PBR activation and print a clear reason if disabled.
+	vk.pbrActive = qfalse;
+	if ( r_pbr->integer ) {
+		if ( !vk.fboActive ) {
+			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "PBR: disabled (requires \\r_fbo 1)\n" S_COLOR_WHITE );
+		} else if ( vk.maxBoundDescriptorSets < 10 ) {
+			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "PBR: disabled (insufficient descriptor sets: have %u, need >= 10)\n" S_COLOR_WHITE,
+				(unsigned)vk.maxBoundDescriptorSets );
+		} else {
+			vk.pbrActive = qtrue;
+			ri.Printf( PRINT_ALL, "PBR: enabled\n" );
+		}
+	} else {
+		ri.Printf( PRINT_ALL, "PBR: disabled (r_pbr 0)\n" );
+	}
 
 #ifdef VK_CUBEMAP
 	if ( vk.pbrActive && r_cubeMapping->integer )
@@ -4458,6 +4474,56 @@ void vk_initialize( void )
 
 	SET_OBJECT_NAME( (intptr_t)vk.device, glConfig.renderer_string, VK_DEBUG_REPORT_OBJECT_TYPE_DEVICE_EXT );
 
+	// Structured Vulkan logging
+	{
+		cvar_t *logVerbosity = ri.Cvar_Get( "log_verbosity", "1", CVAR_ARCHIVE );
+		if ( logVerbosity && logVerbosity->integer >= 1 ) {
+			uint32_t vramMB = 0;
+			VkPhysicalDeviceMemoryProperties mem_props;
+			qvkGetPhysicalDeviceMemoryProperties( vk.physical_device, &mem_props );
+			for ( i = 0; i < mem_props.memoryTypeCount; i++ ) {
+				if ( mem_props.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT ) {
+					uint32_t heapIdx = mem_props.memoryTypes[i].heapIndex;
+					if ( heapIdx < mem_props.memoryHeapCount ) {
+						VkDeviceSize size = mem_props.memoryHeaps[heapIdx].size;
+						if ( size > vramMB ) {
+							vramMB = (uint32_t)(size / (1024 * 1024));
+						}
+					}
+				}
+			}
+			
+			ri.Printf( PRINT_ALL, "[VK] VK_Init\n" );
+			ri.Printf( PRINT_ALL, "[VK]   API Version : %d.%d.%d\n", major, minor, patch );
+			ri.Printf( PRINT_ALL, "[VK]   Driver      : %s\n", driver_version );
+			ri.Printf( PRINT_ALL, "[VK]   GPU         : %s\n", renderer_name( &props ) );
+			if ( vramMB > 0 ) {
+				ri.Printf( PRINT_ALL, "[VK]   VRAM        : %u MB\n", vramMB );
+			}
+			ri.Printf( PRINT_ALL, "[VK]   Renderer    : vulkan\n" );
+			
+			if ( logVerbosity->integer >= 2 ) {
+				VkPhysicalDeviceFeatures features;
+				qvkGetPhysicalDeviceFeatures( vk.physical_device, &features );
+				ri.Printf( PRINT_ALL, "[VK] VK_Features\n" );
+				ri.Printf( PRINT_ALL, "[VK]   Geometry Shader     : %s\n",
+					features.geometryShader ? "yes" : "no" );
+				ri.Printf( PRINT_ALL, "[VK]   Tessellation Shader : %s\n",
+					features.tessellationShader ? "yes" : "no" );
+				ri.Printf( PRINT_ALL, "[VK]   Multi Viewport      : %s\n",
+					features.multiViewport ? "yes" : "no" );
+				ri.Printf( PRINT_ALL, "[VK]   Sampler Anisotropy  : %s\n",
+					features.samplerAnisotropy ? "yes" : "no" );
+#ifdef VK_KHR_RAY_TRACING_PIPELINE
+				ri.Printf( PRINT_ALL, "[VK]   Ray Tracing         : available\n" );
+#else
+				ri.Printf( PRINT_ALL, "[VK]   Ray Tracing         : not available\n" );
+#endif
+				ri.Printf( PRINT_ALL, "[VK]   Compute Pipelines   : enabled\n" );
+			}
+		}
+	}
+
 	// do early texture mode setup to avoid redundant descriptor updates in GL_SetDefaultState()
 	vk.samplers.filter_min = -1;
 	vk.samplers.filter_max = -1;
@@ -4529,7 +4595,7 @@ void vk_initialize( void )
 		pool_size[0].descriptorCount = MAX_DRAWIMAGES + 1 + 1 + 1 + VK_NUM_BLOOM_PASSES * 2; // color, screenmap, bloom descriptors
 #ifdef USE_VK_PBR
         if ( vk.pbrActive )
-            pool_size[0].descriptorCount += 1 + ( MAX_DRAWIMAGES * 2 ); // + 1:  brdf-lut | MAX_DRAWIMAGES * (physical + normal)
+            pool_size[0].descriptorCount += 2 + ( MAX_DRAWIMAGES * 8 ); // brdf-lut + irradiance | MAX_DRAWIMAGES * (physical, normal, emissive, clearcoat, sheen, anisotropy, transmission, subsurface)
 #endif
 
 		pool_size[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
@@ -4591,6 +4657,13 @@ void vk_initialize( void )
 		set_layouts[6] = vk.set_layout_sampler; // normalMap
 		set_layouts[7] = vk.set_layout_sampler; // physicalMap
 		set_layouts[8] = vk.set_layout_sampler; // prefiltered envmap
+		set_layouts[9] = vk.set_layout_sampler; // irradiance
+		set_layouts[10] = vk.set_layout_sampler; // emissive
+		set_layouts[11] = vk.set_layout_sampler; // clearcoat
+		set_layouts[12] = vk.set_layout_sampler; // sheen
+		set_layouts[13] = vk.set_layout_sampler; // anisotropy
+		set_layouts[14] = vk.set_layout_sampler; // transmission
+		set_layouts[15] = vk.set_layout_sampler; // subsurface
 #endif
 		desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		desc.pNext = NULL;
@@ -6153,11 +6226,18 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
         int32_t physical_texture_set;
         int32_t env_texture_set;
         int32_t lightmap_texture_set;
+        int32_t irradiance_texture_set;
+        int32_t emissive_texture_set;
+        int32_t clearcoat_texture_set;
+        int32_t sheen_texture_set;
+        int32_t anisotropy_texture_set;
+        int32_t transmission_texture_set;
+        int32_t subsurface_texture_set;
 #endif
     } frag_spec_data; 
 
 #ifdef USE_VK_PBR
-    VkSpecializationMapEntry spec_entries[24];
+    VkSpecializationMapEntry spec_entries[32];
 #else
     VkSpecializationMapEntry spec_entries[12];
 #endif
@@ -6770,7 +6850,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	frag_spec_info.mapEntryCount = 11;
 #ifdef USE_VK_PBR   
 {
-        frag_spec_info.mapEntryCount += 12;
+        frag_spec_info.mapEntryCount += 19;
 
         {
             spec_entries[12].constantID = 11;
@@ -6823,6 +6903,34 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
         spec_entries[23].constantID = 22;
         spec_entries[23].offset = offsetof(struct FragSpecData, lightmap_texture_set);
         spec_entries[23].size = sizeof(frag_spec_data.lightmap_texture_set);
+
+        spec_entries[24].constantID = 23;
+        spec_entries[24].offset = offsetof(struct FragSpecData, irradiance_texture_set);
+        spec_entries[24].size = sizeof(frag_spec_data.irradiance_texture_set);
+
+        spec_entries[25].constantID = 24;
+        spec_entries[25].offset = offsetof(struct FragSpecData, emissive_texture_set);
+        spec_entries[25].size = sizeof(frag_spec_data.emissive_texture_set);
+
+        spec_entries[26].constantID = 25;
+        spec_entries[26].offset = offsetof(struct FragSpecData, clearcoat_texture_set);
+        spec_entries[26].size = sizeof(frag_spec_data.clearcoat_texture_set);
+
+        spec_entries[27].constantID = 26;
+        spec_entries[27].offset = offsetof(struct FragSpecData, sheen_texture_set);
+        spec_entries[27].size = sizeof(frag_spec_data.sheen_texture_set);
+
+        spec_entries[28].constantID = 27;
+        spec_entries[28].offset = offsetof(struct FragSpecData, anisotropy_texture_set);
+        spec_entries[28].size = sizeof(frag_spec_data.anisotropy_texture_set);
+
+        spec_entries[29].constantID = 28;
+        spec_entries[29].offset = offsetof(struct FragSpecData, transmission_texture_set);
+        spec_entries[29].size = sizeof(frag_spec_data.transmission_texture_set);
+
+        spec_entries[30].constantID = 29;
+        spec_entries[30].offset = offsetof(struct FragSpecData, subsurface_texture_set);
+        spec_entries[30].size = sizeof(frag_spec_data.subsurface_texture_set);
         
         // only use w value, specgloss maps are not supported
         frag_spec_data.specularScale_x = def->specularScale[0];
@@ -6834,6 +6942,18 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
         frag_spec_data.normalScale_y = def->normalScale[1];
         frag_spec_data.normalScale_z = def->normalScale[2];
         frag_spec_data.normalScale_w = def->normalScale[3];
+
+        frag_spec_data.normal_texture_set = 0;
+        frag_spec_data.physical_texture_set = 0;
+        frag_spec_data.env_texture_set = 0;
+        frag_spec_data.lightmap_texture_set = 0;
+        frag_spec_data.irradiance_texture_set = 0;
+        frag_spec_data.emissive_texture_set = 0;
+        frag_spec_data.clearcoat_texture_set = 0;
+        frag_spec_data.sheen_texture_set = 0;
+        frag_spec_data.anisotropy_texture_set = 0;
+        frag_spec_data.transmission_texture_set = 0;
+        frag_spec_data.subsurface_texture_set = 0;
 
 	    if ( ( def->vk_pbr_flags & PBR_HAS_NORMALMAP ) == 0 )
             frag_spec_data.normal_texture_set = -1;
@@ -6849,6 +6969,27 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 
         if ( ( def->vk_pbr_flags & PBR_HAS_LIGHTMAP ) == 0 )
             frag_spec_data.lightmap_texture_set = -1;
+
+        if ( !vk.cubemapActive )
+            frag_spec_data.irradiance_texture_set = -1;
+
+        if ( ( def->vk_pbr_flags & PBR_HAS_EMISSIVE ) == 0 )
+            frag_spec_data.emissive_texture_set = -1;
+
+        if ( ( def->vk_pbr_flags & PBR_HAS_CLEARCOAT ) == 0 )
+            frag_spec_data.clearcoat_texture_set = -1;
+
+        if ( ( def->vk_pbr_flags & PBR_HAS_SHEEN ) == 0 )
+            frag_spec_data.sheen_texture_set = -1;
+
+        if ( ( def->vk_pbr_flags & PBR_HAS_ANISOTROPY ) == 0 )
+            frag_spec_data.anisotropy_texture_set = -1;
+
+        if ( ( def->vk_pbr_flags & PBR_HAS_TRANSMISSION ) == 0 )
+            frag_spec_data.transmission_texture_set = -1;
+
+        if ( ( def->vk_pbr_flags & PBR_HAS_SUBSURFACE ) == 0 )
+            frag_spec_data.subsurface_texture_set = -1;
     }
 #endif
 	frag_spec_info.pMapEntries = spec_entries + 1;
@@ -8962,6 +9103,31 @@ typedef struct {
 
 static filterDef prefilters[2];
 
+static uint32_t vk_pow2_floor_u32( uint32_t v )
+{
+	uint32_t p = 1;
+	while ( ( p << 1 ) && ( ( p << 1 ) <= v ) ) {
+		p <<= 1;
+	}
+	return p;
+}
+
+static uint32_t vk_ibl_size_from_cvar( const cvar_t *cv, uint32_t defValue, uint32_t minValue, uint32_t maxValue )
+{
+	uint32_t v = defValue;
+	if ( cv && cv->integer > 0 ) {
+		v = (uint32_t)cv->integer;
+	}
+	if ( v < minValue ) v = minValue;
+	if ( v > maxValue ) v = maxValue;
+
+	// Prefer power-of-two sizes (required for full mip chains).
+	v = vk_pow2_floor_u32( v );
+	if ( v < minValue ) v = minValue;
+	if ( v > maxValue ) v = vk_pow2_floor_u32( maxValue );
+	return v;
+}
+
 static void vk_create_prefilter_renderpass( filterDef *def ) 
 {
 	VkAttachmentReference	color_attachment_ref;
@@ -9226,13 +9392,13 @@ void vk_create_cubemap_prefilter( void )
 		switch ( def->target ) {
 			case IRRADIANCE:
 				def->format = VK_FORMAT_R32G32B32A32_SFLOAT;
-				def->size = 64;
+				def->size = vk_ibl_size_from_cvar( r_pbr_iblIrradianceSize, 64, 16, (uint32_t)MIN( glConfig.maxTextureSize, 1024 ) );
 				def->shaders.fs_module = &vk.modules.irradiancecube_fs;
 				def->mipLevels = (uint32_t)(floor(log2(def->size))) + 1;
 				break;
 			case PREFILTEREDENV:
 				def->format = VK_FORMAT_R16G16B16A16_SFLOAT;
-				def->size = 256;
+				def->size = vk_ibl_size_from_cvar( r_pbr_iblPrefilterSize, 256, 32, (uint32_t)MIN( glConfig.maxTextureSize, 2048 ) );
 				def->shaders.fs_module = &vk.modules.prefilterenvmap_fs;
 				def->mipLevels = (uint32_t)(floor(log2(def->size))) + 1;
 				break;
@@ -9292,12 +9458,12 @@ void vk_clear_cube_color( image_t *image, VkClearColorValue color )
 	end_command_buffer( command_buffer, __func__ );
 }
 
-static void vk_copy_to_cubemap( filterDef *def, VkImage *image, uint32_t mipLevel, uint32_t size ) 
+static void vk_copy_to_cubemap( filterDef *def, VkImage *image, uint32_t mipLevel, uint32_t size, VkCommandBuffer command_buffer ) 
 {	
 	VkImageCopy region;
 	
 	// change image layout for all offsceen faces to transfer source
-	record_image_layout_transition( vk.cmd->command_buffer, def->offscreen.image, VK_IMAGE_ASPECT_COLOR_BIT, 
+	record_image_layout_transition( command_buffer, def->offscreen.image, VK_IMAGE_ASPECT_COLOR_BIT, 
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 
 		0, 0);
 
@@ -9323,11 +9489,184 @@ static void vk_copy_to_cubemap( filterDef *def, VkImage *image, uint32_t mipLeve
 	region.extent.width = region.extent.height = size;
 	region.extent.depth = 1;
 
-	qvkCmdCopyImage( vk.cmd->command_buffer, def->offscreen.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, *image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region );
+	qvkCmdCopyImage( command_buffer, def->offscreen.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, *image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region );
 
-	record_image_layout_transition( vk.cmd->command_buffer, def->offscreen.image, VK_IMAGE_ASPECT_COLOR_BIT, 
+	record_image_layout_transition( command_buffer, def->offscreen.image, VK_IMAGE_ASPECT_COLOR_BIT, 
 		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
 		0, 0 );
+}
+
+static void vk_create_readback_buffer( VkDeviceSize size, VkBuffer *buffer, VkDeviceMemory *memory, void **data ) {
+	VkBufferCreateInfo buffer_desc = { 0 };
+	buffer_desc.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	buffer_desc.size = size;
+	buffer_desc.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+	buffer_desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	VK_CHECK( qvkCreateBuffer( vk.device, &buffer_desc, NULL, buffer ) );
+
+	VkMemoryRequirements mem_reqs;
+	qvkGetBufferMemoryRequirements( vk.device, *buffer, &mem_reqs );
+
+	VkMemoryAllocateInfo alloc_info = { 0 };
+	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	alloc_info.allocationSize = mem_reqs.size;
+	alloc_info.memoryTypeIndex = find_memory_type( mem_reqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, memory ) );
+	VK_CHECK( qvkBindBufferMemory( vk.device, *buffer, *memory, 0 ) );
+
+	VK_CHECK( qvkMapMemory( vk.device, *memory, 0, size, 0, data ) );
+}
+
+static void vk_destroy_readback_buffer( VkBuffer buffer, VkDeviceMemory memory ) {
+	qvkUnmapMemory( vk.device, memory );
+	qvkDestroyBuffer( vk.device, buffer, NULL );
+	qvkFreeMemory( vk.device, memory, NULL );
+}
+
+#define SH_C0 0.28209479177387814347f // 1/2*sqrt(1/pi)
+#define SH_C1 0.48860251190291992159f // sqrt(3/(4*pi))
+#define SH_C2 1.09254843059207907054f // 1/2*sqrt(15/pi)
+#define SH_C3 0.31539156525252000603f // 1/4*sqrt(5/pi)
+#define SH_C4 0.54627421529603953527f // 1/4*sqrt(15/pi)
+
+static float SH_Basis( int index, const vec3_t dir ) {
+	float x = dir[0];
+	float y = dir[1];
+	float z = dir[2];
+
+	switch ( index ) {
+		case 0: return SH_C0;
+		case 1: return SH_C1 * y;
+		case 2: return SH_C1 * z;
+		case 3: return SH_C1 * x;
+		case 4: return SH_C2 * x * y;
+		case 5: return SH_C2 * y * z;
+		case 6: return SH_C3 * ( 3.0f * z * z - 1.0f );
+		case 7: return SH_C2 * x * z;
+		case 8: return SH_C4 * ( x * x - y * y );
+		default: return 0.0f;
+	}
+}
+
+static void get_cube_dir( int face, float x, float y, vec3_t dir ) {
+	switch ( face ) {
+		case 0: dir[0] =  1.0f; dir[1] = -y;    dir[2] = -x;    break; // +X
+		case 1: dir[0] = -1.0f; dir[1] = -y;    dir[2] =  x;    break; // -X
+		case 2: dir[0] =  x;    dir[1] =  1.0f; dir[2] =  y;    break; // +Y
+		case 3: dir[0] =  x;    dir[1] = -1.0f; dir[2] = -y;    break; // -Y
+		case 4: dir[0] =  x;    dir[1] = -y;    dir[2] =  1.0f; break; // +Z
+		case 5: dir[0] = -x;    dir[1] = -y;    dir[2] = -1.0f; break; // -Z
+		default: VectorClear( dir ); break;
+	}
+}
+
+static qboolean vk_extract_sh_coeffs( const image_t *irradiance_image, vec4_t shCoeffs[9] )
+{
+	int i;
+	uint32_t f, x, y;
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingMemory;
+	void *data;
+	float *pixels;
+	VkCommandBuffer command_buffer;
+
+	if ( !irradiance_image || !shCoeffs )
+	{
+		return qfalse;
+	}
+
+	if ( irradiance_image->internalFormat != VK_FORMAT_R32G32B32A32_SFLOAT ) {
+		ri.Printf( PRINT_WARNING, "vk_extract_sh_coeffs: unsupported irradiance format %s\n",
+			vk_format_string( (VkFormat)irradiance_image->internalFormat ) );
+		return qfalse;
+	}
+
+	uint32_t size = irradiance_image->width;
+	uint32_t bufferSize = size * size * 6 * 4 * sizeof( float );
+
+	for ( i = 0; i < 9; i++ )
+	{
+		VectorClear( shCoeffs[i] );
+		shCoeffs[i][3] = 0.0f;
+	}
+
+	// Create staging buffer for readback
+	vk_create_readback_buffer( bufferSize, &stagingBuffer, &stagingMemory, &data );
+
+	command_buffer = begin_command_buffer();
+
+	// Transition image to transfer src
+	record_image_layout_transition( command_buffer, irradiance_image->handle, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 0, 0 );
+
+	// Copy image to buffer
+	VkBufferImageCopy region = { 0 };
+	region.bufferOffset = 0;
+	region.bufferRowLength = 0;
+	region.bufferImageHeight = 0;
+	region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	region.imageSubresource.mipLevel = 0;
+	region.imageSubresource.baseArrayLayer = 0;
+	region.imageSubresource.layerCount = 6;
+	region.imageExtent.width = size;
+	region.imageExtent.height = size;
+	region.imageExtent.depth = 1;
+
+	qvkCmdCopyImageToBuffer( command_buffer, irradiance_image->handle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, stagingBuffer, 1, &region );
+
+	// Transition image back to shader read only
+	record_image_layout_transition( command_buffer, irradiance_image->handle, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
+
+	end_command_buffer( command_buffer, "sh extraction" );
+
+	pixels = (float *)data;
+
+	float totalWeight = 0.0f;
+	for ( f = 0; f < 6; f++ )
+	{
+		for ( y = 0; y < size; y++ )
+		{
+			for ( x = 0; x < size; x++ )
+			{
+				float u = ( (float)x + 0.5f ) / (float)size * 2.0f - 1.0f;
+				float v = ( (float)y + 0.5f ) / (float)size * 2.0f - 1.0f;
+				float weight = 4.0f / powf( 1.0f + u * u + v * v, 1.5f );
+				
+				vec3_t dir;
+				get_cube_dir( (int)f, u, v, dir );
+				VectorNormalize( dir );
+				
+				const size_t pixel_index =
+					( (size_t)f * (size_t)size * (size_t)size ) +
+					( (size_t)y * (size_t)size ) +
+					(size_t)x;
+				float *pixel = &pixels[ pixel_index * 4 ];
+				vec3_t color = { pixel[0], pixel[1], pixel[2] };
+				
+				for ( i = 0; i < 9; i++ )
+				{
+					float basis = SH_Basis( i, dir );
+					shCoeffs[i][0] += color[0] * basis * weight;
+					shCoeffs[i][1] += color[1] * basis * weight;
+					shCoeffs[i][2] += color[2] * basis * weight;
+				}
+				totalWeight += weight;
+			}
+		}
+	}
+
+	// Normalize
+	float norm = ( 4.0f * M_PI ) / totalWeight;
+	for ( i = 0; i < 9; i++ )
+	{
+		shCoeffs[i][0] *= norm;
+		shCoeffs[i][1] *= norm;
+		shCoeffs[i][2] *= norm;
+	}
+
+	vk_destroy_readback_buffer( stagingBuffer, stagingMemory );
+	return qtrue;
 }
 
 void vk_generate_cubemaps( cubemap_t *cube ) 
@@ -9408,7 +9747,7 @@ void vk_generate_cubemaps( cubemap_t *cube )
 			qvkCmdDraw( vk.cmd->command_buffer, 3, 1, 0, 0 );
 			qvkCmdEndRenderPass( vk.cmd->command_buffer );
 
-			vk_copy_to_cubemap( def, &cubemap->handle, j, (uint32_t)viewport.width );
+			vk_copy_to_cubemap( def, &cubemap->handle, j, (uint32_t)viewport.width, vk.cmd->command_buffer );
 		
 			viewport.width /= 2;
 			viewport.height /= 2;
@@ -9417,6 +9756,16 @@ void vk_generate_cubemaps( cubemap_t *cube )
 		record_image_layout_transition( vk.cmd->command_buffer, cubemap->handle, VK_IMAGE_ASPECT_COLOR_BIT, 
 			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
 	}
+
+#ifdef USE_VK_PBR
+	if ( r_pbr_shExtract && r_pbr_shExtract->integer && vk.pbrActive && cube && cube->irradiance_image ) {
+		R_ResetCubemapSH( cube );
+		if ( vk_extract_sh_coeffs( cube->irradiance_image, cube->shCoeffs ) ) {
+			cube->hasSHCoeffs = qtrue;
+			ri.Printf( PRINT_DEVELOPER, "PBR: extracted SH coeffs for cubemap '%s'\n", cube->name );
+		}
+	}
+#endif
 
 	command_buffer = begin_command_buffer();
 	record_image_layout_transition( command_buffer, vk.cubeMap.color_image, VK_IMAGE_ASPECT_COLOR_BIT, 
