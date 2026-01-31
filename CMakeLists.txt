@@ -417,7 +417,10 @@ ELSEIF(WIN32)
 ENDIF(UNIX)
 
 IF(USE_OPENAL)
-	list(APPEND Q3_UI_SRCS src/audio/backends/openal/openal_snd.c)
+	list(APPEND Q3_UI_SRCS
+		src/audio/backends/openal/openal_snd.c
+		src/audio/acoustics/s_acoustics.c
+	)
 ENDIF()
 
 ADD_LIBRARY(q3ui OBJECT ${Q3_UI_SRCS})
@@ -447,6 +450,7 @@ IF(USE_OPENAL)
 	endif()
 	TARGET_COMPILE_DEFINITIONS(q3ui PRIVATE USE_OPENAL)
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_OPENAL)
+	TARGET_COMPILE_DEFINITIONS(q3ui PRIVATE USE_OPENAL_EFX)
 	target_include_directories(q3ui PRIVATE ${OPENAL_INCLUDE_DIR})
 ENDIF()
 

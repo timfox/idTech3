@@ -26,6 +26,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "snd_local.h"
 #include "snd_public.h"
 
+#ifdef USE_OPENAL
+#include "../audio/acoustics/s_acoustics.h"
+#endif
+
 cvar_t *s_volume;
 cvar_t *s_musicVolume;
 cvar_t *s_doppler;
@@ -50,6 +54,39 @@ cvar_t *s_openalOcclusionHf;
 cvar_t *s_openalVoipSpatial;
 cvar_t *s_openalVoipGain;
 cvar_t *s_openalDebug;
+cvar_t *s_acoustics_enable;
+cvar_t *s_acoustics_debug;
+cvar_t *s_acoustics_draw;
+cvar_t *s_acoustics_print_interval_ms;
+cvar_t *s_acoustics_hz;
+cvar_t *s_acoustics_rays;
+cvar_t *s_acoustics_maxdist;
+cvar_t *s_acoustics_near;
+cvar_t *s_acoustics_cone_deg;
+cvar_t *s_acoustics_smooth_ms;
+cvar_t *s_acoustics_smooth_min_alpha;
+cvar_t *s_acoustics_smooth_max_alpha;
+cvar_t *s_acoustics_preset_force;
+cvar_t *s_acoustics_preset_blend;
+cvar_t *s_acoustics_outdoor_threshold;
+cvar_t *s_acoustics_tunnel_threshold;
+cvar_t *s_acoustics_roomsize_small;
+cvar_t *s_acoustics_roomsize_medium;
+cvar_t *s_acoustics_efx_enable;
+cvar_t *s_acoustics_wet;
+cvar_t *s_acoustics_dry;
+cvar_t *s_acoustics_bypass;
+cvar_t *s_acoustics_air_absorb;
+cvar_t *s_acoustics_occlusion_enable;
+cvar_t *s_acoustics_occlusion_strength;
+cvar_t *s_acoustics_occlusion_hf;
+cvar_t *s_acoustics_occlusion_trace_sources;
+cvar_t *s_acoustics_occlusion_max_sources;
+cvar_t *s_acoustics_occlusion_min_gain;
+cvar_t *s_acoustics_budget_us;
+cvar_t *s_acoustics_warn_efx;
+cvar_t *r_acoustics_reflectivity;
+cvar_t *s_acoustics_decay_scale;
 #endif
 
 cvar_t *s_musicLayer;
@@ -363,6 +400,13 @@ static void S_SoundList( void )
 	}
 }
 
+#ifdef USE_OPENAL
+static void S_Acoustics_Reset_f( void )
+{
+	S_Acoustics_Reset();
+}
+#endif
+
 //=============================================================================
 
 /*
@@ -537,6 +581,138 @@ void S_Init( void )
 	s_openalDebug = Cvar_Get( "s_openalDebug", "0", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( s_openalDebug, "0", "2", CV_INTEGER );
 	Cvar_SetDescription( s_openalDebug, "OpenAL debugging output level (0=off, 1=basic, 2=verbose)." );
+
+	s_acoustics_enable = Cvar_Get( "s_acoustics_enable", "0", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_enable, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( s_acoustics_enable, "Enable heuristic real-time acoustics (OpenAL backend)." );
+
+	s_acoustics_debug = Cvar_Get( "s_acoustics_debug", "0", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_debug, "0", "3", CV_INTEGER );
+	Cvar_SetDescription( s_acoustics_debug, "Acoustics debug output (0=off, 1=metrics, 2=metrics+presets, 3=spam)." );
+
+	s_acoustics_draw = Cvar_Get( "s_acoustics_draw", "0", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_draw, "0", "2", CV_INTEGER );
+	Cvar_SetDescription( s_acoustics_draw, "Draw acoustics rays (if supported) 0=off, 1=lines, 2=lines+hits." );
+
+	s_acoustics_print_interval_ms = Cvar_Get( "s_acoustics_print_interval_ms", "1000", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_print_interval_ms, "100", "5000", CV_INTEGER );
+	Cvar_SetDescription( s_acoustics_print_interval_ms, "Debug print interval in milliseconds." );
+
+	s_acoustics_hz = Cvar_Get( "s_acoustics_hz", "15", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_hz, "1", "60", CV_INTEGER );
+	Cvar_SetDescription( s_acoustics_hz, "Acoustics update rate (Hz)." );
+
+	s_acoustics_rays = Cvar_Get( "s_acoustics_rays", "14", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_rays, "6", "32", CV_INTEGER );
+	Cvar_SetDescription( s_acoustics_rays, "Number of acoustics probe rays (clamped to 32)." );
+
+	s_acoustics_maxdist = Cvar_Get( "s_acoustics_maxdist", "1536", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_maxdist, "128", "4096", CV_FLOAT );
+	Cvar_SetDescription( s_acoustics_maxdist, "Max ray distance for room probing." );
+
+	s_acoustics_near = Cvar_Get( "s_acoustics_near", "64", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_near, "8", "512", CV_FLOAT );
+	Cvar_SetDescription( s_acoustics_near, "Near probe distance for tightness estimation." );
+
+	s_acoustics_cone_deg = Cvar_Get( "s_acoustics_cone_deg", "90", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_cone_deg, "10", "180", CV_FLOAT );
+	Cvar_SetDescription( s_acoustics_cone_deg, "Forward cone angle for weighting." );
+
+	s_acoustics_smooth_ms = Cvar_Get( "s_acoustics_smooth_ms", "250", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_smooth_ms, "0", "2000", CV_INTEGER );
+	Cvar_SetDescription( s_acoustics_smooth_ms, "Smoothing time constant in milliseconds (0 disables)." );
+
+	s_acoustics_smooth_min_alpha = Cvar_Get( "s_acoustics_smooth_min_alpha", "0.05", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_smooth_min_alpha, "0.01", "1", CV_FLOAT );
+	Cvar_SetDescription( s_acoustics_smooth_min_alpha, "Minimum smoothing alpha." );
+
+	s_acoustics_smooth_max_alpha = Cvar_Get( "s_acoustics_smooth_max_alpha", "0.5", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_smooth_max_alpha, "0.05", "1", CV_FLOAT );
+	Cvar_SetDescription( s_acoustics_smooth_max_alpha, "Maximum smoothing alpha." );
+
+	s_acoustics_preset_force = Cvar_Get( "s_acoustics_preset_force", "-1", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_preset_force, "-1", "16", CV_INTEGER );
+	Cvar_SetDescription( s_acoustics_preset_force, "Force a preset by id (-1 uses heuristics)." );
+
+	s_acoustics_preset_blend = Cvar_Get( "s_acoustics_preset_blend", "1.0", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_preset_blend, "0", "1", CV_FLOAT );
+	Cvar_SetDescription( s_acoustics_preset_blend, "Preset blend factor (0=snaps, 1=full blend)." );
+
+	s_acoustics_outdoor_threshold = Cvar_Get( "s_acoustics_outdoor_threshold", "0.55", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_outdoor_threshold, "0", "1", CV_FLOAT );
+	Cvar_SetDescription( s_acoustics_outdoor_threshold, "Openness threshold for outdoor preset." );
+
+	s_acoustics_tunnel_threshold = Cvar_Get( "s_acoustics_tunnel_threshold", "0.25", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_tunnel_threshold, "0", "1", CV_FLOAT );
+	Cvar_SetDescription( s_acoustics_tunnel_threshold, "Openness threshold for tunnel preset." );
+
+	s_acoustics_roomsize_small = Cvar_Get( "s_acoustics_roomsize_small", "0.20", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_roomsize_small, "0", "1", CV_FLOAT );
+	Cvar_SetDescription( s_acoustics_roomsize_small, "Room size threshold for small preset." );
+
+	s_acoustics_roomsize_medium = Cvar_Get( "s_acoustics_roomsize_medium", "0.50", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_roomsize_medium, "0", "1", CV_FLOAT );
+	Cvar_SetDescription( s_acoustics_roomsize_medium, "Room size threshold for medium preset." );
+
+	s_acoustics_efx_enable = Cvar_Get( "s_acoustics_efx_enable", "1", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_efx_enable, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( s_acoustics_efx_enable, "Enable OpenAL EFX usage for acoustics." );
+
+	s_acoustics_wet = Cvar_Get( "s_acoustics_wet", "0.35", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_wet, "0", "1", CV_FLOAT );
+	Cvar_SetDescription( s_acoustics_wet, "Wet (reverb send) gain." );
+
+	s_acoustics_dry = Cvar_Get( "s_acoustics_dry", "1.0", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_dry, "0", "1", CV_FLOAT );
+	Cvar_SetDescription( s_acoustics_dry, "Dry gain multiplier." );
+
+	s_acoustics_bypass = Cvar_Get( "s_acoustics_bypass", "0", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_bypass, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( s_acoustics_bypass, "Bypass acoustics processing (keeps metrics)." );
+
+	s_acoustics_air_absorb = Cvar_Get( "s_acoustics_air_absorb", "0.25", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_air_absorb, "0", "1", CV_FLOAT );
+	Cvar_SetDescription( s_acoustics_air_absorb, "Air absorption gain (HF)." );
+
+	s_acoustics_occlusion_enable = Cvar_Get( "s_acoustics_occlusion_enable", "1", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_occlusion_enable, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( s_acoustics_occlusion_enable, "Enable occlusion processing." );
+
+	s_acoustics_occlusion_strength = Cvar_Get( "s_acoustics_occlusion_strength", "0.8", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_occlusion_strength, "0", "1", CV_FLOAT );
+	Cvar_SetDescription( s_acoustics_occlusion_strength, "Occlusion strength multiplier." );
+
+	s_acoustics_occlusion_hf = Cvar_Get( "s_acoustics_occlusion_hf", "0.25", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_occlusion_hf, "0", "1", CV_FLOAT );
+	Cvar_SetDescription( s_acoustics_occlusion_hf, "Occlusion high-frequency gain when fully occluded." );
+
+	s_acoustics_occlusion_trace_sources = Cvar_Get( "s_acoustics_occlusion_trace_sources", "0", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_occlusion_trace_sources, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( s_acoustics_occlusion_trace_sources, "Trace per source for occlusion (0=global only)." );
+
+	s_acoustics_occlusion_max_sources = Cvar_Get( "s_acoustics_occlusion_max_sources", "16", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_occlusion_max_sources, "1", "32", CV_INTEGER );
+	Cvar_SetDescription( s_acoustics_occlusion_max_sources, "Max sources with occlusion filters." );
+
+	s_acoustics_occlusion_min_gain = Cvar_Get( "s_acoustics_occlusion_min_gain", "0.35", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_occlusion_min_gain, "0.05", "1", CV_FLOAT );
+	Cvar_SetDescription( s_acoustics_occlusion_min_gain, "Minimum gain for fully occluded sounds." );
+
+	s_acoustics_budget_us = Cvar_Get( "s_acoustics_budget_us", "200", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_budget_us, "0", "2000", CV_INTEGER );
+	Cvar_SetDescription( s_acoustics_budget_us, "Soft budget in microseconds for acoustic probes." );
+
+	s_acoustics_warn_efx = Cvar_Get( "s_acoustics_warn_efx", "1", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_warn_efx, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( s_acoustics_warn_efx, "Print a one-time warning if EFX is unavailable." );
+
+	r_acoustics_reflectivity = Cvar_Get( "r_acoustics_reflectivity", "0.5", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( r_acoustics_reflectivity, "0", "1", CV_FLOAT );
+	Cvar_SetDescription( r_acoustics_reflectivity, "Fallback reflectivity for acoustic probes (0-1)." );
+
+	s_acoustics_decay_scale = Cvar_Get( "s_acoustics_decay_scale", "1.2", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_decay_scale, "0.1", "2.0", CV_FLOAT );
+	Cvar_SetDescription( s_acoustics_decay_scale, "Scale factor applied to reverb decay times when acoustics are active." );
 #endif
 
 	s_musicLayer = Cvar_Get( "s_musicLayer", "", CVAR_ARCHIVE_ND | CVAR_LATCH );
@@ -568,6 +744,9 @@ void S_Init( void )
 		Cmd_AddCommand( "s_list", S_SoundList );
 		Cmd_AddCommand( "s_stop", S_StopAllSounds );
 		Cmd_AddCommand( "s_info", S_SoundInfo );
+#ifdef USE_OPENAL
+		Cmd_AddCommand( "s_acoustics_reset", S_Acoustics_Reset_f );
+#endif
 
 #ifdef USE_OPENAL
 		if ( s_openal->integer ) {
@@ -623,6 +802,9 @@ void S_Shutdown( void )
 	Cmd_RemoveCommand( "s_list" );
 	Cmd_RemoveCommand( "s_stop" );
 	Cmd_RemoveCommand( "s_info" );
+#ifdef USE_OPENAL
+	Cmd_RemoveCommand( "s_acoustics_reset" );
+#endif
 
 	S_CodecShutdown();
 

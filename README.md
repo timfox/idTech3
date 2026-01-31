@@ -17,6 +17,7 @@ Go to [Releases](../../releases) section to download latest binaries for your pl
 
 **Audio**:
 * OpenAL backend with HRTF for true 3D positional audio.
+* Heuristic acoustics: real-time reverb/occlusion using OpenAL EFX.
 
 ### Standards
 
