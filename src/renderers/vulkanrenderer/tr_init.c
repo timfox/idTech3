@@ -86,6 +86,14 @@ cvar_t	*r_vbo;
 #ifdef USE_VK_PBR
 cvar_t	*r_pbr;
 cvar_t	*r_pbr_shExtract;
+cvar_t	*r_pbr_debug;
+cvar_t	*r_pbr_packedPreferred;
+#ifdef VK_CUBEMAP
+cvar_t	*r_pbr_iblIrradianceSize;
+cvar_t	*r_pbr_iblPrefilterSize;
+cvar_t	*r_pbr_showCubemap;
+cvar_t	*r_pbr_cubemapInfo;
+#endif
 cvar_t  *r_baseNormalX;
 cvar_t  *r_baseNormalY;
 cvar_t  *r_baseParallax;
@@ -1437,6 +1445,9 @@ static void VarInfo( void )
 	}
 #if defined (USE_VK_PBR)
 	ri.Printf( PRINT_ALL, "PBR SH extraction: %s\n", r_pbr_shExtract->integer ? "enabled" : "disabled" );
+	if ( r_pbr_debug->integer ) {
+		ri.Printf( PRINT_ALL, "PBR debug view: mode %d\n", r_pbr_debug->integer );
+	}
 #endif
 #else
 	if ( r_vertexLight->integer || glConfig.hardwareType == GLHW_PERMEDIA2 ) {
@@ -1569,11 +1580,49 @@ static void R_Register( void )
 	r_pbr_shExtract = ri.Cvar_Get( "r_pbr_shExtract", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_pbr_shExtract, "Extract SH coefficients from generated irradiance cubemaps for PBR." );
 
+	r_pbr_debug = ri.Cvar_Get( "r_pbr_debug", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbr_debug, "0", "4", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pbr_debug,
+		"PBR debug view override (Vulkan PBR only):\n"
+		" 0 - off (normal PBR)\n"
+		" 1 - show base/albedo (texture0)\n"
+		" 2 - show normal map (RGB)\n"
+		" 3 - show physical map (packed)\n"
+		" 4 - show emissive map (RGB)\n" );
+
+	r_pbr_packedPreferred = ri.Cvar_Get( "r_pbr_packedPreferred", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_pbr_packedPreferred, "0", "6", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pbr_packedPreferred,
+		"Preferred packed PBR physical map format for auto-discovery:\n"
+		" 0 - auto (legacy order)\n"
+		" 1 - ORM (recommended)\n"
+		" 2 - RMO\n"
+		" 3 - MOXR\n"
+		" 4 - ORMS\n"
+		" 5 - RMOS\n"
+		" 6 - MOSR\n"
+		"Auto-discovery still falls back to other formats if the preferred suffix is not found." );
+
 	r_baseNormalX	= ri.Cvar_Get("r_baseNormalX",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );
 	r_baseNormalY	= ri.Cvar_Get("r_baseNormalY",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );
 	r_baseParallax	= ri.Cvar_Get("r_baseParallax",		"0.05",	CVAR_ARCHIVE | CVAR_LATCH );
 	r_baseSpecular	= ri.Cvar_Get( "r_baseSpecular",	"0.04",	CVAR_ARCHIVE | CVAR_LATCH );
 #ifdef VK_CUBEMAP
+	r_pbr_iblIrradianceSize = ri.Cvar_Get( "r_pbr_iblIrradianceSize", "64", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_pbr_iblIrradianceSize, "16", "1024", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pbr_iblIrradianceSize, "IBL irradiance cubemap size (resolution per face). Power-of-two recommended. Requires renderer restart." );
+
+	r_pbr_iblPrefilterSize = ri.Cvar_Get( "r_pbr_iblPrefilterSize", "256", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_pbr_iblPrefilterSize, "32", "2048", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pbr_iblPrefilterSize, "IBL prefiltered environment cubemap size (resolution per face). Power-of-two recommended. Requires renderer restart." );
+
+	r_pbr_showCubemap = ri.Cvar_Get( "r_pbr_showCubemap", "0", CVAR_TEMP );
+	ri.Cvar_CheckRange( r_pbr_showCubemap, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pbr_showCubemap, "Show current PBR cubemap selection overlay (updates a debug string cvar)." );
+
+	r_pbr_cubemapInfo = ri.Cvar_Get( "r_pbr_cubemapInfo", "", CVAR_TEMP );
+	ri.Cvar_SetDescription( r_pbr_cubemapInfo, "Read-only-ish debug string updated by renderer when r_pbr_showCubemap is enabled." );
+
 	r_cubeMapping = ri.Cvar_Get( "r_cubeMapping", "0", CVAR_ARCHIVE | CVAR_LATCH );
 #endif
 #endif

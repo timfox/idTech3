@@ -706,8 +706,9 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			}
 		}
 #ifdef USE_VK_PBR
-		else if ( (!Q_stricmp(token, "normalMap") || !Q_stricmp(token, "normalHeightMap")) && vk.pbrActive )
+		else if ( !Q_stricmp(token, "normalMap") || !Q_stricmp(token, "normalHeightMap") )
 		{
+			const qboolean isHeight = !Q_stricmp( token, "normalHeightMap" );
 			token = COM_ParseExt(text, qfalse);
 			if ( !token[0] )
 			{
@@ -715,7 +716,7 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 				return qfalse;
 			}
 
-			stage->normalMapType = !Q_stricmp(token, "normalHeightMap") ? PHYS_NORMALHEIGHT : PHYS_NORMAL;
+			stage->normalMapType = isHeight ? PHYS_NORMALHEIGHT : PHYS_NORMAL;
 
 			Q_strncpyz( bufferNormalTextureName, token, sizeof(bufferNormalTextureName) );
 		
@@ -1692,6 +1693,35 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 		
 		// scan for a potential physical map
 		if ( !stage->physicalMap && physicalAlbedo ) {
+			uint32_t preferredType = 0;
+			if ( r_pbr_packedPreferred ) {
+				switch ( r_pbr_packedPreferred->integer ) {
+					default:
+					case 0: preferredType = 0; break;
+					case 1: preferredType = PHYS_ORM;  break;
+					case 2: preferredType = PHYS_RMO;  break;
+					case 3: preferredType = PHYS_MOXR; break;
+					case 4: preferredType = PHYS_ORMS; break;
+					case 5: preferredType = PHYS_RMOS; break;
+					case 6: preferredType = PHYS_MOSR; break;
+				}
+			}
+
+			// Try preferred packing first (still falls back to the full list below).
+			if ( preferredType ) {
+				uint32_t j;
+				for ( j = 0; j < ARRAY_LEN( textureMapTypes ); j++ ) {
+					if ( textureMapTypes[j].type != preferredType ) {
+						continue;
+					}
+					COM_StripExtension( physicalAlbedoName, bufferPackedTextureName, MAX_QPATH );
+					Q_strcat( bufferPackedTextureName, MAX_QPATH, textureMapTypes[j].suffix );
+					stage->physicalMapType = textureMapTypes[j].type;
+					(void)vk_create_phyisical_texture( stage, bufferPackedTextureName, flags );
+					break;
+				}
+			}
+
 			for ( i = 0; i < ARRAY_LEN( textureMapTypes ); i++ ) {
 				if ( textureMapTypes[i].type != PHYS_RMO &&
 					textureMapTypes[i].type != PHYS_RMOS &&
@@ -1699,6 +1729,10 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 					textureMapTypes[i].type != PHYS_MOSR &&
 					textureMapTypes[i].type != PHYS_ORM &&
 					textureMapTypes[i].type != PHYS_ORMS ) {
+					continue;
+				}
+				if ( preferredType && textureMapTypes[i].type == preferredType ) {
+					// already tried above
 					continue;
 				}
 				COM_StripExtension( physicalAlbedoName, bufferPackedTextureName, MAX_QPATH );
@@ -1806,6 +1840,15 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			Q_strcat( bufferSubsurfaceTextureName, MAX_QPATH, "_subsurface" );
 			stage->subsurfaceMapType = PHYS_SUBSURFACE;
 			vk_create_subsurface_texture( stage, bufferSubsurfaceTextureName, flags );
+		}
+
+		// Only treat basecolor as sRGB when the stage is actually using PBR features.
+		// This avoids changing the appearance of classic shaders (UI backgrounds, decals, etc.).
+		if ( physicalAlbedo && stage->vk_pbr_flags ) {
+			image_t *srgbAlbedo = vk_create_pbr_albedo_srgb( physicalAlbedoName, flags );
+			if ( srgbAlbedo != NULL ) {
+				stage->bundle[0].image[0] = srgbAlbedo;
+			}
 		}
 	}
 #endif

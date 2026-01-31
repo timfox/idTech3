@@ -4385,8 +4385,21 @@ void vk_initialize( void )
 	vk.maxBoundDescriptorSets = props.limits.maxBoundDescriptorSets;
 
 #ifdef USE_VK_PBR
-	if( vk.fboActive && r_pbr->integer && vk.maxBoundDescriptorSets >= 10 )
-		vk.pbrActive = qtrue;
+	// Decide PBR activation and print a clear reason if disabled.
+	vk.pbrActive = qfalse;
+	if ( r_pbr->integer ) {
+		if ( !vk.fboActive ) {
+			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "PBR: disabled (requires \\r_fbo 1)\n" S_COLOR_WHITE );
+		} else if ( vk.maxBoundDescriptorSets < 10 ) {
+			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "PBR: disabled (insufficient descriptor sets: have %u, need >= 10)\n" S_COLOR_WHITE,
+				(unsigned)vk.maxBoundDescriptorSets );
+		} else {
+			vk.pbrActive = qtrue;
+			ri.Printf( PRINT_ALL, "PBR: enabled\n" );
+		}
+	} else {
+		ri.Printf( PRINT_ALL, "PBR: disabled (r_pbr 0)\n" );
+	}
 
 #ifdef VK_CUBEMAP
 	if ( vk.pbrActive && r_cubeMapping->integer )
@@ -9090,6 +9103,31 @@ typedef struct {
 
 static filterDef prefilters[2];
 
+static uint32_t vk_pow2_floor_u32( uint32_t v )
+{
+	uint32_t p = 1;
+	while ( ( p << 1 ) && ( ( p << 1 ) <= v ) ) {
+		p <<= 1;
+	}
+	return p;
+}
+
+static uint32_t vk_ibl_size_from_cvar( const cvar_t *cv, uint32_t defValue, uint32_t minValue, uint32_t maxValue )
+{
+	uint32_t v = defValue;
+	if ( cv && cv->integer > 0 ) {
+		v = (uint32_t)cv->integer;
+	}
+	if ( v < minValue ) v = minValue;
+	if ( v > maxValue ) v = maxValue;
+
+	// Prefer power-of-two sizes (required for full mip chains).
+	v = vk_pow2_floor_u32( v );
+	if ( v < minValue ) v = minValue;
+	if ( v > maxValue ) v = vk_pow2_floor_u32( maxValue );
+	return v;
+}
+
 static void vk_create_prefilter_renderpass( filterDef *def ) 
 {
 	VkAttachmentReference	color_attachment_ref;
@@ -9354,13 +9392,13 @@ void vk_create_cubemap_prefilter( void )
 		switch ( def->target ) {
 			case IRRADIANCE:
 				def->format = VK_FORMAT_R32G32B32A32_SFLOAT;
-				def->size = 64;
+				def->size = vk_ibl_size_from_cvar( r_pbr_iblIrradianceSize, 64, 16, (uint32_t)MIN( glConfig.maxTextureSize, 1024 ) );
 				def->shaders.fs_module = &vk.modules.irradiancecube_fs;
 				def->mipLevels = (uint32_t)(floor(log2(def->size))) + 1;
 				break;
 			case PREFILTEREDENV:
 				def->format = VK_FORMAT_R16G16B16A16_SFLOAT;
-				def->size = 256;
+				def->size = vk_ibl_size_from_cvar( r_pbr_iblPrefilterSize, 256, 32, (uint32_t)MIN( glConfig.maxTextureSize, 2048 ) );
 				def->shaders.fs_module = &vk.modules.prefilterenvmap_fs;
 				def->mipLevels = (uint32_t)(floor(log2(def->size))) + 1;
 				break;

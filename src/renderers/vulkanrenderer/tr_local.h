@@ -1428,6 +1428,14 @@ extern cvar_t	*r_vbo;
 #ifdef USE_VK_PBR
 extern cvar_t	*r_pbr;
 extern cvar_t	*r_pbr_shExtract;
+extern cvar_t	*r_pbr_debug;
+extern cvar_t	*r_pbr_packedPreferred;
+#ifdef VK_CUBEMAP
+extern cvar_t	*r_pbr_iblIrradianceSize;
+extern cvar_t	*r_pbr_iblPrefilterSize;
+extern cvar_t	*r_pbr_showCubemap;
+extern cvar_t	*r_pbr_cubemapInfo;
+#endif
 extern cvar_t	*r_baseNormalX;
 extern cvar_t	*r_baseNormalY;
 extern cvar_t	*r_baseParallax;
@@ -1672,6 +1680,7 @@ qboolean vk_create_sheen_texture( shaderStage_t *stage, const char *albedoMapNam
 qboolean vk_create_anisotropy_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
 qboolean vk_create_transmission_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
 qboolean vk_create_subsurface_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
+image_t *vk_create_pbr_albedo_srgb( const char *albedoMapName, imgFlags_t flags );
 #endif
 
 //
