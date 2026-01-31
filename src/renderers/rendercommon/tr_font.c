@@ -337,6 +337,7 @@ static float readFloat( void ) {
 	return me.ffred;
 }
 
+static void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) __attribute__((unused));
 static void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 #ifdef BUILD_FREETYPE
 	FT_Face face;
@@ -546,6 +547,7 @@ static void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *fon
 
 
 
+static void R_InitFreeType(void) __attribute__((unused));
 static void R_InitFreeType(void) {
 #ifdef BUILD_FREETYPE
 	if (FT_Init_FreeType( &ftLibrary )) {
@@ -556,6 +558,7 @@ static void R_InitFreeType(void) {
 }
 
 
+static void R_DoneFreeType(void) __attribute__((unused));
 static void R_DoneFreeType(void) {
 #ifdef BUILD_FREETYPE
 	if (ftLibrary) {
