@@ -67,6 +67,7 @@ jobs:
         cmake -S . -B build-vk-${{ matrix.btype }} -G Ninja \
           -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
           -DUSE_STB_TRUETYPE=ON \
+          -DBUILD_FREETYPE=ON \
           -DENABLE_FORTIFY_SOURCE=OFF \
           -DENABLE_ASAN=OFF \
           -DBUILD_SERVER=OFF \
@@ -87,6 +88,7 @@ jobs:
         cmake -S . -B build-gl-${{ matrix.btype }} -G Ninja \
           -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
           -DUSE_STB_TRUETYPE=ON \
+          -DBUILD_FREETYPE=ON \
           -DENABLE_FORTIFY_SOURCE=OFF \
           -DENABLE_ASAN=OFF \
           -DBUILD_SERVER=OFF \
@@ -212,6 +214,8 @@ jobs:
         cmake -S . -B build-vk-${{ matrix.btype }} \
           -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
           -DUSE_STB_TRUETYPE=ON \
+          -DBUILD_FREETYPE=ON \
+          -DBUILD_FREETYPE=ON \
           -DENABLE_FORTIFY_SOURCE=OFF \
           -DENABLE_ASAN=OFF \
           -DBUILD_SERVER=OFF \
@@ -233,6 +237,8 @@ jobs:
         cmake -S . -B build-gl-${{ matrix.btype }} \
           -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
           -DUSE_STB_TRUETYPE=ON \
+          -DBUILD_FREETYPE=ON \
+          -DBUILD_FREETYPE=ON \
           -DENABLE_FORTIFY_SOURCE=OFF \
           -DENABLE_ASAN=OFF \
           -DBUILD_SERVER=OFF \
@@ -409,6 +415,7 @@ jobs:
           -DOPENAL_INCLUDE_DIR="${OPENAL_PREFIX}/include" \
           -DOPENAL_LIBRARY="${OPENAL_PREFIX}/lib/libopenal.dylib" \
           -DUSE_STB_TRUETYPE=ON \
+          -DBUILD_FREETYPE=ON \
           -DENABLE_FORTIFY_SOURCE=OFF \
           -DENABLE_ASAN=OFF \
           -DBUILD_SERVER=OFF \
@@ -436,6 +443,7 @@ jobs:
           -DOPENAL_INCLUDE_DIR="${OPENAL_PREFIX}/include" \
           -DOPENAL_LIBRARY="${OPENAL_PREFIX}/lib/libopenal.dylib" \
           -DUSE_STB_TRUETYPE=ON \
+          -DBUILD_FREETYPE=ON \
           -DENABLE_FORTIFY_SOURCE=OFF \
           -DENABLE_ASAN=OFF \
           -DBUILD_SERVER=OFF \
