@@ -422,6 +422,8 @@ jobs:
           -DUSE_VULKAN=ON \
           -DRENDERER_DEFAULT=vulkan \
           -DSKIP_IDPAK_CHECK=ON \
+          -DCMAKE_INCLUDE_PATH="${OPENAL_PREFIX}/include" \
+          -DCMAKE_LIBRARY_PATH="${OPENAL_PREFIX}/lib" \
           -Wno-dev
         cmake --build build-vk-${{ matrix.btype }} -j$(sysctl -n hw.logicalcpu)
         mkdir -p bin
@@ -450,6 +452,8 @@ jobs:
           -DUSE_VULKAN=ON \
           -DRENDERER_DEFAULT=opengl \
           -DSKIP_IDPAK_CHECK=ON \
+          -DCMAKE_INCLUDE_PATH="${OPENAL_PREFIX}/include" \
+          -DCMAKE_LIBRARY_PATH="${OPENAL_PREFIX}/lib" \
           -Wno-dev
         cmake --build build-gl-${{ matrix.btype }} -j$(sysctl -n hw.logicalcpu)
         cp -f build-gl-${{ matrix.btype }}/idtech3* bin/ || true
