@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|ARM64">
@@ -206,6 +206,7 @@
     <ClCompile Include="..\..\renderers\openglrenderer\tr_flares.c" />
     <ClCompile Include="..\..\renderers\openglrenderer\tr_image.c" />
     <ClCompile Include="..\..\renderers\rendercommon\tr_font.c" />
+    <ClCompile Include="..\..\renderers\rendercommon\tr_font_stub.c" />
     <ClCompile Include="..\..\renderers\rendercommon\tr_image_bmp.c" />
     <ClCompile Include="..\..\renderers\rendercommon\tr_image_jpg.c" />
     <ClCompile Include="..\..\renderers\rendercommon\tr_image_pcx.c" />

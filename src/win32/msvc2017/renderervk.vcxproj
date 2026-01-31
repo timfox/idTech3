@@ -218,6 +218,7 @@
     <ClCompile Include="..\..\renderers\vulkanrenderer\tr_curve.c" />
     <ClCompile Include="..\..\renderers\vulkanrenderer\tr_image.c" />
     <ClCompile Include="..\..\renderers\rendercommon\tr_font.c" />
+    <ClCompile Include="..\..\renderers\rendercommon\tr_font_stub.c" />
     <ClCompile Include="..\..\renderers\rendercommon\tr_image_bmp.c" />
     <ClCompile Include="..\..\renderers\rendercommon\tr_image_jpg.c" />
     <ClCompile Include="..\..\renderers\rendercommon\tr_image_pcx.c" />

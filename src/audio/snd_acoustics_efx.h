@@ -1,0 +1,104 @@
+#ifndef SND_ACOUSTICS_EFX_H
+#define SND_ACOUSTICS_EFX_H
+
+#include <AL/al.h>
+
+// Minimal EFX enum fallbacks (guarded for portability).
+#ifndef AL_EFFECT_TYPE
+#define AL_EFFECT_TYPE 0x8001
+#endif
+#ifndef AL_EFFECT_REVERB
+#define AL_EFFECT_REVERB 0x0001
+#endif
+#ifndef AL_EFFECT_EAXREVERB
+#define AL_EFFECT_EAXREVERB 0x8000
+#endif
+#ifndef AL_EFFECTSLOT_EFFECT
+#define AL_EFFECTSLOT_EFFECT 0x0001
+#endif
+#ifndef AL_EFFECTSLOT_GAIN
+#define AL_EFFECTSLOT_GAIN 0x0002
+#endif
+#ifndef AL_AUXILIARY_SEND_FILTER
+#define AL_AUXILIARY_SEND_FILTER 0x20006
+#endif
+#ifndef AL_DIRECT_FILTER
+#define AL_DIRECT_FILTER 0x20005
+#endif
+#ifndef AL_FILTER_TYPE
+#define AL_FILTER_TYPE 0x8001
+#endif
+#ifndef AL_FILTER_LOWPASS
+#define AL_FILTER_LOWPASS 0x0001
+#endif
+#ifndef AL_LOWPASS_GAIN
+#define AL_LOWPASS_GAIN 0x0001
+#endif
+#ifndef AL_LOWPASS_GAINHF
+#define AL_LOWPASS_GAINHF 0x0002
+#endif
+
+#ifndef AL_REVERB_DENSITY
+#define AL_REVERB_DENSITY 0x0001
+#endif
+#ifndef AL_REVERB_DIFFUSION
+#define AL_REVERB_DIFFUSION 0x0002
+#endif
+#ifndef AL_REVERB_GAIN
+#define AL_REVERB_GAIN 0x0003
+#endif
+#ifndef AL_REVERB_GAINHF
+#define AL_REVERB_GAINHF 0x0004
+#endif
+#ifndef AL_REVERB_DECAY_TIME
+#define AL_REVERB_DECAY_TIME 0x0005
+#endif
+#ifndef AL_REVERB_REFLECTIONS_GAIN
+#define AL_REVERB_REFLECTIONS_GAIN 0x0006
+#endif
+#ifndef AL_REVERB_LATE_REVERB_GAIN
+#define AL_REVERB_LATE_REVERB_GAIN 0x0009
+#endif
+#ifndef AL_REVERB_HFDECAY_RATIO
+#define AL_REVERB_HFDECAY_RATIO 0x0008
+#endif
+
+#ifndef AL_EAXREVERB_DENSITY
+#define AL_EAXREVERB_DENSITY 0x0001
+#endif
+#ifndef AL_EAXREVERB_DIFFUSION
+#define AL_EAXREVERB_DIFFUSION 0x0002
+#endif
+#ifndef AL_EAXREVERB_GAIN
+#define AL_EAXREVERB_GAIN 0x0003
+#endif
+#ifndef AL_EAXREVERB_GAINHF
+#define AL_EAXREVERB_GAINHF 0x0004
+#endif
+#ifndef AL_EAXREVERB_DECAY_TIME
+#define AL_EAXREVERB_DECAY_TIME 0x0005
+#endif
+#ifndef AL_EAXREVERB_REFLECTIONS_GAIN
+#define AL_EAXREVERB_REFLECTIONS_GAIN 0x0006
+#endif
+#ifndef AL_EAXREVERB_LATE_REVERB_GAIN
+#define AL_EAXREVERB_LATE_REVERB_GAIN 0x0009
+#endif
+#ifndef AL_EAXREVERB_HFDECAY_RATIO
+#define AL_EAXREVERB_HFDECAY_RATIO 0x0008
+#endif
+
+typedef void (AL_APIENTRY *LPALGENEFFECTS)(ALsizei, ALuint *);
+typedef void (AL_APIENTRY *LPALDELETEEFFECTS)(ALsizei, const ALuint *);
+typedef void (AL_APIENTRY *LPALEFFECTI)(ALuint, ALenum, ALint);
+typedef void (AL_APIENTRY *LPALEFFECTF)(ALuint, ALenum, ALfloat);
+typedef void (AL_APIENTRY *LPALGENAUXILIARYEFFECTSLOTS)(ALsizei, ALuint *);
+typedef void (AL_APIENTRY *LPALDELETEAUXILIARYEFFECTSLOTS)(ALsizei, const ALuint *);
+typedef void (AL_APIENTRY *LPALAUXILIARYEFFECTSLOTI)(ALuint, ALenum, ALint);
+typedef void (AL_APIENTRY *LPALAUXILIARYEFFECTSLOTF)(ALuint, ALenum, ALfloat);
+typedef void (AL_APIENTRY *LPALGENFILTERS)(ALsizei, ALuint *);
+typedef void (AL_APIENTRY *LPALDELETEFILTERS)(ALsizei, const ALuint *);
+typedef void (AL_APIENTRY *LPALFILTERI)(ALuint, ALenum, ALint);
+typedef void (AL_APIENTRY *LPALFILTERF)(ALuint, ALenum, ALfloat);
+
+#endif
