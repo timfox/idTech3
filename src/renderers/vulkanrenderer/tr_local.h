@@ -642,6 +642,19 @@ typedef struct cubemap_s {
 	qboolean	hasSHCoeffs;
 } cubemap_t;
 
+static inline void R_ResetCubemapSH( cubemap_t *cube ) {
+	int i;
+
+	if ( !cube ) {
+		return;
+	}
+
+	for ( i = 0; i < 9; i++ ) {
+		Vector4Set( cube->shCoeffs[i], 0.0f, 0.0f, 0.0f, 0.0f );
+	}
+	cube->hasSHCoeffs = qfalse;
+}
+
 //=================================================================================
 
 // max surfaces per-skin
@@ -1414,6 +1427,7 @@ extern cvar_t	*r_vbo;
 #endif
 #ifdef USE_VK_PBR
 extern cvar_t	*r_pbr;
+extern cvar_t	*r_pbr_shExtract;
 extern cvar_t	*r_baseNormalX;
 extern cvar_t	*r_baseNormalY;
 extern cvar_t	*r_baseParallax;

@@ -1,5 +1,6 @@
 // Sample PBR shader showing the new keywords.
 // Textures named with *_emissive, *_clearcoat, etc. will automatically be discovered too.
+// When r_pbr_shExtract is enabled, shcoeffs can be omitted and will be sourced from irradiance cubemaps.
 sample_model_shader
 {
     qer_editorimage textures/pbr_samples/sample_base.tga

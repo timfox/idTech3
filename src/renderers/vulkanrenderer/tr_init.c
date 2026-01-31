@@ -85,6 +85,7 @@ cvar_t	*r_vbo;
 #endif
 #ifdef USE_VK_PBR
 cvar_t	*r_pbr;
+cvar_t	*r_pbr_shExtract;
 cvar_t  *r_baseNormalX;
 cvar_t  *r_baseNormalY;
 cvar_t  *r_baseParallax;
@@ -1430,6 +1431,9 @@ static void VarInfo( void )
 	if ( r_vertexLight->integer ) {
 		ri.Printf( PRINT_ALL, "HACK: using vertex lightmap approximation\n" );
 	}
+#if defined (USE_VK_PBR)
+	ri.Printf( PRINT_ALL, "PBR SH extraction: %s\n", r_pbr_shExtract->integer ? "enabled" : "disabled" );
+#endif
 #else
 	if ( r_vertexLight->integer || glConfig.hardwareType == GLHW_PERMEDIA2 ) {
 		ri.Printf( PRINT_ALL, "HACK: using vertex lightmap approximation\n" );
@@ -1557,6 +1561,9 @@ static void R_Register( void )
 #if defined (USE_VULKAN) && defined (USE_VK_PBR)
 	r_pbr = ri.Cvar_Get("r_pbr", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_pbr, "Enables Physically Based Rendering. \nRequires " S_COLOR_CYAN "\\r_fbo 1 \n" S_COLOR_GREEN "Advised " S_COLOR_CYAN "\\r_vbo 1 " S_COLOR_GREEN "for static world geometry " S_COLOR_WHITE "*optional" );
+
+	r_pbr_shExtract = ri.Cvar_Get( "r_pbr_shExtract", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_pbr_shExtract, "Extract SH coefficients from generated irradiance cubemaps for PBR." );
 
 	r_baseNormalX	= ri.Cvar_Get("r_baseNormalX",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );
 	r_baseNormalY	= ri.Cvar_Get("r_baseNormalY",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );

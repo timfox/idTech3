@@ -953,6 +953,18 @@ static void R_CopyCubemapSHToUniform( vkUniform_t *dest, int cubemapIndex ) {
 	Com_Memcpy( dest->pbrShCoeffs, cube->shCoeffs, sizeof( cube->shCoeffs ) );
 }
 
+static void R_CopyCubemapSHToStage( shaderStage_t *dest, int cubemapIndex ) {
+	if ( !dest || cubemapIndex < 0 || cubemapIndex >= tr.numCubemaps )
+		return;
+
+	cubemap_t *cube = &tr.cubemaps[ cubemapIndex ];
+	if ( !cube->hasSHCoeffs )
+		return;
+
+	Com_Memcpy( dest->shCoeffs, cube->shCoeffs, sizeof( cube->shCoeffs ) );
+	dest->vk_pbr_flags |= PBR_HAS_IRRADIANCE;
+}
+
 static void R_GetPBRSurfacePosition( vec3_t outPos ) {
 	int i;
 
@@ -1178,6 +1190,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				}
 			}
 			if ( cubemapIndex >= 0 ) {
+				R_CopyCubemapSHToStage( pStage, cubemapIndex );
 				R_CopyCubemapSHToUniform( &uniform, cubemapIndex );
 				pushUniform = qtrue;
 			}

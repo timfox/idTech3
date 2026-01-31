@@ -1418,6 +1418,7 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			stage->subsurfaceParams[3] = atof( token );
 			stage->vk_pbr_flags |= PBR_HAS_SUBSURFACE;
 		}
+		// If shcoeffs are omitted, r_pbr_shExtract can supply runtime cubemap SH.
 		else if ( !Q_stricmp( token, "shcoeffs" ) )
 		{
 			int coeffIndex;
