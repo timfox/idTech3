@@ -337,7 +337,7 @@ static float readFloat( void ) {
 	return me.ffred;
 }
 
-void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
+static void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 #ifdef BUILD_FREETYPE
 	FT_Face face;
 	int j, k, xOut, yOut, lastStart, imageNumber;
@@ -546,7 +546,7 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 
 
 
-void R_InitFreeType(void) {
+static void R_InitFreeType(void) {
 #ifdef BUILD_FREETYPE
 	if (FT_Init_FreeType( &ftLibrary )) {
 		ri.Printf(PRINT_WARNING, "R_InitFreeType: Unable to initialize FreeType.\n");
@@ -556,7 +556,7 @@ void R_InitFreeType(void) {
 }
 
 
-void R_DoneFreeType(void) {
+static void R_DoneFreeType(void) {
 #ifdef BUILD_FREETYPE
 	if (ftLibrary) {
 		FT_Done_FreeType( ftLibrary );
