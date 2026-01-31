@@ -138,13 +138,13 @@ endif()
 find_path(OPENAL_INCLUDE_DIR
   NAMES AL/al.h OpenAL/al.h
   PATH_SUFFIXES include
-  PATHS ${CMAKE_PREFIX_PATH} /usr/local /usr /opt/local /opt
+  PATHS ${CMAKE_PREFIX_PATH} /usr/local /usr /opt/local /opt /opt/homebrew
 )
 
 find_library(OPENAL_LIBRARY
   NAMES openal OpenAL32
   PATH_SUFFIXES lib64 lib
-  PATHS ${CMAKE_PREFIX_PATH} /usr/local /usr /opt/local /opt
+  PATHS ${CMAKE_PREFIX_PATH} /usr/local /usr /opt/local /opt /opt/homebrew
 )
 
 if(OPENAL_INCLUDE_DIR AND OPENAL_LIBRARY)
@@ -453,6 +453,7 @@ IF(USE_OPENAL)
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_OPENAL)
 	TARGET_COMPILE_DEFINITIONS(q3ui PRIVATE USE_OPENAL_EFX)
 	target_include_directories(q3ui PRIVATE ${OPENAL_INCLUDE_DIR})
+	target_include_directories(client PRIVATE ${OPENAL_INCLUDE_DIR})
 ENDIF()
 
 IF(USE_VULKAN)
