@@ -758,10 +758,14 @@ static vmHeader_t *VM_LoadQVM( vm_t *vm, qboolean alloc ) {
 
 	// load the image
 	Com_sprintf( filename, sizeof(filename), "vm/%s.qvm", vm->name );
-	Com_Printf( "Loading vm file %s...\n", filename );
+	if ( !vm->silentQVM ) {
+		Com_Printf( "Loading vm file %s...\n", filename );
+	}
 	length = FS_ReadFile( filename, (void **)&header );
 	if ( !header ) {
-		Com_Printf( "Failed.\n" );
+		if ( !vm->silentQVM ) {
+			Com_Printf( "Failed.\n" );
+		}
 		VM_Free( vm );
 		return NULL;
 	}
@@ -1783,16 +1787,11 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 	vm->systemCall = systemCalls;
 	vm->dllSyscall = dllSyscalls;
 	vm->privateFlag = CVAR_PRIVATE;
+	vm->silentQVM = qfalse;
 
-	// never allow dll loading with a demo
-	if ( interpret == VMI_NATIVE ) {
-		if ( Cvar_VariableIntegerValue( "fs_restrict" ) ) {
-			interpret = VMI_COMPILED;
-		}
-	}
-
-	if ( interpret == VMI_NATIVE ) {
-		// try to load as a system dll
+	// Always try native DLLs first, regardless of interpret setting
+	// (unless fs_restrict is set, which disables native DLLs for demos)
+	if ( !Cvar_VariableIntegerValue( "fs_restrict" ) ) {
 		Com_Printf( "Loading dll file %s.\n", name );
 		vm->dllHandle = VM_LoadDll( name, &vm->entryPoint, dllSyscalls );
 		if ( vm->dllHandle ) {
@@ -1803,8 +1802,15 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 			return vm;
 		}
 
-		Com_Printf( "Failed to load dll, looking for qvm.\n" );
-		interpret = VMI_COMPILED;
+		// Native DLL failed, silently fall back to QVM without reporting
+		vm->silentQVM = qtrue; // Flag to suppress QVM loading messages
+	}
+
+	// never allow dll loading with a demo
+	if ( interpret == VMI_NATIVE ) {
+		if ( Cvar_VariableIntegerValue( "fs_restrict" ) ) {
+			interpret = VMI_COMPILED;
+		}
 	}
 
 	// load the image

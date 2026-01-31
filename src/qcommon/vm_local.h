@@ -220,6 +220,7 @@ struct vm_s {
 	qboolean	forceDataMask;
 
 	int			privateFlag;
+	qboolean	silentQVM;		// Suppress QVM loading messages when falling back from native DLL
 };
 
 qboolean VM_Compile( vm_t *vm, vmHeader_t *header );

@@ -3960,7 +3960,7 @@ void Com_Init( char *commandLine ) {
 	Cmd_SetCommandCompletionFunc( "writeconfig", Cmd_CompleteWriteCfgName );
 	Cmd_AddCommand( "game_restart", Com_GameRestart_f );
 
-	s = va( "%s %s %s", Q3_VERSION, PLATFORM_STRING, __DATE__ );
+	s = va( "%s %s %s %s", Q3_VERSION, PLATFORM_STRING, __DATE__, __TIME__ );
 	com_version = Cvar_Get( "version", s, CVAR_PROTECTED | CVAR_ROM | CVAR_SERVERINFO );
 	Cvar_SetDescription( com_version, "Read-only CVAR to see the version of the game." );
 
