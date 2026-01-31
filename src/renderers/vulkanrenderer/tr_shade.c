@@ -942,6 +942,17 @@ static qboolean vk_is_valid_pbr_surface( const qboolean hasPBR ) {
 	return qtrue;
 }
 
+static void R_CopyCubemapSHToUniform( vkUniform_t *dest, int cubemapIndex ) {
+	if ( !dest || cubemapIndex < 0 || cubemapIndex >= tr.numCubemaps )
+		return;
+
+	cubemap_t *cube = &tr.cubemaps[ cubemapIndex ];
+	if ( !cube->hasSHCoeffs )
+		return;
+
+	Com_Memcpy( dest->pbrShCoeffs, cube->shCoeffs, sizeof( cube->shCoeffs ) );
+}
+
 static void R_GetPBRSurfacePosition( vec3_t outPos ) {
 	int i;
 
@@ -1148,12 +1159,13 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			if ( pStage->vk_pbr_flags & PBR_HAS_SUBSURFACE )
 				vk_update_descriptor( VK_DESC_PBR_SUBSURFACE, pStage->subsurfaceMap->descriptor );
 			
+			int cubemapIndex = -1;
 			if ( !tr.numCubemaps || backEnd.viewParms.targetCube != NULL ) {
 				vk_update_descriptor( VK_DESC_PBR_CUBEMAP, tr.emptyCubemap->descriptor );
 				vk_update_descriptor( VK_DESC_PBR_IRRADIANCE, tr.emptyCubemap->descriptor );
 			}
 			else { 
-				int cubemapIndex = R_SelectCubemapIndexForPBR();
+				cubemapIndex = R_SelectCubemapIndexForPBR();
 				if ( cubemapIndex < 0 ) {
 					vk_update_descriptor( VK_DESC_PBR_CUBEMAP, tr.emptyCubemap->descriptor );
 					vk_update_descriptor( VK_DESC_PBR_IRRADIANCE, tr.emptyCubemap->descriptor );
@@ -1164,6 +1176,10 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 					else
 						vk_update_descriptor( VK_DESC_PBR_IRRADIANCE, tr.emptyCubemap->descriptor );
 				}
+			}
+			if ( cubemapIndex >= 0 ) {
+				R_CopyCubemapSHToUniform( &uniform, cubemapIndex );
+				pushUniform = qtrue;
 			}
 		}
 #endif

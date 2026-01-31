@@ -638,6 +638,8 @@ typedef struct cubemap_s {
 	float		parallaxRadius;
 	image_t		*prefiltered_image;
 	image_t		*irradiance_image;
+	vec4_t		shCoeffs[9];
+	qboolean	hasSHCoeffs;
 } cubemap_t;
 
 //=================================================================================

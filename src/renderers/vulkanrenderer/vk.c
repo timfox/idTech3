@@ -9455,6 +9455,25 @@ static void vk_copy_to_cubemap( filterDef *def, VkImage *image, uint32_t mipLeve
 		0, 0 );
 }
 
+static void vk_extract_sh_coeffs( const image_t *irradiance_image, vec4_t shCoeffs[9] )
+{
+	int i;
+
+	if ( !irradiance_image || !shCoeffs )
+	{
+		return;
+	}
+
+	for ( i = 0; i < 9; i++ )
+	{
+		VectorClear( shCoeffs[i] );
+	}
+
+	// TODO: sample irradiance cubemap to compute real SH coefficients. For now assume uniform ambient.
+	VectorSet( shCoeffs[0], 0.4f, 0.4f, 0.4f );
+	shCoeffs[0][3] = 0.0f;
+}
+
 void vk_generate_cubemaps( cubemap_t *cube ) 
 {
 	VkRenderPassBeginInfo	begin_info = {0};
@@ -9541,6 +9560,15 @@ void vk_generate_cubemaps( cubemap_t *cube )
 
 		record_image_layout_transition( vk.cmd->command_buffer, cubemap->handle, VK_IMAGE_ASPECT_COLOR_BIT, 
 			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
+
+		if ( def->target == IRRADIANCE )
+		{
+			vk_extract_sh_coeffs( cube->irradiance_image, cube->shCoeffs );
+			if ( !cube->hasSHCoeffs )
+			{
+				cube->hasSHCoeffs = qtrue;
+			}
+		}
 	}
 
 	command_buffer = begin_command_buffer();
