@@ -4490,12 +4490,14 @@ void vk_initialize( void )
 				VkPhysicalDeviceFeatures features;
 				qvkGetPhysicalDeviceFeatures( vk.physical_device, &features );
 				ri.Printf( PRINT_ALL, "[VK] VK_Features\n" );
-				ri.Printf( PRINT_ALL, "[VK]   Descriptor Indexing : %s\n", 
-					features.descriptorIndexing ? "yes" : "no" );
-				ri.Printf( PRINT_ALL, "[VK]   Timeline Semaphores : %s\n",
-					features.timelineSemaphore ? "yes" : "no" );
-				ri.Printf( PRINT_ALL, "[VK]   Mesh Shaders        : %s\n",
-					features.meshShader ? "yes" : "no" );
+				ri.Printf( PRINT_ALL, "[VK]   Geometry Shader     : %s\n",
+					features.geometryShader ? "yes" : "no" );
+				ri.Printf( PRINT_ALL, "[VK]   Tessellation Shader : %s\n",
+					features.tessellationShader ? "yes" : "no" );
+				ri.Printf( PRINT_ALL, "[VK]   Multi Viewport      : %s\n",
+					features.multiViewport ? "yes" : "no" );
+				ri.Printf( PRINT_ALL, "[VK]   Sampler Anisotropy  : %s\n",
+					features.samplerAnisotropy ? "yes" : "no" );
 #ifdef VK_KHR_RAY_TRACING_PIPELINE
 				ri.Printf( PRINT_ALL, "[VK]   Ray Tracing         : available\n" );
 #else

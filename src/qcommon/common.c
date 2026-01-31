@@ -308,6 +308,8 @@ void FORMAT_PRINTF(3, 4) QDECL Com_LogCategory( logCategory_t category, int verb
 	char msg[MAXPRINTMSG];
 	char prefixed[MAXPRINTMSG];
 
+	(void)verbosity; // Reserved for future per-category filtering
+
 	if ( category < 0 || category >= LOG_COUNT ) {
 		category = LOG_SYS;
 	}
@@ -316,7 +318,7 @@ void FORMAT_PRINTF(3, 4) QDECL Com_LogCategory( logCategory_t category, int verb
 	Q_vsnprintf( msg, sizeof( msg ), fmt, argptr );
 	va_end( argptr );
 
-	Q_snprintf( prefixed, sizeof( prefixed ), "%s %s", logCategoryNames[category], msg );
+	Com_sprintf( prefixed, sizeof( prefixed ), "%s %s", logCategoryNames[category], msg );
 	Com_Printf( "%s", prefixed );
 }
 
