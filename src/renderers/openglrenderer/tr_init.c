@@ -192,12 +192,12 @@ int		max_polyverts;
 static char gl_extensions[ 32768 ];
 
 #define GLE( ret, name, ... ) ret ( APIENTRY * q##name )( __VA_ARGS__ );
-	QGL_Core_PROCS;
-	QGL_Ext_PROCS;
-	QGL_ARB_PROGRAM_PROCS;
-	QGL_VBO_PROCS;
-	QGL_FBO_PROCS;
-	QGL_FBO_OPT_PROCS;
+	QGL_Core_PROCS
+	QGL_Ext_PROCS
+	QGL_ARB_PROGRAM_PROCS
+	QGL_VBO_PROCS
+	QGL_FBO_PROCS
+	QGL_FBO_OPT_PROCS
 #undef GLE
 
 typedef struct {
@@ -417,9 +417,9 @@ static void R_InitExtensions( void )
 	{
 		if ( r_ext_multitexture->integer )
 		{
-			qglMultiTexCoord2fARB = ri.GL_GetProcAddress( "glMultiTexCoord2fARB" );
-			qglActiveTextureARB = ri.GL_GetProcAddress( "glActiveTextureARB" );
-			qglClientActiveTextureARB = ri.GL_GetProcAddress( "glClientActiveTextureARB" );
+			*(void**)&qglMultiTexCoord2fARB = ri.GL_GetProcAddress( "glMultiTexCoord2fARB" );
+			*(void**)&qglActiveTextureARB = ri.GL_GetProcAddress( "glActiveTextureARB" );
+			*(void**)&qglClientActiveTextureARB = ri.GL_GetProcAddress( "glClientActiveTextureARB" );
 
 			if ( qglActiveTextureARB && qglClientActiveTextureARB )
 			{
@@ -468,8 +468,8 @@ static void R_InitExtensions( void )
 		if ( r_ext_compiled_vertex_array->integer )
 		{
 			ri.Printf( PRINT_ALL, "...using GL_EXT_compiled_vertex_array\n" );
-			qglLockArraysEXT = ri.GL_GetProcAddress( "glLockArraysEXT" );
-			qglUnlockArraysEXT = ri.GL_GetProcAddress( "glUnlockArraysEXT" );
+			*(void**)&qglLockArraysEXT = ri.GL_GetProcAddress( "glLockArraysEXT" );
+			*(void**)&qglUnlockArraysEXT = ri.GL_GetProcAddress( "glUnlockArraysEXT" );
 			if ( !qglLockArraysEXT || !qglUnlockArraysEXT ) {
 				ri.Error( ERR_FATAL, "bad getprocaddress" );
 			}
@@ -1517,7 +1517,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_mergeLightmaps, "Merge built-in small lightmaps into bigger lightmaps (atlases)." );
 
 #ifdef USE_VBO
-	r_vbo = ri.Cvar_Get( "r_vbo", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	r_vbo = ri.Cvar_Get( "r_vbo", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_vbo, "Use Vertex Buffer Objects to cache static map geometry, may improve FPS on modern GPUs, increases hunk memory usage by 15-30MB (map-dependent)." );
 #endif
 
@@ -1772,7 +1772,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_flares, "Enables corona effects on light sources." );
 
 #ifdef USE_FBO
-	r_fbo = ri.Cvar_Get( "r_fbo", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	r_fbo = ri.Cvar_Get( "r_fbo", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_fbo, "Use framebuffer objects, enables gamma correction in windowed mode and allows arbitrary video size and screenshot/video capture.\n Required for bloom, HDR rendering, anti-aliasing and greyscale effects.\n OpenGL 3.0+ required." );
 
 	r_ext_supersample = ri.Cvar_Get( "r_ext_supersample", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );

@@ -205,8 +205,8 @@ Vk_World	vk_world;
 static char gl_extensions[ 32768 ];
 
 #define GLE( ret, name, ... ) ret ( APIENTRY * q##name )( __VA_ARGS__ );
-	QGL_Core_PROCS;
-	QGL_Ext_PROCS;
+	QGL_Core_PROCS
+	QGL_Ext_PROCS
 #undef GLE
 
 typedef struct {
@@ -715,6 +715,10 @@ static byte *RB_ReadPixels(int x, int y, int width, int height, size_t *offset, 
 	int linelen;
 	int	bufAlign;
 	int packAlign = 1;
+
+	(void)x;
+	(void)y;
+	(void)lineAlign;
 
 	linelen = width * 3;
 
@@ -1559,7 +1563,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_vbo, "Use Vertex Buffer Objects to cache static map geometry, may improve FPS on modern GPUs, increases hunk memory usage by 15-30MB (map-dependent)." );
 #endif
 #if defined (USE_VULKAN) && defined (USE_VK_PBR)
-	r_pbr = ri.Cvar_Get("r_pbr", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	r_pbr = ri.Cvar_Get("r_pbr", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_pbr, "Enables Physically Based Rendering. \nRequires " S_COLOR_CYAN "\\r_fbo 1 \n" S_COLOR_GREEN "Advised " S_COLOR_CYAN "\\r_vbo 1 " S_COLOR_GREEN "for static world geometry " S_COLOR_WHITE "*optional" );
 
 	r_pbr_shExtract = ri.Cvar_Get( "r_pbr_shExtract", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
@@ -1809,7 +1813,7 @@ static void R_Register( void )
 		" -2 - first integrated GPU" );
 	r_device->modified = qfalse;
 
-	r_fbo = ri.Cvar_Get( "r_fbo", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	r_fbo = ri.Cvar_Get( "r_fbo", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_fbo, "Use framebuffer objects, enables gamma correction in windowed mode and allows arbitrary video size and screenshot/video capture.\n Required for bloom, HDR rendering, anti-aliasing and greyscale effects." );
 	r_hdr = ri.Cvar_Get( "r_hdr", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription(r_hdr, "Enables high dynamic range frame buffer texture format. Requires \\r_fbo 1.\n -1: 4-bit, for testing purposes, heavy color banding, might not work on all systems\n  0: 8 bit, default, moderate color banding with multi-stage shaders\n  1: 16 bit, enhanced blending precision, no color banding, might decrease performance on AMD / Intel GPUs\n" );
