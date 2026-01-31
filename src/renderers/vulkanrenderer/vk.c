@@ -4458,6 +4458,54 @@ void vk_initialize( void )
 
 	SET_OBJECT_NAME( (intptr_t)vk.device, glConfig.renderer_string, VK_DEBUG_REPORT_OBJECT_TYPE_DEVICE_EXT );
 
+	// Structured Vulkan logging
+	{
+		cvar_t *logVerbosity = ri.Cvar_Get( "log_verbosity", "1", CVAR_ARCHIVE );
+		if ( logVerbosity && logVerbosity->integer >= 1 ) {
+			uint32_t vramMB = 0;
+			VkPhysicalDeviceMemoryProperties mem_props;
+			qvkGetPhysicalDeviceMemoryProperties( vk.physical_device, &mem_props );
+			for ( i = 0; i < mem_props.memoryTypeCount; i++ ) {
+				if ( mem_props.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT ) {
+					uint32_t heapIdx = mem_props.memoryTypes[i].heapIndex;
+					if ( heapIdx < mem_props.memoryHeapCount ) {
+						VkDeviceSize size = mem_props.memoryHeaps[heapIdx].size;
+						if ( size > vramMB ) {
+							vramMB = (uint32_t)(size / (1024 * 1024));
+						}
+					}
+				}
+			}
+			
+			ri.Printf( PRINT_ALL, "[VK] VK_Init\n" );
+			ri.Printf( PRINT_ALL, "[VK]   API Version : %d.%d.%d\n", major, minor, patch );
+			ri.Printf( PRINT_ALL, "[VK]   Driver      : %s\n", driver_version );
+			ri.Printf( PRINT_ALL, "[VK]   GPU         : %s\n", renderer_name( &props ) );
+			if ( vramMB > 0 ) {
+				ri.Printf( PRINT_ALL, "[VK]   VRAM        : %u MB\n", vramMB );
+			}
+			ri.Printf( PRINT_ALL, "[VK]   Renderer    : vulkan\n" );
+			
+			if ( logVerbosity->integer >= 2 ) {
+				VkPhysicalDeviceFeatures features;
+				qvkGetPhysicalDeviceFeatures( vk.physical_device, &features );
+				ri.Printf( PRINT_ALL, "[VK] VK_Features\n" );
+				ri.Printf( PRINT_ALL, "[VK]   Descriptor Indexing : %s\n", 
+					features.descriptorIndexing ? "yes" : "no" );
+				ri.Printf( PRINT_ALL, "[VK]   Timeline Semaphores : %s\n",
+					features.timelineSemaphore ? "yes" : "no" );
+				ri.Printf( PRINT_ALL, "[VK]   Mesh Shaders        : %s\n",
+					features.meshShader ? "yes" : "no" );
+#ifdef VK_KHR_RAY_TRACING_PIPELINE
+				ri.Printf( PRINT_ALL, "[VK]   Ray Tracing         : available\n" );
+#else
+				ri.Printf( PRINT_ALL, "[VK]   Ray Tracing         : not available\n" );
+#endif
+				ri.Printf( PRINT_ALL, "[VK]   Compute Pipelines   : enabled\n" );
+			}
+		}
+	}
+
 	// do early texture mode setup to avoid redundant descriptor updates in GL_SetDefaultState()
 	vk.samplers.filter_min = -1;
 	vk.samplers.filter_max = -1;

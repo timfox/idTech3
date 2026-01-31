@@ -1886,6 +1886,26 @@ void R_Init( void ) {
 	if ( err != GL_NO_ERROR )
 		ri.Printf( PRINT_WARNING, "glGetError() = 0x%x\n", err );
 
+	// Structured OpenGL logging
+	{
+		cvar_t *logVerbosity = ri.Cvar_Get( "log_verbosity", "1", CVAR_ARCHIVE );
+		if ( logVerbosity && logVerbosity->integer >= 1 ) {
+			ri.Printf( PRINT_ALL, "[GL] GL_Init\n" );
+			ri.Printf( PRINT_ALL, "[GL]   Vendor   : %s\n", glConfig.vendor_string );
+			ri.Printf( PRINT_ALL, "[GL]   Renderer : %s\n", glConfig.renderer_string );
+			ri.Printf( PRINT_ALL, "[GL]   Version  : %s\n", glConfig.version_string );
+			ri.Printf( PRINT_ALL, "[GL]   Renderer : opengl\n" );
+			if ( logVerbosity->integer >= 2 ) {
+				ri.Printf( PRINT_ALL, "[GL] GL_Features\n" );
+				ri.Printf( PRINT_ALL, "[GL]   Max Texture Size : %d\n", glConfig.maxTextureSize );
+				ri.Printf( PRINT_ALL, "[GL]   Texture Units    : %d\n", glConfig.numTextureUnits );
+				ri.Printf( PRINT_ALL, "[GL]   Multitexture     : %s\n", qglActiveTextureARB ? "yes" : "no" );
+				ri.Printf( PRINT_ALL, "[GL]   Compressed Textures : %s\n", 
+					glConfig.textureCompression != TC_NONE ? "yes" : "no" );
+			}
+		}
+	}
+
 	ri.Printf( PRINT_ALL, "----- finished R_Init -----\n" );
 }
 

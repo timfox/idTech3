@@ -4844,6 +4844,24 @@ static void FS_Startup( void ) {
 	Com_Printf( "----------------------\n" );
 	Com_Printf( "%d files in %d pk3 files\n", fs_packFiles, fs_packCount );
 
+	// Structured filesystem logging
+	if ( Com_LogVerbosity() >= 1 ) {
+		LOG_FS( "FS_Init\n" );
+		LOG_FS_V( 2, "  Base Path   : %s\n", fs_basepath->string );
+		LOG_FS_V( 2, "  Home Path   : %s\n", fs_homepath->string );
+		if ( fs_gamedirvar->string[0] != '\0' ) {
+			LOG_FS_V( 2, "  Game Path   : %s\n", fs_gamedirvar->string );
+		} else {
+			LOG_FS_V( 2, "  Game Path   : %s (default)\n", fs_basegame->string );
+		}
+		LOG_FS_V( 2, "  Pak Files   : %d loaded", fs_packCount );
+		if ( fs_packFiles > 0 ) {
+			LOG_FS_V( 2, " (%d files)\n", fs_packFiles );
+		} else {
+			LOG_FS_V( 2, "\n" );
+		}
+	}
+
 	fs_gamedirvar->modified = qfalse; // We just loaded, it's not modified
 
 	// check original q3a files (can be disabled via SKIP_IDPAK_CHECK)
