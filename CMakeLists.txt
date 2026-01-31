@@ -310,6 +310,7 @@ ENDIF()
 
 # renderers
 AUX_SOURCE_DIRECTORY(src/renderers/rendercommon RENDERER_COMMON_SRCS)
+list(APPEND RENDERER_COMMON_SRCS src/renderers/rendercommon/tr_font_stub.c)
 AUX_SOURCE_DIRECTORY(src/renderers/openglrenderer RENDERER_GL_SRCS)
 AUX_SOURCE_DIRECTORY(src/renderers/vulkanrenderer RENDERER_VK_SRCS)
 
