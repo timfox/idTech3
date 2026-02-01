@@ -590,7 +590,13 @@ ADD_LIBRARY(qcommon OBJECT ${QCOMMON_SRCS} ${SERVER_SRCS})
 if(USE_GLM)
   target_include_directories(qcommon PRIVATE ${EXTERNAL_GLM_INCLUDE})
 endif()
-target_include_directories(qcommon PRIVATE ${CMAKE_SOURCE_DIR}/src/platform)
+target_include_directories(qcommon PRIVATE
+  ${CMAKE_SOURCE_DIR}/src/platform
+  ${CMAKE_SOURCE_DIR}/src/platform/win32
+  ${CMAKE_SOURCE_DIR}/src/platform/platform/win32
+  ${CMAKE_SOURCE_DIR}/src/client
+  ${CMAKE_SOURCE_DIR}/src/audio
+)
 set_property(TARGET qcommon PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # dedicated server
@@ -599,7 +605,13 @@ TARGET_COMPILE_DEFINITIONS(qcommon_ded PUBLIC DEDICATED)
 if(USE_GLM)
   target_include_directories(qcommon_ded PRIVATE ${EXTERNAL_GLM_INCLUDE})
 endif()
-target_include_directories(qcommon_ded PRIVATE ${CMAKE_SOURCE_DIR}/src/platform)
+target_include_directories(qcommon_ded PRIVATE
+  ${CMAKE_SOURCE_DIR}/src/platform
+  ${CMAKE_SOURCE_DIR}/src/platform/win32
+  ${CMAKE_SOURCE_DIR}/src/platform/platform/win32
+  ${CMAKE_SOURCE_DIR}/src/client
+  ${CMAKE_SOURCE_DIR}/src/audio
+)
 set_property(TARGET qcommon_ded PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # Apply SKIP_IDPAK_CHECK to qcommon targets that compile files.c
