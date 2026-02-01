@@ -188,8 +188,10 @@ set(EXTERNAL_CURL_WINDOWS_INCLUDE_DIR "${EXTERNAL_SRC}/curl/windows/include")
 set(EXTERNAL_JPEG_SRC_DIR "${EXTERNAL_SRC}/jpeg")
 
 # Add cflux2 external library
-if(USE_FLUX)
+if(USE_FLUX AND (NOT WIN32 OR CYGWIN))
 	add_subdirectory(src/external/src/cflux2)
+elseif(USE_FLUX)
+	message(STATUS "Skipping cflux2 build on Windows (sys/mman.h missing)")
 endif()
 
 if(BUILD_FREETYPE)
