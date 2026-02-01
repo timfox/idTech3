@@ -375,13 +375,13 @@ static void emit_rex1( const uint32_t base )
 }
 #endif
 
-#if 1
+#if !idx64
 // reg <-> [offset] - C23 modernized
 static void emit_modrm_offset( uint32_t reg, int32_t offset )
 {
 	modrm_t modrm;
 
-	modrm.s.mod = MOD_DISP4_ONLY_RM_5; // displacement-only mode with ( r_m == 0x5 )	
+	modrm.s.mod = MOD_DISP4_ONLY_RM_5; // displacement-only mode with ( r_m == 0x5 )
 	modrm.s.r_m = 5; // 101
 	modrm.s.r_x = reg;
 
