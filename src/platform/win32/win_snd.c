@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../snd_local.h"
 #include "win_local.h"
 
+#ifndef USE_SDL
 extern cvar_t *s_khz;
 
 extern qboolean dsound_init;
@@ -1105,3 +1106,5 @@ void SNDDMA_Activate( void ) {
 		SNDDMA_Shutdown();
 	}
 }
+
+#endif // !USE_SDL
