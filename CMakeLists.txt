@@ -590,6 +590,7 @@ ADD_LIBRARY(qcommon OBJECT ${QCOMMON_SRCS} ${SERVER_SRCS})
 if(USE_GLM)
   target_include_directories(qcommon PRIVATE ${EXTERNAL_GLM_INCLUDE})
 endif()
+set_property(TARGET qcommon PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # dedicated server
 ADD_LIBRARY(qcommon_ded OBJECT ${QCOMMON_SRCS} ${SERVER_SRCS})
@@ -597,6 +598,7 @@ TARGET_COMPILE_DEFINITIONS(qcommon_ded PUBLIC DEDICATED)
 if(USE_GLM)
   target_include_directories(qcommon_ded PRIVATE ${EXTERNAL_GLM_INCLUDE})
 endif()
+set_property(TARGET qcommon_ded PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # Apply SKIP_IDPAK_CHECK to qcommon targets that compile files.c
 if(SKIP_IDPAK_CHECK)
@@ -781,8 +783,8 @@ IF(USE_RENDERER_DLOPEN)
 	target_link_libraries(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE qcommon m ${CMAKE_DL_LIBS})
 	target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE qcommon m ${CMAKE_DL_LIBS})
 	IF(APPLE)
-		target_link_options(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE "-undefined dynamic_lookup")
-		target_link_options(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE "-undefined dynamic_lookup")
+		target_link_options(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE "-undefined" "dynamic_lookup")
+		target_link_options(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE "-undefined" "dynamic_lookup")
 	ENDIF()
 	# Normalize target filenames for dlopen-friendly plugin names:
 	# set OUTPUT_NAME and remove default 'lib' PREFIX so filenames become:
