@@ -84,7 +84,7 @@ void GL_TextureMode( const char *string ) {
 	int		i;
 
 	mode = NULL;
-	for ( i = 0 ; i < ARRAY_LEN( modes ) ; i++ ) {
+	for ( i = 0 ; i < (int)ARRAY_LEN( modes ) ; i++ ) {
 		if ( !Q_stricmp( modes[i].name, string ) ) {
 			mode = &modes[i];
 			break;
@@ -297,7 +297,7 @@ static void ResampleTexture( unsigned *in, int inwidth, int inheight, unsigned *
 	unsigned	p2[MAX_TEXTURE_SIZE];
 	byte		*pix1, *pix2, *pix3, *pix4;
 
-	if ( outwidth > ARRAY_LEN( p1 ) )
+	if ( outwidth > (int)ARRAY_LEN( p1 ) )
 		ri.Error( ERR_DROP, "ResampleTexture: max width" );
 								
 	fracstep = inwidth * 0x10000 / outwidth;
@@ -1026,7 +1026,7 @@ void R_UploadSubImage( byte *data, int x, int y, int width, int height, image_t 
 }
 #endif // !USE_VULKAN
 
-image_t *R_GetLoadedImage( const char *name, int flags ) {
+static image_t *R_GetLoadedImage( const char *name, int flags ) {
 	long	hash;
 	image_t	*image;
 
@@ -1035,7 +1035,7 @@ image_t *R_GetLoadedImage( const char *name, int flags ) {
 		if ( !strcmp( name, image->imgName ) ) {
 			// the white image can be used with any set of parms, but other mismatches are errors
 			if ( strcmp( name, "*white" ) ) {
-				if ( image->flags != flags ) {
+				if ( image->flags != (imgFlags_t)flags ) {
 					ri.Printf( PRINT_DEVELOPER, "WARNING: reused image %s with mixed flags (%i vs %i)\n", name, image->flags, flags );
 				}
 			}
@@ -1390,7 +1390,7 @@ image_t	*R_FindImageFile( const char *name, imgFlags_t flags, uint32_t type )
 	return image;
 }
 
-image_t *R_BuildSDRSpecGlossImage(shaderStage_t *stage, const char *specImageName, imgFlags_t flags)
+static image_t *R_BuildSDRSpecGlossImage(shaderStage_t *stage, const char *specImageName, imgFlags_t flags)
 {
 	char	sdrName[MAX_QPATH];
 	int		specWidth, specHeight;
@@ -2006,7 +2006,7 @@ void R_SetColorMappings( void ) {
 
 	shift = tr.overbrightBits;
 
-	for ( i = 0; i < ARRAY_LEN( s_gammatable ); i++ ) {
+	for ( i = 0; i < (int)ARRAY_LEN( s_gammatable ); i++ ) {
 		if ( g == 1.0f ) {
 			inf = i;
 		} else {
@@ -2022,7 +2022,7 @@ void R_SetColorMappings( void ) {
 		s_gammatable[i] = inf;
 	}
 
-	for ( i = 0; i < ARRAY_LEN( s_intensitytable ); i++ ) {
+	for ( i = 0; i < (int)ARRAY_LEN( s_intensitytable ); i++ ) {
 		j = i * r_intensity->value;
 		if ( j > 255 ) {
 			j = 255;

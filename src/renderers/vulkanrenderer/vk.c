@@ -3179,6 +3179,8 @@ static void vk_create_shader_modules( void )
 	vk.modules.ssao_fs = SHADER_MODULE( ssao_frag_spv );
 	vk.modules.ssao_blur_fs = SHADER_MODULE( ssao_blur_frag_spv );
 	vk.modules.ssao_combine_fs = SHADER_MODULE( ssao_combine_frag_spv );
+	vk.modules.ssao_debug_fs = SHADER_MODULE( ssao_debug_frag_spv );
+	vk.modules.ssao_depth_debug_fs = SHADER_MODULE( ssao_depth_debug_frag_spv );
 
 	SET_OBJECT_NAME( vk.modules.bloom_fs, "bloom extraction fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.blur_fs, "gaussian blur fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
@@ -3186,6 +3188,8 @@ static void vk_create_shader_modules( void )
 	SET_OBJECT_NAME( vk.modules.ssao_fs, "ssao fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.ssao_blur_fs, "ssao blur fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.ssao_combine_fs, "ssao combine fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	SET_OBJECT_NAME( vk.modules.ssao_debug_fs, "ssao debug fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	SET_OBJECT_NAME( vk.modules.ssao_depth_debug_fs, "ssao depth debug fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 
 	vk.modules.gamma_fs = SHADER_MODULE( gamma_frag_spv );
 	vk.modules.gamma_vs = SHADER_MODULE( gamma_vert_spv );
@@ -3479,6 +3483,8 @@ void vk_update_post_process_pipelines( void )
 			vk_create_post_process_pipeline( 5, glConfig.vidWidth, glConfig.vidHeight );
 			vk_create_post_process_pipeline( 6, glConfig.vidWidth, glConfig.vidHeight );
 			vk_create_post_process_pipeline( 7, glConfig.vidWidth, glConfig.vidHeight );
+			vk_create_post_process_pipeline( 8, glConfig.vidWidth, glConfig.vidHeight );
+			vk_create_post_process_pipeline( 9, glConfig.vidWidth, glConfig.vidHeight );
 		}
 	}
 }
@@ -5207,6 +5213,16 @@ static void vk_destroy_pipelines( qboolean resetCounter )
 		vk.ssao_combine_pipeline = VK_NULL_HANDLE;
 	}
 
+	if ( vk.ssao_debug_pipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.ssao_debug_pipeline, NULL );
+		vk.ssao_debug_pipeline = VK_NULL_HANDLE;
+	}
+
+	if ( vk.ssao_depth_debug_pipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.ssao_depth_debug_pipeline, NULL );
+		vk.ssao_depth_debug_pipeline = VK_NULL_HANDLE;
+	}
+
 #ifdef VK_PBR_BRDFLUT
     if( vk.brdflut_pipeline != VK_NULL_HANDLE ) {
         qvkDestroyPipeline( vk.device, vk.brdflut_pipeline, NULL );
@@ -5448,6 +5464,8 @@ for (i = 0; i < 2; i++) {
 	qvkDestroyShaderModule(vk.device, vk.modules.ssao_fs, NULL);
 	qvkDestroyShaderModule(vk.device, vk.modules.ssao_blur_fs, NULL);
 	qvkDestroyShaderModule(vk.device, vk.modules.ssao_combine_fs, NULL);
+	qvkDestroyShaderModule(vk.device, vk.modules.ssao_debug_fs, NULL);
+	qvkDestroyShaderModule(vk.device, vk.modules.ssao_depth_debug_fs, NULL);
 
 	qvkDestroyShaderModule(vk.device, vk.modules.gamma_vs, NULL);
 	qvkDestroyShaderModule(vk.device, vk.modules.gamma_fs, NULL);
@@ -5999,6 +6017,24 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			layout = vk.pipeline_layout_post_process;
 			samples = VK_SAMPLE_COUNT_1_BIT;
 			pipeline_name = "ssao combine pipeline";
+			blend = qfalse;
+			break;
+		case 8: // ssao debug
+			pipeline = &vk.ssao_debug_pipeline;
+			fsmodule = vk.modules.ssao_debug_fs;
+			renderpass = vk.render_pass.ssao_combine;
+			layout = vk.pipeline_layout_post_process;
+			samples = VK_SAMPLE_COUNT_1_BIT;
+			pipeline_name = "ssao debug pipeline";
+			blend = qfalse;
+			break;
+		case 9: // ssao depth debug
+			pipeline = &vk.ssao_depth_debug_pipeline;
+			fsmodule = vk.modules.ssao_depth_debug_fs;
+			renderpass = vk.render_pass.ssao_combine;
+			layout = vk.pipeline_layout_post_process;
+			samples = VK_SAMPLE_COUNT_1_BIT;
+			pipeline_name = "ssao depth debug pipeline";
 			blend = qfalse;
 			break;
 		case 2: // final bloom blend
@@ -8946,8 +8982,14 @@ void vk_end_frame( void )
 
 				// ssao combine
 				vk_begin_ssao_combine_render_pass();
-				qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.ssao_combine_pipeline );
-				qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.ssao_blur_descriptor, 0, NULL );
+				if ( r_ssaoDebugView && r_ssaoDebugView->integer == 2 ) {
+					qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.ssao_depth_debug_pipeline );
+					qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.depth_descriptor, 0, NULL );
+				} else {
+					qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+						( r_ssaoDebugView && r_ssaoDebugView->integer ) ? vk.ssao_debug_pipeline : vk.ssao_combine_pipeline );
+					qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.ssao_blur_descriptor, 0, NULL );
+				}
 				qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 			}
 		}

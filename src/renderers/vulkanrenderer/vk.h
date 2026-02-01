@@ -704,6 +704,8 @@ typedef struct {
 		VkShaderModule ssao_fs;
 		VkShaderModule ssao_blur_fs;
 		VkShaderModule ssao_combine_fs;
+		VkShaderModule ssao_debug_fs;
+		VkShaderModule ssao_depth_debug_fs;
 
 		VkShaderModule gamma_fs;
 		VkShaderModule gamma_vs;
@@ -785,6 +787,8 @@ typedef struct {
 	VkPipeline ssao_pipeline;
 	VkPipeline ssao_blur_pipeline;
 	VkPipeline ssao_combine_pipeline;
+	VkPipeline ssao_debug_pipeline;
+	VkPipeline ssao_depth_debug_pipeline;
 #ifdef VK_PBR_BRDFLUT
 	VkPipeline brdflut_pipeline;
 #endif

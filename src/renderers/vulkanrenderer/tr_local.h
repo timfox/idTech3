@@ -1455,6 +1455,7 @@ extern cvar_t	*r_ssaoIntensity;
 extern cvar_t	*r_ssaoPower;
 extern cvar_t	*r_ssaoSamples;
 extern cvar_t	*r_ssaoBlurRadius;
+extern cvar_t	*r_ssaoDebugView;
 extern cvar_t	*r_fbo;
 extern cvar_t	*r_hdr;
 extern cvar_t	*r_bloom;
@@ -1585,10 +1586,13 @@ void	GL_TextureMode( const char *string );
 void	GL_CheckErrors( void );
 void	GL_State( unsigned stateVector );
 void	GL_ClientState( int unit, unsigned stateVector );
-#ifndef USE_VULKAN
 void	GL_TexEnv( GLint env );
 void	GL_Cull( cullType_t cullType );
-#endif
+
+void *R_GetCommandBuffer( int bytes );
+
+void Matrix16Identity( mat4_t out );
+void Matrix16Copy( const mat4_t in, mat4_t out );
 
 #define GLS_SRCBLEND_ZERO						0x00000001
 #define GLS_SRCBLEND_ONE						0x00000002
