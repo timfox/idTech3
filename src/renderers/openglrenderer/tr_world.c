@@ -31,7 +31,7 @@ Returns true if the grid is completely culled away.
 Also sets the clipped hint bit in tess
 =================
 */
-static qboolean	R_CullTriSurf( srfTriangles_t *cv ) {
+static qboolean	R_CullTriSurf( const srfTriangles_t *cv ) {
 	int 	boxCull;
 
 	boxCull = R_CullLocalBox( cv->bounds );
@@ -50,7 +50,7 @@ Returns true if the grid is completely culled away.
 Also sets the clipped hint bit in tess
 =================
 */
-static qboolean	R_CullGrid( srfGridMesh_t *cv ) {
+static qboolean	R_CullGrid( const srfGridMesh_t *cv ) {
 	int 	boxCull;
 	int 	sphereCull;
 

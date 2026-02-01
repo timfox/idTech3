@@ -14,6 +14,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#ifdef _WIN32
+#include <io.h>
+#endif
 
 /* ======================================================================
  * Terminal Detection
@@ -247,7 +250,11 @@ int iterm2_display_image(const flux_image *img) {
 
     /* Create temp file for PNG */
     char tmppath[] = "/tmp/flux_iterm_XXXXXX.png";
+#ifdef _WIN32
+    int fd = mkstemp(tmppath);
+#else
     int fd = mkstemps(tmppath, 4);
+#endif
     if (fd < 0) {
         fprintf(stderr, "iterm2: cannot create temp file\n");
         return -1;
