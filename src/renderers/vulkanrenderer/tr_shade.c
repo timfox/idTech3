@@ -23,6 +23,75 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "tr_local.h"
 
+extern cvar_t *r_shLighting;
+extern cvar_t *r_shWorldLighting;
+extern cvar_t *r_shDebugView;
+
+static void R_EvalSH9Color( const vec3_t shCoeffs[SH_COEFF_COUNT], const vec3_t normal, vec3_t out ) {
+	const float x = normal[0];
+	const float y = normal[1];
+	const float z = normal[2];
+	const float basis[SH_COEFF_COUNT] = {
+		1.0f,
+		y,
+		z,
+		x,
+		x * y,
+		y * z,
+		3.0f * z * z - 1.0f,
+		x * z,
+		x * x - y * y
+	};
+	int i;
+
+	VectorClear( out );
+	for ( i = 0; i < SH_COEFF_COUNT; i++ ) {
+		out[0] += shCoeffs[i][0] * basis[i];
+		out[1] += shCoeffs[i][1] * basis[i];
+		out[2] += shCoeffs[i][2] * basis[i];
+	}
+}
+
+static qboolean R_StageHasLightmap( const shaderStage_t *pStage ) {
+	return ( pStage->bundle[0].lightmap != LIGHTMAP_INDEX_NONE || pStage->bundle[1].lightmap != LIGHTMAP_INDEX_NONE );
+}
+
+static void RB_DrawWorldSHDebugOverride( void ) {
+	if ( !r_shDebugView || r_shDebugView->integer != 3 ) {
+		return;
+	}
+
+	if ( backEnd.currentEntity != &tr.worldEntity ) {
+		return;
+	}
+
+	{
+		int v;
+		for ( v = 0; v < tess.numVertexes; v++ ) {
+			vec3_t shCoeffs[SH_COEFF_COUNT];
+			vec3_t shLight;
+			qboolean hasSH = R_SampleLightGridSH( tr.world, tess.xyz[v], shCoeffs );
+
+			if ( hasSH ) {
+				R_EvalSH9Color( shCoeffs, tess.normal[v], shLight );
+				tess.svars.colors[0][v].rgba[0] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[0] );
+				tess.svars.colors[0][v].rgba[1] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[1] );
+				tess.svars.colors[0][v].rgba[2] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[2] );
+			} else {
+				tess.svars.colors[0][v].rgba[0] = 255;
+				tess.svars.colors[0][v].rgba[1] = 0;
+				tess.svars.colors[0][v].rgba[2] = 255;
+			}
+			tess.svars.colors[0][v].rgba[3] = 255;
+		}
+	}
+
+	vk_bind_pipeline( vk.surface_debug_pipeline_solid );
+	vk_bind_index();
+	vk_bind_geometry( TESS_XYZ | TESS_RGBA0 );
+	vk_draw_geometry( DEPTH_RANGE_NORMAL, qtrue );
+}
+
 /*
 
   THIS ENTIRE FILE IS BACK END
@@ -184,6 +253,9 @@ Draws vertex normals for debugging
 */
 static void DrawNormals( const shaderCommands_t *input ) {
 	int		i;
+#if defined(USE_VULKAN)
+	(void)input;
+#endif
 #ifdef USE_VULKAN
 #ifdef USE_VBO
 	if ( tess.vboIndex )
@@ -261,6 +333,12 @@ void RB_BeginSurface( shader_t *shader, int fogNum ) {
 	}
 #endif
 
+	if ( backEnd.currentEntity == &tr.worldEntity &&
+		( ( r_shWorldLighting && r_shWorldLighting->integer ) ||
+		( r_shDebugView && r_shDebugView->integer ) ) ) {
+		tess.allowVBO = qfalse;
+	}
+
 	if ( shader->remappedShader ) {
 		state = shader->remappedShader;
 	} else {
@@ -275,9 +353,15 @@ void RB_BeginSurface( shader_t *shader, int fogNum ) {
 
 #ifdef USE_TESS_NEEDS_NORMAL
 #ifdef USE_PMLIGHT
-	tess.needsNormal = state->needsNormal || tess.dlightPass || r_shownormals->integer;
+	tess.needsNormal = state->needsNormal || tess.dlightPass || r_shownormals->integer ||
+		( backEnd.currentEntity == &tr.worldEntity &&
+		( ( r_shDebugView && r_shDebugView->integer ) ||
+		( r_shWorldLighting && r_shWorldLighting->integer && r_shLighting && r_shLighting->integer ) ) );
 #else
-	tess.needsNormal = state->needsNormal || r_shownormals->integer;
+	tess.needsNormal = state->needsNormal || r_shownormals->integer ||
+		( backEnd.currentEntity == &tr.worldEntity &&
+		( ( r_shDebugView && r_shDebugView->integer ) ||
+		( r_shWorldLighting && r_shWorldLighting->integer && r_shLighting && r_shLighting->integer ) ) );
 #endif
 #endif
 
@@ -406,7 +490,7 @@ static void ProjectDlightTexture( void ) {
 #endif
 	}
 
-	for ( l = 0 ; l < backEnd.refdef.num_dlights ; l++ ) {
+	for ( l = 0 ; l < (int)backEnd.refdef.num_dlights ; l++ ) {
 
 		if ( !( tess.dlightBits & ( 1 << l ) ) ) {
 			continue;	// this surface definitely doesn't have any of this light
@@ -653,6 +737,55 @@ void R_ComputeColors( const int b, color4ub_t *dest, const shaderStage_t *pStage
 
 	if ( tess.numVertexes == 0 )
 		return;
+
+	if ( backEnd.currentEntity == &tr.worldEntity && R_StageHasLightmap( pStage ) &&
+		( ( r_shDebugView && r_shDebugView->integer ) ||
+		( r_shWorldLighting && r_shWorldLighting->integer && r_shLighting && r_shLighting->integer ) ) ) {
+		int v;
+		for ( v = 0; v < tess.numVertexes; v++ ) {
+			vec3_t shCoeffs[SH_COEFF_COUNT];
+			vec3_t shLight;
+			qboolean hasSH = R_SampleLightGridSH( tr.world, tess.xyz[v], shCoeffs );
+
+			if ( r_shDebugView && r_shDebugView->integer ) {
+				if ( hasSH ) {
+					if ( r_shDebugView->integer == 2 ) {
+						float value = shCoeffs[0][0];
+						if ( value < 0.0f ) {
+							value = 0.0f;
+						} else if ( value > 255.0f ) {
+							value = 255.0f;
+						}
+						dest[v].rgba[0] = myftol( value );
+						dest[v].rgba[1] = dest[v].rgba[0];
+						dest[v].rgba[2] = dest[v].rgba[0];
+					} else {
+						R_EvalSH9Color( shCoeffs, tess.normal[v], shLight );
+						dest[v].rgba[0] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[0] );
+						dest[v].rgba[1] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[1] );
+						dest[v].rgba[2] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[2] );
+					}
+				} else {
+					dest[v].rgba[0] = 255;
+					dest[v].rgba[1] = 0;
+					dest[v].rgba[2] = 255;
+				}
+				dest[v].rgba[3] = 255;
+			} else if ( hasSH ) {
+				R_EvalSH9Color( shCoeffs, tess.normal[v], shLight );
+				dest[v].rgba[0] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[0] );
+				dest[v].rgba[1] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[1] );
+				dest[v].rgba[2] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[2] );
+				dest[v].rgba[3] = 255;
+			} else {
+				dest[v].rgba[0] = 255;
+				dest[v].rgba[1] = 255;
+				dest[v].rgba[2] = 255;
+				dest[v].rgba[3] = 255;
+			}
+		}
+		return;
+	}
 
 	//
 	// rgbGen
@@ -1084,6 +1217,12 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 	int stage, i;
 
 #ifdef USE_VULKAN
+#if 1
+	if ( r_shDebugView && r_shDebugView->integer == 3 ) {
+		RB_DrawWorldSHDebugOverride();
+		return;
+	}
+#endif
 #ifdef USE_VK_PBR
 	qboolean is_pbr_surface;
 #endif
@@ -1151,7 +1290,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 #ifdef USE_VULKAN
 		tess_flags |= pStage->tessFlags;
 
-		for ( i = 0;  i < pStage->numTexBundles; i++ ) {
+		for ( i = 0;  i < (int)pStage->numTexBundles; i++ ) {
 			if ( pStage->bundle[i].image[0] != NULL ) {
 				GL_SelectTexture( i );
 				R_BindAnimatedImage( &pStage->bundle[i] );
@@ -1398,21 +1537,21 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 
 #ifdef USE_VULKAN
 
-void VK_SetFogParams( vkUniform_t *uniform, int *fogStage )
+void VK_SetFogParams( vkUniform_t *ubo, int *fogStage )
 {
 	if ( tess.fogNum && tess.shader->fogPass ) {
 		const fogProgramParms_t *fp = RB_CalcFogProgramParms();
 		// vertex data
-		Vector4Copy( fp->fogDistanceVector, uniform->fogDistanceVector );
-		Vector4Copy( fp->fogDepthVector, uniform->fogDepthVector );
-		uniform->fogEyeT[0] = fp->eyeT;
+		Vector4Copy( fp->fogDistanceVector, ubo->fogDistanceVector );
+		Vector4Copy( fp->fogDepthVector, ubo->fogDepthVector );
+		ubo->fogEyeT[0] = fp->eyeT;
 		if ( fp->eyeOutside ) {
-			uniform->fogEyeT[1] = 0.0; // fog eye out
+			ubo->fogEyeT[1] = 0.0; // fog eye out
 		} else {
-			uniform->fogEyeT[1] = 1.0; // fog eye in
+			ubo->fogEyeT[1] = 1.0; // fog eye in
 		}
 		// fragment data
-		Vector4Copy( fp->fogColor, uniform->fogColor );
+		Vector4Copy( fp->fogColor, ubo->fogColor );
 		*fogStage = 1;
 	} else {
 		*fogStage = 0;
@@ -1421,7 +1560,7 @@ void VK_SetFogParams( vkUniform_t *uniform, int *fogStage )
 
 
 #ifdef USE_PMLIGHT
-static void VK_SetLightParams( vkUniform_t *uniform, const dlight_t *dl ) {
+static void VK_SetLightParams( vkUniform_t *ubo, const dlight_t *dl ) {
 	float radius;
 
 #ifdef USE_VULKAN
@@ -1429,36 +1568,36 @@ static void VK_SetLightParams( vkUniform_t *uniform, const dlight_t *dl ) {
 #else
 	if ( !glConfig.deviceSupportsGamma )
 #endif
-		VectorScale( dl->color, 2 * powf( r_intensity->value, r_gamma->value ), uniform->light.color);
+		VectorScale( dl->color, 2 * powf( r_intensity->value, r_gamma->value ), ubo->light.color);
 	else
-		VectorCopy( dl->color, uniform->light.color );
+		VectorCopy( dl->color, ubo->light.color );
 
 	radius = dl->radius;
 
 	// vertex data
-	VectorCopy( backEnd.or.viewOrigin, uniform->eyePos ); uniform->eyePos[3] = 0.0f;
-	VectorCopy( dl->transformed, uniform->light.pos ); uniform->light.pos[3] = 0.0f;
+	VectorCopy( backEnd.or.viewOrigin, ubo->eyePos ); ubo->eyePos[3] = 0.0f;
+	VectorCopy( dl->transformed, ubo->light.pos ); ubo->light.pos[3] = 0.0f;
 
 	// fragment data
-	uniform->light.color[3] = 1.0f / Square( radius );
+	ubo->light.color[3] = 1.0f / Square( radius );
 
 	if ( dl->linear )
 	{
 		vec4_t ab;
 		VectorSubtract( dl->transformed2, dl->transformed, ab );
 		ab[3] = 1.0f / DotProduct( ab, ab );
-		Vector4Copy( ab, uniform->light.vector );
+		Vector4Copy( ab, ubo->light.vector );
 	}
 }
 #endif
 
-uint32_t vk_append_uniform( const void *uniform, size_t size, uint32_t min_offset ) {
+uint32_t vk_append_uniform( const void *uniform_data, size_t size, uint32_t min_offset ) {
 	const uint32_t offset = PAD(vk.cmd->vertex_buffer_offset, (VkDeviceSize)vk.uniform_alignment);
 
 	if ( offset + min_offset > vk.geometry_buffer_size )
 		return ~0U;
 
-	Com_Memcpy( vk.cmd->vertex_buffer_ptr + offset, uniform, size );
+	Com_Memcpy( vk.cmd->vertex_buffer_ptr + offset, uniform_data, size );
 	vk.cmd->vertex_buffer_offset = offset + min_offset;
 
 	return offset;
@@ -1492,8 +1631,8 @@ static uint32_t vk_push_uniform_cached( const vkUniform_t *u )
 	return last_uniform_offset;
 }
 
-uint32_t vk_push_uniform( const vkUniform_t *uniform ) {
-	const uint32_t offset = vk_append_uniform( uniform, sizeof(*uniform), (VkDeviceSize)vk.uniform_item_size );
+uint32_t vk_push_uniform( const vkUniform_t *ubo ) {
+	const uint32_t offset = vk_append_uniform( ubo, sizeof(*ubo), (VkDeviceSize)vk.uniform_item_size );
 
 	vk_reset_descriptor( VK_DESC_UNIFORM );
 	vk_update_descriptor( VK_DESC_UNIFORM, vk.cmd->uniform_descriptor );
@@ -1531,7 +1670,7 @@ void VK_LightingPass( void )
 		tess.dlightUpdateParams = qfalse;
 	}
 
-	if ( uniform_offset == ~0 )
+	if ( uniform_offset == ~0U )
 		return; // no space left...
 
 	cull = tess.shader->cullType;
@@ -1576,6 +1715,7 @@ void RB_StageIteratorGeneric( void )
 	qboolean rebindIndex = qfalse;
 #endif
 	qboolean fogCollapse = qfalse;
+	qboolean worldShOverride;
 
 #ifdef USE_VBO
 	if ( tess.vboIndex != 0 ) {
@@ -1595,6 +1735,7 @@ void RB_StageIteratorGeneric( void )
 #ifdef USE_FOG_COLLAPSE
 	fogCollapse = tess.fogNum && tess.shader->fogPass && tess.shader->fogCollapse;
 #endif
+	worldShOverride = ( r_shDebugView && r_shDebugView->integer == 3 );
 
 	// call shader function
 	RB_IterateStagesGeneric( &tess, fogCollapse );
@@ -1604,7 +1745,7 @@ void RB_StageIteratorGeneric( void )
 #ifdef USE_PMLIGHT
 	if ( r_dlightMode->integer == 0 )
 #endif
-	if ( tess.dlightBits && tess.shader->sort <= SS_OPAQUE && !(tess.shader->surfaceFlags & (SURF_NODLIGHT | SURF_SKY) ) ) {
+	if ( !worldShOverride && tess.dlightBits && tess.shader->sort <= SS_OPAQUE && !(tess.shader->surfaceFlags & (SURF_NODLIGHT | SURF_SKY) ) ) {
 		if ( !fogCollapse ) {
 #ifdef USE_VULKAN
 			rebindIndex = ProjectDlightTexture();
@@ -1616,7 +1757,7 @@ void RB_StageIteratorGeneric( void )
 #endif // USE_LEGACY_DLIGHTS
 
 	// now do fog
-	if ( tess.fogNum && tess.shader->fogPass && !fogCollapse ) {
+	if ( !worldShOverride && tess.fogNum && tess.shader->fogPass && !fogCollapse ) {
 #ifdef USE_VULKAN
 		RB_FogPass( rebindIndex );
 #else
@@ -1704,7 +1845,11 @@ void RB_StageIteratorGeneric( void )
 	//
 	// call shader function
 	//
-	RB_IterateStagesGeneric( input );
+	if ( r_shDebugView && r_shDebugView->integer == 3 ) {
+		RB_DrawWorldSHDebugOverride();
+	} else {
+		RB_IterateStagesGeneric( input );
+	}
 
 	//
 	// now do any dynamic lighting needed
