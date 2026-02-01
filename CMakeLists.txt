@@ -780,6 +780,10 @@ IF(USE_RENDERER_DLOPEN)
 	# static libm which would break building shared objects.
 	target_link_libraries(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE m ${CMAKE_DL_LIBS})
 	target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE m ${CMAKE_DL_LIBS})
+	IF(APPLE)
+		target_link_options(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE "-undefined dynamic_lookup")
+		target_link_options(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE "-undefined dynamic_lookup")
+	ENDIF()
 	# Normalize target filenames for dlopen-friendly plugin names:
 	# set OUTPUT_NAME and remove default 'lib' PREFIX so filenames become:
 	#   idtech3_opengl_x86_64.so  (instead of libidtech3_opengl_x86_64.so)
