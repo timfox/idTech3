@@ -496,6 +496,20 @@ static void pi_set_description(FLAC__StreamMetadata *block, const FLAC__byte *s)
 
 static void pi_set_data(FLAC__StreamMetadata *block, const FLAC__byte *data, FLAC__uint32 len)
 {
+	/* If the new data pointer is the same as the existing one,
+	 * avoid freeing it before reading from it. Just update lengths.
+	 */
+	if(block->data.picture.data == data) {
+		/* Adjust block->length by the difference between new and old lengths. */
+		if(len >= block->data.picture.data_length)
+			block->length += (len - block->data.picture.data_length);
+		else
+			block->length -= (block->data.picture.data_length - len);
+
+		block->data.picture.data_length = len;
+		return;
+	}
+
 	if(block->data.picture.data) {
 		block->length -= block->data.picture.data_length;
 		free(block->data.picture.data);
