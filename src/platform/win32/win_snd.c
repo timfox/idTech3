@@ -773,6 +773,8 @@ Initialize direct sound
 Returns false if failed
 ==================
 */
+static qboolean SNDDMA_InitDS( void ); // forward declaration near use
+
 qboolean SNDDMA_Init( void ) {
 
 #if USE_WASAPI
