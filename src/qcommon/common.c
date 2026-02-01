@@ -31,7 +31,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #else
 #include <winsock.h>
 #if defined(_DEBUG)
-#include "../win32/win_local.h"
+#include "../platform/win32/win_local.h"
 #endif
 #endif
 

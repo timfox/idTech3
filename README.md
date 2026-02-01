@@ -14,13 +14,15 @@ Go to [Releases](../../releases) section to download latest binaries for your pl
 * OpenGL renderer
 * Vulkan renderer
 * Physically Based Rendering
+* Spherical Harmonics lighting support
 
 **Image Generation**:
-* FLUX.2/FLUX.1 C image generation (optional, text-to-image from console with **real-time hot-reloading** and device selection; supports flux1-schnell/fast, flux1-dev/balanced, flux2-dev/high-quality variants; requires model files in game directory; Metal, BLAS, or pure C backend, with graceful fallback)
+* FLUX.2/FLUX.1 C image generation (optional, text-to-image from console with **real-time hot-reloading** and device selection; supports flux1-schnell, flux1-dev, flux2-dev; requires model files in game directory; Metal, BLAS, or pure C backend, with graceful fallback)
 
 **Audio**:
 * OpenAL backend with HRTF for 3D positional audio
 * Heuristic acoustics: real-time reverb/occlusion using OpenAL EFX
+* Supports codecs for mp3, ogg, wav, flac, webm, and opus
 
 ### Standards
 

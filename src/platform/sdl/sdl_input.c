@@ -175,7 +175,7 @@ static qboolean IN_IsConsoleKey( keyNum_t key, int character )
 	}
 
 	// If the character is the same as the key, prefer the character
-	if ( key == character )
+	if ( key == (keyNum_t)character )
 		key = 0;
 
 	for ( i = 0; i < numConsoleKeys; i++ )
