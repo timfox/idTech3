@@ -426,6 +426,10 @@
       <Project>{a410161f-ae9f-485d-a01f-5294891430a6}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
+    <ProjectReference Include="renderer.vcxproj">
+      <Project>{AB424155-FBED-4D8D-B007-5B6CF93EA395}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
     <ProjectReference Include="libjpeg.vcxproj">
       <Project>{17867AF4-12CB-4847-A13E-BF37D8BDF597}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
