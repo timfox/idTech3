@@ -667,7 +667,7 @@ static void emit_cmp_rx( uint32_t base, uint32_t reg )
 }
 
 #if 1
-static void emit_cmp_rx_mem( uint32_t reg, int32_t offset )
+static void emit_cmp_rx_mem( uint32_t reg, int32_t offset ) UNUSED_VAR
 {
 	emit_op_reg_offset( 0, 0x3B, reg, offset );
 }
@@ -804,7 +804,7 @@ static void emit_load4( uint32_t reg, uint32_t base, int32_t offset )
 }
 
 #if 1
-static void emit_load_rx_offset( uint32_t reg, int32_t offset )
+static void emit_load_rx_offset( uint32_t reg, int32_t offset ) UNUSED_VAR
 {
 	emit_op_reg_offset( 0, 0x8B, reg, offset );
 }
@@ -849,7 +849,7 @@ static void emit_store_rx( uint32_t reg, uint32_t base, int32_t offset )
 }
 
 #if 1
-static void emit_store_rx_offset( uint32_t reg, int32_t offset )
+static void emit_store_rx_offset( uint32_t reg, int32_t offset ) UNUSED_VAR
 {
 	emit_op_reg_offset( 0, 0x89, reg, offset );
 }
@@ -925,7 +925,7 @@ static void emit_jump_index( uint32_t base, uint32_t index )
 	emit_op_reg_base_index( 0, 0xFF, 0x4, base, index, sizeof( void* ), 0 );
 }
 
-static void emit_jump_index_offset( int32_t offset, uint32_t index )
+static void emit_jump_index_offset( int32_t offset, uint32_t index ) UNUSED_VAR
 {
 	emit_op_reg_index_offset( 0xFF, 0x4, index, sizeof( void * ), offset );
 }
@@ -935,12 +935,12 @@ static void emit_call_index( uint32_t base, uint32_t index )
 	emit_op_reg_base_index( 0, 0xFF, 0x2, base, index, sizeof( void* ), 0 );
 }
 
-static void emit_call_index_offset( int32_t offset, uint32_t index )
+static void emit_call_index_offset( int32_t offset, uint32_t index ) UNUSED_VAR
 {
 	emit_op_reg_index_offset( 0xFF, 0x2, index, sizeof( void * ), offset );
 }
 
-static void emit_call_indir( int32_t offset )
+static void emit_call_indir( int32_t offset ) UNUSED_VAR
 {
 	Emit1( 0xFF );
 	Emit1( 0x15 );
@@ -957,12 +957,12 @@ static void emit_add_rx( uint32_t base, uint32_t reg )
 	emit_op_reg( 0, 0x01, base, reg );
 }
 
-static void emit_pushad( void )
+static void emit_pushad( void ) UNUSED_VAR
 {
 	Emit1( 0x60 );
 }
 
-static void emit_popad( void )
+static void emit_popad( void ) UNUSED_VAR
 {
 	Emit1( 0x61 );
 }

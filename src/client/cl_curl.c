@@ -1149,5 +1149,5 @@ qboolean Com_DL_Perform( download_t *dl )
 #endif /* USE_CURL */
 
 #ifndef USE_CURL
-static const int cl_curl_unused UNUSED_VAR = 0;
+enum { cl_curl_unused = 0 };
 #endif

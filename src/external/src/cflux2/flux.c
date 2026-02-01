@@ -228,9 +228,8 @@ flux_ctx *flux_load_dir(const char *model_dir) {
             if (st.st_size < 1024 * 1024) {  /* Less than 1MB is suspicious */
                 char error_msg[512];
                 snprintf(error_msg, sizeof(error_msg),
-                        "VAE file %.400s is only %ld bytes (expected ~160MB+). "
-                        "This appears to be corrupted or incomplete. "
-                        "Please ensure model files are downloaded correctly - see README_idtech3.md for setup instructions.",
+                        "VAE file %.200s is only %ld bytes (expected ~160MB+). "
+                        "File may be corrupted or incomplete. See README_idtech3.md.",
                         path, (long)st.st_size);
                 set_error(error_msg);
                 flux_free(ctx);
@@ -245,9 +244,8 @@ flux_ctx *flux_load_dir(const char *model_dir) {
         } else {
             char error_msg[512];
             snprintf(error_msg, sizeof(error_msg),
-                    "Failed to open safetensors file: %.400s. "
-                    "File may be corrupted, incomplete, or missing. "
-                    "Please ensure model files are downloaded and placed in the correct directory.",
+                    "Failed to open safetensors file: %.200s. "
+                    "File may be corrupted, incomplete, or missing. See README_idtech3.md.",
                     path);
             set_error(error_msg);
             flux_free(ctx);
@@ -256,8 +254,7 @@ flux_ctx *flux_load_dir(const char *model_dir) {
     } else {
         char error_msg[512];
         snprintf(error_msg, sizeof(error_msg),
-                "VAE file not found: %.400s. "
-                "Ensure model files are downloaded to the correct directory.",
+                "VAE file not found: %.200s. See README_idtech3.md.",
                 path);
         set_error(error_msg);
         flux_free(ctx);
