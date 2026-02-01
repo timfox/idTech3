@@ -188,10 +188,8 @@ set(EXTERNAL_CURL_WINDOWS_INCLUDE_DIR "${EXTERNAL_SRC}/curl/windows/include")
 set(EXTERNAL_JPEG_SRC_DIR "${EXTERNAL_SRC}/jpeg")
 
 # Add cflux2 external library
-if(USE_FLUX AND (NOT WIN32 OR CYGWIN))
+if(USE_FLUX)
 	add_subdirectory(src/external/src/cflux2)
-elseif(USE_FLUX)
-	message(STATUS "Skipping cflux2 build on Windows (sys/mman.h missing)")
 endif()
 
 if(BUILD_FREETYPE)
@@ -533,7 +531,9 @@ ADD_EXECUTABLE(${CNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
 TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} qcommon botlib client q3ui)
 if(USE_FLUX)
 	TARGET_COMPILE_DEFINITIONS(${CNAME}${BINEXT} PRIVATE USE_FLUX)
-	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} cflux2)
+	if(TARGET cflux2)
+		TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE cflux2)
+	endif()
 endif()
 # Link OpenAL only when enabled
 IF(USE_OPENAL)
