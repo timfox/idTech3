@@ -1,0 +1,12 @@
+#ifndef PLATFORM_AUDIO_MIX_SND_CODEC_H
+#define PLATFORM_AUDIO_MIX_SND_CODEC_H
+
+#include "../snd_codec.h"
+
+#endif // PLATFORM_AUDIO_MIX_SND_CODEC_H
+#ifndef PLATFORM_AUDIO_MIX_SND_CODEC_H
+#define PLATFORM_AUDIO_MIX_SND_CODEC_H
+
+#include "../snd_codec.h"
+
+#endif // PLATFORM_AUDIO_MIX_SND_CODEC_H
