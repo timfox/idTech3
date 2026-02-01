@@ -95,6 +95,16 @@ typedef enum {
 	FLUX_JOB_FAILED
 } flux_job_status_t;
 
+// Helper to check if file exists
+static qboolean CL_FluxFileExists(const char *path) {
+	FILE *f = fopen(path, "r");
+	if (f) {
+		fclose(f);
+		return qtrue;
+	}
+	return qfalse;
+}
+
 // Get model directory path based on selected model variant
 static const char *CL_FluxGetModelPath(const char *model_variant) {
 	// Model variants can have their own directories for better organization
@@ -108,7 +118,15 @@ static const char *CL_FluxGetModelPath(const char *model_variant) {
 	} else if (Q_stricmp(model_variant, "flux1-dev") == 0) {
 		return "flux1-dev";
 	} else if (Q_stricmp(model_variant, "flux2-dev") == 0) {
-		return "flux2-dev"; // FLUX.2 directory
+		// FLUX.2 models can be in "flux2-dev" or fallback to "flux"
+		// Check if flux2-dev exists, otherwise use flux
+		char test_path[MAX_OSPATH];
+		Com_sprintf(test_path, sizeof(test_path), "%s/flux2-dev/vae/diffusion_pytorch_model.safetensors", Sys_DefaultBasePath());
+		if (CL_FluxFileExists(test_path)) {
+			return "flux2-dev";
+		} else {
+			return "flux"; // Fallback to default flux directory
+		}
 	} else {
 		Com_Printf(S_COLOR_YELLOW "FLUX: Unknown model variant '%s', using default flux directory\n", model_variant);
 		return "flux";
@@ -5412,9 +5430,10 @@ static void CL_FluxGenerate_f( void ) {
 async_generation:
 	// Asynchronous generation code
 
-	// Initialize job with safety checks
+	// Initialize job with safety checks - zero everything first
 	Com_Memset(&flux_job, 0, sizeof(flux_job));
-	flux_job.status = FLUX_JOB_RUNNING;
+	
+	// Set all values BEFORE marking as RUNNING to avoid race conditions
 	flux_job.start_time = Com_Milliseconds();
 	flux_job.timeout_seconds = 300; // 5 minute timeout
 
@@ -5424,12 +5443,27 @@ async_generation:
 		Com_Printf(S_COLOR_RED "FLUX: Invalid model path\n");
 		return;
 	}
+	
+	// Check if FLUX.1 is selected but files might not be available
+	if ((Q_stricmp(cl_flux_model->string, "flux1-schnell") == 0 || 
+	     Q_stricmp(cl_flux_model->string, "flux1-dev") == 0) &&
+	    Q_stricmp(model_path, "flux") != 0) {
+		char test_path[MAX_OSPATH];
+		Com_sprintf(test_path, sizeof(test_path), "%s/%s/vae/diffusion_pytorch_model.safetensors", 
+		            Sys_DefaultBasePath(), model_path);
+		if (!CL_FluxFileExists(test_path)) {
+			Com_Printf(S_COLOR_YELLOW "FLUX: FLUX.1 model files not found in %s/\n", model_path);
+			Com_Printf(S_COLOR_YELLOW "FLUX: To use FLUX.1, download model files manually (see MANUAL_DOWNLOAD.md)\n");
+			Com_Printf(S_COLOR_YELLOW "FLUX: Or switch to FLUX.2: /cl_flux_model flux2-dev\n");
+			return;
+		}
+	}
+	
 	Q_strncpyz(flux_job.model_path, model_path, sizeof(flux_job.model_path));
 
 	// Validate and copy prompt
 	if (!prompt || strlen(prompt) == 0) {
 		Com_Printf(S_COLOR_RED "FLUX: Empty prompt\n");
-		flux_job.status = FLUX_JOB_IDLE;
 		return;
 	}
 	Q_strncpyz(flux_job.prompt, prompt, sizeof(flux_job.prompt));
@@ -5442,6 +5476,9 @@ async_generation:
 	// Create output filename with timestamp
 	Com_sprintf(flux_job.output_path, sizeof(flux_job.output_path), "flux_%d_%dx%d.png",
 		Com_Milliseconds(), width, height);
+	
+	// Mark as RUNNING only after all values are set (memory barrier for thread safety)
+	flux_job.status = FLUX_JOB_RUNNING;
 
 	// Start background thread
 	flux_job.thread = SDL_CreateThread(CL_FluxGenerationThread, "FLUX_Generation", &flux_job);
@@ -5472,8 +5509,16 @@ sync_generation:
 		Com_sprintf(full_model_path, sizeof(full_model_path), "%s/%s", Sys_DefaultBasePath(), sync_model_path);
 		ctx = flux_load_dir(full_model_path);
 		if (!ctx) {
-		Com_Printf(S_COLOR_RED "FLUX: Failed to load model from %s: %s\n",
-			full_model_path, flux_get_error());
+			const char *error = flux_get_error();
+			Com_Printf(S_COLOR_RED "FLUX: Failed to load model from %s: %s\n",
+				full_model_path, error ? error : "Unknown error");
+			
+			// Suggest FLUX.2 if FLUX.1 fails
+			if (Q_stricmp(cl_flux_model->string, "flux1-schnell") == 0 || 
+			    Q_stricmp(cl_flux_model->string, "flux1-dev") == 0) {
+				Com_Printf(S_COLOR_YELLOW "FLUX: FLUX.1 model files may be missing or corrupted.\n");
+				Com_Printf(S_COLOR_YELLOW "FLUX: Try switching to FLUX.2: /cl_flux_model flux2-dev\n");
+			}
 			return;
 		}
 
