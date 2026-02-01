@@ -205,15 +205,15 @@ static int parse_header(safetensors_file_t *sf) {
     return 0;
 }
 
-static void *safetensors_platform_mmap(safetensors_file_t *sf, int fd, size_t file_size) {
 static void *safetensors_mmap_fd(safetensors_file_t *sf, int fd, size_t file_size) {
 #if defined(_WIN32)
     sf->file_handle = (void *)_get_osfhandle(fd);
     if (sf->file_handle == (void *)-1) {
         return NULL;
     }
-    DWORD high = (DWORD)(file_size >> 32);
-    DWORD low = (DWORD)(file_size & 0xFFFFFFFF);
+    uint64_t size64 = (uint64_t)file_size;
+    DWORD high = (DWORD)(size64 >> 32);
+    DWORD low = (DWORD)(size64 & 0xFFFFFFFF);
     sf->mapping_handle = CreateFileMapping((HANDLE)sf->file_handle, NULL, PAGE_READONLY, high, low, NULL);
     if (!sf->mapping_handle) {
         return NULL;
@@ -223,6 +223,24 @@ static void *safetensors_mmap_fd(safetensors_file_t *sf, int fd, size_t file_siz
     return mmap(NULL, file_size, PROT_READ, MAP_PRIVATE, fd, 0);
 #endif
 }
+
+static void safetensors_unmap(safetensors_file_t *sf, void *data, size_t file_size) {
+    if (!data) {
+        return;
+    }
+#if defined(_WIN32)
+    UnmapViewOfFile(data);
+    if (sf && sf->mapping_handle) {
+        CloseHandle(sf->mapping_handle);
+        sf->mapping_handle = NULL;
+    }
+    if (sf && sf->file_handle) {
+        CloseHandle((HANDLE)sf->file_handle);
+        sf->file_handle = NULL;
+    }
+#else
+    munmap(data, file_size);
+#endif
 }
 
 static int64_t safetensors_get_file_size(int fd) {
@@ -266,6 +284,10 @@ safetensors_file_t *safetensors_open(const char *path) {
     void *data = safetensors_mmap_fd(sf, crt_fd, file_size);
     _close(crt_fd);
     if (!data) {
+        if (sf->mapping_handle) {
+            CloseHandle(sf->mapping_handle);
+            sf->mapping_handle = NULL;
+        }
         CloseHandle(fh);
         free(sf);
         return NULL;
@@ -315,13 +337,8 @@ safetensors_file_t *safetensors_open(const char *path) {
 
     if (header_size > file_size - 8) {
         fprintf(stderr, "safetensors_open: invalid header size\n");
-        munmap(data, file_size);
-        return NULL;
-    }
-
-    safetensors_file_t *sf = calloc(1, sizeof(safetensors_file_t));
-    if (!sf) {
-        munmap(data, file_size);
+        safetensors_unmap(sf, data, file_size);
+        free(sf);
         return NULL;
     }
 
@@ -333,7 +350,8 @@ safetensors_file_t *safetensors_open(const char *path) {
     /* Copy header JSON for parsing */
     sf->header_json = malloc(header_size + 1);
     if (!sf->header_json) {
-        safetensors_close(sf);
+        safetensors_unmap(sf, data, file_size);
+        free(sf);
         return NULL;
     }
     memcpy(sf->header_json, (char *)data + 8, header_size);
@@ -342,7 +360,10 @@ safetensors_file_t *safetensors_open(const char *path) {
     /* Parse header */
     if (parse_header(sf) != 0) {
         fprintf(stderr, "safetensors_open: failed to parse header\n");
-        safetensors_close(sf);
+        safetensors_unmap(sf, data, file_size);
+        free(sf->header_json);
+        free(sf->path);
+        free(sf);
         return NULL;
     }
 
@@ -352,20 +373,8 @@ safetensors_file_t *safetensors_open(const char *path) {
 void safetensors_close(safetensors_file_t *sf) {
     if (!sf) return;
     if (sf->data) {
-#if defined(_WIN32)
-        UnmapViewOfFile(sf->data);
+        safetensors_unmap(sf, sf->data, sf->file_size);
         sf->data = NULL;
-        if (sf->mapping_handle) {
-            CloseHandle(sf->mapping_handle);
-            sf->mapping_handle = NULL;
-        }
-        if (sf->file_handle) {
-            CloseHandle((HANDLE)sf->file_handle);
-            sf->file_handle = NULL;
-        }
-#else
-        munmap(sf->data, sf->file_size);
-#endif
     }
     free(sf->path);
     free(sf->header_json);
