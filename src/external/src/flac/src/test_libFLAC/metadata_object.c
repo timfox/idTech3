@@ -489,31 +489,29 @@ static void pi_set_mime_type(FLAC__StreamMetadata *block, const char *s)
 
 static void pi_set_description(FLAC__StreamMetadata *block, const FLAC__byte *s)
 {
-	/* If the new description pointer is the same as the existing one,
-	 * avoid freeing it before reading from it. Just update lengths.
-	 */
+	const char *new_desc_src = (const char *)s;
+	size_t old_len = 0;
+
 	if(block->data.picture.description == s) {
-		size_t old_len = strlen((const char *)block->data.picture.description);
-		size_t new_len = old_len; /* same pointer implies same string contents */
-
-		/* Adjust block->length by the difference between new and old lengths.
-		 * Currently this will be zero, but keep the pattern consistent with pi_set_data.
-		 */
-		if(new_len >= old_len)
-			block->length += (new_len - old_len);
-		else
-			block->length -= (old_len - new_len);
-
+		/* Avoid adjusting anything if the pointer and contents are unchanged. */
 		return;
 	}
 
 	if(block->data.picture.description) {
-		block->length -= strlen((const char *)block->data.picture.description);
+		old_len = strlen((const char *)block->data.picture.description);
+	}
+
+	char *new_description = strdup(new_desc_src);
+	FLAC__ASSERT(new_description);
+	size_t new_len = strlen(new_description);
+
+	if(block->data.picture.description) {
+		block->length -= old_len;
 		free(block->data.picture.description);
 	}
-	block->data.picture.description = (FLAC__byte*)strdup((const char *)s);
-	FLAC__ASSERT(block->data.picture.description);
-	block->length += strlen((const char *)block->data.picture.description);
+
+	block->data.picture.description = (FLAC__byte*)new_description;
+	block->length += new_len;
 }
 
 static void pi_set_data(FLAC__StreamMetadata *block, const FLAC__byte *data, FLAC__uint32 len)
@@ -532,12 +530,16 @@ static void pi_set_data(FLAC__StreamMetadata *block, const FLAC__byte *data, FLA
 		return;
 	}
 
+	char *new_data = strdup((const char *)data);
+	FLAC__ASSERT(new_data);
+	size_t old_len = 0;
+
 	if(block->data.picture.data) {
-		block->length -= block->data.picture.data_length;
+		old_len = block->data.picture.data_length;
+		block->length -= old_len;
 		free(block->data.picture.data);
 	}
-	block->data.picture.data = (FLAC__byte*)strdup((const char *)data);
-	FLAC__ASSERT(block->data.picture.data);
+	block->data.picture.data = (FLAC__byte*)new_data;
 	block->data.picture.data_length = len;
 	block->length += len;
 }
