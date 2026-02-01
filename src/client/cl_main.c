@@ -97,20 +97,19 @@ typedef enum {
 
 // Get model directory path based on selected model variant
 static const char *CL_FluxGetModelPath(const char *model_variant) {
-	// Currently all models are in the same "flux" directory
-	// Future: different subdirectories for different model variants
+	// Model variants can have their own directories for better organization
 	if (!model_variant || !*model_variant) {
 		return "flux"; // Default fallback
 	}
 
-	// For now, all variants use the same directory structure
-	// TODO: Implement separate directories when FLUX.1 models are available
-	if (Q_stricmp(model_variant, "flux1-schnell") == 0 ||
-		Q_stricmp(model_variant, "flux1-dev") == 0 ||
-		Q_stricmp(model_variant, "flux2-dev") == 0) {
-		return "flux";
+	// Map model variants to directory names
+	if (Q_stricmp(model_variant, "flux1-schnell") == 0) {
+		return "flux1-schnell";
+	} else if (Q_stricmp(model_variant, "flux1-dev") == 0) {
+		return "flux1-dev";
+	} else if (Q_stricmp(model_variant, "flux2-dev") == 0) {
+		return "flux2-dev"; // FLUX.2 directory
 	} else {
-		// Fallback for unknown variants
 		Com_Printf(S_COLOR_YELLOW "FLUX: Unknown model variant '%s', using default flux directory\n", model_variant);
 		return "flux";
 	}
@@ -4131,7 +4130,7 @@ void CL_Init( void ) {
 	Cvar_CheckRange( cl_flux_async, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( cl_flux_async, "FLUX generation mode: 0=synchronous (blocking), 1=asynchronous (background, may crash)." );
 
-	cl_flux_model = Cvar_Get( "cl_flux_model", "flux2-dev", CVAR_ARCHIVE );
+	cl_flux_model = Cvar_Get( "cl_flux_model", "flux1-schnell", CVAR_ARCHIVE );
 	Cvar_SetDescription( cl_flux_model, "FLUX model variant: flux1-schnell (fast), flux1-dev (balanced), flux2-dev (high quality)." );
 
 	cl_flux_device = Cvar_Get( "cl_flux_device", "auto", CVAR_ARCHIVE );

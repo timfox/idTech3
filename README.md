@@ -16,7 +16,7 @@ Go to [Releases](../../releases) section to download latest binaries for your pl
 * Physically Based Rendering
 
 **Image Generation**:
-* FLUX.2 C image generation (optional, text-to-image from console with **real-time hot-reloading** and device selection; requires ~16GB model files in game directory; Metal, BLAS, or pure C backend, with graceful fallback)
+* FLUX.2/FLUX.1 C image generation (optional, text-to-image from console with **real-time hot-reloading** and device selection; supports flux1-schnell/fast, flux1-dev/balanced, flux2-dev/high-quality variants; requires model files in game directory; Metal, BLAS, or pure C backend, with graceful fallback)
 
 **Audio**:
 * OpenAL backend with HRTF for 3D positional audio
