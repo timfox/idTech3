@@ -8888,12 +8888,16 @@ void vk_end_frame( void )
 				typedef struct {
 					float projInfo[4]; // invProj00, invProj11, proj10, proj14
 					float params[4];   // radius, bias, intensity, power
-					float misc[4];     // samples, invWidth, invHeight, unused
+					float misc[4];     // samples, invWidth, invHeight, depthIsReversed
 				} vk_ssao_push_t;
 
 				vk_ssao_push_t push;
 				VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+#ifdef USE_REVERSED_DEPTH
+				const float depthIsReversed = 1.0f;
+#else
 				const float depthIsReversed = 0.0f;
+#endif
 				if ( glConfig.stencilBits > 0 )
 					depth_aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
 

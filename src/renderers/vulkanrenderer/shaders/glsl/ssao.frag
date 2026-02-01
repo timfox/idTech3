@@ -8,7 +8,7 @@ layout(location = 0) out vec4 out_color;
 layout(push_constant) uniform SSAOParams {
 	vec4 projInfo; // invProj00, invProj11, proj10, proj14
 	vec4 params;   // radius, bias, intensity, power
-	vec4 misc;     // samples, invWidth, invHeight, unused
+	vec4 misc;     // samples, invWidth, invHeight, depthIsReversed
 } pc;
 
 float rand01(vec2 co)
@@ -25,7 +25,7 @@ float viewZFromDepth(float depth)
 void main()
 {
 	float depth = texture(depthTex, frag_tex_coord).r;
-	if (depth >= 0.999) {
+	if ((pc.misc.w > 0.5 && depth <= 0.001) || (pc.misc.w <= 0.5 && depth >= 0.999)) {
 		out_color = vec4(1.0);
 		return;
 	}
