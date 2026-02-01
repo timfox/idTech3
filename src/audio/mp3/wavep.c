@@ -96,3 +96,5 @@ static const BYTE_WAVE wave =
 #endif
 /*-----------------------------------------------*/
 #endif
+
+typedef int wavep_translation_unit_placeholder_t;
