@@ -34,6 +34,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "client.h"
 #include "../audio/snd_local.h"
 
+extern cvar_t *s_volume;
+
 #define MAXSIZE				8
 #define MINSIZE				4
 

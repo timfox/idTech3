@@ -25,8 +25,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 extern cvar_t *s_khz;
 
-static qboolean	dsound_init;
-static qboolean SNDDMA_InitDS( void );
+extern dma_t dma;
+extern qboolean dsound_init;
+extern qboolean SNDDMA_InitDS( void );
+extern void SNDDMA_Init( void );
 
 // Visual Studio 2012+ or MINGW
 #if ( _MSC_VER >= 1700 ) || defined(MINGW)
