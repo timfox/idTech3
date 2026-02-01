@@ -58,6 +58,12 @@ jobs:
       with:
         submodules: recursive
 
+    - name: Ensure cflux2 sources
+      run: |
+        if [ ! -d src/external/src/cflux2 ]; then
+          git clone --depth 1 https://github.com/timfox/libflux2c src/external/src/cflux2
+        fi
+
     - name: Build Vulkan
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
       env:
@@ -140,6 +146,13 @@ jobs:
       with:
         submodules: recursive
 
+    - name: Ensure cflux2 sources
+      shell: bash
+      run: |
+        if [ ! -d src/external/src/cflux2 ]; then
+          git clone --depth 1 https://github.com/timfox/libflux2c src/external/src/cflux2
+        fi
+
     - name: Build
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
       run: |
@@ -203,6 +216,12 @@ jobs:
     - uses: actions/checkout@v4
       with:
         submodules: recursive
+
+    - name: Ensure cflux2 sources
+      run: |
+        if [ ! -d src/external/src/cflux2 ]; then
+          git clone --depth 1 https://github.com/timfox/libflux2c src/external/src/cflux2
+        fi
 
     - name: Build Vulkan
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip in Release builds
@@ -331,6 +350,13 @@ jobs:
       with:
         submodules: recursive
 
+    - name: Ensure cflux2 sources
+      shell: bash
+      run: |
+        if [ ! -d src/external/src/cflux2 ]; then
+          git clone --depth 1 https://github.com/timfox/libflux2c src/external/src/cflux2
+        fi
+
     - name: Build Vulkan
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
       env:
@@ -398,6 +424,13 @@ jobs:
     - uses: actions/checkout@v4
       with:
         submodules: recursive
+
+    - name: Ensure cflux2 sources
+      shell: bash
+      run: |
+        if [ ! -d src/external/src/cflux2 ]; then
+          git clone --depth 1 https://github.com/timfox/libflux2c src/external/src/cflux2
+        fi
 
     - name: Build Vulkan
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
