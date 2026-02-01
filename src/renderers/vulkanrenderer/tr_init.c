@@ -281,7 +281,7 @@ static void R_ClearSymTables( void )
 
 
 // for modular renderer
-#ifndef USE_RENDERER_DLOPEN
+#ifdef USE_RENDERER_DLOPEN
 void QDECL Com_Error( errorParm_t code, const char *fmt, ... )
 {
 	char buf[ 4096 ];
