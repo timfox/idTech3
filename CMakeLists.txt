@@ -8,6 +8,7 @@ set(CMAKE_C_EXTENSIONS OFF)
 
 option(C_STANDARD_STRICT "Enable the stricter warning set for engine builds" ON)
 option(CI_BUILD "Enable CI-specific behaviors such as warnings-as-errors" OFF)
+option(USE_FLUX "Enable FLUX.2 image generation support" ON)
 
 if(C_STANDARD_STRICT)
   if(MSVC)
@@ -175,7 +176,7 @@ OPTION(USE_MP3 "Enable MP3 codec support" ON)
 OPTION(USE_SYSTEM_JPEG "" OFF)
 OPTION(USE_RENDERER_DLOPEN "" ON)
 OPTION(SKIP_IDPAK_CHECK "Skip checking for original Quake III pak files (pak0.pk3)" ON)
-OPTION(BUILD_FREETYPE "Enable FreeType-powered font rendering / font generation" OFF)
+OPTION(BUILD_FREETYPE "Enable FreeType-powered font rendering / font generation" ON)
 
 SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules)
 
@@ -185,6 +186,11 @@ set(EXTERNAL_INCLUDE "${EXTERNAL_ROOT}/include")
 set(EXTERNAL_SDL_INCLUDE_DIR "${EXTERNAL_SRC}/sdl/include/SDL2")
 set(EXTERNAL_CURL_WINDOWS_INCLUDE_DIR "${EXTERNAL_SRC}/curl/windows/include")
 set(EXTERNAL_JPEG_SRC_DIR "${EXTERNAL_SRC}/jpeg")
+
+# Add cflux2 external library
+if(USE_FLUX)
+	add_subdirectory(src/external/src/cflux2)
+endif()
 
 if(BUILD_FREETYPE)
   find_package(Freetype REQUIRED)
@@ -307,22 +313,39 @@ IF(USE_SYSTEM_JPEG)
 	ADD_LIBRARY(client OBJECT ${CLIENT_SRCS})
 	find_package(JPEG REQUIRED)
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE -DUSE_SYSTEM_JPEG)
+	if(USE_FLUX)
+		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_FLUX)
+		target_include_directories(client PRIVATE ${EXTERNAL_ROOT}/src/cflux2)
+	endif()
 	TARGET_LINK_LIBRARIES(client ${JPEG_LIBRARIES})
 ELSE()
 	AUX_SOURCE_DIRECTORY(${EXTERNAL_JPEG_SRC_DIR} JPEG_SRCS)
 	#ADD_LIBRARY(jpeg ${JPEG_SRCS})
 	#TARGET_LINK_LIBRARIES(client jpeg)
 	ADD_LIBRARY(client OBJECT ${CLIENT_SRCS} ${JPEG_SRCS})
+	if(USE_FLUX)
+		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_FLUX)
+		target_include_directories(client PRIVATE ${EXTERNAL_ROOT}/src/cflux2)
+	endif()
 	# Ensure client can find qcommon headers needed by some client-side modules (eg. mp3)
 	target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR}/src/qcommon ${EXTERNAL_JPEG_SRC_DIR})
 ENDIF()
 
 # renderers
-AUX_SOURCE_DIRECTORY(src/renderers/rendercommon RENDERER_COMMON_SRCS)
+set(RENDERER_COMMON_SRCS
+	src/renderers/rendercommon/tr_font_stub.c  # placeholder, will be replaced below
+	src/renderers/rendercommon/tr_image_bmp.c
+	src/renderers/rendercommon/tr_image_jpg.c
+	src/renderers/rendercommon/tr_image_pcx.c
+	src/renderers/rendercommon/tr_image_png.c
+	src/renderers/rendercommon/tr_image_tga.c
+	src/renderers/rendercommon/tr_noise.c
+)
 IF(BUILD_FREETYPE)
+	list(REMOVE_ITEM RENDERER_COMMON_SRCS src/renderers/rendercommon/tr_font_stub.c)
 	list(APPEND RENDERER_COMMON_SRCS src/renderers/rendercommon/tr_font.c)
 ELSE()
-	list(APPEND RENDERER_COMMON_SRCS src/renderers/rendercommon/tr_font_stub.c)
+	# Keep tr_font_stub.c
 ENDIF()
 AUX_SOURCE_DIRECTORY(src/renderers/openglrenderer RENDERER_GL_SRCS)
 AUX_SOURCE_DIRECTORY(src/renderers/vulkanrenderer RENDERER_VK_SRCS)
@@ -506,6 +529,10 @@ endif()
 
 ADD_EXECUTABLE(${CNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
 TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} qcommon botlib client q3ui)
+if(USE_FLUX)
+	TARGET_COMPILE_DEFINITIONS(${CNAME}${BINEXT} PRIVATE USE_FLUX)
+	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} cflux2)
+endif()
 # Link OpenAL only when enabled
 IF(USE_OPENAL)
 	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} OpenAL::OpenAL)

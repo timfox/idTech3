@@ -13,22 +13,22 @@ Go to [Releases](../../releases) section to download latest binaries for your pl
 **Rendering**:
 * OpenGL renderer
 * Vulkan renderer
-* Physical Based Rendering
+* Physically Based Rendering
+
+**Image Generation**:
+* FLUX.2 C image generation (optional, text-to-image from console with **real-time hot-reloading** and device selection; requires ~16GB model files in game directory; Metal, BLAS, or pure C backend, with graceful fallback)
 
 **Audio**:
-* OpenAL backend with HRTF for true 3D positional audio.
-* Heuristic acoustics: real-time reverb/occlusion using OpenAL EFX.
+* OpenAL backend with HRTF for 3D positional audio
+* Heuristic acoustics: real-time reverb/occlusion using OpenAL EFX
 
 ### Standards
 
 - Engine code targets **C23**, with incremental modernization for safety and portability.
 - Engine-internal code prefers native C `bool`; legacy `qboolean` is retained where required for compatibility.
 
+
 ### Links
 
 * https://idtech3.com
-* https://bitbucket.org/CPMADevs/cnq3
-* https://github.com/ioquake/ioq3
-* https://github.com/kennyalive/Quake-III-Arena-Kenny-Edition
 * https://github.com/jksunny/quake3e
-* https://github.com/OpenArena/engine
