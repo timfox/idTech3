@@ -21,6 +21,12 @@
 #include "jpeglib.h"
 #include "jmemsys.h"		/* import the system-dependent declarations */
 
+#if defined(__GNUC__) || defined(__clang__)
+#define UNUSED_PARAM __attribute__((unused))
+#else
+#define UNUSED_PARAM
+#endif
+
 #ifndef HAVE_STDLIB_H		/* <stdlib.h> should declare malloc(),free() */
 extern void * malloc JPP((size_t size));
 extern void free JPP((void *ptr));
@@ -33,14 +39,17 @@ extern void free JPP((void *ptr));
  */
 
 GLOBAL(void *)
-jpeg_get_small (j_common_ptr cinfo, size_t sizeofobject)
+jpeg_get_small (j_common_ptr cinfo UNUSED_PARAM, size_t sizeofobject)
 {
+  (void)cinfo;
   return (void *) malloc(sizeofobject);
 }
 
 GLOBAL(void)
-jpeg_free_small (j_common_ptr cinfo, void * object, size_t sizeofobject)
+jpeg_free_small (j_common_ptr cinfo UNUSED_PARAM, void * object, size_t sizeofobject UNUSED_PARAM)
 {
+  (void)cinfo;
+  (void)sizeofobject;
   free(object);
 }
 
@@ -53,14 +62,17 @@ jpeg_free_small (j_common_ptr cinfo, void * object, size_t sizeofobject)
  */
 
 GLOBAL(void FAR *)
-jpeg_get_large (j_common_ptr cinfo, size_t sizeofobject)
+jpeg_get_large (j_common_ptr cinfo UNUSED_PARAM, size_t sizeofobject)
 {
+  (void)cinfo;
   return (void FAR *) malloc(sizeofobject);
 }
 
 GLOBAL(void)
-jpeg_free_large (j_common_ptr cinfo, void FAR * object, size_t sizeofobject)
+jpeg_free_large (j_common_ptr cinfo UNUSED_PARAM, void FAR * object, size_t sizeofobject UNUSED_PARAM)
 {
+  (void)cinfo;
+  (void)sizeofobject;
   free(object);
 }
 
@@ -70,7 +82,7 @@ jpeg_free_large (j_common_ptr cinfo, void FAR * object, size_t sizeofobject)
  */
 
 GLOBAL(long)
-jpeg_mem_available (j_common_ptr cinfo, long min_bytes_needed,
+jpeg_mem_available (j_common_ptr cinfo, long min_bytes_needed UNUSED_PARAM,
 		    long max_bytes_needed, long already_allocated)
 {
   (void)min_bytes_needed;
@@ -89,8 +101,8 @@ jpeg_mem_available (j_common_ptr cinfo, long min_bytes_needed,
  */
 
 GLOBAL(void)
-jpeg_open_backing_store (j_common_ptr cinfo, backing_store_ptr info,
-			 long total_bytes_needed)
+jpeg_open_backing_store (j_common_ptr cinfo, backing_store_ptr info UNUSED_PARAM,
+			 long total_bytes_needed UNUSED_PARAM)
 {
   (void)info;
   (void)total_bytes_needed;
@@ -104,15 +116,16 @@ jpeg_open_backing_store (j_common_ptr cinfo, backing_store_ptr info,
  */
 
 GLOBAL(long)
-jpeg_mem_init (j_common_ptr cinfo)
+jpeg_mem_init (j_common_ptr cinfo UNUSED_PARAM)
 {
   (void)cinfo;
   return 0;			/* just set max_memory_to_use to 0 */
 }
 
 GLOBAL(void)
-jpeg_mem_term (j_common_ptr cinfo)
+jpeg_mem_term (j_common_ptr cinfo UNUSED_PARAM)
 {
   (void)cinfo;
   /* no work */
 }
+
