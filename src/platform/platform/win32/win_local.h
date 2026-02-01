@@ -1,6 +1,0 @@
-#ifndef PLATFORM_PLATFORM_WIN32_WIN_LOCAL_H
-#define PLATFORM_PLATFORM_WIN32_WIN_LOCAL_H
-
-#include "../../win32/win_local.h"
-
-#endif // PLATFORM_PLATFORM_WIN32_WIN_LOCAL_H
