@@ -1,0 +1,3 @@
+[submodule "src/external/src/SparseVoxelOctree"]
+	path = src/external/src/SparseVoxelOctree
+	url = https://github.com/AdamYuan/SparseVoxelOctree
