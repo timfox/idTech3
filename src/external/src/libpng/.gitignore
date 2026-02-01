@@ -59,6 +59,7 @@
 /libtool
 /stamp-h1
 pnglibconf.[ch]
+!pnglibconf.h
 pnglibconf.dfn
 pnglibconf.pre
 pngprefix.h
