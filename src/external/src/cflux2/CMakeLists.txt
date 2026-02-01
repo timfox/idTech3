@@ -56,7 +56,8 @@ if(FLUX_USE_MPS)
     # Generate Metal shader header
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/flux_shaders_source.h
-        COMMAND xxd -i ${CMAKE_CURRENT_SOURCE_DIR}/flux_shaders.metal > ${CMAKE_CURRENT_BINARY_DIR}/flux_shaders_source.h
+        COMMAND xxd -i -n flux_shaders_metal ${CMAKE_CURRENT_SOURCE_DIR}/flux_shaders.metal
+                > ${CMAKE_CURRENT_BINARY_DIR}/flux_shaders_source.h
         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/flux_shaders.metal
     )
     list(APPEND LIBFLUX2C_SOURCES ${CMAKE_CURRENT_BINARY_DIR}/flux_shaders_source.h)
@@ -96,7 +97,8 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
         -Wno-unused-function
         -Wno-unused-parameter
         -Wno-cast-qual
-        -Wno-discarded-qualifiers)
+        $<$<C_COMPILER_ID:GNU>:-Wno-discarded-qualifiers>
+        $<$<C_COMPILER_ID:Clang>:-Wno-ignored-qualifiers>)
 endif()
 
 # Set include directories
@@ -132,7 +134,8 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
         -Wno-unused-function
         -Wno-unused-parameter
         -Wno-cast-qual
-        -Wno-discarded-qualifiers
+        $<$<C_COMPILER_ID:GNU>:-Wno-discarded-qualifiers>
+        $<$<C_COMPILER_ID:Clang>:-Wno-ignored-qualifiers>
         -Wno-format-truncation
         -Wno-stringop-truncation)
 endif()

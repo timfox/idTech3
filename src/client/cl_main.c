@@ -5347,6 +5347,7 @@ static void CL_ShowIP_f( void ) {
 FLUX Generation Thread Function
 ==================
 */
+#if defined(USE_SDL)
 static int CL_FluxGenerationThread(void *data) {
 	flux_job_t *job = (flux_job_t *)data;
 	flux_ctx *ctx = NULL;
@@ -5452,8 +5453,8 @@ static int CL_FluxGenerationThread(void *data) {
 
 	// Generate image with error handling
 	Com_Printf("FLUX: About to call flux_generate() with prompt: '%s'\n", job->prompt);
-        Com_Printf("FLUX: Parameters: width=%d, height=%d, steps=%d, seed=%ld\n",
-                params.width, params.height, params.num_steps, params.seed);
+        Com_Printf("FLUX: Parameters: width=%d, height=%d, steps=%d, seed=%lld\n",
+                params.width, params.height, params.num_steps, (long long)params.seed);
 	
 	// Validate context and prompt before generation
 	if (!ctx) {
@@ -5549,6 +5550,7 @@ static int CL_FluxGenerationThread(void *data) {
 
 	return 0;
 }
+#endif
 
 /*
 ==================
@@ -5603,24 +5605,21 @@ static void CL_FluxGenerate_f( void ) {
 
 	// Choose generation mode based on cvar
 	if (cl_flux_async->integer) {
-#if !defined(USE_SDL)
-		Com_Printf(S_COLOR_YELLOW "FLUX: Async generation requires SDL threads; falling back to sync mode\n");
-		goto sync_generation;
-#else
+#if defined(USE_SDL)
 		// Asynchronous (background) mode
 		goto async_generation;
+#else
+		Com_Printf(S_COLOR_YELLOW "FLUX: Async generation requires SDL threads; falling back to sync mode\n");
+		goto sync_generation;
 #endif
 	} else {
 		// Synchronous (blocking) mode - revert to original working implementation
 		goto sync_generation;
 	}
 
+#if defined(USE_SDL)
 async_generation:
 	// Asynchronous generation code
-#if !defined(USE_SDL)
-	Com_Printf(S_COLOR_YELLOW "FLUX: Async generation requires SDL threads; falling back to sync mode\n");
-	goto sync_generation;
-#else
 
 	// Initialize job with safety checks - zero everything first
 	Com_Memset(&flux_job, 0, sizeof(flux_job));
@@ -5772,7 +5771,8 @@ sync_generation:
 		if (result != 0) {
 			Com_Printf(S_COLOR_RED "FLUX: Failed to save image to %s\n", outputPath);
 		} else {
-                        Com_Printf(S_COLOR_GREEN "FLUX: Image saved to %s (seed: %ld)\n", outputPath, params.seed);
+			Com_Printf(S_COLOR_GREEN "FLUX: Image saved to %s (seed: %lld)\n",
+				outputPath, (long long)params.seed);
 
 			// Try to hot-reload the texture if renderer supports it
 			if (re.ReloadTexture) {

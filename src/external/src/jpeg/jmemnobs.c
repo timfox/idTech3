@@ -73,6 +73,7 @@ GLOBAL(long)
 jpeg_mem_available (j_common_ptr cinfo, long min_bytes_needed,
 		    long max_bytes_needed, long already_allocated)
 {
+  (void)min_bytes_needed;
   if (cinfo->mem->max_memory_to_use)
     return cinfo->mem->max_memory_to_use - already_allocated;
 
@@ -91,6 +92,8 @@ GLOBAL(void)
 jpeg_open_backing_store (j_common_ptr cinfo, backing_store_ptr info,
 			 long total_bytes_needed)
 {
+  (void)info;
+  (void)total_bytes_needed;
   ERREXIT(cinfo, JERR_NO_BACKING_STORE);
 }
 
@@ -103,11 +106,13 @@ jpeg_open_backing_store (j_common_ptr cinfo, backing_store_ptr info,
 GLOBAL(long)
 jpeg_mem_init (j_common_ptr cinfo)
 {
+  (void)cinfo;
   return 0;			/* just set max_memory_to_use to 0 */
 }
 
 GLOBAL(void)
 jpeg_mem_term (j_common_ptr cinfo)
 {
+  (void)cinfo;
   /* no work */
 }
