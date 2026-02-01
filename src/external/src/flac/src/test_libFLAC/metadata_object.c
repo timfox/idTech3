@@ -489,6 +489,24 @@ static void pi_set_mime_type(FLAC__StreamMetadata *block, const char *s)
 
 static void pi_set_description(FLAC__StreamMetadata *block, const FLAC__byte *s)
 {
+	/* If the new description pointer is the same as the existing one,
+	 * avoid freeing it before reading from it. Just update lengths.
+	 */
+	if(block->data.picture.description == s) {
+		size_t old_len = strlen((const char *)block->data.picture.description);
+		size_t new_len = old_len; /* same pointer implies same string contents */
+
+		/* Adjust block->length by the difference between new and old lengths.
+		 * Currently this will be zero, but keep the pattern consistent with pi_set_data.
+		 */
+		if(new_len >= old_len)
+			block->length += (new_len - old_len);
+		else
+			block->length -= (old_len - new_len);
+
+		return;
+	}
+
 	if(block->data.picture.description) {
 		block->length -= strlen((const char *)block->data.picture.description);
 		free(block->data.picture.description);
