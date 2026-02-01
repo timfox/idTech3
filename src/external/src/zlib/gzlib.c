@@ -5,6 +5,16 @@
 
 #include "gzguts.h"
 
+#if defined(__APPLE__)
+#  include <unistd.h>
+#  if !defined(HAVE_LSEEK64)
+static inline off_t lseek64(int fd, off_t offset, int whence)
+{
+    return lseek(fd, offset, whence);
+}
+#  endif
+#endif
+
 #if defined(_WIN32) && !defined(__BORLANDC__)
 #  define LSEEK _lseeki64
 #else
