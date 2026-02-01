@@ -42,7 +42,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //#pragma warning( push )
 //#endif
 #include "../../qcommon/q_shared.h"
-#include "../../audio/snd_local.h"
+#include "../snd_local.h"
 
 #include <windows.h>
 //#if defined (_MSC_VER) && (_MSC_VER >= 1200)

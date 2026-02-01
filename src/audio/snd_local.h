@@ -19,6 +19,9 @@ along with Quake III Arena source code; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
+#ifndef AUDIO_SND_LOCAL_H
+#define AUDIO_SND_LOCAL_H
+
 // snd_local.h -- private sound definitions
 
 
@@ -318,3 +321,5 @@ void S_Base_UpdateEntityPosition( int entityNum, const vec3_t origin );
 void S_Base_Respatialize( int entityNum, const vec3_t head, vec3_t axis[3], int inwater );
 void S_AddLoopSounds( void );
 portable_samplepair_t *S_GetRawSamplePointer( void );
+
+#endif // AUDIO_SND_LOCAL_H
