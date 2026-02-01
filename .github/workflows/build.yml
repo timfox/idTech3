@@ -64,6 +64,7 @@ jobs:
         mkdir -p build-vk-${{ matrix.btype }}
         cmake -S . -B build-vk-${{ matrix.btype }} -G Ninja \
           -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
+          -DCI_BUILD=OFF \
           -DUSE_STB_TRUETYPE=ON \
           -DBUILD_FREETYPE=ON \
           -DENABLE_FORTIFY_SOURCE=OFF \
@@ -85,6 +86,7 @@ jobs:
         mkdir -p build-gl-${{ matrix.btype }}
         cmake -S . -B build-gl-${{ matrix.btype }} -G Ninja \
           -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
+          -DCI_BUILD=OFF \
           -DUSE_STB_TRUETYPE=ON \
           -DBUILD_FREETYPE=ON \
           -DENABLE_FORTIFY_SOURCE=OFF \
@@ -207,6 +209,7 @@ jobs:
         mkdir -p build-vk-${{ matrix.btype }}
         cmake -S . -B build-vk-${{ matrix.btype }} \
           -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
+          -DCI_BUILD=OFF \
           -DUSE_STB_TRUETYPE=ON \
           -DBUILD_FREETYPE=ON \
           -DBUILD_FREETYPE=ON \
@@ -230,6 +233,7 @@ jobs:
         mkdir -p build-gl-${{ matrix.btype }}
         cmake -S . -B build-gl-${{ matrix.btype }} \
           -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
+          -DCI_BUILD=OFF \
           -DUSE_STB_TRUETYPE=ON \
           -DBUILD_FREETYPE=ON \
           -DBUILD_FREETYPE=ON \
@@ -329,6 +333,7 @@ jobs:
         mkdir -p build-vk-${{ matrix.btype }}
         cmake -S . -B build-vk-${{ matrix.btype }} \
           -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
+          -DCI_BUILD=OFF \
           -DUSE_STB_TRUETYPE=ON \
           -DENABLE_FORTIFY_SOURCE=OFF \
           -DENABLE_ASAN=OFF \
@@ -349,6 +354,7 @@ jobs:
         mkdir -p build-gl-${{ matrix.btype }}
         cmake -S . -B build-gl-${{ matrix.btype }} \
           -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
+          -DCI_BUILD=OFF \
           -DUSE_STB_TRUETYPE=ON \
           -DENABLE_FORTIFY_SOURCE=OFF \
           -DENABLE_ASAN=OFF \
@@ -398,6 +404,7 @@ jobs:
         mkdir -p build-vk-${{ matrix.btype }}
         cmake -S . -B build-vk-${{ matrix.btype }} \
           -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
+          -DCI_BUILD=OFF \
           -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch == 'aarch64' && 'arm64' || matrix.arch }} \
           -DSDL2_PATH="${SDL2_PREFIX}" \
           -DSDL2_INCLUDE_DIR="${SDL2_PREFIX}/include" \
@@ -430,6 +437,7 @@ jobs:
         mkdir -p build-gl-${{ matrix.btype }}
         cmake -S . -B build-gl-${{ matrix.btype }} \
           -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
+          -DCI_BUILD=OFF \
           -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch == 'aarch64' && 'arm64' || matrix.arch }} \
           -DSDL2_PATH="${SDL2_PREFIX}" \
           -DSDL2_INCLUDE_DIR="${SDL2_PREFIX}/include" \

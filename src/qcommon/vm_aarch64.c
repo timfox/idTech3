@@ -40,6 +40,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <sys/socket.h>
 #endif
 
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wgnu-binary-literal"
+#pragma clang diagnostic ignored "-Wgnu-zero-variadic-macro-arguments"
+#pragma clang diagnostic ignored "-Wsign-compare"
+#endif
+
 #if defined(USE_IPV6) && !defined(IPV6_JOIN_GROUP) && !defined(_WIN32)
 struct ipv6_mreq {
 	struct in6_addr ipv6mr_multiaddr;
@@ -3579,3 +3586,7 @@ int32_t VM_CallCompiled( vm_t *vm, int nargs, int32_t *args )
 
 	return opStack[1];
 }
+
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
