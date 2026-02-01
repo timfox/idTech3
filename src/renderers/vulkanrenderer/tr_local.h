@@ -1644,6 +1644,7 @@ void		R_GammaCorrect( byte *buffer, int bufSize );
 void		R_ColorShiftLightingBytes( const byte in[4], byte out[4], qboolean hasAlpha );
 
 void	R_ImageList_f( void );
+qboolean R_ReloadTexture( const char *name );
 void	R_SkinList_f( void );
 
 void	R_InitFogTable( void );

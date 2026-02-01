@@ -928,7 +928,7 @@ static void RB_SurfaceFace( const srfSurfaceFace_t *surf ) {
 			tess.texCoords[1][ndx][0] = v[5];
 			tess.texCoords[1][ndx][1] = v[6];
 		}
-		* ( unsigned int * ) &tess.vertexColors[ndx] = * ( unsigned int * ) &v[7];
+		memcpy( &tess.vertexColors[ndx], &v[7], sizeof( tess.vertexColors[ndx] ) );
 #ifdef USE_LEGACY_DLIGHTS
 		tess.vertexDlightBits[ndx] = dlightBits;
 #endif
@@ -1315,6 +1315,7 @@ Entities that have a single procedurally generated surface
 ====================
 */
 static void RB_SurfaceEntity( const surfaceType_t *surfType ) {
+	(void)surfType;
 #ifdef USE_VBO
 	VBO_Flush();
 #endif
@@ -1343,6 +1344,7 @@ static void RB_SurfaceEntity( const surfaceType_t *surfType ) {
 
 
 static void RB_SurfaceBad( const surfaceType_t *surfType ) {
+	(void)surfType;
 	ri.Printf( PRINT_ALL, "Bad surface tesselated.\n" );
 }
 
@@ -1359,6 +1361,7 @@ static void RB_SurfaceFlare( srfFlare_t *surf ) {
 
 
 static void RB_SurfaceSkip( void *surf ) {
+	(void)surf;
 }
 
 

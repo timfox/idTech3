@@ -1806,3 +1806,57 @@ void	R_SkinList_f( void ) {
 	}
 	ri.Printf (PRINT_ALL, "------------------\n");
 }
+
+/*
+================
+R_ReloadTexture
+
+Reloads a texture from disk if it exists
+================
+*/
+qboolean R_ReloadTexture( const char *name ) {
+	image_t *image;
+	int hash;
+	byte *pic;
+	int width, height;
+
+	if (!name || !name[0]) {
+		return qfalse;
+	}
+
+	hash = generateHashValue(name);
+	for (image = hashTable[hash]; image; image = image->next) {
+		if (!strcmp(name, image->imgName)) {
+			// Found the image, try to reload it
+			const char *localName = R_LoadImage(name, &pic, &width, &height);
+			if (localName && pic) {
+				// Check if dimensions changed
+				if (width != image->width || height != image->height) {
+					ri.Printf(PRINT_DEVELOPER, "Cannot reload texture %s: dimensions changed (%dx%d -> %dx%d)\n",
+						name, image->width, image->height, width, height);
+					ri.Free(pic);
+					return qfalse;
+				}
+
+				// Reload the texture data
+				qglBindTexture(GL_TEXTURE_2D, image->texnum);
+
+				// Upload the new data (no mipmaps for reload)
+				qglTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height,
+					GL_RGBA, GL_UNSIGNED_BYTE, pic);
+
+				qglBindTexture(GL_TEXTURE_2D, 0);
+
+				ri.Free(pic);
+				ri.Printf(PRINT_DEVELOPER, "Reloaded texture: %s\n", name);
+				return qtrue;
+			} else {
+				ri.Printf(PRINT_DEVELOPER, "Failed to reload texture: %s\n", name);
+				return qfalse;
+			}
+		}
+	}
+
+	ri.Printf(PRINT_DEVELOPER, "Texture not found for reload: %s\n", name);
+	return qfalse;
+}

@@ -186,6 +186,19 @@ for sofile in "$BUILD_DIR"/idtech3_*_*.so; do
 done
 shopt -u nullglob
 
+# FLUX CLI helper (external generation)
+if [ -f "$BUILD_DIR/flux_cli" ]; then
+  cp -f "$BUILD_DIR/flux_cli" "$RELEASE_DIR/flux_cli"
+  echo "Copied flux_cli -> $RELEASE_DIR/flux_cli"
+elif [ -f "$BUILD_DIR/src/external/src/cflux2/flux_cli" ]; then
+  cp -f "$BUILD_DIR/src/external/src/cflux2/flux_cli" "$RELEASE_DIR/flux_cli"
+  echo "Copied flux_cli -> $RELEASE_DIR/flux_cli"
+fi
+if [ -f "$BUILD_DIR/flux_cli.x86_64" ]; then
+  cp -f "$BUILD_DIR/flux_cli.x86_64" "$RELEASE_DIR/flux_cli.x86_64"
+  echo "Copied flux_cli -> $RELEASE_DIR/flux_cli.x86_64"
+fi
+
 # ImGui shared
 if [ -f "$BUILD_DIR/libimgui_shared.so" ]; then
   cp -f "$BUILD_DIR/libimgui_shared.so" "$RELEASE_DIR/"

@@ -55,8 +55,6 @@ jobs:
         cache: false
 
     - uses: actions/checkout@v4
-      with:
-        submodules: recursive
 
     - name: Build Vulkan
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
@@ -66,6 +64,7 @@ jobs:
         mkdir -p build-vk-${{ matrix.btype }}
         cmake -S . -B build-vk-${{ matrix.btype }} -G Ninja \
           -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
+          -DCI_BUILD=OFF \
           -DUSE_STB_TRUETYPE=ON \
           -DBUILD_FREETYPE=ON \
           -DENABLE_FORTIFY_SOURCE=OFF \
@@ -87,6 +86,7 @@ jobs:
         mkdir -p build-gl-${{ matrix.btype }}
         cmake -S . -B build-gl-${{ matrix.btype }} -G Ninja \
           -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
+          -DCI_BUILD=OFF \
           -DUSE_STB_TRUETYPE=ON \
           -DBUILD_FREETYPE=ON \
           -DENABLE_FORTIFY_SOURCE=OFF \
@@ -137,8 +137,6 @@ jobs:
     - uses: microsoft/setup-msbuild@v2
 
     - uses: actions/checkout@v4
-      with:
-        submodules: recursive
 
     - name: Build
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
@@ -201,8 +199,6 @@ jobs:
         fi
 
     - uses: actions/checkout@v4
-      with:
-        submodules: recursive
 
     - name: Build Vulkan
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip in Release builds
@@ -213,6 +209,7 @@ jobs:
         mkdir -p build-vk-${{ matrix.btype }}
         cmake -S . -B build-vk-${{ matrix.btype }} \
           -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
+          -DCI_BUILD=OFF \
           -DUSE_STB_TRUETYPE=ON \
           -DBUILD_FREETYPE=ON \
           -DBUILD_FREETYPE=ON \
@@ -236,6 +233,7 @@ jobs:
         mkdir -p build-gl-${{ matrix.btype }}
         cmake -S . -B build-gl-${{ matrix.btype }} \
           -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
+          -DCI_BUILD=OFF \
           -DUSE_STB_TRUETYPE=ON \
           -DBUILD_FREETYPE=ON \
           -DBUILD_FREETYPE=ON \
@@ -277,8 +275,6 @@ jobs:
 
     - uses: actions/checkout@v4
       if: false
-      with:
-        submodules: recursive
 
     - name: Build ${{ matrix.arch }}
       #if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
@@ -328,8 +324,6 @@ jobs:
         sudo apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev
 
     - uses: actions/checkout@v4
-      with:
-        submodules: recursive
 
     - name: Build Vulkan
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
@@ -339,6 +333,7 @@ jobs:
         mkdir -p build-vk-${{ matrix.btype }}
         cmake -S . -B build-vk-${{ matrix.btype }} \
           -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
+          -DCI_BUILD=OFF \
           -DUSE_STB_TRUETYPE=ON \
           -DENABLE_FORTIFY_SOURCE=OFF \
           -DENABLE_ASAN=OFF \
@@ -359,6 +354,7 @@ jobs:
         mkdir -p build-gl-${{ matrix.btype }}
         cmake -S . -B build-gl-${{ matrix.btype }} \
           -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
+          -DCI_BUILD=OFF \
           -DUSE_STB_TRUETYPE=ON \
           -DENABLE_FORTIFY_SOURCE=OFF \
           -DENABLE_ASAN=OFF \
@@ -396,8 +392,6 @@ jobs:
       run: brew install coreutils sdl2 openal-soft cmake ninja freetype
 
     - uses: actions/checkout@v4
-      with:
-        submodules: recursive
 
     - name: Build Vulkan
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
@@ -410,8 +404,11 @@ jobs:
         mkdir -p build-vk-${{ matrix.btype }}
         cmake -S . -B build-vk-${{ matrix.btype }} \
           -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
+          -DCI_BUILD=OFF \
           -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch == 'aarch64' && 'arm64' || matrix.arch }} \
           -DSDL2_PATH="${SDL2_PREFIX}" \
+          -DSDL2_INCLUDE_DIR="${SDL2_PREFIX}/include" \
+          -DSDL2_LIBRARY="${SDL2_PREFIX}/lib/libSDL2.dylib" \
           -DOPENAL_INCLUDE_DIR="${OPENAL_PREFIX}/include" \
           -DOPENAL_LIBRARY="${OPENAL_PREFIX}/lib/libopenal.dylib" \
           -DUSE_STB_TRUETYPE=ON \
@@ -440,8 +437,11 @@ jobs:
         mkdir -p build-gl-${{ matrix.btype }}
         cmake -S . -B build-gl-${{ matrix.btype }} \
           -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
+          -DCI_BUILD=OFF \
           -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch == 'aarch64' && 'arm64' || matrix.arch }} \
           -DSDL2_PATH="${SDL2_PREFIX}" \
+          -DSDL2_INCLUDE_DIR="${SDL2_PREFIX}/include" \
+          -DSDL2_LIBRARY="${SDL2_PREFIX}/lib/libSDL2.dylib" \
           -DOPENAL_INCLUDE_DIR="${OPENAL_PREFIX}/include" \
           -DOPENAL_LIBRARY="${OPENAL_PREFIX}/lib/libopenal.dylib" \
           -DUSE_STB_TRUETYPE=ON \

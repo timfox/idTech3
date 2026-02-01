@@ -41,6 +41,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <sys/mman.h> // for PROT_ stuff
 #endif
 
+
 /* need this on NX enabled systems (i386 with PAE kernel or noexec32=on x86_64) */
 #if defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__APPLE__)
 #define VM_X86_MMAP
@@ -221,8 +222,11 @@ static void Emit4( int32_t v );
 static void Emit8( int64_t v );
 #endif
 static void emit_modrm_offset( uint32_t reg, int32_t offset );
+#if !idx64
 static void emit_op_reg_offset( int prefix, int opcode, uint32_t reg, int32_t offset );
 static void emit_op_reg_index_offset( int opcode, uint32_t reg, uint32_t index, int scale, int32_t offset );
+#endif
+#if !idx64
 static void emit_cmp_rx_mem( uint32_t reg, int32_t offset );
 static void emit_jump_index_offset( int32_t offset, uint32_t index );
 static void emit_call_index_offset( int32_t offset, uint32_t index );
@@ -231,6 +235,7 @@ static void emit_store_rx_offset( uint32_t reg, int32_t offset );
 static void emit_load_rx_offset( uint32_t reg, int32_t offset );
 static void emit_pushad( void );
 static void emit_popad( void );
+#endif
 
 // DROP is used with and without variadic args.
 // Prefer C23 __VA_OPT__ when available, otherwise fall back to widely-supported
@@ -489,7 +494,7 @@ static void emit_op_reg( int prefix, int opcode, uint32_t base, uint32_t reg )
 	emit_modrm_reg( base, reg );
 }
 
-#if 1
+#if !idx64
 // offset is RIP-related in 64-bit mode
 static void emit_op_reg_offset( int prefix, int opcode, uint32_t reg, int32_t offset )
 {
@@ -561,7 +566,7 @@ static void emit_op_reg_base_index( int prefix, int opcode, uint32_t reg, uint32
 }
 
 
-#if 1
+#if !idx64
 static void emit_op_reg_index_offset( int opcode, uint32_t reg, uint32_t index, int scale, int32_t offset )
 {
 	modrm_t modrm;
@@ -666,7 +671,7 @@ static void emit_cmp_rx( uint32_t base, uint32_t reg )
 	emit_op_reg( 0, 0x39, base, reg );
 }
 
-#if 1
+#if !idx64
 static void emit_cmp_rx_mem( uint32_t reg, int32_t offset )
 {
 	emit_op_reg_offset( 0, 0x3B, reg, offset );
@@ -803,7 +808,7 @@ static void emit_load4( uint32_t reg, uint32_t base, int32_t offset )
 	emit_op_reg_base_offset( 0, 0x8B, reg, base, offset );
 }
 
-#if 1
+#if !idx64
 static void emit_load_rx_offset( uint32_t reg, int32_t offset )
 {
 	emit_op_reg_offset( 0, 0x8B, reg, offset );
@@ -848,7 +853,7 @@ static void emit_store_rx( uint32_t reg, uint32_t base, int32_t offset )
 	emit_op_reg_base_offset( 0, 0x89, reg, base, offset );
 }
 
-#if 1
+#if !idx64
 static void emit_store_rx_offset( uint32_t reg, int32_t offset )
 {
 	emit_op_reg_offset( 0, 0x89, reg, offset );
@@ -920,52 +925,68 @@ static void emit_store1_index( uint32_t reg, uint32_t base, uint32_t index )
 	emit_op_reg_base_index( 0, 0x88, reg, base, index, 1, 0 );
 }
 
+#if idx64
 static void emit_jump_index( uint32_t base, uint32_t index )
 {
 	emit_op_reg_base_index( 0, 0xFF, 0x4, base, index, sizeof( void* ), 0 );
 }
+#endif
 
+#if !idx64
 static void emit_jump_index_offset( int32_t offset, uint32_t index )
 {
 	emit_op_reg_index_offset( 0xFF, 0x4, index, sizeof( void * ), offset );
 }
+#endif
 
+#if idx64
 static void emit_call_index( uint32_t base, uint32_t index )
 {
 	emit_op_reg_base_index( 0, 0xFF, 0x2, base, index, sizeof( void* ), 0 );
 }
+#endif
 
+#if !idx64
 static void emit_call_index_offset( int32_t offset, uint32_t index )
 {
 	emit_op_reg_index_offset( 0xFF, 0x2, index, sizeof( void * ), offset );
 }
+#endif
 
+#if !idx64
 static void emit_call_indir( int32_t offset )
 {
 	Emit1( 0xFF );
 	Emit1( 0x15 );
 	Emit4( offset );
 }
+#endif
 
+#if idx64
 static void emit_call_rx( uint32_t reg )
 {
 	emit_op_reg( 0, 0xFF, reg & ~R_REX, 0x2 );
 }
+#endif
 
 static void emit_add_rx( uint32_t base, uint32_t reg )
 {
 	emit_op_reg( 0, 0x01, base, reg );
 }
 
+#if !idx64
 static void emit_pushad( void )
 {
 	Emit1( 0x60 );
 }
+#endif
 
+#if !idx64
 static void emit_popad( void )
 {
 	Emit1( 0x61 );
 }
+#endif
 
 static void emit_push( uint32_t reg )
 {
@@ -2857,7 +2878,8 @@ static void Emit4( int32_t v )
 }
 
 
-void Emit8( int64_t v )
+#if idx64
+static void Emit8( int64_t v )
 {
 	Emit1( ( v >> 0 ) & 255 );
 	Emit1( ( v >> 8 ) & 255 );
@@ -2868,6 +2890,7 @@ void Emit8( int64_t v )
 	Emit1( ( v >> 48 ) & 255 );
 	Emit1( ( v >> 56 ) & 255 );
 }
+#endif
 
 
 static int Hex( int c )

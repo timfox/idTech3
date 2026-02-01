@@ -22,6 +22,13 @@
 
 #include "vorbis/codec.h"
 
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable: 4244) // conversion from double/ogg_int64_t to float/int
+#pragma warning(disable: 4267) // conversion from size_t to long
+#pragma warning(disable: 4101) // unreferenced local variable
+#endif
+
 /* we don't need or want the static callback symbols here */
 #define OV_EXCLUDE_STATIC_CALLBACKS
 #include "vorbis/vorbisfile.h"
@@ -2425,3 +2432,7 @@ int ov_time_seek_lap(OggVorbis_File *vf,double pos){
 int ov_time_seek_page_lap(OggVorbis_File *vf,double pos){
   return _ov_d_seek_lap(vf,pos,ov_time_seek_page);
 }
+
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif

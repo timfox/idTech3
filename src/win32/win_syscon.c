@@ -1042,13 +1042,13 @@ void Conbuf_AppendText( const char *msg )
 	bufLen = b - buffer;
 
 	// not enough space in buffer -> flush
-	if ( bufLen + conBufPos >= sizeof( conBuffer )-1 ) {
+	if ( (size_t)bufLen + (size_t)conBufPos >= sizeof( conBuffer ) - 1 ) {
 		AddBufferText( conBuffer, conBufPos );
 		conBufPos = 0;
 	}
 
 	// new message is too long -> flush
-	if ( bufLen >= sizeof( conBuffer )-1 ) {
+	if ( (size_t)bufLen >= sizeof( conBuffer ) - 1 ) {
 		if ( conBufPos ) {
 			AddBufferText( conBuffer, conBufPos );
 			conBufPos = 0;
