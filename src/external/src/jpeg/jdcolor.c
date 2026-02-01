@@ -602,6 +602,7 @@ cmyk_yk_convert (j_decompress_ptr cinfo,
 METHODDEF(void)
 start_pass_dcolor (j_decompress_ptr cinfo)
 {
+  (void)cinfo;
   /* no work needed */
 }
 
