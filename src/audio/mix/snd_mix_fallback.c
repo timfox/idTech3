@@ -2,8 +2,8 @@
  * Provides a weak C implementation that forwards to the portable C writer.
  * If an optimized assembly version is present, the strong symbol will override this.
  */
-#include "client.h"
-#include "snd_local.h"
+#include "../client/client.h"
+#include "../snd_local.h"
 
 /* Globals used by the portable writer (defined in snd_mix.c) */
 extern int *snd_p;
