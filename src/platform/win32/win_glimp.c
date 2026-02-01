@@ -35,7 +35,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ** related functions that are relevant ONLY to win_glimp.c
 */
 
-#include "../client/client.h"
+#include "../../client/client.h"
 #include "resource.h"
 #include "win_local.h"
 #include "glw_win.h"
