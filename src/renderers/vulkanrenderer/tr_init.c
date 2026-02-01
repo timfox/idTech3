@@ -109,6 +109,13 @@ cvar_t	*r_bloom_threshold;
 cvar_t	*r_bloom_intensity;
 cvar_t	*r_bloom_threshold_mode;
 cvar_t	*r_bloom_modulate;
+cvar_t	*r_ssao;
+cvar_t	*r_ssaoRadius;
+cvar_t	*r_ssaoBias;
+cvar_t	*r_ssaoIntensity;
+cvar_t	*r_ssaoPower;
+cvar_t	*r_ssaoSamples;
+cvar_t	*r_ssaoBlurRadius;
 cvar_t	*r_renderWidth;
 cvar_t	*r_renderHeight;
 cvar_t	*r_renderScale;
@@ -1878,6 +1885,37 @@ static void R_Register( void )
 	r_bloom = ri.Cvar_Get( "r_bloom", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_bloom, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription(r_bloom, "Enables bloom post-processing effect. Requires \\r_fbo 1.");
+
+	r_ssao = ri.Cvar_Get( "r_ssao", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_ssao, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_ssao, "Enables screen-space ambient occlusion (SSAO). Requires \\r_fbo 1." );
+
+	r_ssaoRadius = ri.Cvar_Get( "r_ssaoRadius", "16.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_ssaoRadius, "1.0", "128.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_ssaoRadius, "SSAO sample radius in view space units (higher = broader occlusion)." );
+
+	r_ssaoBias = ri.Cvar_Get( "r_ssaoBias", "0.5", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_ssaoBias, "0.0", "4.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_ssaoBias, "SSAO depth bias to reduce self-occlusion." );
+
+	r_ssaoIntensity = ri.Cvar_Get( "r_ssaoIntensity", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_ssaoIntensity, "0.0", "4.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_ssaoIntensity, "SSAO intensity multiplier." );
+
+	r_ssaoPower = ri.Cvar_Get( "r_ssaoPower", "1.5", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_ssaoPower, "0.5", "4.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_ssaoPower, "SSAO contrast shaping power (higher = darker occlusion)." );
+
+	r_ssaoSamples = ri.Cvar_Get( "r_ssaoSamples", "12", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_ssaoSamples, "4", "32", CV_INTEGER );
+	ri.Cvar_SetDescription( r_ssaoSamples, "SSAO sample count (higher = smoother, slower)." );
+
+	r_ssaoBlurRadius = ri.Cvar_Get( "r_ssaoBlurRadius", "2", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_ssaoBlurRadius, "0", "8", CV_INTEGER );
+	ri.Cvar_SetDescription( r_ssaoBlurRadius, "SSAO blur radius in pixels (0 disables blur)." );
+	if ( r_ssao->integer ) {
+		ri.Printf( PRINT_ALL, "SSAO enabled.\n" );
+	}
 
 	r_ext_multisample = ri.Cvar_Get( "r_ext_multisample", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_multisample, "0", "64", CV_INTEGER );
