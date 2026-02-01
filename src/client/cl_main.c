@@ -25,7 +25,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <limits.h>
 #ifdef USE_FLUX
 #include "flux.h"
+#if defined(USE_SDL)
 #include <SDL2/SDL_thread.h>
+#else
+typedef struct SDL_Thread SDL_Thread;
+#endif
 #endif
 
 cvar_t	*cl_noprint;
@@ -4395,10 +4399,12 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 
 #ifdef USE_FLUX
 	// Clean up any running FLUX jobs
+#if defined(USE_SDL)
 	if (flux_job.thread) {
 		SDL_WaitThread(flux_job.thread, NULL);
 		flux_job.thread = NULL;
 	}
+#endif
 	if (flux_job.result) {
 		flux_image_free(flux_job.result);
 		flux_job.result = NULL;
@@ -5597,8 +5603,13 @@ static void CL_FluxGenerate_f( void ) {
 
 	// Choose generation mode based on cvar
 	if (cl_flux_async->integer) {
+#if !defined(USE_SDL)
+		Com_Printf(S_COLOR_YELLOW "FLUX: Async generation requires SDL threads; falling back to sync mode\n");
+		goto sync_generation;
+#else
 		// Asynchronous (background) mode
 		goto async_generation;
+#endif
 	} else {
 		// Synchronous (blocking) mode - revert to original working implementation
 		goto sync_generation;
@@ -5606,6 +5617,10 @@ static void CL_FluxGenerate_f( void ) {
 
 async_generation:
 	// Asynchronous generation code
+#if !defined(USE_SDL)
+	Com_Printf(S_COLOR_YELLOW "FLUX: Async generation requires SDL threads; falling back to sync mode\n");
+	goto sync_generation;
+#else
 
 	// Initialize job with safety checks - zero everything first
 	Com_Memset(&flux_job, 0, sizeof(flux_job));
@@ -5678,6 +5693,7 @@ async_generation:
 		flux_job.model_path, flux_job.width, flux_job.height, flux_job.steps, flux_job.seed);
 	Com_Printf("FLUX: Use 'flux_status' to check progress, 'flux_view <filename>' when complete\n");
 	return;
+#endif
 
 sync_generation:
 	// Synchronous (blocking) mode - original working implementation
@@ -5829,6 +5845,7 @@ static void CL_FluxCancel_f( void ) {
 		flux_job.status = FLUX_JOB_FAILED;
 		Q_strncpyz(flux_job.error_msg, "Generation cancelled by user", sizeof(flux_job.error_msg));
 
+#if defined(USE_SDL)
 		if (flux_job.thread) {
 			// Wait for thread to finish
 			int thread_result = 0;
@@ -5836,6 +5853,7 @@ static void CL_FluxCancel_f( void ) {
 			flux_job.thread = NULL;
 			Com_Printf("FLUX: Thread cancelled (exit code: %d)\n", thread_result);
 		}
+#endif
 
 		// Clean up any allocated resources
 		if (flux_job.result) {
@@ -6007,10 +6025,12 @@ static void CL_FluxView_f( void ) {
 			flux_image_free(flux_job.result);
 			flux_job.result = NULL;
 		}
+#if defined(USE_SDL)
 		if (flux_job.thread) {
 			SDL_WaitThread(flux_job.thread, NULL);
 			flux_job.thread = NULL;
 		}
+#endif
 		flux_job.status = FLUX_JOB_IDLE;
 		Com_Printf(S_COLOR_GREEN "FLUX: Job completed and cleaned up\n");
 	}

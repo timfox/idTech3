@@ -1686,9 +1686,8 @@ static uint32_t alloc_sx_const( uint32_t pref, uint32_t imm )
 }
 
 
-static uint32_t dyn_alloc_rx( uint32_t pref )
+static uint32_t dyn_alloc_rx( uint32_t pref UNUSED_VAR )
 {
-	(void)pref;
 	const uint32_t _rx_mask = build_rx_mask();
 	const uint32_t mask = _rx_mask | build_opstack_mask( TYPE_RX );
 	const reg_t *reg, *used = NULL;
@@ -1775,9 +1774,8 @@ static uint32_t alloc_rx( uint32_t pref )
 }
 
 
-static uint32_t dyn_alloc_sx( uint32_t pref )
+static uint32_t dyn_alloc_sx( uint32_t pref UNUSED_VAR )
 {
-	(void)pref;
 	const uint32_t _sx_mask = build_sx_mask();
 	const uint32_t mask = _sx_mask | build_opstack_mask( TYPE_SX );
 	const reg_t *reg, *used = NULL;
