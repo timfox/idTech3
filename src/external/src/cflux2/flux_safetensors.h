@@ -46,6 +46,10 @@ typedef struct {
     char *header_json;
     int num_tensors;
     safetensor_t tensors[SAFETENSORS_MAX_TENSORS];
+#ifdef _WIN32
+    void *mapping_handle;
+    void *file_handle;
+#endif
 } safetensors_file_t;
 
 /* Open a safetensors file (memory-mapped) */

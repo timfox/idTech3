@@ -8,8 +8,13 @@
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <sys/mman.h>
 #include <sys/stat.h>
+#if defined(_WIN32)
+#include <windows.h>
+#include <io.h>
+#else
+#include <sys/mman.h>
+#endif
 
 /* Minimal JSON parser for safetensors header */
 
@@ -200,34 +205,109 @@ static int parse_header(safetensors_file_t *sf) {
     return 0;
 }
 
+static void *safetensors_platform_mmap(safetensors_file_t *sf, int fd, size_t file_size) {
+static void *safetensors_mmap_fd(safetensors_file_t *sf, int fd, size_t file_size) {
+#if defined(_WIN32)
+    sf->file_handle = (void *)_get_osfhandle(fd);
+    if (sf->file_handle == (void *)-1) {
+        return NULL;
+    }
+    DWORD high = (DWORD)(file_size >> 32);
+    DWORD low = (DWORD)(file_size & 0xFFFFFFFF);
+    sf->mapping_handle = CreateFileMapping((HANDLE)sf->file_handle, NULL, PAGE_READONLY, high, low, NULL);
+    if (!sf->mapping_handle) {
+        return NULL;
+    }
+    return MapViewOfFile(sf->mapping_handle, FILE_MAP_READ, 0, 0, file_size);
+#else
+    return mmap(NULL, file_size, PROT_READ, MAP_PRIVATE, fd, 0);
+#endif
+}
+}
+
+static int64_t safetensors_get_file_size(int fd) {
+    struct stat st;
+    if (fstat(fd, &st) < 0) {
+        return -1;
+    }
+    return (int64_t)st.st_size;
+}
+
 safetensors_file_t *safetensors_open(const char *path) {
+#if defined(_WIN32)
+    HANDLE fh = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (fh == INVALID_HANDLE_VALUE) {
+        fprintf(stderr, "safetensors_open: CreateFile failed\n");
+        return NULL;
+    }
+    LARGE_INTEGER size_li;
+    if (!GetFileSizeEx(fh, &size_li)) {
+        CloseHandle(fh);
+        fprintf(stderr, "safetensors_open: GetFileSizeEx failed\n");
+        return NULL;
+    }
+    size_t file_size = (size_t)size_li.QuadPart;
+    if (file_size < 8) {
+        fprintf(stderr, "safetensors_open: file too small\n");
+        CloseHandle(fh);
+        return NULL;
+    }
+    safetensors_file_t *sf = calloc(1, sizeof(safetensors_file_t));
+    if (!sf) {
+        CloseHandle(fh);
+        return NULL;
+    }
+    int crt_fd = _open_osfhandle((intptr_t)fh, _O_RDONLY);
+    if (crt_fd < 0) {
+        CloseHandle(fh);
+        free(sf);
+        return NULL;
+    }
+    void *data = safetensors_mmap_fd(sf, crt_fd, file_size);
+    _close(crt_fd);
+    if (!data) {
+        CloseHandle(fh);
+        free(sf);
+        return NULL;
+    }
+    sf->file_handle = (void *)fh;
+#else
     int fd = open(path, O_RDONLY);
     if (fd < 0) {
         perror("safetensors_open: open failed");
         return NULL;
     }
 
-    struct stat st;
-    if (fstat(fd, &st) < 0) {
+    int64_t size = safetensors_get_file_size(fd);
+    if (size < 0) {
         perror("safetensors_open: fstat failed");
         close(fd);
         return NULL;
     }
 
-    size_t file_size = (size_t)st.st_size;
+    size_t file_size = (size_t)size;
     if (file_size < 8) {
         fprintf(stderr, "safetensors_open: file too small\n");
         close(fd);
         return NULL;
     }
 
-    void *data = mmap(NULL, file_size, PROT_READ, MAP_PRIVATE, fd, 0);
-    close(fd);
-
-    if (data == MAP_FAILED) {
-        perror("safetensors_open: mmap failed");
+    safetensors_file_t *sf = calloc(1, sizeof(safetensors_file_t));
+    if (!sf) {
+        close(fd);
         return NULL;
     }
+
+    void *data = safetensors_mmap_fd(sf, fd, file_size);
+    close(fd);
+    if (data == MAP_FAILED) {
+        perror("safetensors_open: mmap failed");
+        free(sf);
+        return NULL;
+    }
+#endif
+
+
 
     /* Read header size (8-byte little-endian) */
     uint64_t header_size = 0;
@@ -271,7 +351,22 @@ safetensors_file_t *safetensors_open(const char *path) {
 
 void safetensors_close(safetensors_file_t *sf) {
     if (!sf) return;
-    if (sf->data) munmap(sf->data, sf->file_size);
+    if (sf->data) {
+#if defined(_WIN32)
+        UnmapViewOfFile(sf->data);
+        sf->data = NULL;
+        if (sf->mapping_handle) {
+            CloseHandle(sf->mapping_handle);
+            sf->mapping_handle = NULL;
+        }
+        if (sf->file_handle) {
+            CloseHandle((HANDLE)sf->file_handle);
+            sf->file_handle = NULL;
+        }
+#else
+        munmap(sf->data, sf->file_size);
+#endif
+    }
     free(sf->path);
     free(sf->header_json);
     free(sf);
