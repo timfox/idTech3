@@ -474,12 +474,16 @@ static void cs_delete_(FLAC__StreamMetadata *block, uint32_t pos)
 
 static void pi_set_mime_type(FLAC__StreamMetadata *block, const char *s)
 {
+	char *new_mime_type = strdup(s);
+
+	FLAC__ASSERT(new_mime_type);
+
 	if(block->data.picture.mime_type) {
 		block->length -= strlen(block->data.picture.mime_type);
 		free(block->data.picture.mime_type);
 	}
-	block->data.picture.mime_type = strdup(s);
-	FLAC__ASSERT(block->data.picture.mime_type);
+
+	block->data.picture.mime_type = new_mime_type;
 	block->length += strlen(block->data.picture.mime_type);
 }
 
