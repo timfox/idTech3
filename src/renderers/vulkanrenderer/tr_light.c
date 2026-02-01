@@ -29,6 +29,143 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define	DLIGHT_MINIMUM_RADIUS	16
 // never calculate a range less than this to prevent huge light numbers
 
+extern	cvar_t	*r_ambientScale;
+extern	cvar_t	*r_directedScale;
+
+static void R_ClearSHCoeffs( vec3_t shCoeffs[SH_COEFF_COUNT] ) {
+	int i;
+
+	for ( i = 0; i < SH_COEFF_COUNT; i++ ) {
+		VectorClear( shCoeffs[i] );
+	}
+}
+
+static void R_AddSHSample( vec3_t shCoeffs[SH_COEFF_COUNT], const vec3_t dir, const vec3_t color, float weight ) {
+	const float x = dir[0];
+	const float y = dir[1];
+	const float z = dir[2];
+	const float basis[SH_COEFF_COUNT] = {
+		1.0f,
+		y,
+		z,
+		x,
+		x * y,
+		y * z,
+		3.0f * z * z - 1.0f,
+		x * z,
+		x * x - y * y
+	};
+	int i;
+
+	for ( i = 0; i < SH_COEFF_COUNT; i++ ) {
+		shCoeffs[i][0] += color[0] * basis[i] * weight;
+		shCoeffs[i][1] += color[1] * basis[i] * weight;
+		shCoeffs[i][2] += color[2] * basis[i] * weight;
+	}
+}
+
+qboolean R_SampleLightGridSH( const world_t *world, const vec3_t position, vec3_t shCoeffs[SH_COEFF_COUNT] ) {
+	vec3_t	lightOrigin;
+	int		pos[3];
+	int		i, j;
+	byte	*gridData;
+	float	frac[3];
+	int		gridStep[3];
+	float	totalFactor;
+
+	R_ClearSHCoeffs( shCoeffs );
+	if ( !world || !world->lightGridData ) {
+		return qfalse;
+	}
+
+	VectorSubtract( position, world->lightGridOrigin, lightOrigin );
+	for ( i = 0 ; i < 3 ; i++ ) {
+		float	v;
+
+		v = lightOrigin[i] * world->lightGridInverseSize[i];
+		pos[i] = floor( v );
+		frac[i] = v - pos[i];
+		if ( pos[i] < 0 ) {
+			pos[i] = 0;
+		} else if ( pos[i] > world->lightGridBounds[i] - 1 ) {
+			pos[i] = world->lightGridBounds[i] - 1;
+		}
+	}
+
+	gridStep[0] = 8;
+	gridStep[1] = 8 * world->lightGridBounds[0];
+	gridStep[2] = 8 * world->lightGridBounds[0] * world->lightGridBounds[1];
+	gridData = world->lightGridData + pos[0] * gridStep[0]
+		+ pos[1] * gridStep[1] + pos[2] * gridStep[2];
+
+	totalFactor = 0.0f;
+	for ( i = 0 ; i < 8 ; i++ ) {
+		float	factor;
+		byte	*data;
+		int		lat, lng;
+		vec3_t	normal;
+
+		factor = 1.0f;
+		data = gridData;
+		for ( j = 0 ; j < 3 ; j++ ) {
+			if ( i & (1<<j) ) {
+				if ( pos[j] + 1 > world->lightGridBounds[j] - 1 ) {
+					break;
+				}
+				factor *= frac[j];
+				data += gridStep[j];
+			} else {
+				factor *= (1.0f - frac[j]);
+			}
+		}
+
+		if ( j != 3 ) {
+			continue;
+		}
+
+		if ( !(data[0]+data[1]+data[2]) ) {
+			continue;
+		}
+
+		totalFactor += factor;
+
+		lat = data[7];
+		lng = data[6];
+		lat *= (FUNCTABLE_SIZE/256);
+		lng *= (FUNCTABLE_SIZE/256);
+
+		normal[0] = tr.sinTable[(lat+(FUNCTABLE_SIZE/4))&FUNCTABLE_MASK] * tr.sinTable[lng];
+		normal[1] = tr.sinTable[lat] * tr.sinTable[lng];
+		normal[2] = tr.sinTable[(lng+(FUNCTABLE_SIZE/4))&FUNCTABLE_MASK];
+
+		{
+			vec3_t ambientColor = {
+				data[0] * r_ambientScale->value,
+				data[1] * r_ambientScale->value,
+				data[2] * r_ambientScale->value
+			};
+			vec3_t directedColor = {
+				data[3] * r_directedScale->value,
+				data[4] * r_directedScale->value,
+				data[5] * r_directedScale->value
+			};
+			shCoeffs[0][0] += ambientColor[0] * factor;
+			shCoeffs[0][1] += ambientColor[1] * factor;
+			shCoeffs[0][2] += ambientColor[2] * factor;
+			R_AddSHSample( shCoeffs, normal, directedColor, factor );
+		}
+	}
+
+	if ( totalFactor > 0.0f && totalFactor < 0.99f ) {
+		totalFactor = 1.0f / totalFactor;
+		for ( i = 0; i < SH_COEFF_COUNT; i++ ) {
+			VectorScale( shCoeffs[i], totalFactor, shCoeffs[i] );
+		}
+	}
+
+	return ( totalFactor > 0.0f );
+}
+
 
 /*
 ===============
@@ -168,6 +305,8 @@ static void R_SetupEntityLightingGrid( trRefEntity_t *ent, world_t *world ) {
 	VectorClear( ent->ambientLight );
 	VectorClear( ent->directedLight );
 	VectorClear( direction );
+	R_ClearSHCoeffs( ent->shCoeffs );
+	ent->shLightingValid = qfalse;
 
 	assert( world->lightGridData ); // NULL with -nolight maps
 
@@ -229,18 +368,30 @@ static void R_SetupEntityLightingGrid( trRefEntity_t *ent, world_t *world ) {
 		normal[2] = tr.sinTable[(lng+(FUNCTABLE_SIZE/4))&FUNCTABLE_MASK];
 
 		VectorMA( direction, factor, normal, direction );
+		{
+			vec3_t directedColor = { data[3], data[4], data[5] };
+			R_AddSHSample( ent->shCoeffs, normal, directedColor, factor );
+		}
 	}
 
+	qboolean hasSH = ( totalFactor > 0.0f );
 	if ( totalFactor > 0 && totalFactor < 0.99 ) {
 		totalFactor = 1.0f / totalFactor;
 		VectorScale( ent->ambientLight, totalFactor, ent->ambientLight );
 		VectorScale( ent->directedLight, totalFactor, ent->directedLight );
+		for ( i = 0; i < SH_COEFF_COUNT; i++ ) {
+			VectorScale( ent->shCoeffs[i], totalFactor, ent->shCoeffs[i] );
+		}
 	}
 
 	VectorScale( ent->ambientLight, r_ambientScale->value, ent->ambientLight );
 	VectorScale( ent->directedLight, r_directedScale->value, ent->directedLight );
+	for ( i = 0; i < SH_COEFF_COUNT; i++ ) {
+		VectorScale( ent->shCoeffs[i], r_directedScale->value, ent->shCoeffs[i] );
+	}
 
 	VectorNormalize2( direction, ent->lightDir );
+	ent->shLightingValid = hasSH;
 }
 
 
@@ -322,6 +473,8 @@ void R_SetupEntityLighting( const trRefdef_t *refdef, trRefEntity_t *ent ) {
 		ent->directedLight[0] = ent->directedLight[1] =
 			ent->directedLight[2] = tr.identityLight * 150;
 		VectorCopy( tr.sunDirection, ent->lightDir );
+		R_ClearSHCoeffs( ent->shCoeffs );
+		ent->shLightingValid = qfalse;
 	}
 
 	// bonus items and view weapons have a fixed minimum add
