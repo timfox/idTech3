@@ -28,7 +28,7 @@ enum { snd_ogg_translation_unit_guard = 0 };
 #ifdef USE_OGG_VORBIS
 
 // includes for the Q3 sound system
-#include "client.h"
+#include "../../client/client.h"
 #include "snd_codec.h"
 
 // includes for the OGG codec

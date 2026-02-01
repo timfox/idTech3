@@ -4,10 +4,10 @@
 ===========================================================================
 */
 
-#include "client.h"
+#include "../../client/client.h"
 #include "snd_codec.h"
 #include "mp3/mp3struct.h"
-#include "snd_local.h"
+#include "../snd_local.h"
 
 typedef struct {
 	byte *data;

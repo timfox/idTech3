@@ -4,9 +4,9 @@ FLAC codec wrapper for idTech3 sound system
 ===============================================================================
 */
 
-#include "client.h"
+#include "../../client/client.h"
 #include "snd_codec.h"
-#include "snd_local.h"
+#include "../snd_local.h"
 
 #ifdef USE_FLAC
 #include <FLAC/stream_decoder.h>
