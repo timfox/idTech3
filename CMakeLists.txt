@@ -756,14 +756,15 @@ ENDIF()
 AUX_SOURCE_DIRECTORY(src/renderers/openglrenderer RENDERER_GL_SRCS)
 AUX_SOURCE_DIRECTORY(src/renderers/vulkanrenderer RENDERER_VK_SRCS)
 
-IF(USE_RENDERER_DLOPEN)
-	SET(AUX_SRCS
+SET(AUX_SRCS)
+if(NOT USE_RENDERER_DLOPEN)
+	list(APPEND AUX_SRCS
 		src/qcommon/q_shared.c
-		src/qcommon/q_math.c
-	)
+		src/qcommon/q_math.c)
 	if(NOT USE_LIBPNG)
 		list(APPEND AUX_SRCS src/qcommon/puff.c)
 	endif()
+endif()
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_RENDERER_DLOPEN RENDERER_PREFIX="${RENDERER_PREFIX}" RENDERER_DEFAULT="${RENDERER_DEFAULT}")
 
 	ADD_LIBRARY(${RENDERER_PREFIX}_opengl${RENDEXT} SHARED ${RENDERER_GL_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
@@ -780,13 +781,8 @@ IF(USE_RENDERER_DLOPEN)
 	# Ensure shared renderer libraries link to the math and dl libs so symbol versions
 	# (eg. powf@GLIBC_2.2.5) are resolved against the dynamic libm rather than a
 	# static libm which would break building shared objects.
-	if(USE_RENDERER_DLOPEN)
-		target_link_libraries(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE m ${CMAKE_DL_LIBS})
-		target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE m ${CMAKE_DL_LIBS})
-	else()
-		target_link_libraries(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE qcommon m ${CMAKE_DL_LIBS})
-		target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE qcommon m ${CMAKE_DL_LIBS})
-	endif()
+	target_link_libraries(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE qcommon m ${CMAKE_DL_LIBS})
+	target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE qcommon m ${CMAKE_DL_LIBS})
 	IF(APPLE)
 		target_link_options(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE "-undefined" "dynamic_lookup")
 		target_link_options(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE "-undefined" "dynamic_lookup")
