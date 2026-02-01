@@ -33,6 +33,11 @@
 
 #include "zconf.h"
 
+#if defined(__APPLE__) && !defined(off64_t)
+#include <sys/types.h>
+typedef off_t off64_t;
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
