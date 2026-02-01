@@ -400,6 +400,8 @@ jobs:
           -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
           -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch == 'aarch64' && 'arm64' || matrix.arch }} \
           -DSDL2_PATH="${SDL2_PREFIX}" \
+          -DSDL2_INCLUDE_DIR="${SDL2_PREFIX}/include" \
+          -DSDL2_LIBRARY="${SDL2_PREFIX}/lib/libSDL2.dylib" \
           -DOPENAL_INCLUDE_DIR="${OPENAL_PREFIX}/include" \
           -DOPENAL_LIBRARY="${OPENAL_PREFIX}/lib/libopenal.dylib" \
           -DUSE_STB_TRUETYPE=ON \
@@ -430,6 +432,8 @@ jobs:
           -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
           -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch == 'aarch64' && 'arm64' || matrix.arch }} \
           -DSDL2_PATH="${SDL2_PREFIX}" \
+          -DSDL2_INCLUDE_DIR="${SDL2_PREFIX}/include" \
+          -DSDL2_LIBRARY="${SDL2_PREFIX}/lib/libSDL2.dylib" \
           -DOPENAL_INCLUDE_DIR="${OPENAL_PREFIX}/include" \
           -DOPENAL_LIBRARY="${OPENAL_PREFIX}/lib/libopenal.dylib" \
           -DUSE_STB_TRUETYPE=ON \
