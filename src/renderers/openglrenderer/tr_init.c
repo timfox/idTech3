@@ -262,7 +262,7 @@ static void R_ClearSymTables( void )
 
 
 // for modular renderer
-#ifdef USE_RENDERER_DLOPEN
+#ifndef USE_RENDERER_DLOPEN
 void QDECL Com_Error( errorParm_t code, const char *fmt, ... )
 {
 	char buf[ 4096 ];
@@ -280,7 +280,6 @@ void QDECL Com_Printf( const char *fmt, ... )
 	va_start( argptr, fmt );
 	Q_vsnprintf( buf, sizeof( buf ), fmt, argptr );
 	va_end( argptr );
-
 	ri.Printf( PRINT_ALL, "%s", buf );
 }
 #endif
