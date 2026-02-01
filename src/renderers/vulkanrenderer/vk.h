@@ -463,7 +463,7 @@ typedef struct vk_tess_s {
 	uint32_t		uniform_read_offset;
 #ifdef USE_VK_PBR
 	uint32_t			camera_ubo_offset;
-	VkDeviceSize		buf_offset[9];
+	VkDeviceSize		buf_offset[10];
 	VkDeviceSize		vbo_offset[10];
 #else
 	VkDeviceSize		buf_offset[8];

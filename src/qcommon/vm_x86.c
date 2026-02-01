@@ -377,7 +377,7 @@ static void emit_rex1( const uint32_t base )
 
 #if !idx64
 // reg <-> [offset] - C23 modernized
-static void emit_modrm_offset( uint32_t reg, int32_t offset )
+static void UNUSED_VAR emit_modrm_offset( uint32_t reg, int32_t offset )
 {
 	modrm_t modrm;
 
