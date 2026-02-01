@@ -95,28 +95,25 @@ const char *grabbag__file_get_basename(const char *srcpath)
 
 FLAC__bool grabbag__file_change_stats(const char *filename, FLAC__bool read_only)
 {
-	struct flac_stat_s stats;
+	mode_t mode;
 
-	if(0 == flac_stat(filename, &stats)) {
 #if !defined _MSC_VER && !defined __MINGW32__
-		if(read_only) {
-			stats.st_mode &= ~S_IWUSR;
-			stats.st_mode &= ~S_IWGRP;
-			stats.st_mode &= ~S_IWOTH;
-		}
-		else {
-			stats.st_mode |= S_IWUSR;
-		}
-#else
-		if(read_only)
-			stats.st_mode &= ~S_IWRITE;
-		else
-			stats.st_mode |= S_IWRITE;
-#endif
-		if(0 != flac_chmod(filename, stats.st_mode))
-			return false;
+	if(read_only) {
+		/* read-only for user, group, others */
+		mode = S_IRUSR | S_IRGRP | S_IROTH;
 	}
+	else {
+		/* at least user read/write, keep group/other readable */
+		mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+	}
+#else
+	if(read_only)
+		mode = _S_IREAD;
 	else
+		mode = _S_IREAD | _S_IWRITE;
+#endif
+
+	if(0 != flac_chmod(filename, mode))
 		return false;
 
 	return true;
