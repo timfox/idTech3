@@ -35,12 +35,12 @@
 #if defined(__GNUC__) && (__GNUC__ > 4 || ( __GNUC__ == 4 && __GNUC_MINOR__ >= 3))
 
 #define flac_max(a,b) \
-	({ __typeof__ (a) _a = (a); \
+	__extension__({ __typeof__ (a) _a = (a); \
 	__typeof__ (b) _b = (b); \
 	_a > _b ? _a : _b; })
 
 #define MIN_PASTE(A,B) A##B
-#define MIN_IMPL(A,B,L) ({ \
+#define MIN_IMPL(A,B,L) __extension__({ \
 	__typeof__(A) MIN_PASTE(__a,L) = (A); \
 	__typeof__(B) MIN_PASTE(__b,L) = (B); \
 	MIN_PASTE(__a,L) < MIN_PASTE(__b,L) ? MIN_PASTE(__a,L) : MIN_PASTE(__b,L); \
