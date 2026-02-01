@@ -19,8 +19,53 @@
 #include "flux.h"
 #include "flux_qwen3.h"  /* For QWEN3_MAX_SEQ_LEN, QWEN3_TEXT_DIM */
 #include "embcache.h"
-#include "linenoise.h"
 #include "terminals.h"
+
+#ifndef FLUX_CLI_NO_LINENOISE
+#include "linenoise.h"
+#else
+static char *linenoise(const char *prompt) {
+    char buffer[4096];
+    size_t len;
+
+    if (prompt) {
+        fputs(prompt, stdout);
+        fflush(stdout);
+    }
+    if (!fgets(buffer, sizeof(buffer), stdin)) {
+        return NULL;
+    }
+    len = strlen(buffer);
+    while (len > 0 && (buffer[len - 1] == '\n' || buffer[len - 1] == '\r')) {
+        buffer[--len] = '\0';
+    }
+    char *line = (char *)malloc(len + 1);
+    if (!line) {
+        return NULL;
+    }
+    memcpy(line, buffer, len + 1);
+    return line;
+}
+
+static int linenoiseHistoryLoad(const char *path) {
+    (void)path;
+    return 0;
+}
+
+static int linenoiseHistorySave(const char *path) {
+    (void)path;
+    return 0;
+}
+
+static int linenoiseHistorySetMaxLen(int len) {
+    (void)len;
+    return 0;
+}
+
+static void linenoiseHistoryAdd(const char *line) {
+    (void)line;
+}
+#endif
 
 /* ======================================================================
  * Constants

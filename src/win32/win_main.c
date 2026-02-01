@@ -524,7 +524,14 @@ void *Sys_LoadFunction( void *handle, const char *name )
 		return NULL;
 	}
 
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#endif
 	symbol = GetProcAddress( handle, name );
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 	if ( !symbol )
 		dll_err_count++;
 
@@ -597,8 +604,15 @@ static void SetTimerResolution( void )
 	dll = LoadLibrary( T( "ntdll" ) );
 	if ( dll )
 	{
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-function-type"
+#endif
 		pNtQueryTimerResolution = (pfnNtQueryTimerResolution) GetProcAddress( dll, "NtQueryTimerResolution" );
 		pNtSetTimerResolution = (pfnNtSetTimerResolution) GetProcAddress( dll, "NtSetTimerResolution" );
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 		if ( pNtQueryTimerResolution && pNtSetTimerResolution )
 		{
 			pNtQueryTimerResolution( &minr, &maxr, &curr );
@@ -736,7 +750,14 @@ static LONG WINAPI ExceptionFilter( struct _EXCEPTION_POINTERS *ExceptionInfo )
 			typedef BOOL (WINAPI *PFN_GetModuleHandleExA)( DWORD dwFlags, LPCSTR lpModuleName, HMODULE *phModule );
 			PFN_GetModuleHandleExA pGetModuleHandleExA;
 
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-function-type"
+#endif
 			pGetModuleHandleExA = (PFN_GetModuleHandleExA) GetProcAddress( hKernel32, "GetModuleHandleExA" );
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 			if ( pGetModuleHandleExA != NULL ) {
 				if ( pGetModuleHandleExA( GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCTSTR)addr, &hModule ) ) {
 					if (GetModuleFileNameA( hModule, name, ARRAY_LEN(name) - 1) != 0 ) {
@@ -786,6 +807,8 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 	qboolean useXYpos;
 	HANDLE hProcess;
 	DWORD dwPriority;
+
+	(void)nCmdShow;
 
 	// should never get a previous instance in Win32
 	if ( hPrevInstance ) {

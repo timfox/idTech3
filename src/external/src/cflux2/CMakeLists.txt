@@ -114,14 +114,23 @@ target_include_directories(cflux2
 target_link_libraries(cflux2 PRIVATE ${FLUX_LINK_LIBRARIES})
 
 # CLI executable (external generator)
-add_executable(flux_cli
+set(FLUX_CLI_SOURCES
     main.c
     flux_cli.c
-    linenoise.c
     embcache.c
 )
+if(WIN32 OR MINGW OR MSYS)
+    list(APPEND FLUX_CLI_SOURCES)
+else()
+    list(APPEND FLUX_CLI_SOURCES linenoise.c)
+endif()
+
+add_executable(flux_cli ${FLUX_CLI_SOURCES})
 
 target_compile_definitions(flux_cli PRIVATE ${FLUX_COMPILE_DEFINITIONS} _GNU_SOURCE)
+if(WIN32)
+    target_compile_definitions(flux_cli PRIVATE FLUX_CLI_NO_LINENOISE)
+endif()
 target_include_directories(flux_cli PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}

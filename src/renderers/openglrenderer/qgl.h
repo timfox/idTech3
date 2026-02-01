@@ -27,7 +27,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define __QGL_H__
 
 #if defined( _WIN32 )
-#if _MSC_VER
+#if defined(_MSC_VER)
 #pragma warning (disable: 4201)
 #pragma warning (disable: 4214)
 #pragma warning (disable: 4514)

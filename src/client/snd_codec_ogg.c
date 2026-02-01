@@ -22,7 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 
-static const int snd_ogg_translation_unit_guard = 0;
+enum { snd_ogg_translation_unit_guard = 0 };
 
 // OGG support is enabled by this define
 #ifdef USE_OGG_VORBIS
