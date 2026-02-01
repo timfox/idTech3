@@ -355,7 +355,7 @@ void NORETURN FORMAT_PRINTF(1, 2) QDECL Sys_Error( const char *format, ... )
 }
 
 
-static void floating_point_exception_handler( int whatever )
+static void UNUSED_VAR floating_point_exception_handler( int whatever )
 {
 	(void)whatever;
 	signal( SIGFPE, floating_point_exception_handler );

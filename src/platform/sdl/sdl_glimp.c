@@ -20,22 +20,26 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 
-#ifdef USE_LOCAL_HEADERS
-#	include "SDL.h"
-#ifdef USE_VULKAN_API
-#	include "SDL_vulkan.h"
-#endif
-#else
-#	include <SDL.h>
-#ifdef USE_VULKAN_API
-#	include <SDL_vulkan.h>
-#endif
-#endif
-
 #include "../../client/client.h"
 #include "../../renderers/rendercommon/tr_public.h"
 #include "sdl_glw.h"
 #include "sdl_icon.h"
+
+#ifdef USE_VULKAN_API
+#	if defined(USE_LOCAL_HEADERS)
+#		include "SDL_vulkan.h"
+#	else
+#		if defined(__has_include)
+#			if __has_include(<SDL2/SDL_vulkan.h>)
+#				include <SDL2/SDL_vulkan.h>
+#			else
+#				include <SDL_vulkan.h>
+#			endif
+#		else
+#			include <SDL_vulkan.h>
+#		endif
+#	endif
+#endif
 
 void GLimp_Init( glconfig_t *config );
 void GLimp_EndFrame( void );
@@ -110,6 +114,7 @@ GLimp_LogComment
 */
 void GLimp_LogComment( const char *comment )
 {
+	(void)comment;
 }
 
 

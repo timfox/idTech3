@@ -607,6 +607,9 @@ void	HandleEvents( void );
 // platform-specific
 void	GLimp_InitGamma(glconfig_t *config);
 void	GLimp_SetGamma(unsigned char red[256], unsigned char green[256], unsigned char blue[256]);
+void	GLimp_Minimize( void );
+void	GLimp_LogComment( const char *comment );
+void	GLW_RestoreGamma( void );
 
 // OpenGL
 #ifdef USE_OPENGL_API
