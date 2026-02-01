@@ -778,8 +778,8 @@ IF(USE_RENDERER_DLOPEN)
 	# Ensure shared renderer libraries link to the math and dl libs so symbol versions
 	# (eg. powf@GLIBC_2.2.5) are resolved against the dynamic libm rather than a
 	# static libm which would break building shared objects.
-	target_link_libraries(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE m ${CMAKE_DL_LIBS})
-	target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE m ${CMAKE_DL_LIBS})
+	target_link_libraries(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE qcommon m ${CMAKE_DL_LIBS})
+	target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE qcommon m ${CMAKE_DL_LIBS})
 	IF(APPLE)
 		target_link_options(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE "-undefined dynamic_lookup")
 		target_link_options(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE "-undefined dynamic_lookup")
@@ -951,6 +951,8 @@ IF(NOT MSVC)
 		TARGET_LINK_LIBRARIES(q3ui ${X11_LIBRARIES})
 	ENDIF()
 ENDIF()
+
+target_include_directories(q3ui PRIVATE ${CMAKE_SOURCE_DIR}/src/audio)
 
 IF(USE_OPENAL)
 	if(NOT OPENAL_FOUND)
