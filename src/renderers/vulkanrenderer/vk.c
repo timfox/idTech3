@@ -3891,7 +3891,7 @@ static void vk_create_attachments( void )
 	//vk_alloc_attachments();
 
 	create_depth_attachment( glConfig.vidWidth, glConfig.vidHeight, vkSamples, &vk.depth_image, &vk.depth_image_view,
-		(vk.fboActive && r_bloom->integer) ? qfalse : qtrue );
+		(vk.fboActive && r_bloom->integer) || (r_ssao && r_ssao->integer) ? qfalse : qtrue );
 
 	vk_alloc_attachments();
 

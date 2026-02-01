@@ -8,5 +8,6 @@ layout(location = 0) out vec4 out_color;
 void main()
 {
 	float d = texture(depthTex, frag_tex_coord).r;
+	d = 1.0 - d; // show reversed-depth clearly too
 	out_color = vec4(d, d, d, 1.0);
 }
