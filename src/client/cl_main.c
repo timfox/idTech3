@@ -80,6 +80,7 @@ cvar_t	*cl_reconnectArgs;
 // FLUX image generation cvars
 cvar_t	*cl_flux_enable;
 cvar_t	*cl_flux_async;        // 0 = synchronous (blocking), 1 = asynchronous (background)
+cvar_t	*cl_flux_external;     // 0 = in-process (unstable), 1 = external CLI (recommended)
 cvar_t	*cl_flux_model;        // Model variant: flux1-schnell, flux1-dev, flux2-dev
 cvar_t	*cl_flux_device;       // Compute device: auto, cpu, gpu, gpu:N (specific GPU)
 cvar_t	*cl_flux_width;
@@ -103,6 +104,112 @@ static qboolean CL_FluxFileExists(const char *path) {
 		return qtrue;
 	}
 	return qfalse;
+}
+
+static qboolean CL_FluxEscapeShellArg(const char *in, char *out, size_t out_size) {
+	size_t pos = 0;
+	if (!in || !out || out_size == 0) {
+		return qfalse;
+	}
+
+	for (const char *p = in; *p; ++p) {
+		char c = *p;
+		if (c == '\n' || c == '\r' || c == '\t') {
+			c = ' ';
+		}
+		if (c == '"' || c == '\\' || c == '$' || c == '`') {
+			if (pos + 2 >= out_size) {
+				return qfalse;
+			}
+			out[pos++] = '\\';
+			out[pos++] = c;
+		} else {
+			if (pos + 1 >= out_size) {
+				return qfalse;
+			}
+			out[pos++] = c;
+		}
+	}
+	out[pos] = '\0';
+	return qtrue;
+}
+
+static qboolean CL_FluxFindCliPath(char *out, size_t out_size) {
+	const char *base_path = Sys_DefaultBasePath();
+	if (!base_path || !out || out_size == 0) {
+		return qfalse;
+	}
+
+	Com_sprintf(out, out_size, "%s/flux_cli", base_path);
+	if (CL_FluxFileExists(out)) {
+		return qtrue;
+	}
+
+	Com_sprintf(out, out_size, "%s/flux_cli.x86_64", base_path);
+	if (CL_FluxFileExists(out)) {
+		return qtrue;
+	}
+
+	out[0] = '\0';
+	return qfalse;
+}
+
+static qboolean CL_FluxGenerateExternal(const char *model_path, const char *prompt,
+										const char *output_path, int width, int height,
+										int steps, int seed,
+										char *error_msg, size_t error_msg_size) {
+	char cli_path[MAX_OSPATH];
+	char model_full[MAX_OSPATH];
+	char output_full[MAX_OSPATH];
+	char prompt_escaped[2048];
+	char cmd[4096];
+	const char *base_path = Sys_DefaultBasePath();
+
+	if (!base_path) {
+		if (error_msg && error_msg_size > 0) {
+			Q_strncpyz(error_msg, "Failed to get base path", error_msg_size);
+		}
+		return qfalse;
+	}
+
+	if (!CL_FluxFindCliPath(cli_path, sizeof(cli_path))) {
+		if (error_msg && error_msg_size > 0) {
+			Q_strncpyz(error_msg, "flux_cli not found in release directory", error_msg_size);
+		}
+		return qfalse;
+	}
+
+	if (!CL_FluxEscapeShellArg(prompt, prompt_escaped, sizeof(prompt_escaped))) {
+		if (error_msg && error_msg_size > 0) {
+			Q_strncpyz(error_msg, "Failed to escape prompt for shell", error_msg_size);
+		}
+		return qfalse;
+	}
+
+	Com_sprintf(model_full, sizeof(model_full), "%s/%s", base_path, model_path);
+	Com_sprintf(output_full, sizeof(output_full), "%s/%s", base_path, output_path);
+
+	Com_sprintf(cmd, sizeof(cmd),
+		"cd \"%s\" && \"%s\" -d \"%s\" -p \"%s\" -o \"%s\" -W %d -H %d -s %d -S %d -q",
+		base_path, cli_path, model_full, prompt_escaped, output_full,
+		width, height, steps, seed);
+
+	Com_Printf("FLUX: External generation command: %s\n", cmd);
+	if (system(cmd) != 0) {
+		if (error_msg && error_msg_size > 0) {
+			Q_strncpyz(error_msg, "External FLUX generation failed", error_msg_size);
+		}
+		return qfalse;
+	}
+
+	if (!CL_FluxFileExists(output_full)) {
+		if (error_msg && error_msg_size > 0) {
+			Q_strncpyz(error_msg, "External FLUX did not produce output image", error_msg_size);
+		}
+		return qfalse;
+	}
+
+	return qtrue;
 }
 
 // Get model directory path based on selected model variant
@@ -4146,7 +4253,11 @@ void CL_Init( void ) {
 
 	cl_flux_async = Cvar_Get( "cl_flux_async", "0", CVAR_ARCHIVE );
 	Cvar_CheckRange( cl_flux_async, "0", "1", CV_INTEGER );
-	Cvar_SetDescription( cl_flux_async, "FLUX generation mode: 0=synchronous (blocking), 1=asynchronous (background, may crash)." );
+	Cvar_SetDescription( cl_flux_async, "FLUX generation mode: 0=synchronous (blocking), 1=asynchronous (background)." );
+
+	cl_flux_external = Cvar_Get( "cl_flux_external", "1", CVAR_ARCHIVE );
+	Cvar_CheckRange( cl_flux_external, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( cl_flux_external, "Use external flux_cli process to avoid in-process crashes (recommended)." );
 
 	cl_flux_model = Cvar_Get( "cl_flux_model", "flux1-schnell", CVAR_ARCHIVE );
 	Cvar_SetDescription( cl_flux_model, "FLUX model variant: flux1-schnell (fast), flux1-dev (balanced), flux2-dev (high quality)." );
@@ -4236,6 +4347,7 @@ void CL_Init( void ) {
 	// Log FLUX initialization status
 	if ( cl_flux_enable && cl_flux_enable->integer ) {
 		Com_Printf( "FLUX image generation: enabled (device: %s, model: %s)\n", cl_flux_device->string, cl_flux_model->string );
+		Com_Printf( "FLUX external generation: %s\n", cl_flux_external && cl_flux_external->integer ? "enabled" : "disabled" );
 	} else {
 		Com_Printf( "FLUX image generation: disabled (set cl_flux_enable 1 to enable)\n" );
 	}
@@ -5235,9 +5347,56 @@ static int CL_FluxGenerationThread(void *data) {
 	flux_params params = FLUX_PARAMS_DEFAULT;
 	flux_image *image = NULL;
 
+	// Validate job pointer
+	if (!job) {
+		Com_Printf(S_COLOR_RED "FLUX: Thread received NULL job pointer\n");
+		return -1;
+	}
+
+	// Validate critical job fields before proceeding
+	if (!job->model_path[0]) {
+		Com_Printf(S_COLOR_RED "FLUX: Thread: model_path is empty\n");
+		Q_strncpyz(job->error_msg, "Model path is empty", sizeof(job->error_msg));
+		job->status = FLUX_JOB_FAILED;
+		return -1;
+	}
+
+	if (!job->prompt[0]) {
+		Com_Printf(S_COLOR_RED "FLUX: Thread: prompt is empty\n");
+		Q_strncpyz(job->error_msg, "Prompt is empty", sizeof(job->error_msg));
+		job->status = FLUX_JOB_FAILED;
+		return -1;
+	}
+
+	if (job->width <= 0 || job->height <= 0) {
+		Com_Printf(S_COLOR_RED "FLUX: Thread: Invalid dimensions (width:%d height:%d)\n", job->width, job->height);
+		Q_strncpyz(job->error_msg, "Invalid image dimensions", sizeof(job->error_msg));
+		job->status = FLUX_JOB_FAILED;
+		return -1;
+	}
+
+	// External generation mode to avoid in-process crashes
+	if (cl_flux_external && cl_flux_external->integer) {
+		if (!CL_FluxGenerateExternal(job->model_path, job->prompt, job->output_path,
+									 job->width, job->height, job->steps, job->seed,
+									 job->error_msg, sizeof(job->error_msg))) {
+			job->status = FLUX_JOB_FAILED;
+			return -1;
+		}
+		job->status = FLUX_JOB_COMPLETED;
+		return 0;
+	}
+
 	// Load FLUX model - construct absolute path from base path
 	char full_model_path[1024];
-	Com_sprintf(full_model_path, sizeof(full_model_path), "%s/%s", Sys_DefaultBasePath(), job->model_path);
+	const char *base_path = Sys_DefaultBasePath();
+	if (!base_path) {
+		Com_Printf(S_COLOR_RED "FLUX: Thread: Sys_DefaultBasePath() returned NULL\n");
+		Q_strncpyz(job->error_msg, "Failed to get base path", sizeof(job->error_msg));
+		job->status = FLUX_JOB_FAILED;
+		return -1;
+	}
+	Com_sprintf(full_model_path, sizeof(full_model_path), "%s/%s", base_path, job->model_path);
 
 	// Add safety check for model path
 	if (strlen(full_model_path) >= sizeof(full_model_path) - 1) {
@@ -5289,8 +5448,26 @@ static int CL_FluxGenerationThread(void *data) {
 	Com_Printf("FLUX: About to call flux_generate() with prompt: '%s'\n", job->prompt);
         Com_Printf("FLUX: Parameters: width=%d, height=%d, steps=%d, seed=%ld\n",
                 params.width, params.height, params.num_steps, params.seed);
+	
+	// Validate context and prompt before generation
+	if (!ctx) {
+		Com_Printf(S_COLOR_RED "FLUX: Thread: ctx is NULL before flux_generate()\n");
+		Q_strncpyz(job->error_msg, "FLUX context is NULL", sizeof(job->error_msg));
+		job->status = FLUX_JOB_FAILED;
+		return -1;
+	}
+	if (strlen(job->prompt) == 0) {
+		Com_Printf(S_COLOR_RED "FLUX: Thread: prompt is empty before flux_generate()\n");
+		Q_strncpyz(job->error_msg, "Prompt is empty", sizeof(job->error_msg));
+		flux_free(ctx);
+		job->status = FLUX_JOB_FAILED;
+		return -1;
+	}
 
 	// CRITICAL: This is where the segmentation fault likely occurs
+	// Known stability issue: flux_generate() can crash the engine
+	// This is documented in README_idtech3.md as a critical stability issue
+	Com_Printf("FLUX: Calling flux_generate() - this may take 30-120+ seconds...\n");
 	image = flux_generate(ctx, job->prompt, &params);
 
 	Com_Printf("FLUX: flux_generate() returned: %p\n", (void*)image);
@@ -5477,6 +5654,14 @@ async_generation:
 	Com_sprintf(flux_job.output_path, sizeof(flux_job.output_path), "flux_%d_%dx%d.png",
 		Com_Milliseconds(), width, height);
 	
+	// Verify all critical fields are set before marking as RUNNING
+	if (!flux_job.model_path[0] || !flux_job.prompt[0] || flux_job.width <= 0 || flux_job.height <= 0) {
+		Com_Printf(S_COLOR_RED "FLUX: Internal error - job structure not properly initialized\n");
+		Com_Printf(S_COLOR_RED "FLUX: model_path='%s', prompt='%s', width=%d, height=%d\n",
+			flux_job.model_path, flux_job.prompt, flux_job.width, flux_job.height);
+		return;
+	}
+	
 	// Mark as RUNNING only after all values are set (memory barrier for thread safety)
 	flux_job.status = FLUX_JOB_RUNNING;
 
@@ -5489,6 +5674,8 @@ async_generation:
 	}
 
 	Com_Printf("FLUX: Started background generation for prompt: %s\n", prompt);
+	Com_Printf("FLUX: Model: %s, Dimensions: %dx%d, Steps: %d, Seed: %d\n",
+		flux_job.model_path, flux_job.width, flux_job.height, flux_job.steps, flux_job.seed);
 	Com_Printf("FLUX: Use 'flux_status' to check progress, 'flux_view <filename>' when complete\n");
 	return;
 
@@ -5502,6 +5689,30 @@ sync_generation:
 		int result;
 
 		Com_Printf("FLUX: Generating image with prompt: %s\n", prompt);
+
+		if (cl_flux_external && cl_flux_external->integer) {
+			const char *sync_model_path = CL_FluxGetModelPath(cl_flux_model->string);
+			Com_sprintf(outputPath, sizeof(outputPath), "flux_%d_%dx%d.png",
+				Com_Milliseconds(), width, height);
+			if (!CL_FluxGenerateExternal(sync_model_path, prompt, outputPath,
+										 width, height, steps, seed,
+										 NULL, 0)) {
+				Com_Printf(S_COLOR_RED "FLUX: External generation failed (see console for details)\n");
+				return;
+			}
+
+			Com_Printf(S_COLOR_GREEN "FLUX: Image saved to %s (seed: %d)\n", outputPath, seed);
+			if (re.ReloadTexture) {
+				if (re.ReloadTexture(outputPath)) {
+					Com_Printf(S_COLOR_GREEN "FLUX: Texture hot-reloaded successfully!\n");
+				} else {
+					Com_Printf(S_COLOR_YELLOW "FLUX: Hot-reload failed, use 'vid_restart' to reload all textures\n");
+				}
+			} else {
+				Com_Printf(S_COLOR_YELLOW "FLUX: Renderer doesn't support hot-reload, use 'vid_restart'\n");
+			}
+			return;
+		}
 
 		// Load FLUX model - construct absolute path from base path
 		char full_model_path[1024];
