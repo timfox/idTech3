@@ -121,6 +121,8 @@ typedef struct {
 	void	(*VertexLighting)( qboolean allowed );
 	void	(*SyncRender)( void );
 
+	// FLUX texture reload functionality
+	qboolean (*ReloadTexture)( const char *name );
 
 } refexport_t;
 

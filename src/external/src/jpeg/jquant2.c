@@ -24,6 +24,11 @@
 
 #ifdef QUANT_2PASS_SUPPORTED
 
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif
+
 
 /*
  * This module implements the well-known Heckbert paradigm for color
@@ -225,6 +230,7 @@ METHODDEF(void)
 prescan_quantize (j_decompress_ptr cinfo, JSAMPARRAY input_buf,
 		  JSAMPARRAY output_buf, int num_rows)
 {
+  (void)output_buf;
   my_cquantize_ptr cquantize = (my_cquantize_ptr) cinfo->cquantize;
   register JSAMPROW ptr;
   register histptr histp;
@@ -1156,6 +1162,7 @@ finish_pass1 (j_decompress_ptr cinfo)
 METHODDEF(void)
 finish_pass2 (j_decompress_ptr cinfo)
 {
+  (void)cinfo;
   /* no work */
 }
 
@@ -1307,5 +1314,9 @@ jinit_2pass_quantizer (j_decompress_ptr cinfo)
     init_error_limit(cinfo);
   }
 }
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
 #endif /* QUANT_2PASS_SUPPORTED */

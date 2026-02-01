@@ -40,6 +40,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <sys/socket.h>
 #endif
 
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wgnu-binary-literal"
+#pragma clang diagnostic ignored "-Wgnu-zero-variadic-macro-arguments"
+#pragma clang diagnostic ignored "-Wsign-compare"
+#endif
+
 #if defined(USE_IPV6) && !defined(IPV6_JOIN_GROUP) && !defined(_WIN32)
 struct ipv6_mreq {
 	struct in6_addr ipv6mr_multiaddr;
@@ -1679,7 +1686,7 @@ static uint32_t alloc_sx_const( uint32_t pref, uint32_t imm )
 }
 
 
-static uint32_t dyn_alloc_rx( uint32_t pref )
+static uint32_t dyn_alloc_rx( uint32_t pref UNUSED_VAR )
 {
 	const uint32_t _rx_mask = build_rx_mask();
 	const uint32_t mask = _rx_mask | build_opstack_mask( TYPE_RX );
@@ -1767,7 +1774,7 @@ static uint32_t alloc_rx( uint32_t pref )
 }
 
 
-static uint32_t dyn_alloc_sx( uint32_t pref )
+static uint32_t dyn_alloc_sx( uint32_t pref UNUSED_VAR )
 {
 	const uint32_t _sx_mask = build_sx_mask();
 	const uint32_t mask = _sx_mask | build_opstack_mask( TYPE_SX );
@@ -3579,3 +3586,7 @@ int32_t VM_CallCompiled( vm_t *vm, int nargs, int32_t *args )
 
 	return opStack[1];
 }
+
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif

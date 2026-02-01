@@ -23,6 +23,12 @@
 #include "jinclude.h"
 #include "jpeglib.h"
 
+#if defined(__GNUC__) || defined(__clang__)
+#define UNUSED_PARAM __attribute__((unused))
+#else
+#define UNUSED_PARAM
+#endif
+
 
 /* Pointer to routine to upsample a single component */
 typedef JMETHOD(void, upsample1_ptr,
@@ -158,9 +164,12 @@ sep_upsample (j_decompress_ptr cinfo,
  */
 
 METHODDEF(void)
-fullsize_upsample (j_decompress_ptr cinfo, jpeg_component_info * compptr,
+fullsize_upsample (j_decompress_ptr cinfo UNUSED_PARAM,
+		   jpeg_component_info * compptr UNUSED_PARAM,
 		   JSAMPARRAY input_data, JSAMPIMAGE output_data_ptr)
 {
+  (void)cinfo;
+  (void)compptr;
   *output_data_ptr = input_data;
 }
 
@@ -219,9 +228,10 @@ int_upsample (j_decompress_ptr cinfo, jpeg_component_info * compptr,
  */
 
 METHODDEF(void)
-h2v1_upsample (j_decompress_ptr cinfo, jpeg_component_info * compptr,
+h2v1_upsample (j_decompress_ptr cinfo, jpeg_component_info * compptr UNUSED_PARAM,
 	       JSAMPARRAY input_data, JSAMPIMAGE output_data_ptr)
 {
+  (void)compptr;
   JSAMPARRAY output_data = *output_data_ptr;
   register JSAMPROW inptr, outptr;
   register JSAMPLE invalue;
@@ -247,9 +257,10 @@ h2v1_upsample (j_decompress_ptr cinfo, jpeg_component_info * compptr,
  */
 
 METHODDEF(void)
-h2v2_upsample (j_decompress_ptr cinfo, jpeg_component_info * compptr,
+h2v2_upsample (j_decompress_ptr cinfo, jpeg_component_info * compptr UNUSED_PARAM,
 	       JSAMPARRAY input_data, JSAMPIMAGE output_data_ptr)
 {
+  (void)compptr;
   JSAMPARRAY output_data, output_end;
   register JSAMPROW inptr, outptr;
   register JSAMPLE invalue;

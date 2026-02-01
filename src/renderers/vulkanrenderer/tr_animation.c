@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "tr_local.h"
+#include <string.h>
 
 /*
 
@@ -484,54 +485,67 @@ void RB_MDRSurfaceAnim( mdrSurface_t *surface )
 void MC_UnCompress(float mat[3][4],const unsigned char * comp)
 {
 	int val;
+	unsigned short s;
 
-	val=(int)((unsigned short *)(comp))[0];
+	memcpy(&s, comp + 0 * sizeof(unsigned short), sizeof(s));
+	val = (int)s;
 	val-=1<<(MC_BITS_X-1);
 	mat[0][3]=((float)(val))*MC_SCALE_X;
 
-	val=(int)((unsigned short *)(comp))[1];
+	memcpy(&s, comp + 1 * sizeof(unsigned short), sizeof(s));
+	val = (int)s;
 	val-=1<<(MC_BITS_Y-1);
 	mat[1][3]=((float)(val))*MC_SCALE_Y;
 
-	val=(int)((unsigned short *)(comp))[2];
+	memcpy(&s, comp + 2 * sizeof(unsigned short), sizeof(s));
+	val = (int)s;
 	val-=1<<(MC_BITS_Z-1);
 	mat[2][3]=((float)(val))*MC_SCALE_Z;
 
-	val=(int)((unsigned short *)(comp))[3];
+	memcpy(&s, comp + 3 * sizeof(unsigned short), sizeof(s));
+	val = (int)s;
 	val-=1<<(MC_BITS_VECT-1);
 	mat[0][0]=((float)(val))*MC_SCALE_VECT;
 
-	val=(int)((unsigned short *)(comp))[4];
+	memcpy(&s, comp + 4 * sizeof(unsigned short), sizeof(s));
+	val = (int)s;
 	val-=1<<(MC_BITS_VECT-1);
 	mat[0][1]=((float)(val))*MC_SCALE_VECT;
 
-	val=(int)((unsigned short *)(comp))[5];
+	memcpy(&s, comp + 5 * sizeof(unsigned short), sizeof(s));
+	val = (int)s;
 	val-=1<<(MC_BITS_VECT-1);
 	mat[0][2]=((float)(val))*MC_SCALE_VECT;
 
 
-	val=(int)((unsigned short *)(comp))[6];
+	memcpy(&s, comp + 6 * sizeof(unsigned short), sizeof(s));
+	val = (int)s;
 	val-=1<<(MC_BITS_VECT-1);
 	mat[1][0]=((float)(val))*MC_SCALE_VECT;
 
-	val=(int)((unsigned short *)(comp))[7];
+	memcpy(&s, comp + 7 * sizeof(unsigned short), sizeof(s));
+	val = (int)s;
 	val-=1<<(MC_BITS_VECT-1);
 	mat[1][1]=((float)(val))*MC_SCALE_VECT;
 
-	val=(int)((unsigned short *)(comp))[8];
+	memcpy(&s, comp + 8 * sizeof(unsigned short), sizeof(s));
+	val = (int)s;
 	val-=1<<(MC_BITS_VECT-1);
 	mat[1][2]=((float)(val))*MC_SCALE_VECT;
 
 
-	val=(int)((unsigned short *)(comp))[9];
+	memcpy(&s, comp + 9 * sizeof(unsigned short), sizeof(s));
+	val = (int)s;
 	val-=1<<(MC_BITS_VECT-1);
 	mat[2][0]=((float)(val))*MC_SCALE_VECT;
 
-	val=(int)((unsigned short *)(comp))[10];
+	memcpy(&s, comp + 10 * sizeof(unsigned short), sizeof(s));
+	val = (int)s;
 	val-=1<<(MC_BITS_VECT-1);
 	mat[2][1]=((float)(val))*MC_SCALE_VECT;
 
-	val=(int)((unsigned short *)(comp))[11];
+	memcpy(&s, comp + 11 * sizeof(unsigned short), sizeof(s));
+	val = (int)s;
 	val-=1<<(MC_BITS_VECT-1);
 	mat[2][2]=((float)(val))*MC_SCALE_VECT;
 }

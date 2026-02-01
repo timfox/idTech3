@@ -2172,6 +2172,7 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 	re.GetConfig = RE_GetConfig;
 	re.VertexLighting = RE_VertexLighting;
 	re.SyncRender = RE_SyncRender;
+	re.ReloadTexture = R_ReloadTexture;
 
 	return &re;
 }

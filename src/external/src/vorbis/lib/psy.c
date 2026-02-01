@@ -20,6 +20,11 @@
 #include "vorbis/codec.h"
 #include "codec_internal.h"
 
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable: 4244) // conversion from double to float
+#endif
+
 #include "masking.h"
 #include "psy.h"
 #include "os.h"
@@ -1207,3 +1212,7 @@ void _vp_couple_quantize_normalize(int blobno,
     }
   }
 }
+
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif

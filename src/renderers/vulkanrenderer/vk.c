@@ -8487,8 +8487,9 @@ _retry:
 	if ( vk_find_screenmap_drawsurfs() ) {
 		vk_begin_screenmap_render_pass();
 	} else {
-		vk_begin_main_render_pass();
-	}
+vk_begin_main_render_pass();
+}
+
 
 	// dynamic vertex buffer layout
 	vk.cmd->uniform_read_offset = 0;
