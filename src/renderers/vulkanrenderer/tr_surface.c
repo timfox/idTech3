@@ -904,7 +904,7 @@ RB_SurfaceFace
 */
 static void RB_SurfaceFace( const srfSurfaceFace_t *surf ) {
 	int			i;
-	unsigned	*indices;
+	const unsigned	*indices;
 	glIndex_t	*tessIndexes;
 	const float	*v;
 	const float	*normal;
@@ -950,7 +950,7 @@ static void RB_SurfaceFace( const srfSurfaceFace_t *surf ) {
 	tess.dlightBits |= dlightBits;
 #endif
 
-	indices = ( unsigned * ) ( ( ( char  * ) surf ) + surf->ofsIndices );
+	indices = ( const unsigned * ) ( ( ( const char  * ) surf ) + surf->ofsIndices );
 
 	Bob = tess.numVertexes;
 	tessIndexes = tess.indexes + tess.numIndexes;
@@ -998,7 +998,11 @@ static void RB_SurfaceFace( const srfSurfaceFace_t *surf ) {
 			tess.texCoords[1][ndx][0] = v[8];
 			tess.texCoords[1][ndx][1] = v[9];
 		}
-		* ( unsigned int * ) &tess.vertexColors[ndx] = * ( unsigned int * ) &v[10];
+		{
+			uint32_t color;
+			Com_Memcpy( &color, &v[10], sizeof( color ) );
+			Com_Memcpy( &tess.vertexColors[ndx], &color, sizeof( color ) );
+		}
 #else
 		tess.texCoords[0][ndx][0] = v[3];
 		tess.texCoords[0][ndx][1] = v[4];
@@ -1009,7 +1013,11 @@ static void RB_SurfaceFace( const srfSurfaceFace_t *surf ) {
 			tess.texCoords[1][ndx][0] = v[5];
 			tess.texCoords[1][ndx][1] = v[6];
 		}
-		* ( unsigned int * ) &tess.vertexColors[ndx] = * ( unsigned int * ) &v[7];
+		{
+			uint32_t color;
+			Com_Memcpy( &color, &v[7], sizeof( color ) );
+			Com_Memcpy( &tess.vertexColors[ndx], &color, sizeof( color ) );
+		}
 #endif
 
 #ifdef USE_LEGACY_DLIGHTS
@@ -1460,6 +1468,7 @@ static void RB_SurfaceEntity( const surfaceType_t *surfType ) {
 #ifdef USE_VBO
 	VBO_Flush();
 #endif
+	(void)surfType;
 	switch( backEnd.currentEntity->e.reType ) {
 	case RT_SPRITE:
 		RB_SurfaceSprite();
@@ -1488,6 +1497,7 @@ static void RB_SurfaceEntity( const surfaceType_t *surfType ) {
 
 static void RB_SurfaceBad( const surfaceType_t *surfType ) {
 	ri.Printf( PRINT_ALL, "Bad surface tesselated.\n" );
+	(void)surfType;
 }
 
 
@@ -1503,6 +1513,7 @@ static void RB_SurfaceFlare( srfFlare_t *surf ) {
 
 
 static void RB_SurfaceSkip( void *surf ) {
+	(void)surf;
 }
 
 

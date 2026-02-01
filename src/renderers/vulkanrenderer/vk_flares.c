@@ -232,7 +232,7 @@ void RB_AddDlightFlares( void ) {
 	if ( tr.world )
 		fog = tr.world->fogs;
 
-	for ( i = 0 ; i < backEnd.refdef.num_dlights; i++, l++ ) {
+	for ( i = 0 ; i < (int)backEnd.refdef.num_dlights; i++, l++ ) {
 
 		if ( fog )
 		{

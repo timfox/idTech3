@@ -31,8 +31,9 @@ void main()
 	}
 
 	float viewZ = viewZFromDepth(depth);
+	float negZ = -viewZ;
 	vec2 ndc = frag_tex_coord * 2.0 - 1.0;
-	vec3 viewPos = vec3(ndc.x * viewZ * pc.projInfo.x, ndc.y * viewZ * pc.projInfo.y, viewZ);
+	vec3 viewPos = vec3(ndc.x * negZ * pc.projInfo.x, ndc.y * negZ * pc.projInfo.y, viewZ);
 
 	// normal from derivatives
 	vec3 dx = dFdx(viewPos);
@@ -76,7 +77,7 @@ void main()
 
 		float proj00 = 1.0 / max(pc.projInfo.x, 1e-6);
 		float proj11 = 1.0 / max(pc.projInfo.y, 1e-6);
-		vec2 sampleNdc = vec2(samplePos.x * proj00 / samplePos.z, samplePos.y * proj11 / samplePos.z);
+		vec2 sampleNdc = vec2(samplePos.x * proj00 / -samplePos.z, samplePos.y * proj11 / -samplePos.z);
 		vec2 sampleUV = sampleNdc * 0.5 + 0.5;
 
 		if (sampleUV.x < 0.0 || sampleUV.x > 1.0 || sampleUV.y < 0.0 || sampleUV.y > 1.0) {

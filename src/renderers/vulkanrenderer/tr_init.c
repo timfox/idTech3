@@ -116,6 +116,7 @@ cvar_t	*r_ssaoIntensity;
 cvar_t	*r_ssaoPower;
 cvar_t	*r_ssaoSamples;
 cvar_t	*r_ssaoBlurRadius;
+cvar_t	*r_ssaoDebugView;
 cvar_t	*r_renderWidth;
 cvar_t	*r_renderHeight;
 cvar_t	*r_renderScale;
@@ -1913,6 +1914,9 @@ static void R_Register( void )
 	r_ssaoBlurRadius = ri.Cvar_Get( "r_ssaoBlurRadius", "2", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_ssaoBlurRadius, "0", "8", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ssaoBlurRadius, "SSAO blur radius in pixels (0 disables blur)." );
+	r_ssaoDebugView = ri.Cvar_Get( "r_ssaoDebugView", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_ssaoDebugView, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_ssaoDebugView, "SSAO debug view:\n 0: off\n 1: show AO only\n 2: show depth" );
 	if ( r_ssao->integer ) {
 		ri.Printf( PRINT_ALL, "SSAO enabled.\n" );
 	}
