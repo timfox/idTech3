@@ -1448,6 +1448,13 @@ extern cvar_t	*r_baseSpecular;
 extern cvar_t	*r_cubeMapping;
 #endif
 #endif
+extern cvar_t	*r_ssao;
+extern cvar_t	*r_ssaoRadius;
+extern cvar_t	*r_ssaoBias;
+extern cvar_t	*r_ssaoIntensity;
+extern cvar_t	*r_ssaoPower;
+extern cvar_t	*r_ssaoSamples;
+extern cvar_t	*r_ssaoBlurRadius;
 extern cvar_t	*r_fbo;
 extern cvar_t	*r_hdr;
 extern cvar_t	*r_bloom;

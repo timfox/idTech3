@@ -33,7 +33,7 @@
 #define USE_DEDICATED_ALLOCATION
 #endif
 //#define MIN_IMAGE_ALIGN (128*1024)
-#define MAX_ATTACHMENTS_IN_POOL (11+VK_NUM_BLOOM_PASSES*2) // depth + msaa + msaa-resolve + depth-resolve + screenmap.msaa + screenmap.resolve + screenmap.depth + bloom_extract + blur pairs
+#define MAX_ATTACHMENTS_IN_POOL (13+VK_NUM_BLOOM_PASSES*2) // depth + msaa + msaa-resolve + depth-resolve + screenmap.msaa + screenmap.resolve + screenmap.depth + bloom_extract + blur pairs + ssao + ssao_blur
 
 #define VK_DESC_STORAGE      0
 #define VK_DESC_UNIFORM      0
@@ -394,6 +394,9 @@ void vk_begin_main_render_pass( void );
 void vk_begin_post_bloom_render_pass( void );
 void vk_begin_bloom_extract_render_pass( void );
 void vk_begin_blur_render_pass( uint32_t index );
+void vk_begin_ssao_render_pass( void );
+void vk_begin_ssao_blur_render_pass( void );
+void vk_begin_ssao_combine_render_pass( void );
 
 void vk_bind_pipeline( uint32_t pipeline );
 void vk_bind_index( void );
@@ -519,6 +522,9 @@ typedef struct {
 		VkRenderPass bloom_extract;
 		VkRenderPass blur[VK_NUM_BLOOM_PASSES*2]; // horizontal-vertical pairs
 		VkRenderPass post_bloom;
+		VkRenderPass ssao;
+		VkRenderPass ssao_blur;
+		VkRenderPass ssao_combine;
 #ifdef VK_PBR_BRDFLUT
 		VkRenderPass brdflut;
 #endif
@@ -534,11 +540,14 @@ typedef struct {
 	VkPipelineLayout pipeline_layout_storage;	// flare test shader layout
 	VkPipelineLayout pipeline_layout_post_process;	// post-processing
 	VkPipelineLayout pipeline_layout_blend;		// post-processing
+	VkPipelineLayout pipeline_layout_ssao;		// ssao (depth + push constants)
+	VkPipelineLayout pipeline_layout_ssao_combine;	// ssao combine (color + ao)
 #ifdef VK_PBR_BRDFLUT
 	VkPipelineLayout pipeline_layout_brdflut;
 #endif
 
 	VkDescriptorSet color_descriptor;
+	VkDescriptorSet depth_descriptor;
 
 	VkImage color_image;
 	VkImageView color_image_view;
@@ -547,6 +556,14 @@ typedef struct {
 	VkImageView bloom_image_view[1+VK_NUM_BLOOM_PASSES*2];
 
 	VkDescriptorSet bloom_image_descriptor[1+VK_NUM_BLOOM_PASSES*2];
+
+	VkImage ssao_image;
+	VkImageView ssao_image_view;
+	VkDescriptorSet ssao_descriptor;
+
+	VkImage ssao_blur_image;
+	VkImageView ssao_blur_image_view;
+	VkDescriptorSet ssao_blur_descriptor;
 
 	VkImage depth_image;
 	VkImageView depth_image_view;
@@ -593,6 +610,9 @@ typedef struct {
 	struct {
 		VkFramebuffer blur[VK_NUM_BLOOM_PASSES*2];
 		VkFramebuffer bloom_extract;
+		VkFramebuffer ssao;
+		VkFramebuffer ssao_blur;
+		VkFramebuffer ssao_combine;
 		VkFramebuffer main[MAX_SWAPCHAIN_IMAGES];
 		VkFramebuffer gamma[MAX_SWAPCHAIN_IMAGES];
 		VkFramebuffer screenmap;
@@ -681,6 +701,10 @@ typedef struct {
 		VkShaderModule blur_fs;
 		VkShaderModule blend_fs;
 
+		VkShaderModule ssao_fs;
+		VkShaderModule ssao_blur_fs;
+		VkShaderModule ssao_combine_fs;
+
 		VkShaderModule gamma_fs;
 		VkShaderModule gamma_vs;
 
@@ -758,6 +782,9 @@ typedef struct {
 	VkPipeline bloom_extract_pipeline;
 	VkPipeline blur_pipeline[VK_NUM_BLOOM_PASSES*2]; // horizontal & vertical pairs
 	VkPipeline bloom_blend_pipeline;
+	VkPipeline ssao_pipeline;
+	VkPipeline ssao_blur_pipeline;
+	VkPipeline ssao_combine_pipeline;
 #ifdef VK_PBR_BRDFLUT
 	VkPipeline brdflut_pipeline;
 #endif
@@ -777,6 +804,7 @@ typedef struct {
 	VkFormat capture_format;
 	VkFormat depth_format;
 	VkFormat bloom_format;
+	VkFormat ssao_format;
 
 	VkImageLayout initSwapchainLayout;
 

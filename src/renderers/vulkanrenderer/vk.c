@@ -388,6 +388,10 @@ static void record_image_layout_transition( VkCommandBuffer command_buffer, VkIm
 				src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 			barrier.srcAccessMask = VK_ACCESS_NONE;
 			break;
+		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+			src_stage = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+			barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			break;
 		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
 			src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
 			barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -419,6 +423,10 @@ static void record_image_layout_transition( VkCommandBuffer command_buffer, VkIm
 		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
 			dst_stage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
 			barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL:
+			dst_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+			barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 			break;
 		case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
 			dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
@@ -719,7 +727,7 @@ static void vk_create_render_passes( void )
 	attachments[1].samples = vkSamples;
 	attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; // Need empty depth buffer before use
 	attachments[1].stencilLoadOp = glConfig.stencilBits ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	if ( r_bloom->integer ) {
+	if ( r_bloom->integer || ( r_ssao && r_ssao->integer ) ) {
 		attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE; // keep it for post-bloom pass
 		attachments[1].stencilStoreOp = glConfig.stencilBits ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE;
 	} else {
@@ -874,6 +882,50 @@ static void vk_create_render_passes( void )
 			VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.blur[i] ) );
 			SET_OBJECT_NAME( vk.render_pass.blur[i], va( "render pass - blur %i", i ), VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
 		}
+	}
+
+	if ( r_ssao && r_ssao->integer && r_fbo->integer )
+	{
+		// ssao render pass
+		desc.attachmentCount = 1;
+
+		colorRef0.attachment = 0;
+		colorRef0.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+		Com_Memset( &subpass, 0, sizeof( subpass ) );
+		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		subpass.colorAttachmentCount = 1;
+		subpass.pColorAttachments = &colorRef0;
+
+		attachments[0].flags = 0;
+		attachments[0].format = vk.ssao_format;
+		attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		attachments[0].initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+		VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.ssao ) );
+		SET_OBJECT_NAME( vk.render_pass.ssao, "render pass - ssao", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
+
+		VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.ssao_blur ) );
+		SET_OBJECT_NAME( vk.render_pass.ssao_blur, "render pass - ssao_blur", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
+
+		// ssao combine pass (write back to main color)
+		attachments[0].flags = 0;
+		attachments[0].format = vk.color_format;
+		attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+		attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		attachments[0].initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+		VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.ssao_combine ) );
+		SET_OBJECT_NAME( vk.render_pass.ssao_combine, "render pass - ssao_combine", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
 	}
 
 	// capture render pass
@@ -1653,6 +1705,7 @@ static void setup_surface_formats( VkPhysicalDevice physical_device )
 	vk.capture_format = VK_FORMAT_R8G8B8A8_UNORM;
 
 	vk.bloom_format = vk.base_format.format;
+	vk.ssao_format = VK_FORMAT_R8_UNORM;
 
 	vk.blitEnabled = vk_blit_enabled( physical_device, vk.color_format, vk.capture_format );
 
@@ -2587,6 +2640,34 @@ void vk_update_attachment_descriptors( void ) {
 
 		qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
 
+		if ( r_ssao && r_ssao->integer )
+		{
+			// depth sampling for SSAO
+			sd.gl_mag_filter = sd.gl_min_filter = GL_NEAREST;
+			sd.max_lod_1_0 = qtrue;
+			sd.noAnisotropy = qtrue;
+			info.sampler = vk_find_sampler( &sd );
+			info.imageView = vk.depth_image_view;
+			info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+			desc.dstSet = vk.depth_descriptor;
+			qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+
+			// ssao output
+			sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+			sd.max_lod_1_0 = qtrue;
+			sd.noAnisotropy = qtrue;
+			info.sampler = vk_find_sampler( &sd );
+			info.imageView = vk.ssao_image_view;
+			info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			desc.dstSet = vk.ssao_descriptor;
+			qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+
+			// ssao blur output
+			info.imageView = vk.ssao_blur_image_view;
+			desc.dstSet = vk.ssao_blur_descriptor;
+			qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+		}
+
 		// bloom images
 		if ( r_bloom->integer )
 		{
@@ -2675,6 +2756,12 @@ void vk_init_descriptors( void )
 		alloc.pSetLayouts = &vk.set_layout_sampler;
 
 		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.color_descriptor ) );
+
+		if ( r_ssao && r_ssao->integer ) {
+			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.depth_descriptor ) );
+			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.ssao_descriptor ) );
+			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.ssao_blur_descriptor ) );
+		}
 
 		if ( r_bloom->integer )
 		{
@@ -3089,10 +3176,16 @@ static void vk_create_shader_modules( void )
 	vk.modules.bloom_fs = SHADER_MODULE( bloom_frag_spv );
 	vk.modules.blur_fs = SHADER_MODULE( blur_frag_spv );
 	vk.modules.blend_fs = SHADER_MODULE( blend_frag_spv );
+	vk.modules.ssao_fs = SHADER_MODULE( ssao_frag_spv );
+	vk.modules.ssao_blur_fs = SHADER_MODULE( ssao_blur_frag_spv );
+	vk.modules.ssao_combine_fs = SHADER_MODULE( ssao_combine_frag_spv );
 
 	SET_OBJECT_NAME( vk.modules.bloom_fs, "bloom extraction fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.blur_fs, "gaussian blur fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.blend_fs, "final bloom blend fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	SET_OBJECT_NAME( vk.modules.ssao_fs, "ssao fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	SET_OBJECT_NAME( vk.modules.ssao_blur_fs, "ssao blur fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	SET_OBJECT_NAME( vk.modules.ssao_combine_fs, "ssao combine fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 
 	vk.modules.gamma_fs = SHADER_MODULE( gamma_frag_spv );
 	vk.modules.gamma_vs = SHADER_MODULE( gamma_vert_spv );
@@ -3381,6 +3474,12 @@ void vk_update_post_process_pipelines( void )
 
 			vk_create_post_process_pipeline( 2, glConfig.vidWidth, glConfig.vidHeight ); // bloom blending
 		}
+
+		if ( r_ssao && r_ssao->integer ) {
+			vk_create_post_process_pipeline( 5, glConfig.vidWidth, glConfig.vidHeight );
+			vk_create_post_process_pipeline( 6, glConfig.vidWidth, glConfig.vidHeight );
+			vk_create_post_process_pipeline( 7, glConfig.vidWidth, glConfig.vidHeight );
+		}
 	}
 }
 
@@ -3654,6 +3753,9 @@ static void create_depth_attachment( uint32_t width, uint32_t height, VkSampleCo
 	create_desc.samples = samples;
 	create_desc.tiling = VK_IMAGE_TILING_OPTIMAL;
 	create_desc.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+	if ( r_ssao && r_ssao->integer ) {
+		create_desc.usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
+	}
 	if ( allowTransient ) {
 		create_desc.usage |= VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
 	}
@@ -3711,6 +3813,14 @@ static void vk_create_attachments( void )
 				create_color_attachment( width, height, VK_SAMPLE_COUNT_1_BIT, vk.bloom_format,
 					usage, &vk.bloom_image[i+1], &vk.bloom_image_view[i+1], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 			}
+		}
+
+		// ssao
+		if ( r_ssao && r_ssao->integer ) {
+			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.ssao_format,
+				usage, &vk.ssao_image, &vk.ssao_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
+			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.ssao_format,
+				usage, &vk.ssao_blur_image, &vk.ssao_blur_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 		}
 
         // cubemap
@@ -3797,6 +3907,16 @@ static void vk_create_attachments( void )
 	{
 		SET_OBJECT_NAME( vk.bloom_image[i], va( "bloom attachment %i", i ), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
 		SET_OBJECT_NAME( vk.bloom_image_view[i], va( "bloom attachment %i", i ), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+	}
+
+	if ( vk.ssao_image ) {
+		SET_OBJECT_NAME( vk.ssao_image, "ssao attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+		SET_OBJECT_NAME( vk.ssao_image_view, "ssao attachment view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+	}
+
+	if ( vk.ssao_blur_image ) {
+		SET_OBJECT_NAME( vk.ssao_blur_image, "ssao blur attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+		SET_OBJECT_NAME( vk.ssao_blur_image_view, "ssao blur attachment view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 	}
 
 #ifdef VK_PBR_BRDFLUT
@@ -3976,6 +4096,28 @@ static void vk_create_framebuffers( void )
 		}
 	}
 
+	if ( r_ssao && r_ssao->integer )
+	{
+		// ssao
+		desc.renderPass = vk.render_pass.ssao;
+		desc.attachmentCount = 1;
+		desc.width = glConfig.vidWidth;
+		desc.height = glConfig.vidHeight;
+		framebuffer_attachments[0] = vk.ssao_image_view;
+		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.ssao ) );
+		SET_OBJECT_NAME( vk.framebuffers.ssao, "framebuffer - ssao", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+
+		desc.renderPass = vk.render_pass.ssao_blur;
+		framebuffer_attachments[0] = vk.ssao_blur_image_view;
+		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.ssao_blur ) );
+		SET_OBJECT_NAME( vk.framebuffers.ssao_blur, "framebuffer - ssao_blur", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+
+		desc.renderPass = vk.render_pass.ssao_combine;
+		framebuffer_attachments[0] = vk.color_image_view;
+		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.ssao_combine ) );
+		SET_OBJECT_NAME( vk.framebuffers.ssao_combine, "framebuffer - ssao_combine", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+	}
+
 	#ifdef VK_PBR_BRDFLUT
 	if( vk.pbrActive )
 	{
@@ -4093,6 +4235,21 @@ static void vk_destroy_framebuffers( void ) {
 	if ( vk.framebuffers.bloom_extract != VK_NULL_HANDLE ) {
 		qvkDestroyFramebuffer( vk.device, vk.framebuffers.bloom_extract, NULL );
 		vk.framebuffers.bloom_extract = VK_NULL_HANDLE;
+	}
+
+	if ( vk.framebuffers.ssao != VK_NULL_HANDLE ) {
+		qvkDestroyFramebuffer( vk.device, vk.framebuffers.ssao, NULL );
+		vk.framebuffers.ssao = VK_NULL_HANDLE;
+	}
+
+	if ( vk.framebuffers.ssao_blur != VK_NULL_HANDLE ) {
+		qvkDestroyFramebuffer( vk.device, vk.framebuffers.ssao_blur, NULL );
+		vk.framebuffers.ssao_blur = VK_NULL_HANDLE;
+	}
+
+	if ( vk.framebuffers.ssao_combine != VK_NULL_HANDLE ) {
+		qvkDestroyFramebuffer( vk.device, vk.framebuffers.ssao_combine, NULL );
+		vk.framebuffers.ssao_combine = VK_NULL_HANDLE;
 	}
 
 	if ( vk.framebuffers.screenmap != VK_NULL_HANDLE ) {
@@ -4592,7 +4749,7 @@ void vk_initialize( void )
 		uint32_t j, maxSets;
 
 		pool_size[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		pool_size[0].descriptorCount = MAX_DRAWIMAGES + 1 + 1 + 1 + VK_NUM_BLOOM_PASSES * 2; // color, screenmap, bloom descriptors
+		pool_size[0].descriptorCount = MAX_DRAWIMAGES + 1 + 1 + 1 + 3 + VK_NUM_BLOOM_PASSES * 2; // color, screenmap, depth/ssao, bloom descriptors
 #ifdef USE_VK_PBR
         if ( vk.pbrActive )
             pool_size[0].descriptorCount += 2 + ( MAX_DRAWIMAGES * 8 ); // brdf-lut + irradiance | MAX_DRAWIMAGES * (physical, normal, emissive, clearcoat, sheen, anisotropy, transmission, subsurface)
@@ -4711,6 +4868,28 @@ void vk_initialize( void )
 		SET_OBJECT_NAME( vk.pipeline_layout, "pipeline layout - main", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
 		SET_OBJECT_NAME( vk.pipeline_layout_post_process, "pipeline layout - post-processing", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
 		SET_OBJECT_NAME( vk.pipeline_layout_blend, "pipeline layout - blend", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
+
+		// ssao pipeline layout (depth sampler + push constants)
+		set_layouts[0] = vk.set_layout_sampler;
+		desc.setLayoutCount = 1;
+		desc.pSetLayouts = set_layouts;
+		push_range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		push_range.offset = 0;
+		push_range.size = 48; // ssao push constants
+		desc.pushConstantRangeCount = 1;
+		desc.pPushConstantRanges = &push_range;
+		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_ssao ) );
+		SET_OBJECT_NAME( vk.pipeline_layout_ssao, "pipeline layout - ssao", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
+
+		// ssao combine layout (color + ao samplers)
+		set_layouts[0] = vk.set_layout_sampler;
+		set_layouts[1] = vk.set_layout_sampler;
+		desc.setLayoutCount = 2;
+		desc.pSetLayouts = set_layouts;
+		desc.pushConstantRangeCount = 0;
+		desc.pPushConstantRanges = NULL;
+		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_ssao_combine ) );
+		SET_OBJECT_NAME( vk.pipeline_layout_ssao_combine, "pipeline layout - ssao_combine", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
 	
 #ifdef VK_PBR_BRDFLUT
 		if( vk.pbrActive ) {
@@ -4798,6 +4977,20 @@ static void vk_destroy_attachments( void )
 			vk.bloom_image[i] = VK_NULL_HANDLE;
 			vk.bloom_image_view[i] = VK_NULL_HANDLE;
 		}
+	}
+
+	if ( vk.ssao_image ) {
+		qvkDestroyImage( vk.device, vk.ssao_image, NULL );
+		qvkDestroyImageView( vk.device, vk.ssao_image_view, NULL );
+		vk.ssao_image = VK_NULL_HANDLE;
+		vk.ssao_image_view = VK_NULL_HANDLE;
+	}
+
+	if ( vk.ssao_blur_image ) {
+		qvkDestroyImage( vk.device, vk.ssao_blur_image, NULL );
+		qvkDestroyImageView( vk.device, vk.ssao_blur_image_view, NULL );
+		vk.ssao_blur_image = VK_NULL_HANDLE;
+		vk.ssao_blur_image_view = VK_NULL_HANDLE;
 	}
 
 	if ( vk.color_image ) {
@@ -4914,6 +5107,21 @@ static void vk_destroy_render_passes( void )
 		vk.render_pass.post_bloom = VK_NULL_HANDLE;
 	}
 
+	if ( vk.render_pass.ssao != VK_NULL_HANDLE ) {
+		qvkDestroyRenderPass( vk.device, vk.render_pass.ssao, NULL );
+		vk.render_pass.ssao = VK_NULL_HANDLE;
+	}
+
+	if ( vk.render_pass.ssao_blur != VK_NULL_HANDLE ) {
+		qvkDestroyRenderPass( vk.device, vk.render_pass.ssao_blur, NULL );
+		vk.render_pass.ssao_blur = VK_NULL_HANDLE;
+	}
+
+	if ( vk.render_pass.ssao_combine != VK_NULL_HANDLE ) {
+		qvkDestroyRenderPass( vk.device, vk.render_pass.ssao_combine, NULL );
+		vk.render_pass.ssao_combine = VK_NULL_HANDLE;
+	}
+
 	if ( vk.render_pass.screenmap != VK_NULL_HANDLE ) {
 		qvkDestroyRenderPass( vk.device, vk.render_pass.screenmap, NULL );
 		vk.render_pass.screenmap = VK_NULL_HANDLE;
@@ -4982,6 +5190,21 @@ static void vk_destroy_pipelines( qboolean resetCounter )
 	if ( vk.bloom_blend_pipeline != VK_NULL_HANDLE ) {
 		qvkDestroyPipeline( vk.device, vk.bloom_blend_pipeline, NULL );
 		vk.bloom_blend_pipeline = VK_NULL_HANDLE;
+	}
+
+	if ( vk.ssao_pipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.ssao_pipeline, NULL );
+		vk.ssao_pipeline = VK_NULL_HANDLE;
+	}
+
+	if ( vk.ssao_blur_pipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.ssao_blur_pipeline, NULL );
+		vk.ssao_blur_pipeline = VK_NULL_HANDLE;
+	}
+
+	if ( vk.ssao_combine_pipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.ssao_combine_pipeline, NULL );
+		vk.ssao_combine_pipeline = VK_NULL_HANDLE;
 	}
 
 #ifdef VK_PBR_BRDFLUT
@@ -5056,6 +5279,8 @@ void vk_shutdown( refShutdownCode_t code )
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_storage, NULL);
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_post_process, NULL);
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_blend, NULL);
+	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_ssao, NULL);
+	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_ssao_combine, NULL);
 #ifdef USE_VK_PBR
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_brdflut, NULL);
 #endif
@@ -5220,6 +5445,9 @@ for (i = 0; i < 2; i++) {
 	qvkDestroyShaderModule(vk.device, vk.modules.bloom_fs, NULL);
 	qvkDestroyShaderModule(vk.device, vk.modules.blur_fs, NULL);
 	qvkDestroyShaderModule(vk.device, vk.modules.blend_fs, NULL);
+	qvkDestroyShaderModule(vk.device, vk.modules.ssao_fs, NULL);
+	qvkDestroyShaderModule(vk.device, vk.modules.ssao_blur_fs, NULL);
+	qvkDestroyShaderModule(vk.device, vk.modules.ssao_combine_fs, NULL);
 
 	qvkDestroyShaderModule(vk.device, vk.modules.gamma_vs, NULL);
 	qvkDestroyShaderModule(vk.device, vk.modules.gamma_fs, NULL);
@@ -5746,6 +5974,33 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			pipeline_name = "bloom extraction pipeline";
 			blend = qfalse;
 			break;
+		case 5: // ssao
+			pipeline = &vk.ssao_pipeline;
+			fsmodule = vk.modules.ssao_fs;
+			renderpass = vk.render_pass.ssao;
+			layout = vk.pipeline_layout_ssao;
+			samples = VK_SAMPLE_COUNT_1_BIT;
+			pipeline_name = "ssao pipeline";
+			blend = qfalse;
+			break;
+		case 6: // ssao blur
+			pipeline = &vk.ssao_blur_pipeline;
+			fsmodule = vk.modules.ssao_blur_fs;
+			renderpass = vk.render_pass.ssao_blur;
+			layout = vk.pipeline_layout_ssao;
+			samples = VK_SAMPLE_COUNT_1_BIT;
+			pipeline_name = "ssao blur pipeline";
+			blend = qfalse;
+			break;
+		case 7: // ssao combine
+			pipeline = &vk.ssao_combine_pipeline;
+			fsmodule = vk.modules.ssao_combine_fs;
+			renderpass = vk.render_pass.ssao_combine;
+			layout = vk.pipeline_layout_post_process;
+			samples = VK_SAMPLE_COUNT_1_BIT;
+			pipeline_name = "ssao combine pipeline";
+			blend = qfalse;
+			break;
 		case 2: // final bloom blend
 			pipeline = &vk.bloom_blend_pipeline;
 			fsmodule = vk.modules.blend_fs;
@@ -5866,6 +6121,9 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	frag_spec_info.pData = &frag_spec_data;
 
 	shader_stages[1].pSpecializationInfo = &frag_spec_info;
+	if ( program_index >= 5 ) {
+		shader_stages[1].pSpecializationInfo = NULL;
+	}
 
 	//
 	// Primitive assembly.
@@ -5945,6 +6203,16 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 		attachment_blend_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
 	} else {
 		attachment_blend_state.blendEnable = VK_FALSE;
+	}
+
+	if ( program_index == 7 ) {
+		attachment_blend_state.blendEnable = VK_TRUE;
+		attachment_blend_state.srcColorBlendFactor = VK_BLEND_FACTOR_DST_COLOR;
+		attachment_blend_state.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+		attachment_blend_state.colorBlendOp = VK_BLEND_OP_ADD;
+		attachment_blend_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+		attachment_blend_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+		attachment_blend_state.alphaBlendOp = VK_BLEND_OP_ADD;
 	}
 
 	blend_state.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
@@ -8285,6 +8553,42 @@ void vk_begin_blur_render_pass( uint32_t index )
 }
 
 
+void vk_begin_ssao_render_pass( void )
+{
+	VkFramebuffer frameBuffer = vk.framebuffers.ssao;
+
+	vk.renderWidth = glConfig.vidWidth;
+	vk.renderHeight = glConfig.vidHeight;
+	vk.renderScaleX = vk.renderScaleY = 1.0f;
+
+	vk_begin_render_pass( vk.render_pass.ssao, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+}
+
+
+void vk_begin_ssao_blur_render_pass( void )
+{
+	VkFramebuffer frameBuffer = vk.framebuffers.ssao_blur;
+
+	vk.renderWidth = glConfig.vidWidth;
+	vk.renderHeight = glConfig.vidHeight;
+	vk.renderScaleX = vk.renderScaleY = 1.0f;
+
+	vk_begin_render_pass( vk.render_pass.ssao_blur, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+}
+
+
+void vk_begin_ssao_combine_render_pass( void )
+{
+	VkFramebuffer frameBuffer = vk.framebuffers.ssao_combine;
+
+	vk.renderWidth = glConfig.vidWidth;
+	vk.renderHeight = glConfig.vidHeight;
+	vk.renderScaleX = vk.renderScaleY = 1.0f;
+
+	vk_begin_render_pass( vk.render_pass.ssao_combine, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+}
+
+
 static void vk_begin_screenmap_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.screenmap;
@@ -8565,6 +8869,83 @@ void vk_end_frame( void )
 		if ( r_bloom->integer )
 		{
 			vk_bloom();
+		}
+
+		if ( r_ssao && r_ssao->integer )
+		{
+			static qboolean warned_msaa = qfalse;
+
+			if ( vk.msaaActive )
+			{
+				if ( !warned_msaa )
+				{
+					ri.Printf( PRINT_WARNING, "Vulkan: SSAO disabled while MSAA is enabled (no depth resolve yet)\n" );
+					warned_msaa = qtrue;
+				}
+			}
+			else
+			{
+				typedef struct {
+					float projInfo[4]; // invProj00, invProj11, proj10, proj14
+					float params[4];   // radius, bias, intensity, power
+					float misc[4];     // samples, invWidth, invHeight, unused
+				} vk_ssao_push_t;
+
+				vk_ssao_push_t push;
+				VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+				const float depthIsReversed = 0.0f;
+				if ( glConfig.stencilBits > 0 )
+					depth_aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
+
+				vk_end_render_pass();
+
+				record_image_layout_transition( vk.cmd->command_buffer, vk.depth_image, depth_aspect,
+					VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+					VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 0, 0 );
+
+				// ssao
+				vk_begin_ssao_render_pass();
+				qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.ssao_pipeline );
+				qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_ssao, 0, 1, &vk.depth_descriptor, 0, NULL );
+
+				push.projInfo[0] = ( backEnd.viewParms.projectionMatrix[0] != 0.0f ) ? 1.0f / backEnd.viewParms.projectionMatrix[0] : 1.0f;
+				push.projInfo[1] = ( backEnd.viewParms.projectionMatrix[5] != 0.0f ) ? 1.0f / backEnd.viewParms.projectionMatrix[5] : 1.0f;
+				push.projInfo[2] = backEnd.viewParms.projectionMatrix[10];
+				push.projInfo[3] = backEnd.viewParms.projectionMatrix[14];
+
+				push.params[0] = r_ssaoRadius->value;
+				push.params[1] = r_ssaoBias->value;
+				push.params[2] = r_ssaoIntensity->value;
+				push.params[3] = r_ssaoPower->value;
+
+				push.misc[0] = (float)r_ssaoSamples->integer;
+				push.misc[1] = ( glConfig.vidWidth > 0 ) ? 1.0f / (float)glConfig.vidWidth : 1.0f;
+				push.misc[2] = ( glConfig.vidHeight > 0 ) ? 1.0f / (float)glConfig.vidHeight : 1.0f;
+				push.misc[3] = depthIsReversed;
+
+				qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_ssao, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
+				qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+				vk_end_render_pass();
+
+				// ssao blur
+				vk_begin_ssao_blur_render_pass();
+				qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.ssao_blur_pipeline );
+				qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_ssao, 0, 1, &vk.ssao_descriptor, 0, NULL );
+
+				push.params[0] = (float)r_ssaoBlurRadius->integer;
+				push.params[1] = 0.0f;
+				push.params[2] = 0.0f;
+				push.params[3] = 0.0f;
+				qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_ssao, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
+				qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+				vk_end_render_pass();
+
+				// ssao combine
+				vk_begin_ssao_combine_render_pass();
+				qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.ssao_combine_pipeline );
+				qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.ssao_blur_descriptor, 0, NULL );
+				qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+			}
 		}
 
 		if ( backEnd.screenshotMask && vk.capture.image )
