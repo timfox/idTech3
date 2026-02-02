@@ -414,6 +414,18 @@ void SNDDMA_Submit( void )
 	SDL_UnlockAudioDevice( sdlPlaybackDevice );
 }
 
+/*
+===============
+SNDDMA_Activate
+
+SDL backend does not require explicit activation on window focus changes.
+Keep as a no-op to satisfy platform callers.
+===============
+*/
+void SNDDMA_Activate( void )
+{
+}
+
 
 /*
 ===============

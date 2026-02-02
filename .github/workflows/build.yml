@@ -285,12 +285,41 @@ jobs:
         shell: /bin/sh
         run: |
           apt-get -qq update
-          apt-get install -y make gcc g++
-          apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev
+          apt-get install -y make gcc g++ cmake ninja-build
+          apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev
 
-          make ${{ matrix.rule }} -j$(nproc) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin MOUNT_DIR=src USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=idtech3-vulkan BUILD_SERVER=0
-          make clean ARCH=${{ matrix.arch }} 
-          make ${{ matrix.rule }} -j$(nproc) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin MOUNT_DIR=src USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=opengl
+          mkdir -p build-vk-${{ matrix.btype }}
+          cmake -S . -B build-vk-${{ matrix.btype }} \
+            -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
+            -DCI_BUILD=OFF \
+            -DUSE_STB_TRUETYPE=ON \
+            -DBUILD_FREETYPE=ON \
+            -DENABLE_FORTIFY_SOURCE=OFF \
+            -DENABLE_ASAN=OFF \
+            -DBUILD_SERVER=OFF \
+            -DUSE_VULKAN=ON \
+            -DRENDERER_DEFAULT=vulkan \
+            -DSKIP_IDPAK_CHECK=ON \
+            -Wno-dev
+          cmake --build build-vk-${{ matrix.btype }} -j$(nproc)
+          mkdir -p bin
+          cp -f build-vk-${{ matrix.btype }}/idtech3* bin/ || true
+
+          mkdir -p build-gl-${{ matrix.btype }}
+          cmake -S . -B build-gl-${{ matrix.btype }} \
+            -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
+            -DCI_BUILD=OFF \
+            -DUSE_STB_TRUETYPE=ON \
+            -DBUILD_FREETYPE=ON \
+            -DENABLE_FORTIFY_SOURCE=OFF \
+            -DENABLE_ASAN=OFF \
+            -DBUILD_SERVER=OFF \
+            -DUSE_VULKAN=ON \
+            -DRENDERER_DEFAULT=opengl \
+            -DSKIP_IDPAK_CHECK=ON \
+            -Wno-dev
+          cmake --build build-gl-${{ matrix.btype }} -j$(nproc)
+          cp -f build-gl-${{ matrix.btype }}/idtech3* bin/ || true
 
     - uses: actions/upload-artifact@v4
       if: matrix.cc == 'gcc' && matrix.btype == 'Release'
