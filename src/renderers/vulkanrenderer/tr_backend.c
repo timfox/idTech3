@@ -178,6 +178,9 @@ void GL_Cull( cullType_t cullType ) {
 */
 void GL_TexEnv( GLint env )
 {
+#ifdef USE_VULKAN
+	(void)env;
+#endif
 #ifndef USE_VULKAN
 	if ( env == glState.texEnv[ glState.currenttmu ] )
 		return;
@@ -208,6 +211,9 @@ void GL_TexEnv( GLint env )
 */
 void GL_State( unsigned stateBits )
 {
+#ifdef USE_VULKAN
+	(void)stateBits;
+#endif
 #ifndef USE_VULKAN
 	unsigned diff = stateBits ^ glState.glStateBits;
 
@@ -1110,6 +1116,8 @@ void RE_StretchRaw( int x, int y, int w, int h, int cols, int rows, byte *data, 
 void RE_UploadCinematic( int w, int h, int cols, int rows, byte *data, int client, qboolean dirty ) {
 
 	image_t *image;
+	(void)w;
+	(void)h;
 
 	if ( !tr.scratchImage[ client ] ) {
 		tr.scratchImage[ client ] = R_CreateImage( va( "*scratch%i", client ), NULL, data, cols, rows, IMGFLAG_CLAMPTOEDGE | IMGFLAG_RGB | IMGFLAG_NOSCALE, 0, 0 );
@@ -1220,7 +1228,7 @@ static void RB_LightingPass( void )
 
 	tess.dlightPass = qtrue;
 
-	for ( i = 0; i < backEnd.viewParms.num_dlights; i++ )
+	for ( i = 0; i < (int)backEnd.viewParms.num_dlights; i++ )
 	{
 		dl = &backEnd.viewParms.dlights[i];
 		if ( dl->head )
@@ -1243,7 +1251,7 @@ static void transform_to_eye_space( const vec3_t v, vec3_t v_eye )
 	v_eye[0] = m[0]*v[0] + m[4]*v[1] + m[8 ]*v[2] + m[12];
 	v_eye[1] = m[1]*v[0] + m[5]*v[1] + m[9 ]*v[2] + m[13];
 	v_eye[2] = m[2]*v[0] + m[6]*v[1] + m[10]*v[2] + m[14];
-};
+}
 
 
 /*

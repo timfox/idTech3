@@ -1044,13 +1044,13 @@ void flux_patchify(float *out, const float *in,
         for (int c = 0; c < channels; c++) {
             for (int ph = 0; ph < outH; ph++) {
                 for (int pw = 0; pw < outW; pw++) {
-                    for (int pi = 0; pi < p; pi++) {
+                    for (int patch_i = 0; patch_i < p; patch_i++) {
                         for (int pj = 0; pj < p; pj++) {
-                            int ih = ph * p + pi;
+                            int ih = ph * p + patch_i;
                             int iw = pw * p + pj;
                             int in_idx = b * channels * H * W + c * H * W + ih * W + iw;
 
-                            int out_c = c * p * p + pi * p + pj;
+                            int out_c = c * p * p + patch_i * p + pj;
                             int out_idx = b * out_ch * outH * outW + out_c * outH * outW + ph * outW + pw;
                             out[out_idx] = in[in_idx];
                         }
@@ -1073,12 +1073,12 @@ void flux_unpatchify(float *out, const float *in,
         for (int c = 0; c < channels; c++) {
             for (int ph = 0; ph < H; ph++) {
                 for (int pw = 0; pw < W; pw++) {
-                    for (int pi = 0; pi < p; pi++) {
+                    for (int patch_i = 0; patch_i < p; patch_i++) {
                         for (int pj = 0; pj < p; pj++) {
-                            int in_c = c * p * p + pi * p + pj;
+                            int in_c = c * p * p + patch_i * p + pj;
                             int in_idx = b * in_ch * H * W + in_c * H * W + ph * W + pw;
 
-                            int oh = ph * p + pi;
+                            int oh = ph * p + patch_i;
                             int ow = pw * p + pj;
                             int out_idx = b * channels * outH * outW + c * outH * outW + oh * outW + ow;
                             out[out_idx] = in[in_idx];

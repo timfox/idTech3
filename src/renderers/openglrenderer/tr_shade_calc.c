@@ -25,6 +25,34 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // -EC-: avoid using ri.ftol
 #define	WAVEVALUE( table, base, amplitude, phase, freq )  ((base) + table[ (int64_t)( ( ( (phase) + tess.shaderTime * (freq) ) * FUNCTABLE_SIZE ) ) & FUNCTABLE_MASK ] * (amplitude))
 
+extern cvar_t *r_shLighting;
+extern cvar_t *r_shDebugView;
+
+static void R_EvalSH9( const vec3_t shCoeffs[SH_COEFF_COUNT], const vec3_t normal, vec3_t out ) {
+	const float x = normal[0];
+	const float y = normal[1];
+	const float z = normal[2];
+	const float basis[SH_COEFF_COUNT] = {
+		1.0f,
+		y,
+		z,
+		x,
+		x * y,
+		y * z,
+		3.0f * z * z - 1.0f,
+		x * z,
+		x * x - y * y
+	};
+	int i;
+
+	VectorClear( out );
+	for ( i = 0; i < SH_COEFF_COUNT; i++ ) {
+		out[0] += shCoeffs[i][0] * basis[i];
+		out[1] += shCoeffs[i][1] * basis[i];
+		out[2] += shCoeffs[i][2] * basis[i];
+	}
+}
+
 static float *TableForFunc( genFunc_t func )
 {
 	switch ( func )
@@ -1240,18 +1268,100 @@ static void RB_CalcDiffuseColor_scalar( unsigned char *colors )
 	vec3_t			ambientLight;
 	vec3_t			lightDir;
 	vec3_t			directedLight;
+	vec3_t			shLight;
 	int				numVertexes;
+	qboolean		useSH;
 	ent = backEnd.currentEntity;
 	ambientLightInt = ent->ambientLightInt;
 	VectorCopy( ent->ambientLight, ambientLight );
 	VectorCopy( ent->directedLight, directedLight );
 	VectorCopy( ent->lightDir, lightDir );
+	useSH = ( r_shLighting && r_shLighting->integer && ent->shLightingValid );
+	if ( r_shDebugView && r_shDebugView->integer ) {
+		useSH = qtrue;
+	}
 
 	v = tess.xyz[0];
 	normal = tess.normal[0];
 
 	numVertexes = tess.numVertexes;
 	for (i = 0 ; i < numVertexes ; i++, v += 4, normal += 4) {
+		if ( r_shDebugView && r_shDebugView->integer ) {
+			if ( ent->shLightingValid ) {
+				float value;
+				R_EvalSH9( ent->shCoeffs, normal, shLight );
+				if ( r_shDebugView->integer == 2 ) {
+					value = ent->shCoeffs[0][0];
+					if ( value < 0.0f ) {
+						value = 0.0f;
+					} else if ( value > 255.0f ) {
+						value = 255.0f;
+					}
+					colors[i*4+0] = myftol( value );
+					colors[i*4+1] = colors[i*4+0];
+					colors[i*4+2] = colors[i*4+0];
+				} else {
+					value = shLight[0];
+					if ( value < 0.0f ) {
+						value = 0.0f;
+					} else if ( value > 255.0f ) {
+						value = 255.0f;
+					}
+					colors[i*4+0] = myftol( value );
+
+					value = shLight[1];
+					if ( value < 0.0f ) {
+						value = 0.0f;
+					} else if ( value > 255.0f ) {
+						value = 255.0f;
+					}
+					colors[i*4+1] = myftol( value );
+
+					value = shLight[2];
+					if ( value < 0.0f ) {
+						value = 0.0f;
+					} else if ( value > 255.0f ) {
+						value = 255.0f;
+					}
+					colors[i*4+2] = myftol( value );
+				}
+			} else {
+				colors[i*4+0] = 255;
+				colors[i*4+1] = 0;
+				colors[i*4+2] = 255;
+			}
+			colors[i*4+3] = 255;
+			continue;
+		}
+		if ( useSH ) {
+			float value;
+			R_EvalSH9( ent->shCoeffs, normal, shLight );
+			value = ambientLight[0] + shLight[0];
+			if ( value < 0.0f ) {
+				value = 0.0f;
+			} else if ( value > 255.0f ) {
+				value = 255.0f;
+			}
+			colors[i*4+0] = myftol( value );
+
+			value = ambientLight[1] + shLight[1];
+			if ( value < 0.0f ) {
+				value = 0.0f;
+			} else if ( value > 255.0f ) {
+				value = 255.0f;
+			}
+			colors[i*4+1] = myftol( value );
+
+			value = ambientLight[2] + shLight[2];
+			if ( value < 0.0f ) {
+				value = 0.0f;
+			} else if ( value > 255.0f ) {
+				value = 255.0f;
+			}
+			colors[i*4+2] = myftol( value );
+			colors[i*4+3] = 255;
+			continue;
+		}
 		incoming = DotProduct (normal, lightDir);
 		if ( incoming <= 0 ) {
 			*(int *)&colors[i*4] = ambientLightInt;

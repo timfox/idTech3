@@ -26,7 +26,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifdef USE_LOCAL_HEADERS
 #	include "SDL.h"
 #else
-#	include <SDL.h>
+#	if defined(__has_include)
+#		if __has_include(<SDL2/SDL.h>)
+#			include <SDL2/SDL.h>
+#		else
+#			include <SDL.h>
+#		endif
+#	else
+#		include <SDL.h>
+#	endif
 #endif
 
 //#define USE_JOYSTICK
@@ -53,6 +61,11 @@ extern SDL_Window *SDL_window;
 extern glwstate_t glw_state;
 
 extern cvar_t *in_nograb;
+
+void GLimp_Shutdown( qboolean unloadDLL );
+void GLimp_Minimize( void );
+void GLimp_InitGamma( glconfig_t *config );
+void GLW_RestoreGamma( void );
 
 void IN_Init( void );
 void IN_Shutdown( void );

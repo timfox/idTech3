@@ -676,7 +676,7 @@ static void vk_generate_light_directions( void )
 	msurface_t *sf;
 	uint32_t i;
 
-	for ( i = 0, sf = &s_worldData.surfaces[0]; i < s_worldData.numsurfaces; i++, sf++ ) {
+	for ( i = 0, sf = &s_worldData.surfaces[0]; i < (uint32_t)s_worldData.numsurfaces; i++, sf++ ) {
 		face = (srfSurfaceFace_t *)sf->data;
 		if ( face->surfaceType == SF_FACE ) {
 			GenerateFaceLightDirs( face );
@@ -746,7 +746,7 @@ static void GenerateNormals( srfSurfaceFace_t *face )
 qsort_idx
 =============
 */
-void qsort_idx( int32_t *a, const int n ) {
+static void qsort_idx( int32_t *a, const int n ) {
 	int32_t temp[3], m;
 	int i, j, x;
 
@@ -1078,6 +1078,8 @@ ParseFlare
 static void ParseFlare( const dsurface_t *ds, const drawVert_t *verts, msurface_t *surf, int *indexes ) {
 	srfFlare_t		*flare;
 	int				i;
+	(void)verts;
+	(void)indexes;
 
 	// get fog volume
 	surf->fogIndex = LittleLong( ds->fogNum ) + 1;
@@ -2198,14 +2200,14 @@ static void R_LoadFogs( const lump_t *l, const lump_t *brushesLump, const lump_t
 	for ( i=0 ; i<count ; i++, fogs++) {
 		out->originalBrushNumber = LittleLong( fogs->brushNum );
 
-		if ( (unsigned)out->originalBrushNumber >= brushesCount ) {
+		if ( (unsigned)out->originalBrushNumber >= (unsigned)brushesCount ) {
 			ri.Error( ERR_DROP, "fog brushNumber out of range" );
 		}
 		brush = brushes + out->originalBrushNumber;
 
 		firstSide = LittleLong( brush->firstSide );
 
-		if ( (unsigned)firstSide > sidesCount - 6 ) {
+		if ( (unsigned)firstSide > (unsigned)(sidesCount - 6) ) {
 			ri.Error( ERR_DROP, "fog brush sideNumber out of range" );
 		}
 
@@ -2267,7 +2269,7 @@ static void R_LoadFogs( const lump_t *l, const lump_t *brushesLump, const lump_t
 			out->hasSurface = qfalse;
 		} else {
 			int sideOffset = firstSide + sideNum;
-			if ( (unsigned)sideOffset >= sidesCount ) {
+			if ( (unsigned)sideOffset >= (unsigned)sidesCount ) {
 				ri.Printf( PRINT_WARNING, "bad fog side offset %i\n", sideOffset );
 				out->hasSurface = qfalse;
 			} else {
@@ -2646,6 +2648,7 @@ static void R_LoadCubemapEntities( int index )
 
 static void R_RenderCubemapSide( int cubemapIndex, int cubemapSide, qboolean subscene, qboolean bounce )
 {
+	(void)bounce;
 	refdef_t refdef;
 	viewParms_t	parms;
 	Com_Memset( &refdef, 0, sizeof( refdef) );
@@ -2721,7 +2724,7 @@ static void R_RenderAllCubemaps( void )
 	uint32_t i, j;
 	// Limit number of Cubemaps per map
 	maxCubemaps = MIN( tr.numCubemaps, 128 );
-	for ( i = 0; i < maxCubemaps; i++ ) 
+	for ( i = 0; i < (uint32_t)maxCubemaps; i++ ) 
 	{
 		RE_BeginFrame( STEREO_CENTER );
 		for ( j = 0; j < 6; j++ )
@@ -2770,7 +2773,7 @@ void RE_LoadWorldMap( const char *name ) {
 	if ( !buffer.b ) {
 		ri.Error( ERR_DROP, "%s: couldn't load %s", __func__, name );
 	}
-	if ( size < sizeof( dheader_t ) ) {
+	if ( size < (int)sizeof( dheader_t ) ) {
 		ri.Error( ERR_DROP, "%s: %s has truncated header", __func__, name );
 	}
 
@@ -2793,7 +2796,7 @@ void RE_LoadWorldMap( const char *name ) {
 	fileBase = (byte *)header;
 
 	// swap all the lumps
-	for ( i = 0; i < sizeof( dheader_t ) / 4; i++ ) {
+	for ( i = 0; i < (int)( sizeof( dheader_t ) / 4 ); i++ ) {
 		( (int32_t *)header )[i] = LittleLong( ( (int32_t *)header )[i] );
 	}
 
@@ -2834,9 +2837,9 @@ void RE_LoadWorldMap( const char *name ) {
 				R_LoadEnvironmentJson( s_worldData.baseName );
 
 				if ( !tr.numCubemaps ) {
-					for ( int i = 0; i < ARRAY_LEN(cubemapEntities); i++ )
+					for ( int entityIndex = 0; entityIndex < (int)ARRAY_LEN(cubemapEntities); entityIndex++ )
 					{
-						R_LoadCubemapEntities( i );
+						R_LoadCubemapEntities( entityIndex );
 						if ( tr.numCubemaps )
 							break;
 					}

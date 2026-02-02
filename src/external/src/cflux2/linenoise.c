@@ -491,7 +491,7 @@ FILE *lndebug_fp = NULL;
         fflush(lndebug_fp); \
     } while (0)
 #else
-#define lndebug(fmt, ...)
+#define lndebug(...) ((void)0)
 #endif
 
 /* ======================= Low level terminal handling ====================== */
@@ -1318,16 +1318,18 @@ char *linenoiseEditFeed(struct linenoiseState *l) {
      * count limits. */
     if (!isatty(l->ifd) && !getenv("LINENOISE_ASSUME_TTY")) return linenoiseNoTTY();
 
-    char c;
+    unsigned char cbuf;
+    int c;
     int nread;
     char seq[3];
 
-    nread = read(l->ifd,&c,1);
+    nread = read(l->ifd, &cbuf, 1);
     if (nread < 0) {
         return (errno == EAGAIN || errno == EWOULDBLOCK) ? linenoiseEditMore : NULL;
     } else if (nread == 0) {
         return NULL;
     }
+    c = (int)cbuf;
 
     /* Only autocomplete when the callback is set. It returns < 0 when
      * there was an error reading from fd. Otherwise it will return the

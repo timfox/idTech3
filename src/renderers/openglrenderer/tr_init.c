@@ -174,6 +174,9 @@ cvar_t	*r_defaultImage;
 
 cvar_t	*r_ambientScale;
 cvar_t	*r_directedScale;
+cvar_t	*r_shLighting;
+cvar_t	*r_shWorldLighting;
+cvar_t	*r_shDebugView;
 cvar_t	*r_debugLight;
 cvar_t	*r_debugSort;
 cvar_t	*r_printShaders;
@@ -258,8 +261,7 @@ static void R_ClearSymTables( void )
 }
 
 
-// for modular renderer
-#ifdef USE_RENDERER_DLOPEN
+#if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
 void QDECL Com_Error( errorParm_t code, const char *fmt, ... )
 {
 	char buf[ 4096 ];
@@ -277,7 +279,6 @@ void QDECL Com_Printf( const char *fmt, ... )
 	va_start( argptr, fmt );
 	Q_vsnprintf( buf, sizeof( buf ), fmt, argptr );
 	va_end( argptr );
-
 	ri.Printf( PRINT_ALL, "%s", buf );
 }
 #endif
@@ -1649,6 +1650,12 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_ambientScale, "Light grid ambient light scaling on entity models." );
 	r_directedScale = ri.Cvar_Get( "r_directedScale", "1", CVAR_CHEAT );
 	ri.Cvar_SetDescription( r_directedScale, "Light grid direct light scaling on entity models." );
+	r_shLighting = ri.Cvar_Get( "r_shLighting", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_shLighting, "Enable spherical harmonics ambient lighting for entity models." );
+	r_shWorldLighting = ri.Cvar_Get( "r_shWorldLighting", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_shWorldLighting, "Apply spherical harmonics to world geometry (lightmapped surfaces)." );
+	r_shDebugView = ri.Cvar_Get( "r_shDebugView", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_shDebugView, "Spherical harmonics debug view:\n 0: off\n 1: SH ambient only\n 2: SH coeff[0] grayscale\n 3: World-only solid SH override" );
 
 	r_anaglyphMode = ri.Cvar_Get( "r_anaglyphMode", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_anaglyphMode, "Enable rendering of anaglyph images. Valid options for 3D glasses types:\n 0: Disabled\n 1: Red-cyan\n 2: Red-blue\n 3: Red-green\n 4: Green-magenta" );
@@ -1857,6 +1864,9 @@ void R_Init( void ) {
 	R_NoiseInit();
 
 	R_Register();
+	ri.Printf( PRINT_ALL, "[GL] SH lighting: %s\n", r_shLighting && r_shLighting->integer ? "enabled" : "disabled" );
+	ri.Printf( PRINT_ALL, "[GL] SH world: %s\n", r_shWorldLighting && r_shWorldLighting->integer ? "enabled" : "disabled" );
+	ri.Printf( PRINT_ALL, "[GL] SH debug view: %d\n", r_shDebugView ? r_shDebugView->integer : 0 );
 
 	max_polys = r_maxpolys->integer;
 	max_polyverts = r_maxpolyverts->integer;

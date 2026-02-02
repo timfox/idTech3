@@ -1,5 +1,13 @@
 /* GIMP RGBA C-Source image dump (sdl_icon.h) */
 
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Woverlength-strings"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Woverlength-strings"
+#endif
+
 static const struct {
   unsigned int 	 width;
   unsigned int 	 height;
@@ -130,3 +138,8 @@ static const struct {
   "\0\0\0\0\0\0\0\0",
 };
 
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#elif defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
