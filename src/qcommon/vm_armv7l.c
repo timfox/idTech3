@@ -202,8 +202,13 @@ static void VM_Destroy_Compiled( vm_t *vm )
 	vm->codeBase.ptr = NULL;
 }
 
+#if defined(_MSC_VER)
+  #define NORETURN __declspec(noreturn)
+#else
+  #define NORETURN __attribute__((noreturn))
+#endif
 
-static void __attribute__((__noreturn__)) OutJump( void )
+static NORETURN void OutJump( void )
 {
 	Com_Error( ERR_DROP, "program tried to execute code outside VM" );
 }
@@ -268,10 +273,11 @@ static unsigned short rimm( uint32_t val )
 	if (val < 256)
 		return val;
 	// rotate the value until it fits
-	while (shift < 16 && (val>255 || !(val&3))) {
-		val = (val&3)<<30 | val>>2;
-		++shift;
+	for (shift = 0; shift < 16; shift++) {
+		if ((val & ~0xFFu) == 0) return ( (16-shift) << 8 ) | (val & 0xFFu);
+		val = (val >> 2) | (val << 30);
 	}
+	DROP("immediate cannot be encoded");
 	if (shift > 15 || val > 255) {
 		DROP( "immediate cannot be encoded (%d, %d)\n", shift, val );
 	}
@@ -360,9 +366,9 @@ static unsigned short can_encode( uint32_t val )
 #define RSCSi(dst, src, i) (RSCi(dst, src, i) | (1<<20))
 
 #define ORRSi(dst, src, i) (ORRi(dst, src, i) | (1<<20))
-#define MOVSi(dst,      i) (MOVi(dst,      i) | (1<<20))
+#define MOVSi(dst, i) (MOVi(dst, i) | (1<<20))
 #define BICSi(dst, src, i) (BICi(dst, src, i) | (1<<20))
-#define MVNSi(dst,      i) (MVNi(dst, src, i) | (1<<20))
+#define MVNSi(dst, i) (MVNi(dst, i) | (1<<20))
 
 #define AND(dst, src, reg) (AL | (0b000<<25) | (0b00000<<20) | (src<<16) | (dst<<12) | reg)
 #define EOR(dst, src, reg) (AL | (0b000<<25) | (0b00010<<20) | (src<<16) | (dst<<12) | reg)
