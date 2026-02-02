@@ -1025,6 +1025,12 @@ void main() {
 		else
 			out_color.rgb = vec3( debugMask, 1.0 - debugMask, 0.0 );
 	}
+
+	if ( glintCore.x > 0.0 )
+	{
+		out_color = vec4( 1.0, 0.0, 0.0, 1.0 );
+		return;
+	}
 #endif
 
 	// clearcoat lobe

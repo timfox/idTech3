@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include "tr_local.h"
 #include "vk.h"
 #include "glints.h"
@@ -4392,6 +4393,9 @@ static void vk_create_glint_dictionary_texture( void )
 	vk.glint_dict_image = vk_glint_dictionary_image.handle;
 	vk.glint_dict_image_view = vk_glint_dictionary_image.view;
 	vk.glint_dict_image_descriptor = vk_glint_dictionary_image.descriptor;
+
+	ri.Printf( PRINT_ALL, "glint dictionary image=%p descriptor=%p view=%p\n",
+		(void *)(uintptr_t)vk.glint_dict_image, (void *)(uintptr_t)vk_glint_dictionary_image.descriptor, (void *)(uintptr_t)vk.glint_dict_image_view );
 }
 #endif
 
