@@ -29,7 +29,7 @@
     <CharacterSet>MultiByte</CharacterSet>
     <PlatformToolset>v142</PlatformToolset>
   </PropertyGroup>
-  <Import Project="$(SolutionDir)\zlib.props" />
+  <Import Project="$(MSBuildThisFileDirectory)..\zlib.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
   </ImportGroup>
