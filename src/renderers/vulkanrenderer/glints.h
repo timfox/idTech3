@@ -9,6 +9,6 @@
 
 void R_Glints_InitDictionary(void);
 void R_Glints_ShutdownDictionary(void);
-const float *R_Glints_GetPackedDictionary(size_t *outSize);
+float *R_Glints_GetPackedDictionary(size_t *outSize);
 
 #endif // TR_GLINTS_H

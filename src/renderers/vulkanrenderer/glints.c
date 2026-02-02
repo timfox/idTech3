@@ -62,7 +62,7 @@ void R_Glints_ShutdownDictionary(void)
 	glint_initialized = 0;
 }
 
-const float *R_Glints_GetPackedDictionary(size_t *outSize)
+float *R_Glints_GetPackedDictionary(size_t *outSize)
 {
 	if (outSize) {
 		*outSize = sizeof(glint_dictionary);

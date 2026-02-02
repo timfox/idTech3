@@ -661,7 +661,7 @@ typedef struct {
 	} storage;
 
 	struct {
-		const float *dictionary;
+		float *dictionary;
 		size_t size;
 	} glint;
 
