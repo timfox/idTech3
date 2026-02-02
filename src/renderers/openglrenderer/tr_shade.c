@@ -23,6 +23,77 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "tr_local.h"
 
+extern cvar_t *r_shLighting;
+extern cvar_t *r_shWorldLighting;
+extern cvar_t *r_shDebugView;
+
+static void R_EvalSH9Color( const vec3_t shCoeffs[SH_COEFF_COUNT], const vec3_t normal, vec3_t out ) {
+	const float x = normal[0];
+	const float y = normal[1];
+	const float z = normal[2];
+	const float basis[SH_COEFF_COUNT] = {
+		1.0f,
+		y,
+		z,
+		x,
+		x * y,
+		y * z,
+		3.0f * z * z - 1.0f,
+		x * z,
+		x * x - y * y
+	};
+	int i;
+
+	VectorClear( out );
+	for ( i = 0; i < SH_COEFF_COUNT; i++ ) {
+		out[0] += shCoeffs[i][0] * basis[i];
+		out[1] += shCoeffs[i][1] * basis[i];
+		out[2] += shCoeffs[i][2] * basis[i];
+	}
+}
+
+static qboolean R_StageHasLightmap( const shaderStage_t *pStage ) {
+	return ( pStage->bundle[0].lightmap != LIGHTMAP_INDEX_NONE || pStage->bundle[1].lightmap != LIGHTMAP_INDEX_NONE );
+}
+
+static void RB_DrawWorldSHDebugOverride( void ) {
+	if ( !r_shDebugView || r_shDebugView->integer != 3 ) {
+		return;
+	}
+
+	if ( backEnd.currentEntity != &tr.worldEntity ) {
+		return;
+	}
+
+	{
+		int v;
+		for ( v = 0; v < tess.numVertexes; v++ ) {
+			vec3_t shCoeffs[SH_COEFF_COUNT];
+			vec3_t shLight;
+			qboolean hasSH = R_SampleLightGridSH( tr.world, tess.xyz[v], shCoeffs );
+
+			if ( hasSH ) {
+				R_EvalSH9Color( shCoeffs, tess.normal[v], shLight );
+				tess.svars.colors[v].rgba[0] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[0] );
+				tess.svars.colors[v].rgba[1] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[1] );
+				tess.svars.colors[v].rgba[2] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[2] );
+			} else {
+				tess.svars.colors[v].rgba[0] = 255;
+				tess.svars.colors[v].rgba[1] = 0;
+				tess.svars.colors[v].rgba[2] = 255;
+			}
+			tess.svars.colors[v].rgba[3] = 255;
+		}
+	}
+
+	GL_ClientState( 1, CLS_NONE );
+	GL_ClientState( 0, CLS_COLOR_ARRAY );
+	qglColorPointer( 4, GL_UNSIGNED_BYTE, 0, tess.svars.colors[0].rgba );
+	GL_Bind( tr.whiteImage );
+	GL_State( GLS_DEFAULT );
+	R_DrawElements( tess.numIndexes, tess.indexes );
+}
+
 /*
 
   THIS ENTIRE FILE IS BACK END
@@ -158,6 +229,7 @@ Draws vertex normals for debugging
 */
 static void DrawNormals( const shaderCommands_t *input ) {
 	int		i;
+	(void)input;
 
 	GL_ClientState( 0, CLS_NONE );
 
@@ -213,6 +285,12 @@ void RB_BeginSurface( shader_t *shader, int fogNum ) {
 	else
 		tess.allowVBO = qfalse;
 
+	if ( backEnd.currentEntity == &tr.worldEntity &&
+		( ( r_shWorldLighting && r_shWorldLighting->integer ) ||
+		( r_shDebugView && r_shDebugView->integer ) ) ) {
+		tess.allowVBO = qfalse;
+	}
+
 	if ( shader->remappedShader ) {
 		state = shader->remappedShader;
 	} else {
@@ -227,9 +305,15 @@ void RB_BeginSurface( shader_t *shader, int fogNum ) {
 
 #ifdef USE_TESS_NEEDS_NORMAL
 #ifdef USE_PMLIGHT
-	tess.needsNormal = state->needsNormal || tess.dlightPass || r_shownormals->integer;
+	tess.needsNormal = state->needsNormal || tess.dlightPass || r_shownormals->integer ||
+		( backEnd.currentEntity == &tr.worldEntity &&
+		( ( r_shDebugView && r_shDebugView->integer ) ||
+		( r_shWorldLighting && r_shWorldLighting->integer && r_shLighting && r_shLighting->integer ) ) );
 #else
-	tess.needsNormal = state->needsNormal || r_shownormals->integer;
+	tess.needsNormal = state->needsNormal || r_shownormals->integer ||
+		( backEnd.currentEntity == &tr.worldEntity &&
+		( ( r_shDebugView && r_shDebugView->integer ) ||
+		( r_shWorldLighting && r_shWorldLighting->integer && r_shLighting && r_shLighting->integer ) ) );
 #endif
 #endif
 
@@ -353,7 +437,7 @@ static void ProjectDlightTexture( void ) {
 		return;
 	}
 
-	for ( l = 0 ; l < backEnd.refdef.num_dlights ; l++ ) {
+	for ( l = 0 ; l < (int)backEnd.refdef.num_dlights ; l++ ) {
 
 		if ( !( tess.dlightBits & ( 1 << l ) ) ) {
 			continue;	// this surface definitely doesn't have any of this light
@@ -513,6 +597,55 @@ void R_ComputeColors( const shaderStage_t *pStage )
 
 	if ( tess.numVertexes == 0 )
 		return;
+
+	if ( backEnd.currentEntity == &tr.worldEntity && R_StageHasLightmap( pStage ) &&
+		( ( r_shDebugView && r_shDebugView->integer ) ||
+		( r_shWorldLighting && r_shWorldLighting->integer && r_shLighting && r_shLighting->integer ) ) ) {
+		int v;
+		for ( v = 0; v < tess.numVertexes; v++ ) {
+			vec3_t shCoeffs[SH_COEFF_COUNT];
+			vec3_t shLight;
+			qboolean hasSH = R_SampleLightGridSH( tr.world, tess.xyz[v], shCoeffs );
+
+			if ( r_shDebugView && r_shDebugView->integer ) {
+				if ( hasSH ) {
+					if ( r_shDebugView->integer == 2 ) {
+						float value = shCoeffs[0][0];
+						if ( value < 0.0f ) {
+							value = 0.0f;
+						} else if ( value > 255.0f ) {
+							value = 255.0f;
+						}
+						tess.svars.colors[v].rgba[0] = myftol( value );
+						tess.svars.colors[v].rgba[1] = tess.svars.colors[v].rgba[0];
+						tess.svars.colors[v].rgba[2] = tess.svars.colors[v].rgba[0];
+					} else {
+						R_EvalSH9Color( shCoeffs, tess.normal[v], shLight );
+						tess.svars.colors[v].rgba[0] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[0] );
+						tess.svars.colors[v].rgba[1] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[1] );
+						tess.svars.colors[v].rgba[2] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[2] );
+					}
+				} else {
+					tess.svars.colors[v].rgba[0] = 255;
+					tess.svars.colors[v].rgba[1] = 0;
+					tess.svars.colors[v].rgba[2] = 255;
+				}
+				tess.svars.colors[v].rgba[3] = 255;
+			} else if ( hasSH ) {
+				R_EvalSH9Color( shCoeffs, tess.normal[v], shLight );
+				tess.svars.colors[v].rgba[0] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[0] );
+				tess.svars.colors[v].rgba[1] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[1] );
+				tess.svars.colors[v].rgba[2] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[2] );
+				tess.svars.colors[v].rgba[3] = 255;
+			} else {
+				tess.svars.colors[v].rgba[0] = 255;
+				tess.svars.colors[v].rgba[1] = 255;
+				tess.svars.colors[v].rgba[2] = 255;
+				tess.svars.colors[v].rgba[3] = 255;
+			}
+		}
+		return;
+	}
 
 	//
 	// rgbGen
@@ -883,6 +1016,7 @@ void RB_StageIteratorGeneric( void )
 {
 	const shaderCommands_t *input;
 	shader_t		*shader;
+	qboolean		worldShOverride;
 
 #ifdef USE_PMLIGHT
 	if ( tess.dlightPass )
@@ -906,6 +1040,7 @@ void RB_StageIteratorGeneric( void )
 
 	input = &tess;
 	shader = input->shader;
+	worldShOverride = ( r_shDebugView && r_shDebugView->integer == 3 );
 
 	RB_DeformTessGeometry();
 
@@ -973,7 +1108,11 @@ void RB_StageIteratorGeneric( void )
 	//
 	// call shader function
 	//
-	RB_IterateStagesGeneric( input );
+	if ( r_shDebugView && r_shDebugView->integer == 3 ) {
+		RB_DrawWorldSHDebugOverride();
+	} else {
+		RB_IterateStagesGeneric( input );
+	}
 
 	//
 	// now do any dynamic lighting needed
@@ -982,7 +1121,7 @@ void RB_StageIteratorGeneric( void )
 #ifdef USE_PMLIGHT
 	if ( !r_dlightMode->integer )
 #endif
-	if ( tess.dlightBits && tess.shader->sort <= SS_OPAQUE && !(tess.shader->surfaceFlags & (SURF_NODLIGHT | SURF_SKY) ) )
+	if ( !worldShOverride && tess.dlightBits && tess.shader->sort <= SS_OPAQUE && !(tess.shader->surfaceFlags & (SURF_NODLIGHT | SURF_SKY) ) )
 	{
 		ProjectDlightTexture();
 	}
@@ -991,7 +1130,7 @@ void RB_StageIteratorGeneric( void )
 	//
 	// now do fog
 	//
-	if ( tess.fogNum && tess.shader->fogPass )
+	if ( !worldShOverride && tess.fogNum && tess.shader->fogPass )
 	{
 		RB_FogPass();
 	}

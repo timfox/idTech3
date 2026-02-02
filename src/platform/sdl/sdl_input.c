@@ -23,7 +23,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifdef USE_LOCAL_HEADERS
 #	include "SDL.h"
 #else
-#	include <SDL.h>
+#	if defined(__has_include)
+#		if __has_include(<SDL2/SDL.h>)
+#			include <SDL2/SDL.h>
+#		else
+#			include <SDL.h>
+#		endif
+#	else
+#		include <SDL.h>
+#	endif
 #endif
 
 #include "../../client/client.h"
@@ -175,7 +183,7 @@ static qboolean IN_IsConsoleKey( keyNum_t key, int character )
 	}
 
 	// If the character is the same as the key, prefer the character
-	if ( key == character )
+	if ( key == (keyNum_t)character )
 		key = 0;
 
 	for ( i = 0; i < numConsoleKeys; i++ )

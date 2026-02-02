@@ -28,7 +28,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../ui/ui_public.h"
 #include "../cgame/cg_public.h"
 #include "../game/bg_public.h"
-#include "snd_public.h"
+#include "../audio/snd_public.h"
 #include "keys.h"
 
 #ifdef USE_CURL
@@ -607,6 +607,9 @@ void	HandleEvents( void );
 // platform-specific
 void	GLimp_InitGamma(glconfig_t *config);
 void	GLimp_SetGamma(unsigned char red[256], unsigned char green[256], unsigned char blue[256]);
+void	GLimp_Minimize( void );
+void	GLimp_LogComment( const char *comment );
+void	GLW_RestoreGamma( void );
 
 // OpenGL
 #ifdef USE_OPENGL_API

@@ -100,6 +100,7 @@ sep_upsample (j_decompress_ptr cinfo,
 	      JDIMENSION out_rows_avail)
 {
   my_upsample_ptr upsample = (my_upsample_ptr) cinfo->upsample;
+  (void)in_row_groups_avail;
   int ci;
   jpeg_component_info * compptr;
   JDIMENSION num_rows;

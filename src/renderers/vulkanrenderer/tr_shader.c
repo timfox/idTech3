@@ -1675,7 +1675,7 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 
 #ifdef USE_VK_PBR
 	if ( vk.pbrActive && ( physicalAlbedo || stage->physicalMapType != PHYS_NONE ) ) {
-		uint32_t i;
+		uint32_t pbrIndex;
 		imgFlags_t flags = IMGFLAG_NOLIGHTSCALE;
 
 		if (!shader.noMipMaps)
@@ -1722,23 +1722,23 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 				}
 			}
 
-			for ( i = 0; i < ARRAY_LEN( textureMapTypes ); i++ ) {
-				if ( textureMapTypes[i].type != PHYS_RMO &&
-					textureMapTypes[i].type != PHYS_RMOS &&
-					textureMapTypes[i].type != PHYS_MOXR &&
-					textureMapTypes[i].type != PHYS_MOSR &&
-					textureMapTypes[i].type != PHYS_ORM &&
-					textureMapTypes[i].type != PHYS_ORMS ) {
+			for ( pbrIndex = 0; pbrIndex < ARRAY_LEN( textureMapTypes ); pbrIndex++ ) {
+				if ( textureMapTypes[pbrIndex].type != PHYS_RMO &&
+					textureMapTypes[pbrIndex].type != PHYS_RMOS &&
+					textureMapTypes[pbrIndex].type != PHYS_MOXR &&
+					textureMapTypes[pbrIndex].type != PHYS_MOSR &&
+					textureMapTypes[pbrIndex].type != PHYS_ORM &&
+					textureMapTypes[pbrIndex].type != PHYS_ORMS ) {
 					continue;
 				}
-				if ( preferredType && textureMapTypes[i].type == preferredType ) {
+				if ( preferredType && textureMapTypes[pbrIndex].type == preferredType ) {
 					// already tried above
 					continue;
 				}
 				COM_StripExtension( physicalAlbedoName, bufferPackedTextureName, MAX_QPATH );
 				
-				Q_strcat( bufferPackedTextureName, MAX_QPATH, textureMapTypes[i].suffix );
-				stage->physicalMapType = textureMapTypes[i].type;
+				Q_strcat( bufferPackedTextureName, MAX_QPATH, textureMapTypes[pbrIndex].suffix );
+				stage->physicalMapType = textureMapTypes[pbrIndex].type;
 
 				if ( vk_create_phyisical_texture( stage, bufferPackedTextureName, flags ) ) {
 					break;
@@ -1754,15 +1754,15 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 		
 		// scan for a potential normal map
 		if ( !stage->normalMap && physicalAlbedo ) {
-			for ( i = 0; i < ARRAY_LEN( textureMapTypes ); i++ ) {
-				if ( textureMapTypes[i].type != PHYS_NORMAL &&
-					textureMapTypes[i].type != PHYS_NORMALHEIGHT ) {
+			for ( pbrIndex = 0; pbrIndex < ARRAY_LEN( textureMapTypes ); pbrIndex++ ) {
+				if ( textureMapTypes[pbrIndex].type != PHYS_NORMAL &&
+					textureMapTypes[pbrIndex].type != PHYS_NORMALHEIGHT ) {
 					continue;
 				}
 				COM_StripExtension( physicalAlbedoName, bufferNormalTextureName, MAX_QPATH );
 				
-				Q_strcat( bufferNormalTextureName, MAX_QPATH, textureMapTypes[i].suffix );
-				stage->normalMapType = textureMapTypes[i].type;
+				Q_strcat( bufferNormalTextureName, MAX_QPATH, textureMapTypes[pbrIndex].suffix );
+				stage->normalMapType = textureMapTypes[pbrIndex].type;
 
 				if ( vk_create_normal_texture( stage, bufferNormalTextureName, flags ) ) {
 					break;
@@ -2464,7 +2464,7 @@ static void FinishStage( shaderStage_t *stage )
 		return;
 	}
 
-	for ( i = 0; i < ARRAY_LEN( stage->bundle ); i++ ) {
+	for ( i = 0; i < (int)ARRAY_LEN( stage->bundle ); i++ ) {
 		textureBundle_t *bundle = &stage->bundle[i];
 		// offset lightmap coordinates
 		if ( bundle->lightmap >= LIGHTMAP_INDEX_OFFSET ) {
@@ -2909,7 +2909,7 @@ static const collapse_t collapse[] = {
 	{ 0, GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA | GLS_SRCBLEND_SRC_ALPHA,
 		GL_DECAL, 0 },
 #endif
-	{ -1 }
+	{ -1, 0, 0, 0 }
 };
 
 
@@ -3274,7 +3274,7 @@ static void FindLightingBundle( void )
 		if ( !st->active ) {
 			break;
 		}
-		for ( n = 0; n < st->numTexBundles; n++ ) {
+		for ( n = 0; n < (int)st->numTexBundles; n++ ) {
 			if ( st->bundle[n].dlight ) {
 				shader.lightingStage = i;
 				shader.lightingBundle = n;
@@ -4306,7 +4306,7 @@ static shader_t *FinishShader( void ) {
 				}
 			} // switch mtEnv3 / mtEnv
 
-			for ( env_mask = 0, n = 0; n < pStage->numTexBundles; n++ ) {
+			for ( env_mask = 0, n = 0; n < (int)pStage->numTexBundles; n++ ) {
 				if ( pStage->bundle[n].numTexMods ) {
 					continue;
 				}
@@ -4361,19 +4361,19 @@ static shader_t *FinishShader( void ) {
 
 #ifdef USE_FOG_COLLAPSE
 			if ( fogCollapse && tr.numFogs > 0 ) {
-				Vk_Pipeline_Def def;
-				Vk_Pipeline_Def def_mirror;
+				Vk_Pipeline_Def fog_def;
+				Vk_Pipeline_Def fog_def_mirror;
 
-				vk_get_pipeline_def( pStage->vk_pipeline[0], &def );
-				vk_get_pipeline_def( pStage->vk_mirror_pipeline[0], &def_mirror );
+				vk_get_pipeline_def( pStage->vk_pipeline[0], &fog_def );
+				vk_get_pipeline_def( pStage->vk_mirror_pipeline[0], &fog_def_mirror );
 
-				def.fog_stage = 1;
-				def_mirror.fog_stage = 1;
-				def.acff = pStage->bundle[0].adjustColorsForFog;
-				def_mirror.acff = pStage->bundle[0].adjustColorsForFog;
+				fog_def.fog_stage = 1;
+				fog_def_mirror.fog_stage = 1;
+				fog_def.acff = pStage->bundle[0].adjustColorsForFog;
+				fog_def_mirror.acff = pStage->bundle[0].adjustColorsForFog;
 
-				pStage->vk_pipeline[1] = vk_find_pipeline_ext( 0, &def, qfalse );
-				pStage->vk_mirror_pipeline[1] = vk_find_pipeline_ext( 0, &def_mirror, qfalse );
+				pStage->vk_pipeline[1] = vk_find_pipeline_ext( 0, &fog_def, qfalse );
+				pStage->vk_mirror_pipeline[1] = vk_find_pipeline_ext( 0, &fog_def_mirror, qfalse );
 
 
 				pStage->bundle[0].adjustColorsForFog = ACFF_NONE; // will be handled in shader from now
@@ -4414,7 +4414,7 @@ static shader_t *FinishShader( void ) {
 		if ( !stages[i].active ) {
 			continue;
 		}
-		for ( n = 0; n < stages[i].numTexBundles; n++ ) {
+		for ( n = 0; n < (int)stages[i].numTexBundles; n++ ) {
 			for ( m = 0; m < stages[i].bundle[n].numTexMods; m++ ) {
 				if ( stages[i].bundle[n].texMods[m].type == TMOD_STRETCH ) {
 					if ( fabsf( stages[i].bundle[n].texMods[m].wave.amplitude ) < 1e-6f ) {
@@ -4699,6 +4699,7 @@ shader_t *R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImag
 qhandle_t RE_RegisterShaderFromImage(const char *name, int lightmapIndex, image_t *image, qboolean mipRawImage) {
 	unsigned long hash;
 	shader_t	*sh;
+	(void)mipRawImage;
 
 	hash = generateHashValue(name, FILE_HASH_SIZE);
 
@@ -5071,7 +5072,8 @@ static void ScanAndLoadShaderFiles( void )
 	char *xbuffers[MAX_SHADER_FILES];
 	int numShaderFiles, numShaderxFiles;
 	int i;
-	const char *token, *hashMem;
+	const char *token;
+	char *hashMem;
 	char *textEnd;
 	const char *p, *oldp;
 	int shaderTextHashTableSizes[MAX_SHADERTEXT_HASH], hash, size;
@@ -5163,7 +5165,7 @@ static void ScanAndLoadShaderFiles( void )
 
 	for (i = 0; i < MAX_SHADERTEXT_HASH; i++) {
 		shaderTextHashTable[i] = (const char **) hashMem;
-		hashMem = ((char *) hashMem) + ((shaderTextHashTableSizes[i] + 1) * sizeof(char *));
+		hashMem = hashMem + ((shaderTextHashTableSizes[i] + 1) * sizeof(char *));
 	}
 
 	p = s_shaderText;
@@ -5176,7 +5178,7 @@ static void ScanAndLoadShaderFiles( void )
 		}
 
 		hash = generateHashValue(token, MAX_SHADERTEXT_HASH);
-		shaderTextHashTable[hash][--shaderTextHashTableSizes[hash]] = (char*)oldp;
+		shaderTextHashTable[hash][--shaderTextHashTableSizes[hash]] = oldp;
 
 		SkipBracedSection(&p, 0);
 	}

@@ -36,7 +36,7 @@ cvar_t	*cl_noprint;
 cvar_t	*cl_debugMove;
 cvar_t	*cl_motd;
 
-#ifdef USE_RENDERER_DLOPEN
+#if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
 static cvar_t *cl_renderer;
 #endif
 
@@ -299,7 +299,7 @@ download_t			download;
 
 // Structure containing functions exported from refresh DLL
 refexport_t	re;
-#ifdef USE_RENDERER_DLOPEN
+#if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
 static void	*rendererLib;
 #endif
 
@@ -3366,7 +3366,7 @@ CL_ShutdownRef
 */
 static void CL_ShutdownRef( refShutdownCode_t code ) {
 
-#ifdef USE_RENDERER_DLOPEN
+#if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
 	if ( cl_renderer->modified ) {
 		code = REF_UNLOAD_DLL;
 	}
@@ -3387,7 +3387,7 @@ static void CL_ShutdownRef( refShutdownCode_t code ) {
 		re.Shutdown( code );
 	}
 
-#ifdef USE_RENDERER_DLOPEN
+#if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
 	if ( rendererLib ) {
 		Sys_UnloadLibrary( rendererLib );
 		rendererLib = NULL;
@@ -3568,7 +3568,7 @@ CL_InitRef
 static void CL_InitRef( void ) {
 	refimport_t	rimp;
 	refexport_t	*ret;
-#ifdef USE_RENDERER_DLOPEN
+#if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
 	GetRefAPI_t		getRefAPI;
 	char			dllName[ MAX_OSPATH ], *ospath;
 #endif
@@ -3577,7 +3577,7 @@ static void CL_InitRef( void ) {
 
 	Com_Printf( "----- Initializing Renderer ----\n" );
 
-#ifdef USE_RENDERER_DLOPEN
+#if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
 
 #if defined (__linux__) && defined(__i386__)
 #define REND_ARCH_STRING "x86"
@@ -3724,7 +3724,7 @@ static void CL_InitRef( void ) {
 	rimp.VK_CreateSurface = VK_CreateSurface;
 #endif
 
-#ifdef USE_RENDERER_DLOPEN
+#if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
 	ret = getRefAPI( REF_API_VERSION, &rimp );
 #else
 	ret = GetRefAPI( REF_API_VERSION, &rimp );
@@ -4007,7 +4007,7 @@ static void CL_ModeList_f( void )
 }
 
 
-#ifdef USE_RENDERER_DLOPEN
+#if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
 static qboolean isValidRenderer( const char *s ) {
 	while ( *s ) {
 		if ( !((*s >= 'a' && *s <= 'z') || (*s >= 'A' && *s <= 'Z') || (*s >= '1' && *s <= '9')) )
@@ -4078,7 +4078,7 @@ static void CL_InitGLimp_Cvars( void )
 
 	cl_drawBuffer = Cvar_Get( "r_drawBuffer", "GL_BACK", CVAR_CHEAT );
 	Cvar_SetDescription( cl_drawBuffer, "Specifies buffer to draw from: GL_FRONT or GL_BACK." );
-#ifdef USE_RENDERER_DLOPEN
+#if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
 #ifdef RENDERER_DEFAULT
 	cl_renderer = Cvar_Get( "cl_renderer", XSTRING( RENDERER_DEFAULT ), CVAR_ARCHIVE | CVAR_LATCH );
 #else

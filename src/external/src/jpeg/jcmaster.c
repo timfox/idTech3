@@ -314,8 +314,16 @@ reduce_script (j_compress_ptr cinfo)
   jpeg_scan_info * scanptr;
   int idxout, idxin;
 
-  /* Circumvent const declaration for this function */
-  scanptr = (jpeg_scan_info *) cinfo->scan_info;
+  if (cinfo->scan_info == NULL || cinfo->num_scans <= 0) {
+    return;
+  }
+
+  scanptr = (jpeg_scan_info *) (*cinfo->mem->alloc_small)
+    ((j_common_ptr) cinfo, JPOOL_IMAGE,
+     cinfo->num_scans * SIZEOF(jpeg_scan_info));
+  memcpy(scanptr, cinfo->scan_info,
+         cinfo->num_scans * SIZEOF(jpeg_scan_info));
+  cinfo->scan_info = scanptr;
   idxout = 0;
 
   for (idxin = 0; idxin < cinfo->num_scans; idxin++) {

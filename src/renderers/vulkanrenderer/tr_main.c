@@ -748,9 +748,9 @@ R_PlaneForSurface
 =============
 */
 static void R_PlaneForSurface( const surfaceType_t *surfType, cplane_t *plane ) {
-	srfTriangles_t	*tri;
-	srfPoly_t		*poly;
-	srfVert_t		*v1, *v2, *v3;
+	const srfTriangles_t	*tri;
+	const srfPoly_t		*poly;
+	const srfVert_t		*v1, *v2, *v3;
 	vec4_t			plane4;
 
 	if (!surfType) {
@@ -760,10 +760,10 @@ static void R_PlaneForSurface( const surfaceType_t *surfType, cplane_t *plane ) 
 	}
 	switch (*surfType) {
 	case SF_FACE:
-		*plane = ((srfSurfaceFace_t *)surfType)->plane;
+		*plane = ((const srfSurfaceFace_t *)surfType)->plane;
 		return;
 	case SF_TRIANGLES:
-		tri = (srfTriangles_t *)surfType;
+		tri = (const srfTriangles_t *)surfType;
 		v1 = tri->verts + tri->indexes[0];
 		v2 = tri->verts + tri->indexes[1];
 		v3 = tri->verts + tri->indexes[2];
@@ -772,7 +772,7 @@ static void R_PlaneForSurface( const surfaceType_t *surfType, cplane_t *plane ) 
 		plane->dist = plane4[3];
 		return;
 	case SF_POLY:
-		poly = (srfPoly_t *)surfType;
+		poly = (const srfPoly_t *)surfType;
 		PlaneFromPoints( plane4, poly->verts[0].xyz, poly->verts[1].xyz, poly->verts[2].xyz );
 		VectorCopy( plane4, plane->normal ); 
 		plane->dist = plane4[3];
@@ -1202,7 +1202,7 @@ static qboolean R_MirrorViewBySurface( const drawSurf_t *drawSurf, int entityNum
 		newParms.dlights = oldParms.dlights + oldParms.num_dlights;
 		newParms.num_dlights = oldParms.num_dlights;
 		r_numdlights += oldParms.num_dlights;
-		for ( i = 0; i < oldParms.num_dlights; i++ )
+		for ( i = 0; i < (int)oldParms.num_dlights; i++ )
 			newParms.dlights[i] = oldParms.dlights[i];
 	}
 #endif
@@ -1290,15 +1290,15 @@ DRAWSURF SORTING
 R_Radix
 ===============
 */
-static ID_INLINE void R_Radix( int byte, int size, const drawSurf_t *source, drawSurf_t *dest )
+static ID_INLINE void R_Radix( int radix_byte, int size, const drawSurf_t *source, drawSurf_t *dest )
 {
   int           count[ 256 ] = { 0 };
   int           index[ 256 ];
   int           i;
-  unsigned char *sortKey;
-  unsigned char *end;
+  const unsigned char *sortKey;
+  const unsigned char *end;
 
-  sortKey = ( (unsigned char *)&source[ 0 ].sort ) + byte;
+  sortKey = ( (const unsigned char *)&source[ 0 ].sort ) + radix_byte;
   end = sortKey + ( size * sizeof( drawSurf_t ) );
   for( ; sortKey < end; sortKey += sizeof( drawSurf_t ) )
     ++count[ *sortKey ];
@@ -1308,7 +1308,7 @@ static ID_INLINE void R_Radix( int byte, int size, const drawSurf_t *source, dra
   for( i = 1; i < 256; ++i )
     index[ i ] = index[ i - 1 ] + count[ i - 1 ];
 
-  sortKey = ( (unsigned char *)&source[ 0 ].sort ) + byte;
+  sortKey = ( (const unsigned char *)&source[ 0 ].sort ) + radix_byte;
   for( i = 0; i < size; ++i, sortKey += sizeof( drawSurf_t ) )
     dest[ index[ *sortKey ]++ ] = source[ i ];
 }
@@ -1448,7 +1448,7 @@ void R_AddLitSurf( surfaceType_t *surface, shader_t *shader, int fogIndex )
 {
 	struct litSurf_s *litsurf;
 
-	if ( tr.refdef.numLitSurfs >= ARRAY_LEN( backEndData->litSurfs ) )
+	if ( tr.refdef.numLitSurfs >= (int)ARRAY_LEN( backEndData->litSurfs ) )
 		return;
 
 	tr.pc.c_lit_surfs++;
@@ -1580,7 +1580,7 @@ static void R_SortDrawSurfs( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 		dlight_t *dl;
 		// all the lit surfaces are in a single queue
 		// but each light's surfaces are sorted within its subsection
-		for ( i = 0; i < tr.refdef.num_dlights; ++i ) { 
+		for ( i = 0; i < (int)tr.refdef.num_dlights; ++i ) { 
 			dl = &tr.refdef.dlights[ i ];
 			if ( dl->head ) {
 				R_SortLitsurfs( dl );

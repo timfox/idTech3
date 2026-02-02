@@ -54,6 +54,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //#define USE_TESS_NEEDS_NORMAL
 //#define USE_TESS_NEEDS_ST2
 
+#define SH_COEFF_COUNT 9
+
 #include "../../qcommon/q_shared.h"
 #include "../../qcommon/qfiles.h"
 #include "../../qcommon/qcommon.h"
@@ -146,6 +148,8 @@ typedef struct {
 	vec3_t		ambientLight;	// color normalized to 0-255
 	int			ambientLightInt;	// 32 bit rgba packed
 	vec3_t		directedLight;
+	vec3_t		shCoeffs[SH_COEFF_COUNT];
+	qboolean	shLightingValid;
 #ifdef USE_PMLIGHT
 	vec3_t		shadowLightDir;	// normalized direction towards light
 #endif
@@ -1444,6 +1448,14 @@ extern cvar_t	*r_baseSpecular;
 extern cvar_t	*r_cubeMapping;
 #endif
 #endif
+extern cvar_t	*r_ssao;
+extern cvar_t	*r_ssaoRadius;
+extern cvar_t	*r_ssaoBias;
+extern cvar_t	*r_ssaoIntensity;
+extern cvar_t	*r_ssaoPower;
+extern cvar_t	*r_ssaoSamples;
+extern cvar_t	*r_ssaoBlurRadius;
+extern cvar_t	*r_ssaoDebugView;
 extern cvar_t	*r_fbo;
 extern cvar_t	*r_hdr;
 extern cvar_t	*r_bloom;
@@ -1574,10 +1586,13 @@ void	GL_TextureMode( const char *string );
 void	GL_CheckErrors( void );
 void	GL_State( unsigned stateVector );
 void	GL_ClientState( int unit, unsigned stateVector );
-#ifndef USE_VULKAN
 void	GL_TexEnv( GLint env );
 void	GL_Cull( cullType_t cullType );
-#endif
+
+void *R_GetCommandBuffer( int bytes );
+
+void Matrix16Identity( mat4_t out );
+void Matrix16Copy( const mat4_t in, mat4_t out );
 
 #define GLS_SRCBLEND_ZERO						0x00000001
 #define GLS_SRCBLEND_ONE						0x00000002
@@ -1819,6 +1834,7 @@ void R_DlightBmodel( bmodel_t *bmodel );
 void R_SetupEntityLighting( const trRefdef_t *refdef, trRefEntity_t *ent );
 void R_TransformDlights( int count, dlight_t *dl, orientationr_t *or );
 int R_LightForPoint( vec3_t point, vec3_t ambientLight, vec3_t directedLight, vec3_t lightDir );
+qboolean R_SampleLightGridSH( const world_t *world, const vec3_t position, vec3_t shCoeffs[SH_COEFF_COUNT] );
 #ifdef USE_VK_PBR
 int R_LightDirForPoint( vec3_t point, vec3_t lightDir, vec3_t normal, world_t *world );
 #endif

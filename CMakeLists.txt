@@ -161,11 +161,281 @@ else()
 endif()
 # --- End FindOpenAL.cmake
 
+if(NOT DEFINED USE_OPUS)
+  option(USE_OPUS "Enable Opus codec support" ON)
+endif()
+if(NOT DEFINED USE_FLAC)
+  option(USE_FLAC "Enable FLAC codec support" ON)
+endif()
+if(NOT DEFINED USE_WEBM)
+  option(USE_WEBM "Enable WebM audio support" ON)
+endif()
+
+set(OPUS_FOUND FALSE)
+set(FLAC_FOUND FALSE)
+set(WEBM_FOUND FALSE)
+set(OPUS_INCLUDE_DIR "")
+set(OPUSFILE_INCLUDE_DIR "")
+set(OPUSFILE_LIBRARY "")
+set(OGG_LIBRARY "")
+set(OGG_INCLUDE_DIR "")
+set(FLAC_INCLUDE_DIR "")
+set(FLAC_LIBRARY "")
+set(NESTEGG_INCLUDE_DIR "")
+set(NESTEGG_LIBRARY "")
+
+# Prefer vendored Ogg/Opus/Opusfile/FLAC/Nestegg when present.
+if(USE_OPUS OR USE_FLAC OR USE_WEBM)
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/external/src/ogg/src/bitwise.c")
+    if(NOT TARGET ogg)
+      add_library(ogg STATIC
+        src/external/src/ogg/src/bitwise.c
+        src/external/src/ogg/src/framing.c
+      )
+      target_include_directories(ogg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/external/src/ogg/include)
+      target_compile_definitions(ogg PRIVATE INCLUDE_INTTYPES_H=1 INCLUDE_SYS_TYPES_H=1)
+      if(NOT MSVC)
+        target_compile_options(ogg PRIVATE -Wno-undef)
+      endif()
+    endif()
+    set(OGG_LIBRARY ogg)
+    set(OGG_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/external/src/ogg/include)
+  endif()
+endif()
+
+if(USE_OPUS)
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/external/src/opus/CMakeLists.txt")
+    set(OPUS_BUILD_SHARED_LIBRARY OFF CACHE BOOL "" FORCE)
+    set(OPUS_BUILD_TESTING OFF CACHE BOOL "" FORCE)
+    set(OPUS_BUILD_PROGRAMS OFF CACHE BOOL "" FORCE)
+    set(OPUS_BUILD_FRAMEWORK OFF CACHE BOOL "" FORCE)
+    set(SKIP_INSTALL_ALL ON CACHE BOOL "" FORCE)
+    add_subdirectory(src/external/src/opus ${CMAKE_BINARY_DIR}/external/opus)
+    set(SKIP_INSTALL_ALL OFF CACHE BOOL "" FORCE)
+    set(OPUS_LIBRARY opus)
+    set(OPUS_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/external/src/opus/include)
+    if(TARGET opus)
+      target_compile_definitions(opus PRIVATE EMBEDDED_ARM=0)
+      if(NOT MSVC)
+        target_compile_options(opus PRIVATE
+          -Wno-vla
+          -Wno-undef
+          -Wno-cast-qual
+          -Wno-missing-prototypes
+          -Wno-stringop-overflow
+          -Wno-sign-compare
+        )
+      endif()
+    endif()
+  endif()
+endif()
+
+if(USE_OPUS)
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/external/src/opusfile/src/opusfile.c")
+    if(NOT TARGET opusfile)
+      add_library(opusfile STATIC
+        src/external/src/opusfile/src/info.c
+        src/external/src/opusfile/src/internal.c
+        src/external/src/opusfile/src/opusfile.c
+        src/external/src/opusfile/src/stream.c
+      )
+      target_compile_definitions(opusfile PRIVATE OP_DISABLE_HTTP INCLUDE_INTTYPES_H=1 INCLUDE_SYS_TYPES_H=1)
+      target_include_directories(opusfile PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/external/src/opusfile/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/external/src/opusfile
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/external/src/ogg/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/external/src/opus/include
+      )
+      if(NOT MSVC)
+        target_compile_options(opusfile PRIVATE
+          -Wno-undef
+          -Wno-cast-qual
+          -Wno-maybe-uninitialized
+        )
+      endif()
+      if(OGG_LIBRARY)
+        target_link_libraries(opusfile PRIVATE ${OGG_LIBRARY})
+      endif()
+      if(OPUS_LIBRARY)
+        target_link_libraries(opusfile PRIVATE ${OPUS_LIBRARY})
+      endif()
+    endif()
+    set(OPUSFILE_LIBRARY opusfile)
+    set(OPUSFILE_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/external/src/opusfile/include)
+  endif()
+endif()
+
+if(USE_FLAC)
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/external/src/flac/CMakeLists.txt")
+    set(BUILD_CXXLIBS OFF CACHE BOOL "" FORCE)
+    set(BUILD_PROGRAMS OFF CACHE BOOL "" FORCE)
+    set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+    set(WITH_OGG OFF CACHE BOOL "" FORCE)
+    set(INSTALL_MANPAGES OFF CACHE BOOL "" FORCE)
+    set(INSTALL_PKGCONFIG_MODULES OFF CACHE BOOL "" FORCE)
+    set(INSTALL_CMAKE_CONFIG_MODULE OFF CACHE BOOL "" FORCE)
+    set(SKIP_INSTALL_ALL ON CACHE BOOL "" FORCE)
+    add_subdirectory(src/external/src/flac ${CMAKE_BINARY_DIR}/external/flac)
+    set(SKIP_INSTALL_ALL OFF CACHE BOOL "" FORCE)
+    if(TARGET FLAC::FLAC)
+      set(FLAC_LIBRARY FLAC::FLAC)
+    elseif(TARGET FLAC)
+      set(FLAC_LIBRARY FLAC)
+    endif()
+    set(FLAC_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/external/src/flac/include)
+    if(TARGET benchmark_residual)
+      set_property(TARGET benchmark_residual PROPERTY EXCLUDE_FROM_ALL TRUE)
+      if(NOT MSVC)
+        target_compile_options(benchmark_residual PRIVATE -Wno-vla -Wno-cast-qual)
+      endif()
+    endif()
+    if(TARGET utf8)
+      if(NOT MSVC)
+        target_compile_options(utf8 PRIVATE -Wno-pedantic -Wno-cast-qual)
+      endif()
+    endif()
+  endif()
+endif()
+
+if(USE_WEBM)
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/external/src/nestegg/src/nestegg.c")
+    if(NOT TARGET nestegg)
+      add_library(nestegg STATIC
+        src/external/src/nestegg/src/nestegg.c
+        src/external/src/nestegg/halloc/src/halloc.c
+      )
+      target_include_directories(nestegg PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/external/src/nestegg
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/external/src/nestegg/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/external/src/nestegg/halloc
+      )
+      if(NOT MSVC)
+        target_compile_options(nestegg PRIVATE -Wno-unused-function)
+      endif()
+    endif()
+    set(NESTEGG_LIBRARY nestegg)
+    set(NESTEGG_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/external/src/nestegg/include)
+  endif()
+endif()
+
+#
+if(USE_OPUS AND NOT OPUS_LIBRARY)
+  find_path(OPUSFILE_INCLUDE_DIR
+    NAMES opus/opusfile.h
+    PATH_SUFFIXES include
+    PATHS ${CMAKE_PREFIX_PATH} /usr/local /usr /opt/local /opt /opt/homebrew
+  )
+  find_library(OPUSFILE_LIBRARY
+    NAMES opusfile
+    PATH_SUFFIXES lib64 lib
+    PATHS ${CMAKE_PREFIX_PATH} /usr/local /usr /opt/local /opt /opt/homebrew
+  )
+  find_library(OPUS_LIBRARY
+    NAMES opus
+    PATH_SUFFIXES lib64 lib
+    PATHS ${CMAKE_PREFIX_PATH} /usr/local /usr /opt/local /opt /opt/homebrew
+  )
+  find_library(OGG_LIBRARY
+    NAMES ogg
+    PATH_SUFFIXES lib64 lib
+    PATHS ${CMAKE_PREFIX_PATH} /usr/local /usr /opt/local /opt /opt/homebrew
+  )
+endif()
+if(USE_OPUS AND OPUSFILE_INCLUDE_DIR AND OPUSFILE_LIBRARY AND OPUS_LIBRARY AND OGG_LIBRARY)
+  set(OPUS_FOUND TRUE)
+endif()
+
+if(USE_OPUS OR USE_WEBM)
+  find_path(OPUS_INCLUDE_DIR
+    NAMES opus/opus.h
+    PATH_SUFFIXES include
+    PATHS ${CMAKE_PREFIX_PATH} /usr/local /usr /opt/local /opt /opt/homebrew
+  )
+  if(NOT OPUS_INCLUDE_DIR AND OPUSFILE_INCLUDE_DIR)
+    set(OPUS_INCLUDE_DIR ${OPUSFILE_INCLUDE_DIR})
+  endif()
+endif()
+
+if(USE_FLAC AND NOT FLAC_LIBRARY)
+  find_path(FLAC_INCLUDE_DIR
+    NAMES FLAC/stream_decoder.h
+    PATH_SUFFIXES include
+    PATHS ${CMAKE_PREFIX_PATH} /usr/local /usr /opt/local /opt /opt/homebrew
+  )
+  find_library(FLAC_LIBRARY
+    NAMES FLAC flac
+    PATH_SUFFIXES lib64 lib
+    PATHS ${CMAKE_PREFIX_PATH} /usr/local /usr /opt/local /opt /opt/homebrew
+  )
+endif()
+if(USE_FLAC AND FLAC_INCLUDE_DIR AND FLAC_LIBRARY)
+  set(FLAC_FOUND TRUE)
+endif()
+
+if(USE_WEBM AND NOT NESTEGG_LIBRARY)
+  find_path(NESTEGG_INCLUDE_DIR
+    NAMES nestegg/nestegg.h
+    PATH_SUFFIXES include
+    PATHS ${EXTERNAL_SRC}/nestegg ${EXTERNAL_INCLUDE}
+  )
+  find_library(NESTEGG_LIBRARY
+    NAMES nestegg
+    PATH_SUFFIXES lib64 lib
+    PATHS ${EXTERNAL_SRC}/nestegg ${EXTERNAL_ROOT}
+  )
+endif()
+if(USE_WEBM AND NESTEGG_INCLUDE_DIR AND NESTEGG_LIBRARY AND USE_OPUS AND OPUS_LIBRARY AND OPUS_INCLUDE_DIR)
+  set(WEBM_FOUND TRUE)
+endif()
+
+# If vendored targets were created, mark codecs as found.
+if(USE_OPUS AND TARGET opus AND TARGET opusfile AND TARGET ogg)
+  set(OPUS_LIBRARY opus)
+  set(OPUSFILE_LIBRARY opusfile)
+  set(OGG_LIBRARY ogg)
+  if(NOT OPUS_INCLUDE_DIR)
+    set(OPUS_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/external/src/opus/include)
+  endif()
+  if(NOT OPUSFILE_INCLUDE_DIR)
+    set(OPUSFILE_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/external/src/opusfile/include)
+  endif()
+  if(NOT OGG_INCLUDE_DIR)
+    set(OGG_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/external/src/ogg/include)
+  endif()
+  set(OPUS_FOUND TRUE)
+endif()
+
+if(USE_FLAC AND (TARGET FLAC::FLAC OR TARGET FLAC))
+  if(NOT FLAC_LIBRARY)
+    if(TARGET FLAC::FLAC)
+      set(FLAC_LIBRARY FLAC::FLAC)
+    else()
+      set(FLAC_LIBRARY FLAC)
+    endif()
+  endif()
+  if(NOT FLAC_INCLUDE_DIR)
+    set(FLAC_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/external/src/flac/include)
+  endif()
+  set(FLAC_FOUND TRUE)
+endif()
+
+if(USE_WEBM AND TARGET nestegg AND USE_OPUS AND OPUS_LIBRARY AND OPUS_INCLUDE_DIR)
+  if(NOT NESTEGG_LIBRARY)
+    set(NESTEGG_LIBRARY nestegg)
+  endif()
+  if(NOT NESTEGG_INCLUDE_DIR)
+    set(NESTEGG_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/external/src/nestegg/include)
+  endif()
+  set(WEBM_FOUND TRUE)
+endif()
+
 SET(CNAME "idtech3")
 SET(DNAME "idtech3_server")
 
 SET(RENDERER_PREFIX ${CNAME})
 SET(RENDERER_DEFAULT vulkan) # valid options: opengl, vulkan
+add_compile_definitions(RENDERER_PREFIX="${RENDERER_PREFIX}" RENDERER_DEFAULT="${RENDERER_DEFAULT}")
 
 OPTION(USE_SDL "" ON)
 OPTION(USE_OPENAL "Enable OpenAL audio backend" ON)
@@ -173,8 +443,26 @@ OPTION(USE_CURL "" ON)
 OPTION(USE_LOCAL_HEADERS "" ON)
 OPTION(USE_VULKAN "" ON)
 OPTION(USE_MP3 "Enable MP3 codec support" ON)
+#
+OPTION(USE_ZLIB "Enable zlib support (vendored)" ON)
+OPTION(USE_LIBPNG "Enable libpng support (vendored)" ON)
+OPTION(USE_GLM "Enable glm headers (vendored)" ON)
 OPTION(USE_SYSTEM_JPEG "" OFF)
 OPTION(USE_RENDERER_DLOPEN "" ON)
+if(WIN32 AND USE_RENDERER_DLOPEN)
+  message(STATUS "Renderer dlopen disabled on Windows targets; switching to static renderer builds")
+  set(USE_RENDERER_DLOPEN OFF CACHE BOOL "" FORCE)
+endif()
+if(USE_RENDERER_DLOPEN)
+  add_compile_definitions(USE_RENDERER_DLOPEN=1)
+else()
+  add_compile_definitions(USE_RENDERER_DLOPEN=0)
+endif()
+if(USE_SDL)
+  add_compile_definitions(USE_SDL=1)
+else()
+  add_compile_definitions(USE_SDL=0)
+endif()
 OPTION(SKIP_IDPAK_CHECK "Skip checking for original Quake III pak files (pak0.pk3)" ON)
 OPTION(BUILD_FREETYPE "Enable FreeType-powered font rendering / font generation" ON)
 
@@ -186,10 +474,68 @@ set(EXTERNAL_INCLUDE "${EXTERNAL_ROOT}/include")
 set(EXTERNAL_SDL_INCLUDE_DIR "${EXTERNAL_SRC}/sdl/include/SDL2")
 set(EXTERNAL_CURL_WINDOWS_INCLUDE_DIR "${EXTERNAL_SRC}/curl/windows/include")
 set(EXTERNAL_JPEG_SRC_DIR "${EXTERNAL_SRC}/jpeg")
+set(EXTERNAL_ZLIB_SRC "${EXTERNAL_SRC}/zlib")
+set(EXTERNAL_LIBPNG_SRC "${EXTERNAL_SRC}/libpng")
+set(EXTERNAL_GLM_INCLUDE "${EXTERNAL_SRC}/glm")
 
 # Add cflux2 external library
 if(USE_FLUX)
 	add_subdirectory(src/external/src/cflux2)
+endif()
+
+if(USE_ZLIB)
+  set(ZLIB_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+  set(ZLIB_BUILD_STATIC ON CACHE BOOL "" FORCE)
+  set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+  set(SKIP_INSTALL_ALL ON CACHE BOOL "" FORCE)
+  if(EXISTS "${EXTERNAL_ZLIB_SRC}/CMakeLists.txt")
+    add_subdirectory(${EXTERNAL_ZLIB_SRC} ${CMAKE_BINARY_DIR}/external/zlib)
+    if(NOT TARGET ZLIB::ZLIB)
+      add_library(ZLIB::ZLIB ALIAS zlibstatic)
+    endif()
+    if(TARGET zlibstatic)
+      target_compile_definitions(zlibstatic PRIVATE ZLIB_CONST)
+      target_compile_definitions(zlibstatic PRIVATE _LFS64_LARGEFILE=1 _LARGEFILE64_SOURCE=1 Z_LARGE64=1)
+      set_property(TARGET zlibstatic PROPERTY POSITION_INDEPENDENT_CODE ON)
+    endif()
+    if(TARGET zlib)
+      target_compile_definitions(zlib PRIVATE ZLIB_CONST)
+      target_compile_definitions(zlib PRIVATE _LFS64_LARGEFILE=1 _LARGEFILE64_SOURCE=1 Z_LARGE64=1)
+      set_property(TARGET zlib PROPERTY POSITION_INDEPENDENT_CODE ON)
+    endif()
+  endif()
+  set(SKIP_INSTALL_ALL OFF CACHE BOOL "" FORCE)
+endif()
+
+if(USE_LIBPNG)
+  if(NOT USE_ZLIB)
+    message(FATAL_ERROR "libpng requires zlib; enable USE_ZLIB.")
+  endif()
+  set(PNG_SHARED OFF CACHE BOOL "" FORCE)
+  set(PNG_STATIC ON CACHE BOOL "" FORCE)
+  set(PNG_TESTS OFF CACHE BOOL "" FORCE)
+  set(PNG_TOOLS OFF CACHE BOOL "" FORCE)
+  set(PNG_BUILD_ZLIB OFF CACHE BOOL "" FORCE)
+  set(ZLIB_ROOT "${CMAKE_BINARY_DIR}/external/zlib" CACHE PATH "" FORCE)
+  set(ZLIB_INCLUDE_DIR "${EXTERNAL_ZLIB_SRC}" CACHE PATH "" FORCE)
+  set(ZLIB_INCLUDE_DIRS "${EXTERNAL_ZLIB_SRC};${CMAKE_BINARY_DIR}/external/zlib" CACHE PATH "" FORCE)
+  set(ZLIB_LIBRARY "${CMAKE_BINARY_DIR}/external/zlib/${CMAKE_STATIC_LIBRARY_PREFIX}z${CMAKE_STATIC_LIBRARY_SUFFIX}" CACHE FILEPATH "" FORCE)
+  set(ZLIB_LIBRARY_RELEASE "${CMAKE_BINARY_DIR}/external/zlib/${CMAKE_STATIC_LIBRARY_PREFIX}z${CMAKE_STATIC_LIBRARY_SUFFIX}" CACHE FILEPATH "" FORCE)
+  set(ZLIB_LIBRARY_DEBUG "${CMAKE_BINARY_DIR}/external/zlib/${CMAKE_STATIC_LIBRARY_PREFIX}z${CMAKE_STATIC_LIBRARY_SUFFIX}" CACHE FILEPATH "" FORCE)
+  set(ZLIB_LIBRARIES "${CMAKE_BINARY_DIR}/external/zlib/${CMAKE_STATIC_LIBRARY_PREFIX}z${CMAKE_STATIC_LIBRARY_SUFFIX}" CACHE FILEPATH "" FORCE)
+  set(ZLIB_FOUND TRUE CACHE BOOL "" FORCE)
+  set(SKIP_INSTALL_ALL ON CACHE BOOL "" FORCE)
+  set(SKIP_INSTALL_EXPORT ON CACHE BOOL "" FORCE)
+  if(EXISTS "${EXTERNAL_LIBPNG_SRC}/CMakeLists.txt")
+    add_subdirectory(${EXTERNAL_LIBPNG_SRC} ${CMAKE_BINARY_DIR}/external/libpng)
+    if(TARGET png_static)
+      target_include_directories(png_static PRIVATE ${EXTERNAL_ZLIB_SRC})
+      target_link_libraries(png_static PRIVATE zlibstatic)
+      set_property(TARGET png_static PROPERTY POSITION_INDEPENDENT_CODE ON)
+    endif()
+  endif()
+  set(SKIP_INSTALL_EXPORT OFF CACHE BOOL "" FORCE)
+  set(SKIP_INSTALL_ALL OFF CACHE BOOL "" FORCE)
 endif()
 
 if(BUILD_FREETYPE)
@@ -247,16 +593,41 @@ endif()
 AUX_SOURCE_DIRECTORY(src/botlib BOTLIB_SRCS)
 ADD_LIBRARY(botlib OBJECT ${BOTLIB_SRCS})
 TARGET_COMPILE_DEFINITIONS(botlib PRIVATE BOTLIB)
+if(USE_GLM)
+  target_include_directories(botlib PRIVATE ${EXTERNAL_GLM_INCLUDE})
+endif()
 
 AUX_SOURCE_DIRECTORY(src/server SERVER_SRCS)
 list(REMOVE_ITEM SERVER_SRCS src/server/sv_rankings.c)
 
 # universal binary
 ADD_LIBRARY(qcommon OBJECT ${QCOMMON_SRCS} ${SERVER_SRCS})
+if(USE_GLM)
+  target_include_directories(qcommon PRIVATE ${EXTERNAL_GLM_INCLUDE})
+endif()
+target_include_directories(qcommon PRIVATE
+  ${CMAKE_SOURCE_DIR}/src/platform
+  ${CMAKE_SOURCE_DIR}/src/platform/win32
+  ${CMAKE_SOURCE_DIR}/src/platform/platform/win32
+  ${CMAKE_SOURCE_DIR}/src/client
+  ${CMAKE_SOURCE_DIR}/src/audio
+)
+set_property(TARGET qcommon PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # dedicated server
 ADD_LIBRARY(qcommon_ded OBJECT ${QCOMMON_SRCS} ${SERVER_SRCS})
 TARGET_COMPILE_DEFINITIONS(qcommon_ded PUBLIC DEDICATED)
+if(USE_GLM)
+  target_include_directories(qcommon_ded PRIVATE ${EXTERNAL_GLM_INCLUDE})
+endif()
+target_include_directories(qcommon_ded PRIVATE
+  ${CMAKE_SOURCE_DIR}/src/platform
+  ${CMAKE_SOURCE_DIR}/src/platform/win32
+  ${CMAKE_SOURCE_DIR}/src/platform/platform/win32
+  ${CMAKE_SOURCE_DIR}/src/client
+  ${CMAKE_SOURCE_DIR}/src/audio
+)
+set_property(TARGET qcommon_ded PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # Apply SKIP_IDPAK_CHECK to qcommon targets that compile files.c
 if(SKIP_IDPAK_CHECK)
@@ -267,6 +638,42 @@ endif()
 # client + cURL
 # client sources
 AUX_SOURCE_DIRECTORY(src/client CLIENT_SRCS)
+# remove audio implementation from client; moved to src/audio
+list(REMOVE_ITEM CLIENT_SRCS
+  src/client/snd_main.c
+  src/client/snd_dma.c
+  src/client/snd_mem.c
+  src/client/snd_mix.c
+  src/client/snd_mix_fallback.c
+  src/client/snd_wavelet.c
+  src/client/snd_adpcm.c
+  src/client/snd_codec.c
+  src/client/snd_codec_mp3.c
+  src/client/snd_codec_ogg.c
+  src/client/snd_codec_wav.c
+)
+list(APPEND CLIENT_SRCS
+  src/audio/snd_main.c
+  src/audio/mix/snd_dma.c
+  src/audio/mix/snd_mem.c
+  src/audio/mix/snd_mix.c
+  src/audio/mix/snd_mix_fallback.c
+  src/audio/mix/snd_wavelet.c
+  src/audio/mix/snd_adpcm.c
+  src/audio/codecs/snd_codec.c
+  src/audio/codecs/snd_codec_mp3.c
+  src/audio/codecs/snd_codec_ogg.c
+  src/audio/codecs/snd_codec_wav.c
+  src/audio/codecs/snd_codec_opus.c
+  src/audio/codecs/snd_codec_flac.c
+  src/audio/codecs/snd_codec_webm.c
+  src/audio/backends/snd_backend_openal.c
+  src/audio/backends/snd_backend_null.c
+  src/audio/effects/snd_efx.c
+)
+if(USE_SDL)
+  list(APPEND CLIENT_SRCS src/audio/backends/snd_backend_sdl.c)
+endif()
 # include architecture-specific assembly implementations (snd_mix etc)
 # Only include x86/x86_64 assembly files on x86/x86_64 architectures on Unix-like systems
 # Assembly is disabled on Windows due to preprocessor macro issues with MSYS2/MinGW
@@ -300,11 +707,23 @@ IF(NOT USE_CURL)
 ENDIF()
 IF(NOT USE_MP3)
 	list(REMOVE_ITEM CLIENT_SRCS src/client/snd_codec_mp3.c)
+	list(REMOVE_ITEM CLIENT_SRCS src/audio/codecs/snd_codec_mp3.c)
 ENDIF()
 IF(USE_MP3)
-	AUX_SOURCE_DIRECTORY(src/client/mp3 MP3_SRCS)
+	AUX_SOURCE_DIRECTORY(src/audio/mp3 MP3_SRCS)
 	list(APPEND CLIENT_SRCS ${MP3_SRCS})
 ENDIF()
+
+# Opus/FLAC sources already listed above; remove if not found.
+if(NOT USE_OPUS OR NOT OPUS_FOUND)
+  list(REMOVE_ITEM CLIENT_SRCS src/audio/codecs/snd_codec_opus.c)
+endif()
+if(NOT USE_FLAC OR NOT FLAC_FOUND)
+  list(REMOVE_ITEM CLIENT_SRCS src/audio/codecs/snd_codec_flac.c)
+endif()
+if(NOT USE_WEBM OR NOT WEBM_FOUND)
+  list(REMOVE_ITEM CLIENT_SRCS src/audio/codecs/snd_codec_webm.c)
+endif()
 
 #ADD_LIBRARY(client OBJECT ${CLIENT_SRCS})
 
@@ -316,6 +735,12 @@ IF(USE_SYSTEM_JPEG)
 	if(USE_FLUX)
 		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_FLUX)
 		target_include_directories(client PRIVATE ${EXTERNAL_ROOT}/src/cflux2)
+	endif()
+	if(USE_OPUS)
+		target_compile_definitions(client PRIVATE INCLUDE_INTTYPES_H=1 INCLUDE_SYS_TYPES_H=1)
+	endif()
+	if(USE_GLM)
+		target_include_directories(client PRIVATE ${EXTERNAL_GLM_INCLUDE})
 	endif()
 	TARGET_LINK_LIBRARIES(client ${JPEG_LIBRARIES})
 ELSE()
@@ -329,6 +754,18 @@ ELSE()
 	endif()
 	# Ensure client can find qcommon headers needed by some client-side modules (eg. mp3)
 	target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR}/src/qcommon ${EXTERNAL_JPEG_SRC_DIR})
+	# Audio module headers (moved from client/)
+	target_include_directories(client PRIVATE
+		${CMAKE_SOURCE_DIR}/src/audio
+		${CMAKE_SOURCE_DIR}/src/audio/codecs
+		${CMAKE_SOURCE_DIR}/src/client
+	)
+	if(USE_OPUS)
+		target_compile_definitions(client PRIVATE INCLUDE_INTTYPES_H=1 INCLUDE_SYS_TYPES_H=1)
+	endif()
+	if(USE_GLM)
+		target_include_directories(client PRIVATE ${EXTERNAL_GLM_INCLUDE})
+	endif()
 ENDIF()
 
 # renderers
@@ -350,12 +787,16 @@ ENDIF()
 AUX_SOURCE_DIRECTORY(src/renderers/openglrenderer RENDERER_GL_SRCS)
 AUX_SOURCE_DIRECTORY(src/renderers/vulkanrenderer RENDERER_VK_SRCS)
 
-IF(USE_RENDERER_DLOPEN)
-	SET(AUX_SRCS
+SET(AUX_SRCS)
+if(NOT USE_RENDERER_DLOPEN)
+	list(APPEND AUX_SRCS
 		src/qcommon/q_shared.c
-		src/qcommon/puff.c
-		src/qcommon/q_math.c
-	)
+		src/qcommon/q_math.c)
+	if(NOT USE_LIBPNG)
+		list(APPEND AUX_SRCS src/qcommon/puff.c)
+	endif()
+endif()
+IF(USE_RENDERER_DLOPEN)
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_RENDERER_DLOPEN RENDERER_PREFIX="${RENDERER_PREFIX}" RENDERER_DEFAULT="${RENDERER_DEFAULT}")
 
 	ADD_LIBRARY(${RENDERER_PREFIX}_opengl${RENDEXT} SHARED ${RENDERER_GL_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
@@ -369,11 +810,21 @@ IF(USE_RENDERER_DLOPEN)
 	IF(BUILD_FREETYPE)
 		target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE idtech3_freetype)
 	ENDIF()
-	# Ensure shared renderer libraries link to the math and dl libs so symbol versions
-	# (eg. powf@GLIBC_2.2.5) are resolved against the dynamic libm rather than a
-	# static libm which would break building shared objects.
-	target_link_libraries(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE m ${CMAKE_DL_LIBS})
-	target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE m ${CMAKE_DL_LIBS})
+	if(WIN32)
+		target_link_libraries(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE qcommon m ${CMAKE_DL_LIBS})
+		target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE qcommon m ${CMAKE_DL_LIBS})
+	else()
+		target_link_libraries(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE m ${CMAKE_DL_LIBS})
+		target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE m ${CMAKE_DL_LIBS})
+	endif()
+	IF(APPLE)
+		target_link_options(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE "-undefined" "dynamic_lookup")
+		target_link_options(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE "-undefined" "dynamic_lookup")
+	ENDIF()
+	if(UNIX AND NOT APPLE)
+		target_link_options(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE "-Wl,--allow-shlib-undefined")
+		target_link_options(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE "-Wl,--allow-shlib-undefined")
+	endif()
 	# Normalize target filenames for dlopen-friendly plugin names:
 	# set OUTPUT_NAME and remove default 'lib' PREFIX so filenames become:
 	#   idtech3_opengl_x86_64.so  (instead of libidtech3_opengl_x86_64.so)
@@ -402,36 +853,81 @@ ELSE()
 	ENDIF()
 ENDIF()
 
+# libpng/zlib for renderer PNG loader
+if(USE_LIBPNG)
+  if(TARGET png_static)
+    set(LIBPNG_TARGET png_static)
+  elseif(TARGET png_shared)
+    set(LIBPNG_TARGET png_shared)
+  elseif(TARGET png)
+    set(LIBPNG_TARGET png)
+  else()
+    set(LIBPNG_TARGET "")
+  endif()
+
+  if(LIBPNG_TARGET)
+    if(NOT MSVC)
+      target_compile_options(${LIBPNG_TARGET} PRIVATE -Wno-cast-qual)
+    endif()
+    if(USE_RENDERER_DLOPEN)
+      target_link_libraries(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE ${LIBPNG_TARGET})
+      target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${LIBPNG_TARGET})
+      target_compile_definitions(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE USE_LIBPNG USE_ZLIB)
+      target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_LIBPNG USE_ZLIB)
+    else()
+      if(USE_VULKAN)
+        target_link_libraries(${RENDERER_PREFIX}_vulkan PRIVATE ${LIBPNG_TARGET})
+        target_compile_definitions(${RENDERER_PREFIX}_vulkan PRIVATE USE_LIBPNG USE_ZLIB)
+      else()
+        target_link_libraries(${RENDERER_PREFIX}_opengl PRIVATE ${LIBPNG_TARGET})
+        target_compile_definitions(${RENDERER_PREFIX}_opengl PRIVATE USE_LIBPNG USE_ZLIB)
+      endif()
+    endif()
+  endif()
+endif()
+
+if(USE_GLM)
+  if(USE_RENDERER_DLOPEN)
+    target_include_directories(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE ${EXTERNAL_GLM_INCLUDE})
+    target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${EXTERNAL_GLM_INCLUDE})
+  else()
+    if(USE_VULKAN)
+      target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${EXTERNAL_GLM_INCLUDE})
+    else()
+      target_include_directories(${RENDERER_PREFIX}_opengl PRIVATE ${EXTERNAL_GLM_INCLUDE})
+    endif()
+  endif()
+endif()
+
 # common function, window system
 IF(UNIX)
 	SET (Q3_SRCS
-		src/unix/unix_main.c
-		src/unix/unix_shared.c
-		src/unix/linux_signals.c)
+		src/platform/unix/unix_main.c
+		src/platform/unix/unix_shared.c
+		src/platform/unix/linux_signals.c)
 
 	IF(USE_SDL)
-		AUX_SOURCE_DIRECTORY(src/audio/backends/sdl Q3_UI_SRCS)
 		list(APPEND Q3_UI_SRCS
 			src/platform/sdl/sdl_gamma.c
 			src/platform/sdl/sdl_glimp.c
 			src/platform/sdl/sdl_input.c)
 	ELSE()
 		SET(Q3_UI_SRCS
-			src/unix/linux_glimp.c
-			src/unix/linux_qgl.c
-			src/unix/linux_snd.c
-			src/unix/x11_dga.c
-			src/unix/x11_randr.c
-			src/unix/x11_vidmode.c)
+			src/platform/unix/linux_glimp.c
+			src/platform/unix/linux_qgl.c
+			src/platform/unix/linux_snd.c
+			src/platform/unix/x11_dga.c
+			src/platform/unix/x11_randr.c
+			src/platform/unix/x11_vidmode.c)
 		IF(USE_VULKAN)
-			list(APPEND Q3_UI_SRCS src/unix/linux_qvk.c)
+			list(APPEND Q3_UI_SRCS src/platform/unix/linux_qvk.c)
 		ENDIF()
 	ENDIF()
 
 	IF(APPLE)
 		SET(EXE_TYPE MACOSX_BUNDLE)
-		list(APPEND Q3_SRCS src/unix/quake3_flat.icns)
-		set_source_files_properties(src/unix/quake3_flat.icns PROPERTIES
+		list(APPEND Q3_SRCS src/platform/unix/quake3_flat.icns)
+		set_source_files_properties(src/platform/unix/quake3_flat.icns PROPERTIES
 			MACOSX_PACKAGE_LOCATION Resources)
 		SET(MACOSX_BUNDLE_ICON_FILE quake3_flat.icns)
 	ENDIF()
@@ -443,41 +939,39 @@ ELSEIF(WIN32)
 	ENDIF()
 
 	SET(Q3_SRCS
-		src/win32/win_main.c
-		src/win32/win_shared.c
-		src/win32/win_syscon.c
-		src/win32/win_resource.rc)
+		src/platform/win32/win_main.c
+		src/platform/win32/win_shared.c
+		src/platform/win32/win_syscon.c
+		src/platform/win32/win_resource.rc)
 	
 	# Set include directory for resource compiler to find icon and manifest files
 	if(MINGW)
-		set_source_files_properties(src/win32/win_resource.rc PROPERTIES
-			COMPILE_FLAGS "-I${CMAKE_CURRENT_SOURCE_DIR}/src/win32")
+		set_source_files_properties(src/platform/win32/win_resource.rc PROPERTIES
+			COMPILE_FLAGS "-I${CMAKE_CURRENT_SOURCE_DIR}/src/platform/win32")
 	endif()
 
 	SET(Q3_UI_SRCS
-		src/win32/win_gamma.c
-		src/win32/win_glimp.c
-		src/win32/win_input.c
-		src/win32/win_minimize.c
-		src/win32/win_qgl.c
-		src/win32/win_snd.c
-		src/win32/win_wndproc.c)
+		src/platform/win32/win_gamma.c
+		src/platform/win32/win_glimp.c
+		src/platform/win32/win_input.c
+		src/platform/win32/win_minimize.c
+		src/platform/win32/win_qgl.c
+		src/platform/win32/win_wndproc.c)
+	IF(NOT USE_SDL)
+		list(APPEND Q3_UI_SRCS src/platform/win32/win_snd.c)
+	ENDIF()
 	IF(USE_VULKAN)
-		list(APPEND Q3_UI_SRCS src/win32/win_qvk.c)
+		list(APPEND Q3_UI_SRCS src/platform/win32/win_qvk.c)
 	ENDIF()
 ENDIF(UNIX)
 
-IF(USE_OPENAL)
-	list(APPEND Q3_UI_SRCS
-		src/audio/backends/openal/openal_snd.c
-		src/audio/acoustics/s_acoustics.c
-	)
-ENDIF()
+# Audio backends/effects are built with the client module only.
 
 ADD_LIBRARY(q3ui OBJECT ${Q3_UI_SRCS})
 
 if(USE_LOCAL_HEADERS)
 	target_include_directories(q3ui PRIVATE ${EXTERNAL_SDL_INCLUDE_DIR})
+	target_include_directories(client PRIVATE ${EXTERNAL_SDL_INCLUDE_DIR})
 endif()
 if(USE_LOCAL_HEADERS AND WIN32)
 	target_include_directories(client PRIVATE ${EXTERNAL_CURL_WINDOWS_INCLUDE_DIR})
@@ -501,6 +995,8 @@ IF(NOT MSVC)
 	ENDIF()
 ENDIF()
 
+target_include_directories(q3ui PRIVATE ${CMAKE_SOURCE_DIR}/src/audio)
+
 IF(USE_OPENAL)
 	if(NOT OPENAL_FOUND)
 	  message(FATAL_ERROR "OpenAL could not be found. Please install or set OPENAL paths.")
@@ -511,6 +1007,36 @@ IF(USE_OPENAL)
 	target_include_directories(q3ui PRIVATE ${OPENAL_INCLUDE_DIR})
 	target_include_directories(client PRIVATE ${OPENAL_INCLUDE_DIR})
 ENDIF()
+
+if(USE_OPUS)
+  if(OPUS_FOUND)
+    TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_OPUS)
+    target_include_directories(client PRIVATE ${OPUSFILE_INCLUDE_DIR} ${OPUS_INCLUDE_DIR})
+    target_link_libraries(client PRIVATE ${OPUSFILE_LIBRARY} ${OPUS_LIBRARY} ${OGG_LIBRARY})
+  else()
+    message(WARNING "Opus requested but libopusfile/libopus/ogg not found; Opus codec disabled.")
+  endif()
+endif()
+
+if(USE_FLAC)
+  if(FLAC_FOUND)
+    TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_FLAC)
+    target_include_directories(client PRIVATE ${FLAC_INCLUDE_DIR})
+    target_link_libraries(client PRIVATE ${FLAC_LIBRARY})
+  else()
+    message(WARNING "FLAC requested but libFLAC not found; FLAC codec disabled.")
+  endif()
+endif()
+
+if(USE_WEBM)
+  if(WEBM_FOUND)
+    TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_WEBM)
+    target_include_directories(client PRIVATE ${NESTEGG_INCLUDE_DIR} ${OPUS_INCLUDE_DIR})
+    target_link_libraries(client PRIVATE ${NESTEGG_LIBRARY} ${OPUS_LIBRARY})
+  else()
+    message(WARNING "WebM requested but libnestegg/libopus not found; WebM codec disabled.")
+  endif()
+endif()
 
 IF(USE_VULKAN)
 	TARGET_COMPILE_DEFINITIONS(q3ui PRIVATE USE_VULKAN_API)

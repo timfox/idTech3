@@ -753,6 +753,7 @@ start_pass (j_decompress_ptr cinfo)
 METHODDEF(void)
 finish_pass (j_decompress_ptr cinfo)
 {
+  (void)cinfo;
   /* no work necessary here */
 }
 

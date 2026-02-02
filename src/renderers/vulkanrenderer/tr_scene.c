@@ -97,14 +97,14 @@ Adds all the scene's polys into this view's drawsurf list
 void R_AddPolygonSurfaces( void ) {
 	int			i;
 	shader_t	*sh;
-	const srfPoly_t	*poly;
+	srfPoly_t	*poly;
 
 	tr.currentEntityNum = REFENTITYNUM_WORLD;
 	tr.shiftedEntityNum = tr.currentEntityNum << QSORT_REFENTITYNUM_SHIFT;
 
 	for ( i = 0, poly = tr.refdef.polys; i < tr.refdef.numPolys ; i++, poly++ ) {
 		sh = R_GetShaderByHandle( poly->hShader );
-		R_AddDrawSurf( ( void * )poly, sh, poly->fogIndex, 0 );
+		R_AddDrawSurf( (surfaceType_t *)poly, sh, poly->fogIndex, 0 );
 	}
 }
 
@@ -199,7 +199,8 @@ void RE_AddPolyToScene( qhandle_t hShader, int numVerts, const polyVert_t *verts
 
 static int isnan_fp( const float *f )
 {
-	uint32_t u = *( (uint32_t*) f );
+	uint32_t u;
+	Com_Memcpy( &u, f, sizeof( u ) );
 	u = 0x7F800000 - ( u & 0x7FFFFFFF );
 	return (int)( u >> 31 );
 }
@@ -249,7 +250,7 @@ static void RE_AddDynamicLightToScene( const vec3_t org, float intensity, float 
 	if ( !tr.registered ) {
 		return;
 	}
-	if ( r_numdlights >= ARRAY_LEN( backEndData->dlights ) ) {
+	if ( r_numdlights >= (int)ARRAY_LEN( backEndData->dlights ) ) {
 		return;
 	}
 	if ( intensity <= 0 ) {
@@ -306,7 +307,7 @@ void RE_AddLinearLightToScene( const vec3_t start, const vec3_t end, float inten
 	if ( !tr.registered ) {
 		return;
 	}
-	if ( r_numdlights >= ARRAY_LEN( backEndData->dlights ) ) {
+	if ( r_numdlights >= (int)ARRAY_LEN( backEndData->dlights ) ) {
 		return;
 	}
 	if ( intensity <= 0 ) {
@@ -396,9 +397,11 @@ void RE_BeginScene( const refdef_t *fd ) {
 
 		// compare the area bits
 		areaDiff = 0;
-		for ( i = 0; i < MAX_MAP_AREA_BYTES/sizeof(int); i++ ) {
-			areaDiff |= ((int *)tr.refdef.areamask)[i] ^ ((int *)fd->areamask)[i];
-			((int *)tr.refdef.areamask)[i] = ((int *)fd->areamask)[i];
+		const int *srcMask = (const int *)fd->areamask;
+		int *dstMask = (int *)tr.refdef.areamask;
+		for ( i = 0; i < (int)( MAX_MAP_AREA_BYTES / sizeof( int ) ); i++ ) {
+			areaDiff |= dstMask[i] ^ srcMask[i];
+			dstMask[i] = srcMask[i];
 		}
 
 		if ( areaDiff ) {
