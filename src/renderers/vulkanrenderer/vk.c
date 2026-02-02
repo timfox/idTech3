@@ -6799,9 +6799,6 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 #ifdef USE_VK_PBR
 	const int use_pbr = def->vk_pbr_flags ? 1 : 0;
 
-	if ( def->vk_pbr_flags )
-		Com_Printf("hi");
-
 	switch ( def->shader_type ) {
 
 		case TYPE_SIGNLE_TEXTURE_LIGHTING:
