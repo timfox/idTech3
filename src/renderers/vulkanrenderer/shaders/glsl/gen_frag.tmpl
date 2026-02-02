@@ -217,39 +217,57 @@ vec3 ComputeGlintContribution( vec3 N, vec3 L, vec3 V, vec3 specColor, float rou
 
 	int entryCount = max( 1, min( GLINT_DICT_ENTRIES_INT, int( clamp( glintDict.z, 1.0, float( GLINT_DICT_ENTRIES_INT ) ) + 0.5 ) ) );
 	int levelCount = max( 1, min( GLINT_DICT_LEVELS_INT, int( clamp( glintDict.x, 1.0, float( GLINT_DICT_LEVELS_INT ) ) + 0.5 ) ) );
-	float levelMax = float( levelCount ) - 1.0;
-	float levelValue = clamp( roughness * levelMax + glintSampling.w + glintPerformance.x, 0.0, levelMax );
-
-	float temporalJitter = ( glintTemporal.x > 0.5 && glintTemporal.w > 0.0 ) ? glint_hash( frag_tex_coord0 * 1.3, glintTemporal.w ) * 0.25 : 0.0;
-	levelValue = clamp( levelValue + temporalJitter, 0.0, levelMax );
-
-	int level0 = clamp( int( floor( levelValue ) ), 0, levelCount - 1 );
-	int level1 = min( levelCount - 1, level0 + 1 );
-	float levelLerp = fract( levelValue );
+	float targetDensity = max( glintDensity.x, exp( glintDensity.y ) );
 
 	vec2 tile = floor( frag_tex_coord0 * max( 1.0, glintSampling.z ) );
 	float baseSeed = glintCore.w + dot( tile, vec2( 12.9898, 78.233 ) );
+	float densityBias = clamp( glintDensity.z * 0.1, -0.5, 0.5 );
 
-	float hashA = glint_hash( tile, baseSeed );
-	float hashB = glint_hash( tile, baseSeed + 0.5 );
+	float totalWeight = 0.0;
+	float accumulatedNdf = 0.0;
 
-	int entryA = max( 0, min( GLINT_DICT_ENTRIES_INT - 1, int( floor( hashA * float( entryCount ) ) ) ) );
-	int entryB = max( 0, min( GLINT_DICT_ENTRIES_INT - 1, int( floor( hashB * float( entryCount ) ) ) ) );
+	for ( int level = 0; level < GLINT_DICT_LEVELS_INT; level++ )
+	{
+		if ( level >= levelCount )
+		{
+			break;
+		}
 
-	float hashC = glint_hash( tile + vec2( hashA, hashB ), baseSeed + 1.3 );
-	float hashD = glint_hash( tile + vec2( hashB, hashA ), baseSeed + 2.7 );
+		float levelNorm = float( level ) / max( 1.0, float( levelCount - 1 ) );
+		float levelBias = clamp( glintPerformance.x * 0.1, -0.5, 0.5 );
+		float lodValue = clamp( levelNorm + levelBias, 0.0, 1.0 );
+		float levelWeight = mix( 1.0, 0.25, lodValue );
 
-	float sampleA = mix(
-		glint_dictionary_lookup( entryA, level0, hashC ),
-		glint_dictionary_lookup( entryA, level1, hashC + 0.33 ),
-		levelLerp );
-	float sampleB = mix(
-		glint_dictionary_lookup( entryB, level0, hashD ),
-		glint_dictionary_lookup( entryB, level1, hashD + 0.67 ),
-		levelLerp );
+		float lookupDensity = targetDensity * ( 1.0 + densityBias * ( levelNorm - 0.5 ) );
+		lookupDensity = max( 0.005, lookupDensity );
 
-	float ndf = max( sampleA * sampleB, 1e-5 );
-	debugIntensity = ndf;
+		float seedOffset = baseSeed + float( level ) * 7.3;
+		float rotationOffset = glint_hash( tile + vec2( float( level ) ), seedOffset ) * 2.0 * PI;
+
+		float hashEntry = glint_hash( tile + vec2( float( level ) * 1.7 ), seedOffset + 1.4 );
+		int entry = max( 0, min( GLINT_DICT_ENTRIES_INT - 1, int( floor( hashEntry * float( entryCount ) ) ) ) );
+
+		float posA = fract( glint_hash( tile, seedOffset + 2.1 ) + rotationOffset * 0.159 );
+		float posB = fract( glint_hash( tile + vec2( 1.0 ), seedOffset + 3.3 ) + rotationOffset * 0.243 );
+
+		float temporalJitter = ( glintTemporal.w > 0.5 && glintTemporal.x > 0.5 ) ? glint_hash( tile + vec2( float( level ) ), seedOffset + 4.7 ) * 0.2 : 0.0;
+		posA = fract( posA + temporalJitter );
+		posB = fract( posB + temporalJitter * 1.3 );
+
+		float sampleA = glint_dictionary_lookup( entry, level, posA );
+		float sampleB = glint_dictionary_lookup( entry, level, posB );
+
+		float ndf = max( sampleA * sampleB, 1e-6 );
+		accumulatedNdf += ndf * levelWeight * lookupDensity;
+		totalWeight += levelWeight * lookupDensity;
+	}
+
+	if ( totalWeight > 0.0 )
+	{
+		accumulatedNdf /= totalWeight;
+	}
+
+	debugIntensity = accumulatedNdf;
 
 	float distanceFade = 1.0;
 	if ( glintBudget.z > 0.0 )
@@ -272,7 +290,7 @@ vec3 ComputeGlintContribution( vec3 N, vec3 L, vec3 V, vec3 specColor, float rou
 	float modeBias = ( glintCore.y < 1.5 ) ? 0.8 : ( glintCore.y >= 2.5 ? 1.2 : 1.0 );
 
 	float amplitude = glintMaterial.x * density * anisotropy * scale * beta * ( 1.0 - roughness ) * modeBias;
-	float energyScale = ( glintEnergy.x > 0.5 ) ? 1.0 / ( 1.0 + ndf ) : 1.0;
+	float energyScale = ( glintEnergy.x > 0.5 ) ? 1.0 / ( 1.0 + accumulatedNdf ) : 1.0;
 
 	vec3 baseSpec = specColor;
 	if ( glintEnergy.z >= 0.0 )
@@ -284,7 +302,18 @@ vec3 ComputeGlintContribution( vec3 N, vec3 L, vec3 V, vec3 specColor, float rou
 	float fresnelMask = ( glintEnergy.y > 0.5 ) ? ( fresnel.r + fresnel.g + fresnel.b ) * 0.3333 : 1.0;
 	float maskStrength = ( glintDictExtras.z > 0.5 ) ? NL : 1.0;
 
-	float intensity = amplitude * ndf * distanceFade * slopeFade * energyScale * maskStrength * maskFactor * fresnelMask;
+	float intensity = amplitude * accumulatedNdf * distanceFade * slopeFade * energyScale * maskStrength * maskFactor * fresnelMask;
+
+	if ( glintTemporal.x > 0.5 )
+	{
+		float taaBlend = clamp( glintTemporal.y, 0.0, 1.0 );
+		intensity = mix( intensity, intensity * 0.4, taaBlend );
+	}
+
+	if ( glintTemporal.z > 0.0 )
+	{
+		intensity = min( intensity, glintTemporal.z );
+	}
 
 	vec3 result = baseSpec * intensity;
 

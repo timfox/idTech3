@@ -4374,6 +4374,11 @@ static void vk_create_glint_dictionary_texture( void )
 	vk_glint_dictionary_image.flags = IMGFLAG_NONE;
 	vk_glint_dictionary_image.descriptor = VK_NULL_HANDLE;
 
+	vk_create_image( &vk_glint_dictionary_image,
+	                 vk_glint_dictionary_image.width,
+	                 vk_glint_dictionary_image.height,
+	                 1 );
+
 	vk_upload_image_data( &vk_glint_dictionary_image,
 	                      0,
 	                      0,
@@ -4993,10 +4998,6 @@ void vk_initialize( void )
 		VK_CHECK( qvkCreateDescriptorPool( vk.device, &desc, NULL, &vk.descriptor_pool ) );
 	}
 
-#ifdef USE_VK_PBR
-	vk_create_glint_dictionary_texture();
-#endif
-
 	//
 	// Descriptor set layout.
 	//
@@ -5004,6 +5005,10 @@ void vk_initialize( void )
 	vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, &vk.set_layout_uniform );
 	vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, &vk.set_layout_storage );
 	//vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_SHADER_STAGE_FRAGMENT_BIT, &vk.set_layout_input );
+
+#ifdef USE_VK_PBR
+	vk_create_glint_dictionary_texture();
+#endif
 
 	//
 	// Pipeline layouts.
