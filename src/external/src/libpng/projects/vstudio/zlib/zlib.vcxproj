@@ -106,6 +106,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release Library|ARM64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <PlatformToolset>v142</PlatformToolset>
+    <TreatWarningAsError>false</TreatWarningAsError>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release Library|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
@@ -131,6 +132,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <PlatformToolset>v142</PlatformToolset>
+    <TreatWarningAsError>false</TreatWarningAsError>
   </PropertyGroup>
   <PropertyGroup Condition="'$(SolutionOutputDir)' != ''">
     <OutDir>$(SolutionOutputDir)</OutDir>
