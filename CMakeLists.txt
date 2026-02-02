@@ -435,6 +435,7 @@ SET(DNAME "idtech3_server")
 
 SET(RENDERER_PREFIX ${CNAME})
 SET(RENDERER_DEFAULT vulkan) # valid options: opengl, vulkan
+add_compile_definitions(RENDERER_PREFIX="${RENDERER_PREFIX}" RENDERER_DEFAULT="${RENDERER_DEFAULT}")
 
 OPTION(USE_SDL "" ON)
 OPTION(USE_OPENAL "Enable OpenAL audio backend" ON)
