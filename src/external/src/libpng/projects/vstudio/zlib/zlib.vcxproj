@@ -52,6 +52,11 @@
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>zlib</RootNamespace>
   </PropertyGroup>
+  <PropertyGroup>
+    <SolutionOutputDir Condition="'$(SolutionDir)' != ''">$(SolutionDir)output\</SolutionOutputDir>
+    <SolutionIntermediateDir Condition="'$(SolutionDir)' != ''">$(SolutionDir)build\$(ProjectName)_$(Configuration)_$(PlatformTarget)\</SolutionIntermediateDir>
+    <TargetName>zlib</TargetName>
+  </PropertyGroup>
   <Import Project="$(SolutionDir)\zlib.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug Library|Win32'" Label="Configuration">
@@ -91,6 +96,10 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(SolutionOutputDir)' != ''">
+    <OutDir>$(SolutionOutputDir)</OutDir>
+    <IntDir>$(SolutionIntermediateDir)</IntDir>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -314,6 +323,11 @@
     </Link>
     <Lib>
       <LinkTimeCodeGeneration>true</LinkTimeCodeGeneration>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(SolutionOutputDir)' != ''">
+    <Lib>
+      <OutputFile>$(OutDir)$(ConfigurationName)-$(PlatformName)-$(TargetName).lib</OutputFile>
     </Lib>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

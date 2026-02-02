@@ -26,7 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef USE_SDL
 extern cvar_t *s_khz;
 
-extern qboolean dsound_init;
+qboolean dsound_init;
 static qboolean SNDDMA_InitDS( void );
 
 // Visual Studio 2012+ or MINGW

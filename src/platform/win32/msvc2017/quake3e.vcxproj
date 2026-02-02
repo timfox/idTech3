@@ -152,7 +152,7 @@
     </ClCompile>
     <ResourceCompile />
     <Link>
-      <AdditionalDependencies>comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;$(LibCurlVS2017)\lib32\libcurl_a_debug.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-libpng16.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-zlib.lib;$(LibCurlVS2017)\lib32\libcurl_a_debug.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <ProgramDatabaseFile>$(IntDir)quake3e-debug.pdb</ProgramDatabaseFile>
       <GenerateMapFile>true</GenerateMapFile>
@@ -176,7 +176,7 @@
     </ClCompile>
     <ResourceCompile />
     <Link>
-      <AdditionalDependencies>comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;$(LibCurlVS2017)\lib64\libcurl_a_debug.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-libpng16.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-zlib.lib;$(LibCurlVS2017)\lib64\libcurl_a_debug.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <ProgramDatabaseFile>$(IntDir)quake3e-debug.x64.pdb</ProgramDatabaseFile>
       <GenerateMapFile>true</GenerateMapFile>
@@ -200,7 +200,7 @@
     </ClCompile>
     <ResourceCompile />
     <Link>
-      <AdditionalDependencies>advapi32.lib;comctl32.lib;gdi32.lib;ole32.lib;winmm.lib;wsock32.lib;ws2_32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>advapi32.lib;comctl32.lib;gdi32.lib;ole32.lib;winmm.lib;wsock32.lib;ws2_32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-libpng16.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <ProgramDatabaseFile>$(IntDir)quake3e-debug.arm64.pdb</ProgramDatabaseFile>
       <GenerateMapFile>true</GenerateMapFile>
@@ -220,7 +220,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;$(LibCurlVS2017)\lib32\libcurl_a.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-libpng16.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-zlib.lib;$(LibCurlVS2017)\lib32\libcurl_a.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <GenerateMapFile>true</GenerateMapFile>
       <MapFileName>$(IntDir)quake3e.map</MapFileName>
@@ -247,7 +247,7 @@
     </ClCompile>
     <Link>
       <AdditionalOptions>/DYNAMICBASE %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;$(LibCurlVS2017)\lib64\libcurl_a.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-libpng16.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-zlib.lib;$(LibCurlVS2017)\lib64\libcurl_a.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <GenerateMapFile>true</GenerateMapFile>
       <MapFileName>$(IntDir)quake3e.x64.map</MapFileName>
@@ -272,7 +272,7 @@
     </ClCompile>
     <Link>
       <AdditionalOptions>/DYNAMICBASE %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>advapi32.lib;comctl32.lib;gdi32.lib;ole32.lib;winmm.lib;wsock32.lib;ws2_32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>advapi32.lib;comctl32.lib;gdi32.lib;ole32.lib;winmm.lib;wsock32.lib;ws2_32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-libpng16.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <GenerateMapFile>true</GenerateMapFile>
       <MapFileName>$(IntDir)quake3e.arm64.map</MapFileName>
@@ -436,6 +436,14 @@
     </ProjectReference>
     <ProjectReference Include="libvorbis.vcxproj">
       <Project>{06803141-6AB5-454C-BA05-1F2FB9C9CD3F}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\external\src\libpng\projects\vstudio\zlib\zlib.vcxproj">
+      <Project>{60F89955-91C6-3A36-8000-13C592FEC2DF}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\external\src\libpng\projects\vstudio\libpng\libpng.vcxproj">
+      <Project>{D6973076-9317-4EF2-A0B8-B7A18AC0713E}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
   </ItemGroup>
