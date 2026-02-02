@@ -1,7 +1,7 @@
 name: build
 
 permissions:
-  contents: read
+  contents: write
 
 on:
   pull_request:
@@ -443,8 +443,8 @@ jobs:
           if-no-files-found: error
           retention-days: 5
 
-  create-testing:
-    if: (github.ref == 'refs/heads/main' && github.event_name == 'push') || github.event_name == 'workflow_dispatch'
+create-testing:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [windows-msys, windows-msvc, ubuntu-x86_64, ubuntu-arm, macos]
     runs-on: ubuntu-latest
     steps:
