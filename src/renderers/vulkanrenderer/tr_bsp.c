@@ -1938,7 +1938,7 @@ R_SetParent
 static void R_SetParent( mnode_t *node, mnode_t *parent )
 {
 	node->parent = parent;
-	if ( node->contents != CONTENTS_NODE )
+        if ( node->contents != (int)CONTENTS_NODE )
 		return;
 	R_SetParent( node->children[0], node );
 	R_SetParent( node->children[1], node );
