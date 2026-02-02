@@ -299,6 +299,9 @@ jobs:
           githubToken: ${{ github.token }}
           shell: /bin/sh
           run: |
+            export CFLAGS="-mfpu=neon -mfloat-abi=hard"
+            export CXXFLAGS="-mfpu=neon -mfloat-abi=hard"
+            export LDFLAGS="-mfpu=neon -mfloat-abi=hard"
             apt-get -qq update
             apt-get install -y make gcc g++ cmake ninja-build
             apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev
