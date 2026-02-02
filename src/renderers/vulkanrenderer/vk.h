@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stddef.h>
 #include "../rendercommon/vulkan/vulkan.h"
 #include "tr_common.h"
 
@@ -29,6 +30,7 @@
 
 #define VK_NUM_BLOOM_PASSES 4
 
+
 #ifndef _DEBUG
 #define USE_DEDICATED_ALLOCATION
 #endif
@@ -42,8 +44,9 @@
 #define VK_DESC_TEXTURE2     3
 #define VK_DESC_FOG_COLLAPSE 4
 
+typedef float mat4_t[16];
+
 #ifdef USE_VK_PBR
-	typedef float mat4_t[16];
 	#define VK_DESC_PBR_BRDFLUT				5
 	#define VK_DESC_PBR_NORMAL				6
 	#define VK_DESC_PBR_PHYSICAL			7
@@ -57,6 +60,7 @@
 	#define VK_DESC_PBR_SUBSURFACE			15
 	#define VK_DESC_PBR_GLINT_DICT			16
 	#define VK_DESC_COUNT	17
+	_Static_assert( VK_DESC_COUNT == VK_DESC_PBR_GLINT_DICT + 1, "VK_DESC_COUNT must cover PBR slots" );
 #else
 	#define VK_DESC_COUNT   5
 #endif
@@ -271,6 +275,12 @@ typedef struct vkUniform_s {
 #endif
 } vkUniform_t;
 
+_Static_assert( offsetof(vkUniform_t, glintMaterial) == offsetof(vkUniform_t, glintCore) + sizeof(vec4_t),
+	"glint layout mismatch: glintMaterial should follow glintCore" );
+_Static_assert( offsetof(vkUniform_t, glintColor) == offsetof(vkUniform_t, glintPerformance) + sizeof(vec4_t),
+	"glint layout mismatch: glintColor should follow glintPerformance" );
+_Static_assert( sizeof(vkUniform_t) % sizeof(vec4_t) == 0, "vkUniform_t size must be a multiple of vec4_t" );
+
 typedef struct vkUniformCamera_s {
 	vec4_t viewOrigin;
 	mat4_t modelMatrix;
@@ -289,10 +299,9 @@ typedef struct vkUniformCamera_s {
 #define TESS_ENT0  (1024) // uniform with ent.color[0]
 #define TESS_ENT1  (2048) // uniform with ent.color[1]
 #define TESS_ENT2  (4096) // uniform with ent.color[2]
-#define TESS_ENV   (512) // mark shader stage with environment mapping
 
 #ifdef USE_VK_PBR
-#define TESS_PBR   				( 1024 ) // PBR shader variant, qtangent vertex attribute and eyePos uniform
+#define TESS_PBR   				( 8192 ) // PBR shader variant, qtangent vertex attribute and eyePos uniform
 
 #define PBR_HAS_NORMALMAP		( 1 )
 #define PBR_HAS_PHYSICALMAP		( 2 )
