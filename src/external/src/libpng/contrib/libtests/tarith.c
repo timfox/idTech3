@@ -724,7 +724,8 @@ int validation_muldiv(int count, int argc, char **argv)
       /* CRUDE */
       a += times;
       times += div;
-      div = randbuffer;
+      /* Limit the magnitude of 'div' to avoid uncontrolled large values. */
+      div = (png_int_32)(randbuffer & 0xFFFFU);
       randbuffer = (randbuffer << randbits) ^ rand();
    }
    while (--count > 0);
