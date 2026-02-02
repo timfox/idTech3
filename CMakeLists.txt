@@ -452,6 +452,16 @@ if(WIN32 AND USE_RENDERER_DLOPEN)
   message(STATUS "Renderer dlopen disabled on Windows targets; switching to static renderer builds")
   set(USE_RENDERER_DLOPEN OFF CACHE BOOL "" FORCE)
 endif()
+if(USE_RENDERER_DLOPEN)
+  add_compile_definitions(USE_RENDERER_DLOPEN=1)
+else()
+  add_compile_definitions(USE_RENDERER_DLOPEN=0)
+endif()
+if(USE_SDL)
+  add_compile_definitions(USE_SDL=1)
+else()
+  add_compile_definitions(USE_SDL=0)
+endif()
 OPTION(SKIP_IDPAK_CHECK "Skip checking for original Quake III pak files (pak0.pk3)" ON)
 OPTION(BUILD_FREETYPE "Enable FreeType-powered font rendering / font generation" ON)
 
@@ -657,10 +667,12 @@ list(APPEND CLIENT_SRCS
   src/audio/codecs/snd_codec_flac.c
   src/audio/codecs/snd_codec_webm.c
   src/audio/backends/snd_backend_openal.c
-  src/audio/backends/snd_backend_sdl.c
   src/audio/backends/snd_backend_null.c
   src/audio/effects/snd_efx.c
 )
+if(USE_SDL)
+  list(APPEND CLIENT_SRCS src/audio/backends/snd_backend_sdl.c)
+endif()
 # include architecture-specific assembly implementations (snd_mix etc)
 # Only include x86/x86_64 assembly files on x86/x86_64 architectures on Unix-like systems
 # Assembly is disabled on Windows due to preprocessor macro issues with MSYS2/MinGW
