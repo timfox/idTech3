@@ -955,8 +955,10 @@ ELSEIF(WIN32)
 		src/platform/win32/win_input.c
 		src/platform/win32/win_minimize.c
 		src/platform/win32/win_qgl.c
-		src/platform/win32/win_snd.c
 		src/platform/win32/win_wndproc.c)
+	IF(NOT USE_SDL)
+		list(APPEND Q3_UI_SRCS src/platform/win32/win_snd.c)
+	ENDIF()
 	IF(USE_VULKAN)
 		list(APPEND Q3_UI_SRCS src/platform/win32/win_qvk.c)
 	ENDIF()
