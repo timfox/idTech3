@@ -110,60 +110,95 @@ jobs:
           path: bin
           if-no-files-found: error
           retention-days: 5
-
+     
   windows-msvc:
-    name: ${{ matrix.btype }} Windows-MSVC ${{ matrix.arch }}
-    runs-on: windows-2022
-    strategy:
-      fail-fast: false
-      matrix:
-        # removed 32-bit Win32 (x86)
-        arch: [arm64, x64]
-        btype: [Release, Debug]
-        include:
-          - arch: arm64
-            platform: ARM64
-            suffix: .arm64
-            pkg_suffix: arm64
-
-          - arch: x64
-            platform: x64
-            suffix: .x64
-            pkg_suffix: x86_64
-
-    steps:
-      - uses: microsoft/setup-msbuild@v2
-
-      - uses: actions/checkout@v4
-
-      - name: Build
-        if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
-        run: |
-          mkdir bin
-
-          msbuild src\platform\win32\msvc2017\quake3e-ded.vcxproj -p:TargetName=idtech3_server,Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }} /p:PlatformToolset=v143
-          copy src\platform\win32\msvc2017\output\idtech3_server.exe bin\idtech3_server${{ matrix.suffix }}.exe
-          msbuild src\platform\win32\msvc2017\quake3e-ded.vcxproj -p:TargetName=idtech3_server,Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }} -t:Clean
-
-          msbuild src\platform\win32\msvc2017\renderer.vcxproj -p:Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }} /p:PlatformToolset=v143
-          msbuild src\platform\win32\msvc2017\quake3e.vcxproj -p:TargetName=idtech3,Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }},UseWasapi=USE_WASAPI=0 /p:PlatformToolset=v143
-          copy src\platform\win32\msvc2017\output\idtech3.exe bin\idtech3${{ matrix.suffix }}.exe
-          msbuild src\platform\win32\msvc2017\quake3e.vcxproj -p:TargetName=idtech3,Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }},UseWasapi=USE_WASAPI=0 -t:Clean
-          msbuild src\platform\win32\msvc2017\renderer.vcxproj -p:Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }} -t:Clean
-
-          msbuild src\platform\win32\msvc2017\renderervk.vcxproj -p:Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }} /p:PlatformToolset=v143
-          msbuild src\platform\win32\msvc2017\quake3e.vcxproj -p:TargetName=idtech3,Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }},UseWasapi=USE_WASAPI=0 /p:PlatformToolset=v143
-          copy src\platform\win32\msvc2017\output\idtech3.exe bin\idtech3-vulkan${{ matrix.suffix }}.exe
-          msbuild src\platform\win32\msvc2017\quake3e.vcxproj -p:TargetName=idtech3,Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }},UseWasapi=USE_WASAPI=0 -t:Clean
-          msbuild src\platform\win32\msvc2017\renderervk.vcxproj -p:Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }} -t:Clean
-
-      - uses: actions/upload-artifact@v4
-        if: ${{ matrix.btype == 'Release' }}
-        with:
-          name: windows-msvc-${{ matrix.pkg_suffix }}
-          path: bin
-          if-no-files-found: error
-          retention-days: 5
+        name: ${{ matrix.btype }} Windows-MSVC ${{ matrix.arch }}
+        runs-on: windows-2022
+        strategy:
+          fail-fast: false
+          matrix:
+            arch: [arm64, x64]
+            btype: [Release, Debug]
+            include:
+              - arch: arm64
+                platform: ARM64
+                suffix: .arm64
+                pkg_suffix: arm64
+    
+              - arch: x64
+                platform: x64
+                suffix: .x64
+                pkg_suffix: x86_64
+    
+        steps:
+          - uses: microsoft/setup-msbuild@v2
+          - uses: actions/checkout@v4
+    
+          - name: Build
+            if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
+            shell: cmd
+            run: |
+              if not exist bin mkdir bin
+    
+              set MSBUILD_COMMON=/m ^
+                /p:Configuration=${{ matrix.btype }} ^
+                /p:Platform=${{ matrix.platform }} ^
+                /p:PlatformToolset=v143 ^
+                /p:TreatWarningsAsErrors=false ^
+                /p:WarningLevel=3
+    
+              rem --- Dedicated server ---
+              msbuild src\platform\win32\msvc2017\quake3e-ded.vcxproj ^
+                %MSBUILD_COMMON% ^
+                /p:TargetName=idtech3_server
+              if exist src\platform\win32\msvc2017\output\idtech3_server.exe copy /Y src\platform\win32\msvc2017\output\idtech3_server.exe bin\idtech3_server${{ matrix.suffix }}.exe
+              msbuild src\platform\win32\msvc2017\quake3e-ded.vcxproj ^
+                %MSBUILD_COMMON% ^
+                /t:Clean ^
+                /p:TargetName=idtech3_server
+    
+              rem --- OpenGL renderer + client ---
+              msbuild src\platform\win32\msvc2017\renderer.vcxproj ^
+                %MSBUILD_COMMON%
+              msbuild src\platform\win32\msvc2017\quake3e.vcxproj ^
+                %MSBUILD_COMMON% ^
+                /p:TargetName=idtech3 ^
+                /p:UseWasapi=0
+              if exist src\platform\win32\msvc2017\output\idtech3.exe copy /Y src\platform\win32\msvc2017\output\idtech3.exe bin\idtech3${{ matrix.suffix }}.exe
+              msbuild src\platform\win32\msvc2017\quake3e.vcxproj ^
+                %MSBUILD_COMMON% ^
+                /t:Clean ^
+                /p:TargetName=idtech3 ^
+                /p:UseWasapi=0
+              msbuild src\platform\win32\msvc2017\renderer.vcxproj ^
+                %MSBUILD_COMMON% ^
+                /t:Clean
+    
+              rem --- Vulkan renderer + client ---
+              msbuild src\platform\win32\msvc2017\renderervk.vcxproj ^
+                %MSBUILD_COMMON%
+              msbuild src\platform\win32\msvc2017\quake3e.vcxproj ^
+                %MSBUILD_COMMON% ^
+                /p:TargetName=idtech3 ^
+                /p:UseWasapi=0
+              if exist src\platform\win32\msvc2017\output\idtech3.exe copy /Y src\platform\win32\msvc2017\output\idtech3.exe bin\idtech3-vulkan${{ matrix.suffix }}.exe
+              msbuild src\platform\win32\msvc2017\quake3e.vcxproj ^
+                %MSBUILD_COMMON% ^
+                /t:Clean ^
+                /p:TargetName=idtech3 ^
+                /p:UseWasapi=0
+              msbuild src\platform\win32\msvc2017\renderervk.vcxproj ^
+                %MSBUILD_COMMON% ^
+                /t:Clean
+    
+          - uses: actions/upload-artifact@v4
+            if: ${{ matrix.btype == 'Release' }}
+            with:
+              name: windows-msvc-${{ matrix.pkg_suffix }}
+              path: bin
+              if-no-files-found: error
+              retention-days: 5
+        
 
   ubuntu-x86_64:
     name: ${{ matrix.btype }} Ubuntu x86_64
