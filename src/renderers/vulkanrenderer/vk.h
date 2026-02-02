@@ -55,7 +55,8 @@
 	#define VK_DESC_PBR_ANISOTROPY			13
 	#define VK_DESC_PBR_TRANSMISSION		14
 	#define VK_DESC_PBR_SUBSURFACE			15
-	#define VK_DESC_COUNT	16
+	#define VK_DESC_PBR_GLINT_DICT			16
+	#define VK_DESC_COUNT	17
 #else
 	#define VK_DESC_COUNT   5
 #endif
@@ -253,6 +254,20 @@ typedef struct vkUniform_s {
 	vec4_t pbrSubsurfaceColor;
 	vec4_t pbrSubsurfaceParams;
 	vec4_t pbrShCoeffs[9];
+	vec4_t glintCore;
+	vec4_t glintMaterial;
+	vec4_t glintMicro;
+	vec4_t glintSampling;
+	vec4_t glintTemporal;
+	vec4_t glintEnergy;
+	vec4_t glintBudget;
+	vec4_t glintRouting;
+	vec4_t glintModel;
+	vec4_t glintDensity;
+	vec4_t glintDict;
+	vec4_t glintDictExtras;
+	vec4_t glintPerformance;
+	vec4_t glintColor;
 #endif
 } vkUniform_t;
 
@@ -475,7 +490,7 @@ typedef struct vk_tess_s {
 
 	struct {
 		uint32_t		start, end;
-		VkDescriptorSet	current[VK_DESC_COUNT]; // 0:uniform, 1:color0, 2:color1, 3:color2, 4:fog, 5:brdf lut, 6:normal, 7:physical, 9:(unused)prefilterd-envmap
+		VkDescriptorSet	current[VK_DESC_COUNT]; // 0:uniform, 1:color0, 2:color1, 3:color2, 4:fog, 5:brdf lut, 6:normal, 7:physical, 8:cubemap, 9:irradiance, 10:emissive, 11:clearcoat, 12:sheen, 13:anisotropy, 14:transmission, 15:subsurface, 16:glint dictionary
 		uint32_t		offset[3]; // 0 (uniform) and 5 (storage)
 	} descriptor_set;
 
@@ -638,6 +653,11 @@ typedef struct {
 		VkDeviceMemory	memory;
 		VkDescriptorSet	descriptor;
 	} storage;
+
+	struct {
+		const float *dictionary;
+		size_t size;
+	} glint;
 
 	uint32_t uniform_item_size;
 	uint32_t uniform_camera_item_size;

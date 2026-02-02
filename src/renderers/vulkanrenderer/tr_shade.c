@@ -1225,6 +1225,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 #endif
 #ifdef USE_VK_PBR
 	qboolean is_pbr_surface;
+	VK_SetGlintParams( &uniform );
 #endif
 	uint32_t pipeline;
 	int fog_stage;
@@ -1557,6 +1558,86 @@ void VK_SetFogParams( vkUniform_t *ubo, int *fogStage )
 		*fogStage = 0;
 	}
 }
+
+#ifdef USE_VK_PBR
+static void VK_SetGlintParams( vkUniform_t *ubo )
+{
+	if ( !r_glints )
+	{
+		return;
+	}
+
+	ubo->glintCore[0] = r_glints->value;
+	ubo->glintCore[1] = r_glints_mode->value;
+	ubo->glintCore[2] = r_glints_debug->value;
+	ubo->glintCore[3] = r_glints_seed->value;
+
+	ubo->glintMaterial[0] = r_glints_strength->value;
+	ubo->glintMaterial[1] = r_glints_minRoughness->value;
+	ubo->glintMaterial[2] = r_glints_maxRoughness->value;
+	ubo->glintMaterial[3] = r_glints_materialMask->value;
+
+	ubo->glintMicro[0] = r_glints_density->value;
+	ubo->glintMicro[1] = r_glints_scale->value;
+	ubo->glintMicro[2] = r_glints_anisotropy->value;
+	ubo->glintMicro[3] = r_glints_slopeVariance->value;
+
+	ubo->glintSampling[0] = r_glints_samples->value;
+	ubo->glintSampling[1] = r_glints_filter->value;
+	ubo->glintSampling[2] = r_glints_tileSize->value;
+	ubo->glintSampling[3] = r_glints_mipBias->value;
+
+	ubo->glintTemporal[0] = r_glints_temporal->value;
+	ubo->glintTemporal[1] = r_glints_taaWeight->value;
+	ubo->glintTemporal[2] = r_glints_historyClamp->value;
+	ubo->glintTemporal[3] = r_glints_jitter->value;
+
+	ubo->glintEnergy[0] = r_glints_energyComp->value;
+	ubo->glintEnergy[1] = r_glints_fresnel->value;
+	ubo->glintEnergy[2] = r_glints_f0Override->value;
+	ubo->glintEnergy[3] = r_glints_fireflyFilter->value;
+
+	ubo->glintBudget[0] = r_glints_maxLuminance->value;
+	ubo->glintBudget[1] = r_glints_budgetMs->value;
+	ubo->glintBudget[2] = r_glints_maxDistance->value;
+	ubo->glintBudget[3] = r_glints_maxScreenSlope->value;
+
+	ubo->glintRouting[0] = r_glints_affectIBL->value;
+	ubo->glintRouting[1] = r_glints_affectDirect->value;
+	ubo->glintRouting[2] = r_glints_shadowed->value;
+	ubo->glintRouting[3] = r_glints_halfRes->value;
+
+	ubo->glintModel[0] = r_glints_beta->value;
+	ubo->glintModel[1] = r_glints_ax->value;
+	ubo->glintModel[2] = r_glints_ay->value;
+	ubo->glintModel[3] = r_glints_gamma->value;
+
+	ubo->glintDensity[0] = r_glints_rho->value;
+	ubo->glintDensity[1] = r_glints_lnrho->value;
+	ubo->glintDensity[2] = r_glints_zeta->value;
+	ubo->glintDensity[3] = r_glints_maxCells->value;
+
+	ubo->glintDict[0] = r_glints_dict_levels->value;
+	ubo->glintDict[1] = r_glints_dict_size->value;
+	ubo->glintDict[2] = r_glints_dict_count->value;
+	ubo->glintDict[3] = r_glints_dict_alpha->value;
+
+	ubo->glintDictExtras[0] = r_glints_dict_lobeSigma->value;
+	ubo->glintDictExtras[1] = r_glints_dict_reload->value;
+	ubo->glintDictExtras[2] = r_glints_masking->value;
+	ubo->glintDictExtras[3] = r_glints_energy_debug->value;
+
+	ubo->glintPerformance[0] = r_glints_lodBias->value;
+	ubo->glintPerformance[1] = r_glints_colored->value;
+	ubo->glintPerformance[2] = r_glints_colorCount->value;
+	ubo->glintPerformance[3] = r_glints_colorStrength->value;
+
+	ubo->glintColor[0] = 0.0f;
+	ubo->glintColor[1] = 0.0f;
+	ubo->glintColor[2] = 0.0f;
+	ubo->glintColor[3] = 0.0f;
+}
+#endif
 
 
 #ifdef USE_PMLIGHT

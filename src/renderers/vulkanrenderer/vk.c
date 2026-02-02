@@ -1,5 +1,6 @@
 #include "tr_local.h"
 #include "vk.h"
+#include "glints.h"
 
 #if defined (_DEBUG)
 #if defined (_WIN32)
@@ -4595,6 +4596,14 @@ void vk_initialize( void )
 
 	vk_set_render_scale();
 
+	#ifdef USE_VK_PBR
+		R_Glints_InitDictionary();
+		vk.glint.dictionary = R_Glints_GetPackedDictionary( &vk.glint.size );
+	#else
+		vk.glint.dictionary = NULL;
+		vk.glint.size = 0;
+	#endif
+
 	if ( r_fbo->integer ) {
 		vk.fboActive = qtrue;
 		if ( r_ext_multisample->integer ) {
@@ -4905,8 +4914,10 @@ void vk_initialize( void )
 		pool_size[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		pool_size[0].descriptorCount = MAX_DRAWIMAGES + 1 + 1 + 1 + 3 + VK_NUM_BLOOM_PASSES * 2; // color, screenmap, depth/ssao, bloom descriptors
 #ifdef USE_VK_PBR
-        if ( vk.pbrActive )
+        if ( vk.pbrActive ) {
             pool_size[0].descriptorCount += 2 + ( MAX_DRAWIMAGES * 8 ); // brdf-lut + irradiance | MAX_DRAWIMAGES * (physical, normal, emissive, clearcoat, sheen, anisotropy, transmission, subsurface)
+            pool_size[0].descriptorCount += 1; // glint dictionary sampler
+        }
 #endif
 
 		pool_size[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
@@ -5628,6 +5639,10 @@ __cleanup:
 	}
 
 	deinit_device_functions();
+
+	#ifdef USE_VK_PBR
+	R_Glints_ShutdownDictionary();
+	#endif
 
 	Com_Memset( &vk, 0, sizeof( vk ) );
 	Com_Memset( &vk_world, 0, sizeof( vk_world ) );
