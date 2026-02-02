@@ -47,7 +47,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define MAX_LITSURFS		(MAX_DRAWSURFS)
 #define	MAX_FLARES			256
 
-#define MAX_TEXTURE_SIZE	2048 // must be less or equal to 32768
+#define MAX_TEXTURE_SIZE	32768 // must be less or equal to 32768
 
 #define USE_BUFFER_CLEAR	/* clear attachments on render pass begin */
 
@@ -1426,6 +1426,12 @@ extern cvar_t	*r_dlightIntensity;		// 0.1 - 1.0
 extern cvar_t	*r_dlightSaturation;	// 0.0 - 1.0
 #ifdef USE_VULKAN
 extern cvar_t	*r_device;
+extern cvar_t	*r_vk_validation;
+extern cvar_t	*r_vk_debugLabels;
+extern cvar_t	*r_vk_gpuMarkers;
+extern cvar_t	*r_vk_dumpCaps;
+extern cvar_t	*r_vk_syncValidation;
+extern cvar_t	*r_vk_deviceOverride;
 #ifdef USE_VBO
 extern cvar_t	*r_vbo;
 #endif

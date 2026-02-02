@@ -12,7 +12,7 @@ Go to [Releases](../../releases) section to download latest binaries for your pl
 
 **Rendering**:
 * OpenGL renderer
-* Vulkan renderer
+* Vulkan renderer (requires Vulkan 1.4 headers/drivers)
 * Physically Based Rendering
 * Spherical Harmonics lighting support
 * Screen Space Ambient Occlusion

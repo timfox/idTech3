@@ -80,6 +80,12 @@ cvar_t	*r_dlightIntensity;
 cvar_t	*r_dlightSaturation;
 #ifdef USE_VULKAN
 cvar_t	*r_device;
+cvar_t	*r_vk_validation;
+cvar_t	*r_vk_debugLabels;
+cvar_t	*r_vk_gpuMarkers;
+cvar_t	*r_vk_dumpCaps;
+cvar_t	*r_vk_syncValidation;
+cvar_t	*r_vk_deviceOverride;
 #ifdef USE_VBO
 cvar_t	*r_vbo;
 #endif
@@ -1877,6 +1883,29 @@ static void R_Register( void )
 		" -1 - first discrete GPU\n" \
 		" -2 - first integrated GPU" );
 	r_device->modified = qfalse;
+
+	r_vk_validation = ri.Cvar_Get( "r_vk_validation", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_vk_validation, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_vk_validation, "Enable Vulkan validation layers when available (requires VK_LAYER_KHRONOS_validation and a restart)." );
+
+	r_vk_syncValidation = ri.Cvar_Get( "r_vk_syncValidation", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_vk_syncValidation, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_vk_syncValidation, "When VK_EXT_validation_features is supported, enable synchronization validation (requires restart)." );
+
+	r_vk_debugLabels = ri.Cvar_Get( "r_vk_debugLabels", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_vk_debugLabels, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_vk_debugLabels, "Name Vulkan objects via VK_EXT_debug_marker when available." );
+
+	r_vk_gpuMarkers = ri.Cvar_Get( "r_vk_gpuMarkers", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_vk_gpuMarkers, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_vk_gpuMarkers, "Emit GPU debug markers around each frame when VK_EXT_debug_marker is available." );
+
+	r_vk_dumpCaps = ri.Cvar_Get( "r_vk_dumpCaps", "0", CVAR_TEMP );
+	ri.Cvar_CheckRange( r_vk_dumpCaps, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_vk_dumpCaps, "Print the chosen Vulkan device properties, enabled features, and supported extensions." );
+
+	r_vk_deviceOverride = ri.Cvar_Get( "r_vk_deviceOverride", "", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_vk_deviceOverride, "Match a substring of the device name to override the automatic physical device selection." );
 
 	r_fbo = ri.Cvar_Get( "r_fbo", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_fbo, "Use framebuffer objects, enables gamma correction in windowed mode and allows arbitrary video size and screenshot/video capture.\n Required for bloom, HDR rendering, anti-aliasing and greyscale effects." );

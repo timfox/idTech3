@@ -132,6 +132,9 @@ static PFN_vkGetImageMemoryRequirements2KHR				qvkGetImageMemoryRequirements2KHR
 static PFN_vkDebugMarkerSetObjectNameEXT				qvkDebugMarkerSetObjectNameEXT;
 
 static PFN_vkCmdClearColorImage								qvkCmdClearColorImage;
+static PFN_vkCmdDebugMarkerBeginEXT							qvkCmdDebugMarkerBeginEXT;
+static PFN_vkCmdDebugMarkerEndEXT								qvkCmdDebugMarkerEndEXT;
+static PFN_vkCmdDebugMarkerInsertEXT							qvkCmdDebugMarkerInsertEXT;
 
 ////////////////////////////////////////////////////////////////////////////
 
@@ -476,15 +479,105 @@ static void record_image_layout_transition( VkCommandBuffer command_buffer, VkIm
 
 static void vk_set_object_name( uint64_t obj, const char *objName, VkDebugReportObjectTypeEXT objType )
 {
-	if ( qvkDebugMarkerSetObjectNameEXT && obj )
+	if ( !vk.debugMarkers || !r_vk_debugLabels || !r_vk_debugLabels->integer || !qvkDebugMarkerSetObjectNameEXT || obj == 0 )
 	{
-		VkDebugMarkerObjectNameInfoEXT info;
-		info.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_NAME_INFO_EXT;
-		info.pNext = NULL;
-		info.objectType = objType;
-		info.object = obj;
-		info.pObjectName = objName;
-		qvkDebugMarkerSetObjectNameEXT( vk.device, &info );
+		return;
+	}
+
+	VkDebugMarkerObjectNameInfoEXT info;
+	info.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_NAME_INFO_EXT;
+	info.pNext = NULL;
+	info.objectType = objType;
+	info.object = obj;
+	info.pObjectName = objName;
+	qvkDebugMarkerSetObjectNameEXT( vk.device, &info );
+}
+
+static void vk_gpu_marker_begin( const char *label )
+{
+	if ( !vk.debugMarkers || !qvkCmdDebugMarkerBeginEXT || !r_vk_gpuMarkers || !r_vk_gpuMarkers->integer || vk.marker_active )
+	{
+		return;
+	}
+
+	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE )
+	{
+		return;
+	}
+
+	VkDebugMarkerMarkerInfoEXT info;
+	info.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT;
+	info.pNext = NULL;
+	info.pMarkerName = label;
+	info.color[0] = 0.0f;
+	info.color[1] = 0.75f;
+	info.color[2] = 0.3f;
+	info.color[3] = 1.0f;
+	qvkCmdDebugMarkerBeginEXT( vk.cmd->command_buffer, &info );
+	vk.marker_active = qtrue;
+}
+
+static void vk_gpu_marker_end( void )
+{
+	if ( !vk.debugMarkers || !qvkCmdDebugMarkerEndEXT || !r_vk_gpuMarkers || !r_vk_gpuMarkers->integer || !vk.marker_active )
+	{
+		return;
+	}
+
+	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE )
+	{
+		return;
+	}
+
+	qvkCmdDebugMarkerEndEXT( vk.cmd->command_buffer );
+	vk.marker_active = qfalse;
+}
+
+static void vk_dump_caps( VkPhysicalDevice physical_device )
+{
+	if ( !r_vk_dumpCaps || !r_vk_dumpCaps->integer )
+	{
+		return;
+	}
+
+	VkPhysicalDeviceProperties props;
+	qvkGetPhysicalDeviceProperties( physical_device, &props );
+	ri.Printf( PRINT_ALL, "Vulkan device selected: %s (api %u.%u.%u, driver %u.%u.%u, vendor: 0x%04x)\n",
+		props.deviceName,
+		VK_API_VERSION_MAJOR( props.apiVersion ),
+		VK_API_VERSION_MINOR( props.apiVersion ),
+		VK_API_VERSION_PATCH( props.apiVersion ),
+		VK_API_VERSION_MAJOR( props.driverVersion ),
+		VK_API_VERSION_MINOR( props.driverVersion ),
+		VK_API_VERSION_PATCH( props.driverVersion ),
+		props.vendorID );
+
+	VkPhysicalDeviceFeatures features;
+	qvkGetPhysicalDeviceFeatures( physical_device, &features );
+	ri.Printf( PRINT_ALL, "  Features: fillModeNonSolid=%u, wideLines=%u, samplerAnisotropy=%u, fragmentStoresAndAtomics=%u, shaderInt64=%u, geometryShader=%u, multitDrawIndirect=%u\n",
+		features.fillModeNonSolid,
+		features.wideLines,
+		features.samplerAnisotropy,
+		features.fragmentStoresAndAtomics,
+		features.shaderInt64,
+		features.geometryShader,
+		features.multiDrawIndirect );
+
+	uint32_t ext_count = 0;
+	if ( qvkEnumerateDeviceExtensionProperties( physical_device, NULL, &ext_count, NULL ) == VK_SUCCESS && ext_count > 0 )
+	{
+		VkExtensionProperties *extensions = (VkExtensionProperties *)ri.Malloc( ext_count * sizeof( VkExtensionProperties ) );
+		if ( extensions )
+		{
+			qvkEnumerateDeviceExtensionProperties( physical_device, NULL, &ext_count, extensions );
+			ri.Printf( PRINT_ALL, "  Extensions (%u):", ext_count );
+			for ( uint32_t i = 0; i < ext_count; i++ )
+			{
+				ri.Printf( PRINT_ALL, " %s", extensions[i].extensionName );
+			}
+			ri.Printf( PRINT_ALL, "\n" );
+			ri.Free( extensions );
+		}
 	}
 }
 
@@ -1436,6 +1529,11 @@ static void create_instance( void )
 	const char **extension_names;
 	uint32_t i, n, count, extension_count;
 	VkApplicationInfo appInfo;
+	qboolean validation_features_ext = qfalse;
+	const VkValidationFeatureEnableEXT validation_feature_enable[] = {
+		VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT
+	};
+	VkValidationFeaturesEXT validation_features;
 
 	flags = 0;
 	count = 0;
@@ -1448,6 +1546,10 @@ static void create_instance( void )
 	VK_CHECK( qvkEnumerateInstanceExtensionProperties( NULL, &count, extension_properties ) );
 	for ( i = 0; i < count; i++ ) {
 		const char *ext = extension_properties[i].extensionName;
+
+		if ( Q_stricmp( ext, VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME ) == 0 ) {
+			validation_features_ext = qtrue;
+		}
 
 		if ( !used_instance_extension( ext ) ) {
 			continue;
@@ -1478,11 +1580,7 @@ static void create_instance( void )
 	appInfo.applicationVersion = 0x0;
 	appInfo.pEngineName = NULL;
 	appInfo.engineVersion = 0x0;
-#ifdef _DEBUG
-	appInfo.apiVersion = VK_API_VERSION_1_1;
-#else
-	appInfo.apiVersion = VK_API_VERSION_1_0;
-#endif
+	appInfo.apiVersion = VK_API_VERSION_1_4;
 
 	// create instance
 	desc.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -1491,30 +1589,56 @@ static void create_instance( void )
 	desc.pApplicationInfo = &appInfo;
 	desc.enabledExtensionCount = extension_count;
 	desc.ppEnabledExtensionNames = extension_names;
+	qboolean enable_validation_features = ( validation_features_ext && r_vk_validation && r_vk_validation->integer && r_vk_syncValidation && r_vk_syncValidation->integer );
+	if ( enable_validation_features )
+	{
+		validation_features.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
+		validation_features.pNext = NULL;
+		validation_features.enabledValidationFeatureCount = ARRAY_LEN( validation_feature_enable );
+		validation_features.pEnabledValidationFeatures = validation_feature_enable;
+		validation_features.disabledValidationFeatureCount = 0;
+		validation_features.pDisabledValidationFeatures = NULL;
+		desc.pNext = &validation_features;
+	}
+	else
+	{
+		if ( r_vk_syncValidation && r_vk_syncValidation->integer && !validation_features_ext )
+		{
+			ri.Printf( PRINT_WARNING, "VK_EXT_validation_features not available; r_vk_syncValidation ignored\n" );
+		}
+		desc.pNext = NULL;
+	}
 
 #ifdef USE_VK_VALIDATION
-	desc.enabledLayerCount = 1;
-	desc.ppEnabledLayerNames = &validation_layer_name;
+	qboolean enable_validation = r_vk_validation && r_vk_validation->integer;
 
-	res = qvkCreateInstance( &desc, NULL, &vk_instance );
-
-	if ( res == VK_ERROR_LAYER_NOT_PRESENT ) {
-
+	if ( enable_validation )
+	{
 		desc.enabledLayerCount = 1;
-		desc.ppEnabledLayerNames = &validation_layer_name2;
+		desc.ppEnabledLayerNames = &validation_layer_name;
 
 		res = qvkCreateInstance( &desc, NULL, &vk_instance );
 
-		if ( res == VK_ERROR_LAYER_NOT_PRESENT ) {
-
-			ri.Printf( PRINT_WARNING, "...validation layer is not available\n" );
-
-			// try without validation layer
-			desc.enabledLayerCount = 0;
-			desc.ppEnabledLayerNames = NULL;
-
+		if ( res == VK_ERROR_LAYER_NOT_PRESENT )
+		{
+			desc.enabledLayerCount = 1;
+			desc.ppEnabledLayerNames = &validation_layer_name2;
 			res = qvkCreateInstance( &desc, NULL, &vk_instance );
+			if ( res == VK_ERROR_LAYER_NOT_PRESENT )
+			{
+				ri.Printf( PRINT_WARNING, "...validation layer is not available\n" );
+				// try without validation layer
+				desc.enabledLayerCount = 0;
+				desc.ppEnabledLayerNames = NULL;
+				res = qvkCreateInstance( &desc, NULL, &vk_instance );
+			}
 		}
+	}
+	else
+	{
+		desc.enabledLayerCount = 0;
+		desc.ppEnabledLayerNames = NULL;
+		res = qvkCreateInstance( &desc, NULL, &vk_instance );
 	}
 #else
 	desc.enabledLayerCount = 0;
@@ -2066,6 +2190,8 @@ static void init_vulkan_library( void )
 	uint32_t device_count;
 	int device_index, i;
 	VkResult res;
+	const char *device_override_name = ( r_vk_deviceOverride && r_vk_deviceOverride->string && r_vk_deviceOverride->string[0] ) ? r_vk_deviceOverride->string : NULL;
+	int override_device_index = -1;
 
 	Com_Memset( &vk, 0, sizeof( vk ) );
 
@@ -2143,6 +2269,11 @@ static void init_vulkan_library( void )
 	for ( i = 0; (uint32_t) i < device_count; i++ ) {
 		qvkGetPhysicalDeviceProperties( physical_devices[ i ], &props );
 		ri.Printf( PRINT_ALL, " %i: %s\n", i, renderer_name( &props ) );
+		if ( device_override_name && override_device_index < 0 && Q_stristr( props.deviceName, device_override_name ) )
+		{
+			override_device_index = i;
+			ri.Printf( PRINT_ALL, "r_vk_deviceOverride matched device %i (%s)\n", i, props.deviceName );
+		}
 		if ( device_index == -1 && props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ) {
 			device_index = i;
 		} else if ( device_index == -2 && props.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU ) {
@@ -2150,6 +2281,12 @@ static void init_vulkan_library( void )
 		}
 	}
 	ri.Printf( PRINT_ALL, ".......................\n" );
+
+	if ( override_device_index >= 0 )
+	{
+		device_index = override_device_index;
+		ri.Printf( PRINT_ALL, "r_vk_deviceOverride using device %i\n", device_index );
+	}
 
 	vk.physical_device = VK_NULL_HANDLE;
 	for ( i = 0; (uint32_t) i < device_count; i++, device_index++ ) {
@@ -2160,6 +2297,11 @@ static void init_vulkan_library( void )
 			vk.physical_device = physical_devices[ device_index ];
 			break;
 		}
+	}
+
+	if ( vk.physical_device != VK_NULL_HANDLE )
+	{
+		vk_dump_caps( vk.physical_device );
 	}
 
 	ri.Free( physical_devices );
@@ -2265,6 +2407,9 @@ static void init_vulkan_library( void )
 
 	if ( vk.debugMarkers ) {
 		INIT_DEVICE_FUNCTION_EXT(vkDebugMarkerSetObjectNameEXT)
+		INIT_DEVICE_FUNCTION_EXT(vkCmdDebugMarkerBeginEXT)
+		INIT_DEVICE_FUNCTION_EXT(vkCmdDebugMarkerEndEXT)
+		INIT_DEVICE_FUNCTION_EXT(vkCmdDebugMarkerInsertEXT)
 	}
 
 	INIT_DEVICE_FUNCTION_EXT(vkCmdClearColorImage)
@@ -2393,6 +2538,9 @@ static void deinit_device_functions( void )
 
 	qvkDebugMarkerSetObjectNameEXT				= NULL;
 	qvkCmdClearColorImage						= NULL;
+	qvkCmdDebugMarkerBeginEXT					= NULL;
+	qvkCmdDebugMarkerEndEXT						= NULL;
+	qvkCmdDebugMarkerInsertEXT					= NULL;
 }
 
 
@@ -4525,10 +4673,10 @@ void vk_initialize( void )
 
 	// fill glConfig information
 
-	// maxTextureSize must not exceed IMAGE_CHUNK_SIZE
-	maxSize = sqrtf( IMAGE_CHUNK_SIZE / 4 );
+	// clamp to hardware limits and requested maximum (power-of-two bucket).
+	maxSize = MIN( props.limits.maxImageDimension2D, MAX_TEXTURE_SIZE );
 	// round down to next power of 2
-	glConfig.maxTextureSize = MIN( props.limits.maxImageDimension2D, log2pad( maxSize, 0 ) );
+	glConfig.maxTextureSize = MIN( maxSize, log2pad( maxSize, 0 ) );
 
 	if ( glConfig.maxTextureSize > MAX_TEXTURE_SIZE )
 		glConfig.maxTextureSize = MAX_TEXTURE_SIZE; // ResampleTexture() relies on that maximum
@@ -8798,6 +8946,8 @@ _retry:
 
 	VK_CHECK( qvkBeginCommandBuffer( vk.cmd->command_buffer, &begin_info ) );
 
+	vk_gpu_marker_begin( "vk frame" );
+
 	// Ensure visibility of geometry buffers writes.
 	//record_buffer_memory_barrier( vk.cmd->command_buffer, vk.cmd->vertex_buffer, vk.geometry_buffer_size, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_ACCESS_HOST_WRITE_BIT, VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT );
 
@@ -8856,6 +9006,8 @@ static void vk_resize_geometry_buffer( void )
 	int i;
 
 	vk_end_render_pass();
+
+	vk_gpu_marker_end();
 
 	VK_CHECK( qvkEndCommandBuffer( vk.cmd->command_buffer ) );
 
@@ -9025,6 +9177,8 @@ void vk_end_frame( void )
 	}
 
 	vk_end_render_pass();
+
+	vk_gpu_marker_end();
 
 	VK_CHECK( qvkEndCommandBuffer( vk.cmd->command_buffer ) );
 

@@ -800,6 +800,7 @@ typedef struct {
 	qboolean fragmentStores;
 	qboolean dedicatedAllocation;
 	qboolean debugMarkers;
+	qboolean marker_active;
 
 	float maxAnisotropy;
 	float maxLod;

@@ -4,6 +4,7 @@
 
 - CMake builds target C23 by default; use a modern compiler (GCC 15+, Clang 18+, or MSVC 2022).
 - Set `C_STANDARD_STRICT=OFF` to disable the strict warning set locally. CI uses strict warnings with warnings-as-errors.
+- The Vulkan renderer now targets Vulkan 1.4; install the Vulkan SDK/headers and drivers for at least that version before building with `USE_VULKAN=1`.
 
 ### windows/msvc
 
