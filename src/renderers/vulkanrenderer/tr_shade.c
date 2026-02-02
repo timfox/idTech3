@@ -1206,6 +1206,9 @@ static void R_UpdatePBRCubemapDebugCvar( int cubemapIndex, const vec3_t pos )
 /*
 ** RB_IterateStagesGeneric
 */
+#ifdef USE_VK_PBR
+static void VK_SetGlintParams( vkUniform_t *ubo );
+#endif
 #ifdef USE_VULKAN
 static void RB_IterateStagesGeneric( const shaderCommands_t *input, qboolean fogCollapse )
 #else
@@ -1225,7 +1228,6 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 #endif
 #ifdef USE_VK_PBR
 	qboolean is_pbr_surface;
-	VK_SetGlintParams( &uniform );
 #endif
 	uint32_t pipeline;
 	int fog_stage;
@@ -1238,6 +1240,10 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 	pushUniform = qfalse;
 
 	is_pbr_surface = qfalse;
+
+#ifdef USE_VK_PBR
+	VK_SetGlintParams( &uniform );
+#endif
 
 #ifdef USE_FOG_COLLAPSE
 	if ( fogCollapse ) {
@@ -1364,6 +1370,8 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			Vector4Copy( pStage->subsurfaceParams, block.subsurfaceParams );
 
 			vk_update_descriptor_if_changed( VK_DESC_PBR_BRDFLUT, vk.brdflut_image_descriptor );
+			if ( vk.glint_dict_image_descriptor )
+				vk_update_descriptor_if_changed( VK_DESC_PBR_GLINT_DICT, vk.glint_dict_image_descriptor );
 				
 			if ( pStage->vk_pbr_flags & PBR_HAS_NORMALMAP )
 				vk_update_descriptor_if_changed( VK_DESC_PBR_NORMAL, pStage->normalMap->descriptor );

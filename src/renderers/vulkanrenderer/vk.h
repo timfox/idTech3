@@ -622,6 +622,12 @@ typedef struct {
 	VkDescriptorSet brdflut_image_descriptor;
 #endif
 
+#ifdef USE_VK_PBR
+	VkImage			glint_dict_image;
+	VkImageView		glint_dict_image_view;
+	VkDescriptorSet glint_dict_image_descriptor;
+#endif
+
 	struct {
 		VkFramebuffer blur[VK_NUM_BLOOM_PASSES*2];
 		VkFramebuffer bloom_extract;

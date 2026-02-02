@@ -142,6 +142,11 @@ static PFN_vkCmdDebugMarkerInsertEXT							qvkCmdDebugMarkerInsertEXT;
 // forward declaration
 VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassIndex, uint32_t def_index );
 
+#ifdef USE_VK_PBR
+static image_t vk_glint_dictionary_image;
+static void vk_create_glint_dictionary_texture( void );
+#endif
+
 static uint32_t find_memory_type( uint32_t memory_type_bits, VkMemoryPropertyFlags properties ) {
 	VkPhysicalDeviceMemoryProperties memory_properties;
 	uint32_t i;
@@ -4345,6 +4350,47 @@ static void vk_create_sync_primitives( void ) {
 }
 
 
+#ifdef USE_VK_PBR
+static void vk_create_glint_dictionary_texture( void )
+{
+	if ( vk.glint.dictionary == NULL || vk.glint.size == 0 )
+	{
+		vk.glint_dict_image = VK_NULL_HANDLE;
+		vk.glint_dict_image_view = VK_NULL_HANDLE;
+		vk.glint_dict_image_descriptor = VK_NULL_HANDLE;
+		return;
+	}
+
+	Com_Memset( &vk_glint_dictionary_image, 0, sizeof( vk_glint_dictionary_image ) );
+	vk_glint_dictionary_image.imgName = "glint_dictionary";
+	vk_glint_dictionary_image.internalFormat = VK_FORMAT_R32_SFLOAT;
+	vk_glint_dictionary_image.width = GLINT_DICT_SIZE;
+	vk_glint_dictionary_image.height = GLINT_DICT_ENTRIES * GLINT_DICT_LEVELS;
+	vk_glint_dictionary_image.uploadWidth = vk_glint_dictionary_image.width;
+	vk_glint_dictionary_image.uploadHeight = vk_glint_dictionary_image.height;
+	vk_glint_dictionary_image.wrapClampMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	vk_glint_dictionary_image.layers = 1;
+	vk_glint_dictionary_image.type = 0;
+	vk_glint_dictionary_image.flags = IMGFLAG_NONE;
+	vk_glint_dictionary_image.descriptor = VK_NULL_HANDLE;
+
+	vk_upload_image_data( &vk_glint_dictionary_image,
+	                      0,
+	                      0,
+	                      vk_glint_dictionary_image.width,
+	                      vk_glint_dictionary_image.height,
+	                      1,
+	                      (byte *)vk.glint.dictionary,
+	                      (int) vk.glint.size,
+	                      qfalse );
+
+	vk.glint_dict_image = vk_glint_dictionary_image.handle;
+	vk.glint_dict_image_view = vk_glint_dictionary_image.view;
+	vk.glint_dict_image_descriptor = vk_glint_dictionary_image.descriptor;
+}
+#endif
+
+
 static void vk_destroy_sync_primitives( void  ) {
 	uint32_t i;
 
@@ -4947,6 +4993,10 @@ void vk_initialize( void )
 		VK_CHECK( qvkCreateDescriptorPool( vk.device, &desc, NULL, &vk.descriptor_pool ) );
 	}
 
+#ifdef USE_VK_PBR
+	vk_create_glint_dictionary_texture();
+#endif
+
 	//
 	// Descriptor set layout.
 	//
@@ -4986,6 +5036,7 @@ void vk_initialize( void )
 		set_layouts[13] = vk.set_layout_sampler; // anisotropy
 		set_layouts[14] = vk.set_layout_sampler; // transmission
 		set_layouts[15] = vk.set_layout_sampler; // subsurface
+		set_layouts[16] = vk.set_layout_sampler; // glint dictionary
 #endif
 		desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		desc.pNext = NULL;
@@ -5211,6 +5262,19 @@ static void vk_destroy_attachments( void )
         qvkDestroyImageView( vk.device, vk.brdflut_image_view, NULL );
         vk.brdflut_image = VK_NULL_HANDLE;
         vk.brdflut_image_view = VK_NULL_HANDLE;
+    }
+#endif
+
+#ifdef USE_VK_PBR
+    if ( vk.glint_dict_image_view ) {
+        qvkDestroyImage( vk.device, vk.glint_dict_image, NULL );
+        qvkDestroyImageView( vk.device, vk.glint_dict_image_view, NULL );
+        vk.glint_dict_image = VK_NULL_HANDLE;
+        vk.glint_dict_image_view = VK_NULL_HANDLE;
+        vk.glint_dict_image_descriptor = VK_NULL_HANDLE;
+        vk_glint_dictionary_image.handle = VK_NULL_HANDLE;
+        vk_glint_dictionary_image.view = VK_NULL_HANDLE;
+        vk_glint_dictionary_image.descriptor = VK_NULL_HANDLE;
     }
 #endif
 

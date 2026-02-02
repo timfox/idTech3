@@ -36,6 +36,20 @@ layout(set = 0, binding = 0) uniform UBO {
 	vec4 pbrSubsurfaceColor;
 	vec4 pbrSubsurfaceParams;
 	vec4 pbrShCoeffs[9];
+	vec4 glintCore;
+	vec4 glintMaterial;
+	vec4 glintMicro;
+	vec4 glintSampling;
+	vec4 glintTemporal;
+	vec4 glintEnergy;
+	vec4 glintBudget;
+	vec4 glintRouting;
+	vec4 glintModel;
+	vec4 glintDensity;
+	vec4 glintDict;
+	vec4 glintDictExtras;
+	vec4 glintPerformance;
+	vec4 glintColor;
 #endif
 //#endif
 };
@@ -134,6 +148,7 @@ layout(set = 12, binding = 0) uniform sampler2D sheen_texture;
 layout(set = 13, binding = 0) uniform sampler2D anisotropy_texture;
 layout(set = 14, binding = 0) uniform sampler2D transmission_texture;
 layout(set = 15, binding = 0) uniform sampler2D subsurface_texture;
+layout(set = 16, binding = 0) uniform sampler2D glint_dict_texture;
 
 // prob use ubo for specularScale & normalScale ..
 layout (constant_id = 11) const float specularScale_x = 1.0;
@@ -157,6 +172,140 @@ layout (constant_id = 26) const int sheen_texture_set = 0;
 layout (constant_id = 27) const int anisotropy_texture_set = 0;
 layout (constant_id = 28) const int transmission_texture_set = 0;
 layout (constant_id = 29) const int subsurface_texture_set = 0;
+
+#define GLINT_DICT_ENTRIES_INT 192
+#define GLINT_DICT_LEVELS_INT 16
+#define GLINT_DICT_SIZE_INT 64
+#define GLINT_DICT_WIDTH_FLOAT float( GLINT_DICT_SIZE_INT )
+#define GLINT_DICT_HEIGHT_FLOAT float( GLINT_DICT_ENTRIES_INT * GLINT_DICT_LEVELS_INT )
+
+float glint_hash( vec2 uv, float seed )
+{
+	return fract( sin( dot( uv, vec2( 12.9898, 78.233 ) ) + seed ) * 43758.5453 );
+}
+
+float glint_dictionary_lookup( int entry, int level, float position )
+{
+	entry = clamp( entry, 0, GLINT_DICT_ENTRIES_INT - 1 );
+	level = clamp( level, 0, GLINT_DICT_LEVELS_INT - 1 );
+	float row = float( entry * GLINT_DICT_LEVELS_INT + level );
+	float y = ( row + 0.5 ) / GLINT_DICT_HEIGHT_FLOAT;
+	float idx = clamp( position, 0.0, 1.0 ) * ( GLINT_DICT_WIDTH_FLOAT - 1.0 );
+	float x = ( idx + 0.5 ) / GLINT_DICT_WIDTH_FLOAT;
+	return texture( glint_dict_texture, vec2( x, y ) ).r;
+}
+
+vec3 ComputeGlintContribution( vec3 N, vec3 L, vec3 V, vec3 specColor, float roughness, float NL, float NH, float NE, float LH, float VH, float lightDistance, out float debugIntensity )
+{
+	debugIntensity = 0.0;
+
+	if ( glintCore.x < 0.5 )
+	{
+		return vec3( 0.0 );
+	}
+
+	float maskFactor = 1.0;
+	if ( glintMaterial.w > 0.5 && physical_texture_set > -1 )
+	{
+		maskFactor = texture( physical_texture, frag_tex_coord0 ).a;
+	}
+
+	if ( maskFactor <= 0.001 )
+	{
+		return vec3( 0.0 );
+	}
+
+	int entryCount = max( 1, min( GLINT_DICT_ENTRIES_INT, int( clamp( glintDict.z, 1.0, float( GLINT_DICT_ENTRIES_INT ) ) + 0.5 ) ) );
+	int levelCount = max( 1, min( GLINT_DICT_LEVELS_INT, int( clamp( glintDict.x, 1.0, float( GLINT_DICT_LEVELS_INT ) ) + 0.5 ) ) );
+	float levelMax = float( levelCount ) - 1.0;
+	float levelValue = clamp( roughness * levelMax + glintSampling.w + glintPerformance.x, 0.0, levelMax );
+
+	float temporalJitter = ( glintTemporal.x > 0.5 && glintTemporal.w > 0.0 ) ? glint_hash( frag_tex_coord0 * 1.3, glintTemporal.w ) * 0.25 : 0.0;
+	levelValue = clamp( levelValue + temporalJitter, 0.0, levelMax );
+
+	int level0 = clamp( int( floor( levelValue ) ), 0, levelCount - 1 );
+	int level1 = min( levelCount - 1, level0 + 1 );
+	float levelLerp = fract( levelValue );
+
+	vec2 tile = floor( frag_tex_coord0 * max( 1.0, glintSampling.z ) );
+	float baseSeed = glintCore.w + dot( tile, vec2( 12.9898, 78.233 ) );
+
+	float hashA = glint_hash( tile, baseSeed );
+	float hashB = glint_hash( tile, baseSeed + 0.5 );
+
+	int entryA = max( 0, min( GLINT_DICT_ENTRIES_INT - 1, int( floor( hashA * float( entryCount ) ) ) ) );
+	int entryB = max( 0, min( GLINT_DICT_ENTRIES_INT - 1, int( floor( hashB * float( entryCount ) ) ) ) );
+
+	float hashC = glint_hash( tile + vec2( hashA, hashB ), baseSeed + 1.3 );
+	float hashD = glint_hash( tile + vec2( hashB, hashA ), baseSeed + 2.7 );
+
+	float sampleA = mix(
+		glint_dictionary_lookup( entryA, level0, hashC ),
+		glint_dictionary_lookup( entryA, level1, hashC + 0.33 ),
+		levelLerp );
+	float sampleB = mix(
+		glint_dictionary_lookup( entryB, level0, hashD ),
+		glint_dictionary_lookup( entryB, level1, hashD + 0.67 ),
+		levelLerp );
+
+	float ndf = max( sampleA * sampleB, 1e-5 );
+	debugIntensity = ndf;
+
+	float distanceFade = 1.0;
+	if ( glintBudget.z > 0.0 )
+	{
+		float maxDistance = max( glintBudget.z, 1e-3 );
+		distanceFade = clamp( 1.0 - lightDistance / maxDistance, 0.0, 1.0 );
+	}
+
+	float slope = length( vec2( dFdx( NL ), dFdy( NL ) ) );
+	float slopeFade = 1.0;
+	if ( glintBudget.w > 0.0 )
+	{
+		slopeFade = clamp( 1.0 - slope / max( glintBudget.w, 1e-3 ), 0.0, 1.0 );
+	}
+
+	float density = max( glintMicro.x, 0.0 );
+	float scale = max( glintMicro.y, 0.01 );
+	float anisotropy = mix( 1.0, 1.5, abs( glintMicro.z ) );
+	float beta = clamp( glintModel.x, 0.0, 1.0 );
+	float modeBias = ( glintCore.y < 1.5 ) ? 0.8 : ( glintCore.y >= 2.5 ? 1.2 : 1.0 );
+
+	float amplitude = glintMaterial.x * density * anisotropy * scale * beta * ( 1.0 - roughness ) * modeBias;
+	float energyScale = ( glintEnergy.x > 0.5 ) ? 1.0 / ( 1.0 + ndf ) : 1.0;
+
+	vec3 baseSpec = specColor;
+	if ( glintEnergy.z >= 0.0 )
+	{
+		baseSpec = vec3( glintEnergy.z );
+	}
+
+	vec3 fresnel = F_Schlick( baseSpec, VH );
+	float fresnelMask = ( glintEnergy.y > 0.5 ) ? ( fresnel.r + fresnel.g + fresnel.b ) * 0.3333 : 1.0;
+	float maskStrength = ( glintDictExtras.z > 0.5 ) ? NL : 1.0;
+
+	float intensity = amplitude * ndf * distanceFade * slopeFade * energyScale * maskStrength * maskFactor * fresnelMask;
+
+	vec3 result = baseSpec * intensity;
+
+	float maxLum = glintBudget.x;
+	if ( maxLum > 0.0 )
+	{
+		float lum = max( max( result.r, result.g ), result.b );
+		if ( lum > maxLum )
+		{
+			result *= maxLum / lum;
+		}
+	}
+
+	if ( glintPerformance.y > 0.5 )
+	{
+		vec3 tint = mix( vec3( 1.0 ), vec3( 1.0, 0.8, 0.6 ), clamp( glintPerformance.w, 0.0, 1.0 ) );
+		result *= tint;
+	}
+
+	return result;
+}
 
 vec3 CalcNormal( in vec3 vertexNormal, in vec2 frag_tex_coord )
 {
@@ -713,7 +862,8 @@ void main() {
 
 	L = var_LightDir.xyz;
 	float sqrLightDist = dot(L, L);
-	L /= sqrt(sqrLightDist);
+	float lightDistance = sqrt( max( sqrLightDist, 1e-6 ) );
+	L /= lightDistance;
 
 	// FIX ME
 	#if defined (USE_CLX_IDENT)
@@ -825,6 +975,28 @@ void main() {
 
 	if ( env_texture_set > -1 )
 		out_color.rgb += CalcIBLContribution( roughness, N, E, NE, specular.rgb * AO );
+
+#ifdef USE_VK_PBR
+	float glintDebugValue = 0.0;
+	vec3 glintTerm = ComputeGlintContribution( N, L, E, specular.rgb, roughness, NL, NH, NE, LH, VH, lightDistance, glintDebugValue );
+
+	if ( glintRouting.y > 0.5 )
+		out_color.rgb += lightColor * glintTerm * ( attenuation * NL );
+
+	if ( glintRouting.x > 0.5 )
+		out_color.rgb += glintTerm;
+
+	if ( glintCore.z > 0.5 )
+	{
+		float debugMask = clamp( glintDebugValue * 40.0, 0.0, 1.0 );
+		if ( glintCore.z < 1.5 )
+			out_color.rgb = vec3( debugMask );
+		else if ( glintCore.z < 2.5 )
+			out_color.rgb = vec3( glintTerm );
+		else
+			out_color.rgb = vec3( debugMask, 1.0 - debugMask, 0.0 );
+	}
+#endif
 
 	// clearcoat lobe
 	if ( clearcoat_texture_set > -1 ) {

@@ -22,6 +22,8 @@ static void Glint_Seed(void) {
 
 static void Glint_GenerateEntry(int entry, int level, float *out)
 {
+	(void)entry;
+	(void)level;
 	const float sigma = 0.02f * (1.0f + 0.25f * level);
 	float sum = 0.0f;
 
