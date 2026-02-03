@@ -444,6 +444,7 @@ void vk_draw_indexed( uint32_t indexCount, uint32_t firstIndex );
 void vk_reset_descriptor( int index );
 void vk_update_descriptor( int index, VkDescriptorSet descriptor );
 void vk_update_descriptor_offset( int index, uint32_t offset );
+void vk_update_glint_descriptor_binding( VkDescriptorSet descriptor );
 void vk_bind_descriptor_sets( void );
 
 void vk_update_post_process_pipelines( void );
@@ -557,6 +558,7 @@ typedef struct {
 
 	VkDescriptorPool descriptor_pool;
 	VkDescriptorSetLayout set_layout_sampler;	// combined image sampler
+	VkDescriptorSetLayout set_layout_pbr;		// PBR samplers (BRDF LUT + glint dict)
 	VkDescriptorSetLayout set_layout_uniform;	// dynamic uniform buffer
 	VkDescriptorSetLayout set_layout_storage;	// feedback buffer
 
@@ -634,7 +636,6 @@ typedef struct {
 #ifdef USE_VK_PBR
 	VkImage			glint_dict_image;
 	VkImageView		glint_dict_image_view;
-	VkDescriptorSet glint_dict_image_descriptor;
 #endif
 
 	struct {

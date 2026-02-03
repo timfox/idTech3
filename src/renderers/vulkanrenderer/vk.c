@@ -4358,7 +4358,6 @@ static void vk_create_glint_dictionary_texture( void )
 	{
 		vk.glint_dict_image = VK_NULL_HANDLE;
 		vk.glint_dict_image_view = VK_NULL_HANDLE;
-		vk.glint_dict_image_descriptor = VK_NULL_HANDLE;
 		return;
 	}
 
@@ -4392,7 +4391,6 @@ static void vk_create_glint_dictionary_texture( void )
 
 	vk.glint_dict_image = vk_glint_dictionary_image.handle;
 	vk.glint_dict_image_view = vk_glint_dictionary_image.view;
-	vk.glint_dict_image_descriptor = vk_glint_dictionary_image.descriptor;
 
 	ri.Printf( PRINT_ALL, "glint dictionary image=%p descriptor=%p view=%p\n",
 		(void *)(uintptr_t)vk.glint_dict_image, (void *)(uintptr_t)vk_glint_dictionary_image.descriptor, (void *)(uintptr_t)vk.glint_dict_image_view );
@@ -5011,6 +5009,32 @@ void vk_initialize( void )
 	//vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_SHADER_STAGE_FRAGMENT_BIT, &vk.set_layout_input );
 
 #ifdef USE_VK_PBR
+	{
+		VkDescriptorSetLayoutBinding pbr_bindings[2];
+		VkDescriptorSetLayoutCreateInfo pbr_desc;
+
+		Com_Memset( pbr_bindings, 0, sizeof( pbr_bindings ) );
+
+		pbr_bindings[0].binding = 0;
+		pbr_bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		pbr_bindings[0].descriptorCount = 1;
+		pbr_bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		pbr_bindings[1].binding = 1;
+		pbr_bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		pbr_bindings[1].descriptorCount = 1;
+		pbr_bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		pbr_desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		pbr_desc.pNext = NULL;
+		pbr_desc.flags = 0;
+		pbr_desc.bindingCount = ARRAY_LEN( pbr_bindings );
+		pbr_desc.pBindings = pbr_bindings;
+
+		VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &pbr_desc, NULL, &vk.set_layout_pbr ) );
+	}
+#endif
+#ifdef USE_VK_PBR
 	vk_create_glint_dictionary_texture();
 #endif
 
@@ -5034,7 +5058,7 @@ void vk_initialize( void )
 		set_layouts[3] = vk.set_layout_sampler; // blend
 		set_layouts[4] = vk.set_layout_sampler; // collapsed fog texture
 #ifdef USE_VK_PBR
-		set_layouts[5] = vk.set_layout_sampler; // brdf lut
+		set_layouts[5] = vk.set_layout_pbr;    // brdf lut + glint dictionary
 		set_layouts[6] = vk.set_layout_sampler; // normalMap
 		set_layouts[7] = vk.set_layout_sampler; // physicalMap
 		set_layouts[8] = vk.set_layout_sampler; // prefiltered envmap
@@ -5050,7 +5074,14 @@ void vk_initialize( void )
 		desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		desc.pNext = NULL;
 		desc.flags = 0;
-		desc.setLayoutCount = (vk.maxBoundDescriptorSets >= VK_DESC_COUNT) ? VK_DESC_COUNT : 4;
+		uint32_t descriptorSetCount = vk.maxBoundDescriptorSets;
+		if ( descriptorSetCount > VK_DESC_COUNT ) {
+			descriptorSetCount = VK_DESC_COUNT;
+		}
+		if ( descriptorSetCount == 0 ) {
+			descriptorSetCount = 1;
+		}
+		desc.setLayoutCount = descriptorSetCount;
 		desc.pSetLayouts = set_layouts;
 		desc.pushConstantRangeCount = 1;
 		desc.pPushConstantRanges = &push_range;
@@ -5280,7 +5311,6 @@ static void vk_destroy_attachments( void )
         qvkDestroyImageView( vk.device, vk.glint_dict_image_view, NULL );
         vk.glint_dict_image = VK_NULL_HANDLE;
         vk.glint_dict_image_view = VK_NULL_HANDLE;
-        vk.glint_dict_image_descriptor = VK_NULL_HANDLE;
         vk_glint_dictionary_image.handle = VK_NULL_HANDLE;
         vk_glint_dictionary_image.view = VK_NULL_HANDLE;
         vk_glint_dictionary_image.descriptor = VK_NULL_HANDLE;
@@ -5520,6 +5550,7 @@ void vk_shutdown( refShutdownCode_t code )
 	qvkDestroyDescriptorPool(vk.device, vk.descriptor_pool, NULL);
 
 	qvkDestroyDescriptorSetLayout(vk.device, vk.set_layout_sampler, NULL);
+	qvkDestroyDescriptorSetLayout(vk.device, vk.set_layout_pbr, NULL);
 	qvkDestroyDescriptorSetLayout(vk.device, vk.set_layout_uniform, NULL);
 	qvkDestroyDescriptorSetLayout(vk.device, vk.set_layout_storage, NULL);
 
@@ -6110,6 +6141,39 @@ void vk_update_descriptor_set( image_t *image, qboolean mipmap ) {
 	descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	descriptor_write.dstSet = image->descriptor;
 	descriptor_write.dstBinding = 0;
+	descriptor_write.dstArrayElement = 0;
+	descriptor_write.descriptorCount = 1;
+	descriptor_write.pNext = NULL;
+	descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descriptor_write.pImageInfo = &image_info;
+	descriptor_write.pBufferInfo = NULL;
+	descriptor_write.pTexelBufferView = NULL;
+
+	qvkUpdateDescriptorSets( vk.device, 1, &descriptor_write, 0, NULL );
+}
+
+void vk_update_glint_descriptor_binding( VkDescriptorSet descriptor ) {
+	Vk_Sampler_Def sampler_def;
+	VkDescriptorImageInfo image_info;
+	VkWriteDescriptorSet descriptor_write;
+
+	if ( descriptor == VK_NULL_HANDLE || vk_glint_dictionary_image.view == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	Com_Memset( &sampler_def, 0, sizeof( sampler_def ) );
+	sampler_def.address_mode = vk_glint_dictionary_image.wrapClampMode;
+	sampler_def.gl_mag_filter = GL_LINEAR;
+	sampler_def.gl_min_filter = GL_LINEAR;
+	sampler_def.noAnisotropy = qtrue;
+
+	image_info.sampler = vk_find_sampler( &sampler_def );
+	image_info.imageView = vk_glint_dictionary_image.view;
+	image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptor_write.dstSet = descriptor;
+	descriptor_write.dstBinding = 1;
 	descriptor_write.dstArrayElement = 0;
 	descriptor_write.descriptorCount = 1;
 	descriptor_write.pNext = NULL;

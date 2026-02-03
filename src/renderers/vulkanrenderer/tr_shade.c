@@ -1371,13 +1371,12 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			Vector4Copy( pStage->subsurfaceParams, block.subsurfaceParams );
 
 			vk_update_descriptor_if_changed( VK_DESC_PBR_BRDFLUT, vk.brdflut_image_descriptor );
-			if ( vk.glint_dict_image_descriptor )
-				vk_update_descriptor_if_changed( VK_DESC_PBR_GLINT_DICT, vk.glint_dict_image_descriptor );
+			vk_update_glint_descriptor_binding( vk.brdflut_image_descriptor );
 
-			ri.Printf( PRINT_ALL, "glint: stage=%s vk_pbr_flags=0x%x glint_desc=%p view=%p\n",
+			ri.Printf( PRINT_ALL, "glint: stage=%s vk_pbr_flags=0x%x brdf_desc=%p view=%p\n",
 				tess.shader ? tess.shader->name : "null",
 				pStage->vk_pbr_flags,
-				(void *)(uintptr_t)vk.glint_dict_image_descriptor,
+				(void *)(uintptr_t)vk.brdflut_image_descriptor,
 				(void *)(uintptr_t)vk.glint_dict_image_view );
 				
 			if ( pStage->vk_pbr_flags & PBR_HAS_NORMALMAP )
