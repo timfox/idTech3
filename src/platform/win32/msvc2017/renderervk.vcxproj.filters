@@ -111,7 +111,13 @@
     <ClCompile Include="..\..\renderers\vulkanrenderer\vk_flares.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\renderers\vulkanrenderer\vk_mikktspace.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\renderers\vulkanrenderer\vk_vbo.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\renderers\vulkanrenderer\utils\mikktspace\mikktspace.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -123,6 +129,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\renderers\vulkanrenderer\tr_local.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\renderers\vulkanrenderer\utils\mikktspace\mikktspace.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\renderers\rendercommon\tr_public.h">

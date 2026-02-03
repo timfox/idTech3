@@ -387,7 +387,15 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\renderers\vulkanrenderer\vk_mikktspace.c"
+				>
+			</File>
+			<File
 				RelativePath="..\..\renderers\vulkanrenderer\vk_vbo.c"
+				>
+			</File>
+			<File
+				RelativePath="..\..\renderers\vulkanrenderer\utils\mikktspace\mikktspace.c"
 				>
 			</File>
 			<Filter
@@ -401,6 +409,10 @@
 			>
 			<File
 				RelativePath="..\..\renderers\vulkanrenderer\iqm.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\renderers\vulkanrenderer\utils\mikktspace\mikktspace.h"
 				>
 			</File>
 			<File

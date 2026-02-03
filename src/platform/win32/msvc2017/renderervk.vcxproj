@@ -241,12 +241,15 @@
     <ClCompile Include="..\..\renderers\vulkanrenderer\tr_world.c" />
     <ClCompile Include="..\..\renderers\vulkanrenderer\vk.c" />
     <ClCompile Include="..\..\renderers\vulkanrenderer\vk_flares.c" />
+    <ClCompile Include="..\..\renderers\vulkanrenderer\vk_mikktspace.c" />
     <ClCompile Include="..\..\renderers\vulkanrenderer\vk_vbo.c" />
+    <ClCompile Include="..\..\renderers\vulkanrenderer\utils\mikktspace\mikktspace.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\renderers\vulkanrenderer\iqm.h" />
     <ClInclude Include="..\..\renderers\vulkanrenderer\tr_common.h" />
     <ClInclude Include="..\..\renderers\vulkanrenderer\tr_local.h" />
+    <ClInclude Include="..\..\renderers\vulkanrenderer\utils\mikktspace\mikktspace.h" />
     <ClInclude Include="..\..\renderers\rendercommon\tr_public.h" />
     <ClInclude Include="..\..\renderers\rendercommon\tr_types.h" />
     <ClInclude Include="..\..\renderers\vulkanrenderer\vk.h" />
