@@ -34,7 +34,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #endif
 
 /* C99 defines __func__ */
-#if __STDC_VERSION__ < 199901L 
+#if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 199901L
 #if __GNUC__ >= 2 || _MSC_VER >= 1300 
 #define __func__ __FUNCTION__ 
 #else 

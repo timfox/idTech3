@@ -136,12 +136,39 @@ static void SV_Netchan_Decode( client_t *client, msg_t *msg ) {
 SV_Netchan_FreeQueue
 =================
 */
+static void SV_Netchan_CheckQueue( const client_t *client, const char *where )
+{
+	if ( client->netchan_queue_magic == 0 && client->netchan_queue_magic2 == 0 &&
+		client->netchan_start_queue == NULL )
+	{
+		// Initialize guards for previously-zeroed clients.
+		((client_t *)client)->netchan_queue_magic = NETCHAN_QUEUE_MAGIC;
+		((client_t *)client)->netchan_queue_magic2 = NETCHAN_QUEUE_MAGIC;
+		if ( client->netchan_end_queue == NULL ) {
+			((client_t *)client)->netchan_end_queue = &((client_t *)client)->netchan_start_queue;
+		}
+		return;
+	}
+
+	if ( client->netchan_queue_magic != NETCHAN_QUEUE_MAGIC ||
+		client->netchan_queue_magic2 != NETCHAN_QUEUE_MAGIC )
+	{
+		Com_Error( ERR_FATAL, "%s: netchan queue guard corrupted (client=%p)", where, (const void *)client );
+	}
+}
+
 void SV_Netchan_FreeQueue(client_t *client)
 {
 	netchan_buffer_t *netbuf, *next;
+
+	SV_Netchan_CheckQueue( client, __func__ );
 	
 	for(netbuf = client->netchan_start_queue; netbuf; netbuf = next)
 	{
+		if ( netbuf->magic != NETCHAN_BUFFER_MAGIC ) {
+			Com_Error( ERR_FATAL, "%s: netchan buffer magic corrupted (buf=%p magic=0x%08x)",
+				__func__, (void *)netbuf, netbuf->magic );
+		}
 		next = netbuf->next;
 		Z_Free(netbuf);
 	}
@@ -158,9 +185,18 @@ SV_Netchan_TransmitNextInQueue
 static void SV_Netchan_TransmitNextInQueue(client_t *client)
 {
 	netchan_buffer_t *netbuf;
+
+	SV_Netchan_CheckQueue( client, __func__ );
 		
 	Com_DPrintf("#462 Netchan_TransmitNextFragment: popping a queued message for transmit\n");
 	netbuf = client->netchan_start_queue;
+	if ( !netbuf ) {
+		return;
+	}
+	if ( netbuf->magic != NETCHAN_BUFFER_MAGIC ) {
+		Com_Error( ERR_FATAL, "%s: netchan buffer magic corrupted (buf=%p magic=0x%08x)",
+			__func__, (void *)netbuf, netbuf->magic );
+	}
 
 	if( client->compat )
 		SV_Netchan_Encode(client, &netbuf->msg, netbuf->clientCommandString);
@@ -221,11 +257,14 @@ void SV_Netchan_Transmit( client_t *client, msg_t *msg)
 {
 	MSG_WriteByte( msg, svc_EOF );
 
+	SV_Netchan_CheckQueue( client, __func__ );
+
 	if(client->netchan.unsentFragments || client->netchan_start_queue)
 	{
 		netchan_buffer_t *netbuf;
 		Com_DPrintf("#462 SV_Netchan_Transmit: unsent fragments, stacked\n");
 		netbuf = (netchan_buffer_t *) Z_Malloc(sizeof(netchan_buffer_t));
+		netbuf->magic = NETCHAN_BUFFER_MAGIC;
 		// store the msg, we can't store it encoded, as the encoding depends on stuff we still have to finish sending
 		MSG_Copy(&netbuf->msg, netbuf->msgBuffer, sizeof( netbuf->msgBuffer ), msg);
 		if ( client->compat ) 
@@ -263,4 +302,3 @@ qboolean SV_Netchan_Process( client_t *client, msg_t *msg ) {
 
 	return qtrue;
 }
-

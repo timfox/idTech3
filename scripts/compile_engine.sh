@@ -12,6 +12,7 @@ VULKAN=0
 OPENGL=0
 SKIP_IDPAK=0
 FREETYPE=0
+ASAN=0
 
 GAME_NAME="idtech3"
 BUILD_TYPE="Release"
@@ -52,6 +53,7 @@ for arg in "$@"; do
     coverage|cov) COVERAGE=1 ;;
     quiet|-q|--quiet|q|silent|-s|--silent) QUIET=1 ;;
     vulkan) VULKAN=1 ;;
+    asan|sanitize|san) ASAN=1 ;;
     skip-idpak-check|skip_idpak_check|skip-pak|skip-paks) SKIP_IDPAK=1 ;;
     opengl) OPENGL=1 ;;
     freetype) FREETYPE=1 ;;
@@ -112,6 +114,11 @@ CMAKE_FLAGS=(
 if [ "$FREETYPE" -eq 1 ]; then
   CMAKE_FLAGS+=("-DBUILD_FREETYPE=ON")
   echo "CMake: BUILD_FREETYPE=ON"
+fi
+
+if [ "$ASAN" -eq 1 ]; then
+  CMAKE_FLAGS+=("-DENABLE_ASAN=ON")
+  echo "CMake: ENABLE_ASAN=ON"
 fi
 
 if [ "$VULKAN" -eq 1 ]; then

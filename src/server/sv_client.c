@@ -767,7 +767,9 @@ gotnewcl:
 	Netchan_Setup( NS_SERVER, &newcl->netchan, from, qport, challenge, compat );
 
 	// init the netchan queue
+	newcl->netchan_queue_magic = NETCHAN_QUEUE_MAGIC;
 	newcl->netchan_end_queue = &newcl->netchan_start_queue;
+	newcl->netchan_queue_magic2 = NETCHAN_QUEUE_MAGIC;
 
 	// save the userinfo
 	Q_strncpyz( newcl->userinfo, userinfo, sizeof(newcl->userinfo) );

@@ -1710,7 +1710,7 @@ static void FinishStage( shaderStage_t *stage )
 		return;
 	}
 
-	for ( i = 0; i < ARRAY_LEN( stage->bundle ); i++ ) {
+	for ( i = 0; i < (int)ARRAY_LEN( stage->bundle ); i++ ) {
 		textureBundle_t *bundle = &stage->bundle[i];
 		// offset lightmap coordinates
 		if ( bundle->lightmap >= LIGHTMAP_INDEX_OFFSET ) {
@@ -2136,7 +2136,7 @@ static const collapse_t collapse[] = {
 	{ 0, GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA | GLS_SRCBLEND_SRC_ALPHA,
 		GL_DECAL, 0 },
 #endif
-	{ -1 }
+	{ -1, 0, 0, 0 }
 };
 
 
@@ -3323,6 +3323,8 @@ qhandle_t RE_RegisterShaderFromImage(const char *name, int lightmapIndex, image_
 	unsigned long hash;
 	shader_t	*sh;
 
+	(void)mipRawImage;
+
 	hash = generateHashValue(name, FILE_HASH_SIZE);
 
 	// probably not necessary since this function
@@ -3674,7 +3676,8 @@ static void ScanAndLoadShaderFiles( void )
 	char *xbuffers[MAX_SHADER_FILES];
 	int numShaderFiles, numShaderxFiles;
 	int i;
-	const char *token, *hashMem;
+	const char *token;
+	const char **hashMem;
 	char *textEnd;
 	const char *p, *oldp;
 	int shaderTextHashTableSizes[MAX_SHADERTEXT_HASH], hash, size;
@@ -3762,11 +3765,11 @@ static void ScanAndLoadShaderFiles( void )
 
 	size += MAX_SHADERTEXT_HASH;
 
-	hashMem = ri.Hunk_Alloc( size * sizeof(char *), h_low );
+	hashMem = ri.Hunk_Alloc( size * sizeof(*hashMem), h_low );
 
 	for (i = 0; i < MAX_SHADERTEXT_HASH; i++) {
-		shaderTextHashTable[i] = (const char **) hashMem;
-		hashMem = ((char *) hashMem) + ((shaderTextHashTableSizes[i] + 1) * sizeof(char *));
+		shaderTextHashTable[i] = hashMem;
+		hashMem += shaderTextHashTableSizes[i] + 1;
 	}
 
 	p = s_shaderText;
@@ -3779,7 +3782,7 @@ static void ScanAndLoadShaderFiles( void )
 		}
 
 		hash = generateHashValue(token, MAX_SHADERTEXT_HASH);
-		shaderTextHashTable[hash][--shaderTextHashTableSizes[hash]] = (char*)oldp;
+		shaderTextHashTable[hash][--shaderTextHashTableSizes[hash]] = oldp;
 
 		SkipBracedSection(&p, 0);
 	}

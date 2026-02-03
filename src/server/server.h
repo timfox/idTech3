@@ -34,6 +34,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define	MAX_ENT_CLUSTERS	16
 
+#define NETCHAN_BUFFER_MAGIC 0x4E43484Eu
+#define NETCHAN_QUEUE_MAGIC  0x514E4348u
+
 typedef struct svEntity_s {
 	struct worldSector_s *worldSector;
 	struct svEntity_s *nextEntityInWorldSector;
@@ -124,6 +127,7 @@ typedef struct netchan_buffer_s {
 	msg_t           msg;
 	byte            msgBuffer[MAX_MSGLEN];
 	char		clientCommandString[MAX_STRING_CHARS];	// valid command string for SV_Netchan_Encode
+	uint32_t	magic;
 	struct netchan_buffer_s *next;
 } netchan_buffer_t;
 
@@ -209,8 +213,10 @@ typedef struct client_s {
 	// queuing outgoing fragmented messages to send them properly, without udp packet bursts
 	// in case large fragmented messages are stacking up
 	// buffer them into this queue, and hand them out to netchan as needed
+	uint32_t		netchan_queue_magic;
 	netchan_buffer_t *netchan_start_queue;
 	netchan_buffer_t **netchan_end_queue;
+	uint32_t		netchan_queue_magic2;
 
 	int				oldServerTime;
 	qboolean		csUpdated[MAX_CONFIGSTRINGS];

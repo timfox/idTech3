@@ -37,11 +37,14 @@ static qboolean IQM_CheckRange( iqmHeader_t *header, int offset,
 				int count, int size ) {
 	// return true if the range specified by offset, count and size
 	// doesn't fit into the file
-	return ( count <= 0 ||
-		 offset <= 0 ||
-		 offset > (int)header->filesize ||
-		 offset + count * size < 0 ||
-		 offset + count * size > (int)header->filesize );
+	if ( count <= 0 || offset <= 0 || size <= 0 ) {
+		return qtrue;
+	}
+
+	{
+		const uint64_t end = (uint64_t)offset + (uint64_t)count * (uint64_t)size;
+		return end > (uint64_t)header->filesize;
+	}
 }
 // "multiply" 3x4 matrices, these are assumed to be the top 3 rows
 // of a 4x4 matrix with the last row = (0 0 0 1)
@@ -213,7 +216,7 @@ qboolean R_LoadIQM( model_t *mod, void *buffer, int filesize, const char *mod_na
 	}
 
 	LL( header->filesize );
-	if( (int)header->filesize > filesize || header->filesize > (16u<<20) ) {
+	if( header->filesize > (unsigned int)filesize || header->filesize > (16u<<20) ) {
 		return qfalse;
 	}
 

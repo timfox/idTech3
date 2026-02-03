@@ -12,6 +12,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(C_STANDARD_STRICT "Enable the stricter warning set for engine builds" ON)
 option(CI_BUILD "Enable CI-specific behaviors such as warnings-as-errors" OFF)
 option(USE_FLUX "Enable FLUX.2 image generation support" ON)
+option(ENABLE_ASAN "Enable AddressSanitizer instrumentation" OFF)
 
 if(C_STANDARD_STRICT)
   if(MSVC)
@@ -22,9 +23,9 @@ if(C_STANDARD_STRICT)
       -Wextra
       -Wpedantic
       -Wshadow
-      -Wstrict-prototypes
-      -Wmissing-prototypes
-      -Wold-style-definition
+      $<$<COMPILE_LANGUAGE:C>:-Wstrict-prototypes>
+      $<$<COMPILE_LANGUAGE:C>:-Wmissing-prototypes>
+      $<$<COMPILE_LANGUAGE:C>:-Wold-style-definition>
       -Wformat=2
       -Wundef
       -Wcast-qual
@@ -40,6 +41,15 @@ if(CI_BUILD)
     add_compile_options(/WX)
   else()
     add_compile_options(-Werror)
+  endif()
+endif()
+
+if(ENABLE_ASAN)
+  if(MSVC)
+    message(WARNING "ENABLE_ASAN is not supported on MSVC.")
+  else()
+    add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=address)
   endif()
 endif()
 
@@ -546,7 +556,9 @@ if(USE_LIBPNG)
 endif()
 
 if(USE_OPENEXR)
-  set(IMATH_INSTALL OFF CACHE BOOL "" FORCE)
+  # Enable IMATH_INSTALL so Imath generates ImathTargets.cmake for OpenEXR's
+  # find_package(Imath) usage during the same build tree.
+  set(IMATH_INSTALL ON CACHE BOOL "" FORCE)
   set(IMATH_INSTALL_PKG_CONFIG OFF CACHE BOOL "" FORCE)
   set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
   if(EXISTS "${EXTERNAL_IMATH_SRC}/CMakeLists.txt")
@@ -565,6 +577,7 @@ if(USE_OPENEXR)
   set(OPENEXR_TEST_LIBRARIES OFF CACHE BOOL "" FORCE)
   set(OPENEXR_TEST_TOOLS OFF CACHE BOOL "" FORCE)
   set(OPENEXR_TEST_PYTHON OFF CACHE BOOL "" FORCE)
+  set(OPENEXR_ENABLE_OPENJPH ON CACHE BOOL "" FORCE)
   set(OPENEXR_FORCE_INTERNAL_IMATH OFF CACHE BOOL "" FORCE)
   set(OPENEXR_FORCE_INTERNAL_OPENJPH ON CACHE BOOL "" FORCE)
   set(OPENEXR_OPENJPH_REPO "${EXTERNAL_OPENJPH_SRC}" CACHE STRING "" FORCE)
@@ -824,6 +837,12 @@ ENDIF()
 AUX_SOURCE_DIRECTORY(src/renderers/openglrenderer RENDERER_GL_SRCS)
 AUX_SOURCE_DIRECTORY(src/renderers/vulkanrenderer RENDERER_VK_SRCS)
 list(APPEND RENDERER_VK_SRCS src/renderers/vulkanrenderer/utils/mikktspace/mikktspace.c)
+if(NOT MSVC)
+	set_source_files_properties(
+		src/renderers/vulkanrenderer/utils/mikktspace/mikktspace.c
+		PROPERTIES COMPILE_OPTIONS "-Wno-shadow"
+	)
+endif()
 
 SET(AUX_SRCS)
 if(NOT USE_RENDERER_DLOPEN)

@@ -429,7 +429,7 @@ const char *fogInVPCode = {
 
 
 #ifdef USE_PMLIGHT
-static const char *dlightVP = {
+static const char *dlightVP_prefix = {
 	"!!ARBvp1.0 \n"
 	"OPTION ARB_position_invariant; \n"
 	"PARAM posEye = program.local[0]; \n"
@@ -441,7 +441,9 @@ static const char *dlightVP = {
 	"SUB lv, posLight, vertex.position; \n"
 	"SUB ev, posEye, vertex.position; \n"
 	"MOV n, vertex.normal; \n"
-	"%s" // fog shader if needed
+};
+
+static const char *dlightVP_suffix = {
 	"END \n"
 };
 
@@ -654,7 +656,7 @@ static char *ARB_BuildGreyscaleProgram( char *buf ) {
 }
 
 
-static const char *gammaFP = {
+static const char *gammaFP_prefix = {
 	"!!ARBfp1.0 \n"
 	"OPTION ARB_precision_hint_fastest; \n"
 	"PARAM gamma = program.local[0]; \n"
@@ -664,7 +666,9 @@ static const char *gammaFP = {
 	"POW base.y, base.y, gamma.y; \n"
 	"POW base.z, base.z, gamma.z; \n"
 	"MUL base.xyz, base, gamma.w; \n"
-	"%s" // for greyscale shader if needed
+};
+
+static const char *gammaFP_suffix = {
 	"MOV base.w, 1.0; \n"
 	"MOV_SAT result.color, base; \n"
 	"END \n"
@@ -818,7 +822,7 @@ static const char *blend2FP = {
 };
 
 // combined blend + gamma correction pass
-static const char *blend2gammaFP = {
+static const char *blend2gammaFP_prefix = {
 	"!!ARBfp1.0 \n"
 	"OPTION ARB_precision_hint_fastest; \n"
 	"PARAM gamma = program.local[0]; \n"
@@ -833,7 +837,9 @@ static const char *blend2gammaFP = {
 	"POW base.y, base.y, gamma.y; \n"
 	"POW base.z, base.z, gamma.z; \n"
 	"MUL base.xyz, base, gamma.w; \n"
-	"%s" // for greyscale shader if needed
+};
+
+static const char *blend2gammaFP_suffix = {
 	"MOV base.w, 1.0; \n"
 	"MOV_SAT result.color, base; \n"
 	"END \n" 
@@ -1017,11 +1023,11 @@ qboolean ARB_UpdatePrograms( void )
 	qglGenProgramsARB( ARRAY_LEN( programs ) - PROGRAM_BASE, programs + PROGRAM_BASE );
 
 #ifdef USE_PMLIGHT
-	if ( !ARB_CompileProgram( Vertex, va( dlightVP, "" ), programs[ DLIGHT_VERTEX ] ) )
+	if ( !ARB_CompileProgram( Vertex, va( "%s%s%s", dlightVP_prefix, "", dlightVP_suffix ), programs[ DLIGHT_VERTEX ] ) )
 		return qfalse;
-	if ( !ARB_CompileProgram( Vertex, va( dlightVP, fogInVPCode ), programs[ DLIGHT_VERTEX_FOG_IN ] ) )
+	if ( !ARB_CompileProgram( Vertex, va( "%s%s%s", dlightVP_prefix, fogInVPCode, dlightVP_suffix ), programs[ DLIGHT_VERTEX_FOG_IN ] ) )
 		return qfalse;
-	if ( !ARB_CompileProgram( Vertex, va( dlightVP, fogOutVPCode ), programs[ DLIGHT_VERTEX_FOG_OUT ] ) )
+	if ( !ARB_CompileProgram( Vertex, va( "%s%s%s", dlightVP_prefix, fogOutVPCode, dlightVP_suffix ), programs[ DLIGHT_VERTEX_FOG_OUT ] ) )
 		return qfalse;
 
 	for ( i = DLIGHT_FRAGMENT; i <= DLIGHT_LINEAR_ABS_FRAGMENT_FOG; i++ ) {
@@ -1039,8 +1045,11 @@ qboolean ARB_UpdatePrograms( void )
 		return qfalse;
 
 #ifdef USE_FBO
-	if ( !ARB_CompileProgram( Fragment, va( gammaFP, ARB_BuildGreyscaleProgram( buf ) ), programs[ GAMMA_FRAGMENT ] ) )
-		return qfalse;
+	{
+		const char *greyscale = ARB_BuildGreyscaleProgram( buf );
+		if ( !ARB_CompileProgram( Fragment, va( "%s%s%s", gammaFP_prefix, greyscale, gammaFP_suffix ), programs[ GAMMA_FRAGMENT ] ) )
+			return qfalse;
+	}
 
 	if ( !ARB_CompileProgram( Fragment, ARB_BuildBloomProgram( buf ), programs[ BLOOM_EXTRACT_FRAGMENT ] ) )
 		return qfalse;
@@ -1060,8 +1069,11 @@ qboolean ARB_UpdatePrograms( void )
 	if ( !ARB_CompileProgram( Fragment, blend2FP, programs[ BLEND2_FRAGMENT ] ) )
 		return qfalse;
 
-	if ( !ARB_CompileProgram( Fragment, va( blend2gammaFP, ARB_BuildGreyscaleProgram( buf ) ), programs[ BLEND2_GAMMA_FRAGMENT ] ) )
-		return qfalse;
+	{
+		const char *greyscale = ARB_BuildGreyscaleProgram( buf );
+		if ( !ARB_CompileProgram( Fragment, va( "%s%s%s", blend2gammaFP_prefix, greyscale, blend2gammaFP_suffix ), programs[ BLEND2_GAMMA_FRAGMENT ] ) )
+			return qfalse;
+	}
 #endif // USE_FBO
 
 	programCompiled = 1;
@@ -1769,7 +1781,7 @@ static void R_Bloom_LensEffect( float alpha )
 	vec4_t color;
 
 	alpha /= (float)ARRAY_LEN( lc );
-	for ( i = 0; i < ARRAY_LEN( lc ); i++ ) {
+	for ( i = 0; i < (int)ARRAY_LEN( lc ); i++ ) {
 		VectorCopy( lc[i], color ); color[3] = alpha;
 		R_Setup_Quad_Lens( (i+1)*144, color, &verts[i*6], &coords[i*6], &colors[i*6] );
 	}

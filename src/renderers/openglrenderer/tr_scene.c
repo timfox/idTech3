@@ -97,14 +97,14 @@ Adds all the scene's polys into this view's drawsurf list
 void R_AddPolygonSurfaces( void ) {
 	int			i;
 	shader_t	*sh;
-	const srfPoly_t	*poly;
+	srfPoly_t	*poly;
 
 	tr.currentEntityNum = REFENTITYNUM_WORLD;
 	tr.shiftedEntityNum = tr.currentEntityNum << QSORT_REFENTITYNUM_SHIFT;
 
 	for ( i = 0, poly = tr.refdef.polys; i < tr.refdef.numPolys ; i++, poly++ ) {
 		sh = R_GetShaderByHandle( poly->hShader );
-		R_AddDrawSurf( ( void * )poly, sh, poly->fogIndex, 0 );
+		R_AddDrawSurf( (surfaceType_t *)poly, sh, poly->fogIndex, 0 );
 	}
 }
 
@@ -249,7 +249,7 @@ static void RE_AddDynamicLightToScene( const vec3_t org, float intensity, float 
 	if ( !tr.registered ) {
 		return;
 	}
-	if ( r_numdlights >= ARRAY_LEN( backEndData->dlights ) ) {
+	if ( r_numdlights >= (int)ARRAY_LEN( backEndData->dlights ) ) {
 		return;
 	}
 	if ( intensity <= 0 ) {
@@ -304,7 +304,7 @@ void RE_AddLinearLightToScene( const vec3_t start, const vec3_t end, float inten
 	if ( !tr.registered ) {
 		return;
 	}
-	if ( r_numdlights >= ARRAY_LEN( backEndData->dlights ) ) {
+	if ( r_numdlights >= (int)ARRAY_LEN( backEndData->dlights ) ) {
 		return;
 	}
 	if ( intensity <= 0 ) {
@@ -415,20 +415,12 @@ void RE_RenderScene( const refdef_t *fd ) {
 	// will force a reset of the visible leafs even if the view hasn't moved
 	tr.refdef.areamaskModified = qfalse;
 	if ( ! (tr.refdef.rdflags & RDF_NOWORLDMODEL) ) {
-		int		areaDiff;
-		int		i;
-
 		// compare the area bits
-		areaDiff = 0;
-		for ( i = 0; i < MAX_MAP_AREA_BYTES/sizeof(int); i++ ) {
-			areaDiff |= ((int *)tr.refdef.areamask)[i] ^ ((int *)fd->areamask)[i];
-			((int *)tr.refdef.areamask)[i] = ((int *)fd->areamask)[i];
-		}
-
-		if ( areaDiff ) {
+		if ( memcmp( tr.refdef.areamask, fd->areamask, MAX_MAP_AREA_BYTES ) != 0 ) {
 			// a door just opened or something
 			tr.refdef.areamaskModified = qtrue;
 		}
+		memcpy( tr.refdef.areamask, fd->areamask, MAX_MAP_AREA_BYTES );
 	}
 
 
