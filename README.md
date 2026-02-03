@@ -13,9 +13,10 @@ Go to [Releases](../../releases) section to download latest binaries for your pl
 **Rendering**:
 * OpenGL renderer
 * Vulkan renderer (requires Vulkan 1.4 headers/drivers)
-* Physically Based Rendering
+* Physically Based Rendering (PBR)
 * Spherical Harmonics lighting support
-* Screen Space Ambient Occlusion
+* Screen Space Ambient Occlusion (SSAO)
+* Glint rendering: physically based microfacet sparkle/glint, stochastic dictionary model, multiscale, with performance and quality controls
 
 **Audio**:
 * OpenAL backend with HRTF for 3D positional audio
