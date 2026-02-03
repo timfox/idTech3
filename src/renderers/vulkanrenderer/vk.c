@@ -2930,8 +2930,11 @@ void vk_init_descriptors( void )
 		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.screenMap.color_descriptor ) ); // screenmap
 
 #ifdef VK_PBR_BRDFLUT
-		if( vk.pbrActive )
+		if( vk.pbrActive ) {
+			alloc.pSetLayouts = &vk.set_layout_pbr;
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.brdflut_image_descriptor ) );
+			alloc.pSetLayouts = &vk.set_layout_sampler;
+		}
 #endif
 
 		// cubemap
@@ -4356,6 +4359,8 @@ static void vk_create_glint_dictionary_texture( void )
 {
 	if ( vk.glint.dictionary == NULL || vk.glint.size == 0 )
 	{
+		ri.Printf( PRINT_WARNING, "glint dictionary missing (ptr=%p size=%zu), skipping texture creation\n",
+			(void *)(uintptr_t)vk.glint.dictionary, vk.glint.size );
 		vk.glint_dict_image = VK_NULL_HANDLE;
 		vk.glint_dict_image_view = VK_NULL_HANDLE;
 		return;
@@ -4396,7 +4401,25 @@ static void vk_create_glint_dictionary_texture( void )
 		(void *)(uintptr_t)vk.glint_dict_image, (void *)(uintptr_t)vk_glint_dictionary_image.descriptor, (void *)(uintptr_t)vk.glint_dict_image_view );
 }
 #endif
+#ifdef USE_VK_PBR
+static void vk_destroy_glint_dictionary_texture( void )
+{
+	if ( vk_glint_dictionary_image.view != VK_NULL_HANDLE )
+	{
+		qvkDestroyImageView( vk.device, vk_glint_dictionary_image.view, NULL );
+		vk_glint_dictionary_image.view = VK_NULL_HANDLE;
+	}
+	if ( vk_glint_dictionary_image.handle != VK_NULL_HANDLE )
+	{
+		qvkDestroyImage( vk.device, vk_glint_dictionary_image.handle, NULL );
+		vk_glint_dictionary_image.handle = VK_NULL_HANDLE;
+	}
 
+	vk.glint_dict_image = VK_NULL_HANDLE;
+	vk.glint_dict_image_view = VK_NULL_HANDLE;
+	vk_glint_dictionary_image.descriptor = VK_NULL_HANDLE;
+}
+#endif
 
 static void vk_destroy_sync_primitives( void  ) {
 	uint32_t i;
@@ -5304,17 +5327,6 @@ static void vk_destroy_attachments( void )
     }
 #endif
 
-#ifdef USE_VK_PBR
-    if ( vk_glint_dictionary_image.view ) {
-        qvkDestroyImage( vk.device, vk.glint_dict_image, NULL );
-        qvkDestroyImageView( vk.device, vk_glint_dictionary_image.view, NULL );
-        vk.glint_dict_image = VK_NULL_HANDLE;
-        vk.glint_dict_image_view = VK_NULL_HANDLE;
-        vk_glint_dictionary_image.handle = VK_NULL_HANDLE;
-        vk_glint_dictionary_image.view = VK_NULL_HANDLE;
-        vk_glint_dictionary_image.descriptor = VK_NULL_HANDLE;
-    }
-#endif
 
 	// render world to cubemap
     if ( vk.cubeMap.color_image ) {
@@ -5737,6 +5749,9 @@ for (i = 0; i < 2; i++) {
 #endif
 
 __cleanup:
+#ifdef USE_VK_PBR
+	vk_destroy_glint_dictionary_texture();
+#endif
 	if ( vk.device != VK_NULL_HANDLE ) {
 		qvkDestroyDevice( vk.device, NULL );
 	}
