@@ -214,6 +214,10 @@ vec3 ComputeGlintContribution( vec3 N, vec3 T, vec3 B, vec3 L, vec3 V, vec3 spec
 	{
 		maskFactor = texture( physical_texture, frag_tex_coord0 ).a;
 	}
+	{
+		float maskStrength = clamp( glintDictExtras.z, 0.0, 1.0 );
+		maskFactor = mix( 1.0, maskFactor, maskStrength );
+	}
 
 	if ( maskFactor <= 0.001 )
 	{
@@ -232,6 +236,22 @@ vec3 ComputeGlintContribution( vec3 N, vec3 T, vec3 B, vec3 L, vec3 V, vec3 spec
 	float ay = max( glintModel.z, 0.01 );
 	float beta = clamp( glintModel.x, 0.0, 1.0 );
 
+	bool useChermain = glintCore.y >= 1.5;
+	float varianceScale = useChermain ? max( glintMicro.w, 1e-3 ) : 1.0;
+	float aniso = useChermain ? clamp( glintMicro.z, -0.95, 0.95 ) : 0.0;
+	float anisoRot = useChermain ? radians( glintColor.x ) : 0.0;
+	float tileScale = useChermain ? max( glintMicro.y, 1e-3 ) : 1.0;
+	float forcedLod = glintDictExtras.y;
+
+	ax *= varianceScale;
+	ay *= varianceScale;
+	if ( abs( aniso ) > 1e-4 )
+	{
+		float aspect = sqrt( ( 1.0 + aniso ) / max( 1.0 - aniso, 1e-4 ) );
+		ax *= aspect;
+		ay /= aspect;
+	}
+
 	vec3 H = normalize( L + V );
 	vec3 Ht = vec3( dot( H, T ), dot( H, B ), dot( H, N ) );
 	if ( Ht.z <= 1e-6 )
@@ -240,9 +260,16 @@ vec3 ComputeGlintContribution( vec3 N, vec3 T, vec3 B, vec3 L, vec3 V, vec3 spec
 	}
 
 	vec2 slope = -vec2( Ht.x, Ht.y ) / Ht.z;
+	if ( abs( anisoRot ) > 1e-4 )
+	{
+		float cRot = cos( anisoRot );
+		float sRot = sin( anisoRot );
+		slope = vec2( cRot * slope.x - sRot * slope.y, sRot * slope.x + cRot * slope.y );
+	}
+	float slopeNorm = clamp( length( slope ) / max( dictDomain, 1e-3 ), 0.0, 1.0 );
 
 	// Pixel footprint in texture space (UVs) for the multiscale hierarchy.
-	vec2 s = frag_tex_coord0 * max( glintSampling.z, 1.0 );
+	vec2 s = frag_tex_coord0 * max( glintSampling.z, 1.0 ) * tileScale;
 	vec2 dx = dFdx( s );
 	vec2 dy = dFdy( s );
 
@@ -264,6 +291,10 @@ vec3 ComputeGlintContribution( vec3 N, vec3 T, vec3 B, vec3 L, vec3 V, vec3 spec
 	float lod = float( levelCount - 1 ) + log2( max( minorLen, 1e-6 ) );
 	lod += glintSampling.w + glintPerformance.x;
 	lod = clamp( lod, 0.0, float( levelCount - 1 ) );
+	if ( forcedLod >= 0.0 )
+	{
+		lod = clamp( forcedLod, 0.0, float( levelCount - 1 ) );
+	}
 
 	int lod0 = int( floor( lod ) );
 	int lod1 = min( lod0 + 1, levelCount - 1 );
@@ -277,6 +308,19 @@ vec3 ComputeGlintContribution( vec3 N, vec3 T, vec3 B, vec3 L, vec3 V, vec3 spec
 	int radius = int( max( 0.0, floor( 0.5 * ( sampleSide - 1.0 ) ) ) );
 	const int maxRadius = 2;
 	radius = clamp( radius, 0, maxRadius );
+	int maxCells = int( glintDensity.w + 0.5 );
+	if ( maxCells > 0 )
+	{
+		while ( radius > 0 )
+		{
+			int tapCount = ( radius * 2 + 1 ) * ( radius * 2 + 1 );
+			if ( tapCount <= maxCells )
+			{
+				break;
+			}
+			radius -= 1;
+		}
+	}
 	float filterStrength = max( glintSampling.y, 0.01 );
 	float totalWeight0 = 0.0;
 	float totalWeight1 = 0.0;
@@ -302,6 +346,7 @@ vec3 ComputeGlintContribution( vec3 N, vec3 T, vec3 B, vec3 L, vec3 V, vec3 spec
 		int tapCount = ( radius * 2 + 1 ) * ( radius * 2 + 1 );
 		int maxTapCount = ( maxRadius * 2 + 1 ) * ( maxRadius * 2 + 1 );
 		debugData.z = clamp( float( tapCount ) / float( maxTapCount ), 0.0, 1.0 );
+		debugData.w = slopeNorm;
 	}
 
 	for ( int oy = -radius; oy <= radius; oy++ )
@@ -446,7 +491,7 @@ vec3 ComputeGlintContribution( vec3 N, vec3 T, vec3 B, vec3 L, vec3 V, vec3 spec
 		bvec4 bad1 = bvec4( isinf( psdf ), isinf( D ), isinf( intensity ), isinf( denom ) );
 		if ( any( bad0 ) || any( bad1 ) )
 		{
-			debugData.w = 1.0;
+			debugData.w = -1.0;
 		}
 	}
 
@@ -1194,7 +1239,7 @@ void main() {
 
 	if ( glintDebugLevel > 0 )
 	{
-		if ( glintDebugData.w > 0.5 )
+		if ( glintDebugData.w < 0.0 )
 		{
 			out_color.rgb = vec3( 1.0, 0.0, 0.0 );
 		}
@@ -1214,14 +1259,13 @@ void main() {
 			float t = clamp( glintDebugData.z, 0.0, 1.0 );
 			out_color.rgb = mix( out_color.rgb, vec3( t ), 0.6 );
 		}
+		else if ( glintDebugLevel == 4 )
+		{
+			float t = clamp( glintDebugData.w, 0.0, 1.0 );
+			out_color.rgb = mix( out_color.rgb, vec3( t, 0.2, 1.0 - t ), 0.6 );
+		}
 	}
 #endif
-
-	// Soft tonemap to avoid overbright blowout.
-	{
-		vec3 color = out_color.rgb;
-		out_color.rgb = color / ( color + vec3( 1.0 ) );
-	}
 
 	// clearcoat lobe
 	if ( clearcoat_texture_set > -1 ) {
@@ -1254,8 +1298,8 @@ void main() {
 	out_color.rgb += emissive;
 
 #ifdef USE_VK_PBR
-	// Soft tonemap for non-glint path to avoid overbright blowout.
-	if ( glintCore.x <= 0.5 )
+	// Soft tonemap for glint path to avoid overbright blowout.
+	if ( glintCore.x > 0.5 )
 	{
 		vec3 color = out_color.rgb;
 		out_color.rgb = color / ( color + vec3( 1.0 ) );

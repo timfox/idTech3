@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <math.h>
+#include <string.h>
 #include "tr_local.h"
 #include "vk.h"
 #include "glints.h"
@@ -13,6 +14,8 @@
 
 static int vkSamples = VK_SAMPLE_COUNT_1_BIT;
 static int vkMaxSamples = VK_SAMPLE_COUNT_1_BIT;
+
+#define VK_PIPELINE_CACHE_FILE "vulkan_pipeline_cache.bin"
 
 static VkInstance vk_instance = VK_NULL_HANDLE;
 static VkSurfaceKHR vk_surface = VK_NULL_HANDLE;
@@ -83,6 +86,7 @@ static PFN_vkCreateImage								qvkCreateImage;
 static PFN_vkCreateImageView							qvkCreateImageView;
 static PFN_vkCreatePipelineLayout						qvkCreatePipelineLayout;
 static PFN_vkCreatePipelineCache						qvkCreatePipelineCache;
+static PFN_vkGetPipelineCacheData						qvkGetPipelineCacheData;
 static PFN_vkCreateRenderPass							qvkCreateRenderPass;
 static PFN_vkCreateSampler								qvkCreateSampler;
 static PFN_vkCreateSemaphore							qvkCreateSemaphore;
@@ -2358,6 +2362,7 @@ static void init_vulkan_library( void )
 	INIT_DEVICE_FUNCTION(vkCreateImage)
 	INIT_DEVICE_FUNCTION(vkCreateImageView)
 	INIT_DEVICE_FUNCTION(vkCreatePipelineCache)
+	INIT_DEVICE_FUNCTION(vkGetPipelineCacheData)
 	INIT_DEVICE_FUNCTION(vkCreatePipelineLayout)
 	INIT_DEVICE_FUNCTION(vkCreateRenderPass)
 	INIT_DEVICE_FUNCTION(vkCreateSampler)
@@ -2494,6 +2499,7 @@ static void deinit_device_functions( void )
 	qvkCreateImage								= NULL;
 	qvkCreateImageView							= NULL;
 	qvkCreatePipelineCache						= NULL;
+	qvkGetPipelineCacheData						= NULL;
 	qvkCreatePipelineLayout						= NULL;
 	qvkCreateRenderPass							= NULL;
 	qvkCreateSampler							= NULL;
@@ -4378,6 +4384,12 @@ static void vk_clamp_glint_params( glint_dict_params_t *params )
 	params->entries = vk_clamp_int( params->entries, 1, GLINT_DICT_MAX_ENTRIES );
 	params->levels = vk_clamp_int( params->levels, 1, GLINT_DICT_MAX_LEVELS );
 	params->size = vk_clamp_int( params->size, 2, GLINT_DICT_MAX_SIZE );
+	if ( params->mode < 0 ) {
+		params->mode = 0;
+	}
+	if ( params->mode > 2 ) {
+		params->mode = 2;
+	}
 
 	if ( params->alpha < 1e-4f ) {
 		params->alpha = 1e-4f;
@@ -4393,6 +4405,12 @@ static qboolean vk_glint_params_equal( const glint_dict_params_t *a, const glint
 		return qfalse;
 	}
 	if ( a->entries != b->entries || a->levels != b->levels || a->size != b->size ) {
+		return qfalse;
+	}
+	if ( a->mode != b->mode ) {
+		return qfalse;
+	}
+	if ( a->seed != b->seed ) {
 		return qfalse;
 	}
 	if ( fabsf( a->alpha - b->alpha ) > 1e-6f ) {
@@ -4419,6 +4437,8 @@ static qboolean vk_build_glint_dictionary( const glint_dict_params_t *params )
 {
 	size_t size;
 	float *dictionary;
+	int buildStart;
+	int buildMs;
 
 	if ( !params ) {
 		return qfalse;
@@ -4435,13 +4455,31 @@ static qboolean vk_build_glint_dictionary( const glint_dict_params_t *params )
 		return qfalse;
 	}
 
+	buildStart = ri.Milliseconds();
 	R_Glints_GenerateDictionary( params, dictionary );
+	buildMs = ri.Milliseconds() - buildStart;
 
 	vk_destroy_glint_dictionary_cpu();
 	vk.glint.dictionary = dictionary;
 	vk.glint.size = size;
 	vk.glint.params = *params;
 	vk.glint.valid = qtrue;
+
+	if ( r_glints_verbose && r_glints_verbose->integer > 0 ) {
+		int sampleCount = R_Glints_GetSampleCount( params );
+		ri.Printf( PRINT_ALL,
+			"glint dict rebuilt: mode=%d seed=%u entries=%d levels=%d size=%d alpha=%.4f sigmaMin=%.4f samples=%d bytes=%zu time=%dms\n",
+			params->mode,
+			params->seed,
+			params->entries,
+			params->levels,
+			params->size,
+			params->alpha,
+			params->lobeSigma,
+			sampleCount,
+			size,
+			buildMs );
+	}
 	return qtrue;
 }
 
@@ -4687,7 +4725,7 @@ static void vk_restart_swapchain( const char *funcname, VkResult res )
 	vk_destroy_swapchain();
 	vk_destroy_sync_primitives();
 #ifdef VK_CUBEMAP	
-    vk_destroy_cubemap_prefilter();
+    // Deferred IBL prefilter: pipelines created on first cubemap generation.
 #endif
 
 	vk_select_surface_format( vk.physical_device, vk_surface );
@@ -4704,7 +4742,7 @@ static void vk_restart_swapchain( const char *funcname, VkResult res )
     vk_create_brdflut_pipeline();
 #endif
 #ifdef VK_CUBEMAP
-    vk_create_cubemap_prefilter();
+	// Deferred IBL prefilter: pipelines created on first cubemap generation.
 #endif
 	vk_update_attachment_descriptors();
 
@@ -4755,6 +4793,102 @@ static void vk_set_render_scale( void )
 	{
 		vk.blitFilter = GL_LINEAR;
 	}
+}
+
+static qboolean vk_pipeline_cache_compatible( const void *data, size_t data_size, const VkPhysicalDeviceProperties *props )
+{
+	const VkPipelineCacheHeaderVersionOne *header;
+
+	if ( !data || data_size < sizeof( *header ) || !props ) {
+		return qfalse;
+	}
+
+	header = (const VkPipelineCacheHeaderVersionOne *)data;
+	if ( header->headerVersion != VK_PIPELINE_CACHE_HEADER_VERSION_ONE ) {
+		return qfalse;
+	}
+	if ( header->headerSize != sizeof( *header ) ) {
+		return qfalse;
+	}
+	if ( header->vendorID != props->vendorID || header->deviceID != props->deviceID ) {
+		return qfalse;
+	}
+	if ( memcmp( header->pipelineCacheUUID, props->pipelineCacheUUID, VK_UUID_SIZE ) != 0 ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+static void vk_create_pipeline_cache( void )
+{
+	VkPipelineCacheCreateInfo ci;
+	VkPhysicalDeviceProperties props;
+	void *cache_data = NULL;
+	int cache_size = 0;
+
+	if ( !qvkCreatePipelineCache ) {
+		return;
+	}
+
+	qvkGetPhysicalDeviceProperties( vk.physical_device, &props );
+
+	cache_size = ri.FS_ReadFile( VK_PIPELINE_CACHE_FILE, &cache_data );
+	if ( cache_size > 0 && cache_data ) {
+		if ( !vk_pipeline_cache_compatible( cache_data, (size_t)cache_size, &props ) ) {
+			if ( r_vk_dumpCaps && r_vk_dumpCaps->integer ) {
+				ri.Printf( PRINT_ALL, "VK: pipeline cache discarded (device mismatch)\n" );
+			}
+			ri.FS_FreeFile( cache_data );
+			cache_data = NULL;
+			cache_size = 0;
+		} else if ( r_vk_dumpCaps && r_vk_dumpCaps->integer ) {
+			ri.Printf( PRINT_ALL, "VK: pipeline cache loaded (%d bytes)\n", cache_size );
+		}
+	}
+
+	Com_Memset( &ci, 0, sizeof( ci ) );
+	ci.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+	if ( cache_data && cache_size > 0 ) {
+		ci.initialDataSize = (size_t)cache_size;
+		ci.pInitialData = cache_data;
+	}
+	VK_CHECK( qvkCreatePipelineCache( vk.device, &ci, NULL, &vk.pipelineCache ) );
+
+	if ( cache_data ) {
+		ri.FS_FreeFile( cache_data );
+	}
+}
+
+static void vk_save_pipeline_cache( void )
+{
+	size_t cache_size = 0;
+	void *cache_data = NULL;
+	VkResult res;
+
+	if ( !qvkGetPipelineCacheData || vk.pipelineCache == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	res = qvkGetPipelineCacheData( vk.device, vk.pipelineCache, &cache_size, NULL );
+	if ( res != VK_SUCCESS || cache_size == 0 ) {
+		return;
+	}
+
+	cache_data = ri.Hunk_AllocateTempMemory( cache_size );
+	if ( !cache_data ) {
+		return;
+	}
+
+	res = qvkGetPipelineCacheData( vk.device, vk.pipelineCache, &cache_size, cache_data );
+	if ( res == VK_SUCCESS && cache_size > 0 ) {
+		ri.FS_WriteFile( VK_PIPELINE_CACHE_FILE, cache_data, (int)cache_size );
+		if ( r_vk_dumpCaps && r_vk_dumpCaps->integer ) {
+			ri.Printf( PRINT_ALL, "VK: pipeline cache saved (%zu bytes)\n", cache_size );
+		}
+	}
+
+	ri.Hunk_FreeTempMemory( cache_data );
 }
 
 
@@ -5301,12 +5435,7 @@ void vk_initialize( void )
 
 	vk_create_shader_modules();
 
-	{
-		VkPipelineCacheCreateInfo ci;
-		Com_Memset( &ci, 0, sizeof( ci ) );
-		ci.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
-		VK_CHECK( qvkCreatePipelineCache( vk.device, &ci, NULL, &vk.pipelineCache ) );
-	}
+	vk_create_pipeline_cache();
 
 	vk.renderPassIndex = RENDER_PASS_MAIN; // default render pass
 
@@ -5325,7 +5454,7 @@ void vk_initialize( void )
 	vk_create_framebuffers();
 
 #ifdef VK_CUBEMAP
-	vk_create_cubemap_prefilter();
+	// Deferred IBL prefilter: pipelines created on first cubemap generation.
 #endif
 
 	// preallocate staging buffer
@@ -5669,6 +5798,8 @@ void vk_shutdown( refShutdownCode_t code )
 		Com_Memset( &tr.cubemaps[ i ], 0, sizeof(cubemap_t) );
 	}
 #endif
+
+	vk_save_pipeline_cache();
 
 	if ( vk.pipelineCache != VK_NULL_HANDLE ) {
 		qvkDestroyPipelineCache( vk.device, vk.pipelineCache, NULL );
@@ -10255,9 +10386,15 @@ void vk_create_cubemap_prefilter( void )
 {
 	if ( !vk.cubemapActive )
 		return;
+	if ( prefilters[0].renderpass != VK_NULL_HANDLE )
+		return;
 
 	uint32_t	i;
 	filterDef	*def;
+	uint32_t	irr_size = 0;
+	uint32_t	irr_mips = 0;
+	uint32_t	pref_size = 0;
+	uint32_t	pref_mips = 0;
 
 	Com_Memset( &prefilters, 0, sizeof( prefilters ) );
 
@@ -10275,18 +10412,27 @@ void vk_create_cubemap_prefilter( void )
 				def->size = vk_ibl_size_from_cvar( r_pbr_iblIrradianceSize, 64, 16, (uint32_t)MIN( glConfig.maxTextureSize, 1024 ) );
 				def->shaders.fs_module = &vk.modules.irradiancecube_fs;
 				def->mipLevels = (uint32_t)(floor(log2(def->size))) + 1;
+				irr_size = def->size;
+				irr_mips = def->mipLevels;
 				break;
 			case PREFILTEREDENV:
 				def->format = VK_FORMAT_R16G16B16A16_SFLOAT;
 				def->size = vk_ibl_size_from_cvar( r_pbr_iblPrefilterSize, 256, 32, (uint32_t)MIN( glConfig.maxTextureSize, 2048 ) );
 				def->shaders.fs_module = &vk.modules.prefilterenvmap_fs;
 				def->mipLevels = (uint32_t)(floor(log2(def->size))) + 1;
+				pref_size = def->size;
+				pref_mips = def->mipLevels;
 				break;
 		};
 
 		vk_create_prefilter_renderpass( def );
 		vk_create_prefilter_framebuffer( def );
 		vk_create_prefilter_pipeline( def );
+	}
+
+	if ( r_vk_dumpCaps && r_vk_dumpCaps->integer ) {
+		ri.Printf( PRINT_ALL, "VK: IBL prefilter ready (irr %ux%u mips %u, pre %ux%u mips %u)\n",
+			irr_size, irr_size, irr_mips, pref_size, pref_size, pref_mips );
 	}
 }
 
@@ -10299,15 +10445,15 @@ void vk_destroy_cubemap_prefilter( void ){
 	{
 		def = &prefilters[i];
 
-		qvkDestroyRenderPass( vk.device, def->renderpass, NULL );
-		qvkDestroyFramebuffer( vk.device, def->offscreen.framebuffer, NULL );
-		qvkFreeMemory( vk.device, def->offscreen.memory, NULL );
-		qvkDestroyImageView( vk.device, def->offscreen.view, NULL );
-		qvkDestroyImage( vk.device, def->offscreen.image, NULL );
+		if ( def->renderpass ) qvkDestroyRenderPass( vk.device, def->renderpass, NULL );
+		if ( def->offscreen.framebuffer ) qvkDestroyFramebuffer( vk.device, def->offscreen.framebuffer, NULL );
+		if ( def->offscreen.memory ) qvkFreeMemory( vk.device, def->offscreen.memory, NULL );
+		if ( def->offscreen.view ) qvkDestroyImageView( vk.device, def->offscreen.view, NULL );
+		if ( def->offscreen.image ) qvkDestroyImage( vk.device, def->offscreen.image, NULL );
 		def->offscreen.image = VK_NULL_HANDLE;
 		def->offscreen.view = VK_NULL_HANDLE;
-		qvkDestroyPipeline( vk.device, def->pipeline, NULL );
-		qvkDestroyPipelineLayout( vk.device, def->pipeline_layout, NULL );
+		if ( def->pipeline ) qvkDestroyPipeline( vk.device, def->pipeline, NULL );
+		if ( def->pipeline_layout ) qvkDestroyPipelineLayout( vk.device, def->pipeline_layout, NULL );
 	}
 
 	Com_Memset( &prefilters, 0, sizeof( prefilters ) );
@@ -10560,6 +10706,18 @@ void vk_generate_cubemaps( cubemap_t *cube )
 	image_t		*cubemap = NULL;
 	uint32_t	i, j;
 	filterDef	*def;
+
+#ifdef VK_CUBEMAP
+	if ( !vk.cubemapActive ) {
+		return;
+	}
+	if ( prefilters[0].renderpass == VK_NULL_HANDLE ) {
+		if ( r_vk_dumpCaps && r_vk_dumpCaps->integer ) {
+			ri.Printf( PRINT_ALL, "VK: creating IBL prefilter pipelines (deferred)\n" );
+		}
+		vk_create_cubemap_prefilter();
+	}
+#endif
 
 	vk_end_render_pass();
 

@@ -473,8 +473,7 @@ jobs:
           automatic_release_tag: "latest"
           prerelease: false
           title: Latest Build
-          files: |
-            *.zip
+          files: "*.zip"
 
   update-release:
     if: ${{ github.event_name == 'release' }}

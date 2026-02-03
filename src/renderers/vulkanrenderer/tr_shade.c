@@ -1585,6 +1585,13 @@ static void VK_SetGlintParams( vkUniform_t *ubo )
 		return;
 	}
 
+	if ( r_glints->integer <= 0 )
+	{
+		const size_t glintBytes = (size_t)((char *)&ubo->glintColor + sizeof( ubo->glintColor ) - (char *)&ubo->glintCore);
+		Com_Memset( &ubo->glintCore, 0, glintBytes );
+		return;
+	}
+
 	// Update the glint dictionary once per frame if params changed or reload requested.
 	{
 		static int lastFrameChecked = -1;
@@ -1599,6 +1606,8 @@ static void VK_SetGlintParams( vkUniform_t *ubo )
 			params.size = r_glints_dict_size ? r_glints_dict_size->integer : GLINT_DICT_MAX_SIZE;
 			params.alpha = r_glints_dict_alpha ? r_glints_dict_alpha->value : 0.5f;
 			params.lobeSigma = r_glints_dict_lobeSigma ? r_glints_dict_lobeSigma->value : 0.02f;
+			params.mode = r_glints_mode ? r_glints_mode->integer : 0;
+			params.seed = r_glints_seed ? (uint32_t)r_glints_seed->integer : 0u;
 
 			if ( r_glints_dict_reload && r_glints_dict_reload->integer != 0 ) {
 				forceReload = qtrue;
@@ -1616,6 +1625,29 @@ static void VK_SetGlintParams( vkUniform_t *ubo )
 			lastGlintDebug = r_glints_debug->value;
 			ri.Printf( PRINT_ALL, "glint debug level = %.2f (r_glints=%d)\n",
 				r_glints_debug->value, r_glints->integer );
+		}
+	}
+
+	if ( r_glints_verbose && r_glints_verbose->integer > 0 ) {
+		static int lastMode = -9999;
+		static int lastLod = -9999;
+		static int lastSeed = -9999;
+		const int mode = r_glints_mode ? r_glints_mode->integer : 0;
+		const int lod = r_glints_lod ? r_glints_lod->integer : -1;
+		const int seed = r_glints_seed ? r_glints_seed->integer : 0;
+
+		if ( mode != lastMode ) {
+			lastMode = mode;
+			ri.Printf( PRINT_ALL, "glint mode = %d (%s)\n",
+				mode, ( mode >= 2 ) ? "Chermain 2020" : "legacy" );
+		}
+		if ( lod != lastLod ) {
+			lastLod = lod;
+			ri.Printf( PRINT_ALL, "glint forced LOD = %d\n", lod );
+		}
+		if ( seed != lastSeed ) {
+			lastSeed = seed;
+			ri.Printf( PRINT_ALL, "glint seed = %d\n", seed );
 		}
 	}
 
@@ -1690,7 +1722,7 @@ static void VK_SetGlintParams( vkUniform_t *ubo )
 	}
 
 	ubo->glintDictExtras[0] = r_glints_dict_lobeSigma->value;
-	ubo->glintDictExtras[1] = r_glints_dict_reload->value;
+	ubo->glintDictExtras[1] = r_glints_lod->value;
 	ubo->glintDictExtras[2] = r_glints_masking->value;
 	ubo->glintDictExtras[3] = r_glints_energy_debug->value;
 
@@ -1699,7 +1731,7 @@ static void VK_SetGlintParams( vkUniform_t *ubo )
 	ubo->glintPerformance[2] = r_glints_colorCount->value;
 	ubo->glintPerformance[3] = r_glints_colorStrength->value;
 
-	ubo->glintColor[0] = 0.0f;
+	ubo->glintColor[0] = r_glints_anisoRotation ? r_glints_anisoRotation->value : 0.0f;
 	ubo->glintColor[1] = 0.0f;
 	ubo->glintColor[2] = 0.0f;
 	ubo->glintColor[3] = 0.0f;

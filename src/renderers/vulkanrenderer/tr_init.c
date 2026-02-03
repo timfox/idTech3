@@ -1713,7 +1713,7 @@ static void R_Register( void )
 	r_glints_slopeVariance = ri.Cvar_Get( "r_glints_slopeVariance", "0.5", CVAR_ARCHIVE_ND );
 	r_glints_seed = ri.Cvar_Get( "r_glints_seed", "0", CVAR_ARCHIVE_ND );
 	r_glints_samples = ri.Cvar_Get( "r_glints_samples", "9", CVAR_ARCHIVE_ND );
-	r_glints_lod = ri.Cvar_Get( "r_glints_lod", "0", CVAR_ARCHIVE_ND );
+	r_glints_lod = ri.Cvar_Get( "r_glints_lod", "-1", CVAR_ARCHIVE_ND );
 	r_glints_filter = ri.Cvar_Get( "r_glints_filter", "1", CVAR_ARCHIVE_ND );
 	r_glints_tileSize = ri.Cvar_Get( "r_glints_tileSize", "64", CVAR_ARCHIVE_ND );
 	r_glints_mipBias = ri.Cvar_Get( "r_glints_mipBias", "0", CVAR_ARCHIVE_ND );
@@ -1746,7 +1746,7 @@ static void R_Register( void )
 	r_glints_dict_alpha = ri.Cvar_Get( "r_glints_dict_alpha", "0.5", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	r_glints_dict_lobeSigma = ri.Cvar_Get( "r_glints_dict_lobeSigma", "0.02", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	r_glints_dict_reload = ri.Cvar_Get( "r_glints_dict_reload", "0", CVAR_TEMP );
-	r_glints_masking = ri.Cvar_Get( "r_glints_masking", "0", CVAR_ARCHIVE_ND );
+	r_glints_masking = ri.Cvar_Get( "r_glints_masking", "1", CVAR_ARCHIVE_ND );
 	r_glints_energy_debug = ri.Cvar_Get( "r_glints_energy_debug", "0", CVAR_TEMP );
 	r_glints_maxCells = ri.Cvar_Get( "r_glints_maxCells", "128", CVAR_ARCHIVE_ND );
 	r_glints_lodBias = ri.Cvar_Get( "r_glints_lodBias", "0", CVAR_ARCHIVE_ND );

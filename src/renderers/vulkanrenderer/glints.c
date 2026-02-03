@@ -15,7 +15,8 @@
 static uint32_t glint_rand_state;
 
 enum {
-	GLINT_DICT_MAX_LOBES = 1 << (GLINT_DICT_MAX_LEVELS + 1)
+	GLINT_DICT_MAX_LOBES = 1 << (GLINT_DICT_MAX_LEVELS + 1),
+	GLINT_DICT_MAX_SAMPLES = 4096
 };
 
 static uint32_t Glint_RandUInt(void) {
@@ -54,10 +55,83 @@ static void Glint_NormalizeDistribution(float *dist, int size)
 	}
 }
 
+static float Glint_GetBaseSigma(const glint_dict_params_t *params)
+{
+	return params->alpha / (float)M_SQRT2;
+}
+
+static float Glint_GetDomain(const glint_dict_params_t *params)
+{
+	return 4.0f * Glint_GetBaseSigma(params);
+}
+
+static int Glint_ComputeSampleCount(const glint_dict_params_t *params)
+{
+	int count;
+
+	if (!params) {
+		return 0;
+	}
+
+	count = params->size * 8;
+	if (count < 128) {
+		count = 128;
+	}
+	if (count > GLINT_DICT_MAX_SAMPLES) {
+		count = GLINT_DICT_MAX_SAMPLES;
+	}
+	return count;
+}
+
+static float Glint_ComputeMinSigma(const glint_dict_params_t *params)
+{
+	const float baseSigma = Glint_GetBaseSigma(params);
+	const float domain = Glint_GetDomain(params);
+	float minSigma = params->lobeSigma;
+	float sampleStep = 0.0f;
+
+	if (params->size > 1) {
+		sampleStep = domain / (float)(params->size - 1);
+	}
+
+	if (minSigma < 0.0f) {
+		minSigma = 0.0f;
+	}
+
+	if (sampleStep > 0.0f) {
+		minSigma = fmaxf(minSigma, sampleStep * 0.5f);
+	}
+
+	if (baseSigma > 0.0f) {
+		minSigma = fminf(minSigma, baseSigma);
+	}
+
+	return minSigma;
+}
+
+static float Glint_ComputeSigmaForLevel(const glint_dict_params_t *params, int level)
+{
+	const float baseSigma = Glint_GetBaseSigma(params);
+	const float minSigma = Glint_ComputeMinSigma(params);
+	const int levels = params->levels;
+	const int j = (levels - 1) - level;
+	float sigma = baseSigma;
+
+	if (levels > 1) {
+		sigma = baseSigma / sqrtf(powf(2.0f, (float)j));
+	}
+
+	if (sigma < minSigma) {
+		sigma = minSigma;
+	}
+
+	return sigma;
+}
+
 static void Glint_ComputeTargetDistribution(const glint_dict_params_t *params, float *out)
 {
-	const float sigma = params->alpha / (float)M_SQRT2;
-	const float domain = 4.0f * params->alpha / (float)M_SQRT2;
+	const float sigma = Glint_GetBaseSigma(params);
+	const float domain = Glint_GetDomain(params);
 	const int size = params->size;
 	for (int i = 0; i < size; i++) {
 		const float x = ((float)i / (float)(size - 1)) * domain;
@@ -67,18 +141,18 @@ static void Glint_ComputeTargetDistribution(const glint_dict_params_t *params, f
 	Glint_NormalizeDistribution(out, size);
 }
 
-static void Glint_GenerateEntry(int entry, const glint_dict_params_t *params, float *out)
+static void Glint_GenerateEntry_Legacy(int entry, const glint_dict_params_t *params, float *out)
 {
 	float lobes[GLINT_DICT_MAX_LOBES];
 	float accum[GLINT_DICT_MAX_SIZE];
 	float target[GLINT_DICT_MAX_SIZE];
 	int prevCount = 0;
-	const float sigma = params->alpha / (float)M_SQRT2;
-	const float domain = 4.0f * params->alpha / (float)M_SQRT2;
+	const float sigma = Glint_GetBaseSigma(params);
+	const float domain = Glint_GetDomain(params);
 	const int levels = params->levels;
 	const int size = params->size;
 
-	Glint_Seed(0xC0FFEEu ^ (uint32_t)entry * 0x9E3779B9u);
+	Glint_Seed(params->seed ^ (uint32_t)entry * 0x9E3779B9u);
 
 	{
 		const int maxLobes = 1 << (levels + 1);
@@ -123,6 +197,58 @@ static void Glint_GenerateEntry(int entry, const glint_dict_params_t *params, fl
 	}
 }
 
+static void Glint_GenerateEntry_Chermain(int entry, const glint_dict_params_t *params, float *out)
+{
+	float accum[GLINT_DICT_MAX_SIZE];
+	float target[GLINT_DICT_MAX_SIZE];
+	float samples[GLINT_DICT_MAX_SAMPLES];
+	const float domain = Glint_GetDomain(params);
+	const int levels = params->levels;
+	const int size = params->size;
+	const int sampleCount = Glint_ComputeSampleCount(params);
+
+	Glint_Seed(params->seed ^ (uint32_t)entry * 0x9E3779B9u);
+
+	for (int i = 0; i < sampleCount; i++) {
+		const float sample = fabsf(Glint_RandNormal(Glint_GetBaseSigma(params)));
+		samples[i] = fminf(sample, domain);
+	}
+
+	memset(accum, 0, sizeof(accum));
+	Glint_ComputeTargetDistribution(params, target);
+
+	for (int level = 0; level < levels; level++) {
+		const float sigma = Glint_ComputeSigmaForLevel(params, level);
+
+		for (int i = 0; i < sampleCount; i++) {
+			const float center = samples[i];
+			for (int x = 0; x < size; x++) {
+				const float pos = ((float)x / (float)(size - 1)) * domain;
+				const float dx = pos - center;
+				accum[x] += expf(-(dx * dx) / (2.0f * sigma * sigma));
+			}
+		}
+
+		{
+			float *row = out + (size_t)level * size;
+			for (int i = 0; i < size; i++) {
+				row[i] = accum[i];
+			}
+			Glint_NormalizeDistribution(row, size);
+		}
+	}
+
+	// Blend the final level towards the Beckmann target to stabilize energy.
+	{
+		float *row = out + (size_t)(levels - 1) * size;
+		const float blend = 0.5f;
+		for (int i = 0; i < size; i++) {
+			row[i] = row[i] * (1.0f - blend) + target[i] * blend;
+		}
+		Glint_NormalizeDistribution(row, size);
+	}
+}
+
 size_t R_Glints_CalcDictionarySize(const glint_dict_params_t *params)
 {
 	if (!params) {
@@ -139,6 +265,15 @@ void R_Glints_GenerateDictionary(const glint_dict_params_t *params, float *out)
 
 	for (int entry = 0; entry < params->entries; entry++) {
 		size_t offset = (size_t)entry * (size_t)params->levels * (size_t)params->size;
-		Glint_GenerateEntry(entry, params, out + offset);
+		if (params->mode >= 2) {
+			Glint_GenerateEntry_Chermain(entry, params, out + offset);
+		} else {
+			Glint_GenerateEntry_Legacy(entry, params, out + offset);
+		}
 	}
+}
+
+int R_Glints_GetSampleCount(const glint_dict_params_t *params)
+{
+	return Glint_ComputeSampleCount(params);
 }

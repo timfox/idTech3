@@ -28,6 +28,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <netinet/in.h>
 #include <sys/stat.h> // umask
 #include <sys/time.h>
+#if defined(__linux__)
+#include <execinfo.h>
+#include <unistd.h>
+#endif
 #else
 #include <winsock.h>
 #if defined(_DEBUG)
@@ -1352,6 +1356,17 @@ static void MergeBlock( memblock_t *curr_free, const memblock_t *next )
 	curr_free->next->prev = curr_free;
 }
 
+#if defined(__linux__)
+static void Z_PrintBacktrace( void )
+{
+	void *syms[16];
+	const size_t size = backtrace( syms, ARRAY_LEN( syms ) );
+	if ( size > 0 ) {
+		backtrace_symbols_fd( syms, size, STDERR_FILENO );
+	}
+}
+#endif
+
 
 /*
 ========================
@@ -1372,7 +1387,12 @@ void Z_Free( void *ptr ) {
 	}
 
 	if (block->tag == TAG_FREE) {
-		Com_Error( ERR_FATAL, "Z_Free: freed a freed pointer" );
+#if defined(__linux__)
+		Com_Printf( "Z_Free: double free at %p (size=%d tag=%d id=0x%x)\n",
+			ptr, block->size, block->tag, block->id );
+		Z_PrintBacktrace();
+#endif
+		Com_Error( ERR_FATAL, "Z_Free: freed a freed pointer (%p)", ptr );
 	}
 
 	// if static memory
