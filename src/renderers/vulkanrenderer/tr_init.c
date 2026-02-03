@@ -110,6 +110,8 @@ cvar_t	*r_cubeMapping;
 cvar_t	*r_glints;
 cvar_t	*r_glints_mode;
 cvar_t	*r_glints_debug;
+cvar_t	*r_glints_verbose;
+cvar_t	*r_preparingShaders;
 cvar_t	*r_glints_materialMask;
 cvar_t	*r_glints_strength;
 cvar_t	*r_glints_minRoughness;
