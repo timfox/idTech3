@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <math.h>
 #include "tr_local.h"
 #include "vk.h"
 #include "glints.h"
@@ -4357,9 +4358,96 @@ static void vk_create_sync_primitives( void ) {
 
 
 #ifdef USE_VK_PBR
+static int vk_clamp_int( int value, int min_value, int max_value )
+{
+	if ( value < min_value ) {
+		return min_value;
+	}
+	if ( value > max_value ) {
+		return max_value;
+	}
+	return value;
+}
+
+static void vk_clamp_glint_params( glint_dict_params_t *params )
+{
+	if ( !params ) {
+		return;
+	}
+
+	params->entries = vk_clamp_int( params->entries, 1, GLINT_DICT_MAX_ENTRIES );
+	params->levels = vk_clamp_int( params->levels, 1, GLINT_DICT_MAX_LEVELS );
+	params->size = vk_clamp_int( params->size, 2, GLINT_DICT_MAX_SIZE );
+
+	if ( params->alpha < 1e-4f ) {
+		params->alpha = 1e-4f;
+	}
+	if ( params->lobeSigma < 1e-5f ) {
+		params->lobeSigma = 1e-5f;
+	}
+}
+
+static qboolean vk_glint_params_equal( const glint_dict_params_t *a, const glint_dict_params_t *b )
+{
+	if ( !a || !b ) {
+		return qfalse;
+	}
+	if ( a->entries != b->entries || a->levels != b->levels || a->size != b->size ) {
+		return qfalse;
+	}
+	if ( fabsf( a->alpha - b->alpha ) > 1e-6f ) {
+		return qfalse;
+	}
+	if ( fabsf( a->lobeSigma - b->lobeSigma ) > 1e-6f ) {
+		return qfalse;
+	}
+	return qtrue;
+}
+
+static void vk_destroy_glint_dictionary_cpu( void )
+{
+	if ( vk.glint.dictionary != NULL ) {
+		ri.Free( vk.glint.dictionary );
+		vk.glint.dictionary = NULL;
+	}
+	vk.glint.size = 0;
+	vk.glint.valid = qfalse;
+	Com_Memset( &vk.glint.params, 0, sizeof( vk.glint.params ) );
+}
+
+static qboolean vk_build_glint_dictionary( const glint_dict_params_t *params )
+{
+	size_t size;
+	float *dictionary;
+
+	if ( !params ) {
+		return qfalse;
+	}
+
+	size = R_Glints_CalcDictionarySize( params );
+	if ( size == 0 ) {
+		return qfalse;
+	}
+
+	dictionary = (float *)ri.Malloc( size );
+	if ( !dictionary ) {
+		ri.Printf( PRINT_WARNING, "glint dictionary allocation failed (%zu bytes)\n", size );
+		return qfalse;
+	}
+
+	R_Glints_GenerateDictionary( params, dictionary );
+
+	vk_destroy_glint_dictionary_cpu();
+	vk.glint.dictionary = dictionary;
+	vk.glint.size = size;
+	vk.glint.params = *params;
+	vk.glint.valid = qtrue;
+	return qtrue;
+}
+
 static void vk_create_glint_dictionary_texture( void )
 {
-	if ( vk.glint.dictionary == NULL || vk.glint.size == 0 )
+	if ( !vk.glint.valid || vk.glint.dictionary == NULL || vk.glint.size == 0 )
 	{
 		ri.Printf( PRINT_WARNING, "glint dictionary missing (ptr=%p size=%zu), skipping texture creation\n",
 			(void *)(uintptr_t)vk.glint.dictionary, vk.glint.size );
@@ -4371,8 +4459,8 @@ static void vk_create_glint_dictionary_texture( void )
 	Com_Memset( &vk_glint_dictionary_image, 0, sizeof( vk_glint_dictionary_image ) );
 	vk_glint_dictionary_image.imgName = "glint_dictionary";
 	vk_glint_dictionary_image.internalFormat = VK_FORMAT_R32_SFLOAT;
-	vk_glint_dictionary_image.width = GLINT_DICT_SIZE;
-	vk_glint_dictionary_image.height = GLINT_DICT_ENTRIES * GLINT_DICT_LEVELS;
+	vk_glint_dictionary_image.width = vk.glint.params.size;
+	vk_glint_dictionary_image.height = vk.glint.params.entries * vk.glint.params.levels;
 	vk_glint_dictionary_image.uploadWidth = vk_glint_dictionary_image.width;
 	vk_glint_dictionary_image.uploadHeight = vk_glint_dictionary_image.height;
 	vk_glint_dictionary_image.wrapClampMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
@@ -4420,6 +4508,36 @@ static void vk_destroy_glint_dictionary_texture( void )
 	vk.glint_dict_image = VK_NULL_HANDLE;
 	vk.glint_dict_image_view = VK_NULL_HANDLE;
 	vk_glint_dictionary_image.descriptor = VK_NULL_HANDLE;
+}
+#endif
+
+#ifdef USE_VK_PBR
+void vk_update_glint_dictionary_if_needed( const glint_dict_params_t *params, qboolean force )
+{
+	glint_dict_params_t clamped;
+	qboolean params_changed;
+
+	if ( !params || vk.device == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	clamped = *params;
+	vk_clamp_glint_params( &clamped );
+
+	params_changed = ( !vk.glint.valid ) || !vk_glint_params_equal( &vk.glint.params, &clamped );
+	if ( !force && !params_changed ) {
+		return;
+	}
+
+	// Ensure we are not destroying resources in flight.
+	vk_wait_idle();
+	vk_destroy_glint_dictionary_texture();
+
+	if ( vk_build_glint_dictionary( &clamped ) ) {
+		vk_create_glint_dictionary_texture();
+	} else {
+		ri.Printf( PRINT_WARNING, "glint dictionary rebuild failed; using fallback\n" );
+	}
 }
 #endif
 
@@ -4675,8 +4793,7 @@ void vk_initialize( void )
 	vk_set_render_scale();
 
 	#ifdef USE_VK_PBR
-		R_Glints_InitDictionary();
-		vk.glint.dictionary = R_Glints_GetPackedDictionary( &vk.glint.size );
+		Com_Memset( &vk.glint, 0, sizeof( vk.glint ) );
 	#else
 		vk.glint.dictionary = NULL;
 		vk.glint.size = 0;
@@ -5059,10 +5176,6 @@ void vk_initialize( void )
 		VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &pbr_desc, NULL, &vk.set_layout_pbr ) );
 	}
 #endif
-#ifdef USE_VK_PBR
-	vk_create_glint_dictionary_texture();
-#endif
-
 	//
 	// Pipeline layouts.
 	//
@@ -5765,7 +5878,7 @@ __cleanup:
 	deinit_device_functions();
 
 	#ifdef USE_VK_PBR
-	R_Glints_ShutdownDictionary();
+	vk_destroy_glint_dictionary_cpu();
 	#endif
 
 	Com_Memset( &vk, 0, sizeof( vk ) );
@@ -6180,19 +6293,31 @@ void vk_update_glint_descriptor_binding( VkDescriptorSet descriptor ) {
 	Vk_Sampler_Def sampler_def;
 	VkDescriptorImageInfo image_info;
 	VkWriteDescriptorSet descriptor_write;
+	VkImageView image_view;
+	VkSamplerAddressMode address_mode;
 
-	if ( descriptor == VK_NULL_HANDLE || vk_glint_dictionary_image.view == VK_NULL_HANDLE ) {
+	if ( descriptor == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	if ( vk_glint_dictionary_image.view != VK_NULL_HANDLE ) {
+		image_view = vk_glint_dictionary_image.view;
+		address_mode = vk_glint_dictionary_image.wrapClampMode;
+	} else if ( tr.blackImage && tr.blackImage->view != VK_NULL_HANDLE ) {
+		image_view = tr.blackImage->view;
+		address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	} else {
 		return;
 	}
 
 	Com_Memset( &sampler_def, 0, sizeof( sampler_def ) );
-	sampler_def.address_mode = vk_glint_dictionary_image.wrapClampMode;
+	sampler_def.address_mode = address_mode;
 	sampler_def.gl_mag_filter = GL_LINEAR;
 	sampler_def.gl_min_filter = GL_LINEAR;
 	sampler_def.noAnisotropy = qtrue;
 
 	image_info.sampler = vk_find_sampler( &sampler_def );
-	image_info.imageView = vk_glint_dictionary_image.view;
+	image_info.imageView = image_view;
 	image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 	descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;

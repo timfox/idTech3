@@ -4,6 +4,8 @@
 #include "../rendercommon/vulkan/vulkan.h"
 #include "tr_common.h"
 
+typedef struct glint_dict_params_s glint_dict_params_t;
+
 #define MAX_SWAPCHAIN_IMAGES 8
 #define MIN_SWAPCHAIN_IMAGES_IMM 3
 #define MIN_SWAPCHAIN_IMAGES_FIFO   3
@@ -445,6 +447,7 @@ void vk_update_descriptor_offset( int index, uint32_t offset );
 void vk_update_glint_descriptor_binding( VkDescriptorSet descriptor );
 #ifdef USE_VK_PBR
 VkImageView vk_get_glint_dictionary_view( void );
+void vk_update_glint_dictionary_if_needed( const glint_dict_params_t *params, qboolean force );
 #endif
 void vk_bind_descriptor_sets( void );
 
@@ -674,6 +677,8 @@ typedef struct {
 	struct {
 		float *dictionary;
 		size_t size;
+		glint_dict_params_t params;
+		qboolean valid;
 	} glint;
 
 	uint32_t uniform_item_size;

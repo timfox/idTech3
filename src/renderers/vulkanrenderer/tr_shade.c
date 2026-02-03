@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include <stdint.h>
 #include "tr_local.h"
+#include "glints.h"
 
 extern cvar_t *r_shLighting;
 extern cvar_t *r_shWorldLighting;
@@ -1584,6 +1585,30 @@ static void VK_SetGlintParams( vkUniform_t *ubo )
 		return;
 	}
 
+	// Update the glint dictionary once per frame if params changed or reload requested.
+	{
+		static int lastFrameChecked = -1;
+		if ( tr.frameCount != lastFrameChecked ) {
+			glint_dict_params_t params;
+			qboolean forceReload = qfalse;
+
+			lastFrameChecked = tr.frameCount;
+
+			params.entries = r_glints_dict_count ? r_glints_dict_count->integer : GLINT_DICT_MAX_ENTRIES;
+			params.levels = r_glints_dict_levels ? r_glints_dict_levels->integer : GLINT_DICT_MAX_LEVELS;
+			params.size = r_glints_dict_size ? r_glints_dict_size->integer : GLINT_DICT_MAX_SIZE;
+			params.alpha = r_glints_dict_alpha ? r_glints_dict_alpha->value : 0.5f;
+			params.lobeSigma = r_glints_dict_lobeSigma ? r_glints_dict_lobeSigma->value : 0.02f;
+
+			if ( r_glints_dict_reload && r_glints_dict_reload->integer != 0 ) {
+				forceReload = qtrue;
+				ri.Cvar_Set( "r_glints_dict_reload", "0" );
+			}
+
+			vk_update_glint_dictionary_if_needed( &params, forceReload );
+		}
+	}
+
 	// Log debug level changes once to confirm the shader override path.
 	if ( r_glints_debug ) {
 		static float lastGlintDebug = -9999.0f;
@@ -1644,10 +1669,25 @@ static void VK_SetGlintParams( vkUniform_t *ubo )
 	ubo->glintDensity[2] = r_glints_zeta->value;
 	ubo->glintDensity[3] = r_glints_maxCells->value;
 
-	ubo->glintDict[0] = r_glints_dict_levels->value;
-	ubo->glintDict[1] = r_glints_dict_size->value;
-	ubo->glintDict[2] = r_glints_dict_count->value;
-	ubo->glintDict[3] = r_glints_dict_alpha->value;
+	{
+		int levels = r_glints_dict_levels ? r_glints_dict_levels->integer : GLINT_DICT_MAX_LEVELS;
+		int size = r_glints_dict_size ? r_glints_dict_size->integer : GLINT_DICT_MAX_SIZE;
+		int entries = r_glints_dict_count ? r_glints_dict_count->integer : GLINT_DICT_MAX_ENTRIES;
+		float alpha = r_glints_dict_alpha ? r_glints_dict_alpha->value : 0.5f;
+
+		if ( levels < 1 ) levels = 1;
+		if ( levels > GLINT_DICT_MAX_LEVELS ) levels = GLINT_DICT_MAX_LEVELS;
+		if ( size < 2 ) size = 2;
+		if ( size > GLINT_DICT_MAX_SIZE ) size = GLINT_DICT_MAX_SIZE;
+		if ( entries < 1 ) entries = 1;
+		if ( entries > GLINT_DICT_MAX_ENTRIES ) entries = GLINT_DICT_MAX_ENTRIES;
+		if ( alpha < 1e-4f ) alpha = 1e-4f;
+
+		ubo->glintDict[0] = (float)levels;
+		ubo->glintDict[1] = (float)size;
+		ubo->glintDict[2] = (float)entries;
+		ubo->glintDict[3] = alpha;
+	}
 
 	ubo->glintDictExtras[0] = r_glints_dict_lobeSigma->value;
 	ubo->glintDictExtras[1] = r_glints_dict_reload->value;

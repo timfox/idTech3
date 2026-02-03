@@ -1730,7 +1730,7 @@ static void R_Register( void )
 	r_glints_maxDistance = ri.Cvar_Get( "r_glints_maxDistance", "1000", CVAR_ARCHIVE_ND );
 	r_glints_maxScreenSlope = ri.Cvar_Get( "r_glints_maxScreenSlope", "1", CVAR_ARCHIVE_ND );
 	r_glints_budgetMs = ri.Cvar_Get( "r_glints_budgetMs", "2", CVAR_ARCHIVE_ND );
-	r_glints_affectIBL = ri.Cvar_Get( "r_glints_affectIBL", "1", CVAR_ARCHIVE_ND );
+	r_glints_affectIBL = ri.Cvar_Get( "r_glints_affectIBL", "0", CVAR_ARCHIVE_ND );
 	r_glints_affectDirect = ri.Cvar_Get( "r_glints_affectDirect", "1", CVAR_ARCHIVE_ND );
 	r_glints_shadowed = ri.Cvar_Get( "r_glints_shadowed", "1", CVAR_ARCHIVE_ND );
 	r_glints_beta = ri.Cvar_Get( "r_glints_beta", "0.01", CVAR_ARCHIVE_ND );
