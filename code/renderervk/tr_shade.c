@@ -1053,7 +1053,16 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			GL_Bind( tr.whiteImage ); // replace diffuse texture with a white one thus effectively render only lightmap
 		}
 
+		if ( backEnd.viewParms.portalView == PV_MIRROR ) {
+			pipeline = pStage->vk_mirror_pipeline[fog_stage];
+		} else {
+			pipeline = pStage->vk_pipeline[fog_stage];
+		}
+
 #ifdef USE_VK_PBR
+		Vk_Pipeline_Def	def;
+		vk_get_pipeline_def( pipeline, &def );
+
 		if ( is_pbr_surface && pStage->vk_pbr_flags ) {
 			vk_update_descriptor( VK_DESC_PBR_BRDFLUT, vk.brdflut_image_descriptor );
 				
@@ -1072,21 +1081,24 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				vk_update_descriptor( VK_DESC_PBR_CUBEMAP, tr.cubemaps[0].prefiltered_image->descriptor );
 				//vk_update_descriptor( 10, tr.cubemaps[0].irradiance_image->descriptor ); // irradiance is currently unused
 			}
-		}
-#endif
 
-		if ( backEnd.viewParms.portalView == PV_MIRROR ) {
-			pipeline = pStage->vk_mirror_pipeline[fog_stage];
-		} else {
-			pipeline = pStage->vk_pipeline[fog_stage];
-		}
+			#ifdef HDR_DELUXE_LIGHTMAP
+				// aparently lightmap is not always in bundle 1 ..
+				// should probably fix this in collapseMuklitexture
+				if ( def.vk_pbr_flags & PBR_HAS_DELUXEMAP0 )
+					vk_update_descriptor(  VK_DESC_PBR_DELUXE, pStage->bundle[0].deluxeMap->descriptor );
+
+				if ( def.vk_pbr_flags & PBR_HAS_DELUXEMAP1 )
+					vk_update_descriptor(  VK_DESC_PBR_DELUXE, pStage->bundle[1].deluxeMap->descriptor );
+
+				else
+					vk_update_descriptor(  VK_DESC_PBR_DELUXE, tr.whiteImage->descriptor );
+				}
+			#endif
+#endif
 
 #ifdef USE_VK_PBR
 		if ( !is_pbr_surface && pStage->vk_pbr_flags ) {
-			Vk_Pipeline_Def			def;
-
-			vk_get_pipeline_def( pipeline, &def );
-
 			def.vk_pbr_flags = 0;
 			pipeline = vk_find_pipeline_ext( 0, &def, qfalse );
 		}

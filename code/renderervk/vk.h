@@ -48,7 +48,8 @@
 	#define VK_DESC_PBR_NORMAL				6
 	#define VK_DESC_PBR_PHYSICAL			7
 	#define VK_DESC_PBR_CUBEMAP				8
-	#define VK_DESC_COUNT	9
+	#define VK_DESC_PBR_DELUXE				9
+	#define VK_DESC_COUNT	10
 #else
 	#define VK_DESC_COUNT   5
 #endif
@@ -265,6 +266,8 @@ typedef struct vkUniformCamera_s {
 #define PBR_HAS_PHYSICALMAP		( 2 )
 #define PBR_HAS_SPECULARMAP		( 4 )
 #define PBR_HAS_LIGHTMAP		( 8 )
+#define PBR_HAS_DELUXEMAP0		( 16 )
+#define PBR_HAS_DELUXEMAP1		( 32 )
 
 #define PHYS_NONE				( 1 )
 #define PHYS_RMO				( 2 )
