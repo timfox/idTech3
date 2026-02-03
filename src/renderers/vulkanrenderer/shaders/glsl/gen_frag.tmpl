@@ -1092,7 +1092,23 @@ void main() {
 	float VH = clamp( dot( E, H ), 0.0, 1.0 );
 	Fs = CalcSpecular( specular.rgb, NH, NL, NE, LH, VH, roughness );
 
-	vec3 reflectance = Fd + Fs;
+	vec3 glintTerm = vec3( 0.0 );
+	float glintDebugValue = 0.0;
+	float glintBlend = 0.0;
+	int glintDebugLevel = 0;
+	vec3 specDirect = Fs;
+
+#ifdef USE_VK_PBR
+	if ( glintCore.x > 0.5 )
+	{
+		glintTerm = ComputeGlintContribution( N, L, E, specular.rgb, roughness, NL, NH, NE, LH, VH, lightDistance, glintDebugValue );
+		glintBlend = clamp( glintModel.x, 0.0, 1.0 );
+
+		glintDebugLevel = int( floor( glintCore.z + 0.5 ) );
+	}
+#endif
+
+	vec3 reflectance = Fd + specDirect;
 
 	out_color.rgb  = lightColor * reflectance * ( attenuation * NL );
 	out_color.rgb += ambientColor * diffuse.rgb;
@@ -1104,37 +1120,43 @@ void main() {
 		out_color.rgb += CalcIBLContribution( roughness, N, E, NE, specular.rgb * AO );
 
 #ifdef USE_VK_PBR
-	float glintDebugValue = 0.0;
-	vec3 glintTerm = ComputeGlintContribution( N, L, E, specular.rgb, roughness, NL, NH, NE, LH, VH, lightDistance, glintDebugValue );
-
-	if ( glintRouting.y > 0.5 )
-		out_color.rgb += lightColor * glintTerm * ( attenuation * NL );
-
-	if ( glintRouting.x > 0.5 )
-		out_color.rgb += glintTerm;
-
+	if ( glintCore.x > 0.5 )
 	{
-		int debugLevel = int( floor( glintCore.z + 0.5 ) );
-		if ( debugLevel > 0 )
+		if ( glintRouting.y > 0.5 )
 		{
-			float debugMask = clamp( glintDebugValue * 40.0, 0.0, 1.0 );
-			if ( debugLevel == 1 )
-			{
-				out_color.rgb = mix( out_color.rgb, vec3( debugMask ), 0.5 );
-			}
-			else if ( debugLevel == 2 )
-			{
-				vec3 debugColor = clamp( glintTerm * 10.0, 0.0, 1.0 );
-				out_color.rgb = mix( out_color.rgb, debugColor, 0.5 );
-			}
-			else if ( debugLevel == 3 )
-			{
-				vec3 heat = vec3( debugMask, 1.0 - debugMask, 0.0 );
-				out_color.rgb = mix( out_color.rgb, heat, 0.5 );
-			}
+			out_color.rgb += lightColor * glintTerm * ( attenuation * NL ) * glintBlend;
+		}
+		if ( glintRouting.x > 0.5 )
+		{
+			out_color.rgb += glintTerm * glintBlend * 0.25;
+		}
+	}
+
+	if ( glintDebugLevel > 0 )
+	{
+		float debugMask = clamp( glintDebugValue * 40.0, 0.0, 1.0 );
+		if ( glintDebugLevel == 1 )
+		{
+			out_color.rgb = mix( out_color.rgb, vec3( debugMask ), 0.5 );
+		}
+		else if ( glintDebugLevel == 2 )
+		{
+			vec3 debugColor = clamp( glintTerm * 10.0, 0.0, 1.0 );
+			out_color.rgb = mix( out_color.rgb, debugColor, 0.5 );
+		}
+		else if ( glintDebugLevel == 3 )
+		{
+			vec3 heat = vec3( debugMask, 1.0 - debugMask, 0.0 );
+			out_color.rgb = mix( out_color.rgb, heat, 0.5 );
 		}
 	}
 #endif
+
+	// Soft tonemap to avoid overbright blowout.
+	{
+		vec3 color = out_color.rgb;
+		out_color.rgb = color / ( color + vec3( 1.0 ) );
+	}
 
 	// clearcoat lobe
 	if ( clearcoat_texture_set > -1 ) {
@@ -1165,6 +1187,15 @@ void main() {
 	}
 	
 	out_color.rgb += emissive;
+
+#ifdef USE_VK_PBR
+	// Soft tonemap for non-glint path to avoid overbright blowout.
+	if ( glintCore.x <= 0.5 )
+	{
+		vec3 color = out_color.rgb;
+		out_color.rgb = color / ( color + vec3( 1.0 ) );
+	}
+#endif
 
 	if ( glintCore.z >= 3.5 )
 	{

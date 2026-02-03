@@ -5524,6 +5524,8 @@ void vk_shutdown( refShutdownCode_t code )
 	int i, j, k, l;
 #endif
 
+	ri.Cvar_Set( "r_preparingShaders", "0" );
+
 	if ( qvkQueuePresentKHR == NULL ) { // not fully initialized
 		goto __cleanup;
 	}
