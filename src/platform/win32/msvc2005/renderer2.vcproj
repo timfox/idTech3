@@ -353,10 +353,14 @@
 				RelativePath="..\..\renderers\rendercommon\tr_image_pcx.c"
 				>
 			</File>
-			<File
-				RelativePath="..\..\renderers\rendercommon\tr_image_png.c"
-				>
-			</File>
+				<File
+					RelativePath="..\..\renderers\rendercommon\tr_image_png.c"
+					>
+				</File>
+				<File
+					RelativePath="..\..\renderers\rendercommon\tr_image_exr.cpp"
+					>
+				</File>
 			<File
 				RelativePath="..\..\renderers\rendercommon\tr_image_tga.c"
 				>

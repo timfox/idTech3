@@ -57,7 +57,7 @@ static void Glint_NormalizeDistribution(float *dist, int size)
 static void Glint_ComputeTargetDistribution(const glint_dict_params_t *params, float *out)
 {
 	const float sigma = params->alpha / (float)M_SQRT2;
-	const float domain = 2.0f * params->alpha;
+	const float domain = 4.0f * params->alpha / (float)M_SQRT2;
 	const int size = params->size;
 	for (int i = 0; i < size; i++) {
 		const float x = ((float)i / (float)(size - 1)) * domain;
@@ -74,7 +74,7 @@ static void Glint_GenerateEntry(int entry, const glint_dict_params_t *params, fl
 	float target[GLINT_DICT_MAX_SIZE];
 	int prevCount = 0;
 	const float sigma = params->alpha / (float)M_SQRT2;
-	const float domain = 2.0f * params->alpha;
+	const float domain = 4.0f * params->alpha / (float)M_SQRT2;
 	const int levels = params->levels;
 	const int size = params->size;
 

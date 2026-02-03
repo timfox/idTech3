@@ -1712,7 +1712,7 @@ static void R_Register( void )
 	r_glints_anisoRotation = ri.Cvar_Get( "r_glints_anisoRotation", "0", CVAR_ARCHIVE_ND );
 	r_glints_slopeVariance = ri.Cvar_Get( "r_glints_slopeVariance", "0.5", CVAR_ARCHIVE_ND );
 	r_glints_seed = ri.Cvar_Get( "r_glints_seed", "0", CVAR_ARCHIVE_ND );
-	r_glints_samples = ri.Cvar_Get( "r_glints_samples", "4", CVAR_ARCHIVE_ND );
+	r_glints_samples = ri.Cvar_Get( "r_glints_samples", "9", CVAR_ARCHIVE_ND );
 	r_glints_lod = ri.Cvar_Get( "r_glints_lod", "0", CVAR_ARCHIVE_ND );
 	r_glints_filter = ri.Cvar_Get( "r_glints_filter", "1", CVAR_ARCHIVE_ND );
 	r_glints_tileSize = ri.Cvar_Get( "r_glints_tileSize", "64", CVAR_ARCHIVE_ND );

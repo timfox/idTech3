@@ -430,6 +430,7 @@ cscript.exe /nologo glsl_stringify.vbs ..\..\renderer2\glsl\tonemap_vp.glsl .\bu
     <ClCompile Include="..\..\renderers\rendercommon\tr_image_jpg.c" />
     <ClCompile Include="..\..\renderers\rendercommon\tr_image_pcx.c" />
     <ClCompile Include="..\..\renderers\rendercommon\tr_image_png.c" />
+    <ClCompile Include="..\..\renderers\rendercommon\tr_image_exr.cpp" />
     <ClCompile Include="..\..\renderers\rendercommon\tr_image_tga.c" />
     <ClCompile Include="..\..\renderers\rendercommon\tr_noise.c" />
     <ClCompile Include="..\win_glimp.c" />

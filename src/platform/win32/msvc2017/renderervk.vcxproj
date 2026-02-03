@@ -223,6 +223,7 @@
     <ClCompile Include="..\..\renderers\rendercommon\tr_image_jpg.c" />
     <ClCompile Include="..\..\renderers\rendercommon\tr_image_pcx.c" />
     <ClCompile Include="..\..\renderers\rendercommon\tr_image_png.c" />
+    <ClCompile Include="..\..\renderers\rendercommon\tr_image_exr.cpp" />
     <ClCompile Include="..\..\renderers\rendercommon\tr_image_tga.c" />
     <ClCompile Include="..\..\renderers\vulkanrenderer\tr_init.c" />
     <ClCompile Include="..\..\renderers\vulkanrenderer\tr_light.c" />

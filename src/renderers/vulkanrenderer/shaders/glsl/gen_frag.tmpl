@@ -127,6 +127,7 @@ layout (constant_id = 10) const int acff = 0; // NONE, RGB, RGBA, ALPHA
 
 #ifdef USE_VK_PBR
 #define PI 3.1415926535897932384626433832795
+#define SQRT2 1.4142135623730950488
 
 layout(location = 9) in vec4 var_Normal;
 layout(location = 10) in vec4 var_LightDir;
@@ -187,9 +188,9 @@ float glint_dictionary_lookup( int entry, int level, float position, float dictW
 
 vec3 F_Schlick( in vec3 SpecularColor, in float VH );
 
-vec3 ComputeGlintContribution( vec3 N, vec3 T, vec3 B, vec3 L, vec3 V, vec3 specColor, float roughness, float NL, float NH, float NE, float LH, float VH, float lightDistance, out float debugIntensity )
+vec3 ComputeGlintContribution( vec3 N, vec3 T, vec3 B, vec3 L, vec3 V, vec3 specColor, float roughness, float NL, float NH, float NE, float LH, float VH, float lightDistance, out vec4 debugData )
 {
-	debugIntensity = 0.0;
+	debugData = vec4( 0.0 );
 
 	if ( glintCore.x < 0.5 )
 	{
@@ -223,7 +224,7 @@ vec3 ComputeGlintContribution( vec3 N, vec3 T, vec3 B, vec3 L, vec3 V, vec3 spec
 	int levelCount = max( 1, int( glintDict.x + 0.5 ) );
 	int dictSize = max( 2, int( glintDict.y + 0.5 ) );
 	float alphaDict = max( glintDict.w, 1e-3 );
-	float dictDomain = max( alphaDict * 2.0, 1e-3 );
+	float dictDomain = max( ( 4.0 * alphaDict ) / SQRT2, 1e-3 );
 	float dictWidth = float( dictSize );
 	float dictHeight = float( max( entryCount * levelCount, 1 ) );
 
@@ -238,7 +239,7 @@ vec3 ComputeGlintContribution( vec3 N, vec3 T, vec3 B, vec3 L, vec3 V, vec3 spec
 		return vec3( 0.0 );
 	}
 
-	vec2 slope = vec2( Ht.x, Ht.y ) / Ht.z;
+	vec2 slope = -vec2( Ht.x, Ht.y ) / Ht.z;
 
 	// Pixel footprint in texture space (UVs) for the multiscale hierarchy.
 	vec2 s = frag_tex_coord0 * max( glintSampling.z, 1.0 );
@@ -271,12 +272,37 @@ vec3 ComputeGlintContribution( vec3 N, vec3 T, vec3 B, vec3 L, vec3 V, vec3 spec
 	float rho = ( glintDensity.x > 0.0 ) ? glintDensity.x : exp( glintDensity.y );
 	rho = max( rho, 1e-6 );
 
-	int radius = int( clamp( glintSampling.x * 0.5, 1.0, 3.0 ) );
+	int sampleCount = max( 1, int( glintSampling.x + 0.5 ) );
+	float sampleSide = floor( sqrt( float( sampleCount ) ) + 0.5 );
+	int radius = int( max( 0.0, floor( 0.5 * ( sampleSide - 1.0 ) ) ) );
+	const int maxRadius = 2;
+	radius = clamp( radius, 0, maxRadius );
 	float filterStrength = max( glintSampling.y, 0.01 );
 	float totalWeight0 = 0.0;
 	float totalWeight1 = 0.0;
 	float psdf0 = 0.0;
 	float psdf1 = 0.0;
+
+	// Debug helpers: density LOD from center cell and tap count.
+	{
+		vec2 cellCenter = floor( s / exp2( float( lod0 ) ) );
+		float cellArea = exp2( 2.0 * float( lod0 ) );
+		float n = max( cellArea * rho, 1e-6 );
+		float ldistCenter = 0.5 * log2( n );
+		if ( glintDensity.z > 0.0 )
+		{
+			float seed = glintCore.w + dot( cellCenter, vec2( 12.9898, 78.233 ) );
+			float u1 = max( glint_hash( cellCenter, seed + 9.1 ), 1e-6 );
+			float u2 = glint_hash( cellCenter, seed + 11.3 );
+			float z0 = sqrt( -2.0 * log( u1 ) ) * cos( 2.0 * PI * u2 );
+			ldistCenter += z0 * glintDensity.z;
+		}
+		debugData.y = ( levelCount > 1 ) ? clamp( ldistCenter / float( levelCount - 1 ), 0.0, 1.0 ) : 0.0;
+
+		int tapCount = ( radius * 2 + 1 ) * ( radius * 2 + 1 );
+		int maxTapCount = ( maxRadius * 2 + 1 ) * ( maxRadius * 2 + 1 );
+		debugData.z = clamp( float( tapCount ) / float( maxTapCount ), 0.0, 1.0 );
+	}
 
 	for ( int oy = -radius; oy <= radius; oy++ )
 	{
@@ -287,8 +313,8 @@ vec3 ComputeGlintContribution( vec3 N, vec3 T, vec3 B, vec3 L, vec3 V, vec3 spec
 
 			vec2 samplePos = s + dx * offset.x + dy * offset.y;
 
-			vec2 cell0 = floor( samplePos * exp2( float( lod0 ) ) );
-			vec2 cell1 = floor( samplePos * exp2( float( lod1 ) ) );
+			vec2 cell0 = floor( samplePos / exp2( float( lod0 ) ) );
+			vec2 cell1 = floor( samplePos / exp2( float( lod1 ) ) );
 
 			float seed0 = glintCore.w + dot( cell0, vec2( 12.9898, 78.233 ) );
 			float seed1 = glintCore.w + dot( cell1, vec2( 12.9898, 78.233 ) );
@@ -382,7 +408,7 @@ vec3 ComputeGlintContribution( vec3 N, vec3 T, vec3 B, vec3 L, vec3 V, vec3 spec
 	}
 
 	float psdf = mix( psdf0, psdf1, lodT ) * beta;
-	debugIntensity = psdf;
+	debugData.x = psdf;
 
 	float distanceFade = 1.0;
 	if ( glintBudget.z > 0.0 )
@@ -402,9 +428,8 @@ vec3 ComputeGlintContribution( vec3 N, vec3 T, vec3 B, vec3 L, vec3 V, vec3 spec
 	float D = psdf / NH4;
 	D = clamp( D, 0.0, 1e6 );
 
-	float G1V = min( 1.0, ( 2.0 * NH * NE ) / max( VH, 1e-4 ) );
-	float G1L = min( 1.0, ( 2.0 * NH * NL ) / max( LH, 1e-4 ) );
-	float G = G1V * G1L;
+	float G = min( 1.0, min( ( 2.0 * NH * NE ) / max( VH, 1e-4 ),
+		( 2.0 * NH * NL ) / max( LH, 1e-4 ) ) );
 
 	vec3 baseSpec = ( glintEnergy.z >= 0.0 ) ? vec3( glintEnergy.z ) : specColor;
 	vec3 F = F_Schlick( baseSpec, VH );
@@ -414,6 +439,16 @@ vec3 ComputeGlintContribution( vec3 N, vec3 T, vec3 B, vec3 L, vec3 V, vec3 spec
 	intensity *= 1.0 / denom;
 
 	vec3 result = F * intensity;
+
+	// NaN/inf guard for debug views.
+	{
+		bvec4 bad0 = bvec4( isnan( psdf ), isnan( D ), isnan( intensity ), isnan( denom ) );
+		bvec4 bad1 = bvec4( isinf( psdf ), isinf( D ), isinf( intensity ), isinf( denom ) );
+		if ( any( bad0 ) || any( bad1 ) )
+		{
+			debugData.w = 1.0;
+		}
+	}
 
 	if ( glintEnergy.x > 0.5 )
 	{
@@ -1118,7 +1153,7 @@ void main() {
 	vec3 binormal = var_Tangent.w * normalize( cross( var_Normal.xyz, tangent ) );
 
 	vec3 glintTerm = vec3( 0.0 );
-	float glintDebugValue = 0.0;
+	vec4 glintDebugData = vec4( 0.0 );
 	float glintBlend = 0.0;
 	int glintDebugLevel = 0;
 	vec3 specDirect = Fs;
@@ -1126,8 +1161,8 @@ void main() {
 #ifdef USE_VK_PBR
 	if ( glintCore.x > 0.5 )
 	{
-		glintTerm = ComputeGlintContribution( N, tangent, binormal, L, E, specular.rgb, roughness, NL, NH, NE, LH, VH, lightDistance, glintDebugValue );
-		glintBlend = clamp( glintModel.x, 0.0, 1.0 );
+		glintTerm = ComputeGlintContribution( N, tangent, binormal, L, E, specular.rgb, roughness, NL, NH, NE, LH, VH, lightDistance, glintDebugData );
+		glintBlend = 1.0;
 
 		glintDebugLevel = int( floor( glintCore.z + 0.5 ) );
 	}
@@ -1159,20 +1194,25 @@ void main() {
 
 	if ( glintDebugLevel > 0 )
 	{
-		float debugMask = clamp( glintDebugValue * 40.0, 0.0, 1.0 );
-		if ( glintDebugLevel == 1 )
+		if ( glintDebugData.w > 0.5 )
 		{
-			out_color.rgb = mix( out_color.rgb, vec3( debugMask ), 0.5 );
+			out_color.rgb = vec3( 1.0, 0.0, 0.0 );
+		}
+		else if ( glintDebugLevel == 1 )
+		{
+			float t = clamp( glintDebugData.y, 0.0, 1.0 );
+			vec3 heat = vec3( t, 1.0 - t, 0.0 );
+			out_color.rgb = mix( out_color.rgb, heat, 0.6 );
 		}
 		else if ( glintDebugLevel == 2 )
 		{
-			vec3 debugColor = clamp( glintTerm * 10.0, 0.0, 1.0 );
-			out_color.rgb = mix( out_color.rgb, debugColor, 0.5 );
+			float t = clamp( glintDebugData.x * 40.0, 0.0, 1.0 );
+			out_color.rgb = mix( out_color.rgb, vec3( t ), 0.6 );
 		}
 		else if ( glintDebugLevel == 3 )
 		{
-			vec3 heat = vec3( debugMask, 1.0 - debugMask, 0.0 );
-			out_color.rgb = mix( out_color.rgb, heat, 0.5 );
+			float t = clamp( glintDebugData.z, 0.0, 1.0 );
+			out_color.rgb = mix( out_color.rgb, vec3( t ), 0.6 );
 		}
 	}
 #endif
@@ -1221,11 +1261,6 @@ void main() {
 		out_color.rgb = color / ( color + vec3( 1.0 ) );
 	}
 #endif
-
-	if ( glintCore.z >= 3.5 )
-	{
-		out_color.rgb = vec3( 1.0, 0.0, 0.0 );
-	}
 
 	out_color.a = diffuse.a;
 #else

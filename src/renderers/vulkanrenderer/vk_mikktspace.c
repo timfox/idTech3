@@ -34,7 +34,7 @@ Change when mesh importers swaps different indices!
 (modelling tool standard is backface culling vs frontface culling in id tech 3)
 ================
 */
-int R_FixMikktVertIndex(const int index)
+static int R_FixMikktVertIndex(const int index)
 {
 	switch (index % 3)
 	{
@@ -49,18 +49,20 @@ int R_FixMikktVertIndex(const int index)
 // BSP triangle soup
 //
 
-int mikkt_bsp_tri_GetNumFaces( const SMikkTSpaceContext *context ) 
+static int mikkt_bsp_tri_GetNumFaces( const SMikkTSpaceContext *context )
 {
 	srfTriangles_t *tri = (srfTriangles_t *)context->m_pUserData;
 	return tri->numIndexes / 3;
 }
 
-int mikkt_bsp_tri_GetNumVerticesOfFace( const SMikkTSpaceContext *context, const int face )
+static int mikkt_bsp_tri_GetNumVerticesOfFace( const SMikkTSpaceContext *context, const int face )
 {
+	(void)context;
+	(void)face;
 	return 3;
 }
 
-void mikkt_bsp_tri_GetPosition( const SMikkTSpaceContext *context, float position[], const int face, const int vert )
+static void mikkt_bsp_tri_GetPosition( const SMikkTSpaceContext *context, float position[], const int face, const int vert )
 {
 	srfTriangles_t *tri = (srfTriangles_t *)context->m_pUserData;
 	const int vert_index = R_FixMikktVertIndex(vert);
@@ -68,7 +70,7 @@ void mikkt_bsp_tri_GetPosition( const SMikkTSpaceContext *context, float positio
 	Com_Memcpy( position, tri->verts[idx].xyz, sizeof(float) * 3);
 }
 
-void mikkt_bsp_tri_GetNormal( const SMikkTSpaceContext *context, float normal[], const int face, const int vert )
+static void mikkt_bsp_tri_GetNormal( const SMikkTSpaceContext *context, float normal[], const int face, const int vert )
 {
 	srfTriangles_t *tri = (srfTriangles_t *)context->m_pUserData;
 	const int vert_index = R_FixMikktVertIndex(vert);
@@ -76,7 +78,7 @@ void mikkt_bsp_tri_GetNormal( const SMikkTSpaceContext *context, float normal[],
 	Com_Memcpy( normal, tri->verts[idx].normal, sizeof(float) * 3);
 }
 
-void mikkt_bsp_tri_GetTexCoord( const SMikkTSpaceContext *context, float st[], const int face, const int vert )
+static void mikkt_bsp_tri_GetTexCoord( const SMikkTSpaceContext *context, float st[], const int face, const int vert )
 {
 	srfTriangles_t *tri = (srfTriangles_t *)context->m_pUserData;
 	const int vert_index = R_FixMikktVertIndex(vert);
@@ -84,7 +86,7 @@ void mikkt_bsp_tri_GetTexCoord( const SMikkTSpaceContext *context, float st[], c
 	Com_Memcpy( st, tri->verts[idx].st, sizeof(float) * 2 );
 }
 
-void mikkt_bsp_tri_SetTangent( const SMikkTSpaceContext *context, const float tangent[], const float sign, const int face, const int vert )
+static void mikkt_bsp_tri_SetTangent( const SMikkTSpaceContext *context, const float tangent[], const float sign, const int face, const int vert )
 {
 	srfTriangles_t *tri = (srfTriangles_t *)context->m_pUserData;
 	const int vert_index = R_FixMikktVertIndex(vert);
@@ -115,18 +117,20 @@ void vk_mikkt_bsp_tri_generate( srfTriangles_t *tri )
 //
 // BSP face
 //
-int mikkt_bsp_face_GetNumFaces( const SMikkTSpaceContext *context ) 
+static int mikkt_bsp_face_GetNumFaces( const SMikkTSpaceContext *context )
 {
 	srfSurfaceFace_t *cv = (srfSurfaceFace_t *)context->m_pUserData;
 	return cv->numIndices / 3;
 }
 
-int mikkt_bsp_face_GetNumVerticesOfFace(const SMikkTSpaceContext *context, const int face) 
+static int mikkt_bsp_face_GetNumVerticesOfFace(const SMikkTSpaceContext *context, const int face)
 {
+	(void)context;
+	(void)face;
 	return 3;
 }
 
-void mikkt_bsp_face_GetPosition( const SMikkTSpaceContext *context, float position[], const int face, const int vert )
+static void mikkt_bsp_face_GetPosition( const SMikkTSpaceContext *context, float position[], const int face, const int vert )
 {
 	srfSurfaceFace_t *cv = (srfSurfaceFace_t *)context->m_pUserData;
 	int *indices = (int *)((byte *)cv + cv->ofsIndices);
@@ -136,7 +140,7 @@ void mikkt_bsp_face_GetPosition( const SMikkTSpaceContext *context, float positi
 	Com_Memcpy( position, cv->points[idx], sizeof(float) * 3); // xyz: [0, 1, 2]
 }
 
-void mikkt_bsp_face_GetNormal( const SMikkTSpaceContext *context, float normal[], const int face, const int vert )
+static void mikkt_bsp_face_GetNormal( const SMikkTSpaceContext *context, float normal[], const int face, const int vert )
 {
 	srfSurfaceFace_t *cv = (srfSurfaceFace_t *)context->m_pUserData;
 	int *indices = (int *)((byte *)cv + cv->ofsIndices);
@@ -146,7 +150,7 @@ void mikkt_bsp_face_GetNormal( const SMikkTSpaceContext *context, float normal[]
 	Com_Memcpy( normal, cv->points[idx] + 3, sizeof(float) * 3); // normal: [3, 4, 5]
 }
 
-void mikkt_bsp_face_GetTexCoord( const SMikkTSpaceContext *context, float st[], const int face, const int vert )
+static void mikkt_bsp_face_GetTexCoord( const SMikkTSpaceContext *context, float st[], const int face, const int vert )
 {
 	srfSurfaceFace_t *cv = (srfSurfaceFace_t *)context->m_pUserData;
 	int *indices = (int *)((byte *)cv + cv->ofsIndices);
@@ -156,7 +160,7 @@ void mikkt_bsp_face_GetTexCoord( const SMikkTSpaceContext *context, float st[], 
 	Com_Memcpy( st, cv->points[idx] + 6, sizeof(float) * 2 ); // st: [6, 7]
 }
 
-void mikkt_bsp_face_SetTangent( const SMikkTSpaceContext *context, const float tangent[], const float sign, const int face, const int vert )
+static void mikkt_bsp_face_SetTangent( const SMikkTSpaceContext *context, const float tangent[], const float sign, const int face, const int vert )
 {
 	srfSurfaceFace_t *cv = (srfSurfaceFace_t *)context->m_pUserData;
 	int *indices = (int *)((byte *)cv + cv->ofsIndices);

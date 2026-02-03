@@ -1211,6 +1211,7 @@ typedef struct
 // when there are multiple images of different formats available
 static const imageExtToLoaderMap_t imageLoaders[] =
 {
+	{ "exr",  R_LoadEXR },
 	{ "png",  R_LoadPNG },
 	{ "tga",  R_LoadTGA },
 	{ "jpg",  R_LoadJPG },

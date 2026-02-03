@@ -219,6 +219,7 @@
     <ClCompile Include="..\..\renderers\rendercommon\tr_image_jpg.c" />
     <ClCompile Include="..\..\renderers\rendercommon\tr_image_pcx.c" />
     <ClCompile Include="..\..\renderers\rendercommon\tr_image_png.c" />
+    <ClCompile Include="..\..\renderers\rendercommon\tr_image_exr.cpp" />
     <ClCompile Include="..\..\renderers\rendercommon\tr_image_tga.c" />
     <ClCompile Include="..\..\renderers\openglrenderer\tr_init.c" />
     <ClCompile Include="..\..\renderers\openglrenderer\tr_light.c" />

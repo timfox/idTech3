@@ -1664,7 +1664,7 @@ static void VK_SetGlintParams( vkUniform_t *ubo )
 	ubo->glintModel[2] = r_glints_ay->value;
 	ubo->glintModel[3] = r_glints_gamma->value;
 
-	ubo->glintDensity[0] = r_glints_rho->value;
+	ubo->glintDensity[0] = r_glints_density->value;
 	ubo->glintDensity[1] = r_glints_lnrho->value;
 	ubo->glintDensity[2] = r_glints_zeta->value;
 	ubo->glintDensity[3] = r_glints_maxCells->value;

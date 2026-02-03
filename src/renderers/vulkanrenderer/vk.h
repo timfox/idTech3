@@ -3,8 +3,7 @@
 #include <stddef.h>
 #include "../rendercommon/vulkan/vulkan.h"
 #include "tr_common.h"
-
-typedef struct glint_dict_params_s glint_dict_params_t;
+#include "glints.h"
 
 #define MAX_SWAPCHAIN_IMAGES 8
 #define MIN_SWAPCHAIN_IMAGES_IMM 3
