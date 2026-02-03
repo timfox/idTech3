@@ -2,7 +2,6 @@
 static void vk_set_shader_name( VkShaderModule shader, const char *name ) {
     SET_OBJECT_NAME( shader, name, VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 }
-
 void vk_bind_generated_shaders( void ){
     vk.modules.vert.ident1[0][0][0][0] = SHADER_MODULE( vert_tx0_ident1 );
     vk_set_shader_name( vk.modules.vert.ident1[0][0][0][0], "vert_tx0_ident1" );

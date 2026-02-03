@@ -1581,6 +1581,16 @@ static void VK_SetGlintParams( vkUniform_t *ubo )
 		return;
 	}
 
+	// Log debug level changes once to confirm the shader override path.
+	if ( r_glints_debug ) {
+		static float lastGlintDebug = -9999.0f;
+		if ( r_glints_debug->value != lastGlintDebug ) {
+			lastGlintDebug = r_glints_debug->value;
+			ri.Printf( PRINT_ALL, "glint debug level = %.2f (r_glints=%d)\n",
+				r_glints_debug->value, r_glints->integer );
+		}
+	}
+
 	ubo->glintCore[0] = r_glints->value;
 	ubo->glintCore[1] = r_glints_mode->value;
 	ubo->glintCore[2] = r_glints_debug->value;

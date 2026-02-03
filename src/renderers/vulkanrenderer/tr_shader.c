@@ -4325,7 +4325,7 @@ static shader_t *FinishShader( void ) {
 				}
 			}
 
-			if ( pStage->vk_pbr_flags && def.shader_type >= TYPE_GENERIC_BEGIN  )
+			if ( pStage->vk_pbr_flags )
 			{
 			#ifdef USE_VK_PBR
 				def.vk_pbr_flags = pStage->vk_pbr_flags;
