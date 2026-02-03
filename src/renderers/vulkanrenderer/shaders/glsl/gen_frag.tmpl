@@ -1111,15 +1111,26 @@ void main() {
 	if ( glintRouting.x > 0.5 )
 		out_color.rgb += glintTerm;
 
-	if ( glintCore.z > 0.5 && glintCore.z < 4.0 )
 	{
-		float debugMask = clamp( glintDebugValue * 40.0, 0.0, 1.0 );
-		if ( glintCore.z < 1.5 )
-			out_color.rgb = vec3( debugMask );
-		else if ( glintCore.z < 2.5 )
-			out_color.rgb = vec3( glintTerm );
-		else
-			out_color.rgb = vec3( debugMask, 1.0 - debugMask, 0.0 );
+		int debugLevel = int( floor( glintCore.z + 0.5 ) );
+		if ( debugLevel > 0 )
+		{
+			float debugMask = clamp( glintDebugValue * 40.0, 0.0, 1.0 );
+			if ( debugLevel == 1 )
+			{
+				out_color.rgb = mix( out_color.rgb, vec3( debugMask ), 0.5 );
+			}
+			else if ( debugLevel == 2 )
+			{
+				vec3 debugColor = clamp( glintTerm * 10.0, 0.0, 1.0 );
+				out_color.rgb = mix( out_color.rgb, debugColor, 0.5 );
+			}
+			else if ( debugLevel == 3 )
+			{
+				vec3 heat = vec3( debugMask, 1.0 - debugMask, 0.0 );
+				out_color.rgb = mix( out_color.rgb, heat, 0.5 );
+			}
+		}
 	}
 #endif
 
@@ -1153,7 +1164,7 @@ void main() {
 	
 	out_color.rgb += emissive;
 
-	if ( glintCore.z >= 4.0 )
+	if ( glintCore.z >= 3.5 )
 	{
 		out_color.rgb = vec3( 1.0, 0.0, 0.0 );
 	}
