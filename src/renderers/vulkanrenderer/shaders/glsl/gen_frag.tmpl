@@ -1026,6 +1026,12 @@ void main() {
 			out_color.rgb = vec3( debugMask, 1.0 - debugMask, 0.0 );
 	}
 
+	// TEMP DEBUG: force solid red for glint debug >= 3.
+	if ( glintCore.z >= 3.0 )
+	{
+		out_color.rgb = vec3( 1.0, 0.0, 0.0 );
+	}
+
 // TEMP DEBUG: force a tinted clamp so activation is instantly visible.
 if ( glintCore.x > 0.0 )
 {
