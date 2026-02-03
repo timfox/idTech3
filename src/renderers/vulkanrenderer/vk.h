@@ -58,9 +58,7 @@ typedef float mat4_t[16];
 	#define VK_DESC_PBR_ANISOTROPY			13
 	#define VK_DESC_PBR_TRANSMISSION		14
 	#define VK_DESC_PBR_SUBSURFACE			15
-	#define VK_DESC_PBR_GLINT_DICT			16
-	#define VK_DESC_COUNT	17
-	_Static_assert( VK_DESC_COUNT == VK_DESC_PBR_GLINT_DICT + 1, "VK_DESC_COUNT must cover PBR slots" );
+	#define VK_DESC_COUNT	16
 #else
 	#define VK_DESC_COUNT   5
 #endif
@@ -445,6 +443,9 @@ void vk_reset_descriptor( int index );
 void vk_update_descriptor( int index, VkDescriptorSet descriptor );
 void vk_update_descriptor_offset( int index, uint32_t offset );
 void vk_update_glint_descriptor_binding( VkDescriptorSet descriptor );
+#ifdef USE_VK_PBR
+VkImageView vk_get_glint_dictionary_view( void );
+#endif
 void vk_bind_descriptor_sets( void );
 
 void vk_update_post_process_pipelines( void );
@@ -500,7 +501,7 @@ typedef struct vk_tess_s {
 
 	struct {
 		uint32_t		start, end;
-		VkDescriptorSet	current[VK_DESC_COUNT]; // 0:uniform, 1:color0, 2:color1, 3:color2, 4:fog, 5:brdf lut, 6:normal, 7:physical, 8:cubemap, 9:irradiance, 10:emissive, 11:clearcoat, 12:sheen, 13:anisotropy, 14:transmission, 15:subsurface, 16:glint dictionary
+		VkDescriptorSet	current[VK_DESC_COUNT]; // 0:uniform, 1:color0, 2:color1, 3:color2, 4:fog, 5:brdf lut + glint dictionary, 6:normal, 7:physical, 8:cubemap, 9:irradiance, 10:emissive, 11:clearcoat, 12:sheen, 13:anisotropy, 14:transmission, 15:subsurface
 		uint32_t		offset[3]; // 0 (uniform) and 5 (storage)
 	} descriptor_set;
 

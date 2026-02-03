@@ -5069,7 +5069,6 @@ void vk_initialize( void )
 		set_layouts[13] = vk.set_layout_sampler; // anisotropy
 		set_layouts[14] = vk.set_layout_sampler; // transmission
 		set_layouts[15] = vk.set_layout_sampler; // subsurface
-		set_layouts[16] = vk.set_layout_sampler; // glint dictionary
 #endif
 		desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		desc.pNext = NULL;
@@ -5306,9 +5305,9 @@ static void vk_destroy_attachments( void )
 #endif
 
 #ifdef USE_VK_PBR
-    if ( vk.glint_dict_image_view ) {
+    if ( vk_glint_dictionary_image.view ) {
         qvkDestroyImage( vk.device, vk.glint_dict_image, NULL );
-        qvkDestroyImageView( vk.device, vk.glint_dict_image_view, NULL );
+        qvkDestroyImageView( vk.device, vk_glint_dictionary_image.view, NULL );
         vk.glint_dict_image = VK_NULL_HANDLE;
         vk.glint_dict_image_view = VK_NULL_HANDLE;
         vk_glint_dictionary_image.handle = VK_NULL_HANDLE;
@@ -6150,6 +6149,10 @@ void vk_update_descriptor_set( image_t *image, qboolean mipmap ) {
 	descriptor_write.pTexelBufferView = NULL;
 
 	qvkUpdateDescriptorSets( vk.device, 1, &descriptor_write, 0, NULL );
+}
+
+VkImageView vk_get_glint_dictionary_view( void ) {
+	return vk_glint_dictionary_image.view;
 }
 
 void vk_update_glint_descriptor_binding( VkDescriptorSet descriptor ) {
