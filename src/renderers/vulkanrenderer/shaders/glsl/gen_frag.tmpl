@@ -273,14 +273,6 @@ vec3 ComputeGlintContribution( vec3 N, vec3 L, vec3 V, vec3 specColor, float rou
 			glint_hash( gl_FragCoord.xy + vec2( 0.0, float( i ) ), seed + 13.7 )
 		);
 
-		if ( beta < 1.0 )
-		{
-			if ( rand2.x > beta )
-			{
-				continue;
-			}
-		}
-
 		vec2 offset = ( rand2 - 0.5 ) * 2.0;
 		vec2 samplePos = s + dx * offset.x * 0.5 + dy * offset.y * 0.5;
 
@@ -360,7 +352,8 @@ vec3 ComputeGlintContribution( vec3 N, vec3 L, vec3 V, vec3 specColor, float rou
 		psdf1 /= float( sampleCount );
 	}
 
-	float psdf = mix( psdf0, psdf1, lodT );
+	float coverage = clamp( glintModel.x, 0.0, 1.0 );
+	float psdf = mix( psdf0, psdf1, lodT ) * coverage;
 	debugIntensity = psdf;
 
 	float distanceFade = 1.0;
