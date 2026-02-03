@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cl_scrn.c -- master for refresh, status bar, console, chat, notify, etc
 
 #include "client.h"
+#include <math.h>
 
 static qboolean	scr_initialized;		// ready to draw
 
@@ -286,6 +287,36 @@ void SCR_DrawBigString( int x, int y, const char *s, float alpha, qboolean noCol
 	color[0] = color[1] = color[2] = 1.0;
 	color[3] = alpha;
 	SCR_DrawStringExt( x, y, BIGCHAR_WIDTH, s, color, qfalse, noColorEscape );
+}
+
+static void SCR_DrawPreparingShadersOverlay( void ) {
+	if ( Cvar_VariableIntegerValue( "r_preparingShaders" ) <= 0 ) {
+		return;
+	}
+
+	const char *title = "Preparing shaders...";
+	const char *subtext = "Please wait while shaders are prepared.";
+	float background[4] = { 0.0f, 0.0f, 0.0f, 0.65f };
+	float bar_color[4] = { 0.15f, 0.15f, 0.15f, 0.85f };
+	float fill_color[4] = { 0.15f, 0.55f, 0.95f, 1.0f };
+	float x = 320.0f - SCR_GetBigStringWidth( title ) * 0.5f;
+	float y = 200.0f;
+
+	SCR_FillRect( 0, 190, 640, 110, background );
+	SCR_DrawBigString( x, y, title, 1.0f, qtrue );
+
+	float timeVal = cls.realtime * 0.002f;
+	float progress = ( sinf( timeVal ) + 1.0f ) * 0.5f;
+	const float barWidth = 220.0f;
+	const float barHeight = 14.0f;
+	const float barX = 210.0f;
+	const float barY = 250.0f;
+
+	SCR_FillRect( barX, barY, barWidth, barHeight, bar_color );
+	SCR_FillRect( barX, barY, barWidth * progress, barHeight, fill_color );
+
+	SCR_DrawSmallStringExt( 320 - ( strlen( subtext ) * 4 ) / 2, 272, subtext,
+		g_color_table[ ColorIndex( COLOR_WHITE ) ], qtrue, qtrue );
 }
 
 
@@ -606,6 +637,10 @@ static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 	// debug graph can be drawn on top of anything
 	if ( cl_debuggraph->integer || cl_timegraph->integer || cl_debugMove->integer ) {
 		SCR_DrawDebugGraph ();
+	}
+
+	if ( Cvar_VariableIntegerValue( "r_preparingShaders" ) > 0 ) {
+		SCR_DrawPreparingShadersOverlay();
 	}
 }
 

@@ -3151,6 +3151,8 @@ static void vk_create_shader_modules( void )
 {	
 	int i, j, k;
 
+	ri.Cvar_Set( "r_preparingShaders", "1" );
+
 	// specialized depth-fragment shader
 	vk.modules.frag.gen0_df = SHADER_MODULE( frag_tx0_df );
 	SET_OBJECT_NAME( vk.modules.frag.gen0_df, "single-texture df fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
@@ -5232,6 +5234,8 @@ void vk_create_pipelines( void )
 #ifdef VK_PBR_BRDFLUT
     vk_create_brdflut_pipeline();
 #endif
+
+	ri.Cvar_Set( "r_preparingShaders", "0" );
 }
 
 #ifdef VK_PBR_BRDFLUT

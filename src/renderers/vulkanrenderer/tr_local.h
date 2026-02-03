@@ -1458,6 +1458,8 @@ extern cvar_t *r_glints_mode;
 extern cvar_t *r_glints_debug;
 extern cvar_t *r_glints_materialMask;
 extern cvar_t *r_glints_strength;
+extern cvar_t *r_preparingShaders;
+extern cvar_t *r_glints_verbose;
 extern cvar_t *r_glints_minRoughness;
 extern cvar_t *r_glints_maxRoughness;
 extern cvar_t *r_glints_density;

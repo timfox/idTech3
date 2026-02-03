@@ -1698,6 +1698,8 @@ static void R_Register( void )
 	r_glints = ri.Cvar_Get( "r_glints", "1", CVAR_ARCHIVE_ND );
 	r_glints_mode = ri.Cvar_Get( "r_glints_mode", "2", CVAR_ARCHIVE_ND );
 	r_glints_debug = ri.Cvar_Get( "r_glints_debug", "0", CVAR_ARCHIVE_ND );
+	r_glints_verbose = ri.Cvar_Get( "r_glints_verbose", "0", CVAR_ARCHIVE_ND );
+	r_preparingShaders = ri.Cvar_Get( "r_preparingShaders", "0", CVAR_ARCHIVE_ND );
 	r_glints_materialMask = ri.Cvar_Get( "r_glints_materialMask", "0", CVAR_ARCHIVE_ND );
 	r_glints_strength = ri.Cvar_Get( "r_glints_strength", "1", CVAR_ARCHIVE_ND );
 	r_glints_minRoughness = ri.Cvar_Get( "r_glints_minRoughness", "0.05", CVAR_ARCHIVE_ND );
