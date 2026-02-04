@@ -1657,7 +1657,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_pbr_shExtract, "Extract SH coefficients from generated irradiance cubemaps for PBR." );
 
 	r_pbr_debug = ri.Cvar_Get( "r_pbr_debug", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_pbr_debug, "0", "18", CV_INTEGER );
+	ri.Cvar_CheckRange( r_pbr_debug, "0", "19", CV_INTEGER );
 	ri.Cvar_SetDescription( r_pbr_debug,
 		"PBR debug view override (Vulkan PBR only):\n"
 		" 0 - off (normal PBR)\n"
@@ -1678,7 +1678,8 @@ static void R_Register( void )
 		" 15 - show direct specular contribution\n"
 		" 16 - show specular IBL (magenta=IBL compiled out, yellow=IBL bound but sampling near-zero)\n"
 		" 17 - show diffuse IBL (MAGENTA=compiled out, YELLOW=bind/sampler issues)\n"
-		" 18 - show glint contribution (RED=glints disabled/dict invalid, CYAN=glints enabled but zero)\n" );
+		" 18 - show glint contribution (RED=glints disabled/dict invalid, CYAN=glints enabled but zero)\n"
+		" 19 - show glint energy (grayscale)\n" );
 
 	r_pbr_normalSwizzle = ri.Cvar_Get( "r_pbr_normalSwizzle", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_pbr_normalSwizzle, "0", "1", CV_INTEGER );
@@ -1737,6 +1738,9 @@ static void R_Register( void )
 	r_preparingShaders = ri.Cvar_Get( "r_preparingShaders", "0", CVAR_ARCHIVE_ND );
 	r_glints_materialMask = ri.Cvar_Get( "r_glints_materialMask", "0", CVAR_ARCHIVE_ND );
 	r_glints_strength = ri.Cvar_Get( "r_glints_strength", "1", CVAR_ARCHIVE_ND );
+	r_glints_intensity = ri.Cvar_Get( "r_glints_intensity", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_glints_intensity, "0", "16", CV_FLOAT );
+	ri.Cvar_SetDescription( r_glints_intensity, "Global multiplier for glint contributions (0=off, higher accentuates)." );
 	r_glints_minRoughness = ri.Cvar_Get( "r_glints_minRoughness", "0.05", CVAR_ARCHIVE_ND );
 	r_glints_maxRoughness = ri.Cvar_Get( "r_glints_maxRoughness", "0.6", CVAR_ARCHIVE_ND );
 	r_glints_density = ri.Cvar_Get( "r_glints_density", "20", CVAR_ARCHIVE_ND );
@@ -1786,6 +1790,7 @@ static void R_Register( void )
 	r_glints_colored = ri.Cvar_Get( "r_glints_colored", "0", CVAR_ARCHIVE_ND );
 	r_glints_colorCount = ri.Cvar_Get( "r_glints_colorCount", "4", CVAR_ARCHIVE_ND );
 	r_glints_colorStrength = ri.Cvar_Get( "r_glints_colorStrength", "1", CVAR_ARCHIVE_ND );
+#endif
 #endif
 #endif
 #endif

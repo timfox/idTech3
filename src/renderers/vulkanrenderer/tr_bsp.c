@@ -376,7 +376,7 @@ static void R_LoadMergedLightmaps( const lump_t *l, byte *image )
 	for ( offs = 0, i = 0 ; i < tr.numLightmaps; i++ ) {
 
 		tr.lightmaps[ i ] = R_CreateImage( va( "*mergedLightmap%d", i ), NULL, NULL,
-			lightmapWidth, lightmapHeight, lightmapFlags | IMGFLAG_CLAMPTOBORDER, 0, 0 );
+			lightmapWidth, lightmapHeight, lightmapFlags | IMGFLAG_CLAMPTOBORDER, VK_FORMAT_R8G8B8A8_SRGB, 0 );
 
 		for ( y = 0; y < lightmapCountY; y++ ) {
 			if ( offs >= l->filelen )
@@ -463,7 +463,7 @@ static void R_LoadLightmaps( const lump_t *l ) {
 	for ( i = 0 ; i < tr.numLightmaps ; i++ ) {
 		maxIntensity = R_ProcessLightmap( image, buf + i * LIGHTMAP_SIZE * LIGHTMAP_SIZE * 3, maxIntensity );
 		tr.lightmaps[i] = R_CreateImage( va( "*lightmap%d", i ), NULL, image, LIGHTMAP_SIZE, LIGHTMAP_SIZE,
-			lightmapFlags | IMGFLAG_CLAMPTOEDGE, 0, 0 );
+			lightmapFlags | IMGFLAG_CLAMPTOEDGE, VK_FORMAT_R8G8B8A8_SRGB, 0 );
 	}
 
 	//if ( r_lightmap->integer == 2 )	{

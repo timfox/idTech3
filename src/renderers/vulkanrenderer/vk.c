@@ -8394,15 +8394,6 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	    if ( def->vk_pbr_flags & PBR_HAS_SPECULARMAP )
             frag_spec_data.physical_texture_set = 1;
 
-        if ( !vk.cubemapActive )
-            frag_spec_data.env_texture_set = -1;
-
-        if ( ( def->vk_pbr_flags & PBR_HAS_LIGHTMAP ) == 0 )
-            frag_spec_data.lightmap_texture_set = -1;
-
-        if ( !vk.cubemapActive )
-            frag_spec_data.irradiance_texture_set = -1;
-
         if ( ( def->vk_pbr_flags & PBR_HAS_EMISSIVE ) == 0 )
             frag_spec_data.emissive_texture_set = -1;
 

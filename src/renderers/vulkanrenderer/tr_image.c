@@ -785,7 +785,9 @@ static void upload_vk_image( image_t *image, byte *pic ) {
 	// Respect explicit formats passed to R_CreateImage (e.g. sRGB albedo for PBR).
 	// Otherwise, auto-select based on r_texturebits and alpha usage.
 	if ( image->internalFormat == 0 ) {
-		if ( r_texturebits->integer > 16 || r_texturebits->integer == 0 || ( image->flags & IMGFLAG_LIGHTMAP ) ) {
+		if ( image->flags & IMGFLAG_LIGHTMAP ) {
+			image->internalFormat = VK_FORMAT_R8G8B8A8_SRGB;
+		} else if ( r_texturebits->integer > 16 || r_texturebits->integer == 0 ) {
 			image->internalFormat = VK_FORMAT_R8G8B8A8_UNORM;
 			//image->internalFormat = VK_FORMAT_B8G8R8A8_UNORM;
 		} else {

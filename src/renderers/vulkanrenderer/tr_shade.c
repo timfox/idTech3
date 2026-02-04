@@ -703,6 +703,7 @@ typedef struct vkPbrUniformBlock_s {
 	vec4_t texIndex0;
 	vec4_t texIndex1;
 	vec4_t texIndex2;
+	vec4_t featureFlags;
 } vkPbrUniformBlock_t;
 #endif
 
@@ -1443,12 +1444,10 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		}
 #endif
 
-#ifdef USE_VK_PBR
+	#ifdef USE_VK_PBR
 		const qboolean useIndexing = vk.descriptorIndexingActive ? qtrue : qfalse;
-		const qboolean forcePbrDebugDescriptor = ( pbr_debug == 13 || ( pbr_debug >= 16 && pbr_debug <= 18 ) ) ? qtrue : qfalse;
 	#else
 		const qboolean useIndexing = qfalse;
-		const qboolean forcePbrDebugDescriptor = qfalse;
 	#endif
 		VkDescriptorSet pbrDescriptor = VK_NULL_HANDLE;
 
@@ -1463,6 +1462,10 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			const image_t *fallback_black = tr.blackImage ? tr.blackImage : tr.whiteImage;
 			const image_t *albedoImage = R_GetAnimatedImage( &pStage->bundle[0] );
 			const image_t *lightmapImage = fallback_white;
+			qboolean hasLightmap = qfalse;
+			qboolean hasEnv = qfalse;
+			qboolean hasIrr = qfalse;
+			VkImageView glintDictView = vk_get_glint_dictionary_view();
 
 			Com_Memset( &block, 0, sizeof( block ) );
 			Vector4Copy( pStage->emissiveScale, block.emissiveScale );
@@ -1478,6 +1481,8 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 					lightmapImage = R_GetAnimatedImage( pbrLightmapBundle );
 				}
 			}
+
+			hasLightmap = ( lightmapImage != fallback_white );
 
 			// Stage descriptor sets can become invalid after a descriptor pool reset (e.g. swapchain/video restart).
 			// Recreate lazily here so we never bind a stale set.
@@ -1496,13 +1501,21 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				}
 			}
 
+			if ( !useIndexing && pbrDescriptor == VK_NULL_HANDLE ) {
+				VkDescriptorSet fallbackDescriptor = vk_get_pbr_indexed_descriptor();
+				if ( fallbackDescriptor != VK_NULL_HANDLE ) {
+					pbrDescriptor = fallbackDescriptor;
+					vk_update_descriptor_if_changed( VK_DESC_PBR, pbrDescriptor );
+				}
+			}
+
 			if ( ( r_glints_debug && r_glints_debug->value > 0.0f ) ||
 				( r_glints_verbose && r_glints_verbose->integer > 0 ) ) {
 				ri.Printf( PRINT_ALL, "glint: stage=%s vk_pbr_flags=0x%x brdf_desc=%p dict_view=%p\n",
 					tess.shader ? tess.shader->name : "null",
 					pStage->vk_pbr_flags,
 					(void *)(uintptr_t)pbrDescriptor,
-					(void *)(uintptr_t)vk_get_glint_dictionary_view() );
+					(void *)(uintptr_t)glintDictView );
 			}
 			
 			int cubemapIndex = -1;
@@ -1541,6 +1554,13 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				}
 			}
 
+			if ( cubemapIndex >= 0 ) {
+				if ( tr.cubemaps[cubemapIndex].prefiltered_image )
+					hasEnv = qtrue;
+				if ( tr.cubemaps[cubemapIndex].irradiance_image )
+					hasIrr = qtrue;
+			}
+
 			if ( useIndexing ) {
 				vk_update_pbr_indexed_common( envImage, irrImage );
 				Vector4Set( block.texIndex0,
@@ -1568,6 +1588,12 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				Vector4Set( block.texIndex2, 0.0f, 0.0f, 0.0f, 0.0f );
 			}
 
+			Vector4Set( block.featureFlags,
+				hasEnv ? 1.0f : 0.0f,
+				hasIrr ? 1.0f : 0.0f,
+				hasLightmap ? 1.0f : 0.0f,
+				glintDictView != VK_NULL_HANDLE ? 1.0f : 0.0f );
+
 			// Only push uniforms when the PBR block has actually changed for this command buffer.
 			if ( vk.cmd && vk.cmd->command_buffer != lastCmdBuf ) {
 				lastCmdBuf = vk.cmd->command_buffer;
@@ -1588,6 +1614,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				Vector4Copy( block.texIndex0, uniform.pbrTexIndex0 );
 				Vector4Copy( block.texIndex1, uniform.pbrTexIndex1 );
 				Vector4Copy( block.texIndex2, uniform.pbrTexIndex2 );
+				Vector4Copy( block.featureFlags, uniform.pbrFeatureFlags );
 
 				vk_push_uniform_cached( &uniform );
 			}
@@ -1612,14 +1639,6 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 #endif
 
 		vk_bind_pipeline( pipeline );
-#ifdef USE_VK_PBR
-		if ( forcePbrDebugDescriptor && vk.pipelines[ pipeline ].def.vk_pbr_flags ) {
-			VkDescriptorSet debugDescriptor = useIndexing ? vk_get_pbr_indexed_descriptor() : pbrDescriptor;
-			if ( debugDescriptor != VK_NULL_HANDLE ) {
-				vk_update_descriptor_if_changed( VK_DESC_PBR, debugDescriptor );
-			}
-		}
-#endif
 		vk_bind_geometry( tess_flags );
 		vk_draw_geometry( tess.depthRange, qtrue );
 
@@ -1866,7 +1885,12 @@ static void VK_SetGlintParams( vkUniform_t *ubo )
 	ubo->glintPerformance[3] = r_glints_colorStrength->value;
 
 	ubo->glintColor[0] = r_glints_anisoRotation ? r_glints_anisoRotation->value : 0.0f;
-	ubo->glintColor[1] = 0.0f;
+	{
+		float glintIntensityValue = ( r_glints_intensity ) ? r_glints_intensity->value : 1.0f;
+		if ( glintIntensityValue < 0.0f )
+			glintIntensityValue = 0.0f;
+		ubo->glintColor[1] = glintIntensityValue;
+	}
 	ubo->glintColor[2] = 0.0f;
 	ubo->glintColor[3] = 0.0f;
 
