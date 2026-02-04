@@ -1,5 +1,9 @@
 #version 450
 
+#ifdef USE_DESCRIPTOR_INDEXING
+#extension GL_EXT_nonuniform_qualifier : enable
+#endif
+
 #ifdef USE_TX2
 #define USE_TX1
 #endif
@@ -50,6 +54,12 @@ layout(set = 0, binding = 0) uniform UBO {
 	vec4 glintDictExtras;
 	vec4 glintPerformance;
 	vec4 glintColor;
+	vec4 pbrDebug;
+#ifdef USE_DESCRIPTOR_INDEXING
+	vec4 pbrTexIndex0;
+	vec4 pbrTexIndex1;
+	vec4 pbrTexIndex2;
+#endif
 #endif
 //#endif
 };
@@ -81,6 +91,16 @@ layout(location = 5) in vec4 frag_color1;
 #ifdef USE_CL2
 layout(location = 6) in vec4 frag_color2;
 #endif
+#endif
+
+#ifdef USE_VK_PBR
+#define VTX_COLOR0 vec4(1.0)
+#define VTX_COLOR1 vec4(1.0)
+#define VTX_COLOR2 vec4(1.0)
+#else
+#define VTX_COLOR0 frag_color0
+#define VTX_COLOR1 frag_color1
+#define VTX_COLOR2 frag_color2
 #endif
 
 layout(location = 1) centroid in vec2 frag_tex_coord0;
@@ -134,18 +154,55 @@ layout(location = 10) in vec4 var_LightDir;
 layout(location = 11) in vec4 var_ViewDir;
 layout(location = 12) in vec4 var_Tangent;
 
-layout(set = 5, binding = 0) uniform sampler2D brdflut_texture;
-layout(set = 6, binding = 0) uniform sampler2D normal_texture;
-layout(set = 7, binding = 0) uniform sampler2D physical_texture;
-layout(set = 8, binding = 0) uniform samplerCube env_texture;
-layout(set = 9, binding = 0) uniform samplerCube irradiance_texture;
-layout(set = 10, binding = 0) uniform sampler2D emissive_texture;
-layout(set = 11, binding = 0) uniform sampler2D clearcoat_texture;
-layout(set = 12, binding = 0) uniform sampler2D sheen_texture;
-layout(set = 13, binding = 0) uniform sampler2D anisotropy_texture;
-layout(set = 14, binding = 0) uniform sampler2D transmission_texture;
-layout(set = 15, binding = 0) uniform sampler2D subsurface_texture;
-layout(set = 5, binding = 1) uniform sampler2D glint_dict_texture;
+#ifdef USE_DESCRIPTOR_INDEXING
+layout(set = 5, binding = 0) uniform sampler2D pbrTextures[];
+layout(set = 5, binding = 1) uniform sampler2D brdflut_texture;
+layout(set = 5, binding = 2) uniform samplerCube env_texture;
+layout(set = 5, binding = 3) uniform samplerCube irradiance_texture;
+#else
+layout(set = 5, binding = 0) uniform sampler2D pbr_albedo;
+layout(set = 5, binding = 1) uniform sampler2D normal_texture;
+layout(set = 5, binding = 2) uniform sampler2D physical_texture;
+layout(set = 5, binding = 3) uniform sampler2D emissive_texture;
+layout(set = 5, binding = 4) uniform sampler2D lightmap_texture;
+layout(set = 5, binding = 5) uniform sampler2D clearcoat_texture;
+layout(set = 5, binding = 6) uniform sampler2D sheen_texture;
+layout(set = 5, binding = 7) uniform sampler2D anisotropy_texture;
+layout(set = 5, binding = 8) uniform sampler2D transmission_texture;
+layout(set = 5, binding = 9) uniform sampler2D subsurface_texture;
+layout(set = 5, binding = 10) uniform sampler2D brdflut_texture;
+layout(set = 5, binding = 11) uniform sampler2D glint_dict_texture;
+layout(set = 5, binding = 12) uniform samplerCube env_texture;
+layout(set = 5, binding = 13) uniform samplerCube irradiance_texture;
+#endif
+
+#ifdef USE_DESCRIPTOR_INDEXING
+int PBR_Index( float v ) { return int( v + 0.5 ); }
+vec4 PBR_SampleIndex( vec2 uv, float idx ) { return texture( pbrTextures[ nonuniformEXT( PBR_Index( idx ) ) ], uv ); }
+#define PBR_SAMPLE_ALBEDO(uv) PBR_SampleIndex( uv, pbrTexIndex0.x )
+#define PBR_SAMPLE_NORMAL(uv) PBR_SampleIndex( uv, pbrTexIndex0.y )
+#define PBR_SAMPLE_PHYSICAL(uv) PBR_SampleIndex( uv, pbrTexIndex0.z )
+#define PBR_SAMPLE_EMISSIVE(uv) PBR_SampleIndex( uv, pbrTexIndex0.w )
+#define PBR_SAMPLE_LIGHTMAP(uv) PBR_SampleIndex( uv, pbrTexIndex1.x )
+#define PBR_SAMPLE_CLEARCOAT(uv) PBR_SampleIndex( uv, pbrTexIndex1.y )
+#define PBR_SAMPLE_SHEEN(uv) PBR_SampleIndex( uv, pbrTexIndex1.z )
+#define PBR_SAMPLE_ANISOTROPY(uv) PBR_SampleIndex( uv, pbrTexIndex1.w )
+#define PBR_SAMPLE_TRANSMISSION(uv) PBR_SampleIndex( uv, pbrTexIndex2.x )
+#define PBR_SAMPLE_SUBSURFACE(uv) PBR_SampleIndex( uv, pbrTexIndex2.y )
+#define PBR_SAMPLE_GLINT_DICT(uv) PBR_SampleIndex( uv, pbrTexIndex2.z )
+#else
+#define PBR_SAMPLE_ALBEDO(uv) texture( pbr_albedo, uv )
+#define PBR_SAMPLE_NORMAL(uv) texture( normal_texture, uv )
+#define PBR_SAMPLE_PHYSICAL(uv) texture( physical_texture, uv )
+#define PBR_SAMPLE_EMISSIVE(uv) texture( emissive_texture, uv )
+#define PBR_SAMPLE_LIGHTMAP(uv) texture( lightmap_texture, uv )
+#define PBR_SAMPLE_CLEARCOAT(uv) texture( clearcoat_texture, uv )
+#define PBR_SAMPLE_SHEEN(uv) texture( sheen_texture, uv )
+#define PBR_SAMPLE_ANISOTROPY(uv) texture( anisotropy_texture, uv )
+#define PBR_SAMPLE_TRANSMISSION(uv) texture( transmission_texture, uv )
+#define PBR_SAMPLE_SUBSURFACE(uv) texture( subsurface_texture, uv )
+#define PBR_SAMPLE_GLINT_DICT(uv) texture( glint_dict_texture, uv )
+#endif
 
 // prob use ubo for specularScale & normalScale ..
 layout (constant_id = 11) const float specularScale_x = 1.0;
@@ -183,7 +240,7 @@ float glint_dictionary_lookup( int entry, int level, float position, float dictW
 	float y = ( row + 0.5 ) / dictHeight;
 	float idx = clamp( position, 0.0, 1.0 ) * ( dictWidth - 1.0 );
 	float x = ( idx + 0.5 ) / dictWidth;
-	return texture( glint_dict_texture, vec2( x, y ) ).r;
+	return PBR_SAMPLE_GLINT_DICT( vec2( x, y ) ).r;
 }
 
 vec3 F_Schlick( in vec3 SpecularColor, in float VH );
@@ -192,7 +249,7 @@ vec3 ComputeGlintContribution( vec3 N, vec3 T, vec3 B, vec3 L, vec3 V, vec3 spec
 {
 	debugData = vec4( 0.0 );
 
-	if ( glintCore.x < 0.5 )
+	if ( glintCore.x < 0.5 && pbrDebug.w < 0.5 )
 	{
 		return vec3( 0.0 );
 	}
@@ -212,7 +269,7 @@ vec3 ComputeGlintContribution( vec3 N, vec3 T, vec3 B, vec3 L, vec3 V, vec3 spec
 	float maskFactor = 1.0;
 	if ( glintMaterial.w > 0.5 && physical_texture_set > -1 )
 	{
-		maskFactor = texture( physical_texture, frag_tex_coord0 ).a;
+		maskFactor = PBR_SAMPLE_PHYSICAL( frag_tex_coord0 ).a;
 	}
 	{
 		float maskStrength = clamp( glintDictExtras.z, 0.0, 1.0 );
@@ -535,6 +592,16 @@ vec3 ComputeGlintContribution( vec3 N, vec3 T, vec3 B, vec3 L, vec3 V, vec3 spec
 	return result;
 }
 
+vec3 DecodeNormalTS( in vec2 frag_tex_coord )
+{
+	vec4 ntex = PBR_SAMPLE_NORMAL( frag_tex_coord );
+	vec2 swizzled = ( pbrDebug.y > 0.5 ) ? ntex.rg : ntex.ag;
+	vec2 xy = swizzled * 2.0 - 1.0;
+	xy *= vec2( normalScale_x, normalScale_y );
+	float z = sqrt( max( 1.0 - dot( xy, xy ), 0.0 ) );
+	return normalize( vec3( xy, z ) );
+}
+
 vec3 CalcNormal( in vec3 vertexNormal, in vec4 vertexTangent, in vec2 frag_tex_coord )
 {
 	vec3 baseN = normalize( vertexNormal );
@@ -542,10 +609,8 @@ vec3 CalcNormal( in vec3 vertexNormal, in vec4 vertexTangent, in vec2 frag_tex_c
 	vec3 biTangent = normalize( cross( baseN, tangent ) ) * vertexTangent.w;
 
 	if ( normal_texture_set > -1 ) {
-		vec2 xy = texture(normal_texture, frag_tex_coord).ag * 2.0 - 1.0;
-		xy *= vec2( normalScale_x, normalScale_y );
-		float z = sqrt( max( 1.0 - dot( xy, xy ), 0.0 ) );
-		vec3 n = xy.x * tangent + xy.y * biTangent + z * baseN;
+		vec3 nTS = DecodeNormalTS( frag_tex_coord );
+		vec3 n = nTS.x * tangent + nTS.y * biTangent + nTS.z * baseN;
 
 		return normalize(n);
 	}else {
@@ -609,6 +674,15 @@ vec3 CalcSpecular( in vec3 specular, in float NH, in float NL,
 	float V = V_SmithJointApprox(roughness, NE, NL);
 
 	return D * F * V;
+}
+
+float CalcSpecularAO( in float ao, in float roughness, in float NE )
+{
+	float a = clamp( ao, 0.0, 1.0 );
+	float exponent = exp2( -16.0 * roughness - 1.0 );
+	float specAO = pow( clamp( NE + a, 0.0, 1.0 ), exponent );
+	specAO = specAO - 1.0 + a;
+	return clamp( specAO, 0.0, 1.0 );
 }
 
 
@@ -697,18 +771,27 @@ void main() {
 	vec4 fog = texture(fog_texture, fog_tex_coord);
 #endif
 
+#ifdef USE_VK_PBR
+	vec4 tex0 = PBR_SAMPLE_ALBEDO( frag_tex_coord0 );
+#else
+	vec4 tex0 = texture(texture0, frag_tex_coord0);
+#endif
+
 #if defined (USE_CLX_IDENT)
-	vec4 color0 = texture(texture0, frag_tex_coord0);
+	vec4 color0 = tex0;
 #elif defined (USE_FIXED_COLOR)
 	const vec4 frag_color = vec4(identity_color, identity_color,identity_color, identity_alpha);
-	vec4 color0 = texture(texture0, frag_tex_coord0) * frag_color;
+	vec4 color0 = tex0 * frag_color;
 #elif defined (USE_ENT_COLOR)
-	vec4 color0 = texture(texture0, frag_tex_coord0) * ent_color0;
+	vec4 color0 = tex0 * ent_color0;
 #else
-	vec4 color0 = texture(texture0, frag_tex_coord0) * frag_color0;
+	vec4 color0 = tex0 * VTX_COLOR0;
 #endif
 	vec4 base;
 
+#ifdef USE_VK_PBR
+	base = color0;
+#else
 	// triple-texture with non-identity colors in color1 and color2
 #if defined (USE_TX2)
 #ifdef USE_CL2
@@ -726,8 +809,8 @@ void main() {
 		vec4 color1 = texture(texture1, frag_tex_coord1) * ent_color1;
 		vec4 color2 = texture(texture2, frag_tex_coord2) * ent_color2;
 #else
-		vec4 color1 = texture(texture1, frag_tex_coord1) * frag_color1;
-		vec4 color2 = texture(texture2, frag_tex_coord2) * frag_color2;
+		vec4 color1 = texture(texture1, frag_tex_coord1) * VTX_COLOR1;
+		vec4 color2 = texture(texture2, frag_tex_coord2) * VTX_COLOR2;
 #endif
 
 		base = vec4( color0.rgb + color1.rgb + color2.rgb, color0.a * color1.a * color2.a );
@@ -745,8 +828,8 @@ void main() {
 		vec4 color1 = texture(texture1, frag_tex_coord1) * ent_color1;
 		vec4 color2 = texture(texture2, frag_tex_coord2) * ent_color2;
 #else
-		vec4 color1 = texture(texture1, frag_tex_coord1) * frag_color1;
-		vec4 color2 = texture(texture2, frag_tex_coord2) * frag_color2;
+		vec4 color1 = texture(texture1, frag_tex_coord1) * VTX_COLOR1;
+		vec4 color2 = texture(texture2, frag_tex_coord2) * VTX_COLOR2;
 #endif
 		color0 *= color0.a;
 		color1 *= color1.a;
@@ -766,8 +849,8 @@ void main() {
 		vec4 color1 = texture(texture1, frag_tex_coord1) * ent_color1;
 		vec4 color2 = texture(texture2, frag_tex_coord2) * ent_color2;
 #else
-		vec4 color1 = texture(texture1, frag_tex_coord1) * frag_color1;
-		vec4 color2 = texture(texture2, frag_tex_coord2) * frag_color2;
+		vec4 color1 = texture(texture1, frag_tex_coord1) * VTX_COLOR1;
+		vec4 color2 = texture(texture2, frag_tex_coord2) * VTX_COLOR2;
 #endif
 		color0 *= 1.0-color0.a;
 		color1 *= 1.0-color1.a;
@@ -787,8 +870,8 @@ void main() {
 		vec4 color1 = texture(texture1, frag_tex_coord1) * ent_color1;
 		vec4 color2 = texture(texture2, frag_tex_coord2) * ent_color2;
 #else
-		vec4 color1 = texture(texture1, frag_tex_coord1) * frag_color1;
-		vec4 color2 = texture(texture2, frag_tex_coord2) * frag_color2;
+		vec4 color1 = texture(texture1, frag_tex_coord1) * VTX_COLOR1;
+		vec4 color2 = texture(texture2, frag_tex_coord2) * VTX_COLOR2;
 #endif
 		//base = mix( color0, color1, color1.a );
 		//base = mix( base, color2, color2.a );
@@ -807,8 +890,8 @@ void main() {
 		vec4 color1 = texture(texture1, frag_tex_coord1) * ent_color1;
 		vec4 color2 = texture(texture2, frag_tex_coord2) * ent_color2;
 #else
-		vec4 color1 = texture(texture1, frag_tex_coord1) * frag_color1;
-		vec4 color2 = texture(texture2, frag_tex_coord2) * frag_color2;
+		vec4 color1 = texture(texture1, frag_tex_coord1) * VTX_COLOR1;
+		vec4 color2 = texture(texture2, frag_tex_coord2) * VTX_COLOR2;
 #endif
 		//base = mix( color1, color0, color1.a );
 		//base = mix( color2, base, color2.a );
@@ -826,8 +909,8 @@ void main() {
 		vec4 color1 = texture(texture1, frag_tex_coord1) * ent_color1;
 		vec4 color2 = texture(texture2, frag_tex_coord2) * ent_color2;
 #else
-		vec4 color1 = texture(texture1, frag_tex_coord1) * frag_color1;
-		vec4 color2 = texture(texture2, frag_tex_coord2) * frag_color2;
+		vec4 color1 = texture(texture1, frag_tex_coord1) * VTX_COLOR1;
+		vec4 color2 = texture(texture2, frag_tex_coord2) * VTX_COLOR2;
 #endif
 		base = (color2 + color2.a) * (color1 + color1.a) * color0;
 	}
@@ -844,8 +927,8 @@ void main() {
 		vec4 color1 = texture(texture1, frag_tex_coord1) * ent_color1;
 		vec4 color2 = texture(texture2, frag_tex_coord2) * ent_color2;
 #else
-		vec4 color1 = texture(texture1, frag_tex_coord1) * frag_color1;
-		vec4 color2 = texture(texture2, frag_tex_coord2) * frag_color2;
+		vec4 color1 = texture(texture1, frag_tex_coord1) * VTX_COLOR1;
+		vec4 color2 = texture(texture2, frag_tex_coord2) * VTX_COLOR2;
 #endif
 		base = color0 * color1 * color2;
 	}
@@ -871,8 +954,8 @@ void main() {
 		vec4 color1 = texture(texture1, frag_tex_coord1) * ent_color1;
 		vec4 color2 = texture(texture2, frag_tex_coord2) * ent_color2;
 #else
-		vec4 color1 = texture(texture1, frag_tex_coord1) * frag_color0;
-		vec4 color2 = texture(texture2, frag_tex_coord2) * frag_color0;
+		vec4 color1 = texture(texture1, frag_tex_coord1) * VTX_COLOR0;
+		vec4 color2 = texture(texture2, frag_tex_coord2) * VTX_COLOR0;
 #endif
 		base = vec4(color0.rgb + color1.rgb + color2.rgb, color0.a * color1.a * color2.a);
 	}
@@ -898,7 +981,7 @@ void main() {
 #elif defined (USE_ENT_COLOR)
 		vec4 color1 = texture(texture1, frag_tex_coord1) * ent_color1;
 #else
-		vec4 color1 = texture(texture1, frag_tex_coord1) * frag_color1;
+		vec4 color1 = texture(texture1, frag_tex_coord1) * VTX_COLOR1;
 #endif
 		base = vec4( color0.rgb + color1.rgb, color0.a * color1.a );
 	}
@@ -912,7 +995,7 @@ void main() {
 #elif defined (USE_ENT_COLOR)
 		vec4 color1 = texture(texture1, frag_tex_coord1) * ent_color1;
 #else
-		vec4 color1 = texture(texture1, frag_tex_coord1) * frag_color1;
+		vec4 color1 = texture(texture1, frag_tex_coord1) * VTX_COLOR1;
 #endif
 		color0 *= color0.a;
 		color1 *= color1.a;
@@ -928,7 +1011,7 @@ void main() {
 #elif defined (USE_ENT_COLOR)
 		vec4 color1 = texture(texture1, frag_tex_coord1) * ent_color1;
 #else
-		vec4 color1 = texture(texture1, frag_tex_coord1) * frag_color1;
+		vec4 color1 = texture(texture1, frag_tex_coord1) * VTX_COLOR1;
 #endif
 		color0 *= 1.0-color0.a;
 		color1 *= 1.0-color1.a;
@@ -944,7 +1027,7 @@ void main() {
 #elif defined (USE_ENT_COLOR)
 		vec4 color1 = texture(texture1, frag_tex_coord1) * ent_color1;
 #else
-		vec4 color1 = texture(texture1, frag_tex_coord1) * frag_color1;
+		vec4 color1 = texture(texture1, frag_tex_coord1) * VTX_COLOR1;
 #endif
 		base = mix( color0, color1, color1.a );
 	}
@@ -958,7 +1041,7 @@ void main() {
 #elif defined (USE_ENT_COLOR)
 		vec4 color1 = texture(texture1, frag_tex_coord1) * ent_color1;
 #else
-		vec4 color1 = texture(texture1, frag_tex_coord1) * frag_color1;
+		vec4 color1 = texture(texture1, frag_tex_coord1) * VTX_COLOR1;
 #endif
 		base = mix( color1, color0, color1.a );
 	}
@@ -973,7 +1056,7 @@ void main() {
 #elif defined (USE_ENT_COLOR)
 		vec4 color1 = texture(texture1, frag_tex_coord1) * ent_color1;
 #else
-		vec4 color1 = texture(texture1, frag_tex_coord1) * frag_color1;
+		vec4 color1 = texture(texture1, frag_tex_coord1) * VTX_COLOR1;
 #endif
 		base = (color1 + color1.a) * color0;
 	}
@@ -987,7 +1070,7 @@ void main() {
 #elif defined (USE_ENT_COLOR)
 		vec4 color1 = texture(texture1, frag_tex_coord1) * ent_color1;
 #else
-		vec4 color1 = texture(texture1, frag_tex_coord1) * frag_color1;
+		vec4 color1 = texture(texture1, frag_tex_coord1) * VTX_COLOR1;
 #endif
 		base = color0 * color1;
 	}
@@ -1009,7 +1092,7 @@ void main() {
 #elif defined (USE_ENT_COLOR)
 		vec4 color1 = texture(texture1, frag_tex_coord1) * ent_color1;
 #else
-		vec4 color1 = texture(texture1, frag_tex_coord1) * frag_color0;
+		vec4 color1 = texture(texture1, frag_tex_coord1) * VTX_COLOR0;
 #endif
 		base = vec4(color0.rgb + color1.rgb, color0.a * color1.a);
 	}
@@ -1027,6 +1110,7 @@ void main() {
 	}
 #endif // !USE_CL1
 #endif // !USE_TX1
+#endif // USE_VK_PBR
 
 #ifdef USE_ATEST
 #if 0
@@ -1104,12 +1188,16 @@ void main() {
 	#elif defined (USE_ENT_COLOR)
 			vec3 bias_color = ent_color1.rgb;
 	#else
-			vec3 bias_color = frag_color0.rgb;
+			vec3 bias_color = VTX_COLOR0.rgb;
 	#endif
 
-	#if ( defined(USE_TX1) || defined(USE_TX2) )
+#if ( defined(USE_TX1) || defined(USE_TX2) )
 		if ( lightmap_texture_set > -1 ) {
+		#ifdef USE_VK_PBR
+			vec3 lightmapColor = PBR_SAMPLE_LIGHTMAP( frag_tex_coord1 ).rgb;
+		#else
 			vec3 lightmapColor = texture(texture1, frag_tex_coord1).rgb;
+		#endif
 
 			lightColor = lightmapColor * bias_color;
 			diffuse = color0;
@@ -1139,6 +1227,11 @@ void main() {
 	#endif
 
 	lightColor *= PI;
+	if ( pbrDebug.z > 0.5 )
+	{
+		lightColor = vec3( 1.0 );
+		attenuation = 1.0;
+	}
 
 	vec4 specular = vec4( 1.0 );
 	float roughness = 0.99;
@@ -1150,7 +1243,7 @@ void main() {
 
 	// metallic roughness workflow
 	if ( physical_texture_set == 0 ) {
-		vec4 ORMS = texture( physical_texture, frag_tex_coord0 );
+		vec4 ORMS = PBR_SAMPLE_PHYSICAL( frag_tex_coord0 );
 		ORMS.xyzw *= vec4( specularScale_z, specularScale_w, specularScale_x, specularScale_y );
 
 		specular.rgb = mix( vec3( 0.08 ) * ORMS.w, diffuse.rgb, ORMS.z );
@@ -1162,24 +1255,32 @@ void main() {
 
 	// specular workflow
 	else if( physical_texture_set == 1 ){
-		specular = texture( physical_texture, frag_tex_coord0 );
+		specular = PBR_SAMPLE_PHYSICAL( frag_tex_coord0 );
 		specular.rgb *= vec3( specularScale_x, specularScale_y, specularScale_z );
 		roughness = mix( 1.0, 0.01, specular.a * ( 1.0 - specularScale_w ) );
 	}
 
 	if ( anisotropy_texture_set > -1 ) {
-		float aniso = texture( anisotropy_texture, frag_tex_coord0 ).r * pbrAnisotropyScale.x;
+		float aniso = PBR_SAMPLE_ANISOTROPY( frag_tex_coord0 ).r * pbrAnisotropyScale.x;
 		roughness = mix( roughness, max( 0.02, roughness * ( 1.0 - aniso ) ), aniso );
 	}
 
 	if ( emissive_texture_set > -1 ) {
-		emissive = texture( emissive_texture, frag_tex_coord0 ).rgb * pbrEmissiveScale.rgb;
+		emissive = PBR_SAMPLE_EMISSIVE( frag_tex_coord0 ).rgb * pbrEmissiveScale.rgb;
 	}
 
 	if ( subsurface_texture_set > -1 ) {
-		vec4 subTex = texture( subsurface_texture, frag_tex_coord0 );
+		vec4 subTex = PBR_SAMPLE_SUBSURFACE( frag_tex_coord0 );
 		subsurfaceColor *= subTex.rgb;
 		subsurfaceStrength *= subTex.a;
+	}
+
+	float clearcoatStrength = 0.0;
+	float clearcoatRoughness = 0.0;
+	if ( clearcoat_texture_set > -1 ) {
+		vec4 cc = PBR_SAMPLE_CLEARCOAT( frag_tex_coord0 );
+		clearcoatStrength = cc.r * pbrClearcoatScale.x;
+		clearcoatRoughness = clamp( cc.g * pbrClearcoatScale.y, 0.02, 1.0 );
 	}
 
 	ambientColor *= AO;
@@ -1205,9 +1306,13 @@ void main() {
 	float glintBlend = 0.0;
 	int glintDebugLevel = 0;
 	vec3 specDirect = Fs;
+	vec3 dbgBaseSpec = vec3( 0.0 );
+	vec3 dbgClearcoat = vec3( 0.0 );
+	vec3 dbgGlint = vec3( 0.0 );
+	bool glintEnabled = ( glintCore.x > 0.5 || pbrDebug.w > 0.5 );
 
 #ifdef USE_VK_PBR
-	if ( glintCore.x > 0.5 )
+	if ( glintEnabled )
 	{
 		glintTerm = ComputeGlintContribution( N, tangent, binormal, L, E, specular.rgb, roughness, NL, NH, NE, LH, VH, lightDistance, glintDebugData );
 		glintBlend = 1.0;
@@ -1216,27 +1321,64 @@ void main() {
 	}
 #endif
 
-	vec3 reflectance = Fd + specDirect;
+	float baseLayerScale = 1.0;
+	if ( clearcoatStrength > 0.0 ) {
+		baseLayerScale = clamp( 1.0 - clearcoatStrength * 0.25, 0.0, 1.0 );
+	}
 
-	out_color.rgb  = lightColor * reflectance * ( attenuation * NL );
-	out_color.rgb += ambientColor * diffuse.rgb;
+	float glintEnergyComp = clamp( glintEnergy.x, 0.0, 1.0 );
+	if ( glintEnabled && glintEnergyComp > 0.0 ) {
+		float glintWeight = clamp( glintMaterial.x, 0.0, 1.0 ) * glintBlend;
+		baseLayerScale *= ( 1.0 - 0.5 * glintEnergyComp * glintWeight );
+	}
+
+	Fd *= baseLayerScale;
+	specDirect = Fs * baseLayerScale;
+	if ( glintEnabled ) {
+		specDirect += glintTerm * glintBlend;
+	}
+
+	vec3 diffuseColor = diffuse.rgb * baseLayerScale;
+	float specAO = CalcSpecularAO( AO, roughness, NE );
+
+	vec3 directDiffuse = lightColor * Fd * ( attenuation * NL );
+	vec3 directSpecBase = lightColor * ( Fs * baseLayerScale ) * ( attenuation * NL );
+	vec3 directSpecGlint = vec3( 0.0 );
+	if ( glintEnabled )
+	{
+		directSpecGlint = lightColor * glintTerm * glintBlend * ( attenuation * NL );
+	}
+
+	out_color.rgb  = directDiffuse + directSpecBase + directSpecGlint;
+	out_color.rgb += ambientColor * diffuseColor;
+
+	dbgBaseSpec += directSpecBase;
+	dbgGlint += directSpecGlint;
 
 	// diffuse IBL (SH + irradiance)
-	out_color.rgb += CalcDiffuseIrradiance( N ) * diffuse.rgb * AO;
+	out_color.rgb += CalcDiffuseIrradiance( N ) * diffuseColor * AO;
 
 	if ( env_texture_set > -1 )
-		out_color.rgb += CalcIBLContribution( roughness, N, E, NE, specular.rgb * AO );
+	{
+		vec3 specIBL = CalcIBLContribution( roughness, N, E, NE, specular.rgb * baseLayerScale * specAO );
+		out_color.rgb += specIBL;
+		dbgBaseSpec += specIBL;
+	}
 
 #ifdef USE_VK_PBR
-	if ( glintCore.x > 0.5 )
+	if ( glintEnabled )
 	{
 		if ( glintRouting.y > 0.5 )
 		{
-			out_color.rgb += lightColor * glintTerm * ( attenuation * NL ) * glintBlend;
+			vec3 glintDirect = lightColor * glintTerm * ( attenuation * NL ) * glintBlend;
+			out_color.rgb += glintDirect;
+			dbgGlint += glintDirect;
 		}
 		if ( glintRouting.x > 0.5 )
 		{
-			out_color.rgb += glintTerm * glintBlend * 0.25;
+			vec3 glintIBL = glintTerm * glintBlend * 0.25 * specAO;
+			out_color.rgb += glintIBL;
+			dbgGlint += glintIBL;
 		}
 	}
 
@@ -1271,17 +1413,16 @@ void main() {
 #endif
 
 	// clearcoat lobe
-	if ( clearcoat_texture_set > -1 ) {
-		vec4 cc = texture( clearcoat_texture, frag_tex_coord0 );
-		float ccStrength = cc.r * pbrClearcoatScale.x;
-		float ccRoughness = clamp( cc.g * pbrClearcoatScale.y, 0.02, 1.0 );
-		vec3 ccSpec = CalcSpecular( vec3(0.04), NH, NL, NE, LH, VH, ccRoughness );
-		out_color.rgb += lightColor * ccSpec * ( attenuation * NL ) * ccStrength;
+	if ( clearcoatStrength > 0.0 ) {
+		vec3 ccSpec = CalcSpecular( vec3(0.04), NH, NL, NE, LH, VH, clearcoatRoughness );
+		vec3 ccDirect = lightColor * ccSpec * ( attenuation * NL ) * clearcoatStrength;
+		out_color.rgb += ccDirect;
+		dbgClearcoat += ccDirect;
 	}
 
 	// sheen term
 	if ( sheen_texture_set > -1 ) {
-		vec3 sheenColor = texture( sheen_texture, frag_tex_coord0 ).rgb * pbrSheenScale.rgb;
+		vec3 sheenColor = PBR_SAMPLE_SHEEN( frag_tex_coord0 ).rgb * pbrSheenScale.rgb;
 		out_color.rgb += sheenColor * NL * 0.05;
 	}
 
@@ -1292,7 +1433,7 @@ void main() {
 
 	// transmission term
 	if ( transmission_texture_set > -1 ) {
-		float transmission = texture( transmission_texture, frag_tex_coord0 ).r * pbrTransmissionScale.x;
+		float transmission = PBR_SAMPLE_TRANSMISSION( frag_tex_coord0 ).r * pbrTransmissionScale.x;
 		float transmitFactor = transmission * ( 1.0 - roughness );
 		diffuse.rgb *= ( 1.0 - transmitFactor );
 		out_color.rgb += lightColor * diffuse.rgb * ( attenuation * NL ) * transmitFactor;
@@ -1302,14 +1443,149 @@ void main() {
 
 #ifdef USE_VK_PBR
 	// Soft tonemap for glint path to avoid overbright blowout.
-	if ( glintCore.x > 0.5 )
+	if ( glintEnabled )
 	{
 		vec3 color = out_color.rgb;
 		out_color.rgb = color / ( color + vec3( 1.0 ) );
 	}
 #endif
 
-	out_color.a = diffuse.a;
+	int pbrDebugView = int( floor( pbrDebug.x + 0.5 ) );
+	if ( pbrDebugView == 5 )
+	{
+		out_color.rgb = vec3( AO );
+		out_color.a = 1.0;
+	}
+	else if ( pbrDebugView == 6 )
+	{
+		out_color.rgb = vec3( specAO );
+		out_color.a = 1.0;
+	}
+	else if ( pbrDebugView == 7 )
+	{
+		vec3 nTS = ( normal_texture_set > -1 ) ? DecodeNormalTS( frag_tex_coord0 ) : vec3( 0.0, 0.0, 1.0 );
+		out_color.rgb = nTS * 0.5 + 0.5;
+		out_color.a = 1.0;
+	}
+	else if ( pbrDebugView == 8 )
+	{
+		if ( normal_texture_set > -1 )
+		{
+			vec4 ntex = PBR_SAMPLE_NORMAL( frag_tex_coord0 );
+			out_color.rgb = vec3( ntex.r, ntex.g, ntex.a );
+		}
+		else
+		{
+			out_color.rgb = vec3( 0.0 );
+		}
+		out_color.a = 1.0;
+	}
+	else if ( pbrDebugView == 9 )
+	{
+		vec3 lum = vec3( 0.2126, 0.7152, 0.0722 );
+		vec3 energy = vec3( dot( dbgBaseSpec, lum ), dot( dbgClearcoat, lum ), dot( dbgGlint, lum ) );
+		energy = energy / ( energy + vec3( 1.0 ) );
+		out_color.rgb = energy;
+		out_color.a = 1.0;
+	}
+	else if ( pbrDebugView == 10 )
+	{
+		vec3 c = lightColor / ( lightColor + vec3( 1.0 ) );
+		out_color.rgb = c;
+		out_color.a = 1.0;
+	}
+	else if ( pbrDebugView == 11 )
+	{
+		out_color.rgb = vec3( NL );
+		out_color.a = 1.0;
+	}
+	else if ( pbrDebugView == 12 )
+	{
+		out_color.rgb = diffuseColor;
+		out_color.a = 1.0;
+	}
+	else if ( pbrDebugView == 13 )
+	{
+		// UBO sanity: R = debug mode / 20, G = normal swizzle, B = forceLight
+		out_color.rgb = vec3( clamp( pbrDebug.x / 20.0, 0.0, 1.0 ), clamp( pbrDebug.y, 0.0, 1.0 ), clamp( pbrDebug.z, 0.0, 1.0 ) );
+		out_color.a = 1.0;
+	}
+	else if ( pbrDebugView == 14 )
+	{
+		// Direct diffuse contribution.
+		out_color.rgb = directDiffuse;
+		out_color.a = 1.0;
+	}
+	else if ( pbrDebugView == 15 )
+	{
+		// Direct specular contribution (base layer).
+		out_color.rgb = directSpecBase;
+		out_color.a = 1.0;
+	}
+	else if ( pbrDebugView == 16 )
+	{
+		// Specular IBL diagnostics.
+		if ( env_texture_set < 0 || irradiance_texture_set < 0 )
+		{
+			out_color.rgb = vec3( 1.0, 0.0, 1.0 ); // MAGENTA: IBL compiled out
+		}
+		else
+		{
+			vec3 specIBL = ( env_texture_set > -1 ) ? CalcIBLContribution( roughness, N, E, NE, specular.rgb * baseLayerScale * specAO ) : vec3( 0.0 );
+			if ( length( specIBL ) < 1e-4 )
+			{
+				out_color.rgb = vec3( 1.0, 1.0, 0.0 ); // YELLOW: IBL on but sampling near-zero
+			}
+			else
+			{
+				out_color.rgb = specIBL;
+			}
+		}
+		out_color.a = 1.0;
+	}
+	else if ( pbrDebugView == 17 )
+	{
+		// Diffuse IBL diagnostics.
+		if ( env_texture_set < 0 || irradiance_texture_set < 0 )
+		{
+			out_color.rgb = vec3( 1.0, 0.0, 1.0 ); // MAGENTA: IBL compiled out
+		}
+		else
+		{
+			vec3 diffIBL = CalcDiffuseIrradiance( N ) * diffuseColor * AO;
+			if ( length( diffIBL ) < 1e-4 )
+			{
+				out_color.rgb = vec3( 1.0, 1.0, 0.0 ); // YELLOW: IBL on but sampling near-zero
+			}
+			else
+			{
+				out_color.rgb = diffIBL;
+			}
+		}
+		out_color.a = 1.0;
+	}
+	else if ( pbrDebugView == 18 )
+	{
+		// Glint contribution diagnostics.
+		bool glintDictInvalid = ( glintDict.x < 1.0 || glintDict.y < 2.0 || glintDict.z < 1.0 );
+		if ( glintCore.x < 0.5 || glintDictInvalid )
+		{
+			out_color.rgb = vec3( 1.0, 0.0, 0.0 ); // RED: glints disabled or dict invalid
+		}
+		else if ( length( dbgGlint ) < 1e-4 )
+		{
+			out_color.rgb = vec3( 0.0, 1.0, 1.0 ); // CYAN: glints enabled but near-zero output
+		}
+		else
+		{
+			out_color.rgb = dbgGlint;
+		}
+		out_color.a = 1.0;
+	}
+	else
+	{
+		out_color.a = diffuse.a;
+	}
 #else
 	out_color = base;
 #endif

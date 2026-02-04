@@ -838,7 +838,6 @@ static void Sys_PrintBinVersion( const char* name )
 }
 
 
-#ifdef __APPLE__
 static char binaryPath[ MAX_OSPATH ] = { 0 };
 static char installPath[ MAX_OSPATH ] = { 0 };
 
@@ -871,6 +870,7 @@ static void Sys_SetDefaultBasePath( const char *path )
 	Q_strncpyz( installPath, path, sizeof( installPath ) );
 }
 
+#ifdef __APPLE__
 
 /*
 =================
@@ -918,6 +918,11 @@ char *Sys_DefaultAppPath( void )
 {
 	return binaryPath;
 }
+#else
+char *Sys_DefaultAppPath( void )
+{
+	return binaryPath[0] ? binaryPath : Sys_Pwd();
+}
 #endif // __APPLE__
 
 
@@ -928,12 +933,15 @@ Sys_DefaultBasePath
 */
 const char *Sys_DefaultBasePath( void )
 {
-#ifdef __APPLE__
+	// Prefer the resolved binary directory when available so launching from a
+	// different working directory (e.g. repo root) still finds game assets.
 	if ( installPath[0] != '\0' )
 		return installPath;
-	else
-#endif
-		return Sys_Pwd();
+
+	if ( binaryPath[0] != '\0' )
+		return binaryPath;
+
+	return Sys_Pwd();
 }
 
 
@@ -1018,10 +1026,15 @@ int main( int argc, const char* argv[] )
 		return 0; // print version and exit
 	}
 
+	{
+		const char *binName = Sys_BinName( argv[ 0 ] );
+		Sys_SetBinaryPath( binName );
 #ifdef __APPLE__
-	Sys_SetBinaryPath( argv[ 0 ] );
-	Sys_SetDefaultBasePath( Sys_StripAppBundle( binaryPath ) );
+		Sys_SetDefaultBasePath( Sys_StripAppBundle( binaryPath ) );
+#else
+		Sys_SetDefaultBasePath( binaryPath );
 #endif
+	}
 
 	// merge the command line, this is kinda silly
 	for ( len = 1, i = 1; i < argc; i++ )

@@ -147,6 +147,12 @@ static void Con_LoadHistory( void )
 		Field_Clear( &historyEditLines[i] );
 	}
 
+	// One-time migration: rename legacy history file if present.
+	if ( !FS_FileExists( CONSOLE_HISTORY_FILE ) && FS_FileExists( LEGACY_CONSOLE_HISTORY_FILE ) ) {
+		Com_Printf( "Migrating %s -> %s\n", LEGACY_CONSOLE_HISTORY_FILE, CONSOLE_HISTORY_FILE );
+		FS_Rename( LEGACY_CONSOLE_HISTORY_FILE, CONSOLE_HISTORY_FILE );
+	}
+
 	consoleSaveBufferSize = FS_Home_FOpenFileRead( CONSOLE_HISTORY_FILE, &f );
 	if ( f == FS_INVALID_HANDLE )
 	{

@@ -135,11 +135,21 @@ fi
 echo "Running CMake configuration..."
 cmake -S "$PROJECT_ROOT" -B "$BUILD_DIR" "${CMAKE_FLAGS[@]}"
 
+if [ "$VULKAN" -eq 1 ]; then
+  echo "Regenerating Vulkan shaders..."
+  python3 "$PROJECT_ROOT/scripts/compile_vulkan_shaders.py"
+fi
+
 echo "Building with ${CORES} parallel jobs..."
 if [ "$QUIET" -eq 1 ]; then
   cmake --build "$BUILD_DIR" -- -j"${CORES}" -s
 else
-  cmake --build "$BUILD_DIR" -- -j"${CORES}"
+  # Explicit Vulkan Release command for convenience
+  if [ "$VULKAN" -eq 1 ] && [ "$BUILD_TYPE" = "Release" ] && [ "$BUILD_DIR" = "$PROJECT_ROOT/build-vk-Release" ]; then
+    cmake --build "$PROJECT_ROOT/build-vk-Release" -- -j"${CORES}"
+  else
+    cmake --build "$BUILD_DIR" -- -j"${CORES}"
+  fi
 fi
 
 echo ""

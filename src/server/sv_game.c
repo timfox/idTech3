@@ -27,6 +27,18 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 botlib_export_t	*botlib_export;
 
+static qboolean SV_EnsureBotLibForCall( int callnum )
+{
+	// Some mods call BOTLIB_* functions without ever issuing BOTLIB_SETUP.
+	// Avoid crashes by auto-initializing botlib on first use. Setup is idempotent.
+	if ( callnum >= BOTLIB_SETUP && callnum < G_CVAR_SETDESCRIPTION ) {
+		if ( callnum != BOTLIB_SETUP && callnum != BOTLIB_SHUTDOWN ) {
+			return ( SV_BotLibSetup() == 0 ) ? qtrue : qfalse;
+		}
+	}
+	return qtrue;
+}
+
 // these functions must be used instead of pointer arithmetic, because
 // the game allocates gentities with private information after the server shared part
 int	SV_NumForGentity( sharedEntity_t *ent ) {
@@ -365,6 +377,12 @@ The module is making a system call
 ====================
 */
 static intptr_t SV_GameSystemCalls( intptr_t *args ) {
+	if ( !SV_EnsureBotLibForCall( (int)args[0] ) ) {
+		// Return a safe default so the server doesn't crash. Mods that rely on botlib
+		// should handle failure codes gracefully (same as missing AAS data, etc.).
+		return 0;
+	}
+
 	switch( args[0] ) {
 	case G_PRINT:
 		Com_Printf( "%s", (const char*)VMA(1) );

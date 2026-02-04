@@ -43,8 +43,8 @@ def collect_tasks():
     mode_flags = ["-DUSE_CLX_IDENT", "-DUSE_FIXED_COLOR"]
     mode_ids = ["ident1", "fixed"]
 
-    pbr_flags = ["", "-DUSE_VK_PBR"]
-    pbr_ids = ["", "pbr_"]
+    pbr_flags = ["", "-DUSE_VK_PBR", "-DUSE_VK_PBR -DUSE_DESCRIPTOR_INDEXING"]
+    pbr_ids = ["", "pbr_", "pbrdi_"]
 
     tx_flags = ["", "-DUSE_TX1", "-DUSE_TX2"]
     tx_ids = ["tx0", "tx1", "tx2"]
@@ -74,6 +74,8 @@ def collect_tasks():
     create_task(tasks, "gen_frag.tmpl", "frag", "frag_tx0_ent_fog", None, "-DUSE_ENT_COLOR -DUSE_ATEST  -DUSE_FOG")
     create_task(tasks, "gen_frag.tmpl", "frag", "frag_pbr_tx0_ent", None, "-DUSE_ENT_COLOR -DUSE_ATEST  -DUSE_VK_PBR")
     create_task(tasks, "gen_frag.tmpl", "frag", "frag_pbr_tx0_ent_fog", None, "-DUSE_ENT_COLOR -DUSE_ATEST  -DUSE_FOG  -DUSE_VK_PBR")
+    create_task(tasks, "gen_frag.tmpl", "frag", "frag_pbrdi_tx0_ent", None, "-DUSE_ENT_COLOR -DUSE_ATEST  -DUSE_VK_PBR -DUSE_DESCRIPTOR_INDEXING")
+    create_task(tasks, "gen_frag.tmpl", "frag", "frag_pbrdi_tx0_ent_fog", None, "-DUSE_ENT_COLOR -DUSE_ATEST  -DUSE_FOG  -DUSE_VK_PBR -DUSE_DESCRIPTOR_INDEXING")
 
     # ident / fixed vertex shaders
     for i in range(len(pbr_flags)):

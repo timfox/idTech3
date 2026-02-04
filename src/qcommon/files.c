@@ -68,7 +68,7 @@ should still function correctly, but all file writes will fail (harmlessly).
 
 The "home path" is the path used for all write access. On win32 systems we have "base path"
 == "home path", but on *nix systems the base installation is usually read-only, and
-"home path" points to ~/.q3a or similar
+"home path" points to ~/.fox or similar
 
 The user can also install custom mods and content in "home path", so it should be searched
 along with "home path" and "cd path" for game content.
@@ -102,7 +102,7 @@ automatically restricts where game media can come from to prevent add-ons from w
 After the paths are initialized, quake will look for the product.txt file.  If not
 found and verified, the game will run in restricted mode.  In restricted mode, only 
 files contained in demoq3/pak0.pk3 will be available for loading, and only if the zip header is
-verified to not have been modified.  A single exception is made for q3config.cfg.  Files
+verified to not have been modified.  A single exception is made for config.cfg.  Files
 can still be written out in restricted mode, so screenshots and demos are allowed.
 Restricted mode can be tested by setting "+set fs_restrict 1" on the command line, even
 if there is a valid product.txt under the basepath or cdpath.
@@ -190,7 +190,7 @@ Read / write config to floppy option.
 
 Different version coexistence?
 
-When building a pak file, make sure a q3config.cfg isn't present in it,
+When building a pak file, make sure a config.cfg isn't present in it,
 or configs will never get loaded from disk!
 
   todo:
@@ -5481,7 +5481,7 @@ void FS_Restart( int checksumFeed ) {
 
 	// new check before safeMode
 	if ( Q_stricmp(fs_gamedirvar->string, lastValidGame) && execConfig ) {
-		// skip the q3config.cfg if "safe" is on the command line
+		// skip config.cfg if "safe" is on the command line
 		if ( !Com_SafeMode() ) {
 			Cbuf_AddText( "exec " Q3CONFIG_CFG "\n" );
 		}
@@ -5825,7 +5825,9 @@ void *FS_LoadLibrary( const char *name )
 	int nameLen = strlen(name);
 
 	while ( !libHandle && sp ) {
-		while ( sp && ( sp->policy != DIR_STATIC || !sp->dir ) ) {
+		// Native VMs should be loadable from any allowed directory searchpath.
+		// Some searchpaths (e.g. pk3dir-backed dirs) use DIR_ALLOW rather than DIR_STATIC.
+		while ( sp && ( !sp->dir || sp->policy == DIR_DENY ) ) {
 			sp = sp->next;
 		}
 		if ( sp ) {
@@ -5841,6 +5843,12 @@ void *FS_LoadLibrary( const char *name )
 				} else if ( Q_strncmp(name, "cgame", 5) == 0 && Q_strncmp(name + nameLen - 3, ".so", 3) == 0 ) {
 					// Convert "cgamex86_64.so" -> "cgame.x86_64.so"
 					Com_sprintf( dottedName, sizeof( dottedName ), "cgame.%s", name + 5 );
+					Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", dottedName );
+					const char *fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath );
+					libHandle = Sys_LoadLibrary( fn );
+				} else if ( Q_strncmp(name, "game", 4) == 0 && Q_strncmp(name + nameLen - 3, ".so", 3) == 0 ) {
+					// Convert "gamex86_64.so" -> "game.x86_64.so"
+					Com_sprintf( dottedName, sizeof( dottedName ), "game.%s", name + 4 );
 					Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", dottedName );
 					const char *fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath );
 					libHandle = Sys_LoadLibrary( fn );

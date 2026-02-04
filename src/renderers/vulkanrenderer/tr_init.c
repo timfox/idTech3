@@ -86,6 +86,7 @@ cvar_t	*r_vk_gpuMarkers;
 cvar_t	*r_vk_dumpCaps;
 cvar_t	*r_vk_syncValidation;
 cvar_t	*r_vk_deviceOverride;
+cvar_t	*r_vk_descriptorIndexing;
 #ifdef USE_VBO
 cvar_t	*r_vbo;
 #endif
@@ -93,6 +94,9 @@ cvar_t	*r_vbo;
 cvar_t	*r_pbr;
 cvar_t	*r_pbr_shExtract;
 cvar_t	*r_pbr_debug;
+cvar_t	*r_pbr_normalSwizzle;
+cvar_t	*r_pbr_forceLight;
+cvar_t	*r_pbr_forceGlints;
 cvar_t	*r_pbr_packedPreferred;
 #ifdef VK_CUBEMAP
 cvar_t	*r_pbr_iblIrradianceSize;
@@ -1653,14 +1657,43 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_pbr_shExtract, "Extract SH coefficients from generated irradiance cubemaps for PBR." );
 
 	r_pbr_debug = ri.Cvar_Get( "r_pbr_debug", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_pbr_debug, "0", "4", CV_INTEGER );
+	ri.Cvar_CheckRange( r_pbr_debug, "0", "18", CV_INTEGER );
 	ri.Cvar_SetDescription( r_pbr_debug,
 		"PBR debug view override (Vulkan PBR only):\n"
 		" 0 - off (normal PBR)\n"
 		" 1 - show base/albedo (texture0)\n"
 		" 2 - show normal map (RGB)\n"
 		" 3 - show physical map (packed)\n"
-		" 4 - show emissive map (RGB)\n" );
+		" 4 - show emissive map (RGB)\n"
+		" 5 - show AO (diffuse)\n"
+		" 6 - show AO (specular)\n"
+		" 7 - show decoded normal (tangent-space)\n"
+		" 8 - show normal texture channels (R,G,A)\n"
+		" 9 - show energy split (R=base spec, G=clearcoat, B=glints)\n"
+		" 10 - show direct light color (compressed)\n"
+		" 11 - show N.L (Lambert)\n"
+		" 12 - show base diffuse color (post-scale)\n"
+		" 13 - show pbrDebug uniforms (R=mode/18, G=swizzle, B=forceLight, A=forceGlints)\n"
+		" 14 - show direct diffuse contribution\n"
+		" 15 - show direct specular contribution\n"
+		" 16 - show diffuse IBL contribution\n"
+		" 17 - show specular IBL contribution\n"
+		" 18 - show glint contribution\n" );
+
+	r_pbr_normalSwizzle = ri.Cvar_Get( "r_pbr_normalSwizzle", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbr_normalSwizzle, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pbr_normalSwizzle,
+		"Normal map swizzle for Vulkan PBR: 0 = AG (DXT5nm), 1 = RG (BC5)." );
+
+	r_pbr_forceLight = ri.Cvar_Get( "r_pbr_forceLight", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbr_forceLight, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pbr_forceLight,
+		"Force PBR direct light color to white for debugging (0=off, 1=on)." );
+
+	r_pbr_forceGlints = ri.Cvar_Get( "r_pbr_forceGlints", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbr_forceGlints, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pbr_forceGlints,
+		"Force glint evaluation for Vulkan PBR debugging (0=off, 1=on)." );
 
 	r_pbr_packedPreferred = ri.Cvar_Get( "r_pbr_packedPreferred", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_pbr_packedPreferred, "0", "6", CV_INTEGER );
@@ -2020,6 +2053,9 @@ static void R_Register( void )
 
 	r_vk_deviceOverride = ri.Cvar_Get( "r_vk_deviceOverride", "", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_vk_deviceOverride, "Match a substring of the device name to override the automatic physical device selection." );
+	r_vk_descriptorIndexing = ri.Cvar_Get( "r_vk_descriptorIndexing", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_vk_descriptorIndexing, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_vk_descriptorIndexing, "Enable Vulkan descriptor indexing for the PBR path when supported (requires restart)." );
 
 	r_fbo = ri.Cvar_Get( "r_fbo", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_fbo, "Use framebuffer objects, enables gamma correction in windowed mode and allows arbitrary video size and screenshot/video capture.\n Required for bloom, HDR rendering, anti-aliasing and greyscale effects." );

@@ -625,7 +625,7 @@ qboolean Com_EarlyParseCmdLine( char *commandLine, char *con_title, int title_si
 Com_SafeMode
 
 Check for "safe" on the command line, which will
-skip loading of q3config.cfg
+skip loading of config.cfg
 ===================
 */
 qboolean Com_SafeMode( void ) {
@@ -2123,7 +2123,7 @@ static void Com_InitZoneMemory( void ) {
 	cvar_t	*cv;
 
 	// Please note: com_zoneMegs can only be set on the command line, and
-	// not in q3config.cfg or Com_StartupVariable, as they haven't been
+	// not in config.cfg or Com_StartupVariable, as they haven't been
 	// executed by this point. It's a chicken and egg problem. We need the
 	// memory manager configured to handle those places where you would
 	// configure the memory manager.
@@ -3065,7 +3065,15 @@ static void Com_ExecuteCfg( void )
 
 	if (!Com_SafeMode())
 	{
-		// skip the q3config.cfg and autoexec.cfg if "safe" is on the command line
+		// Skip config.cfg and autoexec.cfg if "safe" is on the command line.
+		//
+		// One-time migration: if an old q3config*.cfg exists in the current game dir,
+		// rename it so settings carry over.
+		if ( !FS_FileExists( Q3CONFIG_CFG ) && FS_FileExists( LEGACY_Q3CONFIG_CFG ) ) {
+			Com_Printf( "Migrating %s -> %s\n", LEGACY_Q3CONFIG_CFG, Q3CONFIG_CFG );
+			FS_Rename( LEGACY_Q3CONFIG_CFG, Q3CONFIG_CFG );
+		}
+
 		Cbuf_ExecuteText(EXEC_NOW, "exec " Q3CONFIG_CFG "\n");
 		Cbuf_Execute();
 		Cbuf_ExecuteText(EXEC_NOW, "exec autoexec.cfg\n");
@@ -3160,6 +3168,8 @@ char	cl_cdkey[34] = "                                ";
 char	cl_cdkey[34] = "123456789";
 #endif
 
+static cvar_t *cl_skipcdkey;
+
 /*
 =================
 bool CL_CDKeyValidate
@@ -3173,6 +3183,29 @@ qboolean Com_CDKeyValidate( const char *key, const char *checksum ) {
 	byte	sum;
 	char	chs[10];
 	int i, len;
+
+	// Optional dev-friendly bypass: let empty/demo keys pass so the UI won't block startup.
+	// This does NOT accept arbitrary invalid keys (only blank/all-whitespace/"demo").
+	if ( cl_skipcdkey && cl_skipcdkey->integer ) {
+		if ( !key || !*key ) {
+			return qtrue;
+		}
+		if ( Q_stricmp( key, "demo" ) == 0 ) {
+			return qtrue;
+		}
+		{
+			qboolean all_space = qtrue;
+			for ( i = 0; key[i] != '\0'; i++ ) {
+				if ( key[i] > ' ' ) {
+					all_space = qfalse;
+					break;
+				}
+			}
+			if ( all_space ) {
+				return qtrue;
+			}
+		}
+	}
 
 	len = strlen(key);
 	if( len != CDKEY_LEN ) {
@@ -3846,6 +3879,12 @@ void Com_Init( char *commandLine ) {
 #if defined(_WIN32) && defined(_DEBUG)
 	com_noErrorInterrupt = Cvar_Get( "com_noErrorInterrupt", "0", 0 );
 #endif
+
+	// Dev QoL: allow skipping CD key entry (keeps startup unblocked for mods/forks).
+	// See Com_CDKeyValidate().
+	cl_skipcdkey = Cvar_Get( "cl_skipcdkey", "1", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( cl_skipcdkey, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( cl_skipcdkey, "Skip CD key entry/validation for blank keys (0=off, 1=on)." );
 
 #ifdef DEFAULT_GAME
 	Cvar_Set( "fs_game", DEFAULT_GAME );

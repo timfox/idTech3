@@ -48,18 +48,36 @@
 typedef float mat4_t[16];
 
 #ifdef USE_VK_PBR
-	#define VK_DESC_PBR_BRDFLUT				5
-	#define VK_DESC_PBR_NORMAL				6
-	#define VK_DESC_PBR_PHYSICAL			7
-	#define VK_DESC_PBR_CUBEMAP				8
-	#define VK_DESC_PBR_IRRADIANCE			9
-	#define VK_DESC_PBR_EMISSIVE			10
-	#define VK_DESC_PBR_CLEARCOAT			11
-	#define VK_DESC_PBR_SHEEN				12
-	#define VK_DESC_PBR_ANISOTROPY			13
-	#define VK_DESC_PBR_TRANSMISSION		14
-	#define VK_DESC_PBR_SUBSURFACE			15
-	#define VK_DESC_COUNT	16
+	#define VK_PBR_VARIANT_COUNT        3
+	#define VK_PBR_INDEXED_RESERVED     1
+
+	// Descriptor sets
+	#define VK_DESC_PBR					5
+	#define VK_DESC_COUNT				6
+
+	// PBR set bindings (set = VK_DESC_PBR)
+	#define VK_PBR_BINDING_ALBEDO		0
+	#define VK_PBR_BINDING_NORMAL		1
+	#define VK_PBR_BINDING_PHYSICAL		2
+	#define VK_PBR_BINDING_EMISSIVE		3
+	#define VK_PBR_BINDING_LIGHTMAP		4
+	#define VK_PBR_BINDING_CLEARCOAT	5
+	#define VK_PBR_BINDING_SHEEN		6
+	#define VK_PBR_BINDING_ANISOTROPY	7
+	#define VK_PBR_BINDING_TRANSMISSION	8
+	#define VK_PBR_BINDING_SUBSURFACE	9
+	#define VK_PBR_BINDING_BRDFLUT		10
+	#define VK_PBR_BINDING_GLINT_DICT	11
+	#define VK_PBR_BINDING_ENV_CUBEMAP	12
+	#define VK_PBR_BINDING_IRRADIANCE	13
+	#define VK_PBR_BINDING_COUNT		14
+
+	// PBR indexed bindings (set = VK_DESC_PBR)
+	#define VK_PBR_INDEXED_BINDING_TEXTURES	0
+	#define VK_PBR_INDEXED_BINDING_BRDFLUT		1
+	#define VK_PBR_INDEXED_BINDING_ENV_CUBEMAP	2
+	#define VK_PBR_INDEXED_BINDING_IRRADIANCE	3
+	#define VK_PBR_INDEXED_BINDING_COUNT		4
 #else
 	#define VK_DESC_COUNT   5
 #endif
@@ -213,6 +231,7 @@ typedef struct {
 
 #ifdef USE_VK_PBR
 	uint32_t				vk_pbr_flags;
+	uint32_t				descriptorIndexing;
 	vec4_t					specularScale;
 	vec4_t					normalScale;
 #endif
@@ -271,6 +290,10 @@ typedef struct vkUniform_s {
 	vec4_t glintDictExtras;
 	vec4_t glintPerformance;
 	vec4_t glintColor;
+	vec4_t pbrDebug;
+	vec4_t pbrTexIndex0;
+	vec4_t pbrTexIndex1;
+	vec4_t pbrTexIndex2;
 #endif
 } vkUniform_t;
 
@@ -278,6 +301,14 @@ _Static_assert( offsetof(vkUniform_t, glintMaterial) == offsetof(vkUniform_t, gl
 	"glint layout mismatch: glintMaterial should follow glintCore" );
 _Static_assert( offsetof(vkUniform_t, glintColor) == offsetof(vkUniform_t, glintPerformance) + sizeof(vec4_t),
 	"glint layout mismatch: glintColor should follow glintPerformance" );
+_Static_assert( offsetof(vkUniform_t, pbrDebug) == offsetof(vkUniform_t, glintColor) + sizeof(vec4_t),
+	"pbr debug layout mismatch: pbrDebug should follow glintColor" );
+_Static_assert( offsetof(vkUniform_t, pbrTexIndex0) == offsetof(vkUniform_t, pbrDebug) + sizeof(vec4_t),
+	"pbr layout mismatch: pbrTexIndex0 should follow pbrDebug" );
+_Static_assert( offsetof(vkUniform_t, pbrTexIndex1) == offsetof(vkUniform_t, pbrTexIndex0) + sizeof(vec4_t),
+	"pbr layout mismatch: pbrTexIndex1 should follow pbrTexIndex0" );
+_Static_assert( offsetof(vkUniform_t, pbrTexIndex2) == offsetof(vkUniform_t, pbrTexIndex1) + sizeof(vec4_t),
+	"pbr layout mismatch: pbrTexIndex2 should follow pbrTexIndex1" );
 _Static_assert( sizeof(vkUniform_t) % sizeof(vec4_t) == 0, "vkUniform_t size must be a multiple of vec4_t" );
 
 typedef struct vkUniformCamera_s {
@@ -391,6 +422,9 @@ void vk_queue_wait_idle( void );
 void vk_create_image( image_t *image, int width, int height, int mip_levels );
 void vk_upload_image_data( image_t *image, int x, int y, int width, int height, int miplevels, byte *pixels, int size, qboolean update );
 void vk_update_descriptor_set( image_t *image, qboolean mipmap );
+uint32_t vk_get_image_descriptor_index( const image_t *image );
+uint32_t vk_get_glint_dict_index( void );
+VkDescriptorSet vk_get_pbr_indexed_descriptor( void );
 void vk_destroy_image_resources( VkImage *image, VkImageView *imageView );
 void vk_bind_generated_shaders( void );
 void vk_update_attachment_descriptors( void );
@@ -444,6 +478,9 @@ void vk_reset_descriptor( int index );
 void vk_update_descriptor( int index, VkDescriptorSet descriptor );
 void vk_update_descriptor_offset( int index, uint32_t offset );
 void vk_update_glint_descriptor_binding( VkDescriptorSet descriptor );
+void vk_update_pbr_descriptor_binding( VkDescriptorSet descriptor, uint32_t binding, const image_t *image );
+void vk_update_pbr_descriptor_common( VkDescriptorSet descriptor );
+void vk_update_pbr_indexed_common( const image_t *env, const image_t *irr );
 #ifdef USE_VK_PBR
 VkImageView vk_get_glint_dictionary_view( void );
 void vk_update_glint_dictionary_if_needed( const glint_dict_params_t *params, qboolean force );
@@ -503,12 +540,13 @@ typedef struct vk_tess_s {
 
 	struct {
 		uint32_t		start, end;
-		VkDescriptorSet	current[VK_DESC_COUNT]; // 0:uniform, 1:color0, 2:color1, 3:color2, 4:fog, 5:brdf lut + glint dictionary, 6:normal, 7:physical, 8:cubemap, 9:irradiance, 10:emissive, 11:clearcoat, 12:sheen, 13:anisotropy, 14:transmission, 15:subsurface
+		VkDescriptorSet	current[VK_DESC_COUNT]; // 0:uniform, 1:color0, 2:color1, 3:color2, 4:fog, 5:pbr material
 		uint32_t		offset[3]; // 0 (uniform) and 5 (storage)
 	} descriptor_set;
 
 	Vk_Depth_Range		depth_range;
 	VkPipeline			last_pipeline;
+	VkPipelineLayout	pipeline_layout;
 
 	uint32_t num_indexes; // value from most recent vk_bind_index() call
 
@@ -560,12 +598,16 @@ typedef struct {
 	} render_pass;
 
 	VkDescriptorPool descriptor_pool;
+	// Incremented whenever descriptor_pool is reset; lets long-lived objects detect stale VkDescriptorSet handles.
+	uint32_t descriptor_pool_gen;
 	VkDescriptorSetLayout set_layout_sampler;	// combined image sampler
-	VkDescriptorSetLayout set_layout_pbr;		// PBR samplers (BRDF LUT + glint dict)
+	VkDescriptorSetLayout set_layout_pbr;		// PBR material samplers (BRDF LUT + glint dict + maps)
+	VkDescriptorSetLayout set_layout_pbr_indexed; // PBR material array (descriptor indexing)
 	VkDescriptorSetLayout set_layout_uniform;	// dynamic uniform buffer
 	VkDescriptorSetLayout set_layout_storage;	// feedback buffer
 
 	VkPipelineLayout pipeline_layout;			// default shaders
+	VkPipelineLayout pipeline_layout_pbr_indexed; // PBR descriptor indexing layout
 	VkPipelineLayout pipeline_layout_storage;	// flare test shader layout
 	VkPipelineLayout pipeline_layout_post_process;	// post-processing
 	VkPipelineLayout pipeline_layout_blend;		// post-processing
@@ -639,6 +681,11 @@ typedef struct {
 #ifdef USE_VK_PBR
 	VkImage			glint_dict_image;
 	VkImageView		glint_dict_image_view;
+	VkDescriptorSet pbr_indexed_descriptor;
+	uint32_t pbr_indexed_descriptor_gen;
+	uint32_t pbrIndexedMaxSamplers;
+	uint32_t pbrIndexedImageLimit;
+	uint32_t pbrIndexedGlintIndex;
 #endif
 
 	struct {
@@ -708,9 +755,9 @@ typedef struct {
 	struct {
 		struct {
 #ifdef USE_VK_PBR
-			VkShaderModule gen[2][3][2][2][2]; // pbr[0,1], tx[0,1,2], cl[0,1] env0[0,1] fog[0,1]
-			VkShaderModule ident1[2][2][2][2]; // pbr[0,1], tx[0,1], env0[0,1] fog[0,1]
-			VkShaderModule fixed[2][2][2][2];  // pbr[0,1], tx[0,1], env0[0,1] fog[0,1]
+			VkShaderModule gen[VK_PBR_VARIANT_COUNT][3][2][2][2]; // pbr[0..2], tx[0,1,2], cl[0,1] env0[0,1] fog[0,1]
+			VkShaderModule ident1[VK_PBR_VARIANT_COUNT][2][2][2]; // pbr[0..2], tx[0,1], env0[0,1] fog[0,1]
+			VkShaderModule fixed[VK_PBR_VARIANT_COUNT][2][2][2];  // pbr[0..2], tx[0,1], env0[0,1] fog[0,1]
 #else
 			VkShaderModule gen[3][2][2][2]; // tx[0,1,2], cl[0,1] env0[0,1] fog[0,1]
 			VkShaderModule ident1[2][2][2]; // tx[0,1], env0[0,1] fog[0,1]
@@ -721,10 +768,10 @@ typedef struct {
 		struct {
 			VkShaderModule gen0_df;
 #ifdef USE_VK_PBR
-			VkShaderModule gen[2][3][2][2]; // pbr[0,1], tx[0,1,2] cl[0,1] fog[0,1]
-			VkShaderModule ident1[2][2][2]; // pbr[0,1], tx[0,1], fog[0,1]
-			VkShaderModule fixed[2][2][2];  // pbr[0,1], tx[0,1], fog[0,1]
-			VkShaderModule ent[2][1][2];    // pbr[0,1], tx[0], fog[0,1]
+			VkShaderModule gen[VK_PBR_VARIANT_COUNT][3][2][2]; // pbr[0..2], tx[0,1,2] cl[0,1] fog[0,1]
+			VkShaderModule ident1[VK_PBR_VARIANT_COUNT][2][2]; // pbr[0..2], tx[0,1], fog[0,1]
+			VkShaderModule fixed[VK_PBR_VARIANT_COUNT][2][2];  // pbr[0..2], tx[0,1], fog[0,1]
+			VkShaderModule ent[VK_PBR_VARIANT_COUNT][1][2];    // pbr[0..2], tx[0], fog[0,1]
 #else
 			VkShaderModule gen[3][2][2]; // tx[0,1,2] cl[0,1] fog[0,1]
 			VkShaderModule ident1[2][2]; // tx[0,1], fog[0,1]
@@ -860,6 +907,8 @@ typedef struct {
 	qboolean msaaActive;
 #ifdef USE_VK_PBR
 	qboolean pbrActive;
+	qboolean hasDescriptorIndexing;
+	qboolean descriptorIndexingActive;
 #endif
 #ifdef VK_CUBEMAP
 	qboolean cubemapActive;

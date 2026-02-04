@@ -1088,8 +1088,16 @@ image_t *R_CreateImage( const char *name, const char *name2, byte *pic, int widt
 		namelen2 = 0;
 	}
 
-	if ( tr.numImages == MAX_DRAWIMAGES ) {
-		ri.Error( ERR_DROP, "R_CreateImage: MAX_DRAWIMAGES hit" );
+	{
+		int max_images = MAX_DRAWIMAGES;
+#ifdef USE_VULKAN
+		if ( vk.descriptorIndexingActive && vk.pbrIndexedImageLimit > 0 && vk.pbrIndexedImageLimit < (uint32_t)max_images ) {
+			max_images = (int)vk.pbrIndexedImageLimit;
+		}
+#endif
+		if ( tr.numImages == max_images ) {
+			ri.Error( ERR_DROP, "R_CreateImage: MAX_DRAWIMAGES hit" );
+		}
 	}
 
 	image = ri.Hunk_Alloc( sizeof( *image ) + namelen + namelen2, h_low );
@@ -1107,6 +1115,9 @@ image_t *R_CreateImage( const char *name, const char *name2, byte *pic, int widt
 	hashTable[ hash ] = image;
 
 	tr.images[ tr.numImages++ ] = image;
+#ifdef USE_VULKAN
+	image->descriptor_index = tr.numImages - 1;
+#endif
 
 	image->flags = flags;
 	image->width = width;

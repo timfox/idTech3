@@ -562,33 +562,62 @@ static shader_t *ShaderForShaderNum( const int shaderNum, int lightmapNum ) {
 
 #ifdef USE_VK_PBR
 static void GenerateFaceLightDirs( srfSurfaceFace_t *face ) {
+	int i;
+
+	// May be called multiple times (e.g. renderer restart) - don't leak hunk memory.
+	if ( face->lightdir != NULL ) {
+		return;
+	}
+
 	face->lightdir = (float*)ri.Hunk_Alloc( face->numPoints * sizeof(tess.lightdir[0]), h_low );
 
-	for ( int i = 0; i < face->numPoints; i++ )
-		R_LightDirForPoint( face->points[i], face->lightdir + i * 4, face->points[i] + 3, &s_worldData );
+	for ( i = 0; i < face->numPoints; i++ ) {
+		float *dst = face->lightdir + i * 4;
+		const float *n = face->points[i] + 3;
+		vec3_t normal;
+
+		// R_LightDirForPoint() isn't const-correct; it won't write to `normal`, but avoid
+		// cast-qual warnings by copying into a local.
+		VectorCopy( n, normal );
+		if ( !R_LightDirForPoint( face->points[i], dst, normal, &s_worldData ) ) {
+			// No lightgrid: fall back to per-vertex normal so shaders never see garbage.
+			VectorCopy( normal, dst );
+		}
+		dst[3] = 0.0f;
+	}
 }
 
 static void GenerateTriLightDirs( srfTriangles_t *tri ) {
-	for ( int i = 0; i < tri->numVerts; i++ )
-		R_LightDirForPoint( tri->verts[i].xyz, tri->verts[i].lightdir, tri->verts[i].normal, &s_worldData );
+	int i;
+
+	for ( i = 0; i < tri->numVerts; i++ ) {
+		if ( !R_LightDirForPoint( tri->verts[i].xyz, tri->verts[i].lightdir, tri->verts[i].normal, &s_worldData ) ) {
+			// No lightgrid: fall back to per-vertex normal so shaders never see garbage.
+			VectorCopy( tri->verts[i].normal, tri->verts[i].lightdir );
+		}
+		tri->verts[i].lightdir[3] = 0.0f;
+	}
 }
 
 static void GenerateGridLightDirs( srfGridMesh_t *grid ) {
 	int	width, height, numPoints;
+	int i;
 
 	width = LittleLong( grid->width );
 	height = LittleLong( grid->height );
 	numPoints = width * height;
 
-	for ( int i = 0; i < numPoints; i++ )
-		R_LightDirForPoint( grid->verts[i].xyz, grid->verts[i].lightdir, grid->verts[i].normal, &s_worldData );
+	for ( i = 0; i < numPoints; i++ ) {
+		if ( !R_LightDirForPoint( grid->verts[i].xyz, grid->verts[i].lightdir, grid->verts[i].normal, &s_worldData ) ) {
+			// No lightgrid: fall back to per-vertex normal so shaders never see garbage.
+			VectorCopy( grid->verts[i].normal, grid->verts[i].lightdir );
+		}
+		grid->verts[i].lightdir[3] = 0.0f;
+	}
 }
 
 static void vk_generate_light_directions( void )
 {
-	if ( !vk.pbrActive )
-		return;
-
 	srfSurfaceFace_t *face;
 	srfTriangles_t *tris;
 	srfGridMesh_t *grid;

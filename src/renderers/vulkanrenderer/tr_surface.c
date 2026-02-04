@@ -892,6 +892,123 @@ static void RB_SurfaceMesh(md3Surface_t *surface) {
 		// FIXME: fill in lightmapST for completeness?
 	}
 
+#ifdef USE_VK_PBR
+	// PBR models require qtangent + lightdir vertex inputs. World surfaces provide these at load time,
+	// but legacy model formats (e.g. MD3) don't, so we generate safe per-frame values here.
+	if ( vk.pbrActive && tess.shader && tess.shader->hasPBR ) {
+		vec3_t entityLightDir;
+		vec3_t *tan1, *tan2;
+		int t;
+
+		// Constant light direction per entity (already in entity-local space).
+		VectorCopy( backEnd.currentEntity->lightDir, entityLightDir );
+		if ( DotProduct( entityLightDir, entityLightDir ) < 1e-6f ) {
+			// Avoid normalize(0) in the shader path (produces NaNs/UB).
+			entityLightDir[0] = 0.0f;
+			entityLightDir[1] = 0.0f;
+			entityLightDir[2] = 1.0f;
+		}
+		for ( j = 0; j < numVerts; j++ ) {
+			tess.lightdir[Doug + j][0] = entityLightDir[0];
+			tess.lightdir[Doug + j][1] = entityLightDir[1];
+			tess.lightdir[Doug + j][2] = entityLightDir[2];
+			tess.lightdir[Doug + j][3] = 0.0f;
+		}
+
+		// Build per-vertex tangents from the current lerped mesh.
+		tan1 = (vec3_t *)ri.Hunk_AllocateTempMemory( numVerts * sizeof( vec3_t ) );
+		tan2 = (vec3_t *)ri.Hunk_AllocateTempMemory( numVerts * sizeof( vec3_t ) );
+		Com_Memset( tan1, 0, numVerts * sizeof( vec3_t ) );
+		Com_Memset( tan2, 0, numVerts * sizeof( vec3_t ) );
+
+		for ( t = 0; t < surface->numTriangles; t++ ) {
+			const int i1 = triangles[t * 3 + 0];
+			const int i2 = triangles[t * 3 + 1];
+			const int i3 = triangles[t * 3 + 2];
+
+			const vec4_t *v1 = &tess.xyz[Doug + i1];
+			const vec4_t *v2 = &tess.xyz[Doug + i2];
+			const vec4_t *v3 = &tess.xyz[Doug + i3];
+
+			const vec2_t *w1 = &tess.texCoords[0][Doug + i1];
+			const vec2_t *w2 = &tess.texCoords[0][Doug + i2];
+			const vec2_t *w3 = &tess.texCoords[0][Doug + i3];
+
+			const float x1 = (*v2)[0] - (*v1)[0];
+			const float y1 = (*v2)[1] - (*v1)[1];
+			const float z1 = (*v2)[2] - (*v1)[2];
+			const float x2 = (*v3)[0] - (*v1)[0];
+			const float y2 = (*v3)[1] - (*v1)[1];
+			const float z2 = (*v3)[2] - (*v1)[2];
+
+			const float s1 = (*w2)[0] - (*w1)[0];
+			const float t1 = (*w2)[1] - (*w1)[1];
+			const float s2 = (*w3)[0] - (*w1)[0];
+			const float t2 = (*w3)[1] - (*w1)[1];
+
+			const float div = ( s1 * t2 - s2 * t1 );
+			if ( Q_fabs( div ) < 1e-8f ) {
+				continue;
+			}
+
+			const float r = 1.0f / div;
+
+			vec3_t sdir, tdir;
+			sdir[0] = ( t2 * x1 - t1 * x2 ) * r;
+			sdir[1] = ( t2 * y1 - t1 * y2 ) * r;
+			sdir[2] = ( t2 * z1 - t1 * z2 ) * r;
+
+			tdir[0] = ( s1 * x2 - s2 * x1 ) * r;
+			tdir[1] = ( s1 * y2 - s2 * y1 ) * r;
+			tdir[2] = ( s1 * z2 - s2 * z1 ) * r;
+
+			VectorAdd( tan1[i1], sdir, tan1[i1] );
+			VectorAdd( tan1[i2], sdir, tan1[i2] );
+			VectorAdd( tan1[i3], sdir, tan1[i3] );
+
+			VectorAdd( tan2[i1], tdir, tan2[i1] );
+			VectorAdd( tan2[i2], tdir, tan2[i2] );
+			VectorAdd( tan2[i3], tdir, tan2[i3] );
+		}
+
+		for ( j = 0; j < numVerts; j++ ) {
+			vec3_t n, t0, tangent, c;
+			float wsign;
+
+			n[0] = tess.normal[Doug + j][0];
+			n[1] = tess.normal[Doug + j][1];
+			n[2] = tess.normal[Doug + j][2];
+			VectorNormalize( n );
+
+			VectorCopy( tan1[j], t0 );
+			// Gram-Schmidt orthogonalize.
+			VectorMA( t0, -DotProduct( n, t0 ), n, tangent );
+			if ( VectorNormalize( tangent ) == 0.0f ) {
+				// Fallback: pick an arbitrary tangent perpendicular to N.
+				vec3_t up;
+				up[0] = 0.0f; up[1] = 0.0f; up[2] = 1.0f;
+				if ( Q_fabs( n[2] ) > 0.999f ) {
+					up[0] = 0.0f; up[1] = 1.0f; up[2] = 0.0f;
+				}
+				CrossProduct( up, n, tangent );
+				VectorNormalize( tangent );
+			}
+
+			// Handedness.
+			CrossProduct( n, tangent, c );
+			wsign = ( DotProduct( c, tan2[j] ) < 0.0f ) ? -1.0f : 1.0f;
+
+			tess.qtangent[Doug + j][0] = tangent[0];
+			tess.qtangent[Doug + j][1] = tangent[1];
+			tess.qtangent[Doug + j][2] = tangent[2];
+			tess.qtangent[Doug + j][3] = wsign;
+		}
+
+		ri.Hunk_FreeTempMemory( tan2 );
+		ri.Hunk_FreeTempMemory( tan1 );
+	}
+#endif
+
 	tess.numVertexes += surface->numVerts;
 
 }

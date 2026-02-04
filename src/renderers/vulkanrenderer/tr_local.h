@@ -412,6 +412,8 @@ typedef struct {
 	uint32_t		vk_mirror_pipeline_df;
 #ifdef USE_VK_PBR
 	uint32_t		vk_pbr_flags;
+	VkDescriptorSet pbrDescriptor;
+	uint32_t		pbrDescriptorGen;
 	image_t			*normalMap;
 	image_t			*physicalMap;
 	image_t			*emissiveMap;
@@ -628,6 +630,7 @@ typedef struct image_s {
 	// Descriptor set that contains single descriptor used to access the given image.
 	// It is updated only once during image initialization.
 	VkDescriptorSet descriptor;
+	uint32_t	descriptor_index;
 #else
 	GLuint		texnum;				// gl texture binding
 	GLint		internalFormat;
@@ -1432,6 +1435,7 @@ extern cvar_t	*r_vk_gpuMarkers;
 extern cvar_t	*r_vk_dumpCaps;
 extern cvar_t	*r_vk_syncValidation;
 extern cvar_t	*r_vk_deviceOverride;
+extern cvar_t	*r_vk_descriptorIndexing;
 #ifdef USE_VBO
 extern cvar_t	*r_vbo;
 #endif
@@ -1439,6 +1443,9 @@ extern cvar_t	*r_vbo;
 extern cvar_t	*r_pbr;
 extern cvar_t	*r_pbr_shExtract;
 extern cvar_t	*r_pbr_debug;
+extern cvar_t	*r_pbr_normalSwizzle;
+extern cvar_t	*r_pbr_forceLight;
+extern cvar_t	*r_pbr_forceGlints;
 extern cvar_t	*r_pbr_packedPreferred;
 #ifdef VK_CUBEMAP
 extern cvar_t	*r_pbr_iblIrradianceSize;
@@ -1758,6 +1765,7 @@ qboolean vk_create_sheen_texture( shaderStage_t *stage, const char *albedoMapNam
 qboolean vk_create_anisotropy_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
 qboolean vk_create_transmission_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
 qboolean vk_create_subsurface_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
+qboolean vk_create_pbr_descriptor_set( shaderStage_t *stage );
 image_t *vk_create_pbr_albedo_srgb( const char *albedoMapName, imgFlags_t flags );
 #endif
 

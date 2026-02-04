@@ -34,6 +34,28 @@ static	shaderStage_t	stages[MAX_SHADER_STAGES];
 static	shader_t		shader;
 static	texModInfo_t	texMods[MAX_SHADER_STAGES][TR_MAX_TEXMODS+1]; // reserve one additional texmod for lightmap atlas correction
 
+#ifdef USE_VK_PBR
+static Vk_Shader_Type VK_PBR_ForceTx1Shader( Vk_Shader_Type shader_type )
+{
+	switch ( shader_type ) {
+		case TYPE_SIGNLE_TEXTURE:
+			return TYPE_MULTI_TEXTURE_MUL2;
+		case TYPE_SIGNLE_TEXTURE_ENV:
+			return TYPE_MULTI_TEXTURE_MUL2_ENV;
+		case TYPE_SIGNLE_TEXTURE_IDENTITY:
+			return TYPE_MULTI_TEXTURE_MUL2_IDENTITY;
+		case TYPE_SIGNLE_TEXTURE_IDENTITY_ENV:
+			return TYPE_MULTI_TEXTURE_MUL2_IDENTITY_ENV;
+		case TYPE_SIGNLE_TEXTURE_FIXED_COLOR:
+			return TYPE_MULTI_TEXTURE_MUL2_FIXED_COLOR;
+		case TYPE_SIGNLE_TEXTURE_FIXED_COLOR_ENV:
+			return TYPE_MULTI_TEXTURE_MUL2_FIXED_COLOR_ENV;
+		default:
+			return shader_type;
+	}
+}
+#endif
+
 #define FILE_HASH_SIZE		1024
 static	shader_t*		hashTable[FILE_HASH_SIZE];
 
@@ -1850,6 +1872,14 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 				stage->bundle[0].image[0] = srgbAlbedo;
 			}
 		}
+
+		// Build the combined PBR descriptor set now that all maps are known.
+		if ( stage->vk_pbr_flags ) {
+			if ( !vk_create_pbr_descriptor_set( stage ) ) {
+				ri.Printf( PRINT_WARNING, "PBR: disabling stage in shader '%s' (descriptor allocation failed)\n", shader.name );
+				stage->vk_pbr_flags = 0;
+			}
+		}
 	}
 #endif
 
@@ -3085,11 +3115,41 @@ static int CollapseMultitexture( unsigned int st0bits, shaderStage_t *st0, shade
 
 #ifdef USE_VK_PBR
 	if( st1->vk_pbr_flags ) {
+		// st1's bundle[0] has been merged into st0 - carry over all PBR state so the
+		// collapsed stage stays self-consistent (maps, scales, descriptor set, etc.).
 		st0->vk_pbr_flags = st1->vk_pbr_flags;
+		st0->pbrDescriptor = st1->pbrDescriptor;
+		st0->pbrDescriptorGen = st1->pbrDescriptorGen;
+
 		st0->normalMap = st1->normalMap;
 		st0->physicalMap = st1->physicalMap;
+		st0->emissiveMap = st1->emissiveMap;
+		st0->clearcoatMap = st1->clearcoatMap;
+		st0->sheenMap = st1->sheenMap;
+		st0->anisotropyMap = st1->anisotropyMap;
+		st0->transmissionMap = st1->transmissionMap;
+		st0->subsurfaceMap = st1->subsurfaceMap;
+
+		st0->normalMapType = st1->normalMapType;
+		st0->physicalMapType = st1->physicalMapType;
+		st0->emissiveMapType = st1->emissiveMapType;
+		st0->clearcoatMapType = st1->clearcoatMapType;
+		st0->sheenMapType = st1->sheenMapType;
+		st0->anisotropyMapType = st1->anisotropyMapType;
+		st0->transmissionMapType = st1->transmissionMapType;
+		st0->subsurfaceMapType = st1->subsurfaceMapType;
+
 		Vector4Copy( st1->specularScale, st0->specularScale );
 		Vector4Copy( st1->normalScale, st0->normalScale );
+		Vector4Copy( st1->emissiveScale, st0->emissiveScale );
+		Vector4Copy( st1->clearcoatScale, st0->clearcoatScale );
+		Vector4Copy( st1->sheenScale, st0->sheenScale );
+		Vector4Copy( st1->anisotropyScale, st0->anisotropyScale );
+		Vector4Copy( st1->transmissionScale, st0->transmissionScale );
+		Vector4Copy( st1->subsurfaceColor, st0->subsurfaceColor );
+		Vector4Copy( st1->subsurfaceParams, st0->subsurfaceParams );
+		Com_Memcpy( st0->shCoeffs, st1->shCoeffs, sizeof( st0->shCoeffs ) );
+		st0->parallaxBias = st1->parallaxBias;
 	}
 #endif
 
@@ -3693,6 +3753,56 @@ static void VertexLightingCollapse( void ) {
 		}
 
 		stages[0].bundle[0] = bestStage->bundle[0];
+#ifdef USE_VK_PBR
+		// Keep PBR state consistent with the chosen best stage.
+		if ( bestStage->vk_pbr_flags ) {
+			stages[0].vk_pbr_flags = bestStage->vk_pbr_flags;
+			stages[0].pbrDescriptor = bestStage->pbrDescriptor;
+			stages[0].pbrDescriptorGen = bestStage->pbrDescriptorGen;
+
+			stages[0].normalMap = bestStage->normalMap;
+			stages[0].physicalMap = bestStage->physicalMap;
+			stages[0].emissiveMap = bestStage->emissiveMap;
+			stages[0].clearcoatMap = bestStage->clearcoatMap;
+			stages[0].sheenMap = bestStage->sheenMap;
+			stages[0].anisotropyMap = bestStage->anisotropyMap;
+			stages[0].transmissionMap = bestStage->transmissionMap;
+			stages[0].subsurfaceMap = bestStage->subsurfaceMap;
+
+			stages[0].normalMapType = bestStage->normalMapType;
+			stages[0].physicalMapType = bestStage->physicalMapType;
+			stages[0].emissiveMapType = bestStage->emissiveMapType;
+			stages[0].clearcoatMapType = bestStage->clearcoatMapType;
+			stages[0].sheenMapType = bestStage->sheenMapType;
+			stages[0].anisotropyMapType = bestStage->anisotropyMapType;
+			stages[0].transmissionMapType = bestStage->transmissionMapType;
+			stages[0].subsurfaceMapType = bestStage->subsurfaceMapType;
+
+			Vector4Copy( bestStage->specularScale, stages[0].specularScale );
+			Vector4Copy( bestStage->normalScale, stages[0].normalScale );
+			Vector4Copy( bestStage->emissiveScale, stages[0].emissiveScale );
+			Vector4Copy( bestStage->clearcoatScale, stages[0].clearcoatScale );
+			Vector4Copy( bestStage->sheenScale, stages[0].sheenScale );
+			Vector4Copy( bestStage->anisotropyScale, stages[0].anisotropyScale );
+			Vector4Copy( bestStage->transmissionScale, stages[0].transmissionScale );
+			Vector4Copy( bestStage->subsurfaceColor, stages[0].subsurfaceColor );
+			Vector4Copy( bestStage->subsurfaceParams, stages[0].subsurfaceParams );
+			Com_Memcpy( stages[0].shCoeffs, bestStage->shCoeffs, sizeof( stages[0].shCoeffs ) );
+			stages[0].parallaxBias = bestStage->parallaxBias;
+		} else {
+			stages[0].vk_pbr_flags = 0;
+			stages[0].pbrDescriptor = VK_NULL_HANDLE;
+			stages[0].pbrDescriptorGen = 0;
+			stages[0].normalMap = NULL;
+			stages[0].physicalMap = NULL;
+			stages[0].emissiveMap = NULL;
+			stages[0].clearcoatMap = NULL;
+			stages[0].sheenMap = NULL;
+			stages[0].anisotropyMap = NULL;
+			stages[0].transmissionMap = NULL;
+			stages[0].subsurfaceMap = NULL;
+		}
+#endif
 		stages[0].stateBits &= ~( GLS_DSTBLEND_BITS | GLS_SRCBLEND_BITS );
 		stages[0].stateBits |= GLS_DEPTHMASK_TRUE;
 		if ( shader.lightmapIndex == LIGHTMAP_NONE ) {
@@ -4135,7 +4245,10 @@ static shader_t *FinishShader( void ) {
 			int env_mask;
 			shaderStage_t *pStage = &stages[i];
 			def.state_bits = pStage->stateBits;
+#ifdef USE_VK_PBR
 			def.vk_pbr_flags = 0;
+			def.descriptorIndexing = 0;
+#endif
 
 			if ( pStage->mtEnv3 ) {
 				switch ( pStage->mtEnv3 ) {
@@ -4329,11 +4442,27 @@ static shader_t *FinishShader( void ) {
 			{
 			#ifdef USE_VK_PBR
 				def.vk_pbr_flags = pStage->vk_pbr_flags;
-				pStage->tessFlags |= TESS_PBR;
+				def.descriptorIndexing = vk.descriptorIndexingActive ? 1u : 0u;
+				// Vulkan PBR path requires per-vertex normals (and additional PBR attributes).
+				// Ensure both the tesselator and vk_bind_geometry provide them regardless of shader_type.
+				pStage->tessFlags |= ( TESS_PBR | TESS_NNN );
 				shader.hasPBR = qtrue;
+				shader.needsNormal = qtrue;
+
+				// PBR shading already accounts for lighting; legacy blend modes like
+				// DST_COLOR * src (lightmap combine) will multiply against the current
+				// framebuffer and often produce black. For opaque PBR surfaces, force
+				// opaque blending to avoid this.
+				if ( shader.sort <= SS_OPAQUE ) {
+					def.state_bits &= ~GLS_BLEND_BITS;
+					def.state_bits |= GLS_DEPTHMASK_TRUE;
+				}
 
 				if ( hasLightmapStage ) 
 					def.vk_pbr_flags |= PBR_HAS_LIGHTMAP;
+				if ( def.vk_pbr_flags & PBR_HAS_LIGHTMAP ) {
+					def.shader_type = VK_PBR_ForceTx1Shader( def.shader_type );
+				}
 
 				// move this to ubo ..
 				Vector4Copy( pStage->specularScale, def.specularScale );
@@ -4350,6 +4479,7 @@ static shader_t *FinishShader( void ) {
 				def.mirror = qfalse;
 				#ifdef USE_VK_PBR
 					def.vk_pbr_flags = 0;
+					def.descriptorIndexing = 0;
 				#endif
 				def.shader_type = TYPE_SIGNLE_TEXTURE_DF;
 				pStage->vk_pipeline_df = vk_find_pipeline_ext( 0, &def, qtrue );

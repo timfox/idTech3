@@ -10,21 +10,30 @@ pre-compiles .vert, .frag, .geom and .tmpl.
             - shaders/spirv/shader_binding.c
 */
 
+#ifdef _WIN32
 #include <windows.h>
 #include <process.h>            // _beginthreadex
+#include <io.h>                 // _findfirst, _findnext
+#include <direct.h>             // _mkdir
+#else
+#include <filesystem>
+#endif
+
 #include <string>               // std::string
 #include <vector>
 #include <cstdio>               // printf, fprintf
 #include <cstdlib>              // system, getenv
 #include <cstring>              // strcpy, strcat
-#include <io.h>                 // _findfirst, _findnext
-#include <direct.h>             // _mkdir
 #include <iostream>
 
 #define MAX_TASKS 1500
 #define MAX_THREADS 16 
 
 #define ARRAY_LEN( x ) ( sizeof( x ) / sizeof( *(x) ) )
+
+#ifndef MAX_PATH
+#define MAX_PATH 260
+#endif
 
 typedef struct {
     char            c_var_name[MAX_PATH];       // variable name
@@ -52,7 +61,9 @@ typedef struct {
 } compiler_data_t;
 
 ShaderTask tasks[MAX_TASKS];
+#ifdef _WIN32
 HANDLE threads[MAX_THREADS];
+#endif
 
 static uint32_t task_count          = 0;
 static uint32_t thread_count        = 0;
@@ -91,7 +102,22 @@ std::string join_indexes( std::string object, std::initializer_list<uint32_t> fl
     return result;
 }
 
-static std::string create_compiler_cmd( ShaderTask* task, bool silent = true) 
+static std::string path_join( const std::string &a, const std::string &b )
+{
+    if ( a.empty() )
+        return b;
+#ifdef _WIN32
+    const char sep = '\\';
+#else
+    const char sep = '/';
+#endif
+    char last = a.back();
+    if ( last == '/' || last == '\\' )
+        return a + b;
+    return a + sep + b;
+}
+
+static std::string create_compiler_cmd( ShaderTask* task, bool silent = true)
 {
     char cmd[1024];
 
@@ -109,10 +135,8 @@ static std::string create_compiler_cmd( ShaderTask* task, bool silent = true)
     return std::string( cmd );
 }
 
-unsigned __stdcall compile_shader_thread( void* arg ) 
+static int compile_shader( ShaderTask* task )
 {
-    ShaderTask* task = (ShaderTask*)arg;
-
     printf("%s = %s\n", task->output_binding_name, task->output_var_name );
     //printf("cmd: %s\n\n", cmd, task->output_array_name );
 
@@ -164,8 +188,17 @@ unsigned __stdcall compile_shader_thread( void* arg )
     return 0;
 }
 
+#ifdef _WIN32
+unsigned __stdcall compile_shader_thread( void* arg )
+{
+    ShaderTask* task = (ShaderTask*)arg;
+    return (unsigned)compile_shader( task );
+}
+#endif
+
 static void create_shader_task( const char *f_name, const char *stage, const char *out_var, const char *out_binding, const char *defines ) 
 {
+#ifdef _WIN32
     // wait for thread queue before adding new task if thread pool is overflowing
     if ( thread_count >= MAX_THREADS ) {
         WaitForMultipleObjects(thread_count, threads, TRUE, INFINITE);
@@ -175,12 +208,20 @@ static void create_shader_task( const char *f_name, const char *stage, const cha
 
         thread_count = 0; // reset thread count after processing
     }
+#endif
 
     ShaderTask *t = &tasks[task_count];
     t->index = task_count;
 
-    snprintf(t->input_file, MAX_PATH, "%s\\%s", glsl_root_path.c_str(), f_name);
-    snprintf(t->spirv_out, MAX_PATH, "spirv\\tmp_%d.spv", task_count + 1);
+    {
+        std::string input_path = path_join( glsl_root_path, f_name );
+        snprintf(t->input_file, MAX_PATH, "%s", input_path.c_str());
+    }
+    {
+        std::string spirv_name = "tmp_" + std::to_string( task_count + 1 ) + ".spv";
+        std::string spirv_path = path_join( "spirv", spirv_name );
+        snprintf(t->spirv_out, MAX_PATH, "%s", spirv_path.c_str());
+    }
     snprintf(t->stage, 8, "%s", stage);
     snprintf(t->output_var_name, MAX_PATH, "%s", out_var);
 
@@ -194,7 +235,11 @@ static void create_shader_task( const char *f_name, const char *stage, const cha
 
     snprintf(t->defines, sizeof(t->defines), "%s", defines);
 
+#ifdef _WIN32
     threads[thread_count++] = (HANDLE)_beginthreadex(NULL, 0, compile_shader_thread, t, 0, NULL);
+#else
+    compile_shader( t );
+#endif
     task_count++;
 }
 
@@ -206,8 +251,8 @@ static void compile_and_convert_template_shaders( void )
     const char* mode_flags[]       = { "-DUSE_CLX_IDENT", "-DUSE_FIXED_COLOR", };
     const char* mode_ids[]         = { "ident1", "fixed" };
 
-    const char* pbr_flags[]         = { "", "-DUSE_VK_PBR" };
-    const char* pbr_ids[]           = { "", "pbr_" };
+    const char* pbr_flags[]         = { "", "-DUSE_VK_PBR", "-DUSE_VK_PBR -DUSE_DESCRIPTOR_INDEXING" };
+    const char* pbr_ids[]           = { "", "pbr_", "pbrdi_" };
 
     const char* tx_flags[]          = { "", "-DUSE_TX1", "-DUSE_TX2" };
     const char* tx_ids[]            = { "tx0", "tx1", "tx2" };
@@ -239,6 +284,8 @@ static void compile_and_convert_template_shaders( void )
     create_shader_task( "gen_frag.tmpl", "frag", "frag_tx0_ent_fog", NULL, "-DUSE_ENT_COLOR -DUSE_ATEST  -DUSE_FOG");
     create_shader_task( "gen_frag.tmpl", "frag", "frag_pbr_tx0_ent", NULL, "-DUSE_ENT_COLOR -DUSE_ATEST  -DUSE_VK_PBR");
     create_shader_task( "gen_frag.tmpl", "frag", "frag_pbr_tx0_ent_fog", NULL, "-DUSE_ENT_COLOR -DUSE_ATEST  -DUSE_FOG  -DUSE_VK_PBR");
+    create_shader_task( "gen_frag.tmpl", "frag", "frag_pbrdi_tx0_ent", NULL, "-DUSE_ENT_COLOR -DUSE_ATEST  -DUSE_VK_PBR -DUSE_DESCRIPTOR_INDEXING");
+    create_shader_task( "gen_frag.tmpl", "frag", "frag_pbrdi_tx0_ent_fog", NULL, "-DUSE_ENT_COLOR -DUSE_ATEST  -DUSE_FOG  -DUSE_VK_PBR -DUSE_DESCRIPTOR_INDEXING");
 
     // ident / fixed vertex shaders
     for ( i = 0; i < ARRAY_LEN(pbr_flags); ++i ) { // vbo
@@ -334,6 +381,7 @@ static void compile_and_convert_individual_shaders( void )
     const char *stages[] = { "vert", "frag", "geom" };
     const char *stage_exts[] = { ".vert", ".frag", ".geom" };
 
+#ifdef _WIN32
     char find_pattern[256];
     struct _finddata_t f;
     intptr_t handle;
@@ -363,6 +411,23 @@ static void compile_and_convert_individual_shaders( void )
 
         _findclose(handle);
     }
+#else
+    namespace fs = std::filesystem;
+    for (int i = 0; i < 3; ++i) {
+        const char *ext = stage_exts[i];
+        for ( const auto &entry : fs::directory_iterator( glsl_root_path ) ) {
+            if ( !entry.is_regular_file() )
+                continue;
+            const fs::path &p = entry.path();
+            if ( p.extension() != ext )
+                continue;
+            std::string base_name = p.stem().string();
+            std::string out_var = base_name + "_" + stages[i] + "_spv";
+            std::string fname = p.filename().string();
+            create_shader_task( fname.c_str(), stages[i], out_var.c_str(), NULL, "" );
+        }
+    }
+#endif
 }
 
 static void compile_and_convert_shaders( void ) 
@@ -370,6 +435,7 @@ static void compile_and_convert_shaders( void )
     compile_and_convert_individual_shaders();
     compile_and_convert_template_shaders();
 
+#ifdef _WIN32
     // wait for remaining threads to finish if any
     if (thread_count > 0) 
     {
@@ -381,6 +447,7 @@ static void compile_and_convert_shaders( void )
 
         thread_count = 0;
     }
+#endif
 }
 
 static void write_all_shaders_to_file( const char *out_file ) 
@@ -476,7 +543,7 @@ static void write_all_shaders_bindings_to_file( const char *out_file )
 
 static void set_glsl_spirv_compiler_env( std::string compiler_path ) 
 {
-    memset( &compiler, 0, sizeof(compiler_data_t) );
+    compiler = {};
 
     if ( compiler_path.empty() ) {
         printf("Error: compiler path is empty\n");
@@ -509,10 +576,10 @@ int main( int argc, const char* argv[] )
         return -1;
     }
 
-	if ( strlen( argv[1] ) > sizeof( glsl_root_path ) ) {
-		printf( "glsl path name is too long %s\n", argv[1] );
-		return -1;
-	}
+    if ( strlen( argv[1] ) >= MAX_PATH ) {
+        printf( "glsl path name is too long %s\n", argv[1] );
+        return -1;
+    }
 
     // perhaps some more sanity checks ..
 
@@ -531,7 +598,11 @@ int main( int argc, const char* argv[] )
     std::cout << "out data:" << out_data_path << "\n";
     std::cout << "out bindings:" << out_bindings_path << "\n";
 
+#ifdef _WIN32
     _mkdir("spirv");
+#else
+    std::filesystem::create_directories("spirv");
+#endif
     remove(out_data_path.c_str());
     remove(out_bindings_path.c_str());
 

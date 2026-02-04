@@ -37,6 +37,7 @@ static int bot_maxdebugpolys;
 
 extern botlib_export_t	*botlib_export;
 int	bot_enable;
+static qboolean sv_botlib_setup_done;
 
 
 /*
@@ -466,7 +467,10 @@ SV_BotLibSetup
 ===============
 */
 int SV_BotLibSetup( void ) {
-	if (!bot_enable) {
+	// Some mods call botlib syscalls even when bot_enable is 0, and some call
+	// BOTLIB_* functions without ever issuing BOTLIB_SETUP. Make setup idempotent
+	// and independent from bot_enable so botlib/AAS calls won't crash.
+	if ( sv_botlib_setup_done ) {
 		return 0;
 	}
 
@@ -475,7 +479,13 @@ int SV_BotLibSetup( void ) {
 		return -1;
 	}
 
-	return botlib_export->BotLibSetup();
+	{
+		const int err = botlib_export->BotLibSetup();
+		if ( err == 0 ) {
+			sv_botlib_setup_done = qtrue;
+		}
+		return err;
+	}
 }
 
 /*
@@ -492,6 +502,7 @@ int SV_BotLibShutdown( void ) {
 		return -1;
 	}
 
+	sv_botlib_setup_done = qfalse;
 	return botlib_export->BotLibShutdown();
 }
 

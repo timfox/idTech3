@@ -36,6 +36,7 @@ static PFN_vkEnumerateDeviceExtensionProperties			qvkEnumerateDeviceExtensionPro
 static PFN_vkEnumeratePhysicalDevices					qvkEnumeratePhysicalDevices;
 static PFN_vkGetDeviceProcAddr							qvkGetDeviceProcAddr;
 static PFN_vkGetPhysicalDeviceFeatures					qvkGetPhysicalDeviceFeatures;
+static PFN_vkGetPhysicalDeviceFeatures2				qvkGetPhysicalDeviceFeatures2;
 static PFN_vkGetPhysicalDeviceFormatProperties			qvkGetPhysicalDeviceFormatProperties;
 static PFN_vkGetPhysicalDeviceMemoryProperties			qvkGetPhysicalDeviceMemoryProperties;
 static PFN_vkGetPhysicalDeviceProperties				qvkGetPhysicalDeviceProperties;
@@ -117,6 +118,13 @@ static PFN_vkGetBufferMemoryRequirements				qvkGetBufferMemoryRequirements;
 static PFN_vkGetDeviceQueue								qvkGetDeviceQueue;
 static PFN_vkGetImageMemoryRequirements					qvkGetImageMemoryRequirements;
 static PFN_vkGetImageSubresourceLayout					qvkGetImageSubresourceLayout;
+
+#ifdef USE_VK_PBR
+static void vk_fill_pbr_image_info( const image_t *image, VkDescriptorImageInfo *info );
+static void vk_fill_pbr_brdflut_info( VkDescriptorImageInfo *info );
+static void vk_update_pbr_indexed_glint( VkDescriptorSet descriptor );
+static void vk_update_pbr_indexed_common_descriptor( VkDescriptorSet descriptor, const image_t *env, const image_t *irr );
+#endif
 static PFN_vkInvalidateMappedMemoryRanges				qvkInvalidateMappedMemoryRanges;
 static PFN_vkMapMemory									qvkMapMemory;
 static PFN_vkQueueSubmit								qvkQueueSubmit;
@@ -1931,18 +1939,20 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		VkDeviceQueueCreateInfo queue_desc;
 		VkPhysicalDeviceFeatures device_features;
 		VkPhysicalDeviceFeatures features;
+		VkPhysicalDeviceDescriptorIndexingFeatures descriptorIndexingFeatures;
 		VkDeviceCreateInfo device_desc;
 		VkResult res;
 		qboolean swapchainSupported = qfalse;
 		qboolean dedicatedAllocation = qfalse;
 		qboolean memoryRequirements2 = qfalse;
 		qboolean debugMarker = qfalse;
+		qboolean descriptorIndexingExt = qfalse;
+		void *pNextChain;
 #ifdef _DEBUG
 		qboolean timelineSemaphore = qfalse;
 		qboolean memoryModel = qfalse;
 		qboolean devAddrFeat = qfalse;
 		qboolean storage8bit = qfalse;
-		const void** pNextPtr;
 #endif
 		uint32_t i, len, count = 0;
 
@@ -1962,6 +1972,8 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 				dedicatedAllocation = qtrue;
 			} else if ( strcmp( ext, VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME ) == 0 ) {
 				memoryRequirements2 = qtrue;
+			} else if ( strcmp( ext, VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME ) == 0 ) {
+				descriptorIndexingExt = qtrue;
 			} else if ( strcmp( ext, VK_EXT_DEBUG_MARKER_EXTENSION_NAME ) == 0 ) {
 				debugMarker = qtrue;
 #ifdef _DEBUG
@@ -1989,6 +2001,22 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 
 		ri.Free( extension_properties );
 
+		vk.hasDescriptorIndexing = qfalse;
+		Com_Memset( &descriptorIndexingFeatures, 0, sizeof( descriptorIndexingFeatures ) );
+		if ( descriptorIndexingExt && qvkGetPhysicalDeviceFeatures2 ) {
+			VkPhysicalDeviceFeatures2 features2;
+			Com_Memset( &features2, 0, sizeof( features2 ) );
+			features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+			descriptorIndexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
+			features2.pNext = &descriptorIndexingFeatures;
+			qvkGetPhysicalDeviceFeatures2( physical_device, &features2 );
+			if ( descriptorIndexingFeatures.descriptorBindingPartiallyBound &&
+				descriptorIndexingFeatures.runtimeDescriptorArray &&
+				descriptorIndexingFeatures.descriptorBindingVariableDescriptorCount ) {
+				vk.hasDescriptorIndexing = qtrue;
+			}
+		}
+
 		device_extension_count = 0;
 
 		if ( !swapchainSupported ) {
@@ -2015,6 +2043,9 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		if ( debugMarker ) {
 			device_extension_list[ device_extension_count++ ] = VK_EXT_DEBUG_MARKER_EXTENSION_NAME;
 			vk.debugMarkers = qtrue;
+		}
+		if ( vk.hasDescriptorIndexing ) {
+			device_extension_list[ device_extension_count++ ] = VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME;
 		}
 #ifdef _DEBUG
 		if ( timelineSemaphore ) {
@@ -2085,47 +2116,52 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		device_desc.ppEnabledExtensionNames = device_extension_list;
 		device_desc.pEnabledFeatures = &features;
 
+		pNextChain = NULL;
+		if ( vk.hasDescriptorIndexing ) {
+			descriptorIndexingFeatures.pNext = pNextChain;
+			descriptorIndexingFeatures.descriptorBindingPartiallyBound = VK_TRUE;
+			descriptorIndexingFeatures.runtimeDescriptorArray = VK_TRUE;
+			descriptorIndexingFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
+			pNextChain = &descriptorIndexingFeatures;
+		}
+
 #ifdef _DEBUG
-		pNextPtr = (const void **)&device_desc.pNext;
 
 		if ( timelineSemaphore ) {
-			*pNextPtr = &timeline_semaphore;
-			timeline_semaphore.pNext = NULL;
+			timeline_semaphore.pNext = pNextChain;
 			timeline_semaphore.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
 			timeline_semaphore.timelineSemaphore = VK_TRUE;
-			pNextPtr = (const void **)&timeline_semaphore.pNext;
+			pNextChain = &timeline_semaphore;
 		}
 
 		if ( memoryModel ) {
-			*pNextPtr = &memory_model;
-			memory_model.pNext = NULL;
+			memory_model.pNext = pNextChain;
 			memory_model.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_MEMORY_MODEL_FEATURES;
 			memory_model.vulkanMemoryModel = VK_TRUE;
 			memory_model.vulkanMemoryModelAvailabilityVisibilityChains = VK_FALSE;
 			memory_model.vulkanMemoryModelDeviceScope = VK_TRUE;
-			pNextPtr = (const void **)&memory_model.pNext;
+			pNextChain = &memory_model;
 		}
 
 		if ( devAddrFeat ) {
-			*pNextPtr = &devaddr_features;
-			devaddr_features.pNext = NULL;
+			devaddr_features.pNext = pNextChain;
 			devaddr_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
 			devaddr_features.bufferDeviceAddress = VK_TRUE;
 			devaddr_features.bufferDeviceAddressCaptureReplay = VK_FALSE;
 			devaddr_features.bufferDeviceAddressMultiDevice = VK_FALSE;
-			pNextPtr = (const void **)&devaddr_features.pNext;
+			pNextChain = &devaddr_features;
 		}
 
 		if ( storage8bit ) {
-			*pNextPtr = &storage_8bit_features;
-			storage_8bit_features.pNext = NULL;
+			storage_8bit_features.pNext = pNextChain;
 			storage_8bit_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_8BIT_STORAGE_FEATURES;
 			storage_8bit_features.storageBuffer8BitAccess = VK_TRUE;
 			storage_8bit_features.storagePushConstant8 = VK_FALSE;
 			storage_8bit_features.uniformAndStorageBuffer8BitAccess = VK_TRUE;
-			pNextPtr = (const void **)&storage_8bit_features.pNext;
+			pNextChain = &storage_8bit_features;
 		}
 #endif
+		device_desc.pNext = pNextChain;
 		res = qvkCreateDevice( physical_device, &device_desc, NULL, &vk.device );
 		if ( res < 0 ) {
 			ri.Printf( PRINT_ERROR, "vkCreateDevice returned %s\n", vk_result_string( res ) );
@@ -2225,6 +2261,7 @@ static void init_vulkan_library( void )
 		INIT_INSTANCE_FUNCTION( vkEnumeratePhysicalDevices )
 		INIT_INSTANCE_FUNCTION( vkGetDeviceProcAddr )
 		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceFeatures )
+		INIT_INSTANCE_FUNCTION_EXT( vkGetPhysicalDeviceFeatures2 )
 		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceFormatProperties )
 		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceMemoryProperties )
 		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceProperties )
@@ -2444,6 +2481,7 @@ static void deinit_instance_functions( void )
 	qvkEnumeratePhysicalDevices = NULL;
 	qvkGetDeviceProcAddr = NULL;
 	qvkGetPhysicalDeviceFeatures = NULL;
+	qvkGetPhysicalDeviceFeatures2 = NULL;
 	qvkGetPhysicalDeviceFormatProperties = NULL;
 	qvkGetPhysicalDeviceMemoryProperties = NULL;
 	qvkGetPhysicalDeviceProperties = NULL;
@@ -2938,9 +2976,8 @@ void vk_init_descriptors( void )
 
 #ifdef VK_PBR_BRDFLUT
 		if( vk.pbrActive ) {
-			alloc.pSetLayouts = &vk.set_layout_pbr;
-			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.brdflut_image_descriptor ) );
 			alloc.pSetLayouts = &vk.set_layout_sampler;
+			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.brdflut_image_descriptor ) );
 		}
 #endif
 
@@ -3168,18 +3205,22 @@ static void vk_create_shader_modules( void )
 	vk.modules.frag.ent[0][0][1] = SHADER_MODULE( frag_tx0_ent_fog );
 	vk.modules.frag.ent[1][0][0] = SHADER_MODULE( frag_pbr_tx0_ent );
 	vk.modules.frag.ent[1][0][1] = SHADER_MODULE( frag_pbr_tx0_ent_fog );
+	vk.modules.frag.ent[2][0][0] = SHADER_MODULE( frag_pbrdi_tx0_ent );
+	vk.modules.frag.ent[2][0][1] = SHADER_MODULE( frag_pbrdi_tx0_ent_fog );
 	//vk.modules.frag.ent[1][0] = SHADER_MODULE( frag_tx1_ent );
 	//vk.modules.frag.ent[1][1] = SHADER_MODULE( frag_tx1_ent_fog );
 
-	for ( i = 0; i < 2; i++ ) {
-		const char *sh[] = { "", "pbr" };
+	{
+		const char *sh[] = { "", "pbr", "pbrdi" };
 
-		for ( j = 0; j < 1; j++ ) {
-			const char *tx[] = { "single" /*, "double" */};
-			const char *fog[] = { "", "+fog" };
-			for ( k = 0; k < 2; k++ ) {
-				const char *s = va( "%s-%s-texture entity-color%s fragment module", sh[i], tx[j], fog[k] );
-				SET_OBJECT_NAME( vk.modules.frag.ent[i][j][k], s, VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+		for ( i = 0; i < (int)ARRAY_LEN( sh ); i++ ) {
+			for ( j = 0; j < 1; j++ ) {
+				const char *tx[] = { "single" /*, "double" */};
+				const char *fog[] = { "", "+fog" };
+				for ( k = 0; k < 2; k++ ) {
+					const char *s = va( "%s-%s-texture entity-color%s fragment module", sh[i], tx[j], fog[k] );
+					SET_OBJECT_NAME( vk.modules.frag.ent[i][j][k], s, VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+				}
 			}
 		}
 	}
@@ -4909,6 +4950,12 @@ void vk_initialize( void )
 
 	qvkGetPhysicalDeviceProperties( vk.physical_device, &props );
 
+	// Descriptor sets allocated from vk.descriptor_pool become invalid when we reset the pool
+	// (e.g. on map/video restart). Track a generation so long-lived objects can lazily reallocate.
+	if ( vk.descriptor_pool_gen == 0 ) {
+		vk.descriptor_pool_gen = 1;
+	}
+
 	vk.cmd = vk.tess + 0;
 	vk.uniform_alignment = props.limits.minUniformBufferOffsetAlignment;
 	vk.uniform_item_size = PAD( sizeof( vkUniform_t ), (size_t)vk.uniform_alignment );
@@ -5034,14 +5081,32 @@ void vk_initialize( void )
 	vk.maxBoundDescriptorSets = props.limits.maxBoundDescriptorSets;
 
 #ifdef USE_VK_PBR
+	vk.pbrIndexedMaxSamplers = 0;
+	vk.pbrIndexedImageLimit = 0;
+	vk.pbrIndexedGlintIndex = 0;
+	if ( vk.hasDescriptorIndexing ) {
+		uint32_t maxSamplers = props.limits.maxDescriptorSetSampledImages;
+		if ( props.limits.maxPerStageDescriptorSamplers < maxSamplers )
+			maxSamplers = props.limits.maxPerStageDescriptorSamplers;
+		if ( maxSamplers > 0 ) {
+			uint32_t desired = MAX_DRAWIMAGES + VK_PBR_INDEXED_RESERVED;
+			vk.pbrIndexedMaxSamplers = ( maxSamplers < desired ) ? maxSamplers : desired;
+			if ( vk.pbrIndexedMaxSamplers > VK_PBR_INDEXED_RESERVED ) {
+				vk.pbrIndexedImageLimit = vk.pbrIndexedMaxSamplers - VK_PBR_INDEXED_RESERVED;
+				vk.pbrIndexedGlintIndex = vk.pbrIndexedImageLimit;
+			}
+		}
+	}
+
 	// Decide PBR activation and print a clear reason if disabled.
 	vk.pbrActive = qfalse;
 	if ( r_pbr->integer ) {
 		if ( !vk.fboActive ) {
 			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "PBR: disabled (requires \\r_fbo 1)\n" S_COLOR_WHITE );
-		} else if ( vk.maxBoundDescriptorSets < 10 ) {
-			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "PBR: disabled (insufficient descriptor sets: have %u, need >= 10)\n" S_COLOR_WHITE,
-				(unsigned)vk.maxBoundDescriptorSets );
+		} else if ( vk.maxBoundDescriptorSets < VK_DESC_COUNT ) {
+			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "PBR: disabled (insufficient descriptor sets: have %u, need >= %u)\n" S_COLOR_WHITE,
+				(unsigned)vk.maxBoundDescriptorSets,
+				(unsigned)VK_DESC_COUNT );
 		} else {
 			vk.pbrActive = qtrue;
 			ri.Printf( PRINT_ALL, "PBR: enabled\n" );
@@ -5049,6 +5114,24 @@ void vk_initialize( void )
 	} else {
 		ri.Printf( PRINT_ALL, "PBR: disabled (r_pbr 0)\n" );
 	}
+
+#ifdef USE_VK_PBR
+	vk.descriptorIndexingActive = qfalse;
+	if ( vk.pbrActive && r_vk_descriptorIndexing && r_vk_descriptorIndexing->integer ) {
+		if ( !vk.hasDescriptorIndexing ) {
+			ri.Printf( PRINT_WARNING, "Vulkan: descriptor indexing requested but not supported\n" );
+		} else if ( vk.pbrIndexedImageLimit == 0 ) {
+			ri.Printf( PRINT_WARNING, "Vulkan: descriptor indexing requested but descriptor limits are too low\n" );
+		} else {
+			vk.descriptorIndexingActive = qtrue;
+		}
+	}
+	ri.Printf( PRINT_ALL, "Vulkan: descriptor indexing %s\n", vk.descriptorIndexingActive ? "ENABLED" : "DISABLED" );
+	if ( vk.descriptorIndexingActive && vk.pbrIndexedImageLimit < MAX_DRAWIMAGES ) {
+		ri.Printf( PRINT_WARNING, "Vulkan: descriptor indexing image limit %u (MAX_DRAWIMAGES=%u)\n",
+			(unsigned)vk.pbrIndexedImageLimit, (unsigned)MAX_DRAWIMAGES );
+	}
+#endif
 
 #ifdef VK_CUBEMAP
 	if ( vk.pbrActive && r_cubeMapping->integer )
@@ -5244,8 +5327,13 @@ void vk_initialize( void )
 		pool_size[0].descriptorCount = MAX_DRAWIMAGES + 1 + 1 + 1 + 3 + VK_NUM_BLOOM_PASSES * 2; // color, screenmap, depth/ssao, bloom descriptors
 #ifdef USE_VK_PBR
         if ( vk.pbrActive ) {
-            pool_size[0].descriptorCount += 2 + ( MAX_DRAWIMAGES * 8 ); // brdf-lut + irradiance | MAX_DRAWIMAGES * (physical, normal, emissive, clearcoat, sheen, anisotropy, transmission, subsurface)
-            pool_size[0].descriptorCount += 1; // glint dictionary sampler
+            // Reserve extra combined image samplers for PBR material descriptor sets (conservative upper bound).
+            pool_size[0].descriptorCount += 2; // brdf-lut + irradiance
+            pool_size[0].descriptorCount += ( MAX_DRAWIMAGES * VK_PBR_BINDING_COUNT );
+			if ( vk.descriptorIndexingActive && vk.pbrIndexedMaxSamplers > 0 ) {
+				pool_size[0].descriptorCount += vk.pbrIndexedMaxSamplers;
+				pool_size[0].descriptorCount += 3; // brdf + env + irradiance bindings in indexed set
+			}
         }
 #endif
 
@@ -5286,20 +5374,17 @@ void vk_initialize( void )
 
 #ifdef USE_VK_PBR
 	{
-		VkDescriptorSetLayoutBinding pbr_bindings[2];
+		VkDescriptorSetLayoutBinding pbr_bindings[VK_PBR_BINDING_COUNT];
 		VkDescriptorSetLayoutCreateInfo pbr_desc;
+		uint32_t binding_idx;
 
 		Com_Memset( pbr_bindings, 0, sizeof( pbr_bindings ) );
-
-		pbr_bindings[0].binding = 0;
-		pbr_bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		pbr_bindings[0].descriptorCount = 1;
-		pbr_bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-		pbr_bindings[1].binding = 1;
-		pbr_bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		pbr_bindings[1].descriptorCount = 1;
-		pbr_bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		for ( binding_idx = 0; binding_idx < VK_PBR_BINDING_COUNT; ++binding_idx ) {
+			pbr_bindings[binding_idx].binding = binding_idx;
+			pbr_bindings[binding_idx].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			pbr_bindings[binding_idx].descriptorCount = 1;
+			pbr_bindings[binding_idx].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		}
 
 		pbr_desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 		pbr_desc.pNext = NULL;
@@ -5308,6 +5393,51 @@ void vk_initialize( void )
 		pbr_desc.pBindings = pbr_bindings;
 
 		VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &pbr_desc, NULL, &vk.set_layout_pbr ) );
+	}
+
+	if ( vk.hasDescriptorIndexing ) {
+		VkDescriptorSetLayoutBinding pbr_bindings[VK_PBR_INDEXED_BINDING_COUNT];
+		VkDescriptorSetLayoutCreateInfo pbr_desc;
+		VkDescriptorSetLayoutBindingFlagsCreateInfo flags_info;
+		VkDescriptorBindingFlags binding_flags[VK_PBR_INDEXED_BINDING_COUNT];
+
+		Com_Memset( pbr_bindings, 0, sizeof( pbr_bindings ) );
+		Com_Memset( binding_flags, 0, sizeof( binding_flags ) );
+
+		pbr_bindings[VK_PBR_INDEXED_BINDING_TEXTURES].binding = VK_PBR_INDEXED_BINDING_TEXTURES;
+		pbr_bindings[VK_PBR_INDEXED_BINDING_TEXTURES].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		pbr_bindings[VK_PBR_INDEXED_BINDING_TEXTURES].descriptorCount = ( vk.pbrIndexedMaxSamplers > 0 ) ? vk.pbrIndexedMaxSamplers : 1;
+		pbr_bindings[VK_PBR_INDEXED_BINDING_TEXTURES].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		binding_flags[VK_PBR_INDEXED_BINDING_TEXTURES] =
+			VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
+
+		pbr_bindings[VK_PBR_INDEXED_BINDING_BRDFLUT].binding = VK_PBR_INDEXED_BINDING_BRDFLUT;
+		pbr_bindings[VK_PBR_INDEXED_BINDING_BRDFLUT].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		pbr_bindings[VK_PBR_INDEXED_BINDING_BRDFLUT].descriptorCount = 1;
+		pbr_bindings[VK_PBR_INDEXED_BINDING_BRDFLUT].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		pbr_bindings[VK_PBR_INDEXED_BINDING_ENV_CUBEMAP].binding = VK_PBR_INDEXED_BINDING_ENV_CUBEMAP;
+		pbr_bindings[VK_PBR_INDEXED_BINDING_ENV_CUBEMAP].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		pbr_bindings[VK_PBR_INDEXED_BINDING_ENV_CUBEMAP].descriptorCount = 1;
+		pbr_bindings[VK_PBR_INDEXED_BINDING_ENV_CUBEMAP].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		pbr_bindings[VK_PBR_INDEXED_BINDING_IRRADIANCE].binding = VK_PBR_INDEXED_BINDING_IRRADIANCE;
+		pbr_bindings[VK_PBR_INDEXED_BINDING_IRRADIANCE].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		pbr_bindings[VK_PBR_INDEXED_BINDING_IRRADIANCE].descriptorCount = 1;
+		pbr_bindings[VK_PBR_INDEXED_BINDING_IRRADIANCE].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		flags_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
+		flags_info.pNext = NULL;
+		flags_info.bindingCount = ARRAY_LEN( binding_flags );
+		flags_info.pBindingFlags = binding_flags;
+
+		pbr_desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		pbr_desc.pNext = &flags_info;
+		pbr_desc.flags = 0;
+		pbr_desc.bindingCount = ARRAY_LEN( pbr_bindings );
+		pbr_desc.pBindings = pbr_bindings;
+
+		VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &pbr_desc, NULL, &vk.set_layout_pbr_indexed ) );
 	}
 #endif
 	//
@@ -5330,17 +5460,7 @@ void vk_initialize( void )
 		set_layouts[3] = vk.set_layout_sampler; // blend
 		set_layouts[4] = vk.set_layout_sampler; // collapsed fog texture
 #ifdef USE_VK_PBR
-		set_layouts[5] = vk.set_layout_pbr;    // brdf lut + glint dictionary
-		set_layouts[6] = vk.set_layout_sampler; // normalMap
-		set_layouts[7] = vk.set_layout_sampler; // physicalMap
-		set_layouts[8] = vk.set_layout_sampler; // prefiltered envmap
-		set_layouts[9] = vk.set_layout_sampler; // irradiance
-		set_layouts[10] = vk.set_layout_sampler; // emissive
-		set_layouts[11] = vk.set_layout_sampler; // clearcoat
-		set_layouts[12] = vk.set_layout_sampler; // sheen
-		set_layouts[13] = vk.set_layout_sampler; // anisotropy
-		set_layouts[14] = vk.set_layout_sampler; // transmission
-		set_layouts[15] = vk.set_layout_sampler; // subsurface
+		set_layouts[5] = vk.set_layout_pbr;     // PBR material (BRDF LUT + glint dict + maps)
 #endif
 		desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		desc.pNext = NULL;
@@ -5358,6 +5478,14 @@ void vk_initialize( void )
 		desc.pPushConstantRanges = &push_range;
 
 		VK_CHECK(qvkCreatePipelineLayout(vk.device, &desc, NULL, &vk.pipeline_layout));
+
+#ifdef USE_VK_PBR
+		if ( vk.hasDescriptorIndexing && vk.set_layout_pbr_indexed != VK_NULL_HANDLE ) {
+			set_layouts[5] = vk.set_layout_pbr_indexed;
+			desc.pSetLayouts = set_layouts;
+			VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_pbr_indexed ) );
+		}
+#endif
 
 		// flare test pipeline
 		set_layouts[0] = vk.set_layout_storage; // dynamic storage buffer
@@ -5393,6 +5521,9 @@ void vk_initialize( void )
 		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_blend ) );
 
 		SET_OBJECT_NAME( vk.pipeline_layout, "pipeline layout - main", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
+		if ( vk.pipeline_layout_pbr_indexed != VK_NULL_HANDLE ) {
+			SET_OBJECT_NAME( vk.pipeline_layout_pbr_indexed, "pipeline layout - pbr indexed", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
+		}
 		SET_OBJECT_NAME( vk.pipeline_layout_post_process, "pipeline layout - post-processing", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
 		SET_OBJECT_NAME( vk.pipeline_layout_blend, "pipeline layout - blend", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
 
@@ -5420,6 +5551,7 @@ void vk_initialize( void )
 	
 #ifdef VK_PBR_BRDFLUT
 		if( vk.pbrActive ) {
+			set_layouts[0] = vk.set_layout_sampler;
 			desc.setLayoutCount = 1;
 			VK_CHECK(qvkCreatePipelineLayout(vk.device, &desc, NULL, &vk.pipeline_layout_brdflut));
 			SET_OBJECT_NAME(vk.pipeline_layout_brdflut, "pipeline layout - brdflut", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT);
@@ -5812,10 +5944,18 @@ void vk_shutdown( refShutdownCode_t code )
 
 	qvkDestroyDescriptorSetLayout(vk.device, vk.set_layout_sampler, NULL);
 	qvkDestroyDescriptorSetLayout(vk.device, vk.set_layout_pbr, NULL);
+	if ( vk.set_layout_pbr_indexed != VK_NULL_HANDLE ) {
+		qvkDestroyDescriptorSetLayout( vk.device, vk.set_layout_pbr_indexed, NULL );
+		vk.set_layout_pbr_indexed = VK_NULL_HANDLE;
+	}
 	qvkDestroyDescriptorSetLayout(vk.device, vk.set_layout_uniform, NULL);
 	qvkDestroyDescriptorSetLayout(vk.device, vk.set_layout_storage, NULL);
 
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout, NULL);
+	if ( vk.pipeline_layout_pbr_indexed != VK_NULL_HANDLE ) {
+		qvkDestroyPipelineLayout( vk.device, vk.pipeline_layout_pbr_indexed, NULL );
+		vk.pipeline_layout_pbr_indexed = VK_NULL_HANDLE;
+	}
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_storage, NULL);
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_post_process, NULL);
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_blend, NULL);
@@ -5841,32 +5981,32 @@ void vk_shutdown( refShutdownCode_t code )
 	qvkFreeMemory( vk.device, vk.storage.memory, NULL );
 
 #ifdef USE_VK_PBR
-for (i = 0; i < 2; i++) {
-        for (j = 0; j < 3; j++) {
-            for (k = 0; k < 2; k++) {
-                for (l = 0; l < 2; l++) {
-                    for (m = 0; m < 2; m++) {
-                        if (vk.modules.vert.gen[i][j][k][l][m] != VK_NULL_HANDLE) {
-                            qvkDestroyShaderModule(vk.device, vk.modules.vert.gen[i][j][k][l][m], NULL);
-                            vk.modules.vert.gen[i][j][k][l][m] = VK_NULL_HANDLE;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    for (i = 0; i < 2; i++) {
-        for (j = 0; j < 3; j++) {
-            for (k = 0; k < 2; k++) {
-                for (l = 0; l < 2; l++) {
-                    if (vk.modules.frag.gen[i][j][k][l] != VK_NULL_HANDLE) {
-                        qvkDestroyShaderModule(vk.device, vk.modules.frag.gen[i][j][k][l], NULL);
-                        vk.modules.frag.gen[i][j][k][l] = VK_NULL_HANDLE;
-                    }
-                }
-            }
-        }
-    }
+	for ( i = 0; i < VK_PBR_VARIANT_COUNT; i++ ) {
+		for ( j = 0; j < 3; j++ ) {
+			for ( k = 0; k < 2; k++ ) {
+				for ( l = 0; l < 2; l++ ) {
+					for ( m = 0; m < 2; m++ ) {
+						if ( vk.modules.vert.gen[i][j][k][l][m] != VK_NULL_HANDLE ) {
+							qvkDestroyShaderModule( vk.device, vk.modules.vert.gen[i][j][k][l][m], NULL );
+							vk.modules.vert.gen[i][j][k][l][m] = VK_NULL_HANDLE;
+						}
+					}
+				}
+			}
+		}
+	}
+	for ( i = 0; i < VK_PBR_VARIANT_COUNT; i++ ) {
+		for ( j = 0; j < 3; j++ ) {
+			for ( k = 0; k < 2; k++ ) {
+				for ( l = 0; l < 2; l++ ) {
+					if ( vk.modules.frag.gen[i][j][k][l] != VK_NULL_HANDLE ) {
+						qvkDestroyShaderModule( vk.device, vk.modules.frag.gen[i][j][k][l], NULL );
+						vk.modules.frag.gen[i][j][k][l] = VK_NULL_HANDLE;
+					}
+				}
+			}
+		}
+	}
 #else
 	for ( i = 0; i < 3; i++ ) {
 		for ( j = 0; j < 2; j++ ) {
@@ -5906,7 +6046,7 @@ for (i = 0; i < 2; i++) {
 	}
 
 #ifdef USE_VK_PBR
-	for ( i = 0; i < 2; i++ ) {
+	for ( i = 0; i < VK_PBR_VARIANT_COUNT; i++ ) {
 		for ( j = 0; j < 2; j++ ) {
 			for ( k = 0; k < 2; k++ ) {
 				for ( m = 0; m < 2; m++ ) {
@@ -5919,7 +6059,7 @@ for (i = 0; i < 2; i++) {
 		}
 	}
 
-	for ( i = 0; i < 2; i++ ) {
+	for ( i = 0; i < VK_PBR_VARIANT_COUNT; i++ ) {
 		for ( j = 0; j < 2; j++ ) {
 			for ( k = 0; k < 2; k++ ) {
 				for ( m = 0; m < 2; m++ ) {
@@ -5932,7 +6072,7 @@ for (i = 0; i < 2; i++) {
 		}
 	}
 
-	for ( i = 0; i < 2; i++ ) {
+	for ( i = 0; i < VK_PBR_VARIANT_COUNT; i++ ) {
 		for ( j = 0; j < 2; j++ ) {
 			for ( k = 0; k < 2; k++ ) {
 				qvkDestroyShaderModule( vk.device, vk.modules.frag.ent[i][j][k], NULL );
@@ -6059,6 +6199,10 @@ void vk_release_resources( void ) {
 	vk.pipelines_count = vk.pipelines_world_base;
 
 	VK_CHECK( qvkResetDescriptorPool( vk.device, vk.descriptor_pool, 0 ) );
+	vk.descriptor_pool_gen++;
+	if ( vk.descriptor_pool_gen == 0 ) {
+		vk.descriptor_pool_gen = 1;
+	}
 
 	if ( vk_world.num_image_chunks > 1 ) {
 		// if we allocated more than 2 image chunks - use doubled default size
@@ -6414,7 +6558,351 @@ void vk_update_descriptor_set( image_t *image, qboolean mipmap ) {
 	descriptor_write.pTexelBufferView = NULL;
 
 	qvkUpdateDescriptorSets( vk.device, 1, &descriptor_write, 0, NULL );
+
+#ifdef USE_VK_PBR
+	if ( vk.descriptorIndexingActive && image && image->descriptor_index < vk.pbrIndexedImageLimit ) {
+		VkDescriptorSet indexed = vk_get_pbr_indexed_descriptor();
+		if ( indexed != VK_NULL_HANDLE ) {
+			VkDescriptorImageInfo indexed_info;
+			VkWriteDescriptorSet indexed_write;
+
+			vk_fill_pbr_image_info( image, &indexed_info );
+
+			indexed_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			indexed_write.dstSet = indexed;
+			indexed_write.dstBinding = VK_PBR_INDEXED_BINDING_TEXTURES;
+			indexed_write.dstArrayElement = image->descriptor_index;
+			indexed_write.descriptorCount = 1;
+			indexed_write.pNext = NULL;
+			indexed_write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			indexed_write.pImageInfo = &indexed_info;
+			indexed_write.pBufferInfo = NULL;
+			indexed_write.pTexelBufferView = NULL;
+
+			qvkUpdateDescriptorSets( vk.device, 1, &indexed_write, 0, NULL );
+		}
+	}
+#endif
 }
+
+#ifdef USE_VK_PBR
+static void vk_fill_pbr_image_info( const image_t *image, VkDescriptorImageInfo *info )
+{
+	Vk_Sampler_Def sampler_def;
+	const image_t *img = image ? image : tr.whiteImage;
+
+	Com_Memset( &sampler_def, 0, sizeof( sampler_def ) );
+	sampler_def.address_mode = img->wrapClampMode;
+	if ( img->flags & IMGFLAG_MIPMAP ) {
+		sampler_def.gl_mag_filter = gl_filter_max;
+		sampler_def.gl_min_filter = gl_filter_min;
+	} else {
+		sampler_def.gl_mag_filter = GL_LINEAR;
+		sampler_def.gl_min_filter = GL_LINEAR;
+		sampler_def.noAnisotropy = qtrue;
+	}
+
+	info->sampler = vk_find_sampler( &sampler_def );
+	info->imageView = img->view;
+	info->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+}
+
+static void vk_fill_pbr_brdflut_info( VkDescriptorImageInfo *info )
+{
+	Vk_Sampler_Def sampler_def;
+	VkImageView view = vk.brdflut_image_view;
+
+	if ( view == VK_NULL_HANDLE && tr.blackImage ) {
+		view = tr.blackImage->view;
+	}
+
+	Com_Memset( &sampler_def, 0, sizeof( sampler_def ) );
+	sampler_def.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	sampler_def.gl_mag_filter = GL_LINEAR;
+	sampler_def.gl_min_filter = GL_LINEAR;
+	sampler_def.noAnisotropy = qtrue;
+
+	info->sampler = vk_find_sampler( &sampler_def );
+	info->imageView = view;
+	info->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+}
+
+#ifdef USE_VK_PBR
+static void vk_update_pbr_indexed_glint( VkDescriptorSet descriptor )
+{
+	VkDescriptorImageInfo image_info;
+	VkWriteDescriptorSet descriptor_write;
+	const image_t *glint_image = NULL;
+
+	if ( descriptor == VK_NULL_HANDLE || !vk.descriptorIndexingActive )
+		return;
+
+	if ( vk.pbrIndexedImageLimit == 0 )
+		return;
+
+	if ( vk_glint_dictionary_image.view != VK_NULL_HANDLE ) {
+		glint_image = &vk_glint_dictionary_image;
+	} else if ( tr.blackImage ) {
+		glint_image = tr.blackImage;
+	} else {
+		glint_image = tr.whiteImage;
+	}
+
+	vk_fill_pbr_image_info( glint_image, &image_info );
+
+	descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptor_write.dstSet = descriptor;
+	descriptor_write.dstBinding = VK_PBR_INDEXED_BINDING_TEXTURES;
+	descriptor_write.dstArrayElement = vk.pbrIndexedGlintIndex;
+	descriptor_write.descriptorCount = 1;
+	descriptor_write.pNext = NULL;
+	descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descriptor_write.pImageInfo = &image_info;
+	descriptor_write.pBufferInfo = NULL;
+	descriptor_write.pTexelBufferView = NULL;
+
+	qvkUpdateDescriptorSets( vk.device, 1, &descriptor_write, 0, NULL );
+}
+
+static void vk_update_pbr_indexed_common_descriptor( VkDescriptorSet descriptor, const image_t *env, const image_t *irr )
+{
+	VkDescriptorImageInfo infos[3];
+	VkWriteDescriptorSet writes[3];
+	uint32_t write_count = 0;
+	const image_t *env_image = env;
+	const image_t *irr_image = irr;
+
+	if ( descriptor == VK_NULL_HANDLE )
+		return;
+
+	if ( !env_image ) {
+		env_image = tr.emptyCubemap ? tr.emptyCubemap : ( tr.blackImage ? tr.blackImage : tr.whiteImage );
+	}
+	if ( !irr_image ) {
+		irr_image = tr.emptyCubemap ? tr.emptyCubemap : ( tr.blackImage ? tr.blackImage : tr.whiteImage );
+	}
+
+	vk_fill_pbr_brdflut_info( &infos[write_count] );
+	writes[write_count].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writes[write_count].dstSet = descriptor;
+	writes[write_count].dstBinding = VK_PBR_INDEXED_BINDING_BRDFLUT;
+	writes[write_count].dstArrayElement = 0;
+	writes[write_count].descriptorCount = 1;
+	writes[write_count].pNext = NULL;
+	writes[write_count].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	writes[write_count].pImageInfo = &infos[write_count];
+	writes[write_count].pBufferInfo = NULL;
+	writes[write_count].pTexelBufferView = NULL;
+	write_count++;
+
+	vk_fill_pbr_image_info( env_image, &infos[write_count] );
+	writes[write_count].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writes[write_count].dstSet = descriptor;
+	writes[write_count].dstBinding = VK_PBR_INDEXED_BINDING_ENV_CUBEMAP;
+	writes[write_count].dstArrayElement = 0;
+	writes[write_count].descriptorCount = 1;
+	writes[write_count].pNext = NULL;
+	writes[write_count].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	writes[write_count].pImageInfo = &infos[write_count];
+	writes[write_count].pBufferInfo = NULL;
+	writes[write_count].pTexelBufferView = NULL;
+	write_count++;
+
+	vk_fill_pbr_image_info( irr_image, &infos[write_count] );
+	writes[write_count].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writes[write_count].dstSet = descriptor;
+	writes[write_count].dstBinding = VK_PBR_INDEXED_BINDING_IRRADIANCE;
+	writes[write_count].dstArrayElement = 0;
+	writes[write_count].descriptorCount = 1;
+	writes[write_count].pNext = NULL;
+	writes[write_count].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	writes[write_count].pImageInfo = &infos[write_count];
+	writes[write_count].pBufferInfo = NULL;
+	writes[write_count].pTexelBufferView = NULL;
+	write_count++;
+
+	qvkUpdateDescriptorSets( vk.device, write_count, writes, 0, NULL );
+	vk_update_pbr_indexed_glint( descriptor );
+}
+#endif
+
+qboolean vk_create_pbr_descriptor_set( shaderStage_t *stage )
+{
+	VkDescriptorSetAllocateInfo alloc;
+	VkDescriptorImageInfo infos[VK_PBR_BINDING_COUNT];
+	VkWriteDescriptorSet writes[VK_PBR_BINDING_COUNT];
+	const image_t *fallback_white = tr.whiteImage;
+	const image_t *fallback_black = tr.blackImage ? tr.blackImage : tr.whiteImage;
+	const image_t *albedo = NULL;
+	const image_t *empty_cubemap = NULL;
+	uint32_t i;
+	VkResult res;
+
+	if ( !stage || !vk.pbrActive )
+		return qfalse;
+
+	// Descriptor pool resets invalidate VkDescriptorSet handles; recreate lazily when generation changes.
+	if ( stage->pbrDescriptor != VK_NULL_HANDLE && stage->pbrDescriptorGen == vk.descriptor_pool_gen ) {
+		return qtrue;
+	}
+	stage->pbrDescriptor = VK_NULL_HANDLE;
+	stage->pbrDescriptorGen = 0;
+
+	if ( vk.set_layout_pbr == VK_NULL_HANDLE )
+		return qfalse;
+
+	alloc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	alloc.pNext = NULL;
+	alloc.descriptorPool = vk.descriptor_pool;
+	alloc.descriptorSetCount = 1;
+	alloc.pSetLayouts = &vk.set_layout_pbr;
+
+	res = qvkAllocateDescriptorSets( vk.device, &alloc, &stage->pbrDescriptor );
+	if ( res != VK_SUCCESS ) {
+		stage->pbrDescriptor = VK_NULL_HANDLE;
+		ri.Printf( PRINT_WARNING, "PBR: descriptor allocation failed (%d), disabling PBR for stage\n", res );
+		return qfalse;
+	}
+	stage->pbrDescriptorGen = vk.descriptor_pool_gen;
+
+	albedo = ( stage->bundle[0].image[0] != NULL ) ? stage->bundle[0].image[0] : fallback_white;
+	empty_cubemap = tr.emptyCubemap ? tr.emptyCubemap : fallback_black;
+
+	vk_fill_pbr_image_info( albedo, &infos[VK_PBR_BINDING_ALBEDO] );
+	vk_fill_pbr_image_info( stage->normalMap ? stage->normalMap : fallback_white, &infos[VK_PBR_BINDING_NORMAL] );
+	vk_fill_pbr_image_info( stage->physicalMap ? stage->physicalMap : fallback_white, &infos[VK_PBR_BINDING_PHYSICAL] );
+	vk_fill_pbr_image_info( stage->emissiveMap ? stage->emissiveMap : fallback_black, &infos[VK_PBR_BINDING_EMISSIVE] );
+	vk_fill_pbr_image_info( fallback_white, &infos[VK_PBR_BINDING_LIGHTMAP] );
+	vk_fill_pbr_image_info( stage->clearcoatMap ? stage->clearcoatMap : fallback_black, &infos[VK_PBR_BINDING_CLEARCOAT] );
+	vk_fill_pbr_image_info( stage->sheenMap ? stage->sheenMap : fallback_black, &infos[VK_PBR_BINDING_SHEEN] );
+	vk_fill_pbr_image_info( stage->anisotropyMap ? stage->anisotropyMap : fallback_black, &infos[VK_PBR_BINDING_ANISOTROPY] );
+	vk_fill_pbr_image_info( stage->transmissionMap ? stage->transmissionMap : fallback_black, &infos[VK_PBR_BINDING_TRANSMISSION] );
+	vk_fill_pbr_image_info( stage->subsurfaceMap ? stage->subsurfaceMap : fallback_black, &infos[VK_PBR_BINDING_SUBSURFACE] );
+	vk_fill_pbr_brdflut_info( &infos[VK_PBR_BINDING_BRDFLUT] );
+	vk_fill_pbr_image_info( fallback_black, &infos[VK_PBR_BINDING_GLINT_DICT] );
+	vk_fill_pbr_image_info( empty_cubemap, &infos[VK_PBR_BINDING_ENV_CUBEMAP] );
+	vk_fill_pbr_image_info( empty_cubemap, &infos[VK_PBR_BINDING_IRRADIANCE] );
+
+	for ( i = 0; i < VK_PBR_BINDING_COUNT; ++i ) {
+		writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[i].pNext = NULL;
+		writes[i].dstSet = stage->pbrDescriptor;
+		writes[i].dstBinding = i;
+		writes[i].dstArrayElement = 0;
+		writes[i].descriptorCount = 1;
+		writes[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		writes[i].pImageInfo = &infos[i];
+		writes[i].pBufferInfo = NULL;
+		writes[i].pTexelBufferView = NULL;
+	}
+
+	qvkUpdateDescriptorSets( vk.device, VK_PBR_BINDING_COUNT, writes, 0, NULL );
+	vk_update_pbr_descriptor_common( stage->pbrDescriptor );
+
+	return qtrue;
+}
+
+uint32_t vk_get_image_descriptor_index( const image_t *image )
+{
+	if ( !vk.descriptorIndexingActive || !image )
+		return 0;
+
+	if ( image->descriptor_index >= vk.pbrIndexedImageLimit )
+		return 0;
+
+	return image->descriptor_index;
+}
+
+uint32_t vk_get_glint_dict_index( void )
+{
+	if ( !vk.descriptorIndexingActive || vk.pbrIndexedImageLimit == 0 )
+		return 0;
+
+	return vk.pbrIndexedGlintIndex;
+}
+
+VkDescriptorSet vk_get_pbr_indexed_descriptor( void )
+{
+	VkDescriptorSetAllocateInfo alloc;
+	VkDescriptorSetVariableDescriptorCountAllocateInfo variable_count;
+	uint32_t variable_counts[1];
+	VkResult res;
+	int i;
+
+	if ( !vk.descriptorIndexingActive || vk.set_layout_pbr_indexed == VK_NULL_HANDLE )
+		return VK_NULL_HANDLE;
+
+	// Descriptor pool resets invalidate VkDescriptorSet handles; recreate lazily when generation changes.
+	if ( vk.pbr_indexed_descriptor != VK_NULL_HANDLE && vk.pbr_indexed_descriptor_gen == vk.descriptor_pool_gen ) {
+		return vk.pbr_indexed_descriptor;
+	}
+
+	vk.pbr_indexed_descriptor = VK_NULL_HANDLE;
+	vk.pbr_indexed_descriptor_gen = 0;
+
+	variable_counts[0] = ( vk.pbrIndexedMaxSamplers > 0 ) ? vk.pbrIndexedMaxSamplers : 1;
+
+	variable_count.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO;
+	variable_count.pNext = NULL;
+	variable_count.descriptorSetCount = 1;
+	variable_count.pDescriptorCounts = variable_counts;
+
+	alloc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	alloc.pNext = &variable_count;
+	alloc.descriptorPool = vk.descriptor_pool;
+	alloc.descriptorSetCount = 1;
+	alloc.pSetLayouts = &vk.set_layout_pbr_indexed;
+
+	res = qvkAllocateDescriptorSets( vk.device, &alloc, &vk.pbr_indexed_descriptor );
+	if ( res != VK_SUCCESS ) {
+		vk.pbr_indexed_descriptor = VK_NULL_HANDLE;
+		ri.Printf( PRINT_WARNING, "PBR: indexed descriptor allocation failed (%d)\n", res );
+		return VK_NULL_HANDLE;
+	}
+
+	vk.pbr_indexed_descriptor_gen = vk.descriptor_pool_gen;
+
+	// Populate the descriptor array with any images that already exist.
+	if ( vk.pbrIndexedImageLimit > 0 ) {
+		for ( i = 0; i < tr.numImages; ++i ) {
+			image_t *image = tr.images[i];
+			VkDescriptorImageInfo image_info;
+			VkWriteDescriptorSet descriptor_write;
+
+			if ( !image || image->descriptor_index >= vk.pbrIndexedImageLimit )
+				continue;
+
+			vk_fill_pbr_image_info( image, &image_info );
+
+			descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			descriptor_write.dstSet = vk.pbr_indexed_descriptor;
+			descriptor_write.dstBinding = VK_PBR_INDEXED_BINDING_TEXTURES;
+			descriptor_write.dstArrayElement = image->descriptor_index;
+			descriptor_write.descriptorCount = 1;
+			descriptor_write.pNext = NULL;
+			descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			descriptor_write.pImageInfo = &image_info;
+			descriptor_write.pBufferInfo = NULL;
+			descriptor_write.pTexelBufferView = NULL;
+
+			qvkUpdateDescriptorSets( vk.device, 1, &descriptor_write, 0, NULL );
+		}
+	}
+
+	vk_update_pbr_indexed_common_descriptor( vk.pbr_indexed_descriptor, tr.emptyCubemap, tr.emptyCubemap );
+
+	return vk.pbr_indexed_descriptor;
+}
+
+void vk_update_pbr_indexed_common( const image_t *env, const image_t *irr )
+{
+	VkDescriptorSet descriptor = vk_get_pbr_indexed_descriptor();
+	if ( descriptor == VK_NULL_HANDLE )
+		return;
+
+	vk_update_pbr_indexed_common_descriptor( descriptor, env, irr );
+}
+#endif
 
 VkImageView vk_get_glint_dictionary_view( void ) {
 	return vk_glint_dictionary_image.view;
@@ -6453,7 +6941,7 @@ void vk_update_glint_descriptor_binding( VkDescriptorSet descriptor ) {
 
 	descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	descriptor_write.dstSet = descriptor;
-	descriptor_write.dstBinding = 1;
+	descriptor_write.dstBinding = VK_PBR_BINDING_GLINT_DICT;
 	descriptor_write.dstArrayElement = 0;
 	descriptor_write.descriptorCount = 1;
 	descriptor_write.pNext = NULL;
@@ -6464,6 +6952,64 @@ void vk_update_glint_descriptor_binding( VkDescriptorSet descriptor ) {
 
 	qvkUpdateDescriptorSets( vk.device, 1, &descriptor_write, 0, NULL );
 }
+
+#ifdef USE_VK_PBR
+void vk_update_pbr_descriptor_binding( VkDescriptorSet descriptor, uint32_t binding, const image_t *image )
+{
+	VkDescriptorImageInfo image_info;
+	VkWriteDescriptorSet descriptor_write;
+
+	if ( descriptor == VK_NULL_HANDLE ) {
+		return;
+	}
+	if ( binding >= VK_PBR_BINDING_COUNT ) {
+		return;
+	}
+
+	vk_fill_pbr_image_info( image, &image_info );
+
+	descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptor_write.dstSet = descriptor;
+	descriptor_write.dstBinding = binding;
+	descriptor_write.dstArrayElement = 0;
+	descriptor_write.descriptorCount = 1;
+	descriptor_write.pNext = NULL;
+	descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descriptor_write.pImageInfo = &image_info;
+	descriptor_write.pBufferInfo = NULL;
+	descriptor_write.pTexelBufferView = NULL;
+
+	qvkUpdateDescriptorSets( vk.device, 1, &descriptor_write, 0, NULL );
+}
+
+void vk_update_pbr_descriptor_common( VkDescriptorSet descriptor )
+{
+	VkDescriptorImageInfo image_info;
+	VkWriteDescriptorSet descriptor_write;
+
+	if ( descriptor == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	vk_fill_pbr_brdflut_info( &image_info );
+
+	descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptor_write.dstSet = descriptor;
+	descriptor_write.dstBinding = VK_PBR_BINDING_BRDFLUT;
+	descriptor_write.dstArrayElement = 0;
+	descriptor_write.descriptorCount = 1;
+	descriptor_write.pNext = NULL;
+	descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descriptor_write.pImageInfo = &image_info;
+	descriptor_write.pBufferInfo = NULL;
+	descriptor_write.pTexelBufferView = NULL;
+
+	qvkUpdateDescriptorSets( vk.device, 1, &descriptor_write, 0, NULL );
+
+	// Glint dictionary may be rebuilt at runtime; keep its binding current as well.
+	vk_update_glint_descriptor_binding( descriptor );
+}
+#endif
 
 
 void vk_destroy_image_resources( VkImage *image, VkImageView *imageView )
@@ -7145,7 +7691,10 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	unsigned int state_bits = def->state_bits;
 
 #ifdef USE_VK_PBR
-	const int use_pbr = def->vk_pbr_flags ? 1 : 0;
+	int use_pbr = 0;
+	if ( def->vk_pbr_flags ) {
+		use_pbr = def->descriptorIndexing ? 2 : 1;
+	}
 
 	switch ( def->shader_type ) {
 
@@ -8126,7 +8675,24 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	}
 
  #ifdef USE_VK_PBR  
-    if( def->vk_pbr_flags ){    
+    if( def->vk_pbr_flags ){
+		// PBR vertex shaders always consume normals at location=5 (regardless of shader_type).
+		// Some non-ENV shader types don't normally bind normals, so make sure the vertex input
+		// layout includes them when PBR is enabled.
+		{
+			qboolean hasNormalAttr = qfalse;
+			for ( uint32_t a = 0; a < num_attrs; a++ ) {
+				if ( attribs[a].location == 5 ) {
+					hasNormalAttr = qtrue;
+					break;
+				}
+			}
+			if ( !hasNormalAttr ) {
+				push_bind( 5, sizeof( vec4_t ) );					// normals
+				push_attr( 5, 5, VK_FORMAT_R32G32B32A32_SFLOAT );
+			}
+		}
+
         push_bind( 8, sizeof( vec4_t ) );						// qtangent
         push_attr( 8, 8, VK_FORMAT_R32G32B32A32_SFLOAT );
 
@@ -8395,10 +8961,18 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	create_info.pColorBlendState = &blend_state;
 	create_info.pDynamicState = &dynamic_state;
 
-	if ( def->shader_type == TYPE_DOT )
+	if ( def->shader_type == TYPE_DOT ) {
 		create_info.layout = vk.pipeline_layout_storage;
-	else
-		create_info.layout = vk.pipeline_layout;
+	} else {
+#ifdef USE_VK_PBR
+		if ( def->descriptorIndexing && vk.pipeline_layout_pbr_indexed != VK_NULL_HANDLE ) {
+			create_info.layout = vk.pipeline_layout_pbr_indexed;
+		} else
+#endif
+		{
+			create_info.layout = vk.pipeline_layout;
+		}
+	}
 
 	if ( renderPassIndex == RENDER_PASS_SCREENMAP )
 		create_info.renderPass = vk.render_pass.screenmap;
@@ -8673,7 +9247,10 @@ void vk_update_mvp( const float *m ) {
 	else
 		get_mvp_transform( push_constants );
 
-	qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof( push_constants ), push_constants );
+	{
+		VkPipelineLayout layout = vk.cmd->pipeline_layout ? vk.cmd->pipeline_layout : vk.pipeline_layout;
+		qvkCmdPushConstants( vk.cmd->command_buffer, layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof( push_constants ), push_constants );
+	}
 
 	vk.stats.push_size += sizeof( push_constants );
 }
@@ -8974,7 +9551,10 @@ void vk_bind_descriptor_sets( void )
 		}
 	}
 
-	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout, start, count, vk.cmd->descriptor_set.current + start, offset_count, offsets );
+	{
+		VkPipelineLayout layout = vk.cmd->pipeline_layout ? vk.cmd->pipeline_layout : vk.pipeline_layout;
+		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, start, count, vk.cmd->descriptor_set.current + start, offset_count, offsets );
+	}
 
 	vk.cmd->descriptor_set.end = 0;
 	vk.cmd->descriptor_set.start = ~0U;
@@ -8983,12 +9563,25 @@ void vk_bind_descriptor_sets( void )
 
 void vk_bind_pipeline( uint32_t pipeline ) {
 	VkPipeline vkpipe;
+	VkPipelineLayout layout;
 
 	vkpipe = vk_gen_pipeline( pipeline );
+	layout = vk.pipeline_layout;
+#ifdef USE_VK_PBR
+	if ( vk.pipelines[ pipeline ].def.descriptorIndexing && vk.pipeline_layout_pbr_indexed != VK_NULL_HANDLE ) {
+		layout = vk.pipeline_layout_pbr_indexed;
+	}
+#endif
 
 	if ( vkpipe != vk.cmd->last_pipeline ) {
 		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkpipe );
 		vk.cmd->last_pipeline = vkpipe;
+	}
+	if ( vk.cmd->pipeline_layout != layout ) {
+		vk.cmd->pipeline_layout = layout;
+		// force descriptor rebind when layout changes
+		vk.cmd->descriptor_set.start = 0;
+		vk.cmd->descriptor_set.end = vk.pipelines[ pipeline ].def.vk_pbr_flags ? VK_DESC_PBR : VK_DESC_FOG_COLLAPSE;
 	}
 
 	vk_world.dirty_depth_attachment |= ( vk.pipelines[ pipeline ].def.state_bits & GLS_DEPTHMASK_TRUE );
@@ -9094,6 +9687,7 @@ static void vk_begin_render_pass( VkRenderPass renderPass, VkFramebuffer frameBu
 	qvkCmdBeginRenderPass( vk.cmd->command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE );
 
 	vk.cmd->last_pipeline = VK_NULL_HANDLE;
+	vk.cmd->pipeline_layout = vk.pipeline_layout;
 	vk.cmd->depth_range = DEPTH_RANGE_COUNT;
 }
 

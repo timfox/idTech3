@@ -1713,13 +1713,40 @@ static void * QDECL loadNative( const char *name, vmMainFunc_t *entryPoint, dllS
 	dllEntry_t	dllEntry;
 	void		*sym;
 	void		*vmMainAddr;
+	const char	*altName0 = NULL;
+	const char	*names[ 2 ];
+	int			nameCount = 0;
+	int			i;
+	int			j;
 
-	Com_sprintf( filename, sizeof( filename ), "%s" ARCH_STRING DLL_EXT, name );
+	// Historically the Q3 "game" VM is called "qagame", but some mods ship it as
+	// "game.so"/"game.dll". Support both without breaking existing naming.
+	if ( !Q_stricmp( name, "qagame" ) ) {
+		altName0 = "game";
+	}
 
-	libHandle = FS_LoadLibrary( filename );
+	names[nameCount++] = name;
+	if ( altName0 ) {
+		names[nameCount++] = altName0;
+	}
+
+	libHandle = NULL;
+	for ( i = 0; i < nameCount && !libHandle; i++ ) {
+		// Try platform-arch suffix first (e.g. qagamex86_64.so), then plain (qagame.so).
+		for ( j = 0; j < 2 && !libHandle; j++ ) {
+			if ( j == 0 ) {
+				Com_sprintf( filename, sizeof( filename ), "%s" ARCH_STRING DLL_EXT, names[i] );
+			} else {
+				Com_sprintf( filename, sizeof( filename ), "%s" DLL_EXT, names[i] );
+			}
+			libHandle = FS_LoadLibrary( filename );
+			if ( !libHandle ) {
+				Com_Printf( "loadNative '%s' failed\n", filename );
+			}
+		}
+	}
 
 	if ( !libHandle ) {
-		Com_Printf( "loadNative '%s' failed\n", filename );
 		return NULL;
 	}
 

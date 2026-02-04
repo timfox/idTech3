@@ -58,6 +58,29 @@ static qboolean R_StageHasLightmap( const shaderStage_t *pStage ) {
 	return ( pStage->bundle[0].lightmap != LIGHTMAP_INDEX_NONE || pStage->bundle[1].lightmap != LIGHTMAP_INDEX_NONE );
 }
 
+static const textureBundle_t *R_FindLightmapBundle( const shader_t *shader ) {
+	int i;
+
+	if ( !shader ) {
+		return NULL;
+	}
+
+	for ( i = 0; i < shader->numUnfoggedPasses && i < MAX_SHADER_STAGES; i++ ) {
+		const shaderStage_t *stage = shader->stages[ i ];
+		if ( !stage ) {
+			break;
+		}
+		if ( stage->bundle[0].lightmap != LIGHTMAP_INDEX_NONE ) {
+			return &stage->bundle[0];
+		}
+		if ( stage->bundle[1].lightmap != LIGHTMAP_INDEX_NONE ) {
+			return &stage->bundle[1];
+		}
+	}
+
+	return NULL;
+}
+
 static void RB_DrawWorldSHDebugOverride( void ) {
 	if ( !r_shDebugView || r_shDebugView->integer != 3 ) {
 		return;
@@ -170,6 +193,37 @@ static void R_BindAnimatedImage( const textureBundle_t *bundle ) {
 	index %= bundle->numImageAnimations;
 
 	GL_Bind( bundle->image[ index ] );
+}
+
+static const image_t *R_GetAnimatedImage( const textureBundle_t *bundle ) {
+	int64_t index;
+	double v;
+
+	if ( !bundle ) {
+		return tr.whiteImage;
+	}
+
+	if ( bundle->isVideoMap ) {
+		return tr.blackImage ? tr.blackImage : tr.whiteImage;
+	}
+
+	if ( bundle->isScreenMap ) {
+		return tr.blackImage ? tr.blackImage : tr.whiteImage;
+	}
+
+	if ( bundle->numImageAnimations <= 1 ) {
+		return bundle->image[0] ? bundle->image[0] : tr.whiteImage;
+	}
+
+	v = tess.shaderTime * bundle->imageAnimationSpeed;
+	index = v;
+
+	if ( index < 0 ) {
+		index = 0;
+	}
+	index %= bundle->numImageAnimations;
+
+	return bundle->image[index] ? bundle->image[index] : tr.whiteImage;
 }
 
 
@@ -401,7 +455,7 @@ t1 = most downstream according to spec
 */
 #ifndef USE_VULKAN
 static void DrawMultitextured( const shaderCommands_t *input, int stage ) {
-	const shaderStage_t *pStage;
+	shaderStage_t *pStage;
 
 	pStage = tess.xstages[ stage ];
 
@@ -646,6 +700,9 @@ typedef struct vkPbrUniformBlock_s {
 	vec4_t subsurfaceColor;
 	vec4_t subsurfaceParams;
 	vec4_t shCoeffs[9];
+	vec4_t texIndex0;
+	vec4_t texIndex1;
+	vec4_t texIndex2;
 } vkPbrUniformBlock_t;
 #endif
 
@@ -1217,7 +1274,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input, qboolean fog
 static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 #endif
 {
-	const shaderStage_t *pStage;
+	shaderStage_t *pStage;
 	int tess_flags;
 	int stage, i;
 
@@ -1270,7 +1327,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 	// Debug view: render a non-PBR pass and optionally override texture0 binding.
 	// Keeps runtime inspection simple without requiring extra shader variants.
 	const int pbr_debug = ( r_pbr_debug != NULL ) ? r_pbr_debug->integer : 0;
-	if ( pbr_debug ) {
+	if ( pbr_debug > 0 && pbr_debug <= 4 ) {
 		is_pbr_surface = qfalse;
 	}
 
@@ -1280,6 +1337,11 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		uniform_camera.viewOrigin[3] = 0.0;
 
 		vk.cmd->camera_ubo_offset = vk_append_uniform( &uniform_camera, sizeof(uniform_camera), vk.uniform_camera_item_size );
+
+		uniform.pbrDebug[0] = ( pbr_debug > 4 ) ? (float)pbr_debug : 0.0f;
+		uniform.pbrDebug[1] = ( r_pbr_normalSwizzle != NULL ) ? r_pbr_normalSwizzle->value : 0.0f;
+		uniform.pbrDebug[2] = ( r_pbr_forceLight != NULL ) ? r_pbr_forceLight->value : 0.0f;
+		uniform.pbrDebug[3] = ( r_pbr_forceGlints != NULL ) ? r_pbr_forceGlints->value : 0.0f;
 
 		pushUniform = qtrue;
 	}
@@ -1298,6 +1360,9 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 
 #ifdef USE_VULKAN
 		tess_flags |= pStage->tessFlags;
+#ifdef USE_VK_PBR
+		const textureBundle_t *pbrLightmapBundle = NULL;
+#endif
 
 		for ( i = 0;  i < (int)pStage->numTexBundles; i++ ) {
 			if ( pStage->bundle[i].image[0] != NULL ) {
@@ -1319,6 +1384,28 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			}
 		}
 
+#ifdef USE_VK_PBR
+		// PBR uses the lightmap as a lighting source; ensure it is bound even when the
+		// original shader uses a separate lightmap stage (legacy multi-pass).
+		if ( is_pbr_surface && ( pStage->vk_pbr_flags & PBR_HAS_LIGHTMAP ) ) {
+			if ( pStage->numTexBundles > 1 && pStage->bundle[1].lightmap != LIGHTMAP_INDEX_NONE ) {
+				pbrLightmapBundle = &pStage->bundle[1];
+			} else {
+				pbrLightmapBundle = R_FindLightmapBundle( tess.shader );
+			}
+
+			GL_SelectTexture( 1 );
+			if ( pbrLightmapBundle && pbrLightmapBundle->image[0] ) {
+				R_BindAnimatedImage( pbrLightmapBundle );
+				R_ComputeTexCoords( 1, pbrLightmapBundle );
+				tess_flags |= TESS_ST1;
+			} else {
+				GL_Bind( tr.whiteImage );
+			}
+			GL_SelectTexture( 0 );
+		}
+#endif
+
 		if ( pushUniform ) {
 			pushUniform = qfalse;
 			vk_push_uniform_cached( &uniform );
@@ -1332,7 +1419,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		}
 
 #ifdef USE_VK_PBR
-		if ( pbr_debug && pStage->vk_pbr_flags ) {
+		if ( pbr_debug > 0 && pbr_debug <= 4 && pStage->vk_pbr_flags ) {
 			switch ( pbr_debug ) {
 				default:
 				case 1: // base/albedo (already bound)
@@ -1363,6 +1450,14 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			static vkPbrUniformBlock_t lastBlock;
 
 			vkPbrUniformBlock_t block;
+			const qboolean useIndexing = vk.descriptorIndexingActive ? qtrue : qfalse;
+			const image_t *fallback_white = tr.whiteImage;
+			const image_t *fallback_black = tr.blackImage ? tr.blackImage : tr.whiteImage;
+			const image_t *albedoImage = R_GetAnimatedImage( &pStage->bundle[0] );
+			const image_t *lightmapImage = fallback_white;
+			VkDescriptorSet pbrDescriptor = VK_NULL_HANDLE;
+
+			Com_Memset( &block, 0, sizeof( block ) );
 			Vector4Copy( pStage->emissiveScale, block.emissiveScale );
 			Vector4Copy( pStage->clearcoatScale, block.clearcoatScale );
 			Vector4Copy( pStage->sheenScale, block.sheenScale );
@@ -1371,46 +1466,42 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			Vector4Copy( pStage->subsurfaceColor, block.subsurfaceColor );
 			Vector4Copy( pStage->subsurfaceParams, block.subsurfaceParams );
 
-			vk_update_descriptor_if_changed( VK_DESC_PBR_BRDFLUT, vk.brdflut_image_descriptor );
-			vk_update_glint_descriptor_binding( vk.brdflut_image_descriptor );
+			if ( ( pStage->vk_pbr_flags & PBR_HAS_LIGHTMAP ) != 0 ) {
+				if ( pbrLightmapBundle && pbrLightmapBundle->image[0] ) {
+					lightmapImage = R_GetAnimatedImage( pbrLightmapBundle );
+				}
+			}
+
+			// Stage descriptor sets can become invalid after a descriptor pool reset (e.g. swapchain/video restart).
+			// Recreate lazily here so we never bind a stale set.
+			if ( useIndexing ) {
+				pbrDescriptor = vk_get_pbr_indexed_descriptor();
+				if ( pbrDescriptor != VK_NULL_HANDLE ) {
+					vk_update_descriptor_if_changed( VK_DESC_PBR, pbrDescriptor );
+				}
+			} else {
+				if ( vk_create_pbr_descriptor_set( pStage ) && pStage->pbrDescriptor != VK_NULL_HANDLE ) {
+					pbrDescriptor = pStage->pbrDescriptor;
+					vk_update_descriptor_if_changed( VK_DESC_PBR, pbrDescriptor );
+					vk_update_pbr_descriptor_common( pbrDescriptor );
+					vk_update_pbr_descriptor_binding( pbrDescriptor, VK_PBR_BINDING_ALBEDO, albedoImage );
+					vk_update_pbr_descriptor_binding( pbrDescriptor, VK_PBR_BINDING_LIGHTMAP, lightmapImage );
+				}
+			}
 
 			if ( ( r_glints_debug && r_glints_debug->value > 0.0f ) ||
 				( r_glints_verbose && r_glints_verbose->integer > 0 ) ) {
 				ri.Printf( PRINT_ALL, "glint: stage=%s vk_pbr_flags=0x%x brdf_desc=%p dict_view=%p\n",
 					tess.shader ? tess.shader->name : "null",
 					pStage->vk_pbr_flags,
-					(void *)(uintptr_t)vk.brdflut_image_descriptor,
+					(void *)(uintptr_t)pbrDescriptor,
 					(void *)(uintptr_t)vk_get_glint_dictionary_view() );
 			}
-				
-			if ( pStage->vk_pbr_flags & PBR_HAS_NORMALMAP )
-				vk_update_descriptor_if_changed( VK_DESC_PBR_NORMAL, pStage->normalMap->descriptor );
-
-			if ( pStage->vk_pbr_flags & PBR_HAS_PHYSICALMAP || pStage->vk_pbr_flags & PBR_HAS_SPECULARMAP )
-				vk_update_descriptor_if_changed( VK_DESC_PBR_PHYSICAL, pStage->physicalMap->descriptor );
-			
-			if ( pStage->vk_pbr_flags & PBR_HAS_EMISSIVE )
-				vk_update_descriptor_if_changed( VK_DESC_PBR_EMISSIVE, pStage->emissiveMap->descriptor );
-
-			if ( pStage->vk_pbr_flags & PBR_HAS_CLEARCOAT )
-				vk_update_descriptor_if_changed( VK_DESC_PBR_CLEARCOAT, pStage->clearcoatMap->descriptor );
-
-			if ( pStage->vk_pbr_flags & PBR_HAS_SHEEN )
-				vk_update_descriptor_if_changed( VK_DESC_PBR_SHEEN, pStage->sheenMap->descriptor );
-
-			if ( pStage->vk_pbr_flags & PBR_HAS_ANISOTROPY )
-				vk_update_descriptor_if_changed( VK_DESC_PBR_ANISOTROPY, pStage->anisotropyMap->descriptor );
-
-			if ( pStage->vk_pbr_flags & PBR_HAS_TRANSMISSION )
-				vk_update_descriptor_if_changed( VK_DESC_PBR_TRANSMISSION, pStage->transmissionMap->descriptor );
-
-			if ( pStage->vk_pbr_flags & PBR_HAS_SUBSURFACE )
-				vk_update_descriptor_if_changed( VK_DESC_PBR_SUBSURFACE, pStage->subsurfaceMap->descriptor );
 			
 			int cubemapIndex = -1;
+			const image_t *envImage = tr.emptyCubemap ? tr.emptyCubemap : fallback_black;
+			const image_t *irrImage = tr.emptyCubemap ? tr.emptyCubemap : fallback_black;
 			if ( !tr.numCubemaps || backEnd.viewParms.targetCube != NULL ) {
-				vk_update_descriptor_if_changed( VK_DESC_PBR_CUBEMAP, tr.emptyCubemap->descriptor );
-				vk_update_descriptor_if_changed( VK_DESC_PBR_IRRADIANCE, tr.emptyCubemap->descriptor );
 				if ( backEnd.viewParms.targetCube == NULL ) {
 					vec3_t dbgPos;
 					R_GetPBRSurfacePosition( dbgPos );
@@ -1426,15 +1517,13 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				cubemapIndex = R_SelectCubemapIndexForPBR();
 				R_UpdatePBRCubemapDebugCvar( cubemapIndex, dbgPos );
 				if ( cubemapIndex < 0 ) {
-					vk_update_descriptor_if_changed( VK_DESC_PBR_CUBEMAP, tr.emptyCubemap->descriptor );
-					vk_update_descriptor_if_changed( VK_DESC_PBR_IRRADIANCE, tr.emptyCubemap->descriptor );
 					Com_Memcpy( block.shCoeffs, pStage->shCoeffs, sizeof( block.shCoeffs ) );
 				} else {
-					vk_update_descriptor_if_changed( VK_DESC_PBR_CUBEMAP, tr.cubemaps[cubemapIndex].prefiltered_image->descriptor );
-					if ( tr.cubemaps[cubemapIndex].irradiance_image )
-						vk_update_descriptor_if_changed( VK_DESC_PBR_IRRADIANCE, tr.cubemaps[cubemapIndex].irradiance_image->descriptor );
-					else
-						vk_update_descriptor_if_changed( VK_DESC_PBR_IRRADIANCE, tr.emptyCubemap->descriptor );
+					envImage = tr.cubemaps[cubemapIndex].prefiltered_image ?
+						tr.cubemaps[cubemapIndex].prefiltered_image : envImage;
+					if ( tr.cubemaps[cubemapIndex].irradiance_image ) {
+						irrImage = tr.cubemaps[cubemapIndex].irradiance_image;
+					}
 
 					// Prefer cubemap SH coefficients when present, otherwise fall back to stage SH.
 					if ( tr.cubemaps[cubemapIndex].hasSHCoeffs ) {
@@ -1443,6 +1532,33 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 						Com_Memcpy( block.shCoeffs, pStage->shCoeffs, sizeof( block.shCoeffs ) );
 					}
 				}
+			}
+
+			if ( useIndexing ) {
+				vk_update_pbr_indexed_common( envImage, irrImage );
+				Vector4Set( block.texIndex0,
+					(float)vk_get_image_descriptor_index( albedoImage ),
+					(float)vk_get_image_descriptor_index( pStage->normalMap ? pStage->normalMap : fallback_white ),
+					(float)vk_get_image_descriptor_index( pStage->physicalMap ? pStage->physicalMap : fallback_white ),
+					(float)vk_get_image_descriptor_index( pStage->emissiveMap ? pStage->emissiveMap : fallback_black ) );
+				Vector4Set( block.texIndex1,
+					(float)vk_get_image_descriptor_index( lightmapImage ),
+					(float)vk_get_image_descriptor_index( pStage->clearcoatMap ? pStage->clearcoatMap : fallback_black ),
+					(float)vk_get_image_descriptor_index( pStage->sheenMap ? pStage->sheenMap : fallback_black ),
+					(float)vk_get_image_descriptor_index( pStage->anisotropyMap ? pStage->anisotropyMap : fallback_black ) );
+				Vector4Set( block.texIndex2,
+					(float)vk_get_image_descriptor_index( pStage->transmissionMap ? pStage->transmissionMap : fallback_black ),
+					(float)vk_get_image_descriptor_index( pStage->subsurfaceMap ? pStage->subsurfaceMap : fallback_black ),
+					(float)vk_get_glint_dict_index(),
+					0.0f );
+			} else {
+				if ( pbrDescriptor != VK_NULL_HANDLE ) {
+					vk_update_pbr_descriptor_binding( pbrDescriptor, VK_PBR_BINDING_ENV_CUBEMAP, envImage );
+					vk_update_pbr_descriptor_binding( pbrDescriptor, VK_PBR_BINDING_IRRADIANCE, irrImage );
+				}
+				Vector4Set( block.texIndex0, 0.0f, 0.0f, 0.0f, 0.0f );
+				Vector4Set( block.texIndex1, 0.0f, 0.0f, 0.0f, 0.0f );
+				Vector4Set( block.texIndex2, 0.0f, 0.0f, 0.0f, 0.0f );
 			}
 
 			// Only push uniforms when the PBR block has actually changed for this command buffer.
@@ -1462,6 +1578,9 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				Vector4Copy( block.subsurfaceColor, uniform.pbrSubsurfaceColor );
 				Vector4Copy( block.subsurfaceParams, uniform.pbrSubsurfaceParams );
 				Com_Memcpy( uniform.pbrShCoeffs, block.shCoeffs, sizeof( uniform.pbrShCoeffs ) );
+				Vector4Copy( block.texIndex0, uniform.pbrTexIndex0 );
+				Vector4Copy( block.texIndex1, uniform.pbrTexIndex1 );
+				Vector4Copy( block.texIndex2, uniform.pbrTexIndex2 );
 
 				vk_push_uniform_cached( &uniform );
 			}
@@ -1735,6 +1854,42 @@ static void VK_SetGlintParams( vkUniform_t *ubo )
 	ubo->glintColor[1] = 0.0f;
 	ubo->glintColor[2] = 0.0f;
 	ubo->glintColor[3] = 0.0f;
+
+	// Log glint UBO values when they change (sanity check for cvar plumbing).
+	if ( r_glints_verbose && r_glints_verbose->integer > 0 ) {
+		static vkUniform_t lastGlintUbo;
+		static qboolean lastValid = qfalse;
+		const size_t glintBytes = (size_t)((char *)&ubo->glintColor + sizeof( ubo->glintColor ) - (char *)&ubo->glintCore);
+
+		if ( !lastValid || memcmp( &lastGlintUbo.glintCore, &ubo->glintCore, glintBytes ) != 0 ) {
+			ri.Printf( PRINT_ALL,
+				"glint UBO:\n"
+				"  core=(%.3f %.3f %.3f %.3f) material=(%.3f %.3f %.3f %.3f)\n"
+				"  micro=(%.3f %.3f %.3f %.3f) sampling=(%.3f %.3f %.3f %.3f)\n"
+				"  temporal=(%.3f %.3f %.3f %.3f) energy=(%.3f %.3f %.3f %.3f)\n"
+				"  budget=(%.3f %.3f %.3f %.3f) routing=(%.3f %.3f %.3f %.3f)\n"
+				"  model=(%.3f %.3f %.3f %.3f) density=(%.3f %.3f %.3f %.3f)\n"
+				"  dict=(%.3f %.3f %.3f %.3f) dictX=(%.3f %.3f %.3f %.3f)\n"
+				"  perf=(%.3f %.3f %.3f %.3f) color=(%.3f %.3f %.3f %.3f)\n",
+				ubo->glintCore[0], ubo->glintCore[1], ubo->glintCore[2], ubo->glintCore[3],
+				ubo->glintMaterial[0], ubo->glintMaterial[1], ubo->glintMaterial[2], ubo->glintMaterial[3],
+				ubo->glintMicro[0], ubo->glintMicro[1], ubo->glintMicro[2], ubo->glintMicro[3],
+				ubo->glintSampling[0], ubo->glintSampling[1], ubo->glintSampling[2], ubo->glintSampling[3],
+				ubo->glintTemporal[0], ubo->glintTemporal[1], ubo->glintTemporal[2], ubo->glintTemporal[3],
+				ubo->glintEnergy[0], ubo->glintEnergy[1], ubo->glintEnergy[2], ubo->glintEnergy[3],
+				ubo->glintBudget[0], ubo->glintBudget[1], ubo->glintBudget[2], ubo->glintBudget[3],
+				ubo->glintRouting[0], ubo->glintRouting[1], ubo->glintRouting[2], ubo->glintRouting[3],
+				ubo->glintModel[0], ubo->glintModel[1], ubo->glintModel[2], ubo->glintModel[3],
+				ubo->glintDensity[0], ubo->glintDensity[1], ubo->glintDensity[2], ubo->glintDensity[3],
+				ubo->glintDict[0], ubo->glintDict[1], ubo->glintDict[2], ubo->glintDict[3],
+				ubo->glintDictExtras[0], ubo->glintDictExtras[1], ubo->glintDictExtras[2], ubo->glintDictExtras[3],
+				ubo->glintPerformance[0], ubo->glintPerformance[1], ubo->glintPerformance[2], ubo->glintPerformance[3],
+				ubo->glintColor[0], ubo->glintColor[1], ubo->glintColor[2], ubo->glintColor[3] );
+
+			Com_Memcpy( &lastGlintUbo.glintCore, &ubo->glintCore, glintBytes );
+			lastValid = qtrue;
+		}
+	}
 }
 #endif
 
