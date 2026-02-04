@@ -1949,6 +1949,27 @@ static void R_CreateBuiltinImages( void ) {
 
 #ifdef VK_CUBEMAP
 	tr.emptyCubemap = R_CreateImage( "*emptyCubemap", NULL, NULL, 1, 1, IMGFLAG_CUBEMAP, vk.color_format, 0 );
+	if ( tr.emptyCubemap ) {
+		VkClearColorValue envColor;
+		envColor.float32[0] = 0.5f;
+		envColor.float32[1] = 0.5f;
+		envColor.float32[2] = 0.5f;
+		envColor.float32[3] = 1.0f;
+		tr.pbrEnvFallback = R_CreateImage( "*pbrEnvFallback", NULL, NULL, 1, 1, IMGFLAG_CUBEMAP, vk.color_format, 0 );
+		if ( tr.pbrEnvFallback ) {
+			vk_clear_cube_color( tr.pbrEnvFallback, envColor );
+		}
+
+		VkClearColorValue irrColor;
+		irrColor.float32[0] = 0.04f;
+		irrColor.float32[1] = 0.04f;
+		irrColor.float32[2] = 0.04f;
+		irrColor.float32[3] = 1.0f;
+		tr.pbrIrrFallback = R_CreateImage( "*pbrIrrFallback", NULL, NULL, 1, 1, IMGFLAG_CUBEMAP, vk.color_format, 0 );
+		if ( tr.pbrIrrFallback ) {
+			vk_clear_cube_color( tr.pbrIrrFallback, irrColor );
+		}
+	}
 #endif
 #endif
 

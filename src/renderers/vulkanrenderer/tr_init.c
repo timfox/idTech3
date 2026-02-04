@@ -1680,7 +1680,9 @@ static void R_Register( void )
 		" 16 - show specular IBL (magenta=IBL compiled out, yellow=IBL bound but sampling near-zero)\n"
 		" 17 - show diffuse IBL (MAGENTA=compiled out, YELLOW=bind/sampler issues)\n"
 		" 18 - show glint contribution (RED=glints disabled/dict invalid, CYAN=glints enabled but zero)\n"
-		" 19 - show glint energy (grayscale)\n" );
+		" 19 - show glint energy (grayscale)\n"
+		" 20 - show lightmap sample (texture1)\n"
+		" 21 - show base/albedo texture\n" );
 
 	r_pbr_normalSwizzle = ri.Cvar_Get( "r_pbr_normalSwizzle", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_pbr_normalSwizzle, "0", "1", CV_INTEGER );

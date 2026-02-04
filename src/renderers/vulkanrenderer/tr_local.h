@@ -1290,6 +1290,8 @@ typedef struct {
 #endif
 #ifdef VK_CUBEMAP
 	image_t					*emptyCubemap;
+	image_t					*pbrEnvFallback;
+	image_t					*pbrIrrFallback;
 	int                     numCubemaps;
 	cubemap_t               *cubemaps;
 #endif

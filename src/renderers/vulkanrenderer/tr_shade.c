@@ -1519,8 +1519,12 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			}
 			
 			int cubemapIndex = -1;
-			const image_t *envImage = tr.emptyCubemap ? tr.emptyCubemap : fallback_black;
-			const image_t *irrImage = tr.emptyCubemap ? tr.emptyCubemap : fallback_black;
+			const image_t *envFallback = tr.pbrEnvFallback ? tr.pbrEnvFallback :
+				( tr.emptyCubemap ? tr.emptyCubemap : fallback_black );
+			const image_t *irrFallback = tr.pbrIrrFallback ? tr.pbrIrrFallback :
+				( tr.emptyCubemap ? tr.emptyCubemap : fallback_black );
+			const image_t *envImage = envFallback;
+			const image_t *irrImage = irrFallback;
 			if ( !tr.numCubemaps || backEnd.viewParms.targetCube != NULL ) {
 				if ( backEnd.viewParms.targetCube == NULL ) {
 					vec3_t dbgPos;
