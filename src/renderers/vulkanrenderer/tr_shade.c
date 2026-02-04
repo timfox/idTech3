@@ -1444,18 +1444,25 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 #endif
 
 #ifdef USE_VK_PBR
+		const qboolean useIndexing = vk.descriptorIndexingActive ? qtrue : qfalse;
+		const qboolean forcePbrDebugDescriptor = ( pbr_debug == 13 || ( pbr_debug >= 16 && pbr_debug <= 18 ) ) ? qtrue : qfalse;
+	#else
+		const qboolean useIndexing = qfalse;
+		const qboolean forcePbrDebugDescriptor = qfalse;
+	#endif
+		VkDescriptorSet pbrDescriptor = VK_NULL_HANDLE;
+
+#ifdef USE_VK_PBR
 		if ( is_pbr_surface && pStage->vk_pbr_flags ) {
 			static VkCommandBuffer lastCmdBuf = VK_NULL_HANDLE;
 			static qboolean lastValid = qfalse;
 			static vkPbrUniformBlock_t lastBlock;
 
 			vkPbrUniformBlock_t block;
-			const qboolean useIndexing = vk.descriptorIndexingActive ? qtrue : qfalse;
 			const image_t *fallback_white = tr.whiteImage;
 			const image_t *fallback_black = tr.blackImage ? tr.blackImage : tr.whiteImage;
 			const image_t *albedoImage = R_GetAnimatedImage( &pStage->bundle[0] );
 			const image_t *lightmapImage = fallback_white;
-			VkDescriptorSet pbrDescriptor = VK_NULL_HANDLE;
 
 			Com_Memset( &block, 0, sizeof( block ) );
 			Vector4Copy( pStage->emissiveScale, block.emissiveScale );
@@ -1605,6 +1612,14 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 #endif
 
 		vk_bind_pipeline( pipeline );
+#ifdef USE_VK_PBR
+		if ( forcePbrDebugDescriptor && vk.pipelines[ pipeline ].def.vk_pbr_flags ) {
+			VkDescriptorSet debugDescriptor = useIndexing ? vk_get_pbr_indexed_descriptor() : pbrDescriptor;
+			if ( debugDescriptor != VK_NULL_HANDLE ) {
+				vk_update_descriptor_if_changed( VK_DESC_PBR, debugDescriptor );
+			}
+		}
+#endif
 		vk_bind_geometry( tess_flags );
 		vk_draw_geometry( tess.depthRange, qtrue );
 

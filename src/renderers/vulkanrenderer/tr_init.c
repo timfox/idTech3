@@ -1673,12 +1673,12 @@ static void R_Register( void )
 		" 10 - show direct light color (compressed)\n"
 		" 11 - show N.L (Lambert)\n"
 		" 12 - show base diffuse color (post-scale)\n"
-		" 13 - show pbrDebug uniforms (R=mode/18, G=swizzle, B=forceLight, A=forceGlints)\n"
+		" 13 - show pbrDebug uniforms (R=mode/20, G=normal swizzle, B=forceLight) so shader-side values are reaching GLSL\n"
 		" 14 - show direct diffuse contribution\n"
 		" 15 - show direct specular contribution\n"
-		" 16 - show diffuse IBL contribution\n"
-		" 17 - show specular IBL contribution\n"
-		" 18 - show glint contribution\n" );
+		" 16 - show specular IBL (magenta=IBL compiled out, yellow=IBL bound but sampling near-zero)\n"
+		" 17 - show diffuse IBL (MAGENTA=compiled out, YELLOW=bind/sampler issues)\n"
+		" 18 - show glint contribution (RED=glints disabled/dict invalid, CYAN=glints enabled but zero)\n" );
 
 	r_pbr_normalSwizzle = ri.Cvar_Get( "r_pbr_normalSwizzle", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_pbr_normalSwizzle, "0", "1", CV_INTEGER );

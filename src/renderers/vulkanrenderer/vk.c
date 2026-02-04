@@ -8420,6 +8420,23 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 
         if ( ( def->vk_pbr_flags & PBR_HAS_SUBSURFACE ) == 0 )
             frag_spec_data.subsurface_texture_set = -1;
+
+        if ( def->vk_pbr_flags ) {
+            const char *glint_dict_status = ( vk_get_glint_dictionary_view() != VK_NULL_HANDLE ) ? "valid" : "missing";
+            ri.Printf( PRINT_ALL,
+                "PBR pipeline %u layout: vk.pbrActive=%d vk.cubemapActive=%d (r_cubeMapping=%d) "
+                "descriptorSets=%u/%u envSet=%d irrSet=%d lightmapSet=%d glintDict=%s\n",
+                def_index,
+                vk.pbrActive ? 1 : 0,
+                vk.cubemapActive ? 1 : 0,
+                r_cubeMapping ? r_cubeMapping->integer : 0,
+                (unsigned)vk.maxBoundDescriptorSets,
+                (unsigned)VK_DESC_COUNT,
+                frag_spec_data.env_texture_set,
+                frag_spec_data.irradiance_texture_set,
+                frag_spec_data.lightmap_texture_set,
+                glint_dict_status );
+        }
     }
 #endif
 	frag_spec_info.pMapEntries = spec_entries + 1;
