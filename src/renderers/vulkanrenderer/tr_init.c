@@ -118,6 +118,7 @@ cvar_t	*r_glints_verbose;
 cvar_t	*r_preparingShaders;
 cvar_t	*r_glints_materialMask;
 cvar_t	*r_glints_strength;
+cvar_t	*r_glints_intensity;
 cvar_t	*r_glints_minRoughness;
 cvar_t	*r_glints_maxRoughness;
 cvar_t	*r_glints_density;
@@ -1790,10 +1791,9 @@ static void R_Register( void )
 	r_glints_colored = ri.Cvar_Get( "r_glints_colored", "0", CVAR_ARCHIVE_ND );
 	r_glints_colorCount = ri.Cvar_Get( "r_glints_colorCount", "4", CVAR_ARCHIVE_ND );
 	r_glints_colorStrength = ri.Cvar_Get( "r_glints_colorStrength", "1", CVAR_ARCHIVE_ND );
-#endif
-#endif
-#endif
-#endif
+	#endif // USE_VK_PBR
+	#endif // VK_CUBEMAP
+#endif // defined (USE_VULKAN) && defined (USE_VK_PBR)
 	r_mapGreyScale = ri.Cvar_Get( "r_mapGreyScale", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_mapGreyScale, "-1", "1", CV_FLOAT );
 	ri.Cvar_SetDescription(r_mapGreyScale, "Desaturate world map textures only, works independently from \\r_greyscale, negative values only desaturate lightmaps.");

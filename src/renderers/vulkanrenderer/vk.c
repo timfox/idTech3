@@ -8375,9 +8375,9 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 
         frag_spec_data.normal_texture_set = 0;
         frag_spec_data.physical_texture_set = 0;
-        frag_spec_data.env_texture_set = 0;
-        frag_spec_data.lightmap_texture_set = 0;
-        frag_spec_data.irradiance_texture_set = 0;
+        frag_spec_data.env_texture_set = VK_DESC_PBR;
+        frag_spec_data.lightmap_texture_set = VK_DESC_PBR;
+        frag_spec_data.irradiance_texture_set = VK_DESC_PBR;
         frag_spec_data.emissive_texture_set = 0;
         frag_spec_data.clearcoat_texture_set = 0;
         frag_spec_data.sheen_texture_set = 0;

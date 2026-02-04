@@ -1338,6 +1338,7 @@ void main() {
 	const bool hasEnv = pbrFeatureFlags.x > 0.5;
 	const bool hasIrr = pbrFeatureFlags.y > 0.5;
 	const bool hasGlintDict = pbrFeatureFlags.w > 0.5;
+	const bool iblCompiled = env_texture_set >= 0 && irradiance_texture_set >= 0;
 	const bool needsFallbackLight = ( !hasLightmap && !hasEnv && !hasIrr );
 
 	Fd *= baseLayerScale;
@@ -1538,17 +1539,16 @@ void main() {
 	}
 	else if ( pbrDebugView == 16 )
 	{
-		const bool iblAvailable = hasEnv && hasIrr;
-		if ( !iblAvailable )
+		if ( !iblCompiled )
 		{
-			out_color.rgb = vec3( 1.0, 0.0, 1.0 ); // MAGENTA: IBL unavailable
+			out_color.rgb = vec3( 1.0, 0.0, 1.0 ); // MAGENTA: IBL compiled out
 		}
 		else
 		{
 			vec3 specIBL = CalcIBLContribution( roughness, N, E, NE, specular.rgb * baseLayerScale * specAO );
 			if ( length( specIBL ) < diagThreshold )
 			{
-				out_color.rgb = vec3( 1.0, 1.0, 0.0 ); // YELLOW: IBL on but output near-zero
+				out_color.rgb = vec3( 1.0, 1.0, 0.0 ); // YELLOW: IBL on but sampling near-zero
 			}
 			else
 			{
@@ -1559,17 +1559,16 @@ void main() {
 	}
 	else if ( pbrDebugView == 17 )
 	{
-		const bool iblAvailable = hasEnv && hasIrr;
-		if ( !iblAvailable )
+		if ( !iblCompiled )
 		{
-			out_color.rgb = vec3( 1.0, 0.0, 1.0 ); // MAGENTA: IBL unavailable
+			out_color.rgb = vec3( 1.0, 0.0, 1.0 ); // MAGENTA: IBL compiled out
 		}
 		else
 		{
 			vec3 diffIBL = CalcDiffuseIrradiance( N ) * diffuseColor * AO;
 			if ( length( diffIBL ) < diagThreshold )
 			{
-				out_color.rgb = vec3( 1.0, 1.0, 0.0 ); // YELLOW: IBL on but output near-zero
+				out_color.rgb = vec3( 1.0, 1.0, 0.0 ); // YELLOW: IBL on but sampling near-zero
 			}
 			else
 			{
