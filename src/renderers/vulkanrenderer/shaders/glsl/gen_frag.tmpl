@@ -1310,6 +1310,19 @@ void main() {
 	vec3 dbgBaseSpec = vec3( 0.0 );
 	vec3 dbgClearcoat = vec3( 0.0 );
 	vec3 dbgGlint = vec3( 0.0 );
+	int pbrDebugView = int( floor( pbrDebug.x + 0.5 ) );
+	const bool forceGlintsDebug = ( pbrDebugView == 18 );
+
+	const bool hasEnv = pbrFeatureFlags.x > 0.5;
+	const bool hasIrr = pbrFeatureFlags.y > 0.5;
+	const bool hasGlintDict = pbrFeatureFlags.w > 0.5;
+	const bool iblCompiled = env_texture_set >= 0 && irradiance_texture_set >= 0;
+	const bool needsFallbackLight = ( !hasLightmap && !hasEnv && !hasIrr );
+
+	float glintEnergyComp = clamp( glintEnergy.x, 0.0, 1.0 );
+	const bool allowGlints = forceGlintsDebug || glintCore.x > 0.5 || pbrDebug.w > 0.5;
+	const bool glintAvailable = hasGlintDict && allowGlints;
+bool glintEnabled = glintAvailable;
 #ifdef USE_VK_PBR
 	if ( glintEnabled )
 	{
@@ -1325,14 +1338,6 @@ void main() {
 		baseLayerScale = clamp( 1.0 - clearcoatStrength * 0.25, 0.0, 1.0 );
 	}
 
-	int pbrDebugView = int( floor( pbrDebug.x + 0.5 ) );
-	const bool forceGlintsDebug = ( pbrDebugView == 18 );
-
-	float glintEnergyComp = clamp( glintEnergy.x, 0.0, 1.0 );
-	const bool allowGlints = forceGlintsDebug || glintCore.x > 0.5 || pbrDebug.w > 0.5;
-	const bool glintAvailable = hasGlintDict && allowGlints;
-	bool glintEnabled = glintAvailable;
-
 	if ( glintEnabled && glintEnergyComp > 0.0 ) {
 		float glintWeight = clamp( glintMaterial.x, 0.0, 1.0 ) * glintBlend;
 		baseLayerScale *= ( 1.0 - 0.5 * glintEnergyComp * glintWeight );
@@ -1340,11 +1345,6 @@ void main() {
 
 	float glintIntensity = max( glintColor.y, 0.0 );
 	float glintMultiplier = glintBlend * glintIntensity;
-	const bool hasEnv = pbrFeatureFlags.x > 0.5;
-	const bool hasIrr = pbrFeatureFlags.y > 0.5;
-	const bool hasGlintDict = pbrFeatureFlags.w > 0.5;
-	const bool iblCompiled = env_texture_set >= 0 && irradiance_texture_set >= 0;
-	const bool needsFallbackLight = ( !hasLightmap && !hasEnv && !hasIrr );
 
 	Fd *= baseLayerScale;
 	specDirect = Fs * baseLayerScale;
@@ -1606,16 +1606,19 @@ void main() {
 	}
 	else if ( pbrDebugView == 20 )
 	{
-#ifdef USE_TX1
-		out_color.rgb = PBR_SAMPLE_LIGHTMAP( frag_tex_coord1 ).rgb;
-#else
-		out_color.rgb = vec3( 0.0 );
-#endif
+		if ( lightmap_texture_set >= 0 )
+		{
+			out_color.rgb = texture(texture1, frag_tex_coord1).rgb;
+		}
+		else
+		{
+			out_color.rgb = vec3( 1.0, 0.0, 1.0 ); // MAGENTA: lightmap disabled
+		}
 		out_color.a = 1.0;
 	}
 	else if ( pbrDebugView == 21 )
 	{
-		out_color.rgb = tex0.rgb;
+		out_color.rgb = texture(texture0, frag_tex_coord0).rgb;
 		out_color.a = 1.0;
 	}
 	else

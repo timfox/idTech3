@@ -1388,22 +1388,45 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 #ifdef USE_VK_PBR
 		// PBR uses the lightmap as a lighting source; ensure it is bound even when the
 		// original shader uses a separate lightmap stage (legacy multi-pass).
-		if ( is_pbr_surface && ( pStage->vk_pbr_flags & PBR_HAS_LIGHTMAP ) ) {
-			if ( pStage->numTexBundles > 1 && pStage->bundle[1].lightmap != LIGHTMAP_INDEX_NONE ) {
-				pbrLightmapBundle = &pStage->bundle[1];
-			} else {
-				pbrLightmapBundle = R_FindLightmapBundle( tess.shader );
+		if ( is_pbr_surface ) {
+			// Ensure base texture is always bound
+			if ( pStage->bundle[0].image[0] == NULL ) {
+				GL_SelectTexture( 0 );
+				GL_Bind( tr.whiteImage );
+				if ( r_pbr_validate && r_pbr_validate->integer > 0 ) {
+					static char loggedShaders[1024] = {0};
+					if ( !strstr( loggedShaders, tess.shader->name ) ) {
+						ri.Printf( PRINT_ALL, "PBR: missing base bundle0 for shader '%s'\n", tess.shader->name );
+						strncat( loggedShaders, tess.shader->name, sizeof(loggedShaders) - strlen(loggedShaders) - 1 );
+					}
+				}
 			}
 
-			GL_SelectTexture( 1 );
-			if ( pbrLightmapBundle && pbrLightmapBundle->image[0] ) {
-				R_BindAnimatedImage( pbrLightmapBundle );
-				R_ComputeTexCoords( 1, pbrLightmapBundle );
-				tess_flags |= TESS_ST1;
-			} else {
-				GL_Bind( tr.whiteImage );
+			// Ensure lightmap is bound for BSP surfaces
+			if ( tess.lightmapNum >= 0 ) {
+				if ( pStage->numTexBundles > 1 && pStage->bundle[1].lightmap != LIGHTMAP_INDEX_NONE ) {
+					pbrLightmapBundle = &pStage->bundle[1];
+				} else {
+					pbrLightmapBundle = R_FindLightmapBundle( tess.shader );
+				}
+
+				GL_SelectTexture( 1 );
+				if ( pbrLightmapBundle && pbrLightmapBundle->image[0] ) {
+					R_BindAnimatedImage( pbrLightmapBundle );
+					R_ComputeTexCoords( 1, pbrLightmapBundle );
+					tess_flags |= TESS_ST1;
+				} else {
+					GL_Bind( tr.whiteImage );
+					if ( r_pbr_validate && r_pbr_validate->integer > 0 ) {
+						static char loggedShaders[1024] = {0};
+						if ( !strstr( loggedShaders, tess.shader->name ) ) {
+							ri.Printf( PRINT_ALL, "PBR: missing lightmap for shader '%s' (lm=%d)\n", tess.shader->name, tess.lightmapNum );
+							strncat( loggedShaders, tess.shader->name, sizeof(loggedShaders) - strlen(loggedShaders) - 1 );
+						}
+					}
+				}
+				GL_SelectTexture( 0 );
 			}
-			GL_SelectTexture( 0 );
 		}
 #endif
 

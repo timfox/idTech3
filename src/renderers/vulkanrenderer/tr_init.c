@@ -1658,7 +1658,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_pbr_shExtract, "Extract SH coefficients from generated irradiance cubemaps for PBR." );
 
 	r_pbr_debug = ri.Cvar_Get( "r_pbr_debug", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_pbr_debug, "0", "19", CV_INTEGER );
+	ri.Cvar_CheckRange( r_pbr_debug, "0", "21", CV_INTEGER );
 	ri.Cvar_SetDescription( r_pbr_debug,
 		"PBR debug view override (Vulkan PBR only):\n"
 		" 0 - off (normal PBR)\n"
@@ -1744,6 +1744,10 @@ static void R_Register( void )
 	r_glints_intensity = ri.Cvar_Get( "r_glints_intensity", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_glints_intensity, "0", "16", CV_FLOAT );
 	ri.Cvar_SetDescription( r_glints_intensity, "Global multiplier for glint contributions (0=off, higher accentuates)." );
+
+	r_pbr_validate = ri.Cvar_Get( "r_pbr_validate", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbr_validate, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pbr_validate, "Enable PBR binding validation logging (0=off, 1=on)." );
 	r_glints_minRoughness = ri.Cvar_Get( "r_glints_minRoughness", "0.05", CVAR_ARCHIVE_ND );
 	r_glints_maxRoughness = ri.Cvar_Get( "r_glints_maxRoughness", "0.6", CVAR_ARCHIVE_ND );
 	r_glints_density = ri.Cvar_Get( "r_glints_density", "20", CVAR_ARCHIVE_ND );

@@ -1470,6 +1470,7 @@ extern cvar_t *r_glints_strength;
 extern cvar_t *r_glints_intensity;
 extern cvar_t *r_preparingShaders;
 extern cvar_t *r_glints_verbose;
+extern cvar_t *r_pbr_validate;
 extern cvar_t *r_glints_minRoughness;
 extern cvar_t *r_glints_maxRoughness;
 extern cvar_t *r_glints_density;
