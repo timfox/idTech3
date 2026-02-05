@@ -224,6 +224,7 @@ cvar_t	*r_ext_alpha_to_coverage;
 
 cvar_t	*r_drawBuffer;
 cvar_t	*r_lightmap;
+cvar_t	*r_lightmapSRGB;
 cvar_t	*r_vertexLight;
 cvar_t	*r_shadows;
 cvar_t	*r_flares;
@@ -1658,7 +1659,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_pbr_shExtract, "Extract SH coefficients from generated irradiance cubemaps for PBR." );
 
 	r_pbr_debug = ri.Cvar_Get( "r_pbr_debug", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_pbr_debug, "0", "21", CV_INTEGER );
+	ri.Cvar_CheckRange( r_pbr_debug, "0", "23", CV_INTEGER );
 	ri.Cvar_SetDescription( r_pbr_debug,
 		"PBR debug view override (Vulkan PBR only):\n"
 		" 0 - off (normal PBR)\n"
@@ -1682,7 +1683,9 @@ static void R_Register( void )
 		" 18 - show glint contribution (RED=glints disabled/dict invalid, CYAN=glints enabled but zero)\n"
 		" 19 - show glint energy (grayscale)\n"
 		" 20 - show lightmap sample (texture1)\n"
-		" 21 - show base/albedo texture\n" );
+		" 21 - show base/albedo texture\n"
+		" 22 - show lightmap-only contribution (PBR debug)\n"
+		" 23 - show albedo-only contribution (PBR debug)\n" );
 
 	r_pbr_normalSwizzle = ri.Cvar_Get( "r_pbr_normalSwizzle", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_pbr_normalSwizzle, "0", "1", CV_INTEGER );
@@ -1733,7 +1736,11 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_pbr_cubemapInfo, "Read-only-ish debug string updated by renderer when r_pbr_showCubemap is enabled." );
 
 	r_cubeMapping = ri.Cvar_Get( "r_cubeMapping", "0", CVAR_ARCHIVE | CVAR_LATCH );
-#ifdef USE_VK_PBR
+#endif
+
+#endif // defined (USE_VULKAN) && defined (USE_VK_PBR)
+
+#if defined(USE_VK_PBR)
 	r_glints = ri.Cvar_Get( "r_glints", "1", CVAR_ARCHIVE_ND );
 	r_glints_mode = ri.Cvar_Get( "r_glints_mode", "2", CVAR_ARCHIVE_ND );
 	r_glints_debug = ri.Cvar_Get( "r_glints_debug", "0", CVAR_ARCHIVE_ND );
@@ -1748,6 +1755,10 @@ static void R_Register( void )
 	r_pbr_validate = ri.Cvar_Get( "r_pbr_validate", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_pbr_validate, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_pbr_validate, "Enable PBR binding validation logging (0=off, 1=on)." );
+	r_lightmapSRGB = ri.Cvar_Get( "r_lightmapSRGB", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_lightmapSRGB, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_lightmapSRGB,
+		"Upload BSP lightmaps as sRGB textures (1) or raw UNORM (0). Requires renderer restart." );
 	r_glints_minRoughness = ri.Cvar_Get( "r_glints_minRoughness", "0.05", CVAR_ARCHIVE_ND );
 	r_glints_maxRoughness = ri.Cvar_Get( "r_glints_maxRoughness", "0.6", CVAR_ARCHIVE_ND );
 	r_glints_density = ri.Cvar_Get( "r_glints_density", "20", CVAR_ARCHIVE_ND );
@@ -1797,9 +1808,10 @@ static void R_Register( void )
 	r_glints_colored = ri.Cvar_Get( "r_glints_colored", "0", CVAR_ARCHIVE_ND );
 	r_glints_colorCount = ri.Cvar_Get( "r_glints_colorCount", "4", CVAR_ARCHIVE_ND );
 	r_glints_colorStrength = ri.Cvar_Get( "r_glints_colorStrength", "1", CVAR_ARCHIVE_ND );
-	#endif // USE_VK_PBR
-	#endif // VK_CUBEMAP
-#endif // defined (USE_VULKAN) && defined (USE_VK_PBR)
+	ri.Printf( PRINT_ALL, "[VK] Glints cvars: enabled=%s mode=%i\n",
+		( r_glints && r_glints->integer ) ? "yes" : "no",
+		r_glints_mode ? r_glints_mode->integer : -1 );
+#endif
 	r_mapGreyScale = ri.Cvar_Get( "r_mapGreyScale", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_mapGreyScale, "-1", "1", CV_FLOAT );
 	ri.Cvar_SetDescription(r_mapGreyScale, "Desaturate world map textures only, works independently from \\r_greyscale, negative values only desaturate lightmaps.");

@@ -564,6 +564,7 @@ typedef struct {
 	VkPhysicalDevice physical_device;
 	VkSurfaceFormatKHR base_format;
 	VkSurfaceFormatKHR present_format;
+	qboolean swapchainIsSRGB;
 
 	uint32_t queue_family_index;
 	VkDevice device;

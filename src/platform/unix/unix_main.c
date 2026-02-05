@@ -914,15 +914,15 @@ static char *Sys_StripAppBundle( char *dir )
 Sys_DefaultAppPath
 =================
 */
-char *Sys_DefaultAppPath( void )
+const char *Sys_DefaultAppPath( void )
 {
+#ifdef __APPLE__
 	return binaryPath;
-}
 #else
-char *Sys_DefaultAppPath( void )
-{
 	return binaryPath[0] ? binaryPath : Sys_Pwd();
+#endif // __APPLE__
 }
+
 #endif // __APPLE__
 
 

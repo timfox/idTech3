@@ -1630,6 +1630,27 @@ bool glintEnabled = glintAvailable;
 		out_color.rgb = texture(texture0, frag_tex_coord0).rgb;
 		out_color.a = 1.0;
 	}
+	else if ( pbrDebugView == 22 )
+	{
+		if ( lightmap_texture_set >= 0 )
+		{
+#ifdef USE_VK_PBR
+			out_color.rgb = PBR_SAMPLE_LIGHTMAP( frag_tex_coord1 ).rgb;
+#else
+			out_color.rgb = texture(texture1, frag_tex_coord1).rgb;
+#endif
+		}
+		else
+		{
+			out_color.rgb = vec3( 1.0, 0.0, 1.0 );
+		}
+		out_color.a = 1.0;
+	}
+	else if ( pbrDebugView == 23 )
+	{
+		out_color.rgb = texture(texture0, frag_tex_coord0).rgb;
+		out_color.a = 1.0;
+	}
 	else
 	{
 		out_color.a = diffuse.a;

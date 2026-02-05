@@ -46,6 +46,7 @@ static	world_t		s_worldData;
 static	byte		*fileBase;
 
 static int	c_gridVerts;
+static qboolean	lightmapShiftLogged;
 
 //===============================================================================
 
@@ -126,6 +127,12 @@ void R_ColorShiftLightingBytes( const byte in[4], byte out[4], qboolean hasAlpha
 
 	// shift the color data based on overbright range
 	shift = r_mapOverBrightBits->integer - tr.overbrightBits;
+
+	if ( !lightmapShiftLogged ) {
+		ri.Printf( PRINT_ALL, "[VK] Lightmap shift=%i (r_mapOverBrightBits=%i tr.overbrightBits=%i)\n",
+			shift, r_mapOverBrightBits->integer, tr.overbrightBits );
+		lightmapShiftLogged = qtrue;
+	}
 
 	// shift the data based on overbright range
 	if ( shift >= 0 ) {
@@ -360,6 +367,9 @@ static void R_LoadMergedLightmaps( const lump_t *l, byte *image )
 	int			offs;
 	int			i, x, y;
  	float		maxIntensity = 0;
+	const VkFormat	lightmapFormat = ( r_lightmapSRGB && r_lightmapSRGB->integer )
+		? VK_FORMAT_R8G8B8A8_SRGB
+		: VK_FORMAT_R8G8B8A8_UNORM;
 
 	if ( l->filelen < LIGHTMAP_SIZE * LIGHTMAP_SIZE * 3 )
 		return;
@@ -376,7 +386,7 @@ static void R_LoadMergedLightmaps( const lump_t *l, byte *image )
 	for ( offs = 0, i = 0 ; i < tr.numLightmaps; i++ ) {
 
 		tr.lightmaps[ i ] = R_CreateImage( va( "*mergedLightmap%d", i ), NULL, NULL,
-			lightmapWidth, lightmapHeight, lightmapFlags | IMGFLAG_CLAMPTOBORDER, VK_FORMAT_R8G8B8A8_SRGB, 0 );
+			lightmapWidth, lightmapHeight, lightmapFlags | IMGFLAG_CLAMPTOBORDER, lightmapFormat, 0 );
 
 		for ( y = 0; y < lightmapCountY; y++ ) {
 			if ( offs >= l->filelen )
@@ -420,6 +430,9 @@ static void R_LoadLightmaps( const lump_t *l ) {
 	byte		image[LIGHTMAP_LEN*LIGHTMAP_LEN*4];
 	int			i, numLightmaps;
 	float		maxIntensity = 0;
+	const VkFormat	lightmapFormat = ( r_lightmapSRGB && r_lightmapSRGB->integer )
+		? VK_FORMAT_R8G8B8A8_SRGB
+		: VK_FORMAT_R8G8B8A8_UNORM;
 
 	tr.numLightmaps = 0;
 	tr.mergeLightmaps = qfalse;
@@ -432,6 +445,10 @@ static void R_LoadLightmaps( const lump_t *l ) {
 	lightmapHeight = LIGHTMAP_SIZE;
 	lightmapCountX = 1;
 	lightmapCountY = 1;
+
+	lightmapShiftLogged = qfalse;
+	ri.Printf( PRINT_ALL, "[VK] Lightmap load: r_mapOverBrightBits=%i r_overBrightBits=%i tr.overbrightBits=%i\n",
+		r_mapOverBrightBits->integer, r_overBrightBits->integer, tr.overbrightBits );
 
 	if ( l->filelen < LIGHTMAP_SIZE * LIGHTMAP_SIZE * 3 ) {
 		return;
@@ -463,7 +480,7 @@ static void R_LoadLightmaps( const lump_t *l ) {
 	for ( i = 0 ; i < tr.numLightmaps ; i++ ) {
 		maxIntensity = R_ProcessLightmap( image, buf + i * LIGHTMAP_SIZE * LIGHTMAP_SIZE * 3, maxIntensity );
 		tr.lightmaps[i] = R_CreateImage( va( "*lightmap%d", i ), NULL, image, LIGHTMAP_SIZE, LIGHTMAP_SIZE,
-			lightmapFlags | IMGFLAG_CLAMPTOEDGE, VK_FORMAT_R8G8B8A8_SRGB, 0 );
+			lightmapFlags | IMGFLAG_CLAMPTOEDGE, lightmapFormat, 0 );
 	}
 
 	//if ( r_lightmap->integer == 2 )	{

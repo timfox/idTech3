@@ -636,6 +636,7 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 	stage->anisotropyMap = NULL;
 	stage->transmissionMap = NULL;
 	stage->subsurfaceMap = NULL;
+	stage->vk_pbr_flags = 0;
 
 	Vector4Set( stage->emissiveScale, 1.0f, 1.0f, 1.0f, 1.0f );
 	Vector4Set( stage->clearcoatScale, 1.0f, 1.0f, 1.0f, 1.0f );

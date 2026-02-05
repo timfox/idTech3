@@ -24,6 +24,10 @@ static VkSurfaceKHR vk_surface = VK_NULL_HANDLE;
 VkDebugReportCallbackEXT vk_debug_callback = VK_NULL_HANDLE;
 #endif
 
+#ifdef USE_VK_PBR
+cvar_t *r_pbr_validate;
+#endif
+
 //
 // Vulkan API functions used by the renderer.
 //
@@ -246,6 +250,23 @@ const char *vk_format_string( VkFormat format )
 	default:
 		Com_sprintf( buf, sizeof( buf ), "#%i", format );
 		return buf;
+	}
+}
+
+static qboolean vk_format_is_srgb( VkFormat format )
+{
+	switch ( format ) {
+	case VK_FORMAT_B8G8R8A8_SRGB:
+	case VK_FORMAT_R8G8B8A8_SRGB:
+	#ifdef VK_FORMAT_A2B10G10R10_SRGB_PACK32
+	case VK_FORMAT_A2B10G10R10_SRGB_PACK32:
+	#endif
+	#ifdef VK_FORMAT_A2R10G10B10_SRGB_PACK32
+	case VK_FORMAT_A2R10G10B10_SRGB_PACK32:
+	#endif
+		return qtrue;
+	default:
+		return qfalse;
 	}
 }
 
@@ -1833,6 +1854,10 @@ static qboolean vk_select_surface_format( VkPhysicalDevice physical_device, VkSu
 	if ( !r_fbo->integer ) {
 		vk.present_format = vk.base_format;
 	}
+
+	vk.swapchainIsSRGB = vk_format_is_srgb( vk.present_format.format );
+	ri.Printf( PRINT_ALL, "[VK] Swapchain base format: %s\n", vk_format_string( vk.base_format.format ) );
+	ri.Printf( PRINT_ALL, "[VK] Swapchain present format: %s\n", vk_format_string( vk.present_format.format ) );
 
 	ri.Free( candidates );
 
@@ -6906,6 +6931,16 @@ void vk_update_pbr_indexed_common( const image_t *env, const image_t *irr )
 
 VkImageView vk_get_glint_dictionary_view( void ) {
 	return vk_glint_dictionary_image.view;
+}
+
+const image_t *vk_get_glint_dictionary_image( void )
+{
+#ifdef USE_VK_PBR
+	if ( vk_glint_dictionary_image.view != VK_NULL_HANDLE ) {
+		return &vk_glint_dictionary_image;
+	}
+#endif
+	return NULL;
 }
 
 void vk_update_glint_descriptor_binding( VkDescriptorSet descriptor ) {

@@ -1449,6 +1449,7 @@ extern cvar_t	*r_pbr_normalSwizzle;
 extern cvar_t	*r_pbr_forceLight;
 extern cvar_t	*r_pbr_forceGlints;
 extern cvar_t	*r_pbr_packedPreferred;
+extern cvar_t	*r_lightmapSRGB;
 #ifdef VK_CUBEMAP
 extern cvar_t	*r_pbr_iblIrradianceSize;
 extern cvar_t	*r_pbr_iblPrefilterSize;

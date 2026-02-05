@@ -41,6 +41,13 @@ static char *local__strndup_(const char *s, size_t size)
 	return x;
 }
 
+static char *local__strdup_(const char *s)
+{
+	if(s == NULL)
+		return NULL;
+	return local__strndup_(s, strlen(s));
+}
+
 static FLAC__bool local__parse_type_(const char *s, size_t len, FLAC__StreamMetadata_Picture *picture)
 {
 	size_t i;
@@ -404,12 +411,20 @@ FLAC__StreamMetadata *grabbag__picture_parse_specification(const char *spec, con
 			*error_message = error_messages[1];
 		else { /* 'spec' points to filename/URL */
 			if(0 == strcmp(obj->data.picture.mime_type, "-->")) { /* magic MIME type means URL */
-				if(strlen(spec) == 0)
+				if(strlen(spec) == 0) {
 					*error_message = error_messages[1];
-				else if(!FLAC__metadata_object_picture_set_data(obj, (FLAC__byte*)spec, strlen(spec), /*copy=*/true))
-					*error_message = error_messages[0];
-				else if(obj->data.picture.width == 0 || obj->data.picture.height == 0 || obj->data.picture.depth == 0)
-					*error_message = error_messages[3];
+				} else {
+					char *url_copy = local__strdup_(spec);
+					if(!url_copy) {
+						*error_message = error_messages[0];
+					} else {
+						if(!FLAC__metadata_object_picture_set_data(obj, (FLAC__byte*)url_copy, strlen(url_copy), /*copy=*/true))
+							*error_message = error_messages[0];
+						free(url_copy);
+					}
+					if(*error_message == 0 && (obj->data.picture.width == 0 || obj->data.picture.height == 0 || obj->data.picture.depth == 0))
+						*error_message = error_messages[3];
+				}
 			}
 			else { /* regular picture file */
 				*error_message = read_file (spec, obj);
@@ -466,9 +481,17 @@ FLAC__StreamMetadata *grabbag__picture_from_specification(int type, const char *
 	}
 
 	/* Description if present. */
-	if (description && ! FLAC__metadata_object_picture_set_description(obj, (FLAC__byte*) description, /*copy=*/true)) {
-		*error_message = error_messages[0];
-		return obj;
+	if (description) {
+		char *desc_copy = local__strdup_(description);
+		if(!desc_copy) {
+			*error_message = error_messages[0];
+		} else {
+			if(!FLAC__metadata_object_picture_set_description(obj, (FLAC__byte*) desc_copy, /*copy=*/true))
+				*error_message = error_messages[0];
+			free(desc_copy);
+		}
+		if(*error_message)
+			return obj;
 	}
 
 	if (res == NULL) {
@@ -485,10 +508,16 @@ FLAC__StreamMetadata *grabbag__picture_from_specification(int type, const char *
 	}
 
 	if (strcmp(obj->data.picture.mime_type, "-->") == 0) { /* magic MIME type means URL */
-		if (!FLAC__metadata_object_picture_set_data(obj, (FLAC__byte*)filepath, strlen(filepath), /*copy=*/true))
+		char *filepath_copy = local__strdup_(filepath);
+		if(!filepath_copy) {
 			*error_message = error_messages[0];
-		else if (obj->data.picture.width == 0 || obj->data.picture.height == 0 || obj->data.picture.depth == 0)
-			*error_message = error_messages[3];
+		} else {
+			if (!FLAC__metadata_object_picture_set_data(obj, (FLAC__byte*)filepath_copy, strlen(filepath_copy), /*copy=*/true))
+				*error_message = error_messages[0];
+			free(filepath_copy);
+			if(*error_message == 0 && (obj->data.picture.width == 0 || obj->data.picture.height == 0 || obj->data.picture.depth == 0))
+				*error_message = error_messages[3];
+		}
 	}
 	else {
 		*error_message = read_file (filepath, obj);

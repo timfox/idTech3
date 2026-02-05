@@ -136,16 +136,16 @@ static void SV_Netchan_Decode( client_t *client, msg_t *msg ) {
 SV_Netchan_FreeQueue
 =================
 */
-static void SV_Netchan_CheckQueue( const client_t *client, const char *where )
+static void SV_Netchan_CheckQueue( client_t *client, const char *where )
 {
 	if ( client->netchan_queue_magic == 0 && client->netchan_queue_magic2 == 0 &&
 		client->netchan_start_queue == NULL )
 	{
 		// Initialize guards for previously-zeroed clients.
-		((client_t *)client)->netchan_queue_magic = NETCHAN_QUEUE_MAGIC;
-		((client_t *)client)->netchan_queue_magic2 = NETCHAN_QUEUE_MAGIC;
+		client->netchan_queue_magic = NETCHAN_QUEUE_MAGIC;
+		client->netchan_queue_magic2 = NETCHAN_QUEUE_MAGIC;
 		if ( client->netchan_end_queue == NULL ) {
-			((client_t *)client)->netchan_end_queue = &((client_t *)client)->netchan_start_queue;
+			client->netchan_end_queue = &client->netchan_start_queue;
 		}
 		return;
 	}
