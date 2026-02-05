@@ -108,6 +108,11 @@ layout(location = 1) centroid in vec2 frag_tex_coord0;
 #ifdef USE_TX1
 layout(location = 2) centroid in vec2 frag_tex_coord1;
 #endif
+#ifndef USE_TX1
+#ifdef USE_VK_PBR
+layout(location = 2) centroid in vec2 frag_tex_coord1;
+#endif
+#endif
 #ifdef USE_TX2
 layout(location = 3) centroid in vec2 frag_tex_coord2;
 #endif
@@ -1608,7 +1613,11 @@ bool glintEnabled = glintAvailable;
 	{
 		if ( lightmap_texture_set >= 0 )
 		{
+#ifdef USE_VK_PBR
+			out_color.rgb = PBR_SAMPLE_LIGHTMAP( frag_tex_coord1 ).rgb;
+#else
 			out_color.rgb = texture(texture1, frag_tex_coord1).rgb;
+#endif
 		}
 		else
 		{
