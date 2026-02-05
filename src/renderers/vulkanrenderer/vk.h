@@ -426,6 +426,7 @@ void vk_create_image( image_t *image, int width, int height, int mip_levels );
 void vk_upload_image_data( image_t *image, int x, int y, int width, int height, int miplevels, byte *pixels, int size, qboolean update );
 void vk_update_descriptor_set( image_t *image, qboolean mipmap );
 uint32_t vk_get_image_descriptor_index( const image_t *image );
+const image_t *vk_get_glint_dictionary_image( void );
 uint32_t vk_get_glint_dict_index( void );
 VkDescriptorSet vk_get_pbr_indexed_descriptor( void );
 void vk_destroy_image_resources( VkImage *image, VkImageView *imageView );

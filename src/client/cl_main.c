@@ -23,6 +23,28 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "client.h"
 #include <limits.h>
+#include <stdlib.h>
+#if defined(__unix__) || defined(__APPLE__)
+#include <dlfcn.h>
+#if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
+static void CL_FormatRendererDllName( char *dllName, size_t size ) {
+	const char *raw = cl_renderer->string;
+	char clean[ 64 ];
+	size_t rawlen = strlen( raw );
+
+	if ( rawlen >= 2 && (( raw[0] == '"' && raw[rawlen-1] == '"' ) || ( raw[0] == '\'' && raw[rawlen-1] == '\'' )) ) {
+		size_t n = rawlen - 2;
+		if ( n >= sizeof( clean ) ) {
+			n = sizeof( clean ) - 1;
+		}
+		memcpy( clean, raw + 1, n );
+		clean[ n ] = '\0';
+	} else {
+		Q_strncpyz( clean, raw, sizeof( clean ) );
+	}
+	Com_sprintf( dllName, size, RENDERER_PREFIX "_%s_" REND_ARCH_STRING DLL_EXT, clean );
+}
+#endif
 #ifdef USE_FLUX
 #include "flux.h"
 #if defined(USE_SDL)
@@ -30,6 +52,117 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #else
 typedef struct SDL_Thread SDL_Thread;
 #endif
+#endif
+
+
+#if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
+static void CL_BuildRendererPath( char *dest, size_t size, const char *base, const char *subdir, const char *game, const char *dllName ) {
+	if ( base && base[0] ) {
+		if ( subdir && subdir[0] ) {
+			if ( game && game[0] ) {
+				Com_sprintf( dest, size, "%s%c%s%c%s%c%s", base, PATH_SEP, subdir, PATH_SEP, game, PATH_SEP, dllName );
+			} else {
+				Com_sprintf( dest, size, "%s%c%s%c%s", base, PATH_SEP, subdir, PATH_SEP, dllName );
+			}
+		} else if ( game && game[0] ) {
+			Com_sprintf( dest, size, "%s%c%s%c%s", base, PATH_SEP, game, PATH_SEP, dllName );
+		} else {
+			Com_sprintf( dest, size, "%s%c%s", base, PATH_SEP, dllName );
+		}
+		return;
+	}
+	if ( subdir && subdir[0] ) {
+		if ( game && game[0] ) {
+			Com_sprintf( dest, size, "%s%c%s%c%s", subdir, PATH_SEP, game, PATH_SEP, dllName );
+		} else {
+			Com_sprintf( dest, size, "%s%c%s", subdir, PATH_SEP, dllName );
+		}
+		return;
+	}
+	if ( game && game[0] ) {
+		Com_sprintf( dest, size, "%s%c%s", game, PATH_SEP, dllName );
+		return;
+	}
+	Q_strncpyz( dest, dllName, size );
+}
+
+static void CL_PrintRendererSearchSummary( const char *candidate, const char *error ) {
+	Com_Printf( "\nRENDERER: Unable to load renderer shared object.\n" );
+	Com_Printf( "  last attempted path: %s\n", candidate && candidate[0] ? candidate : "(none)" );
+#if defined(__unix__) || defined(__APPLE__)
+	Com_Printf( "  dlerror: %s\n", error && error[0] ? error : "(null)" );
+#endif
+	Com_Printf( "  cwd: %s\n", Sys_Pwd() );
+	Com_Printf( "  fs_homepath: %s\n", Cvar_VariableString( "fs_homepath" ) );
+	Com_Printf( "  fs_basepath: %s\n", Cvar_VariableString( "fs_basepath" ) );
+	Com_Printf( "  fs_game: %s\n", Cvar_VariableString( "fs_game" ) );
+}
+
+static void CL_RunRendererDependencyCheck( const char *rendererPath ) {
+#if defined(__unix__) || defined(__APPLE__)
+	if ( r_printSoDeps && r_printSoDeps->integer && rendererPath && rendererPath[0] ) {
+		char cmd[ MAX_OSPATH + 32 ];
+		Com_sprintf( cmd, sizeof( cmd ), "ldd \"%s\"", rendererPath );
+		Com_Printf( "Renderer dependency check: %s\n", cmd );
+		system( cmd );
+	}
+#else
+	(void)rendererPath;
+#endif
+}
+
+static void *CL_LoadRendererLibraryWithCandidates( const char *dllName, char *lastAttempted, size_t lastSize ) {
+	char candidate[ MAX_OSPATH ];
+	char lastError[ 256 ] = "";
+	const char *homePath = Cvar_VariableString( "fs_homepath" );
+	const char *basePath = Cvar_VariableString( "fs_basepath" );
+	const char *gameDir = Cvar_VariableString( "fs_game" );
+	const char *exeDir = Sys_DefaultBasePath();
+	struct {
+		const char *base;
+		const char *subdir;
+		const char *game;
+	} search[] = {
+		{ exeDir, NULL, NULL },
+		{ exeDir, "renderers", NULL },
+		{ homePath, NULL, gameDir },
+		{ basePath, NULL, gameDir },
+	};
+	void *handle = NULL;
+
+	for ( size_t i = 0; i < ( sizeof( search ) / sizeof( search[0] ) ); ++i ) {
+		const char *base = search[ i ].base;
+		if ( !base || !base[0] ) {
+			continue;
+		}
+		CL_BuildRendererPath( candidate, sizeof( candidate ), base, search[ i ].subdir, search[ i ].game, dllName );
+#if defined(__unix__) || defined(__APPLE__)
+		dlerror();
+#endif
+		Com_Printf( "Attempting renderer load: %s\n", candidate );
+		handle = Sys_LoadLibrary( candidate );
+		if ( handle ) {
+			return handle;
+		}
+#if defined(__unix__) || defined(__APPLE__)
+		const char *dlErr = dlerror();
+		Q_strncpyz( lastError, dlErr ? dlErr : "(null)", sizeof( lastError ) );
+#else
+		Q_strncpyz( lastError, "unknown", sizeof( lastError ) );
+#endif
+		Q_strncpyz( lastAttempted, candidate, lastSize );
+		Com_Printf( "RENDERER dlopen failed for %s: %s\n", candidate, lastError );
+	}
+
+	if ( !lastAttempted[0] ) {
+		Q_strncpyz( lastAttempted, dllName, lastSize );
+	}
+
+	CL_PrintRendererSearchSummary( lastAttempted, lastError );
+	CL_RunRendererDependencyCheck( lastAttempted );
+
+	return NULL;
+}
 #endif
 
 cvar_t	*cl_noprint;
@@ -281,6 +414,7 @@ cvar_t *r_colorbits;
 cvar_t *cl_stencilbits;
 cvar_t *cl_depthbits;
 cvar_t *cl_drawBuffer;
+cvar_t *r_printSoDeps;
 
 clientActive_t		cl;
 clientConnection_t	clc;
@@ -3570,7 +3704,7 @@ static void CL_InitRef( void ) {
 	refexport_t	*ret;
 #if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
 	GetRefAPI_t		getRefAPI;
-	char			dllName[ MAX_OSPATH ], *ospath;
+	char			dllName[ MAX_OSPATH ];
 #endif
 
 	CL_InitGLimp_Cvars();
@@ -3586,45 +3720,18 @@ static void CL_InitRef( void ) {
 #endif
 
 	{
-		/* sanitize renderer name: strip surrounding single/double quotes if present */
-		const char *raw = cl_renderer->string;
-		char clean[64];
-		size_t rawlen = strlen(raw);
-		if ( rawlen >= 2 && ((raw[0] == '\"' && raw[rawlen-1] == '\"') || (raw[0] == '\'' && raw[rawlen-1] == '\'')) ) {
-			size_t n = rawlen - 2;
-			if ( n >= sizeof(clean) ) n = sizeof(clean) - 1;
-			memcpy(clean, raw + 1, n);
-			clean[n] = '\0';
-		} else {
-			Q_strncpyz(clean, raw, sizeof(clean));
-		}
-		Com_sprintf( dllName, sizeof( dllName ), RENDERER_PREFIX "_%s_" REND_ARCH_STRING DLL_EXT, clean );
+		CL_FormatRendererDllName( dllName, sizeof( dllName ) );
 	}
-	ospath = FS_BuildOSPath( Sys_DefaultBasePath(), dllName, NULL );
-	rendererLib = Sys_LoadLibrary( ospath );
+	char lastRendererPath[ MAX_OSPATH ] = "";
+	rendererLib = CL_LoadRendererLibraryWithCandidates( dllName, lastRendererPath, sizeof( lastRendererPath ) );
 	if ( !rendererLib )
 	{
 		Cvar_ForceReset( "cl_renderer" );
-		/* sanitize renderer name for the retry as well */
-		{
-			const char *raw = cl_renderer->string;
-			char clean[64];
-			size_t rawlen = strlen(raw);
-			if ( rawlen >= 2 && ((raw[0] == '\"' && raw[rawlen-1] == '\"') || (raw[0] == '\'' && raw[rawlen-1] == '\'')) ) {
-				size_t n = rawlen - 2;
-				if ( n >= sizeof(clean) ) n = sizeof(clean) - 1;
-				memcpy(clean, raw + 1, n);
-				clean[n] = '\0';
-			} else {
-				Q_strncpyz(clean, raw, sizeof(clean));
-			}
-			Com_sprintf( dllName, sizeof( dllName ), RENDERER_PREFIX "_%s_" REND_ARCH_STRING DLL_EXT, clean );
-		}
-		ospath = FS_BuildOSPath( Sys_DefaultBasePath(), dllName, NULL );
-		rendererLib = Sys_LoadLibrary( ospath );
+		CL_FormatRendererDllName( dllName, sizeof( dllName ) );
+		rendererLib = CL_LoadRendererLibraryWithCandidates( dllName, lastRendererPath, sizeof( lastRendererPath ) );
 		if ( !rendererLib )
 		{
-			Com_Error( ERR_FATAL, "Failed to load renderer %s", dllName );
+			Com_Error( ERR_FATAL, "Failed to load renderer %s (last attempt %s)", dllName, lastRendererPath[0] ? lastRendererPath : dllName );
 		}
 	}
 
@@ -4078,6 +4185,8 @@ static void CL_InitGLimp_Cvars( void )
 
 	cl_drawBuffer = Cvar_Get( "r_drawBuffer", "GL_BACK", CVAR_CHEAT );
 	Cvar_SetDescription( cl_drawBuffer, "Specifies buffer to draw from: GL_FRONT or GL_BACK." );
+	r_printSoDeps = Cvar_Get( "r_printSoDeps", "0", CVAR_ARCHIVE );
+	Cvar_SetDescription( r_printSoDeps, "Run ldd on renderer shared objects when load failures occur (Linux-only)." );
 #if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
 #ifdef RENDERER_DEFAULT
 	cl_renderer = Cvar_Get( "cl_renderer", XSTRING( RENDERER_DEFAULT ), CVAR_ARCHIVE | CVAR_LATCH );
