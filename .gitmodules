@@ -4,9 +4,12 @@
 [submodule "src/external/src/imath"]
 	path = src/external/src/imath
 	url = https://github.com/AcademySoftwareFoundation/Imath.git
+	branch = main
 [submodule "src/external/src/openexr"]
 	path = src/external/src/openexr
 	url = https://github.com/AcademySoftwareFoundation/openexr.git
+	branch = main
 [submodule "src/external/src/openjph"]
 	path = src/external/src/openjph
 	url = https://github.com/aous72/OpenJPH.git
+	branch = main
