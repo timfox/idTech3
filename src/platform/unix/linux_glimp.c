@@ -33,21 +33,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 **
 */
 
-#include <termios.h>
-#include <sys/ioctl.h>
-#ifdef __linux__
-  #include <sys/stat.h>
-  #include <sys/vt.h>
-#endif
-#include <stdarg.h>
-#include <stdio.h>
-#include <signal.h>
-#include <pthread.h>
-#include <semaphore.h>
-
-#include <sys/time.h>
-#include <sys/types.h>
-#include <unistd.h>
+#include "platform_unix.h"
+#include "../linux/platform_x11.h"
+#include "../linux/platform_threads.h"
 
 #include "../client/client.h"
 #include "linux_local.h"
@@ -55,26 +43,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #ifdef USE_OPENGL_API
 #include "../renderers/openglrenderer/qgl.h"
-#endif
-
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/keysym.h>
-#include <X11/cursorfont.h>
-#include <X11/Xatom.h>
-
-#include <X11/XKBlib.h>
-
-#if !defined(__sun)
-#include <X11/extensions/Xxf86dga.h>
-#endif
-
-#if defined(__sun)
-#include <X11/Sunkeysym.h>
-#endif
-
-#ifdef _XF86DGA_H_
-#define HAVE_XF86DGA
 #endif
 
 typedef enum

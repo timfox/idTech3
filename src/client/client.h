@@ -435,6 +435,16 @@ extern	cvar_t	*cl_stencilbits;
 extern	cvar_t	*cl_depthbits;
 extern	cvar_t	*cl_drawBuffer;
 
+// VR (stubbed)
+extern	cvar_t	*vr_enable;
+extern	cvar_t	*vr_runtime;
+extern	cvar_t	*vr_snapturn;
+extern	cvar_t	*vr_turnspeed;
+extern	cvar_t	*vr_vignette;
+extern	cvar_t	*vr_hud_distance;
+extern	cvar_t	*vr_hud_scale;
+extern	cvar_t	*vr_mirror;
+
 //=================================================
 
 //

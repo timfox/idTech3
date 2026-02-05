@@ -1,5 +1,8 @@
 #if defined (__linux__) // ALSA sound path
 
+#include "platform_unix.h"
+#include "../linux/platform_threads.h"
+
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/time.h>
@@ -7,7 +10,6 @@
 #include <sys/syscall.h>
 #include <sys/types.h>
 #include <alsa/asoundlib.h>
-#include <pthread.h>
 
 #include "../audio/snd_local.h"
 #include "../qcommon/q_shared.h"

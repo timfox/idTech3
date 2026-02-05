@@ -89,7 +89,7 @@ cvar_t		*s_khz;
 cvar_t		*s_show;
 static cvar_t *s_mixahead;
 static cvar_t *s_mixOffset;
-#if defined(__linux__) && !defined(USE_SDL)
+#if defined(__linux__) && (!defined(USE_SDL) || (USE_SDL) == 0)
 cvar_t		*s_device;
 #endif
 
@@ -1532,7 +1532,7 @@ Cvar_CheckRange( s_mixOffset, "0", "0.5", CV_FLOAT );
 	Cvar_SetDescription( s_show, "Debugging output (used sound files)." );
 	s_testsound = Cvar_Get( "s_testsound", "0", CVAR_CHEAT );
 	Cvar_SetDescription( s_testsound, "Debugging tool that plays a simple sine wave tone to test the sound system." );
-#if defined(__linux__) && !defined(USE_SDL)
+#if defined(__linux__) && (!defined(USE_SDL) || (USE_SDL) == 0)
 	s_device = Cvar_Get( "s_device", "default", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	Cvar_SetDescription( s_device, "Set ALSA output device\n"
 		" Use \"default\", \"sysdefault\", \"front\", etc.\n"

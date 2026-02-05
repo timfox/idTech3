@@ -6,7 +6,7 @@ if (NOT DOXYGEN_FOUND)
     return()
 endif()
 
-option(BUILD_DOXYGEN "Enable API documentation building via Doxygen" ON)
+option(BUILD_DOXYGEN "Enable API documentation building via Doxygen" OFF)
 
 if (NOT BUILD_DOXYGEN)
     return()

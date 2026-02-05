@@ -26,9 +26,22 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <stdlib.h>
 #if defined(__unix__) || defined(__APPLE__)
 #include <dlfcn.h>
+#endif
+ 
+#if defined(__linux__) && defined(__i386__)
+#define REND_ARCH_STRING "x86"
+#else
+#define REND_ARCH_STRING ARCH_STRING
+#endif
+
+extern cvar_t *r_printSoDeps;
+static cvar_t *cl_renderer;
+
 #if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
 static void CL_FormatRendererDllName( char *dllName, size_t size ) {
 	const char *raw = cl_renderer->string;
+	const char *rendererPrefix = RENDERER_PREFIX;
+	const char *rendererArch = REND_ARCH_STRING;
 	char clean[ 64 ];
 	size_t rawlen = strlen( raw );
 
@@ -42,7 +55,7 @@ static void CL_FormatRendererDllName( char *dllName, size_t size ) {
 	} else {
 		Q_strncpyz( clean, raw, sizeof( clean ) );
 	}
-	Com_sprintf( dllName, size, RENDERER_PREFIX "_%s_" REND_ARCH_STRING DLL_EXT, clean );
+	Com_sprintf( dllName, size, "%s_%s_%s" DLL_EXT, rendererPrefix, clean, rendererArch );
 }
 #endif
 #ifdef USE_FLUX
@@ -104,7 +117,10 @@ static void CL_RunRendererDependencyCheck( const char *rendererPath ) {
 		char cmd[ MAX_OSPATH + 32 ];
 		Com_sprintf( cmd, sizeof( cmd ), "ldd \"%s\"", rendererPath );
 		Com_Printf( "Renderer dependency check: %s\n", cmd );
-		system( cmd );
+		int ret = system( cmd );
+		if ( ret ) {
+			Com_Printf( "Renderer dependency check returned %d\n", ret );
+		}
 	}
 #else
 	(void)rendererPath;
@@ -168,10 +184,6 @@ static void *CL_LoadRendererLibraryWithCandidates( const char *dllName, char *la
 cvar_t	*cl_noprint;
 cvar_t	*cl_debugMove;
 cvar_t	*cl_motd;
-
-#if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
-static cvar_t *cl_renderer;
-#endif
 
 cvar_t	*rcon_client_password;
 cvar_t	*rconAddress;

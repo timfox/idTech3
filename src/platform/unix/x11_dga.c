@@ -1,11 +1,9 @@
 #include "../client/client.h"
 #include "unix_glw.h"
+#include "platform_unix.h"
+#include "../linux/platform_x11.h"
 
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/Xos.h>
-
-#include <X11/extensions/Xxf86dga.h>
+#if PLATFORM_HAVE_XF86DGA
 
 static void *d_lib = NULL;
 
@@ -89,3 +87,24 @@ void DGA_Mouse( qboolean enable )
 
 	_XF86DGADirectVideo( dpy, DefaultScreen( dpy ), enable ? XF86DGADirectMouse : 0 );
 }
+
+#else
+
+qboolean DGA_Init( Display *_dpy )
+{
+	(void)_dpy;
+	glw_state.dga_ext = qfalse;
+	return qfalse;
+}
+
+void DGA_Done( void )
+{
+	glw_state.dga_ext = qfalse;
+}
+
+void DGA_Mouse( qboolean enable )
+{
+	(void)enable;
+}
+
+#endif

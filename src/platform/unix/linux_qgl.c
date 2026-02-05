@@ -30,6 +30,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ** QGL_Shutdown() - unloads libraries, NULLs function pointers
 */
 
+#include "platform_unix.h"
+#include "../linux/platform_x11.h"
+#include "../linux/platform_threads.h"
+
 #include <unistd.h>
 #include <sys/types.h>
 #include "../qcommon/q_shared.h"
