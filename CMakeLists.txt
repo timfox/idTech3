@@ -1,6 +1,11 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 3.30)
+cmake_minimum_required(VERSION 3.30)
 
-PROJECT(idtech3 LANGUAGES C CXX)
+PROJECT(
+  idtech3
+  VERSION 1.0.0
+  DESCRIPTION "Modernized id Tech 3 engine fork with Vulkan, C23/C++23, AI features"
+  LANGUAGES C CXX
+)
 
 set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
