@@ -1402,8 +1402,10 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				}
 			}
 
-			// Ensure lightmap is bound for BSP surfaces
-			if ( tess.lightmapNum >= 0 ) {
+			// Ensure lightmap is bound for BSP-ish passes (when stage expects it)
+			const qboolean wantsLightmap = ( (tess_flags & TESS_ST1) != 0 ) || R_StageHasLightmap( pStage );
+
+			if ( wantsLightmap ) {
 				if ( pStage->numTexBundles > 1 && pStage->bundle[1].lightmap != LIGHTMAP_INDEX_NONE ) {
 					pbrLightmapBundle = &pStage->bundle[1];
 				} else {
@@ -1418,15 +1420,12 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				} else {
 					GL_Bind( tr.whiteImage );
 					if ( r_pbr_validate && r_pbr_validate->integer > 0 ) {
-						static char loggedShaders[1024] = {0};
-						if ( !strstr( loggedShaders, tess.shader->name ) ) {
-							ri.Printf( PRINT_ALL, "PBR: missing lightmap for shader '%s' (lm=%d)\n", tess.shader->name, tess.lightmapNum );
-							strncat( loggedShaders, tess.shader->name, sizeof(loggedShaders) - strlen(loggedShaders) - 1 );
-						}
+						ri.Printf( PRINT_ALL, "PBR: missing lightmap for shader '%s'\n", tess.shader->name );
 					}
 				}
 				GL_SelectTexture( 0 );
 			}
+
 		}
 #endif
 
@@ -1524,11 +1523,23 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				}
 			}
 
-			if ( !useIndexing && pbrDescriptor == VK_NULL_HANDLE ) {
-				VkDescriptorSet fallbackDescriptor = vk_get_pbr_indexed_descriptor();
-				if ( fallbackDescriptor != VK_NULL_HANDLE ) {
-					pbrDescriptor = fallbackDescriptor;
-					vk_update_descriptor_if_changed( VK_DESC_PBR, pbrDescriptor );
+			if (!useIndexing && pbrDescriptor != VK_NULL_HANDLE) {
+				const image_t *glintDictImage = vk_get_glint_dictionary_image();
+
+				if (glintDictView != VK_NULL_HANDLE) {
+					if (glintDictImage) {
+						vk_update_pbr_descriptor_binding(
+							pbrDescriptor,
+							VK_PBR_BINDING_GLINT_DICT,
+							glintDictImage
+						);
+					}
+				} else {
+					vk_update_pbr_descriptor_binding(
+						pbrDescriptor,
+						VK_PBR_BINDING_GLINT_DICT,
+						tr.blackImage ? tr.blackImage : tr.whiteImage
+					);
 				}
 			}
 
