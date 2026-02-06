@@ -15,8 +15,12 @@
 static uint32_t glint_rand_state;
 
 enum {
-	GLINT_DICT_MAX_LOBES = 1 << (GLINT_DICT_MAX_LEVELS + 1),
-	GLINT_DICT_MAX_SAMPLES = 4096
+	// Legacy mode lobe limit -- capped independently of MAX_LEVELS to
+	// prevent stack overflow when MAX_LEVELS is large (Chermain mode
+	// does not use this array at all).
+	GLINT_DICT_MAX_LOBES = 1024,
+	GLINT_DICT_MAX_LEGACY_LEVELS = 9,  // max levels legacy path supports (lobes = 2^(level+1))
+	GLINT_DICT_MAX_SAMPLES = 8192
 };
 
 static uint32_t Glint_RandUInt(void) {
@@ -73,9 +77,14 @@ static int Glint_ComputeSampleCount(const glint_dict_params_t *params)
 		return 0;
 	}
 
+	// Scale samples with both dict size and level count for higher quality
+	// at finer LOD tiers.
 	count = params->size * 8;
-	if (count < 128) {
-		count = 128;
+	if (params->levels > 8) {
+		count = count * params->levels / 8;
+	}
+	if (count < 256) {
+		count = 256;
 	}
 	if (count > GLINT_DICT_MAX_SAMPLES) {
 		count = GLINT_DICT_MAX_SAMPLES;
@@ -149,13 +158,17 @@ static void Glint_GenerateEntry_Legacy(int entry, const glint_dict_params_t *par
 	int prevCount = 0;
 	const float sigma = Glint_GetBaseSigma(params);
 	const float domain = Glint_GetDomain(params);
-	const int levels = params->levels;
+	// Clamp levels for legacy path to avoid exceeding lobe array.
+	const int levels = (params->levels < GLINT_DICT_MAX_LEGACY_LEVELS)
+		? params->levels : GLINT_DICT_MAX_LEGACY_LEVELS;
 	const int size = params->size;
 
 	Glint_Seed(params->seed ^ (uint32_t)entry * 0x9E3779B9u);
 
 	{
-		const int maxLobes = 1 << (levels + 1);
+		int maxLobes = 1 << (levels + 1);
+		if (maxLobes > GLINT_DICT_MAX_LOBES)
+			maxLobes = GLINT_DICT_MAX_LOBES;
 		for (int i = 0; i < maxLobes; i++) {
 			const float sample = fabsf(Glint_RandNormal(sigma));
 			lobes[i] = fminf(sample, domain);
@@ -166,7 +179,9 @@ static void Glint_GenerateEntry_Legacy(int entry, const glint_dict_params_t *par
 	Glint_ComputeTargetDistribution(params, target);
 
 	for (int level = 0; level < levels; level++) {
-		const int lobeCount = 1 << (level + 1);
+		int lobeCount = 1 << (level + 1);
+		if (lobeCount > GLINT_DICT_MAX_LOBES)
+			lobeCount = GLINT_DICT_MAX_LOBES;
 
 		for (int i = prevCount; i < lobeCount; i++) {
 			const float center = lobes[i];
@@ -189,10 +204,14 @@ static void Glint_GenerateEntry_Legacy(int entry, const glint_dict_params_t *par
 	}
 
 	// Enforce convergence to the Beckmann target at the last level.
+	// For levels beyond what the legacy path can generate, fill with the target.
 	{
-		float *row = out + (size_t)(levels - 1) * size;
-		for (int i = 0; i < size; i++) {
-			row[i] = target[i];
+		const int totalLevels = params->levels;
+		for (int level = levels - 1; level < totalLevels; level++) {
+			float *row = out + (size_t)level * size;
+			for (int i = 0; i < size; i++) {
+				row[i] = target[i];
+			}
 		}
 	}
 }

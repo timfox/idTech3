@@ -6196,6 +6196,11 @@ __cleanup:
 	deinit_device_functions();
 
 	#ifdef USE_VK_PBR
+	// During full shutdown, skip the explicit ri.Free() -- the zone system's
+	// bulk Z_FreeTags() will reclaim all renderer allocations in one pass.
+	// Calling ri.Free() here can hit corrupted zone headers and crash with
+	// "Z_Free: freed a pointer without ZONEID".
+	vk.glint.cpu_allocated = qfalse;
 	vk_destroy_glint_dictionary_cpu();
 	#endif
 

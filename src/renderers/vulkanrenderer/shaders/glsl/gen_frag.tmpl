@@ -251,28 +251,31 @@ float glint_dictionary_lookup( int entry, int level, float position, float dictW
 
 vec3 F_Schlick( in vec3 SpecularColor, in float VH );
 
-vec3 ComputeGlintContribution( vec3 N, vec3 T, vec3 B, vec3 L, vec3 V, vec3 specColor, float roughness, float NL, float NH, float NE, float LH, float VH, float lightDistance, out vec4 debugData )
+// Returns the raw glint NDF (D term) from Chermain P-SDF dictionary.
+// This is a drop-in replacement for D_GGX, not a complete BRDF.
+// Energy conservation happens via mix(D_ggx, D_glint, weight) at the call site.
+float ComputeGlintD( vec3 N, vec3 T, vec3 B, vec3 L, vec3 V, float roughness, float NL, float NH, float NE, float LH, float VH, out float maskFactor, out vec4 debugData )
 {
 	debugData = vec4( 0.0 );
+	maskFactor = 1.0;
 
 	if ( glintCore.x < 0.5 && pbrDebug.w < 0.5 )
 	{
-		return vec3( 0.0 );
+		return 0.0;
 	}
 
 	// If we're not lit or view is invalid, glints must contribute nothing.
 	// This also prevents NaNs from 0/0 cases in the BRDF denominator.
 	if ( NL <= 0.0 || NE <= 0.0 || NH <= 0.0 || LH <= 0.0 || VH <= 0.0 )
 	{
-		return vec3( 0.0 );
+		return 0.0;
 	}
 
 	if ( roughness < glintMaterial.y || roughness > glintMaterial.z )
 	{
-		return vec3( 0.0 );
+		return 0.0;
 	}
 
-	float maskFactor = 1.0;
 	if ( glintMaterial.w > 0.5 && physical_texture_set > -1 )
 	{
 		maskFactor = PBR_SAMPLE_PHYSICAL( frag_tex_coord0 ).a;
@@ -284,7 +287,7 @@ vec3 ComputeGlintContribution( vec3 N, vec3 T, vec3 B, vec3 L, vec3 V, vec3 spec
 
 	if ( maskFactor <= 0.001 )
 	{
-		return vec3( 0.0 );
+		return 0.0;
 	}
 
 	int entryCount = max( 1, int( glintDict.z + 0.5 ) );
@@ -319,7 +322,7 @@ vec3 ComputeGlintContribution( vec3 N, vec3 T, vec3 B, vec3 L, vec3 V, vec3 spec
 	vec3 Ht = vec3( dot( H, T ), dot( H, B ), dot( H, N ) );
 	if ( Ht.z <= 1e-6 )
 	{
-		return vec3( 0.0 );
+		return 0.0;
 	}
 
 	vec2 slope = -vec2( Ht.x, Ht.y ) / Ht.z;
@@ -351,12 +354,27 @@ vec3 ComputeGlintContribution( vec3 N, vec3 T, vec3 B, vec3 L, vec3 V, vec3 spec
 		majorLen = minorLen * maxAniso;
 	}
 
-	float lod = float( levelCount - 1 ) + log2( max( minorLen, 1e-6 ) );
-	lod += glintSampling.w + glintPerformance.x;
-	lod = clamp( lod, 0.0, float( levelCount - 1 ) );
+	// LOD selection with detail extension for modern rendering.
+	// Standard mip selection maps pixel footprint to hierarchy level:
+	float maxLod = float( levelCount - 1 );
+	float rawLod = maxLod + log2( max( minorLen, 1e-6 ) );
+	rawLod = clamp( rawLod, 0.0, maxLod );
+
+	// Power-curve remapping: pushes the LOD toward finer levels at
+	// mid-range distances, extending individual glint resolution further
+	// into the scene before converging to the smooth NDF.
+	//   normLod 0.25 -> 0.125  (2x finer at quarter-range)
+	//   normLod 0.50 -> 0.354  (1.4x finer at mid-range)
+	//   normLod 0.75 -> 0.650  (gentle push at far range)
+	//   normLod 1.00 -> 1.000  (unchanged at closest distance)
+	float normLod = rawLod / max( maxLod, 1.0 );
+	float extendedLod = pow( normLod, 1.5 ) * maxLod;
+
+	float lod = extendedLod + glintSampling.w + glintPerformance.x;
+	lod = clamp( lod, 0.0, maxLod );
 	if ( forcedLod >= 0.0 )
 	{
-		lod = clamp( forcedLod, 0.0, float( levelCount - 1 ) );
+		lod = clamp( forcedLod, 0.0, maxLod );
 	}
 
 	int lod0 = int( floor( lod ) );
@@ -515,87 +533,27 @@ vec3 ComputeGlintContribution( vec3 N, vec3 T, vec3 B, vec3 L, vec3 V, vec3 spec
 		psdf1 /= totalWeight1;
 	}
 
-	float psdf = mix( psdf0, psdf1, lodT ) * beta;
+	// Raw P-SDF (without beta -- beta is applied as blend weight at call site)
+	float psdf = mix( psdf0, psdf1, lodT );
 	debugData.x = psdf;
 
-	float distanceFade = 1.0;
-	if ( glintBudget.z > 0.0 )
-	{
-		float maxDistance = max( glintBudget.z, 1e-3 );
-		distanceFade = clamp( 1.0 - lightDistance / maxDistance, 0.0, 1.0 );
-	}
-
-	float slopeFade = 1.0;
-	if ( glintBudget.w > 0.0 )
-	{
-		float slope = length( vec2( dFdx( NL ), dFdy( NL ) ) );
-		slopeFade = clamp( 1.0 - slope / max( glintBudget.w, 1e-3 ), 0.0, 1.0 );
-	}
-
+	// Convert P-SDF to NDF: D = P(slope) / cos^4(theta_h)
 	float NH4 = pow( max( NH, 1e-4 ), 4.0 );
 	float D = psdf / NH4;
 	D = clamp( D, 0.0, 1e6 );
 
-	float G = min( 1.0, min( ( 2.0 * NH * NE ) / max( VH, 1e-4 ),
-		( 2.0 * NH * NL ) / max( LH, 1e-4 ) ) );
-
-	vec3 baseSpec = ( glintEnergy.z >= 0.0 ) ? vec3( glintEnergy.z ) : specColor;
-	vec3 F = F_Schlick( baseSpec, VH );
-
-	float denom = max( 4.0 * NE * NL, 1e-4 );
-	float intensity = glintMaterial.x * D * G * distanceFade * slopeFade * maskFactor;
-	intensity *= 1.0 / denom;
-
-	vec3 result = F * intensity;
-
-	// NaN/inf guard for debug views.
+	// NaN/inf guard
 	{
-		bvec4 bad0 = bvec4( isnan( psdf ), isnan( D ), isnan( intensity ), isnan( denom ) );
-		bvec4 bad1 = bvec4( isinf( psdf ), isinf( D ), isinf( intensity ), isinf( denom ) );
+		bvec4 bad0 = bvec4( isnan( psdf ), isnan( D ), false, false );
+		bvec4 bad1 = bvec4( isinf( psdf ), isinf( D ), false, false );
 		if ( any( bad0 ) || any( bad1 ) )
 		{
 			debugData.w = -1.0;
+			return 0.0;
 		}
 	}
 
-	if ( glintEnergy.x > 0.5 )
-	{
-		float energyScale = 1.0 / ( 1.0 + psdf );
-		result *= energyScale;
-	}
-
-	if ( glintTemporal.x > 0.5 )
-	{
-		float taaBlend = clamp( glintTemporal.y, 0.0, 1.0 );
-		result = mix( result, result * 0.4, taaBlend );
-	}
-
-	if ( glintTemporal.z > 0.0 )
-	{
-		float lum = max( max( result.r, result.g ), result.b );
-		if ( lum > glintTemporal.z )
-		{
-			result *= glintTemporal.z / lum;
-		}
-	}
-
-	float maxLum = glintBudget.x;
-	if ( maxLum > 0.0 )
-	{
-		float lum = max( max( result.r, result.g ), result.b );
-		if ( lum > maxLum )
-		{
-			result *= maxLum / lum;
-		}
-	}
-
-	if ( glintPerformance.y > 0.5 )
-	{
-		vec3 tint = mix( vec3( 1.0 ), vec3( 1.0, 0.8, 0.6 ), clamp( glintPerformance.w, 0.0, 1.0 ) );
-		result *= tint;
-	}
-
-	return result;
+	return D;
 }
 
 vec3 DecodeNormalTS( in vec2 frag_tex_coord )
@@ -1311,7 +1269,6 @@ void main() {
 	vec4 glintDebugData = vec4( 0.0 );
 	float glintBlend = 0.0;
 	int glintDebugLevel = 0;
-	vec3 specDirect = Fs;
 	vec3 dbgBaseSpec = vec3( 0.0 );
 	vec3 dbgClearcoat = vec3( 0.0 );
 	vec3 dbgGlint = vec3( 0.0 );
@@ -1324,58 +1281,77 @@ void main() {
 	const bool iblCompiled = env_texture_set >= 0 && irradiance_texture_set >= 0;
 	const bool needsFallbackLight = ( !hasLightmap && !hasEnv && !hasIrr );
 
-	float glintEnergyComp = clamp( glintEnergy.x, 0.0, 1.0 );
 	const bool allowGlints = forceGlintsDebug || glintCore.x > 0.5 || pbrDebug.w > 0.5;
 	const bool glintAvailable = hasGlintDict && allowGlints;
-bool glintEnabled = glintAvailable;
+	bool glintEnabled = glintAvailable;
+
 #ifdef USE_VK_PBR
 	if ( glintEnabled )
 	{
-		glintTerm = ComputeGlintContribution( N, tangent, binormal, L, E, specular.rgb, roughness, NL, NH, NE, LH, VH, lightDistance, glintDebugData );
-		glintBlend = 1.0;
+		// Compute raw glint NDF (Chermain P-SDF based D term)
+		float glintMaskFactor = 1.0;
+		float D_glint = ComputeGlintD( N, tangent, binormal, L, E, roughness,
+			NL, NH, NE, LH, VH, glintMaskFactor, glintDebugData );
 
+		// Chermain beta: fraction of surface area with glinting microfacets
+		float beta = clamp( glintModel.x, 0.0, 1.0 );
+
+		// Roughness gate: glints collapse rapidly with roughness^2
+		// roughness 0.05 -> 0.96, roughness 0.15 -> 0.70, roughness 0.25 -> 0.37, roughness 0.50 -> 0.018
+		float alpha = roughness * roughness;
+		float roughnessGate = exp( -16.0 * alpha );
+
+		// Distance attenuation: glints vanish with distance
+		float distFade = 1.0;
+		if ( glintBudget.z > 0.0 )
+		{
+			distFade = clamp( 1.0 - lightDistance / max( glintBudget.z, 1e-3 ), 0.0, 1.0 );
+		}
+
+		// Combined blend factor for D-term replacement
+		float glintWeight = beta * roughnessGate * distFade * glintMaskFactor;
+		glintWeight *= clamp( glintMaterial.x, 0.0, 1.0 ); // user strength
+		glintWeight = clamp( glintWeight, 0.0, 1.0 );
+
+		// Energy-conserving D-term replacement:
+		// mix(D_ggx, D_glint, w) preserves expected energy because
+		// E[D_glint] ≈ D_ggx by construction of the P-SDF dictionary.
+		float D_base = D_GGX( NH, roughness );
+		float D_final = mix( D_base, D_glint, glintWeight );
+
+		// Recompute full specular BRDF with combined D
+		float V_spec = V_SmithJointApprox( roughness, NE, NL );
+		vec3 F_spec = F_Schlick( specular.rgb, VH );
+		Fs = D_final * F_spec * V_spec;
+
+		// Track glint contribution for debug views
+		glintBlend = glintWeight;
+		glintTerm = vec3( max( D_final - D_base, 0.0 ) ) * F_spec * V_spec;
 		glintDebugLevel = int( floor( glintCore.z + 0.5 ) );
 	}
 #endif
 
-	float baseLayerScale = 1.0;
+	// Clearcoat energy conservation (base layer dimmed when clearcoat present)
+	float clearcoatDim = 1.0;
 	if ( clearcoatStrength > 0.0 ) {
-		baseLayerScale = clamp( 1.0 - clearcoatStrength * 0.25, 0.0, 1.0 );
+		clearcoatDim = clamp( 1.0 - clearcoatStrength * 0.25, 0.0, 1.0 );
 	}
+	Fd *= clearcoatDim;
 
-	if ( glintEnabled && glintEnergyComp > 0.0 ) {
-		float glintWeight = clamp( glintMaterial.x, 0.0, 1.0 ) * glintBlend;
-		baseLayerScale *= ( 1.0 - 0.5 * glintEnergyComp * glintWeight );
-	}
-
-	float glintIntensity = max( glintColor.y, 0.0 );
-	float glintMultiplier = glintBlend * glintIntensity;
-
-	Fd *= baseLayerScale;
-	specDirect = Fs * baseLayerScale;
-	if ( glintEnabled ) {
-		specDirect += glintTerm * glintMultiplier;
-	}
-
-	vec3 diffuseColor = diffuse.rgb * baseLayerScale;
+	vec3 diffuseColor = diffuse.rgb * clearcoatDim;
 	float specAO = CalcSpecularAO( AO, roughness, NE );
 
 	vec3 directDiffuse = lightColor * Fd * ( attenuation * NL );
-	vec3 directSpecBase = lightColor * ( Fs * baseLayerScale ) * ( attenuation * NL );
-	vec3 directSpecGlint = vec3( 0.0 );
-	if ( glintEnabled )
-	{
-		directSpecGlint = lightColor * glintTerm * glintMultiplier * ( attenuation * NL );
-	}
+	vec3 directSpec = lightColor * ( Fs * clearcoatDim ) * ( attenuation * NL );
 
-	out_color.rgb  = directDiffuse + directSpecBase + directSpecGlint;
+	out_color.rgb  = directDiffuse + directSpec;
 	out_color.rgb += ambientColor * diffuseColor;
 	if ( needsFallbackLight ) {
 		out_color.rgb += diffuseColor * 0.04;
 	}
 
-	dbgBaseSpec += directSpecBase;
-	dbgGlint += directSpecGlint;
+	dbgBaseSpec += directSpec;
+	dbgGlint += lightColor * glintTerm * ( attenuation * NL );
 
 	// diffuse IBL (SH + irradiance)
 	out_color.rgb += CalcDiffuseIrradiance( N ) * diffuseColor * AO;
@@ -1383,28 +1359,12 @@ bool glintEnabled = glintAvailable;
 	const bool hasIBL = hasEnv && hasIrr;
 	if ( hasIBL )
 	{
-		vec3 specIBL = CalcIBLContribution( roughness, N, E, NE, specular.rgb * baseLayerScale * specAO );
+		vec3 specIBL = CalcIBLContribution( roughness, N, E, NE, specular.rgb * clearcoatDim * specAO );
 		out_color.rgb += specIBL;
 		dbgBaseSpec += specIBL;
 	}
 
 #ifdef USE_VK_PBR
-	if ( glintEnabled )
-	{
-		if ( glintRouting.y > 0.5 )
-		{
-			vec3 glintDirect = lightColor * glintTerm * ( attenuation * NL ) * glintMultiplier;
-			out_color.rgb += glintDirect;
-			dbgGlint += glintDirect;
-		}
-		if ( glintRouting.x > 0.5 )
-		{
-			vec3 glintIBL = glintTerm * glintMultiplier * 0.25 * specAO;
-			out_color.rgb += glintIBL;
-			dbgGlint += glintIBL;
-		}
-	}
-
 	if ( glintDebugLevel > 0 )
 	{
 		if ( glintDebugData.w < 0.0 )
@@ -1463,15 +1423,6 @@ bool glintEnabled = glintAvailable;
 	}
 	
 	out_color.rgb += emissive;
-
-#ifdef USE_VK_PBR
-	// Soft tonemap for glint path to avoid overbright blowout.
-	if ( glintEnabled )
-	{
-		vec3 color = out_color.rgb;
-		out_color.rgb = color / ( color + vec3( 1.0 ) );
-	}
-#endif
 
 	const float diagThreshold = 1e-4;
 	if ( pbrDebugView == 5 )
@@ -1542,8 +1493,8 @@ bool glintEnabled = glintAvailable;
 	}
 	else if ( pbrDebugView == 15 )
 	{
-		// Direct specular contribution (base layer).
-		out_color.rgb = directSpecBase;
+		// Direct specular contribution (includes glint D-term replacement).
+		out_color.rgb = directSpec;
 		out_color.a = 1.0;
 	}
 	else if ( pbrDebugView == 16 )
@@ -1554,7 +1505,7 @@ bool glintEnabled = glintAvailable;
 		}
 		else
 		{
-			vec3 specIBL = CalcIBLContribution( roughness, N, E, NE, specular.rgb * baseLayerScale * specAO );
+			vec3 specIBL = CalcIBLContribution( roughness, N, E, NE, specular.rgb * clearcoatDim * specAO );
 			if ( length( specIBL ) < diagThreshold )
 			{
 				out_color.rgb = vec3( 1.0, 1.0, 0.0 ); // YELLOW: IBL on but sampling near-zero

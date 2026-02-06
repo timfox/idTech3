@@ -8,11 +8,11 @@
 #endif
 
 #ifndef GLINT_DICT_MAX_LEVELS
-#define GLINT_DICT_MAX_LEVELS 8
+#define GLINT_DICT_MAX_LEVELS 16
 #endif
 
 #ifndef GLINT_DICT_MAX_SIZE
-#define GLINT_DICT_MAX_SIZE 128
+#define GLINT_DICT_MAX_SIZE 256
 #endif
 
 #ifdef __cplusplus

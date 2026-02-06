@@ -1761,7 +1761,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_lightmapSRGB,
 		"Upload BSP lightmaps as sRGB textures (1) or raw UNORM (0). Requires renderer restart." );
 	r_glints_minRoughness = ri.Cvar_Get( "r_glints_minRoughness", "0.05", CVAR_ARCHIVE_ND );
-	r_glints_maxRoughness = ri.Cvar_Get( "r_glints_maxRoughness", "0.6", CVAR_ARCHIVE_ND );
+	r_glints_maxRoughness = ri.Cvar_Get( "r_glints_maxRoughness", "0.25", CVAR_ARCHIVE_ND );
 	r_glints_density = ri.Cvar_Get( "r_glints_density", "20", CVAR_ARCHIVE_ND );
 	r_glints_scale = ri.Cvar_Get( "r_glints_scale", "1", CVAR_ARCHIVE_ND );
 	r_glints_anisotropy = ri.Cvar_Get( "r_glints_anisotropy", "0", CVAR_ARCHIVE_ND );
@@ -1783,7 +1783,7 @@ static void R_Register( void )
 	r_glints_fresnel = ri.Cvar_Get( "r_glints_fresnel", "1", CVAR_ARCHIVE_ND );
 	r_glints_f0Override = ri.Cvar_Get( "r_glints_f0Override", "-1", CVAR_ARCHIVE_ND );
 	r_glints_halfRes = ri.Cvar_Get( "r_glints_halfRes", "1", CVAR_ARCHIVE_ND );
-	r_glints_maxDistance = ri.Cvar_Get( "r_glints_maxDistance", "1000", CVAR_ARCHIVE_ND );
+	r_glints_maxDistance = ri.Cvar_Get( "r_glints_maxDistance", "512", CVAR_ARCHIVE_ND );
 	r_glints_maxScreenSlope = ri.Cvar_Get( "r_glints_maxScreenSlope", "1", CVAR_ARCHIVE_ND );
 	r_glints_budgetMs = ri.Cvar_Get( "r_glints_budgetMs", "2", CVAR_ARCHIVE_ND );
 	r_glints_affectIBL = ri.Cvar_Get( "r_glints_affectIBL", "0", CVAR_ARCHIVE_ND );
@@ -1797,15 +1797,15 @@ static void R_Register( void )
 	r_glints_zeta = ri.Cvar_Get( "r_glints_zeta", "2", CVAR_ARCHIVE_ND );
 	r_glints_gamma = ri.Cvar_Get( "r_glints_gamma", "4", CVAR_ARCHIVE_ND );
 	r_glints_dict_levels = ri.Cvar_Get( "r_glints_dict_levels", "16", CVAR_ARCHIVE_ND | CVAR_LATCH );
-	r_glints_dict_size = ri.Cvar_Get( "r_glints_dict_size", "64", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	r_glints_dict_size = ri.Cvar_Get( "r_glints_dict_size", "128", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	r_glints_dict_count = ri.Cvar_Get( "r_glints_dict_count", "192", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	r_glints_dict_alpha = ri.Cvar_Get( "r_glints_dict_alpha", "0.5", CVAR_ARCHIVE_ND | CVAR_LATCH );
-	r_glints_dict_lobeSigma = ri.Cvar_Get( "r_glints_dict_lobeSigma", "0.02", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	r_glints_dict_lobeSigma = ri.Cvar_Get( "r_glints_dict_lobeSigma", "0.005", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	r_glints_dict_reload = ri.Cvar_Get( "r_glints_dict_reload", "0", CVAR_TEMP );
 	r_glints_masking = ri.Cvar_Get( "r_glints_masking", "1", CVAR_ARCHIVE_ND );
 	r_glints_energy_debug = ri.Cvar_Get( "r_glints_energy_debug", "0", CVAR_TEMP );
 	r_glints_maxCells = ri.Cvar_Get( "r_glints_maxCells", "128", CVAR_ARCHIVE_ND );
-	r_glints_lodBias = ri.Cvar_Get( "r_glints_lodBias", "0", CVAR_ARCHIVE_ND );
+	r_glints_lodBias = ri.Cvar_Get( "r_glints_lodBias", "-1", CVAR_ARCHIVE_ND );
 	r_glints_colored = ri.Cvar_Get( "r_glints_colored", "0", CVAR_ARCHIVE_ND );
 	r_glints_colorCount = ri.Cvar_Get( "r_glints_colorCount", "4", CVAR_ARCHIVE_ND );
 	r_glints_colorStrength = ri.Cvar_Get( "r_glints_colorStrength", "1", CVAR_ARCHIVE_ND );
