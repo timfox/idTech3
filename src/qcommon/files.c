@@ -4889,63 +4889,39 @@ static void FS_Startup( void ) {
 #endif
 }
 
-/*
-=====================
-FS_ParseGameInfo
+static qboolean FS_IsAbsolutePath( const char *path ) {
+	if ( !path || !path[0] ) {
+		return qfalse;
+	}
 
-Parses gameinfo.txt (Source Engine style) from the game root directory
-and extracts the title field to set the window title.
-=====================
-*/
-static void FS_ParseGameInfo( void )
-{
-	char *buffer;
-	int len;
-	const char *gameDir;
-	char gameInfoPath[MAX_OSPATH];
-	
-	// Determine game directory (fs_game if set, otherwise fs_basegame)
-	if ( fs_gamedirvar->string[0] != '\0' ) {
-		gameDir = fs_gamedirvar->string;
-	} else {
-		gameDir = fs_basegame->string;
+#ifdef _WIN32
+	if ( path[1] == ':' && ( ( path[0] >= 'A' && path[0] <= 'Z' ) || ( path[0] >= 'a' && path[0] <= 'z' ) ) ) {
+		return qtrue;
 	}
-	
-	// Try to find gameinfo.txt in the game directory
-	// Check in basepath first
-	Com_sprintf( gameInfoPath, sizeof( gameInfoPath ), "%s/%s/gameinfo.txt", fs_basepath->string, gameDir );
-	len = FS_ReadFile( gameInfoPath, (void **)&buffer );
-	
-	// If not found in basepath, try homepath
-	if ( !buffer && fs_homepath->string[0] && Q_stricmp( fs_homepath->string, fs_basepath->string ) ) {
-		Com_sprintf( gameInfoPath, sizeof( gameInfoPath ), "%s/%s/gameinfo.txt", fs_homepath->string, gameDir );
-		len = FS_ReadFile( gameInfoPath, (void **)&buffer );
+#endif
+
+	if ( path[0] == '/' || path[0] == '\\' ) {
+		return qtrue;
 	}
-	
-	if ( !buffer || len <= 0 ) {
-		// gameinfo.txt not found, use default title
-		return;
-	}
-	
-	// Simple parser: look for "title" followed by quoted string
+
+	return qfalse;
+}
+
+static qboolean FS_ParseGameInfoBuffer( const char *buffer, int len ) {
 	const char *p = buffer;
 	const char *end = buffer + len;
 	const char *titleStart = NULL;
 	const char *titleEnd = NULL;
-	
-	// Find "title" keyword
+
 	while ( p < end - 5 ) {
 		if ( Q_strncmp( p, "title", 5 ) == 0 ) {
-			// Skip whitespace after "title"
 			p += 5;
 			while ( p < end && ( *p == ' ' || *p == '\t' ) ) {
 				p++;
 			}
-			// Look for opening quote
 			if ( p < end && *p == '"' ) {
-				p++; // Skip opening quote
+				p++;
 				titleStart = p;
-				// Find closing quote
 				while ( p < end && *p != '"' && *p != '\n' && *p != '\r' ) {
 					p++;
 				}
@@ -4957,22 +4933,98 @@ static void FS_ParseGameInfo( void )
 		}
 		p++;
 	}
-	
+
 	if ( titleStart && titleEnd && titleEnd > titleStart ) {
 		int titleLen = titleEnd - titleStart;
 		if ( titleLen > 0 && titleLen < MAX_CVAR_VALUE_STRING ) {
-			// Extract title and update cl_title
 			char title[MAX_CVAR_VALUE_STRING];
 			Q_strncpyz( title, titleStart, titleLen + 1 );
 			Q_strncpyz( cl_title, title, sizeof( cl_title ) );
-			
+
 			if ( Com_LogVerbosity() >= 1 ) {
 				LOG_FS( "Parsed gameinfo.txt: title = \"%s\"\n", title );
 			}
+
+			return qtrue;
 		}
 	}
-	
+
+	return qfalse;
+}
+
+static qboolean FS_ReadAndParseGameInfo( const char *path ) {
+	char *buffer;
+	int len;
+
+	len = FS_ReadFile( path, (void **)&buffer );
+	if ( !buffer || len <= 0 ) {
+		return qfalse;
+	}
+
+	qboolean parsed = FS_ParseGameInfoBuffer( buffer, len );
 	FS_FreeFile( buffer );
+
+	return parsed;
+}
+
+/*
+=====================
+FS_ParseGameInfo
+
+Parses gameinfo.txt (Source Engine style) from the game root directory
+and extracts the title field to set the window title.
+=====================
+*/
+static void FS_ParseGameInfo( void )
+{
+	const char *gameDir;
+	char gameInfoPath[MAX_OSPATH];
+
+	if ( fs_gamedirvar->string[0] != '\0' ) {
+		gameDir = fs_gamedirvar->string;
+	} else {
+		gameDir = fs_basegame->string;
+	}
+
+	qboolean absoluteGameDir = FS_IsAbsolutePath( gameDir );
+
+	if ( !absoluteGameDir ) {
+		Com_sprintf( gameInfoPath, sizeof( gameInfoPath ), "%s/%s/gameinfo.txt", fs_basepath->string, gameDir );
+		FS_ReplaceSeparators( gameInfoPath );
+		if ( FS_ReadAndParseGameInfo( gameInfoPath ) ) {
+			return;
+		}
+
+		if ( fs_homepath->string[0] && Q_stricmp( fs_homepath->string, fs_basepath->string ) ) {
+			Com_sprintf( gameInfoPath, sizeof( gameInfoPath ), "%s/%s/gameinfo.txt", fs_homepath->string, gameDir );
+			FS_ReplaceSeparators( gameInfoPath );
+			if ( FS_ReadAndParseGameInfo( gameInfoPath ) ) {
+				return;
+			}
+		}
+	}
+
+	if ( gameDir[0] != '\0' ) {
+		Com_sprintf( gameInfoPath, sizeof( gameInfoPath ), "%s/gameinfo.txt", gameDir );
+		FS_ReplaceSeparators( gameInfoPath );
+		if ( FS_ReadAndParseGameInfo( gameInfoPath ) ) {
+			return;
+		}
+	}
+
+	Com_sprintf( gameInfoPath, sizeof( gameInfoPath ), "%s/gameinfo.txt", fs_basepath->string );
+	FS_ReplaceSeparators( gameInfoPath );
+	if ( FS_ReadAndParseGameInfo( gameInfoPath ) ) {
+		return;
+	}
+
+	if ( fs_homepath->string[0] && Q_stricmp( fs_homepath->string, fs_basepath->string ) ) {
+		Com_sprintf( gameInfoPath, sizeof( gameInfoPath ), "%s/gameinfo.txt", fs_homepath->string );
+		FS_ReplaceSeparators( gameInfoPath );
+		if ( FS_ReadAndParseGameInfo( gameInfoPath ) ) {
+			return;
+		}
+	}
 }
 
 

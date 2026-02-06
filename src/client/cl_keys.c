@@ -520,14 +520,13 @@ static void Console_Key( int key ) {
 		return;
 	}
 
-	// ctrl-home = top of console
-	if ( key == K_HOME && keys[K_CTRL].down ) {
+	// home/end scroll to the top or bottom for quick navigation
+	if ( key == K_HOME ) {
 		Con_Top();
 		return;
 	}
 
-	// ctrl-end = bottom of console
-	if ( key == K_END && keys[K_CTRL].down ) {
+	if ( key == K_END ) {
 		Con_Bottom();
 		return;
 	}
