@@ -15,6 +15,8 @@
 static int vkSamples = VK_SAMPLE_COUNT_1_BIT;
 static int vkMaxSamples = VK_SAMPLE_COUNT_1_BIT;
 
+static VkFormat get_hdr_format( VkFormat base_format );
+
 #define VK_PIPELINE_CACHE_FILE "vulkan_pipeline_cache.bin"
 
 static VkInstance vk_instance = VK_NULL_HANDLE;
@@ -268,6 +270,24 @@ static qboolean vk_format_is_srgb( VkFormat format )
 	default:
 		return qfalse;
 	}
+}
+
+static VkFormat vk_pick_color_format( void )
+{
+	if ( vk.swapchainIsSRGB ) {
+		return vk.present_format.format;
+	}
+
+	return get_hdr_format( vk.base_format.format );
+}
+
+static VkFormat vk_pick_capture_format( void )
+{
+	if ( vk.swapchainIsSRGB ) {
+		return vk.present_format.format;
+	}
+
+	return VK_FORMAT_R8G8B8A8_UNORM;
 }
 
 
@@ -1869,9 +1889,9 @@ static void setup_surface_formats( VkPhysicalDevice physical_device )
 {
 	vk.depth_format = get_depth_format( physical_device );
 
-	vk.color_format = get_hdr_format( vk.base_format.format );
+	vk.color_format = vk_pick_color_format();
 
-	vk.capture_format = VK_FORMAT_R8G8B8A8_UNORM;
+	vk.capture_format = vk_pick_capture_format();
 
 	vk.bloom_format = vk.base_format.format;
 	vk.ssao_format = VK_FORMAT_R8_UNORM;
@@ -2200,7 +2220,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 
 #define INIT_INSTANCE_FUNCTION(func) \
 	do { \
-		void *_sym = ri.VK_GetInstanceProcAddr( vk_instance, #func ); \
+		PFN_vkVoidFunction _sym = ri.VK_GetInstanceProcAddr( vk_instance, #func ); \
 		Com_Memcpy( &q##func, &_sym, sizeof( q##func ) ); \
 		if ( q##func == NULL ) { \
 			ri.Error( ERR_FATAL, "Failed to find entrypoint %s", #func ); \
@@ -2209,7 +2229,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 
 #define INIT_INSTANCE_FUNCTION_EXT(func) \
 	do { \
-		void *_sym = ri.VK_GetInstanceProcAddr( vk_instance, #func ); \
+		PFN_vkVoidFunction _sym = ri.VK_GetInstanceProcAddr( vk_instance, #func ); \
 		Com_Memcpy( &q##func, &_sym, sizeof( q##func ) ); \
 	} while ( 0 );
 

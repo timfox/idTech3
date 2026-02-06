@@ -231,8 +231,8 @@ static int buffer_sz;					// buffers size, in bytes
 static int frame_sz;					// frame size, in bytes
 
 static void async_proc( snd_async_handler_t *ahandler );
-static void thread_proc_mmap( void );
-static void thread_proc_direct( void );
+static void *thread_proc_mmap( void *arg );
+static void *thread_proc_direct( void *arg );
 
 
 void Snd_Memset( void* dest, const int val, const size_t count )
@@ -277,7 +277,7 @@ static qboolean setup_ALSA( smode_t mode )
 	unsigned int speed, rrate;
 	int err, dir, bps, channels;
 	qboolean use_mmap;
-	int i;
+	size_t i;
 
 	if ( snd_inited == qtrue )
 	{
@@ -577,10 +577,10 @@ static qboolean setup_ALSA( smode_t mode )
 			Com_Printf( S_COLOR_YELLOW "ALSA initial write error: %s\n", _snd_strerror( err ) );
 			goto __fail;
 		}
-		if ( err != period_size * 2 )
+		if ( err != (int)( period_size * 2 ) )
 		{
 			Com_Printf( S_COLOR_YELLOW "ALSA initial write error: written %i expected %li\n", err,
-				period_size * 2 );
+				(long)( period_size * 2 ) );
 			goto __fail;
 		}
 		if ( __snd_pcm_state( handle ) == SND_PCM_STATE_PREPARED )
@@ -605,9 +605,9 @@ static qboolean setup_ALSA( smode_t mode )
 #endif
 	
 		if ( use_mmap )
-			err = _pthread_create( &thread, NULL, (void*)&thread_proc_mmap, NULL );
+			err = _pthread_create( &thread, NULL, thread_proc_mmap, NULL );
 		else
-			err = _pthread_create( &thread, NULL, (void*)&thread_proc_direct, NULL );
+			err = _pthread_create( &thread, NULL, thread_proc_direct, NULL );
 
 		if ( err != 0 )
 		{
@@ -715,11 +715,11 @@ static void print_state( snd_pcm_state_t state )
 	Com_Printf( "%s\n", s );
 }
 
-static int xrun_recovery( snd_pcm_t *handle, int err )
+static int xrun_recovery( snd_pcm_t *pcm, int err )
 {
 	if ( err == -EPIPE ) /* underrun */
 	{
-		err = _snd_pcm_prepare( handle );
+		err = _snd_pcm_prepare( pcm );
 		if ( err < 0 )
 		{
 			fprintf( stderr, "Can't recovery from underrun, prepare failed: %s\n",
@@ -736,7 +736,7 @@ static int xrun_recovery( snd_pcm_t *handle, int err )
 		req.tv_nsec = ( period_time % 1000000 ) * 1000;
 
 		/* wait until the suspend flag is released */
-		while ( ( err = _snd_pcm_resume( handle ) ) == -EAGAIN )
+			while ( ( err = _snd_pcm_resume( pcm ) ) == -EAGAIN )
 		{
 			nanosleep( &req, NULL );
 			if ( tries++ < 16 )
@@ -746,7 +746,7 @@ static int xrun_recovery( snd_pcm_t *handle, int err )
 		}
 		if ( err < 0 )
 		{
-			err = _snd_pcm_prepare( handle );
+			err = _snd_pcm_prepare( pcm );
 			if ( err < 0 )
 			{
 				fprintf( stderr, "Can't recovery from suspend, prepare failed: %s\n",
@@ -832,8 +832,9 @@ int SNDDMA_GetDMAPos( void )
 }
 
 
-static void thread_proc_mmap( void )
+static void *thread_proc_mmap( void *arg )
 {
+	(void)arg;
 	const snd_pcm_channel_area_t *areas;
 	snd_pcm_sframes_t commitres;
 	snd_pcm_uframes_t frames;
@@ -920,8 +921,9 @@ static void thread_proc_mmap( void )
 		}
 		buffer_pos = p / ( dma.samplebits / 8 );
 
+		snd_pcm_sframes_t frames_signed = (snd_pcm_sframes_t)frames;
 		commitres = _snd_pcm_mmap_commit( handle, offset, frames );
-		if ( commitres < 0 || commitres != frames )
+		if ( commitres < 0 || commitres != frames_signed )
 		{
 			if ( ( err = xrun_recovery( handle, commitres >= 0 ? -EPIPE : commitres ) ) < 0 )
 			{
@@ -943,12 +945,14 @@ static void thread_proc_mmap( void )
 
 	_snd_pcm_drop( handle );
 
-	_pthread_exit( 0 );
+	_pthread_exit( NULL );
+	return NULL;
 }
 
 
-static void thread_proc_direct( void )
+static void *thread_proc_direct( void *arg )
 {
+	(void)arg;
 	snd_pcm_uframes_t size;
 	snd_pcm_uframes_t pos;
 	snd_pcm_sframes_t avail, x;
@@ -1032,17 +1036,20 @@ static void thread_proc_direct( void )
 
 	_snd_pcm_drop( handle );
 
-	_pthread_exit( 0 );
+	_pthread_exit( NULL );
+	return NULL;
 }
 
 
 static void async_proc( snd_async_handler_t *ahandler )
 {
+	(void)ahandler;
 	snd_pcm_sframes_t avail;
 	snd_pcm_sframes_t x;
 	snd_pcm_uframes_t pos;
 	snd_pcm_uframes_t size;
 	int err;
+	const snd_pcm_sframes_t period_size_s = (snd_pcm_sframes_t)period_size;
 
 	if ( !snd_async || !dma.samples )
 		return;
@@ -1052,7 +1059,7 @@ static void async_proc( snd_async_handler_t *ahandler )
 
 	size = dma.samples / dma.channels;
 
-	while ( ( avail = _snd_pcm_avail_update( handle ) ) >= period_size )
+	while ( ( avail = _snd_pcm_avail_update( handle ) ) >= period_size_s )
 	{
 #ifdef USE_SPINLOCK
 		_pthread_spin_lock( &lock );
@@ -1061,10 +1068,10 @@ static void async_proc( snd_async_handler_t *ahandler )
 #endif
 		pos = buffer_pos / dma.channels; // buffer position in full samples
 
-		while ( avail >= period_size )
+		while ( avail >= period_size_s )
 		{
-			if ( avail > period_size )
-				x = period_size;
+			if ( avail > period_size_s )
+				x = period_size_s;
 			else
 				x = avail;
 

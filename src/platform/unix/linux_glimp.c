@@ -550,23 +550,23 @@ static qboolean repeated_press( XEvent *event )
 }
 
 
-static qboolean WindowMinimized( Display *dpy, Window win )
+static qboolean WindowMinimized( Display *local_dpy, Window local_win )
 {
 	unsigned long i, num_items, bytes_after;
 	Atom actual_type, *atoms, nws, nwsh;
 	int actual_format;
 
-	nws = XInternAtom( dpy, "_NET_WM_STATE", True );
+	nws = XInternAtom( local_dpy, "_NET_WM_STATE", True );
 	if ( nws == BadValue || nws == None )
 		return qfalse;
 
-	nwsh = XInternAtom( dpy, "_NET_WM_STATE_HIDDEN", True );
+	nwsh = XInternAtom( local_dpy, "_NET_WM_STATE_HIDDEN", True );
 	if ( nwsh == BadValue || nwsh == None )
 		return qfalse;
 
 	atoms = NULL;
 
-	XGetWindowProperty( dpy, win, nws, 0, 0x7FFFFFFF, False, XA_ATOM,
+	XGetWindowProperty( local_dpy, local_win, nws, 0, 0x7FFFFFFF, False, XA_ATOM,
 		&actual_type, &actual_format, &num_items,
 		&bytes_after, (unsigned char**)&atoms );
 
@@ -694,7 +694,7 @@ void HandleEvents( void )
 
 		case ClientMessage:
 
-			if ( event.xclient.data.l[0] == wmDeleteEvent ) {
+			if ( (Atom) event.xclient.data.l[0] == wmDeleteEvent ) {
 				Cmd_Clear();
 				Com_Quit_f();
 			}
@@ -908,13 +908,13 @@ void HandleEvents( void )
 
 // NOTE TTimo for the tty console input, we didn't rely on those .. 
 //   it's not very surprising actually cause they are not used otherwise
-void KBD_Init( void )
+static void KBD_Init( void )
 {
 
 }
 
 
-void KBD_Close( void )
+static void KBD_Close( void )
 {
 
 }
@@ -986,7 +986,7 @@ qboolean IN_MouseActive( void )
 IN_Minimize
 ================
 */
-void IN_Minimize( void )
+static void IN_Minimize( void )
 {
 	if ( !CL_VideoRecording() || ( re.CanMinimize && re.CanMinimize() ) )
 	{
@@ -2128,7 +2128,8 @@ Sys_SetClipboardBitmap
 */
 void Sys_SetClipboardBitmap( const byte *bitmap, int length )
 {
-	// TODO: implement
+	(void)bitmap;
+	(void)length;
 }
 
 

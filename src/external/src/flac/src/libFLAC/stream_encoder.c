@@ -66,7 +66,11 @@
 #include "private/window.h"
 #include "share/alloc.h"
 #include "share/private.h"
-
+#if defined(__clang__) || defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-qual"
+#pragma GCC diagnostic ignored "-Wvla"
+#endif
 
 /* Exact Rice codeword length calculation is off by default.  The simple
  * (and fast) estimation (of how many bits a residual value will be
@@ -4675,6 +4679,10 @@ FLAC__StreamEncoderTellStatus file_tell_callback_(const FLAC__StreamEncoder *enc
 		return FLAC__STREAM_ENCODER_TELL_STATUS_OK;
 	}
 }
+
+#if defined(__clang__) || defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 #ifdef FLAC__VALGRIND_TESTING
 static size_t local__fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)

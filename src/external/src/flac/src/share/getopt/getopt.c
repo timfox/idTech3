@@ -564,7 +564,16 @@ share___getopt_internal (
 	     exchange them so that the options come first.  */
 
 	  if (first_nonopt != last_nonopt && last_nonopt != share__optind)
+	    {
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-qual"
+#endif
 	    exchange ((char **) argv);
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+	    }
 	  else if (last_nonopt != share__optind)
 	    first_nonopt = share__optind;
 
@@ -586,7 +595,16 @@ share___getopt_internal (
 	  share__optind++;
 
 	  if (first_nonopt != last_nonopt && last_nonopt != share__optind)
+	    {
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-qual"
+#endif
 	    exchange ((char **) argv);
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+	    }
 	  else if (first_nonopt == last_nonopt)
 	    first_nonopt = share__optind;
 	  last_nonopt = argc;

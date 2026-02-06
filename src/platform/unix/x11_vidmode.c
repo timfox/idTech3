@@ -44,7 +44,7 @@ qboolean VidMode_Init( void )
 	int ver_major = 0;
 	int ver_minor = 0;
 	int event_base, error_base;
-	int i;
+	size_t i;
 
 	glw_state.vidmode_ext = qfalse;
 	glw_state.vidmode_gamma = qfalse;
@@ -173,6 +173,7 @@ void VidMode_RestoreGamma( void )
 
 qboolean VidMode_SetMode( int *width, int *height, int *rate )
 {
+	(void)rate;
 	int best_fit, best_dist;
 	int dist;
 	int x, y; //, w, h;

@@ -92,7 +92,7 @@ static qboolean monitor_in_list( int x, int y, int w, int h, RROutput outputn, R
 }
 
 
-void monitor_add( int x, int y, int w, int h, const char *name, RROutput outputn, RRCrtc crtcn, RRMode mode )
+static void monitor_add( int x, int y, int w, int h, const char *name, RROutput outputn, RRCrtc crtcn, RRMode mode )
 {
 	monitor_t *m;
 	
@@ -184,7 +184,7 @@ qboolean RandR_SetMode( int *width, int *height, int *rate )
 	
 		// change original policy, i.e. allow selecting lower resolution modes
 		// as it is very unlikely that current mode is lower than mode you want to set
-		if ( mode_info->width > *width || mode_info->height > *height )
+		if ( (int)mode_info->width > *width || (int)mode_info->height > *height )
 			continue;
 		x = *width - mode_info->width;
 		y = *height - mode_info->height;

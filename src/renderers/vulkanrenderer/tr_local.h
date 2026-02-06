@@ -1521,6 +1521,7 @@ extern cvar_t *r_glints_lodBias;
 extern cvar_t *r_glints_colored;
 extern cvar_t *r_glints_colorCount;
 extern cvar_t *r_glints_colorStrength;
+extern cvar_t *r_glintsLog;
 #endif
 extern cvar_t	*r_ssao;
 extern cvar_t	*r_ssaoRadius;

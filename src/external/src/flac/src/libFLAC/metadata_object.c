@@ -46,6 +46,11 @@
 #include "share/alloc.h"
 #include "share/compat.h"
 
+#if defined(__clang__) || defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-qual"
+#endif
+
 /* Alias the first (in share/alloc.h) to the second (in src/libFLAC/memory.c). */
 #define safe_malloc_mul_2op_ safe_malloc_mul_2op_p
 
@@ -2016,3 +2021,7 @@ void error_callback_(const FLAC__StreamDecoder *decoder, FLAC__StreamDecoderErro
 	if(status != FLAC__STREAM_DECODER_ERROR_STATUS_LOST_SYNC)
 		cd->got_error = true;
 }
+
+#if defined(__clang__) || defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif

@@ -81,6 +81,258 @@ static const textureBundle_t *R_FindLightmapBundle( const shader_t *shader ) {
 	return NULL;
 }
 
+#define GLINT_LOG_MAX_ENTRIES	256
+#define GLINT_LOG_MAX_STAGE_LIST	64
+#define GLINT_LOG_MAX_FLAGS	16
+#define GLINT_DESCRIPTOR_MAP_SIZE	64
+#define GLINT_DICT_MAP_SIZE		16
+
+typedef struct {
+	const char *stageName;
+	uint32_t flags;
+	uint32_t brdfId;
+} glintStageKey_t;
+
+typedef struct {
+	uint32_t flags;
+	uint32_t count;
+} glintFlagCounter_t;
+
+typedef struct {
+	VkDescriptorSet descriptor;
+	uint32_t id;
+} glintDescriptorEntry_t;
+
+typedef struct {
+	VkImageView view;
+	uint32_t id;
+} glintDictEntry_t;
+
+typedef struct {
+	glintStageKey_t seen[GLINT_LOG_MAX_ENTRIES];
+	int seenCount;
+	uint32_t totalAttempt;
+	uint32_t duplicates;
+	uint32_t uniqueStages;
+	glintFlagCounter_t flagCounters[GLINT_LOG_MAX_FLAGS];
+	int flagCounterCount;
+	const char *stageNames[GLINT_LOG_MAX_STAGE_LIST];
+	int stageNameCount;
+	uint32_t uniqueBrdfIds[GLINT_LOG_MAX_ENTRIES];
+	int uniqueBrdfCount;
+} glintLogContext_t;
+
+static glintDescriptorEntry_t glintDescriptorMap[GLINT_DESCRIPTOR_MAP_SIZE];
+static int glintDescriptorMapCount;
+static uint32_t glintDescriptorNextId = 1;
+static glintDictEntry_t glintDictMap[GLINT_DICT_MAP_SIZE];
+static int glintDictMapCount;
+static uint32_t glintDictNextId = 1;
+
+static const struct {
+	uint32_t mask;
+	const char *name;
+} glintFlagNames[] = {
+	{ PBR_HAS_NORMALMAP,		"NORMALMAP" },
+	{ PBR_HAS_PHYSICALMAP,		"PHYSICALMAP" },
+	{ PBR_HAS_SPECULARMAP,		"SPECULARMAP" },
+	{ PBR_HAS_LIGHTMAP,			"LIGHTMAP" },
+	{ PBR_HAS_EMISSIVE,			"EMISSIVE" },
+	{ PBR_HAS_CLEARCOAT,		"CLEARCOAT" },
+	{ PBR_HAS_SHEEN,			"SHEEN" },
+	{ PBR_HAS_ANISOTROPY,		"ANISOTROPY" },
+	{ PBR_HAS_TRANSMISSION,		"TRANSMISSION" },
+	{ PBR_HAS_SUBSURFACE,		"SUBSURFACE" },
+	{ PBR_HAS_IRRADIANCE,		"IRRADIANCE" },
+};
+
+
+static uint32_t glint_descriptor_id( VkDescriptorSet descriptor )
+{
+	if ( descriptor == VK_NULL_HANDLE ) {
+		return 0;
+	}
+	for ( int i = 0; i < glintDescriptorMapCount; i++ ) {
+		if ( glintDescriptorMap[i].descriptor == descriptor ) {
+			return glintDescriptorMap[i].id;
+		}
+	}
+	if ( glintDescriptorMapCount >= GLINT_DESCRIPTOR_MAP_SIZE ) {
+		return 0;
+	}
+	glintDescriptorMap[glintDescriptorMapCount].descriptor = descriptor;
+	glintDescriptorMap[glintDescriptorMapCount].id = glintDescriptorNextId;
+	glintDescriptorMapCount++;
+	return glintDescriptorNextId++;
+}
+
+static uint32_t glint_dict_id( VkImageView view )
+{
+	if ( view == VK_NULL_HANDLE ) {
+		return 0;
+	}
+	for ( int i = 0; i < glintDictMapCount; i++ ) {
+		if ( glintDictMap[i].view == view ) {
+			return glintDictMap[i].id;
+		}
+	}
+	if ( glintDictMapCount >= GLINT_DICT_MAP_SIZE ) {
+		return 0;
+	}
+	glintDictMap[glintDictMapCount].view = view;
+	glintDictMap[glintDictMapCount].id = glintDictNextId;
+	glintDictMapCount++;
+	return glintDictNextId++;
+}
+
+static void glint_flags_to_string( uint32_t flags, char *buf, size_t bufSize )
+{
+	buf[0] = '\0';
+	int added = 0;
+	for ( size_t i = 0; i < ARRAY_LEN( glintFlagNames ); i++ ) {
+		if ( ( flags & glintFlagNames[i].mask ) != 0 ) {
+			if ( added > 0 ) {
+				Q_strcat( buf, bufSize, "|" );
+			}
+			Q_strcat( buf, bufSize, glintFlagNames[i].name );
+			added++;
+		}
+	}
+	if ( added == 0 ) {
+		Q_strncpyz( buf, "NONE", bufSize );
+	}
+}
+
+static void glint_log_context_reset( glintLogContext_t *ctx )
+{
+	ctx->seenCount = 0;
+	ctx->totalAttempt = 0;
+	ctx->duplicates = 0;
+	ctx->uniqueStages = 0;
+	ctx->flagCounterCount = 0;
+	ctx->stageNameCount = 0;
+	ctx->uniqueBrdfCount = 0;
+}
+
+static qboolean glint_stage_key_found( glintLogContext_t *ctx, const char *stageName, uint32_t flags, uint32_t brdfId )
+{
+	for ( int i = 0; i < ctx->seenCount; i++ ) {
+		if ( ctx->seen[i].flags == flags && ctx->seen[i].brdfId == brdfId &&
+			!Q_stricmp( ctx->seen[i].stageName, stageName ) ) {
+			return qtrue;
+		}
+	}
+	return qfalse;
+}
+
+static void glint_stage_key_add( glintLogContext_t *ctx, const char *stageName, uint32_t flags, uint32_t brdfId )
+{
+	if ( ctx->seenCount >= GLINT_LOG_MAX_ENTRIES ) {
+		return;
+	}
+	ctx->seen[ctx->seenCount].stageName = stageName;
+	ctx->seen[ctx->seenCount].flags = flags;
+	ctx->seen[ctx->seenCount].brdfId = brdfId;
+	ctx->seenCount++;
+}
+
+static void glint_flag_counter_add( glintLogContext_t *ctx, uint32_t flags )
+{
+	for ( int i = 0; i < ctx->flagCounterCount; i++ ) {
+		if ( ctx->flagCounters[i].flags == flags ) {
+			ctx->flagCounters[i].count++;
+			return;
+		}
+	}
+	if ( ctx->flagCounterCount >= GLINT_LOG_MAX_FLAGS ) {
+		return;
+	}
+	ctx->flagCounters[ctx->flagCounterCount].flags = flags;
+	ctx->flagCounters[ctx->flagCounterCount].count = 1;
+	ctx->flagCounterCount++;
+}
+
+static void glint_unique_brdf_add( glintLogContext_t *ctx, uint32_t brdfId )
+{
+	if ( brdfId == 0 ) {
+		return;
+	}
+	for ( int i = 0; i < ctx->uniqueBrdfCount; i++ ) {
+		if ( ctx->uniqueBrdfIds[i] == brdfId ) {
+			return;
+		}
+	}
+	if ( ctx->uniqueBrdfCount >= GLINT_LOG_MAX_ENTRIES ) {
+		return;
+	}
+	ctx->uniqueBrdfIds[ctx->uniqueBrdfCount++] = brdfId;
+}
+
+static void glint_stage_name_add( glintLogContext_t *ctx, const char *stageName )
+{
+	for ( int i = 0; i < ctx->stageNameCount; i++ ) {
+		if ( !Q_stricmp( ctx->stageNames[i], stageName ) ) {
+			return;
+		}
+	}
+	if ( ctx->stageNameCount >= GLINT_LOG_MAX_STAGE_LIST ) {
+		return;
+	}
+	ctx->stageNames[ctx->stageNameCount++] = stageName;
+}
+
+static void glint_log_summary( glintLogContext_t *ctx, int logLevel )
+{
+	if ( ctx->totalAttempt == 0 && ctx->uniqueStages == 0 ) {
+		return;
+	}
+	ri.Printf( PRINT_ALL, "[glints] scanned=%u unique=%u duplicates=%u uniqueBrdf=%u\n",
+		ctx->totalAttempt, ctx->uniqueStages, ctx->duplicates, ctx->uniqueBrdfCount );
+	if ( ctx->flagCounterCount > 0 ) {
+		char flagBuf[64];
+		ri.Printf( PRINT_ALL, "[glints] flags:" );
+		for ( int i = 0; i < ctx->flagCounterCount; i++ ) {
+			glint_flags_to_string( ctx->flagCounters[i].flags, flagBuf, sizeof( flagBuf ) );
+			ri.Printf( PRINT_ALL, " 0x%x[%s]=%u", ctx->flagCounters[i].flags,
+				flagBuf, ctx->flagCounters[i].count );
+		}
+		ri.Printf( PRINT_ALL, "\n" );
+	}
+	if ( logLevel >= 2 && ctx->stageNameCount > 0 ) {
+		ri.Printf( PRINT_ALL, "[glints] stage list:\n" );
+		for ( int i = 0; i < ctx->stageNameCount; i++ ) {
+			ri.Printf( PRINT_ALL, "  %s\n", ctx->stageNames[i] );
+		}
+	}
+}
+
+static void glint_log_stage_line( glintLogContext_t *ctx, const char *stageName, const char *shaderName,
+	int32_t flags, uint32_t brdfId, uint32_t dictId, VkDescriptorSet descriptor, VkImageView dictView,
+	int logLevel )
+{
+	ctx->totalAttempt++;
+	if ( glint_stage_key_found( ctx, stageName, flags, brdfId ) ) {
+		ctx->duplicates++;
+		return;
+	}
+	glint_stage_key_add( ctx, stageName, flags, brdfId );
+	ctx->uniqueStages++;
+	glint_flag_counter_add( ctx, flags );
+	glint_unique_brdf_add( ctx, brdfId );
+	glint_stage_name_add( ctx, stageName );
+
+	char flagBuf[64];
+	glint_flags_to_string( flags, flagBuf, sizeof( flagBuf ) );
+
+	ri.Printf( PRINT_ALL, "[glints] enable stage=%-40s flags=%s brdf=%u dict=%u shader=%s",
+		stageName, flagBuf, brdfId, dictId, shaderName );
+
+	if ( logLevel >= 3 ) {
+		ri.Printf( PRINT_ALL, " brdf_desc=%p dict_view=%p", (void *)(uintptr_t)descriptor, (void *)(uintptr_t)dictView );
+	}
+	ri.Printf( PRINT_ALL, "\n" );
+}
+
 static void RB_DrawWorldSHDebugOverride( void ) {
 	if ( !r_shDebugView || r_shDebugView->integer != 3 ) {
 		return;
@@ -1293,6 +1545,16 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 	int fog_stage;
 	qboolean pushUniform;
 
+#ifdef USE_VK_PBR
+	const int glintsLogLevel = ( r_glintsLog != NULL ) ? r_glintsLog->integer : 0;
+	const qboolean glintsLogEnabled = glintsLogLevel > 0 ||
+		( r_glints_debug && r_glints_debug->value > 0.0f ) ||
+		( r_glints_verbose && r_glints_verbose->integer > 0 );
+	glintLogContext_t glintLogCtx;
+	if ( glintsLogEnabled ) {
+		glint_log_context_reset( &glintLogCtx );
+	}
+#endif
 	vk_bind_index();
 
 	tess_flags = input->shader->tessFlags;
@@ -1543,13 +1805,13 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				}
 			}
 
-			if ( ( r_glints_debug && r_glints_debug->value > 0.0f ) ||
-				( r_glints_verbose && r_glints_verbose->integer > 0 ) ) {
-				ri.Printf( PRINT_ALL, "glint: stage=%s vk_pbr_flags=0x%x brdf_desc=%p dict_view=%p\n",
-					tess.shader ? tess.shader->name : "null",
-					pStage->vk_pbr_flags,
-					(void *)(uintptr_t)pbrDescriptor,
-					(void *)(uintptr_t)glintDictView );
+			if ( glintsLogEnabled ) {
+				const char *stageName = tess.shader ? tess.shader->name : "null";
+				const char *shaderName = stageName;
+				const uint32_t brdfId = glint_descriptor_id( pbrDescriptor );
+				const uint32_t dictId = glint_dict_id( glintDictView );
+				glint_log_stage_line( &glintLogCtx, stageName, shaderName, pStage->vk_pbr_flags, brdfId, dictId,
+					pbrDescriptor, glintDictView, glintsLogLevel );
 			}
 			
 			int cubemapIndex = -1;
@@ -1741,6 +2003,12 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 	}
 	if ( tess_flags ) // fog-only shaders?
 		vk_bind_geometry( tess_flags );
+#endif
+
+#ifdef USE_VK_PBR
+	if ( glintsLogEnabled ) {
+		glint_log_summary( &glintLogCtx, glintsLogLevel );
+	}
 #endif
 }
 

@@ -19,6 +19,8 @@ along with Quake III Arena source code; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
+#include "../renderers/rendercommon/vulkan/vulkan.h"
+
 #ifndef __LINUX_LOCAL_H__
 #define __LINUX_LOCAL_H__
 
@@ -39,6 +41,8 @@ void QGL_Shutdown( qboolean unloadDLL );
 // Vulkan subsystem
 qboolean QVK_Init( void );
 void QVK_Shutdown( qboolean unloadDLL );
+PFN_vkVoidFunction VK_GetInstanceProcAddr( VkInstance instance, const char *name );
+qboolean VK_CreateSurface( VkInstance instance, VkSurfaceKHR *surface );
 
 
 // bk001130 - win32

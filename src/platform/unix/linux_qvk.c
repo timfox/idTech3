@@ -36,6 +36,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../qcommon/qcommon.h"
 #include "../renderers/rendercommon/tr_types.h"
 #include "unix_glw.h"
+#include "linux_local.h"
 #include <dlfcn.h>
 
 
@@ -70,8 +71,18 @@ void QVK_Shutdown( qboolean unloadDLL )
 	qvkCreateXlibSurfaceKHR = NULL;
 }
 
+static PFN_vkGetInstanceProcAddr cast_vk_instance_proc( void *symbol )
+{
+	union {
+		void *obj;
+		PFN_vkGetInstanceProcAddr func;
+	} caster;
 
-void *VK_GetInstanceProcAddr( VkInstance instance, const char *name )
+	caster.obj = symbol;
+	return caster.func;
+}
+
+PFN_vkVoidFunction VK_GetInstanceProcAddr( VkInstance instance, const char *name )
 {
 	return qvkGetInstanceProcAddr( instance, name );
 }
@@ -105,7 +116,8 @@ static void *load_vulkan_library( const char *dllname )
 	lib = Sys_LoadLibrary( dllname );
 	if ( lib )
 	{
-		qvkGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr) Sys_LoadFunction( lib, "vkGetInstanceProcAddr" );
+		void *sym = Sys_LoadFunction( lib, "vkGetInstanceProcAddr" );
+		qvkGetInstanceProcAddr = cast_vk_instance_proc( sym );
 		if ( qvkGetInstanceProcAddr )
 		{
 			return lib;
@@ -129,7 +141,7 @@ qboolean QVK_Init( void )
 	if ( glw_state.VulkanLib == NULL )
 	{
 		const char *dllnames[] = { "libvulkan.so.1", "libvulkan.so" };
-		int i;
+		size_t i;
 
 		for ( i = 0; i < ARRAY_LEN( dllnames ); i++ )
 		{

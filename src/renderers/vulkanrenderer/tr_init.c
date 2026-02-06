@@ -168,6 +168,7 @@ cvar_t	*r_glints_lodBias;
 cvar_t	*r_glints_colored;
 cvar_t	*r_glints_colorCount;
 cvar_t	*r_glints_colorStrength;
+cvar_t	*r_glintsLog;
 #endif
 cvar_t	*r_fbo;
 cvar_t	*r_hdr;
@@ -1808,6 +1809,9 @@ static void R_Register( void )
 	r_glints_colored = ri.Cvar_Get( "r_glints_colored", "0", CVAR_ARCHIVE_ND );
 	r_glints_colorCount = ri.Cvar_Get( "r_glints_colorCount", "4", CVAR_ARCHIVE_ND );
 	r_glints_colorStrength = ri.Cvar_Get( "r_glints_colorStrength", "1", CVAR_ARCHIVE_ND );
+	r_glintsLog = ri.Cvar_Get( "r_glintsLog", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_glintsLog, "0", "3", CV_INTEGER );
+	ri.Cvar_SetDescription( r_glintsLog, "Glints logging level: 0=off, 1=summary, 2=summary+stage list, 3=full trace." );
 	ri.Printf( PRINT_ALL, "[VK] Glints cvars: enabled=%s mode=%i\n",
 		( r_glints && r_glints->integer ) ? "yes" : "no",
 		r_glints_mode ? r_glints_mode->integer : -1 );
