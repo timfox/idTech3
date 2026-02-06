@@ -44,6 +44,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include <dlfcn.h>
 
+void QGL_Shutdown( qboolean unloadDLL );
+void *GL_GetProcAddress( const char *symbol );
+qboolean QGL_Init( const char *dllname );
+
 #define GLE( ret, name, ... ) ret ( APIENTRY * q##name )( __VA_ARGS__ );
 QGL_LinX11_PROCS
 QGL_Swp_PROCS
@@ -175,7 +179,7 @@ qboolean QGL_Init( const char *dllname )
 		caster.obj = GL_GetProcAddress( XSTRING( name ) ); \
 		q##name = caster.func; \
 		if ( !q##name ) { Com_Printf( "Error resolving core X11 functions\n" ); return qfalse; } \
-	} while (0)
+	} while (0);
 	QGL_LinX11_PROCS;
 #undef GLE
 

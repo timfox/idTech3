@@ -908,13 +908,13 @@ void HandleEvents( void )
 
 // NOTE TTimo for the tty console input, we didn't rely on those .. 
 //   it's not very surprising actually cause they are not used otherwise
-static void KBD_Init( void )
+void KBD_Init( void )
 {
 
 }
 
 
-static void KBD_Close( void )
+void KBD_Close( void )
 {
 
 }
@@ -986,7 +986,7 @@ qboolean IN_MouseActive( void )
 IN_Minimize
 ================
 */
-static void IN_Minimize( void )
+void IN_Minimize( void )
 {
 	if ( !CL_VideoRecording() || ( re.CanMinimize && re.CanMinimize() ) )
 	{
@@ -1708,11 +1708,11 @@ void GLimp_InitGamma( glconfig_t *config )
 **   but those don't seem to be fatal .. so the default would be to just ignore them
 **   our implementation mimics the default handler behaviour (not completely cause I'm lazy)
 */
-static int qXErrorHandler( Display *dpy, XErrorEvent *ev )
+static int qXErrorHandler( Display *local_dpy, XErrorEvent *ev )
 {
 	static char buf[1024];
 
-	XGetErrorText( dpy, ev->error_code, buf, sizeof( buf ) );
+	XGetErrorText( local_dpy, ev->error_code, buf, sizeof( buf ) );
 	Com_Printf( "X Error of failed request: %s\n", buf) ;
 	Com_Printf( "  Major opcode of failed request: %d\n", ev->request_code );
 	Com_Printf( "  Minor opcode of failed request: %d\n", ev->minor_code );

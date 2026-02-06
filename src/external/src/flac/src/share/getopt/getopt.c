@@ -565,12 +565,12 @@ share___getopt_internal (
 
 	  if (first_nonopt != last_nonopt && last_nonopt != share__optind)
 	    {
-#if defined(__GNUC__)
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wcast-qual"
 #endif
 	    exchange ((char **) argv);
-#if defined(__GNUC__)
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC diagnostic pop
 #endif
 	    }
@@ -596,12 +596,12 @@ share___getopt_internal (
 
 	  if (first_nonopt != last_nonopt && last_nonopt != share__optind)
 	    {
-#if defined(__GNUC__)
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wcast-qual"
 #endif
 	    exchange ((char **) argv);
-#if defined(__GNUC__)
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC diagnostic pop
 #endif
 	    }

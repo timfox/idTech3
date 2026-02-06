@@ -503,7 +503,7 @@ qboolean RandR_Init( int x, int y, int w, int h )
 {
 	int event_base, error_base;
 	int ver_major = 1, ver_minor = 2;
-	int i;
+	size_t i;
 
 	glw_state.randr_ext = qfalse;
 	glw_state.randr_active = qfalse;
