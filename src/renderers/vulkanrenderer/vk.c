@@ -4510,10 +4510,11 @@ static qboolean vk_glint_params_equal( const glint_dict_params_t *a, const glint
 
 static void vk_destroy_glint_dictionary_cpu( void )
 {
-	if ( vk.glint.dictionary != NULL ) {
+	if ( vk.glint.dictionary != NULL && vk.glint.cpu_allocated ) {
 		ri.Free( vk.glint.dictionary );
-		vk.glint.dictionary = NULL;
+		vk.glint.cpu_allocated = qfalse;
 	}
+	vk.glint.dictionary = NULL;
 	vk.glint.size = 0;
 	vk.glint.valid = qfalse;
 	Com_Memset( &vk.glint.params, 0, sizeof( vk.glint.params ) );
@@ -4550,6 +4551,7 @@ static qboolean vk_build_glint_dictionary( const glint_dict_params_t *params )
 	vk.glint.size = size;
 	vk.glint.params = *params;
 	vk.glint.valid = qtrue;
+	vk.glint.cpu_allocated = qtrue;
 
 	if ( r_glints_verbose && r_glints_verbose->integer > 0 ) {
 		int sampleCount = R_Glints_GetSampleCount( params );

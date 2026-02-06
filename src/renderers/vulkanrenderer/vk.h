@@ -730,6 +730,7 @@ typedef struct {
 		size_t size;
 		glint_dict_params_t params;
 		qboolean valid;
+		qboolean cpu_allocated;
 	} glint;
 
 	uint32_t uniform_item_size;
