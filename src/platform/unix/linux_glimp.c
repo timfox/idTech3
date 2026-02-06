@@ -45,6 +45,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../renderers/openglrenderer/qgl.h"
 #endif
 
+#ifndef __linux_glimp_prototypes__
+extern void KBD_Init( void );
+extern void KBD_Close( void );
+extern void IN_Minimize( void );
+#endif
+
 typedef enum
 {
   RSERR_OK,

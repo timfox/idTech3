@@ -994,7 +994,21 @@ if(USE_GLM)
 endif()
 
 # common function, window system
-IF(UNIX)
+IF(APPLE)
+	SET(EXE_TYPE MACOSX_BUNDLE)
+	SET(Q3_SRCS
+		src/platform/macos/macos_main.mm
+		src/platform/macos/macos_integration.c
+		src/platform/unix/unix_shared.c
+		src/platform/unix/linux_signals.c)
+	list(APPEND Q3_SRCS src/platform/unix/quake3_flat.icns)
+	set_source_files_properties(src/platform/unix/quake3_flat.icns PROPERTIES
+		MACOSX_PACKAGE_LOCATION Resources)
+	SET(MACOSX_BUNDLE_ICON_FILE quake3_flat.icns)
+	SET(Q3_UI_SRCS
+		src/platform/macos/macos_platform.mm)
+	set_source_files_properties(src/platform/macos/macos_main.mm PROPERTIES LANGUAGE OBJCXX)
+ELSEIF(UNIX)
 	SET (Q3_SRCS
 		src/platform/unix/unix_main.c
 		src/platform/unix/unix_shared.c
@@ -1016,14 +1030,6 @@ IF(UNIX)
 		IF(USE_VULKAN)
 			list(APPEND Q3_UI_SRCS src/platform/unix/linux_qvk.c)
 		ENDIF()
-	ENDIF()
-
-	IF(APPLE)
-		SET(EXE_TYPE MACOSX_BUNDLE)
-		list(APPEND Q3_SRCS src/platform/unix/quake3_flat.icns)
-		set_source_files_properties(src/platform/unix/quake3_flat.icns PROPERTIES
-			MACOSX_PACKAGE_LOCATION Resources)
-		SET(MACOSX_BUNDLE_ICON_FILE quake3_flat.icns)
 	ENDIF()
 ELSEIF(WIN32)
 	SET(EXE_TYPE WIN32)
@@ -1090,6 +1096,23 @@ IF(NOT MSVC)
 ENDIF()
 
 target_include_directories(q3ui PRIVATE ${CMAKE_SOURCE_DIR}/src/audio)
+
+if(APPLE)
+	target_link_libraries(q3ui PRIVATE
+		"-framework Cocoa"
+		"-framework Foundation"
+		"-framework Metal"
+		"-framework MetalKit"
+		"-framework QuartzCore"
+		"-framework CoreGraphics"
+		"-framework CoreFoundation"
+		"-framework IOKit"
+	)
+	target_link_libraries(client PRIVATE
+		"-framework Cocoa"
+		"-framework Foundation"
+	)
+endif()
 
 IF(USE_OPENAL)
 	if(NOT OPENAL_FOUND)
