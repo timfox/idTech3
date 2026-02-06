@@ -94,6 +94,8 @@ cvar_t	*r_vbo;
 cvar_t	*r_pbr;
 cvar_t	*r_pbr_shExtract;
 cvar_t	*r_pbr_debug;
+cvar_t	*r_ibl_forceLod;
+cvar_t	*r_pbr_debug_eps;
 cvar_t	*r_pbr_normalSwizzle;
 cvar_t	*r_pbr_forceLight;
 cvar_t	*r_pbr_forceGlints;
@@ -233,6 +235,7 @@ cvar_t	*r_nobind;
 cvar_t	*r_singleShader;
 cvar_t	*r_roundImagesDown;
 cvar_t	*r_colorMipLevels;
+cvar_t	*r_textureMipBias;
 cvar_t	*r_picmip;
 cvar_t	*r_nomip;
 cvar_t	*r_showtris;
@@ -1661,6 +1664,10 @@ static void R_Register( void )
 
 	r_pbr_debug = ri.Cvar_Get( "r_pbr_debug", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_pbr_debug, "0", "23", CV_INTEGER );
+	r_ibl_forceLod = ri.Cvar_Get( "r_ibl_forceLod", "-1", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_ibl_forceLod, "Force the prefiltered env map LOD in debug views (-1 = automatic)." );
+	r_pbr_debug_eps = ri.Cvar_Get( "r_pbr_debug_eps", "0.0001", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_pbr_debug_eps, "Epsilon used by debug modes to classify near-zero radiance." );
 	ri.Cvar_SetDescription( r_pbr_debug,
 		"PBR debug view override (Vulkan PBR only):\n"
 		" 0 - off (normal PBR)\n"
@@ -1679,14 +1686,15 @@ static void R_Register( void )
 		" 13 - show pbrDebug uniforms (R=mode/20, G=normal swizzle, B=forceLight) so shader-side values are reaching GLSL\n"
 		" 14 - show direct diffuse contribution\n"
 		" 15 - show direct specular contribution\n"
-		" 16 - show specular IBL (magenta=IBL compiled out, yellow=IBL bound but sampling near-zero)\n"
-		" 17 - show diffuse IBL (MAGENTA=compiled out, YELLOW=bind/sampler issues)\n"
-		" 18 - show glint contribution (RED=glints disabled/dict invalid, CYAN=glints enabled but zero)\n"
-		" 19 - show glint energy (grayscale)\n"
+		" 16 - show specular IBL contribution (magenta=compiled out yellow=bound but near-zero)\n"
+		" 17 - show diffuse IBL contribution (MAGENTA=compiled out YELLOW=bound but near-zero)\n"
+		" 18 - show glint contribution (RED=glints disabled/invalid, CYAN=enabled but zero)\n"
+		" 19 - show raw env cubemap sample (LOD forced or 0)\n"
 		" 20 - show lightmap sample (texture1)\n"
 		" 21 - show base/albedo texture\n"
 		" 22 - show lightmap-only contribution (PBR debug)\n"
-		" 23 - show albedo-only contribution (PBR debug)\n" );
+		" 23 - show albedo-only contribution (PBR debug)\n"
+		"Adjust r_ibl_forceLod (>=0 forces that LOD) and r_pbr_debug_eps to tune modes 16-19\n" );
 
 	r_pbr_normalSwizzle = ri.Cvar_Get( "r_pbr_normalSwizzle", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_pbr_normalSwizzle, "0", "1", CV_INTEGER );
@@ -1881,6 +1889,10 @@ static void R_Register( void )
 	r_textureMode = ri.Cvar_Get( "r_textureMode", "GL_LINEAR_MIPMAP_NEAREST", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_textureMode, "Texture interpolation mode:\n GL_NEAREST: Nearest neighbor interpolation and will therefore appear similar to Quake II except with the added colored lighting\n GL_LINEAR: Linear interpolation and will appear to blend in objects that are closer than the resolution that the textures are set as\n GL_NEAREST_MIPMAP_NEAREST: Nearest neighbor interpolation with mipmapping for bilinear hardware, mipmapping will blend objects that are farther away than the resolution that they are set as\n GL_LINEAR_MIPMAP_NEAREST: Linear interpolation with mipmapping for bilinear hardware\n GL_NEAREST_MIPMAP_LINEAR: Nearest neighbor interpolation with mipmapping for trilinear hardware\n GL_LINEAR_MIPMAP_LINEAR: Linear interpolation with mipmapping for trilinear hardware" );
 	ri.Cvar_SetGroup( r_textureMode, CVG_RENDERER );
+	r_textureMipBias = ri.Cvar_Get( "r_textureMipBias", "-0.5", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_textureMipBias, "-4", "4", CV_FLOAT );
+	ri.Cvar_SetDescription( r_textureMipBias, "Texture mipmap bias: negative values keep higher resolution mipmaps farther out." );
+	ri.Cvar_SetGroup( r_textureMipBias, CVG_RENDERER );
 	r_gamma = ri.Cvar_Get( "r_gamma", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_gamma, "0.5", "3", CV_FLOAT );
 	ri.Cvar_SetDescription( r_gamma, "Gamma correction factor." );

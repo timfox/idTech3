@@ -59,7 +59,7 @@ void QVK_Shutdown( qboolean unloadDLL )
 
 	if ( glw_state.VulkanLib && unloadDLL )
 	{
-		Com_Printf( "...unloading Vulkan DLL\n" );
+		Com_Printf( "...unloading Vulkan\n" );
 		dlclose( glw_state.VulkanLib );
 		glw_state.VulkanLib = NULL;
 

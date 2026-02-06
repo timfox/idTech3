@@ -206,6 +206,7 @@ typedef struct {
 	int gl_min_filter;		// GL_XXX min filter
 	qboolean max_lod_1_0;	// fixed 1.0 lod
 	qboolean noAnisotropy;
+	float mip_lod_bias;		// LOD bias applied to Vulkan samplers
 } Vk_Sampler_Def;
 
 typedef enum {
@@ -295,6 +296,8 @@ typedef struct vkUniform_s {
 	vec4_t pbrTexIndex1;
 	vec4_t pbrTexIndex2;
 	vec4_t pbrFeatureFlags;
+	vec4_t pbrDebugFlags;
+	vec4_t pbrDebugParams;
 #endif
 } vkUniform_t;
 
@@ -483,10 +486,12 @@ void vk_update_descriptor( int index, VkDescriptorSet descriptor );
 void vk_update_descriptor_offset( int index, uint32_t offset );
 void vk_update_glint_descriptor_binding( VkDescriptorSet descriptor );
 void vk_update_pbr_descriptor_binding( VkDescriptorSet descriptor, uint32_t binding, const image_t *image );
+void vk_update_pbr_descriptor_binding_from_view( VkDescriptorSet descriptor, uint32_t binding, VkImageView view );
 void vk_update_pbr_descriptor_common( VkDescriptorSet descriptor );
 void vk_update_pbr_indexed_common( const image_t *env, const image_t *irr );
 #ifdef USE_VK_PBR
 VkImageView vk_get_glint_dictionary_view( void );
+VkImageView vk_get_scene_cubemap_view( void );
 void vk_update_glint_dictionary_if_needed( const glint_dict_params_t *params, qboolean force );
 #endif
 void vk_bind_descriptor_sets( void );

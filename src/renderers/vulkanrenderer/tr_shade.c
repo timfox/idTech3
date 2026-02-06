@@ -1861,6 +1861,28 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 					hasIrr = qtrue;
 			}
 
+			static int lastLoggedCubemapIndex = -2;
+			static int lastLoggedNumCubemaps = -1;
+			static qboolean lastLoggedHasEnv = qfalse;
+			static qboolean lastLoggedHasIrr = qfalse;
+
+			if ( cubemapIndex != lastLoggedCubemapIndex ||
+				 tr.numCubemaps != lastLoggedNumCubemaps ||
+				 hasEnv != lastLoggedHasEnv ||
+				 hasIrr != lastLoggedHasIrr )
+			{
+				ri.Printf( PRINT_ALL,
+					"PBR IBL state: numCubemaps=%d index=%d hasEnv=%d hasIrr=%d\n",
+					tr.numCubemaps,
+					cubemapIndex,
+					hasEnv ? 1 : 0,
+					hasIrr ? 1 : 0 );
+				lastLoggedCubemapIndex = cubemapIndex;
+				lastLoggedNumCubemaps = tr.numCubemaps;
+				lastLoggedHasEnv = hasEnv;
+				lastLoggedHasIrr = hasIrr;
+			}
+
 			if ( useIndexing ) {
 				vk_update_pbr_indexed_common( envImage, irrImage );
 				Vector4Set( block.texIndex0,
@@ -1882,6 +1904,16 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				if ( pbrDescriptor != VK_NULL_HANDLE ) {
 					vk_update_pbr_descriptor_binding( pbrDescriptor, VK_PBR_BINDING_ENV_CUBEMAP, envImage );
 					vk_update_pbr_descriptor_binding( pbrDescriptor, VK_PBR_BINDING_IRRADIANCE, irrImage );
+#ifdef VK_CUBEMAP
+					if ( cubemapIndex < 0 ) {
+						VkImageView sceneView = vk_get_scene_cubemap_view();
+						if ( sceneView != VK_NULL_HANDLE ) {
+							vk_update_pbr_descriptor_binding_from_view( pbrDescriptor, VK_PBR_BINDING_ENV_CUBEMAP, sceneView );
+							vk_update_pbr_descriptor_binding_from_view( pbrDescriptor, VK_PBR_BINDING_IRRADIANCE, sceneView );
+							hasEnv = hasIrr = qtrue;
+						}
+					}
+#endif
 				}
 				Vector4Set( block.texIndex0, 0.0f, 0.0f, 0.0f, 0.0f );
 				Vector4Set( block.texIndex1, 0.0f, 0.0f, 0.0f, 0.0f );
@@ -1893,6 +1925,17 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				hasIrr ? 1.0f : 0.0f,
 				hasLightmap ? 1.0f : 0.0f,
 				glintDictView != VK_NULL_HANDLE ? 1.0f : 0.0f );
+
+			const float iblCompiledFlag = ( envImage != NULL && irrImage != NULL ) ? 1.0f : 0.0f;
+			const float hasEnvFlag = hasEnv ? 1.0f : 0.0f;
+			const float hasIrrFlag = hasIrr ? 1.0f : 0.0f;
+			const float dictValidFlag = ( glintDictView != VK_NULL_HANDLE && vk.glint.valid && vk.glint.size > 0 ) ? 1.0f : 0.0f;
+			const float debugForceLod = r_ibl_forceLod ? (float)r_ibl_forceLod->integer : -1.0f;
+			const float debugEps = r_pbr_debug_eps ? r_pbr_debug_eps->value : 1e-4f;
+			const float glintsEnabledFlag = ( r_glints && r_glints->integer > 0 ) ? 1.0f : 0.0f;
+
+			Vector4Set( uniform.pbrDebugFlags, iblCompiledFlag, hasEnvFlag, hasIrrFlag, dictValidFlag );
+			Vector4Set( uniform.pbrDebugParams, debugForceLod, debugEps, glintsEnabledFlag, 0.0f );
 
 			// Only push uniforms when the PBR block has actually changed for this command buffer.
 			if ( vk.cmd && vk.cmd->command_buffer != lastCmdBuf ) {
@@ -2114,6 +2157,24 @@ static void VK_SetGlintParams( vkUniform_t *ubo )
 	ubo->glintCore[1] = r_glints_mode->value;
 	ubo->glintCore[2] = r_glints_debug->value;
 	ubo->glintCore[3] = r_glints_seed->value;
+
+	static qboolean lastGlintValid = qfalse;
+	static size_t lastGlintSize = 0;
+	static VkImageView lastGlintView = VK_NULL_HANDLE;
+	const VkImageView currentGlintView = vk_get_glint_dictionary_view();
+
+	if ( vk.glint.valid != lastGlintValid || vk.glint.size != lastGlintSize || currentGlintView != lastGlintView ) {
+		lastGlintValid = vk.glint.valid;
+		lastGlintSize = vk.glint.size;
+		lastGlintView = currentGlintView;
+		ri.Printf( PRINT_ALL,
+			"PBR glints: r_glints=%d valid=%d dict=%p size=%zu view=%p\n",
+			r_glints->integer,
+			vk.glint.valid ? 1 : 0,
+			(void *)(uintptr_t)vk.glint.dictionary,
+			vk.glint.size,
+			(void *)(uintptr_t)currentGlintView );
+	}
 
 	ubo->glintMaterial[0] = r_glints_strength->value;
 	ubo->glintMaterial[1] = r_glints_minRoughness->value;

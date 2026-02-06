@@ -2795,6 +2795,7 @@ static VkSampler vk_find_sampler( const Vk_Sampler_Def *def ) {
 	desc.magFilter = mag_filter;
 	desc.minFilter = min_filter;
 	desc.mipmapMode = mipmap_mode;
+	desc.mipLodBias = def->mip_lod_bias;
 	desc.addressModeU = address_mode;
 	desc.addressModeV = address_mode;
 	desc.addressModeW = address_mode;
@@ -2856,6 +2857,7 @@ void vk_update_attachment_descriptors( void ) {
 		sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 		sd.max_lod_1_0 = qtrue;
 		sd.noAnisotropy = qtrue;
+		sd.mip_lod_bias = 0.0f;
 
 		info.sampler = vk_find_sampler( &sd );
 		info.imageView = vk.color_image_view;
@@ -4528,11 +4530,14 @@ static qboolean vk_build_glint_dictionary( const glint_dict_params_t *params )
 	int buildMs;
 
 	if ( !params ) {
+		ri.Printf( PRINT_WARNING, "glint dictionary rebuild failed: params == NULL\n" );
 		return qfalse;
 	}
 
 	size = R_Glints_CalcDictionarySize( params );
 	if ( size == 0 ) {
+		ri.Printf( PRINT_WARNING, "glint dictionary rebuild failed: zero-size dictionary entries=%d levels=%d size=%d\n",
+			params->entries, params->levels, params->size );
 		return qfalse;
 	}
 
@@ -6579,10 +6584,12 @@ void vk_update_descriptor_set( image_t *image, qboolean mipmap ) {
 	Vk_Sampler_Def sampler_def;
 	VkDescriptorImageInfo image_info;
 	VkWriteDescriptorSet descriptor_write;
+	float bias = r_textureMipBias ? r_textureMipBias->value : 0.0f;
 
 	Com_Memset( &sampler_def, 0, sizeof( sampler_def ) );
 
 	sampler_def.address_mode = image->wrapClampMode;
+	sampler_def.mip_lod_bias = bias;
 
 	if ( mipmap ) {
 		sampler_def.gl_mag_filter = gl_filter_max;
@@ -6642,9 +6649,11 @@ static void vk_fill_pbr_image_info( const image_t *image, VkDescriptorImageInfo 
 {
 	Vk_Sampler_Def sampler_def;
 	const image_t *img = image ? image : tr.whiteImage;
+	float bias = r_textureMipBias ? r_textureMipBias->value : 0.0f;
 
 	Com_Memset( &sampler_def, 0, sizeof( sampler_def ) );
 	sampler_def.address_mode = img->wrapClampMode;
+	sampler_def.mip_lod_bias = bias;
 	if ( img->flags & IMGFLAG_MIPMAP ) {
 		sampler_def.gl_mag_filter = gl_filter_max;
 		sampler_def.gl_min_filter = gl_filter_min;
@@ -6673,13 +6682,56 @@ static void vk_fill_pbr_brdflut_info( VkDescriptorImageInfo *info )
 	sampler_def.gl_mag_filter = GL_LINEAR;
 	sampler_def.gl_min_filter = GL_LINEAR;
 	sampler_def.noAnisotropy = qtrue;
+	sampler_def.mip_lod_bias = 0.0f;
 
 	info->sampler = vk_find_sampler( &sampler_def );
 	info->imageView = view;
 	info->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 }
 
-#ifdef USE_VK_PBR
+void vk_update_pbr_descriptor_binding_from_view( VkDescriptorSet descriptor, uint32_t binding, VkImageView view )
+{
+	Vk_Sampler_Def sampler_def;
+	VkDescriptorImageInfo image_info;
+	VkWriteDescriptorSet descriptor_write;
+
+	if ( descriptor == VK_NULL_HANDLE || view == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	Com_Memset( &sampler_def, 0, sizeof( sampler_def ) );
+	sampler_def.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	sampler_def.gl_mag_filter = GL_LINEAR;
+	sampler_def.gl_min_filter = GL_LINEAR;
+	sampler_def.noAnisotropy = qtrue;
+	sampler_def.mip_lod_bias = 0.0f;
+
+	image_info.sampler = vk_find_sampler( &sampler_def );
+	image_info.imageView = view;
+	image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptor_write.dstSet = descriptor;
+	descriptor_write.dstBinding = binding;
+	descriptor_write.dstArrayElement = 0;
+	descriptor_write.descriptorCount = 1;
+	descriptor_write.pNext = NULL;
+	descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descriptor_write.pImageInfo = &image_info;
+	descriptor_write.pBufferInfo = NULL;
+	descriptor_write.pTexelBufferView = NULL;
+
+	qvkUpdateDescriptorSets( vk.device, 1, &descriptor_write, 0, NULL );
+}
+
+VkImageView vk_get_scene_cubemap_view( void )
+{
+#ifdef VK_CUBEMAP
+	return vk.cubeMap.color_image_view[0];
+#else
+	return VK_NULL_HANDLE;
+#endif
+}
 static void vk_update_pbr_indexed_glint( VkDescriptorSet descriptor )
 {
 	VkDescriptorImageInfo image_info;
@@ -6954,7 +7006,6 @@ void vk_update_pbr_indexed_common( const image_t *env, const image_t *irr )
 
 	vk_update_pbr_indexed_common_descriptor( descriptor, env, irr );
 }
-#endif
 
 VkImageView vk_get_glint_dictionary_view( void ) {
 	return vk_glint_dictionary_image.view;
@@ -6996,6 +7047,7 @@ void vk_update_glint_descriptor_binding( VkDescriptorSet descriptor ) {
 	sampler_def.gl_mag_filter = GL_LINEAR;
 	sampler_def.gl_min_filter = GL_LINEAR;
 	sampler_def.noAnisotropy = qtrue;
+	sampler_def.mip_lod_bias = 0.0f;
 
 	image_info.sampler = vk_find_sampler( &sampler_def );
 	image_info.imageView = image_view;

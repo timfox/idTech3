@@ -2828,9 +2828,10 @@ void RE_LoadWorldMap( const char *name ) {
 
 #ifdef VK_CUBEMAP
 	// Render all cubemaps
-	if ( vk.cubemapActive && tr.numCubemaps )
+	if ( vk.cubemapActive && tr.numCubemaps ) {
+		ri.Printf( PRINT_ALL, "PBR IBL: %d cubemap(s) available for convolution\n", tr.numCubemaps );
 		R_RenderAllCubemaps();
-	else if ( vk.cubemapActive && vk.pbrActive && !tr.numCubemaps ) {
+	} else if ( vk.cubemapActive && vk.pbrActive && !tr.numCubemaps ) {
 		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "PBR IBL: no cubemaps found (env.json or cubemap entities). Reflections will look generic.\n" S_COLOR_WHITE );
 	}
 #endif

@@ -4,6 +4,42 @@
 #extension GL_EXT_nonuniform_qualifier : enable
 #endif
 
+#ifdef USE_VK_PBR
+const vec3 DBG_MAGENTA = vec3(1.0, 0.0, 1.0);
+const vec3 DBG_YELLOW  = vec3(1.0, 1.0, 0.0);
+const vec3 DBG_RED     = vec3(1.0, 0.0, 0.0);
+const vec3 DBG_CYAN    = vec3(0.0, 1.0, 1.0);
+
+float dbg_len( vec3 v ) {
+	vec3 abs_v = abs( v );
+	return max( max( abs_v.r, abs_v.g ), abs_v.b );
+}
+
+float get_debug_lod( float roughness, float forcedLod ) {
+	return forcedLod >= 0.0 ? forcedLod : roughness * 6.0;
+}
+
+vec3 dbg_classify_ibl( vec3 value, bool compiled, bool bound, float eps ) {
+	if ( !compiled ) {
+		return DBG_MAGENTA;
+	}
+	if ( bound && dbg_len( value ) < eps ) {
+		return DBG_YELLOW;
+	}
+	return value;
+}
+
+vec3 dbg_classify_glints( vec3 value, bool enabled, bool dictValid, float eps ) {
+	if ( !enabled || !dictValid ) {
+		return DBG_RED;
+	}
+	if ( dbg_len( value ) < eps ) {
+		return DBG_CYAN;
+	}
+	return value;
+}
+#endif
+
 #ifdef USE_TX2
 #define USE_TX1
 #endif
@@ -61,6 +97,8 @@ layout(set = 0, binding = 0) uniform UBO {
 	vec4 pbrTexIndex2;
 #endif
 	vec4 pbrFeatureFlags;
+	vec4 pbrDebugFlags;
+	vec4 pbrDebugParams;
 #endif
 //#endif
 };
@@ -651,12 +689,13 @@ float CalcSpecularAO( in float ao, in float roughness, in float NE )
 
 
 vec3 CalcIBLContribution( in float roughness, in vec3 N, in vec3 E,
-	in float NE, in vec3 specular )
+	in float NE, in vec3 specular, in float forcedLod )
 {
 	vec3 R = reflect(-E, N);
 	R.y *= -1.0f;
+	float lod = get_debug_lod( roughness, forcedLod );
 	
-	vec3 cubeLightColor = textureLod(env_texture, R, roughness * 6).rgb * 1.0;
+	vec3 cubeLightColor = textureLod(env_texture, R, lod).rgb * 1.0;
 	vec2 EnvBRDF = texture(brdflut_texture, vec2(NE, 1.0 - roughness)).rg;
 
 	return cubeLightColor * (specular.rgb * EnvBRDF.x + EnvBRDF.y);
@@ -1278,12 +1317,17 @@ void main() {
 	const bool hasEnv = pbrFeatureFlags.x > 0.5;
 	const bool hasIrr = pbrFeatureFlags.y > 0.5;
 	const bool hasGlintDict = pbrFeatureFlags.w > 0.5;
-	const bool iblCompiled = env_texture_set >= 0 && irradiance_texture_set >= 0;
 	const bool needsFallbackLight = ( !hasLightmap && !hasEnv && !hasIrr );
 
-	const bool allowGlints = forceGlintsDebug || glintCore.x > 0.5 || pbrDebug.w > 0.5;
-	const bool glintAvailable = hasGlintDict && allowGlints;
+const bool allowGlints = forceGlintsDebug || glintCore.x > 0.5 || pbrDebug.w > 0.5;
+const bool glintAvailable = hasGlintDict && allowGlints;
 	bool glintEnabled = glintAvailable;
+const bool iblCompiledDebug = pbrDebugFlags.x > 0.5;
+const bool hasEnvDebug = pbrDebugFlags.y > 0.5;
+const bool hasIrrDebug = pbrDebugFlags.z > 0.5;
+const bool dictValidDebug = pbrDebugFlags.w > 0.5;
+const float debugEps = max( pbrDebugParams.y, 1e-6 );
+const bool glintsEnabledDebug = ( pbrDebugParams.z > 0.5 );
 
 #ifdef USE_VK_PBR
 	if ( glintEnabled )
@@ -1359,7 +1403,7 @@ void main() {
 	const bool hasIBL = hasEnv && hasIrr;
 	if ( hasIBL )
 	{
-		vec3 specIBL = CalcIBLContribution( roughness, N, E, NE, specular.rgb * clearcoatDim * specAO );
+			vec3 specIBL = CalcIBLContribution( roughness, N, E, NE, specular.rgb * clearcoatDim * specAO, pbrDebugParams.x );
 		out_color.rgb += specIBL;
 		dbgBaseSpec += specIBL;
 	}
@@ -1424,7 +1468,6 @@ void main() {
 	
 	out_color.rgb += emissive;
 
-	const float diagThreshold = 1e-4;
 	if ( pbrDebugView == 5 )
 	{
 		out_color.rgb = vec3( AO );
@@ -1499,65 +1542,28 @@ void main() {
 	}
 	else if ( pbrDebugView == 16 )
 	{
-		if ( !iblCompiled )
-		{
-			out_color.rgb = vec3( 1.0, 0.0, 1.0 ); // MAGENTA: IBL compiled out
-		}
-		else
-		{
-			vec3 specIBL = CalcIBLContribution( roughness, N, E, NE, specular.rgb * clearcoatDim * specAO );
-			if ( length( specIBL ) < diagThreshold )
-			{
-				out_color.rgb = vec3( 1.0, 1.0, 0.0 ); // YELLOW: IBL on but sampling near-zero
-			}
-			else
-			{
-				out_color.rgb = specIBL;
-			}
-		}
+		vec3 specIBL = CalcIBLContribution( roughness, N, E, NE, specular.rgb * clearcoatDim * specAO, pbrDebugParams.x );
+		out_color.rgb = dbg_classify_ibl( specIBL, iblCompiledDebug, hasEnvDebug, debugEps );
 		out_color.a = 1.0;
 	}
 	else if ( pbrDebugView == 17 )
 	{
-		if ( !iblCompiled )
-		{
-			out_color.rgb = vec3( 1.0, 0.0, 1.0 ); // MAGENTA: IBL compiled out
-		}
-		else
-		{
-			vec3 diffIBL = CalcDiffuseIrradiance( N ) * diffuseColor * AO;
-			if ( length( diffIBL ) < diagThreshold )
-			{
-				out_color.rgb = vec3( 1.0, 1.0, 0.0 ); // YELLOW: IBL on but sampling near-zero
-			}
-			else
-			{
-				out_color.rgb = diffIBL;
-			}
-		}
+		vec3 diffIBL = CalcDiffuseIrradiance( N ) * diffuseColor * AO;
+		out_color.rgb = dbg_classify_ibl( diffIBL, iblCompiledDebug, hasIrrDebug, debugEps );
 		out_color.a = 1.0;
 	}
 	else if ( pbrDebugView == 18 )
 	{
-		const bool glintsDisabled = !glintAvailable;
-		if ( glintsDisabled )
-		{
-			out_color.rgb = vec3( 1.0, 0.0, 0.0 ); // RED: glints disabled or dict invalid
-		}
-		else if ( length( dbgGlint ) < diagThreshold )
-		{
-			out_color.rgb = vec3( 0.0, 1.0, 1.0 ); // CYAN: glints enabled but near-zero output
-		}
-		else
-		{
-			out_color.rgb = dbgGlint;
-		}
+		out_color.rgb = dbg_classify_glints( dbgGlint, glintsEnabledDebug, dictValidDebug, debugEps );
 		out_color.a = 1.0;
 	}
 	else if ( pbrDebugView == 19 )
 	{
-		float glintEnergy = clamp( length( dbgGlint ), 0.0, 1.0 );
-		out_color.rgb = vec3( glintEnergy );
+		vec3 R = reflect( -E, N );
+		R.y *= -1.0;
+		float rawLod = max( pbrDebugParams.x, 0.0 );
+		vec3 rawEnv = textureLod( env_texture, R, rawLod ).rgb;
+		out_color.rgb = dbg_classify_ibl( rawEnv, iblCompiledDebug, hasEnvDebug, debugEps );
 		out_color.a = 1.0;
 	}
 	else if ( pbrDebugView == 20 )

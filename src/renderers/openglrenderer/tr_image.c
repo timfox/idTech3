@@ -82,6 +82,7 @@ void GL_TextureMode( const char *string ) {
 	const textureMode_t *mode;
 	image_t	*img;
 	int		i;
+	float	bias = r_textureMipBias ? r_textureMipBias->value : 0.0f;
 	
 	mode = NULL;
 	for ( i = 0 ; i < (int)ARRAY_LEN( modes ) ; i++ ) {
@@ -114,6 +115,7 @@ void GL_TextureMode( const char *string ) {
 			GL_Bind( img );
 			qglTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, gl_filter_min );
 			qglTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, gl_filter_max );
+			glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_LOD_BIAS, bias );
 		}
 	}
 }
@@ -845,6 +847,7 @@ image_t *R_CreateImage( const char *name, const char *name2, byte *pic, int widt
 
 	GL_Bind( image );
 	Upload32( pic, 0, 0, image->width, image->height, image, qfalse ); // subImage = qfalse
+	float bias = r_textureMipBias ? r_textureMipBias->value : 0.0f;
 
 	if ( image->flags & IMGFLAG_MIPMAP )
 	{
@@ -866,6 +869,7 @@ image_t *R_CreateImage( const char *name, const char *name2, byte *pic, int widt
 
 	qglTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, glWrapClampMode );
 	qglTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, glWrapClampMode );
+	glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_LOD_BIAS, bias );
 
 	// restore original state
 	GL_SelectTexture( currTMU );

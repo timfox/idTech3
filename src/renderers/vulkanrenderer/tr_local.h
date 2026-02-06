@@ -1445,6 +1445,8 @@ extern cvar_t	*r_vbo;
 extern cvar_t	*r_pbr;
 extern cvar_t	*r_pbr_shExtract;
 extern cvar_t	*r_pbr_debug;
+extern cvar_t	*r_ibl_forceLod;
+extern cvar_t	*r_pbr_debug_eps;
 extern cvar_t	*r_pbr_normalSwizzle;
 extern cvar_t	*r_pbr_forceLight;
 extern cvar_t	*r_pbr_forceGlints;
@@ -1565,6 +1567,7 @@ extern	cvar_t	*r_nobind;						// turns off binding to appropriate textures
 extern	cvar_t	*r_singleShader;				// make most world faces use default shader
 extern	cvar_t	*r_roundImagesDown;
 extern	cvar_t	*r_colorMipLevels;				// development aid to see texture mip usage
+extern	cvar_t	*r_textureMipBias;				// bias to push mipmap transitions farther out
 extern	cvar_t	*r_picmip;						// controls picmip values
 extern	cvar_t	*r_nomip;						// apply picmip only on worldspawn textures
 extern	cvar_t	*r_finish;
