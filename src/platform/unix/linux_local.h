@@ -22,8 +22,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef __LINUX_LOCAL_H__
 #define __LINUX_LOCAL_H__
 
-#include "../renderers/rendercommon/vulkan/vulkan.h"
-#include "../renderers/rendercommon/tr_types.h"
+#include "../../renderers/rendercommon/vulkan/vulkan.h"
+#include "../../renderers/rendercommon/tr_types.h"
 
 // Input subsystem
 

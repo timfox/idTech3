@@ -36,13 +36,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../qcommon/qcommon.h"
 #include "../renderers/rendercommon/tr_types.h"
 #include "unix_glw.h"
-#include "linux_local.h"
-#include <dlfcn.h>
-
 
 #define VK_USE_PLATFORM_XLIB_KHR
 //#define VK_USE_PLATFORM_XLIB_XRANDR_EXT
-#include "../renderers/rendercommon/vulkan/vulkan.h"
+#include "linux_local.h"
+#include <dlfcn.h>
 
 static PFN_vkGetInstanceProcAddr qvkGetInstanceProcAddr;
 static PFN_vkCreateXlibSurfaceKHR qvkCreateXlibSurfaceKHR;
