@@ -817,9 +817,21 @@ static void Con_DrawSolidConsole( float frac ) {
 
 	//y = yf;
 
-	// draw the version number
-	SCR_DrawSmallString( cls.glconfig.vidWidth - ( ARRAY_LEN( Q3_VERSION ) ) * smallchar_width,
-		lines - smallchar_height, Q3_VERSION, ARRAY_LEN( Q3_VERSION ) - 1 );
+	// draw the version or game title on the right
+	{
+		const char *consoleBrand = cl_title[0] ? cl_title : Q3_VERSION;
+		int brandLen = (int)strlen( consoleBrand );
+		int brandWidth = brandLen * smallchar_width;
+		int brandX = cls.glconfig.vidWidth - brandWidth;
+
+		if ( brandX < 0 ) {
+			brandX = 0;
+		}
+
+		if ( brandLen > 0 ) {
+			SCR_DrawSmallString( brandX, lines - smallchar_height, consoleBrand, brandLen );
+		}
+	}
 
 	// draw the text
 	con.vislines = lines;
