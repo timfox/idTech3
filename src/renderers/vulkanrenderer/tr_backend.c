@@ -1813,7 +1813,8 @@ static const void *RB_PrefilterEnvMap( const void *data )
 	if ( tess.numIndexes )
 		RB_EndSurface();
 	RB_SetGL2D();
-	Com_Printf("prefilter cubemapsss %s\n", cmd->cubemap->name);
+	ri.Printf( PRINT_ALL, "RB_PrefilterEnvMap: cubemap '%s' (ptr=%p)\n",
+		cmd->cubemap->name, (const void *)cmd->cubemap );
 	if ( !cmd->cubemap->prefiltered_image )
 		cmd->cubemap->prefiltered_image = R_CreateImage( 
 			va("cubemap prefitlered - %s", cmd->cubemap->name ), NULL,  
@@ -1831,7 +1832,28 @@ static const void *RB_PrefilterEnvMap( const void *data )
 	assert( cmd->cubemap->irradiance_image );
 	assert( cmd->cubemap->prefiltered_image );
 #endif
+	ri.Printf( PRINT_ALL, "RB_PrefilterEnvMap: prefiltered=%p irradiance=%p -> calling vk_generate_cubemaps\n",
+		(const void *)cmd->cubemap->prefiltered_image,
+		(const void *)cmd->cubemap->irradiance_image );
 	vk_generate_cubemaps( cmd->cubemap );
+	vk_wait_idle();
+	const image_t *preImg = cmd->cubemap->prefiltered_image;
+	const image_t *irrImg = cmd->cubemap->irradiance_image;
+	const VkImageView preView = preImg ? preImg->view : VK_NULL_HANDLE;
+	const VkImageView irrView = irrImg ? irrImg->view : VK_NULL_HANDLE;
+	ri.Printf( PRINT_ALL,
+		"PBR IBL post: idx=%d preImg=%p preView=%p irrImg=%p irrView=%p\n",
+		cmd->cubemapId,
+		(const void *)preImg,
+		(const void *)(uintptr_t)preView,
+		(const void *)irrImg,
+		(const void *)(uintptr_t)irrView );
+	if ( preView == VK_NULL_HANDLE || irrView == VK_NULL_HANDLE ) {
+		ri.Printf( PRINT_ERROR, "PBR IBL: cubemap '%s' views not ready after prefilter\n", cmd->cubemap->name );
+		cmd->cubemap->state = CUBEMAP_STATE_HAVE_DEFS_NOT_RENDERED;
+	} else {
+		cmd->cubemap->state = CUBEMAP_STATE_READY;
+	}
 	return (const void *)(cmd + 1);
 }
 #endif

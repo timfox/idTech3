@@ -2405,6 +2405,12 @@ qboolean RE_GetEntityToken( char *buffer, int size ) {
 #define MAX_SPAWN_VARS 64
 #endif
 
+static inline void R_SetCubemapState( cubemap_t *cube, cubemap_state_t state ) {
+	if ( cube ) {
+		cube->state = state;
+	}
+}
+
 // derived from G_ParseSpawnVars() in g_spawn.c
 static qboolean R_ParseSpawnVars( char *spawnVarChars, int maxSpawnVarChars, int *numSpawnVars, char *spawnVars[MAX_SPAWN_VARS][2] )
 {
@@ -2541,6 +2547,7 @@ static void R_LoadEnvironmentJson( const char *baseName )
 				cubemap->hasSHCoeffs = qtrue;
 			}
 		}
+		R_SetCubemapState( cubemap, CUBEMAP_STATE_HAVE_DEFS_NOT_RENDERED );
 	}
 	ri.FS_FreeFile(buffer.v);
 }
@@ -2606,10 +2613,83 @@ static void R_LoadCubemapEntities( int index )
 			Q_strncpyz( cubemap->name, name, MAX_QPATH );
 			VectorCopy( origin, cubemap->origin );
 			cubemap->parallaxRadius = parallaxRadius;
+			R_SetCubemapState( cubemap, CUBEMAP_STATE_HAVE_DEFS_NOT_RENDERED );
 			numCubemaps++;
 		}
 	}
 }
+
+#ifdef VK_CUBEMAP
+static void R_CreateFallbackCubemap( void ) {
+	if ( tr.numCubemaps || !s_worldData.bmodels ) {
+		return;
+	}
+
+	const char *baseName = s_worldData.baseName[0] ? s_worldData.baseName : "world";
+	tr.cubemaps = (cubemap_t *)ri.Hunk_Alloc( sizeof( *tr.cubemaps ), h_low );
+	if ( !tr.cubemaps ) {
+		ri.Printf( PRINT_WARNING, "PBR IBL: Hunk_Alloc failed for fallback cubemap\n" );
+		return;
+	}
+	tr.numCubemaps = 1;
+	cubemap_t *cubemap = &tr.cubemaps[0];
+	Com_Memset( cubemap, 0, sizeof( *cubemap ) );
+
+	vec3_t mins, maxs, diag;
+	VectorCopy( s_worldData.bmodels[0].bounds[0], mins );
+	VectorCopy( s_worldData.bmodels[0].bounds[1], maxs );
+	VectorAdd( mins, maxs, cubemap->origin );
+	VectorScale( cubemap->origin, 0.5f, cubemap->origin );
+
+	VectorSubtract( maxs, mins, diag );
+	float radius = 0.5f * VectorLength( diag );
+	if ( radius <= 0.0f ) {
+		radius = 1024.0f;
+	}
+	cubemap->parallaxRadius = radius;
+
+	Q_strncpyz( cubemap->name, va( "%s-fallback", baseName ), sizeof( cubemap->name ) );
+	R_SetCubemapState( cubemap, CUBEMAP_STATE_HAVE_DEFS_NOT_RENDERED );
+	ri.Printf( PRINT_ALL, "PBR IBL: created fallback cubemap '%s' at (%.0f %.0f %.0f) radius %.0f\n",
+		cubemap->name, cubemap->origin[0], cubemap->origin[1], cubemap->origin[2], cubemap->parallaxRadius );
+}
+#endif
+
+#ifdef VK_CUBEMAP
+static void R_CreateForcedCubemap( void )
+{
+	if ( !vk.cubemapActive || !r_ibl_forceCapture || !r_ibl_forceCapture->integer || !s_worldData.bmodels ) {
+		return;
+	}
+
+	const char *baseName = s_worldData.baseName[0] ? s_worldData.baseName : "world";
+	tr.cubemaps = (cubemap_t *)ri.Hunk_Alloc( sizeof( *tr.cubemaps ), h_low );
+	if ( !tr.cubemaps ) {
+		ri.Printf( PRINT_WARNING, "PBR IBL: Hunk_Alloc failed for forced cubemap\n" );
+		return;
+	}
+
+	tr.numCubemaps = 1;
+	cubemap_t *cubemap = &tr.cubemaps[0];
+	Com_Memset( cubemap, 0, sizeof( *cubemap ) );
+
+	vec3_t mins, maxs, diag;
+	VectorCopy( s_worldData.bmodels[0].bounds[0], mins );
+	VectorCopy( s_worldData.bmodels[0].bounds[1], maxs );
+	VectorAdd( mins, maxs, cubemap->origin );
+	VectorScale( cubemap->origin, 0.5f, cubemap->origin );
+	VectorSubtract( maxs, mins, diag );
+	float radius = 0.5f * VectorLength( diag );
+	if ( radius <= 0.0f ) {
+		radius = 1024.0f;
+	}
+	cubemap->parallaxRadius = radius;
+	Q_strncpyz( cubemap->name, va( "%s-forced", baseName ), sizeof( cubemap->name ) );
+	R_SetCubemapState( cubemap, CUBEMAP_STATE_HAVE_DEFS_NOT_RENDERED );
+	ri.Printf( PRINT_ALL, "PBR IBL: forced capture cubemap '%s' at (%.0f %.0f %.0f) radius %.0f\n",
+		cubemap->name, cubemap->origin[0], cubemap->origin[1], cubemap->origin[2], cubemap->parallaxRadius );
+}
+#endif
 
 static void R_RenderCubemapSide( int cubemapIndex, int cubemapSide, qboolean subscene, qboolean bounce )
 {
@@ -2794,19 +2874,27 @@ void RE_LoadWorldMap( const char *name ) {
 #ifdef USE_VK_PBR
 	vk_generate_light_directions();
 
-	#ifdef VK_CUBEMAP
+#ifdef VK_CUBEMAP
 			// load cubemaps
 			if ( vk.cubemapActive )
 			{
-				// Try loading an env.json file first
-				R_LoadEnvironmentJson( s_worldData.baseName );
+				if ( r_ibl_forceCapture && r_ibl_forceCapture->integer ) {
+					R_CreateForcedCubemap();
+				} else {
+					// Try loading an env.json file first
+					R_LoadEnvironmentJson( s_worldData.baseName );
 
-				if ( !tr.numCubemaps ) {
-					for ( int entityIndex = 0; entityIndex < (int)ARRAY_LEN(cubemapEntities); entityIndex++ )
-					{
-						R_LoadCubemapEntities( entityIndex );
-						if ( tr.numCubemaps )
-							break;
+					if ( !tr.numCubemaps ) {
+						for ( int entityIndex = 0; entityIndex < (int)ARRAY_LEN(cubemapEntities); entityIndex++ )
+						{
+							R_LoadCubemapEntities( entityIndex );
+							if ( tr.numCubemaps )
+								break;
+						}
+					}
+
+					if ( !tr.numCubemaps ) {
+						R_CreateFallbackCubemap();
 					}
 				}
 			}
@@ -2823,6 +2911,7 @@ void RE_LoadWorldMap( const char *name ) {
 
 	// only set tr.world now that we know the entire level has loaded properly
 	tr.world = &s_worldData;
+	tr_pbr_bindLogPrinted = qfalse;
 
 	ri.FS_FreeFile( buffer.v );
 
@@ -2831,8 +2920,38 @@ void RE_LoadWorldMap( const char *name ) {
 	if ( vk.cubemapActive && tr.numCubemaps ) {
 		ri.Printf( PRINT_ALL, "PBR IBL: %d cubemap(s) available for convolution\n", tr.numCubemaps );
 		R_RenderAllCubemaps();
+
+		// Post-convolution validation
+		for ( int ci = 0; ci < tr.numCubemaps; ci++ ) {
+			const cubemap_t *cm = &tr.cubemaps[ci];
+		ri.Printf( PRINT_ALL,
+			"PBR IBL: cubemap[%d] '%s' post-convolution state=%d: prefiltered=%p irradiance=%p hasSH=%d\n",
+			ci, cm->name,
+			(int)cm->state,
+			(const void *)cm->prefiltered_image,
+			(const void *)cm->irradiance_image,
+			cm->hasSHCoeffs ? 1 : 0 );
+			if ( cm->prefiltered_image ) {
+				ri.Printf( PRINT_ALL,
+					"  prefiltered: handle=%p view=%p %dx%d\n",
+					(const void *)(uintptr_t)cm->prefiltered_image->handle,
+					(const void *)(uintptr_t)cm->prefiltered_image->view,
+					cm->prefiltered_image->uploadWidth,
+					cm->prefiltered_image->uploadHeight );
+			}
+			if ( cm->irradiance_image ) {
+				ri.Printf( PRINT_ALL,
+					"  irradiance:  handle=%p view=%p %dx%d\n",
+					(const void *)(uintptr_t)cm->irradiance_image->handle,
+					(const void *)(uintptr_t)cm->irradiance_image->view,
+					cm->irradiance_image->uploadWidth,
+					cm->irradiance_image->uploadHeight );
+			}
+		}
 	} else if ( vk.cubemapActive && vk.pbrActive && !tr.numCubemaps ) {
 		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "PBR IBL: no cubemaps found (env.json or cubemap entities). Reflections will look generic.\n" S_COLOR_WHITE );
+	} else if ( !vk.cubemapActive && vk.pbrActive ) {
+		ri.Printf( PRINT_ALL, "PBR IBL: cubemapActive=0 (set r_cubeMapping 1 or r_ibl_forceCapture 1 and vid_restart)\n" );
 	}
 #endif
 }

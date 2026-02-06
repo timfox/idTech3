@@ -95,6 +95,7 @@ cvar_t	*r_pbr;
 cvar_t	*r_pbr_shExtract;
 cvar_t	*r_pbr_debug;
 cvar_t	*r_ibl_forceLod;
+cvar_t	*r_ibl_forceCapture;
 cvar_t	*r_pbr_debug_eps;
 cvar_t	*r_pbr_normalSwizzle;
 cvar_t	*r_pbr_forceLight;
@@ -251,6 +252,12 @@ cvar_t	*r_intensity;
 cvar_t	*r_lockpvs;
 cvar_t	*r_noportals;
 cvar_t	*r_portalOnly;
+
+cvar_t	*r_tonemap;
+cvar_t	*r_exposure;
+cvar_t	*r_lut;
+cvar_t	*r_lut_intensity;
+cvar_t	*r_pbr_bindlog;
 
 cvar_t	*r_subdivisions;
 cvar_t	*r_lodCurveError;
@@ -1663,9 +1670,13 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_pbr_shExtract, "Extract SH coefficients from generated irradiance cubemaps for PBR." );
 
 	r_pbr_debug = ri.Cvar_Get( "r_pbr_debug", "0", CVAR_ARCHIVE_ND );
+	r_pbr_bindlog = ri.Cvar_Get( "r_pbr_bindlog", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_pbr_bindlog, "Log the first env/irr/glint binding per map when Vulkan PBR debug is active." );
 	ri.Cvar_CheckRange( r_pbr_debug, "0", "23", CV_INTEGER );
 	r_ibl_forceLod = ri.Cvar_Get( "r_ibl_forceLod", "-1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_ibl_forceLod, "Force the prefiltered env map LOD in debug views (-1 = automatic)." );
+	r_ibl_forceCapture = ri.Cvar_Get( "r_ibl_forceCapture", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_ibl_forceCapture, "Force runtime IBL capture: create a single cubemap at map center if none exist." );
 	r_pbr_debug_eps = ri.Cvar_Get( "r_pbr_debug_eps", "0.0001", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_pbr_debug_eps, "Epsilon used by debug modes to classify near-zero radiance." );
 	ri.Cvar_SetDescription( r_pbr_debug,
@@ -1694,6 +1705,7 @@ static void R_Register( void )
 		" 21 - show base/albedo texture\n"
 		" 22 - show lightmap-only contribution (PBR debug)\n"
 		" 23 - show albedo-only contribution (PBR debug)\n"
+		" 30 - show lightmap contribution only (linear)\n"
 		"Adjust r_ibl_forceLod (>=0 forces that LOD) and r_pbr_debug_eps to tune modes 16-19\n" );
 
 	r_pbr_normalSwizzle = ri.Cvar_Get( "r_pbr_normalSwizzle", "0", CVAR_ARCHIVE_ND );
@@ -1930,6 +1942,25 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_dither, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription(r_dither, "Set dithering mode:\n 0 - disabled\n 1 - ordered\nRequires " S_COLOR_CYAN "\\r_fbo 1." );
 	ri.Cvar_SetGroup( r_dither, CVG_RENDERER );
+	
+	r_tonemap = ri.Cvar_Get( "r_tonemap", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_tonemap, "0", "3", CV_INTEGER );
+	ri.Cvar_SetDescription( r_tonemap, "Tone mapping operator:\n 0=off (identity)\n 1=Reinhard\n 2=ACES Filmic\n 3=Hable/Uncharted2" );
+	ri.Cvar_SetGroup( r_tonemap, CVG_RENDERER );
+
+	r_exposure = ri.Cvar_Get( "r_exposure", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_exposure, "0.01", "10", CV_FLOAT );
+	ri.Cvar_SetDescription( r_exposure, "Exposure multiplier applied before tone mapping." );
+	ri.Cvar_SetGroup( r_exposure, CVG_RENDERER );
+
+	r_lut = ri.Cvar_Get( "r_lut", "", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_lut, "Path to 3D LUT file (.cube or strip texture). Empty = identity." );
+	ri.Cvar_SetGroup( r_lut, CVG_RENDERER );
+
+	r_lut_intensity = ri.Cvar_Get( "r_lut_intensity", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_lut_intensity, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_lut_intensity, "Blend between identity and loaded LUT." );
+	ri.Cvar_SetGroup( r_lut_intensity, CVG_RENDERER );
 
 	r_presentBits = ri.Cvar_Get( "r_presentBits", "24", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_presentBits, "16", "30", CV_INTEGER );

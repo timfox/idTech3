@@ -5012,6 +5012,12 @@ static void FS_ParseGameInfo( void )
 		}
 	}
 
+	Com_sprintf( gameInfoPath, sizeof( gameInfoPath ), "gameinfo.txt" );
+	FS_ReplaceSeparators( gameInfoPath );
+	if ( FS_ReadAndParseGameInfo( gameInfoPath ) ) {
+		return;
+	}
+
 	Com_sprintf( gameInfoPath, sizeof( gameInfoPath ), "%s/gameinfo.txt", fs_basepath->string );
 	FS_ReplaceSeparators( gameInfoPath );
 	if ( FS_ReadAndParseGameInfo( gameInfoPath ) ) {

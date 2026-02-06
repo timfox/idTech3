@@ -639,6 +639,12 @@ typedef struct image_s {
 
 } image_t;
 
+typedef enum {
+	CUBEMAP_STATE_NONE = 0,
+	CUBEMAP_STATE_HAVE_DEFS_NOT_RENDERED = 1,
+	CUBEMAP_STATE_READY = 2,
+} cubemap_state_t;
+
 typedef struct cubemap_s {
 	char		name[MAX_QPATH];
 	vec3_t		origin;
@@ -647,6 +653,7 @@ typedef struct cubemap_s {
 	image_t		*irradiance_image;
 	vec4_t		shCoeffs[9];
 	qboolean	hasSHCoeffs;
+	cubemap_state_t state;
 } cubemap_t;
 
 static inline void R_ResetCubemapSH( cubemap_t *cube ) {
@@ -1445,7 +1452,9 @@ extern cvar_t	*r_vbo;
 extern cvar_t	*r_pbr;
 extern cvar_t	*r_pbr_shExtract;
 extern cvar_t	*r_pbr_debug;
+extern cvar_t	*r_pbr_bindlog;
 extern cvar_t	*r_ibl_forceLod;
+extern cvar_t	*r_ibl_forceCapture;
 extern cvar_t	*r_pbr_debug_eps;
 extern cvar_t	*r_pbr_normalSwizzle;
 extern cvar_t	*r_pbr_forceLight;
@@ -1471,6 +1480,8 @@ extern cvar_t *r_glints_debug;
 extern cvar_t *r_glints_materialMask;
 extern cvar_t *r_glints_strength;
 extern cvar_t *r_glints_intensity;
+
+extern qboolean tr_pbr_bindLogPrinted;
 extern cvar_t *r_preparingShaders;
 extern cvar_t *r_glints_verbose;
 extern cvar_t *r_pbr_validate;
@@ -1617,6 +1628,10 @@ extern	cvar_t	*r_debugSort;
 extern	cvar_t	*r_printShaders;
 
 extern cvar_t	*r_marksOnTriangleMeshes;
+extern cvar_t	*r_tonemap;
+extern cvar_t	*r_exposure;
+extern cvar_t	*r_lut;
+extern cvar_t	*r_lut_intensity;
 
 //====================================================================
 

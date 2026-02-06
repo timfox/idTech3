@@ -19,11 +19,11 @@ float get_debug_lod( float roughness, float forcedLod ) {
 	return forcedLod >= 0.0 ? forcedLod : roughness * 6.0;
 }
 
-vec3 dbg_classify_ibl( vec3 value, bool compiled, bool bound, float eps ) {
-	if ( !compiled ) {
+vec3 dbg_classify_ibl( vec3 value, bool hasResource, float eps ) {
+	if ( !hasResource ) {
 		return DBG_MAGENTA;
 	}
-	if ( bound && dbg_len( value ) < eps ) {
+	if ( dbg_len( value ) < eps ) {
 		return DBG_YELLOW;
 	}
 	return value;
@@ -1321,8 +1321,7 @@ void main() {
 
 const bool allowGlints = forceGlintsDebug || glintCore.x > 0.5 || pbrDebug.w > 0.5;
 const bool glintAvailable = hasGlintDict && allowGlints;
-	bool glintEnabled = glintAvailable;
-const bool iblCompiledDebug = pbrDebugFlags.x > 0.5;
+bool glintEnabled = glintAvailable;
 const bool hasEnvDebug = pbrDebugFlags.y > 0.5;
 const bool hasIrrDebug = pbrDebugFlags.z > 0.5;
 const bool dictValidDebug = pbrDebugFlags.w > 0.5;
@@ -1543,13 +1542,13 @@ const bool glintsEnabledDebug = ( pbrDebugParams.z > 0.5 );
 	else if ( pbrDebugView == 16 )
 	{
 		vec3 specIBL = CalcIBLContribution( roughness, N, E, NE, specular.rgb * clearcoatDim * specAO, pbrDebugParams.x );
-		out_color.rgb = dbg_classify_ibl( specIBL, iblCompiledDebug, hasEnvDebug, debugEps );
+		out_color.rgb = dbg_classify_ibl( specIBL, hasEnvDebug, debugEps );
 		out_color.a = 1.0;
 	}
 	else if ( pbrDebugView == 17 )
 	{
 		vec3 diffIBL = CalcDiffuseIrradiance( N ) * diffuseColor * AO;
-		out_color.rgb = dbg_classify_ibl( diffIBL, iblCompiledDebug, hasIrrDebug, debugEps );
+		out_color.rgb = dbg_classify_ibl( diffIBL, hasIrrDebug, debugEps );
 		out_color.a = 1.0;
 	}
 	else if ( pbrDebugView == 18 )
@@ -1559,11 +1558,29 @@ const bool glintsEnabledDebug = ( pbrDebugParams.z > 0.5 );
 	}
 	else if ( pbrDebugView == 19 )
 	{
-		vec3 R = reflect( -E, N );
-		R.y *= -1.0;
-		float rawLod = max( pbrDebugParams.x, 0.0 );
-		vec3 rawEnv = textureLod( env_texture, R, rawLod ).rgb;
-		out_color.rgb = dbg_classify_ibl( rawEnv, iblCompiledDebug, hasEnvDebug, debugEps );
+		if ( env_texture_set < 0 )
+		{
+			out_color.rgb = DBG_MAGENTA;
+		}
+		else if ( !hasEnvDebug )
+		{
+			out_color.rgb = DBG_RED;
+		}
+		else
+		{
+			vec3 R = reflect( -E, N );
+			R.y *= -1.0;
+			float rawLod = ( pbrDebugParams.x >= 0.0 ) ? pbrDebugParams.x : 0.0;
+			vec3 rawEnv = textureLod( env_texture, R, rawLod ).rgb;
+			if ( dbg_len( rawEnv ) < debugEps )
+			{
+				out_color.rgb = DBG_YELLOW;
+			}
+			else
+			{
+				out_color.rgb = rawEnv;
+			}
+		}
 		out_color.a = 1.0;
 	}
 	else if ( pbrDebugView == 20 )
@@ -1606,6 +1623,11 @@ const bool glintsEnabledDebug = ( pbrDebugParams.z > 0.5 );
 	else if ( pbrDebugView == 23 )
 	{
 		out_color.rgb = texture(texture0, frag_tex_coord0).rgb;
+		out_color.a = 1.0;
+	}
+	else if ( pbrDebugView == 30 )
+	{
+		out_color.rgb = directDiffuse + directSpec;
 		out_color.a = 1.0;
 	}
 	else

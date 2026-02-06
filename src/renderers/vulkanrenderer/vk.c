@@ -5,6 +5,23 @@
 #include "vk.h"
 #include "glints.h"
 
+#if defined(__clang__) || defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wshadow"
+#pragma GCC diagnostic ignored "-Wcast-qual"
+#pragma GCC diagnostic ignored "-Wmissing-prototypes"
+#endif
+
+#define STBI_ONLY_PNG
+#define STBI_ONLY_TGA
+#define STB_IMAGE_IMPLEMENTATION
+#include "../../external/src/SparseVoxelOctree/dep/stb_image.h"
+#undef STB_IMAGE_IMPLEMENTATION
+
+#if defined(__clang__) || defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+
 #if defined (_DEBUG)
 #if defined (_WIN32)
 #define USE_VK_VALIDATION
@@ -162,10 +179,281 @@ static PFN_vkCmdDebugMarkerInsertEXT							qvkCmdDebugMarkerInsertEXT;
 // forward declaration
 VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassIndex, uint32_t def_index );
 
+static image_t vk_lut_image;
+static qboolean vk_lut_initialized = qfalse;
+
 #ifdef USE_VK_PBR
 static image_t vk_glint_dictionary_image;
 static void vk_create_glint_dictionary_texture( void );
 #endif
+static void vk_create_identity_lut( void );
+static void vk_destroy_lut_image( void );
+static void vk_update_lut_image_data( int lut_size, const byte *pixels, size_t bytes );
+static qboolean vk_load_lut_file( const char *path );
+static qboolean vk_load_cube_lut( const char *path );
+static qboolean vk_load_lut_image_file( const char *path );
+static void vk_load_lut_from_cvar( void );
+
+static void vk_update_lut_image_data( int lut_size, const byte *pixels, size_t bytes ) {
+	if ( lut_size <= 0 || pixels == NULL || bytes == 0 || vk.lut_descriptor == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	const int width = lut_size * lut_size;
+	const int height = lut_size;
+	if ( width <= 0 || height <= 0 ) {
+		return;
+	}
+
+	image_t *image = &vk_lut_image;
+
+	if ( image->handle != VK_NULL_HANDLE || vk.lut_image != VK_NULL_HANDLE ) {
+		vk_destroy_image_resources( &image->handle, &image->view );
+		image->handle = VK_NULL_HANDLE;
+		image->view = VK_NULL_HANDLE;
+	}
+
+	Com_Memset( image, 0, sizeof( *image ) );
+	image->imgName = "gamma_lut";
+	image->imgName2 = "gamma_lut";
+	image->width = width;
+	image->height = height;
+	image->uploadWidth = width;
+	image->uploadHeight = height;
+	image->flags = 0;
+	image->internalFormat = VK_FORMAT_R8G8B8A8_UNORM;
+	image->wrapClampMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	image->type = 0;
+	image->layers = 1;
+	image->descriptor = vk.lut_descriptor;
+	image->descriptor_index = 0;
+
+	vk_create_image( image, width, height, 1 );
+	vk_upload_image_data( image, 0, 0, width, height, 1, pixels, bytes, qfalse );
+
+	vk.lut_image = image->handle;
+	vk.lut_image_view = image->view;
+	vk.lutSize = lut_size;
+	vk_lut_initialized = qtrue;
+}
+
+static void vk_create_identity_lut( void ) {
+	const int lut_size = 32;
+	const int width = lut_size * lut_size;
+	const int height = lut_size;
+	const size_t pixel_count = (size_t)width * height * 4;
+	if ( pixel_count == 0 ) {
+		return;
+	}
+
+	byte *pixels = (byte*)ri.Hunk_AllocateTempMemory( pixel_count );
+	const float inv_size = 1.0f / lut_size;
+	for ( int b = 0; b < lut_size; b++ ) {
+		for ( int g = 0; g < lut_size; g++ ) {
+			for ( int r = 0; r < lut_size; r++ ) {
+				const int x = r + b * lut_size;
+				const int y = g;
+				const size_t offset = (size_t)( y * width + x ) * 4;
+				pixels[offset + 0] = (byte)( ( r + 0.5f ) * inv_size * 255.0f );
+				pixels[offset + 1] = (byte)( ( g + 0.5f ) * inv_size * 255.0f );
+				pixels[offset + 2] = (byte)( ( b + 0.5f ) * inv_size * 255.0f );
+				pixels[offset + 3] = 255;
+			}
+		}
+	}
+
+	vk_update_lut_image_data( lut_size, pixels, pixel_count );
+	ri.Hunk_FreeTempMemory( pixels );
+}
+
+static void vk_destroy_lut_image( void ) {
+	if ( vk.lut_image != VK_NULL_HANDLE || vk.lut_image_view != VK_NULL_HANDLE ) {
+		vk_destroy_image_resources( &vk.lut_image, &vk.lut_image_view );
+	}
+
+	vk.lut_image = VK_NULL_HANDLE;
+	vk.lut_image_view = VK_NULL_HANDLE;
+	vk.lutSize = 0;
+
+	vk_lut_image.handle = VK_NULL_HANDLE;
+	vk_lut_image.view = VK_NULL_HANDLE;
+	vk_lut_initialized = qfalse;
+}
+
+static void vk_load_lut_from_cvar( void ) {
+	const char *path = r_lut ? r_lut->string : "";
+	if ( path && path[0] ) {
+		if ( vk_load_lut_file( path ) ) {
+			return;
+		}
+		ri.Printf( PRINT_WARNING, "VK: failed to load LUT \"%s\", falling back to identity\n", path );
+	}
+
+	vk_create_identity_lut();
+}
+
+static qboolean vk_load_lut_file( const char *path ) {
+	char ext[MAX_QPATH];
+	Q_strncpyz( ext, COM_GetExtension( path ), sizeof( ext ) );
+	if ( !ext[0] ) {
+		return qfalse;
+	}
+	if ( !Q_stricmp( ext, "cube" ) ) {
+		return vk_load_cube_lut( path );
+	}
+	return vk_load_lut_image_file( path );
+}
+
+static qboolean vk_load_cube_lut( const char *path ) {
+	void *file = NULL;
+	int length = ri.FS_ReadFile( path, &file );
+	if ( length <= 0 || !file ) {
+		return qfalse;
+	}
+
+	const char *cursor = (const char *)file;
+	int lut_size = 0;
+	size_t expected_entries = 0;
+	size_t entry_index = 0;
+	byte *pixels = NULL;
+	const char *token;
+
+	while ( qtrue ) {
+		token = COM_ParseExt( &cursor, qtrue );
+		if ( !token || !token[0] ) {
+			break;
+		}
+		if ( token[0] == '#' ) {
+			while ( *cursor && *cursor != '\n' ) {
+				cursor++;
+			}
+			continue;
+		}
+		if ( !Q_stricmp( token, "LUT_3D_SIZE" ) ) {
+			token = COM_ParseExt( &cursor, qtrue );
+			if ( !token || !token[0] ) {
+				break;
+			}
+			lut_size = atoi( token );
+			if ( lut_size <= 0 ) {
+				break;
+			}
+			const int width = lut_size * lut_size;
+			const int height = lut_size;
+			const size_t pixel_count = (size_t)width * height * 4;
+			pixels = (byte *)ri.Hunk_AllocateTempMemory( pixel_count );
+			expected_entries = (size_t)lut_size * lut_size * lut_size;
+			entry_index = 0;
+			continue;
+		}
+		if ( !Q_stricmp( token, "DOMAIN_MIN" ) || !Q_stricmp( token, "DOMAIN_MAX" ) ) {
+			qboolean domain_ok = qtrue;
+			for ( int i = 0; i < 3; ++i ) {
+				token = COM_ParseExt( &cursor, qtrue );
+				if ( !token || !token[0] ) {
+					domain_ok = qfalse;
+					break;
+				}
+			}
+			if ( !domain_ok ) {
+				break;
+			}
+			continue;
+		}
+		if ( lut_size <= 0 || !pixels ) {
+			continue;
+		}
+		float r = (float)atof( token );
+		token = COM_ParseExt( &cursor, qtrue );
+		if ( !token || !token[0] ) {
+			break;
+		}
+		float g = (float)atof( token );
+		token = COM_ParseExt( &cursor, qtrue );
+		if ( !token || !token[0] ) {
+			break;
+		}
+		float b = (float)atof( token );
+		if ( entry_index >= expected_entries ) {
+			break;
+		}
+		int r_idx = entry_index % lut_size;
+		int g_idx = ( entry_index / lut_size ) % lut_size;
+		int b_idx = entry_index / ( lut_size * lut_size );
+		const int width = lut_size * lut_size;
+		const int x = r_idx + b_idx * lut_size;
+		const int y = g_idx;
+		const size_t offset = (size_t)( y * width + x ) * 4;
+		pixels[offset + 0] = (byte)( Com_Clamp( 0.0f, 1.0f, r ) * 255.0f + 0.5f );
+		pixels[offset + 1] = (byte)( Com_Clamp( 0.0f, 1.0f, g ) * 255.0f + 0.5f );
+		pixels[offset + 2] = (byte)( Com_Clamp( 0.0f, 1.0f, b ) * 255.0f + 0.5f );
+		pixels[offset + 3] = 255;
+		entry_index++;
+	}
+
+	if ( pixels && lut_size > 0 && entry_index == expected_entries ) {
+		const int width = lut_size * lut_size;
+		const size_t byte_count = (size_t)width * lut_size * 4;
+		vk_update_lut_image_data( lut_size, pixels, byte_count );
+		ri.Hunk_FreeTempMemory( pixels );
+		ri.FS_FreeFile( file );
+		return qtrue;
+	}
+
+	if ( pixels ) {
+		ri.Hunk_FreeTempMemory( pixels );
+	}
+	ri.FS_FreeFile( file );
+	return qfalse;
+}
+
+static qboolean vk_load_lut_image_file( const char *path ) {
+	int width = 0;
+	int height = 0;
+	int channels = 0;
+	unsigned char *data = stbi_load( path, &width, &height, &channels, 4 );
+	if ( !data || width <= 0 || height <= 0 ) {
+		if ( data ) {
+			stbi_image_free( data );
+		}
+		return qfalse;
+	}
+
+	const int lut_size_hr = height;
+	const int lut_size_v = width;
+	qboolean success = qfalse;
+	if ( width == lut_size_hr * lut_size_hr ) {
+		const int lut_size = lut_size_hr;
+		const size_t byte_count = (size_t)width * height * 4;
+		vk_update_lut_image_data( lut_size, data, byte_count );
+		success = qtrue;
+	} else if ( height == lut_size_v * lut_size_v ) {
+		const int lut_size = lut_size_v;
+		const int new_width = lut_size * lut_size;
+		const int new_height = lut_size;
+		const size_t byte_count = (size_t)new_width * new_height * 4;
+		byte *repacked = (byte *)ri.Hunk_AllocateTempMemory( byte_count );
+		for ( int b = 0; b < lut_size; b++ ) {
+			for ( int g = 0; g < lut_size; g++ ) {
+				for ( int r = 0; r < lut_size; r++ ) {
+					const int src_y = b * lut_size + g;
+					const int src_x = r;
+					const size_t src_offset = (size_t)( src_y * width + src_x ) * 4;
+					const int dst_x = r + b * lut_size;
+					const int dst_y = g;
+					const size_t dst_offset = (size_t)( dst_y * new_width + dst_x ) * 4;
+					memcpy( repacked + dst_offset, data + src_offset, 4 );
+				}
+			}
+		}
+		vk_update_lut_image_data( lut_size, repacked, byte_count );
+		ri.Hunk_FreeTempMemory( repacked );
+		success = qtrue;
+	}
+
+	stbi_image_free( data );
+	return success;
+}
 
 static uint32_t find_memory_type( uint32_t memory_type_bits, VkMemoryPropertyFlags properties ) {
 	VkPhysicalDeviceMemoryProperties memory_properties;
@@ -253,7 +541,10 @@ const char *vk_format_string( VkFormat format )
 		Com_sprintf( buf, sizeof( buf ), "#%i", format );
 		return buf;
 	}
+
+	vk_load_lut_from_cvar();
 }
+
 
 static qboolean vk_format_is_srgb( VkFormat format )
 {
@@ -3003,6 +3294,7 @@ void vk_init_descriptors( void )
 		alloc.pSetLayouts = &vk.set_layout_sampler;
 
 		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.color_descriptor ) );
+		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.lut_descriptor ) );
 
 		if ( r_ssao && r_ssao->integer ) {
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.depth_descriptor ) );
@@ -5188,6 +5480,8 @@ void vk_initialize( void )
 #ifdef VK_CUBEMAP
 	if ( vk.pbrActive && r_cubeMapping->integer )
 		vk.cubemapActive = qtrue;
+	if ( vk.pbrActive && r_ibl_forceCapture && r_ibl_forceCapture->integer )
+		vk.cubemapActive = qtrue;
 #endif
 #endif
 
@@ -5567,6 +5861,25 @@ void vk_initialize( void )
 		desc.pPushConstantRanges = NULL;
 
 		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_post_process ) );
+
+		{
+			VkPipelineLayoutCreateInfo gamma_desc;
+			VkDescriptorSetLayout gamma_layouts[2];
+
+			gamma_layouts[0] = vk.set_layout_sampler;
+			gamma_layouts[1] = vk.set_layout_sampler;
+
+			gamma_desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+			gamma_desc.pNext = NULL;
+			gamma_desc.flags = 0;
+			gamma_desc.setLayoutCount = 2;
+			gamma_desc.pSetLayouts = gamma_layouts;
+			gamma_desc.pushConstantRangeCount = 0;
+			gamma_desc.pPushConstantRanges = NULL;
+
+			VK_CHECK( qvkCreatePipelineLayout( vk.device, &gamma_desc, NULL, &vk.pipeline_layout_gamma ) );
+			SET_OBJECT_NAME( vk.pipeline_layout_gamma, "pipeline layout - gamma", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
+		}
 
 		desc.setLayoutCount = VK_NUM_BLOOM_PASSES;
 
@@ -5992,6 +6305,8 @@ void vk_shutdown( refShutdownCode_t code )
 
 	qvkDestroyCommandPool( vk.device, vk.command_pool, NULL );
 
+	vk_destroy_lut_image();
+
 	qvkDestroyDescriptorPool(vk.device, vk.descriptor_pool, NULL);
 
 	qvkDestroyDescriptorSetLayout(vk.device, vk.set_layout_sampler, NULL);
@@ -6010,6 +6325,7 @@ void vk_shutdown( refShutdownCode_t code )
 	}
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_storage, NULL);
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_post_process, NULL);
+	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_gamma, NULL);
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_blend, NULL);
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_ssao, NULL);
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_ssao_combine, NULL);
@@ -6397,7 +6713,7 @@ void vk_create_image( image_t *image, int width, int height, int mip_levels ) {
 }
 
 
-static byte *resample_image_data( const int target_format, byte *data, const int data_size, int *bytes_per_pixel )
+static byte *resample_image_data( const int target_format, const byte *data, const int data_size, int *bytes_per_pixel )
 {
 	byte* buffer;
 	uint16_t* p;
@@ -6459,23 +6775,34 @@ static byte *resample_image_data( const int target_format, byte *data, const int
 
 	default:
 		*bytes_per_pixel = 4;
-		return data;
+		return NULL;
 	}
 }
 
 
-void vk_upload_image_data( image_t *image, int x, int y, int width, int height, int mipmaps, byte *pixels, int size, qboolean update ) {
+void vk_upload_image_data( image_t *image, int x, int y, int width, int height, int mipmaps, const void *pixels, int size, qboolean update ) {
 
 	VkCommandBuffer   command_buffer;
 	VkBufferImageCopy regions[16];
 	VkBufferImageCopy region;
-	byte *buf;
+	byte *resampled;
 	int n;
+	const byte *pixelSource;
+	const byte *upload_data;
+	byte *free_buf;
 
 	int num_regions = 0;
 	int buffer_size = 0;
 
-	buf = resample_image_data( image->internalFormat, pixels, size, &n /*bpp*/ );
+	pixelSource = (const byte *)pixels;
+	resampled = resample_image_data( image->internalFormat, pixelSource, size, &n /*bpp*/ );
+	if ( resampled ) {
+		upload_data = (const byte *)resampled;
+		free_buf = resampled;
+	} else {
+		upload_data = pixelSource;
+		free_buf = NULL;
+	}
 
 	while (qtrue) {
 		Com_Memset(&region, 0, sizeof(region));
@@ -6530,7 +6857,7 @@ void vk_upload_image_data( image_t *image, int x, int y, int width, int height, 
 		regions[n].bufferOffset += vk.staging_buffer.offset;
 	}
 
-	Com_Memcpy( vk.staging_buffer.ptr + vk.staging_buffer.offset, buf, buffer_size );
+	Com_Memcpy( vk.staging_buffer.ptr + vk.staging_buffer.offset, upload_data, buffer_size );
 
 	if ( vk.staging_buffer.offset == 0 ) {
 		VkCommandBufferBeginInfo begin_info;
@@ -6561,7 +6888,7 @@ void vk_upload_image_data( image_t *image, int x, int y, int width, int height, 
 		vk_alloc_staging_buffer( buffer_size );
 	}
 
-	Com_Memcpy( vk.staging_buffer.ptr, buf, buffer_size );
+	Com_Memcpy( vk.staging_buffer.ptr, upload_data, buffer_size );
 
 	command_buffer = begin_command_buffer();
 	// record_buffer_memory_barrier( command_buffer, vk_world.staging_buffer, VK_WHOLE_SIZE, 0, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_HOST_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT );
@@ -6575,8 +6902,8 @@ void vk_upload_image_data( image_t *image, int x, int y, int width, int height, 
 	end_command_buffer( command_buffer, __func__ );
 #endif
 
-	if ( buf != pixels ) {
-		ri.Hunk_FreeTempMemory( buf );
+	if ( free_buf ) {
+		ri.Hunk_FreeTempMemory( free_buf );
 	}
 }
 
@@ -6722,6 +7049,11 @@ void vk_update_pbr_descriptor_binding_from_view( VkDescriptorSet descriptor, uin
 	descriptor_write.pTexelBufferView = NULL;
 
 	qvkUpdateDescriptorSets( vk.device, 1, &descriptor_write, 0, NULL );
+	if ( r_pbr_bindlog && ( r_pbr_bindlog->integer || ( r_pbr_debug && r_pbr_debug->integer >= 17 ) ) ) {
+		ri.Printf( PRINT_ALL, "PBR IBL descwrite: binding=%u view=%p\n",
+			binding,
+			(const void *)(uintptr_t)view );
+	}
 }
 
 VkImageView vk_get_scene_cubemap_view( void )
@@ -6766,6 +7098,11 @@ static void vk_update_pbr_indexed_glint( VkDescriptorSet descriptor )
 	descriptor_write.pTexelBufferView = NULL;
 
 	qvkUpdateDescriptorSets( vk.device, 1, &descriptor_write, 0, NULL );
+	if ( r_pbr_bindlog && ( r_pbr_bindlog->integer || ( r_pbr_debug && r_pbr_debug->integer >= 17 ) ) ) {
+		ri.Printf( PRINT_ALL, "PBR IBL descwrite: binding=%u view=%p\n",
+			VK_PBR_INDEXED_BINDING_TEXTURES,
+			(const void *)(uintptr_t)image_info.imageView );
+	}
 }
 
 static void vk_update_pbr_indexed_common_descriptor( VkDescriptorSet descriptor, const image_t *env, const image_t *irr )
@@ -7021,6 +7358,13 @@ const image_t *vk_get_glint_dictionary_image( void )
 	return NULL;
 }
 
+#ifdef USE_VK_PBR
+qboolean vk_has_glint_dictionary_descriptor( void )
+{
+	return vk_glint_dictionary_image.descriptor != VK_NULL_HANDLE;
+}
+#endif
+
 void vk_update_glint_descriptor_binding( VkDescriptorSet descriptor ) {
 	Vk_Sampler_Def sampler_def;
 	VkDescriptorImageInfo image_info;
@@ -7065,6 +7409,11 @@ void vk_update_glint_descriptor_binding( VkDescriptorSet descriptor ) {
 	descriptor_write.pTexelBufferView = NULL;
 
 	qvkUpdateDescriptorSets( vk.device, 1, &descriptor_write, 0, NULL );
+	if ( r_pbr_bindlog && ( r_pbr_bindlog->integer || ( r_pbr_debug && r_pbr_debug->integer >= 17 ) ) ) {
+		ri.Printf( PRINT_ALL, "PBR glints descwrite: binding=%u view=%p\n",
+			VK_PBR_BINDING_GLINT_DICT,
+			(const void *)(uintptr_t)image_info.imageView );
+	}
 }
 
 #ifdef USE_VK_PBR
@@ -7198,7 +7547,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	VkGraphicsPipelineCreateInfo create_info;
 	VkViewport viewport;
 	VkRect2D scissor;
-	VkSpecializationMapEntry spec_entries[11];
+	VkSpecializationMapEntry spec_entries[16];
 	VkSpecializationInfo frag_spec_info;
 	VkPipeline *pipeline;
 	VkShaderModule fsmodule;
@@ -7217,6 +7566,11 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 		int bloom_threshold_mode;
 		int bloom_modulate;
 		int dither;
+		int tonemapMode;
+		float exposure;
+		int lutEnabled;
+		float lutIntensity;
+		float lutSize;
 		int depth_r;
 		int depth_g;
 		int depth_b;
@@ -7290,7 +7644,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			pipeline = &vk.capture_pipeline;
 			fsmodule = vk.modules.gamma_fs;
 			renderpass = vk.render_pass.capture;
-			layout = vk.pipeline_layout_post_process;
+			layout = vk.pipeline_layout_gamma;
 			samples = VK_SAMPLE_COUNT_1_BIT;
 			pipeline_name = "capture buffer pipeline";
 			blend = qfalse;
@@ -7310,7 +7664,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			pipeline = &vk.gamma_pipeline;
 			fsmodule = vk.modules.gamma_fs;
 			renderpass = vk.render_pass.gamma;
-			layout = vk.pipeline_layout_post_process;
+			layout = vk.pipeline_layout_gamma;
 			samples = VK_SAMPLE_COUNT_1_BIT;
 			pipeline_name = "gamma-correction pipeline";
 			blend = qfalse;
@@ -7343,6 +7697,11 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	frag_spec_data.bloom_threshold_mode = r_bloom_threshold_mode->integer;
 	frag_spec_data.bloom_modulate = r_bloom_modulate->integer;
 	frag_spec_data.dither = r_dither->integer;
+	frag_spec_data.tonemapMode = r_tonemap ? r_tonemap->integer : 0;
+	frag_spec_data.exposure = r_exposure ? r_exposure->value : 1.0f;
+	frag_spec_data.lutEnabled = vk_lut_initialized ? 1 : 0;
+	frag_spec_data.lutIntensity = r_lut_intensity ? r_lut_intensity->value : 1.0f;
+	frag_spec_data.lutSize = vk.lutSize > 0 ? (float)vk.lutSize : 32.0f;
 
 	if ( !vk_surface_format_color_depth( vk.present_format.format, &frag_spec_data.depth_r, &frag_spec_data.depth_g, &frag_spec_data.depth_b ) )
 		ri.Printf( PRINT_ALL, "Format %s not recognized, dither to assume 8bpc\n", vk_format_string( vk.base_format.format ) );
@@ -7391,7 +7750,27 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	spec_entries[10].offset = offsetof(struct FragSpecData, depth_b);
 	spec_entries[10].size = sizeof(frag_spec_data.depth_b);
 
-	frag_spec_info.mapEntryCount = 11;
+	spec_entries[11].constantID = 11;
+	spec_entries[11].offset = offsetof(struct FragSpecData, tonemapMode);
+	spec_entries[11].size = sizeof(frag_spec_data.tonemapMode);
+
+	spec_entries[12].constantID = 12;
+	spec_entries[12].offset = offsetof(struct FragSpecData, exposure);
+	spec_entries[12].size = sizeof(frag_spec_data.exposure);
+
+	spec_entries[13].constantID = 13;
+	spec_entries[13].offset = offsetof(struct FragSpecData, lutEnabled);
+	spec_entries[13].size = sizeof(frag_spec_data.lutEnabled);
+
+	spec_entries[14].constantID = 14;
+	spec_entries[14].offset = offsetof(struct FragSpecData, lutIntensity);
+	spec_entries[14].size = sizeof(frag_spec_data.lutIntensity);
+
+	spec_entries[15].constantID = 15;
+	spec_entries[15].offset = offsetof(struct FragSpecData, lutSize);
+	spec_entries[15].size = sizeof(frag_spec_data.lutSize);
+
+	frag_spec_info.mapEntryCount = 16;
 	frag_spec_info.pMapEntries = spec_entries;
 	frag_spec_info.dataSize = sizeof( frag_spec_data );
 	frag_spec_info.pData = &frag_spec_data;
@@ -10297,8 +10676,11 @@ void vk_end_frame( void )
 
 			// render to capture FBO
 			vk_begin_render_pass( vk.render_pass.capture, vk.framebuffers.capture, qfalse, gls.captureWidth, gls.captureHeight );
-			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.capture_pipeline );
-			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
+			{
+				VkDescriptorSet sets[2] = { vk.color_descriptor, vk.lut_descriptor };
+				qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.capture_pipeline );
+				qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_gamma, 0, 2, sets, 0, NULL );
+			}
 
 			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 		}
@@ -10314,8 +10696,11 @@ void vk_end_frame( void )
 			vk.renderScaleY = 1.0;
 
 			vk_begin_render_pass( vk.render_pass.gamma, vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ], qfalse, vk.renderWidth, vk.renderHeight );
-			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.gamma_pipeline );
-			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
+			{
+				VkDescriptorSet sets[2] = { vk.color_descriptor, vk.lut_descriptor };
+				qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.gamma_pipeline );
+				qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_gamma, 0, 2, sets, 0, NULL );
+			}
 
 			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 		}

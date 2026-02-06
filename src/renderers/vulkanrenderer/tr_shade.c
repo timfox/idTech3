@@ -146,6 +146,11 @@ static const struct {
 	{ PBR_HAS_IRRADIANCE,		"IRRADIANCE" },
 };
 
+static qboolean pbrDebugPermutationLogged = qfalse;
+static int pbrDebugLastMode = 0;
+static uint32_t pbrDebugLastFlags = 0;
+qboolean tr_pbr_bindLogPrinted = qfalse;
+
 
 static uint32_t glint_descriptor_id( VkDescriptorSet descriptor )
 {
@@ -1475,6 +1480,28 @@ static int R_SelectCubemapIndexForPBR( void ) {
 		}
 	}
 
+	const qboolean logSelect =
+		( r_pbr_bindlog && r_pbr_bindlog->integer ) ||
+		( r_pbr_debug && r_pbr_debug->integer >= 17 );
+
+	if ( logSelect ) {
+		const char *mapName = ( tr.world && tr.world->baseName[0] ) ? tr.world->baseName : "unknown";
+		const cubemap_t *bestCube = ( bestIndex >= 0 ) ? &tr.cubemaps[bestIndex] : NULL;
+		ri.Printf( PRINT_ALL,
+			"PBR cubemap select: map=%s bestIndex=%d bestDistSq=%.2f bestInRadius=%d bestInDistSq=%.2f "
+			"pos=(%.0f %.0f %.0f) cubeOrigin=(%.0f %.0f %.0f) radius=%.0f\n",
+			mapName,
+			bestIndex,
+			bestDistSq,
+			bestInRadius,
+			bestInRadiusDistSq,
+			pos[0], pos[1], pos[2],
+			bestCube ? bestCube->origin[0] : 0.0f,
+			bestCube ? bestCube->origin[1] : 0.0f,
+			bestCube ? bestCube->origin[2] : 0.0f,
+			bestCube ? bestCube->parallaxRadius : 0.0f );
+	}
+
 	return ( bestInRadius != -1 ) ? bestInRadius : bestIndex;
 }
 
@@ -1592,7 +1619,17 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 	const int pbr_debug = ( r_pbr_debug != NULL ) ? r_pbr_debug->integer : 0;
 	if ( pbr_debug > 0 && pbr_debug <= 4 ) {
 		is_pbr_surface = qfalse;
+	} else if ( pbr_debug > 4 ) {
+		is_pbr_surface = qtrue;
 	}
+	const qboolean glintsModeEnabled = ( r_glints_mode && r_glints_mode->integer > 0 );
+	qboolean debugDictValid = qfalse;
+	const image_t *dictImage = vk_get_glint_dictionary_image();
+	const image_t *debugEnvImage = NULL;
+	qboolean debugEnvViewUsed = qfalse;
+	qboolean debugHasEnv = qfalse;
+	qboolean debugHasIrr = qfalse;
+	qboolean stageHasLightmap = qfalse;
 
 	if ( is_pbr_surface ) {
 		Com_Memcpy( &uniform_camera.modelMatrix, backEnd.or.modelMatrix, sizeof(float) * 16 );
@@ -1611,8 +1648,24 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 #endif
 #endif // USE_VULKAN
 
+	if ( pbr_debug == 0 ) {
+		pbrDebugPermutationLogged = qfalse;
+		pbrDebugLastMode = 0;
+		pbrDebugLastFlags = 0;
+	}
+
+#ifdef USE_VK_PBR
+		stageHasLightmap = qfalse;
+#endif
 	for ( stage = 0; stage < MAX_SHADER_STAGES; stage++ )
 	{
+#ifdef USE_VK_PBR
+		stageHasLightmap = qfalse;
+		qboolean wantsLightmap = qfalse;
+		const char *lightmapSource = "none";
+		const image_t *selectedLightmap = NULL;
+		qboolean stageHasEnv = qfalse;
+#endif
 		pStage = tess.xstages[ stage ];
 		if ( !pStage )
 			break;
@@ -1665,13 +1718,17 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			}
 
 			// Ensure lightmap is bound for BSP-ish passes (when stage expects it)
-			const qboolean wantsLightmap = ( (tess_flags & TESS_ST1) != 0 ) || R_StageHasLightmap( pStage );
+			wantsLightmap = ( (tess_flags & TESS_ST1) != 0 ) || R_StageHasLightmap( pStage );
+			lightmapSource = "none";
+			selectedLightmap = NULL;
 
 			if ( wantsLightmap ) {
 				if ( pStage->numTexBundles > 1 && pStage->bundle[1].lightmap != LIGHTMAP_INDEX_NONE ) {
 					pbrLightmapBundle = &pStage->bundle[1];
+					lightmapSource = "bundle1";
 				} else {
 					pbrLightmapBundle = R_FindLightmapBundle( tess.shader );
+					lightmapSource = "surface";
 				}
 
 				GL_SelectTexture( 1 );
@@ -1679,11 +1736,13 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 					R_BindAnimatedImage( pbrLightmapBundle );
 					R_ComputeTexCoords( 1, pbrLightmapBundle );
 					tess_flags |= TESS_ST1;
+					selectedLightmap = R_GetAnimatedImage( pbrLightmapBundle );
 				} else {
 					GL_Bind( tr.whiteImage );
 					if ( r_pbr_validate && r_pbr_validate->integer > 0 ) {
 						ri.Printf( PRINT_ALL, "PBR: missing lightmap for shader '%s'\n", tess.shader->name );
 					}
+					lightmapSource = "missing";
 				}
 				GL_SelectTexture( 0 );
 			}
@@ -1736,7 +1795,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		VkDescriptorSet pbrDescriptor = VK_NULL_HANDLE;
 
 #ifdef USE_VK_PBR
-		if ( is_pbr_surface && pStage->vk_pbr_flags ) {
+		if ( is_pbr_surface && ( pStage->vk_pbr_flags || pbr_debug >= 17 ) ) {
 			static VkCommandBuffer lastCmdBuf = VK_NULL_HANDLE;
 			static qboolean lastValid = qfalse;
 			static vkPbrUniformBlock_t lastBlock;
@@ -1750,6 +1809,8 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			qboolean hasEnv = qfalse;
 			qboolean hasIrr = qfalse;
 			VkImageView glintDictView = vk_get_glint_dictionary_view();
+			VkImageView envView = VK_NULL_HANDLE;
+			VkImageView irrView = VK_NULL_HANDLE;
 
 			Com_Memset( &block, 0, sizeof( block ) );
 			Vector4Copy( pStage->emissiveScale, block.emissiveScale );
@@ -1760,13 +1821,12 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			Vector4Copy( pStage->subsurfaceColor, block.subsurfaceColor );
 			Vector4Copy( pStage->subsurfaceParams, block.subsurfaceParams );
 
-			if ( ( pStage->vk_pbr_flags & PBR_HAS_LIGHTMAP ) != 0 ) {
-				if ( pbrLightmapBundle && pbrLightmapBundle->image[0] ) {
-					lightmapImage = R_GetAnimatedImage( pbrLightmapBundle );
-				}
+			if ( selectedLightmap ) {
+				lightmapImage = selectedLightmap;
 			}
 
 			hasLightmap = ( lightmapImage != fallback_white );
+			stageHasLightmap = hasLightmap;
 
 			// Stage descriptor sets can become invalid after a descriptor pool reset (e.g. swapchain/video restart).
 			// Recreate lazily here so we never bind a stale set.
@@ -1786,14 +1846,12 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			}
 
 			if (!useIndexing && pbrDescriptor != VK_NULL_HANDLE) {
-				const image_t *glintDictImage = vk_get_glint_dictionary_image();
-
 				if (glintDictView != VK_NULL_HANDLE) {
-					if (glintDictImage) {
+					if (dictImage) {
 						vk_update_pbr_descriptor_binding(
 							pbrDescriptor,
 							VK_PBR_BINDING_GLINT_DICT,
-							glintDictImage
+							dictImage
 						);
 					}
 				} else {
@@ -1854,12 +1912,16 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				}
 			}
 
-			if ( cubemapIndex >= 0 ) {
-				if ( tr.cubemaps[cubemapIndex].prefiltered_image )
-					hasEnv = qtrue;
-				if ( tr.cubemaps[cubemapIndex].irradiance_image )
-					hasIrr = qtrue;
-			}
+			envView = envImage ? envImage->view : VK_NULL_HANDLE;
+			irrView = irrImage ? irrImage->view : VK_NULL_HANDLE;
+
+			hasEnv = ( envView != VK_NULL_HANDLE );
+			hasIrr = ( irrView != VK_NULL_HANDLE );
+			stageHasEnv = hasEnv;
+			stageHasEnv = hasEnv;
+
+			debugHasEnv = hasEnv;
+			debugHasIrr = hasIrr;
 
 			static int lastLoggedCubemapIndex = -2;
 			static int lastLoggedNumCubemaps = -1;
@@ -1871,12 +1933,16 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				 hasEnv != lastLoggedHasEnv ||
 				 hasIrr != lastLoggedHasIrr )
 			{
+				const image_t *dbgPre = ( cubemapIndex >= 0 ) ? tr.cubemaps[cubemapIndex].prefiltered_image : NULL;
+				const image_t *dbgIrr = ( cubemapIndex >= 0 ) ? tr.cubemaps[cubemapIndex].irradiance_image : NULL;
 				ri.Printf( PRINT_ALL,
-					"PBR IBL state: numCubemaps=%d index=%d hasEnv=%d hasIrr=%d\n",
+					"PBR IBL state: numCubemaps=%d index=%d hasEnv=%d hasIrr=%d prefiltered=%p irradiance=%p\n",
 					tr.numCubemaps,
 					cubemapIndex,
 					hasEnv ? 1 : 0,
-					hasIrr ? 1 : 0 );
+					hasIrr ? 1 : 0,
+					(const void *)dbgPre,
+					(const void *)dbgIrr );
 				lastLoggedCubemapIndex = cubemapIndex;
 				lastLoggedNumCubemaps = tr.numCubemaps;
 				lastLoggedHasEnv = hasEnv;
@@ -1911,6 +1977,9 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 							vk_update_pbr_descriptor_binding_from_view( pbrDescriptor, VK_PBR_BINDING_ENV_CUBEMAP, sceneView );
 							vk_update_pbr_descriptor_binding_from_view( pbrDescriptor, VK_PBR_BINDING_IRRADIANCE, sceneView );
 							hasEnv = hasIrr = qtrue;
+					envView = sceneView;
+					irrView = sceneView;
+							debugEnvViewUsed = qtrue;
 						}
 					}
 #endif
@@ -1919,6 +1988,40 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				Vector4Set( block.texIndex1, 0.0f, 0.0f, 0.0f, 0.0f );
 				Vector4Set( block.texIndex2, 0.0f, 0.0f, 0.0f, 0.0f );
 			}
+
+			debugEnvImage = debugEnvViewUsed ? NULL : envImage;
+
+			const qboolean shouldLogBindings =
+				!tr_pbr_bindLogPrinted &&
+				( ( r_pbr_bindlog && r_pbr_bindlog->integer ) ||
+				  ( r_pbr_debug && r_pbr_debug->integer >= 17 ) );
+			if ( shouldLogBindings ) {
+			const char *mapName = ( tr.world && tr.world->baseName[0] ) ? tr.world->baseName : "unknown";
+			ri.Printf( PRINT_ALL,
+				"PBR IBL bind: map=%s numCubemaps=%d cubemapIndex=%d envImg=%p envView=%p irrImg=%p irrView=%p hasEnv=%d hasIrr=%d stateBits=0x%08x\n",
+				mapName,
+				tr.numCubemaps,
+				cubemapIndex,
+				(const void *)envImage,
+				(const void *)(uintptr_t)envView,
+				(const void *)irrImage,
+				(const void *)(uintptr_t)irrView,
+				envView != VK_NULL_HANDLE ? 1 : 0,
+				irrView != VK_NULL_HANDLE ? 1 : 0,
+				pStage->stateBits );
+			if ( r_glints && r_glints->integer ) {
+				const int dictW = dictImage ? ( dictImage->uploadWidth ? dictImage->uploadWidth : dictImage->width ) : 0;
+				const int dictH = dictImage ? ( dictImage->uploadHeight ? dictImage->uploadHeight : dictImage->height ) : 0;
+				ri.Printf( PRINT_ALL,
+					"PBR glints bind: dictImg=%p dictView=%p dictValid=%d dictW=%d dictH=%d\n",
+					(const void *)dictImage,
+					(const void *)(uintptr_t)glintDictView,
+					glintDictView != VK_NULL_HANDLE ? 1 : 0,
+					dictW,
+					dictH );
+			}
+			tr_pbr_bindLogPrinted = qtrue;
+		}
 
 			Vector4Set( block.featureFlags,
 				hasEnv ? 1.0f : 0.0f,
@@ -1929,22 +2032,95 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			const float iblCompiledFlag = ( envImage != NULL && irrImage != NULL ) ? 1.0f : 0.0f;
 			const float hasEnvFlag = hasEnv ? 1.0f : 0.0f;
 			const float hasIrrFlag = hasIrr ? 1.0f : 0.0f;
-			const float dictValidFlag = ( glintDictView != VK_NULL_HANDLE && vk.glint.valid && vk.glint.size > 0 ) ? 1.0f : 0.0f;
+			const qboolean dictValidState = ( glintDictView != VK_NULL_HANDLE );
+			const float dictValidFlag = dictValidState ? 1.0f : 0.0f;
+			debugDictValid = dictValidState;
 			const float debugForceLod = r_ibl_forceLod ? (float)r_ibl_forceLod->integer : -1.0f;
 			const float debugEps = r_pbr_debug_eps ? r_pbr_debug_eps->value : 1e-4f;
-			const float glintsEnabledFlag = ( r_glints && r_glints->integer > 0 ) ? 1.0f : 0.0f;
+			const float glintsEnabledFlag = glintsModeEnabled ? 1.0f : 0.0f;
+
+			static const world_t *lastLoggedWorld = NULL;
+			static qboolean loggedBindings = qfalse;
+			if ( tr.world != lastLoggedWorld ) {
+				lastLoggedWorld = tr.world;
+				loggedBindings = qfalse;
+			}
+			if ( !loggedBindings ) {
+				loggedBindings = qtrue;
+				ri.Printf( PRINT_ALL,
+					"PBR IBL bind: numCubemaps=%d index=%d envImg=%p envView=%p irrImg=%p irrView=%p hasEnv=%d hasIrr=%d\n",
+					tr.numCubemaps,
+					cubemapIndex,
+					(const void *)envImage,
+					(const void *)(envImage ? (uintptr_t)envImage->view : 0),
+					(const void *)irrImage,
+					(const void *)(irrImage ? (uintptr_t)irrImage->view : 0),
+					hasEnv ? 1 : 0,
+					hasIrr ? 1 : 0 );
+				if ( r_glints && r_glints->integer ) {
+					ri.Printf( PRINT_ALL,
+						"PBR glints bind: dictImg=%p dictView=%p valid=%d\n",
+						(const void *)dictImage,
+						(const void *)(uintptr_t)glintDictView,
+						dictValidState ? 1 : 0 );
+				}
+			}
+
+			if ( pbr_debug != 0 && (
+					!pbrDebugPermutationLogged ||
+					pbrDebugLastMode != pbr_debug ||
+					pbrDebugLastFlags != pStage->vk_pbr_flags ) )
+			{
+				char flagBuf[64];
+				glint_flags_to_string( pStage->vk_pbr_flags, flagBuf, sizeof( flagBuf ) );
+				ri.Printf( PRINT_ALL,
+					"PBR debug mode %d permutation: flags=0x%08x[%s] wantsLM=%d hasLM=%d src=%s IBL=%d lightmap=%d glints=%d\n",
+					pbr_debug,
+					pStage->vk_pbr_flags,
+					flagBuf,
+					wantsLightmap ? 1 : 0,
+					hasLightmap ? 1 : 0,
+					lightmapSource,
+					( pStage->vk_pbr_flags & PBR_HAS_IRRADIANCE ) ? 1 : 0,
+					( pStage->vk_pbr_flags & PBR_HAS_LIGHTMAP ) ? 1 : 0,
+					( glintsModeEnabled && dictValidState ) ? 1 : 0 );
+				pbrDebugPermutationLogged = qtrue;
+				pbrDebugLastMode = pbr_debug;
+				pbrDebugLastFlags = pStage->vk_pbr_flags;
+			}
 
 			Vector4Set( uniform.pbrDebugFlags, iblCompiledFlag, hasEnvFlag, hasIrrFlag, dictValidFlag );
-			Vector4Set( uniform.pbrDebugParams, debugForceLod, debugEps, glintsEnabledFlag, 0.0f );
+			float cubemapStateValue = CUBEMAP_STATE_NONE;
+			if ( tr.numCubemaps > 0 ) {
+				cubemapStateValue = CUBEMAP_STATE_HAVE_DEFS_NOT_RENDERED;
+			}
+			if ( cubemapIndex >= 0 && cubemapIndex < tr.numCubemaps ) {
+				cubemapStateValue = tr.cubemaps[cubemapIndex].state;
+			}
+			if ( debugEnvViewUsed ) {
+				cubemapStateValue = CUBEMAP_STATE_READY;
+			}
+			Vector4Set( uniform.pbrDebugParams, debugForceLod, debugEps, glintsEnabledFlag, cubemapStateValue );
 
-			// Only push uniforms when the PBR block has actually changed for this command buffer.
+			// Only push uniforms when the PBR block or debug flags actually changed.
 			if ( vk.cmd && vk.cmd->command_buffer != lastCmdBuf ) {
 				lastCmdBuf = vk.cmd->command_buffer;
 				lastValid = qfalse;
 			}
-			if ( !lastValid || memcmp( &lastBlock, &block, sizeof( block ) ) != 0 ) {
+			static vec4_t lastDebugFlags;
+			static vec4_t lastDebugParams;
+			static qboolean lastDebugValid = qfalse;
+			const qboolean debugChanged =
+				( !lastDebugValid ) ||
+				memcmp( lastDebugFlags, uniform.pbrDebugFlags, sizeof( uniform.pbrDebugFlags ) ) != 0 ||
+				memcmp( lastDebugParams, uniform.pbrDebugParams, sizeof( uniform.pbrDebugParams ) ) != 0;
+
+			if ( !lastValid || memcmp( &lastBlock, &block, sizeof( block ) ) != 0 || debugChanged ) {
 				lastBlock = block;
 				lastValid = qtrue;
+				lastDebugValid = qtrue;
+				Vector4Copy( uniform.pbrDebugFlags, lastDebugFlags );
+				Vector4Copy( uniform.pbrDebugParams, lastDebugParams );
 
 				Vector4Copy( block.emissiveScale, uniform.pbrEmissiveScale );
 				Vector4Copy( block.clearcoatScale, uniform.pbrClearcoatScale );
@@ -1970,16 +2146,107 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			pipeline = pStage->vk_pipeline[fog_stage];
 		}
 
-#ifdef USE_VK_PBR
-		if ( !is_pbr_surface && pStage->vk_pbr_flags ) {
-			Vk_Pipeline_Def			def;
-
+	#ifdef USE_VK_PBR
+			if ( pipeline != 0 ) {
+			Vk_Pipeline_Def def;
 			vk_get_pipeline_def( pipeline, &def );
 
-			def.vk_pbr_flags = 0;
-			pipeline = vk_find_pipeline_ext( 0, &def, qfalse );
+		if ( is_pbr_surface && ( pStage->vk_pbr_flags || pbr_debug >= 17 ) ) {
+				const uint32_t baseFlags = pStage->vk_pbr_flags & ~( PBR_HAS_LIGHTMAP | PBR_HAS_IRRADIANCE );
+				uint32_t desiredFlags = baseFlags;
+				if ( stageHasLightmap ) {
+					desiredFlags |= PBR_HAS_LIGHTMAP;
+				}
+				if ( stageHasEnv ) {
+					desiredFlags |= PBR_HAS_IRRADIANCE;
+				}
+
+				if ( def.vk_pbr_flags != desiredFlags ) {
+					def.vk_pbr_flags = desiredFlags;
+					pipeline = vk_find_pipeline_ext( 0, &def, qfalse );
+					vk_get_pipeline_def( pipeline, &def );
+				}
+			}
+
+			if ( !is_pbr_surface && pStage->vk_pbr_flags ) {
+				def.vk_pbr_flags = 0;
+				pipeline = vk_find_pipeline_ext( 0, &def, qfalse );
+				vk_get_pipeline_def( pipeline, &def );
+			}
+
+			if ( ( pbr_debug == 18 || pbr_debug == 19 ) && pipeline != 0 ) {
+				int envBindingIndex = -1;
+				if ( !debugEnvViewUsed ) {
+					if ( useIndexing && debugEnvImage ) {
+						envBindingIndex = (int)vk_get_image_descriptor_index( debugEnvImage );
+					} else if ( !useIndexing ) {
+						envBindingIndex = VK_PBR_BINDING_ENV_CUBEMAP;
+					}
+				}
+
+				const int hasEnvLog = debugHasEnv ? 1 : 0;
+				const int hasIrrLog = debugHasIrr ? 1 : 0;
+				const int glintsEnabledLog = glintsModeEnabled ? 1 : 0;
+				const int dictValidLog = debugDictValid ? 1 : 0;
+				const int dictWidthLog = dictImage ? dictImage->uploadWidth : 0;
+				const int dictHeightLog = dictImage ? dictImage->uploadHeight : 0;
+
+				static struct {
+					qboolean valid;
+					int hasEnv;
+					int hasIrr;
+					int glintsEnabled;
+					int dictValid;
+					int dictW;
+					int dictH;
+					int envIndex;
+					uint32_t stateBits;
+					uint32_t pbrFlags;
+					uint32_t descriptorIndexing;
+				} last_log = { qfalse, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0 };
+
+				if ( !last_log.valid ||
+					last_log.hasEnv != hasEnvLog ||
+					last_log.hasIrr != hasIrrLog ||
+					last_log.glintsEnabled != glintsEnabledLog ||
+					last_log.dictValid != dictValidLog ||
+					last_log.dictW != dictWidthLog ||
+					last_log.dictH != dictHeightLog ||
+					last_log.envIndex != envBindingIndex ||
+					last_log.stateBits != def.state_bits ||
+					last_log.pbrFlags != def.vk_pbr_flags ||
+					last_log.descriptorIndexing != def.descriptorIndexing ) {
+
+					ri.Printf( PRINT_ALL,
+						"PBR debug %d: hasEnv=%d hasIrr=%d glintsEnabled=%d dictValid=%d dictW=%d dictH=%d envBinding=%d stateBits=0x%08x pbrFlags=0x%08x descIndexing=%u\n",
+						pbr_debug,
+						hasEnvLog,
+						hasIrrLog,
+						glintsEnabledLog,
+						dictValidLog,
+						dictWidthLog,
+						dictHeightLog,
+						envBindingIndex,
+						def.state_bits,
+						def.vk_pbr_flags,
+						def.descriptorIndexing );
+
+					last_log.valid = qtrue;
+					last_log.hasEnv = hasEnvLog;
+					last_log.hasIrr = hasIrrLog;
+					last_log.glintsEnabled = glintsEnabledLog;
+					last_log.dictValid = dictValidLog;
+					last_log.dictW = dictWidthLog;
+					last_log.dictH = dictHeightLog;
+					last_log.envIndex = envBindingIndex;
+					last_log.stateBits = def.state_bits;
+					last_log.pbrFlags = def.vk_pbr_flags;
+					last_log.descriptorIndexing = def.descriptorIndexing;
+				}
+			}
 		}
 #endif
+
 
 		vk_bind_pipeline( pipeline );
 		vk_bind_geometry( tess_flags );

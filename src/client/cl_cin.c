@@ -101,6 +101,7 @@ typedef struct {
 	e_status			status;
 	int					startTime;
 	int					lastTime;
+	int					lastRealTime;
 	long				tfps;
 	long				RoQPlayed;
 	long				ROQSize;
@@ -110,6 +111,7 @@ typedef struct {
 	long				samplesPerLine;
 	unsigned int		roq_id;
 	long				screenDelta;
+	double				frameAccumulator;
 
 	void ( *VQ0)(byte *status, void *qdata );
 	void ( *VQ1)(byte *status, void *qdata );
@@ -141,6 +143,7 @@ static int				CL_handle = -1;
 extern int				s_soundtime;		// sample PAIRS
 
 extern int				CL_ScaledMilliseconds( void );
+extern int				Sys_Milliseconds( void );
 
 void CIN_CloseAllVideos( void ) {
 	int		i;
@@ -1003,6 +1006,8 @@ static void initRoQ( void )
 	cinTable[currentHandle].samplesPerPixel = 4;
 	ROQ_GenYUVTables();
 	RllSetupTable();
+	cinTable[currentHandle].frameAccumulator = 0.0;
+	cinTable[currentHandle].lastRealTime = Sys_Milliseconds();
 }
 
 /******************************************************************************
@@ -1039,6 +1044,8 @@ static void RoQReset( void ) {
 	FS_Read( cin.file, 16, cinTable[currentHandle].iFile );
 	RoQ_init();
 	cinTable[currentHandle].status = FMV_LOOPED;
+	cinTable[currentHandle].frameAccumulator = 0.0;
+	cinTable[currentHandle].lastRealTime = Sys_Milliseconds();
 }
 
 
@@ -1290,8 +1297,7 @@ Fetch and decompress the pending frame
 */
 e_status CIN_RunCinematic( int handle )
 {
-	int start = 0;
-	int thisTime = 0;
+	int scaledTime = 0;
 
 	if (handle < 0 || handle>= MAX_VIDEO_HANDLES || cinTable[handle].status == FMV_EOF) return FMV_EOF;
 
@@ -1319,24 +1325,31 @@ e_status CIN_RunCinematic( int handle )
 		return cinTable[currentHandle].status;
 	}
 
-	thisTime = CL_ScaledMilliseconds();
-	if (cinTable[currentHandle].shader && (abs(thisTime - cinTable[currentHandle].lastTime))>100) {
-		cinTable[currentHandle].startTime += thisTime - cinTable[currentHandle].lastTime;
+	scaledTime = CL_ScaledMilliseconds();
+	if (cinTable[currentHandle].shader && (abs(scaledTime - cinTable[currentHandle].lastTime))>100) {
+		cinTable[currentHandle].startTime += scaledTime - cinTable[currentHandle].lastTime;
 	}
-	cinTable[currentHandle].tfps = (((CL_ScaledMilliseconds() - cinTable[currentHandle].startTime)*3)/100);
 
-	start = cinTable[currentHandle].startTime;
-	while(  (cinTable[currentHandle].tfps != cinTable[currentHandle].numQuads)
-		&& (cinTable[currentHandle].status == FMV_PLAY) ) 
 	{
-		RoQInterrupt();
-		if (start != cinTable[currentHandle].startTime) {
-			cinTable[currentHandle].tfps = (((CL_ScaledMilliseconds() - cinTable[currentHandle].startTime)*3)/100);
-			start = cinTable[currentHandle].startTime;
+		const double targetFrameMs = 1000.0 / 30.0;
+		int realTime = Sys_Milliseconds();
+		int delta = realTime - cinTable[currentHandle].lastRealTime;
+		if ( delta < 0 ) {
+			delta = 0;
+		}
+		cinTable[currentHandle].frameAccumulator += delta;
+		cinTable[currentHandle].lastRealTime = realTime;
+
+		while ( cinTable[currentHandle].status == FMV_PLAY && cinTable[currentHandle].frameAccumulator >= targetFrameMs ) {
+			RoQInterrupt();
+			cinTable[currentHandle].frameAccumulator -= targetFrameMs;
+			if ( cinTable[currentHandle].status != FMV_PLAY ) {
+				break;
+			}
 		}
 	}
 
-	cinTable[currentHandle].lastTime = thisTime;
+	cinTable[currentHandle].lastTime = scaledTime;
 
 	if (cinTable[currentHandle].status == FMV_LOOPED) {
 		cinTable[currentHandle].status = FMV_PLAY;

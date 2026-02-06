@@ -426,10 +426,13 @@ void vk_queue_wait_idle( void );
 // Resources allocation.
 //
 void vk_create_image( image_t *image, int width, int height, int mip_levels );
-void vk_upload_image_data( image_t *image, int x, int y, int width, int height, int miplevels, byte *pixels, int size, qboolean update );
+void vk_upload_image_data( image_t *image, int x, int y, int width, int height, int miplevels, const void *pixels, int size, qboolean update );
 void vk_update_descriptor_set( image_t *image, qboolean mipmap );
 uint32_t vk_get_image_descriptor_index( const image_t *image );
 const image_t *vk_get_glint_dictionary_image( void );
+#ifdef USE_VK_PBR
+qboolean vk_has_glint_dictionary_descriptor( void );
+#endif
 uint32_t vk_get_glint_dict_index( void );
 VkDescriptorSet vk_get_pbr_indexed_descriptor( void );
 void vk_destroy_image_resources( VkImage *image, VkImageView *imageView );
@@ -621,6 +624,7 @@ typedef struct {
 	VkPipelineLayout pipeline_layout_storage;	// flare test shader layout
 	VkPipelineLayout pipeline_layout_post_process;	// post-processing
 	VkPipelineLayout pipeline_layout_blend;		// post-processing
+	VkPipelineLayout pipeline_layout_gamma;		// gamma pass with LUT
 	VkPipelineLayout pipeline_layout_ssao;		// ssao (depth + push constants)
 	VkPipelineLayout pipeline_layout_ssao_combine;	// ssao combine (color + ao)
 #ifdef VK_PBR_BRDFLUT
@@ -628,10 +632,15 @@ typedef struct {
 #endif
 
 	VkDescriptorSet color_descriptor;
+	VkDescriptorSet lut_descriptor;
 	VkDescriptorSet depth_descriptor;
 
 	VkImage color_image;
 	VkImageView color_image_view;
+	VkImage lut_image;
+	VkImageView lut_image_view;
+	VkDeviceMemory lut_memory;
+	int lutSize;
 
 	VkImage bloom_image[1+VK_NUM_BLOOM_PASSES*2];
 	VkImageView bloom_image_view[1+VK_NUM_BLOOM_PASSES*2];
