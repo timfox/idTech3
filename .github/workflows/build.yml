@@ -302,6 +302,8 @@ jobs:
           githubToken: ${{ github.token }}
           shell: /bin/sh
           run: |
+            set -eux
+
             export CFLAGS=""
             export CXXFLAGS=""
             export LDFLAGS=""
@@ -310,9 +312,13 @@ jobs:
               export CXXFLAGS="-mfpu=neon -mfloat-abi=hard"
               export LDFLAGS="-mfpu=neon -mfloat-abi=hard"
             fi
+
             apt-get -qq update
             apt-get install -y make gcc g++ cmake ninja-build
             apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev
+
+            OUTDIR="${GITHUB_WORKSPACE}/bin"
+            mkdir -p "$OUTDIR"
 
             mkdir -p build-vk-${{ matrix.btype }}
             cmake -S . -B build-vk-${{ matrix.btype }} \
@@ -327,9 +333,9 @@ jobs:
               -DRENDERER_DEFAULT=vulkan \
               -DSKIP_IDPAK_CHECK=ON \
               -Wno-dev
-            cmake --build build-vk-${{ matrix.btype }} -j$(nproc)
-            mkdir -p /github/workspace/bin
-            cp -f build-vk-${{ matrix.btype }}/idtech3* /github/workspace/bin/ || true
+            cmake --build build-vk-${{ matrix.btype }} -j"$(nproc)"
+
+            find "build-vk-${{ matrix.btype }}" -maxdepth 2 -type f -name 'idtech3*' -print -exec cp -f {} "$OUTDIR/" \;
 
             mkdir -p build-gl-${{ matrix.btype }}
             cmake -S . -B build-gl-${{ matrix.btype }} \
@@ -344,8 +350,12 @@ jobs:
               -DRENDERER_DEFAULT=opengl \
               -DSKIP_IDPAK_CHECK=ON \
               -Wno-dev
-            cmake --build build-gl-${{ matrix.btype }} -j$(nproc)
-            cp -f build-gl-${{ matrix.btype }}/idtech3* /github/workspace/bin/ || true
+            cmake --build build-gl-${{ matrix.btype }} -j"$(nproc)"
+
+            find "build-gl-${{ matrix.btype }}" -maxdepth 2 -type f -name 'idtech3*' -print -exec cp -f {} "$OUTDIR/" \;
+
+            test -n "$(ls -A "$OUTDIR")"
+            ls -al "$OUTDIR"
 
       - uses: actions/upload-artifact@v4
         if: matrix.cc == 'gcc' && matrix.btype == 'Release'
