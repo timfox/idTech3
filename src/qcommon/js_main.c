@@ -4,6 +4,7 @@
 
 #include "q_shared.h"
 #include "qcommon.h"
+#include "js_local.h"
 #include "duktape.h"
 #include "../server/server.h"
 #ifndef DEDICATED

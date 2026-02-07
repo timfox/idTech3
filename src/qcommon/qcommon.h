@@ -363,6 +363,8 @@ VIRTUAL MACHINE
 ==============================================================
 */
 typedef struct vm_s vm_t;
+#define GETVMCONTEXT 1000
+#define VMCALL 1001
 
 typedef enum {
 	VMI_NATIVE,
@@ -565,6 +567,7 @@ modules of the program.
 
 */
 
+cvar_t *Cvar_FindVar( const char *var_name );
 cvar_t *Cvar_Get( const char *var_name, const char *value, int flags );
 // creates the variable if it doesn't exist, or returns the existing one
 // if it exists, the value will not be changed, but flags will be ORed in

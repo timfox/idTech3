@@ -1976,6 +1976,64 @@ qboolean is_pbr_surface;
 			debugHasEnv = hasEnv;
 			debugHasIrr = hasIrr;
 
+			// Step 6: One-time IBL image integrity validation
+			{
+				static qboolean ibl_validated = qfalse;
+				if ( !ibl_validated && cubemapIndex >= 0 ) {
+					ibl_validated = qtrue;
+					const cubemap_t *cube = &tr.cubemaps[cubemapIndex];
+					if ( cube->prefiltered_image ) {
+						const image_t *pre = cube->prefiltered_image;
+						ri.Printf( PRINT_ALL,
+							"PBR IBL validate (env): img=%p handle=%p view=%p w=%d h=%d "
+							"flags=0x%x hasMips=%d type=%u layers=%u\n",
+							(const void *)pre,
+							(const void *)(uintptr_t)pre->handle,
+							(const void *)(uintptr_t)pre->view,
+							pre->uploadWidth ? pre->uploadWidth : pre->width,
+							pre->uploadHeight ? pre->uploadHeight : pre->height,
+							pre->flags,
+							( pre->flags & IMGFLAG_MIPMAP ) ? 1 : 0,
+							(unsigned)pre->type,
+							(unsigned)pre->layers );
+						if ( pre->view == VK_NULL_HANDLE ) {
+							ri.Printf( PRINT_WARNING,
+								"PBR IBL WARNING: prefiltered image has NULL view! "
+								"This will cause debug 19 to show RED.\n" );
+						}
+						if ( !( pre->flags & IMGFLAG_MIPMAP ) ) {
+							ri.Printf( PRINT_WARNING,
+								"PBR IBL WARNING: prefiltered image missing IMGFLAG_MIPMAP! "
+								"IBL roughness LOD levels may not work.\n" );
+						}
+					} else {
+						ri.Printf( PRINT_WARNING,
+							"PBR IBL WARNING: cubemap %d has no prefiltered_image\n", cubemapIndex );
+					}
+					if ( cube->irradiance_image ) {
+						const image_t *irr = cube->irradiance_image;
+						ri.Printf( PRINT_ALL,
+							"PBR IBL validate (irr): img=%p handle=%p view=%p w=%d h=%d "
+							"flags=0x%x type=%u layers=%u\n",
+							(const void *)irr,
+							(const void *)(uintptr_t)irr->handle,
+							(const void *)(uintptr_t)irr->view,
+							irr->uploadWidth ? irr->uploadWidth : irr->width,
+							irr->uploadHeight ? irr->uploadHeight : irr->height,
+							irr->flags,
+							(unsigned)irr->type,
+							(unsigned)irr->layers );
+						if ( irr->view == VK_NULL_HANDLE ) {
+							ri.Printf( PRINT_WARNING,
+								"PBR IBL WARNING: irradiance image has NULL view!\n" );
+						}
+					} else {
+						ri.Printf( PRINT_WARNING,
+							"PBR IBL WARNING: cubemap %d has no irradiance_image\n", cubemapIndex );
+					}
+				}
+			}
+
 			loggedCubemapIndex = cubemapIndex;
 			loggedEnvImage = envImage;
 			loggedIrrImage = irrImage;

@@ -5730,6 +5730,28 @@ void vk_initialize( void )
 	//vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_SHADER_STAGE_FRAGMENT_BIT, &vk.set_layout_input );
 
 #ifdef USE_VK_PBR
+	// Step 3: Compile-time validation that C and GLSL binding constants match.
+	// If any of these fail, update the PBR_BIND_* defines in gen_frag.tmpl to match vk.h.
+	STATIC_ASSERT( VK_DESC_PBR == 5, "VK_DESC_PBR must be 5 to match GLSL PBR_SET" );
+	STATIC_ASSERT( VK_PBR_BINDING_ALBEDO == 0, "binding mismatch" );
+	STATIC_ASSERT( VK_PBR_BINDING_NORMAL == 1, "binding mismatch" );
+	STATIC_ASSERT( VK_PBR_BINDING_PHYSICAL == 2, "binding mismatch" );
+	STATIC_ASSERT( VK_PBR_BINDING_EMISSIVE == 3, "binding mismatch" );
+	STATIC_ASSERT( VK_PBR_BINDING_LIGHTMAP == 4, "binding mismatch" );
+	STATIC_ASSERT( VK_PBR_BINDING_CLEARCOAT == 5, "binding mismatch" );
+	STATIC_ASSERT( VK_PBR_BINDING_SHEEN == 6, "binding mismatch" );
+	STATIC_ASSERT( VK_PBR_BINDING_ANISOTROPY == 7, "binding mismatch" );
+	STATIC_ASSERT( VK_PBR_BINDING_TRANSMISSION == 8, "binding mismatch" );
+	STATIC_ASSERT( VK_PBR_BINDING_SUBSURFACE == 9, "binding mismatch" );
+	STATIC_ASSERT( VK_PBR_BINDING_BRDFLUT == 10, "binding mismatch" );
+	STATIC_ASSERT( VK_PBR_BINDING_GLINT_DICT == 11, "binding mismatch" );
+	STATIC_ASSERT( VK_PBR_BINDING_ENV_CUBEMAP == 12, "binding mismatch" );
+	STATIC_ASSERT( VK_PBR_BINDING_IRRADIANCE == 13, "binding mismatch" );
+	STATIC_ASSERT( VK_PBR_BINDING_COUNT == 14, "binding count mismatch" );
+	STATIC_ASSERT( VK_PBR_INDEXED_BINDING_TEXTURES == 0, "indexed binding mismatch" );
+	STATIC_ASSERT( VK_PBR_INDEXED_BINDING_BRDFLUT == 1, "indexed binding mismatch" );
+	STATIC_ASSERT( VK_PBR_INDEXED_BINDING_ENV_CUBEMAP == 2, "indexed binding mismatch" );
+	STATIC_ASSERT( VK_PBR_INDEXED_BINDING_IRRADIANCE == 3, "indexed binding mismatch" );
 	{
 		VkDescriptorSetLayoutBinding pbr_bindings[VK_PBR_BINDING_COUNT];
 		VkDescriptorSetLayoutCreateInfo pbr_desc;
@@ -7081,9 +7103,16 @@ void vk_update_pbr_descriptor_binding_from_view( VkDescriptorSet descriptor, uin
 
 	qvkUpdateDescriptorSets( vk.device, 1, &descriptor_write, 0, NULL );
 	if ( r_pbr_bindlog && ( r_pbr_bindlog->integer || ( r_pbr_debug && r_pbr_debug->integer >= 17 ) ) ) {
-		ri.Printf( PRINT_ALL, "PBR IBL descwrite (non-indexed view): binding=%u view=%p\n",
+		const char *mapName = ( tr.world && tr.world->baseName[0] ) ? tr.world->baseName : "unknown";
+		ri.Printf( PRINT_ALL,
+			"PBR descwrite (non-indexed view): map=%s set=%p setIndex=%u binding=%u "
+			"view=%p sampler=%p type=COMBINED_IMAGE_SAMPLER\n",
+			mapName,
+			(const void *)(uintptr_t)descriptor,
+			(unsigned)VK_DESC_PBR,
 			binding,
-			(const void *)(uintptr_t)view );
+			(const void *)(uintptr_t)view,
+			(const void *)(uintptr_t)image_info.sampler );
 	}
 }
 
@@ -7526,6 +7555,32 @@ void vk_update_pbr_descriptor_binding( VkDescriptorSet descriptor, uint32_t bind
 
 	vk_fill_pbr_image_info( image, &image_info );
 
+	// Step 5: One-time sampler/view validation for IBL bindings
+	if ( binding == VK_PBR_BINDING_ENV_CUBEMAP || binding == VK_PBR_BINDING_IRRADIANCE || binding == VK_PBR_BINDING_GLINT_DICT ) {
+		static qboolean validated_env = qfalse, validated_irr = qfalse, validated_glint = qfalse;
+		qboolean *flag = ( binding == VK_PBR_BINDING_ENV_CUBEMAP ) ? &validated_env :
+						 ( binding == VK_PBR_BINDING_IRRADIANCE ) ? &validated_irr : &validated_glint;
+		if ( !*flag ) {
+			*flag = qtrue;
+			const char *bname = ( binding == VK_PBR_BINDING_ENV_CUBEMAP ) ? "env" :
+								( binding == VK_PBR_BINDING_IRRADIANCE ) ? "irr" : "glint";
+			ri.Printf( PRINT_ALL,
+				"PBR sampler validate (%s): binding=%u sampler=%p view=%p type=COMBINED_IMAGE_SAMPLER "
+				"sampler_valid=%d view_valid=%d\n",
+				bname, binding,
+				(const void *)(uintptr_t)image_info.sampler,
+				(const void *)(uintptr_t)image_info.imageView,
+				image_info.sampler != VK_NULL_HANDLE ? 1 : 0,
+				image_info.imageView != VK_NULL_HANDLE ? 1 : 0 );
+			if ( image_info.sampler == VK_NULL_HANDLE ) {
+				ri.Printf( PRINT_WARNING, "PBR WARNING: null sampler for %s binding %u!\n", bname, binding );
+			}
+			if ( image_info.imageView == VK_NULL_HANDLE ) {
+				ri.Printf( PRINT_WARNING, "PBR WARNING: null imageView for %s binding %u!\n", bname, binding );
+			}
+		}
+	}
+
 	descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	descriptor_write.dstSet = descriptor;
 	descriptor_write.dstBinding = binding;
@@ -7539,12 +7594,18 @@ void vk_update_pbr_descriptor_binding( VkDescriptorSet descriptor, uint32_t bind
 
 	qvkUpdateDescriptorSets( vk.device, 1, &descriptor_write, 0, NULL );
 	if ( r_pbr_bindlog && ( r_pbr_bindlog->integer || ( r_pbr_debug && r_pbr_debug->integer >= 17 ) ) ) {
-		const VkImageView view = image ? image->view : VK_NULL_HANDLE;
+		const char *mapName = ( tr.world && tr.world->baseName[0] ) ? tr.world->baseName : "unknown";
 		ri.Printf( PRINT_ALL,
-			"PBR IBL descwrite (non-indexed): binding=%u image=%p view=%p\n",
+			"PBR descwrite (non-indexed): map=%s set=%p setIndex=%u binding=%u "
+			"image=%p imgView=%p writtenView=%p sampler=%p type=COMBINED_IMAGE_SAMPLER\n",
+			mapName,
+			(const void *)(uintptr_t)descriptor,
+			(unsigned)VK_DESC_PBR,
 			binding,
 			(const void *)image,
-			(const void *)(uintptr_t)view );
+			(const void *)(uintptr_t)( image ? image->view : VK_NULL_HANDLE ),
+			(const void *)(uintptr_t)image_info.imageView,
+			(const void *)(uintptr_t)image_info.sampler );
 	}
 }
 
@@ -10289,6 +10350,19 @@ void vk_bind_descriptor_sets( void )
 
 	{
 		VkPipelineLayout layout = vk.cmd->pipeline_layout ? vk.cmd->pipeline_layout : vk.pipeline_layout;
+#if defined(USE_VK_PBR) && defined(_DEBUG)
+		// Step 2: assert pipeline layout consistency for PBR descriptor binds
+		if ( start <= VK_DESC_PBR && VK_DESC_PBR <= end ) {
+			// The layout used for vkCmdBindDescriptorSets must match the pipeline's layout
+			if ( layout != vk.pipeline_layout && layout != vk.pipeline_layout_pbr_indexed ) {
+				ri.Printf( PRINT_ERROR,
+					"PBR LAYOUT MISMATCH: bind layout=%p is neither standard(%p) nor indexed(%p)!\n",
+					(const void *)(uintptr_t)layout,
+					(const void *)(uintptr_t)vk.pipeline_layout,
+					(const void *)(uintptr_t)vk.pipeline_layout_pbr_indexed );
+			}
+		}
+#endif
 		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, start, count, vk.cmd->descriptor_set.current + start, offset_count, offsets );
 	#ifdef USE_VK_PBR
 		if ( start <= VK_DESC_PBR && VK_DESC_PBR <= end ) {
@@ -10304,20 +10378,19 @@ void vk_bind_descriptor_sets( void )
 				}
 				if ( bound != last_descriptor || layout != last_layout ) {
 					const char *mapName = ( tr.world && tr.world->baseName[0] ) ? tr.world->baseName : "unknown";
-					if ( r_pbr_bindlog && r_pbr_bindlog->integer ) {
+					if ( ( r_pbr_bindlog && r_pbr_bindlog->integer ) || ( r_pbr_debug && r_pbr_debug->integer >= 17 ) ) {
+						const char *layoutName = ( layout == vk.pipeline_layout ) ? "standard" :
+							( layout == vk.pipeline_layout_pbr_indexed ? "pbr_indexed" : "other" );
 						ri.Printf( PRINT_ALL,
-							"PBR descriptor bind (%s): layout=%p descriptor=%p setIndex=%u\n",
+							"PBR bind (%s): pipeline=%p layout=%p(%s) set=%p setIndex=%u firstSet=%u count=%u\n",
 							mapName,
+							(const void *)(uintptr_t)vk.cmd->last_pipeline,
 							(const void *)(uintptr_t)layout,
+							layoutName,
 							(const void *)(uintptr_t)bound,
-							VK_DESC_PBR );
-					} else if ( r_pbr_debug && r_pbr_debug->integer >= 17 ) {
-						ri.Printf( PRINT_ALL,
-							"PBR descriptor bind (%s): layout=%p descriptor=%p setIndex=%u\n",
-							mapName,
-							(const void *)(uintptr_t)layout,
-							(const void *)(uintptr_t)bound,
-							VK_DESC_PBR );
+							(unsigned)VK_DESC_PBR,
+							start,
+							count );
 					}
 					last_layout = layout;
 					last_descriptor = bound;
@@ -10341,6 +10414,25 @@ void vk_bind_pipeline( uint32_t pipeline ) {
 #ifdef USE_VK_PBR
 	if ( vk.pipelines[ pipeline ].def.descriptorIndexing && vk.pipeline_layout_pbr_indexed != VK_NULL_HANDLE ) {
 		layout = vk.pipeline_layout_pbr_indexed;
+	}
+	// Step 2: log pipeline+layout for PBR surfaces when debug active
+	if ( vk.pipelines[ pipeline ].def.vk_pbr_flags &&
+		 r_pbr_bindlog && ( r_pbr_bindlog->integer || ( r_pbr_debug && r_pbr_debug->integer >= 17 ) ) ) {
+		static VkPipeline last_logged_pipe = VK_NULL_HANDLE;
+		static VkPipelineLayout last_logged_layout = VK_NULL_HANDLE;
+		if ( vkpipe != last_logged_pipe || layout != last_logged_layout ) {
+			const char *layoutName = ( layout == vk.pipeline_layout ) ? "standard" :
+				( layout == vk.pipeline_layout_pbr_indexed ? "pbr_indexed" : "other" );
+			ri.Printf( PRINT_ALL,
+				"PBR pipeline bind: pipe=%p layout=%p(%s) descIndexing=%u pbrFlags=0x%08x\n",
+				(const void *)(uintptr_t)vkpipe,
+				(const void *)(uintptr_t)layout,
+				layoutName,
+				vk.pipelines[ pipeline ].def.descriptorIndexing,
+				vk.pipelines[ pipeline ].def.vk_pbr_flags );
+			last_logged_pipe = vkpipe;
+			last_logged_layout = layout;
+		}
 	}
 #endif
 
