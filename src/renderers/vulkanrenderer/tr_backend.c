@@ -1853,6 +1853,11 @@ static const void *RB_PrefilterEnvMap( const void *data )
 		cmd->cubemap->state = CUBEMAP_STATE_HAVE_DEFS_NOT_RENDERED;
 	} else {
 		cmd->cubemap->state = CUBEMAP_STATE_READY;
+#ifdef USE_VK_PBR
+		if ( vk.descriptorIndexingActive && preImg && irrImg ) {
+			vk_update_pbr_indexed_common( preImg, irrImg );
+		}
+#endif
 	}
 	return (const void *)(cmd + 1);
 }

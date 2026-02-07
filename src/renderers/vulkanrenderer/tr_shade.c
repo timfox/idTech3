@@ -25,6 +25,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_local.h"
 #include "glints.h"
 
+#ifdef USE_VK_PBR
+static VkDescriptorSet vk_get_pbr_descriptor_for_pipeline( const Vk_Pipeline_Def *def, VkDescriptorSet stageDescriptor );
+#endif
+
 extern cvar_t *r_shLighting;
 extern cvar_t *r_shWorldLighting;
 extern cvar_t *r_shDebugView;
@@ -150,6 +154,7 @@ static qboolean pbrDebugPermutationLogged = qfalse;
 static int pbrDebugLastMode = 0;
 static uint32_t pbrDebugLastFlags = 0;
 qboolean tr_pbr_bindLogPrinted = qfalse;
+qboolean tr_pbr_indexedFallbackWarned = qfalse;
 
 
 static uint32_t glint_descriptor_id( VkDescriptorSet descriptor )
@@ -973,6 +978,36 @@ static inline void vk_update_descriptor_if_changed( int index, VkDescriptorSet d
 		vk_update_descriptor( index, descriptor );
 	}
 }
+
+#ifdef USE_VK_PBR
+static VkDescriptorSet vk_get_pbr_descriptor_for_pipeline( const Vk_Pipeline_Def *def, VkDescriptorSet stageDescriptor )
+{
+	VkDescriptorSet descriptor = stageDescriptor;
+
+	if ( def->descriptorIndexing && vk.pipeline_layout_pbr_indexed != VK_NULL_HANDLE ) {
+		VkDescriptorSet indexed = vk_get_pbr_indexed_descriptor();
+		if ( indexed != VK_NULL_HANDLE ) {
+			descriptor = indexed;
+		} else if ( r_pbr_bindlog && ( r_pbr_bindlog->integer || ( r_pbr_debug && r_pbr_debug->integer >= 17 ) ) ) {
+			ri.Printf( PRINT_WARNING, "PBR IBL: descriptor indexing requested but indexed descriptor unavailable, continuing with fallback set.\n" );
+		}
+	}
+
+	if ( descriptor != VK_NULL_HANDLE &&
+		 r_pbr_bindlog && ( r_pbr_bindlog->integer || ( r_pbr_debug && r_pbr_debug->integer >= 17 ) ) ) {
+		const char *descriptorType = ( descriptor == stageDescriptor ) ? "stage" : "indexed";
+		ri.Printf( PRINT_ALL,
+			"PBR descriptor selection: defIndexing=%u descIndexingActive=%d chosen=%s descriptor=%p stageDescriptor=%p\n",
+			def->descriptorIndexing,
+			vk.descriptorIndexingActive ? 1 : 0,
+			descriptorType,
+			(const void *)(uintptr_t)descriptor,
+			(const void *)(uintptr_t)stageDescriptor );
+	}
+
+	return descriptor;
+}
+#endif
 #endif
 
 /*
@@ -1480,6 +1515,8 @@ static int R_SelectCubemapIndexForPBR( void ) {
 		}
 	}
 
+	const int selectedIndex = ( bestInRadius != -1 ) ? bestInRadius : bestIndex;
+
 	const qboolean logSelect =
 		( r_pbr_bindlog && r_pbr_bindlog->integer ) ||
 		( r_pbr_debug && r_pbr_debug->integer >= 17 );
@@ -1487,22 +1524,33 @@ static int R_SelectCubemapIndexForPBR( void ) {
 	if ( logSelect ) {
 		const char *mapName = ( tr.world && tr.world->baseName[0] ) ? tr.world->baseName : "unknown";
 		const cubemap_t *bestCube = ( bestIndex >= 0 ) ? &tr.cubemaps[bestIndex] : NULL;
+		const cubemap_t *selCube = ( selectedIndex >= 0 ) ? &tr.cubemaps[selectedIndex] : NULL;
+		const float radius = bestCube ? bestCube->parallaxRadius : 0.0f;
+		const float radiusSq = radius * radius;
 		ri.Printf( PRINT_ALL,
-			"PBR cubemap select: map=%s bestIndex=%d bestDistSq=%.2f bestInRadius=%d bestInDistSq=%.2f "
-			"pos=(%.0f %.0f %.0f) cubeOrigin=(%.0f %.0f %.0f) radius=%.0f\n",
+			"PBR cubemap select: map=%s selected=%d bestIndex=%d bestDistSq=%.2f bestInRadiusIdx=%d bestInRadiusDistSq=%.2f "
+			"foundInRadius=%d radius=%.0f radiusSq=%.0f sqrtDist=%.1f "
+			"pos=(%.0f %.0f %.0f) cubeOrigin=(%.0f %.0f %.0f) state=%d prefiltered=%p irradiance=%p\n",
 			mapName,
+			selectedIndex,
 			bestIndex,
 			bestDistSq,
 			bestInRadius,
 			bestInRadiusDistSq,
+			( bestInRadius != -1 ) ? 1 : 0,
+			radius,
+			radiusSq,
+			( bestDistSq > 0.0f ) ? sqrtf( bestDistSq ) : 0.0f,
 			pos[0], pos[1], pos[2],
 			bestCube ? bestCube->origin[0] : 0.0f,
 			bestCube ? bestCube->origin[1] : 0.0f,
 			bestCube ? bestCube->origin[2] : 0.0f,
-			bestCube ? bestCube->parallaxRadius : 0.0f );
+			selCube ? selCube->state : CUBEMAP_STATE_NONE,
+			selCube ? (const void *)selCube->prefiltered_image : NULL,
+			selCube ? (const void *)selCube->irradiance_image : NULL );
 	}
 
-	return ( bestInRadius != -1 ) ? bestInRadius : bestIndex;
+	return selectedIndex;
 }
 
 static void R_UpdatePBRCubemapDebugCvar( int cubemapIndex, const vec3_t pos )
@@ -1566,7 +1614,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 	}
 #endif
 #ifdef USE_VK_PBR
-	qboolean is_pbr_surface;
+qboolean is_pbr_surface;
 #endif
 	uint32_t pipeline;
 	int fog_stage;
@@ -1630,6 +1678,11 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 	qboolean debugHasEnv = qfalse;
 	qboolean debugHasIrr = qfalse;
 	qboolean stageHasLightmap = qfalse;
+	int loggedCubemapIndex = -1;
+	const image_t *loggedEnvImage = NULL;
+	const image_t *loggedIrrImage = NULL;
+	VkImageView loggedEnvView = VK_NULL_HANDLE;
+	VkImageView loggedIrrView = VK_NULL_HANDLE;
 
 	if ( is_pbr_surface ) {
 		Com_Memcpy( &uniform_camera.modelMatrix, backEnd.or.modelMatrix, sizeof(float) * 16 );
@@ -1788,7 +1841,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 #endif
 
 	#ifdef USE_VK_PBR
-		const qboolean useIndexing = vk.descriptorIndexingActive ? qtrue : qfalse;
+		qboolean useIndexing = qfalse;
 	#else
 		const qboolean useIndexing = qfalse;
 	#endif
@@ -1922,6 +1975,12 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 
 			debugHasEnv = hasEnv;
 			debugHasIrr = hasIrr;
+
+			loggedCubemapIndex = cubemapIndex;
+			loggedEnvImage = envImage;
+			loggedIrrImage = irrImage;
+			loggedEnvView = envView;
+			loggedIrrView = irrView;
 
 			static int lastLoggedCubemapIndex = -2;
 			static int lastLoggedNumCubemaps = -1;
@@ -2150,6 +2209,9 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			if ( pipeline != 0 ) {
 			Vk_Pipeline_Def def;
 			vk_get_pipeline_def( pipeline, &def );
+#ifdef USE_VK_PBR
+			useIndexing = ( vk.descriptorIndexingActive && def.descriptorIndexing ) ? qtrue : qfalse;
+#endif
 
 		if ( is_pbr_surface && ( pStage->vk_pbr_flags || pbr_debug >= 17 ) ) {
 				const uint32_t baseFlags = pStage->vk_pbr_flags & ~( PBR_HAS_LIGHTMAP | PBR_HAS_IRRADIANCE );
@@ -2244,6 +2306,84 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 					last_log.descriptorIndexing = def.descriptorIndexing;
 				}
 			}
+
+			const VkDescriptorSet activeDescriptor = vk_get_pbr_descriptor_for_pipeline( &def, pbrDescriptor );
+			if ( activeDescriptor != VK_NULL_HANDLE ) {
+				vk_update_descriptor_if_changed( VK_DESC_PBR, activeDescriptor );
+			}
+
+			const cubemap_t *selectedCube = ( loggedCubemapIndex >= 0 && loggedCubemapIndex < tr.numCubemaps ) ? &tr.cubemaps[loggedCubemapIndex] : NULL;
+			const int cubemapState = selectedCube ? selectedCube->state : CUBEMAP_STATE_NONE;
+	#ifdef _DEBUG
+			if ( def.descriptorIndexing && selectedCube && selectedCube->state == CUBEMAP_STATE_READY &&
+				 !tr_pbr_indexedFallbackWarned &&
+				 !vk_pbr_indexed_env_ready )
+			{
+				ri.Printf( PRINT_ERROR,
+					"PBR IBL: indexed pipeline active but indexed env/irr descriptors were never updated; expect envBinding=-1 (map=%s cubemap=%d)\n",
+					( tr.world && tr.world->baseName[0] ) ? tr.world->baseName : "unknown",
+					loggedCubemapIndex );
+				tr_pbr_indexedFallbackWarned = qtrue;
+			}
+	#endif
+
+			const qboolean shouldLogBindings =
+				!tr_pbr_bindLogPrinted &&
+				( ( r_pbr_bindlog && r_pbr_bindlog->integer ) ||
+				  ( r_pbr_debug && r_pbr_debug->integer >= 17 ) );
+			if ( shouldLogBindings ) {
+				const char *mapName = ( tr.world && tr.world->baseName[0] ) ? tr.world->baseName : "unknown";
+				float cubemapRadius = 0.0f;
+				float cubemapDistance = 0.0f;
+				if ( loggedCubemapIndex >= 0 && loggedCubemapIndex < tr.numCubemaps ) {
+					const cubemap_t *cube = &tr.cubemaps[loggedCubemapIndex];
+					vec3_t surfacePos;
+					vec3_t delta;
+					cubemapRadius = cube->parallaxRadius;
+					R_GetPBRSurfacePosition( surfacePos );
+					VectorSubtract( surfacePos, cube->origin, delta );
+					const float distSq = DotProduct( delta, delta );
+					if ( distSq > 0.0f ) {
+						cubemapDistance = sqrtf( distSq );
+					}
+				}
+				const VkPipelineLayout pipelineLayoutHandle =
+					( def.descriptorIndexing && vk.pipeline_layout_pbr_indexed != VK_NULL_HANDLE ) ?
+						vk.pipeline_layout_pbr_indexed : vk.pipeline_layout;
+				const char *pipelineLayoutName =
+					( def.descriptorIndexing && vk.pipeline_layout_pbr_indexed != VK_NULL_HANDLE ) ?
+						"vk.pipeline_layout_pbr_indexed" : "vk.pipeline_layout";
+				const VkImage envHandle = loggedEnvImage ? loggedEnvImage->handle : VK_NULL_HANDLE;
+				const VkImage irrHandle = loggedIrrImage ? loggedIrrImage->handle : VK_NULL_HANDLE;
+				const VkImageView logGlintView = vk_get_glint_dictionary_view();
+				const VkImage logGlintHandle = dictImage ? dictImage->handle : VK_NULL_HANDLE;
+				ri.Printf( PRINT_ALL,
+					"PBR bind truth: map=%s descIndexingActive=%d defIndexing=%d layout=%s(%p) descriptorSet(VK_DESC_PBR)=%p "
+					"cubemapIndex=%d state=%d radius=%.2f dist=%.2f envImg=%p envHandle=%p envView=%p "
+					"irrImg=%p irrHandle=%p irrView=%p glintImg=%p glintHandle=%p glintView=%p\n",
+					mapName,
+					vk.descriptorIndexingActive ? 1 : 0,
+					def.descriptorIndexing ? 1 : 0,
+					pipelineLayoutName,
+					(const void *)(uintptr_t)pipelineLayoutHandle,
+					(const void *)(uintptr_t)activeDescriptor,
+					loggedCubemapIndex,
+					cubemapState,
+					cubemapRadius,
+					cubemapDistance,
+					(const void *)loggedEnvImage,
+					(const void *)(uintptr_t)envHandle,
+					(const void *)(uintptr_t)loggedEnvView,
+					(const void *)loggedIrrImage,
+					(const void *)(uintptr_t)irrHandle,
+					(const void *)(uintptr_t)loggedIrrView,
+					(const void *)dictImage,
+					(const void *)(uintptr_t)logGlintHandle,
+					(const void *)(uintptr_t)logGlintView );
+				tr_pbr_bindLogPrinted = qtrue;
+			}
+
+			pbrDescriptor = activeDescriptor;
 		}
 #endif
 

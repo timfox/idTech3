@@ -1482,6 +1482,7 @@ extern cvar_t *r_glints_strength;
 extern cvar_t *r_glints_intensity;
 
 extern qboolean tr_pbr_bindLogPrinted;
+extern qboolean tr_pbr_indexedFallbackWarned;
 extern cvar_t *r_preparingShaders;
 extern cvar_t *r_glints_verbose;
 extern cvar_t *r_pbr_validate;

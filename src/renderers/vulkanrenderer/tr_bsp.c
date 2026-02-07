@@ -2912,6 +2912,10 @@ void RE_LoadWorldMap( const char *name ) {
 	// only set tr.world now that we know the entire level has loaded properly
 	tr.world = &s_worldData;
 	tr_pbr_bindLogPrinted = qfalse;
+	tr_pbr_indexedFallbackWarned = qfalse;
+#ifdef USE_VK_PBR
+	vk_pbr_indexed_env_ready = qfalse;
+#endif
 
 	ri.FS_FreeFile( buffer.v );
 

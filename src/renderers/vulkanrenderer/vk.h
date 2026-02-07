@@ -490,6 +490,7 @@ void vk_update_descriptor_offset( int index, uint32_t offset );
 void vk_update_glint_descriptor_binding( VkDescriptorSet descriptor );
 void vk_update_pbr_descriptor_binding( VkDescriptorSet descriptor, uint32_t binding, const image_t *image );
 void vk_update_pbr_descriptor_binding_from_view( VkDescriptorSet descriptor, uint32_t binding, VkImageView view );
+void vk_update_cubemap_overlay_view( VkImageView view );
 void vk_update_pbr_descriptor_common( VkDescriptorSet descriptor );
 void vk_update_pbr_indexed_common( const image_t *env, const image_t *irr );
 #ifdef USE_VK_PBR
@@ -498,6 +499,10 @@ VkImageView vk_get_scene_cubemap_view( void );
 void vk_update_glint_dictionary_if_needed( const glint_dict_params_t *params, qboolean force );
 #endif
 void vk_bind_descriptor_sets( void );
+
+#ifdef USE_VK_PBR
+extern qboolean vk_pbr_indexed_env_ready;
+#endif
 
 void vk_update_post_process_pipelines( void );
 
@@ -625,6 +630,7 @@ typedef struct {
 	VkPipelineLayout pipeline_layout_post_process;	// post-processing
 	VkPipelineLayout pipeline_layout_blend;		// post-processing
 	VkPipelineLayout pipeline_layout_gamma;		// gamma pass with LUT
+	VkPipelineLayout pipeline_layout_cubemap_overlay; // cubemap debug overlay
 	VkPipelineLayout pipeline_layout_ssao;		// ssao (depth + push constants)
 	VkPipelineLayout pipeline_layout_ssao_combine;	// ssao combine (color + ao)
 #ifdef VK_PBR_BRDFLUT
@@ -633,12 +639,14 @@ typedef struct {
 
 	VkDescriptorSet color_descriptor;
 	VkDescriptorSet lut_descriptor;
+	VkDescriptorSet cubemap_overlay_descriptor;
 	VkDescriptorSet depth_descriptor;
 
 	VkImage color_image;
 	VkImageView color_image_view;
 	VkImage lut_image;
 	VkImageView lut_image_view;
+	VkImageView cubemap_overlay_view;
 	VkDeviceMemory lut_memory;
 	int lutSize;
 
@@ -816,6 +824,7 @@ typedef struct {
 		VkShaderModule ssao_depth_debug_fs;
 
 		VkShaderModule gamma_fs;
+		VkShaderModule cubemap_overlay_fs;
 		VkShaderModule gamma_vs;
 
 		VkShaderModule fog_fs;
@@ -888,6 +897,7 @@ typedef struct {
 	uint32_t dot_pipeline;
 
 	VkPipeline gamma_pipeline;
+	VkPipeline cubemap_overlay_pipeline;
 	VkPipeline capture_pipeline;
 	VkPipeline bloom_extract_pipeline;
 	VkPipeline blur_pipeline[VK_NUM_BLOOM_PASSES*2]; // horizontal & vertical pairs

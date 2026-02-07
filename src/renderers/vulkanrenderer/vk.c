@@ -44,6 +44,10 @@ VkDebugReportCallbackEXT vk_debug_callback = VK_NULL_HANDLE;
 #endif
 
 #ifdef USE_VK_PBR
+qboolean vk_pbr_indexed_env_ready = qfalse;
+#endif
+
+#ifdef USE_VK_PBR
 cvar_t *r_pbr_validate;
 #endif
 
@@ -3295,6 +3299,7 @@ void vk_init_descriptors( void )
 
 		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.color_descriptor ) );
 		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.lut_descriptor ) );
+		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.cubemap_overlay_descriptor ) );
 
 		if ( r_ssao && r_ssao->integer ) {
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.depth_descriptor ) );
@@ -3325,6 +3330,7 @@ void vk_init_descriptors( void )
 
 		vk_update_attachment_descriptors();
 	}
+	vk.cubemap_overlay_view = VK_NULL_HANDLE;
 }
 
 
@@ -3740,9 +3746,11 @@ static void vk_create_shader_modules( void )
 
 	vk.modules.gamma_fs = SHADER_MODULE( gamma_frag_spv );
 	vk.modules.gamma_vs = SHADER_MODULE( gamma_vert_spv );
+	vk.modules.cubemap_overlay_fs = SHADER_MODULE( cubemap_overlay_frag_spv );
 
 	SET_OBJECT_NAME( vk.modules.gamma_fs, "gamma post-processing fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.gamma_vs, "gamma post-processing vertex module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	SET_OBJECT_NAME( vk.modules.cubemap_overlay_fs, "cubemap overlay fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 
 #ifdef VK_PBR_BRDFLUT
     vk.modules.brdflut_fs = SHADER_MODULE(brdflut_frag_spv);
@@ -3998,12 +4006,14 @@ static void vk_alloc_persistent_pipelines( void )
 }
 
 void vk_create_blur_pipeline( uint32_t index, uint32_t width, uint32_t height, qboolean horizontal_pass );
+static void vk_create_cubemap_overlay_pipeline( uint32_t width, uint32_t height );
 
 void vk_update_post_process_pipelines( void )
 {
 	if ( vk.fboActive ) {
 		// update gamma shader
 		vk_create_post_process_pipeline( 0, 0, 0 );
+		vk_create_cubemap_overlay_pipeline( glConfig.vidWidth, glConfig.vidHeight );
 		if ( vk.capture.image ) {
 			// update capture pipeline
 			vk_create_post_process_pipeline( 3, gls.captureWidth, gls.captureHeight );
@@ -5461,6 +5471,7 @@ void vk_initialize( void )
 
 #ifdef USE_VK_PBR
 	vk.descriptorIndexingActive = qfalse;
+	vk_pbr_indexed_env_ready = qfalse;
 	if ( vk.pbrActive && r_vk_descriptorIndexing && r_vk_descriptorIndexing->integer ) {
 		if ( !vk.hasDescriptorIndexing ) {
 			ri.Printf( PRINT_WARNING, "Vulkan: descriptor indexing requested but not supported\n" );
@@ -5879,6 +5890,24 @@ void vk_initialize( void )
 
 			VK_CHECK( qvkCreatePipelineLayout( vk.device, &gamma_desc, NULL, &vk.pipeline_layout_gamma ) );
 			SET_OBJECT_NAME( vk.pipeline_layout_gamma, "pipeline layout - gamma", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
+		}
+
+		{
+			VkPipelineLayoutCreateInfo overlay_desc;
+			VkDescriptorSetLayout overlay_layouts[1];
+
+			overlay_layouts[0] = vk.set_layout_sampler;
+
+			overlay_desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+			overlay_desc.pNext = NULL;
+			overlay_desc.flags = 0;
+			overlay_desc.setLayoutCount = 1;
+			overlay_desc.pSetLayouts = overlay_layouts;
+			overlay_desc.pushConstantRangeCount = 0;
+			overlay_desc.pPushConstantRanges = NULL;
+
+			VK_CHECK( qvkCreatePipelineLayout( vk.device, &overlay_desc, NULL, &vk.pipeline_layout_cubemap_overlay ) );
+			SET_OBJECT_NAME( vk.pipeline_layout_cubemap_overlay, "pipeline layout - cubemap overlay", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
 		}
 
 		desc.setLayoutCount = VK_NUM_BLOOM_PASSES;
@@ -6326,6 +6355,7 @@ void vk_shutdown( refShutdownCode_t code )
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_storage, NULL);
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_post_process, NULL);
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_gamma, NULL);
+	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_cubemap_overlay, NULL);
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_blend, NULL);
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_ssao, NULL);
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_ssao_combine, NULL);
@@ -6501,6 +6531,7 @@ void vk_shutdown( refShutdownCode_t code )
 
 	qvkDestroyShaderModule(vk.device, vk.modules.gamma_vs, NULL);
 	qvkDestroyShaderModule(vk.device, vk.modules.gamma_fs, NULL);
+	qvkDestroyShaderModule(vk.device, vk.modules.cubemap_overlay_fs, NULL);
 
 #ifdef USE_VK_PBR
 	qvkDestroyShaderModule(vk.device, vk.modules.brdflut_fs, NULL);
@@ -7050,10 +7081,51 @@ void vk_update_pbr_descriptor_binding_from_view( VkDescriptorSet descriptor, uin
 
 	qvkUpdateDescriptorSets( vk.device, 1, &descriptor_write, 0, NULL );
 	if ( r_pbr_bindlog && ( r_pbr_bindlog->integer || ( r_pbr_debug && r_pbr_debug->integer >= 17 ) ) ) {
-		ri.Printf( PRINT_ALL, "PBR IBL descwrite: binding=%u view=%p\n",
+		ri.Printf( PRINT_ALL, "PBR IBL descwrite (non-indexed view): binding=%u view=%p\n",
 			binding,
 			(const void *)(uintptr_t)view );
 	}
+}
+
+void vk_update_cubemap_overlay_view( VkImageView view )
+{
+	Vk_Sampler_Def sampler_def;
+	VkDescriptorImageInfo image_info;
+	VkWriteDescriptorSet descriptor_write;
+
+	if ( vk.cubemap_overlay_view == view ) {
+		return;
+	}
+
+	vk.cubemap_overlay_view = view;
+
+	if ( view == VK_NULL_HANDLE || vk.cubemap_overlay_descriptor == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	Com_Memset( &sampler_def, 0, sizeof( sampler_def ) );
+	sampler_def.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	sampler_def.gl_mag_filter = GL_LINEAR;
+	sampler_def.gl_min_filter = GL_LINEAR;
+	sampler_def.noAnisotropy = qtrue;
+	sampler_def.mip_lod_bias = 0.0f;
+
+	image_info.sampler = vk_find_sampler( &sampler_def );
+	image_info.imageView = view;
+	image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptor_write.dstSet = vk.cubemap_overlay_descriptor;
+	descriptor_write.dstBinding = 0;
+	descriptor_write.dstArrayElement = 0;
+	descriptor_write.descriptorCount = 1;
+	descriptor_write.pNext = NULL;
+	descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descriptor_write.pImageInfo = &image_info;
+	descriptor_write.pBufferInfo = NULL;
+	descriptor_write.pTexelBufferView = NULL;
+
+	qvkUpdateDescriptorSets( vk.device, 1, &descriptor_write, 0, NULL );
 }
 
 VkImageView vk_get_scene_cubemap_view( void )
@@ -7099,8 +7171,10 @@ static void vk_update_pbr_indexed_glint( VkDescriptorSet descriptor )
 
 	qvkUpdateDescriptorSets( vk.device, 1, &descriptor_write, 0, NULL );
 	if ( r_pbr_bindlog && ( r_pbr_bindlog->integer || ( r_pbr_debug && r_pbr_debug->integer >= 17 ) ) ) {
-		ri.Printf( PRINT_ALL, "PBR IBL descwrite: binding=%u view=%p\n",
+		ri.Printf( PRINT_ALL,
+			"PBR IBL descwrite (indexed glints): binding=%u index=%u view=%p\n",
 			VK_PBR_INDEXED_BINDING_TEXTURES,
+			vk.pbrIndexedGlintIndex,
 			(const void *)(uintptr_t)image_info.imageView );
 	}
 }
@@ -7110,8 +7184,10 @@ static void vk_update_pbr_indexed_common_descriptor( VkDescriptorSet descriptor,
 	VkDescriptorImageInfo infos[3];
 	VkWriteDescriptorSet writes[3];
 	uint32_t write_count = 0;
+	const qboolean logIndexWrites = r_pbr_bindlog && ( r_pbr_bindlog->integer || ( r_pbr_debug && r_pbr_debug->integer >= 17 ) );
 	const image_t *env_image = env;
 	const image_t *irr_image = irr;
+	const image_t *fallback_cubemap = tr.emptyCubemap ? tr.emptyCubemap : ( tr.blackImage ? tr.blackImage : tr.whiteImage );
 
 	if ( descriptor == VK_NULL_HANDLE )
 		return;
@@ -7122,6 +7198,8 @@ static void vk_update_pbr_indexed_common_descriptor( VkDescriptorSet descriptor,
 	if ( !irr_image ) {
 		irr_image = tr.emptyCubemap ? tr.emptyCubemap : ( tr.blackImage ? tr.blackImage : tr.whiteImage );
 	}
+	const qboolean envIsFallback = ( env_image == fallback_cubemap );
+	const qboolean irrIsFallback = ( irr_image == fallback_cubemap );
 
 	vk_fill_pbr_brdflut_info( &infos[write_count] );
 	writes[write_count].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -7147,6 +7225,13 @@ static void vk_update_pbr_indexed_common_descriptor( VkDescriptorSet descriptor,
 	writes[write_count].pImageInfo = &infos[write_count];
 	writes[write_count].pBufferInfo = NULL;
 	writes[write_count].pTexelBufferView = NULL;
+	if ( logIndexWrites ) {
+		ri.Printf( PRINT_ALL,
+			"PBR IBL descwrite (indexed env): binding=%u image=%p view=%p\n",
+			writes[write_count].dstBinding,
+			(const void *)env_image,
+			(const void *)(uintptr_t)infos[write_count].imageView );
+	}
 	write_count++;
 
 	vk_fill_pbr_image_info( irr_image, &infos[write_count] );
@@ -7160,10 +7245,20 @@ static void vk_update_pbr_indexed_common_descriptor( VkDescriptorSet descriptor,
 	writes[write_count].pImageInfo = &infos[write_count];
 	writes[write_count].pBufferInfo = NULL;
 	writes[write_count].pTexelBufferView = NULL;
+	if ( logIndexWrites ) {
+		ri.Printf( PRINT_ALL,
+			"PBR IBL descwrite (indexed irr): binding=%u image=%p view=%p\n",
+			writes[write_count].dstBinding,
+			(const void *)irr_image,
+			(const void *)(uintptr_t)infos[write_count].imageView );
+	}
 	write_count++;
 
 	qvkUpdateDescriptorSets( vk.device, write_count, writes, 0, NULL );
 	vk_update_pbr_indexed_glint( descriptor );
+#ifdef USE_VK_PBR
+	vk_pbr_indexed_env_ready = env_image && irr_image && !envIsFallback && !irrIsFallback;
+#endif
 }
 #endif
 
@@ -7443,6 +7538,14 @@ void vk_update_pbr_descriptor_binding( VkDescriptorSet descriptor, uint32_t bind
 	descriptor_write.pTexelBufferView = NULL;
 
 	qvkUpdateDescriptorSets( vk.device, 1, &descriptor_write, 0, NULL );
+	if ( r_pbr_bindlog && ( r_pbr_bindlog->integer || ( r_pbr_debug && r_pbr_debug->integer >= 17 ) ) ) {
+		const VkImageView view = image ? image->view : VK_NULL_HANDLE;
+		ri.Printf( PRINT_ALL,
+			"PBR IBL descwrite (non-indexed): binding=%u image=%p view=%p\n",
+			binding,
+			(const void *)image,
+			(const void *)(uintptr_t)view );
+	}
 }
 
 void vk_update_pbr_descriptor_common( VkDescriptorSet descriptor )
@@ -7919,6 +8022,138 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	VK_CHECK( qvkCreateGraphicsPipelines( vk.device, VK_NULL_HANDLE, 1, &create_info, NULL, pipeline ) );
 
 	SET_OBJECT_NAME( *pipeline, pipeline_name, VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
+}
+
+static void vk_create_cubemap_overlay_pipeline( uint32_t width, uint32_t height )
+{
+	VkPipelineShaderStageCreateInfo shader_stages[2];
+	VkPipelineVertexInputStateCreateInfo vertex_input_state;
+	VkPipelineInputAssemblyStateCreateInfo input_assembly_state;
+	VkPipelineRasterizationStateCreateInfo rasterization_state;
+	VkPipelineViewportStateCreateInfo viewport_state;
+	VkPipelineMultisampleStateCreateInfo multisample_state;
+	VkPipelineColorBlendStateCreateInfo blend_state;
+	VkPipelineColorBlendAttachmentState attachment_blend_state;
+	VkPipelineDynamicStateCreateInfo dynamic_state;
+	VkGraphicsPipelineCreateInfo create_info;
+	VkViewport viewport;
+	VkRect2D scissor;
+	VkPipeline pipeline = vk.cubemap_overlay_pipeline;
+	VkDynamicState dynamic_states[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+	float viewport_width = width ? (float)width : (float)MAX( 1, glConfig.vidWidth );
+	float viewport_height = height ? (float)height : (float)MAX( 1, glConfig.vidHeight );
+
+	if ( pipeline != VK_NULL_HANDLE ) {
+		vk_wait_idle();
+		qvkDestroyPipeline( vk.device, pipeline, NULL );
+		vk.cubemap_overlay_pipeline = VK_NULL_HANDLE;
+	}
+
+	vertex_input_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	vertex_input_state.pNext = NULL;
+	vertex_input_state.flags = 0;
+	vertex_input_state.vertexBindingDescriptionCount = 0;
+	vertex_input_state.pVertexBindingDescriptions = NULL;
+	vertex_input_state.vertexAttributeDescriptionCount = 0;
+	vertex_input_state.pVertexBindingDescriptions = NULL;
+
+	set_shader_stage_desc( shader_stages+0, VK_SHADER_STAGE_VERTEX_BIT, vk.modules.gamma_vs, "main" );
+	set_shader_stage_desc( shader_stages+1, VK_SHADER_STAGE_FRAGMENT_BIT, vk.modules.cubemap_overlay_fs, "main" );
+
+	input_assembly_state.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+	input_assembly_state.pNext = NULL;
+	input_assembly_state.flags = 0;
+	input_assembly_state.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+	input_assembly_state.primitiveRestartEnable = VK_FALSE;
+
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width = viewport_width;
+	viewport.height = viewport_height;
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+
+	scissor.offset.x = 0;
+	scissor.offset.y = 0;
+	scissor.extent.width = ( uint32_t ) viewport_width;
+	scissor.extent.height = ( uint32_t ) viewport_height;
+
+	viewport_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	viewport_state.pNext = NULL;
+	viewport_state.flags = 0;
+	viewport_state.viewportCount = 1;
+	viewport_state.pViewports = &viewport;
+	viewport_state.scissorCount = 1;
+	viewport_state.pScissors = &scissor;
+
+	rasterization_state.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	rasterization_state.pNext = NULL;
+	rasterization_state.flags = 0;
+	rasterization_state.depthClampEnable = VK_FALSE;
+	rasterization_state.rasterizerDiscardEnable = VK_FALSE;
+	rasterization_state.polygonMode = VK_POLYGON_MODE_FILL;
+	rasterization_state.cullMode = VK_CULL_MODE_NONE;
+	rasterization_state.frontFace = VK_FRONT_FACE_CLOCKWISE;
+	rasterization_state.depthBiasEnable = VK_FALSE;
+	rasterization_state.depthBiasConstantFactor = 0.0f;
+	rasterization_state.depthBiasClamp = 0.0f;
+	rasterization_state.depthBiasSlopeFactor = 0.0f;
+	rasterization_state.lineWidth = 1.0f;
+
+	multisample_state.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	multisample_state.pNext = NULL;
+	multisample_state.flags = 0;
+	multisample_state.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+	multisample_state.sampleShadingEnable = VK_FALSE;
+	multisample_state.minSampleShading = 1.0f;
+	multisample_state.pSampleMask = NULL;
+	multisample_state.alphaToCoverageEnable = VK_FALSE;
+	multisample_state.alphaToOneEnable = VK_FALSE;
+
+	Com_Memset( &attachment_blend_state, 0, sizeof( attachment_blend_state ) );
+	attachment_blend_state.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+	attachment_blend_state.blendEnable = VK_FALSE;
+
+	blend_state.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	blend_state.pNext = NULL;
+	blend_state.flags = 0;
+	blend_state.logicOpEnable = VK_FALSE;
+	blend_state.logicOp = VK_LOGIC_OP_COPY;
+	blend_state.attachmentCount = 1;
+	blend_state.pAttachments = &attachment_blend_state;
+	blend_state.blendConstants[0] = 0.0f;
+	blend_state.blendConstants[1] = 0.0f;
+	blend_state.blendConstants[2] = 0.0f;
+	blend_state.blendConstants[3] = 0.0f;
+
+	dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	dynamic_state.pNext = NULL;
+	dynamic_state.flags = 0;
+	dynamic_state.dynamicStateCount = ARRAY_LEN( dynamic_states );
+	dynamic_state.pDynamicStates = dynamic_states;
+
+	create_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	create_info.pNext = NULL;
+	create_info.flags = 0;
+	create_info.stageCount = 2;
+	create_info.pStages = shader_stages;
+	create_info.pVertexInputState = &vertex_input_state;
+	create_info.pInputAssemblyState = &input_assembly_state;
+	create_info.pTessellationState = NULL;
+	create_info.pViewportState = &viewport_state;
+	create_info.pRasterizationState = &rasterization_state;
+	create_info.pMultisampleState = &multisample_state;
+	create_info.pDepthStencilState = NULL;
+	create_info.pColorBlendState = &blend_state;
+	create_info.pDynamicState = &dynamic_state;
+	create_info.layout = vk.pipeline_layout_cubemap_overlay;
+	create_info.renderPass = vk.render_pass.gamma;
+	create_info.subpass = 0;
+	create_info.basePipelineHandle = VK_NULL_HANDLE;
+	create_info.basePipelineIndex = -1;
+
+	VK_CHECK( qvkCreateGraphicsPipelines( vk.device, VK_NULL_HANDLE, 1, &create_info, NULL, &vk.cubemap_overlay_pipeline ) );
+	SET_OBJECT_NAME( vk.cubemap_overlay_pipeline, "cubemap overlay pipeline", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
 }
 
 
@@ -10055,6 +10290,41 @@ void vk_bind_descriptor_sets( void )
 	{
 		VkPipelineLayout layout = vk.cmd->pipeline_layout ? vk.cmd->pipeline_layout : vk.pipeline_layout;
 		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, start, count, vk.cmd->descriptor_set.current + start, offset_count, offsets );
+	#ifdef USE_VK_PBR
+		if ( start <= VK_DESC_PBR && VK_DESC_PBR <= end ) {
+			VkDescriptorSet bound = vk.cmd->descriptor_set.current[VK_DESC_PBR];
+			if ( bound != VK_NULL_HANDLE ) {
+				static const world_t *last_world = NULL;
+				static VkPipelineLayout last_layout = VK_NULL_HANDLE;
+				static VkDescriptorSet last_descriptor = VK_NULL_HANDLE;
+				if ( tr.world != last_world ) {
+					last_world = tr.world;
+					last_layout = VK_NULL_HANDLE;
+					last_descriptor = VK_NULL_HANDLE;
+				}
+				if ( bound != last_descriptor || layout != last_layout ) {
+					const char *mapName = ( tr.world && tr.world->baseName[0] ) ? tr.world->baseName : "unknown";
+					if ( r_pbr_bindlog && r_pbr_bindlog->integer ) {
+						ri.Printf( PRINT_ALL,
+							"PBR descriptor bind (%s): layout=%p descriptor=%p setIndex=%u\n",
+							mapName,
+							(const void *)(uintptr_t)layout,
+							(const void *)(uintptr_t)bound,
+							VK_DESC_PBR );
+					} else if ( r_pbr_debug && r_pbr_debug->integer >= 17 ) {
+						ri.Printf( PRINT_ALL,
+							"PBR descriptor bind (%s): layout=%p descriptor=%p setIndex=%u\n",
+							mapName,
+							(const void *)(uintptr_t)layout,
+							(const void *)(uintptr_t)bound,
+							VK_DESC_PBR );
+					}
+					last_layout = layout;
+					last_descriptor = bound;
+				}
+			}
+		}
+	#endif
 	}
 
 	vk.cmd->descriptor_set.end = 0;
@@ -10683,6 +10953,49 @@ void vk_end_frame( void )
 			}
 
 			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+			if ( r_pbr_showCubemap && r_pbr_showCubemap->integer &&
+				 vk.cubemap_overlay_pipeline != VK_NULL_HANDLE &&
+				 vk.pipeline_layout_cubemap_overlay != VK_NULL_HANDLE &&
+				 vk.cubemap_overlay_descriptor != VK_NULL_HANDLE &&
+				 vk.cubemap_overlay_view != VK_NULL_HANDLE ) {
+				const uint32_t margin = 10;
+				uint32_t overlaySize = MIN( 256u, vk.renderWidth );
+				if ( vk.renderWidth > margin * 2u ) {
+					overlaySize = MIN( overlaySize, vk.renderWidth - margin * 2u );
+				}
+				if ( vk.renderHeight > margin * 2u ) {
+					overlaySize = MIN( overlaySize, vk.renderHeight - margin * 2u );
+				}
+				if ( overlaySize == 0 ) {
+					overlaySize = MIN( vk.renderWidth, vk.renderHeight );
+				}
+
+				if ( overlaySize > 0 ) {
+					const uint32_t overlayX = margin;
+					const uint32_t overlayY = ( vk.renderHeight > overlaySize + margin ) ? ( vk.renderHeight - overlaySize - margin ) : margin;
+
+					VkViewport overlayViewport;
+					overlayViewport.x = (float)overlayX;
+					overlayViewport.y = (float)overlayY;
+					overlayViewport.width = (float)overlaySize;
+					overlayViewport.height = (float)overlaySize;
+					overlayViewport.minDepth = 0.0f;
+					overlayViewport.maxDepth = 1.0f;
+
+					VkRect2D overlayScissor;
+					overlayScissor.offset.x = overlayX;
+					overlayScissor.offset.y = overlayY;
+					overlayScissor.extent.width = overlaySize;
+					overlayScissor.extent.height = overlaySize;
+
+					VkDescriptorSet overlaySets[1] = { vk.cubemap_overlay_descriptor };
+					qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.cubemap_overlay_pipeline );
+					qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_cubemap_overlay, 0, 1, overlaySets, 0, NULL );
+					qvkCmdSetViewport( vk.cmd->command_buffer, 0, 1, &overlayViewport );
+					qvkCmdSetScissor( vk.cmd->command_buffer, 0, 1, &overlayScissor );
+					qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+				}
+			}
 		}
 
 		if ( !ri.CL_IsMinimized() )
