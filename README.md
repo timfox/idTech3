@@ -23,6 +23,10 @@ Go to [Releases](../../releases) section to download latest binaries for your pl
 * Heuristic acoustics: real-time reverb/occlusion using OpenAL EFX
 * Supports codecs for mp3, ogg, wav, flac, webm, and opus
 
+**Scripting**:
+* LUA support for gameplay scripting
+* JavaScript support for UI scripting
+
 **Image Generation**:
 * FLUX.2/FLUX.1 C image generation (optional, text-to-image from console with **real-time hot-reloading** and device selection; supports flux1-schnell, flux1-dev, flux2-dev; requires model files in game directory; Metal, BLAS, or pure C backend, with graceful fallback)
 
