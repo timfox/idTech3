@@ -1634,6 +1634,9 @@ extern	cvar_t	*r_printShaders;
 
 extern cvar_t	*r_marksOnTriangleMeshes;
 extern cvar_t	*r_tonemap;
+extern cvar_t	*r_autoExposure;
+extern cvar_t	*r_autoExposureSpeed;
+extern cvar_t	*r_autoExposureKeyValue;
 extern cvar_t	*r_exposure;
 extern cvar_t	*r_lut;
 extern cvar_t	*r_lut_intensity;

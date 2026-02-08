@@ -4008,6 +4008,11 @@ static void vk_alloc_persistent_pipelines( void )
 void vk_create_blur_pipeline( uint32_t index, uint32_t width, uint32_t height, qboolean horizontal_pass );
 static void vk_create_cubemap_overlay_pipeline( uint32_t width, uint32_t height );
 
+static void vk_create_auto_exposure_resources( void );
+static void vk_destroy_auto_exposure_resources( void );
+static void vk_autoexposure_downsample( void );
+static void vk_update_auto_exposure_from_recent_buffer( void );
+
 void vk_update_post_process_pipelines( void )
 {
 	if ( vk.fboActive ) {
@@ -4695,6 +4700,295 @@ static void vk_create_framebuffers( void )
 	}
 }
 
+static void vk_create_auto_exposure_resources( void )
+{
+	uint32_t i;
+	VkImageCreateInfo image_info;
+	VkImageViewCreateInfo view_info;
+	VkMemoryRequirements memory_requirements;
+	VkMemoryAllocateInfo alloc_info;
+	VkBufferCreateInfo buffer_info;
+	VkMemoryRequirements buffer_reqs;
+
+	if ( vk.autoExposureImage != VK_NULL_HANDLE ) {
+		return;
+	}
+
+	Com_Memset( &image_info, 0, sizeof( image_info ) );
+	image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	image_info.imageType = VK_IMAGE_TYPE_2D;
+	image_info.format = vk.color_format;
+	image_info.extent.width = 1;
+	image_info.extent.height = 1;
+	image_info.extent.depth = 1;
+	image_info.mipLevels = 1;
+	image_info.arrayLayers = 1;
+	image_info.samples = VK_SAMPLE_COUNT_1_BIT;
+	image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+	image_info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+	image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+	VK_CHECK( qvkCreateImage( vk.device, &image_info, NULL, &vk.autoExposureImage ) );
+	vk_get_image_memory_erquirements( vk.autoExposureImage, &memory_requirements );
+
+	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	alloc_info.pNext = NULL;
+	alloc_info.allocationSize = memory_requirements.size;
+	alloc_info.memoryTypeIndex = find_memory_type( memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+
+	if ( alloc_info.memoryTypeIndex == ~0u ) {
+		Com_Error( ERR_FATAL, "vk_create_auto_exposure_resources: no suitable memory type for auto exposure image" );
+	}
+
+	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.autoExposureImageMemory ) );
+	VK_CHECK( qvkBindImageMemory( vk.device, vk.autoExposureImage, vk.autoExposureImageMemory, 0 ) );
+	vk.autoExposureImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+	view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	view_info.pNext = NULL;
+	view_info.flags = 0;
+	view_info.image = vk.autoExposureImage;
+	view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	view_info.format = vk.color_format;
+	view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	view_info.subresourceRange.baseMipLevel = 0;
+	view_info.subresourceRange.levelCount = 1;
+	view_info.subresourceRange.baseArrayLayer = 0;
+	view_info.subresourceRange.layerCount = 1;
+
+	VK_CHECK( qvkCreateImageView( vk.device, &view_info, NULL, &vk.autoExposureImageView ) );
+
+	buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	buffer_info.pNext = NULL;
+	buffer_info.flags = 0;
+	buffer_info.size = AUTO_EXPOSURE_BUFFER_SIZE;
+	buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+	buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	buffer_info.queueFamilyIndexCount = 0;
+	buffer_info.pQueueFamilyIndices = NULL;
+
+	for ( i = 0; i < AUTO_EXPOSURE_BUFFER_COUNT; i++ ) {
+		VK_CHECK( qvkCreateBuffer( vk.device, &buffer_info, NULL, &vk.autoExposureBuffer[i] ) );
+		qvkGetBufferMemoryRequirements( vk.device, vk.autoExposureBuffer[i], &buffer_reqs );
+		alloc_info.allocationSize = buffer_reqs.size;
+		alloc_info.memoryTypeIndex = find_memory_type( buffer_reqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+		if ( alloc_info.memoryTypeIndex == ~0u ) {
+			Com_Error( ERR_FATAL, "vk_create_auto_exposure_resources: no suitable memory type for auto exposure buffer" );
+		}
+		VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.autoExposureBufferMemory[i] ) );
+		VK_CHECK( qvkBindBufferMemory( vk.device, vk.autoExposureBuffer[i], vk.autoExposureBufferMemory[i], 0 ) );
+		VK_CHECK( qvkMapMemory( vk.device, vk.autoExposureBufferMemory[i], 0, AUTO_EXPOSURE_BUFFER_SIZE, 0, (void **)&vk.autoExposureBufferPtr[i] ) );
+	}
+
+	vk.autoExposureBufferIndex = 0;
+	vk.autoExposureValue = r_exposure ? r_exposure->value : 1.0f;
+	vk.autoExposureHistory = vk.autoExposureValue;
+	vk.autoExposureEnabled = qfalse;
+	vk.autoExposureHasValue = qfalse;
+	vk.autoExposureHasCopied = qfalse;
+}
+
+static void vk_destroy_auto_exposure_resources( void )
+{
+	uint32_t i;
+
+	for ( i = 0; i < AUTO_EXPOSURE_BUFFER_COUNT; i++ ) {
+		if ( vk.autoExposureBufferPtr[i] != NULL ) {
+			qvkUnmapMemory( vk.device, vk.autoExposureBufferMemory[i] );
+			vk.autoExposureBufferPtr[i] = NULL;
+		}
+		if ( vk.autoExposureBuffer[i] != VK_NULL_HANDLE ) {
+			qvkDestroyBuffer( vk.device, vk.autoExposureBuffer[i], NULL );
+			vk.autoExposureBuffer[i] = VK_NULL_HANDLE;
+		}
+		if ( vk.autoExposureBufferMemory[i] != VK_NULL_HANDLE ) {
+			qvkFreeMemory( vk.device, vk.autoExposureBufferMemory[i], NULL );
+			vk.autoExposureBufferMemory[i] = VK_NULL_HANDLE;
+		}
+	}
+	if ( vk.autoExposureImageView != VK_NULL_HANDLE ) {
+		qvkDestroyImageView( vk.device, vk.autoExposureImageView, NULL );
+		vk.autoExposureImageView = VK_NULL_HANDLE;
+	}
+	if ( vk.autoExposureImage != VK_NULL_HANDLE ) {
+		qvkDestroyImage( vk.device, vk.autoExposureImage, NULL );
+		vk.autoExposureImage = VK_NULL_HANDLE;
+	}
+	if ( vk.autoExposureImageMemory != VK_NULL_HANDLE ) {
+		qvkFreeMemory( vk.device, vk.autoExposureImageMemory, NULL );
+		vk.autoExposureImageMemory = VK_NULL_HANDLE;
+	}
+}
+
+static void vk_update_gamma_exposure( void )
+{
+	if ( vk.autoExposureEnabled && vk.autoExposureValue > 0.0f ) {
+		vk.gammaExposure = vk.autoExposureValue;
+	} else {
+		vk.gammaExposure = r_exposure ? r_exposure->value : 1.0f;
+	}
+}
+
+static void vk_autoexposure_downsample( void )
+{
+	if ( !vk.autoExposureImage || vk.renderWidth == 0 || vk.renderHeight == 0 ) {
+		return;
+	}
+
+	VkImageMemoryBarrier barriers[2];
+	VkImageMemoryBarrier postBarriers[2];
+
+	Com_Memset( &barriers, 0, sizeof( barriers ) );
+	barriers[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	barriers[0].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	barriers[0].dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+	barriers[0].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	barriers[0].newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+	barriers[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barriers[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barriers[0].image = vk.color_image;
+	barriers[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	barriers[0].subresourceRange.baseMipLevel = 0;
+	barriers[0].subresourceRange.levelCount = 1;
+	barriers[0].subresourceRange.baseArrayLayer = 0;
+	barriers[0].subresourceRange.layerCount = 1;
+
+	barriers[1].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	barriers[1].srcAccessMask = 0;
+	barriers[1].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	barriers[1].oldLayout = vk.autoExposureImageLayout;
+	barriers[1].newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	barriers[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barriers[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barriers[1].image = vk.autoExposureImage;
+	barriers[1].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	barriers[1].subresourceRange.baseMipLevel = 0;
+	barriers[1].subresourceRange.levelCount = 1;
+	barriers[1].subresourceRange.baseArrayLayer = 0;
+	barriers[1].subresourceRange.layerCount = 1;
+
+	qvkCmdPipelineBarrier( vk.cmd->command_buffer,
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		VK_PIPELINE_STAGE_TRANSFER_BIT,
+		0, 0, NULL, 0, NULL, 2, barriers );
+
+	VkImageBlit blit;
+	Com_Memset( &blit, 0, sizeof( blit ) );
+	blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	blit.srcSubresource.layerCount = 1;
+	blit.srcSubresource.baseArrayLayer = 0;
+	blit.srcSubresource.mipLevel = 0;
+
+	blit.dstSubresource = blit.srcSubresource;
+
+	blit.srcOffsets[0].x = 0;
+	blit.srcOffsets[0].y = 0;
+	blit.srcOffsets[0].z = 0;
+	blit.srcOffsets[1].x = (int32_t)vk.renderWidth;
+	blit.srcOffsets[1].y = (int32_t)vk.renderHeight;
+	blit.srcOffsets[1].z = 1;
+
+	blit.dstOffsets[0].x = 0;
+	blit.dstOffsets[0].y = 0;
+	blit.dstOffsets[0].z = 0;
+	blit.dstOffsets[1].x = 1;
+	blit.dstOffsets[1].y = 1;
+	blit.dstOffsets[1].z = 1;
+
+	qvkCmdBlitImage( vk.cmd->command_buffer,
+		vk.color_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		vk.autoExposureImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		1, &blit, VK_FILTER_LINEAR );
+
+	postBarriers[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	postBarriers[0].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	postBarriers[0].dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+	postBarriers[0].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	postBarriers[0].newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+	postBarriers[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	postBarriers[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	postBarriers[0].image = vk.autoExposureImage;
+	postBarriers[0].subresourceRange = barriers[1].subresourceRange;
+
+	postBarriers[1].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	postBarriers[1].srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+	postBarriers[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	postBarriers[1].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+	postBarriers[1].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	postBarriers[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	postBarriers[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	postBarriers[1].image = vk.color_image;
+	postBarriers[1].subresourceRange = barriers[0].subresourceRange;
+
+	qvkCmdPipelineBarrier( vk.cmd->command_buffer,
+		VK_PIPELINE_STAGE_TRANSFER_BIT,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+		0, 0, NULL, 0, NULL, 2, postBarriers );
+
+	VkBufferImageCopy copy_region;
+	Com_Memset( &copy_region, 0, sizeof( copy_region ) );
+	copy_region.bufferOffset = 0;
+	copy_region.bufferRowLength = 0;
+	copy_region.bufferImageHeight = 0;
+	copy_region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	copy_region.imageSubresource.mipLevel = 0;
+	copy_region.imageSubresource.baseArrayLayer = 0;
+	copy_region.imageSubresource.layerCount = 1;
+	copy_region.imageOffset.x = 0;
+	copy_region.imageOffset.y = 0;
+	copy_region.imageOffset.z = 0;
+	copy_region.imageExtent.width = 1;
+	copy_region.imageExtent.height = 1;
+	copy_region.imageExtent.depth = 1;
+
+	qvkCmdCopyImageToBuffer( vk.cmd->command_buffer,
+		vk.autoExposureImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		vk.autoExposureBuffer[ vk.autoExposureBufferIndex ], 1, &copy_region );
+
+	vk.autoExposureImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+	vk.autoExposureHasCopied = qtrue;
+	vk.autoExposureBufferIndex = ( vk.autoExposureBufferIndex + 1 ) % AUTO_EXPOSURE_BUFFER_COUNT;
+}
+
+static void vk_update_auto_exposure_from_recent_buffer( void )
+{
+	if ( r_autoExposure && r_autoExposure->integer ) {
+		vk.autoExposureEnabled = qtrue;
+	} else {
+		vk.autoExposureEnabled = qfalse;
+	}
+
+	if ( !vk.autoExposureEnabled ) {
+		vk.autoExposureValue = r_exposure ? r_exposure->value : 1.0f;
+		vk.autoExposureHistory = vk.autoExposureValue;
+		return;
+	}
+
+	if ( !vk.autoExposureHasCopied ) {
+		return;
+	}
+
+	const uint32_t readIndex = ( vk.autoExposureBufferIndex + AUTO_EXPOSURE_BUFFER_COUNT - 1 ) % AUTO_EXPOSURE_BUFFER_COUNT;
+	float *color = (float *)vk.autoExposureBufferPtr[ readIndex ];
+	if ( !color ) {
+		return;
+	}
+
+	const float lum = color[0] * 0.2126f + color[1] * 0.7152f + color[2] * 0.0722f;
+	const float keyValue = r_autoExposureKeyValue ? fmaxf( r_autoExposureKeyValue->value, 1e-4f ) : 0.18f;
+	const float target = keyValue / fmaxf( lum, 1e-4f );
+	const float smooth = r_autoExposureSpeed ? fmaxf( 0.0f, fminf( r_autoExposureSpeed->value, 1.0f ) ) : 0.1f;
+
+	if ( !vk.autoExposureHasValue ) {
+		vk.autoExposureHistory = target;
+		vk.autoExposureHasValue = qtrue;
+	} else {
+		vk.autoExposureHistory = vk.autoExposureHistory * ( 1.0f - smooth ) + target * smooth;
+	}
+	vk.autoExposureValue = vk.autoExposureHistory;
+}
+
 
 static void vk_create_sync_primitives( void ) {
 	VkSemaphoreCreateInfo desc;
@@ -5131,6 +5425,7 @@ static void vk_restart_swapchain( const char *funcname, VkResult res )
 	vk_create_attachments();
 	vk_create_render_passes();
 	vk_create_framebuffers();
+	vk_create_auto_exposure_resources();
 
 	//vk_create_bloom_pipelines();
 #ifdef VK_PBR_BRDFLUT
@@ -5898,6 +6193,7 @@ void vk_initialize( void )
 		{
 			VkPipelineLayoutCreateInfo gamma_desc;
 			VkDescriptorSetLayout gamma_layouts[2];
+			VkPushConstantRange gamma_push_range;
 
 			gamma_layouts[0] = vk.set_layout_sampler;
 			gamma_layouts[1] = vk.set_layout_sampler;
@@ -5907,8 +6203,11 @@ void vk_initialize( void )
 			gamma_desc.flags = 0;
 			gamma_desc.setLayoutCount = 2;
 			gamma_desc.pSetLayouts = gamma_layouts;
-			gamma_desc.pushConstantRangeCount = 0;
-			gamma_desc.pPushConstantRanges = NULL;
+			gamma_push_range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+			gamma_push_range.offset = 0;
+			gamma_push_range.size = sizeof(float);
+			gamma_desc.pushConstantRangeCount = 1;
+			gamma_desc.pPushConstantRanges = &gamma_push_range;
 
 			VK_CHECK( qvkCreatePipelineLayout( vk.device, &gamma_desc, NULL, &vk.pipeline_layout_gamma ) );
 			SET_OBJECT_NAME( vk.pipeline_layout_gamma, "pipeline layout - gamma", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
@@ -6327,6 +6626,8 @@ void vk_shutdown( refShutdownCode_t code )
 	vk_destroy_render_passes();
 
 	vk_destroy_attachments();
+
+	vk_destroy_auto_exposure_resources();
 
 	vk_destroy_swapchain();
 
@@ -10820,6 +11121,8 @@ void vk_begin_frame( void )
 		VK_CHECK( qvkResetFences( vk.device, 1, &vk.cmd->rendering_finished_fence ) );
 	}
 
+	vk_update_auto_exposure_from_recent_buffer();
+
 	if ( !ri.CL_IsMinimized() && !vk.cmd->swapchain_image_acquired ) {
 		qboolean retry = qfalse;
 _retry:
@@ -11056,6 +11359,9 @@ void vk_end_frame( void )
 				VkDescriptorSet sets[2] = { vk.color_descriptor, vk.lut_descriptor };
 				qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.capture_pipeline );
 				qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_gamma, 0, 2, sets, 0, NULL );
+				vk_update_gamma_exposure();
+				qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_gamma, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+									sizeof( vk.gammaExposure ), &vk.gammaExposure );
 			}
 
 			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
@@ -11103,9 +11409,8 @@ void vk_end_frame( void )
 				}
 			}
 		}
-
-		if ( !ri.CL_IsMinimized() )
-		{
+	if ( !ri.CL_IsMinimized() )
+	{
 			vk_end_render_pass();
 
 			vk.renderWidth = gls.windowWidth;
@@ -11114,11 +11419,17 @@ void vk_end_frame( void )
 			vk.renderScaleX = 1.0;
 			vk.renderScaleY = 1.0;
 
+			if ( vk.autoExposureEnabled ) {
+				vk_autoexposure_downsample();
+			}
 			vk_begin_render_pass( vk.render_pass.gamma, vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ], qfalse, vk.renderWidth, vk.renderHeight );
 			{
 				VkDescriptorSet sets[2] = { vk.color_descriptor, vk.lut_descriptor };
 				qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.gamma_pipeline );
 				qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_gamma, 0, 2, sets, 0, NULL );
+				vk_update_gamma_exposure();
+				qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_gamma, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+									sizeof( vk.gammaExposure ), &vk.gammaExposure );
 			}
 
 			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );

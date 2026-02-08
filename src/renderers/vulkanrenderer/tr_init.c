@@ -261,6 +261,9 @@ cvar_t	*r_tonemap;
 cvar_t	*r_exposure;
 cvar_t	*r_lut;
 cvar_t	*r_lut_intensity;
+cvar_t	*r_autoExposure;
+cvar_t	*r_autoExposureSpeed;
+cvar_t	*r_autoExposureKeyValue;
 cvar_t	*r_pbr_bindlog;
 
 cvar_t	*r_subdivisions;
@@ -1548,6 +1551,12 @@ static void VarInfo( void )
 			ri.Printf( PRINT_ALL, "Tone mapping: %s (exposure %.2f)\n", tonemapNames[tm], r_exposure->value );
 		}
 	}
+	if ( r_autoExposure && r_autoExposureKeyValue && r_autoExposureSpeed ) {
+		ri.Printf( PRINT_ALL, "Auto exposure: %s (key %.2f, speed %.2f)\n",
+			r_autoExposure->integer ? "enabled" : "disabled",
+			r_autoExposureKeyValue->value,
+			r_autoExposureSpeed->value );
+	}
 	if ( r_pbr_debug->integer ) {
 		ri.Printf( PRINT_ALL, "PBR debug view: mode %d\n", r_pbr_debug->integer );
 	}
@@ -1973,6 +1982,21 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_tonemap, "0", "5", CV_INTEGER );
 	ri.Cvar_SetDescription( r_tonemap, "Tone mapping operator:\n 0=off (identity)\n 1=Reinhard\n 2=ACES Filmic\n 3=Hable/Uncharted2\n 4=AgX (Troy Sobotka)\n 5=Khronos PBR Neutral" );
 	ri.Cvar_SetGroup( r_tonemap, CVG_RENDERER );
+
+	r_autoExposure = ri.Cvar_Get( "r_autoExposure", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_autoExposure, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_autoExposure, "Enable automatic exposure adjustment (middle gray target)" );
+	ri.Cvar_SetGroup( r_autoExposure, CVG_RENDERER );
+
+	r_autoExposureSpeed = ri.Cvar_Get( "r_autoExposureSpeed", "0.1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_autoExposureSpeed, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_autoExposureSpeed, "Auto exposure smoothing factor (0 = slow, 1 = immediate)" );
+	ri.Cvar_SetGroup( r_autoExposureSpeed, CVG_RENDERER );
+
+	r_autoExposureKeyValue = ri.Cvar_Get( "r_autoExposureKeyValue", "0.18", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_autoExposureKeyValue, "0.01", "10", CV_FLOAT );
+	ri.Cvar_SetDescription( r_autoExposureKeyValue, "Middle gray target luminance for auto exposure (default 0.18)" );
+	ri.Cvar_SetGroup( r_autoExposureKeyValue, CVG_RENDERER );
 
 	r_exposure = ri.Cvar_Get( "r_exposure", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_exposure, "0.01", "10", CV_FLOAT );

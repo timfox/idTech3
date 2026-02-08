@@ -30,6 +30,8 @@
 //#define USE_UPLOAD_QUEUE
 
 #define VK_NUM_BLOOM_PASSES 4
+#define AUTO_EXPOSURE_BUFFER_COUNT 2
+#define AUTO_EXPOSURE_BUFFER_SIZE (sizeof(float) * 4)
 
 
 #ifndef _DEBUG
@@ -701,6 +703,22 @@ typedef struct {
 		VkImage image;
 		VkImageView image_view;
 	} capture;
+
+	float gammaExposure;
+	float autoExposureValue;
+	float autoExposureHistory;
+	qboolean autoExposureEnabled;
+	qboolean autoExposureHasValue;
+	qboolean autoExposureHasCopied;
+
+	VkImage autoExposureImage;
+	VkImageView autoExposureImageView;
+	VkDeviceMemory autoExposureImageMemory;
+	VkImageLayout autoExposureImageLayout;
+	VkBuffer autoExposureBuffer[AUTO_EXPOSURE_BUFFER_COUNT];
+	VkDeviceMemory autoExposureBufferMemory[AUTO_EXPOSURE_BUFFER_COUNT];
+	byte *autoExposureBufferPtr[AUTO_EXPOSURE_BUFFER_COUNT];
+	uint32_t autoExposureBufferIndex;
 
 #ifdef VK_PBR_BRDFLUT
 	VkImage			brdflut_image;

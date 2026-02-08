@@ -15,7 +15,6 @@ layout(constant_id = 8) const int depth_r = 255;
 layout(constant_id = 9) const int depth_g = 255;
 layout(constant_id = 10) const int depth_b = 255;
 layout(constant_id = 11) const int tonemapMode = 0; // 0=off,1=Reinhard,2=ACES,3=Hable,4=AgX,5=KhronosPBR
-layout(constant_id = 12) const float exposure = 1.0;
 layout(constant_id = 13) const int lutEnabled = 0;
 layout(constant_id = 14) const float lutIntensity = 1.0;
 layout(constant_id = 15) const float lutSize = 32.0;
@@ -148,6 +147,10 @@ vec3 khronosPbrTonemap(vec3 color) {
 	return mix(low, high, step(vec3(0.0031308), color));
 }
 
+layout(push_constant) uniform GammaPush {
+	float exposure;
+} gammaPush;
+
 vec3 applyToneMapping(vec3 color) {
 	color = clamp(color, 0.0, 1e6);
 	if ( tonemapMode == 1 ) {
@@ -185,7 +188,7 @@ vec3 lutLookup(vec3 color) {
 }
 
 void main() {
-	vec3 color = texture(texture0, frag_tex_coord).rgb * exposure;
+	vec3 color = texture(texture0, frag_tex_coord).rgb * gammaPush.exposure;
 	color = applyToneMapping( color );
 
 	if ( lutEnabled != 0 && lutIntensity > 0.0 ) {
