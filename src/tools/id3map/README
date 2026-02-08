@@ -1,0 +1,47 @@
+Q3MAP4 - a heavily optimized quake 3 map compiler
+
+Q3Map (c) 1999 Id Software
+Q3Map2 by Ydnar
+Q3Map3 by SiliconeMilk
+Q3Map4 by VolumetricSteve
+id3map by idtech3.com
+
+HOW TO COMPILE:
+./build-q3map4.sh
+You can also do::
+./build-q3map4.sh -static
+If it doesn't work it's between you and your god.
+a standard GNU Makefile is being put together
+
+COMPILE NOTES:
+This was built based on output ripped from the standard NetRadiant Makefile (make binaries-q3map4) with dependency checking disabled
+I've removed debugging, moved from -O to -O3 (so far that hasn't seemed to result in any issues) added -march=native and added -pipe 
+which seems a harmless way to improve compile time of this code base (not maps, just Q3MAP4)
+
+I've also reorganized the script so that these things may be easily changed without tooling around with any particular build system.
+This is intended for linux, and only linux.  $1 is used so at the command line, you can specify '-static' but that's still buggy.
+This script generally produces an executable that's less than 1/3rd the size of the product of the original Makefile.
+
+CHANGES:
+* done away with a ton of code, specifically anything that's meant for Win32 or OSX.
+* removed /include path, moved version.h and stream_version.h to /common
+* removed debugging options (by default, I think; we're not at the point of needing them yet), switched -O for -O3, added -march=native and -pipe
+
+Dating back to as early as 2003, I've been wanting to compile quake 3 maps faster, also on the hopes that improved performance could lead to bigger maps in less time.
+OSes got better, CPUs got better, but there's always room for improvement.  With the rise of things like Unreal Engine and stuff like realtime cinematic graphics, and now all of this wacky AI stuff going on, you might ask "Why bother updating a map compiler for a game from 1999?"  First and foremost, it's for me.  It's the journey and checking the box.  I want to make it as clean and ideal as I can.  There's a lot to do, as most of this code is ancient.  We got pthreads in there, some older coding conventions in play, and a ton of extra code that really just gets in the way, it's kind of a mess.  There's also a ton of reliance on external libraries that can probably be pulled in, since those probably aren't going to be changing much anymore ;)
+
+Though now I wonder... all of the stuff being done in the JPEG/PNG/other image libs... could those be parallelized?  Software graphics usually parallelize well.... ANYWAY.
+
+Lots to plan, lots to fix.  Other reasons to keep doing this.... I suppose, Quake 3 is a pretty freaking thin engine by modern standards, and it runs no problem on practically everything.  The same could be said for Doom 3's engine, but I'm getting there.  One mountain at a time.
+
+TO DO:
+
+* Start including/refining various external libraries into Q3MAP4
+* Safe-guards for different build environments (configure script/proper makefile)
+* Test-suite with compiling some default maps that ship with Radiant, or maybe I'll make my own acid-test map and automate something with the dedicated server executable to make sure maps are viable.
+* Remove all references and calls to XML.
+* Migrate from pthreads to OpenMP
+* Bring in SiliconeMilk's CUDA code, reimpliment as OpenCL
+* Lots and lots of clutter cleanup
+
+-VolumetricSteve

@@ -1,0 +1,24 @@
+you renamed q3map2.h to q3map4.h so all hell has broken loose, maybe there's some way to mass-update all the files looking for q3map2.h?
+
+branding is important (why move to q3map4 down to the code?)  because all of the code will eventually be modified in some way
+
+*maybe optimizing modern linux kernel calls?  system calls?
+*linux only
+*64 bit only?
+*reduced code base
+*opencl support, hopefully for bsp vis and light, not just light
+*rewritten makefile from scratch
+*static builds
+
+glib is why pcre is being pulled in as a dynamic library
+so far, glib seems to be used for utf8 conversion...not sure why exactly, but it might be tossable
+
+
+q3map4-NOXML...as of now....produces an identically sized executable even though several calls to XML were commented out
+
+james suggests outputting assembly output and running a diff between them
+
+=== Improvements ===
+* Add a note explaining the custom `build-id3map.sh` script now adds `glibconfig` include path so mainland builds succeed on Linux.
+* Mention how to run the built `map-tool` binary to generate `.aas`/`.info` files for a demo map (e.g., `./map-tool -game atlas demo-full.bsp`).
+* Document that missing `maps/demo-full.aas` previously caused swapchain crashes and that building the map assets is required before running `+map demo-full`.

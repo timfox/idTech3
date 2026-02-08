@@ -157,78 +157,6 @@ static void vk_fill_pbr_brdflut_info( VkDescriptorImageInfo *info );
 static void vk_update_pbr_indexed_glint( VkDescriptorSet descriptor );
 static void vk_update_pbr_indexed_common_descriptor( VkDescriptorSet descriptor, const image_t *env, const image_t *irr );
 #endif
-#ifdef USE_VK_PBR
-VkDescriptorSet vk_get_pbr_fallback_descriptor( void )
-{
-    VkDescriptorSetAllocateInfo alloc;
-    VkDescriptorImageInfo infos[VK_PBR_BINDING_COUNT];
-    VkWriteDescriptorSet writes[VK_PBR_BINDING_COUNT];
-    const image_t *fallback_white = tr.whiteImage;
-    const image_t *fallback_black = tr.blackImage ? tr.blackImage : tr.whiteImage;
-    const image_t *empty_cubemap = tr.emptyCubemap ? tr.emptyCubemap : fallback_black;
-    VkResult res;
-    uint32_t i;
-
-    if ( vk_pbr_fallback_descriptor != VK_NULL_HANDLE && vk_pbr_fallback_descriptor_gen == vk.descriptor_pool_gen ) {
-        return vk_pbr_fallback_descriptor;
-    }
-
-    if ( vk.set_layout_pbr == VK_NULL_HANDLE ) {
-        return VK_NULL_HANDLE;
-    }
-
-    alloc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    alloc.pNext = NULL;
-    alloc.descriptorPool = vk.descriptor_pool;
-    alloc.descriptorSetCount = 1;
-    alloc.pSetLayouts = &vk.set_layout_pbr;
-
-    if ( vk_pbr_fallback_descriptor != VK_NULL_HANDLE ) {
-        qvkFreeDescriptorSets( vk.device, vk.descriptor_pool, 1, &vk_pbr_fallback_descriptor );
-        vk_pbr_fallback_descriptor = VK_NULL_HANDLE;
-    }
-
-    res = qvkAllocateDescriptorSets( vk.device, &alloc, &vk_pbr_fallback_descriptor );
-    if ( res != VK_SUCCESS ) {
-        vk_pbr_fallback_descriptor = VK_NULL_HANDLE;
-        ri.Printf( PRINT_WARNING, "PBR fallback descriptor allocation failed (%d)\n", res );
-        return VK_NULL_HANDLE;
-    }
-
-    vk_fill_pbr_image_info( fallback_white, &infos[VK_PBR_BINDING_ALBEDO] );
-    vk_fill_pbr_image_info( fallback_white, &infos[VK_PBR_BINDING_NORMAL] );
-    vk_fill_pbr_image_info( fallback_white, &infos[VK_PBR_BINDING_PHYSICAL] );
-    vk_fill_pbr_image_info( fallback_white, &infos[VK_PBR_BINDING_EMISSIVE] );
-    vk_fill_pbr_image_info( fallback_black, &infos[VK_PBR_BINDING_LIGHTMAP] );
-    vk_fill_pbr_image_info( fallback_white, &infos[VK_PBR_BINDING_CLEARCOAT] );
-    vk_fill_pbr_image_info( fallback_white, &infos[VK_PBR_BINDING_SHEEN] );
-    vk_fill_pbr_image_info( fallback_white, &infos[VK_PBR_BINDING_ANISOTROPY] );
-    vk_fill_pbr_image_info( fallback_white, &infos[VK_PBR_BINDING_TRANSMISSION] );
-    vk_fill_pbr_image_info( fallback_white, &infos[VK_PBR_BINDING_SUBSURFACE] );
-    vk_fill_pbr_brdflut_info( &infos[VK_PBR_BINDING_BRDFLUT] );
-    vk_fill_pbr_image_info( fallback_black, &infos[VK_PBR_BINDING_GLINT_DICT] );
-    vk_fill_pbr_image_info( empty_cubemap, &infos[VK_PBR_BINDING_ENV_CUBEMAP] );
-    vk_fill_pbr_image_info( empty_cubemap, &infos[VK_PBR_BINDING_IRRADIANCE] );
-
-    for ( i = 0; i < VK_PBR_BINDING_COUNT; ++i ) {
-        writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        writes[i].pNext = NULL;
-        writes[i].dstSet = vk_pbr_fallback_descriptor;
-        writes[i].dstBinding = i;
-        writes[i].dstArrayElement = 0;
-        writes[i].descriptorCount = 1;
-        writes[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        writes[i].pImageInfo = &infos[i];
-        writes[i].pBufferInfo = NULL;
-        writes[i].pTexelBufferView = NULL;
-    }
-
-    qvkUpdateDescriptorSets( vk.device, VK_PBR_BINDING_COUNT, writes, 0, NULL );
-    vk_pbr_fallback_descriptor_gen = vk.descriptor_pool_gen;
-    return vk_pbr_fallback_descriptor;
-}
-#endif
-
 static PFN_vkInvalidateMappedMemoryRanges				qvkInvalidateMappedMemoryRanges;
 static PFN_vkMapMemory									qvkMapMemory;
 static PFN_vkQueueSubmit								qvkQueueSubmit;
@@ -256,6 +184,78 @@ static PFN_vkCmdDebugMarkerEndEXT								qvkCmdDebugMarkerEndEXT;
 static PFN_vkCmdDebugMarkerInsertEXT							qvkCmdDebugMarkerInsertEXT;
 
 ////////////////////////////////////////////////////////////////////////////
+
+#ifdef USE_VK_PBR
+VkDescriptorSet vk_get_pbr_fallback_descriptor( void )
+{
+	VkDescriptorSetAllocateInfo alloc;
+	VkDescriptorImageInfo infos[VK_PBR_BINDING_COUNT];
+	VkWriteDescriptorSet writes[VK_PBR_BINDING_COUNT];
+	const image_t *fallback_white = tr.whiteImage;
+	const image_t *fallback_black = tr.blackImage ? tr.blackImage : tr.whiteImage;
+	const image_t *empty_cubemap = tr.emptyCubemap ? tr.emptyCubemap : fallback_black;
+	VkResult res;
+	uint32_t i;
+
+	if ( vk_pbr_fallback_descriptor != VK_NULL_HANDLE && vk_pbr_fallback_descriptor_gen == vk.descriptor_pool_gen ) {
+		return vk_pbr_fallback_descriptor;
+	}
+
+	if ( vk.set_layout_pbr == VK_NULL_HANDLE ) {
+		return VK_NULL_HANDLE;
+	}
+
+	alloc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	alloc.pNext = NULL;
+	alloc.descriptorPool = vk.descriptor_pool;
+	alloc.descriptorSetCount = 1;
+	alloc.pSetLayouts = &vk.set_layout_pbr;
+
+	if ( vk_pbr_fallback_descriptor != VK_NULL_HANDLE ) {
+		qvkFreeDescriptorSets( vk.device, vk.descriptor_pool, 1, &vk_pbr_fallback_descriptor );
+		vk_pbr_fallback_descriptor = VK_NULL_HANDLE;
+	}
+
+	res = qvkAllocateDescriptorSets( vk.device, &alloc, &vk_pbr_fallback_descriptor );
+	if ( res != VK_SUCCESS ) {
+		vk_pbr_fallback_descriptor = VK_NULL_HANDLE;
+		ri.Printf( PRINT_WARNING, "PBR fallback descriptor allocation failed (%d)\n", res );
+		return VK_NULL_HANDLE;
+	}
+
+	vk_fill_pbr_image_info( fallback_white, &infos[VK_PBR_BINDING_ALBEDO] );
+	vk_fill_pbr_image_info( fallback_white, &infos[VK_PBR_BINDING_NORMAL] );
+	vk_fill_pbr_image_info( fallback_white, &infos[VK_PBR_BINDING_PHYSICAL] );
+	vk_fill_pbr_image_info( fallback_white, &infos[VK_PBR_BINDING_EMISSIVE] );
+	vk_fill_pbr_image_info( fallback_black, &infos[VK_PBR_BINDING_LIGHTMAP] );
+	vk_fill_pbr_image_info( fallback_white, &infos[VK_PBR_BINDING_CLEARCOAT] );
+	vk_fill_pbr_image_info( fallback_white, &infos[VK_PBR_BINDING_SHEEN] );
+	vk_fill_pbr_image_info( fallback_white, &infos[VK_PBR_BINDING_ANISOTROPY] );
+	vk_fill_pbr_image_info( fallback_white, &infos[VK_PBR_BINDING_TRANSMISSION] );
+	vk_fill_pbr_image_info( fallback_white, &infos[VK_PBR_BINDING_SUBSURFACE] );
+	vk_fill_pbr_brdflut_info( &infos[VK_PBR_BINDING_BRDFLUT] );
+	vk_fill_pbr_image_info( fallback_black, &infos[VK_PBR_BINDING_GLINT_DICT] );
+	vk_fill_pbr_image_info( empty_cubemap, &infos[VK_PBR_BINDING_ENV_CUBEMAP] );
+	vk_fill_pbr_image_info( empty_cubemap, &infos[VK_PBR_BINDING_IRRADIANCE] );
+
+	for ( i = 0; i < VK_PBR_BINDING_COUNT; ++i ) {
+		writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[i].pNext = NULL;
+		writes[i].dstSet = vk_pbr_fallback_descriptor;
+		writes[i].dstBinding = i;
+		writes[i].dstArrayElement = 0;
+		writes[i].descriptorCount = 1;
+		writes[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		writes[i].pImageInfo = &infos[i];
+		writes[i].pBufferInfo = NULL;
+		writes[i].pTexelBufferView = NULL;
+	}
+
+	qvkUpdateDescriptorSets( vk.device, VK_PBR_BINDING_COUNT, writes, 0, NULL );
+	vk_pbr_fallback_descriptor_gen = vk.descriptor_pool_gen;
+	return vk_pbr_fallback_descriptor;
+}
+#endif
 
 // forward declaration
 VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassIndex, uint32_t def_index );
