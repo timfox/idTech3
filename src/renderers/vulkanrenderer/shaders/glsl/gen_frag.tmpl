@@ -257,6 +257,8 @@ vec4 PBR_SampleIndex( vec2 uv, float idx ) { return texture( pbrTextures[ nonuni
 #define PBR_SAMPLE_SUBSURFACE(uv) PBR_SampleIndex( uv, pbrTexIndex2.y )
 #define PBR_SAMPLE_GLINT_DICT(uv) PBR_SampleIndex( uv, pbrTexIndex2.z )
 #else
+// These macros sample the bound textures; refer to docs/MATH_OF_LUTS_AND_NOISE.md for the expected combination
+// (lightmap + glint dictionary) that produces accuracy suitable for HDR comparisons.
 #define PBR_SAMPLE_ALBEDO(uv) texture( pbr_albedo, uv )
 #define PBR_SAMPLE_NORMAL(uv) texture( normal_texture, uv )
 #define PBR_SAMPLE_PHYSICAL(uv) texture( physical_texture, uv )

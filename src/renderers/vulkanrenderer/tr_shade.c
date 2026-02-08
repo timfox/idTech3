@@ -133,6 +133,8 @@ static glintDictEntry_t glintDictMap[GLINT_DICT_MAP_SIZE];
 static int glintDictMapCount;
 static uint32_t glintDictNextId = 1;
 
+// Flags below describe which descriptors/pbr inputs need binding. Refer to docs/MATH_OF_LUTS_AND_NOISE.md
+// for the expected material ingredients (lightmap, glint dictionary, etc.) when comparing to the HDR reference.
 static const struct {
 	uint32_t mask;
 	const char *name;
@@ -1755,7 +1757,10 @@ qboolean is_pbr_surface;
 
 #ifdef USE_VK_PBR
 		// PBR uses the lightmap as a lighting source; ensure it is bound even when the
-		// original shader uses a separate lightmap stage (legacy multi-pass).
+		// original shader uses a separate lightmap stage (legacy multi-pass). The lightmap
+		// binding flow documented in docs/MATH_OF_LUTS_AND_NOISE.md must always deliver
+		// either the bundle1 lightmap or the surface lightmap so the baked occlusion is measured
+		// against the HDR reference.
 		if ( is_pbr_surface ) {
 			// Ensure base texture is always bound
 			if ( pStage->bundle[0].image[0] == NULL ) {
@@ -2132,6 +2137,7 @@ qboolean is_pbr_surface;
 			{
 				char flagBuf[64];
 				glint_flags_to_string( pStage->vk_pbr_flags, flagBuf, sizeof( flagBuf ) );
+				// Log the current descriptor/flag state relative to the HDR reference expectations from docs/MATH_OF_LUTS_AND_NOISE.md.
 				ri.Printf( PRINT_ALL,
 					"PBR debug mode %d permutation: flags=0x%08x[%s] wantsLM=%d hasLM=%d src=%s IBL=%d lightmap=%d glints=%d\n",
 					pbr_debug,

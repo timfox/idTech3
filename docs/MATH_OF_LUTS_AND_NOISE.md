@@ -16,3 +16,9 @@ Tonemapping uses a two-pass adaptive luminance scheme:
 1. A compute pass builds a histogram of luminance values sampled from the HDR render target.  
 2. A second pass sums the histogram bins to produce the weighted average (key value) used for tonemapping.  
 That key value mirrors our auto-exposure pipeline, which also collects luminance, smooths it on the CPU, and pushes the resulting exposure multiplier before running the gamma shader. Aligning the two strategies keeps the adaptive HDR→LDR conversion behavior consistent across our renderer.
+
+### Verifying baked lighting + glints
+
+- Run the renderer with `r_lightmap 1`, `r_tonemap` in a cinematic mode, and `r_autoExposure 1`, then inspect debug views 20/21 to make sure `PBR_BIND_LIGHTMAP` samples the expected map described in step 1.  
+- Enable `r_glints 1` (and `glint 1`/`q3map_glint 1` on your materials) and watch the `PBR glints bind` logs in `tr_shade.c`—they should show the dictionary texture/view plus `valid=1`. That log ties directly to the descriptor comment inserted earlier.  
+- Compare the final frame to the HDR reference photo with the same exposure key/value settings; when both lightmap and glint paths are valid, the differences should vanish and the scene should lightmatch the target.
