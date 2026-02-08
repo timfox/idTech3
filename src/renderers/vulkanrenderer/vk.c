@@ -198,6 +198,8 @@ static qboolean vk_load_cube_lut( const char *path );
 static qboolean vk_load_lut_image_file( const char *path );
 static void vk_load_lut_from_cvar( void );
 
+// The triangle of atmosphere LUTs (Transmittance → Multiscattering → Sky-View → Aerial Perspective) is described in docs/MATH_OF_LUTS_AND_NOISE.md.
+// Each stage reuses the previous results, so future multi-pass LUT builds should follow that dependency order before this helper uploads the final 2D LUT data.
 static void vk_update_lut_image_data( int lut_size, const byte *pixels, size_t bytes ) {
 	if ( lut_size <= 0 || pixels == NULL || bytes == 0 || vk.lut_descriptor == VK_NULL_HANDLE ) {
 		return;
@@ -4700,6 +4702,7 @@ static void vk_create_framebuffers( void )
 	}
 }
 
+// Cloud Worley noise generation follows the two-pass flow in docs/MATH_OF_LUTS_AND_NOISE.md: first pass writes separate single-channel volumes, second pass normalizes/packs into two 4-channel textures with a barrier between them before sampling.
 static void vk_create_auto_exposure_resources( void )
 {
 	uint32_t i;
@@ -4951,6 +4954,7 @@ static void vk_autoexposure_downsample( void )
 	vk.autoExposureBufferIndex = ( vk.autoExposureBufferIndex + 1 ) % AUTO_EXPOSURE_BUFFER_COUNT;
 }
 
+// The histogram-based key-value math described in docs/MATH_OF_LUTS_AND_NOISE.md drives this auto-exposure smoothing loop (histogram → sum → exposure push constant).
 static void vk_update_auto_exposure_from_recent_buffer( void )
 {
 	if ( r_autoExposure && r_autoExposure->integer ) {

@@ -147,6 +147,7 @@ vec3 khronosPbrTonemap(vec3 color) {
 	return mix(low, high, step(vec3(0.0031308), color));
 }
 
+// The histogram-based key-value ("adaptive exposure") math in docs/MATH_OF_LUTS_AND_NOISE.md feeds this exposure constant: CPU-computed luminance histogram → sum → smooth exposure.
 layout(push_constant) uniform GammaPush {
 	float exposure;
 } gammaPush;
