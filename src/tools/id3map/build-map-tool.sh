@@ -101,8 +101,7 @@ g++ "$@" "${OBJECTS[@]}" libs/ddslib.a libs/filematch.a libs/l_net.a libs/mathli
 
 du -b map-tool
 file map-tool
-echo "  *** AND NOW WE CLEANSE OURSELVES OF THE FILTH OF INTERMEDIATE FILES ***  "
-echo "  ***                    (removing *.o *.d *.a)                       ***  "
+echo "  removing *.o *.d *.a files"
 rm -f include/*.o include/*.d libs/*.o libs/*.d libs/picomodel/*.o libs/picomodel/*.d \
       libs/picomodel/lwo/*.o libs/picomodel/lwo/*.d libs/ddslib/*.o libs/ddslib/*.d \
       libs/l_net/*.o libs/l_net/*.d libs/mathlib/*.o libs/mathlib/*.d main/*.o main/*.d *.a

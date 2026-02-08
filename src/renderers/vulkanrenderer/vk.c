@@ -25,6 +25,7 @@
 #ifdef USE_VK_PBR
 static VkDescriptorSet vk_pbr_fallback_descriptor = VK_NULL_HANDLE;
 static uint32_t vk_pbr_fallback_descriptor_gen = 0;
+static qboolean vk_pbr_fallback_logged = qfalse;
 #endif
 
 #if defined (_DEBUG)
@@ -10745,8 +10746,10 @@ void vk_bind_descriptor_sets( void )
 				VkDescriptorSet fallback = vk_get_pbr_fallback_descriptor();
 				if ( fallback != VK_NULL_HANDLE ) {
 					vk.cmd->descriptor_set.current[i] = fallback;
-					if ( r_pbr_bindlog && ( r_pbr_bindlog->integer || ( r_pbr_debug && r_pbr_debug->integer >= 17 ) ) ) {
-						ri.Printf( PRINT_WARNING, "PBR descriptor fallback (vk_bind_descriptor_sets) used for missing bind state.\n" );
+					if ( r_pbr_bindlog && ( r_pbr_bindlog->integer || ( r_pbr_debug && r_pbr_debug->integer >= 17 ) ) && !vk_pbr_fallback_logged ) {
+						const char *mapName = ( tr.world && tr.world->baseName[0] ) ? tr.world->baseName : "unknown";
+						ri.Printf( PRINT_WARNING, "PBR descriptor fallback (%s) used for missing bind state.\n", mapName );
+						vk_pbr_fallback_logged = qtrue;
 					}
 				} else {
 					vk.cmd->descriptor_set.current[i] = tr.whiteImage->descriptor;
@@ -11196,6 +11199,10 @@ void vk_begin_frame( void )
 
 	if ( vk.frame_count++ ) // might happen during stereo rendering
 		return;
+
+#ifdef USE_VK_PBR
+	vk_pbr_fallback_logged = qfalse;
+#endif
 
 #ifdef USE_UPLOAD_QUEUE
 	vk_flush_staging_buffer( qtrue );
