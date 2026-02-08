@@ -995,6 +995,13 @@ static VkDescriptorSet vk_get_pbr_descriptor_for_pipeline( const Vk_Pipeline_Def
 		}
 	}
 
+	if ( descriptor == VK_NULL_HANDLE ) {
+		descriptor = vk_get_pbr_fallback_descriptor();
+		if ( descriptor != VK_NULL_HANDLE && r_pbr_bindlog && ( r_pbr_bindlog->integer || ( r_pbr_debug && r_pbr_debug->integer >= 17 ) ) ) {
+			ri.Printf( PRINT_WARNING, "PBR descriptor selection: falling back to white descriptor because stage descriptor was null.\n" );
+		}
+	}
+
 	if ( descriptor != VK_NULL_HANDLE &&
 		 r_pbr_bindlog && ( r_pbr_bindlog->integer || ( r_pbr_debug && r_pbr_debug->integer >= 17 ) ) ) {
 		const char *descriptorType = ( descriptor == stageDescriptor ) ? "stage" : "indexed";

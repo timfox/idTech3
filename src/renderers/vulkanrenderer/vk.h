@@ -498,6 +498,7 @@ void vk_update_pbr_descriptor_binding_from_view( VkDescriptorSet descriptor, uin
 void vk_update_cubemap_overlay_view( VkImageView view );
 void vk_update_pbr_descriptor_common( VkDescriptorSet descriptor );
 void vk_update_pbr_indexed_common( const image_t *env, const image_t *irr );
+VkDescriptorSet vk_get_pbr_fallback_descriptor( void );
 #ifdef USE_VK_PBR
 VkImageView vk_get_glint_dictionary_view( void );
 VkImageView vk_get_scene_cubemap_view( void );
