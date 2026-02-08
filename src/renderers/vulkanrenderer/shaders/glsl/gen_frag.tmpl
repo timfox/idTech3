@@ -97,6 +97,7 @@ layout(set = 0, binding = 0) uniform UBO {
 	vec4 pbrFeatureFlags;
 	vec4 pbrDebugFlags;
 	vec4 pbrDebugParams;
+	vec4 pbrQuality;		// x=burleyDiffuse, y=multiScatter, z=microShadow, w=reserved
 #endif
 //#endif
 };
@@ -651,10 +652,28 @@ vec3 Diffuse_Lambert(in vec3 DiffuseColor)
 	return DiffuseColor * (1.0 / PI);
 }
 
+// Disney/Burley roughness-dependent diffuse [Burley 2012]
+// Accounts for retroreflection at grazing angles and surface roughness.
+// Energy-normalized: converges to Lambert at roughness=0.
+vec3 Diffuse_Burley( in vec3 DiffuseColor, in float roughness,
+	in float NE, in float NL, in float LH )
+{
+	float energyBias = mix( 0.0, 0.5, roughness );
+	float energyFactor = mix( 1.0, 1.0 / 1.51, roughness );
+	float fd90 = energyBias + 2.0 * LH * LH * roughness;
+	float lightScatter = 1.0 + ( fd90 - 1.0 ) * pow( 1.0 - NL, 5.0 );
+	float viewScatter  = 1.0 + ( fd90 - 1.0 ) * pow( 1.0 - NE, 5.0 );
+	return DiffuseColor * ( lightScatter * viewScatter * energyFactor * ( 1.0 / PI ) );
+}
+
 vec3 CalcDiffuse( in vec3 diffuse, in float NE, in float NL,
 	in float LH, in float roughness )
 {
-	return Diffuse_Lambert(diffuse);
+	if ( pbrQuality.x > 0.5 )
+	{
+		return Diffuse_Burley( diffuse, roughness, NE, NL, LH );
+	}
+	return Diffuse_Lambert( diffuse );
 }
 
 vec3 F_Schlick( in vec3 SpecularColor, in float VH )
@@ -709,17 +728,55 @@ float CalcSpecularAO( in float ao, in float roughness, in float NE )
 }
 
 
+// Roughness-dependent Fresnel for IBL specular (Fdez-Aguera 2019).
+// At grazing angles on smooth surfaces, reflections should approach 100%
+// regardless of F0; standard Schlick doesn't account for this when
+// pre-integrated BRDF is used.  The roughness term prevents overly bright
+// Fresnel on rough surfaces where the energy is already scattered.
+// Ref: https://bruop.github.io/ibl/#single_scattering_results
 vec3 CalcIBLContribution( in float roughness, in vec3 N, in vec3 E,
-	in float NE, in vec3 specular, in float forcedLod )
+	in float NE, in vec3 F0, in float forcedLod )
 {
 	vec3 R = reflect(-E, N);
 	R.y *= -1.0f;
 	float lod = get_debug_lod( roughness, forcedLod );
-	
-	vec3 cubeLightColor = textureLod(env_texture, R, lod).rgb * 1.0;
-	vec2 EnvBRDF = texture(brdflut_texture, vec2(NE, 1.0 - roughness)).rg;
 
-	return cubeLightColor * (specular.rgb * EnvBRDF.x + EnvBRDF.y);
+	vec3 cubeLightColor = textureLod(env_texture, R, lod).rgb;
+	vec2 f_ab = texture(brdflut_texture, vec2(NE, 1.0 - roughness)).rg;
+
+	// Roughness-dependent Fresnel (Fdez-Aguera)
+	vec3 Fr = max(vec3(1.0 - roughness), F0) - F0;
+	vec3 k_S = F0 + Fr * pow(1.0 - NE, 5.0);
+	vec3 FssEss = k_S * f_ab.x + f_ab.y;
+
+	return cubeLightColor * FssEss;
+}
+
+// Multi-scatter IBL diffuse with energy compensation (Fdez-Aguera 2019).
+// Single-scattering IBL diffuse loses energy that bounces more than once
+// between surface microfacets.  The FmsEms term recovers this by computing
+// the average Fresnel over all directions and redistributing the missing
+// energy back into the diffuse lobe.
+// Ref: https://bruop.github.io/ibl/#single_scattering_results
+vec3 CalcIBLDiffuse( in vec3 irradiance, in vec3 diffuseColor, in vec3 F0,
+	in float NE, in float roughness )
+{
+	vec2 f_ab = texture(brdflut_texture, vec2(NE, 1.0 - roughness)).rg;
+
+	// Single-scatter specular energy
+	vec3 Fr = max(vec3(1.0 - roughness), F0) - F0;
+	vec3 k_S = F0 + Fr * pow(1.0 - NE, 5.0);
+	vec3 FssEss = k_S * f_ab.x + f_ab.y;
+
+	// Multi-scatter compensation (Fdez-Aguera / Kulla-Conty)
+	float Ems = 1.0 - (f_ab.x + f_ab.y);
+	vec3 F_avg = F0 + (1.0 - F0) / 21.0;
+	vec3 FmsEms = Ems * FssEss * F_avg / (1.0 - F_avg * Ems);
+
+	// Diffuse is what's left after single-scatter + multi-scatter specular
+	vec3 k_D = diffuseColor * (1.0 - FssEss + FmsEms);
+
+	return (FmsEms + k_D) * irradiance;
 }
 
 vec3 EvalSH9( in vec3 n )
@@ -750,12 +807,18 @@ vec3 EvalSH9( in vec3 n )
 		c8 * (x * x - y * y);
 }
 
-vec3 CalcDiffuseIrradiance( in vec3 N )
+// Diffuse irradiance: SH + optional cubemap sample.
+// When hasIrr is false the cubemap may hold a fallback (black or placeholder);
+// sampling it could blow out energy or add tint, so skip it.
+vec3 CalcDiffuseIrradiance( in vec3 N, in bool hasIrradiance )
 {
-	vec3 irradiance = EvalSH9( N );
-	vec3 R = N;
-	R.y *= -1.0f;
-	irradiance += texture( irradiance_texture, R ).rgb;
+	vec3 irradiance = max( EvalSH9( N ), vec3( 0.0 ) );
+	if ( hasIrradiance )
+	{
+		vec3 R = N;
+		R.y *= -1.0f;
+		irradiance += texture( irradiance_texture, R ).rgb;
+	}
 	return irradiance;
 }
 
@@ -1405,8 +1468,29 @@ const bool glintsEnabledDebug = ( pbrDebugParams.z > 0.5 );
 	vec3 diffuseColor = diffuse.rgb * clearcoatDim;
 	float specAO = CalcSpecularAO( AO, roughness, NE );
 
-	vec3 directDiffuse = lightColor * Fd * ( attenuation * NL );
+	// Multi-scatter energy compensation (Fdez-Aguera / Kulla-Conty approximation).
+	// At high roughness, single-bounce GGX loses significant energy; this scales
+	// specular contributions to recover it.
+	vec2 dfg = texture( brdflut_texture, vec2( NE, 1.0 - roughness ) ).rg;
+	vec3 energyCompensation = vec3( 1.0 );
+	if ( pbrQuality.y > 0.5 )
+	{
+		float Eo = dfg.x + dfg.y;
+		energyCompensation = 1.0 + specular.rgb * ( 1.0 / max( Eo, 1e-4 ) - 1.0 );
+	}
+
+	// AO micro-shadowing [Jimenez et al. 2016]:
+	// Attenuates diffuse at low NdotL based on AO to prevent light leaks
+	// in crevices. Converges to plain NL when AO=1.
+	float microShadow = 1.0;
+	if ( pbrQuality.z > 0.5 )
+	{
+		microShadow = clamp( NL + 2.0 * AO * AO - 1.0, 0.0, 1.0 );
+	}
+
+	vec3 directDiffuse = lightColor * Fd * ( attenuation * NL * microShadow );
 	vec3 directSpec = lightColor * ( Fs * clearcoatDim ) * ( attenuation * NL );
+	directSpec *= energyCompensation;
 
 	out_color.rgb  = directDiffuse + directSpec;
 	out_color.rgb += ambientColor * diffuseColor;
@@ -1417,13 +1501,29 @@ const bool glintsEnabledDebug = ( pbrDebugParams.z > 0.5 );
 	dbgBaseSpec += directSpec;
 	dbgGlint += lightColor * glintTerm * ( attenuation * NL );
 
-	// diffuse IBL (SH + irradiance)
-	out_color.rgb += CalcDiffuseIrradiance( N ) * diffuseColor * AO;
+	// Diffuse IBL (SH + irradiance cubemap when bound).
+	// When multi-scatter is enabled, use Fdez-Aguera's FmsEms correction
+	// to recover energy lost to multiple bounces in the diffuse lobe.
+	vec3 irradiance = CalcDiffuseIrradiance( N, hasIrr );
+	if ( pbrQuality.y > 0.5 )
+	{
+		out_color.rgb += CalcIBLDiffuse( irradiance, diffuseColor, specular.rgb, NE, roughness ) * AO;
+	}
+	else
+	{
+		out_color.rgb += irradiance * diffuseColor * AO;
+	}
 
+	// Specular IBL.
+	// CalcIBLContribution now uses roughness-dependent Fresnel (Fdez-Aguera)
+	// which correctly brightens grazing angles on smooth surfaces.  The FssEss
+	// term already encodes single+multi scatter weight, so no additional
+	// energyCompensation is needed for the IBL path.
 	const bool hasIBL = hasEnv && hasIrr;
 	if ( hasIBL )
 	{
-			vec3 specIBL = CalcIBLContribution( roughness, N, E, NE, specular.rgb * clearcoatDim * specAO, pbrDebugParams.x );
+		vec3 specIBL = CalcIBLContribution( roughness, N, E, NE, specular.rgb, pbrDebugParams.x );
+		specIBL *= clearcoatDim * specAO;
 		out_color.rgb += specIBL;
 		dbgBaseSpec += specIBL;
 	}
@@ -1562,13 +1662,13 @@ const bool glintsEnabledDebug = ( pbrDebugParams.z > 0.5 );
 	}
 	else if ( pbrDebugView == 16 )
 	{
-		vec3 specIBL = CalcIBLContribution( roughness, N, E, NE, specular.rgb * clearcoatDim * specAO, pbrDebugParams.x );
+		vec3 specIBL = CalcIBLContribution( roughness, N, E, NE, specular.rgb, pbrDebugParams.x ) * clearcoatDim * specAO;
 		out_color.rgb = dbg_classify_ibl( specIBL, hasEnvDebug, debugEps );
 		out_color.a = 1.0;
 	}
 	else if ( pbrDebugView == 17 )
 	{
-		vec3 diffIBL = CalcDiffuseIrradiance( N ) * diffuseColor * AO;
+		vec3 diffIBL = CalcDiffuseIrradiance( N, hasIrrDebug ) * diffuseColor * AO;
 		out_color.rgb = dbg_classify_ibl( diffIBL, hasIrrDebug, debugEps );
 		out_color.a = 1.0;
 	}

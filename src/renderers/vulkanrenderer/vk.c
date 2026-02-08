@@ -1249,7 +1249,7 @@ static void vk_create_render_passes( void )
 	deps[2].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;	// What pipeline stage is waiting on the dependency
 	deps[2].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;			// What access scopes are influence the dependency
 	deps[2].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;			// What access scopes are waiting on the dependency
-	deps[2].dependencyFlags = 0;
+	deps[2].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;					// Tilers only need per-tile synchronization, not whole framebuffer
 
 	if ( r_fbo->integer == 0 )
 	{
@@ -7711,7 +7711,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	VkGraphicsPipelineCreateInfo create_info;
 	VkViewport viewport;
 	VkRect2D scissor;
-	VkSpecializationMapEntry spec_entries[16];
+	VkSpecializationMapEntry spec_entries[17];
 	VkSpecializationInfo frag_spec_info;
 	VkPipeline *pipeline;
 	VkShaderModule fsmodule;
@@ -7738,6 +7738,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 		int depth_r;
 		int depth_g;
 		int depth_b;
+		float bloom_knee;
 	} frag_spec_data;
 
 	switch ( program_index ) {
@@ -7867,6 +7868,8 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	frag_spec_data.lutIntensity = r_lut_intensity ? r_lut_intensity->value : 1.0f;
 	frag_spec_data.lutSize = vk.lutSize > 0 ? (float)vk.lutSize : 32.0f;
 
+	frag_spec_data.bloom_knee = r_bloom_knee ? r_bloom_knee->value : 0.0f;
+
 	if ( !vk_surface_format_color_depth( vk.present_format.format, &frag_spec_data.depth_r, &frag_spec_data.depth_g, &frag_spec_data.depth_b ) )
 		ri.Printf( PRINT_ALL, "Format %s not recognized, dither to assume 8bpc\n", vk_format_string( vk.base_format.format ) );
 
@@ -7934,7 +7937,11 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	spec_entries[15].offset = offsetof(struct FragSpecData, lutSize);
 	spec_entries[15].size = sizeof(frag_spec_data.lutSize);
 
-	frag_spec_info.mapEntryCount = 16;
+	spec_entries[16].constantID = 16;
+	spec_entries[16].offset = offsetof(struct FragSpecData, bloom_knee);
+	spec_entries[16].size = sizeof(frag_spec_data.bloom_knee);
+
+	frag_spec_info.mapEntryCount = 17;
 	frag_spec_info.pMapEntries = spec_entries;
 	frag_spec_info.dataSize = sizeof( frag_spec_data );
 	frag_spec_info.pData = &frag_spec_data;
@@ -8231,8 +8238,8 @@ void vk_create_blur_pipeline( uint32_t index, uint32_t width, uint32_t height, q
 	VkGraphicsPipelineCreateInfo create_info;
 	VkViewport viewport;
 	VkRect2D scissor;
-	float frag_spec_data[3]; // x-offset, y-offset, correction
-	VkSpecializationMapEntry spec_entries[3];
+	float frag_spec_data[4]; // inner offset (x,y), outer offset (x,y)
+	VkSpecializationMapEntry spec_entries[4];
 	VkSpecializationInfo frag_spec_info;
 	VkPipeline *pipeline;
 
@@ -8256,14 +8263,17 @@ void vk_create_blur_pipeline( uint32_t index, uint32_t width, uint32_t height, q
 	set_shader_stage_desc( shader_stages+0, VK_SHADER_STAGE_VERTEX_BIT, vk.modules.gamma_vs, "main" );
 	set_shader_stage_desc( shader_stages+1, VK_SHADER_STAGE_FRAGMENT_BIT, vk.modules.blur_fs, "main" );
 
-	frag_spec_data[0] = 1.2 / (float) width; // x offset
-	frag_spec_data[1] = 1.2 / (float) height; // y offset
-	frag_spec_data[2] = 1.0; // intensity?
-
+	// 9-tap Gaussian via 5 bilinear taps: inner pair at ±1.333, outer pair at ±3.111
 	if ( horizontal_pass ) {
-		frag_spec_data[1] = 0.0;
+		frag_spec_data[0] = 1.33333f / (float) width;  // inner offset x
+		frag_spec_data[1] = 0.0f;                       // inner offset y
+		frag_spec_data[2] = 3.11111f / (float) width;  // outer offset x
+		frag_spec_data[3] = 0.0f;                       // outer offset y
 	} else {
-		frag_spec_data[0] = 0.0;
+		frag_spec_data[0] = 0.0f;                        // inner offset x
+		frag_spec_data[1] = 1.33333f / (float) height; // inner offset y
+		frag_spec_data[2] = 0.0f;                        // outer offset x
+		frag_spec_data[3] = 3.11111f / (float) height; // outer offset y
 	}
 
 	spec_entries[0].constantID = 0;
@@ -8278,9 +8288,13 @@ void vk_create_blur_pipeline( uint32_t index, uint32_t width, uint32_t height, q
 	spec_entries[2].offset = 2 * sizeof( float );
 	spec_entries[2].size = sizeof( float );
 
-	frag_spec_info.mapEntryCount = 3;
+	spec_entries[3].constantID = 3;
+	spec_entries[3].offset = 3 * sizeof( float );
+	spec_entries[3].size = sizeof( float );
+
+	frag_spec_info.mapEntryCount = 4;
 	frag_spec_info.pMapEntries = spec_entries;
-	frag_spec_info.dataSize = 3 * sizeof( float );
+	frag_spec_info.dataSize = 4 * sizeof( float );
 	frag_spec_info.pData = &frag_spec_data[0];
 
 	shader_stages[1].pSpecializationInfo = &frag_spec_info;

@@ -1849,6 +1849,31 @@ static void CL_ForwardToServer_f( void ) {
 
 /*
 ==================
+CL_Menu_f
+
+Engine-level "menu" / "togglemenu" command.
+Opens the appropriate menu regardless of whether the UI VM
+has registered its own "menu" command.
+==================
+*/
+static void CL_Menu_f( void ) {
+	if ( !uivm ) {
+		Com_Printf( "No UI module loaded.\n" );
+		return;
+	}
+	if ( Key_GetCatcher() & KEYCATCH_UI ) {
+		// Menu is already open -- close it
+		VM_Call( uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_NONE );
+	} else if ( cls.state == CA_ACTIVE && !clc.demoplaying ) {
+		VM_Call( uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_INGAME );
+	} else {
+		VM_Call( uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_MAIN );
+	}
+}
+
+
+/*
+==================
 CL_Disconnect_f
 ==================
 */
@@ -4415,6 +4440,8 @@ void CL_Init( void ) {
 	Cmd_AddCommand ("clientinfo", CL_Clientinfo_f);
 	Cmd_AddCommand ("snd_restart", CL_Snd_Restart_f);
 	Cmd_AddCommand ("vid_restart", CL_Vid_Restart_f);
+	Cmd_AddCommand ("menu", CL_Menu_f);
+	Cmd_AddCommand ("togglemenu", CL_Menu_f);
 	Cmd_AddCommand ("disconnect", CL_Disconnect_f);
 	Cmd_AddCommand ("record", CL_Record_f);
 	Cmd_SetCommandCompletionFunc( "record", CL_CompleteRecordName );
@@ -4539,6 +4566,8 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 	Cmd_RemoveCommand ("clientinfo");
 	Cmd_RemoveCommand ("snd_restart");
 	Cmd_RemoveCommand ("vid_restart");
+	Cmd_RemoveCommand ("menu");
+	Cmd_RemoveCommand ("togglemenu");
 	Cmd_RemoveCommand ("disconnect");
 	Cmd_RemoveCommand ("record");
 	Cmd_RemoveCommand ("demo");

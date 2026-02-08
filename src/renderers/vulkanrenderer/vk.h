@@ -298,6 +298,7 @@ typedef struct vkUniform_s {
 	vec4_t pbrFeatureFlags;
 	vec4_t pbrDebugFlags;
 	vec4_t pbrDebugParams;
+	vec4_t pbrQuality;		// x=burleyDiffuse, y=multiScatter, z=microShadow, w=reserved
 #endif
 } vkUniform_t;
 
@@ -315,6 +316,8 @@ _Static_assert( offsetof(vkUniform_t, pbrTexIndex2) == offsetof(vkUniform_t, pbr
 	"pbr layout mismatch: pbrTexIndex2 should follow pbrTexIndex1" );
 _Static_assert( offsetof(vkUniform_t, pbrFeatureFlags) == offsetof(vkUniform_t, pbrTexIndex2) + sizeof(vec4_t),
 	"pbr layout mismatch: pbrFeatureFlags should follow pbrTexIndex2" );
+_Static_assert( offsetof(vkUniform_t, pbrQuality) == offsetof(vkUniform_t, pbrDebugParams) + sizeof(vec4_t),
+	"pbr layout mismatch: pbrQuality should follow pbrDebugParams" );
 _Static_assert( sizeof(vkUniform_t) % sizeof(vec4_t) == 0, "vkUniform_t size must be a multiple of vec4_t" );
 
 typedef struct vkUniformCamera_s {

@@ -107,6 +107,9 @@ cvar_t	*r_pbr_iblPrefilterSize;
 cvar_t	*r_pbr_showCubemap;
 cvar_t	*r_pbr_cubemapInfo;
 #endif
+cvar_t	*r_pbr_burleyDiffuse;
+cvar_t	*r_pbr_multiScatter;
+cvar_t	*r_pbr_microShadow;
 cvar_t  *r_baseNormalX;
 cvar_t  *r_baseNormalY;
 cvar_t  *r_baseParallax;
@@ -180,6 +183,7 @@ cvar_t	*r_bloom_threshold;
 cvar_t	*r_bloom_intensity;
 cvar_t	*r_bloom_threshold_mode;
 cvar_t	*r_bloom_modulate;
+cvar_t	*r_bloom_knee;
 cvar_t	*r_ssao;
 cvar_t	*r_ssaoRadius;
 cvar_t	*r_ssaoBias;
@@ -1534,6 +1538,16 @@ static void VarInfo( void )
 	}
 #if defined (USE_VK_PBR)
 	ri.Printf( PRINT_ALL, "PBR SH extraction: %s\n", r_pbr_shExtract->integer ? "enabled" : "disabled" );
+	ri.Printf( PRINT_ALL, "PBR diffuse model: %s\n", r_pbr_burleyDiffuse->integer ? "Disney/Burley" : "Lambert" );
+	ri.Printf( PRINT_ALL, "PBR multi-scatter: %s\n", r_pbr_multiScatter->integer ? "Kulla-Conty" : "off" );
+	ri.Printf( PRINT_ALL, "PBR micro-shadow: %s\n", r_pbr_microShadow->integer ? "enabled" : "off" );
+	{
+		static const char *tonemapNames[] = { "off", "Reinhard", "ACES Filmic", "Hable/Uncharted2", "AgX", "Khronos PBR Neutral" };
+		int tm = r_tonemap->integer;
+		if ( tm >= 0 && tm <= 5 ) {
+			ri.Printf( PRINT_ALL, "Tone mapping: %s (exposure %.2f)\n", tonemapNames[tm], r_exposure->value );
+		}
+	}
 	if ( r_pbr_debug->integer ) {
 		ri.Printf( PRINT_ALL, "PBR debug view: mode %d\n", r_pbr_debug->integer );
 	}
@@ -1776,6 +1790,18 @@ static void R_Register( void )
 	r_pbr_validate = ri.Cvar_Get( "r_pbr_validate", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_pbr_validate, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_pbr_validate, "Enable PBR binding validation logging (0=off, 1=on)." );
+
+	r_pbr_burleyDiffuse = ri.Cvar_Get( "r_pbr_burleyDiffuse", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbr_burleyDiffuse, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pbr_burleyDiffuse, "Use Disney/Burley roughness-dependent diffuse instead of Lambert (0=Lambert, 1=Burley)." );
+
+	r_pbr_multiScatter = ri.Cvar_Get( "r_pbr_multiScatter", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbr_multiScatter, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pbr_multiScatter, "Enable Kulla-Conty multi-scatter energy compensation for rough surfaces (0=off, 1=on)." );
+
+	r_pbr_microShadow = ri.Cvar_Get( "r_pbr_microShadow", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbr_microShadow, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pbr_microShadow, "Enable AO-based micro-shadowing for diffuse lighting (0=off, 1=on)." );
 	r_lightmapSRGB = ri.Cvar_Get( "r_lightmapSRGB", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_lightmapSRGB, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_lightmapSRGB,
@@ -1944,8 +1970,8 @@ static void R_Register( void )
 	ri.Cvar_SetGroup( r_dither, CVG_RENDERER );
 	
 	r_tonemap = ri.Cvar_Get( "r_tonemap", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_tonemap, "0", "3", CV_INTEGER );
-	ri.Cvar_SetDescription( r_tonemap, "Tone mapping operator:\n 0=off (identity)\n 1=Reinhard\n 2=ACES Filmic\n 3=Hable/Uncharted2" );
+	ri.Cvar_CheckRange( r_tonemap, "0", "5", CV_INTEGER );
+	ri.Cvar_SetDescription( r_tonemap, "Tone mapping operator:\n 0=off (identity)\n 1=Reinhard\n 2=ACES Filmic\n 3=Hable/Uncharted2\n 4=AgX (Troy Sobotka)\n 5=Khronos PBR Neutral" );
 	ri.Cvar_SetGroup( r_tonemap, CVG_RENDERER );
 
 	r_exposure = ri.Cvar_Get( "r_exposure", "1", CVAR_ARCHIVE_ND );
@@ -2059,6 +2085,11 @@ static void R_Register( void )
 	r_bloom_modulate = ri.Cvar_Get( "r_bloom_modulate", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_bloom_modulate, "Modulate extracted color:\n 0: off (color = color, i.e. no changes)\n 1: by itself (color = color * color)\n 2: by intensity (color = color * luma(color))" );
 	ri.Cvar_SetGroup( r_bloom_modulate, CVG_RENDERER );
+
+	r_bloom_knee = ri.Cvar_Get( "r_bloom_knee", "0.5", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_bloom_knee, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_bloom_knee, "Bloom extraction soft knee factor:\n 0: hard threshold (original behavior)\n 0.5: moderate softness (default)\n 1: maximum softness" );
+	ri.Cvar_SetGroup( r_bloom_knee, CVG_RENDERER );
 
 	if ( glConfig.vidWidth )
 		return;

@@ -2160,6 +2160,11 @@ qboolean is_pbr_surface;
 				cubemapStateValue = CUBEMAP_STATE_READY;
 			}
 			Vector4Set( uniform.pbrDebugParams, debugForceLod, debugEps, glintsEnabledFlag, cubemapStateValue );
+			Vector4Set( uniform.pbrQuality,
+				r_pbr_burleyDiffuse ? (float)r_pbr_burleyDiffuse->integer : 1.0f,
+				r_pbr_multiScatter ? (float)r_pbr_multiScatter->integer : 1.0f,
+				r_pbr_microShadow ? (float)r_pbr_microShadow->integer : 1.0f,
+				0.0f );
 
 			// Only push uniforms when the PBR block or debug flags actually changed.
 			if ( vk.cmd && vk.cmd->command_buffer != lastCmdBuf ) {
