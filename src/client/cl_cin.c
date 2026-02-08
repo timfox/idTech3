@@ -1331,21 +1331,45 @@ e_status CIN_RunCinematic( int handle )
 	}
 
 	{
-		const double targetFrameMs = 1000.0 / 30.0;
+		// Cinematic timing should be driven by *real* (unscaled) wall-clock time.
+		// Use the ROQ's declared FPS when available; default to 30.
+		int fps = (int)cinTable[currentHandle].roqFPS;
+		if ( fps <= 0 ) fps = 30;
+		const double targetFrameMs = 1000.0 / (double)fps;
+
 		int realTime = Sys_Milliseconds();
-		int delta = realTime - cinTable[currentHandle].lastRealTime;
-		if ( delta < 0 ) {
-			delta = 0;
+		if ( cinTable[currentHandle].lastRealTime <= 0 ) {
+			cinTable[currentHandle].lastRealTime = realTime;
 		}
-		cinTable[currentHandle].frameAccumulator += delta;
+
+		int delta = realTime - cinTable[currentHandle].lastRealTime;
 		cinTable[currentHandle].lastRealTime = realTime;
 
-		while ( cinTable[currentHandle].status == FMV_PLAY && cinTable[currentHandle].frameAccumulator >= targetFrameMs ) {
+		// Guard against clock anomalies and huge hitches (alt-tab / breakpoint).
+		if ( delta < 0 ) {
+			delta = 0;
+		} else if ( delta > 250 ) {
+			delta = 250;
+		}
+
+		cinTable[currentHandle].frameAccumulator += (double)delta;
+
+		// Never chew through an unbounded number of frames in one client tick.
+		// This prevents apparent "fast-forward" during hitches.
+		int maxFramesThisTick = 5;
+		while ( cinTable[currentHandle].status == FMV_PLAY &&
+				cinTable[currentHandle].frameAccumulator >= targetFrameMs &&
+				maxFramesThisTick-- > 0 ) {
 			RoQInterrupt();
 			cinTable[currentHandle].frameAccumulator -= targetFrameMs;
 			if ( cinTable[currentHandle].status != FMV_PLAY ) {
 				break;
 			}
+		}
+
+		// Keep the accumulator bounded so it doesn't grow without limit.
+		if ( cinTable[currentHandle].frameAccumulator > targetFrameMs * 2.0 ) {
+			cinTable[currentHandle].frameAccumulator = targetFrameMs * 2.0;
 		}
 	}
 
