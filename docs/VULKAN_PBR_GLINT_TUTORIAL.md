@@ -1,42 +1,107 @@
-## Vulkan PBR Glint Tutorial
+## How to Make Shader Materials "Glint" (Vulkan PBR Glint Quick Guide)
 
-This document explains how idTech3’s Vulkan renderer exposes the Chermain 2020 microfacet **glint** subsystem within the PBR pipeline. It is intended for engine integrators and shader authors who want to understand how the dictionary, GPU resources, and cvars work together.
+This guide explains exactly what you need to set on your material or shader to enable visible *glint* (microfacet sparkle) in the Vulkan renderer. If you’re just looking to make a PBR surface sparkle—start here.
 
-### 1. High-level architecture
+---
 
-- **Dictionary generation**: `src/renderers/vulkanrenderer/glints.c` builds a hierarchical dictionary of Beckmann-like distributions per entry/level/size. Modes 0/1 emit legacy lobed dictionaries and mode 2 is the Chermain stochastic sampler.
-- **Vulkan integration**: `vk_build_glint_dictionary()` allocates the CPU buffer, uploads it via `vk_create_glint_dictionary_texture()`, and exposes the texture through descriptor bindings (`vk_fill_pbr_image_info`, `vk_update_pbr_indexed_glint`, `vk_update_glint_descriptor_binding`). `vk_destroy_glint_dictionary_cpu()` guards against double frees.
-- **Shader usage**: `shaders/glsl/gen_frag.tmpl` samples `glint_dict_texture` with helper `glint_dictionary_lookup()` and adds the result into the specular term. The glint parameters are passed from `tr_shade.c` (`VK_SetGlintParams`) through the uniform buffer so the shader can interpolate noise, energy compensation, and masking (G term).
+### 1. Enable Vulkan PBR Glint Support
 
-### 2. Enabling & tuning
+First, make sure the engine is running the Vulkan renderer with the glint system enabled:
 
-1. **Enable the system**: `USE_VK_PBR` is defaulted (`tr_local.h`), so the renderer already compiles the glint pipeline. Make sure you launch the Vulkan renderer (`r_renderer = vulkan`) and `r_glints` cvars exist.
-2. **Key cvars** (see `tr_init.c` for defaults):
-   - `r_glints`: master switch (`0` to disable, `1` for default). This also gate-keeps the uniform updates.
-   - `r_glints_mode`: dictionary algorithm (0 legacy, 1 legacy + Chermain mix, 2 Chermain).
-   - `r_glints_entries`, `r_glints_levels`, `r_glints_size`, `r_glints_alpha`, `r_glints_lobeSigma`: dictionary layout parameters. Entries × levels form the texture height; size is width. Alpha controls base sigma, lobeSigma sets lobe width.
-   - Quality/debug toggles: `r_glints_budget`, `r_glints_strength`, `r_glints_debug`, `r_glints_verbose`, etc.
-3. **Tuning workflow**:
-   - Adjust `r_glints_*` cvars and call `vid_restart` or toggle `r_glints_forceReload` to rebuild the dictionary.
-   - Monitor console output: verbose mode prints build stats (entries, size, sample count, duration). Shader debug modes visualize masks (`r_glints_debug`), energy, or dictionary slices.
+- Launch your game or engine with `+set r_renderer vulkan`
+- Ensure the main glint system cvar is enabled:  
+  ```
+  \set r_glints 1
+  ```
+- (Optional) You can use the default glint algorithm or try `r_glints_mode 2` for full Chermain 2020 microfacet glints.
 
-### 3. Runtime lifecycle
+---
 
-1. **Initialization**: `vk_initialize()` zeroes `vk.glint` and later calls `vk_update_glint_dictionary_if_needed()`.
-2. **Per-frame updates**: `tr_shade.c` calls `vk_update_glint_dictionary_if_needed()` before drawing so atlas parameters stay synchronized. Uniform buffer `vkUniform_t` fills the glint vec4 slots (core/material/micro/temporal/energy/routing/color).
-3. **Resource destruction**: `vk_shutdown()` and `vk_release_resources()` call `vk_destroy_glint_dictionary_texture()` and `vk_destroy_glint_dictionary_cpu()`. The CPU helper now tracks `cpu_allocated` to avoid double frees while still releasing memory across `vk_update_glint_dictionary_if_needed()` rebuilds.
+### 2. Add Glint to Your Material
 
-### 4. Debugging tips
+To make your material **actually glint** in-game:
 
-- **Descriptor availability**: If glint sampling fails acquire a fallback texture (white/black); check `vk_get_glint_dictionary_view()` and `vk_glint_dictionary_image`.
-- **Performance knobs**: Smaller dictionaries cost less upload time; drop entries/levels and rely on shader blending for high-frequency at higher mip levels.
-- **Energy balancing**: `r_glints_energyBoost` and `r_glints_normalScale` (if exposed) keep total specular energy consistent, so increase one while adjusting base specular (metallic/roughness) to avoid fireflies.
-- **Shader inspection**: `gen_frag.tmpl` contains `ComputeGlintContribution`, `ComputeGlintSlope`, and dictionary lookup macros—look at the binding comments near line 180 for sampler layout.
+#### A. Set the following material keywords (in your shader/material file):
 
-### 5. Building shaders
+Depending on your material system (shader stages, .mtr files, or GLSL tagging), you typically need:
 
-Use `scripts/compile_vulkan_shaders.py` (or `shaders/tools/compile_threaded.cpp`) to regenerate SPIR-V whenever you modify the GLSL templates. The compiled blobs live under `src/renderers/vulkanrenderer/shaders/spirv/` and are referenced in `shader_binding.c`. The glint sampler always resides at `set=5, binding=11`.
+- A PBR surface (lit with at least a specular or metallic/roughness workflow)
+- No explicit "glint" map needed by default; instead:
 
-### 6. Summary
+**For idTech3-style .shader/material scripts:**
+```
+q3map_glint 1        // Enables glinting for this surface
+```
+Or for newer PBR systems:
+```
+glint 1
+```
+*(Use whichever keyword is recognized by your engine's material parser. For custom engines, check docs or code for "glint" flags.)*
 
-The Vulkan glint system is production-ready: dictionary generation, descriptor binding, shader sampling, and cvars are already wired into the renderer. Use this guide to customize the dictionary parameters and debug the interaction between GPU resources and shader code when refining microfacet glints.
+#### B. Control the strength and look:
+
+- The *amount* of glint effect is often driven by:
+  - **Roughness/Metalness maps:** Lower roughness, higher metallic = more visible glint
+  - **Uniforms/flags:** Some engines support a direct `glint_strength` or similar property on materials/shaders
+- For fine control (advanced), look for:
+  - `glint_strength`
+  - `glint_lobeSigma`
+  - `glint_alpha`
+
+Example snippet (GLSL uniform or material definition):
+```glsl
+glint_strength 0.7
+glint_lobeSigma 0.14
+glint_alpha 0.18
+```
+
+*(Not all material pipelines expose all of these—use what’s available in your definition system.)*
+
+---
+
+### 3. Debug/Visualize Glints
+
+- Use `\set r_glints_debug 1` to visualize where the glint is being applied in the scene.
+- You can also adjust `r_glints_strength` or similar cvars live in the console and see changes on reload (`\vid_restart`).
+
+---
+
+### 4. Summary Table
+
+| What to set           | Where                                 | Example/Default                   |
+|-----------------------|---------------------------------------|-----------------------------------|
+| `r_glints 1`          | Console cvar or config                | `\set r_glints 1`                 |
+| `q3map_glint 1`       | .shader material file (idTech3 style) | `q3map_glint 1`                   |
+| `glint 1`             | PBR material file (modern style)      | `glint 1`                         |
+| `glint_strength ...`  | Material property or cvar             | `glint_strength 0.7`              |
+| `r_glints_debug 1`    | Console cvar (for debug view)         | `\set r_glints_debug 1`           |
+
+---
+
+### 5. Minimal Example for Material Definition
+
+In a Quake 3-style `.shader`:
+```
+textures/myfolder/my_glinty_material
+{
+    q3map_glint 1
+    // ... other PBR settings ...
+}
+```
+
+Or in a custom PBR material config:
+```
+glint 1
+glint_strength 0.5
+// metalness, roughness, maps as usual
+```
+
+---
+
+**TL;DR:**  
+Set `glint 1` (or `q3map_glint 1`) on your material, ensure `r_glints 1` in the console, and tweak your roughness/metalness for the best visual sparkle.
+
+If you’re authoring GLSL directly: ensure the material’s glint flag/uniform is set to a positive value and uses the glint-enabled shader variants.
+
+For more advanced control over the effect (dictionary shape, sampling quality), adjust the `r_glints_*` console variables and experiment with material-side parameters as described above.
+
