@@ -34,6 +34,13 @@ qboolean	chat_team;
 int			chat_playerNum;
 extern cvar_t	*con_inputMode;
 
+#define MAX_CONSOLE_TOGGLE_KEYS 16
+static int	cl_consoleKeyMap[MAX_CONSOLE_TOGGLE_KEYS];
+static int	cl_consoleKeyCount;
+
+void CL_UpdateConsoleKeyList( void );
+static qboolean CL_IsConsoleKey( int key );
+
 static void Field_CharEvent( field_t *edit, int ch );
 
 /*
@@ -453,6 +460,10 @@ static void Console_Key( int key ) {
 			}
 		}
 
+		if ( !treatAsCommand && con_autochat && !con_autochat->integer ) {
+			treatAsCommand = qtrue;
+		}
+
 		if ( treatAsCommand ) {
 			const char *command = g_consoleField.buffer;
 			if ( command[0] == '\\' || command[0] == '/' ) {
@@ -536,9 +547,6 @@ static void Console_Key( int key ) {
 }
 
 //============================================================================
-
-
-/*
 ================
 Message_Key
 
@@ -583,6 +591,47 @@ static void Message_Key( int key ) {
 
 /*
 ===================
+CL_UpdateConsoleKeyList
+===================
+*/
+void CL_UpdateConsoleKeyList( void ) {
+	char	buffer[MAX_CVAR_VALUE_STRING];
+	const char *parse;
+	char *token;
+
+	cl_consoleKeyCount = 0;
+	if ( !cl_consoleKeys || !cl_consoleKeys->string[0] ) {
+		cl_consoleKeyMap[cl_consoleKeyCount++] = K_CONSOLE;
+		return;
+	}
+
+	Q_strncpyz( buffer, cl_consoleKeys->string, sizeof( buffer ) );
+	parse = buffer;
+
+	while ( ( token = COM_ParseExt( &parse, qfalse ) ) && token[0] ) {
+		int keynum = Key_StringToKeynum( token );
+		if ( keynum >= 0 && cl_consoleKeyCount < MAX_CONSOLE_TOGGLE_KEYS ) {
+			cl_consoleKeyMap[cl_consoleKeyCount++] = keynum;
+		}
+	}
+
+	if ( cl_consoleKeyCount == 0 ) {
+		cl_consoleKeyMap[cl_consoleKeyCount++] = K_CONSOLE;
+	}
+}
+
+static qboolean CL_IsConsoleKey( int key ) {
+	for ( int i = 0; i < cl_consoleKeyCount; i++ ) {
+		if ( cl_consoleKeyMap[i] == key ) {
+			return qtrue;
+		}
+	}
+	return qfalse;
+}
+
+
+/*
+===================
 CL_KeyDownEvent
 
 Called by CL_KeyEvent to handle a keypress
@@ -598,6 +647,11 @@ static void CL_KeyDownEvent( int key, unsigned time )
 		anykeydown++;
 	}
 
+	if ( cl_consoleKeys && cl_consoleKeys->modified ) {
+		CL_UpdateConsoleKeyList();
+		cl_consoleKeys->modified = qfalse;
+	}
+
 #ifndef _WIN32
 	if ( keys[K_ALT].down && key == K_ENTER )
 	{
@@ -608,7 +662,7 @@ static void CL_KeyDownEvent( int key, unsigned time )
 #endif
 
 	// console key is hardcoded, so the user can never unbind it
-	if ( key == K_CONSOLE || ( keys[K_SHIFT].down && key == K_ESCAPE ) ) {
+	if ( CL_IsConsoleKey( key ) || ( keys[K_SHIFT].down && key == K_ESCAPE ) ) {
 		Con_ToggleConsole_f();
 		Key_ClearStates();
 		return;

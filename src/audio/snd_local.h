@@ -222,6 +222,9 @@ extern cvar_t *s_openalOcclusionHf;
 extern cvar_t *s_openalVoipSpatial;
 extern cvar_t *s_openalVoipGain;
 extern cvar_t *s_openalDebug;
+extern cvar_t *s_alMinDistance;
+extern cvar_t *s_alAvailableDevices;
+extern cvar_t *s_alAvailableInputDevices;
 extern cvar_t *s_acoustics_enable;
 extern cvar_t *s_acoustics_debug;
 extern cvar_t *s_acoustics_draw;
@@ -256,6 +259,8 @@ extern cvar_t *s_acoustics_warn_efx;
 extern cvar_t *s_acoustics_decay_scale;
 extern cvar_t *r_acoustics_reflectivity;
 #endif
+
+extern cvar_t *s_backend;
 
 extern cvar_t *s_testsound;
 extern cvar_t *s_khz;

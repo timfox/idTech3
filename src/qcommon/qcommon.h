@@ -1033,6 +1033,18 @@ extern	cvar_t	*com_journal;
 extern	cvar_t	*com_cameraMode;
 extern	cvar_t	*com_protocol;
 extern	qboolean com_protocolCompat;
+extern	cvar_t	*com_legacyprotocol;
+extern	cvar_t	*com_gamename;
+extern	cvar_t	*com_ansiColor;
+extern	cvar_t	*com_altivec;
+extern	cvar_t	*com_standalone;
+extern	cvar_t	*com_basegame;
+extern	cvar_t	*com_homepath;
+#ifndef DEDICATED
+extern	cvar_t	*com_maxfpsMinimized;
+#endif
+extern	cvar_t	*com_busyWait;
+extern	cvar_t	*com_pipefile;
 
 // both client and server must agree to pause
 extern	cvar_t	*sv_paused;

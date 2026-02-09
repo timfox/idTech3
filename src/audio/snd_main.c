@@ -35,7 +35,19 @@ cvar_t *s_musicVolume;
 cvar_t *s_doppler;
 cvar_t *s_muteWhenMinimized;
 cvar_t *s_muteWhenUnfocused;
+cvar_t *s_backend;
 #ifdef USE_OPENAL
+cvar_t *s_useOpenAL;
+cvar_t *s_alGain;
+cvar_t *s_alPrecache;
+cvar_t *s_alSources;
+cvar_t *s_alDriver;
+cvar_t *s_alDevice;
+cvar_t *s_alAvailableDevices;
+cvar_t *s_alInputDevice;
+cvar_t *s_alAvailableInputDevices;
+cvar_t *s_alMinDistance;
+cvar_t *s_alGraceDistance;
 cvar_t *s_openal;
 cvar_t *s_openalDevice;
 cvar_t *s_openalHrtf;
@@ -495,12 +507,19 @@ void S_Init( void )
 
 	Com_Printf( "------ Initializing Sound ------\n" );
 
-	s_volume = Cvar_Get( "s_volume", "0.8", CVAR_ARCHIVE );
-	Cvar_CheckRange( s_volume, "0", "1", CV_FLOAT );
-	Cvar_SetDescription( s_volume, "Sets master volume for all game audio." );
+	s_alGain = Cvar_Get( "s_alGain", "0.8", CVAR_ARCHIVE );
+	Cvar_CheckRange( s_alGain, "0", "1", CV_FLOAT );
+	Cvar_SetDescription( s_alGain, "Sets master volume for all game audio." );
+	s_volume = s_alGain;
 	s_musicVolume = Cvar_Get( "s_musicVolume", "0.25", CVAR_ARCHIVE );
 	Cvar_CheckRange( s_musicVolume, "0", "1", CV_FLOAT );
 	Cvar_SetDescription( s_musicVolume, "Sets volume for in-game music only." );
+	s_alPrecache = Cvar_Get( "s_alPrecache", "0", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( s_alPrecache, "Precache OpenAL buffers at start-up if supported." );
+	s_alSources = Cvar_Get( "s_alSources", "128", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( s_alSources, "Target number of OpenAL sources reserved for active sounds." );
+	s_alDriver = Cvar_Get( "s_alDriver", "OpenAL", CVAR_ROM );
+	Cvar_SetDescription( s_alDriver, "Describes the OpenAL driver used for audio output." );
 s_doppler = Cvar_Get( "s_doppler", "1", CVAR_ARCHIVE_ND );
 Cvar_CheckRange( s_doppler, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( s_doppler, "Enables doppler effect on moving projectiles." );
@@ -512,13 +531,21 @@ Cvar_CheckRange( s_doppler, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( s_muteWhenMinimized, "Mutes all audio while game is minimized." );
 
 #ifdef USE_OPENAL
-	s_openal = Cvar_Get( "s_openal", "0", CVAR_ARCHIVE | CVAR_LATCH );
-	Cvar_CheckRange( s_openal, "0", "1", CV_INTEGER );
-	Cvar_SetDescription( s_openal, "Enables the OpenAL audio backend (requires restart)." );
-	
-	s_openalDevice = Cvar_Get( "s_openalDevice", "default", CVAR_ARCHIVE_ND | CVAR_LATCH );
-	Cvar_SetDescription( s_openalDevice, "OpenAL device name (\"default\" uses the system default)." );
-	
+s_useOpenAL = Cvar_Get( "s_useOpenAL", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	Cvar_CheckRange( s_useOpenAL, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( s_useOpenAL, "Enables the OpenAL audio backend (requires restart)." );
+	s_openal = s_useOpenAL;
+
+	s_alDevice = Cvar_Get( "s_alDevice", "default", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	Cvar_SetDescription( s_alDevice, "OpenAL device name (\"default\" uses the system default)." );
+	s_openalDevice = s_alDevice;
+	s_alAvailableDevices = Cvar_Get( "s_alAvailableDevices", "", CVAR_ROM );
+	Cvar_SetDescription( s_alAvailableDevices, "List of available OpenAL playback devices." );
+	s_alAvailableInputDevices = Cvar_Get( "s_alAvailableInputDevices", "", CVAR_ROM );
+	Cvar_SetDescription( s_alAvailableInputDevices, "List of available OpenAL capture devices." );
+	s_alInputDevice = Cvar_Get( "s_alInputDevice", "default", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	Cvar_SetDescription( s_alInputDevice, "Preferred OpenAL input device name." );
+
 	s_openalHrtf = Cvar_Get( "s_openalHrtf", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	Cvar_CheckRange( s_openalHrtf, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( s_openalHrtf, "Enable OpenAL HRTF if supported by the device." );
@@ -535,21 +562,30 @@ Cvar_CheckRange( s_doppler, "0", "1", CV_INTEGER );
 	Cvar_CheckRange( s_openalCapture, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( s_openalCapture, "Enable OpenAL audio capture for VOIP." );
 	
-	s_openalDopplerFactor = Cvar_Get( "s_openalDopplerFactor", "1.0", CVAR_ARCHIVE_ND );
-	Cvar_CheckRange( s_openalDopplerFactor, "0", "10", CV_FLOAT );
-	Cvar_SetDescription( s_openalDopplerFactor, "OpenAL doppler effect strength (0=off, 1=normal, higher=exaggerated)." );
-	
-	s_openalDopplerSpeed = Cvar_Get( "s_openalDopplerSpeed", "9000", CVAR_ARCHIVE_ND );
-	Cvar_CheckRange( s_openalDopplerSpeed, "1", "100000", CV_FLOAT );
-	Cvar_SetDescription( s_openalDopplerSpeed, "Speed of sound for doppler effect (units/second)." );
-	
-	s_openalRolloff = Cvar_Get( "s_openalRolloff", "1.0", CVAR_ARCHIVE_ND );
-	Cvar_CheckRange( s_openalRolloff, "0", "10", CV_FLOAT );
-	Cvar_SetDescription( s_openalRolloff, "OpenAL distance attenuation rolloff factor." );
-	
-	s_openalMaxDistance = Cvar_Get( "s_openalMaxDistance", "2000", CVAR_ARCHIVE_ND );
-	Cvar_CheckRange( s_openalMaxDistance, "100", "10000", CV_FLOAT );
-	Cvar_SetDescription( s_openalMaxDistance, "Maximum distance for sound attenuation." );
+	s_alDopplerFactor = Cvar_Get( "s_alDopplerFactor", "1.0", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_alDopplerFactor, "0", "10", CV_FLOAT );
+	Cvar_SetDescription( s_alDopplerFactor, "OpenAL doppler effect strength (0=off, 1=normal, higher=exaggerated)." );
+	s_openalDopplerFactor = s_alDopplerFactor;
+
+	s_alDopplerSpeed = Cvar_Get( "s_alDopplerSpeed", "9000", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_alDopplerSpeed, "1", "100000", CV_FLOAT );
+	Cvar_SetDescription( s_alDopplerSpeed, "Speed of sound for doppler effect (units/second)." );
+	s_openalDopplerSpeed = s_alDopplerSpeed;
+
+	s_alRolloff = Cvar_Get( "s_alRolloff", "1.0", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_alRolloff, "0", "10", CV_FLOAT );
+	Cvar_SetDescription( s_alRolloff, "OpenAL distance attenuation rolloff factor." );
+	s_openalRolloff = s_alRolloff;
+
+	s_alMaxDistance = Cvar_Get( "s_alMaxDistance", "2000", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_alMaxDistance, "100", "10000", CV_FLOAT );
+	Cvar_SetDescription( s_alMaxDistance, "Maximum distance for sound attenuation." );
+	s_openalMaxDistance = s_alMaxDistance;
+	s_alMinDistance = Cvar_Get( "s_alMinDistance", "80", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_alMinDistance, "1", "10000", CV_FLOAT );
+	Cvar_SetDescription( s_alMinDistance, "Reference distance for OpenAL attenuation (AL_REFERENCE_DISTANCE)." );
+	s_alGraceDistance = Cvar_Get( "s_alGraceDistance", "10", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( s_alGraceDistance, "Extra attenuation buffer radius for quieting sources near the listener." );
 
 	s_openalLowpass = Cvar_Get( "s_openalLowpass", "0.0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	Cvar_CheckRange( s_openalLowpass, "0", "1", CV_FLOAT );
@@ -809,6 +845,19 @@ Cvar_CheckRange( s_musicIntensity, "0", "1", CV_FLOAT );
 		} else {
 			Com_Printf( "Sound initialization failed.\n" );
 		}
+	}
+
+	const char *backendName = "SDL";
+#ifdef USE_OPENAL
+	if ( s_openal && s_openal->integer ) {
+		backendName = "OpenAL";
+	}
+#endif
+	if ( s_backend ) {
+		Cvar_Set( "s_backend", backendName );
+	}
+	if ( s_alDriver ) {
+		Cvar_Set( "s_alDriver", backendName );
 	}
 
 	Com_Printf( "--------------------------------\n");

@@ -75,10 +75,18 @@ cvar_t	*com_timescale;
 static cvar_t *com_fixedtime;
 cvar_t	*com_journal;
 cvar_t	*com_protocol;
+cvar_t	*com_legacyprotocol;
+cvar_t	*com_gamename;
+cvar_t	*com_ansiColor;
+cvar_t	*com_altivec;
+cvar_t	*com_standalone;
+cvar_t	*com_basegame;
+cvar_t	*com_homepath;
 qboolean com_protocolCompat;
 #ifndef DEDICATED
 cvar_t	*com_maxfps;
 cvar_t	*com_maxfpsUnfocused;
+cvar_t	*com_maxfpsMinimized;
 cvar_t	*com_yieldCPU;
 cvar_t	*com_timedemo;
 #endif
@@ -89,6 +97,8 @@ static cvar_t *com_logfile;		// 1 = buffer log, 2 = flush after each print
 static cvar_t *com_showtrace;
 cvar_t	*com_version;
 static cvar_t *com_buildScript;	// for automated data building scripts
+static cvar_t *com_busyWait;
+static cvar_t *com_pipefile;
 
 #ifndef DEDICATED
 static cvar_t	*com_introPlayed;
@@ -3928,8 +3938,13 @@ void Com_Init( char *commandLine ) {
 	Cvar_Get( "sv_master3", "master.maverickservers.com", CVAR_INIT );
 
 	com_protocol = Cvar_Get( "protocol", XSTRING( DEFAULT_PROTOCOL_VERSION ), 0 );
-	Cvar_SetDescription( com_protocol, "Specify network protocol version number, use -compat suffix for OpenArena compatibility.");
-	if ( Q_stristr( com_protocol->string, "-compat" ) > com_protocol->string ) {
+	Cvar_SetDescription( com_protocol, "Specify network protocol version number, use -compat suffix for OpenArena compatibility." );
+	com_legacyprotocol = Cvar_Get( "com_legacyprotocol", "0", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( com_legacyprotocol, "Force a legacy protocol version that overrides 'protocol'." );
+	if ( com_legacyprotocol->integer > 0 ) {
+		Cvar_Set2( "protocol", va( "%i", com_legacyprotocol->integer ), qtrue );
+		com_protocolCompat = qtrue;
+	} else if ( Q_stristr( com_protocol->string, "-compat" ) > com_protocol->string ) {
 		// strip -compat suffix
 		Cvar_Set2( "protocol", va( "%i", com_protocol->integer ), qtrue );
 		// enforce legacy stream encoding but with new challenge format
@@ -3941,6 +3956,26 @@ void Com_Init( char *commandLine ) {
 	Cvar_CheckRange( com_protocol, "0", NULL, CV_INTEGER );
 	com_protocol->flags &= ~CVAR_USER_CREATED;
 	com_protocol->flags |= CVAR_SERVERINFO | CVAR_ROM;
+	com_gamename = Cvar_Get( "com_gamename", "idtech3", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( com_gamename, "Override the gamename advertised to master servers." );
+	com_ansiColor = Cvar_Get( "com_ansiColor", "1", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( com_ansiColor, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( com_ansiColor, "Enable ANSI console color sequences (0=off, 1=on)." );
+	com_altivec = Cvar_Get( "com_altivec", "0", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( com_altivec, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( com_altivec, "Enable Altivec/VECTOR optimizations on PowerPC builds." );
+	com_standalone = Cvar_Get( "com_standalone", "0", CVAR_ARCHIVE );
+	Cvar_CheckRange( com_standalone, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( com_standalone, "Force running in standalone mode regardless of installed data." );
+	com_basegame = Cvar_Get( "com_basegame", "", CVAR_ARCHIVE );
+	Cvar_SetDescription( com_basegame, "Override the base directory used for game data." );
+	com_homepath = Cvar_Get( "com_homepath", "", CVAR_ARCHIVE );
+	Cvar_SetDescription( com_homepath, "Override the homepath for configuration and user data." );
+	com_pipefile = Cvar_Get( "com_pipefile", "", CVAR_ARCHIVE );
+	Cvar_SetDescription( com_pipefile, "Optional named pipe path for remote server control." );
+	com_busyWait = Cvar_Get( "com_busyWait", "0", CVAR_ARCHIVE );
+	Cvar_CheckRange( com_busyWait, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( com_busyWait, "Set to 1 to busy-wait instead of sleeping when idle." );
 
 	// done early so bind command exists
 	Com_InitKeyCommands();
@@ -3989,6 +4024,9 @@ void Com_Init( char *commandLine ) {
 	com_maxfpsUnfocused = Cvar_Get( "com_maxfpsUnfocused", "60", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( com_maxfpsUnfocused, "0", "1000", CV_INTEGER );
 	Cvar_SetDescription( com_maxfpsUnfocused, "Sets maximum frames per second in unfocused game window." );
+	com_maxfpsMinimized = Cvar_Get( "com_maxfpsMinimized", "25", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( com_maxfpsMinimized, "0", "1000", CV_INTEGER );
+	Cvar_SetDescription( com_maxfpsMinimized, "Sets maximum frames per second in minimized window." );
 	com_yieldCPU = Cvar_Get( "com_yieldCPU", "1", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( com_yieldCPU, "0", "16", CV_INTEGER );
 	Cvar_SetDescription( com_yieldCPU, "Attempt to sleep specified amount of time between rendered frames when game is active, this will greatly reduce CPU load. Use 0 only if you're experiencing some lag." );
@@ -4460,10 +4498,11 @@ void Com_Frame( qboolean noDelay ) {
 			minMsec = 0;
 			bias = 0;
 		} else {
-			if ( !gw_active && com_maxfpsUnfocused->integer > 0 )
+			if ( gw_minimized && com_maxfpsMinimized->integer > 0 )
+				minMsec = 1000 / com_maxfpsMinimized->integer;
+			else if ( !gw_active && com_maxfpsUnfocused->integer > 0 )
 				minMsec = 1000 / com_maxfpsUnfocused->integer;
-			else
-			if ( com_maxfps->integer > 0 )
+			else if ( com_maxfps->integer > 0 )
 				minMsec = 1000 / com_maxfps->integer;
 			else
 				minMsec = 1;
@@ -4499,7 +4538,8 @@ void Com_Frame( qboolean noDelay ) {
 		if ( timeVal > sleepMsec )
 			Com_EventLoop();
 #endif
-		NET_Sleep( sleepMsec * 1000 - 500 );
+		if ( !com_busyWait || !com_busyWait->integer )
+			NET_Sleep( sleepMsec * 1000 - 500 );
 	} while( Com_TimeVal( minMsec ) );
 
 	lastTime = com_frameTime;

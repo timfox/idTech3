@@ -208,6 +208,8 @@ static const keyname_t keynames[] =
 	{"SCROLLOCK", K_SCROLLOCK },
 	{"BREAK", K_BREAK},
 	{"MENU", K_MENU},
+	{"GRAVE", K_CONSOLE},
+	{"CONSOLE", K_CONSOLE},
 	{"POWER", K_POWER},
 	{"EURO", K_EURO},
 	{"UNDO", K_UNDO},

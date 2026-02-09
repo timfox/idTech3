@@ -356,6 +356,9 @@ static void S_AL_ListDevices_f( void ) {
 	} else {
 		devices = alcGetString( NULL, ALC_DEVICE_SPECIFIER );
 	}
+	if ( s_alAvailableDevices ) {
+		Cvar_Set( "s_alAvailableDevices", devices ? devices : "" );
+	}
 
 	if ( !devices || !devices[0] ) {
 		Com_Printf( "No devices found.\n" );
@@ -733,7 +736,8 @@ static void S_AL_UpdateLoopingSounds( void ) {
 		alSourcei( alChannels[channel].source, AL_BUFFER, buffer );
 		alSourcei( alChannels[channel].source, AL_LOOPING, AL_TRUE );
 		alSourcef( alChannels[channel].source, AL_GAIN, alChannels[channel].baseGain );
-		alSourcef( alChannels[channel].source, AL_REFERENCE_DISTANCE, 80.0f );
+		alSourcef( alChannels[channel].source, AL_REFERENCE_DISTANCE,
+			s_alMinDistance ? s_alMinDistance->value : 80.0f );
 		alSourcef( alChannels[channel].source, AL_ROLLOFF_FACTOR, s_openalRolloff ? s_openalRolloff->value : 1.0f );
 		alSourcef( alChannels[channel].source, AL_MAX_DISTANCE, s_openalMaxDistance ? s_openalMaxDistance->value : 2000.0f );
 
@@ -1172,7 +1176,8 @@ static void S_AL_VoipSamples( int entityNum, const vec3_t origin, int samples, i
 	if ( !channel->source ) {
 		alGenSources( 1, &channel->source );
 		alSourcei( channel->source, AL_LOOPING, AL_FALSE );
-		alSourcef( channel->source, AL_REFERENCE_DISTANCE, 80.0f );
+		alSourcef( channel->source, AL_REFERENCE_DISTANCE,
+			s_alMinDistance ? s_alMinDistance->value : 80.0f );
 		alSourcef( channel->source, AL_ROLLOFF_FACTOR, s_openalRolloff ? s_openalRolloff->value : 1.0f );
 		alSourcef( channel->source, AL_MAX_DISTANCE, s_openalMaxDistance ? s_openalMaxDistance->value : 2000.0f );
 		alSourcei( channel->source, AL_SOURCE_RELATIVE, AL_FALSE );
@@ -1478,7 +1483,8 @@ static void S_AL_StartSound( const vec3_t origin, int entityNum, int entchannel,
 	alSourcei( ch->source, AL_BUFFER, buffer );
 	alSourcei( ch->source, AL_LOOPING, AL_FALSE );
 	alSourcef( ch->source, AL_GAIN, ch->baseGain );
-	alSourcef( ch->source, AL_REFERENCE_DISTANCE, 80.0f );
+	alSourcef( ch->source, AL_REFERENCE_DISTANCE,
+		s_alMinDistance ? s_alMinDistance->value : 80.0f );
 	alSourcef( ch->source, AL_ROLLOFF_FACTOR, s_openalRolloff ? s_openalRolloff->value : 1.0f );
 	alSourcef( ch->source, AL_MAX_DISTANCE, s_openalMaxDistance ? s_openalMaxDistance->value : 2000.0f );
 
@@ -1814,19 +1820,22 @@ Cvar_CheckRange( s_khz, "0", "48", CV_INTEGER );
 	dma.isfloat = qfalse;
 	dma.driver = "OpenAL";
 
+	const ALCchar *devices = NULL;
+	if ( alcIsExtensionPresent( NULL, "ALC_ENUMERATE_ALL_EXT" ) == ALC_TRUE ) {
+		devices = alcGetString( NULL, ALC_ALL_DEVICES_SPECIFIER );
+	} else {
+		devices = alcGetString( NULL, ALC_DEVICE_SPECIFIER );
+	}
+	if ( s_alAvailableDevices ) {
+		Cvar_Set( "s_alAvailableDevices", devices ? devices : "" );
+	}
+
 	// Enumerate available devices if debugging
 	if ( s_openalDebug && s_openalDebug->integer >= 1 ) {
-		const ALCchar *devices;
 		const ALCchar *ptr;
 		int count = 0;
 
 		Com_Printf( "Available OpenAL devices:\n" );
-		if ( alcIsExtensionPresent( NULL, "ALC_ENUMERATE_ALL_EXT" ) == ALC_TRUE ) {
-			devices = alcGetString( NULL, ALC_ALL_DEVICES_SPECIFIER );
-		} else {
-			devices = alcGetString( NULL, ALC_DEVICE_SPECIFIER );
-		}
-
 		if ( devices && devices[0] ) {
 			ptr = devices;
 			while ( ptr && *ptr ) {
@@ -1999,6 +2008,13 @@ Cvar_CheckRange( s_khz, "0", "48", CV_INTEGER );
 
 	S_Acoustics_Init();
 
+	if ( s_alAvailableInputDevices ) {
+		Cvar_Set( "s_alAvailableInputDevices", "" );
+	}
+	const ALCchar *captureDevicesEnum = alcGetString( NULL, ALC_CAPTURE_DEVICE_SPECIFIER );
+	if ( s_alAvailableInputDevices ) {
+		Cvar_Set( "s_alAvailableInputDevices", captureDevicesEnum ? captureDevicesEnum : "" );
+	}
 	// Initialize capture if available and requested
 	alCaptureAvailable = qfalse;
 	alCaptureDevice = NULL;
@@ -2009,6 +2025,9 @@ Cvar_CheckRange( s_khz, "0", "48", CV_INTEGER );
 			if ( alCaptureDevice ) {
 				alCaptureAvailable = qtrue;
 				Com_Printf( "OpenAL capture: enabled (%s)\n", captureDeviceName );
+				if ( s_alAvailableInputDevices ) {
+					Cvar_Set( "s_alAvailableInputDevices", captureDeviceName );
+				}
 			}
 		}
 	}

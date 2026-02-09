@@ -74,6 +74,8 @@ cvar_t		*con_autoclear;
 cvar_t		*con_notifytime;
 cvar_t		*con_scale;
 cvar_t		*con_inputMode;
+cvar_t		*con_autochat;
+cvar_t		*con_notifylines;
 
 int			g_console_field_width;
 
@@ -404,6 +406,13 @@ void Con_Init( void )
 	con_scale = Cvar_Get( "con_scale", "1", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( con_scale, "0.5", "8", CV_FLOAT );
 	Cvar_SetDescription( con_scale, "Console font size scale." );
+	con_autochat = Cvar_Get( "con_autochat", "1", CVAR_ARCHIVE );
+	Cvar_SetDescription( con_autochat, "Allow bare console input to be sent as chat when connected." );
+	char maxNotifyStr[16];
+	Com_sprintf( maxNotifyStr, sizeof( maxNotifyStr ), "%d", NUM_CON_TIMES );
+	con_notifylines = Cvar_Get( "con_notifylines", "4", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( con_notifylines, "1", maxNotifyStr, CV_INTEGER );
+	Cvar_SetDescription( con_notifylines, "Number of console notification lines shown above the HUD." );
 	con_inputMode = Cvar_Get( "con_inputMode", "3", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( con_inputMode, "0", "3", CV_INTEGER );
 	Cvar_SetDescription( con_inputMode,
@@ -676,11 +685,23 @@ static void Con_DrawNotify( void )
 	int		skip;
 	int		currentColorIndex;
 	int		colorIndex;
+	int		maxNotifyLines;
+	int		shown;
 
 	currentColorIndex = ColorIndex( COLOR_WHITE );
 	re.SetColor( g_color_table[ currentColorIndex ] );
 
 	v = 0;
+	maxNotifyLines = NUM_CON_TIMES;
+	if ( con_notifylines ) {
+		maxNotifyLines = con_notifylines->integer;
+		if ( maxNotifyLines < 1 ) {
+			maxNotifyLines = 1;
+		} else if ( maxNotifyLines > NUM_CON_TIMES ) {
+			maxNotifyLines = NUM_CON_TIMES;
+		}
+	}
+	shown = 0;
 	for (i= con.current-NUM_CON_TIMES+1 ; i<=con.current ; i++)
 	{
 		if (i < 0)
@@ -710,6 +731,9 @@ static void Con_DrawNotify( void )
 		}
 
 		v += smallchar_height;
+		shown++;
+		if ( shown >= maxNotifyLines )
+			break;
 	}
 
 	re.SetColor( NULL );

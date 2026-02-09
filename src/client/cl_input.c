@@ -85,6 +85,32 @@ static cvar_t *m_yaw;
 static cvar_t *m_forward;
 static cvar_t *m_side;
 static cvar_t *m_filter;
+static cvar_t *in_joystickUseAnalog;
+static cvar_t *j_forward;
+static cvar_t *j_side;
+static cvar_t *j_up;
+static cvar_t *j_pitch;
+static cvar_t *j_yaw;
+static cvar_t *j_forward_axis;
+static cvar_t *j_side_axis;
+static cvar_t *j_up_axis;
+static cvar_t *j_pitch_axis;
+static cvar_t *j_yaw_axis;
+
+static int CL_ClampJoystickAxisSelector( cvar_t *axisCvar, int defaultAxis ) {
+	int axis = defaultAxis;
+
+	if ( axisCvar ) {
+		axis = axisCvar->integer;
+	}
+	if ( axis < 0 ) {
+		axis = 0;
+	}
+	if ( axis >= MAX_JOYSTICK_AXIS ) {
+		axis = MAX_JOYSTICK_AXIS - 1;
+	}
+	return axis;
+}
 
 static qboolean in_mlooking;
 
@@ -418,19 +444,36 @@ static void CL_JoystickMove( usercmd_t *cmd ) {
 		anglespeed = 0.001 * cls.frametime;
 	}
 
+	const int axisSide = CL_ClampJoystickAxisSelector( j_side_axis, AXIS_SIDE );
+	const int axisForward = CL_ClampJoystickAxisSelector( j_forward_axis, AXIS_FORWARD );
+	const int axisUp = CL_ClampJoystickAxisSelector( j_up_axis, AXIS_UP );
+	const int axisPitch = CL_ClampJoystickAxisSelector( j_pitch_axis, AXIS_PITCH );
+	const int axisYaw = CL_ClampJoystickAxisSelector( j_yaw_axis, AXIS_YAW );
+	const qboolean useAnalog = in_joystickUseAnalog && in_joystickUseAnalog->integer;
+	const float sideScale = j_side ? j_side->value : 1.0f;
+	const float forwardScale = j_forward ? j_forward->value : 1.0f;
+	const float upScale = j_up ? j_up->value : 1.0f;
+	const float pitchScale = j_pitch ? j_pitch->value : 1.0f;
+	const float yawScale = j_yaw ? j_yaw->value : 1.0f;
+	const float sideValue = useAnalog ? cl.joystickAxis[axisSide] * sideScale : 0.0f;
+	const float forwardValue = useAnalog ? cl.joystickAxis[axisForward] * forwardScale : 0.0f;
+	const float upValue = useAnalog ? cl.joystickAxis[axisUp] * upScale : 0.0f;
+	const float pitchValue = useAnalog ? cl.joystickAxis[axisPitch] * pitchScale : 0.0f;
+	const float yawValue = useAnalog ? cl.joystickAxis[axisYaw] * yawScale : 0.0f;
+
 	if ( !in_strafe.active ) {
-		cl.viewangles[YAW] += anglespeed * cl_yawspeed->value * cl.joystickAxis[AXIS_SIDE];
+		cl.viewangles[YAW] += anglespeed * cl_yawspeed->value * yawValue;
 	} else {
-		cmd->rightmove = ClampCharMove( cmd->rightmove + cl.joystickAxis[AXIS_SIDE] );
+		cmd->rightmove = ClampCharMove( cmd->rightmove + (int)sideValue );
 	}
 
 	if ( in_mlooking ) {
-		cl.viewangles[PITCH] += anglespeed * cl_pitchspeed->value * cl.joystickAxis[AXIS_FORWARD];
+		cl.viewangles[PITCH] += anglespeed * cl_pitchspeed->value * pitchValue;
 	} else {
-		cmd->forwardmove = ClampCharMove( cmd->forwardmove + cl.joystickAxis[AXIS_FORWARD] );
+		cmd->forwardmove = ClampCharMove( cmd->forwardmove + (int)forwardValue );
 	}
 
-	cmd->upmove = ClampCharMove( cmd->upmove + cl.joystickAxis[AXIS_UP] );
+	cmd->upmove = ClampCharMove( cmd->upmove + (int)upValue );
 }
 
 
@@ -1007,6 +1050,35 @@ void CL_InitInput( void ) {
 
 	cl_showMouseRate = Cvar_Get( "cl_showMouseRate", "0", 0 );
 	Cvar_SetDescription( cl_showMouseRate, "Prints mouse acceleration info when 'cl_mouseAccel' has a value set (rate of mouse samples per frame)." );
+	in_joystickUseAnalog = Cvar_Get( "in_joystickUseAnalog", "1", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( in_joystickUseAnalog, "Toggle whether analog joystick axes affect movement/view." );
+	j_forward = Cvar_Get( "j_forward", "1", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( j_forward, "Scales the joystick axis used for forward/back movement." );
+	j_side = Cvar_Get( "j_side", "1", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( j_side, "Scales the joystick axis used for strafing movement." );
+	j_up = Cvar_Get( "j_up", "1", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( j_up, "Scales the joystick axis used for vertical movement." );
+	j_pitch = Cvar_Get( "j_pitch", "1", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( j_pitch, "Scales the joystick axis used for pitch view changes." );
+	j_yaw = Cvar_Get( "j_yaw", "1", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( j_yaw, "Scales the joystick axis used for yaw view changes." );
+	char maxAxisStr[16];
+	Com_sprintf( maxAxisStr, sizeof( maxAxisStr ), "%d", MAX_JOYSTICK_AXIS - 1 );
+	j_forward_axis = Cvar_Get( "j_forward_axis", va( "%d", AXIS_FORWARD ), CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( j_forward_axis, "0", maxAxisStr, CV_INTEGER );
+	Cvar_SetDescription( j_forward_axis, "Joystick axis to use for forward/back movement (0..MAX_JOYSTICK_AXIS-1)." );
+	j_side_axis = Cvar_Get( "j_side_axis", va( "%d", AXIS_SIDE ), CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( j_side_axis, "0", maxAxisStr, CV_INTEGER );
+	Cvar_SetDescription( j_side_axis, "Joystick axis to use for strafing movement (0..MAX_JOYSTICK_AXIS-1)." );
+	j_up_axis = Cvar_Get( "j_up_axis", va( "%d", AXIS_UP ), CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( j_up_axis, "0", maxAxisStr, CV_INTEGER );
+	Cvar_SetDescription( j_up_axis, "Joystick axis to use for vertical movement (0..MAX_JOYSTICK_AXIS-1)." );
+	j_pitch_axis = Cvar_Get( "j_pitch_axis", va( "%d", AXIS_PITCH ), CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( j_pitch_axis, "0", maxAxisStr, CV_INTEGER );
+	Cvar_SetDescription( j_pitch_axis, "Joystick axis to use for pitch view changes (0..MAX_JOYSTICK_AXIS-1)." );
+	j_yaw_axis = Cvar_Get( "j_yaw_axis", va( "%d", AXIS_YAW ), CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( j_yaw_axis, "0", maxAxisStr, CV_INTEGER );
+	Cvar_SetDescription( j_yaw_axis, "Joystick axis to use for yaw view changes (0..MAX_JOYSTICK_AXIS-1)." );
 
 	m_pitch = Cvar_Get( "m_pitch", "0.022", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( m_pitch, "Set the up and down movement distance of the player in relation to how much the mouse moves." );

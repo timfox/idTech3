@@ -212,6 +212,7 @@ cvar_t	*cl_mapAutoDownload;
 #endif
 cvar_t	*cl_conXOffset;
 cvar_t	*cl_conColor;
+cvar_t	*cl_consoleKeys;
 cvar_t	*cl_inGameVideo;
 
 cvar_t	*cl_serverStatusResendTime;
@@ -4326,6 +4327,9 @@ void CL_Init( void ) {
 	Cvar_SetDescription( cl_conXOffset, "Console notifications X-offset." );
 	cl_conColor = Cvar_Get( "cl_conColor", "", 0 );
 	Cvar_SetDescription( cl_conColor, "Console background color, set as R G B A values from 0-255, use with \\seta to save in config." );
+	cl_consoleKeys = Cvar_Get( "cl_consoleKeys", "GRAVE", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_consoleKeys, "Whitespace-separated key names that toggle the console (default GRAVE)." );
+	CL_UpdateConsoleKeyList();
 
 #ifdef MACOS_X
 	// In game video is REALLY slow in Mac OS X right now due to driver slowness

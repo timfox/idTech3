@@ -407,6 +407,7 @@ extern	cvar_t	*cl_dlDirectory;
 #endif
 extern	cvar_t	*cl_conXOffset;
 extern	cvar_t	*cl_conColor;
+extern	cvar_t	*cl_consoleKeys;
 extern	cvar_t	*cl_inGameVideo;
 
 extern	cvar_t	*cl_lanForcePackets;
@@ -492,6 +493,7 @@ extern  field_t     g_consoleField;
 
 void Field_Draw( field_t *edit, int x, int y, int width, qboolean showCursor, qboolean noColorEscape );
 void Field_BigDraw( field_t *edit, int x, int y, int width, qboolean showCursor, qboolean noColorEscape );
+void CL_UpdateConsoleKeyList( void );
 
 //
 // cl_parse.c
@@ -512,6 +514,8 @@ qboolean CL_ValidPakSignature( const byte *data, int len );
 //
 
 extern cvar_t *con_scale;
+extern cvar_t *con_autochat;
+extern cvar_t *con_notifylines;
 
 void Con_CheckResize( void );
 void Con_Init( void );
