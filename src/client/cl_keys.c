@@ -547,6 +547,8 @@ static void Console_Key( int key ) {
 }
 
 //============================================================================
+
+/*
 ================
 Message_Key
 
@@ -597,7 +599,7 @@ CL_UpdateConsoleKeyList
 void CL_UpdateConsoleKeyList( void ) {
 	char	buffer[MAX_CVAR_VALUE_STRING];
 	const char *parse;
-	char *token;
+	const char *token;
 
 	cl_consoleKeyCount = 0;
 	if ( !cl_consoleKeys || !cl_consoleKeys->string[0] ) {

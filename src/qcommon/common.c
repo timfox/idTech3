@@ -97,9 +97,8 @@ static cvar_t *com_logfile;		// 1 = buffer log, 2 = flush after each print
 static cvar_t *com_showtrace;
 cvar_t	*com_version;
 static cvar_t *com_buildScript;	// for automated data building scripts
-static cvar_t *com_busyWait;
-static cvar_t *com_pipefile;
-
+cvar_t *com_busyWait;
+cvar_t *com_pipefile;
 #ifndef DEDICATED
 static cvar_t	*com_introPlayed;
 cvar_t	*com_skipIdLogo;
