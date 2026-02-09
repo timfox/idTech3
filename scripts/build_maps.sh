@@ -18,6 +18,7 @@ RELEASE_MAPS="$RELEASE_ATLAS/content/maps"
 MAP_TOOL="$ROOT_DIR/src/tools/id3map/build/map-tool"
 MAP_TOOL_BUILD_SCRIPT="$ROOT_DIR/src/tools/id3map/build-map-tool.sh"
 CAPTURE_SCRIPT="$ROOT_DIR/scripts/capture_cubemaps.sh"
+PACKAGE_SCRIPT="$ROOT_DIR/scripts/package_atlas_content.sh"
 
 STAGES=(meta vis light bounce aas info)
 MAP_TOOL_ARGS=(-game atlas -fs_game atlas -fs_basepath "$RELEASE_ATLAS")
@@ -28,9 +29,12 @@ Usage: ./scripts/build_maps.sh <map-name> [more maps...]
 
 Drop .map sources into content/maps/ and run this script by passing the base name
 (without extension). The pipeline runs -meta, -vis, -light, -bounce, -aas, and -info,
-copies the products into both content/maps/ and release/atlas/content/maps/, and
-updates content/manifest.txt so atlas_content.pk3 can be repackaged with the new
-assets.
+copies the products into both content/maps/ and release/atlas/content/maps/, keeps
+content/manifest.txt in sync, optionally repacks atlas_content.pk3, and finally
+captures cubemaps for each scene (based on the cubemap JSON definitions).
+
+Set ATLAS_PACKAGE=0 to skip repackaging atlas_content.pk3.
+Set ATLAS_CAPTURE=0 to skip the cubemap capture step.
 EOF
 }
 
@@ -60,6 +64,7 @@ ensure_map_tool
 mkdir -p "$MAP_DIR" "$RELEASE_MAPS"
 touch "$MANIFEST_FILE"
 
+built_maps=()
 for target in "$@"; do
   map_name="${target%.map}"
   map_path="$MAP_DIR/$map_name.map"
@@ -88,11 +93,31 @@ for target in "$@"; do
     add_manifest_entry "maps/$map_name.$ext"
   done
 
-  if [ -x "$CAPTURE_SCRIPT" ]; then
-    "$CAPTURE_SCRIPT" "$map_name"
-  fi
-
+  built_maps+=("$map_name")
   echo "[map-build] completed $map_name -> content/maps/{.bsp,.aas,.info}"
 done
 
 echo "[map-build] manifest updated at $MANIFEST_FILE"
+
+if [ "${ATLAS_PACKAGE:-1}" -ne 0 ]; then
+  if [ -x "$PACKAGE_SCRIPT" ]; then
+    echo "[map-build] packaging atlas_content.pk3"
+    "$PACKAGE_SCRIPT"
+  else
+    echo "[map-build] warning: package script missing/executable; atlas_content.pk3 not updated"
+  fi
+else
+  echo "[map-build] skipping atlas_content.pk3 packaging (ATLAS_PACKAGE=0)"
+fi
+
+if [ "${ATLAS_CAPTURE:-1}" -ne 0 ] && [ "${#built_maps[@]}" -gt 0 ]; then
+  if [ ! -x "$CAPTURE_SCRIPT" ]; then
+    echo "[map-build] warning: capture script missing/executable; skip cubemap capture"
+  else
+    for map_name in "${built_maps[@]}"; do
+      "$CAPTURE_SCRIPT" "$map_name"
+    done
+  fi
+else
+  echo "[map-build] skipping cubemap capture (ATLAS_CAPTURE=0 or no maps built)"
+fi

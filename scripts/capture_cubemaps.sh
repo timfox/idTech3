@@ -13,6 +13,7 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONTENT_DIR="$ROOT_DIR/content"
 RELEASE_ATLAS="$ROOT_DIR/release/atlas"
 RELEASE_BIN="$ROOT_DIR/release/idtech3"
+PACKAGE_SCRIPT="$ROOT_DIR/scripts/package_content.sh"
 
 usage() {
   echo "Usage: $0 <map-name>"
@@ -42,6 +43,17 @@ fi
 mkdir -p "$CONTENT_CUBEMAP_DIR" "$RELEASE_CUBEMAP_DIR"
 cp "$MAP_JSON" "$CONTENT_CUBEMAP_DIR/env.json"
 cp "$MAP_JSON" "$RELEASE_CUBEMAP_DIR/env.json"
+
+if [ "${CAPTURE_PACKAGE:-1}" -ne 0 ]; then
+  if [ -x "$PACKAGE_SCRIPT" ]; then
+    echo "[cubemap-capture] packaging atlas_content.pk3"
+    "$PACKAGE_SCRIPT"
+  else
+    echo "[cubemap-capture] warning: package script missing/executable; atlas_content.pk3 might be stale"
+  fi
+else
+  echo "[cubemap-capture] skipping packaging (CAPTURE_PACKAGE=0)"
+fi
 
 echo "[cubemap-capture] Running forced capture for $MAP_NAME (r_cubeMapping=1, r_ibl_forceCapture=1)"
 CMD=(
