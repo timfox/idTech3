@@ -17,6 +17,7 @@ RELEASE_ATLAS="$ROOT_DIR/release/atlas"
 RELEASE_MAPS="$RELEASE_ATLAS/content/maps"
 MAP_TOOL="$ROOT_DIR/src/tools/id3map/build/map-tool"
 MAP_TOOL_BUILD_SCRIPT="$ROOT_DIR/src/tools/id3map/build-map-tool.sh"
+CAPTURE_SCRIPT="$ROOT_DIR/scripts/capture_cubemaps.sh"
 
 STAGES=(meta vis light bounce aas info)
 MAP_TOOL_ARGS=(-game atlas -fs_game atlas -fs_basepath "$RELEASE_ATLAS")
@@ -86,6 +87,10 @@ for target in "$@"; do
     cp -u "$artifact" "$RELEASE_MAPS/"
     add_manifest_entry "maps/$map_name.$ext"
   done
+
+  if [ -x "$CAPTURE_SCRIPT" ]; then
+    "$CAPTURE_SCRIPT" "$map_name"
+  fi
 
   echo "[map-build] completed $map_name -> content/maps/{.bsp,.aas,.info}"
 done

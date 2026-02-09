@@ -1,0 +1,6 @@
+# Content manifest for atlas_content.pk3
+# Each entry is relative to the content/ directory.
+maps/demo-full.bsp
+maps/demo-full.aas
+maps/demo-full.info
+cubemaps/demo-full/env.json
