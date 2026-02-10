@@ -14,6 +14,11 @@ layout(push_constant) uniform PushConsts {
 const uint numSamples = 256u;
 const float PI = 3.1415926536;
 
+float sanitizeRoughness( float roughness )
+{
+	return clamp( roughness, 1e-4, 1.0 );
+}
+
 // Based omn http://byteblacksmith.com/improvements-to-the-canonical-one-liner-glsl-rand-for-opengl-es-2-0/
 float random(vec2 co)
 {
@@ -69,12 +74,13 @@ vec3 prefilterEnvMap(vec3 R, float roughness)
 {
 	vec3 N = R;
 	vec3 V = R;
+	float safeRoughness = sanitizeRoughness( roughness );
 	vec3 color = vec3(0.0);
 	float totalWeight = 0.0;
 	float envMapDim = float(textureSize(samplerEnv, 0).s);
 	for ( uint i = 0u; i < numSamples; i++ ) {
 		vec2 Xi = hammersley2d(i, numSamples);
-		vec3 H = importanceSample_GGX(Xi, roughness, N);
+		vec3 H = importanceSample_GGX(Xi, safeRoughness, N);
 		vec3 L = 2.0 * dot(V, H) * H - V;
 		float dotNL = clamp(dot(N, L), 0.0, 1.0);
 		if ( dotNL > 0.0 ) {
@@ -84,7 +90,7 @@ vec3 prefilterEnvMap(vec3 R, float roughness)
 			float dotVH = clamp(dot(V, H), 0.0, 1.0);
 
 			// Probability Distribution Function
-			float pdf = D_GGX(dotNH, roughness) * dotNH / (4.0 * dotVH) + 0.0001;
+			float pdf = D_GGX(dotNH, safeRoughness) * dotNH / (4.0 * dotVH) + 0.0001;
 			// Slid angle of current smple
 			float omegaS = 1.0 / (float(numSamples) * pdf);
 			// Solid angle of 1 pixel across all cube faces
@@ -115,8 +121,9 @@ void main()
 	else if ( face == 4 )
 		normal = normalize( vec3( frag_tex_coord.x, -frag_tex_coord.y, 1.0 ) ); 
 	
-	if ( consts.roughness == 0.0 )
+	float safeRoughness = sanitizeRoughness( consts.roughness );
+	if ( safeRoughness <= 1e-4 )
 		out_color = vec4( textureLod( samplerEnv, normal, 0.0 ).rgb, 1.0 );
 	else
-		out_color = vec4( prefilterEnvMap( normal, consts.roughness ), 1.0 );
+		out_color = vec4( prefilterEnvMap( normal, safeRoughness ), 1.0 );
 }

@@ -24,7 +24,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <stdint.h>
 #include "tr_local.h"
 #include "glints.h"
-
 #ifdef USE_VK_PBR
 static VkDescriptorSet vk_get_pbr_descriptor_for_pipeline( const Vk_Pipeline_Def *def, VkDescriptorSet stageDescriptor );
 #endif
@@ -953,7 +952,6 @@ static uint32_t vk_push_uniform_cached( const vkUniform_t *u );
 void VK_SetFogParams( vkUniform_t *uniform, int *fogStage );
 static vkUniform_t uniform;
 static vkUniformCamera_t uniform_camera;
-
 #ifdef USE_VK_PBR
 typedef struct vkPbrUniformBlock_s {
 	vec4_t emissiveScale;
@@ -1668,12 +1666,14 @@ qboolean is_pbr_surface;
 		}
 	}
 
+	int pbr_debug = 0;
+
 #ifdef USE_VK_PBR
 	is_pbr_surface = vk_is_valid_pbr_surface( tess.shader->hasPBR );
 
 	// Debug view: render a non-PBR pass and optionally override texture0 binding.
 	// Keeps runtime inspection simple without requiring extra shader variants.
-	const int pbr_debug = ( r_pbr_debug != NULL ) ? r_pbr_debug->integer : 0;
+	pbr_debug = ( r_pbr_debug != NULL ) ? r_pbr_debug->integer : 0;
 	if ( pbr_debug > 0 && pbr_debug <= 4 ) {
 		is_pbr_surface = qfalse;
 	} else if ( pbr_debug > 4 ) {
@@ -1683,10 +1683,12 @@ qboolean is_pbr_surface;
 	qboolean debugDictValid = qfalse;
 	const image_t *dictImage = vk_get_glint_dictionary_image();
 	const image_t *debugEnvImage = NULL;
-	qboolean debugEnvViewUsed = qfalse;
+	qboolean envFromSceneView = qfalse;
+	qboolean irrFromSceneView = qfalse;
 	qboolean debugHasEnv = qfalse;
 	qboolean debugHasIrr = qfalse;
 	qboolean stageHasLightmap = qfalse;
+	qboolean stageHasIrr = qfalse;
 	int loggedCubemapIndex = -1;
 	const image_t *loggedEnvImage = NULL;
 	const image_t *loggedIrrImage = NULL;
@@ -1718,6 +1720,7 @@ qboolean is_pbr_surface;
 
 #ifdef USE_VK_PBR
 		stageHasLightmap = qfalse;
+		stageHasIrr = qfalse;
 #endif
 	for ( stage = 0; stage < MAX_SHADER_STAGES; stage++ )
 	{
@@ -1726,7 +1729,6 @@ qboolean is_pbr_surface;
 		qboolean wantsLightmap = qfalse;
 		const char *lightmapSource = "none";
 		const image_t *selectedLightmap = NULL;
-		qboolean stageHasEnv = qfalse;
 #endif
 		pStage = tess.xstages[ stage ];
 		if ( !pStage )
@@ -1852,12 +1854,8 @@ qboolean is_pbr_surface;
 		}
 #endif
 
-	#ifdef USE_VK_PBR
-		qboolean useIndexing = qfalse;
-	#else
-		const qboolean useIndexing = qfalse;
-	#endif
 		VkDescriptorSet pbrDescriptor = VK_NULL_HANDLE;
+		qboolean useIndexing = qfalse;
 
 #ifdef USE_VK_PBR
 		if ( is_pbr_surface && ( pStage->vk_pbr_flags || pbr_debug >= 17 ) ) {
@@ -1876,6 +1874,22 @@ qboolean is_pbr_surface;
 			VkImageView glintDictView = vk_get_glint_dictionary_view();
 			VkImageView envView = VK_NULL_HANDLE;
 			VkImageView irrView = VK_NULL_HANDLE;
+			qboolean envDescriptorBound = qfalse;
+			qboolean irrDescriptorBound = qfalse;
+			useIndexing = ( vk.descriptorIndexingActive && vk.pbrIndexedImageLimit > 0 && vk.pipeline_layout_pbr_indexed != VK_NULL_HANDLE ) ? qtrue : qfalse;
+
+			#define UPDATE_PBR_BINDING_STATE() \
+				do { \
+					const qboolean envIsFallbackLocal = ( envImage == envFallback ) && !envFromSceneView; \
+					const qboolean irrIsFallbackLocal = ( irrImage == irrFallback ) && !irrFromSceneView; \
+					envDescriptorBound = ( envView != VK_NULL_HANDLE ); \
+					irrDescriptorBound = ( irrView != VK_NULL_HANDLE ); \
+					hasEnv = envDescriptorBound && !envIsFallbackLocal; \
+					hasIrr = irrDescriptorBound && !irrIsFallbackLocal; \
+					stageHasIrr = hasIrr; \
+					debugHasEnv = envDescriptorBound; \
+					debugHasIrr = irrDescriptorBound; \
+				} while (0)
 
 			Com_Memset( &block, 0, sizeof( block ) );
 			Vector4Copy( pStage->emissiveScale, block.emissiveScale );
@@ -1944,6 +1958,8 @@ qboolean is_pbr_surface;
 				( tr.emptyCubemap ? tr.emptyCubemap : fallback_black );
 			const image_t *envImage = envFallback;
 			const image_t *irrImage = irrFallback;
+			envFromSceneView = qfalse;
+			irrFromSceneView = qfalse;
 			if ( !tr.numCubemaps || backEnd.viewParms.targetCube != NULL ) {
 				if ( backEnd.viewParms.targetCube == NULL ) {
 					vec3_t dbgPos;
@@ -1979,14 +1995,7 @@ qboolean is_pbr_surface;
 
 			envView = envImage ? envImage->view : VK_NULL_HANDLE;
 			irrView = irrImage ? irrImage->view : VK_NULL_HANDLE;
-
-			hasEnv = ( envView != VK_NULL_HANDLE );
-			hasIrr = ( irrView != VK_NULL_HANDLE );
-			stageHasEnv = hasEnv;
-			stageHasEnv = hasEnv;
-
-			debugHasEnv = hasEnv;
-			debugHasIrr = hasIrr;
+			UPDATE_PBR_BINDING_STATE();
 
 			loggedCubemapIndex = cubemapIndex;
 			loggedEnvImage = envImage;
@@ -2047,10 +2056,10 @@ qboolean is_pbr_surface;
 						if ( sceneView != VK_NULL_HANDLE ) {
 							vk_update_pbr_descriptor_binding_from_view( pbrDescriptor, VK_PBR_BINDING_ENV_CUBEMAP, sceneView );
 							vk_update_pbr_descriptor_binding_from_view( pbrDescriptor, VK_PBR_BINDING_IRRADIANCE, sceneView );
-							hasEnv = hasIrr = qtrue;
-					envView = sceneView;
-					irrView = sceneView;
-							debugEnvViewUsed = qtrue;
+							envView = sceneView;
+							irrView = sceneView;
+							envFromSceneView = qtrue;
+							irrFromSceneView = qtrue;
 						}
 					}
 #endif
@@ -2060,7 +2069,9 @@ qboolean is_pbr_surface;
 				Vector4Set( block.texIndex2, 0.0f, 0.0f, 0.0f, 0.0f );
 			}
 
-			debugEnvImage = debugEnvViewUsed ? NULL : envImage;
+			debugEnvImage = envFromSceneView ? NULL : envImage;
+
+			UPDATE_PBR_BINDING_STATE();
 
 			const qboolean shouldLogBindings =
 				!tr_pbr_bindLogPrinted &&
@@ -2094,15 +2105,14 @@ qboolean is_pbr_surface;
 			tr_pbr_bindLogPrinted = qtrue;
 		}
 
-			Vector4Set( block.featureFlags,
-				hasEnv ? 1.0f : 0.0f,
-				hasIrr ? 1.0f : 0.0f,
+			Vector4Set( uniform.pbrFeatureFlags,
+				envDescriptorBound ? 1.0f : 0.0f,
+				irrDescriptorBound ? 1.0f : 0.0f,
 				hasLightmap ? 1.0f : 0.0f,
 				glintDictView != VK_NULL_HANDLE ? 1.0f : 0.0f );
+			Vector4Copy( uniform.pbrFeatureFlags, block.featureFlags );
 
 			const float iblCompiledFlag = ( envImage != NULL && irrImage != NULL ) ? 1.0f : 0.0f;
-			const float hasEnvFlag = hasEnv ? 1.0f : 0.0f;
-			const float hasIrrFlag = hasIrr ? 1.0f : 0.0f;
 			const qboolean dictValidState = ( glintDictView != VK_NULL_HANDLE );
 			const float dictValidFlag = dictValidState ? 1.0f : 0.0f;
 			debugDictValid = dictValidState;
@@ -2122,9 +2132,9 @@ qboolean is_pbr_surface;
 					"PBR IBL bind: numCubemaps=%d index=%d envImg=%p envView=%p irrImg=%p irrView=%p hasEnv=%d hasIrr=%d\n",
 					tr.numCubemaps,
 					cubemapIndex,
-					(const void *)envImage,
+					(const void *)loggedEnvImage,
 					(const void *)(envImage ? (uintptr_t)envImage->view : 0),
-					(const void *)irrImage,
+					(const void *)loggedIrrImage,
 					(const void *)(irrImage ? (uintptr_t)irrImage->view : 0),
 					hasEnv ? 1 : 0,
 					hasIrr ? 1 : 0 );
@@ -2161,7 +2171,11 @@ qboolean is_pbr_surface;
 				pbrDebugLastFlags = pStage->vk_pbr_flags;
 			}
 
-			Vector4Set( uniform.pbrDebugFlags, iblCompiledFlag, hasEnvFlag, hasIrrFlag, dictValidFlag );
+			Vector4Set( uniform.pbrDebugFlags,
+				iblCompiledFlag,
+				envDescriptorBound ? 1.0f : 0.0f,
+				irrDescriptorBound ? 1.0f : 0.0f,
+				dictValidFlag );
 			float cubemapStateValue = CUBEMAP_STATE_NONE;
 			if ( tr.numCubemaps > 0 ) {
 				cubemapStateValue = CUBEMAP_STATE_HAVE_DEFS_NOT_RENDERED;
@@ -2169,7 +2183,7 @@ qboolean is_pbr_surface;
 			if ( cubemapIndex >= 0 && cubemapIndex < tr.numCubemaps ) {
 				cubemapStateValue = tr.cubemaps[cubemapIndex].state;
 			}
-			if ( debugEnvViewUsed ) {
+			if ( envFromSceneView ) {
 				cubemapStateValue = CUBEMAP_STATE_READY;
 			}
 			Vector4Set( uniform.pbrDebugParams, debugForceLod, debugEps, glintsEnabledFlag, cubemapStateValue );
@@ -2227,17 +2241,13 @@ qboolean is_pbr_surface;
 			if ( pipeline != 0 ) {
 			Vk_Pipeline_Def def;
 			vk_get_pipeline_def( pipeline, &def );
-#ifdef USE_VK_PBR
-			useIndexing = ( vk.descriptorIndexingActive && def.descriptorIndexing ) ? qtrue : qfalse;
-#endif
-
 		if ( is_pbr_surface && ( pStage->vk_pbr_flags || pbr_debug >= 17 ) ) {
 				const uint32_t baseFlags = pStage->vk_pbr_flags & ~( PBR_HAS_LIGHTMAP | PBR_HAS_IRRADIANCE );
 				uint32_t desiredFlags = baseFlags;
 				if ( stageHasLightmap ) {
 					desiredFlags |= PBR_HAS_LIGHTMAP;
 				}
-				if ( stageHasEnv ) {
+				if ( stageHasIrr ) {
 					desiredFlags |= PBR_HAS_IRRADIANCE;
 				}
 
@@ -2256,7 +2266,7 @@ qboolean is_pbr_surface;
 
 			if ( ( pbr_debug == 18 || pbr_debug == 19 ) && pipeline != 0 ) {
 				int envBindingIndex = -1;
-				if ( !debugEnvViewUsed ) {
+				if ( !envFromSceneView ) {
 					if ( useIndexing && debugEnvImage ) {
 						envBindingIndex = (int)vk_get_image_descriptor_index( debugEnvImage );
 					} else if ( !useIndexing ) {
@@ -2398,11 +2408,32 @@ qboolean is_pbr_surface;
 					(const void *)dictImage,
 					(const void *)(uintptr_t)logGlintHandle,
 					(const void *)(uintptr_t)logGlintView );
+				const image_t *envFallbackForLog = tr.pbrEnvFallback ? tr.pbrEnvFallback :
+					( tr.emptyCubemap ? tr.emptyCubemap : ( tr.blackImage ? tr.blackImage : tr.whiteImage ) );
+				const image_t *irrFallbackForLog = tr.pbrIrrFallback ? tr.pbrIrrFallback :
+					( tr.emptyCubemap ? tr.emptyCubemap : ( tr.blackImage ? tr.blackImage : tr.whiteImage ) );
+				const qboolean envIsFallbackLocal = ( loggedEnvImage == envFallbackForLog ) && !envFromSceneView;
+				const qboolean irrIsFallbackLocal = ( loggedIrrImage == irrFallbackForLog ) && !irrFromSceneView;
+				const qboolean envBoundLog = ( loggedEnvView != VK_NULL_HANDLE );
+				const qboolean irrBoundLog = ( loggedIrrView != VK_NULL_HANDLE );
+				ri.Printf( PRINT_ALL,
+					"PBR bind detail: envFromSceneView=%d irrFromSceneView=%d envFallback=%d irrFallback=%d envBound=%d irrBound=%d envImg=%p envView=%p irrImg=%p irrView=%p\n",
+					envFromSceneView ? 1 : 0,
+					irrFromSceneView ? 1 : 0,
+					envIsFallbackLocal ? 1 : 0,
+					irrIsFallbackLocal ? 1 : 0,
+					envBoundLog ? 1 : 0,
+					irrBoundLog ? 1 : 0,
+					(const void *)loggedEnvImage,
+					(const void *)(uintptr_t)loggedEnvView,
+					(const void *)loggedIrrImage,
+					(const void *)(uintptr_t)loggedIrrView );
 				tr_pbr_bindLogPrinted = qtrue;
 			}
 
 			pbrDescriptor = activeDescriptor;
 		}
+#undef UPDATE_PBR_BINDING_STATE
 #endif
 
 

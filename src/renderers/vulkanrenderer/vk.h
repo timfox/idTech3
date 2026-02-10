@@ -264,7 +264,9 @@ typedef struct vkUniform_s {
 			vec4_t color[3];	// ent.color[3]
 		} ent;
 	};
+#ifdef USE_FOG
 	// fog parameters:
+#endif
 	vec4_t fogDistanceVector;	// vertex
 	vec4_t fogDepthVector;		// vertex
 	vec4_t fogEyeT;				// vertex

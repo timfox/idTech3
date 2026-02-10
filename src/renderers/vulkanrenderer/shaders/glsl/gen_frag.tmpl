@@ -61,13 +61,14 @@ layout(set = 0, binding = 0) uniform UBO {
 	vec4 lightColor;			// fragment: rgb + 1/(r*r)
 	vec4 lightVector;			// fragment: linear dynamic light
 #endif
-//#ifdef USE_FOG
+	#ifdef USE_FOG
 	// fog parameters:
 	vec4 fogDistanceVector;		// vertex
 	vec4 fogDepthVector;		// vertex
 	vec4 fogEyeT;				// vertex
 	vec4 fogColor;				// fragment
-#ifdef USE_VK_PBR
+	#endif
+	#ifdef USE_VK_PBR
 	vec4 pbrEmissiveScale;
 	vec4 pbrClearcoatScale;
 	vec4 pbrSheenScale;
@@ -99,7 +100,6 @@ layout(set = 0, binding = 0) uniform UBO {
 	vec4 pbrDebugParams;
 	vec4 pbrQuality;		// x=burleyDiffuse, y=multiScatter, z=microShadow, w=reserved
 #endif
-//#endif
 };
 #endif
 
@@ -312,6 +312,39 @@ float glint_dictionary_lookup( int entry, int level, float position, float dictW
 }
 
 vec3 F_Schlick( in vec3 SpecularColor, in float VH );
+
+float sanitizeRoughness( float roughness )
+{
+	return clamp( roughness, 0.04, 1.0 );
+}
+
+vec3 sanitizeNormal( vec3 n )
+{
+	float len2 = dot( n, n );
+	if ( len2 < 1e-12 ) {
+		return vec3( 0.0, 0.0, 1.0 );
+	}
+	return n * inversesqrt( len2 );
+}
+
+vec3 sanitizeDir( vec3 v, vec3 fallback )
+{
+	float len2 = dot( v, v );
+	if ( len2 < 1e-12 ) {
+		return fallback;
+	}
+	return v * inversesqrt( len2 );
+}
+
+vec3 clampColor( vec3 color )
+{
+	return clamp( color, vec3( 0.0 ), vec3( 1.0 ) );
+}
+
+vec3 remapDebugEnvSample( vec3 incoming )
+{
+	return clamp( incoming * 0.25, vec3( 0.0 ), vec3( 1.0 ) );
+}
 
 // Returns the raw glint NDF (D term) from Chermain P-SDF dictionary.
 // This is a drop-in replacement for D_GGX, not a complete BRDF.
@@ -680,8 +713,8 @@ vec3 CalcDiffuse( in vec3 diffuse, in float NE, in float NL,
 
 vec3 F_Schlick( in vec3 SpecularColor, in float VH )
 {
-	float Fc = pow(1 - VH, 5);
-	return clamp(50.0 * SpecularColor.g, 0.0, 1.0) * Fc + (1 - Fc) * SpecularColor; //hacky way to decide if reflectivity is too low (< 2%)
+	float Fc = pow( 1.0 - max( VH, 0.0 ), 5.0 );
+	return SpecularColor + ( vec3( 1.0 ) - SpecularColor ) * Fc;
 }
 
 float D_GGX( in float NH, in float a )
@@ -713,9 +746,10 @@ float CalcVisibility( in float NL, in float NE, in float roughness )
 vec3 CalcSpecular( in vec3 specular, in float NH, in float NL,
 	in float NE, float LH, in float VH, in float roughness )
 {
-	vec3  F = F_Schlick(specular, VH);
-	float D = D_GGX(NH, roughness);
-	float V = V_SmithJointApprox(roughness, NE, NL);
+	vec3  F = F_Schlick( specular, VH );
+	float alpha = max( roughness * roughness, 1e-4 );
+	float D = D_GGX( NH, alpha );
+	float V = V_SmithJointApprox( alpha, NE, NL );
 
 	return D * F * V;
 }
@@ -739,19 +773,28 @@ float CalcSpecularAO( in float ao, in float roughness, in float NE )
 vec3 CalcIBLContribution( in float roughness, in vec3 N, in vec3 E,
 	in float NE, in vec3 F0, in float forcedLod )
 {
-	vec3 R = reflect(-E, N);
-	R.y *= -1.0f;
-	float lod = get_debug_lod( roughness, forcedLod );
+	float safeRoughness = sanitizeRoughness( roughness );
+	vec3 safeN = sanitizeNormal( N );
+	vec3 safeE = sanitizeDir( E, vec3( 0.0, 0.0, 1.0 ) );
+	float safeNE = clamp( NE, 1e-4, 1.0 );
 
-	vec3 cubeLightColor = textureLod(env_texture, R, lod).rgb;
-	vec2 f_ab = texture(brdflut_texture, vec2(NE, 1.0 - roughness)).rg;
+	vec3 R = reflect( -safeE, safeN );
+	R = normalize( R );
+	R.y *= -1.0;
+
+	float lod = get_debug_lod( safeRoughness, forcedLod );
+	float maxLod = max( float( textureQueryLevels( env_texture ) ) - 1.0, 0.0 );
+	lod = clamp( lod, 0.0, maxLod );
+
+	vec3 cubeLightColor = clampColor( textureLod( env_texture, R, lod ).rgb );
+	vec2 f_ab = texture( brdflut_texture, vec2( safeNE, 1.0 - safeRoughness ) ).rg;
 
 	// Roughness-dependent Fresnel (Fdez-Aguera)
-	vec3 Fr = max(vec3(1.0 - roughness), F0) - F0;
-	vec3 k_S = F0 + Fr * pow(1.0 - NE, 5.0);
-	vec3 FssEss = k_S * f_ab.x + f_ab.y;
+	vec3 Fr = max( vec3( 1.0 - safeRoughness ), F0 ) - F0;
+	vec3 k_S = F0 + Fr * pow( 1.0 - safeNE, 5.0 );
+	vec3 FssEss = clampColor( k_S * f_ab.x + f_ab.y );
 
-	return cubeLightColor * FssEss;
+	return clampColor( cubeLightColor * FssEss );
 }
 
 // Multi-scatter IBL diffuse with energy compensation (Fdez-Aguera 2019).
@@ -818,7 +861,7 @@ vec3 CalcDiffuseIrradiance( in vec3 N, in bool hasIrradiance )
 	if ( hasIrradiance )
 	{
 		vec3 R = N;
-		R.y *= -1.0f;
+		R.y *= -1.0;
 		irradiance += texture( irradiance_texture, R ).rgb;
 	}
 	return irradiance;
@@ -1273,7 +1316,7 @@ void main() {
 	#elif defined (USE_FIXED_COLOR)
 			vec3 bias_color = frag_color.rgb;
 	#elif defined (USE_ENT_COLOR)
-			vec3 bias_color = ent_color1.rgb;
+			vec3 bias_color = ent_color0.rgb;
 	#else
 			vec3 bias_color = VTX_COLOR0.rgb;
 	#endif
@@ -1354,6 +1397,10 @@ void main() {
 		roughness = mix( roughness, max( 0.02, roughness * ( 1.0 - aniso ) ), aniso );
 	}
 
+	float perceptualRoughness = sanitizeRoughness( roughness );
+	float roughnessAlpha = perceptualRoughness * perceptualRoughness;
+	roughness = perceptualRoughness;
+
 	if ( emissive_texture_set > -1 ) {
 		emissive = PBR_SAMPLE_EMISSIVE( frag_tex_coord0 ).rgb * pbrEmissiveScale.rgb;
 	}
@@ -1375,7 +1422,7 @@ void main() {
 	ambientColor *= AO;
 
 	vec3  H  = normalize( L + E );
-	float NE = abs( dot( N, E ) ) + 1e-5;
+	float NE = clamp( dot( N, E ), 0.0, 1.0 ) + 1e-5;
 	float NL = clamp( dot( N, L ), 0.0, 1.0 );
 	float LH = clamp( dot( L, H ), 0.0, 1.0 );
 
@@ -1386,11 +1433,11 @@ void main() {
 	float VH = clamp( dot( E, H ), 0.0, 1.0 );
 	Fs = CalcSpecular( specular.rgb, NH, NL, NE, LH, VH, roughness );
 
-	vec3 baseN = normalize( var_Normal.xyz );
-	vec3 tangent = normalize( var_Tangent.xyz - baseN * dot( baseN, var_Tangent.xyz ) );
-	vec3 binormal = normalize( cross( baseN, tangent ) ) * var_Tangent.w;
+	vec3 Nn = sanitizeNormal( N );
+	vec3 tangent = normalize( var_Tangent.xyz - Nn * dot( Nn, var_Tangent.xyz ) );
+	vec3 binormal = normalize( cross( Nn, tangent ) ) * var_Tangent.w;
 
-	vec3 glintTerm = vec3( 0.0 );
+		vec3 glintTerm = vec3( 0.0 );
 	vec4 glintDebugData = vec4( 0.0 );
 	float glintBlend = 0.0;
 	int glintDebugLevel = 0;
@@ -1419,7 +1466,7 @@ const bool glintsEnabledDebug = ( pbrDebugParams.z > 0.5 );
 	{
 		// Compute raw glint NDF (Chermain P-SDF based D term)
 		float glintMaskFactor = 1.0;
-		float D_glint = ComputeGlintD( N, tangent, binormal, L, E, roughness,
+		float D_glint = ComputeGlintD( sanitizeNormal(N), tangent, binormal, L, E, roughness,
 			NL, NH, NE, LH, VH, glintMaskFactor, glintDebugData );
 
 		// Chermain beta: fraction of surface area with glinting microfacets
@@ -1427,7 +1474,7 @@ const bool glintsEnabledDebug = ( pbrDebugParams.z > 0.5 );
 
 		// Roughness gate: glints collapse rapidly with roughness^2
 		// roughness 0.05 -> 0.96, roughness 0.15 -> 0.70, roughness 0.25 -> 0.37, roughness 0.50 -> 0.018
-		float alpha = roughness * roughness;
+		float alpha = roughnessAlpha;
 		float roughnessGate = exp( -16.0 * alpha );
 
 		// Distance attenuation: glints vanish with distance
@@ -1445,17 +1492,19 @@ const bool glintsEnabledDebug = ( pbrDebugParams.z > 0.5 );
 		// Energy-conserving D-term replacement:
 		// mix(D_ggx, D_glint, w) preserves expected energy because
 		// E[D_glint] ≈ D_ggx by construction of the P-SDF dictionary.
-		float D_base = D_GGX( NH, roughness );
+		float D_base = D_GGX( NH, alpha );
 		float D_final = mix( D_base, D_glint, glintWeight );
 
 		// Recompute full specular BRDF with combined D
-		float V_spec = V_SmithJointApprox( roughness, NE, NL );
+		float V_spec = V_SmithJointApprox( alpha, NE, NL );
 		vec3 F_spec = F_Schlick( specular.rgb, VH );
-		Fs = D_final * F_spec * V_spec;
+		vec3 Fs_base = D_base * F_spec * V_spec;
+		vec3 Fs_final = D_final * F_spec * V_spec;
+		Fs = Fs_final;
 
 		// Track glint contribution for debug views
 		glintBlend = glintWeight;
-		glintTerm = vec3( max( D_final - D_base, 0.0 ) ) * F_spec * V_spec;
+		glintTerm = Fs_final - Fs_base;
 		glintDebugLevel = int( floor( glintCore.z + 0.5 ) );
 	}
 #endif
@@ -1521,8 +1570,8 @@ const bool glintsEnabledDebug = ( pbrDebugParams.z > 0.5 );
 	// which correctly brightens grazing angles on smooth surfaces.  The FssEss
 	// term already encodes single+multi scatter weight, so no additional
 	// energyCompensation is needed for the IBL path.
-	const bool hasIBL = hasEnv && hasIrr;
-	if ( hasIBL )
+	const bool hasSpecIBL = hasEnv;
+	if ( hasSpecIBL )
 	{
 		vec3 specIBL = CalcIBLContribution( roughness, N, E, NE, specular.rgb, pbrDebugParams.x );
 		specIBL *= clearcoatDim * specAO;
@@ -1664,8 +1713,23 @@ const bool glintsEnabledDebug = ( pbrDebugParams.z > 0.5 );
 	}
 	else if ( pbrDebugView == 16 )
 	{
-		vec3 specIBL = CalcIBLContribution( roughness, N, E, NE, specular.rgb, pbrDebugParams.x ) * clearcoatDim * specAO;
-		out_color.rgb = dbg_classify_ibl( specIBL, hasEnvDebug, debugEps );
+		if ( env_texture_set < 0 )
+		{
+			out_color.rgb = DBG_MAGENTA;
+		}
+		else
+		{
+			vec3 specIBL = CalcIBLContribution( roughness, N, E, NE, specular.rgb, pbrDebugParams.x ) * clearcoatDim * specAO;
+			float mag = dbg_len( specIBL );
+			if ( !hasEnvDebug )
+			{
+				out_color.rgb = ( mag > debugEps ) ? vec3( 0.0, 0.0, 1.0 ) : DBG_RED;
+			}
+			else
+			{
+				out_color.rgb = dbg_classify_ibl( specIBL, true, debugEps );
+			}
+		}
 		out_color.a = 1.0;
 	}
 	else if ( pbrDebugView == 17 )
@@ -1676,7 +1740,16 @@ const bool glintsEnabledDebug = ( pbrDebugParams.z > 0.5 );
 	}
 	else if ( pbrDebugView == 18 )
 	{
-		out_color.rgb = dbg_classify_glints( dbgGlint, glintsEnabledDebug, dictValidDebug, debugEps );
+		const bool glintsRuntimeEnabled = glintEnabled;
+		bool dictRuntimeValid = dictValidDebug;
+#ifdef USE_VK_PBR
+		if ( glintDict.x > 0.0 && glintDict.y > 0.0 )
+		{
+			float dictProbe = PBR_SAMPLE_GLINT_DICT( vec2( 0.5, 0.5 ) ).r;
+			dictRuntimeValid = dictRuntimeValid || dictProbe > debugEps;
+		}
+#endif
+		out_color.rgb = dbg_classify_glints( dbgGlint, glintsRuntimeEnabled, dictRuntimeValid, debugEps );
 		out_color.a = 1.0;
 	}
 	else if ( pbrDebugView == 19 )
@@ -1720,7 +1793,7 @@ const bool glintsEnabledDebug = ( pbrDebugParams.z > 0.5 );
 				}
 				else
 				{
-					out_color.rgb = rawEnv; // success
+					out_color.rgb = remapDebugEnvSample( rawEnv ); // success remapped
 				}
 			}
 		}
