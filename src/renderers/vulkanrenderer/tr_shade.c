@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_shade.c
 
 #include <stdint.h>
+#include <math.h>
 #include "tr_local.h"
 #include "glints.h"
 #ifdef USE_VK_PBR
@@ -2158,12 +2159,12 @@ qboolean is_pbr_surface;
 						dictH );
 				}
 				ri.Printf( PRINT_ALL,
-					"PBR debugFlags cpu: irr=%g env=%g dict=%g compiled=%g view=%p\n",
+                                        "PBR debugFlags cpu: irr=%g env=%g dict=%g compiled=%g view=%p\n",
 					uniform.pbrDebugFlags[0],
 					uniform.pbrDebugFlags[1],
 					uniform.pbrDebugFlags[2],
 					uniform.pbrDebugFlags[3],
-					envView );
+                                        (const void *)(uintptr_t)envView );
 				tr_pbr_bindLogPrinted = qtrue;
 			}
 
@@ -2279,7 +2280,7 @@ qboolean is_pbr_surface;
 						if ( VectorNormalize( dir ) == 0.0f ) {
 							VectorSet( dir, 0.0f, 0.0f, 1.0f );
 						}
-						float invRadius = 1.0f / max( dl->radius * dl->radius, 1e-6f );
+						float invRadius = 1.0f / fmaxf( dl->radius * dl->radius, 1e-6f );
 						Vector4Set( block.lightDirs[li], dir[0], dir[1], dir[2], dl->radius );
 						Vector4Set( block.lightColors[li], dl->color[0], dl->color[1], dl->color[2], invRadius );
 					} else {
