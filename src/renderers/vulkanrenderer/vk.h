@@ -436,6 +436,7 @@ void vk_create_image( image_t *image, int width, int height, int mip_levels );
 void vk_upload_image_data( image_t *image, int x, int y, int width, int height, int miplevels, const void *pixels, int size, qboolean update );
 void vk_update_descriptor_set( image_t *image, qboolean mipmap );
 uint32_t vk_get_image_descriptor_index( const image_t *image );
+VkImageView vk_get_pbr_image_view( const image_t *image );
 const image_t *vk_get_glint_dictionary_image( void );
 #ifdef USE_VK_PBR
 qboolean vk_has_glint_dictionary_descriptor( void );

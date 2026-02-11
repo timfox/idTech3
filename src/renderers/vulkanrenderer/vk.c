@@ -7431,6 +7431,12 @@ static void vk_fill_pbr_image_info( const image_t *image, VkDescriptorImageInfo 
 	info->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 }
 
+VkImageView vk_get_pbr_image_view( const image_t *image )
+{
+	const image_t *img = image ? image : tr.whiteImage;
+	return img ? img->view : VK_NULL_HANDLE;
+}
+
 static void vk_fill_pbr_brdflut_info( VkDescriptorImageInfo *info )
 {
 	Vk_Sampler_Def sampler_def;
