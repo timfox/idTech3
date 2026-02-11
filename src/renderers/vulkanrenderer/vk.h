@@ -50,6 +50,7 @@
 typedef float mat4_t[16];
 
 #ifdef USE_VK_PBR
+	#define MAX_PBR_LIGHTS              4
 	#define VK_PBR_VARIANT_COUNT        3
 	#define VK_PBR_INDEXED_RESERVED     1
 
@@ -303,6 +304,10 @@ typedef struct vkUniform_s {
 	vec4_t pbrDebugFlags;
 	vec4_t pbrDebugParams;
 	vec4_t pbrQuality;		// x=burleyDiffuse, y=multiScatter, z=microShadow, w=reserved
+	vec4_t pbrBiasColor;
+	vec4_t pbrLightDirs[MAX_PBR_LIGHTS];
+	vec4_t pbrLightColors[MAX_PBR_LIGHTS];
+	vec4_t pbrLightControl;
 #endif
 } vkUniform_t;
 
@@ -322,6 +327,14 @@ _Static_assert( offsetof(vkUniform_t, pbrFeatureFlags) == offsetof(vkUniform_t, 
 	"pbr layout mismatch: pbrFeatureFlags should follow pbrTexIndex2" );
 _Static_assert( offsetof(vkUniform_t, pbrQuality) == offsetof(vkUniform_t, pbrDebugParams) + sizeof(vec4_t),
 	"pbr layout mismatch: pbrQuality should follow pbrDebugParams" );
+_Static_assert( offsetof(vkUniform_t, pbrBiasColor) == offsetof(vkUniform_t, pbrQuality) + sizeof(vec4_t),
+	"pbr layout mismatch: pbrBiasColor should follow pbrQuality" );
+_Static_assert( offsetof(vkUniform_t, pbrLightDirs) == offsetof(vkUniform_t, pbrBiasColor) + sizeof(vec4_t),
+	"pbr layout mismatch: pbrLightDirs should follow pbrBiasColor" );
+_Static_assert( offsetof(vkUniform_t, pbrLightColors) == offsetof(vkUniform_t, pbrLightDirs) + sizeof(vec4_t) * MAX_PBR_LIGHTS,
+	"pbr layout mismatch: pbrLightColors should follow pbrLightDirs" );
+_Static_assert( offsetof(vkUniform_t, pbrLightControl) == offsetof(vkUniform_t, pbrLightColors) + sizeof(vec4_t) * MAX_PBR_LIGHTS,
+	"pbr layout mismatch: pbrLightControl should follow pbrLightColors" );
 _Static_assert( sizeof(vkUniform_t) % sizeof(vec4_t) == 0, "vkUniform_t size must be a multiple of vec4_t" );
 
 typedef struct vkUniformCamera_s {

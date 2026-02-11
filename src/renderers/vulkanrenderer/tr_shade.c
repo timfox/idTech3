@@ -966,6 +966,10 @@ typedef struct vkPbrUniformBlock_s {
 	vec4_t texIndex1;
 	vec4_t texIndex2;
 	vec4_t featureFlags;
+	vec4_t biasColor;
+	vec4_t lightDirs[MAX_PBR_LIGHTS];
+	vec4_t lightColors[MAX_PBR_LIGHTS];
+	vec4_t lightControl;
 } vkPbrUniformBlock_t;
 #endif
 
@@ -2255,6 +2259,43 @@ qboolean is_pbr_surface;
 				r_pbr_microShadow ? (float)r_pbr_microShadow->integer : 1.0f,
 				0.0f );
 
+			{
+				const color4ub_t *biasColor = &tess.svars.colors[0][0];
+				Vector4Set( block.biasColor,
+					biasColor->rgba[0] * ( 1.0f / 255.0f ),
+					biasColor->rgba[1] * ( 1.0f / 255.0f ),
+					biasColor->rgba[2] * ( 1.0f / 255.0f ),
+					biasColor->rgba[3] * ( 1.0f / 255.0f ) );
+			}
+			{
+				int lightCount = (int)backEnd.refdef.num_dlights;
+				if ( lightCount > MAX_PBR_LIGHTS ) {
+					lightCount = MAX_PBR_LIGHTS;
+				}
+				for ( int li = 0; li < MAX_PBR_LIGHTS; ++li ) {
+					if ( li < lightCount ) {
+						const dlight_t *dl = &backEnd.refdef.dlights[li];
+						vec3_t dir = { dl->dir[0], dl->dir[1], dl->dir[2] };
+						if ( VectorNormalize( dir ) == 0.0f ) {
+							VectorSet( dir, 0.0f, 0.0f, 1.0f );
+						}
+						float invRadius = 1.0f / max( dl->radius * dl->radius, 1e-6f );
+						Vector4Set( block.lightDirs[li], dir[0], dir[1], dir[2], dl->radius );
+						Vector4Set( block.lightColors[li], dl->color[0], dl->color[1], dl->color[2], invRadius );
+					} else {
+						Vector4Set( block.lightDirs[li], 0.0f, 0.0f, 1.0f, 0.0f );
+						Vector4Set( block.lightColors[li], 0.0f, 0.0f, 0.0f, 0.0f );
+					}
+				}
+				Vector4Set( block.lightControl, (float)lightCount, 0.0f, 0.0f, 0.0f );
+			}
+			Vector4Copy( block.biasColor, uniform.pbrBiasColor );
+			for ( int li = 0; li < MAX_PBR_LIGHTS; ++li ) {
+				Vector4Copy( block.lightDirs[li], uniform.pbrLightDirs[li] );
+				Vector4Copy( block.lightColors[li], uniform.pbrLightColors[li] );
+			}
+			Vector4Copy( block.lightControl, uniform.pbrLightControl );
+
 			// Only push uniforms when the PBR block or debug flags actually changed.
 			if ( vk.cmd && vk.cmd->command_buffer != lastCmdBuf ) {
 				lastCmdBuf = vk.cmd->command_buffer;
@@ -2286,8 +2327,6 @@ qboolean is_pbr_surface;
 				Vector4Copy( block.texIndex0, uniform.pbrTexIndex0 );
 				Vector4Copy( block.texIndex1, uniform.pbrTexIndex1 );
 				Vector4Copy( block.texIndex2, uniform.pbrTexIndex2 );
-				Vector4Copy( block.featureFlags, uniform.pbrFeatureFlags );
-
 				vk_push_uniform_cached( &uniform );
 			}
 		}
