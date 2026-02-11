@@ -2126,35 +2126,42 @@ qboolean is_pbr_surface;
 				( ( r_pbr_bindlog && r_pbr_bindlog->integer ) ||
 				  ( r_pbr_debug && r_pbr_debug->integer >= 17 ) );
 			if ( shouldLogBindings ) {
-			ri.Printf( PRINT_ALL,
-				"PBR IBL bind: map=%s numCubemaps=%d cubemapIndex=%d envImg=%p envView=%p envIndex=%d envIndexView=%p irrImg=%p irrView=%p irrIndex=%d irrIndexView=%p hasEnv=%d hasIrr=%d stateBits=0x%08x\n",
-				mapName,
-				tr.numCubemaps,
-				cubemapIndex,
-				(const void *)envImage,
-				(const void *)(uintptr_t)envView,
-				envDescriptorIndex,
-				(const void *)(uintptr_t)envIndexedView,
-				(const void *)irrImage,
-				(const void *)(uintptr_t)irrView,
-				irrDescriptorIndex,
-				(const void *)(uintptr_t)irrIndexedView,
-				envDescriptorBound ? 1 : 0,
-				irrDescriptorBound ? 1 : 0,
-				pStage->stateBits );
-			if ( r_glints && r_glints->integer ) {
-				const int dictW = dictImage ? ( dictImage->uploadWidth ? dictImage->uploadWidth : dictImage->width ) : 0;
-				const int dictH = dictImage ? ( dictImage->uploadHeight ? dictImage->uploadHeight : dictImage->height ) : 0;
 				ri.Printf( PRINT_ALL,
-					"PBR glints bind: dictImg=%p dictView=%p dictValid=%d dictW=%d dictH=%d\n",
-					(const void *)dictImage,
-					(const void *)(uintptr_t)glintDictView,
-					glintDictView != VK_NULL_HANDLE ? 1 : 0,
-					dictW,
-					dictH );
+					"PBR IBL bind: map=%s numCubemaps=%d cubemapIndex=%d envImg=%p envView=%p envIndex=%d envIndexView=%p irrImg=%p irrView=%p irrIndex=%d irrIndexView=%p hasEnv=%d hasIrr=%d stateBits=0x%08x\n",
+					mapName,
+					tr.numCubemaps,
+					cubemapIndex,
+					(const void *)envImage,
+					(const void *)(uintptr_t)envView,
+					envDescriptorIndex,
+					(const void *)(uintptr_t)envIndexedView,
+					(const void *)irrImage,
+					(const void *)(uintptr_t)irrView,
+					irrDescriptorIndex,
+					(const void *)(uintptr_t)irrIndexedView,
+					envDescriptorBound ? 1 : 0,
+					irrDescriptorBound ? 1 : 0,
+					pStage->stateBits );
+				if ( r_glints && r_glints->integer ) {
+					const int dictW = dictImage ? ( dictImage->uploadWidth ? dictImage->uploadWidth : dictImage->width ) : 0;
+					const int dictH = dictImage ? ( dictImage->uploadHeight ? dictImage->uploadHeight : dictImage->height ) : 0;
+					ri.Printf( PRINT_ALL,
+						"PBR glints bind: dictImg=%p dictView=%p dictValid=%d dictW=%d dictH=%d\n",
+						(const void *)dictImage,
+						(const void *)(uintptr_t)glintDictView,
+						glintDictView != VK_NULL_HANDLE ? 1 : 0,
+						dictW,
+						dictH );
+				}
+				ri.Printf( PRINT_ALL,
+					"PBR debugFlags cpu: irr=%g env=%g dict=%g compiled=%g view=%p\n",
+					uniform.pbrDebugFlags[0],
+					uniform.pbrDebugFlags[1],
+					uniform.pbrDebugFlags[2],
+					uniform.pbrDebugFlags[3],
+					envView );
+				tr_pbr_bindLogPrinted = qtrue;
 			}
-			tr_pbr_bindLogPrinted = qtrue;
-		}
 
 			Vector4Set( uniform.pbrFeatureFlags,
 				envDescriptorBound ? 1.0f : 0.0f,
@@ -2227,10 +2234,10 @@ qboolean is_pbr_surface;
 			}
 
 			Vector4Set( uniform.pbrDebugFlags,
-				iblCompiledFlag,
-				envDescriptorBound ? 1.0f : 0.0f,
 				irrDescriptorBound ? 1.0f : 0.0f,
-				dictValidFlag );
+				envDescriptorBound ? 1.0f : 0.0f,
+				dictValidFlag,
+				iblCompiledFlag );
 			float cubemapStateValue = CUBEMAP_STATE_NONE;
 			if ( tr.numCubemaps > 0 ) {
 				cubemapStateValue = CUBEMAP_STATE_HAVE_DEFS_NOT_RENDERED;
@@ -2533,9 +2540,9 @@ qboolean is_pbr_surface;
 					const float featureEnv = uniform.pbrFeatureFlags[0];
 					const float featureIrr = uniform.pbrFeatureFlags[1];
 					const float featureGlint = uniform.pbrFeatureFlags[3];
+					const float debugIrr = uniform.pbrDebugFlags[0];
 					const float debugEnv = uniform.pbrDebugFlags[1];
-					const float debugIrr = uniform.pbrDebugFlags[2];
-					const float debugGlint = uniform.pbrDebugFlags[3];
+					const float debugDict = uniform.pbrDebugFlags[2];
 					ri.Printf( PRINT_ALL,
 						"PBR debug flags: envBound=%d irrBound=%d feature=[%.2f %.2f %.2f] debug=[%.2f %.2f %.2f]\n",
 						envDescriptorBound ? 1 : 0,
@@ -2543,9 +2550,9 @@ qboolean is_pbr_surface;
 						featureEnv,
 						featureIrr,
 						featureGlint,
-						debugEnv,
 						debugIrr,
-						debugGlint );
+						debugEnv,
+						debugDict );
 				}
 			}
 

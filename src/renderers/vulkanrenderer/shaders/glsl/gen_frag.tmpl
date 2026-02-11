@@ -1455,9 +1455,9 @@ void main() {
 const bool allowGlints = forceGlintsDebug || glintCore.x > 0.5 || pbrDebug.w > 0.5;
 const bool glintAvailable = hasGlintDict && allowGlints;
 bool glintEnabled = glintAvailable;
-	const bool hasEnvDebug = pbrDebugFlags.y > 0.5;
-	const bool hasIrrDebug = pbrDebugFlags.z > 0.5;
-	const bool dictValidDebug = pbrDebugFlags.w > 0.5;
+const bool hasEnvDebug = pbrDebugFlags.y > 0.5;
+const bool hasIrrDebug = pbrDebugFlags.x > 0.5;
+const bool dictValidDebug = pbrDebugFlags.z > 0.5;
 	const float debugEps = max( pbrDebugParams.y, 1e-6 );
 	const bool glintsEnabledDebug = ( pbrDebugParams.z > 0.5 );
 
