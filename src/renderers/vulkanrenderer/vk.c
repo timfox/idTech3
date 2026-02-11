@@ -5165,27 +5165,36 @@ static void vk_clamp_glint_params( glint_dict_params_t *params )
 	}
 }
 
-static qboolean vk_glint_params_equal( const glint_dict_params_t *a, const glint_dict_params_t *b )
+static uint64_t vk_glint_params_hash( const glint_dict_params_t *params )
 {
-	if ( !a || !b ) {
-		return qfalse;
+	uint64_t hash = 1469598103934665603ull;
+
+	if ( !params ) {
+		return hash;
 	}
-	if ( a->entries != b->entries || a->levels != b->levels || a->size != b->size ) {
-		return qfalse;
+
+	hash ^= (uint64_t)params->entries;
+	hash *= 1099511628211ull;
+	hash ^= (uint64_t)params->levels;
+	hash *= 1099511628211ull;
+	hash ^= (uint64_t)params->size;
+	hash *= 1099511628211ull;
+	hash ^= (uint64_t)params->mode;
+	hash *= 1099511628211ull;
+	hash ^= (uint64_t)params->seed;
+	hash *= 1099511628211ull;
+
+	{
+		uint32_t fvalue;
+		memcpy( &fvalue, &params->alpha, sizeof( fvalue ) );
+		hash ^= (uint64_t)fvalue;
+		hash *= 1099511628211ull;
+		memcpy( &fvalue, &params->lobeSigma, sizeof( fvalue ) );
+		hash ^= (uint64_t)fvalue;
+		hash *= 1099511628211ull;
 	}
-	if ( a->mode != b->mode ) {
-		return qfalse;
-	}
-	if ( a->seed != b->seed ) {
-		return qfalse;
-	}
-	if ( fabsf( a->alpha - b->alpha ) > 1e-6f ) {
-		return qfalse;
-	}
-	if ( fabsf( a->lobeSigma - b->lobeSigma ) > 1e-6f ) {
-		return qfalse;
-	}
-	return qtrue;
+
+	return hash;
 }
 
 static void vk_destroy_glint_dictionary_cpu( void )
@@ -5198,6 +5207,7 @@ static void vk_destroy_glint_dictionary_cpu( void )
 	vk.glint.size = 0;
 	vk.glint.valid = qfalse;
 	Com_Memset( &vk.glint.params, 0, sizeof( vk.glint.params ) );
+	vk.glint.params_hash = 0;
 }
 
 static qboolean vk_build_glint_dictionary( const glint_dict_params_t *params )
@@ -5235,6 +5245,7 @@ static qboolean vk_build_glint_dictionary( const glint_dict_params_t *params )
 	vk.glint.params = *params;
 	vk.glint.valid = qtrue;
 	vk.glint.cpu_allocated = qtrue;
+	vk.glint.params_hash = vk_glint_params_hash( params );
 
 	if ( r_glints_verbose && r_glints_verbose->integer > 0 ) {
 		int sampleCount = R_Glints_GetSampleCount( params );
@@ -5260,63 +5271,65 @@ static void vk_create_glint_dictionary_texture( void )
 	{
 		ri.Printf( PRINT_WARNING, "glint dictionary missing (ptr=%p size=%zu), skipping texture creation\n",
 			(void *)(uintptr_t)vk.glint.dictionary, vk.glint.size );
-		vk.glint_dict_image = VK_NULL_HANDLE;
-		vk.glint_dict_image_view = VK_NULL_HANDLE;
+		vk.glint.view = VK_NULL_HANDLE;
 		return;
 	}
 
-	Com_Memset( &vk_glint_dictionary_image, 0, sizeof( vk_glint_dictionary_image ) );
-	vk_glint_dictionary_image.imgName = "glint_dictionary";
-	vk_glint_dictionary_image.internalFormat = VK_FORMAT_R32_SFLOAT;
-	vk_glint_dictionary_image.width = vk.glint.params.size;
-	vk_glint_dictionary_image.height = vk.glint.params.entries * vk.glint.params.levels;
-	vk_glint_dictionary_image.uploadWidth = vk_glint_dictionary_image.width;
-	vk_glint_dictionary_image.uploadHeight = vk_glint_dictionary_image.height;
-	vk_glint_dictionary_image.wrapClampMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	vk_glint_dictionary_image.layers = 1;
-	vk_glint_dictionary_image.type = 0;
-	vk_glint_dictionary_image.flags = IMGFLAG_NONE;
-	vk_glint_dictionary_image.descriptor = VK_NULL_HANDLE;
+	image_t *image = &vk_glint_dictionary_image;
+	Com_Memset( image, 0, sizeof( *image ) );
+	image->imgName = "glint_dictionary";
+	image->internalFormat = VK_FORMAT_R32_SFLOAT;
+	image->width = vk.glint.params.size;
+	image->height = vk.glint.params.entries * vk.glint.params.levels;
+	image->uploadWidth = image->width;
+	image->uploadHeight = image->height;
+	image->wrapClampMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	image->layers = 1;
+	image->type = 0;
+	image->flags = IMGFLAG_NONE;
+	image->descriptor = VK_NULL_HANDLE;
 
-	vk_create_image( &vk_glint_dictionary_image,
-	                 vk_glint_dictionary_image.width,
-	                 vk_glint_dictionary_image.height,
-	                 1 );
-
-	vk_upload_image_data( &vk_glint_dictionary_image,
+	vk_create_image( image, image->width, image->height, 1 );
+	vk_upload_image_data( image,
 	                      0,
 	                      0,
-	                      vk_glint_dictionary_image.width,
-	                      vk_glint_dictionary_image.height,
+	                      image->width,
+	                      image->height,
 	                      1,
 	                      (byte *)vk.glint.dictionary,
 	                      (int) vk.glint.size,
 	                      qfalse );
 
-	vk.glint_dict_image = vk_glint_dictionary_image.handle;
-	vk.glint_dict_image_view = vk_glint_dictionary_image.view;
+	Vk_Sampler_Def sampler_def;
+	Com_Memset( &sampler_def, 0, sizeof( sampler_def ) );
+	sampler_def.address_mode = image->wrapClampMode;
+	sampler_def.gl_mag_filter = GL_LINEAR;
+	sampler_def.gl_min_filter = GL_LINEAR;
+	sampler_def.noAnisotropy = qtrue;
+	sampler_def.mip_lod_bias = 0.0f;
+	vk.glint.sampler = vk_find_sampler( &sampler_def );
+	vk.glint.image = image->handle;
+	vk.glint.view = image->view;
+	vk.glint.wrapClampMode = image->wrapClampMode;
 
-	ri.Printf( PRINT_ALL, "glint dictionary image=%p descriptor=%p view=%p\n",
-		(void *)(uintptr_t)vk.glint_dict_image, (void *)(uintptr_t)vk_glint_dictionary_image.descriptor, (void *)(uintptr_t)vk.glint_dict_image_view );
+	ri.Printf( PRINT_ALL, "glint dictionary image=%p descriptor=%p view=%p sampler=%p\n",
+		(void *)(uintptr_t)vk.glint.image,
+		(void *)(uintptr_t)image->descriptor,
+		(void *)(uintptr_t)vk.glint.view,
+		(void *)(uintptr_t)vk.glint.sampler );
 }
 #endif
 #ifdef USE_VK_PBR
 static void vk_destroy_glint_dictionary_texture( void )
 {
-	if ( vk_glint_dictionary_image.view != VK_NULL_HANDLE )
-	{
-		qvkDestroyImageView( vk.device, vk_glint_dictionary_image.view, NULL );
-		vk_glint_dictionary_image.view = VK_NULL_HANDLE;
+	image_t *image = &vk_glint_dictionary_image;
+	if ( image->view != VK_NULL_HANDLE || image->handle != VK_NULL_HANDLE ) {
+		vk_destroy_image_resources( &image->handle, &image->view );
+		image->descriptor = VK_NULL_HANDLE;
 	}
-	if ( vk_glint_dictionary_image.handle != VK_NULL_HANDLE )
-	{
-		qvkDestroyImage( vk.device, vk_glint_dictionary_image.handle, NULL );
-		vk_glint_dictionary_image.handle = VK_NULL_HANDLE;
-	}
-
-	vk.glint_dict_image = VK_NULL_HANDLE;
-	vk.glint_dict_image_view = VK_NULL_HANDLE;
-	vk_glint_dictionary_image.descriptor = VK_NULL_HANDLE;
+	vk.glint.image = VK_NULL_HANDLE;
+	vk.glint.view = VK_NULL_HANDLE;
+	vk.glint.wrapClampMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 }
 #endif
 
@@ -5325,6 +5338,7 @@ void vk_update_glint_dictionary_if_needed( const glint_dict_params_t *params, qb
 {
 	glint_dict_params_t clamped;
 	qboolean params_changed;
+	uint64_t params_hash;
 
 	if ( !params || vk.device == VK_NULL_HANDLE ) {
 		return;
@@ -5333,7 +5347,8 @@ void vk_update_glint_dictionary_if_needed( const glint_dict_params_t *params, qb
 	clamped = *params;
 	vk_clamp_glint_params( &clamped );
 
-	params_changed = ( !vk.glint.valid ) || !vk_glint_params_equal( &vk.glint.params, &clamped );
+	params_hash = vk_glint_params_hash( &clamped );
+	params_changed = force || ( !vk.glint.valid ) || ( params_hash != vk.glint.params_hash );
 	if ( !force && !params_changed ) {
 		return;
 	}
@@ -5343,6 +5358,7 @@ void vk_update_glint_dictionary_if_needed( const glint_dict_params_t *params, qb
 	vk_destroy_glint_dictionary_texture();
 
 	if ( vk_build_glint_dictionary( &clamped ) ) {
+		vk.glint.params_hash = params_hash;
 		vk_create_glint_dictionary_texture();
 	} else {
 		ri.Printf( PRINT_WARNING, "glint dictionary rebuild failed; using fallback\n" );
@@ -7566,7 +7582,7 @@ static void vk_update_pbr_indexed_glint( VkDescriptorSet descriptor )
 	if ( vk.pbrIndexedImageLimit == 0 )
 		return;
 
-	if ( vk_glint_dictionary_image.view != VK_NULL_HANDLE ) {
+	if ( vk.glint.view != VK_NULL_HANDLE ) {
 		glint_image = &vk_glint_dictionary_image;
 	} else if ( tr.blackImage ) {
 		glint_image = tr.blackImage;
@@ -7858,13 +7874,13 @@ void vk_update_pbr_indexed_common( const image_t *env, const image_t *irr )
 }
 
 VkImageView vk_get_glint_dictionary_view( void ) {
-	return vk_glint_dictionary_image.view;
+	return vk.glint.view;
 }
 
 const image_t *vk_get_glint_dictionary_image( void )
 {
 #ifdef USE_VK_PBR
-	if ( vk_glint_dictionary_image.view != VK_NULL_HANDLE ) {
+	if ( vk.glint.view != VK_NULL_HANDLE ) {
 		return &vk_glint_dictionary_image;
 	}
 #endif
@@ -7882,31 +7898,41 @@ void vk_update_glint_descriptor_binding( VkDescriptorSet descriptor ) {
 	Vk_Sampler_Def sampler_def;
 	VkDescriptorImageInfo image_info;
 	VkWriteDescriptorSet descriptor_write;
-	VkImageView image_view;
-	VkSamplerAddressMode address_mode;
+	VkImageView image_view = VK_NULL_HANDLE;
+	VkSamplerAddressMode address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	VkSampler sampler = vk.glint.sampler;
 
 	if ( descriptor == VK_NULL_HANDLE ) {
 		return;
 	}
 
-	if ( vk_glint_dictionary_image.view != VK_NULL_HANDLE ) {
-		image_view = vk_glint_dictionary_image.view;
-		address_mode = vk_glint_dictionary_image.wrapClampMode;
+	if ( vk.glint.view != VK_NULL_HANDLE ) {
+		image_view = vk.glint.view;
+		address_mode = vk.glint.wrapClampMode;
+		if ( sampler == VK_NULL_HANDLE ) {
+			Com_Memset( &sampler_def, 0, sizeof( sampler_def ) );
+			sampler_def.address_mode = address_mode;
+			sampler_def.gl_mag_filter = GL_LINEAR;
+			sampler_def.gl_min_filter = GL_LINEAR;
+			sampler_def.noAnisotropy = qtrue;
+			sampler_def.mip_lod_bias = 0.0f;
+			sampler = vk_find_sampler( &sampler_def );
+		}
 	} else if ( tr.blackImage && tr.blackImage->view != VK_NULL_HANDLE ) {
 		image_view = tr.blackImage->view;
 		address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		Com_Memset( &sampler_def, 0, sizeof( sampler_def ) );
+		sampler_def.address_mode = address_mode;
+		sampler_def.gl_mag_filter = GL_LINEAR;
+		sampler_def.gl_min_filter = GL_LINEAR;
+		sampler_def.noAnisotropy = qtrue;
+		sampler_def.mip_lod_bias = 0.0f;
+		sampler = vk_find_sampler( &sampler_def );
 	} else {
 		return;
 	}
 
-	Com_Memset( &sampler_def, 0, sizeof( sampler_def ) );
-	sampler_def.address_mode = address_mode;
-	sampler_def.gl_mag_filter = GL_LINEAR;
-	sampler_def.gl_min_filter = GL_LINEAR;
-	sampler_def.noAnisotropy = qtrue;
-	sampler_def.mip_lod_bias = 0.0f;
-
-	image_info.sampler = vk_find_sampler( &sampler_def );
+	image_info.sampler = sampler;
 	image_info.imageView = image_view;
 	image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
@@ -7923,9 +7949,10 @@ void vk_update_glint_descriptor_binding( VkDescriptorSet descriptor ) {
 
 	qvkUpdateDescriptorSets( vk.device, 1, &descriptor_write, 0, NULL );
 	if ( r_pbr_bindlog && ( r_pbr_bindlog->integer || ( r_pbr_debug && r_pbr_debug->integer >= 17 ) ) ) {
-		ri.Printf( PRINT_ALL, "PBR glints descwrite: binding=%u view=%p\n",
+		ri.Printf( PRINT_ALL, "PBR glints descwrite: binding=%u view=%p sampler=%p\n",
 			VK_PBR_BINDING_GLINT_DICT,
-			(const void *)(uintptr_t)image_info.imageView );
+			(const void *)(uintptr_t)image_info.imageView,
+			(const void *)(uintptr_t)image_info.sampler );
 	}
 }
 

@@ -731,8 +731,6 @@ typedef struct {
 #endif
 
 #ifdef USE_VK_PBR
-	VkImage			glint_dict_image;
-	VkImageView		glint_dict_image_view;
 	VkDescriptorSet pbr_indexed_descriptor;
 	uint32_t pbr_indexed_descriptor_gen;
 	uint32_t pbrIndexedMaxSamplers;
@@ -778,6 +776,11 @@ typedef struct {
 		glint_dict_params_t params;
 		qboolean valid;
 		qboolean cpu_allocated;
+		uint64_t params_hash;
+		VkSampler sampler;
+		VkImage image;
+		VkImageView view;
+		VkSamplerAddressMode wrapClampMode;
 	} glint;
 
 	uint32_t uniform_item_size;

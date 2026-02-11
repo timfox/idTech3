@@ -1455,11 +1455,59 @@ void main() {
 const bool allowGlints = forceGlintsDebug || glintCore.x > 0.5 || pbrDebug.w > 0.5;
 const bool glintAvailable = hasGlintDict && allowGlints;
 bool glintEnabled = glintAvailable;
-const bool hasEnvDebug = pbrDebugFlags.y > 0.5;
-const bool hasIrrDebug = pbrDebugFlags.z > 0.5;
-const bool dictValidDebug = pbrDebugFlags.w > 0.5;
-const float debugEps = max( pbrDebugParams.y, 1e-6 );
-const bool glintsEnabledDebug = ( pbrDebugParams.z > 0.5 );
+	const bool hasEnvDebug = pbrDebugFlags.y > 0.5;
+	const bool hasIrrDebug = pbrDebugFlags.z > 0.5;
+	const bool dictValidDebug = pbrDebugFlags.w > 0.5;
+	const float debugEps = max( pbrDebugParams.y, 1e-6 );
+	const bool glintsEnabledDebug = ( pbrDebugParams.z > 0.5 );
+
+#ifdef USE_VK_PBR
+	if ( pbrDebugView >= 17 && pbrDebugView <= 19 ) {
+		vec3 healthColor = DBG_RED;
+		if ( pbrDebugView == 17 ) {
+			vec3 sample = vec3( 0.0 );
+			const bool sampleValid = ( irradiance_texture_set >= 0 );
+			if ( sampleValid ) {
+				sample = texture( irradiance_texture, N ).rgb;
+			}
+			const bool sampleFinite = all( isfinite( sample ) );
+			if ( hasIrrDebug && sampleFinite ) {
+				healthColor = vec3( 0.0, 1.0, 0.0 );
+			}
+		} else if ( pbrDebugView == 18 ) {
+			const int dictEntries = max( 1, int( floor( glintDict[2] + 0.5 ) ) );
+			const int dictLevels = max( 1, int( floor( glintDict[0] + 0.5 ) ) );
+			const int dictSize = max( 1, int( floor( glintDict[1] + 0.5 ) ) );
+			float dictSample = 0.0;
+			if ( dictEntries > 0 && dictLevels > 0 && dictSize > 0 ) {
+				dictSample = glint_dictionary_lookup(
+					0,
+					0,
+					0.5,
+					float( dictSize ),
+					float( dictEntries * dictLevels ),
+					dictEntries,
+					dictLevels );
+			}
+			const bool sampleFinite = isfinite( dictSample );
+			if ( dictValidDebug && sampleFinite ) {
+				healthColor = vec3( 0.0, 1.0, 0.0 );
+			}
+		} else if ( pbrDebugView == 19 ) {
+			vec3 sample = vec3( 0.0 );
+			const bool sampleValid = ( env_texture_set >= 0 );
+			if ( sampleValid ) {
+				sample = texture( env_texture, R ).rgb;
+			}
+			const bool sampleFinite = all( isfinite( sample ) );
+			if ( hasEnvDebug && sampleFinite ) {
+				healthColor = vec3( 0.0, 1.0, 0.0 );
+			}
+		}
+		out_color.rgb = healthColor;
+		return;
+	}
+#endif
 
 #ifdef USE_VK_PBR
 	if ( glintEnabled )

@@ -1679,7 +1679,8 @@ qboolean is_pbr_surface;
 	} else if ( pbr_debug > 4 ) {
 		is_pbr_surface = qtrue;
 	}
-	const qboolean glintsModeEnabled = ( r_glints_mode && r_glints_mode->integer > 0 );
+	const qboolean glintsModeEnabled = ( r_glints_mode && r_glints_mode->integer > 0 ) &&
+		vk.glint.valid && vk.pbrActive && ( vk.glint.view != VK_NULL_HANDLE );
 	qboolean debugDictValid = qfalse;
 	const image_t *dictImage = vk_get_glint_dictionary_image();
 	const image_t *debugEnvImage = NULL;
@@ -1858,6 +1859,17 @@ qboolean is_pbr_surface;
 		qboolean useIndexing = qfalse;
 
 #ifdef USE_VK_PBR
+		VkImageView envView = VK_NULL_HANDLE;
+		VkImageView irrView = VK_NULL_HANDLE;
+		VkImageView envIndexedView = VK_NULL_HANDLE;
+		VkImageView irrIndexedView = VK_NULL_HANDLE;
+		qboolean envDescriptorBound = qfalse;
+		qboolean irrDescriptorBound = qfalse;
+		int envDescriptorIndex = -1;
+		int irrDescriptorIndex = -1;
+#endif
+
+#ifdef USE_VK_PBR
 		if ( is_pbr_surface && ( pStage->vk_pbr_flags || pbr_debug >= 17 ) ) {
 			static VkCommandBuffer lastCmdBuf = VK_NULL_HANDLE;
 			static qboolean lastValid = qfalse;
@@ -1872,14 +1884,16 @@ qboolean is_pbr_surface;
 			qboolean hasEnv = qfalse;
 			qboolean hasIrr = qfalse;
 			VkImageView glintDictView = vk_get_glint_dictionary_view();
-			VkImageView envView = VK_NULL_HANDLE;
-			VkImageView irrView = VK_NULL_HANDLE;
-			VkImageView envIndexedView = VK_NULL_HANDLE;
-			VkImageView irrIndexedView = VK_NULL_HANDLE;
-			qboolean envDescriptorBound = qfalse;
-			qboolean irrDescriptorBound = qfalse;
-			int envDescriptorIndex = -1;
-			int irrDescriptorIndex = -1;
+#ifdef USE_VK_PBR
+			envView = VK_NULL_HANDLE;
+			irrView = VK_NULL_HANDLE;
+			envIndexedView = VK_NULL_HANDLE;
+			irrIndexedView = VK_NULL_HANDLE;
+			envDescriptorBound = qfalse;
+			irrDescriptorBound = qfalse;
+			envDescriptorIndex = -1;
+			irrDescriptorIndex = -1;
+#endif
 			useIndexing = ( vk.descriptorIndexingActive && vk.pbrIndexedImageLimit > 0 && vk.pipeline_layout_pbr_indexed != VK_NULL_HANDLE ) ? qtrue : qfalse;
 
 			#define UPDATE_PBR_BINDING_STATE() \
@@ -2003,17 +2017,19 @@ qboolean is_pbr_surface;
 				}
 			}
 
-			if ( useIndexing && envImage && envImage->descriptor_index >= 0 && envImage->descriptor_index < (int)vk.pbrIndexedImageLimit ) {
+			if ( useIndexing && envImage && envImage->descriptor_index < vk.pbrIndexedImageLimit ) {
 				envDescriptorIndex = envImage->descriptor_index;
 				envIndexedView = vk_get_pbr_image_view( envImage );
 			} else {
 				envDescriptorIndex = -1;
+				envIndexedView = VK_NULL_HANDLE;
 			}
-			if ( useIndexing && irrImage && irrImage->descriptor_index >= 0 && irrImage->descriptor_index < (int)vk.pbrIndexedImageLimit ) {
+			if ( useIndexing && irrImage && irrImage->descriptor_index < vk.pbrIndexedImageLimit ) {
 				irrDescriptorIndex = irrImage->descriptor_index;
 				irrIndexedView = vk_get_pbr_image_view( irrImage );
 			} else {
 				irrDescriptorIndex = -1;
+				irrIndexedView = VK_NULL_HANDLE;
 			}
 			envView = envImage ? envImage->view : VK_NULL_HANDLE;
 			irrView = irrImage ? irrImage->view : VK_NULL_HANDLE;
@@ -2104,12 +2120,12 @@ qboolean is_pbr_surface;
 
 			UPDATE_PBR_BINDING_STATE();
 
+			const char *mapName = ( tr.world && tr.world->baseName[0] ) ? tr.world->baseName : "unknown";
 			const qboolean shouldLogBindings =
 				!tr_pbr_bindLogPrinted &&
 				( ( r_pbr_bindlog && r_pbr_bindlog->integer ) ||
 				  ( r_pbr_debug && r_pbr_debug->integer >= 17 ) );
 			if ( shouldLogBindings ) {
-			const char *mapName = ( tr.world && tr.world->baseName[0] ) ? tr.world->baseName : "unknown";
 			ri.Printf( PRINT_ALL,
 				"PBR IBL bind: map=%s numCubemaps=%d cubemapIndex=%d envImg=%p envView=%p envIndex=%d envIndexView=%p irrImg=%p irrView=%p irrIndex=%d irrIndexView=%p hasEnv=%d hasIrr=%d stateBits=0x%08x\n",
 				mapName,
@@ -2377,6 +2393,47 @@ qboolean is_pbr_surface;
 			const VkDescriptorSet activeDescriptor = vk_get_pbr_descriptor_for_pipeline( &def, pbrDescriptor );
 			if ( activeDescriptor != VK_NULL_HANDLE ) {
 				vk_update_descriptor_if_changed( VK_DESC_PBR, activeDescriptor );
+			}
+
+			{
+				const VkDescriptorSet truthDescriptor = activeDescriptor;
+				const VkPipelineLayout pipelineLayoutHandle =
+					( def.descriptorIndexing && vk.pipeline_layout_pbr_indexed != VK_NULL_HANDLE ) ?
+						vk.pipeline_layout_pbr_indexed : vk.pipeline_layout;
+				const VkImageView dictView = vk_get_glint_dictionary_view();
+				static const world_t *lastTruthWorld = NULL;
+				static VkPipelineLayout lastTruthLayout = VK_NULL_HANDLE;
+				static VkDescriptorSet lastTruthDescriptor = VK_NULL_HANDLE;
+				static VkImageView lastTruthEnvView = VK_NULL_HANDLE;
+				static VkImageView lastTruthIrrView = VK_NULL_HANDLE;
+				static VkImageView lastTruthDictView = VK_NULL_HANDLE;
+				const qboolean truthDescriptorValid = ( truthDescriptor != VK_NULL_HANDLE );
+				const qboolean truthChanged =
+					truthDescriptorValid &&
+					( tr.world != lastTruthWorld ||
+					  pipelineLayoutHandle != lastTruthLayout ||
+					  truthDescriptor != lastTruthDescriptor ||
+					  loggedEnvView != lastTruthEnvView ||
+					  loggedIrrView != lastTruthIrrView ||
+					  dictView != lastTruthDictView ||
+					  ( r_pbr_debug && r_pbr_debug->integer >= 17 ) );
+				if ( truthChanged ) {
+					const char *mapName = ( tr.world && tr.world->baseName[0] ) ? tr.world->baseName : "unknown";
+					ri.Printf( PRINT_ALL,
+						"PBR bind truth: map=%s layout=%p set=%p envView=%p irrView=%p dictView=%p\n",
+						mapName,
+						(const void *)(uintptr_t)pipelineLayoutHandle,
+						(const void *)(uintptr_t)truthDescriptor,
+						(const void *)(uintptr_t)loggedEnvView,
+						(const void *)(uintptr_t)loggedIrrView,
+						(const void *)(uintptr_t)dictView );
+					lastTruthWorld = tr.world;
+					lastTruthLayout = pipelineLayoutHandle;
+					lastTruthDescriptor = truthDescriptor;
+					lastTruthEnvView = loggedEnvView;
+					lastTruthIrrView = loggedIrrView;
+					lastTruthDictView = dictView;
+				}
 			}
 
 			const cubemap_t *selectedCube = ( loggedCubemapIndex >= 0 && loggedCubemapIndex < tr.numCubemaps ) ? &tr.cubemaps[loggedCubemapIndex] : NULL;
