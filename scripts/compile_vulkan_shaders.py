@@ -4,7 +4,7 @@ import hashlib
 import json
 import os
 import subprocess
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -241,7 +241,7 @@ def build_metadata(tasks, shader_data):
         )
     return {
         "git_sha": get_git_sha(),
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "shader_hash": global_hasher.hexdigest(),
         "task_count": len(entries),
         "tasks": entries,

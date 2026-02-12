@@ -1681,6 +1681,45 @@ qboolean is_pbr_surface;
 #ifdef USE_VK_PBR
 	is_pbr_surface = vk_is_valid_pbr_surface( tess.shader->hasPBR );
 
+	// For non-PBR surfaces, zero PBR debug uniforms to prevent stale values from leaking into UI/console
+	if ( !is_pbr_surface ) {
+		Com_Memset( &uniform.pbrDebug, 0, sizeof(uniform.pbrDebug) );
+		Com_Memset( &uniform.pbrDebugFlags, 0, sizeof(uniform.pbrDebugFlags) );
+		Com_Memset( &uniform.pbrDebugParams, 0, sizeof(uniform.pbrDebugParams) );
+		Com_Memset( &uniform.pbrTexIndex0, 0, sizeof(uniform.pbrTexIndex0) );
+		Com_Memset( &uniform.pbrTexIndex1, 0, sizeof(uniform.pbrTexIndex1) );
+		Com_Memset( &uniform.pbrTexIndex2, 0, sizeof(uniform.pbrTexIndex2) );
+		Com_Memset( &uniform.pbrFeatureFlags, 0, sizeof(uniform.pbrFeatureFlags) );
+		Com_Memset( &uniform.pbrQuality, 0, sizeof(uniform.pbrQuality) );
+		Com_Memset( &uniform.pbrBiasColor, 0, sizeof(uniform.pbrBiasColor) );
+		Com_Memset( &uniform.pbrLightDirs, 0, sizeof(uniform.pbrLightDirs) );
+		Com_Memset( &uniform.pbrLightColors, 0, sizeof(uniform.pbrLightColors) );
+		Com_Memset( &uniform.pbrLightControl, 0, sizeof(uniform.pbrLightControl) );
+		// Zero glint uniforms too
+		Com_Memset( &uniform.glintCore, 0, sizeof(uniform.glintCore) );
+		Com_Memset( &uniform.glintMaterial, 0, sizeof(uniform.glintMaterial) );
+		Com_Memset( &uniform.glintMicro, 0, sizeof(uniform.glintMicro) );
+		Com_Memset( &uniform.glintSampling, 0, sizeof(uniform.glintSampling) );
+		Com_Memset( &uniform.glintTemporal, 0, sizeof(uniform.glintTemporal) );
+		Com_Memset( &uniform.glintEnergy, 0, sizeof(uniform.glintEnergy) );
+		Com_Memset( &uniform.glintBudget, 0, sizeof(uniform.glintBudget) );
+		Com_Memset( &uniform.glintRouting, 0, sizeof(uniform.glintRouting) );
+		Com_Memset( &uniform.glintModel, 0, sizeof(uniform.glintModel) );
+		Com_Memset( &uniform.glintDensity, 0, sizeof(uniform.glintDensity) );
+		Com_Memset( &uniform.glintDict, 0, sizeof(uniform.glintDict) );
+		Com_Memset( &uniform.glintDictExtras, 0, sizeof(uniform.glintDictExtras) );
+		Com_Memset( &uniform.glintPerformance, 0, sizeof(uniform.glintPerformance) );
+		Com_Memset( &uniform.glintColor, 0, sizeof(uniform.glintColor) );
+		Com_Memset( &uniform.pbrEmissiveScale, 0, sizeof(uniform.pbrEmissiveScale) );
+		Com_Memset( &uniform.pbrClearcoatScale, 0, sizeof(uniform.pbrClearcoatScale) );
+		Com_Memset( &uniform.pbrSheenScale, 0, sizeof(uniform.pbrSheenScale) );
+		Com_Memset( &uniform.pbrAnisotropyScale, 0, sizeof(uniform.pbrAnisotropyScale) );
+		Com_Memset( &uniform.pbrTransmissionScale, 0, sizeof(uniform.pbrTransmissionScale) );
+		Com_Memset( &uniform.pbrSubsurfaceColor, 0, sizeof(uniform.pbrSubsurfaceColor) );
+		Com_Memset( &uniform.pbrSubsurfaceParams, 0, sizeof(uniform.pbrSubsurfaceParams) );
+		Com_Memset( &uniform.pbrShCoeffs, 0, sizeof(uniform.pbrShCoeffs) );
+	}
+
 	// Debug view: render a non-PBR pass and optionally override texture0 binding.
 	// Keeps runtime inspection simple without requiring extra shader variants.
 	pbr_debug = ( r_pbr_debug != NULL ) ? r_pbr_debug->integer : 0;
@@ -2752,6 +2791,21 @@ qboolean is_pbr_surface;
 
 #ifdef USE_VULKAN
 	if ( pushUniform ) {
+		// Log PBR uniform state for debugging stale values
+		if ( r_pbr_debug && r_pbr_debug->integer >= 17 ) {
+			const char *drawType = is_pbr_surface ? "world PBR" : "2D/UI";
+			ri.Printf( PRINT_ALL, "Draw uniform push: type=%s pbrDebug.x=%.1f pbrDebugFlags=(%.1f,%.1f,%.1f,%.1f)\n",
+				drawType, uniform.pbrDebug[0], uniform.pbrDebugFlags[0], uniform.pbrDebugFlags[1],
+				uniform.pbrDebugFlags[2], uniform.pbrDebugFlags[3] );
+#ifdef USE_DESCRIPTOR_INDEXING
+			if ( is_pbr_surface ) {
+				ri.Printf( PRINT_ALL, "  descriptor indices: env=%d irr=%d glint=%d\n",
+					vk_get_image_descriptor_index( tr.pbrEnvFallback ? tr.pbrEnvFallback : tr.emptyCubemap ),
+					vk_get_image_descriptor_index( tr.pbrIrrFallback ? tr.pbrIrrFallback : tr.emptyCubemap ),
+					vk_get_glint_dict_index() );
+			}
+#endif
+		}
 		vk_push_uniform_cached( &uniform );
 	}
 	if ( tess_flags ) // fog-only shaders?

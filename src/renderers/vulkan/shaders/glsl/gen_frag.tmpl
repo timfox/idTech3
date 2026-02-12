@@ -1664,7 +1664,9 @@ const bool glintRouteDirect = glintRouting.y > 0.5;
 const bool glintRouteIbl = glintRouting.x > 0.5;
 float glintDirectWeight = 0.0;
 float glintIblWeight = 0.0;
+
 #ifdef USE_VK_PBR
+	float glintEnergyComp = max( glintEnergy.x, 0.0 );
 	if ( glintEnabled )
 	{
 		// Compute raw glint NDF (Chermain P-SDF based D term)
@@ -1693,7 +1695,6 @@ float glintIblWeight = 0.0;
 		glintIblWeight = iblWeight;
 
 		float D_base = D_GGX_Aniso( H, Nn, tangent, binormal, anisotropyX, anisotropyY );
-		float D_final = mix( D_base, D_glint, glintRouteDirect ? directWeight : 0.0 );
 
 		float V_spec = V_SmithAniso( NE, NL, anisotropyX, anisotropyY );
 		vec3 F_spec = F_Schlick( specular.rgb, VH );
@@ -1717,39 +1718,43 @@ float glintIblWeight = 0.0;
 
 		vec3 Fs_glint = D_glint * glintF_spec * V_spec;
 		vec3 Fs_base = D_base * F_spec * V_spec;
-		vec3 Fs_final = mix( Fs_base, Fs_glint, glintRouteDirect ? directWeight : 0.0 );
+		vec3 Fs_final = Fs_base;
 
-		// Energy compensation: multiply glint contribution by glintEnergy.x
-		if ( glintRouteDirect && directWeight > 0.0 ) {
-			float energyComp = max( glintEnergy.x, 0.0 );
-			vec3 glintContribution = Fs_glint - Fs_base;
-			Fs_final = Fs_base + glintContribution * energyComp;
+		vec3 glintContribution = vec3( 0.0 );
+		float glintWeight = ( glintRouteDirect && directWeight > 0.0 ) ? directWeight : 0.0;
+
+		if ( glintWeight > 0.0 && glintEnergyComp > 0.0 )
+		{
+			vec3 delta = max( Fs_glint - Fs_base, vec3( 0.0 ) );
+			vec3 glintAddition = delta * glintEnergyComp * glintWeight;
 
 			// Firefly filter: clamp extreme glint contributions
 			if ( glintEnergy.w > 0.0 ) {
 				float maxLuminance = glintEnergy.w;
-				float glintLum = dot( glintContribution, vec3( 0.2126, 0.7152, 0.0722 ) );
+				float glintLum = dot( glintAddition, vec3( 0.2126, 0.7152, 0.0722 ) );
 				if ( glintLum > maxLuminance ) {
-					// Soft-knee clamp: smoothly reduce excess
 					float excess = glintLum - maxLuminance;
-					float knee = maxLuminance * 0.1; // 10% of max as knee region
-					float clampedExcess = excess / (1.0 + excess / knee);
-					float scale = (maxLuminance + clampedExcess) / glintLum;
-					glintContribution *= scale;
-					Fs_final = Fs_base + glintContribution * energyComp;
+					float knee = max( maxLuminance * 0.1, 1e-6 );
+					float clampedExcess = excess / (1.0 + excess / knee );
+					float scale = (maxLuminance + clampedExcess) / max( glintLum, 1e-6 );
+					glintAddition *= scale;
 				}
 			}
+
+			glintContribution = glintAddition;
+			Fs_final += glintAddition;
 		}
 
 		if ( glintRouteDirect )
 		{
 			Fs = Fs_final;
 			glintBlend = directWeight;
-			glintTerm = Fs_final - Fs_base;
+			glintTerm = glintContribution;
 			glintDebugLevel = int( floor( glintCore.z + 0.5 ) );
 		}
 	}
 #endif
+
 	// Clearcoat energy conservation (base layer dimmed when clearcoat present)
 	float clearcoatDim = 1.0;
 	if ( clearcoatStrength > 0.0 ) {
@@ -1806,22 +1811,25 @@ float glintIblWeight = 0.0;
 		}
 
 		vec3 specContribution = ( li == 0 ) ? Fs : Fs_i;
-		directDiffuse += intensity * ( Fd_i * clearcoatDim ) * ( attenuation * NL_i * microShadow );
-		directSpec += intensity * specContribution * ( attenuation * NL_i );
+		vec3 specBaseContribution = ( li == 0 ) ? Fs_base : Fs_i;
+		float lightWeight = attenuation * NL_i;
+		directDiffuse += intensity * ( Fd_i * clearcoatDim ) * ( lightWeight * microShadow );
+		directSpec += intensity * specContribution * lightWeight;
+		dbgBaseSpec += intensity * specBaseContribution * lightWeight;
 		if ( li == 0 )
 		{
-			dbgGlint += intensity * glintTerm * ( attenuation * NL_i );
+			dbgGlint += intensity * glintTerm * lightWeight;
 		}
 	}
 	directSpec *= energyCompensation;
+	dbgBaseSpec *= energyCompensation;
+	dbgGlint *= energyCompensation;
 
 	out_color.rgb  = directDiffuse + directSpec;
 	out_color.rgb += ambientColor * diffuseColor;
 	if ( needsFallbackLight ) {
 		out_color.rgb += diffuseColor * 0.04;
 	}
-
-	dbgBaseSpec += directSpec;
 
 	// Diffuse IBL (SH + irradiance cubemap when bound).
 	// When multi-scatter is enabled, use Fdez-Aguera's FmsEms correction
@@ -1846,6 +1854,7 @@ float glintIblWeight = 0.0;
 	{
 		vec3 specIBL = CalcIBLContribution( roughness, N, E, NE, specular.rgb, pbrDebugParams.x );
 		specIBL *= clearcoatDim * specAO;
+		vec3 specIBL_base = specIBL;
 #ifdef USE_VK_PBR
 		if ( glintRouteIbl && glintEnabled && glintIblWeight > 0.0 )
 		{
@@ -1883,30 +1892,35 @@ float glintIblWeight = 0.0;
 			}
 			float envMix = clampedRatio;
 
-			// Apply energy compensation to glint IBL
-			float energyComp = max( glintEnergy.x, 0.0 );
-			vec3 glintContribution = glintIBL * envMix - specIBL;
-			specIBL += glintContribution * energyComp * glintIblWeight;
+			vec3 glintContribution = glintIBL * envMix - specIBL_base;
+			vec3 glintAdditionIBL = vec3( 0.0 );
+			if ( glintEnergyComp > 0.0 && glintIblWeight > 0.0 )
+			{
+				glintAdditionIBL = glintContribution * glintEnergyComp * glintIblWeight;
 
-			// Firefly filter for IBL glints
-			if ( glintEnergy.w > 0.0 ) {
-				float maxLuminance = glintEnergy.w;
-				float glintLum = dot( glintContribution, vec3( 0.2126, 0.7152, 0.0722 ) );
-				if ( glintLum > maxLuminance ) {
-					float excess = glintLum - maxLuminance;
-					float knee = maxLuminance * 0.1;
-					float clampedExcess = excess / (1.0 + excess / knee);
-					float scale = (maxLuminance + clampedExcess) / glintLum;
-					glintContribution *= scale;
-					specIBL = specIBL - glintContribution * energyComp * glintIblWeight + glintContribution * energyComp * glintIblWeight * scale;
+				if ( glintEnergy.w > 0.0 ) {
+					float maxLuminance = glintEnergy.w;
+					float glintLum = dot( glintAdditionIBL, vec3( 0.2126, 0.7152, 0.0722 ) );
+					if ( glintLum > maxLuminance ) {
+						float excess = glintLum - maxLuminance;
+						float knee = max( maxLuminance * 0.1, 1e-6 );
+						float clampedExcess = excess / (1.0 + excess / knee );
+						float scale = (maxLuminance + clampedExcess) / max( glintLum, 1e-6 );
+						glintAdditionIBL *= scale;
+					}
 				}
-			}
 
-			dbgGlint += specIBL * clamp( glintIblWeight, 0.0, 1.0 );
+				specIBL = specIBL_base + glintAdditionIBL;
+				dbgGlint += glintAdditionIBL;
+			}
+			else
+			{
+				specIBL = specIBL_base;
+			}
 		}
 #endif
 		out_color.rgb += specIBL;
-		dbgBaseSpec += specIBL;
+		dbgBaseSpec += specIBL_base;
 	}
 
 #ifdef USE_VK_PBR
@@ -2099,8 +2113,21 @@ float glintIblWeight = 0.0;
 		{
 			vec3 R = reflect( -E, N );
 			R.y *= -1.0;
+			// Guard against NaN/Inf in envDir
+			if ( isnan(R.x) || isnan(R.y) || isnan(R.z) || isinf(R.x) || isinf(R.y) || isinf(R.z)) {
+				R = vec3(0.0, 0.0, 1.0); // fallback
+			}
+			R = normalize(R); // ensure unit length
 			float rawLod = ( pbrDebugParams.x >= 0.0 ) ? pbrDebugParams.x : 0.0;
-			vec3 rawEnv = textureLod( env_texture, R, rawLod ).rgb;
+			vec3 rawEnv = vec3(0.0);
+#ifdef USE_DESCRIPTOR_INDEXING
+			const bool envSampleValid = ( env_texture_set >= 0 );
+#else
+			const bool envSampleValid = true;
+#endif
+			if ( envSampleValid ) {
+				rawEnv = textureLod( env_texture, R, rawLod ).rgb;
+			}
 			float envMag = dbg_len( rawEnv );
 
 			if ( !hasEnvDebug )
@@ -2115,6 +2142,10 @@ float glintIblWeight = 0.0;
 				{
 					out_color.rgb = DBG_RED; // genuinely not bound or empty
 				}
+			}
+			else if ( !envSampleValid )
+			{
+				out_color.rgb = DBG_MAGENTA; // texture set invalid
 			}
 			else
 			{
@@ -2177,6 +2208,20 @@ float glintIblWeight = 0.0;
 		out_color.rgb = directDiffuse + directSpec;
 		out_color.a = 1.0;
 	}
+	else if ( pbrDebugView == 31 )
+	{
+		vec3 glintHeat = clamp( dbgGlint * 8.0, vec3( 0.0 ), vec3( 1.0 ) );
+		out_color.rgb = glintHeat;
+		out_color.a = 1.0;
+	}
+	else if ( pbrDebugView == 32 )
+	{
+		vec3 baseEnergy = clamp( dbgBaseSpec, vec3( 0.0 ), vec3( 1.0 ) );
+		vec3 totalEnergy = clamp( baseEnergy + dbgGlint, vec3( 0.0 ), vec3( 1.0 ) );
+		vec3 glintEnergy = clamp( dbgGlint, vec3( 0.0 ), vec3( 1.0 ) );
+		out_color.rgb = vec3( totalEnergy.r, baseEnergy.r, glintEnergy.r );
+		out_color.a = 1.0;
+	}
 	else
 	{
 		out_color.a = diffuse.a;
@@ -2184,5 +2229,11 @@ float glintIblWeight = 0.0;
 #else
 	out_color = base;
 #endif
+
+	// NaN sentinel: if any channel is NaN/Inf, replace with magenta for visibility
+	if ( isnan(out_color.r) || isnan(out_color.g) || isnan(out_color.b) ||
+		isinf(out_color.r) || isinf(out_color.g) || isinf(out_color.b) ) {
+		out_color.rgb = vec3(1.0, 0.0, 1.0); // magenta
+	}
 #endif
 }
