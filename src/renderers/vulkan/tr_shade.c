@@ -1677,9 +1677,14 @@ qboolean is_pbr_surface;
 	}
 
 	int pbr_debug = 0;
+	const qboolean is2DPass = backEnd.projection2D ||
+		( backEnd.currentEntity == &backEnd.entity2D );
 
 #ifdef USE_VK_PBR
 	is_pbr_surface = vk_is_valid_pbr_surface( tess.shader->hasPBR );
+	if ( is2DPass ) {
+		is_pbr_surface = qfalse;
+	}
 
 	// For non-PBR surfaces, zero PBR debug uniforms to prevent stale values from leaking into UI/console
 	if ( !is_pbr_surface ) {
@@ -1730,10 +1735,8 @@ qboolean is_pbr_surface;
 			ri.Printf( PRINT_ALL, "PBR debug view %d active (shows env/irr/dict health). Set r_pbr_debug 0 for normal rendering.\n", pbr_debug );
 		}
 	}
-	if ( pbr_debug > 0 && pbr_debug <= 4 ) {
+	if ( is_pbr_surface && pbr_debug > 0 && pbr_debug <= 4 ) {
 		is_pbr_surface = qfalse;
-	} else if ( pbr_debug > 4 ) {
-		is_pbr_surface = qtrue;
 	}
 	const qboolean glintsModeEnabled = ( r_glints_mode && r_glints_mode->integer > 0 ) &&
 		vk.glint.valid && vk.pbrActive && ( vk.glint.view != VK_NULL_HANDLE );
@@ -2337,6 +2340,25 @@ qboolean is_pbr_surface;
 			const float dictValid = (glintDictView != VK_NULL_HANDLE) ? 1.0f : 0.0f;
 			const float iblCompiled = (envValid || irrValid) ? 1.0f : 0.0f;
 			Vector4Set( uniform.pbrDebugFlags, irrValid, envValid, dictValid, iblCompiled );
+			if ( r_pbr_debug && r_pbr_debug->integer != 0 ) {
+				static int lastLoggedDebugMode = -9999;
+				static vec4_t lastLoggedUploadFlags;
+				static qboolean lastLoggedUploadFlagsValid = qfalse;
+				const qboolean flagsChanged = !lastLoggedUploadFlagsValid ||
+					memcmp( lastLoggedUploadFlags, uniform.pbrDebugFlags, sizeof( uniform.pbrDebugFlags ) ) != 0;
+				if ( pbr_debug != lastLoggedDebugMode || flagsChanged ) {
+					ri.Printf( PRINT_ALL,
+						"PBR debug upload: view=%d flags=(%.1f,%.1f,%.1f,%.1f)\n",
+						pbr_debug,
+						uniform.pbrDebugFlags[0],
+						uniform.pbrDebugFlags[1],
+						uniform.pbrDebugFlags[2],
+						uniform.pbrDebugFlags[3] );
+					lastLoggedDebugMode = pbr_debug;
+					Vector4Copy( uniform.pbrDebugFlags, lastLoggedUploadFlags );
+					lastLoggedUploadFlagsValid = qtrue;
+				}
+			}
 			if ( r_pbr_debug && r_pbr_debug->integer >= 17 ) {
 				ri.Printf( PRINT_ALL, "CPU pbrDebugFlags: irr=%.1f env=%.1f dict=%.1f ibl=%.1f\n",
 					uniform.pbrDebugFlags[0], uniform.pbrDebugFlags[1], uniform.pbrDebugFlags[2], uniform.pbrDebugFlags[3] );
@@ -2429,8 +2451,8 @@ qboolean is_pbr_surface;
 						"PBR debugFlags: view=%d env=%g irr=%g dict=%g (envView=%p irrView=%p dictView=%p)\n",
 						currentDebugView,
 						uniform.pbrDebugFlags[1], // hasEnvDebug
-						uniform.pbrDebugFlags[2], // hasIrrDebug
-						uniform.pbrDebugFlags[3], // dictValidDebug
+						uniform.pbrDebugFlags[0], // hasIrrDebug
+						uniform.pbrDebugFlags[2], // dictValidDebug
 						(const void *)(uintptr_t)envView,
 						(const void *)(uintptr_t)irrView,
 						(const void *)(uintptr_t)glintDictView);
@@ -2465,33 +2487,31 @@ qboolean is_pbr_surface;
 		if ( pipeline != 0 ) {
 			Vk_Pipeline_Def def;
 			vk_get_pipeline_def( pipeline, &def );
+			uint32_t desiredFlags = 0;
 			if ( is_pbr_surface && !pStage->pbr_disabled && ( pStage->vk_pbr_flags || pbr_debug >= 17 ) ) {
 				const uint32_t baseFlags = pStage->vk_pbr_flags & ~( PBR_HAS_LIGHTMAP | PBR_HAS_IRRADIANCE );
-				uint32_t desiredFlags = baseFlags;
+				desiredFlags = baseFlags;
 				if ( stageHasLightmap ) {
 					desiredFlags |= PBR_HAS_LIGHTMAP;
 				}
 				if ( stageHasIrr ) {
 					desiredFlags |= PBR_HAS_IRRADIANCE;
 				}
-
-				if ( def.vk_pbr_flags != desiredFlags ) {
-					def.vk_pbr_flags = desiredFlags;
-					pipeline = vk_find_pipeline_ext( 0, &def, qfalse );
-					vk_get_pipeline_def( pipeline, &def );
-				}
 			}
 
-			if ( !is_pbr_surface && pStage->vk_pbr_flags ) {
-				def.vk_pbr_flags = 0;
+			/* Make vk_pbr_flags a pure function of current draw/stage.
+			 * Never let previous pipeline state leak into non-PBR draws. */
+			if ( def.vk_pbr_flags != desiredFlags ) {
+				def.vk_pbr_flags = desiredFlags;
 				pipeline = vk_find_pipeline_ext( 0, &def, qfalse );
 				vk_get_pipeline_def( pipeline, &def );
 			}
 
-			if ( pStage->pbr_disabled ) {
-				def.vk_pbr_flags = 0;
-				pipeline = vk_find_pipeline_ext( 0, &def, qfalse );
-				vk_get_pipeline_def( pipeline, &def );
+			if ( !is_pbr_surface && def.vk_pbr_flags != 0 ) {
+				ri.Printf( PRINT_WARNING,
+					"NONPBR pipeline bind leak: vk_pbr_flags=%u pipeline=%p\n",
+					def.vk_pbr_flags,
+					(void *)(uintptr_t)pipeline );
 			}
 
 			if ( ( pbr_debug == 18 || pbr_debug == 19 ) && pipeline != 0 ) {
@@ -2729,6 +2749,33 @@ qboolean is_pbr_surface;
 #undef UPDATE_PBR_BINDING_STATE
 #endif
 
+		if ( ( r_pbr_bindlog && r_pbr_bindlog->integer ) || ( r_pbr_debug && r_pbr_debug->integer >= 17 ) ) {
+			if ( is_pbr_surface ) {
+				ri.Printf( PRINT_ALL,
+					"PBR PIPELINE BIND: is_pbr_surface=%d is2D=%d shader=%s stage=%d debug=%d\n",
+					is_pbr_surface ? 1 : 0,
+					is2DPass ? 1 : 0,
+					tess.shader ? tess.shader->name : "null",
+					stage,
+					pbr_debug );
+			} else if ( is2DPass ) {
+				const void *layoutPtr = (void *)(uintptr_t)(
+					( vk.pipelines[pipeline].def.descriptorIndexing && vk.pipeline_layout_pbr_indexed != VK_NULL_HANDLE ) ?
+						vk.pipeline_layout_pbr_indexed : vk.pipeline_layout );
+				ri.Printf( PRINT_ALL,
+					"NONPBR pipeline bind: vk_pbr_flags=%u layout=%p pipeline=%p\n",
+					vk.pipelines[pipeline].def.vk_pbr_flags,
+					layoutPtr,
+					(void *)(uintptr_t)pipeline );
+				ri.Printf( PRINT_ALL,
+					"NON-PBR 2D PIPELINE BIND: is_pbr_surface=%d is2D=%d shader=%s stage=%d debug=%d\n",
+					is_pbr_surface ? 1 : 0,
+					is2DPass ? 1 : 0,
+					tess.shader ? tess.shader->name : "null",
+					stage,
+					pbr_debug );
+			}
+		}
 
 		vk_bind_pipeline( pipeline );
 		vk_bind_geometry( tess_flags );
