@@ -41,7 +41,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "glw_win.h"
 
 #ifdef USE_OPENGL_API
-#include "../renderers/openglrenderer/qgl.h"
+#include "../renderers/opengl/qgl.h"
 
 // Enable High Performance Graphics while using Integrated Graphics.
 Q_EXPORT DWORD NvOptimusEnablement = 0x00000001;		// Nvidia

@@ -73,9 +73,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_public.h"
 
 #if defined(RENDERER_VULKAN)
-#include "../vulkanrenderer/tr_common.h"
+#include "../vulkan/tr_common.h"
 #elif defined(RENDERER_OPENGL)
-#include "../openglrenderer/tr_common.h"
+#include "../opengl/tr_common.h"
 #else
 #error "tr_font.c must be compiled with either RENDERER_VULKAN or RENDERER_OPENGL defined"
 #endif

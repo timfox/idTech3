@@ -18,22 +18,22 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\renderers\vulkanrenderer\tr_animation.c">
+    <ClCompile Include="..\..\renderers\vulkan\tr_animation.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\vulkanrenderer\tr_backend.c">
+    <ClCompile Include="..\..\renderers\vulkan\tr_backend.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\vulkanrenderer\tr_bsp.c">
+    <ClCompile Include="..\..\renderers\vulkan\tr_bsp.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\vulkanrenderer\tr_cmds.c">
+    <ClCompile Include="..\..\renderers\vulkan\tr_cmds.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\vulkanrenderer\tr_curve.c">
+    <ClCompile Include="..\..\renderers\vulkan\tr_curve.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\vulkanrenderer\tr_image.c">
+    <ClCompile Include="..\..\renderers\vulkan\tr_image.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\renderers\rendercommon\tr_font.c">
@@ -60,81 +60,81 @@
     <ClCompile Include="..\..\renderers\rendercommon\tr_image_tga.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\vulkanrenderer\tr_init.c">
+    <ClCompile Include="..\..\renderers\vulkan\tr_init.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\vulkanrenderer\tr_light.c">
+    <ClCompile Include="..\..\renderers\vulkan\tr_light.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\vulkanrenderer\tr_main.c">
+    <ClCompile Include="..\..\renderers\vulkan\tr_main.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\vulkanrenderer\tr_marks.c">
+    <ClCompile Include="..\..\renderers\vulkan\tr_marks.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\vulkanrenderer\tr_mesh.c">
+    <ClCompile Include="..\..\renderers\vulkan\tr_mesh.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\vulkanrenderer\tr_model.c">
+    <ClCompile Include="..\..\renderers\vulkan\tr_model.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\vulkanrenderer\tr_model_iqm.c">
+    <ClCompile Include="..\..\renderers\vulkan\tr_model_iqm.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\vulkanrenderer\tr_scene.c">
+    <ClCompile Include="..\..\renderers\vulkan\tr_scene.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\vulkanrenderer\tr_shade.c">
+    <ClCompile Include="..\..\renderers\vulkan\tr_shade.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\vulkanrenderer\tr_shade_calc.c">
+    <ClCompile Include="..\..\renderers\vulkan\tr_shade_calc.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\vulkanrenderer\tr_shader.c">
+    <ClCompile Include="..\..\renderers\vulkan\tr_shader.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\vulkanrenderer\tr_shadows.c">
+    <ClCompile Include="..\..\renderers\vulkan\tr_shadows.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\vulkanrenderer\tr_sky.c">
+    <ClCompile Include="..\..\renderers\vulkan\tr_sky.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\vulkanrenderer\tr_surface.c">
+    <ClCompile Include="..\..\renderers\vulkan\tr_surface.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\vulkanrenderer\tr_world.c">
+    <ClCompile Include="..\..\renderers\vulkan\tr_world.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\vulkanrenderer\vk.c">
+    <ClCompile Include="..\..\renderers\vulkan\vk.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\renderers\rendercommon\tr_noise.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\vulkanrenderer\vk_flares.c">
+    <ClCompile Include="..\..\renderers\vulkan\vk_flares.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\vulkanrenderer\vk_mikktspace.c">
+    <ClCompile Include="..\..\renderers\vulkan\vk_mikktspace.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\vulkanrenderer\vk_vbo.c">
+    <ClCompile Include="..\..\renderers\vulkan\vk_vbo.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\vulkanrenderer\utils\mikktspace\mikktspace.c">
+    <ClCompile Include="..\..\renderers\vulkan\utils\mikktspace\mikktspace.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\renderers\vulkanrenderer\iqm.h">
+    <ClInclude Include="..\..\renderers\vulkan\iqm.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\renderers\vulkanrenderer\tr_common.h">
+    <ClInclude Include="..\..\renderers\vulkan\tr_common.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\renderers\vulkanrenderer\tr_local.h">
+    <ClInclude Include="..\..\renderers\vulkan\tr_local.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\renderers\vulkanrenderer\utils\mikktspace\mikktspace.h">
+    <ClInclude Include="..\..\renderers\vulkan\utils\mikktspace\mikktspace.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\renderers\rendercommon\tr_public.h">
@@ -143,7 +143,7 @@
     <ClInclude Include="..\..\renderers\rendercommon\tr_types.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\renderers\vulkanrenderer\vk.h">
+    <ClInclude Include="..\..\renderers\vulkan\vk.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

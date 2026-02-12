@@ -6,7 +6,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-SPIRV_DIR="$REPO_ROOT/src/renderers/vulkanrenderer/shaders/spirv"
+SPIRV_DIR="$REPO_ROOT/src/renderers/vulkan/shaders/spirv"
 METADATA_FILE="$SPIRV_DIR/shader_permutations.json"
 CACHE_HASH="$SPIRV_DIR/shader_hash.txt"
 

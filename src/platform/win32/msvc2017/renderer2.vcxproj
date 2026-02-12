@@ -476,7 +476,7 @@ cscript.exe /nologo glsl_stringify.vbs ..\..\renderer2\glsl\tonemap_vp.glsl .\bu
     <ClInclude Include="..\..\renderer2\tr_local.h" />
     <ClInclude Include="..\..\renderer2\tr_postprocess.h" />
     <ClInclude Include="..\..\renderer2\qgl.h" />
-    <ClInclude Include="..\..\renderers\openglrenderer\tr_common.h" />
+    <ClInclude Include="..\..\renderers\opengl\tr_common.h" />
     <ClInclude Include="..\..\renderers\rendercommon\tr_public.h" />
     <ClInclude Include="..\..\renderers\rendercommon\tr_types.h" />
     <ClInclude Include="..\glw_win.h" />

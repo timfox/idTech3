@@ -475,7 +475,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\openglrenderer\tr_common.h"
+				RelativePath="..\..\renderers\opengl\tr_common.h"
 				>
 			</File>
 			<File

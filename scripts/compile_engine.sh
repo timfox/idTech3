@@ -183,7 +183,7 @@ copy_metadata_to_release() {
     fi
   done
 
-  local shader_meta_src="$PROJECT_ROOT/src/renderers/vulkanrenderer/shaders/spirv/shader_permutations.json"
+  local shader_meta_src="$PROJECT_ROOT/src/renderers/vulkan/shaders/spirv/shader_permutations.json"
   if [ -f "$shader_meta_src" ]; then
     mkdir -p "$RELEASE_DIR/shaders/spirv"
     cp -f "$shader_meta_src" "$RELEASE_DIR/shaders/spirv/"

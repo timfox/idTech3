@@ -42,7 +42,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "unix_glw.h"
 
 #ifdef USE_OPENGL_API
-#include "../renderers/openglrenderer/qgl.h"
+#include "../renderers/opengl/qgl.h"
 #endif
 
 #ifndef __linux_glimp_prototypes__

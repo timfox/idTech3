@@ -261,7 +261,7 @@
     <ClInclude Include="..\..\qcommon\qfiles.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\renderers\openglrenderer\qgl.h">
+    <ClInclude Include="..\..\renderers\opengl\qgl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\resource.h">

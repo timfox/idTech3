@@ -267,23 +267,23 @@
 			Filter="c;cpp;def;bat;asm"
 			>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\tr_animation.c"
+				RelativePath="..\..\renderers\vulkan\tr_animation.c"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\tr_backend.c"
+				RelativePath="..\..\renderers\vulkan\tr_backend.c"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\tr_bsp.c"
+				RelativePath="..\..\renderers\vulkan\tr_bsp.c"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\tr_cmds.c"
+				RelativePath="..\..\renderers\vulkan\tr_cmds.c"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\tr_curve.c"
+				RelativePath="..\..\renderers\vulkan\tr_curve.c"
 				>
 			</File>
 			<File
@@ -291,7 +291,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\tr_image.c"
+				RelativePath="..\..\renderers\vulkan\tr_image.c"
 				>
 			</File>
 			<File
@@ -319,31 +319,31 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\tr_init.c"
+				RelativePath="..\..\renderers\vulkan\tr_init.c"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\tr_light.c"
+				RelativePath="..\..\renderers\vulkan\tr_light.c"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\tr_main.c"
+				RelativePath="..\..\renderers\vulkan\tr_main.c"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\tr_marks.c"
+				RelativePath="..\..\renderers\vulkan\tr_marks.c"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\tr_mesh.c"
+				RelativePath="..\..\renderers\vulkan\tr_mesh.c"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\tr_model.c"
+				RelativePath="..\..\renderers\vulkan\tr_model.c"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\tr_model_iqm.c"
+				RelativePath="..\..\renderers\vulkan\tr_model_iqm.c"
 				>
 			</File>
 			<File
@@ -351,55 +351,55 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\tr_scene.c"
+				RelativePath="..\..\renderers\vulkan\tr_scene.c"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\tr_shade.c"
+				RelativePath="..\..\renderers\vulkan\tr_shade.c"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\tr_shade_calc.c"
+				RelativePath="..\..\renderers\vulkan\tr_shade_calc.c"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\tr_shader.c"
+				RelativePath="..\..\renderers\vulkan\tr_shader.c"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\tr_shadows.c"
+				RelativePath="..\..\renderers\vulkan\tr_shadows.c"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\tr_sky.c"
+				RelativePath="..\..\renderers\vulkan\tr_sky.c"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\tr_surface.c"
+				RelativePath="..\..\renderers\vulkan\tr_surface.c"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\tr_world.c"
+				RelativePath="..\..\renderers\vulkan\tr_world.c"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\vk.c"
+				RelativePath="..\..\renderers\vulkan\vk.c"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\vk_flares.c"
+				RelativePath="..\..\renderers\vulkan\vk_flares.c"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\vk_mikktspace.c"
+				RelativePath="..\..\renderers\vulkan\vk_mikktspace.c"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\vk_vbo.c"
+				RelativePath="..\..\renderers\vulkan\vk_vbo.c"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\utils\mikktspace\mikktspace.c"
+				RelativePath="..\..\renderers\vulkan\utils\mikktspace\mikktspace.c"
 				>
 			</File>
 			<Filter
@@ -412,11 +412,11 @@
 			Filter="h;hpp;inc"
 			>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\iqm.h"
+				RelativePath="..\..\renderers\vulkan\iqm.h"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\utils\mikktspace\mikktspace.h"
+				RelativePath="..\..\renderers\vulkan\utils\mikktspace\mikktspace.h"
 				>
 			</File>
 			<File
@@ -436,11 +436,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\tr_common.h"
+				RelativePath="..\..\renderers\vulkan\tr_common.h"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\tr_local.h"
+				RelativePath="..\..\renderers\vulkan\tr_local.h"
 				>
 			</File>
 			<File
@@ -452,7 +452,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\vulkanrenderer\vk.h"
+				RelativePath="..\..\renderers\vulkan\vk.h"
 				>
 			</File>
 		</Filter>

@@ -241,7 +241,7 @@
     <ClInclude Include="..\..\qcommon\surfaceflags.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\renderers\openglrenderer\tr_common.h">
+    <ClInclude Include="..\..\renderers\opengl\tr_common.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\renderer2\tr_dsa.h">

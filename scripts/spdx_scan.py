@@ -41,7 +41,7 @@ EXCLUDED_PREFIXES = (
     ROOT / "build-gl-Release",
     ROOT / "build-coverage",
     ROOT / "src" / "external",
-    ROOT / "src" / "renderers" / "vulkanrenderer" / "shaders",
+    ROOT / "src" / "renderers" / "vulkan" / "shaders",
     ROOT / "src" / "renderers" / "rendercommon",
     ROOT / "src" / "audio",
     ROOT / "src" / "tools",

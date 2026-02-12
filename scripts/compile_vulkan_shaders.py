@@ -8,8 +8,8 @@ from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-GLSL_ROOT = ROOT / "src" / "renderers" / "vulkanrenderer" / "shaders" / "glsl"
-SPIRV_DIR = ROOT / "src" / "renderers" / "vulkanrenderer" / "shaders" / "spirv"
+GLSL_ROOT = ROOT / "src" / "renderers" / "vulkan" / "shaders" / "glsl"
+SPIRV_DIR = ROOT / "src" / "renderers" / "vulkan" / "shaders" / "spirv"
 OUT_DATA = SPIRV_DIR / "shader_data.c"
 OUT_BINDINGS = SPIRV_DIR / "shader_binding.c"
 METADATA_DEFAULT = SPIRV_DIR / "shader_permutations.json"

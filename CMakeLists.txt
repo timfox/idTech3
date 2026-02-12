@@ -851,12 +851,12 @@ IF(BUILD_FREETYPE)
 ELSE()
 	# Keep tr_font_stub.c
 ENDIF()
-AUX_SOURCE_DIRECTORY(src/renderers/openglrenderer RENDERER_GL_SRCS)
-AUX_SOURCE_DIRECTORY(src/renderers/vulkanrenderer RENDERER_VK_SRCS)
-list(APPEND RENDERER_VK_SRCS src/renderers/vulkanrenderer/utils/mikktspace/mikktspace.c)
+AUX_SOURCE_DIRECTORY(src/renderers/opengl RENDERER_GL_SRCS)
+AUX_SOURCE_DIRECTORY(src/renderers/vulkan RENDERER_VK_SRCS)
+list(APPEND RENDERER_VK_SRCS src/renderers/vulkan/utils/mikktspace/mikktspace.c)
 if(NOT MSVC)
 	set_source_files_properties(
-		src/renderers/vulkanrenderer/utils/mikktspace/mikktspace.c
+		src/renderers/vulkan/utils/mikktspace/mikktspace.c
 		PROPERTIES COMPILE_OPTIONS "-Wno-shadow"
 	)
 endif()
