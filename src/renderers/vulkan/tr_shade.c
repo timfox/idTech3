@@ -1940,7 +1940,7 @@ qboolean is_pbr_surface;
 #endif
 
 #ifdef USE_VK_PBR
-		if ( is_pbr_surface && ( pStage->vk_pbr_flags || pbr_debug >= 17 ) ) {
+		if ( is_pbr_surface && pStage->vk_pbr_flags ) {
 			static VkCommandBuffer lastCmdBuf = VK_NULL_HANDLE;
 			static qboolean lastValid = qfalse;
 			static vkPbrUniformBlock_t lastBlock;
@@ -2401,7 +2401,7 @@ qboolean is_pbr_surface;
 							VectorSet( dir, 0.0f, 0.0f, 1.0f );
 						}
 						float invRadius = 1.0f / fmaxf( dl->radius * dl->radius, 1e-6f );
-						Vector4Set( block.lightDirs[li], dir[0], dir[1], dir[2], dl->radius );
+						Vector4Set( block.lightDirs[li], dir[0], dir[1], dir[2], 0.0f );
 						Vector4Set( block.lightColors[li], dl->color[0], dl->color[1], dl->color[2], invRadius );
 					} else {
 						Vector4Set( block.lightDirs[li], 0.0f, 0.0f, 1.0f, 0.0f );
@@ -2514,7 +2514,7 @@ qboolean is_pbr_surface;
 					(void *)(uintptr_t)pipeline );
 			}
 
-			if ( ( pbr_debug == 18 || pbr_debug == 19 ) && pipeline != 0 ) {
+			if ( is_pbr_surface && ( pbr_debug == 18 || pbr_debug == 19 ) && pipeline != 0 ) {
 				int envBindingIndex = -1;
 				if ( !envFromSceneView ) {
 					if ( useIndexing && debugEnvImage ) {
@@ -2585,167 +2585,169 @@ qboolean is_pbr_surface;
 				}
 			}
 
-			const VkDescriptorSet activeDescriptor = vk_get_pbr_descriptor_for_pipeline( &def, pbrDescriptor );
-			if ( activeDescriptor != VK_NULL_HANDLE ) {
-				vk_update_descriptor_if_changed( VK_DESC_PBR, activeDescriptor );
-			}
-
-			{
-				const VkDescriptorSet truthDescriptor = activeDescriptor;
-				const VkPipelineLayout pipelineLayoutHandle =
-					( def.descriptorIndexing && vk.pipeline_layout_pbr_indexed != VK_NULL_HANDLE ) ?
-						vk.pipeline_layout_pbr_indexed : vk.pipeline_layout;
-				const VkImageView dictView = vk_get_glint_dictionary_view();
-				static const world_t *lastTruthWorld = NULL;
-				static VkPipelineLayout lastTruthLayout = VK_NULL_HANDLE;
-				static VkDescriptorSet lastTruthDescriptor = VK_NULL_HANDLE;
-				static VkImageView lastTruthEnvView = VK_NULL_HANDLE;
-				static VkImageView lastTruthIrrView = VK_NULL_HANDLE;
-				static VkImageView lastTruthDictView = VK_NULL_HANDLE;
-				const qboolean truthDescriptorValid = ( truthDescriptor != VK_NULL_HANDLE );
-				const qboolean truthChanged =
-					truthDescriptorValid &&
-					( tr.world != lastTruthWorld ||
-					  pipelineLayoutHandle != lastTruthLayout ||
-					  truthDescriptor != lastTruthDescriptor ||
-					  loggedEnvView != lastTruthEnvView ||
-					  loggedIrrView != lastTruthIrrView ||
-					  dictView != lastTruthDictView ||
-					  ( r_pbr_debug && r_pbr_debug->integer >= 17 ) );
-				if ( truthChanged ) {
-					const char *mapName = ( tr.world && tr.world->baseName[0] ) ? tr.world->baseName : "unknown";
-					ri.Printf( PRINT_ALL,
-						"PBR bind truth: map=%s layout=%p set=%p envView=%p irrView=%p dictView=%p\n",
-						mapName,
-						(const void *)(uintptr_t)pipelineLayoutHandle,
-						(const void *)(uintptr_t)truthDescriptor,
-						(const void *)(uintptr_t)loggedEnvView,
-						(const void *)(uintptr_t)loggedIrrView,
-						(const void *)(uintptr_t)dictView );
-					lastTruthWorld = tr.world;
-					lastTruthLayout = pipelineLayoutHandle;
-					lastTruthDescriptor = truthDescriptor;
-					lastTruthEnvView = loggedEnvView;
-					lastTruthIrrView = loggedIrrView;
-					lastTruthDictView = dictView;
-				}
-			}
-
-			const cubemap_t *selectedCube = ( loggedCubemapIndex >= 0 && loggedCubemapIndex < tr.numCubemaps ) ? &tr.cubemaps[loggedCubemapIndex] : NULL;
-			const int cubemapState = selectedCube ? selectedCube->state : CUBEMAP_STATE_NONE;
-	#ifdef _DEBUG
-			if ( def.descriptorIndexing && selectedCube && selectedCube->state == CUBEMAP_STATE_READY &&
-				 !tr_pbr_indexedFallbackWarned &&
-				 !vk_pbr_indexed_env_ready )
-			{
-				ri.Printf( PRINT_ERROR,
-					"PBR IBL: indexed pipeline active but indexed env/irr descriptors were never updated; expect envBinding=-1 (map=%s cubemap=%d)\n",
-					( tr.world && tr.world->baseName[0] ) ? tr.world->baseName : "unknown",
-					loggedCubemapIndex );
-				tr_pbr_indexedFallbackWarned = qtrue;
-			}
-	#endif
-
-			const qboolean shouldLogBindings =
-				!tr_pbr_bindLogPrinted &&
-				( ( r_pbr_bindlog && r_pbr_bindlog->integer ) ||
-				  ( r_pbr_debug && r_pbr_debug->integer >= 17 ) );
-			if ( shouldLogBindings ) {
-				const char *mapName = ( tr.world && tr.world->baseName[0] ) ? tr.world->baseName : "unknown";
-				float cubemapRadius = 0.0f;
-				float cubemapDistance = 0.0f;
-				if ( loggedCubemapIndex >= 0 && loggedCubemapIndex < tr.numCubemaps ) {
-					const cubemap_t *cube = &tr.cubemaps[loggedCubemapIndex];
-					vec3_t surfacePos;
-					vec3_t delta;
-					cubemapRadius = cube->parallaxRadius;
-					R_GetPBRSurfacePosition( surfacePos );
-					VectorSubtract( surfacePos, cube->origin, delta );
-					const float distSq = DotProduct( delta, delta );
-					if ( distSq > 0.0f ) {
-						cubemapDistance = sqrtf( distSq );
+			if ( def.vk_pbr_flags || ( is_pbr_surface && pbr_debug >= 17 ) ) {
+					const VkDescriptorSet activeDescriptor = vk_get_pbr_descriptor_for_pipeline( &def, pbrDescriptor );
+					if ( activeDescriptor != VK_NULL_HANDLE ) {
+						vk_update_descriptor_if_changed( VK_DESC_PBR, activeDescriptor );
 					}
-				}
-				const VkPipelineLayout pipelineLayoutHandle =
-					( def.descriptorIndexing && vk.pipeline_layout_pbr_indexed != VK_NULL_HANDLE ) ?
-						vk.pipeline_layout_pbr_indexed : vk.pipeline_layout;
-				const char *pipelineLayoutName =
-					( def.descriptorIndexing && vk.pipeline_layout_pbr_indexed != VK_NULL_HANDLE ) ?
-						"vk.pipeline_layout_pbr_indexed" : "vk.pipeline_layout";
-				const VkImage envHandle = loggedEnvImage ? loggedEnvImage->handle : VK_NULL_HANDLE;
-				const VkImage irrHandle = loggedIrrImage ? loggedIrrImage->handle : VK_NULL_HANDLE;
-				const VkImageView logGlintView = vk_get_glint_dictionary_view();
-				const VkImage logGlintHandle = dictImage ? dictImage->handle : VK_NULL_HANDLE;
-				ri.Printf( PRINT_ALL,
-					"PBR bind truth: map=%s descIndexingActive=%d defIndexing=%d layout=%s(%p) descriptorSet(VK_DESC_PBR)=%p "
-					"cubemapIndex=%d state=%d radius=%.2f dist=%.2f envImg=%p envHandle=%p envView=%p "
-					"irrImg=%p irrHandle=%p irrView=%p glintImg=%p glintHandle=%p glintView=%p\n",
-					mapName,
-					vk.descriptorIndexingActive ? 1 : 0,
-					def.descriptorIndexing ? 1 : 0,
-					pipelineLayoutName,
-					(const void *)(uintptr_t)pipelineLayoutHandle,
-					(const void *)(uintptr_t)activeDescriptor,
-					loggedCubemapIndex,
-					cubemapState,
-					cubemapRadius,
-					cubemapDistance,
-					(const void *)loggedEnvImage,
-					(const void *)(uintptr_t)envHandle,
-					(const void *)(uintptr_t)loggedEnvView,
-					(const void *)loggedIrrImage,
-					(const void *)(uintptr_t)irrHandle,
-					(const void *)(uintptr_t)loggedIrrView,
-					(const void *)dictImage,
-					(const void *)(uintptr_t)logGlintHandle,
-					(const void *)(uintptr_t)logGlintView );
-				const image_t *envFallbackForLog = tr.pbrEnvFallback ? tr.pbrEnvFallback :
-					( tr.emptyCubemap ? tr.emptyCubemap : ( tr.blackImage ? tr.blackImage : tr.whiteImage ) );
-				const image_t *irrFallbackForLog = tr.pbrIrrFallback ? tr.pbrIrrFallback :
-					( tr.emptyCubemap ? tr.emptyCubemap : ( tr.blackImage ? tr.blackImage : tr.whiteImage ) );
-				const qboolean envIsFallbackLocal = ( loggedEnvImage == envFallbackForLog ) && !envFromSceneView;
-				const qboolean irrIsFallbackLocal = ( loggedIrrImage == irrFallbackForLog ) && !irrFromSceneView;
-				const qboolean envBoundLog = ( loggedEnvView != VK_NULL_HANDLE );
-				const qboolean irrBoundLog = ( loggedIrrView != VK_NULL_HANDLE );
-				ri.Printf( PRINT_ALL,
-					"PBR bind detail: envFromSceneView=%d irrFromSceneView=%d envFallback=%d irrFallback=%d envBound=%d irrBound=%d envDescIndex=%d irrDescIndex=%d envImg=%p envView=%p irrImg=%p irrView=%p\n",
-					envFromSceneView ? 1 : 0,
-					irrFromSceneView ? 1 : 0,
-					envIsFallbackLocal ? 1 : 0,
-					irrIsFallbackLocal ? 1 : 0,
-					envBoundLog ? 1 : 0,
-					irrBoundLog ? 1 : 0,
-					envDescriptorIndex,
-					irrDescriptorIndex,
-					(const void *)loggedEnvImage,
-					(const void *)(uintptr_t)loggedEnvView,
-					(const void *)loggedIrrImage,
-					(const void *)(uintptr_t)loggedIrrView );
-				tr_pbr_bindLogPrinted = qtrue;
-				if ( ( pbr_debug >= 16 && pbr_debug <= 19 ) &&
-						( ( r_pbr_bindlog && r_pbr_bindlog->integer ) || ( r_pbr_debug && r_pbr_debug->integer >= 17 ) ) )
-				{
-					const float featureEnv = uniform.pbrFeatureFlags[0];
-					const float featureIrr = uniform.pbrFeatureFlags[1];
-					const float featureGlint = uniform.pbrFeatureFlags[3];
-					const float debugIrr = uniform.pbrDebugFlags[0];
-					const float debugEnv = uniform.pbrDebugFlags[1];
-					const float debugDict = uniform.pbrDebugFlags[2];
-					ri.Printf( PRINT_ALL,
-						"PBR debug flags: envBound=%d irrBound=%d feature=[%.2f %.2f %.2f] debug=[%.2f %.2f %.2f]\n",
-						envDescriptorBound ? 1 : 0,
-						irrDescriptorBound ? 1 : 0,
-						featureEnv,
-						featureIrr,
-						featureGlint,
-						debugIrr,
-						debugEnv,
-						debugDict );
+
+					{
+						const VkDescriptorSet truthDescriptor = activeDescriptor;
+						const VkPipelineLayout pipelineLayoutHandle =
+							( def.descriptorIndexing && vk.pipeline_layout_pbr_indexed != VK_NULL_HANDLE ) ?
+								vk.pipeline_layout_pbr_indexed : vk.pipeline_layout;
+						const VkImageView dictView = vk_get_glint_dictionary_view();
+						static const world_t *lastTruthWorld = NULL;
+						static VkPipelineLayout lastTruthLayout = VK_NULL_HANDLE;
+						static VkDescriptorSet lastTruthDescriptor = VK_NULL_HANDLE;
+						static VkImageView lastTruthEnvView = VK_NULL_HANDLE;
+						static VkImageView lastTruthIrrView = VK_NULL_HANDLE;
+						static VkImageView lastTruthDictView = VK_NULL_HANDLE;
+						const qboolean truthDescriptorValid = ( truthDescriptor != VK_NULL_HANDLE );
+						const qboolean truthChanged =
+							truthDescriptorValid &&
+							( tr.world != lastTruthWorld ||
+							  pipelineLayoutHandle != lastTruthLayout ||
+							  truthDescriptor != lastTruthDescriptor ||
+							  loggedEnvView != lastTruthEnvView ||
+							  loggedIrrView != lastTruthIrrView ||
+							  dictView != lastTruthDictView ||
+							  ( r_pbr_debug && r_pbr_debug->integer >= 17 ) );
+						if ( truthChanged ) {
+							const char *mapName = ( tr.world && tr.world->baseName[0] ) ? tr.world->baseName : "unknown";
+							ri.Printf( PRINT_ALL,
+								"PBR bind truth: map=%s layout=%p set=%p envView=%p irrView=%p dictView=%p\n",
+								mapName,
+								(const void *)(uintptr_t)pipelineLayoutHandle,
+								(const void *)(uintptr_t)truthDescriptor,
+								(const void *)(uintptr_t)loggedEnvView,
+								(const void *)(uintptr_t)loggedIrrView,
+								(const void *)(uintptr_t)dictView );
+							lastTruthWorld = tr.world;
+							lastTruthLayout = pipelineLayoutHandle;
+							lastTruthDescriptor = truthDescriptor;
+							lastTruthEnvView = loggedEnvView;
+							lastTruthIrrView = loggedIrrView;
+							lastTruthDictView = dictView;
+						}
+					}
+
+					const cubemap_t *selectedCube = ( loggedCubemapIndex >= 0 && loggedCubemapIndex < tr.numCubemaps ) ? &tr.cubemaps[loggedCubemapIndex] : NULL;
+					const int cubemapState = selectedCube ? selectedCube->state : CUBEMAP_STATE_NONE;
+			#ifdef _DEBUG
+					if ( def.descriptorIndexing && selectedCube && selectedCube->state == CUBEMAP_STATE_READY &&
+						 !tr_pbr_indexedFallbackWarned &&
+						 !vk_pbr_indexed_env_ready )
+					{
+						ri.Printf( PRINT_ERROR,
+							"PBR IBL: indexed pipeline active but indexed env/irr descriptors were never updated; expect envBinding=-1 (map=%s cubemap=%d)\n",
+							( tr.world && tr.world->baseName[0] ) ? tr.world->baseName : "unknown",
+							loggedCubemapIndex );
+						tr_pbr_indexedFallbackWarned = qtrue;
+					}
+			#endif
+
+					const qboolean shouldLogBindings =
+						!tr_pbr_bindLogPrinted &&
+						( ( r_pbr_bindlog && r_pbr_bindlog->integer ) ||
+						  ( r_pbr_debug && r_pbr_debug->integer >= 17 ) );
+					if ( shouldLogBindings ) {
+						const char *mapName = ( tr.world && tr.world->baseName[0] ) ? tr.world->baseName : "unknown";
+						float cubemapRadius = 0.0f;
+						float cubemapDistance = 0.0f;
+						if ( loggedCubemapIndex >= 0 && loggedCubemapIndex < tr.numCubemaps ) {
+							const cubemap_t *cube = &tr.cubemaps[loggedCubemapIndex];
+							vec3_t surfacePos;
+							vec3_t delta;
+							cubemapRadius = cube->parallaxRadius;
+							R_GetPBRSurfacePosition( surfacePos );
+							VectorSubtract( surfacePos, cube->origin, delta );
+							const float distSq = DotProduct( delta, delta );
+							if ( distSq > 0.0f ) {
+								cubemapDistance = sqrtf( distSq );
+							}
+						}
+						const VkPipelineLayout pipelineLayoutHandle =
+							( def.descriptorIndexing && vk.pipeline_layout_pbr_indexed != VK_NULL_HANDLE ) ?
+								vk.pipeline_layout_pbr_indexed : vk.pipeline_layout;
+						const char *pipelineLayoutName =
+							( def.descriptorIndexing && vk.pipeline_layout_pbr_indexed != VK_NULL_HANDLE ) ?
+								"vk.pipeline_layout_pbr_indexed" : "vk.pipeline_layout";
+						const VkImage envHandle = loggedEnvImage ? loggedEnvImage->handle : VK_NULL_HANDLE;
+						const VkImage irrHandle = loggedIrrImage ? loggedIrrImage->handle : VK_NULL_HANDLE;
+						const VkImageView logGlintView = vk_get_glint_dictionary_view();
+						const VkImage logGlintHandle = dictImage ? dictImage->handle : VK_NULL_HANDLE;
+						ri.Printf( PRINT_ALL,
+							"PBR bind truth: map=%s descIndexingActive=%d defIndexing=%d layout=%s(%p) descriptorSet(VK_DESC_PBR)=%p "
+							"cubemapIndex=%d state=%d radius=%.2f dist=%.2f envImg=%p envHandle=%p envView=%p "
+							"irrImg=%p irrHandle=%p irrView=%p glintImg=%p glintHandle=%p glintView=%p\n",
+							mapName,
+							vk.descriptorIndexingActive ? 1 : 0,
+							def.descriptorIndexing ? 1 : 0,
+							pipelineLayoutName,
+							(const void *)(uintptr_t)pipelineLayoutHandle,
+							(const void *)(uintptr_t)activeDescriptor,
+							loggedCubemapIndex,
+							cubemapState,
+							cubemapRadius,
+							cubemapDistance,
+							(const void *)loggedEnvImage,
+							(const void *)(uintptr_t)envHandle,
+							(const void *)(uintptr_t)loggedEnvView,
+							(const void *)loggedIrrImage,
+							(const void *)(uintptr_t)irrHandle,
+							(const void *)(uintptr_t)loggedIrrView,
+							(const void *)dictImage,
+							(const void *)(uintptr_t)logGlintHandle,
+							(const void *)(uintptr_t)logGlintView );
+						const image_t *envFallbackForLog = tr.pbrEnvFallback ? tr.pbrEnvFallback :
+							( tr.emptyCubemap ? tr.emptyCubemap : ( tr.blackImage ? tr.blackImage : tr.whiteImage ) );
+						const image_t *irrFallbackForLog = tr.pbrIrrFallback ? tr.pbrIrrFallback :
+							( tr.emptyCubemap ? tr.emptyCubemap : ( tr.blackImage ? tr.blackImage : tr.whiteImage ) );
+						const qboolean envIsFallbackLocal = ( loggedEnvImage == envFallbackForLog ) && !envFromSceneView;
+						const qboolean irrIsFallbackLocal = ( loggedIrrImage == irrFallbackForLog ) && !irrFromSceneView;
+						const qboolean envBoundLog = ( loggedEnvView != VK_NULL_HANDLE );
+						const qboolean irrBoundLog = ( loggedIrrView != VK_NULL_HANDLE );
+						ri.Printf( PRINT_ALL,
+							"PBR bind detail: envFromSceneView=%d irrFromSceneView=%d envFallback=%d irrFallback=%d envBound=%d irrBound=%d envDescIndex=%d irrDescIndex=%d envImg=%p envView=%p irrImg=%p irrView=%p\n",
+							envFromSceneView ? 1 : 0,
+							irrFromSceneView ? 1 : 0,
+							envIsFallbackLocal ? 1 : 0,
+							irrIsFallbackLocal ? 1 : 0,
+							envBoundLog ? 1 : 0,
+							irrBoundLog ? 1 : 0,
+							envDescriptorIndex,
+							irrDescriptorIndex,
+							(const void *)loggedEnvImage,
+							(const void *)(uintptr_t)loggedEnvView,
+							(const void *)loggedIrrImage,
+							(const void *)(uintptr_t)loggedIrrView );
+						tr_pbr_bindLogPrinted = qtrue;
+						if ( ( pbr_debug >= 16 && pbr_debug <= 19 ) &&
+								( ( r_pbr_bindlog && r_pbr_bindlog->integer ) || ( r_pbr_debug && r_pbr_debug->integer >= 17 ) ) )
+						{
+							const float featureEnv = uniform.pbrFeatureFlags[0];
+							const float featureIrr = uniform.pbrFeatureFlags[1];
+							const float featureGlint = uniform.pbrFeatureFlags[3];
+							const float debugIrr = uniform.pbrDebugFlags[0];
+							const float debugEnv = uniform.pbrDebugFlags[1];
+							const float debugDict = uniform.pbrDebugFlags[2];
+							ri.Printf( PRINT_ALL,
+								"PBR debug flags: envBound=%d irrBound=%d feature=[%.2f %.2f %.2f] debug=[%.2f %.2f %.2f]\n",
+								envDescriptorBound ? 1 : 0,
+								irrDescriptorBound ? 1 : 0,
+								featureEnv,
+								featureIrr,
+								featureGlint,
+								debugIrr,
+								debugEnv,
+								debugDict );
+						}
+					}
+
+					pbrDescriptor = activeDescriptor;
 				}
 			}
-
-			pbrDescriptor = activeDescriptor;
-		}
 #undef UPDATE_PBR_BINDING_STATE
 #endif
 

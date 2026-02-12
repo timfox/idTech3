@@ -1,7 +1,7 @@
 {
-  "git_sha": "7e6c5df9b0b1e547a86ed03423fd9d982a71eccc",
-  "timestamp": "2026-02-12T09:00:18.964417Z",
-  "shader_hash": "ff9aaa27c909ce95a414076b7d231cb94730b91b37fefb53102902a4606805d6",
+  "git_sha": "f7170e017128070920419a780b08e985825a401d",
+  "timestamp": "2026-02-12T14:33:07.734056Z",
+  "shader_hash": "a67095124cc829d5224bffd94c5a9ab4f9848fe576b6acfb8dbf98c214efc56b",
   "task_count": 197,
   "tasks": [
     {
@@ -49,37 +49,37 @@
     {
       "name": "frag_tx0_ent",
       "stage": "frag",
-      "hash": "a0ff06b57dc90792963e7c773402562f05a58a1d9151e0f3d2e95081d2179e21",
+      "hash": "6fc707fbcb40e946b4f5843bdbd9105ef66a8a40496629a3b66f273ea71f1470",
       "defines": "-DUSE_ENT_COLOR -DUSE_ATEST"
     },
     {
       "name": "frag_tx0_ent_fog",
       "stage": "frag",
-      "hash": "d6158d2ac39a0eeaf4fddad49e510d2e2cbfb3908babaa4d59ab65f075fdb041",
+      "hash": "4c229406f181e17277d88780ba141ce72e98e50683876b3dbd6d348e05173885",
       "defines": "-DUSE_ENT_COLOR -DUSE_ATEST  -DUSE_FOG"
     },
     {
       "name": "frag_pbr_tx0_ent",
       "stage": "frag",
-      "hash": "102a7ca83dadd2384622e03b06b3bf6362c30f953940cab884295816a9f5a41a",
+      "hash": "874684d1aacd3692298e0acefdc65f44ca1417039c810aebcd975d50978deaca",
       "defines": "-DUSE_ENT_COLOR -DUSE_ATEST  -DUSE_VK_PBR"
     },
     {
       "name": "frag_pbr_tx0_ent_fog",
       "stage": "frag",
-      "hash": "35fea2e5ecab90b2aa7eaa19e2e2a4bef4fd30799ca39e4a3e1017dc6b1fbfa5",
+      "hash": "6a4781d18cd3deb1a7d5b651851659f9506ed9de20b2bf50dfad73a2ff866e59",
       "defines": "-DUSE_ENT_COLOR -DUSE_ATEST  -DUSE_FOG  -DUSE_VK_PBR"
     },
     {
       "name": "frag_pbrdi_tx0_ent",
       "stage": "frag",
-      "hash": "066f308c5bf6a28c7a530c9173dc95d5713e9e935c7fa83c40230aa78268da21",
+      "hash": "c904d60c3a828bb86295398f0d61940358bd9c8c47fff4b5adcffe8654af792f",
       "defines": "-DUSE_ENT_COLOR -DUSE_ATEST  -DUSE_VK_PBR -DUSE_DESCRIPTOR_INDEXING"
     },
     {
       "name": "frag_pbrdi_tx0_ent_fog",
       "stage": "frag",
-      "hash": "16c35a685b1248e69062c7f41329dc4f7227f530816c7aacc1020eeac2a9d4a2",
+      "hash": "0670c37a7132273fa108d3107027850e739f636ab3440a68402644385bcd8eaf",
       "defines": "-DUSE_ENT_COLOR -DUSE_ATEST  -DUSE_FOG  -DUSE_VK_PBR -DUSE_DESCRIPTOR_INDEXING"
     },
     {
@@ -373,145 +373,145 @@
     {
       "name": "frag_tx0_ident1",
       "stage": "frag",
-      "hash": "1e337dfde31fd2d706527359e760f57cfb723daa9377d463db7717c50f1e9674",
+      "hash": "634c345c6b3853c3a2763bbe1a6ff3b8bd6cb85ed0b50495e6cb583baf5a8ce1",
       "defines": "-DUSE_CLX_IDENT -DUSE_ATEST"
     },
     {
       "name": "frag_tx0_ident1_fog",
       "stage": "frag",
-      "hash": "e6a1f61d2c339ee3ee08f3236c80b3ce15f2b7df4ac8ccb28421bc6cf606b1d0",
+      "hash": "22a277a1b507bd301abcc5e233632ec216e0acb46d111749a2fe8972c4646440",
       "defines": "-DUSE_CLX_IDENT -DUSE_FOG -DUSE_ATEST"
     },
     {
       "name": "frag_tx0_fixed",
       "stage": "frag",
-      "hash": "d199ba5224a0a2d33709a6e808ae836aa04607991a28a59fe516bca7462e6ef1",
+      "hash": "51e6e75e1f2feb12d6c8d8157cb9a8c958e5ea1ca2cb6a1cd403b668be0f3ae2",
       "defines": "-DUSE_FIXED_COLOR -DUSE_ATEST"
     },
     {
       "name": "frag_tx0_fixed_fog",
       "stage": "frag",
-      "hash": "fbeb3f23d6cd427f4d4ccd170e617636b969a5c241a7c3cd5d84ba83d789fdc0",
+      "hash": "0da316043745401230fe64af4f3bdbb33b25e5e5b4b5166dd7c938568d286b9d",
       "defines": "-DUSE_FIXED_COLOR -DUSE_FOG -DUSE_ATEST"
     },
     {
       "name": "frag_tx1_ident1",
       "stage": "frag",
-      "hash": "7dcecd4e5dc2ecdb8ddac31336eb25640042bf2431e4e7a29af5c41bbef74e39",
+      "hash": "df93e4f79f7b637b83c00a14bcfa9b39fa9ef96eeff9ee88d400c84b634d7d16",
       "defines": "-DUSE_TX1 -DUSE_CLX_IDENT"
     },
     {
       "name": "frag_tx1_ident1_fog",
       "stage": "frag",
-      "hash": "eea994208a2bec23e5455c2e7dd4edb2a99d9b2aefa771c06540822b98e709e7",
+      "hash": "3e9bd21082da7bf39cbf1babb302983c36eec62b96afbf8c431cb23fa8db6b24",
       "defines": "-DUSE_TX1 -DUSE_CLX_IDENT -DUSE_FOG"
     },
     {
       "name": "frag_tx1_fixed",
       "stage": "frag",
-      "hash": "a999fecefe536cb4f33329df412d97408e9ef4909cd1d0167d21a58d304b5759",
+      "hash": "39155034ee4c3461f784a210dc18437125f46f5e261fe8d296dcad9ad464cb9d",
       "defines": "-DUSE_TX1 -DUSE_FIXED_COLOR"
     },
     {
       "name": "frag_tx1_fixed_fog",
       "stage": "frag",
-      "hash": "14b91e7699526b2c800e9db77141153465a85fca6f44df11222d3b7a26ef6a7a",
+      "hash": "b862deb85d308ab518f1cc7737c6fa773fe8ab3a4664c7600bf9317a346f80cb",
       "defines": "-DUSE_TX1 -DUSE_FIXED_COLOR -DUSE_FOG"
     },
     {
       "name": "frag_pbr_tx0_ident1",
       "stage": "frag",
-      "hash": "ac637ed06dfd935fd2bc322847e7b00c76528dcd04630a2ebaaa5c8cfa542ef9",
+      "hash": "d2fb836dcd2180b4d92c6e81879bf5be699025e5497c28a9760847f514455a11",
       "defines": "-DUSE_VK_PBR -DUSE_CLX_IDENT -DUSE_ATEST"
     },
     {
       "name": "frag_pbr_tx0_ident1_fog",
       "stage": "frag",
-      "hash": "8d6d20bfd91ea9298392f48e68ba69edac313dea0bafea0cab0a4d856d770f98",
+      "hash": "fe64e82d3b78d444689970edc1fd363e3c1fe14ea8e07247e3415d6a9ff5720d",
       "defines": "-DUSE_VK_PBR -DUSE_CLX_IDENT -DUSE_FOG -DUSE_ATEST"
     },
     {
       "name": "frag_pbr_tx0_fixed",
       "stage": "frag",
-      "hash": "63abb3ea6a89f6d819bf537af33a7f77312cb4b39c6e50b47754e7dcd1f8d757",
+      "hash": "81788d4edff71254a7d01965f55a216df515f84cc6d05106a235e9da5370775d",
       "defines": "-DUSE_VK_PBR -DUSE_FIXED_COLOR -DUSE_ATEST"
     },
     {
       "name": "frag_pbr_tx0_fixed_fog",
       "stage": "frag",
-      "hash": "0315bf0fd45ddd29a95f21a4f64de7144f413d88312d585f2be8e5b4517e3145",
+      "hash": "ea0d798e8d827c439519b536ce4dd27ed8bb6e4d5072bad4be763459afee227c",
       "defines": "-DUSE_VK_PBR -DUSE_FIXED_COLOR -DUSE_FOG -DUSE_ATEST"
     },
     {
       "name": "frag_pbr_tx1_ident1",
       "stage": "frag",
-      "hash": "5c3974ccd5b3e7915bb472e18828f3c4d71ff0f98d513b2a2d185106374b98c9",
+      "hash": "2ce9eb74d1d7a23468f05a74f624673c512cfdcbb391d47304d88084eb8c4730",
       "defines": "-DUSE_VK_PBR -DUSE_TX1 -DUSE_CLX_IDENT"
     },
     {
       "name": "frag_pbr_tx1_ident1_fog",
       "stage": "frag",
-      "hash": "dce94c45bc353184bd921d43724f61849413bee71b07d0baa780b3cc59fd5d8a",
+      "hash": "b8bde6944f73490afed6d2ecafd4a1ff362c8b92b4cb3fa0bf33c7c332dff08b",
       "defines": "-DUSE_VK_PBR -DUSE_TX1 -DUSE_CLX_IDENT -DUSE_FOG"
     },
     {
       "name": "frag_pbr_tx1_fixed",
       "stage": "frag",
-      "hash": "5782d118263a29c9fa17bc5710a8fe3da276fb57d44df7610b35a27588ec5b69",
+      "hash": "263f7d8d6a2d5d31de2f98aaa880c5c0206a0dd26e471c4e0e5c92c87d12131f",
       "defines": "-DUSE_VK_PBR -DUSE_TX1 -DUSE_FIXED_COLOR"
     },
     {
       "name": "frag_pbr_tx1_fixed_fog",
       "stage": "frag",
-      "hash": "22d7cd0a72705cf3849a307c28134eb358baac2aa69b5af114e3a90f256981e3",
+      "hash": "6a8d95c145481641369b88b89193bb564104f221b9abef49f74a6d8043e151d3",
       "defines": "-DUSE_VK_PBR -DUSE_TX1 -DUSE_FIXED_COLOR -DUSE_FOG"
     },
     {
       "name": "frag_pbrdi_tx0_ident1",
       "stage": "frag",
-      "hash": "e724630d3654b45fd22e82e0d29e68a2a1075e47a878ca7dc582d02e332259cc",
+      "hash": "0eb335289405ee14360125c04b62111a409a7adfbcbb559cf0675f19ec052fac",
       "defines": "-DUSE_VK_PBR -DUSE_DESCRIPTOR_INDEXING -DUSE_CLX_IDENT -DUSE_ATEST"
     },
     {
       "name": "frag_pbrdi_tx0_ident1_fog",
       "stage": "frag",
-      "hash": "6870493a9da0c842505259168ec242d6f80403ce61118ac1231d262b6f4eb581",
+      "hash": "dad36be5a48e24e8f139caab3a0b0e834b1701abac74adcf36abc77d35195e51",
       "defines": "-DUSE_VK_PBR -DUSE_DESCRIPTOR_INDEXING -DUSE_CLX_IDENT -DUSE_FOG -DUSE_ATEST"
     },
     {
       "name": "frag_pbrdi_tx0_fixed",
       "stage": "frag",
-      "hash": "339eb953222f08ac1c1300d9b78587a16eb9f6f10c33c64d6e3f8deb23ee82d3",
+      "hash": "528e6722cede3c1d5b680b01656e6ef82ca6dd3c43b21ddd74ced9c6d0a3b97c",
       "defines": "-DUSE_VK_PBR -DUSE_DESCRIPTOR_INDEXING -DUSE_FIXED_COLOR -DUSE_ATEST"
     },
     {
       "name": "frag_pbrdi_tx0_fixed_fog",
       "stage": "frag",
-      "hash": "5b86684692e05a21a57dc753fc9f67b4d6b5ba00ab1caaeb036cdf8e39cb6294",
+      "hash": "9cf9cfd36f2a73b7abb0f62e2c77fca962cbcb1d22119180c7e79f6e8d7b7f24",
       "defines": "-DUSE_VK_PBR -DUSE_DESCRIPTOR_INDEXING -DUSE_FIXED_COLOR -DUSE_FOG -DUSE_ATEST"
     },
     {
       "name": "frag_pbrdi_tx1_ident1",
       "stage": "frag",
-      "hash": "145f2e17e91cf434a83342abf0c7bd8b2a4a117326172a3a254a5bdb81abb21f",
+      "hash": "69ceeca47f67a805d56ae3216010bf20601339a72c7cda36cfa522c7be23c907",
       "defines": "-DUSE_VK_PBR -DUSE_DESCRIPTOR_INDEXING -DUSE_TX1 -DUSE_CLX_IDENT"
     },
     {
       "name": "frag_pbrdi_tx1_ident1_fog",
       "stage": "frag",
-      "hash": "56a86812489bd5040757a841c7527b94da27c5b49d937a034b71497a7f53ab4f",
+      "hash": "90a8b9d15982c97087d401b2764e1793a267ce62284576cdad3742e8461a9401",
       "defines": "-DUSE_VK_PBR -DUSE_DESCRIPTOR_INDEXING -DUSE_TX1 -DUSE_CLX_IDENT -DUSE_FOG"
     },
     {
       "name": "frag_pbrdi_tx1_fixed",
       "stage": "frag",
-      "hash": "904440a04469c48e3d9c60fdf568735ccb74fb698066eadd3bf1804aa4e226c0",
+      "hash": "229b2955cffb8fba789939e93636cb388944089e39a46a498486c5b77c9cfa46",
       "defines": "-DUSE_VK_PBR -DUSE_DESCRIPTOR_INDEXING -DUSE_TX1 -DUSE_FIXED_COLOR"
     },
     {
       "name": "frag_pbrdi_tx1_fixed_fog",
       "stage": "frag",
-      "hash": "fc11060f11d307c35076c47af72c6544b2d366571ee03f40bdadd22e2adcc619",
+      "hash": "a0718765283f13c68bf7142afa5194c8ff57001882e34daa5bff623e73414e34",
       "defines": "-DUSE_VK_PBR -DUSE_DESCRIPTOR_INDEXING -DUSE_TX1 -DUSE_FIXED_COLOR -DUSE_FOG"
     },
     {
@@ -877,181 +877,181 @@
     {
       "name": "frag_tx0",
       "stage": "frag",
-      "hash": "5a07bf5d225f6880c9d38865a3f41ba52ff6fc20c10ae192e751da941fdf2a2a",
+      "hash": "cab3d1f614b8c4b50eef2e36ed514816d7beb8755eb2740c2fbbaf446e96340b",
       "defines": "-DUSE_ATEST"
     },
     {
       "name": "frag_tx0_fog",
       "stage": "frag",
-      "hash": "cda7659a3022116b988e87db5d8c36623393f84936271488769272b3f609fc3d",
+      "hash": "035f6e03dc9e7de53a8f7e48029e3e0f31dbd0a4e5ece06f3aa283ea5c13cb7e",
       "defines": "-DUSE_FOG -DUSE_ATEST"
     },
     {
       "name": "frag_tx1",
       "stage": "frag",
-      "hash": "08f1abc1776b8544364a1831a3af094b0073cca96bc78577fcb5a89faff7461c",
+      "hash": "aaffe081cc58419b2316b593d347aa87206e246969c6a6b131ba590ec97f143b",
       "defines": "-DUSE_TX1"
     },
     {
       "name": "frag_tx1_cl",
       "stage": "frag",
-      "hash": "5eb9b89358aef86a11185805881aac57300b2050dc2a62461f337ab3363596d3",
+      "hash": "5554835ce80ddab6158cafc8fe97a198ae833d81d16202a7349b62d385a27038",
       "defines": "-DUSE_TX1 -DUSE_CL1"
     },
     {
       "name": "frag_tx1_fog",
       "stage": "frag",
-      "hash": "9c2ddebdc8b385f7ac76e4417e77c2d8d0a91534aea4a4117fe6a8aabafaee69",
+      "hash": "11185200c02bfc1c6ab8c49f323b51c78fdf27f2112078f20258610ab0edd4d3",
       "defines": "-DUSE_TX1 -DUSE_FOG"
     },
     {
       "name": "frag_tx1_cl_fog",
       "stage": "frag",
-      "hash": "878189ac084555b4c66fda65a1fe7aa62516b1f3f98d9506673b5fa5099e571d",
+      "hash": "77fe779bb988838903ceb13bbdf7799942addde249e677a6b84faded6e2e9bff",
       "defines": "-DUSE_TX1 -DUSE_CL1 -DUSE_FOG"
     },
     {
       "name": "frag_tx2",
       "stage": "frag",
-      "hash": "31c521943baec07c2396de7815a92ba69d2aa28949ea798201d48d6c32d031a0",
+      "hash": "eadd478ddeb05fd18fd2a4fa43fe3e87ebe1ba502b234f82836a762f5f87b1dd",
       "defines": "-DUSE_TX2"
     },
     {
       "name": "frag_tx2_cl",
       "stage": "frag",
-      "hash": "a3831f257d6cb979cfc4732c91ff338735526577f87d03bcf2aa63a2f7d90880",
+      "hash": "2ff31bc52a066602ecf41b8b1c656fe196f2b317eff5c4b9d21616ca309a5a89",
       "defines": "-DUSE_TX2 -DUSE_CL2"
     },
     {
       "name": "frag_tx2_fog",
       "stage": "frag",
-      "hash": "9beb60661514cd287df5681cd60e5dbe1ac0c17757ce9e2a70d24e83dcc81539",
+      "hash": "bcd3dcf836a18390fd92cfd78935a342cd14da73497a0c2052fc188780cb885a",
       "defines": "-DUSE_TX2 -DUSE_FOG"
     },
     {
       "name": "frag_tx2_cl_fog",
       "stage": "frag",
-      "hash": "90f2f024bef7f45e9e501ac2c8adf1ef5e1452114d0bceef90d64ad50aacff35",
+      "hash": "3cb7c0f29a2919ab18fa2e896dba3e5193c5edf665e0d5aa668b83a086ed8ae6",
       "defines": "-DUSE_TX2 -DUSE_CL2 -DUSE_FOG"
     },
     {
       "name": "frag_pbr_tx0",
       "stage": "frag",
-      "hash": "033ccc5c4e56767e5893e5873a8b7b31c917071c4b020b4e483dcb81586cc042",
+      "hash": "ee2a6b75db815aee9c02cf1bec0710058e5ae18a5c0c39748e10e75d3494c559",
       "defines": "-DUSE_VK_PBR -DUSE_ATEST"
     },
     {
       "name": "frag_pbr_tx0_fog",
       "stage": "frag",
-      "hash": "ea7f3340fa98c84c39bd894370d0806e5d1e0ea74b70260e4402ff09efb25545",
+      "hash": "98a28b6d06d1396964a4ae240bdb58b39fbf2e62f9c49f3ae96f90acc3d3ae53",
       "defines": "-DUSE_VK_PBR -DUSE_FOG -DUSE_ATEST"
     },
     {
       "name": "frag_pbr_tx1",
       "stage": "frag",
-      "hash": "f2ec0bc00cc20f04cf29171e6d8ee7c77baed4975ead7eadb59ac97c85dd9cdb",
+      "hash": "9dfc976a81b20e808f4b5fc4f5a837fd70793a1780d2ffbcb4ad551348fb6f5f",
       "defines": "-DUSE_VK_PBR -DUSE_TX1"
     },
     {
       "name": "frag_pbr_tx1_cl",
       "stage": "frag",
-      "hash": "32887eb2e440a1a2e6f5b1afb22014e965fe041398f544b17c8b24710b63fe8a",
+      "hash": "c9addc8a23a549cd1af9d7fb872566effa671819d5ca7f1919366682fb0467e6",
       "defines": "-DUSE_VK_PBR -DUSE_TX1 -DUSE_CL1"
     },
     {
       "name": "frag_pbr_tx1_fog",
       "stage": "frag",
-      "hash": "51b426b67a28771b10882d63d091103e753803a24d553bec6a40954c937c1d58",
+      "hash": "6b376dc8eb04b4e8d054c6a8e8f64bc688628c0f44b6944bee82e83ee1f48be2",
       "defines": "-DUSE_VK_PBR -DUSE_TX1 -DUSE_FOG"
     },
     {
       "name": "frag_pbr_tx1_cl_fog",
       "stage": "frag",
-      "hash": "dc4bdd76dcc1a738c9e068ed1fb8e63b0a5ebd69bc41776f945de3cfbdd15ea1",
+      "hash": "8d651933003cc1e1920d6efca2fdbb2acafab1eee50045456ab3ed90f51205a1",
       "defines": "-DUSE_VK_PBR -DUSE_TX1 -DUSE_CL1 -DUSE_FOG"
     },
     {
       "name": "frag_pbr_tx2",
       "stage": "frag",
-      "hash": "eeb9772ef1446fe54e497feafa02e32304e4ba25ac29dfd7277fa82801e978aa",
+      "hash": "e75d1f0c305cbb832767ca1f4e6584ddd830b2e2929836bf527e8ae10b72458b",
       "defines": "-DUSE_VK_PBR -DUSE_TX2"
     },
     {
       "name": "frag_pbr_tx2_cl",
       "stage": "frag",
-      "hash": "92c822ff7c9b2ff834b915a051638e91ddb880b47f30889458a2f50820a3ac12",
+      "hash": "d190c33963a7d3ea45abb699e76da2e3554f9878c62c5f3993417940e885acef",
       "defines": "-DUSE_VK_PBR -DUSE_TX2 -DUSE_CL2"
     },
     {
       "name": "frag_pbr_tx2_fog",
       "stage": "frag",
-      "hash": "d3b00a09b088f2b2e159588e55e3811de186048cb0c048711442c98ac8aa0a11",
+      "hash": "f153e5f2e4de2a98f16e2929fbcd58e2136f9081a5b85bcf5a6f496098ee8c84",
       "defines": "-DUSE_VK_PBR -DUSE_TX2 -DUSE_FOG"
     },
     {
       "name": "frag_pbr_tx2_cl_fog",
       "stage": "frag",
-      "hash": "f1f793fa5fc0cf87c005ea6b4b48ff76e027816763e2307492b343dc62a79377",
+      "hash": "8d2eadf3b898bc2ed82e7e2d4405d64f2ef1d2550f8a012c3747e84c039240e0",
       "defines": "-DUSE_VK_PBR -DUSE_TX2 -DUSE_CL2 -DUSE_FOG"
     },
     {
       "name": "frag_pbrdi_tx0",
       "stage": "frag",
-      "hash": "2ef6c5f9be89480068d8139f9c59b27e3923876e64ae72867ad00bc7aed4a359",
+      "hash": "bd5fc714fd569fa7b852a91202db8c9e66c7df296896ab4fd33063ff940321bf",
       "defines": "-DUSE_VK_PBR -DUSE_DESCRIPTOR_INDEXING -DUSE_ATEST"
     },
     {
       "name": "frag_pbrdi_tx0_fog",
       "stage": "frag",
-      "hash": "93fac402d55f90a82aaaff881db59ee699e79ced14c64a68654afb84f7891b26",
+      "hash": "132c3c3dc572387fe2a62a54ae073311595d59797aa81a3ec404bb4ee88550f8",
       "defines": "-DUSE_VK_PBR -DUSE_DESCRIPTOR_INDEXING -DUSE_FOG -DUSE_ATEST"
     },
     {
       "name": "frag_pbrdi_tx1",
       "stage": "frag",
-      "hash": "5c870c09f954a719b2c61ba8a2a404456cb5253dafb5ee98a53e5d38c4a19238",
+      "hash": "f28e75c750828126a89aafd482e57b8cba653cd2d26102e6be078086d91a72d5",
       "defines": "-DUSE_VK_PBR -DUSE_DESCRIPTOR_INDEXING -DUSE_TX1"
     },
     {
       "name": "frag_pbrdi_tx1_cl",
       "stage": "frag",
-      "hash": "2e2d9a2e9caaedd2e76f7679eb1db0caf968b3f3ed554778b179a9d39cd05391",
+      "hash": "e6f66831afdaae1793bdeb475e83ce61397de72f8224f7383b6ccc7061abad59",
       "defines": "-DUSE_VK_PBR -DUSE_DESCRIPTOR_INDEXING -DUSE_TX1 -DUSE_CL1"
     },
     {
       "name": "frag_pbrdi_tx1_fog",
       "stage": "frag",
-      "hash": "956f2db2de40e3e4b773123d5f8219409509c7879c677a3fad078f3b59a6a25b",
+      "hash": "eb37082d4cc04e7a6881a7b2911701985b49937b5f1fce18c5f9c92e5c7ae583",
       "defines": "-DUSE_VK_PBR -DUSE_DESCRIPTOR_INDEXING -DUSE_TX1 -DUSE_FOG"
     },
     {
       "name": "frag_pbrdi_tx1_cl_fog",
       "stage": "frag",
-      "hash": "8355794e4bd081d55e1d7f1cbdc0f711692d75465be38c18c57ec037433266a8",
+      "hash": "765635333cb228d9466bf507cc2ef85fe1d1fd6f2caebe9accb97b9fd75ebc16",
       "defines": "-DUSE_VK_PBR -DUSE_DESCRIPTOR_INDEXING -DUSE_TX1 -DUSE_CL1 -DUSE_FOG"
     },
     {
       "name": "frag_pbrdi_tx2",
       "stage": "frag",
-      "hash": "d14617e5041f67fc5238fe26da0a990c7150d8c95c7c3b8428cbf77ff0e5c9a9",
+      "hash": "0d3248a241c3f44d55bd237544d3f77be9e2139e7fa96d5f9b9c211a11f763c4",
       "defines": "-DUSE_VK_PBR -DUSE_DESCRIPTOR_INDEXING -DUSE_TX2"
     },
     {
       "name": "frag_pbrdi_tx2_cl",
       "stage": "frag",
-      "hash": "fc7a0f4b794e750326db564903e5184a9a33aa16f241c7a44f227c5525c4334a",
+      "hash": "6881bfa07194c658ebd16b2350bd962c94a3f6d7c9b0b872e0dbcb1e69afbd87",
       "defines": "-DUSE_VK_PBR -DUSE_DESCRIPTOR_INDEXING -DUSE_TX2 -DUSE_CL2"
     },
     {
       "name": "frag_pbrdi_tx2_fog",
       "stage": "frag",
-      "hash": "e712875e84f3b80703790c9027b680830361188723e5847bf5e288b723d52604",
+      "hash": "7888af8774007f7a8c74b4ac20ede0cee555cb955062d830681363791341fff1",
       "defines": "-DUSE_VK_PBR -DUSE_DESCRIPTOR_INDEXING -DUSE_TX2 -DUSE_FOG"
     },
     {
       "name": "frag_pbrdi_tx2_cl_fog",
       "stage": "frag",
-      "hash": "18c502fe3d1d41bc462266151c21bdc7fbf27615831edcf39028d44a9714f595",
+      "hash": "646849d8bf5898c93437ebbaa21a7f63ff3a2dd4e7ca45e8763907427c89dd38",
       "defines": "-DUSE_VK_PBR -DUSE_DESCRIPTOR_INDEXING -DUSE_TX2 -DUSE_CL2 -DUSE_FOG"
     },
     {

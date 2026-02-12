@@ -1410,7 +1410,6 @@ void main() {
 
 	vec3 fallbackDir = sanitizeDir( var_LightDir.xyz, vec3( 0.0, 0.0, 1.0 ) );
 	vec3 glintLightDir = fallbackDir;
-	float glintLightDistance = 1.0;
 	if ( hasDynamicLights )
 	{
 		vec3 storedDir = pbrLightDirs[0].xyz;
@@ -1418,12 +1417,9 @@ void main() {
 		{
 			glintLightDir = normalize( storedDir );
 		}
-		glintLightDistance = max( pbrLightDirs[0].w, 1e-3 );
 	}
 
 	L = sanitizeDir( glintLightDir, fallbackDir );
-	float sqrLightDist = dot( glintLightDir, glintLightDir );
-	float lightDistance = max( sqrt( max( sqrLightDist, 1e-6 ) ), glintLightDistance );
 
 #if ( defined(USE_TX1) || defined(USE_TX2) )
 			if ( hasLightmap ) {
@@ -1510,25 +1506,6 @@ void main() {
 	float anisotropyX = clamp( roughness * ( 1.0 + materialAnisotropy ), 0.02, 1.0 );
 	float anisotropyY = clamp( roughness * ( 1.0 - materialAnisotropy ), 0.02, 1.0 );
 
-	// Apply subsurface scattering approximation
-	float subsurfaceAmount = subsurfaceStrength;
-	if ( subsurfaceAmount > 0.0 ) {
-		// Disney-style subsurface: blend Lambert with wrapped Lambert
-		// Only apply to non-metals (diffuse.rgb is already reduced by metallic)
-		float metallic = 0.0;
-		if ( physical_texture_set == 0 ) {
-			vec4 ORMS = PBR_SAMPLE_PHYSICAL( frag_tex_coord0 );
-			ORMS.xyzw *= vec4( specularScale_z, specularScale_w, specularScale_x, specularScale_y );
-			metallic = ORMS.z;
-		}
-		if ( metallic < 1.0 ) {
-			// Wrapped diffuse for subsurface (approximation)
-			float wrappedNL = clamp( (dot(N, L) + subsurfaceWrap) / (1.0 + subsurfaceWrap), 0.0, 1.0);
-			vec3 subsurfaceDiffuse = diffuse.rgb * wrappedNL;
-			diffuse.rgb = mix( diffuse.rgb, subsurfaceDiffuse, subsurfaceAmount * (1.0 - metallic) );
-		}
-	}
-
 	if ( emissive_texture_set > -1 ) {
 		emissive = sRGB_to_linear( PBR_SAMPLE_EMISSIVE( frag_tex_coord0 ).rgb ) * pbrEmissiveScale.rgb;
 	}
@@ -1549,24 +1526,14 @@ void main() {
 
 	ambientColor *= AO;
 
-	vec3  H  = normalize( L + E );
 	float NE = clamp( dot( N, E ), 0.0, 1.0 ) + 1e-5;
 	float NL = clamp( dot( N, L ), 0.0, 1.0 );
-	float LH = clamp( dot( L, H ), 0.0, 1.0 );
-
-	vec3  Fd = CalcDiffuse( diffuse.rgb, NE, NL, LH, roughness );
-	float NH = clamp( dot( N, H ), 0.0, 1.0 );
-	float VH = clamp( dot( E, H ), 0.0, 1.0 );
-	vec3  Fs_base = CalcSpecular( specular.rgb, NH, NL, NE, LH, VH, roughness );
-	vec3  Fs = Fs_base;
 
 	vec3 Nn = sanitizeNormal( N );
 	vec3 tangent = normalize( var_Tangent.xyz - Nn * dot( Nn, var_Tangent.xyz ) );
 	vec3 binormal = normalize( cross( Nn, tangent ) ) * var_Tangent.w;
 
-		vec3 glintTerm = vec3( 0.0 );
 	vec4 glintDebugData = vec4( 0.0 );
-	float glintBlend = 0.0;
 	int glintDebugLevel = 0;
 	vec3 dbgBaseSpec = vec3( 0.0 );
 	vec3 dbgClearcoat = vec3( 0.0 );
@@ -1578,193 +1545,38 @@ void main() {
 	const bool hasGlintDict = pbrFeatureFlags.w > 0.5;
 	const bool needsFallbackLight = ( !hasLightmap && !hasEnv && !hasIrr );
 
-const bool allowGlints = forceGlintsDebug || (glintCore.x > 0.5 && glint_material_enable > 0) || pbrDebug.w > 0.5;
-const bool glintAvailable = hasGlintDict && allowGlints;
-bool glintEnabled = glintAvailable;
-const bool hasIrrDebug = pbrDebugFlags.x > 0.5;
-const bool hasEnvDebug = pbrDebugFlags.y > 0.5;
-const bool dictValidDebug = pbrDebugFlags.z > 0.5;
-// pbrDebugFlags.w reserved for compiled/extra state
+	const bool allowGlints = forceGlintsDebug || ( glintCore.x > 0.5 && glint_material_enable > 0 ) || pbrDebug.w > 0.5;
+	const bool glintAvailable = hasGlintDict && allowGlints;
+	bool glintEnabled = glintAvailable;
+	const bool hasIrrDebug = pbrDebugFlags.x > 0.5;
+	const bool hasEnvDebug = pbrDebugFlags.y > 0.5;
+	const bool dictValidDebug = pbrDebugFlags.z > 0.5;
+	// pbrDebugFlags.w reserved for compiled/extra state
 	const float debugEps = max( pbrDebugParams.y, 1e-6 );
 	const bool glintsEnabledDebug = ( pbrDebugParams.z > 0.5 );
 
-#ifdef USE_VK_PBR
-	if ( pbrDebug.x <= 0.0 ) {
-		// Debug disabled, fall back to normal shading
-	} else if ( pbrDebugView >= 17 && pbrDebugView <= 19 ) {
-		vec3 healthColor = DBG_RED;
-		if ( pbrDebugView == 17 ) {
-			vec3 irrSample = vec3( 0.0 );
-#ifdef USE_DESCRIPTOR_INDEXING
-			const bool sampleValid = ( irradiance_texture_set >= 0 );
-#else
-			const bool sampleValid = true;
-#endif
-			if ( sampleValid ) {
-				irrSample = textureLod( irradiance_texture, N, 0.0 ).rgb; // explicit LOD 0
-			}
-			const bool sampleFinite = !isnan( irrSample.x ) && !isinf( irrSample.x ) &&
-				!isnan( irrSample.y ) && !isinf( irrSample.y ) &&
-				!isnan( irrSample.z ) && !isinf( irrSample.z );
-			if ( hasIrrDebug && sampleValid && sampleFinite ) {
-				healthColor = vec3( 0.0, 1.0, 0.0 );
-			}
-		} else if ( pbrDebugView == 18 ) {
-			const int dictEntries = max( 1, int( floor( glintDict[2] + 0.5 ) ) );
-			const int dictLevels = max( 1, int( floor( glintDict[0] + 0.5 ) ) );
-			const int dictSize = max( 1, int( floor( glintDict[1] + 0.5 ) ) );
-			float dictSample = 0.0;
-			bool sampleValid = ( dictEntries > 0 && dictLevels > 0 && dictSize > 0 );
-#ifdef USE_DESCRIPTOR_INDEXING
-			sampleValid = sampleValid && ( pbrTexIndex2.z >= 0.0 );
-#endif
-			if ( sampleValid ) {
-				dictSample = glint_dictionary_lookup(
-					0,
-					0,
-					0.5,
-					float( dictSize ),
-					float( dictEntries * dictLevels ),
-					dictEntries,
-					dictLevels );
-			}
-			const bool sampleFinite = !isnan( dictSample ) && !isinf( dictSample );
-			if ( dictValidDebug && sampleValid && sampleFinite ) {
-				healthColor = vec3( 0.0, 1.0, 0.0 );
-			}
-		} else if ( pbrDebugView == 19 ) {
-			vec3 envSample = vec3( 0.0 );
-			vec3 envDir = reflect( -E, N );
-			envDir.y *= -1.0;
-#ifdef USE_DESCRIPTOR_INDEXING
-			const bool sampleValid = ( env_texture_set >= 0 );
-#else
-			const bool sampleValid = true;
-#endif
-			if ( sampleValid ) {
-				envSample = textureLod( env_texture, envDir, 0.0 ).rgb; // explicit LOD 0 to avoid derivatives
-			}
-			const bool sampleFinite = !isnan( envSample.x ) && !isinf( envSample.x ) &&
-				!isnan( envSample.y ) && !isinf( envSample.y ) &&
-				!isnan( envSample.z ) && !isinf( envSample.z );
-			if ( hasEnvDebug && sampleValid && sampleFinite ) {
-				healthColor = vec3( 0.0, 1.0, 0.0 );
-			}
-		} else if ( pbrDebugView == 16 ) {
-			// GPU uniform visualizer: R=hasEnvDebug, G=sampleValid (for env), B=sampleFinite (for env)
-			bool envSampleValid = true;
-#ifdef USE_DESCRIPTOR_INDEXING
-			envSampleValid = ( env_texture_set >= 0 );
-#endif
-			vec3 envSample = vec3( 0.0 );
-			if ( envSampleValid ) {
-				vec3 envDir = reflect( -E, N );
-				envDir.y *= -1.0;
-				envSample = textureLod( env_texture, envDir, 0.0 ).rgb;
-			}
-			bool envSampleFinite = !isnan( envSample.x ) && !isinf( envSample.x ) &&
-				!isnan( envSample.y ) && !isinf( envSample.y ) &&
-				!isnan( envSample.z ) && !isinf( envSample.z );
-			out_color.r = hasEnvDebug ? 1.0 : 0.0;
-			out_color.g = envSampleValid ? 1.0 : 0.0;
-			out_color.b = envSampleFinite ? 1.0 : 0.0;
-			return;
-		}
-		out_color.rgb = healthColor;
-		return;
-	}
-#endif
-
-const bool glintRouteDirect = glintRouting.y > 0.5;
-const bool glintRouteIbl = glintRouting.x > 0.5;
-float glintDirectWeight = 0.0;
-float glintIblWeight = 0.0;
+	const bool glintRouteDirect = glintRouting.y > 0.5;
+	const bool glintRouteIbl = glintRouting.x > 0.5;
+	float glintDirectWeight = 0.0;
+	float glintIblWeight = 0.0;
+	float glintEnergyComp = 0.0;
+	vec3 glintF0 = specular.rgb;
 
 #ifdef USE_VK_PBR
-	float glintEnergyComp = max( glintEnergy.x, 0.0 );
 	if ( glintEnabled )
 	{
-		// Compute raw glint NDF (Chermain P-SDF based D term)
-		float glintMaskFactor = 1.0;
-		float D_glint = ComputeGlintD( sanitizeNormal(N), tangent, binormal, L, E, roughness,
-			NL, NH, NE, LH, VH, glintMaskFactor, glintDebugData );
-
-		// Chermain beta: fraction of surface area with glinting microfacets
 		float beta = clamp( glintModel.x, 0.0, 1.0 );
-
-		// Roughness gate: glints collapse rapidly with roughness^2
-		float alpha = roughnessAlpha;
-		float roughnessGate = exp( -16.0 * alpha );
-
-		// Distance attenuation: glints vanish with distance
-		float distFade = 1.0;
-		if ( glintBudget.z > 0.0 )
-		{
-			distFade = clamp( 1.0 - lightDistance / max( glintBudget.z, 1e-3 ), 0.0, 1.0 );
-		}
-
-		float baseWeight = clamp( beta * roughnessGate * glintMaskFactor * clamp( glintMaterial.x, 0.0, 1.0 ), 0.0, 1.0 );
-		float directWeight = clamp( baseWeight * distFade, 0.0, 1.0 );
-		float iblWeight = clamp( baseWeight, 0.0, 1.0 );
-		glintDirectWeight = directWeight;
-		glintIblWeight = iblWeight;
-
-		float D_base = D_GGX_Aniso( H, Nn, tangent, binormal, anisotropyX, anisotropyY );
-
-		float V_spec = V_SmithAniso( NE, NL, anisotropyX, anisotropyY );
-		vec3 F_spec = F_Schlick( specular.rgb, VH );
-
-		// Apply glint energy parameters
-		vec3 glintF0 = specular.rgb;
+		float roughnessGate = exp( -16.0 * roughnessAlpha );
+		float baseWeight = clamp( beta * roughnessGate * clamp( glintMaterial.x, 0.0, 1.0 ), 0.0, 1.0 );
+		glintDirectWeight = glintRouteDirect ? baseWeight : 0.0;
+		glintIblWeight = glintRouteIbl ? baseWeight : 0.0;
+		glintEnergyComp = max( glintEnergy.x, 0.0 );
 		if ( glintEnergy.z > 0.0 ) {
-			// F0 override for glints
 			float overrideStrength = clamp( glintEnergy.z, 0.0, 1.0 );
 			glintF0 = mix( specular.rgb, vec3( glintEnergy.z ), overrideStrength );
 		}
-		vec3 glintF_spec = F_Schlick( glintF0, VH );
-
-		// Fresnel boost for glints
-		if ( glintEnergy.y > 0.0 ) {
-			float boost = glintEnergy.y;
-			glintF_spec = mix( F_spec, glintF_spec, boost );
-		} else {
-			glintF_spec = F_spec;
-		}
-
-		vec3 Fs_glint = D_glint * glintF_spec * V_spec;
-		vec3 Fs_base = D_base * F_spec * V_spec;
-		vec3 Fs_final = Fs_base;
-
-		vec3 glintContribution = vec3( 0.0 );
-		float glintWeight = ( glintRouteDirect && directWeight > 0.0 ) ? directWeight : 0.0;
-
-		if ( glintWeight > 0.0 && glintEnergyComp > 0.0 )
-		{
-			vec3 delta = max( Fs_glint - Fs_base, vec3( 0.0 ) );
-			vec3 glintAddition = delta * glintEnergyComp * glintWeight;
-
-			// Firefly filter: clamp extreme glint contributions
-			if ( glintEnergy.w > 0.0 ) {
-				float maxLuminance = glintEnergy.w;
-				float glintLum = dot( glintAddition, vec3( 0.2126, 0.7152, 0.0722 ) );
-				if ( glintLum > maxLuminance ) {
-					float excess = glintLum - maxLuminance;
-					float knee = max( maxLuminance * 0.1, 1e-6 );
-					float clampedExcess = excess / (1.0 + excess / knee );
-					float scale = (maxLuminance + clampedExcess) / max( glintLum, 1e-6 );
-					glintAddition *= scale;
-				}
-			}
-
-			glintContribution = glintAddition;
-			Fs_final += glintAddition;
-		}
-
 		if ( glintRouteDirect )
 		{
-			Fs = Fs_final;
-			glintBlend = directWeight;
-			glintTerm = glintContribution;
 			glintDebugLevel = int( floor( glintCore.z + 0.5 ) );
 		}
 	}
@@ -1790,6 +1602,24 @@ float glintIblWeight = 0.0;
 
 	vec3 directDiffuse = vec3( 0.0 );
 	vec3 directSpec = vec3( 0.0 );
+	vec3 directClearcoat = vec3( 0.0 );
+	vec3 directSheen = vec3( 0.0 );
+	vec3 directSubsurface = vec3( 0.0 );
+	vec3 directTransmission = vec3( 0.0 );
+	vec3 sheenColor = vec3( 0.0 );
+	vec3 sheenLobe = vec3( 0.0 );
+	bool hasSheen = false;
+	if ( sheen_texture_set > -1 ) {
+		sheenColor = PBR_SAMPLE_SHEEN( frag_tex_coord0 ).rgb * pbrSheenScale.rgb;
+		sheenLobe = CalcSheen( sheenColor, N, E, roughness );
+		hasSheen = true;
+	}
+	float transmission = 0.0;
+	bool hasTransmission = false;
+	if ( transmission_texture_set > -1 ) {
+		transmission = PBR_SAMPLE_TRANSMISSION( frag_tex_coord0 ).r * pbrTransmissionScale.x;
+		hasTransmission = ( transmission > 0.0 );
+	}
 	const int effectiveLightCount = hasDynamicLights ? pbrLightCount : 1;
 	const vec3 fallbackIntensity = bias_color;
 	for ( int li = 0; li < effectiveLightCount; ++li )
@@ -1817,7 +1647,10 @@ float glintIblWeight = 0.0;
 		vec3 Fd_i = CalcDiffuse( diffuse.rgb, NE, NL_i, LH_i, roughness );
 		float D_aniso = D_GGX_Aniso( Hi, N, tangent, binormal, anisotropyX, anisotropyY );
 		float V_aniso = V_SmithAniso( NE, NL_i, anisotropyX, anisotropyY );
-		vec3 Fs_i = D_aniso * F_Schlick( specular.rgb, VH_i ) * V_aniso;
+		vec3 F_spec_i = F_Schlick( specular.rgb, VH_i );
+		vec3 Fs_i = D_aniso * F_spec_i * V_aniso;
+		vec3 specContribution = Fs_i;
+		vec3 specBaseContribution = Fs_i;
 
 		float microShadow = 1.0;
 		if ( pbrQuality.z > 0.5 )
@@ -1825,22 +1658,76 @@ float glintIblWeight = 0.0;
 			microShadow = clamp( NL_i + 2.0 * AO * AO - 1.0, 0.0, 1.0 );
 		}
 
-		vec3 specContribution = ( li == 0 ) ? Fs : Fs_i;
-		vec3 specBaseContribution = ( li == 0 ) ? Fs_base : Fs_i;
 		float lightWeight = attenuation * NL_i;
+
+#ifdef USE_VK_PBR
+		if ( glintEnabled && glintRouteDirect && glintDirectWeight > 0.0 && glintEnergyComp > 0.0 )
+		{
+			float glintMaskFactor = 1.0;
+			vec4 glintDebug_i = vec4( 0.0 );
+			float D_glint_i = ComputeGlintD( sanitizeNormal( N ), tangent, binormal, Li, E, roughness,
+				NL_i, NH_i, NE, LH_i, VH_i, glintMaskFactor, glintDebug_i );
+			vec3 glintF_spec_i = F_Schlick( glintF0, VH_i );
+			if ( glintEnergy.y > 0.0 ) {
+				float boost = clamp( glintEnergy.y, 0.0, 1.0 );
+				glintF_spec_i = mix( F_spec_i, glintF_spec_i, boost );
+			} else {
+				glintF_spec_i = F_spec_i;
+			}
+			vec3 Fs_glint_i = D_glint_i * glintF_spec_i * V_aniso;
+			float glintWeight = clamp( glintDirectWeight * glintMaskFactor, 0.0, 1.0 );
+			vec3 glintAddition = max( Fs_glint_i - Fs_i, vec3( 0.0 ) ) * glintEnergyComp * glintWeight;
+
+			if ( glintEnergy.w > 0.0 ) {
+				float maxLuminance = glintEnergy.w;
+				float glintLum = dot( glintAddition, vec3( 0.2126, 0.7152, 0.0722 ) );
+				if ( glintLum > maxLuminance ) {
+					float excess = glintLum - maxLuminance;
+					float knee = max( maxLuminance * 0.1, 1e-6 );
+					float clampedExcess = excess / ( 1.0 + excess / knee );
+					float scale = ( maxLuminance + clampedExcess ) / max( glintLum, 1e-6 );
+					glintAddition *= scale;
+				}
+			}
+
+			specContribution = Fs_i + glintAddition;
+			dbgGlint += intensity * glintAddition * lightWeight;
+			if ( li == 0 ) {
+				glintDebugData = glintDebug_i;
+			}
+		}
+#endif
+
 		directDiffuse += intensity * ( Fd_i * clearcoatDim ) * ( lightWeight * microShadow );
 		directSpec += intensity * specContribution * lightWeight;
 		dbgBaseSpec += intensity * specBaseContribution * lightWeight;
-		if ( li == 0 )
-		{
-			dbgGlint += intensity * glintTerm * lightWeight;
+
+		if ( clearcoatStrength > 0.0 ) {
+			vec3 ccSpec = CalcSpecular( vec3( 0.04 ), NH_i, NL_i, NE, LH_i, VH_i, clearcoatRoughness );
+			vec3 ccDirect = intensity * ccSpec * lightWeight * clearcoatStrength;
+			directClearcoat += ccDirect;
+			dbgClearcoat += ccDirect;
+		}
+
+		if ( hasSheen ) {
+			directSheen += intensity * sheenLobe * lightWeight;
+		}
+
+		if ( subsurfaceStrength > 0.0 ) {
+			directSubsurface += intensity * CalcBurleySubsurface( N, Li, subsurfaceColor, subsurfaceStrength, subsurfaceWrap ) * attenuation;
+		}
+
+		if ( hasTransmission ) {
+			vec3 transTint = vec3( transmission );
+			vec3 transmitLobe = CalcTransmission( transTint, N, E, Li, roughness );
+			directTransmission += intensity * transmitLobe * attenuation;
 		}
 	}
 	directSpec *= energyCompensation;
 	dbgBaseSpec *= energyCompensation;
 	dbgGlint *= energyCompensation;
 
-	out_color.rgb  = directDiffuse + directSpec;
+	out_color.rgb  = directDiffuse + directSpec + directClearcoat + directSheen + directSubsurface + directTransmission;
 	out_color.rgb += ambientColor * diffuseColor;
 	if ( needsFallbackLight ) {
 		out_color.rgb += diffuseColor * 0.04;
@@ -1873,15 +1760,8 @@ float glintIblWeight = 0.0;
 #ifdef USE_VK_PBR
 		if ( glintRouteIbl && glintEnabled && glintIblWeight > 0.0 )
 		{
-			// Apply glint F0 override for IBL
-			vec3 iblF0 = specular.rgb;
-			if ( glintEnergy.z > 0.0 ) {
-				float overrideStrength = clamp( glintEnergy.z, 0.0, 1.0 );
-				iblF0 = mix( specular.rgb, vec3( glintEnergy.z ), overrideStrength );
-			}
-
 			// Compute glint IBL contribution separately
-			vec3 glintIBL = CalcIBLContribution( roughness, N, E, NE, iblF0, pbrDebugParams.x );
+			vec3 glintIBL = CalcIBLContribution( roughness, N, E, NE, glintF0, pbrDebugParams.x );
 			glintIBL *= clearcoatDim * specAO;
 
 			vec3 envDir = normalize( reflect( -E, N ) );
@@ -1907,7 +1787,7 @@ float glintIblWeight = 0.0;
 			}
 			float envMix = clampedRatio;
 
-			vec3 glintContribution = glintIBL * envMix - specIBL_base;
+			vec3 glintContribution = max( glintIBL * envMix - specIBL_base, vec3( 0.0 ) );
 			vec3 glintAdditionIBL = vec3( 0.0 );
 			if ( glintEnergyComp > 0.0 && glintIblWeight > 0.0 )
 			{
@@ -1925,7 +1805,7 @@ float glintIblWeight = 0.0;
 					}
 				}
 
-				specIBL = specIBL_base + glintAdditionIBL;
+				specIBL = max( specIBL_base + glintAdditionIBL, vec3( 0.0 ) );
 				dbgGlint += glintAdditionIBL;
 			}
 			else
@@ -1969,34 +1849,6 @@ float glintIblWeight = 0.0;
 	}
 #endif
 
-	// clearcoat lobe
-	if ( clearcoatStrength > 0.0 ) {
-		vec3 ccSpec = CalcSpecular( vec3(0.04), NH, NL, NE, LH, VH, clearcoatRoughness );
-		vec3 ccDirect = lightColor * ccSpec * ( attenuation * NL ) * clearcoatStrength;
-		out_color.rgb += ccDirect;
-		dbgClearcoat += ccDirect;
-	}
-
-	// sheen term
-	if ( sheen_texture_set > -1 ) {
-		vec3 sheenColor = PBR_SAMPLE_SHEEN( frag_tex_coord0 ).rgb * pbrSheenScale.rgb;
-		vec3 sheenLobe = CalcSheen( sheenColor, N, E, roughness );
-		out_color.rgb += sheenLobe * NL;
-	}
-
-	// subsurface term (Burley-style wrap approximation)
-	if ( subsurfaceStrength > 0.0 ) {
-		out_color.rgb += lightColor * CalcBurleySubsurface( N, L, subsurfaceColor, subsurfaceStrength, subsurfaceWrap ) * attenuation;
-	}
-
-	// transmission term
-	if ( transmission_texture_set > -1 ) {
-		float transmission = PBR_SAMPLE_TRANSMISSION( frag_tex_coord0 ).r * pbrTransmissionScale.x;
-		vec3 transTint = vec3( transmission );
-		vec3 transmitLobe = CalcTransmission( transTint, N, E, L, roughness );
-		out_color.rgb += lightColor * transmitLobe * attenuation;
-	}
-	
 	out_color.rgb += emissive;
 
 	if ( pbrDebugView == 5 )
