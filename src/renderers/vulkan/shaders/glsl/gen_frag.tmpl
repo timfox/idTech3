@@ -1569,9 +1569,10 @@ void main() {
 const bool allowGlints = forceGlintsDebug || (glintCore.x > 0.5 && glint_material_enable > 0) || pbrDebug.w > 0.5;
 const bool glintAvailable = hasGlintDict && allowGlints;
 bool glintEnabled = glintAvailable;
-const bool hasEnvDebug = pbrDebugFlags.y > 0.5;
 const bool hasIrrDebug = pbrDebugFlags.x > 0.5;
+const bool hasEnvDebug = pbrDebugFlags.y > 0.5;
 const bool dictValidDebug = pbrDebugFlags.z > 0.5;
+// pbrDebugFlags.w reserved for compiled/extra state
 	const float debugEps = max( pbrDebugParams.y, 1e-6 );
 	const bool glintsEnabledDebug = ( pbrDebugParams.z > 0.5 );
 
@@ -1582,14 +1583,18 @@ const bool dictValidDebug = pbrDebugFlags.z > 0.5;
 		vec3 healthColor = DBG_RED;
 		if ( pbrDebugView == 17 ) {
 			vec3 irrSample = vec3( 0.0 );
+#ifdef USE_DESCRIPTOR_INDEXING
 			const bool sampleValid = ( irradiance_texture_set >= 0 );
+#else
+			const bool sampleValid = true;
+#endif
 			if ( sampleValid ) {
-				irrSample = texture( irradiance_texture, N ).rgb;
+				irrSample = textureLod( irradiance_texture, N, 0.0 ).rgb; // explicit LOD 0
 			}
 			const bool sampleFinite = !isnan( irrSample.x ) && !isinf( irrSample.x ) &&
 				!isnan( irrSample.y ) && !isinf( irrSample.y ) &&
 				!isnan( irrSample.z ) && !isinf( irrSample.z );
-			if ( hasIrrDebug && sampleFinite ) {
+			if ( hasIrrDebug && sampleValid && sampleFinite ) {
 				healthColor = vec3( 0.0, 1.0, 0.0 );
 			}
 		} else if ( pbrDebugView == 18 ) {
@@ -1597,7 +1602,8 @@ const bool dictValidDebug = pbrDebugFlags.z > 0.5;
 			const int dictLevels = max( 1, int( floor( glintDict[0] + 0.5 ) ) );
 			const int dictSize = max( 1, int( floor( glintDict[1] + 0.5 ) ) );
 			float dictSample = 0.0;
-			if ( dictEntries > 0 && dictLevels > 0 && dictSize > 0 ) {
+			const bool sampleValid = ( dictEntries > 0 && dictLevels > 0 && dictSize > 0 );
+			if ( sampleValid ) {
 				dictSample = glint_dictionary_lookup(
 					0,
 					0,
@@ -1608,23 +1614,46 @@ const bool dictValidDebug = pbrDebugFlags.z > 0.5;
 					dictLevels );
 			}
 			const bool sampleFinite = !isnan( dictSample ) && !isinf( dictSample );
-			if ( dictValidDebug && sampleFinite ) {
+			if ( dictValidDebug && sampleValid && sampleFinite ) {
 				healthColor = vec3( 0.0, 1.0, 0.0 );
 			}
 		} else if ( pbrDebugView == 19 ) {
 			vec3 envSample = vec3( 0.0 );
 			vec3 envDir = reflect( -E, N );
 			envDir.y *= -1.0;
+#ifdef USE_DESCRIPTOR_INDEXING
 			const bool sampleValid = ( env_texture_set >= 0 );
+#else
+			const bool sampleValid = true;
+#endif
 			if ( sampleValid ) {
-				envSample = texture( env_texture, envDir ).rgb;
+				envSample = textureLod( env_texture, envDir, 0.0 ).rgb; // explicit LOD 0 to avoid derivatives
 			}
 			const bool sampleFinite = !isnan( envSample.x ) && !isinf( envSample.x ) &&
 				!isnan( envSample.y ) && !isinf( envSample.y ) &&
 				!isnan( envSample.z ) && !isinf( envSample.z );
-			if ( hasEnvDebug && sampleFinite ) {
+			if ( hasEnvDebug && sampleValid && sampleFinite ) {
 				healthColor = vec3( 0.0, 1.0, 0.0 );
 			}
+		} else if ( pbrDebugView == 16 ) {
+			// GPU uniform visualizer: R=hasEnvDebug, G=sampleValid (for env), B=sampleFinite (for env)
+			bool envSampleValid = true;
+#ifdef USE_DESCRIPTOR_INDEXING
+			envSampleValid = ( env_texture_set >= 0 );
+#endif
+			vec3 envSample = vec3( 0.0 );
+			if ( envSampleValid ) {
+				vec3 envDir = reflect( -E, N );
+				envDir.y *= -1.0;
+				envSample = textureLod( env_texture, envDir, 0.0 ).rgb;
+			}
+			bool envSampleFinite = !isnan( envSample.x ) && !isinf( envSample.x ) &&
+				!isnan( envSample.y ) && !isinf( envSample.y ) &&
+				!isnan( envSample.z ) && !isinf( envSample.z );
+			out_color.r = hasEnvDebug ? 1.0 : 0.0;
+			out_color.g = envSampleValid ? 1.0 : 0.0;
+			out_color.b = envSampleFinite ? 1.0 : 0.0;
+			return;
 		}
 		out_color.rgb = healthColor;
 		return;

@@ -2293,11 +2293,15 @@ qboolean is_pbr_surface;
 
 			// Set pbrDebugFlags based on actual VkImageView handles for accurate debug visualization
 			// This ensures debug views reflect the real GPU state, not just descriptor binding
-			Vector4Set( uniform.pbrDebugFlags,
-				0.0f, // reserved
-				(envView != VK_NULL_HANDLE) ? 1.0f : 0.0f,     // hasEnvDebug (pbrDebugFlags.y)
-				(irrView != VK_NULL_HANDLE) ? 1.0f : 0.0f,     // hasIrrDebug (pbrDebugFlags.x)
-				(glintDictView != VK_NULL_HANDLE) ? 1.0f : 0.0f ); // dictValidDebug (pbrDebugFlags.z)
+			const float irrValid = (irrView != VK_NULL_HANDLE) ? 1.0f : 0.0f;
+			const float envValid = (envView != VK_NULL_HANDLE) ? 1.0f : 0.0f;
+			const float dictValid = (glintDictView != VK_NULL_HANDLE) ? 1.0f : 0.0f;
+			const float iblCompiled = (envValid || irrValid) ? 1.0f : 0.0f;
+			Vector4Set( uniform.pbrDebugFlags, irrValid, envValid, dictValid, iblCompiled );
+			if ( r_pbr_debug && r_pbr_debug->integer >= 17 ) {
+				ri.Printf( PRINT_ALL, "CPU pbrDebugFlags: irr=%.1f env=%.1f dict=%.1f ibl=%.1f\n",
+					uniform.pbrDebugFlags[0], uniform.pbrDebugFlags[1], uniform.pbrDebugFlags[2], uniform.pbrDebugFlags[3] );
+			}
 			float cubemapStateValue = CUBEMAP_STATE_NONE;
 			if ( tr.numCubemaps > 0 ) {
 				cubemapStateValue = CUBEMAP_STATE_HAVE_DEFS_NOT_RENDERED;
