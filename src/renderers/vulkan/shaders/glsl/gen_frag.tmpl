@@ -1530,7 +1530,7 @@ void main() {
 	vec3 dbgBaseSpec = vec3( 0.0 );
 	vec3 dbgClearcoat = vec3( 0.0 );
 	vec3 dbgGlint = vec3( 0.0 );
-	int pbrDebugView = int( floor( pbrDebug.x + 0.5 ) );
+	int pbrDebugView = int( pbrDebug.x + 0.5 );
 	const bool forceGlintsDebug = ( pbrDebugView == 18 );
 
 	const bool hasEnv = pbrFeatureFlags.x > 0.5;

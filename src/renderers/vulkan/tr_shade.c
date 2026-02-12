@@ -953,6 +953,7 @@ static uint32_t vk_push_uniform_cached( const vkUniform_t *u );
 void VK_SetFogParams( vkUniform_t *uniform, int *fogStage );
 static vkUniform_t uniform;
 static vkUniformCamera_t uniform_camera;
+static int lastPbrDebugViewLogged = -1;
 #ifdef USE_VK_PBR
 typedef struct vkPbrUniformBlock_s {
 	vec4_t emissiveScale;
@@ -1713,6 +1714,16 @@ qboolean is_pbr_surface;
 		uniform.pbrDebug[2] = ( r_pbr_forceLight != NULL ) ? r_pbr_forceLight->value : 0.0f;
 		uniform.pbrDebug[3] = ( r_pbr_forceGlints != NULL ) ? r_pbr_forceGlints->value : 0.0f;
 
+		if ( pbr_debug > 4 ) {
+			if ( lastPbrDebugViewLogged != pbr_debug ) {
+				lastPbrDebugViewLogged = pbr_debug;
+				ri.Printf( PRINT_ALL, "PBR ubo write: debug=%d (float=%f)\n",
+					pbr_debug, uniform.pbrDebug[0] );
+			}
+		} else if ( lastPbrDebugViewLogged != 0 ) {
+			lastPbrDebugViewLogged = 0;
+		}
+
 		pushUniform = qtrue;
 	}
 #endif
@@ -2238,11 +2249,13 @@ qboolean is_pbr_surface;
 				pbrDebugLastFlags = pStage->vk_pbr_flags;
 			}
 
+			// Set pbrDebugFlags based on actual VkImageView handles for accurate debug visualization
+			// This ensures debug views reflect the real GPU state, not just descriptor binding
 			Vector4Set( uniform.pbrDebugFlags,
-				irrDescriptorBound ? 1.0f : 0.0f,
-				envDescriptorBound ? 1.0f : 0.0f,
-				dictValidFlag,
-				iblCompiledFlag );
+				0.0f, // reserved
+				(envView != VK_NULL_HANDLE) ? 1.0f : 0.0f,     // hasEnvDebug (pbrDebugFlags.y)
+				(irrView != VK_NULL_HANDLE) ? 1.0f : 0.0f,     // hasIrrDebug (pbrDebugFlags.x)
+				(glintDictView != VK_NULL_HANDLE) ? 1.0f : 0.0f ); // dictValidDebug (pbrDebugFlags.z)
 			float cubemapStateValue = CUBEMAP_STATE_NONE;
 			if ( tr.numCubemaps > 0 ) {
 				cubemapStateValue = CUBEMAP_STATE_HAVE_DEFS_NOT_RENDERED;
@@ -2316,6 +2329,30 @@ qboolean is_pbr_surface;
 				lastDebugValid = qtrue;
 				Vector4Copy( uniform.pbrDebugFlags, lastDebugFlags );
 				Vector4Copy( uniform.pbrDebugParams, lastDebugParams );
+
+				// Log pbrDebugFlags changes for debug view troubleshooting
+				static int lastDebugView = -9999;
+				static vec4_t lastLoggedDebugFlags;
+				static qboolean debugFlagsLogged = qfalse;
+				const int currentDebugView = pbr_debug;
+				const qboolean debugViewChanged = (currentDebugView != lastDebugView);
+				const qboolean debugFlagsChanged = !debugFlagsLogged ||
+					memcmp(&lastLoggedDebugFlags, &uniform.pbrDebugFlags, sizeof(uniform.pbrDebugFlags)) != 0;
+
+				if (debugViewChanged || debugFlagsChanged) {
+					ri.Printf(PRINT_ALL,
+						"PBR debugFlags: view=%d env=%g irr=%g dict=%g (envView=%p irrView=%p dictView=%p)\n",
+						currentDebugView,
+						uniform.pbrDebugFlags[1], // hasEnvDebug
+						uniform.pbrDebugFlags[2], // hasIrrDebug
+						uniform.pbrDebugFlags[3], // dictValidDebug
+						(const void *)(uintptr_t)envView,
+						(const void *)(uintptr_t)irrView,
+						(const void *)(uintptr_t)glintDictView);
+					lastDebugView = currentDebugView;
+					Vector4Copy(uniform.pbrDebugFlags, lastLoggedDebugFlags);
+					debugFlagsLogged = qtrue;
+				}
 
 				Vector4Copy( block.emissiveScale, uniform.pbrEmissiveScale );
 				Vector4Copy( block.clearcoatScale, uniform.pbrClearcoatScale );
@@ -2994,6 +3031,20 @@ static uint32_t vk_push_uniform_cached( const vkUniform_t *u )
 }
 
 uint32_t vk_push_uniform( const vkUniform_t *ubo ) {
+	// Verify UBO upload size for PBR debug troubleshooting
+	static qboolean loggedUBOSize = qfalse;
+	if (!loggedUBOSize) {
+		ri.Printf(PRINT_ALL,
+			"UBO upload verification: sizeof(vkUniform_t)=%zu uploaded=%zu "
+			"offsetof(pbrDebug)=%zu offsetof(pbrDebugFlags)=%zu offsetof(pbrDebugParams)=%zu\n",
+			sizeof(vkUniform_t),
+			sizeof(*ubo),
+			offsetof(vkUniform_t, pbrDebug),
+			offsetof(vkUniform_t, pbrDebugFlags),
+			offsetof(vkUniform_t, pbrDebugParams));
+		loggedUBOSize = qtrue;
+	}
+
 	const uint32_t offset = vk_append_uniform( ubo, sizeof(*ubo), (VkDeviceSize)vk.uniform_item_size );
 
 	vk_reset_descriptor( VK_DESC_UNIFORM );
