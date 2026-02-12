@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
+import argparse
+import hashlib
+import json
 import os
 import subprocess
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -8,6 +12,7 @@ GLSL_ROOT = ROOT / "src" / "renderers" / "vulkanrenderer" / "shaders" / "glsl"
 SPIRV_DIR = ROOT / "src" / "renderers" / "vulkanrenderer" / "shaders" / "spirv"
 OUT_DATA = SPIRV_DIR / "shader_data.c"
 OUT_BINDINGS = SPIRV_DIR / "shader_binding.c"
+METADATA_DEFAULT = SPIRV_DIR / "shader_permutations.json"
 
 GLSLANG = os.environ.get("GLSLANG_VALIDATOR", "glslangValidator")
 
@@ -198,17 +203,84 @@ def write_shader_bindings(tasks, shader_data):
                 continue
             f.write(f"    {task.out_binding} = SHADER_MODULE( {task.out_var} );\n")
             f.write(f"    vk_set_shader_name( {task.out_binding}, \"{task.out_var}\" );\n")
-        f.write("}")
+        f.write("}\n")
+
+
+def get_git_sha():
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            check=True,
+            cwd=ROOT,
+            text=True,
+        )
+        return result.stdout.strip()
+    except subprocess.CalledProcessError:
+        return "unknown"
+
+
+def build_metadata(tasks, shader_data):
+    global_hasher = hashlib.sha256()
+    entries = []
+    for task, data in zip(tasks, shader_data):
+        if not data:
+            continue
+        hasher = hashlib.sha256()
+        hasher.update(data)
+        task_hash = hasher.hexdigest()
+        global_hasher.update(data)
+        entries.append(
+            {
+                "name": task.out_var,
+                "stage": task.stage,
+                "hash": task_hash,
+                "defines": task.defines.strip() if task.defines else "",
+            }
+        )
+    return {
+        "git_sha": get_git_sha(),
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "shader_hash": global_hasher.hexdigest(),
+        "task_count": len(entries),
+        "tasks": entries,
+    }
+
+
+def write_metadata(metadata, out_path: Path):
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(metadata, indent=2))
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Compile Vulkan GLSL shaders to SPIR-V")
+    parser.add_argument(
+        "--metadata-out",
+        type=Path,
+        default=METADATA_DEFAULT,
+        help="Write shader permutation metadata to this JSON file",
+    )
+    parser.add_argument(
+        "--metadata-only",
+        action="store_true",
+        help="Only collect metadata without generating C sources",
+    )
+    return parser.parse_args()
 
 
 def main():
+    args = parse_args()
     tasks = collect_tasks()
-    shader_data = []
-    for i, task in enumerate(tasks):
-        shader_data.append(compile_task(task, i))
-    write_shader_data(tasks, shader_data)
-    write_shader_bindings(tasks, shader_data)
-    print(f"Generated {OUT_DATA} and {OUT_BINDINGS} with {len(tasks)} shaders.")
+    shader_data = [compile_task(task, idx) for idx, task in enumerate(tasks)]
+    metadata = build_metadata(tasks, shader_data)
+    if not args.metadata_only:
+        write_shader_data(tasks, shader_data)
+        write_shader_bindings(tasks, shader_data)
+    write_metadata(metadata, args.metadata_out)
+    print(
+        f"Generated {OUT_DATA} and {OUT_BINDINGS} with {len(tasks)} shaders, metadata at {args.metadata_out}"
+    )
 
 
 if __name__ == "__main__":

@@ -19,6 +19,7 @@ MAP_TOOL="$ROOT_DIR/src/tools/id3map/build/map-tool"
 MAP_TOOL_BUILD_SCRIPT="$ROOT_DIR/src/tools/id3map/build-map-tool.sh"
 CAPTURE_SCRIPT="$ROOT_DIR/scripts/capture_cubemaps.sh"
 PACKAGE_SCRIPT="$ROOT_DIR/scripts/package_atlas_content.sh"
+DDC_SCRIPT="$ROOT_DIR/scripts/asset_ddc.sh"
 
 STAGES=(meta vis light bounce aas info)
 MAP_TOOL_ARGS=(-game atlas -fs_game atlas -fs_basepath "$RELEASE_ATLAS")
@@ -76,12 +77,31 @@ for target in "$@"; do
 
   echo "[map-build] starting pipeline for $map_name"
 
-  pushd "$MAP_DIR" >/dev/null
-  for stage in "${STAGES[@]}"; do
-    echo "[map-build]  - stage: $stage"
-    "$MAP_TOOL" "${MAP_TOOL_ARGS[@]}" "-$stage" "$map_name.map"
-  done
-  popd >/dev/null
+  skip_pipeline=0
+  if [ "${FORCE_MAP_BUILD:-0}" -eq 0 ] && [ -x "$DDC_SCRIPT" ]; then
+    if "$DDC_SCRIPT" needs-rebuild "$map_name"; then
+      echo "[map-build] DDC reports $map_name needs rebuild"
+    else
+      rc=$?
+      if [ "$rc" -eq 1 ]; then
+        echo "[map-build] skipping $map_name (cache up-to-date)"
+        skip_pipeline=1
+      else
+        echo "[map-build] DDC check for $map_name failed (rc=$rc), forcing rebuild"
+      fi
+    fi
+  fi
+
+  if [ "$skip_pipeline" -eq 0 ]; then
+    pushd "$MAP_DIR" >/dev/null
+    for stage in "${STAGES[@]}"; do
+      echo "[map-build]  - stage: $stage"
+      "$MAP_TOOL" "${MAP_TOOL_ARGS[@]}" "-$stage" "$map_name.map"
+    done
+    popd >/dev/null
+  else
+    echo "[map-build] using cached outputs for $map_name"
+  fi
 
   for ext in bsp aas info; do
     artifact="$MAP_DIR/$map_name.$ext"
@@ -93,8 +113,16 @@ for target in "$@"; do
     add_manifest_entry "maps/$map_name.$ext"
   done
 
-  built_maps+=("$map_name")
-  echo "[map-build] completed $map_name -> content/maps/{.bsp,.aas,.info}"
+  if [ -x "$DDC_SCRIPT" ] && [ "$skip_pipeline" -eq 0 ]; then
+    "$DDC_SCRIPT" update "$map_name" || true
+  fi
+
+  if [ "$skip_pipeline" -eq 0 ]; then
+    built_maps+=("$map_name")
+    echo "[map-build] completed $map_name -> content/maps/{.bsp,.aas,.info}"
+  else
+    echo "[map-build] cached artifacts preserved for $map_name"
+  fi
 done
 
 echo "[map-build] manifest updated at $MANIFEST_FILE"

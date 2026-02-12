@@ -111,6 +111,86 @@ CMAKE_FLAGS=(
   "-Wno-dev"
 )
 
+generate_build_graph() {
+  local graph_file="${BUILD_DIR}/build_graph.txt"
+
+  echo "Generating CMake build graph (targets list)..."
+  if cmake --build "$BUILD_DIR" --target help >"$graph_file" 2>/dev/null; then
+    echo "Saved build graph to $graph_file"
+  else
+    echo "Warning: failed to generate build graph (target help)"
+  fi
+}
+
+write_build_metadata() {
+  local metadata_file="${BUILD_DIR}/build_metadata.json"
+  local graph_file_name="build_graph.txt"
+  local python_cmd
+  if command -v python3 >/dev/null 2>&1; then
+    python_cmd=python3
+  elif command -v python >/dev/null 2>&1; then
+    python_cmd=python
+  else
+    echo "Warning: python interpreter not found; skipping build metadata"
+    return
+  fi
+
+  local git_sha="unknown"
+  if command -v git >/dev/null 2>&1; then
+    git_sha="$(git -C "$PROJECT_ROOT" rev-parse HEAD 2>/dev/null || echo "unknown")"
+  fi
+  local timestamp
+  timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  local renderer_name="opengl"
+  if [ "$VULKAN" -eq 1 ]; then
+    renderer_name="vulkan"
+  fi
+  local cmake_payload
+  cmake_payload="$(printf '%s\n' "${CMAKE_FLAGS[@]}")"
+
+  echo "Writing build metadata to $metadata_file"
+  CMAKE_FLAG_PAYLOAD="$cmake_payload" \
+    PROJECT_NAME="${GAME_NAME}" \
+    BUILD_TYPE_VALUE="$BUILD_TYPE" \
+    RENDERER_NAME="$renderer_name" \
+    GIT_SHA_VALUE="$git_sha" \
+    TIMESTAMP_VALUE="$timestamp" \
+    GRAPH_FILE_NAME="$graph_file_name" \
+    $python_cmd <<'PY' >"$metadata_file"
+import json, os
+
+flags = [
+    line for line in os.environ.get("CMAKE_FLAG_PAYLOAD", "").splitlines() if line
+]
+data = {
+    "project": os.environ.get("PROJECT_NAME", "idtech3"),
+    "build_type": os.environ["BUILD_TYPE_VALUE"],
+    "renderer": os.environ["RENDERER_NAME"],
+    "git_sha": os.environ["GIT_SHA_VALUE"],
+    "timestamp": os.environ["TIMESTAMP_VALUE"],
+    "graph_file": os.environ["GRAPH_FILE_NAME"],
+    "cmake_flags": flags,
+}
+print(json.dumps(data, indent=2))
+PY
+}
+
+copy_metadata_to_release() {
+  for entry in build_metadata.json build_graph.txt; do
+    if [ -f "$BUILD_DIR/$entry" ]; then
+      cp -f "$BUILD_DIR/$entry" "$RELEASE_DIR/$entry"
+      echo "Copied $entry -> $RELEASE_DIR/"
+    fi
+  done
+
+  local shader_meta_src="$PROJECT_ROOT/src/renderers/vulkanrenderer/shaders/spirv/shader_permutations.json"
+  if [ -f "$shader_meta_src" ]; then
+    mkdir -p "$RELEASE_DIR/shaders/spirv"
+    cp -f "$shader_meta_src" "$RELEASE_DIR/shaders/spirv/"
+    echo "Copied shader metadata -> $RELEASE_DIR/shaders/spirv/"
+  fi
+}
+
 if [ "$FREETYPE" -eq 1 ]; then
   CMAKE_FLAGS+=("-DBUILD_FREETYPE=ON")
   echo "CMake: BUILD_FREETYPE=ON"
@@ -139,6 +219,9 @@ if [ "$VULKAN" -eq 1 ]; then
   echo "Regenerating Vulkan shaders..."
   python3 "$PROJECT_ROOT/scripts/compile_vulkan_shaders.py"
 fi
+
+generate_build_graph
+write_build_metadata
 
 echo "Building with ${CORES} parallel jobs..."
 if [ "$QUIET" -eq 1 ]; then
@@ -234,5 +317,7 @@ if [ "$COVERAGE" -eq 1 ]; then
     echo "Coverage artifacts (HTML/XML) should be in build-coverage/"
   fi
 fi
+
+copy_metadata_to_release
 
 echo "✓ Engine artifacts ready in $RELEASE_DIR"

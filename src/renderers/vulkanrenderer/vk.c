@@ -5646,6 +5646,16 @@ static void vk_create_pipeline_cache( void )
 	if ( cache_data ) {
 		ri.FS_FreeFile( cache_data );
 	}
+	vk_shader_reload_hint();
+}
+
+static void vk_shader_reload_hint( void )
+{
+	if ( !r_vk_shaderReload || !r_vk_shaderReload->integer )
+	{
+		return;
+	}
+	ri.Printf( PRINT_ALL, "VK: shader hot-reload watch active; run scripts/shader_worker_pool.sh when editing Vulkan shaders.\n" );
 }
 
 static void vk_save_pipeline_cache( void )

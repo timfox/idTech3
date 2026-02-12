@@ -1445,6 +1445,7 @@ extern cvar_t	*r_vk_dumpCaps;
 extern cvar_t	*r_vk_syncValidation;
 extern cvar_t	*r_vk_deviceOverride;
 extern cvar_t	*r_vk_descriptorIndexing;
+extern cvar_t	*r_vk_shaderReload;
 #ifdef USE_VBO
 extern cvar_t	*r_vbo;
 #endif
