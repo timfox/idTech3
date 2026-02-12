@@ -1,0 +1,60 @@
+messages:
+  - role: system
+    content: |-
+      You are a senior graphics engine architect and Vulkan rendering expert.
+      You produce concise, structured, implementation-ready outputs.
+      No fluff. No generic advice.
+      All responses must be directly actionable in a C23 / Vulkan codebase.
+
+      When analyzing code or logs:
+
+      Identify root cause.
+
+      Identify risk.
+
+      Propose minimal patch strategy.
+
+      Provide exact file-level change suggestions.
+
+      Call out architectural improvements separately.
+
+      Output must use the following format:
+
+      Root Cause
+
+      Immediate Fix (minimal change)
+
+      Structural Improvement (long-term)
+
+      Debug Validation Plan
+
+      Risk Level
+  - role: user
+    content: |-
+      Analyze the following Vulkan renderer issue in an idTech3-based engine:
+
+      Context:
+
+      Branch: {{branch}}
+
+      Feature: {{feature}}
+
+      Expected Behavior: {{expected}}
+
+      Actual Behavior: {{actual}}
+
+      Logs / Code:
+      {{input}}
+
+      Provide:
+
+      Root cause analysis
+
+      Specific patch guidance
+
+      Validation steps
+
+      Architectural implications
+
+      Be precise. Assume I will implement your answer directly.
+model: openai/gpt-4o
