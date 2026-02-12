@@ -26,7 +26,6 @@
 static VkDescriptorSet vk_pbr_fallback_descriptor = VK_NULL_HANDLE;
 static uint32_t vk_pbr_fallback_descriptor_gen = 0;
 static qboolean vk_pbr_fallback_logged = qfalse;
-static qboolean vk_pbr_disabled_due_to_descriptor_failure = qfalse;
 #endif
 
 #if defined (_DEBUG)
@@ -6087,16 +6086,10 @@ void vk_initialize( void )
 		uint32_t j, maxSets;
 
 		pool_size[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		pool_size[0].descriptorCount = MAX_DRAWIMAGES + 1 + 1 + 1 + 3 + VK_NUM_BLOOM_PASSES * 2; // color, screenmap, depth/ssao, bloom descriptors
+		pool_size[0].descriptorCount = 8192; // generous allocation for all image samplers, including PBR
 #ifdef USE_VK_PBR
         if ( vk.pbrActive ) {
-            // Reserve extra combined image samplers for PBR material descriptor sets (conservative upper bound).
-            pool_size[0].descriptorCount += 2; // brdf-lut + irradiance
-            pool_size[0].descriptorCount += ( MAX_DRAWIMAGES * VK_PBR_BINDING_COUNT );
-			if ( vk.descriptorIndexingActive && vk.pbrIndexedMaxSamplers > 0 ) {
-				pool_size[0].descriptorCount += vk.pbrIndexedMaxSamplers;
-				pool_size[0].descriptorCount += 3; // brdf + env + irradiance bindings in indexed set
-			}
+            pool_size[0].descriptorCount += 2048; // extra safety for PBR
         }
 #endif
 
@@ -6126,6 +6119,8 @@ void vk_initialize( void )
 		desc.pPoolSizes = pool_size;
 
 		VK_CHECK( qvkCreateDescriptorPool( vk.device, &desc, NULL, &vk.descriptor_pool ) );
+		ri.Printf( PRINT_ALL, "VK: descriptor pool created maxSets=%u (samplers=%u, uniforms=%u, storage=%u)\n",
+			vk.descriptor_pool_max_sets, pool_size[0].descriptorCount, pool_size[1].descriptorCount, pool_size[2].descriptorCount );
 	}
 
 	//
@@ -6179,6 +6174,13 @@ void vk_initialize( void )
 		pbr_desc.pBindings = pbr_bindings;
 
 		VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &pbr_desc, NULL, &vk.set_layout_pbr ) );
+		for ( binding_idx = 0; binding_idx < VK_PBR_BINDING_COUNT; ++binding_idx ) {
+			ri.Printf( PRINT_ALL, "VK: PBR layout binding %u type %u count %u stages 0x%x\n",
+				pbr_bindings[binding_idx].binding,
+				pbr_bindings[binding_idx].descriptorType,
+				pbr_bindings[binding_idx].descriptorCount,
+				pbr_bindings[binding_idx].stageFlags );
+		}
 	}
 
 	if ( vk.hasDescriptorIndexing ) {
@@ -6264,12 +6266,18 @@ void vk_initialize( void )
 		desc.pPushConstantRanges = &push_range;
 
 		VK_CHECK(qvkCreatePipelineLayout(vk.device, &desc, NULL, &vk.pipeline_layout));
+		Com_Memcpy( vk.pipeline_layout_sets, set_layouts, sizeof(set_layouts) );
+		ri.Printf( PRINT_ALL, "VK: pipeline layout set order count=%u PBR index=%u -> %p\n",
+			desc.setLayoutCount, VK_DESC_PBR, (void*)set_layouts[VK_DESC_PBR] );
 
 #ifdef USE_VK_PBR
 		if ( vk.hasDescriptorIndexing && vk.set_layout_pbr_indexed != VK_NULL_HANDLE ) {
 			set_layouts[5] = vk.set_layout_pbr_indexed;
 			desc.pSetLayouts = set_layouts;
 			VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_pbr_indexed ) );
+			Com_Memcpy( vk.pipeline_layout_pbr_indexed_sets, set_layouts, sizeof(set_layouts) );
+			ri.Printf( PRINT_ALL, "VK: pipeline layout indexed set order count=%u PBR index=%u -> %p\n",
+				desc.setLayoutCount, VK_DESC_PBR, (void*)set_layouts[VK_DESC_PBR] );
 		}
 #endif
 
@@ -7752,14 +7760,16 @@ qboolean vk_create_pbr_descriptor_set( shaderStage_t *stage )
 	res = qvkAllocateDescriptorSets( vk.device, &alloc, &stage->pbrDescriptor );
 	if ( res != VK_SUCCESS ) {
 		stage->pbrDescriptor = VK_NULL_HANDLE;
-		if (!vk_pbr_disabled_due_to_descriptor_failure) {
-			vk_pbr_disabled_due_to_descriptor_failure = qtrue;
-			ri.Printf( PRINT_WARNING, "PBR: CRITICAL - descriptor allocation failed (%d) for stage %p (gen %u, layout %p). Pool max sets: %u, current gen: %u. DISABLING PBR GLOBALLY for this session.\n",
-				res, (void*)stage, vk.descriptor_pool_gen, (void*)vk.set_layout_pbr, vk.descriptor_pool_max_sets, vk.descriptor_pool_gen );
-		}
+		ri.Printf( PRINT_ERROR, "PBR: CRITICAL - descriptor allocation failed (%d) for stage %p (gen %u, layout %p). Pool max sets: %u, current gen: %u. This should never happen in normal operation.\n",
+			res, (void*)stage, vk.descriptor_pool_gen, (void*)vk.set_layout_pbr, vk.descriptor_pool_max_sets, vk.descriptor_pool_gen );
+#ifdef _DEBUG
+		assert(0 && "PBR descriptor allocation failed - pool exhausted or misconfigured");
+#endif
+		stage->pbr_disabled = qtrue;
 		return qfalse;
 	}
 	stage->pbrDescriptorGen = vk.descriptor_pool_gen;
+	stage->pbr_disabled = qfalse;
 
 	albedo = ( stage->bundle[0].image[0] != NULL ) ? stage->bundle[0].image[0] : fallback_white;
 	empty_cubemap = tr.emptyCubemap ? tr.emptyCubemap : fallback_black;
@@ -10809,16 +10819,11 @@ void vk_bind_descriptor_sets( void )
 		if ( vk.cmd->descriptor_set.current[i] == VK_NULL_HANDLE ) {
 			if ( i == VK_DESC_PBR ) {
 #ifdef USE_VK_PBR
-				VkDescriptorSet fallback = vk_get_pbr_fallback_descriptor();
-				if ( fallback != VK_NULL_HANDLE ) {
-					vk.cmd->descriptor_set.current[i] = fallback;
-					if ( r_pbr_bindlog && ( r_pbr_bindlog->integer || ( r_pbr_debug && r_pbr_debug->integer >= 17 ) ) && !vk_pbr_fallback_logged ) {
-						const char *mapName = ( tr.world && tr.world->baseName[0] ) ? tr.world->baseName : "unknown";
-						ri.Printf( PRINT_WARNING, "PBR descriptor fallback (%s) used for missing bind state.\n", mapName );
-						vk_pbr_fallback_logged = qtrue;
-					}
-				} else {
-					vk.cmd->descriptor_set.current[i] = tr.whiteImage->descriptor;
+				// Do not use fallback in normal operation to prevent "blue world"
+				vk.cmd->descriptor_set.current[i] = tr.whiteImage->descriptor;
+				if ( !vk_pbr_fallback_logged ) {
+					ri.Printf( PRINT_ERROR, "PBR: No descriptor available for set %d, binding white fallback. This indicates descriptor allocation failure.\n", i );
+					vk_pbr_fallback_logged = qtrue;
 				}
 #else
 				vk.cmd->descriptor_set.current[i] = tr.whiteImage->descriptor;
@@ -10831,11 +10836,33 @@ void vk_bind_descriptor_sets( void )
 
 	{
 		VkPipelineLayout layout = vk.cmd->pipeline_layout ? vk.cmd->pipeline_layout : vk.pipeline_layout;
+#if defined(USE_VK_PBR)
+		// Log PBR descriptor binding for verification
+		if ( start <= VK_DESC_PBR && VK_DESC_PBR <= end && vk.cmd->descriptor_set.current[VK_DESC_PBR] != VK_NULL_HANDLE ) {
+			static VkPipelineLayout last_layout = VK_NULL_HANDLE;
+			static VkDescriptorSet last_set = VK_NULL_HANDLE;
+			if ( layout != last_layout || vk.cmd->descriptor_set.current[VK_DESC_PBR] != last_set ) {
+				ri.Printf( PRINT_ALL, "PBR bind: layout %p, set index %d, descriptor %p\n", (void*)layout, VK_DESC_PBR, (void*)vk.cmd->descriptor_set.current[VK_DESC_PBR] );
+				last_layout = layout;
+				last_set = vk.cmd->descriptor_set.current[VK_DESC_PBR];
+			}
+		}
+#endif
 #if defined(USE_VK_PBR) && defined(_DEBUG)
-		// Step 2: assert pipeline layout consistency for PBR descriptor binds
 		if ( start <= VK_DESC_PBR && VK_DESC_PBR <= end ) {
-			// The layout used for vkCmdBindDescriptorSets must match the pipeline's layout
-			if ( layout != vk.pipeline_layout && layout != vk.pipeline_layout_pbr_indexed ) {
+			if ( layout == vk.pipeline_layout ) {
+				if ( vk.pipeline_layout_sets[VK_DESC_PBR] != vk.set_layout_pbr ) {
+					ri.Printf( PRINT_ERROR, "PBR: pipeline_layout set %d (%p) does not match vk.set_layout_pbr (%p)\n",
+						VK_DESC_PBR, (void*)vk.pipeline_layout_sets[VK_DESC_PBR], (void*)vk.set_layout_pbr );
+					assert( vk.pipeline_layout_sets[VK_DESC_PBR] == vk.set_layout_pbr );
+				}
+			} else if ( layout == vk.pipeline_layout_pbr_indexed ) {
+				if ( vk.pipeline_layout_pbr_indexed_sets[VK_DESC_PBR] != vk.set_layout_pbr_indexed ) {
+					ri.Printf( PRINT_ERROR, "PBR: pipeline_layout_pbr_indexed set %d (%p) does not match vk.set_layout_pbr_indexed (%p)\n",
+						VK_DESC_PBR, (void*)vk.pipeline_layout_pbr_indexed_sets[VK_DESC_PBR], (void*)vk.set_layout_pbr_indexed );
+					assert( vk.pipeline_layout_pbr_indexed_sets[VK_DESC_PBR] == vk.set_layout_pbr_indexed );
+				}
+			} else {
 				ri.Printf( PRINT_ERROR,
 					"PBR LAYOUT MISMATCH: bind layout=%p is neither standard(%p) nor indexed(%p)!\n",
 					(const void *)(uintptr_t)layout,

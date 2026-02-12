@@ -637,6 +637,7 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 	stage->transmissionMap = NULL;
 	stage->subsurfaceMap = NULL;
 	stage->vk_pbr_flags = 0;
+	stage->pbr_disabled = qfalse;
 
 	Vector4Set( stage->emissiveScale, 1.0f, 1.0f, 1.0f, 1.0f );
 	Vector4Set( stage->clearcoatScale, 1.0f, 1.0f, 1.0f, 1.0f );
@@ -3144,6 +3145,7 @@ static int CollapseMultitexture( unsigned int st0bits, shaderStage_t *st0, shade
 		st0->vk_pbr_flags = st1->vk_pbr_flags;
 		st0->pbrDescriptor = st1->pbrDescriptor;
 		st0->pbrDescriptorGen = st1->pbrDescriptorGen;
+		st0->pbr_disabled = st1->pbr_disabled;
 
 		st0->normalMap = st1->normalMap;
 		st0->physicalMap = st1->physicalMap;
@@ -3783,6 +3785,7 @@ static void VertexLightingCollapse( void ) {
 			stages[0].vk_pbr_flags = bestStage->vk_pbr_flags;
 			stages[0].pbrDescriptor = bestStage->pbrDescriptor;
 			stages[0].pbrDescriptorGen = bestStage->pbrDescriptorGen;
+			stages[0].pbr_disabled = bestStage->pbr_disabled;
 
 			stages[0].normalMap = bestStage->normalMap;
 			stages[0].physicalMap = bestStage->physicalMap;
@@ -3817,6 +3820,7 @@ static void VertexLightingCollapse( void ) {
 			stages[0].vk_pbr_flags = 0;
 			stages[0].pbrDescriptor = VK_NULL_HANDLE;
 			stages[0].pbrDescriptorGen = 0;
+			stages[0].pbr_disabled = qfalse;
 			stages[0].normalMap = NULL;
 			stages[0].physicalMap = NULL;
 			stages[0].emissiveMap = NULL;

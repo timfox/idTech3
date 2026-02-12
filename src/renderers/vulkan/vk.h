@@ -661,6 +661,10 @@ typedef struct {
 #ifdef VK_PBR_BRDFLUT
 	VkPipelineLayout pipeline_layout_brdflut;
 #endif
+#ifdef USE_VK_PBR
+	VkDescriptorSetLayout pipeline_layout_sets[VK_DESC_COUNT];
+	VkDescriptorSetLayout pipeline_layout_pbr_indexed_sets[VK_DESC_COUNT];
+#endif
 
 	VkDescriptorSet color_descriptor;
 	VkDescriptorSet lut_descriptor;

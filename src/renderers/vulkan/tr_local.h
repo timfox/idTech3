@@ -414,6 +414,7 @@ typedef struct {
 	uint32_t		vk_pbr_flags;
 	VkDescriptorSet pbrDescriptor;
 	uint32_t		pbrDescriptorGen;
+	qboolean		pbr_disabled;
 	image_t			*normalMap;
 	image_t			*physicalMap;
 	image_t			*emissiveMap;

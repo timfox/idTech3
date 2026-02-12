@@ -2418,11 +2418,11 @@ qboolean is_pbr_surface;
 			pipeline = pStage->vk_pipeline[fog_stage];
 		}
 
-	#ifdef USE_VK_PBR
-			if ( pipeline != 0 ) {
+#ifdef USE_VK_PBR
+		if ( pipeline != 0 ) {
 			Vk_Pipeline_Def def;
 			vk_get_pipeline_def( pipeline, &def );
-		if ( is_pbr_surface && ( pStage->vk_pbr_flags || pbr_debug >= 17 ) ) {
+			if ( is_pbr_surface && !pStage->pbr_disabled && ( pStage->vk_pbr_flags || pbr_debug >= 17 ) ) {
 				const uint32_t baseFlags = pStage->vk_pbr_flags & ~( PBR_HAS_LIGHTMAP | PBR_HAS_IRRADIANCE );
 				uint32_t desiredFlags = baseFlags;
 				if ( stageHasLightmap ) {
@@ -2440,6 +2440,12 @@ qboolean is_pbr_surface;
 			}
 
 			if ( !is_pbr_surface && pStage->vk_pbr_flags ) {
+				def.vk_pbr_flags = 0;
+				pipeline = vk_find_pipeline_ext( 0, &def, qfalse );
+				vk_get_pipeline_def( pipeline, &def );
+			}
+
+			if ( pStage->pbr_disabled ) {
 				def.vk_pbr_flags = 0;
 				pipeline = vk_find_pipeline_ext( 0, &def, qfalse );
 				vk_get_pipeline_def( pipeline, &def );
