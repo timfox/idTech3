@@ -1442,6 +1442,29 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			stage->subsurfaceParams[3] = atof( token );
 			stage->vk_pbr_flags |= PBR_HAS_SUBSURFACE;
 		}
+		else if ( !Q_stricmp( token, "glint" ) || !Q_stricmp( token, "q3map_glint" ) )
+		{
+			token = COM_ParseExt( text, qfalse );
+			if ( token[0] == 0 )
+			{
+				ri.Printf( PRINT_WARNING, "WARNING: missing parameter for 'glint' keyword in shader '%s'\n", shader.name );
+				continue;
+			}
+			if ( atoi( token ) != 0 )
+			{
+				stage->vk_pbr_flags |= PBR_HAS_GLINTS;
+			}
+		}
+		else if ( !Q_stricmp( token, "sss" ) || !Q_stricmp( token, "subsurface" ) )
+		{
+			token = COM_ParseExt( text, qfalse );
+			if ( token[0] == 0 )
+			{
+				ri.Printf( PRINT_WARNING, "WARNING: missing parameter for 'sss' keyword in shader '%s'\n", shader.name );
+				continue;
+			}
+			stage->subsurfaceParams[0] = Com_Clamp( 0.0f, 1.0f, atof( token ) );
+		}
 		// If shcoeffs are omitted, r_pbr_shExtract can supply runtime cubemap SH.
 		else if ( !Q_stricmp( token, "shcoeffs" ) )
 		{

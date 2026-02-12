@@ -26,6 +26,7 @@
 static VkDescriptorSet vk_pbr_fallback_descriptor = VK_NULL_HANDLE;
 static uint32_t vk_pbr_fallback_descriptor_gen = 0;
 static qboolean vk_pbr_fallback_logged = qfalse;
+static qboolean vk_pbr_disabled_due_to_descriptor_failure = qfalse;
 #endif
 
 #if defined (_DEBUG)
@@ -6115,6 +6116,7 @@ void vk_initialize( void )
 		for ( j = 0, maxSets = 0; j < ARRAY_LEN( pool_size ); j++ ) {
 			maxSets += pool_size[j].descriptorCount;
 		}
+		vk.descriptor_pool_max_sets = maxSets;
 
 		desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 		desc.pNext = NULL;
@@ -7040,6 +7042,7 @@ void vk_release_resources( void ) {
 	if ( vk.descriptor_pool_gen == 0 ) {
 		vk.descriptor_pool_gen = 1;
 	}
+	ri.Printf( PRINT_ALL, "Vulkan: Descriptor pool reset, gen=%u\n", vk.descriptor_pool_gen );
 
 	if ( vk_world.num_image_chunks > 1 ) {
 		// if we allocated more than 2 image chunks - use doubled default size
@@ -7723,6 +7726,13 @@ qboolean vk_create_pbr_descriptor_set( shaderStage_t *stage )
 	if ( !stage || !vk.pbrActive )
 		return qfalse;
 
+#ifdef _DEBUG
+	if ( vk.pbrActive && vk.set_layout_pbr == VK_NULL_HANDLE ) {
+		ri.Printf( PRINT_ERROR, "PBR: CRITICAL - vk.set_layout_pbr is NULL but PBR is active!\n" );
+		assert(0);
+	}
+#endif
+
 	// Descriptor pool resets invalidate VkDescriptorSet handles; recreate lazily when generation changes.
 	if ( stage->pbrDescriptor != VK_NULL_HANDLE && stage->pbrDescriptorGen == vk.descriptor_pool_gen ) {
 		return qtrue;
@@ -7742,7 +7752,11 @@ qboolean vk_create_pbr_descriptor_set( shaderStage_t *stage )
 	res = qvkAllocateDescriptorSets( vk.device, &alloc, &stage->pbrDescriptor );
 	if ( res != VK_SUCCESS ) {
 		stage->pbrDescriptor = VK_NULL_HANDLE;
-		ri.Printf( PRINT_WARNING, "PBR: descriptor allocation failed (%d), disabling PBR for stage\n", res );
+		if (!vk_pbr_disabled_due_to_descriptor_failure) {
+			vk_pbr_disabled_due_to_descriptor_failure = qtrue;
+			ri.Printf( PRINT_WARNING, "PBR: CRITICAL - descriptor allocation failed (%d) for stage %p (gen %u, layout %p). Pool max sets: %u, current gen: %u. DISABLING PBR GLOBALLY for this session.\n",
+				res, (void*)stage, vk.descriptor_pool_gen, (void*)vk.set_layout_pbr, vk.descriptor_pool_max_sets, vk.descriptor_pool_gen );
+		}
 		return qfalse;
 	}
 	stage->pbrDescriptorGen = vk.descriptor_pool_gen;
@@ -8894,6 +8908,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
         int32_t anisotropy_texture_set;
         int32_t transmission_texture_set;
         int32_t subsurface_texture_set;
+        int32_t glint_material_enable;
 #endif
     } frag_spec_data; 
 
@@ -9511,7 +9526,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	frag_spec_info.mapEntryCount = 11;
 #ifdef USE_VK_PBR   
 {
-        frag_spec_info.mapEntryCount += 19;
+        frag_spec_info.mapEntryCount += 20;
 
         {
             spec_entries[12].constantID = 11;
@@ -9592,7 +9607,11 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
         spec_entries[30].constantID = 29;
         spec_entries[30].offset = offsetof(struct FragSpecData, subsurface_texture_set);
         spec_entries[30].size = sizeof(frag_spec_data.subsurface_texture_set);
-        
+
+        spec_entries[31].constantID = 30;
+        spec_entries[31].offset = offsetof(struct FragSpecData, glint_material_enable);
+        spec_entries[31].size = sizeof(frag_spec_data.glint_material_enable);
+
         // only use w value, specgloss maps are not supported
         frag_spec_data.specularScale_x = def->specularScale[0];
         frag_spec_data.specularScale_y = def->specularScale[1];
@@ -9642,6 +9661,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 
         if ( ( def->vk_pbr_flags & PBR_HAS_SUBSURFACE ) == 0 )
             frag_spec_data.subsurface_texture_set = -1;
+
+        frag_spec_data.glint_material_enable = ( def->vk_pbr_flags & PBR_HAS_GLINTS ) ? 1 : 0;
 
         if ( def->vk_pbr_flags ) {
             const char *glint_dict_status = ( vk_get_glint_dictionary_view() != VK_NULL_HANDLE ) ? "valid" : "missing";
@@ -10928,6 +10949,32 @@ static void vk_update_depth_range( Vk_Depth_Range depth_range )
 		get_viewport( &viewport, depth_range );
 		qvkCmdSetViewport( vk.cmd->command_buffer, 0, 1, &viewport );
 	}
+}
+
+/*
+ * Force viewport and scissor to full-screen for the 3D world pass.
+ * Call at start of RB_IterateStagesGeneric to clear stale state from prior
+ * passes (UI, cinematic, bloom, etc.) that may have left a clipped rect.
+ */
+void vk_force_world_viewport_scissor( void )
+{
+	if ( !vk.cmd || !vk.cmd->command_buffer || vk.renderWidth == 0 || vk.renderHeight == 0 ) {
+		return;
+	}
+
+	VkViewport vp = {
+		0.0f, 0.0f,
+		(float)vk.renderWidth, (float)vk.renderHeight,
+		0.0f, 1.0f
+	};
+	VkRect2D sc = {
+		{ 0, 0 },
+		{ (uint32_t)vk.renderWidth, (uint32_t)vk.renderHeight }
+	};
+
+	qvkCmdSetViewport( vk.cmd->command_buffer, 0, 1, &vp );
+	qvkCmdSetScissor( vk.cmd->command_buffer, 0, 1, &sc );
+	vk.cmd->scissor_rect = sc;
 }
 
 

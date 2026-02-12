@@ -299,6 +299,7 @@ layout (constant_id = 26) const int sheen_texture_set = -1;
 layout (constant_id = 27) const int anisotropy_texture_set = -1;
 layout (constant_id = 28) const int transmission_texture_set = -1;
 layout (constant_id = 29) const int subsurface_texture_set = -1;
+layout (constant_id = 30) const int glint_material_enable = 0;
 
 float glint_hash( vec2 uv, float seed )
 {
@@ -344,6 +345,11 @@ vec3 sanitizeDir( vec3 v, vec3 fallback )
 vec3 clampColor( vec3 color )
 {
 	return clamp( color, vec3( 0.0 ), vec3( 1.0 ) );
+}
+
+vec3 sRGB_to_linear( vec3 srgb )
+{
+	return mix( srgb / 12.92, pow( (srgb + 0.055) / 1.055, vec3(2.4) ), step(0.04045, srgb) );
 }
 
 vec3 remapDebugEnvSample( vec3 incoming )
@@ -1456,6 +1462,9 @@ void main() {
 	float subsurfaceStrength = pbrSubsurfaceParams.x;
 	float subsurfaceWrap = pbrSubsurfaceParams.y;
 
+	// Decode albedo from sRGB to linear
+	diffuse.rgb = sRGB_to_linear( diffuse.rgb );
+
 	// metallic roughness workflow
 	if ( physical_texture_set == 0 ) {
 		vec4 ORMS = PBR_SAMPLE_PHYSICAL( frag_tex_coord0 );
@@ -1488,8 +1497,27 @@ void main() {
 	float anisotropyX = clamp( roughness * ( 1.0 + materialAnisotropy ), 0.02, 1.0 );
 	float anisotropyY = clamp( roughness * ( 1.0 - materialAnisotropy ), 0.02, 1.0 );
 
+	// Apply subsurface scattering approximation
+	float subsurfaceAmount = subsurfaceStrength;
+	if ( subsurfaceAmount > 0.0 ) {
+		// Disney-style subsurface: blend Lambert with wrapped Lambert
+		// Only apply to non-metals (diffuse.rgb is already reduced by metallic)
+		float metallic = 0.0;
+		if ( physical_texture_set == 0 ) {
+			vec4 ORMS = PBR_SAMPLE_PHYSICAL( frag_tex_coord0 );
+			ORMS.xyzw *= vec4( specularScale_z, specularScale_w, specularScale_x, specularScale_y );
+			metallic = ORMS.z;
+		}
+		if ( metallic < 1.0 ) {
+			// Wrapped diffuse for subsurface (approximation)
+			float wrappedNL = clamp( (dot(N, L) + subsurfaceWrap) / (1.0 + subsurfaceWrap), 0.0, 1.0);
+			vec3 subsurfaceDiffuse = diffuse.rgb * wrappedNL;
+			diffuse.rgb = mix( diffuse.rgb, subsurfaceDiffuse, subsurfaceAmount * (1.0 - metallic) );
+		}
+	}
+
 	if ( emissive_texture_set > -1 ) {
-		emissive = PBR_SAMPLE_EMISSIVE( frag_tex_coord0 ).rgb * pbrEmissiveScale.rgb;
+		emissive = sRGB_to_linear( PBR_SAMPLE_EMISSIVE( frag_tex_coord0 ).rgb ) * pbrEmissiveScale.rgb;
 	}
 
 	if ( subsurface_texture_set > -1 ) {
@@ -1538,7 +1566,7 @@ void main() {
 	const bool hasGlintDict = pbrFeatureFlags.w > 0.5;
 	const bool needsFallbackLight = ( !hasLightmap && !hasEnv && !hasIrr );
 
-const bool allowGlints = forceGlintsDebug || glintCore.x > 0.5 || pbrDebug.w > 0.5;
+const bool allowGlints = forceGlintsDebug || (glintCore.x > 0.5 && glint_material_enable > 0) || pbrDebug.w > 0.5;
 const bool glintAvailable = hasGlintDict && allowGlints;
 bool glintEnabled = glintAvailable;
 const bool hasEnvDebug = pbrDebugFlags.y > 0.5;
@@ -1548,7 +1576,9 @@ const bool dictValidDebug = pbrDebugFlags.z > 0.5;
 	const bool glintsEnabledDebug = ( pbrDebugParams.z > 0.5 );
 
 #ifdef USE_VK_PBR
-	if ( pbrDebugView >= 17 && pbrDebugView <= 19 ) {
+	if ( pbrDebug.x <= 0.0 ) {
+		// Debug disabled, fall back to normal shading
+	} else if ( pbrDebugView >= 17 && pbrDebugView <= 19 ) {
 		vec3 healthColor = DBG_RED;
 		if ( pbrDebugView == 17 ) {
 			vec3 irrSample = vec3( 0.0 );
@@ -1638,7 +1668,49 @@ float glintIblWeight = 0.0;
 
 		float V_spec = V_SmithAniso( NE, NL, anisotropyX, anisotropyY );
 		vec3 F_spec = F_Schlick( specular.rgb, VH );
-		vec3 Fs_final = D_final * F_spec * V_spec;
+
+		// Apply glint energy parameters
+		vec3 glintF0 = specular.rgb;
+		if ( glintEnergy.z > 0.0 ) {
+			// F0 override for glints
+			float overrideStrength = clamp( glintEnergy.z, 0.0, 1.0 );
+			glintF0 = mix( specular.rgb, vec3( glintEnergy.z ), overrideStrength );
+		}
+		vec3 glintF_spec = F_Schlick( glintF0, VH );
+
+		// Fresnel boost for glints
+		if ( glintEnergy.y > 0.0 ) {
+			float boost = glintEnergy.y;
+			glintF_spec = mix( F_spec, glintF_spec, boost );
+		} else {
+			glintF_spec = F_spec;
+		}
+
+		vec3 Fs_glint = D_glint * glintF_spec * V_spec;
+		vec3 Fs_base = D_base * F_spec * V_spec;
+		vec3 Fs_final = mix( Fs_base, Fs_glint, glintRouteDirect ? directWeight : 0.0 );
+
+		// Energy compensation: multiply glint contribution by glintEnergy.x
+		if ( glintRouteDirect && directWeight > 0.0 ) {
+			float energyComp = max( glintEnergy.x, 0.0 );
+			vec3 glintContribution = Fs_glint - Fs_base;
+			Fs_final = Fs_base + glintContribution * energyComp;
+
+			// Firefly filter: clamp extreme glint contributions
+			if ( glintEnergy.w > 0.0 ) {
+				float maxLuminance = glintEnergy.w;
+				float glintLum = dot( glintContribution, vec3( 0.2126, 0.7152, 0.0722 ) );
+				if ( glintLum > maxLuminance ) {
+					// Soft-knee clamp: smoothly reduce excess
+					float excess = glintLum - maxLuminance;
+					float knee = maxLuminance * 0.1; // 10% of max as knee region
+					float clampedExcess = excess / (1.0 + excess / knee);
+					float scale = (maxLuminance + clampedExcess) / glintLum;
+					glintContribution *= scale;
+					Fs_final = Fs_base + glintContribution * energyComp;
+				}
+			}
+		}
 
 		if ( glintRouteDirect )
 		{
@@ -1748,6 +1820,17 @@ float glintIblWeight = 0.0;
 #ifdef USE_VK_PBR
 		if ( glintRouteIbl && glintEnabled && glintIblWeight > 0.0 )
 		{
+			// Apply glint F0 override for IBL
+			vec3 iblF0 = specular.rgb;
+			if ( glintEnergy.z > 0.0 ) {
+				float overrideStrength = clamp( glintEnergy.z, 0.0, 1.0 );
+				iblF0 = mix( specular.rgb, vec3( glintEnergy.z ), overrideStrength );
+			}
+
+			// Compute glint IBL contribution separately
+			vec3 glintIBL = CalcIBLContribution( roughness, N, E, NE, iblF0, pbrDebugParams.x );
+			glintIBL *= clearcoatDim * specAO;
+
 			vec3 envDir = normalize( reflect( -E, N ) );
 			vec3 envH = normalize( envDir + E );
 			float envNL = clamp( dot( N, envDir ), 0.0, 1.0 );
@@ -1759,9 +1842,38 @@ float glintIblWeight = 0.0;
 			float D_glint_env = ComputeGlintD( sanitizeNormal( N ), tangent, binormal, envDir, E, roughness,
 				envNL, envNH, NE, envLH, envVH, envMask, envGlintDebug );
 			float D_base_env = max( D_GGX( envNH, roughnessAlpha ), 1e-6 );
-			float envMix = mix( 1.0, clamp( D_glint_env / D_base_env, 0.0, 16.0 ), glintIblWeight );
-			specIBL *= envMix;
-			dbgGlint += specIBL * clamp( envMix - 1.0, 0.0, 1.0 );
+
+			// Apply stabilized glint ratio for IBL
+			float rawRatio = D_glint_env / D_base_env;
+			float clampedRatio = clamp( rawRatio, 0.0, 4.0 ); // Stabilized: hard clamp to 4x max
+			// Soft knee for ratios > 2
+			if ( rawRatio > 2.0 ) {
+				float excess = rawRatio - 2.0;
+				float knee = 1.0; // knee region
+				clampedRatio = 2.0 + excess / (1.0 + excess / knee);
+			}
+			float envMix = clampedRatio;
+
+			// Apply energy compensation to glint IBL
+			float energyComp = max( glintEnergy.x, 0.0 );
+			vec3 glintContribution = glintIBL * envMix - specIBL;
+			specIBL += glintContribution * energyComp * glintIblWeight;
+
+			// Firefly filter for IBL glints
+			if ( glintEnergy.w > 0.0 ) {
+				float maxLuminance = glintEnergy.w;
+				float glintLum = dot( glintContribution, vec3( 0.2126, 0.7152, 0.0722 ) );
+				if ( glintLum > maxLuminance ) {
+					float excess = glintLum - maxLuminance;
+					float knee = maxLuminance * 0.1;
+					float clampedExcess = excess / (1.0 + excess / knee);
+					float scale = (maxLuminance + clampedExcess) / glintLum;
+					glintContribution *= scale;
+					specIBL = specIBL - glintContribution * energyComp * glintIblWeight + glintContribution * energyComp * glintIblWeight * scale;
+				}
+			}
+
+			dbgGlint += specIBL * clamp( glintIblWeight, 0.0, 1.0 );
 		}
 #endif
 		out_color.rgb += specIBL;

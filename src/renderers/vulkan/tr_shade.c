@@ -1655,6 +1655,10 @@ qboolean is_pbr_surface;
 	VK_SetGlintParams( &uniform );
 #endif
 
+	/* Force full-screen viewport/scissor to clear stale state from prior passes
+	 * (UI, cinematic, bloom, etc.) that may leave a clipped rect. */
+	vk_force_world_viewport_scissor();
+
 #ifdef USE_FOG_COLLAPSE
 	if ( fogCollapse ) {
 		VK_SetFogParams( &uniform, &fog_stage );
@@ -1680,6 +1684,13 @@ qboolean is_pbr_surface;
 	// Debug view: render a non-PBR pass and optionally override texture0 binding.
 	// Keeps runtime inspection simple without requiring extra shader variants.
 	pbr_debug = ( r_pbr_debug != NULL ) ? r_pbr_debug->integer : 0;
+	if ( pbr_debug >= 17 && pbr_debug <= 19 ) {
+		static int lastPbrDebugReminder = -1;
+		if ( lastPbrDebugReminder != pbr_debug ) {
+			lastPbrDebugReminder = pbr_debug;
+			ri.Printf( PRINT_ALL, "PBR debug view %d active (shows env/irr/dict health). Set r_pbr_debug 0 for normal rendering.\n", pbr_debug );
+		}
+	}
 	if ( pbr_debug > 0 && pbr_debug <= 4 ) {
 		is_pbr_surface = qfalse;
 	} else if ( pbr_debug > 4 ) {
@@ -1703,13 +1714,14 @@ qboolean is_pbr_surface;
 	VkImageView loggedIrrView = VK_NULL_HANDLE;
 
 	if ( is_pbr_surface ) {
+		Com_Memset( &uniform, 0, sizeof(uniform) );
 		Com_Memcpy( &uniform_camera.modelMatrix, backEnd.or.modelMatrix, sizeof(float) * 16 );
 		Com_Memcpy( &uniform_camera.viewOrigin, backEnd.refdef.vieworg, sizeof( vec3_t) );
 		uniform_camera.viewOrigin[3] = 0.0;
 
 		vk.cmd->camera_ubo_offset = vk_append_uniform( &uniform_camera, sizeof(uniform_camera), vk.uniform_camera_item_size );
 
-		uniform.pbrDebug[0] = ( pbr_debug > 4 ) ? (float)pbr_debug : 0.0f;
+		uniform.pbrDebug[0] = (float)pbr_debug;
 		uniform.pbrDebug[1] = ( r_pbr_normalSwizzle != NULL ) ? r_pbr_normalSwizzle->value : 0.0f;
 		uniform.pbrDebug[2] = ( r_pbr_forceLight != NULL ) ? r_pbr_forceLight->value : 0.0f;
 		uniform.pbrDebug[3] = ( r_pbr_forceGlints != NULL ) ? r_pbr_forceGlints->value : 0.0f;
@@ -2123,8 +2135,40 @@ qboolean is_pbr_surface;
 					}
 #endif
 				} else {
-					envView = ( envImage && envImage->view ) ? envImage->view : VK_NULL_HANDLE;
-					irrView = ( irrImage && irrImage->view ) ? irrImage->view : VK_NULL_HANDLE;
+					/* Stage descriptor is null (vk_create_pbr_descriptor_set failed). Update the
+					 * fallback descriptor with current env/irr/dict/albedo/lightmap so we get
+					 * proper PBR instead of empty cubemaps. */
+					VkDescriptorSet fallback = vk_get_pbr_fallback_descriptor();
+					if ( fallback != VK_NULL_HANDLE ) {
+						vk_update_pbr_descriptor_binding( fallback, VK_PBR_BINDING_ALBEDO, albedoImage );
+						vk_update_pbr_descriptor_binding( fallback, VK_PBR_BINDING_LIGHTMAP, lightmapImage );
+						vk_update_pbr_descriptor_binding( fallback, VK_PBR_BINDING_ENV_CUBEMAP, envImage );
+						vk_update_pbr_descriptor_binding( fallback, VK_PBR_BINDING_IRRADIANCE, irrImage );
+#ifdef VK_CUBEMAP
+						if ( cubemapIndex < 0 ) {
+							VkImageView sceneView = vk_get_scene_cubemap_view();
+							if ( sceneView != VK_NULL_HANDLE ) {
+								vk_update_pbr_descriptor_binding_from_view( fallback, VK_PBR_BINDING_ENV_CUBEMAP, sceneView );
+								vk_update_pbr_descriptor_binding_from_view( fallback, VK_PBR_BINDING_IRRADIANCE, sceneView );
+								envView = sceneView;
+								irrView = sceneView;
+								envFromSceneView = qtrue;
+								irrFromSceneView = qtrue;
+							}
+						}
+#endif
+						if ( glintDictView != VK_NULL_HANDLE && dictImage ) {
+							vk_update_pbr_descriptor_binding( fallback, VK_PBR_BINDING_GLINT_DICT, dictImage );
+						} else {
+							vk_update_pbr_descriptor_binding( fallback, VK_PBR_BINDING_GLINT_DICT,
+								tr.blackImage ? tr.blackImage : tr.whiteImage );
+						}
+						pbrDescriptor = fallback;
+					}
+					if ( !envFromSceneView ) {
+						envView = ( envImage && envImage->view ) ? envImage->view : VK_NULL_HANDLE;
+						irrView = ( irrImage && irrImage->view ) ? irrImage->view : VK_NULL_HANDLE;
+					}
 					UPDATE_PBR_BINDING_STATE();
 				}
 				Vector4Set( block.texIndex0, 0.0f, 0.0f, 0.0f, 0.0f );
@@ -2186,9 +2230,7 @@ qboolean is_pbr_surface;
 				glintDictView != VK_NULL_HANDLE ? 1.0f : 0.0f );
 			Vector4Copy( uniform.pbrFeatureFlags, block.featureFlags );
 
-			const float iblCompiledFlag = ( envImage != NULL && irrImage != NULL ) ? 1.0f : 0.0f;
 			const qboolean dictValidState = ( glintDictView != VK_NULL_HANDLE );
-			const float dictValidFlag = dictValidState ? 1.0f : 0.0f;
 			debugDictValid = dictValidState;
 			const float debugForceLod = r_ibl_forceLod ? (float)r_ibl_forceLod->integer : -1.0f;
 			const float debugEps = r_pbr_debug_eps ? r_pbr_debug_eps->value : 1e-4f;

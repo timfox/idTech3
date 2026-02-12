@@ -370,6 +370,7 @@ typedef struct vkUniformCamera_s {
 #define PBR_HAS_TRANSMISSION	( 256 )
 #define PBR_HAS_SUBSURFACE		( 512 )
 #define PBR_HAS_IRRADIANCE		( 1024 )
+#define PBR_HAS_GLINTS			( 2048 )
 
 #define PHYS_NONE				( 1 )
 #define PHYS_RMO				( 2 )
@@ -492,6 +493,7 @@ void vk_bind_index_ext( const int numIndexes, const uint32_t*indexes );
 void vk_bind_geometry( uint32_t flags );
 void vk_bind_lighting( int stage, int bundle );
 void vk_draw_geometry( Vk_Depth_Range depth_range, qboolean indexed );
+void vk_force_world_viewport_scissor( void );
 void vk_draw_dot( uint32_t storage_offset );
 
 void vk_read_pixels( byte* buffer, uint32_t width, uint32_t height ); // screenshots
@@ -640,6 +642,7 @@ typedef struct {
 	VkDescriptorPool descriptor_pool;
 	// Incremented whenever descriptor_pool is reset; lets long-lived objects detect stale VkDescriptorSet handles.
 	uint32_t descriptor_pool_gen;
+	uint32_t descriptor_pool_max_sets;
 	VkDescriptorSetLayout set_layout_sampler;	// combined image sampler
 	VkDescriptorSetLayout set_layout_pbr;		// PBR material samplers (BRDF LUT + glint dict + maps)
 	VkDescriptorSetLayout set_layout_pbr_indexed; // PBR material array (descriptor indexing)
