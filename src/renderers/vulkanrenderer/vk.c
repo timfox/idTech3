@@ -4820,13 +4820,14 @@ void vk_initialize( void )
 		set_layouts[6] = vk.set_layout_sampler; // normalMap
 		set_layouts[7] = vk.set_layout_sampler; // physicalMap
 		set_layouts[8] = vk.set_layout_sampler; // prefiltered envmap
-		set_layouts[9] = vk.set_layout_sampler; // irradiance
-		set_layouts[10] = vk.set_layout_sampler; // emissive
-		set_layouts[11] = vk.set_layout_sampler; // clearcoat
-		set_layouts[12] = vk.set_layout_sampler; // sheen
-		set_layouts[13] = vk.set_layout_sampler; // anisotropy
-		set_layouts[14] = vk.set_layout_sampler; // transmission
-		set_layouts[15] = vk.set_layout_sampler; // subsurface
+		set_layouts[9] = vk.set_layout_sampler; // deluxemap
+		set_layouts[10] = vk.set_layout_sampler; // irradiance
+		set_layouts[11] = vk.set_layout_sampler; // emissive
+		set_layouts[12] = vk.set_layout_sampler; // clearcoat
+		set_layouts[13] = vk.set_layout_sampler; // sheen
+		set_layouts[14] = vk.set_layout_sampler; // anisotropy
+		set_layouts[15] = vk.set_layout_sampler; // transmission
+		set_layouts[16] = vk.set_layout_sampler; // subsurface
 #endif
 		desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		desc.pNext = NULL;
@@ -6530,6 +6531,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
         int32_t physical_texture_set;
         int32_t env_texture_set;
         int32_t lightmap_texture_set;
+        int32_t deluxe_mapping;
+        float deluxe_specular_scale;
         int32_t irradiance_texture_set;
         int32_t emissive_texture_set;
         int32_t clearcoat_texture_set;
@@ -6541,7 +6544,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
     } frag_spec_data; 
 
 #ifdef USE_VK_PBR
-    VkSpecializationMapEntry spec_entries[32];
+    VkSpecializationMapEntry spec_entries[37];
 #else
     VkSpecializationMapEntry spec_entries[12];
 #endif
@@ -7152,9 +7155,9 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
     spec_entries[11].size = sizeof(frag_spec_data.identity_color);
 
 	frag_spec_info.mapEntryCount = 11;
-#ifdef USE_VK_PBR   
+#ifdef USE_VK_PBR
 {
-        frag_spec_info.mapEntryCount += 19;
+        frag_spec_info.mapEntryCount += 21;
 
         {
             spec_entries[12].constantID = 11;
@@ -7236,6 +7239,14 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
         spec_entries[30].offset = offsetof(struct FragSpecData, subsurface_texture_set);
         spec_entries[30].size = sizeof(frag_spec_data.subsurface_texture_set);
         
+        spec_entries[24].constantID = 23;
+        spec_entries[24].offset = offsetof(struct FragSpecData, deluxe_mapping);
+        spec_entries[24].size = sizeof(frag_spec_data.deluxe_mapping);
+
+        spec_entries[25].constantID = 24;
+        spec_entries[25].offset = offsetof(struct FragSpecData, deluxe_specular_scale);
+        spec_entries[25].size = sizeof(frag_spec_data.deluxe_specular_scale);
+
         // only use w value, specgloss maps are not supported
         frag_spec_data.specularScale_x = def->specularScale[0];
         frag_spec_data.specularScale_y = def->specularScale[1];
@@ -7273,27 +7284,25 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 
         if ( ( def->vk_pbr_flags & PBR_HAS_LIGHTMAP ) == 0 )
             frag_spec_data.lightmap_texture_set = -1;
+#ifdef HDR_DELUXE_LIGHTMAP
+        if ( r_deluxeMapping->integer )
+        {
+            // deluxe_texture_set = 0: use approx + scale
+            frag_spec_data.deluxe_mapping = 0;
+            frag_spec_data.deluxe_specular_scale = r_deluxeSpecular->value;
 
-        if ( !vk.cubemapActive )
-            frag_spec_data.irradiance_texture_set = -1;
-
-        if ( ( def->vk_pbr_flags & PBR_HAS_EMISSIVE ) == 0 )
-            frag_spec_data.emissive_texture_set = -1;
-
-        if ( ( def->vk_pbr_flags & PBR_HAS_CLEARCOAT ) == 0 )
-            frag_spec_data.clearcoat_texture_set = -1;
-
-        if ( ( def->vk_pbr_flags & PBR_HAS_SHEEN ) == 0 )
-            frag_spec_data.sheen_texture_set = -1;
-
-        if ( ( def->vk_pbr_flags & PBR_HAS_ANISOTROPY ) == 0 )
-            frag_spec_data.anisotropy_texture_set = -1;
-
-        if ( ( def->vk_pbr_flags & PBR_HAS_TRANSMISSION ) == 0 )
-            frag_spec_data.transmission_texture_set = -1;
-
-        if ( ( def->vk_pbr_flags & PBR_HAS_SUBSURFACE ) == 0 )
-            frag_spec_data.subsurface_texture_set = -1;
+            // enabled+: use deluxe map
+            if ( def->vk_pbr_flags & (PBR_HAS_DELUXEMAP0 | PBR_HAS_DELUXEMAP1) )
+                frag_spec_data.deluxe_mapping = 1;
+        }
+        else
+#endif // HDR_DELUXE_LIGHTMAP
+        {
+            // use approx + default scale
+            // perhaps when r_specularMapping = 0 set scale to 0 to disable it?
+            frag_spec_data.deluxe_mapping = -1;
+            frag_spec_data.deluxe_specular_scale = 1.0;
+        }
     }
 #endif
 	frag_spec_info.pMapEntries = spec_entries + 1;
@@ -7306,6 +7315,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	// Vertex input
 	//
 	num_binds = num_attrs = 0;
+	qboolean has_normal = qfalse;
+
 	switch ( def->shader_type ) {
 
 		case TYPE_FOG_ONLY:
@@ -7350,6 +7361,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			push_attr( 1, 1, VK_FORMAT_R8G8B8A8_UNORM );
 			//push_attr( 2, 2, VK_FORMAT_R8G8B8A8_UNORM );
 			push_attr( 5, 5, VK_FORMAT_R32G32B32A32_SFLOAT );
+
+			has_normal = qtrue;
 			break;
 
 		case TYPE_SIGNLE_TEXTURE_IDENTITY_ENV:
@@ -7359,6 +7372,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			push_bind( 5, sizeof( vec4_t ) );					// normals
 			push_attr( 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT );
 			push_attr( 5, 5, VK_FORMAT_R32G32B32A32_SFLOAT );
+
+			has_normal = qtrue;
 			break;
 
 		case TYPE_SIGNLE_TEXTURE_LIGHTING:
@@ -7393,6 +7408,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			push_attr( 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT );
 			push_attr( 3, 3, VK_FORMAT_R32G32_SFLOAT );
 			push_attr( 5, 5, VK_FORMAT_R32G32B32A32_SFLOAT );
+
+			has_normal = qtrue;
 			break;
 
 		case TYPE_MULTI_TEXTURE_MUL2:
@@ -7421,6 +7438,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			//push_attr( 2, 2, VK_FORMAT_R32G32_SFLOAT );
 			push_attr( 3, 3, VK_FORMAT_R32G32_SFLOAT );
 			push_attr( 5, 5, VK_FORMAT_R32G32B32A32_SFLOAT );
+
+			has_normal = qtrue;
 			break;
 
 		case TYPE_MULTI_TEXTURE_MUL3:
@@ -7453,6 +7472,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			push_attr( 3, 3, VK_FORMAT_R32G32_SFLOAT );
 			push_attr( 4, 4, VK_FORMAT_R32G32_SFLOAT );
 			push_attr( 5, 5, VK_FORMAT_R32G32B32A32_SFLOAT );
+
+			has_normal = qtrue;
 			break;
 
 		case TYPE_BLEND2_ADD:
@@ -7493,6 +7514,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			push_attr( 3, 3, VK_FORMAT_R32G32_SFLOAT );
 			push_attr( 5, 5, VK_FORMAT_R32G32B32A32_SFLOAT );
 			push_attr( 6, 6, VK_FORMAT_R8G8B8A8_UNORM );
+
+			has_normal = qtrue;
 			break;
 
 		case TYPE_BLEND3_ADD:
@@ -7541,6 +7564,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			push_attr( 5, 5, VK_FORMAT_R32G32B32A32_SFLOAT );
 			push_attr( 6, 6, VK_FORMAT_R8G8B8A8_UNORM );
 			push_attr( 7, 7, VK_FORMAT_R8G8B8A8_UNORM );
+
+			has_normal = qtrue;
 			break;
 
 		default:
@@ -7549,8 +7574,15 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	}
 
  #ifdef USE_VK_PBR  
-    if( def->vk_pbr_flags ){    
-        push_bind( 8, sizeof( vec4_t ) );						// qtangent
+    if( def->vk_pbr_flags ){   
+
+		if ( !has_normal )
+		{
+			push_bind( 5, sizeof( vec4_t ) );					// normals
+			push_attr( 5, 5, VK_FORMAT_R32G32B32A32_SFLOAT );
+		}
+
+        push_bind( 8, sizeof( vec4_t ) );						// tangent
         push_attr( 8, 8, VK_FORMAT_R32G32B32A32_SFLOAT );
 
         push_bind( 9, sizeof(vec4_t) );							// lightdir
@@ -8257,6 +8289,9 @@ void vk_bind_geometry( uint32_t flags )
 		}
 #ifdef USE_VK_PBR
 		if (flags & TESS_PBR) {
+			vk.cmd->vbo_offset[5] = tess.shader->normalOffset;
+			vk_bind_index_attr( 5 );
+
 			vk.cmd->vbo_offset[8] = tess.shader->qtangentOffset;
 			vk_bind_index_attr(8);
 
@@ -8309,6 +8344,7 @@ void vk_bind_geometry( uint32_t flags )
 		}
 #ifdef USE_VK_PBR
 		if (flags & TESS_PBR) {
+			vk_bind_attr(5, sizeof(tess.normal[0]), tess.normal);
 			vk_bind_attr(8, sizeof(tess.qtangent[0]), tess.qtangent);
 			vk_bind_attr(9, sizeof(tess.lightdir[0]), tess.lightdir);
 		}

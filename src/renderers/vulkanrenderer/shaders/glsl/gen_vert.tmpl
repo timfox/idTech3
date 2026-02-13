@@ -49,7 +49,7 @@ layout(location = 3) in vec2 in_tex_coord1;
 layout(location = 4) in vec2 in_tex_coord2;
 #endif
 
-#ifdef USE_ENV
+#if defined(USE_ENV) || defined(USE_VK_PBR)
 layout(location = 5) in vec3 in_normal;
 #endif
 
@@ -91,29 +91,15 @@ layout(set = 0, binding = 1) uniform UBO_Camera {
 	mat4 u_ModelMatrix;
 };
 
-struct NTB {
-	vec3 normal, tangent, binormal;
-};
 
-layout(location = 8) in vec4 in_qtangent;
+layout(location = 8) in vec4 in_tangent;
 layout(location = 9) in vec4 in_lightdir;
 
 layout(location = 9) out vec4 var_Normal;
 layout(location = 10) out vec4 var_LightDir;
 layout(location = 11) out vec4 var_ViewDir;
-layout(location = 12) out NTB out_ntb;
+layout(location = 12) out vec4 var_Tangent;
 
-vec3 QuatTransVec( in vec4 quat, in vec3 vec ) {
-	vec3 tmp = 2.0 * cross( quat.xyz, vec );
-	return vec + quat.w * tmp + cross( quat.xyz, tmp );
-}
-
-void QTangentToNTB( in vec4 qtangent, out NTB ntb ) {
-	ntb.normal = QuatTransVec( qtangent, vec3( 0.0, 0.0, 1.0 ) );
-	ntb.tangent = QuatTransVec( qtangent, vec3( 1.0, 0.0, 0.0 ) );
-	ntb.tangent *= sign( qtangent.w );
-	ntb.binormal = QuatTransVec( qtangent, vec3( 0.0, 1.0, 0.0 ) );
-}
 #endif
 
 out gl_PerVertex {
@@ -124,13 +110,11 @@ void main() {
 	gl_Position = mvp * vec4(in_position, 1.0);
 
 	#ifdef USE_VK_PBR
-		QTangentToNTB( in_qtangent, out_ntb );
+		vec3 tangent = in_tangent.xyz;
 	#endif
 
 	vec3 position = in_position;
-	#if defined(USE_VK_PBR)
-		vec3 normal = out_ntb.normal;
-	#elif defined(USE_ENV)
+	#if defined(USE_ENV) || defined(USE_VK_PBR)
 		vec3 normal = in_normal;
 	#endif
 
@@ -198,5 +182,6 @@ void main() {
 	var_LightDir	= vec4(L, 0.0);
 	var_Normal		= vec4(normal, 0.0);
 	var_ViewDir		= vec4(viewDir, 0.0);
+	var_Tangent		= vec4(tangent, in_tangent.w);
 #endif
 }
