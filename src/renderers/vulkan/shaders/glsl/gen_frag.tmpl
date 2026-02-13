@@ -824,6 +824,24 @@ float CalcSpecularAO( in float ao, in float roughness, in float NE )
 	return clamp( specAO, 0.0, 1.0 );
 }
 
+float ApplySpecularAA( in float roughness, in vec3 N )
+{
+	vec3 n = normalize( N );
+	vec3 dndx = dFdx( n );
+	vec3 dndy = dFdy( n );
+	float variance = max( dot( dndx, dndx ), dot( dndy, dndy ) );
+	float r2 = roughness * roughness;
+	r2 += clamp( variance * 0.25, 0.0, 1.0 );
+	return clamp( sqrt( r2 ), 0.02, 1.0 );
+}
+
+float CalcSpecularHorizonOcclusion( in vec3 R, in vec3 geomN, in float roughness )
+{
+	float horizon = clamp( 1.0 + dot( R, normalize( geomN ) ), 0.0, 1.0 );
+	horizon *= horizon;
+	return mix( horizon, 1.0, roughness * roughness );
+}
+
 
 // Roughness-dependent Fresnel for IBL specular (Fdez-Aguera 2019).
 // At grazing angles on smooth surfaces, reflections should approach 100%
@@ -832,7 +850,7 @@ float CalcSpecularAO( in float ao, in float roughness, in float NE )
 // Fresnel on rough surfaces where the energy is already scattered.
 // Ref: https://bruop.github.io/ibl/#single_scattering_results
 vec3 CalcIBLContribution( in float roughness, in vec3 N, in vec3 E,
-	in float NE, in vec3 F0, in float forcedLod )
+	in vec3 geomN, in float NE, in vec3 F0, in float forcedLod )
 {
 #ifdef USE_DESCRIPTOR_INDEXING
 	if ( env_texture_set < 0 ) {
@@ -860,8 +878,9 @@ vec3 CalcIBLContribution( in float roughness, in vec3 N, in vec3 E,
 	vec3 Fr = max( vec3( 1.0 - safeRoughness ), F0 ) - F0;
 	vec3 k_S = F0 + Fr * pow( 1.0 - safeNE, 5.0 );
 	vec3 FssEss = clampColor( k_S * f_ab.x + f_ab.y );
+	float horizonOcc = CalcSpecularHorizonOcclusion( R, geomN, safeRoughness );
 
-	return clampColor( cubeLightColor * FssEss );
+	return clampColor( cubeLightColor * FssEss * horizonOcc );
 }
 
 // Multi-scatter IBL diffuse with energy compensation (Fdez-Aguera 2019).
@@ -1507,6 +1526,7 @@ void main() {
 	}
 
 	float perceptualRoughness = sanitizeRoughness( roughness );
+	perceptualRoughness = ApplySpecularAA( perceptualRoughness, N );
 	float roughnessAlpha = perceptualRoughness * perceptualRoughness;
 	roughness = perceptualRoughness;
 	float anisotropyX = clamp( roughness * ( 1.0 + materialAnisotropy ), 0.02, 1.0 );
@@ -1761,14 +1781,14 @@ void main() {
 	const bool hasSpecIBL = hasEnv;
 	if ( hasSpecIBL )
 	{
-		vec3 specIBL = CalcIBLContribution( roughness, N, E, NE, specular.rgb, pbrDebugParams.x );
+		vec3 specIBL = CalcIBLContribution( roughness, N, E, var_Normal.xyz, NE, specular.rgb, pbrDebugParams.x );
 		specIBL *= clearcoatDim * specAO;
 		vec3 specIBL_base = specIBL;
 #ifdef USE_VK_PBR
 		if ( glintRouteIbl && glintEnabled && glintIblWeight > 0.0 )
 		{
 			// Compute glint IBL contribution separately
-			vec3 glintIBL = CalcIBLContribution( roughness, N, E, NE, glintF0, pbrDebugParams.x );
+			vec3 glintIBL = CalcIBLContribution( roughness, N, E, var_Normal.xyz, NE, glintF0, pbrDebugParams.x );
 			glintIBL *= clearcoatDim * specAO;
 
 			vec3 envDir = normalize( reflect( -E, N ) );
@@ -1827,7 +1847,7 @@ void main() {
 
 	if ( clearcoatStrength > 0.0 && hasSpecIBL )
 	{
-		vec3 ccIBL = CalcIBLContribution( clearcoatRoughness, N, E, NE, vec3( 0.04 ), pbrDebugParams.x );
+		vec3 ccIBL = CalcIBLContribution( clearcoatRoughness, N, E, var_Normal.xyz, NE, vec3( 0.04 ), pbrDebugParams.x );
 		ccIBL *= specAO * clearcoatStrength;
 		out_color.rgb += ccIBL;
 		dbgClearcoat += ccIBL;
@@ -1898,8 +1918,8 @@ void main() {
 	}
 	else if ( pbrDebugView == 7 )
 	{
-		vec3 nTS = ( normal_texture_set > -1 ) ? DecodeNormalTS( frag_tex_coord0 ) : vec3( 0.0, 0.0, 1.0 );
-		out_color.rgb = nTS * 0.5 + 0.5;
+		vec3 nWS = sanitizeNormal( N );
+		out_color.rgb = nWS * 0.5 + 0.5;
 		out_color.a = 1.0;
 	}
 	else if ( pbrDebugView == 8 )
@@ -1971,7 +1991,7 @@ void main() {
 		else
 #endif
 		{
-			vec3 specIBL = CalcIBLContribution( roughness, N, E, NE, specular.rgb, pbrDebugParams.x ) * clearcoatDim * specAO;
+			vec3 specIBL = CalcIBLContribution( roughness, N, E, var_Normal.xyz, NE, specular.rgb, pbrDebugParams.x ) * clearcoatDim * specAO;
 			float mag = dbg_len( specIBL );
 			if ( !hasEnvDebug )
 			{

@@ -1747,8 +1747,6 @@ qboolean is_pbr_surface;
 	qboolean irrFromSceneView = qfalse;
 	qboolean debugHasEnv = qfalse;
 	qboolean debugHasIrr = qfalse;
-	qboolean stageHasLightmap = qfalse;
-	qboolean stageHasIrr = qfalse;
 	int loggedCubemapIndex = -1;
 	const image_t *loggedEnvImage = NULL;
 	const image_t *loggedIrrImage = NULL;
@@ -1790,13 +1788,10 @@ qboolean is_pbr_surface;
 	}
 
 #ifdef USE_VK_PBR
-		stageHasLightmap = qfalse;
-		stageHasIrr = qfalse;
 #endif
 	for ( stage = 0; stage < MAX_SHADER_STAGES; stage++ )
 	{
 #ifdef USE_VK_PBR
-		stageHasLightmap = qfalse;
 		qboolean wantsLightmap = qfalse;
 		const char *lightmapSource = "none";
 		const image_t *selectedLightmap = NULL;
@@ -1979,7 +1974,6 @@ qboolean is_pbr_surface;
 					irrDescriptorBound = irrHasAnyBinding; \
 					hasEnv = envDescriptorBound; \
 					hasIrr = irrDescriptorBound; \
-					stageHasIrr = hasIrr; \
 					debugHasEnv = envDescriptorBound; \
 					debugHasIrr = irrDescriptorBound; \
 				} while (0)
@@ -1998,8 +1992,6 @@ qboolean is_pbr_surface;
 			}
 
 			hasLightmap = ( lightmapImage != fallback_white );
-			stageHasLightmap = hasLightmap;
-
 			// Stage descriptor sets can become invalid after a descriptor pool reset (e.g. swapchain/video restart).
 			// Recreate lazily here so we never bind a stale set.
 			if ( useIndexing ) {
@@ -2487,15 +2479,10 @@ qboolean is_pbr_surface;
 			Vk_Pipeline_Def def;
 			vk_get_pipeline_def( pipeline, &def );
 			uint32_t desiredFlags = 0;
-			if ( is_pbr_surface && !pStage->pbr_disabled && ( pStage->vk_pbr_flags || pbr_debug >= 17 ) ) {
-				uint32_t baseFlags = pStage->vk_pbr_flags & ~( PBR_HAS_LIGHTMAP | PBR_HAS_IRRADIANCE );
-				desiredFlags = baseFlags;
-				if ( stageHasLightmap ) {
-					desiredFlags |= PBR_HAS_LIGHTMAP;
-				}
-				if ( stageHasIrr ) {
-					desiredFlags |= PBR_HAS_IRRADIANCE;
-				}
+			if ( is_pbr_surface && !pStage->pbr_disabled ) {
+				// Keep runtime permutation selection aligned with stage-authored flags
+				// (reference behavior), so debug 0 remains the real default shading path.
+				desiredFlags = pStage->vk_pbr_flags;
 			}
 
 			/* Make vk_pbr_flags a pure function of current draw/stage.

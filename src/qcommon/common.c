@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "q_shared.h"
 #include "qcommon.h"
+#include "js_local.h"
 #include <setjmp.h>
 #ifndef _WIN32
 #include <netinet/in.h>
@@ -3980,6 +3981,9 @@ void Com_Init( char *commandLine ) {
 	Com_InitKeyCommands();
 
 	FS_InitFilesystem();
+
+	// Initialize JavaScript scripting system
+	JS_Restart();
 
 	com_logfile = Cvar_Get( "logfile", "0", CVAR_TEMP );
 	Cvar_CheckRange( com_logfile, "0", "4", CV_INTEGER );
