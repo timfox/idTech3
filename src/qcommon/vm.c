@@ -1713,15 +1713,32 @@ static void * QDECL loadNative( const char *name, vmMainFunc_t *entryPoint, dllS
 	dllEntry_t	dllEntry;
 	void		*sym;
 	void		*vmMainAddr;
+	qboolean	isGenericModule = qfalse;
 
+	// For ui, game, cgame modules, try generic name first
+	if ( Q_stricmp( name, "ui" ) == 0 || Q_stricmp( name, "game" ) == 0 || Q_stricmp( name, "cgame" ) == 0 ) {
+		isGenericModule = qtrue;
+		Com_sprintf( filename, sizeof( filename ), "%s.so", name );
+		libHandle = FS_LoadLibrary( filename );
+		if ( libHandle ) {
+			goto loadSuccess;
+		}
+		// Generic name failed, fall back to platform-specific name
+	}
+
+	// Try platform-specific name
 	Com_sprintf( filename, sizeof( filename ), "%s" ARCH_STRING DLL_EXT, name );
 
 	libHandle = FS_LoadLibrary( filename );
 
 	if ( !libHandle ) {
-		Com_Printf( "loadNative '%s' failed\n", filename );
+		if ( !isGenericModule ) {
+			Com_Printf( "loadNative '%s' failed\n", filename );
+		}
 		return NULL;
 	}
+
+loadSuccess:
 
 	Com_Printf( "loadNative '%s' ok\n", filename );
 
