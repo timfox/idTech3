@@ -30,6 +30,7 @@ static cvar_t		*cl_debuggraph;
 static cvar_t		*cl_graphheight;
 static cvar_t		*cl_graphscale;
 static cvar_t		*cl_graphshift;
+static cvar_t		*ui_scale;
 
 /*
 ================
@@ -59,28 +60,64 @@ Adjusted for resolution and screen aspect ratio
 void SCR_AdjustFrom640( float *x, float *y, float *w, float *h ) {
 	float	xscale;
 	float	yscale;
+	float	aspectRatio;
+	float	baseAspectRatio;
 
-#if 0
-		// adjust for wide screens
-		if ( cls.glconfig.vidWidth * 480 > cls.glconfig.vidHeight * 640 ) {
-			*x += 0.5 * ( cls.glconfig.vidWidth - ( cls.glconfig.vidHeight * 640 / 480 ) );
+	// Calculate aspect ratios
+	aspectRatio = (float)cls.glconfig.vidWidth / (float)cls.glconfig.vidHeight;
+	baseAspectRatio = 640.0f / 480.0f; // 4:3 aspect ratio
+
+	// For widescreen displays, we want to scale to fit height and center horizontally
+	if ( aspectRatio > baseAspectRatio ) {
+		// Widescreen: scale to fit height, center horizontally
+		yscale = cls.glconfig.vidHeight / 480.0f;
+		xscale = yscale; // Use same scale for consistent UI proportions
+
+		// Center horizontally
+		if ( x ) {
+			float scaledWidth = 640.0f * xscale;
+			float offset = (cls.glconfig.vidWidth - scaledWidth) * 0.5f;
+			*x = *x * xscale + offset;
 		}
-#endif
+		if ( w ) {
+			*w *= xscale;
+		}
+	} else {
+		// Tall screen or 4:3: scale to fit width
+		xscale = cls.glconfig.vidWidth / 640.0f;
+		yscale = xscale; // Maintain aspect ratio
 
-	// scale for screen sizes
-	xscale = cls.glconfig.vidWidth / 640.0;
-	yscale = cls.glconfig.vidHeight / 480.0;
-	if ( x ) {
-		*x *= xscale;
+		if ( x ) {
+			*x *= xscale;
+		}
+		if ( w ) {
+			*w *= xscale;
+		}
 	}
+
+	// Apply vertical scaling
 	if ( y ) {
 		*y *= yscale;
 	}
-	if ( w ) {
-		*w *= xscale;
-	}
 	if ( h ) {
 		*h *= yscale;
+	}
+
+	// Apply UI scale factor for higher resolutions
+	if ( ui_scale ) {
+		float scale = ui_scale->value;
+		if ( x ) {
+			*x *= scale;
+		}
+		if ( y ) {
+			*y *= scale;
+		}
+		if ( w ) {
+			*w *= scale;
+		}
+		if ( h ) {
+			*h *= scale;
+		}
 	}
 }
 
@@ -495,6 +532,9 @@ void SCR_Init( void ) {
 	cl_graphheight = Cvar_Get ("graphheight", "32", CVAR_CHEAT);
 	cl_graphscale = Cvar_Get ("graphscale", "1", CVAR_CHEAT);
 	cl_graphshift = Cvar_Get ("graphshift", "0", CVAR_CHEAT);
+	ui_scale = Cvar_Get ("ui_scale", "1.0", CVAR_ARCHIVE_ND);
+	Cvar_CheckRange( ui_scale, "0.5", "4.0", CV_FLOAT );
+	Cvar_SetDescription( ui_scale, "UI scale factor for high-resolution displays" );
 
 	scr_initialized = qtrue;
 }
