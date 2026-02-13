@@ -179,7 +179,7 @@ fi
 
 # Renderers
 shopt -s nullglob
-for sofile in "$BUILD_DIR"/idtech3_*_*.so; do
+for sofile in "$BUILD_DIR"/idtech3_*.so; do
   base="$(basename "$sofile")"
   cp -f "$sofile" "$RELEASE_DIR/$base"
   echo "Copied renderer -> $RELEASE_DIR/$base"

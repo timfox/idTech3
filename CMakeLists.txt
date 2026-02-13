@@ -831,13 +831,9 @@ IF(USE_RENDERER_DLOPEN)
 	# Normalize target filenames for dlopen-friendly plugin names:
 	# set OUTPUT_NAME and remove default 'lib' PREFIX so filenames become:
 	#   idtech3_opengl_x86_64.so  (instead of libidtech3_opengl_x86_64.so)
-	if(TARGET_ARCH_NAME)
-	  set(RENDERER_OUT_OPengl "idtech3_opengl_${TARGET_ARCH_NAME}")
-	  set(RENDERER_OUT_Vulkan "idtech3_vulkan_${TARGET_ARCH_NAME}")
-	else()
-	  set(RENDERER_OUT_OPengl "idtech3_opengl${RENDEXT}")
-	  set(RENDERER_OUT_Vulkan "idtech3_vulkan${RENDEXT}")
-	endif()
+	# Use simple names by default, architecture-specific names only when explicitly needed
+	set(RENDERER_OUT_OPengl "idtech3_opengl")
+	set(RENDERER_OUT_Vulkan "idtech3_vulkan")
 	set_target_properties(${RENDERER_PREFIX}_opengl${RENDEXT} PROPERTIES OUTPUT_NAME ${RENDERER_OUT_OPengl} PREFIX "")
 	set_target_properties(${RENDERER_PREFIX}_vulkan${RENDEXT} PROPERTIES OUTPUT_NAME ${RENDERER_OUT_Vulkan} PREFIX "")
 ELSE()

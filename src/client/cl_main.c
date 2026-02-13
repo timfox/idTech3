@@ -3582,7 +3582,7 @@ static void CL_InitRef( void ) {
 #if defined (__linux__) && defined(__i386__)
 #define REND_ARCH_STRING "x86"
 #else
-#define REND_ARCH_STRING ARCH_STRING
+#define REND_ARCH_STRING ""
 #endif
 
 	{
@@ -3598,7 +3598,11 @@ static void CL_InitRef( void ) {
 		} else {
 			Q_strncpyz(clean, raw, sizeof(clean));
 		}
-		Com_sprintf( dllName, sizeof( dllName ), RENDERER_PREFIX "_%s_" REND_ARCH_STRING DLL_EXT, clean );
+		if ( REND_ARCH_STRING[0] != '\0' ) {
+			Com_sprintf( dllName, sizeof( dllName ), RENDERER_PREFIX "_%s_" REND_ARCH_STRING DLL_EXT, clean );
+		} else {
+			Com_sprintf( dllName, sizeof( dllName ), RENDERER_PREFIX "_%s" DLL_EXT, clean );
+		}
 	}
 	ospath = FS_BuildOSPath( Sys_DefaultBasePath(), dllName, NULL );
 	rendererLib = Sys_LoadLibrary( ospath );
@@ -3618,7 +3622,11 @@ static void CL_InitRef( void ) {
 			} else {
 				Q_strncpyz(clean, raw, sizeof(clean));
 			}
-			Com_sprintf( dllName, sizeof( dllName ), RENDERER_PREFIX "_%s_" REND_ARCH_STRING DLL_EXT, clean );
+			if ( REND_ARCH_STRING[0] != '\0' ) {
+				Com_sprintf( dllName, sizeof( dllName ), RENDERER_PREFIX "_%s_" REND_ARCH_STRING DLL_EXT, clean );
+			} else {
+				Com_sprintf( dllName, sizeof( dllName ), RENDERER_PREFIX "_%s" DLL_EXT, clean );
+			}
 		}
 		ospath = FS_BuildOSPath( Sys_DefaultBasePath(), dllName, NULL );
 		rendererLib = Sys_LoadLibrary( ospath );
