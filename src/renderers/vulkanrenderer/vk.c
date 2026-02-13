@@ -6186,11 +6186,11 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	spec_entries[8].size = sizeof( frag_spec_data.depth_r );
 
 	spec_entries[9].constantID = 9;
-	spec_entries[9].offset = offsetof(struct Vk_Pipeline_FragSpecData, depth_g);
+	spec_entries[9].offset = offsetof(struct PostProcess_FragSpecData, depth_g);
 	spec_entries[9].size = sizeof(frag_spec_data.depth_g);
 
 	spec_entries[10].constantID = 10;
-	spec_entries[10].offset = offsetof(struct Vk_Pipeline_FragSpecData, depth_b);
+	spec_entries[10].offset = offsetof(struct PostProcess_FragSpecData, depth_b);
 	spec_entries[10].size = sizeof(frag_spec_data.depth_b);
 
 	frag_spec_info.mapEntryCount = 11;
@@ -7548,7 +7548,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			break;
 
 		default:
-			ri.Error( ERR_DROP, "%s: invalid shader type - %i", __FUNCTION__, def->shader_type );
+                        ri.Error( ERR_DROP, "%s: invalid shader type - %i", __func__, def->shader_type );
 			break;
 	}
 
