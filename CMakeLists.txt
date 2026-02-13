@@ -786,6 +786,7 @@ ELSE()
 ENDIF()
 AUX_SOURCE_DIRECTORY(src/renderers/openglrenderer RENDERER_GL_SRCS)
 AUX_SOURCE_DIRECTORY(src/renderers/vulkanrenderer RENDERER_VK_SRCS)
+AUX_SOURCE_DIRECTORY(src/renderers/vulkanrenderer/utils/mikktspace RENDERER_VK_SRCS)
 
 SET(AUX_SRCS)
 if(NOT USE_RENDERER_DLOPEN)
