@@ -789,6 +789,10 @@ AUX_SOURCE_DIRECTORY(src/renderers/vulkanrenderer RENDERER_VK_SRCS)
 list(APPEND RENDERER_VK_SRCS
     src/renderers/vulkanrenderer/utils/mikktspace/mikktspace.c
 )
+# Suppress shadow warnings for MikkTSpace third-party code
+set_source_files_properties(src/renderers/vulkanrenderer/utils/mikktspace/mikktspace.c PROPERTIES
+    COMPILE_OPTIONS "-Wno-shadow"
+)
 
 SET(AUX_SRCS)
 if(NOT USE_RENDERER_DLOPEN)
