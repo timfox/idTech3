@@ -8,7 +8,12 @@
 #endif
 #endif
 
+#ifdef _MSC_VER
+#pragma warning(disable: 4100) // unreferenced formal parameter
+#pragma warning(disable: 4505) // unreferenced local function has been removed
+#else
 #pragma GCC diagnostic ignored "-Wunused-function"
+#endif
 
 struct Vk_Pipeline_FragSpecData {
 	int32_t alpha_test_func;
