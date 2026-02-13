@@ -895,3 +895,12 @@ void Sys_SetClipboardBitmap( const byte *bitmap, int length )
 	CloseClipboard();
 #endif
 }
+
+
+void Sys_UpdateWindowTitle( const char *title )
+{
+	if ( SDL_window && title && *title )
+	{
+		SDL_SetWindowTitle( SDL_window, title );
+	}
+}

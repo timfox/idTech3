@@ -547,6 +547,7 @@ static void Com_ParseCommandLine( char *commandLine ) {
 }
 
 char cl_title[ MAX_CVAR_VALUE_STRING ] = CLIENT_WINDOW_TITLE;
+char con_title[ MAX_CVAR_VALUE_STRING ] = CONSOLE_WINDOW_TITLE;
 
 /*
 ===================
