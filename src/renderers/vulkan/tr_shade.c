@@ -1940,7 +1940,7 @@ qboolean is_pbr_surface;
 #endif
 
 #ifdef USE_VK_PBR
-		if ( is_pbr_surface && ( pStage->vk_pbr_flags || pbr_debug >= 17 ) ) {
+		if ( is_pbr_surface && !pStage->pbr_disabled ) {
 			static VkCommandBuffer lastCmdBuf = VK_NULL_HANDLE;
 			static qboolean lastValid = qfalse;
 			static vkPbrUniformBlock_t lastBlock;
@@ -1968,16 +1968,15 @@ qboolean is_pbr_surface;
 
 			#define UPDATE_PBR_BINDING_STATE() \
 				do { \
-					const qboolean envIsFallbackLocal = ( envImage == envFallback ) && !envFromSceneView; \
-					const qboolean irrIsFallbackLocal = ( irrImage == irrFallback ) && !irrFromSceneView; \
 					const qboolean envHasView = ( envView != VK_NULL_HANDLE ); \
 					const qboolean irrHasView = ( irrView != VK_NULL_HANDLE ); \
 					const qboolean envHasIndexView = ( envDescriptorIndex >= 0 && envIndexedView != VK_NULL_HANDLE ); \
 					const qboolean irrHasIndexView = ( irrDescriptorIndex >= 0 && irrIndexedView != VK_NULL_HANDLE ); \
 					const qboolean envHasAnyBinding = ( envHasView || envHasIndexView ); \
 					const qboolean irrHasAnyBinding = ( irrHasView || irrHasIndexView ); \
-					envDescriptorBound = ( envHasAnyBinding && !envIsFallbackLocal ); \
-					irrDescriptorBound = ( irrHasAnyBinding && !irrIsFallbackLocal ); \
+					/* Treat any valid binding as available; fallback content quality is logged separately. */ \
+					envDescriptorBound = envHasAnyBinding; \
+					irrDescriptorBound = irrHasAnyBinding; \
 					hasEnv = envDescriptorBound; \
 					hasIrr = irrDescriptorBound; \
 					stageHasIrr = hasIrr; \
@@ -2489,7 +2488,7 @@ qboolean is_pbr_surface;
 			vk_get_pipeline_def( pipeline, &def );
 			uint32_t desiredFlags = 0;
 			if ( is_pbr_surface && !pStage->pbr_disabled && ( pStage->vk_pbr_flags || pbr_debug >= 17 ) ) {
-				const uint32_t baseFlags = pStage->vk_pbr_flags & ~( PBR_HAS_LIGHTMAP | PBR_HAS_IRRADIANCE );
+				uint32_t baseFlags = pStage->vk_pbr_flags & ~( PBR_HAS_LIGHTMAP | PBR_HAS_IRRADIANCE );
 				desiredFlags = baseFlags;
 				if ( stageHasLightmap ) {
 					desiredFlags |= PBR_HAS_LIGHTMAP;

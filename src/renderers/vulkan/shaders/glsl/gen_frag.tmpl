@@ -1405,12 +1405,12 @@ void main() {
 		}
 		if ( length( aggregatedLightColor ) < 1e-4 )
 		{
-			aggregatedLightColor = hasLightmap ? vec3( 1.0 ) : bias_color;
+			aggregatedLightColor = bias_color;
 		}
 	}
 	else
 	{
-		aggregatedLightColor = hasLightmap ? vec3( 1.0 ) : bias_color;
+		aggregatedLightColor = bias_color;
 	}
 
 	vec3 fallbackDir = sanitizeDir( var_LightDir.xyz, vec3( 0.0, 0.0, 1.0 ) );
@@ -1628,7 +1628,7 @@ void main() {
 		hasTransmission = ( transmission > 0.0 );
 	}
 	const int effectiveLightCount = hasDynamicLights ? pbrLightCount : 1;
-	const vec3 fallbackIntensity = aggregatedLightColor;
+	const vec3 fallbackIntensity = bias_color;
 	for ( int li = 0; li < effectiveLightCount; ++li )
 	{
 		vec3 Li = fallbackDir;
@@ -1835,19 +1835,21 @@ void main() {
 
 	if ( hasSheen )
 	{
-		vec3 sheenIBL = sheenLobe * irradiance;
+		vec3 sheenIBL = sheenLobe * irradiance * AO;
 		out_color.rgb += sheenIBL;
 	}
 
-	if ( subsurfaceStrength > 0.0 )
+	if ( subsurface_texture_set > -1 && subsurfaceStrength > 0.0 )
 	{
-		vec3 subsurfaceIBL = irradiance * subsurfaceColor * subsurfaceStrength * ( 0.25 + 0.25 * clamp( subsurfaceThickness, 0.0, 4.0 ) );
+		vec3 subsurfaceIBL = irradiance * subsurfaceColor * subsurfaceStrength * AO *
+			( 0.2 + 0.2 * clamp( subsurfaceThickness, 0.0, 4.0 ) );
 		out_color.rgb += subsurfaceIBL;
 	}
 
-	if ( hasTransmission )
+	if ( transmission_texture_set > -1 && hasTransmission )
 	{
-		vec3 transmissionIBL = irradiance * vec3( transmission ) * max( 0.0, 1.0 - roughness ) * exp( -transmissionThickness );
+		vec3 transmissionIBL = irradiance * vec3( transmission ) * AO *
+			max( 0.0, 1.0 - roughness ) * exp( -transmissionThickness );
 		out_color.rgb += transmissionIBL;
 	}
 
