@@ -820,9 +820,13 @@ void main() {
 
 
 	#if ( defined(USE_TX1) || defined(USE_TX2) )
-		if ( deluxe_specular_scale != 0.0 && deluxe_mapping > -1 )
+		if ( deluxe_mapping > -1 )
 		{
 			Fs = CalcSpecular( specular.rgb, NH, NL, NE, LH, VH, roughness ) * deluxe_specular_scale;
+		}
+		else if ( deluxe_specular_scale != 0.0 )
+		{
+			Fs = CalcSpecular( specular.rgb, NH, NL, NE, LH, VH, roughness );
 		}
 	#endif
 
