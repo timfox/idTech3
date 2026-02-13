@@ -720,6 +720,16 @@ void Sys_CreateConsole( const char *title, int xPos, int yPos, qboolean useXYpos
 	rect.top = 0;
 	rect.bottom = DEFAULT_HEIGHT;
 
+	// Apply UI scaling for high-resolution displays
+	{
+		cvar_t *ui_scale = Cvar_FindVar("ui_scale");
+		if (ui_scale && ui_scale->value > 0.0f) {
+			float scale = ui_scale->value;
+			rect.right = (int)(DEFAULT_WIDTH * scale);
+			rect.bottom = (int)(DEFAULT_HEIGHT * scale);
+		}
+	}
+
 	AdjustWindowRect( &rect, DEDSTYLE, FALSE );
 
 	// try to use command line provided coodinates to locate primary monitor
