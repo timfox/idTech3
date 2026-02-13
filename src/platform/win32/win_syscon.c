@@ -771,7 +771,7 @@ void Sys_CreateConsole( const char *title, int xPos, int yPos, qboolean useXYpos
 	}
 
 	s_wcd.hWnd = CreateWindowEx( 0, DEDCLASS,
-		T(CONSOLE_WINDOW_TITLE), DEDSTYLE, con_x, con_y,
+		AtoW(title), DEDSTYLE, con_x, con_y,
 		s_wcd.windowWidth, s_wcd.windowHeight,
 		NULL, NULL, g_wv.hInstance, NULL );
 
@@ -896,6 +896,15 @@ void Sys_DestroyConsole( void )
 		CloseWindow( s_wcd.hWnd );
 		DestroyWindow( s_wcd.hWnd );
 		s_wcd.hWnd = NULL;
+	}
+}
+
+
+void Sys_UpdateConsoleTitle( const char *title )
+{
+	if ( s_wcd.hWnd && title && *title )
+	{
+		SetWindowText( s_wcd.hWnd, AtoW( title ) );
 	}
 }
 
