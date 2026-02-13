@@ -6010,7 +6010,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	const char *pipeline_name;
 	qboolean blend;
 
-	struct FragSpecData {
+	struct PostProcess_FragSpecData {
 		float gamma;
 		float overbright;
 		float greyscale;
@@ -6150,39 +6150,39 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 		ri.Printf( PRINT_ALL, "Format %s not recognized, dither to assume 8bpc\n", vk_format_string( vk.base_format.format ) );
 
 	spec_entries[0].constantID = 0;
-	spec_entries[0].offset = offsetof( struct FragSpecData, gamma );
+	spec_entries[0].offset = offsetof( struct PostProcess_FragSpecData, gamma );
 	spec_entries[0].size = sizeof( frag_spec_data.gamma );
 
 	spec_entries[1].constantID = 1;
-	spec_entries[1].offset = offsetof( struct FragSpecData, overbright );
+	spec_entries[1].offset = offsetof( struct PostProcess_FragSpecData, overbright );
 	spec_entries[1].size = sizeof( frag_spec_data.overbright );
 
 	spec_entries[2].constantID = 2;
-	spec_entries[2].offset = offsetof( struct FragSpecData, greyscale );
+	spec_entries[2].offset = offsetof( struct PostProcess_FragSpecData, greyscale );
 	spec_entries[2].size = sizeof( frag_spec_data.greyscale );
 
 	spec_entries[3].constantID = 3;
-	spec_entries[3].offset = offsetof( struct FragSpecData, bloom_threshold );
+	spec_entries[3].offset = offsetof( struct PostProcess_FragSpecData, bloom_threshold );
 	spec_entries[3].size = sizeof( frag_spec_data.bloom_threshold );
 
 	spec_entries[4].constantID = 4;
-	spec_entries[4].offset = offsetof( struct FragSpecData, bloom_intensity );
+	spec_entries[4].offset = offsetof( struct PostProcess_FragSpecData, bloom_intensity );
 	spec_entries[4].size = sizeof( frag_spec_data.bloom_intensity );
 
 	spec_entries[5].constantID = 5;
-	spec_entries[5].offset = offsetof( struct FragSpecData, bloom_threshold_mode );
+	spec_entries[5].offset = offsetof( struct PostProcess_FragSpecData, bloom_threshold_mode );
 	spec_entries[5].size = sizeof( frag_spec_data.bloom_threshold_mode );
 
 	spec_entries[6].constantID = 6;
-	spec_entries[6].offset = offsetof( struct FragSpecData, bloom_modulate );
+	spec_entries[6].offset = offsetof( struct PostProcess_FragSpecData, bloom_modulate );
 	spec_entries[6].size = sizeof( frag_spec_data.bloom_modulate );
 
 	spec_entries[7].constantID = 7;
-	spec_entries[7].offset = offsetof( struct FragSpecData, dither );
+	spec_entries[7].offset = offsetof( struct PostProcess_FragSpecData, dither );
 	spec_entries[7].size = sizeof( frag_spec_data.dither );
 
 	spec_entries[8].constantID = 8;
-	spec_entries[8].offset = offsetof( struct FragSpecData, depth_r );
+	spec_entries[8].offset = offsetof( struct PostProcess_FragSpecData, depth_r );
 	spec_entries[8].size = sizeof( frag_spec_data.depth_r );
 
 	spec_entries[9].constantID = 9;
@@ -7848,6 +7848,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	SET_OBJECT_NAME( pipeline, va( "pipeline def#%i, pass#%i", def_index, renderPassIndex ), VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
 
 	vk.pipeline_create_count++;
+
+	}
 
 	return pipeline;
 }
