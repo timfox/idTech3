@@ -3028,7 +3028,7 @@ qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size )
 #include "shaders/spirv/shader_data.c"
 #define SHADER_MODULE(name) SHADER_MODULE(name,sizeof(name))
 
-// #include "shaders/spirv/shader_binding.c"
+#include "shaders/spirv/shader_binding.c"
 
 static void vk_create_shader_modules( void )
 {	
