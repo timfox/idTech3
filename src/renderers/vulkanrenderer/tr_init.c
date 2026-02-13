@@ -101,6 +101,10 @@ cvar_t  *r_baseSpecular;
 #ifdef VK_CUBEMAP
 cvar_t	*r_cubeMapping;
 #endif
+#ifdef HDR_DELUXE_LIGHTMAP
+cvar_t	*r_deluxeMapping;
+cvar_t	*r_deluxeSpecular;
+#endif
 #endif
 cvar_t	*r_fbo;
 cvar_t	*r_hdr;
@@ -121,6 +125,7 @@ cvar_t	*r_renderWidth;
 cvar_t	*r_renderHeight;
 cvar_t	*r_renderScale;
 cvar_t	*r_ext_supersample;
+
 #endif // USE_VULKAN
 
 cvar_t	*r_dlightBacks;
@@ -1634,6 +1639,12 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_pbr_cubemapInfo, "Read-only-ish debug string updated by renderer when r_pbr_showCubemap is enabled." );
 
 	r_cubeMapping = ri.Cvar_Get( "r_cubeMapping", "0", CVAR_ARCHIVE | CVAR_LATCH );
+#endif
+	#ifdef HDR_DELUXE_LIGHTMAP
+	r_deluxeMapping		= ri.Cvar_Get("r_deluxeMapping",	"1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_deluxeMapping, "Reading deluxemaps when compiled with q3map2:\n 0: off (approximated from lightgrid)\n 1: on (compiled deluxemaps)" );
+	r_deluxeSpecular	= ri.Cvar_Get("r_deluxeSpecular",	"1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_deluxeSpecular, "Scale the specular response from deluxemaps" );
 #endif
 #endif
 	r_mapGreyScale = ri.Cvar_Get( "r_mapGreyScale", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
