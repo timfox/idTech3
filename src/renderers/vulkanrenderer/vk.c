@@ -8,6 +8,43 @@
 #endif
 #endif
 
+struct Vk_Pipeline_FragSpecData {
+	int32_t alpha_test_func;
+	float   alpha_test_value;
+	float   depth_fragment;
+	int32_t alpha_to_coverage;
+	int32_t color_mode;
+	int32_t abs_light;
+	int32_t tex_mode;
+	int32_t discard_mode;
+	float   identity_color;
+	float	identity_alpha;
+	float	acff;
+#ifdef USE_VK_PBR
+	float   specularScale_x;	// use ubo for this
+	float   specularScale_y;
+	float   specularScale_z;
+	float   specularScale_w;
+	float   normalScale_x;
+	float   normalScale_y;
+	float   normalScale_z;
+	float   normalScale_w;		// ..
+	int32_t normal_texture_set;
+	int32_t physical_texture_set;
+	int32_t env_texture_set;
+	int32_t lightmap_texture_set;
+	int32_t deluxe_mapping;
+	float deluxe_specular_scale;
+	int32_t irradiance_texture_set;
+	int32_t emissive_texture_set;
+	int32_t clearcoat_texture_set;
+	int32_t sheen_texture_set;
+	int32_t anisotropy_texture_set;
+	int32_t transmission_texture_set;
+	int32_t subsurface_texture_set;
+#endif
+};
+
 static int vkSamples = VK_SAMPLE_COUNT_1_BIT;
 static int vkMaxSamples = VK_SAMPLE_COUNT_1_BIT;
 
@@ -137,6 +174,10 @@ static PFN_vkCmdClearColorImage								qvkCmdClearColorImage;
 
 // forward declaration
 VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassIndex, uint32_t def_index );
+static uint32_t vk_alloc_pipeline( const Vk_Pipeline_Def *def );
+static VkPipeline vk_gen_pipeline( uint32_t index );
+uint32_t vk_find_pipeline_ext( uint32_t base, const Vk_Pipeline_Def *def, qboolean use );
+
 
 static uint32_t find_memory_type( uint32_t memory_type_bits, VkMemoryPropertyFlags properties ) {
 	VkPhysicalDeviceMemoryProperties memory_properties;
@@ -1256,7 +1297,7 @@ static qboolean vk_wait_staging_buffer( void )
 	if ( vk.aux_fence_wait ) {
 		VkResult res = qvkWaitForFences( vk.device, 1, &vk.aux_fence, VK_TRUE, 5 * 1000000000ULL );
 		if ( res != VK_SUCCESS ) {
-			ri.Error( ERR_FATAL, "vkWaitForFences() failed with %s at %s", vk_result_string( res ), __func__ );
+			ri.Error( ERR_FATAL, "vkWaitForFences() failed with %s at %s", vk_result_string( res ), __FUNCTION__ );
 		}
 		qvkResetFences( vk.device, 1, &vk.aux_fence );
 		VK_CHECK( qvkResetCommandBuffer( vk.staging_command_buffer, 0 ) );
@@ -1322,7 +1363,7 @@ static void vk_flush_staging_buffer( qboolean final )
 		VK_CHECK( qvkQueueSubmit( vk.queue, 1, &submit_info, vk.aux_fence ) );
 		res = qvkWaitForFences( vk.device, 1, &vk.aux_fence, VK_TRUE, 5 * 1000000000ULL );
 		if ( res != VK_SUCCESS ) {
-			ri.Error( ERR_FATAL, "vkWaitForFences() failed with %s at %s", vk_result_string( res ), __func__ );
+			ri.Error( ERR_FATAL, "vkWaitForFences() failed with %s at %s", vk_result_string( res ), __FUNCTION__ );
 		}
 		qvkResetFences( vk.device, 1, &vk.aux_fence );
 		VK_CHECK( qvkResetCommandBuffer( vk.staging_command_buffer, 0 ) );
@@ -2987,7 +3028,7 @@ qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size )
 #include "shaders/spirv/shader_data.c"
 #define SHADER_MODULE(name) SHADER_MODULE(name,sizeof(name))
 
-#include "shaders/spirv/shader_binding.c"
+// #include "shaders/spirv/shader_binding.c"
 
 static void vk_create_shader_modules( void )
 {	
@@ -6145,11 +6186,11 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	spec_entries[8].size = sizeof( frag_spec_data.depth_r );
 
 	spec_entries[9].constantID = 9;
-	spec_entries[9].offset = offsetof(struct FragSpecData, depth_g);
+	spec_entries[9].offset = offsetof(struct Vk_Pipeline_FragSpecData, depth_g);
 	spec_entries[9].size = sizeof(frag_spec_data.depth_g);
 
 	spec_entries[10].constantID = 10;
-	spec_entries[10].offset = offsetof(struct FragSpecData, depth_b);
+	spec_entries[10].offset = offsetof(struct Vk_Pipeline_FragSpecData, depth_b);
 	spec_entries[10].size = sizeof(frag_spec_data.depth_b);
 
 	frag_spec_info.mapEntryCount = 11;
@@ -6506,42 +6547,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	VkShaderModule *fs_module = NULL;
 	//int32_t vert_spec_data[1]; // clippping
 	//VkSpecializationInfo vert_spec_info;
-    struct FragSpecData {
-        int32_t alpha_test_func; 
-        float   alpha_test_value;
-        float   depth_fragment;
-        int32_t alpha_to_coverage;
-        int32_t color_mode;
-        int32_t abs_light; 
-        int32_t tex_mode;
-        int32_t discard_mode;
-        float   identity_color;
-		float	identity_alpha;
-		float	acff;
-#ifdef USE_VK_PBR
-        float   specularScale_x;	// use ubo for this
-        float   specularScale_y;
-        float   specularScale_z;
-        float   specularScale_w;
-        float   normalScale_x;
-        float   normalScale_y;
-        float   normalScale_z;
-        float   normalScale_w;		// ..
-        int32_t normal_texture_set;
-        int32_t physical_texture_set;
-        int32_t env_texture_set;
-        int32_t lightmap_texture_set;
-        int32_t deluxe_mapping;
-        float deluxe_specular_scale;
-        int32_t irradiance_texture_set;
-        int32_t emissive_texture_set;
-        int32_t clearcoat_texture_set;
-        int32_t sheen_texture_set;
-        int32_t anisotropy_texture_set;
-        int32_t transmission_texture_set;
-        int32_t subsurface_texture_set;
-#endif
-    } frag_spec_data; 
+    struct Vk_Pipeline_FragSpecData frag_spec_data;
 
 #ifdef USE_VK_PBR
     VkSpecializationMapEntry spec_entries[37];
@@ -7110,48 +7116,48 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	//
 
     spec_entries[1].constantID = 0;
-    spec_entries[1].offset = offsetof(struct FragSpecData, alpha_test_func);
+    spec_entries[1].offset = offsetof(struct Vk_Pipeline_FragSpecData, alpha_test_func);
     spec_entries[1].size = sizeof(frag_spec_data.alpha_test_func);
 
     spec_entries[2].constantID = 1;
-    spec_entries[2].offset = offsetof(struct FragSpecData, alpha_test_value);
+    spec_entries[2].offset = offsetof(struct Vk_Pipeline_FragSpecData, alpha_test_value);
     spec_entries[2].size = sizeof(frag_spec_data.alpha_test_value);
 
     spec_entries[3].constantID = 2;
-    spec_entries[3].offset = offsetof(struct FragSpecData, depth_fragment);
+    spec_entries[3].offset = offsetof(struct Vk_Pipeline_FragSpecData, depth_fragment);
     spec_entries[3].size = sizeof(frag_spec_data.depth_fragment);
 
     spec_entries[4].constantID = 3;
-    spec_entries[4].offset = offsetof(struct FragSpecData, alpha_to_coverage);
+    spec_entries[4].offset = offsetof(struct Vk_Pipeline_FragSpecData, alpha_to_coverage);
     spec_entries[4].size = sizeof(frag_spec_data.alpha_to_coverage);
 
     spec_entries[5].constantID = 4;
-    spec_entries[5].offset = offsetof(struct FragSpecData, color_mode);
+    spec_entries[5].offset = offsetof(struct Vk_Pipeline_FragSpecData, color_mode);
     spec_entries[5].size = sizeof(frag_spec_data.color_mode);
 
     spec_entries[6].constantID = 5;
-    spec_entries[6].offset = offsetof(struct FragSpecData, abs_light);
+    spec_entries[6].offset = offsetof(struct Vk_Pipeline_FragSpecData, abs_light);
     spec_entries[6].size = sizeof(frag_spec_data.abs_light);
 
     spec_entries[7].constantID = 6;
-    spec_entries[7].offset = offsetof(struct FragSpecData, tex_mode);
+    spec_entries[7].offset = offsetof(struct Vk_Pipeline_FragSpecData, tex_mode);
     spec_entries[7].size = sizeof(frag_spec_data.tex_mode);
 
     spec_entries[8].constantID = 7;
-    spec_entries[8].offset = offsetof(struct FragSpecData, discard_mode);
+    spec_entries[8].offset = offsetof(struct Vk_Pipeline_FragSpecData, discard_mode);
     spec_entries[8].size = sizeof(frag_spec_data.discard_mode);
 
     spec_entries[9].constantID = 8;
-    spec_entries[9].offset = offsetof(struct FragSpecData, identity_color);
+    spec_entries[9].offset = offsetof(struct Vk_Pipeline_FragSpecData, identity_color);
     spec_entries[9].size = sizeof(frag_spec_data.identity_color);
 
 
 	spec_entries[10].constantID = 9;
-    spec_entries[10].offset = offsetof(struct FragSpecData, identity_color);
+    spec_entries[10].offset = offsetof(struct Vk_Pipeline_FragSpecData, identity_color);
     spec_entries[10].size = sizeof(frag_spec_data.identity_color);
 
 	spec_entries[11].constantID = 10;
-    spec_entries[11].offset = offsetof(struct FragSpecData, identity_color);
+    spec_entries[11].offset = offsetof(struct Vk_Pipeline_FragSpecData, identity_color);
     spec_entries[11].size = sizeof(frag_spec_data.identity_color);
 
 	frag_spec_info.mapEntryCount = 11;
@@ -7161,63 +7167,63 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 
         {
             spec_entries[12].constantID = 11;
-            spec_entries[12].offset = offsetof(struct FragSpecData, specularScale_x);
+            spec_entries[12].offset = offsetof(struct Vk_Pipeline_FragSpecData, specularScale_x);
             spec_entries[12].size = sizeof(frag_spec_data.specularScale_x);
 
             spec_entries[13].constantID = 12;
-            spec_entries[13].offset = offsetof(struct FragSpecData, specularScale_y);
+            spec_entries[13].offset = offsetof(struct Vk_Pipeline_FragSpecData, specularScale_y);
             spec_entries[13].size = sizeof(frag_spec_data.specularScale_y);
 
         spec_entries[12].constantID = 11;
-        spec_entries[12].offset = offsetof(struct FragSpecData, deluxe_mapping);
+        spec_entries[12].offset = offsetof(struct Vk_Pipeline_FragSpecData, deluxe_mapping);
         spec_entries[12].size = sizeof(frag_spec_data.deluxe_mapping);
 
         spec_entries[13].constantID = 12;
-        spec_entries[13].offset = offsetof(struct FragSpecData, deluxe_specular_scale);
+        spec_entries[13].offset = offsetof(struct Vk_Pipeline_FragSpecData, deluxe_specular_scale);
         spec_entries[13].size = sizeof(frag_spec_data.deluxe_specular_scale);
 
         spec_entries[22].constantID = 21;
-        spec_entries[22].offset = offsetof(struct FragSpecData, env_texture_set);
+        spec_entries[22].offset = offsetof(struct Vk_Pipeline_FragSpecData, env_texture_set);
         spec_entries[22].size = sizeof(frag_spec_data.env_texture_set);
 
         spec_entries[23].constantID = 22;
-        spec_entries[23].offset = offsetof(struct FragSpecData, lightmap_texture_set);
+        spec_entries[23].offset = offsetof(struct Vk_Pipeline_FragSpecData, lightmap_texture_set);
         spec_entries[23].size = sizeof(frag_spec_data.lightmap_texture_set);
 
         spec_entries[24].constantID = 23;
-        spec_entries[24].offset = offsetof(struct FragSpecData, irradiance_texture_set);
+        spec_entries[24].offset = offsetof(struct Vk_Pipeline_FragSpecData, irradiance_texture_set);
         spec_entries[24].size = sizeof(frag_spec_data.irradiance_texture_set);
 
         spec_entries[25].constantID = 24;
-        spec_entries[25].offset = offsetof(struct FragSpecData, emissive_texture_set);
+        spec_entries[25].offset = offsetof(struct Vk_Pipeline_FragSpecData, emissive_texture_set);
         spec_entries[25].size = sizeof(frag_spec_data.emissive_texture_set);
 
         spec_entries[26].constantID = 25;
-        spec_entries[26].offset = offsetof(struct FragSpecData, clearcoat_texture_set);
+        spec_entries[26].offset = offsetof(struct Vk_Pipeline_FragSpecData, clearcoat_texture_set);
         spec_entries[26].size = sizeof(frag_spec_data.clearcoat_texture_set);
 
         spec_entries[27].constantID = 26;
-        spec_entries[27].offset = offsetof(struct FragSpecData, sheen_texture_set);
+        spec_entries[27].offset = offsetof(struct Vk_Pipeline_FragSpecData, sheen_texture_set);
         spec_entries[27].size = sizeof(frag_spec_data.sheen_texture_set);
 
         spec_entries[28].constantID = 27;
-        spec_entries[28].offset = offsetof(struct FragSpecData, anisotropy_texture_set);
+        spec_entries[28].offset = offsetof(struct Vk_Pipeline_FragSpecData, anisotropy_texture_set);
         spec_entries[28].size = sizeof(frag_spec_data.anisotropy_texture_set);
 
         spec_entries[29].constantID = 28;
-        spec_entries[29].offset = offsetof(struct FragSpecData, transmission_texture_set);
+        spec_entries[29].offset = offsetof(struct Vk_Pipeline_FragSpecData, transmission_texture_set);
         spec_entries[29].size = sizeof(frag_spec_data.transmission_texture_set);
 
         spec_entries[30].constantID = 29;
-        spec_entries[30].offset = offsetof(struct FragSpecData, subsurface_texture_set);
+        spec_entries[30].offset = offsetof(struct Vk_Pipeline_FragSpecData, subsurface_texture_set);
         spec_entries[30].size = sizeof(frag_spec_data.subsurface_texture_set);
         
         spec_entries[24].constantID = 23;
-        spec_entries[24].offset = offsetof(struct FragSpecData, deluxe_mapping);
+        spec_entries[24].offset = offsetof(struct Vk_Pipeline_FragSpecData, deluxe_mapping);
         spec_entries[24].size = sizeof(frag_spec_data.deluxe_mapping);
 
         spec_entries[25].constantID = 24;
-        spec_entries[25].offset = offsetof(struct FragSpecData, deluxe_specular_scale);
+        spec_entries[25].offset = offsetof(struct Vk_Pipeline_FragSpecData, deluxe_specular_scale);
         spec_entries[25].size = sizeof(frag_spec_data.deluxe_specular_scale);
 
         // only use w value, specgloss maps are not supported
@@ -7542,7 +7548,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			break;
 
 		default:
-			ri.Error( ERR_DROP, "%s: invalid shader type - %i", __func__, def->shader_type );
+			ri.Error( ERR_DROP, "%s: invalid shader type - %i", __FUNCTION__, def->shader_type );
 			break;
 	}
 
@@ -7873,10 +7879,14 @@ static VkPipeline vk_gen_pipeline( uint32_t index ) {
 		}
 		return pipeline->handle[ pass ];
 	} else {
-		ri.Error( ERR_FATAL, "%s(%i): NULL pipeline", __func__, index );
+		ri.Error( ERR_FATAL, "vk_gen_pipeline(%i): NULL pipeline", index );
 		return VK_NULL_HANDLE;
 	}
 }
+
+
+
+
 
 
 uint32_t vk_find_pipeline_ext( uint32_t base, const Vk_Pipeline_Def *def, qboolean use ) {
@@ -9242,7 +9252,7 @@ void vk_read_pixels( byte *buffer, uint32_t width, uint32_t height )
 			memory_reqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 			alloc_info.memoryTypeIndex = find_memory_type2( memory_requirements.memoryTypeBits, memory_reqs, &memory_flags );
 			if ( alloc_info.memoryTypeIndex == ~0U ) {
-				ri.Error( ERR_FATAL, "%s(): failed to find matching memory type for image capture", __func__ );
+				ri.Error( ERR_FATAL, "%s(): failed to find matching memory type for image capture", __FUNCTION__ );
 			}
 		}
 	}
