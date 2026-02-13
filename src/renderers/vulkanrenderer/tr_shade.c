@@ -1435,8 +1435,14 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			#ifdef HDR_DELUXE_LIGHTMAP
 				// aparently lightmap is not always in bundle 1 ..
 				// should probably fix this in collapseMuklitexture
-				// Temporarily disabled deluxe lightmap code for debugging
-				vk_update_descriptor(  VK_DESC_PBR_DELUXE, tr.whiteImage->descriptor );
+				if ( def.vk_pbr_flags & PBR_HAS_DELUXEMAP0 )
+					vk_update_descriptor(  VK_DESC_PBR_DELUXE, pStage->bundle[0].deluxeMap->descriptor );
+
+				if ( def.vk_pbr_flags & PBR_HAS_DELUXEMAP1 )
+					vk_update_descriptor(  VK_DESC_PBR_DELUXE, pStage->bundle[1].deluxeMap->descriptor );
+
+				else if ( !(def.vk_pbr_flags & PBR_HAS_DELUXEMAP0) )
+					vk_update_descriptor(  VK_DESC_PBR_DELUXE, tr.whiteImage->descriptor );
 				}
 			#endif
 #endif

@@ -49,7 +49,14 @@
 	#define VK_DESC_PBR_PHYSICAL			7
 	#define VK_DESC_PBR_CUBEMAP				8
 	#define VK_DESC_PBR_DELUXE				9
-	#define VK_DESC_COUNT	10
+	#define VK_DESC_PBR_IRRADIANCE			10
+	#define VK_DESC_PBR_EMISSIVE			11
+	#define VK_DESC_PBR_CLEARCOAT			12
+	#define VK_DESC_PBR_SHEEN				13
+	#define VK_DESC_PBR_ANISOTROPY			14
+	#define VK_DESC_PBR_TRANSMISSION		15
+	#define VK_DESC_PBR_SUBSURFACE			16
+	#define VK_DESC_COUNT	17
 #else
 	#define VK_DESC_COUNT   5
 #endif
