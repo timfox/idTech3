@@ -2027,11 +2027,9 @@ void R_Init( void ) {
 	ri.Printf( PRINT_ALL, "[VK] SH world: %s\n", r_shWorldLighting && r_shWorldLighting->integer ? "enabled" : "disabled" );
 	ri.Printf( PRINT_ALL, "[VK] SH debug view: %d\n", r_shDebugView ? r_shDebugView->integer : 0 );
 
-	// print renderer info
-	GfxInfo();
 
-	max_polys = r_maxpolys->integer;
-	max_polyverts = r_maxpolyverts->integer;
+	max_polys = r_maxpolys ? r_maxpolys->integer : MAX_POLYS;
+	max_polyverts = r_maxpolyverts ? r_maxpolyverts->integer : MAX_POLYVERTS;
 
 	ptr = ri.Hunk_Alloc( sizeof( *backEndData ) + sizeof(srfPoly_t) * max_polys + sizeof(polyVert_t) * max_polyverts, h_low);
 	backEndData = (backEndData_t *) ptr;
@@ -2041,6 +2039,9 @@ void R_Init( void ) {
 	R_InitNextFrame();
 
 	InitOpenGL();
+
+	// print renderer info after Vulkan is fully initialized
+	GfxInfo();
 
 	R_InitImages();
 
