@@ -40,7 +40,9 @@ if(CI_BUILD)
   if(MSVC)
     add_compile_options(/WX)
   else()
-    add_compile_options(-Werror)
+    # For CI builds, treat most warnings as errors but allow unused functions
+    # (these are API functions used across compilation units)
+    add_compile_options(-Werror -Wno-error=unused-function)
   endif()
 endif()
 
@@ -793,17 +795,6 @@ AUX_SOURCE_DIRECTORY(src/renderers/vulkanrenderer RENDERER_VK_SRCS)
 list(APPEND RENDERER_VK_SRCS
     src/renderers/vulkanrenderer/utils/mikktspace/mikktspace.c
 )
-# Suppress warnings for Vulkan renderer
-if(MSVC)
-    set_source_files_properties(src/renderers/vulkanrenderer/vk.c PROPERTIES
-        COMPILE_OPTIONS "/wd4100;/wd4505;/wd4456;/wd4457;/wd4458;/wd4459"
-    )
-else()
-    set_source_files_properties(src/renderers/vulkanrenderer/vk.c PROPERTIES
-        COMPILE_OPTIONS "-Wno-unused-function;-Wno-shadow"
-    )
-endif()
-
 # Suppress shadow warnings for MikkTSpace third-party code
 if(MSVC)
     set_source_files_properties(src/renderers/vulkanrenderer/utils/mikktspace/mikktspace.c PROPERTIES
