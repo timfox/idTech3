@@ -556,12 +556,12 @@ Com_EarlyParseCmdLine
 returns qtrue if both vid_xpos and vid_ypos was set
 ===================
 */
-qboolean Com_EarlyParseCmdLine( char *commandLine, char *con_title, int title_size, int *vid_xpos, int *vid_ypos )
+qboolean Com_EarlyParseCmdLine( char *commandLine, char *console_title, int title_size, int *vid_xpos, int *vid_ypos )
 {
 	int		flags = 0;
 	int		i;
 
-	*con_title = '\0';
+	*console_title = '\0';
 	Com_ParseCommandLine( commandLine );
 
 	for ( i = 0 ; i < com_numConsoleLines ; i++ ) {
@@ -578,12 +578,12 @@ qboolean Com_EarlyParseCmdLine( char *commandLine, char *con_title, int title_si
 		}
 		if ( !Q_stricmpn( Cmd_Argv(0), "set", 3 ) && !Q_stricmp( Cmd_Argv(1), "con_title" ) ) {
 			com_consoleLines[i][0] = '\0';
-			Q_strncpyz( con_title, Cmd_ArgsFrom( 2 ), title_size );
+			Q_strncpyz( console_title, Cmd_ArgsFrom( 2 ), title_size );
 			continue;
 		}
 		if ( !Q_stricmp( Cmd_Argv(0), "con_title" ) ) {
 			com_consoleLines[i][0] = '\0';
-			Q_strncpyz( con_title, Cmd_ArgsFrom( 1 ), title_size );
+			Q_strncpyz( console_title, Cmd_ArgsFrom( 1 ), title_size );
 			continue;
 		}
 		if ( !Q_stricmpn( Cmd_Argv(0), "set", 3 ) && !Q_stricmp( Cmd_Argv(1), "vid_xpos" ) ) {
