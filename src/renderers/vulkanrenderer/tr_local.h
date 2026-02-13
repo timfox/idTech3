@@ -23,16 +23,17 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef TR_LOCAL_H
 #define TR_LOCAL_H
 
+#define HDR_DELUXE_LIGHTMAP
+
 #define USE_VK_PBR
-
 #ifdef USE_VK_PBR
-#define VK_PBR_BRDFLUT		// for inspecting codebase, does not toggle brdflut. 
-#define VK_CUBEMAP	
+	#define VK_PBR_BRDFLUT		// for inspecting codebase, does not toggle brdflut. 
+	#define VK_CUBEMAP	
 
-#ifdef VK_CUBEMAP
-	#define REF_CUBEMAP_IRRADIANCE_SIZE		64
-	#define REF_CUBEMAP_SIZE				256
-#endif
+	#ifdef VK_CUBEMAP
+		#define REF_CUBEMAP_IRRADIANCE_SIZE		64
+		#define REF_CUBEMAP_SIZE				256
+	#endif
 #endif
 
 #define USE_VBO				// store static world geometry in VBO
@@ -381,6 +382,10 @@ typedef struct {
 	qboolean		isVideoMap;
 	unsigned int 	isScreenMap : 1;
 	unsigned int 	dlight : 1;
+#ifdef USE_VK_PBR
+	// have no dedicated bundle indexes for pbr samplers
+	image_t			*deluxeMap;
+#endif
 } textureBundle_t;
 
 #ifdef USE_VULKAN
@@ -1303,6 +1308,11 @@ typedef struct {
 	int						numLightmaps;
 	image_t					**lightmaps;
 
+#ifdef HDR_DELUXE_LIGHTMAP
+	image_t					**deluxemaps;
+	qboolean				worldDeluxeMapping;
+#endif
+
 	qboolean				mergeLightmaps;
 	float					lightmapOffset[2];	// current shader lightmap offset
 	float					lightmapScale[2];	// for lightmap atlases
@@ -1446,6 +1456,10 @@ extern cvar_t	*r_baseParallax;
 extern cvar_t	*r_baseSpecular;
 #ifdef VK_CUBEMAP
 extern cvar_t	*r_cubeMapping;
+#endif
+#ifdef HDR_DELUXE_LIGHTMAP
+extern cvar_t	*r_deluxeMapping;
+extern cvar_t	*r_deluxeSpecular;
 #endif
 #endif
 extern cvar_t	*r_ssao;
@@ -2146,11 +2160,10 @@ void RE_VertexLighting( qboolean allowed );
 
 #ifdef USE_VK_PBR
 // pbr
-void		R_CalcTangents( vec3_t tangent, vec3_t binormal,
-				const vec3_t v0, const vec3_t v1, const vec3_t v2,
-				const vec2_t t0, const vec2_t t1, const vec2_t t2 );
-void		R_TBNtoQtangents( const vec3_t tangent, const vec3_t binormal,
-		       const vec3_t normal, vec4_t qtangent );
+// mikktspace
+void		vk_mikkt_bsp_tri_generate( srfTriangles_t *tri );
+void		vk_mikkt_bsp_face_generate( srfSurfaceFace_t *face );
+
 void		R_AddConvolveCubemapCmd( cubemap_t *cubemap , int cubemapId );
 void		vk_generate_cubemaps( cubemap_t *cube );
 void		R_IssueRenderCommands( void );
@@ -2169,6 +2182,6 @@ extern void VBO_ClearQueue( void );
 extern void VBO_Flush( void );
 #endif
 
-int R_GetLightmapCoords( const int lightmapIndex, float *x, float *y );
+int R_GetLightmapCoords( int lightmapIndex, float *x, float *y );
 
 #endif //TR_LOCAL_H
