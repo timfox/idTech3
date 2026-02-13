@@ -1940,7 +1940,7 @@ qboolean is_pbr_surface;
 #endif
 
 #ifdef USE_VK_PBR
-		if ( is_pbr_surface && pStage->vk_pbr_flags ) {
+		if ( is_pbr_surface && ( pStage->vk_pbr_flags || pbr_debug >= 17 ) ) {
 			static VkCommandBuffer lastCmdBuf = VK_NULL_HANDLE;
 			static qboolean lastValid = qfalse;
 			static vkPbrUniformBlock_t lastBlock;
@@ -2751,8 +2751,8 @@ qboolean is_pbr_surface;
 #undef UPDATE_PBR_BINDING_STATE
 #endif
 
-		if ( ( r_pbr_bindlog && r_pbr_bindlog->integer ) || ( r_pbr_debug && r_pbr_debug->integer >= 17 ) ) {
-			if ( is_pbr_surface ) {
+			if ( ( r_pbr_bindlog && r_pbr_bindlog->integer ) || ( r_pbr_debug && r_pbr_debug->integer >= 17 ) ) {
+				if ( is_pbr_surface ) {
 				ri.Printf( PRINT_ALL,
 					"PBR PIPELINE BIND: is_pbr_surface=%d is2D=%d shader=%s stage=%d debug=%d\n",
 					is_pbr_surface ? 1 : 0,
@@ -2760,18 +2760,25 @@ qboolean is_pbr_surface;
 					tess.shader ? tess.shader->name : "null",
 					stage,
 					pbr_debug );
-			} else if ( is2DPass ) {
-				const void *layoutPtr = (void *)(uintptr_t)(
-					( vk.pipelines[pipeline].def.descriptorIndexing && vk.pipeline_layout_pbr_indexed != VK_NULL_HANDLE ) ?
-						vk.pipeline_layout_pbr_indexed : vk.pipeline_layout );
-				ri.Printf( PRINT_ALL,
-					"NONPBR pipeline bind: vk_pbr_flags=%u layout=%p pipeline=%p\n",
-					vk.pipelines[pipeline].def.vk_pbr_flags,
-					layoutPtr,
-					(void *)(uintptr_t)pipeline );
-				ri.Printf( PRINT_ALL,
-					"NON-PBR 2D PIPELINE BIND: is_pbr_surface=%d is2D=%d shader=%s stage=%d debug=%d\n",
-					is_pbr_surface ? 1 : 0,
+				} else if ( is2DPass ) {
+					if ( pipeline < vk.pipelines_count ) {
+						const void *layoutPtr = (void *)(uintptr_t)(
+							( vk.pipelines[pipeline].def.descriptorIndexing && vk.pipeline_layout_pbr_indexed != VK_NULL_HANDLE ) ?
+								vk.pipeline_layout_pbr_indexed : vk.pipeline_layout );
+						ri.Printf( PRINT_ALL,
+							"NONPBR pipeline bind: vk_pbr_flags=%u layout=%p pipeline=%p\n",
+							vk.pipelines[pipeline].def.vk_pbr_flags,
+							layoutPtr,
+							(void *)(uintptr_t)pipeline );
+					} else {
+						ri.Printf( PRINT_WARNING,
+							"NONPBR pipeline bind: invalid pipeline index=%u (count=%u)\n",
+							pipeline,
+							vk.pipelines_count );
+					}
+					ri.Printf( PRINT_ALL,
+						"NON-PBR 2D PIPELINE BIND: is_pbr_surface=%d is2D=%d shader=%s stage=%d debug=%d\n",
+						is_pbr_surface ? 1 : 0,
 					is2DPass ? 1 : 0,
 					tess.shader ? tess.shader->name : "null",
 					stage,

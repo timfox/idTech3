@@ -800,14 +800,19 @@ vec3 CalcSheen( in vec3 sheenColor, in vec3 N, in vec3 V, in float roughness )
 	return sheenColor * D * Fc;
 }
 
-vec3 CalcTransmission( in vec3 tint, in vec3 N, in vec3 V, in vec3 L, in float roughness )
+vec3 CalcTransmission( in vec3 tint, in vec3 N, in vec3 V, in vec3 L, in float roughness, in float ior, in float thickness )
 {
-	vec3 H = normalize( L + V );
-	float VH = clamp( dot( V, H ), 0.0, 1.0 );
 	float cosTheta = clamp( dot( N, V ), 0.0, 1.0 );
 	float F = pow( 1.0 - cosTheta, 5.0 );
-	float trans = ( 1.0 - F ) * max( 0.0, 1.0 - roughness );
-	return tint * trans * max( dot( N, L ), 0.0 );
+	float eta = 1.0 / max( ior, 1.01 );
+	vec3 refracted = refract( -V, N, eta );
+	float refrWeight = ( length( refracted ) > 1e-4 ) ? 1.0 : 0.0;
+	float transThickness = exp( -max( thickness, 0.0 ) * 2.0 );
+	float trans = ( 1.0 - F ) * max( 0.0, 1.0 - roughness ) * transThickness;
+	float NL = max( dot( N, L ), 0.0 );
+	float backNL = max( dot( -N, L ), 0.0 );
+	float lobe = mix( NL, backNL, 0.5 + 0.5 * refrWeight );
+	return tint * trans * lobe;
 }
 
 float CalcSpecularAO( in float ao, in float roughness, in float NE )
@@ -934,12 +939,13 @@ vec3 CalcDiffuseIrradiance( in vec3 N, in bool hasIrradiance )
 	return irradiance;
 }
 
-vec3 CalcBurleySubsurface( in vec3 N, in vec3 L, in vec3 subsurfaceColor, in float strength, in float wrap )
+vec3 CalcBurleySubsurface( in vec3 N, in vec3 L, in vec3 subsurfaceColor, in float strength, in float wrap, in float thickness )
 {
 	float NL = clamp( dot( N, L ), 0.0, 1.0 );
 	float wrapValue = clamp( wrap, 0.0, 1.0 );
 	float scatter = WrapLambert( NL, wrapValue );
-	return subsurfaceColor * strength * scatter;
+	float thicknessBoost = 1.0 + clamp( thickness, 0.0, 4.0 ) * 0.25;
+	return subsurfaceColor * strength * scatter * thicknessBoost;
 }
 #endif
 
@@ -1372,9 +1378,8 @@ void main() {
 	viewDir = var_ViewDir.xyz;
 	E = normalize(viewDir);
 
-	// FIX ME
 #ifdef USE_VK_PBR
-			vec3 bias_color = pbrBiasColor.rgb;
+				vec3 bias_color = pbrBiasColor.rgb;
 #elif defined (USE_CLX_IDENT)
 			vec3 bias_color = vec3(1.0);
 #elif defined (USE_FIXED_COLOR)
@@ -1400,12 +1405,12 @@ void main() {
 		}
 		if ( length( aggregatedLightColor ) < 1e-4 )
 		{
-			aggregatedLightColor = bias_color;
+			aggregatedLightColor = hasLightmap ? vec3( 1.0 ) : bias_color;
 		}
 	}
 	else
 	{
-		aggregatedLightColor = bias_color;
+		aggregatedLightColor = hasLightmap ? vec3( 1.0 ) : bias_color;
 	}
 
 	vec3 fallbackDir = sanitizeDir( var_LightDir.xyz, vec3( 0.0, 0.0, 1.0 ) );
@@ -1470,6 +1475,7 @@ void main() {
 	vec3 subsurfaceColor = pbrSubsurfaceColor.rgb;
 	float subsurfaceStrength = pbrSubsurfaceParams.x;
 	float subsurfaceWrap = pbrSubsurfaceParams.y;
+	float subsurfaceThickness = max( pbrSubsurfaceParams.z, 0.0 );
 
 	// Decode albedo from sRGB to linear
 	diffuse.rgb = sRGB_to_linear( diffuse.rgb );
@@ -1553,7 +1559,6 @@ void main() {
 	const bool dictValidDebug = pbrDebugFlags.z > 0.5;
 	// pbrDebugFlags.w reserved for compiled/extra state
 	const float debugEps = max( pbrDebugParams.y, 1e-6 );
-	const bool glintsEnabledDebug = ( pbrDebugParams.z > 0.5 );
 
 	const bool glintRouteDirect = glintRouting.y > 0.5;
 	const bool glintRouteIbl = glintRouting.x > 0.5;
@@ -1615,13 +1620,15 @@ void main() {
 		hasSheen = true;
 	}
 	float transmission = 0.0;
+	float transmissionIor = ( pbrTransmissionScale.y > 1.0 ) ? pbrTransmissionScale.y : 1.5;
+	float transmissionThickness = max( pbrTransmissionScale.z, 0.0 );
 	bool hasTransmission = false;
 	if ( transmission_texture_set > -1 ) {
 		transmission = PBR_SAMPLE_TRANSMISSION( frag_tex_coord0 ).r * pbrTransmissionScale.x;
 		hasTransmission = ( transmission > 0.0 );
 	}
 	const int effectiveLightCount = hasDynamicLights ? pbrLightCount : 1;
-	const vec3 fallbackIntensity = bias_color;
+	const vec3 fallbackIntensity = aggregatedLightColor;
 	for ( int li = 0; li < effectiveLightCount; ++li )
 	{
 		vec3 Li = fallbackDir;
@@ -1714,12 +1721,12 @@ void main() {
 		}
 
 		if ( subsurfaceStrength > 0.0 ) {
-			directSubsurface += intensity * CalcBurleySubsurface( N, Li, subsurfaceColor, subsurfaceStrength, subsurfaceWrap ) * attenuation;
+			directSubsurface += intensity * CalcBurleySubsurface( N, Li, subsurfaceColor, subsurfaceStrength, subsurfaceWrap, subsurfaceThickness ) * attenuation;
 		}
 
 		if ( hasTransmission ) {
 			vec3 transTint = vec3( transmission );
-			vec3 transmitLobe = CalcTransmission( transTint, N, E, Li, roughness );
+			vec3 transmitLobe = CalcTransmission( transTint, N, E, Li, roughness, transmissionIor, transmissionThickness );
 			directTransmission += intensity * transmitLobe * attenuation;
 		}
 	}
@@ -1816,6 +1823,32 @@ void main() {
 #endif
 		out_color.rgb += specIBL;
 		dbgBaseSpec += specIBL_base;
+	}
+
+	if ( clearcoatStrength > 0.0 && hasSpecIBL )
+	{
+		vec3 ccIBL = CalcIBLContribution( clearcoatRoughness, N, E, NE, vec3( 0.04 ), pbrDebugParams.x );
+		ccIBL *= specAO * clearcoatStrength;
+		out_color.rgb += ccIBL;
+		dbgClearcoat += ccIBL;
+	}
+
+	if ( hasSheen )
+	{
+		vec3 sheenIBL = sheenLobe * irradiance;
+		out_color.rgb += sheenIBL;
+	}
+
+	if ( subsurfaceStrength > 0.0 )
+	{
+		vec3 subsurfaceIBL = irradiance * subsurfaceColor * subsurfaceStrength * ( 0.25 + 0.25 * clamp( subsurfaceThickness, 0.0, 4.0 ) );
+		out_color.rgb += subsurfaceIBL;
+	}
+
+	if ( hasTransmission )
+	{
+		vec3 transmissionIBL = irradiance * vec3( transmission ) * max( 0.0, 1.0 - roughness ) * exp( -transmissionThickness );
+		out_color.rgb += transmissionIBL;
 	}
 
 #ifdef USE_VK_PBR
