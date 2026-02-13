@@ -49,6 +49,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define INPUT_HEIGHT    16
 #define ERROR_HEIGHT    27
 
+static int scaled_input_height = INPUT_HEIGHT;
+static int scaled_error_height = ERROR_HEIGHT;
+
 #define MAX_CONSIZE		65536
 
 #define T TEXT
@@ -270,18 +273,18 @@ static LRESULT WINAPI ConWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lP
 			s_wcd.windowHeight = rect.bottom - rect.top + 1;
 
 			if ( s_wcd.hwndErrorBox ) {
-				SetWindowPos( s_wcd.hwndBuffer, HWND_TOP, BORDERW, ERROR_HEIGHT + BORDERH*2, rect.right - BORDERW*2, rect.bottom - sth - ERROR_HEIGHT - BORDERH*3 + 1, SWP_NOZORDER );
+				SetWindowPos( s_wcd.hwndBuffer, HWND_TOP, BORDERW, scaled_error_height + BORDERH*2, rect.right - BORDERW*2, rect.bottom - sth - scaled_error_height - BORDERH*3 + 1, SWP_NOZORDER );
 			} else {
-				SetWindowPos( s_wcd.hwndBuffer, HWND_TOP, BORDERW, BORDERH, rect.right - BORDERW*2, rect.bottom - sth - INPUT_HEIGHT - BORDERH*3 - 2, SWP_NOZORDER );
+				SetWindowPos( s_wcd.hwndBuffer, HWND_TOP, BORDERW, BORDERH, rect.right - BORDERW*2, rect.bottom - sth - scaled_input_height - BORDERH*3 - 2, SWP_NOZORDER );
 			}
 
 			if ( s_wcd.hwndErrorBox ) {
-				SetWindowPos( s_wcd.hwndErrorBox, HWND_TOP, BORDERW, BORDERH, rect.right - BORDERW*2, ERROR_HEIGHT, SWP_NOZORDER );
+				SetWindowPos( s_wcd.hwndErrorBox, HWND_TOP, BORDERW, BORDERH, rect.right - BORDERW*2, scaled_error_height, SWP_NOZORDER );
 				InvalidateRect( s_wcd.hwndErrorBox, NULL, FALSE );
 			}
 
 			if ( s_wcd.hwndInputLine ) {
-				SetWindowPos( s_wcd.hwndInputLine, HWND_TOP, BORDERW, rect.bottom - sth - INPUT_HEIGHT - BORDERH, rect.right - BORDERW*2, INPUT_HEIGHT, SWP_NOZORDER );
+				SetWindowPos( s_wcd.hwndInputLine, HWND_TOP, BORDERW, rect.bottom - sth - scaled_input_height - BORDERH, rect.right - BORDERW*2, scaled_input_height, SWP_NOZORDER );
 				InvalidateRect( s_wcd.hwndInputLine, NULL, FALSE );
 			}
 
@@ -764,6 +767,17 @@ void Sys_CreateConsole( const char *title, int xPos, int yPos, qboolean useXYpos
 	fontHeight = -12;
 	statusFontHeight = -11;
 
+	// Scale UI element heights with the window
+	cvar_t *ui_scale = Cvar_FindVar("ui_scale");
+	if (ui_scale && ui_scale->value > 0.0f) {
+		float scale = ui_scale->value;
+		scaled_input_height = (int)(INPUT_HEIGHT * scale);
+		scaled_error_height = (int)(ERROR_HEIGHT * scale);
+	} else {
+		scaled_input_height = INPUT_HEIGHT;
+		scaled_error_height = ERROR_HEIGHT;
+	}
+
 	s_wcd.windowWidth = rect.right - rect.left + 1;
 	s_wcd.windowHeight = rect.bottom - rect.top + 1;
 
@@ -852,7 +866,7 @@ void Sys_CreateConsole( const char *title, int xPos, int yPos, qboolean useXYpos
 	// create the input line
 	s_wcd.hwndInputLine = CreateWindow( T("edit"), NULL, WS_CHILD | WS_VISIBLE | WS_BORDER |
 		ES_LEFT | ES_AUTOHSCROLL,
-		BORDERW, rect.bottom - sth - INPUT_HEIGHT - BORDERH, rect.right - BORDERW*2, INPUT_HEIGHT,
+		BORDERW, rect.bottom - sth - scaled_input_height - BORDERH, rect.right - BORDERW*2, scaled_input_height,
 		s_wcd.hWnd,
 		(HMENU)(LRESULT)INPUT_ID,	// child window ID
 		g_wv.hInstance, NULL );
@@ -860,7 +874,7 @@ void Sys_CreateConsole( const char *title, int xPos, int yPos, qboolean useXYpos
 	// create the scrollbuffer
 	s_wcd.hwndBuffer = CreateWindow( T("edit"), NULL, WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_BORDER |
 		ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | ES_NOHIDESEL,
-		BORDERW, BORDERH, rect.right - BORDERW*2, rect.bottom - sth - INPUT_HEIGHT - BORDERH*3 - 2,
+		BORDERW, BORDERH, rect.right - BORDERW*2, rect.bottom - sth - scaled_input_height - BORDERH*3 - 2,
 		s_wcd.hWnd,
 		(HMENU)(LRESULT)EDIT_ID,	// child window ID
 		g_wv.hInstance, NULL );
@@ -1149,10 +1163,10 @@ void Sys_SetErrorText( const char *buf )
 	GetClientRect( s_wcd.hWnd, &rect );
 
 	// shift buffer position
-	SetWindowPos( s_wcd.hwndBuffer, HWND_TOP, BORDERW, ERROR_HEIGHT + BORDERH*2, rect.right - BORDERW*2, rect.bottom - sth - ERROR_HEIGHT - BORDERH*3+1, SWP_NOZORDER );
+	SetWindowPos( s_wcd.hwndBuffer, HWND_TOP, BORDERW, scaled_error_height + BORDERH*2, rect.right - BORDERW*2, rect.bottom - sth - scaled_error_height - BORDERH*3+1, SWP_NOZORDER );
 
 	s_wcd.hwndErrorBox = CreateWindow( T("static"), NULL, WS_CHILD | WS_VISIBLE | SS_SUNKEN,
-		BORDERW, BORDERH, rect.right - BORDERW*2, ERROR_HEIGHT,
+		BORDERW, BORDERH, rect.right - BORDERW*2, scaled_error_height,
 		s_wcd.hWnd,
 		(HMENU)(LRESULT)ERRORBOX_ID,	// child window ID
 		g_wv.hInstance, NULL );
