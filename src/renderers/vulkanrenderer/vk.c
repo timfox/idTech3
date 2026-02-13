@@ -4821,6 +4821,13 @@ void vk_initialize( void )
 		set_layouts[7] = vk.set_layout_sampler; // physicalMap
 		set_layouts[8] = vk.set_layout_sampler; // prefiltered envmap
 		set_layouts[9] = vk.set_layout_sampler; // deluxemap
+		set_layouts[10] = vk.set_layout_sampler; // irradiance
+		set_layouts[11] = vk.set_layout_sampler; // emissive
+		set_layouts[12] = vk.set_layout_sampler; // clearcoat
+		set_layouts[13] = vk.set_layout_sampler; // sheen
+		set_layouts[14] = vk.set_layout_sampler; // anisotropy
+		set_layouts[15] = vk.set_layout_sampler; // transmission
+		set_layouts[16] = vk.set_layout_sampler; // subsurface
 #endif
 		desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		desc.pNext = NULL;
@@ -6526,11 +6533,18 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
         int32_t lightmap_texture_set;
         int32_t deluxe_mapping;
         float deluxe_specular_scale;
+        int32_t irradiance_texture_set;
+        int32_t emissive_texture_set;
+        int32_t clearcoat_texture_set;
+        int32_t sheen_texture_set;
+        int32_t anisotropy_texture_set;
+        int32_t transmission_texture_set;
+        int32_t subsurface_texture_set;
 #endif
     } frag_spec_data; 
 
 #ifdef USE_VK_PBR
-    VkSpecializationMapEntry spec_entries[26];
+    VkSpecializationMapEntry spec_entries[37];
 #else
     VkSpecializationMapEntry spec_entries[12];
 #endif
@@ -7143,7 +7157,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	frag_spec_info.mapEntryCount = 11;
 #ifdef USE_VK_PBR
 {
-        frag_spec_info.mapEntryCount += 14;
+        frag_spec_info.mapEntryCount += 21;
 
         {
             spec_entries[12].constantID = 11;

@@ -124,6 +124,13 @@ layout(set = 6, binding = 0) uniform sampler2D normal_texture;
 layout(set = 7, binding = 0) uniform sampler2D physical_texture;
 layout(set = 8, binding = 0) uniform samplerCube env_texture;
 layout(set = 9, binding = 0) uniform sampler2D deluxe_texture;
+layout(set = 10, binding = 0) uniform samplerCube irradiance_texture;
+layout(set = 11, binding = 0) uniform sampler2D emissive_texture;
+layout(set = 12, binding = 0) uniform sampler2D clearcoat_texture;
+layout(set = 13, binding = 0) uniform sampler2D sheen_texture;
+layout(set = 14, binding = 0) uniform sampler2D anisotropy_texture;
+layout(set = 15, binding = 0) uniform sampler2D transmission_texture;
+layout(set = 16, binding = 0) uniform sampler2D subsurface_texture;
 
 // prob use ubo for specularScale & normalScale ..
 layout (constant_id = 11) const float specularScale_x = 1.0;

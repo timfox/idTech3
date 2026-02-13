@@ -49,7 +49,14 @@
 	#define VK_DESC_PBR_PHYSICAL			7
 	#define VK_DESC_PBR_CUBEMAP				8
 	#define VK_DESC_PBR_DELUXE				9
-	#define VK_DESC_COUNT	10
+	#define VK_DESC_PBR_IRRADIANCE			10
+	#define VK_DESC_PBR_EMISSIVE			11
+	#define VK_DESC_PBR_CLEARCOAT			12
+	#define VK_DESC_PBR_SHEEN				13
+	#define VK_DESC_PBR_ANISOTROPY			14
+	#define VK_DESC_PBR_TRANSMISSION		15
+	#define VK_DESC_PBR_SUBSURFACE			16
+	#define VK_DESC_COUNT	17
 #else
 	#define VK_DESC_COUNT   5
 #endif
@@ -279,6 +286,13 @@ typedef struct vkUniformCamera_s {
 #define PBR_HAS_LIGHTMAP		( 8 )
 #define PBR_HAS_DELUXEMAP0		( 16 )
 #define PBR_HAS_DELUXEMAP1		( 32 )
+#define PBR_HAS_EMISSIVE		( 64 )
+#define PBR_HAS_CLEARCOAT		( 128 )
+#define PBR_HAS_SHEEN			( 256 )
+#define PBR_HAS_ANISOTROPY		( 512 )
+#define PBR_HAS_TRANSMISSION	( 1024 )
+#define PBR_HAS_SUBSURFACE		( 2048 )
+#define PBR_HAS_IRRADIANCE		( 4096 )
 
 #define PHYS_NONE				( 1 )
 #define PHYS_RMO				( 2 )
