@@ -1715,14 +1715,26 @@ static void * QDECL loadNative( const char *name, vmMainFunc_t *entryPoint, dllS
 	void		*vmMainAddr;
 	qboolean	isGenericModule = qfalse;
 
-	// For ui, game, cgame modules, try generic name first
-	if ( Q_stricmp( name, "ui" ) == 0 || Q_stricmp( name, "game" ) == 0 || Q_stricmp( name, "cgame" ) == 0 ) {
+	// For ui, game, cgame, qagame modules, try generic name first
+	if ( Q_stricmp( name, "ui" ) == 0 || Q_stricmp( name, "game" ) == 0 || Q_stricmp( name, "cgame" ) == 0 || Q_stricmp( name, "qagame" ) == 0 ) {
 		isGenericModule = qtrue;
+
+		// Try the module name with .so extension first
 		Com_sprintf( filename, sizeof( filename ), "%s.so", name );
 		libHandle = FS_LoadLibrary( filename );
 		if ( libHandle ) {
 			goto loadSuccess;
 		}
+
+		// For qagame, also try "game.so" as an alias
+		if ( Q_stricmp( name, "qagame" ) == 0 ) {
+			Com_sprintf( filename, sizeof( filename ), "game.so" );
+			libHandle = FS_LoadLibrary( filename );
+			if ( libHandle ) {
+				goto loadSuccess;
+			}
+		}
+
 		// Generic name failed, fall back to platform-specific name
 	}
 
