@@ -40,9 +40,9 @@ if(CI_BUILD)
   if(MSVC)
     add_compile_options(/WX)
   else()
-    # For CI builds, treat most warnings as errors but allow unused functions
-    # (these are API functions used across compilation units)
-    add_compile_options(-Werror -Wno-error=unused-function)
+    # For CI builds, disable unused-function warnings since they are API functions
+    # used across compilation units, then treat remaining warnings as errors
+    add_compile_options(-Wno-unused-function -Werror)
   endif()
 endif()
 
