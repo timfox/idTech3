@@ -8,6 +8,8 @@
 #endif
 #endif
 
+#pragma GCC diagnostic ignored "-Wunused-function"
+
 struct Vk_Pipeline_FragSpecData {
 	int32_t alpha_test_func;
 	float   alpha_test_value;
@@ -7891,7 +7893,7 @@ static VkPipeline vk_gen_pipeline( uint32_t index ) {
 
 
 
-uint32_t __attribute__((unused)) vk_find_pipeline_ext( uint32_t base, const Vk_Pipeline_Def *def, qboolean use ) {
+uint32_t vk_find_pipeline_ext( uint32_t base, const Vk_Pipeline_Def *def, qboolean use ) {
 	const Vk_Pipeline_Def *cur_def;
 	uint32_t index;
 
@@ -7912,7 +7914,7 @@ found:
 }
 
 
-void __attribute__((unused)) vk_get_pipeline_def( uint32_t pipeline, Vk_Pipeline_Def *def ) {
+void vk_get_pipeline_def( uint32_t pipeline, Vk_Pipeline_Def *def ) {
 	if ( pipeline >= vk.pipelines_count ) {
 		Com_Memset( def, 0, sizeof( *def ) );
 	} else {
@@ -8047,7 +8049,7 @@ static void get_mvp_transform( float *mvp )
 }
 
 
-void __attribute__((unused)) vk_clear_color( const vec4_t color ) {
+void vk_clear_color( const vec4_t color ) {
 
 	VkClearAttachment attachment;
 	VkClearRect clear_rect;
@@ -8070,7 +8072,7 @@ void __attribute__((unused)) vk_clear_color( const vec4_t color ) {
 }
 
 
-void __attribute__((unused)) vk_clear_depth( qboolean clear_stencil ) {
+void vk_clear_depth( qboolean clear_stencil ) {
 
 	VkClearAttachment attachment;
 	VkClearRect clear_rect[1];
@@ -8181,14 +8183,14 @@ void vk_bind_index_buffer( VkBuffer buffer, uint32_t offset )
 
 
 #ifdef USE_VBO
-void __attribute__((unused)) vk_draw_indexed( uint32_t indexCount, uint32_t firstIndex )
+void vk_draw_indexed( uint32_t indexCount, uint32_t firstIndex )
 {
 	qvkCmdDrawIndexed( vk.cmd->command_buffer, indexCount, 1, firstIndex, 0, 0 );
 }
 #endif
 
 
-void __attribute__((unused)) vk_bind_index( void )
+void vk_bind_index( void )
 {
 #ifdef USE_VBO
 	if ( tess.vboIndex ) {
@@ -8202,7 +8204,7 @@ void __attribute__((unused)) vk_bind_index( void )
 }
 
 
-void __attribute__((unused)) vk_bind_index_ext( const int numIndexes, const uint32_t *indexes )
+void vk_bind_index_ext( const int numIndexes, const uint32_t *indexes )
 {
 	uint32_t offset	= vk_tess_index( numIndexes, indexes );
 	if ( offset != ~0U ) {
@@ -8215,7 +8217,7 @@ void __attribute__((unused)) vk_bind_index_ext( const int numIndexes, const uint
 }
 
 
-void __attribute__((unused)) vk_bind_geometry( uint32_t flags )
+void vk_bind_geometry( uint32_t flags )
 {
 	//unsigned int size;
 	bind_base = -1;
@@ -8340,7 +8342,7 @@ void __attribute__((unused)) vk_bind_geometry( uint32_t flags )
 }
 
 
-void __attribute__((unused)) vk_bind_lighting( int stage, int bundle )
+void vk_bind_lighting( int stage, int bundle )
 {
 	bind_base = -1;
 	bind_count = 0;
@@ -8371,13 +8373,13 @@ void __attribute__((unused)) vk_bind_lighting( int stage, int bundle )
 }
 
 
-void __attribute__((unused)) vk_reset_descriptor( int index )
+void vk_reset_descriptor( int index )
 {
 	vk.cmd->descriptor_set.current[ index ] = VK_NULL_HANDLE;
 }
 
 
-void __attribute__((unused)) vk_update_descriptor( int index, VkDescriptorSet descriptor )
+void vk_update_descriptor( int index, VkDescriptorSet descriptor )
 {
 	if ( vk.cmd->descriptor_set.current[ index ] != descriptor ) {
 		vk.cmd->descriptor_set.start = ( (uint32_t)index < vk.cmd->descriptor_set.start ) ? (uint32_t)index : vk.cmd->descriptor_set.start;
@@ -8386,7 +8388,7 @@ void __attribute__((unused)) vk_update_descriptor( int index, VkDescriptorSet de
 	vk.cmd->descriptor_set.current[ index ] = descriptor;
 }
 
-void __attribute__((unused)) vk_update_descriptor_offset( int index, uint32_t offset )
+void vk_update_descriptor_offset( int index, uint32_t offset )
 {
 	vk.cmd->descriptor_set.offset[ index ] = offset;
 }
@@ -8425,7 +8427,7 @@ void vk_bind_descriptor_sets( void )
 }
 
 
-void __attribute__((unused)) vk_bind_pipeline( uint32_t pipeline ) {
+void vk_bind_pipeline( uint32_t pipeline ) {
 	VkPipeline vkpipe;
 
 	vkpipe = vk_gen_pipeline( pipeline );
