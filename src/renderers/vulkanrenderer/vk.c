@@ -20,7 +20,7 @@ struct Vk_Pipeline_FragSpecData {
 	int32_t discard_mode;
 	float   identity_color;
 	float	identity_alpha;
-	float	acff;
+	int32_t	acff;
 #ifdef USE_VK_PBR
 	float   specularScale_x;	// use ubo for this
 	float   specularScale_y;
@@ -6577,9 +6577,6 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 #ifdef USE_VK_PBR
 	const int use_pbr = def->vk_pbr_flags ? 1 : 0;
 
-	if ( def->vk_pbr_flags )
-		Com_Printf("hi");
-
 	switch ( def->shader_type ) {
 
 		case TYPE_SIGNLE_TEXTURE_LIGHTING:
@@ -7115,180 +7112,112 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	//
 	// fragment module specialization data
 	//
+	Com_Memset( spec_entries, 0, sizeof( spec_entries ) );
+	int spec_entry_count = 0;
+#define ADD_FRAG_SPEC(cid, field) do { \
+		spec_entries[spec_entry_count].constantID = (cid); \
+		spec_entries[spec_entry_count].offset = offsetof( struct Vk_Pipeline_FragSpecData, field ); \
+		spec_entries[spec_entry_count].size = sizeof( frag_spec_data.field ); \
+		spec_entry_count++; \
+	} while ( 0 )
 
-    spec_entries[1].constantID = 0;
-    spec_entries[1].offset = offsetof(struct Vk_Pipeline_FragSpecData, alpha_test_func);
-    spec_entries[1].size = sizeof(frag_spec_data.alpha_test_func);
+	ADD_FRAG_SPEC( 0, alpha_test_func );
+	ADD_FRAG_SPEC( 1, alpha_test_value );
+	ADD_FRAG_SPEC( 2, depth_fragment );
+	ADD_FRAG_SPEC( 3, alpha_to_coverage );
+	ADD_FRAG_SPEC( 4, color_mode );
+	ADD_FRAG_SPEC( 5, abs_light );
+	ADD_FRAG_SPEC( 6, tex_mode );
+	ADD_FRAG_SPEC( 7, discard_mode );
+	ADD_FRAG_SPEC( 8, identity_color );
+	ADD_FRAG_SPEC( 9, identity_alpha );
+	ADD_FRAG_SPEC( 10, acff );
 
-    spec_entries[2].constantID = 1;
-    spec_entries[2].offset = offsetof(struct Vk_Pipeline_FragSpecData, alpha_test_value);
-    spec_entries[2].size = sizeof(frag_spec_data.alpha_test_value);
-
-    spec_entries[3].constantID = 2;
-    spec_entries[3].offset = offsetof(struct Vk_Pipeline_FragSpecData, depth_fragment);
-    spec_entries[3].size = sizeof(frag_spec_data.depth_fragment);
-
-    spec_entries[4].constantID = 3;
-    spec_entries[4].offset = offsetof(struct Vk_Pipeline_FragSpecData, alpha_to_coverage);
-    spec_entries[4].size = sizeof(frag_spec_data.alpha_to_coverage);
-
-    spec_entries[5].constantID = 4;
-    spec_entries[5].offset = offsetof(struct Vk_Pipeline_FragSpecData, color_mode);
-    spec_entries[5].size = sizeof(frag_spec_data.color_mode);
-
-    spec_entries[6].constantID = 5;
-    spec_entries[6].offset = offsetof(struct Vk_Pipeline_FragSpecData, abs_light);
-    spec_entries[6].size = sizeof(frag_spec_data.abs_light);
-
-    spec_entries[7].constantID = 6;
-    spec_entries[7].offset = offsetof(struct Vk_Pipeline_FragSpecData, tex_mode);
-    spec_entries[7].size = sizeof(frag_spec_data.tex_mode);
-
-    spec_entries[8].constantID = 7;
-    spec_entries[8].offset = offsetof(struct Vk_Pipeline_FragSpecData, discard_mode);
-    spec_entries[8].size = sizeof(frag_spec_data.discard_mode);
-
-    spec_entries[9].constantID = 8;
-    spec_entries[9].offset = offsetof(struct Vk_Pipeline_FragSpecData, identity_color);
-    spec_entries[9].size = sizeof(frag_spec_data.identity_color);
-
-
-	spec_entries[10].constantID = 9;
-    spec_entries[10].offset = offsetof(struct Vk_Pipeline_FragSpecData, identity_color);
-    spec_entries[10].size = sizeof(frag_spec_data.identity_color);
-
-	spec_entries[11].constantID = 10;
-    spec_entries[11].offset = offsetof(struct Vk_Pipeline_FragSpecData, identity_color);
-    spec_entries[11].size = sizeof(frag_spec_data.identity_color);
-
-	frag_spec_info.mapEntryCount = 11;
 #ifdef USE_VK_PBR
-{
-        frag_spec_info.mapEntryCount += 21;
+	ADD_FRAG_SPEC( 11, specularScale_x );
+	ADD_FRAG_SPEC( 12, specularScale_y );
+	ADD_FRAG_SPEC( 13, specularScale_z );
+	ADD_FRAG_SPEC( 14, specularScale_w );
+	ADD_FRAG_SPEC( 15, normalScale_x );
+	ADD_FRAG_SPEC( 16, normalScale_y );
+	ADD_FRAG_SPEC( 17, normalScale_z );
+	ADD_FRAG_SPEC( 18, normalScale_w );
+	ADD_FRAG_SPEC( 19, normal_texture_set );
+	ADD_FRAG_SPEC( 20, physical_texture_set );
+	ADD_FRAG_SPEC( 21, env_texture_set );
+	ADD_FRAG_SPEC( 22, lightmap_texture_set );
+	ADD_FRAG_SPEC( 23, irradiance_texture_set );
+	ADD_FRAG_SPEC( 24, emissive_texture_set );
+	ADD_FRAG_SPEC( 25, clearcoat_texture_set );
+	ADD_FRAG_SPEC( 26, sheen_texture_set );
+	ADD_FRAG_SPEC( 27, anisotropy_texture_set );
+	ADD_FRAG_SPEC( 28, transmission_texture_set );
+	ADD_FRAG_SPEC( 29, subsurface_texture_set );
 
-        {
-            spec_entries[12].constantID = 11;
-            spec_entries[12].offset = offsetof(struct Vk_Pipeline_FragSpecData, specularScale_x);
-            spec_entries[12].size = sizeof(frag_spec_data.specularScale_x);
+	// only use w value, specgloss maps are not supported
+	frag_spec_data.specularScale_x = def->specularScale[0];
+	frag_spec_data.specularScale_y = def->specularScale[1];
+	frag_spec_data.specularScale_z = def->specularScale[2];
+	frag_spec_data.specularScale_w = def->specularScale[3];
 
-            spec_entries[13].constantID = 12;
-            spec_entries[13].offset = offsetof(struct Vk_Pipeline_FragSpecData, specularScale_y);
-            spec_entries[13].size = sizeof(frag_spec_data.specularScale_y);
+	frag_spec_data.normalScale_x = def->normalScale[0];
+	frag_spec_data.normalScale_y = def->normalScale[1];
+	frag_spec_data.normalScale_z = def->normalScale[2];
+	frag_spec_data.normalScale_w = def->normalScale[3];
 
-        spec_entries[12].constantID = 11;
-        spec_entries[12].offset = offsetof(struct Vk_Pipeline_FragSpecData, deluxe_mapping);
-        spec_entries[12].size = sizeof(frag_spec_data.deluxe_mapping);
+	frag_spec_data.normal_texture_set = 0;
+	frag_spec_data.physical_texture_set = 0;
+	frag_spec_data.env_texture_set = 0;
+	frag_spec_data.lightmap_texture_set = 0;
+	frag_spec_data.irradiance_texture_set = 0;
+	frag_spec_data.emissive_texture_set = 0;
+	frag_spec_data.clearcoat_texture_set = 0;
+	frag_spec_data.sheen_texture_set = 0;
+	frag_spec_data.anisotropy_texture_set = 0;
+	frag_spec_data.transmission_texture_set = 0;
+	frag_spec_data.subsurface_texture_set = 0;
 
-        spec_entries[13].constantID = 12;
-        spec_entries[13].offset = offsetof(struct Vk_Pipeline_FragSpecData, deluxe_specular_scale);
-        spec_entries[13].size = sizeof(frag_spec_data.deluxe_specular_scale);
+	if ( ( def->vk_pbr_flags & PBR_HAS_NORMALMAP ) == 0 )
+		frag_spec_data.normal_texture_set = -1;
 
-        spec_entries[22].constantID = 21;
-        spec_entries[22].offset = offsetof(struct Vk_Pipeline_FragSpecData, env_texture_set);
-        spec_entries[22].size = sizeof(frag_spec_data.env_texture_set);
+	if ( ( def->vk_pbr_flags & PBR_HAS_PHYSICALMAP ) == 0 )
+		frag_spec_data.physical_texture_set = -1;
 
-        spec_entries[23].constantID = 22;
-        spec_entries[23].offset = offsetof(struct Vk_Pipeline_FragSpecData, lightmap_texture_set);
-        spec_entries[23].size = sizeof(frag_spec_data.lightmap_texture_set);
+	if ( def->vk_pbr_flags & PBR_HAS_SPECULARMAP )
+		frag_spec_data.physical_texture_set = 1;
 
-        spec_entries[24].constantID = 23;
-        spec_entries[24].offset = offsetof(struct Vk_Pipeline_FragSpecData, irradiance_texture_set);
-        spec_entries[24].size = sizeof(frag_spec_data.irradiance_texture_set);
+	if ( !vk.cubemapActive )
+		frag_spec_data.env_texture_set = -1;
 
-        spec_entries[25].constantID = 24;
-        spec_entries[25].offset = offsetof(struct Vk_Pipeline_FragSpecData, emissive_texture_set);
-        spec_entries[25].size = sizeof(frag_spec_data.emissive_texture_set);
-
-        spec_entries[26].constantID = 25;
-        spec_entries[26].offset = offsetof(struct Vk_Pipeline_FragSpecData, clearcoat_texture_set);
-        spec_entries[26].size = sizeof(frag_spec_data.clearcoat_texture_set);
-
-        spec_entries[27].constantID = 26;
-        spec_entries[27].offset = offsetof(struct Vk_Pipeline_FragSpecData, sheen_texture_set);
-        spec_entries[27].size = sizeof(frag_spec_data.sheen_texture_set);
-
-        spec_entries[28].constantID = 27;
-        spec_entries[28].offset = offsetof(struct Vk_Pipeline_FragSpecData, anisotropy_texture_set);
-        spec_entries[28].size = sizeof(frag_spec_data.anisotropy_texture_set);
-
-        spec_entries[29].constantID = 28;
-        spec_entries[29].offset = offsetof(struct Vk_Pipeline_FragSpecData, transmission_texture_set);
-        spec_entries[29].size = sizeof(frag_spec_data.transmission_texture_set);
-
-        spec_entries[30].constantID = 29;
-        spec_entries[30].offset = offsetof(struct Vk_Pipeline_FragSpecData, subsurface_texture_set);
-        spec_entries[30].size = sizeof(frag_spec_data.subsurface_texture_set);
-        
-        spec_entries[24].constantID = 23;
-        spec_entries[24].offset = offsetof(struct Vk_Pipeline_FragSpecData, deluxe_mapping);
-        spec_entries[24].size = sizeof(frag_spec_data.deluxe_mapping);
-
-        spec_entries[25].constantID = 24;
-        spec_entries[25].offset = offsetof(struct Vk_Pipeline_FragSpecData, deluxe_specular_scale);
-        spec_entries[25].size = sizeof(frag_spec_data.deluxe_specular_scale);
-
-        // only use w value, specgloss maps are not supported
-        frag_spec_data.specularScale_x = def->specularScale[0];
-        frag_spec_data.specularScale_y = def->specularScale[1];
-        frag_spec_data.specularScale_z = def->specularScale[2];
-        frag_spec_data.specularScale_w = def->specularScale[3];
-
-        frag_spec_data.normalScale_x = def->normalScale[0];
-        frag_spec_data.normalScale_y = def->normalScale[1];
-        frag_spec_data.normalScale_z = def->normalScale[2];
-        frag_spec_data.normalScale_w = def->normalScale[3];
-
-        frag_spec_data.normal_texture_set = 0;
-        frag_spec_data.physical_texture_set = 0;
-        frag_spec_data.env_texture_set = 0;
-        frag_spec_data.lightmap_texture_set = 0;
-        frag_spec_data.irradiance_texture_set = 0;
-        frag_spec_data.emissive_texture_set = 0;
-        frag_spec_data.clearcoat_texture_set = 0;
-        frag_spec_data.sheen_texture_set = 0;
-        frag_spec_data.anisotropy_texture_set = 0;
-        frag_spec_data.transmission_texture_set = 0;
-        frag_spec_data.subsurface_texture_set = 0;
-
-	    if ( ( def->vk_pbr_flags & PBR_HAS_NORMALMAP ) == 0 )
-            frag_spec_data.normal_texture_set = -1;
-
-	    if ( ( def->vk_pbr_flags & PBR_HAS_PHYSICALMAP ) == 0 )
-            frag_spec_data.physical_texture_set = -1;
-
-	    if ( def->vk_pbr_flags & PBR_HAS_SPECULARMAP )
-            frag_spec_data.physical_texture_set = 1;
-
-        if ( !vk.cubemapActive )
-            frag_spec_data.env_texture_set = -1;
-
-        if ( ( def->vk_pbr_flags & PBR_HAS_LIGHTMAP ) == 0 )
-            frag_spec_data.lightmap_texture_set = -1;
+	if ( ( def->vk_pbr_flags & PBR_HAS_LIGHTMAP ) == 0 )
+		frag_spec_data.lightmap_texture_set = -1;
 #ifdef HDR_DELUXE_LIGHTMAP
-        if ( r_deluxeMapping->integer )
-        {
-            // deluxe_texture_set = 0: use approx + scale
-            frag_spec_data.deluxe_mapping = 0;
-            frag_spec_data.deluxe_specular_scale = r_deluxeSpecular->value;
+	if ( r_deluxeMapping->integer )
+	{
+		// deluxe_texture_set = 0: use approx + scale
+		frag_spec_data.deluxe_mapping = 0;
+		frag_spec_data.deluxe_specular_scale = r_deluxeSpecular->value;
 
-            // enabled+: use deluxe map
-            if ( def->vk_pbr_flags & (PBR_HAS_DELUXEMAP0 | PBR_HAS_DELUXEMAP1) )
-                frag_spec_data.deluxe_mapping = 1;
-        }
-        else
+		// enabled+: use deluxe map
+		if ( def->vk_pbr_flags & (PBR_HAS_DELUXEMAP0 | PBR_HAS_DELUXEMAP1) )
+			frag_spec_data.deluxe_mapping = 1;
+	}
+	else
 #endif // HDR_DELUXE_LIGHTMAP
-        {
-            // use approx + default scale
-            // perhaps when r_specularMapping = 0 set scale to 0 to disable it?
-            frag_spec_data.deluxe_mapping = -1;
-            frag_spec_data.deluxe_specular_scale = 1.0;
-        }
-    }
+	{
+		// use approx + default scale
+		// perhaps when r_specularMapping = 0 set scale to 0 to disable it?
+		frag_spec_data.deluxe_mapping = -1;
+		frag_spec_data.deluxe_specular_scale = 1.0f;
+	}
 #endif
-	frag_spec_info.pMapEntries = spec_entries + 1;
+
+	frag_spec_info.mapEntryCount = spec_entry_count;
+	frag_spec_info.pMapEntries = spec_entries;
 	frag_spec_info.dataSize = sizeof( frag_spec_data );
 	frag_spec_info.pData = &frag_spec_data;
 	shader_stages[1].pSpecializationInfo = &frag_spec_info;
+#undef ADD_FRAG_SPEC
 
 
 	//
@@ -7849,8 +7778,6 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	// SET_OBJECT_NAME( pipeline, va( "pipeline def#%i, pass#%i", def_index, renderPassIndex ), VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
 
 	vk.pipeline_create_count++;
-
-	}
 
 	return pipeline;
 }
@@ -10032,6 +9959,10 @@ static qboolean vk_extract_sh_coeffs( const image_t *irradiance_image, vec4_t sh
 	}
 
 	uint32_t size = irradiance_image->width;
+	if ( size == 0 ) {
+		ri.Printf( PRINT_WARNING, "vk_extract_sh_coeffs: irradiance image has invalid size 0\n" );
+		return qfalse;
+	}
 	uint32_t bufferSize = size * size * 6 * 4 * sizeof( float );
 
 	for ( i = 0; i < 9; i++ )
@@ -10107,6 +10038,11 @@ static qboolean vk_extract_sh_coeffs( const image_t *irradiance_image, vec4_t sh
 	}
 
 	// Normalize
+	if ( totalWeight <= 0.0f ) {
+		vk_destroy_readback_buffer( stagingBuffer, stagingMemory );
+		return qfalse;
+	}
+
 	float norm = ( 4.0f * M_PI ) / totalWeight;
 	for ( i = 0; i < 9; i++ )
 	{
@@ -10131,6 +10067,11 @@ void vk_generate_cubemaps( cubemap_t *cube )
 	uint32_t	i, j;
 	filterDef	*def;
 
+	if ( !cube ) {
+		ri.Printf( PRINT_WARNING, "vk_generate_cubemaps: called with NULL cubemap\n" );
+		return;
+	}
+
 	vk_end_render_pass();
 
 	command_buffer = begin_command_buffer();
@@ -10149,7 +10090,8 @@ void vk_generate_cubemaps( cubemap_t *cube )
 			default: cubemap = NULL; break;
 		};
 		if ( !cubemap ) {
-			ri.Printf( PRINT_WARNING, "vk_generate_cubemaps: unknown target %d\n", def->target );
+			ri.Printf( PRINT_WARNING, "vk_generate_cubemaps: missing cubemap image for target %d (%s)\n",
+				def->target, cube->name[0] ? cube->name : "<unnamed>" );
 			continue;
 		}
 

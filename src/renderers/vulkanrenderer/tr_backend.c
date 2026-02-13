@@ -1809,6 +1809,11 @@ RB_PrefilterEnvMap
 static const void *RB_PrefilterEnvMap( const void *data )
 {
 	const convolveCubemapCommand_t *cmd = (const convolveCubemapCommand_t *)data;
+	if ( !cmd->cubemap ) {
+		ri.Printf( PRINT_WARNING, "RB_PrefilterEnvMap: missing cubemap command data\n" );
+		return (const void *)(cmd + 1);
+	}
+
 	// finish any 2D drawing if needed
 	if ( tess.numIndexes )
 		RB_EndSurface();
