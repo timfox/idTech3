@@ -762,6 +762,15 @@ void Sys_CreateConsole( const char *title, int xPos, int yPos, qboolean useXYpos
 		ReleaseDC( GetDesktopWindow(), hDC );
 	}
 
+	// expand console to span wide monitors
+	{
+		const int wideMargin = 40;
+		int benchWidth = w - wideMargin;
+		if ( benchWidth > rect.right - rect.left + 1 ) {
+			rect.right = rect.left + benchWidth;
+		}
+	}
+
 	fontWidth = -8;
 	fontHeight = -12;
 	statusFontHeight = -11;
