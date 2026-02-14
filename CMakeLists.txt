@@ -970,15 +970,21 @@ ELSEIF(WIN32)
 			COMPILE_FLAGS "-I${CMAKE_CURRENT_SOURCE_DIR}/src/platform/win32")
 	endif()
 
-	SET(Q3_UI_SRCS
-		src/platform/win32/win_gamma.c
-		src/platform/win32/win_glimp.c
-		src/platform/win32/win_input.c
-		src/platform/win32/win_minimize.c
-		src/platform/win32/win_qgl.c
-		src/platform/win32/win_wndproc.c)
-	IF(NOT USE_SDL)
-		list(APPEND Q3_UI_SRCS src/platform/win32/win_snd.c)
+	IF(USE_SDL)
+		SET(Q3_UI_SRCS
+			src/platform/sdl/sdl_gamma.c
+			src/platform/sdl/sdl_glimp.c
+			src/platform/sdl/sdl_input.c
+			src/platform/win32/win_minimize.c)
+	ELSE()
+		SET(Q3_UI_SRCS
+			src/platform/win32/win_gamma.c
+			src/platform/win32/win_glimp.c
+			src/platform/win32/win_input.c
+			src/platform/win32/win_minimize.c
+			src/platform/win32/win_qgl.c
+			src/platform/win32/win_wndproc.c
+			src/platform/win32/win_snd.c)
 	ENDIF()
 	IF(USE_VULKAN)
 		list(APPEND Q3_UI_SRCS src/platform/win32/win_qvk.c)
