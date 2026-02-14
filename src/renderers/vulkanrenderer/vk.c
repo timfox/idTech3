@@ -6544,6 +6544,7 @@ static void push_attr( uint32_t location, uint32_t binding, VkFormat format )
 
 
 VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassIndex, uint32_t def_index ) {
+	(void)def_index; // unused parameter
 	VkShaderModule *vs_module = NULL;
 	VkShaderModule *fs_module = NULL;
 	//int32_t vert_spec_data[1]; // clippping
@@ -9182,7 +9183,7 @@ void vk_read_pixels( byte *buffer, uint32_t width, uint32_t height )
 			memory_reqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 			alloc_info.memoryTypeIndex = find_memory_type2( memory_requirements.memoryTypeBits, memory_reqs, &memory_flags );
 			if ( alloc_info.memoryTypeIndex == ~0U ) {
-				ri.Error( ERR_FATAL, "%s(): failed to find matching memory type for image capture", __FUNCTION__ );
+				ri.Error( ERR_FATAL, "%s(): failed to find matching memory type for image capture", __func__ );
 			}
 		}
 	}
