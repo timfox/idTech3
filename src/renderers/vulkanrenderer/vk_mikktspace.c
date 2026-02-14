@@ -23,6 +23,20 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_local.h"
 #include "utils/mikktspace/mikktspace.h"
 
+// Function prototypes for MikkTSpace interface functions
+static int mikkt_bsp_tri_GetNumFaces( const SMikkTSpaceContext *context );
+static int __attribute__((used)) mikkt_bsp_tri_GetNumVerticesOfFace( const SMikkTSpaceContext *context, const int face );
+static void mikkt_bsp_tri_GetPosition( const SMikkTSpaceContext *context, float position[], const int face, const int vert );
+static void mikkt_bsp_tri_GetNormal( const SMikkTSpaceContext *context, float normal[], const int face, const int vert );
+static void mikkt_bsp_tri_GetTexCoord( const SMikkTSpaceContext *context, float st[], const int face, const int vert );
+static void mikkt_bsp_tri_SetTangent( const SMikkTSpaceContext *context, const float tangent[], const float sign, const int face, const int vert );
+static int mikkt_bsp_face_GetNumFaces( const SMikkTSpaceContext *context );
+static int __attribute__((used)) mikkt_bsp_face_GetNumVerticesOfFace(const SMikkTSpaceContext *context, const int face);
+static void mikkt_bsp_face_GetPosition( const SMikkTSpaceContext *context, float position[], const int face, const int vert );
+static void mikkt_bsp_face_GetNormal( const SMikkTSpaceContext *context, float normal[], const int face, const int vert );
+static void mikkt_bsp_face_GetTexCoord( const SMikkTSpaceContext *context, float st[], const int face, const int vert );
+static void mikkt_bsp_face_SetTangent( const SMikkTSpaceContext *context, const float tangent[], const float sign, const int face, const int vert );
+
 /*
 ================
 R_FixMikktVertIndex

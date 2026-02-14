@@ -452,7 +452,7 @@ static void R_RecursiveLightNode( const mnode_t* node )
 		if ( node->visframe != tr.visCount )
 			return;
 
-		if ( node->contents != CONTENTS_NODE )
+                if ( node->contents != (int)CONTENTS_NODE )
 			break;
 
 		children[0] = children[1] = qfalse;
@@ -647,7 +647,7 @@ static void R_RecursiveWorldNode( mnode_t *node, unsigned int planeBits, unsigne
 
 		}
 
-		if ( node->contents != CONTENTS_NODE ) {
+                if ( node->contents != (int)CONTENTS_NODE ) {
 			break;
 		}
 
@@ -751,7 +751,7 @@ static mnode_t *R_PointInLeaf( const vec3_t p ) {
 
 	node = tr.world->nodes;
 	while( 1 ) {
-		if ( node->contents != CONTENTS_NODE ) {
+                if ( node->contents != (int)CONTENTS_NODE ) {
 			break;
 		}
 		plane = node->plane;

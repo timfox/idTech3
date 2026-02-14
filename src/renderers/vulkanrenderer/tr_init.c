@@ -621,8 +621,7 @@ static void InitOpenGL( void )
 		if ( r_ignorehwgamma->integer )
 			glConfig.deviceSupportsGamma = qfalse;
 
-		// print info
-		GfxInfo();
+		// print info will be called after R_Register
 
 		gls.initTime = ri.Milliseconds();
 	}
@@ -1450,22 +1449,22 @@ static void VarInfo( void )
 		ri.Printf( PRINT_ALL, "GAMMA: software w/ %d overbright bits\n", tr.overbrightBits );
 	}
 
-	ri.Printf( PRINT_ALL, "texturemode: %s\n", r_textureMode->string );
-	ri.Printf( PRINT_ALL, "texture bits: %d\n", r_texturebits->integer ? r_texturebits->integer : 32 );
-	ri.Printf( PRINT_ALL, "picmip: %d%s\n", r_picmip->integer, r_nomip->integer ? ", worldspawn only" : "" );
+	ri.Printf( PRINT_ALL, "texturemode: %s\n", r_textureMode ? r_textureMode->string : "GL_LINEAR_MIPMAP_NEAREST" );
+	ri.Printf( PRINT_ALL, "texture bits: %d\n", r_texturebits ? (r_texturebits->integer ? r_texturebits->integer : 32) : 32 );
+	ri.Printf( PRINT_ALL, "picmip: %d%s\n", r_picmip ? r_picmip->integer : 0, (r_nomip && r_nomip->integer) ? ", worldspawn only" : "" );
 
 #ifdef USE_VULKAN
-	if ( r_vertexLight->integer ) {
+	if ( r_vertexLight && r_vertexLight->integer ) {
 		ri.Printf( PRINT_ALL, "HACK: using vertex lightmap approximation\n" );
 	}
 #if defined (USE_VK_PBR)
-	ri.Printf( PRINT_ALL, "PBR SH extraction: %s\n", r_pbr_shExtract->integer ? "enabled" : "disabled" );
-	if ( r_pbr_debug->integer ) {
+	ri.Printf( PRINT_ALL, "PBR SH extraction: %s\n", (r_pbr_shExtract && r_pbr_shExtract->integer) ? "enabled" : "disabled" );
+	if ( r_pbr_debug && r_pbr_debug->integer ) {
 		ri.Printf( PRINT_ALL, "PBR debug view: mode %d\n", r_pbr_debug->integer );
 	}
 #endif
 #else
-	if ( r_vertexLight->integer || glConfig.hardwareType == GLHW_PERMEDIA2 ) {
+	if ( (r_vertexLight && r_vertexLight->integer) || glConfig.hardwareType == GLHW_PERMEDIA2 ) {
 		ri.Printf( PRINT_ALL, "HACK: using vertex lightmap approximation\n" );
 	} else if ( glConfig.hardwareType == GLHW_RAGEPRO ) {
 		ri.Printf( PRINT_ALL, "HACK: ragePro approximations\n" );
@@ -1473,7 +1472,7 @@ static void VarInfo( void )
 		ri.Printf( PRINT_ALL, "HACK: riva128 approximations\n" );
 	}
 #endif
-	if ( r_finish->integer ) {
+	if ( r_finish && r_finish->integer ) {
 		ri.Printf( PRINT_ALL, "Forcing glFinish\n" );
 	}
 }
@@ -2028,8 +2027,9 @@ void R_Init( void ) {
 	ri.Printf( PRINT_ALL, "[VK] SH world: %s\n", r_shWorldLighting && r_shWorldLighting->integer ? "enabled" : "disabled" );
 	ri.Printf( PRINT_ALL, "[VK] SH debug view: %d\n", r_shDebugView ? r_shDebugView->integer : 0 );
 
-	max_polys = r_maxpolys->integer;
-	max_polyverts = r_maxpolyverts->integer;
+
+	max_polys = r_maxpolys ? r_maxpolys->integer : MAX_POLYS;
+	max_polyverts = r_maxpolyverts ? r_maxpolyverts->integer : MAX_POLYVERTS;
 
 	ptr = ri.Hunk_Alloc( sizeof( *backEndData ) + sizeof(srfPoly_t) * max_polys + sizeof(polyVert_t) * max_polyverts, h_low);
 	backEndData = (backEndData_t *) ptr;
@@ -2039,6 +2039,9 @@ void R_Init( void ) {
 	R_InitNextFrame();
 
 	InitOpenGL();
+
+	// print renderer info after Vulkan is fully initialized
+	GfxInfo();
 
 	R_InitImages();
 

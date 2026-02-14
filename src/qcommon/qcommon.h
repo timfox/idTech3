@@ -930,6 +930,7 @@ extern char cl_cdkey[34];
 
 // customizable client window title
 extern char cl_title[ MAX_CVAR_VALUE_STRING ];
+extern char con_title[ MAX_CVAR_VALUE_STRING ];
 
 extern	int	CPU_Flags;
 
@@ -979,7 +980,7 @@ int			Com_MD5Addr( const netadr_t *addr, int timestamp );
 qboolean	Com_CDKeyValidate( const char *key, const char *checksum );
 void		Com_ReadCDKey( const char *filename );
 void		Com_AppendCDKey( const char *filename );
-qboolean	Com_EarlyParseCmdLine( char *commandLine, char *con_title, int title_size, int *vid_xpos, int *vid_ypos );
+qboolean	Com_EarlyParseCmdLine( char *commandLine, char *console_title, int title_size, int *vid_xpos, int *vid_ypos );
 int			Com_Split( char *in, char **out, int outsz, int delim );
 
 int			Com_Filter( const char *filter, const char *name );

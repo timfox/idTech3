@@ -73,4 +73,6 @@ void IN_Shutdown( void );
 // signals.c
 void InitSig( void );
 
+void Sys_UpdateWindowTitle( const char *title );
+
 #endif

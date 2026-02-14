@@ -511,7 +511,7 @@ static void R_LoadLightmaps( const lump_t *l, const lump_t *surfs ) {
 
 		dsurface_t  *surf;
 		for( i = 0, surf = (dsurface_t *)(fileBase + surfs->fileofs);
-			i < surfs->filelen / sizeof(dsurface_t); i++, surf++ ) {
+                        i < (int)(surfs->filelen / sizeof(dsurface_t)); i++, surf++ ) {
 			int lightmapNum = LittleLong( surf->lightmapNum );
 
 			if ( lightmapNum >= 0 && (lightmapNum & 1) != 0 ) {
@@ -1944,7 +1944,7 @@ R_SetParent
 static void R_SetParent( mnode_t *node, mnode_t *parent )
 {
 	node->parent = parent;
-	if ( node->contents != CONTENTS_NODE )
+        if ( node->contents != (int)CONTENTS_NODE )
 		return;
 	R_SetParent( node->children[0], node );
 	R_SetParent( node->children[1], node );
