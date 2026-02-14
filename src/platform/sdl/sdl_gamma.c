@@ -37,6 +37,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../../client/client.h"
 #include "sdl_glw.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 static Uint16 r[256];
 static Uint16 g[256];
 static Uint16 b[256];
@@ -69,41 +73,32 @@ void GLimp_SetGamma( unsigned char red[256], unsigned char green[256], unsigned 
 		table[2][i] = ( ( ( Uint16 ) blue[i] ) << 8 ) | blue[i];
 	}
 
-#ifdef _WIN32
-#include <windows.h>
-
-	// Win2K and newer put this odd restriction on gamma ramps...
+if ( defined( _WIN32 ) )
+{
+	// handle odd Win2K+ gamma ramp restriction
+	qboolean clamped = qfalse;
+	for ( j = 0; j < 3; j++ )
 	{
-		//OSVERSIONINFO	vinfo;
-		//vinfo.dwOSVersionInfoSize = sizeof( vinfo );
-		//GetVersionEx( &vinfo );
-		//if( vinfo.dwMajorVersion >= 5 && vinfo.dwPlatformId == VER_PLATFORM_WIN32_NT )
+		for ( i = 0; i < 128; i++ )
 		{
-			qboolean clamped = qfalse;
-			for( j = 0 ; j < 3 ; j++ )
+			if ( table[j][i] > ( ( 128 + i ) << 8 ) )
 			{
-				for( i = 0 ; i < 128 ; i++ )
-				{
-					if( table[ j ] [ i] > ( ( 128 + i ) << 8 ) )
-					{
-						table[ j ][ i ] = ( 128 + i ) << 8;
-						clamped = qtrue;
-					}
-				}
-
-				if( table[ j ] [127 ] > 254 << 8 )
-				{
-					table[ j ][ 127 ] = 254 << 8;
-					clamped = qtrue;
-				}
-			}
-			if ( clamped )
-			{
-				Com_DPrintf( "performing gamma clamp.\n" );
+				table[j][i] = ( 128 + i ) << 8;
+				clamped = qtrue;
 			}
 		}
+
+		if ( table[j][127] > 254 << 8 )
+		{
+			table[j][127] = 254 << 8;
+			clamped = qtrue;
+		}
 	}
-#endif
+	if ( clamped )
+	{
+		Com_DPrintf( "performing gamma clamp.\n" );
+	}
+}
 
 	// enforce constantly increasing
 	for ( j = 0; j < 3; j++ )

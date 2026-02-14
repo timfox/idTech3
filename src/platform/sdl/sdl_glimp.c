@@ -25,6 +25,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "sdl_glw.h"
 #include "sdl_icon.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 #ifdef USE_VULKAN_API
 #	if defined(USE_LOCAL_HEADERS)
 #		include "SDL_vulkan.h"
@@ -191,6 +195,10 @@ static int FindNearestDisplay( int *x, int *y, int w, int h )
 
 static SDL_HitTestResult SDL_HitTestFunc( SDL_Window *win, const SDL_Point *area, void *data )
 {
+	(void)win;
+	(void)area;
+	(void)data;
+
 	if ( Key_GetCatcher() & KEYCATCH_CONSOLE && keys[ K_ALT ].down )
 		return SDL_HITTEST_DRAGGABLE;
 
@@ -431,8 +439,6 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 
 		if ( fullscreen )
 		{
-			SDL_DisplayMode mode;
-
 			switch ( testColorBits )
 			{
 				case 16: mode.format = SDL_PIXELFORMAT_RGB565; break;
@@ -445,17 +451,17 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 			mode.refresh_rate = /* config->displayFrequency = */ Cvar_VariableIntegerValue( "r_displayRefresh" );
 			mode.driverdata = NULL;
 
-			if ( SDL_SetWindowDisplayMode( SDL_window, &mode ) < 0 )
+			if ( SDL_SetWindowDisplayMode( SDL_window, &displayMode ) < 0 )
 			{
 				Com_DPrintf( "SDL_SetWindowDisplayMode failed: %s\n", SDL_GetError( ) );
 				continue;
 			}
 
-			if ( SDL_GetWindowDisplayMode( SDL_window, &mode ) >= 0 )
+			if ( SDL_GetWindowDisplayMode( SDL_window, &displayMode ) >= 0 )
 			{
-				config->displayFrequency = mode.refresh_rate;
-				config->vidWidth = mode.w;
-				config->vidHeight = mode.h;
+				config->displayFrequency = displayMode.refresh_rate;
+				config->vidWidth = displayMode.w;
+				config->vidHeight = displayMode.h;
 			}
 		}
 
