@@ -723,15 +723,14 @@ void Sys_CreateConsole( const char *title, int xPos, int yPos, qboolean useXYpos
 	rect.top = 0;
 	rect.bottom = DEFAULT_HEIGHT;
 
-	// Apply UI scaling for high-resolution displays
-	{
-		cvar_t *ui_scale = Cvar_FindVar("ui_scale");
-		if (ui_scale && ui_scale->value > 0.0f) {
-			float scale = ui_scale->value;
-			rect.right = (int)(DEFAULT_WIDTH * scale);
-			rect.bottom = (int)(DEFAULT_HEIGHT * scale);
+		// Apply UI scaling for high-resolution displays
+		{
+			float scale = Cvar_VariableValue("ui_scale");
+			if (scale > 0.0f) {
+				rect.right = (int)(DEFAULT_WIDTH * scale);
+				rect.bottom = (int)(DEFAULT_HEIGHT * scale);
+			}
 		}
-	}
 
 	AdjustWindowRect( &rect, DEDSTYLE, FALSE );
 
@@ -768,9 +767,8 @@ void Sys_CreateConsole( const char *title, int xPos, int yPos, qboolean useXYpos
 	statusFontHeight = -11;
 
 	// Scale UI element heights with the window
-	cvar_t *ui_scale = Cvar_FindVar("ui_scale");
-	if (ui_scale && ui_scale->value > 0.0f) {
-		float scale = ui_scale->value;
+	float scale = Cvar_VariableValue("ui_scale");
+	if (scale > 0.0f) {
 		scaled_input_height = (int)(INPUT_HEIGHT * scale);
 		scaled_error_height = (int)(ERROR_HEIGHT * scale);
 	} else {
