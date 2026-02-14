@@ -69,8 +69,7 @@ void GLimp_SetGamma( unsigned char red[256], unsigned char green[256], unsigned 
 		table[2][i] = ( ( ( Uint16 ) blue[i] ) << 8 ) | blue[i];
 	}
 
-if ( defined( _WIN32 ) )
-{
+#ifdef _WIN32
 	// handle odd Win2K+ gamma ramp restriction
 	qboolean clamped = qfalse;
 	for ( j = 0; j < 3; j++ )
@@ -94,7 +93,7 @@ if ( defined( _WIN32 ) )
 	{
 		Com_DPrintf( "performing gamma clamp.\n" );
 	}
-}
+#endif
 
 	// enforce constantly increasing
 	for ( j = 0; j < 3; j++ )
