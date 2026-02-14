@@ -43,9 +43,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 extern void Sys_UpdateConsoleTitle( const char *title );
 #endif
 
-#if defined(DEDICATED) && !defined(_WIN32)
-// Dedicated server on non-Windows doesn't need window title updates
-#else
+#if !defined(DEDICATED) && defined(USE_SDL)
 extern void Sys_UpdateWindowTitle( const char *title );
 #endif
 
@@ -4986,10 +4984,8 @@ static void FS_ParseGameInfo( void )
 			Sys_UpdateConsoleTitle( consoleTitle );
 #endif
 
-#if defined(DEDICATED) && !defined(_WIN32)
-// Dedicated server on non-Windows doesn't need window title updates
-#else
-			// Update window title if window is already created
+#if !defined(DEDICATED) && defined(USE_SDL)
+			// Update window title if window is already created (SDL only, not for dedicated servers)
 			Sys_UpdateWindowTitle( title );
 #endif
 
