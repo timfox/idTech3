@@ -25,7 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "sdl_glw.h"
 #include "sdl_icon.h"
 
-#ifdef _WIN32
+#if defined(_WIN32) && defined(_MSC_VER)
 #include <windows.h>
 #endif
 
@@ -881,7 +881,7 @@ Sys_SetClipboardBitmap
 */
 void Sys_SetClipboardBitmap( const byte *bitmap, int length )
 {
-#ifdef _WIN32
+#if defined(_WIN32) && defined(_MSC_VER)
 	HGLOBAL hMem;
 	byte *ptr;
 
@@ -899,6 +899,9 @@ void Sys_SetClipboardBitmap( const byte *bitmap, int length )
 		SetClipboardData( CF_DIB, hMem );
 	}
 	CloseClipboard();
+#else
+	(void)bitmap;
+	(void)length;
 #endif
 }
 
