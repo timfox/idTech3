@@ -109,6 +109,7 @@ void	IN_RawMouseEvent( LPARAM lParam );
 
 void	Sys_CreateConsole( const char *title, int xPos, int yPos, qboolean usePos );
 void	Sys_DestroyConsole( void );
+void	Sys_UpdateConsoleTitle( const char *title );
 
 // Input subsystem
 

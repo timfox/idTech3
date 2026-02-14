@@ -2,7 +2,7 @@
 
 ## Toolchain Notes
 
-- CMake builds target C23 by default; use a modern compiler (GCC 15+, Clang 18+, or MSVC 2022).
+- CMake targets C23 when supported by the active compiler/toolchain and falls back to C17 otherwise.
 - Set `C_STANDARD_STRICT=OFF` to disable the strict warning set locally. CI uses strict warnings with warnings-as-errors.
 
 ### windows/msvc

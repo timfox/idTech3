@@ -39,6 +39,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "qcommon.h"
 #include "unzip.h"
 
+#ifdef _WIN32
+extern void Sys_UpdateConsoleTitle( const char *title );
+#endif
+
+#if !defined(DEDICATED) && defined(USE_SDL)
+extern void Sys_UpdateWindowTitle( const char *title );
+#endif
+
 /*
 =============================================================================
 
@@ -4961,13 +4969,28 @@ static void FS_ParseGameInfo( void )
 	if ( titleStart && titleEnd && titleEnd > titleStart ) {
 		int titleLen = titleEnd - titleStart;
 		if ( titleLen > 0 && titleLen < MAX_CVAR_VALUE_STRING ) {
-			// Extract title and update cl_title
+			// Extract title and update cl_title and con_title
 			char title[MAX_CVAR_VALUE_STRING];
+			char consoleTitle[MAX_CVAR_VALUE_STRING];
 			Q_strncpyz( title, titleStart, titleLen + 1 );
 			Q_strncpyz( cl_title, title, sizeof( cl_title ) );
-			
+
+			// Create console title by appending " Console"
+			Com_sprintf( consoleTitle, sizeof( consoleTitle ), "%s Console", title );
+			Q_strncpyz( con_title, consoleTitle, sizeof( con_title ) );
+
+#ifdef _WIN32
+			// Update console window title if console is already created
+			Sys_UpdateConsoleTitle( consoleTitle );
+#endif
+
+#if !defined(DEDICATED) && defined(USE_SDL)
+			// Update window title if window is already created (SDL only, not for dedicated servers)
+			Sys_UpdateWindowTitle( title );
+#endif
+
 			if ( Com_LogVerbosity() >= 1 ) {
-				LOG_FS( "Parsed gameinfo.txt: title = \"%s\"\n", title );
+				LOG_FS( "Parsed gameinfo.txt: title = \"%s\", console = \"%s\"\n", title, consoleTitle );
 			}
 		}
 	}
