@@ -218,6 +218,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 	int colorBits, depthBits, stencilBits;
 	int i;
 	SDL_DisplayMode desktopMode;
+	SDL_DisplayMode displayMode;
 	int display;
 	int x;
 	int y;
@@ -441,15 +442,15 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 		{
 			switch ( testColorBits )
 			{
-				case 16: mode.format = SDL_PIXELFORMAT_RGB565; break;
-				case 24: mode.format = SDL_PIXELFORMAT_RGB24;  break;
+				case 16: displayMode.format = SDL_PIXELFORMAT_RGB565; break;
+				case 24: displayMode.format = SDL_PIXELFORMAT_RGB24;  break;
 				default: Com_DPrintf( "testColorBits is %d, can't fullscreen\n", testColorBits ); continue;
 			}
 
-			mode.w = config->vidWidth;
-			mode.h = config->vidHeight;
-			mode.refresh_rate = /* config->displayFrequency = */ Cvar_VariableIntegerValue( "r_displayRefresh" );
-			mode.driverdata = NULL;
+			displayMode.w = config->vidWidth;
+			displayMode.h = config->vidHeight;
+			displayMode.refresh_rate = /* config->displayFrequency = */ Cvar_VariableIntegerValue( "r_displayRefresh" );
+			displayMode.driverdata = NULL;
 
 			if ( SDL_SetWindowDisplayMode( SDL_window, &displayMode ) < 0 )
 			{
