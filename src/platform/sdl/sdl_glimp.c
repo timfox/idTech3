@@ -440,6 +440,8 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 
 		if ( fullscreen )
 		{
+			SDL_DisplayMode displayMode;
+
 			switch ( testColorBits )
 			{
 				case 16: displayMode.format = SDL_PIXELFORMAT_RGB565; break;

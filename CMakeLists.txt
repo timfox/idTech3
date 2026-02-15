@@ -1001,10 +1001,10 @@ ELSEIF(WIN32)
 			src/platform/win32/win_wndproc.c
 			src/platform/win32/win_snd.c)
 	ENDIF()
-	IF(USE_VULKAN)
-		list(APPEND Q3_UI_SRCS src/platform/win32/win_qvk.c)
-	ENDIF()
-ENDIF(UNIX)
+		IF(USE_VULKAN AND NOT USE_SDL)
+			list(APPEND Q3_UI_SRCS src/platform/win32/win_qvk.c)
+		ENDIF()
+	ENDIF(UNIX)
 
 # Audio backends/effects are built with the client module only.
 
