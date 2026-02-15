@@ -181,6 +181,173 @@ endif()
 if(NOT DEFINED USE_WEBM)
   option(USE_WEBM "Enable WebM audio support" ON)
 endif()
+if(NOT DEFINED USE_LUA)
+  option(USE_LUA "Enable Lua scripting support" ON)
+endif()
+
+set(LUA_FOUND FALSE)
+set(LUA_LINK_LIBRARIES "")
+set(LUA_VERSION_NUM 0)
+set(LUA_VERSION_STRING "")
+set(LUA_EXTRA_LIBRARIES "")
+
+if(USE_LUA)
+  set(_LUA_HINT_PATHS
+    $ENV{LUA_DIR}
+    $ENV{LUA_PATH}
+    ${CMAKE_PREFIX_PATH}
+    ${CMAKE_INSTALL_PREFIX}
+    /usr/local
+    /usr
+    /opt/local
+    /opt
+    /opt/homebrew
+    /sw
+  )
+  if(WIN32)
+    list(APPEND _LUA_HINT_PATHS
+      "C:/msys64/mingw64"
+      "C:/msys64/ucrt64"
+      "C:/msys64/mingw32"
+      "C:/msys64/usr"
+      "C:/Lua"
+      "C:/Program Files/Lua"
+      "C:/Program Files (x86)/Lua"
+    )
+  endif()
+
+  find_path(LUA_INCLUDE_DIR
+    NAMES lua.h
+    PATH_SUFFIXES
+      include
+      include/lua
+      include/lua5.5
+      include/lua-5.5
+      include/lua5.4
+      include/lua-5.4
+      include/lua5.3
+      include/lua-5.3
+      include/lua5.2
+      include/lua-5.2
+      include/lua5.1
+      include/lua-5.1
+    PATHS ${_LUA_HINT_PATHS}
+  )
+
+  set(_LUA_HEADER_PATH "")
+  if(LUA_INCLUDE_DIR AND EXISTS "${LUA_INCLUDE_DIR}/lua.h")
+    set(_LUA_HEADER_PATH "${LUA_INCLUDE_DIR}/lua.h")
+  endif()
+
+  if(_LUA_HEADER_PATH)
+    file(STRINGS "${_LUA_HEADER_PATH}" LUA_VERSION_MAJOR_LINE REGEX "^#define[ \t]+LUA_VERSION_MAJOR_N[ \t]+[0-9]+" LIMIT_COUNT 1)
+    file(STRINGS "${_LUA_HEADER_PATH}" LUA_VERSION_MINOR_LINE REGEX "^#define[ \t]+LUA_VERSION_MINOR_N[ \t]+[0-9]+" LIMIT_COUNT 1)
+    if(LUA_VERSION_MAJOR_LINE AND LUA_VERSION_MINOR_LINE)
+      string(REGEX REPLACE ".*LUA_VERSION_MAJOR_N[ \t]+([0-9]+).*" "\\1" LUA_VERSION_MAJOR "${LUA_VERSION_MAJOR_LINE}")
+      string(REGEX REPLACE ".*LUA_VERSION_MINOR_N[ \t]+([0-9]+).*" "\\1" LUA_VERSION_MINOR "${LUA_VERSION_MINOR_LINE}")
+      math(EXPR LUA_VERSION_NUM "${LUA_VERSION_MAJOR} * 100 + ${LUA_VERSION_MINOR}")
+      set(LUA_VERSION_STRING "${LUA_VERSION_MAJOR}.${LUA_VERSION_MINOR}")
+    else()
+      file(STRINGS "${_LUA_HEADER_PATH}" LUA_VERSION_NUM_LINE REGEX "^#define[ \t]+LUA_VERSION_NUM[ \t]+[0-9]+" LIMIT_COUNT 1)
+      if(LUA_VERSION_NUM_LINE)
+        string(REGEX REPLACE ".*LUA_VERSION_NUM[ \t]+([0-9]+).*" "\\1" LUA_VERSION_NUM "${LUA_VERSION_NUM_LINE}")
+        math(EXPR LUA_VERSION_MAJOR "${LUA_VERSION_NUM} / 100")
+        math(EXPR LUA_VERSION_MINOR "${LUA_VERSION_NUM} % 100")
+        set(LUA_VERSION_STRING "${LUA_VERSION_MAJOR}.${LUA_VERSION_MINOR}")
+      endif()
+    endif()
+  endif()
+
+  set(_LUA_LIB_NAMES lua5.5 lua-5.5 lua55 lua5.4 lua-5.4 lua54 lua5.3 lua-5.3 lua53 lua5.2 lua-5.2 lua52 lua5.1 lua-5.1 lua51 lua)
+  if(LUA_VERSION_STRING)
+    set(_LUA_LIB_NAMES lua${LUA_VERSION_STRING} lua-${LUA_VERSION_STRING} lua${LUA_VERSION_MAJOR}${LUA_VERSION_MINOR} ${_LUA_LIB_NAMES})
+    list(REMOVE_DUPLICATES _LUA_LIB_NAMES)
+  endif()
+
+  set(_LUA_LIB_HINTS "")
+  if(LUA_INCLUDE_DIR)
+    get_filename_component(_LUA_INCLUDE_PARENT "${LUA_INCLUDE_DIR}" DIRECTORY)
+    list(APPEND _LUA_LIB_HINTS
+      "${LUA_INCLUDE_DIR}/../lib"
+      "${LUA_INCLUDE_DIR}/../lib64"
+      "${_LUA_INCLUDE_PARENT}/lib"
+      "${_LUA_INCLUDE_PARENT}/lib64"
+    )
+    list(REMOVE_DUPLICATES _LUA_LIB_HINTS)
+  endif()
+
+  if(_LUA_LIB_HINTS)
+    find_library(LUA_LIBRARY
+      NAMES ${_LUA_LIB_NAMES}
+      HINTS ${_LUA_LIB_HINTS}
+      PATH_SUFFIXES "" lib lib64
+      NO_DEFAULT_PATH
+    )
+  endif()
+
+  if(NOT LUA_LIBRARY)
+    find_library(LUA_LIBRARY
+      NAMES ${_LUA_LIB_NAMES}
+      PATH_SUFFIXES lib64 lib
+      PATHS ${_LUA_HINT_PATHS}
+    )
+  endif()
+
+  if((NOT LUA_INCLUDE_DIR OR NOT LUA_LIBRARY) AND NOT WIN32)
+    find_package(PkgConfig QUIET)
+    if(PKG_CONFIG_FOUND)
+      set(_LUA_PKG_NAMES ${_LUA_LIB_NAMES})
+      list(REMOVE_DUPLICATES _LUA_PKG_NAMES)
+      if(_LUA_PKG_NAMES)
+        set(_LUA_PKG_DETECTED FALSE)
+        foreach(_LUA_PKG_NAME ${_LUA_PKG_NAMES})
+          pkg_search_module(LUA_PKG QUIET ${_LUA_PKG_NAME})
+          if(LUA_PKG_FOUND)
+            set(_LUA_PKG_DETECTED TRUE)
+            break()
+          endif()
+        endforeach()
+        if(_LUA_PKG_DETECTED)
+          if(NOT LUA_INCLUDE_DIR AND LUA_PKG_INCLUDE_DIRS)
+            list(GET LUA_PKG_INCLUDE_DIRS 0 LUA_INCLUDE_DIR)
+          endif()
+          if(NOT LUA_LIBRARY)
+            if(LUA_PKG_LIBRARIES)
+              list(GET LUA_PKG_LIBRARIES 0 LUA_LIBRARY)
+              list(REMOVE_AT LUA_PKG_LIBRARIES 0)
+              set(LUA_EXTRA_LIBRARIES ${LUA_PKG_LIBRARIES})
+            elseif(LUA_PKG_LINK_LIBRARIES)
+              list(GET LUA_PKG_LINK_LIBRARIES 0 LUA_LIBRARY)
+              list(REMOVE_AT LUA_PKG_LINK_LIBRARIES 0)
+              set(LUA_EXTRA_LIBRARIES ${LUA_PKG_LINK_LIBRARIES})
+            endif()
+          endif()
+        endif()
+      endif()
+    endif()
+  endif()
+
+  if(NOT LUA_INCLUDE_DIR OR NOT LUA_LIBRARY)
+    message(WARNING "Lua headers/library not found; Lua scripting support will be disabled.")
+  else()
+    set(LUA_FOUND TRUE)
+
+    if(LUA_VERSION_NUM GREATER 0 AND LUA_VERSION_NUM LESS 501)
+      message(FATAL_ERROR "Lua 5.1+ is required.")
+    endif()
+
+    if(LUA_VERSION_STRING)
+      message(STATUS "Lua support enabled: ${LUA_VERSION_STRING} (${LUA_LIBRARY})")
+    else()
+      message(STATUS "Lua support enabled: ${LUA_LIBRARY}")
+    endif()
+
+    list(APPEND LUA_LINK_LIBRARIES ${LUA_LIBRARY})
+    if(LUA_EXTRA_LIBRARIES)
+      list(APPEND LUA_LINK_LIBRARIES ${LUA_EXTRA_LIBRARIES})
+    endif()
+  endif()
+endif()
 
 set(OPUS_FOUND FALSE)
 set(FLAC_FOUND FALSE)
@@ -634,6 +801,10 @@ target_include_directories(qcommon PRIVATE
   ${CMAKE_SOURCE_DIR}/src/audio
 )
 set_property(TARGET qcommon PROPERTY POSITION_INDEPENDENT_CODE ON)
+if(USE_LUA AND LUA_FOUND)
+  target_compile_definitions(qcommon PRIVATE USE_LUA)
+  target_include_directories(qcommon PRIVATE ${LUA_INCLUDE_DIR})
+endif()
 
 # dedicated server
 ADD_LIBRARY(qcommon_ded OBJECT ${QCOMMON_SRCS} ${SERVER_SRCS})
@@ -649,6 +820,10 @@ target_include_directories(qcommon_ded PRIVATE
   ${CMAKE_SOURCE_DIR}/src/audio
 )
 set_property(TARGET qcommon_ded PROPERTY POSITION_INDEPENDENT_CODE ON)
+if(USE_LUA AND LUA_FOUND)
+  target_compile_definitions(qcommon_ded PRIVATE USE_LUA)
+  target_include_directories(qcommon_ded PRIVATE ${LUA_INCLUDE_DIR})
+endif()
 
 # Apply SKIP_IDPAK_CHECK to qcommon targets that compile files.c
 if(SKIP_IDPAK_CHECK)
@@ -1143,6 +1318,11 @@ TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE qcommon_ded botlib)
 
 if(UNIX AND NOT MSVC AND NOT APPLE)
   target_link_options(${DNAME}${BINEXT} PRIVATE "-Wl,--export-dynamic")
+endif()
+
+if(USE_LUA AND LUA_FOUND)
+  TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ${LUA_LINK_LIBRARIES})
+  TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE ${LUA_LINK_LIBRARIES})
 endif()
 
 IF(WIN32)

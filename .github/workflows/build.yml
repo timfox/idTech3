@@ -56,6 +56,7 @@ jobs:
             ${{ matrix.prefix }}-SDL2
             ${{ matrix.prefix }}-openal
             ${{ matrix.prefix }}-freetype
+            ${{ matrix.prefix }}-lua
           msystem: ${{ matrix.msystem }}
           path-type: minimal
           release: false
@@ -218,7 +219,7 @@ jobs:
           sudo rm -f /etc/apt/sources.list.d/azure-cli.list
           sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list
           sudo apt-get -qq update
-          sudo apt-get -y install cmake ninja-build libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev
+          sudo apt-get -y install cmake ninja-build libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev
 
       - uses: actions/checkout@v4
 
@@ -315,7 +316,7 @@ jobs:
 
             apt-get -qq update
             apt-get install -y make gcc g++ cmake ninja-build
-            apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev
+            apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev
 
             OUTDIR="${GITHUB_WORKSPACE}/bin"
             mkdir -p "$OUTDIR"
@@ -378,7 +379,7 @@ jobs:
 
     steps:
       - name: Install tools
-        run: brew install coreutils sdl2 openal-soft cmake ninja freetype
+        run: brew install coreutils sdl2 openal-soft cmake ninja freetype lua
 
       - uses: actions/checkout@v4
 
