@@ -1997,7 +1997,13 @@ intptr_t QDECL VM_Call( vm_t *vm, int nargs, int callnum, ... )
 	}
 #endif
 
+	// reset syscall counter for top-level calls to detect infinite loops
+	if ( vm->callLevel == 0 ) {
+		vm->syscallCount = 0;
+	}
+
 	++vm->callLevel;
+
 	// if we have a dll loaded, call it directly
 	if ( vm->entryPoint )
 	{

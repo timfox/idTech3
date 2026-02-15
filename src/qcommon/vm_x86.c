@@ -108,7 +108,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
   edx	scratch (required for divisions)
   esi*	programStack
   edi*	opStack
-  ebp*  procStack ( dataBase + programStack )
+  ebp*  procBase ( dataBase + programStack )
   -------------
   rax   scratch
   rbx*  dataBase
@@ -116,7 +116,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
   rdx   scratch (required for divisions)
   rsi*  programStack
   rdi*  opStack
-  rbp*  procStack ( dataBase + programStack )
+  rbp*  procBase ( dataBase + programStack )
   rsp*
   r8    scratch
   r9    scratch
@@ -138,9 +138,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
   Example how data segment will look like during vmMain execution:
   | .... |
-  |------| vm->programStack -=36 (8+12+16) // set by vmMain
-  | ???? | +0 - unused, reserved for interpreter
-  | ???? | +4 - unused, reserved for interpreter
+  |------| vm->programStack -=36 (8+12+16) // set by vmMain -> procBase
+  | ???? | +0 - unused/scratch, reserved for interpreter
+  | ???? | +4 - unused/scratch, reserved for interpreter
   |-------
   | arg0 | +8  \
   | arg4 | +12  | - passed arguments, accessible from subroutines
@@ -150,9 +150,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
   | loc4 | +24  \ - locals, accessible only from local scope
   | loc8 | +28  /
   | lc12 | +32 /
-  |------| vm->programStack -= 24 ( 8 + MAX_VMMAIN_CALL_ARGS*4 ) // set by VM_CallCompiled()
-  | ???? | +0 - unused, reserved for interpreter
-  | ???? | +4 - unused, reserved for interpreter
+  |------| vm->programStack -= 24 ( 8 + MAX_VMMAIN_CALL_ARGS*4 ) // set by VM_CallCompiled() -> procBase
+  | ???? | +0 - unused/scratch, reserved for interpreter
+  | ???? | +4 - unused/scratch, reserved for interpreter
   | arg0 | +8  \
   | arg1 | +12  \ - passed arguments, accessible from vmMain
   | arg2 | +16  /
@@ -1171,12 +1171,6 @@ static void emit_mov_sx( uint32_t dst, uint32_t src )
 	emit_op_reg( 0x0F, 0x28, src, dst );
 }
 
-static void emit_mov_sx_rx( uint32_t xmmreg, uint32_t intreg )
-{
-	Emit1( 0x66 );
-	emit_op_reg( 0x0F, 0x6E, intreg, xmmreg );
-}
-
 static void emit_mov_rx_sx( uint32_t intreg, uint32_t xmmreg )
 {
 	Emit1( 0x66 );
@@ -1198,16 +1192,30 @@ static void emit_comiss( uint32_t base, uint32_t reg )
 	emit_op_reg( 0x0F, 0x2F, reg, base );
 }
 
-static void emit_load_sx( uint32_t reg, uint32_t base, int32_t offset )
+static void emit_load_sx( uint32_t xmmreg, uint32_t base, int32_t offset )
 {
 	Emit1( 0xF3 );
-	emit_op_reg_base_offset( 0x0F, 0x10, reg, base, offset );
+	emit_op_reg_base_offset( 0x0F, 0x10, xmmreg, base, offset );
 }
 
-static void emit_load_sx_index( uint32_t reg, uint32_t base, uint32_t index )
+static void emit_load_sx_index( uint32_t xmmreg, uint32_t base, uint32_t index )
 {
 	Emit1( 0xF3 );
-	emit_op_reg_base_index( 0x0F, 0x10, reg, base, index, 1, 0 );
+	emit_op_reg_base_index( 0x0F, 0x10, xmmreg, base, index, 1, 0 );
+}
+
+// wrapper function
+static void mov_sx_rx( uint32_t xmmreg, uint32_t intreg )
+{
+	if ( CPU_Flags & CPU_SSE2 ) {
+		// movd xmmreg, intreg
+		Emit1( 0x66 );
+		emit_op_reg( 0x0F, 0x6E, intreg, xmmreg );
+	} else {
+		// SSE1 CPUs do not initialize FP register domain with movd so use movss
+		emit_store_rx( intreg, R_PROCBASE, 0 );	// mov dword ptr [procBase + 0], eax
+		emit_load_sx( xmmreg, R_PROCBASE, 0 );	// movss xmm0, [procBase + 0]
+	}
 }
 
 #if 0
@@ -1247,6 +1255,7 @@ static void emit_mul_sx( uint32_t dst, uint32_t src )
 
 static void emit_div_sx( uint32_t dst, uint32_t src )
 {
+	Emit1( 0xF3 ); // use divss instead of divps to avoid division by zero from src[32...127] and triggering "invalid operation" bit
 	emit_op_reg( 0x0F, 0x5E, src, dst );
 }
 
@@ -1367,13 +1376,13 @@ static uint32_t alloc_sx( uint32_t pref );
 
 // register allocation preferences
 
-#define FORCED 0x20  // load function must return specified register
+#define FORCED 0x20  // load function must return specified register, no dynamic allocation allowed
 #define TEMP   0x40  // hint: temporary allocation, will not be stored on opStack
 #define RCONST 0x80  // register value will be not modified
 #define XMASK  0x100 // exclude masked registers
 #define SHIFT4 0x200 // load bottom item
 
-#define RMASK  0x0F
+#define RMASK  0x0F  // mask to get register number from preference
 
 // array sizes for cached/meta registers
 #if idx64
@@ -1752,7 +1761,7 @@ static void mov_sx_imm( uint32_t reg, uint32_t imm32 )
 		emit_xor_sx( reg, reg );
 	} else {
 		uint32_t rx = alloc_rx_const( R_ECX | TEMP, imm32 ); // ecx = imm32
-		emit_mov_sx_rx( reg, rx ); // xmmX = ecx
+		mov_sx_rx( reg, rx ); // xmmX = ecx
 		unmask_rx( rx );
 	}
 }
@@ -2211,9 +2220,8 @@ static uint32_t alloc_sx_const( uint32_t pref, uint32_t imm )
 }
 
 
-static uint32_t dyn_alloc_rx( uint32_t pref )
+static uint32_t dyn_alloc_rx( void )
 {
-	(void)pref;
 	const uint32_t _rx_mask = build_rx_mask();
 	const uint32_t mask = _rx_mask | build_opstack_mask( TYPE_RX );
 	const reg_t *reg, *used = NULL;
@@ -2274,7 +2282,7 @@ static uint32_t alloc_rx( uint32_t pref )
 
 #ifdef DYN_ALLOC_RX
 	if ( ( pref & FORCED ) == 0 ) {
-		uint32_t v = dyn_alloc_rx( pref );
+		uint32_t v = dyn_alloc_rx();
 		if ( v == ~0U ) {
 			DROP( "no free registers at ip %i, pref %x, opStack %i, mask %04x", ip, pref, opstack * 4, build_rx_mask() );
 		}
@@ -2300,9 +2308,8 @@ static uint32_t alloc_rx( uint32_t pref )
 }
 
 
-static uint32_t dyn_alloc_sx( uint32_t pref )
+static uint32_t dyn_alloc_sx( void )
 {
-	(void)pref;
 	const uint32_t _sx_mask = build_sx_mask();
 	const uint32_t mask = _sx_mask | build_opstack_mask( TYPE_SX );
 	const reg_t *reg, *used = NULL;
@@ -2363,7 +2370,7 @@ static uint32_t alloc_sx( uint32_t pref )
 
 #ifdef DYN_ALLOC_SX
 	if ( ( pref & FORCED ) == 0 ) {
-		uint32_t v = dyn_alloc_sx( pref );
+		uint32_t v = dyn_alloc_sx();
 		if ( v == ~0U ) {
 			DROP( "no free registers at ip %i, pref %x, opStack %i, mask %04x", ip, pref, opstack * 4, build_sx_mask() );
 		}
@@ -2738,7 +2745,7 @@ static uint32_t load_sx_opstack( uint32_t pref )
 		// should never happen with FPU type promotion, except syscalls
 		reg = alloc_sx( pref );
 
-		emit_mov_sx_rx( reg, it->value );
+		mov_sx_rx( reg, it->value );
 
 		it->type = TYPE_RAW;
 		return reg;
@@ -2762,7 +2769,7 @@ static uint32_t load_sx_opstack( uint32_t pref )
 		reg = alloc_sx( pref );
 		rx = alloc_rx_local( R_ECX | RCONST, it->value );
 
-		emit_mov_sx_rx( reg, rx ); // move from integer to scalar
+		mov_sx_rx( reg, rx ); // move from integer to scalar
 
 		unmask_rx( rx );
 
@@ -4627,7 +4634,7 @@ __compile:
 						case OP_DIVF: emit_div_sx( sx[1], sx[0] ); break; // xmm1 = xmm1 / xmm0
 					}
 					unmask_sx( sx[0] );
-					store_sx_opstack( sx[1] ); // *opstack = xmm0
+					store_sx_opstack( sx[1] ); // *opstack = xmm1
 				} else {
 					// legacy x87 path
 					flush_opstack_top(); dec_opstack(); // value
@@ -4678,7 +4685,7 @@ __compile:
 				if ( HasSSEFP() ) {
 					rx[0] = alloc_rx( R_EAX );
 					sx[0] = load_sx_opstack( R_XMM0 | RCONST ); // xmm0 = *opstack
-					emit_cvttss2si( rx[0], sx[0] );			// cvttss2si xmm0, eax
+					emit_cvttss2si( rx[0], sx[0] );		// cvttss2si xmm0, eax
 					unmask_sx( sx[0] );
 					store_rx_opstack( rx[0] );				// *opstack = eax
 				} else {

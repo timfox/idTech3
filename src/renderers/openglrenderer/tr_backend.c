@@ -1027,6 +1027,9 @@ void RE_StretchRaw( int x, int y, int w, int h, int cols, int rows, byte *data, 
 
 void RE_UploadCinematic( int w, int h, int cols, int rows, byte *data, int client, qboolean dirty ) {
 
+	(void)w;
+	(void)h;
+
 	image_t *image;
 
 	if ( !tr.scratchImage[ client ] ) {
@@ -1117,7 +1120,7 @@ static const void *RB_StretchPic( const void *data ) {
 static void RB_LightingPass( void )
 {
 	dlight_t	*dl;
-	int	i;
+	unsigned int	i;
 
 #ifdef USE_VBO
 	VBO_Flush();
@@ -1151,7 +1154,7 @@ static void transform_to_eye_space( const vec3_t v, vec3_t v_eye )
 	v_eye[0] = m[0]*v[0] + m[4]*v[1] + m[8 ]*v[2] + m[12];
 	v_eye[1] = m[1]*v[0] + m[5]*v[1] + m[9 ]*v[2] + m[13];
 	v_eye[2] = m[2]*v[0] + m[6]*v[1] + m[10]*v[2] + m[14];
-};
+}
 
 
 /*
