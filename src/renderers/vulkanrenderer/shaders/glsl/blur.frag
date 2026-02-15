@@ -1,8 +1,13 @@
 #version 450
 
-// 3-tap gaussian blur 
-// exploiting linear filtering with -1.2 0 +1.2 texture offsets and 5 6 5 weighting
-// to emulate 5-tap blur
+// 5-tap bilinear Gaussian blur (9-tap equivalent)
+// Exploits hardware linear filtering to halve texture reads.
+// Kernel: [1 8 28 56 70 56 28 8 1] / 256
+//
+// Bilinear tap layout:
+//   center (w=0.27344)
+//   +/-1.333 (w=0.32813) -- blends positions +/-1 and +/-2
+//   +/-3.111 (w=0.03516) -- blends positions +/-3 and +/-4
 
 layout(set = 0, binding = 0) uniform sampler2D texture0;
 
@@ -10,23 +15,21 @@ layout(location = 0) in vec2 tex_coord0;
 
 layout(location = 0) out vec4 out_color;
 
-layout(constant_id = 0) const float texoffset_x = 0.0;
-layout(constant_id = 1) const float texoffset_y = 0.0;
+layout(constant_id = 0) const float offset1_x = 0.0;
+layout(constant_id = 1) const float offset1_y = 0.0;
+layout(constant_id = 2) const float offset2_x = 0.0;
+layout(constant_id = 3) const float offset2_y = 0.0;
 
 void main()
 {
-	vec2 tex_coord1 = tex_coord0;
-	vec2 tex_coord2 = tex_coord0;
+	vec2 inner = vec2( offset1_x, offset1_y );
+	vec2 outer = vec2( offset2_x, offset2_y );
 
-	tex_coord1.x += texoffset_x;
-	tex_coord1.y += texoffset_y;
-
-	tex_coord2.x -= texoffset_x;
-	tex_coord2.y -= texoffset_y;
-
-	vec3 base = texture(texture0, tex_coord0).rgb * (6.0 / 16.0)
-		+ texture(texture0, tex_coord1).rgb * (5.0 / 16.0)
-		+ texture(texture0, tex_coord2).rgb * (5.0 / 16.0);
+	vec3 base = texture( texture0, tex_coord0 ).rgb * 0.27344
+		+ texture( texture0, tex_coord0 + inner ).rgb * 0.32813
+		+ texture( texture0, tex_coord0 - inner ).rgb * 0.32813
+		+ texture( texture0, tex_coord0 + outer ).rgb * 0.03516
+		+ texture( texture0, tex_coord0 - outer ).rgb * 0.03516;
 
 	out_color = vec4( base, 1.0 );
 }

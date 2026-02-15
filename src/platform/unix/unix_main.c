@@ -999,7 +999,7 @@ static int Sys_ParseArgs( int argc, const char* argv[] )
 
 int main( int argc, const char* argv[] )
 {
-	char con_title[ MAX_CVAR_VALUE_STRING ];
+	char console_title_arg[ MAX_CVAR_VALUE_STRING ];
 	int xpos, ypos;
 	//qboolean useXYpos;
 	char  *cmdline;
@@ -1036,7 +1036,7 @@ int main( int argc, const char* argv[] )
 		strcat( cmdline, argv[i] );
 	}
 
-	/*useXYpos = */ Com_EarlyParseCmdLine( cmdline, con_title, sizeof( con_title ), &xpos, &ypos );
+	/*useXYpos = */ Com_EarlyParseCmdLine( cmdline, console_title_arg, sizeof( console_title_arg ), &xpos, &ypos );
 
 	// bk000306 - clear queues
 //	memset( &eventQue[0], 0, sizeof( eventQue ) );

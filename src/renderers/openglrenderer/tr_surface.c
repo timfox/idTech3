@@ -846,7 +846,7 @@ RB_SurfaceFace
 */
 static void RB_SurfaceFace( const srfSurfaceFace_t *surf ) {
 	int			i;
-	unsigned	*indices;
+	const unsigned	*indices;
 	glIndex_t	*tessIndexes;
 	const float	*v;
 	const float	*normal;
@@ -890,7 +890,7 @@ static void RB_SurfaceFace( const srfSurfaceFace_t *surf ) {
 	tess.dlightBits |= dlightBits;
 #endif
 
-	indices = ( unsigned * ) ( ( ( char  * ) surf ) + surf->ofsIndices );
+	indices = ( const unsigned * ) ( ( const byte * ) surf + surf->ofsIndices );
 
 	Bob = tess.numVertexes;
 	tessIndexes = tess.indexes + tess.numIndexes;

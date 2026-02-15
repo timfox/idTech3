@@ -6359,8 +6359,8 @@ void vk_create_blur_pipeline( uint32_t index, uint32_t width, uint32_t height, q
 	VkGraphicsPipelineCreateInfo create_info;
 	VkViewport viewport;
 	VkRect2D scissor;
-	float frag_spec_data[3]; // x-offset, y-offset, correction
-	VkSpecializationMapEntry spec_entries[3];
+	float frag_spec_data[4]; // inner offset (x,y), outer offset (x,y)
+	VkSpecializationMapEntry spec_entries[4];
 	VkSpecializationInfo frag_spec_info;
 	VkPipeline *pipeline;
 
@@ -6384,14 +6384,17 @@ void vk_create_blur_pipeline( uint32_t index, uint32_t width, uint32_t height, q
 	set_shader_stage_desc( shader_stages+0, VK_SHADER_STAGE_VERTEX_BIT, vk.modules.gamma_vs, "main" );
 	set_shader_stage_desc( shader_stages+1, VK_SHADER_STAGE_FRAGMENT_BIT, vk.modules.blur_fs, "main" );
 
-	frag_spec_data[0] = 1.2 / (float) width; // x offset
-	frag_spec_data[1] = 1.2 / (float) height; // y offset
-	frag_spec_data[2] = 1.0; // intensity?
-
+	// 9-tap Gaussian via 5 bilinear taps: inner pair at +/-1.333, outer pair at +/-3.111
 	if ( horizontal_pass ) {
-		frag_spec_data[1] = 0.0;
+		frag_spec_data[0] = 1.33333f / (float)width; // inner offset x
+		frag_spec_data[1] = 0.0f;                    // inner offset y
+		frag_spec_data[2] = 3.11111f / (float)width; // outer offset x
+		frag_spec_data[3] = 0.0f;                    // outer offset y
 	} else {
-		frag_spec_data[0] = 0.0;
+		frag_spec_data[0] = 0.0f;                     // inner offset x
+		frag_spec_data[1] = 1.33333f / (float)height; // inner offset y
+		frag_spec_data[2] = 0.0f;                     // outer offset x
+		frag_spec_data[3] = 3.11111f / (float)height; // outer offset y
 	}
 
 	spec_entries[0].constantID = 0;
@@ -6406,9 +6409,13 @@ void vk_create_blur_pipeline( uint32_t index, uint32_t width, uint32_t height, q
 	spec_entries[2].offset = 2 * sizeof( float );
 	spec_entries[2].size = sizeof( float );
 
-	frag_spec_info.mapEntryCount = 3;
+	spec_entries[3].constantID = 3;
+	spec_entries[3].offset = 3 * sizeof( float );
+	spec_entries[3].size = sizeof( float );
+
+	frag_spec_info.mapEntryCount = 4;
 	frag_spec_info.pMapEntries = spec_entries;
-	frag_spec_info.dataSize = 3 * sizeof( float );
+	frag_spec_info.dataSize = 4 * sizeof( float );
 	frag_spec_info.pData = &frag_spec_data[0];
 
 	shader_stages[1].pSpecializationInfo = &frag_spec_info;
