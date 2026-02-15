@@ -201,8 +201,20 @@ if(USE_LUA)
     /usr
     /opt/local
     /opt
+    /opt/homebrew
     /sw
   )
+  if(WIN32)
+    list(APPEND _LUA_HINT_PATHS
+      "C:/msys64/mingw64"
+      "C:/msys64/ucrt64"
+      "C:/msys64/mingw32"
+      "C:/msys64/usr"
+      "C:/Lua"
+      "C:/Program Files/Lua"
+      "C:/Program Files (x86)/Lua"
+    )
+  endif()
 
   find_path(LUA_INCLUDE_DIR
     NAMES lua.h
@@ -316,24 +328,24 @@ if(USE_LUA)
   endif()
 
   if(NOT LUA_INCLUDE_DIR OR NOT LUA_LIBRARY)
-    message(FATAL_ERROR "USE_LUA=ON but Lua headers/library were not found.")
-  endif()
-
-  set(LUA_FOUND TRUE)
-
-  if(LUA_VERSION_NUM GREATER 0 AND LUA_VERSION_NUM LESS 501)
-    message(FATAL_ERROR "Lua 5.1+ is required.")
-  endif()
-
-  if(LUA_VERSION_STRING)
-    message(STATUS "Lua support enabled: ${LUA_VERSION_STRING} (${LUA_LIBRARY})")
+    message(WARNING "Lua headers/library not found; Lua scripting support will be disabled.")
   else()
-    message(STATUS "Lua support enabled: ${LUA_LIBRARY}")
-  endif()
+    set(LUA_FOUND TRUE)
 
-  list(APPEND LUA_LINK_LIBRARIES ${LUA_LIBRARY})
-  if(LUA_EXTRA_LIBRARIES)
-    list(APPEND LUA_LINK_LIBRARIES ${LUA_EXTRA_LIBRARIES})
+    if(LUA_VERSION_NUM GREATER 0 AND LUA_VERSION_NUM LESS 501)
+      message(FATAL_ERROR "Lua 5.1+ is required.")
+    endif()
+
+    if(LUA_VERSION_STRING)
+      message(STATUS "Lua support enabled: ${LUA_VERSION_STRING} (${LUA_LIBRARY})")
+    else()
+      message(STATUS "Lua support enabled: ${LUA_LIBRARY}")
+    endif()
+
+    list(APPEND LUA_LINK_LIBRARIES ${LUA_LIBRARY})
+    if(LUA_EXTRA_LIBRARIES)
+      list(APPEND LUA_LINK_LIBRARIES ${LUA_EXTRA_LIBRARIES})
+    endif()
   endif()
 endif()
 
