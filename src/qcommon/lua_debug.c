@@ -157,6 +157,7 @@ void Cmd_ScriptList_f( void ) {
 void Cmd_ScriptDump_f( void ) {
 	int maxEntries = 128;
 	int printed = 0;
+	qboolean truncated = qfalse;
 
 	if ( Cmd_Argc() > 1 ) {
 		const int requested = atoi( Cmd_Argv( 1 ) );
@@ -189,11 +190,12 @@ void Cmd_ScriptDump_f( void ) {
 		printed++;
 		if ( printed >= maxEntries ) {
 			Com_Printf( "  ... output truncated ...\n" );
+			truncated = qtrue;
 			break;
 		}
 	}
 
-	lua_pop( s_luaState, 1 );
+	lua_pop( s_luaState, truncated ? 2 : 1 );
 	Com_Printf( "Lua: dumped %d global entr%s\n", printed, printed == 1 ? "y" : "ies" );
 }
 
