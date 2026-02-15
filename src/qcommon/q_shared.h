@@ -163,6 +163,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 short ShortSwap( short l );
 int LongSwap( int l );
 float FloatSwap( const float *f );
+void CopyShortSwap( void *dest, void *src );
+void CopyLongSwap( void *dest, void *src );
 
 #include "q_platform.h"
 
@@ -494,6 +496,10 @@ extern	vec4_t		colorDkGrey;
 #define S_COLOR_CYAN	"^5"
 #define S_COLOR_MAGENTA	"^6"
 #define S_COLOR_WHITE	"^7"
+
+#define S_COLOR_DEVEL	S_COLOR_CYAN
+#define S_COLOR_WARNING	S_COLOR_YELLOW
+#define S_COLOR_ERROR	S_COLOR_RED
 
 extern const vec4_t	g_color_table[ 64 ];
 extern int ColorIndexFromChar( char ccode );

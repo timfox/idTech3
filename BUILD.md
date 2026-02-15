@@ -106,6 +106,25 @@ Copy the resulting binaries from created `build` directory
 
 ---
 
+### ppc64le / ppc64 (PowerPC 64-bit)
+
+Install the same dependencies as generic Linux, then build normally.
+
+The PowerPC JIT (`src/qcommon/vm_powerpc.c`) supports optional ISA-level optimizations that are enabled by compiler target flags:
+
+- ISA 2.07 (POWER8): uses direct-move instructions (`mtvsrwa`, `mfvsrwz`, `xscvdpsxws`) to avoid memory round-trips in float/int conversions (`OP_CVIF`, `OP_CVFI`).
+- ISA 3.0 (POWER9): uses hardware modulo instructions (`modsw`, `moduw`) to optimize `OP_MODI` and `OP_MODU`.
+
+Examples:
+
+- `make CFLAGS='-mcpu=power8'`
+- `make CFLAGS='-mcpu=power9'`
+- `make CFLAGS='-mcpu=native'` (may reduce portability to older CPUs)
+
+Without an explicit `-mcpu`, optimization level depends on compiler defaults, and the JIT falls back to baseline sequences when newer ISA features are unavailable.
+
+---
+
 Several Makefile options are available for linux/mingw/macos builds:
 
 `BUILD_CLIENT=1` - build unified client/server executable, enabled by default

@@ -139,7 +139,7 @@ static void R_BoxSurfaces_r(mnode_t *node, vec3_t mins, vec3_t maxs, surfaceType
 	msurface_t	*surf, **mark;
 
 	// do the tail recursion in a loop
-	while ( node->contents == CONTENTS_NODE ) {
+	while ( node->contents == (int)CONTENTS_NODE ) {
 		s = BoxOnPlaneSide( mins, maxs, node->plane );
 		if (s == 1) {
 			node = node->children[0];
@@ -202,6 +202,10 @@ static void R_AddMarkFragments(int numClipPoints, vec3_t clipPoints[2][MAX_VERTS
 				   int *returnedPoints, int *returnedFragments,
 				   vec3_t mins, vec3_t maxs) {
 	int pingPong, i;
+
+	(void)maxFragments;
+	(void)mins;
+	(void)maxs;
 	markFragment_t	*mf;
 
 	// chop the surface by all the bounding planes of the to be projected polygon

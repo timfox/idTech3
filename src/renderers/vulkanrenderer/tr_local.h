@@ -52,6 +52,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define USE_BUFFER_CLEAR	/* clear attachments on render pass begin */
 
+#ifdef USE_VBO
+#define USE_VBO_GRID		/* put SF_GRID to VBO */
+#endif
+
 //#define USE_TESS_NEEDS_NORMAL
 //#define USE_TESS_NEEDS_ST2
 
@@ -781,7 +785,7 @@ typedef struct litSurf_s {
 #define	MAX_FACE_POINTS		64
 
 #define	MAX_PATCH_SIZE		32			// max dimensions of a patch mesh in map file
-#define	MAX_GRID_SIZE		65			// max dimensions of a grid mesh in memory
+#define	MAX_GRID_SIZE		(128+1)		// max dimensions of a grid mesh in memory
 
 // when cgame directly specifies a polygon, it becomes a srfPoly_t
 // as soon as it is called
@@ -1716,7 +1720,9 @@ image_t *vk_create_pbr_albedo_srgb( const char *albedoMapName, imgFlags_t flags 
 //
 // tr_surface.c
 //
+#ifdef USE_VBO_GRID
 void		RB_SurfaceGridEstimate( srfGridMesh_t *cv, int *numVertexes, int *numIndexes ); 
+#endif
 
 /*
 ====================================================================
