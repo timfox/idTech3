@@ -4657,6 +4657,9 @@ void vk_initialize( void )
 		uint32_t drvMajor = props.driverVersion >> 14;
 		uint32_t drvMinor = props.driverVersion & 0x3FFF;
 		if ( drvMajor == 101 && drvMinor >= 5333 && drvMinor <= 6737 ) {
+			// NOTE: vk.driverNote is never read anywhere, so this warning
+			// currently only populates an unused buffer. Print the guidance
+			// to the console/log during initialization instead.
 			Com_sprintf( vk.driverNote, sizeof( vk.driverNote ), S_COLOR_WARNING
 				"\nWARNING: Intel driver %i.%i is known to cause Vulkan crashes.\n"
 				"Consider updating to driver >= 101.6790 or downgrading to <= 101.5186.\n",
