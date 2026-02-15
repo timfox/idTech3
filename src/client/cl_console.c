@@ -774,14 +774,10 @@ static void Con_DrawSolidConsole( float frac ) {
 	if ( lines > cls.glconfig.vidHeight )
 		lines = cls.glconfig.vidHeight;
 
-	wf = SCREEN_WIDTH;
-
-	// draw the background
-	yf = frac * SCREEN_HEIGHT;
-
-	// on wide screens, we will center the text
+	// draw console in real screen space so it spans full width on widescreen
+	wf = cls.glconfig.vidWidth;
+	yf = cls.glconfig.vidHeight * frac;
 	con.xadjust = 0;
-	SCR_AdjustFrom640( &con.xadjust, &yf, &wf, NULL );
 
 	if ( yf < 1.0 ) {
 		yf = 0;
