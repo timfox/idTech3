@@ -229,3 +229,25 @@ Or let the helper script do it:
 ```
 
 The flag targets the renderer code under `src/renderers/rendercommon/tr_font.c`, links with your platform’s FreeType library, and defines `BUILD_FREETYPE` for the build. Make sure the FreeType headers/libraries (`libfreetype6-dev`, `freetype-devel`, etc.) are installed before you configure the project.
+
+---
+
+### Lua scripting support
+
+Lua support is enabled by default.
+
+To disable it explicitly:
+
+```bash
+cmake -S . -B build -DUSE_LUA=OFF
+```
+
+`scripts/compile_engine.sh` also supports a `lua` flag, which passes `-DUSE_LUA=ON`.
+
+The engine looks for common Lua installs, including `lua5.5` / `lua-5.5` (plus `5.4`..`5.1` variants). Lua support requires Lua 5.1 or newer.
+
+When enabled, these commands are available:
+
+- `script_reload [file1.lua ...]`
+- `script_list`
+- `script_dump [maxEntries]`
