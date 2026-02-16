@@ -1258,13 +1258,6 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 #ifdef USE_VK_PBR
 	is_pbr_surface = vk_is_valid_pbr_surface( tess.shader->hasPBR );
 
-	// Debug view: render a non-PBR pass and optionally override texture0 binding.
-	// Keeps runtime inspection simple without requiring extra shader variants.
-	const int pbr_debug = ( r_pbr_debug != NULL ) ? r_pbr_debug->integer : 0;
-	if ( pbr_debug ) {
-		is_pbr_surface = qfalse;
-	}
-
 	if ( is_pbr_surface ) {
 		Com_Memcpy( &uniform_camera.modelMatrix, backEnd.or.modelMatrix, sizeof(float) * 16 );
 		Com_Memcpy( &uniform_camera.viewOrigin, backEnd.refdef.vieworg, sizeof( vec3_t) );

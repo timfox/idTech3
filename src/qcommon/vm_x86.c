@@ -220,9 +220,8 @@ static void Emit2( int16_t v );
 static void Emit4( int32_t v );
 #if idx64
 static void Emit8( int64_t v );
-#endif
+#else
 static void emit_modrm_offset( uint32_t reg, int32_t offset );
-#if !idx64
 static void emit_op_reg_offset( int prefix, int opcode, uint32_t reg, int32_t offset );
 static void emit_op_reg_index_offset( int opcode, uint32_t reg, uint32_t index, int scale, int32_t offset );
 #endif

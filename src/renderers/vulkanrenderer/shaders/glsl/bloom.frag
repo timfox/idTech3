@@ -17,76 +17,31 @@ layout(constant_id = 6) const int base_modulate = 0;
 //const vec3 sRGB = { 0.2126, 0.7152, 0.0722 };
 
 void main() {
-	vec3 base = texture(texture0, frag_tex_coord).rgb;
+	const vec3 luma = vec3( 0.2126, 0.7152, 0.0722 );
+	vec3 base = texture( texture0, frag_tex_coord ).rgb;
+	float metric;
 
-	if ( extract_mode == 1 ) // (r+g+b)/3 >= threshold
-	{
-		if ( (base.r + base.g + base.b) * 0.33333333 >= threshold)
-		{
-			if ( base_modulate != 0 )
-			{
-				if ( base_modulate == 1 )
-				{
-					base *= base;
-				}
-				else
-				{
-					const vec3 luma = { 0.2126, 0.7152, 0.0722 };
-					base *= dot( luma, base.rgb );
-				}
-			}
-			out_color = vec4( base, 1.0 );
-		}
-		else
-		{
-			out_color = vec4( 0.0 );
+	if ( base_modulate != 0 ) {
+		if ( base_modulate == 1 ) {
+			base *= base;
+		} else {
+			base *= dot( luma, base );
 		}
 	}
-	else if ( extract_mode == 2 ) // luma(r,g,b) >= threshold
-	{
-		const vec3 luma = { 0.2126, 0.7152, 0.0722 };
-		const float v = dot( luma, base.rgb );
-		if ( v >= threshold )
-		{
-			if ( base_modulate != 0 )
-			{
-				if ( base_modulate == 1 )
-				{
-					base *= base;
-				}
-				else
-				{
-					base *= v;
-				}
-			}
-			out_color = vec4( base, 1.0 );
-		}
-		else
-		{
-			out_color = vec4( 0.0 );
-		}
+
+	if ( extract_mode == 1 ) { // average RGB
+		metric = ( base.r + base.g + base.b ) * 0.33333333;
+	} else if ( extract_mode == 2 ) { // luma
+		metric = dot( luma, base );
+	} else { // max channel
+		metric = max( base.r, max( base.g, base.b ) );
 	}
-	else // default case
-	{
-		if ( base.r >= threshold || base.g >= threshold || base.b >= threshold ) // (r|g|b) >= threshold
-		{
-			if ( base_modulate != 0 )
-			{
-				if ( base_modulate == 1 )
-				{
-					base *= base;
-				}
-				else
-				{
-					const vec3 luma = { 0.2126, 0.7152, 0.0722 };
-					base *= dot( luma, base.rgb );
-				}
-			}
-			out_color = vec4( base, 1.0 );
-		}
-		else
-		{
-			out_color = vec4( 0.0 );
-		}
-	}
+
+	// Soft-knee extraction avoids hard threshold edges that show up as block artifacts.
+	float knee = max( threshold * 0.5, 1e-5 );
+	float soft = clamp( ( metric - threshold + knee ) / ( 2.0 * knee ), 0.0, 1.0 );
+	float hard = max( metric - threshold, 0.0 );
+	float contrib = ( hard + soft * soft * knee ) / max( metric, 1e-5 );
+
+	out_color = vec4( base * contrib, 1.0 );
 }

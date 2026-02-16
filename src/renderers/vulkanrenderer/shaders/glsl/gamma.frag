@@ -14,6 +14,7 @@ layout(constant_id = 7) const int ditherMode = 0; // 0 - disabled, 1 - ordered
 layout(constant_id = 8) const int depth_r = 255;
 layout(constant_id = 9) const int depth_g = 255;
 layout(constant_id = 10) const int depth_b = 255;
+layout(constant_id = 11) const int toneMap = 0; // 0 - disabled, 1 - reinhard
 
 const vec3 sRGB = { 0.2126, 0.7152, 0.0722 };
 
@@ -59,13 +60,25 @@ void main() {
 		base = mix(base, luma, greyscale);
 	}
 
+	// Keep legacy overbright in LDR; FP16 HDR path is tone-mapped instead.
+	if ( toneMap == 0 ) {
+		base *= obScale;
+	}
+
+	// Tone-map only HDR highlights so UI/2D colors already in [0..1] stay unchanged.
+	if ( toneMap == 1 ) {
+		vec3 ldr = min(base, vec3(1.0));
+		vec3 hdr = max(base - vec3(1.0), vec3(0.0));
+		base = ldr + (hdr / (vec3(1.0) + hdr));
+	}
+
 	if ( gamma != 1.0 )
 	{
-		out_color = vec4(pow(base, vec3(gamma)) * obScale, 1);
+		out_color = vec4(pow(base, vec3(gamma)), 1);
 	}
 	else
 	{
-		out_color = vec4(base * obScale, 1);
+		out_color = vec4(base, 1);
 	}
 
 	if ( ditherMode == 1 ) {

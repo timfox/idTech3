@@ -6063,7 +6063,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	VkGraphicsPipelineCreateInfo create_info;
 	VkViewport viewport;
 	VkRect2D scissor;
-	VkSpecializationMapEntry spec_entries[11];
+	VkSpecializationMapEntry spec_entries[12];
 	VkSpecializationInfo frag_spec_info;
 	VkPipeline *pipeline;
 	VkShaderModule fsmodule;
@@ -6085,6 +6085,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 		int depth_r;
 		int depth_g;
 		int depth_b;
+		int tone_map;
 	} frag_spec_data;
 
 	switch ( program_index ) {
@@ -6215,6 +6216,11 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 
 	if ( !vk_surface_format_color_depth( vk.present_format.format, &frag_spec_data.depth_r, &frag_spec_data.depth_g, &frag_spec_data.depth_b ) )
 		ri.Printf( PRINT_ALL, "Format %s not recognized, dither to assume 8bpc\n", vk_format_string( vk.base_format.format ) );
+	frag_spec_data.tone_map = ( vk.color_format == VK_FORMAT_R16G16B16A16_SFLOAT ) ? 1 : 0;
+	if ( frag_spec_data.tone_map ) {
+		// HDR path uses tone mapping; keep UI/2D from getting an extra legacy overbright boost.
+		frag_spec_data.overbright = 1.0f;
+	}
 
 	spec_entries[0].constantID = 0;
 	spec_entries[0].offset = offsetof( struct PostProcess_FragSpecData, gamma );
@@ -6260,7 +6266,11 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	spec_entries[10].offset = offsetof(struct PostProcess_FragSpecData, depth_b);
 	spec_entries[10].size = sizeof(frag_spec_data.depth_b);
 
-	frag_spec_info.mapEntryCount = 11;
+	spec_entries[11].constantID = 11;
+	spec_entries[11].offset = offsetof(struct PostProcess_FragSpecData, tone_map);
+	spec_entries[11].size = sizeof(frag_spec_data.tone_map);
+
+	frag_spec_info.mapEntryCount = 12;
 	frag_spec_info.pMapEntries = spec_entries;
 	frag_spec_info.dataSize = sizeof( frag_spec_data );
 	frag_spec_info.pData = &frag_spec_data;
@@ -6396,7 +6406,6 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	create_info.pViewportState = &viewport_state;
 	create_info.pRasterizationState = &rasterization_state;
 	create_info.pMultisampleState = &multisample_state;
-	create_info.pDepthStencilState = (program_index == 2) ? &depth_stencil_state : NULL;
 	create_info.pDepthStencilState = &depth_stencil_state;
 	create_info.pColorBlendState = &blend_state;
 	create_info.pDynamicState = NULL;
@@ -9511,10 +9520,9 @@ qboolean vk_bloom( void )
 	vk_begin_post_bloom_render_pass(); // begin post-bloom
 	{
 		VkDescriptorSet dset[VK_NUM_BLOOM_PASSES];
-
-		for ( i = 0; i < VK_NUM_BLOOM_PASSES; i++ )
-		{
-			dset[i] = vk.bloom_image_descriptor[(i+1)*2];
+			static const uint32_t blend_levels[VK_NUM_BLOOM_PASSES] = { 0, 2, 4, 6 };
+		for ( i = 0; i < VK_NUM_BLOOM_PASSES; i++ ) {
+			dset[i] = vk.bloom_image_descriptor[ blend_levels[i] ];
 		}
 
 		// blend downscaled buffers to main fbo
