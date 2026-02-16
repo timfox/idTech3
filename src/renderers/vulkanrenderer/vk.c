@@ -8459,6 +8459,8 @@ static void vk_begin_render_pass( VkRenderPass renderPass, VkFramebuffer frameBu
 {
 	VkRenderPassBeginInfo render_pass_begin_info;
 	VkClearValue clear_values[3];
+	VkViewport viewport;
+	VkRect2D scissor_rect;
 
 	// Begin render pass.
 
@@ -8490,6 +8492,19 @@ static void vk_begin_render_pass( VkRenderPass renderPass, VkFramebuffer frameBu
 	}
 
 	qvkCmdBeginRenderPass( vk.cmd->command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE );
+
+	Com_Memset( &scissor_rect, 0, sizeof( scissor_rect ) );
+	scissor_rect.extent.width = width;
+	scissor_rect.extent.height = height;
+	qvkCmdSetScissor( vk.cmd->command_buffer, 0, 1, &scissor_rect );
+	vk.cmd->scissor_rect = scissor_rect;
+
+	Com_Memset( &viewport, 0, sizeof( viewport ) );
+	viewport.width = (float)width;
+	viewport.height = (float)height;
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+	qvkCmdSetViewport( vk.cmd->command_buffer, 0, 1, &viewport );
 
 	vk.cmd->last_pipeline = VK_NULL_HANDLE;
 	vk.cmd->depth_range = DEPTH_RANGE_COUNT;
