@@ -1443,24 +1443,25 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			stage->subsurfaceParams[3] = atof( token );
 			stage->vk_pbr_flags |= PBR_HAS_SUBSURFACE;
 		}
-		// If shcoeffs are omitted, r_pbr_shExtract can supply runtime cubemap SH.
-		else if ( !Q_stricmp( token, "shcoeffs" ) )
-		{
-			int coeffIndex;
-			for ( coeffIndex = 0; coeffIndex < 9; coeffIndex++ ) {
-				int component;
-				for ( component = 0; component < 3; component++ ) {
-					token = COM_ParseExt( text, qfalse );
-					if ( token[0] == 0 ) {
-						ri.Printf( PRINT_WARNING, "WARNING: missing parameter for shCoeffs in shader '%s'\n", shader.name );
-						return qfalse;
+			// If shcoeffs are omitted, r_pbr_shExtract can supply runtime cubemap SH.
+			else if ( !Q_stricmp( token, "shcoeffs" ) )
+			{
+				int coeffIndex;
+				for ( coeffIndex = 0; coeffIndex < 9; coeffIndex++ ) {
+					int component;
+					for ( component = 0; component < 3; component++ ) {
+						token = COM_ParseExt( text, qfalse );
+						if ( token[0] == 0 ) {
+							ri.Printf( PRINT_WARNING, "WARNING: missing parameter for shCoeffs in shader '%s'\n", shader.name );
+							return qfalse;
+						}
+						stage->shCoeffs[coeffIndex][component] = atof( token );
 					}
-					stage->shCoeffs[coeffIndex][component] = atof( token );
+					stage->shCoeffs[coeffIndex][3] = 0.0f;
 				}
-				stage->shCoeffs[coeffIndex][3] = 0.0f;
+				stage->vk_pbr_flags |= PBR_HAS_SHCOEFFS;
+				stage->vk_pbr_flags |= PBR_HAS_IRRADIANCE;
 			}
-			stage->vk_pbr_flags |= PBR_HAS_IRRADIANCE;
-		}
 #endif
 		//
 		// rgbGen

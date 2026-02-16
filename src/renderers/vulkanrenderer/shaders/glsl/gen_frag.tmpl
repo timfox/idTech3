@@ -147,16 +147,16 @@ layout (constant_id = 19) const int normal_texture_set = 0;
 layout (constant_id = 20) const int physical_texture_set = 0;
 layout (constant_id = 21) const int env_texture_set = 0;
 layout (constant_id = 22) const int lightmap_texture_set = 0;
-layout (constant_id = 23) const int irradiance_texture_set = 0;
-layout (constant_id = 24) const int emissive_texture_set = 0;
-layout (constant_id = 25) const int clearcoat_texture_set = 0;
-layout (constant_id = 26) const int sheen_texture_set = 0;
-layout (constant_id = 27) const int anisotropy_texture_set = 0;
-layout (constant_id = 28) const int transmission_texture_set = 0;
-layout (constant_id = 29) const int subsurface_texture_set = 0;
+layout (constant_id = 23) const int irradiance_texture_set = -1;
+layout (constant_id = 24) const int emissive_texture_set = -1;
+layout (constant_id = 25) const int clearcoat_texture_set = -1;
+layout (constant_id = 26) const int sheen_texture_set = -1;
+layout (constant_id = 27) const int anisotropy_texture_set = -1;
+layout (constant_id = 28) const int transmission_texture_set = -1;
+layout (constant_id = 29) const int subsurface_texture_set = -1;
 
-layout (constant_id = 23) const int deluxe_mapping			= -1; // -1: deluxemapping off, 0: on, 1: on + bound
-layout (constant_id = 24) const float deluxe_specular_scale = 1.0;
+layout (constant_id = 30) const int deluxe_mapping			= -1; // -1: deluxemapping off, 0: on, 1: on + bound
+layout (constant_id = 31) const float deluxe_specular_scale = 1.0;
 
 vec3 CalcNormal( in vec3 vertexNormal, in vec4 vertexTangent, in vec2 frag_tex_coord )
 {
