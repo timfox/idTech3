@@ -4388,7 +4388,7 @@ static shader_t *FinishShader( void ) {
 				pStage->tessFlags |= TESS_PBR;
 				shader.hasPBR = qtrue;
 
-				if ( hasLightmapStage )
+				if ( hasLightmapStage && shader.lightmapIndex != LIGHTMAP_WHITEIMAGE )
 				{
 					def.vk_pbr_flags |= PBR_HAS_LIGHTMAP;
 				}

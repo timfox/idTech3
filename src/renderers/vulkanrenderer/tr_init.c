@@ -1594,7 +1594,7 @@ static void R_Register( void )
 	r_pbr_shExtract = ri.Cvar_Get( "r_pbr_shExtract", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_pbr_shExtract, "Extract SH coefficients from generated irradiance cubemaps for PBR." );
 
-	r_pbr_debug = ri.Cvar_Get( "r_pbr_debug", "0", CVAR_ARCHIVE_ND );
+	r_pbr_debug = ri.Cvar_Get( "r_pbr_debug", "0", CVAR_TEMP );
 	ri.Cvar_CheckRange( r_pbr_debug, "0", "4", CV_INTEGER );
 	ri.Cvar_SetDescription( r_pbr_debug,
 		"PBR debug view override (Vulkan PBR only):\n"
@@ -1603,6 +1603,10 @@ static void R_Register( void )
 		" 2 - show normal map (RGB)\n"
 		" 3 - show physical map (packed)\n"
 		" 4 - show emissive map (RGB)\n" );
+	if ( r_pbr_debug->integer != 0 ) {
+		ri.Printf( PRINT_WARNING, "Resetting r_pbr_debug to 0 for normal rendering\n" );
+		ri.Cvar_Set( "r_pbr_debug", "0" );
+	}
 
 	r_pbr_packedPreferred = ri.Cvar_Get( "r_pbr_packedPreferred", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_pbr_packedPreferred, "0", "6", CV_INTEGER );

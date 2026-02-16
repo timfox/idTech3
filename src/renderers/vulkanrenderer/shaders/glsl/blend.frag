@@ -21,10 +21,5 @@ void main()
 {
 	vec3 base = texture(texture0, tex_coord).rgb + texture(texture1, tex_coord).rgb + texture(texture2, tex_coord).rgb + texture(texture3, tex_coord).rgb;
 
-	if ( dot(base,base) == 0.0 )
-	{
-		discard;
-	}
-
 	out_color = vec4( base * factor, 0.0 );
 }
