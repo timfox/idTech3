@@ -25,6 +25,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifdef USE_LUA
 #include "lua_debug.h"
 #endif
+#ifdef USE_DUKTAPE
+#include "js_debug.h"
+#endif
 
 #define MAX_CMD_BUFFER  65536
 
@@ -1183,5 +1186,16 @@ void Cmd_Init( void ) {
 	Cmd_AddCommand("script_reload", Cmd_ScriptReload_f);
 	Cmd_AddCommand("script_list", Cmd_ScriptList_f);
 	Cmd_AddCommand("script_dump", Cmd_ScriptDump_f);
+#endif
+#ifdef USE_DUKTAPE
+	// JavaScript debugging commands
+	extern void Cmd_JsReload_f(void);
+	extern void Cmd_JsList_f(void);
+	extern void Cmd_JsDump_f(void);
+	extern void Cmd_JsExec_f(void);
+	Cmd_AddCommand("js_reload", Cmd_JsReload_f);
+	Cmd_AddCommand("js_list", Cmd_JsList_f);
+	Cmd_AddCommand("js_dump", Cmd_JsDump_f);
+	Cmd_AddCommand("js_exec", Cmd_JsExec_f);
 #endif
 }

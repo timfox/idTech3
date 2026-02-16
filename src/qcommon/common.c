@@ -23,6 +23,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "q_shared.h"
 #include "qcommon.h"
+#ifdef USE_DUKTAPE
+#include "js_debug.h"
+#endif
 #include <setjmp.h>
 #ifndef _WIN32
 #include <netinet/in.h>
@@ -4452,6 +4455,10 @@ void Com_Frame( qboolean noDelay ) {
 
 	// mess with msec if needed
 	msec = Com_ModifyMsec( realMsec );
+
+#ifdef USE_DUKTAPE
+	JsDebug_Frame( msec, realMsec );
+#endif
 
 	//
 	// server side
