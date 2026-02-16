@@ -22,6 +22,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // sv_client.c -- server code for dealing with clients
 
 #include "server.h"
+#ifdef USE_DUKTAPE
+#include "../qcommon/js_debug.h"
+#endif
 
 static void SV_CloseDownload( client_t *cl );
 
@@ -820,6 +823,10 @@ gotnewcl:
 	// notice that it is from a different serverid and that the
 	// gamestate message was not just sent, forcing a retransmit
 	newcl->gamestateMessageNum = newcl->messageAcknowledge - 1; // force gamestate retransmit
+
+#ifdef USE_DUKTAPE
+	JsDebug_EmitEvent( "client_connect", ip, newcl->name, clientNum, 0 );
+#endif
 
 	// if this was the first client on the server, or the last client
 	// the server can hold, send a heartbeat to the master.

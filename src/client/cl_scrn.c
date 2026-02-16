@@ -593,6 +593,7 @@ static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 			// force menu up
 			S_StopAllSounds();
 			VM_Call( uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_MAIN );
+			CL_JsNotifyMenuChanged( UIMENU_MAIN );
 			break;
 		case CA_CONNECTING:
 		case CA_CHALLENGING:

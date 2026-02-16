@@ -11,6 +11,16 @@ static lua_State *s_luaState;
 static int s_luaTrackedCount;
 static char s_luaTrackedScripts[MAX_LUA_TRACKED_SCRIPTS][MAX_OSPATH];
 
+static qboolean LuaDebug_IsAllowedPath( const char *scriptPath ) {
+	if ( !scriptPath || !scriptPath[0] ) {
+		return qfalse;
+	}
+	return ( !Q_strncmp( scriptPath, "gameplay/", 9 ) ||
+		!Q_strncmp( scriptPath, "server/", 7 ) ||
+		!Q_strncmp( scriptPath, "vm/game/", 8 ) ||
+		!Q_strncmp( scriptPath, "scripts/lua/", 12 ) );
+}
+
 static void LuaDebug_ClearTrackedScripts( void ) {
 	s_luaTrackedCount = 0;
 }
@@ -45,6 +55,10 @@ static void LuaDebug_PrintLuaError( const char *prefix ) {
 
 static qboolean LuaDebug_LoadScript( const char *scriptPath ) {
 	if ( !LuaDebug_OpenState() ) {
+		return qfalse;
+	}
+	if ( !LuaDebug_IsAllowedPath( scriptPath ) ) {
+		Com_Printf( S_COLOR_RED "Lua: denied script path '%s' (allowed: gameplay/, server/, vm/game/, scripts/lua/)\n", scriptPath );
 		return qfalse;
 	}
 
@@ -140,6 +154,7 @@ void Cmd_ScriptList_f( void ) {
 	int i;
 
 	Com_Printf( "Lua: compile-time API %s (LUA_VERSION_NUM=%d)\n", LUA_VERSION, LUA_VERSION_NUM );
+	Com_Printf( "Lua: script path policy gameplay/, server/, vm/game/, scripts/lua/\n" );
 
 	if ( !s_luaState ) {
 		Com_Printf( "Lua: runtime not initialized. Run script_reload first.\n" );

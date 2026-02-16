@@ -184,12 +184,18 @@ endif()
 if(NOT DEFINED USE_LUA)
   option(USE_LUA "Enable Lua scripting support" ON)
 endif()
+if(NOT DEFINED USE_DUKTAPE)
+  option(USE_DUKTAPE "Enable Duktape JavaScript scripting support" OFF)
+endif()
 
 set(LUA_FOUND FALSE)
 set(LUA_LINK_LIBRARIES "")
 set(LUA_VERSION_NUM 0)
 set(LUA_VERSION_STRING "")
 set(LUA_EXTRA_LIBRARIES "")
+set(DUKTAPE_FOUND FALSE)
+set(DUKTAPE_LINK_LIBRARIES "")
+set(DUKTAPE_EXTRA_LIBRARIES "")
 
 if(USE_LUA)
   set(_LUA_HINT_PATHS
@@ -345,6 +351,75 @@ if(USE_LUA)
     list(APPEND LUA_LINK_LIBRARIES ${LUA_LIBRARY})
     if(LUA_EXTRA_LIBRARIES)
       list(APPEND LUA_LINK_LIBRARIES ${LUA_EXTRA_LIBRARIES})
+    endif()
+  endif()
+endif()
+
+if(USE_DUKTAPE)
+  set(_DUKTAPE_HINT_PATHS
+    $ENV{DUKTAPE_DIR}
+    $ENV{DUKTAPE_PATH}
+    ${CMAKE_PREFIX_PATH}
+    ${CMAKE_INSTALL_PREFIX}
+    /usr/local
+    /usr
+    /opt/local
+    /opt
+    /opt/homebrew
+    /sw
+  )
+  if(WIN32)
+    list(APPEND _DUKTAPE_HINT_PATHS
+      "C:/msys64/mingw64"
+      "C:/msys64/ucrt64"
+      "C:/msys64/mingw32"
+      "C:/msys64/usr"
+    )
+  endif()
+
+  find_path(DUKTAPE_INCLUDE_DIR
+    NAMES duktape.h
+    PATH_SUFFIXES include
+    PATHS ${_DUKTAPE_HINT_PATHS}
+  )
+
+  find_library(DUKTAPE_LIBRARY
+    NAMES duktape
+    PATH_SUFFIXES lib64 lib
+    PATHS ${_DUKTAPE_HINT_PATHS}
+  )
+
+  if((NOT DUKTAPE_INCLUDE_DIR OR NOT DUKTAPE_LIBRARY) AND NOT WIN32)
+    find_package(PkgConfig QUIET)
+    if(PKG_CONFIG_FOUND)
+      pkg_search_module(DUKTAPE_PKG QUIET duktape)
+      if(DUKTAPE_PKG_FOUND)
+        if(NOT DUKTAPE_INCLUDE_DIR AND DUKTAPE_PKG_INCLUDE_DIRS)
+          list(GET DUKTAPE_PKG_INCLUDE_DIRS 0 DUKTAPE_INCLUDE_DIR)
+        endif()
+        if(NOT DUKTAPE_LIBRARY)
+          if(DUKTAPE_PKG_LIBRARIES)
+            list(GET DUKTAPE_PKG_LIBRARIES 0 DUKTAPE_LIBRARY)
+            list(REMOVE_AT DUKTAPE_PKG_LIBRARIES 0)
+            set(DUKTAPE_EXTRA_LIBRARIES ${DUKTAPE_PKG_LIBRARIES})
+          elseif(DUKTAPE_PKG_LINK_LIBRARIES)
+            list(GET DUKTAPE_PKG_LINK_LIBRARIES 0 DUKTAPE_LIBRARY)
+            list(REMOVE_AT DUKTAPE_PKG_LINK_LIBRARIES 0)
+            set(DUKTAPE_EXTRA_LIBRARIES ${DUKTAPE_PKG_LINK_LIBRARIES})
+          endif()
+        endif()
+      endif()
+    endif()
+  endif()
+
+  if(NOT DUKTAPE_INCLUDE_DIR OR NOT DUKTAPE_LIBRARY)
+    message(WARNING "Duktape headers/library not found; JavaScript scripting support will be disabled.")
+  else()
+    set(DUKTAPE_FOUND TRUE)
+    message(STATUS "Duktape support enabled: ${DUKTAPE_LIBRARY}")
+    list(APPEND DUKTAPE_LINK_LIBRARIES ${DUKTAPE_LIBRARY})
+    if(DUKTAPE_EXTRA_LIBRARIES)
+      list(APPEND DUKTAPE_LINK_LIBRARIES ${DUKTAPE_EXTRA_LIBRARIES})
     endif()
   endif()
 endif()
@@ -805,6 +880,10 @@ if(USE_LUA AND LUA_FOUND)
   target_compile_definitions(qcommon PRIVATE USE_LUA)
   target_include_directories(qcommon PRIVATE ${LUA_INCLUDE_DIR})
 endif()
+if(USE_DUKTAPE AND DUKTAPE_FOUND)
+  target_compile_definitions(qcommon PRIVATE USE_DUKTAPE)
+  target_include_directories(qcommon PRIVATE ${DUKTAPE_INCLUDE_DIR})
+endif()
 
 # dedicated server
 ADD_LIBRARY(qcommon_ded OBJECT ${QCOMMON_SRCS} ${SERVER_SRCS})
@@ -823,6 +902,10 @@ set_property(TARGET qcommon_ded PROPERTY POSITION_INDEPENDENT_CODE ON)
 if(USE_LUA AND LUA_FOUND)
   target_compile_definitions(qcommon_ded PRIVATE USE_LUA)
   target_include_directories(qcommon_ded PRIVATE ${LUA_INCLUDE_DIR})
+endif()
+if(USE_DUKTAPE AND DUKTAPE_FOUND)
+  target_compile_definitions(qcommon_ded PRIVATE USE_DUKTAPE)
+  target_include_directories(qcommon_ded PRIVATE ${DUKTAPE_INCLUDE_DIR})
 endif()
 
 # Apply SKIP_IDPAK_CHECK to qcommon targets that compile files.c
@@ -1323,6 +1406,10 @@ endif()
 if(USE_LUA AND LUA_FOUND)
   TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ${LUA_LINK_LIBRARIES})
   TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE ${LUA_LINK_LIBRARIES})
+endif()
+if(USE_DUKTAPE AND DUKTAPE_FOUND)
+  TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ${DUKTAPE_LINK_LIBRARIES})
+  TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE ${DUKTAPE_LINK_LIBRARIES})
 endif()
 
 IF(WIN32)
