@@ -48,7 +48,7 @@ Change when mesh importers swaps different indices!
 (modelling tool standard is backface culling vs frontface culling in id tech 3)
 ================
 */
-static int R_FixMikktVertIndex( const int index )
+int R_FixMikktVertIndex(const int index)
 {
 	switch (index % 3)
 	{
@@ -71,8 +71,6 @@ int mikkt_bsp_tri_GetNumFaces( const SMikkTSpaceContext *context )
 
 int mikkt_bsp_tri_GetNumVerticesOfFace( const SMikkTSpaceContext *context, const int face )
 {
-	(void)context;
-	(void)face;
 	return 3;
 }
 
@@ -139,8 +137,6 @@ int mikkt_bsp_face_GetNumFaces( const SMikkTSpaceContext *context )
 
 int mikkt_bsp_face_GetNumVerticesOfFace(const SMikkTSpaceContext *context, const int face) 
 {
-	(void)context;
-	(void)face;
 	return 3;
 }
 
