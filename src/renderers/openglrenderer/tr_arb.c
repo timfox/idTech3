@@ -872,7 +872,10 @@ static void ARB_BlurParams( int width, int height, int ksize, qboolean horizonta
 	//	{ 1/4,   1, 2, 1 },
 		{ 1.0/16,  5, 6, 5 },
 		{ 1.0/8,   1, 3, 3, 1 },
-		{ 1.0/16,  1, 4, 6, 4, 1 },
+		// 5-tap bilinear Gaussian blur (9-tap equivalent):
+		//   offsets: +/-1.333, +/-3.111, center
+		//   weights: 0.32813, 0.03516, 0.27344
+		{ 1.0, 0.03516, 0.32813, 0.27344, 0.32813, 0.03516 },
 		{ 1.0/32,  1, 5, 10, 10, 5, 1 },
 		{ 1.0/64,  1, 6, 15, 20, 15, 6, 1 },
 		{ 1.0/128, 1, 7, 21, 35, 35, 21, 7, 1 },
@@ -898,7 +901,7 @@ static void ARB_BlurParams( int width, int height, int ksize, qboolean horizonta
 	//	{ -1.0, 0.0, 1.0 },
 		{ -1.2f, 0.0, 1.2f },
 		{ -1.5, -0.5, 0.5, 1.5 },
-		{ -2.0, -1.0, 0.0, 1.0, 2.0 },
+		{ -3.111f, -1.333f, 0.0, 1.333f, 3.111f },
 		{ -2.5, -1.5, -0.5, 0.5, 1.5, 2.5 },
 		{ -3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0 },
 		{ -3.5, -2.5, -1.5, -0.5, 0.5, 1.5, 2.5, 3.5 },
@@ -1047,6 +1050,11 @@ qboolean ARB_UpdatePrograms( void )
 	
 	// only 1, 2, 3, 6, 8, 10, 12, 14, 16, 18 and 20 produces real visual difference
 	fboBloomFilterSize = r_bloom_filter_size->integer;
+	// Legacy 3-tap mode is prone to blocky artifacts on bright highlights.
+	// Use the 5-tap bilinear profile as the minimum stable blur kernel.
+	if ( fboBloomFilterSize < 5 ) {
+		fboBloomFilterSize = 5;
+	}
 	if ( !ARB_CompileProgram( Fragment, ARB_BuildBlurProgram( buf, fboBloomFilterSize ), programs[ BLUR_FRAGMENT ] ) )
 		return qfalse;
 
@@ -1248,6 +1256,14 @@ static void getPreferredFormatAndType( GLint format, GLint *pFormat, GLint *pTyp
 {
 	GLint preferredFormat;
 	GLint preferredType;
+
+	// Avoid driver-reported upload type mismatches for RGB10_A2 bloom targets.
+	// A fixed canonical pair is more stable across vendors.
+	if ( format == GL_RGB10_A2 ) {
+		*pFormat = GL_RGBA;
+		*pType = GL_UNSIGNED_INT_2_10_10_10_REV;
+		return;
+	}
 
 	if ( qglGetInternalformativ && gl_version >= 43 ) {
 		qglGetInternalformativ( GL_TEXTURE_2D, /*GL_RGBA8*/ format, GL_TEXTURE_IMAGE_FORMAT, 1, &preferredFormat );
