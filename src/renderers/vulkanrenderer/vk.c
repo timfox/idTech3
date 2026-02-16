@@ -252,6 +252,7 @@ const char *vk_format_string( VkFormat format )
 		CASE_STR( VK_FORMAT_B4G4R4A4_UNORM_PACK16 );
 		CASE_STR( VK_FORMAT_R4G4B4A4_UNORM_PACK16 );
 		CASE_STR( VK_FORMAT_R16G16B16A16_UNORM );
+		CASE_STR( VK_FORMAT_R16G16B16A16_SFLOAT );
 		CASE_STR( VK_FORMAT_A2B10G10R10_UNORM_PACK32 );
 		CASE_STR( VK_FORMAT_A2R10G10B10_UNORM_PACK32 );
 		CASE_STR( VK_FORMAT_B10G11R11_UFLOAT_PACK32 );
@@ -1218,20 +1219,16 @@ static void allocate_and_bind_image_memory(VkImage image) {
 
 	qvkGetImageMemoryRequirements(vk.device, image, &memory_requirements);
 
-	if ( memory_requirements.size > vk.image_chunk_size ) {
-		ri.Error( ERR_FATAL, "Vulkan: could not allocate memory, image is too large (%ikbytes).",
-			(int)(memory_requirements.size/1024) );
-	}
-
 	chunk = NULL;
 
 	// Try to find an existing chunk of sufficient capacity.
 	alignment = memory_requirements.alignment;
 	for ( i = 0; i < vk_world.num_image_chunks; i++ ) {
+		VkDeviceSize chunk_size = vk_world.image_chunks[i].size;
 		// ensure that memory region has proper alignment
 		VkDeviceSize offset = PAD( vk_world.image_chunks[i].used, alignment );
 
-		if ( offset + memory_requirements.size <= vk.image_chunk_size ) {
+		if ( offset + memory_requirements.size <= chunk_size ) {
 			chunk = &vk_world.image_chunks[i];
 			chunk->used = offset + memory_requirements.size;
 			break;
@@ -1242,6 +1239,13 @@ static void allocate_and_bind_image_memory(VkImage image) {
 	if (chunk == NULL) {
 		VkMemoryAllocateInfo alloc_info;
 		VkDeviceMemory memory;
+		VkDeviceSize chunk_size = vk.image_chunk_size;
+
+		// Very large images should not hard-fail just because they exceed the default chunk size.
+		// Allocate a dedicated chunk rounded to 16 MB for better reuse/alignment.
+		if ( memory_requirements.size > chunk_size ) {
+			chunk_size = PAD( memory_requirements.size, 16 * 1024 * 1024 );
+		}
 
 		if (vk_world.num_image_chunks >= MAX_IMAGE_CHUNKS) {
 			ri.Error(ERR_FATAL, "Vulkan: image chunk limit has been reached" );
@@ -1249,16 +1253,17 @@ static void allocate_and_bind_image_memory(VkImage image) {
 
 		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 		alloc_info.pNext = NULL;
-		alloc_info.allocationSize = vk.image_chunk_size;
+		alloc_info.allocationSize = chunk_size;
 		alloc_info.memoryTypeIndex = find_memory_type( memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 
 		VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &memory ) );
 
 		chunk = &vk_world.image_chunks[vk_world.num_image_chunks];
 		chunk->memory = memory;
+		chunk->size = chunk_size;
 		chunk->used = memory_requirements.size;
 
-		SET_OBJECT_NAME( memory, va( "image memory chunk %i", vk_world.num_image_chunks ), VK_DEBUG_REPORT_OBJECT_TYPE_DEVICE_MEMORY_EXT );
+		SET_OBJECT_NAME( memory, va( "image memory chunk %i (%i MB)", vk_world.num_image_chunks, (int)(chunk_size / (1024 * 1024)) ), VK_DEBUG_REPORT_OBJECT_TYPE_DEVICE_MEMORY_EXT );
 
 		vk_world.num_image_chunks++;
 	}
@@ -1617,6 +1622,14 @@ static qboolean vk_blit_enabled( VkPhysicalDevice physical_device, const VkForma
 	return qtrue;
 }
 
+static qboolean vk_has_optimal_format_features( VkPhysicalDevice physical_device, VkFormat format, VkFormatFeatureFlags requiredFeatures )
+{
+	VkFormatProperties formatProps;
+
+	qvkGetPhysicalDeviceFormatProperties( physical_device, format, &formatProps );
+	return ( formatProps.optimalTilingFeatures & requiredFeatures ) == requiredFeatures;
+}
+
 
 static VkFormat get_hdr_format( VkFormat base_format )
 {
@@ -1740,13 +1753,36 @@ static qboolean vk_select_surface_format( VkPhysicalDevice physical_device, VkSu
 
 static void setup_surface_formats( VkPhysicalDevice physical_device )
 {
+	const VkFormatFeatureFlags color_features = VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT;
+	const VkFormatFeatureFlags bloom_features = VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT;
+
 	vk.depth_format = get_depth_format( physical_device );
 
 	vk.color_format = get_hdr_format( vk.base_format.format );
+	if ( r_fbo->integer && r_hdr && r_hdr->integer == 1 &&
+		vk_has_optimal_format_features( physical_device, VK_FORMAT_R16G16B16A16_SFLOAT, color_features ) ) {
+		vk.color_format = VK_FORMAT_R16G16B16A16_SFLOAT;
+	}
+	if ( !vk_has_optimal_format_features( physical_device, vk.color_format, color_features ) ) {
+		vk.color_format = vk.base_format.format;
+	}
+	if ( !vk_has_optimal_format_features( physical_device, vk.color_format, color_features ) ) {
+		ri.Error( ERR_FATAL, "Failed to select supported color attachment format" );
+	}
 
 	vk.capture_format = VK_FORMAT_R8G8B8A8_UNORM;
 
-	vk.bloom_format = vk.base_format.format;
+	// Prefer FP16 bloom buffers to reduce highlight quantization artifacts.
+	vk.bloom_format = vk.color_format;
+	if ( r_fbo->integer && vk_has_optimal_format_features( physical_device, VK_FORMAT_R16G16B16A16_SFLOAT, bloom_features ) ) {
+		vk.bloom_format = VK_FORMAT_R16G16B16A16_SFLOAT;
+	}
+	if ( !vk_has_optimal_format_features( physical_device, vk.bloom_format, bloom_features ) ) {
+		vk.bloom_format = vk.base_format.format;
+	}
+	if ( !vk_has_optimal_format_features( physical_device, vk.bloom_format, bloom_features ) ) {
+		ri.Error( ERR_FATAL, "Failed to select supported bloom attachment format" );
+	}
 	vk.ssao_format = VK_FORMAT_R8_UNORM;
 
 	vk.blitEnabled = vk_blit_enabled( physical_device, vk.color_format, vk.capture_format );
@@ -2649,7 +2685,8 @@ void vk_update_attachment_descriptors( void ) {
 		Vk_Sampler_Def sd;
 
 		Com_Memset( &sd, 0, sizeof( sd ) );
-		sd.gl_mag_filter = sd.gl_min_filter = vk.blitFilter;
+		sd.gl_mag_filter = sd.gl_min_filter =
+			((r_bloom && r_bloom->integer) || (r_ssao && r_ssao->integer)) ? GL_LINEAR : vk.blitFilter;
 		sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 		sd.max_lod_1_0 = qtrue;
 		sd.noAnisotropy = qtrue;
@@ -2713,6 +2750,11 @@ void vk_update_attachment_descriptors( void ) {
 		// bloom images
 		if ( r_bloom->integer )
 		{
+			sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+			sd.max_lod_1_0 = qtrue;
+			sd.noAnisotropy = qtrue;
+			info.sampler = vk_find_sampler( &sd );
+
 			uint32_t i;
 			for ( i = 0; i < ARRAY_LEN( vk.bloom_image_descriptor ); i++ )
 			{
@@ -4463,7 +4505,6 @@ void vk_initialize( void )
 	uint32_t major;
 	uint32_t minor;
 	uint32_t patch;
-	uint32_t maxSize;
 	uint32_t i;
 
 	init_vulkan_library();
@@ -4567,10 +4608,7 @@ void vk_initialize( void )
 
 	// fill glConfig information
 
-	// maxTextureSize must not exceed IMAGE_CHUNK_SIZE
-	maxSize = sqrtf( IMAGE_CHUNK_SIZE / 4 );
-	// round down to next power of 2
-	glConfig.maxTextureSize = MIN( props.limits.maxImageDimension2D, log2pad( maxSize, 0 ) );
+	glConfig.maxTextureSize = MIN( props.limits.maxImageDimension2D, (uint32_t)MAX_TEXTURE_SIZE );
 
 	if ( glConfig.maxTextureSize > MAX_TEXTURE_SIZE )
 		glConfig.maxTextureSize = MAX_TEXTURE_SIZE; // ResampleTexture() relies on that maximum
@@ -4595,9 +4633,9 @@ void vk_initialize( void )
 	if ( r_pbr->integer ) {
 		if ( !vk.fboActive ) {
 			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "PBR: disabled (requires \\r_fbo 1)\n" S_COLOR_WHITE );
-		} else if ( vk.maxBoundDescriptorSets < 10 ) {
-			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "PBR: disabled (insufficient descriptor sets: have %u, need >= 10)\n" S_COLOR_WHITE,
-				(unsigned)vk.maxBoundDescriptorSets );
+		} else if ( vk.maxBoundDescriptorSets < VK_DESC_COUNT ) {
+			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "PBR: disabled (insufficient descriptor sets: have %u, need >= %u)\n" S_COLOR_WHITE,
+				(unsigned)vk.maxBoundDescriptorSets, (unsigned)VK_DESC_COUNT );
 		} else {
 			vk.pbrActive = qtrue;
 			ri.Printf( PRINT_ALL, "PBR: enabled\n" );
@@ -4815,7 +4853,13 @@ void vk_initialize( void )
 		uint32_t j, maxSets;
 
 		pool_size[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		pool_size[0].descriptorCount = MAX_DRAWIMAGES + 1 + 1 + 1 + 3 + VK_NUM_BLOOM_PASSES * 2; // color, screenmap, depth/ssao, bloom descriptors
+		pool_size[0].descriptorCount =
+			MAX_DRAWIMAGES +
+			1 + // color descriptor
+			1 + // screenmap descriptor
+			1 + // cubemap descriptor
+			3 + // depth + ssao + ssao_blur descriptors
+			(1 + VK_NUM_BLOOM_PASSES * 2); // bloom descriptors
 #ifdef USE_VK_PBR
         if ( vk.pbrActive )
             pool_size[0].descriptorCount += 2 + ( MAX_DRAWIMAGES * 8 ); // brdf-lut + irradiance | MAX_DRAWIMAGES * (physical, normal, emissive, clearcoat, sheen, anisotropy, transmission, subsurface)
@@ -6164,6 +6208,10 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	frag_spec_data.bloom_threshold_mode = r_bloom_threshold_mode->integer;
 	frag_spec_data.bloom_modulate = r_bloom_modulate->integer;
 	frag_spec_data.dither = r_dither->integer;
+	if ( r_bloom && r_bloom->integer ) {
+		// Ordered dithering in the final gamma pass amplifies clipped bloom highlights.
+		frag_spec_data.dither = 0;
+	}
 
 	if ( !vk_surface_format_color_depth( vk.present_format.format, &frag_spec_data.depth_r, &frag_spec_data.depth_g, &frag_spec_data.depth_b ) )
 		ri.Printf( PRINT_ALL, "Format %s not recognized, dither to assume 8bpc\n", vk_format_string( vk.base_format.format ) );
@@ -7179,6 +7227,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	ADD_FRAG_SPEC( 27, anisotropy_texture_set );
 	ADD_FRAG_SPEC( 28, transmission_texture_set );
 	ADD_FRAG_SPEC( 29, subsurface_texture_set );
+	ADD_FRAG_SPEC( 30, deluxe_mapping );
+	ADD_FRAG_SPEC( 31, deluxe_specular_scale );
 
 	// only use w value, specgloss maps are not supported
 	frag_spec_data.specularScale_x = def->specularScale[0];
@@ -7193,15 +7243,15 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 
 	frag_spec_data.normal_texture_set = 0;
 	frag_spec_data.physical_texture_set = 0;
-	frag_spec_data.env_texture_set = 0;
+	frag_spec_data.env_texture_set = vk.cubemapActive ? 0 : -1;
 	frag_spec_data.lightmap_texture_set = 0;
-	frag_spec_data.irradiance_texture_set = 0;
-	frag_spec_data.emissive_texture_set = 0;
-	frag_spec_data.clearcoat_texture_set = 0;
-	frag_spec_data.sheen_texture_set = 0;
-	frag_spec_data.anisotropy_texture_set = 0;
-	frag_spec_data.transmission_texture_set = 0;
-	frag_spec_data.subsurface_texture_set = 0;
+	frag_spec_data.irradiance_texture_set = -1;
+	frag_spec_data.emissive_texture_set = -1;
+	frag_spec_data.clearcoat_texture_set = -1;
+	frag_spec_data.sheen_texture_set = -1;
+	frag_spec_data.anisotropy_texture_set = -1;
+	frag_spec_data.transmission_texture_set = -1;
+	frag_spec_data.subsurface_texture_set = -1;
 
 	if ( ( def->vk_pbr_flags & PBR_HAS_NORMALMAP ) == 0 )
 		frag_spec_data.normal_texture_set = -1;
@@ -7212,11 +7262,29 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	if ( def->vk_pbr_flags & PBR_HAS_SPECULARMAP )
 		frag_spec_data.physical_texture_set = 1;
 
-	if ( !vk.cubemapActive )
-		frag_spec_data.env_texture_set = -1;
-
 	if ( ( def->vk_pbr_flags & PBR_HAS_LIGHTMAP ) == 0 )
 		frag_spec_data.lightmap_texture_set = -1;
+
+	if ( def->vk_pbr_flags & PBR_HAS_IRRADIANCE )
+		frag_spec_data.irradiance_texture_set = vk.cubemapActive ? 0 : -1;
+
+	if ( def->vk_pbr_flags & PBR_HAS_EMISSIVE )
+		frag_spec_data.emissive_texture_set = 0;
+
+	if ( def->vk_pbr_flags & PBR_HAS_CLEARCOAT )
+		frag_spec_data.clearcoat_texture_set = 0;
+
+	if ( def->vk_pbr_flags & PBR_HAS_SHEEN )
+		frag_spec_data.sheen_texture_set = 0;
+
+	if ( def->vk_pbr_flags & PBR_HAS_ANISOTROPY )
+		frag_spec_data.anisotropy_texture_set = 0;
+
+	if ( def->vk_pbr_flags & PBR_HAS_TRANSMISSION )
+		frag_spec_data.transmission_texture_set = 0;
+
+	if ( def->vk_pbr_flags & PBR_HAS_SUBSURFACE )
+		frag_spec_data.subsurface_texture_set = 0;
 #ifdef HDR_DELUXE_LIGHTMAP
 	if ( r_deluxeMapping->integer )
 	{
