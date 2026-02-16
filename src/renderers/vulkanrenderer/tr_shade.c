@@ -1258,6 +1258,13 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 #ifdef USE_VK_PBR
 	is_pbr_surface = vk_is_valid_pbr_surface( tess.shader->hasPBR );
 
+	// Debug view: render a non-PBR pass and optionally override texture0 binding.
+	// Keeps runtime inspection simple without requiring extra shader variants.
+	const int pbr_debug = ( r_pbr_debug != NULL ) ? r_pbr_debug->integer : 0;
+	if ( pbr_debug ) {
+		is_pbr_surface = qfalse;
+	}
+
 	if ( is_pbr_surface ) {
 		Com_Memcpy( &uniform_camera.modelMatrix, backEnd.or.modelMatrix, sizeof(float) * 16 );
 		Com_Memcpy( &uniform_camera.viewOrigin, backEnd.refdef.vieworg, sizeof( vec3_t) );
@@ -1325,7 +1332,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		Vk_Pipeline_Def	def;
 		vk_get_pipeline_def( pipeline, &def );
 
-		if ( is_pbr_surface && def.vk_pbr_flags ) {
+		if ( is_pbr_surface && pStage->vk_pbr_flags ) {
 			static VkCommandBuffer lastCmdBuf = VK_NULL_HANDLE;
 			static qboolean lastValid = qfalse;
 			static vkPbrUniformBlock_t lastBlock;
@@ -1341,40 +1348,35 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 
 			vk_update_descriptor_if_changed( VK_DESC_PBR_BRDFLUT, vk.brdflut_image_descriptor );
 				
-			if ( def.vk_pbr_flags & PBR_HAS_NORMALMAP )
+			if ( pStage->vk_pbr_flags & PBR_HAS_NORMALMAP )
 				vk_update_descriptor_if_changed( VK_DESC_PBR_NORMAL, pStage->normalMap->descriptor );
 
-			if ( def.vk_pbr_flags & PBR_HAS_PHYSICALMAP || def.vk_pbr_flags & PBR_HAS_SPECULARMAP )
+			if ( pStage->vk_pbr_flags & PBR_HAS_PHYSICALMAP || pStage->vk_pbr_flags & PBR_HAS_SPECULARMAP )
 				vk_update_descriptor_if_changed( VK_DESC_PBR_PHYSICAL, pStage->physicalMap->descriptor );
+			
+			// Commented out descriptor updates for removed PBR features
+			// if ( pStage->vk_pbr_flags & PBR_HAS_EMISSIVE )
+			// 	vk_update_descriptor_if_changed( VK_DESC_PBR_EMISSIVE, pStage->emissiveMap->descriptor );
 
-			if ( def.vk_pbr_flags & PBR_HAS_EMISSIVE )
-				vk_update_descriptor_if_changed( VK_DESC_PBR_EMISSIVE,
-					(pStage->emissiveMap ? pStage->emissiveMap->descriptor : tr.whiteImage->descriptor) );
+			// if ( pStage->vk_pbr_flags & PBR_HAS_CLEARCOAT )
+			// 	vk_update_descriptor_if_changed( VK_DESC_PBR_CLEARCOAT, pStage->clearcoatMap->descriptor );
 
-			if ( def.vk_pbr_flags & PBR_HAS_CLEARCOAT )
-				vk_update_descriptor_if_changed( VK_DESC_PBR_CLEARCOAT,
-					(pStage->clearcoatMap ? pStage->clearcoatMap->descriptor : tr.whiteImage->descriptor) );
+			// if ( pStage->vk_pbr_flags & PBR_HAS_SHEEN )
+			// 	vk_update_descriptor_if_changed( VK_DESC_PBR_SHEEN, pStage->sheenMap->descriptor );
 
-			if ( def.vk_pbr_flags & PBR_HAS_SHEEN )
-				vk_update_descriptor_if_changed( VK_DESC_PBR_SHEEN,
-					(pStage->sheenMap ? pStage->sheenMap->descriptor : tr.whiteImage->descriptor) );
+			// if ( pStage->vk_pbr_flags & PBR_HAS_ANISOTROPY )
+			// 	vk_update_descriptor_if_changed( VK_DESC_PBR_ANISOTROPY, pStage->anisotropyMap->descriptor );
 
-			if ( def.vk_pbr_flags & PBR_HAS_ANISOTROPY )
-				vk_update_descriptor_if_changed( VK_DESC_PBR_ANISOTROPY,
-					(pStage->anisotropyMap ? pStage->anisotropyMap->descriptor : tr.whiteImage->descriptor) );
+			// if ( pStage->vk_pbr_flags & PBR_HAS_TRANSMISSION )
+			// 	vk_update_descriptor_if_changed( VK_DESC_PBR_TRANSMISSION, pStage->transmissionMap->descriptor );
 
-			if ( def.vk_pbr_flags & PBR_HAS_TRANSMISSION )
-				vk_update_descriptor_if_changed( VK_DESC_PBR_TRANSMISSION,
-					(pStage->transmissionMap ? pStage->transmissionMap->descriptor : tr.whiteImage->descriptor) );
-
-			if ( def.vk_pbr_flags & PBR_HAS_SUBSURFACE )
-				vk_update_descriptor_if_changed( VK_DESC_PBR_SUBSURFACE,
-					(pStage->subsurfaceMap ? pStage->subsurfaceMap->descriptor : tr.whiteImage->descriptor) );
+			// if ( pStage->vk_pbr_flags & PBR_HAS_SUBSURFACE )
+			// 	vk_update_descriptor_if_changed( VK_DESC_PBR_SUBSURFACE, pStage->subsurfaceMap->descriptor );
 
 			int cubemapIndex = -1;
 			if ( !tr.numCubemaps || backEnd.viewParms.targetCube != NULL ) {
 				vk_update_descriptor_if_changed( VK_DESC_PBR_CUBEMAP, tr.emptyCubemap->descriptor );
-				vk_update_descriptor_if_changed( VK_DESC_PBR_IRRADIANCE, tr.emptyCubemap->descriptor );
+				// vk_update_descriptor_if_changed( VK_DESC_PBR_IRRADIANCE, tr.emptyCubemap->descriptor );
 				if ( backEnd.viewParms.targetCube == NULL ) {
 					vec3_t dbgPos;
 					R_GetPBRSurfacePosition( dbgPos );
@@ -1391,14 +1393,14 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				R_UpdatePBRCubemapDebugCvar( cubemapIndex, dbgPos );
 				if ( cubemapIndex < 0 ) {
 					vk_update_descriptor_if_changed( VK_DESC_PBR_CUBEMAP, tr.emptyCubemap->descriptor );
-					vk_update_descriptor_if_changed( VK_DESC_PBR_IRRADIANCE, tr.emptyCubemap->descriptor );
+					// vk_update_descriptor_if_changed( VK_DESC_PBR_IRRADIANCE, tr.emptyCubemap->descriptor );
 					Com_Memcpy( block.shCoeffs, pStage->shCoeffs, sizeof( block.shCoeffs ) );
 				} else {
 					vk_update_descriptor_if_changed( VK_DESC_PBR_CUBEMAP, tr.cubemaps[cubemapIndex].prefiltered_image->descriptor );
-					if ( tr.cubemaps[cubemapIndex].irradiance_image )
-						vk_update_descriptor_if_changed( VK_DESC_PBR_IRRADIANCE, tr.cubemaps[cubemapIndex].irradiance_image->descriptor );
-					else
-						vk_update_descriptor_if_changed( VK_DESC_PBR_IRRADIANCE, tr.emptyCubemap->descriptor );
+					// if ( tr.cubemaps[cubemapIndex].irradiance_image )
+					// 	vk_update_descriptor_if_changed( VK_DESC_PBR_IRRADIANCE, tr.cubemaps[cubemapIndex].irradiance_image->descriptor );
+					// else
+					// 	vk_update_descriptor_if_changed( VK_DESC_PBR_IRRADIANCE, tr.emptyCubemap->descriptor );
 
 					// Prefer cubemap SH coefficients when present, otherwise fall back to stage SH.
 					if ( tr.cubemaps[cubemapIndex].hasSHCoeffs ) {
@@ -1430,20 +1432,23 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				vk_push_uniform_cached( &uniform );
 			}
 
-#ifdef HDR_DELUXE_LIGHTMAP
-				// Apparently lightmap is not always in bundle 1.
+			#ifdef HDR_DELUXE_LIGHTMAP
+				// aparently lightmap is not always in bundle 1 ..
+				// should probably fix this in collapseMuklitexture
 				if ( def.vk_pbr_flags & PBR_HAS_DELUXEMAP0 )
-					vk_update_descriptor( VK_DESC_PBR_DELUXE, pStage->bundle[0].deluxeMap->descriptor );
-				else if ( def.vk_pbr_flags & PBR_HAS_DELUXEMAP1 )
-					vk_update_descriptor( VK_DESC_PBR_DELUXE, pStage->bundle[1].deluxeMap->descriptor );
-				else
-					vk_update_descriptor( VK_DESC_PBR_DELUXE, tr.whiteImage->descriptor );
-#endif
-		}
+					vk_update_descriptor(  VK_DESC_PBR_DELUXE, pStage->bundle[0].deluxeMap->descriptor );
+
+				if ( def.vk_pbr_flags & PBR_HAS_DELUXEMAP1 )
+					vk_update_descriptor(  VK_DESC_PBR_DELUXE, pStage->bundle[1].deluxeMap->descriptor );
+
+				else if ( !(def.vk_pbr_flags & PBR_HAS_DELUXEMAP0) )
+					vk_update_descriptor(  VK_DESC_PBR_DELUXE, tr.whiteImage->descriptor );
+				}
+			#endif
 #endif
 
 #ifdef USE_VK_PBR
-		if ( !is_pbr_surface && def.vk_pbr_flags ) {
+		if ( !is_pbr_surface && pStage->vk_pbr_flags ) {
 			def.vk_pbr_flags = 0;
 			pipeline = vk_find_pipeline_ext( 0, &def, qfalse );
 		}

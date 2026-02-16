@@ -293,7 +293,6 @@ typedef struct vkUniformCamera_s {
 #define PBR_HAS_TRANSMISSION	( 1024 )
 #define PBR_HAS_SUBSURFACE		( 2048 )
 #define PBR_HAS_IRRADIANCE		( 4096 )
-#define PBR_HAS_SHCOEFFS		( 8192 )
 
 #define PHYS_NONE				( 1 )
 #define PHYS_RMO				( 2 )
@@ -883,7 +882,6 @@ typedef struct {
 
 typedef struct {
 	VkDeviceMemory memory;
-	VkDeviceSize size;
 	VkDeviceSize used;
 } ImageChunk;
 
