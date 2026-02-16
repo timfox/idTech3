@@ -22,6 +22,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cl_main.c  -- client main loop
 
 #include "client.h"
+#ifdef USE_DUKTAPE
+#include "../qcommon/js_debug.h"
+#endif
 #include <limits.h>
 #ifdef USE_FLUX
 #include "flux.h"
@@ -79,6 +82,42 @@ cvar_t	*cl_dlURL;
 cvar_t	*cl_dlDirectory;
 
 cvar_t	*cl_reconnectArgs;
+
+void CL_JsNotifyMenuChanged( int menu ) {
+#ifdef USE_DUKTAPE
+	const char *menuName = "unknown";
+
+	switch ( menu ) {
+		case UIMENU_NONE:
+			menuName = "none";
+			break;
+		case UIMENU_MAIN:
+			menuName = "main";
+			break;
+		case UIMENU_INGAME:
+			menuName = "ingame";
+			break;
+		case UIMENU_NEED_CD:
+			menuName = "need_cd";
+			break;
+		case UIMENU_BAD_CD_KEY:
+			menuName = "bad_cd_key";
+			break;
+		case UIMENU_TEAM:
+			menuName = "team";
+			break;
+		case UIMENU_POSTGAME:
+			menuName = "postgame";
+			break;
+		default:
+			break;
+	}
+
+	JsDebug_EmitEvent( "menu_changed", menuName, NULL, menu, 0 );
+#else
+	(void)menu;
+#endif
+}
 
 #ifdef USE_FLUX
 // FLUX image generation cvars
@@ -1462,6 +1501,7 @@ qboolean CL_Disconnect( qboolean showMainMenu ) {
 
 	if ( uivm && showMainMenu ) {
 		VM_Call( uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_NONE );
+		CL_JsNotifyMenuChanged( UIMENU_NONE );
 	}
 
 	// Remove pure paks
@@ -1727,6 +1767,7 @@ void CL_Disconnect_f( void ) {
 			}
 			if ( uivm ) {
 				VM_Call( uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_MAIN );
+				CL_JsNotifyMenuChanged( UIMENU_MAIN );
 			}
 		}
 	}
@@ -3113,6 +3154,7 @@ static void CL_CheckTimeout( void ) {
 			}
 			if ( uivm ) {
 				VM_Call( uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_MAIN );
+				CL_JsNotifyMenuChanged( UIMENU_MAIN );
 			}
 			return;
 		}
@@ -3229,11 +3271,13 @@ void CL_Frame( int msec, int realMsec ) {
 		// bring up the cd error dialog if needed
 		cls.cddialog = qfalse;
 		VM_Call( uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_NEED_CD );
+		CL_JsNotifyMenuChanged( UIMENU_NEED_CD );
 	} else	if ( cls.state == CA_DISCONNECTED && !( Key_GetCatcher( ) & KEYCATCH_UI )
 		&& !com_sv_running->integer && uivm ) {
 		// if disconnected, bring up the menu
 		S_StopAllSounds();
 		VM_Call( uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_MAIN );
+		CL_JsNotifyMenuChanged( UIMENU_MAIN );
 	}
 
 	// if recording an avi, lock to a fixed fps
