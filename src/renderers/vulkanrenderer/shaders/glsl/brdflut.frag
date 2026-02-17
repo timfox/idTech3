@@ -31,11 +31,17 @@ vec2 hammersley2d(uint i, uint N)
 	return vec2(float(i) /float(N), rdi);
 }
 
+float alphaFromRoughness(float roughness)
+{
+	// Keep roughness->alpha convention consistent across all PBR passes.
+	return max(roughness * roughness, 1e-4);
+}
+
 // Based on http://blog.selfshadow.com/publications/s2013-shading-course/karis/s2013_pbs_epic_slides.pdf
 vec3 importanceSample_GGX(vec2 Xi, float roughness, vec3 normal) 
 {
 	// Maps a 2D point to a hemisphere with spread based on roughness
-	float alpha = roughness * roughness;
+	float alpha = alphaFromRoughness(roughness);
 	float phi = 2.0 * PI * Xi.x + random(normal.xz) * 0.1;
 	float cosTheta = sqrt((1.0 - Xi.y) / (1.0 + (alpha*alpha - 1.0) * Xi.y));
 	float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
@@ -53,7 +59,8 @@ vec3 importanceSample_GGX(vec2 Xi, float roughness, vec3 normal)
 // Geometric Shadowing function
 float G_SchlicksmithGGX(float dotNL, float dotNV, float roughness)
 {
-	float k = (roughness * roughness) / 2.0;
+	float alpha = alphaFromRoughness(roughness);
+	float k = (alpha * alpha) / 2.0;
 	float GL = dotNL / (dotNL * (1.0 - k) + k);
 	float GV = dotNV / (dotNV * (1.0 - k) + k);
 	return GL * GV;
@@ -88,5 +95,6 @@ vec2 BRDF(float NoV, float roughness)
 
 void main() 
 {
+	// Y axis stores inverse roughness for historical compatibility with runtime lookup.
 	out_color = vec4(BRDF(frag_tex_coord.s, 1.0-frag_tex_coord.t), 0.0, 1.0);
 }

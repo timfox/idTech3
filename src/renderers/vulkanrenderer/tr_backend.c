@@ -1818,10 +1818,9 @@ static const void *RB_PrefilterEnvMap( const void *data )
 	if ( tess.numIndexes )
 		RB_EndSurface();
 	RB_SetGL2D();
-	Com_Printf("prefilter cubemapsss %s\n", cmd->cubemap->name);
 	if ( !cmd->cubemap->prefiltered_image )
 		cmd->cubemap->prefiltered_image = R_CreateImage( 
-			va("cubemap prefitlered - %s", cmd->cubemap->name ), NULL,  
+			va("cubemap prefiltered - %s", cmd->cubemap->name ), NULL,
 			NULL, REF_CUBEMAP_SIZE, REF_CUBEMAP_SIZE, 
 			IMGFLAG_CUBEMAP | IMGFLAG_MIPMAP, 
 			VK_FORMAT_R16G16B16A16_SFLOAT, 0 );
@@ -1832,10 +1831,12 @@ static const void *RB_PrefilterEnvMap( const void *data )
 			NULL, REF_CUBEMAP_IRRADIANCE_SIZE, REF_CUBEMAP_IRRADIANCE_SIZE, 
 			IMGFLAG_CUBEMAP | IMGFLAG_MIPMAP, 
 			VK_FORMAT_R32G32B32A32_SFLOAT, 0 );
-#ifdef _DEBUG
-	assert( cmd->cubemap->irradiance_image );
-	assert( cmd->cubemap->prefiltered_image );
-#endif
+
+	if ( !cmd->cubemap->prefiltered_image || !cmd->cubemap->irradiance_image ) {
+		ri.Printf( PRINT_WARNING, "RB_PrefilterEnvMap: failed to allocate prefilter targets for '%s'\n", cmd->cubemap->name );
+		return (const void *)(cmd + 1);
+	}
+
 	vk_generate_cubemaps( cmd->cubemap );
 	return (const void *)(cmd + 1);
 }

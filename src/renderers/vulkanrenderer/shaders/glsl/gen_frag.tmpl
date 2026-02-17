@@ -217,22 +217,15 @@ vec3 F_Schlick( in vec3 SpecularColor, in float VH )
 
 float D_GGX( in float NH, in float alpha )
 {
+	// Trowbridge-Reitz GGX NDF using alpha (where alpha = roughness^2).
 	float alphaSq = alpha * alpha;
 	float d = (NH * alphaSq - NH) * NH + 1;
 	return alphaSq / (PI * d * d);
 }
 
-// Appoximation of joint Smith term for GGX
-// [Heitz 2014, "Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs"]
-float V_SmithJointApprox( in float a, in float NV, in float NL )
-{
-	float Vis_SmithV = NL * (NV * (1 - a) + a);
-	float Vis_SmithL = NV * (NL * (1 - a) + a);
-	return 0.5 * (1.0 / (Vis_SmithV + Vis_SmithL));
-}
-
 float CalcVisibility( in float NL, in float NE, in float alpha )
 {
+	// Smith masking-shadowing using GGX lambda formulation with alpha.
 	float alphaSq = alpha * alpha;
 
 	float lambdaE = NL * sqrt((-NE * alphaSq + NE) * NE + alphaSq);
@@ -244,6 +237,7 @@ float CalcVisibility( in float NL, in float NE, in float alpha )
 vec3 CalcSpecular( in vec3 specular, in float NH, in float NL,
 	in float NE, float LH, in float VH, in float roughness )
 {
+	// Baseline specular convention: alpha = roughness^2.
 	float alpha = max( roughness * roughness, 0.001 );
 	vec3  F = F_Schlick(specular, VH);
 	float D = D_GGX(NH, alpha);

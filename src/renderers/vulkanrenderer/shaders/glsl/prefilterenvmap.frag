@@ -37,11 +37,17 @@ vec2 hammersley2d(uint i, uint N)
 	return vec2(float(i) /float(N), rdi);
 }
 
+float alphaFromRoughness(float roughness)
+{
+	// Keep roughness->alpha convention consistent across all PBR passes.
+	return max(roughness * roughness, 1e-4);
+}
+
 // Based on http://blog.selfshadow.com/publications/s2013-shading-course/karis/s2013_pbs_epic_slides.pdf
 vec3 importanceSample_GGX(vec2 Xi, float roughness, vec3 normal) 
 {
 	// Maps a 2D point to a hemisphere with spread based on roughness
-	float alpha = roughness * roughness;
+	float alpha = alphaFromRoughness(roughness);
 	float phi = 2.0 * PI * Xi.x + random(normal.xz) * 0.1;
 	float cosTheta = sqrt((1.0 - Xi.y) / (1.0 + (alpha*alpha - 1.0) * Xi.y));
 	float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
@@ -59,7 +65,7 @@ vec3 importanceSample_GGX(vec2 Xi, float roughness, vec3 normal)
 // Normal Distribution function
 float D_GGX(float dotNH, float roughness)
 {
-	float alpha = roughness * roughness;
+	float alpha = alphaFromRoughness(roughness);
 	float alpha2 = alpha * alpha;
 	float denom = dotNH * dotNH * (alpha2 - 1.0) + 1.0;
 	return (alpha2)/(PI * denom*denom); 
