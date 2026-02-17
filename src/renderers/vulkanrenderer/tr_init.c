@@ -1371,7 +1371,8 @@ static void GfxInfo( void )
 	ri.Printf( PRINT_DEVELOPER, "VK_EXTENSIONS: " );
 	R_PrintLongString( glConfig.extensions_string );
 
-	ri.Printf( PRINT_ALL, "\nVK_MAX_TEXTURE_SIZE: %d\n", glConfig.maxTextureSize );
+	ri.Printf( PRINT_ALL, "\nVK_MAX_IMAGE_DIMENSION_2D: %u\n", (unsigned)vk.hwMaxImageDimension2D );
+	ri.Printf( PRINT_ALL, "VK_MAX_TEXTURE_SIZE (engine clamp): %d\n", glConfig.maxTextureSize );
 	ri.Printf( PRINT_ALL, "VK_MAX_TEXTURE_UNITS: %d\n", glConfig.numTextureUnits );
 #else
 	const char *enablestrings[] = { "disabled", "enabled" };

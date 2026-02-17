@@ -850,6 +850,9 @@ typedef struct {
 
 	uint32_t image_chunk_size;
 
+	// Physical device limit for 2D image dimension (VkPhysicalDeviceLimits::maxImageDimension2D).
+	uint32_t hwMaxImageDimension2D;
+
 	uint32_t maxBoundDescriptorSets;
 
 #ifdef USE_UPLOAD_QUEUE

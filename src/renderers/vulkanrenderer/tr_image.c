@@ -299,12 +299,17 @@ static void ResampleTexture( unsigned *in, int inwidth, int inheight, unsigned *
 	int		i, j;
 	unsigned	*inrow, *inrow2;
 	unsigned	frac, fracstep;
-	unsigned	p1[MAX_TEXTURE_SIZE];
-	unsigned	p2[MAX_TEXTURE_SIZE];
+	unsigned	*p1;
+	unsigned	*p2;
 	byte		*pix1, *pix2, *pix3, *pix4;
 
-	if ( outwidth > (int)ARRAY_LEN( p1 ) )
-		ri.Error( ERR_DROP, "ResampleTexture: max width" );
+	if ( outwidth <= 0 || outheight <= 0 )
+		ri.Error( ERR_DROP, "ResampleTexture: bad size" );
+
+	p1 = ri.Malloc( (size_t)outwidth * sizeof( *p1 ) );
+	p2 = ri.Malloc( (size_t)outwidth * sizeof( *p2 ) );
+	if ( !p1 || !p2 )
+		ri.Error( ERR_DROP, "ResampleTexture: out of memory" );
 								
 	fracstep = inwidth * 0x10000 / outwidth;
 
@@ -333,6 +338,9 @@ static void ResampleTexture( unsigned *in, int inwidth, int inheight, unsigned *
 			((byte *)(out+j))[3] = (pix1[3] + pix2[3] + pix3[3] + pix4[3])>>2;
 		}
 	}
+
+	ri.Free( p1 );
+	ri.Free( p2 );
 }
 
 
