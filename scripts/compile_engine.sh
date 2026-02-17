@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: ./compile_engine.sh [game_name] [Debug|Release] [clean] [quiet] [coverage] [vulkan] [opengl] [freetype] [lua] [duktape]
+# Usage: ./compile_engine.sh [game_name] [Debug|Release] [clean] [quiet] [coverage] [vulkan] [opengl] [freetype] [lua] [duktape|no-duktape] [system-duktape]
 # Notes:
 # - build type defaults to Release
 # - vulkan and opengl are mutually exclusive
@@ -13,7 +13,8 @@ OPENGL=0
 SKIP_IDPAK=0
 FREETYPE=0
 LUA=0
-DUKTAPE=0
+DUKTAPE=1
+SYSTEM_DUKTAPE=0
 
 GAME_NAME="idtech3"
 BUILD_TYPE="Release"
@@ -59,6 +60,9 @@ for arg in "$@"; do
     freetype) FREETYPE=1 ;;
     lua) LUA=1 ;;
     duktape|js) DUKTAPE=1 ;;
+    no-duktape|noduktape|nojs) DUKTAPE=0 ;;
+    system-duktape|system_duktape) SYSTEM_DUKTAPE=1 ;;
+    vendored-duktape|vendored_duktape|no-system-duktape|nosystemduktape) SYSTEM_DUKTAPE=0 ;;
     *) GAME_NAME="$arg" ;;
   esac
 done
@@ -126,6 +130,16 @@ fi
 if [ "$DUKTAPE" -eq 1 ]; then
   CMAKE_FLAGS+=("-DUSE_DUKTAPE=ON")
   echo "CMake: USE_DUKTAPE=ON"
+  if [ "$SYSTEM_DUKTAPE" -eq 1 ]; then
+    CMAKE_FLAGS+=("-DUSE_SYSTEM_DUKTAPE=ON")
+    echo "CMake: USE_SYSTEM_DUKTAPE=ON"
+  else
+    CMAKE_FLAGS+=("-DUSE_SYSTEM_DUKTAPE=OFF")
+    echo "CMake: USE_SYSTEM_DUKTAPE=OFF"
+  fi
+else
+  CMAKE_FLAGS+=("-DUSE_DUKTAPE=OFF")
+  echo "CMake: USE_DUKTAPE=OFF"
 fi
 
 if [ "$VULKAN" -eq 1 ]; then
