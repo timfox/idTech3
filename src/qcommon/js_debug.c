@@ -12,6 +12,7 @@
 #define MAX_JS_TRACKED_SCRIPTS 64
 #define MAX_JS_EVENT_CALLBACKS 64
 #define JS_STASH_EVENTS "\xff""id3.events"
+#define JS_STASH_MODULES "\xff""id3.modules"
 
 static duk_context *s_jsContext;
 static int s_jsTrackedCount;
@@ -21,6 +22,12 @@ static cvar_t *js_allowEvents;
 static cvar_t *js_allowExec;
 static cvar_t *js_cvarSetMode;
 static cvar_t *js_allowFileWrite;
+static cvar_t *js_maxEventCallbacks;
+static cvar_t *js_frameCallbackBudgetMs;
+static cvar_t *js_disableFaultyCallbacks;
+static cvar_t *js_requireCache;
+static cvar_t *js_compatTarget;
+static cvar_t *js_autoInit;
 
 static qboolean JsDebug_OpenState( void );
 static qboolean JsDebug_LoadScript( const char *scriptPath );
@@ -28,15 +35,50 @@ static qboolean JsDebug_LoadScript( const char *scriptPath );
 static void JsDebug_InitPolicyCvars( void ) {
 	if ( !js_allowEvents ) {
 		js_allowEvents = Cvar_Get( "js_allowEvents", "1", CVAR_ARCHIVE_ND );
+		Cvar_SetDescription( js_allowEvents, "Allow JavaScript event registration via idtech3.on/off (0=disabled, 1=enabled)." );
 	}
 	if ( !js_allowExec ) {
 		js_allowExec = Cvar_Get( "js_allowExec", "1", CVAR_ARCHIVE_ND );
+		Cvar_SetDescription( js_allowExec, "JavaScript command execution level: 0=off, 1=append, 2=append+insert, 3=append+insert+now." );
 	}
 	if ( !js_cvarSetMode ) {
 		js_cvarSetMode = Cvar_Get( "js_cvarSetMode", "1", CVAR_ARCHIVE_ND );
+		Cvar_SetDescription( js_cvarSetMode, "JavaScript cvar write level: 0=off, 1=existing writable only, 2=allow creating user cvars, 3=unrestricted (still subject to Cvar_Set rules)." );
 	}
 	if ( !js_allowFileWrite ) {
 		js_allowFileWrite = Cvar_Get( "js_allowFileWrite", "0", CVAR_ARCHIVE_ND );
+		Cvar_SetDescription( js_allowFileWrite, "Allow JavaScript writeFile/appendFile operations (0=disabled, 1=enabled)." );
+	}
+	if ( !js_maxEventCallbacks ) {
+		js_maxEventCallbacks = Cvar_Get( "js_maxEventCallbacks", "64", CVAR_ARCHIVE_ND );
+		Cvar_SetDescription( js_maxEventCallbacks, "Max callbacks allowed per JavaScript event name (1..1024)." );
+	}
+	if ( !js_frameCallbackBudgetMs ) {
+		js_frameCallbackBudgetMs = Cvar_Get( "js_frameCallbackBudgetMs", "2", CVAR_ARCHIVE_ND );
+		Cvar_SetDescription( js_frameCallbackBudgetMs, "Soft per-frame JavaScript callback budget in milliseconds (0=unlimited)." );
+	}
+	if ( !js_disableFaultyCallbacks ) {
+		js_disableFaultyCallbacks = Cvar_Get( "js_disableFaultyCallbacks", "1", CVAR_ARCHIVE_ND );
+		Cvar_SetDescription( js_disableFaultyCallbacks, "Auto-disable callback entries that throw runtime errors (0=off, 1=on)." );
+	}
+	if ( !js_requireCache ) {
+		js_requireCache = Cvar_Get( "js_requireCache", "1", CVAR_ARCHIVE_ND );
+		Cvar_SetDescription( js_requireCache, "Enable idtech3.require module cache (0=reload every call, 1=cache)." );
+	}
+	if ( !js_compatTarget ) {
+		js_compatTarget = Cvar_Get( "js_compatTarget", "es5.1-duktape", CVAR_ROM | CVAR_PROTECTED );
+		Cvar_SetDescription( js_compatTarget, "Read-only JavaScript compatibility target for scripts." );
+	}
+	if ( !js_autoInit ) {
+		js_autoInit = Cvar_Get( "js_autoInit", "1", CVAR_ARCHIVE_ND );
+		Cvar_SetDescription( js_autoInit, "Initialize JavaScript runtime automatically at startup (0=manual via js_reload, 1=auto)." );
+	}
+}
+
+void JsDebug_InitCvars( void ) {
+	JsDebug_InitPolicyCvars();
+	if ( js_autoInit && js_autoInit->integer ) {
+		JsDebug_OpenState();
 	}
 }
 
@@ -191,6 +233,8 @@ static qboolean JsDebug_GetEventCallbacksArray( duk_context *ctx, const char *ev
 
 static int JsDebug_EventCallbackCount( const char *eventName ) {
 	duk_uarridx_t len;
+	duk_uarridx_t i;
+	int count = 0;
 
 	if ( !s_jsContext ) {
 		return 0;
@@ -201,8 +245,15 @@ static int JsDebug_EventCallbackCount( const char *eventName ) {
 	}
 
 	len = duk_get_length( s_jsContext, -1 );
+	for ( i = 0; i < len; i++ ) {
+		duk_get_prop_index( s_jsContext, -1, i );
+		if ( duk_is_function( s_jsContext, -1 ) ) {
+			count++;
+		}
+		duk_pop( s_jsContext );
+	}
 	duk_pop( s_jsContext );
-	return (int)len;
+	return count;
 }
 
 static void JsDebug_ClearTrackedScripts( void ) {
@@ -364,6 +415,137 @@ static duk_ret_t Js_Binding_Include( duk_context *ctx ) {
 	return 1;
 }
 
+static qboolean JsDebug_FileExists( const char *path ) {
+	void *buffer = NULL;
+	const int len = FS_ReadFile( path, &buffer );
+	if ( len < 0 ) {
+		return qfalse;
+	}
+	if ( buffer ) {
+		FS_FreeFile( buffer );
+	}
+	return qtrue;
+}
+
+static qboolean JsDebug_ResolveRequirePath( const char *requestedPath, char *resolvedPath, size_t resolvedSize ) {
+	char candidate[MAX_OSPATH];
+
+	if ( !requestedPath || !requestedPath[0] ) {
+		return qfalse;
+	}
+	if ( !JsDebug_IsSafePath( requestedPath ) ) {
+		return qfalse;
+	}
+
+	if ( JsDebug_IsAllowedScriptPath( requestedPath ) ) {
+		Q_strncpyz( candidate, requestedPath, sizeof( candidate ) );
+		if ( JsDebug_FileExists( candidate ) ) {
+			Q_strncpyz( resolvedPath, candidate, resolvedSize );
+			return qtrue;
+		}
+
+		if ( !strstr( requestedPath, ".js" ) ) {
+			Com_sprintf( candidate, sizeof( candidate ), "%s.js", requestedPath );
+			if ( JsDebug_FileExists( candidate ) ) {
+				Q_strncpyz( resolvedPath, candidate, resolvedSize );
+				return qtrue;
+			}
+		}
+	}
+
+	Com_sprintf( candidate, sizeof( candidate ), "scripts/js/%s", requestedPath );
+	if ( JsDebug_FileExists( candidate ) ) {
+		Q_strncpyz( resolvedPath, candidate, resolvedSize );
+		return qtrue;
+	}
+
+	if ( !strstr( requestedPath, ".js" ) ) {
+		Com_sprintf( candidate, sizeof( candidate ), "scripts/js/%s.js", requestedPath );
+		if ( JsDebug_FileExists( candidate ) ) {
+			Q_strncpyz( resolvedPath, candidate, resolvedSize );
+			return qtrue;
+		}
+	}
+
+	return qfalse;
+}
+
+static duk_ret_t Js_Binding_Require( duk_context *ctx ) {
+	const char *requestedPath = duk_require_string( ctx, 0 );
+	char resolvedPath[MAX_OSPATH];
+	void *buffer = NULL;
+	int len;
+	const char *prefix = "(function(module, exports, idtech3){\n";
+	const char *suffix = "\n; return module.exports;\n})";
+	const size_t prefixLen = strlen( prefix );
+	const size_t suffixLen = strlen( suffix );
+	char *wrappedSource;
+	duk_idx_t modulesIndex;
+
+	if ( !JsDebug_ResolveRequirePath( requestedPath, resolvedPath, sizeof( resolvedPath ) ) ) {
+		return duk_error( ctx, DUK_ERR_ERROR, "require failed: unresolved/denied path '%s' (allowed roots: ui/, client/, frontend/, scripts/js/)", requestedPath );
+	}
+
+	duk_push_global_stash( ctx );
+	if ( !duk_get_prop_string( ctx, -1, JS_STASH_MODULES ) || !duk_is_object( ctx, -1 ) ) {
+		duk_pop( ctx );
+		duk_push_object( ctx );
+		duk_dup( ctx, -1 );
+		duk_put_prop_string( ctx, -3, JS_STASH_MODULES );
+	}
+	duk_remove( ctx, -2 );
+	modulesIndex = duk_normalize_index( ctx, -1 );
+
+	if ( js_requireCache && js_requireCache->integer ) {
+		if ( duk_get_prop_string( ctx, modulesIndex, resolvedPath ) ) {
+			duk_remove( ctx, modulesIndex );
+			return 1;
+		}
+		duk_pop( ctx );
+	}
+
+	len = FS_ReadFile( resolvedPath, &buffer );
+	if ( len < 0 || !buffer ) {
+		return duk_error( ctx, DUK_ERR_ERROR, "require failed: could not read '%s'", resolvedPath );
+	}
+
+	wrappedSource = Z_Malloc( prefixLen + (size_t)len + suffixLen + 1 );
+	memcpy( wrappedSource, prefix, prefixLen );
+	memcpy( wrappedSource + prefixLen, buffer, (size_t)len );
+	memcpy( wrappedSource + prefixLen + (size_t)len, suffix, suffixLen );
+	wrappedSource[prefixLen + (size_t)len + suffixLen] = '\0';
+
+	FS_FreeFile( buffer );
+	buffer = NULL;
+
+	if ( duk_peval_lstring( ctx, wrappedSource, prefixLen + (size_t)len + suffixLen ) != 0 ) {
+		Z_Free( wrappedSource );
+		return duk_error( ctx, DUK_ERR_ERROR, "require compile error in '%s': %s", resolvedPath, duk_safe_to_string( ctx, -1 ) );
+	}
+
+	Z_Free( wrappedSource );
+
+	duk_push_object( ctx );
+	duk_push_object( ctx );
+	duk_dup( ctx, -1 );
+	duk_put_prop_string( ctx, -3, "exports" );
+	duk_push_string( ctx, resolvedPath );
+	duk_put_prop_string( ctx, -3, "id" );
+	duk_get_global_string( ctx, "idtech3" );
+
+	if ( duk_pcall( ctx, 3 ) != DUK_EXEC_SUCCESS ) {
+		return duk_error( ctx, DUK_ERR_ERROR, "require runtime error in '%s': %s", resolvedPath, duk_safe_to_string( ctx, -1 ) );
+	}
+
+	if ( js_requireCache && js_requireCache->integer ) {
+		duk_dup( ctx, -1 );
+		duk_put_prop_string( ctx, modulesIndex, resolvedPath );
+	}
+
+	duk_remove( ctx, modulesIndex );
+	return 1;
+}
+
 #ifndef DEDICATED
 static duk_ret_t Js_Binding_TextureLoad( duk_context *ctx ) {
 	const char *path = duk_require_string( ctx, 0 );
@@ -451,9 +633,20 @@ static duk_ret_t Js_Binding_On( duk_context *ctx ) {
 		return duk_error( ctx, DUK_ERR_ERROR, "failed to create callback list for '%s'", eventName );
 	}
 	len = duk_get_length( ctx, -1 );
-	if ( len >= MAX_JS_EVENT_CALLBACKS ) {
-		duk_pop( ctx );
-		return duk_error( ctx, DUK_ERR_ERROR, "too many '%s' callbacks (max %d)", eventName, MAX_JS_EVENT_CALLBACKS );
+	{
+		const int maxCallbacks = JsDebug_ClampInt( js_maxEventCallbacks ? js_maxEventCallbacks->integer : MAX_JS_EVENT_CALLBACKS, 1, 1024 );
+		int activeCallbacks = 0;
+		for ( i = 0; i < len; i++ ) {
+			duk_get_prop_index( ctx, -1, i );
+			if ( duk_is_function( ctx, -1 ) ) {
+				activeCallbacks++;
+			}
+			duk_pop( ctx );
+		}
+		if ( activeCallbacks >= maxCallbacks ) {
+			duk_pop( ctx );
+			return duk_error( ctx, DUK_ERR_ERROR, "too many '%s' callbacks (max %d)", eventName, maxCallbacks );
+		}
 	}
 
 	for ( i = 0; i < len; i++ ) {
@@ -514,7 +707,7 @@ static duk_ret_t Js_Binding_Off( duk_context *ctx ) {
 		duk_dup( ctx, -3 );
 		duk_put_prop_string( ctx, -2, eventName );
 	}
-	duk_pop_4( ctx );
+	duk_pop_n( ctx, 4 );
 
 	duk_push_true( ctx );
 	return 1;
@@ -552,6 +745,9 @@ static void JsDebug_RegisterBindings( void ) {
 	duk_push_c_function( s_jsContext, Js_Binding_Include, 1 );
 	duk_put_prop_string( s_jsContext, -2, "include" );
 
+	duk_push_c_function( s_jsContext, Js_Binding_Require, 1 );
+	duk_put_prop_string( s_jsContext, -2, "require" );
+
 	duk_push_c_function( s_jsContext, Js_Binding_On, 2 );
 	duk_put_prop_string( s_jsContext, -2, "on" );
 
@@ -577,6 +773,8 @@ static void JsDebug_RegisterBindings( void ) {
 
 	duk_push_string( s_jsContext, "Duktape" );
 	duk_put_prop_string( s_jsContext, -2, "engine" );
+	duk_push_string( s_jsContext, js_compatTarget ? js_compatTarget->string : "es5.1-duktape" );
+	duk_put_prop_string( s_jsContext, -2, "compatTarget" );
 
 	duk_put_prop_string( s_jsContext, -2, "idtech3" );
 	duk_pop( s_jsContext );
@@ -669,6 +867,9 @@ static void JsDebug_TrackScript( const char *scriptPath ) {
 void JsDebug_Frame( int msec, int realMsec ) {
 	duk_uarridx_t len;
 	duk_uarridx_t i;
+	const int startTime = Sys_Milliseconds();
+	const int budgetMs = JsDebug_ClampInt( js_frameCallbackBudgetMs ? js_frameCallbackBudgetMs->integer : 0, 0, 1000 );
+	static int s_lastBudgetWarnMs = 0;
 
 	if ( !s_jsContext ) {
 		return;
@@ -685,12 +886,31 @@ void JsDebug_Frame( int msec, int realMsec ) {
 	len = duk_get_length( s_jsContext, -1 );
 
 	for ( i = 0; i < len; i++ ) {
+		if ( budgetMs > 0 && ( Sys_Milliseconds() - startTime ) >= budgetMs ) {
+			const int now = Sys_Milliseconds();
+			if ( now - s_lastBudgetWarnMs > 3000 ) {
+				s_lastBudgetWarnMs = now;
+				Com_Printf( S_COLOR_YELLOW "JavaScript: frame callback budget reached (%d ms), skipping remaining callbacks this frame\n", budgetMs );
+			}
+			break;
+		}
+
 		duk_get_prop_index( s_jsContext, -1, i );
+		if ( !duk_is_function( s_jsContext, -1 ) ) {
+			duk_pop( s_jsContext );
+			continue;
+		}
 		duk_push_int( s_jsContext, msec );
 		duk_push_int( s_jsContext, realMsec );
 		if ( duk_pcall( s_jsContext, 2 ) != DUK_EXEC_SUCCESS ) {
 			const char *msg = duk_safe_to_string( s_jsContext, -1 );
 			Com_Printf( S_COLOR_RED "JavaScript: frame callback error: %s\n", msg ? msg : "(unknown error)" );
+			if ( js_disableFaultyCallbacks && js_disableFaultyCallbacks->integer ) {
+				duk_pop( s_jsContext );
+				duk_push_undefined( s_jsContext );
+				duk_put_prop_index( s_jsContext, -2, i );
+				continue;
+			}
 		}
 		duk_pop( s_jsContext );
 	}
@@ -718,6 +938,10 @@ void JsDebug_EmitEvent( const char *eventName, const char *s0, const char *s1, i
 
 	for ( i = 0; i < len; i++ ) {
 		duk_get_prop_index( s_jsContext, -1, i );
+		if ( !duk_is_function( s_jsContext, -1 ) ) {
+			duk_pop( s_jsContext );
+			continue;
+		}
 		duk_push_object( s_jsContext );
 
 		duk_push_string( s_jsContext, eventName );
@@ -779,6 +1003,12 @@ void JsDebug_EmitEvent( const char *eventName, const char *s0, const char *s1, i
 		if ( duk_pcall( s_jsContext, 1 ) != DUK_EXEC_SUCCESS ) {
 			const char *msg = duk_safe_to_string( s_jsContext, -1 );
 			Com_Printf( S_COLOR_RED "JavaScript: %s callback error: %s\n", eventName, msg ? msg : "(unknown error)" );
+			if ( js_disableFaultyCallbacks && js_disableFaultyCallbacks->integer ) {
+				duk_pop( s_jsContext );
+				duk_push_undefined( s_jsContext );
+				duk_put_prop_index( s_jsContext, -2, i );
+				continue;
+			}
 		}
 		duk_pop( s_jsContext );
 	}
@@ -848,11 +1078,17 @@ void Cmd_JsList_f( void ) {
 
 	JsDebug_InitPolicyCvars();
 	Com_Printf( "JavaScript: compile-time API Duktape\n" );
-	Com_Printf( "JavaScript: policy js_allowEvents=%d js_allowExec=%d js_cvarSetMode=%d js_allowFileWrite=%d\n",
+	Com_Printf( "JavaScript: compatibility target %s\n", js_compatTarget ? js_compatTarget->string : "es5.1-duktape" );
+	Com_Printf( "JavaScript: policy js_allowEvents=%d js_allowExec=%d js_cvarSetMode=%d js_allowFileWrite=%d js_maxEventCallbacks=%d js_frameCallbackBudgetMs=%d js_disableFaultyCallbacks=%d js_requireCache=%d js_autoInit=%d\n",
 		js_allowEvents ? js_allowEvents->integer : 0,
 		js_allowExec ? js_allowExec->integer : 0,
 		js_cvarSetMode ? js_cvarSetMode->integer : 0,
-		js_allowFileWrite ? js_allowFileWrite->integer : 0 );
+		js_allowFileWrite ? js_allowFileWrite->integer : 0,
+		js_maxEventCallbacks ? js_maxEventCallbacks->integer : MAX_JS_EVENT_CALLBACKS,
+		js_frameCallbackBudgetMs ? js_frameCallbackBudgetMs->integer : 0,
+		js_disableFaultyCallbacks ? js_disableFaultyCallbacks->integer : 0,
+		js_requireCache ? js_requireCache->integer : 1,
+		js_autoInit ? js_autoInit->integer : 1 );
 
 	if ( !s_jsContext ) {
 		Com_Printf( "JavaScript: runtime not initialized. Run js_reload first.\n" );
@@ -860,7 +1096,7 @@ void Cmd_JsList_f( void ) {
 	}
 
 	Com_Printf( "JavaScript: runtime initialized\n" );
-	Com_Printf( "JavaScript: API namespace idtech3 (print, cvarGet, cvarSet, exec, readFile, writeFile, appendFile, include, on, off, textureLoad, textureReload, materialRegister, hudDrawPic, hudDrawText)\n" );
+	Com_Printf( "JavaScript: API namespace idtech3 (print, cvarGet, cvarSet, exec, readFile, writeFile, appendFile, include, require, on, off, textureLoad, textureReload, materialRegister, hudDrawPic, hudDrawText)\n" );
 	Com_Printf( "JavaScript: script path policy ui/, client/, frontend/, scripts/js/\n" );
 	Com_Printf( "JavaScript: callbacks frame=%d map_load=%d client_connect=%d ui_open=%d ui_close=%d menu_changed=%d input_key=%d mouse_move=%d console_open=%d\n",
 		JsDebug_EventCallbackCount( "frame" ),
@@ -940,6 +1176,9 @@ void Cmd_JsExec_f( void ) {
 }
 
 #else
+
+void JsDebug_InitCvars( void ) {
+}
 
 void Cmd_JsReload_f( void ) {
 	Com_Printf( "JavaScript support is disabled in this build. Configure with -DUSE_DUKTAPE=ON.\n" );

@@ -256,15 +256,19 @@ When enabled, these commands are available:
 
 ### JavaScript scripting support (Duktape)
 
-Duktape support is optional and disabled by default.
+Duktape support is enabled by default and uses a vendored internal static copy from `src/external/duktape`.
 
-To enable it:
+To force-enable it explicitly:
 
 ```bash
 cmake -S . -B build -DUSE_DUKTAPE=ON
 ```
 
-`scripts/compile_engine.sh` also supports a `duktape` flag, which passes `-DUSE_DUKTAPE=ON`.
+`scripts/compile_engine.sh` enables Duktape by default (vendored), and supports:
+
+- `duktape` (explicit enable)
+- `no-duktape` (disable, passes `-DUSE_DUKTAPE=OFF`)
+- `system-duktape` (use system-installed library/headers, passes `-DUSE_SYSTEM_DUKTAPE=ON`)
 
 When enabled, these commands are available:
 
@@ -283,6 +287,7 @@ Global JavaScript helpers are available under `idtech3`:
 - `idtech3.writeFile(path, data)` - write file to virtual filesystem (gated by `js_allowFileWrite`)
 - `idtech3.appendFile(path, data)` - append file to virtual filesystem (gated by `js_allowFileWrite`)
 - `idtech3.include(path)` - evaluate another JS file from virtual filesystem
+- `idtech3.require(path)` - load a JS module and return `module.exports` (cached when `js_requireCache=1`)
 - `idtech3.on(event, fn)` - register callback for `frame`, `map_load`, `client_connect`, `ui_open`, `ui_close`, `menu_changed`, `input_key`, `mouse_move`, `console_open`
 - `idtech3.off(event[, fn])` - remove one callback or all callbacks for an event
 - `idtech3.textureLoad(path[, noMip])` - load texture/shader and return handle
@@ -309,8 +314,19 @@ JavaScript policy cvars:
 - `js_allowExec` (`0..3`) - command execution level: `0=off`, `1=append`, `2=append+insert`, `3=append+insert+now`
 - `js_cvarSetMode` (`0..3`) - cvar write level: `0=off`, `1=existing writable only`, `2=also allow creating user cvars`, `3=unrestricted through Cvar_Set rules`
 - `js_allowFileWrite` (`0/1`) - allow/deny `writeFile` and `appendFile`
+- `js_maxEventCallbacks` (`1..1024`) - max callbacks per event
+- `js_frameCallbackBudgetMs` (`0..1000`) - per-frame callback budget in ms (`0=unlimited`)
+- `js_disableFaultyCallbacks` (`0/1`) - remove callbacks that throw errors
+- `js_requireCache` (`0/1`) - cache module exports for `idtech3.require`
+- `js_autoInit` (`0/1`) - initialize JS runtime automatically at startup
+- `js_compatTarget` (read-only) - compatibility target string (default `es5.1-duktape`)
 
 Script boundary policy:
 
 - JavaScript (`js_reload`, `idtech3.include`) only accepts paths under: `ui/`, `client/`, `frontend/`, `scripts/js/`
 - Lua (`script_reload`) only accepts paths under: `gameplay/`, `server/`, `vm/game/`, `scripts/lua/`
+
+JavaScript module policy:
+
+- `idtech3.require(path)` resolves explicit allowed-root paths and `scripts/js/<path>[.js]`
+- It is intentionally minimal (CommonJS-style `module.exports`) and does not include Node/browser APIs
