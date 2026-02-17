@@ -13,14 +13,18 @@ Go to [Releases](../../releases) section to download latest binaries for your pl
 **Rendering**:
 * OpenGL renderer
 * Vulkan renderer
-* Physically Based Rendering
+* Physically Based Rendering (PBR)
 * Spherical Harmonics lighting support
-* Screen Space Ambient Occlusion
+* Screen Space Ambient Occlusion (SSAO)
 
 **Audio**:
 * OpenAL backend with HRTF for 3D positional audio
-* Heuristic acoustics: real-time reverb/occlusion using OpenAL EFX
-* Supports codecs for mp3, ogg, wav, flac, webm, and opus
+* Real-time reverb and occlusion effects via OpenAL EFX (heuristic environmental acoustics)
+* Audio codec support: mp3, ogg, wav, flac, webm, opus
+
+**Scripting**:
+* Support for Lua scripting
+* Support for JavaScript scripting
 
 **Image Generation**:
 * FLUX.2/FLUX.1 C image generation (optional, text-to-image from console with **real-time hot-reloading** and device selection; supports flux1-schnell, flux1-dev, flux2-dev; requires model files in game directory; Metal, BLAS, or pure C backend, with graceful fallback)
