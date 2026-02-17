@@ -324,6 +324,7 @@
     <ClCompile Include="..\..\qcommon\history.c" />
     <ClCompile Include="..\..\qcommon\huffman.c" />
     <ClCompile Include="..\..\qcommon\huffman_static.c" />
+    <ClCompile Include="..\..\qcommon\js_debug.c" />
     <ClCompile Include="..\..\qcommon\keys.c" />
     <ClCompile Include="..\..\qcommon\md4.c" />
     <ClCompile Include="..\..\qcommon\md5.c" />
