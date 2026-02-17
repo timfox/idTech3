@@ -100,7 +100,9 @@ void GL_TextureMode( const char *string ) {
 	gl_filter_max = mode->maximize;
 
 #ifdef USE_VULKAN
-	if ( gl_filter_min == vk.samplers.filter_min && gl_filter_max == vk.samplers.filter_max ) {
+	if ( gl_filter_min == vk.samplers.filter_min &&
+		 gl_filter_max == vk.samplers.filter_max &&
+		 r_mipLodBias->value == vk.samplers.mip_lod_bias ) {
 		return;
 	}
 	vk_wait_idle();
@@ -108,6 +110,7 @@ void GL_TextureMode( const char *string ) {
 
 	vk.samplers.filter_min = gl_filter_min;
 	vk.samplers.filter_max = gl_filter_max;
+	vk.samplers.mip_lod_bias = r_mipLodBias->value;
 	vk_update_attachment_descriptors();
 	for ( i = 0; i < tr.numImages; i++ ) {
 		img = tr.images[i];

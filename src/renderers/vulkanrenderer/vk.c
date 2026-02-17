@@ -2631,7 +2631,7 @@ static VkSampler vk_find_sampler( const Vk_Sampler_Def *def ) {
 	desc.addressModeU = address_mode;
 	desc.addressModeV = address_mode;
 	desc.addressModeW = address_mode;
-	desc.mipLodBias = 0.0f;
+	desc.mipLodBias = r_mipLodBias->value;
 
 	if ( def->noAnisotropy || mipmap_mode == VK_SAMPLER_MIPMAP_MODE_NEAREST || mag_filter == VK_FILTER_NEAREST ) {
 		desc.anisotropyEnable = VK_FALSE;
@@ -4794,6 +4794,7 @@ void vk_initialize( void )
 	// do early texture mode setup to avoid redundant descriptor updates in GL_SetDefaultState()
 	vk.samplers.filter_min = -1;
 	vk.samplers.filter_max = -1;
+	vk.samplers.mip_lod_bias = -9999.0f;
 	GL_TextureMode( r_textureMode->string );
 	r_textureMode->modified = qfalse;
 
@@ -8676,8 +8677,6 @@ void vk_begin_cubemap_render_pass( void )
     vk.renderScaleX = vk.renderScaleY = 1.0f;
 
     vk_begin_render_pass(vk.render_pass.cubemap, frameBuffer, qtrue, vk.renderWidth, vk.renderHeight);
-
-    Com_Printf("render cube face %d\n", backEnd.viewParms.targetCubeLayer );
 }
 
 #endif
@@ -8731,6 +8730,42 @@ void vk_create_brfdlut( void )
     end_command_buffer( command_buffer, __func__  );
 }
 #endif
+
+void vk_validate_pbr_ibl_resources( void )
+{
+#ifdef USE_VK_PBR
+	if ( !vk.pbrActive ) {
+		return;
+	}
+
+	{
+		const qboolean brdfLutReady = ( vk.brdflut_image != VK_NULL_HANDLE &&
+			vk.brdflut_image_view != VK_NULL_HANDLE &&
+			vk.brdflut_image_descriptor != VK_NULL_HANDLE );
+		const qboolean emptyCubemapReady = ( tr.emptyCubemap != NULL &&
+			tr.emptyCubemap->descriptor != VK_NULL_HANDLE );
+
+		ri.Printf( PRINT_ALL, "[VK] PBR IBL: BRDF LUT %s, empty cubemap fallback %s\n",
+			brdfLutReady ? "ready" : "missing",
+			emptyCubemapReady ? "ready" : "missing" );
+
+#ifdef VK_CUBEMAP
+		ri.Printf( PRINT_ALL, "[VK] PBR IBL: runtime cubemap path %s\n",
+			vk.cubemapActive ? "enabled" : "disabled" );
+		if ( vk.cubemapActive && tr.numCubemaps == 0 ) {
+			ri.Printf( PRINT_ALL, "[VK] PBR IBL: no map cubemaps loaded at startup, using fallback until available\n" );
+		}
+#endif
+
+		if ( !brdfLutReady ) {
+			ri.Printf( PRINT_WARNING, "PBR IBL: BRDF LUT resources are incomplete, split-sum specular may fallback\n" );
+		}
+		if ( !emptyCubemapReady ) {
+			ri.Printf( PRINT_WARNING, "PBR IBL: empty cubemap fallback is missing\n" );
+		}
+	}
+#endif
+}
 
 void vk_end_render_pass( void )
 {
