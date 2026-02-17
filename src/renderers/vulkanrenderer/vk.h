@@ -56,7 +56,9 @@
 	#define VK_DESC_PBR_ANISOTROPY			14
 	#define VK_DESC_PBR_TRANSMISSION		15
 	#define VK_DESC_PBR_SUBSURFACE			16
-	#define VK_DESC_COUNT	17
+	#define VK_DESC_PBR_LTC_MAT				17
+	#define VK_DESC_PBR_LTC_AMP				18
+	#define VK_DESC_COUNT	19
 #else
 	#define VK_DESC_COUNT   5
 #endif
@@ -253,7 +255,7 @@ typedef struct vkUniform_s {
 	vec4_t pbrTransmissionScale;
 	vec4_t pbrSubsurfaceColor;
 	vec4_t pbrSubsurfaceParams;
-	vec4_t pbrAdvancedParams; // x: multi-scatter toggle, y: multi-scatter strength
+	vec4_t pbrAdvancedParams; // x: multi-scatter toggle, y: multi-scatter strength, z: LTC toggle, w: LTC quality
 	vec4_t pbrShCoeffs[9];
 #endif
 } vkUniform_t;

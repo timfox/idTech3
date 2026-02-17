@@ -90,6 +90,8 @@ cvar_t	*r_pbr_debug;
 cvar_t	*r_pbr_packedPreferred;
 cvar_t	*r_pbr_multiScatter;
 cvar_t	*r_pbr_multiScatterStrength;
+cvar_t	*r_ltc;
+cvar_t	*r_ltc_quality;
 #ifdef VK_CUBEMAP
 cvar_t	*r_pbr_iblIrradianceSize;
 cvar_t	*r_pbr_iblPrefilterSize;
@@ -1463,6 +1465,9 @@ static void VarInfo( void )
 	}
 #if defined (USE_VK_PBR)
 	ri.Printf( PRINT_ALL, "PBR SH extraction: %s\n", (r_pbr_shExtract && r_pbr_shExtract->integer) ? "enabled" : "disabled" );
+	ri.Printf( PRINT_ALL, "LTC area lights: %s (quality %d)\n",
+		(r_ltc && r_ltc->integer) ? "enabled" : "disabled",
+		(r_ltc_quality ? r_ltc_quality->integer : 1) );
 	if ( r_pbr_debug && r_pbr_debug->integer ) {
 		ri.Printf( PRINT_ALL, "PBR debug view: mode %d\n", r_pbr_debug->integer );
 	}
@@ -1628,6 +1633,14 @@ static void R_Register( void )
 	r_pbr_multiScatterStrength = ri.Cvar_Get( "r_pbr_multiScatterStrength", "1.0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_pbr_multiScatterStrength, "0.0", "2.0", CV_FLOAT );
 	ri.Cvar_SetDescription( r_pbr_multiScatterStrength, "Scales specular IBL multiple-scattering compensation intensity." );
+
+	r_ltc = ri.Cvar_Get( "r_ltc", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_ltc, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_ltc, "Enable LTC area-light path (incremental rollout)." );
+
+	r_ltc_quality = ri.Cvar_Get( "r_ltc_quality", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_ltc_quality, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_ltc_quality, "LTC quality preset:\n 0 - low\n 1 - medium\n 2 - high" );
 
 	r_baseNormalX	= ri.Cvar_Get("r_baseNormalX",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );
 	r_baseNormalY	= ri.Cvar_Get("r_baseNormalY",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );

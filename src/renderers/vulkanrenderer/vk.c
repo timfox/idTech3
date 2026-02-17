@@ -4639,10 +4639,10 @@ void vk_initialize( void )
 	if ( r_pbr->integer ) {
 		if ( !vk.fboActive ) {
 			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "PBR: disabled (requires \\r_fbo 1)\n" S_COLOR_WHITE );
-		} else if ( vk.maxBoundDescriptorSets < 10 ) {
-			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "PBR: disabled (insufficient descriptor sets: have %u, need >= 10)\n" S_COLOR_WHITE,
-				(unsigned)vk.maxBoundDescriptorSets );
-		} else {
+		} else if ( vk.maxBoundDescriptorSets < VK_DESC_COUNT ) {
+			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "PBR: disabled (insufficient descriptor sets: have %u, need >= %u)\n" S_COLOR_WHITE,
+				(unsigned)vk.maxBoundDescriptorSets, (unsigned)VK_DESC_COUNT );
+			} else {
 			vk.pbrActive = qtrue;
 			ri.Printf( PRINT_ALL, "PBR: enabled\n" );
 		}
@@ -4933,6 +4933,8 @@ void vk_initialize( void )
 		set_layouts[14] = vk.set_layout_sampler; // anisotropy
 		set_layouts[15] = vk.set_layout_sampler; // transmission
 		set_layouts[16] = vk.set_layout_sampler; // subsurface
+		set_layouts[17] = vk.set_layout_sampler; // LTC matrix LUT
+		set_layouts[18] = vk.set_layout_sampler; // LTC amplitude LUT
 #endif
 		desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		desc.pNext = NULL;

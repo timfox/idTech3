@@ -1936,6 +1936,38 @@ static void R_CreateBuiltinImages( void ) {
 #ifdef USE_VK_PBR
 	tr.emptyImage = R_CreateImage("*empty", NULL, (byte*)data, 2, 2, IMGFLAG_NONE, 0, 0);
 
+	{
+		int u, v;
+		byte ltcMat[64][64][4];
+		byte ltcAmp[64][64][4];
+		for ( v = 0; v < 64; v++ ) {
+			for ( u = 0; u < 64; u++ ) {
+				float fu = (float)u / 63.0f; // roughness-like axis
+				float fv = (float)v / 63.0f; // NdotV-like axis
+				float invR = 1.0f - fu;
+				float viewW = 0.35f + 0.65f * fv;
+
+				// Incremental LTC placeholder LUTs:
+				// - matrix LUT encodes a simple roughness/view-dependent transform hint
+				// - amplitude LUT encodes a conservative scalar energy term
+				ltcMat[v][u][0] = (byte)(255.0f * (0.55f + 0.45f * invR));     // M11
+				ltcMat[v][u][1] = (byte)(255.0f * (0.10f + 0.40f * fu));       // M22 hint
+				ltcMat[v][u][2] = (byte)(255.0f * (0.50f + 0.50f * viewW));    // view weight
+				ltcMat[v][u][3] = 255;
+
+				ltcAmp[v][u][0] = (byte)(255.0f * (0.15f + 0.85f * invR * viewW)); // spec weight
+				ltcAmp[v][u][1] = (byte)(255.0f * (0.10f + 0.90f * invR));         // roughness energy
+				ltcAmp[v][u][2] = (byte)(255.0f * (0.20f + 0.80f * viewW));        // view energy
+				ltcAmp[v][u][3] = 255;
+			}
+		}
+
+		tr.ltcMatImage = R_CreateImage( "*ltc_mat", NULL, (byte *)ltcMat, 64, 64,
+			IMGFLAG_CLAMPTOEDGE, 0, 0 );
+		tr.ltcAmpImage = R_CreateImage( "*ltc_amp", NULL, (byte *)ltcAmp, 64, 64,
+			IMGFLAG_CLAMPTOEDGE, 0, 0 );
+	}
+
 #ifdef VK_CUBEMAP
 	tr.emptyCubemap = R_CreateImage( "*emptyCubemap", NULL, NULL, 1, 1, IMGFLAG_CUBEMAP, vk.color_format, 0 );
 #endif
