@@ -5833,6 +5833,10 @@ static byte *resample_image_data( const int target_format, byte *data, const int
 		return buffer;
 	}
 
+	case VK_FORMAT_R16G16B16A16_SFLOAT:
+		*bytes_per_pixel = 8;
+		return data;
+
 	default:
 		*bytes_per_pixel = 4;
 		return data;

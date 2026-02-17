@@ -21,6 +21,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 // tr_image.c
 #include "tr_local.h"
+#ifdef USE_VK_PBR
+#include "ltc_tables.h"
+#endif
 
 static byte			 s_intensitytable[256];
 static unsigned char s_gammatable[256];
@@ -600,6 +603,23 @@ static void generate_image_upload_data( image_t *image, byte *data, Image_Upload
 	int miplevel;
 
 	Com_Memset( upload_data, 0, sizeof( *upload_data ) );
+
+	// Preformatted HDR LUT uploads (e.g. LTC) bypass 8-bit resample/mipmap processing.
+	// Data is expected as tightly packed RGBA16F texels.
+	if ( image->internalFormat == VK_FORMAT_R16G16B16A16_SFLOAT ) {
+		const int raw_size = image->width * image->height * 4 * (int)sizeof( uint16_t );
+		upload_data->base_level_width = image->width;
+		upload_data->base_level_height = image->height;
+		upload_data->mip_levels = 1;
+		upload_data->buffer_size = raw_size;
+		upload_data->buffer = (byte*) ri.Hunk_AllocateTempMemory( raw_size );
+		if ( data ) {
+			Com_Memcpy( upload_data->buffer, data, raw_size );
+		} else {
+			Com_Memset( upload_data->buffer, 0, raw_size );
+		}
+		return;
+	}
 
 	if ( image->flags & IMGFLAG_NOSCALE ) {
 		//
@@ -1937,35 +1957,11 @@ static void R_CreateBuiltinImages( void ) {
 	tr.emptyImage = R_CreateImage("*empty", NULL, (byte*)data, 2, 2, IMGFLAG_NONE, 0, 0);
 
 	{
-		int u, v;
-		byte ltcMat[64][64][4];
-		byte ltcAmp[64][64][4];
-		for ( v = 0; v < 64; v++ ) {
-			for ( u = 0; u < 64; u++ ) {
-				float fu = (float)u / 63.0f; // roughness-like axis
-				float fv = (float)v / 63.0f; // NdotV-like axis
-				float invR = 1.0f - fu;
-				float viewW = 0.35f + 0.65f * fv;
-
-				// Incremental LTC placeholder LUTs:
-				// - matrix LUT encodes a simple roughness/view-dependent transform hint
-				// - amplitude LUT encodes a conservative scalar energy term
-				ltcMat[v][u][0] = (byte)(255.0f * (0.55f + 0.45f * invR));     // M11
-				ltcMat[v][u][1] = (byte)(255.0f * (0.10f + 0.40f * fu));       // M22 hint
-				ltcMat[v][u][2] = (byte)(255.0f * (0.50f + 0.50f * viewW));    // view weight
-				ltcMat[v][u][3] = 255;
-
-				ltcAmp[v][u][0] = (byte)(255.0f * (0.15f + 0.85f * invR * viewW)); // spec weight
-				ltcAmp[v][u][1] = (byte)(255.0f * (0.10f + 0.90f * invR));         // roughness energy
-				ltcAmp[v][u][2] = (byte)(255.0f * (0.20f + 0.80f * viewW));        // view energy
-				ltcAmp[v][u][3] = 255;
-			}
-		}
-
-		tr.ltcMatImage = R_CreateImage( "*ltc_mat", NULL, (byte *)ltcMat, 64, 64,
-			IMGFLAG_CLAMPTOEDGE, 0, 0 );
-		tr.ltcAmpImage = R_CreateImage( "*ltc_amp", NULL, (byte *)ltcAmp, 64, 64,
-			IMGFLAG_CLAMPTOEDGE, 0, 0 );
+		const int ltcFlags = IMGFLAG_CLAMPTOEDGE | IMGFLAG_NOSCALE | IMGFLAG_NOLIGHTSCALE;
+		tr.ltcMatImage = R_CreateImage( "*ltc_mat", NULL, (byte *)s_ltcMatCanonical, LTC_LUT_SIZE, LTC_LUT_SIZE,
+			ltcFlags, VK_FORMAT_R16G16B16A16_SFLOAT, 0 );
+		tr.ltcAmpImage = R_CreateImage( "*ltc_amp", NULL, (byte *)s_ltcAmpCanonical, LTC_LUT_SIZE, LTC_LUT_SIZE,
+			ltcFlags, VK_FORMAT_R16G16B16A16_SFLOAT, 0 );
 	}
 
 #ifdef VK_CUBEMAP
