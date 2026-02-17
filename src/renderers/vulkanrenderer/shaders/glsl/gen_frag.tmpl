@@ -322,17 +322,21 @@ vec3 CalcBurleySubsurface( in vec3 N, in vec3 L, in vec3 subsurfaceColor, in flo
 
 vec3 CalcLTCContribution( in vec3 specular, in float roughness, in float NE, in float NL, in float quality )
 {
-	// Incremental LTC hook: descriptor and shader path plumbing.
-	// Uses LUT-driven weighting without replacing punctual-light BRDF terms yet.
+	// Canonical LTC lookup tables:
+	// ltc_mat_texture -> fitted inverse matrix (LTC_MAT_1)
+	// ltc_amp_texture -> amplitude/fresnel terms (LTC_MAT_2)
 	vec2 uv = vec2( clamp( roughness, 0.0, 1.0 ), clamp( 1.0 - NE, 0.0, 1.0 ) );
 	vec4 ltcMat = texture( ltc_mat_texture, uv );
 	vec4 ltcAmp = texture( ltc_amp_texture, uv );
 
+	// Keep contribution conservative while area-light geometry integration is staged in.
 	float q = clamp( quality, 0.0, 2.0 ) * 0.5;
-	float matrixWeight = mix( ltcMat.g, ltcMat.r, q );
-	float ampWeight = ltcAmp.r;
-	float viewWeight = ltcMat.b;
-	float lobe = clamp( matrixWeight * ampWeight * viewWeight, 0.0, 1.0 );
+	float qualityScale = mix( 0.80, 1.10, q );
+	float minvDet = abs( ltcMat.x * ltcMat.w - ltcMat.y * ltcMat.z );
+	float shape = clamp( minvDet, 0.0, 1.5 );
+	float amp = ltcAmp.x;
+	float fresnel = mix( 1.0, 1.0 + 0.25 * ltcAmp.w, clamp( 1.0 - NE, 0.0, 1.0 ) );
+	float lobe = clamp( 0.35 * amp * shape * fresnel * qualityScale, 0.0, 1.0 );
 
 	return specular * lobe * NL;
 }
