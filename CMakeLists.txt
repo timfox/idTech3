@@ -185,7 +185,10 @@ if(NOT DEFINED USE_LUA)
   option(USE_LUA "Enable Lua scripting support" ON)
 endif()
 if(NOT DEFINED USE_DUKTAPE)
-  option(USE_DUKTAPE "Enable Duktape JavaScript scripting support" OFF)
+  option(USE_DUKTAPE "Enable Duktape JavaScript scripting support" ON)
+endif()
+if(NOT DEFINED USE_SYSTEM_DUKTAPE)
+  option(USE_SYSTEM_DUKTAPE "Use system-installed Duktape instead of vendored internal copy" OFF)
 endif()
 
 set(LUA_FOUND FALSE)
@@ -356,70 +359,91 @@ if(USE_LUA)
 endif()
 
 if(USE_DUKTAPE)
-  set(_DUKTAPE_HINT_PATHS
-    $ENV{DUKTAPE_DIR}
-    $ENV{DUKTAPE_PATH}
-    ${CMAKE_PREFIX_PATH}
-    ${CMAKE_INSTALL_PREFIX}
-    /usr/local
-    /usr
-    /opt/local
-    /opt
-    /opt/homebrew
-    /sw
-  )
-  if(WIN32)
-    list(APPEND _DUKTAPE_HINT_PATHS
-      "C:/msys64/mingw64"
-      "C:/msys64/ucrt64"
-      "C:/msys64/mingw32"
-      "C:/msys64/usr"
+  set(DUKTAPE_VENDORED_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/src/external/duktape/duktape.c")
+  set(DUKTAPE_VENDORED_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/src/external/duktape/duktape.h")
+
+  if((NOT USE_SYSTEM_DUKTAPE) AND EXISTS "${DUKTAPE_VENDORED_SOURCE}" AND EXISTS "${DUKTAPE_VENDORED_HEADER}")
+    add_library(js_runtime_internal STATIC ${DUKTAPE_VENDORED_SOURCE})
+    target_include_directories(js_runtime_internal PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/external/duktape")
+    set_property(TARGET js_runtime_internal PROPERTY POSITION_INDEPENDENT_CODE ON)
+    if(NOT MSVC)
+      target_compile_options(js_runtime_internal PRIVATE -fno-strict-aliasing)
+    endif()
+
+    set(DUKTAPE_FOUND TRUE)
+    set(DUKTAPE_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/external/duktape")
+    list(APPEND DUKTAPE_LINK_LIBRARIES js_runtime_internal)
+    message(STATUS "Duktape support enabled: vendored internal static library")
+  else()
+    set(_DUKTAPE_HINT_PATHS
+      $ENV{DUKTAPE_DIR}
+      $ENV{DUKTAPE_PATH}
+      ${CMAKE_PREFIX_PATH}
+      ${CMAKE_INSTALL_PREFIX}
+      /usr/local
+      /usr
+      /opt/local
+      /opt
+      /opt/homebrew
+      /sw
     )
-  endif()
+    if(WIN32)
+      list(APPEND _DUKTAPE_HINT_PATHS
+        "C:/msys64/mingw64"
+        "C:/msys64/ucrt64"
+        "C:/msys64/mingw32"
+        "C:/msys64/usr"
+      )
+    endif()
 
-  find_path(DUKTAPE_INCLUDE_DIR
-    NAMES duktape.h
-    PATH_SUFFIXES include
-    PATHS ${_DUKTAPE_HINT_PATHS}
-  )
+    find_path(DUKTAPE_INCLUDE_DIR
+      NAMES duktape.h
+      PATH_SUFFIXES include
+      PATHS ${_DUKTAPE_HINT_PATHS}
+    )
 
-  find_library(DUKTAPE_LIBRARY
-    NAMES duktape
-    PATH_SUFFIXES lib64 lib
-    PATHS ${_DUKTAPE_HINT_PATHS}
-  )
+    find_library(DUKTAPE_LIBRARY
+      NAMES duktape
+      PATH_SUFFIXES lib64 lib
+      PATHS ${_DUKTAPE_HINT_PATHS}
+    )
 
-  if((NOT DUKTAPE_INCLUDE_DIR OR NOT DUKTAPE_LIBRARY) AND NOT WIN32)
-    find_package(PkgConfig QUIET)
-    if(PKG_CONFIG_FOUND)
-      pkg_search_module(DUKTAPE_PKG QUIET duktape)
-      if(DUKTAPE_PKG_FOUND)
-        if(NOT DUKTAPE_INCLUDE_DIR AND DUKTAPE_PKG_INCLUDE_DIRS)
-          list(GET DUKTAPE_PKG_INCLUDE_DIRS 0 DUKTAPE_INCLUDE_DIR)
-        endif()
-        if(NOT DUKTAPE_LIBRARY)
-          if(DUKTAPE_PKG_LIBRARIES)
-            list(GET DUKTAPE_PKG_LIBRARIES 0 DUKTAPE_LIBRARY)
-            list(REMOVE_AT DUKTAPE_PKG_LIBRARIES 0)
-            set(DUKTAPE_EXTRA_LIBRARIES ${DUKTAPE_PKG_LIBRARIES})
-          elseif(DUKTAPE_PKG_LINK_LIBRARIES)
-            list(GET DUKTAPE_PKG_LINK_LIBRARIES 0 DUKTAPE_LIBRARY)
-            list(REMOVE_AT DUKTAPE_PKG_LINK_LIBRARIES 0)
-            set(DUKTAPE_EXTRA_LIBRARIES ${DUKTAPE_PKG_LINK_LIBRARIES})
+    if((NOT DUKTAPE_INCLUDE_DIR OR NOT DUKTAPE_LIBRARY) AND NOT WIN32)
+      find_package(PkgConfig QUIET)
+      if(PKG_CONFIG_FOUND)
+        pkg_search_module(DUKTAPE_PKG QUIET duktape)
+        if(DUKTAPE_PKG_FOUND)
+          if(NOT DUKTAPE_INCLUDE_DIR AND DUKTAPE_PKG_INCLUDE_DIRS)
+            list(GET DUKTAPE_PKG_INCLUDE_DIRS 0 DUKTAPE_INCLUDE_DIR)
+          endif()
+          if(NOT DUKTAPE_LIBRARY)
+            if(DUKTAPE_PKG_LIBRARIES)
+              list(GET DUKTAPE_PKG_LIBRARIES 0 DUKTAPE_LIBRARY)
+              list(REMOVE_AT DUKTAPE_PKG_LIBRARIES 0)
+              set(DUKTAPE_EXTRA_LIBRARIES ${DUKTAPE_PKG_LIBRARIES})
+            elseif(DUKTAPE_PKG_LINK_LIBRARIES)
+              list(GET DUKTAPE_PKG_LINK_LIBRARIES 0 DUKTAPE_LIBRARY)
+              list(REMOVE_AT DUKTAPE_PKG_LINK_LIBRARIES 0)
+              set(DUKTAPE_EXTRA_LIBRARIES ${DUKTAPE_PKG_LINK_LIBRARIES})
+            endif()
           endif()
         endif()
       endif()
     endif()
-  endif()
 
-  if(NOT DUKTAPE_INCLUDE_DIR OR NOT DUKTAPE_LIBRARY)
-    message(WARNING "Duktape headers/library not found; JavaScript scripting support will be disabled.")
-  else()
-    set(DUKTAPE_FOUND TRUE)
-    message(STATUS "Duktape support enabled: ${DUKTAPE_LIBRARY}")
-    list(APPEND DUKTAPE_LINK_LIBRARIES ${DUKTAPE_LIBRARY})
-    if(DUKTAPE_EXTRA_LIBRARIES)
-      list(APPEND DUKTAPE_LINK_LIBRARIES ${DUKTAPE_EXTRA_LIBRARIES})
+    if(NOT DUKTAPE_INCLUDE_DIR OR NOT DUKTAPE_LIBRARY)
+      if(USE_SYSTEM_DUKTAPE)
+        message(WARNING "System Duktape requested but headers/library not found; JavaScript scripting support will be disabled.")
+      else()
+        message(WARNING "Vendored Duktape not found and system headers/library not found; JavaScript scripting support will be disabled.")
+      endif()
+    else()
+      set(DUKTAPE_FOUND TRUE)
+      message(STATUS "Duktape support enabled: system library ${DUKTAPE_LIBRARY}")
+      list(APPEND DUKTAPE_LINK_LIBRARIES ${DUKTAPE_LIBRARY})
+      if(DUKTAPE_EXTRA_LIBRARIES)
+        list(APPEND DUKTAPE_LINK_LIBRARIES ${DUKTAPE_EXTRA_LIBRARIES})
+      endif()
     endif()
   endif()
 endif()
