@@ -4507,7 +4507,6 @@ void vk_initialize( void )
 	uint32_t major;
 	uint32_t minor;
 	uint32_t patch;
-	uint32_t maxSize;
 	uint32_t i;
 
 	init_vulkan_library();
@@ -4611,10 +4610,7 @@ void vk_initialize( void )
 
 	// fill glConfig information
 
-	// maxTextureSize must not exceed IMAGE_CHUNK_SIZE
-	maxSize = sqrtf( IMAGE_CHUNK_SIZE / 4 );
-	// round down to next power of 2
-	glConfig.maxTextureSize = MIN( props.limits.maxImageDimension2D, log2pad( maxSize, 0 ) );
+	glConfig.maxTextureSize = props.limits.maxImageDimension2D;
 
 	if ( glConfig.maxTextureSize > MAX_TEXTURE_SIZE )
 		glConfig.maxTextureSize = MAX_TEXTURE_SIZE; // ResampleTexture() relies on that maximum
