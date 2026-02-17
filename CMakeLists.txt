@@ -499,9 +499,11 @@ if(USE_OPUS)
           -Wno-undef
           -Wno-cast-qual
           -Wno-missing-prototypes
-          -Wno-stringop-overflow
           -Wno-sign-compare
         )
+        if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+          target_compile_options(opus PRIVATE -Wno-stringop-overflow)
+        endif()
       endif()
     endif()
   endif()
@@ -527,8 +529,10 @@ if(USE_OPUS)
         target_compile_options(opusfile PRIVATE
           -Wno-undef
           -Wno-cast-qual
-          -Wno-maybe-uninitialized
         )
+        if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+          target_compile_options(opusfile PRIVATE -Wno-maybe-uninitialized)
+        endif()
       endif()
       if(OGG_LIBRARY)
         target_link_libraries(opusfile PRIVATE ${OGG_LIBRARY})
