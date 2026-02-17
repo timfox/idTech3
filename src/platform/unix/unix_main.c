@@ -48,6 +48,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include <dlfcn.h>
 
+#if defined(__unix__) && !defined(__APPLE__)
+#include <X11/Xatom.h>
+#include <X11/Xlib.h>
+#endif
+
 #ifdef __linux__
 #ifdef __GLIBC__
   #include <fpu_control.h> // bk001213 - force dumps on divide by zero
@@ -352,6 +357,103 @@ void NORETURN FORMAT_PRINTF(1, 2) QDECL Sys_Error( const char *format, ... )
 	fprintf( stderr, "Sys_Error: %s\n", text );
 
 	Sys_Exit( 1 ); // bk010104 - use single exit point.
+}
+
+void Sys_ShowErrorMessage( const char *title, const char *message )
+{
+#if defined(__unix__) && !defined(__APPLE__) && !defined(DEDICATED)
+	Display *display = XOpenDisplay( NULL );
+
+	if ( display ) {
+		const int screen = DefaultScreen( display );
+		const Window root = RootWindow( display, screen );
+		const int width = 360;
+		const int height = 140;
+		const int x = ( DisplayWidth( display, screen ) - width ) / 2;
+		const int y = ( DisplayHeight( display, screen ) - height ) / 2;
+		Window window = XCreateSimpleWindow( display, root, x, y, width, height, 2,
+		                                     BlackPixel( display, screen ),
+		                                     WhitePixel( display, screen ) );
+
+		if ( title && *title ) {
+			XStoreName( display, window, title );
+		}
+
+		XSelectInput( display, window, ExposureMask | KeyPressMask | ButtonPressMask | StructureNotifyMask );
+		Atom wmDelete = XInternAtom( display, "WM_DELETE_WINDOW", False );
+		XSetWMProtocols( display, window, &wmDelete, 1 );
+
+		GC gc = XCreateGC( display, window, 0, NULL );
+		XSetForeground( display, gc, BlackPixel( display, screen ) );
+
+		XMapWindow( display, window );
+		XFlush( display );
+
+		XFontStruct *font = XLoadQueryFont( display, "fixed" );
+		if ( !font ) {
+			font = XLoadQueryFont( display, "9x15" );
+		}
+		if ( font ) {
+			XSetFont( display, gc, font->fid );
+		}
+
+		const char *titleText = title && *title ? title : "Error";
+		const char *messageText = message ? message : "";
+		const size_t titleLen = strlen( titleText );
+		const size_t messageLen = strlen( messageText );
+
+		qboolean running = qtrue;
+		XEvent event;
+
+		XClearWindow( display, window );
+
+		while ( running ) {
+			XNextEvent( display, &event );
+			switch ( event.type ) {
+				case Expose:
+					if ( event.xexpose.count == 0 ) {
+						XClearWindow( display, window );
+						int textX = 20;
+						int titleY = 40;
+						int messageY = 70;
+
+						if ( titleLen ) {
+							XDrawString( display, window, gc, textX, titleY, titleText, (int)titleLen );
+						}
+						if ( messageLen ) {
+							XDrawString( display, window, gc, textX, messageY, messageText, (int)messageLen );
+						}
+
+						const char *hint = "Press any key or click to close";
+						XDrawString( display, window, gc, textX, 105, hint, strlen( hint ) );
+					}
+					break;
+				case ButtonPress:
+				case KeyPress:
+					running = qfalse;
+					break;
+				case ClientMessage:
+					if ( event.xclient.data.l[0] == (long)wmDelete ) {
+						running = qfalse;
+					}
+					break;
+				default:
+					break;
+			}
+		}
+
+		if ( font ) {
+			XFreeFont( display, font );
+		}
+		XFreeGC( display, gc );
+		XDestroyWindow( display, window );
+		XCloseDisplay( display );
+		return;
+	}
+#endif
+
+	fprintf( stderr, "%s: %s\n", title ? title : "Error", message ? message : "(null)" );
+	fflush( stderr );
 }
 
 
