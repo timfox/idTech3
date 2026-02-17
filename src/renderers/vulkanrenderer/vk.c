@@ -7256,6 +7256,24 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	frag_spec_data.transmission_texture_set = 0;
 	frag_spec_data.subsurface_texture_set = 0;
 
+	/*if ( ( def->vk_pbr_flags & PBR_HAS_EMISSIVE ) == 0 )
+		frag_spec_data.emissive_texture_set = -1;
+
+	if ( ( def->vk_pbr_flags & PBR_HAS_CLEARCOAT ) == 0 )
+		frag_spec_data.clearcoat_texture_set = -1;
+
+	if ( ( def->vk_pbr_flags & PBR_HAS_SHEEN ) == 0 )
+		frag_spec_data.sheen_texture_set = -1;
+
+	if ( ( def->vk_pbr_flags & PBR_HAS_ANISOTROPY ) == 0 )
+		frag_spec_data.anisotropy_texture_set = -1;
+
+	if ( ( def->vk_pbr_flags & PBR_HAS_TRANSMISSION ) == 0 )
+		frag_spec_data.transmission_texture_set = -1;
+
+	if ( ( def->vk_pbr_flags & PBR_HAS_SUBSURFACE ) == 0 )
+		frag_spec_data.subsurface_texture_set = -1;*/
+
 	if ( ( def->vk_pbr_flags & PBR_HAS_NORMALMAP ) == 0 )
 		frag_spec_data.normal_texture_set = -1;
 

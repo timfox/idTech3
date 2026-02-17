@@ -1459,6 +1459,71 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				}
 			}
 
+			/*{
+				const VkDescriptorSet fallback = ( tr.whiteImage && tr.whiteImage->descriptor ) ? tr.whiteImage->descriptor : VK_NULL_HANDLE;
+				VkDescriptorSet clearcoatDesc = fallback;
+
+				if ( ( pStage->vk_pbr_flags & PBR_HAS_CLEARCOAT ) && pStage->clearcoatMap && pStage->clearcoatMap->descriptor ) {
+					clearcoatDesc = pStage->clearcoatMap->descriptor;
+				}
+
+				if ( clearcoatDesc ) {
+					vk_update_descriptor_if_changed( VK_DESC_PBR_CLEARCOAT, clearcoatDesc );
+				}
+			}
+
+			{
+				const VkDescriptorSet fallback = ( tr.whiteImage && tr.whiteImage->descriptor ) ? tr.whiteImage->descriptor : VK_NULL_HANDLE;
+				VkDescriptorSet sheenDesc = fallback;
+
+				if ( ( pStage->vk_pbr_flags & PBR_HAS_SHEEN ) && pStage->sheenMap && pStage->sheenMap->descriptor ) {
+					sheenDesc = pStage->sheenMap->descriptor;
+				}
+
+				if ( sheenDesc ) {
+					vk_update_descriptor_if_changed( VK_DESC_PBR_SHEEN, sheenDesc );
+				}
+			}
+
+			{
+				const VkDescriptorSet fallback = ( tr.whiteImage && tr.whiteImage->descriptor ) ? tr.whiteImage->descriptor : VK_NULL_HANDLE;
+				VkDescriptorSet anisotropyDesc = fallback;
+
+				if ( ( pStage->vk_pbr_flags & PBR_HAS_ANISOTROPY ) && pStage->anisotropyMap && pStage->anisotropyMap->descriptor ) {
+					anisotropyDesc = pStage->anisotropyMap->descriptor;
+				}
+
+				if ( anisotropyDesc ) {
+					vk_update_descriptor_if_changed( VK_DESC_PBR_ANISOTROPY, anisotropyDesc );
+				}
+			}
+
+			{
+				const VkDescriptorSet fallback = ( tr.whiteImage && tr.whiteImage->descriptor ) ? tr.whiteImage->descriptor : VK_NULL_HANDLE;
+				VkDescriptorSet transmissionDesc = fallback;
+
+				if ( ( pStage->vk_pbr_flags & PBR_HAS_TRANSMISSION ) && pStage->transmissionMap && pStage->transmissionMap->descriptor ) {
+					transmissionDesc = pStage->transmissionMap->descriptor;
+				}
+
+				if ( transmissionDesc ) {
+					vk_update_descriptor_if_changed( VK_DESC_PBR_TRANSMISSION, transmissionDesc );
+				}
+			}
+
+			{
+				const VkDescriptorSet fallback = ( tr.whiteImage && tr.whiteImage->descriptor ) ? tr.whiteImage->descriptor : VK_NULL_HANDLE;
+				VkDescriptorSet subsurfaceDesc = fallback;
+
+				if ( ( pStage->vk_pbr_flags & PBR_HAS_SUBSURFACE ) && pStage->subsurfaceMap && pStage->subsurfaceMap->descriptor ) {
+					subsurfaceDesc = pStage->subsurfaceMap->descriptor;
+				}
+
+				if ( subsurfaceDesc ) {
+					vk_update_descriptor_if_changed( VK_DESC_PBR_SUBSURFACE, subsurfaceDesc );
+				}
+			}*/
+
 			// if ( pStage->vk_pbr_flags & PBR_HAS_CLEARCOAT )
 			// 	vk_update_descriptor_if_changed( VK_DESC_PBR_CLEARCOAT, pStage->clearcoatMap->descriptor );
 
