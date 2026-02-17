@@ -4610,7 +4610,8 @@ void vk_initialize( void )
 
 	// fill glConfig information
 
-	glConfig.maxTextureSize = props.limits.maxImageDimension2D;
+	vk.hwMaxImageDimension2D = props.limits.maxImageDimension2D;
+	glConfig.maxTextureSize = (int)vk.hwMaxImageDimension2D;
 
 	if ( glConfig.maxTextureSize > MAX_TEXTURE_SIZE )
 		glConfig.maxTextureSize = MAX_TEXTURE_SIZE; // ResampleTexture() relies on that maximum
@@ -7269,6 +7270,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 
 	if ( ( def->vk_pbr_flags & PBR_HAS_LIGHTMAP ) == 0 )
 		frag_spec_data.lightmap_texture_set = -1;
+
 #ifdef HDR_DELUXE_LIGHTMAP
 	if ( r_deluxeMapping->integer )
 	{
