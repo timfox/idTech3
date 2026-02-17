@@ -1283,7 +1283,7 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			{
 				stage->emissiveScale[1] = stage->emissiveScale[0];
 				stage->emissiveScale[2] = stage->emissiveScale[0];
-				stage->vk_pbr_flags |= PBR_HAS_EMISSIVE;
+				//stage->vk_pbr_flags |= PBR_HAS_EMISSIVE;
 				continue;
 			}
 			stage->emissiveScale[1] = atof( token );
@@ -1291,11 +1291,11 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			if ( token[0] == 0 )
 			{
 				stage->emissiveScale[2] = stage->emissiveScale[0];
-				stage->vk_pbr_flags |= PBR_HAS_EMISSIVE;
+				//stage->vk_pbr_flags |= PBR_HAS_EMISSIVE;
 				continue;
 			}
 			stage->emissiveScale[2] = atof( token );
-			stage->vk_pbr_flags |= PBR_HAS_EMISSIVE;
+			//stage->vk_pbr_flags |= PBR_HAS_EMISSIVE;
 		}
 		else if ( !Q_stricmp( token, "clearcoatscale" ) )
 		{

@@ -7270,7 +7270,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 
 	if ( ( def->vk_pbr_flags & PBR_HAS_LIGHTMAP ) == 0 )
 		frag_spec_data.lightmap_texture_set = -1;
-
+		
 #ifdef HDR_DELUXE_LIGHTMAP
 	if ( r_deluxeMapping->integer )
 	{
