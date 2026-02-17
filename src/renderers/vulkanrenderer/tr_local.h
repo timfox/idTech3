@@ -1084,7 +1084,7 @@ void		R_Modellist_f (void);
 
 //====================================================
 
-#define	MAX_DRAWIMAGES			2048
+#define	MAX_DRAWIMAGES			32768
 #define	MAX_SKINS				1024
 
 
@@ -1448,6 +1448,8 @@ extern cvar_t	*r_pbr;
 extern cvar_t	*r_pbr_shExtract;
 extern cvar_t	*r_pbr_debug;
 extern cvar_t	*r_pbr_packedPreferred;
+extern cvar_t	*r_pbr_multiScatter;
+extern cvar_t	*r_pbr_multiScatterStrength;
 #ifdef VK_CUBEMAP
 extern cvar_t	*r_pbr_iblIrradianceSize;
 extern cvar_t	*r_pbr_iblPrefilterSize;
@@ -1512,6 +1514,7 @@ extern	cvar_t	*r_picmip;						// controls picmip values
 extern	cvar_t	*r_nomip;						// apply picmip only on worldspawn textures
 extern	cvar_t	*r_finish;
 extern	cvar_t	*r_textureMode;
+extern	cvar_t	*r_mipLodBias;
 extern	cvar_t	*r_offsetFactor;
 extern	cvar_t	*r_offsetUnits;
 

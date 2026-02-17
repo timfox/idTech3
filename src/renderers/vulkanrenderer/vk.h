@@ -253,6 +253,7 @@ typedef struct vkUniform_s {
 	vec4_t pbrTransmissionScale;
 	vec4_t pbrSubsurfaceColor;
 	vec4_t pbrSubsurfaceParams;
+	vec4_t pbrAdvancedParams; // x: multi-scatter toggle, y: multi-scatter strength
 	vec4_t pbrShCoeffs[9];
 #endif
 } vkUniform_t;
@@ -374,6 +375,7 @@ void vk_update_descriptor_set( image_t *image, qboolean mipmap );
 void vk_destroy_image_resources( VkImage *image, VkImageView *imageView );
 void vk_bind_generated_shaders( void );
 void vk_update_attachment_descriptors( void );
+void vk_validate_pbr_ibl_resources( void );
 void vk_destroy_samplers( void );
 
 uint32_t vk_find_pipeline_ext( uint32_t base, const Vk_Pipeline_Def *def, qboolean use );
@@ -869,6 +871,7 @@ typedef struct {
 		VkSampler handle[MAX_VK_SAMPLERS];
 		int filter_min;
 		int filter_max;
+		float mip_lod_bias;
 	} samplers;
 
 	struct defaults_t {

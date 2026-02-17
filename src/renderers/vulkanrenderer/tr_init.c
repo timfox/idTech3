@@ -88,6 +88,8 @@ cvar_t	*r_pbr;
 cvar_t	*r_pbr_shExtract;
 cvar_t	*r_pbr_debug;
 cvar_t	*r_pbr_packedPreferred;
+cvar_t	*r_pbr_multiScatter;
+cvar_t	*r_pbr_multiScatterStrength;
 #ifdef VK_CUBEMAP
 cvar_t	*r_pbr_iblIrradianceSize;
 cvar_t	*r_pbr_iblPrefilterSize;
@@ -177,6 +179,7 @@ cvar_t	*r_shownormals;
 cvar_t	*r_finish;
 cvar_t	*r_clear;
 cvar_t	*r_textureMode;
+cvar_t	*r_mipLodBias;
 cvar_t	*r_offsetFactor;
 cvar_t	*r_offsetUnits;
 cvar_t	*r_gamma;
@@ -1450,6 +1453,7 @@ static void VarInfo( void )
 	}
 
 	ri.Printf( PRINT_ALL, "texturemode: %s\n", r_textureMode ? r_textureMode->string : "GL_LINEAR_MIPMAP_NEAREST" );
+	ri.Printf( PRINT_ALL, "mip LOD bias: %.2f\n", r_mipLodBias ? r_mipLodBias->value : 0.0f );
 	ri.Printf( PRINT_ALL, "texture bits: %d\n", r_texturebits ? (r_texturebits->integer ? r_texturebits->integer : 32) : 32 );
 	ri.Printf( PRINT_ALL, "picmip: %d%s\n", r_picmip ? r_picmip->integer : 0, (r_nomip && r_nomip->integer) ? ", worldspawn only" : "" );
 
@@ -1617,6 +1621,14 @@ static void R_Register( void )
 		" 6 - MOSR\n"
 		"Auto-discovery still falls back to other formats if the preferred suffix is not found." );
 
+	r_pbr_multiScatter = ri.Cvar_Get( "r_pbr_multiScatter", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbr_multiScatter, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pbr_multiScatter, "Enable Kulla-Conty style specular IBL multiple-scattering compensation." );
+
+	r_pbr_multiScatterStrength = ri.Cvar_Get( "r_pbr_multiScatterStrength", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbr_multiScatterStrength, "0.0", "2.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_pbr_multiScatterStrength, "Scales specular IBL multiple-scattering compensation intensity." );
+
 	r_baseNormalX	= ri.Cvar_Get("r_baseNormalX",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );
 	r_baseNormalY	= ri.Cvar_Get("r_baseNormalY",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );
 	r_baseParallax	= ri.Cvar_Get("r_baseParallax",		"0.05",	CVAR_ARCHIVE | CVAR_LATCH );
@@ -1711,6 +1723,10 @@ static void R_Register( void )
 	r_textureMode = ri.Cvar_Get( "r_textureMode", "GL_LINEAR_MIPMAP_NEAREST", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_textureMode, "Texture interpolation mode:\n GL_NEAREST: Nearest neighbor interpolation and will therefore appear similar to Quake II except with the added colored lighting\n GL_LINEAR: Linear interpolation and will appear to blend in objects that are closer than the resolution that the textures are set as\n GL_NEAREST_MIPMAP_NEAREST: Nearest neighbor interpolation with mipmapping for bilinear hardware, mipmapping will blend objects that are farther away than the resolution that they are set as\n GL_LINEAR_MIPMAP_NEAREST: Linear interpolation with mipmapping for bilinear hardware\n GL_NEAREST_MIPMAP_LINEAR: Nearest neighbor interpolation with mipmapping for trilinear hardware\n GL_LINEAR_MIPMAP_LINEAR: Linear interpolation with mipmapping for trilinear hardware" );
 	ri.Cvar_SetGroup( r_textureMode, CVG_RENDERER );
+	r_mipLodBias = ri.Cvar_Get( "r_mipLodBias", "-0.75", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_mipLodBias, "-2.0", "2.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_mipLodBias, "Texture mip LOD bias (Vulkan): negative keeps sharper mips farther away, positive blurs sooner." );
+	ri.Cvar_SetGroup( r_mipLodBias, CVG_RENDERER );
 	r_gamma = ri.Cvar_Get( "r_gamma", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_gamma, "0.5", "3", CV_FLOAT );
 	ri.Cvar_SetDescription( r_gamma, "Gamma correction factor." );
@@ -2054,6 +2070,7 @@ void R_Init( void ) {
 #ifdef VK_PBR_BRDFLUT
 	vk_create_brfdlut();
 #endif
+	vk_validate_pbr_ibl_resources();
 #endif
 
 	R_InitShaders();

@@ -421,7 +421,7 @@ void RE_EndFrame( int *frontEndMsec, int *backEndMsec ) {
 	if ( ri.Cvar_CheckGroup( CVG_RENDERER ) ) {
 
 		// texturemode stuff
-		if ( r_textureMode->modified ) {
+		if ( r_textureMode->modified || r_mipLodBias->modified ) {
 			GL_TextureMode( r_textureMode->string );
 		}
 
