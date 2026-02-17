@@ -1469,3 +1469,22 @@ if(UNIX AND NOT APPLE AND IDTECH3_X11_LIBS)
 	target_link_libraries(${CNAME}${BINEXT} PRIVATE ${IDTECH3_X11_LIBS})
 	target_link_libraries(${DNAME}${BINEXT} PRIVATE ${IDTECH3_X11_LIBS})
 endif()
+
+# Deterministic Vulkan shader codegen/check tooling.
+# Usage:
+#   cmake --build <build-dir> --target vk_shader_regen
+#   cmake --build <build-dir> --target vk_shader_check
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+	add_custom_target(vk_shader_regen
+		COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/vk_shader_tool.py regen
+		WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+		COMMENT "Regenerating Vulkan shader_data.c and shader_binding.c deterministically")
+
+	add_custom_target(vk_shader_check
+		COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/vk_shader_tool.py check --ref HEAD
+		WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+		COMMENT "Checking Vulkan generated shader blobs are up-to-date with GLSL")
+else()
+	message(STATUS "Python3 not found: vk_shader_regen/vk_shader_check targets are unavailable.")
+endif()
