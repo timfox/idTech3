@@ -7226,6 +7226,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	ADD_FRAG_SPEC( 27, anisotropy_texture_set );
 	ADD_FRAG_SPEC( 28, transmission_texture_set );
 	ADD_FRAG_SPEC( 29, subsurface_texture_set );
+	ADD_FRAG_SPEC( 30, deluxe_mapping );
+	ADD_FRAG_SPEC( 31, deluxe_specular_scale );
 
 	// only use w value, specgloss maps are not supported
 	frag_spec_data.specularScale_x = def->specularScale[0];
