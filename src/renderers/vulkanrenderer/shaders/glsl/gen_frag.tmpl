@@ -35,7 +35,7 @@ layout(set = 0, binding = 0) uniform UBO {
 	vec4 pbrTransmissionScale;
 	vec4 pbrSubsurfaceColor;
 	vec4 pbrSubsurfaceParams;
-	vec4 pbrAdvancedParams; // x: multi-scatter toggle, y: multi-scatter strength
+	vec4 pbrAdvancedParams; // x: multi-scatter toggle, y: multi-scatter strength, z: LTC toggle, w: LTC quality
 	vec4 pbrShCoeffs[9];
 #endif
 //#endif
@@ -132,6 +132,8 @@ layout(set = 13, binding = 0) uniform sampler2D sheen_texture;
 layout(set = 14, binding = 0) uniform sampler2D anisotropy_texture;
 layout(set = 15, binding = 0) uniform sampler2D transmission_texture;
 layout(set = 16, binding = 0) uniform sampler2D subsurface_texture;
+layout(set = 17, binding = 0) uniform sampler2D ltc_mat_texture;
+layout(set = 18, binding = 0) uniform sampler2D ltc_amp_texture;
 
 // prob use ubo for specularScale & normalScale ..
 layout (constant_id = 11) const float specularScale_x = 1.0;
@@ -316,6 +318,23 @@ vec3 CalcBurleySubsurface( in vec3 N, in vec3 L, in vec3 subsurfaceColor, in flo
 	float wrapValue = clamp( wrap, 0.0, 1.0 );
 	float scatter = WrapLambert( NL, wrapValue );
 	return subsurfaceColor * strength * scatter;
+}
+
+vec3 CalcLTCContribution( in vec3 specular, in float roughness, in float NE, in float NL, in float quality )
+{
+	// Incremental LTC hook: descriptor and shader path plumbing.
+	// Uses LUT-driven weighting without replacing punctual-light BRDF terms yet.
+	vec2 uv = vec2( clamp( roughness, 0.0, 1.0 ), clamp( 1.0 - NE, 0.0, 1.0 ) );
+	vec4 ltcMat = texture( ltc_mat_texture, uv );
+	vec4 ltcAmp = texture( ltc_amp_texture, uv );
+
+	float q = clamp( quality, 0.0, 2.0 ) * 0.5;
+	float matrixWeight = mix( ltcMat.g, ltcMat.r, q );
+	float ampWeight = ltcAmp.r;
+	float viewWeight = ltcMat.b;
+	float lobe = clamp( matrixWeight * ampWeight * viewWeight, 0.0, 1.0 );
+
+	return specular * lobe * NL;
 }
 #endif
 
@@ -874,6 +893,11 @@ void main() {
 
 	if ( env_texture_set > -1 )
 		out_color.rgb += CalcIBLContribution( roughness, N, E, NE, specular.rgb * AO );
+
+	if ( pbrAdvancedParams.z > 0.5 ) {
+		vec3 ltcSpec = CalcLTCContribution( specular.rgb, roughness, NE, NL, pbrAdvancedParams.w );
+		out_color.rgb += lightColor * ltcSpec * attenuation;
+	}
 
 	// legacy approximation kept intentionally for Step 2 scope containment.
 	// Step 2b pending: Disney clearcoat/sheen energy normalization.

@@ -1293,6 +1293,8 @@ typedef struct {
 	image_t					*identityLightImage;	// full of tr.identityLightByte
 #ifdef USE_VK_PBR
 	image_t					*emptyImage;		// full of 0xff
+	image_t					*ltcMatImage;
+	image_t					*ltcAmpImage;
 #endif
 #ifdef VK_CUBEMAP
 	image_t					*emptyCubemap;
@@ -1450,6 +1452,8 @@ extern cvar_t	*r_pbr_debug;
 extern cvar_t	*r_pbr_packedPreferred;
 extern cvar_t	*r_pbr_multiScatter;
 extern cvar_t	*r_pbr_multiScatterStrength;
+extern cvar_t	*r_ltc;
+extern cvar_t	*r_ltc_quality;
 #ifdef VK_CUBEMAP
 extern cvar_t	*r_pbr_iblIrradianceSize;
 extern cvar_t	*r_pbr_iblPrefilterSize;

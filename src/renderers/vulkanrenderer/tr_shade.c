@@ -1352,7 +1352,8 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			Vector4Set( block.advancedParams,
 				( r_pbr_multiScatter && r_pbr_multiScatter->integer ) ? 1.0f : 0.0f,
 				( r_pbr_multiScatterStrength ? r_pbr_multiScatterStrength->value : 1.0f ),
-				0.0f, 0.0f );
+				( r_ltc && r_ltc->integer ) ? 1.0f : 0.0f,
+				( r_ltc_quality ? (float)r_ltc_quality->integer : 1.0f ) );
 
 			{
 				const VkDescriptorSet fallback2D = ( tr.whiteImage ) ? tr.whiteImage->descriptor : VK_NULL_HANDLE;
@@ -1425,6 +1426,14 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				}
 				if ( irradianceDescriptor ) {
 					vk_update_descriptor_if_changed( VK_DESC_PBR_IRRADIANCE, irradianceDescriptor );
+				}
+				if ( r_ltc && r_ltc->integer ) {
+					if ( tr.ltcMatImage ) {
+						vk_update_descriptor_if_changed( VK_DESC_PBR_LTC_MAT, tr.ltcMatImage->descriptor );
+					}
+					if ( tr.ltcAmpImage ) {
+						vk_update_descriptor_if_changed( VK_DESC_PBR_LTC_AMP, tr.ltcAmpImage->descriptor );
+					}
 				}
 			}
 				
