@@ -251,3 +251,82 @@ When enabled, these commands are available:
 - `script_reload [file1.lua ...]`
 - `script_list`
 - `script_dump [maxEntries]`
+
+---
+
+### JavaScript scripting support (Duktape)
+
+Duktape support is enabled by default and uses a vendored internal static copy from `src/external/duktape`.
+
+To force-enable it explicitly:
+
+```bash
+cmake -S . -B build -DUSE_DUKTAPE=ON
+```
+
+`scripts/compile_engine.sh` enables Duktape by default (vendored), and supports:
+
+- `duktape` (explicit enable)
+- `no-duktape` (disable, passes `-DUSE_DUKTAPE=OFF`)
+- `system-duktape` (use system-installed library/headers, passes `-DUSE_SYSTEM_DUKTAPE=ON`)
+
+When enabled, these commands are available:
+
+- `js_reload [file1.js ...]`
+- `js_list`
+- `js_dump [maxEntries]`
+- `js_exec <javascript-expression-or-code>`
+
+Global JavaScript helpers are available under `idtech3`:
+
+- `idtech3.print(...args)` - print to the engine console
+- `idtech3.cvarGet(name)` - read cvar string value
+- `idtech3.cvarSet(name, value)` - set cvar value (gated by `js_cvarSetMode`)
+- `idtech3.exec(command[, mode])` - execute console command (`mode`: `append`, `insert`, `now`, gated by `js_allowExec`)
+- `idtech3.readFile(path)` - read text from virtual filesystem (returns `null` if not found)
+- `idtech3.writeFile(path, data)` - write file to virtual filesystem (gated by `js_allowFileWrite`)
+- `idtech3.appendFile(path, data)` - append file to virtual filesystem (gated by `js_allowFileWrite`)
+- `idtech3.include(path)` - evaluate another JS file from virtual filesystem
+- `idtech3.require(path)` - load a JS module and return `module.exports` (cached when `js_requireCache=1`)
+- `idtech3.on(event, fn)` - register callback for `frame`, `map_load`, `client_connect`, `ui_open`, `ui_close`, `menu_changed`, `input_key`, `mouse_move`, `console_open`
+- `idtech3.off(event[, fn])` - remove one callback or all callbacks for an event
+- `idtech3.textureLoad(path[, noMip])` - load texture/shader and return handle
+- `idtech3.textureReload(path)` - force texture/shader lookup reload and return handle
+- `idtech3.materialRegister(name)` - register material/shader and return handle
+- `idtech3.hudDrawPic(x, y, w, h, shaderHandleOrName)` - draw image in HUD space
+- `idtech3.hudDrawText(x, y, text[, size])` - draw HUD text
+
+Event callback payloads:
+
+- `frame`: `fn(msec, realMsec)`
+- `map_load`: `fn(ev)` where `ev.map` is the map name
+- `client_connect`: `fn(ev)` where `ev.address` and `ev.clientNum` identify the connection
+- `ui_open`: `fn(ev)` when UI catcher opens
+- `ui_close`: `fn(ev)` when UI catcher closes
+- `menu_changed`: `fn(ev)` where `ev.menu` / `ev.menuId` describe active menu transitions
+- `input_key`: `fn(ev)` where `ev.key`, `ev.keyNum`, `ev.down` report key transitions
+- `mouse_move`: `fn(ev)` where `ev.dx`, `ev.dy` report mouse deltas
+- `console_open`: `fn(ev)` when console catcher opens
+
+JavaScript policy cvars:
+
+- `js_allowEvents` (`0/1`) - allow/deny event registration
+- `js_allowExec` (`0..3`) - command execution level: `0=off`, `1=append`, `2=append+insert`, `3=append+insert+now`
+- `js_cvarSetMode` (`0..3`) - cvar write level: `0=off`, `1=existing writable only`, `2=also allow creating user cvars`, `3=unrestricted through Cvar_Set rules`
+- `js_allowFileWrite` (`0/1`) - allow/deny `writeFile` and `appendFile`
+- `js_maxEventCallbacks` (`1..1024`) - max callbacks per event
+- `js_frameCallbackBudgetMs` (`0..1000`) - per-frame callback budget in ms (`0=unlimited`)
+- `js_disableFaultyCallbacks` (`0/1`) - remove callbacks that throw errors
+- `js_requireCache` (`0/1`) - cache module exports for `idtech3.require`
+- `js_autoInit` (`0/1`) - initialize JS runtime automatically at startup
+- `js_compatTarget` (read-only) - compatibility target string (default `es5.1-duktape`)
+
+Script boundary policy:
+
+- JavaScript (`js_reload`, `idtech3.include`) only accepts paths under: `ui/`, `client/`, `frontend/`, `scripts/js/`
+- Lua (`script_reload`) only accepts paths under: `gameplay/`, `server/`, `vm/game/`, `scripts/lua/`
+
+JavaScript module policy:
+
+- `idtech3.require(path)` resolves explicit allowed-root paths and `scripts/js/<path>[.js]`
+- It is intentionally minimal (CommonJS-style `module.exports`) and does not include Node/browser APIs
