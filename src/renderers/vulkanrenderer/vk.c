@@ -1631,6 +1631,40 @@ static VkFormat get_hdr_format( VkFormat base_format )
 	}
 }
 
+static qboolean vk_format_has_features( VkPhysicalDevice physical_device, VkFormat format, VkFormatFeatureFlags required )
+{
+	VkFormatProperties props;
+	qvkGetPhysicalDeviceFormatProperties( physical_device, format, &props );
+	return ( props.optimalTilingFeatures & required ) == required;
+}
+
+static VkFormat get_bloom_format( VkPhysicalDevice physical_device, VkFormat fallback )
+{
+	const VkFormat preferred[] = {
+		VK_FORMAT_A2B10G10R10_UNORM_PACK32,
+		VK_FORMAT_A2R10G10B10_UNORM_PACK32,
+		VK_FORMAT_B10G11R11_UFLOAT_PACK32
+	};
+	const VkFormatFeatureFlags required = VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT |
+		VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT |
+		VK_FORMAT_FEATURE_BLIT_SRC_BIT |
+		VK_FORMAT_FEATURE_BLIT_DST_BIT |
+		VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
+	uint32_t i;
+
+	for ( i = 0; i < ARRAY_LEN( preferred ); i++ ) {
+		const VkFormat fmt = preferred[i];
+		if ( fmt == fallback ) {
+			return fmt;
+		}
+		if ( vk_format_has_features( physical_device, fmt, required ) ) {
+			return fmt;
+		}
+	}
+
+	return fallback;
+}
+
 typedef struct {
 	int bits;
 	VkFormat rgb;
@@ -1746,7 +1780,9 @@ static void setup_surface_formats( VkPhysicalDevice physical_device )
 
 	vk.capture_format = VK_FORMAT_R8G8B8A8_UNORM;
 
-	vk.bloom_format = vk.base_format.format;
+	// Prefer a higher-precision bloom chain to avoid blocky quantization artifacts
+	// around bright highlights when the main color format is 8-bit.
+	vk.bloom_format = get_bloom_format( physical_device, vk.color_format );
 	vk.ssao_format = VK_FORMAT_R8_UNORM;
 
 	vk.blitEnabled = vk_blit_enabled( physical_device, vk.color_format, vk.capture_format );
@@ -2714,6 +2750,13 @@ void vk_update_attachment_descriptors( void ) {
 		if ( r_bloom->integer )
 		{
 			uint32_t i;
+
+			sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+			sd.max_lod_1_0 = qtrue;
+			sd.noAnisotropy = qtrue;
+			info.sampler = vk_find_sampler( &sd );
+			info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
 			for ( i = 0; i < ARRAY_LEN( vk.bloom_image_descriptor ); i++ )
 			{
 				info.imageView = vk.bloom_image_view[i];
@@ -3848,18 +3891,19 @@ static void vk_create_attachments( void )
 		if ( r_bloom->integer ) {
 			uint32_t width = gls.captureWidth;
 			uint32_t height = gls.captureHeight;
+			VkImageUsageFlags bloomUsage = usage | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
 			create_color_attachment( width, height, VK_SAMPLE_COUNT_1_BIT, vk.bloom_format,
-				usage, &vk.bloom_image[0], &vk.bloom_image_view[0], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
+				bloomUsage, &vk.bloom_image[0], &vk.bloom_image_view[0], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 
 			for ( i = 1; i < ARRAY_LEN( vk.bloom_image ); i += 2 ) {
 				width /= 2;
 				height /= 2;
 				create_color_attachment( width, height, VK_SAMPLE_COUNT_1_BIT, vk.bloom_format,
-					usage, &vk.bloom_image[i+0], &vk.bloom_image_view[i+0], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
+					bloomUsage, &vk.bloom_image[i+0], &vk.bloom_image_view[i+0], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 
 				create_color_attachment( width, height, VK_SAMPLE_COUNT_1_BIT, vk.bloom_format,
-					usage, &vk.bloom_image[i+1], &vk.bloom_image_view[i+1], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
+					bloomUsage, &vk.bloom_image[i+1], &vk.bloom_image_view[i+1], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 			}
 		}
 
@@ -6403,10 +6447,13 @@ void vk_create_blur_pipeline( uint32_t index, uint32_t width, uint32_t height, q
 	set_shader_stage_desc( shader_stages+1, VK_SHADER_STAGE_FRAGMENT_BIT, vk.modules.blur_fs, "main" );
 
 	// 9-tap Gaussian via 5 bilinear taps: inner pair at +/-1.333, outer pair at +/-3.111
+	// Horizontal passes downsample to half resolution, so offsets must be based on
+	// source texel size (2x destination) to avoid over-spaced sampling artifacts.
 	if ( horizontal_pass ) {
-		frag_spec_data[0] = 1.33333f / (float)width; // inner offset x
+		const float src_width = (float)width * 2.0f;
+		frag_spec_data[0] = 1.33333f / src_width;     // inner offset x (source texel size)
 		frag_spec_data[1] = 0.0f;                    // inner offset y
-		frag_spec_data[2] = 3.11111f / (float)width; // outer offset x
+		frag_spec_data[2] = 3.11111f / src_width;     // outer offset x (source texel size)
 		frag_spec_data[3] = 0.0f;                    // outer offset y
 	} else {
 		frag_spec_data[0] = 0.0f;                     // inner offset x
@@ -9374,6 +9421,8 @@ void vk_read_pixels( byte *buffer, uint32_t width, uint32_t height )
 qboolean vk_bloom( void )
 {
 	uint32_t i;
+	const qboolean canBlitDownsample = vk_format_has_features( vk.physical_device, vk.bloom_format,
+		VK_FORMAT_FEATURE_BLIT_SRC_BIT | VK_FORMAT_FEATURE_BLIT_DST_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT );
 
 	if ( vk.renderPassIndex == RENDER_PASS_SCREENMAP )
 	{
@@ -9394,35 +9443,73 @@ qboolean vk_bloom( void )
 	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 	vk_end_render_pass();
 
-	for ( i = 0; i < VK_NUM_BLOOM_PASSES*2; i+=2 ) {
-		// horizontal blur
-		vk_begin_blur_render_pass( i+0 );
-		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.blur_pipeline[i+0] );
-		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.bloom_image_descriptor[i+0], 0, NULL );
-		qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
-		vk_end_render_pass();
+	if ( canBlitDownsample ) {
+		// Split pipeline: downsample first, then blur at same resolution.
+		for ( i = 0; i < VK_NUM_BLOOM_PASSES * 2; i += 2 ) {
+			VkImageBlit region;
+			const uint32_t level = i / 2;
+			const uint32_t srcIndex = ( i == 0 ) ? 0 : i;
+			const uint32_t dstIndex = i + 2;
+			const uint32_t srcWidth = MAX( 1u, gls.captureWidth / ( 1u << level ) );
+			const uint32_t srcHeight = MAX( 1u, gls.captureHeight / ( 1u << level ) );
+			const uint32_t dstWidth = MAX( 1u, srcWidth / 2u );
+			const uint32_t dstHeight = MAX( 1u, srcHeight / 2u );
+			VkCommandBuffer cmd = vk.cmd->command_buffer;
 
-		// vectical blur
-		vk_begin_blur_render_pass( i+1 );
-		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.blur_pipeline[i+1] );
-		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.bloom_image_descriptor[i+1], 0, NULL );
-		qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
-		vk_end_render_pass();
-#if 0
-		// horizontal blur
-		vk_begin_blur_render_pass( i+0 );
-		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.blur_pipeline[i+0] );
-		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.bloom_image_descriptor[i+2], 0, NULL );
-		qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
-		vk_end_render_pass();
+			record_image_layout_transition( cmd, vk.bloom_image[srcIndex], VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 0, 0 );
+			record_image_layout_transition( cmd, vk.bloom_image[dstIndex], VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0 );
 
-		// vectical blur
-		vk_begin_blur_render_pass( i+1 );
-		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.blur_pipeline[i+1] );
-		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.bloom_image_descriptor[i+1], 0, NULL );
-		qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
-		vk_end_render_pass();
-#endif
+			Com_Memset( &region, 0, sizeof( region ) );
+			region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			region.srcSubresource.layerCount = 1;
+			region.srcOffsets[1].x = srcWidth;
+			region.srcOffsets[1].y = srcHeight;
+			region.srcOffsets[1].z = 1;
+			region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			region.dstSubresource.layerCount = 1;
+			region.dstOffsets[1].x = dstWidth;
+			region.dstOffsets[1].y = dstHeight;
+			region.dstOffsets[1].z = 1;
+
+			qvkCmdBlitImage( cmd, vk.bloom_image[srcIndex], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				vk.bloom_image[dstIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region, VK_FILTER_LINEAR );
+
+			record_image_layout_transition( cmd, vk.bloom_image[srcIndex], VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
+			record_image_layout_transition( cmd, vk.bloom_image[dstIndex], VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
+
+			// horizontal blur: downsampled source -> ping image
+			vk_begin_blur_render_pass( i + 0 );
+			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.blur_pipeline[i+0] );
+			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.bloom_image_descriptor[dstIndex], 0, NULL );
+			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+			vk_end_render_pass();
+
+			// vertical blur: ping image -> final image for this level
+			vk_begin_blur_render_pass( i + 1 );
+			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.blur_pipeline[i+1] );
+			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.bloom_image_descriptor[i+1], 0, NULL );
+			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+			vk_end_render_pass();
+		}
+	} else {
+		// Fallback to legacy downsample+blur in one pass if blit features are unavailable.
+		for ( i = 0; i < VK_NUM_BLOOM_PASSES * 2; i += 2 ) {
+			vk_begin_blur_render_pass( i + 0 );
+			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.blur_pipeline[i+0] );
+			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.bloom_image_descriptor[i+0], 0, NULL );
+			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+			vk_end_render_pass();
+
+			vk_begin_blur_render_pass( i + 1 );
+			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.blur_pipeline[i+1] );
+			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.bloom_image_descriptor[i+1], 0, NULL );
+			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+			vk_end_render_pass();
+		}
 	}
 
 	vk_begin_post_bloom_render_pass(); // begin post-bloom

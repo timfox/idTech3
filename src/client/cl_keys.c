@@ -20,6 +20,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 #include "client.h"
+#ifdef USE_DUKTAPE
+#include "../qcommon/js_debug.h"
+#endif
 
 /*
 
@@ -662,6 +665,7 @@ static void CL_KeyDownEvent( int key, unsigned time )
 		if ( !( Key_GetCatcher( ) & KEYCATCH_UI ) ) {
 			if ( cls.state == CA_ACTIVE && !clc.demoplaying ) {
 				VM_Call( uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_INGAME );
+				CL_JsNotifyMenuChanged( UIMENU_INGAME );
 			}
 			else if ( cls.state != CA_DISCONNECTED ) {
 #if 0
@@ -677,6 +681,7 @@ static void CL_KeyDownEvent( int key, unsigned time )
 				}
 #endif
 				VM_Call( uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_MAIN );
+				CL_JsNotifyMenuChanged( UIMENU_MAIN );
 			}
 			return;
 		}
@@ -769,6 +774,10 @@ Called by the system for both key up and key down events
 */
 void CL_KeyEvent( int key, qboolean down, unsigned time )
 {
+#ifdef USE_DUKTAPE
+	JsDebug_EmitEvent( "input_key", Key_KeynumToString( key ), NULL, key, down ? 1 : 0 );
+#endif
+
 	if ( down )
 		CL_KeyDownEvent( key, time );
 	else
@@ -852,9 +861,25 @@ Key_SetCatcher
 */
 void Key_SetCatcher( int catcher )
 {
+#ifdef USE_DUKTAPE
+	const int oldCatchers = keyCatchers;
+#endif
+
 	// If the catcher state is changing, clear all key states
 	if ( catcher != keyCatchers )
 		Key_ClearStates();
 
 	keyCatchers = catcher;
+
+#ifdef USE_DUKTAPE
+	if ( !( oldCatchers & KEYCATCH_UI ) && ( catcher & KEYCATCH_UI ) ) {
+		JsDebug_EmitEvent( "ui_open", NULL, NULL, catcher, 0 );
+	}
+	if ( ( oldCatchers & KEYCATCH_UI ) && !( catcher & KEYCATCH_UI ) ) {
+		JsDebug_EmitEvent( "ui_close", NULL, NULL, catcher, 0 );
+	}
+	if ( !( oldCatchers & KEYCATCH_CONSOLE ) && ( catcher & KEYCATCH_CONSOLE ) ) {
+		JsDebug_EmitEvent( "console_open", NULL, NULL, catcher, 0 );
+	}
+#endif
 }

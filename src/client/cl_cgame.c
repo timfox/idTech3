@@ -22,6 +22,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cl_cgame.c  -- client system interaction with client game
 
 #include "client.h"
+#ifdef USE_DUKTAPE
+#include "../qcommon/js_debug.h"
+#endif
 
 #include "../botlib/botlib.h"
 
@@ -847,6 +850,9 @@ void CL_InitCGame( void ) {
 	info = cl.gameState.stringData + cl.gameState.stringOffsets[ CS_SERVERINFO ];
 	mapname = Info_ValueForKey( info, "mapname" );
 	Com_sprintf( cl.mapname, sizeof( cl.mapname ), "maps/%s.bsp", mapname );
+#ifdef USE_DUKTAPE
+	JsDebug_EmitEvent( "map_load", mapname, NULL, 0, 0 );
+#endif
 
 	// allow vertex lighting for in-game elements
 	re.VertexLighting( qtrue );
