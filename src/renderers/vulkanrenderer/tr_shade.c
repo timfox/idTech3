@@ -1442,10 +1442,22 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 
 			if ( pStage->vk_pbr_flags & PBR_HAS_PHYSICALMAP || pStage->vk_pbr_flags & PBR_HAS_SPECULARMAP )
 				vk_update_descriptor_if_changed( VK_DESC_PBR_PHYSICAL, pStage->physicalMap->descriptor );
-			
-			// Commented out descriptor updates for removed PBR features
-			// if ( pStage->vk_pbr_flags & PBR_HAS_EMISSIVE )
-			// 	vk_update_descriptor_if_changed( VK_DESC_PBR_EMISSIVE, pStage->emissiveMap->descriptor );
+
+			{
+				// Always bind a deterministic descriptor for emissive to avoid stale bindings.
+				const VkDescriptorSet fallback = ( tr.blackImage && tr.blackImage->descriptor ) ?
+					tr.blackImage->descriptor :
+					( tr.whiteImage && tr.whiteImage->descriptor ) ? tr.whiteImage->descriptor : VK_NULL_HANDLE;
+				VkDescriptorSet emissiveDesc = fallback;
+
+				if ( ( pStage->vk_pbr_flags & PBR_HAS_EMISSIVE ) && pStage->emissiveMap && pStage->emissiveMap->descriptor ) {
+					emissiveDesc = pStage->emissiveMap->descriptor;
+				}
+
+				if ( emissiveDesc ) {
+					vk_update_descriptor_if_changed( VK_DESC_PBR_EMISSIVE, emissiveDesc );
+				}
+			}
 
 			// if ( pStage->vk_pbr_flags & PBR_HAS_CLEARCOAT )
 			// 	vk_update_descriptor_if_changed( VK_DESC_PBR_CLEARCOAT, pStage->clearcoatMap->descriptor );
