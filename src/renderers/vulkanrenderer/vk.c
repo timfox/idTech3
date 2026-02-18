@@ -6337,8 +6337,10 @@ VkSpecializationMapEntry spec_entries[17];
 	frag_spec_data.exposure = r_exposure->value;
 	frag_spec_data.bloom_knee = r_bloomKnee->value;
 	frag_spec_data.tonemap_mode = r_tonemap->integer;
-	cvar_t *applyGammaCvar = ri.Cvar_Get( "r_applySrgbGamma", "0", CVAR_ARCHIVE_ND );
-	frag_spec_data.apply_srgb_gamma = applyGammaCvar->integer;
+	qboolean swap_is_srgb =
+		( vk.present_format.format == VK_FORMAT_B8G8R8A8_SRGB ) ||
+		( vk.present_format.format == VK_FORMAT_R8G8B8A8_SRGB );
+	frag_spec_data.apply_srgb_gamma = swap_is_srgb ? 0 : 1;
 	frag_spec_data.post_debug = r_post_debug->integer;
 	frag_spec_data.postprocess_enabled = ( r_post && r_post->integer && vk.fboActive && r_fbo->integer ) ? 1 : 0;
 
@@ -9307,7 +9309,7 @@ void vk_end_frame( void )
 
 			VkPostProcessPushConstants panini_push;
 			panini_push.aspect = vk.renderHeight > 0 ? ( (float)vk.renderWidth / (float)vk.renderHeight ) : 1.0f;
-			panini_push.paniniD = r_paniniD ? r_paniniD->value : 0.0f;
+			panini_push.paniniD = ( r_panini && r_panini->integer == 0 ) ? 0.0f : ( r_paniniD ? r_paniniD->value : 0.0f );
 			panini_push.paniniS = r_paniniS ? r_paniniS->value : 0.0f;
 			panini_push.padding = 0.0f;
 
