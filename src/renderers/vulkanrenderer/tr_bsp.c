@@ -22,6 +22,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_map.c
 
 #include "tr_local.h"
+
+static const vec3_t vk_vec3_origin = { 0.0f, 0.0f, 0.0f };
 #ifdef USE_VULKAN
 #include "vk.h"
 
@@ -2281,7 +2283,7 @@ static void R_LoadFogs( const lump_t *l, const lump_t *brushesLump, const lump_t
 			} else {
 				out->hasSurface = qtrue;
 				planeNum = LittleLong( sides[ sideOffset ].planeNum );
-				VectorSubtract( vec3_origin, s_worldData.planes[ planeNum ].normal, out->surface );
+				VectorSubtract( vk_vec3_origin, s_worldData.planes[ planeNum ].normal, out->surface );
 				out->surface[3] = -s_worldData.planes[ planeNum ].dist;
 			}
 		}

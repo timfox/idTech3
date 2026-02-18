@@ -25,6 +25,19 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include <string.h> // memcpy
 
+static void VkPlaneFromPoints( vec4_t plane, const vec3_t p1, const vec3_t p2, const vec3_t p3 ) {
+	vec3_t v1, v2, normal;
+
+	VectorSubtract( p2, p1, v1 );
+	VectorSubtract( p3, p1, v2 );
+	CrossProduct( v1, v2, normal );
+	VectorNormalize( normal );
+	VectorCopy( normal, plane );
+	plane[3] = DotProduct( p1, normal );
+}
+
+static const vec3_t vk_vec3_origin = { 0.0f, 0.0f, 0.0f };
+
 trGlobals_t		tr;
 
 static const float s_flipMatrix[16] = {
@@ -767,13 +780,13 @@ static void R_PlaneForSurface( const surfaceType_t *surfType, cplane_t *plane ) 
 		v1 = tri->verts + tri->indexes[0];
 		v2 = tri->verts + tri->indexes[1];
 		v3 = tri->verts + tri->indexes[2];
-		PlaneFromPoints( plane4, v1->xyz, v2->xyz, v3->xyz );
+		VkPlaneFromPoints( plane4, v1->xyz, v2->xyz, v3->xyz );
 		VectorCopy( plane4, plane->normal ); 
 		plane->dist = plane4[3];
 		return;
 	case SF_POLY:
 		poly = (const srfPoly_t *)surfType;
-		PlaneFromPoints( plane4, poly->verts[0].xyz, poly->verts[1].xyz, poly->verts[2].xyz );
+		VkPlaneFromPoints( plane4, poly->verts[0].xyz, poly->verts[1].xyz, poly->verts[2].xyz );
 		VectorCopy( plane4, plane->normal ); 
 		plane->dist = plane4[3];
 		return;
@@ -853,7 +866,7 @@ static qboolean R_GetPortalOrientations( const drawSurf_t *drawSurf, int entityN
 			e->e.oldorigin[2] == e->e.origin[2] ) {
 			VectorScale( plane.normal, plane.dist, surface->origin );
 			VectorCopy( surface->origin, camera->origin );
-			VectorSubtract( vec3_origin, surface->axis[0], camera->axis[0] );
+			VectorSubtract( vk_vec3_origin, surface->axis[0], camera->axis[0] );
 			VectorCopy( surface->axis[1], camera->axis[1] );
 			VectorCopy( surface->axis[2], camera->axis[2] );
 
@@ -868,9 +881,11 @@ static qboolean R_GetPortalOrientations( const drawSurf_t *drawSurf, int entityN
 			
 		// now get the camera origin and orientation
 		VectorCopy( e->e.oldorigin, camera->origin );
-		AxisCopy( e->e.axis, camera->axis );
-		VectorSubtract( vec3_origin, camera->axis[0], camera->axis[0] );
-		VectorSubtract( vec3_origin, camera->axis[1], camera->axis[1] );
+			VectorCopy( e->e.axis[0], camera->axis[0] );
+			VectorCopy( e->e.axis[1], camera->axis[1] );
+			VectorCopy( e->e.axis[2], camera->axis[2] );
+		VectorSubtract( vk_vec3_origin, camera->axis[0], camera->axis[0] );
+		VectorSubtract( vk_vec3_origin, camera->axis[1], camera->axis[1] );
 
 		// optionally rotate
 		if ( e->e.oldframe ) {
@@ -1222,7 +1237,7 @@ static qboolean R_MirrorViewBySurface( const drawSurf_t *drawSurf, int entityNum
 
 	R_MirrorPoint( oldParms.or.origin, &surface, &camera, newParms.or.origin );
 
-	VectorSubtract( vec3_origin, camera.axis[0], newParms.portalPlane.normal );
+	VectorSubtract( vk_vec3_origin, camera.axis[0], newParms.portalPlane.normal );
 	newParms.portalPlane.dist = DotProduct( camera.origin, newParms.portalPlane.normal );
 
 	R_MirrorVector (oldParms.or.axis[0], &surface, &camera, newParms.or.axis[0]);

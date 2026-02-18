@@ -21,6 +21,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 // tr_sky.c
 #include "tr_local.h"
+#include <math.h>
+
+static const vec3_t vk_vec3_origin = { 0.0f, 0.0f, 0.0f };
 
 #define SKY_SUBDIVISIONS		8
 #define HALF_SKY_SUBDIVISIONS	(SKY_SUBDIVISIONS/2)
@@ -78,7 +81,7 @@ static void AddSkyPolygon (int nump, vec3_t vecs)
 	};
 
 	// decide which face it maps to
-	VectorCopy (vec3_origin, v);
+	VectorCopy (vk_vec3_origin, v);
 	for (i=0, vp=vecs ; i<nump ; i++, vp+=3)
 	{
 		VectorAdd (vp, v, v);
@@ -750,8 +753,8 @@ void R_InitSkyTexCoords( float heightCloud )
 				// compute vector from world origin to intersection point 'v'
 				VectorNormalize( v );
 
-				sRad = Q_acos( v[0] );
-				tRad = Q_acos( v[1] );
+				sRad = acosf( v[0] );
+				tRad = acosf( v[1] );
 
 				s_cloudTexCoords[i][t][s][0] = sRad;
 				s_cloudTexCoords[i][t][s][1] = tRad;
