@@ -545,13 +545,11 @@ typedef struct {
 	VkDescriptorSetLayout set_layout_sampler;	// combined image sampler
 	VkDescriptorSetLayout set_layout_uniform;	// dynamic uniform buffer
 	VkDescriptorSetLayout set_layout_storage;	// feedback buffer
-	VkDescriptorSetLayout set_layout_gamma;	// gamma postprocess samplers
 
 	VkPipelineLayout pipeline_layout;			// default shaders
 	VkPipelineLayout pipeline_layout_storage;	// flare test shader layout
 	VkPipelineLayout pipeline_layout_post_process;	// post-processing
 	VkPipelineLayout pipeline_layout_blend;		// post-processing
-	VkPipelineLayout pipeline_layout_gamma;		// gamma tonemap
 	VkPipelineLayout pipeline_layout_ssao;		// ssao (depth + push constants)
 	VkPipelineLayout pipeline_layout_ssao_combine;	// ssao combine (color + ao)
 #ifdef VK_PBR_BRDFLUT
@@ -560,8 +558,6 @@ typedef struct {
 
 	VkDescriptorSet color_descriptor;
 	VkDescriptorSet depth_descriptor;
-	VkDescriptorSet gamma_descriptor;
-	VkSampler postSampler;
 
 	VkImage color_image;
 	VkImageView color_image_view;
