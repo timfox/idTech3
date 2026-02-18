@@ -1940,6 +1940,16 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_tonemap, "0", "2", CV_INTEGER );
 	ri.Cvar_SetDescription( r_tonemap, "Tonemapping mode: 0=off, 1=ACES, 2=Reinhard (not yet implemented)." );
 	{
+		cvar_t *r_specularAA = ri.Cvar_Get( "r_specularAA", "1", CVAR_ARCHIVE_ND );
+		ri.Cvar_CheckRange( r_specularAA, "0", "2", CV_INTEGER );
+		ri.Cvar_SetDescription( r_specularAA, "Specular anti-aliasing mode: 0=off, 1=Toksvig variance, 2=LEAN placeholder." );
+	}
+	{
+		cvar_t *r_specularAAStrength = ri.Cvar_Get( "r_specularAAStrength", "0.5", CVAR_ARCHIVE_ND );
+		ri.Cvar_CheckRange( r_specularAAStrength, "0.0", "4.0", CV_FLOAT );
+		ri.Cvar_SetDescription( r_specularAAStrength, "Controls strength of the specular AA variance boost." );
+	}
+	{
 		cvar_t *rlocal_cvar = ri.Cvar_Get( "r_applySrgbGamma", "1", CVAR_ARCHIVE_ND );
 		ri.Cvar_CheckRange( rlocal_cvar, "0", "1", CV_INTEGER );
 		ri.Cvar_SetDescription( rlocal_cvar, "Apply sRGB gamma to the final post-processed image." );
