@@ -1352,8 +1352,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			Vector4Set( block.advancedParams,
 				( r_pbr_multiScatter && r_pbr_multiScatter->integer ) ? 1.0f : 0.0f,
 				( r_pbr_multiScatterStrength ? r_pbr_multiScatterStrength->value : 1.0f ),
-				( r_ltc && r_ltc->integer ) ? 1.0f : 0.0f,
-				( r_ltc_quality ? (float)r_ltc_quality->integer : 1.0f ) );
+				0.0f, 0.0f );
 
 			{
 				const VkDescriptorSet fallback2D = ( tr.whiteImage ) ? tr.whiteImage->descriptor : VK_NULL_HANDLE;
@@ -1427,14 +1426,6 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				if ( irradianceDescriptor ) {
 					vk_update_descriptor_if_changed( VK_DESC_PBR_IRRADIANCE, irradianceDescriptor );
 				}
-				if ( r_ltc && r_ltc->integer ) {
-					if ( tr.ltcMatImage ) {
-						vk_update_descriptor_if_changed( VK_DESC_PBR_LTC_MAT, tr.ltcMatImage->descriptor );
-					}
-					if ( tr.ltcAmpImage ) {
-						vk_update_descriptor_if_changed( VK_DESC_PBR_LTC_AMP, tr.ltcAmpImage->descriptor );
-					}
-				}
 			}
 				
 			if ( pStage->vk_pbr_flags & PBR_HAS_NORMALMAP )
@@ -1442,87 +1433,10 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 
 			if ( pStage->vk_pbr_flags & PBR_HAS_PHYSICALMAP || pStage->vk_pbr_flags & PBR_HAS_SPECULARMAP )
 				vk_update_descriptor_if_changed( VK_DESC_PBR_PHYSICAL, pStage->physicalMap->descriptor );
-
-			{
-				// Always bind a deterministic descriptor for emissive to avoid stale bindings.
-				const VkDescriptorSet fallback = ( tr.blackImage && tr.blackImage->descriptor ) ?
-					tr.blackImage->descriptor :
-					( tr.whiteImage && tr.whiteImage->descriptor ) ? tr.whiteImage->descriptor : VK_NULL_HANDLE;
-				VkDescriptorSet emissiveDesc = fallback;
-
-				if ( ( pStage->vk_pbr_flags & PBR_HAS_EMISSIVE ) && pStage->emissiveMap && pStage->emissiveMap->descriptor ) {
-					emissiveDesc = pStage->emissiveMap->descriptor;
-				}
-
-				if ( emissiveDesc ) {
-					vk_update_descriptor_if_changed( VK_DESC_PBR_EMISSIVE, emissiveDesc );
-				}
-			}
-
-			/*{
-				const VkDescriptorSet fallback = ( tr.whiteImage && tr.whiteImage->descriptor ) ? tr.whiteImage->descriptor : VK_NULL_HANDLE;
-				VkDescriptorSet clearcoatDesc = fallback;
-
-				if ( ( pStage->vk_pbr_flags & PBR_HAS_CLEARCOAT ) && pStage->clearcoatMap && pStage->clearcoatMap->descriptor ) {
-					clearcoatDesc = pStage->clearcoatMap->descriptor;
-				}
-
-				if ( clearcoatDesc ) {
-					vk_update_descriptor_if_changed( VK_DESC_PBR_CLEARCOAT, clearcoatDesc );
-				}
-			}
-
-			{
-				const VkDescriptorSet fallback = ( tr.whiteImage && tr.whiteImage->descriptor ) ? tr.whiteImage->descriptor : VK_NULL_HANDLE;
-				VkDescriptorSet sheenDesc = fallback;
-
-				if ( ( pStage->vk_pbr_flags & PBR_HAS_SHEEN ) && pStage->sheenMap && pStage->sheenMap->descriptor ) {
-					sheenDesc = pStage->sheenMap->descriptor;
-				}
-
-				if ( sheenDesc ) {
-					vk_update_descriptor_if_changed( VK_DESC_PBR_SHEEN, sheenDesc );
-				}
-			}
-
-			{
-				const VkDescriptorSet fallback = ( tr.whiteImage && tr.whiteImage->descriptor ) ? tr.whiteImage->descriptor : VK_NULL_HANDLE;
-				VkDescriptorSet anisotropyDesc = fallback;
-
-				if ( ( pStage->vk_pbr_flags & PBR_HAS_ANISOTROPY ) && pStage->anisotropyMap && pStage->anisotropyMap->descriptor ) {
-					anisotropyDesc = pStage->anisotropyMap->descriptor;
-				}
-
-				if ( anisotropyDesc ) {
-					vk_update_descriptor_if_changed( VK_DESC_PBR_ANISOTROPY, anisotropyDesc );
-				}
-			}
-
-			{
-				const VkDescriptorSet fallback = ( tr.whiteImage && tr.whiteImage->descriptor ) ? tr.whiteImage->descriptor : VK_NULL_HANDLE;
-				VkDescriptorSet transmissionDesc = fallback;
-
-				if ( ( pStage->vk_pbr_flags & PBR_HAS_TRANSMISSION ) && pStage->transmissionMap && pStage->transmissionMap->descriptor ) {
-					transmissionDesc = pStage->transmissionMap->descriptor;
-				}
-
-				if ( transmissionDesc ) {
-					vk_update_descriptor_if_changed( VK_DESC_PBR_TRANSMISSION, transmissionDesc );
-				}
-			}
-
-			{
-				const VkDescriptorSet fallback = ( tr.whiteImage && tr.whiteImage->descriptor ) ? tr.whiteImage->descriptor : VK_NULL_HANDLE;
-				VkDescriptorSet subsurfaceDesc = fallback;
-
-				if ( ( pStage->vk_pbr_flags & PBR_HAS_SUBSURFACE ) && pStage->subsurfaceMap && pStage->subsurfaceMap->descriptor ) {
-					subsurfaceDesc = pStage->subsurfaceMap->descriptor;
-				}
-
-				if ( subsurfaceDesc ) {
-					vk_update_descriptor_if_changed( VK_DESC_PBR_SUBSURFACE, subsurfaceDesc );
-				}
-			}*/
+			
+			// Commented out descriptor updates for removed PBR features
+			// if ( pStage->vk_pbr_flags & PBR_HAS_EMISSIVE )
+			// 	vk_update_descriptor_if_changed( VK_DESC_PBR_EMISSIVE, pStage->emissiveMap->descriptor );
 
 			// if ( pStage->vk_pbr_flags & PBR_HAS_CLEARCOAT )
 			// 	vk_update_descriptor_if_changed( VK_DESC_PBR_CLEARCOAT, pStage->clearcoatMap->descriptor );
@@ -1676,65 +1590,6 @@ void VK_SetFogParams( vkUniform_t *ubo, int *fogStage )
 }
 
 
-static void VK_SetLtcPolygon( vkUniform_t *ubo, const dlight_t *dl )
-{
-	if ( !r_ltc || !r_ltc->integer || !dl )
-	{
-		for ( int i = 0; i < 4; ++i )
-		{
-			VectorClear( ubo->ltcPolygonPoints[i] );
-			ubo->ltcPolygonPoints[i][3] = 0.0f;
-		}
-		VectorClear( ubo->ltcPolygonNormal );
-		return;
-	}
-
-	vec3_t normal;
-	VectorCopy( dl->dir, normal );
-	if ( VectorNormalize( normal ) == 0.0f )
-		VectorSet( normal, 0.0f, 0.0f, 1.0f );
-
-	vec3_t tangent;
-	vec3_t bitangent;
-	vec3_t center;
-	float size = dl->radius;
-
-	VectorCopy( dl->origin, center );
-	if ( size <= 0.0f )
-		size = 1.0f;
-
-	VectorSet( tangent, 1.0f, 0.0f, 0.0f );
-	if ( fabs( normal[2] ) > 0.999f )
-		VectorSet( tangent, 0.0f, 1.0f, 0.0f );
-
-	CrossProduct( tangent, normal, bitangent );
-	if ( VectorNormalize( bitangent ) == 0.0f )
-		VectorSet( bitangent, 0.0f, 0.0f, 1.0f );
-
-	CrossProduct( normal, bitangent, tangent );
-	VectorNormalize( tangent );
-
-	vec2_t offsets[4] = {
-		{  size,  size },
-		{  size, -size },
-		{ -size, -size },
-		{ -size,  size }
-	};
-
-	for ( int i = 0; i < 4; ++i )
-	{
-		vec3_t pt;
-		VectorCopy( center, pt );
-		VectorMA( pt, offsets[i][0], tangent, pt );
-		VectorMA( pt, offsets[i][1], bitangent, pt );
-		VectorCopy( pt, ubo->ltcPolygonPoints[i] );
-		ubo->ltcPolygonPoints[i][3] = 1.0f;
-	}
-
-	VectorSet( ubo->ltcPolygonNormal, normal[0], normal[1], normal[2] );
-	ubo->ltcPolygonNormal[3] = 4.0f;
-}
-
 #ifdef USE_PMLIGHT
 static void VK_SetLightParams( vkUniform_t *ubo, const dlight_t *dl ) {
 	float radius;
@@ -1764,7 +1619,6 @@ static void VK_SetLightParams( vkUniform_t *ubo, const dlight_t *dl ) {
 		ab[3] = 1.0f / DotProduct( ab, ab );
 		Vector4Copy( ab, ubo->light.vector );
 	}
-	VK_SetLtcPolygon( ubo, dl );
 }
 #endif
 

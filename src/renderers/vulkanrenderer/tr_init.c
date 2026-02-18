@@ -90,8 +90,6 @@ cvar_t	*r_pbr_debug;
 cvar_t	*r_pbr_packedPreferred;
 cvar_t	*r_pbr_multiScatter;
 cvar_t	*r_pbr_multiScatterStrength;
-cvar_t	*r_ltc;
-cvar_t	*r_ltc_quality;
 #ifdef VK_CUBEMAP
 cvar_t	*r_pbr_iblIrradianceSize;
 cvar_t	*r_pbr_iblPrefilterSize;
@@ -117,15 +115,6 @@ cvar_t	*r_bloom_threshold;
 cvar_t	*r_bloom_intensity;
 cvar_t	*r_bloom_threshold_mode;
 cvar_t	*r_bloom_modulate;
-cvar_t	*r_bloomKnee;
-cvar_t	*r_post;
-cvar_t	*r_post_debug;
-cvar_t	*r_vk_clearhdr;
-cvar_t	*r_vk_disableblend;
-cvar_t	*r_vk_bindlog;
-cvar_t	*r_vk_swapchain_srgb;
-cvar_t	*r_exposure;
-cvar_t	*r_tonemap;
 cvar_t	*r_ssao;
 cvar_t	*r_ssaoRadius;
 cvar_t	*r_ssaoBias;
@@ -194,9 +183,6 @@ cvar_t	*r_mipLodBias;
 cvar_t	*r_offsetFactor;
 cvar_t	*r_offsetUnits;
 cvar_t	*r_gamma;
-cvar_t	*r_panini;
-cvar_t	*r_paniniD;
-cvar_t	*r_paniniS;
 cvar_t	*r_intensity;
 cvar_t	*r_lockpvs;
 cvar_t	*r_noportals;
@@ -1383,8 +1369,7 @@ static void GfxInfo( void )
 	ri.Printf( PRINT_DEVELOPER, "VK_EXTENSIONS: " );
 	R_PrintLongString( glConfig.extensions_string );
 
-	ri.Printf( PRINT_ALL, "\nVK_MAX_IMAGE_DIMENSION_2D: %u\n", (unsigned)vk.hwMaxImageDimension2D );
-	ri.Printf( PRINT_ALL, "VK_MAX_TEXTURE_SIZE (engine clamp): %d\n", glConfig.maxTextureSize );
+	ri.Printf( PRINT_ALL, "\nVK_MAX_TEXTURE_SIZE: %d\n", glConfig.maxTextureSize );
 	ri.Printf( PRINT_ALL, "VK_MAX_TEXTURE_UNITS: %d\n", glConfig.numTextureUnits );
 #else
 	const char *enablestrings[] = { "disabled", "enabled" };
@@ -1478,9 +1463,6 @@ static void VarInfo( void )
 	}
 #if defined (USE_VK_PBR)
 	ri.Printf( PRINT_ALL, "PBR SH extraction: %s\n", (r_pbr_shExtract && r_pbr_shExtract->integer) ? "enabled" : "disabled" );
-	ri.Printf( PRINT_ALL, "LTC area lights: %s (quality %d)\n",
-		(r_ltc && r_ltc->integer) ? "enabled" : "disabled",
-		(r_ltc_quality ? r_ltc_quality->integer : 1) );
 	if ( r_pbr_debug && r_pbr_debug->integer ) {
 		ri.Printf( PRINT_ALL, "PBR debug view: mode %d\n", r_pbr_debug->integer );
 	}
@@ -1567,8 +1549,8 @@ static void R_Register( void )
 	//
 	r_fullbright = ri.Cvar_Get( "r_fullbright", "0", CVAR_LATCH );
 	ri.Cvar_SetDescription( r_fullbright, "Debugging tool to render the entire level without lighting." );
-	r_overBrightBits = ri.Cvar_Get( "r_overBrightBits", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
-	ri.Cvar_SetDescription( r_overBrightBits, "Sets legacy LDR overbright bits (ignored when HDR tonemap is active)." );
+	r_overBrightBits = ri.Cvar_Get( "r_overBrightBits", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_overBrightBits, "Sets the intensity of overall brightness of texture pixels." );
 	r_mapOverBrightBits = ri.Cvar_Get( "r_mapOverBrightBits", "2", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_mapOverBrightBits, "Sets the number of overbright bits baked into all lightmaps and map data." );
 	r_intensity = ri.Cvar_Get( "r_intensity", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
@@ -1646,14 +1628,6 @@ static void R_Register( void )
 	r_pbr_multiScatterStrength = ri.Cvar_Get( "r_pbr_multiScatterStrength", "1.0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_pbr_multiScatterStrength, "0.0", "2.0", CV_FLOAT );
 	ri.Cvar_SetDescription( r_pbr_multiScatterStrength, "Scales specular IBL multiple-scattering compensation intensity." );
-
-	r_ltc = ri.Cvar_Get( "r_ltc", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_ltc, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_ltc, "Enable LTC area-light path (incremental rollout)." );
-
-	r_ltc_quality = ri.Cvar_Get( "r_ltc_quality", "1", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_ltc_quality, "0", "2", CV_INTEGER );
-	ri.Cvar_SetDescription( r_ltc_quality, "LTC quality preset:\n 0 - low\n 1 - medium\n 2 - high" );
 
 	r_baseNormalX	= ri.Cvar_Get("r_baseNormalX",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );
 	r_baseNormalY	= ri.Cvar_Get("r_baseNormalY",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );
@@ -1757,21 +1731,6 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_gamma, "0.5", "3", CV_FLOAT );
 	ri.Cvar_SetDescription( r_gamma, "Gamma correction factor." );
 	ri.Cvar_SetGroup( r_gamma, CVG_RENDERER );
-
-	r_panini = ri.Cvar_Get( "r_panini", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_panini, "0", "1", CV_FLOAT );
-	ri.Cvar_SetDescription( r_panini, "Enable Panini projection warp." );
-	ri.Cvar_SetGroup( r_panini, CVG_RENDERER );
-
-	r_paniniD = ri.Cvar_Get( "r_paniniD", "0.0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_paniniD, "0.0", "2.0", CV_FLOAT );
-	ri.Cvar_SetDescription( r_paniniD, "Panini projection strength (0 disables)." );
-	ri.Cvar_SetGroup( r_paniniD, CVG_RENDERER );
-
-	r_paniniS = ri.Cvar_Get( "r_paniniS", "0.0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_paniniS, "0.0", "1.0", CV_FLOAT );
-	ri.Cvar_SetDescription( r_paniniS, "Panini projection squeeze factor." );
-	ri.Cvar_SetGroup( r_paniniS, CVG_RENDERER );
 	r_facePlaneCull = ri.Cvar_Get ("r_facePlaneCull", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_facePlaneCull, "Enables culling of planar surfaces with back side test." );
 
@@ -1954,47 +1913,6 @@ static void R_Register( void )
 	r_bloom = ri.Cvar_Get( "r_bloom", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_bloom, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription(r_bloom, "Enables bloom post-processing effect. Requires \\r_fbo 1.");
-	r_bloomKnee = ri.Cvar_Get( "r_bloomKnee", "0.5", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_bloomKnee, "0.0", "4.0", CV_FLOAT );
-	ri.Cvar_SetDescription( r_bloomKnee, "Soft knee for the bloom extractor to control highlight rolloff." );
-	r_exposure = ri.Cvar_Get( "r_exposure", "1.0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_exposure, "0.01", "10.0", CV_FLOAT );
-	ri.Cvar_SetDescription( r_exposure, "Linear exposure multiplier applied before tonemapping." );
-	r_tonemap = ri.Cvar_Get( "r_tonemap", "1", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_tonemap, "0", "2", CV_INTEGER );
-	ri.Cvar_SetDescription( r_tonemap, "Tonemapping mode for the post-process pass: 0=passthrough, 1=Reinhard, 2=ACES." );
-	r_post = ri.Cvar_Get( "r_post", "1", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_post, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_post, "Toggle the HDR post-processing pipeline (1=tonemap + gamma pass, 0=pass-through)." );
-	r_post_debug = ri.Cvar_Get( "r_post_debug", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_post_debug, "0", "2", CV_INTEGER );
-	ri.Cvar_SetDescription( r_post_debug, "Debug view for the post-process pass: 0=final, 1=pre-tonemap HDR, 2=luminance heatmap." );
-	r_vk_clearhdr = ri.Cvar_Get( "r_vk_clearhdr", "1", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_vk_clearhdr, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_vk_clearhdr, "Clear the Vulkan HDR target at the beginning of each frame (1=clear, 0=preserve)." );
-	r_vk_disableblend = ri.Cvar_Get( "r_vk_disableblend", "1", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_vk_disableblend, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_vk_disableblend, "Force opaque Vulkan pipelines to disable color blending (1=disable, 0=use shader state)." );
-	r_vk_bindlog = ri.Cvar_Get( "r_vk_bindlog", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_vk_bindlog, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_vk_bindlog, "Log HDR clear state + post mode each frame when enabled (1=log per frame)." );
-	r_vk_swapchain_srgb = ri.Cvar_Get( "r_vk_swapchain_srgb", "0", CVAR_ROM );
-	ri.Cvar_SetDescription( r_vk_swapchain_srgb, "Read-only: 1 if the selected Vulkan swapchain format is sRGB." );
-	{
-		cvar_t *r_specularAA = ri.Cvar_Get( "r_specularAA", "1", CVAR_ARCHIVE_ND );
-		ri.Cvar_CheckRange( r_specularAA, "0", "2", CV_INTEGER );
-		ri.Cvar_SetDescription( r_specularAA, "Specular anti-aliasing mode: 0=off, 1=Toksvig variance, 2=LEAN placeholder." );
-	}
-	{
-		cvar_t *r_specularAAStrength = ri.Cvar_Get( "r_specularAAStrength", "0.5", CVAR_ARCHIVE_ND );
-		ri.Cvar_CheckRange( r_specularAAStrength, "0.0", "4.0", CV_FLOAT );
-		ri.Cvar_SetDescription( r_specularAAStrength, "Controls strength of the specular AA variance boost." );
-	}
-	{
-		cvar_t *rlocal_cvar = ri.Cvar_Get( "r_applySrgbGamma", "0", CVAR_ARCHIVE_ND );
-		ri.Cvar_CheckRange( rlocal_cvar, "0", "1", CV_INTEGER );
-		ri.Cvar_SetDescription( rlocal_cvar, "Apply sRGB gamma to the final post-processed image." );
-	}
 
 	r_ssao = ri.Cvar_Get( "r_ssao", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ssao, "0", "1", CV_INTEGER );

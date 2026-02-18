@@ -217,8 +217,7 @@ void RE_SetColor( const float *rgba ) {
 	}
 	cmd->commandId = RC_SET_COLOR;
 	if ( !rgba ) {
-		static const float colorWhiteVec[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-		rgba = colorWhiteVec;
+		rgba = colorWhite;
 	}
 
 	cmd->color[0] = rgba[0];

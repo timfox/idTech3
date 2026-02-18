@@ -36,13 +36,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 	#endif
 #endif
 
-#ifdef USE_VULKAN
-#ifndef vec3_origin
-static const vec3_t vk_vec3_origin = { 0, 0, 0 };
-#define vec3_origin vk_vec3_origin
-#endif
-#endif
-
 #define USE_VBO				// store static world geometry in VBO
 #define USE_FOG_ONLY
 #define USE_FOG_COLLAPSE	// not compatible with legacy dlights
@@ -55,7 +48,7 @@ static const vec3_t vk_vec3_origin = { 0, 0, 0 };
 #define MAX_LITSURFS		(MAX_DRAWSURFS)
 #define	MAX_FLARES			256
 
-#define MAX_TEXTURE_SIZE	32768
+#define MAX_TEXTURE_SIZE	2048 // must be less or equal to 32768
 
 #define USE_BUFFER_CLEAR	/* clear attachments on render pass begin */
 
@@ -1300,8 +1293,6 @@ typedef struct {
 	image_t					*identityLightImage;	// full of tr.identityLightByte
 #ifdef USE_VK_PBR
 	image_t					*emptyImage;		// full of 0xff
-	image_t					*ltcMatImage;
-	image_t					*ltcAmpImage;
 #endif
 #ifdef VK_CUBEMAP
 	image_t					*emptyCubemap;
@@ -1459,8 +1450,6 @@ extern cvar_t	*r_pbr_debug;
 extern cvar_t	*r_pbr_packedPreferred;
 extern cvar_t	*r_pbr_multiScatter;
 extern cvar_t	*r_pbr_multiScatterStrength;
-extern cvar_t	*r_ltc;
-extern cvar_t	*r_ltc_quality;
 #ifdef VK_CUBEMAP
 extern cvar_t	*r_pbr_iblIrradianceSize;
 extern cvar_t	*r_pbr_iblPrefilterSize;
@@ -1494,15 +1483,6 @@ extern cvar_t	*r_bloom_threshold;
 extern cvar_t	*r_bloom_intensity;
 extern cvar_t	*r_bloom_threshold_mode;
 extern cvar_t	*r_bloom_modulate;
-extern cvar_t	*r_bloomKnee;
-extern cvar_t	*r_exposure;
-extern cvar_t	*r_tonemap;
-extern cvar_t	*r_post;
-extern cvar_t	*r_post_debug;
-extern cvar_t	*r_vk_clearhdr;
-extern cvar_t	*r_vk_disableblend;
-extern cvar_t	*r_vk_bindlog;
-extern cvar_t	*r_vk_swapchain_srgb;
 extern cvar_t	*r_ext_multisample;
 extern cvar_t	*r_ext_supersample;
 //extern cvar_t	*r_ext_alpha_to_coverage;
@@ -1525,9 +1505,6 @@ extern	cvar_t	*r_nocurves;
 extern	cvar_t	*r_showcluster;
 
 extern cvar_t	*r_gamma;
-extern cvar_t	*r_panini;
-extern cvar_t	*r_paniniD;
-extern cvar_t	*r_paniniS;
 
 extern	cvar_t	*r_nobind;						// turns off binding to appropriate textures
 extern	cvar_t	*r_singleShader;				// make most world faces use default shader

@@ -21,9 +21,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 // tr_image.c
 #include "tr_local.h"
-#ifdef USE_VK_PBR
-#include "ltc_tables.h"
-#endif
 
 static byte			 s_intensitytable[256];
 static unsigned char s_gammatable[256];
@@ -299,17 +296,12 @@ static void ResampleTexture( unsigned *in, int inwidth, int inheight, unsigned *
 	int		i, j;
 	unsigned	*inrow, *inrow2;
 	unsigned	frac, fracstep;
-	unsigned	*p1;
-	unsigned	*p2;
+	unsigned	p1[MAX_TEXTURE_SIZE];
+	unsigned	p2[MAX_TEXTURE_SIZE];
 	byte		*pix1, *pix2, *pix3, *pix4;
 
-	if ( outwidth <= 0 || outheight <= 0 )
-		ri.Error( ERR_DROP, "ResampleTexture: bad size" );
-
-	p1 = ri.Malloc( (size_t)outwidth * sizeof( *p1 ) );
-	p2 = ri.Malloc( (size_t)outwidth * sizeof( *p2 ) );
-	if ( !p1 || !p2 )
-		ri.Error( ERR_DROP, "ResampleTexture: out of memory" );
+	if ( outwidth > (int)ARRAY_LEN( p1 ) )
+		ri.Error( ERR_DROP, "ResampleTexture: max width" );
 								
 	fracstep = inwidth * 0x10000 / outwidth;
 
@@ -338,9 +330,6 @@ static void ResampleTexture( unsigned *in, int inwidth, int inheight, unsigned *
 			((byte *)(out+j))[3] = (pix1[3] + pix2[3] + pix3[3] + pix4[3])>>2;
 		}
 	}
-
-	ri.Free( p1 );
-	ri.Free( p2 );
 }
 
 
@@ -611,23 +600,6 @@ static void generate_image_upload_data( image_t *image, byte *data, Image_Upload
 	int miplevel;
 
 	Com_Memset( upload_data, 0, sizeof( *upload_data ) );
-
-	// Preformatted HDR LUT uploads (e.g. LTC) bypass 8-bit resample/mipmap processing.
-	// Data is expected as tightly packed RGBA16F texels.
-	if ( image->internalFormat == VK_FORMAT_R16G16B16A16_SFLOAT ) {
-		const int raw_size = image->width * image->height * 4 * (int)sizeof( uint16_t );
-		upload_data->base_level_width = image->width;
-		upload_data->base_level_height = image->height;
-		upload_data->mip_levels = 1;
-		upload_data->buffer_size = raw_size;
-		upload_data->buffer = (byte*) ri.Hunk_AllocateTempMemory( raw_size );
-		if ( data ) {
-			Com_Memcpy( upload_data->buffer, data, raw_size );
-		} else {
-			Com_Memset( upload_data->buffer, 0, raw_size );
-		}
-		return;
-	}
 
 	if ( image->flags & IMGFLAG_NOSCALE ) {
 		//
@@ -1963,14 +1935,6 @@ static void R_CreateBuiltinImages( void ) {
 
 #ifdef USE_VK_PBR
 	tr.emptyImage = R_CreateImage("*empty", NULL, (byte*)data, 2, 2, IMGFLAG_NONE, 0, 0);
-
-	{
-		const int ltcFlags = IMGFLAG_CLAMPTOEDGE | IMGFLAG_NOSCALE | IMGFLAG_NOLIGHTSCALE;
-		tr.ltcMatImage = R_CreateImage( "*ltc_mat", NULL, (byte *)s_ltcMatCanonical, LTC_LUT_SIZE, LTC_LUT_SIZE,
-			ltcFlags, VK_FORMAT_R16G16B16A16_SFLOAT, 0 );
-		tr.ltcAmpImage = R_CreateImage( "*ltc_amp", NULL, (byte *)s_ltcAmpCanonical, LTC_LUT_SIZE, LTC_LUT_SIZE,
-			ltcFlags, VK_FORMAT_R16G16B16A16_SFLOAT, 0 );
-	}
 
 #ifdef VK_CUBEMAP
 	tr.emptyCubemap = R_CreateImage( "*emptyCubemap", NULL, NULL, 1, 1, IMGFLAG_CUBEMAP, vk.color_format, 0 );

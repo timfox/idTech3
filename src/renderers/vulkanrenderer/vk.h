@@ -56,9 +56,7 @@
 	#define VK_DESC_PBR_ANISOTROPY			14
 	#define VK_DESC_PBR_TRANSMISSION		15
 	#define VK_DESC_PBR_SUBSURFACE			16
-	#define VK_DESC_PBR_LTC_MAT				17
-	#define VK_DESC_PBR_LTC_AMP				18
-	#define VK_DESC_COUNT	19
+	#define VK_DESC_COUNT	17
 #else
 	#define VK_DESC_COUNT   5
 #endif
@@ -255,10 +253,8 @@ typedef struct vkUniform_s {
 	vec4_t pbrTransmissionScale;
 	vec4_t pbrSubsurfaceColor;
 	vec4_t pbrSubsurfaceParams;
-	vec4_t pbrAdvancedParams; // x: multi-scatter toggle, y: multi-scatter strength, z: LTC toggle, w: LTC quality
+	vec4_t pbrAdvancedParams; // x: multi-scatter toggle, y: multi-scatter strength
 	vec4_t pbrShCoeffs[9];
-	vec4_t ltcPolygonPoints[4];
-	vec4_t ltcPolygonNormal;
 #endif
 } vkUniform_t;
 
@@ -380,7 +376,6 @@ void vk_destroy_image_resources( VkImage *image, VkImageView *imageView );
 void vk_bind_generated_shaders( void );
 void vk_update_attachment_descriptors( void );
 void vk_validate_pbr_ibl_resources( void );
-float vk_get_pre_exposure_scale( void );
 void vk_destroy_samplers( void );
 
 uint32_t vk_find_pipeline_ext( uint32_t base, const Vk_Pipeline_Def *def, qboolean use );
@@ -574,9 +569,6 @@ typedef struct {
 	VkImage ssao_blur_image;
 	VkImageView ssao_blur_image_view;
 	VkDescriptorSet ssao_blur_descriptor;
-
-	VkImage vao_mask_image;
-	VkImageView vao_mask_image_view;
 
 	VkImage depth_image;
 	VkImageView depth_image_view;
@@ -855,9 +847,6 @@ typedef struct {
 	uint32_t screenMapSamples;
 
 	uint32_t image_chunk_size;
-
-	// Physical device limit for 2D image dimension (VkPhysicalDeviceLimits::maxImageDimension2D).
-	uint32_t hwMaxImageDimension2D;
 
 	uint32_t maxBoundDescriptorSets;
 
