@@ -22,8 +22,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_surf.c
 #include "tr_local.h"
 
-static const vec3_t vk_vec3_origin = { 0.0f, 0.0f, 0.0f };
-
 /*
 
   THIS ENTIRE FILE IS BACK END
@@ -114,7 +112,7 @@ void RB_AddQuadStampExt( const vec3_t origin, const vec3_t left, const vec3_t up
 	tess.xyz[ndx+3][2] = origin[2] + left[2] - up[2];
 
 	// constant normal all the way around
-	VectorSubtract( vk_vec3_origin, backEnd.viewParms.or.axis[0], normal );
+	VectorSubtract( vec3_origin, backEnd.viewParms.or.axis[0], normal );
 
 	tess.normal[ndx][0] = tess.normal[ndx+1][0] = tess.normal[ndx+2][0] = tess.normal[ndx+3][0] = normal[0];
 	tess.normal[ndx][1] = tess.normal[ndx+1][1] = tess.normal[ndx+2][1] = tess.normal[ndx+3][1] = normal[1];
@@ -244,7 +242,7 @@ static void RB_SurfaceSprite( void ) {
 	}
 
 	if ( backEnd.viewParms.portalView == PV_MIRROR ) {
-		VectorSubtract( vk_vec3_origin, left, left );
+		VectorSubtract( vec3_origin, left, left );
 	}
 
 	RB_AddQuadStamp( backEnd.currentEntity->e.origin, left, up, backEnd.currentEntity->e.shader );

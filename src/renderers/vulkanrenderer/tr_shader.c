@@ -40,20 +40,6 @@ static	shader_t*		hashTable[FILE_HASH_SIZE];
 #define MAX_SHADERTEXT_HASH		2048
 static const char **shaderTextHashTable[MAX_SHADERTEXT_HASH];
 
-static void VkSkipRestOfLine( const char **text ) {
-	const char *p = *text;
-
-	while ( *p && *p != '\n' ) {
-		p++;
-	}
-	if ( *p == '\n' ) {
-		p++;
-	}
-	*text = p;
-}
-
-#define SkipRestOfLine VkSkipRestOfLine
-
 /*
 ================
 return a hash value for the filename
@@ -1297,7 +1283,7 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			{
 				stage->emissiveScale[1] = stage->emissiveScale[0];
 				stage->emissiveScale[2] = stage->emissiveScale[0];
-				//stage->vk_pbr_flags |= PBR_HAS_EMISSIVE;
+				stage->vk_pbr_flags |= PBR_HAS_EMISSIVE;
 				continue;
 			}
 			stage->emissiveScale[1] = atof( token );
@@ -1305,11 +1291,11 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			if ( token[0] == 0 )
 			{
 				stage->emissiveScale[2] = stage->emissiveScale[0];
-				//stage->vk_pbr_flags |= PBR_HAS_EMISSIVE;
+				stage->vk_pbr_flags |= PBR_HAS_EMISSIVE;
 				continue;
 			}
 			stage->emissiveScale[2] = atof( token );
-			//stage->vk_pbr_flags |= PBR_HAS_EMISSIVE;
+			stage->vk_pbr_flags |= PBR_HAS_EMISSIVE;
 		}
 		else if ( !Q_stricmp( token, "clearcoatscale" ) )
 		{
@@ -2347,59 +2333,32 @@ static void derefVariable( const char *name, char *buf, int size )
 ParseCondition
 
 if ( $cvar|<integer value> [<condition> $cvar|<integer value> [ [ || .. ] && .. ] ] )
-{
-	shader stage
-}
+{ shader stage }
 [ else
-{
-	shader stage
-} ]
+{ shader stage } ]
 ===============
 */
-static tokenType_t ParseOpToken( const char *token ) {
-	if ( !token[0] ) {
-		return 0;
-	}
-
-	if ( !Q_stricmp( token, "=" ) || !Q_stricmp( token, "==" ) ) {
-		return TK_EQ;
-	}
-	if ( !Q_stricmp( token, "!=" ) ) {
-		return TK_NEQ;
-	}
-	if ( !Q_stricmp( token, ">" ) ) {
-		return TK_GT;
-	}
-	if ( !Q_stricmp( token, ">=" ) ) {
-		return TK_GTE;
-	}
-	if ( !Q_stricmp( token, "<" ) ) {
-		return TK_LT;
-	}
-	if ( !Q_stricmp( token, "<=" ) ) {
-		return TK_LTE;
-	}
-
-	return 0;
-}
-
 static qboolean ParseCondition( const char **text, resultType *res )
 {
 	char lval_str[ MAX_CVAR_VALUE_STRING ];
 	char rval_str[ MAX_CVAR_VALUE_STRING ];
+	tokenType_t lval_type;
+	tokenType_t rval_type;
 	const char *token;
 	tokenType_t op;
-	resultMask rm;
-	qboolean str;
+	resultMask	rm;
+	qboolean	str;
 	int r, r0;
 
-	r = 0;
-	rm = maskOR;
+	r = 0;			// resulting value
+	rm = maskOR;	// default mask
 
 	for ( ;; )
 	{
 		rval_str[0] = '\0';
+		rval_type = TK_GENEGIC;
 
+		// expect l-value at least
 		token = COM_ParseComplex( text, qfalse );
 		if ( token[0] == '\0' ) {
 			ri.Printf( PRINT_WARNING, "WARNING: expecting lvalue for condition in shader %s\n", shader.name );
@@ -2407,15 +2366,15 @@ static qboolean ParseCondition( const char **text, resultType *res )
 		}
 
 		Q_strncpyz( lval_str, token, sizeof( lval_str ) );
-		qboolean lval_quoted = ( token[0] == '\"' );
+		lval_type = com_tokentype;
 
-		const char *opToken = COM_ParseComplex( text, qfalse );
-		tokenType_t opType = ParseOpToken( opToken );
-		const char *nextToken = NULL;
+		// get operator
+		token = COM_ParseComplex( text, qfalse );
+		if ( com_tokentype >= TK_EQ && com_tokentype <= TK_LTE )
+		{
+			op = com_tokentype;
 
-		if ( opType ) {
-			op = opType;
-
+			// expect r-value
 			token = COM_ParseComplex( text, qfalse );
 			if ( token[0] == '\0' ) {
 				ri.Printf( PRINT_WARNING, "WARNING: expecting rvalue for condition in shader %s\n", shader.name );
@@ -2423,38 +2382,45 @@ static qboolean ParseCondition( const char **text, resultType *res )
 			}
 
 			Q_strncpyz( rval_str, token, sizeof( rval_str ) );
-			qboolean rval_quoted = ( token[0] == '\"' );
+			rval_type = com_tokentype;
 
-			nextToken = COM_ParseComplex( text, qtrue );
-
-			if ( rval_quoted ) {
-				str = qtrue;
-			} else {
-				if ( rval_str[0] == '$' ) {
-					derefVariable( rval_str + 1, rval_str, sizeof( rval_str ) );
-				}
-				str = qfalse;
-			}
-		} else if ( !Q_stricmp( opToken, ")" ) || !Q_stricmp( opToken, "||" ) || !Q_stricmp( opToken, "&&" ) ) {
+			// read next token, expect '||', '&&' or ')', allow newlines
+			/*token =*/ COM_ParseComplex( text, qtrue );
+		}
+		else if ( com_tokentype == TK_SCOPE_CLOSE || com_tokentype == TK_OR || com_tokentype == TK_AND )
+		{
+			// no r-value, assume 'not zero' comparison
 			op = TK_NEQ;
-			nextToken = opToken;
-			str = qfalse;
-			if ( lval_str[0] == '$' ) {
-				derefVariable( lval_str + 1, lval_str, sizeof( lval_str ) );
-			}
-			Q_strncpyz( rval_str, "0", sizeof( rval_str ) );
-		} else {
-			ri.Printf( PRINT_WARNING, "WARNING: unexpected operator '%s' for comparison in shader %s\n", opToken, shader.name );
+		}
+		else
+		{
+			ri.Printf( PRINT_WARNING, "WARNING: unexpected operator '%s' for comparison in shader %s\n", token, shader.name );
 			return qfalse;
 		}
 
-		if ( lval_quoted ) {
+		str = qfalse;
+
+		if ( lval_type == TK_QUOTED ) {
 			str = qtrue;
-		} else if ( !str && lval_str[0] == '$' ) {
-			derefVariable( lval_str + 1, lval_str, sizeof( lval_str ) );
+		} else {
+			// dereference l-value
+			if ( lval_str[0] == '$' ) {
+				derefVariable( lval_str + 1, lval_str, sizeof( lval_str ) );
+			}
 		}
 
+		if ( rval_type == TK_QUOTED ) {
+			str = qtrue;
+		} else {
+			// dereference r-value
+			if ( rval_str[0] == '$' ) {
+				derefVariable( rval_str + 1, rval_str, sizeof( rval_str ) );
+			}
+		}
+
+		// evaluate expression
 		if ( str ) {
+			// string comparison
 			switch ( op ) {
 				case TK_EQ:  r0 = strcmp( lval_str, rval_str ) == 0; break;
 				case TK_NEQ: r0 = strcmp( lval_str, rval_str ) != 0; break;
@@ -2465,6 +2431,7 @@ static qboolean ParseCondition( const char **text, resultType *res )
 				default:     r0 = 0; break;
 			}
 		} else {
+			// integer comparison
 			int lval = atoi( lval_str );
 			int rval = atoi( rval_str );
 			switch ( op ) {
@@ -2483,25 +2450,17 @@ static qboolean ParseCondition( const char **text, resultType *res )
 		else
 			r &= r0;
 
-		if ( !nextToken ) {
-			nextToken = COM_ParseComplex( text, qtrue );
-		}
-
-		if ( !Q_stricmp( nextToken, "||" ) ) {
+		if ( com_tokentype == TK_OR ) {
 			rm = maskOR;
 			continue;
 		}
 
-		if ( !Q_stricmp( nextToken, "&&" ) ) {
+		if ( com_tokentype == TK_AND ) {
 			rm = maskAND;
 			continue;
 		}
 
-		if ( !Q_stricmp( nextToken, ")" ) ) {
-			break;
-		}
-
-		if ( nextToken[0] != '\0' ) {
+		if ( com_tokentype != TK_SCOPE_CLOSE ) {
 			ri.Printf( PRINT_WARNING, "WARNING: expecting ')' in shader %s\n", shader.name );
 			return qfalse;
 		}
@@ -2840,7 +2799,7 @@ static qboolean ParseShader( const char **text )
 
 			if ( branch != brELSE ) { // we can set/update result
 				token = COM_ParseComplex( text, qfalse );
-				if ( token[0] != '(' ) {
+				if ( com_tokentype != TK_SCOPE_OPEN ) {
 					ri.Printf( PRINT_WARNING, "WARNING: expecting '(' in '%s'\n", shader.name );
 					return qfalse;
 				}

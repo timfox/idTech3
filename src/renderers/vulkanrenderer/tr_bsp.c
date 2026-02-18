@@ -22,8 +22,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_map.c
 
 #include "tr_local.h"
-
-static const vec3_t vk_vec3_origin = { 0.0f, 0.0f, 0.0f };
 #ifdef USE_VULKAN
 #include "vk.h"
 
@@ -2283,7 +2281,7 @@ static void R_LoadFogs( const lump_t *l, const lump_t *brushesLump, const lump_t
 			} else {
 				out->hasSurface = qtrue;
 				planeNum = LittleLong( sides[ sideOffset ].planeNum );
-				VectorSubtract( vk_vec3_origin, s_worldData.planes[ planeNum ].normal, out->surface );
+				VectorSubtract( vec3_origin, s_worldData.planes[ planeNum ].normal, out->surface );
 				out->surface[3] = -s_worldData.planes[ planeNum ].dist;
 			}
 		}
@@ -2875,14 +2873,6 @@ void RE_LoadWorldMap( const char *name ) {
 		R_RenderAllCubemaps();
 	else if ( vk.cubemapActive && vk.pbrActive && !tr.numCubemaps ) {
 		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "PBR IBL: no cubemaps found (env.json or cubemap entities). Reflections will look generic.\n" S_COLOR_WHITE );
-	}
-#endif
-
-#ifdef USE_VULKAN
-	{
-		cvar_t *applyGammaCvar = ri.Cvar_Get( "r_applySrgbGamma", "1", CVAR_ARCHIVE_ND );
-		ri.Printf( PRINT_DEVELOPER, "PostProcess: exposure=%.2f preExposureScale=%.2f apply_srgb_gamma=%d swapchain=%s\n",
-			r_exposure->value, vk_get_pre_exposure_scale(), applyGammaCvar->integer, vk_format_string( vk.present_format.format ) );
 	}
 #endif
 }
