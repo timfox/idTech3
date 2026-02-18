@@ -43,8 +43,13 @@ struct Vk_Pipeline_FragSpecData {
 	int32_t anisotropy_texture_set;
 	int32_t transmission_texture_set;
 	int32_t subsurface_texture_set;
+	int32_t specular_aa_mode;
+	float specular_aa_strength;
+	int32_t env_prefilter_mip_levels;
 #endif
 };
+
+static uint32_t vk_get_prefilter_mip_levels( void );
 
 static int vkSamples = VK_SAMPLE_COUNT_1_BIT;
 static int vkMaxSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -6651,6 +6656,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	//int32_t vert_spec_data[1]; // clippping
 	//VkSpecializationInfo vert_spec_info;
     struct Vk_Pipeline_FragSpecData frag_spec_data;
+    static cvar_t *specularAaModeCvar = NULL;
+    static cvar_t *specularAaStrengthCvar = NULL;
 
 #ifdef USE_VK_PBR
     VkSpecializationMapEntry spec_entries[37];
@@ -7257,6 +7264,9 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	ADD_FRAG_SPEC( 29, subsurface_texture_set );
 	ADD_FRAG_SPEC( 30, deluxe_mapping );
 	ADD_FRAG_SPEC( 31, deluxe_specular_scale );
+	ADD_FRAG_SPEC( 32, specular_aa_mode );
+	ADD_FRAG_SPEC( 33, specular_aa_strength );
+	ADD_FRAG_SPEC( 35, env_prefilter_mip_levels );
 
 	// only use w value, specgloss maps are not supported
 	frag_spec_data.specularScale_x = def->specularScale[0];
@@ -7280,6 +7290,16 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	frag_spec_data.anisotropy_texture_set = 0;
 	frag_spec_data.transmission_texture_set = 0;
 	frag_spec_data.subsurface_texture_set = 0;
+	if ( !specularAaModeCvar ) {
+		specularAaModeCvar = ri.Cvar_Get( "r_specularAA", "1", CVAR_ARCHIVE_ND );
+	}
+	if ( !specularAaStrengthCvar ) {
+		specularAaStrengthCvar = ri.Cvar_Get( "r_specularAAStrength", "0.5", CVAR_ARCHIVE_ND );
+	}
+
+	frag_spec_data.specular_aa_mode = specularAaModeCvar->integer;
+	frag_spec_data.specular_aa_strength = specularAaStrengthCvar->value;
+	frag_spec_data.env_prefilter_mip_levels = vk_get_prefilter_mip_levels();
 
 	/*if ( ( def->vk_pbr_flags & PBR_HAS_EMISSIVE ) == 0 )
 		frag_spec_data.emissive_texture_set = -1;
@@ -9676,6 +9696,17 @@ typedef struct {
 } filterDef;
 
 static filterDef prefilters[2];
+
+static uint32_t vk_get_prefilter_mip_levels( void )
+{
+#ifdef VK_CUBEMAP
+	uint32_t levels = prefilters[PREFILTEREDENV].mipLevels;
+	if ( levels > 0 ) {
+		return levels;
+	}
+#endif
+	return 1;
+}
 
 static uint32_t vk_pow2_floor_u32( uint32_t v )
 {

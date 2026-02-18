@@ -163,7 +163,10 @@ layout (constant_id = 29) const int subsurface_texture_set = -1;
 
 layout (constant_id = 30) const int deluxe_mapping			= -1; // -1: deluxemapping off, 0: on, 1: on + bound
 layout (constant_id = 31) const float deluxe_specular_scale = 1.0;
-layout (constant_id = 32) const int apply_srgb_gamma = 1; // Set to 0 if swapchain expects linear inputs
+layout (constant_id = 32) const int specular_aa_mode		= 1; // 0=off, 1=Toksvig/derivative, 2=future LEAN
+layout (constant_id = 33) const float specular_aa_strength	= 0.5;
+layout (constant_id = 34) const int apply_srgb_gamma = 1; // Set to 0 if swapchain expects linear inputs
+layout (constant_id = 35) const int env_prefilter_mip_levels = 6;
 
 vec3 CalcNormal( in vec3 vertexNormal, in vec4 vertexTangent, in vec2 frag_tex_coord )
 {
@@ -300,7 +303,9 @@ vec3 CalcIBLContribution( in float roughness, in vec3 N, in vec3 E,
 	vec3 R = reflect(-E, N);
 	R.y *= -1.0f;
 	
-	vec3 cubeLightColor = textureLod(env_texture, R, roughness * 6).rgb * 1.0;
+	float mipMax = max(float(env_prefilter_mip_levels) - 1.0, 0.0);
+	float mipLevel = ( mipMax > 0.0 ) ? clamp( roughness * mipMax, 0.0, mipMax ) : 0.0;
+	vec3 cubeLightColor = textureLod( env_texture, R, mipLevel ).rgb;
 	vec2 EnvBRDF = texture(brdflut_texture, vec2(NE, 1.0 - roughness)).rg;
 	vec3 FssEss = (specular.rgb * EnvBRDF.x + EnvBRDF.y);
 
@@ -968,7 +973,14 @@ void main() {
 	vec3 dNdU = dFdx( N );
 	vec3 dNdV = dFdy( N );
 	float normalVariance = dot( dNdU, dNdU ) + dot( dNdV, dNdV );
-	float varianceScale = max( normalVariance * 0.5, 0.0 );
+	float varianceScale = 0.0;
+
+	if ( specular_aa_mode == 1 ) {
+		varianceScale = max( normalVariance * specular_aa_strength, 0.0 );
+	} else if ( specular_aa_mode == 2 ) {
+		// reserved for future LEAN/height-based filtering
+		varianceScale = max( normalVariance * specular_aa_strength * 0.75, 0.0 );
+	}
 	vec2 filteredAlpha = vec2( sqrt( alphaX * alphaX + varianceScale ), sqrt( alphaY * alphaY + varianceScale ) );
 
 	if ( emissive_texture_set > -1 ) {
@@ -990,6 +1002,10 @@ void main() {
 
 	vec3  Fd = CalcDiffuse( diffuse.rgb, NE, NL, LH, roughness );
 	vec3  Fs = vec3( 0.0 );
+
+	float specularEnergy = max( max( specular.r, specular.g ), specular.b );
+	float diffuseEnergy = max( 1.0 - specularEnergy, 0.0 );
+	vec3 diffuseTerm = Fd * diffuseEnergy;
 
 	float NH = clamp( dot( N, H ), 0.0, 1.0 );
 	float VH = clamp( dot( E, H ), 0.0, 1.0 );
@@ -1015,19 +1031,19 @@ void main() {
 	vec3 directSpec = vec3(0.0);
 
 	if ( hasLightmap ) {
-		directDiffuse = lightColor * diffuse.rgb * kD;
+		directDiffuse = lightColor * diffuseTerm * ( attenuation * NL );
 		directSpec = lightColor * Fs * ( attenuation * NL );
 	} else {
-		directDiffuse = lightColor * Fd * ( attenuation * NL );
+		directDiffuse = lightColor * diffuseTerm * ( attenuation * NL );
 		directSpec = lightColor * Fs * ( attenuation * NL );
 	}
 
 	out_color.rgb = directDiffuse + directSpec;
-	out_color.rgb += ambientColor * diffuse.rgb * kD;
+	out_color.rgb += ambientColor * diffuseTerm;
 
 	// diffuse IBL (SH + irradiance)
 	if ( !hasLightmap )
-		out_color.rgb += CalcDiffuseIrradiance( N ) * diffuse.rgb * AO * kD;
+		out_color.rgb += CalcDiffuseIrradiance( N ) * diffuseTerm * AO;
 
 	if ( env_texture_set > -1 ) {
 		float specIblScale = hasLightmap ? 0.25 : 1.0;
