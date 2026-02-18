@@ -1676,6 +1676,65 @@ void VK_SetFogParams( vkUniform_t *ubo, int *fogStage )
 }
 
 
+static void VK_SetLtcPolygon( vkUniform_t *ubo, const dlight_t *dl )
+{
+	if ( !r_ltc || !r_ltc->integer || !dl )
+	{
+		for ( int i = 0; i < 4; ++i )
+		{
+			VectorClear( ubo->ltcPolygonPoints[i] );
+			ubo->ltcPolygonPoints[i][3] = 0.0f;
+		}
+		VectorClear( ubo->ltcPolygonNormal );
+		return;
+	}
+
+	vec3_t normal;
+	VectorCopy( dl->dir, normal );
+	if ( VectorNormalize( normal ) == 0.0f )
+		VectorSet( normal, 0.0f, 0.0f, 1.0f );
+
+	vec3_t tangent;
+	vec3_t bitangent;
+	vec3_t center;
+	float size = dl->radius;
+
+	VectorCopy( dl->origin, center );
+	if ( size <= 0.0f )
+		size = 1.0f;
+
+	VectorSet( tangent, 1.0f, 0.0f, 0.0f );
+	if ( fabs( normal[2] ) > 0.999f )
+		VectorSet( tangent, 0.0f, 1.0f, 0.0f );
+
+	CrossProduct( tangent, normal, bitangent );
+	if ( VectorNormalize( bitangent ) == 0.0f )
+		VectorSet( bitangent, 0.0f, 0.0f, 1.0f );
+
+	CrossProduct( normal, bitangent, tangent );
+	VectorNormalize( tangent );
+
+	vec2_t offsets[4] = {
+		{  size,  size },
+		{  size, -size },
+		{ -size, -size },
+		{ -size,  size }
+	};
+
+	for ( int i = 0; i < 4; ++i )
+	{
+		vec3_t pt;
+		VectorCopy( center, pt );
+		VectorMA( pt, offsets[i][0], tangent, pt );
+		VectorMA( pt, offsets[i][1], bitangent, pt );
+		VectorCopy( pt, ubo->ltcPolygonPoints[i] );
+		ubo->ltcPolygonPoints[i][3] = 1.0f;
+	}
+
+	VectorSet( ubo->ltcPolygonNormal, normal[0], normal[1], normal[2] );
+	ubo->ltcPolygonNormal[3] = 4.0f;
+}
+
 #ifdef USE_PMLIGHT
 static void VK_SetLightParams( vkUniform_t *ubo, const dlight_t *dl ) {
 	float radius;
@@ -1705,6 +1764,7 @@ static void VK_SetLightParams( vkUniform_t *ubo, const dlight_t *dl ) {
 		ab[3] = 1.0f / DotProduct( ab, ab );
 		Vector4Copy( ab, ubo->light.vector );
 	}
+	VK_SetLtcPolygon( ubo, dl );
 }
 #endif
 

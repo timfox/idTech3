@@ -1626,7 +1626,7 @@ static VkFormat get_hdr_format( VkFormat base_format )
 
 	switch ( r_hdr->integer ) {
 		case -1: return VK_FORMAT_B4G4R4A4_UNORM_PACK16;
-		case 1: return VK_FORMAT_R16G16B16A16_UNORM;
+		case 1: return VK_FORMAT_R16G16B16A16_SFLOAT;
 		default: return base_format;
 	}
 }
@@ -6067,7 +6067,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	VkGraphicsPipelineCreateInfo create_info;
 	VkViewport viewport;
 	VkRect2D scissor;
-	VkSpecializationMapEntry spec_entries[11];
+VkSpecializationMapEntry spec_entries[15];
 	VkSpecializationInfo frag_spec_info;
 	VkPipeline *pipeline;
 	VkShaderModule fsmodule;
@@ -6089,6 +6089,10 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 		int depth_r;
 		int depth_g;
 		int depth_b;
+		float exposure;
+		float bloom_knee;
+		int tonemap_mode;
+		int apply_srgb_gamma;
 	} frag_spec_data;
 
 	switch ( program_index ) {
@@ -6212,6 +6216,11 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	frag_spec_data.bloom_threshold_mode = r_bloom_threshold_mode->integer;
 	frag_spec_data.bloom_modulate = r_bloom_modulate->integer;
 	frag_spec_data.dither = r_dither->integer;
+	frag_spec_data.exposure = r_exposure->value;
+	frag_spec_data.bloom_knee = r_bloomKnee->value;
+	frag_spec_data.tonemap_mode = r_tonemap->integer;
+	cvar_t *applyGammaCvar = ri.Cvar_Get( "r_applySrgbGamma", "1", CVAR_ARCHIVE_ND );
+	frag_spec_data.apply_srgb_gamma = applyGammaCvar->integer;
 
 	if ( !vk_surface_format_color_depth( vk.present_format.format, &frag_spec_data.depth_r, &frag_spec_data.depth_g, &frag_spec_data.depth_b ) )
 		ri.Printf( PRINT_ALL, "Format %s not recognized, dither to assume 8bpc\n", vk_format_string( vk.base_format.format ) );
@@ -6260,7 +6269,23 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	spec_entries[10].offset = offsetof(struct PostProcess_FragSpecData, depth_b);
 	spec_entries[10].size = sizeof(frag_spec_data.depth_b);
 
-	frag_spec_info.mapEntryCount = 11;
+	spec_entries[11].constantID = 11;
+	spec_entries[11].offset = offsetof(struct PostProcess_FragSpecData, exposure);
+	spec_entries[11].size = sizeof(frag_spec_data.exposure);
+
+	spec_entries[12].constantID = 12;
+	spec_entries[12].offset = offsetof(struct PostProcess_FragSpecData, bloom_knee);
+	spec_entries[12].size = sizeof(frag_spec_data.bloom_knee);
+
+	spec_entries[13].constantID = 13;
+	spec_entries[13].offset = offsetof(struct PostProcess_FragSpecData, tonemap_mode);
+	spec_entries[13].size = sizeof(frag_spec_data.tonemap_mode);
+
+	spec_entries[14].constantID = 14;
+	spec_entries[14].offset = offsetof(struct PostProcess_FragSpecData, apply_srgb_gamma);
+	spec_entries[14].size = sizeof(frag_spec_data.apply_srgb_gamma);
+
+	frag_spec_info.mapEntryCount = 15;
 	frag_spec_info.pMapEntries = spec_entries;
 	frag_spec_info.dataSize = sizeof( frag_spec_data );
 	frag_spec_info.pData = &frag_spec_data;

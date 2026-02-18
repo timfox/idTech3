@@ -257,6 +257,8 @@ typedef struct vkUniform_s {
 	vec4_t pbrSubsurfaceParams;
 	vec4_t pbrAdvancedParams; // x: multi-scatter toggle, y: multi-scatter strength, z: LTC toggle, w: LTC quality
 	vec4_t pbrShCoeffs[9];
+	vec4_t ltcPolygonPoints[4];
+	vec4_t ltcPolygonNormal;
 #endif
 } vkUniform_t;
 

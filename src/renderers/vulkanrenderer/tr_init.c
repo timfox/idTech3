@@ -117,6 +117,9 @@ cvar_t	*r_bloom_threshold;
 cvar_t	*r_bloom_intensity;
 cvar_t	*r_bloom_threshold_mode;
 cvar_t	*r_bloom_modulate;
+cvar_t	*r_bloomKnee;
+cvar_t	*r_exposure;
+cvar_t	*r_tonemap;
 cvar_t	*r_ssao;
 cvar_t	*r_ssaoRadius;
 cvar_t	*r_ssaoBias;
@@ -1927,6 +1930,20 @@ static void R_Register( void )
 	r_bloom = ri.Cvar_Get( "r_bloom", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_bloom, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription(r_bloom, "Enables bloom post-processing effect. Requires \\r_fbo 1.");
+	r_bloomKnee = ri.Cvar_Get( "r_bloomKnee", "0.5", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_bloomKnee, "0.0", "4.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_bloomKnee, "Soft knee for the bloom extractor to control highlight rolloff." );
+	r_exposure = ri.Cvar_Get( "r_exposure", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_exposure, "0.01", "10.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_exposure, "Linear exposure multiplier applied before tonemapping." );
+	r_tonemap = ri.Cvar_Get( "r_tonemap", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_tonemap, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_tonemap, "Tonemapping mode: 0=off, 1=ACES, 2=Reinhard (not yet implemented)." );
+	{
+		cvar_t *rlocal_cvar = ri.Cvar_Get( "r_applySrgbGamma", "1", CVAR_ARCHIVE_ND );
+		ri.Cvar_CheckRange( rlocal_cvar, "0", "1", CV_INTEGER );
+		ri.Cvar_SetDescription( rlocal_cvar, "Apply sRGB gamma to the final post-processed image." );
+	}
 
 	r_ssao = ri.Cvar_Get( "r_ssao", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ssao, "0", "1", CV_INTEGER );
