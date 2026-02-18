@@ -165,11 +165,22 @@ vec3 CalcNormal( in vec3 vertexNormal, in vec4 vertexTangent, in vec2 frag_tex_c
 {
 	if ( normal_texture_set > -1 ) {
 		vec3 biTangent = vertexTangent.w * cross(vertexNormal, vertexTangent.xyz);
-		vec3 n = texture(normal_texture, frag_tex_coord).agb - vec3(0.5);
+		vec2 dUVdx = dFdx( frag_tex_coord );
+		vec2 dUVdy = dFdy( frag_tex_coord );
+		vec4 normalSample = textureGrad(normal_texture, frag_tex_coord, dUVdx, dUVdy);
+		vec3 base = normalSample.agb - vec3(0.5);
 
-		n.xy *= vec2( normalScale_x, normalScale_y );
-		n.z = sqrt(clamp((0.25 - n.x * n.x) - n.y * n.y, 0.0, 1.0));
-		n = n.x * vertexTangent.xyz + n.y * biTangent + n.z * vertexNormal;
+		base.xy *= vec2( normalScale_x, normalScale_y );
+
+		vec2 leanDetail = vec2( 0.0 );
+		if ( normalScale_z > 0.0 ) {
+			leanDetail = ( normalSample.rg - vec2( 0.5 ) ) * normalScale_z;
+		}
+
+		vec2 slopes = base.xy + leanDetail;
+		float zz = sqrt( clamp( 1.0 - dot( slopes, slopes ), 0.0, 1.0 ) );
+
+		vec3 n = slopes.x * vertexTangent.xyz + slopes.y * biTangent + zz * vertexNormal;
 
 		return normalize(n);
 	}else {
@@ -218,35 +229,54 @@ vec3 F_Schlick( in vec3 SpecularColor, in float VH )
 	return SpecularColor + (1.0 - SpecularColor) * Fc;
 }
 
-float D_GGX( in float NH, in float alpha )
+float LambdaGGX( in vec3 N, in vec3 V, in vec3 T, in vec3 B, in float alphaX, in float alphaY )
 {
-	// Trowbridge-Reitz GGX NDF using alpha (where alpha = roughness^2).
-	float alphaSq = alpha * alpha;
-	float d = (NH * alphaSq - NH) * NH + 1;
-	return alphaSq / (PI * d * d);
+	float NV = clamp( dot( N, V ), 0.0, 1.0 );
+	if ( NV <= 0.0 )
+		return 0.0;
+
+	float sinTheta = sqrt( max( 0.0, 1.0 - NV * NV ) );
+	if ( sinTheta <= 0.0 )
+		return 0.0;
+
+	vec2 projected = vec2( dot( V, T ), dot( V, B ) );
+	float cosPhi = projected.x / sinTheta;
+	float sinPhi = projected.y / sinTheta;
+	float tanTheta2 = ( sinTheta * sinTheta ) / ( NV * NV );
+
+	float alpha = max( sqrt( ( cosPhi * alphaX ) * ( cosPhi * alphaX ) + ( sinPhi * alphaY ) * ( sinPhi * alphaY ) ), 1e-4 );
+	return ( -1.0 + sqrt( 1.0 + alpha * alpha * tanTheta2 ) ) * 0.5;
 }
 
-float CalcVisibility( in float NL, in float NE, in float alpha )
+float GeometrySmithAnisotropic( vec3 N, vec3 V, vec3 L, vec3 T, vec3 B, float alphaX, float alphaY )
 {
-	// Smith masking-shadowing using GGX lambda formulation with alpha.
-	float alphaSq = alpha * alpha;
-
-	float lambdaE = NL * sqrt((-NE * alphaSq + NE) * NE + alphaSq);
-	float lambdaL = NE * sqrt((-NL * alphaSq + NL) * NL + alphaSq);
-
-	return 0.5 / (lambdaE + lambdaL);
+	float lambdaV = LambdaGGX( N, V, T, B, alphaX, alphaY );
+	float lambdaL = LambdaGGX( N, L, T, B, alphaX, alphaY );
+	return 1.0 / ( 1.0 + lambdaV + lambdaL );
 }
 
-vec3 CalcSpecular( in vec3 specular, in float NH, in float NL,
-	in float NE, float LH, in float VH, in float roughness )
+float D_GGX_Anisotropic( in vec3 H, in vec3 N, in vec3 T, in vec3 B, in float alphaX, in float alphaY )
 {
-	// Baseline specular convention: alpha = roughness^2.
-	float alpha = max( roughness * roughness, 0.001 );
-	vec3  F = F_Schlick(specular, VH);
-	float D = D_GGX(NH, alpha);
-	float V = CalcVisibility(NL, NE, alpha);
+	float NH = clamp( dot( N, H ), 0.0, 1.0 );
+	if ( NH <= 0.0 )
+		return 0.0;
 
-	return D * F * V;
+	float Hx = dot( H, T );
+	float Hy = dot( H, B );
+	float denom = ( ( Hx / alphaX ) * ( Hx / alphaX ) ) + ( ( Hy / alphaY ) * ( Hy / alphaY ) ) + ( NH * NH );
+	return 1.0 / ( PI * alphaX * alphaY * denom * denom );
+}
+
+vec3 CalcSpecular( in vec3 specular, in vec3 N, in vec3 L, in vec3 V, in vec3 H, in vec3 T, in vec3 B, in float alphaX, in float alphaY )
+{
+	vec3  F = F_Schlick( specular, clamp( dot( V, H ), 0.0, 1.0 ) );
+	float D = D_GGX_Anisotropic( H, N, T, B, max( alphaX, 1e-4 ), max( alphaY, 1e-4 ) );
+	float G = GeometrySmithAnisotropic( N, V, L, T, B, max( alphaX, 1e-4 ), max( alphaY, 1e-4 ) );
+	float NL = max( dot( N, L ), 0.0 );
+	float NV = max( dot( N, V ), 0.0 );
+	float denom = max( 4.0 * NL * NV, 1e-4 );
+
+	return ( D * G ) * F / denom;
 }
 
 
@@ -800,6 +830,9 @@ void main() {
 	#endif
 
 	N = CalcNormal( var_Normal.xyz, var_Tangent, frag_tex_coord0 );	
+	vec3 Ng = normalize( var_Normal.xyz );
+	vec3 tangent = normalize( var_Tangent.xyz );
+	vec3 bitangent = var_Tangent.w * normalize( cross( Ng, tangent ) );
 
 	#if defined(USE_TX1) || defined(USE_TX2)
 		if ( lightmap_texture_set > -1 ) {
@@ -810,7 +843,7 @@ void main() {
 		}
 	#endif
 
-	lightColor *= PI;
+//	lightColor *= PI;
 
 	vec4 specular = vec4( 1.0 );
 	float roughness = 0.99;
@@ -841,11 +874,35 @@ void main() {
 		roughness = mix( 1.0, 0.01, specular.a * ( 1.0 - specularScale_w ) );
 	}
 
+	float roughnessClamped = clamp( roughness, 0.02, 1.0 );
+	float roughnessSq = roughnessClamped * roughnessClamped;
+	vec3 anisotT = tangent;
+	vec3 anisotB = bitangent;
+	float alphaX = roughnessSq;
+	float alphaY = roughnessSq;
+
 	if ( anisotropy_texture_set > -1 ) {
-		float aniso = texture( anisotropy_texture, frag_tex_coord0 ).r * pbrAnisotropyScale.x;
-		roughness = mix( roughness, max( 0.02, roughness * ( 1.0 - aniso ) ), aniso );
+		float anisoSample = texture( anisotropy_texture, frag_tex_coord0 ).r * pbrAnisotropyScale.x;
+		float anisotropy = clamp( anisoSample, -0.99, 0.99 );
+		float rotation = pbrAnisotropyScale.y * PI;
+		float cosRot = cos( rotation );
+		float sinRot = sin( rotation );
+		vec3 rotatedT = cosRot * tangent + sinRot * bitangent;
+		vec3 rotatedB = -sinRot * tangent + cosRot * bitangent;
+		anisotT = rotatedT;
+		anisotB = rotatedB;
+		float aspect = sqrt( clamp( 1.0 - anisotropy * 0.9, 0.001, 1.0 ) );
+		alphaX = max( roughnessSq / aspect, 0.0001 );
+		alphaY = max( roughnessSq * aspect, 0.0001 );
 	}
-	roughness = clamp( roughness, 0.02, 1.0 );
+
+	roughness = roughnessClamped;
+
+	vec3 dNdU = dFdx( N );
+	vec3 dNdV = dFdy( N );
+	float normalVariance = dot( dNdU, dNdU ) + dot( dNdV, dNdV );
+	float varianceScale = max( normalVariance * 0.5, 0.0 );
+	vec2 filteredAlpha = vec2( sqrt( alphaX * alphaX + varianceScale ), sqrt( alphaY * alphaY + varianceScale ) );
 
 	if ( emissive_texture_set > -1 ) {
 		emissive = texture( emissive_texture, frag_tex_coord0 ).rgb * pbrEmissiveScale.rgb;
@@ -877,11 +934,11 @@ void main() {
 	#if ( defined(USE_TX1) || defined(USE_TX2) )
 		if ( deluxe_mapping > -1 )
 		{
-			Fs = CalcSpecular( specular.rgb, NH, NL, NE, LH, VH, roughness ) * deluxe_specular_scale;
+			Fs = CalcSpecular( specular.rgb, N, L, E, H, anisotT, anisotB, filteredAlpha.x, filteredAlpha.y ) * deluxe_specular_scale;
 		}
 		else if ( deluxe_specular_scale != 0.0 )
 		{
-			Fs = CalcSpecular( specular.rgb, NH, NL, NE, LH, VH, roughness );
+			Fs = CalcSpecular( specular.rgb, N, L, E, H, anisotT, anisotB, filteredAlpha.x, filteredAlpha.y );
 		}
 	#endif
 
@@ -908,9 +965,11 @@ void main() {
 	// clearcoat lobe
 	if ( clearcoat_texture_set > -1 ) {
 		vec4 cc = texture( clearcoat_texture, frag_tex_coord0 );
-		float ccStrength = cc.r * pbrClearcoatScale.x;
+		float ccStrength = clamp( cc.r * pbrClearcoatScale.x, 0.0, 1.0 );
 		float ccRoughness = clamp( cc.g * pbrClearcoatScale.y, 0.02, 1.0 );
-		vec3 ccSpec = CalcSpecular( vec3(0.04), NH, NL, NE, LH, VH, ccRoughness );
+		float ccAlpha = ccRoughness * ccRoughness;
+		vec2 ccFilteredAlpha = vec2( sqrt( ccAlpha * ccAlpha + varianceScale ), sqrt( ccAlpha * ccAlpha + varianceScale ) );
+		vec3 ccSpec = CalcSpecular( vec3(0.04), N, L, E, H, anisotT, anisotB, ccFilteredAlpha.x, ccFilteredAlpha.y );
 		out_color.rgb += lightColor * ccSpec * ( attenuation * NL ) * ccStrength;
 	}
 
