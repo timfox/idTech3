@@ -82,6 +82,13 @@ struct Vk_Pipeline_FragSpecData {
 #endif
 };
 
+typedef struct {
+	float aspect;
+	float paniniD;
+	float paniniS;
+	float padding;
+} VkPostProcessPushConstants;
+
 static uint32_t vk_get_prefilter_mip_levels( void );
 float vk_get_pre_exposure_scale( void );
 
@@ -5057,17 +5064,23 @@ void vk_initialize( void )
 		set_layouts[2] = vk.set_layout_sampler; // sampler
 		set_layouts[3] = vk.set_layout_sampler; // sampler
 
+		push_range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		push_range.offset = 0;
+		push_range.size = sizeof( VkPostProcessPushConstants );
+
 		desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		desc.pNext = NULL;
 		desc.flags = 0;
 		desc.setLayoutCount = 1;
 		desc.pSetLayouts = set_layouts;
-		desc.pushConstantRangeCount = 0;
-		desc.pPushConstantRanges = NULL;
+		desc.pushConstantRangeCount = 1;
+		desc.pPushConstantRanges = &push_range;
 
 		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_post_process ) );
 
 		desc.setLayoutCount = VK_NUM_BLOOM_PASSES;
+		desc.pushConstantRangeCount = 0;
+		desc.pPushConstantRanges = NULL;
 
 		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_blend ) );
 
@@ -9291,6 +9304,14 @@ void vk_end_frame( void )
 			vk_begin_render_pass( vk.render_pass.gamma, vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ], qfalse, vk.renderWidth, vk.renderHeight );
 			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.gamma_pipeline );
 			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
+
+			VkPostProcessPushConstants panini_push;
+			panini_push.aspect = vk.renderHeight > 0 ? ( (float)vk.renderWidth / (float)vk.renderHeight ) : 1.0f;
+			panini_push.paniniD = r_paniniD ? r_paniniD->value : 0.0f;
+			panini_push.paniniS = r_paniniS ? r_paniniS->value : 0.0f;
+			panini_push.padding = 0.0f;
+
+			qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_post_process, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( panini_push ), &panini_push );
 
 			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 		}

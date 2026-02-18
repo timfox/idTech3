@@ -194,6 +194,8 @@ cvar_t	*r_mipLodBias;
 cvar_t	*r_offsetFactor;
 cvar_t	*r_offsetUnits;
 cvar_t	*r_gamma;
+cvar_t	*r_paniniD;
+cvar_t	*r_paniniS;
 cvar_t	*r_intensity;
 cvar_t	*r_lockpvs;
 cvar_t	*r_noportals;
@@ -1754,6 +1756,16 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_gamma, "0.5", "3", CV_FLOAT );
 	ri.Cvar_SetDescription( r_gamma, "Gamma correction factor." );
 	ri.Cvar_SetGroup( r_gamma, CVG_RENDERER );
+
+	r_paniniD = ri.Cvar_Get( "r_paniniD", "0.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_paniniD, "0.0", "2.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_paniniD, "Panini projection strength (0 disables)." );
+	ri.Cvar_SetGroup( r_paniniD, CVG_RENDERER );
+
+	r_paniniS = ri.Cvar_Get( "r_paniniS", "0.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_paniniS, "0.0", "1.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_paniniS, "Panini projection squeeze factor." );
+	ri.Cvar_SetGroup( r_paniniS, CVG_RENDERER );
 	r_facePlaneCull = ri.Cvar_Get ("r_facePlaneCull", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_facePlaneCull, "Enables culling of planar surfaces with back side test." );
 

@@ -24,6 +24,13 @@ layout(constant_id = 14) const int apply_srgb_gamma = 0;
 layout(constant_id = 15) const int post_debug = 0;
 layout(constant_id = 36) const int postprocess_enabled = 1;
 
+layout(push_constant) uniform PaniniPC {
+	float aspect;
+	float paniniD;
+	float paniniS;
+	float padding;
+} paniniPC;
+
 const vec3 sRGB = vec3( 0.2126, 0.7152, 0.0722 );
 
 const int bayerSize = 8;
@@ -78,8 +85,36 @@ vec3 applyBloomKnee( vec3 color ) {
 	return mix( color, color * (1.0 - factor * 0.5), factor );
 }
 
+vec2 panini_project( vec2 uv, float aspect, float d, float s ) {
+	float safeAspect = max( aspect, 0.0001 );
+
+	vec2 p = uv * 2.0 - 1.0;
+	p.x *= safeAspect;
+
+	float x2 = p.x * p.x;
+	float y2 = p.y * p.y;
+
+	float invLen = inversesqrt( 1.0 + x2 + y2 );
+	float c = ( d + 1.0 ) / ( d + invLen );
+	vec2 pp = p * c;
+
+	pp.y = mix( pp.y, pp.y * ( 1.0 + s * ( abs( pp.x ) / safeAspect ) ), s );
+
+	pp.x /= safeAspect;
+
+	return pp * 0.5 + 0.5;
+}
+
 void main() {
-	vec3 hdr = texture( texture0, frag_tex_coord ).rgb;
+	vec2 uv = frag_tex_coord;
+
+	if ( paniniPC.paniniD > 0.0001 ) {
+		uv = panini_project( uv, paniniPC.aspect, paniniPC.paniniD, paniniPC.paniniS );
+	}
+
+	uv = clamp( uv, 0.0, 1.0 );
+
+	vec3 hdr = texture( texture0, uv ).rgb;
 	vec3 hdr_exposed = hdr;
 	if ( postprocess_enabled != 0 ) {
 		hdr_exposed *= exposure;
