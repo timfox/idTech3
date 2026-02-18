@@ -6,6 +6,8 @@
 #define USE_VK_VALIDATION
 #include <windows.h> // for win32 debug callback
 #endif
+
+	ADD_FRAG_SPEC( 36, postprocess_enabled );
 #endif
 
 
@@ -18,6 +20,7 @@ struct Vk_Pipeline_FragSpecData {
 	int32_t abs_light;
 	int32_t tex_mode;
 	int32_t discard_mode;
+	int32_t postprocess_enabled;
 	float   identity_color;
 	float	identity_alpha;
 	int32_t	acff;
@@ -50,6 +53,7 @@ struct Vk_Pipeline_FragSpecData {
 };
 
 static uint32_t vk_get_prefilter_mip_levels( void );
+float vk_get_pre_exposure_scale( void );
 
 static int vkSamples = VK_SAMPLE_COUNT_1_BIT;
 static int vkMaxSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -974,6 +978,25 @@ static void vk_create_render_passes( void )
 		VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.ssao ) );
 		SET_OBJECT_NAME( vk.render_pass.ssao, "render pass - ssao", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
 
+		// ssao blur pass (single color attachment)
+		attachments[0].flags = 0;
+		attachments[0].format = vk.ssao_format;
+		attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		attachments[0].initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+		desc.attachmentCount = 1;
+		colorRef0.attachment = 0;
+		colorRef0.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		Com_Memset( &subpass, 0, sizeof( subpass ) );
+		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		subpass.colorAttachmentCount = 1;
+		subpass.pColorAttachments = &colorRef0;
+
 		VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.ssao_blur ) );
 		SET_OBJECT_NAME( vk.render_pass.ssao_blur, "render pass - ssao_blur", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
 
@@ -987,6 +1010,14 @@ static void vk_create_render_passes( void )
 		attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		attachments[0].initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+		desc.attachmentCount = 1;
+		colorRef0.attachment = 0;
+		colorRef0.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		Com_Memset( &subpass, 0, sizeof( subpass ) );
+		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		subpass.colorAttachmentCount = 1;
+		subpass.pColorAttachments = &colorRef0;
 
 		VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.ssao_combine ) );
 		SET_OBJECT_NAME( vk.render_pass.ssao_combine, "render pass - ssao_combine", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
@@ -3866,7 +3897,7 @@ static void create_depth_attachment( uint32_t width, uint32_t height, VkSampleCo
 	create_desc.samples = samples;
 	create_desc.tiling = VK_IMAGE_TILING_OPTIMAL;
 	create_desc.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-	if ( r_ssao && r_ssao->integer ) {
+	if ( r_ssao && r_ssao->integer && !allowTransient ) {
 		create_desc.usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
 	}
 	if ( allowTransient ) {
@@ -6098,6 +6129,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	VkPipelineMultisampleStateCreateInfo multisample_state;
 	VkPipelineColorBlendStateCreateInfo blend_state;
 	VkPipelineColorBlendAttachmentState attachment_blend_state;
+	VkPipelineColorBlendAttachmentState color_blend_states[2];
 	VkGraphicsPipelineCreateInfo create_info;
 	VkViewport viewport;
 	VkRect2D scissor;
@@ -6113,7 +6145,7 @@ VkSpecializationMapEntry spec_entries[15];
 
 	struct PostProcess_FragSpecData {
 		float gamma;
-		float overbright;
+		float preExposureScale;
 		float greyscale;
 		float bloom_threshold;
 		float bloom_intensity;
@@ -6243,7 +6275,7 @@ VkSpecializationMapEntry spec_entries[15];
 	set_shader_stage_desc( shader_stages+1, VK_SHADER_STAGE_FRAGMENT_BIT, fsmodule, "main" );
 
 	frag_spec_data.gamma = 1.0 / (r_gamma->value);
-	frag_spec_data.overbright = (float)(1 << tr.overbrightBits);
+	frag_spec_data.preExposureScale = vk_get_pre_exposure_scale();
 	frag_spec_data.greyscale = r_greyscale->value;
 	frag_spec_data.bloom_threshold = r_bloom_threshold->value;
 	frag_spec_data.bloom_intensity = r_bloom_intensity->value;
@@ -6264,8 +6296,8 @@ VkSpecializationMapEntry spec_entries[15];
 	spec_entries[0].size = sizeof( frag_spec_data.gamma );
 
 	spec_entries[1].constantID = 1;
-	spec_entries[1].offset = offsetof( struct PostProcess_FragSpecData, overbright );
-	spec_entries[1].size = sizeof( frag_spec_data.overbright );
+	spec_entries[1].offset = offsetof( struct PostProcess_FragSpecData, preExposureScale );
+	spec_entries[1].size = sizeof( frag_spec_data.preExposureScale );
 
 	spec_entries[2].constantID = 2;
 	spec_entries[2].offset = offsetof( struct PostProcess_FragSpecData, greyscale );
@@ -6419,13 +6451,26 @@ VkSpecializationMapEntry spec_entries[15];
 		attachment_blend_state.alphaBlendOp = VK_BLEND_OP_ADD;
 	}
 
+	color_blend_states[0] = attachment_blend_state;
+
+	if ( program_index == 5 ) {
+		Com_Memset(&color_blend_states[1], 0, sizeof(color_blend_states[1]));
+		color_blend_states[1].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+		color_blend_states[1].blendEnable = VK_FALSE;
+	}
+
 	blend_state.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 	blend_state.pNext = NULL;
 	blend_state.flags = 0;
 	blend_state.logicOpEnable = VK_FALSE;
 	blend_state.logicOp = VK_LOGIC_OP_COPY;
-	blend_state.attachmentCount = 1;
-	blend_state.pAttachments = &attachment_blend_state;
+	if ( program_index == 5 ) {
+		blend_state.attachmentCount = 2;
+		blend_state.pAttachments = color_blend_states;
+	} else {
+		blend_state.attachmentCount = 1;
+		blend_state.pAttachments = color_blend_states;
+	}
 	blend_state.blendConstants[0] = 0.0f;
 	blend_state.blendConstants[1] = 0.0f;
 	blend_state.blendConstants[2] = 0.0f;
@@ -6688,11 +6733,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
     static cvar_t *specularAaModeCvar = NULL;
     static cvar_t *specularAaStrengthCvar = NULL;
 
-#ifdef USE_VK_PBR
     VkSpecializationMapEntry spec_entries[37];
-#else
-    VkSpecializationMapEntry spec_entries[12];
-#endif
 	
 	VkSpecializationInfo frag_spec_info;
 	VkPipelineVertexInputStateCreateInfo vertex_input_state;
@@ -7230,6 +7271,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	} else {
 		frag_spec_data.acff = 0;
 	}
+
+	frag_spec_data.postprocess_enabled = ( vk.fboActive && r_fbo->integer ) ? 1 : 0;
 
 	//
 	// vertex module specialization data
@@ -9735,6 +9778,19 @@ static uint32_t vk_get_prefilter_mip_levels( void )
 	}
 #endif
 	return 1;
+}
+
+float vk_get_pre_exposure_scale( void )
+{
+	if ( r_hdr && r_hdr->integer > 0 ) {
+		return 1.0f;
+	}
+
+	if ( tr.overbrightBits > 0 ) {
+		return (float)( 1 << tr.overbrightBits );
+	}
+
+	return 1.0f;
 }
 
 static uint32_t vk_pow2_floor_u32( uint32_t v )

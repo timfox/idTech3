@@ -380,6 +380,7 @@ void vk_destroy_image_resources( VkImage *image, VkImageView *imageView );
 void vk_bind_generated_shaders( void );
 void vk_update_attachment_descriptors( void );
 void vk_validate_pbr_ibl_resources( void );
+float vk_get_pre_exposure_scale( void );
 void vk_destroy_samplers( void );
 
 uint32_t vk_find_pipeline_ext( uint32_t base, const Vk_Pipeline_Def *def, qboolean use );

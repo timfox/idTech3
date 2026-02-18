@@ -2875,4 +2875,12 @@ void RE_LoadWorldMap( const char *name ) {
 		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "PBR IBL: no cubemaps found (env.json or cubemap entities). Reflections will look generic.\n" S_COLOR_WHITE );
 	}
 #endif
+
+#ifdef USE_VULKAN
+	{
+		cvar_t *applyGammaCvar = ri.Cvar_Get( "r_applySrgbGamma", "1", CVAR_ARCHIVE_ND );
+		ri.Printf( PRINT_DEVELOPER, "PostProcess: exposure=%.2f preExposureScale=%.2f apply_srgb_gamma=%d swapchain=%s\n",
+			r_exposure->value, vk_get_pre_exposure_scale(), applyGammaCvar->integer, vk_format_string( vk.present_format.format ) );
+	}
+#endif
 }
