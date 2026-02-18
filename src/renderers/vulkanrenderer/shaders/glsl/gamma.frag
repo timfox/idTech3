@@ -7,7 +7,7 @@ layout(location = 0) in vec2 frag_tex_coord;
 layout(location = 0) out vec4 out_color;
 
 layout(constant_id = 0) const float gamma = 1.0;
-layout(constant_id = 1) const float obScale = 2.0;
+layout(constant_id = 1) const float obScale = 1.0;
 layout(constant_id = 2) const float greyscale = 0.0;
 layout(constant_id = 3) const float bloom_threshold = 0.6;
 layout(constant_id = 4) const float bloom_intensity = 0.5;
@@ -79,6 +79,7 @@ vec3 applyBloomKnee( vec3 color ) {
 void main() {
 	vec3 hdr = texture( texture0, frag_tex_coord ).rgb;
 	hdr *= exposure;
+	hdr *= obScale;
 	hdr = applyBloomKnee( hdr );
 
 	if ( tonemap_mode == 2 ) {
@@ -87,26 +88,26 @@ void main() {
 		hdr = Tonemap_ACES( hdr );
 	}
 
-	vec3 base = hdr * obScale;
+	vec3 ldr = clamp( hdr, 0.0, 1.0 );
 
 	if ( greyscale == 1 ) {
-		base = vec3( dot( base, sRGB ) );
+		ldr = vec3( dot( ldr, sRGB ) );
 	} else if ( greyscale != 0 ) {
-		vec3 luma = vec3( dot( base, sRGB ) );
-		base = mix( base, luma, greyscale );
+		vec3 luma = vec3( dot( ldr, sRGB ) );
+		ldr = mix( ldr, luma, greyscale );
 	}
 
 	if ( gamma != 1.0 ) {
-		base = pow( base, vec3( gamma ) );
+		ldr = pow( ldr, vec3( gamma ) );
 	}
 
 	if ( apply_srgb_gamma != 0 ) {
-		base = pow( base, vec3( 1.0 / 2.2 ) );
+		ldr = pow( ldr, vec3( 1.0 / 2.2 ) );
 	}
 
 	if ( ditherMode == 1 ) {
-		base = dither( base );
+		ldr = dither( ldr );
 	}
 
-	out_color = vec4( base, 1.0 );
+	out_color = vec4( ldr, 1.0 );
 }
