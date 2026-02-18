@@ -1505,6 +1505,7 @@ extern	cvar_t	*r_nocurves;
 extern	cvar_t	*r_showcluster;
 
 extern cvar_t	*r_gamma;
+extern cvar_t	*r_panini;
 extern cvar_t	*r_paniniD;
 extern cvar_t	*r_paniniS;
 

@@ -183,6 +183,7 @@ cvar_t	*r_mipLodBias;
 cvar_t	*r_offsetFactor;
 cvar_t	*r_offsetUnits;
 cvar_t	*r_gamma;
+cvar_t	*r_panini;
 cvar_t	*r_paniniD;
 cvar_t	*r_paniniS;
 cvar_t	*r_intensity;
@@ -1733,6 +1734,11 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_gamma, "0.5", "3", CV_FLOAT );
 	ri.Cvar_SetDescription( r_gamma, "Gamma correction factor." );
 	ri.Cvar_SetGroup( r_gamma, CVG_RENDERER );
+
+	r_panini = ri.Cvar_Get( "r_panini", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_panini, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_panini, "Enable Panini projection warp." );
+	ri.Cvar_SetGroup( r_panini, CVG_RENDERER );
 
 	r_paniniD = ri.Cvar_Get( "r_paniniD", "0.0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_paniniD, "0.0", "2.0", CV_FLOAT );
