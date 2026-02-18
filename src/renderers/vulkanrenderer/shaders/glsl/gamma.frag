@@ -85,6 +85,14 @@ vec3 applyBloomKnee( vec3 color ) {
 	return mix( color, color * (1.0 - factor * 0.5), factor );
 }
 
+vec3 linear_to_srgb( vec3 x ) {
+	x = max( x, vec3( 0.0 ) );
+	vec3 lo = x * 12.92;
+	vec3 hi = 1.055 * pow( x, vec3( 1.0 / 2.4 ) ) - 0.055;
+	bvec3 cut = lessThanEqual( x, vec3( 0.0031308 ) );
+	return mix( hi, lo, vec3( cut ) );
+}
+
 vec2 panini_project( vec2 uv, float aspect, float d, float s ) {
 	float safeAspect = max( aspect, 0.0001 );
 
@@ -131,6 +139,13 @@ void main() {
 		}
 	}
 
+	vec3 base = tonemapped;
+	base = max( base, vec3( 0.0 ) );
+	base = pow( base, vec3( gamma ) );
+	if ( apply_srgb_gamma != 0 ) {
+		base = linear_to_srgb( base );
+	}
+
 	vec3 ldr;
 	if ( postprocess_enabled != 0 ) {
 		if ( post_debug == 1 ) {
@@ -141,25 +156,19 @@ void main() {
 			float heat = clamp( ( logLum + 6.0 ) / 8.0, 0.0, 1.0 );
 			ldr = vec3( heat, clamp( heat * 0.25, 0.0, 1.0 ), 1.0 - heat );
 		} else {
-			ldr = clamp( tonemapped, 0.0, 1.0 );
+			ldr = clamp( base, 0.0, 1.0 );
 			if ( greyscale == 1.0 ) {
 				ldr = vec3( dot( ldr, sRGB ) );
 			} else if ( greyscale != 0.0 ) {
 				vec3 luma = vec3( dot( ldr, sRGB ) );
 				ldr = mix( ldr, luma, greyscale );
 			}
-			if ( gamma != 1.0 ) {
-				ldr = pow( ldr, vec3( gamma ) );
-			}
 			if ( ditherMode == 1 ) {
 				ldr = dither( ldr );
 			}
 		}
 	} else {
-		ldr = clamp( tonemapped, 0.0, 1.0 );
-		if ( apply_srgb_gamma != 0 ) {
-			ldr = pow( ldr, vec3( 1.0 / 2.2 ) );
-		}
+		ldr = clamp( base, 0.0, 1.0 );
 		if ( ditherMode == 1 ) {
 			ldr = dither( ldr );
 		}
