@@ -1,11 +1,43 @@
 #include "tr_local.h"
 #include "vk.h"
 
+static cvar_t *vk_get_cvar_clearhdr( void ) {
+	static cvar_t *vk_r_vk_clearhdr;
+
+	if ( !vk_r_vk_clearhdr ) {
+		vk_r_vk_clearhdr = ri.Cvar_Get( "r_vk_clearhdr", "1", CVAR_ARCHIVE_ND );
+	}
+
+	return vk_r_vk_clearhdr;
+}
+
+static cvar_t *vk_get_cvar_disableblend( void ) {
+	static cvar_t *vk_r_vk_disableblend;
+
+	if ( !vk_r_vk_disableblend ) {
+		vk_r_vk_disableblend = ri.Cvar_Get( "r_vk_disableblend", "1", CVAR_ARCHIVE_ND );
+	}
+
+	return vk_r_vk_disableblend;
+}
+
+static cvar_t *vk_get_cvar_bindlog( void ) {
+	static cvar_t *vk_r_vk_bindlog;
+
+	if ( !vk_r_vk_bindlog ) {
+		vk_r_vk_bindlog = ri.Cvar_Get( "r_vk_bindlog", "0", CVAR_ARCHIVE_ND );
+	}
+
+	return vk_r_vk_bindlog;
+}
+
 #if defined (_DEBUG)
 #if defined (_WIN32)
 #define USE_VK_VALIDATION
 #include <windows.h> // for win32 debug callback
 #endif
+
+	ADD_FRAG_SPEC( 36, postprocess_enabled );
 #endif
 
 
@@ -18,6 +50,7 @@ struct Vk_Pipeline_FragSpecData {
 	int32_t abs_light;
 	int32_t tex_mode;
 	int32_t discard_mode;
+	int32_t postprocess_enabled;
 	float   identity_color;
 	float	identity_alpha;
 	int32_t	acff;
@@ -43,8 +76,21 @@ struct Vk_Pipeline_FragSpecData {
 	int32_t anisotropy_texture_set;
 	int32_t transmission_texture_set;
 	int32_t subsurface_texture_set;
+	int32_t specular_aa_mode;
+	float specular_aa_strength;
+	int32_t env_prefilter_mip_levels;
 #endif
 };
+
+typedef struct {
+	float aspect;
+	float paniniD;
+	float paniniS;
+	float padding;
+} VkPostProcessPushConstants;
+
+static uint32_t vk_get_prefilter_mip_levels( void );
+float vk_get_pre_exposure_scale( void );
 
 static int vkSamples = VK_SAMPLE_COUNT_1_BIT;
 static int vkMaxSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -712,6 +758,8 @@ static void vk_create_render_passes( void )
 	VkAttachmentDescription attachments[3]; // color | depth | msaa color
 	VkAttachmentReference colorResolveRef;
 	VkAttachmentReference colorRef0;
+	VkAttachmentReference colorRef1;
+	VkAttachmentReference colorRefs[2];
 	VkAttachmentReference depthRef0;
 	VkSubpassDescription subpass;
 	VkSubpassDependency deps[3];
@@ -746,15 +794,9 @@ static void vk_create_render_passes( void )
 		attachments[0].flags = 0;
 		attachments[0].format = vk.color_format;
 		attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
-
-#ifdef USE_BUFFER_CLEAR
-		if ( vk.msaaActive )
-			attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;	// Assuming this will be completely overwritten
-		else
-			attachments[ 0 ].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-#else
-		attachments[ 0 ].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;	// Assuming this will be completely overwritten
-#endif
+		attachments[0].loadOp = ( vk_get_cvar_clearhdr()->integer ) ?
+			VK_ATTACHMENT_LOAD_OP_CLEAR :
+			VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 
 		attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;   // needed for next render pass
 		attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -929,15 +971,20 @@ static void vk_create_render_passes( void )
 	if ( r_ssao && r_ssao->integer && r_fbo->integer )
 	{
 		// ssao render pass
-		desc.attachmentCount = 1;
+		desc.attachmentCount = 2;
 
 		colorRef0.attachment = 0;
 		colorRef0.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		colorRef1.attachment = 1;
+		colorRef1.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+		colorRefs[0] = colorRef0;
+		colorRefs[1] = colorRef1;
 
 		Com_Memset( &subpass, 0, sizeof( subpass ) );
 		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		subpass.colorAttachmentCount = 1;
-		subpass.pColorAttachments = &colorRef0;
+		subpass.colorAttachmentCount = 2;
+		subpass.pColorAttachments = colorRefs;
 
 		attachments[0].flags = 0;
 		attachments[0].format = vk.ssao_format;
@@ -949,8 +996,37 @@ static void vk_create_render_passes( void )
 		attachments[0].initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
+		attachments[1].flags = 0;
+		attachments[1].format = VK_FORMAT_R8G8B8A8_UINT;
+		attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
+		attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		attachments[1].initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		attachments[1].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
 		VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.ssao ) );
 		SET_OBJECT_NAME( vk.render_pass.ssao, "render pass - ssao", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
+
+		// ssao blur pass (single color attachment)
+		attachments[0].flags = 0;
+		attachments[0].format = vk.ssao_format;
+		attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		attachments[0].initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+		desc.attachmentCount = 1;
+		colorRef0.attachment = 0;
+		colorRef0.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		Com_Memset( &subpass, 0, sizeof( subpass ) );
+		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		subpass.colorAttachmentCount = 1;
+		subpass.pColorAttachments = &colorRef0;
 
 		VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.ssao_blur ) );
 		SET_OBJECT_NAME( vk.render_pass.ssao_blur, "render pass - ssao_blur", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
@@ -965,6 +1041,14 @@ static void vk_create_render_passes( void )
 		attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		attachments[0].initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+		desc.attachmentCount = 1;
+		colorRef0.attachment = 0;
+		colorRef0.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		Com_Memset( &subpass, 0, sizeof( subpass ) );
+		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		subpass.colorAttachmentCount = 1;
+		subpass.pColorAttachments = &colorRef0;
 
 		VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.ssao_combine ) );
 		SET_OBJECT_NAME( vk.render_pass.ssao_combine, "render pass - ssao_combine", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
@@ -1626,7 +1710,7 @@ static VkFormat get_hdr_format( VkFormat base_format )
 
 	switch ( r_hdr->integer ) {
 		case -1: return VK_FORMAT_B4G4R4A4_UNORM_PACK16;
-		case 1: return VK_FORMAT_R16G16B16A16_UNORM;
+		case 1: return VK_FORMAT_R16G16B16A16_SFLOAT;
 		default: return base_format;
 	}
 }
@@ -1830,6 +1914,19 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 	}
 
 	setup_surface_formats( physical_device );
+
+	if ( r_vk_swapchain_srgb ) {
+		ri.Cvar_SetValue( "r_vk_swapchain_srgb", ( vk.present_format.colorSpace == VK_COLORSPACE_SRGB_NONLINEAR_KHR ) ? 1.0f : 0.0f );
+	}
+	ri.Printf( PRINT_ALL, "Swapchain format %s (%s)\n",
+		vk_format_string( vk.present_format.format ),
+		( vk.present_format.colorSpace == VK_COLORSPACE_SRGB_NONLINEAR_KHR ) ? "SRGB" : "linear" );
+	ri.Printf( PRINT_ALL, "Post settings - r_post=%d, r_exposure=%.2f, r_tonemap=%d, r_post_debug=%d, r_vk_bindlog=%d\n",
+		r_post ? r_post->integer : 0,
+		r_exposure->value,
+		r_tonemap->integer,
+		r_post_debug->integer,
+		vk_get_cvar_bindlog()->integer );
 
 	// select queue family
 	{
@@ -3844,7 +3941,7 @@ static void create_depth_attachment( uint32_t width, uint32_t height, VkSampleCo
 	create_desc.samples = samples;
 	create_desc.tiling = VK_IMAGE_TILING_OPTIMAL;
 	create_desc.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-	if ( r_ssao && r_ssao->integer ) {
+	if ( r_ssao && r_ssao->integer && !allowTransient ) {
 		create_desc.usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
 	}
 	if ( allowTransient ) {
@@ -3911,6 +4008,8 @@ static void vk_create_attachments( void )
 		if ( r_ssao && r_ssao->integer ) {
 			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.ssao_format,
 				usage, &vk.ssao_image, &vk.ssao_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
+			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_UINT,
+				usage, &vk.vao_mask_image, &vk.vao_mask_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.ssao_format,
 				usage, &vk.ssao_blur_image, &vk.ssao_blur_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 		}
@@ -4192,19 +4291,22 @@ static void vk_create_framebuffers( void )
 	{
 		// ssao
 		desc.renderPass = vk.render_pass.ssao;
-		desc.attachmentCount = 1;
+		desc.attachmentCount = 2;
 		desc.width = glConfig.vidWidth;
 		desc.height = glConfig.vidHeight;
 		framebuffer_attachments[0] = vk.ssao_image_view;
+		framebuffer_attachments[1] = vk.vao_mask_image_view;
 		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.ssao ) );
 		SET_OBJECT_NAME( vk.framebuffers.ssao, "framebuffer - ssao", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
 
 		desc.renderPass = vk.render_pass.ssao_blur;
+		desc.attachmentCount = 1;
 		framebuffer_attachments[0] = vk.ssao_blur_image_view;
 		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.ssao_blur ) );
 		SET_OBJECT_NAME( vk.framebuffers.ssao_blur, "framebuffer - ssao_blur", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
 
 		desc.renderPass = vk.render_pass.ssao_combine;
+		desc.attachmentCount = 1;
 		framebuffer_attachments[0] = vk.color_image_view;
 		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.ssao_combine ) );
 		SET_OBJECT_NAME( vk.framebuffers.ssao_combine, "framebuffer - ssao_combine", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
@@ -4610,7 +4712,8 @@ void vk_initialize( void )
 
 	// fill glConfig information
 
-	glConfig.maxTextureSize = props.limits.maxImageDimension2D;
+	vk.hwMaxImageDimension2D = props.limits.maxImageDimension2D;
+	glConfig.maxTextureSize = (int)vk.hwMaxImageDimension2D;
 
 	if ( glConfig.maxTextureSize > MAX_TEXTURE_SIZE )
 		glConfig.maxTextureSize = MAX_TEXTURE_SIZE; // ResampleTexture() relies on that maximum
@@ -4635,10 +4738,10 @@ void vk_initialize( void )
 	if ( r_pbr->integer ) {
 		if ( !vk.fboActive ) {
 			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "PBR: disabled (requires \\r_fbo 1)\n" S_COLOR_WHITE );
-		} else if ( vk.maxBoundDescriptorSets < 10 ) {
-			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "PBR: disabled (insufficient descriptor sets: have %u, need >= 10)\n" S_COLOR_WHITE,
-				(unsigned)vk.maxBoundDescriptorSets );
-		} else {
+		} else if ( vk.maxBoundDescriptorSets < VK_DESC_COUNT ) {
+			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "PBR: disabled (insufficient descriptor sets: have %u, need >= %u)\n" S_COLOR_WHITE,
+				(unsigned)vk.maxBoundDescriptorSets, (unsigned)VK_DESC_COUNT );
+			} else {
 			vk.pbrActive = qtrue;
 			ri.Printf( PRINT_ALL, "PBR: enabled\n" );
 		}
@@ -4929,6 +5032,8 @@ void vk_initialize( void )
 		set_layouts[14] = vk.set_layout_sampler; // anisotropy
 		set_layouts[15] = vk.set_layout_sampler; // transmission
 		set_layouts[16] = vk.set_layout_sampler; // subsurface
+		set_layouts[17] = vk.set_layout_sampler; // LTC matrix LUT
+		set_layouts[18] = vk.set_layout_sampler; // LTC amplitude LUT
 #endif
 		desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		desc.pNext = NULL;
@@ -4959,17 +5064,23 @@ void vk_initialize( void )
 		set_layouts[2] = vk.set_layout_sampler; // sampler
 		set_layouts[3] = vk.set_layout_sampler; // sampler
 
+		push_range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		push_range.offset = 0;
+		push_range.size = sizeof( VkPostProcessPushConstants );
+
 		desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		desc.pNext = NULL;
 		desc.flags = 0;
 		desc.setLayoutCount = 1;
 		desc.pSetLayouts = set_layouts;
-		desc.pushConstantRangeCount = 0;
-		desc.pPushConstantRanges = NULL;
+		desc.pushConstantRangeCount = 1;
+		desc.pPushConstantRanges = &push_range;
 
 		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_post_process ) );
 
 		desc.setLayoutCount = VK_NUM_BLOOM_PASSES;
+		desc.pushConstantRangeCount = 0;
+		desc.pPushConstantRanges = NULL;
 
 		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_blend ) );
 
@@ -5092,6 +5203,13 @@ static void vk_destroy_attachments( void )
 		qvkDestroyImageView( vk.device, vk.ssao_image_view, NULL );
 		vk.ssao_image = VK_NULL_HANDLE;
 		vk.ssao_image_view = VK_NULL_HANDLE;
+	}
+
+	if ( vk.vao_mask_image ) {
+		qvkDestroyImage( vk.device, vk.vao_mask_image, NULL );
+		qvkDestroyImageView( vk.device, vk.vao_mask_image_view, NULL );
+		vk.vao_mask_image = VK_NULL_HANDLE;
+		vk.vao_mask_image_view = VK_NULL_HANDLE;
 	}
 
 	if ( vk.ssao_blur_image ) {
@@ -5827,6 +5945,10 @@ static byte *resample_image_data( const int target_format, byte *data, const int
 		return buffer;
 	}
 
+	case VK_FORMAT_R16G16B16A16_SFLOAT:
+		*bytes_per_pixel = 8;
+		return data;
+
 	default:
 		*bytes_per_pixel = 4;
 		return data;
@@ -6057,10 +6179,11 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	VkPipelineMultisampleStateCreateInfo multisample_state;
 	VkPipelineColorBlendStateCreateInfo blend_state;
 	VkPipelineColorBlendAttachmentState attachment_blend_state;
+	VkPipelineColorBlendAttachmentState color_blend_states[2];
 	VkGraphicsPipelineCreateInfo create_info;
 	VkViewport viewport;
 	VkRect2D scissor;
-	VkSpecializationMapEntry spec_entries[11];
+VkSpecializationMapEntry spec_entries[17];
 	VkSpecializationInfo frag_spec_info;
 	VkPipeline *pipeline;
 	VkShaderModule fsmodule;
@@ -6072,7 +6195,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 
 	struct PostProcess_FragSpecData {
 		float gamma;
-		float overbright;
+		float preExposureScale;
 		float greyscale;
 		float bloom_threshold;
 		float bloom_intensity;
@@ -6082,6 +6205,12 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 		int depth_r;
 		int depth_g;
 		int depth_b;
+		float exposure;
+		float bloom_knee;
+		int tonemap_mode;
+		int apply_srgb_gamma;
+		int post_debug;
+		int postprocess_enabled;
 	} frag_spec_data;
 
 	switch ( program_index ) {
@@ -6198,13 +6327,20 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	set_shader_stage_desc( shader_stages+1, VK_SHADER_STAGE_FRAGMENT_BIT, fsmodule, "main" );
 
 	frag_spec_data.gamma = 1.0 / (r_gamma->value);
-	frag_spec_data.overbright = (float)(1 << tr.overbrightBits);
+	frag_spec_data.preExposureScale = vk_get_pre_exposure_scale();
 	frag_spec_data.greyscale = r_greyscale->value;
 	frag_spec_data.bloom_threshold = r_bloom_threshold->value;
 	frag_spec_data.bloom_intensity = r_bloom_intensity->value;
 	frag_spec_data.bloom_threshold_mode = r_bloom_threshold_mode->integer;
 	frag_spec_data.bloom_modulate = r_bloom_modulate->integer;
 	frag_spec_data.dither = r_dither->integer;
+	frag_spec_data.exposure = r_exposure->value;
+	frag_spec_data.bloom_knee = r_bloomKnee->value;
+	frag_spec_data.tonemap_mode = r_tonemap->integer;
+	cvar_t *applyGammaCvar = ri.Cvar_Get( "r_applySrgbGamma", "0", CVAR_ARCHIVE_ND );
+	frag_spec_data.apply_srgb_gamma = applyGammaCvar->integer;
+	frag_spec_data.post_debug = r_post_debug->integer;
+	frag_spec_data.postprocess_enabled = ( r_post && r_post->integer && vk.fboActive && r_fbo->integer ) ? 1 : 0;
 
 	if ( !vk_surface_format_color_depth( vk.present_format.format, &frag_spec_data.depth_r, &frag_spec_data.depth_g, &frag_spec_data.depth_b ) )
 		ri.Printf( PRINT_ALL, "Format %s not recognized, dither to assume 8bpc\n", vk_format_string( vk.base_format.format ) );
@@ -6214,8 +6350,8 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	spec_entries[0].size = sizeof( frag_spec_data.gamma );
 
 	spec_entries[1].constantID = 1;
-	spec_entries[1].offset = offsetof( struct PostProcess_FragSpecData, overbright );
-	spec_entries[1].size = sizeof( frag_spec_data.overbright );
+	spec_entries[1].offset = offsetof( struct PostProcess_FragSpecData, preExposureScale );
+	spec_entries[1].size = sizeof( frag_spec_data.preExposureScale );
 
 	spec_entries[2].constantID = 2;
 	spec_entries[2].offset = offsetof( struct PostProcess_FragSpecData, greyscale );
@@ -6253,7 +6389,31 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	spec_entries[10].offset = offsetof(struct PostProcess_FragSpecData, depth_b);
 	spec_entries[10].size = sizeof(frag_spec_data.depth_b);
 
-	frag_spec_info.mapEntryCount = 11;
+	spec_entries[11].constantID = 11;
+	spec_entries[11].offset = offsetof(struct PostProcess_FragSpecData, exposure);
+	spec_entries[11].size = sizeof(frag_spec_data.exposure);
+
+	spec_entries[12].constantID = 12;
+	spec_entries[12].offset = offsetof(struct PostProcess_FragSpecData, bloom_knee);
+	spec_entries[12].size = sizeof(frag_spec_data.bloom_knee);
+
+	spec_entries[13].constantID = 13;
+	spec_entries[13].offset = offsetof(struct PostProcess_FragSpecData, tonemap_mode);
+	spec_entries[13].size = sizeof(frag_spec_data.tonemap_mode);
+
+	spec_entries[14].constantID = 14;
+	spec_entries[14].offset = offsetof(struct PostProcess_FragSpecData, apply_srgb_gamma);
+	spec_entries[14].size = sizeof(frag_spec_data.apply_srgb_gamma);
+
+	spec_entries[15].constantID = 15;
+	spec_entries[15].offset = offsetof(struct PostProcess_FragSpecData, post_debug);
+	spec_entries[15].size = sizeof(frag_spec_data.post_debug);
+
+	spec_entries[16].constantID = 36;
+	spec_entries[16].offset = offsetof(struct PostProcess_FragSpecData, postprocess_enabled);
+	spec_entries[16].size = sizeof(frag_spec_data.postprocess_enabled);
+
+	frag_spec_info.mapEntryCount = 17;
 	frag_spec_info.pMapEntries = spec_entries;
 	frag_spec_info.dataSize = sizeof( frag_spec_data );
 	frag_spec_info.pData = &frag_spec_data;
@@ -6353,13 +6513,26 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 		attachment_blend_state.alphaBlendOp = VK_BLEND_OP_ADD;
 	}
 
+	color_blend_states[0] = attachment_blend_state;
+
+	if ( program_index == 5 ) {
+		Com_Memset(&color_blend_states[1], 0, sizeof(color_blend_states[1]));
+		color_blend_states[1].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+		color_blend_states[1].blendEnable = VK_FALSE;
+	}
+
 	blend_state.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 	blend_state.pNext = NULL;
 	blend_state.flags = 0;
 	blend_state.logicOpEnable = VK_FALSE;
 	blend_state.logicOp = VK_LOGIC_OP_COPY;
-	blend_state.attachmentCount = 1;
-	blend_state.pAttachments = &attachment_blend_state;
+	if ( program_index == 5 ) {
+		blend_state.attachmentCount = 2;
+		blend_state.pAttachments = color_blend_states;
+	} else {
+		blend_state.attachmentCount = 1;
+		blend_state.pAttachments = color_blend_states;
+	}
 	blend_state.blendConstants[0] = 0.0f;
 	blend_state.blendConstants[1] = 0.0f;
 	blend_state.blendConstants[2] = 0.0f;
@@ -6619,12 +6792,10 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	//int32_t vert_spec_data[1]; // clippping
 	//VkSpecializationInfo vert_spec_info;
     struct Vk_Pipeline_FragSpecData frag_spec_data;
+    static cvar_t *specularAaModeCvar = NULL;
+    static cvar_t *specularAaStrengthCvar = NULL;
 
-#ifdef USE_VK_PBR
     VkSpecializationMapEntry spec_entries[37];
-#else
-    VkSpecializationMapEntry spec_entries[12];
-#endif
 	
 	VkSpecializationInfo frag_spec_info;
 	VkPipelineVertexInputStateCreateInfo vertex_input_state;
@@ -7163,6 +7334,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 		frag_spec_data.acff = 0;
 	}
 
+	frag_spec_data.postprocess_enabled = ( vk.fboActive && r_fbo->integer ) ? 1 : 0;
+
 	//
 	// vertex module specialization data
 	//
@@ -7225,6 +7398,9 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	ADD_FRAG_SPEC( 29, subsurface_texture_set );
 	ADD_FRAG_SPEC( 30, deluxe_mapping );
 	ADD_FRAG_SPEC( 31, deluxe_specular_scale );
+	ADD_FRAG_SPEC( 32, specular_aa_mode );
+	ADD_FRAG_SPEC( 33, specular_aa_strength );
+	ADD_FRAG_SPEC( 35, env_prefilter_mip_levels );
 
 	// only use w value, specgloss maps are not supported
 	frag_spec_data.specularScale_x = def->specularScale[0];
@@ -7248,6 +7424,34 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	frag_spec_data.anisotropy_texture_set = 0;
 	frag_spec_data.transmission_texture_set = 0;
 	frag_spec_data.subsurface_texture_set = 0;
+	if ( !specularAaModeCvar ) {
+		specularAaModeCvar = ri.Cvar_Get( "r_specularAA", "1", CVAR_ARCHIVE_ND );
+	}
+	if ( !specularAaStrengthCvar ) {
+		specularAaStrengthCvar = ri.Cvar_Get( "r_specularAAStrength", "0.5", CVAR_ARCHIVE_ND );
+	}
+
+	frag_spec_data.specular_aa_mode = specularAaModeCvar->integer;
+	frag_spec_data.specular_aa_strength = specularAaStrengthCvar->value;
+	frag_spec_data.env_prefilter_mip_levels = vk_get_prefilter_mip_levels();
+
+	/*if ( ( def->vk_pbr_flags & PBR_HAS_EMISSIVE ) == 0 )
+		frag_spec_data.emissive_texture_set = -1;
+
+	if ( ( def->vk_pbr_flags & PBR_HAS_CLEARCOAT ) == 0 )
+		frag_spec_data.clearcoat_texture_set = -1;
+
+	if ( ( def->vk_pbr_flags & PBR_HAS_SHEEN ) == 0 )
+		frag_spec_data.sheen_texture_set = -1;
+
+	if ( ( def->vk_pbr_flags & PBR_HAS_ANISOTROPY ) == 0 )
+		frag_spec_data.anisotropy_texture_set = -1;
+
+	if ( ( def->vk_pbr_flags & PBR_HAS_TRANSMISSION ) == 0 )
+		frag_spec_data.transmission_texture_set = -1;
+
+	if ( ( def->vk_pbr_flags & PBR_HAS_SUBSURFACE ) == 0 )
+		frag_spec_data.subsurface_texture_set = -1;*/
 
 	if ( ( def->vk_pbr_flags & PBR_HAS_NORMALMAP ) == 0 )
 		frag_spec_data.normal_texture_set = -1;
@@ -7263,6 +7467,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 
 	if ( ( def->vk_pbr_flags & PBR_HAS_LIGHTMAP ) == 0 )
 		frag_spec_data.lightmap_texture_set = -1;
+		
 #ifdef HDR_DELUXE_LIGHTMAP
 	if ( r_deluxeMapping->integer )
 	{
@@ -7714,11 +7919,18 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 
 	Com_Memset(&attachment_blend_state, 0, sizeof(attachment_blend_state));
 	attachment_blend_state.blendEnable = (state_bits & (GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS)) ? VK_TRUE : VK_FALSE;
+	qboolean forcedBlendOff = qfalse;
+
 
 	if (def->shadow_phase == SHADOW_EDGES || def->shader_type == TYPE_SIGNLE_TEXTURE_DF)
 		attachment_blend_state.colorWriteMask = 0;
 	else
 		attachment_blend_state.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
+	if ( vk_get_cvar_disableblend()->integer && renderPassIndex == RENDER_PASS_MAIN && attachment_blend_state.blendEnable ) {
+		attachment_blend_state.blendEnable = VK_FALSE;
+		forcedBlendOff = qtrue;
+	}
 
 	if (attachment_blend_state.blendEnable) {
 		switch (state_bits & GLS_SRCBLEND_BITS) {
@@ -7809,6 +8021,13 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	blend_state.blendConstants[1] = 0.0f;
 	blend_state.blendConstants[2] = 0.0f;
 	blend_state.blendConstants[3] = 0.0f;
+
+	if ( vk.renderPassIndex == RENDER_PASS_MAIN ) {
+		const char *blend_state_str = attachment_blend_state.blendEnable ? "enabled" :
+			( forcedBlendOff ? "forced-disabled" : "disabled" );
+		ri.Printf( PRINT_DEVELOPER, "VK main pipeline blend=%s, color_format=%s\n",
+			blend_state_str, vk_format_string( vk.color_format ) );
+	}
 
 	dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
 	dynamic_state.pNext = NULL;
@@ -8523,6 +8742,10 @@ static void vk_begin_render_pass( VkRenderPass renderPass, VkFramebuffer frameBu
 		// [1] - depth/stencil
 		// [2] - multisampled color, optional
 		Com_Memset( clear_values, 0, sizeof( clear_values ) );
+		clear_values[0].color.float32[0] = 0.0f;
+		clear_values[0].color.float32[1] = 0.0f;
+		clear_values[0].color.float32[2] = 0.0f;
+		clear_values[0].color.float32[3] = 1.0f;
 #ifndef USE_REVERSED_DEPTH
 		clear_values[1].depthStencil.depth = 1.0;
 #endif
@@ -8539,6 +8762,12 @@ static void vk_begin_render_pass( VkRenderPass renderPass, VkFramebuffer frameBu
 
 	vk.cmd->last_pipeline = VK_NULL_HANDLE;
 	vk.cmd->depth_range = DEPTH_RANGE_COUNT;
+
+	if ( vk.renderPassIndex == RENDER_PASS_MAIN && vk_get_cvar_bindlog()->integer ) {
+		int clear_flag = clearValues ? 1 : 0;
+		int debug_mode = ( r_post_debug ) ? r_post_debug->integer : 0;
+		ri.Printf( PRINT_DEVELOPER, "VK frame %u main pass clear=%d post_debug=%d\n", vk.frame_count, clear_flag, debug_mode );
+	}
 }
 
 
@@ -8555,7 +8784,8 @@ void vk_begin_main_render_pass( void )
 	//vk.renderScaleY = (float)vk.renderHeight / (float)glConfig.vidHeight;
 	vk.renderScaleX = vk.renderScaleY = 1.0f;
 
-	vk_begin_render_pass( vk.render_pass.main, frameBuffer, qtrue, vk.renderWidth, vk.renderHeight );
+	qboolean clearColor = vk_get_cvar_clearhdr()->integer ? qtrue : qfalse;
+	vk_begin_render_pass( vk.render_pass.main, frameBuffer, clearColor, vk.renderWidth, vk.renderHeight );
 }
 
 
@@ -9074,6 +9304,14 @@ void vk_end_frame( void )
 			vk_begin_render_pass( vk.render_pass.gamma, vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ], qfalse, vk.renderWidth, vk.renderHeight );
 			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.gamma_pipeline );
 			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
+
+			VkPostProcessPushConstants panini_push;
+			panini_push.aspect = vk.renderHeight > 0 ? ( (float)vk.renderWidth / (float)vk.renderHeight ) : 1.0f;
+			panini_push.paniniD = r_paniniD ? r_paniniD->value : 0.0f;
+			panini_push.paniniS = r_paniniS ? r_paniniS->value : 0.0f;
+			panini_push.padding = 0.0f;
+
+			qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_post_process, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( panini_push ), &panini_push );
 
 			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 		}
@@ -9625,6 +9863,30 @@ typedef struct {
 } filterDef;
 
 static filterDef prefilters[2];
+
+static uint32_t vk_get_prefilter_mip_levels( void )
+{
+#ifdef VK_CUBEMAP
+	uint32_t levels = prefilters[PREFILTEREDENV].mipLevels;
+	if ( levels > 0 ) {
+		return levels;
+	}
+#endif
+	return 1;
+}
+
+float vk_get_pre_exposure_scale( void )
+{
+	if ( r_hdr && r_hdr->integer > 0 ) {
+		return 1.0f;
+	}
+
+	if ( tr.overbrightBits > 0 ) {
+		return (float)( 1 << tr.overbrightBits );
+	}
+
+	return 1.0f;
+}
 
 static uint32_t vk_pow2_floor_u32( uint32_t v )
 {
