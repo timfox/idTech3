@@ -717,6 +717,8 @@ static void vk_create_render_passes( void )
 	VkAttachmentDescription attachments[3]; // color | depth | msaa color
 	VkAttachmentReference colorResolveRef;
 	VkAttachmentReference colorRef0;
+	VkAttachmentReference colorRef1;
+	VkAttachmentReference colorRefs[2];
 	VkAttachmentReference depthRef0;
 	VkSubpassDescription subpass;
 	VkSubpassDependency deps[3];
@@ -934,15 +936,20 @@ static void vk_create_render_passes( void )
 	if ( r_ssao && r_ssao->integer && r_fbo->integer )
 	{
 		// ssao render pass
-		desc.attachmentCount = 1;
+		desc.attachmentCount = 2;
 
 		colorRef0.attachment = 0;
 		colorRef0.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		colorRef1.attachment = 1;
+		colorRef1.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+		colorRefs[0] = colorRef0;
+		colorRefs[1] = colorRef1;
 
 		Com_Memset( &subpass, 0, sizeof( subpass ) );
 		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		subpass.colorAttachmentCount = 1;
-		subpass.pColorAttachments = &colorRef0;
+		subpass.colorAttachmentCount = 2;
+		subpass.pColorAttachments = colorRefs;
 
 		attachments[0].flags = 0;
 		attachments[0].format = vk.ssao_format;
@@ -953,6 +960,16 @@ static void vk_create_render_passes( void )
 		attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		attachments[0].initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+		attachments[1].flags = 0;
+		attachments[1].format = VK_FORMAT_R8G8B8A8_UINT;
+		attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
+		attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		attachments[1].initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		attachments[1].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 		VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.ssao ) );
 		SET_OBJECT_NAME( vk.render_pass.ssao, "render pass - ssao", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
@@ -3916,6 +3933,8 @@ static void vk_create_attachments( void )
 		if ( r_ssao && r_ssao->integer ) {
 			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.ssao_format,
 				usage, &vk.ssao_image, &vk.ssao_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
+			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_UINT,
+				usage, &vk.vao_mask_image, &vk.vao_mask_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.ssao_format,
 				usage, &vk.ssao_blur_image, &vk.ssao_blur_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 		}
@@ -4197,19 +4216,22 @@ static void vk_create_framebuffers( void )
 	{
 		// ssao
 		desc.renderPass = vk.render_pass.ssao;
-		desc.attachmentCount = 1;
+		desc.attachmentCount = 2;
 		desc.width = glConfig.vidWidth;
 		desc.height = glConfig.vidHeight;
 		framebuffer_attachments[0] = vk.ssao_image_view;
+		framebuffer_attachments[1] = vk.vao_mask_image_view;
 		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.ssao ) );
 		SET_OBJECT_NAME( vk.framebuffers.ssao, "framebuffer - ssao", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
 
 		desc.renderPass = vk.render_pass.ssao_blur;
+		desc.attachmentCount = 1;
 		framebuffer_attachments[0] = vk.ssao_blur_image_view;
 		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.ssao_blur ) );
 		SET_OBJECT_NAME( vk.framebuffers.ssao_blur, "framebuffer - ssao_blur", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
 
 		desc.renderPass = vk.render_pass.ssao_combine;
+		desc.attachmentCount = 1;
 		framebuffer_attachments[0] = vk.color_image_view;
 		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.ssao_combine ) );
 		SET_OBJECT_NAME( vk.framebuffers.ssao_combine, "framebuffer - ssao_combine", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
@@ -5100,6 +5122,13 @@ static void vk_destroy_attachments( void )
 		qvkDestroyImageView( vk.device, vk.ssao_image_view, NULL );
 		vk.ssao_image = VK_NULL_HANDLE;
 		vk.ssao_image_view = VK_NULL_HANDLE;
+	}
+
+	if ( vk.vao_mask_image ) {
+		qvkDestroyImage( vk.device, vk.vao_mask_image, NULL );
+		qvkDestroyImageView( vk.device, vk.vao_mask_image_view, NULL );
+		vk.vao_mask_image = VK_NULL_HANDLE;
+		vk.vao_mask_image_view = VK_NULL_HANDLE;
 	}
 
 	if ( vk.ssao_blur_image ) {

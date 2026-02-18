@@ -574,6 +574,9 @@ typedef struct {
 	VkImageView ssao_blur_image_view;
 	VkDescriptorSet ssao_blur_descriptor;
 
+	VkImage vao_mask_image;
+	VkImageView vao_mask_image_view;
+
 	VkImage depth_image;
 	VkImageView depth_image_view;
 
