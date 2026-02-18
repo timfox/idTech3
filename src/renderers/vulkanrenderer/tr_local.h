@@ -36,6 +36,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 	#endif
 #endif
 
+#ifdef USE_VULKAN
+#ifndef vec3_origin
+static const vec3_t vk_vec3_origin = { 0, 0, 0 };
+#define vec3_origin vk_vec3_origin
+#endif
+#endif
+
 #define USE_VBO				// store static world geometry in VBO
 #define USE_FOG_ONLY
 #define USE_FOG_COLLAPSE	// not compatible with legacy dlights
@@ -1490,6 +1497,12 @@ extern cvar_t	*r_bloom_modulate;
 extern cvar_t	*r_bloomKnee;
 extern cvar_t	*r_exposure;
 extern cvar_t	*r_tonemap;
+extern cvar_t	*r_post;
+extern cvar_t	*r_post_debug;
+extern cvar_t	*r_vk_clearhdr;
+extern cvar_t	*r_vk_disableblend;
+extern cvar_t	*r_vk_bindlog;
+extern cvar_t	*r_vk_swapchain_srgb;
 extern cvar_t	*r_ext_multisample;
 extern cvar_t	*r_ext_supersample;
 //extern cvar_t	*r_ext_alpha_to_coverage;

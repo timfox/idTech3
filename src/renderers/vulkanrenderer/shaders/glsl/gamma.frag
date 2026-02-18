@@ -7,7 +7,7 @@ layout(location = 0) in vec2 frag_tex_coord;
 layout(location = 0) out vec4 out_color;
 
 layout(constant_id = 0) const float gamma = 1.0;
-layout(constant_id = 1) const float obScale = 1.0;
+layout(constant_id = 1) const float preExposureScale = 1.0;
 layout(constant_id = 2) const float greyscale = 0.0;
 layout(constant_id = 3) const float bloom_threshold = 0.6;
 layout(constant_id = 4) const float bloom_intensity = 0.5;
@@ -20,7 +20,9 @@ layout(constant_id = 10) const int depth_b = 255;
 layout(constant_id = 11) const float exposure = 1.0;
 layout(constant_id = 12) const float bloom_knee = 0.5;
 layout(constant_id = 13) const int tonemap_mode = 1;
-layout(constant_id = 14) const int apply_srgb_gamma = 1;
+layout(constant_id = 14) const int apply_srgb_gamma = 0;
+layout(constant_id = 15) const int post_debug = 0;
+layout(constant_id = 36) const int postprocess_enabled = 1;
 
 const vec3 sRGB = vec3( 0.2126, 0.7152, 0.0722 );
 
@@ -78,35 +80,54 @@ vec3 applyBloomKnee( vec3 color ) {
 
 void main() {
 	vec3 hdr = texture( texture0, frag_tex_coord ).rgb;
-	hdr *= exposure;
-	hdr *= obScale;
-	hdr = applyBloomKnee( hdr );
-
-	if ( tonemap_mode == 2 ) {
-		hdr = Tonemap_Reinhard( hdr );
-	} else if ( tonemap_mode == 1 ) {
-		hdr = Tonemap_ACES( hdr );
+	vec3 hdr_exposed = hdr;
+	if ( postprocess_enabled != 0 ) {
+		hdr_exposed *= exposure;
+		hdr_exposed *= preExposureScale;
 	}
 
-	vec3 ldr = clamp( hdr, 0.0, 1.0 );
-
-	if ( greyscale == 1 ) {
-		ldr = vec3( dot( ldr, sRGB ) );
-	} else if ( greyscale != 0 ) {
-		vec3 luma = vec3( dot( ldr, sRGB ) );
-		ldr = mix( ldr, luma, greyscale );
+	vec3 tonemapped = hdr_exposed;
+	if ( postprocess_enabled != 0 ) {
+		tonemapped = applyBloomKnee( tonemapped );
+		if ( tonemap_mode == 2 ) {
+			tonemapped = Tonemap_ACES( tonemapped );
+		} else if ( tonemap_mode == 1 ) {
+			tonemapped = Tonemap_Reinhard( tonemapped );
+		}
 	}
 
-	if ( gamma != 1.0 ) {
-		ldr = pow( ldr, vec3( gamma ) );
-	}
-
-	if ( apply_srgb_gamma != 0 ) {
-		ldr = pow( ldr, vec3( 1.0 / 2.2 ) );
-	}
-
-	if ( ditherMode == 1 ) {
-		ldr = dither( ldr );
+	vec3 ldr;
+	if ( postprocess_enabled != 0 ) {
+		if ( post_debug == 1 ) {
+			ldr = clamp( hdr_exposed, 0.0, 10.0 ) * 0.1;
+		} else if ( post_debug == 2 ) {
+			float lum = max( max( hdr_exposed.r, hdr_exposed.g ), hdr_exposed.b );
+			float logLum = log2( max( lum, 1e-4 ) );
+			float heat = clamp( ( logLum + 6.0 ) / 8.0, 0.0, 1.0 );
+			ldr = vec3( heat, clamp( heat * 0.25, 0.0, 1.0 ), 1.0 - heat );
+		} else {
+			ldr = clamp( tonemapped, 0.0, 1.0 );
+			if ( greyscale == 1.0 ) {
+				ldr = vec3( dot( ldr, sRGB ) );
+			} else if ( greyscale != 0.0 ) {
+				vec3 luma = vec3( dot( ldr, sRGB ) );
+				ldr = mix( ldr, luma, greyscale );
+			}
+			if ( gamma != 1.0 ) {
+				ldr = pow( ldr, vec3( gamma ) );
+			}
+			if ( ditherMode == 1 ) {
+				ldr = dither( ldr );
+			}
+		}
+	} else {
+		ldr = clamp( tonemapped, 0.0, 1.0 );
+		if ( apply_srgb_gamma != 0 ) {
+			ldr = pow( ldr, vec3( 1.0 / 2.2 ) );
+		}
+		if ( ditherMode == 1 ) {
+			ldr = dither( ldr );
+		}
 	}
 
 	out_color = vec4( ldr, 1.0 );

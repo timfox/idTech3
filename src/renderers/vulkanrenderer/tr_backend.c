@@ -24,6 +24,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 backEndData_t	*backEndData;
 backEndState_t	backEnd;
 
+static const vec4_t vk_color_black = { 0.0f, 0.0f, 0.0f, 1.0f };
+
 #ifndef USE_VULKAN
 static const float s_flipMatrix[16] = {
 	// convert from our coordinate system (looking down X)
@@ -1682,7 +1684,7 @@ static const void *RB_ClearColor( const void *data )
 
 #ifdef USE_VULKAN
 	backEnd.projection2D = qtrue;
-	vk_clear_color( colorBlack );
+	vk_clear_color( vk_color_black );
 	backEnd.projection2D = qfalse;
 #else
 	qglViewport( 0, 0, glConfig.vidWidth, glConfig.vidHeight );

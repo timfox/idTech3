@@ -22,6 +22,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_shade_calc.c
 
 #include "tr_local.h"
+
+static const vec3_t vk_vec3_origin = { 0.0f, 0.0f, 0.0f };
 // -EC-: avoid using ri.ftol
 #define	WAVEVALUE( table, base, amplitude, phase, freq )  ((base) + table[ (int64_t)( ( ( (phase) + tess.shaderTime * (freq) ) * FUNCTABLE_SIZE ) ) & FUNCTABLE_MASK ] * (amplitude))
 
@@ -422,7 +424,7 @@ static void AutospriteDeform( void ) {
 		VectorScale( upDir, radius, up );
 
 		if ( backEnd.viewParms.portalView == PV_MIRROR ) {
-			VectorSubtract( vec3_origin, left, left );
+			VectorSubtract( vk_vec3_origin, left, left );
 		}
 
 		// compensate for scale in the axes if necessary

@@ -118,6 +118,12 @@ cvar_t	*r_bloom_intensity;
 cvar_t	*r_bloom_threshold_mode;
 cvar_t	*r_bloom_modulate;
 cvar_t	*r_bloomKnee;
+cvar_t	*r_post;
+cvar_t	*r_post_debug;
+cvar_t	*r_vk_clearhdr;
+cvar_t	*r_vk_disableblend;
+cvar_t	*r_vk_bindlog;
+cvar_t	*r_vk_swapchain_srgb;
 cvar_t	*r_exposure;
 cvar_t	*r_tonemap;
 cvar_t	*r_ssao;
@@ -1938,7 +1944,24 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_exposure, "Linear exposure multiplier applied before tonemapping." );
 	r_tonemap = ri.Cvar_Get( "r_tonemap", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_tonemap, "0", "2", CV_INTEGER );
-	ri.Cvar_SetDescription( r_tonemap, "Tonemapping mode: 0=off, 1=ACES, 2=Reinhard (not yet implemented)." );
+	ri.Cvar_SetDescription( r_tonemap, "Tonemapping mode for the post-process pass: 0=passthrough, 1=Reinhard, 2=ACES." );
+	r_post = ri.Cvar_Get( "r_post", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_post, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_post, "Toggle the HDR post-processing pipeline (1=tonemap + gamma pass, 0=pass-through)." );
+	r_post_debug = ri.Cvar_Get( "r_post_debug", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_post_debug, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_post_debug, "Debug view for the post-process pass: 0=final, 1=pre-tonemap HDR, 2=luminance heatmap." );
+	r_vk_clearhdr = ri.Cvar_Get( "r_vk_clearhdr", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_vk_clearhdr, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_vk_clearhdr, "Clear the Vulkan HDR target at the beginning of each frame (1=clear, 0=preserve)." );
+	r_vk_disableblend = ri.Cvar_Get( "r_vk_disableblend", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_vk_disableblend, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_vk_disableblend, "Force opaque Vulkan pipelines to disable color blending (1=disable, 0=use shader state)." );
+	r_vk_bindlog = ri.Cvar_Get( "r_vk_bindlog", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_vk_bindlog, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_vk_bindlog, "Log HDR clear state + post mode each frame when enabled (1=log per frame)." );
+	r_vk_swapchain_srgb = ri.Cvar_Get( "r_vk_swapchain_srgb", "0", CVAR_ROM );
+	ri.Cvar_SetDescription( r_vk_swapchain_srgb, "Read-only: 1 if the selected Vulkan swapchain format is sRGB." );
 	{
 		cvar_t *r_specularAA = ri.Cvar_Get( "r_specularAA", "1", CVAR_ARCHIVE_ND );
 		ri.Cvar_CheckRange( r_specularAA, "0", "2", CV_INTEGER );
@@ -1950,7 +1973,7 @@ static void R_Register( void )
 		ri.Cvar_SetDescription( r_specularAAStrength, "Controls strength of the specular AA variance boost." );
 	}
 	{
-		cvar_t *rlocal_cvar = ri.Cvar_Get( "r_applySrgbGamma", "1", CVAR_ARCHIVE_ND );
+		cvar_t *rlocal_cvar = ri.Cvar_Get( "r_applySrgbGamma", "0", CVAR_ARCHIVE_ND );
 		ri.Cvar_CheckRange( rlocal_cvar, "0", "1", CV_INTEGER );
 		ri.Cvar_SetDescription( rlocal_cvar, "Apply sRGB gamma to the final post-processed image." );
 	}
