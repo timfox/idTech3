@@ -1483,6 +1483,7 @@ extern cvar_t	*r_bloom_threshold;
 extern cvar_t	*r_bloom_intensity;
 extern cvar_t	*r_bloom_threshold_mode;
 extern cvar_t	*r_bloom_modulate;
+extern cvar_t	*r_bloomKnee;
 extern cvar_t	*r_ext_multisample;
 extern cvar_t	*r_ext_supersample;
 //extern cvar_t	*r_ext_alpha_to_coverage;
@@ -1508,6 +1509,11 @@ extern cvar_t	*r_gamma;
 extern cvar_t	*r_panini;
 extern cvar_t	*r_paniniD;
 extern cvar_t	*r_paniniS;
+extern cvar_t	*r_post;
+extern cvar_t	*r_post_debug;
+extern cvar_t	*r_exposure;
+extern cvar_t	*r_tonemap;
+extern cvar_t	*r_vk_swapchain_srgb;
 
 extern	cvar_t	*r_nobind;						// turns off binding to appropriate textures
 extern	cvar_t	*r_singleShader;				// make most world faces use default shader

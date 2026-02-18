@@ -115,6 +115,7 @@ cvar_t	*r_bloom_threshold;
 cvar_t	*r_bloom_intensity;
 cvar_t	*r_bloom_threshold_mode;
 cvar_t	*r_bloom_modulate;
+cvar_t	*r_bloomKnee;
 cvar_t	*r_ssao;
 cvar_t	*r_ssaoRadius;
 cvar_t	*r_ssaoBias;
@@ -186,6 +187,11 @@ cvar_t	*r_gamma;
 cvar_t	*r_panini;
 cvar_t	*r_paniniD;
 cvar_t	*r_paniniS;
+cvar_t	*r_post;
+cvar_t	*r_post_debug;
+cvar_t	*r_exposure;
+cvar_t	*r_tonemap;
+cvar_t	*r_vk_swapchain_srgb;
 cvar_t	*r_intensity;
 cvar_t	*r_lockpvs;
 cvar_t	*r_noportals;
@@ -1882,6 +1888,34 @@ static void R_Register( void )
 	r_bloom_modulate = ri.Cvar_Get( "r_bloom_modulate", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_bloom_modulate, "Modulate extracted color:\n 0: off (color = color, i.e. no changes)\n 1: by itself (color = color * color)\n 2: by intensity (color = color * luma(color))" );
 	ri.Cvar_SetGroup( r_bloom_modulate, CVG_RENDERER );
+
+	r_bloomKnee = ri.Cvar_Get( "r_bloomKnee", "0.5", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_bloomKnee, "0.0", "4.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_bloomKnee, "Soft knee for the bloom extractor to control highlight rolloff." );
+	ri.Cvar_SetGroup( r_bloomKnee, CVG_RENDERER );
+
+	r_exposure = ri.Cvar_Get( "r_exposure", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_exposure, "0.01", "10.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_exposure, "Linear exposure multiplier applied before tonemapping." );
+	ri.Cvar_SetGroup( r_exposure, CVG_RENDERER );
+
+	r_tonemap = ri.Cvar_Get( "r_tonemap", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_tonemap, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_tonemap, "Tonemapping mode for the post-process pass: 0=passthrough, 1=Reinhard, 2=ACES." );
+	ri.Cvar_SetGroup( r_tonemap, CVG_RENDERER );
+
+	r_post = ri.Cvar_Get( "r_post", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_post, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_post, "Toggle the HDR post-processing pipeline (1=tonemap + gamma pass, 0=pass-through)." );
+	ri.Cvar_SetGroup( r_post, CVG_RENDERER );
+
+	r_post_debug = ri.Cvar_Get( "r_post_debug", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_post_debug, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_post_debug, "Debug view for the post-process pass: 0=final, 1=pre-tonemap HDR, 2=luminance heatmap." );
+	ri.Cvar_SetGroup( r_post_debug, CVG_RENDERER );
+
+	r_vk_swapchain_srgb = ri.Cvar_Get( "r_vk_swapchain_srgb", "0", CVAR_ROM );
+	ri.Cvar_SetDescription( r_vk_swapchain_srgb, "Read-only: 1 if the selected Vulkan swapchain format is sRGB." );
 
 	if ( glConfig.vidWidth )
 		return;

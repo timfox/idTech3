@@ -569,6 +569,8 @@ typedef struct {
 	VkImage ssao_blur_image;
 	VkImageView ssao_blur_image_view;
 	VkDescriptorSet ssao_blur_descriptor;
+	VkImage vao_mask_image;
+	VkImageView vao_mask_image_view;
 
 	VkImage depth_image;
 	VkImageView depth_image_view;
@@ -847,6 +849,9 @@ typedef struct {
 	uint32_t screenMapSamples;
 
 	uint32_t image_chunk_size;
+
+	// Physical device limit for 2D image dimension (VkPhysicalDeviceLimits::maxImageDimension2D).
+	uint32_t hwMaxImageDimension2D;
 
 	uint32_t maxBoundDescriptorSets;
 
