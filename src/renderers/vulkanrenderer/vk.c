@@ -1792,6 +1792,8 @@ static qboolean vk_select_surface_format( VkPhysicalDevice physical_device, VkSu
 	VkSurfaceFormatKHR *candidates;
 	uint32_t format_count;
 	VkResult res;
+	VkSurfaceFormatKHR *preferred_srgb = NULL;
+	uint32_t i;
 
 	res = qvkGetPhysicalDeviceSurfaceFormatsKHR( physical_device, surface, &format_count, NULL );
 	if ( res < 0 ) {
@@ -1823,9 +1825,7 @@ static qboolean vk_select_surface_format( VkPhysicalDevice physical_device, VkSu
 		vk.base_format.colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
 		vk.present_format.format = ext_bgr;
 		vk.present_format.colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
-	}
-	else {
-		uint32_t i;
+	} else {
 		for ( i = 0; i < format_count; i++ ) {
 			if ( ( candidates[i].format == base_bgr || candidates[i].format == base_rgb ) && candidates[i].colorSpace == VK_COLORSPACE_SRGB_NONLINEAR_KHR ) {
 				vk.base_format = candidates[i];
@@ -1848,6 +1848,19 @@ static qboolean vk_select_surface_format( VkPhysicalDevice physical_device, VkSu
 
 	if ( !r_fbo->integer ) {
 		vk.present_format = vk.base_format;
+	}
+
+	for ( i = 0; i < format_count; i++ ) {
+		if ( candidates[i].colorSpace == VK_COLORSPACE_SRGB_NONLINEAR_KHR &&
+			( candidates[i].format == VK_FORMAT_B8G8R8A8_SRGB ||
+			  candidates[i].format == VK_FORMAT_R8G8B8A8_SRGB ) ) {
+			preferred_srgb = &candidates[i];
+			break;
+		}
+	}
+
+	if ( preferred_srgb ) {
+		vk.present_format = *preferred_srgb;
 	}
 
 	ri.Free( candidates );
@@ -2773,6 +2786,44 @@ void vk_destroy_samplers( void )
 }
 
 
+static void vk_create_post_sampler( void )
+{
+	vk_destroy_post_sampler();
+
+	VkSamplerCreateInfo desc;
+
+	Com_Memset( &desc, 0, sizeof( desc ) );
+	desc.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	desc.pNext = NULL;
+	desc.flags = 0;
+	desc.magFilter = VK_FILTER_LINEAR;
+	desc.minFilter = VK_FILTER_LINEAR;
+	desc.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+	desc.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	desc.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	desc.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	desc.mipLodBias = 0.0f;
+	desc.anisotropyEnable = VK_FALSE;
+	desc.compareEnable = VK_FALSE;
+	desc.minLod = 0.0f;
+	desc.maxLod = 0.0f;
+	desc.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
+	desc.unnormalizedCoordinates = VK_FALSE;
+
+	VK_CHECK( qvkCreateSampler( vk.device, &desc, NULL, &vk.postSampler ) );
+	SET_OBJECT_NAME( vk.postSampler, "postprocess sampler", VK_DEBUG_REPORT_OBJECT_TYPE_SAMPLER_EXT );
+}
+
+
+static void vk_destroy_post_sampler( void )
+{
+	if ( vk.postSampler != VK_NULL_HANDLE ) {
+		qvkDestroySampler( vk.device, vk.postSampler, NULL );
+		vk.postSampler = VK_NULL_HANDLE;
+	}
+}
+
+
 void vk_update_attachment_descriptors( void ) {
 
 	if ( vk.color_image_view )
@@ -2781,13 +2832,7 @@ void vk_update_attachment_descriptors( void ) {
 		VkWriteDescriptorSet desc;
 		Vk_Sampler_Def sd;
 
-		Com_Memset( &sd, 0, sizeof( sd ) );
-		sd.gl_mag_filter = sd.gl_min_filter = vk.blitFilter;
-		sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		sd.max_lod_1_0 = qtrue;
-		sd.noAnisotropy = qtrue;
-
-		info.sampler = vk_find_sampler( &sd );
+		info.sampler = vk.postSampler;
 		info.imageView = vk.color_image_view;
 		info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -2804,6 +2849,7 @@ void vk_update_attachment_descriptors( void ) {
 		qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
 
 		// screenmap
+		Com_Memset( &sd, 0, sizeof( sd ) );
 		sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
 		sd.max_lod_1_0 = qfalse;
 		sd.noAnisotropy = qtrue;
@@ -2848,10 +2894,7 @@ void vk_update_attachment_descriptors( void ) {
 		{
 			uint32_t i;
 
-			sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
-			sd.max_lod_1_0 = qtrue;
-			sd.noAnisotropy = qtrue;
-			info.sampler = vk_find_sampler( &sd );
+			info.sampler = vk.postSampler;
 			info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 			for ( i = 0; i < ARRAY_LEN( vk.bloom_image_descriptor ); i++ )
@@ -2860,6 +2903,37 @@ void vk_update_attachment_descriptors( void ) {
 				desc.dstSet = vk.bloom_image_descriptor[i];
 
 				qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+			}
+		}
+
+		if ( vk.gamma_descriptor != VK_NULL_HANDLE )
+		{
+			VkDescriptorImageInfo gamma_info;
+			VkWriteDescriptorSet gamma_desc;
+			uint32_t i;
+
+			gamma_info.sampler = vk.postSampler;
+			gamma_info.imageView = vk.color_image_view;
+			gamma_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+			gamma_desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			gamma_desc.dstSet = vk.gamma_descriptor;
+			gamma_desc.dstBinding = 0;
+			gamma_desc.dstArrayElement = 0;
+			gamma_desc.descriptorCount = 1;
+			gamma_desc.pNext = NULL;
+			gamma_desc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			gamma_desc.pImageInfo = &gamma_info;
+			gamma_desc.pBufferInfo = NULL;
+			gamma_desc.pTexelBufferView = NULL;
+
+			qvkUpdateDescriptorSets( vk.device, 1, &gamma_desc, 0, NULL );
+
+			for ( i = 0; i < VK_NUM_BLOOM_PASSES; i++ )
+			{
+				gamma_info.imageView = ( r_bloom->integer ) ? vk.bloom_image_view[( i + 1 ) * 2] : vk.color_image_view;
+				gamma_desc.dstBinding = i + 1;
+				qvkUpdateDescriptorSets( vk.device, 1, &gamma_desc, 0, NULL );
 			}
 		}
 
@@ -2887,6 +2961,8 @@ void vk_init_descriptors( void )
 	VkDescriptorBufferInfo info;
 	VkWriteDescriptorSet desc;
 	uint32_t i;
+
+	vk_create_post_sampler();
 
 	alloc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	alloc.pNext = NULL;
@@ -2960,6 +3036,11 @@ void vk_init_descriptors( void )
 		if( vk.pbrActive )
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.brdflut_image_descriptor ) );
 #endif
+
+		alloc.pSetLayouts = &vk.set_layout_gamma;
+		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.gamma_descriptor ) );
+
+		alloc.pSetLayouts = &vk.set_layout_sampler;
 
 		// cubemap
 		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.cubeMap.color_descriptor ) );
@@ -4998,6 +5079,27 @@ void vk_initialize( void )
 	vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &vk.set_layout_sampler );
 	vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, &vk.set_layout_uniform );
 	vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, &vk.set_layout_storage );
+	{
+		VkDescriptorSetLayoutBinding gamma_bindings[ 1 + VK_NUM_BLOOM_PASSES ];
+		VkDescriptorSetLayoutCreateInfo gamma_layout_desc;
+		int i;
+
+		for ( i = 0; i < 1 + VK_NUM_BLOOM_PASSES; i++ ) {
+			gamma_bindings[i].binding = i;
+			gamma_bindings[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			gamma_bindings[i].descriptorCount = 1;
+			gamma_bindings[i].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+			gamma_bindings[i].pImmutableSamplers = NULL;
+		}
+
+		gamma_layout_desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		gamma_layout_desc.pNext = NULL;
+		gamma_layout_desc.flags = 0;
+		gamma_layout_desc.bindingCount = 1 + VK_NUM_BLOOM_PASSES;
+		gamma_layout_desc.pBindings = gamma_bindings;
+
+		VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &gamma_layout_desc, NULL, &vk.set_layout_gamma ) );
+	}
 	//vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_SHADER_STAGE_FRAGMENT_BIT, &vk.set_layout_input );
 
 	//
@@ -5083,6 +5185,24 @@ void vk_initialize( void )
 		desc.pPushConstantRanges = NULL;
 
 		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_blend ) );
+	{
+		VkPipelineLayoutCreateInfo gamma_desc;
+
+		push_range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		push_range.offset = 0;
+		push_range.size = sizeof( VkPostProcessPushConstants );
+
+		gamma_desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		gamma_desc.pNext = NULL;
+		gamma_desc.flags = 0;
+		gamma_desc.setLayoutCount = 1;
+		gamma_desc.pSetLayouts = &vk.set_layout_gamma;
+		gamma_desc.pushConstantRangeCount = 1;
+		gamma_desc.pPushConstantRanges = &push_range;
+
+		VK_CHECK( qvkCreatePipelineLayout( vk.device, &gamma_desc, NULL, &vk.pipeline_layout_gamma ) );
+		SET_OBJECT_NAME( vk.pipeline_layout_gamma, "pipeline layout - gamma", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
+	}
 
 		SET_OBJECT_NAME( vk.pipeline_layout, "pipeline layout - main", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
 		SET_OBJECT_NAME( vk.pipeline_layout_post_process, "pipeline layout - post-processing", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
@@ -5510,11 +5630,13 @@ void vk_shutdown( refShutdownCode_t code )
 	qvkDestroyDescriptorSetLayout(vk.device, vk.set_layout_sampler, NULL);
 	qvkDestroyDescriptorSetLayout(vk.device, vk.set_layout_uniform, NULL);
 	qvkDestroyDescriptorSetLayout(vk.device, vk.set_layout_storage, NULL);
+	qvkDestroyDescriptorSetLayout(vk.device, vk.set_layout_gamma, NULL);
 
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout, NULL);
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_storage, NULL);
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_post_process, NULL);
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_blend, NULL);
+	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_gamma, NULL);
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_ssao, NULL);
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_ssao_combine, NULL);
 #ifdef USE_VK_PBR
@@ -5530,6 +5652,7 @@ void vk_shutdown( refShutdownCode_t code )
 	vk_release_geometry_buffers();
 
 	vk_destroy_samplers();
+	vk_destroy_post_sampler();
 
 	vk_destroy_sync_primitives();
 
@@ -6183,7 +6306,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	VkGraphicsPipelineCreateInfo create_info;
 	VkViewport viewport;
 	VkRect2D scissor;
-VkSpecializationMapEntry spec_entries[17];
+	VkSpecializationMapEntry spec_entries[5];
 	VkSpecializationInfo frag_spec_info;
 	VkPipeline *pipeline;
 	VkShaderModule fsmodule;
@@ -6194,22 +6317,10 @@ VkSpecializationMapEntry spec_entries[17];
 	qboolean blend;
 
 	struct PostProcess_FragSpecData {
-		float gamma;
-		float preExposureScale;
-		float greyscale;
-		float bloom_threshold;
-		float bloom_intensity;
-		int bloom_threshold_mode;
-		int bloom_modulate;
-		int dither;
-		int depth_r;
-		int depth_g;
-		int depth_b;
+		float bloomIntensity;
 		float exposure;
-		float bloom_knee;
+		float bloomClamp;
 		int tonemap_mode;
-		int apply_srgb_gamma;
-		int post_debug;
 		int postprocess_enabled;
 	} frag_spec_data;
 
@@ -6301,7 +6412,7 @@ VkSpecializationMapEntry spec_entries[17];
 			pipeline = &vk.gamma_pipeline;
 			fsmodule = vk.modules.gamma_fs;
 			renderpass = vk.render_pass.gamma;
-			layout = vk.pipeline_layout_post_process;
+			layout = vk.pipeline_layout_gamma;
 			samples = VK_SAMPLE_COUNT_1_BIT;
 			pipeline_name = "gamma-correction pipeline";
 			blend = qfalse;
@@ -6326,96 +6437,36 @@ VkSpecializationMapEntry spec_entries[17];
 	set_shader_stage_desc( shader_stages+0, VK_SHADER_STAGE_VERTEX_BIT, vk.modules.gamma_vs, "main" );
 	set_shader_stage_desc( shader_stages+1, VK_SHADER_STAGE_FRAGMENT_BIT, fsmodule, "main" );
 
-	frag_spec_data.gamma = 1.0 / (r_gamma->value);
-	frag_spec_data.preExposureScale = vk_get_pre_exposure_scale();
-	frag_spec_data.greyscale = r_greyscale->value;
-	frag_spec_data.bloom_threshold = r_bloom_threshold->value;
-	frag_spec_data.bloom_intensity = r_bloom_intensity->value;
-	frag_spec_data.bloom_threshold_mode = r_bloom_threshold_mode->integer;
-	frag_spec_data.bloom_modulate = r_bloom_modulate->integer;
-	frag_spec_data.dither = r_dither->integer;
+	frag_spec_data.bloomIntensity = r_bloom_intensity->value;
 	frag_spec_data.exposure = r_exposure->value;
-	frag_spec_data.bloom_knee = r_bloomKnee->value;
+	frag_spec_data.bloomClamp = 8.0f;
 	frag_spec_data.tonemap_mode = r_tonemap->integer;
-	qboolean swap_is_srgb =
-		( vk.present_format.format == VK_FORMAT_B8G8R8A8_SRGB ) ||
-		( vk.present_format.format == VK_FORMAT_R8G8B8A8_SRGB );
-	frag_spec_data.apply_srgb_gamma = swap_is_srgb ? 0 : 1;
-	frag_spec_data.post_debug = r_post_debug->integer;
 	frag_spec_data.postprocess_enabled = ( r_post && r_post->integer && vk.fboActive && r_fbo->integer ) ? 1 : 0;
 
 	if ( !vk_surface_format_color_depth( vk.present_format.format, &frag_spec_data.depth_r, &frag_spec_data.depth_g, &frag_spec_data.depth_b ) )
 		ri.Printf( PRINT_ALL, "Format %s not recognized, dither to assume 8bpc\n", vk_format_string( vk.base_format.format ) );
 
 	spec_entries[0].constantID = 0;
-	spec_entries[0].offset = offsetof( struct PostProcess_FragSpecData, gamma );
-	spec_entries[0].size = sizeof( frag_spec_data.gamma );
+	spec_entries[0].offset = offsetof( struct PostProcess_FragSpecData, bloomIntensity );
+	spec_entries[0].size = sizeof( frag_spec_data.bloomIntensity );
 
 	spec_entries[1].constantID = 1;
-	spec_entries[1].offset = offsetof( struct PostProcess_FragSpecData, preExposureScale );
-	spec_entries[1].size = sizeof( frag_spec_data.preExposureScale );
+	spec_entries[1].offset = offsetof( struct PostProcess_FragSpecData, exposure );
+	spec_entries[1].size = sizeof( frag_spec_data.exposure );
 
 	spec_entries[2].constantID = 2;
-	spec_entries[2].offset = offsetof( struct PostProcess_FragSpecData, greyscale );
-	spec_entries[2].size = sizeof( frag_spec_data.greyscale );
+	spec_entries[2].offset = offsetof( struct PostProcess_FragSpecData, bloomClamp );
+	spec_entries[2].size = sizeof( frag_spec_data.bloomClamp );
 
 	spec_entries[3].constantID = 3;
-	spec_entries[3].offset = offsetof( struct PostProcess_FragSpecData, bloom_threshold );
-	spec_entries[3].size = sizeof( frag_spec_data.bloom_threshold );
+	spec_entries[3].offset = offsetof( struct PostProcess_FragSpecData, tonemap_mode );
+	spec_entries[3].size = sizeof( frag_spec_data.tonemap_mode );
 
 	spec_entries[4].constantID = 4;
-	spec_entries[4].offset = offsetof( struct PostProcess_FragSpecData, bloom_intensity );
-	spec_entries[4].size = sizeof( frag_spec_data.bloom_intensity );
+	spec_entries[4].offset = offsetof( struct PostProcess_FragSpecData, postprocess_enabled );
+	spec_entries[4].size = sizeof( frag_spec_data.postprocess_enabled );
 
-	spec_entries[5].constantID = 5;
-	spec_entries[5].offset = offsetof( struct PostProcess_FragSpecData, bloom_threshold_mode );
-	spec_entries[5].size = sizeof( frag_spec_data.bloom_threshold_mode );
-
-	spec_entries[6].constantID = 6;
-	spec_entries[6].offset = offsetof( struct PostProcess_FragSpecData, bloom_modulate );
-	spec_entries[6].size = sizeof( frag_spec_data.bloom_modulate );
-
-	spec_entries[7].constantID = 7;
-	spec_entries[7].offset = offsetof( struct PostProcess_FragSpecData, dither );
-	spec_entries[7].size = sizeof( frag_spec_data.dither );
-
-	spec_entries[8].constantID = 8;
-	spec_entries[8].offset = offsetof( struct PostProcess_FragSpecData, depth_r );
-	spec_entries[8].size = sizeof( frag_spec_data.depth_r );
-
-	spec_entries[9].constantID = 9;
-	spec_entries[9].offset = offsetof(struct PostProcess_FragSpecData, depth_g);
-	spec_entries[9].size = sizeof(frag_spec_data.depth_g);
-
-	spec_entries[10].constantID = 10;
-	spec_entries[10].offset = offsetof(struct PostProcess_FragSpecData, depth_b);
-	spec_entries[10].size = sizeof(frag_spec_data.depth_b);
-
-	spec_entries[11].constantID = 11;
-	spec_entries[11].offset = offsetof(struct PostProcess_FragSpecData, exposure);
-	spec_entries[11].size = sizeof(frag_spec_data.exposure);
-
-	spec_entries[12].constantID = 12;
-	spec_entries[12].offset = offsetof(struct PostProcess_FragSpecData, bloom_knee);
-	spec_entries[12].size = sizeof(frag_spec_data.bloom_knee);
-
-	spec_entries[13].constantID = 13;
-	spec_entries[13].offset = offsetof(struct PostProcess_FragSpecData, tonemap_mode);
-	spec_entries[13].size = sizeof(frag_spec_data.tonemap_mode);
-
-	spec_entries[14].constantID = 14;
-	spec_entries[14].offset = offsetof(struct PostProcess_FragSpecData, apply_srgb_gamma);
-	spec_entries[14].size = sizeof(frag_spec_data.apply_srgb_gamma);
-
-	spec_entries[15].constantID = 15;
-	spec_entries[15].offset = offsetof(struct PostProcess_FragSpecData, post_debug);
-	spec_entries[15].size = sizeof(frag_spec_data.post_debug);
-
-	spec_entries[16].constantID = 36;
-	spec_entries[16].offset = offsetof(struct PostProcess_FragSpecData, postprocess_enabled);
-	spec_entries[16].size = sizeof(frag_spec_data.postprocess_enabled);
-
-	frag_spec_info.mapEntryCount = 17;
+	frag_spec_info.mapEntryCount = 5;
 	frag_spec_info.pMapEntries = spec_entries;
 	frag_spec_info.dataSize = sizeof( frag_spec_data );
 	frag_spec_info.pData = &frag_spec_data;
@@ -9305,7 +9356,7 @@ void vk_end_frame( void )
 
 			vk_begin_render_pass( vk.render_pass.gamma, vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ], qfalse, vk.renderWidth, vk.renderHeight );
 			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.gamma_pipeline );
-			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
+			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_gamma, 0, 1, &vk.gamma_descriptor, 0, NULL );
 
 			VkPostProcessPushConstants panini_push;
 			panini_push.aspect = vk.renderHeight > 0 ? ( (float)vk.renderWidth / (float)vk.renderHeight ) : 1.0f;
@@ -9783,21 +9834,6 @@ qboolean vk_bloom( void )
 			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 			vk_end_render_pass();
 		}
-	}
-
-	vk_begin_post_bloom_render_pass(); // begin post-bloom
-	{
-		VkDescriptorSet dset[VK_NUM_BLOOM_PASSES];
-
-		for ( i = 0; i < VK_NUM_BLOOM_PASSES; i++ )
-		{
-			dset[i] = vk.bloom_image_descriptor[(i+1)*2];
-		}
-
-		// blend downscaled buffers to main fbo
-		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.bloom_blend_pipeline );
-		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_blend, 0, ARRAY_LEN(dset), dset, 0, NULL );
-		qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 	}
 
 	// invalidate pipeline state cache
