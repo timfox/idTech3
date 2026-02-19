@@ -1791,6 +1791,11 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_paniniOverdraw, "0.0", "0.2", CV_FLOAT );
 	ri.Cvar_SetDescription( r_paniniOverdraw, "Expand uv after Panini warp to cover edges." );
 	ri.Cvar_SetGroup( r_paniniOverdraw, CVG_RENDERER );
+
+	r_panini_console = ri.Cvar_Get( "r_panini_console", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_panini_console, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_panini_console, "Set to 1 when console is visible to disable Panini." );
+	ri.Cvar_SetGroup( r_panini_console, CVG_RENDERER );
 	r_panini_console = ri.Cvar_Get( "r_panini_console", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_panini_console, "0", "1", CV_FLOAT );
 	ri.Cvar_SetDescription( r_panini_console, "Temporarily disable Panini when the console is visible (set to 1 to hold off)." );

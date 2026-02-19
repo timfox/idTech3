@@ -24,7 +24,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "client.h"
 
 static void Con_UpdatePaniniConsoleState( void ) {
-	// r_panini_console is toggled indirectly via console visibility (0 = Panini active, 1 = disable)
 	Cvar_SetValue( "r_panini_console", ( Key_GetCatcher() & KEYCATCH_CONSOLE ) ? 1.0f : 0.0f );
 }
 
