@@ -75,7 +75,9 @@ void main() {
 
 	vec4 history = vec4(0.0);
 	bool hasHistory = params.misc.y > 0.5;
-	if ( hasHistory ) {
+	float temporal = clamp(params.densityParams.w, 0.0, 1.0);
+	bool doTemporal = hasHistory && temporal > 0.0;
+	if ( doTemporal ) {
 		vec4 prevViewPos = params.prevView * vec4(worldPos, 1.0);
 		vec4 prevClip = params.prevProj * prevViewPos;
 		vec3 prevNdc = prevClip.xyz / prevClip.w;
@@ -93,8 +95,7 @@ void main() {
 	}
 
 	vec4 finalValue = current;
-	if ( hasHistory ) {
-		float temporal = clamp(params.densityParams.w, 0.0, 1.0);
+	if ( doTemporal ) {
 		vec4 blended = mix(current, history, temporal);
 		vec4 diff = blended - history;
 		diff = clamp(diff, -0.25, 0.25);
