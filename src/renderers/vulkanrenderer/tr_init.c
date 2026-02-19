@@ -197,12 +197,14 @@ cvar_t	*r_volumetricFog;
 cvar_t	*r_volumetricFogDensity;
 cvar_t	*r_volumetricFogHeightFalloff;
 cvar_t	*r_volumetricFogAniso;
-cvar_t	*r_volumetricFogSteps;
-cvar_t	*r_volumetricFogJitter;
-cvar_t	*r_volumetricFogTemporalWeight;
-cvar_t	*r_vk_swapchain_srgb;
-cvar_t	*r_intensity;
-cvar_t	*r_lockpvs;
+	cvar_t	*r_volumetricFogSteps;
+	cvar_t	*r_volumetricFogJitter;
+	cvar_t	*r_volumetricFogTemporalWeight;
+	cvar_t	*r_volumetricFogColorMode;
+	cvar_t	*r_volumetricFogTint;
+	cvar_t	*r_vk_swapchain_srgb;
+	cvar_t	*r_intensity;
+	cvar_t	*r_lockpvs;
 cvar_t	*r_noportals;
 cvar_t	*r_portalOnly;
 
@@ -1961,6 +1963,15 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_volumetricFogTemporalWeight, "0", "1", CV_FLOAT );
 	ri.Cvar_SetDescription( r_volumetricFogTemporalWeight, "History blend weight for temporal reprojection (0 = no history)." );
 	ri.Cvar_SetGroup( r_volumetricFogTemporalWeight, CVG_RENDERER );
+
+	r_volumetricFogColorMode = ri.Cvar_Get( "r_volumetricFogColorMode", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogColorMode, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_volumetricFogColorMode, "Volumetric fog color source: 0=map fog volume (fallback sun tint), 1=use r_volumetricFogTint, 2=use nearest IBL cubemap SH (fallback mode 0)." );
+	ri.Cvar_SetGroup( r_volumetricFogColorMode, CVG_RENDERER );
+
+	r_volumetricFogTint = ri.Cvar_Get( "r_volumetricFogTint", "1 1 1", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_volumetricFogTint, "Volumetric fog RGB tint (3 floats). Applied as a multiplier in modes 0 and 2, or used directly in mode 1." );
+	ri.Cvar_SetGroup( r_volumetricFogTint, CVG_RENDERER );
 
 	r_vk_swapchain_srgb = ri.Cvar_Get( "r_vk_swapchain_srgb", "0", CVAR_ROM );
 	ri.Cvar_SetDescription( r_vk_swapchain_srgb, "Read-only: 1 if the selected Vulkan swapchain format is sRGB." );
