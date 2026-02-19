@@ -277,6 +277,132 @@ const char *vk_format_string( VkFormat format )
 		Com_sprintf( buf, sizeof( buf ), "#%i", format );
 		return buf;
 	}
+
+	if ( vk.volumetric_compute_descriptor != VK_NULL_HANDLE && vk.froxel_volume_view && vk.froxel_history_view && vk.depth_image_view )
+	{
+		VkDescriptorImageInfo storage_info[2];
+		VkDescriptorImageInfo depth_info;
+		VkDescriptorBufferInfo params_buffer;
+		VkWriteDescriptorSet compute_writes[4];
+		Vk_Sampler_Def depth_sd;
+
+		Com_Memset( &storage_info, 0, sizeof( storage_info ) );
+		storage_info[0].imageView = vk.froxel_volume_view;
+		storage_info[0].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+		storage_info[1].imageView = vk.froxel_history_view;
+		storage_info[1].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+		Com_Memset( &depth_sd, 0, sizeof( depth_sd ) );
+		depth_sd.gl_mag_filter = depth_sd.gl_min_filter = GL_NEAREST;
+		depth_sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		depth_sd.noAnisotropy = qtrue;
+		vk.froxel_depth_sampler = vk_find_sampler( &depth_sd );
+
+		depth_info.sampler = vk.froxel_depth_sampler;
+		depth_info.imageView = vk.depth_image_view;
+		depth_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+
+		for ( int i = 0; i < 2; i++ ) {
+			compute_writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			compute_writes[i].dstSet = vk.volumetric_compute_descriptor;
+			compute_writes[i].dstBinding = i;
+			compute_writes[i].dstArrayElement = 0;
+			compute_writes[i].descriptorCount = 1;
+			compute_writes[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+			compute_writes[i].pImageInfo = &storage_info[i];
+			compute_writes[i].pBufferInfo = NULL;
+			compute_writes[i].pTexelBufferView = NULL;
+		}
+
+		compute_writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		compute_writes[2].dstSet = vk.volumetric_compute_descriptor;
+		compute_writes[2].dstBinding = 2;
+		compute_writes[2].dstArrayElement = 0;
+		compute_writes[2].descriptorCount = 1;
+		compute_writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		compute_writes[2].pImageInfo = &depth_info;
+		compute_writes[2].pBufferInfo = NULL;
+		compute_writes[2].pTexelBufferView = NULL;
+
+		params_buffer.buffer = vk.volumetric_params_buffer;
+		params_buffer.offset = 0;
+		params_buffer.range = sizeof( volumetric_params_t );
+
+		compute_writes[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		compute_writes[3].dstSet = vk.volumetric_compute_descriptor;
+		compute_writes[3].dstBinding = 3;
+		compute_writes[3].dstArrayElement = 0;
+		compute_writes[3].descriptorCount = 1;
+		compute_writes[3].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		compute_writes[3].pImageInfo = NULL;
+		compute_writes[3].pBufferInfo = &params_buffer;
+		compute_writes[3].pTexelBufferView = NULL;
+
+		qvkUpdateDescriptorSets( vk.device, ARRAY_LEN( compute_writes ), compute_writes, 0, NULL );
+	}
+
+	if ( vk.volumetric_composite_descriptor != VK_NULL_HANDLE && vk.color_image_view && vk.depth_image_view && vk.froxel_volume_view )
+	{
+		VkDescriptorImageInfo composite_info[3];
+		VkDescriptorBufferInfo params_buffer_info;
+		VkWriteDescriptorSet composite_writes[4];
+		Vk_Sampler_Def color_sd;
+		Vk_Sampler_Def volume_sd;
+		VkDescriptorImageInfo depth_sampler_info;
+
+		Com_Memset( &color_sd, 0, sizeof( color_sd ) );
+		color_sd.gl_mag_filter = color_sd.gl_min_filter = GL_LINEAR;
+		color_sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		color_sd.noAnisotropy = qtrue;
+
+		Com_Memset( &volume_sd, 0, sizeof( volume_sd ) );
+		volume_sd.gl_mag_filter = volume_sd.gl_min_filter = GL_LINEAR;
+		volume_sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		volume_sd.noAnisotropy = qtrue;
+		vk.froxel_sampler = vk_find_sampler( &volume_sd );
+
+		composite_info[0].sampler = vk_find_sampler( &color_sd );
+		composite_info[0].imageView = vk.color_image_view;
+		composite_info[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+		depth_sampler_info.sampler = vk.froxel_depth_sampler;
+		depth_sampler_info.imageView = vk.depth_image_view;
+		depth_sampler_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+
+		composite_info[1] = depth_sampler_info;
+
+		composite_info[2].sampler = vk.froxel_sampler;
+		composite_info[2].imageView = vk.froxel_volume_view;
+		composite_info[2].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+		for ( int i = 0; i < 3; i++ ) {
+			composite_writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			composite_writes[i].dstSet = vk.volumetric_composite_descriptor;
+			composite_writes[i].dstBinding = i;
+			composite_writes[i].dstArrayElement = 0;
+			composite_writes[i].descriptorCount = 1;
+			composite_writes[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			composite_writes[i].pImageInfo = &composite_info[i];
+			composite_writes[i].pBufferInfo = NULL;
+			composite_writes[i].pTexelBufferView = NULL;
+		}
+
+		params_buffer_info.buffer = vk.volumetric_params_buffer;
+		params_buffer_info.offset = 0;
+		params_buffer_info.range = sizeof( volumetric_params_t );
+
+		composite_writes[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		composite_writes[3].dstSet = vk.volumetric_composite_descriptor;
+		composite_writes[3].dstBinding = 3;
+		composite_writes[3].dstArrayElement = 0;
+		composite_writes[3].descriptorCount = 1;
+		composite_writes[3].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		composite_writes[3].pImageInfo = NULL;
+		composite_writes[3].pBufferInfo = &params_buffer_info;
+		composite_writes[3].pTexelBufferView = NULL;
+
+		qvkUpdateDescriptorSets( vk.device, ARRAY_LEN( composite_writes ), composite_writes, 0, NULL );
+	}
 }
 
 
@@ -1013,6 +1139,37 @@ static void vk_create_render_passes( void )
 
 		VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.ssao_combine ) );
 		SET_OBJECT_NAME( vk.render_pass.ssao_combine, "render pass - ssao_combine", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
+	}
+
+	if ( vk.fboActive )
+	{
+		Com_Memset( &subpass, 0, sizeof( subpass ) );
+		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		subpass.colorAttachmentCount = 1;
+		subpass.pColorAttachments = &colorRef0;
+
+		attachments[0].flags = 0;
+		attachments[0].format = vk.color_format;
+		attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+		attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		attachments[0].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		attachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+		desc.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+		desc.pNext = NULL;
+		desc.flags = 0;
+		desc.pAttachments = attachments;
+		desc.attachmentCount = 1;
+		desc.pSubpasses = &subpass;
+		desc.subpassCount = 1;
+		desc.dependencyCount = 0;
+		desc.pDependencies = NULL;
+
+		VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.volumetric ) );
+		SET_OBJECT_NAME( vk.render_pass.volumetric, "render pass - volumetric fog", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
 	}
 
 	// capture render pass
@@ -2912,6 +3069,12 @@ void vk_init_descriptors( void )
 		// cubemap
 		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.cubeMap.color_descriptor ) );
 
+	alloc.pSetLayouts = &vk.volumetric_compute_layout;
+	VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.volumetric_compute_descriptor ) );
+
+	alloc.pSetLayouts = &vk.volumetric_composite_layout;
+	VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.volumetric_composite_descriptor ) );
+
 		vk_update_attachment_descriptors();
 	}
 }
@@ -3921,6 +4084,7 @@ static void vk_create_attachments( void )
 	uint32_t i;
 
 	vk_clear_attachment_pool();
+	vk_create_volumetric_params_buffer();
 
 	// It looks like resulting performance depends from order you're creating/allocating
 	// memory for attachments in vulkan i.e. similar images grouped together will provide best results
@@ -4025,6 +4189,8 @@ static void vk_create_attachments( void )
 		(vk.fboActive && r_bloom->integer) || (r_ssao && r_ssao->integer) ? qfalse : qtrue );
 
 	vk_alloc_attachments();
+
+	vk_create_froxel_images();
 
 	for ( i = 0; i < vk.image_memory_count; i++ )
 	{
@@ -4389,6 +4555,28 @@ static void vk_destroy_framebuffers( void ) {
 		vk.framebuffers.ssao_combine = VK_NULL_HANDLE;
 	}
 
+	if ( vk.framebuffers.volumetric[0] != VK_NULL_HANDLE ) {
+		qvkDestroyFramebuffer( vk.device, vk.framebuffers.volumetric[0], NULL );
+		for ( n = 0; (uint32_t)n < vk.swapchain_image_count; n++ ) {
+			vk.framebuffers.volumetric[n] = VK_NULL_HANDLE;
+		}
+	}
+
+	if ( vk.render_pass.volumetric != VK_NULL_HANDLE )
+	{
+		desc.renderPass = vk.render_pass.volumetric;
+		desc.attachmentCount = 1;
+		desc.width = glConfig.vidWidth;
+		desc.height = glConfig.vidHeight;
+		framebuffer_attachments[0] = vk.color_image_view;
+		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.volumetric[0] ) );
+		SET_OBJECT_NAME( vk.framebuffers.volumetric[0], "framebuffer - volumetric fog", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+		for ( n = 1; (uint32_t)n < vk.swapchain_image_count; n++ )
+		{
+			vk.framebuffers.volumetric[n] = vk.framebuffers.volumetric[0];
+		}
+	}
+
 	if ( vk.framebuffers.screenmap != VK_NULL_HANDLE ) {
 		qvkDestroyFramebuffer( vk.device, vk.framebuffers.screenmap, NULL );
 		vk.framebuffers.screenmap = VK_NULL_HANDLE;
@@ -4658,10 +4846,8 @@ void vk_initialize( void )
 
 	// fill glConfig information
 
-	// maxTextureSize must not exceed IMAGE_CHUNK_SIZE
-	maxSize = sqrtf( IMAGE_CHUNK_SIZE / 4 );
-	// round down to next power of 2
-	glConfig.maxTextureSize = MIN( props.limits.maxImageDimension2D, log2pad( maxSize, 0 ) );
+	// maxTextureSize should respect physical limits; we clamp to our MAX_TEXTURE_SIZE
+	glConfig.maxTextureSize = MIN( props.limits.maxImageDimension2D, MAX_TEXTURE_SIZE );
 
 	if ( glConfig.maxTextureSize > MAX_TEXTURE_SIZE )
 		glConfig.maxTextureSize = MAX_TEXTURE_SIZE; // ResampleTexture() relies on that maximum
@@ -4902,12 +5088,12 @@ void vk_initialize( void )
 	// Descriptor pool.
 	//
 	{
-		VkDescriptorPoolSize pool_size[3];
+		VkDescriptorPoolSize pool_size[5];
 		VkDescriptorPoolCreateInfo desc;
 		uint32_t j, maxSets;
 
 		pool_size[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		pool_size[0].descriptorCount = MAX_DRAWIMAGES + 1 + 1 + 1 + 3 + VK_NUM_BLOOM_PASSES * 2; // color, screenmap, depth/ssao, bloom descriptors
+		pool_size[0].descriptorCount = MAX_DRAWIMAGES + 1 + 1 + 1 + 3 + 4 + VK_NUM_BLOOM_PASSES * 2; // color, screenmap, depth/ssao, volumetric, bloom descriptors
 #ifdef USE_VK_PBR
         if ( vk.pbrActive )
             pool_size[0].descriptorCount += 2 + ( MAX_DRAWIMAGES * 8 ); // brdf-lut + irradiance | MAX_DRAWIMAGES * (physical, normal, emissive, clearcoat, sheen, anisotropy, transmission, subsurface)
@@ -4925,6 +5111,12 @@ void vk_initialize( void )
 
 		pool_size[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
 		pool_size[2].descriptorCount = 1;
+
+		pool_size[3].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		pool_size[3].descriptorCount = 2;
+
+		pool_size[4].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		pool_size[4].descriptorCount = 2;
 
 		for ( j = 0, maxSets = 0; j < ARRAY_LEN( pool_size ); j++ ) {
 			maxSets += pool_size[j].descriptorCount;
@@ -4947,6 +5139,82 @@ void vk_initialize( void )
 	vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, &vk.set_layout_uniform );
 	vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, &vk.set_layout_storage );
 	//vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_SHADER_STAGE_FRAGMENT_BIT, &vk.set_layout_input );
+
+	{
+		VkDescriptorSetLayoutBinding compute_bindings[4];
+		VkDescriptorSetLayoutCreateInfo compute_layout_desc;
+
+		compute_bindings[0].binding = 0;
+		compute_bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		compute_bindings[0].descriptorCount = 1;
+		compute_bindings[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		compute_bindings[0].pImmutableSamplers = NULL;
+
+		compute_bindings[1].binding = 1;
+		compute_bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		compute_bindings[1].descriptorCount = 1;
+		compute_bindings[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		compute_bindings[1].pImmutableSamplers = NULL;
+
+		compute_bindings[2].binding = 2;
+		compute_bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		compute_bindings[2].descriptorCount = 1;
+		compute_bindings[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		compute_bindings[2].pImmutableSamplers = NULL;
+
+		compute_bindings[3].binding = 3;
+		compute_bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		compute_bindings[3].descriptorCount = 1;
+		compute_bindings[3].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		compute_bindings[3].pImmutableSamplers = NULL;
+
+		compute_layout_desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		compute_layout_desc.pNext = NULL;
+		compute_layout_desc.flags = 0;
+		compute_layout_desc.bindingCount = ARRAY_LEN( compute_bindings );
+		compute_layout_desc.pBindings = compute_bindings;
+
+		VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &compute_layout_desc, NULL, &vk.volumetric_compute_layout ) );
+	}
+
+	{
+		VkDescriptorSetLayoutBinding composite_bindings[4];
+		VkDescriptorSetLayoutCreateInfo composite_layout_desc;
+
+		composite_bindings[0].binding = 0;
+		composite_bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		composite_bindings[0].descriptorCount = 1;
+		composite_bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		composite_bindings[0].pImmutableSamplers = NULL;
+
+		composite_bindings[1].binding = 1;
+		composite_bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		composite_bindings[1].descriptorCount = 1;
+		composite_bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		composite_bindings[1].pImmutableSamplers = NULL;
+
+		composite_bindings[2].binding = 2;
+		composite_bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		composite_bindings[2].descriptorCount = 1;
+		composite_bindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		composite_bindings[2].pImmutableSamplers = NULL;
+
+		composite_bindings[3].binding = 3;
+		composite_bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		composite_bindings[3].descriptorCount = 1;
+		composite_bindings[3].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		composite_bindings[3].pImmutableSamplers = NULL;
+
+		composite_layout_desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		composite_layout_desc.pNext = NULL;
+		composite_layout_desc.flags = 0;
+		composite_layout_desc.bindingCount = ARRAY_LEN( composite_bindings );
+		composite_layout_desc.pBindings = composite_bindings;
+
+		VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &composite_layout_desc, NULL, &vk.volumetric_composite_layout ) );
+	}
+
+	vk_create_volumetric_params_buffer();
 
 	//
 	// Pipeline layouts.
@@ -5119,6 +5387,7 @@ void vk_create_pipelines( void )
 #ifdef VK_PBR_BRDFLUT
     vk_create_brdflut_pipeline();
 #endif
+	vk_create_volumetric_pipelines();
 }
 
 #ifdef VK_PBR_BRDFLUT
@@ -5131,9 +5400,475 @@ void vk_create_brdflut_pipeline( void )
 }
 #endif
 
+static void vk_create_volumetric_pipeline_layouts( void )
+{
+	if ( vk.volumetric_compute_pipeline_layout != VK_NULL_HANDLE || vk.volumetric_composite_pipeline_layout != VK_NULL_HANDLE ) {
+		return;
+	}
+
+	VkPipelineLayoutCreateInfo desc;
+	Com_Memset( &desc, 0, sizeof( desc ) );
+	desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	desc.pNext = NULL;
+	desc.flags = 0;
+	desc.setLayoutCount = 1;
+	desc.pSetLayouts = &vk.volumetric_compute_layout;
+	desc.pushConstantRangeCount = 0;
+	desc.pPushConstantRanges = NULL;
+
+	VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.volumetric_compute_pipeline_layout ) );
+
+	desc.pSetLayouts = &vk.volumetric_composite_layout;
+	VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.volumetric_composite_pipeline_layout ) );
+}
+
+static void vk_create_volumetric_compute_pipeline( void )
+{
+	if ( vk.volumetric_compute_pipeline != VK_NULL_HANDLE )
+	{
+		qvkDestroyPipeline( vk.device, vk.volumetric_compute_pipeline, NULL );
+		vk.volumetric_compute_pipeline = VK_NULL_HANDLE;
+	}
+
+	if ( vk.volumetric_compute_pipeline_layout == VK_NULL_HANDLE || vk.modules.volumetric_fog_cs == VK_NULL_HANDLE )
+	{
+		return;
+	}
+
+	VkPipelineShaderStageCreateInfo stage;
+	Com_Memset( &stage, 0, sizeof( stage ) );
+	stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+	stage.module = vk.modules.volumetric_fog_cs;
+	stage.pName = "main";
+
+	VkComputePipelineCreateInfo desc;
+	Com_Memset( &desc, 0, sizeof( desc ) );
+	desc.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+	desc.pNext = NULL;
+	desc.flags = 0;
+	desc.stage = stage;
+	desc.layout = vk.volumetric_compute_pipeline_layout;
+
+	VK_CHECK( qvkCreateComputePipelines( vk.device, VK_NULL_HANDLE, 1, &desc, NULL, &vk.volumetric_compute_pipeline ) );
+	SET_OBJECT_NAME( vk.volumetric_compute_pipeline, "pipeline - volumetric compute", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
+}
+
+static void vk_create_volumetric_composite_pipeline( void )
+{
+	if ( vk.volumetric_composite_pipeline != VK_NULL_HANDLE )
+	{
+		qvkDestroyPipeline( vk.device, vk.volumetric_composite_pipeline, NULL );
+		vk.volumetric_composite_pipeline = VK_NULL_HANDLE;
+	}
+
+	if ( vk.volumetric_composite_pipeline_layout == VK_NULL_HANDLE ||
+		vk.modules.volumetric_fog_vs == VK_NULL_HANDLE ||
+		vk.modules.volumetric_fog_fs == VK_NULL_HANDLE )
+	{
+		return;
+	}
+
+	VkPipelineShaderStageCreateInfo shader_stages[2];
+	Com_Memset( shader_stages, 0, sizeof( shader_stages ) );
+	shader_stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	shader_stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+	shader_stages[0].module = vk.modules.volumetric_fog_vs;
+	shader_stages[0].pName = "main";
+	shader_stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	shader_stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	shader_stages[1].module = vk.modules.volumetric_fog_fs;
+	shader_stages[1].pName = "main";
+
+	VkPipelineVertexInputStateCreateInfo vertex_input;
+	Com_Memset( &vertex_input, 0, sizeof( vertex_input ) );
+	vertex_input.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	vertex_input.vertexBindingDescriptionCount = 0;
+	vertex_input.vertexAttributeDescriptionCount = 0;
+
+	VkPipelineInputAssemblyStateCreateInfo input_assembly;
+	Com_Memset( &input_assembly, 0, sizeof( input_assembly ) );
+	input_assembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+	input_assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+	input_assembly.primitiveRestartEnable = VK_FALSE;
+
+	VkPipelineViewportStateCreateInfo viewport_state;
+	VkViewport viewport = { 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f };
+	VkRect2D scissor = { { 0, 0 }, { 1, 1 } };
+	Com_Memset( &viewport_state, 0, sizeof( viewport_state ) );
+	viewport_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	viewport_state.viewportCount = 1;
+	viewport_state.pViewports = &viewport;
+	viewport_state.scissorCount = 1;
+	viewport_state.pScissors = &scissor;
+
+	VkPipelineRasterizationStateCreateInfo raster_state;
+	Com_Memset( &raster_state, 0, sizeof( raster_state ) );
+	raster_state.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	raster_state.polygonMode = VK_POLYGON_MODE_FILL;
+	raster_state.rasterizerDiscardEnable = VK_FALSE;
+	raster_state.cullMode = VK_CULL_MODE_NONE;
+	raster_state.frontFace = VK_FRONT_FACE_CLOCKWISE;
+	raster_state.depthBiasEnable = VK_FALSE;
+	raster_state.lineWidth = 1.0f;
+
+	VkPipelineMultisampleStateCreateInfo multisample_state;
+	Com_Memset( &multisample_state, 0, sizeof( multisample_state ) );
+	multisample_state.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	multisample_state.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+	VkPipelineColorBlendAttachmentState blend_attachment;
+	Com_Memset( &blend_attachment, 0, sizeof( blend_attachment ) );
+	blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
+	VkPipelineColorBlendStateCreateInfo blend_state;
+	Com_Memset( &blend_state, 0, sizeof( blend_state ) );
+	blend_state.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	blend_state.attachmentCount = 1;
+	blend_state.pAttachments = &blend_attachment;
+
+	VkPipelineDepthStencilStateCreateInfo depth_state;
+	Com_Memset( &depth_state, 0, sizeof( depth_state ) );
+	depth_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+	depth_state.depthTestEnable = VK_FALSE;
+	depth_state.depthWriteEnable = VK_FALSE;
+
+	VkDynamicState dynamic_states[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+	VkPipelineDynamicStateCreateInfo dynamic_state;
+	Com_Memset( &dynamic_state, 0, sizeof( dynamic_state ) );
+	dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	dynamic_state.dynamicStateCount = ARRAY_LEN( dynamic_states );
+	dynamic_state.pDynamicStates = dynamic_states;
+
+	VkGraphicsPipelineCreateInfo desc;
+	Com_Memset( &desc, 0, sizeof( desc ) );
+	desc.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	desc.stageCount = 2;
+	desc.pStages = shader_stages;
+	desc.pVertexInputState = &vertex_input;
+	desc.pInputAssemblyState = &input_assembly;
+	desc.pViewportState = &viewport_state;
+	desc.pRasterizationState = &raster_state;
+	desc.pMultisampleState = &multisample_state;
+	desc.pDepthStencilState = &depth_state;
+	desc.pColorBlendState = &blend_state;
+	desc.pDynamicState = &dynamic_state;
+	desc.layout = vk.volumetric_composite_pipeline_layout;
+	desc.renderPass = vk.render_pass.volumetric;
+	desc.subpass = 0;
+
+	VK_CHECK( qvkCreateGraphicsPipelines( vk.device, VK_NULL_HANDLE, 1, &desc, NULL, &vk.volumetric_composite_pipeline ) );
+	SET_OBJECT_NAME( vk.volumetric_composite_pipeline, "pipeline - volumetric composite", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
+}
+
+static void vk_create_volumetric_pipelines( void )
+{
+	vk_create_volumetric_pipeline_layouts();
+	vk_create_volumetric_compute_pipeline();
+	vk_create_volumetric_composite_pipeline();
+}
+
+static void vk_destroy_volumetric_pipelines( void )
+{
+	if ( vk.volumetric_compute_pipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.volumetric_compute_pipeline, NULL );
+		vk.volumetric_compute_pipeline = VK_NULL_HANDLE;
+	}
+	if ( vk.volumetric_composite_pipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.volumetric_composite_pipeline, NULL );
+		vk.volumetric_composite_pipeline = VK_NULL_HANDLE;
+	}
+	if ( vk.volumetric_compute_pipeline_layout != VK_NULL_HANDLE ) {
+		qvkDestroyPipelineLayout( vk.device, vk.volumetric_compute_pipeline_layout, NULL );
+		vk.volumetric_compute_pipeline_layout = VK_NULL_HANDLE;
+	}
+	if ( vk.volumetric_composite_pipeline_layout != VK_NULL_HANDLE ) {
+		qvkDestroyPipelineLayout( vk.device, vk.volumetric_composite_pipeline_layout, NULL );
+		vk.volumetric_composite_pipeline_layout = VK_NULL_HANDLE;
+	}
+}
+
+#define VK_FROXEL_SLICES 64
+
+typedef struct {
+	float invProj[16];
+	float invView[16];
+	float prevView[16];
+	float prevProj[16];
+	float viewOrigin[4];
+	float sunDirection[4];
+	float fogColor[4];
+	float densityParams[4];
+	float sliceParams[4];
+	float prevSliceParams[4];
+	float resolution[4];
+	float jitter[4];
+	float misc[4];
+} volumetric_params_t;
+
+static void Mat4Multiply( const float *lhs, const float *rhs, float *out ) {
+	for ( int row = 0; row < 4; ++row ) {
+		for ( int col = 0; col < 4; ++col ) {
+			out[col*4 + row] =
+				lhs[0*4 + row] * rhs[col*4 + 0] +
+				lhs[1*4 + row] * rhs[col*4 + 1] +
+				lhs[2*4 + row] * rhs[col*4 + 2] +
+				lhs[3*4 + row] * rhs[col*4 + 3];
+		}
+	}
+}
+
+static qboolean Mat4Inverse( const float *m, float *out ) {
+	float tmp[16];
+	tmp[0] = m[5]  * m[10] * m[15] -
+	         m[5]  * m[11] * m[14] -
+	         m[9]  * m[6]  * m[15] +
+	         m[9]  * m[7]  * m[14] +
+	         m[13] * m[6]  * m[11] -
+	         m[13] * m[7]  * m[10];
+
+	tmp[4] = -m[4]  * m[10] * m[15] +
+	          m[4]  * m[11] * m[14] +
+	          m[8]  * m[6]  * m[15] -
+	          m[8]  * m[7]  * m[14] -
+	          m[12] * m[6]  * m[11] +
+	          m[12] * m[7]  * m[10];
+
+	tmp[8] = m[4]  * m[9] * m[15] -
+	         m[4]  * m[11] * m[13] -
+	         m[8]  * m[5] * m[15] +
+	         m[8]  * m[7] * m[13] +
+	         m[12] * m[5] * m[11] -
+	         m[12] * m[7] * m[9];
+
+	tmp[12] = -m[4]  * m[9] * m[14] +
+	           m[4]  * m[10] * m[13] +
+	           m[8]  * m[5] * m[14] -
+	           m[8]  * m[6] * m[13] -
+	           m[12] * m[5] * m[10] +
+	           m[12] * m[6] * m[9];
+
+	tmp[1] = -m[1]  * m[10] * m[15] +
+	          m[1]  * m[11] * m[14] +
+	          m[9]  * m[2] * m[15] -
+	          m[9]  * m[3] * m[14] -
+	          m[13] * m[2] * m[11] +
+	          m[13] * m[3] * m[10];
+
+	tmp[5] = m[0]  * m[10] * m[15] -
+	         m[0]  * m[11] * m[14] -
+	         m[8]  * m[2] * m[15] +
+	         m[8]  * m[3] * m[14] +
+	         m[12] * m[2] * m[11] -
+	         m[12] * m[3] * m[10];
+
+	tmp[9] = -m[0]  * m[9] * m[15] +
+	          m[0]  * m[11] * m[13] +
+	          m[8]  * m[1] * m[15] -
+	          m[8]  * m[3] * m[13] -
+	          m[12] * m[1] * m[11] +
+	          m[12] * m[3] * m[9];
+
+	tmp[13] = m[0]  * m[9] * m[14] -
+	          m[0]  * m[10] * m[13] -
+	          m[8]  * m[1] * m[14] +
+	          m[8]  * m[2] * m[13] +
+	          m[12] * m[1] * m[10] -
+	          m[12] * m[2] * m[9];
+
+	tmp[2] = m[1]  * m[6] * m[15] -
+	         m[1]  * m[7] * m[14] -
+	         m[5]  * m[2] * m[15] +
+	         m[5]  * m[3] * m[14] +
+	         m[13] * m[2] * m[7] -
+	         m[13] * m[3] * m[6];
+
+	tmp[6] = -m[0]  * m[6] * m[15] +
+	          m[0]  * m[7] * m[14] +
+	          m[4]  * m[2] * m[15] -
+	          m[4]  * m[3] * m[14] -
+	          m[12] * m[2] * m[7] +
+	          m[12] * m[3] * m[6];
+
+	tmp[10] = m[0]  * m[5] * m[15] -
+	          m[0]  * m[7] * m[13] -
+	          m[4]  * m[1] * m[15] +
+	          m[4]  * m[3] * m[13] +
+	          m[12] * m[1] * m[7] -
+	          m[12] * m[3] * m[5];
+
+	tmp[14] = -m[0]  * m[5] * m[14] +
+	           m[0]  * m[6] * m[13] +
+	           m[4]  * m[1] * m[14] -
+	           m[4]  * m[2] * m[13] -
+	           m[12] * m[1] * m[6] +
+	           m[12] * m[2] * m[5];
+
+	tmp[3] = -m[1] * m[6] * m[11] +
+	          m[1] * m[7] * m[10] +
+	          m[5] * m[2] * m[11] -
+	          m[5] * m[3] * m[10] -
+	          m[9] * m[2] * m[7] +
+	          m[9] * m[3] * m[6];
+
+	tmp[7] = m[0] * m[6] * m[11] -
+	         m[0] * m[7] * m[10] -
+	         m[4] * m[2] * m[11] +
+	         m[4] * m[3] * m[10] +
+	         m[8] * m[2] * m[7] -
+	         m[8] * m[3] * m[6];
+
+	tmp[11] = -m[0] * m[5] * m[11] +
+	           m[0] * m[7] * m[9] +
+	           m[4] * m[1] * m[11] -
+	           m[4] * m[3] * m[9] -
+	           m[8] * m[1] * m[7] +
+	           m[8] * m[3] * m[5];
+
+	tmp[15] = m[0] * m[5] * m[10] -
+	          m[0] * m[6] * m[9] -
+	          m[4] * m[1] * m[10] +
+	          m[4] * m[2] * m[9] +
+	          m[8] * m[1] * m[6] -
+	          m[8] * m[2] * m[5];
+
+	float det = m[0] * tmp[0] + m[1] * tmp[4] + m[2] * tmp[8] + m[3] * tmp[12];
+
+	if ( fabs( det ) < 1e-9f ) {
+		return qfalse;
+	}
+
+	det = 1.0f / det;
+
+	for ( int i = 0; i < 16; ++i ) {
+		out[i] = tmp[i] * det;
+	}
+	return qtrue;
+}
+
+static void vk_destroy_froxel_images( void )
+{
+	if ( vk.froxel_volume_image ) {
+		qvkDestroyImage( vk.device, vk.froxel_volume_image, NULL );
+		vk.froxel_volume_image = VK_NULL_HANDLE;
+	}
+	if ( vk.froxel_volume_view ) {
+		qvkDestroyImageView( vk.device, vk.froxel_volume_view, NULL );
+		vk.froxel_volume_view = VK_NULL_HANDLE;
+	}
+	if ( vk.froxel_volume_memory ) {
+		qvkFreeMemory( vk.device, vk.froxel_volume_memory, NULL );
+		vk.froxel_volume_memory = VK_NULL_HANDLE;
+	}
+
+	if ( vk.froxel_history_image ) {
+		qvkDestroyImage( vk.device, vk.froxel_history_image, NULL );
+		vk.froxel_history_image = VK_NULL_HANDLE;
+	}
+	if ( vk.froxel_history_view ) {
+		qvkDestroyImageView( vk.device, vk.froxel_history_view, NULL );
+		vk.froxel_history_view = VK_NULL_HANDLE;
+	}
+	if ( vk.froxel_history_memory ) {
+		qvkFreeMemory( vk.device, vk.froxel_history_memory, NULL );
+		vk.froxel_history_memory = VK_NULL_HANDLE;
+	}
+
+	vk.froxel_width = 0;
+	vk.froxel_height = 0;
+	vk.froxel_slices = 0;
+}
+
+static void vk_create_froxel_images( void )
+{
+	if ( !glConfig.vidWidth || !glConfig.vidHeight ) {
+		return;
+	}
+
+	vk_destroy_froxel_images();
+
+	vk.froxel_width = MAX( 1u, glConfig.vidWidth / 2 );
+	vk.froxel_height = MAX( 1u, glConfig.vidHeight / 2 );
+	vk.froxel_slices = VK_FROXEL_SLICES;
+
+	VkImageCreateInfo create_info;
+	VkMemoryRequirements mem_req;
+	VkMemoryAllocateInfo alloc_info;
+
+	Com_Memset( &create_info, 0, sizeof( create_info ) );
+	create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	create_info.pNext = NULL;
+	create_info.flags = 0;
+	create_info.imageType = VK_IMAGE_TYPE_3D;
+	create_info.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+	create_info.extent.width = vk.froxel_width;
+	create_info.extent.height = vk.froxel_height;
+	create_info.extent.depth = vk.froxel_slices;
+	create_info.mipLevels = 1;
+	create_info.arrayLayers = 1;
+	create_info.samples = VK_SAMPLE_COUNT_1_BIT;
+	create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+	create_info.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+	create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	create_info.queueFamilyIndexCount = 0;
+	create_info.pQueueFamilyIndices = NULL;
+	create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+	VK_CHECK( qvkCreateImage( vk.device, &create_info, NULL, &vk.froxel_volume_image ) );
+
+	qvkGetImageMemoryRequirements( vk.device, vk.froxel_volume_image, &mem_req );
+	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	alloc_info.pNext = NULL;
+	alloc_info.allocationSize = mem_req.size;
+	alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.froxel_volume_memory ) );
+	VK_CHECK( qvkBindImageMemory( vk.device, vk.froxel_volume_image, vk.froxel_volume_memory, 0 ) );
+
+	VK_CHECK( qvkCreateImage( vk.device, &create_info, NULL, &vk.froxel_history_image ) );
+
+	qvkGetImageMemoryRequirements( vk.device, vk.froxel_history_image, &mem_req );
+	alloc_info.allocationSize = mem_req.size;
+	alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.froxel_history_memory ) );
+	VK_CHECK( qvkBindImageMemory( vk.device, vk.froxel_history_image, vk.froxel_history_memory, 0 ) );
+
+	VkImageViewCreateInfo view_info;
+	Com_Memset( &view_info, 0, sizeof( view_info ) );
+	view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	view_info.pNext = NULL;
+	view_info.flags = 0;
+	view_info.viewType = VK_IMAGE_VIEW_TYPE_3D;
+	view_info.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+	view_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+	view_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+	view_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+	view_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+	view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	view_info.subresourceRange.baseMipLevel = 0;
+	view_info.subresourceRange.levelCount = 1;
+	view_info.subresourceRange.baseArrayLayer = 0;
+	view_info.subresourceRange.layerCount = 1;
+
+	view_info.image = vk.froxel_volume_image;
+	VK_CHECK( qvkCreateImageView( vk.device, &view_info, NULL, &vk.froxel_volume_view ) );
+
+	view_info.image = vk.froxel_history_image;
+	VK_CHECK( qvkCreateImageView( vk.device, &view_info, NULL, &vk.froxel_history_view ) );
+
+	VkCommandBuffer command_buffer = begin_command_buffer();
+	record_image_layout_transition( command_buffer, vk.froxel_volume_image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, 0 );
+	record_image_layout_transition( command_buffer, vk.froxel_history_image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, 0 );
+	end_command_buffer( command_buffer, __func__ );
+}
+
 static void vk_destroy_attachments( void )
 {
 	uint32_t i;
+
+	vk_destroy_volumetric_params_buffer();
+	vk_destroy_froxel_images();
+	vk.volumetric_compute_descriptor = VK_NULL_HANDLE;
+	vk.volumetric_composite_descriptor = VK_NULL_HANDLE;
 
 	if ( vk.bloom_image[0] ) {
 		for ( i = 0; i < ARRAY_LEN( vk.bloom_image ); i++ ) {
@@ -5287,6 +6022,11 @@ static void vk_destroy_render_passes( void )
 		vk.render_pass.ssao_combine = VK_NULL_HANDLE;
 	}
 
+	if ( vk.render_pass.volumetric != VK_NULL_HANDLE ) {
+		qvkDestroyRenderPass( vk.device, vk.render_pass.volumetric, NULL );
+		vk.render_pass.volumetric = VK_NULL_HANDLE;
+	}
+
 	if ( vk.render_pass.screenmap != VK_NULL_HANDLE ) {
 		qvkDestroyRenderPass( vk.device, vk.render_pass.screenmap, NULL );
 		vk.render_pass.screenmap = VK_NULL_HANDLE;
@@ -5316,7 +6056,6 @@ static void vk_destroy_render_passes( void )
     }
 #endif
 }
-
 
 static void vk_destroy_pipelines( qboolean resetCounter )
 {
@@ -5395,6 +6134,7 @@ static void vk_destroy_pipelines( qboolean resetCounter )
 			vk.blur_pipeline[i] = VK_NULL_HANDLE;
 		}
 	}
+	vk_destroy_volumetric_pipelines();
 }
 
 
@@ -8818,6 +9558,158 @@ void vk_begin_ssao_combine_render_pass( void )
 }
 
 
+void vk_begin_volumetric_render_pass( void )
+{
+	VkFramebuffer frameBuffer = vk.framebuffers.volumetric[ vk.cmd->swapchain_image_index ];
+
+	vk.renderWidth = glConfig.vidWidth;
+	vk.renderHeight = glConfig.vidHeight;
+	vk.renderScaleX = vk.renderScaleY = 1.0f;
+
+	vk_begin_render_pass( vk.render_pass.volumetric, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+}
+
+static void vk_volumetric_compute_pass( void )
+{
+	if ( vk.volumetric_compute_pipeline == VK_NULL_HANDLE || !vk.froxel_width || !vk.froxel_height || !vk.froxel_slices ) {
+		return;
+	}
+
+	vk_update_volumetric_params();
+
+	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.volumetric_compute_pipeline );
+	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.volumetric_compute_pipeline_layout, 0, 1, &vk.volumetric_compute_descriptor, 0, NULL );
+
+	const uint32_t groups_x = ( vk.froxel_width + 7 ) / 8;
+	const uint32_t groups_y = ( vk.froxel_height + 7 ) / 8;
+	const uint32_t groups_z = ( vk.froxel_slices + 3 ) / 4;
+
+	qvkCmdDispatch( vk.cmd->command_buffer, groups_x, groups_y, groups_z );
+
+	VkMemoryBarrier barrier;
+	Com_Memset( &barrier, 0, sizeof( barrier ) );
+	barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+	barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+	barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+	qvkCmdPipelineBarrier( vk.cmd->command_buffer,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+		0,
+		1, &barrier,
+		0, NULL,
+		0, NULL );
+}
+
+static void vk_copy_froxel_history( void )
+{
+	if ( !vk.froxel_volume_image || !vk.froxel_history_image || !vk.froxel_width || !vk.froxel_height || !vk.froxel_slices ) {
+		return;
+	}
+
+	VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+	VkCommandBuffer cmd = vk.cmd->command_buffer;
+
+	VkImageCopy copy;
+	Com_Memset( &copy, 0, sizeof( copy ) );
+	copy.srcSubresource.aspectMask = aspect;
+	copy.srcSubresource.mipLevel = 0;
+	copy.srcSubresource.baseArrayLayer = 0;
+	copy.srcSubresource.layerCount = 1;
+	copy.dstSubresource = copy.srcSubresource;
+	copy.extent.width = vk.froxel_width;
+	copy.extent.height = vk.froxel_height;
+	copy.extent.depth = vk.froxel_slices;
+
+	record_image_layout_transition( cmd, vk.froxel_volume_image, aspect,
+		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 0, 0 );
+	record_image_layout_transition( cmd, vk.froxel_history_image, aspect,
+		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0 );
+
+	qvkCmdCopyImage( cmd,
+		vk.froxel_volume_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		vk.froxel_history_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		1, &copy );
+
+	record_image_layout_transition( cmd, vk.froxel_volume_image, aspect,
+		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, 0, 0 );
+	record_image_layout_transition( cmd, vk.froxel_history_image, aspect,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, 0, 0 );
+
+	vk.has_prev_volumetric = qtrue;
+}
+
+static void vk_volumetric_composite_pass( void )
+{
+	if ( vk.volumetric_composite_pipeline == VK_NULL_HANDLE || vk.render_pass.volumetric == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	vk_begin_volumetric_render_pass();
+
+	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.volumetric_composite_pipeline );
+	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.volumetric_composite_pipeline_layout, 0, 1, &vk.volumetric_composite_descriptor, 0, NULL );
+
+	VkViewport viewport;
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width = vk.renderWidth > 0 ? (float) vk.renderWidth : (float)glConfig.vidWidth;
+	viewport.height = vk.renderHeight > 0 ? (float) vk.renderHeight : (float)glConfig.vidHeight;
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+
+	VkRect2D scissor;
+	scissor.offset.x = 0;
+	scissor.offset.y = 0;
+	scissor.extent.width = ( viewport.width > 0.0f ) ? (uint32_t) viewport.width : glConfig.vidWidth;
+	scissor.extent.height = ( viewport.height > 0.0f ) ? (uint32_t) viewport.height : glConfig.vidHeight;
+
+	qvkCmdSetViewport( vk.cmd->command_buffer, 0, 1, &viewport );
+	qvkCmdSetScissor( vk.cmd->command_buffer, 0, 1, &scissor );
+
+	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+	vk_end_render_pass();
+}
+
+static void vk_volumetric_fog_pass( void )
+{
+	if ( !r_volumetricFog->integer || backEnd.doneFog || !vk.fboActive ) {
+		vk.has_prev_volumetric = qfalse;
+		vk.volumetric_frame = 0;
+		return;
+	}
+
+	VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+	if ( glConfig.stencilBits > 0 ) {
+		depth_aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
+	}
+
+	record_image_layout_transition( vk.cmd->command_buffer, vk.depth_image, depth_aspect,
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 0, 0 );
+
+	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		VK_IMAGE_LAYOUT_GENERAL, 0, 0 );
+
+	vk_volumetric_compute_pass();
+
+	vk_copy_froxel_history();
+
+	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_GENERAL,
+		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0, 0 );
+
+	vk_volumetric_composite_pass();
+
+	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
+
+	backEnd.doneFog = qtrue;
+}
+
+
 static void vk_begin_screenmap_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.screenmap;
@@ -9237,6 +10129,11 @@ void vk_end_frame( void )
 		{
 			vk_end_render_pass();
 
+			if ( !backEnd.doneFog )
+			{
+				vk_volumetric_fog_pass();
+			}
+
 			vk.renderWidth = gls.windowWidth;
 			vk.renderHeight = gls.windowHeight;
 
@@ -9651,6 +10548,163 @@ void vk_read_pixels( byte *buffer, uint32_t width, uint32_t height )
 
 		end_command_buffer( command_buffer, "restore layout" );
 	}
+
+static void vk_destroy_volumetric_params_buffer( void )
+{
+	if ( vk.volumetric_params_ptr ) {
+		qvkUnmapMemory( vk.device, vk.volumetric_params_memory );
+		vk.volumetric_params_ptr = NULL;
+	}
+
+	if ( vk.volumetric_params_buffer != VK_NULL_HANDLE ) {
+		qvkDestroyBuffer( vk.device, vk.volumetric_params_buffer, NULL );
+		vk.volumetric_params_buffer = VK_NULL_HANDLE;
+		vk.volumetric_params_buffer_size = 0;
+	}
+
+	if ( vk.volumetric_params_memory != VK_NULL_HANDLE ) {
+		qvkFreeMemory( vk.device, vk.volumetric_params_memory, NULL );
+		vk.volumetric_params_memory = VK_NULL_HANDLE;
+	}
+	vk.volumetric_frame = 0;
+	vk.has_prev_volumetric = qfalse;
+}
+
+static void vk_create_volumetric_params_buffer( void )
+{
+	if ( vk.volumetric_params_buffer != VK_NULL_HANDLE ) {
+		return;
+	}
+
+	VkBufferCreateInfo desc;
+	VkMemoryRequirements mem_req;
+	VkMemoryAllocateInfo alloc_info;
+
+	desc.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	desc.pNext = NULL;
+	desc.flags = 0;
+	desc.size = sizeof( volumetric_params_t );
+	desc.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+	desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	desc.queueFamilyIndexCount = 0;
+	desc.pQueueFamilyIndices = NULL;
+
+	VK_CHECK( qvkCreateBuffer( vk.device, &desc, NULL, &vk.volumetric_params_buffer ) );
+
+	qvkGetBufferMemoryRequirements( vk.device, vk.volumetric_params_buffer, &mem_req );
+
+	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	alloc_info.pNext = NULL;
+	alloc_info.allocationSize = mem_req.size;
+	alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+
+	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.volumetric_params_memory ) );
+	VK_CHECK( qvkBindBufferMemory( vk.device, vk.volumetric_params_buffer, vk.volumetric_params_memory, 0 ) );
+
+	vk.volumetric_params_buffer_size = mem_req.size;
+
+	VK_CHECK( qvkMapMemory( vk.device, vk.volumetric_params_memory, 0, vk.volumetric_params_buffer_size, 0, &vk.volumetric_params_ptr ) );
+	vk.volumetric_frame = 0;
+	vk.has_prev_volumetric = qfalse;
+}
+
+static float vk_random01( uint32_t seed ) {
+	float x = sinf( (float)seed * 12.9898f ) * 43758.5453f;
+	return x - floorf( x );
+}
+
+static void vk_update_volumetric_params( void )
+{
+	if ( !vk.volumetric_params_ptr ) {
+		return;
+	}
+
+	volumetric_params_t params;
+	Com_Memset( &params, 0, sizeof( params ) );
+
+	const float *projection = backEnd.viewParms.projectionMatrix;
+	const float *view = backEnd.viewParms.world.modelViewMatrix;
+
+	if ( !Mat4Inverse( projection, params.invProj ) ) {
+		Com_Memcpy( params.invProj, projection, sizeof( params.invProj ) );
+	}
+	if ( !Mat4Inverse( view, params.invView ) ) {
+		Com_Memcpy( params.invView, view, sizeof( params.invView ) );
+	}
+
+	if ( vk.has_prev_volumetric ) {
+		Com_Memcpy( params.prevView, vk.prev_view_matrix, sizeof( params.prevView ) );
+		Com_Memcpy( params.prevProj, vk.prev_projection_matrix, sizeof( params.prevProj ) );
+	} else {
+		Com_Memcpy( params.prevView, view, sizeof( params.prevView ) );
+		Com_Memcpy( params.prevProj, projection, sizeof( params.prevProj ) );
+	}
+
+	params.viewOrigin[0] = backEnd.viewParms.or.origin[0];
+	params.viewOrigin[1] = backEnd.viewParms.or.origin[1];
+	params.viewOrigin[2] = backEnd.viewParms.or.origin[2];
+	params.viewOrigin[3] = 0.0f;
+
+	params.sunDirection[0] = tr.sunDirection[0];
+	params.sunDirection[1] = tr.sunDirection[1];
+	params.sunDirection[2] = tr.sunDirection[2];
+	params.sunDirection[3] = 0.0f;
+
+	params.fogColor[0] = backEnd.fogParms.color[0];
+	params.fogColor[1] = backEnd.fogParms.color[1];
+	params.fogColor[2] = backEnd.fogParms.color[2];
+	params.fogColor[3] = 0.0f;
+
+	params.densityParams[0] = r_volumetricFogDensity->value;
+	params.densityParams[1] = r_volumetricFogHeightFalloff->value;
+	params.densityParams[2] = r_volumetricFogAniso->value;
+	params.densityParams[3] = r_volumetricFogTemporalWeight->value;
+
+	const float near_plane = r_znear->value;
+	const float far_plane = backEnd.viewParms.zFar;
+	const float log_far = ( far_plane > near_plane ) ? logf( far_plane / near_plane ) : 1.0f;
+
+	params.sliceParams[0] = near_plane;
+	params.sliceParams[1] = far_plane;
+	params.sliceParams[2] = log_far;
+	params.sliceParams[3] = (float)vk.froxel_slices;
+
+	float prev_far = vk.prev_zfar > 0.0f ? vk.prev_zfar : far_plane;
+	const float prev_log_far = ( prev_far > near_plane ) ? logf( prev_far / near_plane ) : log_far;
+
+	params.prevSliceParams[0] = near_plane;
+	params.prevSliceParams[1] = prev_far;
+	params.prevSliceParams[2] = prev_log_far;
+	params.prevSliceParams[3] = (float)vk.froxel_slices;
+
+	params.resolution[0] = vk.froxel_width > 0 ? 1.0f / (float)vk.froxel_width : 0.0f;
+	params.resolution[1] = vk.froxel_height > 0 ? 1.0f / (float)vk.froxel_height : 0.0f;
+	params.resolution[2] = (float)vk.froxel_width;
+	params.resolution[3] = (float)vk.froxel_height;
+
+	const float jitter_amount = r_volumetricFogJitter->value;
+	uint32_t frame_seed = vk.volumetric_frame;
+	const float jitter_x = jitter_amount * vk_random01( frame_seed * 279 );
+	const float jitter_y = jitter_amount * vk_random01( frame_seed * 311 );
+	params.jitter[0] = jitter_amount;
+	params.jitter[1] = jitter_x;
+	params.jitter[2] = jitter_y;
+	params.jitter[3] = 0.0f;
+
+	params.misc[0] = (float)r_volumetricFogSteps->integer;
+	params.misc[1] = vk.has_prev_volumetric ? 1.0f : 0.0f;
+	params.misc[2] = (float)vk.volumetric_frame;
+	params.misc[3] = 0.0f;
+
+	Com_Memcpy( vk.volumetric_params_ptr, &params, sizeof( params ) );
+
+	// update previous frame data for next update
+	Com_Memcpy( vk.prev_view_matrix, view, sizeof( vk.prev_view_matrix ) );
+	Com_Memcpy( vk.prev_projection_matrix, projection, sizeof( vk.prev_projection_matrix ) );
+	vk.prev_zfar = far_plane;
+	vk.volumetric_frame++;
+}
 }
 
 
@@ -9671,6 +10725,7 @@ qboolean vk_bloom( void )
 	}
 
 	vk_end_render_pass(); // end main
+	vk_volumetric_fog_pass();
 
 	// bloom extraction
 	vk_begin_bloom_extract_render_pass();

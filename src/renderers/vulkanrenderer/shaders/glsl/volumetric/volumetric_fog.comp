@@ -1,0 +1,105 @@
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;
+
+layout(binding = 0, rgba16f) uniform writeonly image3D froxelVolume;
+layout(binding = 1, rgba16f) uniform readonly image3D froxelHistory;
+layout(binding = 2) uniform sampler2D depthTexture;
+
+layout(std140, binding = 3) uniform VolumetricParams {
+	mat4 invProj;
+	mat4 invView;
+	mat4 prevView;
+	mat4 prevProj;
+	vec4 viewOrigin;
+	vec4 sunDirection;
+	vec4 fogColor;
+	vec4 densityParams;
+	vec4 sliceParams;
+	vec4 prevSliceParams;
+	vec4 resolution;
+	vec4 jitter;
+	vec4 misc;
+} params;
+
+const float PI = 3.14159265359;
+
+float phaseFunction(float cosTheta, float g) {
+	float denom = 1.0 + g * g - 2.0 * g * cosTheta;
+	return (1.0 - g * g) / (4.0 * PI * pow(max(denom, 1e-5), 1.5));
+}
+
+vec3 reconstructViewDir(vec2 uv) {
+	vec4 clip = vec4(uv * 2.0 - 1.0, 1.0, 1.0);
+	vec4 view = params.invProj * clip;
+	return normalize(view.xyz / view.w);
+}
+
+void main() {
+	ivec3 idx = ivec3(gl_GlobalInvocationID);
+	int width = int(params.resolution.z);
+	int height = int(params.resolution.w);
+	int slices = int(params.sliceParams.w);
+
+	if ( idx.x >= width || idx.y >= height || idx.z >= slices ) {
+		return;
+	}
+
+	vec2 baseUV = (vec2(idx.xy) + vec2(0.5) + vec2(params.jitter.y, params.jitter.z)) * vec2(params.resolution.x, params.resolution.y);
+	vec2 uv = clamp(baseUV, 0.0, 1.0);
+	float sliceNormalized = (float(idx.z) + 0.5) / max(params.sliceParams.w, 1.0);
+
+	vec3 viewDir = reconstructViewDir(uv);
+	float viewDepth = params.sliceParams.x * exp(sliceNormalized * params.sliceParams.z);
+	vec3 viewPos = viewDir * viewDepth;
+	vec4 worldPos4 = params.invView * vec4(viewPos, 1.0);
+	vec3 worldPos = worldPos4.xyz / worldPos4.w;
+
+	float depthSample = texture(depthTexture, uv).r;
+	float sceneDepth = depthSample > 0.0 ? params.sliceParams.x / depthSample : params.sliceParams.y;
+
+	bool occluded = viewDepth > sceneDepth;
+	float heightDelta = worldPos.z - params.viewOrigin.z;
+	float heightFalloff = max(0.0, params.densityParams.y);
+	float heightFactor = exp(-heightFalloff * max(0.0, heightDelta));
+	float density = params.densityParams.x * heightFactor;
+	if ( occluded ) {
+		density = 0.0;
+	}
+
+	float g = params.densityParams.z;
+	float cosTheta = dot(viewDir, normalize(params.sunDirection.xyz));
+	float phase = phaseFunction(cosTheta, g);
+	vec3 currentScattering = params.fogColor.rgb * density * phase;
+	vec4 current = vec4(currentScattering, density);
+
+	vec4 history = vec4(0.0);
+	bool hasHistory = params.misc.y > 0.5;
+	if ( hasHistory ) {
+		vec4 prevViewPos = params.prevView * vec4(worldPos, 1.0);
+		vec4 prevClip = params.prevProj * prevViewPos;
+		vec3 prevNdc = prevClip.xyz / prevClip.w;
+		vec2 prevUV = clamp(prevNdc.xy * 0.5 + 0.5, 0.0, 1.0);
+
+		float prevDepth = max(-prevViewPos.z, 1e-3);
+		float prevLog = params.prevSliceParams.z > 0.0 ? log(max(prevDepth / params.prevSliceParams.x, 1e-5)) / params.prevSliceParams.z : 0.0;
+		float prevSlice = clamp(prevLog, 0.0, 1.0) * (params.prevSliceParams.w - 1.0);
+
+		ivec3 prevIndex;
+		prevIndex.x = clamp(int(floor(prevUV.x * params.resolution.z)), 0, max(width - 1, 0));
+		prevIndex.y = clamp(int(floor(prevUV.y * params.resolution.w)), 0, max(height - 1, 0));
+		prevIndex.z = clamp(int(floor(prevSlice)), 0, max(slices - 1, 0));
+		history = imageLoad(froxelHistory, prevIndex);
+	}
+
+	vec4 finalValue = current;
+	if ( hasHistory ) {
+		float temporal = clamp(params.densityParams.w, 0.0, 1.0);
+		vec4 blended = mix(current, history, temporal);
+		vec4 diff = blended - history;
+		diff = clamp(diff, -0.25, 0.25);
+		finalValue = history + diff;
+	}
+
+	imageStore(froxelVolume, idx, finalValue);
+}

@@ -538,6 +538,7 @@ typedef struct {
 		VkRenderPass brdflut;
 #endif
 		VkRenderPass cubemap;
+		VkRenderPass volumetric;
 	} render_pass;
 
 	VkDescriptorPool descriptor_pool;
@@ -554,6 +555,14 @@ typedef struct {
 #ifdef VK_PBR_BRDFLUT
 	VkPipelineLayout pipeline_layout_brdflut;
 #endif
+	VkDescriptorSetLayout volumetric_compute_layout;
+	VkDescriptorSetLayout volumetric_composite_layout;
+	VkDescriptorSet volumetric_compute_descriptor;
+	VkDescriptorSet volumetric_composite_descriptor;
+	VkPipelineLayout volumetric_compute_pipeline_layout;
+	VkPipelineLayout volumetric_composite_pipeline_layout;
+	VkPipeline volumetric_compute_pipeline;
+	VkPipeline volumetric_composite_pipeline;
 
 	VkDescriptorSet color_descriptor;
 	VkDescriptorSet depth_descriptor;
@@ -632,7 +641,19 @@ typedef struct {
 		VkFramebuffer brdflut;
 #endif
 		VkFramebuffer cubemap[6];
+		VkFramebuffer volumetric[MAX_SWAPCHAIN_IMAGES];
 	} framebuffers;
+
+	VkBuffer volumetric_params_buffer;
+	VkDeviceSize volumetric_params_buffer_size;
+	VkDeviceMemory volumetric_params_memory;
+	void *volumetric_params_ptr;
+	float prev_view_matrix[16];
+	float prev_projection_matrix[16];
+	float prev_view_proj[16];
+	float prev_zfar;
+	qboolean has_prev_volumetric;
+	uint32_t volumetric_frame;
 
 #ifdef USE_UPLOAD_QUEUE
 	VkSemaphore rendering_finished;	// reference to vk.cmd->rendering_finished2
@@ -723,6 +744,9 @@ typedef struct {
 
 		VkShaderModule fog_fs;
 		VkShaderModule fog_vs;
+		VkShaderModule volumetric_fog_vs;
+		VkShaderModule volumetric_fog_fs;
+		VkShaderModule volumetric_fog_cs;
 
 		VkShaderModule dot_fs;
 		VkShaderModule dot_vs;
@@ -820,6 +844,17 @@ typedef struct {
 	VkFormat depth_format;
 	VkFormat bloom_format;
 	VkFormat ssao_format;
+	VkImage froxel_volume_image;
+	VkImageView froxel_volume_view;
+	VkDeviceMemory froxel_volume_memory;
+	VkImage froxel_history_image;
+	VkImageView froxel_history_view;
+	VkDeviceMemory froxel_history_memory;
+	VkSampler froxel_sampler;
+	VkSampler froxel_depth_sampler;
+	uint32_t froxel_width;
+	uint32_t froxel_height;
+	uint32_t froxel_slices;
 
 	VkImageLayout initSwapchainLayout;
 
