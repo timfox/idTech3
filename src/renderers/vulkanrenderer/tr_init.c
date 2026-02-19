@@ -188,6 +188,7 @@ cvar_t	*r_gamma;
 cvar_t	*r_panini;
 cvar_t	*r_paniniD;
 cvar_t	*r_paniniS;
+cvar_t	*r_paniniBrightness;
 cvar_t	*r_post;
 cvar_t	*r_post_debug;
 cvar_t	*r_exposure;
@@ -1756,6 +1757,11 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_paniniS, "0.0", "1.0", CV_FLOAT );
 	ri.Cvar_SetDescription( r_paniniS, "Panini projection squeeze factor." );
 	ri.Cvar_SetGroup( r_paniniS, CVG_RENDERER );
+
+	r_paniniBrightness = ri.Cvar_Get( "r_paniniBrightness", "1.25", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_paniniBrightness, "0.5", "2.5", CV_FLOAT );
+	ri.Cvar_SetDescription( r_paniniBrightness, "Multiplier applied after Panini warp (allows brightening the post-pass)." );
+	ri.Cvar_SetGroup( r_paniniBrightness, CVG_RENDERER );
 	r_facePlaneCull = ri.Cvar_Get ("r_facePlaneCull", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_facePlaneCull, "Enables culling of planar surfaces with back side test." );
 

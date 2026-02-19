@@ -1510,6 +1510,7 @@ extern cvar_t	*r_gamma;
 extern cvar_t	*r_panini;
 extern cvar_t	*r_paniniD;
 extern cvar_t	*r_paniniS;
+extern cvar_t	*r_paniniBrightness;
 extern cvar_t	*r_post;
 extern cvar_t	*r_post_debug;
 extern cvar_t	*r_exposure;
