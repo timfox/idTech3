@@ -7277,32 +7277,52 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	frag_spec_data.normalScale_z = def->normalScale[2];
 	frag_spec_data.normalScale_w = def->normalScale[3];
 
-	frag_spec_data.normal_texture_set = 0;
-	frag_spec_data.physical_texture_set = 0;
-	frag_spec_data.env_texture_set = 0;
-	frag_spec_data.lightmap_texture_set = 0;
-	frag_spec_data.irradiance_texture_set = 0;
-	frag_spec_data.emissive_texture_set = 0;
-	frag_spec_data.clearcoat_texture_set = 0;
-	frag_spec_data.sheen_texture_set = 0;
-	frag_spec_data.anisotropy_texture_set = 0;
-	frag_spec_data.transmission_texture_set = 0;
-	frag_spec_data.subsurface_texture_set = 0;
+	frag_spec_data.normal_texture_set = -1;
+	frag_spec_data.physical_texture_set = -1;
+	frag_spec_data.env_texture_set = -1;
+	frag_spec_data.lightmap_texture_set = -1;
+	frag_spec_data.irradiance_texture_set = -1;
+	frag_spec_data.emissive_texture_set = -1;
+	frag_spec_data.clearcoat_texture_set = -1;
+	frag_spec_data.sheen_texture_set = -1;
+	frag_spec_data.anisotropy_texture_set = -1;
+	frag_spec_data.transmission_texture_set = -1;
+	frag_spec_data.subsurface_texture_set = -1;
 
-	if ( ( def->vk_pbr_flags & PBR_HAS_NORMALMAP ) == 0 )
-		frag_spec_data.normal_texture_set = -1;
-
-	if ( ( def->vk_pbr_flags & PBR_HAS_PHYSICALMAP ) == 0 )
-		frag_spec_data.physical_texture_set = -1;
+	if ( def->vk_pbr_flags & PBR_HAS_NORMALMAP )
+		frag_spec_data.normal_texture_set = 0;
 
 	if ( def->vk_pbr_flags & PBR_HAS_SPECULARMAP )
 		frag_spec_data.physical_texture_set = 1;
+	else if ( def->vk_pbr_flags & PBR_HAS_PHYSICALMAP )
+		frag_spec_data.physical_texture_set = 0;
 
-	if ( !vk.cubemapActive )
-		frag_spec_data.env_texture_set = -1;
+	if ( vk.cubemapActive )
+		frag_spec_data.env_texture_set = 0;
 
-	if ( ( def->vk_pbr_flags & PBR_HAS_LIGHTMAP ) == 0 )
-		frag_spec_data.lightmap_texture_set = -1;
+	if ( def->vk_pbr_flags & PBR_HAS_LIGHTMAP )
+		frag_spec_data.lightmap_texture_set = 0;
+
+	if ( def->vk_pbr_flags & PBR_HAS_IRRADIANCE )
+		frag_spec_data.irradiance_texture_set = 0;
+
+	if ( def->vk_pbr_flags & PBR_HAS_EMISSIVE )
+		frag_spec_data.emissive_texture_set = 0;
+
+	if ( def->vk_pbr_flags & PBR_HAS_CLEARCOAT )
+		frag_spec_data.clearcoat_texture_set = 0;
+
+	if ( def->vk_pbr_flags & PBR_HAS_SHEEN )
+		frag_spec_data.sheen_texture_set = 0;
+
+	if ( def->vk_pbr_flags & PBR_HAS_ANISOTROPY )
+		frag_spec_data.anisotropy_texture_set = 0;
+
+	if ( def->vk_pbr_flags & PBR_HAS_TRANSMISSION )
+		frag_spec_data.transmission_texture_set = 0;
+
+	if ( def->vk_pbr_flags & PBR_HAS_SUBSURFACE )
+		frag_spec_data.subsurface_texture_set = 0;
 #ifdef HDR_DELUXE_LIGHTMAP
 	if ( r_deluxeMapping->integer )
 	{
@@ -7841,6 +7861,22 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	if ( r_vk_pipeline_debug && r_vk_pipeline_debug->integer ) {
 		ri.Printf( PRINT_DEVELOPER, "vk pipeline def#%u render_pass=%u shader=%u fog=%d state=0x%x allow_discard=%d discard_mode=%d\n",
 			def_index, renderPassIndex, def->shader_type, def->fog_stage, def->state_bits, def->allow_discard, frag_spec_data.discard_mode );
+#ifdef USE_VK_PBR
+		if ( def->vk_pbr_flags ) {
+			ri.Printf( PRINT_DEVELOPER, "vk pipeline PBR spec consts [19=%d 20=%d 21=%d 22=%d 23=%d 24=%d 25=%d 26=%d 27=%d 28=%d 29=%d]\n",
+				frag_spec_data.normal_texture_set,
+				frag_spec_data.physical_texture_set,
+				frag_spec_data.env_texture_set,
+				frag_spec_data.lightmap_texture_set,
+				frag_spec_data.irradiance_texture_set,
+				frag_spec_data.emissive_texture_set,
+				frag_spec_data.clearcoat_texture_set,
+				frag_spec_data.sheen_texture_set,
+				frag_spec_data.anisotropy_texture_set,
+				frag_spec_data.transmission_texture_set,
+				frag_spec_data.subsurface_texture_set );
+		}
+#endif
 	}
 
 	blend_state.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
@@ -8462,6 +8498,16 @@ void vk_bind_descriptor_sets( void )
 			vk.cmd->descriptor_set.current[i] = tr.whiteImage->descriptor;
 		}
 	}
+
+#ifdef USE_VK_PBR
+	if ( r_vk_pipeline_debug && r_vk_pipeline_debug->integer && vk.cmd ) {
+		ri.Printf( PRINT_DEVELOPER, "vk bind descriptors PBR normal=%p physical=%p env=%p irradiance=%p\n",
+			(void*)vk.cmd->descriptor_set.current[VK_DESC_PBR_NORMAL],
+			(void*)vk.cmd->descriptor_set.current[VK_DESC_PBR_PHYSICAL],
+			(void*)vk.cmd->descriptor_set.current[VK_DESC_PBR_CUBEMAP],
+			(void*)vk.cmd->descriptor_set.current[VK_DESC_PBR_IRRADIANCE] );
+	}
+#endif
 
 	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout, start, count, vk.cmd->descriptor_set.current + start, offset_count, offsets );
 
