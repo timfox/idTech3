@@ -644,6 +644,7 @@ typedef struct image_s {
 	// Descriptor set that contains single descriptor used to access the given image.
 	// It is updated only once during image initialization.
 	VkDescriptorSet descriptor;
+	VkSampler	vk_sampler;
 #else
 	GLuint		texnum;				// gl texture binding
 	GLint		internalFormat;
@@ -1502,6 +1503,7 @@ extern cvar_t	*r_post_debug;
 extern cvar_t	*r_vk_clearhdr;
 extern cvar_t	*r_vk_disableblend;
 extern cvar_t	*r_vk_bindlog;
+extern cvar_t	*r_vk_pipeline_debug;
 extern cvar_t	*r_vk_swapchain_srgb;
 extern cvar_t	*r_ext_multisample;
 extern cvar_t	*r_ext_supersample;
@@ -1525,8 +1527,12 @@ extern	cvar_t	*r_nocurves;
 extern	cvar_t	*r_showcluster;
 
 extern cvar_t	*r_gamma;
+extern cvar_t	*r_panini;
 extern cvar_t	*r_paniniD;
 extern cvar_t	*r_paniniS;
+extern cvar_t	*r_paniniBrightness;
+extern cvar_t	*r_paniniCircle;
+extern cvar_t	*r_paniniOverdraw;
 
 extern	cvar_t	*r_nobind;						// turns off binding to appropriate textures
 extern	cvar_t	*r_singleShader;				// make most world faces use default shader

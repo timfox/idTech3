@@ -28,7 +28,11 @@ layout(push_constant) uniform PaniniPC {
 	float aspect;
 	float paniniD;
 	float paniniS;
-	float padding;
+	float brightness;
+	float circleMix;
+	float overdraw;
+	float padding0;
+	float padding1;
 } paniniPC;
 
 const vec3 sRGB = vec3( 0.2126, 0.7152, 0.0722 );
@@ -86,10 +90,12 @@ vec3 applyBloomKnee( vec3 color ) {
 }
 
 vec2 panini_project( vec2 uv, float aspect, float d, float s ) {
-	float safeAspect = max( aspect, 0.0001 );
+float safeAspect = max( aspect, 0.0001 );
+float circleMix = clamp( paniniPC.circleMix, 0.0, 1.0 );
+float aspectMix = mix( safeAspect, 1.0, circleMix );
 
-	vec2 p = uv * 2.0 - 1.0;
-	p.x *= safeAspect;
+vec2 p = uv * 2.0 - 1.0;
+	p.x *= aspectMix;
 
 	float x2 = p.x * p.x;
 	float y2 = p.y * p.y;
@@ -98,11 +104,23 @@ vec2 panini_project( vec2 uv, float aspect, float d, float s ) {
 	float c = ( d + 1.0 ) / ( d + invLen );
 	vec2 pp = p * c;
 
-	pp.y = mix( pp.y, pp.y * ( 1.0 + s * ( abs( pp.x ) / safeAspect ) ), s );
+	pp.y = mix( pp.y, pp.y * ( 1.0 + s * ( abs( pp.x ) / aspectMix ) ), s );
 
-	pp.x /= safeAspect;
+	pp.x /= aspectMix;
 
 	return pp * 0.5 + 0.5;
+}
+
+vec2 circle_blend( vec2 uv, float mixValue ) {
+	float clamped = clamp( mixValue, 0.0, 1.0 );
+	if ( clamped <= 0.0001 ) {
+		return uv;
+	}
+	vec2 centered = uv * 2.0 - 1.0;
+	float len = length( centered );
+	vec2 circle = centered / max( len, 1.0 );
+	circle = circle * 0.5 + 0.5;
+	return mix( uv, circle, clamped );
 }
 
 void main() {
@@ -110,6 +128,12 @@ void main() {
 
 	if ( paniniPC.paniniD > 0.0001 ) {
 		uv = panini_project( uv, paniniPC.aspect, paniniPC.paniniD, paniniPC.paniniS );
+		uv = circle_blend( uv, paniniPC.circleMix );
+	}
+
+	float overdraw = max( paniniPC.overdraw, 0.0 );
+	if ( overdraw > 0.0 ) {
+		uv = uv * ( 1.0 + overdraw ) - vec2( overdraw * 0.5 );
 	}
 
 	uv = clamp( uv, 0.0, 1.0 );
@@ -165,5 +189,7 @@ void main() {
 		}
 	}
 
-	out_color = vec4( ldr, 1.0 );
+	vec3 finalColor = ldr;
+	finalColor *= max( paniniPC.brightness, 0.0 );
+	out_color = vec4( finalColor, 1.0 );
 }
