@@ -1530,6 +1530,7 @@ extern cvar_t	*r_gamma;
 extern cvar_t	*r_panini;
 extern cvar_t	*r_paniniD;
 extern cvar_t	*r_paniniS;
+extern cvar_t	*r_panini_console;
 extern cvar_t	*r_paniniBrightness;
 extern cvar_t	*r_paniniCircle;
 extern cvar_t	*r_paniniOverdraw;
