@@ -590,6 +590,10 @@ static void record_image_layout_transition( VkCommandBuffer command_buffer, VkIm
 			src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 			barrier.srcAccessMask = VK_ACCESS_NONE;
 			break;
+		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+			src_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+			barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			break;
 		case VK_IMAGE_LAYOUT_GENERAL:
 			src_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
 			barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
@@ -597,6 +601,10 @@ static void record_image_layout_transition( VkCommandBuffer command_buffer, VkIm
 		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
 			src_stage = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
 			barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL:
+			src_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+			barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
 			break;
 		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
 			src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
@@ -910,9 +918,38 @@ static void vk_log_swapchain_recreation( VkResult res, const VkExtent2D *old_ext
 	uint32_t old_height = vk.swapchain_extent_valid && old_extent ? old_extent->height : 0;
 	uint32_t new_width = new_extent ? new_extent->width : 0;
 	uint32_t new_height = new_extent ? new_extent->height : 0;
+	static int last_print_ms = -1;
+	static VkResult last_res = VK_SUCCESS;
+	static uint32_t last_old_width, last_old_height, last_new_width, last_new_height;
+	static int last_fullscreen, last_refresh;
+	const int now_ms = ri.Milliseconds();
+	const qboolean same_as_last =
+		( res == last_res ) &&
+		( old_width == last_old_width ) &&
+		( old_height == last_old_height ) &&
+		( new_width == last_new_width ) &&
+		( new_height == last_new_height ) &&
+		( (int)glConfig.isFullscreen == last_fullscreen ) &&
+		( glConfig.displayFrequency == last_refresh );
+
+	// Avoid per-frame spam when the driver keeps returning SUBOPTIMAL_KHR with
+	// unchanged extents (common on some WMs/compositors). Still log promptly when
+	// anything changes.
+	if ( same_as_last && last_print_ms >= 0 && ( now_ms - last_print_ms ) < 5000 ) {
+		return;
+	}
 
 	ri.Printf( PRINT_WARNING, "vk_present_frame(): %s old=%ux%u new=%ux%u fullscreen=%d refresh=%d\n",
 		vk_result_string( res ), old_width, old_height, new_width, new_height, glConfig.isFullscreen, glConfig.displayFrequency );
+
+	last_print_ms = now_ms;
+	last_res = res;
+	last_old_width = old_width;
+	last_old_height = old_height;
+	last_new_width = new_width;
+	last_new_height = new_height;
+	last_fullscreen = (int)glConfig.isFullscreen;
+	last_refresh = glConfig.displayFrequency;
 }
 
 static void vk_create_render_passes( void )
@@ -3026,6 +3063,127 @@ void vk_update_attachment_descriptors( void ) {
 	}
 }
 
+static void vk_update_volumetric_descriptors( void )
+{
+	VkDescriptorBufferInfo params_buffer;
+
+	if ( vk.volumetric_params_buffer == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	params_buffer.buffer = vk.volumetric_params_buffer;
+	params_buffer.offset = 0;
+	params_buffer.range = sizeof( volumetric_params_t );
+
+	if ( vk.volumetric_compute_descriptor != VK_NULL_HANDLE &&
+		vk.froxel_volume_view && vk.froxel_history_view && vk.depth_image_view )
+	{
+		VkDescriptorImageInfo storage_info[2];
+		VkDescriptorImageInfo depth_info;
+		VkWriteDescriptorSet writes[4];
+		Vk_Sampler_Def depth_sd;
+
+		Com_Memset( storage_info, 0, sizeof( storage_info ) );
+		storage_info[0].imageView = vk.froxel_volume_view;
+		storage_info[0].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+		storage_info[1].imageView = vk.froxel_history_view;
+		storage_info[1].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+		Com_Memset( &depth_sd, 0, sizeof( depth_sd ) );
+		depth_sd.gl_mag_filter = depth_sd.gl_min_filter = GL_NEAREST;
+		depth_sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		depth_sd.noAnisotropy = qtrue;
+		vk.froxel_depth_sampler = vk_find_sampler( &depth_sd );
+
+		Com_Memset( &depth_info, 0, sizeof( depth_info ) );
+		depth_info.sampler = vk.froxel_depth_sampler;
+		depth_info.imageView = vk.depth_image_view;
+		depth_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+
+		Com_Memset( writes, 0, sizeof( writes ) );
+		for ( int i = 0; i < 2; i++ ) {
+			writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writes[i].dstSet = vk.volumetric_compute_descriptor;
+			writes[i].dstBinding = i;
+			writes[i].descriptorCount = 1;
+			writes[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+			writes[i].pImageInfo = &storage_info[i];
+		}
+
+		writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[2].dstSet = vk.volumetric_compute_descriptor;
+		writes[2].dstBinding = 2;
+		writes[2].descriptorCount = 1;
+		writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		writes[2].pImageInfo = &depth_info;
+
+		writes[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[3].dstSet = vk.volumetric_compute_descriptor;
+		writes[3].dstBinding = 3;
+		writes[3].descriptorCount = 1;
+		writes[3].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		writes[3].pBufferInfo = &params_buffer;
+
+		qvkUpdateDescriptorSets( vk.device, ARRAY_LEN( writes ), writes, 0, NULL );
+	}
+
+	if ( vk.volumetric_composite_descriptor != VK_NULL_HANDLE &&
+		vk.color_image_view && vk.depth_image_view && vk.froxel_volume_view )
+	{
+		VkDescriptorImageInfo composite_info[3];
+		VkWriteDescriptorSet writes[4];
+		Vk_Sampler_Def color_sd;
+		Vk_Sampler_Def volume_sd;
+
+		Com_Memset( &color_sd, 0, sizeof( color_sd ) );
+		color_sd.gl_mag_filter = color_sd.gl_min_filter = GL_LINEAR;
+		color_sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		color_sd.noAnisotropy = qtrue;
+
+		Com_Memset( &volume_sd, 0, sizeof( volume_sd ) );
+		volume_sd.gl_mag_filter = volume_sd.gl_min_filter = GL_LINEAR;
+		volume_sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		volume_sd.noAnisotropy = qtrue;
+		vk.froxel_sampler = vk_find_sampler( &volume_sd );
+
+		Com_Memset( composite_info, 0, sizeof( composite_info ) );
+
+		// hdrColor (binding 0) - kept for layout compatibility, may be unused by shader
+		composite_info[0].sampler = vk_find_sampler( &color_sd );
+		composite_info[0].imageView = vk.color_image_view;
+		composite_info[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+		// depthTexture (binding 1)
+		composite_info[1].sampler = vk.froxel_depth_sampler;
+		composite_info[1].imageView = vk.depth_image_view;
+		composite_info[1].imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+
+		// froxelVolume (binding 2) - kept in GENERAL layout
+		composite_info[2].sampler = vk.froxel_sampler;
+		composite_info[2].imageView = vk.froxel_volume_view;
+		composite_info[2].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+		Com_Memset( writes, 0, sizeof( writes ) );
+		for ( int i = 0; i < 3; i++ ) {
+			writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writes[i].dstSet = vk.volumetric_composite_descriptor;
+			writes[i].dstBinding = i;
+			writes[i].descriptorCount = 1;
+			writes[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			writes[i].pImageInfo = &composite_info[i];
+		}
+
+		writes[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[3].dstSet = vk.volumetric_composite_descriptor;
+		writes[3].dstBinding = 3;
+		writes[3].descriptorCount = 1;
+		writes[3].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		writes[3].pBufferInfo = &params_buffer;
+
+		qvkUpdateDescriptorSets( vk.device, ARRAY_LEN( writes ), writes, 0, NULL );
+	}
+}
+
 
 void vk_init_descriptors( void )
 {
@@ -3114,9 +3272,10 @@ void vk_init_descriptors( void )
 	VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.volumetric_compute_descriptor ) );
 
 	alloc.pSetLayouts = &vk.volumetric_composite_layout;
-	VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.volumetric_composite_descriptor ) );
+		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.volumetric_composite_descriptor ) );
 
 		vk_update_attachment_descriptors();
+		vk_update_volumetric_descriptors();
 	}
 }
 
@@ -5555,9 +5714,19 @@ static void vk_create_volumetric_composite_pipeline( void )
 	multisample_state.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 	multisample_state.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-	VkPipelineColorBlendAttachmentState blend_attachment;
-	Com_Memset( &blend_attachment, 0, sizeof( blend_attachment ) );
-	blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+		VkPipelineColorBlendAttachmentState blend_attachment;
+		Com_Memset( &blend_attachment, 0, sizeof( blend_attachment ) );
+		blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+		blend_attachment.blendEnable = VK_TRUE;
+		blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+		// Composite without sampling the current color attachment:
+		// dst = dst * transmittance + inScattering
+		// where shader writes alpha = 1 - transmittance.
+		blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+		blend_attachment.colorBlendOp = VK_BLEND_OP_ADD;
+		blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+		blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+		blend_attachment.alphaBlendOp = VK_BLEND_OP_ADD;
 
 	VkPipelineColorBlendStateCreateInfo blend_state;
 	Com_Memset( &blend_state, 0, sizeof( blend_state ) );
@@ -9421,6 +9590,8 @@ void vk_draw_dot( uint32_t storage_offset )
 }
 
 
+static qboolean vk_in_render_pass;
+
 static void vk_begin_render_pass( VkRenderPass renderPass, VkFramebuffer frameBuffer, qboolean clearValues, uint32_t width, uint32_t height )
 {
 	VkRenderPassBeginInfo render_pass_begin_info;
@@ -9456,6 +9627,7 @@ static void vk_begin_render_pass( VkRenderPass renderPass, VkFramebuffer frameBu
 	}
 
 	qvkCmdBeginRenderPass( vk.cmd->command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE );
+	vk_in_render_pass = qtrue;
 
 	vk.cmd->last_pipeline = VK_NULL_HANDLE;
 	vk.cmd->depth_range = DEPTH_RANGE_COUNT;
@@ -9718,6 +9890,11 @@ static void vk_volumetric_fog_pass( void )
 		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
 
+	// Restore depth layout for the next frame's main render pass clears/attachments.
+	record_image_layout_transition( vk.cmd->command_buffer, vk.depth_image, depth_aspect,
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 0, 0 );
+
 	backEnd.doneFog = qtrue;
 }
 
@@ -9841,7 +10018,12 @@ void vk_validate_pbr_ibl_resources( void )
 
 void vk_end_render_pass( void )
 {
+	if ( !vk_in_render_pass ) {
+		return;
+	}
+
 	qvkCmdEndRenderPass( vk.cmd->command_buffer );
+	vk_in_render_pass = qfalse;
 
 //	vk.renderPassIndex = RENDER_PASS_MAIN;
 }
@@ -10116,14 +10298,21 @@ void vk_end_frame( void )
 				if ( r_ssaoDebugView && r_ssaoDebugView->integer == 2 ) {
 					qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.ssao_depth_debug_pipeline );
 					qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.depth_descriptor, 0, NULL );
-				} else {
-					qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-						( r_ssaoDebugView && r_ssaoDebugView->integer ) ? vk.ssao_debug_pipeline : vk.ssao_combine_pipeline );
-					qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.ssao_blur_descriptor, 0, NULL );
+					} else {
+						qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+							( r_ssaoDebugView && r_ssaoDebugView->integer ) ? vk.ssao_debug_pipeline : vk.ssao_combine_pipeline );
+						qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.ssao_blur_descriptor, 0, NULL );
+					}
+					qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+					vk_end_render_pass();
+
+					// SSAO samples depth as read-only; restore the depth image layout for later passes
+					// and for the next frame's main render pass.
+					record_image_layout_transition( vk.cmd->command_buffer, vk.depth_image, depth_aspect,
+						VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+						VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 0, 0 );
 				}
-				qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 			}
-		}
 
 		if ( backEnd.screenshotMask && vk.capture.image )
 		{
@@ -10627,13 +10816,116 @@ static float vk_random01( uint32_t seed ) {
 	return x - floorf( x );
 }
 
+static qboolean vk_parse_rgb_string( const char *s, vec3_t out )
+{
+	float r, g, b;
+
+	if ( !s || !s[0] ) {
+		return qfalse;
+	}
+
+	if ( sscanf( s, "%f %f %f", &r, &g, &b ) != 3 ) {
+		return qfalse;
+	}
+
+	out[0] = r;
+	out[1] = g;
+	out[2] = b;
+	return qtrue;
+}
+
+static void vk_normalize_rgb_luma_safe( vec3_t io )
+{
+	float maxc = MAX( io[0], MAX( io[1], io[2] ) );
+
+	if ( maxc <= 0.0f ) {
+		VectorSet( io, 1.0f, 1.0f, 1.0f );
+		return;
+	}
+
+	if ( maxc > 1.0f ) {
+		VectorScale( io, 1.0f / maxc, io );
+	}
+}
+
+static qboolean vk_get_ibl_fog_color( vec3_t out )
+{
+	int i;
+	int bestIndex = -1;
+	float bestDistSq = 0.0f;
+	const float *pos = backEnd.viewParms.or.origin;
+
+	if ( !tr.cubemaps || tr.numCubemaps <= 0 ) {
+		return qfalse;
+	}
+
+	for ( i = 0; i < tr.numCubemaps; i++ ) {
+		vec3_t delta;
+		float distSq;
+		const cubemap_t *cube = &tr.cubemaps[i];
+
+		if ( !cube->hasSHCoeffs ) {
+			continue;
+		}
+
+		VectorSubtract( pos, cube->origin, delta );
+		distSq = VectorLengthSquared( delta );
+
+		if ( bestIndex == -1 || distSq < bestDistSq ) {
+			bestIndex = i;
+			bestDistSq = distSq;
+		}
+	}
+
+	if ( bestIndex < 0 ) {
+		return qfalse;
+	}
+
+	out[0] = tr.cubemaps[bestIndex].shCoeffs[0][0];
+	out[1] = tr.cubemaps[bestIndex].shCoeffs[0][1];
+	out[2] = tr.cubemaps[bestIndex].shCoeffs[0][2];
+	vk_normalize_rgb_luma_safe( out );
+	return qtrue;
+}
+
 static void vk_get_volumetric_fog_color( vec4_t out )
 {
 	int i;
+	vec3_t base;
+	float maxc;
+	vec3_t tint = { 1.0f, 1.0f, 1.0f };
+	const int colorMode = ( r_volumetricFogColorMode ) ? r_volumetricFogColorMode->integer : 0;
+	qboolean foundFogVolume = qfalse;
 
-	Vector4Set( out, tr.sunLight[0], tr.sunLight[1], tr.sunLight[2], 1.0f );
+	// Default to a "tint" derived from the sky light, but clamp it to LDR range.
+	// tr.sunLight can include intensity (q3map_sun), which would otherwise
+	// blow out the volumetric contribution (especially with bloom enabled).
+	VectorCopy( tr.sunLight, base );
+	maxc = MAX( base[0], MAX( base[1], base[2] ) );
+	if ( maxc <= 0.0f ) {
+		VectorSet( base, 1.0f, 1.0f, 1.0f );
+	} else if ( maxc > 1.0f ) {
+		VectorScale( base, 1.0f / maxc, base );
+	}
+	Vector4Set( out, base[0], base[1], base[2], 1.0f );
 
 	if ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+		// Still allow user tinting when there's no world (menus, cinematics, etc.)
+		if ( r_volumetricFogTint && vk_parse_rgb_string( r_volumetricFogTint->string, tint ) ) {
+			out[0] *= tint[0];
+			out[1] *= tint[1];
+			out[2] *= tint[2];
+		}
+		return;
+	}
+
+	if ( colorMode == 1 ) {
+		if ( r_volumetricFogTint && vk_parse_rgb_string( r_volumetricFogTint->string, tint ) ) {
+			out[0] = tint[0];
+			out[1] = tint[1];
+			out[2] = tint[2];
+		}
+		out[3] = 1.0f;
 		return;
 	}
 
@@ -10652,7 +10944,26 @@ static void vk_get_volumetric_fog_color( vec4_t out )
 		}
 
 		Vector4Copy( fog->color, out );
-		return;
+		foundFogVolume = qtrue;
+		break;
+	}
+
+	// In IBL mode, use the nearest cubemap's SH (average irradiance) when not inside a fog volume.
+	if ( colorMode == 2 && !foundFogVolume ) {
+		vec3_t ibl;
+		if ( vk_get_ibl_fog_color( ibl ) ) {
+			out[0] = ibl[0];
+			out[1] = ibl[1];
+			out[2] = ibl[2];
+			out[3] = 1.0f;
+		}
+	}
+
+	// Apply user tint in modes 0 and 2.
+	if ( r_volumetricFogTint && vk_parse_rgb_string( r_volumetricFogTint->string, tint ) ) {
+		out[0] *= tint[0];
+		out[1] *= tint[1];
+		out[2] *= tint[2];
 	}
 }
 

@@ -1523,6 +1523,8 @@ extern cvar_t	*r_volumetricFogAniso;
 extern cvar_t	*r_volumetricFogSteps;
 extern cvar_t	*r_volumetricFogJitter;
 extern cvar_t	*r_volumetricFogTemporalWeight;
+extern cvar_t	*r_volumetricFogColorMode;
+extern cvar_t	*r_volumetricFogTint;
 extern cvar_t	*r_vk_swapchain_srgb;
 extern cvar_t	*r_vk_pipeline_debug;
 

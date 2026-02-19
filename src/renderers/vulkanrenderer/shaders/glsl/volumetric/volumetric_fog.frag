@@ -3,7 +3,6 @@
 layout(location = 0) in vec2 v_UV;
 layout(location = 0) out vec4 fragColor;
 
-layout(binding = 0) uniform sampler2D hdrColor;
 layout(binding = 1) uniform sampler2D depthTexture;
 layout(binding = 2) uniform sampler3D froxelVolume;
 
@@ -24,7 +23,6 @@ layout(std140, binding = 3) uniform VolumetricParams {
 } params;
 
 void main() {
-	vec3 hdr = texture(hdrColor, v_UV).rgb;
 	float depthSample = texture(depthTexture, v_UV).r;
 	float nearPlane = params.sliceParams.x;
 	float farPlane = params.sliceParams.y;
@@ -55,6 +53,6 @@ void main() {
 		}
 	}
 
-	vec3 result = hdr + fogAccum;
-	fragColor = vec4(result, 1.0);
+	float fogOpacity = clamp( 1.0 - transmittance, 0.0, 1.0 );
+	fragColor = vec4( fogAccum, fogOpacity );
 }
