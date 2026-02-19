@@ -89,8 +89,8 @@ typedef struct {
 	float brightness;
 	float circleMix;
 	float overdraw;
-	float padding0;
-	float padding1;
+	float paniniMask;
+	float padding;
 } VkPostProcessPushConstants;
 
 static uint32_t vk_get_prefilter_mip_levels( void );
@@ -9356,8 +9356,14 @@ void vk_end_frame( void )
 			panini_push.brightness = r_paniniBrightness ? r_paniniBrightness->value : 1.0f;
 			panini_push.circleMix = r_paniniCircle ? r_paniniCircle->value : 0.0f;
 			panini_push.overdraw = r_paniniOverdraw ? r_paniniOverdraw->value : 0.0f;
-			panini_push.padding0 = 0.0f;
-			panini_push.padding1 = 0.0f;
+			float console_value = r_panini_console ? r_panini_console->value : 0.0f;
+			if ( console_value < 0.0f ) {
+				console_value = 0.0f;
+			} else if ( console_value > 1.0f ) {
+				console_value = 1.0f;
+			}
+			panini_push.paniniMask = panini_enabled * ( 1.0f - console_value );
+			panini_push.padding = 0.0f;
 
 			qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_post_process, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( panini_push ), &panini_push );
 

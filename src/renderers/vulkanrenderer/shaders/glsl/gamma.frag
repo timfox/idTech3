@@ -31,8 +31,8 @@ layout(push_constant) uniform PaniniPC {
 	float brightness;
 	float circleMix;
 	float overdraw;
-	float padding0;
-	float padding1;
+	float paniniMask;
+	float padding;
 } paniniPC;
 
 const vec3 sRGB = vec3( 0.2126, 0.7152, 0.0722 );
@@ -126,13 +126,14 @@ vec2 circle_blend( vec2 uv, float mixValue ) {
 void main() {
 	vec2 uv = frag_tex_coord;
 
-	if ( paniniPC.paniniD > 0.0001 ) {
+	float paniniMask = clamp( paniniPC.paniniMask, 0.0, 1.0 );
+	if ( paniniMask > 0.0001 && paniniPC.paniniD > 0.0001 ) {
 		uv = panini_project( uv, paniniPC.aspect, paniniPC.paniniD, paniniPC.paniniS );
 		uv = circle_blend( uv, paniniPC.circleMix );
 	}
 
 	float overdraw = max( paniniPC.overdraw, 0.0 );
-	if ( overdraw > 0.0 ) {
+	if ( paniniMask > 0.0001 && overdraw > 0.0 ) {
 		uv = uv * ( 1.0 + overdraw ) - vec2( overdraw * 0.5 );
 	}
 
