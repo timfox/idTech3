@@ -95,46 +95,7 @@ extern qhandle_t RE_RegisterShaderNoMip( const char *name );
 #define _CEIL(x)   (((x)+63) & -64)
 #define _TRUNC(x)  ((x) >> 6)
 
-FT_Library ftLibrary = NULL;
-
-static const char *FindAvailableFont( const char *preferred ) {
-	static const char *const fallback_fonts[] = {
-		"fonts/SourceSans3-Regular.ttf",
-		"fonts/SourceSans3-Bold.ttf",
-		"/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
-		"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-		"/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-		"/usr/share/fonts/truetype/freefont/FreeSans.ttf",
-		"/usr/local/share/fonts/SourceSans3-Regular.ttf",
-		"/Library/Fonts/Arial.ttf",
-		"/Library/Fonts/Helvetica.ttc",
-		"/Library/Fonts/SourceSans3-Regular.ttf",
-	};
-	static char windows_font[MAX_QPATH];
-	if ( preferred && ri.FS_FileExists( preferred ) ) {
-		return preferred;
-	}
-#ifdef _WIN32
-	const char *system_root = getenv( "SystemRoot" );
-	if ( system_root ) {
-		Com_sprintf( windows_font, sizeof( windows_font ), "%s\\Fonts\\Arial.ttf", system_root );
-		if ( ri.FS_FileExists( windows_font ) ) {
-			return windows_font;
-		}
-		Com_sprintf( windows_font, sizeof( windows_font ), "%s\\Fonts\\SourceSans3-Regular.ttf", system_root );
-		if ( ri.FS_FileExists( windows_font ) ) {
-			return windows_font;
-		}
-	}
-#endif
-	for ( size_t i = 0; i < ARRAY_LEN( fallback_fonts ); i++ ) {
-		if ( ri.FS_FileExists( fallback_fonts[i] ) ) {
-			return fallback_fonts[i];
-		}
-	}
-	return preferred;
-}
-
+FT_Library ftLibrary = NULL;  
 #endif
 
 #ifdef BUILD_FREETYPE
@@ -457,15 +418,9 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 		return;
 	}
 
-	const char *fontPath = FindAvailableFont( fontName );
-	const char *fontToUse = fontPath ? fontPath : fontName;
-	len = fontToUse ? ri.FS_ReadFile( fontToUse, &faceData ) : 0;
+	len = ri.FS_ReadFile(fontName, &faceData);
 	if (len <= 0) {
-		if ( fontPath && fontName && Q_stricmp( fontToUse, fontName ) != 0 ) {
-			ri.Printf( PRINT_WARNING, "RE_RegisterFont: falling back to %s because %s is missing\n", fontToUse, fontName );
-		} else {
-			ri.Printf( PRINT_WARNING, "RE_RegisterFont: Unable to read font file '%s'\n", fontToUse ? fontToUse : "NULL" );
-		}
+		ri.Printf(PRINT_WARNING, "RE_RegisterFont: Unable to read font file '%s'\n", fontName);
 		return;
 	}
 
