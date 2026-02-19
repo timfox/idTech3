@@ -111,11 +111,24 @@ vec2 panini_project( vec2 uv, float aspect, float d, float s ) {
 	return pp * 0.5 + 0.5;
 }
 
+vec2 circle_blend( vec2 uv, float mixValue ) {
+	float clamped = clamp( mixValue, 0.0, 1.0 );
+	if ( clamped <= 0.0001 ) {
+		return uv;
+	}
+	vec2 centered = uv * 2.0 - 1.0;
+	float len = length( centered );
+	vec2 circle = centered / max( len, 1.0 );
+	circle = circle * 0.5 + 0.5;
+	return mix( uv, circle, clamped );
+}
+
 void main() {
 	vec2 uv = frag_tex_coord;
 
 	if ( paniniPC.paniniD > 0.0001 ) {
 		uv = panini_project( uv, paniniPC.aspect, paniniPC.paniniD, paniniPC.paniniS );
+		uv = circle_blend( uv, paniniPC.circleMix );
 	}
 
 	float overdraw = max( paniniPC.overdraw, 0.0 );
