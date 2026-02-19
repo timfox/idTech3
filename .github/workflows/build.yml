@@ -316,7 +316,7 @@ jobs:
 
             apt-get -qq update
             apt-get install -y make gcc g++ cmake ninja-build
-            apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev
+            apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools
 
             OUTDIR="${GITHUB_WORKSPACE}/bin"
             mkdir -p "$OUTDIR"
