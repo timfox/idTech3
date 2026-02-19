@@ -88,6 +88,8 @@ cvar_t	*r_pbr;
 cvar_t	*r_pbr_shExtract;
 cvar_t	*r_pbr_debug;
 cvar_t	*r_pbr_packedPreferred;
+cvar_t	*r_pbr_multiScatter;
+cvar_t	*r_pbr_multiScatterStrength;
 #ifdef VK_CUBEMAP
 cvar_t	*r_pbr_iblIrradianceSize;
 cvar_t	*r_pbr_iblPrefilterSize;
@@ -106,6 +108,7 @@ cvar_t	*r_deluxeMapping;
 cvar_t	*r_deluxeSpecular;
 #endif
 #endif
+cvar_t   *r_vk_pipeline_debug;
 cvar_t	*r_fbo;
 cvar_t	*r_hdr;
 cvar_t	*r_bloom;
@@ -113,6 +116,7 @@ cvar_t	*r_bloom_threshold;
 cvar_t	*r_bloom_intensity;
 cvar_t	*r_bloom_threshold_mode;
 cvar_t	*r_bloom_modulate;
+cvar_t	*r_bloomKnee;
 cvar_t	*r_ssao;
 cvar_t	*r_ssaoRadius;
 cvar_t	*r_ssaoBias;
@@ -177,9 +181,19 @@ cvar_t	*r_shownormals;
 cvar_t	*r_finish;
 cvar_t	*r_clear;
 cvar_t	*r_textureMode;
+cvar_t	*r_mipLodBias;
 cvar_t	*r_offsetFactor;
 cvar_t	*r_offsetUnits;
 cvar_t	*r_gamma;
+cvar_t	*r_panini;
+cvar_t	*r_paniniD;
+cvar_t	*r_paniniS;
+cvar_t	*r_paniniBrightness;
+cvar_t	*r_post;
+cvar_t	*r_post_debug;
+cvar_t	*r_exposure;
+cvar_t	*r_tonemap;
+cvar_t	*r_vk_swapchain_srgb;
 cvar_t	*r_intensity;
 cvar_t	*r_lockpvs;
 cvar_t	*r_noportals;
@@ -1450,6 +1464,7 @@ static void VarInfo( void )
 	}
 
 	ri.Printf( PRINT_ALL, "texturemode: %s\n", r_textureMode ? r_textureMode->string : "GL_LINEAR_MIPMAP_NEAREST" );
+	ri.Printf( PRINT_ALL, "mip LOD bias: %.2f\n", r_mipLodBias ? r_mipLodBias->value : 0.0f );
 	ri.Printf( PRINT_ALL, "texture bits: %d\n", r_texturebits ? (r_texturebits->integer ? r_texturebits->integer : 32) : 32 );
 	ri.Printf( PRINT_ALL, "picmip: %d%s\n", r_picmip ? r_picmip->integer : 0, (r_nomip && r_nomip->integer) ? ", worldspawn only" : "" );
 
@@ -1460,7 +1475,7 @@ static void VarInfo( void )
 #if defined (USE_VK_PBR)
 	ri.Printf( PRINT_ALL, "PBR SH extraction: %s\n", (r_pbr_shExtract && r_pbr_shExtract->integer) ? "enabled" : "disabled" );
 	if ( r_pbr_debug && r_pbr_debug->integer ) {
-		ri.Printf( PRINT_ALL, "PBR debug view: mode %d\n", r_pbr_debug->integer );
+		ri.Printf( PRINT_ALL, "PBR debug view: mode %d (1=direct,2=ibl spec,3=irradiance,4=env samples)\n", r_pbr_debug->integer );
 	}
 #endif
 #else
@@ -1598,11 +1613,11 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_pbr_debug, "0", "4", CV_INTEGER );
 	ri.Cvar_SetDescription( r_pbr_debug,
 		"PBR debug view override (Vulkan PBR only):\n"
-		" 0 - off (normal PBR)\n"
-		" 1 - show base/albedo (texture0)\n"
-		" 2 - show normal map (RGB)\n"
-		" 3 - show physical map (packed)\n"
-		" 4 - show emissive map (RGB)\n" );
+		" 0 - off (standard PBR)\n"
+		" 1 - show direct lighting only\n"
+		" 2 - show specular environment contribution only\n"
+		" 3 - show diffuse irradiance only\n"
+		" 4 - show env/irradiance cubemap samples\n" );
 
 	r_pbr_packedPreferred = ri.Cvar_Get( "r_pbr_packedPreferred", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_pbr_packedPreferred, "0", "6", CV_INTEGER );
@@ -1616,6 +1631,14 @@ static void R_Register( void )
 		" 5 - RMOS\n"
 		" 6 - MOSR\n"
 		"Auto-discovery still falls back to other formats if the preferred suffix is not found." );
+
+	r_pbr_multiScatter = ri.Cvar_Get( "r_pbr_multiScatter", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbr_multiScatter, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pbr_multiScatter, "Enable Kulla-Conty style specular IBL multiple-scattering compensation." );
+
+	r_pbr_multiScatterStrength = ri.Cvar_Get( "r_pbr_multiScatterStrength", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbr_multiScatterStrength, "0.0", "2.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_pbr_multiScatterStrength, "Scales specular IBL multiple-scattering compensation intensity." );
 
 	r_baseNormalX	= ri.Cvar_Get("r_baseNormalX",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );
 	r_baseNormalY	= ri.Cvar_Get("r_baseNormalY",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );
@@ -1711,10 +1734,34 @@ static void R_Register( void )
 	r_textureMode = ri.Cvar_Get( "r_textureMode", "GL_LINEAR_MIPMAP_NEAREST", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_textureMode, "Texture interpolation mode:\n GL_NEAREST: Nearest neighbor interpolation and will therefore appear similar to Quake II except with the added colored lighting\n GL_LINEAR: Linear interpolation and will appear to blend in objects that are closer than the resolution that the textures are set as\n GL_NEAREST_MIPMAP_NEAREST: Nearest neighbor interpolation with mipmapping for bilinear hardware, mipmapping will blend objects that are farther away than the resolution that they are set as\n GL_LINEAR_MIPMAP_NEAREST: Linear interpolation with mipmapping for bilinear hardware\n GL_NEAREST_MIPMAP_LINEAR: Nearest neighbor interpolation with mipmapping for trilinear hardware\n GL_LINEAR_MIPMAP_LINEAR: Linear interpolation with mipmapping for trilinear hardware" );
 	ri.Cvar_SetGroup( r_textureMode, CVG_RENDERER );
+	r_mipLodBias = ri.Cvar_Get( "r_mipLodBias", "-0.75", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_mipLodBias, "-2.0", "2.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_mipLodBias, "Texture mip LOD bias (Vulkan): negative keeps sharper mips farther away, positive blurs sooner." );
+	ri.Cvar_SetGroup( r_mipLodBias, CVG_RENDERER );
 	r_gamma = ri.Cvar_Get( "r_gamma", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_gamma, "0.5", "3", CV_FLOAT );
 	ri.Cvar_SetDescription( r_gamma, "Gamma correction factor." );
 	ri.Cvar_SetGroup( r_gamma, CVG_RENDERER );
+
+	r_panini = ri.Cvar_Get( "r_panini", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_panini, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_panini, "Enable Panini projection warp." );
+	ri.Cvar_SetGroup( r_panini, CVG_RENDERER );
+
+	r_paniniD = ri.Cvar_Get( "r_paniniD", "0.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_paniniD, "0.0", "2.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_paniniD, "Panini projection strength (0 disables)." );
+	ri.Cvar_SetGroup( r_paniniD, CVG_RENDERER );
+
+	r_paniniS = ri.Cvar_Get( "r_paniniS", "0.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_paniniS, "0.0", "1.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_paniniS, "Panini projection squeeze factor." );
+	ri.Cvar_SetGroup( r_paniniS, CVG_RENDERER );
+
+	r_paniniBrightness = ri.Cvar_Get( "r_paniniBrightness", "1.25", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_paniniBrightness, "0.5", "2.5", CV_FLOAT );
+	ri.Cvar_SetDescription( r_paniniBrightness, "Multiplier applied after Panini warp (allows brightening the post-pass)." );
+	ri.Cvar_SetGroup( r_paniniBrightness, CVG_RENDERER );
 	r_facePlaneCull = ri.Cvar_Get ("r_facePlaneCull", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_facePlaneCull, "Enables culling of planar surfaces with back side test." );
 
@@ -1849,6 +1896,38 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_bloom_modulate, "Modulate extracted color:\n 0: off (color = color, i.e. no changes)\n 1: by itself (color = color * color)\n 2: by intensity (color = color * luma(color))" );
 	ri.Cvar_SetGroup( r_bloom_modulate, CVG_RENDERER );
 
+	r_bloomKnee = ri.Cvar_Get( "r_bloomKnee", "0.5", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_bloomKnee, "0.0", "4.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_bloomKnee, "Soft knee for the bloom extractor to control highlight rolloff." );
+	ri.Cvar_SetGroup( r_bloomKnee, CVG_RENDERER );
+
+	r_exposure = ri.Cvar_Get( "r_exposure", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_exposure, "0.01", "10.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_exposure, "Linear exposure multiplier applied before tonemapping." );
+	ri.Cvar_SetGroup( r_exposure, CVG_RENDERER );
+
+	r_tonemap = ri.Cvar_Get( "r_tonemap", "2", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_tonemap, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_tonemap, "Tonemapping mode for the post-process pass: 0=passthrough, 1=Reinhard, 2=ACES." );
+	ri.Cvar_SetGroup( r_tonemap, CVG_RENDERER );
+
+	r_post = ri.Cvar_Get( "r_post", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_post, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_post, "Toggle the HDR post-processing pipeline (1=tonemap + gamma pass, 0=pass-through)." );
+	ri.Cvar_SetGroup( r_post, CVG_RENDERER );
+
+	r_post_debug = ri.Cvar_Get( "r_post_debug", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_post_debug, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_post_debug, "Debug view for the post-process pass: 0=final, 1=pre-tonemap HDR, 2=luminance heatmap." );
+	ri.Cvar_SetGroup( r_post_debug, CVG_RENDERER );
+
+	r_vk_swapchain_srgb = ri.Cvar_Get( "r_vk_swapchain_srgb", "0", CVAR_ROM );
+	ri.Cvar_SetDescription( r_vk_swapchain_srgb, "Read-only: 1 if the selected Vulkan swapchain format is sRGB." );
+
+	r_vk_pipeline_debug = ri.Cvar_Get( "r_vk_pipeline_debug", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_vk_pipeline_debug, "Print Vulkan pipeline creation info (discard mode, shader type, fog, etc)." );
+	ri.Cvar_SetGroup( r_vk_pipeline_debug, CVG_RENDERER );
+
 	if ( glConfig.vidWidth )
 		return;
 
@@ -1892,8 +1971,8 @@ static void R_Register( void )
 
 	r_fbo = ri.Cvar_Get( "r_fbo", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_fbo, "Use framebuffer objects, enables gamma correction in windowed mode and allows arbitrary video size and screenshot/video capture.\n Required for bloom, HDR rendering, anti-aliasing and greyscale effects." );
-	r_hdr = ri.Cvar_Get( "r_hdr", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
-	ri.Cvar_SetDescription(r_hdr, "Enables high dynamic range frame buffer texture format. Requires \\r_fbo 1.\n -1: 4-bit, for testing purposes, heavy color banding, might not work on all systems\n  0: 8 bit, default, moderate color banding with multi-stage shaders\n  1: 16 bit, enhanced blending precision, no color banding, might decrease performance on AMD / Intel GPUs\n" );
+	r_hdr = ri.Cvar_Get( "r_hdr", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_SetDescription(r_hdr, "Enables high dynamic range frame buffer texture format. Requires \\r_fbo 1.\n -1: 4-bit, for testing purposes, heavy color banding, might not work on all systems\n  0: 8 bit, default, moderate color banding with multi-stage shaders\n  1: 16 bit floating point (RGBA16F), highest precision\n" );
 	r_bloom = ri.Cvar_Get( "r_bloom", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_bloom, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription(r_bloom, "Enables bloom post-processing effect. Requires \\r_fbo 1.");
@@ -2054,6 +2133,7 @@ void R_Init( void ) {
 #ifdef VK_PBR_BRDFLUT
 	vk_create_brfdlut();
 #endif
+	vk_validate_pbr_ibl_resources();
 #endif
 
 	R_InitShaders();

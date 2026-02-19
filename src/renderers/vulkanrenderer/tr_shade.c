@@ -643,6 +643,7 @@ typedef struct vkPbrUniformBlock_s {
 	vec4_t transmissionScale;
 	vec4_t subsurfaceColor;
 	vec4_t subsurfaceParams;
+	vec4_t advancedParams;
 	vec4_t shCoeffs[9];
 } vkPbrUniformBlock_t;
 #endif
@@ -654,6 +655,14 @@ static inline void vk_update_descriptor_if_changed( int index, VkDescriptorSet d
 	// in hot loops when nothing changes.
 	if ( vk.cmd && vk.cmd->descriptor_set.current[index] != descriptor ) {
 		vk_update_descriptor( index, descriptor );
+	}
+}
+
+static inline void vk_update_descriptor_if_changed_with_image( int index, VkDescriptorSet descriptor, const image_t *image )
+{
+	vk_update_descriptor_if_changed( index, descriptor );
+	if ( vk.cmd ) {
+		vk.cmd->descriptor_set.image[ index ] = image;
 	}
 }
 #endif
@@ -1261,9 +1270,10 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 	// Debug view: render a non-PBR pass and optionally override texture0 binding.
 	// Keeps runtime inspection simple without requiring extra shader variants.
 	const int pbr_debug = ( r_pbr_debug != NULL ) ? r_pbr_debug->integer : 0;
-	if ( pbr_debug ) {
-		is_pbr_surface = qfalse;
-	}
+	uniform.pbrDebugMode[0] = pbr_debug;
+	uniform.pbrDebugMode[1] = 0.0f;
+	uniform.pbrDebugMode[2] = 0.0f;
+	uniform.pbrDebugMode[3] = 0.0f;
 
 	if ( is_pbr_surface ) {
 		Com_Memcpy( &uniform_camera.modelMatrix, backEnd.or.modelMatrix, sizeof(float) * 16 );
@@ -1336,6 +1346,9 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			static VkCommandBuffer lastCmdBuf = VK_NULL_HANDLE;
 			static qboolean lastValid = qfalse;
 			static vkPbrUniformBlock_t lastBlock;
+			static qboolean warnedMissingBrdfLut = qfalse;
+			static qboolean warnedMissingEmptyCubemap = qfalse;
+			static qboolean warnedMissingMapCubemapData = qfalse;
 
 			vkPbrUniformBlock_t block;
 			Vector4Copy( pStage->emissiveScale, block.emissiveScale );
@@ -1345,14 +1358,90 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			Vector4Copy( pStage->transmissionScale, block.transmissionScale );
 			Vector4Copy( pStage->subsurfaceColor, block.subsurfaceColor );
 			Vector4Copy( pStage->subsurfaceParams, block.subsurfaceParams );
+			Vector4Set( block.advancedParams,
+				( r_pbr_multiScatter && r_pbr_multiScatter->integer ) ? 1.0f : 0.0f,
+				( r_pbr_multiScatterStrength ? r_pbr_multiScatterStrength->value : 1.0f ),
+				0.0f, 0.0f );
 
-			vk_update_descriptor_if_changed( VK_DESC_PBR_BRDFLUT, vk.brdflut_image_descriptor );
+			{
+				const VkDescriptorSet fallback2D = ( tr.whiteImage ) ? tr.whiteImage->descriptor : VK_NULL_HANDLE;
+				const VkDescriptorSet fallbackCube = ( tr.emptyCubemap ) ? tr.emptyCubemap->descriptor : VK_NULL_HANDLE;
+				VkDescriptorSet brdfDescriptor = vk.brdflut_image_descriptor ? vk.brdflut_image_descriptor : fallback2D;
+				VkDescriptorSet envDescriptor = fallbackCube;
+				VkDescriptorSet irradianceDescriptor = fallbackCube;
+
+				if ( !vk.brdflut_image_descriptor && !warnedMissingBrdfLut ) {
+					ri.Printf( PRINT_WARNING, "PBR IBL: BRDF LUT descriptor unavailable, using fallback texture\n" );
+					warnedMissingBrdfLut = qtrue;
+				}
+				if ( !fallbackCube && !warnedMissingEmptyCubemap ) {
+					ri.Printf( PRINT_WARNING, "PBR IBL: empty cubemap fallback missing\n" );
+					warnedMissingEmptyCubemap = qtrue;
+				}
+
+				const cubemap_t *cube = NULL;
+				int cubemapIndex = -1;
+				if ( !tr.numCubemaps || backEnd.viewParms.targetCube != NULL ) {
+					if ( backEnd.viewParms.targetCube == NULL ) {
+						vec3_t dbgPos;
+						R_GetPBRSurfacePosition( dbgPos );
+						R_UpdatePBRCubemapDebugCvar( -1, dbgPos );
+					}
+
+					// Use stage-provided SH when no cubemap is available.
+					Com_Memcpy( block.shCoeffs, pStage->shCoeffs, sizeof( block.shCoeffs ) );
+				}
+				else {
+					vec3_t dbgPos;
+					R_GetPBRSurfacePosition( dbgPos );
+					cubemapIndex = R_SelectCubemapIndexForPBR();
+					R_UpdatePBRCubemapDebugCvar( cubemapIndex, dbgPos );
+					if ( cubemapIndex >= 0 ) {
+						cube = &tr.cubemaps[cubemapIndex];
+					}
+
+					if ( cube ) {
+						if ( cube->prefiltered_image ) {
+							envDescriptor = cube->prefiltered_image->descriptor;
+						}
+						if ( cube->irradiance_image ) {
+							irradianceDescriptor = cube->irradiance_image->descriptor;
+						}
+						if ( !cube->prefiltered_image || !cube->irradiance_image ) {
+							if ( !warnedMissingMapCubemapData ) {
+								ri.Printf( PRINT_WARNING, "PBR IBL: cubemap '%s' missing prefiltered/irradiance image, using fallback where needed\n",
+									cube->name[0] ? cube->name : "<unnamed>" );
+								warnedMissingMapCubemapData = qtrue;
+							}
+						}
+
+						// Prefer cubemap SH coefficients when present, otherwise fall back to stage SH.
+						if ( cube->hasSHCoeffs ) {
+							Com_Memcpy( block.shCoeffs, cube->shCoeffs, sizeof( block.shCoeffs ) );
+						} else {
+							Com_Memcpy( block.shCoeffs, pStage->shCoeffs, sizeof( block.shCoeffs ) );
+						}
+					} else {
+						Com_Memcpy( block.shCoeffs, pStage->shCoeffs, sizeof( block.shCoeffs ) );
+					}
+				}
+
+				if ( brdfDescriptor ) {
+					vk_update_descriptor_if_changed( VK_DESC_PBR_BRDFLUT, brdfDescriptor );
+				}
+				if ( envDescriptor ) {
+					vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_CUBEMAP, envDescriptor, cube ? cube->prefiltered_image : NULL );
+				}
+				if ( irradianceDescriptor ) {
+					vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_IRRADIANCE, irradianceDescriptor, cube ? cube->irradiance_image : NULL );
+				}
+			}
 				
 			if ( pStage->vk_pbr_flags & PBR_HAS_NORMALMAP )
-				vk_update_descriptor_if_changed( VK_DESC_PBR_NORMAL, pStage->normalMap->descriptor );
+				vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_NORMAL, pStage->normalMap->descriptor, pStage->normalMap );
 
 			if ( pStage->vk_pbr_flags & PBR_HAS_PHYSICALMAP || pStage->vk_pbr_flags & PBR_HAS_SPECULARMAP )
-				vk_update_descriptor_if_changed( VK_DESC_PBR_PHYSICAL, pStage->physicalMap->descriptor );
+				vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_PHYSICAL, pStage->physicalMap->descriptor, pStage->physicalMap );
 			
 			// Commented out descriptor updates for removed PBR features
 			// if ( pStage->vk_pbr_flags & PBR_HAS_EMISSIVE )
@@ -1373,44 +1462,6 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			// if ( pStage->vk_pbr_flags & PBR_HAS_SUBSURFACE )
 			// 	vk_update_descriptor_if_changed( VK_DESC_PBR_SUBSURFACE, pStage->subsurfaceMap->descriptor );
 
-			int cubemapIndex = -1;
-			if ( !tr.numCubemaps || backEnd.viewParms.targetCube != NULL ) {
-				vk_update_descriptor_if_changed( VK_DESC_PBR_CUBEMAP, tr.emptyCubemap->descriptor );
-				// vk_update_descriptor_if_changed( VK_DESC_PBR_IRRADIANCE, tr.emptyCubemap->descriptor );
-				if ( backEnd.viewParms.targetCube == NULL ) {
-					vec3_t dbgPos;
-					R_GetPBRSurfacePosition( dbgPos );
-					R_UpdatePBRCubemapDebugCvar( -1, dbgPos );
-				}
-
-				// Use stage-provided SH when no cubemap is available.
-				Com_Memcpy( block.shCoeffs, pStage->shCoeffs, sizeof( block.shCoeffs ) );
-			}
-			else { 
-				vec3_t dbgPos;
-				R_GetPBRSurfacePosition( dbgPos );
-				cubemapIndex = R_SelectCubemapIndexForPBR();
-				R_UpdatePBRCubemapDebugCvar( cubemapIndex, dbgPos );
-				if ( cubemapIndex < 0 ) {
-					vk_update_descriptor_if_changed( VK_DESC_PBR_CUBEMAP, tr.emptyCubemap->descriptor );
-					// vk_update_descriptor_if_changed( VK_DESC_PBR_IRRADIANCE, tr.emptyCubemap->descriptor );
-					Com_Memcpy( block.shCoeffs, pStage->shCoeffs, sizeof( block.shCoeffs ) );
-				} else {
-					vk_update_descriptor_if_changed( VK_DESC_PBR_CUBEMAP, tr.cubemaps[cubemapIndex].prefiltered_image->descriptor );
-					// if ( tr.cubemaps[cubemapIndex].irradiance_image )
-					// 	vk_update_descriptor_if_changed( VK_DESC_PBR_IRRADIANCE, tr.cubemaps[cubemapIndex].irradiance_image->descriptor );
-					// else
-					// 	vk_update_descriptor_if_changed( VK_DESC_PBR_IRRADIANCE, tr.emptyCubemap->descriptor );
-
-					// Prefer cubemap SH coefficients when present, otherwise fall back to stage SH.
-					if ( tr.cubemaps[cubemapIndex].hasSHCoeffs ) {
-						Com_Memcpy( block.shCoeffs, tr.cubemaps[cubemapIndex].shCoeffs, sizeof( block.shCoeffs ) );
-					} else {
-						Com_Memcpy( block.shCoeffs, pStage->shCoeffs, sizeof( block.shCoeffs ) );
-					}
-				}
-			}
-
 			// Only push uniforms when the PBR block has actually changed for this command buffer.
 			if ( vk.cmd && vk.cmd->command_buffer != lastCmdBuf ) {
 				lastCmdBuf = vk.cmd->command_buffer;
@@ -1427,6 +1478,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				Vector4Copy( block.transmissionScale, uniform.pbrTransmissionScale );
 				Vector4Copy( block.subsurfaceColor, uniform.pbrSubsurfaceColor );
 				Vector4Copy( block.subsurfaceParams, uniform.pbrSubsurfaceParams );
+				Vector4Copy( block.advancedParams, uniform.pbrAdvancedParams );
 				Com_Memcpy( uniform.pbrShCoeffs, block.shCoeffs, sizeof( uniform.pbrShCoeffs ) );
 
 				vk_push_uniform_cached( &uniform );

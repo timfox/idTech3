@@ -1307,6 +1307,7 @@ void	Sys_DisplaySystemConsole( qboolean show );
 
 void	Sys_ShowConsole( int level, qboolean quitOnClose );
 void	Sys_SetErrorText( const char *text );
+void	Sys_ShowErrorMessage( const char *title, const char *message );
 
 void	Sys_SendPacket( int length, const void *data, const netadr_t *to );
 

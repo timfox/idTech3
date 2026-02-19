@@ -148,6 +148,11 @@ void Sys_Print( const char *msg )
 	Conbuf_AppendText( msg );
 }
 
+void Sys_ShowErrorMessage( const char *title, const char *message )
+{
+	MessageBoxA( NULL, message, title, MB_OK | MB_ICONERROR | MB_SETFOREGROUND );
+}
+
 
 /*
 =============
