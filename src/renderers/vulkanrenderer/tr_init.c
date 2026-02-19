@@ -188,6 +188,9 @@ cvar_t	*r_gamma;
 cvar_t	*r_panini;
 cvar_t	*r_paniniD;
 cvar_t	*r_paniniS;
+cvar_t	*r_paniniBrightness;
+cvar_t	*r_paniniCircle;
+cvar_t	*r_paniniOverdraw;
 cvar_t	*r_post;
 cvar_t	*r_post_debug;
 cvar_t	*r_exposure;
@@ -1756,6 +1759,21 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_paniniS, "0.0", "1.0", CV_FLOAT );
 	ri.Cvar_SetDescription( r_paniniS, "Panini projection squeeze factor." );
 	ri.Cvar_SetGroup( r_paniniS, CVG_RENDERER );
+
+	r_paniniBrightness = ri.Cvar_Get( "r_paniniBrightness", "1.25", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_paniniBrightness, "0.5", "2.5", CV_FLOAT );
+	ri.Cvar_SetDescription( r_paniniBrightness, "Panini postprocess brightness multiplier." );
+	ri.Cvar_SetGroup( r_paniniBrightness, CVG_RENDERER );
+
+	r_paniniCircle = ri.Cvar_Get( "r_paniniCircle", "0.25", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_paniniCircle, "0.0", "1.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_paniniCircle, "Clamp panini aspect toward circular output (0=off,1=circle)." );
+	ri.Cvar_SetGroup( r_paniniCircle, CVG_RENDERER );
+
+	r_paniniOverdraw = ri.Cvar_Get( "r_paniniOverdraw", "0.04", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_paniniOverdraw, "0.0", "0.2", CV_FLOAT );
+	ri.Cvar_SetDescription( r_paniniOverdraw, "Expand uv after Panini warp to cover edges." );
+	ri.Cvar_SetGroup( r_paniniOverdraw, CVG_RENDERER );
 	r_facePlaneCull = ri.Cvar_Get ("r_facePlaneCull", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_facePlaneCull, "Enables culling of planar surfaces with back side test." );
 

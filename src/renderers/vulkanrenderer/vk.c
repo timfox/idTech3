@@ -50,7 +50,11 @@ typedef struct {
 	float aspect;
 	float paniniD;
 	float paniniS;
-	float padding;
+	float brightness;
+	float circleMix;
+	float overdraw;
+	float padding0;
+	float padding1;
 } VkPostProcessPushConstants;
 
 static int vkSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -9211,7 +9215,11 @@ void vk_end_frame( void )
 			panini_push.aspect = vk.renderHeight > 0 ? ( (float)vk.renderWidth / (float)vk.renderHeight ) : 1.0f;
 			panini_push.paniniD = r_paniniD ? r_paniniD->value : 0.0f;
 			panini_push.paniniS = r_paniniS ? r_paniniS->value : 0.0f;
-			panini_push.padding = 0.0f;
+			panini_push.brightness = r_paniniBrightness ? r_paniniBrightness->value : 1.0f;
+			panini_push.circleMix = r_paniniCircle ? r_paniniCircle->value : 0.0f;
+			panini_push.overdraw = r_paniniOverdraw ? r_paniniOverdraw->value : 0.0f;
+			panini_push.padding0 = 0.0f;
+			panini_push.padding1 = 0.0f;
 
 			qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_post_process, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( panini_push ), &panini_push );
 
