@@ -123,6 +123,7 @@ cvar_t	*r_post_debug;
 cvar_t	*r_vk_clearhdr;
 cvar_t	*r_vk_disableblend;
 cvar_t	*r_vk_bindlog;
+cvar_t	*r_vk_pipeline_debug;
 cvar_t	*r_vk_swapchain_srgb;
 cvar_t	*r_exposure;
 cvar_t	*r_tonemap;
@@ -194,8 +195,12 @@ cvar_t	*r_mipLodBias;
 cvar_t	*r_offsetFactor;
 cvar_t	*r_offsetUnits;
 cvar_t	*r_gamma;
+cvar_t	*r_panini;
 cvar_t	*r_paniniD;
 cvar_t	*r_paniniS;
+cvar_t	*r_paniniBrightness;
+cvar_t	*r_paniniCircle;
+cvar_t	*r_paniniOverdraw;
 cvar_t	*r_intensity;
 cvar_t	*r_lockpvs;
 cvar_t	*r_noportals;
@@ -1757,6 +1762,11 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_gamma, "Gamma correction factor." );
 	ri.Cvar_SetGroup( r_gamma, CVG_RENDERER );
 
+	r_panini = ri.Cvar_Get( "r_panini", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_panini, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_panini, "Enable Panini projection warp." );
+	ri.Cvar_SetGroup( r_panini, CVG_RENDERER );
+
 	r_paniniD = ri.Cvar_Get( "r_paniniD", "0.0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_paniniD, "0.0", "2.0", CV_FLOAT );
 	ri.Cvar_SetDescription( r_paniniD, "Panini projection strength (0 disables)." );
@@ -1766,6 +1776,21 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_paniniS, "0.0", "1.0", CV_FLOAT );
 	ri.Cvar_SetDescription( r_paniniS, "Panini projection squeeze factor." );
 	ri.Cvar_SetGroup( r_paniniS, CVG_RENDERER );
+
+	r_paniniBrightness = ri.Cvar_Get( "r_paniniBrightness", "1.25", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_paniniBrightness, "0.5", "2.5", CV_FLOAT );
+	ri.Cvar_SetDescription( r_paniniBrightness, "Panini postprocess brightness multiplier." );
+	ri.Cvar_SetGroup( r_paniniBrightness, CVG_RENDERER );
+
+	r_paniniCircle = ri.Cvar_Get( "r_paniniCircle", "0.25", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_paniniCircle, "0.0", "1.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_paniniCircle, "Clamp panini aspect toward circular output (0=off,1=circle)." );
+	ri.Cvar_SetGroup( r_paniniCircle, CVG_RENDERER );
+
+	r_paniniOverdraw = ri.Cvar_Get( "r_paniniOverdraw", "0.04", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_paniniOverdraw, "0.0", "0.2", CV_FLOAT );
+	ri.Cvar_SetDescription( r_paniniOverdraw, "Expand uv after Panini warp to cover edges." );
+	ri.Cvar_SetGroup( r_paniniOverdraw, CVG_RENDERER );
 	r_facePlaneCull = ri.Cvar_Get ("r_facePlaneCull", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_facePlaneCull, "Enables culling of planar surfaces with back side test." );
 
@@ -1972,6 +1997,9 @@ static void R_Register( void )
 	r_vk_bindlog = ri.Cvar_Get( "r_vk_bindlog", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_vk_bindlog, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_vk_bindlog, "Log HDR clear state + post mode each frame when enabled (1=log per frame)." );
+	r_vk_pipeline_debug = ri.Cvar_Get( "r_vk_pipeline_debug", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_vk_pipeline_debug, "Print Vulkan pipeline creation info (discard mode, shader type, fog, etc)." );
+	ri.Cvar_SetGroup( r_vk_pipeline_debug, CVG_RENDERER );
 	r_vk_swapchain_srgb = ri.Cvar_Get( "r_vk_swapchain_srgb", "0", CVAR_ROM );
 	ri.Cvar_SetDescription( r_vk_swapchain_srgb, "Read-only: 1 if the selected Vulkan swapchain format is sRGB." );
 	{

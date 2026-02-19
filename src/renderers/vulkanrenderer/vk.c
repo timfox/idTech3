@@ -86,7 +86,11 @@ typedef struct {
 	float aspect;
 	float paniniD;
 	float paniniS;
-	float padding;
+	float brightness;
+	float circleMix;
+	float overdraw;
+	float padding0;
+	float padding1;
 } VkPostProcessPushConstants;
 
 static uint32_t vk_get_prefilter_mip_levels( void );
@@ -6095,6 +6099,8 @@ void vk_update_descriptor_set( image_t *image, qboolean mipmap ) {
 	image_info.imageView = image->view;
 	image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
+	image->vk_sampler = image_info.sampler;
+
 	descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	descriptor_write.dstSet = image->descriptor;
 	descriptor_write.dstBinding = 0;
@@ -8593,6 +8599,7 @@ void vk_bind_lighting( int stage, int bundle )
 void vk_reset_descriptor( int index )
 {
 	vk.cmd->descriptor_set.current[ index ] = VK_NULL_HANDLE;
+	vk.cmd->descriptor_set.image[ index ] = NULL;
 }
 
 
@@ -8634,8 +8641,44 @@ void vk_bind_descriptor_sets( void )
 	for ( i = start + 1; i < end; i++ ) {
 		if ( vk.cmd->descriptor_set.current[i] == VK_NULL_HANDLE ) {
 			vk.cmd->descriptor_set.current[i] = tr.whiteImage->descriptor;
+			vk.cmd->descriptor_set.image[i] = tr.whiteImage;
 		}
 	}
+
+#ifdef USE_VK_PBR
+	if ( r_vk_pipeline_debug && r_vk_pipeline_debug->integer && vk.cmd ) {
+		struct {
+			int index;
+			const char *name;
+		} pbr_descs[] = {
+			{ VK_DESC_PBR_NORMAL, "normal" },
+			{ VK_DESC_PBR_PHYSICAL, "physical" },
+			{ VK_DESC_PBR_CUBEMAP, "env" },
+			{ VK_DESC_PBR_IRRADIANCE, "irradiance" }
+		};
+
+		ri.Printf( PRINT_DEVELOPER, "vk bind descriptors PBR\n" );
+		for ( int desc_index = 0; desc_index < (int)ARRAY_LEN(pbr_descs); desc_index++ ) {
+			int index = pbr_descs[desc_index].index;
+			const char *name = pbr_descs[desc_index].name;
+			const image_t *img = vk.cmd->descriptor_set.image[index];
+			const char *source = img ? img->imgName : "none";
+			const char *tag = "missing";
+			if ( img == tr.whiteImage ) {
+				tag = "fallback";
+			} else if ( img != NULL ) {
+				tag = "source";
+			}
+			ri.Printf( PRINT_DEVELOPER, "  %s desc=%p view=%p sampler=%p %s(%s)\n",
+				name,
+				(void*)vk.cmd->descriptor_set.current[index],
+				(void*)(img ? img->view : VK_NULL_HANDLE),
+				(void*)(img ? img->vk_sampler : VK_NULL_HANDLE),
+				tag,
+				source );
+		}
+	}
+#endif
 
 	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout, start, count, vk.cmd->descriptor_set.current + start, offset_count, offsets );
 
@@ -9307,9 +9350,14 @@ void vk_end_frame( void )
 
 			VkPostProcessPushConstants panini_push;
 			panini_push.aspect = vk.renderHeight > 0 ? ( (float)vk.renderWidth / (float)vk.renderHeight ) : 1.0f;
-			panini_push.paniniD = r_paniniD ? r_paniniD->value : 0.0f;
+			float panini_enabled = ( r_panini && r_panini->integer ) ? 1.0f : 0.0f;
+			panini_push.paniniD = panini_enabled * ( r_paniniD ? r_paniniD->value : 0.0f );
 			panini_push.paniniS = r_paniniS ? r_paniniS->value : 0.0f;
-			panini_push.padding = 0.0f;
+			panini_push.brightness = r_paniniBrightness ? r_paniniBrightness->value : 1.0f;
+			panini_push.circleMix = r_paniniCircle ? r_paniniCircle->value : 0.0f;
+			panini_push.overdraw = r_paniniOverdraw ? r_paniniOverdraw->value : 0.0f;
+			panini_push.padding0 = 0.0f;
+			panini_push.padding1 = 0.0f;
 
 			qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_post_process, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( panini_push ), &panini_push );
 
