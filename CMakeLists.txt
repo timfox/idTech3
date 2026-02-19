@@ -1114,6 +1114,42 @@ AUX_SOURCE_DIRECTORY(src/renderers/vulkanrenderer RENDERER_VK_SRCS)
 list(APPEND RENDERER_VK_SRCS
     src/renderers/vulkanrenderer/utils/mikktspace/mikktspace.c
 )
+set(VK_SHADER_DIR "${CMAKE_SOURCE_DIR}/src/renderers/vulkanrenderer/shaders")
+set(VK_SPIRV_DIR "${VK_SHADER_DIR}/spirv")
+set(VK_GEN_DIR "${VK_SPIRV_DIR}/generated")
+
+set(VK_SHADER_DATA_GEN "${VK_GEN_DIR}/shader_data.c")
+set(VK_SHADER_BINDING_GEN "${VK_GEN_DIR}/shader_binding.c")
+set(VK_SHADER_GENERATED_SRCS ${VK_SHADER_DATA_GEN} ${VK_SHADER_BINDING_GEN})
+
+file(GLOB VK_SHADER_GLSL_FILES
+  "${VK_SHADER_DIR}/glsl/*.frag"
+  "${VK_SHADER_DIR}/glsl/*.vert"
+  "${VK_SHADER_DIR}/glsl/*.geom"
+  "${VK_SHADER_DIR}/glsl/*.tmpl"
+)
+
+set(VK_SHADER_TOOL_SOURCES
+  "${VK_SHADER_DIR}/tools/bin2hex.c"
+  "${VK_SHADER_DIR}/tools/bindshader.c"
+)
+
+add_custom_command(
+  OUTPUT ${VK_SHADER_GENERATED_SRCS}
+  COMMAND "${CMAKE_SOURCE_DIR}/scripts/compile_shaders.sh"
+          --generated-dir "${VK_GEN_DIR}"
+  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+  DEPENDS
+    "${CMAKE_SOURCE_DIR}/scripts/compile_shaders.sh"
+    ${VK_SHADER_GLSL_FILES}
+    ${VK_SHADER_TOOL_SOURCES}
+  COMMENT "Generating Vulkan shader blobs"
+  VERBATIM
+)
+
+add_custom_target(vk_shaders_autogen
+  DEPENDS ${VK_SHADER_GENERATED_SRCS}
+)
 # Suppress shadow warnings for MikkTSpace third-party code
 if(MSVC)
     set_source_files_properties(src/renderers/vulkanrenderer/utils/mikktspace/mikktspace.c PROPERTIES
@@ -1145,6 +1181,7 @@ IF(USE_RENDERER_DLOPEN)
 
 	ADD_LIBRARY(${RENDERER_PREFIX}_vulkan${RENDEXT} SHARED ${RENDERER_VK_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
 	TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_RENDERER_DLOPEN RENDERER_VULKAN)
+	add_dependencies(${RENDERER_PREFIX}_vulkan${RENDEXT} vk_shaders_autogen)
 	IF(BUILD_FREETYPE)
 		target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE idtech3_freetype)
 	ENDIF()
@@ -1175,6 +1212,7 @@ ELSE()
 	IF(USE_VULKAN)
 		ADD_LIBRARY(${RENDERER_PREFIX}_vulkan OBJECT ${RENDERER_VK_SRCS} ${RENDERER_COMMON_SRCS})
 		TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan PRIVATE RENDERER_VULKAN)
+		add_dependencies(${RENDERER_PREFIX}_vulkan vk_shaders_autogen)
 		IF(BUILD_FREETYPE)
 			target_link_libraries(${RENDERER_PREFIX}_vulkan PRIVATE idtech3_freetype)
 		ENDIF()
