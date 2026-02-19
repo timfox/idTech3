@@ -748,6 +748,29 @@ endif()
 OPTION(SKIP_IDPAK_CHECK "Skip checking for original Quake III pak files (pak0.pk3)" ON)
 OPTION(BUILD_FREETYPE "Enable FreeType-powered font rendering / font generation" ON)
 
+set(FONTS_DIR "${CMAKE_SOURCE_DIR}/fonts")
+file(MAKE_DIRECTORY "${FONTS_DIR}")
+
+function(download_font_if_missing target name url)
+  if(NOT EXISTS "${target}")
+    message(STATUS "Downloading ${name} to ${target}")
+    file(DOWNLOAD "${url}" "${target}"
+      STATUS download_status
+      SHOW_PROGRESS
+      TLS_VERIFY ON)
+    list(GET download_status 0 status_code)
+    if(NOT status_code EQUAL 0)
+      list(GET download_status 1 reason)
+      message(WARNING "Could not download ${name}: ${reason}. Please place the font manually in ${target}")
+    endif()
+  endif()
+endfunction()
+
+if(BUILD_FREETYPE)
+  download_font_if_missing("${FONTS_DIR}/SourceSans3-Regular.ttf" "SourceSans3 Regular" "https://github.com/google/fonts/raw/main/ofl/sourcesans3/SourceSans3-Regular.ttf")
+  download_font_if_missing("${FONTS_DIR}/SourceSans3-Bold.ttf" "SourceSans3 Bold" "https://github.com/google/fonts/raw/main/ofl/sourcesans3/SourceSans3-Bold.ttf")
+endif()
+
 SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules)
 
 set(EXTERNAL_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/src/external")

@@ -10,11 +10,11 @@ set -euo pipefail
 # - mac-ub2 compiles universal-2 binaries (release only) and can optionally notarize
 # - first unrecognized arg becomes game_name
 
-VULKAN=0
+VULKAN=1
 OPENGL=0
-SKIP_IDPAK=0
-FREETYPE=0
-LUA=0
+SKIP_IDPAK=1
+FREETYPE=1
+LUA=1
 DUKTAPE=1
 SYSTEM_DUKTAPE=0
 
@@ -83,6 +83,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     freetype)
       FREETYPE=1
+      shift
+      ;;
+    no-freetype|nofreetype)
+      FREETYPE=0
       shift
       ;;
     lua)
@@ -198,6 +202,9 @@ CMAKE_FLAGS=(
 if [ "$FREETYPE" -eq 1 ]; then
   CMAKE_FLAGS+=("-DBUILD_FREETYPE=ON")
   echo "CMake: BUILD_FREETYPE=ON"
+else
+  CMAKE_FLAGS+=("-DBUILD_FREETYPE=OFF")
+  echo "CMake: BUILD_FREETYPE=OFF"
 fi
 
 if [ "$LUA" -eq 1 ]; then

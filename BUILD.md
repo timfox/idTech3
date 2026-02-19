@@ -216,19 +216,19 @@ Enable the OpenAL backend (requires engine restart):
 
 ### FreeType font rendering
 
-FreeType font generation is disabled by default to keep the dependencies minimal. Enable it when you need the TrueType pipeline by passing `BUILD_FREETYPE=ON` to CMake:
+FreeType font generation is enabled by default. The `fonts/` directory is populated automatically during configure by downloading Source Sans 3 (the file is cached so it only hits the network once). When FreeType is enabled the renderer builds the UI fonts at runtime from these TrueType files, so you no longer need to pre-render or ship bitmap fonts.
 
 ```
-cmake -S . -B build -DBUILD_FREETYPE=ON ...
+cmake -S . -B build ...
 ```
 
-Or let the helper script do it:
+or use the helper script:
 
 ```
-./scripts/compile_engine.sh freetype vulkan
+./scripts/compile_engine.sh vulkan
 ```
 
-The flag targets the renderer code under `src/renderers/rendercommon/tr_font.c`, links with your platform’s FreeType library, and defines `BUILD_FREETYPE` for the build. Make sure the FreeType headers/libraries (`libfreetype6-dev`, `freetype-devel`, etc.) are installed before you configure the project.
+If you need to turn FreeType off for minimal builds, pass `-DBUILD_FREETYPE=OFF` to CMake or run `./scripts/compile_engine.sh no-freetype`. The flag controls `src/renderers/rendercommon/tr_font.c` and requires your platform’s FreeType headers/libraries (`libfreetype6-dev`, `freetype-devel`, etc.).
 
 ---
 
