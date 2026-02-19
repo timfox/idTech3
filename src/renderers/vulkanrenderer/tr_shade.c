@@ -657,6 +657,14 @@ static inline void vk_update_descriptor_if_changed( int index, VkDescriptorSet d
 		vk_update_descriptor( index, descriptor );
 	}
 }
+
+static inline void vk_update_descriptor_if_changed_with_image( int index, VkDescriptorSet descriptor, const image_t *image )
+{
+	vk_update_descriptor_if_changed( index, descriptor );
+	if ( vk.cmd ) {
+		vk.cmd->descriptor_set.image[ index ] = image;
+	}
+}
 #endif
 
 /*
@@ -1262,9 +1270,10 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 	// Debug view: render a non-PBR pass and optionally override texture0 binding.
 	// Keeps runtime inspection simple without requiring extra shader variants.
 	const int pbr_debug = ( r_pbr_debug != NULL ) ? r_pbr_debug->integer : 0;
-	if ( pbr_debug ) {
-		is_pbr_surface = qfalse;
-	}
+	uniform.pbrDebugMode[0] = pbr_debug;
+	uniform.pbrDebugMode[1] = 0.0f;
+	uniform.pbrDebugMode[2] = 0.0f;
+	uniform.pbrDebugMode[3] = 0.0f;
 
 	if ( is_pbr_surface ) {
 		Com_Memcpy( &uniform_camera.modelMatrix, backEnd.or.modelMatrix, sizeof(float) * 16 );
@@ -1370,6 +1379,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 					warnedMissingEmptyCubemap = qtrue;
 				}
 
+				const cubemap_t *cube = NULL;
 				int cubemapIndex = -1;
 				if ( !tr.numCubemaps || backEnd.viewParms.targetCube != NULL ) {
 					if ( backEnd.viewParms.targetCube == NULL ) {
@@ -1382,7 +1392,6 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 					Com_Memcpy( block.shCoeffs, pStage->shCoeffs, sizeof( block.shCoeffs ) );
 				}
 				else {
-					const cubemap_t *cube = NULL;
 					vec3_t dbgPos;
 					R_GetPBRSurfacePosition( dbgPos );
 					cubemapIndex = R_SelectCubemapIndexForPBR();
@@ -1421,18 +1430,18 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 					vk_update_descriptor_if_changed( VK_DESC_PBR_BRDFLUT, brdfDescriptor );
 				}
 				if ( envDescriptor ) {
-					vk_update_descriptor_if_changed( VK_DESC_PBR_CUBEMAP, envDescriptor );
+					vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_CUBEMAP, envDescriptor, cube ? cube->prefiltered_image : NULL );
 				}
 				if ( irradianceDescriptor ) {
-					vk_update_descriptor_if_changed( VK_DESC_PBR_IRRADIANCE, irradianceDescriptor );
+					vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_IRRADIANCE, irradianceDescriptor, cube ? cube->irradiance_image : NULL );
 				}
 			}
 				
 			if ( pStage->vk_pbr_flags & PBR_HAS_NORMALMAP )
-				vk_update_descriptor_if_changed( VK_DESC_PBR_NORMAL, pStage->normalMap->descriptor );
+				vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_NORMAL, pStage->normalMap->descriptor, pStage->normalMap );
 
 			if ( pStage->vk_pbr_flags & PBR_HAS_PHYSICALMAP || pStage->vk_pbr_flags & PBR_HAS_SPECULARMAP )
-				vk_update_descriptor_if_changed( VK_DESC_PBR_PHYSICAL, pStage->physicalMap->descriptor );
+				vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_PHYSICAL, pStage->physicalMap->descriptor, pStage->physicalMap );
 			
 			// Commented out descriptor updates for removed PBR features
 			// if ( pStage->vk_pbr_flags & PBR_HAS_EMISSIVE )

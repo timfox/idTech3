@@ -46,6 +46,13 @@ struct Vk_Pipeline_FragSpecData {
 #endif
 };
 
+typedef struct {
+	float aspect;
+	float paniniD;
+	float paniniS;
+	float padding;
+} VkPostProcessPushConstants;
+
 static int vkSamples = VK_SAMPLE_COUNT_1_BIT;
 static int vkMaxSamples = VK_SAMPLE_COUNT_1_BIT;
 
@@ -4999,17 +5006,23 @@ void vk_initialize( void )
 		set_layouts[2] = vk.set_layout_sampler; // sampler
 		set_layouts[3] = vk.set_layout_sampler; // sampler
 
+		push_range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		push_range.offset = 0;
+		push_range.size = sizeof( VkPostProcessPushConstants );
+
 		desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		desc.pNext = NULL;
 		desc.flags = 0;
 		desc.setLayoutCount = 1;
 		desc.pSetLayouts = set_layouts;
-		desc.pushConstantRangeCount = 0;
-		desc.pPushConstantRanges = NULL;
+		desc.pushConstantRangeCount = 1;
+		desc.pPushConstantRanges = &push_range;
 
 		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_post_process ) );
 
 		desc.setLayoutCount = VK_NUM_BLOOM_PASSES;
+		desc.pushConstantRangeCount = 0;
+		desc.pPushConstantRanges = NULL;
 
 		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_blend ) );
 
@@ -6012,6 +6025,8 @@ void vk_update_descriptor_set( image_t *image, qboolean mipmap ) {
 	image_info.sampler = vk_find_sampler( &sampler_def );
 	image_info.imageView = image->view;
 	image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	image->vk_sampler = image_info.sampler;
+	image->sampler = image_info.sampler;
 
 	descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	descriptor_write.dstSet = image->descriptor;
@@ -8455,6 +8470,7 @@ void vk_bind_lighting( int stage, int bundle )
 void vk_reset_descriptor( int index )
 {
 	vk.cmd->descriptor_set.current[ index ] = VK_NULL_HANDLE;
+	vk.cmd->descriptor_set.image[ index ] = NULL;
 }
 
 
@@ -8496,16 +8512,42 @@ void vk_bind_descriptor_sets( void )
 	for ( i = start + 1; i < end; i++ ) {
 		if ( vk.cmd->descriptor_set.current[i] == VK_NULL_HANDLE ) {
 			vk.cmd->descriptor_set.current[i] = tr.whiteImage->descriptor;
+			vk.cmd->descriptor_set.image[i] = tr.whiteImage;
 		}
 	}
 
 #ifdef USE_VK_PBR
 	if ( r_vk_pipeline_debug && r_vk_pipeline_debug->integer && vk.cmd ) {
-		ri.Printf( PRINT_DEVELOPER, "vk bind descriptors PBR normal=%p physical=%p env=%p irradiance=%p\n",
-			(void*)vk.cmd->descriptor_set.current[VK_DESC_PBR_NORMAL],
-			(void*)vk.cmd->descriptor_set.current[VK_DESC_PBR_PHYSICAL],
-			(void*)vk.cmd->descriptor_set.current[VK_DESC_PBR_CUBEMAP],
-			(void*)vk.cmd->descriptor_set.current[VK_DESC_PBR_IRRADIANCE] );
+		struct {
+			int index;
+			const char *name;
+		} pbr_descs[] = {
+			{ VK_DESC_PBR_NORMAL, "normal" },
+			{ VK_DESC_PBR_PHYSICAL, "physical" },
+			{ VK_DESC_PBR_CUBEMAP, "env" },
+			{ VK_DESC_PBR_IRRADIANCE, "irradiance" }
+		};
+
+		ri.Printf( PRINT_DEVELOPER, "vk bind descriptors PBR\n" );
+		for ( int i = 0; i < (int)ARRAY_LEN(pbr_descs); i++ ) {
+			int index = pbr_descs[i].index;
+			const char *name = pbr_descs[i].name;
+			const image_t *img = vk.cmd->descriptor_set.image[index];
+			const char *source = img ? img->imgName : "none";
+			const char *tag = "missing";
+			if ( img == tr.whiteImage ) {
+				tag = "fallback";
+			} else if ( img != NULL ) {
+				tag = "source";
+			}
+			ri.Printf( PRINT_DEVELOPER, "  %s desc=%p view=%p sampler=%p %s(%s)\n",
+				name,
+				(void*)vk.cmd->descriptor_set.current[index],
+				(void*)(img ? img->view : VK_NULL_HANDLE),
+				(void*)(img ? img->vk_sampler : VK_NULL_HANDLE),
+				tag,
+				source );
+		}
 	}
 #endif
 
@@ -9165,6 +9207,14 @@ void vk_end_frame( void )
 			vk_begin_render_pass( vk.render_pass.gamma, vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ], qfalse, vk.renderWidth, vk.renderHeight );
 			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.gamma_pipeline );
 			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
+
+			VkPostProcessPushConstants panini_push;
+			panini_push.aspect = vk.renderHeight > 0 ? ( (float)vk.renderWidth / (float)vk.renderHeight ) : 1.0f;
+			panini_push.paniniD = r_paniniD ? r_paniniD->value : 0.0f;
+			panini_push.paniniS = r_paniniS ? r_paniniS->value : 0.0f;
+			panini_push.padding = 0.0f;
+
+			qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_post_process, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( panini_push ), &panini_push );
 
 			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 		}

@@ -1474,7 +1474,7 @@ static void VarInfo( void )
 #if defined (USE_VK_PBR)
 	ri.Printf( PRINT_ALL, "PBR SH extraction: %s\n", (r_pbr_shExtract && r_pbr_shExtract->integer) ? "enabled" : "disabled" );
 	if ( r_pbr_debug && r_pbr_debug->integer ) {
-		ri.Printf( PRINT_ALL, "PBR debug view: mode %d\n", r_pbr_debug->integer );
+		ri.Printf( PRINT_ALL, "PBR debug view: mode %d (1=direct,2=ibl spec,3=irradiance,4=env samples)\n", r_pbr_debug->integer );
 	}
 #endif
 #else
@@ -1612,11 +1612,11 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_pbr_debug, "0", "4", CV_INTEGER );
 	ri.Cvar_SetDescription( r_pbr_debug,
 		"PBR debug view override (Vulkan PBR only):\n"
-		" 0 - off (normal PBR)\n"
-		" 1 - show base/albedo (texture0)\n"
-		" 2 - show normal map (RGB)\n"
-		" 3 - show physical map (packed)\n"
-		" 4 - show emissive map (RGB)\n" );
+		" 0 - off (standard PBR)\n"
+		" 1 - show direct lighting only\n"
+		" 2 - show specular environment contribution only\n"
+		" 3 - show diffuse irradiance only\n"
+		" 4 - show env/irradiance cubemap samples\n" );
 
 	r_pbr_packedPreferred = ri.Cvar_Get( "r_pbr_packedPreferred", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_pbr_packedPreferred, "0", "6", CV_INTEGER );

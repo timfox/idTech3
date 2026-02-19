@@ -254,6 +254,7 @@ typedef struct vkUniform_s {
 	vec4_t pbrSubsurfaceColor;
 	vec4_t pbrSubsurfaceParams;
 	vec4_t pbrAdvancedParams; // x: multi-scatter toggle, y: multi-scatter strength
+	vec4_t pbrDebugMode; // x: debug mode selector
 	vec4_t pbrShCoeffs[9];
 #endif
 } vkUniform_t;
@@ -482,6 +483,7 @@ typedef struct vk_tess_s {
 		uint32_t		start, end;
 		VkDescriptorSet	current[VK_DESC_COUNT]; // 0:uniform, 1:color0, 2:color1, 3:color2, 4:fog, 5:brdf lut, 6:normal, 7:physical, 9:(unused)prefilterd-envmap
 		uint32_t		offset[3]; // 0 (uniform) and 5 (storage)
+		const image_t	*image[VK_DESC_COUNT];
 	} descriptor_set;
 
 	Vk_Depth_Range		depth_range;

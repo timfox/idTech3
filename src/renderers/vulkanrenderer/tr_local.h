@@ -637,6 +637,7 @@ typedef struct image_s {
 	// Descriptor set that contains single descriptor used to access the given image.
 	// It is updated only once during image initialization.
 	VkDescriptorSet descriptor;
+	VkSampler	 vk_sampler;
 #else
 	GLuint		texnum;				// gl texture binding
 	GLint		internalFormat;
