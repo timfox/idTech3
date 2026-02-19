@@ -35,6 +35,8 @@ layout(set = 0, binding = 0) uniform UBO {
 	vec4 pbrTransmissionScale;
 	vec4 pbrSubsurfaceColor;
 	vec4 pbrSubsurfaceParams;
+	vec4 pbrAdvancedParams; // x: multi-scatter toggle, y: multi-scatter strength
+	vec4 pbrDebugMode; // x: debug mode selector
 	vec4 pbrShCoeffs[9];
 #endif
 //#endif
@@ -143,24 +145,24 @@ layout (constant_id = 16) const float normalScale_y = 0.0;
 layout (constant_id = 17) const float normalScale_z = 0.0;
 layout (constant_id = 18) const float normalScale_w = 0.0;
 
-layout (constant_id = 19) const int normal_texture_set = 0;
-layout (constant_id = 20) const int physical_texture_set = 0;
-layout (constant_id = 21) const int env_texture_set = 0;
-layout (constant_id = 22) const int lightmap_texture_set = 0;
-layout (constant_id = 23) const int irradiance_texture_set = 0;
-layout (constant_id = 24) const int emissive_texture_set = 0;
-layout (constant_id = 25) const int clearcoat_texture_set = 0;
-layout (constant_id = 26) const int sheen_texture_set = 0;
-layout (constant_id = 27) const int anisotropy_texture_set = 0;
-layout (constant_id = 28) const int transmission_texture_set = 0;
-layout (constant_id = 29) const int subsurface_texture_set = 0;
+layout (constant_id = 19) const int normal_texture_set = -1;
+layout (constant_id = 20) const int physical_texture_set = -1;
+layout (constant_id = 21) const int env_texture_set = -1;
+layout (constant_id = 22) const int lightmap_texture_set = -1;
+layout (constant_id = 23) const int irradiance_texture_set = -1;
+layout (constant_id = 24) const int emissive_texture_set = -1;
+layout (constant_id = 25) const int clearcoat_texture_set = -1;
+layout (constant_id = 26) const int sheen_texture_set = -1;
+layout (constant_id = 27) const int anisotropy_texture_set = -1;
+layout (constant_id = 28) const int transmission_texture_set = -1;
+layout (constant_id = 29) const int subsurface_texture_set = -1;
 
-layout (constant_id = 23) const int deluxe_mapping			= -1; // -1: deluxemapping off, 0: on, 1: on + bound
-layout (constant_id = 24) const float deluxe_specular_scale = 1.0;
+layout (constant_id = 30) const int deluxe_mapping			= -1; // -1: deluxemapping off, 0: on, 1: on + bound
+layout (constant_id = 31) const float deluxe_specular_scale = 1.0;
 
 vec3 CalcNormal( in vec3 vertexNormal, in vec4 vertexTangent, in vec2 frag_tex_coord )
 {
-	if ( normal_texture_set > -1 ) {
+	if ( normal_texture_set >= 0 ) {
 		vec3 biTangent = vertexTangent.w * cross(vertexNormal, vertexTangent.xyz);
 		vec3 n = texture(normal_texture, frag_tex_coord).agb - vec3(0.5);
 
@@ -184,37 +186,49 @@ vec3 Diffuse_Lambert(in vec3 DiffuseColor)
 	return DiffuseColor * (1.0 / PI);
 }
 
+float Pow5( in float x )
+{
+	float x2 = x * x;
+	return x2 * x2 * x;
+}
+
+vec3 Diffuse_Burley( in vec3 diffuseColor, in float NE, in float NL, in float LH, in float roughness )
+{
+	// Disney 2012 diffuse term for direct lighting.
+	float FD90 = 0.5 + 2.0 * LH * LH * roughness;
+	float lightScatter = 1.0 + ( FD90 - 1.0 ) * Pow5( 1.0 - NL );
+	float viewScatter = 1.0 + ( FD90 - 1.0 ) * Pow5( 1.0 - NE );
+	return diffuseColor * (1.0 / PI) * lightScatter * viewScatter;
+}
+
 vec3 CalcDiffuse( in vec3 diffuse, in float NE, in float NL,
 	in float LH, in float roughness )
 {
-	return Diffuse_Lambert(diffuse);
+	// Keep Lambert as a fallback during Disney diffuse rollout.
+	const bool useDisneyDiffuse = true;
+	if ( useDisneyDiffuse )
+		return Diffuse_Burley( diffuse, NE, NL, LH, roughness );
+	return Diffuse_Lambert( diffuse );
 }
 
 vec3 F_Schlick( in vec3 SpecularColor, in float VH )
 {
 	float Fc = pow(1 - VH, 5);
-	return clamp(50.0 * SpecularColor.g, 0.0, 1.0) * Fc + (1 - Fc) * SpecularColor; //hacky way to decide if reflectivity is too low (< 2%)
+	return SpecularColor + (1.0 - SpecularColor) * Fc;
 }
 
-float D_GGX( in float NH, in float a )
+float D_GGX( in float NH, in float alpha )
 {
-	float a2 = a * a;
-	float d = (NH * a2 - NH) * NH + 1;
-	return a2 / (PI * d * d);
+	// Trowbridge-Reitz GGX NDF using alpha (where alpha = roughness^2).
+	float alphaSq = alpha * alpha;
+	float d = (NH * alphaSq - NH) * NH + 1;
+	return alphaSq / (PI * d * d);
 }
 
-// Appoximation of joint Smith term for GGX
-// [Heitz 2014, "Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs"]
-float V_SmithJointApprox( in float a, in float NV, in float NL )
+float CalcVisibility( in float NL, in float NE, in float alpha )
 {
-	float Vis_SmithV = NL * (NV * (1 - a) + a);
-	float Vis_SmithL = NV * (NL * (1 - a) + a);
-	return 0.5 * (1.0 / (Vis_SmithV + Vis_SmithL));
-}
-
-float CalcVisibility( in float NL, in float NE, in float roughness )
-{
-	float alphaSq = roughness * roughness;
+	// Smith masking-shadowing using GGX lambda formulation with alpha.
+	float alphaSq = alpha * alpha;
 
 	float lambdaE = NL * sqrt((-NE * alphaSq + NE) * NE + alphaSq);
 	float lambdaL = NE * sqrt((-NL * alphaSq + NL) * NL + alphaSq);
@@ -225,9 +239,11 @@ float CalcVisibility( in float NL, in float NE, in float roughness )
 vec3 CalcSpecular( in vec3 specular, in float NH, in float NL,
 	in float NE, float LH, in float VH, in float roughness )
 {
+	// Baseline specular convention: alpha = roughness^2.
+	float alpha = max( roughness * roughness, 0.001 );
 	vec3  F = F_Schlick(specular, VH);
-	float D = D_GGX(NH, roughness);
-	float V = V_SmithJointApprox(roughness, NE, NL);
+	float D = D_GGX(NH, alpha);
+	float V = CalcVisibility(NL, NE, alpha);
 
 	return D * F * V;
 }
@@ -239,10 +255,24 @@ vec3 CalcIBLContribution( in float roughness, in vec3 N, in vec3 E,
 	vec3 R = reflect(-E, N);
 	R.y *= -1.0f;
 	
-	vec3 cubeLightColor = textureLod(env_texture, R, roughness * 6).rgb * 1.0;
+	uint envLevels = textureQueryLevels(env_texture);
+	float maxEnvLod = (envLevels > 0u) ? float(envLevels - 1u) : 0.0;
+	float envLod = min( roughness * 6.0, maxEnvLod );
+	vec3 cubeLightColor = textureLod(env_texture, R, envLod).rgb;
 	vec2 EnvBRDF = texture(brdflut_texture, vec2(NE, 1.0 - roughness)).rg;
+	vec3 FssEss = (specular.rgb * EnvBRDF.x + EnvBRDF.y);
 
-	return cubeLightColor * (specular.rgb * EnvBRDF.x + EnvBRDF.y);
+	// Step 3 (Kulla-Conty): optional multiple-scattering compensation for specular IBL.
+	if ( pbrAdvancedParams.x > 0.5 ) {
+		float Ess = clamp( EnvBRDF.x + EnvBRDF.y, 0.0, 1.0 );
+		float Ems = 1.0 - Ess;
+		vec3 Favg = specular + (1.0 - specular) * (1.0 / 21.0);
+		vec3 Fms = (FssEss * Favg) / max( vec3(1.0 - Ems * Favg), vec3(1e-3) );
+		float strength = clamp( pbrAdvancedParams.y, 0.0, 2.0 );
+		return cubeLightColor * (FssEss + Fms * strength);
+	}
+
+	return cubeLightColor * FssEss;
 }
 
 vec3 EvalSH9( in vec3 n )
@@ -276,7 +306,7 @@ vec3 EvalSH9( in vec3 n )
 vec3 CalcDiffuseIrradiance( in vec3 N )
 {
 	vec3 irradiance = EvalSH9( N );
-	if ( irradiance_texture_set > -1 ) {
+	if ( irradiance_texture_set >= 0 ) {
 		vec3 R = N;
 		R.y *= -1.0f;
 		irradiance += texture( irradiance_texture, R ).rgb;
@@ -728,7 +758,7 @@ void main() {
 	#endif
 
 	#if ( defined(USE_TX1) || defined(USE_TX2) )
-		if ( lightmap_texture_set > -1 ) {
+		if ( lightmap_texture_set >= 0 ) {
 			vec3 lightmapColor = texture(texture1, frag_tex_coord1).rgb;
 
 			lightColor = lightmapColor * bias_color;
@@ -753,7 +783,7 @@ void main() {
 	N = CalcNormal( var_Normal.xyz, var_Tangent, frag_tex_coord0 );	
 
 	#if defined(USE_TX1) || defined(USE_TX2)
-		if ( lightmap_texture_set > -1 ) {
+		if ( lightmap_texture_set >= 0 ) {
 			ambientColor = lightColor;
 			float surfNL = clamp(dot(var_Normal.xyz, L), 0.0, 1.0);
 			lightColor /= max( surfNL, 0.25 );
@@ -761,10 +791,9 @@ void main() {
 		}
 	#endif
 
-	lightColor *= PI;
-
-	vec4 specular = vec4( 1.0 );
+	vec4 specular = vec4( 0.04, 0.04, 0.04, 1.0 );
 	float roughness = 0.99;
+	float metalness = 0.0;
 	float AO = 1.0;
 	vec3 emissive = vec3( 0.0 );
 	vec3 subsurfaceColor = pbrSubsurfaceColor.rgb;
@@ -772,34 +801,36 @@ void main() {
 	float subsurfaceWrap = pbrSubsurfaceParams.y;
 
 	// metallic roughness workflow
-	if ( physical_texture_set == 0 ) {
-		vec4 ORMS = texture( physical_texture, frag_tex_coord0 );
-		ORMS.xyzw *= vec4( specularScale_z, specularScale_w, specularScale_x, specularScale_y );
+	if ( physical_texture_set >= 0 ) {
+		if ( physical_texture_set == 0 ) {
+			vec4 ORMS = texture( physical_texture, frag_tex_coord0 );
+			ORMS.xyzw *= vec4( specularScale_z, specularScale_w, specularScale_x, specularScale_y );
+			metalness = clamp( ORMS.z, 0.0, 1.0 );
 
-		specular.rgb = mix( vec3( 0.08 ) * ORMS.w, diffuse.rgb, ORMS.z );
-		diffuse.rgb *= vec3( 1.0 - ORMS.z );
+			specular.rgb = mix( vec3( 0.08 ) * ORMS.w, diffuse.rgb, metalness );
+			diffuse.rgb *= vec3( 1.0 - metalness );
 
-		roughness = mix( 0.01, 1.0, ORMS.y );
-		AO = min( ORMS.x, AO );
+			roughness = mix( 0.01, 1.0, ORMS.y );
+			AO = min( ORMS.x, AO );
+		}
+		else if ( physical_texture_set == 1 ) {
+			specular = texture( physical_texture, frag_tex_coord0 );
+			specular.rgb *= vec3( specularScale_x, specularScale_y, specularScale_z );
+			roughness = mix( 1.0, 0.01, specular.a * ( 1.0 - specularScale_w ) );
+		}
 	}
 
-	// specular workflow
-	else if( physical_texture_set == 1 ){
-		specular = texture( physical_texture, frag_tex_coord0 );
-		specular.rgb *= vec3( specularScale_x, specularScale_y, specularScale_z );
-		roughness = mix( 1.0, 0.01, specular.a * ( 1.0 - specularScale_w ) );
-	}
-
-	if ( anisotropy_texture_set > -1 ) {
+	if ( anisotropy_texture_set >= 0 ) {
 		float aniso = texture( anisotropy_texture, frag_tex_coord0 ).r * pbrAnisotropyScale.x;
 		roughness = mix( roughness, max( 0.02, roughness * ( 1.0 - aniso ) ), aniso );
 	}
+	roughness = clamp( roughness, 0.02, 1.0 );
 
-	if ( emissive_texture_set > -1 ) {
+	if ( emissive_texture_set >= 0 ) {
 		emissive = texture( emissive_texture, frag_tex_coord0 ).rgb * pbrEmissiveScale.rgb;
 	}
 
-	if ( subsurface_texture_set > -1 ) {
+	if ( subsurface_texture_set >= 0 ) {
 		vec4 subTex = texture( subsurface_texture, frag_tex_coord0 );
 		subsurfaceColor *= subTex.rgb;
 		subsurfaceStrength *= subTex.a;
@@ -817,6 +848,9 @@ void main() {
 
 	float NH = clamp( dot( N, H ), 0.0, 1.0 );
 	float VH = clamp( dot( E, H ), 0.0, 1.0 );
+	vec3  kS = clamp( F_Schlick( specular.rgb, VH ), vec3(0.0), vec3(1.0) );
+	vec3  kD = ( vec3( 1.0 ) - kS ) * ( 1.0 - metalness );
+	Fd *= kD;
 
 
 	#if ( defined(USE_TX1) || defined(USE_TX2) )
@@ -834,17 +868,56 @@ void main() {
 
 	vec3 reflectance = Fd + Fs;
 
-	out_color.rgb  = lightColor * reflectance * ( attenuation * NL );
-	out_color.rgb += ambientColor * diffuse.rgb;
+	vec3 directLighting = lightColor * reflectance * ( attenuation * NL );
+	vec3 ambientContribution = ambientColor * diffuse.rgb * kD;
+	vec3 diffuseIrradiance = vec3( 0.0 );
+	if ( irradiance_texture_set >= 0 ) {
+		diffuseIrradiance = CalcDiffuseIrradiance( N ) * diffuse.rgb * AO * kD;
+	}
+	vec3 iblSpec = vec3( 0.0 );
+	if ( env_texture_set >= 0 ) {
+		iblSpec = CalcIBLContribution( roughness, N, E, NE, specular.rgb * AO );
+	}
 
-	// diffuse IBL (SH + irradiance)
-	out_color.rgb += CalcDiffuseIrradiance( N ) * diffuse.rgb * AO;
+	vec3 debugDir = reflect( -E, N );
+	debugDir.y *= -1.0;
+	int debugMode = int( pbrDebugMode.x + 0.5 );
+	if ( debugMode != 0 ) {
+		vec3 envDebugSample = vec3( 0.0 );
+		vec3 irrDebugSample = vec3( 0.0 );
+		if ( env_texture_set >= 0 ) {
+			envDebugSample = textureLod( env_texture, debugDir, 0.0 ).rgb;
+		}
+		if ( irradiance_texture_set >= 0 ) {
+			irrDebugSample = texture( irradiance_texture, debugDir ).rgb;
+		}
+		vec3 debugColor = vec3( 0.0 );
+		if ( debugMode == 1 ) {
+			debugColor = directLighting;
+		} else if ( debugMode == 2 ) {
+			debugColor = iblSpec;
+		} else if ( debugMode == 3 ) {
+			debugColor = diffuseIrradiance;
+		} else if ( debugMode == 4 ) {
+			debugColor = mix( envDebugSample, irrDebugSample, 0.5 );
+		}
+		out_color = vec4( debugColor, 1.0 );
+		return;
+	}
 
-	if ( env_texture_set > -1 )
-		out_color.rgb += CalcIBLContribution( roughness, N, E, NE, specular.rgb * AO );
+	out_color.rgb = directLighting;
+	out_color.rgb += ambientContribution;
+	if ( irradiance_texture_set >= 0 ) {
+		out_color.rgb += diffuseIrradiance;
+	}
+	if ( env_texture_set >= 0 ) {
+		out_color.rgb += iblSpec;
+	}
 
+	// legacy approximation kept intentionally for Step 2 scope containment.
+	// Step 2b pending: Disney clearcoat/sheen energy normalization.
 	// clearcoat lobe
-	if ( clearcoat_texture_set > -1 ) {
+	if ( clearcoat_texture_set >= 0 ) {
 		vec4 cc = texture( clearcoat_texture, frag_tex_coord0 );
 		float ccStrength = cc.r * pbrClearcoatScale.x;
 		float ccRoughness = clamp( cc.g * pbrClearcoatScale.y, 0.02, 1.0 );
@@ -852,8 +925,10 @@ void main() {
 		out_color.rgb += lightColor * ccSpec * ( attenuation * NL ) * ccStrength;
 	}
 
+	// legacy approximation kept intentionally for Step 2 scope containment.
+	// Step 2b pending: Disney clearcoat/sheen energy normalization.
 	// sheen term
-	if ( sheen_texture_set > -1 ) {
+	if ( sheen_texture_set >= 0 ) {
 		vec3 sheenColor = texture( sheen_texture, frag_tex_coord0 ).rgb * pbrSheenScale.rgb;
 		out_color.rgb += sheenColor * NL * 0.05;
 	}
@@ -864,7 +939,7 @@ void main() {
 	}
 
 	// transmission term
-	if ( transmission_texture_set > -1 ) {
+	if ( transmission_texture_set >= 0 ) {
 		float transmission = texture( transmission_texture, frag_tex_coord0 ).r * pbrTransmissionScale.x;
 		float transmitFactor = transmission * ( 1.0 - roughness );
 		diffuse.rgb *= ( 1.0 - transmitFactor );

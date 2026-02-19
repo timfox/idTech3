@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: ./compile_engine.sh [game_name] [Debug|Release] [clean] [quiet] [coverage] [vulkan] [opengl] [freetype] [lua] [duktape|no-duktape] [system-duktape]
+# Usage: ./compile_engine.sh [game_name] [Debug|Release] [clean] [quiet] [coverage] [vulkan] [opengl] [freetype] [lua] [duktape|no-duktape] [system-duktape] [mac-app <target> [arch]] [mac-ub2 [notarize]]
 # Notes:
 # - build type defaults to Release
 # - vulkan and opengl are mutually exclusive
 # - if neither is specified: defaults to OpenGL
+# - mac-app wraps the legacy bundle script (requires release|debug target, optional architecture)
+# - mac-ub2 compiles universal-2 binaries (release only) and can optionally notarize
 # - first unrecognized arg becomes game_name
 
 VULKAN=0
@@ -21,6 +23,13 @@ BUILD_TYPE="Release"
 CLEAN=0
 COVERAGE=0
 QUIET=0
+MAC_APP=0
+MAC_APP_TARGET=""
+MAC_APP_ARCH=""
+MAC_UB2=0
+MAC_UB2_NOTARIZE=0
+MAC_HAS_LIPO="$(command -v lipo || true)"
+MAC_HAS_CP="$(command -v cp || true)"
 
 normalize_build_type() {
   local arg
@@ -46,24 +55,93 @@ fi
 RELEASE_DIR="$PROJECT_ROOT/release"
 
 # Argument parsing
-for arg in "$@"; do
-  norm_bt="$(normalize_build_type "$arg")"
-  if [ -n "$norm_bt" ]; then BUILD_TYPE="$norm_bt"; continue; fi
-
-  case "$arg" in
-    clean) CLEAN=1 ;;
-    coverage|cov) COVERAGE=1 ;;
-    quiet|-q|--quiet|q|silent|-s|--silent) QUIET=1 ;;
-    vulkan) VULKAN=1 ;;
-    skip-idpak-check|skip_idpak_check|skip-pak|skip-paks) SKIP_IDPAK=1 ;;
-    opengl) OPENGL=1 ;;
-    freetype) FREETYPE=1 ;;
-    lua) LUA=1 ;;
-    duktape|js) DUKTAPE=1 ;;
-    no-duktape|noduktape|nojs) DUKTAPE=0 ;;
-    system-duktape|system_duktape) SYSTEM_DUKTAPE=1 ;;
-    vendored-duktape|vendored_duktape|no-system-duktape|nosystemduktape) SYSTEM_DUKTAPE=0 ;;
-    *) GAME_NAME="$arg" ;;
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    clean)
+      CLEAN=1
+      shift
+      ;;
+    coverage|cov)
+      COVERAGE=1
+      shift
+      ;;
+    quiet|-q|--quiet|q|silent|-s|--silent)
+      QUIET=1
+      shift
+      ;;
+    vulkan)
+      VULKAN=1
+      shift
+      ;;
+    skip-idpak-check|skip_idpak_check|skip-pak|skip-paks)
+      SKIP_IDPAK=1
+      shift
+      ;;
+    opengl)
+      OPENGL=1
+      shift
+      ;;
+    freetype)
+      FREETYPE=1
+      shift
+      ;;
+    lua)
+      LUA=1
+      shift
+      ;;
+    duktape|js)
+      DUKTAPE=1
+      shift
+      ;;
+    no-duktape|noduktape|nojs)
+      DUKTAPE=0
+      shift
+      ;;
+    system-duktape|system_duktape)
+      SYSTEM_DUKTAPE=1
+      shift
+      ;;
+    vendored-duktape|vendored_duktape|no-system-duktape|nosystemduktape)
+      SYSTEM_DUKTAPE=0
+      shift
+      ;;
+    mac-app)
+      MAC_APP=1
+      shift
+      if [[ $# -eq 0 ]]; then
+        echo "mac-app requires a target (release|debug)." >&2
+        exit 1
+      fi
+      target_norm="$(normalize_build_type "$1")"
+      if [[ -z "$target_norm" ]]; then
+        echo "mac-app target must be release or debug." >&2
+        exit 1
+      fi
+      MAC_APP_TARGET="$(echo "$target_norm" | tr '[:upper:]' '[:lower:]')"
+      shift
+      if [[ $# -gt 0 ]] && [[ "$1" =~ ^(x86|x86_64|ppc|aarch64)$ ]]; then
+        MAC_APP_ARCH="$1"
+        shift
+      fi
+      ;;
+    mac-ub2)
+      MAC_UB2=1
+      shift
+      if [[ $# -gt 0 ]] && [[ "$1" == "notarize" ]]; then
+        MAC_UB2_NOTARIZE=1
+        shift
+      fi
+      ;;
+    *)
+      norm_bt="$(normalize_build_type "$1")"
+      if [[ -n "$norm_bt" ]]; then
+        BUILD_TYPE="$norm_bt"
+        shift
+        continue
+      fi
+      GAME_NAME="$1"
+      shift
+      ;;
   esac
 done
 
@@ -244,6 +322,279 @@ if [ "$COVERAGE" -eq 1 ]; then
     cmake --build "$PROJECT_ROOT/build-coverage" --target coverage
     echo "Coverage artifacts (HTML/XML) should be in build-coverage/"
   fi
+fi
+
+macos_action() {
+  local dest="$1"
+  shift
+  local sources=("$@")
+  if [[ ${#sources[@]} -eq 0 ]]; then
+    echo "macos_action: no source binaries provided for $dest" >&2
+    return 1
+  fi
+
+  if [[ -x "$MAC_HAS_LIPO" ]]; then
+    "$MAC_HAS_LIPO" -create -o "$dest" "${sources[@]}"
+  elif [[ -x "$MAC_HAS_CP" ]]; then
+    "$MAC_HAS_CP" "${sources[0]}" "$dest"
+  else
+    echo "macos_action: lipo and cp are unavailable; cannot create $dest" >&2
+    return 1
+  fi
+}
+
+macos_app_bundle() {
+  local target="${1:-release}"
+  local arch_override="${2:-}"
+  local target_lower
+  target_lower="$(echo "$target" | tr '[:upper:]' '[:lower:]')"
+  if [[ "$target_lower" != "release" && "$target_lower" != "debug" ]]; then
+    echo "mac-app: unsupported target '$target'; use release or debug." >&2
+    return 1
+  fi
+
+  local objroot="$PROJECT_ROOT/build"
+  local product="quake3e"
+  local dedicated="quake3e.ded"
+  local wrapper="${product}.app"
+  local contents="${wrapper}/Contents"
+  local executable_folder="${contents}/MacOS"
+  local resources="${contents}/Resources"
+  local base_dir="baseq3"
+  local icnsdir="code/unix"
+  local icns="quake3_flat.icns"
+  local pkginfo="APPLQ3E"
+  local q3e_version="1.32e"
+  local deployment="${MACOSX_DEPLOYMENT_TARGET:-13.0}"
+  local search_archs="x86 x86_64 ppc aarch64"
+  if [[ -n "$arch_override" ]]; then
+    search_archs="$arch_override"
+  fi
+
+  local valid_archs=()
+  local client_archs=()
+  local server_archs=()
+
+  pushd "$PROJECT_ROOT" > /dev/null
+  for arch in $search_archs; do
+    local build_dir="${objroot}/${target_lower}-darwin-${arch}"
+    if [[ ! -d "$build_dir" ]]; then
+      continue
+    fi
+    local client_bin="${build_dir}/${product}.${arch}"
+    if [[ -f "$client_bin" ]]; then
+      client_archs+=("$client_bin")
+      valid_archs+=("$arch")
+    fi
+    local server_bin="${build_dir}/${dedicated}.${arch}"
+    if [[ -f "$server_bin" ]]; then
+      server_archs+=("$server_bin")
+    fi
+  done
+
+  if [[ ${#client_archs[@]} -eq 0 ]]; then
+    echo "mac-app: no client binaries found for target ${target_lower} (${search_archs})." >&2
+    popd > /dev/null
+    return 1
+  fi
+
+  local built_products_dir
+  if [[ -n "$arch_override" ]]; then
+    built_products_dir="${objroot}/${target_lower}-darwin-${arch_override}"
+  else
+    built_products_dir="${objroot}/${target_lower}-darwin-universal2"
+  fi
+  mkdir -p "$built_products_dir"
+  mkdir -p "${built_products_dir}/${executable_folder}/${base_dir}"
+  mkdir -p "${built_products_dir}/${resources}"
+
+  local libs=()
+  shopt -s nullglob
+  libs=(code/libsdl/macosx/*.dylib)
+  shopt -u nullglob
+  if [[ ${#libs[@]} -gt 0 ]]; then
+    cp "${libs[@]}" "${built_products_dir}/${executable_folder}"
+  fi
+
+  if [[ -f "${icnsdir}/${icns}" ]]; then
+    cp "${icnsdir}/${icns}" "${built_products_dir}/${resources}/${icns}"
+  fi
+
+  printf "%s" "${pkginfo}" > "${built_products_dir}/${contents}/PkgInfo"
+
+  cat <<EOF > "${built_products_dir}/${contents}/Info.plist"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleExecutable</key>
+    <string>${product}</string>
+    <key>CFBundleIconFile</key>
+    <string>${icns%.icns}</string>
+    <key>CFBundleIdentifier</key>
+    <string>org.quake3e.${product}</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>${product}</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>${q3e_version}</string>
+    <key>CFBundleSignature</key>
+    <string>????</string>
+    <key>CFBundleVersion</key>
+    <string>${q3e_version}</string>
+    <key>CGDisableCoalescedUpdates</key>
+    <true/>
+    <key>LSMinimumSystemVersion</key>
+    <string>${deployment}</string>
+    <key>NSHumanReadableCopyright</key>
+    <string>QUAKE III ARENA Copyright © 1999-2000 id Software, Inc. All rights reserved.</string>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    <key>NSHighResolutionCapable</key>
+    <false/>
+    <key>NSRequiresAquaSystemAppearance</key>
+    <false/>
+</dict>
+</plist>
+EOF
+
+  echo "Creating bundle '${built_products_dir}/${wrapper}'"
+  echo "with architectures:"
+  for arch in "${valid_archs[@]}"; do
+    echo " ${arch}"
+  done
+  echo ""
+
+  macos_action "${built_products_dir}/${executable_folder}/${product}" "${client_archs[@]}"
+  if [[ ${#server_archs[@]} -gt 0 ]]; then
+    macos_action "${built_products_dir}/${executable_folder}/${dedicated}" "${server_archs[@]}"
+  fi
+
+  popd > /dev/null
+}
+
+macos_build_universal() {
+  local target="${1:-release}"
+  local target_lower
+  target_lower="$(echo "$target" | tr '[:upper:]' '[:lower:]')"
+  local jobs="${CORES:-4}"
+  local archs=("x86_64" "aarch64")
+
+  pushd "$PROJECT_ROOT" > /dev/null
+  for arch in "${archs[@]}"; do
+    echo "Building ${arch} client/dedicated server (${target_lower})"
+    (PLATFORM=darwin ARCH="$arch" make -j"$jobs") || {
+      echo "mac-ub2: failed to build ${arch}" >&2
+      popd > /dev/null
+      return 1
+    }
+    echo
+  done
+  popd > /dev/null
+
+  macos_app_bundle "$target_lower"
+  if [[ "$MAC_UB2_NOTARIZE" -eq 1 ]]; then
+    macos_notarize_app "$target_lower"
+  fi
+}
+
+macos_notarize_app() {
+  local target="${1:-release}"
+  local target_lower
+  target_lower="$(echo "$target" | tr '[:upper:]' '[:lower:]')"
+  local values_file="${SCRIPT_DIR}/make-macosx-values.local"
+  if [[ ! -f "$values_file" ]]; then
+    echo "Notarization values file missing at $values_file; skipping notarization." >&2
+    return 1
+  fi
+
+  # shellcheck disable=SC1090
+  source "$values_file"
+
+  if [[ -z "${SIGNING_IDENTITY:-}" || -z "${ASC_USERNAME:-}" || -z "${ASC_PASSWORD:-}" || -z "${ASC_PROVIDER:-}" ]]; then
+    echo "Notarization credentials are incomplete; please define SIGNING_IDENTITY, ASC_USERNAME, ASC_PASSWORD, and ASC_PROVIDER." >&2
+    return 1
+  fi
+
+  if ! command -v codesign >/dev/null 2>&1 || ! command -v xcrun >/dev/null 2>&1; then
+    echo "codesign and xcrun are required for notarization; skipping." >&2
+    return 1
+  fi
+
+  local release_location="$PROJECT_ROOT/build/${target_lower}-darwin-universal2"
+  local release_build="quake3e.app"
+  local pre_notarized_zip="quake3e_prenotarized.zip"
+  local post_notarized_zip="quake3e_notarized.zip"
+  local bundle_id="org.quake3e.quake3e"
+  local entitlements="$PROJECT_ROOT/misc/xcode/quake3e/quake3e.entitlements"
+
+  if [[ ! -d "$release_location" ]]; then
+    echo "Notarization target missing: $release_location" >&2
+    return 1
+  fi
+  if [[ ! -f "$entitlements" ]]; then
+    echo "Entitlements file missing: $entitlements" >&2
+    return 1
+  fi
+
+  codesign --force --options runtime --deep --entitlements "$entitlements" --sign "$SIGNING_IDENTITY" "$release_location/$release_build"
+
+  if ! command -v ditto >/dev/null 2>&1; then
+    echo "ditto is required to package the app for notarization; skipping." >&2
+    return 1
+  fi
+
+  pushd "$release_location" > /dev/null
+
+  rm -f "$pre_notarized_zip" "$post_notarized_zip"
+  ditto -c -k --sequesterRsrc --keepParent "$release_build" "$pre_notarized_zip"
+
+  local notarize_app_log
+  local notarize_info_log
+  notarize_app_log="$(mktemp -t notarize-app)"
+  notarize_info_log="$(mktemp -t notarize-info)"
+
+  if ! xcrun altool --notarize-app --primary-bundle-id "$bundle_id" --asc-provider "$ASC_PROVIDER" --username "$ASC_USERNAME" --password "$ASC_PASSWORD" -f "$pre_notarized_zip" > "$notarize_app_log" 2>&1; then
+    cat "$notarize_app_log" 1>&2
+    rm -f "$notarize_app_log" "$notarize_info_log"
+    popd > /dev/null
+    return 1
+  fi
+
+  local request_uuid
+  request_uuid="$(awk -F ' = ' '/RequestUUID/ {print $2}' "$notarize_app_log")"
+
+  while sleep 60 && date; do
+    if xcrun altool --notarization-info "$request_uuid" --asc-provider "$ASC_PROVIDER" --username "$ASC_USERNAME" --password "$ASC_PASSWORD" > "$notarize_info_log" 2>&1; then
+      cat "$notarize_info_log"
+      if ! grep -q "Status: in progress" "$notarize_info_log"; then
+        xcrun stapler staple "$release_build"
+        break
+      fi
+    else
+      cat "$notarize_info_log" 1>&2
+      rm -f "$notarize_app_log" "$notarize_info_log"
+      popd > /dev/null
+      return 1
+    fi
+  done
+
+  rm -f "$notarize_app_log" "$notarize_info_log"
+  ditto -c -k --sequesterRsrc --keepParent "$release_build" "$post_notarized_zip"
+  popd > /dev/null
+  echo "Notarization artifacts ready at ${release_location}/${post_notarized_zip}"
+}
+
+MAC_APP_TARGET="${MAC_APP_TARGET:-release}"
+if [[ "$MAC_UB2" -eq 1 ]]; then
+  macos_build_universal "$MAC_APP_TARGET"
+elif [[ "$MAC_APP" -eq 1 ]]; then
+  macos_app_bundle "$MAC_APP_TARGET" "$MAC_APP_ARCH"
 fi
 
 echo "✓ Engine artifacts ready in $RELEASE_DIR"

@@ -4178,19 +4178,16 @@ static shader_t *FinishShader( void ) {
 	{
 		Vk_Pipeline_Def def;
 
-		Com_Memset( &def, 0, sizeof( def ) );
-		def.face_culling = shader.cullType;
-		def.polygon_offset = shader.polygonOffset;
-
-		if ( (stages[0].stateBits & GLS_DEPTHMASK_TRUE) == 0 ) {
-			def.allow_discard = 1;
-		}
+	Com_Memset( &def, 0, sizeof( def ) );
+	def.face_culling = shader.cullType;
+	def.polygon_offset = shader.polygonOffset;
 
 		for ( i = 0; i < stage; i++ ) {
 			int env_mask;
 			shaderStage_t *pStage = &stages[i];
 			def.state_bits = pStage->stateBits;
 			def.vk_pbr_flags = 0;
+			def.allow_discard = ( (pStage->stateBits & GLS_DEPTHMASK_TRUE) == 0 ) ? 1 : 0;
 
 			if ( pStage->mtEnv3 ) {
 				switch ( pStage->mtEnv3 ) {

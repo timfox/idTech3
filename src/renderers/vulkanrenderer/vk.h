@@ -253,6 +253,8 @@ typedef struct vkUniform_s {
 	vec4_t pbrTransmissionScale;
 	vec4_t pbrSubsurfaceColor;
 	vec4_t pbrSubsurfaceParams;
+	vec4_t pbrAdvancedParams; // x: multi-scatter toggle, y: multi-scatter strength
+	vec4_t pbrDebugMode; // x: debug mode selector
 	vec4_t pbrShCoeffs[9];
 #endif
 } vkUniform_t;
@@ -374,6 +376,7 @@ void vk_update_descriptor_set( image_t *image, qboolean mipmap );
 void vk_destroy_image_resources( VkImage *image, VkImageView *imageView );
 void vk_bind_generated_shaders( void );
 void vk_update_attachment_descriptors( void );
+void vk_validate_pbr_ibl_resources( void );
 void vk_destroy_samplers( void );
 
 uint32_t vk_find_pipeline_ext( uint32_t base, const Vk_Pipeline_Def *def, qboolean use );
@@ -480,6 +483,7 @@ typedef struct vk_tess_s {
 		uint32_t		start, end;
 		VkDescriptorSet	current[VK_DESC_COUNT]; // 0:uniform, 1:color0, 2:color1, 3:color2, 4:fog, 5:brdf lut, 6:normal, 7:physical, 9:(unused)prefilterd-envmap
 		uint32_t		offset[3]; // 0 (uniform) and 5 (storage)
+		const image_t	*image[VK_DESC_COUNT];
 	} descriptor_set;
 
 	Vk_Depth_Range		depth_range;
@@ -504,6 +508,8 @@ typedef struct {
 
 	VkSwapchainKHR swapchain;
 	uint32_t swapchain_image_count;
+	VkExtent2D swapchain_extent;
+	qboolean swapchain_extent_valid;
 	VkImage swapchain_images[MAX_SWAPCHAIN_IMAGES];
 	VkImageView swapchain_image_views[MAX_SWAPCHAIN_IMAGES];
 	VkSemaphore swapchain_rendering_finished[MAX_SWAPCHAIN_IMAGES];
@@ -567,6 +573,8 @@ typedef struct {
 	VkImage ssao_blur_image;
 	VkImageView ssao_blur_image_view;
 	VkDescriptorSet ssao_blur_descriptor;
+	VkImage vao_mask_image;
+	VkImageView vao_mask_image_view;
 
 	VkImage depth_image;
 	VkImageView depth_image_view;
@@ -846,6 +854,9 @@ typedef struct {
 
 	uint32_t image_chunk_size;
 
+	// Physical device limit for 2D image dimension (VkPhysicalDeviceLimits::maxImageDimension2D).
+	uint32_t hwMaxImageDimension2D;
+
 	uint32_t maxBoundDescriptorSets;
 
 #ifdef USE_UPLOAD_QUEUE
@@ -869,6 +880,7 @@ typedef struct {
 		VkSampler handle[MAX_VK_SAMPLERS];
 		int filter_min;
 		int filter_max;
+		float mip_lod_bias;
 	} samplers;
 
 	struct defaults_t {

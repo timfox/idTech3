@@ -5471,6 +5471,11 @@ void FS_Restart( int checksumFeed ) {
 	static char lastValidGame[MAX_OSPATH];
 
 	static qboolean execConfig = qfalse;
+	static const char fallbackDefaultCfg[] =
+		"// Auto-generated minimal default configuration\n"
+		"set com_introPlayed \"0\"\n"
+		"set in_mouse \"1\"\n"
+		"set in_joystick \"0\"\n";
 
 	// free anything we currently have loaded
 	FS_Shutdown( qfalse );
@@ -5481,10 +5486,20 @@ void FS_Restart( int checksumFeed ) {
 	// try to start up normally
 	FS_Startup();
 
+	if ( fs_packFiles == 0 ) {
+		Sys_ShowErrorMessage( CLIENT_WINDOW_TITLE, "No game data" );
+		Sys_Quit();
+	}
+
 	// if we can't find default.cfg, assume that the paths are
 	// busted and error out now, rather than getting an unreadable
 	// graphics screen when the font fails to load
-	if ( FS_ReadFile( "default.cfg", NULL ) <= 0 ) {
+	int defaultCfgLen = FS_ReadFile( "default.cfg", NULL );
+	if ( defaultCfgLen <= 0 ) {
+		if ( fs_numServerPaks == 0 ) {
+			Sys_ShowErrorMessage( CLIENT_WINDOW_TITLE, "No game data" );
+			Sys_Quit();
+		}
 		// this might happen when connecting to a pure server not using BASEGAME/pak0.pk3
 		// (for instance a TA demo server)
 		if (lastValidBase[0]) {
@@ -5499,7 +5514,13 @@ void FS_Restart( int checksumFeed ) {
 			Com_Error( ERR_DROP, "Invalid game folder" );
 			return;
 		}
-		Com_Error( ERR_FATAL, "Couldn't load default.cfg" );
+		Com_Printf( "default.cfg missing; generating minimal fallback configuration\n" );
+		FS_WriteFile( "default.cfg", fallbackDefaultCfg, (int)sizeof( fallbackDefaultCfg ) - 1 );
+		defaultCfgLen = FS_ReadFile( "default.cfg", NULL );
+		if ( defaultCfgLen <= 0 ) {
+			Sys_ShowErrorMessage( CLIENT_WINDOW_TITLE, "No game data" );
+			Com_Error( ERR_FATAL, "Couldn't load default.cfg" );
+		}
 	}
 
 	// new check before safeMode

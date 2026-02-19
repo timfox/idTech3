@@ -46,6 +46,17 @@ struct Vk_Pipeline_FragSpecData {
 #endif
 };
 
+typedef struct {
+	float aspect;
+	float paniniD;
+	float paniniS;
+	float brightness;
+	float circleMix;
+	float overdraw;
+	float paniniMask;
+	float padding;
+} VkPostProcessPushConstants;
+
 static int vkSamples = VK_SAMPLE_COUNT_1_BIT;
 static int vkMaxSamples = VK_SAMPLE_COUNT_1_BIT;
 
@@ -640,6 +651,8 @@ static void vk_create_swapchain( VkPhysicalDevice physical_device, VkDevice devi
 	desc.imageFormat = surface_format.format;
 	desc.imageColorSpace = surface_format.colorSpace;
 	desc.imageExtent = image_extent;
+	vk.swapchain_extent = image_extent;
+	vk.swapchain_extent_valid = qtrue;
 	desc.imageArrayLayers = 1;
 	desc.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 	if ( !vk.fboActive ) {
@@ -706,6 +719,38 @@ static void vk_create_swapchain( VkPhysicalDevice physical_device, VkDevice devi
 	}
 }
 
+static qboolean vk_query_surface_extent( VkExtent2D *extent ) {
+	VkSurfaceCapabilitiesKHR caps;
+
+	if ( qvkGetPhysicalDeviceSurfaceCapabilitiesKHR( vk.physical_device, vk_surface, &caps ) != VK_SUCCESS ) {
+		return qfalse;
+	}
+
+	if ( caps.currentExtent.width == UINT32_MAX && caps.currentExtent.height == UINT32_MAX ) {
+		extent->width = (uint32_t) gls.windowWidth;
+		extent->height = (uint32_t) gls.windowHeight;
+	}
+	else {
+		extent->width = caps.currentExtent.width;
+		extent->height = caps.currentExtent.height;
+	}
+
+	if ( extent->width == 0 || extent->height == 0 ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+static void vk_log_swapchain_recreation( VkResult res, const VkExtent2D *old_extent, const VkExtent2D *new_extent ) {
+	uint32_t old_width = vk.swapchain_extent_valid && old_extent ? old_extent->width : 0;
+	uint32_t old_height = vk.swapchain_extent_valid && old_extent ? old_extent->height : 0;
+	uint32_t new_width = new_extent ? new_extent->width : 0;
+	uint32_t new_height = new_extent ? new_extent->height : 0;
+
+	ri.Printf( PRINT_WARNING, "vk_present_frame(): %s old=%ux%u new=%ux%u fullscreen=%d refresh=%d\n",
+		vk_result_string( res ), old_width, old_height, new_width, new_height, glConfig.isFullscreen, glConfig.displayFrequency );
+}
 
 static void vk_create_render_passes( void )
 {
@@ -1626,7 +1671,7 @@ static VkFormat get_hdr_format( VkFormat base_format )
 
 	switch ( r_hdr->integer ) {
 		case -1: return VK_FORMAT_B4G4R4A4_UNORM_PACK16;
-		case 1: return VK_FORMAT_R16G16B16A16_UNORM;
+		case 1: return VK_FORMAT_R16G16B16A16_SFLOAT;
 		default: return base_format;
 	}
 }
@@ -1675,7 +1720,7 @@ static const present_format_t present_formats[] = {
 	//{12, VK_FORMAT_B4G4R4A4_UNORM_PACK16, VK_FORMAT_R4G4B4A4_UNORM_PACK16},
 	//{15, VK_FORMAT_B5G5R5A1_UNORM_PACK16, VK_FORMAT_R5G5B5A1_UNORM_PACK16},
 	{16, VK_FORMAT_B5G6R5_UNORM_PACK16, VK_FORMAT_R5G6B5_UNORM_PACK16},
-	{24, VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM},
+	{24, VK_FORMAT_B8G8R8A8_SRGB, VK_FORMAT_R8G8B8A8_SRGB},
 	{30, VK_FORMAT_A2B10G10R10_UNORM_PACK32, VK_FORMAT_A2R10G10B10_UNORM_PACK32},
 	//{32, VK_FORMAT_B10G11R11_UFLOAT_PACK32, VK_FORMAT_B10G11R11_UFLOAT_PACK32}
 };
@@ -2631,7 +2676,7 @@ static VkSampler vk_find_sampler( const Vk_Sampler_Def *def ) {
 	desc.addressModeU = address_mode;
 	desc.addressModeV = address_mode;
 	desc.addressModeW = address_mode;
-	desc.mipLodBias = 0.0f;
+	desc.mipLodBias = r_mipLodBias->value;
 
 	if ( def->noAnisotropy || mipmap_mode == VK_SAMPLER_MIPMAP_MODE_NEAREST || mag_filter == VK_FILTER_NEAREST ) {
 		desc.anisotropyEnable = VK_FALSE;
@@ -4382,6 +4427,8 @@ static void vk_destroy_framebuffers( void ) {
 static void vk_destroy_swapchain( void ) {
 	uint32_t i;
 
+	vk.swapchain_extent_valid = qfalse;
+
 	for ( i = 0; (uint32_t) i < vk.swapchain_image_count; i++ ) {
 		if ( vk.swapchain_image_views[i] != VK_NULL_HANDLE ) {
 			qvkDestroyImageView( vk.device, vk.swapchain_image_views[i], NULL );
@@ -4794,6 +4841,7 @@ void vk_initialize( void )
 	// do early texture mode setup to avoid redundant descriptor updates in GL_SetDefaultState()
 	vk.samplers.filter_min = -1;
 	vk.samplers.filter_max = -1;
+	vk.samplers.mip_lod_bias = -9999.0f;
 	GL_TextureMode( r_textureMode->string );
 	r_textureMode->modified = qfalse;
 
@@ -4962,17 +5010,23 @@ void vk_initialize( void )
 		set_layouts[2] = vk.set_layout_sampler; // sampler
 		set_layouts[3] = vk.set_layout_sampler; // sampler
 
+		push_range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		push_range.offset = 0;
+		push_range.size = sizeof( VkPostProcessPushConstants );
+
 		desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		desc.pNext = NULL;
 		desc.flags = 0;
 		desc.setLayoutCount = 1;
 		desc.pSetLayouts = set_layouts;
-		desc.pushConstantRangeCount = 0;
-		desc.pPushConstantRanges = NULL;
+		desc.pushConstantRangeCount = 1;
+		desc.pPushConstantRanges = &push_range;
 
 		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_post_process ) );
 
 		desc.setLayoutCount = VK_NUM_BLOOM_PASSES;
+		desc.pushConstantRangeCount = 0;
+		desc.pPushConstantRanges = NULL;
 
 		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_blend ) );
 
@@ -5975,6 +6029,7 @@ void vk_update_descriptor_set( image_t *image, qboolean mipmap ) {
 	image_info.sampler = vk_find_sampler( &sampler_def );
 	image_info.imageView = image->view;
 	image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	image->vk_sampler = image_info.sampler;
 
 	descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	descriptor_write.dstSet = image->descriptor;
@@ -6063,7 +6118,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	VkGraphicsPipelineCreateInfo create_info;
 	VkViewport viewport;
 	VkRect2D scissor;
-	VkSpecializationMapEntry spec_entries[11];
+	VkSpecializationMapEntry spec_entries[18];
 	VkSpecializationInfo frag_spec_info;
 	VkPipeline *pipeline;
 	VkShaderModule fsmodule;
@@ -6074,17 +6129,23 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	qboolean blend;
 
 	struct PostProcess_FragSpecData {
-		float gamma;
-		float overbright;
-		float greyscale;
-		float bloom_threshold;
-		float bloom_intensity;
-		int bloom_threshold_mode;
-		int bloom_modulate;
-		int dither;
-		int depth_r;
-		int depth_g;
-		int depth_b;
+		float gamma;           /* constant_id = 0  */
+		float preExposureScale; /* constant_id = 1 */
+		float greyscale;       /* constant_id = 2  */
+		float bloom_threshold; /* constant_id = 3  */
+		float bloom_intensity; /* constant_id = 4  */
+		int bloom_threshold_mode; /* constant_id = 5 */
+		int bloom_modulate;    /* constant_id = 6  */
+		int dither;            /* constant_id = 7  */
+		int depth_r;           /* constant_id = 8  */
+		int depth_g;           /* constant_id = 9  */
+		int depth_b;           /* constant_id = 10 */
+		float exposure;        /* constant_id = 11 */
+		float bloom_knee;      /* constant_id = 12 */
+		int tonemap_mode;      /* constant_id = 13 */
+		int apply_srgb_gamma;  /* constant_id = 14 */
+		int post_debug;        /* constant_id = 15 */
+		int postprocess_enabled; /* constant_id = 36 */
 	} frag_spec_data;
 
 	switch ( program_index ) {
@@ -6200,14 +6261,20 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	set_shader_stage_desc( shader_stages+0, VK_SHADER_STAGE_VERTEX_BIT, vk.modules.gamma_vs, "main" );
 	set_shader_stage_desc( shader_stages+1, VK_SHADER_STAGE_FRAGMENT_BIT, fsmodule, "main" );
 
-	frag_spec_data.gamma = 1.0 / (r_gamma->value);
-	frag_spec_data.overbright = (float)(1 << tr.overbrightBits);
+	frag_spec_data.gamma = 1.0f / (r_gamma->value);
+	frag_spec_data.preExposureScale = 1.0f;
 	frag_spec_data.greyscale = r_greyscale->value;
 	frag_spec_data.bloom_threshold = r_bloom_threshold->value;
 	frag_spec_data.bloom_intensity = r_bloom_intensity->value;
 	frag_spec_data.bloom_threshold_mode = r_bloom_threshold_mode->integer;
 	frag_spec_data.bloom_modulate = r_bloom_modulate->integer;
 	frag_spec_data.dither = r_dither->integer;
+	frag_spec_data.exposure = r_exposure ? r_exposure->value : 1.0f;
+	frag_spec_data.bloom_knee = r_bloomKnee ? r_bloomKnee->value : 0.5f;
+	frag_spec_data.tonemap_mode = r_tonemap ? r_tonemap->integer : 2;
+	frag_spec_data.apply_srgb_gamma = 0;
+	frag_spec_data.post_debug = r_post_debug ? r_post_debug->integer : 0;
+	frag_spec_data.postprocess_enabled = ( r_post && r_post->integer ) ? 1 : 0;
 
 	if ( !vk_surface_format_color_depth( vk.present_format.format, &frag_spec_data.depth_r, &frag_spec_data.depth_g, &frag_spec_data.depth_b ) )
 		ri.Printf( PRINT_ALL, "Format %s not recognized, dither to assume 8bpc\n", vk_format_string( vk.base_format.format ) );
@@ -6217,8 +6284,8 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	spec_entries[0].size = sizeof( frag_spec_data.gamma );
 
 	spec_entries[1].constantID = 1;
-	spec_entries[1].offset = offsetof( struct PostProcess_FragSpecData, overbright );
-	spec_entries[1].size = sizeof( frag_spec_data.overbright );
+	spec_entries[1].offset = offsetof( struct PostProcess_FragSpecData, preExposureScale );
+	spec_entries[1].size = sizeof( frag_spec_data.preExposureScale );
 
 	spec_entries[2].constantID = 2;
 	spec_entries[2].offset = offsetof( struct PostProcess_FragSpecData, greyscale );
@@ -6249,14 +6316,38 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	spec_entries[8].size = sizeof( frag_spec_data.depth_r );
 
 	spec_entries[9].constantID = 9;
-	spec_entries[9].offset = offsetof(struct PostProcess_FragSpecData, depth_g);
-	spec_entries[9].size = sizeof(frag_spec_data.depth_g);
+	spec_entries[9].offset = offsetof( struct PostProcess_FragSpecData, depth_g );
+	spec_entries[9].size = sizeof( frag_spec_data.depth_g );
 
 	spec_entries[10].constantID = 10;
-	spec_entries[10].offset = offsetof(struct PostProcess_FragSpecData, depth_b);
-	spec_entries[10].size = sizeof(frag_spec_data.depth_b);
+	spec_entries[10].offset = offsetof( struct PostProcess_FragSpecData, depth_b );
+	spec_entries[10].size = sizeof( frag_spec_data.depth_b );
 
-	frag_spec_info.mapEntryCount = 11;
+	spec_entries[11].constantID = 11;
+	spec_entries[11].offset = offsetof( struct PostProcess_FragSpecData, exposure );
+	spec_entries[11].size = sizeof( frag_spec_data.exposure );
+
+	spec_entries[12].constantID = 12;
+	spec_entries[12].offset = offsetof( struct PostProcess_FragSpecData, bloom_knee );
+	spec_entries[12].size = sizeof( frag_spec_data.bloom_knee );
+
+	spec_entries[13].constantID = 13;
+	spec_entries[13].offset = offsetof( struct PostProcess_FragSpecData, tonemap_mode );
+	spec_entries[13].size = sizeof( frag_spec_data.tonemap_mode );
+
+	spec_entries[14].constantID = 14;
+	spec_entries[14].offset = offsetof( struct PostProcess_FragSpecData, apply_srgb_gamma );
+	spec_entries[14].size = sizeof( frag_spec_data.apply_srgb_gamma );
+
+	spec_entries[15].constantID = 15;
+	spec_entries[15].offset = offsetof( struct PostProcess_FragSpecData, post_debug );
+	spec_entries[15].size = sizeof( frag_spec_data.post_debug );
+
+	spec_entries[16].constantID = 36;
+	spec_entries[16].offset = offsetof( struct PostProcess_FragSpecData, postprocess_enabled );
+	spec_entries[16].size = sizeof( frag_spec_data.postprocess_enabled );
+
+	frag_spec_info.mapEntryCount = 17;
 	frag_spec_info.pMapEntries = spec_entries;
 	frag_spec_info.dataSize = sizeof( frag_spec_data );
 	frag_spec_info.pData = &frag_spec_data;
@@ -7226,6 +7317,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	ADD_FRAG_SPEC( 27, anisotropy_texture_set );
 	ADD_FRAG_SPEC( 28, transmission_texture_set );
 	ADD_FRAG_SPEC( 29, subsurface_texture_set );
+	ADD_FRAG_SPEC( 30, deluxe_mapping );
+	ADD_FRAG_SPEC( 31, deluxe_specular_scale );
 
 	// only use w value, specgloss maps are not supported
 	frag_spec_data.specularScale_x = def->specularScale[0];
@@ -7238,32 +7331,52 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	frag_spec_data.normalScale_z = def->normalScale[2];
 	frag_spec_data.normalScale_w = def->normalScale[3];
 
-	frag_spec_data.normal_texture_set = 0;
-	frag_spec_data.physical_texture_set = 0;
-	frag_spec_data.env_texture_set = 0;
-	frag_spec_data.lightmap_texture_set = 0;
-	frag_spec_data.irradiance_texture_set = 0;
-	frag_spec_data.emissive_texture_set = 0;
-	frag_spec_data.clearcoat_texture_set = 0;
-	frag_spec_data.sheen_texture_set = 0;
-	frag_spec_data.anisotropy_texture_set = 0;
-	frag_spec_data.transmission_texture_set = 0;
-	frag_spec_data.subsurface_texture_set = 0;
+	frag_spec_data.normal_texture_set = -1;
+	frag_spec_data.physical_texture_set = -1;
+	frag_spec_data.env_texture_set = -1;
+	frag_spec_data.lightmap_texture_set = -1;
+	frag_spec_data.irradiance_texture_set = -1;
+	frag_spec_data.emissive_texture_set = -1;
+	frag_spec_data.clearcoat_texture_set = -1;
+	frag_spec_data.sheen_texture_set = -1;
+	frag_spec_data.anisotropy_texture_set = -1;
+	frag_spec_data.transmission_texture_set = -1;
+	frag_spec_data.subsurface_texture_set = -1;
 
-	if ( ( def->vk_pbr_flags & PBR_HAS_NORMALMAP ) == 0 )
-		frag_spec_data.normal_texture_set = -1;
-
-	if ( ( def->vk_pbr_flags & PBR_HAS_PHYSICALMAP ) == 0 )
-		frag_spec_data.physical_texture_set = -1;
+	if ( def->vk_pbr_flags & PBR_HAS_NORMALMAP )
+		frag_spec_data.normal_texture_set = 0;
 
 	if ( def->vk_pbr_flags & PBR_HAS_SPECULARMAP )
 		frag_spec_data.physical_texture_set = 1;
+	else if ( def->vk_pbr_flags & PBR_HAS_PHYSICALMAP )
+		frag_spec_data.physical_texture_set = 0;
 
-	if ( !vk.cubemapActive )
-		frag_spec_data.env_texture_set = -1;
+	if ( vk.cubemapActive )
+		frag_spec_data.env_texture_set = 0;
 
-	if ( ( def->vk_pbr_flags & PBR_HAS_LIGHTMAP ) == 0 )
-		frag_spec_data.lightmap_texture_set = -1;
+	if ( def->vk_pbr_flags & PBR_HAS_LIGHTMAP )
+		frag_spec_data.lightmap_texture_set = 0;
+
+	if ( def->vk_pbr_flags & PBR_HAS_IRRADIANCE )
+		frag_spec_data.irradiance_texture_set = 0;
+
+	if ( def->vk_pbr_flags & PBR_HAS_EMISSIVE )
+		frag_spec_data.emissive_texture_set = 0;
+
+	if ( def->vk_pbr_flags & PBR_HAS_CLEARCOAT )
+		frag_spec_data.clearcoat_texture_set = 0;
+
+	if ( def->vk_pbr_flags & PBR_HAS_SHEEN )
+		frag_spec_data.sheen_texture_set = 0;
+
+	if ( def->vk_pbr_flags & PBR_HAS_ANISOTROPY )
+		frag_spec_data.anisotropy_texture_set = 0;
+
+	if ( def->vk_pbr_flags & PBR_HAS_TRANSMISSION )
+		frag_spec_data.transmission_texture_set = 0;
+
+	if ( def->vk_pbr_flags & PBR_HAS_SUBSURFACE )
+		frag_spec_data.subsurface_texture_set = 0;
 #ifdef HDR_DELUXE_LIGHTMAP
 	if ( r_deluxeMapping->integer )
 	{
@@ -7789,7 +7902,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 		attachment_blend_state.colorBlendOp = VK_BLEND_OP_ADD;
 		attachment_blend_state.alphaBlendOp = VK_BLEND_OP_ADD;
 
-		if ( def->allow_discard && vkSamples != VK_SAMPLE_COUNT_1_BIT ) {
+		if ( def->allow_discard ) {
 			// try to reduce pixel fillrate for transparent surfaces, this yields 1..10% fps increase when multisampling in enabled
 			if ( attachment_blend_state.srcColorBlendFactor == VK_BLEND_FACTOR_SRC_ALPHA && attachment_blend_state.dstColorBlendFactor == VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA ) {
 				frag_spec_data.discard_mode = 1;
@@ -7797,6 +7910,27 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 				frag_spec_data.discard_mode = 2;
 			}
 		}
+	}
+
+	if ( r_vk_pipeline_debug && r_vk_pipeline_debug->integer ) {
+		ri.Printf( PRINT_DEVELOPER, "vk pipeline def#%u render_pass=%u shader=%u fog=%d state=0x%x allow_discard=%d discard_mode=%d\n",
+			def_index, renderPassIndex, def->shader_type, def->fog_stage, def->state_bits, def->allow_discard, frag_spec_data.discard_mode );
+#ifdef USE_VK_PBR
+		if ( def->vk_pbr_flags ) {
+			ri.Printf( PRINT_DEVELOPER, "vk pipeline PBR spec consts [19=%d 20=%d 21=%d 22=%d 23=%d 24=%d 25=%d 26=%d 27=%d 28=%d 29=%d]\n",
+				frag_spec_data.normal_texture_set,
+				frag_spec_data.physical_texture_set,
+				frag_spec_data.env_texture_set,
+				frag_spec_data.lightmap_texture_set,
+				frag_spec_data.irradiance_texture_set,
+				frag_spec_data.emissive_texture_set,
+				frag_spec_data.clearcoat_texture_set,
+				frag_spec_data.sheen_texture_set,
+				frag_spec_data.anisotropy_texture_set,
+				frag_spec_data.transmission_texture_set,
+				frag_spec_data.subsurface_texture_set );
+		}
+#endif
 	}
 
 	blend_state.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
@@ -8375,6 +8509,7 @@ void vk_bind_lighting( int stage, int bundle )
 void vk_reset_descriptor( int index )
 {
 	vk.cmd->descriptor_set.current[ index ] = VK_NULL_HANDLE;
+	vk.cmd->descriptor_set.image[ index ] = NULL;
 }
 
 
@@ -8416,8 +8551,44 @@ void vk_bind_descriptor_sets( void )
 	for ( i = start + 1; i < end; i++ ) {
 		if ( vk.cmd->descriptor_set.current[i] == VK_NULL_HANDLE ) {
 			vk.cmd->descriptor_set.current[i] = tr.whiteImage->descriptor;
+			vk.cmd->descriptor_set.image[i] = tr.whiteImage;
 		}
 	}
+
+#ifdef USE_VK_PBR
+	if ( r_vk_pipeline_debug && r_vk_pipeline_debug->integer && vk.cmd ) {
+		struct {
+			int index;
+			const char *name;
+		} pbr_descs[] = {
+			{ VK_DESC_PBR_NORMAL, "normal" },
+			{ VK_DESC_PBR_PHYSICAL, "physical" },
+			{ VK_DESC_PBR_CUBEMAP, "env" },
+			{ VK_DESC_PBR_IRRADIANCE, "irradiance" }
+		};
+
+		ri.Printf( PRINT_DEVELOPER, "vk bind descriptors PBR\n" );
+		for ( int desc_index = 0; desc_index < (int)ARRAY_LEN(pbr_descs); desc_index++ ) {
+			int index = pbr_descs[desc_index].index;
+			const char *name = pbr_descs[desc_index].name;
+			const image_t *img = vk.cmd->descriptor_set.image[index];
+			const char *source = img ? img->imgName : "none";
+			const char *tag = "missing";
+			if ( img == tr.whiteImage ) {
+				tag = "fallback";
+			} else if ( img != NULL ) {
+				tag = "source";
+			}
+			ri.Printf( PRINT_DEVELOPER, "  %s desc=%p view=%p sampler=%p %s(%s)\n",
+				name,
+				(void*)vk.cmd->descriptor_set.current[index],
+				(void*)(img ? img->view : VK_NULL_HANDLE),
+				(void*)(img ? img->vk_sampler : VK_NULL_HANDLE),
+				tag,
+				source );
+		}
+	}
+#endif
 
 	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout, start, count, vk.cmd->descriptor_set.current + start, offset_count, offsets );
 
@@ -8674,8 +8845,6 @@ void vk_begin_cubemap_render_pass( void )
     vk.renderScaleX = vk.renderScaleY = 1.0f;
 
     vk_begin_render_pass(vk.render_pass.cubemap, frameBuffer, qtrue, vk.renderWidth, vk.renderHeight);
-
-    Com_Printf("render cube face %d\n", backEnd.viewParms.targetCubeLayer );
 }
 
 #endif
@@ -8729,6 +8898,42 @@ void vk_create_brfdlut( void )
     end_command_buffer( command_buffer, __func__  );
 }
 #endif
+
+void vk_validate_pbr_ibl_resources( void )
+{
+#ifdef USE_VK_PBR
+	if ( !vk.pbrActive ) {
+		return;
+	}
+
+	{
+		const qboolean brdfLutReady = ( vk.brdflut_image != VK_NULL_HANDLE &&
+			vk.brdflut_image_view != VK_NULL_HANDLE &&
+			vk.brdflut_image_descriptor != VK_NULL_HANDLE );
+		const qboolean emptyCubemapReady = ( tr.emptyCubemap != NULL &&
+			tr.emptyCubemap->descriptor != VK_NULL_HANDLE );
+
+		ri.Printf( PRINT_ALL, "[VK] PBR IBL: BRDF LUT %s, empty cubemap fallback %s\n",
+			brdfLutReady ? "ready" : "missing",
+			emptyCubemapReady ? "ready" : "missing" );
+
+#ifdef VK_CUBEMAP
+		ri.Printf( PRINT_ALL, "[VK] PBR IBL: runtime cubemap path %s\n",
+			vk.cubemapActive ? "enabled" : "disabled" );
+		if ( vk.cubemapActive && tr.numCubemaps == 0 ) {
+			ri.Printf( PRINT_ALL, "[VK] PBR IBL: no map cubemaps loaded at startup, using fallback until available\n" );
+		}
+#endif
+
+		if ( !brdfLutReady ) {
+			ri.Printf( PRINT_WARNING, "PBR IBL: BRDF LUT resources are incomplete, split-sum specular may fallback\n" );
+		}
+		if ( !emptyCubemapReady ) {
+			ri.Printf( PRINT_WARNING, "PBR IBL: empty cubemap fallback is missing\n" );
+		}
+	}
+#endif
+}
 
 void vk_end_render_pass( void )
 {
@@ -9042,6 +9247,17 @@ void vk_end_frame( void )
 			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.gamma_pipeline );
 			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
 
+			VkPostProcessPushConstants panini_push = { 0 };
+			panini_push.aspect = vk.renderHeight > 0 ? ( (float)vk.renderWidth / (float)vk.renderHeight ) : 1.0f;
+			panini_push.paniniD = r_paniniD ? r_paniniD->value : 0.0f;
+			panini_push.paniniS = r_paniniS ? r_paniniS->value : 0.0f;
+			panini_push.brightness = r_paniniBrightness ? r_paniniBrightness->value : 1.0f;
+			panini_push.circleMix = 0.0f;
+			panini_push.overdraw = 0.0f;
+			panini_push.paniniMask = r_panini ? r_panini->value : 0.0f;
+
+			qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_post_process, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( panini_push ), &panini_push );
+
 			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 		}
 	}
@@ -9117,8 +9333,18 @@ void vk_present_frame( void )
 {
 	VkPresentInfoKHR present_info;
 	VkResult res;
+	VkExtent2D new_extent;
+	qboolean new_extent_valid;
 
 	if ( ri.CL_IsMinimized() || !vk.cmd->swapchain_image_acquired ) {
+		return;
+	}
+
+	if ( gls.windowWidth == 0 || gls.windowHeight == 0 ) {
+		return;
+	}
+
+	if ( vk.swapchain_extent_valid && ( vk.swapchain_extent.width == 0 || vk.swapchain_extent.height == 0 ) ) {
 		return;
 	}
 
@@ -9143,8 +9369,18 @@ void vk_present_frame( void )
 		case VK_SUCCESS:
 			break;
 		case VK_SUBOPTIMAL_KHR:
+			new_extent_valid = vk_query_surface_extent( &new_extent );
+			vk_log_swapchain_recreation( res, &vk.swapchain_extent, new_extent_valid ? &new_extent : NULL );
+			if ( new_extent_valid && ( !vk.swapchain_extent_valid ||
+					new_extent.width != vk.swapchain_extent.width ||
+					new_extent.height != vk.swapchain_extent.height ) ) {
+				vk_restart_swapchain( __func__, res );
+				return;
+			}
+			break;
 		case VK_ERROR_OUT_OF_DATE_KHR:
-			// swapchain re-creation needed
+			new_extent_valid = vk_query_surface_extent( &new_extent );
+			vk_log_swapchain_recreation( res, &vk.swapchain_extent, new_extent_valid ? &new_extent : NULL );
 			vk_restart_swapchain( __func__, res );
 			return;
 		case VK_ERROR_DEVICE_LOST:

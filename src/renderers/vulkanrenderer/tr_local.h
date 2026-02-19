@@ -48,7 +48,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define MAX_LITSURFS		(MAX_DRAWSURFS)
 #define	MAX_FLARES			256
 
-#define MAX_TEXTURE_SIZE	2048 // must be less or equal to 32768
+#define MAX_TEXTURE_SIZE	32768
 
 #define USE_BUFFER_CLEAR	/* clear attachments on render pass begin */
 
@@ -637,6 +637,7 @@ typedef struct image_s {
 	// Descriptor set that contains single descriptor used to access the given image.
 	// It is updated only once during image initialization.
 	VkDescriptorSet descriptor;
+	VkSampler	 vk_sampler;
 #else
 	GLuint		texnum;				// gl texture binding
 	GLint		internalFormat;
@@ -1084,7 +1085,7 @@ void		R_Modellist_f (void);
 
 //====================================================
 
-#define	MAX_DRAWIMAGES			2048
+#define	MAX_DRAWIMAGES			32768
 #define	MAX_SKINS				1024
 
 
@@ -1448,6 +1449,8 @@ extern cvar_t	*r_pbr;
 extern cvar_t	*r_pbr_shExtract;
 extern cvar_t	*r_pbr_debug;
 extern cvar_t	*r_pbr_packedPreferred;
+extern cvar_t	*r_pbr_multiScatter;
+extern cvar_t	*r_pbr_multiScatterStrength;
 #ifdef VK_CUBEMAP
 extern cvar_t	*r_pbr_iblIrradianceSize;
 extern cvar_t	*r_pbr_iblPrefilterSize;
@@ -1481,6 +1484,7 @@ extern cvar_t	*r_bloom_threshold;
 extern cvar_t	*r_bloom_intensity;
 extern cvar_t	*r_bloom_threshold_mode;
 extern cvar_t	*r_bloom_modulate;
+extern cvar_t	*r_bloomKnee;
 extern cvar_t	*r_ext_multisample;
 extern cvar_t	*r_ext_supersample;
 //extern cvar_t	*r_ext_alpha_to_coverage;
@@ -1503,6 +1507,16 @@ extern	cvar_t	*r_nocurves;
 extern	cvar_t	*r_showcluster;
 
 extern cvar_t	*r_gamma;
+extern cvar_t	*r_panini;
+extern cvar_t	*r_paniniD;
+extern cvar_t	*r_paniniS;
+extern cvar_t	*r_paniniBrightness;
+extern cvar_t	*r_post;
+extern cvar_t	*r_post_debug;
+extern cvar_t	*r_exposure;
+extern cvar_t	*r_tonemap;
+extern cvar_t	*r_vk_swapchain_srgb;
+extern cvar_t	*r_vk_pipeline_debug;
 
 extern	cvar_t	*r_nobind;						// turns off binding to appropriate textures
 extern	cvar_t	*r_singleShader;				// make most world faces use default shader
@@ -1512,6 +1526,7 @@ extern	cvar_t	*r_picmip;						// controls picmip values
 extern	cvar_t	*r_nomip;						// apply picmip only on worldspawn textures
 extern	cvar_t	*r_finish;
 extern	cvar_t	*r_textureMode;
+extern	cvar_t	*r_mipLodBias;
 extern	cvar_t	*r_offsetFactor;
 extern	cvar_t	*r_offsetUnits;
 

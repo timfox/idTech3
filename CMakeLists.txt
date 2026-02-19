@@ -548,6 +548,7 @@ endif()
 
 if(USE_FLAC)
   if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/external/src/flac/CMakeLists.txt")
+    set(BUILD_DOCS OFF CACHE BOOL "" FORCE)
     set(BUILD_CXXLIBS OFF CACHE BOOL "" FORCE)
     set(BUILD_PROGRAMS OFF CACHE BOOL "" FORCE)
     set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
@@ -758,6 +759,19 @@ set(EXTERNAL_JPEG_SRC_DIR "${EXTERNAL_SRC}/jpeg")
 set(EXTERNAL_ZLIB_SRC "${EXTERNAL_SRC}/zlib")
 set(EXTERNAL_LIBPNG_SRC "${EXTERNAL_SRC}/libpng")
 set(EXTERNAL_GLM_INCLUDE "${EXTERNAL_SRC}/glm")
+
+if(UNIX AND NOT APPLE)
+  find_package(X11 REQUIRED)
+  if(TARGET X11::X11)
+    set(IDTECH3_X11_LIBS X11::X11)
+  else()
+    set(IDTECH3_X11_LIBS ${X11_LIBRARIES})
+  endif()
+  set(IDTECH3_X11_INCLUDE ${X11_INCLUDE_DIR})
+else()
+  set(IDTECH3_X11_LIBS "")
+  set(IDTECH3_X11_INCLUDE "")
+endif()
 
 # Add cflux2 external library
 if(USE_FLUX)
@@ -1101,6 +1115,42 @@ AUX_SOURCE_DIRECTORY(src/renderers/vulkanrenderer RENDERER_VK_SRCS)
 list(APPEND RENDERER_VK_SRCS
     src/renderers/vulkanrenderer/utils/mikktspace/mikktspace.c
 )
+set(VK_SHADER_DIR "${CMAKE_SOURCE_DIR}/src/renderers/vulkanrenderer/shaders")
+set(VK_SPIRV_DIR "${VK_SHADER_DIR}/spirv")
+set(VK_GEN_DIR "${VK_SPIRV_DIR}/generated")
+
+set(VK_SHADER_DATA_GEN "${VK_GEN_DIR}/shader_data.c")
+set(VK_SHADER_BINDING_GEN "${VK_GEN_DIR}/shader_binding.c")
+set(VK_SHADER_GENERATED_SRCS ${VK_SHADER_DATA_GEN} ${VK_SHADER_BINDING_GEN})
+
+file(GLOB VK_SHADER_GLSL_FILES
+  "${VK_SHADER_DIR}/glsl/*.frag"
+  "${VK_SHADER_DIR}/glsl/*.vert"
+  "${VK_SHADER_DIR}/glsl/*.geom"
+  "${VK_SHADER_DIR}/glsl/*.tmpl"
+)
+
+set(VK_SHADER_TOOL_SOURCES
+  "${VK_SHADER_DIR}/tools/bin2hex.c"
+  "${VK_SHADER_DIR}/tools/bindshader.c"
+)
+
+add_custom_command(
+  OUTPUT ${VK_SHADER_GENERATED_SRCS}
+  COMMAND "${CMAKE_SOURCE_DIR}/scripts/compile_shaders.sh"
+          --generated-dir "${VK_GEN_DIR}"
+  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+  DEPENDS
+    "${CMAKE_SOURCE_DIR}/scripts/compile_shaders.sh"
+    ${VK_SHADER_GLSL_FILES}
+    ${VK_SHADER_TOOL_SOURCES}
+  COMMENT "Generating Vulkan shader blobs"
+  VERBATIM
+)
+
+add_custom_target(vk_shaders_autogen
+  DEPENDS ${VK_SHADER_GENERATED_SRCS}
+)
 # Suppress shadow warnings for MikkTSpace third-party code
 if(MSVC)
     set_source_files_properties(src/renderers/vulkanrenderer/utils/mikktspace/mikktspace.c PROPERTIES
@@ -1132,6 +1182,7 @@ IF(USE_RENDERER_DLOPEN)
 
 	ADD_LIBRARY(${RENDERER_PREFIX}_vulkan${RENDEXT} SHARED ${RENDERER_VK_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
 	TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_RENDERER_DLOPEN RENDERER_VULKAN)
+	add_dependencies(${RENDERER_PREFIX}_vulkan${RENDEXT} vk_shaders_autogen)
 	IF(BUILD_FREETYPE)
 		target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE idtech3_freetype)
 	ENDIF()
@@ -1162,6 +1213,7 @@ ELSE()
 	IF(USE_VULKAN)
 		ADD_LIBRARY(${RENDERER_PREFIX}_vulkan OBJECT ${RENDERER_VK_SRCS} ${RENDERER_COMMON_SRCS})
 		TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan PRIVATE RENDERER_VULKAN)
+		add_dependencies(${RENDERER_PREFIX}_vulkan vk_shaders_autogen)
 		IF(BUILD_FREETYPE)
 			target_link_libraries(${RENDERER_PREFIX}_vulkan PRIVATE idtech3_freetype)
 		ENDIF()
@@ -1447,3 +1499,31 @@ ELSE()
 	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE m ${CMAKE_DL_LIBS})
 	TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE m ${CMAKE_DL_LIBS})
 ENDIF()
+
+if(UNIX AND NOT APPLE AND IDTECH3_X11_LIBS)
+	if(IDTECH3_X11_INCLUDE)
+		target_include_directories(${CNAME}${BINEXT} PRIVATE ${IDTECH3_X11_INCLUDE})
+		target_include_directories(${DNAME}${BINEXT} PRIVATE ${IDTECH3_X11_INCLUDE})
+	endif()
+	target_link_libraries(${CNAME}${BINEXT} PRIVATE ${IDTECH3_X11_LIBS})
+	target_link_libraries(${DNAME}${BINEXT} PRIVATE ${IDTECH3_X11_LIBS})
+endif()
+
+# Deterministic Vulkan shader codegen/check tooling.
+# Usage:
+#   cmake --build <build-dir> --target vk_shader_regen
+#   cmake --build <build-dir> --target vk_shader_check
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+	add_custom_target(vk_shader_regen
+		COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/vk_shader_tool.py regen
+		WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+		COMMENT "Regenerating Vulkan shader_data.c and shader_binding.c deterministically")
+
+	add_custom_target(vk_shader_check
+		COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/vk_shader_tool.py check --ref HEAD
+		WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+		COMMENT "Checking Vulkan generated shader blobs are up-to-date with GLSL")
+else()
+	message(STATUS "Python3 not found: vk_shader_regen/vk_shader_check targets are unavailable.")
+endif()
