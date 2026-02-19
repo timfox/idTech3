@@ -1245,6 +1245,7 @@ typedef struct {
 
 	qboolean screenMapDone;
 	qboolean doneBloom;
+	qboolean doneFog;
 
 } backEndState_t;
 
@@ -1515,6 +1516,13 @@ extern cvar_t	*r_post;
 extern cvar_t	*r_post_debug;
 extern cvar_t	*r_exposure;
 extern cvar_t	*r_tonemap;
+extern cvar_t	*r_volumetricFog;
+extern cvar_t	*r_volumetricFogDensity;
+extern cvar_t	*r_volumetricFogHeightFalloff;
+extern cvar_t	*r_volumetricFogAniso;
+extern cvar_t	*r_volumetricFogSteps;
+extern cvar_t	*r_volumetricFogJitter;
+extern cvar_t	*r_volumetricFogTemporalWeight;
 extern cvar_t	*r_vk_swapchain_srgb;
 extern cvar_t	*r_vk_pipeline_debug;
 

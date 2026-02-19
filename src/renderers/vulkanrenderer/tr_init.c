@@ -1921,6 +1921,40 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_post_debug, "Debug view for the post-process pass: 0=final, 1=pre-tonemap HDR, 2=luminance heatmap." );
 	ri.Cvar_SetGroup( r_post_debug, CVG_RENDERER );
 
+	r_volumetricFog = ri.Cvar_Get( "r_volumetricFog", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_volumetricFog, "Enable the volumetric fog compute/composite passes before tonemapping." );
+	ri.Cvar_SetGroup( r_volumetricFog, CVG_RENDERER );
+
+	r_volumetricFogDensity = ri.Cvar_Get( "r_volumetricFogDensity", "0.35", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogDensity, "0", "5", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogDensity, "Fog density multiplier for the volumetric fog pass." );
+	ri.Cvar_SetGroup( r_volumetricFogDensity, CVG_RENDERER );
+
+	r_volumetricFogHeightFalloff = ri.Cvar_Get( "r_volumetricFogHeightFalloff", "0.4", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogHeightFalloff, "0", "5", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogHeightFalloff, "Controls vertical falloff of density for the height fog component." );
+	ri.Cvar_SetGroup( r_volumetricFogHeightFalloff, CVG_RENDERER );
+
+	r_volumetricFogAniso = ri.Cvar_Get( "r_volumetricFogAniso", "0.6", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogAniso, "-0.999", "0.999", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogAniso, "Henyey-Greenstein anisotropy factor (positive = forward scattering, negative = backward)." );
+	ri.Cvar_SetGroup( r_volumetricFogAniso, CVG_RENDERER );
+
+	r_volumetricFogSteps = ri.Cvar_Get( "r_volumetricFogSteps", "32", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogSteps, "1", "64", CV_INTEGER );
+	ri.Cvar_SetDescription( r_volumetricFogSteps, "Raymarch steps per pixel when compositing volumetric fog." );
+	ri.Cvar_SetGroup( r_volumetricFogSteps, CVG_RENDERER );
+
+	r_volumetricFogJitter = ri.Cvar_Get( "r_volumetricFogJitter", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogJitter, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogJitter, "Introduces sub-pixel jitter to the fog raymarch samples." );
+	ri.Cvar_SetGroup( r_volumetricFogJitter, CVG_RENDERER );
+
+	r_volumetricFogTemporalWeight = ri.Cvar_Get( "r_volumetricFogTemporalWeight", "0.85", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogTemporalWeight, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogTemporalWeight, "History blend weight for temporal reprojection (0 = no history)." );
+	ri.Cvar_SetGroup( r_volumetricFogTemporalWeight, CVG_RENDERER );
+
 	r_vk_swapchain_srgb = ri.Cvar_Get( "r_vk_swapchain_srgb", "0", CVAR_ROM );
 	ri.Cvar_SetDescription( r_vk_swapchain_srgb, "Read-only: 1 if the selected Vulkan swapchain format is sRGB." );
 

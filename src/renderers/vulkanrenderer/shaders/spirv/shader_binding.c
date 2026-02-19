@@ -219,4 +219,10 @@ void vk_bind_generated_shaders( void ){
     vk_set_shader_name( vk.modules.frag.gen[1][2][0][1], "frag_pbr_tx2_fog" );
     vk.modules.frag.gen[1][2][1][1] = SHADER_MODULE( frag_pbr_tx2_cl_fog );
     vk_set_shader_name( vk.modules.frag.gen[1][2][1][1], "frag_pbr_tx2_cl_fog" );
+    vk.modules.volumetric_fog_vs = SHADER_MODULE( volumetric_fog_vs );
+    vk_set_shader_name( vk.modules.volumetric_fog_vs, "volumetric_fog_vs" );
+    vk.modules.volumetric_fog_fs = SHADER_MODULE( volumetric_fog_fs );
+    vk_set_shader_name( vk.modules.volumetric_fog_fs, "volumetric_fog_fs" );
+    vk.modules.volumetric_fog_cs = SHADER_MODULE( volumetric_fog_cs );
+    vk_set_shader_name( vk.modules.volumetric_fog_cs, "volumetric_fog_cs" );
 }
