@@ -36,6 +36,7 @@ layout(set = 0, binding = 0) uniform UBO {
 	vec4 pbrSubsurfaceColor;
 	vec4 pbrSubsurfaceParams;
 	vec4 pbrAdvancedParams; // x: multi-scatter toggle, y: multi-scatter strength
+	vec4 pbrDebugMode; // x: debug mode selector
 	vec4 pbrShCoeffs[9];
 #endif
 //#endif
@@ -254,7 +255,10 @@ vec3 CalcIBLContribution( in float roughness, in vec3 N, in vec3 E,
 	vec3 R = reflect(-E, N);
 	R.y *= -1.0f;
 	
-	vec3 cubeLightColor = textureLod(env_texture, R, roughness * 6).rgb * 1.0;
+	uint envLevels = textureQueryLevels(env_texture);
+	float maxEnvLod = (envLevels > 0u) ? float(envLevels - 1u) : 0.0;
+	float envLod = min( roughness * 6.0, maxEnvLod );
+	vec3 cubeLightColor = textureLod(env_texture, R, envLod).rgb;
 	vec2 EnvBRDF = texture(brdflut_texture, vec2(NE, 1.0 - roughness)).rg;
 	vec3 FssEss = (specular.rgb * EnvBRDF.x + EnvBRDF.y);
 
@@ -787,8 +791,6 @@ void main() {
 		}
 	#endif
 
-	lightColor *= PI;
-
 	vec4 specular = vec4( 0.04, 0.04, 0.04, 1.0 );
 	float roughness = 0.99;
 	float metalness = 0.0;
@@ -866,16 +868,51 @@ void main() {
 
 	vec3 reflectance = Fd + Fs;
 
-	out_color.rgb  = lightColor * reflectance * ( attenuation * NL );
-	out_color.rgb += ambientColor * diffuse.rgb * kD;
-
-	// diffuse IBL (SH + irradiance)
+	vec3 directLighting = lightColor * reflectance * ( attenuation * NL );
+	vec3 ambientContribution = ambientColor * diffuse.rgb * kD;
+	vec3 diffuseIrradiance = vec3( 0.0 );
 	if ( irradiance_texture_set >= 0 ) {
-		out_color.rgb += CalcDiffuseIrradiance( N ) * diffuse.rgb * AO * kD;
+		diffuseIrradiance = CalcDiffuseIrradiance( N ) * diffuse.rgb * AO * kD;
+	}
+	vec3 iblSpec = vec3( 0.0 );
+	if ( env_texture_set >= 0 ) {
+		iblSpec = CalcIBLContribution( roughness, N, E, NE, specular.rgb * AO );
 	}
 
-	if ( env_texture_set >= 0 )
-		out_color.rgb += CalcIBLContribution( roughness, N, E, NE, specular.rgb * AO );
+	vec3 debugDir = reflect( -E, N );
+	debugDir.y *= -1.0;
+	int debugMode = int( pbrDebugMode.x + 0.5 );
+	if ( debugMode != 0 ) {
+		vec3 envDebugSample = vec3( 0.0 );
+		vec3 irrDebugSample = vec3( 0.0 );
+		if ( env_texture_set >= 0 ) {
+			envDebugSample = textureLod( env_texture, debugDir, 0.0 ).rgb;
+		}
+		if ( irradiance_texture_set >= 0 ) {
+			irrDebugSample = texture( irradiance_texture, debugDir ).rgb;
+		}
+		vec3 debugColor = vec3( 0.0 );
+		if ( debugMode == 1 ) {
+			debugColor = directLighting;
+		} else if ( debugMode == 2 ) {
+			debugColor = iblSpec;
+		} else if ( debugMode == 3 ) {
+			debugColor = diffuseIrradiance;
+		} else if ( debugMode == 4 ) {
+			debugColor = mix( envDebugSample, irrDebugSample, 0.5 );
+		}
+		out_color = vec4( debugColor, 1.0 );
+		return;
+	}
+
+	out_color.rgb = directLighting;
+	out_color.rgb += ambientContribution;
+	if ( irradiance_texture_set >= 0 ) {
+		out_color.rgb += diffuseIrradiance;
+	}
+	if ( env_texture_set >= 0 ) {
+		out_color.rgb += iblSpec;
+	}
 
 	// legacy approximation kept intentionally for Step 2 scope containment.
 	// Step 2b pending: Disney clearcoat/sheen energy normalization.

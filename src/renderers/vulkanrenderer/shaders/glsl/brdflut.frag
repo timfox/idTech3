@@ -8,17 +8,6 @@ layout(location = 0) out vec4 out_color;
 const float PI = 3.1415926535897932384626433832795;
 const uint NUM_SAMPLES = 1024u;
 
-// Based on http://byteblacksmith.com/improvements-to-the-canonical-one-liner-glsl-rand-for-opengl-es-2-0/
-float random(vec2 co)
-{
-	float a = 12.9898;
-	float b = 78.233;
-	float c = 43758.5453;
-	float dt= dot(co.xy ,vec2(a,b));
-	float sn= mod(dt,3.14);
-	return fract(sin(sn) * c);
-}
-
 vec2 hammersley2d(uint i, uint N) 
 {
 	// Radical inverse based on http://holger.dammertz.org/stuff/notes_HammersleyOnHemisphere.html
@@ -42,9 +31,9 @@ vec3 importanceSample_GGX(vec2 Xi, float roughness, vec3 normal)
 {
 	// Maps a 2D point to a hemisphere with spread based on roughness
 	float alpha = alphaFromRoughness(roughness);
-	float phi = 2.0 * PI * Xi.x + random(normal.xz) * 0.1;
-	float cosTheta = sqrt((1.0 - Xi.y) / (1.0 + (alpha*alpha - 1.0) * Xi.y));
-	float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
+	float phi = 2.0 * PI * Xi.x;
+	float cosTheta = sqrt((1.0 - Xi.y) / (1.0 + (alpha - 1.0) * Xi.y));
+	float sinTheta = sqrt(max(1.0 - cosTheta * cosTheta, 0.0));
 	vec3 H = vec3(sinTheta * cos(phi), sinTheta * sin(phi), cosTheta);
 
 	// Tangent space
@@ -60,7 +49,7 @@ vec3 importanceSample_GGX(vec2 Xi, float roughness, vec3 normal)
 float G_SchlicksmithGGX(float dotNL, float dotNV, float roughness)
 {
 	float alpha = alphaFromRoughness(roughness);
-	float k = (alpha * alpha) / 2.0;
+	float k = alpha * 0.5;
 	float GL = dotNL / (dotNL * (1.0 - k) + k);
 	float GV = dotNV / (dotNV * (1.0 - k) + k);
 	return GL * GV;
@@ -85,7 +74,7 @@ vec2 BRDF(float NoV, float roughness)
 
 		if (dotNL > 0.0) {
 			float G = G_SchlicksmithGGX(dotNL, dotNV, roughness);
-			float G_Vis = (G * dotVH) / (dotNH * dotNV);
+			float G_Vis = (G * dotVH) / max(dotNH * dotNV, 1e-4);
 			float Fc = pow(1.0 - dotVH, 5.0);
 			LUT += vec2((1.0 - Fc) * G_Vis, Fc * G_Vis);
 		}
