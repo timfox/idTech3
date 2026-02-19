@@ -23,10 +23,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "client.h"
 
-static void Con_UpdatePaniniConsoleState( void ) {
-	Cvar_SetValue( "r_panini_console", ( Key_GetCatcher() & KEYCATCH_CONSOLE ) ? 1.0f : 0.0f );
-}
-
 #define  DEFAULT_CONSOLE_WIDTH 78
 #define  MAX_CONSOLE_WIDTH 120
 
@@ -100,7 +96,6 @@ void Con_ToggleConsole_f( void ) {
 
 	Con_ClearNotify();
 	Key_SetCatcher( Key_GetCatcher() ^ KEYCATCH_CONSOLE );
-	Con_UpdatePaniniConsoleState();
 }
 
 
@@ -430,7 +425,6 @@ void Con_Init( void )
 	Cmd_AddCommand( "messagemode2", Con_MessageMode2_f );
 	Cmd_AddCommand( "messagemode3", Con_MessageMode3_f );
 	Cmd_AddCommand( "messagemode4", Con_MessageMode4_f );
-	Con_UpdatePaniniConsoleState();
 }
 
 
@@ -1003,7 +997,6 @@ void Con_Close( void )
 	Field_Clear( &g_consoleField );
 	Con_ClearNotify();
 	Key_SetCatcher( Key_GetCatcher( ) & ~KEYCATCH_CONSOLE );
-	Con_UpdatePaniniConsoleState();
 	con.finalFrac = 0.0;			// none visible
 	con.displayFrac = 0.0;
 }
