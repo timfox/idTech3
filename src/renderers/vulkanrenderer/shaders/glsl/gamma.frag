@@ -19,7 +19,7 @@ layout(constant_id = 9) const int depth_g = 255;
 layout(constant_id = 10) const int depth_b = 255;
 layout(constant_id = 11) const float exposure = 1.0;
 layout(constant_id = 12) const float bloom_knee = 0.5;
-layout(constant_id = 13) const int tonemap_mode = 1;
+layout(constant_id = 13) const int tonemap_mode = 2;
 layout(constant_id = 14) const int apply_srgb_gamma = 0;
 layout(constant_id = 15) const int post_debug = 0;
 layout(constant_id = 36) const int postprocess_enabled = 1;
@@ -65,7 +65,7 @@ vec3 dither( vec3 color ) {
 	return dithered / depth;
 }
 
-vec3 Tonemap_ACES( vec3 x ) {
+vec3 ACESFilm( vec3 x ) {
 	const float a = 2.51;
 	const float b = 0.03;
 	const float c = 2.43;
@@ -90,11 +90,11 @@ vec3 applyBloomKnee( vec3 color ) {
 }
 
 vec2 panini_project( vec2 uv, float aspect, float d, float s ) {
-float safeAspect = max( aspect, 0.0001 );
-float circleMix = clamp( paniniPC.circleMix, 0.0, 1.0 );
-float aspectMix = mix( safeAspect, 1.0, circleMix );
+	float safeAspect = max( aspect, 0.0001 );
+	float circleMix = clamp( paniniPC.circleMix, 0.0, 1.0 );
+	float aspectMix = mix( safeAspect, 1.0, circleMix );
 
-vec2 p = uv * 2.0 - 1.0;
+	vec2 p = uv * 2.0 - 1.0;
 	p.x *= aspectMix;
 
 	float x2 = p.x * p.x;
@@ -123,6 +123,15 @@ vec2 circle_blend( vec2 uv, float mixValue ) {
 	return mix( uv, circle, clamped );
 }
 
+vec3 doTonemap( vec3 value ) {
+	if ( tonemap_mode == 2 ) {
+		return ACESFilm( value );
+	} else if ( tonemap_mode == 1 ) {
+		return Tonemap_Reinhard( value );
+	}
+	return value;
+}
+
 void main() {
 	vec2 uv = frag_tex_coord;
 
@@ -140,51 +149,35 @@ void main() {
 	uv = clamp( uv, 0.0, 1.0 );
 
 	vec3 hdr = texture( texture0, uv ).rgb;
-	vec3 hdr_exposed = hdr;
+	vec3 hdr_exposed = hdr * max( paniniPC.brightness, 0.0 );
 	if ( postprocess_enabled != 0 ) {
 		hdr_exposed *= exposure;
 		hdr_exposed *= preExposureScale;
-		hdr_exposed *= max( paniniPC.brightness, 0.0 );
+		hdr_exposed = applyBloomKnee( hdr_exposed );
 	}
 
 	vec3 tonemapped = hdr_exposed;
 	if ( postprocess_enabled != 0 ) {
-		tonemapped = applyBloomKnee( tonemapped );
-		if ( tonemap_mode == 2 ) {
-			tonemapped = Tonemap_ACES( tonemapped );
-		} else if ( tonemap_mode == 1 ) {
-			tonemapped = Tonemap_Reinhard( tonemapped );
-		}
+		tonemapped = doTonemap( tonemapped );
 	}
 
 	vec3 ldr;
-	if ( postprocess_enabled != 0 ) {
+	if ( postprocess_enabled != 0 && post_debug != 0 ) {
 		if ( post_debug == 1 ) {
 			ldr = clamp( hdr_exposed, 0.0, 10.0 ) * 0.1;
-		} else if ( post_debug == 2 ) {
+		} else {
 			float lum = max( max( hdr_exposed.r, hdr_exposed.g ), hdr_exposed.b );
 			float logLum = log2( max( lum, 1e-4 ) );
 			float heat = clamp( ( logLum + 6.0 ) / 8.0, 0.0, 1.0 );
 			ldr = vec3( heat, clamp( heat * 0.25, 0.0, 1.0 ), 1.0 - heat );
-		} else {
-			ldr = clamp( tonemapped, 0.0, 1.0 );
-			if ( greyscale == 1.0 ) {
-				ldr = vec3( dot( ldr, sRGB ) );
-			} else if ( greyscale != 0.0 ) {
-				vec3 luma = vec3( dot( ldr, sRGB ) );
-				ldr = mix( ldr, luma, greyscale );
-			}
-			if ( gamma != 1.0 ) {
-				ldr = pow( ldr, vec3( gamma ) );
-			}
-			if ( ditherMode == 1 ) {
-				ldr = dither( ldr );
-			}
 		}
 	} else {
 		ldr = clamp( tonemapped, 0.0, 1.0 );
-		if ( apply_srgb_gamma != 0 ) {
-			ldr = pow( ldr, vec3( 1.0 / 2.2 ) );
+		if ( greyscale == 1.0 ) {
+			ldr = vec3( dot( ldr, sRGB ) );
+		} else if ( greyscale != 0.0 ) {
+			vec3 luma = vec3( dot( ldr, sRGB ) );
+			ldr = mix( ldr, luma, greyscale );
 		}
 		if ( ditherMode == 1 ) {
 			ldr = dither( ldr );
