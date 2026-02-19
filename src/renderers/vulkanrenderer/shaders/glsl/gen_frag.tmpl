@@ -144,24 +144,24 @@ layout (constant_id = 16) const float normalScale_y = 0.0;
 layout (constant_id = 17) const float normalScale_z = 0.0;
 layout (constant_id = 18) const float normalScale_w = 0.0;
 
-layout (constant_id = 19) const int normal_texture_set = 0;
-layout (constant_id = 20) const int physical_texture_set = 0;
-layout (constant_id = 21) const int env_texture_set = 0;
-layout (constant_id = 22) const int lightmap_texture_set = 0;
-layout (constant_id = 23) const int irradiance_texture_set = 0;
-layout (constant_id = 24) const int emissive_texture_set = 0;
-layout (constant_id = 25) const int clearcoat_texture_set = 0;
-layout (constant_id = 26) const int sheen_texture_set = 0;
-layout (constant_id = 27) const int anisotropy_texture_set = 0;
-layout (constant_id = 28) const int transmission_texture_set = 0;
-layout (constant_id = 29) const int subsurface_texture_set = 0;
+layout (constant_id = 19) const int normal_texture_set = -1;
+layout (constant_id = 20) const int physical_texture_set = -1;
+layout (constant_id = 21) const int env_texture_set = -1;
+layout (constant_id = 22) const int lightmap_texture_set = -1;
+layout (constant_id = 23) const int irradiance_texture_set = -1;
+layout (constant_id = 24) const int emissive_texture_set = -1;
+layout (constant_id = 25) const int clearcoat_texture_set = -1;
+layout (constant_id = 26) const int sheen_texture_set = -1;
+layout (constant_id = 27) const int anisotropy_texture_set = -1;
+layout (constant_id = 28) const int transmission_texture_set = -1;
+layout (constant_id = 29) const int subsurface_texture_set = -1;
 
 layout (constant_id = 30) const int deluxe_mapping			= -1; // -1: deluxemapping off, 0: on, 1: on + bound
 layout (constant_id = 31) const float deluxe_specular_scale = 1.0;
 
 vec3 CalcNormal( in vec3 vertexNormal, in vec4 vertexTangent, in vec2 frag_tex_coord )
 {
-	if ( normal_texture_set > -1 ) {
+	if ( normal_texture_set >= 0 ) {
 		vec3 biTangent = vertexTangent.w * cross(vertexNormal, vertexTangent.xyz);
 		vec3 n = texture(normal_texture, frag_tex_coord).agb - vec3(0.5);
 
@@ -302,7 +302,7 @@ vec3 EvalSH9( in vec3 n )
 vec3 CalcDiffuseIrradiance( in vec3 N )
 {
 	vec3 irradiance = EvalSH9( N );
-	if ( irradiance_texture_set > -1 ) {
+	if ( irradiance_texture_set >= 0 ) {
 		vec3 R = N;
 		R.y *= -1.0f;
 		irradiance += texture( irradiance_texture, R ).rgb;
@@ -754,7 +754,7 @@ void main() {
 	#endif
 
 	#if ( defined(USE_TX1) || defined(USE_TX2) )
-		if ( lightmap_texture_set > -1 ) {
+		if ( lightmap_texture_set >= 0 ) {
 			vec3 lightmapColor = texture(texture1, frag_tex_coord1).rgb;
 
 			lightColor = lightmapColor * bias_color;
@@ -779,7 +779,7 @@ void main() {
 	N = CalcNormal( var_Normal.xyz, var_Tangent, frag_tex_coord0 );	
 
 	#if defined(USE_TX1) || defined(USE_TX2)
-		if ( lightmap_texture_set > -1 ) {
+		if ( lightmap_texture_set >= 0 ) {
 			ambientColor = lightColor;
 			float surfNL = clamp(dot(var_Normal.xyz, L), 0.0, 1.0);
 			lightColor /= max( surfNL, 0.25 );
@@ -789,7 +789,7 @@ void main() {
 
 	lightColor *= PI;
 
-	vec4 specular = vec4( 1.0 );
+	vec4 specular = vec4( 0.04, 0.04, 0.04, 1.0 );
 	float roughness = 0.99;
 	float metalness = 0.0;
 	float AO = 1.0;
@@ -799,36 +799,36 @@ void main() {
 	float subsurfaceWrap = pbrSubsurfaceParams.y;
 
 	// metallic roughness workflow
-	if ( physical_texture_set == 0 ) {
-		vec4 ORMS = texture( physical_texture, frag_tex_coord0 );
-		ORMS.xyzw *= vec4( specularScale_z, specularScale_w, specularScale_x, specularScale_y );
-		metalness = clamp( ORMS.z, 0.0, 1.0 );
+	if ( physical_texture_set >= 0 ) {
+		if ( physical_texture_set == 0 ) {
+			vec4 ORMS = texture( physical_texture, frag_tex_coord0 );
+			ORMS.xyzw *= vec4( specularScale_z, specularScale_w, specularScale_x, specularScale_y );
+			metalness = clamp( ORMS.z, 0.0, 1.0 );
 
-		specular.rgb = mix( vec3( 0.08 ) * ORMS.w, diffuse.rgb, metalness );
-		diffuse.rgb *= vec3( 1.0 - metalness );
+			specular.rgb = mix( vec3( 0.08 ) * ORMS.w, diffuse.rgb, metalness );
+			diffuse.rgb *= vec3( 1.0 - metalness );
 
-		roughness = mix( 0.01, 1.0, ORMS.y );
-		AO = min( ORMS.x, AO );
+			roughness = mix( 0.01, 1.0, ORMS.y );
+			AO = min( ORMS.x, AO );
+		}
+		else if ( physical_texture_set == 1 ) {
+			specular = texture( physical_texture, frag_tex_coord0 );
+			specular.rgb *= vec3( specularScale_x, specularScale_y, specularScale_z );
+			roughness = mix( 1.0, 0.01, specular.a * ( 1.0 - specularScale_w ) );
+		}
 	}
 
-	// specular workflow
-	else if( physical_texture_set == 1 ){
-		specular = texture( physical_texture, frag_tex_coord0 );
-		specular.rgb *= vec3( specularScale_x, specularScale_y, specularScale_z );
-		roughness = mix( 1.0, 0.01, specular.a * ( 1.0 - specularScale_w ) );
-	}
-
-	if ( anisotropy_texture_set > -1 ) {
+	if ( anisotropy_texture_set >= 0 ) {
 		float aniso = texture( anisotropy_texture, frag_tex_coord0 ).r * pbrAnisotropyScale.x;
 		roughness = mix( roughness, max( 0.02, roughness * ( 1.0 - aniso ) ), aniso );
 	}
 	roughness = clamp( roughness, 0.02, 1.0 );
 
-	if ( emissive_texture_set > -1 ) {
+	if ( emissive_texture_set >= 0 ) {
 		emissive = texture( emissive_texture, frag_tex_coord0 ).rgb * pbrEmissiveScale.rgb;
 	}
 
-	if ( subsurface_texture_set > -1 ) {
+	if ( subsurface_texture_set >= 0 ) {
 		vec4 subTex = texture( subsurface_texture, frag_tex_coord0 );
 		subsurfaceColor *= subTex.rgb;
 		subsurfaceStrength *= subTex.a;
@@ -846,7 +846,7 @@ void main() {
 
 	float NH = clamp( dot( N, H ), 0.0, 1.0 );
 	float VH = clamp( dot( E, H ), 0.0, 1.0 );
-	vec3  kS = clamp( F_Schlick( specular.rgb, NE ), vec3(0.0), vec3(1.0) );
+	vec3  kS = clamp( F_Schlick( specular.rgb, VH ), vec3(0.0), vec3(1.0) );
 	vec3  kD = ( vec3( 1.0 ) - kS ) * ( 1.0 - metalness );
 	Fd *= kD;
 
@@ -870,15 +870,17 @@ void main() {
 	out_color.rgb += ambientColor * diffuse.rgb * kD;
 
 	// diffuse IBL (SH + irradiance)
-	out_color.rgb += CalcDiffuseIrradiance( N ) * diffuse.rgb * AO * kD;
+	if ( irradiance_texture_set >= 0 ) {
+		out_color.rgb += CalcDiffuseIrradiance( N ) * diffuse.rgb * AO * kD;
+	}
 
-	if ( env_texture_set > -1 )
+	if ( env_texture_set >= 0 )
 		out_color.rgb += CalcIBLContribution( roughness, N, E, NE, specular.rgb * AO );
 
 	// legacy approximation kept intentionally for Step 2 scope containment.
 	// Step 2b pending: Disney clearcoat/sheen energy normalization.
 	// clearcoat lobe
-	if ( clearcoat_texture_set > -1 ) {
+	if ( clearcoat_texture_set >= 0 ) {
 		vec4 cc = texture( clearcoat_texture, frag_tex_coord0 );
 		float ccStrength = cc.r * pbrClearcoatScale.x;
 		float ccRoughness = clamp( cc.g * pbrClearcoatScale.y, 0.02, 1.0 );
@@ -889,7 +891,7 @@ void main() {
 	// legacy approximation kept intentionally for Step 2 scope containment.
 	// Step 2b pending: Disney clearcoat/sheen energy normalization.
 	// sheen term
-	if ( sheen_texture_set > -1 ) {
+	if ( sheen_texture_set >= 0 ) {
 		vec3 sheenColor = texture( sheen_texture, frag_tex_coord0 ).rgb * pbrSheenScale.rgb;
 		out_color.rgb += sheenColor * NL * 0.05;
 	}
@@ -900,7 +902,7 @@ void main() {
 	}
 
 	// transmission term
-	if ( transmission_texture_set > -1 ) {
+	if ( transmission_texture_set >= 0 ) {
 		float transmission = texture( transmission_texture, frag_tex_coord0 ).r * pbrTransmissionScale.x;
 		float transmitFactor = transmission * ( 1.0 - roughness );
 		diffuse.rgb *= ( 1.0 - transmitFactor );
