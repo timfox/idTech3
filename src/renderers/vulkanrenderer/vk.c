@@ -1671,7 +1671,7 @@ static VkFormat get_hdr_format( VkFormat base_format )
 
 	switch ( r_hdr->integer ) {
 		case -1: return VK_FORMAT_B4G4R4A4_UNORM_PACK16;
-		case 1: return VK_FORMAT_R16G16B16A16_UNORM;
+		case 1: return VK_FORMAT_R16G16B16A16_SFLOAT;
 		default: return base_format;
 	}
 }
@@ -1720,7 +1720,7 @@ static const present_format_t present_formats[] = {
 	//{12, VK_FORMAT_B4G4R4A4_UNORM_PACK16, VK_FORMAT_R4G4B4A4_UNORM_PACK16},
 	//{15, VK_FORMAT_B5G5R5A1_UNORM_PACK16, VK_FORMAT_R5G5B5A1_UNORM_PACK16},
 	{16, VK_FORMAT_B5G6R5_UNORM_PACK16, VK_FORMAT_R5G6B5_UNORM_PACK16},
-	{24, VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM},
+	{24, VK_FORMAT_B8G8R8A8_SRGB, VK_FORMAT_R8G8B8A8_SRGB},
 	{30, VK_FORMAT_A2B10G10R10_UNORM_PACK32, VK_FORMAT_A2R10G10B10_UNORM_PACK32},
 	//{32, VK_FORMAT_B10G11R11_UFLOAT_PACK32, VK_FORMAT_B10G11R11_UFLOAT_PACK32}
 };
@@ -6130,7 +6130,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 
 	struct PostProcess_FragSpecData {
 		float gamma;           /* constant_id = 0  */
-		float overbright;      /* constant_id = 1  (preExposureScale) */
+		float preExposureScale; /* constant_id = 1 */
 		float greyscale;       /* constant_id = 2  */
 		float bloom_threshold; /* constant_id = 3  */
 		float bloom_intensity; /* constant_id = 4  */
@@ -6261,8 +6261,8 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	set_shader_stage_desc( shader_stages+0, VK_SHADER_STAGE_VERTEX_BIT, vk.modules.gamma_vs, "main" );
 	set_shader_stage_desc( shader_stages+1, VK_SHADER_STAGE_FRAGMENT_BIT, fsmodule, "main" );
 
-	frag_spec_data.gamma = 1.0 / (r_gamma->value);
-	frag_spec_data.overbright = (float)(1 << tr.overbrightBits);
+	frag_spec_data.gamma = 1.0f / (r_gamma->value);
+	frag_spec_data.preExposureScale = 1.0f;
 	frag_spec_data.greyscale = r_greyscale->value;
 	frag_spec_data.bloom_threshold = r_bloom_threshold->value;
 	frag_spec_data.bloom_intensity = r_bloom_intensity->value;
@@ -6271,10 +6271,8 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	frag_spec_data.dither = r_dither->integer;
 	frag_spec_data.exposure = r_exposure ? r_exposure->value : 1.0f;
 	frag_spec_data.bloom_knee = r_bloomKnee ? r_bloomKnee->value : 0.5f;
-	frag_spec_data.tonemap_mode = r_tonemap ? r_tonemap->integer : 1;
-	frag_spec_data.apply_srgb_gamma = ( vk.present_format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR &&
-		vk.present_format.format != VK_FORMAT_B8G8R8A8_SRGB &&
-		vk.present_format.format != VK_FORMAT_R8G8B8A8_SRGB ) ? 1 : 0;
+	frag_spec_data.tonemap_mode = r_tonemap ? r_tonemap->integer : 2;
+	frag_spec_data.apply_srgb_gamma = 0;
 	frag_spec_data.post_debug = r_post_debug ? r_post_debug->integer : 0;
 	frag_spec_data.postprocess_enabled = ( r_post && r_post->integer ) ? 1 : 0;
 
@@ -6286,8 +6284,8 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	spec_entries[0].size = sizeof( frag_spec_data.gamma );
 
 	spec_entries[1].constantID = 1;
-	spec_entries[1].offset = offsetof( struct PostProcess_FragSpecData, overbright );
-	spec_entries[1].size = sizeof( frag_spec_data.overbright );
+	spec_entries[1].offset = offsetof( struct PostProcess_FragSpecData, preExposureScale );
+	spec_entries[1].size = sizeof( frag_spec_data.preExposureScale );
 
 	spec_entries[2].constantID = 2;
 	spec_entries[2].offset = offsetof( struct PostProcess_FragSpecData, greyscale );
