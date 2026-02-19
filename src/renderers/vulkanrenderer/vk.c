@@ -6026,7 +6026,6 @@ void vk_update_descriptor_set( image_t *image, qboolean mipmap ) {
 	image_info.imageView = image->view;
 	image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	image->vk_sampler = image_info.sampler;
-	image->sampler = image_info.sampler;
 
 	descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	descriptor_write.dstSet = image->descriptor;
@@ -8529,9 +8528,9 @@ void vk_bind_descriptor_sets( void )
 		};
 
 		ri.Printf( PRINT_DEVELOPER, "vk bind descriptors PBR\n" );
-		for ( int i = 0; i < (int)ARRAY_LEN(pbr_descs); i++ ) {
-			int index = pbr_descs[i].index;
-			const char *name = pbr_descs[i].name;
+		for ( int desc_index = 0; desc_index < (int)ARRAY_LEN(pbr_descs); desc_index++ ) {
+			int index = pbr_descs[desc_index].index;
+			const char *name = pbr_descs[desc_index].name;
 			const image_t *img = vk.cmd->descriptor_set.image[index];
 			const char *source = img ? img->imgName : "none";
 			const char *tag = "missing";
