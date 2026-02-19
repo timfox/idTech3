@@ -144,6 +144,7 @@ void main() {
 	if ( postprocess_enabled != 0 ) {
 		hdr_exposed *= exposure;
 		hdr_exposed *= preExposureScale;
+		hdr_exposed *= max( paniniPC.brightness, 0.0 );
 	}
 
 	vec3 tonemapped = hdr_exposed;
@@ -190,7 +191,5 @@ void main() {
 		}
 	}
 
-	vec3 finalColor = ldr;
-	finalColor *= max( paniniPC.brightness, 0.0 );
-	out_color = vec4( finalColor, 1.0 );
+	out_color = vec4( ldr, 1.0 );
 }
