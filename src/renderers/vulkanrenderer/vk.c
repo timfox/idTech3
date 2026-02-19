@@ -111,6 +111,7 @@ static PFN_vkCmdCopyImage								qvkCmdCopyImage;
 static PFN_vkCmdCopyImageToBuffer						qvkCmdCopyImageToBuffer;
 static PFN_vkCmdDraw									qvkCmdDraw;
 static PFN_vkCmdDrawIndexed								qvkCmdDrawIndexed;
+static PFN_vkCmdDispatch								qvkCmdDispatch;
 static PFN_vkCmdEndRenderPass							qvkCmdEndRenderPass;
 static PFN_vkCmdNextSubpass								qvkCmdNextSubpass;
 static PFN_vkCmdPipelineBarrier							qvkCmdPipelineBarrier;
@@ -124,6 +125,7 @@ static PFN_vkCreateDescriptorPool						qvkCreateDescriptorPool;
 static PFN_vkCreateDescriptorSetLayout					qvkCreateDescriptorSetLayout;
 static PFN_vkCreateFence								qvkCreateFence;
 static PFN_vkCreateFramebuffer							qvkCreateFramebuffer;
+static PFN_vkCreateComputePipelines						qvkCreateComputePipelines;
 static PFN_vkCreateGraphicsPipelines					qvkCreateGraphicsPipelines;
 static PFN_vkCreateImage								qvkCreateImage;
 static PFN_vkCreateImageView							qvkCreateImageView;
@@ -189,6 +191,31 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 static uint32_t vk_alloc_pipeline( const Vk_Pipeline_Def *def );
 static VkPipeline vk_gen_pipeline( uint32_t index );
 uint32_t vk_find_pipeline_ext( uint32_t base, const Vk_Pipeline_Def *def, qboolean use );
+
+#define VK_FROXEL_SLICES 64
+
+typedef struct {
+	float invProj[16];
+	float invView[16];
+	float prevView[16];
+	float prevProj[16];
+	float viewOrigin[4];
+	float sunDirection[4];
+	float fogColor[4];
+	float densityParams[4];
+	float sliceParams[4];
+	float prevSliceParams[4];
+	float resolution[4];
+	float jitter[4];
+	float misc[4];
+} volumetric_params_t;
+
+static VkSampler vk_find_sampler( const Vk_Sampler_Def *def );
+static void vk_create_froxel_images( void );
+static void vk_create_volumetric_pipelines( void );
+static void vk_create_volumetric_params_buffer( void );
+static void vk_destroy_volumetric_params_buffer( void );
+static void vk_update_volumetric_params( void );
 
 
 static uint32_t find_memory_type( uint32_t memory_type_bits, VkMemoryPropertyFlags properties ) {
@@ -555,17 +582,17 @@ static void end_command_buffer( VkCommandBuffer command_buffer, const char *loca
 
 static void record_image_layout_transition( VkCommandBuffer command_buffer, VkImage image, VkImageAspectFlags image_aspect_flags, 
 	VkImageLayout old_layout, VkImageLayout new_layout, uint32_t src_stage_override, uint32_t dst_stage_override ) {
-	(void)dst_stage_override;
 	VkImageMemoryBarrier barrier;
 	uint32_t src_stage, dst_stage;
 
 	switch ( old_layout ) {
 		case VK_IMAGE_LAYOUT_UNDEFINED:
-			if ( src_stage_override != 0 )
-				src_stage = src_stage_override;
-			else
-				src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+			src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 			barrier.srcAccessMask = VK_ACCESS_NONE;
+			break;
+		case VK_IMAGE_LAYOUT_GENERAL:
+			src_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+			barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
 			break;
 		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
 			src_stage = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
@@ -599,6 +626,10 @@ static void record_image_layout_transition( VkCommandBuffer command_buffer, VkIm
 			dst_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 			barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 			break;
+		case VK_IMAGE_LAYOUT_GENERAL:
+			dst_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+			barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+			break;
 		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
 			dst_stage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
 			barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
@@ -630,6 +661,12 @@ static void record_image_layout_transition( VkCommandBuffer command_buffer, VkIm
 			break;
 	}
 
+	if ( src_stage_override != 0 ) {
+		src_stage = src_stage_override;
+	}
+	if ( dst_stage_override != 0 ) {
+		dst_stage = dst_stage_override;
+	}
 
 	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 	barrier.pNext = NULL;
@@ -2471,6 +2508,7 @@ static void init_vulkan_library( void )
 	INIT_DEVICE_FUNCTION(vkCmdCopyImageToBuffer)
 	INIT_DEVICE_FUNCTION(vkCmdDraw)
 	INIT_DEVICE_FUNCTION(vkCmdDrawIndexed)
+	INIT_DEVICE_FUNCTION(vkCmdDispatch)
 	INIT_DEVICE_FUNCTION(vkCmdEndRenderPass)
 	INIT_DEVICE_FUNCTION(vkCmdNextSubpass)
 	INIT_DEVICE_FUNCTION(vkCmdPipelineBarrier)
@@ -2484,6 +2522,7 @@ static void init_vulkan_library( void )
 	INIT_DEVICE_FUNCTION(vkCreateDescriptorSetLayout)
 	INIT_DEVICE_FUNCTION(vkCreateFence)
 	INIT_DEVICE_FUNCTION(vkCreateFramebuffer)
+	INIT_DEVICE_FUNCTION(vkCreateComputePipelines)
 	INIT_DEVICE_FUNCTION(vkCreateGraphicsPipelines)
 	INIT_DEVICE_FUNCTION(vkCreateImage)
 	INIT_DEVICE_FUNCTION(vkCreateImageView)
@@ -2604,6 +2643,7 @@ static void deinit_device_functions( void )
 	qvkCmdCopyImageToBuffer						= NULL;
 	qvkCmdDraw									= NULL;
 	qvkCmdDrawIndexed							= NULL;
+	qvkCmdDispatch								= NULL;
 	qvkCmdEndRenderPass							= NULL;
 	qvkCmdNextSubpass							= NULL;
 	qvkCmdPipelineBarrier						= NULL;
@@ -2617,6 +2657,7 @@ static void deinit_device_functions( void )
 	qvkCreateDescriptorSetLayout				= NULL;
 	qvkCreateFence								= NULL;
 	qvkCreateFramebuffer						= NULL;
+	qvkCreateComputePipelines					= NULL;
 	qvkCreateGraphicsPipelines					= NULL;
 	qvkCreateImage								= NULL;
 	qvkCreateImageView							= NULL;
@@ -4421,6 +4462,19 @@ static void vk_create_framebuffers( void )
 		SET_OBJECT_NAME( vk.framebuffers.ssao_combine, "framebuffer - ssao_combine", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
 	}
 
+	if ( vk.render_pass.volumetric != VK_NULL_HANDLE ) {
+		desc.renderPass = vk.render_pass.volumetric;
+		desc.attachmentCount = 1;
+		desc.width = glConfig.vidWidth;
+		desc.height = glConfig.vidHeight;
+		framebuffer_attachments[0] = vk.color_image_view;
+		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.volumetric[0] ) );
+		SET_OBJECT_NAME( vk.framebuffers.volumetric[0], "framebuffer - volumetric fog", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+		for ( n = 1; (uint32_t)n < vk.swapchain_image_count; n++ ) {
+			vk.framebuffers.volumetric[n] = vk.framebuffers.volumetric[0];
+		}
+	}
+
 	#ifdef VK_PBR_BRDFLUT
 	if( vk.pbrActive )
 	{
@@ -4559,21 +4613,6 @@ static void vk_destroy_framebuffers( void ) {
 		qvkDestroyFramebuffer( vk.device, vk.framebuffers.volumetric[0], NULL );
 		for ( n = 0; (uint32_t)n < vk.swapchain_image_count; n++ ) {
 			vk.framebuffers.volumetric[n] = VK_NULL_HANDLE;
-		}
-	}
-
-	if ( vk.render_pass.volumetric != VK_NULL_HANDLE )
-	{
-		desc.renderPass = vk.render_pass.volumetric;
-		desc.attachmentCount = 1;
-		desc.width = glConfig.vidWidth;
-		desc.height = glConfig.vidHeight;
-		framebuffer_attachments[0] = vk.color_image_view;
-		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.volumetric[0] ) );
-		SET_OBJECT_NAME( vk.framebuffers.volumetric[0], "framebuffer - volumetric fog", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
-		for ( n = 1; (uint32_t)n < vk.swapchain_image_count; n++ )
-		{
-			vk.framebuffers.volumetric[n] = vk.framebuffers.volumetric[0];
 		}
 	}
 
@@ -4742,7 +4781,6 @@ void vk_initialize( void )
 	uint32_t major;
 	uint32_t minor;
 	uint32_t patch;
-	uint32_t maxSize;
 	uint32_t i;
 
 	init_vulkan_library();
@@ -5585,36 +5623,6 @@ static void vk_destroy_volumetric_pipelines( void )
 	if ( vk.volumetric_composite_pipeline_layout != VK_NULL_HANDLE ) {
 		qvkDestroyPipelineLayout( vk.device, vk.volumetric_composite_pipeline_layout, NULL );
 		vk.volumetric_composite_pipeline_layout = VK_NULL_HANDLE;
-	}
-}
-
-#define VK_FROXEL_SLICES 64
-
-typedef struct {
-	float invProj[16];
-	float invView[16];
-	float prevView[16];
-	float prevProj[16];
-	float viewOrigin[4];
-	float sunDirection[4];
-	float fogColor[4];
-	float densityParams[4];
-	float sliceParams[4];
-	float prevSliceParams[4];
-	float resolution[4];
-	float jitter[4];
-	float misc[4];
-} volumetric_params_t;
-
-static void Mat4Multiply( const float *lhs, const float *rhs, float *out ) {
-	for ( int row = 0; row < 4; ++row ) {
-		for ( int col = 0; col < 4; ++col ) {
-			out[col*4 + row] =
-				lhs[0*4 + row] * rhs[col*4 + 0] +
-				lhs[1*4 + row] * rhs[col*4 + 1] +
-				lhs[2*4 + row] * rhs[col*4 + 2] +
-				lhs[3*4 + row] * rhs[col*4 + 3];
-		}
 	}
 }
 
@@ -9558,7 +9566,7 @@ void vk_begin_ssao_combine_render_pass( void )
 }
 
 
-void vk_begin_volumetric_render_pass( void )
+static void vk_begin_volumetric_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.volumetric[ vk.cmd->swapchain_image_index ];
 
@@ -9694,7 +9702,11 @@ static void vk_volumetric_fog_pass( void )
 
 	vk_volumetric_compute_pass();
 
-	vk_copy_froxel_history();
+	if ( r_volumetricFogTemporalWeight->value > 0.0f ) {
+		vk_copy_froxel_history();
+	} else {
+		vk.has_prev_volumetric = qfalse;
+	}
 
 	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_GENERAL,
@@ -10548,6 +10560,7 @@ void vk_read_pixels( byte *buffer, uint32_t width, uint32_t height )
 
 		end_command_buffer( command_buffer, "restore layout" );
 	}
+}
 
 static void vk_destroy_volumetric_params_buffer( void )
 {
@@ -10614,6 +10627,35 @@ static float vk_random01( uint32_t seed ) {
 	return x - floorf( x );
 }
 
+static void vk_get_volumetric_fog_color( vec4_t out )
+{
+	int i;
+
+	Vector4Set( out, tr.sunLight[0], tr.sunLight[1], tr.sunLight[2], 1.0f );
+
+	if ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+		return;
+	}
+
+	for ( i = 1; i < tr.world->numfogs; i++ ) {
+		const fog_t *fog = &tr.world->fogs[ i ];
+		const float *o = backEnd.viewParms.or.origin;
+
+		if ( o[0] < fog->bounds[0][0] || o[0] > fog->bounds[1][0] ) {
+			continue;
+		}
+		if ( o[1] < fog->bounds[0][1] || o[1] > fog->bounds[1][1] ) {
+			continue;
+		}
+		if ( o[2] < fog->bounds[0][2] || o[2] > fog->bounds[1][2] ) {
+			continue;
+		}
+
+		Vector4Copy( fog->color, out );
+		return;
+	}
+}
+
 static void vk_update_volumetric_params( void )
 {
 	if ( !vk.volumetric_params_ptr ) {
@@ -10651,10 +10693,7 @@ static void vk_update_volumetric_params( void )
 	params.sunDirection[2] = tr.sunDirection[2];
 	params.sunDirection[3] = 0.0f;
 
-	params.fogColor[0] = backEnd.fogParms.color[0];
-	params.fogColor[1] = backEnd.fogParms.color[1];
-	params.fogColor[2] = backEnd.fogParms.color[2];
-	params.fogColor[3] = 0.0f;
+	vk_get_volumetric_fog_color( params.fogColor );
 
 	params.densityParams[0] = r_volumetricFogDensity->value;
 	params.densityParams[1] = r_volumetricFogHeightFalloff->value;
@@ -10693,7 +10732,7 @@ static void vk_update_volumetric_params( void )
 	params.jitter[3] = 0.0f;
 
 	params.misc[0] = (float)r_volumetricFogSteps->integer;
-	params.misc[1] = vk.has_prev_volumetric ? 1.0f : 0.0f;
+	params.misc[1] = ( vk.has_prev_volumetric && r_volumetricFogTemporalWeight->value > 0.0f ) ? 1.0f : 0.0f;
 	params.misc[2] = (float)vk.volumetric_frame;
 	params.misc[3] = 0.0f;
 
@@ -10704,7 +10743,6 @@ static void vk_update_volumetric_params( void )
 	Com_Memcpy( vk.prev_projection_matrix, projection, sizeof( vk.prev_projection_matrix ) );
 	vk.prev_zfar = far_plane;
 	vk.volumetric_frame++;
-}
 }
 
 

@@ -35,7 +35,7 @@ void main() {
 
 	int rawSteps = int(clamp(params.misc.x, 1.0, 64.0));
 	int steps = max(1, rawSteps);
-	float distance = farPlane - nearPlane;
+	float distance = max(sceneDepth - nearPlane, 0.0);
 	float stepDistance = distance / float(steps);
 	float transmittance = 1.0;
 	vec3 fogAccum = vec3(0.0);
@@ -47,7 +47,7 @@ void main() {
 		float sliceIdx = steps == 1 ? maxSlice : min(maxSlice, float(i) * (maxSlice / float(max(steps - 1, 1))));
 		float normalizedSlice = sliceIdx / max(sliceCount - 1.0, 1.0);
 		vec4 vol = texture(froxelVolume, vec3(v_UV, normalizedSlice));
-		fogAccum += transmittance * vol.rgb;
+		fogAccum += transmittance * vol.rgb * stepDistance;
 		float extinction = vol.a;
 		transmittance *= exp( -extinction * stepDistance );
 		if ( transmittance <= 0.01 ) {
