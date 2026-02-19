@@ -108,6 +108,7 @@ cvar_t	*r_deluxeMapping;
 cvar_t	*r_deluxeSpecular;
 #endif
 #endif
+cvar_t   *r_vk_pipeline_debug;
 cvar_t	*r_fbo;
 cvar_t	*r_hdr;
 cvar_t	*r_bloom;
@@ -1916,6 +1917,10 @@ static void R_Register( void )
 
 	r_vk_swapchain_srgb = ri.Cvar_Get( "r_vk_swapchain_srgb", "0", CVAR_ROM );
 	ri.Cvar_SetDescription( r_vk_swapchain_srgb, "Read-only: 1 if the selected Vulkan swapchain format is sRGB." );
+
+	r_vk_pipeline_debug = ri.Cvar_Get( "r_vk_pipeline_debug", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_vk_pipeline_debug, "Print Vulkan pipeline creation info (discard mode, shader type, fog, etc)." );
+	ri.Cvar_SetGroup( r_vk_pipeline_debug, CVG_RENDERER );
 
 	if ( glConfig.vidWidth )
 		return;

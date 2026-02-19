@@ -640,6 +640,8 @@ static void vk_create_swapchain( VkPhysicalDevice physical_device, VkDevice devi
 	desc.imageFormat = surface_format.format;
 	desc.imageColorSpace = surface_format.colorSpace;
 	desc.imageExtent = image_extent;
+	vk.swapchain_extent = image_extent;
+	vk.swapchain_extent_valid = qtrue;
 	desc.imageArrayLayers = 1;
 	desc.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 	if ( !vk.fboActive ) {
@@ -706,6 +708,38 @@ static void vk_create_swapchain( VkPhysicalDevice physical_device, VkDevice devi
 	}
 }
 
+static qboolean vk_query_surface_extent( VkExtent2D *extent ) {
+	VkSurfaceCapabilitiesKHR caps;
+
+	if ( qvkGetPhysicalDeviceSurfaceCapabilitiesKHR( vk.physical_device, vk_surface, &caps ) != VK_SUCCESS ) {
+		return qfalse;
+	}
+
+	if ( caps.currentExtent.width == UINT32_MAX && caps.currentExtent.height == UINT32_MAX ) {
+		extent->width = (uint32_t) gls.windowWidth;
+		extent->height = (uint32_t) gls.windowHeight;
+	}
+	else {
+		extent->width = caps.currentExtent.width;
+		extent->height = caps.currentExtent.height;
+	}
+
+	if ( extent->width == 0 || extent->height == 0 ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+static void vk_log_swapchain_recreation( VkResult res, const VkExtent2D *old_extent, const VkExtent2D *new_extent ) {
+	uint32_t old_width = vk.swapchain_extent_valid && old_extent ? old_extent->width : 0;
+	uint32_t old_height = vk.swapchain_extent_valid && old_extent ? old_extent->height : 0;
+	uint32_t new_width = new_extent ? new_extent->width : 0;
+	uint32_t new_height = new_extent ? new_extent->height : 0;
+
+	ri.Printf( PRINT_WARNING, "vk_present_frame(): %s old=%ux%u new=%ux%u fullscreen=%d refresh=%d\n",
+		vk_result_string( res ), old_width, old_height, new_width, new_height, glConfig.isFullscreen, glConfig.displayFrequency );
+}
 
 static void vk_create_render_passes( void )
 {
@@ -4382,6 +4416,8 @@ static void vk_destroy_framebuffers( void ) {
 static void vk_destroy_swapchain( void ) {
 	uint32_t i;
 
+	vk.swapchain_extent_valid = qfalse;
+
 	for ( i = 0; (uint32_t) i < vk.swapchain_image_count; i++ ) {
 		if ( vk.swapchain_image_views[i] != VK_NULL_HANDLE ) {
 			qvkDestroyImageView( vk.device, vk.swapchain_image_views[i], NULL );
@@ -7792,7 +7828,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 		attachment_blend_state.colorBlendOp = VK_BLEND_OP_ADD;
 		attachment_blend_state.alphaBlendOp = VK_BLEND_OP_ADD;
 
-		if ( def->allow_discard && vkSamples != VK_SAMPLE_COUNT_1_BIT ) {
+		if ( def->allow_discard ) {
 			// try to reduce pixel fillrate for transparent surfaces, this yields 1..10% fps increase when multisampling in enabled
 			if ( attachment_blend_state.srcColorBlendFactor == VK_BLEND_FACTOR_SRC_ALPHA && attachment_blend_state.dstColorBlendFactor == VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA ) {
 				frag_spec_data.discard_mode = 1;
@@ -7800,6 +7836,11 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 				frag_spec_data.discard_mode = 2;
 			}
 		}
+	}
+
+	if ( r_vk_pipeline_debug && r_vk_pipeline_debug->integer ) {
+		ri.Printf( PRINT_DEVELOPER, "vk pipeline def#%u render_pass=%u shader=%u fog=%d state=0x%x allow_discard=%d discard_mode=%d\n",
+			def_index, renderPassIndex, def->shader_type, def->fog_stage, def->state_bits, def->allow_discard, frag_spec_data.discard_mode );
 	}
 
 	blend_state.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
@@ -9154,8 +9195,18 @@ void vk_present_frame( void )
 {
 	VkPresentInfoKHR present_info;
 	VkResult res;
+	VkExtent2D new_extent;
+	qboolean new_extent_valid;
 
 	if ( ri.CL_IsMinimized() || !vk.cmd->swapchain_image_acquired ) {
+		return;
+	}
+
+	if ( gls.windowWidth == 0 || gls.windowHeight == 0 ) {
+		return;
+	}
+
+	if ( vk.swapchain_extent_valid && ( vk.swapchain_extent.width == 0 || vk.swapchain_extent.height == 0 ) ) {
 		return;
 	}
 
@@ -9180,8 +9231,18 @@ void vk_present_frame( void )
 		case VK_SUCCESS:
 			break;
 		case VK_SUBOPTIMAL_KHR:
+			new_extent_valid = vk_query_surface_extent( &new_extent );
+			vk_log_swapchain_recreation( res, &vk.swapchain_extent, new_extent_valid ? &new_extent : NULL );
+			if ( new_extent_valid && ( !vk.swapchain_extent_valid ||
+					new_extent.width != vk.swapchain_extent.width ||
+					new_extent.height != vk.swapchain_extent.height ) ) {
+				vk_restart_swapchain( __func__, res );
+				return;
+			}
+			break;
 		case VK_ERROR_OUT_OF_DATE_KHR:
-			// swapchain re-creation needed
+			new_extent_valid = vk_query_surface_extent( &new_extent );
+			vk_log_swapchain_recreation( res, &vk.swapchain_extent, new_extent_valid ? &new_extent : NULL );
 			vk_restart_swapchain( __func__, res );
 			return;
 		case VK_ERROR_DEVICE_LOST:

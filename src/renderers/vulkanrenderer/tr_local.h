@@ -1514,6 +1514,7 @@ extern cvar_t	*r_post_debug;
 extern cvar_t	*r_exposure;
 extern cvar_t	*r_tonemap;
 extern cvar_t	*r_vk_swapchain_srgb;
+extern cvar_t	*r_vk_pipeline_debug;
 
 extern	cvar_t	*r_nobind;						// turns off binding to appropriate textures
 extern	cvar_t	*r_singleShader;				// make most world faces use default shader
