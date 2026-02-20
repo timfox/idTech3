@@ -1527,6 +1527,14 @@ extern cvar_t	*r_volumetricFogColorMode;
 extern cvar_t	*r_volumetricFogTint;
 extern cvar_t	*r_volumetricFogIntensity;
 extern cvar_t	*r_volumetricFogBaseHeight;
+extern cvar_t	*r_volumetricFogWorldMin;
+extern cvar_t	*r_volumetricFogWorldMax;
+extern cvar_t	*r_volumetricFogGridDim;
+extern cvar_t	*r_volumetricFogDepthMode;
+extern cvar_t	*r_volumetricFogSunIntensity;
+extern cvar_t	*r_volumetricFogAmbientIntensity;
+extern cvar_t	*r_fogDebug;
+extern cvar_t	*r_froxelDebug;
 extern cvar_t	*r_vk_swapchain_srgb;
 extern cvar_t	*r_vk_pipeline_debug;
 
