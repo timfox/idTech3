@@ -1040,6 +1040,7 @@ RB_SetGL2D
 */
 static void RB_SetGL2D( void ) {
 #ifdef USE_VULKAN
+	// Finalize world fog right at the 3D -> 2D boundary.
 	vk_prepare_2d();
 #endif
 
@@ -1204,14 +1205,12 @@ static const void *RB_StretchPic( const void *data ) {
 #endif
 
 	if ( !backEnd.projection2D ) {
+#ifdef USE_VULKAN
+		// Keep volumetric fog behind all subsequent 2D/HUD draws.
+		vk_prepare_2d();
+#endif
 		RB_SetGL2D();
 	}
-
-#ifdef USE_VULKAN
-	if ( r_bloom->integer ) {
-		vk_bloom();
-	}
-#endif
 
 	RB_AddQuadStamp2( cmd->x, cmd->y, cmd->w, cmd->h, cmd->s1, cmd->t1, cmd->s2, cmd->t2, backEnd.color2D );
 
@@ -1711,6 +1710,9 @@ static const void *RB_FinishBloom( const void *data )
 	RB_EndSurface();
 
 #ifdef USE_VULKAN
+	// Finalize volumetrics before entering 2D/HUD/console phase.
+	vk_prepare_2d();
+
 	if ( r_bloom->integer ) {
 		vk_bloom();
 	}
@@ -1860,9 +1862,21 @@ void RB_ExecuteRenderCommands( const void *data ) {
 
 		switch ( *(const int *)data ) {
 		case RC_SET_COLOR:
+#ifdef USE_VULKAN
+			// Force volumetrics to be finalized before any 2D command stream begins.
+			// This keeps HUD/console layers above fog regardless of command ordering.
+			if ( backEnd.doneSurfaces && !backEnd.doneFog ) {
+				vk_prepare_2d();
+			}
+#endif
 			data = RB_SetColor( data );
 			break;
 		case RC_STRETCH_PIC:
+#ifdef USE_VULKAN
+			if ( backEnd.doneSurfaces && !backEnd.doneFog ) {
+				vk_prepare_2d();
+			}
+#endif
 			data = RB_StretchPic( data );
 			break;
 		case RC_DRAW_SURFS:

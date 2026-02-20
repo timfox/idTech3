@@ -24,6 +24,12 @@ layout(std140, binding = 3) uniform VolumetricParams {
 
 const float PI = 3.14159265359;
 
+float hash12(vec2 p) {
+	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+	p3 += dot(p3, p3.yzx + 33.33);
+	return fract((p3.x + p3.y) * p3.z);
+}
+
 float phaseFunction(float cosTheta, float g) {
 	float denom = 1.0 + g * g - 2.0 * g * cosTheta;
 	return (1.0 - g * g) / (4.0 * PI * pow(max(denom, 1e-5), 1.5));
@@ -45,7 +51,10 @@ void main() {
 		return;
 	}
 
-	vec2 baseUV = (vec2(idx.xy) + vec2(0.5) + vec2(params.jitter.y, params.jitter.z)) * vec2(params.resolution.x, params.resolution.y);
+	float pxJitterX = hash12(vec2(idx.xy) + vec2(params.misc.z, 17.0)) - 0.5;
+	float pxJitterY = hash12(vec2(idx.yx) + vec2(31.0, params.misc.z)) - 0.5;
+	vec2 baseUV = (vec2(idx.xy) + vec2(0.5) + vec2(params.jitter.y, params.jitter.z) + vec2(pxJitterX, pxJitterY) * params.jitter.x)
+		* vec2(params.resolution.x, params.resolution.y);
 	vec2 uv = clamp(baseUV, 0.0, 1.0);
 	float sliceNormalized = (float(idx.z) + 0.5) / max(params.sliceParams.w, 1.0);
 

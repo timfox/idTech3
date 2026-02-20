@@ -22,6 +22,12 @@ layout(std140, binding = 3) uniform VolumetricParams {
 	vec4 misc;
 } params;
 
+float hash12(vec2 p) {
+	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+	p3 += dot(p3, p3.yzx + 33.33);
+	return fract((p3.x + p3.y) * p3.z);
+}
+
 void main() {
 	float depthSample = texture(depthTexture, v_UV).r;
 	float nearPlane = params.sliceParams.x;
@@ -45,7 +51,10 @@ void main() {
 
 		// Sample along the ray in view-space distance, then map the distance to the froxel z-slice.
 		// This reduces visible banding compared to stepping in slice-index space.
-		float stepJitter = (params.jitter.x > 0.0) ? (fract(sin(dot(v_UV * params.resolution.zw + vec2(float(i), params.misc.z), vec2(12.9898, 78.233))) * 43758.5453) - 0.5) : 0.0;
+		float stepJitter = 0.0;
+		if ( params.jitter.x > 0.0 ) {
+			stepJitter = hash12( gl_FragCoord.xy + vec2( float(i) * 13.37, params.misc.z * 17.11 ) ) - 0.5;
+		}
 		float sampleDepth = nearPlane + (float(i) + 0.5 + stepJitter) * stepDistance;
 		sampleDepth = clamp(sampleDepth, nearPlane, farPlane);
 
@@ -58,6 +67,11 @@ void main() {
 			break;
 		}
 	}
+
+	// Small screen-space dither helps hide low-amplitude quantization bands.
+	float dither = hash12(gl_FragCoord.xy + params.misc.z) - 0.5;
+	fogAccum += dither * (1.0 / 1024.0);
+	fogAccum = max(fogAccum, vec3(0.0));
 
 	float fogOpacity = clamp( 1.0 - transmittance, 0.0, 1.0 );
 	fragColor = vec4( fogAccum, fogOpacity );
