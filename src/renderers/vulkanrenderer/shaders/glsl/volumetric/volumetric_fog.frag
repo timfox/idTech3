@@ -96,7 +96,7 @@ void main() {
 	int fogDebug = int( clamp( floor( params.froxelDim.w + 0.5 ), 0.0, 5.0 ) );
 
 	if ( fogDebug == 1 ) {
-		fragColor = vec4( 1.0, 0.0, 1.0, 0.2 );
+		fragColor = vec4( 1.0, 0.0, 1.0, 0.35 );
 		return;
 	}
 	if ( fogDebug == 2 ) {
@@ -119,7 +119,14 @@ void main() {
 	float sceneDepth = farPlane;
 	reconstructViewPos( v_UV, depthSample, depthMode, nearPlane, farPlane, viewDir, sceneDepth );
 	if ( fogDebug == 5 ) {
-		float depthGray = clamp( sceneDepth / max( farPlane, 1e-4 ), 0.0, 1.0 );
+		if ( farPlane <= 0.0 ) {
+			fragColor = vec4( 1.0, 0.0, 1.0, 1.0 );
+			return;
+		}
+		float depthK = 1.0;
+		float depthNumer = log2( 1.0 + max( sceneDepth, 0.0 ) * depthK );
+		float depthDenom = max( log2( 1.0 + farPlane * depthK ), 1e-5 );
+		float depthGray = clamp( depthNumer / depthDenom, 0.0, 1.0 );
 		fragColor = vec4( depthGray, depthGray, depthGray, 1.0 );
 		return;
 	}
