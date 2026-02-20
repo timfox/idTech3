@@ -130,7 +130,7 @@ void main() {
 
 	if ( froxelDebug == 1 ) {
 		vec3 uvw = (vec3(idx) + vec3(0.5)) / vec3(dim);
-		imageStore(froxelVolume, idx, vec4(uvw, 1.0));
+		imageStore(froxelVolume, idx, vec4(uvw, uvw.z));
 		return;
 	}
 	if ( froxelDebug == 2 ) {
