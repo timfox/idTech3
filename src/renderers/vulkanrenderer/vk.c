@@ -192,7 +192,7 @@ static uint32_t vk_alloc_pipeline( const Vk_Pipeline_Def *def );
 static VkPipeline vk_gen_pipeline( uint32_t index );
 uint32_t vk_find_pipeline_ext( uint32_t base, const Vk_Pipeline_Def *def, qboolean use );
 
-#define VK_FROXEL_SLICES 64
+#define VK_FROXEL_SLICES 96
 
 typedef struct {
 	float invProj[16];
@@ -5963,8 +5963,8 @@ static void vk_create_froxel_images( void )
 
 	vk_destroy_froxel_images();
 
-	vk.froxel_width = MAX( 1u, glConfig.vidWidth / 2 );
-	vk.froxel_height = MAX( 1u, glConfig.vidHeight / 2 );
+		vk.froxel_width = MAX( 1u, (uint32_t)glConfig.vidWidth );
+		vk.froxel_height = MAX( 1u, (uint32_t)glConfig.vidHeight );
 	vk.froxel_slices = VK_FROXEL_SLICES;
 
 	VkImageCreateInfo create_info;
@@ -10358,10 +10358,10 @@ void vk_end_frame( void )
 		{
 			vk_end_render_pass();
 
-			if ( !backEnd.doneFog )
-			{
-				vk_volumetric_fog_pass();
-			}
+				if ( !backEnd.doneFog )
+				{
+					vk_volumetric_fog_pass();
+				}
 
 			vk.renderWidth = gls.windowWidth;
 			vk.renderHeight = gls.windowHeight;
