@@ -204,6 +204,14 @@ cvar_t	*r_volumetricFogColorMode;
 cvar_t	*r_volumetricFogTint;
 cvar_t	*r_volumetricFogIntensity;
 cvar_t	*r_volumetricFogBaseHeight;
+cvar_t	*r_volumetricFogWorldMin;
+cvar_t	*r_volumetricFogWorldMax;
+cvar_t	*r_volumetricFogGridDim;
+cvar_t	*r_volumetricFogDepthMode;
+cvar_t	*r_volumetricFogSunIntensity;
+cvar_t	*r_volumetricFogAmbientIntensity;
+cvar_t	*r_fogDebug;
+cvar_t	*r_froxelDebug;
 cvar_t	*r_vk_swapchain_srgb;
 cvar_t	*r_intensity;
 cvar_t	*r_lockpvs;
@@ -1984,6 +1992,43 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_volumetricFogBaseHeight, "-8192", "8192", CV_FLOAT );
 	ri.Cvar_SetDescription( r_volumetricFogBaseHeight, "World-space Z reference height for the volumetric fog height falloff (0 = world origin)." );
 	ri.Cvar_SetGroup( r_volumetricFogBaseHeight, CVG_RENDERER );
+
+	r_volumetricFogWorldMin = ri.Cvar_Get( "r_volumetricFogWorldMin", "-2048 -2048 -256", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_volumetricFogWorldMin, "World-space fog AABB minimum corner (x y z)." );
+	ri.Cvar_SetGroup( r_volumetricFogWorldMin, CVG_RENDERER );
+
+	r_volumetricFogWorldMax = ri.Cvar_Get( "r_volumetricFogWorldMax", "2048 2048 1024", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_volumetricFogWorldMax, "World-space fog AABB maximum corner (x y z)." );
+	ri.Cvar_SetGroup( r_volumetricFogWorldMax, CVG_RENDERER );
+
+	r_volumetricFogGridDim = ri.Cvar_Get( "r_volumetricFogGridDim", "160 90 96", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_volumetricFogGridDim, "World-space froxel grid dimensions (x y z). Requires vid_restart." );
+	ri.Cvar_SetGroup( r_volumetricFogGridDim, CVG_RENDERER );
+
+	r_volumetricFogDepthMode = ri.Cvar_Get( "r_volumetricFogDepthMode", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogDepthMode, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_volumetricFogDepthMode, "Volumetric depth decode mode: 0=standard 0..1, 1=reversed-Z 0..1, 2=linear viewZ packed." );
+	ri.Cvar_SetGroup( r_volumetricFogDepthMode, CVG_RENDERER );
+
+	r_volumetricFogSunIntensity = ri.Cvar_Get( "r_volumetricFogSunIntensity", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogSunIntensity, "0", "64", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogSunIntensity, "Directional light intensity used by world-space volumetric scattering." );
+	ri.Cvar_SetGroup( r_volumetricFogSunIntensity, CVG_RENDERER );
+
+	r_volumetricFogAmbientIntensity = ri.Cvar_Get( "r_volumetricFogAmbientIntensity", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogAmbientIntensity, "0", "64", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogAmbientIntensity, "Ambient light intensity used by world-space volumetric scattering." );
+	ri.Cvar_SetGroup( r_volumetricFogAmbientIntensity, CVG_RENDERER );
+
+	r_fogDebug = ri.Cvar_Get( "r_fogDebug", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_fogDebug, "0", "5", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fogDebug, "Volumetric fog debug view: 0=off, 1=composite alive, 2=froxel color z=0.5, 3=froxel alpha z=0.5, 4=world bounds mask, 5=depth grayscale." );
+	ri.Cvar_SetGroup( r_fogDebug, CVG_RENDERER );
+
+	r_froxelDebug = ri.Cvar_Get( "r_froxelDebug", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_froxelDebug, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_froxelDebug, "Volumetric froxel debug injection: 0=normal, 1=uvw gradient, 2=constant density fill." );
+	ri.Cvar_SetGroup( r_froxelDebug, CVG_RENDERER );
 
 	r_vk_swapchain_srgb = ri.Cvar_Get( "r_vk_swapchain_srgb", "0", CVAR_ROM );
 	ri.Cvar_SetDescription( r_vk_swapchain_srgb, "Read-only: 1 if the selected Vulkan swapchain format is sRGB." );
