@@ -932,10 +932,9 @@ static void vk_log_swapchain_recreation( VkResult res, const VkExtent2D *old_ext
 		( (int)glConfig.isFullscreen == last_fullscreen ) &&
 		( glConfig.displayFrequency == last_refresh );
 
-	// Avoid per-frame spam when the driver keeps returning SUBOPTIMAL_KHR with
-	// unchanged extents (common on some WMs/compositors). Still log promptly when
-	// anything changes.
-	if ( same_as_last && last_print_ms >= 0 && ( now_ms - last_print_ms ) < 5000 ) {
+	// Avoid spam when the driver repeatedly returns SUBOPTIMAL_KHR with unchanged
+	// swapchain metrics (common on some WMs/compositors).
+	if ( same_as_last && last_print_ms >= 0 ) {
 		return;
 	}
 
@@ -9896,6 +9895,35 @@ static void vk_volumetric_fog_pass( void )
 		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 0, 0 );
 
 	backEnd.doneFog = qtrue;
+}
+
+void vk_prepare_2d( void )
+{
+	// Run volumetrics before switching to 2D so UI/console/HUD are not fogged.
+	if ( !vk.fboActive || !r_volumetricFog || !r_volumetricFog->integer || backEnd.doneFog ) {
+		return;
+	}
+	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE || !vk_in_render_pass ) {
+		return;
+	}
+	if ( vk.cmd->swapchain_image_index >= MAX_SWAPCHAIN_IMAGES ) {
+		return;
+	}
+	if ( vk.render_pass.post_bloom == VK_NULL_HANDLE ||
+		vk.framebuffers.main[ vk.cmd->swapchain_image_index ] == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	// Only split the main scene pass.
+	if ( vk.renderPassIndex != RENDER_PASS_MAIN && vk.renderPassIndex != RENDER_PASS_POST_BLOOM ) {
+		return;
+	}
+
+	vk_end_render_pass();
+	vk_volumetric_fog_pass();
+
+	// Resume drawing for 2D overlays.
+	vk_begin_post_bloom_render_pass();
 }
 
 

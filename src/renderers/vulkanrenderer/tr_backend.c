@@ -1039,6 +1039,10 @@ RB_SetGL2D
 ================
 */
 static void RB_SetGL2D( void ) {
+#ifdef USE_VULKAN
+	vk_prepare_2d();
+#endif
+
 	backEnd.projection2D = qtrue;
 
 #ifdef USE_VULKAN
