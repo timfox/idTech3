@@ -26,6 +26,7 @@ void main() {
 	float depthSample = texture(depthTexture, v_UV).r;
 	float nearPlane = params.sliceParams.x;
 	float farPlane = params.sliceParams.y;
+	// Engine uses reversed depth and encodes depth approximately as zNear / viewZ.
 	float sceneDepth = depthSample > 0.0 ? nearPlane / depthSample : farPlane;
 	float logFar = max(params.sliceParams.z, 1e-4);
 	float sliceCount = max(params.sliceParams.w, 1.0);

@@ -394,6 +394,7 @@ void vk_clear_depth( qboolean clear_stencil );
 void vk_begin_frame( void );
 void vk_end_frame( void );
 void vk_present_frame( void );
+void vk_prepare_2d( void );
 
 void vk_end_render_pass( void );
 void vk_begin_main_render_pass( void );
