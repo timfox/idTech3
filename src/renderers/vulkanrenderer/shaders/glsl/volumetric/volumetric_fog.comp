@@ -59,7 +59,8 @@ void main() {
 	float sceneDepth = depthSample > 0.0 ? params.sliceParams.x / depthSample : params.sliceParams.y;
 
 	bool occluded = viewDepth > sceneDepth;
-	float heightDelta = worldPos.z - params.viewOrigin.z;
+	// Height fog should be stable in world space (not camera-relative).
+	float heightDelta = worldPos.z - params.viewOrigin.w;
 	float heightFalloff = max(0.0, params.densityParams.y);
 	float heightFactor = exp(-heightFalloff * max(0.0, heightDelta));
 	float density = params.densityParams.x * heightFactor;
@@ -70,7 +71,7 @@ void main() {
 	float g = params.densityParams.z;
 	float cosTheta = dot(viewDir, normalize(params.sunDirection.xyz));
 	float phase = phaseFunction(cosTheta, g);
-	vec3 currentScattering = params.fogColor.rgb * density * phase;
+	vec3 currentScattering = params.fogColor.rgb * params.fogColor.a * density * phase;
 	vec4 current = vec4(currentScattering, density);
 
 	vec4 history = vec4(0.0);

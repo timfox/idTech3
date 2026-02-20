@@ -29,7 +29,6 @@ void main() {
 	float sceneDepth = depthSample > 0.0 ? nearPlane / depthSample : farPlane;
 	float logFar = max(params.sliceParams.z, 1e-4);
 	float sliceCount = max(params.sliceParams.w, 1.0);
-	float maxSlice = clamp(log(max(sceneDepth / nearPlane, 1e-4)) / logFar, 0.0, 1.0) * max(sliceCount - 1.0, 1.0);
 
 	int rawSteps = int(clamp(params.misc.x, 1.0, 64.0));
 	int steps = max(1, rawSteps);
@@ -42,9 +41,15 @@ void main() {
 		if ( i >= steps ) {
 			break;
 		}
-		float sliceIdx = steps == 1 ? maxSlice : min(maxSlice, float(i) * (maxSlice / float(max(steps - 1, 1))));
-		float normalizedSlice = sliceIdx / max(sliceCount - 1.0, 1.0);
-		vec4 vol = texture(froxelVolume, vec3(v_UV, normalizedSlice));
+
+		// Sample along the ray in view-space distance, then map the distance to the froxel z-slice.
+		// This reduces visible banding compared to stepping in slice-index space.
+		float stepJitter = (params.jitter.x > 0.0) ? (fract(sin(dot(v_UV * params.resolution.zw + vec2(float(i), params.misc.z), vec2(12.9898, 78.233))) * 43758.5453) - 0.5) : 0.0;
+		float sampleDepth = nearPlane + (float(i) + 0.5 + stepJitter) * stepDistance;
+		sampleDepth = clamp(sampleDepth, nearPlane, farPlane);
+
+		float sliceNormalized = clamp(log(max(sampleDepth / nearPlane, 1e-4)) / logFar, 0.0, 1.0);
+		vec4 vol = texture(froxelVolume, vec3(v_UV, sliceNormalized));
 		fogAccum += transmittance * vol.rgb * stepDistance;
 		float extinction = vol.a;
 		transmittance *= exp( -extinction * stepDistance );

@@ -10997,7 +10997,7 @@ static void vk_update_volumetric_params( void )
 	params.viewOrigin[0] = backEnd.viewParms.or.origin[0];
 	params.viewOrigin[1] = backEnd.viewParms.or.origin[1];
 	params.viewOrigin[2] = backEnd.viewParms.or.origin[2];
-	params.viewOrigin[3] = 0.0f;
+	params.viewOrigin[3] = ( r_volumetricFogBaseHeight ) ? r_volumetricFogBaseHeight->value : 0.0f;
 
 	params.sunDirection[0] = tr.sunDirection[0];
 	params.sunDirection[1] = tr.sunDirection[1];
@@ -11005,6 +11005,7 @@ static void vk_update_volumetric_params( void )
 	params.sunDirection[3] = 0.0f;
 
 	vk_get_volumetric_fog_color( params.fogColor );
+	params.fogColor[3] = ( r_volumetricFogIntensity ) ? r_volumetricFogIntensity->value : 1.0f;
 
 	params.densityParams[0] = r_volumetricFogDensity->value;
 	params.densityParams[1] = r_volumetricFogHeightFalloff->value;
