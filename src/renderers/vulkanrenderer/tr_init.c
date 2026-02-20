@@ -197,14 +197,16 @@ cvar_t	*r_volumetricFog;
 cvar_t	*r_volumetricFogDensity;
 cvar_t	*r_volumetricFogHeightFalloff;
 cvar_t	*r_volumetricFogAniso;
-	cvar_t	*r_volumetricFogSteps;
-	cvar_t	*r_volumetricFogJitter;
-	cvar_t	*r_volumetricFogTemporalWeight;
-	cvar_t	*r_volumetricFogColorMode;
-	cvar_t	*r_volumetricFogTint;
-	cvar_t	*r_vk_swapchain_srgb;
-	cvar_t	*r_intensity;
-	cvar_t	*r_lockpvs;
+cvar_t	*r_volumetricFogSteps;
+cvar_t	*r_volumetricFogJitter;
+cvar_t	*r_volumetricFogTemporalWeight;
+cvar_t	*r_volumetricFogColorMode;
+cvar_t	*r_volumetricFogTint;
+cvar_t	*r_volumetricFogIntensity;
+cvar_t	*r_volumetricFogBaseHeight;
+cvar_t	*r_vk_swapchain_srgb;
+cvar_t	*r_intensity;
+cvar_t	*r_lockpvs;
 cvar_t	*r_noportals;
 cvar_t	*r_portalOnly;
 
@@ -1972,6 +1974,16 @@ static void R_Register( void )
 	r_volumetricFogTint = ri.Cvar_Get( "r_volumetricFogTint", "1 1 1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_volumetricFogTint, "Volumetric fog RGB tint (3 floats). Applied as a multiplier in modes 0 and 2, or used directly in mode 1." );
 	ri.Cvar_SetGroup( r_volumetricFogTint, CVG_RENDERER );
+
+	r_volumetricFogIntensity = ri.Cvar_Get( "r_volumetricFogIntensity", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogIntensity, "0", "50", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogIntensity, "Scattering intensity multiplier for volumetric fog color (useful to brighten tints/IBL contribution)." );
+	ri.Cvar_SetGroup( r_volumetricFogIntensity, CVG_RENDERER );
+
+	r_volumetricFogBaseHeight = ri.Cvar_Get( "r_volumetricFogBaseHeight", "0.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogBaseHeight, "-8192", "8192", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogBaseHeight, "World-space Z reference height for the volumetric fog height falloff (0 = world origin)." );
+	ri.Cvar_SetGroup( r_volumetricFogBaseHeight, CVG_RENDERER );
 
 	r_vk_swapchain_srgb = ri.Cvar_Get( "r_vk_swapchain_srgb", "0", CVAR_ROM );
 	ri.Cvar_SetDescription( r_vk_swapchain_srgb, "Read-only: 1 if the selected Vulkan swapchain format is sRGB." );
