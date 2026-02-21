@@ -6,6 +6,7 @@ layout(binding = 0, rgba16f) uniform writeonly image3D froxelVolume;
 layout(binding = 1, rgba16f) uniform readonly image3D froxelHistory;
 layout(binding = 2) uniform sampler2D depthTexture;
 layout(binding = 4) uniform sampler3D fogNoiseTexture;
+layout(binding = 5) uniform sampler2D sunShadowMap;
 
 layout(std140, binding = 3) uniform VolumetricParams {
 	mat4 invProj;
@@ -26,6 +27,9 @@ layout(std140, binding = 3) uniform VolumetricParams {
 	vec4 phaseParams;
 	vec4 noiseParams;
 	vec4 noiseScroll;
+	mat4 sunShadowMatrix0;
+	vec4 shadowParams0;
+	vec4 shadowMapSize0;
 } params;
 
 const float PI = 3.14159265359;
@@ -54,7 +58,7 @@ float decodeClipZ( float depthSample, int depthMode ) {
 		return depthSample * 2.0 - 1.0;
 	}
 	if ( depthMode == 1 ) {
-		return depthSample * 2.0 - 1.0;
+		return ( 1.0 - depthSample ) * 2.0 - 1.0;
 	}
 	return 0.0;
 }
@@ -119,7 +123,52 @@ void mediumAtWorldPos( vec3 worldPos, vec3 rayDir, out vec3 scatterSource, out f
 	scatterSource = params.fogColor.rgb * max( lighting, 0.0 ) * sigmaT * max( params.fogColor.a, 0.0 );
 }
 
-vec4 buildMediaAtIdx( ivec3 idx, ivec3 dim, int depthMode, bool useBounds, vec3 boundsExtent ) {
+float sampleSunShadow( vec3 worldPos, out vec3 shadowUVW )
+{
+	float lit = 1.0;
+	shadowUVW = vec3( 0.0, 0.0, 1.0 );
+
+	if ( params.shadowParams0.z < 0.5 || params.shadowParams0.w < 0.5 ) {
+		return 1.0;
+	}
+	if ( params.shadowMapSize0.z <= 0.0 || params.shadowMapSize0.w <= 0.0 ) {
+		return 1.0;
+	}
+
+	vec4 lightClip = params.sunShadowMatrix0 * vec4( worldPos, 1.0 );
+	if ( abs( lightClip.w ) <= 1e-6 ) {
+		return 1.0;
+	}
+
+	vec3 ndc = lightClip.xyz / lightClip.w;
+	vec2 uv = ndc.xy * 0.5 + 0.5;
+	float depth = ndc.z * 0.5 + 0.5;
+	shadowUVW = vec3( uv, depth );
+
+	if ( any( lessThan( uv, vec2( 0.0 ) ) ) || any( greaterThan( uv, vec2( 1.0 ) ) ) || depth <= 0.0 || depth >= 1.0 ) {
+		return 1.0;
+	}
+
+	float compareDepth = depth - max( params.shadowParams0.x, 0.0 );
+	vec2 texelStep = params.shadowMapSize0.zw * max( params.shadowParams0.y, 0.0 );
+
+	if ( texelStep.x <= 0.0 || texelStep.y <= 0.0 ) {
+		float sampleDepth = texture( sunShadowMap, uv ).r;
+		return ( compareDepth <= sampleDepth ) ? 1.0 : 0.0;
+	}
+
+	lit = 0.0;
+	for ( int y = -1; y <= 1; ++y ) {
+		for ( int x = -1; x <= 1; ++x ) {
+			vec2 pcfUV = uv + vec2( x, y ) * texelStep;
+			float sampleDepth = texture( sunShadowMap, pcfUV ).r;
+			lit += ( compareDepth <= sampleDepth ) ? 1.0 : 0.0;
+		}
+	}
+	return lit * ( 1.0 / 9.0 );
+}
+
+vec4 buildMediaAtIdx( ivec3 idx, ivec3 dim, int depthMode, bool useBounds, vec3 boundsExtent, int froxelDebug ) {
 	float nearPlane = getNearPlane();
 	float farPlane = getFarPlane( nearPlane );
 	float logRatio = getLogRatio( nearPlane, farPlane );
@@ -151,7 +200,30 @@ vec4 buildMediaAtIdx( ivec3 idx, ivec3 dim, int depthMode, bool useBounds, vec3 
 
 	vec3 scatter;
 	float sigma;
+	float sunVis;
+	vec3 shadowUVW;
 	mediumAtWorldPos( worldPos, viewDir, scatter, sigma );
+	sunVis = sampleSunShadow( worldPos, shadowUVW );
+	if ( sigma > 0.0 ) {
+		float g = clamp( params.phaseParams.x, -0.999, 0.999 );
+		float cosTheta = dot( normalize( params.sunDirection.xyz ), normalize( -viewDir ) );
+		float phase = phaseHG( cosTheta, g );
+		float ambient = max( params.phaseParams.z, 0.0 );
+		float directional = max( params.phaseParams.y, 0.0 ) * phase * sunVis;
+		scatter = params.fogColor.rgb * ( ambient + directional ) * sigma * max( params.fogColor.a, 0.0 );
+	}
+
+	if ( froxelDebug == 3 ) {
+		return vec4( vec3( clamp( sunVis, 0.0, 1.0 ) ), 1.0 );
+	}
+	if ( froxelDebug == 4 ) {
+		return vec4( clamp( shadowUVW, vec3( 0.0 ), vec3( 1.0 ) ), 1.0 );
+	}
+	if ( froxelDebug == 5 ) {
+		float mask = step( 0.5, sunVis );
+		return vec4( vec3( mask ), 1.0 );
+	}
+
 	return vec4( max( scatter, vec3( 0.0 ) ), max( sigma, 0.0 ) );
 }
 
@@ -189,12 +261,12 @@ vec4 neighborhoodClampHistory( ivec3 idx, ivec3 dim, int depthMode, bool useBoun
 		ivec3( 0, 1, 0 ), ivec3( 0, -1, 0 ),
 		ivec3( 0, 0, 1 ), ivec3( 0, 0, -1 )
 	);
-	vec4 center = buildMediaAtIdx( idx, dim, depthMode, useBounds, boundsExtent );
+	vec4 center = buildMediaAtIdx( idx, dim, depthMode, useBounds, boundsExtent, 0 );
 	vec4 minV = center;
 	vec4 maxV = center;
 	for ( int i = 0; i < 6; ++i ) {
 		ivec3 n = clamp( idx + offsets[i], ivec3( 0 ), dim - ivec3( 1 ) );
-		vec4 sampleV = buildMediaAtIdx( n, dim, depthMode, useBounds, boundsExtent );
+		vec4 sampleV = buildMediaAtIdx( n, dim, depthMode, useBounds, boundsExtent, 0 );
 		minV = min( minV, sampleV );
 		maxV = max( maxV, sampleV );
 	}
@@ -205,7 +277,7 @@ void main() {
 	ivec3 idx = ivec3( gl_GlobalInvocationID );
 	ivec3 dim = ivec3( max( params.gridDim.xyz, vec3( 1.0 ) ) );
 	int depthMode = int( clamp( floor( params.miscParams.y + 0.5 ), 0.0, 2.0 ) );
-	int froxelDebug = int( clamp( floor( params.phaseParams.w + 0.5 ), 0.0, 2.0 ) );
+	int froxelDebug = int( clamp( floor( params.phaseParams.w + 0.5 ), 0.0, 5.0 ) );
 	vec3 extent;
 	bool useWorldGrid = boundsValid( extent );
 
@@ -223,7 +295,11 @@ void main() {
 		return;
 	}
 
-	vec4 current = buildMediaAtIdx( idx, dim, depthMode, useWorldGrid, extent );
+	vec4 current = buildMediaAtIdx( idx, dim, depthMode, useWorldGrid, extent, froxelDebug );
+	if ( froxelDebug >= 3 ) {
+		imageStore( froxelVolume, idx, current );
+		return;
+	}
 
 	vec4 history = vec4( 0.0 );
 	bool hasHistory = params.miscParams.w > 0.5;

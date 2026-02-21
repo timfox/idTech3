@@ -404,6 +404,8 @@ void vk_begin_blur_render_pass( uint32_t index );
 void vk_begin_ssao_render_pass( void );
 void vk_begin_ssao_blur_render_pass( void );
 void vk_begin_ssao_combine_render_pass( void );
+qboolean vk_begin_sun_shadow_render_pass( void );
+void vk_end_sun_shadow_render_pass( void );
 
 void vk_bind_pipeline( uint32_t pipeline );
 void vk_bind_index( void );
@@ -645,6 +647,7 @@ typedef struct {
 #endif
 		VkFramebuffer cubemap[6];
 		VkFramebuffer volumetric[MAX_SWAPCHAIN_IMAGES];
+		VkFramebuffer sun_shadow;
 	} framebuffers;
 
 	VkBuffer volumetric_params_buffer;
@@ -857,11 +860,25 @@ typedef struct {
 	VkImageView fog_noise_view;
 	VkDeviceMemory fog_noise_memory;
 	VkSampler fog_noise_sampler;
+	VkImage sun_shadow_image;
+	VkImageView sun_shadow_view;
+	VkDeviceMemory sun_shadow_memory;
+	VkImage sun_shadow_color_image;
+	VkImageView sun_shadow_color_view;
+	VkDeviceMemory sun_shadow_color_memory;
+	VkImage sun_shadow_color_msaa_image;
+	VkImageView sun_shadow_color_msaa_view;
+	VkDeviceMemory sun_shadow_color_msaa_memory;
+	VkSampler sun_shadow_sampler;
 	VkSampler froxel_sampler;
 	VkSampler froxel_depth_sampler;
 	uint32_t froxel_width;
 	uint32_t froxel_height;
 	uint32_t froxel_slices;
+	uint32_t sun_shadow_width;
+	uint32_t sun_shadow_height;
+	float sun_shadow_matrix0[16];
+	qboolean sun_shadow_valid;
 
 	VkImageLayout initSwapchainLayout;
 

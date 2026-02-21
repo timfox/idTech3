@@ -1375,6 +1375,255 @@ static void RB_DebugGraphics( void ) {
 	ri.CM_DrawDebugSurface( RB_DebugPolygon );
 }
 
+#ifdef USE_VULKAN
+static const float s_shadow_flipMatrix[16] = {
+	0, 0, -1, 0,
+	-1, 0, 0, 0,
+	0, 1, 0, 0,
+	0, 0, 0, 1
+};
+
+static qboolean RB_ShouldRenderSunShadowMap( const drawSurfsCommand_t *cmd )
+{
+	if ( !vk.fboActive || !r_fog_shadows || !r_fog_shadows->integer ) {
+		return qfalse;
+	}
+	if ( !r_volumetricFog || !r_volumetricFog->integer ) {
+		return qfalse;
+	}
+	if ( !cmd || cmd->numDrawSurfs <= 0 ) {
+		return qfalse;
+	}
+	if ( cmd->refdef.rdflags & RDF_NOWORLDMODEL ) {
+		return qfalse;
+	}
+	if ( cmd->viewParms.portalView != PV_NONE ) {
+		return qfalse;
+	}
+	if ( cmd->viewParms.targetCube != NULL ) {
+		return qfalse;
+	}
+	if ( cmd->refdef.needScreenMap || cmd->refdef.switchRenderPass ) {
+		return qfalse;
+	}
+	if ( vk.renderPassIndex != RENDER_PASS_MAIN ) {
+		return qfalse;
+	}
+	return qtrue;
+}
+
+static qboolean RB_BuildSunShadowView( const drawSurfsCommand_t *cmd, viewParms_t *shadowParms, float *outViewProj )
+{
+	float nearPlane;
+	float farPlane;
+	float tanHalfX;
+	float tanHalfY;
+	float nearW, nearH, farW, farH;
+	vec3_t camPos;
+	vec3_t camForward, camRight, camUp;
+	vec3_t nearCenter, farCenter;
+	vec3_t frustumCorners[8];
+	vec3_t cascadeCenter = { 0.0f, 0.0f, 0.0f };
+	vec3_t lightForward, lightRight, lightUp;
+	vec3_t upRef = { 0.0f, 0.0f, 1.0f };
+	float padding = ( r_fogShadowPadding ) ? r_fogShadowPadding->value : 64.0f;
+	float lightMin[3], lightMax[3];
+	vec3_t shadowOrigin;
+	float viewerMatrix[16];
+	float lightView[16];
+	float invW, invH, invD;
+	float left, right, bottom, top, zNear, zFar;
+	int i;
+
+	if ( !cmd || !shadowParms || !outViewProj ) {
+		return qfalse;
+	}
+
+	nearPlane = ( r_znear ) ? r_znear->value : 4.0f;
+	if ( nearPlane < 0.1f ) {
+		nearPlane = 0.1f;
+	}
+
+	farPlane = cmd->viewParms.zFar;
+	if ( r_fogShadowMaxDistance ) {
+		const float maxDistance = r_fogShadowMaxDistance->value;
+		if ( maxDistance > nearPlane && farPlane > maxDistance ) {
+			farPlane = maxDistance;
+		}
+	}
+	if ( farPlane <= nearPlane + 1.0f ) {
+		return qfalse;
+	}
+
+	VectorCopy( cmd->viewParms.or.origin, camPos );
+	VectorCopy( cmd->viewParms.or.axis[0], camForward );
+	VectorCopy( cmd->viewParms.or.axis[1], camRight );
+	VectorCopy( cmd->viewParms.or.axis[2], camUp );
+	tanHalfX = tanf( DEG2RAD( cmd->viewParms.fovX * 0.5f ) );
+	tanHalfY = tanf( DEG2RAD( cmd->viewParms.fovY * 0.5f ) );
+	nearW = nearPlane * tanHalfX;
+	nearH = nearPlane * tanHalfY;
+	farW = farPlane * tanHalfX;
+	farH = farPlane * tanHalfY;
+
+	VectorMA( camPos, nearPlane, camForward, nearCenter );
+	VectorMA( camPos, farPlane, camForward, farCenter );
+
+	for ( i = 0; i < 8; i++ ) {
+		const qboolean farCorner = ( i >= 4 ) ? qtrue : qfalse;
+		const float sx = ( ( i & 1 ) ? 1.0f : -1.0f );
+		const float sy = ( ( i & 2 ) ? 1.0f : -1.0f );
+		const float w = farCorner ? farW : nearW;
+		const float h = farCorner ? farH : nearH;
+		const vec3_t center = { farCorner ? farCenter[0] : nearCenter[0], farCorner ? farCenter[1] : nearCenter[1], farCorner ? farCenter[2] : nearCenter[2] };
+		VectorCopy( center, frustumCorners[i] );
+		VectorMA( frustumCorners[i], sx * w, camRight, frustumCorners[i] );
+		VectorMA( frustumCorners[i], sy * h, camUp, frustumCorners[i] );
+		VectorAdd( cascadeCenter, frustumCorners[i], cascadeCenter );
+	}
+	VectorScale( cascadeCenter, 1.0f / 8.0f, cascadeCenter );
+
+	VectorScale( tr.sunDirection, -1.0f, lightForward );
+	if ( VectorNormalize( lightForward ) <= 0.0f ) {
+		return qfalse;
+	}
+	if ( fabsf( DotProduct( lightForward, upRef ) ) > 0.95f ) {
+		VectorSet( upRef, 0.0f, 1.0f, 0.0f );
+	}
+	CrossProduct( upRef, lightForward, lightRight );
+	if ( VectorNormalize( lightRight ) <= 0.0f ) {
+		return qfalse;
+	}
+	CrossProduct( lightForward, lightRight, lightUp );
+	VectorNormalize( lightUp );
+
+	for ( i = 0; i < 3; i++ ) {
+		lightMin[i] = 1e30f;
+		lightMax[i] = -1e30f;
+	}
+	for ( i = 0; i < 8; i++ ) {
+		vec3_t rel;
+		float lx, ly, lz;
+		VectorSubtract( frustumCorners[i], cascadeCenter, rel );
+		lx = DotProduct( rel, lightRight );
+		ly = DotProduct( rel, lightUp );
+		lz = DotProduct( rel, lightForward );
+		lightMin[0] = MIN( lightMin[0], lx );
+		lightMax[0] = MAX( lightMax[0], lx );
+		lightMin[1] = MIN( lightMin[1], ly );
+		lightMax[1] = MAX( lightMax[1], ly );
+		lightMin[2] = MIN( lightMin[2], lz );
+		lightMax[2] = MAX( lightMax[2], lz );
+	}
+
+	left = lightMin[0] - padding;
+	right = lightMax[0] + padding;
+	bottom = lightMin[1] - padding;
+	top = lightMax[1] + padding;
+	zNear = -( lightMax[2] + padding );
+	zFar = -( lightMin[2] - padding );
+	if ( right <= left + 1e-3f || top <= bottom + 1e-3f || zFar <= zNear + 1e-3f ) {
+		return qfalse;
+	}
+
+	VectorMA( cascadeCenter, -lightMin[2] + padding, lightForward, shadowOrigin );
+
+	Com_Memset( shadowParms, 0, sizeof( *shadowParms ) );
+	*shadowParms = cmd->viewParms;
+	VectorCopy( shadowOrigin, shadowParms->or.origin );
+	VectorCopy( shadowOrigin, shadowParms->pvsOrigin );
+	VectorCopy( lightForward, shadowParms->or.axis[0] );
+	VectorCopy( lightRight, shadowParms->or.axis[1] );
+	VectorCopy( lightUp, shadowParms->or.axis[2] );
+	shadowParms->portalView = PV_NONE;
+	shadowParms->viewportX = 0;
+	shadowParms->viewportY = 0;
+	shadowParms->viewportWidth = (int)vk.sun_shadow_width;
+	shadowParms->viewportHeight = (int)vk.sun_shadow_height;
+	shadowParms->scissorX = 0;
+	shadowParms->scissorY = 0;
+	shadowParms->scissorWidth = (int)vk.sun_shadow_width;
+	shadowParms->scissorHeight = (int)vk.sun_shadow_height;
+	shadowParms->zFar = farPlane;
+
+	Matrix16Identity( shadowParms->projectionMatrix );
+	invW = 1.0f / ( right - left );
+	invH = 1.0f / ( top - bottom );
+	invD = 1.0f / ( zFar - zNear );
+	shadowParms->projectionMatrix[0] = 2.0f * invW;
+	shadowParms->projectionMatrix[5] = 2.0f * invH;
+	shadowParms->projectionMatrix[10] = -2.0f * invD;
+	shadowParms->projectionMatrix[12] = -( right + left ) * invW;
+	shadowParms->projectionMatrix[13] = -( top + bottom ) * invH;
+	shadowParms->projectionMatrix[14] = -( zFar + zNear ) * invD;
+	shadowParms->projectionMatrix[15] = 1.0f;
+
+	viewerMatrix[0] = shadowParms->or.axis[0][0];
+	viewerMatrix[4] = shadowParms->or.axis[0][1];
+	viewerMatrix[8] = shadowParms->or.axis[0][2];
+	viewerMatrix[12] = -shadowOrigin[0] * viewerMatrix[0] + -shadowOrigin[1] * viewerMatrix[4] + -shadowOrigin[2] * viewerMatrix[8];
+	viewerMatrix[1] = shadowParms->or.axis[1][0];
+	viewerMatrix[5] = shadowParms->or.axis[1][1];
+	viewerMatrix[9] = shadowParms->or.axis[1][2];
+	viewerMatrix[13] = -shadowOrigin[0] * viewerMatrix[1] + -shadowOrigin[1] * viewerMatrix[5] + -shadowOrigin[2] * viewerMatrix[9];
+	viewerMatrix[2] = shadowParms->or.axis[2][0];
+	viewerMatrix[6] = shadowParms->or.axis[2][1];
+	viewerMatrix[10] = shadowParms->or.axis[2][2];
+	viewerMatrix[14] = -shadowOrigin[0] * viewerMatrix[2] + -shadowOrigin[1] * viewerMatrix[6] + -shadowOrigin[2] * viewerMatrix[10];
+	viewerMatrix[3] = 0.0f;
+	viewerMatrix[7] = 0.0f;
+	viewerMatrix[11] = 0.0f;
+	viewerMatrix[15] = 1.0f;
+
+	myGlMultMatrix( viewerMatrix, s_shadow_flipMatrix, lightView );
+	Matrix16Identity( shadowParms->world.modelMatrix );
+	Com_Memcpy( shadowParms->world.modelViewMatrix, lightView, sizeof( lightView ) );
+	VectorCopy( shadowOrigin, shadowParms->world.viewOrigin );
+	VectorClear( shadowParms->world.origin );
+	AxisCopy( axisDefault, shadowParms->world.axis );
+
+	myGlMultMatrix( lightView, shadowParms->projectionMatrix, outViewProj );
+	return qtrue;
+}
+
+static void RB_RenderSunShadowMap( const drawSurfsCommand_t *cmd )
+{
+	viewParms_t savedViewParms;
+	viewParms_t shadowViewParms;
+	float shadowViewProj[16];
+
+	if ( !RB_ShouldRenderSunShadowMap( cmd ) ) {
+		vk.sun_shadow_valid = qfalse;
+		Matrix16Identity( vk.sun_shadow_matrix0 );
+		return;
+	}
+
+	if ( !RB_BuildSunShadowView( cmd, &shadowViewParms, shadowViewProj ) ) {
+		vk.sun_shadow_valid = qfalse;
+		Matrix16Identity( vk.sun_shadow_matrix0 );
+		return;
+	}
+
+	if ( !vk_begin_sun_shadow_render_pass() ) {
+		vk.sun_shadow_valid = qfalse;
+		Matrix16Identity( vk.sun_shadow_matrix0 );
+		return;
+	}
+
+	vk.sun_shadow_valid = qtrue;
+	Com_Memcpy( vk.sun_shadow_matrix0, shadowViewProj, sizeof( vk.sun_shadow_matrix0 ) );
+
+	savedViewParms = backEnd.viewParms;
+	backEnd.viewParms = shadowViewParms;
+	RB_BeginDrawingView();
+	RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
+	RB_EndSurface();
+	backEnd.viewParms = savedViewParms;
+	vk_end_sun_shadow_render_pass();
+	SetViewportAndScissor();
+}
+#endif
+
 
 /*
 =============
@@ -1394,6 +1643,10 @@ static const void *RB_DrawSurfs( const void *data ) {
 
 #ifdef USE_VBO
 	VBO_UnBind();
+#endif
+
+#ifdef USE_VULKAN
+	RB_RenderSunShadowMap( cmd );
 #endif
 
 	// clear the z buffer, set the modelview, etc
