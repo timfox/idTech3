@@ -27,8 +27,11 @@ layout(location = 3) in vec4 V;  // object-space view vector
 #ifdef USE_FOG
 layout(location = 4) in vec2 fog_tex_coord;
 #endif
+layout(location = 13) in vec4 var_CurrentClip;
+layout(location = 14) in vec4 var_PrevClip;
 
 layout(location = 0) out vec4 out_color;
+layout(location = 1) out vec2 out_motion;
 
 layout (constant_id = 0) const int alpha_test_func = 0;
 layout (constant_id = 1) const float alpha_test_value = 0.0;
@@ -49,6 +52,13 @@ float CorrectAlpha(float threshold, float alpha, vec2 tc)
 }
 
 void main() {
+	out_motion = vec2(0.0);
+	if ( abs(var_CurrentClip.w) > 1e-6 && abs(var_PrevClip.w) > 1e-6 ) {
+		vec2 currUV = var_CurrentClip.xy / var_CurrentClip.w * 0.5 + 0.5;
+		vec2 prevUV = var_PrevClip.xy / var_PrevClip.w * 0.5 + 0.5;
+		out_motion = currUV - prevUV;
+	}
+
 #ifdef USE_FOG
 	vec4 fog = texture(fogtexture, fog_tex_coord);
 #endif

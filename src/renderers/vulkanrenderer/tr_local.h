@@ -1939,6 +1939,9 @@ SHADOWS
 void RB_ShadowTessEnd( void );
 void RB_ShadowFinish( void );
 void RB_ProjectionShadowDeform( void );
+#ifdef USE_VULKAN
+void RB_RenderVolumetricShadowView( const viewParms_t *shadowViewParms, drawSurf_t *drawSurfs, int numDrawSurfs );
+#endif
 
 /*
 ============================================================
