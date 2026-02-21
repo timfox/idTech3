@@ -33,6 +33,10 @@ layout(push_constant) uniform PaniniPC {
 	float paniniBorderMode;
 	float paniniDebugMode;
 	float brightness;
+	float paniniZoom;
+	float paniniPad0;
+	float paniniPad1;
+	float paniniPad2;
 	vec4 srcUVScaleBias; // scale.xy, bias.xy
 } paniniPC;
 
@@ -135,7 +139,9 @@ vec3 paniniInverseDir( vec2 uvOut, float d, float s, float fovYRadians, float as
 	float kMax = ( safeD + 1.0 ) / denomMax;
 	float fitX = kMax * sin( thetaMax );
 	float fitY = tan( phiMax ) * mix( 1.0, kMax, safeS );
-	float fit = max( max( abs( fitX ), abs( fitY ) ), 1e-6 );
+	vec2 fit = vec2(
+		max( abs( fitX ), 1e-6 ),
+		max( abs( fitY ), 1e-6 ) );
 
 	vec2 pRaw = ( uvOut * 2.0 - 1.0 ) * fit;
 	float theta = clamp( pRaw.x, -1.0, 1.0 ) * thetaMax;
@@ -183,7 +189,8 @@ void main() {
 		float aspect = max( paniniPC.aspect, 1e-6 );
 		float fovX = radians( clamp( paniniPC.fovXDeg, 1.0, 179.0 ) );
 		float fovY = 2.0 * atan( tan( 0.5 * fovX ) / aspect );
-		vec2 uvOut = uv;
+		float paniniZoom = max( paniniPC.paniniZoom, 1.0 );
+		vec2 uvOut = ( uv - 0.5 ) / paniniZoom + 0.5;
 		vec3 dirPan = paniniInverseDir( uvOut, paniniPC.paniniD, paniniPC.paniniS, fovY, aspect );
 
 		vec2 persp = dirPan.xy / max( -dirPan.z, 1e-6 );
