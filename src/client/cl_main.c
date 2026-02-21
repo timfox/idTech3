@@ -3812,6 +3812,15 @@ static void CL_SetModel_f( void ) {
 	}
 }
 
+static void CL_FovAlias_f( void ) {
+	if ( Cmd_Argc() > 1 ) {
+		Cvar_Set( "cg_fov", Cmd_Argv( 1 ) );
+		return;
+	}
+
+	Com_Printf( "cg_fov is \"%s\"\n", Cvar_VariableString( "cg_fov" ) );
+}
+
 
 //===========================================================================================
 
@@ -4365,6 +4374,7 @@ void CL_Init( void ) {
 	Cmd_AddCommand ("fs_openedList", CL_OpenedPK3List_f );
 	Cmd_AddCommand ("fs_referencedList", CL_ReferencedPK3List_f );
 	Cmd_AddCommand ("model", CL_SetModel_f );
+	Cmd_AddCommand ("r_fov", CL_FovAlias_f );
 	Cmd_AddCommand ("video", CL_Video_f );
 	Cmd_AddCommand ("video-pipe", CL_Video_f );
 	Cmd_SetCommandCompletionFunc( "video", CL_CompleteVideoName );
@@ -4486,6 +4496,7 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 	Cmd_RemoveCommand ("fs_openedList");
 	Cmd_RemoveCommand ("fs_referencedList");
 	Cmd_RemoveCommand ("model");
+	Cmd_RemoveCommand ("r_fov");
 	Cmd_RemoveCommand ("video");
 	Cmd_RemoveCommand ("stopvideo");
 	Cmd_RemoveCommand ("serverinfo");

@@ -1488,6 +1488,7 @@ extern cvar_t	*r_bloom_modulate;
 extern cvar_t	*r_bloomKnee;
 extern cvar_t	*r_ext_multisample;
 extern cvar_t	*r_ext_supersample;
+extern cvar_t	*r_ext_smaa;
 //extern cvar_t	*r_ext_alpha_to_coverage;
 extern cvar_t	*r_renderWidth;
 extern cvar_t	*r_renderHeight;

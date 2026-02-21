@@ -541,6 +541,9 @@ typedef struct {
 		VkRenderPass brdflut;
 #endif
 		VkRenderPass cubemap;
+		VkRenderPass smaa_edge;
+		VkRenderPass smaa_blend;
+		VkRenderPass smaa_compose;
 		VkRenderPass volumetric;
 	} render_pass;
 
@@ -553,6 +556,7 @@ typedef struct {
 	VkPipelineLayout pipeline_layout_storage;	// flare test shader layout
 	VkPipelineLayout pipeline_layout_post_process;	// post-processing
 	VkPipelineLayout pipeline_layout_blend;		// post-processing
+	VkPipelineLayout pipeline_layout_smaa;
 	VkPipelineLayout pipeline_layout_ssao;		// ssao (depth + push constants)
 	VkPipelineLayout pipeline_layout_ssao_combine;	// ssao combine (color + ao)
 #ifdef VK_PBR_BRDFLUT
@@ -569,11 +573,20 @@ typedef struct {
 
 	VkDescriptorSet color_descriptor;
 	VkDescriptorSet depth_descriptor;
+	VkDescriptorSet smaa_edge_descriptor;
+	VkDescriptorSet smaa_blend_descriptor;
+	VkDescriptorSet smaa_compose_descriptor;
 
 	VkImage color_image;
 	VkImageView color_image_view;
 	VkImage fog_scene_image;
 	VkImageView fog_scene_image_view;
+	VkImage smaa_edge_image;
+	VkImageView smaa_edge_image_view;
+	VkImage smaa_blend_image;
+	VkImageView smaa_blend_image_view;
+	VkImage smaa_output_image;
+	VkImageView smaa_output_image_view;
 
 	VkImage bloom_image[1+VK_NUM_BLOOM_PASSES*2];
 	VkImageView bloom_image_view[1+VK_NUM_BLOOM_PASSES*2];
@@ -646,6 +659,9 @@ typedef struct {
 		VkFramebuffer brdflut;
 #endif
 		VkFramebuffer cubemap[6];
+		VkFramebuffer smaa_edge;
+		VkFramebuffer smaa_blend;
+		VkFramebuffer smaa_compose;
 		VkFramebuffer volumetric[MAX_SWAPCHAIN_IMAGES];
 		VkFramebuffer sun_shadow;
 	} framebuffers;
@@ -825,6 +841,9 @@ typedef struct {
 	VkPipeline bloom_extract_pipeline;
 	VkPipeline blur_pipeline[VK_NUM_BLOOM_PASSES*2]; // horizontal & vertical pairs
 	VkPipeline bloom_blend_pipeline;
+	VkPipeline smaa_edge_pipeline;
+	VkPipeline smaa_blend_pipeline;
+	VkPipeline smaa_compose_pipeline;
 	VkPipeline ssao_pipeline;
 	VkPipeline ssao_blur_pipeline;
 	VkPipeline ssao_combine_pipeline;
@@ -886,6 +905,7 @@ typedef struct {
 	qboolean fboActive;
 	qboolean blitEnabled;
 	qboolean msaaActive;
+	qboolean smaaActive;
 #ifdef USE_VK_PBR
 	qboolean pbrActive;
 #endif
