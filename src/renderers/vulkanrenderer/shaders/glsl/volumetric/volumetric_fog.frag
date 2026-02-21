@@ -108,10 +108,8 @@ void main() {
 		return;
 	}
 
-	int rawSteps = int( clamp( params.miscParams.x, 1.0, 128.0 ) );
-	int steps = max( 1, rawSteps );
-	float transmittance = 1.0;
 	vec3 fogAccum = vec3( 0.0 );
+	float fogOpacity = 0.0;
 	vec3 extent;
 	bool worldBounds = boundsValid( extent );
 	vec3 viewDir;
@@ -142,69 +140,24 @@ void main() {
 	}
 
 	if ( worldBounds ) {
-		float nearT = nearPlane;
-		float hitT = sceneDepth;
-		float totalDistance = max( hitT - nearT, 0.0 );
-		float ds = totalDistance / float( steps );
 		vec3 worldDir = normalize( ( params.invView * vec4( viewDir, 0.0 ) ).xyz );
 		vec3 worldCam = params.viewOrigin.xyz;
-
-		for ( int i = 0; i < 128; ++i ) {
-			if ( i >= steps ) {
-				break;
-			}
-
-			float jitterStep = ( hash12( gl_FragCoord.xy + vec2( frameIndex, float( i ) * 17.0 ) ) - 0.5 ) * clamp( params.densityParams.z, 0.0, 1.0 );
-
-			float t = nearT + ( float( i ) + 0.5 + jitterStep ) * ds;
-			t = clamp( t, nearT, hitT );
-			vec3 worldPos = worldCam + worldDir * t;
-			vec3 uvw = ( worldPos - params.worldMin.xyz ) / extent;
-			if ( any( lessThan( uvw, vec3( 0.0 ) ) ) || any( greaterThan( uvw, vec3( 1.0 ) ) ) ) {
-				continue;
-			}
-
+		vec3 worldHit = worldCam + worldDir * sceneDepth;
+		vec3 uvw = ( worldHit - params.worldMin.xyz ) / extent;
+		if ( all( greaterThanEqual( uvw, vec3( 0.0 ) ) ) && all( lessThanEqual( uvw, vec3( 1.0 ) ) ) ) {
 			vec4 vol = texture( froxelVolume, uvw );
-			float sigma_t = max( vol.a, 0.0 );
-			vec3 inscatter = max( vol.rgb, vec3( 0.0 ) );
-			if ( dot( inscatter, inscatter ) < 1e-8 && sigma_t > 0.0 ) {
-				float cosTheta = dot( normalize( params.sunDirection.xyz ), -worldDir );
-				float phase = phaseHG( cosTheta, clamp( params.phaseParams.x, -0.999, 0.999 ) );
-				vec3 ambient = params.fogColor.rgb * params.phaseParams.z;
-				vec3 directional = params.fogColor.rgb * params.phaseParams.y * phase;
-				inscatter = ( ambient + directional ) * sigma_t * params.fogColor.a;
-			}
-
-			fogAccum += transmittance * inscatter * ds;
-			transmittance *= exp( -sigma_t * ds );
-			if ( transmittance <= 0.01 ) {
-				break;
-			}
+			fogAccum = max( vol.rgb, vec3( 0.0 ) );
+			fogOpacity = clamp( vol.a, 0.0, 1.0 );
 		}
 	} else {
-		float stepDistance = max( sceneDepth - nearPlane, 0.0 ) / float( steps );
-
-		for ( int i = 0; i < 128; ++i ) {
-			if ( i >= steps ) {
-				break;
-			}
-
-			float stepJitter = ( hash12( gl_FragCoord.xy + vec2( frameIndex, float( i ) * 17.0 ) ) - 0.5 ) * clamp( params.densityParams.z, 0.0, 1.0 );
-			float sampleDepth = nearPlane + ( float( i ) + 0.5 + stepJitter ) * stepDistance;
-			float sliceNormalized = clamp( sampleDepth / max( sceneDepth, 1e-4 ), 0.0, 1.0 );
-			vec4 vol = texture( froxelVolume, vec3( v_UV, sliceNormalized ) );
-			fogAccum += transmittance * vol.rgb * stepDistance;
-			transmittance *= exp( -max( vol.a, 0.0 ) * stepDistance );
-			if ( transmittance <= 0.01 ) {
-				break;
-			}
-		}
+		vec4 vol = texture( froxelVolume, vec3( v_UV, 1.0 ) );
+		fogAccum = max( vol.rgb, vec3( 0.0 ) );
+		fogOpacity = clamp( vol.a, 0.0, 1.0 );
 	}
 
 	float dither = hash12( gl_FragCoord.xy + frameIndex ) - 0.5;
 	fogAccum = max( fogAccum + dither * ( 1.0 / 1024.0 ), vec3( 0.0 ) );
 
-	float fogOpacity = clamp( 1.0 - transmittance, 0.0, 1.0 );
 	vec3 scene = texture( sceneColor, v_UV ).rgb;
 	vec3 outRgb = scene * ( 1.0 - fogOpacity ) + fogAccum;
 	fragColor = vec4( outRgb, 1.0 );
