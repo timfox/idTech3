@@ -900,6 +900,8 @@ typedef struct {
 	VkImageView volumetric_depth_view;
 	VkImage motion_vector_image;
 	VkImageView motion_vector_view;
+	VkImage motion_vector_msaa_image;
+	VkImageView motion_vector_msaa_view;
 	VkImage fog_noise_image;
 	VkImageView fog_noise_view;
 	VkDeviceMemory fog_noise_memory;

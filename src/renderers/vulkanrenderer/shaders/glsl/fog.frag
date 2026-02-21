@@ -22,12 +22,22 @@ layout(set = 2, binding = 0) uniform sampler2D fog_texture;
 //layout(location = 2) in vec2 frag_tex_coord1;
 //layout(location = 3) in vec2 frag_tex_coord2;
 layout(location = 4) in vec2 fog_tex_coord;
+layout(location = 13) in vec4 var_CurrentClip;
+layout(location = 14) in vec4 var_PrevClip;
 
 layout(location = 0) out vec4 out_color;
+layout(location = 1) out vec2 out_motion;
 
 //layout(constant_id = 0) const int alpha_test_func = 0;
 
 void main() {
+	out_motion = vec2(0.0);
+	if ( abs(var_CurrentClip.w) > 1e-6 && abs(var_PrevClip.w) > 1e-6 ) {
+		vec2 currUV = var_CurrentClip.xy / var_CurrentClip.w * 0.5 + 0.5;
+		vec2 prevUV = var_PrevClip.xy / var_PrevClip.w * 0.5 + 0.5;
+		out_motion = currUV - prevUV;
+	}
+
     //vec4 base = frag_color * texture(texture0, frag_tex_coord0);
 	//vec4 fog = texture(fog_texture, fog_tex_coord);
 

@@ -1624,6 +1624,23 @@ static void RB_RenderSunShadowMap( const drawSurfsCommand_t *cmd )
 	vk_end_sun_shadow_render_pass();
 	SetViewportAndScissor();
 }
+
+void RB_RenderVolumetricShadowView( const viewParms_t *shadowViewParms, drawSurf_t *drawSurfs, int numDrawSurfs )
+{
+	viewParms_t savedViewParms;
+
+	if ( !shadowViewParms || !drawSurfs || numDrawSurfs <= 0 ) {
+		return;
+	}
+
+	savedViewParms = backEnd.viewParms;
+	backEnd.viewParms = *shadowViewParms;
+	RB_BeginDrawingView();
+	RB_RenderDrawSurfList( drawSurfs, numDrawSurfs );
+	RB_EndSurface();
+	backEnd.viewParms = savedViewParms;
+	SetViewportAndScissor();
+}
 #endif
 
 

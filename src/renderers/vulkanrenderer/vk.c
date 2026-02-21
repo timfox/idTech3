@@ -288,14 +288,26 @@ static void vk_create_volumetric_params_buffer( void );
 static void vk_destroy_volumetric_params_buffer( void );
 static void vk_update_volumetric_params( void );
 static void vk_resolve_volumetric_depth_msaa( void );
-static void vk_generate_volumetric_motion_vectors( void );
+static qboolean vk_begin_local_shadow_render_pass( void );
+static void vk_end_local_shadow_render_pass( void );
+static const dlight_t *vk_get_volumetric_local_light( int local_index );
+static qboolean vk_build_local_spot_shadow_view( const dlight_t *dl, viewParms_t *shadowParms, float *outViewProj );
+static qboolean vk_build_local_point_shadow_view( const dlight_t *dl, int face, viewParms_t *shadowParms, float *outViewProj );
+static qboolean vk_render_local_volumetric_shadow_view( const viewParms_t *shadowParms );
 
 static float vk_prev_view_matrix[16];
+static float vk_prev_projection_matrix[16];
 static float vk_prev_viewproj_matrix[16];
 static qboolean vk_prev_matrices_valid = qfalse;
 static int vk_prev_volumetric_time_ms = 0;
 static qboolean vk_prev_volumetric_time_valid = qfalse;
 static float vk_volumetric_noise_time = 0.0f;
+static const float vk_local_shadow_flip_matrix[16] = {
+	0, 0, -1, 0,
+	-1, 0, 0, 0,
+	0, 1, 0, 0,
+	0, 0, 0, 1
+};
 
 
 static uint32_t find_memory_type( uint32_t memory_type_bits, VkMemoryPropertyFlags properties ) {
@@ -907,8 +919,10 @@ static void vk_log_swapchain_recreation( VkResult res, const VkExtent2D *old_ext
 
 static void vk_create_render_passes( void )
 {
-	VkAttachmentDescription attachments[3]; // color | depth | msaa color
+	VkAttachmentDescription attachments[5]; // color resolve | depth | motion resolve | msaa color | msaa motion
+	VkAttachmentReference colorResolveRefs[2];
 	VkAttachmentReference colorResolveRef;
+	VkAttachmentReference colorRefs[2];
 	VkAttachmentReference colorRef0;
 	VkAttachmentReference depthRef0;
 	VkSubpassDescription subpass;
@@ -977,17 +991,41 @@ static void vk_create_render_passes( void )
 	attachments[1].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 	attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-	colorRef0.attachment = 0;
-	colorRef0.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	colorRefs[0].attachment = 0;
+	colorRefs[0].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	colorRefs[1].attachment = VK_ATTACHMENT_UNUSED;
+	colorRefs[1].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 	depthRef0.attachment = 1;
 	depthRef0.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
+	Com_Memset( colorResolveRefs, 0, sizeof( colorResolveRefs ) );
+	colorResolveRefs[0].attachment = VK_ATTACHMENT_UNUSED;
+	colorResolveRefs[0].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	colorResolveRefs[1].attachment = VK_ATTACHMENT_UNUSED;
+	colorResolveRefs[1].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	if ( r_fbo->integer ) {
+		// velocity buffer used for per-pixel reprojection.
+		attachments[2].flags = 0;
+		attachments[2].format = VK_FORMAT_R16G16_SFLOAT;
+		attachments[2].samples = VK_SAMPLE_COUNT_1_BIT;
+		attachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		attachments[2].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachments[2].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		attachments[2].initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		attachments[2].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+		colorRefs[1].attachment = 2;
+	}
+
 	Com_Memset( &subpass, 0, sizeof( subpass ) );
 	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-	subpass.colorAttachmentCount = 1;
-	subpass.pColorAttachments = &colorRef0;
+	subpass.colorAttachmentCount = r_fbo->integer ? 2 : 1;
+	subpass.pColorAttachments = colorRefs;
 	subpass.pDepthStencilAttachment = &depthRef0;
+	subpass.pResolveAttachments = NULL;
 
 	Com_Memset( &desc, 0, sizeof( desc ) );
 	desc.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -997,37 +1035,58 @@ static void vk_create_render_passes( void )
 	desc.pSubpasses = &subpass;
 
 	desc.subpassCount = 1;
-	desc.attachmentCount = 2;
+	desc.attachmentCount = r_fbo->integer ? 3 : 2;
 
 	if ( vk.msaaActive )
 	{
-		attachments[2].flags = 0;
-		attachments[2].format = vk.color_format;
-		attachments[2].samples = vkSamples;
+		attachments[3].flags = 0;
+		attachments[3].format = vk.color_format;
+		attachments[3].samples = vkSamples;
 #ifdef USE_BUFFER_CLEAR
-		attachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 #else
-		attachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 #endif
 		if ( r_bloom->integer ) {
-			attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_STORE; // keep it for post-bloom pass
+			attachments[3].storeOp = VK_ATTACHMENT_STORE_OP_STORE; // keep it for post-bloom pass
 		} else {
-			attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // Intermediate storage (not written)
+			attachments[3].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // Intermediate storage (not written)
 		}
-		attachments[2].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		attachments[2].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		attachments[2].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		attachments[2].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		attachments[3].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachments[3].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		attachments[3].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		attachments[3].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-		desc.attachmentCount = 3;
+		if ( r_fbo->integer ) {
+			attachments[4].flags = 0;
+			attachments[4].format = VK_FORMAT_R16G16_SFLOAT;
+			attachments[4].samples = vkSamples;
+#ifdef USE_BUFFER_CLEAR
+			attachments[4].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+#else
+			attachments[4].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+#endif
+			attachments[4].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			attachments[4].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+			attachments[4].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			attachments[4].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			attachments[4].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-		colorRef0.attachment = 2; // msaa image attachment
-		colorRef0.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			desc.attachmentCount = 5;
 
-		colorResolveRef.attachment = 0; // resolve image attachment
-		colorResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			colorRefs[0].attachment = 3; // msaa scene color attachment
+			colorRefs[1].attachment = 4; // msaa motion attachment
 
-		subpass.pResolveAttachments = &colorResolveRef;
+			colorResolveRefs[0].attachment = 0; // scene resolve
+			colorResolveRefs[1].attachment = 2; // motion resolve
+			subpass.pResolveAttachments = colorResolveRefs;
+		} else {
+			desc.attachmentCount = 3;
+
+			colorRefs[0].attachment = 2; // msaa image attachment
+			colorResolveRefs[0].attachment = 0; // resolve image attachment
+			subpass.pResolveAttachments = &colorResolveRefs[0];
+		}
 	}
 
 	// subpass dependencies
@@ -1080,6 +1139,10 @@ static void vk_create_render_passes( void )
 		// post-bloom pass
 		// color buffer
 		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD; // load from previous pass
+		if ( r_fbo->integer ) {
+			attachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+			attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		}
 		 // depth buffer
 		attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 		attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -1087,8 +1150,12 @@ static void vk_create_render_passes( void )
 		attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		if ( vk.msaaActive ) {
 			// msaa render target
-			attachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-			attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+			attachments[3].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			if ( r_fbo->integer ) {
+				attachments[4].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+				attachments[4].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			}
 		}
 		VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.post_bloom ) );
 		SET_OBJECT_NAME( vk.render_pass.post_bloom, "render pass - post_bloom", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
@@ -4686,8 +4753,13 @@ static void vk_create_attachments( void )
 					VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 					&vk.volumetric_depth_image, &vk.volumetric_depth_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 				create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R16G16_SFLOAT,
-					VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+					VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
 					&vk.motion_vector_image, &vk.motion_vector_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
+				if ( vk.msaaActive ) {
+					create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, vkSamples, VK_FORMAT_R16G16_SFLOAT,
+						VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+						&vk.motion_vector_msaa_image, &vk.motion_vector_msaa_view, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, qtrue, 0 );
+				}
 
 		// screenmap-msaa
 		if ( vk.screenMapSamples > VK_SAMPLE_COUNT_1_BIT ) {
@@ -4763,6 +4835,12 @@ static void vk_create_attachments( void )
 			SET_OBJECT_NAME( vk.volumetric_depth_view, "volumetric depth resolve view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 			SET_OBJECT_NAME( vk.motion_vector_image, "volumetric motion vectors", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
 			SET_OBJECT_NAME( vk.motion_vector_view, "volumetric motion vectors view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+			if ( vk.motion_vector_msaa_image ) {
+				SET_OBJECT_NAME( vk.motion_vector_msaa_image, "volumetric motion vectors msaa", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+			}
+			if ( vk.motion_vector_msaa_view ) {
+				SET_OBJECT_NAME( vk.motion_vector_msaa_view, "volumetric motion vectors msaa view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+			}
 			SET_OBJECT_NAME( vk.sun_shadow_image, "sun shadow depth", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
 	SET_OBJECT_NAME( vk.sun_shadow_view, "sun shadow depth view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 	SET_OBJECT_NAME( vk.sun_shadow_color_image, "sun shadow color", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
@@ -4827,7 +4905,7 @@ static void vk_create_attachments( void )
 
 static void vk_create_framebuffers( void )
 {
-	VkImageView framebuffer_attachments[3];
+	VkImageView framebuffer_attachments[5];
 	VkFramebufferCreateInfo desc;
 	uint32_t n;
 
@@ -4860,10 +4938,13 @@ static void vk_create_framebuffers( void )
 				desc.height = glConfig.vidHeight;
 				framebuffer_attachments[0] = vk.color_image_view;
 				framebuffer_attachments[1] = vk.depth_image_view;
+				framebuffer_attachments[2] = vk.motion_vector_view;
+				desc.attachmentCount = 3;
 				if ( vk.msaaActive )
 				{
-					desc.attachmentCount = 3;
-					framebuffer_attachments[2] = vk.msaa_image_view;
+					desc.attachmentCount = 5;
+					framebuffer_attachments[3] = vk.msaa_image_view;
+					framebuffer_attachments[4] = vk.motion_vector_msaa_view;
 				}
 				VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.main[n] ) );
 				SET_OBJECT_NAME( vk.framebuffers.main[n], "framebuffer - main", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
@@ -5962,7 +6043,7 @@ void vk_initialize( void )
 
 		push_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 		push_range.offset = 0;
-		push_range.size = 64; // 16 floats
+		push_range.size = 128; // current + previous MVP matrices
 
 		// standard pipelines
 
@@ -7173,6 +7254,12 @@ static void vk_destroy_attachments( void )
 		qvkDestroyImageView( vk.device, vk.motion_vector_view, NULL );
 		vk.motion_vector_image = VK_NULL_HANDLE;
 		vk.motion_vector_view = VK_NULL_HANDLE;
+	}
+	if ( vk.motion_vector_msaa_image ) {
+		qvkDestroyImage( vk.device, vk.motion_vector_msaa_image, NULL );
+		qvkDestroyImageView( vk.device, vk.motion_vector_msaa_view, NULL );
+		vk.motion_vector_msaa_image = VK_NULL_HANDLE;
+		vk.motion_vector_msaa_view = VK_NULL_HANDLE;
 	}
 
 	if ( vk.smaa_edge_image ) {
@@ -8879,12 +8966,14 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	VkPipelineDepthStencilStateCreateInfo depth_stencil_state;
 	VkPipelineColorBlendStateCreateInfo blend_state;
 	VkPipelineColorBlendAttachmentState attachment_blend_state;
+	VkPipelineColorBlendAttachmentState attachment_blend_states[2];
 	VkPipelineDynamicStateCreateInfo dynamic_state;
 	VkDynamicState dynamic_state_array[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
 	VkGraphicsPipelineCreateInfo create_info;
 	VkPipeline pipeline;
 	VkPipelineShaderStageCreateInfo shader_stages[2];
 	VkBool32 alphaToCoverage = VK_FALSE;
+	VkBool32 main_motion_target = VK_FALSE;
 	unsigned int atest_bits;
 	unsigned int state_bits = def->state_bits;
 
@@ -10068,6 +10157,21 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 		}
 	}
 
+	main_motion_target = ( r_fbo->integer &&
+		( renderPassIndex == RENDER_PASS_MAIN || renderPassIndex == RENDER_PASS_POST_BLOOM ) ) ? VK_TRUE : VK_FALSE;
+	attachment_blend_states[0] = attachment_blend_state;
+	Com_Memset( &attachment_blend_states[1], 0, sizeof( attachment_blend_states[1] ) );
+	attachment_blend_states[1].blendEnable = VK_FALSE;
+	attachment_blend_states[1].colorWriteMask = 0;
+	if ( main_motion_target &&
+		def->shader_type != TYPE_DOT &&
+		def->shadow_phase == SHADOW_DISABLED &&
+		depth_stencil_state.depthTestEnable == VK_TRUE &&
+		depth_stencil_state.depthWriteEnable == VK_TRUE )
+	{
+		attachment_blend_states[1].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT;
+	}
+
 	if ( r_vk_pipeline_debug && r_vk_pipeline_debug->integer ) {
 		ri.Printf( PRINT_DEVELOPER, "vk pipeline def#%u render_pass=%u shader=%u fog=%d state=0x%x allow_discard=%d discard_mode=%d\n",
 			def_index, renderPassIndex, def->shader_type, def->fog_stage, def->state_bits, def->allow_discard, frag_spec_data.discard_mode );
@@ -10094,8 +10198,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	blend_state.flags = 0;
 	blend_state.logicOpEnable = VK_FALSE;
 	blend_state.logicOp = VK_LOGIC_OP_COPY;
-	blend_state.attachmentCount = 1;
-	blend_state.pAttachments = &attachment_blend_state;
+	blend_state.attachmentCount = main_motion_target ? 2 : 1;
+	blend_state.pAttachments = attachment_blend_states;
 	blend_state.blendConstants[0] = 0.0f;
 	blend_state.blendConstants[1] = 0.0f;
 	blend_state.blendConstants[2] = 0.0f;
@@ -10308,6 +10412,17 @@ static void get_scissor_rect(VkRect2D *r) {
 }
 
 
+typedef struct vkMvpPushConstants_s {
+	float mvp[16];
+	float prev_mvp[16];
+} vkMvpPushConstants_t;
+
+static void vk_get_projection_matrix_vk( const float *projection_matrix, float *projection_vk )
+{
+	Com_Memcpy( projection_vk, projection_matrix, sizeof( float ) * 16 );
+	projection_vk[5] = -projection_matrix[5];
+}
+
 static void get_mvp_transform( float *mvp )
 {
 	if ( backEnd.projection2D )
@@ -10327,16 +10442,35 @@ static void get_mvp_transform( float *mvp )
 	}
 	else
 	{
-		const float *p = backEnd.viewParms.projectionMatrix;
 		float proj[16];
-		Com_Memcpy( proj, p, 64 );
-
-		// update q3's proj matrix (opengl) to vulkan conventions: z - [0, 1] instead of [-1, 1] and invert y direction
-		proj[5] = -p[5];
-		//proj[10] = ( p[10] - 1.0f ) / 2.0f;
-		//proj[14] = p[14] / 2.0f;
+		vk_get_projection_matrix_vk( backEnd.viewParms.projectionMatrix, proj );
 		myGlMultMatrix( vk_world.modelview_transform, proj, mvp );
 	}
+}
+
+static void get_prev_mvp_transform( float *prev_mvp )
+{
+	float prev_model[16];
+	float prev_model_view[16];
+	float prev_proj[16];
+
+	if ( backEnd.projection2D || !vk_prev_matrices_valid ) {
+		get_mvp_transform( prev_mvp );
+		return;
+	}
+
+	Com_Memcpy( prev_model, backEnd.or.modelMatrix, sizeof( prev_model ) );
+
+	// Preserve previous frame object translation when available to capture true object motion.
+	if ( backEnd.currentEntity && backEnd.currentEntity != &tr.worldEntity && backEnd.currentEntity->e.reType == RT_MODEL ) {
+		prev_model[12] = backEnd.currentEntity->e.oldorigin[0];
+		prev_model[13] = backEnd.currentEntity->e.oldorigin[1];
+		prev_model[14] = backEnd.currentEntity->e.oldorigin[2];
+	}
+
+	myGlMultMatrix( prev_model, vk_prev_view_matrix, prev_model_view );
+	vk_get_projection_matrix_vk( vk_prev_projection_matrix, prev_proj );
+	myGlMultMatrix( prev_model_view, prev_proj, prev_mvp );
 }
 
 
@@ -10396,17 +10530,19 @@ void vk_clear_depth( qboolean clear_stencil ) {
 
 
 void vk_update_mvp( const float *m ) {
-	float push_constants[16]; // mvp transform
+	vkMvpPushConstants_t push_constants;
 
 	//
 	// Specify push constants.
 	//
-	if ( m )
-		Com_Memcpy( push_constants, m, sizeof( push_constants ) );
-	else
-		get_mvp_transform( push_constants );
+	if ( m ) {
+		Com_Memcpy( push_constants.mvp, m, sizeof( push_constants.mvp ) );
+	} else {
+		get_mvp_transform( push_constants.mvp );
+	}
+	get_prev_mvp_transform( push_constants.prev_mvp );
 
-	qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof( push_constants ), push_constants );
+	qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof( push_constants ), &push_constants );
 
 	vk.stats.push_size += sizeof( push_constants );
 }
@@ -10897,7 +11033,7 @@ static void vk_set_fullscreen_viewport_scissor( uint32_t width, uint32_t height 
 static void vk_begin_render_pass( VkRenderPass renderPass, VkFramebuffer frameBuffer, qboolean clearValues, uint32_t width, uint32_t height )
 {
 	VkRenderPassBeginInfo render_pass_begin_info;
-	VkClearValue clear_values[3];
+	VkClearValue clear_values[5];
 
 	// Begin render pass.
 
@@ -10911,10 +11047,10 @@ static void vk_begin_render_pass( VkRenderPass renderPass, VkFramebuffer frameBu
 	render_pass_begin_info.renderArea.extent.height = height;
 
 	if ( clearValues ) {
-		// attachments layout:
-		// [0] - resolve/color/presentation
-		// [1] - depth/stencil
-		// [2] - multisampled color, optional
+		uint32_t clear_count = 2;
+
+		// attachments layout for main pass when FBO is enabled:
+		// [0] resolve color, [1] depth, [2] motion resolve, [3] msaa color, [4] msaa motion
 		Com_Memset( clear_values, 0, sizeof( clear_values ) );
 		// Keep color clears black so uncovered regions are obvious and neutral in post-process debug.
 		clear_values[0].color.float32[0] = 0.0f;
@@ -10924,7 +11060,24 @@ static void vk_begin_render_pass( VkRenderPass renderPass, VkFramebuffer frameBu
 #ifndef USE_REVERSED_DEPTH
 		clear_values[1].depthStencil.depth = 1.0;
 #endif
-		render_pass_begin_info.clearValueCount = vk.msaaActive ? 3 : 2;
+		if ( vk.renderPassIndex == RENDER_PASS_MAIN || vk.renderPassIndex == RENDER_PASS_POST_BLOOM ) {
+			if ( r_fbo->integer ) {
+				clear_values[2].color.float32[0] = 0.0f;
+				clear_values[2].color.float32[1] = 0.0f;
+				clear_values[2].color.float32[2] = 0.0f;
+				clear_values[2].color.float32[3] = 0.0f;
+				clear_count = vk.msaaActive ? 5 : 3;
+			} else {
+				clear_count = vk.msaaActive ? 3 : 2;
+			}
+		} else if ( vk.renderPassIndex == RENDER_PASS_SCREENMAP ) {
+			clear_count = ( vk.screenMapSamples > VK_SAMPLE_COUNT_1_BIT ) ? 3 : 2;
+		} else if ( vk.renderPassIndex == RENDER_PASS_SUN_SHADOW ) {
+			clear_count = 2;
+		} else {
+			clear_count = vk.msaaActive ? 3 : 2;
+		}
+		render_pass_begin_info.clearValueCount = clear_count;
 		render_pass_begin_info.pClearValues = clear_values;
 
 		vk_world.dirty_depth_attachment = 0;
@@ -11110,6 +11263,60 @@ void vk_end_sun_shadow_render_pass( void )
 	vk_begin_main_render_pass();
 }
 
+static qboolean vk_begin_local_shadow_render_pass( void )
+{
+	VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+
+	if ( !vk.fboActive || vk.render_pass.sun_shadow == VK_NULL_HANDLE || vk.framebuffers.sun_shadow == VK_NULL_HANDLE ||
+		vk.sun_shadow_image == VK_NULL_HANDLE || vk.sun_shadow_width == 0 || vk.sun_shadow_height == 0 )
+	{
+		return qfalse;
+	}
+
+	if ( glConfig.stencilBits > 0 ) {
+		depth_aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
+	}
+
+	// During volumetric compute there is no active graphics pass, but this remains safe
+	// if the caller invokes local shadow rendering while a pass is active.
+	vk_end_render_pass();
+
+	record_image_layout_transition( vk.cmd->command_buffer, vk.sun_shadow_image, depth_aspect,
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+		VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT );
+
+	vk.renderPassIndex = RENDER_PASS_SUN_SHADOW;
+	vk.renderWidth = vk.sun_shadow_width;
+	vk.renderHeight = vk.sun_shadow_height;
+	vk.renderScaleX = vk.renderScaleY = 1.0f;
+	vk_begin_render_pass( vk.render_pass.sun_shadow, vk.framebuffers.sun_shadow, qtrue, vk.renderWidth, vk.renderHeight );
+
+	return qtrue;
+}
+
+static void vk_end_local_shadow_render_pass( void )
+{
+	VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+
+	if ( !vk.fboActive || vk.sun_shadow_image == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	if ( glConfig.stencilBits > 0 ) {
+		depth_aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
+	}
+
+	vk_end_render_pass();
+
+	record_image_layout_transition( vk.cmd->command_buffer, vk.sun_shadow_image, depth_aspect,
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+		VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
+}
+
 
 static void vk_begin_volumetric_render_pass( void )
 {
@@ -11168,29 +11375,199 @@ static void vk_volumetric_stage_barrier( VkImage image )
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
 }
 
-static void vk_generate_volumetric_motion_vectors( void )
+static const dlight_t *vk_get_volumetric_local_light( int local_index )
 {
-	if ( vk.volumetric_motion_pipeline == VK_NULL_HANDLE ||
-		vk.volumetric_motion_pipeline_layout == VK_NULL_HANDLE ||
-		vk.volumetric_motion_descriptor == VK_NULL_HANDLE ||
-		vk.motion_vector_image == VK_NULL_HANDLE )
-	{
-		return;
+	int current = 0;
+
+	if ( local_index < 0 ) {
+		return NULL;
 	}
 
-	record_image_layout_transition( vk.cmd->command_buffer, vk.motion_vector_image, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
-		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
+	for ( int i = 0; i < (int)backEnd.viewParms.num_dlights; i++ ) {
+		const dlight_t *dl = &backEnd.viewParms.dlights[i];
+		if ( dl->radius <= 0.001f ) {
+			continue;
+		}
+		if ( current == local_index ) {
+			return dl;
+		}
+		current++;
+	}
 
-	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.volumetric_motion_pipeline );
-	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-		vk.volumetric_motion_pipeline_layout, 0, 1, &vk.volumetric_motion_descriptor, 0, NULL );
-	qvkCmdDispatch( vk.cmd->command_buffer, ( glConfig.vidWidth + 7 ) / 8, ( glConfig.vidHeight + 7 ) / 8, 1 );
+	return NULL;
+}
 
-	record_image_layout_transition( vk.cmd->command_buffer, vk.motion_vector_image, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
+static qboolean vk_build_local_shadow_view_axes(
+	const vec3_t origin,
+	const vec3_t forward_in,
+	const vec3_t up_hint,
+	float fov_degrees,
+	float max_distance,
+	viewParms_t *shadowParms,
+	float *outViewProj )
+{
+	vec3_t forward;
+	vec3_t upRef;
+	vec3_t right;
+	vec3_t up;
+	float viewerMatrix[16];
+	float lightView[16];
+	float nearPlane = ( r_znear ) ? r_znear->value : 4.0f;
+
+	if ( !shadowParms || !outViewProj ) {
+		return qfalse;
+	}
+
+	if ( nearPlane < 1.0f ) {
+		nearPlane = 1.0f;
+	}
+	if ( max_distance <= nearPlane + 1.0f ) {
+		return qfalse;
+	}
+
+	VectorCopy( forward_in, forward );
+	if ( VectorNormalize( forward ) <= 0.0f ) {
+		return qfalse;
+	}
+
+	VectorCopy( up_hint, upRef );
+	if ( VectorLengthSquared( upRef ) < 1e-6f || fabsf( DotProduct( forward, upRef ) ) > 0.95f ) {
+		VectorSet( upRef, 0.0f, 0.0f, 1.0f );
+		if ( fabsf( DotProduct( forward, upRef ) ) > 0.95f ) {
+			VectorSet( upRef, 0.0f, 1.0f, 0.0f );
+		}
+	}
+
+	CrossProduct( upRef, forward, right );
+	if ( VectorNormalize( right ) <= 0.0f ) {
+		return qfalse;
+	}
+	CrossProduct( forward, right, up );
+	VectorNormalize( up );
+
+	*shadowParms = backEnd.viewParms;
+	VectorCopy( origin, shadowParms->or.origin );
+	VectorCopy( origin, shadowParms->pvsOrigin );
+	VectorCopy( forward, shadowParms->or.axis[0] );
+	VectorCopy( right, shadowParms->or.axis[1] );
+	VectorCopy( up, shadowParms->or.axis[2] );
+	shadowParms->portalView = PV_NONE;
+	shadowParms->targetCube = NULL;
+	shadowParms->targetCubeLayer = 0;
+	shadowParms->viewportX = 0;
+	shadowParms->viewportY = 0;
+	shadowParms->viewportWidth = (int)vk.sun_shadow_width;
+	shadowParms->viewportHeight = (int)vk.sun_shadow_height;
+	shadowParms->scissorX = 0;
+	shadowParms->scissorY = 0;
+	shadowParms->scissorWidth = (int)vk.sun_shadow_width;
+	shadowParms->scissorHeight = (int)vk.sun_shadow_height;
+	shadowParms->zFar = max_distance;
+	shadowParms->fovX = fov_degrees;
+	shadowParms->fovY = fov_degrees;
+	R_SetupProjection( shadowParms, nearPlane, qfalse );
+
+	viewerMatrix[0] = shadowParms->or.axis[0][0];
+	viewerMatrix[4] = shadowParms->or.axis[0][1];
+	viewerMatrix[8] = shadowParms->or.axis[0][2];
+	viewerMatrix[12] = -origin[0] * viewerMatrix[0] + -origin[1] * viewerMatrix[4] + -origin[2] * viewerMatrix[8];
+	viewerMatrix[1] = shadowParms->or.axis[1][0];
+	viewerMatrix[5] = shadowParms->or.axis[1][1];
+	viewerMatrix[9] = shadowParms->or.axis[1][2];
+	viewerMatrix[13] = -origin[0] * viewerMatrix[1] + -origin[1] * viewerMatrix[5] + -origin[2] * viewerMatrix[9];
+	viewerMatrix[2] = shadowParms->or.axis[2][0];
+	viewerMatrix[6] = shadowParms->or.axis[2][1];
+	viewerMatrix[10] = shadowParms->or.axis[2][2];
+	viewerMatrix[14] = -origin[0] * viewerMatrix[2] + -origin[1] * viewerMatrix[6] + -origin[2] * viewerMatrix[10];
+	viewerMatrix[3] = 0.0f;
+	viewerMatrix[7] = 0.0f;
+	viewerMatrix[11] = 0.0f;
+	viewerMatrix[15] = 1.0f;
+
+	myGlMultMatrix( viewerMatrix, vk_local_shadow_flip_matrix, lightView );
+	Matrix16Identity( shadowParms->world.modelMatrix );
+	Com_Memcpy( shadowParms->world.modelViewMatrix, lightView, sizeof( lightView ) );
+	VectorCopy( origin, shadowParms->world.viewOrigin );
+	VectorClear( shadowParms->world.origin );
+	AxisCopy( axisDefault, shadowParms->world.axis );
+
+	myGlMultMatrix( lightView, shadowParms->projectionMatrix, outViewProj );
+	return qtrue;
+}
+
+static qboolean vk_build_local_spot_shadow_view( const dlight_t *dl, viewParms_t *shadowParms, float *outViewProj )
+{
+	vec3_t forward;
+	vec3_t up = { 0.0f, 0.0f, 1.0f };
+
+	if ( !dl || !shadowParms || !outViewProj ) {
+		return qfalse;
+	}
+
+	VectorSubtract( dl->origin2, dl->origin, forward );
+	if ( VectorNormalize( forward ) <= 0.001f ) {
+		VectorSet( forward, 0.0f, 0.0f, -1.0f );
+	}
+
+	return vk_build_local_shadow_view_axes( dl->origin, forward, up, 70.0f, dl->radius, shadowParms, outViewProj );
+}
+
+static qboolean vk_build_local_point_shadow_view( const dlight_t *dl, int face, viewParms_t *shadowParms, float *outViewProj )
+{
+	vec3_t forward = { 0.0f, 0.0f, -1.0f };
+	vec3_t up = { 0.0f, 0.0f, 1.0f };
+
+	if ( !dl || !shadowParms || !outViewProj ) {
+		return qfalse;
+	}
+
+	switch ( face ) {
+		case 0: VectorSet( forward, 1.0f, 0.0f, 0.0f ); VectorSet( up, 0.0f, 0.0f, 1.0f ); break; // +X
+		case 1: VectorSet( forward, -1.0f, 0.0f, 0.0f ); VectorSet( up, 0.0f, 0.0f, 1.0f ); break; // -X
+		case 2: VectorSet( forward, 0.0f, 1.0f, 0.0f ); VectorSet( up, 0.0f, 0.0f, 1.0f ); break; // +Y
+		case 3: VectorSet( forward, 0.0f, -1.0f, 0.0f ); VectorSet( up, 0.0f, 0.0f, 1.0f ); break; // -Y
+		case 4: VectorSet( forward, 0.0f, 0.0f, 1.0f ); VectorSet( up, 0.0f, -1.0f, 0.0f ); break; // +Z
+		case 5: VectorSet( forward, 0.0f, 0.0f, -1.0f ); VectorSet( up, 0.0f, 1.0f, 0.0f ); break; // -Z
+		default: return qfalse;
+	}
+
+	return vk_build_local_shadow_view_axes( dl->origin, forward, up, 90.0f, dl->radius, shadowParms, outViewProj );
+}
+
+static qboolean vk_render_local_volumetric_shadow_view( const viewParms_t *shadowParms )
+{
+	renderPass_t saved_pass;
+	uint32_t saved_width;
+	uint32_t saved_height;
+	float saved_scale_x;
+	float saved_scale_y;
+
+	if ( !shadowParms || backEnd.refdef.numDrawSurfs <= 0 || !backEnd.refdef.drawSurfs ) {
+		return qfalse;
+	}
+	saved_pass = vk.renderPassIndex;
+	saved_width = vk.renderWidth;
+	saved_height = vk.renderHeight;
+	saved_scale_x = vk.renderScaleX;
+	saved_scale_y = vk.renderScaleY;
+
+	if ( !vk_begin_local_shadow_render_pass() ) {
+		vk.renderPassIndex = saved_pass;
+		vk.renderWidth = saved_width;
+		vk.renderHeight = saved_height;
+		vk.renderScaleX = saved_scale_x;
+		vk.renderScaleY = saved_scale_y;
+		return qfalse;
+	}
+
+	RB_RenderVolumetricShadowView( shadowParms, backEnd.refdef.drawSurfs, backEnd.refdef.numDrawSurfs );
+	vk_end_local_shadow_render_pass();
+	vk.renderPassIndex = saved_pass;
+	vk.renderWidth = saved_width;
+	vk.renderHeight = saved_height;
+	vk.renderScaleX = saved_scale_x;
+	vk.renderScaleY = saved_scale_y;
+	return qtrue;
 }
 
 static void vk_volumetric_compute_pass( void )
@@ -11234,6 +11611,10 @@ static void vk_volumetric_compute_pass( void )
 	const uint32_t clamp1_groups_y = ( clamp1_height + 7 ) / 8;
 	const uint32_t clamp_groups_z = ( vk.froxel_slices + 3 ) / 4;
 	int local_light_count = 0;
+	volumetric_params_t *params_rw = (volumetric_params_t *)vk.volumetric_params_ptr;
+	float saved_shadow_matrix[16];
+	float saved_shadow_valid = 0.0f;
+	qboolean use_local_shadows = ( r_fog_shadows && r_fog_shadows->integer ) ? qtrue : qfalse;
 
 	if ( vk.volumetric_params_ptr ) {
 		const volumetric_params_t *params = (const volumetric_params_t *)vk.volumetric_params_ptr;
@@ -11243,6 +11624,8 @@ static void vk_volumetric_compute_pass( void )
 		} else if ( local_light_count > VK_VOLUMETRIC_MAX_LIGHTS ) {
 			local_light_count = VK_VOLUMETRIC_MAX_LIGHTS;
 		}
+		Com_Memcpy( saved_shadow_matrix, params->sunShadowMatrix0, sizeof( saved_shadow_matrix ) );
+		saved_shadow_valid = params->shadowParams0[3];
 	}
 
 	if ( r_fogDebug && r_fogDebug->integer >= 1 && ( vk.volumetric_frame % 120u ) == 0u ) {
@@ -11279,11 +11662,62 @@ static void vk_volumetric_compute_pass( void )
 	vk_volumetric_stage_barrier( vk.froxel_extinction_image );
 
 	for ( int i = 0; i < local_light_count; i++ ) {
-		// passParams: x=lightIndex, y=pointShadowFace, z=localShadowValid.
-		// localShadowValid remains 0 until the local shadow-map render path is fully wired.
-		vk_set_volumetric_pass_params( (float)VK_VOLUMETRIC_STAGE_LOCAL_LIGHT, (float)i, -1.0f, 0.0f );
-		qvkCmdDispatch( vk.cmd->command_buffer, groups_x, groups_y, groups_z );
-		vk_volumetric_stage_barrier( vk.froxel_volume_image );
+		const dlight_t *dl = vk_get_volumetric_local_light( i );
+		qboolean dispatched_shadowed = qfalse;
+
+		if ( use_local_shadows && params_rw && dl ) {
+			if ( dl->linear ) {
+				viewParms_t shadowView;
+				float shadowViewProj[16];
+
+				if ( vk_build_local_spot_shadow_view( dl, &shadowView, shadowViewProj ) &&
+					vk_render_local_volumetric_shadow_view( &shadowView ) )
+				{
+					Com_Memcpy( params_rw->sunShadowMatrix0, shadowViewProj, sizeof( shadowViewProj ) );
+					params_rw->shadowParams0[3] = 1.0f;
+					// passParams: x=lightIndex, y=pointShadowFace(-1 for spot), z=localShadowValid.
+					vk_set_volumetric_pass_params( (float)VK_VOLUMETRIC_STAGE_LOCAL_LIGHT, (float)i, -1.0f, 1.0f );
+					qvkCmdDispatch( vk.cmd->command_buffer, groups_x, groups_y, groups_z );
+					vk_volumetric_stage_barrier( vk.froxel_volume_image );
+					dispatched_shadowed = qtrue;
+				}
+			} else {
+				for ( int face = 0; face < 6; face++ ) {
+					viewParms_t shadowView;
+					float shadowViewProj[16];
+
+					if ( !vk_build_local_point_shadow_view( dl, face, &shadowView, shadowViewProj ) ) {
+						continue;
+					}
+					if ( !vk_render_local_volumetric_shadow_view( &shadowView ) ) {
+						continue;
+					}
+
+					Com_Memcpy( params_rw->sunShadowMatrix0, shadowViewProj, sizeof( shadowViewProj ) );
+					params_rw->shadowParams0[3] = 1.0f;
+					// passParams: x=lightIndex, y=pointShadowFace(0..5), z=localShadowValid.
+					vk_set_volumetric_pass_params( (float)VK_VOLUMETRIC_STAGE_LOCAL_LIGHT, (float)i, (float)face, 1.0f );
+					qvkCmdDispatch( vk.cmd->command_buffer, groups_x, groups_y, groups_z );
+					vk_volumetric_stage_barrier( vk.froxel_volume_image );
+					dispatched_shadowed = qtrue;
+				}
+			}
+		}
+
+		if ( !dispatched_shadowed ) {
+			if ( params_rw ) {
+				params_rw->shadowParams0[3] = 0.0f;
+			}
+			// passParams: x=lightIndex, y=pointShadowFace(-1), z=localShadowValid(0).
+			vk_set_volumetric_pass_params( (float)VK_VOLUMETRIC_STAGE_LOCAL_LIGHT, (float)i, -1.0f, 0.0f );
+			qvkCmdDispatch( vk.cmd->command_buffer, groups_x, groups_y, groups_z );
+			vk_volumetric_stage_barrier( vk.froxel_volume_image );
+		}
+	}
+
+	if ( params_rw ) {
+		Com_Memcpy( params_rw->sunShadowMatrix0, saved_shadow_matrix, sizeof( saved_shadow_matrix ) );
+		params_rw->shadowParams0[3] = saved_shadow_valid;
 	}
 
 	vk_set_volumetric_pass_params( (float)VK_VOLUMETRIC_STAGE_CLAMP_LEVEL0, 0.0f, 0.0f, 0.0f );
@@ -11461,17 +11895,6 @@ static void vk_volumetric_fog_pass( void )
 		vk_prev_volumetric_time_valid = qfalse;
 		return;
 	}
-	if ( vk.volumetric_motion_pipeline == VK_NULL_HANDLE || vk.volumetric_motion_descriptor == VK_NULL_HANDLE ) {
-		if ( r_fogDebug && r_fogDebug->integer >= 1 ) {
-			ri.Printf( PRINT_WARNING, "[VK][fog] skipping fog pass: motion pipeline/descriptor missing pipeline=0x%llx descriptor=0x%llx\n",
-				(unsigned long long)(uintptr_t)vk.volumetric_motion_pipeline,
-				(unsigned long long)(uintptr_t)vk.volumetric_motion_descriptor );
-		}
-		vk.has_prev_volumetric = qfalse;
-		vk_prev_matrices_valid = qfalse;
-		vk_prev_volumetric_time_valid = qfalse;
-		return;
-	}
 	if ( vk.msaaActive &&
 		( vk.volumetric_depth_image == VK_NULL_HANDLE ||
 		  vk.volumetric_depth_view == VK_NULL_HANDLE ||
@@ -11504,7 +11927,6 @@ static void vk_volumetric_fog_pass( void )
 
 	vk_resolve_volumetric_depth_msaa();
 	vk_update_volumetric_params();
-	vk_generate_volumetric_motion_vectors();
 
 	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
@@ -13117,6 +13539,7 @@ static void vk_update_volumetric_params( void )
 
 	Com_Memcpy( vk.volumetric_params_ptr, &params, sizeof( params ) );
 	Com_Memcpy( vk_prev_view_matrix, view, sizeof( vk_prev_view_matrix ) );
+	Com_Memcpy( vk_prev_projection_matrix, projection, sizeof( vk_prev_projection_matrix ) );
 	Com_Memcpy( vk_prev_viewproj_matrix, params.viewProj, sizeof( vk_prev_viewproj_matrix ) );
 	vk_prev_matrices_valid = qtrue;
 

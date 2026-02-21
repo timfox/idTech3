@@ -8,9 +8,10 @@
 #define USE_CL1
 #endif
 
-// 64 bytes
+// 128 bytes
 layout(push_constant) uniform Transform {
 	mat4 mvp;
+	mat4 prevMvp;
 };
 
 #if defined(USE_FOG) || defined(USE_ENV)
@@ -102,12 +103,19 @@ layout(location = 12) out vec4 var_Tangent;
 
 #endif
 
+layout(location = 13) out vec4 var_CurrentClip;
+layout(location = 14) out vec4 var_PrevClip;
+
 out gl_PerVertex {
 	vec4 gl_Position;
 };
 
 void main() {
-	gl_Position = mvp * vec4(in_position, 1.0);
+	vec4 currClip = mvp * vec4(in_position, 1.0);
+	vec4 prevClip = prevMvp * vec4(in_position, 1.0);
+	gl_Position = currClip;
+	var_CurrentClip = currClip;
+	var_PrevClip = prevClip;
 
 	#ifdef USE_VK_PBR
 		vec3 tangent = in_tangent.xyz;
