@@ -215,6 +215,12 @@ cvar_t	*r_volumetricFogNoiseScale;
 cvar_t	*r_volumetricFogNoiseStrength;
 cvar_t	*r_volumetricFogNoiseThreshold;
 cvar_t	*r_volumetricFogNoiseScroll;
+cvar_t	*r_fog_shadows;
+cvar_t	*r_fogShadowMapSize;
+cvar_t	*r_fogShadowBias;
+cvar_t	*r_fogShadowPcfRadius;
+cvar_t	*r_fogShadowMaxDistance;
+cvar_t	*r_fogShadowPadding;
 cvar_t	*r_fogDebug;
 cvar_t	*r_froxelDebug;
 cvar_t	*r_vk_swapchain_srgb;
@@ -2049,14 +2055,44 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_volumetricFogNoiseScroll, "3D noise scroll velocity (x y z) for volumetric fog movement." );
 	ri.Cvar_SetGroup( r_volumetricFogNoiseScroll, CVG_RENDERER );
 
+	r_fog_shadows = ri.Cvar_Get( "r_fog_shadows", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_fog_shadows, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fog_shadows, "Enable directional sun-shadow visibility in volumetric froxel lighting." );
+	ri.Cvar_SetGroup( r_fog_shadows, CVG_RENDERER );
+
+	r_fogShadowMapSize = ri.Cvar_Get( "r_fogShadowMapSize", "1024", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_fogShadowMapSize, "256", "4096", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fogShadowMapSize, "Sun shadow map resolution used by volumetric fog (single-cascade). Requires vid_restart." );
+	ri.Cvar_SetGroup( r_fogShadowMapSize, CVG_RENDERER );
+
+	r_fogShadowBias = ri.Cvar_Get( "r_fogShadowBias", "0.001", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_fogShadowBias, "0", "0.05", CV_FLOAT );
+	ri.Cvar_SetDescription( r_fogShadowBias, "Depth bias for volumetric sun-shadow sampling." );
+	ri.Cvar_SetGroup( r_fogShadowBias, CVG_RENDERER );
+
+	r_fogShadowPcfRadius = ri.Cvar_Get( "r_fogShadowPcfRadius", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_fogShadowPcfRadius, "0", "4", CV_FLOAT );
+	ri.Cvar_SetDescription( r_fogShadowPcfRadius, "PCF radius in texels for volumetric sun-shadow filtering." );
+	ri.Cvar_SetGroup( r_fogShadowPcfRadius, CVG_RENDERER );
+
+	r_fogShadowMaxDistance = ri.Cvar_Get( "r_fogShadowMaxDistance", "4096", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_fogShadowMaxDistance, "256", "32768", CV_FLOAT );
+	ri.Cvar_SetDescription( r_fogShadowMaxDistance, "Max camera depth fitted into the volumetric sun shadow cascade." );
+	ri.Cvar_SetGroup( r_fogShadowMaxDistance, CVG_RENDERER );
+
+	r_fogShadowPadding = ri.Cvar_Get( "r_fogShadowPadding", "64", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_fogShadowPadding, "0", "4096", CV_FLOAT );
+	ri.Cvar_SetDescription( r_fogShadowPadding, "World-space XY padding added to volumetric sun shadow cascade bounds." );
+	ri.Cvar_SetGroup( r_fogShadowPadding, CVG_RENDERER );
+
 	r_fogDebug = ri.Cvar_Get( "r_fogDebug", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_fogDebug, "0", "5", CV_INTEGER );
-	ri.Cvar_SetDescription( r_fogDebug, "Volumetric fog debug view: 0=off, 1=froxel coords, 2=extinction slice, 3=scattering slice, 4=temporal validity/weight, 5=integrated transmittance." );
+	ri.Cvar_CheckRange( r_fogDebug, "0", "6", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fogDebug, "Volumetric fog debug view: 0=off, 1=froxel coords, 2=extinction slice, 3=scattering slice, 4=temporal validity/weight, 5=integrated transmittance, 6=sun-shadow debug slice." );
 	ri.Cvar_SetGroup( r_fogDebug, CVG_RENDERER );
 
 	r_froxelDebug = ri.Cvar_Get( "r_froxelDebug", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_froxelDebug, "0", "2", CV_INTEGER );
-	ri.Cvar_SetDescription( r_froxelDebug, "Volumetric froxel debug injection: 0=normal, 1=uvw gradient, 2=constant density fill." );
+	ri.Cvar_CheckRange( r_froxelDebug, "0", "5", CV_INTEGER );
+	ri.Cvar_SetDescription( r_froxelDebug, "Volumetric froxel debug injection: 0=normal, 1=uvw gradient, 2=constant density fill, 3=sun visibility, 4=shadow uv/depth, 5=binary sun mask." );
 	ri.Cvar_SetGroup( r_froxelDebug, CVG_RENDERER );
 
 	r_vk_swapchain_srgb = ri.Cvar_Get( "r_vk_swapchain_srgb", "0", CVAR_ROM );

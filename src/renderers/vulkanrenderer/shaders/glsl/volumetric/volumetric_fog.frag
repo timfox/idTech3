@@ -26,6 +26,9 @@ layout(std140, binding = 3) uniform VolumetricParams {
 	vec4 phaseParams;
 	vec4 noiseParams;
 	vec4 noiseScroll;
+	mat4 sunShadowMatrix0;
+	vec4 shadowParams0;
+	vec4 shadowMapSize0;
 } params;
 
 const int MAX_Z_SLICES = 128;
@@ -41,7 +44,7 @@ float decodeClipZ( float depthSample, int depthMode ) {
 		return depthSample * 2.0 - 1.0;
 	}
 	if ( depthMode == 1 ) {
-		return depthSample * 2.0 - 1.0;
+		return ( 1.0 - depthSample ) * 2.0 - 1.0;
 	}
 	return 0.0;
 }
@@ -99,7 +102,7 @@ void reconstructViewRayAndDepth(
 void main() {
 	float depthSample = texture( depthTexture, v_UV ).r;
 	int depthMode = int( clamp( floor( params.miscParams.y + 0.5 ), 0.0, 2.0 ) );
-	int fogDebug = int( clamp( floor( params.gridDim.w + 0.5 ), 0.0, 5.0 ) );
+	int fogDebug = int( clamp( floor( params.gridDim.w + 0.5 ), 0.0, 6.0 ) );
 	float frameIndex = params.miscParams.z;
 	float nearPlane = getNearPlane();
 	float farPlane = getFarPlane( nearPlane );
@@ -171,6 +174,11 @@ void main() {
 
 	if ( fogDebug == 5 ) {
 		fragColor = vec4( vec3( clamp( transmittance, 0.0, 1.0 ) ), 1.0 );
+		return;
+	}
+	if ( fogDebug == 6 ) {
+		vec3 shadowVis = texture( froxelVolume, vec3( v_UV, 0.5 ) ).rgb;
+		fragColor = vec4( shadowVis, 1.0 );
 		return;
 	}
 
