@@ -25,11 +25,11 @@ layout(constant_id = 15) const int post_debug = 0;
 layout(constant_id = 36) const int postprocess_enabled = 1;
 
 layout(push_constant) uniform PaniniPC {
-	mat4 invProj;
 	float paniniAmount;
 	float paniniD;
 	float paniniS;
-	float paniniThetaDeg;
+	float aspect;
+	float fovXDeg;
 	float paniniBorderMode;
 	float paniniDebugMode;
 	float brightness;
@@ -162,22 +162,28 @@ void main() {
 	float paniniAmount = clamp( paniniPC.paniniAmount, 0.0, 1.0 );
 	int borderMode = int( clamp( floor( paniniPC.paniniBorderMode + 0.5 ), 0.0, 1.0 ) );
 	int paniniDebug = int( clamp( floor( paniniPC.paniniDebugMode + 0.5 ), 0.0, 1.0 ) );
+	int debugMode = post_debug;
+	bool debugProj = ( postprocess_enabled != 0 ) && ( debugMode == 97 || debugMode == 98 || debugMode == 99 );
+	bool doPaniniPath = paniniAmount > 0.0001 || debugProj;
 
-	if ( paniniAmount > 0.0001 ) {
-		ivec2 texSize = textureSize( texture0, 0 );
-		float aspect = float( texSize.x ) / max( float( texSize.y ), 1.0 );
-		float fovY = radians( paniniPC.paniniThetaDeg );
+	if ( doPaniniPath ) {
+		float aspect = max( paniniPC.aspect, 1e-6 );
+		float fovX = radians( clamp( paniniPC.fovXDeg, 1.0, 179.0 ) );
+		float fovY = 2.0 * atan( tan( 0.5 * fovX ) / aspect );
 		vec3 dir = reconstructRay( uv, fovY, aspect );
 
-		vec2 persp = dir.xy / max( -dir.z, 1e-4 );
-		vec2 panini = paniniProjectStable(
+		vec2 persp = dir.xy / max( -dir.z, 1e-6 );
+		float perspFitX = max( tan( 0.5 * fovX ), 1e-6 );
+		float perspFitY = max( tan( 0.5 * fovY ), 1e-6 );
+		vec2 perspN = vec2( persp.x / perspFitX, persp.y / perspFitY );
+		vec2 panN = paniniProjectStable(
 			dir,
 			paniniPC.paniniD,
 			paniniPC.paniniS,
 			fovY,
 			aspect );
-		vec2 proj = mix( persp, panini, paniniAmount );
-		bool projInvalid = !finite2( proj );
+		vec2 projN = mix( perspN, panN, paniniAmount );
+		bool projInvalid = !( finite2( perspN ) && finite2( panN ) && finite2( projN ) );
 
 		if ( projInvalid ) {
 			if ( paniniDebug != 0 ) {
@@ -188,7 +194,22 @@ void main() {
 			return;
 		}
 
-		vec2 uv2 = proj * 0.5 + 0.5;
+		vec2 uvPerspN = perspN * 0.5 + 0.5;
+		vec2 uvPanN = panN * 0.5 + 0.5;
+		vec2 uv2 = projN * 0.5 + 0.5;
+		if ( debugProj ) {
+			if ( debugMode == 98 ) {
+				out_color = vec4( uvPerspN, 0.0, 1.0 );
+				return;
+			}
+			if ( debugMode == 97 ) {
+				out_color = vec4( uvPanN, 0.0, 1.0 );
+				return;
+			}
+			out_color = vec4( uv2, 0.0, 1.0 );
+			return;
+		}
+
 		bool oob = any( lessThan( uv2, vec2( 0.0 ) ) ) || any( greaterThan( uv2, vec2( 1.0 ) ) );
 		if ( oob ) {
 			if ( borderMode == 0 ) {
