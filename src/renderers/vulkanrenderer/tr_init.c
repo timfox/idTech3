@@ -189,6 +189,7 @@ cvar_t	*r_panini;
 cvar_t	*r_panini_d;
 cvar_t	*r_panini_s;
 cvar_t	*r_panini_theta;
+cvar_t	*r_panini_zoom;
 cvar_t	*r_panini_border;
 cvar_t	*r_panini_debug;
 cvar_t	*r_paniniBrightness;
@@ -1795,6 +1796,11 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_panini_theta, "60.0", "85.0", CV_FLOAT );
 	ri.Cvar_SetDescription( r_panini_theta, "Panini angular gate in degrees to prevent edge blow-up." );
 	ri.Cvar_SetGroup( r_panini_theta, CVG_RENDERER );
+
+	r_panini_zoom = ri.Cvar_Get( "r_panini_zoom", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_panini_zoom, "1.0", "2.5", CV_FLOAT );
+	ri.Cvar_SetDescription( r_panini_zoom, "Panini output zoom/fill (1.0=no zoom, higher reduces edge stretch/OOB)." );
+	ri.Cvar_SetGroup( r_panini_zoom, CVG_RENDERER );
 
 	r_panini_border = ri.Cvar_Get( "r_panini_border", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_panini_border, "0", "1", CV_INTEGER );

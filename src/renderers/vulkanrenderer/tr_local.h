@@ -1512,6 +1512,7 @@ extern cvar_t	*r_panini;
 extern cvar_t	*r_panini_d;
 extern cvar_t	*r_panini_s;
 extern cvar_t	*r_panini_theta;
+extern cvar_t	*r_panini_zoom;
 extern cvar_t	*r_panini_border;
 extern cvar_t	*r_panini_debug;
 extern cvar_t	*r_paniniBrightness;

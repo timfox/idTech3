@@ -56,6 +56,10 @@ typedef struct {
 	float paniniBorderMode;
 	float paniniDebugMode;
 	float brightness;
+	float paniniZoom;
+	float paniniPad0;
+	float paniniPad1;
+	float paniniPad2;
 	float srcUVScaleBias[4]; // scale.xy, bias.xy
 } VkPostProcessPushConstants;
 
@@ -10974,6 +10978,10 @@ void vk_end_frame( void )
 			panini_push.paniniBorderMode = r_panini_border ? (float)r_panini_border->integer : 0.0f;
 			panini_push.paniniDebugMode = r_panini_debug ? (float)r_panini_debug->integer : 0.0f;
 			panini_push.brightness = r_paniniBrightness ? r_paniniBrightness->value : 1.0f;
+			panini_push.paniniZoom = r_panini_zoom ? r_panini_zoom->value : 1.0f;
+			panini_push.paniniPad0 = 0.0f;
+			panini_push.paniniPad1 = 0.0f;
+			panini_push.paniniPad2 = 0.0f;
 			if ( vk_scene_src_rect_valid ) {
 				srcRect = vk_scene_src_rect;
 			} else {
