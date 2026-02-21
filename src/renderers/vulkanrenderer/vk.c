@@ -202,6 +202,8 @@ typedef struct {
 	float invView[16];
 	float proj[16];
 	float viewProj[16];
+	float prevView[16];
+	float prevViewProj[16];
 	float viewOrigin[4];
 	float sunDirection[4];
 	float fogColor[4];
@@ -210,6 +212,7 @@ typedef struct {
 	float worldMax[4];
 	float gridDim[4];
 	float miscParams[4];
+	float sliceParams[4];
 	float phaseParams[4];
 	float noiseParams[4];
 	float noiseScroll[4];
@@ -221,6 +224,8 @@ VK_VOLUMETRIC_ASSERT_ALIGNED16( invProj );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( invView );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( proj );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( viewProj );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( prevView );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( prevViewProj );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( viewOrigin );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( sunDirection );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( fogColor );
@@ -229,6 +234,7 @@ VK_VOLUMETRIC_ASSERT_ALIGNED16( worldMin );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( worldMax );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( gridDim );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( miscParams );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( sliceParams );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( phaseParams );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( noiseParams );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( noiseScroll );
@@ -240,6 +246,10 @@ static void vk_create_volumetric_pipelines( void );
 static void vk_create_volumetric_params_buffer( void );
 static void vk_destroy_volumetric_params_buffer( void );
 static void vk_update_volumetric_params( void );
+
+static float vk_prev_view_matrix[16];
+static float vk_prev_viewproj_matrix[16];
+static qboolean vk_prev_matrices_valid = qfalse;
 
 
 static uint32_t find_memory_type( uint32_t memory_type_bits, VkMemoryPropertyFlags properties ) {
@@ -9978,6 +9988,7 @@ static void vk_volumetric_fog_pass( void )
 	if ( !r_volumetricFog->integer || backEnd.doneFog || !vk.fboActive ) {
 		vk.has_prev_volumetric = qfalse;
 		vk.volumetric_frame = 0;
+		vk_prev_matrices_valid = qfalse;
 		return;
 	}
 	if ( vk.froxel_volume_image == VK_NULL_HANDLE || vk.froxel_history_image == VK_NULL_HANDLE ||
@@ -9990,6 +10001,7 @@ static void vk_volumetric_fog_pass( void )
 				(unsigned long long)(uintptr_t)vk.fog_scene_image );
 		}
 		vk.has_prev_volumetric = qfalse;
+		vk_prev_matrices_valid = qfalse;
 		return;
 	}
 
@@ -10966,6 +10978,7 @@ static void vk_destroy_volumetric_params_buffer( void )
 	}
 	vk.volumetric_frame = 0;
 	vk.has_prev_volumetric = qfalse;
+	vk_prev_matrices_valid = qfalse;
 }
 
 static void vk_create_volumetric_params_buffer( void )
@@ -11181,6 +11194,8 @@ static void vk_update_volumetric_params( void )
 	float g_aniso = r_volumetricFogAniso ? r_volumetricFogAniso->value : 0.0f;
 	float fog_density = r_volumetricFogDensity ? r_volumetricFogDensity->value : 0.0f;
 	float height_falloff = r_volumetricFogHeightFalloff ? r_volumetricFogHeightFalloff->value : 0.0f;
+	float near_plane = ( r_znear ) ? r_znear->value : 4.0f;
+	float far_plane = backEnd.viewParms.zFar;
 	vec3_t fog_min = { -2048.0f, -2048.0f, -256.0f };
 	vec3_t fog_max = {  2048.0f,  2048.0f, 1024.0f };
 	vec3_t noise_scroll = { 0.03f, 0.01f, 0.02f };
@@ -11193,6 +11208,13 @@ static void vk_update_volumetric_params( void )
 	}
 	Com_Memcpy( params.proj, projection, sizeof( params.proj ) );
 	myGlMultMatrix( view, projection, params.viewProj );
+	if ( vk_prev_matrices_valid ) {
+		Com_Memcpy( params.prevView, vk_prev_view_matrix, sizeof( params.prevView ) );
+		Com_Memcpy( params.prevViewProj, vk_prev_viewproj_matrix, sizeof( params.prevViewProj ) );
+	} else {
+		Com_Memcpy( params.prevView, view, sizeof( params.prevView ) );
+		Com_Memcpy( params.prevViewProj, params.viewProj, sizeof( params.prevViewProj ) );
+	}
 
 	params.viewOrigin[0] = backEnd.viewParms.or.origin[0];
 	params.viewOrigin[1] = backEnd.viewParms.or.origin[1];
@@ -11303,6 +11325,16 @@ static void vk_update_volumetric_params( void )
 	params.miscParams[1] = (float)depth_mode;
 	params.miscParams[2] = (float)vk.volumetric_frame;
 	params.miscParams[3] = ( vk.has_prev_volumetric && temporal_weight > 0.0f ) ? 1.0f : 0.0f;
+	if ( near_plane < 0.001f ) {
+		near_plane = 0.001f;
+	}
+	if ( far_plane <= near_plane + 1.0f ) {
+		far_plane = near_plane + 1.0f;
+	}
+	params.sliceParams[0] = near_plane;
+	params.sliceParams[1] = far_plane;
+	params.sliceParams[2] = logf( far_plane / near_plane );
+	params.sliceParams[3] = 1.0f / MAX( params.gridDim[2], 1.0f );
 	params.noiseParams[0] = noise_scale;
 	params.noiseParams[1] = noise_threshold;
 	params.noiseParams[2] = noise_strength;
@@ -11322,12 +11354,17 @@ static void vk_update_volumetric_params( void )
 			params.sunDirection[0], params.sunDirection[1], params.sunDirection[2] );
 		ri.Printf( PRINT_ALL, "[VK][fog] frame=%u hasHistory=%.0f jitter=%.3f\n",
 			vk.volumetric_frame, params.miscParams[3], jitter_amount );
+		ri.Printf( PRINT_ALL, "[VK][fog] slice near=%.3f far=%.1f log=%.6f invZ=%.6f\n",
+			params.sliceParams[0], params.sliceParams[1], params.sliceParams[2], params.sliceParams[3] );
 		ri.Printf( PRINT_ALL, "[VK][fog] noise scale=%.5f threshold=%.3f strength=%.3f scroll=(%.4f %.4f %.4f)\n",
 			params.noiseParams[0], params.noiseParams[1], params.noiseParams[2],
 			params.noiseScroll[0], params.noiseScroll[1], params.noiseScroll[2] );
 	}
 
 	Com_Memcpy( vk.volumetric_params_ptr, &params, sizeof( params ) );
+	Com_Memcpy( vk_prev_view_matrix, view, sizeof( vk_prev_view_matrix ) );
+	Com_Memcpy( vk_prev_viewproj_matrix, params.viewProj, sizeof( vk_prev_viewproj_matrix ) );
+	vk_prev_matrices_valid = qtrue;
 
 	vk.volumetric_frame++;
 }
