@@ -1960,7 +1960,7 @@ static void R_Register( void )
 	ri.Cvar_SetGroup( r_volumetricFogAniso, CVG_RENDERER );
 
 	r_volumetricFogSteps = ri.Cvar_Get( "r_volumetricFogSteps", "32", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_volumetricFogSteps, "1", "64", CV_INTEGER );
+	ri.Cvar_CheckRange( r_volumetricFogSteps, "1", "128", CV_INTEGER );
 	ri.Cvar_SetDescription( r_volumetricFogSteps, "Raymarch steps per pixel when compositing volumetric fog." );
 	ri.Cvar_SetGroup( r_volumetricFogSteps, CVG_RENDERER );
 
