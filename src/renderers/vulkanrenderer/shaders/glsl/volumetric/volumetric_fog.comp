@@ -11,6 +11,8 @@ layout(binding = 6, rgba16f) uniform image3D froxelLight;
 layout(binding = 7, r16f) uniform image3D froxelExtinction;
 layout(binding = 8, rgba16f) uniform image3D froxelClamp;
 layout(binding = 9) uniform sampler2D motionTexture;
+layout(binding = 10) uniform sampler2D localSpotShadowMap;
+layout(binding = 11) uniform sampler2DArray localPointShadowMap;
 
 const int MAX_VOLUMES = 24;
 const int MAX_LIGHTS = 32;
@@ -65,6 +67,11 @@ layout(std140, binding = 3) uniform VolumetricParams {
     mat4 sunShadowMatrix0;
     vec4 shadowParams0;
     vec4 shadowMapSize0;
+    mat4 localSpotShadowMatrix[MAX_LIGHTS];
+    mat4 localPointShadowMatrix[MAX_LIGHTS][6];
+    vec4 localShadowAtlasUv[MAX_LIGHTS];
+    vec4 localSpotShadowMapSize;
+    vec4 localPointShadowMapSize;
 } params;
 
 float Saturate(float v) {
@@ -274,39 +281,47 @@ void ApplyVolumeDensity(vec3 worldPos, inout float density, inout vec3 mediumCol
     }
 }
 
-float SampleProjectedShadow(vec3 worldPos) {
-    if (params.passParams.w < 0.5) {
+float SampleSpotShadow(vec3 worldPos, int lightIndex) {
+    int shadowSlot = int(floor(params.lightExtra[lightIndex].w + 0.5));
+    if (shadowSlot < 0) {
         return 1.0;
     }
-    if (params.shadowMapSize0.z <= 0.0 || params.shadowMapSize0.w <= 0.0) {
+    if (params.localSpotShadowMapSize.z <= 0.0 || params.localSpotShadowMapSize.w <= 0.0) {
         return 1.0;
     }
 
-    vec4 lightClip = params.sunShadowMatrix0 * vec4(worldPos, 1.0);
+    vec4 lightClip = params.localSpotShadowMatrix[lightIndex] * vec4(worldPos, 1.0);
     if (abs(lightClip.w) <= 1e-6) {
         return 1.0;
     }
 
+    vec4 atlasRect = params.localShadowAtlasUv[lightIndex];
     vec3 ndc = lightClip.xyz / lightClip.w;
     vec2 uv = ndc.xy * 0.5 + 0.5;
+    vec2 atlasUV = uv * atlasRect.xy + atlasRect.zw;
     float depth = ndc.z * 0.5 + 0.5;
     if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0))) || depth <= 0.0 || depth >= 1.0) {
         return 1.0;
     }
+    if (any(lessThan(atlasUV, atlasRect.zw)) || any(greaterThan(atlasUV, atlasRect.zw + atlasRect.xy))) {
+        return 1.0;
+    }
 
     float compareDepth = depth - max(params.shadowParams0.x, 0.0);
-    vec2 texelStep = params.shadowMapSize0.zw * max(params.shadowParams0.y, 0.0);
+    vec2 texelStep = params.localSpotShadowMapSize.zw * max(params.shadowParams0.y, 0.0);
 
     if (texelStep.x <= 0.0 || texelStep.y <= 0.0) {
-        float sampleDepth = texture(sunShadowMap, uv).r;
+        float sampleDepth = texture(localSpotShadowMap, atlasUV).r;
         return (compareDepth <= sampleDepth) ? 1.0 : 0.0;
     }
 
     float lit = 0.0;
+    vec2 atlasMin = atlasRect.zw + texelStep * 0.5;
+    vec2 atlasMax = atlasRect.zw + atlasRect.xy - texelStep * 0.5;
     for (int y = -1; y <= 1; ++y) {
         for (int x = -1; x <= 1; ++x) {
-            vec2 pcfUV = uv + vec2(x, y) * texelStep;
-            float sampleDepth = texture(sunShadowMap, pcfUV).r;
+            vec2 pcfUV = clamp(atlasUV + vec2(x, y) * texelStep, atlasMin, atlasMax);
+            float sampleDepth = texture(localSpotShadowMap, pcfUV).r;
             lit += (compareDepth <= sampleDepth) ? 1.0 : 0.0;
         }
     }
@@ -324,24 +339,55 @@ int SelectPointShadowFace(vec3 dirFromLight) {
     return (dirFromLight.z >= 0.0) ? 4 : 5;
 }
 
-float SampleLightShadow(int lightIndex, vec3 worldPos, int dispatchFace) {
+float SampleLightShadow(int lightIndex, vec3 worldPos) {
     float shadowType = params.lightExtra[lightIndex].z;
 
     if (shadowType < 0.5) {
         return 1.0;
     }
 
-    if (shadowType > 1.5) {
-        if (dispatchFace < 0) {
-            return 1.0;
-        }
-        vec3 fromLight = worldPos - params.lightPosRadius[lightIndex].xyz;
-        if (SelectPointShadowFace(fromLight) != dispatchFace) {
-            return 0.0;
-        }
+    if (shadowType < 1.5) {
+        return SampleSpotShadow(worldPos, lightIndex);
     }
 
-    return SampleProjectedShadow(worldPos);
+    int pointSlot = int(floor(params.lightExtra[lightIndex].w + 0.5));
+    if (pointSlot < 0 || params.localPointShadowMapSize.z <= 0.0) {
+        return 1.0;
+    }
+
+    vec3 fromLight = worldPos - params.lightPosRadius[lightIndex].xyz;
+    int face = SelectPointShadowFace(fromLight);
+    int layer = pointSlot * 6 + face;
+
+    vec4 lightClip = params.localPointShadowMatrix[lightIndex][face] * vec4(worldPos, 1.0);
+    if (abs(lightClip.w) <= 1e-6) {
+        return 1.0;
+    }
+
+    vec3 ndc = lightClip.xyz / lightClip.w;
+    vec2 uv = ndc.xy * 0.5 + 0.5;
+    float depth = ndc.z * 0.5 + 0.5;
+    if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0))) || depth <= 0.0 || depth >= 1.0) {
+        return 1.0;
+    }
+
+    float compareDepth = depth - max(params.shadowParams0.x, 0.0);
+    vec2 texelStep = vec2(params.localPointShadowMapSize.z) * max(params.shadowParams0.y, 0.0);
+
+    if (texelStep.x <= 0.0) {
+        float sampleDepth = texture(localPointShadowMap, vec3(uv, float(layer))).r;
+        return (compareDepth <= sampleDepth) ? 1.0 : 0.0;
+    }
+
+    float lit = 0.0;
+    for (int y = -1; y <= 1; ++y) {
+        for (int x = -1; x <= 1; ++x) {
+            vec2 pcfUV = uv + vec2(x, y) * texelStep;
+            float sampleDepth = texture(localPointShadowMap, vec3(pcfUV, float(layer))).r;
+            lit += (compareDepth <= sampleDepth) ? 1.0 : 0.0;
+        }
+    }
+    return lit * (1.0 / 9.0);
 }
 
 vec3 ComputeSunLighting(vec3 worldPos, vec3 viewDir, float density, vec3 mediumColor, float sunShadow) {
@@ -359,7 +405,7 @@ vec3 ComputeSunLighting(vec3 worldPos, vec3 viewDir, float density, vec3 mediumC
     return result * density * max(params.fogColor.a, 0.0);
 }
 
-vec3 ComputeLocalLightScattering(vec3 worldPos, vec3 viewDir, float density, vec3 mediumColor, int lightIndex, int dispatchFace) {
+vec3 ComputeLocalLightScattering(vec3 worldPos, vec3 viewDir, float density, vec3 mediumColor, int lightIndex) {
     float g = clamp(params.phaseParams.x, -0.999, 0.999);
     vec3 V = normalize(-viewDir);
     vec3 result = vec3(0.0);
@@ -396,7 +442,7 @@ vec3 ComputeLocalLightScattering(vec3 worldPos, vec3 viewDir, float density, vec
         attenuation *= spot * Saturate(1.0 - dist / coneRange);
     }
 
-    float localShadow = SampleLightShadow(lightIndex, worldPos, dispatchFace);
+    float localShadow = SampleLightShadow(lightIndex, worldPos);
     float phase = phaseHG(dot(L, V), g);
     vec3 lightColor = max(params.lightColorType[lightIndex].rgb, vec3(0.0));
     result += lightColor * (phase * attenuation * localShadow) * mediumColor;
@@ -630,9 +676,8 @@ void main() {
         }
 
         int lightIndex = int(floor(params.passParams.y + 0.5));
-        int dispatchFace = int(floor(params.passParams.z + 0.5));
         vec3 mediumColor = imageLoad(froxelLight, idx).rgb;
-        vec3 scatter = ComputeLocalLightScattering(worldPos, viewDir, density, mediumColor, lightIndex, dispatchFace);
+        vec3 scatter = ComputeLocalLightScattering(worldPos, viewDir, density, mediumColor, lightIndex);
 
         vec4 accum = imageLoad(froxelScattering, idx);
         accum.rgb += max(scatter, vec3(0.0));

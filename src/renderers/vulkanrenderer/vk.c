@@ -240,6 +240,11 @@ typedef struct {
 	float sunShadowMatrix0[16];
 	float shadowParams0[4];
 	float shadowMapSize0[4];
+	float localSpotShadowMatrix[VK_VOLUMETRIC_MAX_LIGHTS][16];
+	float localPointShadowMatrix[VK_VOLUMETRIC_MAX_LIGHTS][6][16];
+	float localShadowAtlasUv[VK_VOLUMETRIC_MAX_LIGHTS][4];
+	float localSpotShadowMapSize[4];
+	float localPointShadowMapSize[4];
 } volumetric_params_t;
 
 _Static_assert( ( sizeof( volumetric_params_t ) % 16 ) == 0, "volumetric_params_t must be 16-byte aligned in size" );
@@ -277,23 +282,33 @@ VK_VOLUMETRIC_ASSERT_ALIGNED16( lightExtra );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( sunShadowMatrix0 );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( shadowParams0 );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( shadowMapSize0 );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( localSpotShadowMatrix );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( localPointShadowMatrix );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( localShadowAtlasUv );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( localSpotShadowMapSize );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( localPointShadowMapSize );
 #undef VK_VOLUMETRIC_ASSERT_ALIGNED16
 
 static VkSampler vk_find_sampler( const Vk_Sampler_Def *def );
 static void vk_create_froxel_images( void );
 static void vk_create_sun_shadow_resources( void );
 static void vk_destroy_sun_shadow_resources( void );
+static void vk_create_local_shadow_resources( void );
+static void vk_destroy_local_shadow_resources( void );
 static void vk_create_volumetric_pipelines( void );
 static void vk_create_volumetric_params_buffer( void );
 static void vk_destroy_volumetric_params_buffer( void );
 static void vk_update_volumetric_params( void );
 static void vk_resolve_volumetric_depth_msaa( void );
-static qboolean vk_begin_local_shadow_render_pass( void );
-static void vk_end_local_shadow_render_pass( void );
+static qboolean vk_begin_local_spot_shadow_render_pass( void );
+static void vk_end_local_spot_shadow_render_pass( void );
+static qboolean vk_begin_local_point_shadow_render_pass( int faceLayer );
+static void vk_end_local_point_shadow_render_pass( void );
 static const dlight_t *vk_get_volumetric_local_light( int local_index );
-static qboolean vk_build_local_spot_shadow_view( const dlight_t *dl, viewParms_t *shadowParms, float *outViewProj );
-static qboolean vk_build_local_point_shadow_view( const dlight_t *dl, int face, viewParms_t *shadowParms, float *outViewProj );
-static qboolean vk_render_local_volumetric_shadow_view( const viewParms_t *shadowParms );
+static qboolean vk_build_local_spot_shadow_view( const dlight_t *dl, int viewportX, int viewportY, int viewportSize, viewParms_t *shadowParms, float *outViewProj );
+static qboolean vk_build_local_point_shadow_view( const dlight_t *dl, int face, int viewportSize, viewParms_t *shadowParms, float *outViewProj );
+static qboolean vk_render_local_volumetric_shadow_view( const viewParms_t *shadowParms, qboolean pointShadow, int pointFaceLayer );
+static void vk_reset_motion_history( void );
 
 static float vk_prev_view_matrix[16];
 static float vk_prev_projection_matrix[16];
@@ -302,6 +317,14 @@ static qboolean vk_prev_matrices_valid = qfalse;
 static int vk_prev_volumetric_time_ms = 0;
 static qboolean vk_prev_volumetric_time_valid = qfalse;
 static float vk_volumetric_noise_time = 0.0f;
+static float vk_prev_entity_model_matrices[MAX_REFENTITIES][16];
+static float vk_curr_entity_model_matrices[MAX_REFENTITIES][16];
+static int vk_prev_entity_model_handles[MAX_REFENTITIES];
+static int vk_curr_entity_model_handles[MAX_REFENTITIES];
+static int vk_prev_entity_types[MAX_REFENTITIES];
+static int vk_curr_entity_types[MAX_REFENTITIES];
+static qboolean vk_prev_entity_model_valid[MAX_REFENTITIES];
+static qboolean vk_curr_entity_model_valid[MAX_REFENTITIES];
 static const float vk_local_shadow_flip_matrix[16] = {
 	0, 0, -1, 0,
 	-1, 0, 0, 0,
@@ -1532,6 +1555,12 @@ static void vk_create_render_passes( void )
 
 	VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.sun_shadow ) );
 	SET_OBJECT_NAME( vk.render_pass.sun_shadow, "render pass - sun shadow", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
+
+	VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.local_spot_shadow ) );
+	SET_OBJECT_NAME( vk.render_pass.local_spot_shadow, "render pass - local spot shadow", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
+
+	VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.local_point_shadow ) );
+	SET_OBJECT_NAME( vk.render_pass.local_point_shadow, "render pass - local point shadow", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
 
 #ifdef VK_PBR_BRDFLUT
     if( vk.pbrActive )
@@ -3266,14 +3295,17 @@ static void vk_update_volumetric_descriptors( void )
 	if ( vk.volumetric_compute_descriptor != VK_NULL_HANDLE &&
 		vk.froxel_volume_view && vk.froxel_history_view && vk.froxel_light_view &&
 		vk.froxel_extinction_view && vk.froxel_clamp_view &&
-		volumetric_depth_view && vk.fog_noise_view && vk.sun_shadow_view && vk.motion_vector_view )
+		volumetric_depth_view && vk.fog_noise_view && vk.sun_shadow_view &&
+		vk.local_spot_shadow_atlas_view && vk.local_point_shadow_array_view && vk.motion_vector_view )
 	{
 		VkDescriptorImageInfo storage_info[5];
 		VkDescriptorImageInfo depth_info;
 		VkDescriptorImageInfo noise_info;
 		VkDescriptorImageInfo shadow_info;
+		VkDescriptorImageInfo local_spot_shadow_info;
+		VkDescriptorImageInfo local_point_shadow_info;
 		VkDescriptorImageInfo motion_info;
-		VkWriteDescriptorSet writes[10];
+		VkWriteDescriptorSet writes[12];
 		Vk_Sampler_Def depth_sd;
 		Vk_Sampler_Def noise_sd;
 		Vk_Sampler_Def shadow_sd;
@@ -3322,6 +3354,16 @@ static void vk_update_volumetric_descriptors( void )
 		shadow_info.sampler = vk.sun_shadow_sampler;
 		shadow_info.imageView = vk.sun_shadow_view;
 		shadow_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+
+		Com_Memset( &local_spot_shadow_info, 0, sizeof( local_spot_shadow_info ) );
+		local_spot_shadow_info.sampler = vk.sun_shadow_sampler;
+		local_spot_shadow_info.imageView = vk.local_spot_shadow_atlas_view;
+		local_spot_shadow_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+
+		Com_Memset( &local_point_shadow_info, 0, sizeof( local_point_shadow_info ) );
+		local_point_shadow_info.sampler = vk.sun_shadow_sampler;
+		local_point_shadow_info.imageView = vk.local_point_shadow_array_view;
+		local_point_shadow_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 
 		Com_Memset( &motion_sd, 0, sizeof( motion_sd ) );
 		motion_sd.gl_mag_filter = motion_sd.gl_min_filter = GL_LINEAR;
@@ -3398,6 +3440,20 @@ static void vk_update_volumetric_descriptors( void )
 		writes[9].descriptorCount = 1;
 		writes[9].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		writes[9].pImageInfo = &motion_info;
+
+		writes[10].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[10].dstSet = vk.volumetric_compute_descriptor;
+		writes[10].dstBinding = 10;
+		writes[10].descriptorCount = 1;
+		writes[10].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		writes[10].pImageInfo = &local_spot_shadow_info;
+
+		writes[11].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[11].dstSet = vk.volumetric_compute_descriptor;
+		writes[11].dstBinding = 11;
+		writes[11].descriptorCount = 1;
+		writes[11].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		writes[11].pImageInfo = &local_point_shadow_info;
 
 		qvkUpdateDescriptorSets( vk.device, ARRAY_LEN( writes ), writes, 0, NULL );
 	}
@@ -3503,59 +3559,14 @@ static void vk_update_volumetric_descriptors( void )
 		qvkUpdateDescriptorSets( vk.device, ARRAY_LEN( resolve_writes ), resolve_writes, 0, NULL );
 	}
 
-	if ( vk.volumetric_motion_descriptor != VK_NULL_HANDLE &&
-		volumetric_depth_view != VK_NULL_HANDLE && vk.motion_vector_view != VK_NULL_HANDLE )
-	{
-		VkDescriptorImageInfo motion_desc_info[2];
-		VkWriteDescriptorSet motion_writes[3];
-		Vk_Sampler_Def depth_sd;
-
-		if ( vk.froxel_depth_sampler == VK_NULL_HANDLE ) {
-			Com_Memset( &depth_sd, 0, sizeof( depth_sd ) );
-			depth_sd.gl_mag_filter = depth_sd.gl_min_filter = GL_NEAREST;
-			depth_sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-			depth_sd.noAnisotropy = qtrue;
-			vk.froxel_depth_sampler = vk_find_sampler( &depth_sd );
-		}
-
-		Com_Memset( motion_desc_info, 0, sizeof( motion_desc_info ) );
-		motion_desc_info[0].sampler = vk.froxel_depth_sampler;
-		motion_desc_info[0].imageView = volumetric_depth_view;
-		motion_desc_info[0].imageLayout = volumetric_depth_layout;
-		motion_desc_info[1].imageView = vk.motion_vector_view;
-		motion_desc_info[1].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-		Com_Memset( motion_writes, 0, sizeof( motion_writes ) );
-		motion_writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		motion_writes[0].dstSet = vk.volumetric_motion_descriptor;
-		motion_writes[0].dstBinding = 0;
-		motion_writes[0].descriptorCount = 1;
-		motion_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		motion_writes[0].pImageInfo = &motion_desc_info[0];
-
-		motion_writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		motion_writes[1].dstSet = vk.volumetric_motion_descriptor;
-		motion_writes[1].dstBinding = 1;
-		motion_writes[1].descriptorCount = 1;
-		motion_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-		motion_writes[1].pImageInfo = &motion_desc_info[1];
-
-		motion_writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		motion_writes[2].dstSet = vk.volumetric_motion_descriptor;
-		motion_writes[2].dstBinding = 2;
-		motion_writes[2].descriptorCount = 1;
-		motion_writes[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		motion_writes[2].pBufferInfo = &params_buffer;
-
-		qvkUpdateDescriptorSets( vk.device, ARRAY_LEN( motion_writes ), motion_writes, 0, NULL );
-	}
-
 	if ( r_fogDebug && r_fogDebug->integer >= 1 && ( vk.volumetric_frame % 120u ) == 0u ) {
 		ri.Printf( PRINT_ALL,
-			"[VK][fog] descriptors computeSet=0x%llx storage=GENERAL history=GENERAL light=GENERAL ext=GENERAL clamp=GENERAL noiseView=0x%llx shadowView=0x%llx motionView=0x%llx depthView=0x%llx compositeSet=0x%llx sceneView=0x%llx\n",
+			"[VK][fog] descriptors computeSet=0x%llx storage=GENERAL history=GENERAL light=GENERAL ext=GENERAL clamp=GENERAL noiseView=0x%llx sunShadow=0x%llx localSpot=0x%llx localPoint=0x%llx motionView=0x%llx depthView=0x%llx compositeSet=0x%llx sceneView=0x%llx\n",
 			(unsigned long long)(uintptr_t)vk.volumetric_compute_descriptor,
 			(unsigned long long)(uintptr_t)vk.fog_noise_view,
 			(unsigned long long)(uintptr_t)vk.sun_shadow_view,
+			(unsigned long long)(uintptr_t)vk.local_spot_shadow_atlas_view,
+			(unsigned long long)(uintptr_t)vk.local_point_shadow_array_view,
 			(unsigned long long)(uintptr_t)vk.motion_vector_view,
 			(unsigned long long)(uintptr_t)volumetric_depth_view,
 			(unsigned long long)(uintptr_t)vk.volumetric_composite_descriptor,
@@ -3663,10 +3674,6 @@ void vk_init_descriptors( void )
 			if ( vk.volumetric_depth_resolve_layout != VK_NULL_HANDLE ) {
 				alloc.pSetLayouts = &vk.volumetric_depth_resolve_layout;
 				VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.volumetric_depth_resolve_descriptor ) );
-			}
-			if ( vk.volumetric_motion_layout != VK_NULL_HANDLE ) {
-				alloc.pSetLayouts = &vk.volumetric_motion_layout;
-				VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.volumetric_motion_descriptor ) );
 			}
 
 			vk_update_attachment_descriptors();
@@ -4816,6 +4823,7 @@ static void vk_create_attachments( void )
 
 	vk_alloc_attachments();
 	vk_create_sun_shadow_resources();
+	vk_create_local_shadow_resources();
 
 	vk_create_froxel_images();
 
@@ -4851,6 +4859,14 @@ static void vk_create_attachments( void )
 	if ( vk.sun_shadow_color_msaa_view ) {
 		SET_OBJECT_NAME( vk.sun_shadow_color_msaa_view, "sun shadow color msaa view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 	}
+	SET_OBJECT_NAME( vk.local_spot_shadow_atlas_image, "local spot shadow atlas depth", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+	SET_OBJECT_NAME( vk.local_spot_shadow_atlas_view, "local spot shadow atlas depth view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+	SET_OBJECT_NAME( vk.local_spot_shadow_color_image, "local spot shadow atlas color", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+	SET_OBJECT_NAME( vk.local_spot_shadow_color_view, "local spot shadow atlas color view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+	SET_OBJECT_NAME( vk.local_point_shadow_array_image, "local point shadow array depth", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+	SET_OBJECT_NAME( vk.local_point_shadow_array_view, "local point shadow array depth view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+	SET_OBJECT_NAME( vk.local_point_shadow_color_array_image, "local point shadow array color", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+	SET_OBJECT_NAME( vk.local_point_shadow_color_array_view, "local point shadow array color view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 
 	SET_OBJECT_NAME( vk.capture.image, "capture image", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 	SET_OBJECT_NAME( vk.capture.image_view, "capture image view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
@@ -4993,6 +5009,37 @@ static void vk_create_framebuffers( void )
 			framebuffer_attachments[1] = vk.sun_shadow_view;
 			VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.sun_shadow ) );
 			SET_OBJECT_NAME( vk.framebuffers.sun_shadow, "framebuffer - sun shadow", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+		}
+
+		if ( vk.local_spot_shadow_atlas_image != VK_NULL_HANDLE &&
+			vk.local_spot_shadow_color_image != VK_NULL_HANDLE &&
+			vk.render_pass.local_spot_shadow != VK_NULL_HANDLE )
+		{
+			desc.renderPass = vk.render_pass.local_spot_shadow;
+			desc.attachmentCount = 2;
+			desc.width = vk.local_spot_shadow_atlas_size;
+			desc.height = vk.local_spot_shadow_atlas_size;
+			framebuffer_attachments[0] = vk.local_spot_shadow_color_view;
+			framebuffer_attachments[1] = vk.local_spot_shadow_atlas_view;
+			VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.local_spot_shadow ) );
+			SET_OBJECT_NAME( vk.framebuffers.local_spot_shadow, "framebuffer - local spot shadow", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+		}
+
+		if ( vk.local_point_shadow_array_image != VK_NULL_HANDLE &&
+			vk.local_point_shadow_color_array_image != VK_NULL_HANDLE &&
+			vk.render_pass.local_point_shadow != VK_NULL_HANDLE )
+		{
+			const uint32_t point_layers = vk.local_point_shadow_capacity * 6;
+			desc.renderPass = vk.render_pass.local_point_shadow;
+			desc.attachmentCount = 2;
+			desc.width = vk.local_point_shadow_face_size;
+			desc.height = vk.local_point_shadow_face_size;
+
+			for ( uint32_t layer = 0; layer < point_layers && layer < ARRAY_LEN( vk.framebuffers.local_point_shadow ); layer++ ) {
+				framebuffer_attachments[0] = vk.local_point_shadow_color_face_views[layer];
+				framebuffer_attachments[1] = vk.local_point_shadow_face_views[layer];
+				VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.local_point_shadow[layer] ) );
+			}
 		}
 
 	#ifdef VK_CUBEMAP
@@ -5281,6 +5328,16 @@ static void vk_destroy_framebuffers( void ) {
 		qvkDestroyFramebuffer( vk.device, vk.framebuffers.sun_shadow, NULL );
 		vk.framebuffers.sun_shadow = VK_NULL_HANDLE;
 	}
+	if ( vk.framebuffers.local_spot_shadow != VK_NULL_HANDLE ) {
+		qvkDestroyFramebuffer( vk.device, vk.framebuffers.local_spot_shadow, NULL );
+		vk.framebuffers.local_spot_shadow = VK_NULL_HANDLE;
+	}
+	for ( n = 0; n < ARRAY_LEN( vk.framebuffers.local_point_shadow ); n++ ) {
+		if ( vk.framebuffers.local_point_shadow[n] != VK_NULL_HANDLE ) {
+			qvkDestroyFramebuffer( vk.device, vk.framebuffers.local_point_shadow[n], NULL );
+			vk.framebuffers.local_point_shadow[n] = VK_NULL_HANDLE;
+		}
+	}
 
 	if ( vk.framebuffers.capture != VK_NULL_HANDLE ) {
 		qvkDestroyFramebuffer( vk.device, vk.framebuffers.capture, NULL );
@@ -5467,6 +5524,7 @@ void vk_initialize( void )
 	qvkGetPhysicalDeviceProperties( vk.physical_device, &props );
 
 	vk.cmd = vk.tess + 0;
+	vk_reset_motion_history();
 	vk.uniform_alignment = props.limits.minUniformBufferOffsetAlignment;
 	vk.uniform_item_size = PAD( sizeof( vkUniform_t ), (size_t)vk.uniform_alignment );
 #ifdef USE_VK_PBR	
@@ -5858,7 +5916,7 @@ void vk_initialize( void )
 	//vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_SHADER_STAGE_FRAGMENT_BIT, &vk.set_layout_input );
 
 		{
-			VkDescriptorSetLayoutBinding compute_bindings[10];
+			VkDescriptorSetLayoutBinding compute_bindings[12];
 		VkDescriptorSetLayoutCreateInfo compute_layout_desc;
 
 		compute_bindings[0].binding = 0;
@@ -5920,6 +5978,18 @@ void vk_initialize( void )
 			compute_bindings[9].descriptorCount = 1;
 			compute_bindings[9].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 			compute_bindings[9].pImmutableSamplers = NULL;
+
+			compute_bindings[10].binding = 10;
+			compute_bindings[10].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			compute_bindings[10].descriptorCount = 1;
+			compute_bindings[10].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+			compute_bindings[10].pImmutableSamplers = NULL;
+
+			compute_bindings[11].binding = 11;
+			compute_bindings[11].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			compute_bindings[11].descriptorCount = 1;
+			compute_bindings[11].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+			compute_bindings[11].pImmutableSamplers = NULL;
 
 		compute_layout_desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 		compute_layout_desc.pNext = NULL;
@@ -5996,37 +6066,6 @@ void vk_initialize( void )
 				resolve_layout_desc.pBindings = resolve_bindings;
 
 				VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &resolve_layout_desc, NULL, &vk.volumetric_depth_resolve_layout ) );
-			}
-
-			{
-				VkDescriptorSetLayoutBinding motion_bindings[3];
-				VkDescriptorSetLayoutCreateInfo motion_layout_desc;
-
-				motion_bindings[0].binding = 0;
-				motion_bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-				motion_bindings[0].descriptorCount = 1;
-				motion_bindings[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-				motion_bindings[0].pImmutableSamplers = NULL;
-
-				motion_bindings[1].binding = 1;
-				motion_bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-				motion_bindings[1].descriptorCount = 1;
-				motion_bindings[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-				motion_bindings[1].pImmutableSamplers = NULL;
-
-				motion_bindings[2].binding = 2;
-				motion_bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-				motion_bindings[2].descriptorCount = 1;
-				motion_bindings[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-				motion_bindings[2].pImmutableSamplers = NULL;
-
-				motion_layout_desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-				motion_layout_desc.pNext = NULL;
-				motion_layout_desc.flags = 0;
-				motion_layout_desc.bindingCount = ARRAY_LEN( motion_bindings );
-				motion_layout_desc.pBindings = motion_bindings;
-
-				VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &motion_layout_desc, NULL, &vk.volumetric_motion_layout ) );
 			}
 
 			/* old composite/resolve block removed below */
@@ -6241,8 +6280,7 @@ static void vk_create_volumetric_pipeline_layouts( void )
 {
 	if ( vk.volumetric_compute_pipeline_layout != VK_NULL_HANDLE ||
 		vk.volumetric_composite_pipeline_layout != VK_NULL_HANDLE ||
-		vk.volumetric_depth_resolve_pipeline_layout != VK_NULL_HANDLE ||
-		vk.volumetric_motion_pipeline_layout != VK_NULL_HANDLE )
+		vk.volumetric_depth_resolve_pipeline_layout != VK_NULL_HANDLE )
 	{
 		return;
 	}
@@ -6264,9 +6302,6 @@ static void vk_create_volumetric_pipeline_layouts( void )
 
 	desc.pSetLayouts = &vk.volumetric_depth_resolve_layout;
 	VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.volumetric_depth_resolve_pipeline_layout ) );
-
-	desc.pSetLayouts = &vk.volumetric_motion_layout;
-	VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.volumetric_motion_pipeline_layout ) );
 }
 
 static void vk_create_volumetric_compute_pipeline( void )
@@ -6332,39 +6367,6 @@ static void vk_create_volumetric_depth_resolve_pipeline( void )
 
 	VK_CHECK( qvkCreateComputePipelines( vk.device, VK_NULL_HANDLE, 1, &desc, NULL, &vk.volumetric_depth_resolve_pipeline ) );
 	SET_OBJECT_NAME( vk.volumetric_depth_resolve_pipeline, "pipeline - volumetric depth resolve", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
-}
-
-static void vk_create_volumetric_motion_pipeline( void )
-{
-	if ( vk.volumetric_motion_pipeline != VK_NULL_HANDLE )
-	{
-		qvkDestroyPipeline( vk.device, vk.volumetric_motion_pipeline, NULL );
-		vk.volumetric_motion_pipeline = VK_NULL_HANDLE;
-	}
-
-	if ( vk.volumetric_motion_pipeline_layout == VK_NULL_HANDLE ||
-		vk.modules.volumetric_motion_vectors_cs == VK_NULL_HANDLE )
-	{
-		return;
-	}
-
-	VkPipelineShaderStageCreateInfo stage;
-	Com_Memset( &stage, 0, sizeof( stage ) );
-	stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-	stage.module = vk.modules.volumetric_motion_vectors_cs;
-	stage.pName = "main";
-
-	VkComputePipelineCreateInfo desc;
-	Com_Memset( &desc, 0, sizeof( desc ) );
-	desc.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-	desc.pNext = NULL;
-	desc.flags = 0;
-	desc.stage = stage;
-	desc.layout = vk.volumetric_motion_pipeline_layout;
-
-	VK_CHECK( qvkCreateComputePipelines( vk.device, VK_NULL_HANDLE, 1, &desc, NULL, &vk.volumetric_motion_pipeline ) );
-	SET_OBJECT_NAME( vk.volumetric_motion_pipeline, "pipeline - volumetric motion vectors", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
 }
 
 static void vk_create_volumetric_composite_pipeline( void )
@@ -6479,17 +6481,12 @@ static void vk_create_volumetric_pipelines( void )
 {
 	vk_create_volumetric_pipeline_layouts();
 	vk_create_volumetric_depth_resolve_pipeline();
-	vk_create_volumetric_motion_pipeline();
 	vk_create_volumetric_compute_pipeline();
 	vk_create_volumetric_composite_pipeline();
 }
 
 static void vk_destroy_volumetric_pipelines( void )
 {
-	if ( vk.volumetric_motion_pipeline != VK_NULL_HANDLE ) {
-		qvkDestroyPipeline( vk.device, vk.volumetric_motion_pipeline, NULL );
-		vk.volumetric_motion_pipeline = VK_NULL_HANDLE;
-	}
 	if ( vk.volumetric_depth_resolve_pipeline != VK_NULL_HANDLE ) {
 		qvkDestroyPipeline( vk.device, vk.volumetric_depth_resolve_pipeline, NULL );
 		vk.volumetric_depth_resolve_pipeline = VK_NULL_HANDLE;
@@ -6513,10 +6510,6 @@ static void vk_destroy_volumetric_pipelines( void )
 	if ( vk.volumetric_depth_resolve_pipeline_layout != VK_NULL_HANDLE ) {
 		qvkDestroyPipelineLayout( vk.device, vk.volumetric_depth_resolve_pipeline_layout, NULL );
 		vk.volumetric_depth_resolve_pipeline_layout = VK_NULL_HANDLE;
-	}
-	if ( vk.volumetric_motion_pipeline_layout != VK_NULL_HANDLE ) {
-		qvkDestroyPipelineLayout( vk.device, vk.volumetric_motion_pipeline_layout, NULL );
-		vk.volumetric_motion_pipeline_layout = VK_NULL_HANDLE;
 	}
 }
 
@@ -6922,6 +6915,252 @@ static void vk_create_sun_shadow_resources( void )
 	}
 }
 
+static void vk_destroy_local_shadow_resources( void )
+{
+	for ( uint32_t i = 0; i < ARRAY_LEN( vk.local_point_shadow_face_views ); i++ ) {
+		if ( vk.local_point_shadow_face_views[i] ) {
+			qvkDestroyImageView( vk.device, vk.local_point_shadow_face_views[i], NULL );
+			vk.local_point_shadow_face_views[i] = VK_NULL_HANDLE;
+		}
+		if ( vk.local_point_shadow_color_face_views[i] ) {
+			qvkDestroyImageView( vk.device, vk.local_point_shadow_color_face_views[i], NULL );
+			vk.local_point_shadow_color_face_views[i] = VK_NULL_HANDLE;
+		}
+	}
+
+	if ( vk.local_spot_shadow_atlas_image ) {
+		qvkDestroyImage( vk.device, vk.local_spot_shadow_atlas_image, NULL );
+		vk.local_spot_shadow_atlas_image = VK_NULL_HANDLE;
+	}
+	if ( vk.local_spot_shadow_atlas_view ) {
+		qvkDestroyImageView( vk.device, vk.local_spot_shadow_atlas_view, NULL );
+		vk.local_spot_shadow_atlas_view = VK_NULL_HANDLE;
+	}
+	if ( vk.local_spot_shadow_atlas_memory ) {
+		qvkFreeMemory( vk.device, vk.local_spot_shadow_atlas_memory, NULL );
+		vk.local_spot_shadow_atlas_memory = VK_NULL_HANDLE;
+	}
+
+	if ( vk.local_spot_shadow_color_image ) {
+		qvkDestroyImage( vk.device, vk.local_spot_shadow_color_image, NULL );
+		vk.local_spot_shadow_color_image = VK_NULL_HANDLE;
+	}
+	if ( vk.local_spot_shadow_color_view ) {
+		qvkDestroyImageView( vk.device, vk.local_spot_shadow_color_view, NULL );
+		vk.local_spot_shadow_color_view = VK_NULL_HANDLE;
+	}
+	if ( vk.local_spot_shadow_color_memory ) {
+		qvkFreeMemory( vk.device, vk.local_spot_shadow_color_memory, NULL );
+		vk.local_spot_shadow_color_memory = VK_NULL_HANDLE;
+	}
+
+	if ( vk.local_point_shadow_array_image ) {
+		qvkDestroyImage( vk.device, vk.local_point_shadow_array_image, NULL );
+		vk.local_point_shadow_array_image = VK_NULL_HANDLE;
+	}
+	if ( vk.local_point_shadow_array_view ) {
+		qvkDestroyImageView( vk.device, vk.local_point_shadow_array_view, NULL );
+		vk.local_point_shadow_array_view = VK_NULL_HANDLE;
+	}
+	if ( vk.local_point_shadow_array_memory ) {
+		qvkFreeMemory( vk.device, vk.local_point_shadow_array_memory, NULL );
+		vk.local_point_shadow_array_memory = VK_NULL_HANDLE;
+	}
+
+	if ( vk.local_point_shadow_color_array_image ) {
+		qvkDestroyImage( vk.device, vk.local_point_shadow_color_array_image, NULL );
+		vk.local_point_shadow_color_array_image = VK_NULL_HANDLE;
+	}
+	if ( vk.local_point_shadow_color_array_view ) {
+		qvkDestroyImageView( vk.device, vk.local_point_shadow_color_array_view, NULL );
+		vk.local_point_shadow_color_array_view = VK_NULL_HANDLE;
+	}
+	if ( vk.local_point_shadow_color_array_memory ) {
+		qvkFreeMemory( vk.device, vk.local_point_shadow_color_array_memory, NULL );
+		vk.local_point_shadow_color_array_memory = VK_NULL_HANDLE;
+	}
+
+	vk.local_spot_shadow_atlas_size = 0;
+	vk.local_spot_shadow_tile_size = 0;
+	vk.local_spot_shadow_capacity = 0;
+	vk.local_point_shadow_face_size = 0;
+	vk.local_point_shadow_capacity = 0;
+}
+
+static void vk_create_local_shadow_resources( void )
+{
+	int map_size = 1024;
+	uint32_t point_layers;
+	VkImageCreateInfo image_info;
+	VkImageViewCreateInfo view_info;
+	VkMemoryRequirements mem_req;
+	VkMemoryAllocateInfo alloc_info;
+	VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+	VkCommandBuffer cmd;
+
+	if ( !vk.fboActive ) {
+		vk_destroy_local_shadow_resources();
+		return;
+	}
+
+	if ( r_fogShadowMapSize ) {
+		map_size = r_fogShadowMapSize->integer;
+	}
+	if ( map_size < 256 ) map_size = 256;
+	if ( map_size > 4096 ) map_size = 4096;
+
+	vk_destroy_local_shadow_resources();
+
+	int atlas_size = map_size * 2;
+	int point_size = map_size / 4;
+	if ( atlas_size < 512 ) atlas_size = 512;
+	if ( atlas_size > (int)vk.hwMaxImageDimension2D ) atlas_size = (int)vk.hwMaxImageDimension2D;
+	if ( atlas_size < 128 ) atlas_size = 128;
+	if ( point_size < 128 ) point_size = 128;
+	if ( point_size > 512 ) point_size = 512;
+	vk.local_spot_shadow_atlas_size = (uint32_t)atlas_size;
+	vk.local_point_shadow_face_size = (uint32_t)point_size;
+	if ( vk.local_point_shadow_face_size > vk.local_spot_shadow_atlas_size ) {
+		vk.local_point_shadow_face_size = vk.local_spot_shadow_atlas_size;
+	}
+	vk.local_spot_shadow_tile_size = vk.local_point_shadow_face_size;
+	if ( vk.local_spot_shadow_tile_size == 0 ) {
+		vk.local_spot_shadow_tile_size = 128;
+	}
+
+	const uint32_t grid = MAX( 1u, vk.local_spot_shadow_atlas_size / vk.local_spot_shadow_tile_size );
+	vk.local_spot_shadow_capacity = MIN( (uint32_t)MAX_DLIGHTS, grid * grid );
+	vk.local_point_shadow_capacity = MIN( (uint32_t)MAX_DLIGHTS, 16u );
+	point_layers = vk.local_point_shadow_capacity * 6u;
+	if ( point_layers == 0 ) {
+		point_layers = 6;
+		vk.local_point_shadow_capacity = 1;
+	}
+
+	if ( glConfig.stencilBits > 0 ) {
+		depth_aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
+	}
+
+	Com_Memset( &image_info, 0, sizeof( image_info ) );
+	image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	image_info.imageType = VK_IMAGE_TYPE_2D;
+	image_info.extent.depth = 1;
+	image_info.mipLevels = 1;
+	image_info.arrayLayers = 1;
+	image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+	image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	image_info.samples = VK_SAMPLE_COUNT_1_BIT;
+
+	image_info.format = vk.depth_format;
+	image_info.extent.width = vk.local_spot_shadow_atlas_size;
+	image_info.extent.height = vk.local_spot_shadow_atlas_size;
+	image_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	VK_CHECK( qvkCreateImage( vk.device, &image_info, NULL, &vk.local_spot_shadow_atlas_image ) );
+
+	qvkGetImageMemoryRequirements( vk.device, vk.local_spot_shadow_atlas_image, &mem_req );
+	Com_Memset( &alloc_info, 0, sizeof( alloc_info ) );
+	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	alloc_info.allocationSize = mem_req.size;
+	alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.local_spot_shadow_atlas_memory ) );
+	VK_CHECK( qvkBindImageMemory( vk.device, vk.local_spot_shadow_atlas_image, vk.local_spot_shadow_atlas_memory, 0 ) );
+
+	image_info.format = vk.color_format;
+	image_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	VK_CHECK( qvkCreateImage( vk.device, &image_info, NULL, &vk.local_spot_shadow_color_image ) );
+	qvkGetImageMemoryRequirements( vk.device, vk.local_spot_shadow_color_image, &mem_req );
+	alloc_info.allocationSize = mem_req.size;
+	alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.local_spot_shadow_color_memory ) );
+	VK_CHECK( qvkBindImageMemory( vk.device, vk.local_spot_shadow_color_image, vk.local_spot_shadow_color_memory, 0 ) );
+
+	image_info.format = vk.depth_format;
+	image_info.extent.width = vk.local_point_shadow_face_size;
+	image_info.extent.height = vk.local_point_shadow_face_size;
+	image_info.arrayLayers = point_layers;
+	image_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	VK_CHECK( qvkCreateImage( vk.device, &image_info, NULL, &vk.local_point_shadow_array_image ) );
+
+	qvkGetImageMemoryRequirements( vk.device, vk.local_point_shadow_array_image, &mem_req );
+	alloc_info.allocationSize = mem_req.size;
+	alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.local_point_shadow_array_memory ) );
+	VK_CHECK( qvkBindImageMemory( vk.device, vk.local_point_shadow_array_image, vk.local_point_shadow_array_memory, 0 ) );
+
+	image_info.format = vk.color_format;
+	image_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	VK_CHECK( qvkCreateImage( vk.device, &image_info, NULL, &vk.local_point_shadow_color_array_image ) );
+
+	qvkGetImageMemoryRequirements( vk.device, vk.local_point_shadow_color_array_image, &mem_req );
+	alloc_info.allocationSize = mem_req.size;
+	alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.local_point_shadow_color_array_memory ) );
+	VK_CHECK( qvkBindImageMemory( vk.device, vk.local_point_shadow_color_array_image, vk.local_point_shadow_color_array_memory, 0 ) );
+
+	Com_Memset( &view_info, 0, sizeof( view_info ) );
+	view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	view_info.subresourceRange.baseMipLevel = 0;
+	view_info.subresourceRange.levelCount = 1;
+	view_info.subresourceRange.baseArrayLayer = 0;
+	view_info.subresourceRange.layerCount = 1;
+
+	view_info.image = vk.local_spot_shadow_atlas_image;
+	view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	view_info.format = vk.depth_format;
+	view_info.subresourceRange.aspectMask = depth_aspect;
+	VK_CHECK( qvkCreateImageView( vk.device, &view_info, NULL, &vk.local_spot_shadow_atlas_view ) );
+
+	view_info.image = vk.local_spot_shadow_color_image;
+	view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	view_info.format = vk.color_format;
+	view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	VK_CHECK( qvkCreateImageView( vk.device, &view_info, NULL, &vk.local_spot_shadow_color_view ) );
+
+	view_info.image = vk.local_point_shadow_array_image;
+	view_info.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+	view_info.format = vk.depth_format;
+	view_info.subresourceRange.aspectMask = depth_aspect;
+	view_info.subresourceRange.layerCount = point_layers;
+	VK_CHECK( qvkCreateImageView( vk.device, &view_info, NULL, &vk.local_point_shadow_array_view ) );
+
+	view_info.image = vk.local_point_shadow_color_array_image;
+	view_info.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+	view_info.format = vk.color_format;
+	view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	view_info.subresourceRange.layerCount = point_layers;
+	VK_CHECK( qvkCreateImageView( vk.device, &view_info, NULL, &vk.local_point_shadow_color_array_view ) );
+
+	for ( uint32_t layer = 0; layer < point_layers; layer++ ) {
+		view_info.image = vk.local_point_shadow_array_image;
+		view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		view_info.format = vk.depth_format;
+		view_info.subresourceRange.aspectMask = depth_aspect;
+		view_info.subresourceRange.baseArrayLayer = layer;
+		view_info.subresourceRange.layerCount = 1;
+		VK_CHECK( qvkCreateImageView( vk.device, &view_info, NULL, &vk.local_point_shadow_face_views[layer] ) );
+
+		view_info.image = vk.local_point_shadow_color_array_image;
+		view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		view_info.format = vk.color_format;
+		view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		view_info.subresourceRange.baseArrayLayer = layer;
+		view_info.subresourceRange.layerCount = 1;
+		VK_CHECK( qvkCreateImageView( vk.device, &view_info, NULL, &vk.local_point_shadow_color_face_views[layer] ) );
+	}
+
+	cmd = begin_command_buffer();
+	record_image_layout_transition( cmd, vk.local_spot_shadow_color_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
+	record_image_layout_transition( cmd, vk.local_spot_shadow_atlas_image, depth_aspect,
+		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
+	record_image_layout_transition( cmd, vk.local_point_shadow_color_array_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
+	record_image_layout_transition( cmd, vk.local_point_shadow_array_image, depth_aspect,
+		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
+	end_command_buffer( cmd, __func__ );
+}
+
 static void vk_destroy_froxel_images( void )
 {
 	if ( vk.froxel_volume_image ) {
@@ -7203,10 +7442,10 @@ static void vk_destroy_attachments( void )
 	vk_destroy_volumetric_params_buffer();
 	vk_destroy_froxel_images();
 	vk_destroy_sun_shadow_resources();
+	vk_destroy_local_shadow_resources();
 	vk.volumetric_compute_descriptor = VK_NULL_HANDLE;
 	vk.volumetric_composite_descriptor = VK_NULL_HANDLE;
 	vk.volumetric_depth_resolve_descriptor = VK_NULL_HANDLE;
-	vk.volumetric_motion_descriptor = VK_NULL_HANDLE;
 
 	if ( vk.bloom_image[0] ) {
 		for ( i = 0; i < ARRAY_LEN( vk.bloom_image ); i++ ) {
@@ -7419,6 +7658,14 @@ static void vk_destroy_render_passes( void )
 		qvkDestroyRenderPass( vk.device, vk.render_pass.sun_shadow, NULL );
 		vk.render_pass.sun_shadow = VK_NULL_HANDLE;
 	}
+	if ( vk.render_pass.local_spot_shadow != VK_NULL_HANDLE ) {
+		qvkDestroyRenderPass( vk.device, vk.render_pass.local_spot_shadow, NULL );
+		vk.render_pass.local_spot_shadow = VK_NULL_HANDLE;
+	}
+	if ( vk.render_pass.local_point_shadow != VK_NULL_HANDLE ) {
+		qvkDestroyRenderPass( vk.device, vk.render_pass.local_point_shadow, NULL );
+		vk.render_pass.local_point_shadow = VK_NULL_HANDLE;
+	}
 
 	if ( vk.render_pass.gamma != VK_NULL_HANDLE ) {
 		qvkDestroyRenderPass( vk.device, vk.render_pass.gamma, NULL );
@@ -7613,10 +7860,6 @@ void vk_shutdown( refShutdownCode_t code )
 		qvkDestroyDescriptorSetLayout( vk.device, vk.volumetric_depth_resolve_layout, NULL );
 		vk.volumetric_depth_resolve_layout = VK_NULL_HANDLE;
 	}
-	if ( vk.volumetric_motion_layout != VK_NULL_HANDLE ) {
-		qvkDestroyDescriptorSetLayout( vk.device, vk.volumetric_motion_layout, NULL );
-		vk.volumetric_motion_layout = VK_NULL_HANDLE;
-	}
 
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout, NULL);
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_storage, NULL);
@@ -7804,7 +8047,6 @@ for (i = 0; i < 2; i++) {
 	qvkDestroyShaderModule(vk.device, vk.modules.volumetric_fog_fs, NULL);
 	qvkDestroyShaderModule(vk.device, vk.modules.volumetric_fog_cs, NULL);
 	qvkDestroyShaderModule(vk.device, vk.modules.volumetric_depth_resolve_msaa_cs, NULL);
-	qvkDestroyShaderModule(vk.device, vk.modules.volumetric_motion_vectors_cs, NULL);
 
 #ifdef USE_VK_PBR
 	qvkDestroyShaderModule(vk.device, vk.modules.brdflut_fs, NULL);
@@ -10165,6 +10407,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	attachment_blend_states[1].colorWriteMask = 0;
 	if ( main_motion_target &&
 		def->shader_type != TYPE_DOT &&
+		def->shader_type != TYPE_SIGNLE_TEXTURE_DF &&
 		def->shadow_phase == SHADOW_DISABLED &&
 		depth_stencil_state.depthTestEnable == VK_TRUE &&
 		depth_stencil_state.depthWriteEnable == VK_TRUE )
@@ -10448,11 +10691,69 @@ static void get_mvp_transform( float *mvp )
 	}
 }
 
+static void vk_begin_motion_frame( void )
+{
+	for ( int i = 0; i < MAX_REFENTITIES; i++ ) {
+		if ( vk_curr_entity_model_valid[i] ) {
+			Com_Memcpy( vk_prev_entity_model_matrices[i], vk_curr_entity_model_matrices[i], sizeof( vk_prev_entity_model_matrices[i] ) );
+			vk_prev_entity_model_handles[i] = vk_curr_entity_model_handles[i];
+			vk_prev_entity_types[i] = vk_curr_entity_types[i];
+			vk_prev_entity_model_valid[i] = qtrue;
+		} else {
+			vk_prev_entity_model_valid[i] = qfalse;
+		}
+		vk_curr_entity_model_valid[i] = qfalse;
+	}
+}
+
+static void vk_reset_motion_history( void )
+{
+	Com_Memset( vk_prev_entity_model_matrices, 0, sizeof( vk_prev_entity_model_matrices ) );
+	Com_Memset( vk_curr_entity_model_matrices, 0, sizeof( vk_curr_entity_model_matrices ) );
+	Com_Memset( vk_prev_entity_model_handles, 0, sizeof( vk_prev_entity_model_handles ) );
+	Com_Memset( vk_curr_entity_model_handles, 0, sizeof( vk_curr_entity_model_handles ) );
+	Com_Memset( vk_prev_entity_types, 0, sizeof( vk_prev_entity_types ) );
+	Com_Memset( vk_curr_entity_types, 0, sizeof( vk_curr_entity_types ) );
+	Com_Memset( vk_prev_entity_model_valid, 0, sizeof( vk_prev_entity_model_valid ) );
+	Com_Memset( vk_curr_entity_model_valid, 0, sizeof( vk_curr_entity_model_valid ) );
+}
+
+static int vk_get_current_entity_motion_index( void )
+{
+	const trRefEntity_t *ent = backEnd.currentEntity;
+	const trRefEntity_t *base = backEnd.refdef.entities;
+
+	if ( !ent || ent == &tr.worldEntity || !base || backEnd.refdef.num_entities <= 0 ) {
+		return -1;
+	}
+	if ( ent < base || ent >= base + backEnd.refdef.num_entities ) {
+		return -1;
+	}
+	return (int)( ent - base );
+}
+
+static qboolean vk_entity_requires_no_motion( const trRefEntity_t *ent )
+{
+	// Until previous-frame skinning/deform data is available in Vulkan, animated entities
+	// explicitly output zero velocity to avoid undefined or ghosting motion vectors.
+	if ( !ent ) {
+		return qfalse;
+	}
+	if ( ent->e.frame != ent->e.oldframe ) {
+		return qtrue;
+	}
+	if ( ent->e.backlerp > 0.001f ) {
+		return qtrue;
+	}
+	return qfalse;
+}
+
 static void get_prev_mvp_transform( float *prev_mvp )
 {
 	float prev_model[16];
 	float prev_model_view[16];
 	float prev_proj[16];
+	int motion_index;
 
 	if ( backEnd.projection2D || !vk_prev_matrices_valid ) {
 		get_mvp_transform( prev_mvp );
@@ -10461,11 +10762,23 @@ static void get_prev_mvp_transform( float *prev_mvp )
 
 	Com_Memcpy( prev_model, backEnd.or.modelMatrix, sizeof( prev_model ) );
 
-	// Preserve previous frame object translation when available to capture true object motion.
-	if ( backEnd.currentEntity && backEnd.currentEntity != &tr.worldEntity && backEnd.currentEntity->e.reType == RT_MODEL ) {
-		prev_model[12] = backEnd.currentEntity->e.oldorigin[0];
-		prev_model[13] = backEnd.currentEntity->e.oldorigin[1];
-		prev_model[14] = backEnd.currentEntity->e.oldorigin[2];
+	motion_index = vk_get_current_entity_motion_index();
+	if ( motion_index >= 0 && backEnd.currentEntity && backEnd.currentEntity->e.reType == RT_MODEL ) {
+		if ( !vk_curr_entity_model_valid[motion_index] ) {
+			Com_Memcpy( vk_curr_entity_model_matrices[motion_index], backEnd.or.modelMatrix, sizeof( vk_curr_entity_model_matrices[motion_index] ) );
+			vk_curr_entity_model_handles[motion_index] = backEnd.currentEntity->e.hModel;
+			vk_curr_entity_types[motion_index] = (int)backEnd.currentEntity->e.reType;
+			vk_curr_entity_model_valid[motion_index] = qtrue;
+		}
+
+		if ( !vk_entity_requires_no_motion( backEnd.currentEntity ) &&
+			vk_prev_entity_model_valid[motion_index] &&
+			vk_prev_entity_model_handles[motion_index] == backEnd.currentEntity->e.hModel &&
+			vk_prev_entity_types[motion_index] == (int)backEnd.currentEntity->e.reType )
+		{
+			// Use full previous model matrix (translation + rotation + scale) for rigid motion.
+			Com_Memcpy( prev_model, vk_prev_entity_model_matrices[motion_index], sizeof( prev_model ) );
+		}
 	}
 
 	myGlMultMatrix( prev_model, vk_prev_view_matrix, prev_model_view );
@@ -11263,12 +11576,14 @@ void vk_end_sun_shadow_render_pass( void )
 	vk_begin_main_render_pass();
 }
 
-static qboolean vk_begin_local_shadow_render_pass( void )
+static qboolean vk_begin_local_spot_shadow_render_pass( void )
 {
 	VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
 
-	if ( !vk.fboActive || vk.render_pass.sun_shadow == VK_NULL_HANDLE || vk.framebuffers.sun_shadow == VK_NULL_HANDLE ||
-		vk.sun_shadow_image == VK_NULL_HANDLE || vk.sun_shadow_width == 0 || vk.sun_shadow_height == 0 )
+	if ( !vk.fboActive || vk.render_pass.local_spot_shadow == VK_NULL_HANDLE ||
+		vk.framebuffers.local_spot_shadow == VK_NULL_HANDLE ||
+		vk.local_spot_shadow_atlas_image == VK_NULL_HANDLE ||
+		vk.local_spot_shadow_atlas_size == 0 )
 	{
 		return qfalse;
 	}
@@ -11277,30 +11592,28 @@ static qboolean vk_begin_local_shadow_render_pass( void )
 		depth_aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
 	}
 
-	// During volumetric compute there is no active graphics pass, but this remains safe
-	// if the caller invokes local shadow rendering while a pass is active.
 	vk_end_render_pass();
 
-	record_image_layout_transition( vk.cmd->command_buffer, vk.sun_shadow_image, depth_aspect,
+	record_image_layout_transition( vk.cmd->command_buffer, vk.local_spot_shadow_atlas_image, depth_aspect,
 		VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
 		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 		VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT );
 
 	vk.renderPassIndex = RENDER_PASS_SUN_SHADOW;
-	vk.renderWidth = vk.sun_shadow_width;
-	vk.renderHeight = vk.sun_shadow_height;
+	vk.renderWidth = vk.local_spot_shadow_atlas_size;
+	vk.renderHeight = vk.local_spot_shadow_atlas_size;
 	vk.renderScaleX = vk.renderScaleY = 1.0f;
-	vk_begin_render_pass( vk.render_pass.sun_shadow, vk.framebuffers.sun_shadow, qtrue, vk.renderWidth, vk.renderHeight );
+	vk_begin_render_pass( vk.render_pass.local_spot_shadow, vk.framebuffers.local_spot_shadow, qtrue, vk.renderWidth, vk.renderHeight );
 
 	return qtrue;
 }
 
-static void vk_end_local_shadow_render_pass( void )
+static void vk_end_local_spot_shadow_render_pass( void )
 {
 	VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
 
-	if ( !vk.fboActive || vk.sun_shadow_image == VK_NULL_HANDLE ) {
+	if ( !vk.fboActive || vk.local_spot_shadow_atlas_image == VK_NULL_HANDLE ) {
 		return;
 	}
 
@@ -11310,7 +11623,62 @@ static void vk_end_local_shadow_render_pass( void )
 
 	vk_end_render_pass();
 
-	record_image_layout_transition( vk.cmd->command_buffer, vk.sun_shadow_image, depth_aspect,
+	record_image_layout_transition( vk.cmd->command_buffer, vk.local_spot_shadow_atlas_image, depth_aspect,
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+		VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
+}
+
+static qboolean vk_begin_local_point_shadow_render_pass( int faceLayer )
+{
+	VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+
+	if ( !vk.fboActive || vk.render_pass.local_point_shadow == VK_NULL_HANDLE ||
+		vk.local_point_shadow_array_image == VK_NULL_HANDLE ||
+		vk.local_point_shadow_face_size == 0 ||
+		faceLayer < 0 || faceLayer >= (int)( vk.local_point_shadow_capacity * 6 ) ||
+		vk.framebuffers.local_point_shadow[faceLayer] == VK_NULL_HANDLE )
+	{
+		return qfalse;
+	}
+
+	if ( glConfig.stencilBits > 0 ) {
+		depth_aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
+	}
+
+	vk_end_render_pass();
+
+	record_image_layout_transition( vk.cmd->command_buffer, vk.local_point_shadow_array_image, depth_aspect,
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+		VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT );
+
+	vk.renderPassIndex = RENDER_PASS_SUN_SHADOW;
+	vk.renderWidth = vk.local_point_shadow_face_size;
+	vk.renderHeight = vk.local_point_shadow_face_size;
+	vk.renderScaleX = vk.renderScaleY = 1.0f;
+	vk_begin_render_pass( vk.render_pass.local_point_shadow, vk.framebuffers.local_point_shadow[faceLayer], qtrue, vk.renderWidth, vk.renderHeight );
+
+	return qtrue;
+}
+
+static void vk_end_local_point_shadow_render_pass( void )
+{
+	VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+
+	if ( !vk.fboActive || vk.local_point_shadow_array_image == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	if ( glConfig.stencilBits > 0 ) {
+		depth_aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
+	}
+
+	vk_end_render_pass();
+
+	record_image_layout_transition( vk.cmd->command_buffer, vk.local_point_shadow_array_image, depth_aspect,
 		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 		VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
 		VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
@@ -11403,6 +11771,10 @@ static qboolean vk_build_local_shadow_view_axes(
 	const vec3_t up_hint,
 	float fov_degrees,
 	float max_distance,
+	int viewportX,
+	int viewportY,
+	int viewportWidth,
+	int viewportHeight,
 	viewParms_t *shadowParms,
 	float *outViewProj )
 {
@@ -11415,6 +11787,9 @@ static qboolean vk_build_local_shadow_view_axes(
 	float nearPlane = ( r_znear ) ? r_znear->value : 4.0f;
 
 	if ( !shadowParms || !outViewProj ) {
+		return qfalse;
+	}
+	if ( viewportWidth <= 0 || viewportHeight <= 0 ) {
 		return qfalse;
 	}
 
@@ -11454,14 +11829,14 @@ static qboolean vk_build_local_shadow_view_axes(
 	shadowParms->portalView = PV_NONE;
 	shadowParms->targetCube = NULL;
 	shadowParms->targetCubeLayer = 0;
-	shadowParms->viewportX = 0;
-	shadowParms->viewportY = 0;
-	shadowParms->viewportWidth = (int)vk.sun_shadow_width;
-	shadowParms->viewportHeight = (int)vk.sun_shadow_height;
-	shadowParms->scissorX = 0;
-	shadowParms->scissorY = 0;
-	shadowParms->scissorWidth = (int)vk.sun_shadow_width;
-	shadowParms->scissorHeight = (int)vk.sun_shadow_height;
+	shadowParms->viewportX = viewportX;
+	shadowParms->viewportY = viewportY;
+	shadowParms->viewportWidth = viewportWidth;
+	shadowParms->viewportHeight = viewportHeight;
+	shadowParms->scissorX = viewportX;
+	shadowParms->scissorY = viewportY;
+	shadowParms->scissorWidth = viewportWidth;
+	shadowParms->scissorHeight = viewportHeight;
 	shadowParms->zFar = max_distance;
 	shadowParms->fovX = fov_degrees;
 	shadowParms->fovY = fov_degrees;
@@ -11495,7 +11870,7 @@ static qboolean vk_build_local_shadow_view_axes(
 	return qtrue;
 }
 
-static qboolean vk_build_local_spot_shadow_view( const dlight_t *dl, viewParms_t *shadowParms, float *outViewProj )
+static qboolean vk_build_local_spot_shadow_view( const dlight_t *dl, int viewportX, int viewportY, int viewportSize, viewParms_t *shadowParms, float *outViewProj )
 {
 	vec3_t forward;
 	vec3_t up = { 0.0f, 0.0f, 1.0f };
@@ -11509,10 +11884,11 @@ static qboolean vk_build_local_spot_shadow_view( const dlight_t *dl, viewParms_t
 		VectorSet( forward, 0.0f, 0.0f, -1.0f );
 	}
 
-	return vk_build_local_shadow_view_axes( dl->origin, forward, up, 70.0f, dl->radius, shadowParms, outViewProj );
+	return vk_build_local_shadow_view_axes( dl->origin, forward, up, 70.0f, dl->radius,
+		viewportX, viewportY, viewportSize, viewportSize, shadowParms, outViewProj );
 }
 
-static qboolean vk_build_local_point_shadow_view( const dlight_t *dl, int face, viewParms_t *shadowParms, float *outViewProj )
+static qboolean vk_build_local_point_shadow_view( const dlight_t *dl, int face, int viewportSize, viewParms_t *shadowParms, float *outViewProj )
 {
 	vec3_t forward = { 0.0f, 0.0f, -1.0f };
 	vec3_t up = { 0.0f, 0.0f, 1.0f };
@@ -11531,10 +11907,11 @@ static qboolean vk_build_local_point_shadow_view( const dlight_t *dl, int face, 
 		default: return qfalse;
 	}
 
-	return vk_build_local_shadow_view_axes( dl->origin, forward, up, 90.0f, dl->radius, shadowParms, outViewProj );
+	return vk_build_local_shadow_view_axes( dl->origin, forward, up, 90.0f, dl->radius,
+		0, 0, viewportSize, viewportSize, shadowParms, outViewProj );
 }
 
-static qboolean vk_render_local_volumetric_shadow_view( const viewParms_t *shadowParms )
+static qboolean vk_render_local_volumetric_shadow_view( const viewParms_t *shadowParms, qboolean pointShadow, int pointFaceLayer )
 {
 	renderPass_t saved_pass;
 	uint32_t saved_width;
@@ -11551,7 +11928,16 @@ static qboolean vk_render_local_volumetric_shadow_view( const viewParms_t *shado
 	saved_scale_x = vk.renderScaleX;
 	saved_scale_y = vk.renderScaleY;
 
-	if ( !vk_begin_local_shadow_render_pass() ) {
+	if ( pointShadow ) {
+		if ( !vk_begin_local_point_shadow_render_pass( pointFaceLayer ) ) {
+			vk.renderPassIndex = saved_pass;
+			vk.renderWidth = saved_width;
+			vk.renderHeight = saved_height;
+			vk.renderScaleX = saved_scale_x;
+			vk.renderScaleY = saved_scale_y;
+			return qfalse;
+		}
+	} else if ( !vk_begin_local_spot_shadow_render_pass() ) {
 		vk.renderPassIndex = saved_pass;
 		vk.renderWidth = saved_width;
 		vk.renderHeight = saved_height;
@@ -11561,7 +11947,11 @@ static qboolean vk_render_local_volumetric_shadow_view( const viewParms_t *shado
 	}
 
 	RB_RenderVolumetricShadowView( shadowParms, backEnd.refdef.drawSurfs, backEnd.refdef.numDrawSurfs );
-	vk_end_local_shadow_render_pass();
+	if ( pointShadow ) {
+		vk_end_local_point_shadow_render_pass();
+	} else {
+		vk_end_local_spot_shadow_render_pass();
+	}
 	vk.renderPassIndex = saved_pass;
 	vk.renderWidth = saved_width;
 	vk.renderHeight = saved_height;
@@ -11612,9 +12002,9 @@ static void vk_volumetric_compute_pass( void )
 	const uint32_t clamp_groups_z = ( vk.froxel_slices + 3 ) / 4;
 	int local_light_count = 0;
 	volumetric_params_t *params_rw = (volumetric_params_t *)vk.volumetric_params_ptr;
-	float saved_shadow_matrix[16];
-	float saved_shadow_valid = 0.0f;
 	qboolean use_local_shadows = ( r_fog_shadows && r_fog_shadows->integer ) ? qtrue : qfalse;
+	int spot_shadow_slot = 0;
+	int point_shadow_slot = 0;
 
 	if ( vk.volumetric_params_ptr ) {
 		const volumetric_params_t *params = (const volumetric_params_t *)vk.volumetric_params_ptr;
@@ -11624,8 +12014,20 @@ static void vk_volumetric_compute_pass( void )
 		} else if ( local_light_count > VK_VOLUMETRIC_MAX_LIGHTS ) {
 			local_light_count = VK_VOLUMETRIC_MAX_LIGHTS;
 		}
-		Com_Memcpy( saved_shadow_matrix, params->sunShadowMatrix0, sizeof( saved_shadow_matrix ) );
-		saved_shadow_valid = params->shadowParams0[3];
+	}
+
+	if ( params_rw ) {
+		for ( int i = 0; i < VK_VOLUMETRIC_MAX_LIGHTS; i++ ) {
+			Matrix16Identity( params_rw->localSpotShadowMatrix[i] );
+			for ( int face = 0; face < 6; face++ ) {
+				Matrix16Identity( params_rw->localPointShadowMatrix[i][face] );
+			}
+			params_rw->localShadowAtlasUv[i][0] = 1.0f;
+			params_rw->localShadowAtlasUv[i][1] = 1.0f;
+			params_rw->localShadowAtlasUv[i][2] = 0.0f;
+			params_rw->localShadowAtlasUv[i][3] = 0.0f;
+			params_rw->lightExtra[i][3] = -1.0f;
+		}
 	}
 
 	if ( r_fogDebug && r_fogDebug->integer >= 1 && ( vk.volumetric_frame % 120u ) == 0u ) {
@@ -11663,61 +12065,65 @@ static void vk_volumetric_compute_pass( void )
 
 	for ( int i = 0; i < local_light_count; i++ ) {
 		const dlight_t *dl = vk_get_volumetric_local_light( i );
-		qboolean dispatched_shadowed = qfalse;
+		qboolean shadow_ready = qfalse;
 
 		if ( use_local_shadows && params_rw && dl ) {
 			if ( dl->linear ) {
 				viewParms_t shadowView;
 				float shadowViewProj[16];
+				const uint32_t atlas_size = MAX( vk.local_spot_shadow_atlas_size, 1u );
+				const uint32_t tile_size = MAX( vk.local_spot_shadow_tile_size, 1u );
+				const uint32_t grid = MAX( 1u, atlas_size / tile_size );
 
-				if ( vk_build_local_spot_shadow_view( dl, &shadowView, shadowViewProj ) &&
-					vk_render_local_volumetric_shadow_view( &shadowView ) )
-				{
-					Com_Memcpy( params_rw->sunShadowMatrix0, shadowViewProj, sizeof( shadowViewProj ) );
-					params_rw->shadowParams0[3] = 1.0f;
-					// passParams: x=lightIndex, y=pointShadowFace(-1 for spot), z=localShadowValid.
-					vk_set_volumetric_pass_params( (float)VK_VOLUMETRIC_STAGE_LOCAL_LIGHT, (float)i, -1.0f, 1.0f );
-					qvkCmdDispatch( vk.cmd->command_buffer, groups_x, groups_y, groups_z );
-					vk_volumetric_stage_barrier( vk.froxel_volume_image );
-					dispatched_shadowed = qtrue;
+				if ( spot_shadow_slot < (int)vk.local_spot_shadow_capacity ) {
+					const int slot = spot_shadow_slot++;
+					const int tile_x = ( slot % (int)grid ) * (int)tile_size;
+					const int tile_y = ( slot / (int)grid ) * (int)tile_size;
+
+					if ( vk_build_local_spot_shadow_view( dl, tile_x, tile_y, (int)tile_size, &shadowView, shadowViewProj ) &&
+						vk_render_local_volumetric_shadow_view( &shadowView, qfalse, -1 ) )
+					{
+						Com_Memcpy( params_rw->localSpotShadowMatrix[i], shadowViewProj, sizeof( shadowViewProj ) );
+						params_rw->localShadowAtlasUv[i][0] = (float)tile_size / (float)atlas_size;
+						params_rw->localShadowAtlasUv[i][1] = (float)tile_size / (float)atlas_size;
+						params_rw->localShadowAtlasUv[i][2] = (float)tile_x / (float)atlas_size;
+						params_rw->localShadowAtlasUv[i][3] = (float)tile_y / (float)atlas_size;
+						params_rw->lightExtra[i][3] = (float)slot;
+						shadow_ready = qtrue;
+					}
 				}
 			} else {
-				for ( int face = 0; face < 6; face++ ) {
-					viewParms_t shadowView;
-					float shadowViewProj[16];
+				if ( point_shadow_slot < (int)vk.local_point_shadow_capacity ) {
+					const int point_slot = point_shadow_slot++;
+					qboolean all_faces_rendered = qtrue;
 
-					if ( !vk_build_local_point_shadow_view( dl, face, &shadowView, shadowViewProj ) ) {
-						continue;
-					}
-					if ( !vk_render_local_volumetric_shadow_view( &shadowView ) ) {
-						continue;
+					for ( int face = 0; face < 6; face++ ) {
+						viewParms_t shadowView;
+						float shadowViewProj[16];
+						const int layer = point_slot * 6 + face;
+
+						if ( !vk_build_local_point_shadow_view( dl, face, (int)vk.local_point_shadow_face_size, &shadowView, shadowViewProj ) ||
+							!vk_render_local_volumetric_shadow_view( &shadowView, qtrue, layer ) )
+						{
+							all_faces_rendered = qfalse;
+							break;
+						}
+
+						Com_Memcpy( params_rw->localPointShadowMatrix[i][face], shadowViewProj, sizeof( shadowViewProj ) );
 					}
 
-					Com_Memcpy( params_rw->sunShadowMatrix0, shadowViewProj, sizeof( shadowViewProj ) );
-					params_rw->shadowParams0[3] = 1.0f;
-					// passParams: x=lightIndex, y=pointShadowFace(0..5), z=localShadowValid.
-					vk_set_volumetric_pass_params( (float)VK_VOLUMETRIC_STAGE_LOCAL_LIGHT, (float)i, (float)face, 1.0f );
-					qvkCmdDispatch( vk.cmd->command_buffer, groups_x, groups_y, groups_z );
-					vk_volumetric_stage_barrier( vk.froxel_volume_image );
-					dispatched_shadowed = qtrue;
+					if ( all_faces_rendered ) {
+						params_rw->lightExtra[i][3] = (float)point_slot;
+						shadow_ready = qtrue;
+					}
 				}
 			}
 		}
 
-		if ( !dispatched_shadowed ) {
-			if ( params_rw ) {
-				params_rw->shadowParams0[3] = 0.0f;
-			}
-			// passParams: x=lightIndex, y=pointShadowFace(-1), z=localShadowValid(0).
-			vk_set_volumetric_pass_params( (float)VK_VOLUMETRIC_STAGE_LOCAL_LIGHT, (float)i, -1.0f, 0.0f );
-			qvkCmdDispatch( vk.cmd->command_buffer, groups_x, groups_y, groups_z );
-			vk_volumetric_stage_barrier( vk.froxel_volume_image );
-		}
-	}
-
-	if ( params_rw ) {
-		Com_Memcpy( params_rw->sunShadowMatrix0, saved_shadow_matrix, sizeof( saved_shadow_matrix ) );
-		params_rw->shadowParams0[3] = saved_shadow_valid;
+		// passParams.y carries local light index for the STAGE_LOCAL_LIGHT dispatch.
+		vk_set_volumetric_pass_params( (float)VK_VOLUMETRIC_STAGE_LOCAL_LIGHT, (float)i, shadow_ready ? 1.0f : 0.0f, 0.0f );
+		qvkCmdDispatch( vk.cmd->command_buffer, groups_x, groups_y, groups_z );
+		vk_volumetric_stage_barrier( vk.froxel_volume_image );
 	}
 
 	vk_set_volumetric_pass_params( (float)VK_VOLUMETRIC_STAGE_CLAMP_LEVEL0, 0.0f, 0.0f, 0.0f );
@@ -12194,6 +12600,7 @@ void vk_begin_frame( void )
 	if ( vk.frame_count++ ) // might happen during stereo rendering
 		return;
 
+	vk_begin_motion_frame();
 	vk.sun_shadow_valid = qfalse;
 
 #ifdef USE_UPLOAD_QUEUE
@@ -13447,7 +13854,7 @@ static void vk_update_volumetric_params( void )
 		params.lightColorType[local_light_count][3] = dl->linear ? 1.0f : 0.0f;
 		// Shadow type is consumed by the local-light injection stage:
 		// 0 = unshadowed, 1 = spot shadow path, 2 = point shadow path.
-		// The shadow-map render path toggles passParams.w per dispatch.
+		// Per-light shadow slot index is written later into lightExtra.w.
 		params.lightExtra[local_light_count][2] = ( r_fog_shadows && r_fog_shadows->integer ) ? ( dl->linear ? 1.0f : 2.0f ) : 0.0f;
 
 		if ( dl->linear ) {
@@ -13467,7 +13874,7 @@ static void vk_update_volumetric_params( void )
 			params.lightDirAngle[local_light_count][3] = cosf( DEG2RAD( 35.0f ) );
 			params.lightExtra[local_light_count][0] = cosf( DEG2RAD( 20.0f ) );
 			params.lightExtra[local_light_count][1] = len;
-			params.lightExtra[local_light_count][3] = 0.0f;
+			params.lightExtra[local_light_count][3] = -1.0f;
 		} else {
 			params.lightDirAngle[local_light_count][0] = 0.0f;
 			params.lightDirAngle[local_light_count][1] = 0.0f;
@@ -13475,7 +13882,7 @@ static void vk_update_volumetric_params( void )
 			params.lightDirAngle[local_light_count][3] = -1.0f;
 			params.lightExtra[local_light_count][0] = -1.0f;
 			params.lightExtra[local_light_count][1] = radius;
-			params.lightExtra[local_light_count][3] = 0.0f;
+			params.lightExtra[local_light_count][3] = -1.0f;
 		}
 
 		local_light_count++;
@@ -13501,6 +13908,14 @@ static void vk_update_volumetric_params( void )
 	params.shadowMapSize0[1] = (float)vk.sun_shadow_height;
 	params.shadowMapSize0[2] = ( vk.sun_shadow_width > 0 ) ? ( 1.0f / (float)vk.sun_shadow_width ) : 0.0f;
 	params.shadowMapSize0[3] = ( vk.sun_shadow_height > 0 ) ? ( 1.0f / (float)vk.sun_shadow_height ) : 0.0f;
+	params.localSpotShadowMapSize[0] = (float)vk.local_spot_shadow_atlas_size;
+	params.localSpotShadowMapSize[1] = (float)vk.local_spot_shadow_atlas_size;
+	params.localSpotShadowMapSize[2] = ( vk.local_spot_shadow_atlas_size > 0 ) ? ( 1.0f / (float)vk.local_spot_shadow_atlas_size ) : 0.0f;
+	params.localSpotShadowMapSize[3] = ( vk.local_spot_shadow_atlas_size > 0 ) ? ( 1.0f / (float)vk.local_spot_shadow_atlas_size ) : 0.0f;
+	params.localPointShadowMapSize[0] = (float)vk.local_point_shadow_face_size;
+	params.localPointShadowMapSize[1] = (float)vk.local_point_shadow_face_size;
+	params.localPointShadowMapSize[2] = ( vk.local_point_shadow_face_size > 0 ) ? ( 1.0f / (float)vk.local_point_shadow_face_size ) : 0.0f;
+	params.localPointShadowMapSize[3] = (float)vk.local_point_shadow_capacity;
 	if ( params.shadowParams0[0] < 0.0f ) {
 		params.shadowParams0[0] = 0.0f;
 	}
