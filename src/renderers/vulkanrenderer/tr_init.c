@@ -2051,7 +2051,7 @@ static void R_Register( void )
 
 	r_fogDebug = ri.Cvar_Get( "r_fogDebug", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_fogDebug, "0", "5", CV_INTEGER );
-	ri.Cvar_SetDescription( r_fogDebug, "Volumetric fog debug view: 0=off, 1=composite alive, 2=froxel color z=0.5, 3=froxel alpha z=0.5, 4=world bounds mask, 5=depth grayscale." );
+	ri.Cvar_SetDescription( r_fogDebug, "Volumetric fog debug view: 0=off, 1=froxel coords, 2=extinction slice, 3=scattering slice, 4=temporal validity/weight, 5=integrated transmittance." );
 	ri.Cvar_SetGroup( r_fogDebug, CVG_RENDERER );
 
 	r_froxelDebug = ri.Cvar_Get( "r_froxelDebug", "0", CVAR_ARCHIVE_ND );
