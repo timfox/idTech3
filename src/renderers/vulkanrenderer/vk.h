@@ -531,6 +531,8 @@ typedef struct {
 		VkRenderPass main;
 		VkRenderPass screenmap;
 		VkRenderPass sun_shadow;
+		VkRenderPass local_spot_shadow;
+		VkRenderPass local_point_shadow;
 		VkRenderPass gamma;
 		VkRenderPass capture;
 		VkRenderPass bloom_extract;
@@ -567,19 +569,15 @@ typedef struct {
 	VkDescriptorSetLayout volumetric_compute_layout;
 	VkDescriptorSetLayout volumetric_composite_layout;
 	VkDescriptorSetLayout volumetric_depth_resolve_layout;
-	VkDescriptorSetLayout volumetric_motion_layout;
 	VkDescriptorSet volumetric_compute_descriptor;
 	VkDescriptorSet volumetric_composite_descriptor;
 	VkDescriptorSet volumetric_depth_resolve_descriptor;
-	VkDescriptorSet volumetric_motion_descriptor;
 	VkPipelineLayout volumetric_compute_pipeline_layout;
 	VkPipelineLayout volumetric_composite_pipeline_layout;
 	VkPipelineLayout volumetric_depth_resolve_pipeline_layout;
-	VkPipelineLayout volumetric_motion_pipeline_layout;
 	VkPipeline volumetric_compute_pipeline;
 	VkPipeline volumetric_composite_pipeline;
 	VkPipeline volumetric_depth_resolve_pipeline;
-	VkPipeline volumetric_motion_pipeline;
 
 	VkDescriptorSet color_descriptor;
 	VkDescriptorSet depth_descriptor;
@@ -674,6 +672,8 @@ typedef struct {
 		VkFramebuffer smaa_compose;
 		VkFramebuffer volumetric[MAX_SWAPCHAIN_IMAGES];
 		VkFramebuffer sun_shadow;
+		VkFramebuffer local_spot_shadow;
+		VkFramebuffer local_point_shadow[MAX_DLIGHTS * 6];
 	} framebuffers;
 
 	VkBuffer volumetric_params_buffer;
@@ -780,7 +780,6 @@ typedef struct {
 		VkShaderModule volumetric_fog_fs;
 		VkShaderModule volumetric_fog_cs;
 		VkShaderModule volumetric_depth_resolve_msaa_cs;
-		VkShaderModule volumetric_motion_vectors_cs;
 
 		VkShaderModule dot_fs;
 		VkShaderModule dot_vs;
@@ -916,6 +915,20 @@ typedef struct {
 	VkImageView sun_shadow_color_msaa_view;
 	VkDeviceMemory sun_shadow_color_msaa_memory;
 	VkSampler sun_shadow_sampler;
+	VkImage local_spot_shadow_atlas_image;
+	VkImageView local_spot_shadow_atlas_view;
+	VkDeviceMemory local_spot_shadow_atlas_memory;
+	VkImage local_spot_shadow_color_image;
+	VkImageView local_spot_shadow_color_view;
+	VkDeviceMemory local_spot_shadow_color_memory;
+	VkImage local_point_shadow_array_image;
+	VkImageView local_point_shadow_array_view;
+	VkDeviceMemory local_point_shadow_array_memory;
+	VkImage local_point_shadow_color_array_image;
+	VkImageView local_point_shadow_color_array_view;
+	VkDeviceMemory local_point_shadow_color_array_memory;
+	VkImageView local_point_shadow_face_views[MAX_DLIGHTS * 6];
+	VkImageView local_point_shadow_color_face_views[MAX_DLIGHTS * 6];
 	VkSampler froxel_sampler;
 	VkSampler froxel_depth_sampler;
 	uint32_t froxel_width;
@@ -925,6 +938,11 @@ typedef struct {
 	uint32_t sun_shadow_height;
 	float sun_shadow_matrix0[16];
 	qboolean sun_shadow_valid;
+	uint32_t local_spot_shadow_atlas_size;
+	uint32_t local_spot_shadow_tile_size;
+	uint32_t local_spot_shadow_capacity;
+	uint32_t local_point_shadow_face_size;
+	uint32_t local_point_shadow_capacity;
 
 	VkImageLayout initSwapchainLayout;
 
