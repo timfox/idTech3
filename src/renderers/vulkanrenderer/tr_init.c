@@ -186,8 +186,11 @@ cvar_t	*r_offsetFactor;
 cvar_t	*r_offsetUnits;
 cvar_t	*r_gamma;
 cvar_t	*r_panini;
-cvar_t	*r_paniniD;
-cvar_t	*r_paniniS;
+cvar_t	*r_panini_d;
+cvar_t	*r_panini_s;
+cvar_t	*r_panini_theta;
+cvar_t	*r_panini_border;
+cvar_t	*r_panini_debug;
 cvar_t	*r_paniniBrightness;
 cvar_t	*r_post;
 cvar_t	*r_post_debug;
@@ -1775,18 +1778,33 @@ static void R_Register( void )
 
 	r_panini = ri.Cvar_Get( "r_panini", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_panini, "0", "1", CV_FLOAT );
-	ri.Cvar_SetDescription( r_panini, "Enable Panini projection warp." );
+	ri.Cvar_SetDescription( r_panini, "Panini blend amount (0=perspective, 1=full panini)." );
 	ri.Cvar_SetGroup( r_panini, CVG_RENDERER );
 
-	r_paniniD = ri.Cvar_Get( "r_paniniD", "0.0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_paniniD, "0.0", "2.0", CV_FLOAT );
-	ri.Cvar_SetDescription( r_paniniD, "Panini projection strength (0 disables)." );
-	ri.Cvar_SetGroup( r_paniniD, CVG_RENDERER );
+	r_panini_d = ri.Cvar_Get( "r_panini_d", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_panini_d, "0.5", "3.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_panini_d, "Panini distance parameter (higher is milder)." );
+	ri.Cvar_SetGroup( r_panini_d, CVG_RENDERER );
 
-	r_paniniS = ri.Cvar_Get( "r_paniniS", "0.0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_paniniS, "0.0", "1.0", CV_FLOAT );
-	ri.Cvar_SetDescription( r_paniniS, "Panini projection squeeze factor." );
-	ri.Cvar_SetGroup( r_paniniS, CVG_RENDERER );
+	r_panini_s = ri.Cvar_Get( "r_panini_s", "0.25", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_panini_s, "0.0", "1.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_panini_s, "Panini vertical compression amount." );
+	ri.Cvar_SetGroup( r_panini_s, CVG_RENDERER );
+
+	r_panini_theta = ri.Cvar_Get( "r_panini_theta", "80.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_panini_theta, "60.0", "85.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_panini_theta, "Panini angular gate in degrees to prevent edge blow-up." );
+	ri.Cvar_SetGroup( r_panini_theta, CVG_RENDERER );
+
+	r_panini_border = ri.Cvar_Get( "r_panini_border", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_panini_border, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_panini_border, "Panini border mode: 0=black outside source, 1=clamp to edge." );
+	ri.Cvar_SetGroup( r_panini_border, CVG_RENDERER );
+
+	r_panini_debug = ri.Cvar_Get( "r_panini_debug", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_panini_debug, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_panini_debug, "Panini debug: color invalid/OOB pixels." );
+	ri.Cvar_SetGroup( r_panini_debug, CVG_RENDERER );
 
 	r_paniniBrightness = ri.Cvar_Get( "r_paniniBrightness", "1.25", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_paniniBrightness, "0.5", "2.5", CV_FLOAT );

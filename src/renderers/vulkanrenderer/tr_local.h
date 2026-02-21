@@ -1509,8 +1509,11 @@ extern	cvar_t	*r_showcluster;
 
 extern cvar_t	*r_gamma;
 extern cvar_t	*r_panini;
-extern cvar_t	*r_paniniD;
-extern cvar_t	*r_paniniS;
+extern cvar_t	*r_panini_d;
+extern cvar_t	*r_panini_s;
+extern cvar_t	*r_panini_theta;
+extern cvar_t	*r_panini_border;
+extern cvar_t	*r_panini_debug;
 extern cvar_t	*r_paniniBrightness;
 extern cvar_t	*r_post;
 extern cvar_t	*r_post_debug;
