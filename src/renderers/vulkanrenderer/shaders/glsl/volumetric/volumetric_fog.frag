@@ -3,26 +3,21 @@
 layout(location = 0) in vec2 v_UV;
 layout(location = 0) out vec4 fragColor;
 
+layout(binding = 0) uniform sampler2D sceneColor;
 layout(binding = 1) uniform sampler2D depthTexture;
 layout(binding = 2) uniform sampler3D froxelVolume;
 
 layout(std140, binding = 3) uniform VolumetricParams {
 	mat4 invProj;
 	mat4 invView;
-	mat4 prevView;
-	mat4 prevProj;
 	vec4 viewOrigin;
 	vec4 sunDirection;
 	vec4 fogColor;
 	vec4 densityParams;
-	vec4 sliceParams;
-	vec4 prevSliceParams;
-	vec4 resolution;
-	vec4 jitter;
-	vec4 misc;
-	vec4 fogMin;
-	vec4 fogMax;
-	vec4 froxelDim;
+	vec4 worldMin;
+	vec4 worldMax;
+	vec4 gridDim;
+	vec4 miscParams;
 	vec4 phaseParams;
 } params;
 
@@ -69,34 +64,38 @@ vec3 reconstructViewPos(
 	viewDir = normalize( viewRay );
 
 	if ( depthMode == 2 ) {
-		sceneDepth = clamp( depthSample, nearPlane, farPlane );
-		float tLinear = sceneDepth / max( -viewDir.z, 1e-4 );
-		return viewDir * tLinear;
+		float linearDepth = depthSample;
+		if ( linearDepth <= 1.0 ) {
+			linearDepth = mix( nearPlane, farPlane, clamp( linearDepth, 0.0, 1.0 ) );
+		}
+		sceneDepth = clamp( linearDepth, nearPlane, farPlane );
+		return viewDir * sceneDepth;
 	}
 
 	vec4 clip = vec4( uv * 2.0 - 1.0, decodeClipZ( depthSample, depthMode ), 1.0 );
 	vec4 view = params.invProj * clip;
 	vec3 viewPos = view.xyz / max( abs( view.w ), 1e-6 );
 	viewDir = normalize( viewPos );
-	sceneDepth = clamp( max( -viewPos.z, nearPlane ), nearPlane, farPlane );
+	sceneDepth = clamp( length( viewPos ), nearPlane, farPlane );
 	return viewPos;
 }
 
 bool boundsValid(out vec3 extent) {
-	extent = params.fogMax.xyz - params.fogMin.xyz;
+	extent = params.worldMax.xyz - params.worldMin.xyz;
 	return all( greaterThan( extent, vec3( 1e-4 ) ) );
 }
 
 void main() {
+	const float nearPlane = 0.05;
+	const float maxFar = 16384.0;
 	float depthSample = texture( depthTexture, v_UV ).r;
-	float nearPlane = params.sliceParams.x;
-	float farPlane = params.sliceParams.y;
-	int depthMode = int( clamp( floor( params.misc.y + 0.5 ), 0.0, 2.0 ) );
-	float frameIndex = params.misc.z;
-	int fogDebug = int( clamp( floor( params.froxelDim.w + 0.5 ), 0.0, 5.0 ) );
+	int depthMode = int( clamp( floor( params.miscParams.y + 0.5 ), 0.0, 2.0 ) );
+	float frameIndex = params.miscParams.z;
+	int fogDebug = int( clamp( floor( params.gridDim.w + 0.5 ), 0.0, 5.0 ) );
 
 	if ( fogDebug == 1 ) {
-		fragColor = vec4( 1.0, 0.0, 1.0, 0.35 );
+		vec3 scene = texture( sceneColor, v_UV ).rgb;
+		fragColor = vec4( mix( scene, vec3( 1.0, 0.0, 1.0 ), 0.35 ), 1.0 );
 		return;
 	}
 	if ( fogDebug == 2 ) {
@@ -109,23 +108,19 @@ void main() {
 		return;
 	}
 
-	int rawSteps = int( clamp( params.misc.x, 1.0, 64.0 ) );
+	int rawSteps = int( clamp( params.miscParams.x, 1.0, 128.0 ) );
 	int steps = max( 1, rawSteps );
 	float transmittance = 1.0;
 	vec3 fogAccum = vec3( 0.0 );
 	vec3 extent;
 	bool worldBounds = boundsValid( extent );
 	vec3 viewDir;
-	float sceneDepth = farPlane;
-	reconstructViewPos( v_UV, depthSample, depthMode, nearPlane, farPlane, viewDir, sceneDepth );
+	float sceneDepth = maxFar;
+	reconstructViewPos( v_UV, depthSample, depthMode, nearPlane, maxFar, viewDir, sceneDepth );
+	sceneDepth = clamp( sceneDepth, nearPlane, maxFar );
 	if ( fogDebug == 5 ) {
-		if ( farPlane <= 0.0 ) {
-			fragColor = vec4( 1.0, 0.0, 1.0, 1.0 );
-			return;
-		}
-		float depthK = 1.0;
-		float depthNumer = log2( 1.0 + max( sceneDepth, 0.0 ) * depthK );
-		float depthDenom = max( log2( 1.0 + farPlane * depthK ), 1e-5 );
+		float depthNumer = log2( 1.0 + max( sceneDepth, 0.0 ) );
+		float depthDenom = max( log2( 1.0 + maxFar ), 1e-5 );
 		float depthGray = clamp( depthNumer / depthDenom, 0.0, 1.0 );
 		fragColor = vec4( depthGray, depthGray, depthGray, 1.0 );
 		return;
@@ -135,41 +130,36 @@ void main() {
 			fragColor = vec4( 1.0, 0.0, 0.0, 1.0 );
 			return;
 		}
-		float invViewZDbg = 1.0 / max( -viewDir.z, 1e-4 );
-		float nearTDbg = nearPlane * invViewZDbg;
-		float hitTDbg = sceneDepth * invViewZDbg;
+		float nearTDbg = nearPlane;
+		float hitTDbg = sceneDepth;
 		float midTDbg = mix( nearTDbg, hitTDbg, 0.5 );
 		vec3 worldDirDbg = normalize( ( params.invView * vec4( viewDir, 0.0 ) ).xyz );
 		vec3 worldPosDbg = params.viewOrigin.xyz + worldDirDbg * midTDbg;
-		vec3 uvwDbg = ( worldPosDbg - params.fogMin.xyz ) / extent;
+		vec3 uvwDbg = ( worldPosDbg - params.worldMin.xyz ) / extent;
 		bool inRange = all( greaterThanEqual( uvwDbg, vec3( 0.0 ) ) ) && all( lessThanEqual( uvwDbg, vec3( 1.0 ) ) );
 		fragColor = inRange ? vec4( 0.0, 1.0, 0.0, 1.0 ) : vec4( 1.0, 0.0, 0.0, 1.0 );
 		return;
 	}
 
 	if ( worldBounds ) {
-		float invViewZ = 1.0 / max( -viewDir.z, 1e-4 );
-		float nearT = nearPlane * invViewZ;
-		float hitT = sceneDepth * invViewZ;
+		float nearT = nearPlane;
+		float hitT = sceneDepth;
 		float totalDistance = max( hitT - nearT, 0.0 );
 		float ds = totalDistance / float( steps );
 		vec3 worldDir = normalize( ( params.invView * vec4( viewDir, 0.0 ) ).xyz );
 		vec3 worldCam = params.viewOrigin.xyz;
 
-		for ( int i = 0; i < 64; ++i ) {
+		for ( int i = 0; i < 128; ++i ) {
 			if ( i >= steps ) {
 				break;
 			}
 
-			float jitterStep = 0.0;
-			if ( params.jitter.x > 0.0 ) {
-				jitterStep = ( hash12( gl_FragCoord.xy + vec2( frameIndex, float( i ) * 17.0 ) ) - 0.5 ) * params.jitter.x;
-			}
+			float jitterStep = ( hash12( gl_FragCoord.xy + vec2( frameIndex, float( i ) * 17.0 ) ) - 0.5 ) * clamp( params.densityParams.z, 0.0, 1.0 );
 
 			float t = nearT + ( float( i ) + 0.5 + jitterStep ) * ds;
 			t = clamp( t, nearT, hitT );
 			vec3 worldPos = worldCam + worldDir * t;
-			vec3 uvw = ( worldPos - params.fogMin.xyz ) / extent;
+			vec3 uvw = ( worldPos - params.worldMin.xyz ) / extent;
 			if ( any( lessThan( uvw, vec3( 0.0 ) ) ) || any( greaterThan( uvw, vec3( 1.0 ) ) ) ) {
 				continue;
 			}
@@ -192,23 +182,16 @@ void main() {
 			}
 		}
 	} else {
-		float logFar = max( params.sliceParams.z, 1e-4 );
-		float distance = max( sceneDepth - nearPlane, 0.0 );
-		float stepDistance = distance / float( steps );
+		float stepDistance = max( sceneDepth - nearPlane, 0.0 ) / float( steps );
 
-		for ( int i = 0; i < 64; ++i ) {
+		for ( int i = 0; i < 128; ++i ) {
 			if ( i >= steps ) {
 				break;
 			}
 
-			float stepJitter = 0.0;
-			if ( params.jitter.x > 0.0 ) {
-				stepJitter = ( hash12( gl_FragCoord.xy + vec2( frameIndex, float( i ) * 17.0 ) ) - 0.5 ) * params.jitter.x;
-			}
+			float stepJitter = ( hash12( gl_FragCoord.xy + vec2( frameIndex, float( i ) * 17.0 ) ) - 0.5 ) * clamp( params.densityParams.z, 0.0, 1.0 );
 			float sampleDepth = nearPlane + ( float( i ) + 0.5 + stepJitter ) * stepDistance;
-			sampleDepth = clamp( sampleDepth, nearPlane, farPlane );
-
-			float sliceNormalized = clamp( log( max( sampleDepth / nearPlane, 1e-4 ) ) / logFar, 0.0, 1.0 );
+			float sliceNormalized = clamp( sampleDepth / max( sceneDepth, 1e-4 ), 0.0, 1.0 );
 			vec4 vol = texture( froxelVolume, vec3( v_UV, sliceNormalized ) );
 			fogAccum += transmittance * vol.rgb * stepDistance;
 			transmittance *= exp( -max( vol.a, 0.0 ) * stepDistance );
@@ -222,5 +205,7 @@ void main() {
 	fogAccum = max( fogAccum + dither * ( 1.0 / 1024.0 ), vec3( 0.0 ) );
 
 	float fogOpacity = clamp( 1.0 - transmittance, 0.0, 1.0 );
-	fragColor = vec4( fogAccum, fogOpacity );
+	vec3 scene = texture( sceneColor, v_UV ).rgb;
+	vec3 outRgb = scene * ( 1.0 - fogOpacity ) + fogAccum;
+	fragColor = vec4( outRgb, 1.0 );
 }

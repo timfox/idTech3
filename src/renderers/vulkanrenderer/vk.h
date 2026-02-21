@@ -570,6 +570,8 @@ typedef struct {
 
 	VkImage color_image;
 	VkImageView color_image_view;
+	VkImage fog_scene_image;
+	VkImageView fog_scene_image_view;
 
 	VkImage bloom_image[1+VK_NUM_BLOOM_PASSES*2];
 	VkImageView bloom_image_view[1+VK_NUM_BLOOM_PASSES*2];

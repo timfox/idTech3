@@ -9,152 +9,156 @@ layout(binding = 2) uniform sampler2D depthTexture;
 layout(std140, binding = 3) uniform VolumetricParams {
 	mat4 invProj;
 	mat4 invView;
-	mat4 prevView;
-	mat4 prevProj;
 	vec4 viewOrigin;
 	vec4 sunDirection;
 	vec4 fogColor;
 	vec4 densityParams;
-	vec4 sliceParams;
-	vec4 prevSliceParams;
-	vec4 resolution;
-	vec4 jitter;
-	vec4 misc;
-	vec4 fogMin;
-	vec4 fogMax;
-	vec4 froxelDim;
+	vec4 worldMin;
+	vec4 worldMax;
+	vec4 gridDim;
+	vec4 miscParams;
 	vec4 phaseParams;
 } params;
 
 const float PI = 3.14159265359;
+const float NEAR_PLANE = 0.05;
+const float FAR_PLANE = 16384.0;
 
-float phaseHG(float cosTheta, float g) {
+float phaseHG( float cosTheta, float g ) {
 	float gg = g * g;
-	float denom = max(1.0 + gg - 2.0 * g * cosTheta, 1e-5);
-	return (1.0 - gg) / (4.0 * PI * pow(denom, 1.5));
+	float denom = max( 1.0 + gg - 2.0 * g * cosTheta, 1e-5 );
+	return ( 1.0 - gg ) / ( 4.0 * PI * pow( denom, 1.5 ) );
 }
 
-vec3 reconstructViewRay(vec2 uv) {
-	vec4 clip = vec4(uv * 2.0 - 1.0, 1.0, 1.0);
+vec3 reconstructViewRay( vec2 uv ) {
+	vec4 clip = vec4( uv * 2.0 - 1.0, 1.0, 1.0 );
 	vec4 view = params.invProj * clip;
-	return view.xyz / max(abs(view.w), 1e-6);
+	return view.xyz / max( abs( view.w ), 1e-6 );
 }
 
-float decodeClipZ(float depthSample, int depthMode) {
+float decodeClipZ( float depthSample, int depthMode ) {
 	if ( depthMode == 0 ) {
 		return depthSample * 2.0 - 1.0;
 	}
 	if ( depthMode == 1 ) {
-		return (1.0 - depthSample) * 2.0 - 1.0;
+		return ( 1.0 - depthSample ) * 2.0 - 1.0;
 	}
 	return 0.0;
 }
 
-float reconstructSceneDepth(vec2 uv, float depthSample, int depthMode, float nearPlane, float farPlane) {
+float reconstructSceneDepth( vec2 uv, float depthSample, int depthMode ) {
 	if ( depthMode == 2 ) {
-		return clamp(depthSample, nearPlane, farPlane);
+		float linearDepth = depthSample;
+		if ( linearDepth <= 1.0 ) {
+			linearDepth = mix( NEAR_PLANE, FAR_PLANE, clamp( linearDepth, 0.0, 1.0 ) );
+		}
+		return clamp( linearDepth, NEAR_PLANE, FAR_PLANE );
 	}
-	vec4 clip = vec4(uv * 2.0 - 1.0, decodeClipZ(depthSample, depthMode), 1.0);
+	vec4 clip = vec4( uv * 2.0 - 1.0, decodeClipZ( depthSample, depthMode ), 1.0 );
 	vec4 view = params.invProj * clip;
-	vec3 viewPos = view.xyz / max(abs(view.w), 1e-6);
-	return clamp(max(-viewPos.z, nearPlane), nearPlane, farPlane);
+	vec3 viewPos = view.xyz / max( abs( view.w ), 1e-6 );
+	return clamp( length( viewPos ), NEAR_PLANE, FAR_PLANE );
 }
 
-bool boundsValid(out vec3 extent) {
-	extent = params.fogMax.xyz - params.fogMin.xyz;
-	return all(greaterThan(extent, vec3(1e-4)));
+bool boundsValid( out vec3 extent ) {
+	extent = params.worldMax.xyz - params.worldMin.xyz;
+	return all( greaterThan( extent, vec3( 1e-4 ) ) );
 }
 
-vec4 computeLegacyValue(ivec3 idx, ivec3 dim, int depthMode) {
-	vec2 uv = (vec2(idx.xy) + vec2(0.5)) / vec2(dim.xy);
-	float sliceNormalized = (float(idx.z) + 0.5) / max(float(dim.z), 1.0);
-	vec3 viewRay = reconstructViewRay(uv);
-	vec3 viewDir = normalize(viewRay);
-
-	float viewDepthZ = params.sliceParams.x * exp(sliceNormalized * params.sliceParams.z);
-	float invZ = 1.0 / max(-viewRay.z, 1e-4);
-	vec3 viewPos = viewRay * (viewDepthZ * invZ);
-	vec4 worldPos4 = params.invView * vec4(viewPos, 1.0);
-	vec3 worldPos = worldPos4.xyz / max(abs(worldPos4.w), 1e-6);
-
-	float sceneDepth = reconstructSceneDepth(uv, texture(depthTexture, uv).r, depthMode, params.sliceParams.x, params.sliceParams.y);
-	bool occluded = viewDepthZ > sceneDepth;
-
+vec4 computeWorldValue( ivec3 idx, ivec3 dim, vec3 extent, int depthMode ) {
+	vec3 cell = ( vec3( idx ) + vec3( 0.5 ) ) / vec3( dim );
+	vec3 worldPos = params.worldMin.xyz + cell * extent;
+	vec3 rel = worldPos - params.viewOrigin.xyz;
+	float relLen = max( length( rel ), 1e-4 );
+	vec3 viewDir = rel / relLen;
 	float heightDelta = worldPos.z - params.viewOrigin.w;
-	float heightFalloff = max(0.0, params.densityParams.y);
-	float density = max(0.0, params.densityParams.x) * exp(-heightFalloff * max(0.0, heightDelta));
-	if ( occluded ) {
-		density = 0.0;
+	float baseDensity = max( params.densityParams.x, 0.0 );
+	float heightFalloff = max( params.densityParams.y, 0.0 );
+	float density = baseDensity * exp( -heightFalloff * max( 0.0, heightDelta ) );
+
+	float g = clamp( params.phaseParams.x, -0.999, 0.999 );
+	float cosTheta = dot( normalize( params.sunDirection.xyz ), normalize( -viewDir ) );
+	float phase = phaseHG( cosTheta, g );
+	float lighting = params.phaseParams.z + params.phaseParams.y * phase;
+	vec3 inscatter = params.fogColor.rgb * max( lighting, 0.0 ) * density * max( params.fogColor.a, 0.0 );
+
+	ivec3 gridXY = ivec3( max( params.gridDim.xyz, vec3( 1.0 ) ) );
+	vec2 uv = ( vec2( idx.xy ) + vec2( 0.5 ) ) / vec2( gridXY.xy );
+	float sceneDepth = reconstructSceneDepth( uv, texture( depthTexture, uv ).r, depthMode );
+	float viewDistance = relLen;
+	if ( viewDistance > sceneDepth ) {
+		return vec4( 0.0 );
 	}
 
-	float g = clamp(params.phaseParams.x, -0.999, 0.999);
-	float cosTheta = dot(normalize(params.sunDirection.xyz), -viewDir);
-	float phase = phaseHG(cosTheta, g);
-	vec3 ambient = params.fogColor.rgb * params.phaseParams.z;
-	vec3 directional = params.fogColor.rgb * params.phaseParams.y * phase;
-	vec3 inscatter = (ambient + directional) * density * params.fogColor.a;
-	return vec4(inscatter, density);
+	return vec4( inscatter, density );
 }
 
-vec4 computeWorldValue(ivec3 idx, ivec3 dim, vec3 extent) {
-	vec3 cell = (vec3(idx) + vec3(0.5)) / vec3(dim);
-	vec3 worldPos = params.fogMin.xyz + cell * extent;
-	vec3 rel = worldPos - params.viewOrigin.xyz;
-	float heightDelta = worldPos.z - params.viewOrigin.w;
-	float heightFalloff = max(0.0, params.densityParams.y);
-	float density = max(0.0, params.densityParams.x) * exp(-heightFalloff * max(0.0, heightDelta));
+vec4 computeLegacyValue( ivec3 idx, ivec3 dim, int depthMode ) {
+	vec2 uv = ( vec2( idx.xy ) + vec2( 0.5 ) ) / vec2( dim.xy );
+	float sceneDepth = reconstructSceneDepth( uv, texture( depthTexture, uv ).r, depthMode );
+	float slice = ( float( idx.z ) + 0.5 ) / float( dim.z );
+	float sampleDepth = mix( NEAR_PLANE, max( sceneDepth, NEAR_PLANE ), slice );
+	if ( sampleDepth > sceneDepth ) {
+		return vec4( 0.0 );
+	}
 
-	float relLen = max(length(rel), 1e-4);
-	vec3 rayDir = rel / relLen;
-	float g = clamp(params.phaseParams.x, -0.999, 0.999);
-	float cosTheta = dot(normalize(params.sunDirection.xyz), -rayDir);
-	float phase = phaseHG(cosTheta, g);
-	vec3 ambient = params.fogColor.rgb * params.phaseParams.z;
-	vec3 directional = params.fogColor.rgb * params.phaseParams.y * phase;
-	vec3 inscatter = (ambient + directional) * density * params.fogColor.a;
-
-	return vec4(inscatter, density);
+	vec3 viewRay = reconstructViewRay( uv );
+	vec3 viewDir = normalize( viewRay );
+	float g = clamp( params.phaseParams.x, -0.999, 0.999 );
+	float cosTheta = dot( normalize( params.sunDirection.xyz ), -viewDir );
+	float phase = phaseHG( cosTheta, g );
+	float lighting = params.phaseParams.z + params.phaseParams.y * phase;
+	float baseDensity = max( params.densityParams.x, 0.0 );
+	float heightFalloff = max( params.densityParams.y, 0.0 );
+	float density = baseDensity * exp( -heightFalloff * max( 0.0, sampleDepth - NEAR_PLANE ) );
+	vec3 inscatter = params.fogColor.rgb * max( lighting, 0.0 ) * density * max( params.fogColor.a, 0.0 );
+	return vec4( inscatter, density );
 }
 
 void main() {
-	ivec3 idx = ivec3(gl_GlobalInvocationID);
-	ivec3 dim = ivec3(max(params.froxelDim.xyz, vec3(1.0)));
-	int depthMode = int(clamp(floor(params.misc.y + 0.5), 0.0, 2.0));
-	int froxelDebug = int(clamp(floor(params.phaseParams.w + 0.5), 0.0, 2.0));
+	ivec3 idx = ivec3( gl_GlobalInvocationID );
+	ivec3 dim = ivec3( max( params.gridDim.xyz, vec3( 1.0 ) ) );
+	int depthMode = int( clamp( floor( params.miscParams.y + 0.5 ), 0.0, 2.0 ) );
+	int froxelDebug = int( clamp( floor( params.phaseParams.w + 0.5 ), 0.0, 2.0 ) );
 	vec3 extent;
-	bool useWorldGrid = boundsValid(extent);
+	bool useWorldGrid = boundsValid( extent );
 
-	if ( any(greaterThanEqual(idx, dim)) ) {
+	if ( any( greaterThanEqual( idx, dim ) ) ) {
 		return;
 	}
 
 	if ( froxelDebug == 1 ) {
-		vec3 uvw = (vec3(idx) + vec3(0.5)) / vec3(dim);
-		imageStore(froxelVolume, idx, vec4(uvw, uvw.z));
+		vec3 uvw = ( vec3( idx ) + vec3( 0.5 ) ) / vec3( dim );
+		imageStore( froxelVolume, idx, vec4( uvw, uvw.z ) );
 		return;
 	}
 	if ( froxelDebug == 2 ) {
-		imageStore(froxelVolume, idx, vec4(params.fogColor.rgb * 0.05, 0.05));
+		imageStore( froxelVolume, idx, vec4( params.fogColor.rgb * 0.05, 0.05 ) );
 		return;
 	}
 
-	vec4 current = useWorldGrid ? computeWorldValue(idx, dim, extent) : computeLegacyValue(idx, dim, depthMode);
+	vec4 current = vec4( 0.0 );
+	if ( useWorldGrid ) {
+		current = computeWorldValue( idx, dim, extent, depthMode );
+	} else {
+		current = computeLegacyValue( idx, dim, depthMode );
+	}
 
-	vec4 history = vec4(0.0);
-	bool hasHistory = params.misc.w > 0.5;
-	float temporal = clamp(params.densityParams.w, 0.0, 1.0);
+	vec4 history = vec4( 0.0 );
+	bool hasHistory = params.miscParams.w > 0.5;
+	float temporal = clamp( params.densityParams.w, 0.0, 1.0 );
 	bool doTemporal = hasHistory && temporal > 0.0;
 	if ( doTemporal ) {
-		history = imageLoad(froxelHistory, idx);
+		history = imageLoad( froxelHistory, idx );
 	}
 
 	vec4 finalValue = current;
 	if ( doTemporal ) {
-		vec4 blended = mix(current, history, temporal);
+		vec4 blended = mix( current, history, temporal );
 		vec4 diff = blended - history;
-		diff = clamp(diff, -0.25, 0.25);
+		diff = clamp( diff, -0.25, 0.25 );
 		finalValue = history + diff;
 	}
 
-	imageStore(froxelVolume, idx, finalValue);
+	imageStore( froxelVolume, idx, finalValue );
 }

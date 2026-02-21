@@ -200,20 +200,14 @@ uint32_t vk_find_pipeline_ext( uint32_t base, const Vk_Pipeline_Def *def, qboole
 typedef struct {
 	float invProj[16];
 	float invView[16];
-	float prevView[16];
-	float prevProj[16];
 	float viewOrigin[4];
 	float sunDirection[4];
 	float fogColor[4];
 	float densityParams[4];
-	float sliceParams[4];
-	float prevSliceParams[4];
-	float resolution[4];
-	float jitter[4];
-	float misc[4];
-	float fogMin[4];
-	float fogMax[4];
-	float froxelDim[4];
+	float worldMin[4];
+	float worldMax[4];
+	float gridDim[4];
+	float miscParams[4];
 	float phaseParams[4];
 } volumetric_params_t;
 
@@ -221,20 +215,14 @@ _Static_assert( ( sizeof( volumetric_params_t ) % 16 ) == 0, "volumetric_params_
 #define VK_VOLUMETRIC_ASSERT_ALIGNED16(member) _Static_assert( ( offsetof( volumetric_params_t, member ) % 16 ) == 0, "volumetric_params_t::" #member " must be 16-byte aligned" )
 VK_VOLUMETRIC_ASSERT_ALIGNED16( invProj );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( invView );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( prevView );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( prevProj );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( viewOrigin );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( sunDirection );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( fogColor );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( densityParams );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( sliceParams );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( prevSliceParams );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( resolution );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( jitter );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( misc );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( fogMin );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( fogMax );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( froxelDim );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( worldMin );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( worldMax );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( gridDim );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( miscParams );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( phaseParams );
 #undef VK_VOLUMETRIC_ASSERT_ALIGNED16
 
@@ -3029,7 +3017,7 @@ static void vk_update_volumetric_descriptors( void )
 	}
 
 	if ( vk.volumetric_composite_descriptor != VK_NULL_HANDLE &&
-		vk.color_image_view && vk.depth_image_view && vk.froxel_volume_view )
+		vk.fog_scene_image_view && vk.depth_image_view && vk.froxel_volume_view )
 	{
 		VkDescriptorImageInfo composite_info[3];
 		VkWriteDescriptorSet writes[4];
@@ -3049,9 +3037,9 @@ static void vk_update_volumetric_descriptors( void )
 
 		Com_Memset( composite_info, 0, sizeof( composite_info ) );
 
-		// hdrColor (binding 0) - kept for layout compatibility, may be unused by shader
+		// sceneColor (binding 0)
 		composite_info[0].sampler = vk_find_sampler( &color_sd );
-		composite_info[0].imageView = vk.color_image_view;
+		composite_info[0].imageView = vk.fog_scene_image_view;
 		composite_info[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 		// depthTexture (binding 1)
@@ -3086,9 +3074,10 @@ static void vk_update_volumetric_descriptors( void )
 
 	if ( r_fogDebug && r_fogDebug->integer >= 1 && ( vk.volumetric_frame % 120u ) == 0u ) {
 		ri.Printf( PRINT_ALL,
-			"[VK][fog] descriptors computeSet=0x%llx storageLayout=GENERAL historyLayout=GENERAL compositeSet=0x%llx sampleLayout=SHADER_READ_ONLY_OPTIMAL\n",
+			"[VK][fog] descriptors computeSet=0x%llx storageLayout=GENERAL historyLayout=GENERAL compositeSet=0x%llx sceneView=0x%llx sampleLayout=SHADER_READ_ONLY_OPTIMAL\n",
 			(unsigned long long)(uintptr_t)vk.volumetric_compute_descriptor,
-			(unsigned long long)(uintptr_t)vk.volumetric_composite_descriptor );
+			(unsigned long long)(uintptr_t)vk.volumetric_composite_descriptor,
+			(unsigned long long)(uintptr_t)vk.fog_scene_image_view );
 	}
 }
 
@@ -4252,6 +4241,10 @@ static void vk_create_attachments( void )
 		// post-processing/msaa-resolve
 		create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
 			usage, &vk.color_image, &vk.color_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
+		// scene copy sampled by volumetric composite (avoids read/write feedback on vk.color_image)
+		create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
+			VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+			&vk.fog_scene_image, &vk.fog_scene_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 
 		// screenmap-msaa
 		if ( vk.screenMapSamples > VK_SAMPLE_COUNT_1_BIT ) {
@@ -4310,6 +4303,8 @@ static void vk_create_attachments( void )
 
 	SET_OBJECT_NAME( vk.color_image, "color attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
 	SET_OBJECT_NAME( vk.color_image_view, "color attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+	SET_OBJECT_NAME( vk.fog_scene_image, "fog scene copy", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+	SET_OBJECT_NAME( vk.fog_scene_image_view, "fog scene copy view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 
 	SET_OBJECT_NAME( vk.capture.image, "capture image", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 	SET_OBJECT_NAME( vk.capture.image_view, "capture image view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
@@ -5623,19 +5618,10 @@ static void vk_create_volumetric_composite_pipeline( void )
 	multisample_state.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 	multisample_state.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-		VkPipelineColorBlendAttachmentState blend_attachment;
-		Com_Memset( &blend_attachment, 0, sizeof( blend_attachment ) );
-		blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-		blend_attachment.blendEnable = VK_TRUE;
-		blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
-		// Composite without sampling the current color attachment:
-		// dst = dst * transmittance + inScattering
-		// where shader writes alpha = 1 - transmittance.
-		blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-		blend_attachment.colorBlendOp = VK_BLEND_OP_ADD;
-		blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-		blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-		blend_attachment.alphaBlendOp = VK_BLEND_OP_ADD;
+	VkPipelineColorBlendAttachmentState blend_attachment;
+	Com_Memset( &blend_attachment, 0, sizeof( blend_attachment ) );
+	blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+	blend_attachment.blendEnable = VK_FALSE;
 
 	VkPipelineColorBlendStateCreateInfo blend_state;
 	Com_Memset( &blend_state, 0, sizeof( blend_state ) );
@@ -6014,6 +6000,12 @@ static void vk_destroy_attachments( void )
 		qvkDestroyImageView( vk.device, vk.color_image_view, NULL );
 		vk.color_image = VK_NULL_HANDLE;
 		vk.color_image_view = VK_NULL_HANDLE;
+	}
+	if ( vk.fog_scene_image ) {
+		qvkDestroyImage( vk.device, vk.fog_scene_image, NULL );
+		qvkDestroyImageView( vk.device, vk.fog_scene_image_view, NULL );
+		vk.fog_scene_image = VK_NULL_HANDLE;
+		vk.fog_scene_image_view = VK_NULL_HANDLE;
 	}
 
 	if ( vk.msaa_image ) {
@@ -9813,11 +9805,14 @@ static void vk_volumetric_fog_pass( void )
 		vk.volumetric_frame = 0;
 		return;
 	}
-	if ( vk.froxel_volume_image == VK_NULL_HANDLE || vk.froxel_history_image == VK_NULL_HANDLE ) {
+	if ( vk.froxel_volume_image == VK_NULL_HANDLE || vk.froxel_history_image == VK_NULL_HANDLE ||
+		vk.fog_scene_image == VK_NULL_HANDLE )
+	{
 		if ( r_fogDebug && r_fogDebug->integer >= 1 ) {
-			ri.Printf( PRINT_WARNING, "[VK][fog] skipping fog pass: froxel image missing vol=0x%llx hist=0x%llx\n",
+			ri.Printf( PRINT_WARNING, "[VK][fog] skipping fog pass: resources missing vol=0x%llx hist=0x%llx scene=0x%llx\n",
 				(unsigned long long)(uintptr_t)vk.froxel_volume_image,
-				(unsigned long long)(uintptr_t)vk.froxel_history_image );
+				(unsigned long long)(uintptr_t)vk.froxel_history_image,
+				(unsigned long long)(uintptr_t)vk.fog_scene_image );
 		}
 		vk.has_prev_volumetric = qfalse;
 		return;
@@ -9833,8 +9828,37 @@ static void vk_volumetric_fog_pass( void )
 		VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 0, 0 );
 
 	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		VK_IMAGE_LAYOUT_GENERAL, 0, 0 );
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
+	record_image_layout_transition( vk.cmd->command_buffer, vk.fog_scene_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
+	{
+		VkImageCopy copy_region;
+		Com_Memset( &copy_region, 0, sizeof( copy_region ) );
+		copy_region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		copy_region.srcSubresource.layerCount = 1;
+		copy_region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		copy_region.dstSubresource.layerCount = 1;
+		copy_region.extent.width = glConfig.vidWidth;
+		copy_region.extent.height = glConfig.vidHeight;
+		copy_region.extent.depth = 1;
+		qvkCmdCopyImage( vk.cmd->command_buffer,
+			vk.color_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			vk.fog_scene_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			1, &copy_region );
+	}
+	record_image_layout_transition( vk.cmd->command_buffer, vk.fog_scene_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
+	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT );
+	if ( r_fogDebug && r_fogDebug->integer >= 1 && ( vk.volumetric_frame % 120u ) == 0u ) {
+		ri.Printf( PRINT_ALL, "[VK][fog] copied scene color src=0x%llx dst=0x%llx for explicit composite\n",
+			(unsigned long long)(uintptr_t)vk.color_image,
+			(unsigned long long)(uintptr_t)vk.fog_scene_image );
+	}
 
 	record_image_layout_transition( vk.cmd->command_buffer, vk.froxel_volume_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
@@ -9851,10 +9875,6 @@ static void vk_volumetric_fog_pass( void )
 	} else {
 		vk.has_prev_volumetric = qfalse;
 	}
-
-	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_GENERAL,
-		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0, 0 );
 
 	vk_volumetric_composite_pass();
 
@@ -10812,11 +10832,6 @@ static void vk_create_volumetric_params_buffer( void )
 	vk.has_prev_volumetric = qfalse;
 }
 
-static float vk_random01( uint32_t seed ) {
-	float x = sinf( (float)seed * 12.9898f ) * 43758.5453f;
-	return x - floorf( x );
-}
-
 static qboolean vk_parse_rgb_string( const char *s, vec3_t out )
 {
 	float r, g, b;
@@ -10979,20 +10994,23 @@ static void vk_update_volumetric_params( void )
 
 	const float *projection = backEnd.viewParms.projectionMatrix;
 	const float *view = backEnd.viewParms.world.modelViewMatrix;
+	int depth_mode = r_volumetricFogDepthMode ? r_volumetricFogDepthMode->integer : 1;
+	int fog_steps = r_volumetricFogSteps ? r_volumetricFogSteps->integer : 32;
+	float temporal_weight = r_volumetricFogTemporalWeight ? r_volumetricFogTemporalWeight->value : 0.0f;
+	float jitter_amount = r_volumetricFogJitter ? r_volumetricFogJitter->value : 0.0f;
+	float sun_intensity = r_volumetricFogSunIntensity ? r_volumetricFogSunIntensity->value : 1.0f;
+	float ambient_intensity = r_volumetricFogAmbientIntensity ? r_volumetricFogAmbientIntensity->value : 1.0f;
+	float g_aniso = r_volumetricFogAniso ? r_volumetricFogAniso->value : 0.0f;
+	float fog_density = r_volumetricFogDensity ? r_volumetricFogDensity->value : 0.0f;
+	float height_falloff = r_volumetricFogHeightFalloff ? r_volumetricFogHeightFalloff->value : 0.0f;
+	vec3_t fog_min = { -2048.0f, -2048.0f, -256.0f };
+	vec3_t fog_max = {  2048.0f,  2048.0f, 1024.0f };
 
 	if ( !Mat4Inverse( projection, params.invProj ) ) {
 		Com_Memcpy( params.invProj, projection, sizeof( params.invProj ) );
 	}
 	if ( !Mat4Inverse( view, params.invView ) ) {
 		Com_Memcpy( params.invView, view, sizeof( params.invView ) );
-	}
-
-	if ( vk.has_prev_volumetric ) {
-		Com_Memcpy( params.prevView, vk.prev_view_matrix, sizeof( params.prevView ) );
-		Com_Memcpy( params.prevProj, vk.prev_projection_matrix, sizeof( params.prevProj ) );
-	} else {
-		Com_Memcpy( params.prevView, view, sizeof( params.prevView ) );
-		Com_Memcpy( params.prevProj, projection, sizeof( params.prevProj ) );
 	}
 
 	params.viewOrigin[0] = backEnd.viewParms.or.origin[0];
@@ -11014,117 +11032,92 @@ static void vk_update_volumetric_params( void )
 		}
 	}
 
-	{
-		vec3_t fog_min = { -2048.0f, -2048.0f, -256.0f };
-		vec3_t fog_max = {  2048.0f,  2048.0f, 1024.0f };
-		int depth_mode = r_volumetricFogDepthMode ? r_volumetricFogDepthMode->integer : 1;
-		float sun_intensity = r_volumetricFogSunIntensity ? r_volumetricFogSunIntensity->value : 1.0f;
-		float ambient_intensity = r_volumetricFogAmbientIntensity ? r_volumetricFogAmbientIntensity->value : 1.0f;
-
-		if ( r_volumetricFogWorldMin && r_volumetricFogWorldMin->string ) {
-			sscanf( r_volumetricFogWorldMin->string, "%f %f %f", &fog_min[0], &fog_min[1], &fog_min[2] );
-		}
-		if ( r_volumetricFogWorldMax && r_volumetricFogWorldMax->string ) {
-			sscanf( r_volumetricFogWorldMax->string, "%f %f %f", &fog_max[0], &fog_max[1], &fog_max[2] );
-		}
-
-		params.fogMin[0] = fog_min[0];
-		params.fogMin[1] = fog_min[1];
-		params.fogMin[2] = fog_min[2];
-		params.fogMin[3] = 0.0f;
-
-		params.fogMax[0] = fog_max[0];
-		params.fogMax[1] = fog_max[1];
-		params.fogMax[2] = fog_max[2];
-		params.fogMax[3] = 0.0f;
-
-		params.froxelDim[0] = (float)vk.froxel_width;
-		params.froxelDim[1] = (float)vk.froxel_height;
-		params.froxelDim[2] = (float)vk.froxel_slices;
-		params.froxelDim[3] = (float)( ( r_fogDebug ) ? r_fogDebug->integer : 0 );
-
-		params.phaseParams[0] = r_volumetricFogAniso ? r_volumetricFogAniso->value : 0.0f;
-		params.phaseParams[1] = sun_intensity;
-		params.phaseParams[2] = ambient_intensity;
-		params.phaseParams[3] = (float)( ( r_froxelDebug ) ? r_froxelDebug->integer : 0 );
-
-		if ( depth_mode < 0 ) depth_mode = 0;
-		if ( depth_mode > 2 ) depth_mode = 2;
-		params.misc[1] = (float)depth_mode;
+	if ( r_volumetricFogWorldMin && r_volumetricFogWorldMin->string ) {
+		sscanf( r_volumetricFogWorldMin->string, "%f %f %f", &fog_min[0], &fog_min[1], &fog_min[2] );
+	}
+	if ( r_volumetricFogWorldMax && r_volumetricFogWorldMax->string ) {
+		sscanf( r_volumetricFogWorldMax->string, "%f %f %f", &fog_max[0], &fog_max[1], &fog_max[2] );
 	}
 
-	params.densityParams[0] = ( r_volumetricFogDensity->value > 0.0f ) ? r_volumetricFogDensity->value : 0.0f;
-	params.densityParams[1] = r_volumetricFogHeightFalloff->value;
-	params.densityParams[2] = r_volumetricFogAniso->value;
-	params.densityParams[3] = r_volumetricFogTemporalWeight->value;
-	if ( params.densityParams[3] < 0.0f ) {
-		params.densityParams[3] = 0.0f;
-	} else if ( params.densityParams[3] > 1.0f ) {
-		params.densityParams[3] = 1.0f;
+	params.worldMin[0] = fog_min[0];
+	params.worldMin[1] = fog_min[1];
+	params.worldMin[2] = fog_min[2];
+	params.worldMin[3] = 0.0f;
+
+	params.worldMax[0] = fog_max[0];
+	params.worldMax[1] = fog_max[1];
+	params.worldMax[2] = fog_max[2];
+	params.worldMax[3] = 0.0f;
+
+	params.gridDim[0] = (float)vk.froxel_width;
+	params.gridDim[1] = (float)vk.froxel_height;
+	params.gridDim[2] = (float)vk.froxel_slices;
+	params.gridDim[3] = (float)( ( r_fogDebug ) ? r_fogDebug->integer : 0 );
+
+	params.phaseParams[0] = g_aniso;
+	params.phaseParams[1] = sun_intensity;
+	params.phaseParams[2] = ambient_intensity;
+	params.phaseParams[3] = (float)( ( r_froxelDebug ) ? r_froxelDebug->integer : 0 );
+
+	if ( fog_steps < 1 ) {
+		fog_steps = 1;
+	} else if ( fog_steps > 128 ) {
+		fog_steps = 128;
+	}
+	if ( depth_mode < 0 ) {
+		depth_mode = 0;
+	} else if ( depth_mode > 2 ) {
+		depth_mode = 2;
+	}
+	if ( g_aniso < -0.999f ) {
+		params.phaseParams[0] = -0.999f;
+	} else if ( g_aniso > 0.999f ) {
+		params.phaseParams[0] = 0.999f;
+	}
+	if ( fog_density < 0.0f ) {
+		fog_density = 0.0f;
+	}
+	if ( height_falloff < 0.0f ) {
+		height_falloff = 0.0f;
+	}
+	if ( temporal_weight < 0.0f ) {
+		temporal_weight = 0.0f;
+	} else if ( temporal_weight > 1.0f ) {
+		temporal_weight = 1.0f;
+	}
+	if ( jitter_amount < 0.0f ) {
+		jitter_amount = 0.0f;
 	}
 
-	const float near_plane = ( r_znear->value > 0.001f ) ? r_znear->value : 0.001f;
-	const float far_plane = backEnd.viewParms.zFar;
-	const float far_over_near = ( far_plane > near_plane ) ? ( far_plane / near_plane ) : 1.0001f;
-	const float log_far = logf( far_over_near > 1.0001f ? far_over_near : 1.0001f );
+	params.densityParams[0] = fog_density;
+	params.densityParams[1] = height_falloff;
+	params.densityParams[2] = jitter_amount;
+	params.densityParams[3] = temporal_weight;
 
-	params.sliceParams[0] = near_plane;
-	params.sliceParams[1] = far_plane;
-	params.sliceParams[2] = log_far;
-	params.sliceParams[3] = (float)vk.froxel_slices;
-
-	float prev_far = vk.prev_zfar > 0.0f ? vk.prev_zfar : far_plane;
-	const float prev_log_far = ( prev_far > near_plane ) ? logf( prev_far / near_plane ) : log_far;
-
-	params.prevSliceParams[0] = near_plane;
-	params.prevSliceParams[1] = prev_far;
-	params.prevSliceParams[2] = prev_log_far;
-	params.prevSliceParams[3] = (float)vk.froxel_slices;
-
-	params.resolution[0] = vk.froxel_width > 0 ? 1.0f / (float)vk.froxel_width : 0.0f;
-	params.resolution[1] = vk.froxel_height > 0 ? 1.0f / (float)vk.froxel_height : 0.0f;
-	params.resolution[2] = (float)vk.froxel_width;
-	params.resolution[3] = (float)vk.froxel_height;
-
-	const float jitter_amount = r_volumetricFogJitter->value > 0.0f ? r_volumetricFogJitter->value : 0.0f;
-	uint32_t frame_seed = vk.volumetric_frame;
-	const float jitter_x = jitter_amount * vk_random01( frame_seed * 279 );
-	const float jitter_y = jitter_amount * vk_random01( frame_seed * 311 );
-	params.jitter[0] = jitter_amount;
-	params.jitter[1] = jitter_x;
-	params.jitter[2] = jitter_y;
-	params.jitter[3] = 0.0f;
-
-	{
-		int fog_steps = r_volumetricFogSteps ? r_volumetricFogSteps->integer : 32;
-		if ( fog_steps < 1 ) {
-			fog_steps = 1;
-		} else if ( fog_steps > 64 ) {
-			fog_steps = 64;
-		}
-		params.misc[0] = (float)fog_steps;
-	}
-	params.misc[2] = (float)vk.volumetric_frame;
-	params.misc[3] = ( vk.has_prev_volumetric && params.densityParams[3] > 0.0f ) ? 1.0f : 0.0f;
+	params.miscParams[0] = (float)fog_steps;
+	params.miscParams[1] = (float)depth_mode;
+	params.miscParams[2] = (float)vk.volumetric_frame;
+	params.miscParams[3] = ( vk.has_prev_volumetric && temporal_weight > 0.0f ) ? 1.0f : 0.0f;
 
 	if ( r_fogDebug && r_fogDebug->integer > 0 && ( vk.volumetric_frame % 120u ) == 0u ) {
 		ri.Printf( PRINT_ALL,
-			"[VK][fog] params froxelDim=(%.0f %.0f %.0f %.0f) phase.w=%.0f misc=(%.0f %.0f %.0f %.0f) density=(%.5f %.5f %.5f %.5f) fogColor=(%.3f %.3f %.3f %.3f) fogMin=(%.1f %.1f %.1f) fogMax=(%.1f %.1f %.1f)\n",
-			params.froxelDim[0], params.froxelDim[1], params.froxelDim[2], params.froxelDim[3],
-			params.phaseParams[3],
-			params.misc[0], params.misc[1], params.misc[2], params.misc[3],
+			"[VK][fog] params grid=(%.0f %.0f %.0f %.0f) phase=(%.3f %.3f %.3f %.0f) misc=(%.0f %.0f %.0f %.0f) density=(%.5f %.5f %.5f %.5f) fogColor=(%.3f %.3f %.3f %.3f) worldMin=(%.1f %.1f %.1f) worldMax=(%.1f %.1f %.1f)\n",
+			params.gridDim[0], params.gridDim[1], params.gridDim[2], params.gridDim[3],
+			params.phaseParams[0], params.phaseParams[1], params.phaseParams[2], params.phaseParams[3],
+			params.miscParams[0], params.miscParams[1], params.miscParams[2], params.miscParams[3],
 			params.densityParams[0], params.densityParams[1], params.densityParams[2], params.densityParams[3],
 			params.fogColor[0], params.fogColor[1], params.fogColor[2], params.fogColor[3],
-			params.fogMin[0], params.fogMin[1], params.fogMin[2],
-			params.fogMax[0], params.fogMax[1], params.fogMax[2] );
+			params.worldMin[0], params.worldMin[1], params.worldMin[2],
+			params.worldMax[0], params.worldMax[1], params.worldMax[2] );
+		ri.Printf( PRINT_ALL, "[VK][fog] viewOrigin=(%.2f %.2f %.2f %.2f) sunDir=(%.3f %.3f %.3f)\n",
+			params.viewOrigin[0], params.viewOrigin[1], params.viewOrigin[2], params.viewOrigin[3],
+			params.sunDirection[0], params.sunDirection[1], params.sunDirection[2] );
+		ri.Printf( PRINT_ALL, "[VK][fog] frame=%u hasHistory=%.0f jitter=%.3f\n",
+			vk.volumetric_frame, params.miscParams[3], jitter_amount );
 	}
 
 	Com_Memcpy( vk.volumetric_params_ptr, &params, sizeof( params ) );
 
-	// update previous frame data for next update
-	Com_Memcpy( vk.prev_view_matrix, view, sizeof( vk.prev_view_matrix ) );
-	Com_Memcpy( vk.prev_projection_matrix, projection, sizeof( vk.prev_projection_matrix ) );
-	vk.prev_zfar = far_plane;
 	vk.volumetric_frame++;
 }
 
