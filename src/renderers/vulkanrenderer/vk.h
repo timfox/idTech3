@@ -853,6 +853,10 @@ typedef struct {
 	VkImage froxel_history_image;
 	VkImageView froxel_history_view;
 	VkDeviceMemory froxel_history_memory;
+	VkImage fog_noise_image;
+	VkImageView fog_noise_view;
+	VkDeviceMemory fog_noise_memory;
+	VkSampler fog_noise_sampler;
 	VkSampler froxel_sampler;
 	VkSampler froxel_depth_sampler;
 	uint32_t froxel_width;

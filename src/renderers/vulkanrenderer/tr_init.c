@@ -210,6 +210,11 @@ cvar_t	*r_volumetricFogGridDim;
 cvar_t	*r_volumetricFogDepthMode;
 cvar_t	*r_volumetricFogSunIntensity;
 cvar_t	*r_volumetricFogAmbientIntensity;
+cvar_t	*r_volumetricFogNoiseDim;
+cvar_t	*r_volumetricFogNoiseScale;
+cvar_t	*r_volumetricFogNoiseStrength;
+cvar_t	*r_volumetricFogNoiseThreshold;
+cvar_t	*r_volumetricFogNoiseScroll;
 cvar_t	*r_fogDebug;
 cvar_t	*r_froxelDebug;
 cvar_t	*r_vk_swapchain_srgb;
@@ -2019,6 +2024,30 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_volumetricFogAmbientIntensity, "0", "64", CV_FLOAT );
 	ri.Cvar_SetDescription( r_volumetricFogAmbientIntensity, "Ambient light intensity used by world-space volumetric scattering." );
 	ri.Cvar_SetGroup( r_volumetricFogAmbientIntensity, CVG_RENDERER );
+
+	r_volumetricFogNoiseDim = ri.Cvar_Get( "r_volumetricFogNoiseDim", "64", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_volumetricFogNoiseDim, "8", "128", CV_INTEGER );
+	ri.Cvar_SetDescription( r_volumetricFogNoiseDim, "3D noise texture dimension for volumetric fog modulation. Requires vid_restart." );
+	ri.Cvar_SetGroup( r_volumetricFogNoiseDim, CVG_RENDERER );
+
+	r_volumetricFogNoiseScale = ri.Cvar_Get( "r_volumetricFogNoiseScale", "0.0125", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogNoiseScale, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogNoiseScale, "World-to-noise UV scale for volumetric fog." );
+	ri.Cvar_SetGroup( r_volumetricFogNoiseScale, CVG_RENDERER );
+
+	r_volumetricFogNoiseStrength = ri.Cvar_Get( "r_volumetricFogNoiseStrength", "0.85", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogNoiseStrength, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogNoiseStrength, "How strongly 3D noise modulates volumetric density (0=off, 1=full)." );
+	ri.Cvar_SetGroup( r_volumetricFogNoiseStrength, CVG_RENDERER );
+
+	r_volumetricFogNoiseThreshold = ri.Cvar_Get( "r_volumetricFogNoiseThreshold", "0.2", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogNoiseThreshold, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogNoiseThreshold, "Threshold applied to 3D noise before density modulation." );
+	ri.Cvar_SetGroup( r_volumetricFogNoiseThreshold, CVG_RENDERER );
+
+	r_volumetricFogNoiseScroll = ri.Cvar_Get( "r_volumetricFogNoiseScroll", "0.03 0.01 0.02", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_volumetricFogNoiseScroll, "3D noise scroll velocity (x y z) for volumetric fog movement." );
+	ri.Cvar_SetGroup( r_volumetricFogNoiseScroll, CVG_RENDERER );
 
 	r_fogDebug = ri.Cvar_Get( "r_fogDebug", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_fogDebug, "0", "5", CV_INTEGER );

@@ -200,6 +200,8 @@ uint32_t vk_find_pipeline_ext( uint32_t base, const Vk_Pipeline_Def *def, qboole
 typedef struct {
 	float invProj[16];
 	float invView[16];
+	float proj[16];
+	float viewProj[16];
 	float viewOrigin[4];
 	float sunDirection[4];
 	float fogColor[4];
@@ -209,12 +211,16 @@ typedef struct {
 	float gridDim[4];
 	float miscParams[4];
 	float phaseParams[4];
+	float noiseParams[4];
+	float noiseScroll[4];
 } volumetric_params_t;
 
 _Static_assert( ( sizeof( volumetric_params_t ) % 16 ) == 0, "volumetric_params_t must be 16-byte aligned in size" );
 #define VK_VOLUMETRIC_ASSERT_ALIGNED16(member) _Static_assert( ( offsetof( volumetric_params_t, member ) % 16 ) == 0, "volumetric_params_t::" #member " must be 16-byte aligned" )
 VK_VOLUMETRIC_ASSERT_ALIGNED16( invProj );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( invView );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( proj );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( viewProj );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( viewOrigin );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( sunDirection );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( fogColor );
@@ -224,6 +230,8 @@ VK_VOLUMETRIC_ASSERT_ALIGNED16( worldMax );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( gridDim );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( miscParams );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( phaseParams );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( noiseParams );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( noiseScroll );
 #undef VK_VOLUMETRIC_ASSERT_ALIGNED16
 
 static VkSampler vk_find_sampler( const Vk_Sampler_Def *def );
@@ -2965,12 +2973,14 @@ static void vk_update_volumetric_descriptors( void )
 	params_buffer.range = sizeof( volumetric_params_t );
 
 	if ( vk.volumetric_compute_descriptor != VK_NULL_HANDLE &&
-		vk.froxel_volume_view && vk.froxel_history_view && vk.depth_image_view )
+		vk.froxel_volume_view && vk.froxel_history_view && vk.depth_image_view && vk.fog_noise_view )
 	{
 		VkDescriptorImageInfo storage_info[2];
 		VkDescriptorImageInfo depth_info;
-		VkWriteDescriptorSet writes[4];
+		VkDescriptorImageInfo noise_info;
+		VkWriteDescriptorSet writes[5];
 		Vk_Sampler_Def depth_sd;
+		Vk_Sampler_Def noise_sd;
 
 		Com_Memset( storage_info, 0, sizeof( storage_info ) );
 		storage_info[0].imageView = vk.froxel_volume_view;
@@ -2988,6 +2998,16 @@ static void vk_update_volumetric_descriptors( void )
 		depth_info.sampler = vk.froxel_depth_sampler;
 		depth_info.imageView = vk.depth_image_view;
 		depth_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+		Com_Memset( &noise_sd, 0, sizeof( noise_sd ) );
+		noise_sd.gl_mag_filter = noise_sd.gl_min_filter = GL_LINEAR;
+		noise_sd.address_mode = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		noise_sd.noAnisotropy = qtrue;
+		vk.fog_noise_sampler = vk_find_sampler( &noise_sd );
+
+		Com_Memset( &noise_info, 0, sizeof( noise_info ) );
+		noise_info.sampler = vk.fog_noise_sampler;
+		noise_info.imageView = vk.fog_noise_view;
+		noise_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 		Com_Memset( writes, 0, sizeof( writes ) );
 		for ( int i = 0; i < 2; i++ ) {
@@ -3012,6 +3032,13 @@ static void vk_update_volumetric_descriptors( void )
 		writes[3].descriptorCount = 1;
 		writes[3].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		writes[3].pBufferInfo = &params_buffer;
+
+		writes[4].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[4].dstSet = vk.volumetric_compute_descriptor;
+		writes[4].dstBinding = 4;
+		writes[4].descriptorCount = 1;
+		writes[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		writes[4].pImageInfo = &noise_info;
 
 		qvkUpdateDescriptorSets( vk.device, ARRAY_LEN( writes ), writes, 0, NULL );
 	}
@@ -3074,8 +3101,9 @@ static void vk_update_volumetric_descriptors( void )
 
 	if ( r_fogDebug && r_fogDebug->integer >= 1 && ( vk.volumetric_frame % 120u ) == 0u ) {
 		ri.Printf( PRINT_ALL,
-			"[VK][fog] descriptors computeSet=0x%llx storageLayout=GENERAL historyLayout=GENERAL compositeSet=0x%llx sceneView=0x%llx sampleLayout=SHADER_READ_ONLY_OPTIMAL\n",
+			"[VK][fog] descriptors computeSet=0x%llx storageLayout=GENERAL historyLayout=GENERAL noiseView=0x%llx compositeSet=0x%llx sceneView=0x%llx sampleLayout=SHADER_READ_ONLY_OPTIMAL\n",
 			(unsigned long long)(uintptr_t)vk.volumetric_compute_descriptor,
+			(unsigned long long)(uintptr_t)vk.fog_noise_view,
 			(unsigned long long)(uintptr_t)vk.volumetric_composite_descriptor,
 			(unsigned long long)(uintptr_t)vk.fog_scene_image_view );
 	}
@@ -5194,7 +5222,7 @@ void vk_initialize( void )
 		uint32_t j, maxSets;
 
 		pool_size[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		pool_size[0].descriptorCount = MAX_DRAWIMAGES + 1 + 1 + 1 + 3 + 4 + VK_NUM_BLOOM_PASSES * 2; // color, screenmap, depth/ssao, volumetric, bloom descriptors
+		pool_size[0].descriptorCount = MAX_DRAWIMAGES + 1 + 1 + 1 + 3 + 5 + VK_NUM_BLOOM_PASSES * 2; // color, screenmap, depth/ssao, volumetric, bloom descriptors
 #ifdef USE_VK_PBR
         if ( vk.pbrActive )
             pool_size[0].descriptorCount += 2 + ( MAX_DRAWIMAGES * 8 ); // brdf-lut + irradiance | MAX_DRAWIMAGES * (physical, normal, emissive, clearcoat, sheen, anisotropy, transmission, subsurface)
@@ -5242,7 +5270,7 @@ void vk_initialize( void )
 	//vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_SHADER_STAGE_FRAGMENT_BIT, &vk.set_layout_input );
 
 	{
-		VkDescriptorSetLayoutBinding compute_bindings[4];
+		VkDescriptorSetLayoutBinding compute_bindings[5];
 		VkDescriptorSetLayoutCreateInfo compute_layout_desc;
 
 		compute_bindings[0].binding = 0;
@@ -5268,6 +5296,12 @@ void vk_initialize( void )
 		compute_bindings[3].descriptorCount = 1;
 		compute_bindings[3].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 		compute_bindings[3].pImmutableSamplers = NULL;
+
+		compute_bindings[4].binding = 4;
+		compute_bindings[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		compute_bindings[4].descriptorCount = 1;
+		compute_bindings[4].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		compute_bindings[4].pImmutableSamplers = NULL;
 
 		compute_layout_desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 		compute_layout_desc.pNext = NULL;
@@ -5818,6 +5852,130 @@ static qboolean Mat4Inverse( const float *m, float *out ) {
 	return qtrue;
 }
 
+static uint32_t vk_noise_hash3( uint32_t x, uint32_t y, uint32_t z )
+{
+	uint32_t h = x * 374761393u + y * 668265263u + z * 2246822519u;
+	h = ( h ^ ( h >> 13 ) ) * 1274126177u;
+	return h ^ ( h >> 16 );
+}
+
+static void vk_create_fog_noise_texture( void )
+{
+	int noise_dim = 64;
+	const VkDeviceSize max_bytes = 128ull * 128ull * 128ull;
+	byte *noise_data;
+	VkDeviceSize noise_bytes;
+	VkBuffer staging_buffer = VK_NULL_HANDLE;
+	VkDeviceMemory staging_memory = VK_NULL_HANDLE;
+	VkBufferCreateInfo buffer_info;
+	VkMemoryRequirements mem_req;
+	VkMemoryAllocateInfo alloc_info;
+	VkCommandBuffer command_buffer;
+	VkBufferImageCopy copy_region;
+	VkImageCreateInfo image_info;
+	VkImageViewCreateInfo view_info;
+
+	if ( r_volumetricFogNoiseDim ) {
+		noise_dim = r_volumetricFogNoiseDim->integer;
+	}
+	if ( noise_dim < 8 ) noise_dim = 8;
+	if ( noise_dim > 128 ) noise_dim = 128;
+
+	noise_bytes = (VkDeviceSize)noise_dim * noise_dim * noise_dim;
+	if ( noise_bytes > max_bytes ) {
+		noise_dim = 128;
+		noise_bytes = max_bytes;
+	}
+
+	noise_data = (byte *)ri.Hunk_AllocateTempMemory( (int)noise_bytes );
+	for ( uint32_t z = 0; z < (uint32_t)noise_dim; z++ ) {
+		for ( uint32_t y = 0; y < (uint32_t)noise_dim; y++ ) {
+			for ( uint32_t x = 0; x < (uint32_t)noise_dim; x++ ) {
+				const uint32_t h = vk_noise_hash3( x, y, z );
+				noise_data[ ( z * (uint32_t)noise_dim + y ) * (uint32_t)noise_dim + x ] = (byte)( h & 0xFFu );
+			}
+		}
+	}
+
+	Com_Memset( &image_info, 0, sizeof( image_info ) );
+	image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	image_info.imageType = VK_IMAGE_TYPE_3D;
+	image_info.format = VK_FORMAT_R8_UNORM;
+	image_info.extent.width = (uint32_t)noise_dim;
+	image_info.extent.height = (uint32_t)noise_dim;
+	image_info.extent.depth = (uint32_t)noise_dim;
+	image_info.mipLevels = 1;
+	image_info.arrayLayers = 1;
+	image_info.samples = VK_SAMPLE_COUNT_1_BIT;
+	image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+	image_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+	image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	VK_CHECK( qvkCreateImage( vk.device, &image_info, NULL, &vk.fog_noise_image ) );
+
+	qvkGetImageMemoryRequirements( vk.device, vk.fog_noise_image, &mem_req );
+	Com_Memset( &alloc_info, 0, sizeof( alloc_info ) );
+	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	alloc_info.allocationSize = mem_req.size;
+	alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.fog_noise_memory ) );
+	VK_CHECK( qvkBindImageMemory( vk.device, vk.fog_noise_image, vk.fog_noise_memory, 0 ) );
+
+	Com_Memset( &view_info, 0, sizeof( view_info ) );
+	view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	view_info.image = vk.fog_noise_image;
+	view_info.viewType = VK_IMAGE_VIEW_TYPE_3D;
+	view_info.format = VK_FORMAT_R8_UNORM;
+	view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	view_info.subresourceRange.levelCount = 1;
+	view_info.subresourceRange.layerCount = 1;
+	VK_CHECK( qvkCreateImageView( vk.device, &view_info, NULL, &vk.fog_noise_view ) );
+
+	Com_Memset( &buffer_info, 0, sizeof( buffer_info ) );
+	buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	buffer_info.size = noise_bytes;
+	buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+	buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	VK_CHECK( qvkCreateBuffer( vk.device, &buffer_info, NULL, &staging_buffer ) );
+	qvkGetBufferMemoryRequirements( vk.device, staging_buffer, &mem_req );
+
+	Com_Memset( &alloc_info, 0, sizeof( alloc_info ) );
+	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	alloc_info.allocationSize = mem_req.size;
+	alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &staging_memory ) );
+	VK_CHECK( qvkBindBufferMemory( vk.device, staging_buffer, staging_memory, 0 ) );
+
+	void *mapped = NULL;
+	VK_CHECK( qvkMapMemory( vk.device, staging_memory, 0, noise_bytes, 0, &mapped ) );
+	Com_Memcpy( mapped, noise_data, (size_t)noise_bytes );
+	qvkUnmapMemory( vk.device, staging_memory );
+	ri.Hunk_FreeTempMemory( noise_data );
+
+	Com_Memset( &copy_region, 0, sizeof( copy_region ) );
+	copy_region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	copy_region.imageSubresource.layerCount = 1;
+	copy_region.imageExtent.width = (uint32_t)noise_dim;
+	copy_region.imageExtent.height = (uint32_t)noise_dim;
+	copy_region.imageExtent.depth = (uint32_t)noise_dim;
+
+	command_buffer = begin_command_buffer();
+	record_image_layout_transition( command_buffer, vk.fog_noise_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
+	qvkCmdCopyBufferToImage( command_buffer, staging_buffer, vk.fog_noise_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy_region );
+	record_image_layout_transition( command_buffer, vk.fog_noise_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
+	end_command_buffer( command_buffer, __func__ );
+
+	qvkDestroyBuffer( vk.device, staging_buffer, NULL );
+	qvkFreeMemory( vk.device, staging_memory, NULL );
+
+	if ( r_fogDebug && r_fogDebug->integer >= 1 ) {
+		ri.Printf( PRINT_ALL, "[VK][fog] noise texture created %dx%dx%d\n", noise_dim, noise_dim, noise_dim );
+	}
+}
+
 static void vk_destroy_froxel_images( void )
 {
 	if ( vk.froxel_volume_image ) {
@@ -5844,6 +6002,21 @@ static void vk_destroy_froxel_images( void )
 	if ( vk.froxel_history_memory ) {
 		qvkFreeMemory( vk.device, vk.froxel_history_memory, NULL );
 		vk.froxel_history_memory = VK_NULL_HANDLE;
+	}
+	if ( vk.fog_noise_sampler ) {
+		vk.fog_noise_sampler = VK_NULL_HANDLE;
+	}
+	if ( vk.fog_noise_image ) {
+		qvkDestroyImage( vk.device, vk.fog_noise_image, NULL );
+		vk.fog_noise_image = VK_NULL_HANDLE;
+	}
+	if ( vk.fog_noise_view ) {
+		qvkDestroyImageView( vk.device, vk.fog_noise_view, NULL );
+		vk.fog_noise_view = VK_NULL_HANDLE;
+	}
+	if ( vk.fog_noise_memory ) {
+		qvkFreeMemory( vk.device, vk.fog_noise_memory, NULL );
+		vk.fog_noise_memory = VK_NULL_HANDLE;
 	}
 
 	vk.froxel_width = 0;
@@ -5961,6 +6134,8 @@ static void vk_create_froxel_images( void )
 	record_image_layout_transition( command_buffer, vk.froxel_volume_image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
 	record_image_layout_transition( command_buffer, vk.froxel_history_image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, 0 );
 	end_command_buffer( command_buffer, __func__ );
+
+	vk_create_fog_noise_texture();
 }
 
 static void vk_destroy_attachments( void )
@@ -11000,11 +11175,15 @@ static void vk_update_volumetric_params( void )
 	float jitter_amount = r_volumetricFogJitter ? r_volumetricFogJitter->value : 0.0f;
 	float sun_intensity = r_volumetricFogSunIntensity ? r_volumetricFogSunIntensity->value : 1.0f;
 	float ambient_intensity = r_volumetricFogAmbientIntensity ? r_volumetricFogAmbientIntensity->value : 1.0f;
+	float noise_scale = r_volumetricFogNoiseScale ? r_volumetricFogNoiseScale->value : 0.0125f;
+	float noise_strength = r_volumetricFogNoiseStrength ? r_volumetricFogNoiseStrength->value : 0.85f;
+	float noise_threshold = r_volumetricFogNoiseThreshold ? r_volumetricFogNoiseThreshold->value : 0.2f;
 	float g_aniso = r_volumetricFogAniso ? r_volumetricFogAniso->value : 0.0f;
 	float fog_density = r_volumetricFogDensity ? r_volumetricFogDensity->value : 0.0f;
 	float height_falloff = r_volumetricFogHeightFalloff ? r_volumetricFogHeightFalloff->value : 0.0f;
 	vec3_t fog_min = { -2048.0f, -2048.0f, -256.0f };
 	vec3_t fog_max = {  2048.0f,  2048.0f, 1024.0f };
+	vec3_t noise_scroll = { 0.03f, 0.01f, 0.02f };
 
 	if ( !Mat4Inverse( projection, params.invProj ) ) {
 		Com_Memcpy( params.invProj, projection, sizeof( params.invProj ) );
@@ -11012,6 +11191,8 @@ static void vk_update_volumetric_params( void )
 	if ( !Mat4Inverse( view, params.invView ) ) {
 		Com_Memcpy( params.invView, view, sizeof( params.invView ) );
 	}
+	Com_Memcpy( params.proj, projection, sizeof( params.proj ) );
+	myGlMultMatrix( view, projection, params.viewProj );
 
 	params.viewOrigin[0] = backEnd.viewParms.or.origin[0];
 	params.viewOrigin[1] = backEnd.viewParms.or.origin[1];
@@ -11038,6 +11219,9 @@ static void vk_update_volumetric_params( void )
 	if ( r_volumetricFogWorldMax && r_volumetricFogWorldMax->string ) {
 		sscanf( r_volumetricFogWorldMax->string, "%f %f %f", &fog_max[0], &fog_max[1], &fog_max[2] );
 	}
+	if ( r_volumetricFogNoiseScroll && r_volumetricFogNoiseScroll->string ) {
+		vk_parse_rgb_string( r_volumetricFogNoiseScroll->string, noise_scroll );
+	}
 
 	params.worldMin[0] = fog_min[0];
 	params.worldMin[1] = fog_min[1];
@@ -11058,6 +11242,14 @@ static void vk_update_volumetric_params( void )
 	params.phaseParams[1] = sun_intensity;
 	params.phaseParams[2] = ambient_intensity;
 	params.phaseParams[3] = (float)( ( r_froxelDebug ) ? r_froxelDebug->integer : 0 );
+	params.noiseParams[0] = noise_scale;
+	params.noiseParams[1] = noise_threshold;
+	params.noiseParams[2] = noise_strength;
+	params.noiseParams[3] = 1.0f / 60.0f;
+	params.noiseScroll[0] = noise_scroll[0];
+	params.noiseScroll[1] = noise_scroll[1];
+	params.noiseScroll[2] = noise_scroll[2];
+	params.noiseScroll[3] = 0.0f;
 
 	if ( fog_steps < 1 ) {
 		fog_steps = 1;
@@ -11088,6 +11280,19 @@ static void vk_update_volumetric_params( void )
 	if ( jitter_amount < 0.0f ) {
 		jitter_amount = 0.0f;
 	}
+	if ( noise_scale < 0.0f ) {
+		noise_scale = 0.0f;
+	}
+	if ( noise_threshold < 0.0f ) {
+		noise_threshold = 0.0f;
+	} else if ( noise_threshold > 1.0f ) {
+		noise_threshold = 1.0f;
+	}
+	if ( noise_strength < 0.0f ) {
+		noise_strength = 0.0f;
+	} else if ( noise_strength > 1.0f ) {
+		noise_strength = 1.0f;
+	}
 
 	params.densityParams[0] = fog_density;
 	params.densityParams[1] = height_falloff;
@@ -11098,6 +11303,9 @@ static void vk_update_volumetric_params( void )
 	params.miscParams[1] = (float)depth_mode;
 	params.miscParams[2] = (float)vk.volumetric_frame;
 	params.miscParams[3] = ( vk.has_prev_volumetric && temporal_weight > 0.0f ) ? 1.0f : 0.0f;
+	params.noiseParams[0] = noise_scale;
+	params.noiseParams[1] = noise_threshold;
+	params.noiseParams[2] = noise_strength;
 
 	if ( r_fogDebug && r_fogDebug->integer > 0 && ( vk.volumetric_frame % 120u ) == 0u ) {
 		ri.Printf( PRINT_ALL,
@@ -11114,6 +11322,9 @@ static void vk_update_volumetric_params( void )
 			params.sunDirection[0], params.sunDirection[1], params.sunDirection[2] );
 		ri.Printf( PRINT_ALL, "[VK][fog] frame=%u hasHistory=%.0f jitter=%.3f\n",
 			vk.volumetric_frame, params.miscParams[3], jitter_amount );
+		ri.Printf( PRINT_ALL, "[VK][fog] noise scale=%.5f threshold=%.3f strength=%.3f scroll=(%.4f %.4f %.4f)\n",
+			params.noiseParams[0], params.noiseParams[1], params.noiseParams[2],
+			params.noiseScroll[0], params.noiseScroll[1], params.noiseScroll[2] );
 	}
 
 	Com_Memcpy( vk.volumetric_params_ptr, &params, sizeof( params ) );
