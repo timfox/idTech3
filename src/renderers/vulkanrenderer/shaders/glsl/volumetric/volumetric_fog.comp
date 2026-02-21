@@ -2,16 +2,28 @@
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;
 
-layout(binding = 0, rgba16f) uniform writeonly image3D froxelVolume;
+layout(binding = 0, rgba16f) uniform image3D froxelScattering;
 layout(binding = 1, rgba16f) uniform readonly image3D froxelHistory;
 layout(binding = 2) uniform sampler2D depthTexture;
 layout(binding = 4) uniform sampler3D fogNoiseTexture;
 layout(binding = 5) uniform sampler2D sunShadowMap;
-layout(binding = 6, rgba16f) uniform writeonly image3D volumeLightBuffer;
+layout(binding = 6, rgba16f) uniform image3D froxelLight;
+layout(binding = 7, r16f) uniform image3D froxelExtinction;
+layout(binding = 8, rgba16f) uniform image3D froxelClamp;
+layout(binding = 9) uniform sampler2D motionTexture;
 
 const int MAX_VOLUMES = 24;
 const int MAX_LIGHTS = 32;
 const float PI = 3.14159265359;
+
+const int STAGE_CLEAR = 0;
+const int STAGE_GLOBAL_DENSITY = 1;
+const int STAGE_VOLUME_DENSITY = 2;
+const int STAGE_LOCAL_LIGHT = 3;
+const int STAGE_SUN_LIGHT = 4;
+const int STAGE_CLAMP_LEVEL0 = 5;
+const int STAGE_CLAMP_LEVEL1 = 6;
+const int STAGE_TEMPORAL = 7;
 
 #define USE_VOLUME_RESTIR 0
 struct VolumeReservoir {
@@ -42,6 +54,7 @@ layout(std140, binding = 3) uniform VolumetricParams {
     vec4 qualityParams;
     vec4 windParams;
     vec4 volumeCounts;
+    vec4 passParams;
     vec4 volumeBoundsMin[MAX_VOLUMES];
     vec4 volumeBoundsMax[MAX_VOLUMES];
     vec4 volumeColorDensity[MAX_VOLUMES];
@@ -53,6 +66,10 @@ layout(std140, binding = 3) uniform VolumetricParams {
     vec4 shadowParams0;
     vec4 shadowMapSize0;
 } params;
+
+float Saturate(float v) {
+    return clamp(v, 0.0, 1.0);
+}
 
 float Luminance(vec3 c) {
     return dot(c, vec3(0.2126, 0.7152, 0.0722));
@@ -68,16 +85,6 @@ float rand31(vec3 p) {
     vec3 q = fract(p * vec3(0.1031, 0.11369, 0.13787));
     q += dot(q, q.yzx + 19.19);
     return fract((q.x + q.y) * q.z);
-}
-
-float saturate(float v) {
-    return clamp(v, 0.0, 1.0);
-}
-
-vec3 reconstructViewRay(vec2 uv) {
-    vec4 clip = vec4(uv * 2.0 - 1.0, 1.0, 1.0);
-    vec4 view = params.invProj * clip;
-    return view.xyz / max(abs(view.w), 1e-6);
 }
 
 float decodeClipZ(float depthSample, int depthMode) {
@@ -103,25 +110,33 @@ float getSliceExponent() {
 }
 
 float depthFromSliceNorm(float sliceNorm, float nearPlane, float farPlane) {
-    float expNorm = pow(saturate(sliceNorm), getSliceExponent());
+    float expNorm = pow(Saturate(sliceNorm), getSliceExponent());
     return nearPlane * pow(farPlane / nearPlane, expNorm);
 }
 
 float sliceNormFromDepth(float depth, float nearPlane, float farPlane) {
     float ratio = log(max(depth / nearPlane, 1e-4)) / max(log(farPlane / nearPlane), 1e-5);
-    return pow(saturate(ratio), 1.0 / getSliceExponent());
+    return pow(Saturate(ratio), 1.0 / getSliceExponent());
+}
+
+vec3 reconstructViewRay(vec2 uv) {
+    vec4 clip = vec4(uv * 2.0 - 1.0, 1.0, 1.0);
+    vec4 view = params.invProj * clip;
+    return view.xyz / max(abs(view.w), 1e-6);
 }
 
 float reconstructSceneDepth(vec2 uv, float depthSample, int depthMode) {
     float nearPlane = getNearPlane();
     float farPlane = getFarPlane(nearPlane);
+
     if (depthMode == 2) {
         float linearDepth = depthSample;
         if (linearDepth <= 1.0) {
-            linearDepth = mix(nearPlane, farPlane, saturate(linearDepth));
+            linearDepth = mix(nearPlane, farPlane, Saturate(linearDepth));
         }
         return clamp(linearDepth, nearPlane, farPlane);
     }
+
     vec4 clip = vec4(uv * 2.0 - 1.0, decodeClipZ(depthSample, depthMode), 1.0);
     vec4 view = params.invProj * clip;
     vec3 viewPos = view.xyz / max(abs(view.w), 1e-6);
@@ -131,6 +146,42 @@ float reconstructSceneDepth(vec2 uv, float depthSample, int depthMode) {
 bool boundsValid(out vec3 extent) {
     extent = params.worldMax.xyz - params.worldMin.xyz;
     return all(greaterThan(extent, vec3(1e-4)));
+}
+
+bool ComputeFroxelSample(ivec3 idx, ivec3 dim, int depthMode, bool useBounds, vec3 boundsExtent, out vec3 worldPos, out vec3 viewDir, out float centerDepth) {
+    float nearPlane = getNearPlane();
+    float farPlane = getFarPlane(nearPlane);
+    vec2 uv = (vec2(idx.xy) + 0.5) / vec2(dim.xy);
+
+    float slice0 = float(idx.z) / float(dim.z);
+    float slice1 = float(idx.z + 1) / float(dim.z);
+    float zNear = depthFromSliceNorm(slice0, nearPlane, farPlane);
+    float zFar = depthFromSliceNorm(slice1, nearPlane, farPlane);
+
+    float jitter = rand31(vec3(vec2(idx.xy), float(idx.z) + params.miscParams.z * 0.6180339)) - 0.5;
+    float depthMix = clamp(0.5 + jitter * max(params.densityParams.z, 0.0), 0.0, 1.0);
+    centerDepth = mix(zNear, zFar, depthMix);
+
+    float sceneDepth = reconstructSceneDepth(uv, texture(depthTexture, uv).r, depthMode);
+    float maxDistance = max(params.sliceParams.w, nearPlane + 1.0);
+    sceneDepth = min(sceneDepth, maxDistance);
+    if (zNear >= sceneDepth) {
+        return false;
+    }
+
+    viewDir = normalize(reconstructViewRay(uv));
+    float viewDistance = centerDepth / max(-viewDir.z, 1e-4);
+    vec3 viewPos = viewDir * viewDistance;
+    worldPos = (params.invView * vec4(viewPos, 1.0)).xyz;
+
+    if (useBounds) {
+        vec3 uvw = (worldPos - params.worldMin.xyz) / boundsExtent;
+        if (any(lessThan(uvw, vec3(0.0))) || any(greaterThan(uvw, vec3(1.0)))) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 float ComputeShadow(vec3 worldPos, out vec3 shadowUVW) {
@@ -176,15 +227,15 @@ float ComputeShadow(vec3 worldPos, out vec3 shadowUVW) {
     return lit * (1.0 / 9.0);
 }
 
-float ComputeDensity(vec3 worldPos, vec3 viewDir, out vec3 mediumColor) {
+float ComputeBaseDensity(vec3 worldPos) {
     float baseDensity = max(params.densityParams.x, 0.0);
     float heightFalloff = max(params.densityParams.y, 0.0);
     float heightDelta = worldPos.z - params.viewOrigin.w;
     float density = baseDensity * exp(-heightFalloff * max(0.0, heightDelta));
 
     float noiseScale = max(params.noiseParams.x, 0.0);
-    float noiseThreshold = saturate(params.noiseParams.y);
-    float noiseStrength = saturate(params.noiseParams.z);
+    float noiseThreshold = Saturate(params.noiseParams.y);
+    float noiseStrength = Saturate(params.noiseParams.z);
 
     if (noiseScale > 0.0 && noiseStrength > 0.0) {
         vec3 wind = params.noiseScroll.xyz * max(params.windParams.z, 0.0);
@@ -194,6 +245,10 @@ float ComputeDensity(vec3 worldPos, vec3 viewDir, out vec3 mediumColor) {
         density *= mix(1.0, noiseMask, noiseStrength);
     }
 
+    return max(density, 0.0);
+}
+
+void ApplyVolumeDensity(vec3 worldPos, inout float density, inout vec3 mediumColor) {
     vec3 volumeColorAccum = vec3(0.0);
     float volumeWeight = 0.0;
     int volumeCount = int(clamp(floor(params.volumeCounts.x + 0.5), 0.0, float(MAX_VOLUMES)));
@@ -204,9 +259,7 @@ float ComputeDensity(vec3 worldPos, vec3 viewDir, out vec3 mediumColor) {
         }
         vec3 bMin = params.volumeBoundsMin[i].xyz;
         vec3 bMax = params.volumeBoundsMax[i].xyz;
-        bvec3 insideMin = greaterThanEqual(worldPos, bMin);
-        bvec3 insideMax = lessThanEqual(worldPos, bMax);
-        if (all(insideMin) && all(insideMax)) {
+        if (all(greaterThanEqual(worldPos, bMin)) && all(lessThanEqual(worldPos, bMax))) {
             float d = max(params.volumeColorDensity[i].w, 0.0);
             density += d;
             volumeColorAccum += params.volumeColorDensity[i].rgb * d;
@@ -214,120 +267,141 @@ float ComputeDensity(vec3 worldPos, vec3 viewDir, out vec3 mediumColor) {
         }
     }
 
-    mediumColor = params.fogColor.rgb;
     if (volumeWeight > 1e-4) {
         vec3 volumeColor = volumeColorAccum / volumeWeight;
-        float t = saturate(volumeWeight / max(density, 1e-4));
+        float t = Saturate(volumeWeight / max(density, 1e-4));
         mediumColor = mix(mediumColor, volumeColor, t);
     }
-
-    return max(density, 0.0);
 }
 
-vec3 ComputeLighting(vec3 worldPos, vec3 viewDir, float density, vec3 mediumColor, float sunShadow, out vec3 directLightAccum) {
+float SampleProjectedShadow(vec3 worldPos) {
+    if (params.passParams.w < 0.5) {
+        return 1.0;
+    }
+    if (params.shadowMapSize0.z <= 0.0 || params.shadowMapSize0.w <= 0.0) {
+        return 1.0;
+    }
+
+    vec4 lightClip = params.sunShadowMatrix0 * vec4(worldPos, 1.0);
+    if (abs(lightClip.w) <= 1e-6) {
+        return 1.0;
+    }
+
+    vec3 ndc = lightClip.xyz / lightClip.w;
+    vec2 uv = ndc.xy * 0.5 + 0.5;
+    float depth = ndc.z * 0.5 + 0.5;
+    if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0))) || depth <= 0.0 || depth >= 1.0) {
+        return 1.0;
+    }
+
+    float compareDepth = depth - max(params.shadowParams0.x, 0.0);
+    vec2 texelStep = params.shadowMapSize0.zw * max(params.shadowParams0.y, 0.0);
+
+    if (texelStep.x <= 0.0 || texelStep.y <= 0.0) {
+        float sampleDepth = texture(sunShadowMap, uv).r;
+        return (compareDepth <= sampleDepth) ? 1.0 : 0.0;
+    }
+
+    float lit = 0.0;
+    for (int y = -1; y <= 1; ++y) {
+        for (int x = -1; x <= 1; ++x) {
+            vec2 pcfUV = uv + vec2(x, y) * texelStep;
+            float sampleDepth = texture(sunShadowMap, pcfUV).r;
+            lit += (compareDepth <= sampleDepth) ? 1.0 : 0.0;
+        }
+    }
+    return lit * (1.0 / 9.0);
+}
+
+int SelectPointShadowFace(vec3 dirFromLight) {
+    vec3 a = abs(dirFromLight);
+    if (a.x >= a.y && a.x >= a.z) {
+        return (dirFromLight.x >= 0.0) ? 0 : 1;
+    }
+    if (a.y >= a.x && a.y >= a.z) {
+        return (dirFromLight.y >= 0.0) ? 2 : 3;
+    }
+    return (dirFromLight.z >= 0.0) ? 4 : 5;
+}
+
+float SampleLightShadow(int lightIndex, vec3 worldPos, int dispatchFace) {
+    float shadowType = params.lightExtra[lightIndex].z;
+
+    if (shadowType < 0.5) {
+        return 1.0;
+    }
+
+    if (shadowType > 1.5) {
+        if (dispatchFace < 0) {
+            return 1.0;
+        }
+        vec3 fromLight = worldPos - params.lightPosRadius[lightIndex].xyz;
+        if (SelectPointShadowFace(fromLight) != dispatchFace) {
+            return 0.0;
+        }
+    }
+
+    return SampleProjectedShadow(worldPos);
+}
+
+vec3 ComputeSunLighting(vec3 worldPos, vec3 viewDir, float density, vec3 mediumColor, float sunShadow) {
     float g = clamp(params.phaseParams.x, -0.999, 0.999);
     vec3 V = normalize(-viewDir);
+    vec3 result = vec3(0.0);
+
     vec3 Ls = normalize(params.sunDirection.xyz);
     float sunPhase = phaseHG(dot(Ls, V), g);
-
     vec3 ambientTerm = mediumColor * max(params.phaseParams.z, 0.0);
     vec3 sunTerm = mediumColor * max(params.phaseParams.y, 0.0) * sunPhase * sunShadow;
-
-    vec3 localTerm = vec3(0.0);
-    int lightCount = int(clamp(floor(params.volumeCounts.y + 0.5), 0.0, float(MAX_LIGHTS)));
-
-    for (int i = 0; i < MAX_LIGHTS; i++) {
-        if (i >= lightCount) {
-            break;
-        }
-
-        vec3 lightPos = params.lightPosRadius[i].xyz;
-        float radius = max(params.lightPosRadius[i].w, 0.001);
-        vec3 toLight = lightPos - worldPos;
-        float dist = length(toLight);
-        if (dist >= radius) {
-            continue;
-        }
-
-        vec3 L = toLight / max(dist, 1e-4);
-        float attenuation = saturate(1.0 - dist / radius);
-        attenuation *= attenuation;
-
-        float type = params.lightColorType[i].w;
-        if (type > 0.5) {
-            vec3 coneDir = normalize(params.lightDirAngle[i].xyz);
-            float cosOuter = params.lightDirAngle[i].w;
-            float cosInner = max(params.lightExtra[i].x, cosOuter + 1e-4);
-            float cosTheta = dot(coneDir, -L);
-            float spot = smoothstep(cosOuter, cosInner, cosTheta);
-            float coneRange = max(params.lightExtra[i].y, 0.001);
-            attenuation *= spot * saturate(1.0 - dist / coneRange);
-        }
-
-        float localShadow = (params.lightExtra[i].z > 0.5) ? 0.0 : 1.0;
-        float phase = phaseHG(dot(L, V), g);
-        vec3 lightColor = max(params.lightColorType[i].rgb, vec3(0.0));
-        localTerm += lightColor * (phase * attenuation * localShadow);
-    }
-
-    directLightAccum = sunTerm + localTerm * mediumColor;
     vec3 multiScatter = mediumColor * density * 0.25 * max(params.phaseParams.z, 0.0);
+    result += ambientTerm + sunTerm + multiScatter;
 
-    vec3 total = (ambientTerm + directLightAccum + multiScatter) * density * max(params.fogColor.a, 0.0);
-    return max(total, vec3(0.0));
+    return result * density * max(params.fogColor.a, 0.0);
 }
 
-vec4 buildMediaAtIdx(ivec3 idx, ivec3 dim, int depthMode, bool useBounds, vec3 boundsExtent, int froxelDebug) {
-    float nearPlane = getNearPlane();
-    float farPlane = getFarPlane(nearPlane);
+vec3 ComputeLocalLightScattering(vec3 worldPos, vec3 viewDir, float density, vec3 mediumColor, int lightIndex, int dispatchFace) {
+    float g = clamp(params.phaseParams.x, -0.999, 0.999);
+    vec3 V = normalize(-viewDir);
+    vec3 result = vec3(0.0);
 
-    vec2 uv = (vec2(idx.xy) + 0.5) / vec2(dim.xy);
-    float slice0 = float(idx.z) / float(dim.z);
-    float slice1 = float(idx.z + 1) / float(dim.z);
-    float zNear = depthFromSliceNorm(slice0, nearPlane, farPlane);
-    float zFar = depthFromSliceNorm(slice1, nearPlane, farPlane);
-
-    float jitter = rand31(vec3(vec2(idx.xy), float(idx.z) + params.miscParams.z * 0.6180339)) - 0.5;
-    float depthMix = clamp(0.5 + jitter * max(params.densityParams.z, 0.0), 0.0, 1.0);
-    float sampleDepth = mix(zNear, zFar, depthMix);
-
-    float sceneDepth = reconstructSceneDepth(uv, texture(depthTexture, uv).r, depthMode);
-    float maxDistance = max(params.sliceParams.w, nearPlane + 1.0);
-    sceneDepth = min(sceneDepth, maxDistance);
-    if (zNear >= sceneDepth) {
-        return vec4(0.0);
+    if (lightIndex < 0 || lightIndex >= MAX_LIGHTS) {
+        return vec3(0.0);
     }
 
-    vec3 viewDir = normalize(reconstructViewRay(uv));
-    float viewDistance = sampleDepth / max(-viewDir.z, 1e-4);
-    vec3 viewPos = viewDir * viewDistance;
-    vec3 worldPos = (params.invView * vec4(viewPos, 1.0)).xyz;
-
-    if (useBounds) {
-        vec3 uvw = (worldPos - params.worldMin.xyz) / boundsExtent;
-        if (any(lessThan(uvw, vec3(0.0))) || any(greaterThan(uvw, vec3(1.0)))) {
-            return vec4(0.0);
-        }
+    int lightCount = int(clamp(floor(params.volumeCounts.y + 0.5), 0.0, float(MAX_LIGHTS)));
+    if (lightIndex >= lightCount) {
+        return vec3(0.0);
     }
 
-    vec3 shadowUVW;
-    float sunVis = ComputeShadow(worldPos, shadowUVW);
-    vec3 mediumColor;
-    float sigma = ComputeDensity(worldPos, viewDir, mediumColor);
-    vec3 directAccum;
-    vec3 scatter = ComputeLighting(worldPos, viewDir, sigma, mediumColor, sunVis, directAccum);
-
-    if (froxelDebug == 3) {
-        return vec4(vec3(clamp(sunVis, 0.0, 1.0)), 1.0);
-    }
-    if (froxelDebug == 4) {
-        return vec4(clamp(shadowUVW, vec3(0.0), vec3(1.0)), 1.0);
-    }
-    if (froxelDebug == 5) {
-        return vec4(vec3(step(0.5, sunVis)), 1.0);
+    vec3 lightPos = params.lightPosRadius[lightIndex].xyz;
+    float radius = max(params.lightPosRadius[lightIndex].w, 0.001);
+    vec3 toLight = lightPos - worldPos;
+    float dist = length(toLight);
+    if (dist >= radius) {
+        return vec3(0.0);
     }
 
-    return vec4(scatter, sigma);
+    vec3 L = toLight / max(dist, 1e-4);
+    float attenuation = Saturate(1.0 - dist / radius);
+    attenuation *= attenuation;
+
+    float type = params.lightColorType[lightIndex].w;
+    if (type > 0.5) {
+        vec3 coneDir = normalize(params.lightDirAngle[lightIndex].xyz);
+        float cosOuter = params.lightDirAngle[lightIndex].w;
+        float cosInner = max(params.lightExtra[lightIndex].x, cosOuter + 1e-4);
+        float cosTheta = dot(coneDir, -L);
+        float spot = smoothstep(cosOuter, cosInner, cosTheta);
+        float coneRange = max(params.lightExtra[lightIndex].y, 0.001);
+        attenuation *= spot * Saturate(1.0 - dist / coneRange);
+    }
+
+    float localShadow = SampleLightShadow(lightIndex, worldPos, dispatchFace);
+    float phase = phaseHG(dot(L, V), g);
+    vec3 lightColor = max(params.lightColorType[lightIndex].rgb, vec3(0.0));
+    result += lightColor * (phase * attenuation * localShadow) * mediumColor;
+
+    return result * density * max(params.fogColor.a, 0.0);
 }
 
 vec4 ApplyFireflyClamp(vec4 value) {
@@ -343,59 +417,18 @@ vec4 ApplyFireflyClamp(vec4 value) {
     return value;
 }
 
-vec4 LuminanceClampHistory(ivec3 idx, ivec3 dim, int depthMode, bool useBounds, vec3 boundsExtent, vec4 historyValue) {
-    const ivec3 offsets[6] = ivec3[6](
-        ivec3(1, 0, 0), ivec3(-1, 0, 0),
-        ivec3(0, 1, 0), ivec3(0, -1, 0),
-        ivec3(0, 0, 1), ivec3(0, 0, -1)
-    );
-
-    vec4 center = buildMediaAtIdx(idx, dim, depthMode, useBounds, boundsExtent, 0);
-    float minLum = Luminance(center.rgb);
-    float maxLum = minLum;
-    float minAlpha = center.a;
-    float maxAlpha = center.a;
-
-    for (int i = 0; i < 6; i++) {
-        ivec3 n = clamp(idx + offsets[i], ivec3(0), dim - ivec3(1));
-        vec4 sampleV = buildMediaAtIdx(n, dim, depthMode, useBounds, boundsExtent, 0);
-        float l = Luminance(sampleV.rgb);
-        minLum = min(minLum, l);
-        maxLum = max(maxLum, l);
-        minAlpha = min(minAlpha, sampleV.a);
-        maxAlpha = max(maxAlpha, sampleV.a);
-    }
-
-    float histLum = Luminance(historyValue.rgb);
-    float clampedLum = clamp(histLum, minLum, maxLum);
-    if (histLum > 1e-4) {
-        historyValue.rgb *= clampedLum / histLum;
-    }
-    historyValue.a = clamp(historyValue.a, minAlpha, maxAlpha);
-    return historyValue;
-}
-
-ivec3 reprojectToHistoryIdx(vec3 worldPos, ivec3 dim, out bool valid, out vec2 motion, out float prevDepthOut) {
+ivec3 ReprojectHistoryIdx(ivec3 idx, ivec3 dim, vec3 worldPos, out bool valid, out vec2 motion, out float prevDepthOut) {
     valid = false;
     motion = vec2(0.0);
     prevDepthOut = 0.0;
 
-    vec4 prevClip = params.prevViewProj * vec4(worldPos, 1.0);
-    vec4 currClip = params.viewProj * vec4(worldPos, 1.0);
-    if (prevClip.w <= 1e-6 || currClip.w <= 1e-6) {
+    vec2 currentUV = (vec2(idx.xy) + 0.5) / vec2(dim.xy);
+    motion = texture(motionTexture, currentUV).rg;
+    vec2 prevUV = currentUV - motion;
+
+    if (any(lessThan(prevUV, vec2(0.0))) || any(greaterThan(prevUV, vec2(1.0)))) {
         return ivec3(0);
     }
-
-    vec3 prevNdc = prevClip.xyz / prevClip.w;
-    vec3 currNdc = currClip.xyz / currClip.w;
-    vec2 prevUV = prevNdc.xy * 0.5 + 0.5;
-    vec2 currUV = currNdc.xy * 0.5 + 0.5;
-
-    if (any(lessThan(prevUV, vec2(0.0))) || any(greaterThan(prevUV, vec2(1.0))) || prevNdc.z < -1.0 || prevNdc.z > 1.0) {
-        return ivec3(0);
-    }
-
-    motion = currUV - prevUV;
 
     float nearPlane = getNearPlane();
     float farPlane = getFarPlane(nearPlane);
@@ -412,17 +445,36 @@ ivec3 reprojectToHistoryIdx(vec3 worldPos, ivec3 dim, out bool valid, out vec2 m
     return prevIdx;
 }
 
-vec4 ReprojectHistory(ivec3 idx, ivec3 dim, int depthMode, bool useBounds, vec3 boundsExtent, vec4 current, vec3 worldPos, float currentDepth) {
+vec4 ClampHistoryByPyramid(ivec3 idx, ivec3 dim, vec4 historyValue) {
+    ivec3 pyramidDim = ivec3(max((dim.x + 3) / 4, 1), max((dim.y + 3) / 4, 1), dim.z);
+    ivec3 pyramidIdx = ivec3(min(idx.x / 4, pyramidDim.x - 1), min(idx.y / 4, pyramidDim.y - 1), idx.z);
+    vec4 bounds = imageLoad(froxelLight, pyramidIdx);
+
+    float minLum = bounds.x;
+    float maxLum = max(bounds.y, minLum);
+    float minSigma = max(bounds.z, 0.0);
+    float maxSigma = max(bounds.w, minSigma);
+
+    float histLum = Luminance(historyValue.rgb);
+    float clampedLum = clamp(histLum, minLum, maxLum);
+    if (histLum > 1e-4) {
+        historyValue.rgb *= clampedLum / histLum;
+    }
+    historyValue.a = clamp(historyValue.a, minSigma, maxSigma);
+    return historyValue;
+}
+
+vec4 ReprojectHistory(ivec3 idx, ivec3 dim, vec4 current, vec3 worldPos, float currentDepth) {
     bool hasHistory = params.miscParams.w > 0.5;
     float temporal = clamp(params.densityParams.w, 0.0, 1.0);
     if (!hasHistory || temporal <= 0.0 || params.temporalParams.w > 0.5) {
         return current;
     }
 
-    bool valid = false;
+    bool valid;
     vec2 motion;
     float prevDepth;
-    ivec3 prevIdx = reprojectToHistoryIdx(worldPos, dim, valid, motion, prevDepth);
+    ivec3 prevIdx = ReprojectHistoryIdx(idx, dim, worldPos, valid, motion, prevDepth);
     if (!valid) {
         return current;
     }
@@ -437,7 +489,7 @@ vec4 ReprojectHistory(ivec3 idx, ivec3 dim, int depthMode, bool useBounds, vec3 
     }
 
     vec4 history = imageLoad(froxelHistory, prevIdx);
-    history = LuminanceClampHistory(idx, dim, depthMode, useBounds, boundsExtent, history);
+    history = ClampHistoryByPyramid(idx, dim, history);
     history = ApplyFireflyClamp(history);
 
     float change = length(current.rgb - history.rgb) + abs(current.a - history.a);
@@ -449,61 +501,181 @@ vec4 ReprojectHistory(ivec3 idx, ivec3 dim, int depthMode, bool useBounds, vec3 
 void main() {
     ivec3 idx = ivec3(gl_GlobalInvocationID);
     ivec3 dim = ivec3(max(params.gridDim.xyz, vec3(1.0)));
-    int depthMode = int(clamp(floor(params.miscParams.y + 0.5), 0.0, 2.0));
-    int froxelDebug = int(clamp(floor(params.phaseParams.w + 0.5), 0.0, 5.0));
-    vec3 extent;
-    bool useWorldGrid = boundsValid(extent);
-
     if (any(greaterThanEqual(idx, dim))) {
         return;
     }
 
-    if (froxelDebug == 1) {
-        vec3 uvw = (vec3(idx) + vec3(0.5)) / vec3(dim);
-        vec4 outV = vec4(uvw, uvw.z);
-        imageStore(froxelVolume, idx, outV);
-        imageStore(volumeLightBuffer, idx, outV);
-        return;
-    }
-    if (froxelDebug == 2) {
-        vec4 outV = vec4(params.fogColor.rgb * 0.3, 0.3);
-        imageStore(froxelVolume, idx, outV);
-        imageStore(volumeLightBuffer, idx, vec4(outV.rgb, 1.0));
+    int stage = int(clamp(floor(params.passParams.x + 0.5), 0.0, 7.0));
+    int depthMode = int(clamp(floor(params.miscParams.y + 0.5), 0.0, 2.0));
+
+    vec3 boundsExtent;
+    bool useWorldGrid = boundsValid(boundsExtent);
+
+    if (stage == STAGE_CLEAR) {
+        imageStore(froxelScattering, idx, vec4(0.0));
+        imageStore(froxelLight, idx, vec4(0.0));
+        imageStore(froxelExtinction, idx, vec4(0.0));
+        imageStore(froxelClamp, idx, vec4(0.0));
         return;
     }
 
-    bool checkerboard = params.qualityParams.y > 0.5;
-    if (checkerboard && params.miscParams.w > 0.5) {
-        int parity = int(params.miscParams.z) & 1;
-        if (((idx.x + idx.y + parity) & 1) != 0) {
-            vec4 hist = imageLoad(froxelHistory, idx);
-            hist = ApplyFireflyClamp(hist);
-            imageStore(froxelVolume, idx, hist);
-            imageStore(volumeLightBuffer, idx, vec4(hist.rgb, 1.0));
+    if (stage == STAGE_CLAMP_LEVEL0) {
+        ivec3 levelDim = ivec3(max((dim.x + 1) / 2, 1), max((dim.y + 1) / 2, 1), dim.z);
+        if (any(greaterThanEqual(idx, levelDim))) {
             return;
         }
-    }
 
-    vec4 current = buildMediaAtIdx(idx, dim, depthMode, useWorldGrid, extent, froxelDebug);
-    current = ApplyFireflyClamp(current);
-    if (froxelDebug >= 3) {
-        imageStore(froxelVolume, idx, current);
-        imageStore(volumeLightBuffer, idx, vec4(current.rgb, 1.0));
+        float minLum = 1e20;
+        float maxLum = 0.0;
+        float minSigma = 1e20;
+        float maxSigma = 0.0;
+
+        for (int oy = 0; oy < 2; ++oy) {
+            for (int ox = 0; ox < 2; ++ox) {
+                ivec3 srcIdx = ivec3(min(idx.x * 2 + ox, dim.x - 1), min(idx.y * 2 + oy, dim.y - 1), idx.z);
+                vec3 scatter = imageLoad(froxelScattering, srcIdx).rgb;
+                float sigma = imageLoad(froxelExtinction, srcIdx).x;
+                float lum = Luminance(scatter);
+                minLum = min(minLum, lum);
+                maxLum = max(maxLum, lum);
+                minSigma = min(minSigma, sigma);
+                maxSigma = max(maxSigma, sigma);
+            }
+        }
+
+        if (minLum > maxLum) {
+            minLum = maxLum;
+        }
+        if (minSigma > maxSigma) {
+            minSigma = maxSigma;
+        }
+
+        imageStore(froxelClamp, idx, vec4(minLum, maxLum, minSigma, maxSigma));
         return;
     }
 
-    float nearPlane = getNearPlane();
-    float farPlane = getFarPlane(nearPlane);
-    vec2 uv = (vec2(idx.xy) + 0.5) / vec2(dim.xy);
-    float sliceCenter = (float(idx.z) + 0.5) / float(dim.z);
-    float centerDepth = depthFromSliceNorm(sliceCenter, nearPlane, farPlane);
-    vec3 viewDir = normalize(reconstructViewRay(uv));
-    float t = centerDepth / max(-viewDir.z, 1e-4);
-    vec3 worldPos = (params.invView * vec4(viewDir * t, 1.0)).xyz;
+    if (stage == STAGE_CLAMP_LEVEL1) {
+        ivec3 srcDim = ivec3(max((dim.x + 1) / 2, 1), max((dim.y + 1) / 2, 1), dim.z);
+        ivec3 dstDim = ivec3(max((srcDim.x + 1) / 2, 1), max((srcDim.y + 1) / 2, 1), dim.z);
+        if (any(greaterThanEqual(idx, dstDim))) {
+            return;
+        }
 
-    vec4 finalValue = ReprojectHistory(idx, dim, depthMode, useWorldGrid, extent, current, worldPos, centerDepth);
-    finalValue = ApplyFireflyClamp(finalValue);
+        float minLum = 1e20;
+        float maxLum = 0.0;
+        float minSigma = 1e20;
+        float maxSigma = 0.0;
 
-    imageStore(froxelVolume, idx, finalValue);
-    imageStore(volumeLightBuffer, idx, vec4(finalValue.rgb, 1.0));
+        for (int oy = 0; oy < 2; ++oy) {
+            for (int ox = 0; ox < 2; ++ox) {
+                ivec3 srcIdx = ivec3(min(idx.x * 2 + ox, srcDim.x - 1), min(idx.y * 2 + oy, srcDim.y - 1), idx.z);
+                vec4 bounds = imageLoad(froxelClamp, srcIdx);
+                minLum = min(minLum, bounds.x);
+                maxLum = max(maxLum, bounds.y);
+                minSigma = min(minSigma, bounds.z);
+                maxSigma = max(maxSigma, bounds.w);
+            }
+        }
+
+        if (minLum > maxLum) {
+            minLum = maxLum;
+        }
+        if (minSigma > maxSigma) {
+            minSigma = maxSigma;
+        }
+
+        imageStore(froxelLight, idx, vec4(minLum, maxLum, minSigma, maxSigma));
+        return;
+    }
+
+    vec3 worldPos;
+    vec3 viewDir;
+    float centerDepth;
+    bool validSample = ComputeFroxelSample(idx, dim, depthMode, useWorldGrid, boundsExtent, worldPos, viewDir, centerDepth);
+
+    if (stage == STAGE_GLOBAL_DENSITY) {
+        if (!validSample) {
+            imageStore(froxelExtinction, idx, vec4(0.0));
+            imageStore(froxelLight, idx, vec4(params.fogColor.rgb, 1.0));
+            return;
+        }
+
+        float density = ComputeBaseDensity(worldPos);
+        imageStore(froxelExtinction, idx, vec4(density, 0.0, 0.0, 0.0));
+        imageStore(froxelLight, idx, vec4(params.fogColor.rgb, 1.0));
+        return;
+    }
+
+    if (stage == STAGE_VOLUME_DENSITY) {
+        if (!validSample) {
+            return;
+        }
+
+        float density = max(imageLoad(froxelExtinction, idx).x, 0.0);
+        vec3 mediumColor = imageLoad(froxelLight, idx).rgb;
+        ApplyVolumeDensity(worldPos, density, mediumColor);
+        imageStore(froxelExtinction, idx, vec4(max(density, 0.0), 0.0, 0.0, 0.0));
+        imageStore(froxelLight, idx, vec4(mediumColor, 1.0));
+        return;
+    }
+
+    if (stage == STAGE_LOCAL_LIGHT) {
+        if (!validSample) {
+            return;
+        }
+
+        float density = max(imageLoad(froxelExtinction, idx).x, 0.0);
+        if (density <= 0.0) {
+            return;
+        }
+
+        int lightIndex = int(floor(params.passParams.y + 0.5));
+        int dispatchFace = int(floor(params.passParams.z + 0.5));
+        vec3 mediumColor = imageLoad(froxelLight, idx).rgb;
+        vec3 scatter = ComputeLocalLightScattering(worldPos, viewDir, density, mediumColor, lightIndex, dispatchFace);
+
+        vec4 accum = imageLoad(froxelScattering, idx);
+        accum.rgb += max(scatter, vec3(0.0));
+        accum.a = density;
+        imageStore(froxelScattering, idx, accum);
+        return;
+    }
+
+    if (stage == STAGE_SUN_LIGHT) {
+        if (!validSample) {
+            return;
+        }
+
+        float density = max(imageLoad(froxelExtinction, idx).x, 0.0);
+        if (density <= 0.0) {
+            return;
+        }
+
+        vec3 mediumColor = imageLoad(froxelLight, idx).rgb;
+        vec3 shadowUVW;
+        float sunVis = ComputeShadow(worldPos, shadowUVW);
+        vec3 scatter = ComputeSunLighting(worldPos, viewDir, density, mediumColor, sunVis);
+
+        vec4 accum = imageLoad(froxelScattering, idx);
+        accum.rgb += max(scatter, vec3(0.0));
+        accum.a = density;
+        imageStore(froxelScattering, idx, accum);
+        return;
+    }
+
+    if (stage == STAGE_TEMPORAL) {
+        vec4 current = imageLoad(froxelScattering, idx);
+        current.a = max(imageLoad(froxelExtinction, idx).x, 0.0);
+        current = ApplyFireflyClamp(current);
+
+        vec4 finalValue = current;
+        if (validSample) {
+            finalValue = ReprojectHistory(idx, dim, current, worldPos, centerDepth);
+            finalValue = ApplyFireflyClamp(finalValue);
+        }
+
+        imageStore(froxelScattering, idx, vec4(finalValue.rgb, finalValue.a));
+        imageStore(froxelExtinction, idx, vec4(finalValue.a, 0.0, 0.0, 0.0));
+        return;
+    }
 }

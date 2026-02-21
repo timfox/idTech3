@@ -564,18 +564,22 @@ typedef struct {
 #ifdef VK_PBR_BRDFLUT
 	VkPipelineLayout pipeline_layout_brdflut;
 #endif
-		VkDescriptorSetLayout volumetric_compute_layout;
-		VkDescriptorSetLayout volumetric_composite_layout;
-		VkDescriptorSetLayout volumetric_depth_resolve_layout;
-		VkDescriptorSet volumetric_compute_descriptor;
-		VkDescriptorSet volumetric_composite_descriptor;
-		VkDescriptorSet volumetric_depth_resolve_descriptor;
-		VkPipelineLayout volumetric_compute_pipeline_layout;
-		VkPipelineLayout volumetric_composite_pipeline_layout;
-		VkPipelineLayout volumetric_depth_resolve_pipeline_layout;
-		VkPipeline volumetric_compute_pipeline;
-		VkPipeline volumetric_composite_pipeline;
-		VkPipeline volumetric_depth_resolve_pipeline;
+	VkDescriptorSetLayout volumetric_compute_layout;
+	VkDescriptorSetLayout volumetric_composite_layout;
+	VkDescriptorSetLayout volumetric_depth_resolve_layout;
+	VkDescriptorSetLayout volumetric_motion_layout;
+	VkDescriptorSet volumetric_compute_descriptor;
+	VkDescriptorSet volumetric_composite_descriptor;
+	VkDescriptorSet volumetric_depth_resolve_descriptor;
+	VkDescriptorSet volumetric_motion_descriptor;
+	VkPipelineLayout volumetric_compute_pipeline_layout;
+	VkPipelineLayout volumetric_composite_pipeline_layout;
+	VkPipelineLayout volumetric_depth_resolve_pipeline_layout;
+	VkPipelineLayout volumetric_motion_pipeline_layout;
+	VkPipeline volumetric_compute_pipeline;
+	VkPipeline volumetric_composite_pipeline;
+	VkPipeline volumetric_depth_resolve_pipeline;
+	VkPipeline volumetric_motion_pipeline;
 
 	VkDescriptorSet color_descriptor;
 	VkDescriptorSet depth_descriptor;
@@ -776,6 +780,7 @@ typedef struct {
 		VkShaderModule volumetric_fog_fs;
 		VkShaderModule volumetric_fog_cs;
 		VkShaderModule volumetric_depth_resolve_msaa_cs;
+		VkShaderModule volumetric_motion_vectors_cs;
 
 		VkShaderModule dot_fs;
 		VkShaderModule dot_vs;
@@ -882,11 +887,19 @@ typedef struct {
 	VkImage froxel_history_image;
 	VkImageView froxel_history_view;
 	VkDeviceMemory froxel_history_memory;
+	VkImage froxel_extinction_image;
+	VkImageView froxel_extinction_view;
+	VkDeviceMemory froxel_extinction_memory;
 	VkImage froxel_light_image;
 	VkImageView froxel_light_view;
 	VkDeviceMemory froxel_light_memory;
+	VkImage froxel_clamp_image;
+	VkImageView froxel_clamp_view;
+	VkDeviceMemory froxel_clamp_memory;
 	VkImage volumetric_depth_image;
 	VkImageView volumetric_depth_view;
+	VkImage motion_vector_image;
+	VkImageView motion_vector_view;
 	VkImage fog_noise_image;
 	VkImageView fog_noise_view;
 	VkDeviceMemory fog_noise_memory;
