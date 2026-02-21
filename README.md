@@ -16,6 +16,8 @@ Go to [Releases](../../releases) section to download latest binaries for your pl
 * Physically Based Rendering (PBR)
 * Spherical Harmonics lighting support
 * Screen Space Ambient Occlusion (SSAO)
+* Froxel-based Volumetric Lighting with 2D Navier–Stokes fluid solver
+* MSAA and SMAA anti-aliasing
 
 **Audio**:
 * OpenAL backend with HRTF for 3D positional audio
