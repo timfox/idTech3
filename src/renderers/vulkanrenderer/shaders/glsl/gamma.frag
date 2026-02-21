@@ -98,41 +98,53 @@ bool finite2( vec2 v ) {
 	return !( isnan( v.x ) || isnan( v.y ) || isinf( v.x ) || isinf( v.y ) );
 }
 
-vec3 reconstructViewRay( vec2 uv ) {
+vec3 reconstructRay( vec2 uv, float fovYRadians, float aspect ) {
 	vec2 ndc = uv * 2.0 - 1.0;
-	vec4 clip = vec4( ndc, 1.0, 1.0 );
-	vec4 view = paniniPC.invProj * clip;
-	float invW = 1.0 / max( abs( view.w ), 1e-6 );
-	vec3 v = view.xyz * invW;
-	float invLen = inversesqrt( max( dot( v, v ), 1e-8 ) );
-	return v * invLen;
+	float tanHalfFovY = tan( 0.5 * fovYRadians );
+
+	vec3 ray;
+	ray.x = ndc.x * aspect * tanHalfFovY;
+	ray.y = ndc.y * tanHalfFovY;
+	ray.z = -1.0;
+
+	float invLen = inversesqrt( max( dot( ray, ray ), 1e-8 ) );
+	return ray * invLen;
 }
 
-vec2 paniniProjectStable( vec3 dir, float d, float s, float thetaMax ) {
+vec2 paniniProjectStable(
+	vec3 dir,
+	float d,
+	float s,
+	float fovYRadians,
+	float aspect )
+{
 	float safeD = max( d, 0.001 );
 	float safeS = clamp( s, 0.0, 1.0 );
-	float safeThetaMax = clamp( thetaMax, radians( 1.0 ), radians( 89.0 ) );
+	float thetaMax = atan( tan( fovYRadians * 0.5 ) * aspect );
+	float phiMax = fovYRadians * 0.5;
 
-	// Use +Z forward for angular math.
-	vec3 ray = vec3( dir.x, dir.y, -dir.z );
-	float xzLen = max( length( ray.xz ), 1e-6 );
-	float theta = atan( ray.x, ray.z );
-	float phi = atan( ray.y, xzLen );
-	theta = clamp( theta, -safeThetaMax, safeThetaMax );
-	phi = clamp( phi, -safeThetaMax, safeThetaMax );
+	float xzLen = max( length( dir.xz ), 1e-6 );
+	float theta = atan( dir.x, -dir.z );
+	float phi = atan( dir.y, xzLen );
 
-	float denom = max( safeD + cos( theta ), 1e-3 );
+	theta = clamp( theta, -thetaMax, thetaMax );
+	phi = clamp( phi, -phiMax, phiMax );
+
+	float denom = max( safeD + cos( theta ), 1e-4 );
 	float k = ( safeD + 1.0 ) / denom;
+
 	vec2 p;
 	p.x = k * sin( theta );
 	p.y = tan( phi );
 	p.y *= mix( 1.0, k, safeS );
 
-	float denomMax = max( safeD + cos( safeThetaMax ), 1e-3 );
+	float denomMax = max( safeD + cos( thetaMax ), 1e-4 );
 	float kMax = ( safeD + 1.0 ) / denomMax;
-	float fitX = kMax * sin( safeThetaMax );
-	float fitY = tan( safeThetaMax ) * mix( 1.0, kMax, safeS );
-	float fit = max( max( abs( fitX ), abs( fitY ) ), 1e-3 );
+
+	float fitX = kMax * sin( thetaMax );
+	float fitY = tan( phiMax ) * mix( 1.0, kMax, safeS );
+	float fit = max( max( abs( fitX ), abs( fitY ) ), 1e-4 );
+
 	return p / fit;
 }
 
@@ -152,12 +164,18 @@ void main() {
 	int paniniDebug = int( clamp( floor( paniniPC.paniniDebugMode + 0.5 ), 0.0, 1.0 ) );
 
 	if ( paniniAmount > 0.0001 ) {
-		vec3 dir = reconstructViewRay( uv );
-		vec3 ray = vec3( dir.x, dir.y, -dir.z );
+		ivec2 texSize = textureSize( texture0, 0 );
+		float aspect = float( texSize.x ) / max( float( texSize.y ), 1.0 );
+		float fovY = radians( paniniPC.paniniThetaDeg );
+		vec3 dir = reconstructRay( uv, fovY, aspect );
 
-		float forwardZ = max( ray.z, 1e-3 );
-		vec2 persp = ray.xy / forwardZ;
-		vec2 panini = paniniProjectStable( dir, paniniPC.paniniD, paniniPC.paniniS, radians( paniniPC.paniniThetaDeg ) );
+		vec2 persp = dir.xy / max( -dir.z, 1e-4 );
+		vec2 panini = paniniProjectStable(
+			dir,
+			paniniPC.paniniD,
+			paniniPC.paniniS,
+			fovY,
+			aspect );
 		vec2 proj = mix( persp, panini, paniniAmount );
 		bool projInvalid = !finite2( proj );
 
