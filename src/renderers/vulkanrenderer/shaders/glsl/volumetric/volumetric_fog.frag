@@ -10,6 +10,8 @@ layout(binding = 2) uniform sampler3D froxelVolume;
 layout(std140, binding = 3) uniform VolumetricParams {
 	mat4 invProj;
 	mat4 invView;
+	mat4 proj;
+	mat4 viewProj;
 	vec4 viewOrigin;
 	vec4 sunDirection;
 	vec4 fogColor;
@@ -19,6 +21,8 @@ layout(std140, binding = 3) uniform VolumetricParams {
 	vec4 gridDim;
 	vec4 miscParams;
 	vec4 phaseParams;
+	vec4 noiseParams;
+	vec4 noiseScroll;
 } params;
 
 const float PI = 3.14159265359;
@@ -40,7 +44,7 @@ float decodeClipZ(float depthSample, int depthMode) {
 		return depthSample * 2.0 - 1.0;
 	}
 	if ( depthMode == 1 ) {
-		return ( 1.0 - depthSample ) * 2.0 - 1.0;
+		return depthSample * 2.0 - 1.0;
 	}
 	return 0.0;
 }
