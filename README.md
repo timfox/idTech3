@@ -24,6 +24,9 @@ Go to [Releases](../../releases) section to download latest binaries for your pl
 * Real-time reverb and occlusion effects via OpenAL EFX (heuristic environmental acoustics)
 * Audio codec support: mp3, ogg, wav, flac, webm, opus
 
+**Video**:
+* Video codec support: RoQ, WebM (VP8/VP9), Ogg Theora, MP4 (H.264)
+
 **Scripting**:
 * Support for Lua scripting
 * Support for JavaScript scripting
