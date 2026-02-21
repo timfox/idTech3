@@ -36,6 +36,7 @@ glstatic_t	gls;
 
 #ifdef USE_VULKAN
 static void VkInfo_f( void );
+static void VkVolumetricValidate_f( void );
 #endif
 static void GfxInfo( void );
 static void VarInfo( void );
@@ -229,6 +230,9 @@ cvar_t	*r_volumetricFogNoiseThreshold;
 cvar_t	*r_volumetricFogNoiseScroll;
 cvar_t	*r_volumetricFogWindSpeed;
 cvar_t	*r_volumetricFogWindDirection;
+cvar_t	*r_volumetricFogValidation;
+cvar_t	*r_volumetricFogValidationPrintInterval;
+cvar_t	*r_volumetricFogForceCameraCut;
 cvar_t	*r_fog_shadows;
 cvar_t	*r_fogShadowMapSize;
 cvar_t	*r_fogShadowBias;
@@ -1559,6 +1563,128 @@ static void VkInfo_f( void )
 	ri.Printf(PRINT_ALL, "pipeline descriptors: %i, base: %i\n", vk.pipelines_count, vk.pipelines_world_base );
 	ri.Printf(PRINT_ALL, "image chunks: %i\n", vk_world.num_image_chunks );
 }
+
+static void VkVolumetricValidate_f( void )
+{
+	const int argc = ri.Cmd_Argc();
+	const char *mode = ( argc > 1 ) ? ri.Cmd_Argv( 1 ) : "";
+
+	if ( !mode[0] ) {
+		ri.Printf( PRINT_ALL,
+			"usage: vkVolumetricValidate <camera|ghosting|localspot|localpoint|msaa|checklist>\n"
+			"  camera [captureName]       : force one camera-cut reset and show reset overlay.\n"
+			"  ghosting [captureName]     : show motion-vector threshold debug for fast camera tests.\n"
+			"  localspot [captureName]    : show local spot-shadow visibility debug.\n"
+			"  localpoint [captureName]   : show local point-shadow visibility debug.\n"
+			"  msaa [capture base [msaa]] : queue off/on MSAA parity screenshots (+ optional sample count).\n"
+			"  checklist                  : print exact validation commands for the final checklist.\n" );
+		return;
+	}
+
+	if ( !Q_stricmp( mode, "camera" ) ) {
+		ri.Cvar_Set( "r_fogDebug", "10" );
+		ri.Cvar_Set( "r_volumetricFogValidation", "1" );
+		ri.Cvar_SetValue( "r_volumetricFogForceCameraCut", 1.0f );
+		if ( argc > 2 && ri.Cmd_Argv( 2 )[0] ) {
+			ri.Cmd_ExecuteText( EXEC_APPEND, va( "screenshotJPEG %s\n", ri.Cmd_Argv( 2 ) ) );
+		}
+		ri.Printf( PRINT_ALL, "[VK][fog] validation camera-cut armed: debug=10, forceCut=1\n" );
+		return;
+	}
+
+	if ( !Q_stricmp( mode, "ghosting" ) ) {
+		ri.Cvar_Set( "r_fogDebug", "7" );
+		ri.Cvar_Set( "r_volumetricFogValidation", "1" );
+		if ( argc > 2 && ri.Cmd_Argv( 2 )[0] ) {
+			ri.Cmd_ExecuteText( EXEC_APPEND, va( "screenshotJPEG %s\n", ri.Cmd_Argv( 2 ) ) );
+		}
+		ri.Printf( PRINT_ALL, "[VK][fog] validation ghosting view enabled: debug=7 (motion magnitude / threshold)\n" );
+		return;
+	}
+
+	if ( !Q_stricmp( mode, "localspot" ) ) {
+		ri.Cvar_Set( "r_fog_shadows", "1" );
+		ri.Cvar_Set( "r_fogDebug", "8" );
+		ri.Cvar_Set( "r_volumetricFogValidation", "1" );
+		if ( argc > 2 && ri.Cmd_Argv( 2 )[0] ) {
+			ri.Cmd_ExecuteText( EXEC_APPEND, va( "screenshotJPEG %s\n", ri.Cmd_Argv( 2 ) ) );
+		}
+		ri.Printf( PRINT_ALL, "[VK][fog] validation local spot shadow view enabled: debug=8\n" );
+		return;
+	}
+
+	if ( !Q_stricmp( mode, "localpoint" ) ) {
+		ri.Cvar_Set( "r_fog_shadows", "1" );
+		ri.Cvar_Set( "r_fogDebug", "9" );
+		ri.Cvar_Set( "r_volumetricFogValidation", "1" );
+		if ( argc > 2 && ri.Cmd_Argv( 2 )[0] ) {
+			ri.Cmd_ExecuteText( EXEC_APPEND, va( "screenshotJPEG %s\n", ri.Cmd_Argv( 2 ) ) );
+		}
+		ri.Printf( PRINT_ALL, "[VK][fog] validation local point shadow view enabled: debug=9\n" );
+		return;
+	}
+
+	if ( !Q_stricmp( mode, "msaa" ) ) {
+		const int current_msaa = ( r_ext_multisample ) ? r_ext_multisample->integer : 0;
+		const char *base = ( argc > 2 && ri.Cmd_Argv( 2 )[0] ) ? ri.Cmd_Argv( 2 ) : "";
+		int target_msaa = ( current_msaa > 1 ) ? current_msaa : 4;
+
+		if ( argc > 3 && ri.Cmd_Argv( 3 )[0] ) {
+			target_msaa = atoi( ri.Cmd_Argv( 3 ) );
+		}
+		if ( target_msaa < 2 ) {
+			target_msaa = 2;
+		} else if ( target_msaa > 8 ) {
+			target_msaa = 8;
+		}
+
+		if ( !base[0] ) {
+			ri.Printf( PRINT_ALL,
+				"[VK][fog] msaa parity helper:\n"
+				"  run: vkVolumetricValidate msaa <captureBase> [targetSamples]\n"
+				"  example: vkVolumetricValidate msaa fog_msaa_parity 4\n"
+				"  current r_ext_multisample=%d target=%d\n",
+				current_msaa, target_msaa );
+			return;
+		}
+
+		ri.Cvar_Set( "r_fogDebug", "0" );
+		ri.Cmd_ExecuteText( EXEC_APPEND, va(
+			"set r_fogDebug 0\n"
+			"set r_ext_multisample 0\n"
+			"vid_restart\n"
+			"wait\nwait\nwait\nwait\n"
+			"screenshotJPEG %s_off\n"
+			"set r_ext_multisample %d\n"
+			"vid_restart\n"
+			"wait\nwait\nwait\nwait\n"
+			"screenshotJPEG %s_on\n",
+			base, target_msaa, base ) );
+
+		if ( current_msaa != target_msaa ) {
+			ri.Cmd_ExecuteText( EXEC_APPEND, va(
+				"set r_ext_multisample %d\n"
+				"vid_restart\n",
+				current_msaa ) );
+		}
+
+		ri.Printf( PRINT_ALL, "[VK][fog] queued MSAA parity capture: base=%s (off vs %dx)\n", base, target_msaa );
+		return;
+	}
+
+	if ( !Q_stricmp( mode, "checklist" ) ) {
+		ri.Printf( PRINT_ALL,
+			"[VK][fog] final checklist commands:\n"
+			"  camera cut reset       : vkVolumetricValidate camera fog_camera_cut\n"
+			"  fast camera ghosting   : vkVolumetricValidate ghosting fog_ghosting\n"
+			"  local spot shadows     : vkVolumetricValidate localspot fog_local_spot\n"
+			"  local point shadows    : vkVolumetricValidate localpoint fog_local_point\n"
+			"  msaa parity capture    : vkVolumetricValidate msaa fog_msaa_parity 4\n" );
+		return;
+	}
+
+	ri.Printf( PRINT_WARNING, "vkVolumetricValidate: unknown mode '%s'\n", mode );
+}
 #endif
 
 
@@ -1597,6 +1723,7 @@ static void R_Register( void )
 	ri.Cmd_AddCommand( "gfxinfo", GfxInfo_f );
 #ifdef USE_VULKAN
 	ri.Cmd_AddCommand( "vkinfo", VkInfo_f );
+	ri.Cmd_AddCommand( "vkVolumetricValidate", VkVolumetricValidate_f );
 #endif
 
 	//
@@ -2138,6 +2265,21 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_volumetricFogWindDirection, "World-space wind direction for volumetric noise advection (x y z)." );
 	ri.Cvar_SetGroup( r_volumetricFogWindDirection, CVG_RENDERER );
 
+	r_volumetricFogValidation = ri.Cvar_Get( "r_volumetricFogValidation", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogValidation, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_volumetricFogValidation, "Enable periodic runtime validation logging for volumetric fog checklist checks." );
+	ri.Cvar_SetGroup( r_volumetricFogValidation, CVG_RENDERER );
+
+	r_volumetricFogValidationPrintInterval = ri.Cvar_Get( "r_volumetricFogValidationPrintInterval", "120", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogValidationPrintInterval, "1", "6000", CV_INTEGER );
+	ri.Cvar_SetDescription( r_volumetricFogValidationPrintInterval, "Frame interval between runtime volumetric validation log lines when r_volumetricFogValidation is enabled." );
+	ri.Cvar_SetGroup( r_volumetricFogValidationPrintInterval, CVG_RENDERER );
+
+	r_volumetricFogForceCameraCut = ri.Cvar_Get( "r_volumetricFogForceCameraCut", "0", CVAR_TEMP );
+	ri.Cvar_CheckRange( r_volumetricFogForceCameraCut, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_volumetricFogForceCameraCut, "One-shot debug trigger to force a volumetric camera-cut history reset on the next frame." );
+	ri.Cvar_SetGroup( r_volumetricFogForceCameraCut, CVG_RENDERER );
+
 	r_fog_shadows = ri.Cvar_Get( "r_fog_shadows", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_fog_shadows, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_fog_shadows, "Enable directional sun-shadow visibility in volumetric froxel lighting." );
@@ -2169,8 +2311,8 @@ static void R_Register( void )
 	ri.Cvar_SetGroup( r_fogShadowPadding, CVG_RENDERER );
 
 	r_fogDebug = ri.Cvar_Get( "r_fogDebug", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_fogDebug, "0", "6", CV_INTEGER );
-	ri.Cvar_SetDescription( r_fogDebug, "Volumetric fog debug view: 0=off, 1=froxel coords, 2=extinction slice, 3=scattering slice, 4=temporal validity/weight, 5=integrated transmittance, 6=sun-shadow debug slice." );
+	ri.Cvar_CheckRange( r_fogDebug, "0", "10", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fogDebug, "Volumetric fog debug view: 0=off, 1=froxel coords, 2=extinction slice, 3=scattering slice, 4=temporal validity/weight, 5=integrated transmittance, 6=sun-shadow debug slice, 7=motion magnitude/threshold, 8=local spot-shadow visibility, 9=local point-shadow visibility, 10=camera-cut/reset state." );
 	ri.Cvar_SetGroup( r_fogDebug, CVG_RENDERER );
 
 	r_froxelDebug = ri.Cvar_Get( "r_froxelDebug", "0", CVAR_ARCHIVE_ND );
@@ -2441,6 +2583,7 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	ri.Cmd_RemoveCommand( "shaderstate" );
 #ifdef USE_VULKAN
 	ri.Cmd_RemoveCommand( "vkinfo" );
+	ri.Cmd_RemoveCommand( "vkVolumetricValidate" );
 #endif
 
 	//if ( tr.registered ) {

@@ -7,6 +7,9 @@ layout(binding = 0) uniform sampler2D sceneColor;
 layout(binding = 1) uniform sampler2D depthTexture;
 layout(binding = 2) uniform sampler3D froxelScattering;
 layout(binding = 3) uniform sampler3D froxelExtinction;
+layout(binding = 5) uniform sampler2D motionTexture;
+layout(binding = 6) uniform sampler2D localSpotShadowMap;
+layout(binding = 7) uniform sampler2DArray localPointShadowMap;
 
 const int MAX_VOLUMES = 24;
 const int MAX_LIGHTS = 32;
@@ -45,6 +48,11 @@ layout(std140, binding = 4) uniform VolumetricParams {
     mat4 sunShadowMatrix0;
     vec4 shadowParams0;
     vec4 shadowMapSize0;
+    mat4 localSpotShadowMatrix[MAX_LIGHTS];
+    mat4 localPointShadowMatrix[MAX_LIGHTS][6];
+    vec4 localShadowAtlasUv[MAX_LIGHTS];
+    vec4 localSpotShadowMapSize;
+    vec4 localPointShadowMapSize;
 } params;
 
 float hash12(vec2 p) {
@@ -118,10 +126,130 @@ void reconstructViewRayAndDepth(
     sceneDepth = clamp(max(-viewPos.z, nearPlane), nearPlane, farPlane);
 }
 
+vec3 reconstructWorldPos(vec3 viewDir, float sceneDepth) {
+    float viewDistance = sceneDepth / max(-viewDir.z, 1e-4);
+    vec3 viewPos = viewDir * viewDistance;
+    return (params.invView * vec4(viewPos, 1.0)).xyz;
+}
+
+int selectPointShadowFace(vec3 dirFromLight) {
+    vec3 a = abs(dirFromLight);
+    if (a.x >= a.y && a.x >= a.z) {
+        return (dirFromLight.x >= 0.0) ? 0 : 1;
+    }
+    if (a.y >= a.x && a.y >= a.z) {
+        return (dirFromLight.y >= 0.0) ? 2 : 3;
+    }
+    return (dirFromLight.z >= 0.0) ? 4 : 5;
+}
+
+float sampleSpotShadowDebug(vec3 worldPos, int lightIndex) {
+    if (lightIndex < 0 || lightIndex >= MAX_LIGHTS) {
+        return 1.0;
+    }
+    if (params.localSpotShadowMapSize.z <= 0.0 || params.localSpotShadowMapSize.w <= 0.0) {
+        return 1.0;
+    }
+
+    vec4 lightClip = params.localSpotShadowMatrix[lightIndex] * vec4(worldPos, 1.0);
+    if (abs(lightClip.w) <= 1e-6) {
+        return 1.0;
+    }
+
+    vec4 atlasRect = params.localShadowAtlasUv[lightIndex];
+    vec3 ndc = lightClip.xyz / lightClip.w;
+    vec2 uv = ndc.xy * 0.5 + 0.5;
+    vec2 atlasUV = uv * atlasRect.xy + atlasRect.zw;
+    float depth = ndc.z * 0.5 + 0.5;
+    if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0))) || depth <= 0.0 || depth >= 1.0) {
+        return 1.0;
+    }
+    if (any(lessThan(atlasUV, atlasRect.zw)) || any(greaterThan(atlasUV, atlasRect.zw + atlasRect.xy))) {
+        return 1.0;
+    }
+
+    float compareDepth = depth - max(params.shadowParams0.x, 0.0);
+    vec2 texelStep = params.localSpotShadowMapSize.zw * max(params.shadowParams0.y, 0.0);
+    if (texelStep.x <= 0.0 || texelStep.y <= 0.0) {
+        float sampleDepth = texture(localSpotShadowMap, atlasUV).r;
+        return (compareDepth <= sampleDepth) ? 1.0 : 0.0;
+    }
+
+    float lit = 0.0;
+    vec2 atlasMin = atlasRect.zw + texelStep * 0.5;
+    vec2 atlasMax = atlasRect.zw + atlasRect.xy - texelStep * 0.5;
+    for (int y = -1; y <= 1; ++y) {
+        for (int x = -1; x <= 1; ++x) {
+            vec2 pcfUV = clamp(atlasUV + vec2(x, y) * texelStep, atlasMin, atlasMax);
+            float sampleDepth = texture(localSpotShadowMap, pcfUV).r;
+            lit += (compareDepth <= sampleDepth) ? 1.0 : 0.0;
+        }
+    }
+    return lit * (1.0 / 9.0);
+}
+
+float samplePointShadowDebug(vec3 worldPos, int lightIndex) {
+    if (lightIndex < 0 || lightIndex >= MAX_LIGHTS) {
+        return 1.0;
+    }
+    int pointSlot = int(floor(params.lightExtra[lightIndex].w + 0.5));
+    if (pointSlot < 0 || params.localPointShadowMapSize.z <= 0.0) {
+        return 1.0;
+    }
+
+    vec3 fromLight = worldPos - params.lightPosRadius[lightIndex].xyz;
+    int face = selectPointShadowFace(fromLight);
+    int layer = pointSlot * 6 + face;
+
+    vec4 lightClip = params.localPointShadowMatrix[lightIndex][face] * vec4(worldPos, 1.0);
+    if (abs(lightClip.w) <= 1e-6) {
+        return 1.0;
+    }
+
+    vec3 ndc = lightClip.xyz / lightClip.w;
+    vec2 uv = ndc.xy * 0.5 + 0.5;
+    float depth = ndc.z * 0.5 + 0.5;
+    if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0))) || depth <= 0.0 || depth >= 1.0) {
+        return 1.0;
+    }
+
+    float compareDepth = depth - max(params.shadowParams0.x, 0.0);
+    vec2 texelStep = vec2(params.localPointShadowMapSize.z) * max(params.shadowParams0.y, 0.0);
+    if (texelStep.x <= 0.0) {
+        float sampleDepth = texture(localPointShadowMap, vec3(uv, float(layer))).r;
+        return (compareDepth <= sampleDepth) ? 1.0 : 0.0;
+    }
+
+    float lit = 0.0;
+    for (int y = -1; y <= 1; ++y) {
+        for (int x = -1; x <= 1; ++x) {
+            vec2 pcfUV = uv + vec2(x, y) * texelStep;
+            float sampleDepth = texture(localPointShadowMap, vec3(pcfUV, float(layer))).r;
+            lit += (compareDepth <= sampleDepth) ? 1.0 : 0.0;
+        }
+    }
+    return lit * (1.0 / 9.0);
+}
+
+int findFirstShadowedLightIndex(bool wantSpot) {
+    int lightCount = int(clamp(floor(params.volumeCounts.y + 0.5), 0.0, float(MAX_LIGHTS)));
+    for (int i = 0; i < MAX_LIGHTS; ++i) {
+        if (i >= lightCount) {
+            break;
+        }
+        bool isSpot = params.lightColorType[i].w > 0.5;
+        bool hasShadow = params.lightExtra[i].z > 0.5 && params.lightExtra[i].w >= 0.0;
+        if (isSpot == wantSpot && hasShadow) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 void main() {
     float depthSample = texture(depthTexture, v_UV).r;
     int depthMode = int(clamp(floor(params.miscParams.y + 0.5), 0.0, 2.0));
-    int fogDebug = int(clamp(floor(params.gridDim.w + 0.5), 0.0, 6.0));
+    int fogDebug = int(clamp(floor(params.gridDim.w + 0.5), 0.0, 10.0));
     float frameIndex = params.miscParams.z;
     float nearPlane = getNearPlane();
     float farPlane = getFarPlane(nearPlane);
@@ -206,6 +334,34 @@ void main() {
     if (fogDebug == 6) {
         vec3 scatter = texture(froxelScattering, vec3(v_UV, 0.5)).rgb;
         fragColor = vec4(scatter, 1.0);
+        return;
+    }
+    if (fogDebug == 7) {
+        vec2 motion = texture(motionTexture, v_UV).rg;
+        float threshold = max(params.temporalParams.x, 1e-5);
+        float motionMag = length(motion);
+        float motionNorm = clamp(motionMag / threshold, 0.0, 1.0);
+        float rejected = motionMag > threshold ? 1.0 : 0.0;
+        fragColor = vec4(motionNorm, clamp(motionMag * 8.0, 0.0, 1.0), 1.0 - rejected, 1.0);
+        return;
+    }
+    if (fogDebug == 8 || fogDebug == 9) {
+        vec3 worldPos = reconstructWorldPos(viewDir, sceneDepth);
+        int lightIndex = findFirstShadowedLightIndex(fogDebug == 8);
+        if (lightIndex < 0) {
+            fragColor = (fogDebug == 8) ? vec4(1.0, 0.0, 1.0, 1.0) : vec4(0.0, 1.0, 1.0, 1.0);
+            return;
+        }
+
+        float shadowVis = (fogDebug == 8) ? sampleSpotShadowDebug(worldPos, lightIndex) : samplePointShadowDebug(worldPos, lightIndex);
+        fragColor = vec4(vec3(clamp(shadowVis, 0.0, 1.0)), 1.0);
+        return;
+    }
+    if (fogDebug == 10) {
+        float hasHistory = params.miscParams.w > 0.5 ? 1.0 : 0.0;
+        float cameraCut = params.temporalParams.w > 0.5 ? 1.0 : 0.0;
+        float temporalWeight = clamp(params.densityParams.w, 0.0, 1.0);
+        fragColor = vec4(hasHistory, cameraCut, temporalWeight, 1.0);
         return;
     }
 
