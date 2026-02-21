@@ -5,12 +5,13 @@ layout(location = 0) out vec4 fragColor;
 
 layout(binding = 0) uniform sampler2D sceneColor;
 layout(binding = 1) uniform sampler2D depthTexture;
-layout(binding = 2) uniform sampler3D froxelVolume;
+layout(binding = 2) uniform sampler3D froxelScattering;
+layout(binding = 3) uniform sampler3D froxelExtinction;
 
 const int MAX_VOLUMES = 24;
 const int MAX_LIGHTS = 32;
 
-layout(std140, binding = 3) uniform VolumetricParams {
+layout(std140, binding = 4) uniform VolumetricParams {
     mat4 invProj;
     mat4 invView;
     mat4 proj;
@@ -33,6 +34,7 @@ layout(std140, binding = 3) uniform VolumetricParams {
     vec4 qualityParams;
     vec4 windParams;
     vec4 volumeCounts;
+    vec4 passParams;
     vec4 volumeBoundsMin[MAX_VOLUMES];
     vec4 volumeBoundsMax[MAX_VOLUMES];
     vec4 volumeColorDensity[MAX_VOLUMES];
@@ -144,12 +146,12 @@ void main() {
         return;
     }
     if (fogDebug == 2) {
-        float sigma = texture(froxelVolume, vec3(v_UV, 0.5)).a;
+        float sigma = texture(froxelExtinction, vec3(v_UV, 0.5)).r;
         fragColor = vec4(sigma, sigma, sigma, 1.0);
         return;
     }
     if (fogDebug == 3) {
-        vec3 scatter = texture(froxelVolume, vec3(v_UV, 0.5)).rgb;
+        vec3 scatter = texture(froxelScattering, vec3(v_UV, 0.5)).rgb;
         fragColor = vec4(scatter, 1.0);
         return;
     }
@@ -181,9 +183,8 @@ void main() {
         if (t1 > t0) {
             float sCenter = (float(step) + 0.5 * float(advance) + jitter) / float(marchCount);
             vec3 uvw = vec3(v_UV, clamp(sCenter, 0.0, 1.0));
-            vec4 media = texture(froxelVolume, uvw);
-            float sigmaT = max(media.a, 0.0);
-            vec3 scatterSource = max(media.rgb, vec3(0.0));
+            float sigmaT = max(texture(froxelExtinction, uvw).r, 0.0);
+            vec3 scatterSource = max(texture(froxelScattering, uvw).rgb, vec3(0.0));
 
             float dt = t1 - t0;
             float prevT = transmittance;
@@ -203,7 +204,7 @@ void main() {
         return;
     }
     if (fogDebug == 6) {
-        vec3 scatter = texture(froxelVolume, vec3(v_UV, 0.5)).rgb;
+        vec3 scatter = texture(froxelScattering, vec3(v_UV, 0.5)).rgb;
         fragColor = vec4(scatter, 1.0);
         return;
     }
