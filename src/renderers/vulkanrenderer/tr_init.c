@@ -207,11 +207,13 @@ cvar_t	*r_volumetricFogMaxDistance;
 cvar_t	*r_volumetricFogJitter;
 cvar_t	*r_volumetricFogTemporalWeight;
 cvar_t	*r_volumetricFogReprojectionThreshold;
+cvar_t	*r_volumetricFogHistoryVelocityThreshold;
 cvar_t	*r_volumetricFogFireflyClamp;
 cvar_t	*r_volumetricFogColorMode;
 cvar_t	*r_volumetricFogTint;
 cvar_t	*r_volumetricFogIntensity;
 cvar_t	*r_volumetricFogQuality;
+cvar_t	*r_volumetricFogResolutionScale;
 cvar_t	*r_volumetricFogTransmittanceCutoff;
 cvar_t	*r_volumetricFogBaseHeight;
 cvar_t	*r_volumetricFogWorldMin;
@@ -2032,6 +2034,11 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_volumetricFogReprojectionThreshold, "Reject history when reprojection motion exceeds this screen-space threshold." );
 	ri.Cvar_SetGroup( r_volumetricFogReprojectionThreshold, CVG_RENDERER );
 
+	r_volumetricFogHistoryVelocityThreshold = ri.Cvar_Get( "r_volumetricFogHistoryVelocityThreshold", "0.075", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogHistoryVelocityThreshold, "0", "2", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogHistoryVelocityThreshold, "Reject history when per-pixel motion velocity magnitude exceeds this screen-space threshold." );
+	ri.Cvar_SetGroup( r_volumetricFogHistoryVelocityThreshold, CVG_RENDERER );
+
 	r_volumetricFogFireflyClamp = ri.Cvar_Get( "r_volumetricFogFireflyClamp", "8.0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogFireflyClamp, "0", "128", CV_FLOAT );
 	ri.Cvar_SetDescription( r_volumetricFogFireflyClamp, "Optional luminance clamp used to suppress temporal fireflies (0 disables)." );
@@ -2055,6 +2062,11 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_volumetricFogQuality, "0", "3", CV_INTEGER );
 	ri.Cvar_SetDescription( r_volumetricFogQuality, "Volumetric quality tier: 0=low, 1=medium, 2=high, 3=ultra. Requires vid_restart." );
 	ri.Cvar_SetGroup( r_volumetricFogQuality, CVG_RENDERER );
+
+	r_volumetricFogResolutionScale = ri.Cvar_Get( "r_volumetricFogResolutionScale", "1.0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_volumetricFogResolutionScale, "0.25", "1.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogResolutionScale, "Scales volumetric froxel XY resolution before quality tiering (0.25-1.0). Requires vid_restart." );
+	ri.Cvar_SetGroup( r_volumetricFogResolutionScale, CVG_RENDERER );
 
 	r_volumetricFogTransmittanceCutoff = ri.Cvar_Get( "r_volumetricFogTransmittanceCutoff", "0.01", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogTransmittanceCutoff, "0.0001", "1.0", CV_FLOAT );

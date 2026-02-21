@@ -1,0 +1,18 @@
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(binding = 0) uniform sampler2DMS depthMsaaTexture;
+layout(binding = 1, r32f) uniform writeonly image2D resolvedDepthTexture;
+
+void main() {
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 size = imageSize(resolvedDepthTexture);
+    if (pixel.x >= size.x || pixel.y >= size.y) {
+        return;
+    }
+
+    // SAMPLE_ZERO resolve keeps depth semantics stable across normal/reversed depth paths.
+    float depthSample = texelFetch(depthMsaaTexture, pixel, 0).r;
+    imageStore(resolvedDepthTexture, pixel, vec4(depthSample, 0.0, 0.0, 1.0));
+}

@@ -225,4 +225,6 @@ void vk_bind_generated_shaders( void ){
     vk_set_shader_name( vk.modules.volumetric_fog_fs, "volumetric_fog_fs" );
     vk.modules.volumetric_fog_cs = SHADER_MODULE( volumetric_fog_cs );
     vk_set_shader_name( vk.modules.volumetric_fog_cs, "volumetric_fog_cs" );
+    vk.modules.volumetric_depth_resolve_msaa_cs = SHADER_MODULE( volumetric_depth_resolve_msaa_cs );
+    vk_set_shader_name( vk.modules.volumetric_depth_resolve_msaa_cs, "volumetric_depth_resolve_msaa_cs" );
 }
