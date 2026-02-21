@@ -79,6 +79,10 @@ vec3 Tonemap_Reinhard( vec3 x ) {
 	return x / ( x + vec3( 1.0 ) );
 }
 
+vec3 linearToDisplay( vec3 x ) {
+	return pow( max( x, vec3( 0.0 ) ), vec3( max( gamma, 1e-6 ) ) );
+}
+
 vec3 applyBloomKnee( vec3 color ) {
 	float knee = max( bloom_knee, 0.0 );
 	if ( knee <= 0.0 ) {
@@ -221,6 +225,10 @@ void main() {
 		if ( ditherMode == 1 ) {
 			ldr = dither( ldr );
 		}
+	}
+
+	if ( apply_srgb_gamma != 0 ) {
+		ldr = linearToDisplay( ldr );
 	}
 
 	out_color = vec4( ldr, 1.0 );

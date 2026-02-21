@@ -1892,6 +1892,7 @@ static void get_present_format( int present_bits, VkFormat *bgr, VkFormat *rgb )
 	}
 }
 
+static qboolean vk_format_is_srgb( VkFormat format );
 
 static qboolean vk_select_surface_format( VkPhysicalDevice physical_device, VkSurfaceKHR surface )
 {
@@ -1956,6 +1957,10 @@ static qboolean vk_select_surface_format( VkPhysicalDevice physical_device, VkSu
 
 	if ( !r_fbo->integer ) {
 		vk.present_format = vk.base_format;
+	}
+
+	if ( r_vk_swapchain_srgb ) {
+		ri.Cvar_Set( "r_vk_swapchain_srgb", vk_format_is_srgb( vk.present_format.format ) ? "1" : "0" );
 	}
 
 	ri.Free( candidates );
@@ -7369,6 +7374,17 @@ static qboolean vk_surface_format_color_depth( VkFormat format, int *r, int *g, 
 	}
 }
 
+static qboolean vk_format_is_srgb( VkFormat format ) {
+	switch ( format ) {
+		case VK_FORMAT_B8G8R8A8_SRGB:
+		case VK_FORMAT_R8G8B8A8_SRGB:
+		case VK_FORMAT_A8B8G8R8_SRGB_PACK32:
+			return qtrue;
+		default:
+			return qfalse;
+	}
+}
+
 
 void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_t height )
 {
@@ -7390,6 +7406,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	VkShaderModule fsmodule;
 	VkRenderPass renderpass;
 	VkPipelineLayout layout;
+	VkFormat target_format;
 	VkSampleCountFlagBits samples;
 	const char *pipeline_name;
 	qboolean blend;
@@ -7422,6 +7439,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			layout = vk.pipeline_layout_post_process;
 			samples = VK_SAMPLE_COUNT_1_BIT;
 			pipeline_name = "bloom extraction pipeline";
+			target_format = vk.capture_format;
 			blend = qfalse;
 			break;
 		case 5: // ssao
@@ -7431,6 +7449,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			layout = vk.pipeline_layout_ssao;
 			samples = VK_SAMPLE_COUNT_1_BIT;
 			pipeline_name = "ssao pipeline";
+			target_format = vk.capture_format;
 			blend = qfalse;
 			break;
 		case 6: // ssao blur
@@ -7440,6 +7459,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			layout = vk.pipeline_layout_ssao;
 			samples = VK_SAMPLE_COUNT_1_BIT;
 			pipeline_name = "ssao blur pipeline";
+			target_format = vk.capture_format;
 			blend = qfalse;
 			break;
 		case 7: // ssao combine
@@ -7449,6 +7469,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			layout = vk.pipeline_layout_post_process;
 			samples = VK_SAMPLE_COUNT_1_BIT;
 			pipeline_name = "ssao combine pipeline";
+			target_format = vk.capture_format;
 			blend = qfalse;
 			break;
 		case 8: // ssao debug
@@ -7458,6 +7479,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			layout = vk.pipeline_layout_post_process;
 			samples = VK_SAMPLE_COUNT_1_BIT;
 			pipeline_name = "ssao debug pipeline";
+			target_format = vk.capture_format;
 			blend = qfalse;
 			break;
 		case 9: // ssao depth debug
@@ -7467,6 +7489,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			layout = vk.pipeline_layout_post_process;
 			samples = VK_SAMPLE_COUNT_1_BIT;
 			pipeline_name = "ssao depth debug pipeline";
+			target_format = vk.capture_format;
 			blend = qfalse;
 			break;
 		case 2: // final bloom blend
@@ -7476,6 +7499,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			layout = vk.pipeline_layout_blend;
 			samples = vkSamples;
 			pipeline_name = "bloom blend pipeline";
+			target_format = vk.color_format;
 			blend = qtrue;
 			break;
 		case 3: // capture buffer extraction
@@ -7485,6 +7509,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			layout = vk.pipeline_layout_post_process;
 			samples = VK_SAMPLE_COUNT_1_BIT;
 			pipeline_name = "capture buffer pipeline";
+			target_format = vk.capture_format;
 			blend = qfalse;
 			break;
 #ifdef VK_PBR_BRDFLUT
@@ -7495,6 +7520,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
             layout = vk.pipeline_layout_brdflut;
             samples = VK_SAMPLE_COUNT_1_BIT;
             pipeline_name = "brdf LUT pipeline";
+            target_format = vk.capture_format;
             blend = qfalse;
             break;
 #endif
@@ -7505,6 +7531,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			layout = vk.pipeline_layout_post_process;
 			samples = VK_SAMPLE_COUNT_1_BIT;
 			pipeline_name = "gamma-correction pipeline";
+			target_format = vk.present_format.format;
 			blend = qfalse;
 			break;
 	}
@@ -7538,7 +7565,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	frag_spec_data.exposure = r_exposure ? r_exposure->value : 1.0f;
 	frag_spec_data.bloom_knee = r_bloomKnee ? r_bloomKnee->value : 0.5f;
 	frag_spec_data.tonemap_mode = r_tonemap ? r_tonemap->integer : 2;
-	frag_spec_data.apply_srgb_gamma = 0;
+	frag_spec_data.apply_srgb_gamma = vk_format_is_srgb( target_format ) ? 0 : 1;
 	frag_spec_data.post_debug = r_post_debug ? r_post_debug->integer : 0;
 	frag_spec_data.postprocess_enabled = ( r_post && r_post->integer ) ? 1 : 0;
 
