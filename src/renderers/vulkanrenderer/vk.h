@@ -564,14 +564,18 @@ typedef struct {
 #ifdef VK_PBR_BRDFLUT
 	VkPipelineLayout pipeline_layout_brdflut;
 #endif
-	VkDescriptorSetLayout volumetric_compute_layout;
-	VkDescriptorSetLayout volumetric_composite_layout;
-	VkDescriptorSet volumetric_compute_descriptor;
-	VkDescriptorSet volumetric_composite_descriptor;
-	VkPipelineLayout volumetric_compute_pipeline_layout;
-	VkPipelineLayout volumetric_composite_pipeline_layout;
-	VkPipeline volumetric_compute_pipeline;
-	VkPipeline volumetric_composite_pipeline;
+		VkDescriptorSetLayout volumetric_compute_layout;
+		VkDescriptorSetLayout volumetric_composite_layout;
+		VkDescriptorSetLayout volumetric_depth_resolve_layout;
+		VkDescriptorSet volumetric_compute_descriptor;
+		VkDescriptorSet volumetric_composite_descriptor;
+		VkDescriptorSet volumetric_depth_resolve_descriptor;
+		VkPipelineLayout volumetric_compute_pipeline_layout;
+		VkPipelineLayout volumetric_composite_pipeline_layout;
+		VkPipelineLayout volumetric_depth_resolve_pipeline_layout;
+		VkPipeline volumetric_compute_pipeline;
+		VkPipeline volumetric_composite_pipeline;
+		VkPipeline volumetric_depth_resolve_pipeline;
 
 	VkDescriptorSet color_descriptor;
 	VkDescriptorSet depth_descriptor;
@@ -771,6 +775,7 @@ typedef struct {
 		VkShaderModule volumetric_fog_vs;
 		VkShaderModule volumetric_fog_fs;
 		VkShaderModule volumetric_fog_cs;
+		VkShaderModule volumetric_depth_resolve_msaa_cs;
 
 		VkShaderModule dot_fs;
 		VkShaderModule dot_vs;
@@ -880,6 +885,8 @@ typedef struct {
 	VkImage froxel_light_image;
 	VkImageView froxel_light_view;
 	VkDeviceMemory froxel_light_memory;
+	VkImage volumetric_depth_image;
+	VkImageView volumetric_depth_view;
 	VkImage fog_noise_image;
 	VkImageView fog_noise_view;
 	VkDeviceMemory fog_noise_memory;
