@@ -190,6 +190,7 @@ typedef struct {
 typedef enum {
 	RENDER_PASS_MAIN = 0,
 	RENDER_PASS_SCREENMAP,
+	RENDER_PASS_SUN_SHADOW,
 	RENDER_PASS_POST_BLOOM,
 	RENDER_PASS_CUBEMAP,
 	RENDER_PASS_COUNT
@@ -529,6 +530,7 @@ typedef struct {
 	struct {
 		VkRenderPass main;
 		VkRenderPass screenmap;
+		VkRenderPass sun_shadow;
 		VkRenderPass gamma;
 		VkRenderPass capture;
 		VkRenderPass bloom_extract;
@@ -875,6 +877,9 @@ typedef struct {
 	VkImage froxel_history_image;
 	VkImageView froxel_history_view;
 	VkDeviceMemory froxel_history_memory;
+	VkImage froxel_light_image;
+	VkImageView froxel_light_view;
+	VkDeviceMemory froxel_light_memory;
 	VkImage fog_noise_image;
 	VkImageView fog_noise_view;
 	VkDeviceMemory fog_noise_memory;

@@ -203,6 +203,8 @@ uint32_t vk_find_pipeline_ext( uint32_t base, const Vk_Pipeline_Def *def, qboole
 #define VK_FROXEL_DEFAULT_WIDTH 160
 #define VK_FROXEL_DEFAULT_HEIGHT 90
 #define VK_FROXEL_DEFAULT_SLICES 96
+#define VK_VOLUMETRIC_MAX_VOLUMES 24
+#define VK_VOLUMETRIC_MAX_LIGHTS 32
 
 typedef struct {
 	float invProj[16];
@@ -223,6 +225,17 @@ typedef struct {
 	float phaseParams[4];
 	float noiseParams[4];
 	float noiseScroll[4];
+	float temporalParams[4];
+	float qualityParams[4];
+	float windParams[4];
+	float volumeCounts[4];
+	float volumeBoundsMin[VK_VOLUMETRIC_MAX_VOLUMES][4];
+	float volumeBoundsMax[VK_VOLUMETRIC_MAX_VOLUMES][4];
+	float volumeColorDensity[VK_VOLUMETRIC_MAX_VOLUMES][4];
+	float lightPosRadius[VK_VOLUMETRIC_MAX_LIGHTS][4];
+	float lightColorType[VK_VOLUMETRIC_MAX_LIGHTS][4];
+	float lightDirAngle[VK_VOLUMETRIC_MAX_LIGHTS][4];
+	float lightExtra[VK_VOLUMETRIC_MAX_LIGHTS][4];
 	float sunShadowMatrix0[16];
 	float shadowParams0[4];
 	float shadowMapSize0[4];
@@ -248,6 +261,17 @@ VK_VOLUMETRIC_ASSERT_ALIGNED16( sliceParams );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( phaseParams );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( noiseParams );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( noiseScroll );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( temporalParams );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( qualityParams );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( windParams );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( volumeCounts );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( volumeBoundsMin );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( volumeBoundsMax );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( volumeColorDensity );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( lightPosRadius );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( lightColorType );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( lightDirAngle );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( lightExtra );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( sunShadowMatrix0 );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( shadowParams0 );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( shadowMapSize0 );
@@ -265,6 +289,9 @@ static void vk_update_volumetric_params( void );
 static float vk_prev_view_matrix[16];
 static float vk_prev_viewproj_matrix[16];
 static qboolean vk_prev_matrices_valid = qfalse;
+static int vk_prev_volumetric_time_ms = 0;
+static qboolean vk_prev_volumetric_time_valid = qfalse;
+static float vk_volumetric_noise_time = 0.0f;
 
 
 static uint32_t find_memory_type( uint32_t memory_type_bits, VkMemoryPropertyFlags properties ) {
@@ -1387,6 +1414,53 @@ static void vk_create_render_passes( void )
 	VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.screenmap ) );
 
 	SET_OBJECT_NAME( vk.render_pass.screenmap, "render pass - screenmap", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
+
+	// sun shadow (always 1x depth/color so compute sampling is never MSAA)
+	attachments[0].flags = 0;
+	attachments[0].format = vk.color_format;
+	attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+	attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	attachments[0].initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	attachments[1].flags = 0;
+	attachments[1].format = depth_format;
+	attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
+	attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	attachments[1].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+	colorRef0.attachment = 0;
+	colorRef0.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	depthRef0.attachment = 1;
+	depthRef0.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+	Com_Memset( &subpass, 0, sizeof( subpass ) );
+	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass.colorAttachmentCount = 1;
+	subpass.pColorAttachments = &colorRef0;
+	subpass.pDepthStencilAttachment = &depthRef0;
+	subpass.pResolveAttachments = NULL;
+
+	Com_Memset( &desc, 0, sizeof( desc ) );
+	desc.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	desc.pNext = NULL;
+	desc.flags = 0;
+	desc.pAttachments = attachments;
+	desc.attachmentCount = 2;
+	desc.pSubpasses = &subpass;
+	desc.subpassCount = 1;
+	desc.dependencyCount = 2;
+	desc.pDependencies = deps;
+
+	VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.sun_shadow ) );
+	SET_OBJECT_NAME( vk.render_pass.sun_shadow, "render pass - sun shadow", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
 
 #ifdef VK_PBR_BRDFLUT
     if( vk.pbrActive )
@@ -3110,13 +3184,14 @@ static void vk_update_volumetric_descriptors( void )
 	params_buffer.range = sizeof( volumetric_params_t );
 
 	if ( vk.volumetric_compute_descriptor != VK_NULL_HANDLE &&
-		vk.froxel_volume_view && vk.froxel_history_view && vk.depth_image_view && vk.fog_noise_view && vk.sun_shadow_view )
+		vk.froxel_volume_view && vk.froxel_history_view && vk.froxel_light_view &&
+		vk.depth_image_view && vk.fog_noise_view && vk.sun_shadow_view )
 	{
-		VkDescriptorImageInfo storage_info[2];
+		VkDescriptorImageInfo storage_info[3];
 		VkDescriptorImageInfo depth_info;
 		VkDescriptorImageInfo noise_info;
 		VkDescriptorImageInfo shadow_info;
-		VkWriteDescriptorSet writes[6];
+		VkWriteDescriptorSet writes[7];
 		Vk_Sampler_Def depth_sd;
 		Vk_Sampler_Def noise_sd;
 		Vk_Sampler_Def shadow_sd;
@@ -3126,6 +3201,8 @@ static void vk_update_volumetric_descriptors( void )
 		storage_info[0].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 		storage_info[1].imageView = vk.froxel_history_view;
 		storage_info[1].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+		storage_info[2].imageView = vk.froxel_light_view;
+		storage_info[2].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
 		Com_Memset( &depth_sd, 0, sizeof( depth_sd ) );
 		depth_sd.gl_mag_filter = depth_sd.gl_min_filter = GL_NEAREST;
@@ -3197,6 +3274,13 @@ static void vk_update_volumetric_descriptors( void )
 		writes[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		writes[5].pImageInfo = &shadow_info;
 
+		writes[6].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[6].dstSet = vk.volumetric_compute_descriptor;
+		writes[6].dstBinding = 6;
+		writes[6].descriptorCount = 1;
+		writes[6].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		writes[6].pImageInfo = &storage_info[2];
+
 		qvkUpdateDescriptorSets( vk.device, ARRAY_LEN( writes ), writes, 0, NULL );
 	}
 
@@ -3258,7 +3342,7 @@ static void vk_update_volumetric_descriptors( void )
 
 	if ( r_fogDebug && r_fogDebug->integer >= 1 && ( vk.volumetric_frame % 120u ) == 0u ) {
 		ri.Printf( PRINT_ALL,
-			"[VK][fog] descriptors computeSet=0x%llx storageLayout=GENERAL historyLayout=GENERAL noiseView=0x%llx shadowView=0x%llx compositeSet=0x%llx sceneView=0x%llx sampleLayout=SHADER_READ_ONLY_OPTIMAL\n",
+			"[VK][fog] descriptors computeSet=0x%llx storageLayout=GENERAL historyLayout=GENERAL lightLayout=GENERAL noiseView=0x%llx shadowView=0x%llx compositeSet=0x%llx sceneView=0x%llx sampleLayout=SHADER_READ_ONLY_OPTIMAL\n",
 			(unsigned long long)(uintptr_t)vk.volumetric_compute_descriptor,
 			(unsigned long long)(uintptr_t)vk.fog_noise_view,
 			(unsigned long long)(uintptr_t)vk.sun_shadow_view,
@@ -4518,8 +4602,12 @@ static void vk_create_attachments( void )
 	SET_OBJECT_NAME( vk.sun_shadow_view, "sun shadow depth view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 	SET_OBJECT_NAME( vk.sun_shadow_color_image, "sun shadow color", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
 	SET_OBJECT_NAME( vk.sun_shadow_color_view, "sun shadow color view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
-	SET_OBJECT_NAME( vk.sun_shadow_color_msaa_image, "sun shadow color msaa", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
-	SET_OBJECT_NAME( vk.sun_shadow_color_msaa_view, "sun shadow color msaa view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+	if ( vk.sun_shadow_color_msaa_image ) {
+		SET_OBJECT_NAME( vk.sun_shadow_color_msaa_image, "sun shadow color msaa", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+	}
+	if ( vk.sun_shadow_color_msaa_view ) {
+		SET_OBJECT_NAME( vk.sun_shadow_color_msaa_view, "sun shadow color msaa view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+	}
 
 	SET_OBJECT_NAME( vk.capture.image, "capture image", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 	SET_OBJECT_NAME( vk.capture.image_view, "capture image view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
@@ -4649,18 +4737,14 @@ static void vk_create_framebuffers( void )
 		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.screenmap ) );
 		SET_OBJECT_NAME( vk.framebuffers.screenmap, "framebuffer - screenmap", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
 
-		// sun shadow map framebuffer (single cascade, screenmap-compatible render pass)
+		// sun shadow map framebuffer (single-cascade, resolved depth path)
 		if ( vk.sun_shadow_image != VK_NULL_HANDLE && vk.sun_shadow_color_image != VK_NULL_HANDLE ) {
-			desc.renderPass = vk.render_pass.screenmap;
+			desc.renderPass = vk.render_pass.sun_shadow;
 			desc.attachmentCount = 2;
 			desc.width = vk.sun_shadow_width;
 			desc.height = vk.sun_shadow_height;
 			framebuffer_attachments[0] = vk.sun_shadow_color_view;
 			framebuffer_attachments[1] = vk.sun_shadow_view;
-			if ( vk.screenMapSamples > VK_SAMPLE_COUNT_1_BIT ) {
-				desc.attachmentCount = 3;
-				framebuffer_attachments[2] = vk.sun_shadow_color_msaa_view;
-			}
 			VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.sun_shadow ) );
 			SET_OBJECT_NAME( vk.framebuffers.sun_shadow, "framebuffer - sun shadow", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
 		}
@@ -5500,7 +5584,7 @@ void vk_initialize( void )
 		pool_size[2].descriptorCount = 1;
 
 		pool_size[3].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-		pool_size[3].descriptorCount = 2;
+		pool_size[3].descriptorCount = 3;
 
 		pool_size[4].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		pool_size[4].descriptorCount = 2;
@@ -5528,7 +5612,7 @@ void vk_initialize( void )
 	//vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_SHADER_STAGE_FRAGMENT_BIT, &vk.set_layout_input );
 
 	{
-		VkDescriptorSetLayoutBinding compute_bindings[6];
+		VkDescriptorSetLayoutBinding compute_bindings[7];
 		VkDescriptorSetLayoutCreateInfo compute_layout_desc;
 
 		compute_bindings[0].binding = 0;
@@ -5566,6 +5650,12 @@ void vk_initialize( void )
 		compute_bindings[5].descriptorCount = 1;
 		compute_bindings[5].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 		compute_bindings[5].pImmutableSamplers = NULL;
+
+		compute_bindings[6].binding = 6;
+		compute_bindings[6].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		compute_bindings[6].descriptorCount = 1;
+		compute_bindings[6].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		compute_bindings[6].pImmutableSamplers = NULL;
 
 		compute_layout_desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 		compute_layout_desc.pNext = NULL;
@@ -6352,7 +6442,7 @@ static void vk_create_sun_shadow_resources( void )
 	image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
 	image_info.format = vk.depth_format;
-	image_info.samples = vk.screenMapSamples;
+	image_info.samples = VK_SAMPLE_COUNT_1_BIT;
 	image_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 	VK_CHECK( qvkCreateImage( vk.device, &image_info, NULL, &vk.sun_shadow_image ) );
 
@@ -6375,18 +6465,6 @@ static void vk_create_sun_shadow_resources( void )
 	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.sun_shadow_color_memory ) );
 	VK_CHECK( qvkBindImageMemory( vk.device, vk.sun_shadow_color_image, vk.sun_shadow_color_memory, 0 ) );
 
-	if ( vk.screenMapSamples > VK_SAMPLE_COUNT_1_BIT ) {
-		image_info.samples = vk.screenMapSamples;
-		image_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-		VK_CHECK( qvkCreateImage( vk.device, &image_info, NULL, &vk.sun_shadow_color_msaa_image ) );
-
-		qvkGetImageMemoryRequirements( vk.device, vk.sun_shadow_color_msaa_image, &mem_req );
-		alloc_info.allocationSize = mem_req.size;
-		alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
-		VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.sun_shadow_color_msaa_memory ) );
-		VK_CHECK( qvkBindImageMemory( vk.device, vk.sun_shadow_color_msaa_image, vk.sun_shadow_color_msaa_memory, 0 ) );
-	}
-
 	Com_Memset( &view_info, 0, sizeof( view_info ) );
 	view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 	view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
@@ -6405,26 +6483,19 @@ static void vk_create_sun_shadow_resources( void )
 	view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	VK_CHECK( qvkCreateImageView( vk.device, &view_info, NULL, &vk.sun_shadow_color_view ) );
 
-	if ( vk.screenMapSamples > VK_SAMPLE_COUNT_1_BIT ) {
-		view_info.image = vk.sun_shadow_color_msaa_image;
-		view_info.format = vk.color_format;
-		view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		VK_CHECK( qvkCreateImageView( vk.device, &view_info, NULL, &vk.sun_shadow_color_msaa_view ) );
-	}
-
 	cmd = begin_command_buffer();
 	record_image_layout_transition( cmd, vk.sun_shadow_color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
 	record_image_layout_transition( cmd, vk.sun_shadow_image, depth_aspect,
 		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
-	if ( vk.sun_shadow_color_msaa_image ) {
-		record_image_layout_transition( cmd, vk.sun_shadow_color_msaa_image, VK_IMAGE_ASPECT_COLOR_BIT,
-			VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT );
-	}
 	end_command_buffer( cmd, __func__ );
 
+	vk.sun_shadow_color_msaa_image = VK_NULL_HANDLE;
+	vk.sun_shadow_color_msaa_view = VK_NULL_HANDLE;
+	vk.sun_shadow_color_msaa_memory = VK_NULL_HANDLE;
+
 	if ( r_fogDebug && r_fogDebug->integer >= 1 ) {
-		ri.Printf( PRINT_ALL, "[VK][fog] sun shadow resources created %ux%u samples=%u\n",
+		ri.Printf( PRINT_ALL, "[VK][fog] sun shadow resources created %ux%u (resolved depth path, screenMapSamples=%u)\n",
 			vk.sun_shadow_width, vk.sun_shadow_height, vk.screenMapSamples );
 	}
 }
@@ -6456,6 +6527,18 @@ static void vk_destroy_froxel_images( void )
 		qvkFreeMemory( vk.device, vk.froxel_history_memory, NULL );
 		vk.froxel_history_memory = VK_NULL_HANDLE;
 	}
+	if ( vk.froxel_light_image ) {
+		qvkDestroyImage( vk.device, vk.froxel_light_image, NULL );
+		vk.froxel_light_image = VK_NULL_HANDLE;
+	}
+	if ( vk.froxel_light_view ) {
+		qvkDestroyImageView( vk.device, vk.froxel_light_view, NULL );
+		vk.froxel_light_view = VK_NULL_HANDLE;
+	}
+	if ( vk.froxel_light_memory ) {
+		qvkFreeMemory( vk.device, vk.froxel_light_memory, NULL );
+		vk.froxel_light_memory = VK_NULL_HANDLE;
+	}
 	if ( vk.fog_noise_sampler ) {
 		vk.fog_noise_sampler = VK_NULL_HANDLE;
 	}
@@ -6482,6 +6565,7 @@ static void vk_create_froxel_images( void )
 	int grid_x = VK_FROXEL_DEFAULT_WIDTH;
 	int grid_y = VK_FROXEL_DEFAULT_HEIGHT;
 	int grid_z = VK_FROXEL_DEFAULT_SLICES;
+	int quality = ( r_volumetricFogQuality ) ? r_volumetricFogQuality->integer : 2;
 
 	if ( !glConfig.vidWidth || !glConfig.vidHeight ) {
 		return;
@@ -6504,6 +6588,30 @@ static void vk_create_froxel_images( void )
 	if ( grid_z < 1 ) grid_z = 1;
 	if ( grid_z > 256 ) grid_z = 256;
 
+	if ( quality < 0 ) {
+		quality = 0;
+	} else if ( quality > 3 ) {
+		quality = 3;
+	}
+
+	switch ( quality ) {
+		case 0:
+			grid_x = MAX( 1, grid_x / 2 );
+			grid_y = MAX( 1, grid_y / 2 );
+			grid_z = MAX( 1, grid_z / 2 );
+			break;
+		case 1:
+			grid_x = MAX( 1, ( grid_x * 3 ) / 4 );
+			grid_y = MAX( 1, ( grid_y * 3 ) / 4 );
+			grid_z = MAX( 1, ( grid_z * 3 ) / 4 );
+			break;
+		case 3:
+			grid_z = MIN( 256, MAX( 1, ( grid_z * 5 ) / 4 ) );
+			break;
+		default:
+			break;
+	}
+
 	vk.froxel_width = (uint32_t)grid_x;
 	vk.froxel_height = (uint32_t)grid_y;
 	vk.froxel_slices = (uint32_t)grid_z;
@@ -6515,8 +6623,8 @@ static void vk_create_froxel_images( void )
 	}
 
 	if ( r_fogDebug && r_fogDebug->integer >= 1 ) {
-		ri.Printf( PRINT_ALL, "[VK][fog] froxel create/resize %ux%ux%u (screen %dx%d)\n",
-			vk.froxel_width, vk.froxel_height, vk.froxel_slices, glConfig.vidWidth, glConfig.vidHeight );
+		ri.Printf( PRINT_ALL, "[VK][fog] froxel create/resize %ux%ux%u quality=%d (screen %dx%d)\n",
+			vk.froxel_width, vk.froxel_height, vk.froxel_slices, quality, glConfig.vidWidth, glConfig.vidHeight );
 	}
 
 	VkImageCreateInfo create_info;
@@ -6560,6 +6668,14 @@ static void vk_create_froxel_images( void )
 	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.froxel_history_memory ) );
 	VK_CHECK( qvkBindImageMemory( vk.device, vk.froxel_history_image, vk.froxel_history_memory, 0 ) );
 
+	VK_CHECK( qvkCreateImage( vk.device, &create_info, NULL, &vk.froxel_light_image ) );
+
+	qvkGetImageMemoryRequirements( vk.device, vk.froxel_light_image, &mem_req );
+	alloc_info.allocationSize = mem_req.size;
+	alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.froxel_light_memory ) );
+	VK_CHECK( qvkBindImageMemory( vk.device, vk.froxel_light_image, vk.froxel_light_memory, 0 ) );
+
 	VkImageViewCreateInfo view_info;
 	Com_Memset( &view_info, 0, sizeof( view_info ) );
 	view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -6583,9 +6699,13 @@ static void vk_create_froxel_images( void )
 	view_info.image = vk.froxel_history_image;
 	VK_CHECK( qvkCreateImageView( vk.device, &view_info, NULL, &vk.froxel_history_view ) );
 
+	view_info.image = vk.froxel_light_image;
+	VK_CHECK( qvkCreateImageView( vk.device, &view_info, NULL, &vk.froxel_light_view ) );
+
 	VkCommandBuffer command_buffer = begin_command_buffer();
 	record_image_layout_transition( command_buffer, vk.froxel_volume_image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
 	record_image_layout_transition( command_buffer, vk.froxel_history_image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, 0 );
+	record_image_layout_transition( command_buffer, vk.froxel_light_image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, 0 );
 	end_command_buffer( command_buffer, __func__ );
 
 	vk_create_fog_noise_texture();
@@ -6788,6 +6908,11 @@ static void vk_destroy_render_passes( void )
 	if ( vk.render_pass.screenmap != VK_NULL_HANDLE ) {
 		qvkDestroyRenderPass( vk.device, vk.render_pass.screenmap, NULL );
 		vk.render_pass.screenmap = VK_NULL_HANDLE;
+	}
+
+	if ( vk.render_pass.sun_shadow != VK_NULL_HANDLE ) {
+		qvkDestroyRenderPass( vk.device, vk.render_pass.sun_shadow, NULL );
+		vk.render_pass.sun_shadow = VK_NULL_HANDLE;
 	}
 
 	if ( vk.render_pass.gamma != VK_NULL_HANDLE ) {
@@ -9363,7 +9488,13 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	multisample_state.pNext = NULL;
 	multisample_state.flags = 0;
 
-	multisample_state.rasterizationSamples = (renderPassIndex == RENDER_PASS_SCREENMAP) ? vk.screenMapSamples : (VkSampleCountFlagBits)vkSamples;
+	if ( renderPassIndex == RENDER_PASS_SCREENMAP ) {
+		multisample_state.rasterizationSamples = vk.screenMapSamples;
+	} else if ( renderPassIndex == RENDER_PASS_SUN_SHADOW ) {
+		multisample_state.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+	} else {
+		multisample_state.rasterizationSamples = (VkSampleCountFlagBits)vkSamples;
+	}
 
 	multisample_state.sampleShadingEnable = VK_FALSE;
 	multisample_state.minSampleShading = 1.0f;
@@ -9559,6 +9690,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 
 	if ( renderPassIndex == RENDER_PASS_SCREENMAP )
 		create_info.renderPass = vk.render_pass.screenmap;
+	else if ( renderPassIndex == RENDER_PASS_SUN_SHADOW )
+		create_info.renderPass = vk.render_pass.sun_shadow;
 	else
 		create_info.renderPass = vk.render_pass.main;
 
@@ -10477,7 +10610,7 @@ qboolean vk_begin_sun_shadow_render_pass( void )
 {
 	VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
 
-	if ( !vk.fboActive || vk.render_pass.screenmap == VK_NULL_HANDLE || vk.framebuffers.sun_shadow == VK_NULL_HANDLE ||
+	if ( !vk.fboActive || vk.render_pass.sun_shadow == VK_NULL_HANDLE || vk.framebuffers.sun_shadow == VK_NULL_HANDLE ||
 		vk.sun_shadow_image == VK_NULL_HANDLE || vk.sun_shadow_width == 0 || vk.sun_shadow_height == 0 )
 	{
 		return qfalse;
@@ -10495,11 +10628,11 @@ qboolean vk_begin_sun_shadow_render_pass( void )
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 		VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT );
 
-	vk.renderPassIndex = RENDER_PASS_SCREENMAP;
+	vk.renderPassIndex = RENDER_PASS_SUN_SHADOW;
 	vk.renderWidth = vk.sun_shadow_width;
 	vk.renderHeight = vk.sun_shadow_height;
 	vk.renderScaleX = vk.renderScaleY = 1.0f;
-	vk_begin_render_pass( vk.render_pass.screenmap, vk.framebuffers.sun_shadow, qtrue, vk.renderWidth, vk.renderHeight );
+	vk_begin_render_pass( vk.render_pass.sun_shadow, vk.framebuffers.sun_shadow, qtrue, vk.renderWidth, vk.renderHeight );
 
 	if ( r_fogDebug && r_fogDebug->integer >= 1 && ( vk.volumetric_frame % 120u ) == 0u ) {
 		ri.Printf( PRINT_ALL, "[VK][fog] sun shadow pass begin %ux%u image=0x%llx\n",
@@ -10723,6 +10856,8 @@ static void vk_volumetric_fog_pass( void )
 		vk.has_prev_volumetric = qfalse;
 		vk.volumetric_frame = 0;
 		vk_prev_matrices_valid = qfalse;
+		vk_prev_volumetric_time_valid = qfalse;
+		vk_volumetric_noise_time = 0.0f;
 		return;
 	}
 	if ( vk.froxel_volume_image == VK_NULL_HANDLE || vk.froxel_history_image == VK_NULL_HANDLE ||
@@ -10736,6 +10871,7 @@ static void vk_volumetric_fog_pass( void )
 		}
 		vk.has_prev_volumetric = qfalse;
 		vk_prev_matrices_valid = qfalse;
+		vk_prev_volumetric_time_valid = qfalse;
 		return;
 	}
 
@@ -11744,6 +11880,8 @@ static void vk_destroy_volumetric_params_buffer( void )
 	vk.volumetric_frame = 0;
 	vk.has_prev_volumetric = qfalse;
 	vk_prev_matrices_valid = qfalse;
+	vk_prev_volumetric_time_valid = qfalse;
+	vk_volumetric_noise_time = 0.0f;
 }
 
 static void vk_create_volumetric_params_buffer( void )
@@ -11783,6 +11921,8 @@ static void vk_create_volumetric_params_buffer( void )
 	VK_CHECK( qvkMapMemory( vk.device, vk.volumetric_params_memory, 0, vk.volumetric_params_buffer_size, 0, &vk.volumetric_params_ptr ) );
 	vk.volumetric_frame = 0;
 	vk.has_prev_volumetric = qfalse;
+	vk_prev_volumetric_time_valid = qfalse;
+	vk_volumetric_noise_time = 0.0f;
 }
 
 static qboolean vk_parse_rgb_string( const char *s, vec3_t out )
@@ -11936,6 +12076,19 @@ static void vk_get_volumetric_fog_color( vec4_t out )
 	}
 }
 
+static float vk_matrix_max_abs_diff( const float *a, const float *b )
+{
+	float max_diff = 0.0f;
+
+	for ( int i = 0; i < 16; i++ ) {
+		const float d = fabsf( a[i] - b[i] );
+		if ( d > max_diff ) {
+			max_diff = d;
+		}
+	}
+	return max_diff;
+}
+
 static void vk_update_volumetric_params( void )
 {
 	if ( !vk.volumetric_params_ptr ) {
@@ -11947,8 +12100,12 @@ static void vk_update_volumetric_params( void )
 
 	const float *projection = backEnd.viewParms.projectionMatrix;
 	const float *view = backEnd.viewParms.world.modelViewMatrix;
+	const int now_ms = backEnd.refdef.time;
 	int depth_mode = r_volumetricFogDepthMode ? r_volumetricFogDepthMode->integer : 1;
 	int fog_steps = r_volumetricFogSteps ? r_volumetricFogSteps->integer : 32;
+	int quality = r_volumetricFogQuality ? r_volumetricFogQuality->integer : 2;
+	int local_light_count = 0;
+	int local_volume_count = 0;
 	float temporal_weight = r_volumetricFogTemporalWeight ? r_volumetricFogTemporalWeight->value : 0.0f;
 	float jitter_amount = r_volumetricFogJitter ? r_volumetricFogJitter->value : 0.0f;
 	float sun_intensity = r_volumetricFogSunIntensity ? r_volumetricFogSunIntensity->value : 1.0f;
@@ -11961,9 +12118,30 @@ static void vk_update_volumetric_params( void )
 	float height_falloff = r_volumetricFogHeightFalloff ? r_volumetricFogHeightFalloff->value : 0.0f;
 	float near_plane = ( r_znear ) ? r_znear->value : 4.0f;
 	float far_plane = backEnd.viewParms.zFar;
+	float z_exponent = ( r_volumetricFogZExponent ) ? r_volumetricFogZExponent->value : 1.5f;
+	float max_distance = ( r_volumetricFogMaxDistance ) ? r_volumetricFogMaxDistance->value : 4096.0f;
+	float reprojection_threshold = ( r_volumetricFogReprojectionThreshold ) ? r_volumetricFogReprojectionThreshold->value : 0.075f;
+	float firefly_clamp = ( r_volumetricFogFireflyClamp ) ? r_volumetricFogFireflyClamp->value : 8.0f;
+	float transmittance_cutoff = ( r_volumetricFogTransmittanceCutoff ) ? r_volumetricFogTransmittanceCutoff->value : 0.01f;
+	float wind_speed = ( r_volumetricFogWindSpeed ) ? r_volumetricFogWindSpeed->value : 1.0f;
+	float delta_time = 1.0f / 60.0f;
+	qboolean camera_cut = qfalse;
 	vec3_t fog_min = { -2048.0f, -2048.0f, -256.0f };
 	vec3_t fog_max = {  2048.0f,  2048.0f, 1024.0f };
 	vec3_t noise_scroll = { 0.03f, 0.01f, 0.02f };
+	vec3_t wind_dir = { 1.0f, 0.0f, 0.0f };
+	vec3_t motion_dir = { 1.0f, 0.0f, 0.0f };
+
+	if ( vk_prev_volumetric_time_valid ) {
+		int dt = now_ms - vk_prev_volumetric_time_ms;
+		if ( dt < 0 || dt > 1000 ) {
+			dt = 16;
+		}
+		delta_time = (float)dt * 0.001f;
+	}
+	vk_prev_volumetric_time_ms = now_ms;
+	vk_prev_volumetric_time_valid = qtrue;
+	vk_volumetric_noise_time += delta_time;
 
 	if ( !Mat4Inverse( projection, params.invProj ) ) {
 		Com_Memcpy( params.invProj, projection, sizeof( params.invProj ) );
@@ -11974,6 +12152,16 @@ static void vk_update_volumetric_params( void )
 	Com_Memcpy( params.proj, projection, sizeof( params.proj ) );
 	myGlMultMatrix( view, projection, params.viewProj );
 	if ( vk_prev_matrices_valid ) {
+		const float view_delta = vk_matrix_max_abs_diff( view, vk_prev_view_matrix );
+		const float view_proj_delta = vk_matrix_max_abs_diff( params.viewProj, vk_prev_viewproj_matrix );
+		if ( view_delta > 0.25f || view_proj_delta > 0.35f || backEnd.viewParms.portalView != PV_NONE ) {
+			camera_cut = qtrue;
+		}
+	}
+	if ( camera_cut ) {
+		vk.has_prev_volumetric = qfalse;
+	}
+	if ( vk_prev_matrices_valid && !camera_cut ) {
 		Com_Memcpy( params.prevView, vk_prev_view_matrix, sizeof( params.prevView ) );
 		Com_Memcpy( params.prevViewProj, vk_prev_viewproj_matrix, sizeof( params.prevViewProj ) );
 	} else {
@@ -12009,6 +12197,9 @@ static void vk_update_volumetric_params( void )
 	if ( r_volumetricFogNoiseScroll && r_volumetricFogNoiseScroll->string ) {
 		vk_parse_rgb_string( r_volumetricFogNoiseScroll->string, noise_scroll );
 	}
+	if ( r_volumetricFogWindDirection && r_volumetricFogWindDirection->string ) {
+		vk_parse_rgb_string( r_volumetricFogWindDirection->string, wind_dir );
+	}
 
 	params.worldMin[0] = fog_min[0];
 	params.worldMin[1] = fog_min[1];
@@ -12032,21 +12223,26 @@ static void vk_update_volumetric_params( void )
 	params.noiseParams[0] = noise_scale;
 	params.noiseParams[1] = noise_threshold;
 	params.noiseParams[2] = noise_strength;
-	params.noiseParams[3] = 1.0f / 60.0f;
-	params.noiseScroll[0] = noise_scroll[0];
-	params.noiseScroll[1] = noise_scroll[1];
-	params.noiseScroll[2] = noise_scroll[2];
+	params.noiseParams[3] = 1.0f;
+	params.noiseScroll[0] = 0.0f;
+	params.noiseScroll[1] = 0.0f;
+	params.noiseScroll[2] = 0.0f;
 	params.noiseScroll[3] = 0.0f;
 
 	if ( fog_steps < 1 ) {
 		fog_steps = 1;
-	} else if ( fog_steps > 128 ) {
-		fog_steps = 128;
+	} else if ( fog_steps > 256 ) {
+		fog_steps = 256;
 	}
 	if ( depth_mode < 0 ) {
 		depth_mode = 0;
 	} else if ( depth_mode > 2 ) {
 		depth_mode = 2;
+	}
+	if ( quality < 0 ) {
+		quality = 0;
+	} else if ( quality > 3 ) {
+		quality = 3;
 	}
 	if ( g_aniso < -0.999f ) {
 		params.phaseParams[0] = -0.999f;
@@ -12080,6 +12276,30 @@ static void vk_update_volumetric_params( void )
 	} else if ( noise_strength > 1.0f ) {
 		noise_strength = 1.0f;
 	}
+	if ( z_exponent < 1.0f ) {
+		z_exponent = 1.0f;
+	}
+	if ( max_distance < near_plane + 1.0f ) {
+		max_distance = near_plane + 1.0f;
+	}
+	if ( reprojection_threshold < 0.0f ) {
+		reprojection_threshold = 0.0f;
+	}
+	if ( firefly_clamp < 0.0f ) {
+		firefly_clamp = 0.0f;
+	}
+	if ( transmittance_cutoff < 0.0001f ) {
+		transmittance_cutoff = 0.0001f;
+	} else if ( transmittance_cutoff > 1.0f ) {
+		transmittance_cutoff = 1.0f;
+	}
+	if ( wind_speed < 0.0f ) {
+		wind_speed = 0.0f;
+	}
+	if ( VectorLengthSquared( wind_dir ) < 1e-6f ) {
+		VectorSet( wind_dir, 1.0f, 0.0f, 0.0f );
+	}
+	VectorNormalize2( wind_dir, motion_dir );
 
 	params.densityParams[0] = fog_density;
 	params.densityParams[1] = height_falloff;
@@ -12089,20 +12309,132 @@ static void vk_update_volumetric_params( void )
 	params.miscParams[0] = (float)fog_steps;
 	params.miscParams[1] = (float)depth_mode;
 	params.miscParams[2] = (float)vk.volumetric_frame;
-	params.miscParams[3] = ( vk.has_prev_volumetric && temporal_weight > 0.0f ) ? 1.0f : 0.0f;
+	params.miscParams[3] = ( vk.has_prev_volumetric && temporal_weight > 0.0f && !camera_cut ) ? 1.0f : 0.0f;
 	if ( near_plane < 0.001f ) {
 		near_plane = 0.001f;
+	}
+	if ( far_plane > max_distance ) {
+		far_plane = max_distance;
 	}
 	if ( far_plane <= near_plane + 1.0f ) {
 		far_plane = near_plane + 1.0f;
 	}
 	params.sliceParams[0] = near_plane;
 	params.sliceParams[1] = far_plane;
-	params.sliceParams[2] = logf( far_plane / near_plane );
-	params.sliceParams[3] = 1.0f / MAX( params.gridDim[2], 1.0f );
+	params.sliceParams[2] = z_exponent;
+	params.sliceParams[3] = max_distance;
 	params.noiseParams[0] = noise_scale;
 	params.noiseParams[1] = noise_threshold;
 	params.noiseParams[2] = noise_strength;
+	params.temporalParams[0] = reprojection_threshold;
+	params.temporalParams[1] = 0.04f;
+	params.temporalParams[2] = firefly_clamp;
+	params.temporalParams[3] = camera_cut ? 1.0f : 0.0f;
+	params.qualityParams[0] = (float)quality;
+	params.qualityParams[1] = ( quality <= 1 ) ? 1.0f : 0.0f;
+	params.qualityParams[2] = ( quality == 0 ) ? 0.65f : ( ( quality == 1 ) ? 0.8f : 0.9f );
+	params.qualityParams[3] = transmittance_cutoff;
+	params.windParams[0] = vk_volumetric_noise_time;
+	params.windParams[1] = delta_time;
+	params.windParams[2] = wind_speed;
+	params.windParams[3] = camera_cut ? 1.0f : 0.0f;
+	params.noiseScroll[0] = noise_scroll[0] + motion_dir[0];
+	params.noiseScroll[1] = noise_scroll[1] + motion_dir[1];
+	params.noiseScroll[2] = noise_scroll[2] + motion_dir[2];
+
+	if ( tr.world && tr.world->fogs && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+		for ( int i = 1; i < tr.world->numfogs && local_volume_count < VK_VOLUMETRIC_MAX_VOLUMES; i++ ) {
+			const fog_t *fog = &tr.world->fogs[i];
+			const float extent_x = fog->bounds[1][0] - fog->bounds[0][0];
+			const float extent_y = fog->bounds[1][1] - fog->bounds[0][1];
+			const float extent_z = fog->bounds[1][2] - fog->bounds[0][2];
+			float local_density = fog_density;
+
+			if ( extent_x <= 0.001f || extent_y <= 0.001f || extent_z <= 0.001f ) {
+				continue;
+			}
+
+			if ( fog->parms.depthForOpaque > 0.001f ) {
+				local_density *= ( 1.0f / fog->parms.depthForOpaque );
+			}
+			if ( local_density < 0.0f ) {
+				local_density = 0.0f;
+			}
+
+			params.volumeBoundsMin[local_volume_count][0] = fog->bounds[0][0];
+			params.volumeBoundsMin[local_volume_count][1] = fog->bounds[0][1];
+			params.volumeBoundsMin[local_volume_count][2] = fog->bounds[0][2];
+			params.volumeBoundsMin[local_volume_count][3] = 0.0f;
+
+			params.volumeBoundsMax[local_volume_count][0] = fog->bounds[1][0];
+			params.volumeBoundsMax[local_volume_count][1] = fog->bounds[1][1];
+			params.volumeBoundsMax[local_volume_count][2] = fog->bounds[1][2];
+			params.volumeBoundsMax[local_volume_count][3] = 0.0f;
+
+			params.volumeColorDensity[local_volume_count][0] = fog->color[0];
+			params.volumeColorDensity[local_volume_count][1] = fog->color[1];
+			params.volumeColorDensity[local_volume_count][2] = fog->color[2];
+			params.volumeColorDensity[local_volume_count][3] = local_density;
+			local_volume_count++;
+		}
+	}
+
+	for ( int i = 0; i < (int)backEnd.viewParms.num_dlights && local_light_count < VK_VOLUMETRIC_MAX_LIGHTS; i++ ) {
+		const dlight_t *dl = &backEnd.viewParms.dlights[i];
+		float radius = dl->radius;
+
+		if ( radius <= 0.001f ) {
+			continue;
+		}
+
+		params.lightPosRadius[local_light_count][0] = dl->origin[0];
+		params.lightPosRadius[local_light_count][1] = dl->origin[1];
+		params.lightPosRadius[local_light_count][2] = dl->origin[2];
+		params.lightPosRadius[local_light_count][3] = radius;
+
+		params.lightColorType[local_light_count][0] = MAX( dl->color[0], 0.0f );
+		params.lightColorType[local_light_count][1] = MAX( dl->color[1], 0.0f );
+		params.lightColorType[local_light_count][2] = MAX( dl->color[2], 0.0f );
+		params.lightColorType[local_light_count][3] = dl->linear ? 1.0f : 0.0f;
+
+		if ( dl->linear ) {
+			vec3_t dir;
+			float len;
+
+			VectorSubtract( dl->origin2, dl->origin, dir );
+			len = VectorNormalize( dir );
+			if ( len <= 0.001f ) {
+				VectorSet( dir, 0.0f, 0.0f, -1.0f );
+				len = radius;
+			}
+
+			params.lightDirAngle[local_light_count][0] = dir[0];
+			params.lightDirAngle[local_light_count][1] = dir[1];
+			params.lightDirAngle[local_light_count][2] = dir[2];
+			params.lightDirAngle[local_light_count][3] = cosf( DEG2RAD( 35.0f ) );
+
+			params.lightExtra[local_light_count][0] = cosf( DEG2RAD( 20.0f ) );
+			params.lightExtra[local_light_count][1] = len;
+			params.lightExtra[local_light_count][2] = 0.0f;
+			params.lightExtra[local_light_count][3] = 0.0f;
+		} else {
+			params.lightDirAngle[local_light_count][0] = 0.0f;
+			params.lightDirAngle[local_light_count][1] = 0.0f;
+			params.lightDirAngle[local_light_count][2] = 0.0f;
+			params.lightDirAngle[local_light_count][3] = -1.0f;
+			params.lightExtra[local_light_count][0] = -1.0f;
+			params.lightExtra[local_light_count][1] = radius;
+			params.lightExtra[local_light_count][2] = 0.0f;
+			params.lightExtra[local_light_count][3] = 0.0f;
+		}
+
+		local_light_count++;
+	}
+	params.volumeCounts[0] = (float)local_volume_count;
+	params.volumeCounts[1] = (float)local_light_count;
+	params.volumeCounts[2] = vk.sun_shadow_valid ? 1.0f : 0.0f;
+	params.volumeCounts[3] = 0.0f;
+
 	Matrix16Identity( params.sunShadowMatrix0 );
 	if ( vk.sun_shadow_valid ) {
 		Com_Memcpy( params.sunShadowMatrix0, vk.sun_shadow_matrix0, sizeof( params.sunShadowMatrix0 ) );
@@ -12124,7 +12456,7 @@ static void vk_update_volumetric_params( void )
 
 	if ( r_fogDebug && r_fogDebug->integer > 0 && ( vk.volumetric_frame % 120u ) == 0u ) {
 		ri.Printf( PRINT_ALL,
-			"[VK][fog] params grid=(%.0f %.0f %.0f %.0f) phase=(%.3f %.3f %.3f %.0f) misc=(%.0f %.0f %.0f %.0f) density=(%.5f %.5f %.5f %.5f) fogColor=(%.3f %.3f %.3f %.3f) worldMin=(%.1f %.1f %.1f) worldMax=(%.1f %.1f %.1f)\n",
+			"[VK][fog] params grid=(%.0f %.0f %.0f %.0f) phase=(%.3f %.3f %.3f %.0f) misc=(%.0f %.0f %.3f %.0f) density=(%.5f %.5f %.5f %.5f) fogColor=(%.3f %.3f %.3f %.3f) worldMin=(%.1f %.1f %.1f) worldMax=(%.1f %.1f %.1f)\n",
 			params.gridDim[0], params.gridDim[1], params.gridDim[2], params.gridDim[3],
 			params.phaseParams[0], params.phaseParams[1], params.phaseParams[2], params.phaseParams[3],
 			params.miscParams[0], params.miscParams[1], params.miscParams[2], params.miscParams[3],
@@ -12137,11 +12469,15 @@ static void vk_update_volumetric_params( void )
 			params.sunDirection[0], params.sunDirection[1], params.sunDirection[2] );
 		ri.Printf( PRINT_ALL, "[VK][fog] frame=%u hasHistory=%.0f jitter=%.3f\n",
 			vk.volumetric_frame, params.miscParams[3], jitter_amount );
-		ri.Printf( PRINT_ALL, "[VK][fog] slice near=%.3f far=%.1f log=%.6f invZ=%.6f\n",
+		ri.Printf( PRINT_ALL, "[VK][fog] slice near=%.3f far=%.1f zExp=%.3f maxDist=%.1f\n",
 			params.sliceParams[0], params.sliceParams[1], params.sliceParams[2], params.sliceParams[3] );
-		ri.Printf( PRINT_ALL, "[VK][fog] noise scale=%.5f threshold=%.3f strength=%.3f scroll=(%.4f %.4f %.4f)\n",
+		ri.Printf( PRINT_ALL, "[VK][fog] noise scale=%.5f threshold=%.3f strength=%.3f windDir=(%.3f %.3f %.3f) windSpeed=%.3f dt=%.4f\n",
 			params.noiseParams[0], params.noiseParams[1], params.noiseParams[2],
-			params.noiseScroll[0], params.noiseScroll[1], params.noiseScroll[2] );
+			params.noiseScroll[0], params.noiseScroll[1], params.noiseScroll[2],
+			params.windParams[2], params.windParams[1] );
+		ri.Printf( PRINT_ALL, "[VK][fog] reprojection threshold=%.4f depthEps=%.4f fireflyClamp=%.3f cameraCut=%.0f quality=%.0f checkerboard=%.0f transCut=%.4f volumes=%.0f lights=%.0f\n",
+			params.temporalParams[0], params.temporalParams[1], params.temporalParams[2], params.temporalParams[3],
+			params.qualityParams[0], params.qualityParams[1], params.qualityParams[3], params.volumeCounts[0], params.volumeCounts[1] );
 		ri.Printf( PRINT_ALL, "[VK][fog] sun shadow enabled=%.0f valid=%.0f bias=%.6f pcf=%.3f size=%.0fx%.0f\n",
 			params.shadowParams0[2], params.shadowParams0[3], params.shadowParams0[0], params.shadowParams0[1],
 			params.shadowMapSize0[0], params.shadowMapSize0[1] );
@@ -12162,7 +12498,7 @@ qboolean vk_bloom( void )
 	const qboolean canBlitDownsample = vk_format_has_features( vk.physical_device, vk.bloom_format,
 		VK_FORMAT_FEATURE_BLIT_SRC_BIT | VK_FORMAT_FEATURE_BLIT_DST_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT );
 
-	if ( vk.renderPassIndex == RENDER_PASS_SCREENMAP )
+	if ( vk.renderPassIndex == RENDER_PASS_SCREENMAP || vk.renderPassIndex == RENDER_PASS_SUN_SHADOW )
 	{
 		return qfalse;
 	}
