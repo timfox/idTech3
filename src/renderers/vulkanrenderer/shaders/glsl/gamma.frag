@@ -25,13 +25,14 @@ layout(constant_id = 15) const int post_debug = 0;
 layout(constant_id = 36) const int postprocess_enabled = 1;
 
 layout(push_constant) uniform PaniniPC {
-	float aspect;
+	mat4 invProj;
+	float paniniAmount;
 	float paniniD;
 	float paniniS;
+	float paniniThetaDeg;
+	float paniniBorderMode;
+	float paniniDebugMode;
 	float brightness;
-	float circleMix;
-	float overdraw;
-	float paniniMask;
 	float padding;
 } paniniPC;
 
@@ -89,38 +90,46 @@ vec3 applyBloomKnee( vec3 color ) {
 	return mix( color, color * (1.0 - factor * 0.5), factor );
 }
 
-vec2 panini_project( vec2 uv, float aspect, float d, float s ) {
-	float safeAspect = max( aspect, 0.0001 );
-	float circleMix = clamp( paniniPC.circleMix, 0.0, 1.0 );
-	float aspectMix = mix( safeAspect, 1.0, circleMix );
-
-	vec2 p = uv * 2.0 - 1.0;
-	p.x *= aspectMix;
-
-	float x2 = p.x * p.x;
-	float y2 = p.y * p.y;
-
-	float invLen = inversesqrt( 1.0 + x2 + y2 );
-	float c = ( d + 1.0 ) / ( d + invLen );
-	vec2 pp = p * c;
-
-	pp.y = mix( pp.y, pp.y * ( 1.0 + s * ( abs( pp.x ) / aspectMix ) ), s );
-
-	pp.x /= aspectMix;
-
-	return pp * 0.5 + 0.5;
+bool finite2( vec2 v ) {
+	return !( isnan( v.x ) || isnan( v.y ) || isinf( v.x ) || isinf( v.y ) );
 }
 
-vec2 circle_blend( vec2 uv, float mixValue ) {
-	float clamped = clamp( mixValue, 0.0, 1.0 );
-	if ( clamped <= 0.0001 ) {
-		return uv;
-	}
-	vec2 centered = uv * 2.0 - 1.0;
-	float len = length( centered );
-	vec2 circle = centered / max( len, 1.0 );
-	circle = circle * 0.5 + 0.5;
-	return mix( uv, circle, clamped );
+vec3 reconstructViewRay( vec2 uv ) {
+	vec2 ndc = uv * 2.0 - 1.0;
+	vec4 clip = vec4( ndc, 1.0, 1.0 );
+	vec4 view = paniniPC.invProj * clip;
+	float invW = 1.0 / max( abs( view.w ), 1e-6 );
+	vec3 v = view.xyz * invW;
+	float invLen = inversesqrt( max( dot( v, v ), 1e-8 ) );
+	return v * invLen;
+}
+
+vec2 paniniProjectStable( vec3 dir, float d, float s, float thetaMax ) {
+	float safeD = max( d, 0.001 );
+	float safeS = clamp( s, 0.0, 1.0 );
+	float safeThetaMax = clamp( thetaMax, radians( 1.0 ), radians( 89.0 ) );
+
+	// Use +Z forward for angular math.
+	vec3 ray = vec3( dir.x, dir.y, -dir.z );
+	float xzLen = max( length( ray.xz ), 1e-6 );
+	float theta = atan( ray.x, ray.z );
+	float phi = atan( ray.y, xzLen );
+	theta = clamp( theta, -safeThetaMax, safeThetaMax );
+	phi = clamp( phi, -safeThetaMax, safeThetaMax );
+
+	float denom = max( safeD + cos( theta ), 1e-3 );
+	float k = ( safeD + 1.0 ) / denom;
+	vec2 p;
+	p.x = k * sin( theta );
+	p.y = tan( phi );
+	p.y *= mix( 1.0, k, safeS );
+
+	float denomMax = max( safeD + cos( safeThetaMax ), 1e-3 );
+	float kMax = ( safeD + 1.0 ) / denomMax;
+	float fitX = kMax * sin( safeThetaMax );
+	float fitY = tan( safeThetaMax ) * mix( 1.0, kMax, safeS );
+	float fit = max( max( abs( fitX ), abs( fitY ) ), 1e-3 );
+	return p / fit;
 }
 
 vec3 doTonemap( vec3 value ) {
@@ -134,19 +143,49 @@ vec3 doTonemap( vec3 value ) {
 
 void main() {
 	vec2 uv = frag_tex_coord;
+	float paniniAmount = clamp( paniniPC.paniniAmount, 0.0, 1.0 );
+	int borderMode = int( clamp( floor( paniniPC.paniniBorderMode + 0.5 ), 0.0, 1.0 ) );
+	int paniniDebug = int( clamp( floor( paniniPC.paniniDebugMode + 0.5 ), 0.0, 1.0 ) );
 
-	float paniniMask = clamp( paniniPC.paniniMask, 0.0, 1.0 );
-	if ( paniniMask > 0.0001 && paniniPC.paniniD > 0.0001 ) {
-		uv = panini_project( uv, paniniPC.aspect, paniniPC.paniniD, paniniPC.paniniS );
-		uv = circle_blend( uv, paniniPC.circleMix );
+	if ( paniniAmount > 0.0001 ) {
+		vec3 dir = reconstructViewRay( uv );
+		vec3 ray = vec3( dir.x, dir.y, -dir.z );
+
+		float forwardZ = max( ray.z, 1e-3 );
+		vec2 persp = ray.xy / forwardZ;
+		vec2 panini = paniniProjectStable( dir, paniniPC.paniniD, paniniPC.paniniS, radians( paniniPC.paniniThetaDeg ) );
+		vec2 proj = mix( persp, panini, paniniAmount );
+		bool projInvalid = !finite2( proj );
+
+		if ( projInvalid ) {
+			if ( paniniDebug != 0 ) {
+				out_color = vec4( 1.0, 0.0, 1.0, 1.0 );
+				return;
+			}
+			out_color = vec4( 0.0, 0.0, 0.0, 1.0 );
+			return;
+		}
+
+		vec2 uv2 = proj * 0.5 + 0.5;
+		bool oob = any( lessThan( uv2, vec2( 0.0 ) ) ) || any( greaterThan( uv2, vec2( 1.0 ) ) );
+		if ( oob ) {
+			if ( borderMode == 0 ) {
+				if ( paniniDebug != 0 ) {
+					out_color = vec4( 1.0, 0.4, 0.0, 1.0 );
+					return;
+				}
+				out_color = vec4( 0.0, 0.0, 0.0, 1.0 );
+				return;
+			}
+			if ( paniniDebug != 0 ) {
+				out_color = vec4( 0.0, 1.0, 1.0, 1.0 );
+				return;
+			}
+			uv = clamp( uv2, 0.0, 1.0 );
+		} else {
+			uv = uv2;
+		}
 	}
-
-	float overdraw = max( paniniPC.overdraw, 0.0 );
-	if ( paniniMask > 0.0001 && overdraw > 0.0 ) {
-		uv = uv * ( 1.0 + overdraw ) - vec2( overdraw * 0.5 );
-	}
-
-	uv = clamp( uv, 0.0, 1.0 );
 
 	vec3 hdr = texture( texture0, uv ).rgb;
 	vec3 hdr_exposed = hdr * max( paniniPC.brightness, 0.0 );
