@@ -189,6 +189,20 @@ else
   CORES=4
 fi
 
+if [[ "$SKIP_SHADERS" -eq 1 ]]; then
+  echo "Skipping Vulkan shader compilation/apply (skipshaders requested)."
+elif [[ "$VULKAN" -eq 1 ]]; then
+  SHADER_SCRIPT="$PROJECT_ROOT/scripts/compile_shaders.sh"
+  if [[ -x "$SHADER_SCRIPT" ]]; then
+    echo "Compiling and applying Vulkan shaders..."
+    "$SHADER_SCRIPT" --apply
+  else
+    echo "Warning: shader compile script not found or not executable: $SHADER_SCRIPT" >&2
+  fi
+else
+  echo "Skipping Vulkan shader compilation/apply for OpenGL build."
+fi
+
 # CMake flags
 CMAKE_FLAGS=(
   "-DCMAKE_BUILD_TYPE=${BUILD_TYPE}"
@@ -600,20 +614,6 @@ if [[ "$MAC_UB2" -eq 1 ]]; then
   macos_build_universal "$MAC_APP_TARGET"
 elif [[ "$MAC_APP" -eq 1 ]]; then
   macos_app_bundle "$MAC_APP_TARGET" "$MAC_APP_ARCH"
-fi
-
-if [[ "$SKIP_SHADERS" -eq 1 ]]; then
-  echo "Skipping Vulkan shader compilation/apply (skipshaders requested)."
-elif [[ "$VULKAN" -eq 1 ]]; then
-  SHADER_SCRIPT="$PROJECT_ROOT/scripts/compile_shaders.sh"
-  if [[ -x "$SHADER_SCRIPT" ]]; then
-    echo "Compiling and applying Vulkan shaders..."
-    "$SHADER_SCRIPT" --apply
-  else
-    echo "Warning: shader compile script not found or not executable: $SHADER_SCRIPT" >&2
-  fi
-else
-  echo "Skipping Vulkan shader compilation/apply for OpenGL build."
 fi
 
 echo "✓ Engine artifacts ready in $RELEASE_DIR"
