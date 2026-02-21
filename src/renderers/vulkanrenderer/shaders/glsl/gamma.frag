@@ -33,7 +33,7 @@ layout(push_constant) uniform PaniniPC {
 	float paniniBorderMode;
 	float paniniDebugMode;
 	float brightness;
-	float padding;
+	vec4 srcUVScaleBias; // scale.xy, bias.xy
 } paniniPC;
 
 const vec3 sRGB = vec3( 0.2126, 0.7152, 0.0722 );
@@ -98,6 +98,10 @@ bool finite2( vec2 v ) {
 	return !( isnan( v.x ) || isnan( v.y ) || isinf( v.x ) || isinf( v.y ) );
 }
 
+vec2 to_src_uv( vec2 uv01 ) {
+	return uv01 * paniniPC.srcUVScaleBias.xy + paniniPC.srcUVScaleBias.zw;
+}
+
 vec3 reconstructRay( vec2 uv, float fovYRadians, float aspect ) {
 	vec2 ndc = uv * 2.0 - 1.0;
 	float tanHalfFovY = tan( 0.5 * fovYRadians );
@@ -111,41 +115,49 @@ vec3 reconstructRay( vec2 uv, float fovYRadians, float aspect ) {
 	return ray * invLen;
 }
 
-vec2 paniniProjectStable(
-	vec3 dir,
-	float d,
-	float s,
-	float fovYRadians,
-	float aspect )
-{
+float paniniForwardX( float theta, float d ) {
+	float denom = max( d + cos( theta ), 1e-6 );
+	return ( d + 1.0 ) * sin( theta ) / denom;
+}
+
+float paniniForwardXDerivative( float theta, float d ) {
+	float denom = max( d + cos( theta ), 1e-6 );
+	return ( d + 1.0 ) * ( d * cos( theta ) + 1.0 ) / ( denom * denom );
+}
+
+vec3 paniniInverseDir( vec2 uvOut, float d, float s, float fovYRadians, float aspect ) {
 	float safeD = max( d, 0.001 );
 	float safeS = clamp( s, 0.0, 1.0 );
 	float thetaMax = atan( tan( fovYRadians * 0.5 ) * aspect );
 	float phiMax = fovYRadians * 0.5;
 
-	float xzLen = max( length( dir.xz ), 1e-6 );
-	float theta = atan( dir.x, -dir.z );
-	float phi = atan( dir.y, xzLen );
-
-	theta = clamp( theta, -thetaMax, thetaMax );
-	phi = clamp( phi, -phiMax, phiMax );
-
-	float denom = max( safeD + cos( theta ), 1e-4 );
-	float k = ( safeD + 1.0 ) / denom;
-
-	vec2 p;
-	p.x = k * sin( theta );
-	p.y = tan( phi );
-	p.y *= mix( 1.0, k, safeS );
-
-	float denomMax = max( safeD + cos( thetaMax ), 1e-4 );
+	float denomMax = max( safeD + cos( thetaMax ), 1e-6 );
 	float kMax = ( safeD + 1.0 ) / denomMax;
-
 	float fitX = kMax * sin( thetaMax );
 	float fitY = tan( phiMax ) * mix( 1.0, kMax, safeS );
-	float fit = max( max( abs( fitX ), abs( fitY ) ), 1e-4 );
+	float fit = max( max( abs( fitX ), abs( fitY ) ), 1e-6 );
 
-	return p / fit;
+	vec2 pRaw = ( uvOut * 2.0 - 1.0 ) * fit;
+	float theta = clamp( pRaw.x, -1.0, 1.0 ) * thetaMax;
+
+	for ( int i = 0; i < 6; ++i ) {
+		float f = paniniForwardX( theta, safeD ) - pRaw.x;
+		float fp = paniniForwardXDerivative( theta, safeD );
+		float safeFp = abs( fp ) > 1e-6 ? fp : ( fp < 0.0 ? -1e-6 : 1e-6 );
+		theta = clamp( theta - f / safeFp, -thetaMax, thetaMax );
+	}
+
+	float denom = max( safeD + cos( theta ), 1e-6 );
+	float k = ( safeD + 1.0 ) / denom;
+	float m = max( mix( 1.0, k, safeS ), 1e-6 );
+	float phi = clamp( atan( pRaw.y / m ), -phiMax, phiMax );
+
+	vec3 dir;
+	dir.x = sin( theta );
+	dir.z = -cos( theta );
+	dir.y = tan( phi ) * max( length( dir.xz ), 1e-6 );
+	float invLen = inversesqrt( max( dot( dir, dir ), 1e-8 ) );
+	return dir * invLen;
 }
 
 vec3 doTonemap( vec3 value ) {
@@ -163,27 +175,25 @@ void main() {
 	int borderMode = int( clamp( floor( paniniPC.paniniBorderMode + 0.5 ), 0.0, 1.0 ) );
 	int paniniDebug = int( clamp( floor( paniniPC.paniniDebugMode + 0.5 ), 0.0, 1.0 ) );
 	int debugMode = post_debug;
-	bool debugProj = ( postprocess_enabled != 0 ) && ( debugMode == 97 || debugMode == 98 || debugMode == 99 );
-	bool doPaniniPath = paniniAmount > 0.0001 || debugProj;
+	bool debugInverse = ( postprocess_enabled != 0 ) && ( debugMode == 97 || debugMode == 98 || debugMode == 99 );
+	bool doPaniniPath = paniniAmount > 0.0001 || debugInverse;
+	vec2 uvLogical = uv;
 
 	if ( doPaniniPath ) {
 		float aspect = max( paniniPC.aspect, 1e-6 );
 		float fovX = radians( clamp( paniniPC.fovXDeg, 1.0, 179.0 ) );
 		float fovY = 2.0 * atan( tan( 0.5 * fovX ) / aspect );
-		vec3 dir = reconstructRay( uv, fovY, aspect );
+		vec2 uvOut = uv;
+		vec3 dirPan = paniniInverseDir( uvOut, paniniPC.paniniD, paniniPC.paniniS, fovY, aspect );
 
-		vec2 persp = dir.xy / max( -dir.z, 1e-6 );
+		vec2 persp = dirPan.xy / max( -dirPan.z, 1e-6 );
 		float perspFitX = max( tan( 0.5 * fovX ), 1e-6 );
 		float perspFitY = max( tan( 0.5 * fovY ), 1e-6 );
 		vec2 perspN = vec2( persp.x / perspFitX, persp.y / perspFitY );
-		vec2 panN = paniniProjectStable(
-			dir,
-			paniniPC.paniniD,
-			paniniPC.paniniS,
-			fovY,
-			aspect );
-		vec2 projN = mix( perspN, panN, paniniAmount );
-		bool projInvalid = !( finite2( perspN ) && finite2( panN ) && finite2( projN ) );
+		vec2 uvSrcPan = perspN * 0.5 + 0.5;
+		uvLogical = mix( uvOut, uvSrcPan, paniniAmount );
+		vec2 uvSample = to_src_uv( uvLogical );
+		bool projInvalid = !( finite2( perspN ) && finite2( uvSrcPan ) && finite2( uvLogical ) && finite2( uvSample ) );
 
 		if ( projInvalid ) {
 			if ( paniniDebug != 0 ) {
@@ -194,24 +204,21 @@ void main() {
 			return;
 		}
 
-		vec2 uvPerspN = perspN * 0.5 + 0.5;
-		vec2 uvPanN = panN * 0.5 + 0.5;
-		vec2 uv2 = projN * 0.5 + 0.5;
-		if ( debugProj ) {
-			if ( debugMode == 98 ) {
-				out_color = vec4( uvPerspN, 0.0, 1.0 );
-				return;
-			}
+		bool logicalOob = any( lessThan( uvLogical, vec2( 0.0 ) ) ) || any( greaterThan( uvLogical, vec2( 1.0 ) ) );
+		if ( debugInverse ) {
 			if ( debugMode == 97 ) {
-				out_color = vec4( uvPanN, 0.0, 1.0 );
+				out_color = vec4( uvLogical, 0.0, 1.0 );
 				return;
 			}
-			out_color = vec4( uv2, 0.0, 1.0 );
+			if ( debugMode == 98 ) {
+				out_color = vec4( uvSample, 0.0, 1.0 );
+				return;
+			}
+			out_color = logicalOob ? vec4( 1.0, 0.0, 0.0, 1.0 ) : vec4( 0.0, 1.0, 0.0, 1.0 );
 			return;
 		}
 
-		bool oob = any( lessThan( uv2, vec2( 0.0 ) ) ) || any( greaterThan( uv2, vec2( 1.0 ) ) );
-		if ( oob ) {
+		if ( logicalOob ) {
 			if ( borderMode == 0 ) {
 				if ( paniniDebug != 0 ) {
 					out_color = vec4( 1.0, 0.4, 0.0, 1.0 );
@@ -224,12 +231,11 @@ void main() {
 				out_color = vec4( 0.0, 1.0, 1.0, 1.0 );
 				return;
 			}
-			uv = clamp( uv2, 0.0, 1.0 );
-		} else {
-			uv = uv2;
+			uvLogical = clamp( uvLogical, 0.0, 1.0 );
 		}
 	}
 
+	uv = to_src_uv( uvLogical );
 	vec3 hdr = texture( texture0, uv ).rgb;
 	vec3 hdr_exposed = hdr * max( paniniPC.brightness, 0.0 );
 	if ( postprocess_enabled != 0 ) {
