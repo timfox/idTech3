@@ -56,11 +56,13 @@ typedef struct {
 	float paniniBorderMode;
 	float paniniDebugMode;
 	float brightness;
-	float padding;
+	float srcUVScaleBias[4]; // scale.xy, bias.xy
 } VkPostProcessPushConstants;
 
 static int vkSamples = VK_SAMPLE_COUNT_1_BIT;
 static int vkMaxSamples = VK_SAMPLE_COUNT_1_BIT;
+static VkRect2D vk_scene_src_rect;
+static qboolean vk_scene_src_rect_valid;
 
 static VkInstance vk_instance = VK_NULL_HANDLE;
 static VkSurfaceKHR vk_surface = VK_NULL_HANDLE;
@@ -9930,6 +9932,46 @@ static void vk_update_depth_range( Vk_Depth_Range depth_range )
 		get_viewport( &viewport, depth_range );
 		qvkCmdSetViewport( vk.cmd->command_buffer, 0, 1, &viewport );
 	}
+
+	// Track the largest 3D render viewport that populates the scene color source image.
+	if ( !backEnd.projection2D &&
+		( vk.renderPassIndex == RENDER_PASS_MAIN || vk.renderPassIndex == RENDER_PASS_POST_BLOOM ) )
+	{
+		VkRect2D r;
+		uint32_t maxW = ( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u;
+		uint32_t maxH = ( glConfig.vidHeight > 0 ) ? (uint32_t)glConfig.vidHeight : 1u;
+		uint64_t area;
+		uint64_t bestArea;
+
+		get_viewport_rect( &r );
+
+		if ( r.offset.x < 0 ) {
+			int dx = -r.offset.x;
+			r.offset.x = 0;
+			r.extent.width = ( r.extent.width > (uint32_t)dx ) ? ( r.extent.width - (uint32_t)dx ) : 0u;
+		}
+		if ( r.offset.y < 0 ) {
+			int dy = -r.offset.y;
+			r.offset.y = 0;
+			r.extent.height = ( r.extent.height > (uint32_t)dy ) ? ( r.extent.height - (uint32_t)dy ) : 0u;
+		}
+		if ( (uint32_t)r.offset.x >= maxW || (uint32_t)r.offset.y >= maxH ) {
+			return;
+		}
+		if ( (uint32_t)r.offset.x + r.extent.width > maxW ) {
+			r.extent.width = maxW - (uint32_t)r.offset.x;
+		}
+		if ( (uint32_t)r.offset.y + r.extent.height > maxH ) {
+			r.extent.height = maxH - (uint32_t)r.offset.y;
+		}
+
+		area = (uint64_t)r.extent.width * (uint64_t)r.extent.height;
+		bestArea = vk_scene_src_rect_valid ? (uint64_t)vk_scene_src_rect.extent.width * (uint64_t)vk_scene_src_rect.extent.height : 0u;
+		if ( !vk_scene_src_rect_valid || area > bestArea ) {
+			vk_scene_src_rect = r;
+			vk_scene_src_rect_valid = qtrue;
+		}
+	}
 }
 
 
@@ -10020,6 +10062,11 @@ static void vk_begin_render_pass( VkRenderPass renderPass, VkFramebuffer frameBu
 		// [1] - depth/stencil
 		// [2] - multisampled color, optional
 		Com_Memset( clear_values, 0, sizeof( clear_values ) );
+		// Keep color clears black so uncovered regions are obvious and neutral in post-process debug.
+		clear_values[0].color.float32[0] = 0.0f;
+		clear_values[0].color.float32[1] = 0.0f;
+		clear_values[0].color.float32[2] = 0.0f;
+		clear_values[0].color.float32[3] = 1.0f;
 #ifndef USE_REVERSED_DEPTH
 		clear_values[1].depthStencil.depth = 1.0;
 #endif
@@ -10052,6 +10099,7 @@ void vk_begin_main_render_pass( void )
 	//vk.renderScaleX = (float)vk.renderWidth / (float)glConfig.vidWidth;
 	//vk.renderScaleY = (float)vk.renderHeight / (float)glConfig.vidHeight;
 	vk.renderScaleX = vk.renderScaleY = 1.0f;
+	vk_scene_src_rect_valid = qfalse;
 
 	vk_begin_render_pass( vk.render_pass.main, frameBuffer, qtrue, vk.renderWidth, vk.renderHeight );
 }
@@ -10915,6 +10963,9 @@ void vk_end_frame( void )
 			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
 
 			VkPostProcessPushConstants panini_push = { 0 };
+			uint32_t srcTexW = ( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u;
+			uint32_t srcTexH = ( glConfig.vidHeight > 0 ) ? (uint32_t)glConfig.vidHeight : 1u;
+			VkRect2D srcRect;
 			panini_push.paniniAmount = r_panini ? r_panini->value : 0.0f;
 			panini_push.paniniD = r_panini_d ? r_panini_d->value : 1.0f;
 			panini_push.paniniS = r_panini_s ? r_panini_s->value : 0.25f;
@@ -10923,6 +10974,18 @@ void vk_end_frame( void )
 			panini_push.paniniBorderMode = r_panini_border ? (float)r_panini_border->integer : 0.0f;
 			panini_push.paniniDebugMode = r_panini_debug ? (float)r_panini_debug->integer : 0.0f;
 			panini_push.brightness = r_paniniBrightness ? r_paniniBrightness->value : 1.0f;
+			if ( vk_scene_src_rect_valid ) {
+				srcRect = vk_scene_src_rect;
+			} else {
+				srcRect.offset.x = 0;
+				srcRect.offset.y = 0;
+				srcRect.extent.width = srcTexW;
+				srcRect.extent.height = srcTexH;
+			}
+			panini_push.srcUVScaleBias[0] = (float)srcRect.extent.width / (float)srcTexW;
+			panini_push.srcUVScaleBias[1] = (float)srcRect.extent.height / (float)srcTexH;
+			panini_push.srcUVScaleBias[2] = (float)srcRect.offset.x / (float)srcTexW;
+			panini_push.srcUVScaleBias[3] = (float)srcRect.offset.y / (float)srcTexH;
 
 			qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_post_process, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( panini_push ), &panini_push );
 
