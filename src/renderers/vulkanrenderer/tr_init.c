@@ -1965,8 +1965,8 @@ static void R_Register( void )
 	ri.Cvar_SetGroup( r_post, CVG_RENDERER );
 
 	r_post_debug = ri.Cvar_Get( "r_post_debug", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_post_debug, "0", "2", CV_INTEGER );
-	ri.Cvar_SetDescription( r_post_debug, "Debug view for the post-process pass: 0=final, 1=pre-tonemap HDR, 2=luminance heatmap." );
+	ri.Cvar_CheckRange( r_post_debug, "0", "99", CV_INTEGER );
+	ri.Cvar_SetDescription( r_post_debug, "Debug view for the post-process pass: 0=final, 1=pre-tonemap HDR, 2=luminance heatmap, 97=panini normalized UV, 98=perspective normalized UV, 99=blended UV." );
 	ri.Cvar_SetGroup( r_post_debug, CVG_RENDERER );
 
 	r_volumetricFog = ri.Cvar_Get( "r_volumetricFog", "0", CVAR_ARCHIVE_ND );

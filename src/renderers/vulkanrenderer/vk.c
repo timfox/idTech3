@@ -48,11 +48,11 @@ struct Vk_Pipeline_FragSpecData {
 };
 
 typedef struct {
-	float invProj[16];
 	float paniniAmount;
 	float paniniD;
 	float paniniS;
-	float paniniThetaDeg;
+	float aspect;
+	float fovXDeg;
 	float paniniBorderMode;
 	float paniniDebugMode;
 	float brightness;
@@ -2886,7 +2886,8 @@ void vk_update_attachment_descriptors( void ) {
 		Vk_Sampler_Def sd;
 
 		Com_Memset( &sd, 0, sizeof( sd ) );
-		sd.gl_mag_filter = sd.gl_min_filter = vk.blitFilter;
+		// Post-process source should stay linear-filtered; Panini magnifies edges and nearest exacerbates aliasing.
+		sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
 		sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 		sd.max_lod_1_0 = qtrue;
 		sd.noAnisotropy = qtrue;
@@ -7394,6 +7395,8 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	VkPipelineRasterizationStateCreateInfo rasterization_state;
 	VkPipelineDepthStencilStateCreateInfo depth_stencil_state;
 	VkPipelineViewportStateCreateInfo viewport_state;
+	VkPipelineDynamicStateCreateInfo dynamic_state;
+	VkDynamicState dynamic_state_array[2] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
 	VkPipelineMultisampleStateCreateInfo multisample_state;
 	VkPipelineColorBlendStateCreateInfo blend_state;
 	VkPipelineColorBlendAttachmentState attachment_blend_state;
@@ -7692,6 +7695,12 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	viewport_state.scissorCount = 1;
 	viewport_state.pScissors = &scissor;
 
+	dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	dynamic_state.pNext = NULL;
+	dynamic_state.flags = 0;
+	dynamic_state.dynamicStateCount = ARRAY_LEN( dynamic_state_array );
+	dynamic_state.pDynamicStates = dynamic_state_array;
+
 	//
 	// Rasterization.
 	//
@@ -7779,7 +7788,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	create_info.pDepthStencilState = (program_index == 2) ? &depth_stencil_state : NULL;
 	create_info.pDepthStencilState = &depth_stencil_state;
 	create_info.pColorBlendState = &blend_state;
-	create_info.pDynamicState = NULL;
+	create_info.pDynamicState = &dynamic_state;
 	create_info.layout = layout;
 	create_info.renderPass = renderpass;
 	create_info.subpass = 0;
@@ -9968,6 +9977,27 @@ void vk_draw_dot( uint32_t storage_offset )
 
 static qboolean vk_in_render_pass;
 
+static void vk_set_fullscreen_viewport_scissor( uint32_t width, uint32_t height )
+{
+	VkViewport viewport;
+	VkRect2D scissor;
+
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width = (float)width;
+	viewport.height = (float)height;
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+
+	scissor.offset.x = 0;
+	scissor.offset.y = 0;
+	scissor.extent.width = width;
+	scissor.extent.height = height;
+
+	qvkCmdSetViewport( vk.cmd->command_buffer, 0, 1, &viewport );
+	qvkCmdSetScissor( vk.cmd->command_buffer, 0, 1, &scissor );
+}
+
 static void vk_begin_render_pass( VkRenderPass renderPass, VkFramebuffer frameBuffer, qboolean clearValues, uint32_t width, uint32_t height )
 {
 	VkRenderPassBeginInfo render_pass_begin_info;
@@ -10812,6 +10842,7 @@ void vk_end_frame( void )
 				push.misc[3] = depthIsReversed;
 
 				qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_ssao, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
+				vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
 				qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 				vk_end_render_pass();
 
@@ -10825,6 +10856,7 @@ void vk_end_frame( void )
 				push.params[2] = 0.0f;
 				push.params[3] = 0.0f;
 				qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_ssao, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
+				vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
 				qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 				vk_end_render_pass();
 
@@ -10838,6 +10870,7 @@ void vk_end_frame( void )
 							( r_ssaoDebugView && r_ssaoDebugView->integer ) ? vk.ssao_debug_pipeline : vk.ssao_combine_pipeline );
 						qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.ssao_blur_descriptor, 0, NULL );
 					}
+					vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
 					qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 					vk_end_render_pass();
 
@@ -10858,6 +10891,7 @@ void vk_end_frame( void )
 			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.capture_pipeline );
 			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
 
+			vk_set_fullscreen_viewport_scissor( gls.captureWidth, gls.captureHeight );
 			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 		}
 
@@ -10881,20 +10915,18 @@ void vk_end_frame( void )
 			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
 
 			VkPostProcessPushConstants panini_push = { 0 };
-			const float *projection = backEnd.viewParms.projectionMatrix;
-			if ( !Mat4Inverse( projection, panini_push.invProj ) ) {
-				Com_Memcpy( panini_push.invProj, projection, sizeof( panini_push.invProj ) );
-			}
 			panini_push.paniniAmount = r_panini ? r_panini->value : 0.0f;
 			panini_push.paniniD = r_panini_d ? r_panini_d->value : 1.0f;
 			panini_push.paniniS = r_panini_s ? r_panini_s->value : 0.25f;
-			panini_push.paniniThetaDeg = r_panini_theta ? r_panini_theta->value : 80.0f;
+			panini_push.aspect = vk.renderHeight > 0 ? ( (float)vk.renderWidth / (float)vk.renderHeight ) : 1.0f;
+			panini_push.fovXDeg = backEnd.viewParms.fovX > 1.0f ? backEnd.viewParms.fovX : ( r_panini_theta ? r_panini_theta->value : 90.0f );
 			panini_push.paniniBorderMode = r_panini_border ? (float)r_panini_border->integer : 0.0f;
 			panini_push.paniniDebugMode = r_panini_debug ? (float)r_panini_debug->integer : 0.0f;
 			panini_push.brightness = r_paniniBrightness ? r_paniniBrightness->value : 1.0f;
 
 			qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_post_process, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( panini_push ), &panini_push );
 
+			vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
 			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 		}
 	}
@@ -11745,6 +11777,7 @@ qboolean vk_bloom( void )
 	vk_begin_bloom_extract_render_pass();
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.bloom_extract_pipeline );
 	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
+	vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
 	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 	vk_end_render_pass();
 
@@ -11829,6 +11862,7 @@ qboolean vk_bloom( void )
 		// blend downscaled buffers to main fbo
 		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.bloom_blend_pipeline );
 		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_blend, 0, ARRAY_LEN(dset), dset, 0, NULL );
+		vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
 		qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 	}
 
