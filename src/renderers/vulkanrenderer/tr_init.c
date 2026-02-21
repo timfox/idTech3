@@ -202,11 +202,17 @@ cvar_t	*r_volumetricFogDensity;
 cvar_t	*r_volumetricFogHeightFalloff;
 cvar_t	*r_volumetricFogAniso;
 cvar_t	*r_volumetricFogSteps;
+cvar_t	*r_volumetricFogZExponent;
+cvar_t	*r_volumetricFogMaxDistance;
 cvar_t	*r_volumetricFogJitter;
 cvar_t	*r_volumetricFogTemporalWeight;
+cvar_t	*r_volumetricFogReprojectionThreshold;
+cvar_t	*r_volumetricFogFireflyClamp;
 cvar_t	*r_volumetricFogColorMode;
 cvar_t	*r_volumetricFogTint;
 cvar_t	*r_volumetricFogIntensity;
+cvar_t	*r_volumetricFogQuality;
+cvar_t	*r_volumetricFogTransmittanceCutoff;
 cvar_t	*r_volumetricFogBaseHeight;
 cvar_t	*r_volumetricFogWorldMin;
 cvar_t	*r_volumetricFogWorldMax;
@@ -219,6 +225,8 @@ cvar_t	*r_volumetricFogNoiseScale;
 cvar_t	*r_volumetricFogNoiseStrength;
 cvar_t	*r_volumetricFogNoiseThreshold;
 cvar_t	*r_volumetricFogNoiseScroll;
+cvar_t	*r_volumetricFogWindSpeed;
+cvar_t	*r_volumetricFogWindDirection;
 cvar_t	*r_fog_shadows;
 cvar_t	*r_fogShadowMapSize;
 cvar_t	*r_fogShadowBias;
@@ -1995,9 +2003,19 @@ static void R_Register( void )
 	ri.Cvar_SetGroup( r_volumetricFogAniso, CVG_RENDERER );
 
 	r_volumetricFogSteps = ri.Cvar_Get( "r_volumetricFogSteps", "32", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_volumetricFogSteps, "1", "128", CV_INTEGER );
+	ri.Cvar_CheckRange( r_volumetricFogSteps, "1", "256", CV_INTEGER );
 	ri.Cvar_SetDescription( r_volumetricFogSteps, "Raymarch steps per pixel when compositing volumetric fog." );
 	ri.Cvar_SetGroup( r_volumetricFogSteps, CVG_RENDERER );
+
+	r_volumetricFogZExponent = ri.Cvar_Get( "r_volumetricFogZExponent", "1.5", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogZExponent, "1.0", "8.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogZExponent, "Exponent used for volumetric depth-slice distribution (higher values allocate more slices near camera)." );
+	ri.Cvar_SetGroup( r_volumetricFogZExponent, CVG_RENDERER );
+
+	r_volumetricFogMaxDistance = ri.Cvar_Get( "r_volumetricFogMaxDistance", "4096", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogMaxDistance, "1", "65536", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogMaxDistance, "Maximum integration distance for volumetric fog in world units." );
+	ri.Cvar_SetGroup( r_volumetricFogMaxDistance, CVG_RENDERER );
 
 	r_volumetricFogJitter = ri.Cvar_Get( "r_volumetricFogJitter", "1.0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogJitter, "0", "1", CV_FLOAT );
@@ -2008,6 +2026,16 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_volumetricFogTemporalWeight, "0", "1", CV_FLOAT );
 	ri.Cvar_SetDescription( r_volumetricFogTemporalWeight, "History blend weight for temporal reprojection (0 = no history)." );
 	ri.Cvar_SetGroup( r_volumetricFogTemporalWeight, CVG_RENDERER );
+
+	r_volumetricFogReprojectionThreshold = ri.Cvar_Get( "r_volumetricFogReprojectionThreshold", "0.075", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogReprojectionThreshold, "0", "2", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogReprojectionThreshold, "Reject history when reprojection motion exceeds this screen-space threshold." );
+	ri.Cvar_SetGroup( r_volumetricFogReprojectionThreshold, CVG_RENDERER );
+
+	r_volumetricFogFireflyClamp = ri.Cvar_Get( "r_volumetricFogFireflyClamp", "8.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogFireflyClamp, "0", "128", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogFireflyClamp, "Optional luminance clamp used to suppress temporal fireflies (0 disables)." );
+	ri.Cvar_SetGroup( r_volumetricFogFireflyClamp, CVG_RENDERER );
 
 	r_volumetricFogColorMode = ri.Cvar_Get( "r_volumetricFogColorMode", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogColorMode, "0", "2", CV_INTEGER );
@@ -2022,6 +2050,16 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_volumetricFogIntensity, "0", "50", CV_FLOAT );
 	ri.Cvar_SetDescription( r_volumetricFogIntensity, "Scattering intensity multiplier for volumetric fog color (useful to brighten tints/IBL contribution)." );
 	ri.Cvar_SetGroup( r_volumetricFogIntensity, CVG_RENDERER );
+
+	r_volumetricFogQuality = ri.Cvar_Get( "r_volumetricFogQuality", "2", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_volumetricFogQuality, "0", "3", CV_INTEGER );
+	ri.Cvar_SetDescription( r_volumetricFogQuality, "Volumetric quality tier: 0=low, 1=medium, 2=high, 3=ultra. Requires vid_restart." );
+	ri.Cvar_SetGroup( r_volumetricFogQuality, CVG_RENDERER );
+
+	r_volumetricFogTransmittanceCutoff = ri.Cvar_Get( "r_volumetricFogTransmittanceCutoff", "0.01", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogTransmittanceCutoff, "0.0001", "1.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogTransmittanceCutoff, "Early-out threshold for volumetric integration (smaller values = higher quality)." );
+	ri.Cvar_SetGroup( r_volumetricFogTransmittanceCutoff, CVG_RENDERER );
 
 	r_volumetricFogBaseHeight = ri.Cvar_Get( "r_volumetricFogBaseHeight", "0.0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogBaseHeight, "-8192", "8192", CV_FLOAT );
@@ -2078,6 +2116,15 @@ static void R_Register( void )
 	r_volumetricFogNoiseScroll = ri.Cvar_Get( "r_volumetricFogNoiseScroll", "0.03 0.01 0.02", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_volumetricFogNoiseScroll, "3D noise scroll velocity (x y z) for volumetric fog movement." );
 	ri.Cvar_SetGroup( r_volumetricFogNoiseScroll, CVG_RENDERER );
+
+	r_volumetricFogWindSpeed = ri.Cvar_Get( "r_volumetricFogWindSpeed", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogWindSpeed, "0", "64", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogWindSpeed, "World-space wind speed multiplier for animated volumetric noise advection." );
+	ri.Cvar_SetGroup( r_volumetricFogWindSpeed, CVG_RENDERER );
+
+	r_volumetricFogWindDirection = ri.Cvar_Get( "r_volumetricFogWindDirection", "1 0 0", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_volumetricFogWindDirection, "World-space wind direction for volumetric noise advection (x y z)." );
+	ri.Cvar_SetGroup( r_volumetricFogWindDirection, CVG_RENDERER );
 
 	r_fog_shadows = ri.Cvar_Get( "r_fog_shadows", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_fog_shadows, "0", "1", CV_INTEGER );
