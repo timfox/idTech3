@@ -3149,6 +3149,42 @@ void vk_destroy_samplers( void )
 }
 
 
+static void vk_update_color_descriptor_image( VkImageView color_view )
+{
+	if ( vk.color_descriptor == VK_NULL_HANDLE || color_view == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	VkDescriptorImageInfo info;
+	VkWriteDescriptorSet desc;
+	Vk_Sampler_Def sd;
+
+	Com_Memset( &sd, 0, sizeof( sd ) );
+	sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+	sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	sd.max_lod_1_0 = qtrue;
+	sd.noAnisotropy = qtrue;
+
+	info.sampler = vk_find_sampler( &sd );
+	info.imageView = color_view;
+	info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	desc.dstSet = vk.color_descriptor;
+	desc.dstBinding = 0;
+	desc.dstArrayElement = 0;
+	desc.descriptorCount = 1;
+	desc.pNext = NULL;
+	desc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	desc.pImageInfo = &info;
+	desc.pBufferInfo = NULL;
+	desc.pTexelBufferView = NULL;
+
+	qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+}
+
+
+
 void vk_update_attachment_descriptors( void ) {
 
 	if ( vk.color_image_view )
@@ -3165,26 +3201,20 @@ void vk_update_attachment_descriptors( void ) {
 		sd.noAnisotropy = qtrue;
 
 		info.sampler = vk_find_sampler( &sd );
-		VkImageView color_source = vk.color_image_view;
-		if ( vk.smaaActive && vk.smaa_output_image_view ) {
-			color_source = vk.smaa_output_image_view;
-		}
-		if ( color_source ) {
-			info.imageView = color_source;
-			info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			desc.dstSet = vk.color_descriptor;
-			desc.dstBinding = 0;
-			desc.dstArrayElement = 0;
-			desc.descriptorCount = 1;
-			desc.pNext = NULL;
-			desc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			desc.pImageInfo = &info;
-			desc.pBufferInfo = NULL;
-			desc.pTexelBufferView = NULL;
+		info.imageView = vk.color_image_view;
+		info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		desc.dstSet = vk.color_descriptor;
+		desc.dstBinding = 0;
+		desc.dstArrayElement = 0;
+		desc.descriptorCount = 1;
+		desc.pNext = NULL;
+		desc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		desc.pImageInfo = &info;
+		desc.pBufferInfo = NULL;
+		desc.pTexelBufferView = NULL;
 
-			qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
-		}
+		qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
 
 		// screenmap
 		sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
@@ -13032,6 +13062,11 @@ static void vk_volumetric_fog_pass( void )
 
 	if ( vk.smaaActive ) {
 		vk_smaa_passes();
+		if ( vk.smaa_output_image_view ) {
+			vk_update_color_descriptor_image( vk.smaa_output_image_view );
+		}
+	} else {
+		vk_update_color_descriptor_image( vk.color_image_view );
 	}
 
 	// Restore depth layout for the next frame's main render pass clears/attachments.
