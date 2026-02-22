@@ -14495,9 +14495,13 @@ static void vk_update_volumetric_params( void )
 	}
 	if ( fluid_force < 0.0f ) {
 		fluid_force = 0.0f;
+	} else if ( fluid_force > 8.0f ) {
+		fluid_force = 8.0f;
 	}
 	if ( fluid_velocity_clamp < 1.0f ) {
 		fluid_velocity_clamp = 1.0f;
+	} else if ( fluid_velocity_clamp > 512.0f ) {
+		fluid_velocity_clamp = 512.0f;
 	}
 	if ( fluid_pressure_iterations < 1 ) {
 		fluid_pressure_iterations = 1;
