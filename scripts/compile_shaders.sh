@@ -226,6 +226,10 @@ compile_template_shaders()
 compile_shader("vert", "volumetric/volumetric_fog.vert", "volumetric_fog_vs", binding_expr="vk.modules.volumetric_fog_vs")
 compile_shader("frag", "volumetric/volumetric_fog.frag", "volumetric_fog_fs", binding_expr="vk.modules.volumetric_fog_fs")
 compile_shader("comp", "volumetric/volumetric_fog.comp", "volumetric_fog_cs", binding_expr="vk.modules.volumetric_fog_cs")
+compile_shader("comp", "volumetric/fluid_advect.comp", "fluid_advect_cs", binding_expr="vk.modules.fluid_advect_cs")
+compile_shader("comp", "volumetric/fluid_divergence.comp", "fluid_divergence_cs", binding_expr="vk.modules.fluid_divergence_cs")
+compile_shader("comp", "volumetric/fluid_pressure.comp", "fluid_pressure_cs", binding_expr="vk.modules.fluid_pressure_cs")
+compile_shader("comp", "volumetric/fluid_gradient.comp", "fluid_gradient_cs", binding_expr="vk.modules.fluid_gradient_cs")
 compile_shader("comp", "volumetric/depth_resolve_msaa.comp", "volumetric_depth_resolve_msaa_cs", binding_expr="vk.modules.volumetric_depth_resolve_msaa_cs")
 
 with binding_file.open("w") as f:
