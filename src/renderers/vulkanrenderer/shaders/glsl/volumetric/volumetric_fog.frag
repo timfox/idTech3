@@ -65,6 +65,10 @@ float saturate(float v) {
     return clamp(v, 0.0, 1.0);
 }
 
+bool isFinite1(float v) {
+    return !(isnan(v) || isinf(v));
+}
+
 float decodeClipZ(float depthSample, int depthMode) {
     if (depthMode == 0) {
         return depthSample * 2.0 - 1.0;
@@ -311,7 +315,11 @@ void main() {
         if (t1 > t0) {
             float sCenter = (float(step) + 0.5 * float(advance) + jitter) / float(marchCount);
             vec3 uvw = vec3(v_UV, clamp(sCenter, 0.0, 1.0));
-            float sigmaT = max(texture(froxelExtinction, uvw).r, 0.0);
+            float sigmaT = texture(froxelExtinction, uvw).r;
+            if (!isFinite1(sigmaT)) {
+                sigmaT = 0.0;
+            }
+            sigmaT = clamp(sigmaT, 0.0, 6.0);
             vec3 scatterSource = max(texture(froxelScattering, uvw).rgb, vec3(0.0));
 
             float dt = t1 - t0;

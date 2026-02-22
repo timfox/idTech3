@@ -91,6 +91,17 @@ float Luminance(vec3 c) {
     return dot(c, vec3(0.2126, 0.7152, 0.0722));
 }
 
+bool IsFinite(float v) {
+    return !(isnan(v) || isinf(v));
+}
+
+float ClampExtinction(float density) {
+    if (!IsFinite(density)) {
+        return 0.0;
+    }
+    return clamp(density, 0.0, 6.0);
+}
+
 float phaseHG(float cosTheta, float g) {
     float gg = g * g;
     float denom = max(1.0 + gg - 2.0 * g * cosTheta, 1e-5);
@@ -684,7 +695,7 @@ void main() {
         }
 
         float density = ComputeBaseDensity(worldPos);
-        imageStore(froxelExtinction, idx, vec4(density, 0.0, 0.0, 0.0));
+        imageStore(froxelExtinction, idx, vec4(ClampExtinction(density), 0.0, 0.0, 0.0));
         imageStore(froxelLight, idx, vec4(params.fogColor.rgb, 1.0));
         return;
     }
@@ -694,10 +705,10 @@ void main() {
             return;
         }
 
-        float density = max(imageLoad(froxelExtinction, idx).x, 0.0);
+        float density = ClampExtinction(imageLoad(froxelExtinction, idx).x);
         vec3 mediumColor = imageLoad(froxelLight, idx).rgb;
         ApplyVolumeDensity(worldPos, density, mediumColor);
-        imageStore(froxelExtinction, idx, vec4(max(density, 0.0), 0.0, 0.0, 0.0));
+        imageStore(froxelExtinction, idx, vec4(ClampExtinction(density), 0.0, 0.0, 0.0));
         imageStore(froxelLight, idx, vec4(mediumColor, 1.0));
         return;
     }
@@ -707,7 +718,7 @@ void main() {
             return;
         }
 
-        float density = max(imageLoad(froxelExtinction, idx).x, 0.0);
+        float density = ClampExtinction(imageLoad(froxelExtinction, idx).x);
         int velocityIndex = int(clamp(floor(params.fluidParams2.z + 0.5), 0.0, 1.0));
         int densityIndex = int(clamp(floor(params.fluidParams2.w + 0.5), 0.0, 1.0));
         bool wrapMode = params.fluidParams1.y > 0.5;
@@ -724,12 +735,12 @@ void main() {
         float baseFluidDensity = max(FluidSampleDensity(uv, densityIndex, wrapMode), 0.0);
         float advectedFluidDensity = max(FluidSampleDensity(advectedUV, densityIndex, wrapMode), 0.0);
 
-        float influence = clamp(params.fluidParams0.w * 0.2, 0.0, 8.0);
+        float influence = clamp(params.fluidParams0.w * 0.05, 0.0, 0.35);
         float blendedFluid = mix(baseFluidDensity, advectedFluidDensity, 0.75);
         density += blendedFluid * influence;
         density *= mix(1.0, clamp(params.fluidParams0.z, 0.0, 1.0), 0.35);
 
-        imageStore(froxelExtinction, idx, vec4(max(density, 0.0), 0.0, 0.0, 0.0));
+        imageStore(froxelExtinction, idx, vec4(ClampExtinction(density), 0.0, 0.0, 0.0));
         return;
     }
 
@@ -738,7 +749,7 @@ void main() {
             return;
         }
 
-        float density = max(imageLoad(froxelExtinction, idx).x, 0.0);
+        float density = ClampExtinction(imageLoad(froxelExtinction, idx).x);
         if (density <= 0.0) {
             return;
         }
@@ -759,7 +770,7 @@ void main() {
             return;
         }
 
-        float density = max(imageLoad(froxelExtinction, idx).x, 0.0);
+        float density = ClampExtinction(imageLoad(froxelExtinction, idx).x);
         if (density <= 0.0) {
             return;
         }
@@ -778,7 +789,7 @@ void main() {
 
     if (stage == STAGE_TEMPORAL) {
         vec4 current = imageLoad(froxelScattering, idx);
-        current.a = max(imageLoad(froxelExtinction, idx).x, 0.0);
+        current.a = ClampExtinction(imageLoad(froxelExtinction, idx).x);
         current = ApplyFireflyClamp(current);
 
         vec4 finalValue = current;
@@ -788,7 +799,7 @@ void main() {
         }
 
         imageStore(froxelScattering, idx, vec4(finalValue.rgb, finalValue.a));
-        imageStore(froxelExtinction, idx, vec4(finalValue.a, 0.0, 0.0, 0.0));
+        imageStore(froxelExtinction, idx, vec4(ClampExtinction(finalValue.a), 0.0, 0.0, 0.0));
         return;
     }
 }

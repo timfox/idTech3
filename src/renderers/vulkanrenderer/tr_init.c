@@ -2275,7 +2275,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_volumetricFogWindDirection, "World-space wind direction for volumetric noise advection (x y z)." );
 	ri.Cvar_SetGroup( r_volumetricFogWindDirection, CVG_RENDERER );
 
-	r_fogFluid = ri.Cvar_Get( "r_fogFluid", "1", CVAR_ARCHIVE_ND );
+	r_fogFluid = ri.Cvar_Get( "r_fogFluid", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_fogFluid, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_fogFluid, "Enable 2D fluid-driven advection for volumetric fog extinction/scattering." );
 	ri.Cvar_SetGroup( r_fogFluid, CVG_RENDERER );
