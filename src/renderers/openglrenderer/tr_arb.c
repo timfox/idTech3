@@ -656,7 +656,7 @@ static char *ARB_BuildGreyscaleProgram( char *buf ) {
 }
 
 
-static const char *gammaFP = {
+static const char gammaFPPrefix[] = {
 	"!!ARBfp1.0 \n"
 	"OPTION ARB_precision_hint_fastest; \n"
 	"PARAM gamma = program.local[0]; \n"
@@ -666,7 +666,9 @@ static const char *gammaFP = {
 	"POW base.y, base.y, gamma.y; \n"
 	"POW base.z, base.z, gamma.z; \n"
 	"MUL base.xyz, base, gamma.w; \n"
-	"%s" // for greyscale shader if needed
+};
+
+static const char gammaFPSuffix[] = {
 	"MOV base.w, 1.0; \n"
 	"MOV_SAT result.color, base; \n"
 	"END \n"
@@ -820,7 +822,7 @@ static const char *blend2FP = {
 };
 
 // combined blend + gamma correction pass
-static const char *blend2gammaFP = {
+static const char blend2gammaFPPrefix[] = {
 	"!!ARBfp1.0 \n"
 	"OPTION ARB_precision_hint_fastest; \n"
 	"PARAM gamma = program.local[0]; \n"
@@ -835,10 +837,12 @@ static const char *blend2gammaFP = {
 	"POW base.y, base.y, gamma.y; \n"
 	"POW base.z, base.z, gamma.z; \n"
 	"MUL base.xyz, base, gamma.w; \n"
-	"%s" // for greyscale shader if needed
+};
+
+static const char blend2gammaFPSuffix[] = {
 	"MOV base.w, 1.0; \n"
 	"MOV_SAT result.color, base; \n"
-	"END \n" 
+	"END \n"
 };
 
 
@@ -1008,6 +1012,7 @@ qboolean ARB_UpdatePrograms( void )
 #endif
 #if defined (USE_FBO) || defined (USE_PMLIGHT)
 	char buf[4096];
+	char program[4096];
 #endif
 
 	if ( !qglGenProgramsARB )
@@ -1046,9 +1051,12 @@ qboolean ARB_UpdatePrograms( void )
 	if ( !ARB_CompileProgram( Fragment, spriteFP, programs[ SPRITE_FRAGMENT ] ) )
 		return qfalse;
 
-#ifdef USE_FBO
-	if ( !ARB_CompileProgram( Fragment, va( gammaFP, ARB_BuildGreyscaleProgram( buf ) ), programs[ GAMMA_FRAGMENT ] ) )
-		return qfalse;
+	{
+		const char *grey = ARB_BuildGreyscaleProgram( buf );
+		Com_sprintf( program, sizeof( program ), "%s%s%s", gammaFPPrefix, grey, gammaFPSuffix );
+		if ( !ARB_CompileProgram( Fragment, program, programs[ GAMMA_FRAGMENT ] ) )
+			return qfalse;
+	}
 
 	if ( !ARB_CompileProgram( Fragment, ARB_BuildBloomProgram( buf ), programs[ BLOOM_EXTRACT_FRAGMENT ] ) )
 		return qfalse;
@@ -1073,8 +1081,12 @@ qboolean ARB_UpdatePrograms( void )
 	if ( !ARB_CompileProgram( Fragment, blend2FP, programs[ BLEND2_FRAGMENT ] ) )
 		return qfalse;
 
-	if ( !ARB_CompileProgram( Fragment, va( blend2gammaFP, ARB_BuildGreyscaleProgram( buf ) ), programs[ BLEND2_GAMMA_FRAGMENT ] ) )
-		return qfalse;
+	{
+		const char *grey = ARB_BuildGreyscaleProgram( buf );
+		Com_sprintf( program, sizeof( program ), "%s%s%s", blend2gammaFPPrefix, grey, blend2gammaFPSuffix );
+		if ( !ARB_CompileProgram( Fragment, program, programs[ BLEND2_GAMMA_FRAGMENT ] ) )
+			return qfalse;
+	}
 #endif // USE_FBO
 
 	programCompiled = 1;
