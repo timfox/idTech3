@@ -33,7 +33,7 @@
 #define USE_DEDICATED_ALLOCATION
 #endif
 //#define MIN_IMAGE_ALIGN (128*1024)
-#define MAX_ATTACHMENTS_IN_POOL (13+VK_NUM_BLOOM_PASSES*2) // depth + msaa + msaa-resolve + depth-resolve + screenmap.msaa + screenmap.resolve + screenmap.depth + bloom_extract + blur pairs + ssao + ssao_blur
+#define MAX_ATTACHMENTS_IN_POOL (32+VK_NUM_BLOOM_PASSES*2) // extra space for new SMAA buffers, screenmap, bloom, SSAO, etc.
 
 #define VK_DESC_STORAGE      0
 #define VK_DESC_UNIFORM      0
@@ -569,15 +569,22 @@ typedef struct {
 	VkDescriptorSetLayout volumetric_compute_layout;
 	VkDescriptorSetLayout volumetric_composite_layout;
 	VkDescriptorSetLayout volumetric_depth_resolve_layout;
+	VkDescriptorSetLayout volumetric_fluid_layout;
 	VkDescriptorSet volumetric_compute_descriptor;
 	VkDescriptorSet volumetric_composite_descriptor;
 	VkDescriptorSet volumetric_depth_resolve_descriptor;
+	VkDescriptorSet volumetric_fluid_descriptor;
 	VkPipelineLayout volumetric_compute_pipeline_layout;
 	VkPipelineLayout volumetric_composite_pipeline_layout;
 	VkPipelineLayout volumetric_depth_resolve_pipeline_layout;
+	VkPipelineLayout volumetric_fluid_pipeline_layout;
 	VkPipeline volumetric_compute_pipeline;
 	VkPipeline volumetric_composite_pipeline;
 	VkPipeline volumetric_depth_resolve_pipeline;
+	VkPipeline volumetric_fluid_advect_pipeline;
+	VkPipeline volumetric_fluid_divergence_pipeline;
+	VkPipeline volumetric_fluid_pressure_pipeline;
+	VkPipeline volumetric_fluid_gradient_pipeline;
 
 	VkDescriptorSet color_descriptor;
 	VkDescriptorSet depth_descriptor;
@@ -780,6 +787,10 @@ typedef struct {
 		VkShaderModule volumetric_fog_fs;
 		VkShaderModule volumetric_fog_cs;
 		VkShaderModule volumetric_depth_resolve_msaa_cs;
+		VkShaderModule fluid_advect_cs;
+		VkShaderModule fluid_divergence_cs;
+		VkShaderModule fluid_pressure_cs;
+		VkShaderModule fluid_gradient_cs;
 
 		VkShaderModule dot_fs;
 		VkShaderModule dot_vs;
@@ -895,6 +906,18 @@ typedef struct {
 	VkImage froxel_clamp_image;
 	VkImageView froxel_clamp_view;
 	VkDeviceMemory froxel_clamp_memory;
+	VkImage fluid_velocity_images[2];
+	VkImageView fluid_velocity_views[2];
+	VkDeviceMemory fluid_velocity_memory[2];
+	VkImage fluid_density_images[2];
+	VkImageView fluid_density_views[2];
+	VkDeviceMemory fluid_density_memory[2];
+	VkImage fluid_pressure_images[2];
+	VkImageView fluid_pressure_views[2];
+	VkDeviceMemory fluid_pressure_memory[2];
+	VkImage fluid_divergence_image;
+	VkImageView fluid_divergence_view;
+	VkDeviceMemory fluid_divergence_memory;
 	VkImage volumetric_depth_image;
 	VkImageView volumetric_depth_view;
 	VkImage motion_vector_image;
@@ -934,6 +957,11 @@ typedef struct {
 	uint32_t froxel_width;
 	uint32_t froxel_height;
 	uint32_t froxel_slices;
+	uint32_t fluid_width;
+	uint32_t fluid_height;
+	uint32_t fluid_velocity_index;
+	uint32_t fluid_density_index;
+	uint32_t fluid_pressure_index;
 	uint32_t sun_shadow_width;
 	uint32_t sun_shadow_height;
 	float sun_shadow_matrix0[16];

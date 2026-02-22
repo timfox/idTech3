@@ -1123,10 +1123,11 @@ set(VK_SHADER_DATA_GEN "${VK_GEN_DIR}/shader_data.c")
 set(VK_SHADER_BINDING_GEN "${VK_GEN_DIR}/shader_binding.c")
 set(VK_SHADER_GENERATED_SRCS ${VK_SHADER_DATA_GEN} ${VK_SHADER_BINDING_GEN})
 
-file(GLOB VK_SHADER_GLSL_FILES
+file(GLOB_RECURSE VK_SHADER_GLSL_FILES
   "${VK_SHADER_DIR}/glsl/*.frag"
   "${VK_SHADER_DIR}/glsl/*.vert"
   "${VK_SHADER_DIR}/glsl/*.geom"
+  "${VK_SHADER_DIR}/glsl/*.comp"
   "${VK_SHADER_DIR}/glsl/*.tmpl"
 )
 

@@ -130,6 +130,7 @@ cvar_t	*r_renderWidth;
 cvar_t	*r_renderHeight;
 cvar_t	*r_renderScale;
 cvar_t	*r_ext_supersample;
+cvar_t	*r_ext_smaa;
 
 #endif // USE_VULKAN
 
@@ -230,6 +231,15 @@ cvar_t	*r_volumetricFogNoiseThreshold;
 cvar_t	*r_volumetricFogNoiseScroll;
 cvar_t	*r_volumetricFogWindSpeed;
 cvar_t	*r_volumetricFogWindDirection;
+cvar_t	*r_fogFluid;
+cvar_t	*r_fogFluidQuality;
+cvar_t	*r_fogFluidResolutionScale;
+cvar_t	*r_fogFluidViscosity;
+cvar_t	*r_fogFluidPressureIterations;
+cvar_t	*r_fogFluidDissipation;
+cvar_t	*r_fogFluidForceScale;
+cvar_t	*r_fogFluidWrap;
+cvar_t	*r_fogFluidVelocityClamp;
 cvar_t	*r_volumetricFogValidation;
 cvar_t	*r_volumetricFogValidationPrintInterval;
 cvar_t	*r_volumetricFogForceCameraCut;
@@ -2264,6 +2274,51 @@ static void R_Register( void )
 	r_volumetricFogWindDirection = ri.Cvar_Get( "r_volumetricFogWindDirection", "1 0 0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_volumetricFogWindDirection, "World-space wind direction for volumetric noise advection (x y z)." );
 	ri.Cvar_SetGroup( r_volumetricFogWindDirection, CVG_RENDERER );
+
+	r_fogFluid = ri.Cvar_Get( "r_fogFluid", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_fogFluid, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fogFluid, "Enable 2D fluid-driven advection for volumetric fog extinction/scattering." );
+	ri.Cvar_SetGroup( r_fogFluid, CVG_RENDERER );
+
+	r_fogFluidQuality = ri.Cvar_Get( "r_fogFluidQuality", "2", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_fogFluidQuality, "0", "3", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fogFluidQuality, "Fluid quality tier: 0=low, 1=medium, 2=high, 3=ultra." );
+	ri.Cvar_SetGroup( r_fogFluidQuality, CVG_RENDERER );
+
+	r_fogFluidResolutionScale = ri.Cvar_Get( "r_fogFluidResolutionScale", "0.5", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_fogFluidResolutionScale, "0.125", "1.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_fogFluidResolutionScale, "Fluid XY grid scale relative to froxel XY resolution. Requires vid_restart." );
+	ri.Cvar_SetGroup( r_fogFluidResolutionScale, CVG_RENDERER );
+
+	r_fogFluidViscosity = ri.Cvar_Get( "r_fogFluidViscosity", "0.05", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_fogFluidViscosity, "0.0", "10.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_fogFluidViscosity, "Velocity diffusion strength for the fluid solve." );
+	ri.Cvar_SetGroup( r_fogFluidViscosity, CVG_RENDERER );
+
+	r_fogFluidPressureIterations = ri.Cvar_Get( "r_fogFluidPressureIterations", "12", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_fogFluidPressureIterations, "1", "64", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fogFluidPressureIterations, "Jacobi iterations for incompressibility projection." );
+	ri.Cvar_SetGroup( r_fogFluidPressureIterations, CVG_RENDERER );
+
+	r_fogFluidDissipation = ri.Cvar_Get( "r_fogFluidDissipation", "0.985", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_fogFluidDissipation, "0.0", "1.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_fogFluidDissipation, "Per-frame density retention (1=no loss)." );
+	ri.Cvar_SetGroup( r_fogFluidDissipation, CVG_RENDERER );
+
+	r_fogFluidForceScale = ri.Cvar_Get( "r_fogFluidForceScale", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_fogFluidForceScale, "0.0", "128.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_fogFluidForceScale, "External force scale applied to fluid velocity from wind/noise impulses." );
+	ri.Cvar_SetGroup( r_fogFluidForceScale, CVG_RENDERER );
+
+	r_fogFluidWrap = ri.Cvar_Get( "r_fogFluidWrap", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_fogFluidWrap, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fogFluidWrap, "Fluid boundary mode: 0=zero velocity walls, 1=wrap." );
+	ri.Cvar_SetGroup( r_fogFluidWrap, CVG_RENDERER );
+
+	r_fogFluidVelocityClamp = ri.Cvar_Get( "r_fogFluidVelocityClamp", "96.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_fogFluidVelocityClamp, "1.0", "4096.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_fogFluidVelocityClamp, "Maximum velocity magnitude clamp to avoid simulation blow-ups." );
+	ri.Cvar_SetGroup( r_fogFluidVelocityClamp, CVG_RENDERER );
 
 	r_volumetricFogValidation = ri.Cvar_Get( "r_volumetricFogValidation", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogValidation, "0", "1", CV_INTEGER );
