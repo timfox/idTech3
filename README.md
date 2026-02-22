@@ -33,6 +33,7 @@ This is a modernized id Tech 3 engine.
 * FLUX.2/FLUX.1 C image generation (optional, text-to-image from console with **real-time hot-reloading** and device selection; supports flux1-schnell, flux1-dev, flux2-dev; requires model files in game directory; Metal, BLAS, or pure C backend, with graceful fallback)
 
 ### Platforms
+
 * Windows
 * Linux
 * Android
