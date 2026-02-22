@@ -429,7 +429,7 @@ const char *fogInVPCode = {
 
 
 #ifdef USE_PMLIGHT
-static const char *dlightVP = {
+static const char dlightVPPrefix[] = {
 	"!!ARBvp1.0 \n"
 	"OPTION ARB_position_invariant; \n"
 	"PARAM posEye = program.local[0]; \n"
@@ -441,7 +441,9 @@ static const char *dlightVP = {
 	"SUB lv, posLight, vertex.position; \n"
 	"SUB ev, posEye, vertex.position; \n"
 	"MOV n, vertex.normal; \n"
-	"%s" // fog shader if needed
+};
+
+static const char dlightVPSuffix[] = {
 	"END \n"
 };
 
@@ -1020,11 +1022,14 @@ qboolean ARB_UpdatePrograms( void )
 	qglGenProgramsARB( ARRAY_LEN( programs ) - PROGRAM_BASE, programs + PROGRAM_BASE );
 
 #ifdef USE_PMLIGHT
-	if ( !ARB_CompileProgram( Vertex, va( dlightVP, "" ), programs[ DLIGHT_VERTEX ] ) )
+	Com_sprintf( buf, sizeof( buf ), "%s%s%s", dlightVPPrefix, "", dlightVPSuffix );
+	if ( !ARB_CompileProgram( Vertex, buf, programs[ DLIGHT_VERTEX ] ) )
 		return qfalse;
-	if ( !ARB_CompileProgram( Vertex, va( dlightVP, fogInVPCode ), programs[ DLIGHT_VERTEX_FOG_IN ] ) )
+	Com_sprintf( buf, sizeof( buf ), "%s%s%s", dlightVPPrefix, fogInVPCode, dlightVPSuffix );
+	if ( !ARB_CompileProgram( Vertex, buf, programs[ DLIGHT_VERTEX_FOG_IN ] ) )
 		return qfalse;
-	if ( !ARB_CompileProgram( Vertex, va( dlightVP, fogOutVPCode ), programs[ DLIGHT_VERTEX_FOG_OUT ] ) )
+	Com_sprintf( buf, sizeof( buf ), "%s%s%s", dlightVPPrefix, fogOutVPCode, dlightVPSuffix );
+	if ( !ARB_CompileProgram( Vertex, buf, programs[ DLIGHT_VERTEX_FOG_OUT ] ) )
 		return qfalse;
 
 	for ( i = DLIGHT_FRAGMENT; i <= DLIGHT_LINEAR_ABS_FRAGMENT_FOG; i++ ) {
