@@ -294,7 +294,7 @@ vec3 CalcSpecular( in vec3 specular, in vec3 H, in float NH, in float NL,
 
 			float lambda = 0.0;
 			float comp = 0.0;
-			float D_glint = D_GLINT_GGX( shadingFrame, H, uv, uvJac, alpha, glintParams, lambda, comp );
+			float D_glint = D_GLINT_GGX( base, H, uv, uvJac, alpha, glintParams, lambda, comp );
 			D = mix( D, D_glint, glintWeight );
 			glintDebugD = D_glint;
 			glintDebugLambda = lambda;
