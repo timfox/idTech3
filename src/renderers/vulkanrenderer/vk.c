@@ -13289,13 +13289,15 @@ static void vk_smaa_passes( void )
 
 static void vk_volumetric_fog_pass( void )
 {
-	if ( !r_volumetricFog->integer || backEnd.doneFog || !vk.fboActive ) {
+	if ( !r_volumetricFog->integer || backEnd.doneFog || !vk.fboActive ||
+		!tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
 		vk.has_prev_volumetric = qfalse;
 		vk.volumetric_frame = 0;
 		vk_prev_matrices_valid = qfalse;
 		vk_prev_volumetric_time_valid = qfalse;
 		vk_volumetric_noise_time = 0.0f;
 		Com_Memset( &vk_volumetric_validation_state, 0, sizeof( vk_volumetric_validation_state ) );
+		backEnd.doneFog = qtrue;
 		return;
 	}
 	if ( vk.froxel_volume_image == VK_NULL_HANDLE || vk.froxel_history_image == VK_NULL_HANDLE ||
@@ -13512,6 +13514,13 @@ void vk_prepare_2d( void )
 	}
 
 	vk_end_render_pass();
+
+	if ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+		vk_begin_post_bloom_render_pass();
+		backEnd.doneFog = qtrue;
+		return;
+	}
+
 	vk_volumetric_fog_pass();
 
 	// Resume drawing for 2D overlays.
