@@ -1421,6 +1421,36 @@ qboolean FS_StripExt( char *filename, const char *ext )
 }
 
 
+static const char *fs_pakExtensions[] = { ".pk3", ".zip", ".orb" };
+static const int fs_pakExtensionCount = ARRAY_LEN( fs_pakExtensions );
+
+static qboolean FS_IsPakFile( const char *filename, size_t namelen )
+{
+	int i;
+
+	for ( i = 0; i < fs_pakExtensionCount; i++ ) {
+		if ( FS_IsExt( filename, fs_pakExtensions[i], namelen ) ) {
+			return qtrue;
+		}
+	}
+
+	return qfalse;
+}
+
+static qboolean FS_StripPakExt( char *filename )
+{
+	int i;
+
+	for ( i = 0; i < fs_pakExtensionCount; i++ ) {
+		if ( FS_StripExt( filename, fs_pakExtensions[i] ) ) {
+			return qtrue;
+		}
+	}
+
+	return qfalse;
+}
+
+
 static const char *FS_HasExt( const char *fileName, const char **extList, int extCount ) 
 {
 	const char *e;
@@ -2723,7 +2753,7 @@ static qboolean FS_LoadPakFromFile( FILE *f )
 		basename++;
 
 	Q_strncpyz( pakBase, basename, sizeof( pakBase ) );
-	FS_StripExt( pakBase, ".pk3" );
+	FS_StripPakExt( pakBase );
 	pakBaseLen = (int) strlen( pakBase ) + 1;
 	pakBaseLen = PAD( pakBaseLen, sizeof( int ) );
 
@@ -3082,8 +3112,8 @@ static pack_t *FS_LoadZipFile( const char *zipfile )
 	Com_Memcpy( pack->pakFilename, zipfile, fileNameLen );
 	Com_Memcpy( pack->pakBasename, basename, baseNameLen );
 
-	// strip .pk3 if needed
-	FS_StripExt( pack->pakBasename, ".pk3" );
+	// strip pak extension if needed
+	FS_StripPakExt( pack->pakBasename );
 
 	unzGoToFirstFile( uf );
 	curFile = pack->buildBuffer;
@@ -4187,8 +4217,8 @@ static void FS_AddGameDirectory( const char *path, const char *dir ) {
 	// find all pak files in this directory
 	Q_strncpyz( curpath, FS_BuildOSPath( path, dir, NULL ), sizeof( curpath ) );
 
-	// Get .pk3 files
-	pakfiles = Sys_ListFiles( curpath, ".pk3", NULL, &numfiles, 0 );
+	// Get pak files (.pk3/.zip/.orb)
+	pakfiles = Sys_ListFiles( curpath, NULL, NULL, &numfiles, 0 );
 
 	if ( numfiles >= 2 )
 		FS_SortFileList( pakfiles, numfiles - 1 );
@@ -4226,16 +4256,16 @@ static void FS_AddGameDirectory( const char *path, const char *dir ) {
 		if ( pakwhich ) {
 
 			len = strlen( pakfiles[pakfilesi] );
-			if ( !FS_IsExt( pakfiles[pakfilesi], ".pk3", len ) ) {
-				// not a pk3 file
+			if ( !FS_IsPakFile( pakfiles[pakfilesi], len ) ) {
+				// not a pak file
 				pakfilesi++;
 				continue;
 			}
 
-			// The next .pk3 file is before the next .pk3dir
+			// The next pak file is before the next .pk3dir
 			pakfile = FS_BuildOSPath( path, dir, pakfiles[pakfilesi] );
 			if ( (pak = FS_LoadZipFile( pakfile ) ) == NULL ) {
-				// This isn't a .pk3! Next!
+				// This isn't a pak file! Next!
 				pakfilesi++;
 				continue;
 			}
@@ -4262,7 +4292,7 @@ static void FS_AddGameDirectory( const char *path, const char *dir ) {
 
 			len = strlen(pakdirs[pakdirsi]);
 
-			// The next .pk3dir is before the next .pk3 file
+			// The next .pk3dir is before the next pak file
 			// But wait, this could be any directory, we're filtering to only ending with ".pk3dir" here.
 			if (!FS_IsExt(pakdirs[pakdirsi], ".pk3dir", len)) {
 				// This isn't a .pk3dir! Next!
