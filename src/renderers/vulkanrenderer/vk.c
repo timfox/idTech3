@@ -13287,16 +13287,21 @@ static void vk_smaa_passes( void )
 	vk_run_smaa_pass( vk.smaa_compose_pipeline, vk.render_pass.smaa_compose, vk.framebuffers.smaa_compose, vk.smaa_edge_descriptor, vk.smaa_compose_descriptor, glConfig.vidWidth, glConfig.vidHeight );
 }
 
+static void vk_reset_volumetric_history( void )
+{
+	vk.has_prev_volumetric = qfalse;
+	vk.volumetric_frame = 0;
+	vk_prev_matrices_valid = qfalse;
+	vk_prev_volumetric_time_valid = qfalse;
+	vk_volumetric_noise_time = 0.0f;
+	Com_Memset( &vk_volumetric_validation_state, 0, sizeof( vk_volumetric_validation_state ) );
+}
+
 static void vk_volumetric_fog_pass( void )
 {
 	if ( !r_volumetricFog->integer || backEnd.doneFog || !vk.fboActive ||
 		!tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
-		vk.has_prev_volumetric = qfalse;
-		vk.volumetric_frame = 0;
-		vk_prev_matrices_valid = qfalse;
-		vk_prev_volumetric_time_valid = qfalse;
-		vk_volumetric_noise_time = 0.0f;
-		Com_Memset( &vk_volumetric_validation_state, 0, sizeof( vk_volumetric_validation_state ) );
+		vk_reset_volumetric_history();
 		backEnd.doneFog = qtrue;
 		return;
 	}
@@ -13513,14 +13518,13 @@ void vk_prepare_2d( void )
 		return;
 	}
 
-	vk_end_render_pass();
-
 	if ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
-		vk_begin_post_bloom_render_pass();
+		vk_reset_volumetric_history();
 		backEnd.doneFog = qtrue;
 		return;
 	}
 
+	vk_end_render_pass();
 	vk_volumetric_fog_pass();
 
 	// Resume drawing for 2D overlays.
