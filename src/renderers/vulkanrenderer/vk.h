@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stddef.h>
 #include "../rendercommon/vulkan/vulkan.h"
 #include "tr_common.h"
 
@@ -353,6 +354,11 @@ static const textureMapType_t textureMapTypes[] = {
 //
 // Initialization.
 //
+
+// Returns pending validation warnings/errors delivered through the Vulkan
+// debug report callback.  Copies at most `bufsize` bytes into `buffer`.
+// Returns qtrue when a message was consumed.
+qboolean vk_consume_validation_error( char *buffer, size_t bufsize );
 
 // Initializes VK_Instance structure.
 // After calling this function we get fully functional vulkan subsystem.

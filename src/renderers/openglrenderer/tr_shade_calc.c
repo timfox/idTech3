@@ -1198,8 +1198,6 @@ void RB_CalcRotateTexCoords( float degsPerSecond, float *src, float *dst )
 **
 ** Calculates specular coefficient and places it in the alpha channel
 */
-vec3_t lightOrigin = { -960, 1980, 96 };		// FIXME: track dynamically
-
 void RB_CalcSpecularAlpha( unsigned char *alphas ) {
 	int			i;
 	const float *v, *normal;
@@ -1208,19 +1206,23 @@ void RB_CalcSpecularAlpha( unsigned char *alphas ) {
 	int			b;
 	vec3_t		lightDir;
 	int			numVertexes;
+	const trRefEntity_t *ent = backEnd.currentEntity;
 
 	v = tess.xyz[0];
 	normal = tess.normal[0];
 
 	alphas += 3;
 
+	if ( ent ) {
+		VectorCopy( ent->lightDir, lightDir );
+	} else {
+		VectorCopy( tr.sunDirection, lightDir );
+	}
+	VectorNormalizeFast( lightDir );
+
 	numVertexes = tess.numVertexes;
 	for (i = 0 ; i < numVertexes ; i++, v += 4, normal += 4, alphas += 4) {
 		float ilength;
-
-		VectorSubtract( lightOrigin, v, lightDir );
-//		ilength = Q_rsqrt( DotProduct( lightDir, lightDir ) );
-		VectorNormalizeFast( lightDir );
 
 		// calculate the specular color
 		d = DotProduct (normal, lightDir);

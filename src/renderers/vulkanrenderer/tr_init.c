@@ -747,6 +747,11 @@ GL_CheckErrors
 */
 void GL_CheckErrors( void ) {
 #ifdef USE_VULKAN
+	char validation_msg[512];
+
+	if ( vk_consume_validation_error( validation_msg, sizeof( validation_msg ) ) ) {
+		ri.Error( ERR_FATAL, "Vulkan validation: %s", validation_msg );
+	}
 #else
 	int		err;
     const char *s;

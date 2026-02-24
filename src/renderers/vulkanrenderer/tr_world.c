@@ -298,11 +298,7 @@ static int R_DlightGrid( srfGridMesh_t *grid, int dlightBits ) {
 
 
 static int R_DlightTrisurf( srfTriangles_t *surf, int dlightBits ) {
-	// FIXME: more dlight culling to trisurfs...
-	surf->dlightBits = dlightBits;
-	return dlightBits;
-#if 0
-	int			i;
+	int				i;
 	const dlight_t	*dl;
 
 	for ( i = 0 ; i < (int)tr.refdef.num_dlights ; i++ ) {
@@ -310,12 +306,12 @@ static int R_DlightTrisurf( srfTriangles_t *surf, int dlightBits ) {
 			continue;
 		}
 		dl = &tr.refdef.dlights[i];
-		if ( dl->origin[0] - dl->radius > grid->meshBounds[1][0]
-			|| dl->origin[0] + dl->radius < grid->meshBounds[0][0]
-			|| dl->origin[1] - dl->radius > grid->meshBounds[1][1]
-			|| dl->origin[1] + dl->radius < grid->meshBounds[0][1]
-			|| dl->origin[2] - dl->radius > grid->meshBounds[1][2]
-			|| dl->origin[2] + dl->radius < grid->meshBounds[0][2] ) {
+		if ( dl->origin[0] - dl->radius > surf->bounds[1][0]
+			|| dl->origin[0] + dl->radius < surf->bounds[0][0]
+			|| dl->origin[1] - dl->radius > surf->bounds[1][1]
+			|| dl->origin[1] + dl->radius < surf->bounds[0][1]
+			|| dl->origin[2] - dl->radius > surf->bounds[1][2]
+			|| dl->origin[2] + dl->radius < surf->bounds[0][2] ) {
 			// dlight doesn't reach the bounds
 			dlightBits &= ~( 1 << i );
 		}
@@ -325,9 +321,8 @@ static int R_DlightTrisurf( srfTriangles_t *surf, int dlightBits ) {
 		tr.pc.c_dlightSurfacesCulled++;
 	}
 
-	grid->dlightBits = dlightBits;
+	surf->dlightBits = dlightBits;
 	return dlightBits;
-#endif
 }
 
 
