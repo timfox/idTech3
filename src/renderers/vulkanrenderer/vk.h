@@ -255,6 +255,9 @@ typedef struct vkUniform_s {
 	vec4_t pbrSubsurfaceColor;
 	vec4_t pbrSubsurfaceParams;
 	vec4_t pbrAdvancedParams; // x: multi-scatter toggle, y: multi-scatter strength
+	vec4_t pbrGlintParams0;
+	vec4_t pbrGlintParams1;
+	vec4_t pbrGlintFlags;
 	vec4_t pbrDebugMode; // x: debug mode selector
 	vec4_t pbrShCoeffs[9];
 #endif
