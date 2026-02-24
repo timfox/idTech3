@@ -281,7 +281,7 @@ vec3 CalcSpecular( in vec3 specular, in vec3 H, in float NH, in float NL,
 	float glintMode = pbrGlintFlags.y;
 
 	if ( glintEnabled > 0.5 && glintMode >= 0.5 && roughness < roughnessHi ) {
-		float glintWeight = smoothstep( roughnessHi, roughnessLo, roughness );
+		float glintWeight = clamp( 1.0 - smoothstep( roughnessLo, roughnessHi, roughness ), 0.0, 1.0 );
 		if ( glintWeight > 0.0 ) {
 			mat2 uvJac = mat2( dFdx( uv ), dFdy( uv ) );
 			GlintParams glintParams;
