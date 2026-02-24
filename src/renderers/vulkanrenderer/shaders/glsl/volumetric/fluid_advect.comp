@@ -16,6 +16,7 @@ layout(binding = 10, r16f) uniform image2D pressureAWrite;
 layout(binding = 11, r16f) uniform image2D pressureBWrite;
 layout(binding = 12, r16f) uniform image2D divergenceWrite;
 layout(binding = 13) uniform sampler2D divergenceRead;
+layout(binding = 15, r32ui) uniform uimage2D telemetryCounters;
 
 const int MAX_VOLUMES = 24;
 const int MAX_LIGHTS = 32;
@@ -63,7 +64,20 @@ layout(std140, binding = 14) uniform VolumetricParams {
     vec4 fluidParams1;
     vec4 fluidParams2;
     vec4 fluidWorldMap;
+    vec4 telemetryParams0;
+    vec4 telemetryParams1;
 } params;
+
+const int TELEMETRY_NAN_INF = 0;
+const int TELEMETRY_EXTINCTION_CLAMP = 1;
+const int TELEMETRY_VELOCITY_CLAMP = 2;
+const int TELEMETRY_DENSITY_CLAMP = 3;
+const int TELEMETRY_PRESSURE_SANITIZE = 4;
+const int TELEMETRY_TEMPORAL_REJECT = 5;
+
+void TelemetryIncrement(int counterIndex) {
+    imageAtomicAdd(telemetryCounters, ivec2(counterIndex, 0), 1u);
+}
 
 float hash12(vec2 p) {
     vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -121,8 +135,16 @@ void storeVelocity(int index, ivec2 coord, vec2 value) {
 }
 
 void storeDensity(int index, ivec2 coord, float value) {
-    float d = finite1(value) ? value : 0.0;
-    vec4 v = vec4(clamp(d, 0.0, 1.0), 0.0, 0.0, 0.0);
+    float d = value;
+    if (!finite1(d)) {
+        TelemetryIncrement(TELEMETRY_NAN_INF);
+        d = 0.0;
+    }
+    float clamped = clamp(d, 0.0, 1.0);
+    if (abs(clamped - d) > 1e-5) {
+        TelemetryIncrement(TELEMETRY_DENSITY_CLAMP);
+    }
+    vec4 v = vec4(clamped, 0.0, 0.0, 0.0);
     if (index == 0) {
         imageStore(densityAWrite, coord, v);
     } else {
@@ -183,8 +205,10 @@ void main() {
         float m = length(nextVel);
         if (m > velMax) {
             nextVel *= velMax / m;
+            TelemetryIncrement(TELEMETRY_VELOCITY_CLAMP);
         }
         if (!finite1(nextVel.x) || !finite1(nextVel.y)) {
+            TelemetryIncrement(TELEMETRY_NAN_INF);
             nextVel = vec2(0.0);
         }
 

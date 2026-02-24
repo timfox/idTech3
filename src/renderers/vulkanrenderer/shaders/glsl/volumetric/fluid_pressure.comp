@@ -16,6 +16,7 @@ layout(binding = 10, r16f) uniform image2D pressureAWrite;
 layout(binding = 11, r16f) uniform image2D pressureBWrite;
 layout(binding = 12, r16f) uniform image2D divergenceWrite;
 layout(binding = 13) uniform sampler2D divergenceRead;
+layout(binding = 15, r32ui) uniform uimage2D telemetryCounters;
 
 const int MAX_VOLUMES = 24;
 const int MAX_LIGHTS = 32;
@@ -63,7 +64,16 @@ layout(std140, binding = 14) uniform VolumetricParams {
     vec4 fluidParams1;
     vec4 fluidParams2;
     vec4 fluidWorldMap;
+    vec4 telemetryParams0;
+    vec4 telemetryParams1;
 } params;
+
+const int TELEMETRY_NAN_INF = 0;
+const int TELEMETRY_PRESSURE_SANITIZE = 4;
+
+void TelemetryIncrement(int counterIndex) {
+    imageAtomicAdd(telemetryCounters, ivec2(counterIndex, 0), 1u);
+}
 
 ivec2 fluidDim() {
     return ivec2(max(params.fluidParams2.xy, vec2(1.0)));
@@ -108,8 +118,17 @@ float fetchDivergence(ivec2 coord, ivec2 dim, bool wrap) {
 }
 
 void storePressure(int index, ivec2 coord, float value) {
-    float p = finite1(value) ? value : 0.0;
-    p = clamp(p, -65504.0, 65504.0);
+    float p = value;
+    if (!finite1(p)) {
+        TelemetryIncrement(TELEMETRY_NAN_INF);
+        TelemetryIncrement(TELEMETRY_PRESSURE_SANITIZE);
+        p = 0.0;
+    }
+    float clamped = clamp(p, -65504.0, 65504.0);
+    if (abs(clamped - p) > 1e-5) {
+        TelemetryIncrement(TELEMETRY_PRESSURE_SANITIZE);
+    }
+    p = clamped;
     if (index == 0) {
         imageStore(pressureAWrite, coord, vec4(p, 0.0, 0.0, 0.0));
     } else {
