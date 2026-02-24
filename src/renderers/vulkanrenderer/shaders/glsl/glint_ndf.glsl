@@ -14,6 +14,15 @@ outputs are stable without temporal noise.
 const float GLINT_PI = 3.14159265358979323846;
 const float GLINT_TWO_PI = 2.0 * GLINT_PI;
 
+struct GlintParams {
+	float density;				// actual particle density after exp(10, value) base scaling
+	float microfacetRoughness;	// microfacet lattice roughness (smaller = sharper glints)
+	float pixelFilterSize;		// pixel filter radius multiplier (controls uv filtering)
+	float sampleBudget;			// 0=1 tap, 1=2 taps, 2=4 taps
+	float maxLodClamp;			// clamp for the computed glint LOD
+	float dClamp;				// clamp to prevent the final D term from spiking
+};
+
 vec2 lambert( vec3 v ) {
 	return v.xy / sqrt( max( 1e-6, 1.0 + v.z ) );
 }
@@ -190,22 +199,25 @@ float ndf(
 }
 
 float D_GLINT_GGX(
-	mat3 base,
+	mat3 shadingFrame,
 	vec3 H,
 	vec2 uv,
 	mat2 uv_J,
 	float alpha,
-	float density,
-	float microfacetRoughness,
-	float pixelFilterSize,
-	int sampleBudget,
-	float maxLodClamp,
+	GlintParams params,
 	out float outLambda,
 	out float outComp )
 {
-	vec3 h_local = normalize( transpose( base ) * H );
-	float D = ndf( h_local, alpha, microfacetRoughness, uv, uv_J, density, pixelFilterSize, sampleBudget, maxLodClamp, outLambda, outComp );
-	return max( 0.0, D );
+	vec3 h_local = normalize( transpose( shadingFrame ) * H );
+	float density = max( params.density, 1e-3 );
+	float microRough = max( params.microfacetRoughness, 1e-4 );
+	float pixelFilter = max( params.pixelFilterSize, 0.5 );
+	float maxLod = max( params.maxLodClamp, 0.0 );
+	int budget = clamp( int( floor( params.sampleBudget + 0.5 ) ), 0, 2 );
+	float clampD = max( params.dClamp, 1.0 );
+
+	float D = ndf( h_local, alpha, microRough, uv, uv_J, density, pixelFilter, budget, maxLod, outLambda, outComp );
+	return min( clampD, max( 0.0, D ) );
 }
 
 #endif // GLINT_NDF_GLSL
