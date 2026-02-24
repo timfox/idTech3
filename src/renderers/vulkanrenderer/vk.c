@@ -13521,6 +13521,7 @@ void vk_prepare_2d( void )
 	if ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
 		vk_reset_volumetric_history();
 		backEnd.doneFog = qtrue;
+		vk_begin_post_bloom_render_pass();
 		return;
 	}
 
