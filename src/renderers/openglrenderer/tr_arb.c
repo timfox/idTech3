@@ -1012,7 +1012,7 @@ qboolean ARB_UpdatePrograms( void )
 #endif
 #if defined (USE_FBO) || defined (USE_PMLIGHT)
 	char buf[4096];
-	char program[4096];
+	char programText[4096];
 #endif
 
 	if ( !qglGenProgramsARB )
@@ -1053,8 +1053,8 @@ qboolean ARB_UpdatePrograms( void )
 
 	{
 		const char *grey = ARB_BuildGreyscaleProgram( buf );
-		Com_sprintf( program, sizeof( program ), "%s%s%s", gammaFPPrefix, grey, gammaFPSuffix );
-		if ( !ARB_CompileProgram( Fragment, program, programs[ GAMMA_FRAGMENT ] ) )
+		Com_sprintf( programText, sizeof( programText ), "%s%s%s", gammaFPPrefix, grey, gammaFPSuffix );
+		if ( !ARB_CompileProgram( Fragment, programText, programs[ GAMMA_FRAGMENT ] ) )
 			return qfalse;
 	}
 
@@ -1083,11 +1083,10 @@ qboolean ARB_UpdatePrograms( void )
 
 	{
 		const char *grey = ARB_BuildGreyscaleProgram( buf );
-		Com_sprintf( program, sizeof( program ), "%s%s%s", blend2gammaFPPrefix, grey, blend2gammaFPSuffix );
-		if ( !ARB_CompileProgram( Fragment, program, programs[ BLEND2_GAMMA_FRAGMENT ] ) )
+		Com_sprintf( programText, sizeof( programText ), "%s%s%s", blend2gammaFPPrefix, grey, blend2gammaFPSuffix );
+		if ( !ARB_CompileProgram( Fragment, programText, programs[ BLEND2_GAMMA_FRAGMENT ] ) )
 			return qfalse;
 	}
-#endif // USE_FBO
 
 	programCompiled = 1;
 

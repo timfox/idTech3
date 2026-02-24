@@ -16,6 +16,7 @@ layout(binding = 10, r16f) uniform image2D pressureAWrite;
 layout(binding = 11, r16f) uniform image2D pressureBWrite;
 layout(binding = 12, r16f) uniform image2D divergenceWrite;
 layout(binding = 13) uniform sampler2D divergenceRead;
+layout(binding = 15, r32ui) uniform uimage2D telemetryCounters;
 
 const int MAX_VOLUMES = 24;
 const int MAX_LIGHTS = 32;
@@ -63,7 +64,15 @@ layout(std140, binding = 14) uniform VolumetricParams {
     vec4 fluidParams1;
     vec4 fluidParams2;
     vec4 fluidWorldMap;
+    vec4 telemetryParams0;
+    vec4 telemetryParams1;
 } params;
+
+const int TELEMETRY_NAN_INF = 0;
+
+void TelemetryIncrement(int counterIndex) {
+    imageAtomicAdd(telemetryCounters, ivec2(counterIndex, 0), 1u);
+}
 
 ivec2 fluidDim() {
     return ivec2(max(params.fluidParams2.xy, vec2(1.0)));
@@ -124,6 +133,7 @@ void main() {
 
     float div = 0.5 * ((vR.x - vL.x) + (vT.y - vB.y));
     if (!finite1(div)) {
+        TelemetryIncrement(TELEMETRY_NAN_INF);
         div = 0.0;
     }
     div = clamp(div, -65504.0, 65504.0);

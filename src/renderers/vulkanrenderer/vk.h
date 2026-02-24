@@ -570,6 +570,7 @@ typedef struct {
 	VkDescriptorSetLayout volumetric_composite_layout;
 	VkDescriptorSetLayout volumetric_depth_resolve_layout;
 	VkDescriptorSetLayout volumetric_fluid_layout;
+	VkQueryPool volumetric_query_pool;
 	VkDescriptorSet volumetric_compute_descriptor;
 	VkDescriptorSet volumetric_composite_descriptor;
 	VkDescriptorSet volumetric_depth_resolve_descriptor;
@@ -918,6 +919,9 @@ typedef struct {
 	VkImage fluid_divergence_image;
 	VkImageView fluid_divergence_view;
 	VkDeviceMemory fluid_divergence_memory;
+	VkImage volumetric_telemetry_image;
+	VkImageView volumetric_telemetry_view;
+	VkDeviceMemory volumetric_telemetry_memory;
 	VkImage volumetric_depth_image;
 	VkImageView volumetric_depth_view;
 	VkImage motion_vector_image;
@@ -959,9 +963,17 @@ typedef struct {
 	uint32_t froxel_slices;
 	uint32_t fluid_width;
 	uint32_t fluid_height;
+	uint32_t fluid_active_width;
+	uint32_t fluid_active_height;
 	uint32_t fluid_velocity_index;
 	uint32_t fluid_density_index;
 	uint32_t fluid_pressure_index;
+	float volumetric_stage_ms[16];
+	float volumetric_total_ms;
+	float volumetric_fluid_ms;
+	float volumetric_timestamp_period_ns;
+	float fluid_dynamic_resolution_scale;
+	int fluid_dynamic_pressure_iterations;
 	uint32_t sun_shadow_width;
 	uint32_t sun_shadow_height;
 	float sun_shadow_matrix0[16];

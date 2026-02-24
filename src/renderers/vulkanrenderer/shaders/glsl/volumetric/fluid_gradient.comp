@@ -16,6 +16,7 @@ layout(binding = 10, r16f) uniform image2D pressureAWrite;
 layout(binding = 11, r16f) uniform image2D pressureBWrite;
 layout(binding = 12, r16f) uniform image2D divergenceWrite;
 layout(binding = 13) uniform sampler2D divergenceRead;
+layout(binding = 15, r32ui) uniform uimage2D telemetryCounters;
 
 const int MAX_VOLUMES = 24;
 const int MAX_LIGHTS = 32;
@@ -63,7 +64,16 @@ layout(std140, binding = 14) uniform VolumetricParams {
     vec4 fluidParams1;
     vec4 fluidParams2;
     vec4 fluidWorldMap;
+    vec4 telemetryParams0;
+    vec4 telemetryParams1;
 } params;
+
+const int TELEMETRY_NAN_INF = 0;
+const int TELEMETRY_VELOCITY_CLAMP = 2;
+
+void TelemetryIncrement(int counterIndex) {
+    imageAtomicAdd(telemetryCounters, ivec2(counterIndex, 0), 1u);
+}
 
 ivec2 fluidDim() {
     return ivec2(max(params.fluidParams2.xy, vec2(1.0)));
@@ -110,12 +120,14 @@ float fetchPressure(int index, ivec2 coord, ivec2 dim, bool wrap) {
 void storeVelocity(int index, ivec2 coord, vec2 velocity) {
     vec2 v = velocity;
     if (!finite1(v.x) || !finite1(v.y)) {
+        TelemetryIncrement(TELEMETRY_NAN_INF);
         v = vec2(0.0);
     }
     float maxVelocity = max(params.fluidParams1.x, 1.0);
     float mag = length(v);
     if (mag > maxVelocity) {
         v *= maxVelocity / mag;
+        TelemetryIncrement(TELEMETRY_VELOCITY_CLAMP);
     }
     if (index == 0) {
         imageStore(velocityAWrite, coord, vec4(v, 0.0, 0.0));

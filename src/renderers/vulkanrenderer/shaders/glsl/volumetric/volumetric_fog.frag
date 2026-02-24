@@ -10,6 +10,7 @@ layout(binding = 3) uniform sampler3D froxelExtinction;
 layout(binding = 5) uniform sampler2D motionTexture;
 layout(binding = 6) uniform sampler2D localSpotShadowMap;
 layout(binding = 7) uniform sampler2DArray localPointShadowMap;
+layout(binding = 8) uniform usampler2D telemetryTexture;
 
 const int MAX_VOLUMES = 24;
 const int MAX_LIGHTS = 32;
@@ -53,6 +54,12 @@ layout(std140, binding = 4) uniform VolumetricParams {
     vec4 localShadowAtlasUv[MAX_LIGHTS];
     vec4 localSpotShadowMapSize;
     vec4 localPointShadowMapSize;
+    vec4 fluidParams0;
+    vec4 fluidParams1;
+    vec4 fluidParams2;
+    vec4 fluidWorldMap;
+    vec4 telemetryParams0;
+    vec4 telemetryParams1;
 } params;
 
 float hash12(vec2 p) {
@@ -67,6 +74,11 @@ float saturate(float v) {
 
 bool isFinite1(float v) {
     return !(isnan(v) || isinf(v));
+}
+
+float telemetryNormalize(uint counterValue) {
+    float c = float(counterValue);
+    return clamp(log2(c + 1.0) / 12.0, 0.0, 1.0);
 }
 
 float decodeClipZ(float depthSample, int depthMode) {
@@ -253,7 +265,7 @@ int findFirstShadowedLightIndex(bool wantSpot) {
 void main() {
     float depthSample = texture(depthTexture, v_UV).r;
     int depthMode = int(clamp(floor(params.miscParams.y + 0.5), 0.0, 2.0));
-    int fogDebug = int(clamp(floor(params.gridDim.w + 0.5), 0.0, 10.0));
+    int fogDebug = int(clamp(floor(params.gridDim.w + 0.5), 0.0, 13.0));
     float frameIndex = params.miscParams.z;
     float nearPlane = getNearPlane();
     float farPlane = getFarPlane(nearPlane);
@@ -372,7 +384,43 @@ void main() {
         fragColor = vec4(hasHistory, cameraCut, temporalWeight, 1.0);
         return;
     }
+    if (fogDebug == 11) {
+        const vec3 palette[6] = vec3[6](
+            vec3(1.0, 0.25, 0.25),
+            vec3(1.0, 0.7, 0.15),
+            vec3(0.2, 0.75, 1.0),
+            vec3(0.3, 1.0, 0.45),
+            vec3(0.95, 0.45, 1.0),
+            vec3(1.0, 1.0, 0.35)
+        );
+        float lane = clamp(v_UV.x, 0.0, 0.9999) * 6.0;
+        int idx = int(floor(lane));
+        float counterNorm = telemetryNormalize(texelFetch(telemetryTexture, ivec2(idx, 0), 0).r);
+        float filled = (v_UV.y <= counterNorm) ? 1.0 : 0.0;
+        vec3 col = mix(vec3(0.02), palette[idx], filled);
+        fragColor = vec4(col, 1.0);
+        return;
+    }
+    if (fogDebug == 12) {
+        float targetMs = max(params.telemetryParams0.w, 0.1);
+        float totalMs = max(params.telemetryParams1.x, 0.0);
+        float fluidMs = max(params.telemetryParams1.y, 0.0);
+        float dynScale = clamp(params.telemetryParams1.z, 0.0, 1.0);
+        float dynIters = clamp(params.telemetryParams1.w / 32.0, 0.0, 1.0);
+        float totalNorm = clamp(totalMs / targetMs, 0.0, 2.0) * 0.5;
+        float fluidNorm = clamp(fluidMs / targetMs, 0.0, 2.0) * 0.5;
+        fragColor = vec4(totalNorm, fluidNorm, dynScale, dynIters);
+        return;
+    }
 
     vec3 outRgb = scene * transmittance + fogRadiance;
+    if (fogDebug == 13) {
+        vec3 fogDelta = outRgb - scene;
+        float fogAmount = clamp(dot(abs(fogDelta), vec3(0.3333)) * 6.0, 0.0, 1.0);
+        float extinction = clamp(1.0 - transmittance, 0.0, 1.0);
+        vec3 heat = mix(vec3(0.0, 0.10, 0.65), vec3(1.0, 0.28, 0.0), fogAmount);
+        fragColor = vec4(heat * fogAmount + vec3(0.0, extinction * 0.35, 0.0), 1.0);
+        return;
+    }
     fragColor = vec4(outRgb, 1.0);
 }

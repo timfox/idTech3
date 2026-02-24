@@ -240,9 +240,21 @@ cvar_t	*r_fogFluidDissipation;
 cvar_t	*r_fogFluidForceScale;
 cvar_t	*r_fogFluidWrap;
 cvar_t	*r_fogFluidVelocityClamp;
+cvar_t	*r_fogFluidAutoScale;
+cvar_t	*r_fogFluidTargetMs;
+cvar_t	*r_fogFluidAutoScaleRate;
+cvar_t	*r_fogFluidAutoScaleMinResolution;
+cvar_t	*r_fogFluidAutoScaleMinIterations;
+cvar_t	*r_fogFluidFlowFieldStrength;
+cvar_t	*r_fogFluidFlowFieldScale;
 cvar_t	*r_volumetricFogValidation;
 cvar_t	*r_volumetricFogValidationPrintInterval;
 cvar_t	*r_volumetricFogForceCameraCut;
+cvar_t	*r_volumetricFogPerfTimers;
+cvar_t	*r_volumetricFogPerfPrintInterval;
+cvar_t	*r_volumetricFogTemporalStability;
+cvar_t	*r_volumetricFogShadowContrast;
+cvar_t	*r_volumetricFogShowcase;
 cvar_t	*r_fog_shadows;
 cvar_t	*r_fogShadowMapSize;
 cvar_t	*r_fogShadowBias;
@@ -2320,6 +2332,41 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_fogFluidVelocityClamp, "Maximum velocity magnitude clamp to avoid simulation blow-ups." );
 	ri.Cvar_SetGroup( r_fogFluidVelocityClamp, CVG_RENDERER );
 
+	r_fogFluidAutoScale = ri.Cvar_Get( "r_fogFluidAutoScale", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_fogFluidAutoScale, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fogFluidAutoScale, "Auto-adjust fluid pressure iterations and effective simulation resolution to keep GPU time in budget." );
+	ri.Cvar_SetGroup( r_fogFluidAutoScale, CVG_RENDERER );
+
+	r_fogFluidTargetMs = ri.Cvar_Get( "r_fogFluidTargetMs", "1.2", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_fogFluidTargetMs, "0.1", "8.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_fogFluidTargetMs, "Target GPU milliseconds budget for fluid simulation auto-scaling." );
+	ri.Cvar_SetGroup( r_fogFluidTargetMs, CVG_RENDERER );
+
+	r_fogFluidAutoScaleRate = ri.Cvar_Get( "r_fogFluidAutoScaleRate", "0.08", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_fogFluidAutoScaleRate, "0.01", "1.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_fogFluidAutoScaleRate, "Adaptation speed for fluid auto-scaling (higher reacts faster)." );
+	ri.Cvar_SetGroup( r_fogFluidAutoScaleRate, CVG_RENDERER );
+
+	r_fogFluidAutoScaleMinResolution = ri.Cvar_Get( "r_fogFluidAutoScaleMinResolution", "0.45", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_fogFluidAutoScaleMinResolution, "0.125", "1.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_fogFluidAutoScaleMinResolution, "Minimum effective internal fluid resolution multiplier used by auto-scaling." );
+	ri.Cvar_SetGroup( r_fogFluidAutoScaleMinResolution, CVG_RENDERER );
+
+	r_fogFluidAutoScaleMinIterations = ri.Cvar_Get( "r_fogFluidAutoScaleMinIterations", "6", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_fogFluidAutoScaleMinIterations, "1", "64", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fogFluidAutoScaleMinIterations, "Minimum pressure iterations allowed by fluid auto-scaling." );
+	ri.Cvar_SetGroup( r_fogFluidAutoScaleMinIterations, CVG_RENDERER );
+
+	r_fogFluidFlowFieldStrength = ri.Cvar_Get( "r_fogFluidFlowFieldStrength", "0.35", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_fogFluidFlowFieldStrength, "0.0", "4.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_fogFluidFlowFieldStrength, "Art-driven noise flow influence strength when advecting fog with the fluid field." );
+	ri.Cvar_SetGroup( r_fogFluidFlowFieldStrength, CVG_RENDERER );
+
+	r_fogFluidFlowFieldScale = ri.Cvar_Get( "r_fogFluidFlowFieldScale", "0.004", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_fogFluidFlowFieldScale, "0.0001", "1.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_fogFluidFlowFieldScale, "World-space scale for the art-driven flow field sampled from 3D fog noise." );
+	ri.Cvar_SetGroup( r_fogFluidFlowFieldScale, CVG_RENDERER );
+
 	r_volumetricFogValidation = ri.Cvar_Get( "r_volumetricFogValidation", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogValidation, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_volumetricFogValidation, "Enable periodic runtime validation logging for volumetric fog checklist checks." );
@@ -2334,6 +2381,31 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_volumetricFogForceCameraCut, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_volumetricFogForceCameraCut, "One-shot debug trigger to force a volumetric camera-cut history reset on the next frame." );
 	ri.Cvar_SetGroup( r_volumetricFogForceCameraCut, CVG_RENDERER );
+
+	r_volumetricFogPerfTimers = ri.Cvar_Get( "r_volumetricFogPerfTimers", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogPerfTimers, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_volumetricFogPerfTimers, "Enable Vulkan timestamp profiling for volumetric fog stages and fluid auto-scaling." );
+	ri.Cvar_SetGroup( r_volumetricFogPerfTimers, CVG_RENDERER );
+
+	r_volumetricFogPerfPrintInterval = ri.Cvar_Get( "r_volumetricFogPerfPrintInterval", "120", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogPerfPrintInterval, "1", "6000", CV_INTEGER );
+	ri.Cvar_SetDescription( r_volumetricFogPerfPrintInterval, "Frame interval between printed volumetric performance timer lines when perf timers are enabled." );
+	ri.Cvar_SetGroup( r_volumetricFogPerfPrintInterval, CVG_RENDERER );
+
+	r_volumetricFogTemporalStability = ri.Cvar_Get( "r_volumetricFogTemporalStability", "0.7", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogTemporalStability, "0.0", "1.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogTemporalStability, "Additional temporal stabilization strength for volumetric history blending." );
+	ri.Cvar_SetGroup( r_volumetricFogTemporalStability, CVG_RENDERER );
+
+	r_volumetricFogShadowContrast = ri.Cvar_Get( "r_volumetricFogShadowContrast", "1.35", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogShadowContrast, "0.5", "4.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogShadowContrast, "Shadow contrast shaping for volumetric sun/local light scattering." );
+	ri.Cvar_SetGroup( r_volumetricFogShadowContrast, CVG_RENDERER );
+
+	r_volumetricFogShowcase = ri.Cvar_Get( "r_volumetricFogShowcase", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogShowcase, "0", "3", CV_INTEGER );
+	ri.Cvar_SetDescription( r_volumetricFogShowcase, "Showcase presets for visibly stronger fog in regular maps: 0=off, 1=cinematic haze, 2=heavy shafts, 3=full-force stress test." );
+	ri.Cvar_SetGroup( r_volumetricFogShowcase, CVG_RENDERER );
 
 	r_fog_shadows = ri.Cvar_Get( "r_fog_shadows", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_fog_shadows, "0", "1", CV_INTEGER );
@@ -2366,8 +2438,8 @@ static void R_Register( void )
 	ri.Cvar_SetGroup( r_fogShadowPadding, CVG_RENDERER );
 
 	r_fogDebug = ri.Cvar_Get( "r_fogDebug", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_fogDebug, "0", "10", CV_INTEGER );
-	ri.Cvar_SetDescription( r_fogDebug, "Volumetric fog debug view: 0=off, 1=froxel coords, 2=extinction slice, 3=scattering slice, 4=temporal validity/weight, 5=integrated transmittance, 6=sun-shadow debug slice, 7=motion magnitude/threshold, 8=local spot-shadow visibility, 9=local point-shadow visibility, 10=camera-cut/reset state." );
+	ri.Cvar_CheckRange( r_fogDebug, "0", "13", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fogDebug, "Volumetric fog debug view: 0=off, 1=froxel coords, 2=extinction slice, 3=scattering slice, 4=temporal validity/weight, 5=integrated transmittance, 6=sun-shadow debug slice, 7=motion magnitude/threshold, 8=local spot-shadow visibility, 9=local point-shadow visibility, 10=camera-cut/reset state, 11=GPU safety telemetry counters, 12=perf budget/autoscale state, 13=fog contribution heatmap." );
 	ri.Cvar_SetGroup( r_fogDebug, CVG_RENDERER );
 
 	r_froxelDebug = ri.Cvar_Get( "r_froxelDebug", "0", CVAR_ARCHIVE_ND );
