@@ -91,6 +91,16 @@ cvar_t	*r_pbr_debug;
 cvar_t	*r_pbr_packedPreferred;
 cvar_t	*r_pbr_multiScatter;
 cvar_t	*r_pbr_multiScatterStrength;
+cvar_t	*r_glint;
+cvar_t	*r_glintMode;
+cvar_t	*r_glintDensity;
+cvar_t	*r_glintMicrofacetRoughness;
+cvar_t	*r_glintPixelFilterSize;
+cvar_t	*r_glintSampleBudget;
+cvar_t	*r_glintMaxLodClamp;
+cvar_t	*r_glintRoughnessLo;
+cvar_t	*r_glintRoughnessHi;
+cvar_t	*r_glintDMax;
 #ifdef VK_CUBEMAP
 cvar_t	*r_pbr_iblIrradianceSize;
 cvar_t	*r_pbr_iblPrefilterSize;
@@ -1803,14 +1813,58 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_pbr_shExtract, "Extract SH coefficients from generated irradiance cubemaps for PBR." );
 
 	r_pbr_debug = ri.Cvar_Get( "r_pbr_debug", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_pbr_debug, "0", "4", CV_INTEGER );
+	ri.Cvar_CheckRange( r_pbr_debug, "0", "8", CV_INTEGER );
 	ri.Cvar_SetDescription( r_pbr_debug,
 		"PBR debug view override (Vulkan PBR only):\n"
 		" 0 - off (standard PBR)\n"
 		" 1 - show direct lighting only\n"
 		" 2 - show specular environment contribution only\n"
 		" 3 - show diffuse irradiance only\n"
-		" 4 - show env/irradiance cubemap samples\n" );
+		" 4 - show env/irradiance cubemap samples\n"
+		" 5 - show glint D term (log)\n"
+		" 6 - show glint lambda (LOD)\n"
+		" 7 - show glint compensation\n"
+		" 8 - show glint weight\n" );
+
+	r_glint = ri.Cvar_Get( "r_glint", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_glint, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_glint, "Master toggle for the glint-based microfacet NDF (requires \\r_pbr 1)." );
+
+	r_glintMode = ri.Cvar_Get( "r_glintMode", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_glintMode, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_glintMode, "Glint behavior mode: 0 = off, 1 = replace the GGX D term." );
+
+	r_glintDensity = ri.Cvar_Get( "r_glintDensity", "3.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_glintDensity, "-4.0", "6.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_glintDensity, "Log10 density control for glint particles (N = 1e3 * pow(10, value))." );
+
+	r_glintMicrofacetRoughness = ri.Cvar_Get( "r_glintMicrofacetRoughness", "0.01", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_glintMicrofacetRoughness, "0.001", "0.1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_glintMicrofacetRoughness, "Microfacet roughness for the glint lattice (smaller = sharper glints)." );
+
+	r_glintPixelFilterSize = ri.Cvar_Get( "r_glintPixelFilterSize", "0.7", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_glintPixelFilterSize, "0.5", "1.2", CV_FLOAT );
+	ri.Cvar_SetDescription( r_glintPixelFilterSize, "Pixel filter multiplier for the glint sampling lattice." );
+
+	r_glintSampleBudget = ri.Cvar_Get( "r_glintSampleBudget", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_glintSampleBudget, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_glintSampleBudget, "Glint sample budget: 0=fast (1 tap), 1=medium (2 taps), 2=best (4 taps)." );
+
+	r_glintMaxLodClamp = ri.Cvar_Get( "r_glintMaxLodClamp", "12.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_glintMaxLodClamp, "0.0", "16.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_glintMaxLodClamp, "Clamp on the computed LOD for glint sampling to avoid expensive levels." );
+
+	r_glintRoughnessLo = ri.Cvar_Get( "r_glintRoughnessLo", "0.02", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_glintRoughnessLo, "0.0", "0.5", CV_FLOAT );
+	ri.Cvar_SetDescription( r_glintRoughnessLo, "Lower roughness threshold where glints start fading out (smoother values)." );
+
+	r_glintRoughnessHi = ri.Cvar_Get( "r_glintRoughnessHi", "0.15", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_glintRoughnessHi, "0.0", "0.6", CV_FLOAT );
+	ri.Cvar_SetDescription( r_glintRoughnessHi, "Upper roughness threshold where glints are disabled (rougher values)." );
+
+	r_glintDMax = ri.Cvar_Get( "r_glintDMax", "1000.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_glintDMax, "1.0", "1000000.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_glintDMax, "Clamp for the glint D term to avoid fireflies." );
 
 	r_pbr_packedPreferred = ri.Cvar_Get( "r_pbr_packedPreferred", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_pbr_packedPreferred, "0", "6", CV_INTEGER );

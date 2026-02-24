@@ -644,6 +644,9 @@ typedef struct vkPbrUniformBlock_s {
 	vec4_t subsurfaceColor;
 	vec4_t subsurfaceParams;
 	vec4_t advancedParams;
+	vec4_t glintParams0;
+	vec4_t glintParams1;
+	vec4_t glintFlags;
 	vec4_t shCoeffs[9];
 } vkPbrUniformBlock_t;
 #endif
@@ -1215,6 +1218,17 @@ static void R_UpdatePBRCubemapDebugCvar( int cubemapIndex, const vec3_t pos )
 /*
 ** RB_IterateStagesGeneric
 */
+static inline float LerpClamp( float value, float minValue, float maxValue )
+{
+	if ( value < minValue ) {
+		return minValue;
+	}
+	if ( value > maxValue ) {
+		return maxValue;
+	}
+	return value;
+}
+
 #ifdef USE_VULKAN
 static void RB_IterateStagesGeneric( const shaderCommands_t *input, qboolean fogCollapse )
 #else
@@ -1363,6 +1377,26 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				( r_pbr_multiScatterStrength ? r_pbr_multiScatterStrength->value : 1.0f ),
 				0.0f, 0.0f );
 
+			float glintDensityExp = r_glintDensity ? LerpClamp( r_glintDensity->value, -4.0f, 6.0f ) : 3.0f;
+			float glintDensity = 1000.0f * powf( 10.0f, glintDensityExp );
+			float glintMicro = r_glintMicrofacetRoughness ? LerpClamp( r_glintMicrofacetRoughness->value, 0.001f, 0.1f ) : 0.01f;
+			float glintPixel = r_glintPixelFilterSize ? LerpClamp( r_glintPixelFilterSize->value, 0.5f, 1.2f ) : 0.7f;
+			int glintBudget = r_glintSampleBudget ? (int) LerpClamp( (float)r_glintSampleBudget->integer, 0.0f, 2.0f ) : 1;
+			float glintMaxLod = r_glintMaxLodClamp ? LerpClamp( r_glintMaxLodClamp->value, 0.0f, 16.0f ) : 12.0f;
+			float glintDMax = r_glintDMax ? LerpClamp( r_glintDMax->value, 1.0f, 1000000.0f ) : 1000.0f;
+			float glintLo = r_glintRoughnessLo ? LerpClamp( r_glintRoughnessLo->value, 0.0f, 0.5f ) : 0.02f;
+			float glintHi = r_glintRoughnessHi ? LerpClamp( r_glintRoughnessHi->value, 0.0f, 0.6f ) : 0.15f;
+			if ( glintHi < glintLo + 0.001f ) {
+				glintHi = glintLo + 0.001f;
+			}
+
+			Vector4Set( block.glintParams0, glintDensity, glintMicro, glintPixel, (float)glintBudget );
+			Vector4Set( block.glintParams1, glintMaxLod, glintDMax, glintLo, glintHi );
+			Vector4Set( block.glintFlags,
+				( r_glint && r_glint->integer ) ? 1.0f : 0.0f,
+				( r_glintMode && r_glintMode->integer ) ? 1.0f : 0.0f,
+				0.0f, 0.0f );
+
 			{
 				const VkDescriptorSet fallback2D = ( tr.whiteImage ) ? tr.whiteImage->descriptor : VK_NULL_HANDLE;
 				const VkDescriptorSet fallbackCube = ( tr.emptyCubemap ) ? tr.emptyCubemap->descriptor : VK_NULL_HANDLE;
@@ -1479,6 +1513,9 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				Vector4Copy( block.subsurfaceColor, uniform.pbrSubsurfaceColor );
 				Vector4Copy( block.subsurfaceParams, uniform.pbrSubsurfaceParams );
 				Vector4Copy( block.advancedParams, uniform.pbrAdvancedParams );
+				Vector4Copy( block.glintParams0, uniform.pbrGlintParams0 );
+				Vector4Copy( block.glintParams1, uniform.pbrGlintParams1 );
+				Vector4Copy( block.glintFlags, uniform.pbrGlintFlags );
 				Com_Memcpy( uniform.pbrShCoeffs, block.shCoeffs, sizeof( uniform.pbrShCoeffs ) );
 
 				vk_push_uniform_cached( &uniform );
