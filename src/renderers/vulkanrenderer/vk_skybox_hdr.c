@@ -287,8 +287,6 @@ void SkyboxHDR_GeneratePrefiltered(void) {
 				float u = ((float)x + 0.5f) / baseSize;
 				float v = ((float)y + 0.5f) / baseSize;
 
-				SkyboxHDR_DirFromCubeFace(face, u, v, dir);
-
 				float rgb[3] = {0, 0, 0};
 				if (skybox.cubeFaces[face]) {
 					int cubeX = (int)(u * (skybox.cubeSize - 1));

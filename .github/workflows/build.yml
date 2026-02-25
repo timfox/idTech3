@@ -343,6 +343,7 @@ jobs:
               -DUSE_VULKAN=ON \
               -DRENDERER_DEFAULT=vulkan \
               -DSKIP_IDPAK_CHECK=ON \
+              -DSKIP_SHADER_REGEN=ON \
               -Wno-dev
             cmake --build build-vk-${{ matrix.btype }} -j"$(nproc)"
 
@@ -360,6 +361,7 @@ jobs:
               -DUSE_VULKAN=ON \
               -DRENDERER_DEFAULT=opengl \
               -DSKIP_IDPAK_CHECK=ON \
+              -DSKIP_SHADER_REGEN=ON \
               -Wno-dev
             cmake --build build-gl-${{ matrix.btype }} -j"$(nproc)"
 

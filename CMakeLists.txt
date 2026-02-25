@@ -1227,22 +1227,28 @@ set(VK_SHADER_TOOL_SOURCES
   "${VK_SHADER_DIR}/tools/bindshader.c"
 )
 
-add_custom_command(
-  OUTPUT ${VK_SHADER_GENERATED_SRCS}
-  COMMAND "${CMAKE_SOURCE_DIR}/scripts/compile_shaders.sh"
-          --generated-dir "${VK_GEN_DIR}"
-  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-  DEPENDS
-    "${CMAKE_SOURCE_DIR}/scripts/compile_shaders.sh"
-    ${VK_SHADER_GLSL_FILES}
-    ${VK_SHADER_TOOL_SOURCES}
-  COMMENT "Generating Vulkan shader blobs"
-  VERBATIM
-)
+option(SKIP_SHADER_REGEN "Skip shader regeneration, use pre-committed generated shaders" OFF)
 
-add_custom_target(vk_shaders_autogen
-  DEPENDS ${VK_SHADER_GENERATED_SRCS}
-)
+if(SKIP_SHADER_REGEN)
+  message(STATUS "Shader regeneration: SKIPPED (using pre-committed shaders)")
+  add_custom_target(vk_shaders_autogen)
+else()
+  add_custom_command(
+    OUTPUT ${VK_SHADER_GENERATED_SRCS}
+    COMMAND "${CMAKE_SOURCE_DIR}/scripts/compile_shaders.sh"
+            --generated-dir "${VK_GEN_DIR}"
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    DEPENDS
+      "${CMAKE_SOURCE_DIR}/scripts/compile_shaders.sh"
+      ${VK_SHADER_GLSL_FILES}
+      ${VK_SHADER_TOOL_SOURCES}
+    COMMENT "Generating Vulkan shader blobs"
+    VERBATIM
+  )
+  add_custom_target(vk_shaders_autogen
+    DEPENDS ${VK_SHADER_GENERATED_SRCS}
+  )
+endif()
 # Suppress shadow warnings for MikkTSpace third-party code
 if(MSVC)
     set_source_files_properties(src/renderers/vulkanrenderer/utils/mikktspace/mikktspace.c PROPERTIES
