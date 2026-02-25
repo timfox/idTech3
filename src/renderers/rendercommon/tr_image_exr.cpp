@@ -52,8 +52,18 @@ extern "C" void R_LoadEXR(const char *filename, byte **pic, int *width, int *hei
 		return;
 	}
 
+	if (w <= 0 || h <= 0 || w > 16384 || h > 16384) {
+		Com_Printf(S_COLOR_YELLOW "EXR: %s: invalid dimensions %dx%d\n", filename, w, h);
+		free(rgba);
+		return;
+	}
+
 	numPixels = w * h;
 	out = (byte *)Z_Malloc(numPixels * 4);
+	if (!out) {
+		free(rgba);
+		return;
+	}
 
 	for (i = 0; i < numPixels; i++) {
 		float r = rgba[i * 4 + 0];
