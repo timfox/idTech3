@@ -237,7 +237,7 @@ jobs:
             -DBUILD_FREETYPE=ON \
             -DENABLE_FORTIFY_SOURCE=OFF \
             -DENABLE_ASAN=OFF \
-            -DBUILD_SERVER=OFF \
+            -DBUILD_SERVER=ON \
             -DUSE_VULKAN=ON \
             -DRENDERER_DEFAULT=vulkan \
             -DSKIP_IDPAK_CHECK=ON \
@@ -260,13 +260,21 @@ jobs:
             -DBUILD_FREETYPE=ON \
             -DENABLE_FORTIFY_SOURCE=OFF \
             -DENABLE_ASAN=OFF \
-            -DBUILD_SERVER=OFF \
+            -DBUILD_SERVER=ON \
             -DUSE_VULKAN=ON \
             -DRENDERER_DEFAULT=opengl \
             -DSKIP_IDPAK_CHECK=ON \
             -Wno-dev
           cmake --build build-gl-${{ matrix.btype }} -j$(nproc)
           cp -f build-gl-${{ matrix.btype }}/idtech3* bin/ || true
+
+      - name: Smoke test
+        if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
+        run: |
+          mkdir -p release
+          cp -f bin/idtech3* release/ || true
+          chmod +x scripts/smoke_test.sh
+          ./scripts/smoke_test.sh release
 
       - uses: actions/upload-artifact@v4
         if: matrix.cc == 'gcc' && matrix.btype == 'Release'
