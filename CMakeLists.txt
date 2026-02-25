@@ -1,6 +1,6 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.24)
 
-PROJECT(idtech3 LANGUAGES C)
+PROJECT(idtech3 LANGUAGES C CXX)
 
 if("c_std_23" IN_LIST CMAKE_C_COMPILE_FEATURES)
     set(CMAKE_C_STANDARD 23)
@@ -1192,6 +1192,7 @@ set(RENDERER_COMMON_SRCS
 	src/renderers/rendercommon/tr_image_pcx.c
 	src/renderers/rendercommon/tr_image_png.c
 	src/renderers/rendercommon/tr_image_tga.c
+	src/renderers/rendercommon/tr_image_exr.cpp
 	src/renderers/rendercommon/tr_noise.c
 )
 IF(BUILD_FREETYPE)
@@ -1360,6 +1361,18 @@ if(USE_GLM)
     else()
       target_include_directories(${RENDERER_PREFIX}_opengl PRIVATE ${EXTERNAL_GLM_INCLUDE})
     endif()
+  endif()
+endif()
+
+# tinyexr include for EXR image loading
+if(USE_RENDERER_DLOPEN)
+  target_include_directories(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE ${EXTERNAL_INCLUDE}/tinyexr)
+  target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${EXTERNAL_INCLUDE}/tinyexr)
+else()
+  if(USE_VULKAN)
+    target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${EXTERNAL_INCLUDE}/tinyexr)
+  else()
+    target_include_directories(${RENDERER_PREFIX}_opengl PRIVATE ${EXTERNAL_INCLUDE}/tinyexr)
   endif()
 endif()
 
