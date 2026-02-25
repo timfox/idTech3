@@ -4434,6 +4434,14 @@ static void vk_create_shader_modules( void )
 	SET_OBJECT_NAME( vk.modules.gamma_fs, "gamma post-processing fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.gamma_vs, "gamma post-processing vertex module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 
+	vk.modules.smaa_edge_fs = SHADER_MODULE( smaa_edge_frag_spv );
+	vk.modules.smaa_blend_fs = SHADER_MODULE( smaa_blend_frag_spv );
+	vk.modules.smaa_compose_fs = SHADER_MODULE( smaa_compose_frag_spv );
+
+	SET_OBJECT_NAME( vk.modules.smaa_edge_fs, "smaa edge fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	SET_OBJECT_NAME( vk.modules.smaa_blend_fs, "smaa blend fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	SET_OBJECT_NAME( vk.modules.smaa_compose_fs, "smaa compose fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+
 #ifdef VK_PBR_BRDFLUT
     vk.modules.brdflut_fs = SHADER_MODULE(brdflut_frag_spv);
     SET_OBJECT_NAME(vk.modules.brdflut_fs, "brdf LUT fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT);
@@ -8798,6 +8806,9 @@ for (i = 0; i < 2; i++) {
 
 	qvkDestroyShaderModule(vk.device, vk.modules.gamma_vs, NULL);
 	qvkDestroyShaderModule(vk.device, vk.modules.gamma_fs, NULL);
+	qvkDestroyShaderModule(vk.device, vk.modules.smaa_edge_fs, NULL);
+	qvkDestroyShaderModule(vk.device, vk.modules.smaa_blend_fs, NULL);
+	qvkDestroyShaderModule(vk.device, vk.modules.smaa_compose_fs, NULL);
 	qvkDestroyShaderModule(vk.device, vk.modules.volumetric_fog_vs, NULL);
 	qvkDestroyShaderModule(vk.device, vk.modules.volumetric_fog_fs, NULL);
 	qvkDestroyShaderModule(vk.device, vk.modules.volumetric_fog_cs, NULL);
@@ -9423,7 +9434,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			break;
 		case 10: // smaa edge
 			pipeline = &vk.smaa_edge_pipeline;
-			fsmodule = vk.modules.gamma_fs;
+			fsmodule = vk.modules.smaa_edge_fs;
 			renderpass = vk.render_pass.smaa_edge;
 			layout = vk.pipeline_layout_smaa;
 			samples = VK_SAMPLE_COUNT_1_BIT;
@@ -9433,7 +9444,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			break;
 		case 11: // smaa blend
 			pipeline = &vk.smaa_blend_pipeline;
-			fsmodule = vk.modules.gamma_fs;
+			fsmodule = vk.modules.smaa_blend_fs;
 			renderpass = vk.render_pass.smaa_blend;
 			layout = vk.pipeline_layout_smaa;
 			samples = VK_SAMPLE_COUNT_1_BIT;
@@ -9443,7 +9454,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			break;
 		case 12: // smaa compose
 			pipeline = &vk.smaa_compose_pipeline;
-			fsmodule = vk.modules.gamma_fs;
+			fsmodule = vk.modules.smaa_compose_fs;
 			renderpass = vk.render_pass.smaa_compose;
 			layout = vk.pipeline_layout_smaa;
 			samples = VK_SAMPLE_COUNT_1_BIT;
