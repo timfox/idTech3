@@ -6,44 +6,24 @@ This file is original work by Gopex LLC and is not derived from
 existing id Tech 3 / ioquake3 code.
 The engine framework is based on id Tech 3 (GPLv2).
 
-GPU-based Navier-Stokes fluid simulation using Vulkan compute shaders.
-Implements Jos Stam's "Stable Fluids" algorithm on the GPU for
-real-time smoke, fog, and fire density simulation.
-
-Pipeline:
-  1. External forces injection (emitters, wind, buoyancy)
-  2. Advection (semi-Lagrangian, unconditionally stable)
-  3. Diffusion (Jacobi iteration)
-  4. Pressure projection (Helmholtz-Hodge decomposition)
-     a. Compute divergence
-     b. Pressure solve (Jacobi iteration)
-     c. Subtract pressure gradient
-  5. Density advection (for smoke/fog visualization)
+Navier-Stokes fluid simulation public API.
+Manages cvars and parameter interface for the GPU-based fluid
+simulation. Compute dispatch is handled by vk.c.
 ===========================================================================
 */
 
 #pragma once
 
-#include "vk.h"
+#include "../rendercommon/tr_types.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define FLUID_GRID_SIZE     64
-#define FLUID_JACOBI_ITERS  40
-#define FLUID_WORKGROUP_SIZE 8
-
-typedef enum {
-	FLUID_PASS_ADVECTION = 0,
-	FLUID_PASS_DIFFUSION,
-	FLUID_PASS_DIVERGENCE,
-	FLUID_PASS_PRESSURE,
-	FLUID_PASS_GRADIENT_SUB,
-	FLUID_PASS_FORCE_INJECT,
-	FLUID_PASS_DENSITY_ADVECT,
-	FLUID_PASS_COUNT
-} fluidPass_t;
+#define FLUID_GRID_SIZE      64
+#define FLUID_JACOBI_ITERS   40
+#define FLUID_WORKGROUP_SIZE  8
+#define MAX_FLUID_EMITTERS   16
 
 typedef struct fluidEmitter_s {
 	float position[3];
@@ -54,45 +34,22 @@ typedef struct fluidEmitter_s {
 	float pad;
 } fluidEmitter_t;
 
-#define MAX_FLUID_EMITTERS 16
+void      FluidSim_RegisterCvars(void);
+qboolean  FluidSim_IsEnabled(void);
 
-typedef struct fluidSimParams_s {
-	float viscosity;
-	float diffusion;
-	float dissipation;
-	float buoyancy;
+float     FluidSim_GetViscosity(void);
+float     FluidSim_GetDiffusion(void);
+float     FluidSim_GetDissipation(void);
+float     FluidSim_GetBuoyancy(void);
+float     FluidSim_GetVorticity(void);
+float     FluidSim_GetGridScale(void);
+int       FluidSim_GetJacobiIterations(void);
+void      FluidSim_GetWindForce(float *x, float *y, float *z);
 
-	float ambientTemperature;
-	float dt;
-	float gridScale;
-	float vorticityStrength;
-
-	float windForce[3];
-	int   jacobiIterations;
-
-	float densityDissipation;
-	float temperatureDissipation;
-	float velocityDissipation;
-	float padding;
-} fluidSimParams_t;
-
-typedef struct fluidPushConstants_s {
-	float params[4];
-	float gridSize[4];
-	float dt;
-	float viscosity;
-	float diffusion;
-	float dissipation;
-} fluidPushConstants_t;
-
-void FluidSim_Init(void);
-void FluidSim_Shutdown(void);
-void FluidSim_RegisterCvars(void);
-qboolean FluidSim_IsEnabled(void);
-void FluidSim_Step(float dt);
-void FluidSim_AddEmitter(const fluidEmitter_t *emitter);
-void FluidSim_ClearEmitters(void);
-void FluidSim_Reset(void);
+void      FluidSim_AddEmitter(const fluidEmitter_t *emitter);
+void      FluidSim_ClearEmitters(void);
+int       FluidSim_GetEmitterCount(void);
+const fluidEmitter_t *FluidSim_GetEmitter(int index);
 
 #ifdef __cplusplus
 }

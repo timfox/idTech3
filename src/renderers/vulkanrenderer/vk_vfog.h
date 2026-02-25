@@ -6,17 +6,16 @@ This file is original work by Gopex LLC and is not derived from
 existing id Tech 3 / ioquake3 code.
 The engine framework is based on id Tech 3 (GPLv2).
 
-Volumetric fog system for Vulkan renderer.
-Implements three phases:
-  Phase 1: Analytical height fog (exponential height + distance fog)
-  Phase 2: Ray-marched volumetric fog with noise-driven density
-  Phase 3: Froxel-based volumetric lighting with compute scatter
+Volumetric fog public API for Vulkan renderer.
+Manages cvars, parameter structures, and public interface for the
+volumetric fog system. GPU pipeline dispatch is handled by vk.c
+which calls into this module for parameter data.
 ===========================================================================
 */
 
 #pragma once
 
-#include "vk.h"
+#include "../rendercommon/tr_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,64 +25,32 @@ extern "C" {
 #define VFOG_FROXEL_HEIGHT   90
 #define VFOG_FROXEL_DEPTH    64
 
-#define VFOG_RAY_STEPS       48
-
-typedef struct vfogParams_s {
-	float   density;
-	float   heightFalloff;
-	float   heightOffset;
-	float   maxDistance;
-
-	float   scatterIntensity;
-	float   scatterAnisotropy;
-	float   absorptionCoeff;
-	float   noiseScale;
-
-	float   noiseSpeed;
-	float   windDirX;
-	float   windDirY;
-	float   windDirZ;
-
-	float   fogColorR;
-	float   fogColorG;
-	float   fogColorB;
-	float   ambientIntensity;
-
-	float   temporalBlend;
-	float   lightScatterStrength;
-	float   phaseG;
-	float   enabled;
-} vfogParams_t;
-
-typedef struct vfogPushConstants_s {
-	float viewOrigin[4];
-	float viewForward[4];
-	float viewRight[4];
-	float viewUp[4];
-
-	float invProjection[16];
-
-	float fogParams[4];
-	float fogColor[4];
-	float noiseParams[4];
-	float windParams[4];
-	float scatterParams[4];
-
-	float time;
-	float nearPlane;
-	float farPlane;
-	float padding;
-} vfogPushConstants_t;
-
-void VFog_Init(void);
-void VFog_Shutdown(void);
-void VFog_RegisterCvars(void);
-void VFog_UpdateParams(vfogParams_t *params);
+void     VFog_RegisterCvars(void);
 qboolean VFog_IsEnabled(void);
+int      VFog_GetMode(void);
 
-void VFog_RenderRayMarch(void);
-void VFog_ComputeFroxels(void);
-void VFog_ApplyFog(void);
+float VFog_GetDensity(void);
+float VFog_GetHeightFalloff(void);
+float VFog_GetHeightOffset(void);
+float VFog_GetMaxDistance(void);
+float VFog_GetScatterIntensity(void);
+float VFog_GetAnisotropy(void);
+float VFog_GetAbsorption(void);
+float VFog_GetNoiseScale(void);
+float VFog_GetNoiseSpeed(void);
+float VFog_GetNoiseOctaves(void);
+float VFog_GetAmbientIntensity(void);
+float VFog_GetTemporalBlend(void);
+float VFog_GetPhaseG(void);
+void  VFog_GetWindDirection(float *x, float *y, float *z);
+void  VFog_GetFogColor(float *r, float *g, float *b);
+float VFog_GetSliceDistribution(void);
+
+int   VFog_GetFroxelWidth(void);
+int   VFog_GetFroxelHeight(void);
+int   VFog_GetFroxelDepth(void);
+float VFog_GetNearPlane(void);
+float VFog_GetFarPlane(void);
 
 #ifdef __cplusplus
 }
