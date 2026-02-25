@@ -243,6 +243,12 @@
     <ClCompile Include="..\..\renderervk\vk_flares.c" />
     <ClCompile Include="..\..\renderervk\vk_mikktspace.c" />
     <ClCompile Include="..\..\renderervk\vk_vbo.c" />
+    <ClCompile Include="..\..\renderervk\vk_vfog.c" />
+    <ClCompile Include="..\..\renderervk\vk_fluidsim.c" />
+    <ClCompile Include="..\..\renderervk\vk_postfx.c" />
+    <ClCompile Include="..\..\renderervk\tr_model_gltf.c">
+      <AdditionalIncludeDirectories>..\..\external\include\cgltf;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\renderervk\iqm.h" />
@@ -252,6 +258,10 @@
     <ClInclude Include="..\..\renderercommon\tr_types.h" />
     <ClInclude Include="..\..\renderervk\utils\mikktspace\mikktspace.h" />
     <ClInclude Include="..\..\renderervk\vk.h" />
+    <ClInclude Include="..\..\renderervk\vk_vfog.h" />
+    <ClInclude Include="..\..\renderervk\vk_fluidsim.h" />
+    <ClInclude Include="..\..\renderervk\vk_postfx.h" />
+    <ClInclude Include="..\..\renderervk\tr_model_gltf.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

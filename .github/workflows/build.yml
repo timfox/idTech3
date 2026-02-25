@@ -69,6 +69,7 @@ jobs:
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
         env:
           CFLAGS: "-DSKIP_IDPAK_CHECK=1"
+          CXXFLAGS: "-DSKIP_IDPAK_CHECK=1"
         run: |
           mkdir -p build-vk-${{ matrix.btype }}
           cmake -S . -B build-vk-${{ matrix.btype }} -G Ninja \
@@ -91,6 +92,7 @@ jobs:
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
         env:
           CFLAGS: "-DSKIP_IDPAK_CHECK=1"
+          CXXFLAGS: "-DSKIP_IDPAK_CHECK=1"
         run: |
           mkdir -p build-gl-${{ matrix.btype }}
           cmake -S . -B build-gl-${{ matrix.btype }} -G Ninja \
@@ -219,7 +221,7 @@ jobs:
           sudo rm -f /etc/apt/sources.list.d/azure-cli.list
           sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list
           sudo apt-get -qq update
-          sudo apt-get -y install cmake ninja-build libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools
+          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools
 
       - uses: actions/checkout@v4
 
@@ -323,7 +325,7 @@ jobs:
             fi
 
             apt-get -qq update
-            apt-get install -y make gcc g++ cmake ninja-build
+            apt-get install -y make gcc g++ cmake ninja-build libstdc++-14-dev
             apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools
 
             OUTDIR="${GITHUB_WORKSPACE}/bin"
@@ -395,6 +397,7 @@ jobs:
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
         env:
           CFLAGS: "-DSKIP_IDPAK_CHECK=1"
+          CXXFLAGS: "-DSKIP_IDPAK_CHECK=1"
         run: |
           SDL2_PREFIX=$(brew --prefix sdl2)
           OPENAL_PREFIX=$(brew --prefix openal-soft)
@@ -427,6 +430,7 @@ jobs:
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
         env:
           CFLAGS: "-DSKIP_IDPAK_CHECK=1"
+          CXXFLAGS: "-DSKIP_IDPAK_CHECK=1"
         run: |
           SDL2_PREFIX=$(brew --prefix sdl2)
           OPENAL_PREFIX=$(brew --prefix openal-soft)

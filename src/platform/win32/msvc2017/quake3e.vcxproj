@@ -290,6 +290,7 @@
     <ClCompile Include="..\..\client\cl_avi.c" />
     <ClCompile Include="..\..\client\cl_cgame.c" />
     <ClCompile Include="..\..\client\cl_cin.c" />
+    <ClCompile Include="..\..\client\cl_cin_modern.c" />
     <ClCompile Include="..\..\client\cl_console.c" />
     <ClCompile Include="..\..\client\cl_curl.c" />
     <ClCompile Include="..\..\client\cl_input.c" />
@@ -368,6 +369,7 @@
     <ClCompile Include="..\win_gamma.c" />
     <ClCompile Include="..\win_glimp.c" />
     <ClCompile Include="..\win_qgl.c" />
+    <ClCompile Include="..\..\physics\phys_bullet.c" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\..\asm\snd_mix_x64.asm">
