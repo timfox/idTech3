@@ -1,6 +1,12 @@
 #version 450
 
 /*
+ * Copyright (C) 2026 Gopex LLC. All rights reserved.
+ *
+ * This file is original work by Gopex LLC and is not derived from
+ * existing id Tech 3 / ioquake3 code.
+ * The engine framework is based on id Tech 3 (GPLv2).
+ *
  * Fullscreen triangle vertex shader for volumetric fog post-process.
  * Generates a full-screen triangle from vertex ID without any vertex buffer.
  */
