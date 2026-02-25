@@ -1362,6 +1362,33 @@ else()
   endif()
 endif()
 
+# --- ImGui Inspector (optional, requires C++) ---
+option(USE_IMGUI "Enable ImGui inspector overlay" OFF)
+if(USE_IMGUI)
+  enable_language(CXX)
+  set(IMGUI_SRCS
+    src/renderers/vulkanrenderer/inspector/vk_imgui.cpp
+  )
+  set(IMGUI_INCLUDE_DIRS
+    ${EXTERNAL_SRC}/cimgui/imgui
+    ${EXTERNAL_SRC}/cimgui/imgui/backends
+    ${EXTERNAL_SRC}/cimgui
+    ${CMAKE_SOURCE_DIR}/src/renderers/rendercommon
+  )
+  if(USE_RENDERER_DLOPEN)
+    target_sources(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${IMGUI_SRCS})
+    target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${IMGUI_INCLUDE_DIRS})
+    target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_IMGUI)
+  else()
+    if(USE_VULKAN)
+      target_sources(${RENDERER_PREFIX}_vulkan PRIVATE ${IMGUI_SRCS})
+      target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${IMGUI_INCLUDE_DIRS})
+      target_compile_definitions(${RENDERER_PREFIX}_vulkan PRIVATE USE_IMGUI)
+    endif()
+  endif()
+  message(STATUS "ImGui Inspector: enabled")
+endif()
+
 # common function, window system
 IF(UNIX)
 	SET (Q3_SRCS
