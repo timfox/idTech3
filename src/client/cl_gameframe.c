@@ -19,10 +19,20 @@ Ticks all gameplay subsystems each client frame:
 #include "../qcommon/qcommon.h"
 #include "cl_gameframe.h"
 #include "cl_particles.h"
+#include "cl_map_background.h"
+#include "cl_window_title.h"
 #include "../physics/phys_bullet.h"
 #include "../physics/phys_procedural_anim.h"
+#include "../physics/phys_cloth.h"
 #include "../navigation/nav_recast.h"
 #include "../game/g_director.h"
+#include "../game/g_response.h"
+#include "../game/g_choreography.h"
+#include "../game/g_facial.h"
+#include "../game/g_horde.h"
+#include "../game/g_dismember.h"
+#include "../game/g_goap.h"
+#include "../game/g_lua_bindings.h"
 #include "../audio/snd_music_adaptive.h"
 
 static qboolean gameSystemsInitialized = qfalse;
@@ -42,8 +52,16 @@ void CL_InitGameSystems(void) {
 	Phys_Init();
 	Nav_Init();
 	Particles_Init();
+	Cloth_Init();
 	Director_Init();
 	Music_Init();
+	Response_Init();
+	Face_Init();
+	Horde_Init();
+	Dismember_Init();
+	GOAP_Init();
+	BgMap_Init();
+	WinTitle_Init();
 
 	gameSystemsInitialized = qtrue;
 	Com_Printf("Game systems initialized (physics, navigation, particles)\n");
@@ -55,8 +73,15 @@ void CL_ShutdownGameSystems(void) {
 	Phys_Shutdown();
 	Nav_Shutdown();
 	Particles_Clear();
+	Cloth_Shutdown();
 	Director_Shutdown();
 	Music_Shutdown();
+	Response_Shutdown();
+	Face_Shutdown();
+	Horde_Shutdown();
+	Dismember_Shutdown();
+	GOAP_Shutdown();
+	BgMap_Shutdown();
 
 	activeNavMesh = -1;
 	gameSystemsInitialized = qfalse;
@@ -82,4 +107,18 @@ void CL_GameFrame(float frametime) {
 
 	Director_Update(frametime);
 	Music_Update(Director_GetGlobalIntensity(), frametime);
+
+	Cloth_SimulateAll(frametime);
+	Face_Update(frametime);
+	Dismember_Update(frametime);
+	GOAP_Update(frametime);
+	Choreo_Update(frametime);
+
+	{
+		vec3_t playerPos = {0, 0, 0};
+		Horde_Update(frametime, playerPos);
+	}
+
+	BgMap_Frame(frametime);
+	WinTitle_Update(frametime);
 }
