@@ -140,8 +140,10 @@ static void Horde_UpdateAgent(hordeAgent_t *a, float dt, const vec3_t playerPos)
 
 		case HORDE_STATE_FLEE:
 			VectorSubtract(a->position, playerPos, toTarget);
-			VectorNormalize(toTarget);
-			VectorScale(toTarget, a->speed * 1.2f, a->velocity);
+			if (VectorLength(toTarget) > 0.1f) {
+				VectorNormalize(toTarget);
+				VectorScale(toTarget, a->speed * 1.2f, a->velocity);
+			}
 			break;
 
 		default: break;

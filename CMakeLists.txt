@@ -1195,7 +1195,8 @@ set(RENDERER_COMMON_SRCS
 	src/renderers/rendercommon/tr_image_pcx.c
 	src/renderers/rendercommon/tr_image_png.c
 	src/renderers/rendercommon/tr_image_tga.c
-	src/renderers/rendercommon/tr_image_exr.cpp
+	# tr_image_exr.cpp excluded from RENDERER_COMMON_SRCS to avoid
+	# duplicate TINYEXR_IMPLEMENTATION symbols when both renderers load
 	src/renderers/rendercommon/tr_noise.c
 )
 IF(BUILD_FREETYPE)
@@ -1373,15 +1374,23 @@ if(USE_GLM)
   endif()
 endif()
 
-# tinyexr include for EXR image loading
+# EXR image loading via tinyexr -- built as separate static lib to avoid
+# duplicate TINYEXR_IMPLEMENTATION symbols when both renderers are loaded
+enable_language(CXX)
+add_library(exr_loader STATIC src/renderers/rendercommon/tr_image_exr.cpp)
+target_include_directories(exr_loader PRIVATE ${EXTERNAL_INCLUDE}/tinyexr ${CMAKE_SOURCE_DIR}/src)
+set_property(TARGET exr_loader PROPERTY POSITION_INDEPENDENT_CODE ON)
+if(NOT MSVC)
+  target_compile_options(exr_loader PRIVATE -Wno-old-style-cast -Wno-sign-compare)
+endif()
 if(USE_RENDERER_DLOPEN)
-  target_include_directories(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE ${EXTERNAL_INCLUDE}/tinyexr)
-  target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${EXTERNAL_INCLUDE}/tinyexr)
+  target_link_libraries(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE exr_loader)
+  target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE exr_loader)
 else()
   if(USE_VULKAN)
-    target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${EXTERNAL_INCLUDE}/tinyexr)
+    target_link_libraries(${RENDERER_PREFIX}_vulkan PRIVATE exr_loader)
   else()
-    target_include_directories(${RENDERER_PREFIX}_opengl PRIVATE ${EXTERNAL_INCLUDE}/tinyexr)
+    target_link_libraries(${RENDERER_PREFIX}_opengl PRIVATE exr_loader)
   endif()
 endif()
 

@@ -49,7 +49,9 @@ void CL_InitGameSystems(void) {
 	cl_navEnabled      = Cvar_Get("cl_navEnabled",      "1", CVAR_ARCHIVE);
 	cl_particlesEnabled = Cvar_Get("cl_particlesEnabled","1", CVAR_ARCHIVE);
 
-	Phys_Init();
+	if (!Phys_Init()) {
+		Com_Printf(S_COLOR_YELLOW "Warning: Physics not available, physics-dependent systems will be limited\n");
+	}
 	Nav_Init();
 	Particles_Init();
 	Cloth_Init();
@@ -114,9 +116,13 @@ void CL_GameFrame(float frametime) {
 	GOAP_Update(frametime);
 	Choreo_Update(frametime);
 
-	{
-		vec3_t playerPos = {0, 0, 0};
-		Horde_Update(frametime, playerPos);
+	/* Horde_Update needs actual player position -- game code should
+	   call Horde_Update directly with the real player origin.
+	   This fallback uses origin {0,0,0} which is overridden by
+	   game-side Lua calling Engine.Horde.setTarget(). */
+	if (cl_navEnabled && cl_navEnabled->integer) {
+		vec3_t hordePlayerPos = {0, 0, 0};
+		Horde_Update(frametime, hordePlayerPos);
 	}
 
 	BgMap_Frame(frametime);
