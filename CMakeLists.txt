@@ -1009,6 +1009,7 @@ list(APPEND CLIENT_SRCS
   src/game/g_facial.c
   src/game/g_horde.c
   src/game/g_lua_bindings.c
+  src/client/cl_map_background.c
 )
 # include architecture-specific assembly implementations (snd_mix etc)
 # Only include x86/x86_64 assembly files on x86/x86_64 architectures on Unix-like systems
