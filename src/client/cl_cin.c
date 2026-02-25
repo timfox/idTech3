@@ -33,6 +33,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "client.h"
 #include "../audio/snd_local.h"
+#include "cl_cin_modern.h"
 
 extern cvar_t *s_volume;
 
@@ -131,6 +132,9 @@ typedef struct {
 	int					playonwalls;
 	byte*				buf;
 	long				drawX, drawY;
+
+	cinModernDecoder_t	*modernDecoder;
+	cinFrame_t			modernFrame;
 } cin_cache;
 
 static cinematics_t		cin;
@@ -144,6 +148,8 @@ extern int				CL_ScaledMilliseconds( void );
 
 void CIN_CloseAllVideos( void ) {
 	int		i;
+
+	CIN_Modern_Init();
 
 	for ( i = 0 ; i < MAX_VIDEO_HANDLES ; i++ ) {
 		if (cinTable[i].fileName[0] != '\0' ) {
@@ -1265,6 +1271,14 @@ e_status CIN_StopCinematic( int handle ) {
 
 	Com_DPrintf("trFMV::stop(), closing %s\n", cinTable[currentHandle].fileName);
 
+	if (cinTable[currentHandle].modernDecoder) {
+		CIN_Modern_Close(cinTable[currentHandle].modernDecoder);
+		cinTable[currentHandle].modernDecoder = NULL;
+		cinTable[currentHandle].buf = NULL;
+		cinTable[currentHandle].status = FMV_EOF;
+		return FMV_EOF;
+	}
+
 	if (!cinTable[currentHandle].buf) {
 		return FMV_EOF;
 	}
@@ -1316,6 +1330,32 @@ e_status CIN_RunCinematic( int handle )
 	}
 
 	if (cinTable[currentHandle].status == FMV_IDLE) {
+		return cinTable[currentHandle].status;
+	}
+
+	if (cinTable[currentHandle].modernDecoder) {
+		cinModernDecoder_t *dec = cinTable[currentHandle].modernDecoder;
+		cinFrame_t frame;
+		Com_Memset(&frame, 0, sizeof(frame));
+
+		if (CIN_Modern_DecodeFrame(dec, &frame, NULL)) {
+			if (frame.valid && frame.data) {
+				cinTable[currentHandle].buf = frame.data;
+				cinTable[currentHandle].drawX = frame.width;
+				cinTable[currentHandle].drawY = frame.height;
+				cinTable[currentHandle].CIN_WIDTH = frame.width;
+				cinTable[currentHandle].CIN_HEIGHT = frame.height;
+				cinTable[currentHandle].dirty = qtrue;
+			}
+		} else if (dec->isEof && dec->isEof(dec)) {
+			if (cinTable[currentHandle].looping) {
+				CIN_Modern_Seek(dec, 0);
+			} else {
+				cinTable[currentHandle].status = FMV_EOF;
+			}
+		}
+
+		cinTable[currentHandle].lastTime = CL_ScaledMilliseconds();
 		return cinTable[currentHandle].status;
 	}
 
@@ -1429,8 +1469,8 @@ int CIN_PlayCinematic( const char *arg, int x, int y, int w, int h, int systemBi
 	if (RoQID == 0x1084)
 	{
 		RoQ_init();
-//		FS_Read (cin.file, cinTable[currentHandle].RoQFrameSize+8, cinTable[currentHandle].iFile);
 
+		cinTable[currentHandle].modernDecoder = NULL;
 		cinTable[currentHandle].status = FMV_PLAY;
 		Com_DPrintf("trFMV::play(), playing %s\n", arg);
 
@@ -1446,9 +1486,54 @@ int CIN_PlayCinematic( const char *arg, int x, int y, int w, int h, int systemBi
 
 		return currentHandle;
 	}
-	Com_DPrintf("trFMV::play(), invalid RoQ ID\n");
 
-	RoQShutdown();
+	FS_FCloseFile( cinTable[currentHandle].iFile );
+	cinTable[currentHandle].iFile = FS_INVALID_HANDLE;
+
+	{
+		cinCodecType_t codec = CIN_DetectCodec(name, 0);
+		if (codec != CODEC_NONE && codec != CODEC_ROQ) {
+			cinModernDecoder_t *dec = CIN_Modern_Open(name, codec);
+			if (dec) {
+				fileHandle_t modernFile;
+				int modernSize = FS_FOpenFileRead(name, &modernFile, qtrue);
+				if (modernSize > 0) {
+					if (dec->open && dec->open(dec, name, modernFile, modernSize)) {
+						cinTable[currentHandle].modernDecoder = dec;
+						cinTable[currentHandle].CIN_WIDTH = dec->width > 0 ? dec->width : DEFAULT_CIN_WIDTH;
+						cinTable[currentHandle].CIN_HEIGHT = dec->height > 0 ? dec->height : DEFAULT_CIN_HEIGHT;
+						cinTable[currentHandle].drawX = cinTable[currentHandle].CIN_WIDTH;
+						cinTable[currentHandle].drawY = cinTable[currentHandle].CIN_HEIGHT;
+						cinTable[currentHandle].status = FMV_PLAY;
+
+						Com_Printf("Playing %s with %s codec (%dx%d)\n",
+							name, CIN_CodecName(codec),
+							cinTable[currentHandle].CIN_WIDTH,
+							cinTable[currentHandle].CIN_HEIGHT);
+
+						if (cinTable[currentHandle].alterGameState) {
+							cls.state = CA_CINEMATIC;
+						}
+
+						Con_Close();
+
+						if ( !cinTable[currentHandle].silent ) {
+							s_rawend = s_soundtime;
+						}
+
+						FS_FCloseFile(modernFile);
+						return currentHandle;
+					}
+					FS_FCloseFile(modernFile);
+				}
+				CIN_Modern_Close(dec);
+			}
+		}
+	}
+
+	Com_DPrintf("trFMV::play(), unsupported format: %s\n", arg);
+
+	cinTable[currentHandle].fileName[0] = '\0';
 	return -1;
 }
 
