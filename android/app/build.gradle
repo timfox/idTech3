@@ -1,0 +1,75 @@
+/*
+ * Copyright (C) 2026 Gopex LLC. All rights reserved.
+ * Android build configuration for id Tech 3 engine.
+ */
+
+apply plugin: 'com.android.application'
+
+android {
+    namespace "com.gopex.idtech3"
+    compileSdkVersion 35
+
+    defaultConfig {
+        applicationId "com.gopex.idtech3"
+        minSdkVersion 26
+        targetSdkVersion 35
+        versionCode 1
+        versionName "1.0.0"
+
+        externalNativeBuild {
+            cmake {
+                arguments "-DBUILD_SERVER=OFF",
+                    "-DUSE_VULKAN=ON",
+                    "-DUSE_RENDERER_DLOPEN=OFF",
+                    "-DRENDERER_DEFAULT=vulkan",
+                    "-DSKIP_IDPAK_CHECK=ON",
+                    "-DSKIP_SHADER_REGEN=ON",
+                    "-DUSE_SDL=ON",
+                    "-DUSE_OPENAL=OFF",
+                    "-DUSE_CURL=OFF",
+                    "-DUSE_LUA=OFF",
+                    "-DUSE_DUKTAPE=OFF",
+                    "-DUSE_RECAST_NAV=OFF",
+                    "-DUSE_BULLET_PHYSICS=OFF",
+                    "-DCI_BUILD=OFF"
+            }
+        }
+
+        ndk {
+            abiFilters 'arm64-v8a', 'armeabi-v7a'
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path "../../CMakeLists.txt"
+            version "3.22.1"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            jniDebuggable true
+        }
+    }
+
+    sourceSets {
+        main {
+            java.srcDirs = ['src/main/java']
+        }
+    }
+
+    lint {
+        abortOnError false
+    }
+
+    ndkVersion "27.0.12077973"
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+}
