@@ -1,0 +1,47 @@
+#version 450
+
+/*
+ * Jacobi iteration for pressure Poisson equation.
+ *
+ * Solves: Laplacian(p) = divergence
+ * Using iterative relaxation:
+ *   p_new[i,j,k] = (p[i-1] + p[i+1] + p[j-1] + p[j+1] + p[k-1] + p[k+1] - div[i,j,k]) / 6
+ *
+ * Run multiple iterations (typically 40-80) for convergence.
+ * Ping-pong between pressureIn and pressureOut each iteration.
+ */
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
+
+layout(binding = 0, r16f) readonly  uniform image3D pressureIn;
+layout(binding = 1, r16f) writeonly uniform image3D pressureOut;
+layout(binding = 2, r16f) readonly  uniform image3D divergence;
+
+layout(push_constant) uniform Params {
+	int gridSize;
+	int pad0;
+	int pad1;
+	int pad2;
+} params;
+
+void main() {
+	ivec3 gid = ivec3(gl_GlobalInvocationID);
+	int N = params.gridSize;
+
+	if (any(greaterThanEqual(gid, ivec3(N)))) {
+		return;
+	}
+
+	float pL = imageLoad(pressureIn, ivec3(max(gid.x - 1, 0),   gid.y, gid.z)).r;
+	float pR = imageLoad(pressureIn, ivec3(min(gid.x + 1, N-1),  gid.y, gid.z)).r;
+	float pD = imageLoad(pressureIn, ivec3(gid.x, max(gid.y - 1, 0),   gid.z)).r;
+	float pU = imageLoad(pressureIn, ivec3(gid.x, min(gid.y + 1, N-1),  gid.z)).r;
+	float pB = imageLoad(pressureIn, ivec3(gid.x, gid.y, max(gid.z - 1, 0))).r;
+	float pF = imageLoad(pressureIn, ivec3(gid.x, gid.y, min(gid.z + 1, N-1))).r;
+
+	float div = imageLoad(divergence, gid).r;
+
+	float pNew = (pL + pR + pD + pU + pB + pF - div) / 6.0;
+
+	imageStore(pressureOut, gid, vec4(pNew));
+}
