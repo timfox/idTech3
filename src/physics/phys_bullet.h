@@ -8,7 +8,7 @@ The engine framework is based on id Tech 3 (GPLv2).
 
 Bullet Physics integration for id Tech 3 engine.
 Provides rigid body dynamics, ragdoll/procedural animation
-(Euphoria-quality), and Digital Molecular Matter (DMM) capabilities
+(Procedural animation), and Digital Molecular Matter (DMM) capabilities
 for real-time material deformation and destruction.
 
 Bullet Physics is licensed under the zlib license.
@@ -178,7 +178,7 @@ physConstraintHandle_t Phys_CreateConstraint(const physConstraintDef_t *def);
 void                   Phys_DestroyConstraint(physConstraintHandle_t handle);
 void                   Phys_SetConstraintLimits(physConstraintHandle_t handle, float lower, float upper);
 
-/* ragdoll / Euphoria-style procedural animation */
+/* ragdoll / Procedural animation */
 physRagdollHandle_t Phys_CreateRagdoll(const physRagdollDef_t *def);
 void                Phys_DestroyRagdoll(physRagdollHandle_t handle);
 void                Phys_RagdollApplyImpact(physRagdollHandle_t handle, const vec3_t point, const vec3_t impulse, float radius);

@@ -6,7 +6,7 @@ This file is original work by Gopex LLC and is not derived from
 existing id Tech 3 / ioquake3 code.
 The engine framework is based on id Tech 3 (GPLv2).
 
-Euphoria-inspired procedural animation controller implementation.
+Procedural animation controller implementation.
 Runs a state machine per-character that drives Bullet Physics ragdoll
 bones with corrective forces for balance, reactions, and recovery.
 ===========================================================================
@@ -15,13 +15,13 @@ bones with corrective forces for balance, reactions, and recovery.
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
 #include "phys_bullet.h"
-#include "phys_euphoria.h"
+#include "phys_procedural_anim.h"
 
-typedef struct euphController_s {
+typedef struct procAnimController_s {
 	qboolean            active;
 	physRagdollHandle_t ragdoll;
-	euphConfig_t        config;
-	euphState_t         state;
+	procAnimConfig_t        config;
+	procAnimState_t         state;
 	float               stateTimer;
 	float               balance;
 	float               painLevel;
@@ -29,7 +29,7 @@ typedef struct euphController_s {
 	float               muscleStiffness;
 	vec3_t              lookAtTarget;
 	qboolean            lookAtActive;
-	euphIKTarget_t      ikTargets[EUPH_MAX_IK_TARGETS];
+	procAnimIKTarget_t      ikTargets[PROCANIM_MAX_IK_TARGETS];
 	float               animBlend;
 	vec3_t              lastCOM;
 	vec3_t              comVelocity;
@@ -37,14 +37,14 @@ typedef struct euphController_s {
 	float               groundTimer;
 	float               impactAccum;
 	float               recoveryTimer;
-} euphController_t;
+} procAnimController_t;
 
-static euphController_t controllers[EUPH_MAX_CONTROLLERS];
+static procAnimController_t controllers[PROCANIM_MAX_CONTROLLERS];
 static int controllerCount = 0;
 
-#define VALID_EUPH(h) ((h) >= 0 && (h) < controllerCount && controllers[(h)].active)
+#define VALID_PROCANIM(h) ((h) >= 0 && (h) < controllerCount && controllers[(h)].active)
 
-void Euph_DefaultConfig(euphConfig_t *config) {
+void ProcAnim_DefaultConfig(procAnimConfig_t *config) {
 	config->balanceStiffness = 200.0f;
 	config->balanceDamping = 40.0f;
 	config->balanceRecoverySpeed = 2.0f;
@@ -63,14 +63,14 @@ void Euph_DefaultConfig(euphConfig_t *config) {
 	config->massScale = 1.0f;
 }
 
-static void Euph_ComputeCOM(euphController_t *ctrl) {
+static void ProcAnim_ComputeCOM(procAnimController_t *ctrl) {
 	physTransform_t t;
 	vec3_t com;
 	int count = 0;
 	int i;
 
 	VectorClear(com);
-	for (i = 0; i < EUPH_BONE_COUNT; i++) {
+	for (i = 0; i < PROCANIM_BONE_COUNT; i++) {
 		Phys_RagdollGetBoneTransform(ctrl->ragdoll, i, &t);
 		VectorAdd(com, t.position, com);
 		count++;
@@ -85,14 +85,14 @@ static void Euph_ComputeCOM(euphController_t *ctrl) {
 	VectorCopy(com, ctrl->lastCOM);
 }
 
-static float Euph_ComputeBalance(euphController_t *ctrl) {
+static float ProcAnim_ComputeBalance(procAnimController_t *ctrl) {
 	physTransform_t pelvis, lfoot, rfoot;
 	vec3_t supportCenter;
 	float dx, dy, supportRadius, comOffset, balance;
 
-	Phys_RagdollGetBoneTransform(ctrl->ragdoll, EUPH_BONE_PELVIS, &pelvis);
-	Phys_RagdollGetBoneTransform(ctrl->ragdoll, EUPH_BONE_LOWER_LEG_L, &lfoot);
-	Phys_RagdollGetBoneTransform(ctrl->ragdoll, EUPH_BONE_LOWER_LEG_R, &rfoot);
+	Phys_RagdollGetBoneTransform(ctrl->ragdoll, PROCANIM_BONE_PELVIS, &pelvis);
+	Phys_RagdollGetBoneTransform(ctrl->ragdoll, PROCANIM_BONE_LOWER_LEG_L, &lfoot);
+	Phys_RagdollGetBoneTransform(ctrl->ragdoll, PROCANIM_BONE_LOWER_LEG_R, &rfoot);
 
 	supportCenter[0] = (lfoot.position[0] + rfoot.position[0]) * 0.5f;
 	supportCenter[1] = (lfoot.position[1] + rfoot.position[1]) * 0.5f;
@@ -110,14 +110,14 @@ static float Euph_ComputeBalance(euphController_t *ctrl) {
 	return balance;
 }
 
-static void Euph_ApplyBalanceForces(euphController_t *ctrl, float dt) {
+static void ProcAnim_ApplyBalanceForces(procAnimController_t *ctrl, float dt) {
 	physTransform_t pelvis, lfoot, rfoot;
 	vec3_t supportCenter, corrective, damping, zero;
 	float stiffness, dampCoeff;
 
-	Phys_RagdollGetBoneTransform(ctrl->ragdoll, EUPH_BONE_PELVIS, &pelvis);
-	Phys_RagdollGetBoneTransform(ctrl->ragdoll, EUPH_BONE_LOWER_LEG_L, &lfoot);
-	Phys_RagdollGetBoneTransform(ctrl->ragdoll, EUPH_BONE_LOWER_LEG_R, &rfoot);
+	Phys_RagdollGetBoneTransform(ctrl->ragdoll, PROCANIM_BONE_PELVIS, &pelvis);
+	Phys_RagdollGetBoneTransform(ctrl->ragdoll, PROCANIM_BONE_LOWER_LEG_L, &lfoot);
+	Phys_RagdollGetBoneTransform(ctrl->ragdoll, PROCANIM_BONE_LOWER_LEG_R, &rfoot);
 
 	supportCenter[0] = (lfoot.position[0] + rfoot.position[0]) * 0.5f;
 	supportCenter[1] = (lfoot.position[1] + rfoot.position[1]) * 0.5f;
@@ -140,14 +140,14 @@ static void Euph_ApplyBalanceForces(euphController_t *ctrl, float dt) {
 	Phys_RagdollApplyImpact(ctrl->ragdoll, pelvis.position, corrective, 50.0f);
 }
 
-static void Euph_ApplyBraceReaction(euphController_t *ctrl, float dt) {
+static void ProcAnim_ApplyBraceReaction(procAnimController_t *ctrl, float dt) {
 	physTransform_t pelvis;
 	vec3_t braceTarget, zero;
 	float extension;
 
 	(void)dt;
 
-	Phys_RagdollGetBoneTransform(ctrl->ragdoll, EUPH_BONE_PELVIS, &pelvis);
+	Phys_RagdollGetBoneTransform(ctrl->ragdoll, PROCANIM_BONE_PELVIS, &pelvis);
 
 	extension = ctrl->config.braceArmExtension;
 
@@ -157,11 +157,11 @@ static void Euph_ApplyBraceReaction(euphController_t *ctrl, float dt) {
 	braceTarget[1] -= 20.0f;
 
 	VectorSet(zero, 0, 0, 0);
-	Phys_RagdollReach(ctrl->ragdoll, EUPH_BONE_LOWER_ARM_L, braceTarget, ctrl->config.grabStrength * 0.5f);
-	Phys_RagdollReach(ctrl->ragdoll, EUPH_BONE_LOWER_ARM_R, braceTarget, ctrl->config.grabStrength * 0.5f);
+	Phys_RagdollReach(ctrl->ragdoll, PROCANIM_BONE_LOWER_ARM_L, braceTarget, ctrl->config.grabStrength * 0.5f);
+	Phys_RagdollReach(ctrl->ragdoll, PROCANIM_BONE_LOWER_ARM_R, braceTarget, ctrl->config.grabStrength * 0.5f);
 }
 
-static void Euph_ApplyHeadTracking(euphController_t *ctrl, float dt) {
+static void ProcAnim_ApplyHeadTracking(procAnimController_t *ctrl, float dt) {
 	vec3_t headTarget;
 	float trackSpeed;
 
@@ -169,12 +169,12 @@ static void Euph_ApplyHeadTracking(euphController_t *ctrl, float dt) {
 
 	trackSpeed = ctrl->config.headTrackSpeed * dt;
 	VectorCopy(ctrl->lookAtTarget, headTarget);
-	Phys_RagdollReach(ctrl->ragdoll, EUPH_BONE_HEAD, headTarget, trackSpeed * 50.0f);
+	Phys_RagdollReach(ctrl->ragdoll, PROCANIM_BONE_HEAD, headTarget, trackSpeed * 50.0f);
 }
 
-static void Euph_ApplyIKTargets(euphController_t *ctrl, float dt) {
+static void ProcAnim_ApplyIKTargets(procAnimController_t *ctrl, float dt) {
 	int i;
-	for (i = 0; i < EUPH_MAX_IK_TARGETS; i++) {
+	for (i = 0; i < PROCANIM_MAX_IK_TARGETS; i++) {
 		if (!ctrl->ikTargets[i].active) continue;
 
 		float force = ctrl->ikTargets[i].weight * ctrl->ikTargets[i].speed * dt * 100.0f;
@@ -183,34 +183,34 @@ static void Euph_ApplyIKTargets(euphController_t *ctrl, float dt) {
 	}
 }
 
-static void Euph_TransitionState(euphController_t *ctrl, euphState_t newState) {
+static void ProcAnim_TransitionState(procAnimController_t *ctrl, procAnimState_t newState) {
 	if (ctrl->state == newState) return;
 
 	switch (newState) {
-		case EUPH_STATE_STUMBLE:
+		case PROCANIM_STATE_STUMBLE:
 			ctrl->muscleStiffness = ctrl->config.muscleStiffnessMax * 0.6f;
 			break;
-		case EUPH_STATE_FALLING:
+		case PROCANIM_STATE_FALLING:
 			ctrl->muscleStiffness = ctrl->config.muscleStiffnessMax * 0.3f;
 			break;
-		case EUPH_STATE_RAGDOLL:
+		case PROCANIM_STATE_RAGDOLL:
 			ctrl->muscleStiffness = ctrl->config.muscleStiffnessMin;
 			Phys_RagdollSetMuscleStiffness(ctrl->ragdoll, ctrl->muscleStiffness);
 			break;
-		case EUPH_STATE_IMPACT:
+		case PROCANIM_STATE_IMPACT:
 			ctrl->recoveryTimer = ctrl->config.impactRecoveryTime;
 			ctrl->muscleStiffness = ctrl->config.muscleStiffnessMax * 0.4f;
 			break;
-		case EUPH_STATE_BRACING:
+		case PROCANIM_STATE_BRACING:
 			ctrl->muscleStiffness = ctrl->config.muscleStiffnessMax * 0.7f;
 			break;
-		case EUPH_STATE_GETUP:
+		case PROCANIM_STATE_GETUP:
 			ctrl->muscleStiffness = ctrl->config.muscleStiffnessMax;
 			break;
-		case EUPH_STATE_BALANCE:
+		case PROCANIM_STATE_BALANCE:
 			ctrl->muscleStiffness = ctrl->config.muscleStiffnessMax;
 			break;
-		case EUPH_STATE_DEAD:
+		case PROCANIM_STATE_DEAD:
 			ctrl->muscleStiffness = 0.0f;
 			ctrl->consciousness = 0.0f;
 			Phys_RagdollSetMuscleStiffness(ctrl->ragdoll, 0.0f);
@@ -224,11 +224,11 @@ static void Euph_TransitionState(euphController_t *ctrl, euphState_t newState) {
 	Phys_RagdollSetMuscleStiffness(ctrl->ragdoll, ctrl->muscleStiffness);
 }
 
-euphHandle_t Euph_Create(physRagdollHandle_t ragdoll, const euphConfig_t *config) {
+procAnimHandle_t ProcAnim_Create(physRagdollHandle_t ragdoll, const procAnimConfig_t *config) {
 	int idx;
-	euphController_t *ctrl;
+	procAnimController_t *ctrl;
 
-	if (controllerCount >= EUPH_MAX_CONTROLLERS) return -1;
+	if (controllerCount >= PROCANIM_MAX_CONTROLLERS) return -1;
 
 	idx = controllerCount++;
 	ctrl = &controllers[idx];
@@ -237,12 +237,12 @@ euphHandle_t Euph_Create(physRagdollHandle_t ragdoll, const euphConfig_t *config
 	ctrl->active = qtrue;
 	ctrl->ragdoll = ragdoll;
 	if (config) {
-		Com_Memcpy(&ctrl->config, config, sizeof(euphConfig_t));
+		Com_Memcpy(&ctrl->config, config, sizeof(procAnimConfig_t));
 	} else {
-		Euph_DefaultConfig(&ctrl->config);
+		ProcAnim_DefaultConfig(&ctrl->config);
 	}
 
-	ctrl->state = EUPH_STATE_ANIMATED;
+	ctrl->state = PROCANIM_STATE_ANIMATED;
 	ctrl->balance = 1.0f;
 	ctrl->painLevel = 0.0f;
 	ctrl->consciousness = 1.0f;
@@ -252,102 +252,102 @@ euphHandle_t Euph_Create(physRagdollHandle_t ragdoll, const euphConfig_t *config
 
 	Phys_RagdollSetBalance(ragdoll, qtrue, ctrl->lastCOM);
 
-	Com_Printf("Euphoria: created controller %d for ragdoll %d\n", idx, ragdoll);
+	Com_Printf("Procedural Animation: created controller %d for ragdoll %d\n", idx, ragdoll);
 	return idx;
 }
 
-void Euph_Destroy(euphHandle_t handle) {
-	if (!VALID_EUPH(handle)) return;
+void ProcAnim_Destroy(procAnimHandle_t handle) {
+	if (!VALID_PROCANIM(handle)) return;
 	controllers[handle].active = qfalse;
 }
 
-void Euph_Update(euphHandle_t handle, float dt) {
-	euphController_t *ctrl;
+void ProcAnim_Update(procAnimHandle_t handle, float dt) {
+	procAnimController_t *ctrl;
 
-	if (!VALID_EUPH(handle)) return;
+	if (!VALID_PROCANIM(handle)) return;
 	ctrl = &controllers[handle];
 
-	if (ctrl->state == EUPH_STATE_DEAD) return;
+	if (ctrl->state == PROCANIM_STATE_DEAD) return;
 
 	ctrl->stateTimer += dt;
 
-	Euph_ComputeCOM(ctrl);
-	ctrl->balance = Euph_ComputeBalance(ctrl);
+	ProcAnim_ComputeCOM(ctrl);
+	ctrl->balance = ProcAnim_ComputeBalance(ctrl);
 
 	if (ctrl->painLevel > 0) {
 		ctrl->painLevel -= dt * 0.5f;
 		if (ctrl->painLevel < 0) ctrl->painLevel = 0;
 	}
 
-	if (ctrl->consciousness < 1.0f && ctrl->state != EUPH_STATE_DEAD) {
+	if (ctrl->consciousness < 1.0f && ctrl->state != PROCANIM_STATE_DEAD) {
 		ctrl->consciousness += dt * 0.1f;
 		if (ctrl->consciousness > 1.0f) ctrl->consciousness = 1.0f;
 	}
 
 	switch (ctrl->state) {
-		case EUPH_STATE_ANIMATED:
-		case EUPH_STATE_BALANCE:
-			Euph_ApplyBalanceForces(ctrl, dt);
-			Euph_ApplyHeadTracking(ctrl, dt);
-			Euph_ApplyIKTargets(ctrl, dt);
+		case PROCANIM_STATE_ANIMATED:
+		case PROCANIM_STATE_BALANCE:
+			ProcAnim_ApplyBalanceForces(ctrl, dt);
+			ProcAnim_ApplyHeadTracking(ctrl, dt);
+			ProcAnim_ApplyIKTargets(ctrl, dt);
 
 			if (ctrl->balance < ctrl->config.stumbleThreshold) {
-				Euph_TransitionState(ctrl, EUPH_STATE_STUMBLE);
+				ProcAnim_TransitionState(ctrl, PROCANIM_STATE_STUMBLE);
 			}
 			break;
 
-		case EUPH_STATE_STUMBLE:
-			Euph_ApplyBalanceForces(ctrl, dt);
+		case PROCANIM_STATE_STUMBLE:
+			ProcAnim_ApplyBalanceForces(ctrl, dt);
 
 			if (ctrl->balance > ctrl->config.stumbleThreshold + 0.1f) {
-				Euph_TransitionState(ctrl, EUPH_STATE_BALANCE);
+				ProcAnim_TransitionState(ctrl, PROCANIM_STATE_BALANCE);
 			} else if (ctrl->balance < ctrl->config.fallThreshold) {
-				Euph_TransitionState(ctrl, EUPH_STATE_FALLING);
+				ProcAnim_TransitionState(ctrl, PROCANIM_STATE_FALLING);
 			}
 			break;
 
-		case EUPH_STATE_FALLING:
-			Euph_ApplyBraceReaction(ctrl, dt);
+		case PROCANIM_STATE_FALLING:
+			ProcAnim_ApplyBraceReaction(ctrl, dt);
 
 			if (ctrl->stateTimer > ctrl->config.braceReactionTime) {
-				Euph_TransitionState(ctrl, EUPH_STATE_BRACING);
+				ProcAnim_TransitionState(ctrl, PROCANIM_STATE_BRACING);
 			}
 			break;
 
-		case EUPH_STATE_BRACING:
-			Euph_ApplyBraceReaction(ctrl, dt);
+		case PROCANIM_STATE_BRACING:
+			ProcAnim_ApplyBraceReaction(ctrl, dt);
 
 			if (ctrl->onGround && ctrl->stateTimer > 0.5f) {
 				if (ctrl->consciousness > 0.3f) {
-					Euph_TransitionState(ctrl, EUPH_STATE_GETUP);
+					ProcAnim_TransitionState(ctrl, PROCANIM_STATE_GETUP);
 				} else {
-					Euph_TransitionState(ctrl, EUPH_STATE_RAGDOLL);
+					ProcAnim_TransitionState(ctrl, PROCANIM_STATE_RAGDOLL);
 				}
 			}
 			break;
 
-		case EUPH_STATE_RAGDOLL:
+		case PROCANIM_STATE_RAGDOLL:
 			if (ctrl->consciousness > 0.5f && ctrl->onGround) {
-				Euph_TransitionState(ctrl, EUPH_STATE_GETUP);
+				ProcAnim_TransitionState(ctrl, PROCANIM_STATE_GETUP);
 			}
 			break;
 
-		case EUPH_STATE_IMPACT:
+		case PROCANIM_STATE_IMPACT:
 			ctrl->recoveryTimer -= dt;
 			if (ctrl->recoveryTimer <= 0) {
 				if (ctrl->balance > ctrl->config.stumbleThreshold) {
-					Euph_TransitionState(ctrl, EUPH_STATE_BALANCE);
+					ProcAnim_TransitionState(ctrl, PROCANIM_STATE_BALANCE);
 				} else {
-					Euph_TransitionState(ctrl, EUPH_STATE_STUMBLE);
+					ProcAnim_TransitionState(ctrl, PROCANIM_STATE_STUMBLE);
 				}
 			}
 			break;
 
-		case EUPH_STATE_GETUP: {
+		case PROCANIM_STATE_GETUP: {
 			physTransform_t pelvis;
 			vec3_t upForce, zero;
 
-			Phys_RagdollGetBoneTransform(ctrl->ragdoll, EUPH_BONE_PELVIS, &pelvis);
+			Phys_RagdollGetBoneTransform(ctrl->ragdoll, PROCANIM_BONE_PELVIS, &pelvis);
 
 			VectorSet(upForce, 0, ctrl->config.getupSpeed * 200.0f * dt, 0);
 			VectorSet(zero, 0, 0, 0);
@@ -360,7 +360,7 @@ void Euph_Update(euphHandle_t handle, float dt) {
 			Phys_RagdollSetMuscleStiffness(ctrl->ragdoll, ctrl->muscleStiffness);
 
 			if (ctrl->stateTimer > 2.0f / ctrl->config.getupSpeed) {
-				Euph_TransitionState(ctrl, EUPH_STATE_BALANCE);
+				ProcAnim_TransitionState(ctrl, PROCANIM_STATE_BALANCE);
 			}
 			break;
 		}
@@ -372,10 +372,10 @@ void Euph_Update(euphHandle_t handle, float dt) {
 	Phys_RagdollBlendToAnimation(ctrl->ragdoll, ctrl->animBlend);
 }
 
-void Euph_GetStatus(euphHandle_t handle, euphStatus_t *status) {
-	euphController_t *ctrl;
+void ProcAnim_GetStatus(procAnimHandle_t handle, procAnimStatus_t *status) {
+	procAnimController_t *ctrl;
 
-	if (!VALID_EUPH(handle) || !status) return;
+	if (!VALID_PROCANIM(handle) || !status) return;
 	ctrl = &controllers[handle];
 
 	status->state = ctrl->state;
@@ -390,14 +390,14 @@ void Euph_GetStatus(euphHandle_t handle, euphStatus_t *status) {
 	status->canRecover = (ctrl->consciousness > 0.3f) ? qtrue : qfalse;
 }
 
-void Euph_ApplyImpact(euphHandle_t handle, const vec3_t point, const vec3_t force, float radius) {
-	euphController_t *ctrl;
+void ProcAnim_ApplyImpact(procAnimHandle_t handle, const vec3_t point, const vec3_t force, float radius) {
+	procAnimController_t *ctrl;
 	float impactMag;
 
-	if (!VALID_EUPH(handle)) return;
+	if (!VALID_PROCANIM(handle)) return;
 	ctrl = &controllers[handle];
 
-	if (ctrl->state == EUPH_STATE_DEAD) return;
+	if (ctrl->state == PROCANIM_STATE_DEAD) return;
 
 	Phys_RagdollApplyImpact(ctrl->ragdoll, point, force, radius);
 
@@ -411,22 +411,22 @@ void Euph_ApplyImpact(euphHandle_t handle, const vec3_t point, const vec3_t forc
 	ctrl->impactAccum += impactMag;
 
 	if (ctrl->consciousness <= 0.0f) {
-		Euph_TransitionState(ctrl, EUPH_STATE_RAGDOLL);
+		ProcAnim_TransitionState(ctrl, PROCANIM_STATE_RAGDOLL);
 	} else if (impactMag > 500.0f) {
-		Euph_TransitionState(ctrl, EUPH_STATE_IMPACT);
-	} else if (impactMag > 200.0f && ctrl->state == EUPH_STATE_BALANCE) {
-		Euph_TransitionState(ctrl, EUPH_STATE_STUMBLE);
+		ProcAnim_TransitionState(ctrl, PROCANIM_STATE_IMPACT);
+	} else if (impactMag > 200.0f && ctrl->state == PROCANIM_STATE_BALANCE) {
+		ProcAnim_TransitionState(ctrl, PROCANIM_STATE_STUMBLE);
 	}
 }
 
-void Euph_SetLookAt(euphHandle_t handle, const vec3_t target) {
-	if (!VALID_EUPH(handle)) return;
+void ProcAnim_SetLookAt(procAnimHandle_t handle, const vec3_t target) {
+	if (!VALID_PROCANIM(handle)) return;
 	VectorCopy(target, controllers[handle].lookAtTarget);
 	controllers[handle].lookAtActive = qtrue;
 }
 
-void Euph_SetIKTarget(euphHandle_t handle, int slot, int boneIndex, const vec3_t target, float weight, float speed) {
-	if (!VALID_EUPH(handle) || slot < 0 || slot >= EUPH_MAX_IK_TARGETS) return;
+void ProcAnim_SetIKTarget(procAnimHandle_t handle, int slot, int boneIndex, const vec3_t target, float weight, float speed) {
+	if (!VALID_PROCANIM(handle) || slot < 0 || slot >= PROCANIM_MAX_IK_TARGETS) return;
 	controllers[handle].ikTargets[slot].active = qtrue;
 	controllers[handle].ikTargets[slot].boneIndex = boneIndex;
 	VectorCopy(target, controllers[handle].ikTargets[slot].target);
@@ -434,27 +434,27 @@ void Euph_SetIKTarget(euphHandle_t handle, int slot, int boneIndex, const vec3_t
 	controllers[handle].ikTargets[slot].speed = speed;
 }
 
-void Euph_ClearIKTarget(euphHandle_t handle, int slot) {
-	if (!VALID_EUPH(handle) || slot < 0 || slot >= EUPH_MAX_IK_TARGETS) return;
+void ProcAnim_ClearIKTarget(procAnimHandle_t handle, int slot) {
+	if (!VALID_PROCANIM(handle) || slot < 0 || slot >= PROCANIM_MAX_IK_TARGETS) return;
 	controllers[handle].ikTargets[slot].active = qfalse;
 }
 
-void Euph_SetAnimationBlend(euphHandle_t handle, float blend) {
-	if (!VALID_EUPH(handle)) return;
+void ProcAnim_SetAnimationBlend(procAnimHandle_t handle, float blend) {
+	if (!VALID_PROCANIM(handle)) return;
 	controllers[handle].animBlend = blend < 0 ? 0 : (blend > 1 ? 1 : blend);
 }
 
-void Euph_ForceState(euphHandle_t handle, euphState_t state) {
-	if (!VALID_EUPH(handle)) return;
-	Euph_TransitionState(&controllers[handle], state);
+void ProcAnim_ForceState(procAnimHandle_t handle, procAnimState_t state) {
+	if (!VALID_PROCANIM(handle)) return;
+	ProcAnim_TransitionState(&controllers[handle], state);
 }
 
-void Euph_SetPainLevel(euphHandle_t handle, float pain) {
-	if (!VALID_EUPH(handle)) return;
+void ProcAnim_SetPainLevel(procAnimHandle_t handle, float pain) {
+	if (!VALID_PROCANIM(handle)) return;
 	controllers[handle].painLevel = pain < 0 ? 0 : (pain > 1 ? 1 : pain);
 }
 
-void Euph_Kill(euphHandle_t handle) {
-	if (!VALID_EUPH(handle)) return;
-	Euph_TransitionState(&controllers[handle], EUPH_STATE_DEAD);
+void ProcAnim_Kill(procAnimHandle_t handle) {
+	if (!VALID_PROCANIM(handle)) return;
+	ProcAnim_TransitionState(&controllers[handle], PROCANIM_STATE_DEAD);
 }
