@@ -1,6 +1,10 @@
 /*
 ===========================================================================
-Copyright (C) 2026 id Tech 3 Contributors
+Copyright (C) 2026 Gopex LLC. All rights reserved.
+
+This file is original work by Gopex LLC and is not derived from
+existing id Tech 3 / ioquake3 code.
+The engine framework is based on id Tech 3 (GPLv2).
 
 libvpx VP8/VP9 decoder backend for id Tech 3 engine.
 Provides VP8 and VP9 video decoding via libvpx, typically used
