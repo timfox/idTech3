@@ -1005,6 +1005,7 @@ list(APPEND CLIENT_SRCS
   src/game/g_director.c
   src/game/g_response.c
   src/game/g_choreography.c
+  src/game/g_dismember.c
 )
 # include architecture-specific assembly implementations (snd_mix etc)
 # Only include x86/x86_64 assembly files on x86/x86_64 architectures on Unix-like systems
