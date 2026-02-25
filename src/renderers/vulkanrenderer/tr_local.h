@@ -1527,6 +1527,8 @@ extern cvar_t	*r_panini_zoom;
 extern cvar_t	*r_panini_border;
 extern cvar_t	*r_panini_debug;
 extern cvar_t	*r_paniniBrightness;
+extern cvar_t	*r_paniniLensPreset;
+extern cvar_t	*r_paniniBarrelDistortion;
 extern cvar_t	*r_post;
 extern cvar_t	*r_post_debug;
 extern cvar_t	*r_exposure;

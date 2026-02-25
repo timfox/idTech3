@@ -14048,15 +14048,36 @@ void vk_end_frame( void )
 			uint32_t srcTexW = ( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u;
 			uint32_t srcTexH = ( glConfig.vidHeight > 0 ) ? (uint32_t)glConfig.vidHeight : 1u;
 			VkRect2D srcRect;
-			panini_push.paniniAmount = r_panini ? r_panini->value : 0.0f;
-			panini_push.paniniD = r_panini_d ? r_panini_d->value : 1.0f;
-			panini_push.paniniS = r_panini_s ? r_panini_s->value : 0.25f;
+			{
+			int lensPreset = r_paniniLensPreset ? r_paniniLensPreset->integer : 0;
+			float presetAmount = r_panini ? r_panini->value : 0.0f;
+			float presetD = r_panini_d ? r_panini_d->value : 1.0f;
+			float presetS = r_panini_s ? r_panini_s->value : 0.25f;
+			float presetFov = r_panini_theta ? r_panini_theta->value : 90.0f;
+			float presetZoom = r_panini_zoom ? r_panini_zoom->value : 1.0f;
+			float presetBright = r_paniniBrightness ? r_paniniBrightness->value : 1.0f;
+
+			switch (lensPreset) {
+				case 1: presetAmount=1.0f; presetD=1.0f; presetS=0.2f; presetFov=120.0f; presetZoom=1.15f; presetBright=1.2f; break;
+				case 2: presetAmount=1.0f; presetD=1.2f; presetS=0.35f; presetFov=150.0f; presetZoom=1.25f; presetBright=1.25f; break;
+				case 3: presetAmount=0.0f; presetD=0.0f; presetS=0.0f; presetFov=90.0f; presetZoom=1.0f; break;
+				case 4: presetAmount=0.4f; presetD=0.3f; presetS=0.05f; presetFov=84.0f; presetZoom=1.0f; break;
+				case 5: presetAmount=0.2f; presetD=0.15f; presetS=0.02f; presetFov=63.0f; presetZoom=1.0f; break;
+				case 6: presetAmount=1.0f; presetD=1.5f; presetS=0.5f; presetFov=170.0f; presetZoom=1.4f; presetBright=1.3f; break;
+				case 7: presetAmount=0.8f; presetD=0.8f; presetS=0.15f; presetFov=110.0f; presetZoom=1.1f; break;
+				default: break;
+			}
+
+			panini_push.paniniAmount = presetAmount;
+			panini_push.paniniD = presetD;
+			panini_push.paniniS = presetS;
+			panini_push.fovXDeg = backEnd.viewParms.fovX > 1.0f ? backEnd.viewParms.fovX : presetFov;
+			panini_push.paniniZoom = presetZoom;
+			panini_push.brightness = presetBright;
+			}
 			panini_push.aspect = vk.renderHeight > 0 ? ( (float)vk.renderWidth / (float)vk.renderHeight ) : 1.0f;
-			panini_push.fovXDeg = backEnd.viewParms.fovX > 1.0f ? backEnd.viewParms.fovX : ( r_panini_theta ? r_panini_theta->value : 90.0f );
 			panini_push.paniniBorderMode = r_panini_border ? (float)r_panini_border->integer : 0.0f;
 			panini_push.paniniDebugMode = r_panini_debug ? (float)r_panini_debug->integer : 0.0f;
-			panini_push.brightness = r_paniniBrightness ? r_paniniBrightness->value : 1.0f;
-			panini_push.paniniZoom = r_panini_zoom ? r_panini_zoom->value : 1.0f;
 			panini_push.paniniPad0 = 0.0f;
 			panini_push.paniniPad1 = 0.0f;
 			panini_push.paniniPad2 = 0.0f;
