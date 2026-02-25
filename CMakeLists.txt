@@ -1353,6 +1353,15 @@ if(USE_GLM)
   endif()
 endif()
 
+# cgltf include for glTF 2.0 model loading
+if(USE_RENDERER_DLOPEN)
+  target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${EXTERNAL_INCLUDE}/cgltf)
+else()
+  if(USE_VULKAN)
+    target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${EXTERNAL_INCLUDE}/cgltf)
+  endif()
+endif()
+
 # common function, window system
 IF(UNIX)
 	SET (Q3_SRCS
@@ -1549,10 +1558,19 @@ if(APPLE)
   endif()
 endif()
 
+# --- Bullet Physics module ---
+option(USE_BULLET_PHYSICS "Enable Bullet Physics integration" ON)
+set(PHYSICS_SRCS src/physics/phys_bullet.c)
+ADD_LIBRARY(phys_module OBJECT ${PHYSICS_SRCS})
+target_include_directories(phys_module PRIVATE ${CMAKE_SOURCE_DIR}/src/physics)
+if(NOT MSVC)
+  target_compile_options(phys_module PRIVATE -Wno-unused-parameter)
+endif()
+
 # client executable
 
 ADD_EXECUTABLE(${CNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
-TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE qcommon botlib client q3ui)
+TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE qcommon botlib client q3ui phys_module)
 if(USE_FLUX)
 	TARGET_COMPILE_DEFINITIONS(${CNAME}${BINEXT} PRIVATE USE_FLUX)
 	if(TARGET cflux2)
