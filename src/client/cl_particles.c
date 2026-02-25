@@ -15,7 +15,11 @@ sparks, blood, explosions, and animated sprite sequences.
 
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
+#include "../renderers/rendercommon/tr_types.h"
+#include "../renderers/rendercommon/tr_public.h"
 #include "cl_particles.h"
+
+extern refexport_t re;
 
 static particle_t   particles[MAX_PARTICLES];
 static particle_t  *freeParticles;
@@ -195,6 +199,13 @@ void Particles_Render(const vec3_t viewOrigin, const vec3_t viewForward,
 	particle_t *p;
 	float t, t2, alpha, lifeRatio, w, h;
 	vec3_t org;
+	polyVert_t verts[4];
+	vec3_t point;
+	vec4_t pcolor;
+	byte r, g, b, a;
+
+	(void)viewOrigin;
+	(void)viewForward;
 
 	for (p = activeParticles; p; p = p->next) {
 		if (!p->shader || p->type == PT_NONE) {
@@ -224,14 +235,62 @@ void Particles_Render(const vec3_t viewOrigin, const vec3_t viewForward,
 		w = p->width + lifeRatio * (p->endWidth - p->width);
 		h = p->height + lifeRatio * (p->endHeight - p->height);
 
-		(void)viewOrigin;
-		(void)viewForward;
-		(void)viewRight;
-		(void)viewUp;
-		(void)w;
-		(void)h;
-		(void)alpha;
-		(void)org;
+		Particle_GetColor(p->colorPreset, pcolor);
+		if (p->colorPreset == PC_CUSTOM) {
+			Vector4Copy(p->color, pcolor);
+		}
+		r = (byte)(pcolor[0] * 255);
+		g = (byte)(pcolor[1] * 255);
+		b = (byte)(pcolor[2] * 255);
+		a = (byte)(alpha * 255);
+
+		if (p->type == PT_FLAT || p->type == PT_FLAT_SCALEUP || p->type == PT_FLAT_FADEOUT) {
+			VectorCopy(org, verts[0].xyz);
+			verts[0].xyz[0] -= h; verts[0].xyz[1] -= w;
+			verts[0].st[0] = 0; verts[0].st[1] = 0;
+			verts[0].modulate.rgba[0] = r; verts[0].modulate.rgba[1] = g; verts[0].modulate.rgba[2] = b; verts[0].modulate.rgba[3] = a;
+
+			VectorCopy(org, verts[1].xyz);
+			verts[1].xyz[0] -= h; verts[1].xyz[1] += w;
+			verts[1].st[0] = 0; verts[1].st[1] = 1;
+			verts[1].modulate.rgba[0] = r; verts[1].modulate.rgba[1] = g; verts[1].modulate.rgba[2] = b; verts[1].modulate.rgba[3] = a;
+
+			VectorCopy(org, verts[2].xyz);
+			verts[2].xyz[0] += h; verts[2].xyz[1] += w;
+			verts[2].st[0] = 1; verts[2].st[1] = 1;
+			verts[2].modulate.rgba[0] = r; verts[2].modulate.rgba[1] = g; verts[2].modulate.rgba[2] = b; verts[2].modulate.rgba[3] = a;
+
+			VectorCopy(org, verts[3].xyz);
+			verts[3].xyz[0] += h; verts[3].xyz[1] -= w;
+			verts[3].st[0] = 1; verts[3].st[1] = 0;
+			verts[3].modulate.rgba[0] = r; verts[3].modulate.rgba[1] = g; verts[3].modulate.rgba[2] = b; verts[3].modulate.rgba[3] = a;
+		} else {
+			VectorMA(org, -h, viewUp, point);
+			VectorMA(point, -w, viewRight, point);
+			VectorCopy(point, verts[0].xyz);
+			verts[0].st[0] = 0; verts[0].st[1] = 0;
+			verts[0].modulate.rgba[0] = r; verts[0].modulate.rgba[1] = g; verts[0].modulate.rgba[2] = b; verts[0].modulate.rgba[3] = a;
+
+			VectorMA(org, -h, viewUp, point);
+			VectorMA(point, w, viewRight, point);
+			VectorCopy(point, verts[1].xyz);
+			verts[1].st[0] = 0; verts[1].st[1] = 1;
+			verts[1].modulate.rgba[0] = r; verts[1].modulate.rgba[1] = g; verts[1].modulate.rgba[2] = b; verts[1].modulate.rgba[3] = a;
+
+			VectorMA(org, h, viewUp, point);
+			VectorMA(point, w, viewRight, point);
+			VectorCopy(point, verts[2].xyz);
+			verts[2].st[0] = 1; verts[2].st[1] = 1;
+			verts[2].modulate.rgba[0] = r; verts[2].modulate.rgba[1] = g; verts[2].modulate.rgba[2] = b; verts[2].modulate.rgba[3] = a;
+
+			VectorMA(org, h, viewUp, point);
+			VectorMA(point, -w, viewRight, point);
+			VectorCopy(point, verts[3].xyz);
+			verts[3].st[0] = 1; verts[3].st[1] = 0;
+			verts[3].modulate.rgba[0] = r; verts[3].modulate.rgba[1] = g; verts[3].modulate.rgba[2] = b; verts[3].modulate.rgba[3] = a;
+		}
+
+		re.AddPolyToScene(p->shader, 4, verts, 1);
 	}
 }
 
