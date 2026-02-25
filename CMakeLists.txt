@@ -1003,6 +1003,8 @@ endif()
 list(APPEND CLIENT_SRCS
   src/audio/snd_music_adaptive.c
   src/game/g_director.c
+  src/game/g_response.c
+  src/game/g_choreography.c
 )
 # include architecture-specific assembly implementations (snd_mix etc)
 # Only include x86/x86_64 assembly files on x86/x86_64 architectures on Unix-like systems
@@ -1620,6 +1622,7 @@ set(PHYSICS_SRCS
   src/physics/phys_bullet.c
   src/physics/phys_procedural_anim.c
   src/physics/phys_dmm.c
+  src/physics/phys_ik.c
 )
 
 set(BULLET_FOUND FALSE)
