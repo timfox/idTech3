@@ -790,6 +790,9 @@ typedef struct {
 
 		VkShaderModule gamma_fs;
 		VkShaderModule gamma_vs;
+		VkShaderModule smaa_edge_fs;
+		VkShaderModule smaa_blend_fs;
+		VkShaderModule smaa_compose_fs;
 
 		VkShaderModule fog_fs;
 		VkShaderModule fog_vs;
