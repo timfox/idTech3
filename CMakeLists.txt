@@ -1595,7 +1595,7 @@ if(USE_RECAST_NAV)
     src/external/src/recast/DetourCrowd/Source/*.cpp
     src/external/src/recast/DetourTileCache/Source/*.cpp
   )
-  ADD_LIBRARY(recast_nav STATIC ${RECAST_SRCS} src/navigation/nav_recast.cpp)
+  ADD_LIBRARY(recast_nav STATIC ${RECAST_SRCS} src/navigation/nav_recast.cpp src/navigation/nav_bsp_extract.c)
   target_include_directories(recast_nav PRIVATE
     ${CMAKE_SOURCE_DIR}/src/external/src/recast/Recast/Include
     ${CMAKE_SOURCE_DIR}/src/external/src/recast/Detour/Include

@@ -92,32 +92,141 @@ extern "C" void Nav_Shutdown(void) {
 	Com_Printf("Navigation system shut down\n");
 }
 
+extern "C" void Nav_BSP_ClearGeometry(void);
+extern "C" int  Nav_BSP_AddVertex(float x, float y, float z);
+extern "C" void Nav_BSP_AddTriangle(int v0, int v1, int v2);
+extern "C" float *Nav_BSP_GetVerts(void);
+extern "C" int   *Nav_BSP_GetTris(void);
+extern "C" int    Nav_BSP_GetVertCount(void);
+extern "C" int    Nav_BSP_GetTriCount(void);
+
 extern "C" navMeshHandle_t Nav_BuildFromBSP(const char *mapName, const navMeshParams_t *params) {
 	if (!navInitialized || navMeshCount >= MAX_NAV_MESHES) return -1;
 
 	navMeshParams_t p;
 	if (params) { p = *params; } else { Nav_DefaultParams(&p); }
 
+	int nverts = Nav_BSP_GetVertCount();
+	int ntris = Nav_BSP_GetTriCount();
+	float *verts = Nav_BSP_GetVerts();
+	int *tris = Nav_BSP_GetTris();
+
+	if (nverts == 0 || ntris == 0) {
+		Com_Printf(S_COLOR_YELLOW "Nav: no BSP geometry extracted for %s, building empty mesh\n", mapName);
+	}
+
+	float bmin[3] = { 1e10f, 1e10f, 1e10f };
+	float bmax[3] = { -1e10f, -1e10f, -1e10f };
+	for (int v = 0; v < nverts; v++) {
+		for (int a = 0; a < 3; a++) {
+			if (verts[v*3+a] < bmin[a]) bmin[a] = verts[v*3+a];
+			if (verts[v*3+a] > bmax[a]) bmax[a] = verts[v*3+a];
+		}
+	}
+
+	rcContext ctx;
+	rcConfig cfg;
+	memset(&cfg, 0, sizeof(cfg));
+	cfg.cs = p.cellSize;
+	cfg.ch = p.cellHeight;
+	cfg.walkableSlopeAngle = p.agentMaxSlope;
+	cfg.walkableHeight = (int)ceilf(p.agentHeight / cfg.ch);
+	cfg.walkableClimb = (int)floorf(p.agentMaxClimb / cfg.ch);
+	cfg.walkableRadius = (int)ceilf(p.agentRadius / cfg.cs);
+	cfg.maxEdgeLen = (int)(p.edgeMaxLen / cfg.cs);
+	cfg.maxSimplificationError = p.edgeMaxError;
+	cfg.minRegionArea = p.regionMinSize * p.regionMinSize;
+	cfg.mergeRegionArea = p.regionMergeSize * p.regionMergeSize;
+	cfg.maxVertsPerPoly = p.vertsPerPoly;
+	cfg.detailSampleDist = p.detailSampleDist < 0.9f ? 0 : cfg.cs * p.detailSampleDist;
+	cfg.detailSampleMaxError = cfg.ch * p.detailSampleMaxError;
+	rcVcopy(cfg.bmin, bmin);
+	rcVcopy(cfg.bmax, bmax);
+	rcCalcGridSize(cfg.bmin, cfg.bmax, cfg.cs, &cfg.width, &cfg.height);
+
+	rcHeightfield *solid = rcAllocHeightfield();
+	rcCreateHeightfield(&ctx, *solid, cfg.width, cfg.height, cfg.bmin, cfg.bmax, cfg.cs, cfg.ch);
+
+	unsigned char *triAreas = new unsigned char[ntris];
+	memset(triAreas, 0, ntris);
+	rcMarkWalkableTriangles(&ctx, cfg.walkableSlopeAngle, verts, nverts, tris, ntris, triAreas);
+	rcRasterizeTriangles(&ctx, verts, nverts, tris, triAreas, ntris, *solid, cfg.walkableClimb);
+	delete[] triAreas;
+
+	rcFilterLowHangingWalkableObstacles(&ctx, cfg.walkableClimb, *solid);
+	rcFilterLedgeSpans(&ctx, cfg.walkableHeight, cfg.walkableClimb, *solid);
+	rcFilterWalkableLowHeightSpans(&ctx, cfg.walkableHeight, *solid);
+
+	rcCompactHeightfield *chf = rcAllocCompactHeightfield();
+	rcBuildCompactHeightfield(&ctx, cfg.walkableHeight, cfg.walkableClimb, *solid, *chf);
+	rcFreeHeightField(solid);
+
+	rcErodeWalkableArea(&ctx, cfg.walkableRadius, *chf);
+	rcBuildDistanceField(&ctx, *chf);
+	rcBuildRegions(&ctx, *chf, 0, cfg.minRegionArea, cfg.mergeRegionArea);
+
+	rcContourSet *cset = rcAllocContourSet();
+	rcBuildContours(&ctx, *chf, cfg.maxSimplificationError, cfg.maxEdgeLen, *cset);
+
+	rcPolyMesh *pmesh = rcAllocPolyMesh();
+	rcBuildPolyMesh(&ctx, *cset, cfg.maxVertsPerPoly, *pmesh);
+
+	rcPolyMeshDetail *dmesh = rcAllocPolyMeshDetail();
+	rcBuildPolyMeshDetail(&ctx, *pmesh, *chf, cfg.detailSampleDist, cfg.detailSampleMaxError, *dmesh);
+	rcFreeCompactHeightfield(chf);
+	rcFreeContourSet(cset);
+
+	unsigned char *navData = nullptr;
+	int navDataSize = 0;
+
+	for (int i = 0; i < pmesh->npolys; i++) {
+		if (pmesh->areas[i] == RC_WALKABLE_AREA)
+			pmesh->areas[i] = 0;
+		if (pmesh->areas[i] == 0)
+			pmesh->flags[i] = 1;
+	}
+
+	dtNavMeshCreateParams dtParams;
+	memset(&dtParams, 0, sizeof(dtParams));
+	dtParams.verts = pmesh->verts;
+	dtParams.vertCount = pmesh->nverts;
+	dtParams.polys = pmesh->polys;
+	dtParams.polyAreas = pmesh->areas;
+	dtParams.polyFlags = pmesh->flags;
+	dtParams.polyCount = pmesh->npolys;
+	dtParams.nvp = pmesh->nvp;
+	dtParams.detailMeshes = dmesh->meshes;
+	dtParams.detailVerts = dmesh->verts;
+	dtParams.detailVertsCount = dmesh->nverts;
+	dtParams.detailTris = dmesh->tris;
+	dtParams.detailTriCount = dmesh->ntris;
+	dtParams.walkableHeight = p.agentHeight;
+	dtParams.walkableRadius = p.agentRadius;
+	dtParams.walkableClimb = p.agentMaxClimb;
+	rcVcopy(dtParams.bmin, pmesh->bmin);
+	rcVcopy(dtParams.bmax, pmesh->bmax);
+	dtParams.cs = cfg.cs;
+	dtParams.ch = cfg.ch;
+	dtParams.buildBvTree = true;
+
+	dtCreateNavMeshData(&dtParams, &navData, &navDataSize);
+	rcFreePolyMesh(pmesh);
+	rcFreePolyMeshDetail(dmesh);
+
+	if (!navData) {
+		Com_Printf(S_COLOR_RED "Nav: failed to create Detour navmesh data for %s\n", mapName);
+		return -1;
+	}
+
 	int idx = navMeshCount++;
 	NavMeshInstance *inst = &navMeshes[idx];
 	memset(inst, 0, sizeof(*inst));
 
 	inst->navMesh = dtAllocNavMesh();
-	if (!inst->navMesh) {
-		Com_Printf(S_COLOR_RED "Nav: failed to allocate navmesh for %s\n", mapName);
-		navMeshCount--;
-		return -1;
-	}
-
-	dtNavMeshParams meshParams;
-	memset(&meshParams, 0, sizeof(meshParams));
-	meshParams.tileWidth = p.tileSize * p.cellSize;
-	meshParams.tileHeight = p.tileSize * p.cellSize;
-	meshParams.maxTiles = 1024;
-	meshParams.maxPolys = 1024 * 64;
-	dtStatus status = inst->navMesh->init(&meshParams);
+	dtStatus status = inst->navMesh->init(navData, navDataSize, DT_TILE_FREE_DATA);
 	if (dtStatusFailed(status)) {
-		Com_Printf(S_COLOR_RED "Nav: failed to init navmesh for %s\n", mapName);
+		Com_Printf(S_COLOR_RED "Nav: Detour init failed for %s\n", mapName);
+		dtFree(navData);
 		dtFreeNavMesh(inst->navMesh);
 		navMeshCount--;
 		return -1;
@@ -132,8 +241,8 @@ extern "C" navMeshHandle_t Nav_BuildFromBSP(const char *mapName, const navMeshPa
 	inst->active = qtrue;
 	inst->agentCount = 0;
 
-	Com_Printf("Nav: built navmesh for %s (cellSize=%.2f, agentR=%.2f, agentH=%.2f)\n",
-		mapName, (double)p.cellSize, (double)p.agentRadius, (double)p.agentHeight);
+	Com_Printf("Nav: built navmesh for %s (%d verts, %d tris -> Detour %d bytes)\n",
+		mapName, nverts, ntris, navDataSize);
 	return idx;
 }
 
