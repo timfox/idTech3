@@ -25,6 +25,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_vfog.h"
 #include "vk_fluidsim.h"
 #include "vk_postfx.h"
+#include "vk_flashlight.h"
+#include "vk_skybox_hdr.h"
 
 glconfig_t	glConfig;
 
@@ -2659,6 +2661,8 @@ static void R_Register( void )
 	VFog_RegisterCvars();
 	FluidSim_RegisterCvars();
 	PostFX_RegisterCvars();
+	ProjLight_Init();
+	SkyboxHDR_Init();
 }
 
 #define EPSILON 1e-6f

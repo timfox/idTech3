@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cl_main.c  -- client main loop
 
 #include "client.h"
+#include "cl_gameframe.h"
 #ifdef USE_DUKTAPE
 #include "../qcommon/js_debug.h"
 #endif
@@ -3375,6 +3376,9 @@ void CL_Frame( int msec, int realMsec ) {
 	// advance local effects for next frame
 	SCR_RunCinematic();
 
+	// tick all gameplay subsystems (physics, navigation, particles, director, music)
+	CL_GameFrame( (float)msec * 0.001f );
+
 	Con_RunConsole();
 }
 
@@ -4420,6 +4424,8 @@ void CL_Init( void ) {
 #else
 	Com_Printf( "FLUX.2 image generation: not available (compiled without USE_FLUX)\n" );
 #endif
+
+	CL_InitGameSystems();
 
 	Com_Printf( "----- Client Initialization Complete -----\n" );
 }
