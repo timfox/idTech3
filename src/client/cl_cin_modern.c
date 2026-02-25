@@ -55,6 +55,8 @@ cinCodecType_t CIN_DetectCodec(const char *filename, fileHandle_t file) {
 	const char *ext;
 	int i;
 
+	(void)file;
+
 	if (!filename || !filename[0]) {
 		return CODEC_NONE;
 	}
