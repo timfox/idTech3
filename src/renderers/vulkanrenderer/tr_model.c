@@ -202,11 +202,23 @@ typedef struct
 
 // Note that the ordering indicates the order of preference used
 // when there are multiple models of different formats available
+extern qhandle_t R_RegisterOBJ(const char *name, model_t *mod);
+extern qhandle_t R_RegisterMD5(const char *name, model_t *mod);
+extern qboolean  R_RegisterGLTF(const char *name, model_t *mod);
+
+static qhandle_t R_RegisterGLTF_Wrapper(const char *name, model_t *mod) {
+	return R_RegisterGLTF(name, mod) ? mod->index : 0;
+}
+
 static modelExtToLoaderMap_t modelLoaders[ ] =
 {
-	{ "iqm", R_RegisterIQM },
-	{ "mdr", R_RegisterMDR },
-	{ "md3", R_RegisterMD3 }
+	{ "gltf", R_RegisterGLTF_Wrapper },
+	{ "glb",  R_RegisterGLTF_Wrapper },
+	{ "obj",  R_RegisterOBJ },
+	{ "md5mesh", R_RegisterMD5 },
+	{ "iqm",  R_RegisterIQM },
+	{ "mdr",  R_RegisterMDR },
+	{ "md3",  R_RegisterMD3 }
 };
 
 static int numModelLoaders = ARRAY_LEN(modelLoaders);
