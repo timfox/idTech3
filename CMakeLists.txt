@@ -1612,7 +1612,11 @@ endif()
 
 # --- Bullet Physics module ---
 option(USE_BULLET_PHYSICS "Enable Bullet Physics integration" ON)
-set(PHYSICS_SRCS src/physics/phys_bullet.c)
+set(PHYSICS_SRCS
+  src/physics/phys_bullet.c
+  src/physics/phys_euphoria.c
+  src/physics/phys_dmm.c
+)
 
 set(BULLET_FOUND FALSE)
 if(USE_BULLET_PHYSICS)

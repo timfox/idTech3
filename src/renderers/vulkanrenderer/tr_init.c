@@ -22,6 +22,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_init.c -- functions that are not called every frame
 
 #include "tr_local.h"
+#include "vk_vfog.h"
+#include "vk_fluidsim.h"
+#include "vk_postfx.h"
 
 glconfig_t	glConfig;
 
@@ -2629,6 +2632,11 @@ static void R_Register( void )
 		" 3 - linear filtering, stretch to full size\n"
 		" 4 - linear filtering, preserve aspect ratio (black bars on sides)\n" );
 #endif // USE_VULKAN
+
+	// Register modular subsystem cvars
+	VFog_RegisterCvars();
+	FluidSim_RegisterCvars();
+	PostFX_RegisterCvars();
 }
 
 #define EPSILON 1e-6f
