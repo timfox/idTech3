@@ -1624,6 +1624,7 @@ set(PHYSICS_SRCS
   src/physics/phys_procedural_anim.c
   src/physics/phys_dmm.c
   src/physics/phys_ik.c
+  src/physics/phys_dmm_materials.c
 )
 
 set(BULLET_FOUND FALSE)
