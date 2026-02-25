@@ -1,8 +1,10 @@
 #version 450
 
-// SMAA compose pass: binding 0 = resolved color, binding 1 = blend-weight output.
+// SMAA compose pass
+//   set 0 binding 0: resolved color input (vk.color_image_view)
+//   set 1 binding 0: blend-weight output (vk.smaa_blend_image_view)
 layout(set = 0, binding = 0) uniform sampler2D colorTexture;
-layout(set = 0, binding = 1) uniform sampler2D blendTexture;
+layout(set = 1, binding = 0) uniform sampler2D blendTexture;
 
 layout(location = 0) in vec2 frag_tex_coord;
 layout(location = 0) out vec4 out_color;
