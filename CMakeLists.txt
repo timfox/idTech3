@@ -1539,12 +1539,6 @@ if(THEORA_FOUND)
   target_link_libraries(client PRIVATE ${THEORA_PKG_LINK_LIBRARIES})
 endif()
 
-# --- Volumetric fog and fluid simulation sources (Vulkan renderer) ---
-set(VK_VFOG_SRCS
-  src/renderers/vulkanrenderer/vk_vfog.c
-  src/renderers/vulkanrenderer/vk_fluidsim.c
-)
-
 # Ensure GNU-style --export-dynamic is not present in global linker flags on macOS
 if(APPLE)
   if(DEFINED CMAKE_EXE_LINKER_FLAGS)
