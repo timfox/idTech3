@@ -13,6 +13,9 @@ on:
   push:
     branches:
       - main
+      - next-gen
+      - next-gen-2
+      - next-gen-3
     paths-ignore:
       - '**/*.md'
       - '**/*.txt'
@@ -83,6 +86,7 @@ jobs:
             -DUSE_VULKAN=ON \
             -DRENDERER_DEFAULT=vulkan \
             -DSKIP_IDPAK_CHECK=ON \
+            -DSKIP_SHADER_REGEN=ON \
             -Wno-dev
           cmake --build build-vk-${{ matrix.btype }} -j$(nproc)
           mkdir -p bin
@@ -106,6 +110,7 @@ jobs:
             -DUSE_VULKAN=ON \
             -DRENDERER_DEFAULT=opengl \
             -DSKIP_IDPAK_CHECK=ON \
+            -DSKIP_SHADER_REGEN=ON \
             -Wno-dev
           cmake --build build-gl-${{ matrix.btype }} -j$(nproc)
           cp -f build-gl-${{ matrix.btype }}/idtech3* bin/ || true
@@ -243,6 +248,7 @@ jobs:
             -DUSE_VULKAN=ON \
             -DRENDERER_DEFAULT=vulkan \
             -DSKIP_IDPAK_CHECK=ON \
+            -DSKIP_SHADER_REGEN=ON \
             -Wno-dev
           cmake --build build-vk-${{ matrix.btype }} -j$(nproc)
           mkdir -p bin
@@ -266,6 +272,7 @@ jobs:
             -DUSE_VULKAN=ON \
             -DRENDERER_DEFAULT=opengl \
             -DSKIP_IDPAK_CHECK=ON \
+            -DSKIP_SHADER_REGEN=ON \
             -Wno-dev
           cmake --build build-gl-${{ matrix.btype }} -j$(nproc)
           cp -f build-gl-${{ matrix.btype }}/idtech3* bin/ || true
@@ -343,7 +350,7 @@ jobs:
               -DUSE_VULKAN=ON \
               -DRENDERER_DEFAULT=vulkan \
               -DSKIP_IDPAK_CHECK=ON \
-              -DSKIP_SHADER_REGEN=ON \
+            -DSKIP_SHADER_REGEN=ON \
               -Wno-dev
             cmake --build build-vk-${{ matrix.btype }} -j"$(nproc)"
 
@@ -361,7 +368,7 @@ jobs:
               -DUSE_VULKAN=ON \
               -DRENDERER_DEFAULT=opengl \
               -DSKIP_IDPAK_CHECK=ON \
-              -DSKIP_SHADER_REGEN=ON \
+            -DSKIP_SHADER_REGEN=ON \
               -Wno-dev
             cmake --build build-gl-${{ matrix.btype }} -j"$(nproc)"
 
@@ -421,6 +428,7 @@ jobs:
             -DUSE_VULKAN=ON \
             -DRENDERER_DEFAULT=vulkan \
             -DSKIP_IDPAK_CHECK=ON \
+            -DSKIP_SHADER_REGEN=ON \
             -DCMAKE_INCLUDE_PATH="${OPENAL_PREFIX}/include" \
             -DCMAKE_LIBRARY_PATH="${OPENAL_PREFIX}/lib" \
             -Wno-dev
@@ -454,6 +462,7 @@ jobs:
             -DUSE_VULKAN=ON \
             -DRENDERER_DEFAULT=opengl \
             -DSKIP_IDPAK_CHECK=ON \
+            -DSKIP_SHADER_REGEN=ON \
             -DCMAKE_INCLUDE_PATH="${OPENAL_PREFIX}/include" \
             -DCMAKE_LIBRARY_PATH="${OPENAL_PREFIX}/lib" \
             -Wno-dev
