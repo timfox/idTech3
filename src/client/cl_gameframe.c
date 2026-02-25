@@ -22,6 +22,8 @@ Ticks all gameplay subsystems each client frame:
 #include "../physics/phys_bullet.h"
 #include "../physics/phys_procedural_anim.h"
 #include "../navigation/nav_recast.h"
+#include "../game/g_director.h"
+#include "../audio/snd_music_adaptive.h"
 
 static qboolean gameSystemsInitialized = qfalse;
 static int activeNavMesh = -1;
@@ -40,6 +42,8 @@ void CL_InitGameSystems(void) {
 	Phys_Init();
 	Nav_Init();
 	Particles_Init();
+	Director_Init();
+	Music_Init();
 
 	gameSystemsInitialized = qtrue;
 	Com_Printf("Game systems initialized (physics, navigation, particles)\n");
@@ -51,6 +55,8 @@ void CL_ShutdownGameSystems(void) {
 	Phys_Shutdown();
 	Nav_Shutdown();
 	Particles_Clear();
+	Director_Shutdown();
+	Music_Shutdown();
 
 	activeNavMesh = -1;
 	gameSystemsInitialized = qfalse;
@@ -73,4 +79,7 @@ void CL_GameFrame(float frametime) {
 		float frametimeMs = frametime * 1000.0f;
 		Particles_Update(timeMs, frametimeMs);
 	}
+
+	Director_Update(frametime);
+	Music_Update(Director_GetGlobalIntensity(), frametime);
 }

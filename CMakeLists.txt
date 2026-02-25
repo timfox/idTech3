@@ -1000,6 +1000,10 @@ list(APPEND CLIENT_SRCS
 if(USE_SDL)
   list(APPEND CLIENT_SRCS src/audio/backends/snd_backend_sdl.c)
 endif()
+list(APPEND CLIENT_SRCS
+  src/audio/snd_music_adaptive.c
+  src/game/g_director.c
+)
 # include architecture-specific assembly implementations (snd_mix etc)
 # Only include x86/x86_64 assembly files on x86/x86_64 architectures on Unix-like systems
 # Assembly is disabled on Windows due to preprocessor macro issues with MSYS2/MinGW
