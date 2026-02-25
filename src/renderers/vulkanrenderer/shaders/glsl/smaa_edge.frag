@@ -1,6 +1,10 @@
 #version 450
 
+// SMAA edge detection pass
+// set 0 binding 0: resolved color input for the frame (vk.color_image_view)
+// set 1 binding 0: optional previous SMAA pass output (bound to the same color view for the first pass)
 layout(set = 0, binding = 0) uniform sampler2D colorTexture;
+layout(set = 1, binding = 0) uniform sampler2D previousStageTexture;
 
 layout(location = 0) in vec2 frag_tex_coord;
 layout(location = 0) out vec4 out_edge;
