@@ -22,6 +22,10 @@ layout(constant_id = 12) const float bloom_knee = 0.5;
 layout(constant_id = 13) const int tonemap_mode = 2;
 layout(constant_id = 14) const int apply_srgb_gamma = 0;
 layout(constant_id = 15) const int post_debug = 0;
+layout(constant_id = 16) const float vignette_intensity = 0.0;
+layout(constant_id = 17) const float vignette_radius = 0.75;
+layout(constant_id = 18) const float chromatic_aberration = 0.0;
+layout(constant_id = 19) const float film_grain = 0.0;
 layout(constant_id = 36) const int postprocess_enabled = 1;
 
 layout(push_constant) uniform PaniniPC {
@@ -277,6 +281,39 @@ void main() {
 		if ( ditherMode == 1 ) {
 			ldr = dither( ldr );
 		}
+	}
+
+	if ( chromatic_aberration > 0.0 && postprocess_enabled != 0 ) {
+		vec2 caUV = uvLogical;
+		vec2 caOffset = (caUV - 0.5) * chromatic_aberration * 0.01;
+		vec2 srcR = to_src_uv( caUV + caOffset );
+		vec2 srcB = to_src_uv( caUV - caOffset );
+		vec3 caHdr;
+		caHdr.r = texture( texture0, srcR ).r;
+		caHdr.g = ldr.g;
+		caHdr.b = texture( texture0, srcB ).b;
+		caHdr.r *= max( paniniPC.brightness, 0.0 ) * exposure * preExposureScale;
+		caHdr.b *= max( paniniPC.brightness, 0.0 ) * exposure * preExposureScale;
+		vec3 caTone;
+		caTone.r = doTonemap( vec3( caHdr.r ) ).r;
+		caTone.g = ldr.g;
+		caTone.b = doTonemap( vec3( caHdr.b ) ).b;
+		ldr = clamp( caTone, 0.0, 1.0 );
+	}
+
+	if ( vignette_intensity > 0.0 && postprocess_enabled != 0 ) {
+		vec2 vigUV = uvLogical * 2.0 - 1.0;
+		float vigDist = length( vigUV );
+		float vig = 1.0 - smoothstep( vignette_radius, vignette_radius + 0.5, vigDist );
+		vig = mix( 1.0, vig, vignette_intensity );
+		ldr *= vig;
+	}
+
+	if ( film_grain > 0.0 && postprocess_enabled != 0 ) {
+		float grainSeed = fract( sin( dot( gl_FragCoord.xy, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
+		float grain = ( grainSeed - 0.5 ) * film_grain * 0.1;
+		ldr += grain;
+		ldr = clamp( ldr, 0.0, 1.0 );
 	}
 
 	if ( apply_srgb_gamma != 0 ) {
