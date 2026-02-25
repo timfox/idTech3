@@ -1585,6 +1585,31 @@ if(APPLE)
   endif()
 endif()
 
+# --- Recast Navigation module ---
+option(USE_RECAST_NAV "Enable Recast/Detour navigation mesh" ON)
+if(USE_RECAST_NAV)
+  enable_language(CXX)
+  file(GLOB RECAST_SRCS
+    src/external/src/recast/Recast/Source/*.cpp
+    src/external/src/recast/Detour/Source/*.cpp
+    src/external/src/recast/DetourCrowd/Source/*.cpp
+    src/external/src/recast/DetourTileCache/Source/*.cpp
+  )
+  ADD_LIBRARY(recast_nav STATIC ${RECAST_SRCS} src/navigation/nav_recast.cpp)
+  target_include_directories(recast_nav PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/external/src/recast/Recast/Include
+    ${CMAKE_SOURCE_DIR}/src/external/src/recast/Detour/Include
+    ${CMAKE_SOURCE_DIR}/src/external/src/recast/DetourCrowd/Include
+    ${CMAKE_SOURCE_DIR}/src/external/src/recast/DetourTileCache/Include
+    ${CMAKE_SOURCE_DIR}/src/navigation
+  )
+  set_property(TARGET recast_nav PROPERTY POSITION_INDEPENDENT_CODE ON)
+  if(NOT MSVC)
+    target_compile_options(recast_nav PRIVATE -Wno-unused-parameter -Wno-sign-compare -Wno-cast-qual -Wno-shadow)
+  endif()
+  message(STATUS "Recast Navigation: enabled")
+endif()
+
 # --- Bullet Physics module ---
 option(USE_BULLET_PHYSICS "Enable Bullet Physics integration" ON)
 set(PHYSICS_SRCS src/physics/phys_bullet.c)
@@ -1621,6 +1646,9 @@ endif()
 
 ADD_EXECUTABLE(${CNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
 TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE qcommon botlib client q3ui phys_module)
+if(USE_RECAST_NAV AND TARGET recast_nav)
+  TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE recast_nav)
+endif()
 if(USE_FLUX)
 	TARGET_COMPILE_DEFINITIONS(${CNAME}${BINEXT} PRIVATE USE_FLUX)
 	if(TARGET cflux2)
