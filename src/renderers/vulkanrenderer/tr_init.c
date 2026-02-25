@@ -208,6 +208,8 @@ cvar_t	*r_panini_zoom;
 cvar_t	*r_panini_border;
 cvar_t	*r_panini_debug;
 cvar_t	*r_paniniBrightness;
+cvar_t	*r_paniniLensPreset;
+cvar_t	*r_paniniBarrelDistortion;
 cvar_t	*r_post;
 cvar_t	*r_post_debug;
 cvar_t	*r_exposure;
@@ -2037,6 +2039,26 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_paniniBrightness, "0.5", "2.5", CV_FLOAT );
 	ri.Cvar_SetDescription( r_paniniBrightness, "Multiplier applied after Panini warp (allows brightening the post-pass)." );
 	ri.Cvar_SetGroup( r_paniniBrightness, CVG_RENDERER );
+
+	r_paniniLensPreset = ri.Cvar_Get( "r_paniniLensPreset", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_paniniLensPreset, "0", "7", CV_INTEGER );
+	ri.Cvar_SetDescription( r_paniniLensPreset,
+		"Camera lens preset (auto-sets panini params):\n"
+		" 0 - Off (manual params)\n"
+		" 1 - GoPro Wide (d=1.0, s=0.2, fov=120, zoom=1.15)\n"
+		" 2 - GoPro SuperView (d=1.2, s=0.35, fov=150, zoom=1.25)\n"
+		" 3 - GoPro Linear (d=0.0, s=0.0, fov=90, zoom=1.0)\n"
+		" 4 - Cinematic 24mm (d=0.3, s=0.05, fov=84, zoom=1.0)\n"
+		" 5 - Cinematic 35mm (d=0.15, s=0.02, fov=63, zoom=1.0)\n"
+		" 6 - Fisheye (d=1.5, s=0.5, fov=170, zoom=1.4)\n"
+		" 7 - Security Cam (d=0.8, s=0.15, fov=110, zoom=1.1)\n" );
+	ri.Cvar_SetGroup( r_paniniLensPreset, CVG_RENDERER );
+
+	r_paniniBarrelDistortion = ri.Cvar_Get( "r_paniniBarrelDistortion", "0.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_paniniBarrelDistortion, "-1.0", "1.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_paniniBarrelDistortion, "Barrel/pincushion distortion coefficient. Positive = barrel (GoPro-like), negative = pincushion." );
+	ri.Cvar_SetGroup( r_paniniBarrelDistortion, CVG_RENDERER );
+
 	r_facePlaneCull = ri.Cvar_Get ("r_facePlaneCull", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_facePlaneCull, "Enables culling of planar surfaces with back side test." );
 
