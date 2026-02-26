@@ -27,12 +27,20 @@ extern "C" {
 #define GOAP_MAX_GOALS         16
 #define GOAP_MAX_PLAN_STEPS    16
 #define GOAP_MAX_AGENTS        64
+#define GOAP_BLACKBOARD_SIZE   16
 
 typedef struct goapState_s {
 	int     values[GOAP_MAX_STATE_PROPS];
 	int     mask[GOAP_MAX_STATE_PROPS];
 	int     numProps;
 } goapState_t;
+
+typedef enum {
+	GOAP_ACTION_IDLE,
+	GOAP_ACTION_RUNNING,
+	GOAP_ACTION_SUCCESS,
+	GOAP_ACTION_FAILED
+} goapActionStatus_t;
 
 typedef struct goapAction_s {
 	char            name[64];
@@ -41,9 +49,14 @@ typedef struct goapAction_s {
 	float           cost;
 	int             id;
 	qboolean        active;
+	float           duration;
+	float           range;
 
 	qboolean (*checkProceduralPrecondition)(int agentId, const goapState_t *worldState);
 	float    (*getDynamicCost)(int agentId, const goapState_t *worldState);
+	void     (*onEnter)(int agentId);
+	goapActionStatus_t (*onUpdate)(int agentId, float dt);
+	void     (*onExit)(int agentId, goapActionStatus_t status);
 } goapAction_t;
 
 typedef struct goapGoal_s {
@@ -70,6 +83,12 @@ typedef struct goapPlan_s {
 	qboolean        valid;
 } goapPlan_t;
 
+typedef struct {
+	char    key[32];
+	union { float f; int i; vec3_t v; } val;
+	int     type; /* 0=unused, 1=float, 2=int, 3=vec3 */
+} goapBBEntry_t;
+
 typedef struct goapAgent_s {
 	int             id;
 	qboolean        active;
@@ -80,6 +99,9 @@ typedef struct goapAgent_s {
 	int             numAvailableActions;
 	float           replanTimer;
 	float           replanInterval;
+	float           actionTimer;
+	goapActionStatus_t actionStatus;
+	goapBBEntry_t   blackboard[GOAP_BLACKBOARD_SIZE];
 } goapAgent_t;
 
 typedef int goapAgentHandle_t;
@@ -121,6 +143,47 @@ qboolean       GOAP_IsPlanComplete(goapAgentHandle_t handle);
 int  GOAP_GetActionCount(void);
 int  GOAP_GetGoalCount(void);
 int  GOAP_GetAgentCount(void);
+
+/* ---- Named state properties ---- */
+
+#define GOAP_MAX_PROP_NAMES  32
+
+int         GOAP_DefineProperty( const char *name );
+const char *GOAP_GetPropertyName( int propIndex );
+int         GOAP_FindProperty( const char *name );
+
+/* ---- Blackboard (per-agent key-value memory) ---- */
+
+void        GOAP_BBSetFloat( goapAgentHandle_t h, const char *key, float value );
+float       GOAP_BBGetFloat( goapAgentHandle_t h, const char *key );
+void        GOAP_BBSetInt( goapAgentHandle_t h, const char *key, int value );
+int         GOAP_BBGetInt( goapAgentHandle_t h, const char *key );
+void        GOAP_BBSetVec( goapAgentHandle_t h, const char *key, const vec3_t v );
+void        GOAP_BBGetVec( goapAgentHandle_t h, const char *key, vec3_t out );
+void        GOAP_BBClear( goapAgentHandle_t h );
+
+/* ---- Action execution ---- */
+
+void GOAP_SetActionCallbacks( int actionId,
+	void (*onEnter)(int agentId),
+	goapActionStatus_t (*onUpdate)(int agentId, float dt),
+	void (*onExit)(int agentId, goapActionStatus_t status) );
+void GOAP_SetActionDuration( int actionId, float duration );
+void GOAP_SetActionRange( int actionId, float range );
+
+/* ---- Default FPS action library ---- */
+
+void GOAP_RegisterDefaultActions( void );
+void GOAP_RegisterDefaultGoals( void );
+
+/* ---- Debug / introspection ---- */
+
+void GOAP_DebugPrintAgent( goapAgentHandle_t h );
+void GOAP_DebugPrintPlan( goapAgentHandle_t h );
+void GOAP_DebugPrintActions( void );
+void GOAP_DebugPrintGoals( void );
+const char *GOAP_GetActionName( int actionId );
+const char *GOAP_GetGoalName( int goalId );
 
 #ifdef __cplusplus
 }
