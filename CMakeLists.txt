@@ -2,6 +2,8 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.24)
 
 PROJECT(idtech3 LANGUAGES C CXX)
 
+find_package(Threads REQUIRED)
+
 if("c_std_23" IN_LIST CMAKE_C_COMPILE_FEATURES)
     set(CMAKE_C_STANDARD 23)
 else()
@@ -1699,7 +1701,7 @@ endif()
 # client executable
 
 ADD_EXECUTABLE(${CNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
-TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE qcommon botlib client q3ui phys_module)
+TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE qcommon botlib client q3ui phys_module Threads::Threads)
 if(USE_RECAST_NAV AND TARGET recast_nav)
   TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE recast_nav)
 endif()
@@ -1732,7 +1734,7 @@ ENDIF()
 # dedicated server executable
 
 ADD_EXECUTABLE(${DNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
-TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE qcommon_ded botlib)
+TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE qcommon_ded botlib Threads::Threads)
 #TARGET_LINK_OPTIONS(${DNAME} PRIVATE -fno-pie) # v3.13+
 
 if(UNIX AND NOT MSVC AND NOT APPLE)

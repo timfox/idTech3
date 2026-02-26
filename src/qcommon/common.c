@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "q_shared.h"
 #include "qcommon.h"
+#include "jobs.h"
 #ifdef USE_DUKTAPE
 #include "js_debug.h"
 #endif
@@ -4127,6 +4128,8 @@ void Com_Init( char *commandLine ) {
 
 	com_fullyInitialized = qtrue;
 
+	Jobs_Init();
+
 	Com_Printf( "--- Common Initialization Complete ---\n" );
 
 	NET_Init();
@@ -4583,6 +4586,8 @@ Com_Shutdown
 =================
 */
 static void Com_Shutdown( void ) {
+	Jobs_Shutdown();
+
 	if ( logfile != FS_INVALID_HANDLE ) {
 		FS_FCloseFile( logfile );
 		logfile = FS_INVALID_HANDLE;
