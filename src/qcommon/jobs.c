@@ -29,38 +29,249 @@ Thread safety:
 #include "jobs.h"
 
 #if defined(_MSC_VER)
-/* MSVC: job system uses Win32 threads in future; stub for now */
+/* Win32 threading via CreateThread + CRITICAL_SECTION + CONDITION_VARIABLE */
 #include <windows.h>
 
-qboolean Jobs_Init( void ) {
-	int numCores;
-	SYSTEM_INFO si;
-	cvar_t *jobs_enabled = Cvar_Get( "jobs_enabled", "1", CVAR_ARCHIVE | CVAR_LATCH );
-	(void)numCores; (void)si;
-	if ( !jobs_enabled->integer ) {
-		Com_Printf( "Job system: disabled by cvar\n" );
-		return qfalse;
+typedef enum { SLOT_FREE=0, SLOT_PENDING, SLOT_RUNNING, SLOT_COMPLETE } slotState_t;
+
+typedef struct {
+	jobFunc_t       func;
+	void            *data;
+	uint32_t        count;
+	jobPriority_t   priority;
+	jobHandle_t     parent;
+	volatile LONG   unfinished;
+	volatile LONG   state;
+} jobSlot_t;
+
+typedef struct {
+	volatile LONG   head;
+	volatile LONG   tail;
+	jobHandle_t     buf[JOBS_QUEUE_CAPACITY];
+} jobQueue_t;
+
+static struct {
+	qboolean            initialized;
+	int                 workerCount;
+	HANDLE              workers[JOBS_MAX_WORKERS];
+	volatile LONG       shutdownRequested;
+	jobSlot_t           slots[JOBS_MAX_PENDING];
+	volatile LONG       nextSlot;
+	jobQueue_t          queues[JOB_PRIORITY_COUNT];
+	CRITICAL_SECTION    wakeMutex;
+	CONDITION_VARIABLE  wakeCond;
+	volatile LONG       pendingJobCount;
+} js;
+
+static cvar_t *jobs_threads;
+static cvar_t *jobs_enabled;
+static __declspec(thread) uint32_t tls_threadId = 0;
+
+static qboolean queue_push( jobQueue_t *q, jobHandle_t h ) {
+	LONG tail, next;
+	for (;;) {
+		tail = q->tail;
+		next = ( tail + 1 ) % JOBS_QUEUE_CAPACITY;
+		if ( next == q->head ) return qfalse;
+		if ( InterlockedCompareExchange( &q->tail, next, tail ) == tail ) {
+			q->buf[tail] = h;
+			return qtrue;
+		}
 	}
-	GetSystemInfo( &si );
-	numCores = (int)si.dwNumberOfProcessors;
-	Com_Printf( "Job system: stub (MSVC), %d cores detected\n", numCores );
+}
+
+static qboolean queue_pop( jobQueue_t *q, jobHandle_t *out ) {
+	LONG head, next;
+	for (;;) {
+		head = q->head;
+		if ( head == q->tail ) return qfalse;
+		next = ( head + 1 ) % JOBS_QUEUE_CAPACITY;
+		if ( InterlockedCompareExchange( &q->head, next, head ) == head ) {
+			*out = q->buf[head];
+			return qtrue;
+		}
+	}
+}
+
+static jobSlot_t *slot_get( jobHandle_t h ) {
+	return ( h < JOBS_MAX_PENDING ) ? &js.slots[h] : NULL;
+}
+
+static jobHandle_t alloc_slot( void ) {
+	uint32_t attempt;
+	for ( attempt = 0; attempt < JOBS_MAX_PENDING; attempt++ ) {
+		uint32_t idx = (uint32_t)InterlockedIncrement( &js.nextSlot ) % JOBS_MAX_PENDING;
+		if ( InterlockedCompareExchange( &js.slots[idx].state, SLOT_PENDING, SLOT_FREE ) == SLOT_FREE ) {
+			return (jobHandle_t)idx;
+		}
+	}
+	return JOBS_INVALID_HANDLE;
+}
+
+static void wake_workers( int n ) {
+	EnterCriticalSection( &js.wakeMutex );
+	if ( n == 1 ) WakeConditionVariable( &js.wakeCond );
+	else WakeAllConditionVariable( &js.wakeCond );
+	LeaveCriticalSection( &js.wakeMutex );
+}
+
+static void finish_job( jobHandle_t h ) {
+	jobSlot_t *s = slot_get( h );
+	if ( !s ) return;
+	if ( s->parent != JOBS_INVALID_HANDLE ) {
+		jobSlot_t *p = slot_get( s->parent );
+		if ( p && InterlockedDecrement( &p->unfinished ) == 0 ) {
+			InterlockedExchange( &p->state, SLOT_COMPLETE );
+		}
+	}
+	if ( InterlockedDecrement( &s->unfinished ) <= 0 ) {
+		InterlockedExchange( &s->state, SLOT_COMPLETE );
+	}
+	InterlockedDecrement( &js.pendingJobCount );
+}
+
+static qboolean try_execute_one( void ) {
+	jobHandle_t h; int p;
+	for ( p = JOB_PRIORITY_HIGH; p >= JOB_PRIORITY_LOW; p-- ) {
+		if ( queue_pop( &js.queues[p], &h ) ) {
+			jobSlot_t *s = slot_get( h );
+			if ( !s || s->state != SLOT_PENDING ) return qtrue;
+			InterlockedExchange( &s->state, SLOT_RUNNING );
+			if ( s->func ) s->func( s->data, s->count );
+			finish_job( h );
+			return qtrue;
+		}
+	}
 	return qfalse;
 }
-void Jobs_Shutdown( void ) {}
-int Jobs_WorkerCount( void ) { return 0; }
+
+static DWORD WINAPI worker_main( LPVOID arg ) {
+	uint32_t id = (uint32_t)(uintptr_t)arg;
+	int spins = 0;
+	tls_threadId = id;
+	while ( !js.shutdownRequested ) {
+		if ( try_execute_one() ) { spins = 0; continue; }
+		spins++;
+		if ( spins < 64 ) { SwitchToThread(); }
+		else {
+			EnterCriticalSection( &js.wakeMutex );
+			SleepConditionVariableCS( &js.wakeCond, &js.wakeMutex, 1 );
+			LeaveCriticalSection( &js.wakeMutex );
+			spins = 0;
+		}
+	}
+	return 0;
+}
+
+qboolean Jobs_Init( void ) {
+	int numCores, i;
+	SYSTEM_INFO si;
+	if ( js.initialized ) return qtrue;
+	memset( &js, 0, sizeof( js ) );
+	jobs_enabled = Cvar_Get( "jobs_enabled", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	jobs_threads = Cvar_Get( "jobs_threads", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	if ( !jobs_enabled->integer ) { Com_Printf( "Job system: disabled by cvar\n" ); return qfalse; }
+	GetSystemInfo( &si );
+	numCores = (int)si.dwNumberOfProcessors;
+	js.workerCount = jobs_threads->integer > 0 ? jobs_threads->integer : numCores - 1;
+	if ( js.workerCount < 1 ) js.workerCount = 1;
+	if ( js.workerCount > JOBS_MAX_WORKERS ) js.workerCount = JOBS_MAX_WORKERS;
+	for ( i = 0; i < (int)JOBS_MAX_PENDING; i++ ) {
+		js.slots[i].state = SLOT_FREE;
+		js.slots[i].parent = JOBS_INVALID_HANDLE;
+	}
+	InitializeCriticalSection( &js.wakeMutex );
+	InitializeConditionVariable( &js.wakeCond );
+	for ( i = 0; i < js.workerCount; i++ ) {
+		js.workers[i] = CreateThread( NULL, 0, worker_main, (LPVOID)(uintptr_t)(i + 1), 0, NULL );
+		if ( !js.workers[i] ) { js.workerCount = i; break; }
+	}
+	js.initialized = qtrue;
+	Com_Printf( "Job system: %d worker threads (%d cores detected, Win32)\n", js.workerCount, numCores );
+	return qtrue;
+}
+
+void Jobs_Shutdown( void ) {
+	int i;
+	if ( !js.initialized ) return;
+	InterlockedExchange( &js.shutdownRequested, 1 );
+	WakeAllConditionVariable( &js.wakeCond );
+	for ( i = 0; i < js.workerCount; i++ ) {
+		WaitForSingleObject( js.workers[i], INFINITE );
+		CloseHandle( js.workers[i] );
+	}
+	DeleteCriticalSection( &js.wakeMutex );
+	js.initialized = qfalse;
+	Com_Printf( "Job system: shut down\n" );
+}
+
+int Jobs_WorkerCount( void ) { return js.workerCount; }
+
 jobHandle_t Jobs_Submit( const jobDesc_t *desc ) {
-	if ( desc && desc->func ) desc->func( desc->data, 0 );
-	return JOBS_INVALID_HANDLE;
+	jobHandle_t h; jobSlot_t *s; int pri;
+	if ( !js.initialized || !desc || !desc->func ) return JOBS_INVALID_HANDLE;
+	h = alloc_slot();
+	if ( h == JOBS_INVALID_HANDLE ) { desc->func( desc->data, 0 ); return JOBS_INVALID_HANDLE; }
+	s = slot_get( h );
+	s->func = desc->func; s->data = desc->data; s->count = 0;
+	s->priority = desc->priority; s->parent = desc->parent;
+	InterlockedExchange( &s->unfinished, 1 );
+	InterlockedExchange( &s->state, SLOT_PENDING );
+	if ( desc->parent != JOBS_INVALID_HANDLE ) {
+		jobSlot_t *p = slot_get( desc->parent );
+		if ( p ) InterlockedIncrement( &p->unfinished );
+	}
+	pri = (int)desc->priority;
+	if ( pri < 0 ) pri = 0; if ( pri >= JOB_PRIORITY_COUNT ) pri = JOB_PRIORITY_COUNT - 1;
+	if ( !queue_push( &js.queues[pri], h ) ) {
+		InterlockedExchange( &s->state, SLOT_RUNNING );
+		s->func( s->data, s->count );
+		finish_job( h );
+		return h;
+	}
+	InterlockedIncrement( &js.pendingJobCount );
+	wake_workers( 1 );
+	return h;
 }
+
 jobHandle_t Jobs_ParallelFor( jobFunc_t func, void *data, uint32_t count, uint32_t batchSize, jobPriority_t priority ) {
-	(void)batchSize; (void)priority;
-	if ( func ) { for ( uint32_t i = 0; i < count; i++ ) func( data, i ); }
+	uint32_t i;
+	if ( !js.initialized || !func || count == 0 ) {
+		if ( func ) for ( i = 0; i < count; i++ ) func( data, i );
+		return JOBS_INVALID_HANDLE;
+	}
+	for ( i = 0; i < count; i++ ) {
+		jobDesc_t d; d.func = func; d.data = data; d.priority = priority; d.parent = JOBS_INVALID_HANDLE;
+		Jobs_Submit( &d );
+	}
+	(void)batchSize;
 	return JOBS_INVALID_HANDLE;
 }
-void Jobs_Wait( jobHandle_t handle ) { (void)handle; }
-void Jobs_WaitAll( void ) {}
-qboolean Jobs_IsComplete( jobHandle_t handle ) { (void)handle; return qtrue; }
-uint32_t Jobs_GetThreadId( void ) { return 0; }
+
+void Jobs_Wait( jobHandle_t handle ) {
+	jobSlot_t *s;
+	if ( handle == JOBS_INVALID_HANDLE ) return;
+	s = slot_get( handle );
+	if ( !s ) return;
+	while ( s->state != SLOT_COMPLETE ) {
+		if ( !try_execute_one() ) SwitchToThread();
+	}
+	InterlockedExchange( &s->state, SLOT_FREE );
+}
+
+void Jobs_WaitAll( void ) {
+	while ( js.pendingJobCount > 0 ) {
+		if ( !try_execute_one() ) SwitchToThread();
+	}
+}
+
+qboolean Jobs_IsComplete( jobHandle_t handle ) {
+	if ( handle == JOBS_INVALID_HANDLE ) return qtrue;
+	jobSlot_t *s = slot_get( handle );
+	return ( !s || s->state == SLOT_COMPLETE ) ? qtrue : qfalse;
+}
+
+uint32_t Jobs_GetThreadId( void ) { return tls_threadId; }
 
 #else /* POSIX (includes MinGW/MSYS2) */
 

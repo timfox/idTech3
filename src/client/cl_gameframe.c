@@ -184,6 +184,18 @@ void CL_GameFrame(float frametime) {
 	Director_Update(frametime);
 	Music_Update(Director_GetGlobalIntensity(), frametime);
 
+	/* Director → Horde spawning bridge:
+	   When the director says to spawn, pick a type and feed to the horde system. */
+	{
+		int spawnType = Director_PickSpawnType();
+		if (spawnType >= 0 && Director_ShouldSpawn(spawnType)) {
+			Director_SpawnTypeActivated(spawnType);
+			Director_TriggerWave(0.1f);
+			Com_DPrintf("Director: spawned type %d (intensity %.2f, phase %d)\n",
+				spawnType, Director_GetGlobalIntensity(), (int)Director_GetPhase());
+		}
+	}
+
 	Cloth_SimulateAll(frametime);
 	Face_Update(frametime);
 	Dismember_Update(frametime);
