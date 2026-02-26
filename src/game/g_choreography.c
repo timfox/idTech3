@@ -112,6 +112,9 @@ static void Choreo_DispatchEvent(choreoScene_t *scene, const choreoEvent_t *evt)
 			break;
 		case CHOREO_EVT_ANIMATE:
 			Com_DPrintf("Choreo [%s]: actor %d animate \"%s\"\n", scene->name, evt->actorIndex, evt->param);
+			if (evt->param[0]) {
+				Cbuf_AddText(va("lua Engine.Choreo.onAnimate(%d, \"%s\")\n", evt->actorIndex, evt->param));
+			}
 			break;
 		case CHOREO_EVT_CAMERA_CUT:
 			Com_DPrintf("Choreo [%s]: camera cut (%.0f, %.0f, %.0f)\n",

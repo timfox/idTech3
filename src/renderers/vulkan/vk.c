@@ -15202,8 +15202,8 @@ static void vk_update_volumetric_params( void )
 			params.fluidEmitterData[i][3] = em->velocity[1];
 		}
 		params.fluidEmitterCount[0] = (float)emCount;
-		params.fluidEmitterCount[1] = 0.0f;
-		params.fluidEmitterCount[2] = 0.0f;
+		params.fluidEmitterCount[1] = FluidSim_GetVorticity();
+		params.fluidEmitterCount[2] = FluidSim_GetBuoyancy();
 		params.fluidEmitterCount[3] = 0.0f;
 	}
 	if ( VectorLengthSquared( wind_dir ) < 1e-6f ) {

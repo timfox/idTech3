@@ -2376,6 +2376,31 @@ void SV_ExecuteClientMessage( client_t *cl, msg_t *msg ) {
 		SV_UserMove( cl, msg, qtrue );
 	} else if ( c == clc_moveNoDelta ) {
 		SV_UserMove( cl, msg, qfalse );
+	} else if ( c == clc_voipOpus || c == clc_voipSpeex ) {
+		/* VoIP relay: read encoded audio and forward to all other clients */
+		int voipLen = MSG_ReadShort( msg );
+		if ( voipLen > 0 && voipLen <= 4000 ) {
+			byte voipData[4000];
+			int sender = (int)( cl - svs.clients );
+			int i;
+			MSG_ReadData( msg, voipData, voipLen );
+			for ( i = 0; i < sv.maxclients; i++ ) {
+				client_t *dst = &svs.clients[i];
+				if ( dst == cl || dst->state < CS_ACTIVE ) continue;
+				if ( dst->netchan.remoteAddress.type == NA_BOT ) continue;
+				SV_SendServerCommand( dst, "voip %d %d %s", sender, voipLen, "" );
+				{
+					msg_t relay;
+					byte relayBuf[4096];
+					MSG_Init( &relay, relayBuf, sizeof( relayBuf ) );
+					MSG_WriteByte( &relay, svc_voipOpus );
+					MSG_WriteByte( &relay, sender );
+					MSG_WriteShort( &relay, voipLen );
+					MSG_WriteData( &relay, voipData, voipLen );
+					SV_Netchan_Transmit( dst, &relay );
+				}
+			}
+		}
 	} else if ( c != clc_EOF ) {
 		Com_Printf( "WARNING: bad command byte %i for client %i\n", c, (int) (cl - svs.clients) );
 	}

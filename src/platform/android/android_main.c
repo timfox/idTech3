@@ -137,7 +137,42 @@ static void onResume( ANativeActivity *activity ) {
 static int32_t onInputEvent( ANativeActivity *activity, AInputEvent *event ) {
 	(void)activity;
 	int32_t type = AInputEvent_getType( event );
-	(void)type;
+
+	if ( type == AINPUT_EVENT_TYPE_MOTION ) {
+		int32_t action = AMotionEvent_getAction( event ) & AMOTION_EVENT_ACTION_MASK;
+		float x = AMotionEvent_getX( event, 0 );
+		float y = AMotionEvent_getY( event, 0 );
+
+		if ( action == AMOTION_EVENT_ACTION_DOWN || action == AMOTION_EVENT_ACTION_MOVE ) {
+			Com_QueueEvent( Sys_Milliseconds(), SE_MOUSE, (int)x, (int)y, 0, NULL );
+		}
+		if ( action == AMOTION_EVENT_ACTION_DOWN ) {
+			Com_QueueEvent( Sys_Milliseconds(), SE_KEY, K_MOUSE1, qtrue, 0, NULL );
+		} else if ( action == AMOTION_EVENT_ACTION_UP ) {
+			Com_QueueEvent( Sys_Milliseconds(), SE_KEY, K_MOUSE1, qfalse, 0, NULL );
+		}
+		return 1;
+	}
+
+	if ( type == AINPUT_EVENT_TYPE_KEY ) {
+		int32_t keyCode = AKeyEvent_getKeyCode( event );
+		int32_t action = AKeyEvent_getAction( event );
+		qboolean down = ( action == AKEY_EVENT_ACTION_DOWN ) ? qtrue : qfalse;
+
+		if ( keyCode == AKEYCODE_BACK ) {
+			Com_QueueEvent( Sys_Milliseconds(), SE_KEY, K_ESCAPE, down, 0, NULL );
+			return 1;
+		}
+		if ( keyCode == AKEYCODE_VOLUME_UP ) {
+			Com_QueueEvent( Sys_Milliseconds(), SE_KEY, K_UPARROW, down, 0, NULL );
+			return 1;
+		}
+		if ( keyCode == AKEYCODE_VOLUME_DOWN ) {
+			Com_QueueEvent( Sys_Milliseconds(), SE_KEY, K_DOWNARROW, down, 0, NULL );
+			return 1;
+		}
+	}
+
 	return 0;
 }
 
