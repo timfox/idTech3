@@ -9,7 +9,7 @@ on:
   pull_request:
     paths-ignore:
       - '**/*.md'
-      - '**/*.txt'
+      - '**/LICENSE*'
       - '**/.gitignore'
       - 'docs/**'
   push:
@@ -21,7 +21,7 @@ on:
       - next-gen-4
     paths-ignore:
       - '**/*.md'
-      - '**/*.txt'
+      - '**/LICENSE*'
       - '**/.gitignore'
       - 'docs/**'
   release:
