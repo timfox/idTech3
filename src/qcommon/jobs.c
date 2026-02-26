@@ -62,13 +62,17 @@ void Jobs_WaitAll( void ) {}
 qboolean Jobs_IsComplete( jobHandle_t handle ) { (void)handle; return qtrue; }
 uint32_t Jobs_GetThreadId( void ) { return 0; }
 
-#else /* POSIX */
+#else /* POSIX (includes MinGW/MSYS2) */
 
 #include <stdatomic.h>
 #include <pthread.h>
 #include <unistd.h>
 #include <sched.h>
 #include <time.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 /* ---------- job slot ---------- */
 
