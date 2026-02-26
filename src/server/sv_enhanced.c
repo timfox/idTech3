@@ -6,7 +6,7 @@ This file is original work by Gopex LLC and is not derived from
 existing id Tech 3 / ioquake3 code.
 The engine framework is based on id Tech 3 (GPLv2).
 
-Ratmod-inspired server enhancements implementation.
+Enhanced server features implementation.
 
 Backward reconciliation (Unlagged):
   Records entity bounding boxes each server frame into a circular
@@ -15,19 +15,14 @@ Backward reconciliation (Unlagged):
   for latency), performs the trace, then restores positions. This makes
   hitscan weapons feel responsive at any ping.
 
-  Based on the Unlagged concept by Neil "haste" Toronto, as extended
-  by Ratmod (rdntcntrl) with delagged projectiles.
-
 Server pause:
   Freezes the game clock while keeping network connections alive.
   Essential for competitive/LAN events.
-
-Inspired by: Ratmod (https://github.com/rdntcntrl/ratoa_gamecode)
 ===========================================================================
 */
 
 #include "server.h"
-#include "sv_ratmod.h"
+#include "sv_enhanced.h"
 
 static unlaggedState_t  unlagState;
 static qboolean         unlagInitialized = qfalse;
@@ -93,7 +88,7 @@ static cvar_t *g_warmupReady;
 static cvar_t *g_warmupReadyPercentage;
 static cvar_t *g_warmupDelay;
 
-void SV_Ratmod_Init( void ) {
+void SV_Enhanced_Init( void ) {
 	/* Unlagged */
 	sv_unlagged            = Cvar_Get( "sv_unlagged",            "1",    CVAR_SERVERINFO | CVAR_ARCHIVE );
 	sv_unlaggedMaxRewind   = Cvar_Get( "sv_unlaggedMaxRewind",   "800",  CVAR_ARCHIVE );
@@ -178,11 +173,11 @@ void SV_Ratmod_Init( void ) {
 	unlagInitialized = qtrue;
 	serverPaused = qfalse;
 
-	Com_Printf( "Ratmod features: unlagged %s, %d server cvars registered\n",
+	Com_Printf( "Server enhancements: unlagged %s, %d server cvars registered\n",
 		sv_unlagged->integer ? "enabled" : "disabled", 30 );
 }
 
-void SV_Ratmod_Shutdown( void ) {
+void SV_Enhanced_Shutdown( void ) {
 	unlagInitialized = qfalse;
 	serverPaused = qfalse;
 }

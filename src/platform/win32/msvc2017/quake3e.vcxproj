@@ -358,7 +358,7 @@
     <ClCompile Include="..\..\server\sv_filter.c" />
     <ClCompile Include="..\..\server\sv_game.c" />
     <ClCompile Include="..\..\server\sv_init.c" />
-    <ClCompile Include="..\..\server\sv_ratmod.c" />
+    <ClCompile Include="..\..\server\sv_enhanced.c" />
     <ClCompile Include="..\..\server\sv_main.c" />
     <ClCompile Include="..\..\server\sv_net_chan.c" />
     <ClCompile Include="..\..\server\sv_snapshot.c" />
