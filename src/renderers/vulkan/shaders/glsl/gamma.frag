@@ -27,6 +27,8 @@ layout(constant_id = 17) const float vignette_radius = 0.75;
 layout(constant_id = 18) const float chromatic_aberration = 0.0;
 layout(constant_id = 19) const float film_grain = 0.0;
 layout(constant_id = 20) const int postprocess_enabled = 1;
+layout(constant_id = 21) const float outline_strength = 0.0;
+layout(constant_id = 22) const float outline_threshold = 0.15;
 
 layout(push_constant) uniform PaniniPC {
 	float paniniAmount;
@@ -299,6 +301,20 @@ void main() {
 		caTone.g = ldr.g;
 		caTone.b = doTonemap( vec3( caHdr.b ) ).b;
 		ldr = clamp( caTone, 0.0, 1.0 );
+	}
+
+	if ( outline_strength > 0.0 && postprocess_enabled != 0 ) {
+		vec2 outlineTexel = 1.0 / vec2( textureSize( texture0, 0 ) );
+		float lumC  = dot( ldr, vec3(0.299, 0.587, 0.114) );
+		float lumL  = dot( texture( texture0, uv + vec2(-outlineTexel.x, 0.0) ).rgb, vec3(0.299, 0.587, 0.114) );
+		float lumR  = dot( texture( texture0, uv + vec2( outlineTexel.x, 0.0) ).rgb, vec3(0.299, 0.587, 0.114) );
+		float lumU  = dot( texture( texture0, uv + vec2(0.0, -outlineTexel.y) ).rgb, vec3(0.299, 0.587, 0.114) );
+		float lumD  = dot( texture( texture0, uv + vec2(0.0,  outlineTexel.y) ).rgb, vec3(0.299, 0.587, 0.114) );
+		float edgeH = abs( lumL - lumR );
+		float edgeV = abs( lumU - lumD );
+		float edge  = sqrt( edgeH * edgeH + edgeV * edgeV );
+		float outlineMask = smoothstep( outline_threshold * 0.5, outline_threshold, edge );
+		ldr = mix( ldr, vec3(0.0), outlineMask * outline_strength );
 	}
 
 	if ( vignette_intensity > 0.0 && postprocess_enabled != 0 ) {
