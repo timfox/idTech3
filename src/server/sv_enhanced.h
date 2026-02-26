@@ -6,11 +6,8 @@ This file is original work by Gopex LLC and is not derived from
 existing id Tech 3 / ioquake3 code.
 The engine framework is based on id Tech 3 (GPLv2).
 
-Ratmod-inspired server enhancements.
-Provides engine-level improvements from the Ratmod (ratoa_gamecode)
-project by rdntcntrl, adapted as optional server-side features.
-
-Features:
+Enhanced server features.
+Provides engine-level competitive and quality-of-life improvements:
   - Backward reconciliation (unlagged) history buffer
   - Server pause/unpause
   - Latency equalizer
@@ -20,8 +17,8 @@ Features:
 ===========================================================================
 */
 
-#ifndef SV_RATMOD_H
-#define SV_RATMOD_H
+#ifndef SV_ENHANCED_H
+#define SV_ENHANCED_H
 
 #include "../qcommon/q_shared.h"
 
@@ -41,8 +38,8 @@ typedef struct {
 	int             historyHead;
 } unlaggedState_t;
 
-void        SV_Ratmod_Init( void );
-void        SV_Ratmod_Shutdown( void );
+void        SV_Enhanced_Init( void );
+void        SV_Enhanced_Shutdown( void );
 
 void        SV_Unlagged_Record( int serverTime );
 void        SV_Unlagged_Rewind( int clientNum, int targetTime );
@@ -52,4 +49,4 @@ void        SV_Pause( void );
 void        SV_Unpause( void );
 qboolean    SV_IsPaused( void );
 
-#endif /* SV_RATMOD_H */
+#endif /* SV_ENHANCED_H */
