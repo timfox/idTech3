@@ -1015,6 +1015,7 @@ list(APPEND CLIENT_SRCS
   src/game/g_facial.c
   src/game/g_horde.c
   src/game/g_goap.c
+  src/game/g_aiml.c
   src/game/g_entity_bridge.c
   src/game/g_lua_bindings.c
   src/client/cl_map_background.c

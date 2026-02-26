@@ -33,6 +33,7 @@ Ticks all gameplay subsystems each client frame:
 #include "../game/g_horde.h"
 #include "../game/g_dismember.h"
 #include "../game/g_goap.h"
+#include "../game/g_aiml.h"
 #include "../game/g_lua_bindings.h"
 #include "../audio/snd_music_adaptive.h"
 
@@ -146,6 +147,7 @@ void CL_InitGameSystems(void) {
 	Horde_Init();
 	Dismember_Init();
 	GOAP_Init();
+	AIML_Init();
 	BgMap_Init();
 	WinTitle_Init();
 
