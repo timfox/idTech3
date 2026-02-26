@@ -11,6 +11,10 @@ Vulkan surface, input, file system, and JNI bridge.
 
 #include "../../qcommon/q_shared.h"
 #include "../../qcommon/qcommon.h"
+#ifndef DEDICATED
+#include "../../client/keycodes.h"
+#endif
+#define Com_QueueEvent Sys_QueEvent
 #include <android/log.h>
 #include <android/native_activity.h>
 #include <android/native_window.h>
