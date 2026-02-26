@@ -1,60 +1,50 @@
 /*
  * Copyright (C) 2026 Gopex LLC. All rights reserved.
  *
- * This file is original work by Gopex LLC and is not derived from
- * existing id Tech 3 / ioquake3 code.
- * The engine framework is based on id Tech 3 (GPLv2).
+ * Android launcher activity for id Tech 3 engine.
+ * The actual engine runs via NativeActivity (android_main.c).
+ * This class provides the JNI bridge for setting data paths.
  *
- * Main Android activity for the id Tech 3 engine.
- * Manages SDL2 lifecycle, Vulkan surface creation, touch input,
- * and game data directory setup.
+ * The engine can be launched either as:
+ *   1. NativeActivity (declared in manifest, no Java UI)
+ *   2. This GameActivity (Java UI + JNI bridge)
  */
 
 package com.gopex.idtech3;
 
-import android.app.Activity;
-import android.content.pm.ActivityInfo;
+import android.app.NativeActivity;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
 
 import java.io.File;
 
-public class GameActivity extends Activity {
+public class GameActivity extends NativeActivity {
     private static final String TAG = "idTech3";
 
     static {
-        System.loadLibrary("SDL2");
         System.loadLibrary("idtech3");
     }
 
-    private static native int nativeInit(String[] args);
-    private static native void nativeSetDataPath(String path);
+    public static native void nativeSetDataPath(String path);
+    public static native void nativeSetHomePath(String path);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         setupWindow();
-        setupGameData();
+        setupPaths();
 
-        Log.i(TAG, "id Tech 3 engine starting on Android");
+        Log.i(TAG, "id Tech 3 engine starting");
         Log.i(TAG, "Device: " + Build.MANUFACTURER + " " + Build.MODEL);
         Log.i(TAG, "Android API: " + Build.VERSION.SDK_INT);
-
-        new Thread(() -> {
-            String dataPath = getGameDataPath();
-            nativeSetDataPath(dataPath);
-            nativeInit(new String[]{ "+set", "r_renderer", "vulkan" });
-        }).start();
     }
 
     private void setupWindow() {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
         View decorView = getWindow().getDecorView();
         decorView.setSystemUiVisibility(
@@ -67,25 +57,23 @@ public class GameActivity extends Activity {
         );
     }
 
-    private void setupGameData() {
-        File gameDir = new File(getGameDataPath());
-        if (!gameDir.exists()) {
-            boolean created = gameDir.mkdirs();
-            Log.i(TAG, "Game data directory " + (created ? "created" : "exists") + ": " + gameDir.getAbsolutePath());
-        }
-
-        File baseDir = new File(gameDir, "base");
-        if (!baseDir.exists()) {
-            baseDir.mkdirs();
-        }
-    }
-
-    private String getGameDataPath() {
+    private void setupPaths() {
         File externalDir = getExternalFilesDir(null);
         if (externalDir != null) {
-            return externalDir.getAbsolutePath();
+            externalDir.mkdirs();
+            nativeSetDataPath(externalDir.getAbsolutePath());
+
+            File baseDir = new File(externalDir, "base");
+            baseDir.mkdirs();
         }
-        return Environment.getExternalStorageDirectory().getAbsolutePath() + "/idtech3";
+
+        File internalDir = getFilesDir();
+        if (internalDir != null) {
+            nativeSetHomePath(internalDir.getAbsolutePath());
+        }
+
+        Log.i(TAG, "Data: " + (externalDir != null ? externalDir.getAbsolutePath() : "null"));
+        Log.i(TAG, "Home: " + (internalDir != null ? internalDir.getAbsolutePath() : "null"));
     }
 
     @Override

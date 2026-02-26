@@ -2,68 +2,8 @@
 ===========================================================================
 Copyright (C) 2026 Gopex LLC. All rights reserved.
 
-Remaining platform stubs for Android (functions not yet implemented
-in android_main.c). These will be replaced as Android support matures.
+This file is intentionally empty.
+All Android platform functions are now in android_main.c.
+This file exists to prevent build errors if referenced by legacy configs.
 ===========================================================================
 */
-
-#ifdef __ANDROID__
-
-#include "../../qcommon/q_shared.h"
-#include "../../qcommon/qcommon.h"
-#include <android/log.h>
-#include <stdlib.h>
-#include <unistd.h>
-
-#define TAG "idTech3"
-
-/* Core system */
-void NORETURN Sys_Quit( void ) { exit( 0 ); }
-
-void NORETURN Sys_Error( const char *fmt, ... ) {
-	va_list ap; char buf[1024];
-	va_start( ap, fmt ); Q_vsnprintf( buf, sizeof(buf), fmt, ap ); va_end( ap );
-	__android_log_print( ANDROID_LOG_ERROR, TAG, "Sys_Error: %s", buf );
-	exit( 1 );
-}
-
-void Sys_Print( const char *msg ) {
-	__android_log_print( ANDROID_LOG_INFO, TAG, "%s", msg );
-}
-
-void Sys_Init( void ) {
-	__android_log_print( ANDROID_LOG_INFO, TAG, "Sys_Init (Android)" );
-}
-
-const char *Sys_DefaultBasePath( void ) { return "/sdcard/idtech3"; }
-qboolean Sys_LowPhysicalMemory( void ) { return qfalse; }
-void Sys_BeginProfiling( void ) {}
-void Sys_ShowErrorMessage( const char *msg, const char *title ) {
-	(void)title;
-	__android_log_print( ANDROID_LOG_ERROR, TAG, "Error: %s", msg );
-}
-void Sys_SetStatus( const char *format, ... ) { (void)format; }
-void Sys_SendKeyEvents( void ) {}
-char *Sys_ConsoleInput( void ) { return NULL; }
-void Sys_Sleep( int msec ) { if ( msec > 0 ) usleep( msec * 1000 ); }
-void Sys_UpdateWindowTitle( const char *title ) { (void)title; }
-char *Sys_GetClipboardData( void ) { return NULL; }
-void Sys_SetClipboardBitmap( const byte *bitmap, int length ) { (void)bitmap; (void)length; }
-
-/* Sound stubs */
-qboolean SNDDMA_Init( int sampleFrequencyInKHz ) { (void)sampleFrequencyInKHz; return qfalse; }
-void SNDDMA_Shutdown( void ) {}
-void SNDDMA_BeginPainting( void ) {}
-int  SNDDMA_GetDMAPos( void ) { return 0; }
-void SNDDMA_Submit( void ) {}
-
-/* Navigation stubs */
-void Nav_Init( void ) {}
-void Nav_Shutdown( void ) {}
-int  Nav_BuildFromBSP( const char *mapName, void *params ) { (void)mapName; (void)params; return -1; }
-void Nav_UpdateCrowd( int mesh, float dt ) { (void)mesh; (void)dt; }
-void Nav_BSP_ClearGeometry( void ) {}
-int  Nav_BSP_AddVertex( float x, float y, float z ) { (void)x; (void)y; (void)z; return 0; }
-void Nav_BSP_AddTriangle( int v0, int v1, int v2 ) { (void)v0; (void)v1; (void)v2; }
-
-#endif /* __ANDROID__ */
