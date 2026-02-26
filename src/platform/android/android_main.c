@@ -507,13 +507,19 @@ static void onDestroy( ANativeActivity *activity ) {
 static void onPause( ANativeActivity *activity ) {
 	(void)activity;
 	g_paused = 1;
-	LOGI( "Paused" );
+	if ( audioInitialized && slPlay ) {
+		(*slPlay)->SetPlayState( slPlay, SL_PLAYSTATE_PAUSED );
+	}
+	LOGI( "Paused (audio suspended)" );
 }
 
 static void onResume( ANativeActivity *activity ) {
 	(void)activity;
 	g_paused = 0;
-	LOGI( "Resumed" );
+	if ( audioInitialized && slPlay ) {
+		(*slPlay)->SetPlayState( slPlay, SL_PLAYSTATE_PLAYING );
+	}
+	LOGI( "Resumed (audio resumed)" );
 }
 
 /* ---- JNI bridge ---- */
