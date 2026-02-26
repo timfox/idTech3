@@ -16,6 +16,11 @@ contextual stingers for combat/danger events.
 #include "../qcommon/qcommon.h"
 #include "snd_music_adaptive.h"
 
+extern void S_StartBackgroundTrack(const char *intro, const char *loop);
+extern void S_StopBackgroundTrack(void);
+extern sfxHandle_t S_RegisterSound(const char *name, qboolean compressed);
+extern void S_StartLocalSound(sfxHandle_t sfx, int channelNum);
+
 static musicLayer_t   layers[MUSIC_MAX_LAYERS];
 static int            numLayers;
 static musicStinger_t stingers[MUSIC_MAX_STINGERS];
@@ -89,10 +94,38 @@ void Music_Update(float intensity, float dt) {
 		}
 	}
 
+	{
+		int bestLayer = -1;
+		float bestVol = 0;
+		for (i = 0; i < numLayers; i++) {
+			if (layers[i].active && layers[i].volume > bestVol) {
+				bestVol = layers[i].volume;
+				bestLayer = i;
+			}
+		}
+
+		static int lastActiveLayer = -1;
+		if (bestLayer != lastActiveLayer && bestLayer >= 0 && bestVol > 0.1f) {
+			if (layers[bestLayer].track[0]) {
+				S_StartBackgroundTrack(layers[bestLayer].track, layers[bestLayer].looping ? layers[bestLayer].track : "");
+			}
+			lastActiveLayer = bestLayer;
+		} else if (bestLayer < 0 || bestVol < 0.05f) {
+			if (lastActiveLayer >= 0) {
+				S_StopBackgroundTrack();
+				lastActiveLayer = -1;
+			}
+		}
+	}
+
 	for (i = 0; i < numStingers; i++) {
 		if (currentIntensity >= stingers[i].intensityTrigger &&
 			musicTime - stingers[i].lastPlayTime >= stingers[i].cooldown) {
 			stingers[i].lastPlayTime = musicTime;
+			if (stingers[i].track[0]) {
+				sfxHandle_t sfx = S_RegisterSound(stingers[i].track, qfalse);
+				if (sfx) S_StartLocalSound(sfx, 0);
+			}
 		}
 	}
 }

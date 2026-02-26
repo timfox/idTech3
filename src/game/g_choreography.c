@@ -96,19 +96,25 @@ void Choreo_Pause(choreoHandle_t h) {
 	scenes[h].paused = !scenes[h].paused;
 }
 
+extern sfxHandle_t S_RegisterSound(const char *name, qboolean compressed);
+extern void S_StartLocalSound(sfxHandle_t sfx, int channelNum);
+
 static void Choreo_DispatchEvent(choreoScene_t *scene, const choreoEvent_t *evt) {
 	switch (evt->type) {
 		case CHOREO_EVT_SPEAK:
-			Com_Printf("Choreo [%s]: actor %d speaks \"%s\"\n", scene->name, evt->actorIndex, evt->param);
+		case CHOREO_EVT_SOUND:
+			if (evt->param[0]) {
+				sfxHandle_t sfx = S_RegisterSound(evt->param, qfalse);
+				if (sfx) S_StartLocalSound(sfx, 0);
+			}
+			Com_DPrintf("Choreo [%s]: %s \"%s\"\n", scene->name,
+				evt->type == CHOREO_EVT_SPEAK ? "speak" : "sound", evt->param);
 			break;
 		case CHOREO_EVT_ANIMATE:
-			Com_Printf("Choreo [%s]: actor %d plays animation \"%s\"\n", scene->name, evt->actorIndex, evt->param);
-			break;
-		case CHOREO_EVT_SOUND:
-			Com_Printf("Choreo [%s]: play sound \"%s\"\n", scene->name, evt->param);
+			Com_DPrintf("Choreo [%s]: actor %d animate \"%s\"\n", scene->name, evt->actorIndex, evt->param);
 			break;
 		case CHOREO_EVT_CAMERA_CUT:
-			Com_Printf("Choreo [%s]: camera cut to (%.0f, %.0f, %.0f)\n",
+			Com_DPrintf("Choreo [%s]: camera cut (%.0f, %.0f, %.0f)\n",
 				scene->name, (double)evt->position[0], (double)evt->position[1], (double)evt->position[2]);
 			break;
 		default:

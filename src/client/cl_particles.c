@@ -208,8 +208,13 @@ void Particles_Render(const vec3_t viewOrigin, const vec3_t viewForward,
 	(void)viewForward;
 
 	for (p = activeParticles; p; p = p->next) {
-		if (!p->shader || p->type == PT_NONE) {
+		if (p->type == PT_NONE) {
 			continue;
+		}
+
+		if (!p->shader) {
+			p->shader = re.RegisterShader("white");
+			if (!p->shader) continue;
 		}
 
 		t = (currentTime - p->spawnTime) * 0.001f;
@@ -313,6 +318,8 @@ void Particles_EmitSmoke(qhandle_t shader, const vec3_t origin, const vec3_t dir
                          float alpha, particleColor_t color) {
 	particle_t *p = Particles_Alloc();
 	if (!p) return;
+
+	if (!shader) shader = re.RegisterShader("white");
 
 	p->spawnTime = currentTime;
 	p->endTime = currentTime + lifetime;
