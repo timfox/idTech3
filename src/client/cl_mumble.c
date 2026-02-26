@@ -15,7 +15,7 @@ See: https://wiki.mumble.info/wiki/Link
 #include "client.h"
 #include "cl_mumble.h"
 
-#ifdef __linux__
+#if defined(__linux__) && !defined(__ANDROID__)
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
