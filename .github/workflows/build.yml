@@ -538,6 +538,10 @@ jobs:
             -DUSE_DUKTAPE=OFF \
             -DUSE_RECAST_NAV=OFF \
             -DUSE_BULLET_PHYSICS=OFF \
+            -DBUILD_FREETYPE=OFF \
+            -DUSE_STB_TRUETYPE=ON \
+            -DENABLE_FORTIFY_SOURCE=OFF \
+            -DENABLE_ASAN=OFF \
             -DCI_BUILD=OFF \
             -Wno-dev
           cmake --build build-android-${{ matrix.btype }}-${{ matrix.abi }} -j$(nproc)
