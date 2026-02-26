@@ -429,7 +429,7 @@
       <Project>{a410161f-ae9f-485d-a01f-5294891430a6}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
-    <ProjectReference Include="renderer.vcxproj">
+    <ProjectReference Include="opengl.vcxproj">
       <Project>{AB424155-FBED-4D8D-B007-5B6CF93EA395}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
