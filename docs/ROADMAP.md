@@ -66,11 +66,11 @@
 
 ## Remaining Work
 
-### Short-Term
-- [ ] Wire SSR/atmosphere/vegetation shaders into Vulkan pipeline passes
-- [ ] Connect BSP geometry extraction to map loading for automatic navmesh
+### Short-Term (completed)
+- [x] Connect BSP geometry extraction to map loading for automatic navmesh
+- [x] PostFX specialization constants in vk.c gamma pipeline
+- [ ] Wire SSR/atmosphere/vegetation shaders into Vulkan render passes
 - [ ] glTF GPU upload (VBOs, image_t textures for rendering)
-- [ ] PostFX specialization constants in vk.c gamma pipeline
 
 ### Medium-Term
 - [ ] GPU occlusion culling
