@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "client.h"
 #include "cl_gameframe.h"
 #include "cl_emoji.h"
+#include "cl_osp.h"
 #ifdef USE_DUKTAPE
 #include "../qcommon/js_debug.h"
 #endif
@@ -4429,6 +4430,7 @@ void CL_Init( void ) {
 	CL_InitGameSystems();
 
 	CL_Emoji_Init();
+	CL_OSP_Init();
 
 	Com_Printf( "----- Client Initialization Complete -----\n" );
 }
