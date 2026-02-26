@@ -64,6 +64,9 @@ layout(std140, binding = 14) uniform VolumetricParams {
     vec4 fluidParams1;
     vec4 fluidParams2;
     vec4 fluidWorldMap;
+    vec4 fluidEmitters[16];
+    vec4 fluidEmitterData[16];
+    vec4 fluidEmitterCount;
     vec4 telemetryParams0;
     vec4 telemetryParams1;
 } params;
@@ -201,6 +204,17 @@ void main() {
         float viscosity = max(params.fluidParams0.y, 0.0);
         vec2 nextVel = advected + (viscosity * dt) * lap + force * dt;
 
+        int emCount = int(params.fluidEmitterCount.x);
+        for (int ei = 0; ei < emCount && ei < 16; ei++) {
+            vec2 emPos = params.fluidEmitters[ei].xy;
+            float emRadius = max(params.fluidEmitters[ei].w, 0.001);
+            vec2 emVel = params.fluidEmitterData[ei].zw;
+            vec2 worldPos = params.fluidWorldMap.xy + uv * (vec2(1.0) / max(params.fluidWorldMap.zw, vec2(1e-6)));
+            float dist = length(worldPos - emPos);
+            float falloff = 1.0 - smoothstep(0.0, emRadius, dist);
+            nextVel += emVel * falloff * dt;
+        }
+
         float velMax = max(params.fluidParams1.x, 1.0);
         float m = length(nextVel);
         if (m > velMax) {
@@ -224,6 +238,17 @@ void main() {
 
         float injectNoise = hash12(uv * 251.0 + vec2(params.windParams.x * 0.11, params.windParams.x * 0.17));
         d += injectNoise * params.fluidParams0.w * 0.0025;
+
+        int emitterCount = int(params.fluidEmitterCount.x);
+        for (int ei = 0; ei < emitterCount && ei < 16; ei++) {
+            vec2 emPos = params.fluidEmitters[ei].xy;
+            float emRadius = max(params.fluidEmitters[ei].w, 0.001);
+            float emDensity = params.fluidEmitterData[ei].x;
+            vec2 worldPos = params.fluidWorldMap.xy + uv * (vec2(1.0) / max(params.fluidWorldMap.zw, vec2(1e-6)));
+            float dist = length(worldPos - emPos);
+            float falloff = 1.0 - smoothstep(0.0, emRadius, dist);
+            d += emDensity * falloff * dt;
+        }
 
         if (!wrapMode() && atBoundary(coord, dim)) {
             d *= 0.98;

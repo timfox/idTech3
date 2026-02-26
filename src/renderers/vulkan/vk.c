@@ -1,6 +1,7 @@
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_postfx.h"
+#include "vk_fluidsim.h"
 #include <stddef.h>
 
 #if defined (_DEBUG)
@@ -260,6 +261,9 @@ typedef struct {
 	float fluidParams1[4];
 	float fluidParams2[4];
 	float fluidWorldMap[4];
+	float fluidEmitters[16][4];  /* pos.xyz + radius, up to 16 emitters */
+	float fluidEmitterData[16][4]; /* density, temperature, vel.x, vel.y per emitter */
+	float fluidEmitterCount[4]; /* [0]=count, [1..3]=reserved */
 	float telemetryParams0[4];
 	float telemetryParams1[4];
 } volumetric_params_t;
@@ -308,6 +312,9 @@ VK_VOLUMETRIC_ASSERT_ALIGNED16( fluidParams0 );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( fluidParams1 );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( fluidParams2 );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( fluidWorldMap );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( fluidEmitters );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( fluidEmitterData );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( fluidEmitterCount );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( telemetryParams0 );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( telemetryParams1 );
 #undef VK_VOLUMETRIC_ASSERT_ALIGNED16
@@ -15176,6 +15183,29 @@ static void vk_update_volumetric_params( void )
 	params.fluidParams2[1] = fluid_enabled ? (float)vk.fluid_active_height : 0.0f;
 	params.fluidParams2[2] = (float)( vk.fluid_velocity_index & 1u );
 	params.fluidParams2[3] = (float)( vk.fluid_density_index & 1u );
+
+	/* Upload emitter data to GPU */
+	{
+		int emCount = FluidSim_GetEmitterCount();
+		int i;
+		if ( emCount > 16 ) emCount = 16;
+		for ( i = 0; i < emCount; i++ ) {
+			const fluidEmitter_t *em = FluidSim_GetEmitter( i );
+			if ( !em ) continue;
+			params.fluidEmitters[i][0] = em->position[0];
+			params.fluidEmitters[i][1] = em->position[1];
+			params.fluidEmitters[i][2] = em->position[2];
+			params.fluidEmitters[i][3] = em->radius;
+			params.fluidEmitterData[i][0] = em->density;
+			params.fluidEmitterData[i][1] = em->temperature;
+			params.fluidEmitterData[i][2] = em->velocity[0];
+			params.fluidEmitterData[i][3] = em->velocity[1];
+		}
+		params.fluidEmitterCount[0] = (float)emCount;
+		params.fluidEmitterCount[1] = 0.0f;
+		params.fluidEmitterCount[2] = 0.0f;
+		params.fluidEmitterCount[3] = 0.0f;
+	}
 	if ( VectorLengthSquared( wind_dir ) < 1e-6f ) {
 		VectorSet( wind_dir, 1.0f, 0.0f, 0.0f );
 	}
