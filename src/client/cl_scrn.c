@@ -22,6 +22,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cl_scrn.c -- master for refresh, status bar, console, chat, notify, etc
 
 #include "client.h"
+#include "cl_emoji.h"
+#include "../qcommon/q_utf8.h"
 
 static qboolean	scr_initialized;		// ready to draw
 
@@ -282,6 +284,15 @@ void SCR_DrawStringExt( int x, int y, float size, const char *string, const floa
 			s += 2;
 			continue;
 		}
+		if ( CL_Emoji_IsEnabled() && ( (unsigned char)*s >= 0x80 ) ) {
+			const char *prev = s;
+			uint32_t cp = Q_UTF8_Decode( &s );
+			if ( Q_UTF8_IsEmoji( cp ) ) {
+				xx += (int)size;
+				continue;
+			}
+			s = prev;
+		}
 		SCR_DrawChar( xx+2, y+2, size, *s );
 		xx += size;
 		s++;
@@ -303,6 +314,16 @@ void SCR_DrawStringExt( int x, int y, float size, const char *string, const floa
 				s += 2;
 				continue;
 			}
+		}
+		if ( CL_Emoji_IsEnabled() && ( (unsigned char)*s >= 0x80 ) ) {
+			const char *prev = s;
+			uint32_t cp = Q_UTF8_Decode( &s );
+			if ( CL_Emoji_DrawChar( xx, y, size, size, cp ) ) {
+				re.SetColor( forceColor ? setColor : color );
+				xx += (int)size;
+				continue;
+			}
+			s = prev;
 		}
 		SCR_DrawChar( xx, y, size, *s );
 		xx += size;
