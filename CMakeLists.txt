@@ -1197,6 +1197,8 @@ set(RENDERER_COMMON_SRCS
 	src/renderers/rendercommon/tr_image_png.c
 	src/renderers/rendercommon/tr_image_tga.c
 	src/renderers/rendercommon/tr_image_hdr.c
+	src/renderers/rendercommon/tr_image_qoi.c
+	src/renderers/rendercommon/tr_image_dds.c
 	src/renderers/rendercommon/tr_noise.c
 )
 IF(BUILD_FREETYPE)
