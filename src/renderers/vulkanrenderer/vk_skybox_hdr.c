@@ -68,8 +68,10 @@ static void SkyboxHDR_SampleEquirect(const float *data, int w, int h, const floa
 
 	int px = (int)(u * (w - 1) + 0.5f);
 	int py = (int)((1.0f - v) * (h - 1) + 0.5f);
-	if (px < 0) px = 0; if (px >= w) px = w - 1;
-	if (py < 0) py = 0; if (py >= h) py = h - 1;
+	if (px < 0) px = 0;
+	if (px >= w) px = w - 1;
+	if (py < 0) py = 0;
+	if (py >= h) py = h - 1;
 
 	int idx = (py * w + px) * 4;
 	outRGB[0] = data[idx + 0] * skybox.exposure * skybox.tintR;
@@ -326,7 +328,7 @@ void SkyboxHDR_SampleDirection(const float *dir, float *outRGB) {
 
 void SkyboxHDR_SampleIrradiance(const float *normal, float *outRGB) {
 	int bestFace = 0, i;
-	float maxDot = -999, dir[3];
+	float maxDot = -999;
 
 	outRGB[0] = outRGB[1] = outRGB[2] = 0;
 	if (!skybox.loaded) return;

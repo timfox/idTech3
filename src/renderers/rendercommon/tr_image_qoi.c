@@ -1,3 +1,4 @@
+#include "tr_image_loaders.h"
 /*
 ===========================================================================
 Copyright (C) 2026 Gopex LLC. All rights reserved.

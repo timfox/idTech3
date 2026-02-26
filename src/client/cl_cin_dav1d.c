@@ -221,10 +221,10 @@ static qboolean cin_dav1d_decodeFrame(cinModernDecoder_t *dec, cinFrame_t *frame
 
 /*
 ===============
-dav1d_seek
+cin_dav1d_seek
 ===============
 */
-static void dav1d_seek(cinModernDecoder_t *dec, int timeMs) {
+static void cin_dav1d_seek(cinModernDecoder_t *dec, int timeMs) {
 	dav1dContext_t *ctx;
 
 	(void)timeMs;
