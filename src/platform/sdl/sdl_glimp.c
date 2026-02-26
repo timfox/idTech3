@@ -218,7 +218,6 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 	int colorBits, depthBits, stencilBits;
 	int i;
 	SDL_DisplayMode desktopMode;
-	SDL_DisplayMode displayMode;
 	int display;
 	int x;
 	int y;

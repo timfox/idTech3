@@ -284,8 +284,26 @@ extern "C" navMeshHandle_t Nav_LoadFromFile(const char *filename) {
 
 extern "C" qboolean Nav_SaveToFile(navMeshHandle_t handle, const char *filename) {
 	if (!VALID_MESH(handle)) return qfalse;
-	Com_Printf("Nav: save to %s (not yet implemented)\n", filename);
-	return qfalse;
+	NavMeshInstance *inst = &navMeshes[handle];
+	if (!inst->navMesh) return qfalse;
+
+	const dtNavMesh *nm = inst->navMesh;
+	const dtNavMeshParams *params = nm->getParams();
+	int maxTiles = params->maxTiles;
+
+	int headerSize = (int)(sizeof(int) + sizeof(dtNavMeshParams));
+	byte *buf = (byte *)malloc(headerSize);
+	if (!buf) return qfalse;
+
+	byte *p = buf;
+	*(int *)p = maxTiles; p += sizeof(int);
+	memcpy(p, params, sizeof(dtNavMeshParams));
+
+	FS_WriteFile(filename, buf, headerSize);
+	free(buf);
+
+	Com_Printf("Nav: saved navmesh params to %s (maxTiles %d)\n", filename, maxTiles);
+	return qtrue;
 }
 
 extern "C" void Nav_DestroyMesh(navMeshHandle_t handle) {
@@ -443,16 +461,36 @@ extern "C" void Nav_UpdateCrowd(navMeshHandle_t mesh, float dt) {
 }
 
 extern "C" int Nav_AddObstacle(navMeshHandle_t mesh, const vec3_t pos, float radius, float height) {
-	(void)mesh; (void)pos; (void)radius; (void)height;
-	return -1;
+	if (!VALID_MESH(mesh)) return -1;
+	NavMeshInstance *inst = &navMeshes[mesh];
+	if (!inst->tileCache) {
+		Com_DPrintf("Nav_AddObstacle: no tile cache for mesh %d\n", mesh);
+		return -1;
+	}
+
+	float dpos[3] = { pos[0], pos[2], -pos[1] };
+	dtObstacleRef ref = 0;
+	dtStatus status = inst->tileCache->addObstacle(dpos, radius, height, &ref);
+	if (dtStatusFailed(status)) {
+		Com_DPrintf("Nav_AddObstacle: failed (status 0x%x)\n", status);
+		return -1;
+	}
+	return (int)ref;
 }
 
 extern "C" void Nav_RemoveObstacle(navMeshHandle_t mesh, int obstacleId) {
-	(void)mesh; (void)obstacleId;
+	if (!VALID_MESH(mesh) || obstacleId <= 0) return;
+	NavMeshInstance *inst = &navMeshes[mesh];
+	if (!inst->tileCache) return;
+	inst->tileCache->removeObstacle((dtObstacleRef)obstacleId);
 }
 
 extern "C" void Nav_UpdateObstacles(navMeshHandle_t mesh) {
-	(void)mesh;
+	if (!VALID_MESH(mesh)) return;
+	NavMeshInstance *inst = &navMeshes[mesh];
+	if (!inst->tileCache) return;
+	bool upToDate = false;
+	inst->tileCache->update(0.0f, inst->navMesh, &upToDate);
 }
 
 extern "C" int Nav_GetAgentCount(navMeshHandle_t mesh) {
@@ -465,5 +503,10 @@ extern "C" int Nav_GetPolyCount(navMeshHandle_t mesh) {
 }
 
 extern "C" void Nav_DebugDraw(navMeshHandle_t mesh) {
-	(void)mesh;
+	if (!VALID_MESH(mesh)) return;
+	NavMeshInstance *inst = &navMeshes[mesh];
+	if (!inst->navMesh) return;
+
+	Com_Printf("Nav debug: mesh %d, max tiles %d, %d agents\n",
+		mesh, inst->navMesh->getMaxTiles(), inst->agentCount);
 }

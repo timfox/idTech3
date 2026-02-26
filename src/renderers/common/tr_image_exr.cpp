@@ -21,9 +21,10 @@ to engine-native RGBA8 or RGBA16F formats.
 extern "C" {
 #include "../../qcommon/q_shared.h"
 #include "../../qcommon/qcommon.h"
+#include "tr_image_loaders.h"
 }
 
-extern "C" void R_LoadEXR(const char *filename, byte **pic, int *width, int *height) {
+void R_LoadEXR(const char *filename, byte **pic, int *width, int *height) {
 	float *rgba = NULL;
 	int w, h;
 	const char *err = NULL;
@@ -91,7 +92,7 @@ extern "C" void R_LoadEXR(const char *filename, byte **pic, int *width, int *hei
 	*height = h;
 }
 
-extern "C" void R_LoadEXR_HDR(const char *filename, float **pic, int *width, int *height) {
+void R_LoadEXR_HDR(const char *filename, float **pic, int *width, int *height) {
 	void *fileData;
 	int fileSize;
 	const char *err = NULL;
@@ -118,7 +119,7 @@ extern "C" void R_LoadEXR_HDR(const char *filename, float **pic, int *width, int
 	}
 }
 
-extern "C" qboolean R_SaveEXR(const char *filename, const float *rgba, int width, int height) {
+qboolean R_SaveEXR(const char *filename, const float *rgba, int width, int height) {
 	const char *err = NULL;
 	int ret;
 
