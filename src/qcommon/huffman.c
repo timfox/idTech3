@@ -265,9 +265,12 @@ static void Huff_addRef(huff_t* huff, byte ch) {
 	}
 }
 
-/* Get a symbol */
-static int Huff_Receive(node_t *node, int *ch, byte *fin) {
+/* Get a symbol — maxoffset prevents out-of-bounds reads (CVE-2017-11721) */
+static int Huff_Receive(node_t *node, int *ch, byte *fin, int maxoffset) {
 	while (node && node->symbol == INTERNAL_NODE) {
+		if ( bloc > maxoffset ) {
+			return 0;
+		}
 		if (get_bit(fin)) {
 			node = node->right;
 		} else {
@@ -339,16 +342,16 @@ void Huff_Decompress(msg_t *mbuf, int offset) {
 
 	for ( j = 0; j < cch; j++ ) {
 		ch = 0;
-		// don't overflow reading from the messages
-		// FIXME: would it be better to have an overflow check in get_bit ?
+		// don't overflow reading from the messages (CVE-2017-11721)
 		if ( (bloc >> 3) > size ) {
 			seq[j] = 0;
 			break;
 		}
-		Huff_Receive(huff.tree, &ch, buffer);				/* Get a character */
+		Huff_Receive(huff.tree, &ch, buffer, size << 3);	/* Get a character, with bounds check */
 		if ( ch == NYT ) {								/* We got a NYT, get the symbol associated with it */
 			ch = 0;
 			for ( i = 0; i < 8; i++ ) {
+				if ( bloc > (size << 3) ) { break; }
 				ch = (ch<<1) + get_bit(buffer);
 			}
 		}
