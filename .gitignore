@@ -29,4 +29,4 @@ enable_vulkan_patch1_tiny.flag
 .cursor/
 test-build/
 build_log.txt
-src/renderers/vulkanrenderer/shaders/spirv/generated/backups/
+src/renderers/vulkan/shaders/spirv/generated/backups/
