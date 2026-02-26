@@ -44,7 +44,6 @@ This is a modernized id Tech 3 engine.
 * Engine code targets **C23**, with incremental modernization for safety and portability.
 * Engine-internal code prefers native C `bool`; legacy `qboolean` is retained where required for compatibility.
 
-
 ### Links
 
 * https://idtech3.com
