@@ -26,7 +26,7 @@ layout(constant_id = 16) const float vignette_intensity = 0.0;
 layout(constant_id = 17) const float vignette_radius = 0.75;
 layout(constant_id = 18) const float chromatic_aberration = 0.0;
 layout(constant_id = 19) const float film_grain = 0.0;
-layout(constant_id = 36) const int postprocess_enabled = 1;
+layout(constant_id = 20) const int postprocess_enabled = 1;
 
 layout(push_constant) uniform PaniniPC {
 	float paniniAmount;
