@@ -29,6 +29,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cl_mumble.h"
 #include "cl_superhud.h"
 #include "cl_websocket.h"
+#include "cl_steam.h"
 #ifdef USE_DUKTAPE
 #include "../qcommon/js_debug.h"
 #endif
@@ -3387,6 +3388,7 @@ void CL_Frame( int msec, int realMsec ) {
 
 	CL_VoIP_Frame();
 	WS_Frame();
+	Steam_Frame();
 
 	Con_RunConsole();
 }
@@ -4442,6 +4444,7 @@ void CL_Init( void ) {
 	CL_Mumble_Init();
 	SHUD_Init();
 	WS_Init();
+	Steam_Init();
 
 	Com_Printf( "----- Client Initialization Complete -----\n" );
 }
