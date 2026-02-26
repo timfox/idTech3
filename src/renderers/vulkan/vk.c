@@ -9328,7 +9328,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	VkGraphicsPipelineCreateInfo create_info;
 	VkViewport viewport;
 	VkRect2D scissor;
-	VkSpecializationMapEntry spec_entries[22];
+	VkSpecializationMapEntry spec_entries[24];
 	VkSpecializationInfo frag_spec_info;
 	VkPipeline *pipeline;
 	VkShaderModule fsmodule;
@@ -9361,6 +9361,8 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 		float chromatic_aberration; /* constant_id = 18 */
 		float film_grain;          /* constant_id = 19 */
 		int postprocess_enabled;   /* constant_id = 20 */
+		float outline_strength;    /* constant_id = 21 */
+		float outline_threshold;   /* constant_id = 22 */
 	} frag_spec_data;
 
 	switch ( program_index ) {
@@ -9534,6 +9536,12 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	frag_spec_data.chromatic_aberration = PostFX_GetChromaticAberration();
 	frag_spec_data.film_grain = PostFX_GetFilmGrain();
 	frag_spec_data.postprocess_enabled = ( r_post && r_post->integer ) ? 1 : 0;
+	{
+		cvar_t *r_outline = ri.Cvar_Get( "r_outline", "0", CVAR_ARCHIVE );
+		cvar_t *r_outlineThreshold = ri.Cvar_Get( "r_outlineThreshold", "0.15", CVAR_ARCHIVE );
+		frag_spec_data.outline_strength = r_outline ? r_outline->value : 0.0f;
+		frag_spec_data.outline_threshold = r_outlineThreshold ? r_outlineThreshold->value : 0.15f;
+	}
 
 	if ( !vk_surface_format_color_depth( vk.present_format.format, &frag_spec_data.depth_r, &frag_spec_data.depth_g, &frag_spec_data.depth_b ) )
 		ri.Printf( PRINT_ALL, "Format %s not recognized, dither to assume 8bpc\n", vk_format_string( vk.base_format.format ) );
@@ -9622,7 +9630,15 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	spec_entries[20].offset = offsetof( struct PostProcess_FragSpecData, postprocess_enabled );
 	spec_entries[20].size = sizeof( frag_spec_data.postprocess_enabled );
 
-	frag_spec_info.mapEntryCount = 21;
+	spec_entries[21].constantID = 21;
+	spec_entries[21].offset = offsetof( struct PostProcess_FragSpecData, outline_strength );
+	spec_entries[21].size = sizeof( frag_spec_data.outline_strength );
+
+	spec_entries[22].constantID = 22;
+	spec_entries[22].offset = offsetof( struct PostProcess_FragSpecData, outline_threshold );
+	spec_entries[22].size = sizeof( frag_spec_data.outline_threshold );
+
+	frag_spec_info.mapEntryCount = 23;
 	frag_spec_info.pMapEntries = spec_entries;
 	frag_spec_info.dataSize = sizeof( frag_spec_data );
 	frag_spec_info.pData = &frag_spec_data;
