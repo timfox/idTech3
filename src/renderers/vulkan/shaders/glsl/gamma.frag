@@ -165,7 +165,7 @@ vec3 paniniInverseDir( vec2 uvOut, float d, float s, float fovYRadians, float as
 	vec3 dir;
 	dir.x = sin( theta );
 	dir.z = -cos( theta );
-	dir.y = tan( phi ) * max( length( dir.xz ), 1e-6 );
+	dir.y = tan( phi ) * max( -dir.z, 1e-6 );
 	float invLen = inversesqrt( max( dot( dir, dir ), 1e-8 ) );
 	return dir * invLen;
 }
