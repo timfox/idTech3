@@ -2,12 +2,8 @@
  * Copyright (C) 2026 Gopex LLC. All rights reserved.
  *
  * Android launcher activity for id Tech 3 engine.
- * The actual engine runs via NativeActivity (android_main.c).
- * This class provides the JNI bridge for setting data paths.
- *
- * The engine can be launched either as:
- *   1. NativeActivity (declared in manifest, no Java UI)
- *   2. This GameActivity (Java UI + JNI bridge)
+ * Extends NativeActivity for direct native code execution.
+ * Provides JNI bridge, lifecycle management, and immersive mode.
  */
 
 package com.gopex.idtech3;
@@ -34,17 +30,56 @@ public class GameActivity extends NativeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
         setupWindow();
         setupPaths();
 
         Log.i(TAG, "id Tech 3 engine starting");
         Log.i(TAG, "Device: " + Build.MANUFACTURER + " " + Build.MODEL);
         Log.i(TAG, "Android API: " + Build.VERSION.SDK_INT);
+        Log.i(TAG, "ABI: " + Build.SUPPORTED_ABIS[0]);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        setupWindow();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        Log.i(TAG, "Activity paused");
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            setupWindow();
+        }
+    }
+
+    @Override
+    public void onLowMemory() {
+        super.onLowMemory();
+        Log.w(TAG, "Low memory warning");
+    }
+
+    @Override
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        if (level >= TRIM_MEMORY_RUNNING_LOW) {
+            Log.w(TAG, "Trim memory level: " + level);
+        }
     }
 
     private void setupWindow() {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            getWindow().getAttributes().layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+        }
 
         View decorView = getWindow().getDecorView();
         decorView.setSystemUiVisibility(
@@ -65,20 +100,14 @@ public class GameActivity extends NativeActivity {
 
             File baseDir = new File(externalDir, "base");
             baseDir.mkdirs();
+
+            Log.i(TAG, "Data path: " + externalDir.getAbsolutePath());
         }
 
         File internalDir = getFilesDir();
         if (internalDir != null) {
             nativeSetHomePath(internalDir.getAbsolutePath());
+            Log.i(TAG, "Home path: " + internalDir.getAbsolutePath());
         }
-
-        Log.i(TAG, "Data: " + (externalDir != null ? externalDir.getAbsolutePath() : "null"));
-        Log.i(TAG, "Home: " + (internalDir != null ? internalDir.getAbsolutePath() : "null"));
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        setupWindow();
     }
 }
