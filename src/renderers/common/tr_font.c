@@ -99,7 +99,7 @@ FT_Library ftLibrary = NULL;
 #endif
 
 #ifdef BUILD_FREETYPE
-#define MAX_FONTS 6
+#define MAX_FONTS 16
 static int registeredFontCount = 0;
 static fontInfo_t registeredFont[MAX_FONTS];
 
@@ -372,6 +372,41 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 		return;
 	}
 
+	/* --- Try name-based cache first: fonts/<fontbase>_<pointSize>.dat --- */
+	{
+		char namedDat[MAX_QPATH];
+		const char *baseName = fontName;
+		const char *slash = strrchr(fontName, '/');
+		const char *dot;
+		if (slash) baseName = slash + 1;
+		dot = strrchr(baseName, '.');
+
+		if (dot) {
+			int nameLen = (int)(dot - baseName);
+			char cleanName[64];
+			if (nameLen >= (int)sizeof(cleanName)) nameLen = (int)sizeof(cleanName) - 1;
+			Com_Memcpy(cleanName, baseName, nameLen);
+			cleanName[nameLen] = '\0';
+			Com_sprintf(namedDat, sizeof(namedDat), "fonts/%s_%i.dat", cleanName, pointSize);
+		} else {
+			Com_sprintf(namedDat, sizeof(namedDat), "fonts/%s_%i.dat", baseName, pointSize);
+		}
+
+		for (i = 0; i < registeredFontCount; i++) {
+			if (Q_stricmp(namedDat, registeredFont[i].name) == 0) {
+				Com_Memcpy(font, &registeredFont[i], sizeof(fontInfo_t));
+				return;
+			}
+		}
+
+		len = ri.FS_ReadFile(namedDat, NULL);
+		if (len == sizeof(fontInfo_t)) {
+			Q_strncpyz(name, namedDat, sizeof(name));
+			goto load_cached_dat;
+		}
+	}
+
+	/* --- Fall back to legacy point-size-only lookup --- */
 	Com_sprintf(name, sizeof(name), "fonts/fontImage_%i.dat", pointSize);
 	for (i = 0; i < registeredFontCount; i++) {
 		if (Q_stricmp(name, registeredFont[i].name) == 0) {
@@ -382,36 +417,43 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 
 	len = ri.FS_ReadFile(name, NULL);
 	if (len == sizeof(fontInfo_t)) {
-		ri.FS_ReadFile(name, &faceData);
-		fdOffset = 0;
-		fdFile = faceData;
-		for (i = 0; i < GLYPHS_PER_FONT; i++) {
-			font->glyphs[i].height = readInt();
-			font->glyphs[i].top = readInt();
-			font->glyphs[i].bottom = readInt();
-			font->glyphs[i].pitch = readInt();
-			font->glyphs[i].xSkip = readInt();
-			font->glyphs[i].imageWidth = readInt();
-			font->glyphs[i].imageHeight = readInt();
-			font->glyphs[i].s = readFloat();
-			font->glyphs[i].t = readFloat();
-			font->glyphs[i].s2 = readFloat();
-			font->glyphs[i].t2 = readFloat();
-			font->glyphs[i].glyph = readInt();
-			Q_strncpyz(font->glyphs[i].shaderName, (const char *)&fdFile[fdOffset], sizeof(font->glyphs[i].shaderName));
-			fdOffset += sizeof(font->glyphs[i].shaderName);
-		}
-		font->glyphScale = readFloat();
-		Com_Memcpy(font->name, &fdFile[fdOffset], MAX_QPATH);
-
-		Q_strncpyz(font->name, name, sizeof(font->name));
-		for (i = GLYPH_START; i <= GLYPH_END; i++) {
-			font->glyphs[i].glyph = RE_RegisterShaderNoMip(font->glyphs[i].shaderName);
-		}
-		Com_Memcpy(&registeredFont[registeredFontCount++], font, sizeof(fontInfo_t));
-		ri.FS_FreeFile(faceData);
-		return;
+		goto load_cached_dat;
 	}
+
+	goto try_freetype;
+
+load_cached_dat:
+	ri.FS_ReadFile(name, &faceData);
+	fdOffset = 0;
+	fdFile = faceData;
+	for (i = 0; i < GLYPHS_PER_FONT; i++) {
+		font->glyphs[i].height = readInt();
+		font->glyphs[i].top = readInt();
+		font->glyphs[i].bottom = readInt();
+		font->glyphs[i].pitch = readInt();
+		font->glyphs[i].xSkip = readInt();
+		font->glyphs[i].imageWidth = readInt();
+		font->glyphs[i].imageHeight = readInt();
+		font->glyphs[i].s = readFloat();
+		font->glyphs[i].t = readFloat();
+		font->glyphs[i].s2 = readFloat();
+		font->glyphs[i].t2 = readFloat();
+		font->glyphs[i].glyph = readInt();
+		Q_strncpyz(font->glyphs[i].shaderName, (const char *)&fdFile[fdOffset], sizeof(font->glyphs[i].shaderName));
+		fdOffset += sizeof(font->glyphs[i].shaderName);
+	}
+	font->glyphScale = readFloat();
+	Com_Memcpy(font->name, &fdFile[fdOffset], MAX_QPATH);
+
+	Q_strncpyz(font->name, name, sizeof(font->name));
+	for (i = GLYPH_START; i <= GLYPH_END; i++) {
+		font->glyphs[i].glyph = RE_RegisterShaderNoMip(font->glyphs[i].shaderName);
+	}
+	Com_Memcpy(&registeredFont[registeredFontCount++], font, sizeof(fontInfo_t));
+	ri.FS_FreeFile(faceData);
+	return;
+
+try_freetype:
 
 	if (ftLibrary == NULL) {
 		ri.Printf(PRINT_WARNING, "RE_RegisterFont: FreeType not initialized.\n");
@@ -520,6 +562,25 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 
 	if (r_saveFontData->integer) {
 		ri.FS_WriteFile(va("fonts/fontImage_%i.dat", pointSize), font, sizeof(fontInfo_t));
+
+		/* Also save a name-based .dat for direct lookup */
+		{
+			const char *baseName = fontName;
+			const char *slash = strrchr(fontName, '/');
+			const char *dot;
+			char cleanName[64];
+			if (slash) baseName = slash + 1;
+			dot = strrchr(baseName, '.');
+			if (dot) {
+				int nl = (int)(dot - baseName);
+				if (nl >= (int)sizeof(cleanName)) nl = (int)sizeof(cleanName) - 1;
+				Com_Memcpy(cleanName, baseName, nl);
+				cleanName[nl] = '\0';
+			} else {
+				Q_strncpyz(cleanName, baseName, sizeof(cleanName));
+			}
+			ri.FS_WriteFile(va("fonts/%s_%i.dat", cleanName, pointSize), font, sizeof(fontInfo_t));
+		}
 	}
 
 	ri.Free(out);
