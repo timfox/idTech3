@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "server.h"
+#include "sv_ratmod.h"
 
 
 /*
@@ -827,6 +828,8 @@ void SV_Init( void )
 	SV_TrackCvarChanges();
 
 	SV_InitChallenger();
+
+	SV_Ratmod_Init();
 }
 
 

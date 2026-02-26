@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "server.h"
+#include "sv_ratmod.h"
 
 serverStatic_t	svs;				// persistant server info
 server_t		sv;					// local server
@@ -1389,6 +1390,9 @@ void SV_Frame( int msec ) {
 
 		// let everything in the world think and move
 		VM_Call( gvm, 1, GAME_RUN_FRAME, sv.time );
+
+		// record entity positions for backward reconciliation
+		SV_Unlagged_Record( sv.time );
 	}
 
 	if ( com_speeds->integer ) {
