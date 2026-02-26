@@ -260,6 +260,51 @@ static int l_response_trigger(lua_State *L) {
 	return 0;
 }
 
+/* ========== AIML bindings ========== */
+
+#include "g_aiml.h"
+
+static int l_aiml_createBot(lua_State *L) {
+	lua_pushinteger(L, AIML_CreateBot(luaL_checkstring(L, 1)));
+	return 1;
+}
+static int l_aiml_destroyBot(lua_State *L) {
+	AIML_DestroyBot((int)luaL_checkinteger(L, 1));
+	return 0;
+}
+static int l_aiml_loadFile(lua_State *L) {
+	lua_pushboolean(L, AIML_LoadFile((int)luaL_checkinteger(L, 1), luaL_checkstring(L, 2)));
+	return 1;
+}
+static int l_aiml_setProperty(lua_State *L) {
+	AIML_SetBotProperty((int)luaL_checkinteger(L, 1), luaL_checkstring(L, 2), luaL_checkstring(L, 3));
+	return 0;
+}
+static int l_aiml_getProperty(lua_State *L) {
+	lua_pushstring(L, AIML_GetBotProperty((int)luaL_checkinteger(L, 1), luaL_checkstring(L, 2)));
+	return 1;
+}
+static int l_aiml_getResponse(lua_State *L) {
+	lua_pushstring(L, AIML_GetResponse((int)luaL_checkinteger(L, 1), luaL_checkstring(L, 2), luaL_checkstring(L, 3)));
+	return 1;
+}
+static int l_aiml_setUserVar(lua_State *L) {
+	AIML_SetUserVar((int)luaL_checkinteger(L, 1), luaL_checkstring(L, 2), luaL_checkstring(L, 3), luaL_checkstring(L, 4));
+	return 0;
+}
+static int l_aiml_getUserVar(lua_State *L) {
+	lua_pushstring(L, AIML_GetUserVar((int)luaL_checkinteger(L, 1), luaL_checkstring(L, 2), luaL_checkstring(L, 3)));
+	return 1;
+}
+static int l_aiml_resetUser(lua_State *L) {
+	AIML_ResetUser((int)luaL_checkinteger(L, 1), luaL_checkstring(L, 2));
+	return 0;
+}
+static int l_aiml_getCategoryCount(lua_State *L) {
+	lua_pushinteger(L, AIML_GetCategoryCount((int)luaL_checkinteger(L, 1)));
+	return 1;
+}
+
 /* ========== GOAP bindings ========== */
 
 #include "g_goap.h"
@@ -584,6 +629,21 @@ void LuaBindings_RegisterAll(void *luaState) {
 		{NULL, NULL}
 	};
 	registerTable(L, "GOAP", goapFuncs);
+
+	static const luaL_Reg aimlFuncs[] = {
+		{"createBot", l_aiml_createBot},
+		{"destroyBot", l_aiml_destroyBot},
+		{"loadFile", l_aiml_loadFile},
+		{"setProperty", l_aiml_setProperty},
+		{"getProperty", l_aiml_getProperty},
+		{"getResponse", l_aiml_getResponse},
+		{"setUserVar", l_aiml_setUserVar},
+		{"getUserVar", l_aiml_getUserVar},
+		{"resetUser", l_aiml_resetUser},
+		{"getCategoryCount", l_aiml_getCategoryCount},
+		{NULL, NULL}
+	};
+	registerTable(L, "AIML", aimlFuncs);
 
 	lua_setglobal(L, "Engine");
 	Com_Printf("Lua bindings registered: Engine.{Director,Nav,Physics,Particles,Music,Face,Horde,Dismember,Choreo,Response,GOAP}\n");
