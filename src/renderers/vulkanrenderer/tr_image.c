@@ -1213,10 +1213,12 @@ typedef struct
 // Note that the ordering indicates the order of preference used
 // when there are multiple images of different formats available
 extern void R_LoadEXR( const char *filename, byte **pic, int *width, int *height );
+extern void R_LoadHDR( const char *filename, byte **pic, int *width, int *height );
 
 static const imageExtToLoaderMap_t imageLoaders[] =
 {
 	{ "exr",  R_LoadEXR },
+	{ "hdr",  R_LoadHDR },
 	{ "png",  R_LoadPNG },
 	{ "tga",  R_LoadTGA },
 	{ "jpg",  R_LoadJPG },
