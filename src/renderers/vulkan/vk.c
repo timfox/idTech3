@@ -9353,7 +9353,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 		float vignette_radius;    /* constant_id = 17 */
 		float chromatic_aberration; /* constant_id = 18 */
 		float film_grain;          /* constant_id = 19 */
-		int postprocess_enabled;   /* constant_id = 36 */
+		int postprocess_enabled;   /* constant_id = 20 */
 	} frag_spec_data;
 
 	switch ( program_index ) {
@@ -9611,7 +9611,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	spec_entries[19].offset = offsetof( struct PostProcess_FragSpecData, film_grain );
 	spec_entries[19].size = sizeof( frag_spec_data.film_grain );
 
-	spec_entries[20].constantID = 36;
+	spec_entries[20].constantID = 20;
 	spec_entries[20].offset = offsetof( struct PostProcess_FragSpecData, postprocess_enabled );
 	spec_entries[20].size = sizeof( frag_spec_data.postprocess_enabled );
 
