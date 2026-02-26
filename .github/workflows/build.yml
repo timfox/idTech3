@@ -477,3 +477,81 @@ jobs:
           path: bin
           if-no-files-found: error
           retention-days: 5
+
+  android:
+    name: ${{ matrix.btype }} Android ${{ matrix.abi }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, armeabi-v7a]
+        btype: [Release, Debug]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK
+        run: |
+          sdkmanager --install "ndk;27.0.12077973" "cmake;3.22.1"
+
+      - name: Build ${{ matrix.btype }} (${{ matrix.abi }})
+        if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
+        working-directory: android
+        run: |
+          # Use direct CMake cross-compile instead of Gradle to avoid
+          # wrapper/SDK bootstrapping complexity in CI.
+          NDK_HOME="${ANDROID_NDK_HOME:-$ANDROID_SDK_ROOT/ndk/27.0.12077973}"
+          TOOLCHAIN="$NDK_HOME/build/cmake/android.toolchain.cmake"
+
+          if [ "${{ matrix.abi }}" = "arm64-v8a" ]; then
+            ANDROID_ABI="arm64-v8a"
+          else
+            ANDROID_ABI="armeabi-v7a"
+          fi
+
+          mkdir -p build-android-${{ matrix.btype }}-${{ matrix.abi }}
+          cmake -S .. -B build-android-${{ matrix.btype }}-${{ matrix.abi }} \
+            -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
+            -DANDROID_ABI="$ANDROID_ABI" \
+            -DANDROID_PLATFORM=android-26 \
+            -DANDROID_STL=c++_shared \
+            -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
+            -DBUILD_SERVER=OFF \
+            -DUSE_VULKAN=ON \
+            -DUSE_RENDERER_DLOPEN=OFF \
+            -DRENDERER_DEFAULT=vulkan \
+            -DSKIP_IDPAK_CHECK=ON \
+            -DSKIP_SHADER_REGEN=ON \
+            -DUSE_SDL=OFF \
+            -DUSE_OPENAL=OFF \
+            -DUSE_CURL=OFF \
+            -DUSE_LUA=OFF \
+            -DUSE_DUKTAPE=OFF \
+            -DUSE_RECAST_NAV=OFF \
+            -DUSE_BULLET_PHYSICS=OFF \
+            -DCI_BUILD=OFF \
+            -Wno-dev
+          cmake --build build-android-${{ matrix.btype }}-${{ matrix.abi }} -j$(nproc)
+
+          mkdir -p ../bin
+          find build-android-${{ matrix.btype }}-${{ matrix.abi }} -maxdepth 2 \
+            \( -name 'libidtech3*' -o -name 'idtech3*' \) -type f \
+            -exec cp -f {} ../bin/ \;
+          ls -la ../bin/
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.btype == 'Release'
+        with:
+          name: android-${{ matrix.abi }}
+          path: bin
+          if-no-files-found: error
+          retention-days: 5
