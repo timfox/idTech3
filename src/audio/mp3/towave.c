@@ -142,7 +142,7 @@ decode (standard decoder) reduction_code:
 #include "port.h"
 
 // JDW
-#ifdef __linux__
+#if defined(__linux__) && !defined(__ANDROID__)
 #include <sys/ioctl.h>
 #include <sys/soundcard.h>
 #include <fcntl.h>
