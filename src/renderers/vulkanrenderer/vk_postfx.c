@@ -128,6 +128,19 @@ void PostFX_VegWind_GetWindDir(float *x, float *y, float *z) {
 }
 float PostFX_VegWind_GetWindStrength(void) { return r_vegWind_strength ? r_vegWind_strength->value : 1.0f; }
 
+static float lastVignette = 0, lastChromAb = 0, lastGrain = 0;
+
+qboolean PostFX_NeedsPipelineUpdate(void) {
+	float v = r_vignette ? r_vignette->value : 0;
+	float c = r_chromaticAberration ? r_chromaticAberration->value : 0;
+	float g = r_filmGrain ? r_filmGrain->value : 0;
+	if (v != lastVignette || c != lastChromAb || g != lastGrain) {
+		lastVignette = v; lastChromAb = c; lastGrain = g;
+		return qtrue;
+	}
+	return qfalse;
+}
+
 float PostFX_GetVignetteIntensity(void) { return r_vignette ? r_vignette->value : 0.0f; }
 float PostFX_GetVignetteRadius(void) { return r_vignette_radius ? r_vignette_radius->value : 0.75f; }
 float PostFX_GetChromaticAberration(void) { return r_chromaticAberration ? r_chromaticAberration->value : 0.0f; }

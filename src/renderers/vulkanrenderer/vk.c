@@ -13777,6 +13777,10 @@ void vk_begin_frame( void )
 	if ( vk.frame_count++ ) // might happen during stereo rendering
 		return;
 
+	if (PostFX_NeedsPipelineUpdate()) {
+		vk_update_post_process_pipelines();
+	}
+
 	vk_begin_motion_frame();
 	vk.sun_shadow_valid = qfalse;
 

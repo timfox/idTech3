@@ -47,6 +47,7 @@ float    PostFX_VegWind_GetGustAmp(void);
 void     PostFX_VegWind_GetWindDir(float *x, float *y, float *z);
 float    PostFX_VegWind_GetWindStrength(void);
 
+qboolean PostFX_NeedsPipelineUpdate(void);
 float    PostFX_GetVignetteIntensity(void);
 float    PostFX_GetVignetteRadius(void);
 float    PostFX_GetChromaticAberration(void);

@@ -120,10 +120,17 @@ const responseAction_t *Response_Evaluate(const char *concept, const responseCon
 	return NULL;
 }
 
+extern sfxHandle_t S_RegisterSound(const char *name, qboolean compressed);
+extern void S_StartLocalSound(sfxHandle_t sfx, int channelNum);
+
 void Response_TriggerConcept(const char *concept, const responseContext_t *ctx) {
 	const responseAction_t *action = Response_Evaluate(concept, ctx);
 	if (action) {
-		Com_Printf("Response: [%s] -> %s\n", concept, action->soundFile);
+		Com_DPrintf("Response: [%s] -> %s\n", concept, action->soundFile);
+		if (action->soundFile[0]) {
+			sfxHandle_t sfx = S_RegisterSound(action->soundFile, qfalse);
+			if (sfx) S_StartLocalSound(sfx, 0);
+		}
 	}
 }
 
