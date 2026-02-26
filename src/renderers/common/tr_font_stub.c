@@ -1,35 +1,177 @@
+/*
+===========================================================================
+Copyright (C) 2026 Gopex LLC. All rights reserved.
+
+Font loading stub for non-FreeType builds.
+Loads pre-cached .dat font files and their atlas textures so that
+custom fonts work even without a FreeType dependency at runtime.
+Falls back to the bitmap charset for uncached fonts.
+===========================================================================
+*/
+
 #include "../../qcommon/q_shared.h"
 #include "../../qcommon/qcommon.h"
 #include "tr_public.h"
 
 #if !defined(BUILD_FREETYPE)
 
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmissing-prototypes"
+extern qhandle_t RE_RegisterShaderNoMip( const char *name );
+
+#define MAX_FONTS_STUB 16
+static int registeredFontCount = 0;
+static fontInfo_t registeredFont[MAX_FONTS_STUB];
+
+static int fdOffset;
+static byte *fdFile;
+
+static int readInt( void ) {
+	int i = ((unsigned int)fdFile[fdOffset] |
+		((unsigned int)fdFile[fdOffset+1]<<8) |
+		((unsigned int)fdFile[fdOffset+2]<<16) |
+		((unsigned int)fdFile[fdOffset+3]<<24));
+	fdOffset += 4;
+	return i;
+}
+
+static float readFloat( void ) {
+	union { byte b[4]; float f; } u;
+#if defined Q3_BIG_ENDIAN
+	u.b[0] = fdFile[fdOffset+3];
+	u.b[1] = fdFile[fdOffset+2];
+	u.b[2] = fdFile[fdOffset+1];
+	u.b[3] = fdFile[fdOffset+0];
+#else
+	u.b[0] = fdFile[fdOffset+0];
+	u.b[1] = fdFile[fdOffset+1];
+	u.b[2] = fdFile[fdOffset+2];
+	u.b[3] = fdFile[fdOffset+3];
 #endif
-
-void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font);
-void R_InitFreeType(void);
-void R_DoneFreeType(void);
-
-void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
-	(void)fontName;
-	(void)pointSize;
-	(void)font;
-	ri.Printf(PRINT_WARNING, "RE_RegisterFont: FreeType code not available\n");
+	fdOffset += 4;
+	return u.f;
 }
 
-void R_InitFreeType(void) {
-	ri.Printf(PRINT_WARNING, "R_InitFreeType: FreeType support is disabled in this build.\n");
+static qboolean Font_LoadCached( const char *datName, fontInfo_t *font ) {
+	void *faceData;
+	int len, i;
+
+	len = ri.FS_ReadFile( datName, NULL );
+	if ( len != sizeof( fontInfo_t ) ) {
+		return qfalse;
+	}
+
+	ri.FS_ReadFile( datName, &faceData );
+	if ( !faceData ) {
+		return qfalse;
+	}
+
+	fdOffset = 0;
+	fdFile = (byte *)faceData;
+
+	for ( i = 0; i < GLYPHS_PER_FONT; i++ ) {
+		font->glyphs[i].height      = readInt();
+		font->glyphs[i].top         = readInt();
+		font->glyphs[i].bottom      = readInt();
+		font->glyphs[i].pitch       = readInt();
+		font->glyphs[i].xSkip       = readInt();
+		font->glyphs[i].imageWidth   = readInt();
+		font->glyphs[i].imageHeight  = readInt();
+		font->glyphs[i].s            = readFloat();
+		font->glyphs[i].t            = readFloat();
+		font->glyphs[i].s2           = readFloat();
+		font->glyphs[i].t2           = readFloat();
+		font->glyphs[i].glyph        = readInt();
+		Q_strncpyz( font->glyphs[i].shaderName,
+			(const char *)&fdFile[fdOffset],
+			sizeof( font->glyphs[i].shaderName ) );
+		fdOffset += sizeof( font->glyphs[i].shaderName );
+	}
+	font->glyphScale = readFloat();
+	Com_Memcpy( font->name, &fdFile[fdOffset], MAX_QPATH );
+
+	Q_strncpyz( font->name, datName, sizeof( font->name ) );
+	for ( i = GLYPH_START; i <= GLYPH_END; i++ ) {
+		font->glyphs[i].glyph = RE_RegisterShaderNoMip( font->glyphs[i].shaderName );
+	}
+
+	ri.FS_FreeFile( faceData );
+
+	ri.Printf( PRINT_DEVELOPER, "Font loaded from cache: %s\n", datName );
+	return qtrue;
 }
 
-void R_DoneFreeType(void) {
-	ri.Printf(PRINT_WARNING, "R_DoneFreeType: FreeType support is disabled in this build.\n");
+void RE_RegisterFont( const char *fontName, int pointSize, fontInfo_t *font ) {
+	int i;
+	char datPath[MAX_QPATH];
+	char namedDat[MAX_QPATH];
+
+	if ( !fontName ) {
+		ri.Printf( PRINT_ALL, "RE_RegisterFont: called with empty name\n" );
+		return;
+	}
+
+	if ( pointSize <= 0 ) {
+		pointSize = 12;
+	}
+
+	if ( registeredFontCount >= MAX_FONTS_STUB ) {
+		ri.Printf( PRINT_WARNING, "RE_RegisterFont: too many fonts registered (%d)\n", MAX_FONTS_STUB );
+		return;
+	}
+
+	Com_sprintf( datPath, sizeof( datPath ), "fonts/fontImage_%i.dat", pointSize );
+
+	for ( i = 0; i < registeredFontCount; i++ ) {
+		if ( Q_stricmp( datPath, registeredFont[i].name ) == 0 ) {
+			Com_Memcpy( font, &registeredFont[i], sizeof( fontInfo_t ) );
+			return;
+		}
+	}
+
+	if ( fontName[0] && Q_stricmp( fontName, "default" ) != 0 ) {
+		const char *baseName = fontName;
+		const char *slash = strrchr( fontName, '/' );
+		if ( slash ) baseName = slash + 1;
+		const char *dot = strrchr( baseName, '.' );
+
+		if ( dot ) {
+			int nameLen = (int)( dot - baseName );
+			char cleanName[64];
+			if ( nameLen >= (int)sizeof( cleanName ) ) nameLen = (int)sizeof( cleanName ) - 1;
+			Com_Memcpy( cleanName, baseName, nameLen );
+			cleanName[nameLen] = '\0';
+			Com_sprintf( namedDat, sizeof( namedDat ), "fonts/%s_%i.dat", cleanName, pointSize );
+		} else {
+			Com_sprintf( namedDat, sizeof( namedDat ), "fonts/%s_%i.dat", baseName, pointSize );
+		}
+
+		for ( i = 0; i < registeredFontCount; i++ ) {
+			if ( Q_stricmp( namedDat, registeredFont[i].name ) == 0 ) {
+				Com_Memcpy( font, &registeredFont[i], sizeof( fontInfo_t ) );
+				return;
+			}
+		}
+
+		if ( Font_LoadCached( namedDat, font ) ) {
+			Com_Memcpy( &registeredFont[registeredFontCount++], font, sizeof( fontInfo_t ) );
+			return;
+		}
+	}
+
+	if ( Font_LoadCached( datPath, font ) ) {
+		Com_Memcpy( &registeredFont[registeredFontCount++], font, sizeof( fontInfo_t ) );
+		return;
+	}
+
+	ri.Printf( PRINT_DEVELOPER, "RE_RegisterFont: no cached font data for '%s' at %dpt\n", fontName, pointSize );
 }
 
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC diagnostic pop
-#endif
+void R_InitFreeType( void ) {
+	registeredFontCount = 0;
+	ri.Printf( PRINT_DEVELOPER, "Font system: using cached font data (FreeType not available)\n" );
+}
+
+void R_DoneFreeType( void ) {
+	registeredFontCount = 0;
+}
 
 #endif
