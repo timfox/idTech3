@@ -16,6 +16,7 @@ on:
       - next-gen
       - next-gen-2
       - next-gen-3
+      - next-gen-4
     paths-ignore:
       - '**/*.md'
       - '**/*.txt'
@@ -170,7 +171,7 @@ jobs:
             /p:TargetName=idtech3_server
 
           rem --- OpenGL renderer + client ---
-          msbuild src\platform\win32\msvc2017\renderer.vcxproj ^
+          msbuild src\platform\win32\msvc2017\opengl.vcxproj ^
             %MSBUILD_COMMON%
           msbuild src\platform\win32\msvc2017\quake3e.vcxproj ^
             %MSBUILD_COMMON% ^
@@ -182,12 +183,12 @@ jobs:
             /t:Clean ^
             /p:TargetName=idtech3 ^
             /p:UseWasapi=0
-          msbuild src\platform\win32\msvc2017\renderer.vcxproj ^
+          msbuild src\platform\win32\msvc2017\opengl.vcxproj ^
             %MSBUILD_COMMON% ^
             /t:Clean
 
           rem --- Vulkan renderer + client ---
-          msbuild src\platform\win32\msvc2017\renderervk.vcxproj ^
+          msbuild src\platform\win32\msvc2017\vulkan.vcxproj ^
             %MSBUILD_COMMON%
           msbuild src\platform\win32\msvc2017\quake3e.vcxproj ^
             %MSBUILD_COMMON% ^
@@ -199,7 +200,7 @@ jobs:
             /t:Clean ^
             /p:TargetName=idtech3 ^
             /p:UseWasapi=0
-          msbuild src\platform\win32\msvc2017\renderervk.vcxproj ^
+          msbuild src\platform\win32\msvc2017\vulkan.vcxproj ^
             %MSBUILD_COMMON% ^
             /t:Clean
 
