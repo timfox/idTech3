@@ -28,15 +28,47 @@ Thread safety:
 #include "qcommon.h"
 #include "jobs.h"
 
+#if defined(_MSC_VER)
+/* MSVC: job system uses Win32 threads in future; stub for now */
+#include <windows.h>
+
+qboolean Jobs_Init( void ) {
+	int numCores;
+	SYSTEM_INFO si;
+	cvar_t *jobs_enabled = Cvar_Get( "jobs_enabled", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	(void)numCores; (void)si;
+	if ( !jobs_enabled->integer ) {
+		Com_Printf( "Job system: disabled by cvar\n" );
+		return qfalse;
+	}
+	GetSystemInfo( &si );
+	numCores = (int)si.dwNumberOfProcessors;
+	Com_Printf( "Job system: stub (MSVC), %d cores detected\n", numCores );
+	return qfalse;
+}
+void Jobs_Shutdown( void ) {}
+int Jobs_WorkerCount( void ) { return 0; }
+jobHandle_t Jobs_Submit( const jobDesc_t *desc ) {
+	if ( desc && desc->func ) desc->func( desc->data, 0 );
+	return JOBS_INVALID_HANDLE;
+}
+jobHandle_t Jobs_ParallelFor( jobFunc_t func, void *data, uint32_t count, uint32_t batchSize, jobPriority_t priority ) {
+	(void)batchSize; (void)priority;
+	if ( func ) { for ( uint32_t i = 0; i < count; i++ ) func( data, i ); }
+	return JOBS_INVALID_HANDLE;
+}
+void Jobs_Wait( jobHandle_t handle ) { (void)handle; }
+void Jobs_WaitAll( void ) {}
+qboolean Jobs_IsComplete( jobHandle_t handle ) { (void)handle; return qtrue; }
+uint32_t Jobs_GetThreadId( void ) { return 0; }
+
+#else /* POSIX */
+
 #include <stdatomic.h>
 #include <pthread.h>
 #include <unistd.h>
 #include <sched.h>
 #include <time.h>
-
-#ifdef _WIN32
-#include <windows.h>
-#endif
 
 /* ---------- job slot ---------- */
 
@@ -497,3 +529,5 @@ qboolean Jobs_IsComplete( jobHandle_t handle ) {
 uint32_t Jobs_GetThreadId( void ) {
 	return tls_threadId;
 }
+
+#endif /* !_MSC_VER */

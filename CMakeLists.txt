@@ -997,10 +997,12 @@ list(APPEND CLIENT_SRCS
   src/audio/codecs/snd_codec_opus.c
   src/audio/codecs/snd_codec_flac.c
   src/audio/codecs/snd_codec_webm.c
-  src/audio/backends/snd_backend_openal.c
   src/audio/backends/snd_backend_null.c
-  src/audio/effects/snd_efx.c
 )
+if(USE_OPENAL)
+  list(APPEND CLIENT_SRCS src/audio/backends/snd_backend_openal.c)
+  list(APPEND CLIENT_SRCS src/audio/effects/snd_efx.c)
+endif()
 if(USE_SDL)
   list(APPEND CLIENT_SRCS src/audio/backends/snd_backend_sdl.c)
 endif()

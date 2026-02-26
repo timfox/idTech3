@@ -268,6 +268,8 @@
     <ClCompile Include="..\..\qcommon\cm_test.c" />
     <ClCompile Include="..\..\qcommon\cm_trace.c" />
     <ClCompile Include="..\..\qcommon\common.c" />
+    <ClCompile Include="..\..\qcommon\jobs.c" />
+    <ClCompile Include="..\..\qcommon\q_utf8.c" />
     <ClCompile Include="..\..\qcommon\cvar.c" />
     <ClCompile Include="..\..\qcommon\files.c" />
     <ClCompile Include="..\..\qcommon\history.c" />
@@ -301,6 +303,7 @@
     <ClCompile Include="..\..\server\sv_filter.c" />
     <ClCompile Include="..\..\server\sv_game.c" />
     <ClCompile Include="..\..\server\sv_init.c" />
+    <ClCompile Include="..\..\server\sv_ratmod.c" />
     <ClCompile Include="..\..\server\sv_main.c" />
     <ClCompile Include="..\..\server\sv_net_chan.c" />
     <ClCompile Include="..\..\server\sv_snapshot.c" />
