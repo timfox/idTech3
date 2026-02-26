@@ -97,7 +97,7 @@ echo ""
 echo "Shader checks:"
 if command -v glslangValidator &>/dev/null; then
   shader_errors=0
-  shader_dir="$PROJECT_ROOT/src/renderers/vulkanrenderer/shaders/glsl"
+  shader_dir="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl"
 
   for shader in "$shader_dir"/*.vert "$shader_dir"/*.frag; do
     [ -f "$shader" ] || continue

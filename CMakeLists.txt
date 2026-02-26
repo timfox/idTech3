@@ -1190,29 +1190,29 @@ ENDIF()
 
 # renderers
 set(RENDERER_COMMON_SRCS
-	src/renderers/rendercommon/tr_font_stub.c  # placeholder, will be replaced below
-	src/renderers/rendercommon/tr_image_bmp.c
-	src/renderers/rendercommon/tr_image_jpg.c
-	src/renderers/rendercommon/tr_image_pcx.c
-	src/renderers/rendercommon/tr_image_png.c
-	src/renderers/rendercommon/tr_image_tga.c
-	src/renderers/rendercommon/tr_image_hdr.c
-	src/renderers/rendercommon/tr_image_qoi.c
-	src/renderers/rendercommon/tr_image_dds.c
-	src/renderers/rendercommon/tr_noise.c
+	src/renderers/common/tr_font_stub.c  # placeholder, will be replaced below
+	src/renderers/common/tr_image_bmp.c
+	src/renderers/common/tr_image_jpg.c
+	src/renderers/common/tr_image_pcx.c
+	src/renderers/common/tr_image_png.c
+	src/renderers/common/tr_image_tga.c
+	src/renderers/common/tr_image_hdr.c
+	src/renderers/common/tr_image_qoi.c
+	src/renderers/common/tr_image_dds.c
+	src/renderers/common/tr_noise.c
 )
 IF(BUILD_FREETYPE)
-	list(REMOVE_ITEM RENDERER_COMMON_SRCS src/renderers/rendercommon/tr_font_stub.c)
-	list(APPEND RENDERER_COMMON_SRCS src/renderers/rendercommon/tr_font.c)
+	list(REMOVE_ITEM RENDERER_COMMON_SRCS src/renderers/common/tr_font_stub.c)
+	list(APPEND RENDERER_COMMON_SRCS src/renderers/common/tr_font.c)
 ELSE()
 	# Keep tr_font_stub.c
 ENDIF()
-AUX_SOURCE_DIRECTORY(src/renderers/openglrenderer RENDERER_GL_SRCS)
-AUX_SOURCE_DIRECTORY(src/renderers/vulkanrenderer RENDERER_VK_SRCS)
+AUX_SOURCE_DIRECTORY(src/renderers/opengl RENDERER_GL_SRCS)
+AUX_SOURCE_DIRECTORY(src/renderers/vulkan RENDERER_VK_SRCS)
 list(APPEND RENDERER_VK_SRCS
-    src/renderers/vulkanrenderer/utils/mikktspace/mikktspace.c
+    src/renderers/vulkan/utils/mikktspace/mikktspace.c
 )
-set(VK_SHADER_DIR "${CMAKE_SOURCE_DIR}/src/renderers/vulkanrenderer/shaders")
+set(VK_SHADER_DIR "${CMAKE_SOURCE_DIR}/src/renderers/vulkan/shaders")
 set(VK_SPIRV_DIR "${VK_SHADER_DIR}/spirv")
 set(VK_GEN_DIR "${VK_SPIRV_DIR}/generated")
 
@@ -1257,11 +1257,11 @@ else()
 endif()
 # Suppress shadow warnings for MikkTSpace third-party code
 if(MSVC)
-    set_source_files_properties(src/renderers/vulkanrenderer/utils/mikktspace/mikktspace.c PROPERTIES
+    set_source_files_properties(src/renderers/vulkan/utils/mikktspace/mikktspace.c PROPERTIES
         COMPILE_OPTIONS "/wd4456;/wd4457;/wd4458;/wd4459"
     )
 else()
-    set_source_files_properties(src/renderers/vulkanrenderer/utils/mikktspace/mikktspace.c PROPERTIES
+    set_source_files_properties(src/renderers/vulkan/utils/mikktspace/mikktspace.c PROPERTIES
         COMPILE_OPTIONS "-Wno-shadow"
     )
 endif()
@@ -1379,7 +1379,7 @@ endif()
 # EXR image loading via tinyexr -- built as separate static lib to avoid
 # duplicate TINYEXR_IMPLEMENTATION symbols when both renderers are loaded
 enable_language(CXX)
-add_library(exr_loader STATIC src/renderers/rendercommon/tr_image_exr.cpp)
+add_library(exr_loader STATIC src/renderers/common/tr_image_exr.cpp)
 target_include_directories(exr_loader PRIVATE ${EXTERNAL_INCLUDE}/tinyexr ${CMAKE_SOURCE_DIR}/src)
 target_include_directories(exr_loader PRIVATE ${EXTERNAL_ZLIB_SRC})
 set_property(TARGET exr_loader PROPERTY POSITION_INDEPENDENT_CODE ON)
@@ -1414,13 +1414,13 @@ option(USE_IMGUI "Enable ImGui inspector overlay" OFF)
 if(USE_IMGUI)
   enable_language(CXX)
   set(IMGUI_SRCS
-    src/renderers/vulkanrenderer/inspector/vk_imgui.cpp
+    src/renderers/vulkan/inspector/vk_imgui.cpp
   )
   set(IMGUI_INCLUDE_DIRS
     ${EXTERNAL_SRC}/cimgui/imgui
     ${EXTERNAL_SRC}/cimgui/imgui/backends
     ${EXTERNAL_SRC}/cimgui
-    ${CMAKE_SOURCE_DIR}/src/renderers/rendercommon
+    ${CMAKE_SOURCE_DIR}/src/renderers/common
   )
   if(USE_RENDERER_DLOPEN)
     target_sources(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${IMGUI_SRCS})

@@ -34,12 +34,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
-#include "../renderers/rendercommon/tr_types.h"
+#include "../renderers/common/tr_types.h"
 #include "glw_win.h"
 #include "win_local.h"
 
 #define VK_USE_PLATFORM_WIN32_KHR
-#include "../renderers/rendercommon/vulkan/vulkan.h"
+#include "../renderers/common/vulkan/vulkan.h"
 
 static PFN_vkGetInstanceProcAddr qvkGetInstanceProcAddr;
 static PFN_vkCreateWin32SurfaceKHR qvkCreateWin32SurfaceKHR;
