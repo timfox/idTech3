@@ -281,6 +281,14 @@ void MSG_WriteFloat( msg_t *sb, float f ) {
 void MSG_WriteString( msg_t *sb, const char *s ) {
 	int l, i;
 	char v;
+	static cvar_t *sv_utf8 = NULL;
+	qboolean allowUTF8;
+
+	if ( !sv_utf8 ) {
+		sv_utf8 = Cvar_Get( "sv_utf8", "1", CVAR_ARCHIVE );
+		Cvar_SetDescription( sv_utf8, "Allow UTF-8 characters in network messages (0 = strip high bytes for legacy clients, 1 = pass through)." );
+	}
+	allowUTF8 = sv_utf8 && sv_utf8->integer;
 
 	l = s ? strlen( s ) : 0;
 	if ( l >= MAX_STRING_CHARS ) {
@@ -289,8 +297,9 @@ void MSG_WriteString( msg_t *sb, const char *s ) {
 	}
 
 	for ( i = 0 ; i < l; i++ ) {
-		// get rid of 0x80+ and '%' chars, because old clients don't like them
-		if ( s[i] & 0x80 || s[i] == '%' )
+		if ( !allowUTF8 && ( (unsigned char)s[i] >= 0x80 || s[i] == '%' ) )
+			v = '.';
+		else if ( s[i] == '%' )
 			v = '.';
 		else
 			v = s[i];

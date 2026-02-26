@@ -17,6 +17,7 @@ Ticks all gameplay subsystems each client frame:
 
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
+#include "../qcommon/cm_public.h"
 #include "cl_gameframe.h"
 #include "cl_particles.h"
 #include "cl_map_background.h"
@@ -68,26 +69,39 @@ static void CL_BuildNavMesh_f(void) {
 
 	Nav_BSP_ClearGeometry();
 
-	/* Extract collision triangles from the collision model.
-	   CM uses brushes + patches internally. We sample the
-	   AABB and add simplified geometry for navmesh generation. */
+	/* Extract walkable surfaces from the collision model using raycasts.
+	   Shoots a grid of downward traces and connects hits into triangles.
+	   This captures actual floor geometry including stairs and ramps. */
 	{
 		vec3_t worldMins = {-4096, -4096, -4096};
 		vec3_t worldMaxs = { 4096,  4096,  4096};
-		float step = 64.0f;
-		float x, y;
+		float step = 48.0f;
 		int gridW, gridH, gx, gy;
+		trace_t tr;
+		vec3_t start, end, mins, maxs;
+
+		VectorSet(mins, 0, 0, 0);
+		VectorSet(maxs, 0, 0, 0);
 
 		gridW = (int)((worldMaxs[0] - worldMins[0]) / step);
 		gridH = (int)((worldMaxs[1] - worldMins[1]) / step);
-		if (gridW > 128) gridW = 128;
-		if (gridH > 128) gridH = 128;
+		if (gridW > 170) gridW = 170;
+		if (gridH > 170) gridH = 170;
 
 		for (gy = 0; gy <= gridH; gy++) {
 			for (gx = 0; gx <= gridW; gx++) {
-				x = worldMins[0] + gx * step;
-				y = worldMins[1] + gy * step;
-				Nav_BSP_AddVertex(x, y, 0);
+				float x = worldMins[0] + gx * step;
+				float y = worldMins[1] + gy * step;
+
+				VectorSet(start, x, y, worldMaxs[2]);
+				VectorSet(end, x, y, worldMins[2]);
+				CM_BoxTrace(&tr, start, end, mins, maxs, 0, CONTENTS_SOLID, qfalse);
+
+				if (tr.fraction < 1.0f && tr.plane.normal[2] > 0.7f) {
+					Nav_BSP_AddVertex(tr.endpos[0], tr.endpos[1], tr.endpos[2]);
+				} else {
+					Nav_BSP_AddVertex(x, y, -9999.0f);
+				}
 			}
 		}
 
@@ -207,6 +221,20 @@ void CL_GameFrame(float frametime) {
 	if (cl_navEnabled && cl_navEnabled->integer) {
 		vec3_t hordePlayerPos = {0, 0, 0};
 		Horde_Update(frametime, hordePlayerPos);
+
+		/* Submit visible horde agents as spark particles for debug rendering */
+		{
+			int hc = Horde_GetActiveCount();
+			int hi;
+			for (hi = 0; hi < hc && hi < 256; hi++) {
+				vec3_t agentPos;
+				hordeState_t agentState = Horde_GetAgentState(hi);
+				if (agentState == HORDE_STATE_DEAD) continue;
+				Horde_GetAgentPos(hi, agentPos);
+				if (agentPos[0] == 0 && agentPos[1] == 0 && agentPos[2] == 0) continue;
+				Particles_EmitSparks(agentPos, (vec3_t){0,0,50}, 1, 8.0f, 200.0f);
+			}
+		}
 	}
 
 	BgMap_Frame(frametime);

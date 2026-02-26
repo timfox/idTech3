@@ -27,6 +27,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cl_osp.h"
 #include "cl_voip.h"
 #include "cl_mumble.h"
+#include "cl_superhud.h"
 #ifdef USE_DUKTAPE
 #include "../qcommon/js_debug.h"
 #endif
@@ -4437,6 +4438,7 @@ void CL_Init( void ) {
 	CL_OSP_Init();
 	CL_VoIP_Init();
 	CL_Mumble_Init();
+	SHUD_Init();
 
 	Com_Printf( "----- Client Initialization Complete -----\n" );
 }

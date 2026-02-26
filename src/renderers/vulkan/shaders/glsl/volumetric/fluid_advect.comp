@@ -164,14 +164,45 @@ vec2 sampleVelocityLaplacian(int index, vec2 uv, vec2 invDim) {
     return (vL + vR + vB + vT - 4.0 * vC);
 }
 
-vec2 fluidForce(vec2 uv) {
+float computeCurl(int readIdx, vec2 uv, vec2 invDim) {
+    float vR = sampleVelocity(readIdx, uv + vec2(invDim.x, 0.0)).y;
+    float vL = sampleVelocity(readIdx, uv - vec2(invDim.x, 0.0)).y;
+    float vT = sampleVelocity(readIdx, uv + vec2(0.0, invDim.y)).x;
+    float vB = sampleVelocity(readIdx, uv - vec2(0.0, invDim.y)).x;
+    return 0.5 * ((vR - vL) - (vT - vB));
+}
+
+vec2 vorticityConfinement(int readIdx, vec2 uv, vec2 invDim, float epsilon) {
+    if (epsilon < 1e-6) return vec2(0.0);
+    float curlC = computeCurl(readIdx, uv, invDim);
+    float curlR = computeCurl(readIdx, uv + vec2(invDim.x, 0.0), invDim);
+    float curlL = computeCurl(readIdx, uv - vec2(invDim.x, 0.0), invDim);
+    float curlT = computeCurl(readIdx, uv + vec2(0.0, invDim.y), invDim);
+    float curlB = computeCurl(readIdx, uv - vec2(0.0, invDim.y), invDim);
+    vec2 grad = vec2(abs(curlR) - abs(curlL), abs(curlT) - abs(curlB)) * 0.5;
+    vec2 N = safeNormalize(grad);
+    return epsilon * vec2(N.y, -N.x) * curlC;
+}
+
+vec2 fluidForce(vec2 uv, int readIdx, vec2 invDim) {
     vec2 wind = safeNormalize(params.noiseScroll.xy);
     vec2 sunPush = safeNormalize(params.sunDirection.xy);
     float t = params.windParams.x;
     float n = hash12(uv * 173.0 + vec2(t * 0.37, t * 0.19));
     float a = n * 6.2831853;
     vec2 curl = vec2(cos(a), sin(a));
-    return (wind + sunPush * 0.35 + curl * 0.5) * params.fluidParams0.w;
+    vec2 base = (wind + sunPush * 0.35 + curl * 0.5) * params.fluidParams0.w;
+
+    float vorticityEpsilon = params.fluidEmitterCount.y;
+    base += vorticityConfinement(readIdx, uv, invDim, vorticityEpsilon);
+
+    float buoyancy = params.fluidEmitterCount.z;
+    if (buoyancy > 1e-6) {
+        float density = sampleDensity(readIdx, uv);
+        base.y += buoyancy * density;
+    }
+
+    return base;
 }
 
 void main() {
@@ -200,7 +231,7 @@ void main() {
         vec2 backUV = uv - vel * dt * invDim;
         vec2 advected = sampleVelocity(readIndex, backUV);
         vec2 lap = sampleVelocityLaplacian(readIndex, backUV, invDim);
-        vec2 force = fluidForce(uv);
+        vec2 force = fluidForce(uv, readIndex, invDim);
         float viscosity = max(params.fluidParams0.y, 0.0);
         vec2 nextVel = advected + (viscosity * dt) * lap + force * dt;
 
