@@ -1,5 +1,7 @@
 name: build
 
+# CI matrix: Windows (MSYS/MSVC), Ubuntu (x86_64/ARM), macOS, Android
+
 permissions:
   contents: read
 
