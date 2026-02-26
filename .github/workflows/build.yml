@@ -159,8 +159,7 @@ jobs:
             /p:Configuration=${{ matrix.btype }} ^
             /p:Platform=${{ matrix.platform }} ^
             /p:PlatformToolset=v143 ^
-            /p:TreatWarningsAsErrors=false ^
-            /p:WarningLevel=3
+            /p:TreatWarningsAsErrors=false
 
           rem --- Dedicated server ---
           msbuild src\platform\win32\msvc2017\quake3e-ded.vcxproj ^
