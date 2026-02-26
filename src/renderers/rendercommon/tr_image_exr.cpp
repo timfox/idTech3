@@ -14,7 +14,8 @@ to engine-native RGBA8 or RGBA16F formats.
 */
 
 #define TINYEXR_IMPLEMENTATION
-#define TINYEXR_USE_MINIZ (1)
+#define TINYEXR_USE_MINIZ (0)
+#include <zlib.h>
 #include "../../external/include/tinyexr/tinyexr.h"
 
 extern "C" {
