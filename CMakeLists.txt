@@ -1196,8 +1196,7 @@ set(RENDERER_COMMON_SRCS
 	src/renderers/rendercommon/tr_image_pcx.c
 	src/renderers/rendercommon/tr_image_png.c
 	src/renderers/rendercommon/tr_image_tga.c
-	# tr_image_exr.cpp excluded from RENDERER_COMMON_SRCS to avoid
-	# duplicate TINYEXR_IMPLEMENTATION symbols when both renderers load
+	src/renderers/rendercommon/tr_image_hdr.c
 	src/renderers/rendercommon/tr_noise.c
 )
 IF(BUILD_FREETYPE)
