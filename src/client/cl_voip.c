@@ -31,18 +31,18 @@ static float    voipPower = 0.0f;
 static int16_t  captureBuffer[VOIP_FRAME_SAMPLES * 4];
 static byte     encodedBuffer[VOIP_MAX_PACKET];
 
-/* These are provided by the active sound backend (SDL or OpenAL).
+/* Capture functions from the active sound backend (SDL or OpenAL).
    Weak symbols provide no-op fallback when neither backend has capture. */
+void SNDDMA_StartCapture( void ) __attribute__((weak));
+int  SNDDMA_AvailableCaptureSamples( void ) __attribute__((weak));
+void SNDDMA_Capture( int samples, byte *data ) __attribute__((weak));
+void SNDDMA_StopCapture( void ) __attribute__((weak));
+
 #ifdef __GNUC__
-__attribute__((weak)) void SNDDMA_StartCapture( void ) {}
-__attribute__((weak)) int  SNDDMA_AvailableCaptureSamples( void ) { return 0; }
-__attribute__((weak)) void SNDDMA_Capture( int samples, byte *data ) { (void)samples; (void)data; }
-__attribute__((weak)) void SNDDMA_StopCapture( void ) {}
-#else
-extern void     SNDDMA_StartCapture( void );
-extern int      SNDDMA_AvailableCaptureSamples( void );
-extern void     SNDDMA_Capture( int samples, byte *data );
-extern void     SNDDMA_StopCapture( void );
+void SNDDMA_StartCapture( void ) {}
+int  SNDDMA_AvailableCaptureSamples( void ) { return 0; }
+void SNDDMA_Capture( int samples, byte *data ) { (void)samples; (void)data; }
+void SNDDMA_StopCapture( void ) {}
 #endif
 
 void CL_VoIP_Init( void ) {
