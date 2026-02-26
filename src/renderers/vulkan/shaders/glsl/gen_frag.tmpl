@@ -874,7 +874,8 @@ void main() {
 			ORMS.xyzw *= vec4( specularScale_z, specularScale_w, specularScale_x, specularScale_y );
 			metalness = clamp( ORMS.z, 0.0, 1.0 );
 
-			specular.rgb = mix( vec3( 0.08 ) * ORMS.w, diffuse.rgb, metalness );
+			float dielectricF0 = 0.04 * clamp( ORMS.w, 0.0, 1.0 );
+			specular.rgb = mix( vec3( dielectricF0 ), diffuse.rgb, metalness );
 			diffuse.rgb *= vec3( 1.0 - metalness );
 
 			roughness = mix( 0.01, 1.0, ORMS.y );
