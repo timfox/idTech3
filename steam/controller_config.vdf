@@ -1,0 +1,80 @@
+"controller_mappings"
+{
+	"version"		"3"
+	"title"			"id Tech 3 - Steam Deck Default"
+	"description"	"Optimized layout for id Tech 3 engine on Steam Deck"
+	"creator"		"Gopex LLC"
+
+	"group"
+	{
+		"id"		"0"
+		"mode"		"joystick_move"
+		"inputs"
+		{
+			"click"		"key_press LSHIFT, Sprint"
+		}
+	}
+	"group"
+	{
+		"id"		"1"
+		"mode"		"joystick_camera"
+		"inputs" {}
+	}
+	"group"
+	{
+		"id"		"2"
+		"mode"		"dpad"
+		"inputs"
+		{
+			"dpad_north"	"key_press UP, Weapon Prev"
+			"dpad_south"	"key_press DOWN, Weapon Next"
+			"dpad_east"		"key_press RIGHT"
+			"dpad_west"		"key_press LEFT"
+		}
+	}
+	"group"
+	{
+		"id"		"3"
+		"mode"		"four_buttons"
+		"inputs"
+		{
+			"button_a"		"key_press SPACE, Jump"
+			"button_b"		"key_press LCTRL, Crouch"
+			"button_x"		"key_press E, Use"
+			"button_y"		"key_press 1, Weapon 1"
+		}
+	}
+	"group"
+	{
+		"id"		"4"
+		"mode"		"trigger"
+		"inputs"
+		{
+			"click"		"key_press MOUSE1, Fire"
+		}
+	}
+	"group"
+	{
+		"id"		"5"
+		"mode"		"trigger"
+		"inputs"
+		{
+			"click"		"key_press MOUSE2, Zoom"
+		}
+	}
+
+	"preset"
+	{
+		"id"			"0"
+		"name"			"Default"
+		"group_source_bindings"
+		{
+			"0"		"left_joystick active"
+			"1"		"right_joystick active"
+			"2"		"dpad active"
+			"3"		"button_diamond active"
+			"4"		"right_trigger active"
+			"5"		"left_trigger active"
+		}
+	}
+}

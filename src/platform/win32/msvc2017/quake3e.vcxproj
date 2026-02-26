@@ -302,6 +302,10 @@
     <ClCompile Include="..\..\client\cl_emoji.c" />
     <ClCompile Include="..\..\client\cl_osp.c" />
     <ClCompile Include="..\..\client\cl_voip.c" />
+    <ClCompile Include="..\..\client\cl_websocket.c" />
+    <ClCompile Include="..\..\client\cl_steam.c" />
+    <ClCompile Include="..\..\client\cl_superhud.c" />
+    <ClCompile Include="..\..\client\cl_mumble.c" />
     <ClCompile Include="..\..\client\cl_net_chan.c" />
     <ClCompile Include="..\..\client\cl_parse.c" />
     <ClCompile Include="..\..\client\cl_scrn.c" />
