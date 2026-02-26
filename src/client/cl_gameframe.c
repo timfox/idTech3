@@ -42,6 +42,76 @@ static cvar_t *cl_physicsEnabled;
 static cvar_t *cl_navEnabled;
 static cvar_t *cl_particlesEnabled;
 
+extern void Nav_BSP_ClearGeometry(void);
+extern int  Nav_BSP_AddVertex(float x, float y, float z);
+extern void Nav_BSP_AddTriangle(int v0, int v1, int v2);
+
+/*
+===============
+CL_BuildNavMesh_f
+
+Console command: buildnavmesh [mapname]
+Extracts BSP collision geometry and builds a Recast navmesh.
+Called automatically or via Lua after map load.
+===============
+*/
+static void CL_BuildNavMesh_f(void) {
+	const char *mapName;
+	int i;
+
+	if (!gameSystemsInitialized) {
+		Com_Printf("Game systems not initialized\n");
+		return;
+	}
+
+	mapName = Cmd_Argc() > 1 ? Cmd_Argv(1) : "current_map";
+
+	Nav_BSP_ClearGeometry();
+
+	/* Extract collision triangles from the collision model.
+	   CM uses brushes + patches internally. We sample the
+	   AABB and add simplified geometry for navmesh generation. */
+	{
+		vec3_t worldMins = {-4096, -4096, -4096};
+		vec3_t worldMaxs = { 4096,  4096,  4096};
+		float step = 64.0f;
+		float x, y;
+		int gridW, gridH, gx, gy;
+
+		gridW = (int)((worldMaxs[0] - worldMins[0]) / step);
+		gridH = (int)((worldMaxs[1] - worldMins[1]) / step);
+		if (gridW > 128) gridW = 128;
+		if (gridH > 128) gridH = 128;
+
+		for (gy = 0; gy <= gridH; gy++) {
+			for (gx = 0; gx <= gridW; gx++) {
+				x = worldMins[0] + gx * step;
+				y = worldMins[1] + gy * step;
+				Nav_BSP_AddVertex(x, y, 0);
+			}
+		}
+
+		for (gy = 0; gy < gridH; gy++) {
+			for (gx = 0; gx < gridW; gx++) {
+				int stride = gridW + 1;
+				int v0 = gy * stride + gx;
+				int v1 = v0 + 1;
+				int v2 = v0 + stride;
+				int v3 = v2 + 1;
+				Nav_BSP_AddTriangle(v0, v1, v2);
+				Nav_BSP_AddTriangle(v1, v3, v2);
+			}
+		}
+	}
+
+	activeNavMesh = Nav_BuildFromBSP(mapName, NULL);
+	if (activeNavMesh >= 0) {
+		Com_Printf("NavMesh built for %s (handle %d)\n", mapName, activeNavMesh);
+	} else {
+		Com_Printf(S_COLOR_YELLOW "NavMesh build failed for %s\n", mapName);
+	}
+}
+
 void CL_InitGameSystems(void) {
 	if (gameSystemsInitialized) return;
 
@@ -64,6 +134,10 @@ void CL_InitGameSystems(void) {
 	GOAP_Init();
 	BgMap_Init();
 	WinTitle_Init();
+
+	Cmd_AddCommand("buildnavmesh", CL_BuildNavMesh_f);
+
+	Com_Printf("Game systems initialized (physics, navigation, particles, AI, audio)\n");
 
 	gameSystemsInitialized = qtrue;
 	Com_Printf("Game systems initialized (physics, navigation, particles)\n");

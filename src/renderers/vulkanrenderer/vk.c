@@ -1,5 +1,6 @@
 #include "tr_local.h"
 #include "vk.h"
+#include "vk_postfx.h"
 #include <stddef.h>
 
 #if defined (_DEBUG)
@@ -9320,7 +9321,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	VkGraphicsPipelineCreateInfo create_info;
 	VkViewport viewport;
 	VkRect2D scissor;
-	VkSpecializationMapEntry spec_entries[18];
+	VkSpecializationMapEntry spec_entries[22];
 	VkSpecializationInfo frag_spec_info;
 	VkPipeline *pipeline;
 	VkShaderModule fsmodule;
@@ -9348,7 +9349,11 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 		int tonemap_mode;      /* constant_id = 13 */
 		int apply_srgb_gamma;  /* constant_id = 14 */
 		int post_debug;        /* constant_id = 15 */
-		int postprocess_enabled; /* constant_id = 36 */
+		float vignette_intensity; /* constant_id = 16 */
+		float vignette_radius;    /* constant_id = 17 */
+		float chromatic_aberration; /* constant_id = 18 */
+		float film_grain;          /* constant_id = 19 */
+		int postprocess_enabled;   /* constant_id = 36 */
 	} frag_spec_data;
 
 	switch ( program_index ) {
@@ -9517,6 +9522,10 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	frag_spec_data.tonemap_mode = r_tonemap ? r_tonemap->integer : 2;
 	frag_spec_data.apply_srgb_gamma = vk_format_is_srgb( target_format ) ? 0 : 1;
 	frag_spec_data.post_debug = r_post_debug ? r_post_debug->integer : 0;
+	frag_spec_data.vignette_intensity = PostFX_GetVignetteIntensity();
+	frag_spec_data.vignette_radius = PostFX_GetVignetteRadius();
+	frag_spec_data.chromatic_aberration = PostFX_GetChromaticAberration();
+	frag_spec_data.film_grain = PostFX_GetFilmGrain();
 	frag_spec_data.postprocess_enabled = ( r_post && r_post->integer ) ? 1 : 0;
 
 	if ( !vk_surface_format_color_depth( vk.present_format.format, &frag_spec_data.depth_r, &frag_spec_data.depth_g, &frag_spec_data.depth_b ) )
@@ -9586,11 +9595,27 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	spec_entries[15].offset = offsetof( struct PostProcess_FragSpecData, post_debug );
 	spec_entries[15].size = sizeof( frag_spec_data.post_debug );
 
-	spec_entries[16].constantID = 36;
-	spec_entries[16].offset = offsetof( struct PostProcess_FragSpecData, postprocess_enabled );
-	spec_entries[16].size = sizeof( frag_spec_data.postprocess_enabled );
+	spec_entries[16].constantID = 16;
+	spec_entries[16].offset = offsetof( struct PostProcess_FragSpecData, vignette_intensity );
+	spec_entries[16].size = sizeof( frag_spec_data.vignette_intensity );
 
-	frag_spec_info.mapEntryCount = 17;
+	spec_entries[17].constantID = 17;
+	spec_entries[17].offset = offsetof( struct PostProcess_FragSpecData, vignette_radius );
+	spec_entries[17].size = sizeof( frag_spec_data.vignette_radius );
+
+	spec_entries[18].constantID = 18;
+	spec_entries[18].offset = offsetof( struct PostProcess_FragSpecData, chromatic_aberration );
+	spec_entries[18].size = sizeof( frag_spec_data.chromatic_aberration );
+
+	spec_entries[19].constantID = 19;
+	spec_entries[19].offset = offsetof( struct PostProcess_FragSpecData, film_grain );
+	spec_entries[19].size = sizeof( frag_spec_data.film_grain );
+
+	spec_entries[20].constantID = 36;
+	spec_entries[20].offset = offsetof( struct PostProcess_FragSpecData, postprocess_enabled );
+	spec_entries[20].size = sizeof( frag_spec_data.postprocess_enabled );
+
+	frag_spec_info.mapEntryCount = 21;
 	frag_spec_info.pMapEntries = spec_entries;
 	frag_spec_info.dataSize = sizeof( frag_spec_data );
 	frag_spec_info.pData = &frag_spec_data;
