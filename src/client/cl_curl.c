@@ -328,6 +328,9 @@ void CL_cURL_BeginDownload( const char *localName, const char *remoteURL )
 	if ( com_developer->integer )
 		qcurl_easy_setopt_warn( clc.downloadCURL, CURLOPT_VERBOSE, 1 );
 	qcurl_easy_setopt_warn(clc.downloadCURL, CURLOPT_URL, clc.downloadURL);
+#ifdef CURL_HTTP_VERSION_2TLS
+	qcurl_easy_setopt_warn(clc.downloadCURL, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2TLS);
+#endif
 	qcurl_easy_setopt_warn(clc.downloadCURL, CURLOPT_TRANSFERTEXT, 0);
 	qcurl_easy_setopt_warn(clc.downloadCURL, CURLOPT_REFERER, va("ioQ3://%s",
 		NET_AdrToString(&clc.serverAddress)));
@@ -988,6 +991,9 @@ qboolean Com_DL_Begin( download_t *dl, const char *localName, const char *remote
 		dl->func.easy_setopt( dl->cURL, CURLOPT_VERBOSE, 1 );
 
 	dl->func.easy_setopt( dl->cURL, CURLOPT_URL, dl->URL );
+#ifdef CURL_HTTP_VERSION_2TLS
+	dl->func.easy_setopt( dl->cURL, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2TLS );
+#endif
 	dl->func.easy_setopt( dl->cURL, CURLOPT_TRANSFERTEXT, 0 );
 	//dl->func.easy_setopt( dl->cURL, CURLOPT_REFERER, "q3a://127.0.0.1" );
 	dl->func.easy_setopt( dl->cURL, CURLOPT_REFERER, dl->URL );
