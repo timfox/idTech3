@@ -47,10 +47,10 @@
     <ClCompile Include="..\..\renderer2\tr_flares.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\rendercommon\tr_font.c">
+    <ClCompile Include="..\..\renderers\common\tr_font.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\rendercommon\tr_font_stub.c">
+    <ClCompile Include="..\..\renderers\common\tr_font_stub.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\renderer2\tr_glsl.c">
@@ -59,22 +59,22 @@
     <ClCompile Include="..\..\renderer2\tr_image.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\rendercommon\tr_image_bmp.c">
+    <ClCompile Include="..\..\renderers\common\tr_image_bmp.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\renderer2\tr_image_dds.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\rendercommon\tr_image_jpg.c">
+    <ClCompile Include="..\..\renderers\common\tr_image_jpg.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\rendercommon\tr_image_pcx.c">
+    <ClCompile Include="..\..\renderers\common\tr_image_pcx.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\rendercommon\tr_image_png.c">
+    <ClCompile Include="..\..\renderers\common\tr_image_png.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\rendercommon\tr_image_tga.c">
+    <ClCompile Include="..\..\renderers\common\tr_image_tga.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\renderer2\tr_init.c">
@@ -98,7 +98,7 @@
     <ClCompile Include="..\..\renderer2\tr_model_iqm.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\rendercommon\tr_noise.c">
+    <ClCompile Include="..\..\renderers\common\tr_noise.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\renderer2\tr_postprocess.c">
@@ -238,7 +238,7 @@
     <ClInclude Include="..\..\qcommon\surfaceflags.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\renderers\openglrenderer\tr_common.h">
+    <ClInclude Include="..\..\renderers\opengl\tr_common.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\renderer2\tr_dsa.h">
@@ -259,10 +259,10 @@
     <ClInclude Include="..\..\renderer2\tr_postprocess.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\renderers\rendercommon\tr_public.h">
+    <ClInclude Include="..\..\renderers\common\tr_public.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\renderers\rendercommon\tr_types.h">
+    <ClInclude Include="..\..\renderers\common\tr_types.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\win_local.h">

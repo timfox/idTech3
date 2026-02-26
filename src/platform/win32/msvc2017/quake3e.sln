@@ -21,11 +21,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "quake3e", "quake3e.vcxproj"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "quake3e-ded", "quake3e-ded.vcxproj", "{81CB51C4-B434-4E12-B69B-BAEE102F2853}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "renderer", "renderer.vcxproj", "{AB424155-FBED-4D8D-B007-5B6CF93EA395}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "opengl", "opengl.vcxproj", "{AB424155-FBED-4D8D-B007-5B6CF93EA395}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "renderer2", "renderer2.vcxproj", "{AB424155-FBED-4D8D-B007-5B6CF93EA396}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "renderervk", "renderervk.vcxproj", "{157AD8A8-E8BD-41C1-9139-F4687A8E3668}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "vulkan", "vulkan.vcxproj", "{157AD8A8-E8BD-41C1-9139-F4687A8E3668}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

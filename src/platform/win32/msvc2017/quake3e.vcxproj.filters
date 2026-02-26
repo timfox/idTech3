@@ -261,7 +261,7 @@
     <ClInclude Include="..\..\qcommon\qfiles.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\renderers\openglrenderer\qgl.h">
+    <ClInclude Include="..\..\renderers\opengl\qgl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\resource.h">
@@ -279,10 +279,10 @@
     <ClInclude Include="..\..\qcommon\surfaceflags.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\renderers\rendercommon\tr_public.h">
+    <ClInclude Include="..\..\renderers\common\tr_public.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\renderers\rendercommon\tr_types.h">
+    <ClInclude Include="..\..\renderers\common\tr_types.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\ui\ui_public.h">
