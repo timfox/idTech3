@@ -713,8 +713,152 @@ static duk_ret_t Js_Binding_Off( duk_context *ctx ) {
 	return 1;
 }
 
+/* ========== Timer system (setTimeout/setInterval) ========== */
+
+#define MAX_JS_TIMERS 32
+typedef struct {
+	int     id;
+	int     fireTime;
+	int     interval;
+	qboolean active;
+	qboolean repeating;
+} jsTimer_t;
+static jsTimer_t jsTimers[MAX_JS_TIMERS];
+static int jsTimerNextId = 1;
+
+static duk_ret_t Js_Binding_SetTimeout( duk_context *ctx ) {
+	int i, delay;
+	if ( !duk_is_function( ctx, 0 ) ) return duk_error( ctx, DUK_ERR_TYPE_ERROR, "callback must be a function" );
+	delay = duk_require_int( ctx, 1 );
+	for ( i = 0; i < MAX_JS_TIMERS; i++ ) {
+		if ( !jsTimers[i].active ) {
+			jsTimers[i].id = jsTimerNextId++;
+			jsTimers[i].fireTime = Sys_Milliseconds() + delay;
+			jsTimers[i].interval = 0;
+			jsTimers[i].active = qtrue;
+			jsTimers[i].repeating = qfalse;
+			duk_push_global_stash( ctx );
+			duk_dup( ctx, 0 );
+			duk_put_prop_string( ctx, -2, va( "\xff""timer_%d", jsTimers[i].id ) );
+			duk_pop( ctx );
+			duk_push_int( ctx, jsTimers[i].id );
+			return 1;
+		}
+	}
+	duk_push_int( ctx, -1 );
+	return 1;
+}
+
+static duk_ret_t Js_Binding_SetInterval( duk_context *ctx ) {
+	int i, delay;
+	if ( !duk_is_function( ctx, 0 ) ) return duk_error( ctx, DUK_ERR_TYPE_ERROR, "callback must be a function" );
+	delay = duk_require_int( ctx, 1 );
+	if ( delay < 16 ) delay = 16;
+	for ( i = 0; i < MAX_JS_TIMERS; i++ ) {
+		if ( !jsTimers[i].active ) {
+			jsTimers[i].id = jsTimerNextId++;
+			jsTimers[i].fireTime = Sys_Milliseconds() + delay;
+			jsTimers[i].interval = delay;
+			jsTimers[i].active = qtrue;
+			jsTimers[i].repeating = qtrue;
+			duk_push_global_stash( ctx );
+			duk_dup( ctx, 0 );
+			duk_put_prop_string( ctx, -2, va( "\xff""timer_%d", jsTimers[i].id ) );
+			duk_pop( ctx );
+			duk_push_int( ctx, jsTimers[i].id );
+			return 1;
+		}
+	}
+	duk_push_int( ctx, -1 );
+	return 1;
+}
+
+static duk_ret_t Js_Binding_ClearTimer( duk_context *ctx ) {
+	int id = duk_require_int( ctx, 0 );
+	int i;
+	for ( i = 0; i < MAX_JS_TIMERS; i++ ) {
+		if ( jsTimers[i].active && jsTimers[i].id == id ) {
+			jsTimers[i].active = qfalse;
+			duk_push_global_stash( ctx );
+			duk_del_prop_string( ctx, -1, va( "\xff""timer_%d", id ) );
+			duk_pop( ctx );
+			break;
+		}
+	}
+	return 0;
+}
+
+/* ========== Engine info queries ========== */
+
+static duk_ret_t Js_Binding_GetEngineInfo( duk_context *ctx ) {
+	duk_push_object( ctx );
+	duk_push_string( ctx, Q3_VERSION );
+	duk_put_prop_string( ctx, -2, "version" );
+	duk_push_string( ctx, OS_STRING );
+	duk_put_prop_string( ctx, -2, "platform" );
+	duk_push_string( ctx, ARCH_STRING );
+	duk_put_prop_string( ctx, -2, "arch" );
+	duk_push_int( ctx, Sys_Milliseconds() );
+	duk_put_prop_string( ctx, -2, "uptime" );
+	return 1;
+}
+
+static duk_ret_t Js_Binding_GetMilliseconds( duk_context *ctx ) {
+	(void)ctx;
+	duk_push_int( ctx, Sys_Milliseconds() );
+	return 1;
+}
+
+/* ========== HUD drawing extensions ========== */
+
+#ifndef DEDICATED
+static duk_ret_t Js_Binding_HudSetColor( duk_context *ctx ) {
+	vec4_t color;
+	color[0] = (float)duk_require_number( ctx, 0 );
+	color[1] = (float)duk_require_number( ctx, 1 );
+	color[2] = (float)duk_require_number( ctx, 2 );
+	color[3] = ( duk_get_top( ctx ) > 3 ) ? (float)duk_to_number( ctx, 3 ) : 1.0f;
+	re.SetColor( color );
+	return 0;
+}
+
+static duk_ret_t Js_Binding_HudDrawRect( duk_context *ctx ) {
+	float x = (float)duk_require_number( ctx, 0 );
+	float y = (float)duk_require_number( ctx, 1 );
+	float w = (float)duk_require_number( ctx, 2 );
+	float h = (float)duk_require_number( ctx, 3 );
+	re.DrawStretchPic( x, y, w, h, 0, 0, 1, 1, cls.whiteShader );
+	return 0;
+}
+
+static duk_ret_t Js_Binding_HudResetColor( duk_context *ctx ) {
+	(void)ctx;
+	re.SetColor( NULL );
+	return 0;
+}
+
+static duk_ret_t Js_Binding_GetScreenSize( duk_context *ctx ) {
+	duk_push_object( ctx );
+	duk_push_int( ctx, cls.glconfig.vidWidth );
+	duk_put_prop_string( ctx, -2, "width" );
+	duk_push_int( ctx, cls.glconfig.vidHeight );
+	duk_put_prop_string( ctx, -2, "height" );
+	return 1;
+}
+#endif
+
 static void JsDebug_RegisterBindings( void ) {
 	duk_push_global_object( s_jsContext );
+
+	/* Standard JS globals */
+	duk_push_c_function( s_jsContext, Js_Binding_SetTimeout, 2 );
+	duk_put_prop_string( s_jsContext, -2, "setTimeout" );
+	duk_push_c_function( s_jsContext, Js_Binding_SetInterval, 2 );
+	duk_put_prop_string( s_jsContext, -2, "setInterval" );
+	duk_push_c_function( s_jsContext, Js_Binding_ClearTimer, 1 );
+	duk_put_prop_string( s_jsContext, -2, "clearTimeout" );
+	duk_push_c_function( s_jsContext, Js_Binding_ClearTimer, 1 );
+	duk_put_prop_string( s_jsContext, -2, "clearInterval" );
 
 	duk_push_c_function( s_jsContext, Js_Binding_Print, DUK_VARARGS );
 	duk_put_prop_string( s_jsContext, -2, "print" );
@@ -769,7 +913,25 @@ static void JsDebug_RegisterBindings( void ) {
 
 	duk_push_c_function( s_jsContext, Js_Binding_HudDrawText, DUK_VARARGS );
 	duk_put_prop_string( s_jsContext, -2, "hudDrawText" );
+
+	duk_push_c_function( s_jsContext, Js_Binding_HudSetColor, DUK_VARARGS );
+	duk_put_prop_string( s_jsContext, -2, "hudSetColor" );
+
+	duk_push_c_function( s_jsContext, Js_Binding_HudDrawRect, 4 );
+	duk_put_prop_string( s_jsContext, -2, "hudDrawRect" );
+
+	duk_push_c_function( s_jsContext, Js_Binding_HudResetColor, 0 );
+	duk_put_prop_string( s_jsContext, -2, "hudResetColor" );
+
+	duk_push_c_function( s_jsContext, Js_Binding_GetScreenSize, 0 );
+	duk_put_prop_string( s_jsContext, -2, "getScreenSize" );
 #endif
+
+	duk_push_c_function( s_jsContext, Js_Binding_GetEngineInfo, 0 );
+	duk_put_prop_string( s_jsContext, -2, "getEngineInfo" );
+
+	duk_push_c_function( s_jsContext, Js_Binding_GetMilliseconds, 0 );
+	duk_put_prop_string( s_jsContext, -2, "getMilliseconds" );
 
 	duk_push_string( s_jsContext, "Duktape" );
 	duk_put_prop_string( s_jsContext, -2, "engine" );
@@ -873,6 +1035,33 @@ void JsDebug_Frame( int msec, int realMsec ) {
 
 	if ( !s_jsContext ) {
 		return;
+	}
+
+	/* Process timers */
+	{
+		int now = Sys_Milliseconds();
+		int ti;
+		for ( ti = 0; ti < MAX_JS_TIMERS; ti++ ) {
+			if ( !jsTimers[ti].active ) continue;
+			if ( now >= jsTimers[ti].fireTime ) {
+				duk_push_global_stash( s_jsContext );
+				if ( duk_get_prop_string( s_jsContext, -1, va( "\xff""timer_%d", jsTimers[ti].id ) ) && duk_is_function( s_jsContext, -1 ) ) {
+					if ( duk_pcall( s_jsContext, 0 ) != 0 ) {
+						Com_Printf( S_COLOR_YELLOW "JS timer %d error: %s\n", jsTimers[ti].id, duk_safe_to_string( s_jsContext, -1 ) );
+					}
+				}
+				duk_pop_2( s_jsContext );
+
+				if ( jsTimers[ti].repeating ) {
+					jsTimers[ti].fireTime = now + jsTimers[ti].interval;
+				} else {
+					jsTimers[ti].active = qfalse;
+					duk_push_global_stash( s_jsContext );
+					duk_del_prop_string( s_jsContext, -1, va( "\xff""timer_%d", jsTimers[ti].id ) );
+					duk_pop( s_jsContext );
+				}
+			}
+		}
 	}
 
 	JsDebug_InitPolicyCvars();
