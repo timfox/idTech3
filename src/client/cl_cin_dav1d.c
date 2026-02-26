@@ -37,11 +37,11 @@ typedef struct {
 	int              height;
 } dav1dContext_t;
 
-static qboolean dav1d_open(cinModernDecoder_t *dec, const char *filename, fileHandle_t file, int fileSize);
-static qboolean dav1d_decodeFrame(cinModernDecoder_t *dec, cinFrame_t *frame, cinAudio_t *audio);
-static void     dav1d_seek(cinModernDecoder_t *dec, int timeMs);
-static void     dav1d_close(cinModernDecoder_t *dec);
-static qboolean dav1d_isEof(cinModernDecoder_t *dec);
+static qboolean cin_dav1d_open(cinModernDecoder_t *dec, const char *filename, fileHandle_t file, int fileSize);
+static qboolean cin_dav1d_decodeFrame(cinModernDecoder_t *dec, cinFrame_t *frame, cinAudio_t *audio);
+static void     cin_dav1d_seek(cinModernDecoder_t *dec, int timeMs);
+static void     cin_dav1d_close(cinModernDecoder_t *dec);
+static qboolean cin_dav1d_isEof(cinModernDecoder_t *dec);
 
 static void dav1d_yuv420_to_rgba(const Dav1dPicture *pic, byte *rgba, int width, int height);
 
@@ -51,11 +51,11 @@ CIN_Dav1d_CreateDecoder
 ===============
 */
 qboolean CIN_Dav1d_CreateDecoder(cinModernDecoder_t *dec) {
-	dec->open = dav1d_open;
-	dec->decodeFrame = dav1d_decodeFrame;
-	dec->seek = dav1d_seek;
-	dec->close = dav1d_close;
-	dec->isEof = dav1d_isEof;
+	dec->open = cin_dav1d_open;
+	dec->decodeFrame = cin_dav1d_decodeFrame;
+	dec->seek = cin_dav1d_seek;
+	dec->close = cin_dav1d_close;
+	dec->isEof = cin_dav1d_isEof;
 	dec->type = CODEC_DAV1D;
 	return qtrue;
 }
@@ -65,7 +65,7 @@ qboolean CIN_Dav1d_CreateDecoder(cinModernDecoder_t *dec) {
 dav1d_open
 ===============
 */
-static qboolean dav1d_open(cinModernDecoder_t *dec, const char *filename, fileHandle_t file, int fileSize) {
+static qboolean cin_dav1d_open(cinModernDecoder_t *dec, const char *filename, fileHandle_t file, int fileSize) {
 	dav1dContext_t *ctx;
 	int ret;
 
@@ -88,7 +88,7 @@ static qboolean dav1d_open(cinModernDecoder_t *dec, const char *filename, fileHa
 	ctx->fileSize = FS_ReadFile(filename, (void **)&ctx->fileData);
 	if (ctx->fileSize <= 0 || !ctx->fileData) {
 		Com_Printf(S_COLOR_RED "dav1d: Could not read %s\n", filename);
-		dav1d_close_internal(ctx->dav1dCtx);
+		dav1d_close(&ctx->dav1dCtx);
 		Z_Free(ctx);
 		return qfalse;
 	}
@@ -146,7 +146,7 @@ static void dav1d_yuv420_to_rgba(const Dav1dPicture *pic, byte *rgba, int width,
 dav1d_decodeFrame
 ===============
 */
-static qboolean dav1d_decodeFrame(cinModernDecoder_t *dec, cinFrame_t *frame, cinAudio_t *audio) {
+static qboolean cin_dav1d_decodeFrame(cinModernDecoder_t *dec, cinFrame_t *frame, cinAudio_t *audio) {
 	dav1dContext_t *ctx;
 	Dav1dData data;
 	Dav1dPicture pic;
@@ -244,7 +244,7 @@ static void dav1d_seek(cinModernDecoder_t *dec, int timeMs) {
 dav1d_close
 ===============
 */
-static void dav1d_close(cinModernDecoder_t *dec) {
+static void cin_dav1d_close(cinModernDecoder_t *dec) {
 	dav1dContext_t *ctx;
 
 	if (!dec || !dec->context) {
@@ -272,7 +272,7 @@ static void dav1d_close(cinModernDecoder_t *dec) {
 dav1d_isEof
 ===============
 */
-static qboolean dav1d_isEof(cinModernDecoder_t *dec) {
+static qboolean cin_dav1d_isEof(cinModernDecoder_t *dec) {
 	dav1dContext_t *ctx;
 
 	if (!dec || !dec->context) {

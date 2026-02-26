@@ -136,7 +136,7 @@ qboolean BgMap_IsLoaded(void) { return bgMapLoaded; }
 void BgMap_SetActive(qboolean active) { bgMapActive = active; }
 
 static void BgMap_InterpolateCamera(float t) {
-	int segCount, segA, segB;
+	int segA, segB;
 	float segT, totalTime;
 	bgCameraPoint_t *a, *b;
 
@@ -158,7 +158,6 @@ static void BgMap_InterpolateCamera(float t) {
 		if (t > totalTime) t = totalTime;
 	}
 
-	segCount = cameraLoop ? numCameraPoints : (numCameraPoints - 1);
 
 	for (segA = 0; segA < numCameraPoints - 1; segA++) {
 		if (t < cameraPath[segA + 1].time) break;

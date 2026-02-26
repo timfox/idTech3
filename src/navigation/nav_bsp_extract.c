@@ -15,6 +15,7 @@ geometry to the Recast rasterizer.
 
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
+#include "nav_bsp_extract.h"
 
 #define NAV_MAX_TRIS  (256 * 1024)
 #define NAV_MAX_VERTS (NAV_MAX_TRIS * 3)

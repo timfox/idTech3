@@ -57,7 +57,7 @@ Called automatically or via Lua after map load.
 */
 static void CL_BuildNavMesh_f(void) {
 	const char *mapName;
-	int i;
+	(void)0;
 
 	if (!gameSystemsInitialized) {
 		Com_Printf("Game systems not initialized\n");
