@@ -31,7 +31,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <limits.h>
 #ifdef USE_FLUX
 #include "flux.h"
-#if defined(USE_SDL)
+#if USE_SDL
 #include <SDL2/SDL_thread.h>
 #else
 typedef struct SDL_Thread SDL_Thread;
@@ -4472,7 +4472,7 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 
 #ifdef USE_FLUX
 	// Clean up any running FLUX jobs
-#if defined(USE_SDL)
+#if USE_SDL
 	if (flux_job.thread) {
 		SDL_WaitThread(flux_job.thread, NULL);
 		flux_job.thread = NULL;
@@ -5421,7 +5421,7 @@ static void CL_ShowIP_f( void ) {
 FLUX Generation Thread Function
 ==================
 */
-#if defined(USE_SDL)
+#if USE_SDL
 static int CL_FluxGenerationThread(void *data) {
 	flux_job_t *job = (flux_job_t *)data;
 	flux_ctx *ctx = NULL;
@@ -5679,7 +5679,7 @@ static void CL_FluxGenerate_f( void ) {
 
 	// Choose generation mode based on cvar
 	if (cl_flux_async->integer) {
-#if defined(USE_SDL)
+#if USE_SDL
 		// Asynchronous (background) mode
 		goto async_generation;
 #else
@@ -5691,7 +5691,7 @@ static void CL_FluxGenerate_f( void ) {
 		goto sync_generation;
 	}
 
-#if defined(USE_SDL)
+#if USE_SDL
 async_generation:
 	// Asynchronous generation code
 
@@ -5919,7 +5919,7 @@ static void CL_FluxCancel_f( void ) {
 		flux_job.status = FLUX_JOB_FAILED;
 		Q_strncpyz(flux_job.error_msg, "Generation cancelled by user", sizeof(flux_job.error_msg));
 
-#if defined(USE_SDL)
+#if USE_SDL
 		if (flux_job.thread) {
 			// Wait for thread to finish
 			int thread_result = 0;
@@ -6099,7 +6099,7 @@ static void CL_FluxView_f( void ) {
 			flux_image_free(flux_job.result);
 			flux_job.result = NULL;
 		}
-#if defined(USE_SDL)
+#if USE_SDL
 		if (flux_job.thread) {
 			SDL_WaitThread(flux_job.thread, NULL);
 			flux_job.thread = NULL;
