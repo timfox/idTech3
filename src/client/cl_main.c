@@ -26,6 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cl_emoji.h"
 #include "cl_osp.h"
 #include "cl_voip.h"
+#include "cl_mumble.h"
 #ifdef USE_DUKTAPE
 #include "../qcommon/js_debug.h"
 #endif
@@ -3382,6 +3383,8 @@ void CL_Frame( int msec, int realMsec ) {
 	// tick all gameplay subsystems (physics, navigation, particles, director, music)
 	CL_GameFrame( (float)msec * 0.001f );
 
+	CL_VoIP_Frame();
+
 	Con_RunConsole();
 }
 
@@ -4433,6 +4436,7 @@ void CL_Init( void ) {
 	CL_Emoji_Init();
 	CL_OSP_Init();
 	CL_VoIP_Init();
+	CL_Mumble_Init();
 
 	Com_Printf( "----- Client Initialization Complete -----\n" );
 }

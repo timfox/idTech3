@@ -137,10 +137,8 @@ void CL_InitGameSystems(void) {
 
 	Cmd_AddCommand("buildnavmesh", CL_BuildNavMesh_f);
 
-	Com_Printf("Game systems initialized (physics, navigation, particles, AI, audio)\n");
-
 	gameSystemsInitialized = qtrue;
-	Com_Printf("Game systems initialized (physics, navigation, particles)\n");
+	Com_Printf("Game systems initialized (physics, navigation, particles, AI, audio)\n");
 }
 
 void CL_ShutdownGameSystems(void) {
