@@ -190,6 +190,10 @@ void SkyboxHDR_GenerateCubemap(void) {
 
 	for (face = 0; face < 6; face++) {
 		skybox.cubeFaces[face] = (float *)Z_Malloc(size * size * 4 * sizeof(float));
+		if (!skybox.cubeFaces[face]) {
+			ri.Printf(PRINT_WARNING, "SkyboxHDR: failed to allocate cubemap face %d\n", face);
+			return;
+		}
 
 		for (y = 0; y < size; y++) {
 			for (x = 0; x < size; x++) {
@@ -224,6 +228,10 @@ void SkyboxHDR_GenerateIrradiance(void) {
 
 	for (face = 0; face < 6; face++) {
 		skybox.irradianceFaces[face] = (float *)Z_Malloc(size * size * 4 * sizeof(float));
+		if (!skybox.irradianceFaces[face]) {
+			ri.Printf(PRINT_WARNING, "SkyboxHDR: failed to allocate irradiance face %d\n", face);
+			return;
+		}
 
 		for (y = 0; y < size; y++) {
 			for (x = 0; x < size; x++) {
@@ -283,6 +291,10 @@ void SkyboxHDR_GeneratePrefiltered(void) {
 
 	for (face = 0; face < 6; face++) {
 		skybox.prefilteredFaces[face] = (float *)Z_Malloc(baseSize * baseSize * 4 * sizeof(float));
+		if (!skybox.prefilteredFaces[face]) {
+			ri.Printf(PRINT_WARNING, "SkyboxHDR: failed to allocate prefiltered face %d\n", face);
+			return;
+		}
 
 		for (y = 0; y < baseSize; y++) {
 			for (x = 0; x < baseSize; x++) {

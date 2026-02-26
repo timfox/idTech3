@@ -5578,7 +5578,7 @@ static int CL_FluxGenerationThread(void *data) {
 
 	if (!image->data || image->width <= 0 || image->height <= 0) {
 		Com_Printf("FLUX: Invalid image data - data:%p width:%d height:%d\n",
-			image->data, image->width, image->height);
+			(void *)image->data, image->width, image->height);
 		Q_strncpyz(job->error_msg, "Generated image is invalid", sizeof(job->error_msg));
 		flux_image_free(image);
 		flux_free(ctx);
