@@ -295,11 +295,50 @@ qboolean GOAP_IsPlanComplete(goapAgentHandle_t h) {
 void GOAP_Update(float dt) {
 	int i;
 	for (i = 0; i < numAgents; i++) {
-		if (!agents[i].active) continue;
-		agents[i].replanTimer += dt;
-		if (agents[i].replanTimer >= agents[i].replanInterval) {
-			agents[i].replanTimer = 0;
-			if (!agents[i].currentPlan.valid || GOAP_IsPlanComplete(i)) {
+		goapAgent_t *a = &agents[i];
+		if (!a->active) continue;
+
+		/* Execute current action */
+		if (a->currentPlan.valid && !GOAP_IsPlanComplete(i)) {
+			int actionId = a->currentPlan.steps[a->currentPlan.currentStep].actionId;
+			goapAction_t *act = &actions[actionId];
+
+			if (a->actionStatus == GOAP_ACTION_IDLE) {
+				a->actionStatus = GOAP_ACTION_RUNNING;
+				a->actionTimer = 0;
+				if (act->onEnter) act->onEnter(i);
+			}
+
+			if (a->actionStatus == GOAP_ACTION_RUNNING) {
+				a->actionTimer += dt;
+				goapActionStatus_t result = GOAP_ACTION_RUNNING;
+
+				if (act->onUpdate) {
+					result = act->onUpdate(i, dt);
+				} else if (act->duration > 0 && a->actionTimer >= act->duration) {
+					result = GOAP_ACTION_SUCCESS;
+				}
+
+				if (result == GOAP_ACTION_SUCCESS) {
+					if (act->onExit) act->onExit(i, GOAP_ACTION_SUCCESS);
+					GOAP_ApplyEffects(&a->worldState, &act->effects, &a->worldState);
+					a->currentPlan.currentStep++;
+					a->actionStatus = GOAP_ACTION_IDLE;
+					a->actionTimer = 0;
+				} else if (result == GOAP_ACTION_FAILED) {
+					if (act->onExit) act->onExit(i, GOAP_ACTION_FAILED);
+					a->currentPlan.valid = qfalse;
+					a->actionStatus = GOAP_ACTION_IDLE;
+					a->actionTimer = 0;
+				}
+			}
+		}
+
+		/* Replan when needed */
+		a->replanTimer += dt;
+		if (a->replanTimer >= a->replanInterval) {
+			a->replanTimer = 0;
+			if (!a->currentPlan.valid || GOAP_IsPlanComplete(i)) {
 				GOAP_AutoPlan(i);
 			}
 		}
@@ -309,3 +348,260 @@ void GOAP_Update(float dt) {
 int GOAP_GetActionCount(void) { return numActions; }
 int GOAP_GetGoalCount(void) { return numGoals; }
 int GOAP_GetAgentCount(void) { return numAgents; }
+
+/* ---- Named properties ---- */
+
+static char propNames[GOAP_MAX_PROP_NAMES][32];
+static int numPropNames = 0;
+
+int GOAP_DefineProperty(const char *name) {
+	int i;
+	for (i = 0; i < numPropNames; i++) {
+		if (Q_stricmp(propNames[i], name) == 0) return i;
+	}
+	if (numPropNames >= GOAP_MAX_PROP_NAMES) return -1;
+	Q_strncpyz(propNames[numPropNames], name, sizeof(propNames[0]));
+	return numPropNames++;
+}
+
+const char *GOAP_GetPropertyName(int idx) {
+	return (idx >= 0 && idx < numPropNames) ? propNames[idx] : "unknown";
+}
+
+int GOAP_FindProperty(const char *name) {
+	int i;
+	for (i = 0; i < numPropNames; i++) {
+		if (Q_stricmp(propNames[i], name) == 0) return i;
+	}
+	return -1;
+}
+
+/* ---- Blackboard ---- */
+
+static goapBBEntry_t *BB_Find(goapAgentHandle_t h, const char *key, qboolean create) {
+	int i;
+	if (!VALID_AGENT(h)) return NULL;
+	for (i = 0; i < GOAP_BLACKBOARD_SIZE; i++) {
+		if (agents[h].blackboard[i].type && Q_stricmp(agents[h].blackboard[i].key, key) == 0)
+			return &agents[h].blackboard[i];
+	}
+	if (!create) return NULL;
+	for (i = 0; i < GOAP_BLACKBOARD_SIZE; i++) {
+		if (!agents[h].blackboard[i].type) {
+			Q_strncpyz(agents[h].blackboard[i].key, key, sizeof(agents[h].blackboard[i].key));
+			return &agents[h].blackboard[i];
+		}
+	}
+	return NULL;
+}
+
+void GOAP_BBSetFloat(goapAgentHandle_t h, const char *key, float v) {
+	goapBBEntry_t *e = BB_Find(h, key, qtrue);
+	if (e) { e->val.f = v; e->type = 1; }
+}
+float GOAP_BBGetFloat(goapAgentHandle_t h, const char *key) {
+	goapBBEntry_t *e = BB_Find(h, key, qfalse);
+	return e ? e->val.f : 0.0f;
+}
+void GOAP_BBSetInt(goapAgentHandle_t h, const char *key, int v) {
+	goapBBEntry_t *e = BB_Find(h, key, qtrue);
+	if (e) { e->val.i = v; e->type = 2; }
+}
+int GOAP_BBGetInt(goapAgentHandle_t h, const char *key) {
+	goapBBEntry_t *e = BB_Find(h, key, qfalse);
+	return e ? e->val.i : 0;
+}
+void GOAP_BBSetVec(goapAgentHandle_t h, const char *key, const vec3_t v) {
+	goapBBEntry_t *e = BB_Find(h, key, qtrue);
+	if (e) { VectorCopy(v, e->val.v); e->type = 3; }
+}
+void GOAP_BBGetVec(goapAgentHandle_t h, const char *key, vec3_t out) {
+	goapBBEntry_t *e = BB_Find(h, key, qfalse);
+	if (e && e->type == 3) VectorCopy(e->val.v, out);
+	else VectorClear(out);
+}
+void GOAP_BBClear(goapAgentHandle_t h) {
+	if (VALID_AGENT(h)) Com_Memset(agents[h].blackboard, 0, sizeof(agents[h].blackboard));
+}
+
+/* ---- Action execution setup ---- */
+
+void GOAP_SetActionCallbacks(int id,
+	void (*onEnter)(int), goapActionStatus_t (*onUpdate)(int, float),
+	void (*onExit)(int, goapActionStatus_t))
+{
+	if (id < 0 || id >= numActions) return;
+	actions[id].onEnter = onEnter;
+	actions[id].onUpdate = onUpdate;
+	actions[id].onExit = onExit;
+}
+
+void GOAP_SetActionDuration(int id, float d) {
+	if (id >= 0 && id < numActions) actions[id].duration = d;
+}
+void GOAP_SetActionRange(int id, float r) {
+	if (id >= 0 && id < numActions) actions[id].range = r;
+}
+
+/* ---- Default FPS action library ---- */
+
+enum {
+	PROP_ALIVE = 0, PROP_HAS_WEAPON, PROP_HAS_AMMO, PROP_HAS_HEALTH,
+	PROP_HAS_ARMOR, PROP_ENEMY_VISIBLE, PROP_ENEMY_DEAD, PROP_IN_COVER,
+	PROP_AT_PATROL_POINT, PROP_AT_ITEM, PROP_ENEMY_IN_RANGE,
+	PROP_LOW_HEALTH, PROP_COUNT
+};
+
+void GOAP_RegisterDefaultActions(void) {
+	int id;
+
+	GOAP_DefineProperty("alive");
+	GOAP_DefineProperty("has_weapon");
+	GOAP_DefineProperty("has_ammo");
+	GOAP_DefineProperty("has_health");
+	GOAP_DefineProperty("has_armor");
+	GOAP_DefineProperty("enemy_visible");
+	GOAP_DefineProperty("enemy_dead");
+	GOAP_DefineProperty("in_cover");
+	GOAP_DefineProperty("at_patrol_point");
+	GOAP_DefineProperty("at_item");
+	GOAP_DefineProperty("enemy_in_range");
+	GOAP_DefineProperty("low_health");
+
+	id = GOAP_RegisterAction("attack", 2.0f);
+	GOAP_SetActionPrecondition(id, PROP_HAS_WEAPON, 1);
+	GOAP_SetActionPrecondition(id, PROP_HAS_AMMO, 1);
+	GOAP_SetActionPrecondition(id, PROP_ENEMY_VISIBLE, 1);
+	GOAP_SetActionPrecondition(id, PROP_ENEMY_IN_RANGE, 1);
+	GOAP_SetActionEffect(id, PROP_ENEMY_DEAD, 1);
+	GOAP_SetActionDuration(id, 3.0f);
+
+	id = GOAP_RegisterAction("chase", 3.0f);
+	GOAP_SetActionPrecondition(id, PROP_ENEMY_VISIBLE, 1);
+	GOAP_SetActionEffect(id, PROP_ENEMY_IN_RANGE, 1);
+	GOAP_SetActionDuration(id, 5.0f);
+
+	id = GOAP_RegisterAction("find_enemy", 4.0f);
+	GOAP_SetActionEffect(id, PROP_ENEMY_VISIBLE, 1);
+	GOAP_SetActionDuration(id, 8.0f);
+
+	id = GOAP_RegisterAction("take_cover", 3.0f);
+	GOAP_SetActionPrecondition(id, PROP_LOW_HEALTH, 1);
+	GOAP_SetActionEffect(id, PROP_IN_COVER, 1);
+	GOAP_SetActionDuration(id, 2.0f);
+
+	id = GOAP_RegisterAction("heal", 2.0f);
+	GOAP_SetActionPrecondition(id, PROP_HAS_HEALTH, 1);
+	GOAP_SetActionEffect(id, PROP_LOW_HEALTH, 0);
+	GOAP_SetActionDuration(id, 1.5f);
+
+	id = GOAP_RegisterAction("find_health", 4.0f);
+	GOAP_SetActionEffect(id, PROP_HAS_HEALTH, 1);
+	GOAP_SetActionEffect(id, PROP_AT_ITEM, 1);
+	GOAP_SetActionDuration(id, 6.0f);
+
+	id = GOAP_RegisterAction("find_weapon", 4.0f);
+	GOAP_SetActionEffect(id, PROP_HAS_WEAPON, 1);
+	GOAP_SetActionEffect(id, PROP_HAS_AMMO, 1);
+	GOAP_SetActionDuration(id, 5.0f);
+
+	id = GOAP_RegisterAction("find_ammo", 3.0f);
+	GOAP_SetActionEffect(id, PROP_HAS_AMMO, 1);
+	GOAP_SetActionDuration(id, 4.0f);
+
+	id = GOAP_RegisterAction("find_armor", 4.0f);
+	GOAP_SetActionEffect(id, PROP_HAS_ARMOR, 1);
+	GOAP_SetActionDuration(id, 5.0f);
+
+	id = GOAP_RegisterAction("patrol", 1.0f);
+	GOAP_SetActionEffect(id, PROP_AT_PATROL_POINT, 1);
+	GOAP_SetActionDuration(id, 10.0f);
+
+	id = GOAP_RegisterAction("flee", 5.0f);
+	GOAP_SetActionPrecondition(id, PROP_LOW_HEALTH, 1);
+	GOAP_SetActionEffect(id, PROP_IN_COVER, 1);
+	GOAP_SetActionEffect(id, PROP_ENEMY_VISIBLE, 0);
+	GOAP_SetActionDuration(id, 4.0f);
+
+	Com_Printf("GOAP: %d default actions registered\n", numActions);
+}
+
+void GOAP_RegisterDefaultGoals(void) {
+	int id;
+
+	id = GOAP_RegisterGoal("kill_enemy", 10.0f);
+	GOAP_SetGoalState(id, PROP_ENEMY_DEAD, 1);
+
+	id = GOAP_RegisterGoal("survive", 8.0f);
+	GOAP_SetGoalState(id, PROP_LOW_HEALTH, 0);
+
+	id = GOAP_RegisterGoal("get_armed", 6.0f);
+	GOAP_SetGoalState(id, PROP_HAS_WEAPON, 1);
+	GOAP_SetGoalState(id, PROP_HAS_AMMO, 1);
+
+	id = GOAP_RegisterGoal("patrol_area", 2.0f);
+	GOAP_SetGoalState(id, PROP_AT_PATROL_POINT, 1);
+
+	Com_Printf("GOAP: %d default goals registered\n", numGoals);
+}
+
+/* ---- Debug ---- */
+
+const char *GOAP_GetActionName(int id) {
+	return (id >= 0 && id < numActions) ? actions[id].name : "none";
+}
+
+const char *GOAP_GetGoalName(int id) {
+	return (id >= 0 && id < numGoals) ? goals[id].name : "none";
+}
+
+void GOAP_DebugPrintActions(void) {
+	int i;
+	Com_Printf("--- GOAP Actions (%d) ---\n", numActions);
+	for (i = 0; i < numActions; i++) {
+		Com_Printf("  [%d] %s (cost %.1f, duration %.1f, %s)\n",
+			i, actions[i].name, actions[i].cost, actions[i].duration,
+			actions[i].active ? "active" : "inactive");
+	}
+}
+
+void GOAP_DebugPrintGoals(void) {
+	int i;
+	Com_Printf("--- GOAP Goals (%d) ---\n", numGoals);
+	for (i = 0; i < numGoals; i++) {
+		Com_Printf("  [%d] %s (priority %.1f, %s)\n",
+			i, goals[i].name, goals[i].priority,
+			goals[i].active ? "active" : "inactive");
+	}
+}
+
+void GOAP_DebugPrintPlan(goapAgentHandle_t h) {
+	int i;
+	const goapPlan_t *p;
+	if (!VALID_AGENT(h)) { Com_Printf("GOAP: invalid agent %d\n", h); return; }
+	p = &agents[h].currentPlan;
+	if (!p->valid) { Com_Printf("GOAP agent %d: no valid plan\n", h); return; }
+	Com_Printf("GOAP agent %d plan (goal: %s, cost %.1f, step %d/%d):\n",
+		h, GOAP_GetGoalName(p->goalId), p->totalCost, p->currentStep, p->numSteps);
+	for (i = 0; i < p->numSteps; i++) {
+		Com_Printf("  %s[%d] %s (cost %.1f)\n",
+			i == p->currentStep ? ">" : " ",
+			i, GOAP_GetActionName(p->steps[i].actionId), p->steps[i].cost);
+	}
+}
+
+void GOAP_DebugPrintAgent(goapAgentHandle_t h) {
+	int i;
+	if (!VALID_AGENT(h)) { Com_Printf("GOAP: invalid agent %d\n", h); return; }
+	goapAgent_t *a = &agents[h];
+	Com_Printf("GOAP agent %d: goal=%s, actions=%d, status=%d\n",
+		h, GOAP_GetGoalName(a->currentGoalId), a->numAvailableActions, a->actionStatus);
+	Com_Printf("  World state: ");
+	for (i = 0; i < GOAP_MAX_STATE_PROPS; i++) {
+		if (a->worldState.mask[i]) {
+			Com_Printf("%s=%d ", GOAP_GetPropertyName(i), a->worldState.values[i]);
+		}
+	}
+	Com_Printf("\n");
+	GOAP_DebugPrintPlan(h);
+}
