@@ -31,11 +31,7 @@ void CL_Emoji_Init( void ) {
 
 	Q_Emoji_Init();
 
-	emojiAtlasShader = re.RegisterShaderNoMip( "gfx/2d/emoji_atlas" );
-	if ( !emojiAtlasShader ) {
-		Com_DPrintf( "Emoji: atlas texture not found, emoji will render as placeholders\n" );
-	}
-
+	emojiAtlasShader = 0;
 	emojiInited = qtrue;
 	Com_Printf( "Emoji rendering: %s (cl_emoji %d)\n",
 		cl_emoji->integer ? "enabled" : "disabled", cl_emoji->integer );
@@ -62,6 +58,10 @@ qboolean CL_Emoji_DrawChar( int x, int y, float w, float h, uint32_t codepoint )
 	e = Q_Emoji_Lookup( codepoint );
 	if ( !e ) {
 		return qfalse;
+	}
+
+	if ( !emojiAtlasShader && re.RegisterShaderNoMip ) {
+		emojiAtlasShader = re.RegisterShaderNoMip( "gfx/2d/emoji_atlas" );
 	}
 
 	if ( !emojiAtlasShader ) {
