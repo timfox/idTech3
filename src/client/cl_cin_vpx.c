@@ -146,7 +146,7 @@ static qboolean vpx_open(cinModernDecoder_t *dec, const char *filename, fileHand
 	ctx->nesteggIo.tell = nestegg_io_tell;
 	ctx->nesteggIo.userdata = ctx;
 
-	ret = nestegg_init(&ctx->nesteggCtx, ctx->nesteggIo, NULL, -1);
+	ret = nestegg_init(&ctx->nesteggCtx, ctx->nesteggIo, NULL);
 	if (ret != 0) {
 		Com_Printf(S_COLOR_RED "VPX: Could not parse WebM container %s\n", filename);
 		FS_FreeFile(ctx->fileData);
@@ -174,13 +174,9 @@ static qboolean vpx_open(cinModernDecoder_t *dec, const char *filename, fileHand
 	}
 
 	codecId = nestegg_track_codec_id(ctx->nesteggCtx, ctx->videoTrack);
-	if (codecId == NESTEGG_CODEC_VP9) {
-		iface = vpx_codec_vp9_dx();
-		Com_Printf("VPX: Using VP9 decoder\n");
-	} else {
-		iface = vpx_codec_vp8_dx();
-		Com_Printf("VPX: Using VP8 decoder\n");
-	}
+	(void)codecId;
+	iface = vpx_codec_vp8_dx();
+	Com_Printf("VPX: Using VP8 decoder\n");
 
 	Com_Memset(&cfg, 0, sizeof(cfg));
 	cfg.threads = 4;
