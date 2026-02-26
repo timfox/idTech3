@@ -260,6 +260,180 @@ static int l_response_trigger(lua_State *L) {
 	return 0;
 }
 
+/* ========== GOAP bindings ========== */
+
+#include "g_goap.h"
+
+/* Actions */
+static int l_goap_registerAction(lua_State *L) {
+	lua_pushinteger(L, GOAP_RegisterAction(luaL_checkstring(L,1), (float)luaL_optnumber(L,2,1.0)));
+	return 1;
+}
+static int l_goap_setActionPrecondition(lua_State *L) {
+	GOAP_SetActionPrecondition((int)luaL_checkinteger(L,1), (int)luaL_checkinteger(L,2), (int)luaL_checkinteger(L,3));
+	return 0;
+}
+static int l_goap_setActionEffect(lua_State *L) {
+	GOAP_SetActionEffect((int)luaL_checkinteger(L,1), (int)luaL_checkinteger(L,2), (int)luaL_checkinteger(L,3));
+	return 0;
+}
+static int l_goap_setActionDuration(lua_State *L) {
+	GOAP_SetActionDuration((int)luaL_checkinteger(L,1), (float)luaL_checknumber(L,2));
+	return 0;
+}
+static int l_goap_setActionRange(lua_State *L) {
+	GOAP_SetActionRange((int)luaL_checkinteger(L,1), (float)luaL_checknumber(L,2));
+	return 0;
+}
+static int l_goap_setActionActive(lua_State *L) {
+	GOAP_SetActionActive((int)luaL_checkinteger(L,1), lua_toboolean(L,2));
+	return 0;
+}
+static int l_goap_getActionName(lua_State *L) {
+	lua_pushstring(L, GOAP_GetActionName((int)luaL_checkinteger(L,1)));
+	return 1;
+}
+
+/* Goals */
+static int l_goap_registerGoal(lua_State *L) {
+	lua_pushinteger(L, GOAP_RegisterGoal(luaL_checkstring(L,1), (float)luaL_optnumber(L,2,1.0)));
+	return 1;
+}
+static int l_goap_setGoalState(lua_State *L) {
+	GOAP_SetGoalState((int)luaL_checkinteger(L,1), (int)luaL_checkinteger(L,2), (int)luaL_checkinteger(L,3));
+	return 0;
+}
+static int l_goap_setGoalActive(lua_State *L) {
+	GOAP_SetGoalActive((int)luaL_checkinteger(L,1), lua_toboolean(L,2));
+	return 0;
+}
+static int l_goap_getGoalName(lua_State *L) {
+	lua_pushstring(L, GOAP_GetGoalName((int)luaL_checkinteger(L,1)));
+	return 1;
+}
+
+/* Properties */
+static int l_goap_defineProperty(lua_State *L) {
+	lua_pushinteger(L, GOAP_DefineProperty(luaL_checkstring(L,1)));
+	return 1;
+}
+static int l_goap_findProperty(lua_State *L) {
+	lua_pushinteger(L, GOAP_FindProperty(luaL_checkstring(L,1)));
+	return 1;
+}
+static int l_goap_getPropertyName(lua_State *L) {
+	lua_pushstring(L, GOAP_GetPropertyName((int)luaL_checkinteger(L,1)));
+	return 1;
+}
+
+/* Agents */
+static int l_goap_createAgent(lua_State *L) {
+	lua_pushinteger(L, GOAP_CreateAgent());
+	return 1;
+}
+static int l_goap_destroyAgent(lua_State *L) {
+	GOAP_DestroyAgent((int)luaL_checkinteger(L,1));
+	return 0;
+}
+static int l_goap_setWorldState(lua_State *L) {
+	GOAP_SetAgentWorldState((int)luaL_checkinteger(L,1), (int)luaL_checkinteger(L,2), (int)luaL_checkinteger(L,3));
+	return 0;
+}
+static int l_goap_getWorldState(lua_State *L) {
+	lua_pushinteger(L, GOAP_GetAgentWorldState((int)luaL_checkinteger(L,1), (int)luaL_checkinteger(L,2)));
+	return 1;
+}
+static int l_goap_addAgentAction(lua_State *L) {
+	GOAP_AddAgentAction((int)luaL_checkinteger(L,1), (int)luaL_checkinteger(L,2));
+	return 0;
+}
+static int l_goap_setReplanInterval(lua_State *L) {
+	GOAP_SetAgentReplanInterval((int)luaL_checkinteger(L,1), (float)luaL_checknumber(L,2));
+	return 0;
+}
+
+/* Planning */
+static int l_goap_plan(lua_State *L) {
+	lua_pushboolean(L, GOAP_Plan((int)luaL_checkinteger(L,1), (int)luaL_checkinteger(L,2)));
+	return 1;
+}
+static int l_goap_autoPlan(lua_State *L) {
+	lua_pushboolean(L, GOAP_AutoPlan((int)luaL_checkinteger(L,1)));
+	return 1;
+}
+static int l_goap_getCurrentAction(lua_State *L) {
+	lua_pushinteger(L, GOAP_GetCurrentAction((int)luaL_checkinteger(L,1)));
+	return 1;
+}
+static int l_goap_advancePlan(lua_State *L) {
+	GOAP_AdvancePlan((int)luaL_checkinteger(L,1));
+	return 0;
+}
+static int l_goap_abortPlan(lua_State *L) {
+	GOAP_AbortPlan((int)luaL_checkinteger(L,1));
+	return 0;
+}
+static int l_goap_isPlanComplete(lua_State *L) {
+	lua_pushboolean(L, GOAP_IsPlanComplete((int)luaL_checkinteger(L,1)));
+	return 1;
+}
+
+/* Blackboard */
+static int l_goap_bbSetFloat(lua_State *L) {
+	GOAP_BBSetFloat((int)luaL_checkinteger(L,1), luaL_checkstring(L,2), (float)luaL_checknumber(L,3));
+	return 0;
+}
+static int l_goap_bbGetFloat(lua_State *L) {
+	lua_pushnumber(L, GOAP_BBGetFloat((int)luaL_checkinteger(L,1), luaL_checkstring(L,2)));
+	return 1;
+}
+static int l_goap_bbSetInt(lua_State *L) {
+	GOAP_BBSetInt((int)luaL_checkinteger(L,1), luaL_checkstring(L,2), (int)luaL_checkinteger(L,3));
+	return 0;
+}
+static int l_goap_bbGetInt(lua_State *L) {
+	lua_pushinteger(L, GOAP_BBGetInt((int)luaL_checkinteger(L,1), luaL_checkstring(L,2)));
+	return 1;
+}
+static int l_goap_bbClear(lua_State *L) {
+	GOAP_BBClear((int)luaL_checkinteger(L,1));
+	return 0;
+}
+
+/* Defaults + debug */
+static int l_goap_registerDefaults(lua_State *L) {
+	(void)L;
+	GOAP_RegisterDefaultActions();
+	GOAP_RegisterDefaultGoals();
+	return 0;
+}
+static int l_goap_debugAgent(lua_State *L) {
+	GOAP_DebugPrintAgent((int)luaL_checkinteger(L,1));
+	return 0;
+}
+static int l_goap_debugActions(lua_State *L) {
+	(void)L;
+	GOAP_DebugPrintActions();
+	return 0;
+}
+static int l_goap_debugGoals(lua_State *L) {
+	(void)L;
+	GOAP_DebugPrintGoals();
+	return 0;
+}
+static int l_goap_getActionCount(lua_State *L) {
+	lua_pushinteger(L, GOAP_GetActionCount());
+	return 1;
+}
+static int l_goap_getGoalCount(lua_State *L) {
+	lua_pushinteger(L, GOAP_GetGoalCount());
+	return 1;
+}
+static int l_goap_getAgentCount(lua_State *L) {
+	lua_pushinteger(L, GOAP_GetAgentCount());
+	return 1;
+}
+
 /* ========== Registration ========== */
 
 static void registerTable(lua_State *L, const char *name, const luaL_Reg *funcs) {
@@ -361,8 +535,58 @@ void LuaBindings_RegisterAll(void *luaState) {
 	};
 	registerTable(L, "Response", responseFuncs);
 
+	static const luaL_Reg goapFuncs[] = {
+		/* Actions */
+		{"registerAction", l_goap_registerAction},
+		{"setActionPrecondition", l_goap_setActionPrecondition},
+		{"setActionEffect", l_goap_setActionEffect},
+		{"setActionDuration", l_goap_setActionDuration},
+		{"setActionRange", l_goap_setActionRange},
+		{"setActionActive", l_goap_setActionActive},
+		{"getActionName", l_goap_getActionName},
+		/* Goals */
+		{"registerGoal", l_goap_registerGoal},
+		{"setGoalState", l_goap_setGoalState},
+		{"setGoalActive", l_goap_setGoalActive},
+		{"getGoalName", l_goap_getGoalName},
+		/* Properties */
+		{"defineProperty", l_goap_defineProperty},
+		{"findProperty", l_goap_findProperty},
+		{"getPropertyName", l_goap_getPropertyName},
+		/* Agents */
+		{"createAgent", l_goap_createAgent},
+		{"destroyAgent", l_goap_destroyAgent},
+		{"setWorldState", l_goap_setWorldState},
+		{"getWorldState", l_goap_getWorldState},
+		{"addAgentAction", l_goap_addAgentAction},
+		{"setReplanInterval", l_goap_setReplanInterval},
+		/* Planning */
+		{"plan", l_goap_plan},
+		{"autoPlan", l_goap_autoPlan},
+		{"getCurrentAction", l_goap_getCurrentAction},
+		{"advancePlan", l_goap_advancePlan},
+		{"abortPlan", l_goap_abortPlan},
+		{"isPlanComplete", l_goap_isPlanComplete},
+		/* Blackboard */
+		{"bbSetFloat", l_goap_bbSetFloat},
+		{"bbGetFloat", l_goap_bbGetFloat},
+		{"bbSetInt", l_goap_bbSetInt},
+		{"bbGetInt", l_goap_bbGetInt},
+		{"bbClear", l_goap_bbClear},
+		/* Defaults + debug */
+		{"registerDefaults", l_goap_registerDefaults},
+		{"debugAgent", l_goap_debugAgent},
+		{"debugActions", l_goap_debugActions},
+		{"debugGoals", l_goap_debugGoals},
+		{"getActionCount", l_goap_getActionCount},
+		{"getGoalCount", l_goap_getGoalCount},
+		{"getAgentCount", l_goap_getAgentCount},
+		{NULL, NULL}
+	};
+	registerTable(L, "GOAP", goapFuncs);
+
 	lua_setglobal(L, "Engine");
-	Com_Printf("Lua bindings registered: Engine.{Director,Nav,Physics,Particles,Music,Face,Horde,Dismember,Choreo,Response}\n");
+	Com_Printf("Lua bindings registered: Engine.{Director,Nav,Physics,Particles,Music,Face,Horde,Dismember,Choreo,Response,GOAP}\n");
 }
 
 #else /* !USE_LUA */
