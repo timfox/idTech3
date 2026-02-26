@@ -1066,10 +1066,10 @@ if(NOT USE_WEBM OR NOT WEBM_FOUND)
 endif()
 
 # --- Modern video codec support ---
-option(USE_FFMPEG "Enable FFmpeg video codec support (requires system libavcodec)" OFF)
-option(USE_DAV1D "Enable dav1d AV1 video codec support (requires system libdav1d)" OFF)
-option(USE_VPX "Enable libvpx VP8/VP9 video codec support (requires system libvpx)" OFF)
-option(USE_THEORA "Enable Theora video codec support (requires system libtheora)" OFF)
+option(USE_FFMPEG "Enable FFmpeg video codec support (requires system libavcodec)" ON)
+option(USE_DAV1D "Enable dav1d AV1 video codec support (requires system libdav1d)" ON)
+option(USE_VPX "Enable libvpx VP8/VP9 video codec support (requires system libvpx)" ON)
+option(USE_THEORA "Enable Theora video codec support (requires system libtheora)" ON)
 
 set(FFMPEG_FOUND FALSE)
 set(DAV1D_FOUND FALSE)
