@@ -44,9 +44,8 @@ void Sys_Init( void ) {
 	__android_log_print( ANDROID_LOG_INFO, TAG, "Sys_Init (Android stub)" );
 }
 
-char *Sys_DefaultBasePath( void ) {
-	static char path[] = "/sdcard/idtech3";
-	return path;
+const char *Sys_DefaultBasePath( void ) {
+	return "/sdcard/idtech3";
 }
 
 qboolean Sys_LowPhysicalMemory( void ) {
@@ -74,8 +73,8 @@ void Sys_Sleep( int msec ) {
 
 void Sys_UpdateWindowTitle( const char *title ) { (void)title; }
 char *Sys_GetClipboardData( void ) { return NULL; }
-void Sys_SetClipboardBitmap( const byte *data, int w, int h ) {
-	(void)data; (void)w; (void)h;
+void Sys_SetClipboardBitmap( const byte *bitmap, int length ) {
+	(void)bitmap; (void)length;
 }
 
 /* ---- Sound (stubs until OpenSL ES / AAudio) ---- */
