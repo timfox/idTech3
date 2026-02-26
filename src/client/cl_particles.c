@@ -15,8 +15,8 @@ sparks, blood, explosions, and animated sprite sequences.
 
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
-#include "../renderers/rendercommon/tr_types.h"
-#include "../renderers/rendercommon/tr_public.h"
+#include "../renderers/common/tr_types.h"
+#include "../renderers/common/tr_public.h"
 #include "cl_particles.h"
 
 extern refexport_t re;

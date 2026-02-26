@@ -14,7 +14,7 @@ else
   exit 1
 fi
 
-SHADER_DIR="$PROJECT_ROOT/src/renderers/vulkanrenderer/shaders"
+SHADER_DIR="$PROJECT_ROOT/src/renderers/vulkan/shaders"
 SPIRV_DIR="$SHADER_DIR/spirv"
 TOOLS_DIR="$SHADER_DIR/tools"
 

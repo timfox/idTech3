@@ -34,8 +34,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <sys/types.h>
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
-#include "../renderers/openglrenderer/qgl.h"
-#include "../renderers/rendercommon/tr_types.h"
+#include "../renderers/opengl/qgl.h"
+#include "../renderers/common/tr_types.h"
 #include "unix_glw.h"
 
 #include <dlfcn.h>

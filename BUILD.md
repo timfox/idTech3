@@ -13,7 +13,7 @@ Install Visual Studio Community Edition 2017 or later and compile `quake3e` proj
 
 Copy resulting exe from `src/platform/win32/msvc2017/output` directory
 
-To compile with Vulkan backend - clean solution, right click on `quake3e` project, find `Project Dependencies` and select `renderervk` instead of `renderer`
+To compile with Vulkan backend - clean solution, right click on `quake3e` project, find `Project Dependencies` and select `vulkan` instead of `renderer`
 
 ---
 
@@ -228,7 +228,7 @@ Or let the helper script do it:
 ./scripts/compile_engine.sh freetype vulkan
 ```
 
-The flag targets the renderer code under `src/renderers/rendercommon/tr_font.c`, links with your platform’s FreeType library, and defines `BUILD_FREETYPE` for the build. Make sure the FreeType headers/libraries (`libfreetype6-dev`, `freetype-devel`, etc.) are installed before you configure the project.
+The flag targets the renderer code under `src/renderers/common/tr_font.c`, links with your platform’s FreeType library, and defines `BUILD_FREETYPE` for the build. Make sure the FreeType headers/libraries (`libfreetype6-dev`, `freetype-devel`, etc.) are installed before you configure the project.
 
 ---
 

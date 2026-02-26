@@ -39,7 +39,7 @@ src/
 │   ├── effects/                   EFX reverb, acoustics
 │   └── snd_music_adaptive.c/h    Adaptive music layers
 ├── renderers/
-│   ├── vulkanrenderer/            Vulkan 1.4 renderer
+│   ├── vulkan/            Vulkan 1.4 renderer
 │   │   ├── vk.c/h                Core pipeline + dispatch
 │   │   ├── vk_vfog.c/h           Volumetric fog module
 │   │   ├── vk_fluidsim.c/h       Fluid simulation module
@@ -51,8 +51,8 @@ src/
 │   │   ├── tr_model_md5.c        MD5 loader
 │   │   ├── inspector/             ImGui inspector overlay
 │   │   └── shaders/glsl/          GLSL shaders
-│   ├── openglrenderer/            OpenGL fallback renderer
-│   └── rendercommon/              Shared (images, fonts, types)
+│   ├── opengl/            OpenGL fallback renderer
+│   └── common/              Shared (images, fonts, types)
 │       └── tr_image_exr.cpp       OpenEXR loader
 ├── platform/
 │   ├── unix/            Linux/macOS
