@@ -36,6 +36,8 @@ static void obj_file_reader(void *ctx, const char *filename, int is_mtl,
 	*len = (size_t)size;
 }
 
+extern qhandle_t R_RegisterOBJ(const char *name, model_t *mod);
+
 qhandle_t R_RegisterOBJ(const char *name, model_t *mod) {
 	tinyobj_attrib_t attrib;
 	tinyobj_shape_t *shapes = NULL;

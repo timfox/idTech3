@@ -56,7 +56,7 @@ typedef struct {
 } md5Mesh_t;
 
 static const char *MD5_ParseToken(const char **text) {
-	return COM_Parse((char **)text);
+	return COM_Parse(text);
 }
 
 static void MD5_SkipLine(const char **text) {
@@ -68,6 +68,8 @@ static void MD5_QuatComputeW(vec4_t q) {
 	float t = 1.0f - q[0]*q[0] - q[1]*q[1] - q[2]*q[2];
 	q[3] = (t < 0.0f) ? 0.0f : -sqrtf(t);
 }
+
+extern qhandle_t R_RegisterMD5(const char *name, model_t *mod);
 
 qhandle_t R_RegisterMD5(const char *name, model_t *mod) {
 	void *fileData;
