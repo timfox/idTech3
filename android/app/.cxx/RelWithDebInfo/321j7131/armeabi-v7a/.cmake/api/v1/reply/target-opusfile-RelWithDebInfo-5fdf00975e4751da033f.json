@@ -1,0 +1,290 @@
+{
+	"archive" : {},
+	"artifacts" : 
+	[
+		{
+			"path" : "libopusfile.a"
+		}
+	],
+	"backtrace" : 1,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"add_library",
+			"target_link_libraries",
+			"add_compile_options",
+			"target_compile_options",
+			"target_compile_definitions",
+			"add_compile_definitions",
+			"target_include_directories"
+		],
+		"files" : 
+		[
+			"CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 519,
+				"parent" : 0
+			},
+			{
+				"command" : 1,
+				"file" : 0,
+				"line" : 542,
+				"parent" : 0
+			},
+			{
+				"command" : 1,
+				"file" : 0,
+				"line" : 545,
+				"parent" : 0
+			},
+			{
+				"command" : 2,
+				"file" : 0,
+				"line" : 44,
+				"parent" : 0
+			},
+			{
+				"command" : 3,
+				"file" : 0,
+				"line" : 533,
+				"parent" : 0
+			},
+			{
+				"command" : 4,
+				"file" : 0,
+				"line" : 525,
+				"parent" : 0
+			},
+			{
+				"command" : 5,
+				"file" : 0,
+				"line" : 724,
+				"parent" : 0
+			},
+			{
+				"command" : 5,
+				"file" : 0,
+				"line" : 745,
+				"parent" : 0
+			},
+			{
+				"command" : 5,
+				"file" : 0,
+				"line" : 750,
+				"parent" : 0
+			},
+			{
+				"command" : 6,
+				"file" : 0,
+				"line" : 526,
+				"parent" : 0
+			}
+		]
+	},
+	"compileGroups" : 
+	[
+		{
+			"compileCommandFragments" : 
+			[
+				{
+					"fragment" : "-g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -march=armv7-a -mthumb -Wformat -Werror=format-security  -O2 -g -DNDEBUG -std=c23 -fPIC"
+				},
+				{
+					"backtrace" : 4,
+					"fragment" : "-Wall"
+				},
+				{
+					"backtrace" : 4,
+					"fragment" : "-Wextra"
+				},
+				{
+					"backtrace" : 4,
+					"fragment" : "-Wpedantic"
+				},
+				{
+					"backtrace" : 4,
+					"fragment" : "-Wshadow"
+				},
+				{
+					"backtrace" : 4,
+					"fragment" : "-Wstrict-prototypes"
+				},
+				{
+					"backtrace" : 4,
+					"fragment" : "-Wmissing-prototypes"
+				},
+				{
+					"backtrace" : 4,
+					"fragment" : "-Wold-style-definition"
+				},
+				{
+					"backtrace" : 4,
+					"fragment" : "-Wformat=2"
+				},
+				{
+					"backtrace" : 4,
+					"fragment" : "-Wundef"
+				},
+				{
+					"backtrace" : 4,
+					"fragment" : "-Wcast-qual"
+				},
+				{
+					"backtrace" : 4,
+					"fragment" : "-Wpointer-arith"
+				},
+				{
+					"backtrace" : 4,
+					"fragment" : "-Wvla"
+				},
+				{
+					"backtrace" : 5,
+					"fragment" : "-Wno-undef"
+				},
+				{
+					"backtrace" : 5,
+					"fragment" : "-Wno-cast-qual"
+				}
+			],
+			"defines" : 
+			[
+				{
+					"backtrace" : 6,
+					"define" : "INCLUDE_INTTYPES_H=1"
+				},
+				{
+					"backtrace" : 6,
+					"define" : "INCLUDE_SYS_TYPES_H=1"
+				},
+				{
+					"backtrace" : 6,
+					"define" : "OP_DISABLE_HTTP"
+				},
+				{
+					"backtrace" : 7,
+					"define" : "RENDERER_DEFAULT=\"vulkan\""
+				},
+				{
+					"backtrace" : 7,
+					"define" : "RENDERER_PREFIX=\"idtech3\""
+				},
+				{
+					"backtrace" : 8,
+					"define" : "USE_RENDERER_DLOPEN=0"
+				},
+				{
+					"backtrace" : 9,
+					"define" : "USE_SDL=0"
+				}
+			],
+			"includes" : 
+			[
+				{
+					"backtrace" : 10,
+					"path" : "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opusfile/include"
+				},
+				{
+					"backtrace" : 10,
+					"path" : "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opusfile"
+				},
+				{
+					"backtrace" : 10,
+					"path" : "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/ogg/include"
+				},
+				{
+					"backtrace" : 10,
+					"path" : "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opus/include"
+				}
+			],
+			"language" : "C",
+			"languageStandard" : 
+			{
+				"backtraces" : 
+				[
+					1
+				],
+				"standard" : "23"
+			},
+			"sourceIndexes" : 
+			[
+				0,
+				1,
+				2,
+				3
+			],
+			"sysroot" : 
+			{
+				"path" : "/home/tim/android-sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
+			}
+		}
+	],
+	"dependencies" : 
+	[
+		{
+			"backtrace" : 2,
+			"id" : "ogg::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 3,
+			"id" : "opus::@a438e9e1ee33e660ede3"
+		}
+	],
+	"id" : "opusfile::@6890427a1f51a3e7e1df",
+	"name" : "opusfile",
+	"nameOnDisk" : "libopusfile.a",
+	"paths" : 
+	{
+		"build" : ".",
+		"source" : "."
+	},
+	"sourceGroups" : 
+	[
+		{
+			"name" : "Source Files",
+			"sourceIndexes" : 
+			[
+				0,
+				1,
+				2,
+				3
+			]
+		}
+	],
+	"sources" : 
+	[
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/external/src/opusfile/src/info.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/external/src/opusfile/src/internal.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/external/src/opusfile/src/opusfile.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/external/src/opusfile/src/stream.c",
+			"sourceGroupIndex" : 0
+		}
+	],
+	"type" : "STATIC_LIBRARY"
+}

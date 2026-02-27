@@ -1,0 +1,41 @@
+                        -H/home/tim/Desktop/next-gen-4/idtech3
+-DCMAKE_SYSTEM_NAME=Android
+-DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+-DCMAKE_SYSTEM_VERSION=26
+-DANDROID_PLATFORM=android-26
+-DANDROID_ABI=armeabi-v7a
+-DCMAKE_ANDROID_ARCH_ABI=armeabi-v7a
+-DANDROID_NDK=/home/tim/android-sdk/ndk/27.0.12077973
+-DCMAKE_ANDROID_NDK=/home/tim/android-sdk/ndk/27.0.12077973
+-DCMAKE_TOOLCHAIN_FILE=/home/tim/android-sdk/ndk/27.0.12077973/build/cmake/android.toolchain.cmake
+-DCMAKE_MAKE_PROGRAM=/home/tim/android-sdk/cmake/3.31.6/bin/ninja
+-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=/home/tim/Desktop/next-gen-4/idtech3/android/app/build/intermediates/cxx/Debug/446d6s5u/obj/armeabi-v7a
+-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=/home/tim/Desktop/next-gen-4/idtech3/android/app/build/intermediates/cxx/Debug/446d6s5u/obj/armeabi-v7a
+-DCMAKE_BUILD_TYPE=Debug
+-B/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/Debug/446d6s5u/armeabi-v7a
+-GNinja
+-DBUILD_SERVER=OFF
+-DUSE_VULKAN=ON
+-DUSE_RENDERER_DLOPEN=OFF
+-DRENDERER_DEFAULT=vulkan
+-DSKIP_IDPAK_CHECK=ON
+-DSKIP_SHADER_REGEN=ON
+-DUSE_SDL=OFF
+-DUSE_OPENAL=OFF
+-DUSE_CURL=OFF
+-DUSE_LUA=OFF
+-DUSE_DUKTAPE=OFF
+-DUSE_FFMPEG=OFF
+-DUSE_DAV1D=OFF
+-DUSE_VPX=OFF
+-DUSE_THEORA=OFF
+-DUSE_FLUX=OFF
+-DUSE_RECAST_NAV=OFF
+-DUSE_BULLET_PHYSICS=OFF
+-DBUILD_FREETYPE=OFF
+-DUSE_STB_TRUETYPE=ON
+-DENABLE_FORTIFY_SOURCE=OFF
+-DENABLE_ASAN=OFF
+-DCI_BUILD=OFF
+                        Build command args: []
+                        Version: 2

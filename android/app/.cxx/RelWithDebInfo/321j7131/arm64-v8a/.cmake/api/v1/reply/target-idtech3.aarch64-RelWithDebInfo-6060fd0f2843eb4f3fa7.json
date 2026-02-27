@@ -1,0 +1,2067 @@
+{
+	"artifacts" : 
+	[
+		{
+			"path" : "/home/tim/Desktop/next-gen-4/idtech3/android/app/build/intermediates/cxx/RelWithDebInfo/321j7131/obj/arm64-v8a/libidtech3.aarch64.so"
+		}
+	],
+	"backtrace" : 1,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"ADD_LIBRARY",
+			"target_link_options",
+			"TARGET_LINK_LIBRARIES",
+			"target_link_libraries",
+			"add_compile_options",
+			"add_compile_definitions"
+		],
+		"files" : 
+		[
+			"CMakeLists.txt",
+			"src/external/src/libpng/CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 1729,
+				"parent" : 0
+			},
+			{
+				"command" : 1,
+				"file" : 0,
+				"line" : 1759,
+				"parent" : 0
+			},
+			{
+				"command" : 2,
+				"file" : 0,
+				"line" : 1805,
+				"parent" : 0
+			},
+			{
+				"command" : 3,
+				"file" : 0,
+				"line" : 1590,
+				"parent" : 0
+			},
+			{
+				"command" : 3,
+				"file" : 0,
+				"line" : 1600,
+				"parent" : 0
+			},
+			{
+				"command" : 3,
+				"file" : 0,
+				"line" : 1610,
+				"parent" : 0
+			},
+			{
+				"command" : 3,
+				"file" : 0,
+				"line" : 1363,
+				"parent" : 0
+			},
+			{
+				"command" : 3,
+				"file" : 0,
+				"line" : 1404,
+				"parent" : 0
+			},
+			{
+				"file" : 1
+			},
+			{
+				"command" : 3,
+				"file" : 1,
+				"line" : 733,
+				"parent" : 9
+			},
+			{
+				"command" : 2,
+				"file" : 0,
+				"line" : 1736,
+				"parent" : 0
+			},
+			{
+				"command" : 2,
+				"file" : 0,
+				"line" : 1764,
+				"parent" : 0
+			},
+			{
+				"command" : 4,
+				"file" : 0,
+				"line" : 44,
+				"parent" : 0
+			},
+			{
+				"command" : 5,
+				"file" : 0,
+				"line" : 724,
+				"parent" : 0
+			},
+			{
+				"command" : 5,
+				"file" : 0,
+				"line" : 745,
+				"parent" : 0
+			},
+			{
+				"command" : 5,
+				"file" : 0,
+				"line" : 750,
+				"parent" : 0
+			}
+		]
+	},
+	"compileGroups" : 
+	[
+		{
+			"compileCommandFragments" : 
+			[
+				{
+					"fragment" : "-g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -O2 -g -DNDEBUG -std=c23 -fPIC"
+				},
+				{
+					"backtrace" : 13,
+					"fragment" : "-Wall"
+				},
+				{
+					"backtrace" : 13,
+					"fragment" : "-Wextra"
+				},
+				{
+					"backtrace" : 13,
+					"fragment" : "-Wpedantic"
+				},
+				{
+					"backtrace" : 13,
+					"fragment" : "-Wshadow"
+				},
+				{
+					"backtrace" : 13,
+					"fragment" : "-Wstrict-prototypes"
+				},
+				{
+					"backtrace" : 13,
+					"fragment" : "-Wmissing-prototypes"
+				},
+				{
+					"backtrace" : 13,
+					"fragment" : "-Wold-style-definition"
+				},
+				{
+					"backtrace" : 13,
+					"fragment" : "-Wformat=2"
+				},
+				{
+					"backtrace" : 13,
+					"fragment" : "-Wundef"
+				},
+				{
+					"backtrace" : 13,
+					"fragment" : "-Wcast-qual"
+				},
+				{
+					"backtrace" : 13,
+					"fragment" : "-Wpointer-arith"
+				},
+				{
+					"backtrace" : 13,
+					"fragment" : "-Wvla"
+				}
+			],
+			"defines" : 
+			[
+				{
+					"backtrace" : 14,
+					"define" : "RENDERER_DEFAULT=\"vulkan\""
+				},
+				{
+					"backtrace" : 14,
+					"define" : "RENDERER_PREFIX=\"idtech3\""
+				},
+				{
+					"backtrace" : 15,
+					"define" : "USE_RENDERER_DLOPEN=0"
+				},
+				{
+					"backtrace" : 16,
+					"define" : "USE_SDL=0"
+				},
+				{
+					"define" : "idtech3_aarch64_EXPORTS"
+				}
+			],
+			"language" : "C",
+			"languageStandard" : 
+			{
+				"backtraces" : 
+				[
+					1
+				],
+				"standard" : "23"
+			},
+			"sourceIndexes" : 
+			[
+				0,
+				1,
+				2
+			],
+			"sysroot" : 
+			{
+				"path" : "/home/tim/android-sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
+			}
+		}
+	],
+	"dependencies" : 
+	[
+		{
+			"backtrace" : 11,
+			"id" : "ogg::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 11,
+			"id" : "opusfile::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 11,
+			"id" : "nestegg::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 11,
+			"id" : "botlib::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 11,
+			"id" : "qcommon::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 11,
+			"id" : "client::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 12,
+			"id" : "idtech3_vulkan::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 12,
+			"id" : "exr_loader::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 11,
+			"id" : "phys_module::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 11,
+			"id" : "opus::@a438e9e1ee33e660ede3"
+		},
+		{
+			"backtrace" : 11,
+			"id" : "FLAC::@5d1cc5397f98eaa8e4b9"
+		},
+		{
+			"backtrace" : 12,
+			"id" : "zlibstatic::@62f0f490a982c87fefdf"
+		},
+		{
+			"backtrace" : 12,
+			"id" : "png_static::@031acffb9bb0241b3cdb"
+		}
+	],
+	"id" : "idtech3.aarch64::@6890427a1f51a3e7e1df",
+	"link" : 
+	{
+		"commandFragments" : 
+		[
+			{
+				"fragment" : "-static-libstdc++ -Wl,--build-id=sha1 -Wl,--no-rosegment -Wl,--no-undefined-version -Wl,--fatal-warnings -Wl,--no-undefined -Qunused-arguments  -Wl,--gc-sections",
+				"role" : "flags"
+			},
+			{
+				"backtrace" : 2,
+				"fragment" : "-Wl,--export-dynamic",
+				"role" : "flags"
+			},
+			{
+				"backtrace" : 3,
+				"fragment" : "-lm",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 3,
+				"fragment" : "-ldl",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 3,
+				"fragment" : "-llog",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 3,
+				"fragment" : "-landroid",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 3,
+				"fragment" : "-lOpenSLES",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "libopusfile.a",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "external/opus/libopus.a",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "libogg.a",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 5,
+				"fragment" : "external/flac/src/libFLAC/libFLAC.a",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 6,
+				"fragment" : "libnestegg.a",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 7,
+				"fragment" : "external/libpng/libpng16.a",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 3,
+				"fragment" : "-lm",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 8,
+				"fragment" : "libexr_loader.a",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 10,
+				"fragment" : "external/zlib/libz.a",
+				"role" : "libraries"
+			},
+			{
+				"fragment" : "-latomic -lm",
+				"role" : "libraries"
+			}
+		],
+		"language" : "CXX",
+		"sysroot" : 
+		{
+			"path" : "/home/tim/android-sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
+		}
+	},
+	"name" : "idtech3.aarch64",
+	"nameOnDisk" : "libidtech3.aarch64.so",
+	"paths" : 
+	{
+		"build" : ".",
+		"source" : "."
+	},
+	"sourceGroups" : 
+	[
+		{
+			"name" : "Source Files",
+			"sourceIndexes" : 
+			[
+				0,
+				1,
+				2
+			]
+		},
+		{
+			"name" : "Object Libraries",
+			"sourceIndexes" : 
+			[
+				3,
+				4,
+				5,
+				6,
+				7,
+				8,
+				9,
+				10,
+				11,
+				12,
+				13,
+				14,
+				15,
+				16,
+				17,
+				18,
+				19,
+				20,
+				21,
+				22,
+				23,
+				24,
+				25,
+				26,
+				27,
+				28,
+				29,
+				30,
+				31,
+				32,
+				33,
+				34,
+				35,
+				36,
+				37,
+				38,
+				39,
+				40,
+				41,
+				42,
+				43,
+				44,
+				45,
+				46,
+				47,
+				48,
+				49,
+				50,
+				51,
+				52,
+				53,
+				54,
+				55,
+				56,
+				57,
+				58,
+				59,
+				60,
+				61,
+				62,
+				63,
+				64,
+				65,
+				66,
+				67,
+				68,
+				69,
+				70,
+				71,
+				72,
+				73,
+				74,
+				75,
+				76,
+				77,
+				78,
+				79,
+				80,
+				81,
+				82,
+				83,
+				84,
+				85,
+				86,
+				87,
+				88,
+				89,
+				90,
+				91,
+				92,
+				93,
+				94,
+				95,
+				96,
+				97,
+				98,
+				99,
+				100,
+				101,
+				102,
+				103,
+				104,
+				105,
+				106,
+				107,
+				108,
+				109,
+				110,
+				111,
+				112,
+				113,
+				114,
+				115,
+				116,
+				117,
+				118,
+				119,
+				120,
+				121,
+				122,
+				123,
+				124,
+				125,
+				126,
+				127,
+				128,
+				129,
+				130,
+				131,
+				132,
+				133,
+				134,
+				135,
+				136,
+				137,
+				138,
+				139,
+				140,
+				141,
+				142,
+				143,
+				144,
+				145,
+				146,
+				147,
+				148,
+				149,
+				150,
+				151,
+				152,
+				153,
+				154,
+				155,
+				156,
+				157,
+				158,
+				159,
+				160,
+				161,
+				162,
+				163,
+				164,
+				165,
+				166,
+				167,
+				168,
+				169,
+				170,
+				171,
+				172,
+				173,
+				174,
+				175,
+				176,
+				177,
+				178,
+				179,
+				180,
+				181,
+				182,
+				183,
+				184,
+				185,
+				186,
+				187,
+				188,
+				189,
+				190,
+				191,
+				192,
+				193,
+				194,
+				195,
+				196,
+				197,
+				198,
+				199,
+				200,
+				201,
+				202,
+				203,
+				204,
+				205,
+				206,
+				207,
+				208,
+				209,
+				210,
+				211,
+				212,
+				213,
+				214,
+				215,
+				216,
+				217,
+				218,
+				219,
+				220,
+				221,
+				222,
+				223,
+				224,
+				225,
+				226,
+				227,
+				228,
+				229,
+				230,
+				231,
+				232,
+				233,
+				234,
+				235,
+				236,
+				237
+			]
+		}
+	],
+	"sources" : 
+	[
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/platform/unix/unix_shared.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/platform/android/android_stubs.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/platform/android/android_main.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/qcommon/cm_load.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/qcommon/cm_patch.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/qcommon/cm_polylib.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/qcommon/cm_test.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/qcommon/cm_trace.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/qcommon/cmd.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/qcommon/common.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/qcommon/cvar.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/qcommon/files.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/qcommon/history.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/qcommon/huffman.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/qcommon/huffman_static.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/qcommon/jobs.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/qcommon/js_debug.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/qcommon/keys.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/qcommon/lua_debug.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/qcommon/md4.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/qcommon/md5.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/qcommon/msg.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/qcommon/net_chan.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/qcommon/net_ip.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/qcommon/puff.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/qcommon/q_math.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/qcommon/q_shared.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/qcommon/q_utf8.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/qcommon/unzip.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/qcommon/vm.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/qcommon/vm_interpreted.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/qcommon/vm_aarch64.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/server/sv_bot.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/server/sv_ccmds.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/server/sv_client.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/server/sv_enhanced.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/server/sv_filter.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/server/sv_game.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/server/sv_init.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/server/sv_main.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/server/sv_net_chan.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/server/sv_snapshot.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/qcommon.dir/src/server/sv_world.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/botlib.dir/src/botlib/be_aas_bspq3.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/botlib.dir/src/botlib/be_aas_cluster.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/botlib.dir/src/botlib/be_aas_debug.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/botlib.dir/src/botlib/be_aas_entity.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/botlib.dir/src/botlib/be_aas_file.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/botlib.dir/src/botlib/be_aas_main.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/botlib.dir/src/botlib/be_aas_move.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/botlib.dir/src/botlib/be_aas_optimize.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/botlib.dir/src/botlib/be_aas_reach.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/botlib.dir/src/botlib/be_aas_route.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/botlib.dir/src/botlib/be_aas_routealt.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/botlib.dir/src/botlib/be_aas_sample.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/botlib.dir/src/botlib/be_ai_char.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/botlib.dir/src/botlib/be_ai_chat.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/botlib.dir/src/botlib/be_ai_gen.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/botlib.dir/src/botlib/be_ai_goal.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/botlib.dir/src/botlib/be_ai_move.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/botlib.dir/src/botlib/be_ai_weap.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/botlib.dir/src/botlib/be_ai_weight.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/botlib.dir/src/botlib/be_ea.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/botlib.dir/src/botlib/be_interface.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/botlib.dir/src/botlib/l_crc.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/botlib.dir/src/botlib/l_libvar.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/botlib.dir/src/botlib/l_log.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/botlib.dir/src/botlib/l_memory.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/botlib.dir/src/botlib/l_precomp.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/botlib.dir/src/botlib/l_script.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/botlib.dir/src/botlib/l_struct.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/client/cl_avi.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/client/cl_cgame.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/client/cl_cin.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/client/cl_cin_modern.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/client/cl_console.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/client/cl_emoji.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/client/cl_gameframe.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/client/cl_input.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/client/cl_jpeg.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/client/cl_keys.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/client/cl_main.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/client/cl_map_background.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/client/cl_mumble.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/client/cl_net_chan.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/client/cl_osp.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/client/cl_parse.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/client/cl_particles.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/client/cl_scrn.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/client/cl_steam.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/client/cl_superhud.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/client/cl_ui.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/client/cl_voip.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/client/cl_websocket.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/client/cl_window_title.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/snd_main.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/mix/snd_dma.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/mix/snd_mem.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/mix/snd_mix.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/mix/snd_mix_fallback.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/mix/snd_wavelet.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/mix/snd_adpcm.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/codecs/snd_codec.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/codecs/snd_codec_mp3.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/codecs/snd_codec_ogg.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/codecs/snd_codec_wav.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/codecs/snd_codec_opus.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/codecs/snd_codec_flac.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/codecs/snd_codec_webm.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/backends/snd_backend_null.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/snd_music_adaptive.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/game/g_director.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/game/g_response.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/game/g_choreography.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/game/g_dismember.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/game/g_facial.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/game/g_horde.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/game/g_goap.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/game/g_aiml.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/game/g_entity_bridge.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/game/g_lua_bindings.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/mp3/cdct.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/mp3/csbt.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/mp3/csbtb.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/mp3/csbtl3.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/mp3/cup.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/mp3/cupini.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/mp3/cupl1.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/mp3/cupl3.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/mp3/cwin.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/mp3/cwinb.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/mp3/cwinm.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/mp3/hwin.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/mp3/l3dq.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/mp3/l3init.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/mp3/mdct.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/mp3/mhead.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/mp3/msis.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/mp3/towave.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/mp3/uph.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/mp3/upsf.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/audio/mp3/wavep.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jaricom.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jcapimin.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jcapistd.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jcarith.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jccoefct.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jccolor.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jcdctmgr.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jchuff.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jcinit.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jcmainct.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jcmarker.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jcmaster.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jcomapi.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jcparam.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jcprepct.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jcsample.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jctrans.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jdapimin.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jdapistd.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jdarith.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jdatadst.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jdatasrc.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jdcoefct.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jdcolor.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jddctmgr.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jdhuff.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jdinput.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jdmainct.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jdmarker.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jdmaster.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jdmerge.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jdpostct.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jdsample.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jdtrans.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jerror.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jfdctflt.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jfdctfst.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jfdctint.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jidctflt.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jidctfst.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jidctint.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jmemmgr.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jmemnobs.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jquant1.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jquant2.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/client.dir/src/external/src/jpeg/jutils.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/phys_module.dir/src/physics/phys_bullet.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/phys_module.dir/src/physics/phys_procedural_anim.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/phys_module.dir/src/physics/phys_dmm.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/phys_module.dir/src/physics/phys_ik.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/phys_module.dir/src/physics/phys_dmm_materials.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 11,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/phys_module.dir/src/physics/phys_cloth.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/tr_animation.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/tr_backend.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/tr_bsp.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/tr_cmds.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/tr_curve.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/tr_image.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/tr_init.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/tr_light.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/tr_main.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/tr_marks.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/tr_mesh.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/tr_model.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/tr_model_gltf.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/tr_model_iqm.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/tr_model_md5.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/tr_model_obj.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/tr_scene.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/tr_shade.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/tr_shade_calc.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/tr_shader.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/tr_shadows.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/tr_sky.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/tr_surface.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/tr_world.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/vk.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/vk_flares.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/vk_flashlight.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/vk_fluidsim.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/vk_mikktspace.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/vk_postfx.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/vk_skybox_hdr.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/vk_vbo.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/vk_vfog.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/vulkan/utils/mikktspace/mikktspace.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/common/tr_font_stub.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/common/tr_image_bmp.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/common/tr_image_jpg.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/common/tr_image_pcx.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/common/tr_image_png.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/common/tr_image_tga.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/common/tr_image_hdr.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/common/tr_image_qoi.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/common/tr_image_dds.c.o",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 12,
+			"isGenerated" : true,
+			"path" : "android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a/CMakeFiles/idtech3_vulkan.dir/src/renderers/common/tr_noise.c.o",
+			"sourceGroupIndex" : 1
+		}
+	],
+	"type" : "SHARED_LIBRARY"
+}

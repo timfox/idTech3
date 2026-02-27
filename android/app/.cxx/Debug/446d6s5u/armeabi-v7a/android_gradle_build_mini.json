@@ -1,0 +1,193 @@
+{
+  "buildFiles": [
+    "/home/tim/Desktop/next-gen-4/idtech3/CMakeLists.txt",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/CMakeLists.txt",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/cmake/CheckA64NEON.cmake",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/cmake/CheckCPUArch.cmake",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/cmake/UseSystemExtensions.cmake",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/microbench/CMakeLists.txt",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/src/CMakeLists.txt",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/src/libFLAC/CMakeLists.txt",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/src/share/getopt/CMakeLists.txt",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/src/share/grabbag/CMakeLists.txt",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/src/share/replaygain_analysis/CMakeLists.txt",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/src/share/replaygain_synthesis/CMakeLists.txt",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/src/share/utf8/CMakeLists.txt",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/libpng/CMakeLists.txt",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/libpng/scripts/cmake/genchk.cmake.in",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/libpng/scripts/cmake/genout.cmake.in",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/libpng/scripts/cmake/gensrc.cmake.in",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opus/CMakeLists.txt",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opus/cmake/CFeatureCheck.cmake",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opus/cmake/OpusBuildtype.cmake",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opus/cmake/OpusConfig.cmake",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opus/cmake/OpusConfig.cmake.in",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opus/cmake/OpusFunctions.cmake",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opus/cmake/OpusPackageVersion.cmake",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opus/cmake/OpusSources.cmake",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opus/cmake/config.h.cmake.in",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/zlib/CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "/home/tim/android-sdk/cmake/3.31.6/bin/ninja",
+      "-C",
+      "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/Debug/446d6s5u/armeabi-v7a",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "/home/tim/android-sdk/cmake/3.31.6/bin/ninja",
+    "-C",
+    "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/Debug/446d6s5u/armeabi-v7a",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "opusfile::@6890427a1f51a3e7e1df": {
+      "artifactName": "opusfile",
+      "abi": "armeabi-v7a",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/Debug/446d6s5u/armeabi-v7a/libopusfile.a",
+      "runtimeFiles": []
+    },
+    "benchmark_residual::@65af17abb5d4fdedf724": {
+      "artifactName": "benchmark_residual",
+      "abi": "armeabi-v7a",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/build/intermediates/cxx/Debug/446d6s5u/obj/armeabi-v7a/benchmark_residual",
+      "runtimeFiles": []
+    },
+    "botlib::@6890427a1f51a3e7e1df": {
+      "artifactName": "botlib",
+      "abi": "armeabi-v7a",
+      "runtimeFiles": []
+    },
+    "utf8::@cbb4242b2a2beb34e4a0": {
+      "artifactName": "utf8",
+      "abi": "armeabi-v7a",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/Debug/446d6s5u/armeabi-v7a/external/flac/src/share/utf8/libutf8.a",
+      "runtimeFiles": []
+    },
+    "vk_shaders_autogen::@6890427a1f51a3e7e1df": {
+      "artifactName": "vk_shaders_autogen",
+      "abi": "armeabi-v7a",
+      "runtimeFiles": []
+    },
+    "nestegg::@6890427a1f51a3e7e1df": {
+      "artifactName": "nestegg",
+      "abi": "armeabi-v7a",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/Debug/446d6s5u/armeabi-v7a/libnestegg.a",
+      "runtimeFiles": []
+    },
+    "png_static::@031acffb9bb0241b3cdb": {
+      "artifactName": "png_static",
+      "abi": "armeabi-v7a",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/Debug/446d6s5u/armeabi-v7a/external/libpng/libpng16d.a",
+      "runtimeFiles": []
+    },
+    "opus::@a438e9e1ee33e660ede3": {
+      "artifactName": "opus",
+      "abi": "armeabi-v7a",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/Debug/446d6s5u/armeabi-v7a/external/opus/libopus.a",
+      "runtimeFiles": []
+    },
+    "replaygain_synthesis::@d9922ac0da7460f4cef0": {
+      "artifactName": "replaygain_synthesis",
+      "abi": "armeabi-v7a",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/Debug/446d6s5u/armeabi-v7a/external/flac/src/share/replaygain_synthesis/libreplaygain_synthesis.a",
+      "runtimeFiles": []
+    },
+    "vk_shader_check::@6890427a1f51a3e7e1df": {
+      "artifactName": "vk_shader_check",
+      "abi": "armeabi-v7a",
+      "runtimeFiles": []
+    },
+    "zlib::@62f0f490a982c87fefdf": {
+      "artifactName": "zlib",
+      "abi": "armeabi-v7a",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/build/intermediates/cxx/Debug/446d6s5u/obj/armeabi-v7a/libz.so",
+      "runtimeFiles": []
+    },
+    "qcommon_ded::@6890427a1f51a3e7e1df": {
+      "artifactName": "qcommon_ded",
+      "abi": "armeabi-v7a",
+      "runtimeFiles": []
+    },
+    "phys_module::@6890427a1f51a3e7e1df": {
+      "artifactName": "phys_module",
+      "abi": "armeabi-v7a",
+      "runtimeFiles": []
+    },
+    "FLAC::@5d1cc5397f98eaa8e4b9": {
+      "artifactName": "FLAC",
+      "abi": "armeabi-v7a",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/Debug/446d6s5u/armeabi-v7a/external/flac/src/libFLAC/libFLAC.a",
+      "runtimeFiles": []
+    },
+    "grabbag::@e15e1a78b21afb13d4ba": {
+      "artifactName": "grabbag",
+      "abi": "armeabi-v7a",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/Debug/446d6s5u/armeabi-v7a/external/flac/src/share/grabbag/libgrabbag.a",
+      "runtimeFiles": []
+    },
+    "qcommon::@6890427a1f51a3e7e1df": {
+      "artifactName": "qcommon",
+      "abi": "armeabi-v7a",
+      "runtimeFiles": []
+    },
+    "idtech3_vulkan::@6890427a1f51a3e7e1df": {
+      "artifactName": "idtech3_vulkan",
+      "abi": "armeabi-v7a",
+      "runtimeFiles": []
+    },
+    "png_genfiles::@031acffb9bb0241b3cdb": {
+      "artifactName": "png_genfiles",
+      "abi": "armeabi-v7a",
+      "runtimeFiles": []
+    },
+    "zlibstatic::@62f0f490a982c87fefdf": {
+      "artifactName": "zlibstatic",
+      "abi": "armeabi-v7a",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/Debug/446d6s5u/armeabi-v7a/external/zlib/libz.a",
+      "runtimeFiles": []
+    },
+    "exr_loader::@6890427a1f51a3e7e1df": {
+      "artifactName": "exr_loader",
+      "abi": "armeabi-v7a",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/Debug/446d6s5u/armeabi-v7a/libexr_loader.a",
+      "runtimeFiles": []
+    },
+    "getopt::@7706c207f69f22e13a1d": {
+      "artifactName": "getopt",
+      "abi": "armeabi-v7a",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/Debug/446d6s5u/armeabi-v7a/external/flac/src/share/getopt/libgetopt.a",
+      "runtimeFiles": []
+    },
+    "ogg::@6890427a1f51a3e7e1df": {
+      "artifactName": "ogg",
+      "abi": "armeabi-v7a",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/Debug/446d6s5u/armeabi-v7a/libogg.a",
+      "runtimeFiles": []
+    },
+    "vk_shader_regen::@6890427a1f51a3e7e1df": {
+      "artifactName": "vk_shader_regen",
+      "abi": "armeabi-v7a",
+      "runtimeFiles": []
+    },
+    "client::@6890427a1f51a3e7e1df": {
+      "artifactName": "client",
+      "abi": "armeabi-v7a",
+      "runtimeFiles": []
+    },
+    "idtech3.arm::@6890427a1f51a3e7e1df": {
+      "artifactName": "idtech3.arm",
+      "abi": "armeabi-v7a",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/build/intermediates/cxx/Debug/446d6s5u/obj/armeabi-v7a/libidtech3.arm.so",
+      "runtimeFiles": []
+    },
+    "replaygain_analysis::@7490de00e969281bbab7": {
+      "artifactName": "replaygain_analysis",
+      "abi": "armeabi-v7a",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/Debug/446d6s5u/armeabi-v7a/external/flac/src/share/replaygain_analysis/libreplaygain_analysis.a",
+      "runtimeFiles": []
+    }
+  }
+}

@@ -1,0 +1,71 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"install"
+		],
+		"files" : 
+		[
+			"src/external/src/flac/CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 268,
+				"parent" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 269,
+				"parent" : 0
+			}
+		]
+	},
+	"installers" : 
+	[
+		{
+			"backtrace" : 1,
+			"component" : "Unspecified",
+			"destination" : "include/FLAC",
+			"paths" : 
+			[
+				"src/external/src/flac/include/FLAC/all.h",
+				"src/external/src/flac/include/FLAC/assert.h",
+				"src/external/src/flac/include/FLAC/callback.h",
+				"src/external/src/flac/include/FLAC/export.h",
+				"src/external/src/flac/include/FLAC/format.h",
+				"src/external/src/flac/include/FLAC/metadata.h",
+				"src/external/src/flac/include/FLAC/ordinals.h",
+				"src/external/src/flac/include/FLAC/stream_decoder.h",
+				"src/external/src/flac/include/FLAC/stream_encoder.h"
+			],
+			"type" : "file"
+		},
+		{
+			"backtrace" : 2,
+			"component" : "Unspecified",
+			"destination" : "include/FLAC++",
+			"paths" : 
+			[
+				"src/external/src/flac/include/FLAC++/all.h",
+				"src/external/src/flac/include/FLAC++/decoder.h",
+				"src/external/src/flac/include/FLAC++/encoder.h",
+				"src/external/src/flac/include/FLAC++/export.h",
+				"src/external/src/flac/include/FLAC++/metadata.h"
+			],
+			"type" : "file"
+		}
+	],
+	"paths" : 
+	{
+		"build" : "external/flac",
+		"source" : "src/external/src/flac"
+	}
+}

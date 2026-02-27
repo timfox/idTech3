@@ -1,0 +1,502 @@
+{
+	"artifacts" : 
+	[
+		{
+			"path" : "CMakeFiles/botlib.dir/./src/botlib/be_aas_bspq3.c.o"
+		},
+		{
+			"path" : "CMakeFiles/botlib.dir/./src/botlib/be_aas_cluster.c.o"
+		},
+		{
+			"path" : "CMakeFiles/botlib.dir/./src/botlib/be_aas_debug.c.o"
+		},
+		{
+			"path" : "CMakeFiles/botlib.dir/./src/botlib/be_aas_entity.c.o"
+		},
+		{
+			"path" : "CMakeFiles/botlib.dir/./src/botlib/be_aas_file.c.o"
+		},
+		{
+			"path" : "CMakeFiles/botlib.dir/./src/botlib/be_aas_main.c.o"
+		},
+		{
+			"path" : "CMakeFiles/botlib.dir/./src/botlib/be_aas_move.c.o"
+		},
+		{
+			"path" : "CMakeFiles/botlib.dir/./src/botlib/be_aas_optimize.c.o"
+		},
+		{
+			"path" : "CMakeFiles/botlib.dir/./src/botlib/be_aas_reach.c.o"
+		},
+		{
+			"path" : "CMakeFiles/botlib.dir/./src/botlib/be_aas_route.c.o"
+		},
+		{
+			"path" : "CMakeFiles/botlib.dir/./src/botlib/be_aas_routealt.c.o"
+		},
+		{
+			"path" : "CMakeFiles/botlib.dir/./src/botlib/be_aas_sample.c.o"
+		},
+		{
+			"path" : "CMakeFiles/botlib.dir/./src/botlib/be_ai_char.c.o"
+		},
+		{
+			"path" : "CMakeFiles/botlib.dir/./src/botlib/be_ai_chat.c.o"
+		},
+		{
+			"path" : "CMakeFiles/botlib.dir/./src/botlib/be_ai_gen.c.o"
+		},
+		{
+			"path" : "CMakeFiles/botlib.dir/./src/botlib/be_ai_goal.c.o"
+		},
+		{
+			"path" : "CMakeFiles/botlib.dir/./src/botlib/be_ai_move.c.o"
+		},
+		{
+			"path" : "CMakeFiles/botlib.dir/./src/botlib/be_ai_weap.c.o"
+		},
+		{
+			"path" : "CMakeFiles/botlib.dir/./src/botlib/be_ai_weight.c.o"
+		},
+		{
+			"path" : "CMakeFiles/botlib.dir/./src/botlib/be_ea.c.o"
+		},
+		{
+			"path" : "CMakeFiles/botlib.dir/./src/botlib/be_interface.c.o"
+		},
+		{
+			"path" : "CMakeFiles/botlib.dir/./src/botlib/l_crc.c.o"
+		},
+		{
+			"path" : "CMakeFiles/botlib.dir/./src/botlib/l_libvar.c.o"
+		},
+		{
+			"path" : "CMakeFiles/botlib.dir/./src/botlib/l_log.c.o"
+		},
+		{
+			"path" : "CMakeFiles/botlib.dir/./src/botlib/l_memory.c.o"
+		},
+		{
+			"path" : "CMakeFiles/botlib.dir/./src/botlib/l_precomp.c.o"
+		},
+		{
+			"path" : "CMakeFiles/botlib.dir/./src/botlib/l_script.c.o"
+		},
+		{
+			"path" : "CMakeFiles/botlib.dir/./src/botlib/l_struct.c.o"
+		}
+	],
+	"backtrace" : 1,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"ADD_LIBRARY",
+			"add_compile_options",
+			"TARGET_COMPILE_DEFINITIONS",
+			"add_compile_definitions",
+			"target_include_directories"
+		],
+		"files" : 
+		[
+			"CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 903,
+				"parent" : 0
+			},
+			{
+				"command" : 1,
+				"file" : 0,
+				"line" : 44,
+				"parent" : 0
+			},
+			{
+				"command" : 2,
+				"file" : 0,
+				"line" : 904,
+				"parent" : 0
+			},
+			{
+				"command" : 3,
+				"file" : 0,
+				"line" : 724,
+				"parent" : 0
+			},
+			{
+				"command" : 3,
+				"file" : 0,
+				"line" : 745,
+				"parent" : 0
+			},
+			{
+				"command" : 3,
+				"file" : 0,
+				"line" : 750,
+				"parent" : 0
+			},
+			{
+				"command" : 4,
+				"file" : 0,
+				"line" : 906,
+				"parent" : 0
+			}
+		]
+	},
+	"compileGroups" : 
+	[
+		{
+			"compileCommandFragments" : 
+			[
+				{
+					"fragment" : "-g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -O2 -g -DNDEBUG -std=c23 -fPIC"
+				},
+				{
+					"backtrace" : 2,
+					"fragment" : "-Wall"
+				},
+				{
+					"backtrace" : 2,
+					"fragment" : "-Wextra"
+				},
+				{
+					"backtrace" : 2,
+					"fragment" : "-Wpedantic"
+				},
+				{
+					"backtrace" : 2,
+					"fragment" : "-Wshadow"
+				},
+				{
+					"backtrace" : 2,
+					"fragment" : "-Wstrict-prototypes"
+				},
+				{
+					"backtrace" : 2,
+					"fragment" : "-Wmissing-prototypes"
+				},
+				{
+					"backtrace" : 2,
+					"fragment" : "-Wold-style-definition"
+				},
+				{
+					"backtrace" : 2,
+					"fragment" : "-Wformat=2"
+				},
+				{
+					"backtrace" : 2,
+					"fragment" : "-Wundef"
+				},
+				{
+					"backtrace" : 2,
+					"fragment" : "-Wcast-qual"
+				},
+				{
+					"backtrace" : 2,
+					"fragment" : "-Wpointer-arith"
+				},
+				{
+					"backtrace" : 2,
+					"fragment" : "-Wvla"
+				}
+			],
+			"defines" : 
+			[
+				{
+					"backtrace" : 3,
+					"define" : "BOTLIB"
+				},
+				{
+					"backtrace" : 4,
+					"define" : "RENDERER_DEFAULT=\"vulkan\""
+				},
+				{
+					"backtrace" : 4,
+					"define" : "RENDERER_PREFIX=\"idtech3\""
+				},
+				{
+					"backtrace" : 5,
+					"define" : "USE_RENDERER_DLOPEN=0"
+				},
+				{
+					"backtrace" : 6,
+					"define" : "USE_SDL=0"
+				}
+			],
+			"includes" : 
+			[
+				{
+					"backtrace" : 7,
+					"path" : "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/glm"
+				}
+			],
+			"language" : "C",
+			"languageStandard" : 
+			{
+				"backtraces" : 
+				[
+					1
+				],
+				"standard" : "23"
+			},
+			"sourceIndexes" : 
+			[
+				0,
+				1,
+				2,
+				3,
+				4,
+				5,
+				6,
+				7,
+				8,
+				9,
+				10,
+				11,
+				12,
+				13,
+				14,
+				15,
+				16,
+				17,
+				18,
+				19,
+				20,
+				21,
+				22,
+				23,
+				24,
+				25,
+				26,
+				27
+			],
+			"sysroot" : 
+			{
+				"path" : "/home/tim/android-sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
+			}
+		}
+	],
+	"id" : "botlib::@6890427a1f51a3e7e1df",
+	"name" : "botlib",
+	"paths" : 
+	{
+		"build" : ".",
+		"source" : "."
+	},
+	"sourceGroups" : 
+	[
+		{
+			"name" : "Source Files",
+			"sourceIndexes" : 
+			[
+				0,
+				1,
+				2,
+				3,
+				4,
+				5,
+				6,
+				7,
+				8,
+				9,
+				10,
+				11,
+				12,
+				13,
+				14,
+				15,
+				16,
+				17,
+				18,
+				19,
+				20,
+				21,
+				22,
+				23,
+				24,
+				25,
+				26,
+				27
+			]
+		}
+	],
+	"sources" : 
+	[
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/botlib/be_aas_bspq3.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/botlib/be_aas_cluster.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/botlib/be_aas_debug.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/botlib/be_aas_entity.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/botlib/be_aas_file.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/botlib/be_aas_main.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/botlib/be_aas_move.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/botlib/be_aas_optimize.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/botlib/be_aas_reach.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/botlib/be_aas_route.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/botlib/be_aas_routealt.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/botlib/be_aas_sample.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/botlib/be_ai_char.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/botlib/be_ai_chat.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/botlib/be_ai_gen.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/botlib/be_ai_goal.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/botlib/be_ai_move.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/botlib/be_ai_weap.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/botlib/be_ai_weight.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/botlib/be_ea.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/botlib/be_interface.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/botlib/l_crc.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/botlib/l_libvar.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/botlib/l_log.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/botlib/l_memory.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/botlib/l_precomp.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/botlib/l_script.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/botlib/l_struct.c",
+			"sourceGroupIndex" : 0
+		}
+	],
+	"type" : "OBJECT_LIBRARY"
+}

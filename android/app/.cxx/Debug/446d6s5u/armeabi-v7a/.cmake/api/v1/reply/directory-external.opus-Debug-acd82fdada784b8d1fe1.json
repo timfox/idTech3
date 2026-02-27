@@ -1,0 +1,116 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"install"
+		],
+		"files" : 
+		[
+			"src/external/src/opus/CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 602,
+				"parent" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 620,
+				"parent" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 628,
+				"parent" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 646,
+				"parent" : 0
+			}
+		]
+	},
+	"installers" : 
+	[
+		{
+			"backtrace" : 1,
+			"component" : "Unspecified",
+			"destination" : "lib",
+			"paths" : 
+			[
+				"external/opus/libopus.a"
+			],
+			"targetId" : "opus::@a438e9e1ee33e660ede3",
+			"targetIndex" : 11,
+			"type" : "target"
+		},
+		{
+			"backtrace" : 1,
+			"component" : "Unspecified",
+			"destination" : "include/opus",
+			"paths" : 
+			[
+				"src/external/src/opus/include/opus.h",
+				"src/external/src/opus/include/opus_defines.h",
+				"src/external/src/opus/include/opus_multistream.h",
+				"src/external/src/opus/include/opus_projection.h",
+				"src/external/src/opus/include/opus_types.h"
+			],
+			"type" : "file"
+		},
+		{
+			"backtrace" : 2,
+			"component" : "Unspecified",
+			"destination" : "lib/pkgconfig",
+			"paths" : 
+			[
+				"android/app/.cxx/Debug/446d6s5u/armeabi-v7a/external/opus/opus.pc"
+			],
+			"type" : "file"
+		},
+		{
+			"backtrace" : 3,
+			"component" : "Unspecified",
+			"destination" : "lib/cmake/Opus",
+			"exportName" : "OpusTargets",
+			"exportTargets" : 
+			[
+				{
+					"id" : "opus::@a438e9e1ee33e660ede3",
+					"index" : 11
+				}
+			],
+			"paths" : 
+			[
+				"external/opus/CMakeFiles/Export/9d35469462eacf47198a472e89b71320/OpusTargets.cmake"
+			],
+			"type" : "export"
+		},
+		{
+			"backtrace" : 4,
+			"component" : "Unspecified",
+			"destination" : "lib/cmake/Opus",
+			"paths" : 
+			[
+				"android/app/.cxx/Debug/446d6s5u/armeabi-v7a/external/opus/OpusConfig.cmake",
+				"android/app/.cxx/Debug/446d6s5u/armeabi-v7a/external/opus/OpusConfigVersion.cmake"
+			],
+			"type" : "file"
+		}
+	],
+	"paths" : 
+	{
+		"build" : "external/opus",
+		"source" : "src/external/src/opus"
+	}
+}

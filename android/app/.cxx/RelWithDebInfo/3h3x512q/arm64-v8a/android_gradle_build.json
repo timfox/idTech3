@@ -1,0 +1,222 @@
+{
+  "buildFiles": [
+    "/home/tim/Desktop/next-gen-4/idtech3/CMakeLists.txt",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/cflux2/CMakeLists.txt",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/CMakeLists.txt",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/cmake/CheckA64NEON.cmake",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/cmake/CheckCPUArch.cmake",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/cmake/UseSystemExtensions.cmake",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/microbench/CMakeLists.txt",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/src/CMakeLists.txt",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/src/libFLAC/CMakeLists.txt",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/src/share/getopt/CMakeLists.txt",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/src/share/grabbag/CMakeLists.txt",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/src/share/replaygain_analysis/CMakeLists.txt",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/src/share/replaygain_synthesis/CMakeLists.txt",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/src/share/utf8/CMakeLists.txt",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/libpng/CMakeLists.txt",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/libpng/scripts/cmake/genchk.cmake.in",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/libpng/scripts/cmake/genout.cmake.in",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/libpng/scripts/cmake/gensrc.cmake.in",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opus/CMakeLists.txt",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opus/cmake/CFeatureCheck.cmake",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opus/cmake/OpusBuildtype.cmake",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opus/cmake/OpusConfig.cmake",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opus/cmake/OpusConfig.cmake.in",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opus/cmake/OpusFunctions.cmake",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opus/cmake/OpusPackageVersion.cmake",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opus/cmake/OpusSources.cmake",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opus/cmake/config.h.cmake.in",
+    "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/zlib/CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "/home/tim/android-sdk/cmake/3.31.6/bin/ninja",
+      "-C",
+      "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/RelWithDebInfo/3h3x512q/arm64-v8a",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "/home/tim/android-sdk/cmake/3.31.6/bin/ninja",
+    "-C",
+    "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/RelWithDebInfo/3h3x512q/arm64-v8a",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "FLAC::@5d1cc5397f98eaa8e4b9": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "FLAC",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/RelWithDebInfo/3h3x512q/arm64-v8a/external/flac/src/libFLAC/libFLAC.a"
+    },
+    "benchmark_residual::@65af17abb5d4fdedf724": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "benchmark_residual",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/build/intermediates/cxx/RelWithDebInfo/3h3x512q/obj/arm64-v8a/benchmark_residual",
+      "runtimeFiles": []
+    },
+    "botlib::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "botlib"
+    },
+    "cflux2::@b54d7ef85b543969f9c7": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "cflux2",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/RelWithDebInfo/3h3x512q/arm64-v8a/src/external/src/cflux2/libcflux2.a"
+    },
+    "client::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "client"
+    },
+    "exr_loader::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "exr_loader",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/RelWithDebInfo/3h3x512q/arm64-v8a/libexr_loader.a"
+    },
+    "flux_cli::@b54d7ef85b543969f9c7": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "flux_cli",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/build/intermediates/cxx/RelWithDebInfo/3h3x512q/obj/arm64-v8a/flux_cli",
+      "runtimeFiles": []
+    },
+    "getopt::@7706c207f69f22e13a1d": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "getopt",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/RelWithDebInfo/3h3x512q/arm64-v8a/external/flac/src/share/getopt/libgetopt.a"
+    },
+    "grabbag::@e15e1a78b21afb13d4ba": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "grabbag",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/RelWithDebInfo/3h3x512q/arm64-v8a/external/flac/src/share/grabbag/libgrabbag.a"
+    },
+    "idtech3.aarch64::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "idtech3.aarch64",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/build/intermediates/cxx/RelWithDebInfo/3h3x512q/obj/arm64-v8a/libidtech3.aarch64.so",
+      "runtimeFiles": []
+    },
+    "idtech3_vulkan::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "idtech3_vulkan"
+    },
+    "nestegg::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "nestegg",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/RelWithDebInfo/3h3x512q/arm64-v8a/libnestegg.a"
+    },
+    "ogg::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "ogg",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/RelWithDebInfo/3h3x512q/arm64-v8a/libogg.a"
+    },
+    "opus::@a438e9e1ee33e660ede3": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "opus",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/RelWithDebInfo/3h3x512q/arm64-v8a/external/opus/libopus.a"
+    },
+    "opusfile::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "opusfile",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/RelWithDebInfo/3h3x512q/arm64-v8a/libopusfile.a"
+    },
+    "phys_module::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "phys_module"
+    },
+    "png_genfiles::@031acffb9bb0241b3cdb": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "png_genfiles"
+    },
+    "png_static::@031acffb9bb0241b3cdb": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "png_static",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/RelWithDebInfo/3h3x512q/arm64-v8a/external/libpng/libpng16.a"
+    },
+    "qcommon::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "qcommon"
+    },
+    "qcommon_ded::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "qcommon_ded"
+    },
+    "replaygain_analysis::@7490de00e969281bbab7": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "replaygain_analysis",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/RelWithDebInfo/3h3x512q/arm64-v8a/external/flac/src/share/replaygain_analysis/libreplaygain_analysis.a"
+    },
+    "replaygain_synthesis::@d9922ac0da7460f4cef0": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "replaygain_synthesis",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/RelWithDebInfo/3h3x512q/arm64-v8a/external/flac/src/share/replaygain_synthesis/libreplaygain_synthesis.a"
+    },
+    "utf8::@cbb4242b2a2beb34e4a0": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "utf8",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/RelWithDebInfo/3h3x512q/arm64-v8a/external/flac/src/share/utf8/libutf8.a"
+    },
+    "vk_shader_check::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "vk_shader_check"
+    },
+    "vk_shader_regen::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "vk_shader_regen"
+    },
+    "vk_shaders_autogen::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "vk_shaders_autogen"
+    },
+    "zlib::@62f0f490a982c87fefdf": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "zlib",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/build/intermediates/cxx/RelWithDebInfo/3h3x512q/obj/arm64-v8a/libz.so",
+      "runtimeFiles": []
+    },
+    "zlibstatic::@62f0f490a982c87fefdf": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "zlibstatic",
+      "output": "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/RelWithDebInfo/3h3x512q/arm64-v8a/external/zlib/libz.a"
+    }
+  },
+  "toolchains": {
+    "toolchain": {
+      "cCompilerExecutable": "/home/tim/android-sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/clang.lld",
+      "cppCompilerExecutable": "/home/tim/android-sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++.lld"
+    }
+  },
+  "cFileExtensions": [
+    "c"
+  ],
+  "cppFileExtensions": [
+    "cpp"
+  ]
+}

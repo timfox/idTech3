@@ -1,0 +1,81 @@
+C/C++ Structured Log7
+5
+3/home/tim/Desktop/next-gen-4/idtech3/CMakeLists.txtC
+A
+?com.android.build.gradle.internal.cxx.io.EncodedFileFingerPrint	ÚÿêÉ3¢ğ §ß÷ãÉ3z
+x
+v/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/RelWithDebInfo/321j7131/armeabi-v7a/additional_project_files.txt	ÚÿêÉ3å© Æ³ıêÉ3w
+u
+s/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/RelWithDebInfo/321j7131/armeabi-v7a/android_gradle_build.json	ÚÿêÉ3•J Æ³ıêÉ3|
+z
+x/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/RelWithDebInfo/321j7131/armeabi-v7a/android_gradle_build_mini.json	ÚÿêÉ3´E •´ıêÉ3i
+g
+e/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/RelWithDebInfo/321j7131/armeabi-v7a/build.ninja	ÚÿêÉ3½ß? ¥³ıêÉ3m
+k
+i/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/RelWithDebInfo/321j7131/armeabi-v7a/build.ninja.txt	ÚÿêÉ3r
+p
+n/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/RelWithDebInfo/321j7131/armeabi-v7a/build_file_index.txt	ÚÿêÉ3ñ –´ıêÉ3s
+q
+o/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/RelWithDebInfo/321j7131/armeabi-v7a/compile_commands.json	ÚÿêÉ3	âã8 ¥³ıêÉ3w
+u
+s/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/RelWithDebInfo/321j7131/armeabi-v7a/compile_commands.json.bin	ÚÿêÉ3
+òô ¥³ıêÉ3}
+{
+y/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/RelWithDebInfo/321j7131/armeabi-v7a/metadata_generation_command.txt	ÚÿêÉ3¾ –´ıêÉ3p
+n
+l/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/RelWithDebInfo/321j7131/armeabi-v7a/prefab_config.json	ÚÿêÉ3( –´ıêÉ3u
+s
+q/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/RelWithDebInfo/321j7131/armeabi-v7a/symbol_folder_index.txt	ÚÿêÉ3p –´ıêÉ3M
+K
+I/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/CMakeLists.txt	ÚÿêÉ3ÄR ÈœÏºÉ3W
+U
+S/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/cmake/CheckA64NEON.cmake	ÚÿêÉ3Ç ÉœÏºÉ3W
+U
+S/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/cmake/CheckCPUArch.cmake	ÚÿêÉ3ë
+ ÉœÏºÉ3^
+\
+Z/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/cmake/UseSystemExtensions.cmake	ÚÿêÉ3× ÉœÏºÉ3X
+V
+T/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/microbench/CMakeLists.txt	ÚÿêÉ3¶ ÙœÏºÉ3Q
+O
+M/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/src/CMakeLists.txt	ÚÿêÉ3ƒ ÚœÏºÉ3Y
+W
+U/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/src/libFLAC/CMakeLists.txt	ÚÿêÉ3Ü ÛœÏºÉ3^
+\
+Z/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/src/share/getopt/CMakeLists.txt	ÚÿêÉ3ß ŞœÏºÉ3_
+]
+[/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/src/share/grabbag/CMakeLists.txt	ÚÿêÉ3œ ŞœÏºÉ3k
+i
+g/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/src/share/replaygain_analysis/CMakeLists.txt	ÚÿêÉ3B ßœÏºÉ3l
+j
+h/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/src/share/replaygain_synthesis/CMakeLists.txt	ÚÿêÉ3D ßœÏºÉ3\
+Z
+X/home/tim/Desktop/next-gen-4/idtech3/src/external/src/flac/src/share/utf8/CMakeLists.txt	ÚÿêÉ3¹ ßœÏºÉ3O
+M
+K/home/tim/Desktop/next-gen-4/idtech3/src/external/src/libpng/CMakeLists.txt	ÚÿêÉ3Ìà ‰ÏºÉ3^
+\
+Z/home/tim/Desktop/next-gen-4/idtech3/src/external/src/libpng/scripts/cmake/genchk.cmake.in	ÚÿêÉ3É —ÏºÉ3^
+\
+Z/home/tim/Desktop/next-gen-4/idtech3/src/external/src/libpng/scripts/cmake/genout.cmake.in	ÚÿêÉ3¼ —ÏºÉ3^
+\
+Z/home/tim/Desktop/next-gen-4/idtech3/src/external/src/libpng/scripts/cmake/gensrc.cmake.in	ÚÿêÉ3ş( —ÏºÉ3M
+K
+I/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opus/CMakeLists.txt	ÚÿêÉ3¥ñ ™ÏºÉ3X
+V
+T/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opus/cmake/CFeatureCheck.cmake	ÚÿêÉ3Œ œÏºÉ3X
+V
+T/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opus/cmake/OpusBuildtype.cmake	ÚÿêÉ3 Ú œÏºÉ3U
+S
+Q/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opus/cmake/OpusConfig.cmake	ÚÿêÉ3!» œÏºÉ3X
+V
+T/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opus/cmake/OpusConfig.cmake.in	ÚÿêÉ3"ô œÏºÉ3X
+V
+T/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opus/cmake/OpusFunctions.cmake	ÚÿêÉ3#…5 œÏºÉ3]
+[
+Y/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opus/cmake/OpusPackageVersion.cmake	ÚÿêÉ3$© œÏºÉ3V
+T
+R/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opus/cmake/OpusSources.cmake	ÛÿêÉ3%â œÏºÉ3V
+T
+R/home/tim/Desktop/next-gen-4/idtech3/src/external/src/opus/cmake/config.h.cmake.in	ÛÿêÉ3&0 œÏºÉ3M
+K
+I/home/tim/Desktop/next-gen-4/idtech3/src/external/src/zlib/CMakeLists.txt	ÛÿêÉ3'á; îÏºÉ3
