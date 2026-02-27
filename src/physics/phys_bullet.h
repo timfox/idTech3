@@ -161,6 +161,8 @@ void        Phys_RegisterCvars(void);
 void        Phys_StepSimulation(float dt);
 void        Phys_SetGravity(const vec3_t gravity);
 void        Phys_ClearWorld(void);
+qboolean    Phys_LoadBSPCollision(void);
+physBodyHandle_t Phys_AddStaticTriMesh(const float *verts, int numVerts, const int *indices, int numIndices);
 
 /* rigid bodies */
 physBodyHandle_t Phys_CreateBody(const physBodyDef_t *def);
