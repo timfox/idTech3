@@ -260,6 +260,44 @@ static int l_response_trigger(lua_State *L) {
 	return 0;
 }
 
+/* ========== VDB bindings ========== */
+
+#include "../renderers/vulkan/vk_vdb.h"
+
+static int l_vdb_load(lua_State *L) {
+	lua_pushinteger(L, VDB_Load(luaL_checkstring(L, 1), luaL_optstring(L, 2, "density")));
+	return 1;
+}
+static int l_vdb_free(lua_State *L) { VDB_Free((int)luaL_checkinteger(L, 1)); return 0; }
+static int l_vdb_sample(lua_State *L) {
+	lua_pushnumber(L, VDB_SampleFloat((int)luaL_checkinteger(L, 1),
+		(float)luaL_checknumber(L, 2), (float)luaL_checknumber(L, 3), (float)luaL_checknumber(L, 4)));
+	return 1;
+}
+static int l_vdb_getInfo(lua_State *L) {
+	vdbGridInfo_t info;
+	if (VDB_GetInfo((int)luaL_checkinteger(L, 1), &info)) {
+		lua_newtable(L);
+		lua_pushstring(L, info.name); lua_setfield(L, -2, "name");
+		lua_pushinteger(L, info.dimX); lua_setfield(L, -2, "dimX");
+		lua_pushinteger(L, info.dimY); lua_setfield(L, -2, "dimY");
+		lua_pushinteger(L, info.dimZ); lua_setfield(L, -2, "dimZ");
+		lua_pushnumber(L, info.voxelSize); lua_setfield(L, -2, "voxelSize");
+		lua_pushinteger(L, info.activeVoxels); lua_setfield(L, -2, "activeVoxels");
+		return 1;
+	}
+	lua_pushnil(L);
+	return 1;
+}
+static int l_vdb_bindAsFog(lua_State *L) {
+	lua_pushboolean(L, VDB_BindAsFogDensity((int)luaL_checkinteger(L, 1)));
+	return 1;
+}
+static int l_vdb_getGridCount(lua_State *L) {
+	lua_pushinteger(L, VDB_GetGridCount());
+	return 1;
+}
+
 /* ========== AIML bindings ========== */
 
 #include "g_aiml.h"
@@ -644,6 +682,17 @@ void LuaBindings_RegisterAll(void *luaState) {
 		{NULL, NULL}
 	};
 	registerTable(L, "AIML", aimlFuncs);
+
+	static const luaL_Reg vdbFuncs[] = {
+		{"load", l_vdb_load},
+		{"free", l_vdb_free},
+		{"sample", l_vdb_sample},
+		{"getInfo", l_vdb_getInfo},
+		{"bindAsFog", l_vdb_bindAsFog},
+		{"getGridCount", l_vdb_getGridCount},
+		{NULL, NULL}
+	};
+	registerTable(L, "VDB", vdbFuncs);
 
 	lua_setglobal(L, "Engine");
 	Com_Printf("Lua bindings registered: Engine.{Director,Nav,Physics,Particles,Music,Face,Horde,Dismember,Choreo,Response,GOAP}\n");
