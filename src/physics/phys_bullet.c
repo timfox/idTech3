@@ -107,7 +107,7 @@ qboolean Phys_Init(void) {
 	}
 	{
 		vec3_t g;
-		VectorSet(g, 0, phys_gravity->value, 0);
+		VectorSet(g, 0, 0, phys_gravity->value);
 		Phys_SetGravity_Impl(g);
 	}
 	Com_Printf("Bullet Physics: initialized with C++ backend\n");
@@ -234,25 +234,75 @@ qboolean Phys_LoadBSPCollision(void) {
 		}
 	}
 
-	/* Create the static floor body */
+	/* Create static box bodies at each traced floor cell.
+	   Each cell becomes a thin static box at the traced height. */
 	{
-		physBodyDef_t def;
-		Com_Memset(&def, 0, sizeof(def));
-		def.shape = PHYS_SHAPE_BOX;
-		def.type = PHYS_BODY_STATIC;
-		def.mass = 0;
-		def.halfExtents[0] = 4096;
-		def.halfExtents[1] = 4096;
-		def.halfExtents[2] = 1;
-		def.position[2] = worldMins[2];
-		Phys_CreateBody(&def);
+		int cellCount = 0;
+		for (gy = 0; gy < gridH; gy++) {
+			for (gx = 0; gx < gridW; gx++) {
+				int idx = gy * (gridW + 1) + gx;
+				float z = verts[idx * 3 + 2];
+
+				if (z <= worldMins[2] + 1.0f) continue;
+
+				physBodyDef_t def;
+				Com_Memset(&def, 0, sizeof(def));
+				def.shape = PHYS_SHAPE_BOX;
+				def.type = PHYS_BODY_STATIC;
+				def.mass = 0;
+				def.halfExtents[0] = step * 0.5f;
+				def.halfExtents[1] = step * 0.5f;
+				def.halfExtents[2] = 2.0f;
+				def.position[0] = verts[idx * 3 + 0];
+				def.position[1] = verts[idx * 3 + 1];
+				def.position[2] = z - 2.0f;
+				def.friction = 0.8f;
+				def.restitution = 0.3f;
+				Phys_CreateBody(&def);
+				cellCount++;
+			}
+		}
+		Com_Printf("Physics: created %d floor collision cells\n", cellCount);
+	}
+
+	/* Also add 4 wall planes around the map boundary */
+	{
+		physBodyDef_t wdef;
+		Com_Memset(&wdef, 0, sizeof(wdef));
+		wdef.shape = PHYS_SHAPE_BOX;
+		wdef.type = PHYS_BODY_STATIC;
+		wdef.mass = 0;
+		wdef.friction = 0.5f;
+		wdef.restitution = 0.2f;
+
+		/* Floor (catch-all at very bottom) */
+		wdef.halfExtents[0] = 4096; wdef.halfExtents[1] = 4096; wdef.halfExtents[2] = 1;
+		wdef.position[0] = 0; wdef.position[1] = 0; wdef.position[2] = worldMins[2] - 1;
+		Phys_CreateBody(&wdef);
+
+		/* Ceiling */
+		wdef.position[2] = worldMaxs[2] + 1;
+		Phys_CreateBody(&wdef);
+
+		/* Walls */
+		wdef.halfExtents[0] = 1; wdef.halfExtents[1] = 4096; wdef.halfExtents[2] = 4096;
+		wdef.position[0] = worldMins[0] - 1; wdef.position[1] = 0; wdef.position[2] = 0;
+		Phys_CreateBody(&wdef);
+		wdef.position[0] = worldMaxs[0] + 1;
+		Phys_CreateBody(&wdef);
+
+		wdef.halfExtents[0] = 4096; wdef.halfExtents[1] = 1; wdef.halfExtents[2] = 4096;
+		wdef.position[0] = 0; wdef.position[1] = worldMins[1] - 1; wdef.position[2] = 0;
+		Phys_CreateBody(&wdef);
+		wdef.position[1] = worldMaxs[1] + 1;
+		Phys_CreateBody(&wdef);
 	}
 
 	Z_Free(verts);
 	Z_Free(indices);
 
-	Com_Printf("Physics: loaded BSP collision (%d vertices, %d triangles)\n",
-		numVerts, numIndices / 3);
+	Com_Printf("Physics: loaded BSP collision (%d raycasts, %d floor cells + 6 boundary planes)\n",
+		numVerts, numVerts);
 	return qtrue;
 }
 

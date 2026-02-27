@@ -153,7 +153,7 @@ extern "C" qboolean Phys_Init_Impl(void) {
 	bs.broadphase      = new btDbvtBroadphase();
 	bs.solver          = new btSequentialImpulseConstraintSolver();
 	bs.world           = new btSoftRigidDynamicsWorld(bs.dispatcher, bs.broadphase, bs.solver, bs.collisionConfig);
-	bs.world->setGravity(btVector3(0, -800, 0));
+	bs.world->setGravity(btVector3(0, 0, -800));
 
 	bs.softBodyWorldInfo.m_broadphase  = bs.broadphase;
 	bs.softBodyWorldInfo.m_dispatcher  = bs.dispatcher;
