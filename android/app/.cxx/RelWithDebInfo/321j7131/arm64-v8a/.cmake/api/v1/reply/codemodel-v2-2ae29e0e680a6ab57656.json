@@ -1,0 +1,532 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"childIndexes" : 
+					[
+						1,
+						2,
+						11,
+						12
+					],
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-.-RelWithDebInfo-f5ebdc15457944623624.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.6.0"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						2,
+						3,
+						4,
+						7,
+						8,
+						9,
+						10,
+						12,
+						13,
+						16,
+						17,
+						21,
+						22,
+						23
+					]
+				},
+				{
+					"build" : "external/opus",
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-external.opus-RelWithDebInfo-293f828c8ea1451b3de0.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.16"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 1,
+					"source" : "src/external/src/opus",
+					"targetIndexes" : 
+					[
+						11
+					]
+				},
+				{
+					"build" : "external/flac",
+					"childIndexes" : 
+					[
+						3,
+						10
+					],
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-external.flac-RelWithDebInfo-fc5d07085a183b16d666.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.5"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 2,
+					"source" : "src/external/src/flac"
+				},
+				{
+					"build" : "external/flac/src",
+					"childIndexes" : 
+					[
+						4,
+						5,
+						6,
+						7,
+						8,
+						9
+					],
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-external.flac.src-RelWithDebInfo-e99af089b3b0dd66ee6d.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.11"
+					},
+					"parentIndex" : 2,
+					"projectIndex" : 2,
+					"source" : "src/external/src/flac/src"
+				},
+				{
+					"build" : "external/flac/src/libFLAC",
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-external.flac.src.libFLAC-RelWithDebInfo-6a48c7f7ff651567df97.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.11"
+					},
+					"parentIndex" : 3,
+					"projectIndex" : 2,
+					"source" : "src/external/src/flac/src/libFLAC",
+					"targetIndexes" : 
+					[
+						0
+					]
+				},
+				{
+					"build" : "external/flac/src/share/replaygain_analysis",
+					"jsonFile" : "directory-external.flac.src.share.replaygain_analysis-RelWithDebInfo-132bc96cb595d78572c3.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.11"
+					},
+					"parentIndex" : 3,
+					"projectIndex" : 2,
+					"source" : "src/external/src/flac/src/share/replaygain_analysis",
+					"targetIndexes" : 
+					[
+						18
+					]
+				},
+				{
+					"build" : "external/flac/src/share/replaygain_synthesis",
+					"jsonFile" : "directory-external.flac.src.share.replaygain_synthesis-RelWithDebInfo-0e9366da2ef1e7d56e26.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.11"
+					},
+					"parentIndex" : 3,
+					"projectIndex" : 2,
+					"source" : "src/external/src/flac/src/share/replaygain_synthesis",
+					"targetIndexes" : 
+					[
+						19
+					]
+				},
+				{
+					"build" : "external/flac/src/share/getopt",
+					"jsonFile" : "directory-external.flac.src.share.getopt-RelWithDebInfo-291125b5f52d03a5e181.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.11"
+					},
+					"parentIndex" : 3,
+					"projectIndex" : 2,
+					"source" : "src/external/src/flac/src/share/getopt",
+					"targetIndexes" : 
+					[
+						5
+					]
+				},
+				{
+					"build" : "external/flac/src/share/utf8",
+					"jsonFile" : "directory-external.flac.src.share.utf8-RelWithDebInfo-6caef161c948e5fb3d70.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.12"
+					},
+					"parentIndex" : 3,
+					"projectIndex" : 2,
+					"source" : "src/external/src/flac/src/share/utf8",
+					"targetIndexes" : 
+					[
+						20
+					]
+				},
+				{
+					"build" : "external/flac/src/share/grabbag",
+					"jsonFile" : "directory-external.flac.src.share.grabbag-RelWithDebInfo-a5ab40953637ba27aa76.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.11"
+					},
+					"parentIndex" : 3,
+					"projectIndex" : 2,
+					"source" : "src/external/src/flac/src/share/grabbag",
+					"targetIndexes" : 
+					[
+						6
+					]
+				},
+				{
+					"build" : "external/flac/microbench",
+					"jsonFile" : "directory-external.flac.microbench-RelWithDebInfo-83c0b9aadb9671f2b813.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.5"
+					},
+					"parentIndex" : 2,
+					"projectIndex" : 2,
+					"source" : "src/external/src/flac/microbench",
+					"targetIndexes" : 
+					[
+						1
+					]
+				},
+				{
+					"build" : "external/zlib",
+					"jsonFile" : "directory-external.zlib-RelWithDebInfo-5e9104cfd1654ec61ce2.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "2.4.4"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 3,
+					"source" : "src/external/src/zlib",
+					"targetIndexes" : 
+					[
+						24,
+						25
+					]
+				},
+				{
+					"build" : "external/libpng",
+					"jsonFile" : "directory-external.libpng-RelWithDebInfo-97301dc328cc4ff94770.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.6"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 4,
+					"source" : "src/external/src/libpng",
+					"targetIndexes" : 
+					[
+						14,
+						15
+					]
+				}
+			],
+			"name" : "RelWithDebInfo",
+			"projects" : 
+			[
+				{
+					"childIndexes" : 
+					[
+						1,
+						2,
+						3,
+						4
+					],
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "idtech3",
+					"targetIndexes" : 
+					[
+						2,
+						3,
+						4,
+						7,
+						8,
+						9,
+						10,
+						12,
+						13,
+						16,
+						17,
+						21,
+						22,
+						23
+					]
+				},
+				{
+					"directoryIndexes" : 
+					[
+						1
+					],
+					"name" : "Opus",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						11
+					]
+				},
+				{
+					"directoryIndexes" : 
+					[
+						2,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8,
+						9,
+						10
+					],
+					"name" : "FLAC",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						5,
+						6,
+						18,
+						19,
+						20
+					]
+				},
+				{
+					"directoryIndexes" : 
+					[
+						11
+					],
+					"name" : "zlib",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						24,
+						25
+					]
+				},
+				{
+					"directoryIndexes" : 
+					[
+						12
+					],
+					"name" : "libpng",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						14,
+						15
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 4,
+					"id" : "FLAC::@5d1cc5397f98eaa8e4b9",
+					"jsonFile" : "target-FLAC-RelWithDebInfo-8929b639a02ab39cde75.json",
+					"name" : "FLAC",
+					"projectIndex" : 2
+				},
+				{
+					"directoryIndex" : 10,
+					"id" : "benchmark_residual::@65af17abb5d4fdedf724",
+					"jsonFile" : "target-benchmark_residual-RelWithDebInfo-70424674ff074b25277d.json",
+					"name" : "benchmark_residual",
+					"projectIndex" : 2
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "botlib::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-botlib-RelWithDebInfo-2446e00dd4caf873f991.json",
+					"name" : "botlib",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "client::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-client-RelWithDebInfo-b5940dabf8d26a73e2c1.json",
+					"name" : "client",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "exr_loader::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-exr_loader-RelWithDebInfo-3a6918090374bf2c5807.json",
+					"name" : "exr_loader",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 7,
+					"id" : "getopt::@7706c207f69f22e13a1d",
+					"jsonFile" : "target-getopt-RelWithDebInfo-a557bca28efb2d8cc441.json",
+					"name" : "getopt",
+					"projectIndex" : 2
+				},
+				{
+					"directoryIndex" : 9,
+					"id" : "grabbag::@e15e1a78b21afb13d4ba",
+					"jsonFile" : "target-grabbag-RelWithDebInfo-723d9aaea2f9cf8d23e8.json",
+					"name" : "grabbag",
+					"projectIndex" : 2
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "idtech3.aarch64::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-idtech3.aarch64-RelWithDebInfo-6060fd0f2843eb4f3fa7.json",
+					"name" : "idtech3.aarch64",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "idtech3_vulkan::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-idtech3_vulkan-RelWithDebInfo-3e65ee414943fea88b52.json",
+					"name" : "idtech3_vulkan",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "nestegg::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-nestegg-RelWithDebInfo-170378121b377d53aa7f.json",
+					"name" : "nestegg",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "ogg::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ogg-RelWithDebInfo-e57c45dfd49a54a209ad.json",
+					"name" : "ogg",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "opus::@a438e9e1ee33e660ede3",
+					"jsonFile" : "target-opus-RelWithDebInfo-8ce0a8fe0f760bf5b84f.json",
+					"name" : "opus",
+					"projectIndex" : 1
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "opusfile::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-opusfile-RelWithDebInfo-7d31921daf38795c169b.json",
+					"name" : "opusfile",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "phys_module::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-phys_module-RelWithDebInfo-e2194f1ca8cea7123605.json",
+					"name" : "phys_module",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 12,
+					"id" : "png_genfiles::@031acffb9bb0241b3cdb",
+					"jsonFile" : "target-png_genfiles-RelWithDebInfo-3362a318ca85eef2b647.json",
+					"name" : "png_genfiles",
+					"projectIndex" : 4
+				},
+				{
+					"directoryIndex" : 12,
+					"id" : "png_static::@031acffb9bb0241b3cdb",
+					"jsonFile" : "target-png_static-RelWithDebInfo-5936c7bc1c38bc572120.json",
+					"name" : "png_static",
+					"projectIndex" : 4
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "qcommon::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-qcommon-RelWithDebInfo-436a47f978726b6f914d.json",
+					"name" : "qcommon",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "qcommon_ded::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-qcommon_ded-RelWithDebInfo-8ad9b4a9aca82f52736e.json",
+					"name" : "qcommon_ded",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 5,
+					"id" : "replaygain_analysis::@7490de00e969281bbab7",
+					"jsonFile" : "target-replaygain_analysis-RelWithDebInfo-5873c7072a3a0bb213f1.json",
+					"name" : "replaygain_analysis",
+					"projectIndex" : 2
+				},
+				{
+					"directoryIndex" : 6,
+					"id" : "replaygain_synthesis::@d9922ac0da7460f4cef0",
+					"jsonFile" : "target-replaygain_synthesis-RelWithDebInfo-1526b21bf4cc9de2de55.json",
+					"name" : "replaygain_synthesis",
+					"projectIndex" : 2
+				},
+				{
+					"directoryIndex" : 8,
+					"id" : "utf8::@cbb4242b2a2beb34e4a0",
+					"jsonFile" : "target-utf8-RelWithDebInfo-3b1015f3ddd73fd359b2.json",
+					"name" : "utf8",
+					"projectIndex" : 2
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "vk_shader_check::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-vk_shader_check-RelWithDebInfo-d609e9ec3c4a31ebf1b3.json",
+					"name" : "vk_shader_check",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "vk_shader_regen::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-vk_shader_regen-RelWithDebInfo-2d21da729cf393f80531.json",
+					"name" : "vk_shader_regen",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "vk_shaders_autogen::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-vk_shaders_autogen-RelWithDebInfo-7cfb7dfcc55b0edf6e33.json",
+					"name" : "vk_shaders_autogen",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 11,
+					"id" : "zlib::@62f0f490a982c87fefdf",
+					"jsonFile" : "target-zlib-RelWithDebInfo-85989ee99019f91cdea5.json",
+					"name" : "zlib",
+					"projectIndex" : 3
+				},
+				{
+					"directoryIndex" : 11,
+					"id" : "zlibstatic::@62f0f490a982c87fefdf",
+					"jsonFile" : "target-zlibstatic-RelWithDebInfo-26a124be5db76292f50b.json",
+					"name" : "zlibstatic",
+					"projectIndex" : 3
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/RelWithDebInfo/321j7131/arm64-v8a",
+		"source" : "/home/tim/Desktop/next-gen-4/idtech3"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 7
+	}
+}

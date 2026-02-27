@@ -1,0 +1,14 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : [],
+		"files" : [],
+		"nodes" : []
+	},
+	"installers" : [],
+	"paths" : 
+	{
+		"build" : "external/flac/src/share/grabbag",
+		"source" : "src/external/src/flac/src/share/grabbag"
+	}
+}

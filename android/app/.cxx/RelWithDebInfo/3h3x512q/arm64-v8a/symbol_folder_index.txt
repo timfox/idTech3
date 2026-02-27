@@ -1,0 +1,1 @@
+/home/tim/Desktop/next-gen-4/idtech3/android/app/build/intermediates/cxx/RelWithDebInfo/3h3x512q/obj/arm64-v8a

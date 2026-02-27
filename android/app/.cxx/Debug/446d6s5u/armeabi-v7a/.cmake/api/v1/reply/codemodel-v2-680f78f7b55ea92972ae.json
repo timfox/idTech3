@@ -1,0 +1,532 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"childIndexes" : 
+					[
+						1,
+						2,
+						11,
+						12
+					],
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-.-Debug-f5ebdc15457944623624.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.6.0"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						2,
+						3,
+						4,
+						7,
+						8,
+						9,
+						10,
+						12,
+						13,
+						16,
+						17,
+						21,
+						22,
+						23
+					]
+				},
+				{
+					"build" : "external/opus",
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-external.opus-Debug-acd82fdada784b8d1fe1.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.16"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 1,
+					"source" : "src/external/src/opus",
+					"targetIndexes" : 
+					[
+						11
+					]
+				},
+				{
+					"build" : "external/flac",
+					"childIndexes" : 
+					[
+						3,
+						10
+					],
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-external.flac-Debug-fc5d07085a183b16d666.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.5"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 2,
+					"source" : "src/external/src/flac"
+				},
+				{
+					"build" : "external/flac/src",
+					"childIndexes" : 
+					[
+						4,
+						5,
+						6,
+						7,
+						8,
+						9
+					],
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-external.flac.src-Debug-e99af089b3b0dd66ee6d.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.11"
+					},
+					"parentIndex" : 2,
+					"projectIndex" : 2,
+					"source" : "src/external/src/flac/src"
+				},
+				{
+					"build" : "external/flac/src/libFLAC",
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-external.flac.src.libFLAC-Debug-6a48c7f7ff651567df97.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.11"
+					},
+					"parentIndex" : 3,
+					"projectIndex" : 2,
+					"source" : "src/external/src/flac/src/libFLAC",
+					"targetIndexes" : 
+					[
+						0
+					]
+				},
+				{
+					"build" : "external/flac/src/share/replaygain_analysis",
+					"jsonFile" : "directory-external.flac.src.share.replaygain_analysis-Debug-132bc96cb595d78572c3.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.11"
+					},
+					"parentIndex" : 3,
+					"projectIndex" : 2,
+					"source" : "src/external/src/flac/src/share/replaygain_analysis",
+					"targetIndexes" : 
+					[
+						18
+					]
+				},
+				{
+					"build" : "external/flac/src/share/replaygain_synthesis",
+					"jsonFile" : "directory-external.flac.src.share.replaygain_synthesis-Debug-0e9366da2ef1e7d56e26.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.11"
+					},
+					"parentIndex" : 3,
+					"projectIndex" : 2,
+					"source" : "src/external/src/flac/src/share/replaygain_synthesis",
+					"targetIndexes" : 
+					[
+						19
+					]
+				},
+				{
+					"build" : "external/flac/src/share/getopt",
+					"jsonFile" : "directory-external.flac.src.share.getopt-Debug-291125b5f52d03a5e181.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.11"
+					},
+					"parentIndex" : 3,
+					"projectIndex" : 2,
+					"source" : "src/external/src/flac/src/share/getopt",
+					"targetIndexes" : 
+					[
+						5
+					]
+				},
+				{
+					"build" : "external/flac/src/share/utf8",
+					"jsonFile" : "directory-external.flac.src.share.utf8-Debug-6caef161c948e5fb3d70.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.12"
+					},
+					"parentIndex" : 3,
+					"projectIndex" : 2,
+					"source" : "src/external/src/flac/src/share/utf8",
+					"targetIndexes" : 
+					[
+						20
+					]
+				},
+				{
+					"build" : "external/flac/src/share/grabbag",
+					"jsonFile" : "directory-external.flac.src.share.grabbag-Debug-a5ab40953637ba27aa76.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.11"
+					},
+					"parentIndex" : 3,
+					"projectIndex" : 2,
+					"source" : "src/external/src/flac/src/share/grabbag",
+					"targetIndexes" : 
+					[
+						6
+					]
+				},
+				{
+					"build" : "external/flac/microbench",
+					"jsonFile" : "directory-external.flac.microbench-Debug-83c0b9aadb9671f2b813.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.5"
+					},
+					"parentIndex" : 2,
+					"projectIndex" : 2,
+					"source" : "src/external/src/flac/microbench",
+					"targetIndexes" : 
+					[
+						1
+					]
+				},
+				{
+					"build" : "external/zlib",
+					"jsonFile" : "directory-external.zlib-Debug-5e9104cfd1654ec61ce2.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "2.4.4"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 3,
+					"source" : "src/external/src/zlib",
+					"targetIndexes" : 
+					[
+						24,
+						25
+					]
+				},
+				{
+					"build" : "external/libpng",
+					"jsonFile" : "directory-external.libpng-Debug-97301dc328cc4ff94770.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.6"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 4,
+					"source" : "src/external/src/libpng",
+					"targetIndexes" : 
+					[
+						14,
+						15
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"childIndexes" : 
+					[
+						1,
+						2,
+						3,
+						4
+					],
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "idtech3",
+					"targetIndexes" : 
+					[
+						2,
+						3,
+						4,
+						7,
+						8,
+						9,
+						10,
+						12,
+						13,
+						16,
+						17,
+						21,
+						22,
+						23
+					]
+				},
+				{
+					"directoryIndexes" : 
+					[
+						1
+					],
+					"name" : "Opus",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						11
+					]
+				},
+				{
+					"directoryIndexes" : 
+					[
+						2,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8,
+						9,
+						10
+					],
+					"name" : "FLAC",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						5,
+						6,
+						18,
+						19,
+						20
+					]
+				},
+				{
+					"directoryIndexes" : 
+					[
+						11
+					],
+					"name" : "zlib",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						24,
+						25
+					]
+				},
+				{
+					"directoryIndexes" : 
+					[
+						12
+					],
+					"name" : "libpng",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						14,
+						15
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 4,
+					"id" : "FLAC::@5d1cc5397f98eaa8e4b9",
+					"jsonFile" : "target-FLAC-Debug-fa972cbdcfd89e22ebe9.json",
+					"name" : "FLAC",
+					"projectIndex" : 2
+				},
+				{
+					"directoryIndex" : 10,
+					"id" : "benchmark_residual::@65af17abb5d4fdedf724",
+					"jsonFile" : "target-benchmark_residual-Debug-973956b5d1af07afc8f6.json",
+					"name" : "benchmark_residual",
+					"projectIndex" : 2
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "botlib::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-botlib-Debug-f5daf15f743b2af75334.json",
+					"name" : "botlib",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "client::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-client-Debug-b1400f752d07c8c03f27.json",
+					"name" : "client",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "exr_loader::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-exr_loader-Debug-74de0b59f7130a3f85ba.json",
+					"name" : "exr_loader",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 7,
+					"id" : "getopt::@7706c207f69f22e13a1d",
+					"jsonFile" : "target-getopt-Debug-ebcdb5279ee814374b6b.json",
+					"name" : "getopt",
+					"projectIndex" : 2
+				},
+				{
+					"directoryIndex" : 9,
+					"id" : "grabbag::@e15e1a78b21afb13d4ba",
+					"jsonFile" : "target-grabbag-Debug-561500c1ecfe79bc7740.json",
+					"name" : "grabbag",
+					"projectIndex" : 2
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "idtech3.arm::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-idtech3.arm-Debug-74d586f689c61a96541f.json",
+					"name" : "idtech3.arm",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "idtech3_vulkan::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-idtech3_vulkan-Debug-abe3713a6797f1c378a3.json",
+					"name" : "idtech3_vulkan",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "nestegg::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-nestegg-Debug-e4eb511d2e72b352e0fc.json",
+					"name" : "nestegg",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "ogg::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ogg-Debug-62a5a1016a1cf685aec4.json",
+					"name" : "ogg",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "opus::@a438e9e1ee33e660ede3",
+					"jsonFile" : "target-opus-Debug-b6cc138a8b4274bc8d28.json",
+					"name" : "opus",
+					"projectIndex" : 1
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "opusfile::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-opusfile-Debug-c13594654f16cd8a5207.json",
+					"name" : "opusfile",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "phys_module::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-phys_module-Debug-827b093458fcc363bc77.json",
+					"name" : "phys_module",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 12,
+					"id" : "png_genfiles::@031acffb9bb0241b3cdb",
+					"jsonFile" : "target-png_genfiles-Debug-3362a318ca85eef2b647.json",
+					"name" : "png_genfiles",
+					"projectIndex" : 4
+				},
+				{
+					"directoryIndex" : 12,
+					"id" : "png_static::@031acffb9bb0241b3cdb",
+					"jsonFile" : "target-png_static-Debug-c5483806e1d677ba2a97.json",
+					"name" : "png_static",
+					"projectIndex" : 4
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "qcommon::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-qcommon-Debug-30eefa002595196fdeb3.json",
+					"name" : "qcommon",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "qcommon_ded::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-qcommon_ded-Debug-4e6b105a665441936a17.json",
+					"name" : "qcommon_ded",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 5,
+					"id" : "replaygain_analysis::@7490de00e969281bbab7",
+					"jsonFile" : "target-replaygain_analysis-Debug-9d9ad82bec0fb54365c7.json",
+					"name" : "replaygain_analysis",
+					"projectIndex" : 2
+				},
+				{
+					"directoryIndex" : 6,
+					"id" : "replaygain_synthesis::@d9922ac0da7460f4cef0",
+					"jsonFile" : "target-replaygain_synthesis-Debug-81580e2ceb76dd6e05e4.json",
+					"name" : "replaygain_synthesis",
+					"projectIndex" : 2
+				},
+				{
+					"directoryIndex" : 8,
+					"id" : "utf8::@cbb4242b2a2beb34e4a0",
+					"jsonFile" : "target-utf8-Debug-250d84c2c3dc830a99e6.json",
+					"name" : "utf8",
+					"projectIndex" : 2
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "vk_shader_check::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-vk_shader_check-Debug-dcaa3cb66a564b68c046.json",
+					"name" : "vk_shader_check",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "vk_shader_regen::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-vk_shader_regen-Debug-db60a58f17b2a3cdcb4b.json",
+					"name" : "vk_shader_regen",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "vk_shaders_autogen::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-vk_shaders_autogen-Debug-7cfb7dfcc55b0edf6e33.json",
+					"name" : "vk_shaders_autogen",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 11,
+					"id" : "zlib::@62f0f490a982c87fefdf",
+					"jsonFile" : "target-zlib-Debug-9d2c0ba84a67b3714640.json",
+					"name" : "zlib",
+					"projectIndex" : 3
+				},
+				{
+					"directoryIndex" : 11,
+					"id" : "zlibstatic::@62f0f490a982c87fefdf",
+					"jsonFile" : "target-zlibstatic-Debug-821e19d2ccb8cc4cf187.json",
+					"name" : "zlibstatic",
+					"projectIndex" : 3
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/home/tim/Desktop/next-gen-4/idtech3/android/app/.cxx/Debug/446d6s5u/armeabi-v7a",
+		"source" : "/home/tim/Desktop/next-gen-4/idtech3"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 7
+	}
+}

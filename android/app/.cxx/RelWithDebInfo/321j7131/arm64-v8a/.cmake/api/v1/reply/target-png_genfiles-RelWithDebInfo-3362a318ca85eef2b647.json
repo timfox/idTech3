@@ -1,0 +1,35 @@
+{
+	"backtrace" : 1,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"add_custom_target"
+		],
+		"files" : 
+		[
+			"src/external/src/libpng/CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 371,
+				"parent" : 0
+			}
+		]
+	},
+	"id" : "png_genfiles::@031acffb9bb0241b3cdb",
+	"name" : "png_genfiles",
+	"paths" : 
+	{
+		"build" : "external/libpng",
+		"source" : "src/external/src/libpng"
+	},
+	"sources" : [],
+	"type" : "UTILITY"
+}
