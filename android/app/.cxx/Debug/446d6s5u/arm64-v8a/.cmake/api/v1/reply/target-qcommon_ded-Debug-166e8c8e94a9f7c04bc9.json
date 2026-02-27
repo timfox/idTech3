@@ -1,0 +1,670 @@
+{
+	"artifacts" : 
+	[
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/qcommon/cm_load.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/qcommon/cm_patch.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/qcommon/cm_polylib.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/qcommon/cm_test.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/qcommon/cm_trace.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/qcommon/cmd.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/qcommon/common.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/qcommon/cvar.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/qcommon/files.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/qcommon/history.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/qcommon/huffman.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/qcommon/huffman_static.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/qcommon/jobs.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/qcommon/js_debug.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/qcommon/keys.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/qcommon/lua_debug.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/qcommon/md4.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/qcommon/md5.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/qcommon/msg.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/qcommon/net_chan.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/qcommon/net_ip.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/qcommon/puff.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/qcommon/q_math.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/qcommon/q_shared.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/qcommon/q_utf8.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/qcommon/unzip.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/qcommon/vm.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/qcommon/vm_interpreted.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/qcommon/vm_aarch64.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/server/sv_bot.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/server/sv_ccmds.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/server/sv_client.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/server/sv_enhanced.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/server/sv_filter.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/server/sv_game.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/server/sv_init.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/server/sv_main.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/server/sv_net_chan.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/server/sv_snapshot.c.o"
+		},
+		{
+			"path" : "CMakeFiles/qcommon_ded.dir/./src/server/sv_world.c.o"
+		}
+	],
+	"backtrace" : 1,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"ADD_LIBRARY",
+			"add_compile_options",
+			"TARGET_COMPILE_DEFINITIONS",
+			"add_compile_definitions",
+			"target_include_directories"
+		],
+		"files" : 
+		[
+			"CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 935,
+				"parent" : 0
+			},
+			{
+				"command" : 1,
+				"file" : 0,
+				"line" : 44,
+				"parent" : 0
+			},
+			{
+				"command" : 2,
+				"file" : 0,
+				"line" : 936,
+				"parent" : 0
+			},
+			{
+				"command" : 3,
+				"file" : 0,
+				"line" : 724,
+				"parent" : 0
+			},
+			{
+				"command" : 2,
+				"file" : 0,
+				"line" : 960,
+				"parent" : 0
+			},
+			{
+				"command" : 3,
+				"file" : 0,
+				"line" : 745,
+				"parent" : 0
+			},
+			{
+				"command" : 3,
+				"file" : 0,
+				"line" : 750,
+				"parent" : 0
+			},
+			{
+				"command" : 4,
+				"file" : 0,
+				"line" : 938,
+				"parent" : 0
+			},
+			{
+				"command" : 4,
+				"file" : 0,
+				"line" : 940,
+				"parent" : 0
+			}
+		]
+	},
+	"compileGroups" : 
+	[
+		{
+			"compileCommandFragments" : 
+			[
+				{
+					"fragment" : "-g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -std=c23 -fPIC"
+				},
+				{
+					"backtrace" : 2,
+					"fragment" : "-Wall"
+				},
+				{
+					"backtrace" : 2,
+					"fragment" : "-Wextra"
+				},
+				{
+					"backtrace" : 2,
+					"fragment" : "-Wpedantic"
+				},
+				{
+					"backtrace" : 2,
+					"fragment" : "-Wshadow"
+				},
+				{
+					"backtrace" : 2,
+					"fragment" : "-Wstrict-prototypes"
+				},
+				{
+					"backtrace" : 2,
+					"fragment" : "-Wmissing-prototypes"
+				},
+				{
+					"backtrace" : 2,
+					"fragment" : "-Wold-style-definition"
+				},
+				{
+					"backtrace" : 2,
+					"fragment" : "-Wformat=2"
+				},
+				{
+					"backtrace" : 2,
+					"fragment" : "-Wundef"
+				},
+				{
+					"backtrace" : 2,
+					"fragment" : "-Wcast-qual"
+				},
+				{
+					"backtrace" : 2,
+					"fragment" : "-Wpointer-arith"
+				},
+				{
+					"backtrace" : 2,
+					"fragment" : "-Wvla"
+				}
+			],
+			"defines" : 
+			[
+				{
+					"backtrace" : 3,
+					"define" : "DEDICATED"
+				},
+				{
+					"backtrace" : 4,
+					"define" : "RENDERER_DEFAULT=\"vulkan\""
+				},
+				{
+					"backtrace" : 4,
+					"define" : "RENDERER_PREFIX=\"idtech3\""
+				},
+				{
+					"backtrace" : 5,
+					"define" : "SKIP_IDPAK_CHECK=1"
+				},
+				{
+					"backtrace" : 6,
+					"define" : "USE_RENDERER_DLOPEN=0"
+				},
+				{
+					"backtrace" : 7,
+					"define" : "USE_SDL=0"
+				}
+			],
+			"includes" : 
+			[
+				{
+					"backtrace" : 8,
+					"path" : "/home/tim/Desktop/next-gen-4/idtech3/src/external/src/glm"
+				},
+				{
+					"backtrace" : 9,
+					"path" : "/home/tim/Desktop/next-gen-4/idtech3/src/platform"
+				},
+				{
+					"backtrace" : 9,
+					"path" : "/home/tim/Desktop/next-gen-4/idtech3/src/platform/win32"
+				},
+				{
+					"backtrace" : 9,
+					"path" : "/home/tim/Desktop/next-gen-4/idtech3/src/platform/platform/win32"
+				},
+				{
+					"backtrace" : 9,
+					"path" : "/home/tim/Desktop/next-gen-4/idtech3/src/client"
+				},
+				{
+					"backtrace" : 9,
+					"path" : "/home/tim/Desktop/next-gen-4/idtech3/src/audio"
+				}
+			],
+			"language" : "C",
+			"languageStandard" : 
+			{
+				"backtraces" : 
+				[
+					1
+				],
+				"standard" : "23"
+			},
+			"sourceIndexes" : 
+			[
+				0,
+				1,
+				2,
+				3,
+				4,
+				5,
+				6,
+				7,
+				8,
+				9,
+				10,
+				11,
+				12,
+				13,
+				14,
+				15,
+				16,
+				17,
+				18,
+				19,
+				20,
+				21,
+				22,
+				23,
+				24,
+				25,
+				26,
+				27,
+				28,
+				29,
+				30,
+				31,
+				32,
+				33,
+				34,
+				35,
+				36,
+				37,
+				38,
+				39
+			],
+			"sysroot" : 
+			{
+				"path" : "/home/tim/android-sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
+			}
+		}
+	],
+	"id" : "qcommon_ded::@6890427a1f51a3e7e1df",
+	"name" : "qcommon_ded",
+	"paths" : 
+	{
+		"build" : ".",
+		"source" : "."
+	},
+	"sourceGroups" : 
+	[
+		{
+			"name" : "Source Files",
+			"sourceIndexes" : 
+			[
+				0,
+				1,
+				2,
+				3,
+				4,
+				5,
+				6,
+				7,
+				8,
+				9,
+				10,
+				11,
+				12,
+				13,
+				14,
+				15,
+				16,
+				17,
+				18,
+				19,
+				20,
+				21,
+				22,
+				23,
+				24,
+				25,
+				26,
+				27,
+				28,
+				29,
+				30,
+				31,
+				32,
+				33,
+				34,
+				35,
+				36,
+				37,
+				38,
+				39
+			]
+		}
+	],
+	"sources" : 
+	[
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/qcommon/cm_load.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/qcommon/cm_patch.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/qcommon/cm_polylib.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/qcommon/cm_test.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/qcommon/cm_trace.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/qcommon/cmd.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/qcommon/common.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/qcommon/cvar.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/qcommon/files.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/qcommon/history.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/qcommon/huffman.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/qcommon/huffman_static.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/qcommon/jobs.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/qcommon/js_debug.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/qcommon/keys.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/qcommon/lua_debug.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/qcommon/md4.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/qcommon/md5.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/qcommon/msg.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/qcommon/net_chan.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/qcommon/net_ip.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/qcommon/puff.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/qcommon/q_math.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/qcommon/q_shared.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/qcommon/q_utf8.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/qcommon/unzip.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/qcommon/vm.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/qcommon/vm_interpreted.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/qcommon/vm_aarch64.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/server/sv_bot.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/server/sv_ccmds.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/server/sv_client.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/server/sv_enhanced.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/server/sv_filter.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/server/sv_game.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/server/sv_init.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/server/sv_main.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/server/sv_net_chan.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/server/sv_snapshot.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/server/sv_world.c",
+			"sourceGroupIndex" : 0
+		}
+	],
+	"type" : "OBJECT_LIBRARY"
+}

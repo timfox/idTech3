@@ -30,3 +30,4 @@ enable_vulkan_patch1_tiny.flag
 test-build/
 build_log.txt
 src/renderers/vulkan/shaders/spirv/generated/backups/
+android/.gradle/

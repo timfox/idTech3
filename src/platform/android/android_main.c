@@ -51,21 +51,6 @@ static int              g_engineInitialized = 0;
 
 /* ---- Sys functions ---- */
 
-int Sys_Milliseconds( void ) {
-	struct timespec ts;
-	static long base = 0;
-	clock_gettime( CLOCK_MONOTONIC, &ts );
-	long ms = ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
-	if ( !base ) base = ms;
-	return (int)( ms - base );
-}
-
-int64_t Sys_Microseconds( void ) {
-	struct timespec ts;
-	clock_gettime( CLOCK_MONOTONIC, &ts );
-	return (int64_t)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
-}
-
 void NORETURN Sys_Quit( void ) {
 	g_running = 0;
 	LOGI( "Sys_Quit" );
@@ -93,10 +78,6 @@ void Sys_Init( void ) {
 
 const char *Sys_DefaultBasePath( void ) {
 	return g_dataPath;
-}
-
-const char *Sys_DefaultHomePath( void ) {
-	return g_homePath[0] ? g_homePath : g_dataPath;
 }
 
 qboolean Sys_LowPhysicalMemory( void ) { return qfalse; }
@@ -225,6 +206,7 @@ typedef struct {
 	byte *buffer;
 } dma_t;
 extern dma_t dma;
+void SNDDMA_Shutdown( void );
 
 static void SNDDMA_Callback( SLBufferQueueItf bq, void *context ) {
 	(void)context;
@@ -468,7 +450,7 @@ static void *gameThreadFunc( void *arg ) {
 	}
 
 	LOGI( "Game thread: shutting down" );
-	Com_Shutdown();
+	CL_Shutdown( "Android shutdown", qtrue );
 	return NULL;
 }
 
@@ -571,7 +553,6 @@ void ANativeActivity_onCreate( ANativeActivity *activity, void *savedState, size
 	activity->callbacks->onNativeWindowCreated = onNativeWindowCreated;
 	activity->callbacks->onNativeWindowDestroyed = onNativeWindowDestroyed;
 	activity->callbacks->onNativeWindowResized = onNativeWindowResized;
-	activity->callbacks->onInputEvent = onInputEvent;
 
 	LOGI( "ANativeActivity_onCreate: id Tech 3 starting" );
 	LOGI( "  Internal: %s", activity->internalDataPath ? activity->internalDataPath : "null" );
