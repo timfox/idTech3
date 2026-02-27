@@ -529,12 +529,44 @@ static void *gameThreadFunc( void *arg ) {
 		if ( msec < 1 ) msec = 1;
 		if ( msec > 200 ) msec = 200;
 
+		Android_PollInput();
 		Com_Frame( msec );
 	}
 
 	LOGI( "Game thread: shutting down" );
+<<<<<<< HEAD
 	CL_Shutdown( "Android shutdown", qtrue );
+=======
+>>>>>>> 1f37be6b8d699e0edc8d68548301b133a41fe1b3
 	return NULL;
+}
+
+/* ---- Input queue handling ---- */
+
+static AInputQueue *g_inputQueue = NULL;
+
+static void onInputQueueCreated( ANativeActivity *activity, AInputQueue *queue ) {
+	(void)activity;
+	g_inputQueue = queue;
+	LOGI( "Input queue created" );
+}
+
+static void onInputQueueDestroyed( ANativeActivity *activity, AInputQueue *queue ) {
+	(void)activity; (void)queue;
+	g_inputQueue = NULL;
+	LOGI( "Input queue destroyed" );
+}
+
+/* Called from the game thread to drain pending input events */
+static void Android_PollInput( void ) {
+	AInputEvent *event = NULL;
+	if ( !g_inputQueue ) return;
+
+	while ( AInputQueue_getEvent( g_inputQueue, &event ) >= 0 ) {
+		if ( AInputQueue_preDispatchEvent( g_inputQueue, event ) ) continue;
+		int handled = onInputEvent( NULL, event );
+		AInputQueue_finishEvent( g_inputQueue, event, handled );
+	}
 }
 
 /* ---- NativeActivity callbacks ---- */
@@ -644,6 +676,11 @@ void ANativeActivity_onCreate( ANativeActivity *activity, void *savedState, size
 	activity->callbacks->onNativeWindowCreated = onNativeWindowCreated;
 	activity->callbacks->onNativeWindowDestroyed = onNativeWindowDestroyed;
 	activity->callbacks->onNativeWindowResized = onNativeWindowResized;
+<<<<<<< HEAD
+=======
+	activity->callbacks->onInputQueueCreated = onInputQueueCreated;
+	activity->callbacks->onInputQueueDestroyed = onInputQueueDestroyed;
+>>>>>>> 1f37be6b8d699e0edc8d68548301b133a41fe1b3
 
 	LOGI( "ANativeActivity_onCreate: id Tech 3 starting" );
 	LOGI( "  Internal: %s", activity->internalDataPath ? activity->internalDataPath : "null" );
