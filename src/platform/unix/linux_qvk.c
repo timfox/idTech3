@@ -33,6 +33,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <unistd.h>
 #include <sys/types.h>
 #include "../qcommon/q_shared.h"
+#if defined(__APPLE__)
+/* macOS uses macos_qvk.c instead */
+#else
+
 #include "../qcommon/qcommon.h"
 #include "../renderers/common/tr_types.h"
 #include "unix_glw.h"
@@ -152,3 +156,5 @@ qboolean QVK_Init( void )
 
 	return qtrue;
 }
+
+#endif /* !__APPLE__ */
