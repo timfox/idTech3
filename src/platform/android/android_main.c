@@ -192,6 +192,13 @@ static int   audioDmaPos = 0;
 static qboolean audioInitialized = qfalse;
 static int   audioBackendType = 0; /* 0=none, 1=AAudio, 2=OpenSL ES */
 
+/* Forward declarations */
+static void SNDDMA_FillBuffer( short *dest, int framesToFill );
+static qboolean SNDDMA_InitAAudio( int sampleRate );
+void SNDDMA_Shutdown( void );
+static void Android_PollInput( void );
+static int32_t onInputEvent( ANativeActivity *activity, AInputEvent *event );
+
 typedef struct {
 	int speed;
 	int channels;
@@ -252,7 +259,9 @@ static qboolean SNDDMA_InitAAudio( int sampleRate ) {
 	AAudioStreamBuilder_setChannelCount( builder, ANDROID_AUDIO_CHANNELS );
 	AAudioStreamBuilder_setFormat( builder, AAUDIO_FORMAT_PCM_I16 );
 	AAudioStreamBuilder_setPerformanceMode( builder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY );
+#if __ANDROID_API__ >= 28
 	AAudioStreamBuilder_setUsage( builder, AAUDIO_USAGE_GAME );
+#endif
 	AAudioStreamBuilder_setDataCallback( builder, SNDDMA_AAudioCallback, NULL );
 	AAudioStreamBuilder_setFramesPerDataCallback( builder, ANDROID_AUDIO_SAMPLES );
 
