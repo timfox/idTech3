@@ -195,26 +195,21 @@ void GLimp_SetGamma( unsigned char *r, unsigned char *g, unsigned char *b ) {
 	(void)r; (void)g; (void)b;
 }
 
-/* ---- OpenSL ES Audio Backend ---- */
+/* ---- Audio Backend: AAudio (primary) + OpenSL ES (fallback) ---- */
 
+#include <aaudio/AAudio.h>
 #include <SLES/OpenSLES.h>
 #include <SLES/OpenSLES_Android.h>
 
-#define ANDROID_AUDIO_SAMPLES   4096
+#define ANDROID_AUDIO_SAMPLES   2048
 #define ANDROID_AUDIO_CHANNELS  2
-#define ANDROID_AUDIO_RATE      22050
-
-static SLObjectItf slEngineObj = NULL;
-static SLEngineItf slEngine = NULL;
-static SLObjectItf slMixObj = NULL;
-static SLObjectItf slPlayerObj = NULL;
-static SLPlayItf   slPlay = NULL;
-static SLBufferQueueItf slBufferQueue = NULL;
+#define ANDROID_AUDIO_RATE      48000
 
 static short audioBuffer[2][ANDROID_AUDIO_SAMPLES * ANDROID_AUDIO_CHANNELS];
 static int   audioBufferIdx = 0;
 static int   audioDmaPos = 0;
 static qboolean audioInitialized = qfalse;
+static int   audioBackendType = 0; /* 0=none, 1=AAudio, 2=OpenSL ES */
 
 typedef struct {
 	int speed;
@@ -226,36 +221,115 @@ typedef struct {
 } dma_t;
 extern dma_t dma;
 
-static void SNDDMA_Callback( SLBufferQueueItf bq, void *context ) {
-	(void)context;
-	int bufSize = ANDROID_AUDIO_SAMPLES * ANDROID_AUDIO_CHANNELS * sizeof(short);
-	audioBufferIdx ^= 1;
+/* ---- AAudio backend ---- */
 
+static AAudioStream *aaStream = NULL;
+
+static void SNDDMA_FillBuffer( short *dest, int framesToFill ) {
+	int bufSize = framesToFill * ANDROID_AUDIO_CHANNELS * (int)sizeof(short);
 	if ( dma.buffer ) {
 		int pos = audioDmaPos * (dma.samplebits / 8) * dma.channels;
 		int avail = dma.samples * (dma.samplebits / 8) * dma.channels;
 		int copyLen = bufSize;
 		if ( copyLen > avail ) copyLen = avail;
-
 		int end = pos + copyLen;
 		if ( end > avail ) {
 			int first = avail - pos;
-			memcpy( audioBuffer[audioBufferIdx], dma.buffer + pos, first );
-			memcpy( (byte*)audioBuffer[audioBufferIdx] + first, dma.buffer, copyLen - first );
+			memcpy( dest, dma.buffer + pos, first );
+			memcpy( (byte*)dest + first, dma.buffer, copyLen - first );
 		} else {
-			memcpy( audioBuffer[audioBufferIdx], dma.buffer + pos, copyLen );
+			memcpy( dest, dma.buffer + pos, copyLen );
 		}
-		audioDmaPos = (audioDmaPos + ANDROID_AUDIO_SAMPLES) % dma.samples;
+		audioDmaPos = (audioDmaPos + framesToFill) % dma.samples;
 	} else {
-		memset( audioBuffer[audioBufferIdx], 0, bufSize );
+		memset( dest, 0, bufSize );
+	}
+}
+
+static aaudio_data_callback_result_t SNDDMA_AAudioCallback(
+	AAudioStream *stream, void *userData, void *audioData, int32_t numFrames )
+{
+	(void)stream; (void)userData;
+	SNDDMA_FillBuffer( (short *)audioData, numFrames );
+	return AAUDIO_CALLBACK_RESULT_CONTINUE;
+}
+
+static qboolean SNDDMA_InitAAudio( int sampleRate ) {
+	AAudioStreamBuilder *builder = NULL;
+	aaudio_result_t result;
+
+	result = AAudio_createStreamBuilder( &builder );
+	if ( result != AAUDIO_OK ) {
+		LOGE( "AAudio: createStreamBuilder failed (%d)", result );
+		return qfalse;
 	}
 
-	(*bq)->Enqueue( bq, audioBuffer[audioBufferIdx], bufSize );
+	AAudioStreamBuilder_setDirection( builder, AAUDIO_DIRECTION_OUTPUT );
+	AAudioStreamBuilder_setSharingMode( builder, AAUDIO_SHARING_MODE_SHARED );
+	AAudioStreamBuilder_setSampleRate( builder, sampleRate );
+	AAudioStreamBuilder_setChannelCount( builder, ANDROID_AUDIO_CHANNELS );
+	AAudioStreamBuilder_setFormat( builder, AAUDIO_FORMAT_PCM_I16 );
+	AAudioStreamBuilder_setPerformanceMode( builder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY );
+	AAudioStreamBuilder_setUsage( builder, AAUDIO_USAGE_GAME );
+	AAudioStreamBuilder_setDataCallback( builder, SNDDMA_AAudioCallback, NULL );
+	AAudioStreamBuilder_setFramesPerDataCallback( builder, ANDROID_AUDIO_SAMPLES );
+
+	result = AAudioStreamBuilder_openStream( builder, &aaStream );
+	AAudioStreamBuilder_delete( builder );
+
+	if ( result != AAUDIO_OK ) {
+		LOGE( "AAudio: openStream failed (%d)", result );
+		aaStream = NULL;
+		return qfalse;
+	}
+
+	result = AAudioStream_requestStart( aaStream );
+	if ( result != AAUDIO_OK ) {
+		LOGE( "AAudio: requestStart failed (%d)", result );
+		AAudioStream_close( aaStream );
+		aaStream = NULL;
+		return qfalse;
+	}
+
+	audioBackendType = 1;
+	LOGI( "AAudio: initialized (%d Hz, %d ch, low-latency, game usage)",
+		sampleRate, ANDROID_AUDIO_CHANNELS );
+	return qtrue;
+}
+
+/* ---- OpenSL ES fallback ---- */
+
+static SLObjectItf slEngineObj = NULL;
+static SLEngineItf slEngine = NULL;
+static SLObjectItf slMixObj = NULL;
+static SLObjectItf slPlayerObj = NULL;
+static SLPlayItf   slPlay = NULL;
+static SLBufferQueueItf slBufferQueue = NULL;
+
+static void SNDDMA_SLCallback( SLBufferQueueItf bq, void *context ) {
+	(void)context;
+	audioBufferIdx ^= 1;
+	SNDDMA_FillBuffer( audioBuffer[audioBufferIdx], ANDROID_AUDIO_SAMPLES );
+	(*bq)->Enqueue( bq, audioBuffer[audioBufferIdx],
+		ANDROID_AUDIO_SAMPLES * ANDROID_AUDIO_CHANNELS * sizeof(short) );
 }
 
 qboolean SNDDMA_Init( int sampleFrequencyInKHz ) {
 	SLresult result;
 	int sampleRate = sampleFrequencyInKHz > 0 ? sampleFrequencyInKHz * 1000 : ANDROID_AUDIO_RATE;
+
+	/* Try AAudio first (low-latency, modern API) */
+	if ( SNDDMA_InitAAudio( sampleRate ) ) {
+		dma.speed = sampleRate;
+		dma.channels = ANDROID_AUDIO_CHANNELS;
+		dma.samplebits = 16;
+		dma.samples = ANDROID_AUDIO_SAMPLES * 8;
+		dma.submission_chunk = ANDROID_AUDIO_SAMPLES;
+		audioInitialized = qtrue;
+		return qtrue;
+	}
+
+	LOGI( "AAudio unavailable, falling back to OpenSL ES" );
 
 	result = slCreateEngine( &slEngineObj, 0, NULL, 0, NULL, NULL );
 	if ( result != SL_RESULT_SUCCESS ) {
@@ -295,7 +369,7 @@ qboolean SNDDMA_Init( int sampleFrequencyInKHz ) {
 	(*slPlayerObj)->GetInterface( slPlayerObj, SL_IID_PLAY, &slPlay );
 	(*slPlayerObj)->GetInterface( slPlayerObj, SL_IID_BUFFERQUEUE, &slBufferQueue );
 
-	(*slBufferQueue)->RegisterCallback( slBufferQueue, SNDDMA_Callback, NULL );
+	(*slBufferQueue)->RegisterCallback( slBufferQueue, SNDDMA_SLCallback, NULL );
 
 	dma.speed = sampleRate;
 	dma.channels = ANDROID_AUDIO_CHANNELS;
@@ -315,16 +389,25 @@ qboolean SNDDMA_Init( int sampleFrequencyInKHz ) {
 
 	(*slPlay)->SetPlayState( slPlay, SL_PLAYSTATE_PLAYING );
 
+	audioBackendType = 2;
 	audioInitialized = qtrue;
 	LOGI( "OpenSL ES: initialized (%d Hz, %d ch, %d samples)", sampleRate, ANDROID_AUDIO_CHANNELS, dma.samples );
 	return qtrue;
 }
 
 void SNDDMA_Shutdown( void ) {
-	if ( slPlayerObj ) { (*slPlayerObj)->Destroy( slPlayerObj ); slPlayerObj = NULL; }
-	if ( slMixObj ) { (*slMixObj)->Destroy( slMixObj ); slMixObj = NULL; }
-	if ( slEngineObj ) { (*slEngineObj)->Destroy( slEngineObj ); slEngineObj = NULL; }
-	slPlay = NULL; slBufferQueue = NULL; slEngine = NULL;
+	if ( audioBackendType == 1 && aaStream ) {
+		AAudioStream_requestStop( aaStream );
+		AAudioStream_close( aaStream );
+		aaStream = NULL;
+	}
+	if ( audioBackendType == 2 ) {
+		if ( slPlayerObj ) { (*slPlayerObj)->Destroy( slPlayerObj ); slPlayerObj = NULL; }
+		if ( slMixObj ) { (*slMixObj)->Destroy( slMixObj ); slMixObj = NULL; }
+		if ( slEngineObj ) { (*slEngineObj)->Destroy( slEngineObj ); slEngineObj = NULL; }
+		slPlay = NULL; slBufferQueue = NULL; slEngine = NULL;
+	}
+	audioBackendType = 0;
 	audioInitialized = qfalse;
 }
 
@@ -507,8 +590,12 @@ static void onDestroy( ANativeActivity *activity ) {
 static void onPause( ANativeActivity *activity ) {
 	(void)activity;
 	g_paused = 1;
-	if ( audioInitialized && slPlay ) {
-		(*slPlay)->SetPlayState( slPlay, SL_PLAYSTATE_PAUSED );
+	if ( audioInitialized ) {
+		if ( audioBackendType == 1 && aaStream ) {
+			AAudioStream_requestPause( aaStream );
+		} else if ( audioBackendType == 2 && slPlay ) {
+			(*slPlay)->SetPlayState( slPlay, SL_PLAYSTATE_PAUSED );
+		}
 	}
 	LOGI( "Paused (audio suspended)" );
 }
@@ -516,8 +603,12 @@ static void onPause( ANativeActivity *activity ) {
 static void onResume( ANativeActivity *activity ) {
 	(void)activity;
 	g_paused = 0;
-	if ( audioInitialized && slPlay ) {
-		(*slPlay)->SetPlayState( slPlay, SL_PLAYSTATE_PLAYING );
+	if ( audioInitialized ) {
+		if ( audioBackendType == 1 && aaStream ) {
+			AAudioStream_requestStart( aaStream );
+		} else if ( audioBackendType == 2 && slPlay ) {
+			(*slPlay)->SetPlayState( slPlay, SL_PLAYSTATE_PLAYING );
+		}
 	}
 	LOGI( "Resumed (audio resumed)" );
 }
