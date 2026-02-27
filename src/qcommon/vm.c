@@ -1715,27 +1715,49 @@ static void * QDECL loadNative( const char *name, vmMainFunc_t *entryPoint, dllS
 	void		*vmMainAddr;
 	qboolean	isGenericModule = qfalse;
 
-	// For ui, game, cgame, qagame modules, try generic name first
+	// For ui, game, cgame, qagame modules, try alternate names
 	if ( Q_stricmp( name, "ui" ) == 0 || Q_stricmp( name, "game" ) == 0 || Q_stricmp( name, "cgame" ) == 0 || Q_stricmp( name, "qagame" ) == 0 ) {
 		isGenericModule = qtrue;
 
 		// Try the module name with .so extension first
 		Com_sprintf( filename, sizeof( filename ), "%s.so", name );
 		libHandle = FS_LoadLibrary( filename );
-		if ( libHandle ) {
-			goto loadSuccess;
-		}
+		if ( libHandle ) goto loadSuccess;
 
-		// For qagame, also try "game.so" as an alias
-		if ( Q_stricmp( name, "qagame" ) == 0 ) {
-			Com_sprintf( filename, sizeof( filename ), "game.so" );
-			libHandle = FS_LoadLibrary( filename );
-			if ( libHandle ) {
-				goto loadSuccess;
+		// Try alternate artifact names:
+		//   qagame/game -> "server"
+		//   cgame       -> "client"
+		//   ui          -> "frontend"
+		{
+			const char *altNames[3] = { NULL, NULL, NULL };
+			int altCount = 0;
+			int a;
+
+			if ( Q_stricmp( name, "qagame" ) == 0 ) {
+				altNames[altCount++] = "server";
+				altNames[altCount++] = "game";
+			} else if ( Q_stricmp( name, "game" ) == 0 ) {
+				altNames[altCount++] = "server";
+			} else if ( Q_stricmp( name, "cgame" ) == 0 ) {
+				altNames[altCount++] = "client";
+			} else if ( Q_stricmp( name, "ui" ) == 0 ) {
+				altNames[altCount++] = "frontend";
+			}
+
+			for ( a = 0; a < altCount; a++ ) {
+				// Try .so
+				Com_sprintf( filename, sizeof( filename ), "%s.so", altNames[a] );
+				libHandle = FS_LoadLibrary( filename );
+				if ( libHandle ) goto loadSuccess;
+
+				// Try platform-specific
+				Com_sprintf( filename, sizeof( filename ), "%s" ARCH_STRING DLL_EXT, altNames[a] );
+				libHandle = FS_LoadLibrary( filename );
+				if ( libHandle ) goto loadSuccess;
 			}
 		}
 
-		// Generic name failed, fall back to platform-specific name
+		// All alternate names failed, fall back to platform-specific original name
 	}
 
 	// Try platform-specific name
