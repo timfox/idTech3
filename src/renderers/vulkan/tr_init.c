@@ -2118,6 +2118,12 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( ri.Cvar_Get( "r_consoleFont", "", CVAR_ARCHIVE ), "Custom TrueType font for the console (e.g. fonts/consolefont.ttf). Empty = default." );
 	ri.Cvar_Get( "r_fontSize", "16", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( ri.Cvar_Get( "r_fontSize", "16", CVAR_ARCHIVE ), "Point size for custom fonts loaded via r_font / r_consoleFont." );
+	ri.Cvar_Get( "r_outline", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( ri.Cvar_Get( "r_outline", "0", CVAR_ARCHIVE ), "Edge-detection outline strength (0 = off, 0.5 = subtle, 1.0 = strong)." );
+	ri.Cvar_Get( "r_outlineThreshold", "0.15", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( ri.Cvar_Get( "r_outlineThreshold", "0.15", CVAR_ARCHIVE ), "Luminance edge threshold for outline detection." );
+	ri.Cvar_Get( "r_safeMode", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( ri.Cvar_Get( "r_safeMode", "0", CVAR_ARCHIVE | CVAR_LATCH ), "Safe mode: disables post-processing, bloom, SSAO, volumetric fog. Use if the engine crashes on startup." );
 
 	r_nocurves = ri.Cvar_Get ("r_nocurves", "0", CVAR_CHEAT );
 	ri.Cvar_SetDescription( r_nocurves, "Set to 1 to disable drawing world bezier curves. Set to 0 to enable." );

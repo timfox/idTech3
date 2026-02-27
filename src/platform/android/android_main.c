@@ -195,12 +195,141 @@ void GLimp_SetGamma( unsigned char *r, unsigned char *g, unsigned char *b ) {
 	(void)r; (void)g; (void)b;
 }
 
-/* ---- Sound stubs (until OpenSL ES / Oboe) ---- */
+/* ---- OpenSL ES Audio Backend ---- */
 
-qboolean SNDDMA_Init( int freq ) { (void)freq; return qfalse; }
-void SNDDMA_Shutdown( void ) {}
+#include <SLES/OpenSLES.h>
+#include <SLES/OpenSLES_Android.h>
+
+#define ANDROID_AUDIO_SAMPLES   4096
+#define ANDROID_AUDIO_CHANNELS  2
+#define ANDROID_AUDIO_RATE      22050
+
+static SLObjectItf slEngineObj = NULL;
+static SLEngineItf slEngine = NULL;
+static SLObjectItf slMixObj = NULL;
+static SLObjectItf slPlayerObj = NULL;
+static SLPlayItf   slPlay = NULL;
+static SLBufferQueueItf slBufferQueue = NULL;
+
+static short audioBuffer[2][ANDROID_AUDIO_SAMPLES * ANDROID_AUDIO_CHANNELS];
+static int   audioBufferIdx = 0;
+static int   audioDmaPos = 0;
+static qboolean audioInitialized = qfalse;
+
+typedef struct {
+	int speed;
+	int channels;
+	int samplebits;
+	int samples;
+	int submission_chunk;
+	byte *buffer;
+} dma_t;
+extern dma_t dma;
+
+static void SNDDMA_Callback( SLBufferQueueItf bq, void *context ) {
+	(void)context;
+	int bufSize = ANDROID_AUDIO_SAMPLES * ANDROID_AUDIO_CHANNELS * sizeof(short);
+	audioBufferIdx ^= 1;
+
+	if ( dma.buffer ) {
+		int pos = audioDmaPos * (dma.samplebits / 8) * dma.channels;
+		int avail = dma.samples * (dma.samplebits / 8) * dma.channels;
+		int copyLen = bufSize;
+		if ( copyLen > avail ) copyLen = avail;
+
+		int end = pos + copyLen;
+		if ( end > avail ) {
+			int first = avail - pos;
+			memcpy( audioBuffer[audioBufferIdx], dma.buffer + pos, first );
+			memcpy( (byte*)audioBuffer[audioBufferIdx] + first, dma.buffer, copyLen - first );
+		} else {
+			memcpy( audioBuffer[audioBufferIdx], dma.buffer + pos, copyLen );
+		}
+		audioDmaPos = (audioDmaPos + ANDROID_AUDIO_SAMPLES) % dma.samples;
+	} else {
+		memset( audioBuffer[audioBufferIdx], 0, bufSize );
+	}
+
+	(*bq)->Enqueue( bq, audioBuffer[audioBufferIdx], bufSize );
+}
+
+qboolean SNDDMA_Init( int sampleFrequencyInKHz ) {
+	SLresult result;
+	int sampleRate = sampleFrequencyInKHz > 0 ? sampleFrequencyInKHz * 1000 : ANDROID_AUDIO_RATE;
+
+	result = slCreateEngine( &slEngineObj, 0, NULL, 0, NULL, NULL );
+	if ( result != SL_RESULT_SUCCESS ) {
+		LOGE( "OpenSL ES: slCreateEngine failed (%d)", (int)result );
+		return qfalse;
+	}
+	(*slEngineObj)->Realize( slEngineObj, SL_BOOLEAN_FALSE );
+	(*slEngineObj)->GetInterface( slEngineObj, SL_IID_ENGINE, &slEngine );
+
+	(*slEngine)->CreateOutputMix( slEngine, &slMixObj, 0, NULL, NULL );
+	(*slMixObj)->Realize( slMixObj, SL_BOOLEAN_FALSE );
+
+	SLDataLocator_AndroidSimpleBufferQueue locBufQ = {
+		SL_DATALOCATOR_ANDROIDSIMPLEBUFFERQUEUE, 2
+	};
+	SLDataFormat_PCM formatPcm = {
+		SL_DATAFORMAT_PCM, ANDROID_AUDIO_CHANNELS,
+		(SLuint32)(sampleRate * 1000),
+		SL_PCMSAMPLEFORMAT_FIXED_16, SL_PCMSAMPLEFORMAT_FIXED_16,
+		SL_SPEAKER_FRONT_LEFT | SL_SPEAKER_FRONT_RIGHT,
+		SL_BYTEORDER_LITTLEENDIAN
+	};
+	SLDataSource audioSrc = { &locBufQ, &formatPcm };
+	SLDataLocator_OutputMix locOutMix = { SL_DATALOCATOR_OUTPUTMIX, slMixObj };
+	SLDataSink audioSnk = { &locOutMix, NULL };
+
+	const SLInterfaceID ids[] = { SL_IID_BUFFERQUEUE };
+	const SLboolean req[] = { SL_BOOLEAN_TRUE };
+
+	result = (*slEngine)->CreateAudioPlayer( slEngine, &slPlayerObj, &audioSrc, &audioSnk, 1, ids, req );
+	if ( result != SL_RESULT_SUCCESS ) {
+		LOGE( "OpenSL ES: CreateAudioPlayer failed (%d)", (int)result );
+		SNDDMA_Shutdown();
+		return qfalse;
+	}
+	(*slPlayerObj)->Realize( slPlayerObj, SL_BOOLEAN_FALSE );
+	(*slPlayerObj)->GetInterface( slPlayerObj, SL_IID_PLAY, &slPlay );
+	(*slPlayerObj)->GetInterface( slPlayerObj, SL_IID_BUFFERQUEUE, &slBufferQueue );
+
+	(*slBufferQueue)->RegisterCallback( slBufferQueue, SNDDMA_Callback, NULL );
+
+	dma.speed = sampleRate;
+	dma.channels = ANDROID_AUDIO_CHANNELS;
+	dma.samplebits = 16;
+	dma.samples = ANDROID_AUDIO_SAMPLES * 8;
+	dma.submission_chunk = ANDROID_AUDIO_SAMPLES;
+
+	memset( audioBuffer, 0, sizeof( audioBuffer ) );
+	audioBufferIdx = 0;
+	audioDmaPos = 0;
+
+	/* Prime the buffer queue */
+	(*slBufferQueue)->Enqueue( slBufferQueue, audioBuffer[0],
+		ANDROID_AUDIO_SAMPLES * ANDROID_AUDIO_CHANNELS * sizeof(short) );
+	(*slBufferQueue)->Enqueue( slBufferQueue, audioBuffer[1],
+		ANDROID_AUDIO_SAMPLES * ANDROID_AUDIO_CHANNELS * sizeof(short) );
+
+	(*slPlay)->SetPlayState( slPlay, SL_PLAYSTATE_PLAYING );
+
+	audioInitialized = qtrue;
+	LOGI( "OpenSL ES: initialized (%d Hz, %d ch, %d samples)", sampleRate, ANDROID_AUDIO_CHANNELS, dma.samples );
+	return qtrue;
+}
+
+void SNDDMA_Shutdown( void ) {
+	if ( slPlayerObj ) { (*slPlayerObj)->Destroy( slPlayerObj ); slPlayerObj = NULL; }
+	if ( slMixObj ) { (*slMixObj)->Destroy( slMixObj ); slMixObj = NULL; }
+	if ( slEngineObj ) { (*slEngineObj)->Destroy( slEngineObj ); slEngineObj = NULL; }
+	slPlay = NULL; slBufferQueue = NULL; slEngine = NULL;
+	audioInitialized = qfalse;
+}
+
 void SNDDMA_BeginPainting( void ) {}
-int  SNDDMA_GetDMAPos( void ) { return 0; }
+int  SNDDMA_GetDMAPos( void ) { return audioDmaPos; }
 void SNDDMA_Submit( void ) {}
 
 /* ---- Navigation stubs ---- */
@@ -378,13 +507,19 @@ static void onDestroy( ANativeActivity *activity ) {
 static void onPause( ANativeActivity *activity ) {
 	(void)activity;
 	g_paused = 1;
-	LOGI( "Paused" );
+	if ( audioInitialized && slPlay ) {
+		(*slPlay)->SetPlayState( slPlay, SL_PLAYSTATE_PAUSED );
+	}
+	LOGI( "Paused (audio suspended)" );
 }
 
 static void onResume( ANativeActivity *activity ) {
 	(void)activity;
 	g_paused = 0;
-	LOGI( "Resumed" );
+	if ( audioInitialized && slPlay ) {
+		(*slPlay)->SetPlayState( slPlay, SL_PLAYSTATE_PLAYING );
+	}
+	LOGI( "Resumed (audio resumed)" );
 }
 
 /* ---- JNI bridge ---- */

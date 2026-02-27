@@ -27,6 +27,8 @@ static cvar_t *cl_voipShowMeter;
 static qboolean voipInitialized = qfalse;
 static qboolean voipCapturing = qfalse;
 static float    voipPower = 0.0f;
+static uint32_t voipOutSequence = 0;
+static uint32_t voipInSequence[VOIP_MAX_CLIENTS];
 
 static int16_t  captureBuffer[VOIP_FRAME_SAMPLES * 4];
 static byte     encodedBuffer[VOIP_MAX_PACKET];
@@ -144,10 +146,11 @@ void CL_VoIP_Frame( void ) {
 
 		if ( encodedLen > 0 && cls.state == CA_ACTIVE ) {
 			msg_t buf;
-			byte msgData[VOIP_MAX_PACKET + 16];
+			byte msgData[VOIP_MAX_PACKET + 32];
 
 			MSG_Init( &buf, msgData, sizeof( msgData ) );
 			MSG_WriteByte( &buf, clc_voipOpus );
+			MSG_WriteLong( &buf, (int)voipOutSequence++ );
 			MSG_WriteShort( &buf, (int)encodedLen );
 			MSG_WriteData( &buf, encodedBuffer, encodedLen );
 
@@ -160,8 +163,22 @@ void CL_VoIP_ParsePacket( int sender, const byte *data, int len ) {
 	int err;
 	int16_t pcmBuffer[VOIP_FRAME_SAMPLES];
 	int decodedSamples;
+	uint32_t sequence;
 
 	if ( !voipInitialized || sender < 0 || sender >= VOIP_MAX_CLIENTS ) return;
+
+	if ( len < 4 ) return;
+	sequence = (uint32_t)data[0] | ((uint32_t)data[1] << 8) |
+		((uint32_t)data[2] << 16) | ((uint32_t)data[3] << 24);
+	data += 4;
+	len -= 4;
+
+	if ( sequence < voipInSequence[sender] ) {
+		Com_DPrintf( "VoIP: dropped out-of-order packet from %d (seq %u < %u)\n",
+			sender, sequence, voipInSequence[sender] );
+		return;
+	}
+	voipInSequence[sender] = sequence + 1;
 
 	if ( !voipDecoders[sender] ) {
 		voipDecoders[sender] = opus_decoder_create( VOIP_SAMPLE_RATE, 1, &err );

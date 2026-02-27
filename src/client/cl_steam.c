@@ -19,7 +19,7 @@ API, with fallback to the SteamDeck environment variable.
 static cvar_t *in_steamDeck;
 static cvar_t *cl_steamOverlay;
 static cvar_t *cl_steamRichPresence;
-static qboolean steamInitialized = qfalse;
+static qboolean steamInitialized UNUSED_VAR = qfalse;
 static qboolean steamDeckDetected = qfalse;
 
 #ifdef USE_STEAM
