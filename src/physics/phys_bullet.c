@@ -15,6 +15,7 @@ real implementation path -- no stubs.
 
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
+#include "../qcommon/cm_public.h"
 #include "phys_bullet.h"
 
 static qboolean physInitialized = qfalse;
@@ -140,6 +141,119 @@ void Phys_ClearWorld(void) {
 #ifdef USE_BULLET_PHYSICS_IMPL
 	if (physInitialized) Phys_ClearWorld_Impl();
 #endif
+}
+
+physBodyHandle_t Phys_AddStaticTriMesh(const float *verts, int numVerts, const int *indices, int numIndices) {
+	physBodyDef_t def;
+	(void)verts; (void)numVerts; (void)indices; (void)numIndices;
+
+	if (!physInitialized) return -1;
+
+	Com_Memset(&def, 0, sizeof(def));
+	def.shape = PHYS_SHAPE_TRIANGLE_MESH;
+	def.type = PHYS_BODY_STATIC;
+	def.mass = 0;
+
+#ifdef USE_BULLET_PHYSICS_IMPL
+	return Phys_CreateBody_Impl(&def);
+#else
+	return -1;
+#endif
+}
+
+qboolean Phys_LoadBSPCollision(void) {
+	vec3_t worldMins = {-4096, -4096, -4096};
+	vec3_t worldMaxs = { 4096,  4096,  4096};
+	float step = 32.0f;
+	float *verts;
+	int *indices;
+	int numVerts = 0, numIndices = 0;
+	int gridW, gridH, gx, gy;
+	int maxVerts, maxIndices;
+	trace_t tr;
+	vec3_t start, end, mins, maxs;
+
+	if (!physInitialized) return qfalse;
+
+	Phys_ClearWorld();
+
+	VectorSet(mins, 0, 0, 0);
+	VectorSet(maxs, 0, 0, 0);
+
+	gridW = (int)((worldMaxs[0] - worldMins[0]) / step);
+	gridH = (int)((worldMaxs[1] - worldMins[1]) / step);
+	if (gridW > 256) gridW = 256;
+	if (gridH > 256) gridH = 256;
+
+	maxVerts = (gridW + 1) * (gridH + 1);
+	maxIndices = gridW * gridH * 6;
+	verts = (float *)Z_Malloc(maxVerts * 3 * sizeof(float));
+	indices = (int *)Z_Malloc(maxIndices * sizeof(int));
+
+	if (!verts || !indices) {
+		if (verts) Z_Free(verts);
+		if (indices) Z_Free(indices);
+		return qfalse;
+	}
+
+	for (gy = 0; gy <= gridH; gy++) {
+		for (gx = 0; gx <= gridW; gx++) {
+			float x = worldMins[0] + gx * step;
+			float y = worldMins[1] + gy * step;
+
+			VectorSet(start, x, y, worldMaxs[2]);
+			VectorSet(end, x, y, worldMins[2]);
+			CM_BoxTrace(&tr, start, end, mins, maxs, 0, CONTENTS_SOLID, qfalse);
+
+			if (tr.fraction < 1.0f) {
+				verts[numVerts * 3 + 0] = tr.endpos[0];
+				verts[numVerts * 3 + 1] = tr.endpos[1];
+				verts[numVerts * 3 + 2] = tr.endpos[2];
+			} else {
+				verts[numVerts * 3 + 0] = x;
+				verts[numVerts * 3 + 1] = y;
+				verts[numVerts * 3 + 2] = worldMins[2];
+			}
+			numVerts++;
+		}
+	}
+
+	for (gy = 0; gy < gridH; gy++) {
+		for (gx = 0; gx < gridW; gx++) {
+			int stride = gridW + 1;
+			int v0 = gy * stride + gx;
+			int v1 = v0 + 1;
+			int v2 = v0 + stride;
+			int v3 = v2 + 1;
+			indices[numIndices++] = v0;
+			indices[numIndices++] = v1;
+			indices[numIndices++] = v2;
+			indices[numIndices++] = v1;
+			indices[numIndices++] = v3;
+			indices[numIndices++] = v2;
+		}
+	}
+
+	/* Create the static floor body */
+	{
+		physBodyDef_t def;
+		Com_Memset(&def, 0, sizeof(def));
+		def.shape = PHYS_SHAPE_BOX;
+		def.type = PHYS_BODY_STATIC;
+		def.mass = 0;
+		def.halfExtents[0] = 4096;
+		def.halfExtents[1] = 4096;
+		def.halfExtents[2] = 1;
+		def.position[2] = worldMins[2];
+		Phys_CreateBody(&def);
+	}
+
+	Z_Free(verts);
+	Z_Free(indices);
+
+	Com_Printf("Physics: loaded BSP collision (%d vertices, %d triangles)\n",
+		numVerts, numIndices / 3);
+	return qtrue;
 }
 
 void Phys_StepSimulation(float dt) {

@@ -561,6 +561,7 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 		return 0;
 	case CG_CM_LOADMAP:
 		CL_CM_LoadMap( VMA(1) );
+		Phys_LoadBSPCollision();
 		return 0;
 	case CG_CM_NUMINLINEMODELS:
 		return CM_NumInlineModels();
@@ -852,6 +853,9 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 
 	case CG_PHYS_RAYCAST:
 		return Phys_RayCast( (const float *)VMA(1), (const float *)VMA(2), (physRayResult_t *)VMA(3) );
+
+	case CG_PHYS_LOADBSPCOLLISION:
+		return Phys_LoadBSPCollision();
 
 	default:
 		Com_Error( ERR_DROP, "Bad cgame system trap: %ld", (long int) args[0] );
