@@ -74,6 +74,8 @@ cvar_t		*con_autoclear;
 cvar_t		*con_notifytime;
 cvar_t		*con_scale;
 cvar_t		*con_inputMode;
+cvar_t		*con_showVersion;
+cvar_t		*con_drawInput;
 
 int			g_console_field_width;
 
@@ -413,6 +415,10 @@ void Con_Init( void )
 		" 2 - chat-first (bare text always chat; commands require \\ or /)\n"
 		" 3 - smart (bare text becomes a command only if it matches a registered command)"
 	);
+	con_showVersion = Cvar_Get( "con_showVersion", "1", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( con_showVersion, "Show engine version at bottom of console. Set to 0 for custom game branding." );
+	con_drawInput = Cvar_Get( "con_drawInput", "1", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( con_drawInput, "Draw console input line (] prompt and cursor). Set to 0 to hide (e.g. for custom game UIs)." );
 
 	Field_Clear( &g_consoleField );
 	g_consoleField.widthInChars = g_console_field_width;
@@ -872,8 +878,17 @@ static void Con_DrawSolidConsole( float frac ) {
 		}
 	}
 
-	// draw the input prompt, user text, and cursor if desired
-	Con_DrawInput();
+	// draw the input line (optional; game can disable via con_drawInput 0)
+	if ( con_drawInput->integer )
+		Con_DrawInput();
+
+	// draw version at bottom (optional; game can disable via con_showVersion 0)
+	if ( con_showVersion->integer && com_version && com_version->string[0] )
+	{
+		re.SetColor( g_color_table[ ColorIndex( COLOR_WHITE ) ] );
+		SCR_DrawSmallString( con.xadjust + smallchar_width, lines - smallchar_height,
+			com_version->string, (int)strlen( com_version->string ) );
+	}
 
 	re.SetColor( NULL );
 }
