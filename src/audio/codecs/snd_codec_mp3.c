@@ -15,6 +15,11 @@ typedef struct {
 	MP3STREAM mp3;
 } mp3_stream_ctx_t;
 
+static int MP3_AbsInt( int value )
+{
+	return value < 0 ? -value : value;
+}
+
 // forward declarations
 void *S_MP3_CodecLoad(const char *filename, snd_info_t *info);
 snd_stream_t *S_MP3_CodecOpenStream(const char *filename);
@@ -134,6 +139,15 @@ snd_stream_t *S_MP3_CodecOpenStream(const char *filename)
 	mp3_stream_ctx_t *ctx = NULL;
 	char *err;
 	int stereoDesired = (dma.channels == 2) ? 1 : 0;
+	int sourceRate = 0;
+	int sourceWidth = 0;
+	int sourceChannels = 0;
+	int supportedRates[3];
+	int tryRates[4];
+	int supportedCount = 0;
+	int tryCount = 0;
+	int i, j;
+	int decodeRate = 0;
 
 	if (!filename) return NULL;
 
@@ -161,17 +175,65 @@ snd_stream_t *S_MP3_CodecOpenStream(const char *filename)
 	ctx->data = filebuf;
 	ctx->length = length;
 
-	// init decoder to game audio format (dma.speed / dma.samplebits)
-	err = C_MP3Stream_DecodeInit(&ctx->mp3, ctx->data, ctx->length, dma.speed, dma.samplebits, stereoDesired);
-	if (err) {
+	// get source stream properties so we can choose a supported decode rate
+	err = C_MP3_GetHeaderData( ctx->data, ctx->length, &sourceRate, &sourceWidth, &sourceChannels, stereoDesired );
+	if ( err || sourceRate <= 0 ) {
 		Z_Free(ctx);
 		Z_Free(filebuf);
 		S_CodecUtilClose(&stream);
 		return NULL;
 	}
 
+	// this decoder supports source, source/2, source/4 output rates only
+	supportedRates[supportedCount++] = sourceRate;
+	if ( sourceRate / 2 > 0 ) {
+		supportedRates[supportedCount++] = sourceRate / 2;
+	}
+	if ( sourceRate / 4 > 0 ) {
+		supportedRates[supportedCount++] = sourceRate / 4;
+	}
+
+	// sort supported rates by proximity to current mix rate
+	for ( i = 0; i < supportedCount; ++i ) {
+		for ( j = i + 1; j < supportedCount; ++j ) {
+			if ( MP3_AbsInt( supportedRates[j] - dma.speed ) < MP3_AbsInt( supportedRates[i] - dma.speed ) ) {
+				int tmp = supportedRates[i];
+				supportedRates[i] = supportedRates[j];
+				supportedRates[j] = tmp;
+			}
+		}
+	}
+
+	// first try the exact engine rate, then closest supported fallbacks
+	tryRates[tryCount++] = dma.speed;
+	for ( i = 0; i < supportedCount; ++i ) {
+		if ( supportedRates[i] != dma.speed ) {
+			tryRates[tryCount++] = supportedRates[i];
+		}
+	}
+
+	err = NULL;
+	for ( i = 0; i < tryCount; ++i ) {
+		decodeRate = tryRates[i];
+		err = C_MP3Stream_DecodeInit( &ctx->mp3, ctx->data, ctx->length, decodeRate, dma.samplebits, stereoDesired );
+		if ( !err ) {
+			break;
+		}
+	}
+
+	if ( err ) {
+		Com_DPrintf( S_COLOR_YELLOW "MP3 stream init failed for %s: %s\n", filename, err );
+		Z_Free(ctx);
+		Z_Free(filebuf);
+		S_CodecUtilClose(&stream);
+		return NULL;
+	}
+	if ( decodeRate != dma.speed ) {
+		Com_DPrintf( "MP3 stream %s using %d Hz decode for %d Hz mix\n", filename, decodeRate, dma.speed );
+	}
+
 	// fill stream info to indicate decoded output format
-	stream->info.rate = dma.speed;
+	stream->info.rate = decodeRate;
 	stream->info.width = dma.samplebits / 8;
 	stream->info.channels = dma.channels;
 	stream->info.samples = 0;
