@@ -2080,7 +2080,13 @@ static void create_instance( void )
 	appInfo.applicationVersion = 0x0;
 	appInfo.pEngineName = NULL;
 	appInfo.engineVersion = 0x0;
-#ifdef _DEBUG
+#ifdef VK_API_VERSION_1_4
+	appInfo.apiVersion = VK_API_VERSION_1_4;
+#elif defined(VK_API_VERSION_1_3)
+	appInfo.apiVersion = VK_API_VERSION_1_3;
+#elif defined(VK_API_VERSION_1_2)
+	appInfo.apiVersion = VK_API_VERSION_1_2;
+#elif defined(VK_API_VERSION_1_1)
 	appInfo.apiVersion = VK_API_VERSION_1_1;
 #else
 	appInfo.apiVersion = VK_API_VERSION_1_0;
@@ -2429,7 +2435,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 
 	// create VkDevice
 	{
-		const char *device_extension_list[24];
+		const char *device_extension_list[32];
 		uint32_t device_extension_count;
 		const char *ext, *end;
 		char *str;
@@ -2453,6 +2459,19 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		qboolean maintenance9 = qfalse;
 		qboolean shaderFma = qfalse;
 		qboolean portabilitySubset = qfalse;
+		qboolean dynamicRenderingLocalRead = qfalse;
+		qboolean globalPriority = qfalse;
+		qboolean lineRasterization = qfalse;
+		qboolean lineRasterizationExt = qfalse;
+		qboolean maintenance5 = qfalse;
+		qboolean maintenance8 = qfalse;
+		qboolean presentId = qfalse;
+		qboolean presentWait = qfalse;
+		qboolean shaderFloatControls2 = qfalse;
+		qboolean shaderMaximalReconvergence = qfalse;
+		qboolean shaderQuadControl = qfalse;
+		qboolean shaderRelaxedExtInstr = qfalse;
+		qboolean shaderSubgroupUniformCF = qfalse;
 #ifdef _DEBUG
 		qboolean timelineSemaphore = qfalse;
 		qboolean memoryModel = qfalse;
@@ -2510,6 +2529,32 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 				shaderFma = qtrue;
 			} else if ( strcmp( ext, "VK_KHR_portability_subset" ) == 0 ) {
 				portabilitySubset = qtrue;
+			} else if ( strcmp( ext, "VK_KHR_dynamic_rendering_local_read" ) == 0 ) {
+				dynamicRenderingLocalRead = qtrue;
+			} else if ( strcmp( ext, "VK_KHR_global_priority" ) == 0 ) {
+				globalPriority = qtrue;
+			} else if ( strcmp( ext, "VK_KHR_line_rasterization" ) == 0 ) {
+				lineRasterization = qtrue;
+			} else if ( strcmp( ext, "VK_EXT_line_rasterization" ) == 0 ) {
+				lineRasterizationExt = qtrue;
+			} else if ( strcmp( ext, "VK_KHR_maintenance5" ) == 0 ) {
+				maintenance5 = qtrue;
+			} else if ( strcmp( ext, "VK_KHR_maintenance8" ) == 0 ) {
+				maintenance8 = qtrue;
+			} else if ( strcmp( ext, "VK_KHR_present_id" ) == 0 || strcmp( ext, "VK_KHR_present_id2" ) == 0 ) {
+				presentId = qtrue;
+			} else if ( strcmp( ext, "VK_KHR_present_wait" ) == 0 || strcmp( ext, "VK_KHR_present_wait2" ) == 0 ) {
+				presentWait = qtrue;
+			} else if ( strcmp( ext, "VK_KHR_shader_float_controls2" ) == 0 ) {
+				shaderFloatControls2 = qtrue;
+			} else if ( strcmp( ext, "VK_KHR_shader_maximal_reconvergence" ) == 0 ) {
+				shaderMaximalReconvergence = qtrue;
+			} else if ( strcmp( ext, "VK_KHR_shader_quad_control" ) == 0 ) {
+				shaderQuadControl = qtrue;
+			} else if ( strcmp( ext, "VK_KHR_shader_relaxed_extended_instruction" ) == 0 ) {
+				shaderRelaxedExtInstr = qtrue;
+			} else if ( strcmp( ext, "VK_KHR_shader_subgroup_uniform_control_flow" ) == 0 ) {
+				shaderSubgroupUniformCF = qtrue;
 			}
 			// add this device extension to glConfig
 			if ( i != 0 ) {
@@ -2598,6 +2643,36 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			device_extension_list[ device_extension_count++ ] = "VK_KHR_shader_fma";
 			ri.Printf( PRINT_DEVELOPER, "  VK_KHR_shader_fma: enabled\n" );
 		}
+		if ( lineRasterization ) {
+			device_extension_list[ device_extension_count++ ] = "VK_KHR_line_rasterization";
+			ri.Printf( PRINT_DEVELOPER, "  VK_KHR_line_rasterization: enabled\n" );
+		} else if ( lineRasterizationExt ) {
+			device_extension_list[ device_extension_count++ ] = "VK_EXT_line_rasterization";
+			ri.Printf( PRINT_DEVELOPER, "  VK_EXT_line_rasterization: enabled\n" );
+		}
+		if ( maintenance5 ) {
+			device_extension_list[ device_extension_count++ ] = "VK_KHR_maintenance5";
+			ri.Printf( PRINT_DEVELOPER, "  VK_KHR_maintenance5: enabled\n" );
+		}
+		if ( maintenance8 ) {
+			device_extension_list[ device_extension_count++ ] = "VK_KHR_maintenance8";
+			ri.Printf( PRINT_DEVELOPER, "  VK_KHR_maintenance8: enabled\n" );
+		}
+		if ( dynamicRenderingLocalRead ) {
+			device_extension_list[ device_extension_count++ ] = "VK_KHR_dynamic_rendering_local_read";
+		}
+		if ( presentId ) {
+			device_extension_list[ device_extension_count++ ] = "VK_KHR_present_id";
+		}
+		if ( presentWait ) {
+			device_extension_list[ device_extension_count++ ] = "VK_KHR_present_wait";
+		}
+		if ( shaderQuadControl ) {
+			device_extension_list[ device_extension_count++ ] = "VK_KHR_shader_quad_control";
+		}
+		(void)globalPriority; (void)shaderFloatControls2; (void)shaderMaximalReconvergence;
+		(void)shaderRelaxedExtInstr; (void)shaderSubgroupUniformCF; (void)legacyDithering;
+		(void)surfaceMaintenance1;
 		qvkGetPhysicalDeviceFeatures( physical_device, &device_features );
 
 		if ( device_features.fillModeNonSolid == VK_FALSE ) {
