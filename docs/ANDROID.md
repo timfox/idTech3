@@ -2,6 +2,7 @@
 
 ## Requirements
 
+- **Java 17** (JDK 17) — AGP 8.7.3 requires Java 11+; Java 17 is recommended. If you see "Java 8 JVM" errors, set `JAVA_HOME` or add `org.gradle.java.home=/path/to/jdk17` to `android/gradle.properties`. In Android Studio: File → Settings → Build → Gradle → Gradle JDK.
 - Android SDK 35+
 - NDK 27+
 - CMake 3.22.1+ (via SDK Manager)
