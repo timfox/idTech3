@@ -31,6 +31,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cl_websocket.h"
 #include "cl_steam.h"
 #include "cl_menuvideo.h"
+#include "cl_sdf_font.h"
 #ifdef USE_DUKTAPE
 #include "../qcommon/js_debug.h"
 #endif
@@ -4447,6 +4448,7 @@ void CL_Init( void ) {
 	WS_Init();
 	Steam_Init();
 	MenuVideo_Init();
+	SDF_Init();
 
 	Com_Printf( "----- Client Initialization Complete -----\n" );
 }
