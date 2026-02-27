@@ -808,15 +808,6 @@ static void Con_DrawSolidConsole( float frac ) {
 
 	}
 
-	re.SetColor( g_color_table[ ColorIndex( COLOR_RED ) ] );
-	re.DrawStretchPic( 0, yf, wf, 2, 0, 0, 1, 1, cls.whiteShader );
-
-	//y = yf;
-
-	// draw the version number
-	SCR_DrawSmallString( cls.glconfig.vidWidth - ( ARRAY_LEN( Q3_VERSION ) ) * smallchar_width,
-		lines - smallchar_height, Q3_VERSION, ARRAY_LEN( Q3_VERSION ) - 1 );
-
 	// draw the text
 	con.vislines = lines;
 	rows = lines / smallchar_width - 1;	// rows of text to draw
