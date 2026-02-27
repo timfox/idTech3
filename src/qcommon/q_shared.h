@@ -217,7 +217,13 @@ int Q_longjmp_c(void *, int);
 
 typedef unsigned char byte;
 
+#ifdef Q3_VM
 typedef enum { qfalse = 0, qtrue } qboolean;
+#else
+typedef bool qboolean;
+#define qtrue true
+#define qfalse false
+#endif
 
 typedef union floatint_u
 {
