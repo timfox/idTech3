@@ -305,7 +305,7 @@ void main() {
 
 	if ( outline_strength > 0.0 && postprocess_enabled != 0 ) {
 		vec2 outlineTexel = 1.0 / vec2( textureSize( texture0, 0 ) );
-		float lumC  = dot( ldr, vec3(0.299, 0.587, 0.114) );
+		float lumC  = dot( texture( texture0, uv ).rgb, vec3(0.299, 0.587, 0.114) );
 		float lumL  = dot( texture( texture0, uv + vec2(-outlineTexel.x, 0.0) ).rgb, vec3(0.299, 0.587, 0.114) );
 		float lumR  = dot( texture( texture0, uv + vec2( outlineTexel.x, 0.0) ).rgb, vec3(0.299, 0.587, 0.114) );
 		float lumU  = dot( texture( texture0, uv + vec2(0.0, -outlineTexel.y) ).rgb, vec3(0.299, 0.587, 0.114) );
