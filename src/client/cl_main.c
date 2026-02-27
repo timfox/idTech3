@@ -30,6 +30,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cl_superhud.h"
 #include "cl_websocket.h"
 #include "cl_steam.h"
+#include "cl_menuvideo.h"
 #ifdef USE_DUKTAPE
 #include "../qcommon/js_debug.h"
 #endif
@@ -4445,6 +4446,7 @@ void CL_Init( void ) {
 	SHUD_Init();
 	WS_Init();
 	Steam_Init();
+	MenuVideo_Init();
 
 	Com_Printf( "----- Client Initialization Complete -----\n" );
 }

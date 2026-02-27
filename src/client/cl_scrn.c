@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "client.h"
 #include "cl_emoji.h"
+#include "cl_menuvideo.h"
 #include "../qcommon/q_utf8.h"
 
 static qboolean	scr_initialized;		// ready to draw
@@ -656,6 +657,10 @@ static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 			break;
 		}
 	}
+
+	// menu background video draws behind the UI
+	MenuVideo_Frame();
+	MenuVideo_Draw();
 
 	// the menu draws next
 	if ( Key_GetCatcher( ) & KEYCATCH_UI && uivm ) {
