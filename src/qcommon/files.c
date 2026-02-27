@@ -5905,39 +5905,51 @@ void *FS_LoadLibrary( const char *name )
 		if ( sp ) {
 			// Try both naming conventions: "uix86_64.so" and "ui.x86_64.so"
 			// Check if name matches pattern like "uiARCH.so" and try "ui.ARCH.so"
+			// Look in modules/ first, then vm/
 			if ( nameLen > 7 && nameLen < MAX_QPATH - 1 ) {
 				if ( Q_strncmp(name, "ui", 2) == 0 && Q_strncmp(name + nameLen - 3, ".so", 3) == 0 ) {
 					// Convert "uix86_64.so" -> "ui.x86_64.so"
 					Com_sprintf( dottedName, sizeof( dottedName ), "ui.%s", name + 2 );
-					Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", dottedName );
-					const char *fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath );
-					libHandle = Sys_LoadLibrary( fn );
+					Com_sprintf( vmPath, sizeof( vmPath ), "modules/%s", dottedName );
+					libHandle = Sys_LoadLibrary( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
+					if ( !libHandle ) {
+						Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", dottedName );
+						libHandle = Sys_LoadLibrary( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
+					}
 				} else if ( Q_strncmp(name, "cgame", 5) == 0 && Q_strncmp(name + nameLen - 3, ".so", 3) == 0 ) {
 					// Convert "cgamex86_64.so" -> "cgame.x86_64.so"
 					Com_sprintf( dottedName, sizeof( dottedName ), "cgame.%s", name + 5 );
-					Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", dottedName );
-					const char *fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath );
-					libHandle = Sys_LoadLibrary( fn );
+					Com_sprintf( vmPath, sizeof( vmPath ), "modules/%s", dottedName );
+					libHandle = Sys_LoadLibrary( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
+					if ( !libHandle ) {
+						Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", dottedName );
+						libHandle = Sys_LoadLibrary( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
+					}
 				} else if ( Q_strncmp(name, "qagame", 6) == 0 && Q_strncmp(name + nameLen - 3, ".so", 3) == 0 ) {
 					// Convert "qagamex86_64.so" -> "qagame.x86_64.so"
 					Com_sprintf( dottedName, sizeof( dottedName ), "qagame.%s", name + 6 );
-					Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", dottedName );
-					const char *fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath );
-					libHandle = Sys_LoadLibrary( fn );
+					Com_sprintf( vmPath, sizeof( vmPath ), "modules/%s", dottedName );
+					libHandle = Sys_LoadLibrary( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
+					if ( !libHandle ) {
+						Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", dottedName );
+						libHandle = Sys_LoadLibrary( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
+					}
 				}
 			}
 			
-			// Try vm/ subdirectory with original name
+			// Try modules/ first, then vm/ subdirectory with original name
 			if ( !libHandle ) {
-				Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", name );
-				const char *fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath );
-				libHandle = Sys_LoadLibrary( fn );
+				Com_sprintf( vmPath, sizeof( vmPath ), "modules/%s", name );
+				libHandle = Sys_LoadLibrary( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
+				if ( !libHandle ) {
+					Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", name );
+					libHandle = Sys_LoadLibrary( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
+				}
 			}
 			
 			// Finally try directly in gamedir (legacy location)
 			if ( !libHandle ) {
-				const char *fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, name );
-				libHandle = Sys_LoadLibrary( fn );
+				libHandle = Sys_LoadLibrary( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, name ) );
 			}
 			sp = sp->next;
 		}
