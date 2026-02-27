@@ -89,6 +89,33 @@ vec3 Tonemap_Reinhard( vec3 x ) {
 	return x / ( x + vec3( 1.0 ) );
 }
 
+/* Filmic tonemap — preserves saturation better than ACES.
+   Based on John Hable's Uncharted 2 curve with tuned parameters. */
+vec3 Tonemap_Filmic( vec3 x ) {
+	const float A = 0.22;  /* shoulder strength */
+	const float B = 0.30;  /* linear strength */
+	const float C = 0.10;  /* linear angle */
+	const float D = 0.20;  /* toe strength */
+	const float E = 0.01;  /* toe numerator */
+	const float F = 0.30;  /* toe denominator */
+	vec3 mapped = ((x*(A*x+C*B)+D*E)/(x*(A*x+B)+D*F))-E/F;
+	const float W = 11.2;  /* linear white point */
+	float whiteScale = 1.0 / (((W*(A*W+C*B)+D*E)/(W*(A*W+B)+D*F))-E/F);
+	return clamp( mapped * whiteScale, 0.0, 1.0 );
+}
+
+/* AgX-inspired tonemap — punchy, saturated, modern look.
+   Attempt to preserve chrominance through the curve. */
+vec3 Tonemap_AgX( vec3 x ) {
+	/* Per-channel curve with luminance-guided saturation recovery */
+	float lum = dot( x, vec3( 0.2126, 0.7152, 0.0722 ) );
+	vec3 mapped = x / ( x + vec3( 0.7 ) );
+	float lumMapped = lum / ( lum + 0.7 );
+	/* Recover saturation lost by per-channel mapping */
+	vec3 satRecovered = lumMapped + 1.2 * ( mapped - lumMapped );
+	return clamp( satRecovered, 0.0, 1.0 );
+}
+
 vec3 linearToDisplay( vec3 x ) {
 	return pow( max( x, vec3( 0.0 ) ), vec3( max( gamma, 1e-6 ) ) );
 }
@@ -177,6 +204,10 @@ vec3 doTonemap( vec3 value ) {
 		return ACESFilm( value );
 	} else if ( tonemap_mode == 1 ) {
 		return Tonemap_Reinhard( value );
+	} else if ( tonemap_mode == 3 ) {
+		return Tonemap_Filmic( value );
+	} else if ( tonemap_mode == 4 ) {
+		return Tonemap_AgX( value );
 	}
 	return value;
 }
@@ -274,6 +305,15 @@ void main() {
 		}
 	} else {
 		ldr = clamp( tonemapped, 0.0, 1.0 );
+
+		/* Saturation recovery — compensate for tonemap desaturation.
+		   Boosts chroma by pulling colors away from their luminance. */
+		if ( postprocess_enabled != 0 ) {
+			float satBoost = 1.15;
+			float lum = dot( ldr, sRGB );
+			ldr = clamp( vec3(lum) + satBoost * ( ldr - vec3(lum) ), 0.0, 1.0 );
+		}
+
 		if ( greyscale == 1.0 ) {
 			ldr = vec3( dot( ldr, sRGB ) );
 		} else if ( greyscale != 0.0 ) {
