@@ -24,13 +24,22 @@ android {
                     "-DRENDERER_DEFAULT=vulkan",
                     "-DSKIP_IDPAK_CHECK=ON",
                     "-DSKIP_SHADER_REGEN=ON",
-                    "-DUSE_SDL=ON",
+                    "-DUSE_SDL=OFF",
                     "-DUSE_OPENAL=OFF",
                     "-DUSE_CURL=OFF",
                     "-DUSE_LUA=OFF",
                     "-DUSE_DUKTAPE=OFF",
+                    "-DUSE_FFMPEG=OFF",
+                    "-DUSE_DAV1D=OFF",
+                    "-DUSE_VPX=OFF",
+                    "-DUSE_THEORA=OFF",
+                    "-DUSE_FLUX=OFF",
                     "-DUSE_RECAST_NAV=OFF",
                     "-DUSE_BULLET_PHYSICS=OFF",
+                    "-DBUILD_FREETYPE=OFF",
+                    "-DUSE_STB_TRUETYPE=ON",
+                    "-DENABLE_FORTIFY_SOURCE=OFF",
+                    "-DENABLE_ASAN=OFF",
                     "-DCI_BUILD=OFF"
             }
         }
@@ -48,7 +57,7 @@ android {
     externalNativeBuild {
         cmake {
             path "../../CMakeLists.txt"
-            version "3.22.1"
+            version "3.31.6"
         }
     }
 
@@ -73,6 +82,11 @@ android {
     }
 
     ndkVersion "27.0.12077973"
+}
+
+configurations.all {
+    exclude group: "org.jetbrains.kotlin", module: "kotlin-stdlib-jdk7"
+    exclude group: "org.jetbrains.kotlin", module: "kotlin-stdlib-jdk8"
 }
 
 dependencies {
