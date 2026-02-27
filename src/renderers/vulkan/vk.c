@@ -2429,7 +2429,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 
 	// create VkDevice
 	{
-		const char *device_extension_list[8];
+		const char *device_extension_list[24];
 		uint32_t device_extension_count;
 		const char *ext, *end;
 		char *str;
@@ -2444,6 +2444,15 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		qboolean dedicatedAllocation = qfalse;
 		qboolean memoryRequirements2 = qfalse;
 		qboolean debugMarker = qfalse;
+		qboolean swapchainMaintenance1 = qfalse;
+		qboolean surfaceMaintenance1 = qfalse;
+		qboolean provokingVertex = qfalse;
+		qboolean nonSeamlessCubeMap = qfalse;
+		qboolean primTopoListRestart = qfalse;
+		qboolean legacyDithering = qfalse;
+		qboolean maintenance9 = qfalse;
+		qboolean shaderFma = qfalse;
+		qboolean portabilitySubset = qfalse;
 #ifdef _DEBUG
 		qboolean timelineSemaphore = qfalse;
 		qboolean memoryModel = qfalse;
@@ -2481,6 +2490,26 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			} else if ( strcmp( ext, VK_KHR_8BIT_STORAGE_EXTENSION_NAME ) == 0 ) {
 				storage8bit = qtrue;
 #endif
+			}
+			/* MoltenVK 1.2.7+ extensions */
+			if ( strcmp( ext, "VK_KHR_swapchain_maintenance1" ) == 0 ) {
+				swapchainMaintenance1 = qtrue;
+			} else if ( strcmp( ext, "VK_KHR_surface_maintenance1" ) == 0 ) {
+				surfaceMaintenance1 = qtrue;
+			} else if ( strcmp( ext, "VK_EXT_provoking_vertex" ) == 0 ) {
+				provokingVertex = qtrue;
+			} else if ( strcmp( ext, "VK_EXT_non_seamless_cube_map" ) == 0 ) {
+				nonSeamlessCubeMap = qtrue;
+			} else if ( strcmp( ext, "VK_EXT_primitive_topology_list_restart" ) == 0 ) {
+				primTopoListRestart = qtrue;
+			} else if ( strcmp( ext, "VK_EXT_legacy_dithering" ) == 0 ) {
+				legacyDithering = qtrue;
+			} else if ( strcmp( ext, "VK_KHR_maintenance9" ) == 0 ) {
+				maintenance9 = qtrue;
+			} else if ( strcmp( ext, "VK_KHR_shader_fma" ) == 0 ) {
+				shaderFma = qtrue;
+			} else if ( strcmp( ext, "VK_KHR_portability_subset" ) == 0 ) {
+				portabilitySubset = qtrue;
 			}
 			// add this device extension to glConfig
 			if ( i != 0 ) {
@@ -2540,6 +2569,35 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			device_extension_list[ device_extension_count++ ] = VK_KHR_8BIT_STORAGE_EXTENSION_NAME;
 		}
 #endif // _DEBUG
+
+		/* MoltenVK 1.2.7+ extensions (enabled when available) */
+		if ( portabilitySubset ) {
+			device_extension_list[ device_extension_count++ ] = "VK_KHR_portability_subset";
+		}
+		if ( swapchainMaintenance1 ) {
+			device_extension_list[ device_extension_count++ ] = "VK_KHR_swapchain_maintenance1";
+			ri.Printf( PRINT_DEVELOPER, "  VK_KHR_swapchain_maintenance1: enabled\n" );
+		}
+		if ( provokingVertex ) {
+			device_extension_list[ device_extension_count++ ] = "VK_EXT_provoking_vertex";
+			ri.Printf( PRINT_DEVELOPER, "  VK_EXT_provoking_vertex: enabled\n" );
+		}
+		if ( nonSeamlessCubeMap ) {
+			device_extension_list[ device_extension_count++ ] = "VK_EXT_non_seamless_cube_map";
+			ri.Printf( PRINT_DEVELOPER, "  VK_EXT_non_seamless_cube_map: enabled\n" );
+		}
+		if ( primTopoListRestart ) {
+			device_extension_list[ device_extension_count++ ] = "VK_EXT_primitive_topology_list_restart";
+			ri.Printf( PRINT_DEVELOPER, "  VK_EXT_primitive_topology_list_restart: enabled\n" );
+		}
+		if ( maintenance9 ) {
+			device_extension_list[ device_extension_count++ ] = "VK_KHR_maintenance9";
+			ri.Printf( PRINT_DEVELOPER, "  VK_KHR_maintenance9: enabled\n" );
+		}
+		if ( shaderFma ) {
+			device_extension_list[ device_extension_count++ ] = "VK_KHR_shader_fma";
+			ri.Printf( PRINT_DEVELOPER, "  VK_KHR_shader_fma: enabled\n" );
+		}
 		qvkGetPhysicalDeviceFeatures( physical_device, &device_features );
 
 		if ( device_features.fillModeNonSolid == VK_FALSE ) {
