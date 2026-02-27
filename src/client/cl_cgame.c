@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cl_cgame.c  -- client system interaction with client game
 
 #include "client.h"
+#include "../physics/phys_bullet.h"
 #ifdef USE_DUKTAPE
 #include "../qcommon/js_debug.h"
 #endif
@@ -439,6 +440,27 @@ static qboolean CL_GetValue( char* value, int valueSize, const char* key ) {
 		return qtrue;
 	}
 
+	if ( !Q_stricmp( key, "trap_Phys_CreateBody" ) ) {
+		Com_sprintf( value, valueSize, "%i", CG_PHYS_CREATEBODY );
+		return qtrue;
+	}
+	if ( !Q_stricmp( key, "trap_Phys_DestroyBody" ) ) {
+		Com_sprintf( value, valueSize, "%i", CG_PHYS_DESTROYBODY );
+		return qtrue;
+	}
+	if ( !Q_stricmp( key, "trap_Phys_ApplyImpulse" ) ) {
+		Com_sprintf( value, valueSize, "%i", CG_PHYS_APPLYIMPULSE );
+		return qtrue;
+	}
+	if ( !Q_stricmp( key, "trap_Phys_GetBodyTransform" ) ) {
+		Com_sprintf( value, valueSize, "%i", CG_PHYS_GETBODYTRANSFORM );
+		return qtrue;
+	}
+	if ( !Q_stricmp( key, "trap_Phys_RayCast" ) ) {
+		Com_sprintf( value, valueSize, "%i", CG_PHYS_RAYCAST );
+		return qtrue;
+	}
+
 	if ( !Q_stricmp( key, "trap_Cvar_SetDescription_Q3E" ) ) {
 		Com_sprintf( value, valueSize, "%i", CG_CVAR_SETDESCRIPTION );
 		return qtrue;
@@ -794,6 +816,42 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 	case CG_TRAP_GETVALUE:
 		VM_CHECKBOUNDS( cgvm, args[1], args[2] );
 		return CL_GetValue( VMA(1), args[2], VMA(3) );
+
+	/* ---- Physics syscalls (Gopex) ---- */
+
+	case CG_PHYS_CREATEBODY:
+		return Phys_CreateBody( (const physBodyDef_t *)VMA(1) );
+
+	case CG_PHYS_DESTROYBODY:
+		Phys_DestroyBody( (physBodyHandle_t)args[1] );
+		return 0;
+
+	case CG_PHYS_APPLYFORCEBODY:
+		Phys_ApplyForce( (physBodyHandle_t)args[1], (const float *)VMA(2), (const float *)VMA(3) );
+		return 0;
+
+	case CG_PHYS_APPLYIMPULSE:
+		Phys_ApplyImpulse( (physBodyHandle_t)args[1], (const float *)VMA(2), (const float *)VMA(3) );
+		return 0;
+
+	case CG_PHYS_GETBODYTRANSFORM:
+		Phys_GetBodyTransform( (physBodyHandle_t)args[1], (physTransform_t *)VMA(2) );
+		return 0;
+
+	case CG_PHYS_SETBODYTRANSFORM:
+		Phys_SetBodyTransform( (physBodyHandle_t)args[1], (const float *)VMA(2), (const float *)VMA(3) );
+		return 0;
+
+	case CG_PHYS_SETBODYVELOCITY:
+		Phys_SetBodyVelocity( (physBodyHandle_t)args[1], (const float *)VMA(2), (const float *)VMA(3) );
+		return 0;
+
+	case CG_PHYS_STEPSIMULATION:
+		Phys_StepSimulation( VMF(1) );
+		return 0;
+
+	case CG_PHYS_RAYCAST:
+		return Phys_RayCast( (const float *)VMA(1), (const float *)VMA(2), (physRayResult_t *)VMA(3) );
 
 	default:
 		Com_Error( ERR_DROP, "Bad cgame system trap: %ld", (long int) args[0] );
