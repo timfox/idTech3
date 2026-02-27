@@ -22,6 +22,7 @@ Ticks all gameplay subsystems each client frame:
 #include "cl_particles.h"
 #include "cl_map_background.h"
 #include "cl_window_title.h"
+#include "cl_mobilefog.h"
 #include "../physics/phys_bullet.h"
 #include "../physics/phys_procedural_anim.h"
 #include "../physics/phys_cloth.h"
@@ -148,6 +149,7 @@ void CL_InitGameSystems(void) {
 	Dismember_Init();
 	GOAP_Init();
 	AIML_Init();
+	MobileFog_Init();
 	BgMap_Init();
 	WinTitle_Init();
 
@@ -241,4 +243,9 @@ void CL_GameFrame(float frametime) {
 
 	BgMap_Frame(frametime);
 	WinTitle_Update(frametime);
+
+	{
+		vec3_t fwd = {1,0,0}, right = {0,1,0}, up = {0,0,1}, origin = {0,0,0};
+		MobileFog_Frame(origin, fwd, right, up, frametime);
+	}
 }
