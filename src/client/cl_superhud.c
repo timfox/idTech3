@@ -215,6 +215,57 @@ void SHUD_Render( int screenW, int screenH ) {
 			SCR_DrawStringExt( (int)(e->x), (int)(e->y), e->fontsize, e->text, e->color, qfalse, qfalse );
 		}
 
+		if ( e->type == SHUD_BAR ) {
+			float fillFrac = 1.0f;
+			if ( e->text[0] ) {
+				cvar_t *cv = Cvar_Get( e->text, "0", 0 );
+				if ( cv ) {
+					float maxVal = e->fontsize > 0 ? e->fontsize : 100.0f;
+					fillFrac = cv->value / maxVal;
+					if ( fillFrac < 0 ) fillFrac = 0;
+					if ( fillFrac > 1 ) fillFrac = 1;
+				}
+			}
+			re.SetColor( e->color );
+			if ( e->style == 1 ) {
+				re.DrawStretchPic( rx, ry, rw * fillFrac, rh, 0, 0, 1, 1, cls.whiteShader );
+			} else {
+				re.DrawStretchPic( rx, ry + rh * (1.0f - fillFrac), rw, rh * fillFrac, 0, 0, 1, 1, cls.whiteShader );
+			}
+		}
+
+		if ( e->type == SHUD_NUMBER && e->text[0] ) {
+			cvar_t *cv = Cvar_Get( e->text, "0", 0 );
+			if ( cv ) {
+				char numStr[32];
+				if ( e->style == 1 ) {
+					Com_sprintf( numStr, sizeof(numStr), "%.1f", cv->value );
+				} else {
+					Com_sprintf( numStr, sizeof(numStr), "%d", cv->integer );
+				}
+				re.SetColor( e->color );
+				SCR_DrawStringExt( (int)(e->x), (int)(e->y), e->fontsize > 0 ? e->fontsize : 16, numStr, e->color, qtrue, qtrue );
+			}
+		}
+
+		if ( e->type == SHUD_TIMER ) {
+			int totalMs = Sys_Milliseconds();
+			int secs = ( totalMs / 1000 ) % 60;
+			int mins = ( totalMs / 60000 ) % 60;
+			char timeStr[16];
+			Com_sprintf( timeStr, sizeof(timeStr), "%02d:%02d", mins, secs );
+			re.SetColor( e->color );
+			SCR_DrawStringExt( (int)(e->x), (int)(e->y), e->fontsize > 0 ? e->fontsize : 16, timeStr, e->color, qtrue, qtrue );
+		}
+
+		if ( e->type == SHUD_ICON && e->text[0] ) {
+			qhandle_t shader = re.RegisterShaderNoMip ? re.RegisterShaderNoMip( e->text ) : 0;
+			if ( shader ) {
+				re.SetColor( e->color );
+				re.DrawStretchPic( rx, ry, rw, rh, 0, 0, 1, 1, shader );
+			}
+		}
+
 		re.SetColor( NULL );
 	}
 }

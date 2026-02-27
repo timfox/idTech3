@@ -58,6 +58,9 @@ layout(std140, binding = 4) uniform VolumetricParams {
     vec4 fluidParams1;
     vec4 fluidParams2;
     vec4 fluidWorldMap;
+    vec4 fluidEmitters[16];
+    vec4 fluidEmitterData[16];
+    vec4 fluidEmitterCount;
     vec4 telemetryParams0;
     vec4 telemetryParams1;
 } params;

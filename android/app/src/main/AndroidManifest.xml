@@ -7,18 +7,19 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:installLocation="auto">
 
-    <!-- Vulkan hardware (optional — OpenGL fallback if not available) -->
+    <!-- Vulkan hardware (optional — engine has OpenGL fallback) -->
     <uses-feature android:name="android.hardware.vulkan.level" android:version="0" android:required="false" />
     <uses-feature android:name="android.hardware.vulkan.version" android:version="0x00401000" android:required="false" />
 
-    <!-- Touchscreen (not required for TV/desktop) -->
+    <!-- Input devices (all optional) -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
-
-    <!-- Game controller support -->
     <uses-feature android:name="android.hardware.gamepad" android:required="false" />
 
-    <!-- Network -->
+    <!-- Permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <application
         android:allowBackup="true"
@@ -28,20 +29,22 @@
         android:appCategory="game"
         android:isGame="true"
         android:hasCode="true"
+        android:largeHeap="true"
         tools:targetApi="tiramisu">
 
         <activity
             android:name=".GameActivity"
             android:exported="true"
             android:configChanges="layoutDirection|locale|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation"
-            android:largeHeap="true"
-            android:screenOrientation="sensorLandscape">
+            android:screenOrientation="sensorLandscape"
+            android:launchMode="singleTask">
 
             <meta-data android:name="android.app.lib_name" android:value="idtech3" />
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
     </application>

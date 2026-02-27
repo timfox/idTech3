@@ -111,9 +111,33 @@ static void Choreo_DispatchEvent(choreoScene_t *scene, const choreoEvent_t *evt)
 				evt->type == CHOREO_EVT_SPEAK ? "speak" : "sound", evt->param);
 			break;
 		case CHOREO_EVT_ANIMATE:
-			Com_DPrintf("Choreo [%s]: actor %d animate \"%s\"\n", scene->name, evt->actorIndex, evt->param);
-			if (evt->param[0]) {
-				Cbuf_AddText(va("lua Engine.Choreo.onAnimate(%d, \"%s\")\n", evt->actorIndex, evt->param));
+			{
+				int entNum = -1;
+				if (evt->actorIndex >= 0 && evt->actorIndex < CHOREO_MAX_ACTORS) {
+					entNum = scene->actors[evt->actorIndex].entityNum;
+				}
+				Com_DPrintf("Choreo [%s]: actor %d (ent %d) animate \"%s\"\n",
+					scene->name, evt->actorIndex, entNum, evt->param);
+				if (evt->param[0]) {
+					Cbuf_AddText(va("lua Engine.Choreo.onAnimate(%d, %d, \"%s\")\n",
+						evt->actorIndex, entNum, evt->param));
+				}
+			}
+			break;
+		case CHOREO_EVT_MOVE_TO:
+			{
+				int entNum = -1;
+				if (evt->actorIndex >= 0 && evt->actorIndex < CHOREO_MAX_ACTORS) {
+					entNum = scene->actors[evt->actorIndex].entityNum;
+				}
+				Com_DPrintf("Choreo [%s]: actor %d (ent %d) move to (%.0f, %.0f, %.0f)\n",
+					scene->name, evt->actorIndex, entNum,
+					evt->position[0], evt->position[1], evt->position[2]);
+				if (entNum >= 0) {
+					Cbuf_AddText(va("lua Engine.Choreo.onMoveTo(%d, %d, %.1f, %.1f, %.1f)\n",
+						evt->actorIndex, entNum,
+						evt->position[0], evt->position[1], evt->position[2]));
+				}
 			}
 			break;
 		case CHOREO_EVT_CAMERA_CUT:
