@@ -543,10 +543,6 @@ static void *gameThreadFunc( void *arg ) {
 	}
 
 	LOGI( "Game thread: shutting down" );
-<<<<<<< HEAD
-	CL_Shutdown( "Android shutdown", qtrue );
-=======
->>>>>>> 1f37be6b8d699e0edc8d68548301b133a41fe1b3
 	return NULL;
 }
 
@@ -685,11 +681,8 @@ void ANativeActivity_onCreate( ANativeActivity *activity, void *savedState, size
 	activity->callbacks->onNativeWindowCreated = onNativeWindowCreated;
 	activity->callbacks->onNativeWindowDestroyed = onNativeWindowDestroyed;
 	activity->callbacks->onNativeWindowResized = onNativeWindowResized;
-<<<<<<< HEAD
-=======
 	activity->callbacks->onInputQueueCreated = onInputQueueCreated;
 	activity->callbacks->onInputQueueDestroyed = onInputQueueDestroyed;
->>>>>>> 1f37be6b8d699e0edc8d68548301b133a41fe1b3
 
 	LOGI( "ANativeActivity_onCreate: id Tech 3 starting" );
 	LOGI( "  Internal: %s", activity->internalDataPath ? activity->internalDataPath : "null" );
