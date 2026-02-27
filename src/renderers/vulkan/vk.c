@@ -13688,7 +13688,7 @@ static void vk_volumetric_fog_pass( void )
 		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
 
-	if ( vk.smaaActive ) {
+	if ( vk.smaaActive && tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
 		vk_smaa_passes();
 		if ( vk.smaa_output_image_view ) {
 			vk_update_color_descriptor_image( vk.smaa_output_image_view );
