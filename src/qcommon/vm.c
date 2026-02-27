@@ -439,8 +439,12 @@ static void VM_LoadSymbols( vm_t *vm ) {
 	}
 
 	COM_StripExtension(vm->name, name, sizeof(name));
-	Com_sprintf( symbols, sizeof( symbols ), "vm/%s.map", name );
+	Com_sprintf( symbols, sizeof( symbols ), "modules/%s.map", name );
 	FS_ReadFile( symbols, &mapfile.v );
+	if ( !mapfile.c ) {
+		Com_sprintf( symbols, sizeof( symbols ), "vm/%s.map", name );
+		FS_ReadFile( symbols, &mapfile.v );
+	}
 	if ( !mapfile.c ) {
 		Com_Printf( "Couldn't load symbol file: %s\n", symbols );
 		return;
@@ -583,12 +587,15 @@ static int Load_JTS( vm_t *vm, uint32_t crc32, void *data, int vmPakIndex ) {
 	int			length;
 	fileHandle_t fh;
 
-	// load the image
-	Com_sprintf( filename, sizeof(filename), "vm/%s.jts", vm->name );
+	// load the image: try modules/ first, then vm/
+	Com_sprintf( filename, sizeof(filename), "modules/%s.jts", vm->name );
+	length = FS_FOpenFileRead( filename, &fh, qtrue );
+	if ( fh == FS_INVALID_HANDLE ) {
+		Com_sprintf( filename, sizeof(filename), "vm/%s.jts", vm->name );
+		length = FS_FOpenFileRead( filename, &fh, qtrue );
+	}
 	if ( data )
 		Com_Printf( "Loading jts file %s...\n", filename );
-
-	length = FS_FOpenFileRead( filename, &fh, qtrue );
 
 	if ( fh == FS_INVALID_HANDLE ) {
 		if ( data )
@@ -756,12 +763,16 @@ static vmHeader_t *VM_LoadQVM( vm_t *vm, qboolean alloc ) {
 	vmHeader_t			*header;
 	int					vmPakIndex;
 
-	// load the image
-	Com_sprintf( filename, sizeof(filename), "vm/%s.qvm", vm->name );
+	// load the image: try modules/ first, then vm/
+	Com_sprintf( filename, sizeof(filename), "modules/%s.qvm", vm->name );
+	length = FS_ReadFile( filename, (void **)&header );
+	if ( !header || length <= 0 ) {
+		Com_sprintf( filename, sizeof(filename), "vm/%s.qvm", vm->name );
+		length = FS_ReadFile( filename, (void **)&header );
+	}
 	if ( !vm->silentQVM ) {
 		Com_Printf( "Loading vm file %s...\n", filename );
 	}
-	length = FS_ReadFile( filename, (void **)&header );
 	if ( !header ) {
 		if ( !vm->silentQVM ) {
 			Com_Printf( "Failed.\n" );
