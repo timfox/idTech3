@@ -368,12 +368,16 @@ void CL_OSP_DrawCrosshairHitFeedback( int x, int y, float size ) {
 	frac = 1.0f - ( t / (float)HIT_FEEDBACK_DURATION );
 
 	if ( ch_crosshairAction->integer & 8 ) {
+		int n;
 		if ( lastHitDamage >= 50 ) {
-			sscanf( ch_crosshairActionColorHigh->string, "%f %f %f %f", &color[0], &color[1], &color[2], &color[3] );
+			n = sscanf( ch_crosshairActionColorHigh->string, "%f %f %f %f", &color[0], &color[1], &color[2], &color[3] );
 		} else if ( lastHitDamage >= 25 ) {
-			sscanf( ch_crosshairActionColorMid->string, "%f %f %f %f", &color[0], &color[1], &color[2], &color[3] );
+			n = sscanf( ch_crosshairActionColorMid->string, "%f %f %f %f", &color[0], &color[1], &color[2], &color[3] );
 		} else {
-			sscanf( ch_crosshairActionColorLow->string, "%f %f %f %f", &color[0], &color[1], &color[2], &color[3] );
+			n = sscanf( ch_crosshairActionColorLow->string, "%f %f %f %f", &color[0], &color[1], &color[2], &color[3] );
+		}
+		if ( n != 4 ) {
+			color[0] = color[1] = color[2] = color[3] = 1.0f;
 		}
 	} else {
 		color[0] = 1.0f;

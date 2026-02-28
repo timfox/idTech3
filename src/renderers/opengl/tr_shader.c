@@ -45,9 +45,8 @@ static const char **shaderTextHashTable[MAX_SHADERTEXT_HASH];
 return a hash value for the filename
 ================
 */
-#ifdef __GNUCC__
-  #warning TODO: check if long is ok here
-#endif
+/* Com_GenerateHashValue returns unsigned long; verified sufficient for table
+ * indices (hash is masked to MAX_SHADERTEXT_HASH-1). */
 
 #define generateHashValue Com_GenerateHashValue
 
@@ -1710,7 +1709,7 @@ static void FinishStage( shaderStage_t *stage )
 		return;
 	}
 
-	for ( i = 0; i < ARRAY_LEN( stage->bundle ); i++ ) {
+	for ( i = 0; (size_t) i < ARRAY_LEN( stage->bundle ); i++ ) {
 		textureBundle_t *bundle = &stage->bundle[i];
 		// offset lightmap coordinates
 		if ( bundle->lightmap >= LIGHTMAP_INDEX_OFFSET ) {
@@ -2136,7 +2135,7 @@ static const collapse_t collapse[] = {
 	{ 0, GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA | GLS_SRCBLEND_SRC_ALPHA,
 		GL_DECAL, 0 },
 #endif
-	{ -1 }
+	{ -1, -1, 0, 0 }
 };
 
 
@@ -3351,6 +3350,7 @@ shader_t *R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImag
 
 
 qhandle_t RE_RegisterShaderFromImage(const char *name, int lightmapIndex, image_t *image, qboolean mipRawImage) {
+	(void)mipRawImage;
 	unsigned long hash;
 	shader_t	*sh;
 
@@ -3705,7 +3705,8 @@ static void ScanAndLoadShaderFiles( void )
 	char *xbuffers[MAX_SHADER_FILES];
 	int numShaderFiles, numShaderxFiles;
 	int i;
-	const char *token, *hashMem;
+	const char *token;
+	void *hashMem;
 	char *textEnd;
 	const char *p, *oldp;
 	int shaderTextHashTableSizes[MAX_SHADERTEXT_HASH], hash, size;
@@ -3797,7 +3798,7 @@ static void ScanAndLoadShaderFiles( void )
 
 	for (i = 0; i < MAX_SHADERTEXT_HASH; i++) {
 		shaderTextHashTable[i] = (const char **) hashMem;
-		hashMem = ((char *) hashMem) + ((shaderTextHashTableSizes[i] + 1) * sizeof(char *));
+		hashMem = (char *) hashMem + ((shaderTextHashTableSizes[i] + 1) * sizeof(char *));
 	}
 
 	p = s_shaderText;
@@ -3810,7 +3811,7 @@ static void ScanAndLoadShaderFiles( void )
 		}
 
 		hash = generateHashValue(token, MAX_SHADERTEXT_HASH);
-		shaderTextHashTable[hash][--shaderTextHashTableSizes[hash]] = (char*)oldp;
+		shaderTextHashTable[hash][--shaderTextHashTableSizes[hash]] = oldp;
 
 		SkipBracedSection(&p, 0);
 	}

@@ -28,7 +28,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - Semi-Lagrangian advection (unconditionally stable)
 - Jacobi pressure solver (configurable iterations)
 - Helmholtz-Hodge decomposition for incompressibility
-- 3D velocity, density, and pressure fields (default 64^3 grid)
+- 2D velocity, density, and pressure fields (resolution derived from froxel grid)
 - Emitter system (up to 16 emitters) for smoke, fire, fog injection
 - Wind and buoyancy forces
 - Cvars: `r_fluidsim`, `r_fluidsim_viscosity`, `r_fluidsim_dissipation`, etc.

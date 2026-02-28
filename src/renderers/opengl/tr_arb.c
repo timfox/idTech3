@@ -1345,8 +1345,21 @@ static qboolean FBO_Create( frameBuffer_t *fb, GLsizei width, GLsizei height, qb
 	getPreferredFormatAndType( internalFormat, &textureFormat, &textureType );
 
 	qglTexImage2D( GL_TEXTURE_2D, 0, internalFormat, width, height, 0, textureFormat, textureType, NULL );
-	// TODO: handle GL_INVALID_OPERATION in case of unsupported internalFormat/textureFormat
-	
+	if ( qglGetError() == GL_INVALID_OPERATION ) {
+		ri.Printf( PRINT_WARNING, "FBO: %s (%s:%s) not supported, falling back to GL_RGBA8\n",
+			glDefToStr( internalFormat ), glDefToStr( textureFormat ), glDefToStr( textureType ) );
+		internalFormat = GL_RGBA8;
+		textureFormat = GL_RGBA;
+		textureType = GL_UNSIGNED_BYTE;
+		qglTexImage2D( GL_TEXTURE_2D, 0, internalFormat, width, height, 0, textureFormat, textureType, NULL );
+		if ( qglGetError() != GL_NO_ERROR ) {
+			ri.Printf( PRINT_ALL, "FBO: fallback format also failed\n" );
+			qglDeleteTextures( 1, &fb->color );
+			fb->color = 0;
+			return qfalse;
+		}
+	}
+
 	if ( outFormat )
 		*outFormat = textureFormat;
 	if ( outType )
@@ -1801,7 +1814,7 @@ static void R_Bloom_LensEffect( float alpha )
 	vec4_t color;
 
 	alpha /= (float)ARRAY_LEN( lc );
-	for ( i = 0; i < ARRAY_LEN( lc ); i++ ) {
+	for ( i = 0; (size_t) i < ARRAY_LEN( lc ); i++ ) {
 		VectorCopy( lc[i], color ); color[3] = alpha;
 		R_Setup_Quad_Lens( (i+1)*144, color, &verts[i*6], &coords[i*6], &colors[i*6] );
 	}

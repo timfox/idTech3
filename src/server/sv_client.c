@@ -777,7 +777,7 @@ gotnewcl:
 
 	newcl->longstr = longstr;
 
-	strcpy( newcl->tld, tld );
+	Q_strncpyz( newcl->tld, tld, sizeof( newcl->tld ) );
 	newcl->country = SV_FindCountry( newcl->tld );
 
 	SV_UserinfoChanged( newcl, qtrue, qfalse ); // update userinfo, do not run filter

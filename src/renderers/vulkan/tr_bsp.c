@@ -2635,11 +2635,14 @@ static void R_LoadCubemapEntities( int index )
 				Q_strncpyz( name, spawnVars[i][1], MAX_QPATH );
 			if ( !Q_stricmp( spawnVars[i][0], "origin" ) )
 			{
-				sscanf( spawnVars[i][1], "%f %f %f", &origin[0], &origin[1], &origin[2] );
-				originSet = qtrue;
+				if ( sscanf( spawnVars[i][1], "%f %f %f", &origin[0], &origin[1], &origin[2] ) == 3 ) {
+					originSet = qtrue;
+				}
 			}
-			else if ( !Q_stricmp( spawnVars[i][0], "radius" ) )
-				sscanf( spawnVars[i][1], "%f", &parallaxRadius );
+			else if ( !Q_stricmp( spawnVars[i][0], "radius" ) ) {
+				int n = sscanf( spawnVars[i][1], "%f", &parallaxRadius );
+				if ( n != 1 ) parallaxRadius = 1000.0f;
+			}
 		}
 		if ( isCubemap && originSet )
 		{
