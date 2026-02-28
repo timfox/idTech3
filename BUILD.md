@@ -232,6 +232,26 @@ The flag targets the renderer code under `src/renderers/common/tr_font.c`, links
 
 ---
 
+### SDF HUD text rendering
+
+The client includes an SDF (signed-distance-field) HUD text path that can render UTF-8 glyphs from BMFont metrics + atlas assets.
+
+Runtime cvars:
+
+- `r_sdfEnable` (`0/1`) - enable SDF text path for supported HUD string rendering.
+- `r_sdfFont` - base font path (for example `fonts/myfont` expects `fonts/myfont.fnt` and atlas image).
+- `r_sdfFontMetrics` - optional explicit `.fnt` path override.
+- `r_sdfFontAtlas` - optional explicit atlas image path override.
+- `r_sdfSmoothing` - edge smoothing width hint for SDF content.
+
+Behavior:
+
+- When enabled and the configured SDF assets are valid, supported string draws use SDF glyph quads.
+- If assets are missing/invalid or a glyph cannot be resolved, the renderer falls back to legacy bitmap text.
+- Emoji rendering compatibility is preserved via the existing emoji atlas path.
+
+---
+
 ### SVG image loading (librsvg)
 
 The renderer can optionally rasterize `.svg` assets via **librsvg + cairo**.

@@ -14,6 +14,8 @@ This is a modernized id Tech 3 engine.
 * Physically Based Rendering (PBR)
 * Spherical Harmonics lighting support
 * Screen Space Ambient Occlusion (SSAO)
+* High-quality SDF HUD text rendering with UTF-8 glyph support
+* Optional SVG asset rasterization backend (librsvg/cairo)
 * Froxel-based Volumetric Lighting with 2D Navier–Stokes fluid solver
 * MSAA and SMAA anti-aliasing
 
