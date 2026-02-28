@@ -21,6 +21,7 @@ uint32_t Q_UTF8_Decode( const char **pp ) {
 	const unsigned char *s = (const unsigned char *)*pp;
 	uint32_t cp;
 	int extra;
+	const unsigned char *next;
 
 	if ( s[0] < 0x80 ) {
 		cp = s[0];
@@ -47,12 +48,22 @@ uint32_t Q_UTF8_Decode( const char **pp ) {
 		cp = ( cp << 6 ) | ( s[1 + i] & 0x3F );
 	}
 
-	*pp = (const char *)( s + 1 + extra );
+	next = s + 1 + extra;
 
-	if ( cp > 0x10FFFF || ( cp >= 0xD800 && cp <= 0xDFFF ) ) {
+	/* Reject overlong encodings */
+	if ( ( extra == 1 && cp < 0x80 ) ||
+		( extra == 2 && cp < 0x800 ) ||
+		( extra == 3 && cp < 0x10000 ) ) {
+		*pp = (const char *)( s + 1 );
 		return Q_UTF8_INVALID;
 	}
 
+	if ( cp > 0x10FFFF || ( cp >= 0xD800 && cp <= 0xDFFF ) ) {
+		*pp = (const char *)( s + 1 );
+		return Q_UTF8_INVALID;
+	}
+
+	*pp = (const char *)next;
 	return cp;
 }
 

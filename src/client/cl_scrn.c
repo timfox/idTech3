@@ -303,6 +303,7 @@ void SCR_DrawStringExt( int x, int y, float size, const char *string, const floa
 	// draw the colored text
 	s = string;
 	xx = x;
+	Com_Memcpy( color, setColor, sizeof( color ) );
 	re.SetColor( setColor );
 	while ( *s ) {
 		if ( Q_IsColorString( s ) ) {

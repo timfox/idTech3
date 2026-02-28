@@ -331,13 +331,18 @@ static duk_ret_t Js_Binding_Exec( duk_context *ctx ) {
 static duk_ret_t Js_Binding_ReadFile( duk_context *ctx ) {
 	const char *path = duk_require_string( ctx, 0 );
 	void *buffer = NULL;
-	const int len = FS_ReadFile( path, &buffer );
+	int len;
 
 	if ( !JsDebug_IsSafePath( path ) ) {
 		return duk_error( ctx, DUK_ERR_ERROR, "unsafe path '%s'", path );
 	}
 
+	len = FS_ReadFile( path, &buffer );
+
 	if ( len < 0 ) {
+		if ( buffer ) {
+			FS_FreeFile( buffer );
+		}
 		duk_push_null( ctx );
 		return 1;
 	}
