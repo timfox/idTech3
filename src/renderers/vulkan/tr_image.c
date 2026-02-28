@@ -1216,6 +1216,7 @@ extern void R_LoadEXR( const char *filename, byte **pic, int *width, int *height
 extern void R_LoadHDR( const char *filename, byte **pic, int *width, int *height );
 extern void R_LoadQOI( const char *filename, byte **pic, int *width, int *height );
 extern void R_LoadDDS( const char *filename, byte **pic, int *width, int *height );
+extern void R_LoadSVG( const char *filename, byte **pic, int *width, int *height );
 
 static const imageExtToLoaderMap_t imageLoaders[] =
 {
@@ -1223,6 +1224,7 @@ static const imageExtToLoaderMap_t imageLoaders[] =
 	{ "exr",  R_LoadEXR },
 	{ "hdr",  R_LoadHDR },
 	{ "qoi",  R_LoadQOI },
+	{ "svg",  R_LoadSVG },
 	{ "png",  R_LoadPNG },
 	{ "tga",  R_LoadTGA },
 	{ "jpg",  R_LoadJPG },

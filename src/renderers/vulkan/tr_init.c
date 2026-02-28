@@ -2119,6 +2119,15 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( ri.Cvar_Get( "r_consoleFont", "", CVAR_ARCHIVE ), "Custom TrueType font for the console (e.g. fonts/consolefont.ttf). Empty = default." );
 	ri.Cvar_Get( "r_fontSize", "16", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( ri.Cvar_Get( "r_fontSize", "16", CVAR_ARCHIVE ), "Point size for custom fonts loaded via r_font / r_consoleFont." );
+	ri.Cvar_Get( "r_svgRasterScale", "1.0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( ri.Cvar_Get( "r_svgRasterScale", "1.0", CVAR_ARCHIVE ),
+		"SVG rasterization scale factor (vector assets only). 1.0 = intrinsic size." );
+	ri.Cvar_Get( "r_svgMaxRasterSize", "4096", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( ri.Cvar_Get( "r_svgMaxRasterSize", "4096", CVAR_ARCHIVE ),
+		"Maximum rasterized SVG dimension in pixels. Prevents pathological memory usage." );
+	ri.Cvar_Get( "r_svgMaxFileBytes", "2097152", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( ri.Cvar_Get( "r_svgMaxFileBytes", "2097152", CVAR_ARCHIVE ),
+		"Maximum accepted SVG source file size in bytes." );
 	ri.Cvar_Get( "r_outline", "0", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( ri.Cvar_Get( "r_outline", "0", CVAR_ARCHIVE ), "Edge-detection outline strength (0 = off, 0.5 = subtle, 1.0 = strong)." );
 	ri.Cvar_Get( "r_outlineThreshold", "0.15", CVAR_ARCHIVE );
