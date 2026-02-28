@@ -52,6 +52,7 @@ float    PostFX_GetVignetteIntensity(void);
 float    PostFX_GetVignetteRadius(void);
 float    PostFX_GetChromaticAberration(void);
 float    PostFX_GetFilmGrain(void);
+int      PostFX_GetFilmLook(void);
 
 #ifdef __cplusplus
 }

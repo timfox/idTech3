@@ -48,6 +48,7 @@ static cvar_t *r_vignette;
 static cvar_t *r_vignette_radius;
 static cvar_t *r_chromaticAberration;
 static cvar_t *r_filmGrain;
+static cvar_t *r_filmLook;
 
 /*
 ===============
@@ -84,10 +85,17 @@ void PostFX_RegisterCvars(void) {
 	r_vegWind_dirZ           = ri.Cvar_Get("r_vegWind_dirZ",           "0.3",  CVAR_ARCHIVE);
 	r_vegWind_strength       = ri.Cvar_Get("r_vegWind_strength",       "1.0",  CVAR_ARCHIVE);
 
-	r_vignette               = ri.Cvar_Get("r_vignette",               "0.0",  CVAR_ARCHIVE);
-	r_vignette_radius        = ri.Cvar_Get("r_vignette_radius",        "0.75", CVAR_ARCHIVE);
-	r_chromaticAberration    = ri.Cvar_Get("r_chromaticAberration",    "0.0",  CVAR_ARCHIVE);
-	r_filmGrain              = ri.Cvar_Get("r_filmGrain",              "0.0",  CVAR_ARCHIVE);
+	r_vignette               = ri.Cvar_Get("r_vignette",               "0.55", CVAR_ARCHIVE);
+	r_vignette_radius        = ri.Cvar_Get("r_vignette_radius",        "0.60", CVAR_ARCHIVE);
+	r_chromaticAberration    = ri.Cvar_Get("r_chromaticAberration",    "0.22", CVAR_ARCHIVE);
+	r_filmGrain              = ri.Cvar_Get("r_filmGrain",              "0.75", CVAR_ARCHIVE);
+	r_filmLook               = ri.Cvar_Get("r_filmLook",               "1",    CVAR_ARCHIVE);
+
+	ri.Cvar_SetDescription( r_vignette, "Vignette strength for post-processing lens darkening." );
+	ri.Cvar_SetDescription( r_vignette_radius, "Vignette inner radius before edge darkening starts." );
+	ri.Cvar_SetDescription( r_chromaticAberration, "Chromatic aberration strength for lens separation." );
+	ri.Cvar_SetDescription( r_filmGrain, "Film grain intensity for post-process pass." );
+	ri.Cvar_SetDescription( r_filmLook, "Enable 1970s-inspired film look (flicker, scratches, dust and animated grain)." );
 
 	ri.Printf(PRINT_ALL, "PostFX: cvars registered (SSR %s, Atmosphere %s, VegWind %s)\n",
 		r_ssr->integer ? "on" : "off",
@@ -128,14 +136,21 @@ void PostFX_VegWind_GetWindDir(float *x, float *y, float *z) {
 }
 float PostFX_VegWind_GetWindStrength(void) { return r_vegWind_strength ? r_vegWind_strength->value : 1.0f; }
 
-static float lastVignette = 0, lastChromAb = 0, lastGrain = 0;
+static float lastVignette = 0, lastVigRadius = 0, lastChromAb = 0, lastGrain = 0;
+static int lastFilmLook = 0;
 
 qboolean PostFX_NeedsPipelineUpdate(void) {
 	float v = r_vignette ? r_vignette->value : 0;
+	float vr = r_vignette_radius ? r_vignette_radius->value : 0;
 	float c = r_chromaticAberration ? r_chromaticAberration->value : 0;
 	float g = r_filmGrain ? r_filmGrain->value : 0;
-	if (v != lastVignette || c != lastChromAb || g != lastGrain) {
-		lastVignette = v; lastChromAb = c; lastGrain = g;
+	int filmLook = ( r_filmLook && r_filmLook->integer ) ? 1 : 0;
+	if (v != lastVignette || vr != lastVigRadius || c != lastChromAb || g != lastGrain || filmLook != lastFilmLook) {
+		lastVignette = v;
+		lastVigRadius = vr;
+		lastChromAb = c;
+		lastGrain = g;
+		lastFilmLook = filmLook;
 		return qtrue;
 	}
 	return qfalse;
@@ -145,3 +160,4 @@ float PostFX_GetVignetteIntensity(void) { return r_vignette ? r_vignette->value 
 float PostFX_GetVignetteRadius(void) { return r_vignette_radius ? r_vignette_radius->value : 0.75f; }
 float PostFX_GetChromaticAberration(void) { return r_chromaticAberration ? r_chromaticAberration->value : 0.0f; }
 float PostFX_GetFilmGrain(void) { return r_filmGrain ? r_filmGrain->value : 0.0f; }
+int PostFX_GetFilmLook(void) { return ( r_filmLook && r_filmLook->integer ) ? 1 : 0; }

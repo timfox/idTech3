@@ -9496,6 +9496,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 		int postprocess_enabled;   /* constant_id = 20 */
 		float outline_strength;    /* constant_id = 21 */
 		float outline_threshold;   /* constant_id = 22 */
+		int film_look;             /* constant_id = 23 */
 	} frag_spec_data;
 
 	switch ( program_index ) {
@@ -9669,6 +9670,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	frag_spec_data.chromatic_aberration = PostFX_GetChromaticAberration();
 	frag_spec_data.film_grain = PostFX_GetFilmGrain();
 	frag_spec_data.postprocess_enabled = ( r_post && r_post->integer ) ? 1 : 0;
+	frag_spec_data.film_look = PostFX_GetFilmLook();
 	{
 		cvar_t *r_outline = ri.Cvar_Get( "r_outline", "0", CVAR_ARCHIVE );
 		cvar_t *r_outlineThreshold = ri.Cvar_Get( "r_outlineThreshold", "0.15", CVAR_ARCHIVE );
@@ -9771,7 +9773,11 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	spec_entries[22].offset = offsetof( struct PostProcess_FragSpecData, outline_threshold );
 	spec_entries[22].size = sizeof( frag_spec_data.outline_threshold );
 
-	frag_spec_info.mapEntryCount = 23;
+	spec_entries[23].constantID = 23;
+	spec_entries[23].offset = offsetof( struct PostProcess_FragSpecData, film_look );
+	spec_entries[23].size = sizeof( frag_spec_data.film_look );
+
+	frag_spec_info.mapEntryCount = 24;
 	frag_spec_info.pMapEntries = spec_entries;
 	frag_spec_info.dataSize = sizeof( frag_spec_data );
 	frag_spec_info.pData = &frag_spec_data;
@@ -14266,7 +14272,7 @@ void vk_end_frame( void )
 			panini_push.aspect = vk.renderHeight > 0 ? ( (float)vk.renderWidth / (float)vk.renderHeight ) : 1.0f;
 			panini_push.paniniBorderMode = r_panini_border ? (float)r_panini_border->integer : 0.0f;
 			panini_push.paniniDebugMode = r_panini_debug ? (float)r_panini_debug->integer : 0.0f;
-			panini_push.paniniPad0 = 0.0f;
+			panini_push.paniniPad0 = (float)backEnd.refdef.time * 0.001f;
 			panini_push.paniniPad1 = 0.0f;
 			panini_push.paniniPad2 = 0.0f;
 			if ( vk_scene_src_rect_valid ) {
