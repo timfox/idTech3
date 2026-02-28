@@ -1,0 +1,135 @@
+# Codebase Quality Audit — Phase 2
+
+**Date**: 2026-02-28  
+**Scope**: String safety, unbounded functions, memory, and remaining project code (excluding `external/`)
+
+---
+
+## 1. String Safety — Remaining `strcpy` / `strcat`
+
+### High priority (user/network-controlled input)
+
+| Location | Issue | Risk |
+|----------|-------|------|
+| `cl_curl.c:898` | `strcpy(dl->Name, name)` | `name` from HTTP `Content-Disposition` header; malicious server can overflow `dl->Name[MAX_OSPATH]` |
+| `snd_dma.c:283` | `strcpy(sfx->soundName, name)` | `name` has length check at 246–249 in same file, but only in `S_RegisterSound_`; `S_FindName` uses it without prior check. Defensive: use `Q_strncpyz` |
+
+### Medium priority (parsed/trusted but unvalidated)
+
+| Location | Issue | Notes |
+|----------|-------|-------|
+| `tr_bsp.c:2361` (Vulkan) | `strcpy(w->entityString, p)` | `p` from BSP lump; allocation is `l->filelen+1`. Assumes null terminator in lump; `memcpy` + explicit null safer |
+| `tr_bsp.c:2496,2499` (Vulkan) | `strcpy(spawnVarChars + ..., keyname/com_token)` | Bounds checked before copy; safe given check, but `Q_strncpyz` would be more defensive |
+| `tr_bsp.c:2045` (Vulkan), `tr_bsp.c:1817` (OpenGL) | `strcpy(out[72].shader, "textures/...")` | Fixed string; low risk |
+| `sv_client.c:337` | `strcpy(str, "**")` | Fixed 2-char string; safe |
+| `net_ip.c:596,598,619,621` | `strcpy(s, "loopback")` / `strcpy(s, "bot")` | Fixed strings; safe |
+| `sv_filter.c:503` | `strcpy(node->p2.string, p2)` | `p2` from filter logic; verify `p2.string` size vs input |
+| `sv_ccmds.c:1227,1235` | `strcpy(nc, cl->name)` / `strcpy(ac, s)` | Need buffer sizes; `cl->name` is bounded |
+| `sv_ccmds.c:1338–1339, 1384–1385` | `strcpy` + `strcat` for console text | `text[MAX_STRING_CHARS]`, `p` truncated to 1000; safe but `Com_sprintf` clearer |
+| `files.c` (multiple) | `strcpy` for pak names, paths | Most from internal paths; verify each destination size |
+| `common.c:1805,2731` | `strcpy(out, in)` | Need context for buffer sizes |
+| `q_shared.c:2164` | `strcpy(s+len1, newi)` | Inside `Info_SetValueForKey`; bounds depend on `maxSize` |
+
+### Lower priority (OpenGL ARB/VBO program strings)
+
+| Location | Issue | Notes |
+|----------|-------|-------|
+| `tr_arb.c`, `tr_vbo.c` | `strcat(program, ...)` / `strcpy(buf, ...)` | Building shader strings; buffer sizes should be validated |
+
+---
+
+## 2. Unbounded `sprintf`
+
+### Project code (non-external)
+
+| Location | Issue | Recommendation |
+|----------|-------|----------------|
+| `vk.c:455,541` | `sprintf(buf, "mode#%x" / "code %i")` | Use `Com_sprintf` with buffer size |
+| `sv_client.c:403,405` | `sprintf(str, "connected (%s)...", country/tld)` | `str` points into `reliableCommands`; use `Com_sprintf` with explicit size |
+| `tr_arb.c:652,1265` | `sprintf(s, ...)` for shader/gen | Use `Com_sprintf` |
+| `tr_vbo.c:205,211,214` | `sprintf(b, ...)` for ARB program | Use `Com_sprintf` |
+| `vm.c` (many) | `sprintf(errMsg, ...)` / `sprintf(errBuf, ...)` | Error strings; verify `errMsg`/`errBuf` size and use `Com_sprintf` |
+| `cl_curl.c:764,766` | `sprintf(dl->progress, ...)` | `dl->progress[MAX_OSPATH+64]`; use `Com_sprintf` |
+| `bindshader.c:26`, `bin2hex.c:64,72,92` | Build tools | Lower risk; still prefer bounded variants |
+
+---
+
+## 3. `strcat` Without Bounds
+
+| Location | Issue |
+|----------|-------|
+| `tr_arb.c` (many) | `strcat(program, ...)` — program buffer size unclear |
+| `tr_vbo.c` (many) | `strcat(buf, ...)` — same concern |
+| `unix_main.c:1137–1138` | `strcat(cmdline, " ")` / `strcat(cmdline, argv[i])` — `len` precomputed; safe |
+| `common.c:3272` | `strcat(&cl_cdkey[16], buffer)` — CD key handling; verify bounds |
+| `common.c:3468–3580` | `strcat(vendor, ...)` — CPU vendor string; fixed suffixes |
+| `cl_cgame.c:305,314–315` | `strcat(bigConfigString, ...)` — length checked before; safe |
+| `win_syscon.c:650` | `strcat(s_wcd.consoleText, "\n")` — verify buffer size |
+
+---
+
+## 4. TODO / FIXME / XXX
+
+Approx. **150+** instances across `src/` (excluding most of `external/`). Notable areas:
+
+- **Renderers**: `tr_backend.c`, `tr_shader.c`, `tr_init.c`, `tr_surface.c`, Vulkan backend
+- **Platform**: `unix_main.c`, `linux_glimp.c`
+- **Qcommon**: `files.c`, `q_shared.c`, `cvar.c`
+- **Game/server**: `sv_main.c`, `sv_game.c`, `sv_rankings.c`
+
+Many are legacy or low-priority; a pass to triage and resolve or document would help.
+
+---
+
+## 5. Memory and Allocation
+
+- **Mikktspace** (`mikktspace.c`): Uses `malloc`/`free` with null checks; pattern looks correct.
+- **Common**: `calloc` for zone/hunk with null checks.
+- **Files**: `malloc` in `files.c:685` with null check.
+- **Unix**: `malloc` for `cmdline` in `unix_main.c`; length computed to fit `argv`.
+- **snd_dma.c**: `malloc` for `dma_buffer2`; no obvious leak.
+
+No critical leaks identified in project code; external libs not audited in depth.
+
+---
+
+## 6. Logic and Correctness
+
+- **Entity string** (`tr_bsp.c`): `strcpy(w->entityString, p)` assumes BSP entity lump is null-terminated. If not, reads past lump. Safer: `memcpy` + explicit null.
+- **Spawn vars** (`tr_bsp.c`): Bounds check before `strcpy`; logic is sound.
+- **Cubemap origin/radius** (`tr_bsp.c`): `sscanf` return checks added in Phase 1.
+
+---
+
+## 7. Suggested Priorities
+
+### P0 — Security / robustness ✅ DONE
+
+1. **cl_curl.c:898** — `strcpy(dl->Name, name)` → `Q_strncpyz(dl->Name, name, sizeof(dl->Name))` (Content-Disposition is untrusted).
+2. **snd_dma.c:283** — `strcpy(sfx->soundName, name)` → `Q_strncpyz(sfx->soundName, name, sizeof(sfx->soundName))` (defense in depth).
+
+### P1 — Consistency and safety ✅ DONE
+
+3. **sv_client.c:403,405** — `sprintf` → `Com_sprintf` with buffer size.
+4. **vk.c:455,541** — `sprintf` → `Com_sprintf`.
+5. **tr_bsp.c:2361** (Vulkan + OpenGL) — `strcpy` → `Com_Memcpy` + explicit null (BSP lump may lack terminator).
+6. **cl_curl.c:764,766** — `sprintf(dl->progress, ...)` → `Com_sprintf`.
+
+### P2 — Cleanup
+
+6. Replace remaining `sprintf` in project code with `Com_sprintf`.
+7. Replace `strcat` in `tr_arb.c` / `tr_vbo.c` with `Q_strcat` or equivalent bounded append.
+8. Triage TODO/FIXME comments and resolve or document.
+
+---
+
+## 8. Summary
+
+Phase 1 addressed model loaders, image creation, TLD, fog/color parsing, and several `sprintf` usages. Phase 2 highlights:
+
+- **2 high-priority** string safety fixes (curl download name, sound name).
+- **~15 medium-priority** `strcpy`/`sprintf`/`strcat` replacements for consistency.
+- **150+** TODO/FIXME items to triage.
+- No critical memory leaks found in project code.
+
+Constitution principles (backward compatibility, no breaking changes, incremental fixes) are respected by these recommendations.

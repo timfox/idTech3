@@ -399,10 +399,11 @@ static void SV_InjectLocation( const char *tld, const char *country ) {
 				cmd = svs.clients[i].reliableCommands[n & (MAX_RELIABLE_COMMANDS-1)];
 				str = strstr( cmd, "connected\n\"" );
 				if ( str && str[11] == '\0' && str < cmd + 512 ) {
+					const int rem = (int)( (const char *)cmd + MAX_STRING_CHARS - str );
 					if ( *tld == '\0' )
-						sprintf( str, S_COLOR_WHITE "connected (%s)\n\"", country );
+						Com_sprintf( str, rem, S_COLOR_WHITE "connected (%s)\n\"", country );
 					else
-						sprintf( str, S_COLOR_WHITE "connected (" S_COLOR_RED "%s" S_COLOR_WHITE ", %s)\n\"", tld, country );
+						Com_sprintf( str, rem, S_COLOR_WHITE "connected (" S_COLOR_RED "%s" S_COLOR_WHITE ", %s)\n\"", tld, country );
 					break;
 				}
 			}
