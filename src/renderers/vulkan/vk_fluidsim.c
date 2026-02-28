@@ -47,6 +47,7 @@ void FluidSim_RegisterCvars(void) {
 	r_fluidsim_windZ      = ri.Cvar_Get("r_fluidsim_windZ",      "0.0",    CVAR_ARCHIVE);
 	r_fluidsim_gridScale  = ri.Cvar_Get("r_fluidsim_gridScale",  "1.0",    CVAR_ARCHIVE);
 	r_fluidsim_iterations = ri.Cvar_Get("r_fluidsim_iterations", "40",     CVAR_ARCHIVE);
+	ri.Cvar_CheckRange( r_fluidsim_iterations, "1", "64", CV_INTEGER );
 
 	ri.Printf(PRINT_ALL, "Navier-Stokes fluid sim: cvars registered (r_fluidsim %s)\n",
 		r_fluidsim->integer ? "enabled" : "disabled");
@@ -75,6 +76,10 @@ void FluidSim_AddEmitter(const fluidEmitter_t *emitter) {
 		return;
 	}
 	Com_Memcpy(&fluidEmitters[numFluidEmitters], emitter, sizeof(fluidEmitter_t));
+	/* Clamp radius to avoid division issues in shader; shader uses max(radius, 0.001) */
+	if ( fluidEmitters[numFluidEmitters].radius < 0.0f ) {
+		fluidEmitters[numFluidEmitters].radius = 0.0f;
+	}
 	numFluidEmitters++;
 }
 

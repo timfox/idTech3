@@ -15055,11 +15055,19 @@ static void vk_update_volumetric_params( void )
 	}
 
 	if ( r_volumetricFogWorldMin && r_volumetricFogWorldMin->string ) {
-		sscanf( r_volumetricFogWorldMin->string, "%f %f %f", &fog_min[0], &fog_min[1], &fog_min[2] );
+		if ( sscanf( r_volumetricFogWorldMin->string, "%f %f %f", &fog_min[0], &fog_min[1], &fog_min[2] ) != 3 ) {
+			ri.Printf( PRINT_WARNING, "r_volumetricFogWorldMin: expected 3 floats, using defaults\n" );
+		}
 	}
 	if ( r_volumetricFogWorldMax && r_volumetricFogWorldMax->string ) {
-		sscanf( r_volumetricFogWorldMax->string, "%f %f %f", &fog_max[0], &fog_max[1], &fog_max[2] );
+		if ( sscanf( r_volumetricFogWorldMax->string, "%f %f %f", &fog_max[0], &fog_max[1], &fog_max[2] ) != 3 ) {
+			ri.Printf( PRINT_WARNING, "r_volumetricFogWorldMax: expected 3 floats, using defaults\n" );
+		}
 	}
+	/* Ensure valid AABB for fluid world mapping */
+	if ( fog_max[0] <= fog_min[0] + 1.0f ) fog_max[0] = fog_min[0] + 4096.0f;
+	if ( fog_max[1] <= fog_min[1] + 1.0f ) fog_max[1] = fog_min[1] + 4096.0f;
+	if ( fog_max[2] <= fog_min[2] + 1.0f ) fog_max[2] = fog_min[2] + 1280.0f;
 	if ( r_volumetricFogNoiseScroll && r_volumetricFogNoiseScroll->string ) {
 		vk_parse_rgb_string( r_volumetricFogNoiseScroll->string, noise_scroll );
 	}

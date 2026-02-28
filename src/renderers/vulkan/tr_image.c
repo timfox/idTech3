@@ -1097,10 +1097,10 @@ image_t *R_CreateImage( const char *name, const char *name2, byte *pic, int widt
 
 	image = ri.Hunk_Alloc( sizeof( *image ) + namelen + namelen2, h_low );
 	image->imgName = (char *)( image + 1 );
-	strcpy( image->imgName, name );
+	Q_strncpyz( image->imgName, name, namelen );
 	if ( namelen2 ) {
 		image->imgName2 = image->imgName + namelen;
-		strcpy( image->imgName2, name2 );
+		Q_strncpyz( image->imgName2, name2, namelen2 );
 	} else {
 		image->imgName2 = image->imgName; 
 	}

@@ -921,7 +921,12 @@ qboolean Sys_IsLANAddress( const netadr_t *adr ) {
 #ifdef USE_IPV6
 			else if ( adr->type == NA_IP6 || adr->type == NA_MULTICAST6 )
 			{
-				// TODO? should we check the scope_id here?
+				/* For link-local addresses (fe80::/10), scope_id identifies the
+				 * interface; addresses on different interfaces are not on same LAN. */
+				if ( ( adr->ipv._6[0] == 0xfe && ( adr->ipv._6[1] & 0xc0 ) == 0x80 )
+					&& adr->scope_id != ( (struct sockaddr_in6 *) &localIP[index].addr )->sin6_scope_id ) {
+					continue;
+				}
 
 				compareip = (byte *) &((struct sockaddr_in6 *) &localIP[index].addr)->sin6_addr;
 				comparemask = (byte *) &((struct sockaddr_in6 *) &localIP[index].netmask)->sin6_addr;

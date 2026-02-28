@@ -89,7 +89,7 @@ void PostFX_RegisterCvars(void) {
 	r_vignette_radius        = ri.Cvar_Get("r_vignette_radius",        "0.60", CVAR_ARCHIVE);
 	r_chromaticAberration    = ri.Cvar_Get("r_chromaticAberration",    "0.22", CVAR_ARCHIVE);
 	r_filmGrain              = ri.Cvar_Get("r_filmGrain",              "0.75", CVAR_ARCHIVE);
-	r_filmLook               = ri.Cvar_Get("r_filmLook",               "1",    CVAR_ARCHIVE);
+	r_filmLook               = ri.Cvar_Get("r_filmLook",               "0",    CVAR_ARCHIVE);
 
 	ri.Cvar_SetDescription( r_vignette, "Vignette strength for post-processing lens darkening." );
 	ri.Cvar_SetDescription( r_vignette_radius, "Vignette inner radius before edge darkening starts." );
