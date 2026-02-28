@@ -1717,6 +1717,20 @@ Used to load a development dll instead of a virtual machine
 TTimo: added some verbosity in debug
 =================
 */
+static void *VM_TryLoadNativeModule( const char *moduleName, char *filename, int filenameSize ) {
+	void		*libHandle;
+
+	Com_sprintf( filename, filenameSize, "%s.so", moduleName );
+	libHandle = FS_LoadLibrary( filename );
+	if ( libHandle ) {
+		return libHandle;
+	}
+
+	Com_sprintf( filename, filenameSize, "%s" ARCH_STRING DLL_EXT, moduleName );
+	libHandle = FS_LoadLibrary( filename );
+	return libHandle;
+}
+
 static void * QDECL loadNative( const char *name, vmMainFunc_t *entryPoint, dllSyscall_t systemcalls ) {
 
 	char		filename[ MAX_QPATH ];
@@ -1726,45 +1740,60 @@ static void * QDECL loadNative( const char *name, vmMainFunc_t *entryPoint, dllS
 	void		*vmMainAddr;
 	qboolean	isGenericModule = qfalse;
 
-	// For ui, game, cgame, qagame modules, try alternate names
-	if ( Q_stricmp( name, "ui" ) == 0 || Q_stricmp( name, "game" ) == 0 || Q_stricmp( name, "cgame" ) == 0 || Q_stricmp( name, "qagame" ) == 0 ) {
+	// For ui, game, cgame, qagame and custom aliases, try generic names first.
+	if ( Q_stricmp( name, "ui" ) == 0 || Q_stricmp( name, "game" ) == 0 || Q_stricmp( name, "cgame" ) == 0 ||
+		 Q_stricmp( name, "qagame" ) == 0 || Q_stricmp( name, "frontend" ) == 0 ||
+		 Q_stricmp( name, "client" ) == 0 || Q_stricmp( name, "server" ) == 0 ) {
 		isGenericModule = qtrue;
 
-		// Try the module name with .so extension first
-		Com_sprintf( filename, sizeof( filename ), "%s.so", name );
-		libHandle = FS_LoadLibrary( filename );
-		if ( libHandle ) goto loadSuccess;
+		libHandle = VM_TryLoadNativeModule( name, filename, sizeof( filename ) );
+		if ( libHandle ) {
+			goto loadSuccess;
+		}
 
-		// Try alternate artifact names:
-		//   qagame/game -> "server"
-		//   cgame       -> "client"
-		//   ui          -> "frontend"
-		{
-			const char *altNames[3] = { NULL, NULL, NULL };
-			int altCount = 0;
-			int a;
-
-			if ( Q_stricmp( name, "qagame" ) == 0 ) {
-				altNames[altCount++] = "server";
-				altNames[altCount++] = "game";
-			} else if ( Q_stricmp( name, "game" ) == 0 ) {
-				altNames[altCount++] = "server";
-			} else if ( Q_stricmp( name, "cgame" ) == 0 ) {
-				altNames[altCount++] = "client";
-			} else if ( Q_stricmp( name, "ui" ) == 0 ) {
-				altNames[altCount++] = "frontend";
+		// qagame has historically been loaded from game.* as an alias.
+		if ( Q_stricmp( name, "qagame" ) == 0 ) {
+			libHandle = VM_TryLoadNativeModule( "game", filename, sizeof( filename ) );
+			if ( libHandle ) {
+				goto loadSuccess;
 			}
+		}
 
-			for ( a = 0; a < altCount; a++ ) {
-				// Try .so
-				Com_sprintf( filename, sizeof( filename ), "%s.so", altNames[a] );
-				libHandle = FS_LoadLibrary( filename );
-				if ( libHandle ) goto loadSuccess;
-
-				// Try platform-specific
-				Com_sprintf( filename, sizeof( filename ), "%s" ARCH_STRING DLL_EXT, altNames[a] );
-				libHandle = FS_LoadLibrary( filename );
-				if ( libHandle ) goto loadSuccess;
+		// Support renamed native modules for this project.
+		if ( Q_stricmp( name, "qagame" ) == 0 || Q_stricmp( name, "game" ) == 0 ) {
+			libHandle = VM_TryLoadNativeModule( "server", filename, sizeof( filename ) );
+			if ( libHandle ) {
+				goto loadSuccess;
+			}
+		}
+		if ( Q_stricmp( name, "cgame" ) == 0 ) {
+			libHandle = VM_TryLoadNativeModule( "client", filename, sizeof( filename ) );
+			if ( libHandle ) {
+				goto loadSuccess;
+			}
+		}
+		if ( Q_stricmp( name, "ui" ) == 0 ) {
+			libHandle = VM_TryLoadNativeModule( "frontend", filename, sizeof( filename ) );
+			if ( libHandle ) {
+				goto loadSuccess;
+			}
+		}
+		if ( Q_stricmp( name, "server" ) == 0 ) {
+			libHandle = VM_TryLoadNativeModule( "game", filename, sizeof( filename ) );
+			if ( libHandle ) {
+				goto loadSuccess;
+			}
+		}
+		if ( Q_stricmp( name, "client" ) == 0 ) {
+			libHandle = VM_TryLoadNativeModule( "cgame", filename, sizeof( filename ) );
+			if ( libHandle ) {
+				goto loadSuccess;
+			}
+		}
+		if ( Q_stricmp( name, "frontend" ) == 0 ) {
+			libHandle = VM_TryLoadNativeModule( "ui", filename, sizeof( filename ) );
+			if ( libHandle ) {
+				goto loadSuccess;
 			}
 		}
 
