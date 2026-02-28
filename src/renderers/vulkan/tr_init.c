@@ -2086,12 +2086,12 @@ static void R_Register( void )
 	//r_anaglyphMode = ri.Cvar_Get( "r_anaglyphMode", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	//ri.Cvar_SetDescription( r_anaglyphMode, "Enable rendering of anaglyph images. Valid options for 3D glasses types:\n 0: Disabled\n 1: Red-cyan\n 2: Red-blue\n 3: Red-green\n 4: Green-magenta" );
 
-	r_greyscale = ri.Cvar_Get( "r_greyscale", "0", CVAR_ARCHIVE_ND );
+	r_greyscale = ri.Cvar_Get( "r_greyscale", "0.22", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_greyscale, "-1", "1", CV_FLOAT );
 	ri.Cvar_SetDescription( r_greyscale, "Desaturate rendered frame, requires \\r_fbo 1." );
 	ri.Cvar_SetGroup( r_greyscale, CVG_RENDERER );
 
-	r_dither = ri.Cvar_Get( "r_dither", "0", CVAR_ARCHIVE_ND );
+	r_dither = ri.Cvar_Get( "r_dither", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_dither, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription(r_dither, "Set dithering mode:\n 0 - disabled\n 1 - ordered\nRequires " S_COLOR_CYAN "\\r_fbo 1." );
 	ri.Cvar_SetGroup( r_dither, CVG_RENDERER );
@@ -2222,12 +2222,12 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_bloomKnee, "Soft knee for the bloom extractor to control highlight rolloff." );
 	ri.Cvar_SetGroup( r_bloomKnee, CVG_RENDERER );
 
-	r_exposure = ri.Cvar_Get( "r_exposure", "1.0", CVAR_ARCHIVE_ND );
+	r_exposure = ri.Cvar_Get( "r_exposure", "0.82", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_exposure, "0.01", "10.0", CV_FLOAT );
 	ri.Cvar_SetDescription( r_exposure, "Linear exposure multiplier applied before tonemapping." );
 	ri.Cvar_SetGroup( r_exposure, CVG_RENDERER );
 
-	r_tonemap = ri.Cvar_Get( "r_tonemap", "2", CVAR_ARCHIVE_ND );
+	r_tonemap = ri.Cvar_Get( "r_tonemap", "3", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_tonemap, "0", "4", CV_INTEGER );
 	ri.Cvar_SetDescription( r_tonemap, "Tonemapping: 0=off, 1=Reinhard, 2=ACES, 3=Filmic (Hable/Uncharted2), 4=AgX (punchy, saturated)." );
 	ri.Cvar_SetGroup( r_tonemap, CVG_RENDERER );

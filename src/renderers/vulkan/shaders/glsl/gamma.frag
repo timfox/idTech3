@@ -29,6 +29,7 @@ layout(constant_id = 19) const float film_grain = 0.0;
 layout(constant_id = 20) const int postprocess_enabled = 1;
 layout(constant_id = 21) const float outline_strength = 0.0;
 layout(constant_id = 22) const float outline_threshold = 0.15;
+layout(constant_id = 23) const int film_look = 0;
 
 layout(push_constant) uniform PaniniPC {
 	float paniniAmount;
@@ -366,9 +367,25 @@ void main() {
 	}
 
 	if ( film_grain > 0.0 && postprocess_enabled != 0 ) {
-		float grainSeed = fract( sin( dot( gl_FragCoord.xy, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
+		float t = paniniPC.paniniPad0;
+		float grainSeed = fract( sin( dot( gl_FragCoord.xy + vec2( t * 173.0, t * 79.0 ), vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
 		float grain = ( grainSeed - 0.5 ) * film_grain * 0.1;
 		ldr += grain;
+		ldr = clamp( ldr, 0.0, 1.0 );
+	}
+
+	if ( film_look != 0 && postprocess_enabled != 0 ) {
+		float t = paniniPC.paniniPad0;
+		float flicker = 1.0 + sin( t * 23.0 ) * 0.015 + sin( t * 57.0 ) * 0.007;
+		float scratchBand = step( 0.995, fract( uvLogical.x * 120.0 + sin( t * 0.7 ) * 10.0 ) );
+		float scratchNoise = fract( sin( dot( vec2( floor( uvLogical.y * 720.0 ), floor( t * 24.0 ) ), vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
+		float scratch = scratchBand * step( 0.65, scratchNoise );
+		float dustHash = fract( sin( dot( floor( uvLogical * vec2( 960.0, 540.0 ) + t * 30.0 ), vec2( 127.1, 311.7 ) ) ) * 43758.5453 );
+		float dust = step( 0.9985, dustHash );
+
+		ldr *= flicker;
+		ldr = mix( ldr, vec3( 1.0 ), scratch * 0.12 );
+		ldr = mix( ldr, vec3( 0.9, 0.85, 0.7 ), dust * 0.35 );
 		ldr = clamp( ldr, 0.0, 1.0 );
 	}
 
