@@ -232,6 +232,38 @@ The flag targets the renderer code under `src/renderers/common/tr_font.c`, links
 
 ---
 
+### SVG image loading (librsvg)
+
+The renderer can optionally rasterize `.svg` assets via **librsvg + cairo**.
+
+Enable it with:
+
+```bash
+cmake -S . -B build -DUSE_LIBRSVG=ON ..
+```
+
+If dependencies are missing, CMake automatically disables the SVG loader and prints a status line.
+
+Typical Linux packages:
+
+- `librsvg2-dev`
+- `libcairo2-dev`
+- `pkg-config`
+
+Runtime controls:
+
+- `r_svgRasterScale` (default `1.0`) - rasterization scale multiplier.
+- `r_svgMaxRasterSize` (default `4096`) - max rasterized width/height in pixels.
+- `r_svgMaxFileBytes` (default `2097152`) - max accepted SVG source size.
+
+Security behavior:
+
+- Loads from virtual filesystem paths only.
+- External resource resolution is disabled via empty base URI.
+- Oversized files/raster targets are rejected safely with warnings.
+
+---
+
 ### Lua scripting support
 
 Lua support is enabled by default.

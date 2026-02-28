@@ -26,6 +26,7 @@ qboolean R_SaveEXR(const char *filename, const float *rgba, int width, int heigh
 void R_LoadHDR(const char *filename, byte **pic, int *width, int *height);
 void R_LoadQOI(const char *filename, byte **pic, int *width, int *height);
 void R_LoadDDS(const char *filename, byte **pic, int *width, int *height);
+void R_LoadSVG(const char *filename, byte **pic, int *width, int *height);
 
 #ifdef __cplusplus
 }
