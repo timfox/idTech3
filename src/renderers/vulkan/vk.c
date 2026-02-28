@@ -452,7 +452,7 @@ static const char *pmode_to_str( VkPresentModeKHR mode )
 		case VK_PRESENT_MODE_FIFO_KHR: return "FIFO";
 		case VK_PRESENT_MODE_FIFO_RELAXED_KHR: return "FIFO_RELAXED";
 		case VK_PRESENT_MODE_FIFO_LATEST_READY_EXT: return "FIFO_LATEST_READY";
-		default: sprintf( buf, "mode#%x", mode ); return buf;
+		default: Com_sprintf( buf, sizeof( buf ), "mode#%x", mode ); return buf;
 	};
 }
 
@@ -538,7 +538,7 @@ static const char *vk_result_string( VkResult code ) {
 		CASE_STR( VK_OPERATION_NOT_DEFERRED_KHR );
 		CASE_STR( VK_PIPELINE_COMPILE_REQUIRED_EXT );
 	default:
-		sprintf( buffer, "code %i", code );
+		Com_sprintf( buffer, sizeof( buffer ), "code %i", code );
 		return buffer;
 	}
 }

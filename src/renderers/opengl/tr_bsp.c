@@ -2114,9 +2114,10 @@ static void R_LoadEntities( const lump_t *l ) {
 
 	p = (const char *)(fileBase + l->fileofs);
 
-	// store for reference by the cgame
+	// store for reference by the cgame (memcpy: BSP lump may lack null terminator)
 	w->entityString = ri.Hunk_Alloc( l->filelen + 1, h_low );
-	strcpy( w->entityString, p );
+	Com_Memcpy( w->entityString, p, l->filelen );
+	w->entityString[l->filelen] = '\0';
 	w->entityParsePoint = w->entityString;
 
 	token = COM_ParseExt( &p, qtrue );

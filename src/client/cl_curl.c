@@ -761,9 +761,9 @@ static int Com_DL_CallbackProgress( void *data, double dltotal, double dlnow, do
 #else
 		percentage = ( dlnow / dltotal ) * 100.0;
 #endif
-		sprintf( dl->progress, " downloading %s: %s (%i%%)", dl->Name, sizeToString( dl->Count ), (int)percentage );
+		Com_sprintf( dl->progress, sizeof( dl->progress ), " downloading %s: %s (%i%%)", dl->Name, sizeToString( dl->Count ), (int)percentage );
 	} else {
-		sprintf( dl->progress, " downloading %s: %s", dl->Name, sizeToString( dl->Count ) );
+		Com_sprintf( dl->progress, sizeof( dl->progress ), " downloading %s: %s", dl->Name, sizeToString( dl->Count ) );
 	}
 
 #if CURL_AT_LEAST_VERSION(7, 55, 0)
@@ -894,8 +894,8 @@ static size_t Com_DL_HeaderCallback( void *ptr, size_t size, size_t nmemb, void 
 			// strip extension
 			FS_StripExt( name, ".pk3" );
 
-			// store in
-			strcpy( dl->Name, name );
+			// store in (Q_strncpyz: Content-Disposition is server-controlled)
+			Q_strncpyz( dl->Name, name, sizeof( dl->Name ) );
 		}
 	}
 
