@@ -37,6 +37,7 @@ static cvar_t *r_sdfFont;
 static cvar_t *r_sdfSmoothing;
 
 #define VALID_FONT(h) ((h) >= 0 && (h) < numFonts && fonts[(h)].active)
+#define SDF_MAX_METRICS_FILE_SIZE (1024 * 1024)
 
 void SDF_Init( void ) {
 	Com_Memset( fonts, 0, sizeof( fonts ) );
@@ -69,14 +70,20 @@ static qboolean SDF_ParseFNT( sdfFont_t *font, const char *data ) {
 		while ( *p == '\n' || *p == '\r' ) p++;
 
 		if ( !Q_strncmp( line, "common ", 7 ) ) {
-			sscanf( line, "common lineHeight=%f base=%f scaleW=%f scaleH=%f",
+			const int parsed = sscanf( line, "common lineHeight=%f base=%f scaleW=%f scaleH=%f",
 				&font->lineHeight, &font->base, &font->atlasW, &font->atlasH );
+			if ( parsed != 4 ) {
+				continue;
+			}
 		}
 		else if ( !Q_strncmp( line, "char ", 5 ) ) {
 			int id = 0;
 			float x = 0, y = 0, w = 0, h = 0, xoff = 0, yoff = 0, xadv = 0;
-			sscanf( line, "char id=%d x=%f y=%f width=%f height=%f xoffset=%f yoffset=%f xadvance=%f",
+			const int parsed = sscanf( line, "char id=%d x=%f y=%f width=%f height=%f xoffset=%f yoffset=%f xadvance=%f",
 				&id, &x, &y, &w, &h, &xoff, &yoff, &xadv );
+			if ( parsed != 8 ) {
+				continue;
+			}
 
 			if ( id >= 0 && id < SDF_MAX_GLYPHS && font->atlasW > 0 && font->atlasH > 0 ) {
 				sdfGlyph_t *g = &font->glyphs[id];
@@ -100,6 +107,11 @@ sdfFontHandle_t SDF_LoadFont( const char *name, const char *atlasImage, const ch
 	void *buf;
 	int len, slot;
 
+	if ( !name || !name[0] || !atlasImage || !atlasImage[0] || !metricsFile || !metricsFile[0] ) {
+		Com_Printf( S_COLOR_YELLOW "SDF: invalid font arguments\n" );
+		return SDF_INVALID_HANDLE;
+	}
+
 	if ( numFonts >= SDF_MAX_FONTS ) return SDF_INVALID_HANDLE;
 
 	slot = numFonts++;
@@ -120,6 +132,13 @@ sdfFontHandle_t SDF_LoadFont( const char *name, const char *atlasImage, const ch
 	len = FS_ReadFile( metricsFile, &buf );
 	if ( len <= 0 || !buf ) {
 		Com_Printf( S_COLOR_YELLOW "SDF: metrics '%s' not found\n", metricsFile );
+		numFonts--;
+		return SDF_INVALID_HANDLE;
+	}
+	if ( len > SDF_MAX_METRICS_FILE_SIZE ) {
+		Com_Printf( S_COLOR_YELLOW "SDF: metrics '%s' too large (%d bytes, max %d)\n",
+			metricsFile, len, SDF_MAX_METRICS_FILE_SIZE );
+		FS_FreeFile( buf );
 		numFonts--;
 		return SDF_INVALID_HANDLE;
 	}
