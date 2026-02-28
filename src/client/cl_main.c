@@ -4478,6 +4478,7 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 
 	noGameRestart = quit;
 	CL_Disconnect( qfalse );
+	SDF_Shutdown();
 
 	// clear and mute all sounds until next registration
 	S_DisableSounds();
