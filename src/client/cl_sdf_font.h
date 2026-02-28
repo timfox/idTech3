@@ -23,7 +23,8 @@ crisp edges at any resolution.
 #include "../qcommon/q_shared.h"
 
 #define SDF_MAX_FONTS       8
-#define SDF_MAX_GLYPHS      256
+#define SDF_MAX_GLYPHS      4096
+#define SDF_MAX_KERNINGS    8192
 #define SDF_INVALID_HANDLE  (-1)
 
 typedef int sdfFontHandle_t;
@@ -35,6 +36,12 @@ typedef struct {
 	float   xadvance;
 	float   s0, t0, s1, t1;
 } sdfGlyph_t;
+
+typedef struct {
+	uint32_t first;
+	uint32_t second;
+	float    amount;
+} sdfKerning_t;
 
 typedef struct {
 	float   outlineWidth;
@@ -55,5 +62,9 @@ void            SDF_DrawText( sdfFontHandle_t font, float x, float y, float scal
                               const char *text, const float *color, const sdfDrawParams_t *params );
 float           SDF_TextWidth( sdfFontHandle_t font, float scale, const char *text );
 float           SDF_TextHeight( sdfFontHandle_t font, float scale );
+
+qboolean        SDF_IsEnabled( void );
+qboolean        SDF_DrawStringExt( int x, int y, float size, const char *string,
+                                   const float *setColor, qboolean forceColor, qboolean noColorEscape );
 
 #endif /* CL_SDF_FONT_H */

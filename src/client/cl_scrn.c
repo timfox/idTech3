@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "client.h"
 #include "cl_emoji.h"
 #include "cl_menuvideo.h"
+#include "cl_sdf_font.h"
 #include "../qcommon/q_utf8.h"
 
 static qboolean	scr_initialized;		// ready to draw
@@ -273,6 +274,10 @@ void SCR_DrawStringExt( int x, int y, float size, const char *string, const floa
 	vec4_t		color;
 	const char	*s;
 	int			xx;
+
+	if ( SDF_DrawStringExt( x, y, size, string, setColor, forceColor, noColorEscape ) ) {
+		return;
+	}
 
 	// draw the drop shadow
 	color[0] = color[1] = color[2] = 0.0;
