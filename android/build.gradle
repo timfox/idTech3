@@ -2,7 +2,7 @@ buildscript {
     // AGP 8.7.3 requires Java 11+ (Java 17 recommended). Fail early with clear guidance.
     def javaVersion = org.gradle.api.JavaVersion.current()
     if (javaVersion < org.gradle.api.JavaVersion.VERSION_11) {
-        throw new org.gradle.api.GradleException("""
+        throw new RuntimeException("""
 Android Gradle Plugin 8.7.3 requires Java 11 or higher (Java 17 recommended).
 Current JVM: ${javaVersion}
 
