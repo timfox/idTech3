@@ -1077,13 +1077,8 @@ static void vk_create_render_passes( void )
 	attachments[1].samples = vkSamples;
 	attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; // Need empty depth buffer before use
 	attachments[1].stencilLoadOp = glConfig.stencilBits ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	if ( r_bloom->integer || ( r_ssao && r_ssao->integer ) ) {
-		attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE; // keep it for post-bloom pass
-		attachments[1].stencilStoreOp = glConfig.stencilBits ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	} else {
-		attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	}
+	attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	attachments[1].stencilStoreOp = glConfig.stencilBits ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE;
 	attachments[1].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 	attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
@@ -1143,11 +1138,7 @@ static void vk_create_render_passes( void )
 #else
 		attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 #endif
-		if ( r_bloom->integer ) {
-			attachments[3].storeOp = VK_ATTACHMENT_STORE_OP_STORE; // keep it for post-bloom pass
-		} else {
-			attachments[3].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // Intermediate storage (not written)
-		}
+		attachments[3].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 		attachments[3].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		attachments[3].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		attachments[3].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -1162,7 +1153,7 @@ static void vk_create_render_passes( void )
 #else
 			attachments[4].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 #endif
-			attachments[4].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			attachments[4].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 			attachments[4].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 			attachments[4].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 			attachments[4].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -1230,7 +1221,8 @@ static void vk_create_render_passes( void )
 	VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.main ) );
 	SET_OBJECT_NAME( vk.render_pass.main, "render pass - main", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
 
-	if ( r_bloom->integer ) {
+	// Post-main continuation pass used by 3D -> 2D split (volumetric fog runs here even when bloom is off).
+	{
 
 		// post-bloom pass
 		// color buffer
@@ -1255,7 +1247,9 @@ static void vk_create_render_passes( void )
 		}
 		VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.post_bloom ) );
 		SET_OBJECT_NAME( vk.render_pass.post_bloom, "render pass - post_bloom", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
+	}
 
+	if ( r_bloom->integer ) {
 		// bloom extraction, using resolved/main fbo as a source
 		desc.attachmentCount = 1;
 
@@ -9496,6 +9490,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 		int postprocess_enabled;   /* constant_id = 20 */
 		float outline_strength;    /* constant_id = 21 */
 		float outline_threshold;   /* constant_id = 22 */
+		int film_look;             /* constant_id = 23 */
 	} frag_spec_data;
 
 	switch ( program_index ) {
@@ -9669,6 +9664,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	frag_spec_data.chromatic_aberration = PostFX_GetChromaticAberration();
 	frag_spec_data.film_grain = PostFX_GetFilmGrain();
 	frag_spec_data.postprocess_enabled = ( r_post && r_post->integer ) ? 1 : 0;
+	frag_spec_data.film_look = PostFX_GetFilmLook();
 	{
 		cvar_t *r_outline = ri.Cvar_Get( "r_outline", "0", CVAR_ARCHIVE );
 		cvar_t *r_outlineThreshold = ri.Cvar_Get( "r_outlineThreshold", "0.15", CVAR_ARCHIVE );
@@ -9771,7 +9767,11 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	spec_entries[22].offset = offsetof( struct PostProcess_FragSpecData, outline_threshold );
 	spec_entries[22].size = sizeof( frag_spec_data.outline_threshold );
 
-	frag_spec_info.mapEntryCount = 23;
+	spec_entries[23].constantID = 23;
+	spec_entries[23].offset = offsetof( struct PostProcess_FragSpecData, film_look );
+	spec_entries[23].size = sizeof( frag_spec_data.film_look );
+
+	frag_spec_info.mapEntryCount = 24;
 	frag_spec_info.pMapEntries = spec_entries;
 	frag_spec_info.dataSize = sizeof( frag_spec_data );
 	frag_spec_info.pData = &frag_spec_data;
@@ -13534,7 +13534,11 @@ static void vk_reset_volumetric_history( void )
 
 static void vk_volumetric_fog_pass( void )
 {
-	if ( !r_volumetricFog->integer || backEnd.doneFog || !vk.fboActive ||
+	if ( backEnd.doneFog ) {
+		return;
+	}
+
+	if ( !r_volumetricFog->integer || !vk.fboActive ||
 		!tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
 		vk_reset_volumetric_history();
 		backEnd.doneFog = qtrue;
@@ -14266,7 +14270,7 @@ void vk_end_frame( void )
 			panini_push.aspect = vk.renderHeight > 0 ? ( (float)vk.renderWidth / (float)vk.renderHeight ) : 1.0f;
 			panini_push.paniniBorderMode = r_panini_border ? (float)r_panini_border->integer : 0.0f;
 			panini_push.paniniDebugMode = r_panini_debug ? (float)r_panini_debug->integer : 0.0f;
-			panini_push.paniniPad0 = 0.0f;
+			panini_push.paniniPad0 = (float)backEnd.refdef.time * 0.001f;
 			panini_push.paniniPad1 = 0.0f;
 			panini_push.paniniPad2 = 0.0f;
 			if ( vk_scene_src_rect_valid ) {
@@ -15598,8 +15602,10 @@ qboolean vk_bloom( void )
 		return qfalse;
 	}
 
-	vk_end_render_pass(); // end main
-	vk_volumetric_fog_pass();
+	vk_end_render_pass(); // end main/post-bloom continuation
+	if ( !backEnd.doneFog ) {
+		vk_volumetric_fog_pass();
+	}
 
 	// bloom extraction
 	vk_begin_bloom_extract_render_pass();
