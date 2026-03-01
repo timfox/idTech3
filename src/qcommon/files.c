@@ -4939,27 +4939,10 @@ static void FS_ParseGameInfo( void )
 {
 	char *buffer;
 	int len;
-	const char *gameDir;
-	char gameInfoPath[MAX_OSPATH];
-	
-	// Determine game directory (fs_game if set, otherwise fs_basegame)
-	if ( fs_gamedirvar->string[0] != '\0' ) {
-		gameDir = fs_gamedirvar->string;
-	} else {
-		gameDir = fs_basegame->string;
-	}
-	
-	// Try to find gameinfo.txt in the game directory
-	// Check in basepath first
-	Com_sprintf( gameInfoPath, sizeof( gameInfoPath ), "%s/%s/gameinfo.txt", fs_basepath->string, gameDir );
-	len = FS_ReadFile( gameInfoPath, (void **)&buffer );
-	
-	// If not found in basepath, try homepath
-	if ( !buffer && fs_homepath->string[0] && Q_stricmp( fs_homepath->string, fs_basepath->string ) ) {
-		Com_sprintf( gameInfoPath, sizeof( gameInfoPath ), "%s/%s/gameinfo.txt", fs_homepath->string, gameDir );
-		len = FS_ReadFile( gameInfoPath, (void **)&buffer );
-	}
-	
+
+	// Find gameinfo.txt via the filesystem (current game dir is already in search paths)
+	len = FS_ReadFile( "gameinfo.txt", (void **)&buffer );
+
 	if ( !buffer || len <= 0 ) {
 		// gameinfo.txt not found, use default title
 		return;
