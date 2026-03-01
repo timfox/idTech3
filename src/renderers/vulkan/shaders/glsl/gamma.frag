@@ -366,26 +366,46 @@ void main() {
 		ldr *= vig;
 	}
 
-	if ( film_grain > 0.0 && postprocess_enabled != 0 ) {
+	/* Film grain: film_look = Source-style (luminance-dependent, soft-light);
+	   else film_grain = simple additive. */
+	if ( film_look != 0 && postprocess_enabled != 0 ) {
+		/* Source Engine–style film grain (DoD:S, L4D): luminance-dependent, fine-grained,
+		   soft-light blend. Grain peaks in mid-tones, fades in shadows/highlights.
+		   r_filmGrain scales intensity (0.5–1.5x) when film_look is on. */
+		float t = paniniPC.paniniPad0;
+		vec2 px = gl_FragCoord.xy;
+		/* Multi-octave hash for fine grain; higher scale = finer grain; temporal for animation */
+		vec2 seedA = px * 8.0 + vec2( t * 47.0, t * 31.0 );
+		vec2 seedB = px * 16.0 + vec2( t * 73.0, t * 59.0 );
+		float n0 = fract( sin( dot( floor( seedA ), vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
+		float n1 = fract( sin( dot( floor( seedB ), vec2( 127.1, 311.7 ) ) ) * 43758.5453 );
+		float grainRaw = ( n0 + n1 ) * 0.5 - 0.5;  /* -0.5 .. 0.5 */
+		/* Luminance mask: peak in mid-tones, fade in shadows and highlights (like real film) */
+		float lum = dot( ldr, sRGB );
+		float midTone = lum * ( 1.0 - lum ) * 4.0;  /* 0 at 0/1, max 1 at 0.5 */
+		float lumMask = smoothstep( 0.0, 0.06, lum ) * smoothstep( 1.0, 0.35, lum );
+		float intensity = 0.5 + film_grain * 0.5;  /* 0.5–1.0 when film_grain 0–1 */
+		float grainStrength = 0.12 * intensity * midTone * lumMask;
+		/* Soft-light blend: blend = 0.5 + grain, so 0.5 = neutral */
+		vec3 blend = vec3( 0.5 + grainRaw * grainStrength );
+		vec3 base = ldr;
+		vec3 result;
+		result.r = ( blend.r < 0.5 )
+			? ( 2.0 * base.r * blend.r + base.r * base.r * ( 1.0 - 2.0 * blend.r ) )
+			: ( sqrt( base.r ) * ( 2.0 * blend.r - 1.0 ) + 2.0 * base.r * ( 1.0 - blend.r ) );
+		result.g = ( blend.g < 0.5 )
+			? ( 2.0 * base.g * blend.g + base.g * base.g * ( 1.0 - 2.0 * blend.g ) )
+			: ( sqrt( base.g ) * ( 2.0 * blend.g - 1.0 ) + 2.0 * base.g * ( 1.0 - blend.g ) );
+		result.b = ( blend.b < 0.5 )
+			? ( 2.0 * base.b * blend.b + base.b * base.b * ( 1.0 - 2.0 * blend.b ) )
+			: ( sqrt( base.b ) * ( 2.0 * blend.b - 1.0 ) + 2.0 * base.b * ( 1.0 - blend.b ) );
+		ldr = clamp( result, 0.0, 1.0 );
+	} else if ( film_grain > 0.0 && postprocess_enabled != 0 ) {
+		/* Simple additive grain when film_look is off */
 		float t = paniniPC.paniniPad0;
 		float grainSeed = fract( sin( dot( gl_FragCoord.xy + vec2( t * 173.0, t * 79.0 ), vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
 		float grain = ( grainSeed - 0.5 ) * film_grain * 0.1;
 		ldr += grain;
-		ldr = clamp( ldr, 0.0, 1.0 );
-	}
-
-	if ( film_look != 0 && postprocess_enabled != 0 ) {
-		float t = paniniPC.paniniPad0;
-		float flicker = 1.0 + sin( t * 23.0 ) * 0.015 + sin( t * 57.0 ) * 0.007;
-		float scratchBand = step( 0.995, fract( uvLogical.x * 120.0 + sin( t * 0.7 ) * 10.0 ) );
-		float scratchNoise = fract( sin( dot( vec2( floor( uvLogical.y * 720.0 ), floor( t * 24.0 ) ), vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
-		float scratch = scratchBand * step( 0.65, scratchNoise );
-		float dustHash = fract( sin( dot( floor( uvLogical * vec2( 960.0, 540.0 ) + t * 30.0 ), vec2( 127.1, 311.7 ) ) ) * 43758.5453 );
-		float dust = step( 0.9985, dustHash );
-
-		ldr *= flicker;
-		ldr = mix( ldr, vec3( 1.0 ), scratch * 0.12 );
-		ldr = mix( ldr, vec3( 0.9, 0.85, 0.7 ), dust * 0.35 );
 		ldr = clamp( ldr, 0.0, 1.0 );
 	}
 

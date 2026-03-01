@@ -95,7 +95,7 @@ void PostFX_RegisterCvars(void) {
 	ri.Cvar_SetDescription( r_vignette_radius, "Vignette inner radius before edge darkening starts." );
 	ri.Cvar_SetDescription( r_chromaticAberration, "Chromatic aberration strength for lens separation." );
 	ri.Cvar_SetDescription( r_filmGrain, "Film grain intensity for post-process pass." );
-	ri.Cvar_SetDescription( r_filmLook, "Enable 1970s-inspired film look (flicker, scratches, dust and animated grain)." );
+	ri.Cvar_SetDescription( r_filmLook, "Source Engine–style film grain: luminance-dependent, fine-grained, soft-light blend (DoD:S, L4D quality)." );
 
 	ri.Printf(PRINT_ALL, "PostFX: cvars registered (SSR %s, Atmosphere %s, VegWind %s)\n",
 		r_ssr->integer ? "on" : "off",
