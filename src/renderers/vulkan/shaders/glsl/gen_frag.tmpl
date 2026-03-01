@@ -813,7 +813,7 @@ void main() {
 	float sqrLightDist = dot(L, L);
 	L /= sqrt(sqrLightDist);
 
-	// FIX ME
+	/* bias_color source by vertex color mode */
 	#if defined (USE_CLX_IDENT)
 			vec3 bias_color = vec3(1.0);
 	#elif defined (USE_FIXED_COLOR)
@@ -939,6 +939,9 @@ void main() {
 		{
 			Fs = CalcSpecular( specular.rgb, H, NH, NL, NE, LH, VH, roughness, baseUV, shadingFrame );
 		}
+	#else
+		/* PBR with single texture (tx0): compute direct specular for glint support */
+		Fs = CalcSpecular( specular.rgb, H, NH, NL, NE, LH, VH, roughness, baseUV, shadingFrame );
 	#endif
 
 

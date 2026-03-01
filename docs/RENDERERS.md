@@ -11,6 +11,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - Texture map types: normal, physical (RMO/ORM/RMOS variants), emissive, clearcoat, sheen, anisotropy, transmission, subsurface
 - Spherical harmonics for diffuse irradiance
 - Multi-scatter energy compensation
+- **Glint NDF**: Procedural microfacet NDF for specular glints (replaces GGX D term on low-roughness surfaces). Cvars: `r_glint`, `r_glintMode`, `r_glintDensity`, `r_glintMicrofacetRoughness`, `r_glintPixelFilterSize`, `r_glintSampleBudget`, `r_glintMaxLodClamp`, `r_glintRoughnessLo`, `r_glintRoughnessHi`, `r_glintDMax`. Debug modes 5–8 via `r_pbr_debug`.
 - See [PBR_TEXTURES.md](PBR_TEXTURES.md) for texture naming conventions
 
 ### Volumetric Fog
@@ -21,7 +22,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - Temporal reprojection for stable results
 - Integration with Navier-Stokes fluid simulation for dynamic fog
 - Shadowed volumetrics via sun CSM and local shadow maps
-- Cvars: `r_vfog`, `r_vfog_density`, `r_vfog_heightFalloff`, `r_vfog_noiseScale`, etc.
+- Cvars: `r_volumetricFog`, `r_volumetricFogDensity`, `r_volumetricFogHeightFalloff`, `r_volumetricFogNoiseScale`, `r_volumetricFogGridDim`, `r_volumetricFogQuality`, etc. (Note: `r_vfog*` cvars in vk_vfog.c are legacy/unused; the pipeline uses `r_volumetricFog*` exclusively.)
 
 ### Navier-Stokes Fluid Simulation
 - GPU compute-based Stable Fluids (Jos Stam 1999)
