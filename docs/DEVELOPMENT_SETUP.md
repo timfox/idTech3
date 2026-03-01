@@ -139,13 +139,11 @@ ffmpeg play <file>      # Play a video file
 ## Validation
 
 ```bash
-# Smoke test (verify binaries work)
-./scripts/smoke_test.sh
+# Smoke test (verify binaries in release/ work)
+./scripts/smoke_test.sh release
 
-# Full CI validation
-./scripts/compile_engine.sh vulkan
-./scripts/compile_engine.sh opengl
-./scripts/compile_shaders.sh
+# Local CI validation (shader compile + Vulkan build + smoke test)
+./scripts/validate_ci_build.sh
 ```
 
 ## IDE Setup

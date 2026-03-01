@@ -148,6 +148,10 @@ def compile_template_shaders():
     print("Compiling template-driven shaders...")
     compile_shader("frag", "gen_frag.tmpl", "frag_tx0_df", defines="-DUSE_CLX_IDENT -DUSE_ATEST -DUSE_DF")
 
+    # flowmap water shaders (flow vectors offset texture UVs)
+    compile_shader("frag", "gen_frag.tmpl", "frag_tx0_flowmap", binding_expr="vk.modules.frag.flowmap[0]", defines="-DUSE_FLOWMAP -DUSE_ATEST")
+    compile_shader("frag", "gen_frag.tmpl", "frag_tx0_flowmap_fog", binding_expr="vk.modules.frag.flowmap[1]", defines="-DUSE_FLOWMAP -DUSE_ATEST -DUSE_FOG")
+
     compile_shader("vert", "light_vert.tmpl", "vert_light")
     compile_shader("vert", "light_vert.tmpl", "vert_light_fog", defines="-DUSE_FOG")
     compile_shader("frag", "light_frag.tmpl", "frag_light")

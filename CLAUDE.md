@@ -447,6 +447,7 @@ All significant changes require architectural review:
 - **[BRANCHES.md](docs/BRANCHES.md)**: Development philosophy
 - **[ROADMAP.md](docs/ROADMAP.md)**: Development priorities
 - **[DEVELOPMENT_SETUP.md](docs/DEVELOPMENT_SETUP.md)**: Development environment
+- **[RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md)**: Pre-release validation and release steps
 
 ### Build Scripts
 - `./scripts/compile_engine.sh` - Primary build script

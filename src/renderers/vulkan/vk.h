@@ -215,6 +215,7 @@ typedef struct {
 	vec4_t					specularScale;
 	vec4_t					normalScale;
 #endif
+	unsigned int			hasFlowmap : 1;	// water flowmap: flow vectors offset texture UVs
 	int acff; // none, rgb, rgba, alpha
 	struct {
 		byte rgb;
@@ -246,6 +247,8 @@ typedef struct vkUniform_s {
 	vec4_t fogDepthVector;		// vertex
 	vec4_t fogEyeT;				// vertex
 	vec4_t fogColor;			// fragment
+	// flowmap: x=flowSpeed, y=flowTime (seconds), z=phaseCycle (0..1), w=unused
+	vec4_t flowmapParams;
 
 #ifdef USE_VK_PBR
 	vec4_t pbrEmissiveScale;
@@ -760,6 +763,7 @@ typedef struct {
 		} vert;
 		struct {
 			VkShaderModule gen0_df;
+			VkShaderModule flowmap[2];      // fog[0,1] - water flowmap
 #ifdef USE_VK_PBR
 			VkShaderModule gen[2][3][2][2]; // pbr[0,1], tx[0,1,2] cl[0,1] fog[0,1]
 			VkShaderModule ident1[2][2][2]; // pbr[0,1], tx[0,1], fog[0,1]

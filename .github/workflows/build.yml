@@ -228,9 +228,13 @@ jobs:
           sudo rm -f /etc/apt/sources.list.d/azure-cli.list
           sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list
           sudo apt-get -qq update
-          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools
+          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools python3
 
       - uses: actions/checkout@v4
+
+      - name: Verify shader compilation
+        if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
+        run: ./scripts/compile_shaders.sh
 
       - name: Build Vulkan
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
