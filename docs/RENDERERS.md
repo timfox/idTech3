@@ -49,6 +49,14 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - Separable blur pass
 - Combine pass with debug visualization modes
 
+### IQM Morph Targets (Vulkan)
+- IQM-only morph sidecar loading (`.morph`) with additive position and normal deltas
+- Per-entity runtime weights (`re.SetEntityMorphWeight`)
+- Top-K active channel evaluation (`r_morphMaxActive`, hard capped at 4)
+- Distance-based LOD fade (`r_morphLodStart`, `r_morphLodEnd`)
+- Debug visualization (`r_morphDebug`)
+- Optional procedural breathing demo (`r_morphBreath`, `r_morphBreathAmp`, `r_morphBreathFreq`)
+
 ### Bloom and HDR
 - HDR rendering with RGBA16F color targets
 - Bloom extraction with configurable threshold and knee
@@ -88,4 +96,4 @@ Features:
 - Stencil shadows
 - Fog volumes (distance-based)
 
-The OpenGL renderer does not include PBR, volumetric fog, SSAO, SMAA, bloom, or fluid simulation.
+The OpenGL renderer does not include PBR, volumetric fog, SSAO, SMAA, bloom, fluid simulation, or IQM morph target evaluation.

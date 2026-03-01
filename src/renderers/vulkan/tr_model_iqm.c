@@ -163,6 +163,239 @@ static vec_t QuatNormalize2( const quat_t v, quat_t out) {
 	return length;
 }
 
+typedef struct {
+	char		name[IQM_MORPH_NAME_MAX];
+	int			numVertexes;
+} iqmMorphSurfaceDiskInfo_t;
+
+static qboolean IQM_ReadU32LE( const byte **cursor, const byte *end, uint32_t *out ) {
+	const byte *p;
+
+	if ( (size_t)( end - *cursor ) < 4 ) {
+		return qfalse;
+	}
+
+	p = *cursor;
+	*out = (uint32_t)p[0] |
+		( (uint32_t)p[1] << 8 ) |
+		( (uint32_t)p[2] << 16 ) |
+		( (uint32_t)p[3] << 24 );
+	*cursor += 4;
+	return qtrue;
+}
+
+static qboolean IQM_ReadFloatArrayLE( float *dst, const byte **cursor, const byte *end, size_t count ) {
+	size_t i;
+
+	if ( (size_t)( end - *cursor ) < count * sizeof( uint32_t ) ) {
+		return qfalse;
+	}
+
+	for ( i = 0; i < count; i++ ) {
+		uint32_t bits = (uint32_t)(*cursor)[0] |
+			( (uint32_t)(*cursor)[1] << 8 ) |
+			( (uint32_t)(*cursor)[2] << 16 ) |
+			( (uint32_t)(*cursor)[3] << 24 );
+		Com_Memcpy( &dst[i], &bits, sizeof( bits ) );
+		*cursor += sizeof( bits );
+	}
+	return qtrue;
+}
+
+static qboolean R_LoadIQMMorphSidecar( iqmData_t *iqmData, const char *modelName ) {
+	union {
+		byte *b;
+		void *v;
+	} fileData;
+	const byte *cursor;
+	const byte *end;
+	char sidecarPath[MAX_QPATH];
+	size_t i;
+	int fileSize;
+	qboolean loaded = qfalse;
+	uint32_t version;
+	uint32_t numTargets;
+	uint32_t numSurfaces;
+	uint32_t flags;
+	char *targetNames = NULL;
+	iqmMorphSurfaceDiskInfo_t *surfaceInfos = NULL;
+	int *surfaceMap = NULL;
+
+	iqmData->morphNumTargets = 0;
+	iqmData->morphTargets = NULL;
+	iqmData->morphSurfaces = NULL;
+
+	COM_StripExtension( modelName, sidecarPath, sizeof( sidecarPath ) );
+	Q_strcat( sidecarPath, sizeof( sidecarPath ), ".morph" );
+
+	fileSize = ri.FS_ReadFile( sidecarPath, &fileData.v );
+	if ( !fileData.b ) {
+		return qfalse;
+	}
+
+	cursor = fileData.b;
+	end = fileData.b + fileSize;
+
+	if ( (size_t)( end - cursor ) < 8 + 4 * sizeof( uint32_t ) ) {
+		ri.Printf( PRINT_WARNING, "R_LoadIQMMorphSidecar: %s has a truncated header, ignoring.\n", sidecarPath );
+		goto cleanup;
+	}
+
+	if ( memcmp( cursor, "IQMMORPH", 8 ) != 0 ) {
+		ri.Printf( PRINT_WARNING, "R_LoadIQMMorphSidecar: %s has an invalid magic, ignoring.\n", sidecarPath );
+		goto cleanup;
+	}
+	cursor += 8;
+
+	if ( !IQM_ReadU32LE( &cursor, end, &version ) ||
+		!IQM_ReadU32LE( &cursor, end, &numTargets ) ||
+		!IQM_ReadU32LE( &cursor, end, &numSurfaces ) ||
+		!IQM_ReadU32LE( &cursor, end, &flags ) ) {
+		ri.Printf( PRINT_WARNING, "R_LoadIQMMorphSidecar: %s has invalid metadata, ignoring.\n", sidecarPath );
+		goto cleanup;
+	}
+
+	if ( version != 1 ) {
+		ri.Printf( PRINT_WARNING, "R_LoadIQMMorphSidecar: %s has unsupported version %u, ignoring.\n",
+			sidecarPath, (unsigned)version );
+		goto cleanup;
+	}
+	if ( !( flags & 1u ) ) {
+		ri.Printf( PRINT_WARNING, "R_LoadIQMMorphSidecar: %s is missing normal deltas (required), ignoring.\n", sidecarPath );
+		goto cleanup;
+	}
+	if ( numTargets == 0 || numTargets > 1024 ) {
+		ri.Printf( PRINT_WARNING, "R_LoadIQMMorphSidecar: %s has invalid target count %u, ignoring.\n",
+			sidecarPath, (unsigned)numTargets );
+		goto cleanup;
+	}
+	if ( numSurfaces == 0 || numSurfaces > (uint32_t)iqmData->num_surfaces ) {
+		ri.Printf( PRINT_WARNING, "R_LoadIQMMorphSidecar: %s has invalid surface count %u (model has %d), ignoring.\n",
+			sidecarPath, (unsigned)numSurfaces, iqmData->num_surfaces );
+		goto cleanup;
+	}
+
+	targetNames = (char *)ri.Hunk_AllocateTempMemory( (int)( numTargets * IQM_MORPH_NAME_MAX ) );
+	surfaceInfos = (iqmMorphSurfaceDiskInfo_t *)ri.Hunk_AllocateTempMemory( (int)( numSurfaces * sizeof( *surfaceInfos ) ) );
+	surfaceMap = (int *)ri.Hunk_AllocateTempMemory( (int)( numSurfaces * sizeof( *surfaceMap ) ) );
+	if ( !targetNames || !surfaceInfos || !surfaceMap ) {
+		ri.Printf( PRINT_WARNING, "R_LoadIQMMorphSidecar: temp allocation failed for %s, ignoring.\n", sidecarPath );
+		goto cleanup;
+	}
+
+	for ( i = 0; i < numSurfaces; i++ ) {
+		surfaceMap[i] = -1;
+	}
+
+	for ( i = 0; i < numTargets; i++ ) {
+		if ( (size_t)( end - cursor ) < IQM_MORPH_NAME_MAX ) {
+			ri.Printf( PRINT_WARNING, "R_LoadIQMMorphSidecar: %s target name table is truncated, ignoring.\n", sidecarPath );
+			goto cleanup;
+		}
+
+		Q_strncpyz( targetNames + i * IQM_MORPH_NAME_MAX, (const char *)cursor, IQM_MORPH_NAME_MAX );
+		Q_strlwr( targetNames + i * IQM_MORPH_NAME_MAX );
+		cursor += IQM_MORPH_NAME_MAX;
+	}
+
+	for ( i = 0; i < numSurfaces; i++ ) {
+		uint32_t diskVertexes;
+		int j;
+		int match = -1;
+
+		if ( (size_t)( end - cursor ) < IQM_MORPH_NAME_MAX ) {
+			ri.Printf( PRINT_WARNING, "R_LoadIQMMorphSidecar: %s surface table is truncated, ignoring.\n", sidecarPath );
+			goto cleanup;
+		}
+
+		Q_strncpyz( surfaceInfos[i].name, (const char *)cursor, sizeof( surfaceInfos[i].name ) );
+		Q_strlwr( surfaceInfos[i].name );
+		cursor += IQM_MORPH_NAME_MAX;
+
+		if ( !IQM_ReadU32LE( &cursor, end, &diskVertexes ) ) {
+			ri.Printf( PRINT_WARNING, "R_LoadIQMMorphSidecar: %s surface table is truncated, ignoring.\n", sidecarPath );
+			goto cleanup;
+		}
+		surfaceInfos[i].numVertexes = (int)diskVertexes;
+
+		for ( j = 0; j < iqmData->num_surfaces; j++ ) {
+			if ( !Q_stricmp( surfaceInfos[i].name, iqmData->surfaces[j].name ) ) {
+				match = j;
+				break;
+			}
+		}
+
+		if ( match < 0 ) {
+			ri.Printf( PRINT_WARNING, "R_LoadIQMMorphSidecar: %s surface '%s' not found in model, ignoring sidecar.\n",
+				sidecarPath, surfaceInfos[i].name );
+			goto cleanup;
+		}
+		if ( surfaceInfos[i].numVertexes != iqmData->surfaces[match].num_vertexes ) {
+			ri.Printf( PRINT_WARNING, "R_LoadIQMMorphSidecar: %s surface '%s' vertex count mismatch (%d != %d), ignoring sidecar.\n",
+				sidecarPath, surfaceInfos[i].name, surfaceInfos[i].numVertexes, iqmData->surfaces[match].num_vertexes );
+			goto cleanup;
+		}
+		surfaceMap[i] = match;
+	}
+
+	iqmData->morphTargets = (iqmMorphTarget_t *)ri.Hunk_Alloc( (int)( numTargets * sizeof( iqmMorphTarget_t ) ), h_low );
+	iqmData->morphSurfaces = (iqmMorphSurface_t *)ri.Hunk_Alloc( iqmData->num_surfaces * sizeof( iqmMorphSurface_t ), h_low );
+	iqmData->morphNumTargets = (int)numTargets;
+	for ( i = 0; i < (size_t)iqmData->num_surfaces; i++ ) {
+		Com_Memset( &iqmData->morphSurfaces[i], 0, sizeof( iqmData->morphSurfaces[i] ) );
+		Q_strncpyz( iqmData->morphSurfaces[i].name, iqmData->surfaces[i].name, sizeof( iqmData->morphSurfaces[i].name ) );
+		iqmData->morphSurfaces[i].nameHash = (uint32_t)Com_GenerateHashValue( iqmData->morphSurfaces[i].name, 0x7fffffffU );
+		iqmData->morphSurfaces[i].num_vertexes = iqmData->surfaces[i].num_vertexes;
+	}
+	for ( i = 0; i < numTargets; i++ ) {
+		Q_strncpyz( iqmData->morphTargets[i].name, targetNames + i * IQM_MORPH_NAME_MAX, sizeof( iqmData->morphTargets[i].name ) );
+		iqmData->morphTargets[i].nameHash = (uint32_t)Com_GenerateHashValue( iqmData->morphTargets[i].name, 0x7fffffffU );
+	}
+
+	for ( i = 0; i < numSurfaces; i++ ) {
+		int modelSurface = surfaceMap[i];
+		iqmMorphSurface_t *dstSurface = &iqmData->morphSurfaces[modelSurface];
+		size_t floatsPerTarget = (size_t)surfaceInfos[i].numVertexes * 3u;
+		size_t totalFloats = (size_t)numTargets * floatsPerTarget;
+		size_t targetIndex;
+
+		dstSurface->deltaPos = (float *)ri.Hunk_Alloc( (int)( totalFloats * sizeof( float ) ), h_low );
+		dstSurface->deltaNorm = (float *)ri.Hunk_Alloc( (int)( totalFloats * sizeof( float ) ), h_low );
+
+		for ( targetIndex = 0; targetIndex < numTargets; targetIndex++ ) {
+			float *pos = dstSurface->deltaPos + targetIndex * floatsPerTarget;
+			float *norm = dstSurface->deltaNorm + targetIndex * floatsPerTarget;
+			if ( !IQM_ReadFloatArrayLE( pos, &cursor, end, floatsPerTarget ) ||
+				!IQM_ReadFloatArrayLE( norm, &cursor, end, floatsPerTarget ) ) {
+				ri.Printf( PRINT_WARNING, "R_LoadIQMMorphSidecar: %s payload is truncated, ignoring sidecar.\n", sidecarPath );
+				iqmData->morphNumTargets = 0;
+				iqmData->morphTargets = NULL;
+				iqmData->morphSurfaces = NULL;
+				goto cleanup;
+			}
+		}
+	}
+
+	loaded = qtrue;
+	ri.Printf( PRINT_DEVELOPER, "R_LoadIQMMorphSidecar: loaded %u targets for %u surfaces from %s\n",
+		(unsigned)numTargets, (unsigned)numSurfaces, sidecarPath );
+
+cleanup:
+	if ( targetNames ) {
+		ri.Hunk_FreeTempMemory( targetNames );
+	}
+	if ( surfaceInfos ) {
+		ri.Hunk_FreeTempMemory( surfaceInfos );
+	}
+	if ( surfaceMap ) {
+		ri.Hunk_FreeTempMemory( surfaceMap );
+	}
+	if ( fileData.b ) {
+		ri.FS_FreeFile( fileData.b );
+	}
+	return loaded;
+}
+
 /*
 =================
 R_LoadIQM
@@ -713,6 +946,7 @@ qboolean R_LoadIQM( model_t *mod, void *buffer, int filesize, const char *mod_na
 			surface->num_vertexes = mesh->num_vertexes;
 			surface->first_triangle = mesh->first_triangle;
 			surface->num_triangles = mesh->num_triangles;
+			surface->morphSurfaceIndex = i;
 		}
 
 		// copy triangles
@@ -959,6 +1193,8 @@ qboolean R_LoadIQM( model_t *mod, void *buffer, int filesize, const char *mod_na
 		}
 	}
 
+	(void)R_LoadIQMMorphSidecar( iqmData, mod_name );
+
 	return qtrue;
 }
 
@@ -1050,6 +1286,157 @@ static int R_ComputeIQMFogNum( const iqmData_t *data, const trRefEntity_t *ent )
 	return 0;
 }
 
+static int R_IQMFindMorphTargetByHash( const iqmData_t *data, uint32_t hash ) {
+	int i;
+
+	for ( i = 0; i < data->morphNumTargets; i++ ) {
+		if ( data->morphTargets[i].nameHash == hash ) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+static float R_IQMMorphLodFactor( const trRefEntity_t *ent ) {
+	float start;
+	float end;
+	vec3_t toEntity;
+	float dist;
+
+	if ( !r_morphLodStart || !r_morphLodEnd ) {
+		return 1.0f;
+	}
+
+	start = r_morphLodStart->value;
+	end = r_morphLodEnd->value;
+	if ( end <= start ) {
+		return 1.0f;
+	}
+
+	VectorSubtract( ent->e.origin, tr.viewParms.or.origin, toEntity );
+	dist = VectorLength( toEntity );
+
+	if ( dist <= start ) {
+		return 1.0f;
+	}
+	if ( dist >= end ) {
+		return 0.0f;
+	}
+	return 1.0f - ( dist - start ) / ( end - start );
+}
+
+static void R_IQMInsertMorphTopK( int *count, int maxCount, int targetIndex, float weight,
+	int *outIndices, float *outWeights, float *outAbsWeights ) {
+	float absWeight = fabsf( weight );
+	int insertPos;
+
+	if ( absWeight <= 0.0001f ) {
+		return;
+	}
+
+	if ( *count < maxCount ) {
+		insertPos = ( *count )++;
+	} else {
+		if ( absWeight < outAbsWeights[maxCount - 1] ) {
+			return;
+		}
+		if ( absWeight == outAbsWeights[maxCount - 1] && targetIndex > outIndices[maxCount - 1] ) {
+			return;
+		}
+		insertPos = maxCount - 1;
+	}
+
+	while ( insertPos > 0 ) {
+		if ( absWeight > outAbsWeights[insertPos - 1] ||
+			( absWeight == outAbsWeights[insertPos - 1] && targetIndex < outIndices[insertPos - 1] ) ) {
+			outIndices[insertPos] = outIndices[insertPos - 1];
+			outWeights[insertPos] = outWeights[insertPos - 1];
+			outAbsWeights[insertPos] = outAbsWeights[insertPos - 1];
+			insertPos--;
+		} else {
+			break;
+		}
+	}
+
+	outIndices[insertPos] = targetIndex;
+	outWeights[insertPos] = weight;
+	outAbsWeights[insertPos] = absWeight;
+}
+
+static void R_IQMSelectActiveMorphTargets( const iqmData_t *data, trRefEntity_t *ent ) {
+	int i;
+	int activeCount = 0;
+	int maxActive;
+	float lodFactor;
+	int activeIndices[IQM_MORPH_TOP_K];
+	float activeWeights[IQM_MORPH_TOP_K];
+	float activeAbs[IQM_MORPH_TOP_K];
+	static uint32_t breathHash;
+	float breathWeight;
+	int breathIndex;
+
+	ent->morphActiveCount = 0;
+	ent->morphDebugMaxAbsWeight = 0.0f;
+	for ( i = 0; i < IQM_MORPH_TOP_K; i++ ) {
+		ent->morphActiveTargetIndex[i] = -1;
+		ent->morphActiveWeight[i] = 0.0f;
+		activeIndices[i] = -1;
+		activeWeights[i] = 0.0f;
+		activeAbs[i] = 0.0f;
+	}
+
+	if ( !r_morph || !r_morph->integer || !data->morphTargets || !data->morphSurfaces || data->morphNumTargets <= 0 ) {
+		return;
+	}
+
+	maxActive = r_morphMaxActive ? r_morphMaxActive->integer : IQM_MORPH_TOP_K;
+	if ( maxActive < 1 ) {
+		maxActive = 1;
+	} else if ( maxActive > IQM_MORPH_TOP_K ) {
+		maxActive = IQM_MORPH_TOP_K;
+	}
+
+	lodFactor = R_IQMMorphLodFactor( ent );
+	if ( lodFactor <= 0.0f ) {
+		return;
+	}
+
+	for ( i = 0; i < ent->morphChannelCount; i++ ) {
+		int targetIndex = R_IQMFindMorphTargetByHash( data, ent->morphChannelHashes[i] );
+		float effectiveWeight;
+		if ( targetIndex < 0 ) {
+			continue;
+		}
+		effectiveWeight = ent->morphChannelWeights[i] * lodFactor;
+		R_IQMInsertMorphTopK( &activeCount, maxActive, targetIndex, effectiveWeight,
+			activeIndices, activeWeights, activeAbs );
+	}
+
+	if ( r_morphBreath && r_morphBreath->integer ) {
+		if ( !breathHash ) {
+			breathHash = (uint32_t)Com_GenerateHashValue( "breath", 0x7fffffffU );
+		}
+		breathIndex = R_IQMFindMorphTargetByHash( data, breathHash );
+		if ( breathIndex >= 0 ) {
+			float freq = r_morphBreathFreq ? r_morphBreathFreq->value : 0.33f;
+			float amp = r_morphBreathAmp ? r_morphBreathAmp->value : 0.25f;
+			float t = (float)tr.refdef.time * 0.001f;
+			breathWeight = sinf( t * freq * 6.28318530718f ) * amp * lodFactor;
+			R_IQMInsertMorphTopK( &activeCount, maxActive, breathIndex, breathWeight,
+				activeIndices, activeWeights, activeAbs );
+		}
+	}
+
+	ent->morphActiveCount = activeCount;
+	for ( i = 0; i < activeCount; i++ ) {
+		ent->morphActiveTargetIndex[i] = activeIndices[i];
+		ent->morphActiveWeight[i] = activeWeights[i];
+	}
+	if ( activeCount > 0 ) {
+		ent->morphDebugMaxAbsWeight = activeAbs[0];
+	}
+}
+
 /*
 =================
 R_AddIQMSurfaces
@@ -1115,6 +1502,7 @@ void R_AddIQMSurfaces( trRefEntity_t *ent ) {
 	// see if we are in a fog volume
 	//
 	fogNum = R_ComputeIQMFogNum( data, ent );
+	R_IQMSelectActiveMorphTargets( data, ent );
 
 	for ( i = 0 ; i < data->num_surfaces ; i++ ) {
 		if(ent->e.customShader)
@@ -1256,6 +1644,9 @@ Compute vertices for this model surface
 void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 	const srfIQModel_t	*surf = (const srfIQModel_t *)surface;
 	iqmData_t	*data = surf->data;
+	const trRefEntity_t *ent = backEnd.currentEntity;
+	const iqmMorphSurface_t *morphSurface = NULL;
+	qboolean applyMorph = qfalse;
 	float		poseMats[IQM_MAX_JOINTS * 12];
 	float		influenceVtxMat[SHADER_MAX_VERTEXES * 12];
 	float		influenceNrmMat[SHADER_MAX_VERTEXES * 9];
@@ -1277,6 +1668,13 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 	int		*tri;
 	glIndex_t	*ptr;
 	glIndex_t	base;
+
+	if ( data->morphSurfaces && surf->morphSurfaceIndex >= 0 && surf->morphSurfaceIndex < data->num_surfaces ) {
+		morphSurface = &data->morphSurfaces[surf->morphSurfaceIndex];
+	}
+	applyMorph = ( ent && ent->morphActiveCount > 0 && morphSurface &&
+		morphSurface->deltaPos && morphSurface->deltaNorm &&
+		ent->morphActiveCount <= IQM_MORPH_TOP_K );
 
 	RB_CHECKOVERFLOW( surf->num_vertexes, surf->num_triangles * 3 );
 
@@ -1383,67 +1781,152 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 		}
 
 		// transform vertexes and fill other data
-		for( i = 0; i < surf->num_vertexes;
-		     i++, xyz+=3, normal+=3, texCoords+=2,
-		     outXYZ++, outNormal++, outTexCoord+=2 ) {
-			int influence = data->influences[surf->first_vertex + i] - surf->first_influence;
-			float *vtxMat = &influenceVtxMat[12*influence];
-			float *nrmMat = &influenceNrmMat[9*influence];
+			for( i = 0; i < surf->num_vertexes;
+			     i++, xyz+=3, normal+=3, texCoords+=2,
+			     outXYZ++, outNormal++, outTexCoord+=2 ) {
+				int influence = data->influences[surf->first_vertex + i] - surf->first_influence;
+				float *vtxMat = &influenceVtxMat[12*influence];
+				float *nrmMat = &influenceNrmMat[9*influence];
+				float morphedPos[3];
+				float morphedNormal[3];
+				int morphIndex;
 
-			outTexCoord[0] = texCoords[0];
-			outTexCoord[1] = texCoords[1];
+				morphedPos[0] = xyz[0];
+				morphedPos[1] = xyz[1];
+				morphedPos[2] = xyz[2];
+				morphedNormal[0] = normal[0];
+				morphedNormal[1] = normal[1];
+				morphedNormal[2] = normal[2];
+				if ( applyMorph ) {
+					for ( morphIndex = 0; morphIndex < ent->morphActiveCount; morphIndex++ ) {
+						int targetIndex = ent->morphActiveTargetIndex[morphIndex];
+						float weight = ent->morphActiveWeight[morphIndex];
+						size_t deltaOffset;
+						const float *deltaPos;
+						const float *deltaNorm;
 
-			(*outXYZ)[0] =
-				vtxMat[ 0] * xyz[0] +
-				vtxMat[ 1] * xyz[1] +
-				vtxMat[ 2] * xyz[2] +
-				vtxMat[ 3];
-			(*outXYZ)[1] =
-				vtxMat[ 4] * xyz[0] +
-				vtxMat[ 5] * xyz[1] +
-				vtxMat[ 6] * xyz[2] +
-				vtxMat[ 7];
-			(*outXYZ)[2] =
-				vtxMat[ 8] * xyz[0] +
-				vtxMat[ 9] * xyz[1] +
-				vtxMat[10] * xyz[2] +
-				vtxMat[11];
+						if ( targetIndex < 0 || targetIndex >= data->morphNumTargets ) {
+							continue;
+						}
+						deltaOffset = ( (size_t)targetIndex * (size_t)surf->num_vertexes + (size_t)i ) * 3u;
+						deltaPos = morphSurface->deltaPos + deltaOffset;
+						deltaNorm = morphSurface->deltaNorm + deltaOffset;
+						morphedPos[0] += deltaPos[0] * weight;
+						morphedPos[1] += deltaPos[1] * weight;
+						morphedPos[2] += deltaPos[2] * weight;
+						morphedNormal[0] += deltaNorm[0] * weight;
+						morphedNormal[1] += deltaNorm[1] * weight;
+						morphedNormal[2] += deltaNorm[2] * weight;
+					}
+					VectorNormalize( morphedNormal );
+				}
 
-			(*outNormal)[0] =
-				nrmMat[ 0] * normal[0] +
-				nrmMat[ 1] * normal[1] +
-				nrmMat[ 2] * normal[2];
-			(*outNormal)[1] =
-				nrmMat[ 3] * normal[0] +
-				nrmMat[ 4] * normal[1] +
-				nrmMat[ 5] * normal[2];
-			(*outNormal)[2] =
-				nrmMat[ 6] * normal[0] +
-				nrmMat[ 7] * normal[1] +
-				nrmMat[ 8] * normal[2];
+				outTexCoord[0] = texCoords[0];
+				outTexCoord[1] = texCoords[1];
+
+				(*outXYZ)[0] =
+					vtxMat[ 0] * morphedPos[0] +
+					vtxMat[ 1] * morphedPos[1] +
+					vtxMat[ 2] * morphedPos[2] +
+					vtxMat[ 3];
+				(*outXYZ)[1] =
+					vtxMat[ 4] * morphedPos[0] +
+					vtxMat[ 5] * morphedPos[1] +
+					vtxMat[ 6] * morphedPos[2] +
+					vtxMat[ 7];
+				(*outXYZ)[2] =
+					vtxMat[ 8] * morphedPos[0] +
+					vtxMat[ 9] * morphedPos[1] +
+					vtxMat[10] * morphedPos[2] +
+					vtxMat[11];
+
+				(*outNormal)[0] =
+					nrmMat[ 0] * morphedNormal[0] +
+					nrmMat[ 1] * morphedNormal[1] +
+					nrmMat[ 2] * morphedNormal[2];
+				(*outNormal)[1] =
+					nrmMat[ 3] * morphedNormal[0] +
+					nrmMat[ 4] * morphedNormal[1] +
+					nrmMat[ 5] * morphedNormal[2];
+				(*outNormal)[2] =
+					nrmMat[ 6] * morphedNormal[0] +
+					nrmMat[ 7] * morphedNormal[1] +
+					nrmMat[ 8] * morphedNormal[2];
+			}
+		} else {
+			// copy vertexes and fill other data
+			for( i = 0; i < surf->num_vertexes;
+				i++, xyz+=3, normal+=3, texCoords+=2,
+				outXYZ++, outNormal++, outTexCoord+=2 ) {
+				float morphedPos[3];
+				float morphedNormal[3];
+				int morphIndex;
+
+				morphedPos[0] = xyz[0];
+				morphedPos[1] = xyz[1];
+				morphedPos[2] = xyz[2];
+				morphedNormal[0] = normal[0];
+				morphedNormal[1] = normal[1];
+				morphedNormal[2] = normal[2];
+				if ( applyMorph ) {
+					for ( morphIndex = 0; morphIndex < ent->morphActiveCount; morphIndex++ ) {
+						int targetIndex = ent->morphActiveTargetIndex[morphIndex];
+						float weight = ent->morphActiveWeight[morphIndex];
+						size_t deltaOffset;
+						const float *deltaPos;
+						const float *deltaNorm;
+
+						if ( targetIndex < 0 || targetIndex >= data->morphNumTargets ) {
+							continue;
+						}
+						deltaOffset = ( (size_t)targetIndex * (size_t)surf->num_vertexes + (size_t)i ) * 3u;
+						deltaPos = morphSurface->deltaPos + deltaOffset;
+						deltaNorm = morphSurface->deltaNorm + deltaOffset;
+						morphedPos[0] += deltaPos[0] * weight;
+						morphedPos[1] += deltaPos[1] * weight;
+						morphedPos[2] += deltaPos[2] * weight;
+						morphedNormal[0] += deltaNorm[0] * weight;
+						morphedNormal[1] += deltaNorm[1] * weight;
+						morphedNormal[2] += deltaNorm[2] * weight;
+					}
+					VectorNormalize( morphedNormal );
+				}
+
+				outTexCoord[0] = texCoords[0];
+				outTexCoord[1] = texCoords[1];
+
+				(*outXYZ)[0] = morphedPos[0];
+				(*outXYZ)[1] = morphedPos[1];
+				(*outXYZ)[2] = morphedPos[2];
+
+				(*outNormal)[0] = morphedNormal[0];
+				(*outNormal)[1] = morphedNormal[1];
+				(*outNormal)[2] = morphedNormal[2];
+			}
 		}
-	} else {
-		// copy vertexes and fill other data
-		for( i = 0; i < surf->num_vertexes;
-			i++, xyz+=3, normal+=3, texCoords+=2,
-			outXYZ++, outNormal++, outTexCoord+=2 ) {
-			outTexCoord[0] = texCoords[0];
-			outTexCoord[1] = texCoords[1];
-
-			(*outXYZ)[0] = xyz[0];
-			(*outXYZ)[1] = xyz[1];
-			(*outXYZ)[2] = xyz[2];
-
-			(*outNormal)[0] = normal[0];
-			(*outNormal)[1] = normal[1];
-			(*outNormal)[2] = normal[2];
-		}
-	}
 
 	if ( color ) {
 		Com_Memcpy( outColor, color, surf->num_vertexes * sizeof( outColor[0] ) );
 	} else {
 		Com_Memset( outColor, 0, surf->num_vertexes * sizeof( outColor[0] ) );
+	}
+	if ( r_morphDebug && r_morphDebug->integer && ent && ent->morphActiveCount > 0 ) {
+		int v;
+		float t = ent->morphDebugMaxAbsWeight;
+		byte r, g;
+		if ( t < 0.0f ) {
+			t = 0.0f;
+		} else if ( t > 1.0f ) {
+			t = 1.0f;
+		}
+		r = (byte)( t * 255.0f );
+		g = (byte)( ( 1.0f - t ) * 255.0f );
+		for ( v = 0; v < surf->num_vertexes; v++ ) {
+			outColor[v].rgba[0] = r;
+			outColor[v].rgba[1] = g;
+			outColor[v].rgba[2] = 32;
+			outColor[v].rgba[3] = 255;
+		}
 	}
 
 	tri = data->triangles + 3 * surf->first_triangle;

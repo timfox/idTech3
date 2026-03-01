@@ -37,3 +37,42 @@ Text-based format from id Tech 4 (Doom 3):
 - Joint hierarchy with quaternion orientations
 - Weighted vertex skinning (multiple joints per vertex)
 - Bind pose mesh generation
+
+## IQM Morph Sidecar (`.morph`)
+
+Vulkan renderer supports IQM morph targets through a sidecar file next to the `.iqm`:
+- Example: `models/creature.iqm` + `models/creature.morph`
+- Missing or invalid sidecar falls back safely to non-morph IQM rendering.
+
+### Binary Layout (Version 1)
+All values are little-endian.
+
+1. Header:
+- 8 bytes magic: `IQMMORPH`
+- `u32 version` (currently `1`)
+- `u32 numTargets`
+- `u32 numSurfaces`
+- `u32 flags` (`bit0` = normal deltas present, required)
+2. Target table:
+- `numTargets` entries of fixed 64-byte target names
+3. Surface table:
+- `numSurfaces` entries:
+- fixed 64-byte surface name
+- `u32 numVertexes` (must match IQM surface vertex count)
+4. Payload:
+- For each sidecar surface, for each target:
+- dense `deltaPos` float array (`numVertexes * 3`)
+- dense `deltaNorm` float array (`numVertexes * 3`)
+
+### Runtime Controls
+- `r_morph` (0/1): master toggle
+- `r_morphMaxActive` (1..4): top-K active targets evaluated per entity
+- `r_morphLodStart`: start distance for morph fade
+- `r_morphLodEnd`: end distance (morph weight reaches 0)
+- `r_morphDebug` (0/1): debug coloring by morph strength
+- `r_morphBreath` (0/1), `r_morphBreathAmp`, `r_morphBreathFreq`: optional procedural demo drive for target name `breath`
+
+### Renderer API
+- `re.SetEntityMorphWeight(const refEntity_t *ent, const char *name, float weight)`
+- Queues per-entity morph weights for the current scene submission.
+- Weights are deduplicated by channel hash and clamped.

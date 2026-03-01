@@ -139,6 +139,10 @@ typedef struct dlight_s {
 } dlight_t;
 
 
+#define IQM_MORPH_MAX_CHANNELS 8
+#define IQM_MORPH_TOP_K 4
+#define IQM_MORPH_NAME_MAX 64
+
 // a trRefEntity_t has all the information passed in by
 // the client game, as well as some locally derived info
 typedef struct {
@@ -159,6 +163,13 @@ typedef struct {
 	vec3_t		shadowLightDir;	// normalized direction towards light
 #endif
 	qboolean	intShaderTime;
+	int			morphChannelCount;
+	uint32_t	morphChannelHashes[IQM_MORPH_MAX_CHANNELS];
+	float		morphChannelWeights[IQM_MORPH_MAX_CHANNELS];
+	int			morphActiveCount;
+	int			morphActiveTargetIndex[IQM_MORPH_TOP_K];
+	float		morphActiveWeight[IQM_MORPH_TOP_K];
+	float		morphDebugMaxAbsWeight;
 } trRefEntity_t;
 
 
@@ -898,6 +909,19 @@ typedef struct {
 	vec3_t scale;
 } iqmTransform_t;
 
+typedef struct {
+	char		name[IQM_MORPH_NAME_MAX];
+	uint32_t	nameHash;
+} iqmMorphTarget_t;
+
+typedef struct {
+	char		name[IQM_MORPH_NAME_MAX];
+	uint32_t	nameHash;
+	int			num_vertexes;
+	float		*deltaPos; // [numTargets * num_vertexes * 3]
+	float		*deltaNorm; // [numTargets * num_vertexes * 3]
+} iqmMorphSurface_t;
+
 // inter-quake-model
 typedef struct {
 	int		num_vertexes;
@@ -936,6 +960,9 @@ typedef struct {
 	float		*invBindJoints; // [num_joints * 12]
 	iqmTransform_t	*poses; // [num_frames * num_poses]
 	float		*bounds;
+	int			morphNumTargets;
+	iqmMorphTarget_t *morphTargets;
+	iqmMorphSurface_t *morphSurfaces; // [num_surfaces], NULL when absent
 } iqmData_t;
 
 // inter-quake-model surface
@@ -947,6 +974,7 @@ typedef struct srfIQModel_s {
 	int		first_vertex, num_vertexes;
 	int		first_triangle, num_triangles;
 	int		first_influence, num_influences;
+	int		morphSurfaceIndex;
 } srfIQModel_t;
 
 
@@ -1599,6 +1627,14 @@ extern cvar_t	*r_fogDebug;
 extern cvar_t	*r_froxelDebug;
 extern cvar_t	*r_vk_swapchain_srgb;
 extern cvar_t	*r_vk_pipeline_debug;
+extern cvar_t	*r_morph;
+extern cvar_t	*r_morphMaxActive;
+extern cvar_t	*r_morphLodStart;
+extern cvar_t	*r_morphLodEnd;
+extern cvar_t	*r_morphDebug;
+extern cvar_t	*r_morphBreath;
+extern cvar_t	*r_morphBreathAmp;
+extern cvar_t	*r_morphBreathFreq;
 
 extern	cvar_t	*r_nobind;						// turns off binding to appropriate textures
 extern	cvar_t	*r_singleShader;				// make most world faces use default shader
@@ -2030,6 +2066,7 @@ SCENE GENERATION
 void R_InitNextFrame( void );
 
 void RE_ClearScene( void );
+void RE_SetEntityMorphWeight( const refEntity_t *ent, const char *name, float weight );
 void RE_AddRefEntityToScene( const refEntity_t *ent, qboolean intShaderTime );
 void RE_AddPolyToScene( qhandle_t hShader , int numVerts, const polyVert_t *verts, int num );
 void RE_AddLightToScene( const vec3_t org, float intensity, float r, float g, float b );

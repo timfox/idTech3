@@ -126,6 +126,14 @@ cvar_t	*r_deluxeSpecular;
 #endif
 #endif
 cvar_t   *r_vk_pipeline_debug;
+cvar_t	*r_morph;
+cvar_t	*r_morphMaxActive;
+cvar_t	*r_morphLodStart;
+cvar_t	*r_morphLodEnd;
+cvar_t	*r_morphDebug;
+cvar_t	*r_morphBreath;
+cvar_t	*r_morphBreathAmp;
+cvar_t	*r_morphBreathFreq;
 cvar_t	*r_fbo;
 cvar_t	*r_hdr;
 cvar_t	*r_bloom;
@@ -1952,6 +1960,47 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_lodCurveError, "Level of detail error on curved surface grids. Higher values result in better quality at a distance." );
 	r_lodbias = ri.Cvar_Get( "r_lodbias", "-2", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_lodbias, "Sets the level of detail of in-game models:\n -2: Ultra (further delays LOD transition in the distance)\n -1: Very High (delays LOD transition in the distance)\n 0: High\n 1: Medium\n 2: Low" );
+
+	r_morph = ri.Cvar_Get( "r_morph", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_morph, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_morph, "Enable IQM morph target evaluation in Vulkan renderer." );
+	ri.Cvar_SetGroup( r_morph, CVG_RENDERER );
+
+	r_morphMaxActive = ri.Cvar_Get( "r_morphMaxActive", "4", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_morphMaxActive, "1", XSTRING( IQM_MORPH_TOP_K ), CV_INTEGER );
+	ri.Cvar_SetDescription( r_morphMaxActive, "Maximum active IQM morph channels evaluated per entity (top-K by absolute weight)." );
+	ri.Cvar_SetGroup( r_morphMaxActive, CVG_RENDERER );
+
+	r_morphLodStart = ri.Cvar_Get( "r_morphLodStart", "900", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_morphLodStart, "0", "65536", CV_FLOAT );
+	ri.Cvar_SetDescription( r_morphLodStart, "Distance where IQM morph fading begins." );
+	ri.Cvar_SetGroup( r_morphLodStart, CVG_RENDERER );
+
+	r_morphLodEnd = ri.Cvar_Get( "r_morphLodEnd", "2200", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_morphLodEnd, "0", "65536", CV_FLOAT );
+	ri.Cvar_SetDescription( r_morphLodEnd, "Distance where IQM morph contribution reaches zero." );
+	ri.Cvar_SetGroup( r_morphLodEnd, CVG_RENDERER );
+
+	r_morphDebug = ri.Cvar_Get( "r_morphDebug", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_morphDebug, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_morphDebug, "Show IQM morph influence debug coloring." );
+	ri.Cvar_SetGroup( r_morphDebug, CVG_RENDERER );
+
+	r_morphBreath = ri.Cvar_Get( "r_morphBreath", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_morphBreath, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_morphBreath, "Procedural demo: drive morph target named 'breath' on IQM entities." );
+	ri.Cvar_SetGroup( r_morphBreath, CVG_RENDERER );
+
+	r_morphBreathAmp = ri.Cvar_Get( "r_morphBreathAmp", "0.25", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_morphBreathAmp, "0", "2", CV_FLOAT );
+	ri.Cvar_SetDescription( r_morphBreathAmp, "Procedural breath amplitude." );
+	ri.Cvar_SetGroup( r_morphBreathAmp, CVG_RENDERER );
+
+	r_morphBreathFreq = ri.Cvar_Get( "r_morphBreathFreq", "0.33", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_morphBreathFreq, "0.01", "8", CV_FLOAT );
+	ri.Cvar_SetDescription( r_morphBreathFreq, "Procedural breath frequency in Hz." );
+	ri.Cvar_SetGroup( r_morphBreathFreq, CVG_RENDERER );
+
 	r_flares = ri.Cvar_Get ("r_flares", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_flares, "Enables corona effects on light sources." );
 	r_znear = ri.Cvar_Get( "r_znear", "4", CVAR_CHEAT );
@@ -2756,6 +2805,10 @@ void R_Init( void ) {
 	ri.Printf( PRINT_ALL, "[VK] SH lighting: %s\n", r_shLighting && r_shLighting->integer ? "enabled" : "disabled" );
 	ri.Printf( PRINT_ALL, "[VK] SH world: %s\n", r_shWorldLighting && r_shWorldLighting->integer ? "enabled" : "disabled" );
 	ri.Printf( PRINT_ALL, "[VK] SH debug view: %d\n", r_shDebugView ? r_shDebugView->integer : 0 );
+	ri.Printf( PRINT_ALL, "[VK][morph] IQM morph: %s (max channels=%d, top-k cap=%d, active=%d)\n",
+		( r_morph && r_morph->integer ) ? "enabled" : "disabled",
+		IQM_MORPH_MAX_CHANNELS, IQM_MORPH_TOP_K,
+		r_morphMaxActive ? r_morphMaxActive->integer : IQM_MORPH_TOP_K );
 
 
 	max_polys = r_maxpolys ? r_maxpolys->integer : MAX_POLYS;
@@ -2947,6 +3000,7 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 	re.ModelBounds = R_ModelBounds;
 
 	re.ClearScene = RE_ClearScene;
+	re.SetEntityMorphWeight = RE_SetEntityMorphWeight;
 	re.AddRefEntityToScene = RE_AddRefEntityToScene;
 	re.AddPolyToScene = RE_AddPolyToScene;
 	re.LightForPoint = R_LightForPoint;

@@ -79,6 +79,12 @@ void RE_ClearScene( void ) {
 	r_firstScenePoly = r_numpolys;
 }
 
+void RE_SetEntityMorphWeight( const refEntity_t *ent, const char *name, float weight ) {
+	(void)ent;
+	(void)name;
+	(void)weight;
+}
+
 /*
 ===========================================================================
 
