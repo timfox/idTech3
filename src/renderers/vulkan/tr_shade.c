@@ -1334,6 +1334,16 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			}
 		}
 
+		if ( pStage->bundle[0].flowmapImage != NULL ) {
+			const float flowTime = (float)tess.shaderTime;
+			uniform.flowmapParams[0] = pStage->bundle[0].flowmapSpeed;
+			uniform.flowmapParams[1] = flowTime;
+			uniform.flowmapParams[2] = fmodf( flowTime, 1.0f );
+			uniform.flowmapParams[3] = 0.0f;
+			vk_update_descriptor( VK_DESC_TEXTURE1, pStage->bundle[0].flowmapImage->descriptor );
+			pushUniform = qtrue;
+		}
+
 		if ( pushUniform ) {
 			pushUniform = qfalse;
 			vk_push_uniform_cached( &uniform );

@@ -1689,6 +1689,32 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 		{
 			stage->bundle[0].dlight = 1;
 		}
+		else if ( !Q_stricmp( token, "flowmapTex" ) && s_extendedShader )
+		{
+			token = COM_ParseExt( text, qfalse );
+			if ( !token[0] )
+			{
+				ri.Printf( PRINT_WARNING, "WARNING: missing parameter for 'flowmapTex' in shader '%s'\n", shader.name );
+				return qfalse;
+			}
+			stage->bundle[0].flowmapImage = R_FindImageFile( token, IMGFLAG_CLAMPTOEDGE | IMGFLAG_NOLIGHTSCALE, 0 );
+			if ( !stage->bundle[0].flowmapImage )
+			{
+				ri.Printf( PRINT_WARNING, "WARNING: could not load flowmap '%s' in shader '%s'\n", token, shader.name );
+			}
+		}
+		else if ( !Q_stricmp( token, "flowSpeed" ) && s_extendedShader )
+		{
+			token = COM_ParseExt( text, qfalse );
+			if ( !token[0] )
+			{
+				ri.Printf( PRINT_WARNING, "WARNING: missing parameter for 'flowSpeed' in shader '%s'\n", shader.name );
+				return qfalse;
+			}
+			stage->bundle[0].flowmapSpeed = Q_atof( token );
+			if ( stage->bundle[0].flowmapSpeed <= 0.0f )
+				stage->bundle[0].flowmapSpeed = 0.1f;
+		}
 		else
 		{
 			ri.Printf( PRINT_WARNING, "WARNING: unknown parameter '%s' in shader '%s'\n", token, shader.name );
@@ -4331,7 +4357,8 @@ static shader_t *FinishShader( void ) {
 				default:
 					pStage->tessFlags = TESS_RGBA0 | TESS_ST0;
 					def.shader_type = TYPE_SIGNLE_TEXTURE;
-					if ( pStage->bundle[0].adjustColorsForFog == ACFF_NONE || fogCollapse ) {
+					def.hasFlowmap = ( pStage->bundle[0].flowmapImage != NULL ) ? 1 : 0;
+					if ( !def.hasFlowmap && ( pStage->bundle[0].adjustColorsForFog == ACFF_NONE || fogCollapse ) ) {
 						if ( pStage->bundle[0].rgbGen == CGEN_IDENTITY ) {
 							if ( pStage->bundle[0].alphaGen == AGEN_SKIP ) {
 								pStage->tessFlags = TESS_ST0;

@@ -24,6 +24,13 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - Shadowed volumetrics via sun CSM and local shadow maps
 - Cvars: `r_volumetricFog`, `r_volumetricFogDensity`, `r_volumetricFogHeightFalloff`, `r_volumetricFogNoiseScale`, `r_volumetricFogGridDim`, `r_volumetricFogQuality`, etc. (Note: `r_vfog*` cvars in vk_vfog.c are legacy/unused; the pipeline uses `r_volumetricFog*` exclusively.)
 
+### Water Flowmap
+- Flowmap textures drive per-pixel UV offset for water surfaces (rivers, pools, wakes)
+- Shader keywords: `flowmapTex <path>`, `flowSpeed <value>`
+- Flowmap RG channels encode flow direction (0.5 = no flow); shader offsets main texture UV by flow × speed × time
+- Requires extended shader support; single-texture stages only
+- Sample assets: [docs/samples/flowmap/](samples/flowmap/README.md)
+
 ### Navier-Stokes Fluid Simulation
 - GPU compute-based Stable Fluids (Jos Stam 1999)
 - Semi-Lagrangian advection (unconditionally stable)
