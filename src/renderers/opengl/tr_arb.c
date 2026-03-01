@@ -448,7 +448,7 @@ static const char dlightVPSuffix[] = {
 };
 
 
-static const char *ARB_BuildDlightFP( char *program, int programIndex )
+static const char *ARB_BuildDlightFP( char *program, int programSize, int programIndex )
 {
 	qboolean fog = qfalse;
 	qboolean linear = qfalse;
@@ -483,7 +483,7 @@ static const char *ARB_BuildDlightFP( char *program, int programIndex )
 			break;
 	}
 
-	strcat( program,
+	Q_strcat( program, programSize,
 	"!!ARBfp1.0 \n"
 	"OPTION ARB_precision_hint_fastest; \n"
 	"PARAM lightRGB = program.local[0]; \n"
@@ -493,7 +493,7 @@ static const char *ARB_BuildDlightFP( char *program, int programIndex )
 	"TEX base, fragment.texcoord[0], texture[0], 2D; \n" );
 
 	if ( linear ) {
-		strcat( program,
+		Q_strcat( program, programSize,
 		"PARAM lightVector = program.local[4]; \n"
 		"ATTRIB LV = fragment.texcoord[1]; \n"
 		"TEMP dnLV; \n"
@@ -504,10 +504,10 @@ static const char *ARB_BuildDlightFP( char *program, int programIndex )
 		"MAD dnLV, lightVector, tmp.x, LV; \n"
 		);
 	} else {
-		strcat( program, "ATTRIB dnLV = fragment.texcoord[1]; \n" );
+		Q_strcat( program, programSize, "ATTRIB dnLV = fragment.texcoord[1]; \n" );
 	}
 
-	strcat( program,
+	Q_strcat( program, programSize,
 	"ATTRIB dnEV = fragment.texcoord[2]; \n" // 2
 	"ATTRIB n = fragment.texcoord[3]; \n"    // 3
 	
@@ -527,11 +527,11 @@ static const char *ARB_BuildDlightFP( char *program, int programIndex )
 	"MUL light, lightRGB, tmp.x; \n" ); // light.rgb
 
 	if ( r_dlightSpecColor->value > 0 )
-		strcat( program, va( "PARAM specRGB = %1.2f; \n", r_dlightSpecColor->value ) );
+		Q_strcat( program, programSize, va( "PARAM specRGB = %1.2f; \n", r_dlightSpecColor->value ) );
 
-	strcat( program, va( "PARAM specEXP = %1.2f; \n", r_dlightSpecPower->value ) );
+	Q_strcat( program, programSize, va( "PARAM specEXP = %1.2f; \n", r_dlightSpecPower->value ) );
 
-	strcat( program,
+	Q_strcat( program, programSize,
 	// normalize eye vector
 	"TEMP ev; \n"
 	"DP3 ev.w, dnEV, dnEV; \n"
@@ -546,30 +546,30 @@ static const char *ARB_BuildDlightFP( char *program, int programIndex )
 
 	// modulate specular strength
 	if ( abslight ) {
-		strcat( program,
+		Q_strcat( program, programSize,
 		"DP3 tmp.w, n, tmp; \n"
 		"ABS tmp.w, tmp.w; \n" );
 	} else {
-		strcat( program,
+		Q_strcat( program, programSize,
 		"DP3_SAT tmp.w, n, tmp; \n" );
 	}
 
-	strcat( program,
+	Q_strcat( program, programSize,
 	"POW tmp.w, tmp.w, specEXP.w; \n"
 	"TEMP spec; \n" );
 
 	if ( r_dlightSpecColor->value > 0 ) {
 		// by constant
-		strcat( program, "MUL spec, specRGB, tmp.w; \n" );
+		Q_strcat( program, programSize, "MUL spec, specRGB, tmp.w; \n" );
 	} else {
 		// by texture
-		strcat( program, va( "MUL tmp.w, tmp.w, %1.2f; \n", -r_dlightSpecColor->value ) );
-		strcat( program, "MUL spec, base, tmp.w; \n" );
+		Q_strcat( program, programSize, va( "MUL tmp.w, tmp.w, %1.2f; \n", -r_dlightSpecColor->value ) );
+		Q_strcat( program, programSize, "MUL spec, base, tmp.w; \n" );
 	}
 
 	// diffuse
 	if ( abslight ) {
-		strcat( program,
+		Q_strcat( program, programSize,
 		"TEMP bump; \n"
 		"DP3 bump.w, n, lv; \n"
 		// make sure that light and eye vectors are on the same plane side
@@ -578,15 +578,15 @@ static const char *ARB_BuildDlightFP( char *program, int programIndex )
 		"KIL tmp.w; \n"
 		"ABS bump.w, bump.w; \n" );
 	} else {
-		strcat( program,
+		Q_strcat( program, programSize,
 		"TEMP bump; \n"
 		"DP3_SAT bump.w, n, lv; \n" );
 	}
 
-	strcat( program, "MAD base, base, bump.w, spec; \n" );
+	Q_strcat( program, programSize, "MAD base, base, bump.w, spec; \n" );
 
 	if ( fog ) {
-		strcat( program,
+		Q_strcat( program, programSize,
 		"TEMP fog; \n"
 		"TEX fog, fragment.texcoord[4], texture[1], 2D; \n" // fog texture
 		//"MUL fog, fog, fogColor; \n"
@@ -597,7 +597,7 @@ static const char *ARB_BuildDlightFP( char *program, int programIndex )
 		"MUL base, base, fog.a; \n" );
 	}
 
-	strcat( program,
+	Q_strcat( program, programSize,
 	"MUL_SAT result.color, base, light; \n"
 	"END \n" );
 	
@@ -634,8 +634,9 @@ static const char *spriteFP = {
 
 
 #ifdef USE_FBO
-static char *ARB_BuildGreyscaleProgram( char *buf ) {
+static char *ARB_BuildGreyscaleProgram( char *buf, int bufsize ) {
 	char *s;
+	size_t remain;
 
 	if ( r_greyscale->value == 0 ) {
 		*buf = '\0';
@@ -649,7 +650,9 @@ static char *ARB_BuildGreyscaleProgram( char *buf ) {
 	} else {
 		s = Q_stradd( s, "TEMP luma; \n" );
 		s = Q_stradd( s, "DP3 luma, base, sRGB; \n" );
-		/*s +=*/ sprintf( s, "LRP base.xyz, %1.2f, luma, base; \n", r_greyscale->value );
+		remain = (size_t)bufsize - (size_t)( s - buf );
+		if ( remain > 0 )
+			Com_sprintf( s, remain, "LRP base.xyz, %1.2f, luma, base; \n", r_greyscale->value );
 	}
 
 	return buf;
@@ -1038,7 +1041,7 @@ qboolean ARB_UpdatePrograms( void )
 		return qfalse;
 
 	for ( i = DLIGHT_FRAGMENT; i <= DLIGHT_LINEAR_ABS_FRAGMENT_FOG; i++ ) {
-		program = ARB_BuildDlightFP( buf, i );
+		program = ARB_BuildDlightFP( buf, sizeof( buf ), i );
 		if ( !ARB_CompileProgram( Fragment, program, programs[ i ] ) ) {
 			return qfalse;
 		}
@@ -1052,7 +1055,7 @@ qboolean ARB_UpdatePrograms( void )
 		return qfalse;
 
 	{
-		const char *grey = ARB_BuildGreyscaleProgram( buf );
+		const char *grey = ARB_BuildGreyscaleProgram( buf, sizeof( buf ) );
 		Com_sprintf( programText, sizeof( programText ), "%s%s%s", gammaFPPrefix, grey, gammaFPSuffix );
 		if ( !ARB_CompileProgram( Fragment, programText, programs[ GAMMA_FRAGMENT ] ) )
 			return qfalse;
@@ -1082,7 +1085,7 @@ qboolean ARB_UpdatePrograms( void )
 		return qfalse;
 
 	{
-		const char *grey = ARB_BuildGreyscaleProgram( buf );
+		const char *grey = ARB_BuildGreyscaleProgram( buf, sizeof( buf ) );
 		Com_sprintf( programText, sizeof( programText ), "%s%s%s", blend2gammaFPPrefix, grey, blend2gammaFPSuffix );
 		if ( !ARB_CompileProgram( Fragment, programText, programs[ BLEND2_GAMMA_FRAGMENT ] ) )
 			return qfalse;
@@ -1262,7 +1265,7 @@ static const char *glDefToStr( GLint define )
 		CASE_STR(GL_FRAMEBUFFER_UNSUPPORTED);
 	}
 	s = buf[ index ]; // to handle multiple invocations as function parameters
-	sprintf( s, "0x%04x", define );
+	Com_sprintf( s, sizeof( buf[0] ), "0x%04x", define );
 	index = ( index + 1 ) & 7;
 	return s;
 }

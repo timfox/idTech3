@@ -211,8 +211,8 @@ typedef enum {
 #endif
 	STAT_WEAPONS,					// 16 bit fields
 	STAT_ARMOR,
-	STAT_DEAD_YAW,					// look this direction when dead (FIXME: get rid of?)
-	STAT_CLIENTS_READY,				// bit mask of clients wishing to exit the intermission (FIXME: configstring?)
+	STAT_DEAD_YAW,					// look this direction when dead
+	STAT_CLIENTS_READY,				// bit mask of clients wishing to exit the intermission
 	STAT_MAX_HEALTH					// health / armor limit, changeable by handicap
 } statIndex_t;
 

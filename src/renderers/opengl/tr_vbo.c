@@ -144,25 +144,25 @@ static const char *BuildVP( int multitexture, int fogmode, int texgen )
 	const char *tex0;
 	const char *tex1;
 
-	strcpy( buf,
+	Q_strncpyz( buf,
 	"!!ARBvp1.0 \n"
-	"OPTION ARB_position_invariant; \n" );
+	"OPTION ARB_position_invariant; \n", sizeof( buf ) );
 
 	switch ( fogmode ) {
 		default:
 		case VP_FOG_NONE:
 			break;
 		case VP_FOG_EYE_IN:
-			strcat( buf, fogInVPCode ); break;
+			Q_strcat( buf, sizeof( buf ), fogInVPCode ); break;
 		case VP_FOG_EYE_OUT:
-			strcat( buf, fogOutVPCode ); break;
+			Q_strcat( buf, sizeof( buf ), fogOutVPCode ); break;
 	}
 
 	if ( texgen ) {
 
 		// environment mapping
 
-		strcat( buf,
+		Q_strcat( buf, sizeof( buf ),
 		"TEMP viewer, d; \n"
 
 		// VectorSubtract( backEnd.or.viewOrigin, v, viewer );
@@ -202,22 +202,22 @@ static const char *BuildVP( int multitexture, int fogmode, int texgen )
 	switch ( multitexture ) {
 		case GL_ADD:
 		case GL_MODULATE:
-			sprintf( b,
+			Com_sprintf( b, sizeof( b ),
 				"MOV result.texcoord[0], %s; \n"
 				"MOV result.texcoord[1], %s; \n",
 				tex0, tex1 );
 			break;
 		case GL_REPLACE:
-			sprintf( b, "MOV result.texcoord[1], %s; \n", tex1 );
+			Com_sprintf( b, sizeof( b ), "MOV result.texcoord[1], %s; \n", tex1 );
 			break;
 		default:
-			sprintf( b, "MOV result.texcoord[0], %s; \n", tex0 );
+			Com_sprintf( b, sizeof( b ), "MOV result.texcoord[0], %s; \n", tex0 );
 			break;
 	}
 
-	strcat( buf, b );
+	Q_strcat( buf, sizeof( buf ), b );
 
-	strcat( buf,
+	Q_strcat( buf, sizeof( buf ),
 	"MOV result.color, vertex.color; \n"
 	"END \n" );
 
@@ -229,37 +229,37 @@ static const char *BuildFP( int multitexture, int alphatest, int fogMode )
 {
 	static char buf[1024];
 
-	strcpy( buf, "!!ARBfp1.0 \n"
+	Q_strncpyz( buf, "!!ARBfp1.0 \n"
 	"OPTION ARB_precision_hint_fastest; \n"
-	"TEMP base; \n" );
+	"TEMP base; \n", sizeof( buf ) );
 
 	if ( fogMode == FP_FOG_ONLY ) {
-		strcat( buf, "TEX base, fragment.texcoord[4], texture[2], 2D; \n" );
-		strcat( buf, "MUL result.color, base, program.local[0]; \n" );
-		strcat( buf, "END \n" );
+		Q_strcat( buf, sizeof( buf ), "TEX base, fragment.texcoord[4], texture[2], 2D; \n" );
+		Q_strcat( buf, sizeof( buf ), "MUL result.color, base, program.local[0]; \n" );
+		Q_strcat( buf, sizeof( buf ), "END \n" );
 		return buf;
 	}
 
 	if ( alphatest || multitexture == GL_ADD  || multitexture == GL_MODULATE ) {
-		strcat( buf, "TEMP t; \n" );
+		Q_strcat( buf, sizeof( buf ), "TEMP t; \n" );
 	}
 
 	switch ( multitexture ) {
 		case 0:
-			strcat( buf, "TEX base, fragment.texcoord[0], texture[0], 2D; \n" );
+			Q_strcat( buf, sizeof( buf ), "TEX base, fragment.texcoord[0], texture[0], 2D; \n" );
 			break;
 		case GL_ADD:
-			strcat( buf, "TEX base, fragment.texcoord[0], texture[0], 2D; \n" );
-			strcat( buf, "TEX t,    fragment.texcoord[1], texture[1], 2D; \n"
+			Q_strcat( buf, sizeof( buf ), "TEX base, fragment.texcoord[0], texture[0], 2D; \n" );
+			Q_strcat( buf, sizeof( buf ), "TEX t,    fragment.texcoord[1], texture[1], 2D; \n"
 			"ADD base, base, t; \n" );
 			break;
 		case GL_MODULATE:
-			strcat( buf, "TEX base, fragment.texcoord[0], texture[0], 2D; \n" );
-			strcat( buf, "TEX t,    fragment.texcoord[1], texture[1], 2D; \n" );
-			strcat( buf, "MUL base, base, t; \n" );
+			Q_strcat( buf, sizeof( buf ), "TEX base, fragment.texcoord[0], texture[0], 2D; \n" );
+			Q_strcat( buf, sizeof( buf ), "TEX t,    fragment.texcoord[1], texture[1], 2D; \n" );
+			Q_strcat( buf, sizeof( buf ), "MUL base, base, t; \n" );
 			break;
 		case GL_REPLACE:
-			strcat( buf, "TEX base, fragment.texcoord[1], texture[1], 2D; \n" );
+			Q_strcat( buf, sizeof( buf ), "TEX base, fragment.texcoord[1], texture[1], 2D; \n" );
 			break;
 		default:
 			ri.Error( ERR_DROP, "Invalid multitexture mode %04x", multitexture );
@@ -267,22 +267,22 @@ static const char *BuildFP( int multitexture, int alphatest, int fogMode )
 	}
 
 	if ( fogMode == FP_FOG_BLEND ) {
-		strcat( buf, "MUL base, base, fragment.color; \n" );
-		strcat( buf, genATestFP( alphatest ) );
-		strcat( buf, "TEMP fog; \n"
+		Q_strcat( buf, sizeof( buf ), "MUL base, base, fragment.color; \n" );
+		Q_strcat( buf, sizeof( buf ), genATestFP( alphatest ) );
+		Q_strcat( buf, sizeof( buf ), "TEMP fog; \n"
 		"TEX fog, fragment.texcoord[4], texture[2], 2D; \n"
 		"MUL fog, fog, program.local[0]; \n"
 		"LRP_SAT result.color, fog.a, fog, base; \n"
 		"END \n" );
 	} else {
 		if ( alphatest ) {
-			strcat( buf, "MUL base, base, fragment.color; \n" );
-			strcat( buf, genATestFP( alphatest ) );
-			strcat( buf,
+			Q_strcat( buf, sizeof( buf ), "MUL base, base, fragment.color; \n" );
+			Q_strcat( buf, sizeof( buf ), genATestFP( alphatest ) );
+			Q_strcat( buf, sizeof( buf ),
 			"MOV result.color, base; \n"
 			"END \n" );
 		} else {
-			strcat( buf,
+			Q_strcat( buf, sizeof( buf ),
 			"MUL result.color, base, fragment.color; \n"
 			"END \n" );
 		}
