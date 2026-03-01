@@ -38,6 +38,116 @@ static int			r_firstScenePoly;
 
 static int			r_numpolyverts;
 
+typedef struct {
+	const refEntity_t	*ent;
+	int					channelCount;
+	uint32_t			channelHash[IQM_MORPH_MAX_CHANNELS];
+	float				channelWeight[IQM_MORPH_MAX_CHANNELS];
+} pendingMorphState_t;
+
+static pendingMorphState_t	r_pendingMorphStates[MAX_REFENTITIES];
+static int					r_numPendingMorphStates;
+
+static pendingMorphState_t *R_FindPendingMorphState( const refEntity_t *ent, qboolean create ) {
+	int i;
+
+	for ( i = 0; i < r_numPendingMorphStates; i++ ) {
+		if ( r_pendingMorphStates[i].ent == ent ) {
+			return &r_pendingMorphStates[i];
+		}
+	}
+
+	if ( !create || r_numPendingMorphStates >= (int)ARRAY_LEN( r_pendingMorphStates ) ) {
+		return NULL;
+	}
+
+	Com_Memset( &r_pendingMorphStates[r_numPendingMorphStates], 0, sizeof( r_pendingMorphStates[0] ) );
+	r_pendingMorphStates[r_numPendingMorphStates].ent = ent;
+	r_numPendingMorphStates++;
+	return &r_pendingMorphStates[r_numPendingMorphStates - 1];
+}
+
+static void R_CopyPendingMorphStateToEntity( const refEntity_t *srcEnt, trRefEntity_t *dstEnt ) {
+	const pendingMorphState_t *state = R_FindPendingMorphState( srcEnt, qfalse );
+	int i;
+
+	dstEnt->morphChannelCount = 0;
+	dstEnt->morphActiveCount = 0;
+	dstEnt->morphDebugMaxAbsWeight = 0.0f;
+	for ( i = 0; i < IQM_MORPH_TOP_K; i++ ) {
+		dstEnt->morphActiveTargetIndex[i] = -1;
+		dstEnt->morphActiveWeight[i] = 0.0f;
+	}
+
+	if ( !state ) {
+		return;
+	}
+
+	dstEnt->morphChannelCount = state->channelCount;
+	for ( i = 0; i < state->channelCount; i++ ) {
+		dstEnt->morphChannelHashes[i] = state->channelHash[i];
+		dstEnt->morphChannelWeights[i] = state->channelWeight[i];
+	}
+}
+
+void RE_SetEntityMorphWeight( const refEntity_t *ent, const char *name, float weight ) {
+	pendingMorphState_t *state;
+	uint32_t hash;
+	int i;
+	int replaceIndex;
+	float replaceAbs;
+	float absWeight;
+
+	if ( !ent || !name || !name[0] ) {
+		return;
+	}
+
+	if ( !tr.registered || !r_morph || !r_morph->integer ) {
+		return;
+	}
+
+	if ( weight > 2.0f ) {
+		weight = 2.0f;
+	} else if ( weight < -2.0f ) {
+		weight = -2.0f;
+	}
+
+	hash = (uint32_t)Com_GenerateHashValue( name, 0x7fffffffU );
+	state = R_FindPendingMorphState( ent, qtrue );
+	if ( !state ) {
+		return;
+	}
+
+	for ( i = 0; i < state->channelCount; i++ ) {
+		if ( state->channelHash[i] == hash ) {
+			state->channelWeight[i] = weight;
+			return;
+		}
+	}
+
+	if ( state->channelCount < IQM_MORPH_MAX_CHANNELS ) {
+		state->channelHash[state->channelCount] = hash;
+		state->channelWeight[state->channelCount] = weight;
+		state->channelCount++;
+		return;
+	}
+
+	replaceIndex = 0;
+	replaceAbs = fabsf( state->channelWeight[0] );
+	absWeight = fabsf( weight );
+	for ( i = 1; i < state->channelCount; i++ ) {
+		float curAbs = fabsf( state->channelWeight[i] );
+		if ( curAbs < replaceAbs ) {
+			replaceIndex = i;
+			replaceAbs = curAbs;
+		}
+	}
+
+	if ( absWeight > replaceAbs ) {
+		state->channelHash[replaceIndex] = hash;
+		state->channelWeight[replaceIndex] = weight;
+	}
+}
 
 /*
 ====================
@@ -64,6 +174,7 @@ void R_InitNextFrame( void ) {
 	r_firstScenePoly = 0;
 
 	r_numpolyverts = 0;
+	r_numPendingMorphStates = 0;
 }
 
 
@@ -77,6 +188,7 @@ void RE_ClearScene( void ) {
 	r_firstSceneDlight = r_numdlights;
 	r_firstSceneEntity = r_numentities;
 	r_firstScenePoly = r_numpolys;
+	r_numPendingMorphStates = 0;
 }
 
 /*
@@ -234,6 +346,7 @@ void RE_AddRefEntityToScene( const refEntity_t *ent, qboolean intShaderTime ) {
 	backEndData->entities[r_numentities].e = *ent;
 	backEndData->entities[r_numentities].lightingCalculated = qfalse;
 	backEndData->entities[r_numentities].intShaderTime = intShaderTime;
+	R_CopyPendingMorphStateToEntity( ent, &backEndData->entities[r_numentities] );
 
 	r_numentities++;
 }

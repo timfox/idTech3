@@ -25,7 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_types.h"
 #include "vulkan/vulkan.h"
 
-#define	REF_API_VERSION		8
+#define	REF_API_VERSION		9
 
 //
 // these are the functions exported by the refresh module
@@ -70,6 +70,7 @@ typedef struct {
 	// a scene is built up by calls to R_ClearScene and the various R_Add functions.
 	// Nothing is drawn until R_RenderScene is called.
 	void	(*ClearScene)( void );
+	void	(*SetEntityMorphWeight)( const refEntity_t *re, const char *name, float weight );
 	void	(*AddRefEntityToScene)( const refEntity_t *re, qboolean intShaderTime );
 	void	(*AddPolyToScene)( qhandle_t hShader , int numVerts, const polyVert_t *verts, int num );
 	int		(*LightForPoint)( vec3_t point, vec3_t ambientLight, vec3_t directedLight, vec3_t lightDir );
