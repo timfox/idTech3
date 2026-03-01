@@ -17,6 +17,7 @@
 - [x] Flashlight / projected texture system
 - [x] HDR EXR skybox with IBL (equirectangular, cubemap, spherical)
 - [x] OpenEXR image format support
+- [x] Water flowmap (flow vectors offset texture UVs for rivers, pools, wakes)
 
 ### Physics -- Complete
 - [x] Bullet Physics (35 API functions, C++ backend)

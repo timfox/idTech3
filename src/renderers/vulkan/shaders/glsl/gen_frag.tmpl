@@ -8,7 +8,7 @@
 #define USE_CL1
 #endif
 
-#if defined (USE_FOG) || defined (USE_ENT_COLOR) || defined (USE_VK_PBR)
+#if defined (USE_FOG) || defined (USE_ENT_COLOR) || defined (USE_VK_PBR) || defined (USE_FLOWMAP)
 layout(set = 0, binding = 0) uniform UBO {
 	// light/env parameters:
 	vec4 eyePos;				// vertex
@@ -27,6 +27,8 @@ layout(set = 0, binding = 0) uniform UBO {
 	vec4 fogDepthVector;		// vertex
 	vec4 fogEyeT;				// vertex
 	vec4 fogColor;				// fragment
+	// flowmap: x=flowSpeed, y=flowTime, z=phaseCycle (0..1), w=unused
+	vec4 flowmapParams;
 #ifdef USE_VK_PBR
 	vec4 pbrEmissiveScale;
 	vec4 pbrClearcoatScale;
@@ -49,6 +51,9 @@ layout(set = 0, binding = 0) uniform UBO {
 layout(set = 1, binding = 0) uniform sampler2D texture0;
 #ifdef USE_TX1
 layout(set = 2, binding = 0) uniform sampler2D texture1;
+#endif
+#ifdef USE_FLOWMAP
+layout(set = 2, binding = 0) uniform sampler2D flowmap_texture;
 #endif
 #ifdef USE_TX2
 layout(set = 3, binding = 0) uniform sampler2D texture2;
@@ -415,15 +420,21 @@ void main() {
 	vec4 fog = texture(fog_texture, fog_tex_coord);
 #endif
 
+	vec2 uv0 = frag_tex_coord0;
+#if defined(USE_FLOWMAP)
+	// flowmap: sample flow vectors, offset UV for texture0
+	vec2 flowVec = texture(flowmap_texture, frag_tex_coord0).rg - 0.5;
+	uv0 = frag_tex_coord0 + flowVec * flowmapParams.x * flowmapParams.y;
+#endif
 #if defined (USE_CLX_IDENT)
-	vec4 color0 = texture(texture0, frag_tex_coord0);
+	vec4 color0 = texture(texture0, uv0);
 #elif defined (USE_FIXED_COLOR)
 	const vec4 frag_color = vec4(identity_color, identity_color,identity_color, identity_alpha);
-	vec4 color0 = texture(texture0, frag_tex_coord0) * frag_color;
+	vec4 color0 = texture(texture0, uv0) * frag_color;
 #elif defined (USE_ENT_COLOR)
-	vec4 color0 = texture(texture0, frag_tex_coord0) * ent_color0;
+	vec4 color0 = texture(texture0, uv0) * ent_color0;
 #else
-	vec4 color0 = texture(texture0, frag_tex_coord0) * frag_color0;
+	vec4 color0 = texture(texture0, uv0) * frag_color0;
 #endif
 	vec4 base;
 

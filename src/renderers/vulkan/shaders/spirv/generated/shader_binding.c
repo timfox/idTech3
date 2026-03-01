@@ -3,6 +3,10 @@ static void vk_set_shader_name( VkShaderModule shader, const char *name ) {
     SET_OBJECT_NAME( shader, name, VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 }
 void vk_bind_generated_shaders( void ){
+    vk.modules.frag.flowmap[0] = SHADER_MODULE( frag_tx0_flowmap );
+    vk_set_shader_name( vk.modules.frag.flowmap[0], "frag_tx0_flowmap" );
+    vk.modules.frag.flowmap[1] = SHADER_MODULE( frag_tx0_flowmap_fog );
+    vk_set_shader_name( vk.modules.frag.flowmap[1], "frag_tx0_flowmap_fog" );
     vk.modules.vert.ident1[0][0][0][0] = SHADER_MODULE( vert_tx0_ident1 );
     vk_set_shader_name( vk.modules.vert.ident1[0][0][0][0], "vert_tx0_ident1" );
     vk.modules.vert.ident1[0][0][0][1] = SHADER_MODULE( vert_tx0_ident1_fog );

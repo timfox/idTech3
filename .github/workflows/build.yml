@@ -228,9 +228,13 @@ jobs:
           sudo rm -f /etc/apt/sources.list.d/azure-cli.list
           sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list
           sudo apt-get -qq update
-          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools
+          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools python3
 
       - uses: actions/checkout@v4
+
+      - name: Verify shader compilation
+        if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
+        run: ./scripts/compile_shaders.sh
 
       - name: Build Vulkan
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
@@ -560,3 +564,31 @@ jobs:
           path: bin
           if-no-files-found: error
           retention-days: 5
+
+  release-attach:
+    name: Attach artifacts to release
+    if: github.event_name == 'release' && github.event.action == 'published'
+    needs: [windows-msys, windows-msvc, ubuntu-x86_64, ubuntu-arm, macos, android]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create release archives
+        run: |
+          mkdir -p dist
+          tag="${GITHUB_REF#refs/tags/}"
+          for dir in artifacts/*/; do
+            name=$(basename "$dir")
+            zip -r "dist/idtech3-${tag}-${name}.zip" "$dir"
+          done
+          ls -la dist/
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
