@@ -429,48 +429,16 @@ void SDF_DrawText( sdfFontHandle_t font, float x, float y, float scale,
 	re.SetColor( NULL );
 }
 
-static qboolean SDF_CanRenderString( const sdfFont_t *font, const char *text, qboolean noColorEscape ) {
-	const char *s;
-
-	if ( !font || !text ) {
-		return qfalse;
-	}
-
-	s = text;
-	while ( *s ) {
-		const char *prev = s;
-		uint32_t cp;
-
-		if ( !noColorEscape && Q_IsColorString( s ) ) {
-			s += 2;
-			continue;
-		}
-
-		cp = Q_UTF8_Decode( &s );
-		if ( cp == '\n' ) {
-			continue;
-		}
-
-		if ( CL_Emoji_IsEnabled() && ( (unsigned char)prev[0] >= 0x80 ) && Q_UTF8_IsEmoji( cp ) ) {
-			continue;
-		}
-
-		if ( !SDF_FindGlyph( font, cp ) && !SDF_FindGlyph( font, (uint32_t)'?' ) ) {
-			return qfalse;
-		}
-	}
-
-	return qtrue;
-}
-
 qboolean SDF_DrawStringExt( int x, int y, float size, const char *string,
 	const float *setColor, qboolean forceColor, qboolean noColorEscape ) {
 	const char *s;
 	sdfFont_t *f;
 	float xx;
+	float yy;
 	uint32_t prevCp;
 	vec4_t color;
 	float scale;
+	const float clampedSize = Com_Clamp( 1.0f, 256.0f, size );
 	const sdfGlyph_t *fallbackGlyph;
 
 	if ( !string || !string[0] || !setColor ) {
@@ -483,11 +451,8 @@ qboolean SDF_DrawStringExt( int x, int y, float size, const char *string,
 		return qfalse;
 	}
 	f = &fonts[defaultFontHandle];
-	if ( !SDF_CanRenderString( f, string, noColorEscape ) ) {
-		return qfalse;
-	}
 
-	scale = SDF_LineScale( f, size );
+	scale = SDF_LineScale( f, clampedSize );
 	fallbackGlyph = SDF_FindGlyph( f, (uint32_t)'?' );
 
 	/* drop shadow pass */
@@ -496,6 +461,7 @@ qboolean SDF_DrawStringExt( int x, int y, float size, const char *string,
 	re.SetColor( color );
 	s = string;
 	xx = (float)x;
+	yy = (float)y;
 	prevCp = 0;
 	while ( *s ) {
 		const char *prevPtr = s;
@@ -510,12 +476,13 @@ qboolean SDF_DrawStringExt( int x, int y, float size, const char *string,
 		cp = Q_UTF8_Decode( &s );
 		if ( cp == '\n' ) {
 			xx = (float)x;
+			yy += f->lineHeight * scale;
 			prevCp = 0;
 			continue;
 		}
 
 		if ( CL_Emoji_IsEnabled() && ( (unsigned char)prevPtr[0] >= 0x80 ) && Q_UTF8_IsEmoji( cp ) ) {
-			xx += size;
+			xx += clampedSize;
 			prevCp = cp;
 			continue;
 		}
@@ -525,14 +492,14 @@ qboolean SDF_DrawStringExt( int x, int y, float size, const char *string,
 			g = fallbackGlyph;
 		}
 		if ( !g ) {
-			xx += size;
+			xx += clampedSize;
 			prevCp = cp;
 			continue;
 		}
 
 		if ( g->w > 0.0f && g->h > 0.0f ) {
 			float drawX = xx + 2.0f + g->xoffset * scale;
-			float drawY = (float)y + 2.0f + g->yoffset * scale;
+			float drawY = yy + 2.0f + g->yoffset * scale;
 			float drawW = g->w * scale;
 			float drawH = g->h * scale;
 			float ax = drawX;
@@ -550,6 +517,7 @@ qboolean SDF_DrawStringExt( int x, int y, float size, const char *string,
 	/* color pass */
 	s = string;
 	xx = (float)x;
+	yy = (float)y;
 	Com_Memcpy( color, setColor, sizeof( color ) );
 	re.SetColor( setColor );
 	prevCp = 0;
@@ -573,14 +541,15 @@ qboolean SDF_DrawStringExt( int x, int y, float size, const char *string,
 		cp = Q_UTF8_Decode( &s );
 		if ( cp == '\n' ) {
 			xx = (float)x;
+			yy += f->lineHeight * scale;
 			prevCp = 0;
 			continue;
 		}
 
 		if ( CL_Emoji_IsEnabled() && ( (unsigned char)prevPtr[0] >= 0x80 ) && Q_UTF8_IsEmoji( cp ) ) {
-			if ( CL_Emoji_DrawChar( (int)xx, y, size, size, cp ) ) {
+			if ( CL_Emoji_DrawChar( (int)xx, (int)yy, clampedSize, clampedSize, cp ) ) {
 				re.SetColor( forceColor ? setColor : color );
-				xx += size;
+				xx += clampedSize;
 				prevCp = cp;
 				continue;
 			}
@@ -591,14 +560,14 @@ qboolean SDF_DrawStringExt( int x, int y, float size, const char *string,
 			g = fallbackGlyph;
 		}
 		if ( !g ) {
-			xx += size;
+			xx += clampedSize;
 			prevCp = cp;
 			continue;
 		}
 
 		if ( g->w > 0.0f && g->h > 0.0f ) {
 			float drawX = xx + g->xoffset * scale;
-			float drawY = (float)y + g->yoffset * scale;
+			float drawY = yy + g->yoffset * scale;
 			float drawW = g->w * scale;
 			float drawH = g->h * scale;
 			float ax = drawX;
