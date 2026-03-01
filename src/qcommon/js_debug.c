@@ -141,6 +141,17 @@ static int JsDebug_ClampInt( int value, int minValue, int maxValue ) {
 	return value;
 }
 
+static qboolean JsDebug_IsAllowedLatchedCvar( const char *name ) {
+	if ( !name || !name[0] ) {
+		return qfalse;
+	}
+
+	/* Allow common video mode/fullscreen toggles while keeping other latched cvars protected. */
+	return ( !Q_stricmp( name, "r_fullscreen" ) ||
+		!Q_stricmp( name, "r_mode" ) ||
+		!Q_stricmp( name, "r_modeFullscreen" ) );
+}
+
 static qboolean JsDebug_IsSafePath( const char *path ) {
 	int i;
 
@@ -192,7 +203,10 @@ static qboolean JsDebug_IsCvarSetAllowed( const char *name ) {
 	}
 
 	if ( mode < 3 ) {
-		if ( flags & ( CVAR_ROM | CVAR_INIT | CVAR_PROTECTED | CVAR_PRIVATE | CVAR_CHEAT | CVAR_LATCH ) ) {
+		if ( flags & ( CVAR_ROM | CVAR_INIT | CVAR_PROTECTED | CVAR_PRIVATE | CVAR_CHEAT ) ) {
+			return qfalse;
+		}
+		if ( ( flags & CVAR_LATCH ) && !JsDebug_IsAllowedLatchedCvar( name ) ) {
 			return qfalse;
 		}
 		if ( flags & ( CVAR_USERINFO | CVAR_SERVERINFO | CVAR_SYSTEMINFO ) ) {
