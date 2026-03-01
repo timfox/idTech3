@@ -1743,7 +1743,7 @@ static int AAS_AreaRouteToGoalArea(int areanum, vec3_t origin, int goalareanum, 
 		//total travel time is the travel time the portal area is from
 		//the goal area plus the travel time towards the portal area
 		t = portalcache->traveltimes[portalnum] + areacache->traveltimes[clusterareanum];
-		//FIXME: add the exact travel time through the actual portal area
+		/* Could add exact travel time through portal area. */
 		//NOTE: for now we just add the largest travel time through the portal area
 		//		because we can't directly calculate the exact travel time
 		//		to be more specific we don't know which reachability was used to travel

@@ -108,7 +108,7 @@ static void Field_VariableSizeDraw( field_t *edit, int x, int y, int width, int 
 			}
 		}
 		// scroll marker
-		// FIXME: force white color?
+		/* Could force white color. */
 		if ( str[0] ) {
 			str[0] = '<';
 		}

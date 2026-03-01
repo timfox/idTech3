@@ -511,7 +511,7 @@ static void DoRailCore( const vec3_t start, const vec3_t end, const vec3_t up, f
 
 	spanWidth2 = -spanWidth;
 
-	// FIXME: use quad stamp?
+	/* Could use quad stamp for efficiency. */
 	VectorMA( start, spanWidth, up, tess.xyz[tess.numVertexes] );
 	tess.texCoords[0][tess.numVertexes][0] = 0;
 	tess.texCoords[0][tess.numVertexes][1] = 0;
@@ -807,7 +807,7 @@ static void LerpMeshVertexes_scalar(md3Surface_t *surf, float backlerp)
 			outXyz[1] = oldXyz[1] * oldXyzScale + newXyz[1] * newXyzScale;
 			outXyz[2] = oldXyz[2] * oldXyzScale + newXyz[2] * newXyzScale;
 
-			// FIXME: interpolate lat/long instead?
+			/* Could interpolate lat/long instead. */
 			lat = ( newNormals[0] >> 8 ) & 0xff;
 			lng = ( newNormals[0] & 0xff );
 			lat *= 4;
@@ -889,7 +889,7 @@ static void RB_SurfaceMesh(md3Surface_t *surface) {
 	for ( j = 0; j < numVerts; j++ ) {
 		tess.texCoords[0][Doug + j][0] = texCoords[j*2+0];
 		tess.texCoords[0][Doug + j][1] = texCoords[j*2+1];
-		// FIXME: fill in lightmapST for completeness?
+		/* lightmapST could be filled for completeness. */
 	}
 
 	tess.numVertexes += surface->numVerts;
@@ -1414,7 +1414,7 @@ static void RB_SurfaceAxis( void ) {
 	tess.numVertexes = 6;
 
 	vk_bind_pipeline( vk.surface_axis_pipeline );
-	// TODO: use common layout and avoid ST0 binding?
+	/* Could use common layout and avoid ST0 binding. */
 	vk_bind_geometry( TESS_XYZ | TESS_RGBA0 | TESS_ST0 );
 	vk_draw_geometry( DEPTH_RANGE_NORMAL, qfalse );
 

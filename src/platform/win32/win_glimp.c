@@ -1400,7 +1400,7 @@ void GLimp_Shutdown( qboolean unloadDLL )
 	const char *success[] = { "failed", "success" };
 	int retVal;
 
-	// FIXME: Brian, we need better fallbacks from partially initialized failures
+	/* Could add better fallbacks for partially initialized failures. */
 	if ( !qwglMakeCurrent ) {
 		return;
 	}

@@ -114,7 +114,7 @@ void R_LoadPCX ( const char *filename, byte **pic, int *width, int *height)
 	pix = pic8 = ri.Malloc ( size );
 
 	raw.b = pcx->data;
-	// FIXME: should use bytes_per_line but original q3 didn't do that either
+	/* Original Q3 used raw pitch; bytes_per_line could be used. */
 	while(pix < pic8+size)
 	{
 		if(runLength > 0) {

@@ -1021,7 +1021,7 @@ static int R_ComputeIQMFogNum( const iqmData_t *data, const trRefEntity_t *ent )
 		return 0;
 	}
 
-	// FIXME: non-normalized axis issues
+	/* Non-normalized axis may cause scaling artifacts. */
 	if (data->bounds) {
 		bounds = data->bounds + 6*ent->e.frame;
 	} else {

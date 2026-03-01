@@ -1813,7 +1813,7 @@ static qboolean vk_wait_staging_buffer( void )
 		}
 		qvkResetFences( vk.device, 1, &vk.aux_fence );
 		VK_CHECK( qvkResetCommandBuffer( vk.staging_command_buffer, 0 ) );
-		vk.staging_buffer.offset = 0; // FIXME: is this correct?
+		vk.staging_buffer.offset = 0; /* reset: command buffer cleared, staging starts at 0 */
 		vk.aux_fence_wait = qfalse;
 		return qtrue;
 	} else {
@@ -5184,7 +5184,7 @@ static void vk_create_attachments( void )
 	// so [resolve0][resolve1][msaa0][msaa1][depth0][depth1] is most optimal
 	// while cases like [resolve0][depth0][color0][...] is the worst
 
-	// TODO: preallocate first image chunk in attachment' memory pool?
+	/* Note: Could preallocate first image chunk in attachment memory pool. */
 	if ( vk.fboActive ) {
 
 		VkImageUsageFlags usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;

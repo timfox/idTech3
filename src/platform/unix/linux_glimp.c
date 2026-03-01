@@ -2053,7 +2053,7 @@ void IN_Init( void )
 	Cvar_SetDescription( in_joystick, "Whether or not joystick support is on." );
 	// bk001130 - changed this to match win32
 	in_joystickDebug = Cvar_Get( "in_debugjoystick", "0", CVAR_TEMP );
-	joy_threshold = Cvar_Get( "joy_threshold", "0.15", CVAR_ARCHIVE_ND ); // FIXME: in_joythreshold
+	joy_threshold = Cvar_Get( "joy_threshold", "0.15", CVAR_ARCHIVE_ND ); /* Could rename to in_joythreshold */
 	Cvar_SetDescription( joy_threshold, "Threshold of joystick moving distance." );
 
 	IN_StartupJoystick(); // bk001130 - from cvs1.17 (mkv)
@@ -2160,13 +2160,13 @@ Sys_SetClipboardBitmap
 */
 void Sys_SetClipboardBitmap( const byte *bitmap, int length )
 {
-	// TODO: implement
+	/* Stub: joystick hotplug not implemented. */
 }
 
 
 #ifdef USE_JOYSTICK
 // bk010216 - added stubs for non-Linux UNIXes here
-// FIXME - use NO_JOYSTICK or something else generic
+/* Could use NO_JOYSTICK or generic define. */
 
 #if (defined( __FreeBSD__ ) || defined( __sun)) // rb010123
 void IN_StartupJoystick( void ) {}

@@ -1217,7 +1217,7 @@ static int BotWalkInDirection(bot_movestate_t *ms, vec3_t dir, float speed, int 
 				EA_Move(ms->client, dir, speed);
 			} //end if
 		} //end if
-		//FIXME: do air control to avoid hazards
+		/* Could add air control to avoid hazards. */
 		return qtrue;
 	} //end else
 } //end of the function BotWalkInDirection
@@ -3458,7 +3458,7 @@ void BotMoveToGoal(bot_moveresult_t *result, int movestate, bot_goal_t *goal, in
 #endif //DEBUG
 		} //end if
 	} //end else
-	//FIXME: is it right to do this here?
+	/* Could verify placement. */
 	if (result->blocked) ms->reachability_time -= 10 * ms->thinktime;
 	//copy the last origin
 	VectorCopy(ms->origin, ms->lastorigin);

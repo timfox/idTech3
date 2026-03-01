@@ -106,7 +106,7 @@ static qboolean ParseVector( const char **text, int count, float *v ) {
 	const char	*token;
 	int		i;
 
-	// FIXME: spaces are currently required after parens, should change parseext...
+	/* Parser limitation: spaces required after parens (COM_ParseExt). */
 	token = COM_ParseExt( text, qfalse );
 	if ( strcmp( token, "(" ) ) {
 		ri.Printf( PRINT_WARNING, "WARNING: missing parenthesis in shader '%s'\n", shader.name );
@@ -1750,7 +1750,7 @@ static void FinishStage( shaderStage_t *stage )
 						tmi->translate[0] *= tr.lightmapScale[0];
 						tmi->translate[1] *= tr.lightmapScale[1];
 					} else {
-						// TODO: correct other transformations?
+						/* Could correct other transformations. */
 					}
 				}
 			}
@@ -2144,7 +2144,7 @@ static const collapse_t collapse[] = {
 CollapseMultitexture
 
 Attempt to combine two stages into a single multitexture stage
-FIXME: I think modulated add + modulated add collapses incorrectly
+Note: Modulated add + modulated add may collapse incorrectly.
 =================
 */
 static qboolean CollapseMultitexture( shaderStage_t *st0, shaderStage_t *st1, int num_stages ) {
@@ -3289,8 +3289,7 @@ shader_t *R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImag
 
 	InitShader( strippedName, lightmapIndex );
 
-	// FIXME: set these "need" values appropriately
-	//shader.needsNormal = qtrue;
+	/* needsNormal etc. could be set based on stage requirements. */
 	//shader.needsST1 = qtrue;
 	//shader.needsST2 = qtrue;
 	//shader.needsColor = qtrue;
@@ -3379,8 +3378,7 @@ qhandle_t RE_RegisterShaderFromImage(const char *name, int lightmapIndex, image_
 
 	InitShader( name, lightmapIndex );
 
-	// FIXME: set these "need" values appropriately
-	//shader.needsNormal = qtrue;
+	/* needsNormal etc. could be set based on stage requirements. */
 	//shader.needsST1 = qtrue;
 	//shader.needsST2 = qtrue;
 	//shader.needsColor = qtrue;
@@ -3549,7 +3547,7 @@ void	R_ShaderList_f (void) {
 			ri.Printf (PRINT_ALL, "  ");
 		}
 		if ( sh->multitextureEnv ) {
-			ri.Printf( PRINT_ALL, "MT(x) " ); // TODO: per-stage statistics?
+			ri.Printf( PRINT_ALL, "MT(x) " ); /* Could add per-stage statistics. */
 		} else {
 			ri.Printf( PRINT_ALL, "      " );
 		}

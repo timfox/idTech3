@@ -315,7 +315,7 @@ typedef enum {
 #define	MAX_MAP_AREA_BYTES		32		// bit vector of area visibility
 
 
-// print levels from renderer (FIXME: set up for game / cgame?)
+/* Print levels from renderer; could be set up for game/cgame. */
 typedef enum {
 	PRINT_ALL,
 	PRINT_DEVELOPER,		// only print when "developer 1"
@@ -1312,7 +1312,7 @@ typedef struct playerState_s {
 
 	// not communicated over the net at all
 	int			ping;			// server to game info for scoreboard
-	int			pmove_framecount;	// FIXME: don't transmit over the network
+	int			pmove_framecount;	/* Note: transmitted; could be local only */
 	int			jumppad_frame;
 	int			entityEventSequence;
 } playerState_t;

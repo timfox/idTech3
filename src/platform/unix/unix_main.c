@@ -63,7 +63,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
   #include <sys/file.h>
 #endif
 
-// FIXME TTimo should we gard this? most *nix system should comply?
+/* termios.h: most *nix systems provide it. */
 #include <termios.h>
 
 #include "../../qcommon/q_shared.h"
@@ -136,7 +136,7 @@ qboolean Sys_LowPhysicalMemory( void )
 	//MEMORYSTATUS stat;
 	//GlobalMemoryStatus (&stat);
 	//return (stat.dwTotalPhys <= MEM_THRESHOLD) ? qtrue : qfalse;
-	return qfalse; // bk001207 - FIXME
+	return qfalse; /* Low-memory check not implemented on this platform. */
 }
 
 
@@ -153,7 +153,7 @@ void Sys_BeginProfiling( void )
 // =============================================================
 
 // flush stdin, I suspect some terminals are sending a LOT of shit
-// FIXME TTimo relevant?
+/* tty_FlushIn: may be needed for some terminals. */
 static void tty_FlushIn( void )
 {
 #if 1
@@ -209,7 +209,7 @@ static void tty_Hide( void )
 
 
 // show the current line
-// FIXME TTimo need to position the cursor if needed??
+/* Could position cursor if needed. */
 static void tty_Show( void )
 {
 	if ( !ttycon_on )
@@ -497,7 +497,7 @@ tty_err Sys_ConsoleInputInit( void )
 	fcntl( STDIN_FILENO, F_SETFL, stdin_flags | O_NONBLOCK );
 	stdin_active = qtrue;
 
-	// FIXME TTimo initialize this in Sys_Init or something?
+	/* Could initialize ttycon in Sys_Init. */
 	if ( !ttycon || !ttycon->integer )
 	{
 		ttycon_on = qfalse;

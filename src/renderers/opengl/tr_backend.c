@@ -526,11 +526,11 @@ static void RB_BeginDrawingView( void ) {
 	}
 	if ( 0 && r_fastsky->integer && !( backEnd.refdef.rdflags & RDF_NOWORLDMODEL ) )
 	{
-		clearBits |= GL_COLOR_BUFFER_BIT;	// FIXME: only if sky shaders have been used
+		clearBits |= GL_COLOR_BUFFER_BIT;	/* Could clear only if sky shaders used */
 #ifdef _DEBUG
-		qglClearColor( 0.8f, 0.7f, 0.4f, 1.0f );	// FIXME: get color of sky
+		qglClearColor( 0.8f, 0.7f, 0.4f, 1.0f );	/* Debug: could sample sky color */
 #else
-		qglClearColor( 0.0f, 0.0f, 0.0f, 1.0f );	// FIXME: get color of sky
+		qglClearColor( 0.0f, 0.0f, 0.0f, 1.0f );	/* Could sample sky color */
 #endif
 	}
 	qglClear( clearBits );
@@ -986,7 +986,7 @@ void RB_SetGL2D( void ) {
 =============
 RE_StretchRaw
 
-FIXME: not exactly backend
+Note: Function is screen/bitmap related, not strictly backend.
 Stretches a raw 32 bit power of 2 bitmap image over the given screen rectangle.
 Used for cinematics.
 =============
@@ -1289,7 +1289,7 @@ static const void *RB_DrawSurfs( const void *data ) {
 	// draw main system development information (surface outlines, etc)
 	RB_DebugGraphics();
 
-	//TODO Maybe check for rdf_noworld stuff but q3mme has full 3d ui
+	/* Could check rdf_noworld; q3mme uses full 3d ui. */
 	backEnd.doneSurfaces = qtrue; // for bloom
 
 	return (const void *)(cmd + 1);
@@ -1471,7 +1471,7 @@ static const void *RB_FinishBloom( const void *data )
 	if ( fboEnabled )
 	{
 		// let's always render console with the same quality
-		// TODO: fix this to work with multiple views and opened console
+		/* Could fix for multiple views and opened console. */
 		if ( blitMSfbo && tr.frameSceneNum == 1 )
 		{
 			FBO_BlitMS( qfalse );

@@ -714,7 +714,7 @@ typedef struct {
 #endif
 	int				vboItemIndex;
 
-	// culling information (FIXME: use this!)
+	// culling information (bounds could be used for culling)
 	vec3_t			bounds[2];
 	vec3_t			localOrigin;
 	float			radius;

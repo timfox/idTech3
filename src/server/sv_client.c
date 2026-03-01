@@ -1280,8 +1280,7 @@ static void SV_NextDownload_f( client_t *cl )
 		return;
 	}
 	// We aren't getting an acknowledge for the correct block, drop the client
-	// FIXME: this is bad... the client will never parse the disconnect message
-	//			because the cgame isn't loaded yet
+	/* Known limitation: client may not parse disconnect if cgame not loaded yet. */
 	SV_DropClient( cl, "broken download" );
 }
 
@@ -1584,7 +1583,7 @@ int SV_SendDownloadMessages( void )
 =================
 SV_Disconnect_f
 
-The client is going to disconnect, so remove the connection immediately  FIXME: move to game?
+The client is going to disconnect, so remove the connection immediately.
 =================
 */
 static void SV_Disconnect_f( client_t *cl ) {

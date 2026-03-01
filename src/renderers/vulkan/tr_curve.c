@@ -275,7 +275,7 @@ static void MakeMeshTangentVectors( int width, int height, srfVert_t ctrl[MAX_GR
 	static srfVert_t       ctrl2[MAX_GRID_SIZE * MAX_GRID_SIZE];
 	glIndex_t  *tri;
 
-	// FIXME: use more elegant way
+	/* Could use more elegant iteration. */
 	for ( i = 0; i < width; i++ )
 	{
 		for ( j = 0; j < height; j++ )
@@ -522,7 +522,7 @@ srfGridMesh_t *R_SubdividePatchToGrid( int width, int height,
 		for ( j = 0 ; j + 2 < width ; j += 2 ) {
 			// check subdivided midpoints against control points
 
-			// FIXME: also check midpoints of adjacent patches against the control points
+			/* Could also check midpoints of adjacent patches. */
 			// this would basically stitch all patches in the same LOD group together.
 
 			maxLen = 0;

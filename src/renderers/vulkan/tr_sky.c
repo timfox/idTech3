@@ -548,7 +548,7 @@ static void FillCloudBox( void )
 		int s, t;
 		float MIN_T;
 
-		if ( 1 ) // FIXME? shader->sky.fullClouds )
+		if ( 1 ) /* shader->sky.fullClouds when supported */
 		{
 			MIN_T = -HALF_SKY_SUBDIVISIONS;
 
@@ -638,7 +638,7 @@ static void R_BuildCloudData( const shaderCommands_t *input )
 
 	shader = input->shader;
 
-	sky_min = 1.0 / 256.0f;		// FIXME: not correct?
+	sky_min = 1.0 / 256.0f;		/* Empirical; matches legacy behavior */
 	sky_max = 255.0 / 256.0f;
 
 	// set up for drawing

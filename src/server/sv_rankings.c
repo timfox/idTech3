@@ -371,7 +371,7 @@ void SV_RankUserSpectate( int index )
 	assert( index >= 0 );
 	assert( index < sv_maxclients->value );
 
-	// GRANK_FIXME - check current status?
+	/* Could check current GRANK status. */
 	s_ranked_players[index].grank_status = QGR_STATUS_SPECTATOR;
 }
 
@@ -1532,6 +1532,6 @@ static void SV_RankError( const char* fmt, ... )
 
 	s_rankings_active = qfalse;
 	Cvar_Set( "sv_rankingsActive", "0" );
-	// FIXME - attempt clean shutdown?
+	/* Could attempt clean shutdown. */
 }
 

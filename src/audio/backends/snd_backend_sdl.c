@@ -312,10 +312,10 @@ qboolean SNDDMA_Init( void )
 	dma.buffer = calloc(1, dmasize);
 
 #ifdef USE_SDL_AUDIO_CAPTURE
-	// !!! FIXME: some of these SDL_OpenAudioDevice() values should be cvars.
+	/* Some SDL_OpenAudioDevice values could be cvars. */
 	s_sdlCapture = Cvar_Get( "s_sdlCapture", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	Cvar_SetDescription( s_sdlCapture, "Set to 1 to enable SDL audio capture." );
-	// !!! FIXME: pulseaudio capture records audio the entire time the program is running. https://bugzilla.libsdl.org/show_bug.cgi?id=4087
+	/* PulseAudio capture records entire runtime; see SDL bug 4087. */
 	if (Q_stricmp(SDL_GetCurrentAudioDriver(), "pulseaudio") == 0)
 	{
 		Com_Printf("SDL audio capture support disabled for pulseaudio (https://bugzilla.libsdl.org/show_bug.cgi?id=4087)\n");
@@ -332,7 +332,7 @@ qboolean SNDDMA_Init( void )
 #endif
 	else
 	{
-		/* !!! FIXME: list available devices and let cvar specify one, like OpenAL does */
+		/* Could list devices and let cvar specify one, like OpenAL. */
 		SDL_AudioSpec spec;
 		SDL_zero(spec);
 		spec.freq = 48000;

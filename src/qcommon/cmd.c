@@ -702,7 +702,7 @@ static void Cmd_TokenizeString2( const char *text_in, qboolean ignoreQuotes ) {
 	char sanitizedInput[MAX_CMD_BUFFER];
 
 #ifdef TKN_DBG
-	// FIXME: Debug hook for tokenization - this is a temporary debugging aid.
+	/* Debug hook for tokenization. */
 	// Consider implementing proper tokenization debugging with structured output
 	// (token boundaries, types, etc.) rather than just printing the input string.
 	Com_DPrintf("Cmd_TokenizeString: %s\n", text_in);

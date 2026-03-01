@@ -168,7 +168,7 @@ load the file with a request to cache.  Only one file will be kept cached at a t
 so any models that are going to be referenced by both subsystems should alternate
 between the CM_ load function and the ref load function.
 
-TODO: A qpath that starts with a leading slash will always refer to the base game, even if another
+Note: A qpath with leading slash refers to base game even when another
 game is currently active.  This allows character models, skins, and sounds to be downloaded
 to a common directory no matter which game is active.
 
@@ -418,7 +418,7 @@ static qboolean FS_PakIsPure( const pack_t *pack ) {
 	int i;
 	if ( fs_numServerPaks ) {
 		for ( i = 0 ; i < fs_numServerPaks ; i++ ) {
-			// FIXME: also use hashed file names
+			/* Could also use hashed file names. */
 			// NOTE TTimo: a pk3 with same checksum but different name would be validated too
 			//   I don't see this as allowing for any exploit, it would only happen if the client does manips of its file names 'not a bug'
 			if ( pack->checksum == fs_serverPaks[i] ) {
@@ -633,7 +633,7 @@ static qboolean FS_CreatePath( const char *OSPath ) {
 	char	*ofs;
 	
 	// make absolutely sure that it can't back up the path
-	// FIXME: is c: allowed???
+	/* Check whether c: or other drive letters are allowed. */
 	if ( FS_CheckDirTraversal( OSPath ) ) {
 		Com_Printf( "WARNING: refusing to create relative path \"%s\"\n", OSPath );
 		return qtrue;
@@ -1975,7 +1975,7 @@ int FS_Seek( fileHandle_t f, long offset, fsOrigin_t origin ) {
 	}
 
 	if ( fsh[f].zipFile == qtrue ) {
-		//FIXME: this is really, really crappy
+		/* Workaround: zip handling could be improved. */
 		//(but better than what was here before)
 		byte	buffer[PK3_SEEK_BUFFER_SIZE];
 		int		remainder;
@@ -3610,7 +3610,7 @@ mkv: Naive implementation. Concatenates three lists into a
      new list, and frees the old lists from the heap.
 bk001129 - from cvs1.17 (mkv)
 
-FIXME TTimo those two should move to common.c next to Sys_ListFiles
+Note: Could move to common.c next to Sys_ListFiles.
 =======================
  */
 static unsigned int Sys_CountFileList( char **list )

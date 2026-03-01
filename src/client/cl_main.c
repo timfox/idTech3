@@ -3115,7 +3115,7 @@ void CL_PacketEvent( const netadr_t *from, msg_t *msg ) {
 			Com_Printf( "%s:sequenced packet without connection\n",
 				NET_AdrToStringwPort( from ) );
 		}
-		// FIXME: send a client disconnect?
+		/* Note: Could send explicit client disconnect. */
 		return;
 	}
 

@@ -1264,7 +1264,7 @@ static void CM_Trace( trace_t *results, const vec3_t start, const vec3_t end, co
 	//
 	if (start[0] == end[0] && start[1] == end[1] && start[2] == end[2]) {
 		if ( model ) {
-#ifdef ALWAYS_BBOX_VS_BBOX // FIXME - compile time flag?
+#ifdef ALWAYS_BBOX_VS_BBOX /* Compile-time option */
 			if ( model == BOX_MODEL_HANDLE || model == CAPSULE_MODEL_HANDLE) {
 				tw.sphere.use = qfalse;
 				CM_TestInLeaf( &tw, &cmod->leaf );
