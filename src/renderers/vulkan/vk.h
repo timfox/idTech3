@@ -69,7 +69,9 @@
 
 #define VK_DESC_UNIFORM_MAIN_BINDING		0
 #define VK_DESC_UNIFORM_CAMERA_BINDING		1
-#define VK_DESC_UNIFORM_COUNT				2
+#define VK_DESC_UNIFORM_IQM_SKIN_BINDING	2
+#define VK_DESC_UNIFORM_IQM_MORPH_BINDING	3
+#define VK_DESC_UNIFORM_COUNT				4
 
 typedef enum {
 	TYPE_COLOR_BLACK,
@@ -435,6 +437,9 @@ qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size );
 void vk_update_mvp( const float *m );
 
 uint32_t vk_tess_index( uint32_t numIndexes, const void *src );
+void *vk_alloc_storage( size_t size, uint32_t *offset );
+void vk_set_iqm_storage_offsets( uint32_t skin_offset, uint32_t morph_offset );
+void vk_reset_iqm_storage_offsets( void );
 void vk_bind_index_buffer( VkBuffer buffer, uint32_t offset );
 #ifdef USE_VBO
 void vk_draw_indexed( uint32_t indexCount, uint32_t firstIndex );
@@ -483,6 +488,8 @@ typedef struct vk_tess_s {
 
 	VkDescriptorSet uniform_descriptor;
 	uint32_t		uniform_read_offset;
+	uint32_t		iqm_skin_offset;
+	uint32_t		iqm_morph_offset;
 #ifdef USE_VK_PBR
 	uint32_t			camera_ubo_offset;
 	VkDeviceSize		buf_offset[10];
@@ -498,7 +505,7 @@ typedef struct vk_tess_s {
 	struct {
 		uint32_t		start, end;
 		VkDescriptorSet	current[VK_DESC_COUNT]; // 0:uniform, 1:color0, 2:color1, 3:color2, 4:fog, 5:brdf lut, 6:normal, 7:physical, 9:(unused)prefilterd-envmap
-		uint32_t		offset[3]; // 0 (uniform) and 5 (storage)
+		uint32_t		offset[VK_DESC_UNIFORM_COUNT]; // set 0 dynamic offsets
 		const image_t	*image[VK_DESC_COUNT];
 	} descriptor_set;
 

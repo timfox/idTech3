@@ -373,6 +373,8 @@ void RB_BeginSurface( shader_t *shader, int fogNum ) {
 	tess.numVertexes = 0;
 	tess.shader = state;
 	tess.fogNum = fogNum;
+	vk_reset_iqm_storage_offsets();
+	R_IQMBeginSurfaceBatch();
 
 #ifdef USE_LEGACY_DLIGHTS
 	tess.dlightBits = 0;		// will be OR'd in by surface functions
@@ -1725,6 +1727,8 @@ uint32_t vk_push_uniform( const vkUniform_t *ubo ) {
 	vk_update_descriptor( VK_DESC_UNIFORM, vk.cmd->uniform_descriptor );
 	vk_update_descriptor_offset( VK_DESC_UNIFORM_MAIN_BINDING, offset );
 	vk_update_descriptor_offset( VK_DESC_UNIFORM_CAMERA_BINDING, vk.cmd->camera_ubo_offset );
+	vk_update_descriptor_offset( VK_DESC_UNIFORM_IQM_SKIN_BINDING, vk.cmd->iqm_skin_offset );
+	vk_update_descriptor_offset( VK_DESC_UNIFORM_IQM_MORPH_BINDING, vk.cmd->iqm_morph_offset );
 
 	return offset;
 }
@@ -2029,6 +2033,7 @@ void RB_EndSurface( void ) {
 	//
 	// call off to shader specific tess end function
 	//
+	R_IQMCommitSurfaceBatch();
 	tess.shader->optimalStageIteratorFunc();
 
 	//

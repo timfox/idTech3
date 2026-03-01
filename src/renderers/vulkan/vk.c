@@ -3202,37 +3202,62 @@ static VkShaderModule SHADER_MODULE(const uint8_t *bytes, const int count) {
 
 static void vk_create_layout_binding( int binding, VkDescriptorType type, VkShaderStageFlags flags, VkDescriptorSetLayout *layout )
 {
-	uint32_t count = 0;
-	VkDescriptorSetLayoutBinding bind[2];
+	VkDescriptorSetLayoutBinding bind[1];
 	VkDescriptorSetLayoutCreateInfo desc;
 
-	bind[count].binding = binding;
-	bind[count].descriptorType = type;
-	bind[count].descriptorCount = 1;
-	bind[count].stageFlags = flags;
-	bind[count].pImmutableSamplers = NULL;
-	count++;
-
-	if ( *layout == vk.set_layout_uniform ) {
-		bind[count].binding = VK_DESC_UNIFORM_CAMERA_BINDING;
-		bind[count].descriptorType = type;
-		bind[count].descriptorCount = 1;
-		bind[count].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-		bind[count].pImmutableSamplers = NULL;
-		count++;    
-	}
+	bind[0].binding = binding;
+	bind[0].descriptorType = type;
+	bind[0].descriptorCount = 1;
+	bind[0].stageFlags = flags;
+	bind[0].pImmutableSamplers = NULL;
 
 	desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	desc.pNext = NULL;
 	desc.flags = 0;
-	desc.bindingCount = count;
+	desc.bindingCount = ARRAY_LEN( bind );
 	desc.pBindings = bind;
 
 	VK_CHECK( qvkCreateDescriptorSetLayout(vk.device, &desc, NULL, layout ) );
 }
 
-static void vk_write_uniform_descriptor( VkWriteDescriptorSet *desc, VkDescriptorBufferInfo *info, 
-	VkBuffer buffer, VkDescriptorSet descriptor, const uint32_t binding, const size_t size )
+static void vk_create_uniform_layout( VkDescriptorSetLayout *layout )
+{
+	VkDescriptorSetLayoutBinding bindings[VK_DESC_UNIFORM_COUNT];
+	VkDescriptorSetLayoutCreateInfo desc;
+
+	Com_Memset( bindings, 0, sizeof( bindings ) );
+
+	bindings[VK_DESC_UNIFORM_MAIN_BINDING].binding = VK_DESC_UNIFORM_MAIN_BINDING;
+	bindings[VK_DESC_UNIFORM_MAIN_BINDING].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+	bindings[VK_DESC_UNIFORM_MAIN_BINDING].descriptorCount = 1;
+	bindings[VK_DESC_UNIFORM_MAIN_BINDING].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT;
+
+	bindings[VK_DESC_UNIFORM_CAMERA_BINDING].binding = VK_DESC_UNIFORM_CAMERA_BINDING;
+	bindings[VK_DESC_UNIFORM_CAMERA_BINDING].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+	bindings[VK_DESC_UNIFORM_CAMERA_BINDING].descriptorCount = 1;
+	bindings[VK_DESC_UNIFORM_CAMERA_BINDING].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+	bindings[VK_DESC_UNIFORM_IQM_SKIN_BINDING].binding = VK_DESC_UNIFORM_IQM_SKIN_BINDING;
+	bindings[VK_DESC_UNIFORM_IQM_SKIN_BINDING].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+	bindings[VK_DESC_UNIFORM_IQM_SKIN_BINDING].descriptorCount = 1;
+	bindings[VK_DESC_UNIFORM_IQM_SKIN_BINDING].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+	bindings[VK_DESC_UNIFORM_IQM_MORPH_BINDING].binding = VK_DESC_UNIFORM_IQM_MORPH_BINDING;
+	bindings[VK_DESC_UNIFORM_IQM_MORPH_BINDING].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+	bindings[VK_DESC_UNIFORM_IQM_MORPH_BINDING].descriptorCount = 1;
+	bindings[VK_DESC_UNIFORM_IQM_MORPH_BINDING].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+	desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	desc.pNext = NULL;
+	desc.flags = 0;
+	desc.bindingCount = ARRAY_LEN( bindings );
+	desc.pBindings = bindings;
+
+	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &desc, NULL, layout ) );
+}
+
+static void vk_write_buffer_descriptor( VkWriteDescriptorSet *desc, VkDescriptorBufferInfo *info,
+	VkBuffer buffer, VkDescriptorSet descriptor, const uint32_t binding, VkDeviceSize size, VkDescriptorType type )
 {
 	info[binding].buffer = buffer;
 	info[binding].offset = 0;
@@ -3244,7 +3269,7 @@ static void vk_write_uniform_descriptor( VkWriteDescriptorSet *desc, VkDescripto
 	desc[binding].dstArrayElement = 0;
 	desc[binding].descriptorCount = 1;
 	desc[binding].pNext = NULL;
-	desc[binding].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+	desc[binding].descriptorType = type;
 	desc[binding].pImageInfo = NULL;
 	desc[binding].pBufferInfo = &info[binding];
 	desc[binding].pTexelBufferView = NULL;
@@ -3255,8 +3280,14 @@ static void vk_update_uniform_descriptor( VkDescriptorSet descriptor, VkBuffer b
 	VkDescriptorBufferInfo info[VK_DESC_UNIFORM_COUNT];
 	VkWriteDescriptorSet desc[VK_DESC_UNIFORM_COUNT];
 
-	vk_write_uniform_descriptor( desc, info, buffer, descriptor, VK_DESC_UNIFORM_MAIN_BINDING, sizeof(vkUniform_t) );
-	vk_write_uniform_descriptor( desc, info, buffer, descriptor, VK_DESC_UNIFORM_CAMERA_BINDING, sizeof(vkUniformCamera_t) );
+	vk_write_buffer_descriptor( desc, info, buffer, descriptor, VK_DESC_UNIFORM_MAIN_BINDING,
+		(VkDeviceSize)sizeof( vkUniform_t ), VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC );
+	vk_write_buffer_descriptor( desc, info, buffer, descriptor, VK_DESC_UNIFORM_CAMERA_BINDING,
+		(VkDeviceSize)sizeof( vkUniformCamera_t ), VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC );
+	vk_write_buffer_descriptor( desc, info, buffer, descriptor, VK_DESC_UNIFORM_IQM_SKIN_BINDING,
+		VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC );
+	vk_write_buffer_descriptor( desc, info, buffer, descriptor, VK_DESC_UNIFORM_IQM_MORPH_BINDING,
+		VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC );
 
 	qvkUpdateDescriptorSets(vk.device, VK_DESC_UNIFORM_COUNT, desc, 0, NULL);
 }
@@ -4195,7 +4226,8 @@ static void vk_create_geometry_buffers( VkDeviceSize size )
 
 	for ( i = 0 ; i < NUM_COMMAND_BUFFERS; i++ ) {
 		desc.size = size;
-		desc.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+		desc.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 		VK_CHECK( qvkCreateBuffer( vk.device, &desc, NULL, &vk.tess[i].vertex_buffer ) );
 
 		qvkGetBufferMemoryRequirements( vk.device, vk.tess[i].vertex_buffer, &vb_memory_requirements );
@@ -6394,17 +6426,13 @@ void vk_initialize( void )
 #endif
 
 		pool_size[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-		pool_size[1].descriptorCount = NUM_COMMAND_BUFFERS;
-#ifdef USE_VK_PBR
-        if ( vk.pbrActive )
-            pool_size[1].descriptorCount += NUM_COMMAND_BUFFERS; // camera uniform
-#endif
+		pool_size[1].descriptorCount = NUM_COMMAND_BUFFERS * 2; // main + camera
 
 		//pool_size[2].type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
 		//pool_size[2].descriptorCount = NUM_COMMAND_BUFFERS;
 
 		pool_size[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
-		pool_size[2].descriptorCount = 1;
+		pool_size[2].descriptorCount = 1 + NUM_COMMAND_BUFFERS * 2; // flare storage + IQM skin/morph
 
 		pool_size[3].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 			pool_size[3].descriptorCount = 22;
@@ -6430,7 +6458,7 @@ void vk_initialize( void )
 	// Descriptor set layout.
 	//
 	vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &vk.set_layout_sampler );
-	vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, &vk.set_layout_uniform );
+	vk_create_uniform_layout( &vk.set_layout_uniform );
 	vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, &vk.set_layout_storage );
 	//vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_SHADER_STAGE_FRAGMENT_BIT, &vk.set_layout_input );
 
@@ -11865,6 +11893,40 @@ static void vk_bind_attr( int index, unsigned int item_size, const void *src ) {
 	vk_bind_index_attr( index );
 }
 
+void *vk_alloc_storage( size_t size, uint32_t *offset )
+{
+	const uint32_t aligned = PAD( vk.cmd->vertex_buffer_offset, (VkDeviceSize)vk.storage_alignment );
+	const uint32_t size32 = (uint32_t)size;
+
+	if ( aligned + size32 > vk.geometry_buffer_size ) {
+		// schedule geometry buffer resize
+		vk.geometry_buffer_size_new = log2pad( aligned + size32, 1 );
+		return NULL;
+	}
+
+	if ( offset ) {
+		*offset = aligned;
+	}
+
+	vk.cmd->vertex_buffer_offset = (VkDeviceSize)aligned + size32;
+	return vk.cmd->vertex_buffer_ptr + aligned;
+}
+
+void vk_set_iqm_storage_offsets( uint32_t skin_offset, uint32_t morph_offset )
+{
+	if ( !vk.cmd ) {
+		return;
+	}
+
+	vk.cmd->iqm_skin_offset = skin_offset;
+	vk.cmd->iqm_morph_offset = morph_offset;
+}
+
+void vk_reset_iqm_storage_offsets( void )
+{
+	vk_set_iqm_storage_offsets( 0, 0 );
+}
+
 
 uint32_t vk_tess_index( uint32_t numIndexes, const void *src ) {
 	const uint32_t offset = vk.cmd->vertex_buffer_offset;
@@ -12107,7 +12169,7 @@ void vk_update_descriptor_offset( int index, uint32_t offset )
 
 void vk_bind_descriptor_sets( void )
 {
-	uint32_t offsets[3], offset_count;
+	uint32_t offsets[VK_DESC_UNIFORM_COUNT], offset_count;
 	uint32_t start, end, count, i;
 
 	start = vk.cmd->descriptor_set.start;
@@ -12117,9 +12179,10 @@ void vk_bind_descriptor_sets( void )
 	end = vk.cmd->descriptor_set.end;
 
 	offset_count = 0;
-	if ( /*start == VK_DESC_STORAGE || */ start == VK_DESC_UNIFORM ) { // uniform offset or storage offset
-		offsets[ offset_count++ ] = vk.cmd->descriptor_set.offset[ start ];
-		offsets[offset_count++] = vk.cmd->descriptor_set.offset[start+1]; // camera uniform
+	if ( start == VK_DESC_UNIFORM ) {
+		for ( i = 0; i < VK_DESC_UNIFORM_COUNT; i++ ) {
+			offsets[offset_count++] = vk.cmd->descriptor_set.offset[i];
+		}
 	}
 
 	count = end - start + 1;
@@ -14053,6 +14116,9 @@ vk_begin_main_render_pass();
 	// dynamic vertex buffer layout
 	vk.cmd->uniform_read_offset = 0;
 	vk.cmd->vertex_buffer_offset = 0;
+	Com_Memset( vk.cmd->vertex_buffer_ptr, 0, 64 );
+	vk.cmd->vertex_buffer_offset = PAD( 64, 32 );
+	vk_reset_iqm_storage_offsets();
 	Com_Memset( vk.cmd->buf_offset, 0, sizeof( vk.cmd->buf_offset ) );
 	Com_Memset( vk.cmd->vbo_offset, 0, sizeof( vk.cmd->vbo_offset ) );
 	vk.cmd->curr_index_buffer = VK_NULL_HANDLE;
@@ -15740,7 +15806,7 @@ qboolean vk_bloom( void )
 		// force depth range and viewport/scissor updates
 		vk.cmd->depth_range = DEPTH_RANGE_COUNT;
 
-		uint32_t offsets[2], offset_count;
+		uint32_t offsets[VK_DESC_UNIFORM_COUNT], offset_count;
 
 		// restore clobbered descriptor sets
 		for ( i = 0; i < VK_NUM_BLOOM_PASSES; i++ ) {
@@ -15748,8 +15814,10 @@ qboolean vk_bloom( void )
 				if ( i == VK_DESC_UNIFORM /*|| i == VK_DESC_STORAGE*/ ) {
 					offset_count = 0;
 
-					offsets[offset_count++] = vk.cmd->descriptor_set.offset[i];
+					offsets[offset_count++] = vk.cmd->descriptor_set.offset[VK_DESC_UNIFORM_MAIN_BINDING];
 					offsets[offset_count++] = vk.cmd->descriptor_set.offset[VK_DESC_UNIFORM_CAMERA_BINDING];
+					offsets[offset_count++] = vk.cmd->descriptor_set.offset[VK_DESC_UNIFORM_IQM_SKIN_BINDING];
+					offsets[offset_count++] = vk.cmd->descriptor_set.offset[VK_DESC_UNIFORM_IQM_MORPH_BINDING];
 
 					qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout, i, 1, &vk.cmd->descriptor_set.current[i], offset_count, offsets );
 				}

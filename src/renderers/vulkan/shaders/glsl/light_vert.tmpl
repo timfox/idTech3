@@ -21,12 +21,20 @@ layout(set = 0, binding = 0) uniform UBO {
 #endif
 };
 
-layout(location = 0) in vec3 in_position;
+layout(set = 0, binding = 2) readonly buffer IQMSkinBuffer {
+	float iqmSkinData[];
+};
+
+layout(set = 0, binding = 3) readonly buffer IQMMorphBuffer {
+	float iqmMorphData[];
+};
+
+layout(location = 0) in vec4 in_position;
 layout(location = 1) in vec2 in_tex_coord;
-layout(location = 2) in vec3 in_normal;
+layout(location = 2) in vec4 in_normal;
 
 layout(location = 0) out vec2 frag_tex_coord;
-layout(location = 1) out vec3 N; // normal array 
+layout(location = 1) out vec3 N; // normal array
 layout(location = 2) out vec4 L; // object-space light vector
 layout(location = 3) out vec4 V; // object-space view vector
 
@@ -41,21 +49,94 @@ out gl_PerVertex {
 	vec4 gl_Position;
 };
 
+const uint IQM_GPU_META_TAG = 0xAB000000u;
+const uint IQM_GPU_INDEX_MASK = 0x00000FFFu;
+const uint IQM_GPU_MORPH_SHIFT = 12u;
+
+bool IQMDecodeMeta( float packedFloat, out int skinIndex, out int morphIndex ) {
+	uint packed = floatBitsToUint( packedFloat );
+	if ( ( packed & 0xFF000000u ) != IQM_GPU_META_TAG ) {
+		skinIndex = -1;
+		morphIndex = -1;
+		return false;
+	}
+
+	skinIndex = int( packed & IQM_GPU_INDEX_MASK );
+	morphIndex = int( ( packed >> IQM_GPU_MORPH_SHIFT ) & IQM_GPU_INDEX_MASK );
+	return true;
+}
+
+vec3 IQMSkinPosition( int skinIndex, vec3 position ) {
+	int base = 1 + skinIndex * 12;
+	return vec3(
+		iqmSkinData[base + 0] * position.x + iqmSkinData[base + 1] * position.y + iqmSkinData[base + 2] * position.z + iqmSkinData[base + 3],
+		iqmSkinData[base + 4] * position.x + iqmSkinData[base + 5] * position.y + iqmSkinData[base + 6] * position.z + iqmSkinData[base + 7],
+		iqmSkinData[base + 8] * position.x + iqmSkinData[base + 9] * position.y + iqmSkinData[base + 10] * position.z + iqmSkinData[base + 11]
+	);
+}
+
+vec3 IQMSkinNormal( int skinIndex, int skinCount, vec3 normal ) {
+	int base = 1 + skinCount * 12 + skinIndex * 9;
+	return vec3(
+		iqmSkinData[base + 0] * normal.x + iqmSkinData[base + 1] * normal.y + iqmSkinData[base + 2] * normal.z,
+		iqmSkinData[base + 3] * normal.x + iqmSkinData[base + 4] * normal.y + iqmSkinData[base + 5] * normal.z,
+		iqmSkinData[base + 6] * normal.x + iqmSkinData[base + 7] * normal.y + iqmSkinData[base + 8] * normal.z
+	);
+}
+
+vec3 IQMMorphDeltaPos( int morphIndex, int morphStage ) {
+	int base = 6 + morphIndex * (4 * 6) + morphStage * 6;
+	return vec3( iqmMorphData[base + 0], iqmMorphData[base + 1], iqmMorphData[base + 2] );
+}
+
+vec3 IQMMorphDeltaNormal( int morphIndex, int morphStage ) {
+	int base = 6 + morphIndex * (4 * 6) + morphStage * 6;
+	return vec3( iqmMorphData[base + 3], iqmMorphData[base + 4], iqmMorphData[base + 5] );
+}
+
 void main() {
-	vec4 currClip = mvp * vec4(in_position, 1.0);
-	vec4 prevClip = prevMvp * vec4(in_position, 1.0);
+	vec3 position = in_position.xyz;
+	vec3 normal = in_normal.xyz;
+	int skinIndex;
+	int morphIndex;
+	int skinCount = int( iqmSkinData[0] );
+
+	if ( IQMDecodeMeta( in_position.w, skinIndex, morphIndex ) && skinIndex >= 0 && skinIndex < skinCount ) {
+		int morphCount = int( iqmMorphData[0] );
+		int activeCount = min( int( iqmMorphData[1] ), 4 );
+		vec3 morphPosition = position;
+		vec3 morphNormal = normal;
+
+		if ( morphIndex >= 0 && morphIndex < morphCount && activeCount > 0 ) {
+			for ( int k = 0; k < 4; k++ ) {
+				if ( k >= activeCount ) {
+					break;
+				}
+				float weight = iqmMorphData[2 + k];
+				morphPosition += IQMMorphDeltaPos( morphIndex, k ) * weight;
+				morphNormal += IQMMorphDeltaNormal( morphIndex, k ) * weight;
+			}
+			morphNormal = normalize( morphNormal );
+		}
+
+		position = IQMSkinPosition( skinIndex, morphPosition );
+		normal = normalize( IQMSkinNormal( skinIndex, skinCount, morphNormal ) );
+	}
+
+	vec4 currClip = mvp * vec4(position, 1.0);
+	vec4 prevClip = prevMvp * vec4(position, 1.0);
 	gl_Position = currClip;
 	var_CurrentClip = currClip;
 	var_PrevClip = prevClip;
 
 	frag_tex_coord = in_tex_coord;
-	N = in_normal;
-	L = lightPos - vec4(in_position, 1.0);
-	V = eyePos - vec4(in_position, 1.0);
+	N = normal;
+	L = lightPos - vec4(position, 1.0);
+	V = eyePos - vec4(position, 1.0);
 
 #ifdef USE_FOG
-	float s = dot(in_position, fogDistanceVector.xyz) + fogDistanceVector.w;
-	float t = dot(in_position, fogDepthVector.xyz) + fogDepthVector.w;
+	float s = dot(position, fogDistanceVector.xyz) + fogDistanceVector.w;
+	float t = dot(position, fogDepthVector.xyz) + fogDepthVector.w;
 
 	if ( fogEyeT.y == 1.0 ) {
 		if ( t < 0.0 ) {
