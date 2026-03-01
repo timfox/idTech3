@@ -274,8 +274,9 @@ void SCR_DrawStringExt( int x, int y, float size, const char *string, const floa
 	vec4_t		color;
 	const char	*s;
 	int			xx;
+	const float	clampedSize = Com_Clamp( 1.0f, 256.0f, size );
 
-	if ( SDF_DrawStringExt( x, y, size, string, setColor, forceColor, noColorEscape ) ) {
+	if ( SDF_DrawStringExt( x, y, clampedSize, string, setColor, forceColor, noColorEscape ) ) {
 		return;
 	}
 
@@ -294,13 +295,13 @@ void SCR_DrawStringExt( int x, int y, float size, const char *string, const floa
 			const char *prev = s;
 			uint32_t cp = Q_UTF8_Decode( &s );
 			if ( Q_UTF8_IsEmoji( cp ) ) {
-				xx += (int)size;
+				xx += (int)clampedSize;
 				continue;
 			}
 			s = prev;
 		}
-		SCR_DrawChar( xx+2, y+2, size, *s );
-		xx += size;
+		SCR_DrawChar( xx+2, y+2, clampedSize, *s );
+		xx += (int)clampedSize;
 		s++;
 	}
 
@@ -325,15 +326,15 @@ void SCR_DrawStringExt( int x, int y, float size, const char *string, const floa
 		if ( CL_Emoji_IsEnabled() && ( (unsigned char)*s >= 0x80 ) ) {
 			const char *prev = s;
 			uint32_t cp = Q_UTF8_Decode( &s );
-			if ( CL_Emoji_DrawChar( xx, y, size, size, cp ) ) {
+			if ( CL_Emoji_DrawChar( xx, y, clampedSize, clampedSize, cp ) ) {
 				re.SetColor( forceColor ? setColor : color );
-				xx += (int)size;
+				xx += (int)clampedSize;
 				continue;
 			}
 			s = prev;
 		}
-		SCR_DrawChar( xx, y, size, *s );
-		xx += size;
+		SCR_DrawChar( xx, y, clampedSize, *s );
+		xx += (int)clampedSize;
 		s++;
 	}
 	re.SetColor( NULL );
