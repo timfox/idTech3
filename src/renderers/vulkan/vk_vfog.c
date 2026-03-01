@@ -49,6 +49,7 @@ VFog_RegisterCvars
 */
 void VFog_RegisterCvars(void) {
 	r_vfog               = ri.Cvar_Get("r_vfog",               "0",     CVAR_ARCHIVE);
+	ri.Cvar_SetDescription( r_vfog, "Legacy/unused. Volumetric fog uses r_volumetricFog instead." );
 	r_vfog_density       = ri.Cvar_Get("r_vfog_density",       "0.02",  CVAR_ARCHIVE);
 	r_vfog_heightFalloff = ri.Cvar_Get("r_vfog_heightFalloff", "0.04",  CVAR_ARCHIVE);
 	r_vfog_heightOffset  = ri.Cvar_Get("r_vfog_heightOffset",  "0.0",   CVAR_ARCHIVE);
@@ -75,8 +76,7 @@ void VFog_RegisterCvars(void) {
 	r_vfog_froxelH       = ri.Cvar_Get("r_vfog_froxelH",       "90",    CVAR_ARCHIVE | CVAR_LATCH);
 	r_vfog_froxelD       = ri.Cvar_Get("r_vfog_froxelD",       "64",    CVAR_ARCHIVE | CVAR_LATCH);
 
-	ri.Printf(PRINT_ALL, "Volumetric fog: cvars registered (r_vfog %s)\n",
-		r_vfog->integer ? "enabled" : "disabled");
+	ri.Printf(PRINT_ALL, "Volumetric fog: legacy r_vfog* cvars registered (unused; use r_volumetricFog)\n" );
 }
 
 qboolean VFog_IsEnabled(void) {

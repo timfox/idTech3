@@ -1567,8 +1567,11 @@ static void VarInfo( void )
 	}
 #if defined (USE_VK_PBR)
 	ri.Printf( PRINT_ALL, "PBR SH extraction: %s\n", (r_pbr_shExtract && r_pbr_shExtract->integer) ? "enabled" : "disabled" );
+	if ( r_glint && r_glint->integer ) {
+		ri.Printf( PRINT_ALL, "PBR glint NDF: enabled (r_glint 1)\n" );
+	}
 	if ( r_pbr_debug && r_pbr_debug->integer ) {
-		ri.Printf( PRINT_ALL, "PBR debug view: mode %d (1=direct,2=ibl spec,3=irradiance,4=env samples)\n", r_pbr_debug->integer );
+		ri.Printf( PRINT_ALL, "PBR debug view: mode %d (1=direct,2=ibl spec,3=irradiance,4=env samples,5-8=glint)\n", r_pbr_debug->integer );
 	}
 #endif
 #else
