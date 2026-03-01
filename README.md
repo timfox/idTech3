@@ -27,6 +27,9 @@ This is a modernized id Tech 3 engine.
 **Video**:
 * Video codec support: RoQ, WebM (VP8/VP9), Ogg Theora, MP4 (H.264)
 
+**Models**:
+* Model formats supported: MD3, MDR, IQM, OBJ, FBX, GLTF, USD (Universal Scene Description), Maya Ascii, Collada (DAE), STL
+
 **Scripting**:
 * Support for Lua scripting
 * Support for JavaScript scripting
