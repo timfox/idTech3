@@ -2111,9 +2111,11 @@ void RB_MDRSurfaceAnim( mdrSurface_t *surface );
 qboolean R_LoadIQM (model_t *mod, void *buffer, int filesize, const char *name );
 void R_AddIQMSurfaces( trRefEntity_t *ent );
 void RB_IQMSurfaceAnim( const surfaceType_t *surface );
+void R_IQMBeginSurfaceBatch( void );
+void R_IQMCommitSurfaceBatch( void );
 int R_IQMLerpTag( orientation_t *tag, iqmData_t *data,
-                  int startFrame, int endFrame,
-                  float frac, const char *tagName );
+		  int startFrame, int endFrame,
+		  float frac, const char *tagName );
 
 /*
 =============================================================

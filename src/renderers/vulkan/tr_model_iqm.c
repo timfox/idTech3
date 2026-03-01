@@ -1437,6 +1437,99 @@ static void R_IQMSelectActiveMorphTargets( const iqmData_t *data, trRefEntity_t 
 	}
 }
 
+#define IQM_GPU_META_TAG	0xAB000000u
+#define IQM_GPU_INDEX_MASK	0x00000FFFu
+#define IQM_GPU_MORPH_SHIFT	12
+
+typedef struct {
+	qboolean	enabled;
+	int			skinCount;
+	int			morphVertexCount;
+	int			activeCount;
+	float		weights[IQM_MORPH_TOP_K];
+	float		skinMatrices[SHADER_MAX_VERTEXES * 12];
+	float		normalMatrices[SHADER_MAX_VERTEXES * 9];
+	float		morphDeltas[SHADER_MAX_VERTEXES * IQM_MORPH_TOP_K * 6];
+} iqmGpuBatchState_t;
+
+static iqmGpuBatchState_t s_iqmGpuBatch;
+
+static float R_IQMPackGpuMeta( int skinIndex, int morphIndex )
+{
+	uint32_t packed;
+	float out;
+
+	packed = IQM_GPU_META_TAG |
+		( ( (uint32_t)morphIndex & IQM_GPU_INDEX_MASK ) << IQM_GPU_MORPH_SHIFT ) |
+		( (uint32_t)skinIndex & IQM_GPU_INDEX_MASK );
+	Com_Memcpy( &out, &packed, sizeof( out ) );
+	return out;
+}
+
+void R_IQMBeginSurfaceBatch( void )
+{
+	int i;
+
+	s_iqmGpuBatch.enabled = qfalse;
+	s_iqmGpuBatch.skinCount = 0;
+	s_iqmGpuBatch.morphVertexCount = 0;
+	s_iqmGpuBatch.activeCount = 0;
+	for ( i = 0; i < IQM_MORPH_TOP_K; i++ ) {
+		s_iqmGpuBatch.weights[i] = 0.0f;
+	}
+}
+
+void R_IQMCommitSurfaceBatch( void )
+{
+	size_t skinFloats;
+	size_t skinBytes;
+	size_t morphFloats;
+	size_t morphBytes;
+	uint32_t skinOffset;
+	uint32_t morphOffset;
+	float *skinPayload;
+	float *morphPayload;
+
+	if ( !s_iqmGpuBatch.enabled || s_iqmGpuBatch.skinCount <= 0 ||
+		s_iqmGpuBatch.morphVertexCount <= 0 || s_iqmGpuBatch.activeCount <= 0 ) {
+		vk_reset_iqm_storage_offsets();
+		return;
+	}
+
+	skinFloats = 1u + (size_t)s_iqmGpuBatch.skinCount * 12u + (size_t)s_iqmGpuBatch.skinCount * 9u;
+	skinBytes = skinFloats * sizeof( float );
+	skinPayload = (float *)vk_alloc_storage( skinBytes, &skinOffset );
+	if ( !skinPayload ) {
+		vk_reset_iqm_storage_offsets();
+		return;
+	}
+
+	skinPayload[0] = (float)s_iqmGpuBatch.skinCount;
+	Com_Memcpy( skinPayload + 1, s_iqmGpuBatch.skinMatrices,
+		(size_t)s_iqmGpuBatch.skinCount * 12u * sizeof( float ) );
+	Com_Memcpy( skinPayload + 1 + (size_t)s_iqmGpuBatch.skinCount * 12u,
+		s_iqmGpuBatch.normalMatrices, (size_t)s_iqmGpuBatch.skinCount * 9u * sizeof( float ) );
+
+	morphFloats = 6u + (size_t)s_iqmGpuBatch.morphVertexCount * IQM_MORPH_TOP_K * 6u;
+	morphBytes = morphFloats * sizeof( float );
+	morphPayload = (float *)vk_alloc_storage( morphBytes, &morphOffset );
+	if ( !morphPayload ) {
+		vk_reset_iqm_storage_offsets();
+		return;
+	}
+
+	morphPayload[0] = (float)s_iqmGpuBatch.morphVertexCount;
+	morphPayload[1] = (float)s_iqmGpuBatch.activeCount;
+	morphPayload[2] = s_iqmGpuBatch.weights[0];
+	morphPayload[3] = s_iqmGpuBatch.weights[1];
+	morphPayload[4] = s_iqmGpuBatch.weights[2];
+	morphPayload[5] = s_iqmGpuBatch.weights[3];
+	Com_Memcpy( morphPayload + 6, s_iqmGpuBatch.morphDeltas,
+		(size_t)s_iqmGpuBatch.morphVertexCount * IQM_MORPH_TOP_K * 6u * sizeof( float ) );
+
+	vk_set_iqm_storage_offsets( skinOffset, morphOffset );
+}
+
 /*
 =================
 R_AddIQMSurfaces
@@ -1647,6 +1740,9 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 	const trRefEntity_t *ent = backEnd.currentEntity;
 	const iqmMorphSurface_t *morphSurface = NULL;
 	qboolean applyMorph = qfalse;
+	qboolean useGpuMorphPath = qfalse;
+	int gpuSkinBase = 0;
+	int gpuMorphBase = 0;
 	float		poseMats[IQM_MAX_JOINTS * 12];
 	float		influenceVtxMat[SHADER_MAX_VERTEXES * 12];
 	float		influenceNrmMat[SHADER_MAX_VERTEXES * 9];
@@ -1675,6 +1771,7 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 	applyMorph = ( ent && ent->morphActiveCount > 0 && morphSurface &&
 		morphSurface->deltaPos && morphSurface->deltaNorm &&
 		ent->morphActiveCount <= IQM_MORPH_TOP_K );
+	useGpuMorphPath = ( applyMorph && data->num_poses > 0 );
 
 	RB_CHECKOVERFLOW( surf->num_vertexes, surf->num_triangles * 3 );
 
@@ -1692,6 +1789,45 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 	outNormal = &tess.normal[tess.numVertexes];
 	outTexCoord = &tess.texCoords[0][tess.numVertexes][0];
 	outColor = &tess.vertexColors[tess.numVertexes];
+
+	if ( useGpuMorphPath ) {
+		if ( surf->num_influences > SHADER_MAX_VERTEXES || surf->num_vertexes > SHADER_MAX_VERTEXES ) {
+			useGpuMorphPath = qfalse;
+		}
+		if ( s_iqmGpuBatch.skinCount + surf->num_influences > SHADER_MAX_VERTEXES ||
+			s_iqmGpuBatch.morphVertexCount + surf->num_vertexes > SHADER_MAX_VERTEXES ) {
+			useGpuMorphPath = qfalse;
+		}
+		if ( s_iqmGpuBatch.skinCount + surf->num_influences > (int)IQM_GPU_INDEX_MASK ||
+			s_iqmGpuBatch.morphVertexCount + surf->num_vertexes > (int)IQM_GPU_INDEX_MASK ) {
+			useGpuMorphPath = qfalse;
+		}
+		if ( s_iqmGpuBatch.enabled ) {
+			if ( s_iqmGpuBatch.activeCount != ent->morphActiveCount ) {
+				useGpuMorphPath = qfalse;
+			} else {
+				for ( i = 0; i < ent->morphActiveCount; i++ ) {
+					if ( fabsf( s_iqmGpuBatch.weights[i] - ent->morphActiveWeight[i] ) > 0.0001f ) {
+						useGpuMorphPath = qfalse;
+						break;
+					}
+				}
+			}
+		}
+		if ( useGpuMorphPath ) {
+			int weightIndex;
+			gpuSkinBase = s_iqmGpuBatch.skinCount;
+			gpuMorphBase = s_iqmGpuBatch.morphVertexCount;
+			if ( !s_iqmGpuBatch.enabled ) {
+				s_iqmGpuBatch.enabled = qtrue;
+				s_iqmGpuBatch.activeCount = ent->morphActiveCount;
+				for ( weightIndex = 0; weightIndex < IQM_MORPH_TOP_K; weightIndex++ ) {
+					s_iqmGpuBatch.weights[weightIndex] =
+						( weightIndex < ent->morphActiveCount ) ? ent->morphActiveWeight[weightIndex] : 0.0f;
+				}
+			}
+		}
+	}
 
 	if ( data->num_poses > 0 ) {
 		// compute interpolated joint matrices
@@ -1778,6 +1914,11 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 			nrmMat[ 6] = vtxMat[ 1]*vtxMat[ 6] - vtxMat[ 2]*vtxMat[ 5];
 			nrmMat[ 7] = vtxMat[ 2]*vtxMat[ 4] - vtxMat[ 0]*vtxMat[ 6];
 			nrmMat[ 8] = vtxMat[ 0]*vtxMat[ 5] - vtxMat[ 1]*vtxMat[ 4];
+
+			if ( useGpuMorphPath ) {
+				Com_Memcpy( &s_iqmGpuBatch.skinMatrices[( gpuSkinBase + i ) * 12], vtxMat, 12 * sizeof( float ) );
+				Com_Memcpy( &s_iqmGpuBatch.normalMatrices[( gpuSkinBase + i ) * 9], nrmMat, 9 * sizeof( float ) );
+			}
 		}
 
 		// transform vertexes and fill other data
@@ -1797,61 +1938,115 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 				morphedNormal[0] = normal[0];
 				morphedNormal[1] = normal[1];
 				morphedNormal[2] = normal[2];
-				if ( applyMorph ) {
-					for ( morphIndex = 0; morphIndex < ent->morphActiveCount; morphIndex++ ) {
-						int targetIndex = ent->morphActiveTargetIndex[morphIndex];
-						float weight = ent->morphActiveWeight[morphIndex];
-						size_t deltaOffset;
-						const float *deltaPos;
-						const float *deltaNorm;
-
-						if ( targetIndex < 0 || targetIndex >= data->morphNumTargets ) {
-							continue;
-						}
-						deltaOffset = ( (size_t)targetIndex * (size_t)surf->num_vertexes + (size_t)i ) * 3u;
-						deltaPos = morphSurface->deltaPos + deltaOffset;
-						deltaNorm = morphSurface->deltaNorm + deltaOffset;
-						morphedPos[0] += deltaPos[0] * weight;
-						morphedPos[1] += deltaPos[1] * weight;
-						morphedPos[2] += deltaPos[2] * weight;
-						morphedNormal[0] += deltaNorm[0] * weight;
-						morphedNormal[1] += deltaNorm[1] * weight;
-						morphedNormal[2] += deltaNorm[2] * weight;
-					}
-					VectorNormalize( morphedNormal );
-				}
-
 				outTexCoord[0] = texCoords[0];
 				outTexCoord[1] = texCoords[1];
 
-				(*outXYZ)[0] =
-					vtxMat[ 0] * morphedPos[0] +
-					vtxMat[ 1] * morphedPos[1] +
-					vtxMat[ 2] * morphedPos[2] +
-					vtxMat[ 3];
-				(*outXYZ)[1] =
-					vtxMat[ 4] * morphedPos[0] +
-					vtxMat[ 5] * morphedPos[1] +
-					vtxMat[ 6] * morphedPos[2] +
-					vtxMat[ 7];
-				(*outXYZ)[2] =
-					vtxMat[ 8] * morphedPos[0] +
-					vtxMat[ 9] * morphedPos[1] +
-					vtxMat[10] * morphedPos[2] +
-					vtxMat[11];
+				if ( useGpuMorphPath ) {
+					size_t packedBase = (size_t)( gpuMorphBase + i ) * IQM_MORPH_TOP_K * 6u;
+					int k;
 
-				(*outNormal)[0] =
-					nrmMat[ 0] * morphedNormal[0] +
-					nrmMat[ 1] * morphedNormal[1] +
-					nrmMat[ 2] * morphedNormal[2];
-				(*outNormal)[1] =
-					nrmMat[ 3] * morphedNormal[0] +
-					nrmMat[ 4] * morphedNormal[1] +
-					nrmMat[ 5] * morphedNormal[2];
-				(*outNormal)[2] =
-					nrmMat[ 6] * morphedNormal[0] +
-					nrmMat[ 7] * morphedNormal[1] +
-					nrmMat[ 8] * morphedNormal[2];
+					(*outXYZ)[0] = morphedPos[0];
+					(*outXYZ)[1] = morphedPos[1];
+					(*outXYZ)[2] = morphedPos[2];
+					(*outXYZ)[3] = R_IQMPackGpuMeta( gpuSkinBase + influence, gpuMorphBase + i );
+
+					(*outNormal)[0] = morphedNormal[0];
+					(*outNormal)[1] = morphedNormal[1];
+					(*outNormal)[2] = morphedNormal[2];
+					(*outNormal)[3] = 0.0f;
+
+					for ( k = 0; k < IQM_MORPH_TOP_K; k++ ) {
+						size_t dst = packedBase + (size_t)k * 6u;
+
+						s_iqmGpuBatch.morphDeltas[dst + 0] = 0.0f;
+						s_iqmGpuBatch.morphDeltas[dst + 1] = 0.0f;
+						s_iqmGpuBatch.morphDeltas[dst + 2] = 0.0f;
+						s_iqmGpuBatch.morphDeltas[dst + 3] = 0.0f;
+						s_iqmGpuBatch.morphDeltas[dst + 4] = 0.0f;
+						s_iqmGpuBatch.morphDeltas[dst + 5] = 0.0f;
+
+						if ( k < ent->morphActiveCount ) {
+							int targetIndex = ent->morphActiveTargetIndex[k];
+							size_t deltaOffset;
+							const float *deltaPos;
+							const float *deltaNorm;
+
+							if ( targetIndex < 0 || targetIndex >= data->morphNumTargets ) {
+								continue;
+							}
+
+							deltaOffset = ( (size_t)targetIndex * (size_t)surf->num_vertexes + (size_t)i ) * 3u;
+							deltaPos = morphSurface->deltaPos + deltaOffset;
+							deltaNorm = morphSurface->deltaNorm + deltaOffset;
+
+							s_iqmGpuBatch.morphDeltas[dst + 0] = deltaPos[0];
+							s_iqmGpuBatch.morphDeltas[dst + 1] = deltaPos[1];
+							s_iqmGpuBatch.morphDeltas[dst + 2] = deltaPos[2];
+							s_iqmGpuBatch.morphDeltas[dst + 3] = deltaNorm[0];
+							s_iqmGpuBatch.morphDeltas[dst + 4] = deltaNorm[1];
+							s_iqmGpuBatch.morphDeltas[dst + 5] = deltaNorm[2];
+						}
+					}
+				} else {
+					if ( applyMorph ) {
+						for ( morphIndex = 0; morphIndex < ent->morphActiveCount; morphIndex++ ) {
+							int targetIndex = ent->morphActiveTargetIndex[morphIndex];
+							float weight = ent->morphActiveWeight[morphIndex];
+							size_t deltaOffset;
+							const float *deltaPos;
+							const float *deltaNorm;
+
+							if ( targetIndex < 0 || targetIndex >= data->morphNumTargets ) {
+								continue;
+							}
+							deltaOffset = ( (size_t)targetIndex * (size_t)surf->num_vertexes + (size_t)i ) * 3u;
+							deltaPos = morphSurface->deltaPos + deltaOffset;
+							deltaNorm = morphSurface->deltaNorm + deltaOffset;
+							morphedPos[0] += deltaPos[0] * weight;
+							morphedPos[1] += deltaPos[1] * weight;
+							morphedPos[2] += deltaPos[2] * weight;
+							morphedNormal[0] += deltaNorm[0] * weight;
+							morphedNormal[1] += deltaNorm[1] * weight;
+							morphedNormal[2] += deltaNorm[2] * weight;
+						}
+						VectorNormalize( morphedNormal );
+					}
+
+					(*outXYZ)[0] =
+						vtxMat[ 0] * morphedPos[0] +
+						vtxMat[ 1] * morphedPos[1] +
+						vtxMat[ 2] * morphedPos[2] +
+						vtxMat[ 3];
+					(*outXYZ)[1] =
+						vtxMat[ 4] * morphedPos[0] +
+						vtxMat[ 5] * morphedPos[1] +
+						vtxMat[ 6] * morphedPos[2] +
+						vtxMat[ 7];
+					(*outXYZ)[2] =
+						vtxMat[ 8] * morphedPos[0] +
+						vtxMat[ 9] * morphedPos[1] +
+						vtxMat[10] * morphedPos[2] +
+						vtxMat[11];
+					(*outXYZ)[3] = 0.0f;
+
+					(*outNormal)[0] =
+						nrmMat[ 0] * morphedNormal[0] +
+						nrmMat[ 1] * morphedNormal[1] +
+						nrmMat[ 2] * morphedNormal[2];
+					(*outNormal)[1] =
+						nrmMat[ 3] * morphedNormal[0] +
+						nrmMat[ 4] * morphedNormal[1] +
+						nrmMat[ 5] * morphedNormal[2];
+					(*outNormal)[2] =
+						nrmMat[ 6] * morphedNormal[0] +
+						nrmMat[ 7] * morphedNormal[1] +
+						nrmMat[ 8] * morphedNormal[2];
+					(*outNormal)[3] = 0.0f;
+				}
+			}
+			if ( useGpuMorphPath ) {
+				s_iqmGpuBatch.skinCount += surf->num_influences;
+				s_iqmGpuBatch.morphVertexCount += surf->num_vertexes;
 			}
 		} else {
 			// copy vertexes and fill other data
@@ -1898,10 +2093,12 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 				(*outXYZ)[0] = morphedPos[0];
 				(*outXYZ)[1] = morphedPos[1];
 				(*outXYZ)[2] = morphedPos[2];
+				(*outXYZ)[3] = 0.0f;
 
 				(*outNormal)[0] = morphedNormal[0];
 				(*outNormal)[1] = morphedNormal[1];
 				(*outNormal)[2] = morphedNormal[2];
+				(*outNormal)[3] = 0.0f;
 			}
 		}
 
