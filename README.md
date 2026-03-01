@@ -29,6 +29,7 @@ This is a modernized id Tech 3 engine.
 
 **Models**:
 * Model formats supported: MD3, MDR, IQM, OBJ, FBX, GLTF, USD (Universal Scene Description), Maya Ascii, Collada (DAE), STL
+* Blend Shapes (IQM)
 
 **Scripting**:
 * Support for Lua scripting
@@ -49,8 +50,8 @@ This is a modernized id Tech 3 engine.
 
 ### Standards
 
-* Engine code targets **C23**, with incremental modernization for safety and portability.
-* Engine-internal code prefers native C `bool`; legacy `qboolean` is retained where required for compatibility.
+* The engine aims to be C23-compatible, and modernization is ongoing where it improves safety and portability.
+* Native C `bool` is preferred in new or modernized code, but `qboolean` remains in use where needed for backward compatibility.
 
 ### Links
 
