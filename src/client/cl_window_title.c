@@ -58,7 +58,12 @@ void WinTitle_Init(void) {
 		sections[i][0] = '\0';
 	}
 
-	Q_strncpyz(sections[WINTITLE_SECTION_GAME_NAME], CLIENT_WINDOW_TITLE, sizeof(sections[0]));
+	/* Use cl_title (from gameinfo.txt when present), else default */
+	if ( cl_title[0] != '\0' ) {
+		Q_strncpyz( sections[WINTITLE_SECTION_GAME_NAME], cl_title, sizeof( sections[0] ) );
+	} else {
+		Q_strncpyz( sections[WINTITLE_SECTION_GAME_NAME], CLIENT_WINDOW_TITLE, sizeof( sections[0] ) );
+	}
 
 	lastTitle[0] = '\0';
 	eventText[0] = '\0';
