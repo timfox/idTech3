@@ -32,6 +32,92 @@ vkImguiGlobal_t      vkImguiState;
 
 static ImGuiContext *imguiContext = nullptr;
 
+typedef struct {
+	float threshold;
+	float intensity;
+	int tonemapMode;
+	float exposure;
+	float vignette;
+	float vigRadius;
+	float chromAb;
+	float grain;
+	float maxDist;
+	float stepSz;
+	float thick;
+	float ssrIntensity;
+} vkPostFxPanelState_t;
+
+typedef struct {
+	float gravity;
+	float stiffness;
+	float damping;
+} vkPhysicsPanelState_t;
+
+typedef struct {
+	float density;
+	float heightFalloff;
+	float scatter;
+	float viscosity;
+	float dissipation;
+} vkVolumetricsPanelState_t;
+
+static const vkPostFxPanelState_t vkPostFxDefaults = {
+	0.6f, 0.5f, 2, 1.0f,
+	0.0f, 0.75f, 0.0f, 0.0f,
+	100.0f, 1.0f, 0.5f, 0.8f
+};
+
+static const vkPhysicsPanelState_t vkPhysicsDefaults = {
+	-800.0f, 0.8f, 0.4f
+};
+
+static const vkVolumetricsPanelState_t vkVolumetricsDefaults = {
+	0.02f, 0.04f, 1.0f, 0.0001f, 0.995f
+};
+
+static vkPostFxPanelState_t vkPostFxState = vkPostFxDefaults;
+static vkPhysicsPanelState_t vkPhysicsState = vkPhysicsDefaults;
+static vkVolumetricsPanelState_t vkVolumetricsState = vkVolumetricsDefaults;
+
+static void VkImgui_ResetPostFxDefaults(void) {
+	vkPostFxState = vkPostFxDefaults;
+}
+
+static void VkImgui_ResetPhysicsDefaults(void) {
+	vkPhysicsState = vkPhysicsDefaults;
+}
+
+static void VkImgui_ResetVolumetricsDefaults(void) {
+	vkVolumetricsState = vkVolumetricsDefaults;
+}
+
+static void VkImgui_DrawDefaultsConfirmation(
+	const char *buttonLabel,
+	const char *popupId,
+	const char *panelName,
+	void (*resetFn)(void)
+) {
+	if (ImGui::Button(buttonLabel)) {
+		ImGui::OpenPopup(popupId);
+	}
+
+	if (ImGui::BeginPopupModal(popupId, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+		ImGui::Text("Reset %s settings to defaults?", panelName);
+		ImGui::Separator();
+
+		if (ImGui::Button("Cancel", ImVec2(120.0f, 0.0f))) {
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Apply Defaults", ImVec2(140.0f, 0.0f))) {
+			resetFn();
+			ImGui::CloseCurrentPopup();
+		}
+
+		ImGui::EndPopup();
+	}
+}
+
 static void VkImgui_DarkTheme(void) {
 	ImVec4 *colors = ImGui::GetStyle().Colors;
 	colors[ImGuiCol_Text]               = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
@@ -136,76 +222,100 @@ static void VkImgui_DrawMenuBar(void) {
 extern "C" void VkImgui_DrawPostFXPanel(void) {
 	if (!vkWindows.postfx.open) return;
 	ImGui::Begin("PostFX", (bool *)&vkWindows.postfx.open);
+	VkImgui_DrawDefaultsConfirmation(
+		"Defaults##PostFX",
+		"ConfirmDefaultsPostFX",
+		"PostFX",
+		VkImgui_ResetPostFxDefaults
+	);
+	ImGui::SameLine();
+	ImGui::TextDisabled("Apply baseline values for this panel.");
+	ImGui::Separator();
+	ImGui::BeginChild("PostFXScrollRegion", ImVec2(0.0f, 0.0f), qfalse, ImGuiWindowFlags_AlwaysVerticalScrollbar);
 
 	if (ImGui::CollapsingHeader("Bloom", ImGuiTreeNodeFlags_DefaultOpen)) {
-		static float threshold = 0.6f, intensity = 0.5f;
-		ImGui::SliderFloat("Threshold", &threshold, 0.0f, 2.0f);
-		ImGui::SliderFloat("Intensity", &intensity, 0.0f, 2.0f);
+		ImGui::SliderFloat("Threshold", &vkPostFxState.threshold, 0.0f, 2.0f);
+		ImGui::SliderFloat("Intensity", &vkPostFxState.intensity, 0.0f, 2.0f);
 	}
 
 	if (ImGui::CollapsingHeader("Tonemapping", ImGuiTreeNodeFlags_DefaultOpen)) {
-		static int tonemapMode = 2;
 		const char *modes[] = { "None", "Reinhard", "ACES" };
-		ImGui::Combo("Mode", &tonemapMode, modes, 3);
-		static float exposure = 1.0f;
-		ImGui::SliderFloat("Exposure", &exposure, 0.1f, 10.0f);
+		ImGui::Combo("Mode", &vkPostFxState.tonemapMode, modes, 3);
+		ImGui::SliderFloat("Exposure", &vkPostFxState.exposure, 0.1f, 10.0f);
 	}
 
 	if (ImGui::CollapsingHeader("Lens Effects")) {
-		static float vignette = 0.0f, vigRadius = 0.75f, chromAb = 0.0f, grain = 0.0f;
-		ImGui::SliderFloat("Vignette", &vignette, 0.0f, 1.0f);
-		ImGui::SliderFloat("Vignette Radius", &vigRadius, 0.3f, 1.5f);
-		ImGui::SliderFloat("Chromatic Aberration", &chromAb, 0.0f, 5.0f);
-		ImGui::SliderFloat("Film Grain", &grain, 0.0f, 1.0f);
+		ImGui::SliderFloat("Vignette", &vkPostFxState.vignette, 0.0f, 1.0f);
+		ImGui::SliderFloat("Vignette Radius", &vkPostFxState.vigRadius, 0.3f, 1.5f);
+		ImGui::SliderFloat("Chromatic Aberration", &vkPostFxState.chromAb, 0.0f, 5.0f);
+		ImGui::SliderFloat("Film Grain", &vkPostFxState.grain, 0.0f, 1.0f);
 	}
 
 	if (ImGui::CollapsingHeader("SSR")) {
-		static float maxDist = 100.0f, stepSz = 1.0f, thick = 0.5f, inten = 0.8f;
-		ImGui::SliderFloat("Max Distance", &maxDist, 10.0f, 500.0f);
-		ImGui::SliderFloat("Step Size", &stepSz, 0.1f, 5.0f);
-		ImGui::SliderFloat("Thickness", &thick, 0.1f, 5.0f);
-		ImGui::SliderFloat("SSR Intensity", &inten, 0.0f, 1.0f);
+		ImGui::SliderFloat("Max Distance", &vkPostFxState.maxDist, 10.0f, 500.0f);
+		ImGui::SliderFloat("Step Size", &vkPostFxState.stepSz, 0.1f, 5.0f);
+		ImGui::SliderFloat("Thickness", &vkPostFxState.thick, 0.1f, 5.0f);
+		ImGui::SliderFloat("SSR Intensity", &vkPostFxState.ssrIntensity, 0.0f, 1.0f);
 	}
 
+	ImGui::EndChild();
 	ImGui::End();
 }
 
 extern "C" void VkImgui_DrawPhysicsPanel(void) {
 	if (!vkWindows.physics.open) return;
 	ImGui::Begin("Physics", (bool *)&vkWindows.physics.open);
+	VkImgui_DrawDefaultsConfirmation(
+		"Defaults##Physics",
+		"ConfirmDefaultsPhysics",
+		"Physics",
+		VkImgui_ResetPhysicsDefaults
+	);
+	ImGui::SameLine();
+	ImGui::TextDisabled("Apply baseline values for this panel.");
+	ImGui::Separator();
+	ImGui::BeginChild("PhysicsScrollRegion", ImVec2(0.0f, 0.0f), qfalse, ImGuiWindowFlags_AlwaysVerticalScrollbar);
 
 	if (ImGui::CollapsingHeader("Bullet Physics", ImGuiTreeNodeFlags_DefaultOpen)) {
 		ImGui::Text("Rigid Bodies: --");
 		ImGui::Text("Constraints: --");
 		ImGui::Text("Ragdolls: --");
 		ImGui::Text("DMM Objects: --");
-		static float gravity = -800.0f;
-		ImGui::SliderFloat("Gravity", &gravity, -2000.0f, 0.0f);
-		static float stiffness = 0.8f, damping = 0.4f;
-		ImGui::SliderFloat("Ragdoll Stiffness", &stiffness, 0.0f, 1.0f);
-		ImGui::SliderFloat("Ragdoll Damping", &damping, 0.0f, 1.0f);
+		ImGui::SliderFloat("Gravity", &vkPhysicsState.gravity, -2000.0f, 0.0f);
+		ImGui::SliderFloat("Ragdoll Stiffness", &vkPhysicsState.stiffness, 0.0f, 1.0f);
+		ImGui::SliderFloat("Ragdoll Damping", &vkPhysicsState.damping, 0.0f, 1.0f);
 	}
 
+	ImGui::EndChild();
 	ImGui::End();
 }
 
 extern "C" void VkImgui_DrawVolumetricsPanel(void) {
 	if (!vkWindows.volumetrics.open) return;
 	ImGui::Begin("Volumetrics", (bool *)&vkWindows.volumetrics.open);
+	VkImgui_DrawDefaultsConfirmation(
+		"Defaults##Volumetrics",
+		"ConfirmDefaultsVolumetrics",
+		"Volumetrics",
+		VkImgui_ResetVolumetricsDefaults
+	);
+	ImGui::SameLine();
+	ImGui::TextDisabled("Apply baseline values for this panel.");
+	ImGui::Separator();
+	ImGui::BeginChild("VolumetricsScrollRegion", ImVec2(0.0f, 0.0f), qfalse, ImGuiWindowFlags_AlwaysVerticalScrollbar);
 
 	if (ImGui::CollapsingHeader("Volumetric Fog", ImGuiTreeNodeFlags_DefaultOpen)) {
-		static float density = 0.02f, heightFalloff = 0.04f, scatter = 1.0f;
-		ImGui::SliderFloat("Density", &density, 0.0f, 0.5f);
-		ImGui::SliderFloat("Height Falloff", &heightFalloff, 0.0f, 0.5f);
-		ImGui::SliderFloat("Scatter", &scatter, 0.0f, 5.0f);
+		ImGui::SliderFloat("Density", &vkVolumetricsState.density, 0.0f, 0.5f);
+		ImGui::SliderFloat("Height Falloff", &vkVolumetricsState.heightFalloff, 0.0f, 0.5f);
+		ImGui::SliderFloat("Scatter", &vkVolumetricsState.scatter, 0.0f, 5.0f);
 	}
 
 	if (ImGui::CollapsingHeader("Fluid Simulation")) {
-		static float viscosity = 0.0001f, dissipation = 0.995f;
-		ImGui::SliderFloat("Viscosity", &viscosity, 0.0f, 0.01f, "%.5f");
-		ImGui::SliderFloat("Dissipation", &dissipation, 0.9f, 1.0f, "%.4f");
+		ImGui::SliderFloat("Viscosity", &vkVolumetricsState.viscosity, 0.0f, 0.01f, "%.5f");
+		ImGui::SliderFloat("Dissipation", &vkVolumetricsState.dissipation, 0.9f, 1.0f, "%.4f");
 	}
 
+	ImGui::EndChild();
 	ImGui::End();
 }
 
