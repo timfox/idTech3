@@ -8921,6 +8921,13 @@ for (i = 0; i < 2; i++) {
 
 	qvkDestroyShaderModule( vk.device, vk.modules.frag.gen0_df, NULL );
 
+	for ( i = 0; i < 2; i++ ) {
+		if ( vk.modules.frag.flowmap[i] != VK_NULL_HANDLE ) {
+			qvkDestroyShaderModule( vk.device, vk.modules.frag.flowmap[i], NULL );
+			vk.modules.frag.flowmap[i] = VK_NULL_HANDLE;
+		}
+	}
+
 	qvkDestroyShaderModule( vk.device, vk.modules.color_fs, NULL );
 	qvkDestroyShaderModule( vk.device, vk.modules.color_vs, NULL );
 
@@ -10212,8 +10219,14 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			break;
 
 		case TYPE_SIGNLE_TEXTURE:
-			vs_module = &vk.modules.vert.gen[use_pbr][0][0][0][0];
-			fs_module = &vk.modules.frag.gen[use_pbr][0][0][0];
+			if ( def->hasFlowmap && !use_pbr ) {
+				const int fog = def->fog_stage ? 1 : 0;
+				vs_module = &vk.modules.vert.gen[0][0][0][0][fog];
+				fs_module = &vk.modules.frag.flowmap[fog];
+			} else {
+				vs_module = &vk.modules.vert.gen[use_pbr][0][0][0][0];
+				fs_module = &vk.modules.frag.gen[use_pbr][0][0][0];
+			}
 			break;
 
 		case TYPE_SIGNLE_TEXTURE_ENV:
@@ -10389,8 +10402,14 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			break;
 
 		case TYPE_SIGNLE_TEXTURE:
-			vs_module = &vk.modules.vert.gen[0][0][0][0];
-			fs_module = &vk.modules.frag.gen[0][0][0];
+			if ( def->hasFlowmap ) {
+				const int fog = def->fog_stage ? 1 : 0;
+				vs_module = &vk.modules.vert.gen[0][0][0][fog];
+				fs_module = &vk.modules.frag.flowmap[fog];
+			} else {
+				vs_module = &vk.modules.vert.gen[0][0][0][0];
+				fs_module = &vk.modules.frag.gen[0][0][0];
+			}
 			break;
 
 		case TYPE_SIGNLE_TEXTURE_ENV:

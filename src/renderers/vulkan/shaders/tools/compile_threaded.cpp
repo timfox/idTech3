@@ -224,6 +224,10 @@ static void compile_and_convert_template_shaders( void )
     // single-texture fragment, depth-fragment
     create_shader_task("gen_frag.tmpl", "frag", "frag_tx0_df", NULL, " -DUSE_CLX_IDENT -DUSE_ATEST -DUSE_DF");
 
+    // flowmap water shaders (flow vectors offset texture UVs)
+    create_shader_task("gen_frag.tmpl", "frag", "frag_tx0_flowmap", NULL, "-DUSE_FLOWMAP -DUSE_ATEST");
+    create_shader_task("gen_frag.tmpl", "frag", "frag_tx0_flowmap_fog", NULL, "-DUSE_FLOWMAP -DUSE_ATEST -DUSE_FOG");
+
     // compile lighting shader variations from templates
     create_shader_task( "light_vert.tmpl", "vert", "vert_light", NULL, "");
     create_shader_task( "light_vert.tmpl", "vert", "vert_light_fog", NULL, "-DUSE_FOG");

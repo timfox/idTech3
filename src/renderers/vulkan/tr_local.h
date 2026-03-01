@@ -397,6 +397,9 @@ typedef struct {
 	qboolean		isVideoMap;
 	unsigned int 	isScreenMap : 1;
 	unsigned int 	dlight : 1;
+	/* water flowmap: flow vectors offset texture UVs */
+	image_t			*flowmapImage;
+	float			flowmapSpeed;
 #ifdef USE_VK_PBR
 	// have no dedicated bundle indexes for pbr samplers
 	image_t			*deluxeMap;
