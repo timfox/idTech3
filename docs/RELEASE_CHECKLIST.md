@@ -27,9 +27,11 @@ Use this checklist before tagging or publishing a release.
 ### Documentation
 - [ ] `CHANGELOG.md` or release notes updated
 - [ ] `docs/` reflects current features
+- [ ] `docs/QUICKSTART.md` accurate for release download URL
 
 ## Post-Release
 
 - [ ] Tag created with version (e.g. `v1.0.0`)
-- [ ] GitHub Release created with artifacts and notes
+- [ ] GitHub Release created (draft first, then publish)
+- [ ] CI `release-attach` job uploads build artifacts to the release
 - [ ] Announcement (if applicable)
