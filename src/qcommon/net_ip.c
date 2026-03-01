@@ -246,7 +246,7 @@ NET_ErrorString
 */
 static char *NET_ErrorString( void ) {
 #ifdef _WIN32
-	//FIXME: replace with FormatMessage?
+	/* Windows: could use FormatMessage for localized strings. */
 	switch( socketError ) {
 		case WSAEINTR: return "WSAEINTR";
 		case WSAEBADF: return "WSAEBADF";

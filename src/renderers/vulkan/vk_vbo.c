@@ -243,7 +243,7 @@ static qboolean isStaticShader( shader_t *shader )
 
 	shader->isStaticShader = qtrue;
 
-	// TODO: alloc separate structure?
+	/* Could allocate svars in separate structure. */
 	shader->svarsSize = svarsSize;
 	shader->iboOffset = -1;
 	shader->vboOffset = -1;

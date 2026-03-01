@@ -32,7 +32,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //#define DEBUG			//debug code
 #define RANDOMIZE		//randomize bot behaviour
 
-//FIXME: get rid of this global structure
+/* Could refactor to avoid global structure. */
 typedef struct botlib_globals_s
 {
 	int botlibsetup;						//true when the bot library has been setup

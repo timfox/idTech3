@@ -366,7 +366,7 @@ static void R_AddWorldSurface( msurface_t *surf, int dlightBits ) {
 	}
 
 	surf->viewCount = tr.viewCount;
-	// FIXME: bmodel fog?
+	/* bmodel fog could be supported. */
 
 	// try to cull before dlighting or adding
 	if ( R_CullSurface( surf->data, surf->shader ) ) {

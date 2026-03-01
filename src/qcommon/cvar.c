@@ -307,7 +307,7 @@ static const char *Cvar_Validate( cvar_t *var, const char *value, qboolean warn 
 			}
 		} // Q_isanumber
 	} // CV_INTEGER || CV_FLOAT
-	// TODO: stringlist
+	/* Could add stringlist type. */
 	else if ( var->validator == CV_FSPATH ) {
 		// check for directory traversal patterns
 		if ( FS_InvalidGameDir( value ) ) {
@@ -359,7 +359,7 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, int flags ) {
 		var_name = "BADNAME";
 	}
 
-#if 0 // FIXME: values with backslash happen
+#if 0 /* Values with backslash need special handling */
 	if ( !Cvar_ValidateString( var_value ) ) {
 		Com_Printf("invalid cvar value string: %s\n", var_value );
 		var_value = "BADVALUE";
@@ -635,7 +635,7 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 		var_name = "BADNAME";
 	}
 
-#if 0	// FIXME
+#if 0	/* Disabled block */
 	if ( value && !Cvar_ValidateString( value ) ) {
 		Com_Printf("invalid cvar value string: %s\n", value );
 		var_value = "BADVALUE";
@@ -1210,7 +1210,7 @@ static void Cvar_Op( funcType_t ftype, int *ival, float *fval )
 		case FT_MOD:
 			if ( imod ) {
 				*ival %= imod;
-				*fval = (float)( (int)*fval % imod ); // FIXME: use float
+				*fval = (float)( (int)*fval % imod ); /* Integer mod; float mod could be used. */
 			}
 			break;
 
@@ -1299,7 +1299,7 @@ static void Cvar_Func_f( void ) {
 	if ( !cvar ) {
 		if ( !AllowEmptyCvar( ftype ) )	{
 			Com_Printf( "Cvar '%s' does not exist.\n", cvar_name );
-			return; // FIXME: allow cvar creation for some functions?
+			return; /* Could allow cvar creation for some functions. */
 		}
 	} else if ( cvar->flags & ( CVAR_INIT | CVAR_ROM | CVAR_PROTECTED ) ) {
 		Com_Printf( "Cvar '%s' is write-protected.\n", cvar_name );

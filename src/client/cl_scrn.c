@@ -720,7 +720,6 @@ void SCR_UpdateScreen( void ) {
 	// that case.
 	if ( uivm )
 	{
-		// XXX
 		int in_anaglyphMode = Cvar_VariableIntegerValue("r_anaglyphMode");
 		// if running in stereo, we need to draw the frame twice
 		if ( cls.glconfig.stereoEnabled || in_anaglyphMode) {

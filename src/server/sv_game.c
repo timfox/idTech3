@@ -135,7 +135,7 @@ static void SV_SetBrushModel( sharedEntity_t *ent, const char *name ) {
 
 	ent->r.contents = -1;		// we don't know exactly what is in the brushes
 
-	SV_LinkEntity( ent );		// FIXME: remove
+	SV_LinkEntity( ent );		/* Could be moved to game module. */
 }
 
 
@@ -1085,7 +1085,7 @@ Called on a normal map change, not on a map_restart
 */
 void SV_InitGameProgs( void ) {
 	cvar_t	*var;
-	//FIXME these are temp while I make bots run in vm
+	/* Temporary: bots will run in VM. */
 	extern int	bot_enable;
 
 	var = Cvar_Get( "bot_enable", "1", CVAR_LATCH );

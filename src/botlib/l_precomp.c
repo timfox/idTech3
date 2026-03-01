@@ -508,7 +508,7 @@ static int PC_MergeTokens(token_t *t1, token_t *t2)
 		strcat(t1->string, &t2->string[1]);
 		return qtrue;
 	}
-	//FIXME: merging of two number of the same sub type
+	/* Could merge two numbers of same subtype. */
 	return qfalse;
 } //end of the function PC_MergeTokens
 //============================================================================

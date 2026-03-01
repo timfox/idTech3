@@ -524,7 +524,7 @@ static qboolean isStaticShader( shader_t *shader )
 
 	shader->isStaticShader = qtrue;
 
-	// TODO: alloc separate structure?
+	/* Could allocate svars in separate structure. */
 	shader->svarsSize = svarsSize;
 	shader->iboOffset = -1;
 	shader->vboOffset = -1;
@@ -1378,7 +1378,7 @@ static void RB_IterateStagesVBO( const shaderCommands_t *input )
 	qglVertexPointer( 3, GL_FLOAT, 16, (const GLvoid *)(intptr_t)tess.shader->vboOffset );
 
 	if ( qglLockArraysEXT ) {
-		// FIXME: not needed for VBOs?
+		/* LockArrays may be redundant with VBOs. */
 		qglLockArraysEXT( 0, world_vbo.items_queue_vertexes );
 	}
 

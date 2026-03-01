@@ -252,7 +252,7 @@ static float R_ProcessLightmap( byte *image, const byte *buf_p, float maxIntensi
 
 	if ( 0 && r_lightmap->integer == 2 ) {
 		int j;
-		// color code by intensity as development tool	(FIXME: check range)
+		// color code by intensity as development tool (r/g/b from buf_p, clamp output)
 		for ( j = 0; j < LIGHTMAP_SIZE * LIGHTMAP_SIZE; j++ )
 		{
 			float r = buf_p[j*3+0];
@@ -273,9 +273,9 @@ static float R_ProcessLightmap( byte *image, const byte *buf_p, float maxIntensi
 
 			HSVtoRGB( intensity, 1.00, 0.50, out );
 
-			image[j*4+0] = out[0] * 255;
-			image[j*4+1] = out[1] * 255;
-			image[j*4+2] = out[2] * 255;
+			image[j*4+0] = (byte)Com_Clamp( 0.0f, 255.0f, out[0] * 255.0f );
+			image[j*4+1] = (byte)Com_Clamp( 0.0f, 255.0f, out[1] * 255.0f );
+			image[j*4+2] = (byte)Com_Clamp( 0.0f, 255.0f, out[2] * 255.0f );
 			image[j*4+3] = 255;
 		}
 	} else {
@@ -1156,7 +1156,7 @@ R_FixSharedVertexLodError_r
 
 NOTE: never sync LoD through grid edges with merged points!
 
-FIXME: write generalized version that also avoids cracks between a patch and one that meets half way?
+Note: Could generalize to avoid cracks between a patch and one that meets halfway.
 =================
 */
 static void R_FixSharedVertexLodError_r( int start, srfGridMesh_t *grid1 ) {

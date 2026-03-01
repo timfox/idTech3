@@ -384,7 +384,7 @@ srfGridMesh_t *R_SubdividePatchToGrid( int width, int height,
 		for ( j = 0 ; j + 2 < width ; j += 2 ) {
 			// check subdivided midpoints against control points
 
-			// FIXME: also check midpoints of adjacent patches against the control points
+			/* Could also check midpoints of adjacent patches. */
 			// this would basically stitch all patches in the same LOD group together.
 
 			maxLen = 0;

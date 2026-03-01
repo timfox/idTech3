@@ -118,8 +118,7 @@ static void IN_PrintKey( const SDL_Keysym *keysym, keyNum_t key, qboolean down )
 ===============
 IN_IsConsoleKey
 
-TODO: If the SDL_Scancode situation improves, use it instead of
-      both of these methods
+Could use SDL_Scancode when situation improves instead of both methods.
 ===============
 */
 static qboolean IN_IsConsoleKey( keyNum_t key, int character )
@@ -350,7 +349,7 @@ static keyNum_t IN_TranslateSDLToQ3Key( SDL_Keysym *keysym, qboolean down )
 				if( !( keysym->sym & SDLK_SCANCODE_MASK ) && keysym->scancode <= 95 )
 				{
 					// Map Unicode characters to 95 world keys using the key's scan code.
-					// FIXME: There aren't enough world keys to cover all the scancodes.
+					/* World keys may not cover all scancodes. */
 					// Maybe create a map of scancode to quake key at start up and on
 					// key map change; allocate world key numbers as needed similar
 					// to SDL 1.2.
@@ -910,7 +909,7 @@ static void IN_JoyMove( void )
 		}
 		if (balldx || balldy)
 		{
-			// !!! FIXME: is this good for stick balls, or just mice?
+			/* May need adjustment for stick balls vs mice. */
 			// Scale like the mouse input...
 			if (abs(balldx) > 1)
 				balldx *= 2;

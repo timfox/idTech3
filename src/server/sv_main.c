@@ -103,7 +103,7 @@ static const char *SV_ExpandNewlines( const char *in ) {
 ======================
 SV_ReplacePendingServerCommands
 
-FIXME: This is ugly
+Note: Could refactor for clarity.
 ======================
 */
 #if 0 // unused
@@ -1343,7 +1343,7 @@ void SV_Frame( int msec ) {
 	if ( sv.time > (12*3600*1000) && ( sv_levelTimeReset->integer == 0 || sv.time > 0x40000000 ) ) {
 		if ( svs.clients ) {
 			for ( i = 0; i < sv.maxclients; i++ ) {
-				// FIXME: deal with bots (reconnect?)
+				/* Bots may need reconnect handling. */
 				if ( svs.clients[i].state != CS_FREE && svs.clients[i].netchan.remoteAddress.type != NA_BOT ) {
 					break;
 				}

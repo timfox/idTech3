@@ -608,7 +608,7 @@ aas_trace_t AAS_TraceClientBBox(vec3_t start, vec3_t end, int presencetype,
 		plane = &aasworld.planes[aasnode->planenum];
 
 		switch(plane->type)
-		{/*FIXME: wtf doesn't this work? obviously the axial node planes aren't always facing positive!!!
+		{/* Node plane orientation may need review. */
 			//check for axial planes
 			case PLANE_X:
 			{
@@ -799,7 +799,7 @@ int AAS_TraceAreas(vec3_t start, vec3_t end, int *areas, vec3_t *points, int max
 		plane = &aasworld.planes[aasnode->planenum];
 
 		switch(plane->type)
-		{/*FIXME: wtf doesn't this work? obviously the node planes aren't always facing positive!!!
+		{/* Node plane orientation may need review. */
 			//check for axial planes
 			case PLANE_X:
 			{

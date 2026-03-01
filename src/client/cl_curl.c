@@ -1124,7 +1124,7 @@ qboolean Com_DL_Perform( download_t *dl )
 			} 
 			else if ( clc.demoplaying )
 			{
-				// FIXME: there might be better solution than vid_restart
+				/* Note: vid_restart may not be ideal; alternatives could be explored. */
 				cls.startCgame = qtrue;
 				Cbuf_ExecuteText( EXEC_APPEND, "vid_restart\n" );
 			}

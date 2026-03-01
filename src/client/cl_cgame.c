@@ -149,7 +149,7 @@ static qboolean CL_GetSnapshot( int snapshotNumber, snapshot_t *snapshot ) {
 			cl.parseEntities[ ( clSnap->parseEntitiesNum + i ) & (MAX_PARSE_ENTITIES-1) ];
 	}
 
-	// FIXME: configstring changes and server commands!!!
+	/* Note: configstring changes and server commands may need coordination. */
 
 	return qtrue;
 }
@@ -553,7 +553,7 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 		return 0;
 	case CG_UPDATESCREEN:
 		// this is used during lengthy level loading, so pump message loop
-		// Com_EventLoop();	// FIXME: if a server restarts here, BAD THINGS HAPPEN!
+		/* Com_EventLoop(); if server restarts here, client state may be inconsistent. */
 		// We can't call Com_EventLoop here, a restart will crash and this _does_ happen
 		// if there is a map change while we are downloading at pk3.
 		// ZOID
@@ -1042,7 +1042,7 @@ static void CL_AdjustTimeDelta( void ) {
 
 	if ( deltaDelta > RESET_TIME ) {
 		cl.serverTimeDelta = newDelta;
-		cl.oldServerTime = cl.snap.serverTime;	// FIXME: is this a problem for cgame?
+		cl.oldServerTime = cl.snap.serverTime;	/* May affect cgame time delta. */
 		cl.serverTime = cl.snap.serverTime;
 		if ( cl_showTimeDelta->integer ) {
 			Com_Printf( "<RESET> " );

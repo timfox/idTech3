@@ -961,7 +961,7 @@ static void readQuadInfo( byte *qData )
 			cinTable[currentHandle].drawY = 256;
 		}
 		if ( cinTable[currentHandle].CIN_WIDTH != 256 || cinTable[currentHandle].CIN_HEIGHT != 256 ) {
-			Com_Printf( "HACK: approxmimating cinematic for Rage Pro or Voodoo\n" );
+			Com_Printf( "Note: approximating cinematic for Rage Pro or Voodoo\n" );
 		}
 	}
 }
