@@ -217,6 +217,53 @@ static qboolean JsDebug_IsCvarSetAllowed( const char *name ) {
 	return qtrue;
 }
 
+static void JsDebug_SanitizeExecCommandName( const char *cmd, char *out, size_t outSize ) {
+	const char *src;
+	const char *tail;
+	char token[MAX_TOKEN_CHARS];
+	size_t tokenLen = 0;
+
+	if ( !out || outSize == 0 ) {
+		return;
+	}
+
+	out[0] = '\0';
+	if ( !cmd || !cmd[0] ) {
+		return;
+	}
+
+	src = cmd;
+	while ( *src && *src <= ' ' ) {
+		src++;
+	}
+
+	/* Extract first token (command name), then strip Quake color codes from it. */
+	while ( src[tokenLen] && src[tokenLen] > ' ' && src[tokenLen] != ';' && src[tokenLen] != '\n' && src[tokenLen] != '\r' ) {
+		if ( tokenLen + 1 >= sizeof( token ) ) {
+			break;
+		}
+		token[tokenLen] = src[tokenLen];
+		tokenLen++;
+	}
+	token[tokenLen] = '\0';
+
+	if ( tokenLen == 0 ) {
+		Q_strncpyz( out, cmd, outSize );
+		return;
+	}
+
+	Q_CleanStr( token );
+	tail = src + tokenLen;
+
+	if ( !token[0] ) {
+		/* If command token was only color codes, keep original input. */
+		Q_strncpyz( out, cmd, outSize );
+		return;
+	}
+
+	Com_sprintf( out, outSize, "%s%s", token, tail );
+}
+
 static qboolean JsDebug_GetEventCallbacksArray( duk_context *ctx, const char *eventName, qboolean create ) {
 	duk_push_global_stash( ctx );
 	if ( !duk_get_prop_string( ctx, -1, JS_STASH_EVENTS ) || !duk_is_object( ctx, -1 ) ) {
@@ -326,6 +373,7 @@ static duk_ret_t Js_Binding_CvarSet( duk_context *ctx ) {
 static duk_ret_t Js_Binding_Exec( duk_context *ctx ) {
 	const char *cmd = duk_require_string( ctx, 0 );
 	const char *mode = ( duk_get_top( ctx ) > 1 ) ? duk_safe_to_string( ctx, 1 ) : "append";
+	char sanitizedCmd[MAX_STRING_CHARS];
 	cbufExec_t when = EXEC_APPEND;
 
 	if ( mode && !Q_stricmp( mode, "now" ) ) {
@@ -338,7 +386,8 @@ static duk_ret_t Js_Binding_Exec( duk_context *ctx ) {
 		return duk_error( ctx, DUK_ERR_ERROR, "exec denied for mode '%s' (js_allowExec=%d)", mode ? mode : "append", js_allowExec ? js_allowExec->integer : 0 );
 	}
 
-	Cbuf_ExecuteText( when, cmd );
+	JsDebug_SanitizeExecCommandName( cmd, sanitizedCmd, sizeof( sanitizedCmd ) );
+	Cbuf_ExecuteText( when, sanitizedCmd );
 	return 0;
 }
 
