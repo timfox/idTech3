@@ -75,7 +75,7 @@
 
 ### Medium-Term
 - [x] GPU occlusion culling (r_occlusionCulling, entity bbox queries, previous-frame visibility)
-- [ ] Texture compression (BC7/KTX2)
+- [x] Texture compression (BC7/KTX2)
 - [ ] DTLS network encryption
 - [ ] clang-tidy / cppcheck static analysis
 

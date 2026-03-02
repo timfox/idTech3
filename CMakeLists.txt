@@ -1225,6 +1225,7 @@ set(RENDERER_COMMON_SRCS
 	src/renderers/common/tr_image_qoi.c
 	src/renderers/common/tr_image_dds.c
 	src/renderers/common/tr_image_svg.c
+	src/renderers/common/tr_image_ktx2.c
 	src/renderers/common/tr_noise.c
 )
 IF(BUILD_FREETYPE)

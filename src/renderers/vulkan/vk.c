@@ -9405,6 +9405,94 @@ void vk_upload_image_data( image_t *image, int x, int y, int width, int height, 
 	}
 }
 
+/*
+ * Upload pre-compressed BC7 block data. pixels layout: mip0, mip1, ... (no resampling).
+ */
+void vk_upload_compressed_image_data( image_t *image, int width, int height, int miplevels, byte *pixels, int size, qboolean update ) {
+	VkCommandBuffer   command_buffer;
+	VkBufferImageCopy regions[16];
+	VkBufferImageCopy region;
+	int num_regions = 0;
+	int buffer_offset = 0;
+	int w, h;
+	int n;
+
+	for ( n = 0; n < miplevels && (size_t)n < ARRAY_LEN( regions ); n++ ) {
+		w = width >> n;
+		h = height >> n;
+		if ( w < 1 ) w = 1;
+		if ( h < 1 ) h = 1;
+
+		Com_Memset( &region, 0, sizeof( region ) );
+		region.bufferOffset = buffer_offset;
+		region.bufferRowLength = 0;
+		region.bufferImageHeight = 0;
+		region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		region.imageSubresource.mipLevel = n;
+		region.imageSubresource.baseArrayLayer = 0;
+		region.imageSubresource.layerCount = 1;
+		region.imageOffset.x = 0;
+		region.imageOffset.y = 0;
+		region.imageOffset.z = 0;
+		region.imageExtent.width = w;
+		region.imageExtent.height = h;
+		region.imageExtent.depth = 1;
+
+		regions[num_regions] = region;
+		num_regions++;
+
+		/* BC7: 4x4 blocks, 16 bytes per block */
+		buffer_offset += ( ( w + 3 ) / 4 ) * ( ( h + 3 ) / 4 ) * 16;
+
+		if ( w == 1 && h == 1 )
+			break;
+	}
+
+#ifdef USE_UPLOAD_QUEUE
+	if ( vk_wait_staging_buffer() ) {
+		vk_flush_staging_buffer( qfalse );
+	}
+	if ( vk.staging_buffer.size - vk.staging_buffer.offset < (VkDeviceSize)size ) {
+		vk_flush_staging_buffer( qfalse );
+	}
+	if ( vk.staging_buffer.size < (VkDeviceSize)size ) {
+		vk_alloc_staging_buffer( size );
+	}
+	for ( n = 0; n < num_regions; n++ ) {
+		regions[n].bufferOffset += vk.staging_buffer.offset;
+	}
+	Com_Memcpy( vk.staging_buffer.ptr + vk.staging_buffer.offset, pixels, size );
+	if ( vk.staging_buffer.offset == 0 ) {
+		VkCommandBufferBeginInfo begin_info;
+		begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		begin_info.pNext = NULL;
+		begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+		begin_info.pInheritanceInfo = NULL;
+		VK_CHECK( qvkBeginCommandBuffer( vk.staging_command_buffer, &begin_info ) );
+	}
+	vk.staging_buffer.offset += size;
+	command_buffer = vk.staging_command_buffer;
+#else
+	if ( vk.staging_buffer.size < (VkDeviceSize)size ) {
+		vk_alloc_staging_buffer( size );
+	}
+	Com_Memcpy( vk.staging_buffer.ptr, pixels, size );
+	command_buffer = begin_command_buffer();
+#endif
+
+	if ( update ) {
+		record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0 );
+	} else {
+		record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_HOST_BIT, 0 );
+	}
+	qvkCmdCopyBufferToImage( command_buffer, vk.staging_buffer.handle, image->handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, num_regions, regions );
+	record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
+
+#ifndef USE_UPLOAD_QUEUE
+	end_command_buffer( command_buffer, __func__ );
+#endif
+}
+
 void vk_update_descriptor_set( image_t *image, qboolean mipmap ) {
 	Vk_Sampler_Def sampler_def;
 	VkDescriptorImageInfo image_info;
