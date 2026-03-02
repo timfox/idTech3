@@ -674,7 +674,18 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 			// the world (like water) continue with the wrong frame
 			tess.shaderTime = backEnd.refdef.floatTime - tess.shader->timeOffset;
 
-			qglLoadMatrixf( backEnd.or.modelMatrix );
+			if ( depthRange && !isCrosshair && r_firstPersonScaleEnabled->integer && r_firstPersonScale->value > 0.0f && r_firstPersonScale->value != 1.0f ) {
+				float s = r_firstPersonScale->value;
+				float *m = backEnd.or.modelMatrix;
+				float scaled[16];
+				scaled[0]  = m[0]  * s; scaled[1]  = m[1]  * s; scaled[2]  = m[2]  * s; scaled[3]  = m[3];
+				scaled[4]  = m[4]  * s; scaled[5]  = m[5]  * s; scaled[6]  = m[6]  * s; scaled[7]  = m[7];
+				scaled[8]  = m[8]  * s; scaled[9]  = m[9]  * s; scaled[10] = m[10] * s; scaled[11] = m[11];
+				scaled[12] = m[12] * s; scaled[13] = m[13] * s; scaled[14] = m[14] * s; scaled[15] = m[15];
+				qglLoadMatrixf( scaled );
+			} else {
+				qglLoadMatrixf( backEnd.or.modelMatrix );
+			}
 
 			//
 			// change depthrange. Also change projection matrix so first person weapon does not look like coming
@@ -684,28 +695,25 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 			{
 				if (depthRange)
 				{
-					if(backEnd.viewParms.stereoFrame != STEREO_CENTER)
-					{
-						if(isCrosshair)
-						{
-							if(oldDepthRange)
-							{
-								// was not a crosshair but now is, change back proj matrix
-								qglMatrixMode(GL_PROJECTION);
-								qglLoadMatrixf(backEnd.viewParms.projectionMatrix);
-								qglMatrixMode(GL_MODELVIEW);
-							}
-						}
-						else
-						{
+					if ( !isCrosshair ) {
+						if ( r_firstPersonFovEnabled->integer && r_firstPersonFov->value > 0.0f ) {
+							float fpProj[16];
+							R_SetupFirstPersonProjection( &backEnd.viewParms, fpProj );
+							qglMatrixMode(GL_PROJECTION);
+							qglLoadMatrixf( fpProj );
+							qglMatrixMode(GL_MODELVIEW);
+						} else if ( backEnd.viewParms.stereoFrame != STEREO_CENTER ) {
 							viewParms_t temp = backEnd.viewParms;
-
 							R_SetupProjection(&temp, r_znear->value, qfalse);
-
 							qglMatrixMode(GL_PROJECTION);
 							qglLoadMatrixf(temp.projectionMatrix);
 							qglMatrixMode(GL_MODELVIEW);
 						}
+					} else if ( oldDepthRange && backEnd.viewParms.stereoFrame != STEREO_CENTER ) {
+						/* was not a crosshair but now is, change back proj matrix */
+						qglMatrixMode(GL_PROJECTION);
+						qglLoadMatrixf(backEnd.viewParms.projectionMatrix);
+						qglMatrixMode(GL_MODELVIEW);
 					}
 
 					if(!oldDepthRange)
@@ -713,7 +721,7 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 				}
 				else
 				{
-					if(!wasCrosshair && backEnd.viewParms.stereoFrame != STEREO_CENTER)
+					if(!wasCrosshair && ( r_firstPersonFovEnabled->integer || backEnd.viewParms.stereoFrame != STEREO_CENTER ) )
 					{
 						qglMatrixMode(GL_PROJECTION);
 						qglLoadMatrixf(backEnd.viewParms.projectionMatrix);
@@ -868,7 +876,18 @@ static void RB_RenderLitSurfList( dlight_t* dl ) {
 			R_TransformDlights( 1, dl, &backEnd.or );
 			tess.dlightUpdateParams = qtrue;
 
-			qglLoadMatrixf( backEnd.or.modelMatrix );
+			if ( depthRange && !isCrosshair && r_firstPersonScaleEnabled->integer && r_firstPersonScale->value > 0.0f && r_firstPersonScale->value != 1.0f ) {
+				float s = r_firstPersonScale->value;
+				float *m = backEnd.or.modelMatrix;
+				float scaled[16];
+				scaled[0]  = m[0]  * s; scaled[1]  = m[1]  * s; scaled[2]  = m[2]  * s; scaled[3]  = m[3];
+				scaled[4]  = m[4]  * s; scaled[5]  = m[5]  * s; scaled[6]  = m[6]  * s; scaled[7]  = m[7];
+				scaled[8]  = m[8]  * s; scaled[9]  = m[9]  * s; scaled[10] = m[10] * s; scaled[11] = m[11];
+				scaled[12] = m[12] * s; scaled[13] = m[13] * s; scaled[14] = m[14] * s; scaled[15] = m[15];
+				qglLoadMatrixf( scaled );
+			} else {
+				qglLoadMatrixf( backEnd.or.modelMatrix );
+			}
 
 			//
 			// change depthrange. Also change projection matrix so first person weapon does not look like coming
@@ -879,28 +898,24 @@ static void RB_RenderLitSurfList( dlight_t* dl ) {
 			{
 				if (depthRange)
 				{
-					if(backEnd.viewParms.stereoFrame != STEREO_CENTER)
-					{
-						if(isCrosshair)
-						{
-							if(oldDepthRange)
-							{
-								// was not a crosshair but now is, change back proj matrix
-								qglMatrixMode(GL_PROJECTION);
-								qglLoadMatrixf(backEnd.viewParms.projectionMatrix);
-								qglMatrixMode(GL_MODELVIEW);
-							}
-						}
-						else
-						{
+					if ( !isCrosshair ) {
+						if ( r_firstPersonFovEnabled->integer && r_firstPersonFov->value > 0.0f ) {
+							float fpProj[16];
+							R_SetupFirstPersonProjection( &backEnd.viewParms, fpProj );
+							qglMatrixMode(GL_PROJECTION);
+							qglLoadMatrixf( fpProj );
+							qglMatrixMode(GL_MODELVIEW);
+						} else if ( backEnd.viewParms.stereoFrame != STEREO_CENTER ) {
 							viewParms_t temp = backEnd.viewParms;
-
 							R_SetupProjection(&temp, r_znear->value, qfalse);
-
 							qglMatrixMode(GL_PROJECTION);
 							qglLoadMatrixf(temp.projectionMatrix);
 							qglMatrixMode(GL_MODELVIEW);
 						}
+					} else if ( oldDepthRange && backEnd.viewParms.stereoFrame != STEREO_CENTER ) {
+						qglMatrixMode(GL_PROJECTION);
+						qglLoadMatrixf(backEnd.viewParms.projectionMatrix);
+						qglMatrixMode(GL_MODELVIEW);
 					}
 
 					if(!oldDepthRange)
@@ -908,7 +923,7 @@ static void RB_RenderLitSurfList( dlight_t* dl ) {
 				}
 				else
 				{
-					if(!wasCrosshair && backEnd.viewParms.stereoFrame != STEREO_CENTER)
+					if(!wasCrosshair && ( r_firstPersonFovEnabled->integer || backEnd.viewParms.stereoFrame != STEREO_CENTER ) )
 					{
 						qglMatrixMode(GL_PROJECTION);
 						qglLoadMatrixf(backEnd.viewParms.projectionMatrix);

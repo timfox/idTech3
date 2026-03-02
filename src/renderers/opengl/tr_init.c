@@ -51,6 +51,10 @@ cvar_t	*r_detailTextures;
 cvar_t	*r_znear;
 cvar_t	*r_zproj;
 cvar_t	*r_stereoSeparation;
+cvar_t	*r_firstPersonFov;
+cvar_t	*r_firstPersonScale;
+cvar_t	*r_firstPersonFovEnabled;
+cvar_t	*r_firstPersonScaleEnabled;
 
 cvar_t	*r_skipBackEnd;
 
@@ -1549,6 +1553,18 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_zproj, "Projected viewport frustum." );
 	r_stereoSeparation = ri.Cvar_Get( "r_stereoSeparation", "64", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_stereoSeparation, "Control eye separation. Resulting separation is \\r_zproj divided by this value in standard units." );
+	r_firstPersonFov = ri.Cvar_Get( "r_firstPersonFov", "90", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_firstPersonFov, "60", "120", CV_FLOAT );
+	ri.Cvar_SetDescription( r_firstPersonFov, "Horizontal field of view (degrees) for first-person primitives (arms, weapons). 0 = use scene FOV." );
+	r_firstPersonScale = ri.Cvar_Get( "r_firstPersonScale", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_firstPersonScale, "0.1", "2.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_firstPersonScale, "Scale factor for first-person primitives toward camera (anti-clipping). 1.0 = no scale." );
+	r_firstPersonFovEnabled = ri.Cvar_Get( "r_firstPersonFovEnabled", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_firstPersonFovEnabled, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_firstPersonFovEnabled, "0 = use scene FOV for first-person; 1 = use r_firstPersonFov." );
+	r_firstPersonScaleEnabled = ri.Cvar_Get( "r_firstPersonScaleEnabled", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_firstPersonScaleEnabled, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_firstPersonScaleEnabled, "0 = no scale; 1 = apply r_firstPersonScale for anti-clipping." );
 	r_ignoreGLErrors = ri.Cvar_Get( "r_ignoreGLErrors", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_ignoreGLErrors, "Ignore OpenGL errors." );
 	r_teleporterFlash = ri.Cvar_Get( "r_teleporterFlash", "1", CVAR_ARCHIVE );
