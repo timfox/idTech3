@@ -636,6 +636,9 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 
 		R_DecomposeSort( drawSurf->sort, &entityNum, &shader, &fogNum, &dlighted );
 #ifdef USE_VULKAN
+		if ( backEnd.depthOnlyWorldPass && entityNum != REFENTITYNUM_WORLD ) {
+			continue;  /* occlusion pass: world depth only */
+		}
 		if ( ( vk.renderPassIndex == RENDER_PASS_SCREENMAP || vk.renderPassIndex == RENDER_PASS_SUN_SHADOW ) &&
 			entityNum != REFENTITYNUM_WORLD && backEnd.refdef.entities[ entityNum ].e.renderfx & RF_DEPTHHACK ) {
 			continue;
@@ -1712,6 +1715,15 @@ static const void *RB_DrawSurfs( const void *data ) {
 
 	// clear the z buffer, set the modelview, etc
 	RB_BeginDrawingView();
+
+#ifdef USE_VULKAN
+	if ( r_occlusionCulling && r_occlusionCulling->integer && vk.occlusion_query_pool != VK_NULL_HANDLE ) {
+		backEnd.depthOnlyWorldPass = qtrue;
+		RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
+		backEnd.depthOnlyWorldPass = qfalse;
+		vk_occlusion_draw_entity_bboxes( cmd );
+	}
+#endif
 
 #ifdef VK_CUBEMAP
 	if ( backEnd.viewParms.targetCube != NULL ) 

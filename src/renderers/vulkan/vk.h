@@ -156,8 +156,9 @@ typedef enum {
 	TYPE_BLEND3_DST_COLOR_SRC_ALPHA,
 	TYPE_BLEND3_DST_COLOR_SRC_ALPHA_ENV,
 
-	TYPE_GENERIC_END = TYPE_BLEND3_MIX_ONE_MINUS_ALPHA_ENV
+	TYPE_GENERIC_END = TYPE_BLEND3_MIX_ONE_MINUS_ALPHA_ENV,
 
+	TYPE_OCCLUSION_BBOX = 128	// depth-test only, no color/depth write (for occlusion queries)
 } Vk_Shader_Type;
 
 // used with cg_shadows == 2
@@ -456,6 +457,12 @@ const char *vk_format_string( VkFormat format );
 void VBO_PrepareQueues( void );
 void VBO_RenderIBOItems( void );
 void VBO_ClearQueue( void );
+
+/* GPU occlusion culling for entities */
+struct drawSurfsCommand_s;
+void vk_occlusion_pass( const struct drawSurfsCommand_s *cmd );
+void vk_occlusion_readback( void );
+void vk_occlusion_draw_entity_bboxes( const struct drawSurfsCommand_s *cmd );
 
 // cubemap
 #ifdef VK_CUBEMAP
@@ -881,6 +888,8 @@ typedef struct {
 	uint32_t surface_beam_pipeline;
 	uint32_t surface_axis_pipeline;
 	uint32_t dot_pipeline;
+	uint32_t occlusion_bbox_pipeline;
+	VkQueryPool occlusion_query_pool;
 
 	VkPipeline gamma_pipeline;
 	VkPipeline capture_pipeline;
