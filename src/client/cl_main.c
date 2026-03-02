@@ -2603,7 +2603,7 @@ Resend a connect message if the last one has timed out
 */
 static void CL_CheckForResend( void ) {
 	int		port, len;
-	char	info[MAX_INFO_STRING*2]; // larger buffer to detect overflows
+	char	info[BIG_INFO_STRING]; // Cvar_InfoString(CVAR_USERINFO) can use BIG_INFO_STRING
 	char	data[MAX_INFO_STRING];
 	qboolean	notOverflowed;
 	qboolean	infoTruncated;
@@ -2642,6 +2642,10 @@ static void CL_CheckForResend( void ) {
 
 		infoTruncated = qfalse;
 		Q_strncpyz( info, Cvar_InfoString( CVAR_USERINFO, &infoTruncated ), sizeof( info ) );
+		if ( strlen( info ) > MAX_USERINFO_LENGTH ) {
+			info[ MAX_USERINFO_LENGTH ] = '\0';
+			notOverflowed = qfalse;
+		}
 
 		// remove some non-important keys that may cause overflow during connection
 		if ( strlen( info ) > MAX_USERINFO_LENGTH - 64 ) {
@@ -3300,15 +3304,17 @@ static void CL_CheckUserinfo( void ) {
 	{
 		qboolean infoTruncated = qfalse;
 		const char *info;
+		char truncated[ MAX_USERINFO_LENGTH + 1 ];
 
 		cvar_modifiedFlags &= ~CVAR_USERINFO;
 
 		info = Cvar_InfoString( CVAR_USERINFO, &infoTruncated );
+		Q_strncpyz( truncated, info, sizeof( truncated ) );
 		if ( strlen( info ) > MAX_USERINFO_LENGTH || infoTruncated ) {
 			Com_Printf( S_COLOR_YELLOW "WARNING: oversize userinfo, you might be not able to play on remote server!\n" );
 		}
 
-		CL_AddReliableCommand( va( "userinfo \"%s\"", info ), qfalse );
+		CL_AddReliableCommand( va( "userinfo \"%s\"", truncated ), qfalse );
 	}
 }
 
@@ -3453,11 +3459,11 @@ void CL_Frame( int msec, int realMsec ) {
 	cls.framecount++;
 	SCR_UpdateScreen();
 
+	// advance cinematic before audio so ROQ/video samples are mixed this frame
+	SCR_RunCinematic();
+
 	// update audio
 	S_Update( realMsec );
-
-	// advance local effects for next frame
-	SCR_RunCinematic();
 
 	// tick all gameplay subsystems (physics, navigation, particles, director, music)
 	CL_GameFrame( (float)msec * 0.001f );

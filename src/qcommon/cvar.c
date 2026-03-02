@@ -1749,6 +1749,7 @@ Cvar_InfoString
 const char *Cvar_InfoString( int bit, qboolean *truncated )
 {
 	static char	info[ MAX_INFO_STRING ];
+	static char	info_big[ BIG_INFO_STRING ];
 	const cvar_t *user_vars[ MAX_CVARS ];
 	const cvar_t *vm_vars[ MAX_CVARS ];
 	const cvar_t *var;
@@ -1756,6 +1757,12 @@ const char *Cvar_InfoString( int bit, qboolean *truncated )
 	int vm_count;
 	int i;
 	qboolean allSet;
+	int slen;
+	char *buf;
+
+	/* CVAR_USERINFO often has many mod-added keys (videoflags, voteflags, etc.) */
+	slen = ( bit == CVAR_USERINFO ) ? BIG_INFO_STRING : MAX_INFO_STRING;
+	buf = ( bit == CVAR_USERINFO ) ? info_big : info;
 
 	// sort to get more predictable output
 	if ( cvar_sort )
@@ -1764,7 +1771,7 @@ const char *Cvar_InfoString( int bit, qboolean *truncated )
 		Cvar_Sort();
 	}
 
-	info[0] = '\0';
+	buf[0] = '\0';
 	user_count = 0;
 	vm_count = 0;
 	allSet = qtrue; // this will be qfalse on overflow
@@ -1783,7 +1790,7 @@ const char *Cvar_InfoString( int bit, qboolean *truncated )
 			}
 			else
 			{
-				allSet &= Info_SetValueForKey( info, var->name, var->string );
+				allSet &= Info_SetValueForKey_s( buf, slen, var->name, var->string );
 			}
 		}
 	}
@@ -1792,14 +1799,14 @@ const char *Cvar_InfoString( int bit, qboolean *truncated )
 	for ( i = 0; i < vm_count; i++ )
 	{
 		var = vm_vars[ i ];
-		allSet &= Info_SetValueForKey( info, var->name, var->string );
+		allSet &= Info_SetValueForKey_s( buf, slen, var->name, var->string );
 	}
 
 	// add user-created cvars
 	for ( i = 0; i < user_count; i++ )
 	{
 		var = user_vars[ i ];
-		allSet &= Info_SetValueForKey( info, var->name, var->string );
+		allSet &= Info_SetValueForKey_s( buf, slen, var->name, var->string );
 	}
 
 	if ( truncated )
@@ -1807,7 +1814,7 @@ const char *Cvar_InfoString( int bit, qboolean *truncated )
 		*truncated = !allSet;
 	}
 
-	return info;
+	return buf;
 }
 
 
