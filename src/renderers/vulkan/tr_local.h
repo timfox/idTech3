@@ -1278,7 +1278,7 @@ typedef struct {
 	qboolean doneBloom;
 	qboolean doneFog;
 
-	/* First-person rendering (UE-style): custom FOV and anti-clipping scale */
+	/* First-person rendering: custom FOV and anti-clipping scale */
 	qboolean useFirstPersonProjection;
 	float firstPersonProjectionMatrix[16];
 
