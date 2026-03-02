@@ -28,6 +28,20 @@ static cvar_t *js_disableFaultyCallbacks;
 static cvar_t *js_requireCache;
 static cvar_t *js_compatTarget;
 static cvar_t *js_autoInit;
+static cvar_t *js_verbose;
+static cvar_t *js_verboseMenu;
+
+/* Current UI menu (UIMENU_*), set by client when menu changes */
+static int s_jsCurrentMenu = -1;
+
+#define MAX_JS_ERROR_LOG 8
+#define JS_ERROR_MSG_LEN 192
+static struct {
+	char msg[JS_ERROR_MSG_LEN];
+	int count;
+} s_jsErrorLog[MAX_JS_ERROR_LOG];
+static int s_jsErrorLogHead;
+static int s_jsErrorTotalCount;
 
 static qboolean JsDebug_OpenState( void );
 static qboolean JsDebug_LoadScript( const char *scriptPath );
@@ -73,6 +87,37 @@ static void JsDebug_InitPolicyCvars( void ) {
 		js_autoInit = Cvar_Get( "js_autoInit", "1", CVAR_ARCHIVE_ND );
 		Cvar_SetDescription( js_autoInit, "Initialize JavaScript runtime automatically at startup (0=manual via js_reload, 1=auto)." );
 	}
+	if ( !js_verbose ) {
+		js_verbose = Cvar_Get( "js_verbose", "0", CVAR_ARCHIVE_ND );
+		Cvar_SetDescription( js_verbose, "Toggle verbose UI/JS debug info when at a menu (0=off, 1=on)." );
+	}
+	if ( !js_verboseMenu ) {
+		js_verboseMenu = Cvar_Get( "js_verboseMenu", "main", CVAR_ARCHIVE_ND );
+		Cvar_SetDescription( js_verboseMenu, "Which menu to show verbose info: main, ingame, all, or none." );
+	}
+}
+
+void JsDebug_SetCurrentMenu( int menu ) {
+	s_jsCurrentMenu = menu;
+}
+
+static void JsDebug_RecordError( const char *context, const char *msg ) {
+	(void)context;
+	int i;
+	if ( !msg || !msg[0] ) {
+		msg = "(unknown error)";
+	}
+	s_jsErrorTotalCount++;
+	for ( i = 0; i < MAX_JS_ERROR_LOG; i++ ) {
+		if ( s_jsErrorLog[i].count > 0 && !Q_stricmp( s_jsErrorLog[i].msg, msg ) ) {
+			s_jsErrorLog[i].count++;
+			return;
+		}
+	}
+	i = s_jsErrorLogHead % MAX_JS_ERROR_LOG;
+	Q_strncpyz( s_jsErrorLog[i].msg, msg, JS_ERROR_MSG_LEN );
+	s_jsErrorLog[i].count = 1;
+	s_jsErrorLogHead++;
 }
 
 void JsDebug_InitCvars( void ) {
@@ -322,15 +367,25 @@ static void JsDebug_ClearTrackedScripts( void ) {
 }
 
 static void JsDebug_CloseState( void ) {
+	int i;
 	if ( s_jsContext ) {
 		duk_destroy_heap( s_jsContext );
 		s_jsContext = NULL;
+	}
+	s_jsCurrentMenu = -1;
+	s_jsErrorTotalCount = 0;
+	s_jsErrorLogHead = 0;
+	for ( i = 0; i < MAX_JS_ERROR_LOG; i++ ) {
+		s_jsErrorLog[i].msg[0] = '\0';
+		s_jsErrorLog[i].count = 0;
 	}
 }
 
 static void JsDebug_PrintJsError( const char *prefix ) {
 	const char *msg = duk_safe_to_string( s_jsContext, -1 );
-	Com_Printf( S_COLOR_RED "JavaScript: %s: %s\n", prefix, msg ? msg : "(unknown error)" );
+	const char *err = msg ? msg : "(unknown error)";
+	Com_Printf( S_COLOR_RED "JavaScript: %s: %s\n", prefix, err );
+	JsDebug_RecordError( prefix, err );
 	duk_pop( s_jsContext );
 }
 
@@ -1115,7 +1170,9 @@ void JsDebug_Frame( int msec, int realMsec ) {
 				duk_push_global_stash( s_jsContext );
 				if ( duk_get_prop_string( s_jsContext, -1, va( "\xff""timer_%d", jsTimers[ti].id ) ) && duk_is_function( s_jsContext, -1 ) ) {
 					if ( duk_pcall( s_jsContext, 0 ) != 0 ) {
-						Com_Printf( S_COLOR_YELLOW "JS timer %d error: %s\n", jsTimers[ti].id, duk_safe_to_string( s_jsContext, -1 ) );
+						const char *err = duk_safe_to_string( s_jsContext, -1 );
+						Com_Printf( S_COLOR_YELLOW "JS timer %d error: %s\n", jsTimers[ti].id, err ? err : "(unknown)" );
+						JsDebug_RecordError( "timer", err ? err : "(unknown error)" );
 					}
 				}
 				duk_pop_2( s_jsContext );
@@ -1161,7 +1218,9 @@ void JsDebug_Frame( int msec, int realMsec ) {
 		duk_push_int( s_jsContext, realMsec );
 		if ( duk_pcall( s_jsContext, 2 ) != DUK_EXEC_SUCCESS ) {
 			const char *msg = duk_safe_to_string( s_jsContext, -1 );
-			Com_Printf( S_COLOR_RED "JavaScript: frame callback error: %s\n", msg ? msg : "(unknown error)" );
+			const char *err = msg ? msg : "(unknown error)";
+			Com_Printf( S_COLOR_RED "JavaScript: frame callback error: %s\n", err );
+			JsDebug_RecordError( "frame", err );
 			if ( js_disableFaultyCallbacks && js_disableFaultyCallbacks->integer ) {
 				duk_pop( s_jsContext );
 				duk_push_undefined( s_jsContext );
@@ -1173,6 +1232,50 @@ void JsDebug_Frame( int msec, int realMsec ) {
 	}
 
 	duk_pop( s_jsContext );
+
+	/* Verbose UI/JS info when at a menu */
+	if ( js_verbose && js_verbose->integer && js_verboseMenu && js_verboseMenu->string && js_verboseMenu->string[0] ) {
+		static int s_lastVerboseMs = 0;
+		const int now = Sys_Milliseconds();
+		qboolean match = qfalse;
+		const char *menuStr = js_verboseMenu->string;
+
+		if ( !Q_stricmp( menuStr, "all" ) ) {
+			match = ( s_jsCurrentMenu >= 0 );
+		} else if ( !Q_stricmp( menuStr, "main" ) ) {
+			match = ( s_jsCurrentMenu == 1 );
+		} else if ( !Q_stricmp( menuStr, "ingame" ) ) {
+			match = ( s_jsCurrentMenu == 2 );
+		} else if ( !Q_stricmp( menuStr, "none" ) ) {
+			match = ( s_jsCurrentMenu == 0 );
+		} else if ( !Q_stricmp( menuStr, "off" ) ) {
+			match = qfalse;
+		} else {
+			match = ( s_jsCurrentMenu >= 0 );
+		}
+
+		if ( match && now - s_lastVerboseMs >= 1000 ) {
+			s_lastVerboseMs = now;
+			Com_Printf( "JavaScript verbose: menu=%d callbacks frame=%d menu_changed=%d ui_open=%d ui_close=%d",
+				s_jsCurrentMenu,
+				JsDebug_EventCallbackCount( "frame" ),
+				JsDebug_EventCallbackCount( "menu_changed" ),
+				JsDebug_EventCallbackCount( "ui_open" ),
+				JsDebug_EventCallbackCount( "ui_close" ) );
+			if ( s_jsErrorTotalCount > 0 ) {
+				int ei, n;
+				Com_Printf( " errors=%d", s_jsErrorTotalCount );
+				for ( ei = 0, n = 0; ei < MAX_JS_ERROR_LOG && n < 3; ei++ ) {
+					int idx = ( s_jsErrorLogHead - 1 - ei + MAX_JS_ERROR_LOG * 2 ) % MAX_JS_ERROR_LOG;
+					if ( s_jsErrorLog[idx].count > 0 ) {
+						Com_Printf( " [%.64s x%d]", s_jsErrorLog[idx].msg, s_jsErrorLog[idx].count );
+						n++;
+					}
+				}
+			}
+			Com_Printf( "\n" );
+		}
+	}
 }
 
 void JsDebug_EmitEvent( const char *eventName, const char *s0, const char *s1, int i0, int i1 ) {
@@ -1259,7 +1362,9 @@ void JsDebug_EmitEvent( const char *eventName, const char *s0, const char *s1, i
 
 		if ( duk_pcall( s_jsContext, 1 ) != DUK_EXEC_SUCCESS ) {
 			const char *msg = duk_safe_to_string( s_jsContext, -1 );
-			Com_Printf( S_COLOR_RED "JavaScript: %s callback error: %s\n", eventName, msg ? msg : "(unknown error)" );
+			const char *err = msg ? msg : "(unknown error)";
+			Com_Printf( S_COLOR_RED "JavaScript: %s callback error: %s\n", eventName, err );
+			JsDebug_RecordError( eventName, err );
 			if ( js_disableFaultyCallbacks && js_disableFaultyCallbacks->integer ) {
 				duk_pop( s_jsContext );
 				duk_push_undefined( s_jsContext );
@@ -1330,6 +1435,17 @@ void Cmd_JsReload_f( void ) {
 	Com_Printf( "JavaScript: loaded %d script(s), %d failure(s)\n", successCount, failureCount );
 }
 
+void Cmd_JsClearErrors_f( void ) {
+	int i;
+	s_jsErrorTotalCount = 0;
+	s_jsErrorLogHead = 0;
+	for ( i = 0; i < MAX_JS_ERROR_LOG; i++ ) {
+		s_jsErrorLog[i].msg[0] = '\0';
+		s_jsErrorLog[i].count = 0;
+	}
+	Com_Printf( "JavaScript: error log cleared\n" );
+}
+
 void Cmd_JsList_f( void ) {
 	int i;
 
@@ -1365,6 +1481,11 @@ void Cmd_JsList_f( void ) {
 		JsDebug_EventCallbackCount( "input_key" ),
 		JsDebug_EventCallbackCount( "mouse_move" ),
 		JsDebug_EventCallbackCount( "console_open" ) );
+	Com_Printf( "JavaScript: verbose js_verbose=%d js_verboseMenu=%s currentMenu=%d errors=%d (use js_clearErrors to reset)\n",
+		js_verbose ? js_verbose->integer : 0,
+		js_verboseMenu ? js_verboseMenu->string : "main",
+		s_jsCurrentMenu,
+		s_jsErrorTotalCount );
 	Com_Printf( "JavaScript: tracked scripts (%d)\n", s_jsTrackedCount );
 
 	for ( i = 0; i < s_jsTrackedCount; i++ ) {
@@ -1449,6 +1570,10 @@ void Cmd_JsDump_f( void ) {
 	Com_Printf( "JavaScript support is disabled in this build. Configure with -DUSE_DUKTAPE=ON.\n" );
 }
 
+void Cmd_JsClearErrors_f( void ) {
+	Com_Printf( "JavaScript support is disabled in this build. Configure with -DUSE_DUKTAPE=ON.\n" );
+}
+
 void Cmd_JsExec_f( void ) {
 	Com_Printf( "JavaScript support is disabled in this build. Configure with -DUSE_DUKTAPE=ON.\n" );
 }
@@ -1464,6 +1589,10 @@ void JsDebug_EmitEvent( const char *eventName, const char *s0, const char *s1, i
 	(void)s1;
 	(void)i0;
 	(void)i1;
+}
+
+void JsDebug_SetCurrentMenu( int menu ) {
+	(void)menu;
 }
 
 #endif

@@ -124,6 +124,7 @@ void CL_JsNotifyMenuChanged( int menu ) {
 	}
 
 	JsDebug_EmitEvent( "menu_changed", menuName, NULL, menu, 0 );
+	JsDebug_SetCurrentMenu( menu );
 #else
 	(void)menu;
 #endif

@@ -232,23 +232,31 @@ void SCR_DrawSmallChar( int x, int y, int ch ) {
 ** small string are drawn at native screen resolution
 */
 void SCR_DrawSmallString( int x, int y, const char *s, int len ) {
-	int row, col, ch, i;
+	int row, col, ch;
 	float frow, fcol;
 	float size;
+	const char *end;
 
 	if ( y < -smallchar_height ) {
 		return;
 	}
 
 	size = 0.0625;
+	end = s + len;
 
-	for ( i = 0; i < len; i++ ) {
-		ch = *s++ & 255;
-		row = ch>>4;
-		col = ch&15;
+	while ( s < end && *s ) {
+		if ( (unsigned char)*s >= 0x80 ) {
+			uint32_t cp = Q_UTF8_Decode( &s );
+			ch = ( cp < 256 ) ? (int)( cp & 0xFF ) : '?';
+		} else {
+			ch = (unsigned char)*s;
+			s++;
+		}
+		row = ch >> 4;
+		col = ch & 15;
 
-		frow = row*0.0625;
-		fcol = col*0.0625;
+		frow = row * 0.0625;
+		fcol = col * 0.0625;
 
 		re.DrawStretchPic( x, y, smallchar_width, smallchar_height,
 						   fcol, frow, fcol + size, frow + size, 
@@ -287,22 +295,24 @@ void SCR_DrawStringExt( int x, int y, float size, const char *string, const floa
 	s = string;
 	xx = x;
 	while ( *s ) {
+		int ch;
 		if ( !noColorEscape && Q_IsColorString( s ) ) {
 			s += 2;
 			continue;
 		}
-		if ( CL_Emoji_IsEnabled() && ( (unsigned char)*s >= 0x80 ) ) {
-			const char *prev = s;
+		if ( (unsigned char)*s >= 0x80 ) {
 			uint32_t cp = Q_UTF8_Decode( &s );
-			if ( Q_UTF8_IsEmoji( cp ) ) {
+			if ( CL_Emoji_IsEnabled() && Q_UTF8_IsEmoji( cp ) ) {
 				xx += (int)clampedSize;
 				continue;
 			}
-			s = prev;
+			ch = ( cp < 256 ) ? (int)( cp & 0xFF ) : '?';
+		} else {
+			ch = (unsigned char)*s;
+			s++;
 		}
-		SCR_DrawChar( xx+2, y+2, clampedSize, *s );
+		SCR_DrawChar( xx+2, y+2, clampedSize, ch );
 		xx += (int)clampedSize;
-		s++;
 	}
 
 
@@ -312,6 +322,7 @@ void SCR_DrawStringExt( int x, int y, float size, const char *string, const floa
 	Com_Memcpy( color, setColor, sizeof( color ) );
 	re.SetColor( setColor );
 	while ( *s ) {
+		int ch;
 		if ( Q_IsColorString( s ) ) {
 			if ( !forceColor ) {
 				Com_Memcpy( color, g_color_table[ ColorIndexFromChar( *(s+1) ) ], sizeof( color ) );
@@ -323,19 +334,20 @@ void SCR_DrawStringExt( int x, int y, float size, const char *string, const floa
 				continue;
 			}
 		}
-		if ( CL_Emoji_IsEnabled() && ( (unsigned char)*s >= 0x80 ) ) {
-			const char *prev = s;
+		if ( (unsigned char)*s >= 0x80 ) {
 			uint32_t cp = Q_UTF8_Decode( &s );
-			if ( CL_Emoji_DrawChar( xx, y, clampedSize, clampedSize, cp ) ) {
+			if ( CL_Emoji_IsEnabled() && Q_UTF8_IsEmoji( cp ) && CL_Emoji_DrawChar( xx, y, clampedSize, clampedSize, cp ) ) {
 				re.SetColor( forceColor ? setColor : color );
 				xx += (int)clampedSize;
 				continue;
 			}
-			s = prev;
+			ch = ( cp < 256 ) ? (int)( cp & 0xFF ) : '?';
+		} else {
+			ch = (unsigned char)*s;
+			s++;
 		}
-		SCR_DrawChar( xx, y, clampedSize, *s );
+		SCR_DrawChar( xx, y, clampedSize, ch );
 		xx += (int)clampedSize;
-		s++;
 	}
 	re.SetColor( NULL );
 }
@@ -368,6 +380,7 @@ void SCR_DrawSmallStringExt( int x, int y, const char *string, const float *setC
 	vec4_t		color;
 	const char	*s;
 	int			xx;
+	int			ch;
 
 	// draw the colored text
 	s = string;
@@ -385,9 +398,15 @@ void SCR_DrawSmallStringExt( int x, int y, const char *string, const float *setC
 				continue;
 			}
 		}
-		SCR_DrawSmallChar( xx, y, *s );
+		if ( (unsigned char)*s >= 0x80 ) {
+			uint32_t cp = Q_UTF8_Decode( &s );
+			ch = ( cp < 256 ) ? (int)( cp & 0xFF ) : '?';
+		} else {
+			ch = (unsigned char)*s;
+			s++;
+		}
+		SCR_DrawSmallChar( xx, y, ch );
 		xx += smallchar_width;
-		s++;
 	}
 	re.SetColor( NULL );
 }

@@ -102,3 +102,15 @@ CL_Frame(msec)
 6. SMAA (edge → blend → compose)
 7. Post-processing (tonemapping, panini, lens effects)
 8. Present
+
+## JavaScript / UI Debug (Duktape)
+
+When `USE_DUKTAPE` is enabled, the engine provides a JavaScript runtime (`idtech3` namespace) with event callbacks (frame, menu_changed, ui_open, ui_close, etc.) and HUD bindings. For debugging UI and script issues:
+
+- **`js_verbose`** (0/1): Toggle verbose info when at a menu.
+- **`js_verboseMenu`** (main|ingame|all|none|off): Which menu to show verbose for. Default `main`.
+- **`js_list`**: Shows policy cvars, callback counts, current menu, and error count.
+- **`js_clearErrors`**: Reset the JavaScript error log.
+- **`js_reload`**, **`js_exec`**, **`js_dump`**: Reload scripts, run code, dump globals.
+
+When verbose is on and you are at the specified menu, the console prints once per second: menu id, callback counts, and any JavaScript errors (with counts). Errors are always printed to console when they occur; the log tracks them for the verbose summary.
