@@ -19,6 +19,8 @@ on:
       - next-gen-2
       - next-gen-3
       - next-gen-4
+      - proximity-voice-chat
+      - proximity-voice-chat
     paths-ignore:
       - '**/*.md'
       - '**/LICENSE*'
