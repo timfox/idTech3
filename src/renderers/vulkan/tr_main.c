@@ -630,7 +630,7 @@ void R_SetupProjection( viewParms_t *dest, float zProj, qboolean computeFrustum 
 R_SetupFirstPersonProjection
 
 Builds a projection matrix for first-person primitives (arms, weapons) with
-custom FOV. Used for UE-style first-person rendering to avoid clipping.
+custom FOV for first-person primitives to avoid clipping.
 ===============
 */
 void R_SetupFirstPersonProjection( viewParms_t *dest, float *outProjection )

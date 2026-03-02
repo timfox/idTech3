@@ -79,7 +79,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - sRGB gamma correction
 - Debug views (pre-tonemap HDR, luminance heatmap)
 
-### First Person Rendering (UE-style)
+### First Person Rendering
 - Custom FOV for first-person primitives (arms, weapons) separate from scene FOV
 - Anti-clipping scale factor to shrink first-person geometry toward camera
 - Applies to entities with `RF_FIRST_PERSON` + `RF_DEPTHHACK` (view weapon, arms)
