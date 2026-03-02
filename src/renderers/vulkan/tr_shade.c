@@ -373,6 +373,9 @@ void RB_BeginSurface( shader_t *shader, int fogNum ) {
 	tess.numVertexes = 0;
 	tess.shader = state;
 	tess.fogNum = fogNum;
+#ifdef USE_VULKAN
+	tess.gltfDrawSurface = NULL;
+#endif
 	vk_reset_iqm_storage_offsets();
 	R_IQMBeginSurfaceBatch();
 

@@ -1178,6 +1178,9 @@ void R_ModelBounds( qhandle_t handle, vec3_t mins, vec3_t maxs ) {
 		VectorCopy( frame->bounds[1], maxs );
 		
 		return;
+	} else if (model->type == MOD_GLTF) {
+		R_GLTFModelBounds(model->modelData, mins, maxs);
+		return;
 	} else if (model->type == MOD_MDR) {
 		mdrHeader_t	*header;
 		mdrFrame_t	*frame;

@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 // tr_surf.c
 #include "tr_local.h"
+#include "tr_model_gltf.h"
 
 /*
 
@@ -1520,6 +1521,141 @@ static void RB_SurfaceSkip( void *surf ) {
 	(void)surf;
 }
 
+/*
+=============
+RB_GLTFSurface
+=============
+glTF mesh primitive. Uses VBO when available (static, no skinning/morph); otherwise tess path.
+*/
+void RB_GLTFSurface( const surfaceType_t *surface ) {
+	const srfGLTFPrimitive_t *surf = (const srfGLTFPrimitive_t *)surface;
+	const gltfVertex_t *v;
+	int i, j;
+	int base;
+
+	if ( surf->vbo_vertex != VK_NULL_HANDLE && surf->vbo_index != VK_NULL_HANDLE ) {
+		/* VBO path: set gltfDrawSurface for vk_bind_geometry to use */
+		tess.gltfDrawSurface = surf;
+		tess.numVertexes = surf->numVertices;
+		tess.numIndexes = surf->numIndices;
+		return;
+	}
+
+	/* Tess path (skinning, morph targets, or VBO creation failed) */
+	tess.gltfDrawSurface = NULL;
+	RB_CHECKOVERFLOW( surf->numVertices, surf->numIndices );
+
+	base = tess.numVertexes;
+
+	if ( surf->hasSkinning && tr.currentModel && tr.currentModel->modelData ) {
+		const gltfModel_t *model = R_GetGLTFModelFromModelData( tr.currentModel->modelData );
+		float jointMatrix[GLTF_MAX_JOINTS * 12];
+
+		if ( model ) {
+			R_ComputeGLTFJointMatrices( model, jointMatrix );
+
+		for ( i = 0; i < surf->numVertices; i++ ) {
+			v = &surf->vertices[i];
+			vec3_t pos, nrm;
+			float w0 = v->weights[0], w1 = v->weights[1], w2 = v->weights[2], w3 = v->weights[3];
+			int j0 = v->joints[0], j1 = v->joints[1], j2 = v->joints[2], j3 = v->joints[3];
+			float *m0, *m1, *m2, *m3;
+
+			VectorClear( pos );
+			VectorClear( nrm );
+			if ( w0 > 0 && j0 < model->skeleton.numJoints ) {
+				m0 = &jointMatrix[j0 * 12];
+				pos[0] += w0 * (m0[0]*v->position[0] + m0[1]*v->position[1] + m0[2]*v->position[2] + m0[3]);
+				pos[1] += w0 * (m0[4]*v->position[0] + m0[5]*v->position[1] + m0[6]*v->position[2] + m0[7]);
+				pos[2] += w0 * (m0[8]*v->position[0] + m0[9]*v->position[1] + m0[10]*v->position[2] + m0[11]);
+				nrm[0] += w0 * (m0[0]*v->normal[0] + m0[1]*v->normal[1] + m0[2]*v->normal[2]);
+				nrm[1] += w0 * (m0[4]*v->normal[0] + m0[5]*v->normal[1] + m0[6]*v->normal[2]);
+				nrm[2] += w0 * (m0[8]*v->normal[0] + m0[9]*v->normal[1] + m0[10]*v->normal[2]);
+			}
+			if ( w1 > 0 && j1 < model->skeleton.numJoints ) {
+				m1 = &jointMatrix[j1 * 12];
+				pos[0] += w1 * (m1[0]*v->position[0] + m1[1]*v->position[1] + m1[2]*v->position[2] + m1[3]);
+				pos[1] += w1 * (m1[4]*v->position[0] + m1[5]*v->position[1] + m1[6]*v->position[2] + m1[7]);
+				pos[2] += w1 * (m1[8]*v->position[0] + m1[9]*v->position[1] + m1[10]*v->position[2] + m1[11]);
+				nrm[0] += w1 * (m1[0]*v->normal[0] + m1[1]*v->normal[1] + m1[2]*v->normal[2]);
+				nrm[1] += w1 * (m1[4]*v->normal[0] + m1[5]*v->normal[1] + m1[6]*v->normal[2]);
+				nrm[2] += w1 * (m1[8]*v->normal[0] + m1[9]*v->normal[1] + m1[10]*v->normal[2]);
+			}
+			if ( w2 > 0 && j2 < model->skeleton.numJoints ) {
+				m2 = &jointMatrix[j2 * 12];
+				pos[0] += w2 * (m2[0]*v->position[0] + m2[1]*v->position[1] + m2[2]*v->position[2] + m2[3]);
+				pos[1] += w2 * (m2[4]*v->position[0] + m2[5]*v->position[1] + m2[6]*v->position[2] + m2[7]);
+				pos[2] += w2 * (m2[8]*v->position[0] + m2[9]*v->position[1] + m2[10]*v->position[2] + m2[11]);
+				nrm[0] += w2 * (m2[0]*v->normal[0] + m2[1]*v->normal[1] + m2[2]*v->normal[2]);
+				nrm[1] += w2 * (m2[4]*v->normal[0] + m2[5]*v->normal[1] + m2[6]*v->normal[2]);
+				nrm[2] += w2 * (m2[8]*v->normal[0] + m2[9]*v->normal[1] + m2[10]*v->normal[2]);
+			}
+			if ( w3 > 0 && j3 < model->skeleton.numJoints ) {
+				m3 = &jointMatrix[j3 * 12];
+				pos[0] += w3 * (m3[0]*v->position[0] + m3[1]*v->position[1] + m3[2]*v->position[2] + m3[3]);
+				pos[1] += w3 * (m3[4]*v->position[0] + m3[5]*v->position[1] + m3[6]*v->position[2] + m3[7]);
+				pos[2] += w3 * (m3[8]*v->position[0] + m3[9]*v->position[1] + m3[10]*v->position[2] + m3[11]);
+				nrm[0] += w3 * (m3[0]*v->normal[0] + m3[1]*v->normal[1] + m3[2]*v->normal[2]);
+				nrm[1] += w3 * (m3[4]*v->normal[0] + m3[5]*v->normal[1] + m3[6]*v->normal[2]);
+				nrm[2] += w3 * (m3[8]*v->normal[0] + m3[9]*v->normal[1] + m3[10]*v->normal[2]);
+			}
+			VectorNormalize( nrm );
+			tess.xyz[base + i][0] = pos[0];
+			tess.xyz[base + i][1] = pos[1];
+			tess.xyz[base + i][2] = pos[2];
+			tess.normal[base + i][0] = nrm[0];
+			tess.normal[base + i][1] = nrm[1];
+			tess.normal[base + i][2] = nrm[2];
+			tess.texCoords[0][base + i][0] = v->texCoord0[0];
+			tess.texCoords[0][base + i][1] = v->texCoord0[1];
+			tess.vertexColors[base + i].rgba[0] = (byte)( v->color[0] * 255 );
+			tess.vertexColors[base + i].rgba[1] = (byte)( v->color[1] * 255 );
+			tess.vertexColors[base + i].rgba[2] = (byte)( v->color[2] * 255 );
+			tess.vertexColors[base + i].rgba[3] = (byte)( v->color[3] * 255 );
+		}
+		} else {
+			/* No model data, fall through to non-skinned path */
+			for ( i = 0; i < surf->numVertices; i++ ) {
+				v = &surf->vertices[i];
+				tess.xyz[base + i][0] = v->position[0];
+				tess.xyz[base + i][1] = v->position[1];
+				tess.xyz[base + i][2] = v->position[2];
+				tess.normal[base + i][0] = v->normal[0];
+				tess.normal[base + i][1] = v->normal[1];
+				tess.normal[base + i][2] = v->normal[2];
+				tess.texCoords[0][base + i][0] = v->texCoord0[0];
+				tess.texCoords[0][base + i][1] = v->texCoord0[1];
+				tess.vertexColors[base + i].rgba[0] = (byte)( v->color[0] * 255 );
+				tess.vertexColors[base + i].rgba[1] = (byte)( v->color[1] * 255 );
+				tess.vertexColors[base + i].rgba[2] = (byte)( v->color[2] * 255 );
+				tess.vertexColors[base + i].rgba[3] = (byte)( v->color[3] * 255 );
+			}
+		}
+	} else {
+		for ( i = 0; i < surf->numVertices; i++ ) {
+			v = &surf->vertices[i];
+			tess.xyz[base + i][0] = v->position[0];
+			tess.xyz[base + i][1] = v->position[1];
+			tess.xyz[base + i][2] = v->position[2];
+			tess.normal[base + i][0] = v->normal[0];
+			tess.normal[base + i][1] = v->normal[1];
+			tess.normal[base + i][2] = v->normal[2];
+			tess.texCoords[0][base + i][0] = v->texCoord0[0];
+			tess.texCoords[0][base + i][1] = v->texCoord0[1];
+			tess.vertexColors[base + i].rgba[0] = (byte)( v->color[0] * 255 );
+			tess.vertexColors[base + i].rgba[1] = (byte)( v->color[1] * 255 );
+			tess.vertexColors[base + i].rgba[2] = (byte)( v->color[2] * 255 );
+			tess.vertexColors[base + i].rgba[3] = (byte)( v->color[3] * 255 );
+		}
+	}
+
+	tess.numVertexes += surf->numVertices;
+
+	for ( j = 0; j < surf->numIndices; j++ ) {
+		tess.indexes[tess.numIndexes + j] = (glIndex_t)( base + surf->indices[j] );
+	}
+	tess.numIndexes += surf->numIndices;
+}
 
 void (*rb_surfaceTable[SF_NUM_SURFACE_TYPES])( void *) = {
 	(void(*)(void*))RB_SurfaceBad,			// SF_BAD, 
@@ -1531,6 +1667,7 @@ void (*rb_surfaceTable[SF_NUM_SURFACE_TYPES])( void *) = {
 	(void(*)(void*))RB_SurfaceMesh,			// SF_MD3,
 	(void(*)(void*))RB_MDRSurfaceAnim,		// SF_MDR,
 	(void(*)(void*))RB_IQMSurfaceAnim,		// SF_IQM,
+	(void(*)(void*))RB_GLTFSurface,			// SF_GLTF,
 	(void(*)(void*))RB_SurfaceFlare,		// SF_FLARE,
 	(void(*)(void*))RB_SurfaceEntity		// SF_ENTITY
 };

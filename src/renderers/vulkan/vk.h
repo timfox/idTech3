@@ -459,6 +459,10 @@ void VBO_PrepareQueues( void );
 void VBO_RenderIBOItems( void );
 void VBO_ClearQueue( void );
 
+/* glTF primitive VBO: creates device-local vertex+index buffers from packed data */
+qboolean vk_create_gltf_buffers( const byte *vboData, int vboSize, const uint32_t *idxData, int idxCount,
+	VkBuffer *outVertexBuffer, VkBuffer *outIndexBuffer );
+
 /* GPU occlusion culling for entities */
 struct drawSurfsCommand_s;
 void vk_occlusion_pass( const struct drawSurfsCommand_s *cmd );
