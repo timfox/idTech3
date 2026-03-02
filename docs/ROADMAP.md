@@ -72,6 +72,7 @@
 - [x] PostFX specialization constants in vk.c gamma pipeline
 - [ ] Wire SSR/atmosphere/vegetation shaders into Vulkan render passes
 - [ ] glTF GPU upload (VBOs, image_t textures for rendering)
+- [x] CBT-inspired GPU terrain tessellation (compute shader LOD, r_cbtTerrain)
 
 ### Medium-Term
 - [x] GPU occlusion culling (r_occlusionCulling, entity bbox queries, previous-frame visibility)

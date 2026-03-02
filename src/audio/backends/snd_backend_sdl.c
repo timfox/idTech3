@@ -37,6 +37,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../../qcommon/q_shared.h"
 #include "../snd_local.h"
 #include "../../client/client.h"
+#include "../../client/cl_voip.h"
 
 qboolean snd_inited = qfalse;
 
@@ -52,7 +53,7 @@ static int dmasize = 0;
 
 static SDL_AudioDeviceID sdlPlaybackDevice;
 
-#if defined USE_VOIP && SDL_VERSION_ATLEAST( 2, 0, 5 )
+#if defined USE_OPUS && defined USE_SDL && !defined USE_OPENAL && SDL_VERSION_ATLEAST( 2, 0, 5 )
 #define USE_SDL_AUDIO_CAPTURE
 
 static SDL_AudioDeviceID sdlCaptureDevice;
@@ -338,7 +339,7 @@ qboolean SNDDMA_Init( void )
 		spec.freq = 48000;
 		spec.format = AUDIO_S16SYS;
 		spec.channels = 1;
-		spec.samples = VOIP_MAX_PACKET_SAMPLES * 4;
+		spec.samples = VOIP_FRAME_SAMPLES * 4;
 		sdlCaptureDevice = SDL_OpenAudioDevice(NULL, SDL_TRUE, &spec, NULL, 0);
 		Com_Printf( "SDL capture device %s.\n",
 				    (sdlCaptureDevice == 0) ? "failed to open" : "opened");
@@ -438,40 +439,30 @@ void SNDDMA_BeginPainting( void )
 }
 
 
-#ifdef USE_VOIP
+#if defined USE_OPUS && defined USE_SDL_AUDIO_CAPTURE
 void SNDDMA_StartCapture(void)
 {
-#ifdef USE_SDL_AUDIO_CAPTURE
 	if (sdlCaptureDevice)
 	{
 		SDL_ClearQueuedAudio(sdlCaptureDevice);
 		SDL_PauseAudioDevice(sdlCaptureDevice, 0);
 	}
-#endif
 }
-
 
 int SNDDMA_AvailableCaptureSamples(void)
 {
-#ifdef USE_SDL_AUDIO_CAPTURE
 	// divided by 2 to convert from bytes to (mono16) samples.
 	return sdlCaptureDevice ? (SDL_GetQueuedAudioSize(sdlCaptureDevice) / 2) : 0;
-#else
-	return 0;
-#endif
 }
-
 
 void SNDDMA_Capture(int samples, byte *data)
 {
-#ifdef USE_SDL_AUDIO_CAPTURE
 	// multiplied by 2 to convert from (mono16) samples to bytes.
 	if (sdlCaptureDevice)
 	{
 		SDL_DequeueAudio(sdlCaptureDevice, data, samples * 2);
 	}
 	else
-#endif
 	{
 		SDL_memset(data, '\0', samples * 2);
 	}
@@ -479,18 +470,14 @@ void SNDDMA_Capture(int samples, byte *data)
 
 void SNDDMA_StopCapture(void)
 {
-#ifdef USE_SDL_AUDIO_CAPTURE
 	if (sdlCaptureDevice)
 	{
 		SDL_PauseAudioDevice(sdlCaptureDevice, 1);
 	}
-#endif
 }
 
 void SNDDMA_MasterGain( float val )
 {
-#ifdef USE_SDL_AUDIO_CAPTURE
 	sdlMasterGain = val;
-#endif
 }
 #endif

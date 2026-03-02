@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cl_parse.c  -- parse a message received from the server
 
 #include "client.h"
+#include "cl_voip.h"
 
 static const char *svc_strings[] = {
 	"svc_bad",
@@ -829,6 +830,33 @@ static void CL_ParseCommandString( msg_t *msg ) {
 
 /*
 =====================
+CL_ParseVoip
+
+Read VoIP packet from server message and hand to decoder.
+Format: sender (byte), voipLen (short), voipData (voipLen bytes).
+=====================
+*/
+static void CL_ParseVoip( msg_t *msg, qboolean speex ) {
+	int sender;
+	int voipLen;
+	byte voipData[4000];
+
+	(void)speex;
+
+	sender = MSG_ReadByte( msg );
+	voipLen = MSG_ReadShort( msg );
+	if ( voipLen <= 0 || voipLen > (int)sizeof( voipData ) ) {
+		return;
+	}
+	if ( msg->readcount + voipLen > msg->cursize ) {
+		return;
+	}
+	MSG_ReadData( msg, voipData, voipLen );
+	CL_VoIP_ParsePacket( sender, voipData, voipLen );
+}
+
+/*
+=====================
 CL_ParseServerMessage
 =====================
 */
@@ -905,7 +933,7 @@ void CL_ParseServerMessage( msg_t *msg ) {
 			break;
 		case svc_voipSpeex: // ioq3 extension
 			clc.dm68compat = qfalse;
-#ifdef USE_VOIP
+#ifdef USE_OPUS
 			CL_ParseVoip( msg, qtrue );
 			break;
 #else
@@ -913,8 +941,8 @@ void CL_ParseServerMessage( msg_t *msg ) {
 #endif
 		case svc_voipOpus: // ioq3 extension
 			clc.dm68compat = qfalse;
-#ifdef USE_VOIP
-			CL_ParseVoip( msg, !clc.voipEnabled );
+#ifdef USE_OPUS
+			CL_ParseVoip( msg, qfalse );
 			break;
 #else
 			return;

@@ -2377,17 +2377,34 @@ void SV_ExecuteClientMessage( client_t *cl, msg_t *msg ) {
 	} else if ( c == clc_moveNoDelta ) {
 		SV_UserMove( cl, msg, qfalse );
 	} else if ( c == clc_voipOpus || c == clc_voipSpeex ) {
-		/* VoIP relay: read encoded audio and forward to all other clients */
+		/* VoIP relay: read encoded audio and forward to clients (proximity-filtered when sv_voipProximity > 0) */
 		int voipLen = MSG_ReadShort( msg );
 		if ( voipLen > 0 && voipLen <= 4000 ) {
 			byte voipData[4000];
 			int sender = (int)( cl - svs.clients );
 			int i;
+			float prox = sv_voipProximity ? sv_voipProximity->value : 0.0f;
+			vec3_t senderOrigin;
+
 			MSG_ReadData( msg, voipData, voipLen );
+
+			/* Sender position for proximity check (0 = global relay) */
+			if ( prox > 0.0f && cl->gentity ) {
+				VectorCopy( cl->gentity->r.currentOrigin, senderOrigin );
+			} else {
+				prox = 0.0f; /* no position or disabled: relay to all */
+			}
+
 			for ( i = 0; i < sv.maxclients; i++ ) {
 				client_t *dst = &svs.clients[i];
 				if ( dst == cl || dst->state < CS_ACTIVE ) continue;
 				if ( dst->netchan.remoteAddress.type == NA_BOT ) continue;
+
+				if ( prox > 0.0f && dst->gentity ) {
+					float d = Distance( senderOrigin, dst->gentity->r.currentOrigin );
+					if ( d > prox ) continue; /* out of range */
+				}
+
 				SV_SendServerCommand( dst, "voip %d %d %s", sender, voipLen, "" );
 				{
 					msg_t relay;

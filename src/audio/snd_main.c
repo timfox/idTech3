@@ -573,7 +573,7 @@ Cvar_CheckRange( s_doppler, "0", "1", CV_INTEGER );
 
 	s_openalVoipSpatial = Cvar_Get( "s_openalVoipSpatial", "1", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( s_openalVoipSpatial, "0", "1", CV_INTEGER );
-	Cvar_SetDescription( s_openalVoipSpatial, "Route VOIP through spatial OpenAL sources." );
+	Cvar_SetDescription( s_openalVoipSpatial, "Route VOIP through spatial OpenAL sources for proximity voice chat." );
 
 	s_openalVoipGain = Cvar_Get( "s_openalVoipGain", "1.0", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( s_openalVoipGain, "0", "2", CV_FLOAT );

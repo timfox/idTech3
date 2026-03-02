@@ -55,7 +55,7 @@ void CL_VoIP_Init( void ) {
 	cl_voipGainDuringCapture = Cvar_Get( "cl_voipGainDuringCapture", "0.2", CVAR_ARCHIVE );
 	cl_voipShowMeter = Cvar_Get( "cl_voipShowMeter", "1", CVAR_ARCHIVE );
 
-	Cvar_SetDescription( cl_voip, "Enable VoIP voice chat (0 = off, 1 = on)." );
+	Cvar_SetDescription( cl_voip, "Enable VoIP proximity voice chat (0 = off, 1 = on)." );
 
 	if ( !cl_voip->integer ) {
 		Com_Printf( "VoIP: disabled (cl_voip 0)\n" );
@@ -125,6 +125,22 @@ void CL_VoIP_StopTransmit( void ) {
 	Cvar_Set( "cl_voipSend", "0" );
 }
 
+float CL_VoIP_GetPower( void ) {
+	return voipInitialized ? voipPower : 0.0f;
+}
+
+int CL_VoIP_IsEnabled( void ) {
+	return cl_voip && cl_voip->integer;
+}
+
+int CL_VoIP_IsSending( void ) {
+	return cl_voipSend && cl_voipSend->integer;
+}
+
+int CL_VoIP_GetShowMeter( void ) {
+	return cl_voipShowMeter && cl_voipShowMeter->integer;
+}
+
 void CL_VoIP_Frame( void ) {
 	if ( !voipInitialized || !voipCapturing ) return;
 
@@ -192,8 +208,24 @@ void CL_VoIP_ParsePacket( int sender, const byte *data, int len ) {
 		pcmBuffer, VOIP_FRAME_SAMPLES, 0 );
 
 	if ( decodedSamples > 0 ) {
-		vec3_t origin = { 0, 0, 0 };
+		vec3_t origin;
+		int i;
+		qboolean haveOrigin = qfalse;
+
+		VectorClear( origin );
+		if ( cls.state == CA_ACTIVE && cl.snap.valid ) {
+			for ( i = 0; i < cl.snap.numEntities; i++ ) {
+				const entityState_t *es = &cl.parseEntities[
+					( cl.snap.parseEntitiesNum + i ) & ( MAX_PARSE_ENTITIES - 1 ) ];
+				if ( es->number == sender ) {
+					VectorCopy( es->origin, origin );
+					haveOrigin = qtrue;
+					break;
+				}
+			}
+		}
 		S_VoipSamples( sender, origin, decodedSamples, VOIP_SAMPLE_RATE, 2, 1, (byte *)pcmBuffer, 1.0f );
+		(void)haveOrigin;
 	}
 }
 
@@ -205,5 +237,9 @@ void CL_VoIP_Frame( void ) {}
 void CL_VoIP_Transmit( int mode ) { (void)mode; }
 void CL_VoIP_ParsePacket( int sender, const byte *data, int len ) { (void)sender; (void)data; (void)len; }
 void CL_VoIP_StopTransmit( void ) {}
+float CL_VoIP_GetPower( void ) { return 0.0f; }
+int CL_VoIP_IsEnabled( void ) { return 0; }
+int CL_VoIP_IsSending( void ) { return 0; }
+int CL_VoIP_GetShowMeter( void ) { return 0; }
 
 #endif /* USE_OPUS */

@@ -807,6 +807,10 @@ void SV_Init( void )
 	sv_filter = Cvar_Get( "sv_filter", "filter.txt", CVAR_ARCHIVE );
 	Cvar_SetDescription( sv_filter, "Cvar that point on filter file, if it is "" then filtering will be disabled." );
 
+	sv_voipProximity = Cvar_Get( "sv_voipProximity", "1024", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( sv_voipProximity, "0", "4096", CV_FLOAT );
+	Cvar_SetDescription( sv_voipProximity, "VoIP proximity range in world units. 0 = global (all players hear everyone)." );
+
 	// initialize bot cvars so they are listed and can be set before loading the botlib
 	SV_BotInitCvars();
 
