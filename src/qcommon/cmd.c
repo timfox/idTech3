@@ -1190,10 +1190,12 @@ void Cmd_Init( void ) {
 	extern void Cmd_JsList_f(void);
 	extern void Cmd_JsDump_f(void);
 	extern void Cmd_JsExec_f(void);
+	extern void Cmd_JsClearErrors_f(void);
 	extern void JsDebug_InitCvars(void);
 	Cmd_AddCommand("js_reload", Cmd_JsReload_f);
 	Cmd_AddCommand("js_list", Cmd_JsList_f);
 	Cmd_AddCommand("js_dump", Cmd_JsDump_f);
 	Cmd_AddCommand("js_exec", Cmd_JsExec_f);
+	Cmd_AddCommand("js_clearErrors", Cmd_JsClearErrors_f);
 	JsDebug_InitCvars();
 }
