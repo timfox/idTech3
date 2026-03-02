@@ -66,6 +66,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../../qcommon/qcommon.h"
 #include "../common/tr_public.h"
 #include "tr_common.h"
+#include "tr_model_gltf.h"
 #include "iqm.h"
 
 
@@ -781,6 +782,7 @@ typedef enum {
 	SF_MD3,
 	SF_MDR,
 	SF_IQM,
+	SF_GLTF,
 	SF_FLARE,
 	SF_ENTITY,				// beams, rails, lightning, etc that can be determined by entity
 
@@ -984,6 +986,23 @@ typedef struct srfIQModel_s {
 	int		morphSurfaceIndex;
 } srfIQModel_t;
 
+// glTF primitive surface (VBO path or tess fallback; supports skinning and morph)
+typedef struct srfGLTFPrimitive_s {
+	surfaceType_t	surfaceType;
+	shader_t	*shader;
+	gltfVertex_t	*vertices;
+	int		numVertices;
+	uint32_t	*indices;
+	int		numIndices;
+	/* VBO: device-local buffers (VK_NULL_HANDLE = use tess path) */
+	VkBuffer	vbo_vertex;
+	VkBuffer	vbo_index;
+	VkDeviceSize	vbo_vertex_offsets[10]; /* per-attribute offsets for xyz,rgba,st,normal */
+	int		materialIndex;
+	qboolean	hasSkinning;
+	qboolean	hasMorphTargets;
+} srfGLTFPrimitive_t;
+
 
 extern	void (*rb_surfaceTable[SF_NUM_SURFACE_TYPES])(void *);
 
@@ -1092,7 +1111,8 @@ typedef enum {
 	MOD_BRUSH,
 	MOD_MESH,
 	MOD_MDR,
-	MOD_IQM
+	MOD_IQM,
+	MOD_GLTF
 } modtype_t;
 
 typedef struct model_s {
@@ -1103,7 +1123,7 @@ typedef struct model_s {
 	int			dataSize;	// just for listing purposes
 	bmodel_t	*bmodel;		// only if type == MOD_BRUSH
 	md3Header_t	*md3[MD3_MAX_LODS];	// only if type == MOD_MESH
-	void	*modelData;			// only if type == (MOD_MDR | MOD_IQM)
+	void	*modelData;			// only if type == (MOD_MDR | MOD_IQM | MOD_GLTF)
 
 	int			 numLods;
 } model_t;
@@ -1935,6 +1955,7 @@ typedef struct shaderCommands_s
 
 #ifdef USE_VULKAN
 	Vk_Depth_Range depthRange;
+	const struct srfGLTFPrimitive_s *gltfDrawSurface; /* when set, draw from glTF VBO instead of tess */
 #endif
 
 	// info extracted from current shader
@@ -2126,6 +2147,10 @@ void RB_MDRSurfaceAnim( mdrSurface_t *surface );
 qboolean R_LoadIQM (model_t *mod, void *buffer, int filesize, const char *name );
 void R_AddIQMSurfaces( trRefEntity_t *ent );
 void RB_IQMSurfaceAnim( const surfaceType_t *surface );
+qboolean R_RegisterGLTF( const char *name, model_t *mod );
+void R_AddGLTFSurfaces( trRefEntity_t *ent );
+void RB_GLTFSurface( const surfaceType_t *surface );
+void R_GLTFModelBounds( const void *modelData, vec3_t mins, vec3_t maxs );
 void R_IQMBeginSurfaceBatch( void );
 void R_IQMCommitSurfaceBatch( void );
 int R_IQMLerpTag( orientation_t *tag, iqmData_t *data,

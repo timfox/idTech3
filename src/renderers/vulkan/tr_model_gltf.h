@@ -36,12 +36,21 @@ typedef struct gltfVertex_s {
 	vec4_t  weights;
 } gltfVertex_t;
 
+/* Morph target: delta position/normal per vertex */
+typedef struct gltfMorphTarget_s {
+	float *deltaPosition;  /* numVertices * 3, or NULL */
+	float *deltaNormal;   /* numVertices * 3, or NULL */
+	float *deltaTangent;  /* numVertices * 3, or NULL (optional) */
+} gltfMorphTarget_t;
+
 typedef struct gltfPrimitive_s {
 	gltfVertex_t   *vertices;
 	int             numVertices;
 	uint32_t       *indices;
 	int             numIndices;
 	int             materialIndex;
+	int             numMorphTargets;
+	gltfMorphTarget_t *morphTargets;  /* [numMorphTargets], NULL if none */
 } gltfPrimitive_t;
 
 typedef struct gltfMesh_s {
@@ -122,9 +131,13 @@ typedef struct gltfModel_s {
 } gltfModel_t;
 
 qboolean R_LoadGLTF(const char *filename, gltfModel_t *model);
+void     R_ComputeGLTFJointMatrices(const gltfModel_t *model, float *outMatrices);
+
+/* Returns gltfModel_t* from modelData when model is MOD_GLTF, else NULL */
+const gltfModel_t *R_GetGLTFModelFromModelData(const void *modelData);
 void     R_FreeGLTF(gltfModel_t *model);
 
-qboolean R_RegisterGLTF(const char *name, model_t *mod);
+/* R_RegisterGLTF, R_AddGLTFSurfaces, R_GLTFModelBounds declared in tr_local.h */
 
 #ifdef __cplusplus
 }
