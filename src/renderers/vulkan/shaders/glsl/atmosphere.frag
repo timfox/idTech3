@@ -13,8 +13,6 @@
  * Henyey-Greenstein phase function for Mie scattering.
  */
 
-layout(set = 0, binding = 0) uniform sampler2D depthTexture;
-
 layout(location = 0) in vec2 frag_tex_coord;
 layout(location = 0) out vec4 out_color;
 
@@ -67,6 +65,8 @@ float opticalDepth(vec3 origin, vec3 dir, float rayLength, float scaleHeight) {
 }
 
 void main() {
+	/* Depth test (LESS_OR_EQUAL, frag 1.0) culls geometry; only sky pixels pass */
+	gl_FragDepth = 1.0;
 	vec2 uv = frag_tex_coord * 2.0 - 1.0;
 	vec3 rayDir = normalize(vec3(uv.x, uv.y, -1.0));
 

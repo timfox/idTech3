@@ -1424,6 +1424,71 @@ static void vk_create_render_passes( void )
 	VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.gamma ) );
 	SET_OBJECT_NAME( vk.render_pass.gamma, "render pass - gamma", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
 
+	/* Atmosphere pass: additive fullscreen overlay for sky (depth test culls geometry) */
+	{
+		VkAttachmentDescription atm_att[2];
+		VkAttachmentReference atm_color_ref, atm_depth_ref;
+		VkSubpassDescription atm_subpass;
+		VkSubpassDependency atm_deps[2];
+		VkRenderPassCreateInfo atm_desc;
+
+		Com_Memset( atm_att, 0, sizeof( atm_att ) );
+		atm_att[0].format = vk.color_format;
+		atm_att[0].samples = (VkSampleCountFlagBits)vkSamples;
+		atm_att[0].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+		atm_att[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		atm_att[0].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		atm_att[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+		atm_att[1].format = vk.depth_format;
+		atm_att[1].samples = (VkSampleCountFlagBits)vkSamples;
+		atm_att[1].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+		atm_att[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		atm_att[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+		atm_att[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+		atm_att[1].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+		atm_att[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+
+		atm_color_ref.attachment = 0;
+		atm_color_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		atm_depth_ref.attachment = 1;
+		atm_depth_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+
+		Com_Memset( &atm_subpass, 0, sizeof( atm_subpass ) );
+		atm_subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		atm_subpass.colorAttachmentCount = 1;
+		atm_subpass.pColorAttachments = &atm_color_ref;
+		atm_subpass.pDepthStencilAttachment = &atm_depth_ref;
+
+		Com_Memset( atm_deps, 0, sizeof( atm_deps ) );
+		atm_deps[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+		atm_deps[0].dstSubpass = 0;
+		atm_deps[0].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+		atm_deps[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+		atm_deps[0].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		atm_deps[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+		atm_deps[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+		atm_deps[1].srcSubpass = 0;
+		atm_deps[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+		atm_deps[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		atm_deps[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT;
+		atm_deps[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		atm_deps[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_TRANSFER_READ_BIT;
+		atm_deps[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+		Com_Memset( &atm_desc, 0, sizeof( atm_desc ) );
+		atm_desc.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+		atm_desc.attachmentCount = 2;
+		atm_desc.pAttachments = atm_att;
+		atm_desc.subpassCount = 1;
+		atm_desc.pSubpasses = &atm_subpass;
+		atm_desc.dependencyCount = 2;
+		atm_desc.pDependencies = atm_deps;
+		VK_CHECK( qvkCreateRenderPass( device, &atm_desc, NULL, &vk.render_pass.atmosphere ) );
+		SET_OBJECT_NAME( vk.render_pass.atmosphere, "render pass - atmosphere", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
+	}
+
 	if ( vk.smaaActive )
 	{
 		VkAttachmentDescription smaaAttachment;
@@ -4608,9 +4673,11 @@ static void vk_create_shader_modules( void )
 
 	vk.modules.gamma_fs = SHADER_MODULE( gamma_frag_spv );
 	vk.modules.gamma_vs = SHADER_MODULE( gamma_vert_spv );
+	vk.modules.atmosphere_fs = SHADER_MODULE( atmosphere_frag_spv );
 
 	SET_OBJECT_NAME( vk.modules.gamma_fs, "gamma post-processing fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.gamma_vs, "gamma post-processing vertex module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	SET_OBJECT_NAME( vk.modules.atmosphere_fs, "atmosphere fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 
 	vk.modules.smaa_edge_fs = SHADER_MODULE( smaa_edge_frag_spv );
 	vk.modules.smaa_blend_fs = SHADER_MODULE( smaa_blend_frag_spv );
@@ -4884,6 +4951,7 @@ static void vk_alloc_persistent_pipelines( void )
 }
 
 void vk_create_blur_pipeline( uint32_t index, uint32_t width, uint32_t height, qboolean horizontal_pass );
+static void vk_create_atmosphere_pipeline( void );
 
 void vk_update_post_process_pipelines( void )
 {
@@ -4924,6 +4992,7 @@ void vk_update_post_process_pipelines( void )
 			vk_create_post_process_pipeline( 8, glConfig.vidWidth, glConfig.vidHeight );
 			vk_create_post_process_pipeline( 9, glConfig.vidWidth, glConfig.vidHeight );
 		}
+		vk_create_atmosphere_pipeline();
 	}
 }
 
@@ -5516,6 +5585,21 @@ static void vk_create_framebuffers( void )
 			else
 			{
 				vk.framebuffers.main[n] = vk.framebuffers.main[0];
+			}
+			if ( vk.render_pass.atmosphere != VK_NULL_HANDLE && n == 0 ) {
+				desc.renderPass = vk.render_pass.atmosphere;
+				desc.attachmentCount = 2;
+				desc.width = glConfig.vidWidth;
+				desc.height = glConfig.vidHeight;
+				framebuffer_attachments[0] = vk.msaaActive ? vk.msaa_image_view : vk.color_image_view;
+				framebuffer_attachments[1] = vk.depth_image_view;
+				VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.atmosphere[0] ) );
+				SET_OBJECT_NAME( vk.framebuffers.atmosphere[0], "framebuffer - atmosphere", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+			}
+			if ( vk.render_pass.atmosphere != VK_NULL_HANDLE ) {
+				vk.framebuffers.atmosphere[n] = vk.framebuffers.atmosphere[0];
+			} else {
+				vk.framebuffers.atmosphere[n] = VK_NULL_HANDLE;
 			}
 
 			// gamma correction
@@ -6907,6 +6991,17 @@ void vk_initialize( void )
 		desc.pPushConstantRanges = NULL;
 		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_ssao_combine ) );
 		SET_OBJECT_NAME( vk.pipeline_layout_ssao_combine, "pipeline layout - ssao_combine", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
+
+		/* Atmosphere: push constants only (7 vec4s = 112 bytes) */
+		desc.setLayoutCount = 0;
+		desc.pSetLayouts = NULL;
+		push_range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		push_range.offset = 0;
+		push_range.size = 112;
+		desc.pushConstantRangeCount = 1;
+		desc.pPushConstantRanges = &push_range;
+		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_atmosphere ) );
+		SET_OBJECT_NAME( vk.pipeline_layout_atmosphere, "pipeline layout - atmosphere", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
 	
 #ifdef VK_PBR_BRDFLUT
 		if( vk.pbrActive ) {
@@ -9672,6 +9767,102 @@ static qboolean vk_format_is_srgb( VkFormat format ) {
 	}
 }
 
+
+static void vk_create_atmosphere_pipeline( void )
+{
+	VkPipelineShaderStageCreateInfo shader_stages[2];
+	VkPipelineVertexInputStateCreateInfo vertex_input_state;
+	VkPipelineInputAssemblyStateCreateInfo input_assembly_state;
+	VkPipelineRasterizationStateCreateInfo rasterization_state;
+	VkPipelineDepthStencilStateCreateInfo depth_stencil_state;
+	VkPipelineViewportStateCreateInfo viewport_state;
+	VkPipelineMultisampleStateCreateInfo multisample_state;
+	VkPipelineColorBlendStateCreateInfo blend_state;
+	VkPipelineColorBlendAttachmentState attachment_blend;
+	VkGraphicsPipelineCreateInfo create_info;
+	VkViewport viewport;
+	VkRect2D scissor;
+
+	if ( vk.atmosphere_pipeline ) {
+		qvkDestroyPipeline( vk.device, vk.atmosphere_pipeline, NULL );
+		vk.atmosphere_pipeline = VK_NULL_HANDLE;
+	}
+	if ( vk.render_pass.atmosphere == VK_NULL_HANDLE ) return;
+
+	Com_Memset( &shader_stages, 0, sizeof( shader_stages ) );
+	shader_stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	shader_stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+	shader_stages[0].module = vk.modules.gamma_vs;
+	shader_stages[0].pName = "main";
+	shader_stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	shader_stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	shader_stages[1].module = vk.modules.atmosphere_fs;
+	shader_stages[1].pName = "main";
+
+	Com_Memset( &vertex_input_state, 0, sizeof( vertex_input_state ) );
+	vertex_input_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
+	Com_Memset( &input_assembly_state, 0, sizeof( input_assembly_state ) );
+	input_assembly_state.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+	input_assembly_state.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+
+	viewport = (VkViewport){ 0, 0, (float)glConfig.vidWidth, (float)glConfig.vidHeight, 0.0f, 1.0f };
+	scissor = (VkRect2D){ {0, 0}, { (uint32_t)glConfig.vidWidth, (uint32_t)glConfig.vidHeight } };
+	Com_Memset( &viewport_state, 0, sizeof( viewport_state ) );
+	viewport_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	viewport_state.viewportCount = 1;
+	viewport_state.pViewports = &viewport;
+	viewport_state.scissorCount = 1;
+	viewport_state.pScissors = &scissor;
+
+	Com_Memset( &rasterization_state, 0, sizeof( rasterization_state ) );
+	rasterization_state.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	rasterization_state.cullMode = VK_CULL_MODE_NONE;
+	rasterization_state.frontFace = VK_FRONT_FACE_CLOCKWISE;
+
+	Com_Memset( &depth_stencil_state, 0, sizeof( depth_stencil_state ) );
+	depth_stencil_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+	depth_stencil_state.depthTestEnable = VK_TRUE;
+	depth_stencil_state.depthWriteEnable = VK_FALSE;
+	depth_stencil_state.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+
+	Com_Memset( &attachment_blend, 0, sizeof( attachment_blend ) );
+	attachment_blend.blendEnable = VK_TRUE;
+	attachment_blend.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+	attachment_blend.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+	attachment_blend.colorBlendOp = VK_BLEND_OP_ADD;
+	attachment_blend.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+	attachment_blend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+	attachment_blend.alphaBlendOp = VK_BLEND_OP_ADD;
+	attachment_blend.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
+	Com_Memset( &blend_state, 0, sizeof( blend_state ) );
+	blend_state.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	blend_state.attachmentCount = 1;
+	blend_state.pAttachments = &attachment_blend;
+
+	Com_Memset( &multisample_state, 0, sizeof( multisample_state ) );
+	multisample_state.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	multisample_state.rasterizationSamples = (VkSampleCountFlagBits)vkSamples;
+
+	Com_Memset( &create_info, 0, sizeof( create_info ) );
+	create_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	create_info.stageCount = 2;
+	create_info.pStages = shader_stages;
+	create_info.pVertexInputState = &vertex_input_state;
+	create_info.pInputAssemblyState = &input_assembly_state;
+	create_info.pViewportState = &viewport_state;
+	create_info.pRasterizationState = &rasterization_state;
+	create_info.pMultisampleState = &multisample_state;
+	create_info.pDepthStencilState = &depth_stencil_state;
+	create_info.pColorBlendState = &blend_state;
+	create_info.layout = vk.pipeline_layout_atmosphere;
+	create_info.renderPass = vk.render_pass.atmosphere;
+	create_info.subpass = 0;
+
+	VK_CHECK( qvkCreateGraphicsPipelines( vk.device, vk.pipelineCache, 1, &create_info, NULL, &vk.atmosphere_pipeline ) );
+	SET_OBJECT_NAME( vk.atmosphere_pipeline, "atmosphere pipeline", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
+}
 
 void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_t height )
 {
@@ -13938,8 +14129,59 @@ static void vk_reset_volumetric_history( void )
 	Com_Memset( &vk_volumetric_validation_state, 0, sizeof( vk_volumetric_validation_state ) );
 }
 
+static void vk_atmosphere_pass( void )
+{
+	VkImageAspectFlags depth_aspect;
+	typedef struct { float sunDir[4]; float sunColor[4]; float rayleigh[4]; float mie[4]; float atmParams[4]; float viewOrigin[4]; } AtmospherePC_t;
+	AtmospherePC_t pc;
+
+	if ( !PostFX_Atmosphere_IsEnabled() || vk.atmosphere_pipeline == VK_NULL_HANDLE ||
+	     vk.render_pass.atmosphere == VK_NULL_HANDLE || vk.framebuffers.atmosphere[0] == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+	if ( glConfig.stencilBits > 0 ) depth_aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
+
+	record_image_layout_transition( vk.cmd->command_buffer, vk.depth_image, depth_aspect,
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+		VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT );
+
+	vk_begin_render_pass( vk.render_pass.atmosphere, vk.framebuffers.atmosphere[ vk.cmd->swapchain_image_index ], qtrue,
+		glConfig.vidWidth, glConfig.vidHeight );
+
+	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.atmosphere_pipeline );
+
+	PostFX_Atmosphere_GetSunDirection( &pc.sunDir[0], &pc.sunDir[1], &pc.sunDir[2] );
+	pc.sunDir[3] = 0.0f;
+	pc.sunColor[0] = pc.sunColor[1] = pc.sunColor[2] = 1.0f;
+	pc.sunColor[3] = PostFX_Atmosphere_GetSunIntensity();
+	pc.rayleigh[0] = 5.5e-6f; pc.rayleigh[1] = 13.0e-6f; pc.rayleigh[2] = 22.4e-6f;
+	pc.rayleigh[3] = 1.0f;
+	pc.mie[0] = 21e-6f; pc.mie[1] = PostFX_Atmosphere_GetMieG(); pc.mie[2] = 0.0f; pc.mie[3] = 0.0f;
+	pc.atmParams[0] = PostFX_Atmosphere_GetRayleighHeight();
+	pc.atmParams[1] = PostFX_Atmosphere_GetMieHeight();
+	pc.atmParams[2] = 0.0f; pc.atmParams[3] = 0.0f;
+	pc.viewOrigin[0] = pc.viewOrigin[1] = pc.viewOrigin[2] = 0.0f; pc.viewOrigin[3] = 1.0f;
+
+	qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_atmosphere, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( pc ), &pc );
+
+	vk_set_fullscreen_viewport_scissor( glConfig.vidWidth, glConfig.vidHeight );
+	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+
+	vk_end_render_pass();
+
+	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
+}
+
 static void vk_volumetric_fog_pass( void )
 {
+	/* Atmosphere runs when enabled regardless of fog state */
+	vk_atmosphere_pass();
+
 	if ( backEnd.doneFog ) {
 		return;
 	}
