@@ -4,6 +4,7 @@
 
 ### Renderer -- Complete
 - [x] Vulkan 1.4 with PBR (metalness/roughness, IBL, BRDF LUT)
+- [x] Shader discovery: scripts/ (legacy) + shaders/ (priority override)
 - [x] Volumetric fog (froxel compute, temporal reprojection, fluid sim)
 - [x] Navier-Stokes fluid simulation (GPU compute)
 - [x] Shadow mapping (sun CSM, spot atlas, point cubemaps)
@@ -70,13 +71,15 @@
 ### Short-Term (completed)
 - [x] Connect BSP geometry extraction to map loading for automatic navmesh
 - [x] PostFX specialization constants in vk.c gamma pipeline
-- [ ] Wire SSR/atmosphere/vegetation shaders into Vulkan render passes
-- [ ] glTF GPU upload (VBOs, image_t textures for rendering)
+- [x] Wire SSR/atmosphere shaders into Vulkan render passes
+- [ ] Wire vegetation wind compute into Vulkan pipeline
+- [x] glTF GPU upload (MOD_GLTF, tess path, baseColorTexture shader, bounds)
 - [x] CBT-inspired GPU terrain tessellation (compute shader LOD, r_cbtTerrain)
 
 ### Medium-Term
 - [x] GPU occlusion culling (r_occlusionCulling, entity bbox queries, previous-frame visibility)
 - [x] Texture compression (BC7/KTX2)
+- [x] Optional USD format for entities and shaders (com_usdEntities, com_usdShaders; GPLv2 parser)
 - [ ] DTLS network encryption
 - [ ] clang-tidy / cppcheck static analysis
 

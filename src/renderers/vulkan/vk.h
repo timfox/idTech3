@@ -576,6 +576,7 @@ typedef struct {
 		VkRenderPass smaa_blend;
 		VkRenderPass smaa_compose;
 		VkRenderPass volumetric;
+		VkRenderPass atmosphere;
 	} render_pass;
 
 	VkDescriptorPool descriptor_pool;
@@ -590,6 +591,7 @@ typedef struct {
 	VkPipelineLayout pipeline_layout_smaa;
 	VkPipelineLayout pipeline_layout_ssao;		// ssao (depth + push constants)
 	VkPipelineLayout pipeline_layout_ssao_combine;	// ssao combine (color + ao)
+	VkPipelineLayout pipeline_layout_atmosphere;	// atmosphere (push constants only)
 #ifdef VK_PBR_BRDFLUT
 	VkPipelineLayout pipeline_layout_brdflut;
 #endif
@@ -710,6 +712,7 @@ typedef struct {
 		VkFramebuffer smaa_blend;
 		VkFramebuffer smaa_compose;
 		VkFramebuffer volumetric[MAX_SWAPCHAIN_IMAGES];
+		VkFramebuffer atmosphere[MAX_SWAPCHAIN_IMAGES];
 		VkFramebuffer sun_shadow;
 		VkFramebuffer local_spot_shadow;
 		VkFramebuffer local_point_shadow[MAX_DLIGHTS * 6];
@@ -813,6 +816,7 @@ typedef struct {
 
 		VkShaderModule gamma_fs;
 		VkShaderModule gamma_vs;
+		VkShaderModule atmosphere_fs;
 		VkShaderModule smaa_edge_fs;
 		VkShaderModule smaa_blend_fs;
 		VkShaderModule smaa_compose_fs;
@@ -913,6 +917,7 @@ typedef struct {
 	VkPipeline ssao_combine_pipeline;
 	VkPipeline ssao_debug_pipeline;
 	VkPipeline ssao_depth_debug_pipeline;
+	VkPipeline atmosphere_pipeline;
 #ifdef VK_PBR_BRDFLUT
 	VkPipeline brdflut_pipeline;
 #endif
