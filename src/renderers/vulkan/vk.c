@@ -6322,6 +6322,7 @@ void vk_initialize( void )
 				ri.Printf( PRINT_ALL, "[VK]   Ray Tracing         : not available\n" );
 #endif
 				ri.Printf( PRINT_ALL, "[VK]   Compute Pipelines   : enabled\n" );
+				ri.Printf( PRINT_ALL, "[VK]   First Person Rendering : enabled (r_firstPersonFov, r_firstPersonScale)\n" );
 			}
 		}
 	}
@@ -11684,7 +11685,10 @@ static void get_mvp_transform( float *mvp )
 	else
 	{
 		float proj[16];
-		vk_get_projection_matrix_vk( backEnd.viewParms.projectionMatrix, proj );
+		const float *projection = backEnd.useFirstPersonProjection
+			? backEnd.firstPersonProjectionMatrix
+			: backEnd.viewParms.projectionMatrix;
+		vk_get_projection_matrix_vk( projection, proj );
 		myGlMultMatrix( vk_world.modelview_transform, proj, mvp );
 	}
 }

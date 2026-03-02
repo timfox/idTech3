@@ -722,7 +722,27 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 			tess.shaderTime = backEnd.refdef.floatTime - tess.shader->timeOffset;
 
 #ifdef USE_VULKAN
-			Com_Memcpy( vk_world.modelview_transform, backEnd.or.modelViewMatrix, 64 );
+			backEnd.useFirstPersonProjection = qfalse;
+			if ( depthRange && !isCrosshair ) {
+				if ( r_firstPersonFovEnabled->integer && r_firstPersonFov->value > 0.0f ) {
+					R_SetupFirstPersonProjection( &backEnd.viewParms, backEnd.firstPersonProjectionMatrix );
+					backEnd.useFirstPersonProjection = qtrue;
+				}
+				if ( r_firstPersonScaleEnabled->integer && r_firstPersonScale->value > 0.0f && r_firstPersonScale->value != 1.0f ) {
+					float s = r_firstPersonScale->value;
+					float *m = backEnd.or.modelViewMatrix;
+					float scaled[16];
+					scaled[0]  = m[0]  * s; scaled[1]  = m[1]  * s; scaled[2]  = m[2]  * s; scaled[3]  = m[3];
+					scaled[4]  = m[4]  * s; scaled[5]  = m[5]  * s; scaled[6]  = m[6]  * s; scaled[7]  = m[7];
+					scaled[8]  = m[8]  * s; scaled[9]  = m[9]  * s; scaled[10] = m[10] * s; scaled[11] = m[11];
+					scaled[12] = m[12] * s; scaled[13] = m[13] * s; scaled[14] = m[14] * s; scaled[15] = m[15];
+					Com_Memcpy( vk_world.modelview_transform, scaled, 64 );
+				} else {
+					Com_Memcpy( vk_world.modelview_transform, backEnd.or.modelViewMatrix, 64 );
+				}
+			} else {
+				Com_Memcpy( vk_world.modelview_transform, backEnd.or.modelViewMatrix, 64 );
+			}
 			tess.depthRange = depthRange ? DEPTH_RANGE_WEAPON : DEPTH_RANGE_NORMAL;
 			vk_update_mvp( NULL );
 #else
@@ -799,6 +819,7 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 #ifdef USE_VULKAN
 	Com_Memcpy( vk_world.modelview_transform, backEnd.viewParms.world.modelViewMatrix, 64 );
 	tess.depthRange = DEPTH_RANGE_NORMAL;
+	backEnd.useFirstPersonProjection = qfalse;
 	//vk_update_mvp();
 #else
 	qglLoadMatrixf( backEnd.viewParms.world.modelViewMatrix );
@@ -940,8 +961,28 @@ static void RB_RenderLitSurfList( dlight_t* dl ) {
 			tess.dlightUpdateParams = qtrue;
 
 #ifdef USE_VULKAN
+			backEnd.useFirstPersonProjection = qfalse;
+			if ( depthRange && !isCrosshair ) {
+				if ( r_firstPersonFovEnabled->integer && r_firstPersonFov->value > 0.0f ) {
+					R_SetupFirstPersonProjection( &backEnd.viewParms, backEnd.firstPersonProjectionMatrix );
+					backEnd.useFirstPersonProjection = qtrue;
+				}
+				if ( r_firstPersonScaleEnabled->integer && r_firstPersonScale->value > 0.0f && r_firstPersonScale->value != 1.0f ) {
+					float s = r_firstPersonScale->value;
+					float *m = backEnd.or.modelViewMatrix;
+					float scaled[16];
+					scaled[0]  = m[0]  * s; scaled[1]  = m[1]  * s; scaled[2]  = m[2]  * s; scaled[3]  = m[3];
+					scaled[4]  = m[4]  * s; scaled[5]  = m[5]  * s; scaled[6]  = m[6]  * s; scaled[7]  = m[7];
+					scaled[8]  = m[8]  * s; scaled[9]  = m[9]  * s; scaled[10] = m[10] * s; scaled[11] = m[11];
+					scaled[12] = m[12] * s; scaled[13] = m[13] * s; scaled[14] = m[14] * s; scaled[15] = m[15];
+					Com_Memcpy( vk_world.modelview_transform, scaled, 64 );
+				} else {
+					Com_Memcpy( vk_world.modelview_transform, backEnd.or.modelViewMatrix, 64 );
+				}
+			} else {
+				Com_Memcpy( vk_world.modelview_transform, backEnd.or.modelViewMatrix, 64 );
+			}
 			tess.depthRange = depthRange ? DEPTH_RANGE_WEAPON : DEPTH_RANGE_NORMAL;
-			Com_Memcpy( vk_world.modelview_transform, backEnd.or.modelViewMatrix, 64 );
 			vk_update_mvp( NULL );
 #else
 			qglLoadMatrixf( backEnd.or.modelViewMatrix );
@@ -1016,6 +1057,7 @@ static void RB_RenderLitSurfList( dlight_t* dl ) {
 #ifdef USE_VULKAN
 	Com_Memcpy( vk_world.modelview_transform, backEnd.viewParms.world.modelViewMatrix, 64 );
 	tess.depthRange = DEPTH_RANGE_NORMAL;
+	backEnd.useFirstPersonProjection = qfalse;
 	//vk_update_mvp();
 #else
 	qglLoadMatrixf( backEnd.viewParms.world.modelViewMatrix );

@@ -1222,6 +1222,10 @@ extern cvar_t	*r_railSegmentLength;
 extern cvar_t	*r_znear;				// near Z clip plane
 extern cvar_t	*r_zproj;				// z distance of projection plane
 extern cvar_t	*r_stereoSeparation;			// separation of cameras for stereo rendering
+extern cvar_t	*r_firstPersonFov;			// FOV for first-person primitives
+extern cvar_t	*r_firstPersonScale;			// anti-clipping scale for first-person primitives
+extern cvar_t	*r_firstPersonFovEnabled;		// use custom FOV for first-person
+extern cvar_t	*r_firstPersonScaleEnabled;		// apply scale for first-person anti-clipping
 
 extern cvar_t	*r_lodbias;				// push/pull LOD transitions
 extern cvar_t	*r_lodscale;
@@ -1365,6 +1369,7 @@ int R_CullLocalPointAndRadius( const vec3_t origin, float radius );
 int R_CullDlight( const dlight_t *dl );
 
 void R_SetupProjection( viewParms_t *dest, float zProj, qboolean computeFrustum );
+void R_SetupFirstPersonProjection( viewParms_t *dest, float *outProjection );
 void R_RotateForEntity( const trRefEntity_t *ent, const viewParms_t *viewParms, orientationr_t *or );
 
 /*
