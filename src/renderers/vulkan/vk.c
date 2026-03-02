@@ -6,6 +6,7 @@
 uint64_t vk_entity_occlusion_visibility[MAX_REFENTITIES];
 static uint32_t vk_occlusion_last_entity_count;
 #include "vk_fluidsim.h"
+#include "vk_terrain.h"
 #include <stddef.h>
 
 #if defined (_DEBUG)
@@ -6646,6 +6647,43 @@ void vk_initialize( void )
 		VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &fluid_layout_desc, NULL, &vk.volumetric_fluid_layout ) );
 	}
 
+	{
+		VkDescriptorSetLayoutBinding cbt_bindings[4];
+		VkDescriptorSetLayoutCreateInfo cbt_layout_desc;
+
+		cbt_bindings[0].binding = 0;
+		cbt_bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		cbt_bindings[0].descriptorCount = 1;
+		cbt_bindings[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		cbt_bindings[0].pImmutableSamplers = NULL;
+
+		cbt_bindings[1].binding = 1;
+		cbt_bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		cbt_bindings[1].descriptorCount = 1;
+		cbt_bindings[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		cbt_bindings[1].pImmutableSamplers = NULL;
+
+		cbt_bindings[2].binding = 2;
+		cbt_bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		cbt_bindings[2].descriptorCount = 1;
+		cbt_bindings[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		cbt_bindings[2].pImmutableSamplers = NULL;
+
+		cbt_bindings[3].binding = 3;
+		cbt_bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		cbt_bindings[3].descriptorCount = 1;
+		cbt_bindings[3].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		cbt_bindings[3].pImmutableSamplers = NULL;
+
+		cbt_layout_desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		cbt_layout_desc.pNext = NULL;
+		cbt_layout_desc.flags = 0;
+		cbt_layout_desc.bindingCount = ARRAY_LEN( cbt_bindings );
+		cbt_layout_desc.pBindings = cbt_bindings;
+
+		VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &cbt_layout_desc, NULL, &vk.cbt_terrain_layout ) );
+	}
+
 			{
 				VkDescriptorSetLayoutBinding composite_bindings[9];
 			VkDescriptorSetLayoutCreateInfo composite_layout_desc;
@@ -6951,7 +6989,8 @@ static void vk_create_volumetric_pipeline_layouts( void )
 	if ( vk.volumetric_compute_pipeline_layout != VK_NULL_HANDLE ||
 		vk.volumetric_composite_pipeline_layout != VK_NULL_HANDLE ||
 		vk.volumetric_depth_resolve_pipeline_layout != VK_NULL_HANDLE ||
-		vk.volumetric_fluid_pipeline_layout != VK_NULL_HANDLE )
+		vk.volumetric_fluid_pipeline_layout != VK_NULL_HANDLE ||
+		vk.cbt_terrain_compute_layout != VK_NULL_HANDLE )
 	{
 		return;
 	}
@@ -6976,6 +7015,9 @@ static void vk_create_volumetric_pipeline_layouts( void )
 
 	desc.pSetLayouts = &vk.volumetric_fluid_layout;
 	VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.volumetric_fluid_pipeline_layout ) );
+
+	desc.pSetLayouts = &vk.cbt_terrain_layout;
+	VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.cbt_terrain_compute_layout ) );
 }
 
 static void vk_create_volumetric_fluid_pipeline( VkPipeline *pipeline, VkShaderModule module, const char *debug_name )
@@ -7195,6 +7237,24 @@ static void vk_create_volumetric_pipelines( void )
 	vk_create_volumetric_compute_pipeline();
 	vk_create_volumetric_fluid_pipelines();
 	vk_create_volumetric_composite_pipeline();
+
+	if ( vk.modules.cbt_terrain_cs != VK_NULL_HANDLE && vk.cbt_terrain_compute_layout != VK_NULL_HANDLE ) {
+		VkPipelineShaderStageCreateInfo stage;
+		VkComputePipelineCreateInfo desc;
+		Com_Memset( &stage, 0, sizeof( stage ) );
+		Com_Memset( &desc, 0, sizeof( desc ) );
+		stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+		stage.module = vk.modules.cbt_terrain_cs;
+		stage.pName = "main";
+		desc.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+		desc.stage = stage;
+		desc.layout = vk.cbt_terrain_compute_layout;
+		if ( qvkCreateComputePipelines( vk.device, VK_NULL_HANDLE, 1, &desc, NULL, &vk.cbt_terrain_compute_pipeline ) == VK_SUCCESS ) {
+			SET_OBJECT_NAME( vk.cbt_terrain_compute_pipeline, "pipeline - cbt terrain compute", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
+			ri.Printf( PRINT_ALL, "[VK] CBT terrain tessellation pipeline created (r_cbtTerrain)\n" );
+		}
+	}
 }
 
 static void vk_destroy_volumetric_pipelines( void )
@@ -7242,6 +7302,14 @@ static void vk_destroy_volumetric_pipelines( void )
 	if ( vk.volumetric_fluid_pipeline_layout != VK_NULL_HANDLE ) {
 		qvkDestroyPipelineLayout( vk.device, vk.volumetric_fluid_pipeline_layout, NULL );
 		vk.volumetric_fluid_pipeline_layout = VK_NULL_HANDLE;
+	}
+	if ( vk.cbt_terrain_compute_pipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.cbt_terrain_compute_pipeline, NULL );
+		vk.cbt_terrain_compute_pipeline = VK_NULL_HANDLE;
+	}
+	if ( vk.cbt_terrain_compute_layout != VK_NULL_HANDLE ) {
+		qvkDestroyPipelineLayout( vk.device, vk.cbt_terrain_compute_layout, NULL );
+		vk.cbt_terrain_compute_layout = VK_NULL_HANDLE;
 	}
 }
 
@@ -8824,6 +8892,10 @@ void vk_shutdown( refShutdownCode_t code )
 	if ( vk.volumetric_fluid_layout != VK_NULL_HANDLE ) {
 		qvkDestroyDescriptorSetLayout( vk.device, vk.volumetric_fluid_layout, NULL );
 		vk.volumetric_fluid_layout = VK_NULL_HANDLE;
+	}
+	if ( vk.cbt_terrain_layout != VK_NULL_HANDLE ) {
+		qvkDestroyDescriptorSetLayout( vk.device, vk.cbt_terrain_layout, NULL );
+		vk.cbt_terrain_layout = VK_NULL_HANDLE;
 	}
 
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout, NULL);

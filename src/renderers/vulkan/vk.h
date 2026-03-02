@@ -614,6 +614,10 @@ typedef struct {
 	VkPipeline volumetric_fluid_pressure_pipeline;
 	VkPipeline volumetric_fluid_gradient_pipeline;
 
+	VkDescriptorSetLayout cbt_terrain_layout;
+	VkPipelineLayout cbt_terrain_compute_layout;
+	VkPipeline cbt_terrain_compute_pipeline;
+
 	VkDescriptorSet color_descriptor;
 	VkDescriptorSet depth_descriptor;
 	VkDescriptorSet smaa_edge_descriptor;
@@ -823,6 +827,10 @@ typedef struct {
 		VkShaderModule fluid_divergence_cs;
 		VkShaderModule fluid_pressure_cs;
 		VkShaderModule fluid_gradient_cs;
+
+		VkShaderModule cbt_terrain_cs;
+		VkShaderModule terrain_vs;
+		VkShaderModule terrain_fs;
 
 		VkShaderModule dot_fs;
 		VkShaderModule dot_vs;

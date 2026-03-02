@@ -22,5 +22,9 @@ void    CL_VoIP_Frame( void );
 void    CL_VoIP_Transmit( int mode );
 void    CL_VoIP_ParsePacket( int sender, const byte *data, int len );
 void    CL_VoIP_StopTransmit( void );
+float   CL_VoIP_GetPower( void );
+int     CL_VoIP_IsEnabled( void );
+int     CL_VoIP_IsSending( void );
+int     CL_VoIP_GetShowMeter( void );
 
 #endif /* CL_VOIP_H */

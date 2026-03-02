@@ -73,6 +73,7 @@ cvar_t		*con_conspeed;
 cvar_t		*con_autoclear;
 cvar_t		*con_notifytime;
 cvar_t		*con_scale;
+cvar_t		*con_opacity;
 cvar_t		*con_inputMode;
 cvar_t		*con_showVersion;
 cvar_t		*con_drawInput;
@@ -297,6 +298,8 @@ void Con_CheckResize( void )
 	}
 
 	scale = con_scale->value;
+	if ( scale < 0.5f ) scale = 0.5f;
+	if ( scale > 8.0f ) scale = 8.0f;
 
 	con.viswidth = cls.glconfig.vidWidth;
 
@@ -406,6 +409,9 @@ void Con_Init( void )
 	con_scale = Cvar_Get( "con_scale", "1", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( con_scale, "0.5", "8", CV_FLOAT );
 	Cvar_SetDescription( con_scale, "Console font size scale." );
+	con_opacity = Cvar_Get( "con_opacity", "1", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( con_opacity, "0", "1", CV_FLOAT );
+	Cvar_SetDescription( con_opacity, "Console background opacity (0=transparent, 1=opaque)." );
 	con_inputMode = Cvar_Get( "con_inputMode", "3", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( con_inputMode, "0", "3", CV_INTEGER );
 	Cvar_SetDescription( con_inputMode,
@@ -808,7 +814,12 @@ static void Con_DrawSolidConsole( float frac ) {
 			re.SetColor( conColorValue );
 			re.DrawStretchPic( 0, 0, wf, yf, 0, 0, 1, 1, cls.whiteShader );
 		} else {
-			re.SetColor( g_color_table[ ColorIndex( COLOR_WHITE ) ] );
+			float bgColor[4];
+			float op = con_opacity && con_opacity->value >= 0.0f ? con_opacity->value : 1.0f;
+			if ( op > 1.0f ) op = 1.0f;
+			bgColor[0] = bgColor[1] = bgColor[2] = 1.0f;
+			bgColor[3] = op;
+			re.SetColor( bgColor );
 			re.DrawStretchPic( 0, 0, wf, yf, 0, 0, 1, 1, cls.consoleShader );
 		}
 
@@ -816,7 +827,7 @@ static void Con_DrawSolidConsole( float frac ) {
 
 	// draw the text
 	con.vislines = lines;
-	rows = lines / smallchar_width - 1;	// rows of text to draw
+	rows = lines / smallchar_height - 1;	// rows of text to draw
 
 	y = lines - (smallchar_height * 3);
 

@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_local.h"
 #include "vk_vfog.h"
 #include "vk_fluidsim.h"
+#include "vk_terrain.h"
 #include "vk_vdb.h"
 #include "vk_postfx.h"
 #include "vk_flashlight.h"
@@ -2757,6 +2758,7 @@ static void R_Register( void )
 	// Register modular subsystem cvars
 	VFog_RegisterCvars();
 	FluidSim_RegisterCvars();
+	CBTerrain_RegisterCvars();
 	PostFX_RegisterCvars();
 	VDB_Init();
 	ProjLight_Init();

@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "client.h"
 #include "cl_emoji.h"
+#include "cl_voip.h"
 #include "cl_menuvideo.h"
 #include "cl_sdf_font.h"
 #include "../qcommon/q_utf8.h"
@@ -470,7 +471,7 @@ static void SCR_DrawDemoRecording( void ) {
 }
 
 
-#ifdef USE_VOIP
+#ifdef USE_OPUS
 /*
 =================
 SCR_DrawVoipMeter
@@ -481,20 +482,18 @@ static void SCR_DrawVoipMeter( void ) {
 	char	string[256];
 	int limit, i;
 
-	if (!cl_voipShowMeter->integer)
+	if ( !CL_VoIP_GetShowMeter() )
 		return;  // player doesn't want to show meter at all.
-	else if (!cl_voipSend->integer)
+	else if ( !CL_VoIP_IsSending() )
 		return;  // not recording at the moment.
-	else if (clc.state != CA_ACTIVE)
+	else if ( cls.state != CA_ACTIVE )
 		return;  // not connected to a server.
-	else if (!clc.voipEnabled)
-		return;  // server doesn't support VoIP.
-	else if (clc.demoplaying)
+	else if ( clc.demoplaying )
 		return;  // playing back a demo.
-	else if (!cl_voip->integer)
+	else if ( !CL_VoIP_IsEnabled() )
 		return;  // client has VoIP support disabled.
 
-	limit = (int) (clc.voipPower * 10.0f);
+	limit = (int) ( CL_VoIP_GetPower() * 10.0f );
 	if (limit > 10)
 		limit = 10;
 
@@ -580,9 +579,9 @@ void SCR_Init( void ) {
 	cl_graphheight = Cvar_Get ("graphheight", "32", CVAR_CHEAT);
 	cl_graphscale = Cvar_Get ("graphscale", "1", CVAR_CHEAT);
 	cl_graphshift = Cvar_Get ("graphshift", "0", CVAR_CHEAT);
-	ui_scale = Cvar_Get ("ui_scale", "1.0", CVAR_ARCHIVE_ND);
+	ui_scale = Cvar_Get( "ui_scale", "1.0", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( ui_scale, "0.5", "4.0", CV_FLOAT );
-	Cvar_SetDescription( ui_scale, "UI scale factor for high-resolution displays" );
+	Cvar_SetDescription( ui_scale, "UI scale factor for menus and HUD. Increase for 4K/ultra-wide displays." );
 
 	scr_initialized = qtrue;
 }
@@ -667,7 +666,7 @@ static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 			// always supply STEREO_CENTER as vieworg offset is now done by the engine.
 			CL_CGameRendering( stereoFrame );
 			SCR_DrawDemoRecording();
-#ifdef USE_VOIP
+#ifdef USE_OPUS
 			SCR_DrawVoipMeter();
 #endif
 			// PBR cubemap selection overlay (renderer-updated cvar string).

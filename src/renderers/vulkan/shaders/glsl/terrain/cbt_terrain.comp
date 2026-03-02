@@ -1,0 +1,62 @@
+#version 450
+/*
+ * GPU-driven terrain tessellation - CBT-inspired quadtree LOD.
+ * Selects visible patches based on screen-space error.
+ * Outputs multi-draw indirect command buffer.
+ */
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+/* Multi-draw: array of VkDrawIndexedIndirectCommand (5 uints each) */
+layout(binding = 0, std430) buffer DrawCommands {
+    uint commands[];  /* [indexCount, instanceCount, firstIndex, vertexOffset, firstInstance] per patch */
+};
+
+layout(binding = 1, r32ui) uniform uimage2D patchCounter;
+
+layout(binding = 2) uniform sampler2D heightmap;
+
+layout(std140, binding = 3) uniform TerrainParams {
+    mat4 viewProj;
+    vec4 viewOrigin;
+    vec4 terrainScale;
+    vec4 lodParams;  /* x=minError, y=errorScale, z=unused, w=gridSize */
+} params;
+
+float lodMetric(vec3 worldPos, float patchWorldSize) {
+    float dist = length(worldPos - params.viewOrigin.xyz);
+    dist = max(dist, 1.0);
+    return (patchWorldSize / dist) * params.lodParams.y;
+}
+
+void main() {
+    uint patchId = gl_GlobalInvocationID.x;
+    int gridSize = int(params.lodParams.w);
+    if (gridSize < 2) gridSize = 32;
+
+    int patchesPerDim = gridSize - 1;
+    int totalPatches = patchesPerDim * patchesPerDim;
+    if (int(patchId) >= totalPatches) return;
+
+    int px = int(patchId) % patchesPerDim;
+    int pz = int(patchId) / patchesPerDim;
+
+    float patchSize = 1.0 / float(patchesPerDim);
+    vec2 uvMid = (vec2(float(px), float(pz)) + 0.5) * patchSize;
+
+    float h = texture(heightmap, uvMid).r * params.terrainScale.y;
+    vec3 worldPos = vec3(uvMid.x * params.terrainScale.x, h, uvMid.y * params.terrainScale.z);
+
+    float worldPatchSize = patchSize * max(params.terrainScale.x, params.terrainScale.z);
+    float metric = lodMetric(worldPos, worldPatchSize);
+
+    if (metric < params.lodParams.x) return;
+
+    uint slot = imageAtomicAdd(patchCounter, ivec2(0, 0), 1u);
+
+    uint cmdBase = slot * 5u;
+    commands[cmdBase + 0u] = 6u;   /* indexCount */
+    commands[cmdBase + 1u] = 1u;   /* instanceCount */
+    commands[cmdBase + 2u] = uint(patchId) * 6u;  /* firstIndex */
+    commands[cmdBase + 3u] = 0u;   /* vertexOffset */
+    commands[cmdBase + 4u] = 0u;   /* firstInstance */
+}

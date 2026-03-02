@@ -57,6 +57,7 @@ cvar_t	*sv_lanForceRate; // dedicated 1 (LAN) server forces local client rates t
 
 cvar_t *sv_levelTimeReset;
 cvar_t *sv_filter;
+cvar_t *sv_voipProximity;
 
 #ifdef USE_BANS
 cvar_t	*sv_banFile;
