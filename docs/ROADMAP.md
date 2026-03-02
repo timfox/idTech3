@@ -74,7 +74,7 @@
 - [ ] glTF GPU upload (VBOs, image_t textures for rendering)
 
 ### Medium-Term
-- [ ] GPU occlusion culling
+- [x] GPU occlusion culling (r_occlusionCulling, entity bbox queries, previous-frame visibility)
 - [ ] Texture compression (BC7/KTX2)
 - [ ] DTLS network encryption
 - [ ] clang-tidy / cppcheck static analysis

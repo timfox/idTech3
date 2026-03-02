@@ -85,6 +85,13 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - Applies to entities with `RF_FIRST_PERSON` + `RF_DEPTHHACK` (view weapon, arms)
 - Cvars: `r_firstPersonFov` (default 90), `r_firstPersonScale` (default 1.0), `r_firstPersonFovEnabled`, `r_firstPersonScaleEnabled`
 
+### GPU Occlusion Culling
+- Entity occlusion culling via Vulkan occlusion queries (VkQueryPool)
+- Depth-only world pass fills depth buffer; entity bounding boxes are drawn with occlusion queries
+- Previous-frame visibility: query results read at frame end, used to skip occluded entities next frame
+- Cvar: `r_occlusionCulling` (0=off, 1=on, default 0)
+- Only entities (models) are culled; world geometry uses BSP/PVS
+
 ### Key Cvars
 | Cvar | Default | Description |
 |------|---------|-------------|
@@ -100,6 +107,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 | `r_firstPersonScale` | 1.0 | Anti-clipping scale for first-person primitives |
 | `r_firstPersonFovEnabled` | 1 | Use custom FOV for first-person (0=scene FOV) |
 | `r_firstPersonScaleEnabled` | 1 | Apply scale for anti-clipping (0=no scale) |
+| `r_occlusionCulling` | 0 | GPU occlusion culling for entities (0=off, 1=on) |
 
 ## OpenGL Renderer (Fallback)
 

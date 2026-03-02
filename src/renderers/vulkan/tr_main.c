@@ -1683,6 +1683,15 @@ static void R_AddEntitySurfaces( void ) {
 			continue;
 		}
 
+#ifdef USE_VULKAN
+		/* GPU occlusion culling: skip entities occluded last frame */
+		if ( r_occlusionCulling && r_occlusionCulling->integer && ent->e.reType == RT_MODEL ) {
+			if ( tr.currentEntityNum < MAX_REFENTITIES && vk_entity_occlusion_visibility[tr.currentEntityNum] == 0 ) {
+				continue;
+			}
+		}
+#endif
+
 		// simple generated models, like sprites and beams, are not culled
 		switch ( ent->e.reType ) {
 		case RT_PORTALSURFACE:

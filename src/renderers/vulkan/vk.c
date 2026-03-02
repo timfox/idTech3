@@ -1,6 +1,10 @@
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_postfx.h"
+
+/* GPU occlusion culling: visibility from previous frame (1=visible, 0=occluded) */
+uint64_t vk_entity_occlusion_visibility[MAX_REFENTITIES];
+static uint32_t vk_occlusion_last_entity_count;
 #include "vk_fluidsim.h"
 #include <stddef.h>
 
@@ -131,6 +135,8 @@ static PFN_vkCmdSetScissor								qvkCmdSetScissor;
 static PFN_vkCmdSetViewport								qvkCmdSetViewport;
 static PFN_vkCmdWriteTimestamp							qvkCmdWriteTimestamp;
 static PFN_vkCmdResetQueryPool							qvkCmdResetQueryPool;
+static PFN_vkCmdBeginQuery								qvkCmdBeginQuery;
+static PFN_vkCmdEndQuery								qvkCmdEndQuery;
 static PFN_vkCreateBuffer								qvkCreateBuffer;
 static PFN_vkCreateCommandPool							qvkCreateCommandPool;
 static PFN_vkCreateDescriptorPool						qvkCreateDescriptorPool;
@@ -2970,6 +2976,8 @@ static void init_vulkan_library( void )
 	INIT_DEVICE_FUNCTION(vkCmdSetScissor)
 	INIT_DEVICE_FUNCTION(vkCmdSetViewport)
 	INIT_DEVICE_FUNCTION(vkCmdWriteTimestamp)
+	INIT_DEVICE_FUNCTION(vkCmdBeginQuery)
+	INIT_DEVICE_FUNCTION(vkCmdEndQuery)
 	INIT_DEVICE_FUNCTION_EXT(vkCmdResetQueryPool)
 	INIT_DEVICE_FUNCTION(vkCreateBuffer)
 	INIT_DEVICE_FUNCTION(vkCreateCommandPool)
@@ -3110,6 +3118,8 @@ static void deinit_device_functions( void )
 	qvkCmdSetScissor							= NULL;
 	qvkCmdSetViewport							= NULL;
 	qvkCmdWriteTimestamp						= NULL;
+	qvkCmdBeginQuery							= NULL;
+	qvkCmdEndQuery								= NULL;
 	qvkCmdResetQueryPool						= NULL;
 	qvkCreateBuffer								= NULL;
 	qvkCreateCommandPool						= NULL;
@@ -4778,6 +4788,16 @@ static void vk_alloc_persistent_pipelines( void )
 		vk.dot_pipeline = vk_find_pipeline_ext( 0, &def, qtrue );
 	}
 
+	// occlusion culling: bbox pipeline (depth test on, depth/color write off)
+	{
+		Com_Memset( &def, 0, sizeof( def ) );
+		def.state_bits = 0;  /* depth test on, depth write off */
+		def.face_culling = CT_FRONT_SIDED;
+		def.shader_type = TYPE_OCCLUSION_BBOX;
+		def.primitives = TRIANGLE_LIST;
+		vk.occlusion_bbox_pipeline = vk_find_pipeline_ext( 0, &def, qtrue );
+	}
+
 	// DrawTris()
 	state_bits = GLS_POLYMODE_LINE | GLS_DEPTHMASK_TRUE;
 	{
@@ -6409,6 +6429,24 @@ void vk_initialize( void )
 		} else {
 			vk.volumetric_query_pool = VK_NULL_HANDLE;
 		}
+	}
+
+	/* Occlusion query pool for entity culling */
+	if ( qvkCreateQueryPool && qvkGetQueryPoolResults && qvkCmdBeginQuery && qvkCmdEndQuery && qvkCmdResetQueryPool ) {
+		VkQueryPoolCreateInfo query_desc;
+		Com_Memset( &query_desc, 0, sizeof( query_desc ) );
+		query_desc.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+		query_desc.queryType = VK_QUERY_TYPE_OCCLUSION;
+		query_desc.queryCount = MAX_REFENTITIES;
+		if ( qvkCreateQueryPool( vk.device, &query_desc, NULL, &vk.occlusion_query_pool ) == VK_SUCCESS ) {
+			SET_OBJECT_NAME( vk.occlusion_query_pool, "occlusion query pool", VK_DEBUG_REPORT_OBJECT_TYPE_QUERY_POOL_EXT );
+			Com_Memset( vk_entity_occlusion_visibility, 0xFF, sizeof( vk_entity_occlusion_visibility ) );  /* first frame: all visible */
+			ri.Printf( PRINT_ALL, "GPU occlusion culling available (r_occlusionCulling 0=off 1=on)\n" );
+		} else {
+			vk.occlusion_query_pool = VK_NULL_HANDLE;
+		}
+	} else {
+		vk.occlusion_query_pool = VK_NULL_HANDLE;
 	}
 
 	//
@@ -10387,6 +10425,11 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			fs_module = &vk.modules.dot_fs;
 			break;
 
+		case TYPE_OCCLUSION_BBOX:
+			vs_module = &vk.modules.color_vs;
+			fs_module = &vk.modules.color_fs;
+			break;
+
 		default:
 			ri.Error(ERR_DROP, "create_pipeline: unknown shader type %i\n", def->shader_type);
 			return 0;
@@ -10570,6 +10613,11 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			fs_module = &vk.modules.dot_fs;
 			break;
 
+		case TYPE_OCCLUSION_BBOX:
+			vs_module = &vk.modules.color_vs;
+			fs_module = &vk.modules.color_fs;
+			break;
+
 		default:
 			ri.Error(ERR_DROP, "create_pipeline: unknown shader type %i\n", def->shader_type);
 			return 0;
@@ -10582,6 +10630,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			case TYPE_FOG_ONLY:
 			case TYPE_DOT:
 			case TYPE_SIGNLE_TEXTURE_DF:
+			case TYPE_OCCLUSION_BBOX:
 			case TYPE_COLOR_BLACK:
 			case TYPE_COLOR_WHITE:
 			case TYPE_COLOR_GREEN:
@@ -11277,7 +11326,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	depth_stencil_state.pNext = NULL;
 	depth_stencil_state.flags = 0;
 	depth_stencil_state.depthTestEnable = (state_bits & GLS_DEPTHTEST_DISABLE) ? VK_FALSE : VK_TRUE;
-	depth_stencil_state.depthWriteEnable = (state_bits & GLS_DEPTHMASK_TRUE) ? VK_TRUE : VK_FALSE;
+	depth_stencil_state.depthWriteEnable = ( def->shader_type == TYPE_OCCLUSION_BBOX ) ? VK_FALSE : ( (state_bits & GLS_DEPTHMASK_TRUE) ? VK_TRUE : VK_FALSE );
 #ifdef USE_REVERSED_DEPTH
 	depth_stencil_state.depthCompareOp = (state_bits & GLS_DEPTHFUNC_EQUAL) ? VK_COMPARE_OP_EQUAL : VK_COMPARE_OP_GREATER_OR_EQUAL;
 #else
@@ -11315,7 +11364,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	Com_Memset(&attachment_blend_state, 0, sizeof(attachment_blend_state));
 	attachment_blend_state.blendEnable = (state_bits & (GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS)) ? VK_TRUE : VK_FALSE;
 
-	if (def->shadow_phase == SHADOW_EDGES || def->shader_type == TYPE_SIGNLE_TEXTURE_DF)
+	if (def->shadow_phase == SHADOW_EDGES || def->shader_type == TYPE_SIGNLE_TEXTURE_DF || def->shader_type == TYPE_OCCLUSION_BBOX)
 		attachment_blend_state.colorWriteMask = 0;
 	else
 		attachment_blend_state.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
@@ -11788,6 +11837,117 @@ static void get_prev_mvp_transform( float *prev_mvp )
 	myGlMultMatrix( prev_model_view, prev_proj, prev_mvp );
 }
 
+
+/* Unit cube for occlusion bbox: 8 vertices, 36 indices (12 triangles) */
+static const float s_occlusion_cube_verts[8][3] = {
+	{ 0, 0, 0 }, { 1, 0, 0 }, { 0, 1, 0 }, { 1, 1, 0 },
+	{ 0, 0, 1 }, { 1, 0, 1 }, { 0, 1, 1 }, { 1, 1, 1 }
+};
+static const uint16_t s_occlusion_cube_indices[36] = {
+	0,2,1, 1,2,3, 4,5,6, 5,7,6, 0,1,4, 1,5,4,
+	2,6,3, 3,6,7, 0,4,2, 2,4,6, 1,3,5, 3,7,5
+};
+
+void vk_occlusion_draw_entity_bboxes( const struct drawSurfsCommand_s *cmd )
+{
+	const trRefEntity_t *ent;
+	vec3_t mins, maxs;
+	float model[16], mvp[16];
+	int i, n;
+	const drawSurfsCommand_t *c = (const drawSurfsCommand_t *)cmd;
+
+	if ( vk.occlusion_query_pool == VK_NULL_HANDLE || vk.occlusion_bbox_pipeline == 0 ||
+		!qvkCmdBeginQuery || !qvkCmdEndQuery || !qvkCmdResetQueryPool )
+		return;
+
+	n = c->refdef.num_entities;
+	vk_occlusion_last_entity_count = (uint32_t)n;
+	if ( n <= 0 || n > MAX_REFENTITIES )
+		return;
+
+	qvkCmdResetQueryPool( vk.cmd->command_buffer, vk.occlusion_query_pool, 0, (uint32_t)n );
+	vk_bind_pipeline( vk.occlusion_bbox_pipeline );
+
+	for ( i = 0; i < n; i++ ) {
+		ent = &c->refdef.entities[i];
+		if ( ent->e.reType != RT_MODEL || !ent->e.hModel )
+			continue;
+
+		R_ModelBounds( ent->e.hModel, mins, maxs );
+		R_RotateForEntity( ent, &c->viewParms, &backEnd.or );
+
+		/* Build model matrix: origin + axis * (mins + v * (maxs-mins)) for v in [0,1]^3 */
+		{
+			float *m = model;
+			float sx = maxs[0] - mins[0], sy = maxs[1] - mins[1], sz = maxs[2] - mins[2];
+			const float *ax0 = backEnd.or.axis[0], *ax1 = backEnd.or.axis[1], *ax2 = backEnd.or.axis[2];
+			const float *o = backEnd.or.origin;
+
+			m[0]  = ax0[0]*sx; m[1]  = ax0[1]*sx; m[2]  = ax0[2]*sx; m[3]  = 0;
+			m[4]  = ax1[0]*sy; m[5]  = ax1[1]*sy; m[6]  = ax1[2]*sy; m[7]  = 0;
+			m[8]  = ax2[0]*sz; m[9]  = ax2[1]*sz; m[10] = ax2[2]*sz; m[11] = 0;
+			m[12] = o[0] + ax0[0]*mins[0] + ax1[0]*mins[1] + ax2[0]*mins[2];
+			m[13] = o[1] + ax0[1]*mins[0] + ax1[1]*mins[1] + ax2[1]*mins[2];
+			m[14] = o[2] + ax0[2]*mins[0] + ax1[2]*mins[1] + ax2[2]*mins[2];
+			m[15] = 1;
+		}
+		myGlMultMatrix( c->viewParms.world.modelViewMatrix, model, mvp );
+		myGlMultMatrix( c->viewParms.projectionMatrix, mvp, mvp );
+
+		qvkCmdBeginQuery( vk.cmd->command_buffer, vk.occlusion_query_pool, (uint32_t)i, 0 );
+		vk_update_mvp( mvp );
+		RB_CheckOverflow( 8, 36 );
+		for ( n = 0; n < 8; n++ ) {
+			tess.xyz[n][0] = s_occlusion_cube_verts[n][0];
+			tess.xyz[n][1] = s_occlusion_cube_verts[n][1];
+			tess.xyz[n][2] = s_occlusion_cube_verts[n][2];
+			tess.xyz[n][3] = 1.0f;
+		}
+		tess.numVertexes = 8;
+		{
+			glIndex_t idx_buf[36];
+			uint32_t idx_off;
+			for ( n = 0; n < 36; n++ )
+				idx_buf[n] = s_occlusion_cube_indices[n];
+			vk_bind_geometry( TESS_XYZ );
+			idx_off = vk_tess_index( 36, idx_buf );
+			if ( idx_off != ~0U ) {
+				vk_bind_index_buffer( vk.cmd->vertex_buffer, idx_off );
+				vk.cmd->num_indexes = 36;
+				vk_draw_geometry( DEPTH_RANGE_NORMAL, qtrue );
+			}
+		}
+		qvkCmdEndQuery( vk.cmd->command_buffer, vk.occlusion_query_pool, (uint32_t)i );
+	}
+}
+
+void vk_occlusion_readback( void )
+{
+	VkResult res;
+	uint32_t n;
+
+	if ( vk.occlusion_query_pool == VK_NULL_HANDLE || !qvkGetQueryPoolResults )
+		return;
+
+	n = vk_occlusion_last_entity_count;
+	if ( n <= 0 || n > MAX_REFENTITIES )
+		return;
+
+	res = qvkGetQueryPoolResults( vk.device, vk.occlusion_query_pool, 0, n,
+		sizeof( vk_entity_occlusion_visibility ), vk_entity_occlusion_visibility,
+		sizeof( uint64_t ), VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, "Occlusion readback failed: %s\n", vk_result_string( res ) );
+		Com_Memset( vk_entity_occlusion_visibility, 0, sizeof( vk_entity_occlusion_visibility ) );
+		return;
+	}
+}
+
+void vk_occlusion_pass( const struct drawSurfsCommand_s *cmd )
+{
+	/* Called from RB_DrawSurfs. World depth + entity bboxes are done there. */
+	(void)cmd;
+}
 
 void vk_clear_color( const vec4_t color ) {
 
@@ -14055,6 +14215,9 @@ void vk_begin_frame( void )
 		if ( vk.volumetric_query_pool != VK_NULL_HANDLE &&
 			r_volumetricFogPerfTimers && r_volumetricFogPerfTimers->integer ) {
 			vk_update_volumetric_perf_queries();
+		}
+		if ( r_occlusionCulling && r_occlusionCulling->integer ) {
+			vk_occlusion_readback();
 		}
 	}
 

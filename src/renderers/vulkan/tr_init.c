@@ -170,6 +170,7 @@ cvar_t	*r_lodscale;
 cvar_t	*r_norefresh;
 cvar_t	*r_drawentities;
 cvar_t	*r_drawworld;
+cvar_t	*r_occlusionCulling;
 cvar_t	*r_speeds;
 cvar_t	*r_fullbright;
 cvar_t	*r_novis;
@@ -2235,6 +2236,8 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_norefresh, "Bypasses refreshing of the rendered scene." );
 	r_drawentities = ri.Cvar_Get ("r_drawentities", "1", CVAR_CHEAT );
 	ri.Cvar_SetDescription( r_drawentities, "Draw all world entities." );
+	r_occlusionCulling = ri.Cvar_Get ("r_occlusionCulling", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_occlusionCulling, "GPU occlusion culling for entities (0=off, 1=on). Uses previous-frame visibility." );
 	r_nocull = ri.Cvar_Get ("r_nocull", "0", CVAR_CHEAT);
 	ri.Cvar_SetDescription( r_nocull, "Draw all culled objects." );
 	r_novis = ri.Cvar_Get ("r_novis", "0", CVAR_CHEAT);

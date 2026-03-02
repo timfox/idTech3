@@ -1555,17 +1555,28 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		}
 #endif
 
-		vk_bind_pipeline( pipeline );
-		vk_bind_geometry( tess_flags );
-		vk_draw_geometry( tess.depthRange, qtrue );
-
-		if ( pStage->depthFragment ) {
+		if ( backEnd.depthOnlyWorldPass && pStage->depthFragment ) {
+			/* Occlusion pass: depth-only draw */
 			if ( backEnd.viewParms.portalView == PV_MIRROR )
 				pipeline = pStage->vk_mirror_pipeline_df;
 			else
 				pipeline = pStage->vk_pipeline_df;
 			vk_bind_pipeline( pipeline );
+			vk_bind_geometry( tess_flags );
 			vk_draw_geometry( tess.depthRange, qtrue );
+		} else {
+			vk_bind_pipeline( pipeline );
+			vk_bind_geometry( tess_flags );
+			vk_draw_geometry( tess.depthRange, qtrue );
+
+			if ( !backEnd.depthOnlyWorldPass && pStage->depthFragment ) {
+				if ( backEnd.viewParms.portalView == PV_MIRROR )
+					pipeline = pStage->vk_mirror_pipeline_df;
+				else
+					pipeline = pStage->vk_pipeline_df;
+				vk_bind_pipeline( pipeline );
+				vk_draw_geometry( tess.depthRange, qtrue );
+			}
 		}
 #else
 		R_ComputeColors( 0, tess.svars.colors[0].rgba, pStage );
