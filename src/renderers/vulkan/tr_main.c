@@ -627,6 +627,64 @@ void R_SetupProjection( viewParms_t *dest, float zProj, qboolean computeFrustum 
 
 /*
 ===============
+R_SetupFirstPersonProjection
+
+Builds a projection matrix for first-person primitives (arms, weapons) with
+custom FOV. Used for UE-style first-person rendering to avoid clipping.
+===============
+*/
+void R_SetupFirstPersonProjection( viewParms_t *dest, float *outProjection )
+{
+	float fovX, fovY;
+	float xmin, xmax, ymin, ymax;
+	float width, height;
+	float zProj = r_zproj->value;
+	float stereoSep = r_stereoSeparation->value;
+
+	if ( !r_firstPersonFovEnabled->integer || r_firstPersonFov->value <= 0.0f ) {
+		Com_Memcpy( outProjection, dest->projectionMatrix, sizeof( float ) * 16 );
+		return;
+	}
+
+	fovX = r_firstPersonFov->value;
+	{
+		float aspect = ( dest->viewportWidth > 0 && dest->viewportHeight > 0 )
+			? (float)dest->viewportHeight / (float)dest->viewportWidth
+			: 0.75f;
+		fovY = 2.0f * (float)atan( tan( fovX * (float)M_PI / 360.0f ) * aspect ) * 360.0f / (float)M_PI;
+	}
+
+	if ( stereoSep != 0.0f ) {
+		if ( dest->stereoFrame == STEREO_LEFT )
+			stereoSep = zProj / stereoSep;
+		else if ( dest->stereoFrame == STEREO_RIGHT )
+			stereoSep = zProj / -stereoSep;
+		else
+			stereoSep = 0.0f;
+	}
+
+	ymax = zProj * (float)tan( fovY * (float)M_PI / 360.0f );
+	ymin = -ymax;
+	xmax = zProj * (float)tan( fovX * (float)M_PI / 360.0f );
+	xmin = -xmax;
+	width = xmax - xmin;
+	height = ymax - ymin;
+
+	Com_Memcpy( outProjection, dest->projectionMatrix, sizeof( float ) * 16 );
+	/* overwrite XY scaling from custom FOV; keep Z from original */
+	outProjection[0]  = 2.0f * zProj / width;
+	outProjection[4]  = 0.0f;
+	outProjection[8]  = ( xmax + xmin + 2.0f * stereoSep ) / width;
+	outProjection[12] = 2.0f * zProj * stereoSep / width;
+	outProjection[1]  = 0.0f;
+	outProjection[5]  = 2.0f * zProj / height;
+	outProjection[9]  = ( ymax + ymin ) / height;
+	outProjection[13] = 0.0f;
+}
+
+
+/*
+===============
 R_SetupProjectionZ
 
 Sets the z-component transformation part in the projection matrix
