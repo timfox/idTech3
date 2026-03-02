@@ -129,6 +129,80 @@ void CL_JsNotifyMenuChanged( int menu ) {
 #endif
 }
 
+static qboolean CL_SetActiveMenuByName( const char *name ) {
+	int menu = -1;
+
+	if ( !uivm || !name || !name[0] ) {
+		return qfalse;
+	}
+
+	if ( !Q_stricmp( name, "none" ) || !Q_stricmp( name, "close" ) ) {
+		menu = UIMENU_NONE;
+	} else if ( !Q_stricmp( name, "main" ) || !Q_stricmp( name, "menu" ) || !Q_stricmp( name, "home" ) ) {
+		menu = UIMENU_MAIN;
+	} else if ( !Q_stricmp( name, "ingame" ) || !Q_stricmp( name, "pause" ) ) {
+		menu = UIMENU_INGAME;
+	} else if ( !Q_stricmp( name, "need_cd" ) || !Q_stricmp( name, "needcd" ) ) {
+		menu = UIMENU_NEED_CD;
+	} else if ( !Q_stricmp( name, "bad_cd_key" ) || !Q_stricmp( name, "badcdkey" ) ) {
+		menu = UIMENU_BAD_CD_KEY;
+	} else if ( !Q_stricmp( name, "team" ) ) {
+		menu = UIMENU_TEAM;
+	} else if ( !Q_stricmp( name, "postgame" ) ) {
+		menu = UIMENU_POSTGAME;
+	}
+
+	if ( menu < 0 ) {
+		return qfalse;
+	}
+
+	VM_Call( uivm, 1, UI_SET_ACTIVE_MENU, menu );
+	CL_JsNotifyMenuChanged( menu );
+	return qtrue;
+}
+
+static void CL_Open_f( void ) {
+	char target[MAX_TOKEN_CHARS];
+
+	if ( Cmd_Argc() < 2 ) {
+		if ( !CL_SetActiveMenuByName( "main" ) ) {
+			Com_Printf( "open: UI is not available\n" );
+		}
+		return;
+	}
+
+	Q_strncpyz( target, Cmd_Argv( 1 ), sizeof( target ) );
+	Q_CleanStr( target );
+
+	if ( !target[0] ) {
+		Com_Printf( "open: empty target\n" );
+		return;
+	}
+
+	/* First handle direct menu ids locally. */
+	if ( CL_SetActiveMenuByName( target ) ) {
+		return;
+	}
+
+	/* Preserve the VM-driven UI path for custom menu commands/scripts. */
+	if ( uivm && UI_GameCommand() ) {
+		return;
+	}
+
+	/* Keep legacy JS "open <tab>" flows alive by advertising a menu_changed event. */
+#ifdef USE_DUKTAPE
+	JsDebug_EmitEvent( "menu_changed", target, NULL, -1, 0 );
+#endif
+
+	/* Common tabs live under main menu in most UI scripts. */
+	if ( !Q_stricmp( target, "credits" ) || !Q_stricmp( target, "audio" ) || !Q_stricmp( target, "gameplay" ) ) {
+		CL_SetActiveMenuByName( "main" );
+		return;
+	}
+
+	Com_Printf( "open: unhandled target '%s'\n", target );
+}
+
 #ifdef USE_FLUX
 // FLUX image generation cvars
 cvar_t	*cl_flux_enable;
@@ -4400,6 +4474,7 @@ void CL_Init( void ) {
 	Cmd_AddCommand ("systeminfo", CL_Systeminfo_f );
 	Cmd_AddCommand ("playername", CL_SetPlayerName_f );
 	Cmd_AddCommand ("setname", CL_SetPlayerName_f );
+	Cmd_AddCommand ("open", CL_Open_f );
 #ifdef USE_FLUX
 	Cmd_AddCommand ("flux_generate", CL_FluxGenerate_f );
 	Cmd_AddCommand ("flux_status", CL_FluxStatus_f );
@@ -4532,6 +4607,7 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 	Cmd_RemoveCommand ("serverinfo");
 	Cmd_RemoveCommand ("systeminfo");
 	Cmd_RemoveCommand ("modelist");
+	Cmd_RemoveCommand ("open");
 
 #ifdef USE_CURL
 	Com_DL_Cleanup( &download );
