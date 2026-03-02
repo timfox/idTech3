@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 // tr_image.c
 #include "tr_local.h"
+#include "../common/tr_image_loaders.h"
 
 static byte			 s_intensitytable[256];
 static unsigned char s_gammatable[256];
@@ -807,6 +808,35 @@ static void upload_vk_image( image_t *image, byte *pic ) {
 	ri.Hunk_FreeTempMemory( upload_data.buffer );
 }
 
+static void upload_vk_image_compressed( image_t *image, byte *data, int width, int height, int format, int size ) {
+	int miplevels = 0;
+	int w, h;
+	int acc = 0;
+
+	w = width;
+	h = height;
+	while ( acc < size ) {
+		int blockW = ( w + 3 ) / 4;
+		int blockH = ( h + 3 ) / 4;
+		acc += blockW * blockH * 16;
+		miplevels++;
+		if ( w == 1 && h == 1 )
+			break;
+		w >>= 1;
+		h >>= 1;
+		if ( w < 1 ) w = 1;
+		if ( h < 1 ) h = 1;
+	}
+
+	image->internalFormat = format;
+	image->uploadWidth = width;
+	image->uploadHeight = height;
+	image->layers = 1;
+
+	vk_create_image( image, width, height, miplevels );
+	vk_upload_compressed_image_data( image, width, height, miplevels, data, size, qfalse );
+}
+
 #else // !USE_VULKAN
 
 static GLint RawImage_GetInternalFormat( const byte *scan, int numPixels, qboolean lightMap, qboolean allowCompression )
@@ -1057,6 +1087,75 @@ static uint32_t vk_find_texture_type( const uint32_t type ) {
 	}
 #endif
 	return  0; // identity
+}
+
+/*
+================
+R_CreateImageCompressed
+
+Creates image from pre-compressed BC7 data (KTX2/DDS). Vulkan only.
+================
+*/
+static image_t *R_CreateImageCompressed( const char *name, const char *name2, byte *data, int width, int height, int format, int size, imgFlags_t flags, uint32_t type ) {
+	image_t		*image;
+	long		hash;
+	int			namelen, namelen2;
+	const char	*slash;
+
+	namelen = (int)strlen( name ) + 1;
+	if ( namelen > MAX_QPATH ) {
+		ri.Error( ERR_DROP, "R_CreateImageCompressed: \"%s\" is too long", name );
+	}
+
+	if ( name2 && Q_stricmp( name, name2 ) != 0 ) {
+		name2 = ( slash = strrchr( name2, '/' ) ) != NULL ? slash + 1 : name2;
+		namelen2 = (int)strlen( name2 ) + 1;
+	} else {
+		namelen2 = 0;
+	}
+
+	if ( tr.numImages == MAX_DRAWIMAGES ) {
+		ri.Error( ERR_DROP, "R_CreateImageCompressed: MAX_DRAWIMAGES hit" );
+	}
+
+	image = ri.Hunk_Alloc( sizeof( *image ) + namelen + namelen2, h_low );
+	image->imgName = (char *)( image + 1 );
+	strcpy( image->imgName, name );
+	if ( namelen2 ) {
+		image->imgName2 = image->imgName + namelen;
+		strcpy( image->imgName2, name2 );
+	} else {
+		image->imgName2 = image->imgName;
+	}
+
+	hash = generateHashValue( name );
+	image->next = hashTable[ hash ];
+	hashTable[ hash ] = image;
+
+	tr.images[ tr.numImages++ ] = image;
+
+	image->flags = flags;
+	image->width = width;
+	image->height = height;
+	image->type = vk_find_texture_type( type );
+
+	if ( namelen > 6 && Q_stristr( image->imgName, "maps/" ) == image->imgName && Q_stristr( image->imgName + 6, "/lm_" ) != NULL ) {
+		image->flags |= IMGFLAG_NO_COMPRESSION | IMGFLAG_NOSCALE;
+	}
+
+	image->handle = VK_NULL_HANDLE;
+	image->view = VK_NULL_HANDLE;
+	image->descriptor = VK_NULL_HANDLE;
+
+	if ( flags & IMGFLAG_CLAMPTOBORDER )
+		image->wrapClampMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+	else if ( flags & IMGFLAG_CLAMPTOEDGE )
+		image->wrapClampMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	else
+		image->wrapClampMode = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+	upload_vk_image_compressed( image, data, width, height, format, size );
+	return image;
 }
 
 /*
@@ -1371,7 +1470,27 @@ image_t	*R_FindImageFile( const char *name, imgFlags_t flags, uint32_t type )
 				return image;
 			}
 		}
+	} else {
+		Q_strncpyz( strippedName, name, sizeof( strippedName ) );
 	}
+
+#ifdef USE_VULKAN
+	{
+		byte *compData = NULL;
+		int compWidth, compHeight, compFormat, compSize;
+
+		if ( R_LoadKTX2( va( "%s.ktx2", strippedName ), &compData, &compWidth, &compHeight, &compFormat, &compSize ) ) {
+			image = R_CreateImageCompressed( name, va( "%s.ktx2", strippedName ), compData, compWidth, compHeight, compFormat, compSize, flags, type );
+			Z_Free( compData );
+			return image;
+		}
+		if ( R_LoadDDS_Compressed( va( "%s.dds", strippedName ), &compData, &compWidth, &compHeight, &compFormat, &compSize ) ) {
+			image = R_CreateImageCompressed( name, va( "%s.dds", strippedName ), compData, compWidth, compHeight, compFormat, compSize, flags, type );
+			Z_Free( compData );
+			return image;
+		}
+	}
+#endif
 
 	//
 	// load the pic from disk

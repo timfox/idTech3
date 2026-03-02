@@ -28,6 +28,10 @@ void R_LoadQOI(const char *filename, byte **pic, int *width, int *height);
 void R_LoadDDS(const char *filename, byte **pic, int *width, int *height);
 void R_LoadSVG(const char *filename, byte **pic, int *width, int *height);
 
+/* Compressed loaders: return raw BC7/block data. format = VkFormat, size = byte count. */
+qboolean R_LoadDDS_Compressed(const char *filename, byte **data, int *width, int *height, int *format, int *size);
+qboolean R_LoadKTX2(const char *filename, byte **data, int *width, int *height, int *format, int *size);
+
 #ifdef __cplusplus
 }
 #endif

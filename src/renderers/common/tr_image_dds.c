@@ -24,6 +24,18 @@ Pure C implementation, no external dependencies.
 #define FOURCC_DXT1 0x31545844  /* "DXT1" */
 #define FOURCC_DXT3 0x33545844  /* "DXT3" */
 #define FOURCC_DXT5 0x35545844  /* "DXT5" */
+#define FOURCC_DX10 0x30315844  /* "DX10" */
+
+#define DXGI_FORMAT_BC7_UNORM    98
+#define DXGI_FORMAT_BC7_UNORM_SRGB 99
+
+typedef struct {
+	uint32_t dxgiFormat;
+	uint32_t resourceDimension;
+	uint32_t miscFlag;
+	uint32_t arraySize;
+	uint32_t miscFlags2;
+} ddsHeaderDxt10_t;
 
 typedef struct {
 	uint32_t size;
@@ -168,4 +180,91 @@ void R_LoadDDS(const char *filename, byte **pic, int *width, int *height) {
 
 	FS_FreeFile(fileData);
 	*pic = out; *width = w; *height = h;
+}
+
+/*
+===============
+R_LoadDDS_Compressed
+
+Load BC7 compressed DDS (DX10 header). Returns raw block data for GPU upload.
+===============
+*/
+qboolean R_LoadDDS_Compressed(const char *filename, byte **data, int *width, int *height, int *format, int *size) {
+	void *fileData;
+	int fileSize;
+	const ddsHeader_t *hdr;
+	const ddsHeaderDxt10_t *dx10;
+	const byte *src;
+	byte *out;
+	int w, h;
+	int totalSize;
+	int level;
+	int blockW, blockH;
+	int levelSize;
+
+	*data = NULL; *width = 0; *height = 0; *format = 0; *size = 0;
+
+	fileSize = FS_ReadFile(filename, &fileData);
+	if (fileSize <= 0 || !fileData) return qfalse;
+
+	if (fileSize < (int)(sizeof(ddsHeader_t) + sizeof(ddsHeaderDxt10_t))) {
+		FS_FreeFile(fileData);
+		return qfalse;
+	}
+
+	hdr = (const ddsHeader_t *)fileData;
+	if (hdr->magic != DDS_MAGIC || hdr->size != 124) {
+		FS_FreeFile(fileData);
+		return qfalse;
+	}
+
+	if (!(hdr->pixelFormat.flags & DDPF_FOURCC) || hdr->pixelFormat.fourCC != FOURCC_DX10) {
+		FS_FreeFile(fileData);
+		return qfalse;
+	}
+
+	dx10 = (const ddsHeaderDxt10_t *)((const byte *)fileData + sizeof(ddsHeader_t));
+	if (dx10->dxgiFormat != DXGI_FORMAT_BC7_UNORM && dx10->dxgiFormat != DXGI_FORMAT_BC7_UNORM_SRGB) {
+		FS_FreeFile(fileData);
+		return qfalse;
+	}
+
+	w = (int)hdr->width;
+	h = (int)hdr->height;
+	if (w <= 0 || h <= 0 || w > 16384 || h > 16384) {
+		FS_FreeFile(fileData);
+		return qfalse;
+	}
+
+	src = (const byte *)fileData + sizeof(ddsHeader_t) + sizeof(ddsHeaderDxt10_t);
+
+	/* Compute total size for all mip levels */
+	totalSize = 0;
+	for (level = 0; ; level++) {
+		int lw = w >> level; int lh = h >> level;
+		if (lw < 1) lw = 1;
+		if (lh < 1) lh = 1;
+		blockW = (lw + 3) / 4;
+		blockH = (lh + 3) / 4;
+		levelSize = blockW * blockH * 16;
+		totalSize += levelSize;
+		if ((lw == 1 && lh == 1) || (hdr->mipMapCount > 0 && level + 1 >= (int)hdr->mipMapCount))
+			break;
+	}
+
+	if ((int)(src - (const byte *)fileData) + totalSize > fileSize) {
+		FS_FreeFile(fileData);
+		return qfalse;
+	}
+
+	out = (byte *)Z_Malloc(totalSize);
+	Com_Memcpy(out, src, totalSize);
+	FS_FreeFile(fileData);
+
+	*data = out;
+	*width = w;
+	*height = h;
+	*format = (dx10->dxgiFormat == DXGI_FORMAT_BC7_UNORM_SRGB) ? 146 : 145; /* VK_FORMAT_BC7_* */
+	*size = totalSize;
+	return qtrue;
 }
