@@ -753,8 +753,6 @@ endif()
 OPTION(SKIP_IDPAK_CHECK "Skip checking for original Quake III pak files (pak0.pk3)" ON)
 OPTION(BUILD_FREETYPE "Enable FreeType-powered font rendering / font generation" ON)
 
-SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules)
-
 set(EXTERNAL_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/src/external")
 set(EXTERNAL_SRC "${EXTERNAL_ROOT}/src")
 set(EXTERNAL_INCLUDE "${EXTERNAL_ROOT}/include")
@@ -925,7 +923,6 @@ if(USE_GLM)
 endif()
 
 AUX_SOURCE_DIRECTORY(src/server SERVER_SRCS)
-list(REMOVE_ITEM SERVER_SRCS src/server/sv_rankings.c)
 
 # universal binary
 ADD_LIBRARY(qcommon OBJECT ${QCOMMON_SRCS} ${SERVER_SRCS})

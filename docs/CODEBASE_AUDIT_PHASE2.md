@@ -75,7 +75,7 @@ Approx. **150+** instances across `src/` (excluding most of `external/`). Notabl
 - **Renderers**: `tr_backend.c`, `tr_shader.c`, `tr_init.c`, `tr_surface.c`, Vulkan backend
 - **Platform**: `unix_main.c`, `linux_glimp.c`
 - **Qcommon**: `files.c`, `q_shared.c`, `cvar.c`
-- **Game/server**: `sv_main.c`, `sv_game.c`, `sv_rankings.c`
+- **Game/server**: `sv_main.c`, `sv_game.c`
 
 Many are legacy or low-priority; a pass to triage and resolve or document would help.
 
