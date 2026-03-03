@@ -29,6 +29,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_postfx.h"
 #include "vk_flashlight.h"
 #include "vk_skybox_hdr.h"
+#ifdef USE_IMGUI
+void VkImgui_Shutdown( void );
+#endif
 
 glconfig_t	glConfig;
 
@@ -2917,6 +2920,10 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 
 #ifdef USE_VULKAN
 	vk_release_resources();
+#endif
+
+#ifdef USE_IMGUI
+	VkImgui_Shutdown();
 #endif
 
 	R_DoneFreeType();

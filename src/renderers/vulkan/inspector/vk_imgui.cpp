@@ -238,6 +238,8 @@ extern "C" void VkImgui_BeginFrame(void) {
 
 static void VkImgui_DrawMenuBar(void) {
 	ImGuiIO &io = ImGui::GetIO();
+	const float fps = io.Framerate > 0.0f ? io.Framerate : 0.0f;
+	const float ms = fps > 0.0f ? 1000.0f / fps : 0.0f;
 
 	if (ImGui::BeginMainMenuBar()) {
 		if (ImGui::BeginMenu("File")) {
@@ -265,7 +267,7 @@ static void VkImgui_DrawMenuBar(void) {
 		}
 
 		ImGui::SameLine(ImGui::GetWindowWidth() - 220);
-		ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+		ImGui::Text("%.3f ms/frame (%.1f FPS)", ms, fps);
 
 		ImGui::EndMainMenuBar();
 	}
@@ -517,17 +519,52 @@ extern "C" void VkImgui_DrawVolumetricsPanel(void) {
 extern "C" void VkImgui_DrawProfiler(void) {
 	if (!vkWindows.profiler.open) return;
 	ImGuiIO &io = ImGui::GetIO();
+	const float fps = io.Framerate > 0.0f ? io.Framerate : 0.0f;
+	const float ms = fps > 0.0f ? 1000.0f / fps : 0.0f;
 	ImGui::Begin("GPU Profiler", (bool *)&vkWindows.profiler.open);
 
-	ImGui::Text("Frame Time: %.3f ms", 1000.0f / io.Framerate);
-	ImGui::Text("FPS: %.1f", io.Framerate);
+	ImGui::Text("Frame Time: %.3f ms", ms);
+	ImGui::Text("FPS: %.1f", fps);
 
 	static float frameTimes[120] = {};
 	static int frameIdx = 0;
-	frameTimes[frameIdx] = 1000.0f / io.Framerate;
+	frameTimes[frameIdx] = ms;
 	frameIdx = (frameIdx + 1) % 120;
 	ImGui::PlotLines("Frame Time (ms)", frameTimes, 120, frameIdx, nullptr, 0.0f, 33.0f, ImVec2(0, 80));
 
+	ImGui::End();
+}
+
+extern "C" void VkImgui_DrawViewport(void) {
+	if ( !vkWindows.viewport.open ) return;
+	ImGui::Begin( "Viewport", (bool *)&vkWindows.viewport.open );
+	ImGui::Text( "Viewport preview is host-rendered." );
+	ImGui::TextDisabled( "Game scene remains visible behind the dockspace." );
+	ImGui::TextDisabled( "Live texture binding hook: pending backend integration." );
+	ImGui::End();
+}
+
+extern "C" void VkImgui_DrawShaderEditor(void) {
+	if ( !vkWindows.shader.open ) return;
+	ImGui::Begin( "Shader Editor", (bool *)&vkWindows.shader.open );
+	ImGui::Text( "Shader live-edit pipeline is not wired yet." );
+	ImGui::TextDisabled( "Use r_reloadShaders / vid_restart for now." );
+	ImGui::End();
+}
+
+extern "C" void VkImgui_DrawObjects(void) {
+	static bool open = false;
+	if ( !open ) return;
+	ImGui::Begin( "Objects", (bool *)&open );
+	ImGui::TextDisabled( "Object browser is not implemented in this build." );
+	ImGui::End();
+}
+
+extern "C" void VkImgui_DrawInspector(void) {
+	static bool open = false;
+	if ( !open ) return;
+	ImGui::Begin( "Inspector", (bool *)&open );
+	ImGui::TextDisabled( "Property inspector is not implemented in this build." );
 	ImGui::End();
 }
 
@@ -554,6 +591,10 @@ extern "C" void VkImgui_Draw(void) {
 	ImGui::DockSpace(dockId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
 
 	VkImgui_DrawMenuBar();
+	VkImgui_DrawViewport();
+	VkImgui_DrawShaderEditor();
+	VkImgui_DrawObjects();
+	VkImgui_DrawInspector();
 	VkImgui_DrawPostFXPanel();
 	VkImgui_DrawPhysicsPanel();
 	VkImgui_DrawVolumetricsPanel();
@@ -565,9 +606,5 @@ extern "C" void VkImgui_Draw(void) {
 
 extern "C" void VkImgui_SwapchainRestarted(void) { }
 extern "C" void VkImgui_BindGameColorImage(void) { }
-extern "C" void VkImgui_DrawObjects(void) { }
-extern "C" void VkImgui_DrawInspector(void) { }
-extern "C" void VkImgui_DrawViewport(void) { }
-extern "C" void VkImgui_DrawShaderEditor(void) { }
 
 #endif /* USE_IMGUI */

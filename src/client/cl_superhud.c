@@ -26,6 +26,36 @@ static cvar_t *cg_shud;
 static cvar_t *cg_shud_file;
 static qboolean shudInitialized = qfalse;
 
+static void SHUD_UpdateConfigState( void ) {
+	if ( !shudInitialized || !cg_shud || !cg_shud_file ) {
+		return;
+	}
+
+	if ( cg_shud_file->modified ) {
+		cg_shud_file->modified = qfalse;
+		if ( cg_shud_file->string[0] ) {
+			if ( cg_shud->integer ) {
+				SHUD_LoadConfig( cg_shud_file->string );
+			}
+		} else {
+			Com_Memset( &activeConfig, 0, sizeof( activeConfig ) );
+			Com_Printf( "SuperHUD: cleared active config (cg_shud_file empty)\n" );
+		}
+	}
+
+	if ( cg_shud->modified ) {
+		cg_shud->modified = qfalse;
+		Com_Printf( "SuperHUD: %s (cg_shud %d)\n",
+			cg_shud->integer ? "enabled" : "disabled", cg_shud->integer );
+	}
+
+	if ( cg_shud->integer && cg_shud_file->string[0] ) {
+		if ( !activeConfig.loaded || Q_stricmp( activeConfig.name, cg_shud_file->string ) != 0 ) {
+			SHUD_LoadConfig( cg_shud_file->string );
+		}
+	}
+}
+
 void SHUD_Init( void ) {
 	cg_shud = Cvar_Get( "cg_shud", "0", CVAR_ARCHIVE );
 	cg_shud_file = Cvar_Get( "cg_shud_file", "", CVAR_ARCHIVE );
@@ -34,6 +64,8 @@ void SHUD_Init( void ) {
 
 	Com_Memset( &activeConfig, 0, sizeof( activeConfig ) );
 	shudInitialized = qtrue;
+	cg_shud->modified = qfalse;
+	cg_shud_file->modified = qfalse;
 
 	if ( cg_shud->integer && cg_shud_file->string[0] ) {
 		SHUD_LoadConfig( cg_shud_file->string );
@@ -121,6 +153,7 @@ void SHUD_LoadConfig( const char *filename ) {
 	len = FS_ReadFile( filename, &buf );
 	if ( len <= 0 || !buf ) {
 		Com_Printf( S_COLOR_YELLOW "SuperHUD: could not load %s\n", filename );
+		Com_Memset( &activeConfig, 0, sizeof( activeConfig ) );
 		return;
 	}
 
@@ -179,40 +212,36 @@ void SHUD_SetElementText( int idx, const char *text ) {
 
 void SHUD_Render( int screenW, int screenH ) {
 	int i;
-	float scaleX, scaleY;
+	(void)screenW;
+	(void)screenH;
+
+	SHUD_UpdateConfigState();
 
 	if ( !shudInitialized || !cg_shud || !cg_shud->integer ) return;
 	if ( !activeConfig.loaded || activeConfig.numElements == 0 ) return;
-
-	scaleX = (float)screenW / 640.0f;
-	scaleY = (float)screenH / 480.0f;
 
 	for ( i = 0; i < activeConfig.numElements; i++ ) {
 		shudElement_t *e = &activeConfig.elements[i];
 		if ( !e->active ) continue;
 
-		float rx = e->x * scaleX;
-		float ry = e->y * scaleY;
-		float rw = e->w * scaleX;
-		float rh = e->h * scaleY;
-
 		if ( e->bgcolor[3] > 0.0f ) {
-			re.SetColor( e->bgcolor );
-			re.DrawStretchPic( rx, ry, rw, rh, 0, 0, 1, 1, cls.whiteShader );
+			SCR_FillRect( e->x, e->y, e->w, e->h, e->bgcolor );
 		}
 
 		if ( e->border > 0.0f && e->bordercolor[3] > 0.0f ) {
-			float b = e->border * scaleX;
-			re.SetColor( e->bordercolor );
-			re.DrawStretchPic( rx, ry, rw, b, 0, 0, 1, 1, cls.whiteShader );
-			re.DrawStretchPic( rx, ry + rh - b, rw, b, 0, 0, 1, 1, cls.whiteShader );
-			re.DrawStretchPic( rx, ry + b, b, rh - 2*b, 0, 0, 1, 1, cls.whiteShader );
-			re.DrawStretchPic( rx + rw - b, ry + b, b, rh - 2*b, 0, 0, 1, 1, cls.whiteShader );
+			float b = e->border;
+			const float maxBorder = 0.5f * ( e->w < e->h ? e->w : e->h );
+			if ( b > maxBorder ) {
+				b = maxBorder;
+			}
+			SCR_FillRect( e->x, e->y, e->w, b, e->bordercolor );
+			SCR_FillRect( e->x, e->y + e->h - b, e->w, b, e->bordercolor );
+			SCR_FillRect( e->x, e->y + b, b, e->h - ( 2.0f * b ), e->bordercolor );
+			SCR_FillRect( e->x + e->w - b, e->y + b, b, e->h - ( 2.0f * b ), e->bordercolor );
 		}
 
 		if ( e->type == SHUD_TEXT && e->text[0] ) {
-			re.SetColor( e->color );
-			SCR_DrawStringExt( (int)(e->x), (int)(e->y), e->fontsize, e->text, e->color, qfalse, qfalse );
+			SCR_DrawStringExt( (int)e->x, (int)e->y, e->fontsize, e->text, e->color, qfalse, qfalse );
 		}
 
 		if ( e->type == SHUD_BAR ) {
@@ -222,15 +251,15 @@ void SHUD_Render( int screenW, int screenH ) {
 				if ( cv ) {
 					float maxVal = e->fontsize > 0 ? e->fontsize : 100.0f;
 					fillFrac = cv->value / maxVal;
-					if ( fillFrac < 0 ) fillFrac = 0;
-					if ( fillFrac > 1 ) fillFrac = 1;
 				}
 			}
-			re.SetColor( e->color );
+			if ( fillFrac < 0 ) fillFrac = 0;
+			if ( fillFrac > 1 ) fillFrac = 1;
+
 			if ( e->style == 1 ) {
-				re.DrawStretchPic( rx, ry, rw * fillFrac, rh, 0, 0, 1, 1, cls.whiteShader );
+				SCR_FillRect( e->x, e->y, e->w * fillFrac, e->h, e->color );
 			} else {
-				re.DrawStretchPic( rx, ry + rh * (1.0f - fillFrac), rw, rh * fillFrac, 0, 0, 1, 1, cls.whiteShader );
+				SCR_FillRect( e->x, e->y + e->h * ( 1.0f - fillFrac ), e->w, e->h * fillFrac, e->color );
 			}
 		}
 
@@ -239,12 +268,11 @@ void SHUD_Render( int screenW, int screenH ) {
 			if ( cv ) {
 				char numStr[32];
 				if ( e->style == 1 ) {
-					Com_sprintf( numStr, sizeof(numStr), "%.1f", cv->value );
+					Com_sprintf( numStr, sizeof( numStr ), "%.1f", cv->value );
 				} else {
-					Com_sprintf( numStr, sizeof(numStr), "%d", cv->integer );
+					Com_sprintf( numStr, sizeof( numStr ), "%d", cv->integer );
 				}
-				re.SetColor( e->color );
-				SCR_DrawStringExt( (int)(e->x), (int)(e->y), e->fontsize > 0 ? e->fontsize : 16, numStr, e->color, qtrue, qtrue );
+				SCR_DrawStringExt( (int)e->x, (int)e->y, e->fontsize > 0 ? e->fontsize : 16, numStr, e->color, qtrue, qtrue );
 			}
 		}
 
@@ -253,19 +281,21 @@ void SHUD_Render( int screenW, int screenH ) {
 			int secs = ( totalMs / 1000 ) % 60;
 			int mins = ( totalMs / 60000 ) % 60;
 			char timeStr[16];
-			Com_sprintf( timeStr, sizeof(timeStr), "%02d:%02d", mins, secs );
-			re.SetColor( e->color );
-			SCR_DrawStringExt( (int)(e->x), (int)(e->y), e->fontsize > 0 ? e->fontsize : 16, timeStr, e->color, qtrue, qtrue );
+			Com_sprintf( timeStr, sizeof( timeStr ), "%02d:%02d", mins, secs );
+			SCR_DrawStringExt( (int)e->x, (int)e->y, e->fontsize > 0 ? e->fontsize : 16, timeStr, e->color, qtrue, qtrue );
 		}
 
 		if ( e->type == SHUD_ICON && e->text[0] ) {
 			qhandle_t shader = re.RegisterShaderNoMip ? re.RegisterShaderNoMip( e->text ) : 0;
 			if ( shader ) {
 				re.SetColor( e->color );
-				re.DrawStretchPic( rx, ry, rw, rh, 0, 0, 1, 1, shader );
+				SCR_DrawPic( e->x, e->y, e->w, e->h, shader );
+				re.SetColor( NULL );
 			}
 		}
 
-		re.SetColor( NULL );
+		if ( e->type == SHUD_RECT && e->color[3] > 0.0f ) {
+			SCR_FillRect( e->x, e->y, e->w, e->h, e->color );
+		}
 	}
 }

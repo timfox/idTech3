@@ -182,6 +182,7 @@ static void CL_Open_f( void ) {
 
 	/* First handle direct menu ids locally. */
 	if ( CL_SetActiveMenuByName( target ) ) {
+		Cvar_Set( "ui_open_tab", "" );
 		return;
 	}
 
@@ -203,6 +204,7 @@ static void CL_Open_f( void ) {
 		return;
 	}
 
+	Cvar_Set( "ui_open_tab", "" );
 	Com_Printf( "open: unhandled target '%s'\n", target );
 }
 
@@ -4563,6 +4565,8 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 	noGameRestart = quit;
 	CL_Disconnect( qfalse );
 	SDF_Shutdown();
+	SHUD_Shutdown();
+	MenuVideo_Shutdown();
 
 	// clear and mute all sounds until next registration
 	S_DisableSounds();
