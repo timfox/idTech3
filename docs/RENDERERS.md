@@ -95,7 +95,9 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 ### Key Cvars
 | Cvar | Default | Description |
 |------|---------|-------------|
-| `r_vfog` | 0 | Volumetric fog mode (0=off, 1+=on) |
+| `r_volumetricFog` | 0 | Volumetric fog enable (0=off, 1=on) |
+| `r_volumetricFogDensity` | 0.35 | Volumetric density multiplier |
+| `r_volumetricFogQuality` | 2 | Quality tier (0=low, 1=medium, 2=high, 3=ultra; latched) |
 | `r_fluidsim` | 0 | Fluid simulation (0=off, 1=on) |
 | `r_bloom` | 0 | Bloom enable |
 | `r_bloom_threshold` | 0.6 | Bloom extraction threshold |
@@ -108,6 +110,8 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 | `r_firstPersonFovEnabled` | 1 | Use custom FOV for first-person (0=scene FOV) |
 | `r_firstPersonScaleEnabled` | 1 | Apply scale for anti-clipping (0=no scale) |
 | `r_occlusionCulling` | 0 | GPU occlusion culling for entities (0=off, 1=on) |
+
+Legacy note: `r_vfog*` cvars are still registered in `vk_vfog.c` for compatibility, but the active volumetric pipeline reads `r_volumetricFog*`.
 
 ## OpenGL Renderer (Fallback)
 
