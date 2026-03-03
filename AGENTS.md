@@ -29,7 +29,7 @@ Build artifacts go to `build-vk-Release/` or `build-gl-Release/` and are copied 
 
 ### Linting / Static Analysis
 
-The CLAUDE.md references `scripts/run_clang_tidy.sh` and `scripts/run_cppcheck.sh`, but these scripts do not exist in the repo yet. Lint checking is done via compiler warnings: the build uses `-Wall -Wextra -Wpedantic` and many other warning flags. CI uses `CI_BUILD=OFF` so warnings are not treated as errors by default.
+`scripts/run_clang_tidy.sh` and `scripts/run_cppcheck.sh` are available for optional local static analysis. CI primarily enforces quality through compiler warnings (`-Wall -Wextra -Wpedantic` and more), with `CI_BUILD=OFF` in the current workflow so warnings are not treated as errors by default.
 
 ### Running
 

@@ -41,7 +41,7 @@ This document serves as the **constitutional contract** for the idTech3 engine f
 
 #### Developer Experience
 - ✅ **Build System**: One-command builds for all configurations
-- ✅ **Testing**: Comprehensive automated test suite
+- ✅ **Testing**: Build-matrix + smoke-test validation (no unified `make test`/`ctest` suite)
 - ✅ **Debugging**: Rich debugging tools and error reporting
 - ✅ **Documentation**: Complete architectural documentation
 
@@ -379,7 +379,7 @@ Limited scope prevents **feature creep** and maintains focus on core engine exce
 
 #### 3. Validation
 - Build with all supported compilers
-- Run full test suite
+- Run smoke tests and validation scripts
 - Validate no regressions
 - Update documentation
 
@@ -402,7 +402,7 @@ Limited scope prevents **feature creep** and maintains focus on core engine exce
 #### CI Validation
 - [ ] All compilers pass
 - [ ] No new warnings
-- [ ] Tests pass
+- [ ] Smoke/validation scripts pass
 - [ ] Smoke tests validate functionality
 
 #### Release Criteria
@@ -458,7 +458,7 @@ All significant changes require architectural review:
 ### Quality Tools
 - `./scripts/run_clang_tidy.sh` - Code quality analysis
 - `./scripts/run_cppcheck.sh` - Static analysis
-- `./scripts/test_engine.sh` - Comprehensive testing
+- `./scripts/smoke_test.sh` - Runtime smoke test checks
 
 ---
 
