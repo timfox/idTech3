@@ -233,6 +233,8 @@ cvar_t	*r_paniniBarrelDistortion;
 cvar_t	*r_post;
 cvar_t	*r_post_debug;
 cvar_t	*r_exposure;
+cvar_t	*r_hdr_lightmap_scale;
+cvar_t	*r_exposure_auto;
 cvar_t	*r_tonemap;
 cvar_t	*r_volumetricFog;
 cvar_t	*r_volumetricFogDensity;
@@ -2314,6 +2316,15 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_exposure, "0.01", "10.0", CV_FLOAT );
 	ri.Cvar_SetDescription( r_exposure, "Linear exposure multiplier applied before tonemapping." );
 	ri.Cvar_SetGroup( r_exposure, CVG_RENDERER );
+
+	r_hdr_lightmap_scale = ri.Cvar_Get( "r_hdr_lightmap_scale", "2.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hdr_lightmap_scale, "0.5", "8.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_hdr_lightmap_scale, "HDR lightmap intensity scale. 8-bit lightmaps multiplied by this for HDR-like brightness (1=normal, 2+=brighter)." );
+	ri.Cvar_SetGroup( r_hdr_lightmap_scale, CVG_RENDERER );
+
+	r_exposure_auto = ri.Cvar_Get( "r_exposure_auto", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_exposure_auto, "Eye adaptation (Source Lost Coast style): 0=manual r_exposure, 1=auto from scene luminance. Requires luminance pass." );
+	ri.Cvar_SetGroup( r_exposure_auto, CVG_RENDERER );
 
 	r_tonemap = ri.Cvar_Get( "r_tonemap", "3", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_tonemap, "0", "4", CV_INTEGER );
