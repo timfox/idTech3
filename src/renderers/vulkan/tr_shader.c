@@ -659,12 +659,13 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			else if ( !Q_stricmp( token, "$lightmap" ) )
 			{
 				stage->bundle[0].lightmap = LIGHTMAP_INDEX_SHADER; // regular lightmap
-				if ( shader.lightmapIndex < 0 || !tr.lightmaps ) {
+				if ( shader.lightmapIndex < 0 || shader.lightmapIndex >= tr.numLightmaps || !tr.lightmaps ) {
 					stage->bundle[0].image[0] = tr.whiteImage;
 				} else {
 					stage->bundle[0].image[0] = tr.lightmaps[shader.lightmapIndex];
 #ifdef HDR_DELUXE_LIGHTMAP
-					if ( r_deluxeMapping->integer && tr.worldDeluxeMapping )
+					if ( r_deluxeMapping->integer && tr.worldDeluxeMapping && tr.deluxemaps != NULL &&
+						shader.lightmapIndex < tr.numLightmaps )
 						stage->bundle[0].deluxeMap = tr.deluxemaps[shader.lightmapIndex];
 #endif
 				}
@@ -680,7 +681,8 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 				}
 
 				stage->bundle[0].lightmap = qtrue;
-				if ( shader.lightmapIndex < 0 || shader.lightmapIndex >= tr.numLightmaps ) {
+				if ( shader.lightmapIndex < 0 || shader.lightmapIndex >= tr.numLightmaps ||
+					tr.deluxemaps == NULL ) {
 					stage->bundle[0].image[0] = tr.whiteImage;
 				}
 				else {
@@ -4644,10 +4646,15 @@ static void R_CreateDefaultShading( image_t *image ) {
 		stages[0].stateBits = GLS_DEFAULT;
 	} else {
 		// two pass lightmap
-		stages[0].bundle[0].image[0] = tr.lightmaps[shader.lightmapIndex];
+		if ( shader.lightmapIndex < 0 || shader.lightmapIndex >= tr.numLightmaps || !tr.lightmaps ) {
+			stages[0].bundle[0].image[0] = tr.whiteImage;
+		} else {
+			stages[0].bundle[0].image[0] = tr.lightmaps[shader.lightmapIndex];
+		}
 		stages[0].bundle[0].lightmap = LIGHTMAP_INDEX_SHADER;
 #ifdef HDR_DELUXE_LIGHTMAP
-		if ( r_deluxeMapping->integer && tr.worldDeluxeMapping )
+		if ( r_deluxeMapping->integer && tr.worldDeluxeMapping && tr.deluxemaps != NULL &&
+			shader.lightmapIndex >= 0 && shader.lightmapIndex < tr.numLightmaps )
 			stages[0].bundle[0].deluxeMap = tr.deluxemaps[shader.lightmapIndex];
 #endif
 		stages[0].active = qtrue;
