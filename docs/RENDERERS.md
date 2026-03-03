@@ -103,7 +103,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 | `r_tonemap` | 2 | Tonemapping (0=none, 1=Reinhard, 2=ACES) |
 | `r_exposure` | 1.0 | Exposure multiplier |
 | `r_ssao` | 0 | SSAO enable |
-| `r_firstPersonFov` | 90 | Horizontal FOV (degrees) for first-person primitives |
+| `r_firstPersonFov` | 90 | Horizontal FOV (degrees) for first-person primitives (range 50–150) |
 | `r_firstPersonScale` | 1.0 | Anti-clipping scale for first-person primitives |
 | `r_firstPersonFovEnabled` | 1 | Use custom FOV for first-person (0=scene FOV) |
 | `r_firstPersonScaleEnabled` | 1 | Apply scale for anti-clipping (0=no scale) |

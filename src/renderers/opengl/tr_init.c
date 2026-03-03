@@ -1554,7 +1554,7 @@ static void R_Register( void )
 	r_stereoSeparation = ri.Cvar_Get( "r_stereoSeparation", "64", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_stereoSeparation, "Control eye separation. Resulting separation is \\r_zproj divided by this value in standard units." );
 	r_firstPersonFov = ri.Cvar_Get( "r_firstPersonFov", "90", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_firstPersonFov, "60", "120", CV_FLOAT );
+	ri.Cvar_CheckRange( r_firstPersonFov, "50", "150", CV_FLOAT );
 	ri.Cvar_SetDescription( r_firstPersonFov, "Horizontal field of view (degrees) for first-person primitives (arms, weapons). 0 = use scene FOV." );
 	r_firstPersonScale = ri.Cvar_Get( "r_firstPersonScale", "1.0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_firstPersonScale, "0.1", "2.0", CV_FLOAT );
