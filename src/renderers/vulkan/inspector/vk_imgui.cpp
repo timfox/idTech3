@@ -316,6 +316,29 @@ extern "C" void VkImgui_DrawPostFXPanel(void) {
 		}
 	}
 
+	if (ImGui::CollapsingHeader("Sky / Atmosphere", ImGuiTreeNodeFlags_DefaultOpen)) {
+		int atmOn = ri.Cvar_VariableIntegerValue( "r_atmosphere" );
+		bool atmEnabled = ( atmOn != 0 );
+		if ( ImGui::Checkbox( "Procedural atmospheric sky", &atmEnabled ) ) {
+			ri.Cvar_Set( "r_atmosphere", atmEnabled ? "1" : "0" );
+		}
+		ImGui::SameLine();
+		ImGui::TextDisabled( "(?)" );
+		if ( ImGui::IsItemHovered() ) {
+			ImGui::SetTooltip( "Rayleigh+Mie scattering sky. Replaces grey sky when no HDR skybox. Use r_skyboxHDR for custom EXR panorama." );
+		}
+		if ( atmEnabled ) {
+			float sunX = VkImgui_CvarFloat( "r_atmosphere_sunDirX" );
+			float sunY = VkImgui_CvarFloat( "r_atmosphere_sunDirY" );
+			float sunZ = VkImgui_CvarFloat( "r_atmosphere_sunDirZ" );
+			float sunInt = VkImgui_CvarFloat( "r_atmosphere_sunIntensity" );
+			VkImgui_CvarSlider( "Sun dir X", "r_atmosphere_sunDirX", sunX, -1.0f, 1.0f );
+			VkImgui_CvarSlider( "Sun dir Y", "r_atmosphere_sunDirY", sunY, -1.0f, 1.0f );
+			VkImgui_CvarSlider( "Sun dir Z", "r_atmosphere_sunDirZ", sunZ, -1.0f, 1.0f );
+			VkImgui_CvarSlider( "Sun intensity", "r_atmosphere_sunIntensity", sunInt, 1.0f, 100.0f );
+		}
+	}
+
 	if (ImGui::CollapsingHeader("Bloom", ImGuiTreeNodeFlags_DefaultOpen)) {
 		int bloomOn = ri.Cvar_VariableIntegerValue( "r_bloom" );
 		bool bloomEnabled = ( bloomOn != 0 );

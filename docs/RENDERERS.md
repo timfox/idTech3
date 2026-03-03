@@ -106,6 +106,8 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 | `r_tonemap` | 2 | Tonemapping (0=none, 1=Reinhard, 2=ACES) |
 | `r_exposure` | 1.0 | Exposure multiplier |
 | `r_exposure_auto` | 0 | Eye adaptation (0=manual, 1=auto; full impl planned) |
+| `r_atmosphere` | 1 | Procedural atmospheric sky (Rayleigh+Mie). Replaces grey sky when no HDR skybox. |
+| `r_skyboxHDR` | "" | Path to HDR EXR/PNG skybox panorama (empty = use atmosphere or map skybox). |
 | `r_ssao` | 0 | SSAO enable |
 | `r_firstPersonFov` | 90 | Horizontal FOV (degrees) for first-person primitives (range 50–150) |
 | `r_firstPersonScale` | 1.0 | Anti-clipping scale for first-person primitives |
