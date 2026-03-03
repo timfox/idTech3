@@ -4517,8 +4517,9 @@ qboolean vk_create_gltf_buffers( const byte *vboData, int vboSize, const uint32_
 	VK_CHECK( qvkAllocateMemory( vk.device, &allocInfo, NULL, &idxMem ) );
 	qvkBindBufferMemory( vk.device, idxBuf, idxMem, 0 );
 
-	/* Upload via staging */
-	if ( vboSize > (int)vk.staging_buffer.size || idxSize > vk.staging_buffer.size ) {
+	/* Upload via staging - need space for both vbo and index data */
+	if ( !vk.device || !vk.staging_buffer.ptr ||
+	     (VkDeviceSize)vboSize + idxSize > vk.staging_buffer.size ) {
 		qvkDestroyBuffer( vk.device, vertBuf, NULL );
 		qvkDestroyBuffer( vk.device, idxBuf, NULL );
 		qvkFreeMemory( vk.device, vertMem, NULL );
@@ -12596,18 +12597,23 @@ void vk_bind_geometry( uint32_t flags )
 	/* glTF VBO path: bind per-primitive buffers instead of tess */
 	if ( tess.gltfDrawSurface ) {
 		const struct srfGLTFPrimitive_s *surf = tess.gltfDrawSurface;
-		VkBuffer bufs[6];
-		VkDeviceSize offs[6];
-		bufs[0] = bufs[1] = bufs[2] = bufs[3] = bufs[4] = bufs[5] = surf->vbo_vertex;
-		offs[0] = surf->vbo_vertex_offsets[0];
-		offs[1] = surf->vbo_vertex_offsets[1];
-		offs[2] = surf->vbo_vertex_offsets[2];
-		offs[3] = offs[4] = 0; /* unused bindings */
-		offs[5] = surf->vbo_vertex_offsets[5];
-		qvkCmdBindVertexBuffers( vk.cmd->command_buffer, 0, 6, bufs, offs );
-		vk_bind_index_buffer( surf->vbo_index, 0 );
-		vk.cmd->num_indexes = surf->numIndices;
 		tess.gltfDrawSurface = NULL;
+		if ( surf->vbo_vertex != VK_NULL_HANDLE && surf->vbo_index != VK_NULL_HANDLE &&
+		     surf->numVertices > 0 && surf->numIndices > 0 ) {
+			VkBuffer bufs[6];
+			VkDeviceSize offs[6];
+			bufs[0] = bufs[1] = bufs[2] = bufs[3] = bufs[4] = bufs[5] = surf->vbo_vertex;
+			offs[0] = surf->vbo_vertex_offsets[0];
+			offs[1] = surf->vbo_vertex_offsets[1];
+			offs[2] = surf->vbo_vertex_offsets[2];
+			offs[3] = offs[4] = 0; /* unused bindings */
+			offs[5] = surf->vbo_vertex_offsets[5];
+			qvkCmdBindVertexBuffers( vk.cmd->command_buffer, 0, 6, bufs, offs );
+			vk_bind_index_buffer( surf->vbo_index, 0 );
+			vk.cmd->num_indexes = surf->numIndices;
+		} else {
+			vk.cmd->num_indexes = 0;
+		}
 		return;
 	}
 
