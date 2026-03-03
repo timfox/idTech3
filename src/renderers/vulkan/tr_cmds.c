@@ -20,6 +20,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 #include "tr_local.h"
+#ifdef USE_IMGUI
+void VkImgui_Initialize( void );
+void VkImgui_BeginFrame( void );
+void VkImgui_Draw( void );
+#endif
 
 /*
 =====================
@@ -316,6 +321,13 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 		return;
 	}
 
+#ifdef USE_IMGUI
+	if ( stereoFrame == STEREO_CENTER ) {
+		VkImgui_Initialize();
+		VkImgui_BeginFrame();
+	}
+#endif
+
 	glState.finishCalled = qfalse;
 
 #ifdef USE_VULKAN
@@ -393,6 +405,10 @@ void RE_EndFrame( int *frontEndMsec, int *backEndMsec ) {
 	if ( !tr.registered ) {
 		return;
 	}
+
+#ifdef USE_IMGUI
+	VkImgui_Draw();
+#endif
 
 	cmd = R_GetCommandBufferReserved( sizeof( *cmd ), 0 );
 	if ( !cmd ) {

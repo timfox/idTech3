@@ -113,6 +113,19 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 
 Legacy note: `r_vfog*` cvars are still registered in `vk_vfog.c` for compatibility, but the active volumetric pipeline reads `r_volumetricFog*`.
 
+### SDF Text Rendering
+- Signed Distance Field (SDF) fonts for resolution-independent sharp text
+- Applied to HUD, menu, console, key bindings, and all UI text paths
+- BMFont-format metrics (`.fnt`) + SDF atlas textures
+- Cvars: `r_sdfEnable`, `r_sdfFont`, `r_sdfFontAtlas`, `r_sdfSmoothing`
+- Fallback to bitmap charset when SDF font unavailable
+
+### SVG Graphics
+- Vector SVG assets load as textures (icons, logos, UI graphics)
+- Uses librsvg when available; NanoSVG fallback on all platforms
+- Cvars: `r_svgRasterScale`, `r_svgMaxRasterSize`, `r_svgMaxFileBytes`
+- Use `.svg` files in textures/ or gfx/ for scalable UI elements
+
 ## OpenGL Renderer (Fallback)
 
 The OpenGL renderer provides compatibility for systems without Vulkan support. It implements the same `refexport_t` interface with classic OpenGL fixed-function and shader-based rendering.

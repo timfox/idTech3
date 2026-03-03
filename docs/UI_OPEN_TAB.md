@@ -6,9 +6,10 @@ When the engine receives `open credits`, `open audio`, or `open gameplay` and no
 
 ## Engine Behavior
 
-- **Cvar**: `ui_open_tab` (CVAR_ARCHIVE_ND)
+- **Cvar**: `ui_open_tab` (engine clears stale values on startup)
 - **Set by**: `CL_Open_f` in `src/client/cl_main.c` when target is `credits`, `audio`, or `gameplay`
 - **Flow**: Engine sets `ui_open_tab` to the target string, then calls `CL_SetActiveMenuByName("main")`
+- **Engine cleanup**: `open` to known menu ids and unhandled targets now clears `ui_open_tab` to avoid stale carry-over
 - **UI responsibility**: On main menu open, read `ui_open_tab`, open the appropriate sub-menu, and clear the cvar
 
 ## Implementation for Mods
@@ -89,4 +90,5 @@ If your mod uses different menu names, adjust the `cmd` strings in `handleOpenTa
 
 - `handleOpenTab` runs every time the main menu opens; it returns immediately if `ui_open_tab` is empty
 - The cvar is cleared after navigation so subsequent main menu opens behave normally
+- Engine startup also clears stale `ui_open_tab` from previous sessions
 - If `idtech3.exec` is restricted by `js_allowExec`, ensure it allows the required commands
