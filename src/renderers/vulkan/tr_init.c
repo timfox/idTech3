@@ -2330,16 +2330,16 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_post_debug, "Debug view for the post-process pass: 0=final, 1=pre-tonemap HDR, 2=luminance heatmap, 97=panini logical UV, 98=panini remapped source UV, 99=panini logical OOB mask." );
 	ri.Cvar_SetGroup( r_post_debug, CVG_RENDERER );
 
-	r_volumetricFog = ri.Cvar_Get( "r_volumetricFog", "0", CVAR_ARCHIVE_ND );
+	r_volumetricFog = ri.Cvar_Get( "r_volumetricFog", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_volumetricFog, "Enable the volumetric fog compute/composite passes before tonemapping." );
 	ri.Cvar_SetGroup( r_volumetricFog, CVG_RENDERER );
 
-	r_volumetricFogDensity = ri.Cvar_Get( "r_volumetricFogDensity", "0.35", CVAR_ARCHIVE_ND );
+	r_volumetricFogDensity = ri.Cvar_Get( "r_volumetricFogDensity", "0.6", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogDensity, "0", "5", CV_FLOAT );
 	ri.Cvar_SetDescription( r_volumetricFogDensity, "Fog density multiplier for the volumetric fog pass." );
 	ri.Cvar_SetGroup( r_volumetricFogDensity, CVG_RENDERER );
 
-	r_volumetricFogHeightFalloff = ri.Cvar_Get( "r_volumetricFogHeightFalloff", "0.4", CVAR_ARCHIVE_ND );
+	r_volumetricFogHeightFalloff = ri.Cvar_Get( "r_volumetricFogHeightFalloff", "0.015", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogHeightFalloff, "0", "5", CV_FLOAT );
 	ri.Cvar_SetDescription( r_volumetricFogHeightFalloff, "Controls vertical falloff of density for the height fog component." );
 	ri.Cvar_SetGroup( r_volumetricFogHeightFalloff, CVG_RENDERER );
@@ -2440,7 +2440,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_volumetricFogTint, "Volumetric fog RGB tint (3 floats). Applied as a multiplier in modes 0 and 2, or used directly in mode 1." );
 	ri.Cvar_SetGroup( r_volumetricFogTint, CVG_RENDERER );
 
-	r_volumetricFogIntensity = ri.Cvar_Get( "r_volumetricFogIntensity", "1.0", CVAR_ARCHIVE_ND );
+	r_volumetricFogIntensity = ri.Cvar_Get( "r_volumetricFogIntensity", "1.5", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogIntensity, "0", "50", CV_FLOAT );
 	ri.Cvar_SetDescription( r_volumetricFogIntensity, "Scattering intensity multiplier for volumetric fog color (useful to brighten tints/IBL contribution)." );
 	ri.Cvar_SetGroup( r_volumetricFogIntensity, CVG_RENDERER );
@@ -2640,7 +2640,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_volumetricFogShadowContrast, "Shadow contrast shaping for volumetric sun/local light scattering." );
 	ri.Cvar_SetGroup( r_volumetricFogShadowContrast, CVG_RENDERER );
 
-	r_volumetricFogShowcase = ri.Cvar_Get( "r_volumetricFogShowcase", "0", CVAR_ARCHIVE_ND );
+	r_volumetricFogShowcase = ri.Cvar_Get( "r_volumetricFogShowcase", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogShowcase, "0", "3", CV_INTEGER );
 	ri.Cvar_SetDescription( r_volumetricFogShowcase, "Showcase presets for visibly stronger fog in regular maps: 0=off, 1=cinematic haze, 2=heavy shafts, 3=full-force stress test." );
 	ri.Cvar_SetGroup( r_volumetricFogShowcase, CVG_RENDERER );
