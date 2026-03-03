@@ -115,10 +115,15 @@ void GLimp_Minimize( void )
 ===============
 GLimp_LogComment
 ===============
+Writes renderer debug comments to the log file when glw_state.log_fp is set.
+Platform function used by both OpenGL and Vulkan renderers.
 */
 void GLimp_LogComment( const char *comment )
 {
-	(void)comment;
+	if ( glw_state.log_fp )
+	{
+		fprintf( glw_state.log_fp, "%s", comment );
+	}
 }
 
 
