@@ -463,6 +463,38 @@ extern "C" void VkImgui_DrawVolumetricsPanel(void) {
 		VkImgui_VolumetricsSlider( "Volume Blend Distance", "r_volumetricFogBlendDistance", blendDist, 0.0f, 256.0f, "%.0f" );
 	}
 
+	if (ImGui::CollapsingHeader("Sphere Volumes (Debug)")) {
+		bool sphereOn = ( ri.Cvar_Get( "r_volumetricFogSphere", "0", 0 )->integer != 0 );
+		if ( ImGui::Checkbox( "Enable Debug Sphere", &sphereOn ) ) {
+			ri.Cvar_SetValue( "r_volumetricFogSphere", sphereOn ? 1.0f : 0.0f );
+		}
+		if ( sphereOn ) {
+			char buf[64];
+			Q_strncpyz( buf, ri.Cvar_VariableString( "r_volumetricFogSphereCenter" ), sizeof( buf ) );
+			if ( ImGui::InputText( "Center (x y z)", buf, sizeof( buf ) ) ) {
+				ri.Cvar_Set( "r_volumetricFogSphereCenter", buf );
+			}
+			float rad = VkImgui_CvarFloat( "r_volumetricFogSphereRadius" );
+			VkImgui_VolumetricsSlider( "Radius", "r_volumetricFogSphereRadius", rad, 1.0f, 2048.0f, "%.0f" );
+			float dens = VkImgui_CvarFloat( "r_volumetricFogSphereDensity" );
+			VkImgui_VolumetricsSlider( "Density", "r_volumetricFogSphereDensity", dens, 0.0f, 1.0f, "%.4f" );
+		}
+	}
+
+	if (ImGui::CollapsingHeader("Quality Tiers")) {
+		const char *tierNames[] = { "Full Froxel", "Reduced", "Mobile Height", "Mobile Sprites", "Off" };
+		int tier = (int)VkImgui_CvarFloat( "r_volumetricFogTier" );
+		if ( tier < 0 || tier > 4 ) tier = 0;
+		if ( ImGui::Combo( "Fog Tier", &tier, tierNames, 5 ) ) {
+			ri.Cvar_SetValue( "r_volumetricFogTier", (float)tier );
+		}
+		ImGui::SameLine();
+		ImGui::TextDisabled( "(?)" );
+		if ( ImGui::IsItemHovered() ) {
+			ImGui::SetTooltip( "0=full volumetric, 1=reduced, 2=mobile height fog, 3=mobile sprites, 4=off" );
+		}
+	}
+
 	if (ImGui::CollapsingHeader("Fluid Simulation")) {
 		float viscosity = VkImgui_CvarFloat( "r_fogFluidViscosity" );
 		float dissipation = VkImgui_CvarFloat( "r_fogFluidDissipation" );
@@ -502,6 +534,17 @@ extern "C" void VkImgui_DrawVolumetricsPanel(void) {
 		VkImgui_VolumetricsSlider( "Sun Intensity", "r_volumetricFogSunIntensity", sunInt, 0.0f, 64.0f );
 		VkImgui_VolumetricsSlider( "Ambient Intensity", "r_volumetricFogAmbientIntensity", ambInt, 0.0f, 64.0f );
 		ImGui::TextDisabled( "Tint: r_volumetricFogTint \"r g b\"" );
+	}
+
+	if (ImGui::CollapsingHeader("Denoising")) {
+		bool denoiseOn = ( ri.Cvar_Get( "r_volumetricFogDenoise", "0", 0 )->integer != 0 );
+		if ( ImGui::Checkbox( "Gaussian Spatial Denoise", &denoiseOn ) ) {
+			ri.Cvar_SetValue( "r_volumetricFogDenoise", denoiseOn ? 1.0f : 0.0f );
+		}
+		if ( denoiseOn ) {
+			float sigma = VkImgui_CvarFloat( "r_volumetricFogDenoiseSigma" );
+			VkImgui_VolumetricsSlider( "Sigma", "r_volumetricFogDenoiseSigma", sigma, 0.1f, 3.0f, "%.2f" );
+		}
 	}
 
 	if (ImGui::CollapsingHeader("Temporal")) {

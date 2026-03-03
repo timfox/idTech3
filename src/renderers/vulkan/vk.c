@@ -253,6 +253,7 @@ typedef struct {
 	float volumeBoundsMin[VK_VOLUMETRIC_MAX_VOLUMES][4];
 	float volumeBoundsMax[VK_VOLUMETRIC_MAX_VOLUMES][4];
 	float volumeColorDensity[VK_VOLUMETRIC_MAX_VOLUMES][4];
+	float volumeTypeParams[VK_VOLUMETRIC_MAX_VOLUMES][4];  /* .x=type(0=box,1=sphere), .y=radius, .z=blendDist(-1=global), .w=albedo(0=global) */
 	float lightPosRadius[VK_VOLUMETRIC_MAX_LIGHTS][4];
 	float lightColorType[VK_VOLUMETRIC_MAX_LIGHTS][4];
 	float lightDirAngle[VK_VOLUMETRIC_MAX_LIGHTS][4];
@@ -305,6 +306,7 @@ VK_VOLUMETRIC_ASSERT_ALIGNED16( passParams );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( volumeBoundsMin );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( volumeBoundsMax );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( volumeColorDensity );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( volumeTypeParams );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( lightPosRadius );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( lightColorType );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( lightDirAngle );
@@ -14296,11 +14298,16 @@ static void vk_volumetric_fog_pass( void )
 		return;
 	}
 
-	if ( !r_volumetricFog->integer || !vk.fboActive ||
-		!tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
-		vk_reset_volumetric_history();
-		backEnd.doneFog = qtrue;
-		return;
+	{
+		int tier = 0;
+		cvar_t *tierCvar = ri.Cvar_Get( "r_volumetricFogTier", "0", 0 );
+		if ( tierCvar ) tier = tierCvar->integer;
+		if ( tier >= 2 || !r_volumetricFog->integer || !vk.fboActive ||
+			!tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+			vk_reset_volumetric_history();
+			backEnd.doneFog = qtrue;
+			return;
+		}
 	}
 	if ( vk.froxel_volume_image == VK_NULL_HANDLE || vk.froxel_history_image == VK_NULL_HANDLE ||
 		vk.froxel_extinction_image == VK_NULL_HANDLE || vk.froxel_clamp_image == VK_NULL_HANDLE ||
@@ -14496,8 +14503,13 @@ static void vk_volumetric_fog_pass( void )
 void vk_prepare_2d( void )
 {
 	// Run volumetrics before switching to 2D so UI/console/HUD are not fogged.
-	if ( !vk.fboActive || !r_volumetricFog || !r_volumetricFog->integer || backEnd.doneFog ) {
-		return;
+	{
+		int tier = 0;
+		cvar_t *tierCvar = ri.Cvar_Get( "r_volumetricFogTier", "0", 0 );
+		if ( tierCvar ) tier = tierCvar->integer;
+		if ( !vk.fboActive || !r_volumetricFog || !r_volumetricFog->integer || tier >= 2 || backEnd.doneFog ) {
+			return;
+		}
 	}
 	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE || !vk_in_render_pass ) {
 		return;
@@ -16147,7 +16159,8 @@ static void vk_update_volumetric_params( void )
 	params.scatterParams[0] = r_volumetricFogAlbedo ? r_volumetricFogAlbedo->value : 0.95f;
 	params.scatterParams[1] = r_volumetricFogExtinctionScale ? r_volumetricFogExtinctionScale->value : 1.0f;
 	params.scatterParams[2] = r_volumetricFogBlendDistance ? r_volumetricFogBlendDistance->value : 0.0f;
-	params.scatterParams[3] = 0.0f;
+	params.scatterParams[3] = ( r_volumetricFogDenoise && r_volumetricFogDenoise->integer && r_volumetricFogDenoiseSigma ) ?
+		r_volumetricFogDenoiseSigma->value : 0.0f;
 
 	params.miscParams[0] = (float)fog_steps;
 	params.miscParams[1] = (float)depth_mode;
@@ -16185,6 +16198,7 @@ static void vk_update_volumetric_params( void )
 	params.noiseScroll[1] = noise_scroll[1] + motion_dir[1];
 	params.noiseScroll[2] = noise_scroll[2] + motion_dir[2];
 
+	memset( params.volumeTypeParams, 0, sizeof( params.volumeTypeParams ) );
 	if ( tr.world && tr.world->fogs && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
 		for ( int i = 1; i < tr.world->numfogs && local_volume_count < VK_VOLUMETRIC_MAX_VOLUMES; i++ ) {
 			const fog_t *fog = &tr.world->fogs[i];
@@ -16218,6 +16232,41 @@ static void vk_update_volumetric_params( void )
 			params.volumeColorDensity[local_volume_count][1] = fog->color[1];
 			params.volumeColorDensity[local_volume_count][2] = fog->color[2];
 			params.volumeColorDensity[local_volume_count][3] = local_density;
+			params.volumeTypeParams[local_volume_count][0] = 0.0f;
+			params.volumeTypeParams[local_volume_count][1] = 0.0f;
+			params.volumeTypeParams[local_volume_count][2] = -1.0f;
+			params.volumeTypeParams[local_volume_count][3] = 0.0f;
+			local_volume_count++;
+		}
+	}
+
+	/* Optional sphere volumes from r_volumetricFogSphere* cvars */
+	{
+		float sphereCenter[3] = { 0.0f, 0.0f, 0.0f };
+		float sphereRadius, sphereDensity;
+		int sphereOn;
+		sphereOn = r_volumetricFogSphere ? r_volumetricFogSphere->integer : 0;
+		if ( sphereOn && local_volume_count < VK_VOLUMETRIC_MAX_VOLUMES ) {
+			sscanf( ri.Cvar_VariableString( "r_volumetricFogSphereCenter" ), "%f %f %f",
+				&sphereCenter[0], &sphereCenter[1], &sphereCenter[2] );
+			sphereRadius = r_volumetricFogSphereRadius ? r_volumetricFogSphereRadius->value : 128.0f;
+			sphereDensity = r_volumetricFogSphereDensity ? r_volumetricFogSphereDensity->value : fog_density * 0.5f;
+			params.volumeBoundsMin[local_volume_count][0] = sphereCenter[0];
+			params.volumeBoundsMin[local_volume_count][1] = sphereCenter[1];
+			params.volumeBoundsMin[local_volume_count][2] = sphereCenter[2];
+			params.volumeBoundsMin[local_volume_count][3] = 0.0f;
+			params.volumeBoundsMax[local_volume_count][0] = sphereRadius;
+			params.volumeBoundsMax[local_volume_count][1] = 0.0f;
+			params.volumeBoundsMax[local_volume_count][2] = 0.0f;
+			params.volumeBoundsMax[local_volume_count][3] = 0.0f;
+			params.volumeColorDensity[local_volume_count][0] = params.fogColor[0];
+			params.volumeColorDensity[local_volume_count][1] = params.fogColor[1];
+			params.volumeColorDensity[local_volume_count][2] = params.fogColor[2];
+			params.volumeColorDensity[local_volume_count][3] = sphereDensity;
+			params.volumeTypeParams[local_volume_count][0] = 1.0f;
+			params.volumeTypeParams[local_volume_count][1] = sphereRadius;
+			params.volumeTypeParams[local_volume_count][2] = -1.0f;
+			params.volumeTypeParams[local_volume_count][3] = 0.0f;
 			local_volume_count++;
 		}
 	}

@@ -25,6 +25,7 @@ Sprite-based volumetric fog:
 #include <math.h>
 
 static cvar_t *r_mobileFog;
+static cvar_t *r_volumetricFogTier;
 static cvar_t *r_mobileFogDensity;
 static cvar_t *r_mobileFogHeight;
 static cvar_t *r_mobileFogHeightFalloff;
@@ -44,6 +45,10 @@ void MobileFog_Init( void ) {
 	Cvar_SetDescription( r_mobileFog,
 		"Mobile fog mode: 0=off, 1=exponential height fog (free), "
 		"2=sprite-based volumetric (medium), 3=full volumetric (expensive)." );
+
+	r_volumetricFogTier = Cvar_Get( "r_volumetricFogTier", "0", CVAR_ARCHIVE );
+	Cvar_SetDescription( r_volumetricFogTier,
+		"Volumetric fog quality tier: 0=full froxel, 1=reduced, 2=mobile height fog, 3=mobile sprites, 4=off." );
 
 	r_mobileFogDensity = Cvar_Get( "r_mobileFogDensity", "0.015", CVAR_ARCHIVE );
 	r_mobileFogHeight = Cvar_Get( "r_mobileFogHeight", "0", CVAR_ARCHIVE );
@@ -74,7 +79,11 @@ void MobileFog_Shutdown( void ) {
 }
 
 mobileFogMode_t MobileFog_GetMode( void ) {
-	if ( !fogInitialized || !r_mobileFog ) return MOBILE_FOG_NONE;
+	if ( !fogInitialized ) return MOBILE_FOG_NONE;
+	if ( r_volumetricFogTier && r_volumetricFogTier->integer >= 2 && r_volumetricFogTier->integer <= 3 ) {
+		return ( r_volumetricFogTier->integer == 2 ) ? MOBILE_FOG_HEIGHT : MOBILE_FOG_SPRITES;
+	}
+	if ( !r_mobileFog ) return MOBILE_FOG_NONE;
 	return (mobileFogMode_t)r_mobileFog->integer;
 }
 
@@ -161,8 +170,14 @@ void MobileFog_Frame( const vec3_t viewOrigin, const vec3_t viewForward,
 	const vec3_t viewRight, const vec3_t viewUp, float frametime ) {
 	int mode;
 
-	if ( !fogInitialized || !r_mobileFog ) return;
-	mode = r_mobileFog->integer;
+	if ( !fogInitialized ) return;
+	if ( r_volumetricFogTier && r_volumetricFogTier->integer >= 2 && r_volumetricFogTier->integer <= 3 ) {
+		mode = r_volumetricFogTier->integer;
+	} else if ( r_mobileFog ) {
+		mode = r_mobileFog->integer;
+	} else {
+		return;
+	}
 
 	if ( mode <= 0 ) return;
 
