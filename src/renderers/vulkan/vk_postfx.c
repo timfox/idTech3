@@ -64,7 +64,7 @@ void PostFX_RegisterCvars(void) {
 	r_ssr_roughnessThreshold = ri.Cvar_Get("r_ssr_roughnessThreshold", "0.5",  CVAR_ARCHIVE);
 	r_ssr_intensity          = ri.Cvar_Get("r_ssr_intensity",          "0.8",  CVAR_ARCHIVE);
 
-	r_atmosphere             = ri.Cvar_Get("r_atmosphere",             "0",    CVAR_ARCHIVE);
+	r_atmosphere             = ri.Cvar_Get("r_atmosphere",             "1",    CVAR_ARCHIVE);
 	r_atmosphere_sunDirX     = ri.Cvar_Get("r_atmosphere_sunDirX",     "0.3",  CVAR_ARCHIVE);
 	r_atmosphere_sunDirY     = ri.Cvar_Get("r_atmosphere_sunDirY",     "0.8",  CVAR_ARCHIVE);
 	r_atmosphere_sunDirZ     = ri.Cvar_Get("r_atmosphere_sunDirZ",     "0.5",  CVAR_ARCHIVE);
