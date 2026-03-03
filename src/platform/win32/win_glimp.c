@@ -1307,6 +1307,20 @@ void GLimp_EndFrame( void )
 }
 
 
+/*
+** GLimp_LogComment
+**
+** Writes renderer debug comments to the log file when glw_state.log_fp is set.
+*/
+void GLimp_LogComment( const char *comment )
+{
+	if ( glw_state.log_fp )
+	{
+		fprintf( glw_state.log_fp, "%s", comment );
+	}
+}
+
+
 static qboolean GLW_StartOpenGL( void )
 {
 	//
