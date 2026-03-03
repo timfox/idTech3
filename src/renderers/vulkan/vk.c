@@ -242,6 +242,7 @@ typedef struct {
 	float miscParams[4];
 	float sliceParams[4];
 	float phaseParams[4];
+	float scatterParams[4];  /* [0]=albedo, [1]=extinctionScale, [2-3]=reserved */
 	float noiseParams[4];
 	float noiseScroll[4];
 	float temporalParams[4];
@@ -293,6 +294,7 @@ VK_VOLUMETRIC_ASSERT_ALIGNED16( gridDim );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( miscParams );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( sliceParams );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( phaseParams );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( scatterParams );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( noiseParams );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( noiseScroll );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( temporalParams );
@@ -16141,6 +16143,11 @@ static void vk_update_volumetric_params( void )
 	params.densityParams[1] = height_falloff;
 	params.densityParams[2] = jitter_amount;
 	params.densityParams[3] = temporal_weight;
+
+	params.scatterParams[0] = r_volumetricFogAlbedo ? r_volumetricFogAlbedo->value : 0.95f;
+	params.scatterParams[1] = r_volumetricFogExtinctionScale ? r_volumetricFogExtinctionScale->value : 1.0f;
+	params.scatterParams[2] = r_volumetricFogBlendDistance ? r_volumetricFogBlendDistance->value : 0.0f;
+	params.scatterParams[3] = 0.0f;
 
 	params.miscParams[0] = (float)fog_steps;
 	params.miscParams[1] = (float)depth_mode;

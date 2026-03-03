@@ -237,6 +237,9 @@ cvar_t	*r_tonemap;
 cvar_t	*r_volumetricFog;
 cvar_t	*r_volumetricFogDensity;
 cvar_t	*r_volumetricFogHeightFalloff;
+cvar_t	*r_volumetricFogAlbedo;
+cvar_t	*r_volumetricFogExtinctionScale;
+cvar_t	*r_volumetricFogBlendDistance;
 cvar_t	*r_volumetricFogAniso;
 cvar_t	*r_volumetricFogSteps;
 cvar_t	*r_volumetricFogZExponent;
@@ -2334,6 +2337,21 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_volumetricFogHeightFalloff, "0", "5", CV_FLOAT );
 	ri.Cvar_SetDescription( r_volumetricFogHeightFalloff, "Controls vertical falloff of density for the height fog component." );
 	ri.Cvar_SetGroup( r_volumetricFogHeightFalloff, CVG_RENDERER );
+
+	r_volumetricFogAlbedo = ri.Cvar_Get( "r_volumetricFogAlbedo", "0.95", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogAlbedo, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogAlbedo, "Single-scatter albedo (0=absorbing, 1=fully scattering). Controls scatter vs absorption ratio." );
+	ri.Cvar_SetGroup( r_volumetricFogAlbedo, CVG_RENDERER );
+
+	r_volumetricFogExtinctionScale = ri.Cvar_Get( "r_volumetricFogExtinctionScale", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogExtinctionScale, "0.1", "10", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogExtinctionScale, "Scale for extinction coefficient. Multiplies density for beam attenuation." );
+	ri.Cvar_SetGroup( r_volumetricFogExtinctionScale, CVG_RENDERER );
+
+	r_volumetricFogBlendDistance = ri.Cvar_Get( "r_volumetricFogBlendDistance", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogBlendDistance, "0", "256", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogBlendDistance, "Distance from volume bounds over which density blends (0=hard edge)." );
+	ri.Cvar_SetGroup( r_volumetricFogBlendDistance, CVG_RENDERER );
 
 	r_volumetricFogAniso = ri.Cvar_Get( "r_volumetricFogAniso", "0.6", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogAniso, "-0.999", "0.999", CV_FLOAT );

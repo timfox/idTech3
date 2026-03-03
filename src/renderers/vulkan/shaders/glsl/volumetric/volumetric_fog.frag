@@ -32,6 +32,7 @@ layout(std140, binding = 4) uniform VolumetricParams {
     vec4 miscParams;
     vec4 sliceParams;
     vec4 phaseParams;
+    vec4 scatterParams;
     vec4 noiseParams;
     vec4 noiseScroll;
     vec4 temporalParams;

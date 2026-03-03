@@ -196,6 +196,8 @@ typedef enum {
 	CG_PHYS_RAYCAST,
 	CG_PHYS_LOADBSPCOLLISION,
 
+	CG_EMIT_JSEVENT,  /* void trap_EmitJSEvent( const char *eventName, const char *s0, const char *s1, int i0, int i1 ) */
+
 	CG_TRAP_GETVALUE = COM_TRAP_GETVALUE,
 
 } cgameImport_t;
