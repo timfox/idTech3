@@ -460,6 +460,10 @@ static qboolean CL_GetValue( char* value, int valueSize, const char* key ) {
 		Com_sprintf( value, valueSize, "%i", CG_PHYS_RAYCAST );
 		return qtrue;
 	}
+	if ( !Q_stricmp( key, "trap_EmitJSEvent" ) ) {
+		Com_sprintf( value, valueSize, "%i", CG_EMIT_JSEVENT );
+		return qtrue;
+	}
 
 	if ( !Q_stricmp( key, "trap_Cvar_SetDescription_Q3E" ) ) {
 		Com_sprintf( value, valueSize, "%i", CG_CVAR_SETDESCRIPTION );
@@ -856,6 +860,12 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 
 	case CG_PHYS_LOADBSPCOLLISION:
 		return Phys_LoadBSPCollision();
+
+#ifdef USE_DUKTAPE
+	case CG_EMIT_JSEVENT:
+		JsDebug_EmitEvent( (const char *)VMA(1), (const char *)VMA(2), (const char *)VMA(3), args[4], args[5] );
+		return 0;
+#endif
 
 	default:
 		Com_Error( ERR_DROP, "Bad cgame system trap: %ld", (long int) args[0] );

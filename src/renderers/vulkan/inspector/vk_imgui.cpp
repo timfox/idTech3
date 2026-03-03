@@ -83,6 +83,8 @@ static const float vkVolumetricsCvarDefaults[] = {
 	0.35f,   /* r_volumetricFogDensity */
 	0.4f,    /* r_volumetricFogHeightFalloff */
 	1.0f,    /* r_volumetricFogIntensity */
+	0.95f,   /* r_volumetricFogAlbedo */
+	1.0f,    /* r_volumetricFogExtinctionScale */
 	0.05f,   /* r_fogFluidViscosity */
 	0.985f,  /* r_fogFluidDissipation */
 };
@@ -137,8 +139,10 @@ static void VkImgui_ResetVolumetricsDefaults(void) {
 	ri.Cvar_SetValue( "r_volumetricFogDensity", vkVolumetricsCvarDefaults[0] );
 	ri.Cvar_SetValue( "r_volumetricFogHeightFalloff", vkVolumetricsCvarDefaults[1] );
 	ri.Cvar_SetValue( "r_volumetricFogIntensity", vkVolumetricsCvarDefaults[2] );
-	ri.Cvar_SetValue( "r_fogFluidViscosity", vkVolumetricsCvarDefaults[3] );
-	ri.Cvar_SetValue( "r_fogFluidDissipation", vkVolumetricsCvarDefaults[4] );
+	ri.Cvar_SetValue( "r_volumetricFogAlbedo", vkVolumetricsCvarDefaults[3] );
+	ri.Cvar_SetValue( "r_volumetricFogExtinctionScale", vkVolumetricsCvarDefaults[4] );
+	ri.Cvar_SetValue( "r_fogFluidViscosity", vkVolumetricsCvarDefaults[5] );
+	ri.Cvar_SetValue( "r_fogFluidDissipation", vkVolumetricsCvarDefaults[6] );
 }
 
 static void VkImgui_DrawDefaultsConfirmation(
@@ -258,10 +262,15 @@ static void VkImgui_DrawMenuBar(void) {
 		}
 
 		if (ImGui::BeginMenu("Render Mode")) {
+			int pbrDbg = ri.Cvar_VariableIntegerValue( "r_pbr_debug" );
 			for (unsigned int i = 0; i < NUM_RENDER_MODES; i++) {
-				bool selected = (vkInspector.renderMode.index == (int)i);
-				if (ImGui::MenuItem(vkRenderModes[i], nullptr, selected))
-					vkInspector.renderMode.index = (int)i;
+				bool selected = ( pbrDbg == (int)i );
+				if ( ImGui::MenuItem( vkRenderModes[i], nullptr, selected ) ) {
+					/* r_pbr_debug supports 0-8; indices 9+ are placeholders */
+					if ( (int)i <= 8 ) {
+						ri.Cvar_Set( "r_pbr_debug", va( "%d", (int)i ) );
+					}
+				}
 			}
 			ImGui::EndMenu();
 		}
@@ -298,12 +307,12 @@ extern "C" void VkImgui_DrawPostFXPanel(void) {
 			ri.Cvar_Set( "r_post", enabled ? "1" : "0" );
 		}
 		int dbg = ri.Cvar_VariableIntegerValue( "r_post_debug" );
-		const char *dbgModes[] = { "Final", "Pre-tonemap HDR", "Luminance heatmap" };
-		if ( ImGui::Combo( "Debug View", &dbg, dbgModes, 3 ) ) {
-			ri.Cvar_Set( "r_post_debug", va( "%d", dbg ) );
-		}
-		if ( ImGui::IsItemHovered() ) {
-			ImGui::SetTooltip( "0=final, 1=HDR, 2=luma. 97-99=Panini debug." );
+		const char *dbgModes[] = { "Final", "Pre-tonemap HDR", "Luminance heatmap",
+			"Panini logical UV (97)", "Panini remapped UV (98)", "Panini OOB mask (99)" };
+		int dbgCombo = ( dbg == 97 ) ? 3 : ( dbg == 98 ) ? 4 : ( dbg == 99 ) ? 5 : ( dbg >= 1 && dbg <= 2 ) ? dbg : 0;
+		if ( ImGui::Combo( "Debug View", &dbgCombo, dbgModes, 6 ) ) {
+			int v = ( dbgCombo == 3 ) ? 97 : ( dbgCombo == 4 ) ? 98 : ( dbgCombo == 5 ) ? 99 : dbgCombo;
+			ri.Cvar_Set( "r_post_debug", va( "%d", v ) );
 		}
 	}
 
@@ -443,9 +452,15 @@ extern "C" void VkImgui_DrawVolumetricsPanel(void) {
 		float density = VkImgui_CvarFloat( "r_volumetricFogDensity" );
 		float heightFalloff = VkImgui_CvarFloat( "r_volumetricFogHeightFalloff" );
 		float intensity = VkImgui_CvarFloat( "r_volumetricFogIntensity" );
+		float albedo = VkImgui_CvarFloat( "r_volumetricFogAlbedo" );
+		float extinctionScale = VkImgui_CvarFloat( "r_volumetricFogExtinctionScale" );
 		VkImgui_VolumetricsSlider( "Density", "r_volumetricFogDensity", density, 0.0f, 5.0f );
 		VkImgui_VolumetricsSlider( "Height Falloff", "r_volumetricFogHeightFalloff", heightFalloff, 0.0f, 5.0f );
 		VkImgui_VolumetricsSlider( "Scatter Intensity", "r_volumetricFogIntensity", intensity, 0.0f, 50.0f );
+		VkImgui_VolumetricsSlider( "Albedo", "r_volumetricFogAlbedo", albedo, 0.0f, 1.0f );
+		VkImgui_VolumetricsSlider( "Extinction Scale", "r_volumetricFogExtinctionScale", extinctionScale, 0.1f, 10.0f );
+		float blendDist = VkImgui_CvarFloat( "r_volumetricFogBlendDistance" );
+		VkImgui_VolumetricsSlider( "Volume Blend Distance", "r_volumetricFogBlendDistance", blendDist, 0.0f, 256.0f, "%.0f" );
 	}
 
 	if (ImGui::CollapsingHeader("Fluid Simulation")) {

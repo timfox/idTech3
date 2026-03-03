@@ -56,6 +56,7 @@ layout(std140, binding = 3) uniform VolumetricParams {
     vec4 miscParams;
     vec4 sliceParams;
     vec4 phaseParams;
+    vec4 scatterParams;  /* x=albedo, y=extinctionScale */
     vec4 noiseParams;
     vec4 noiseScroll;
     vec4 temporalParams;
@@ -279,8 +280,11 @@ float ComputeShadow(vec3 worldPos, out vec3 shadowUVW) {
 float ComputeBaseDensity(vec3 worldPos) {
     float baseDensity = max(params.densityParams.x, 0.0);
     float heightFalloff = max(params.densityParams.y, 0.0);
+    float extinctionScale = max(params.scatterParams.y, 0.0);
     float heightDelta = worldPos.z - params.viewOrigin.w;
     float density = baseDensity * exp(-heightFalloff * max(0.0, heightDelta));
+
+    density *= max(extinctionScale, 0.0);
 
     float noiseScale = max(params.noiseParams.x, 0.0);
     float noiseThreshold = Saturate(params.noiseParams.y);
@@ -301,6 +305,7 @@ void ApplyVolumeDensity(vec3 worldPos, inout float density, inout vec3 mediumCol
     vec3 volumeColorAccum = vec3(0.0);
     float volumeWeight = 0.0;
     int volumeCount = int(clamp(floor(params.volumeCounts.x + 0.5), 0.0, float(MAX_VOLUMES)));
+    float blendDist = max(params.scatterParams.z, 0.0);
 
     for (int i = 0; i < MAX_VOLUMES; i++) {
         if (i >= volumeCount) {
@@ -308,12 +313,23 @@ void ApplyVolumeDensity(vec3 worldPos, inout float density, inout vec3 mediumCol
         }
         vec3 bMin = params.volumeBoundsMin[i].xyz;
         vec3 bMax = params.volumeBoundsMax[i].xyz;
-        if (all(greaterThanEqual(worldPos, bMin)) && all(lessThanEqual(worldPos, bMax))) {
-            float d = max(params.volumeColorDensity[i].w, 0.0);
-            density += d;
-            volumeColorAccum += params.volumeColorDensity[i].rgb * d;
-            volumeWeight += d;
+        if (!all(greaterThanEqual(worldPos, bMin)) || !all(lessThanEqual(worldPos, bMax))) {
+            continue;
         }
+        vec3 distToMin = worldPos - bMin;
+        vec3 distToMax = bMax - worldPos;
+        vec3 distToEdge = min(distToMin, distToMax);
+        float insideDist = min(min(distToEdge.x, distToEdge.y), distToEdge.z);
+
+        float weight = 1.0;
+        if (blendDist > 0.0 && insideDist < blendDist) {
+            weight = Saturate(insideDist / blendDist);
+        }
+
+        float d = max(params.volumeColorDensity[i].w, 0.0) * weight;
+        density += d;
+        volumeColorAccum += params.volumeColorDensity[i].rgb * d;
+        volumeWeight += d;
     }
 
     if (volumeWeight > 1e-4) {
@@ -446,7 +462,8 @@ vec3 ComputeSunLighting(vec3 worldPos, vec3 viewDir, float density, vec3 mediumC
     vec3 multiScatter = mediumColor * density * 0.25 * max(params.phaseParams.z, 0.0);
     result += ambientTerm + sunTerm + multiScatter;
 
-    return result * density * max(params.fogColor.a, 0.0);
+    float albedo = clamp(params.scatterParams.x, 0.0, 1.0);
+    return result * density * max(params.fogColor.a, 0.0) * albedo;
 }
 
 vec3 ComputeLocalLightScattering(vec3 worldPos, vec3 viewDir, float density, vec3 mediumColor, int lightIndex) {
@@ -493,7 +510,8 @@ vec3 ComputeLocalLightScattering(vec3 worldPos, vec3 viewDir, float density, vec
     vec3 lightColor = max(params.lightColorType[lightIndex].rgb, vec3(0.0));
     result += lightColor * (phase * attenuation * localShadowShaped) * mediumColor;
 
-    return result * density * max(params.fogColor.a, 0.0);
+    float albedo = clamp(params.scatterParams.x, 0.0, 1.0);
+    return result * density * max(params.fogColor.a, 0.0) * albedo;
 }
 
 vec4 ApplyFireflyClamp(vec4 value) {

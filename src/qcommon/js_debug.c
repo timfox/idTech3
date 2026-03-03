@@ -139,7 +139,10 @@ static qboolean JsDebug_IsSupportedEvent( const char *eventName ) {
 		!Q_stricmp( eventName, "menu_changed" ) ||
 		!Q_stricmp( eventName, "input_key" ) ||
 		!Q_stricmp( eventName, "mouse_move" ) ||
-		!Q_stricmp( eventName, "console_open" ) );
+		!Q_stricmp( eventName, "console_open" ) ||
+		!Q_stricmp( eventName, "entity_spawn" ) ||
+		!Q_stricmp( eventName, "entity_death" ) ||
+		!Q_stricmp( eventName, "weapon_fire" ) );
 }
 
 static qboolean JsDebug_IsAllowedScriptPath( const char *path ) {
