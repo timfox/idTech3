@@ -80,9 +80,9 @@ typedef struct {
 
 /* Engine cvar defaults for Volumetrics reset (must match tr_init.c) */
 static const float vkVolumetricsCvarDefaults[] = {
-	0.35f,   /* r_volumetricFogDensity */
-	0.4f,    /* r_volumetricFogHeightFalloff */
-	1.0f,    /* r_volumetricFogIntensity */
+	0.6f,    /* r_volumetricFogDensity */
+	0.015f,  /* r_volumetricFogHeightFalloff */
+	1.5f,    /* r_volumetricFogIntensity */
 	0.95f,   /* r_volumetricFogAlbedo */
 	1.0f,    /* r_volumetricFogExtinctionScale */
 	0.05f,   /* r_fogFluidViscosity */
