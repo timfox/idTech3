@@ -583,6 +583,11 @@ void SCR_Init( void ) {
 	Cvar_CheckRange( ui_scale, "0.5", "4.0", CV_FLOAT );
 	Cvar_SetDescription( ui_scale, "UI scale factor for menus and HUD. Increase for 4K/ultra-wide displays." );
 
+	{
+		cvar_t *ui_open_tab = Cvar_Get( "ui_open_tab", "", CVAR_ARCHIVE_ND );
+		Cvar_SetDescription( ui_open_tab, "Requested tab when opening main menu (credits, audio, gameplay). Set by engine for 'open <tab>' fallback; UI should read and clear when switching." );
+	}
+
 	scr_initialized = qtrue;
 }
 
