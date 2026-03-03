@@ -1307,20 +1307,6 @@ void GLimp_EndFrame( void )
 }
 
 
-/*
-** GLimp_LogComment
-**
-** Writes renderer debug comments to the log file when glw_state.log_fp is set.
-*/
-void GLimp_LogComment( const char *comment )
-{
-	if ( glw_state.log_fp )
-	{
-		fprintf( glw_state.log_fp, "%s", comment );
-	}
-}
-
-
 static qboolean GLW_StartOpenGL( void )
 {
 	//
@@ -1471,6 +1457,21 @@ void GLimp_Shutdown( qboolean unloadDLL )
 	QGL_Shutdown( unloadDLL );
 }
 #endif // USE_OPENGL_API
+
+
+/*
+** GLimp_LogComment
+**
+** Writes renderer debug comments to the log file when glw_state.log_fp is set.
+** Platform function used by both OpenGL and Vulkan renderers.
+*/
+void GLimp_LogComment( const char *comment )
+{
+	if ( glw_state.log_fp )
+	{
+		fprintf( glw_state.log_fp, "%s", comment );
+	}
+}
 
 
 #ifdef USE_VULKAN_API
