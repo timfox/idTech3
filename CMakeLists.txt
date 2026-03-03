@@ -1448,7 +1448,7 @@ else()
 endif()
 
 # --- ImGui Inspector (optional, requires C++) ---
-option(USE_IMGUI "Enable ImGui inspector overlay" OFF)
+option(USE_IMGUI "Enable ImGui inspector overlay" ON)
 if(USE_IMGUI)
   enable_language(CXX)
   set(IMGUI_SRCS
