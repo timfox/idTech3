@@ -7087,6 +7087,9 @@ void vk_initialize( void )
 #ifdef VK_PBR_BRDFLUT
 		if( vk.pbrActive ) {
 			desc.setLayoutCount = 1;
+			desc.pSetLayouts = &vk.set_layout_sampler;
+			desc.pushConstantRangeCount = 0;
+			desc.pPushConstantRanges = NULL;
 			VK_CHECK(qvkCreatePipelineLayout(vk.device, &desc, NULL, &vk.pipeline_layout_brdflut));
 			SET_OBJECT_NAME(vk.pipeline_layout_brdflut, "pipeline layout - brdflut", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT);
 		}
