@@ -794,7 +794,7 @@ typedef enum {
 
 extern tokenType_t com_tokentype;
 
-#define MAX_TOKENLENGTH		1024
+#define MAX_TOKENLENGTH		4096
 
 #ifndef TT_STRING
 //token types
