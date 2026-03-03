@@ -2042,7 +2042,7 @@ static void R_ReplaceMapShaders( dshader_t *out, int count )
 	if ( Q_stricmp( s_worldData.baseName, "mapel4b" ) == 0 && count == 86 ) {
 		if ( crc32_buffer( (const byte*)out, count*sizeof(*out) ) == 0x1593623C ) {
 			if ( strcmp( out[72].shader, "textures/mapel4/crate1_top3" ) == 0 ) {
-				strcpy( out[72].shader, "textures/mapel4/crate1_top2" );
+				Q_strncpyz( out[72].shader, "textures/mapel4/crate1_top2", sizeof( out[72].shader ) );
 			}
 		}
 	}
@@ -2494,10 +2494,10 @@ static qboolean R_ParseSpawnVars( char *spawnVarChars, int maxSpawnVarChars, int
 			ri.Printf( PRINT_ALL, "R_ParseSpawnVars: MAX_SPAWN_VAR_CHARS\n" );
 			return qfalse;
 		}
-		strcpy( spawnVarChars + numSpawnVarChars, keyname );
+		Q_strncpyz( spawnVarChars + numSpawnVarChars, keyname, maxSpawnVarChars - numSpawnVarChars );
 		spawnVars[ *numSpawnVars ][0] = spawnVarChars + numSpawnVarChars;
 		numSpawnVarChars += keyLength;
-		strcpy( spawnVarChars + numSpawnVarChars, com_token );
+		Q_strncpyz( spawnVarChars + numSpawnVarChars, com_token, maxSpawnVarChars - numSpawnVarChars );
 		spawnVars[ *numSpawnVars ][1] = spawnVarChars + numSpawnVarChars;
 		numSpawnVarChars += tokenLength;
 		(*numSpawnVars)++;

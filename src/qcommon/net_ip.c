@@ -593,9 +593,9 @@ const char *NET_AdrToString( const netadr_t *a )
 	static char s[NET_ADDRSTRMAXLEN];
 
 	if (a->type == NA_LOOPBACK)
-		strcpy( s, "loopback" );
+		Q_strncpyz( s, "loopback", sizeof( s ) );
 	else if (a->type == NA_BOT)
-		strcpy( s, "bot" );
+		Q_strncpyz( s, "bot", sizeof( s ) );
 #ifdef USE_IPV6
 	else if (a->type == NA_IP || a->type == NA_IP6)
 #else
@@ -616,9 +616,9 @@ const char *NET_AdrToStringwPort( const netadr_t *a )
 	static char s[NET_ADDRSTRMAXLEN];
 
 	if (a->type == NA_LOOPBACK)
-		strcpy( s, "loopback" );
+		Q_strncpyz( s, "loopback", sizeof( s ) );
 	else if (a->type == NA_BOT)
-		strcpy( s, "bot" );
+		Q_strncpyz( s, "bot", sizeof( s ) );
 	else if(a->type == NA_IP)
 		Com_sprintf(s, sizeof(s), "%s:%hu", NET_AdrToString(a), ntohs(a->port));
 #ifdef USE_IPV6

@@ -500,7 +500,7 @@ static filter_node_t *new_node( const char *p1, const char *p2, filter_op fop, i
 		else
 			node->p2.string = (char*)( node + 1 );
 
-		strcpy( node->p2.string, p2 );
+		Q_strncpyz( node->p2.string, p2, len2 );
 	}
 	else // integer/action parameter
 	{
@@ -1073,7 +1073,7 @@ void SV_AddFilter_f( void )
 	if ( *reason )
 		Com_sprintf( buf, sizeof( buf ), " drop \"%s\"", reason );
 	else
-		strcpy( buf, " drop" );
+		Q_strncpyz( buf, " drop", sizeof( buf ) );
 
 	Q_strcat( cmd, sizeof( cmd ), buf );
 
