@@ -647,10 +647,17 @@ void R_SetupFirstPersonProjection( viewParms_t *dest, float *outProjection )
 	}
 
 	fovX = r_firstPersonFov->value;
+	fovX = ( fovX < 1.0f ) ? 1.0f : ( ( fovX > 179.0f ) ? 179.0f : fovX );
+
 	{
-		float aspect = ( dest->viewportWidth > 0 && dest->viewportHeight > 0 )
-			? (float)dest->viewportHeight / (float)dest->viewportWidth
-			: 0.75f;
+		float aspect;
+		if ( dest->viewportWidth > 0 && dest->viewportHeight > 0 ) {
+			aspect = (float)dest->viewportHeight / (float)dest->viewportWidth;
+		} else if ( tr.refdef.width > 0 && tr.refdef.height > 0 ) {
+			aspect = (float)tr.refdef.height / (float)tr.refdef.width;
+		} else {
+			aspect = 0.75f;
+		}
 		fovY = 2.0f * (float)atan( tan( fovX * (float)M_PI / 360.0f ) * aspect ) * 360.0f / (float)M_PI;
 	}
 
