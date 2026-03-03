@@ -102,8 +102,10 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 | `r_bloom` | 0 | Bloom enable |
 | `r_bloom_threshold` | 0.6 | Bloom extraction threshold |
 | `r_hdr` | 0 | HDR format (0=off, 1=RGBA16F) |
+| `r_hdr_lightmap_scale` | 2.0 | HDR lightmap intensity (1=normal, 2+=brighter for 8-bit lightmaps) |
 | `r_tonemap` | 2 | Tonemapping (0=none, 1=Reinhard, 2=ACES) |
 | `r_exposure` | 1.0 | Exposure multiplier |
+| `r_exposure_auto` | 0 | Eye adaptation (0=manual, 1=auto; full impl planned) |
 | `r_ssao` | 0 | SSAO enable |
 | `r_firstPersonFov` | 90 | Horizontal FOV (degrees) for first-person primitives (range 50–150) |
 | `r_firstPersonScale` | 1.0 | Anti-clipping scale for first-person primitives |

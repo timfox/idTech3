@@ -1597,6 +1597,8 @@ extern cvar_t	*r_paniniBarrelDistortion;
 extern cvar_t	*r_post;
 extern cvar_t	*r_post_debug;
 extern cvar_t	*r_exposure;
+extern cvar_t	*r_hdr_lightmap_scale;
+extern cvar_t	*r_exposure_auto;
 extern cvar_t	*r_tonemap;
 extern cvar_t	*r_volumetricFog;
 extern cvar_t	*r_volumetricFogDensity;

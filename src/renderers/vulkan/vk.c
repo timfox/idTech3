@@ -44,6 +44,7 @@ struct Vk_Pipeline_FragSpecData {
 	int32_t lightmap_texture_set;
 	int32_t deluxe_mapping;
 	float deluxe_specular_scale;
+	float lightmap_scale;
 	int32_t irradiance_texture_set;
 	int32_t emissive_texture_set;
 	int32_t clearcoat_texture_set;
@@ -11287,6 +11288,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	ADD_FRAG_SPEC( 29, subsurface_texture_set );
 	ADD_FRAG_SPEC( 30, deluxe_mapping );
 	ADD_FRAG_SPEC( 31, deluxe_specular_scale );
+	ADD_FRAG_SPEC( 32, lightmap_scale );
 
 	// only use w value, specgloss maps are not supported
 	frag_spec_data.specularScale_x = def->specularScale[0];
@@ -11365,6 +11367,9 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 		frag_spec_data.deluxe_specular_scale = 1.0f;
 	}
 #endif
+
+	frag_spec_data.lightmap_scale = ( r_hdr_lightmap_scale && r_hdr_lightmap_scale->value > 0.0f ) ?
+		r_hdr_lightmap_scale->value : 1.0f;
 
 	frag_spec_info.mapEntryCount = spec_entry_count;
 	frag_spec_info.pMapEntries = spec_entries;

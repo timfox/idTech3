@@ -348,6 +348,20 @@ extern "C" void VkImgui_DrawPostFXPanel(void) {
 			ri.Cvar_Set( "r_tonemap", va( "%d", tonemap ) );
 		}
 		VkImgui_CvarSlider( "Exposure", "r_exposure", exposure, 0.01f, 10.0f );
+		int expAuto = ri.Cvar_Get( "r_exposure_auto", "0", 0 )->integer;
+		bool expAutoOn = ( expAuto != 0 );
+		if ( ImGui::Checkbox( "Eye adaptation (auto exposure)", &expAutoOn ) ) {
+			ri.Cvar_SetValue( "r_exposure_auto", expAutoOn ? 1.0f : 0.0f );
+		}
+		if ( expAutoOn ) {
+			ImGui::SameLine();
+			ImGui::TextDisabled( "(?)" );
+			if ( ImGui::IsItemHovered() ) {
+				ImGui::SetTooltip( "Source Lost Coast style. Full implementation requires luminance pass (planned)." );
+			}
+		}
+		float lmScale = VkImgui_CvarFloat( "r_hdr_lightmap_scale" );
+		VkImgui_CvarSlider( "HDR lightmap scale", "r_hdr_lightmap_scale", lmScale, 0.5f, 8.0f );
 	}
 
 	if (ImGui::CollapsingHeader("Lens Effects")) {
