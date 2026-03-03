@@ -1108,7 +1108,7 @@ static const char *eventName( SDL_WindowEventID event )
 		case SDL_WINDOWEVENT_TAKE_FOCUS: return "TAKE_FOCUS";
 		case SDL_WINDOWEVENT_HIT_TEST: return "HIT_TEST"; 
 		default:
-			sprintf( buf, "EVENT#%i", event );
+			Com_sprintf( buf, sizeof( buf ), "EVENT#%i", event );
 			return buf;
 	}
 }

@@ -277,7 +277,7 @@ static const char *Cvar_Validate( cvar_t *var, const char *value, qboolean warn 
 				if ( !Cvar_IsIntegral( value ) ) {
 					if ( warn )
 						Com_Printf( "WARNING: cvar '%s' must be integral", var->name );
-					sprintf( intbuf, "%i", atoi( value ) );
+					Com_sprintf( intbuf, sizeof( intbuf ), "%i", atoi( value ) );
 					value = intbuf; // new value
 				}
 				valuei = atoi( value );
@@ -833,7 +833,7 @@ Cvar_SetIntegerValue
 void Cvar_SetIntegerValue( const char *var_name, int value ) {
 	char	val[32];
 
-	sprintf( val, "%i", value );
+	Com_sprintf( val, sizeof( val ), "%i", value );
 	Cvar_Set( var_name, val );
 }
 
@@ -1320,12 +1320,12 @@ static void Cvar_Func_f( void ) {
 		Cvar_Op( ftype, &ival, &fval ); // apply modification
 	
 	if ( cvar && cvar->validator == CV_INTEGER ) {
-		sprintf( value, "%i", ival );
+		Com_sprintf( value, sizeof( value ), "%i", ival );
 	} else {
 		if ( (int)fval == fval )
-			sprintf( value, "%i", (int)fval );
+			Com_sprintf( value, sizeof( value ), "%i", (int)fval );
 		else
-			sprintf( value, "%f", fval );
+			Com_sprintf( value, sizeof( value ), "%f", fval );
 	}
 
 	Cvar_Set2( cvar_name, value, qfalse );
