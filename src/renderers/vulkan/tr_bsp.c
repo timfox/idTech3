@@ -543,6 +543,12 @@ static void R_LoadLightmaps( const lump_t *l, const lump_t *surfs ) {
 		}
 	}
 
+#ifdef HDR_DELUXE_LIGHTMAP
+	/* Non-merged path does not allocate deluxemaps; ensure no stale pointer */
+	tr.deluxemaps = NULL;
+	tr.worldDeluxeMapping = qfalse;
+#endif
+
 	buf = fileBase + l->fileofs;
 
 	tr.lightmaps = ri.Hunk_Alloc( tr.numLightmaps * sizeof(image_t *), h_low );
