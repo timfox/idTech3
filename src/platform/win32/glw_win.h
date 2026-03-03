@@ -54,7 +54,7 @@ typedef struct
 	qboolean	cdsFullscreen;
 	int			monitorCount;
 
-	FILE		*log_fp;	// TODO: implement?
+	FILE		*log_fp;	// renderer debug log file for GLimp_LogComment
 
 	glconfig_t	*config;	// feedback to renderer module
 
