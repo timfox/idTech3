@@ -706,11 +706,11 @@ static const char *sizeToString( int size )
 {
 	static char buf[ 32 ];
 	if ( size < 1024 ) {
-		sprintf( buf, "%iB", size );
+		Com_sprintf( buf, sizeof( buf ), "%iB", size );
 	} else if ( size < 1024*1024 ) {
-		sprintf( buf, "%iKB", size / 1024 );
+		Com_sprintf( buf, sizeof( buf ), "%iKB", size / 1024 );
 	} else {
-		sprintf( buf, "%i.%iMB", size / (1024*1024), (size / (1024*1024/10 )) % 10 );
+		Com_sprintf( buf, sizeof( buf ), "%i.%iMB", size / (1024*1024), (size / (1024*1024/10 )) % 10 );
 	}
 	return buf;
 }
@@ -1137,7 +1137,7 @@ qboolean Com_DL_Perform( download_t *dl )
 		dl->func.easy_getinfo( msg->easy_handle, CURLINFO_RESPONSE_CODE, &code );
 		Com_Printf( S_COLOR_RED "Download Error: %s Code: %ld\n",
 			dl->func.easy_strerror( msg->data.result ), code );
-		strcpy( name, dl->TempName );
+		Q_strncpyz( name, dl->TempName, sizeof( name ) );
 		Com_DL_Cleanup( dl );
 		FS_Remove( name );
 		if ( autoDownload )

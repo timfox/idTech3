@@ -1224,7 +1224,7 @@ static void SV_Status_f( void ) {
 			continue;
 
 		l = strlen( cl->name ) + 1;
-		strcpy( nc, cl->name );
+		Q_strncpyz( nc, cl->name, (int)( sizeof( names ) - ( nc - names ) ) );
 		np[ i ] = nc; nc += l;			// name pointer in name buffer
 		nl[ i ] = SV_Strlen( cl->name );// name length without color sequences
 		if ( nl[ i ] > max_namelength )
@@ -1232,7 +1232,7 @@ static void SV_Status_f( void ) {
 
 		s = NET_AdrToString( &cl->netchan.remoteAddress );
 		l = strlen( s ) + 1;
-		strcpy( ac, s );
+		Q_strncpyz( ac, s, (int)( sizeof( addrs ) - ( ac - addrs ) ) );
 		ap[ i ] = ac; ac += l;			// address pointer in address buffer
 		al[ i ] = l - 1;				// address length
 		if ( al[ i ] > max_addrlength )
@@ -1335,8 +1335,8 @@ static void SV_ConSay_f( void ) {
 		p++;
 	}
 
-	strcpy( text, "console: " );
-	strcat( text, p );
+	Q_strncpyz( text, "console: ", sizeof( text ) );
+	Q_strcat( text, sizeof( text ), p );
 
 	SV_SendServerCommand( NULL, "chat \"%s\"", text );
 }
@@ -1381,8 +1381,8 @@ static void SV_ConTell_f( void ) {
 		p++;
 	}
 
-	strcpy( text, S_COLOR_MAGENTA "console: " );
-	strcat( text, p );
+	Q_strncpyz( text, S_COLOR_MAGENTA "console: ", sizeof( text ) );
+	Q_strcat( text, sizeof( text ), p );
 
 	Com_Printf( "%s\n", text );
 	SV_SendServerCommand( cl, "chat \"%s\"", text );

@@ -5045,7 +5045,7 @@ static int loadShaderBuffers( char **shaderFiles, const int numShaderFiles, char
 			Com_sprintf( filename, sizeof( filename ), "scripts/%s", shaderFiles[i] );
 			if ( (ext = strrchr(filename, '.')) )
 			{
-				strcpy(ext, ".mtr");
+				Q_strncpyz( ext, ".mtr", sizeof( filename ) - (int)( ext - filename ) );
 			}
 
 			if ( ri.FS_ReadFile( filename, NULL ) <= 0 )
