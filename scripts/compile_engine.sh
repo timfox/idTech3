@@ -5,7 +5,7 @@ set -euo pipefail
 # Notes:
 # - build type defaults to Release
 # - vulkan and opengl are mutually exclusive
-# - if neither is specified: defaults to OpenGL
+# - if neither is specified: defaults to Vulkan
 # - mac-app wraps the legacy bundle script (requires release|debug target, optional architecture)
 # - mac-ub2 compiles universal-2 binaries (release only) and can optionally notarize
 # - first unrecognized arg becomes game_name
@@ -155,9 +155,9 @@ if [ "$VULKAN" -eq 1 ] && [ "$OPENGL" -eq 1 ]; then
   exit 1
 fi
 
-# Default to OpenGL if neither specified
+# Default to Vulkan if neither specified
 if [ "$VULKAN" -eq 0 ] && [ "$OPENGL" -eq 0 ]; then
-  OPENGL=1
+  VULKAN=1
 fi
 
 # Renderer-specific build directory (prevents cache collisions)
