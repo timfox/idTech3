@@ -11388,6 +11388,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 		case TYPE_COLOR_WHITE:
 		case TYPE_COLOR_GREEN:
 		case TYPE_COLOR_RED:
+		case TYPE_OCCLUSION_BBOX:
 			push_bind( 0, sizeof( vec4_t ) );					// xyz array
 			push_attr( 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT );
 			break;
