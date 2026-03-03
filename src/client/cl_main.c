@@ -195,8 +195,10 @@ static void CL_Open_f( void ) {
 	JsDebug_EmitEvent( "menu_changed", target, NULL, -1, 0 );
 #endif
 
-	/* Common tabs live under main menu in most UI scripts. */
+	/* Common tabs live under main menu in most UI scripts. Set ui_open_tab
+	 * so the UI can switch to the requested tab when main menu opens. */
 	if ( !Q_stricmp( target, "credits" ) || !Q_stricmp( target, "audio" ) || !Q_stricmp( target, "gameplay" ) ) {
+		Cvar_Set( "ui_open_tab", target );
 		CL_SetActiveMenuByName( "main" );
 		return;
 	}
