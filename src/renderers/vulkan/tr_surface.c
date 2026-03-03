@@ -1534,11 +1534,14 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 	int base;
 
 	if ( surf->vbo_vertex != VK_NULL_HANDLE && surf->vbo_index != VK_NULL_HANDLE ) {
-		/* VBO path: set gltfDrawSurface for vk_bind_geometry to use */
-		tess.gltfDrawSurface = surf;
-		tess.numVertexes = surf->numVertices;
-		tess.numIndexes = surf->numIndices;
-		return;
+		cvar_t *r_gltfVBO = ri.Cvar_Get( "r_gltfVBO", "1", CVAR_ARCHIVE );
+		if ( r_gltfVBO->integer ) {
+			/* VBO path: set gltfDrawSurface for vk_bind_geometry to use */
+			tess.gltfDrawSurface = surf;
+			tess.numVertexes = surf->numVertices;
+			tess.numIndexes = surf->numIndices;
+			return;
+		}
 	}
 
 	/* Tess path (skinning, morph targets, or VBO creation failed) */
