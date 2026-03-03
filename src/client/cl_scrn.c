@@ -230,16 +230,29 @@ void SCR_DrawSmallChar( int x, int y, int ch ) {
 
 /*
 ** SCR_DrawSmallString
-** small string are drawn at native screen resolution
+** small string are drawn at native screen resolution.
+** Uses SDF when enabled for resolution-independent sharp text.
 */
 void SCR_DrawSmallString( int x, int y, const char *s, int len ) {
 	int row, col, ch;
 	float frow, fcol;
 	float size;
 	const char *end;
+	vec4_t white = { 1.0f, 1.0f, 1.0f, 1.0f };
 
 	if ( y < -smallchar_height ) {
 		return;
+	}
+
+	if ( SDF_IsEnabled() && len > 0 && len < 1024 ) {
+		char buf[1024];
+		int n = len;
+		if ( n >= (int)sizeof( buf ) ) n = (int)sizeof( buf ) - 1;
+		Com_Memcpy( buf, s, (size_t)n );
+		buf[n] = '\0';
+		if ( SDF_DrawStringExt( x, y, (float)smallchar_height, buf, white, qtrue, qtrue ) ) {
+			return;
+		}
 	}
 
 	size = 0.0625;
@@ -373,7 +386,7 @@ void SCR_DrawBigString( int x, int y, const char *s, float alpha, qboolean noCol
 SCR_DrawSmallString[Color]
 
 Draws a multi-colored string with a drop shadow, optionally forcing
-to a fixed color.
+to a fixed color. Uses SDF when enabled for resolution-independent sharp text.
 ==================
 */
 void SCR_DrawSmallStringExt( int x, int y, const char *string, const float *setColor, qboolean forceColor,
@@ -382,8 +395,13 @@ void SCR_DrawSmallStringExt( int x, int y, const char *string, const float *setC
 	const char	*s;
 	int			xx;
 	int			ch;
+	const float	sdfSize = (float)smallchar_height;
 
-	// draw the colored text
+	if ( SDF_IsEnabled() && SDF_DrawStringExt( x, y, sdfSize, string, setColor, forceColor, noColorEscape ) ) {
+		return;
+	}
+
+	// draw the colored text (bitmap fallback)
 	s = string;
 	xx = x;
 	re.SetColor( setColor );
