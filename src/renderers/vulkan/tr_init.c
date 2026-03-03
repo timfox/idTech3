@@ -240,6 +240,12 @@ cvar_t	*r_volumetricFogHeightFalloff;
 cvar_t	*r_volumetricFogAlbedo;
 cvar_t	*r_volumetricFogExtinctionScale;
 cvar_t	*r_volumetricFogBlendDistance;
+cvar_t	*r_volumetricFogSphere;
+cvar_t	*r_volumetricFogSphereCenter;
+cvar_t	*r_volumetricFogSphereRadius;
+cvar_t	*r_volumetricFogSphereDensity;
+cvar_t	*r_volumetricFogDenoise;
+cvar_t	*r_volumetricFogDenoiseSigma;
 cvar_t	*r_volumetricFogAniso;
 cvar_t	*r_volumetricFogSteps;
 cvar_t	*r_volumetricFogZExponent;
@@ -2352,6 +2358,33 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_volumetricFogBlendDistance, "0", "256", CV_FLOAT );
 	ri.Cvar_SetDescription( r_volumetricFogBlendDistance, "Distance from volume bounds over which density blends (0=hard edge)." );
 	ri.Cvar_SetGroup( r_volumetricFogBlendDistance, CVG_RENDERER );
+
+	r_volumetricFogSphere = ri.Cvar_Get( "r_volumetricFogSphere", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_volumetricFogSphere, "Enable debug sphere fog volume (1=on)." );
+	ri.Cvar_SetGroup( r_volumetricFogSphere, CVG_RENDERER );
+
+	r_volumetricFogSphereCenter = ri.Cvar_Get( "r_volumetricFogSphereCenter", "0 0 0", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_volumetricFogSphereCenter, "Sphere fog center (x y z)." );
+	ri.Cvar_SetGroup( r_volumetricFogSphereCenter, CVG_RENDERER );
+
+	r_volumetricFogSphereRadius = ri.Cvar_Get( "r_volumetricFogSphereRadius", "128", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogSphereRadius, "1", "2048", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogSphereRadius, "Sphere fog radius." );
+	ri.Cvar_SetGroup( r_volumetricFogSphereRadius, CVG_RENDERER );
+
+	r_volumetricFogSphereDensity = ri.Cvar_Get( "r_volumetricFogSphereDensity", "0.01", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogSphereDensity, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogSphereDensity, "Sphere fog density." );
+	ri.Cvar_SetGroup( r_volumetricFogSphereDensity, CVG_RENDERER );
+
+	r_volumetricFogDenoise = ri.Cvar_Get( "r_volumetricFogDenoise", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_volumetricFogDenoise, "Enable Gaussian spatial denoise on volumetric fog (0=off, 1=on)." );
+	ri.Cvar_SetGroup( r_volumetricFogDenoise, CVG_RENDERER );
+
+	r_volumetricFogDenoiseSigma = ri.Cvar_Get( "r_volumetricFogDenoiseSigma", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogDenoiseSigma, "0.1", "3", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogDenoiseSigma, "Gaussian sigma for volumetric denoise (spatial blur strength)." );
+	ri.Cvar_SetGroup( r_volumetricFogDenoiseSigma, CVG_RENDERER );
 
 	r_volumetricFogAniso = ri.Cvar_Get( "r_volumetricFogAniso", "0.6", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogAniso, "-0.999", "0.999", CV_FLOAT );

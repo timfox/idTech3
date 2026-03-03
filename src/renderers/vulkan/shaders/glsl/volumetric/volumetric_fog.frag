@@ -43,6 +43,7 @@ layout(std140, binding = 4) uniform VolumetricParams {
     vec4 volumeBoundsMin[MAX_VOLUMES];
     vec4 volumeBoundsMax[MAX_VOLUMES];
     vec4 volumeColorDensity[MAX_VOLUMES];
+    vec4 volumeTypeParams[MAX_VOLUMES];
     vec4 lightPosRadius[MAX_LIGHTS];
     vec4 lightColorType[MAX_LIGHTS];
     vec4 lightDirAngle[MAX_LIGHTS];
