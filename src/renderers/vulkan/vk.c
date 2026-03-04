@@ -68,6 +68,7 @@ typedef struct {
 	float paniniPad0;
 	float paniniPad1;
 	float paniniPad2;
+	float exposure;  /* per-frame exposure (eye adaptation or r_exposure) */
 	float srcUVScaleBias[4]; // scale.xy, bias.xy
 } VkPostProcessPushConstants;
 
@@ -6243,6 +6244,7 @@ void vk_initialize( void )
 
 	vk.cmd = vk.tess + 0;
 	vk_reset_motion_history();
+	vk.adaptedExposure = 1.0f;
 	vk.uniform_alignment = props.limits.minUniformBufferOffsetAlignment;
 	vk.uniform_item_size = PAD( sizeof( vkUniform_t ), (size_t)vk.uniform_alignment );
 #ifdef USE_VK_PBR	
@@ -14748,6 +14750,18 @@ void vk_begin_frame( void )
 		if ( r_occlusionCulling && r_occlusionCulling->integer ) {
 			vk_occlusion_readback();
 		}
+		/* Eye adaptation: temporal blend toward target (placeholder until luminance pass) */
+		{
+			cvar_t *auto_var = ri.Cvar_Get( "r_exposure_auto", "0", 0 );
+			cvar_t *target_var = ri.Cvar_Get( "r_exposure_auto_target", "0.5", CVAR_ARCHIVE_ND );
+			cvar_t *speed_var = ri.Cvar_Get( "r_exposure_auto_speed", "2.0", CVAR_ARCHIVE_ND );
+			if ( auto_var && auto_var->integer && target_var && speed_var ) {
+				float target = target_var->value > 0.0f ? target_var->value : 0.5f;
+				float speed = speed_var->value > 0.0f ? speed_var->value * 0.016f : 0.02f;
+				vk.adaptedExposure += ( target - vk.adaptedExposure ) * speed;
+				vk.adaptedExposure = ( vk.adaptedExposure < 0.01f ) ? 0.01f : ( vk.adaptedExposure > 10.0f ? 10.0f : vk.adaptedExposure );
+			}
+		}
 	}
 
 	if ( !ri.CL_IsMinimized() && !vk.cmd->swapchain_image_acquired ) {
@@ -15054,6 +15068,15 @@ void vk_end_frame( void )
 			panini_push.paniniPad0 = (float)backEnd.refdef.time * 0.001f;
 			panini_push.paniniPad1 = 0.0f;
 			panini_push.paniniPad2 = 0.0f;
+			{
+				cvar_t *r_exposure_auto_var = ri.Cvar_Get( "r_exposure_auto", "0", 0 );
+				float expVal = ( r_exposure && r_exposure->value > 0.0f ) ? r_exposure->value : 1.0f;
+				if ( r_exposure_auto_var && r_exposure_auto_var->integer ) {
+					/* Eye adaptation: use vk.adaptedExposure when luminance pass has run */
+					expVal = vk.adaptedExposure > 0.0f ? vk.adaptedExposure : expVal;
+				}
+				panini_push.exposure = expVal;
+			}
 			if ( vk_scene_src_rect_valid ) {
 				srcRect = vk_scene_src_rect;
 			} else {

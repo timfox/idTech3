@@ -58,6 +58,30 @@ idtech3.on("frame", function() {
 - Use `js_frameCallbackBudgetMs` to limit callback time.
 - Prefer `textureLoad` once and reuse the handle.
 
+## Game Events
+
+The engine emits gameplay events that scripts can listen to:
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `entity_spawn` | `entityNum`, `eType` | New entity appeared in snapshot |
+| `entity_death` | `entityNum`, `attacker` | Player/entity died |
+| `weapon_fire` | `entityNum`, `weapon` | Entity fired a weapon |
+
+```javascript
+idtech3.on("entity_spawn", function(ev) {
+  // ev.entityNum, ev.eType
+});
+idtech3.on("entity_death", function(ev) {
+  // ev.entityNum (victim), ev.attacker
+});
+idtech3.on("weapon_fire", function(ev) {
+  // ev.entityNum (shooter), ev.weapon
+});
+```
+
+Requires `js_allowEvents 1`. See `idtech3.on` / `idtech3.off` for registration.
+
 ## See Also
 
 - `docs/samples/ui/options_tabs.js` – UI integration example

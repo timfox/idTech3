@@ -2323,8 +2323,14 @@ static void R_Register( void )
 	ri.Cvar_SetGroup( r_hdr_lightmap_scale, CVG_RENDERER );
 
 	r_exposure_auto = ri.Cvar_Get( "r_exposure_auto", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_SetDescription( r_exposure_auto, "Eye adaptation (Source Lost Coast style): 0=manual r_exposure, 1=auto from scene luminance. Requires luminance pass." );
+	ri.Cvar_SetDescription( r_exposure_auto, "Eye adaptation: 0=manual r_exposure, 1=temporal adaptation toward r_exposure_auto_target. Luminance pass planned." );
 	ri.Cvar_SetGroup( r_exposure_auto, CVG_RENDERER );
+	{
+		cvar_t *exp_target = ri.Cvar_Get( "r_exposure_auto_target", "0.5", CVAR_ARCHIVE_ND );
+		cvar_t *exp_speed = ri.Cvar_Get( "r_exposure_auto_speed", "2.0", CVAR_ARCHIVE_ND );
+		ri.Cvar_SetDescription( exp_target, "Target exposure for eye adaptation (r_exposure_auto 1)." );
+		ri.Cvar_SetDescription( exp_speed, "Eye adaptation speed (higher = faster)." );
+	}
 
 	r_tonemap = ri.Cvar_Get( "r_tonemap", "3", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_tonemap, "0", "4", CV_INTEGER );

@@ -380,8 +380,12 @@ extern "C" void VkImgui_DrawPostFXPanel(void) {
 			ImGui::SameLine();
 			ImGui::TextDisabled( "(?)" );
 			if ( ImGui::IsItemHovered() ) {
-				ImGui::SetTooltip( "Source Lost Coast style. Full implementation requires luminance pass (planned)." );
+				ImGui::SetTooltip( "Temporal adaptation toward target. Luminance pass planned for full Source Lost Coast style." );
 			}
+			float expTarget = VkImgui_CvarFloat( "r_exposure_auto_target" );
+			float expSpeed = VkImgui_CvarFloat( "r_exposure_auto_speed" );
+			VkImgui_CvarSlider( "Adapt target", "r_exposure_auto_target", expTarget, 0.1f, 2.0f );
+			VkImgui_CvarSlider( "Adapt speed", "r_exposure_auto_speed", expSpeed, 0.1f, 10.0f );
 		}
 		float lmScale = VkImgui_CvarFloat( "r_hdr_lightmap_scale" );
 		VkImgui_CvarSlider( "HDR lightmap scale", "r_hdr_lightmap_scale", lmScale, 0.5f, 8.0f );
