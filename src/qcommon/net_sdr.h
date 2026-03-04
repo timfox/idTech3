@@ -40,6 +40,13 @@ void NET_SDR_Init( void );
 void NET_SDR_Shutdown( void );
 void NET_SDR_Frame( void );
 
+/* Call from Steam_Init after SteamAPI_Init succeeds. */
+void NET_SDR_OnSteamReady( void );
+
+/* Receive path: poll SDR queue. Returns qtrue if packet placed in net_from/net_message. */
+qboolean NET_SDR_ReceivePacket( netadr_t *net_from, msg_t *net_message );
+qboolean NET_SDR_HasPacket( void );
+
 /* Send via SDR when active; otherwise falls through to normal UDP. */
 qboolean NET_SDR_SendPacket( netsrc_t sock, int length, const void *data, const netadr_t *to );
 
@@ -49,10 +56,13 @@ qboolean NET_SDR_UseForAddress( const netadr_t *adr );
 
 #else
 
-#define NET_SDR_Init()             ((void)0)
-#define NET_SDR_Shutdown()         ((void)0)
-#define NET_SDR_Frame()            ((void)0)
-#define NET_SDR_SendPacket(a,b,c,d)  (qfalse)
+#define NET_SDR_Init()                ((void)0)
+#define NET_SDR_Shutdown()            ((void)0)
+#define NET_SDR_Frame()               ((void)0)
+#define NET_SDR_OnSteamReady()        ((void)0)
+#define NET_SDR_ReceivePacket(a,b)    (qfalse)
+#define NET_SDR_HasPacket()           (qfalse)
+#define NET_SDR_SendPacket(a,b,c,d)   (qfalse)
 #define NET_SDR_IsActive()         (qfalse)
 #define NET_SDR_UseForAddress(a)    (qfalse)
 

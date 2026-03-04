@@ -23,7 +23,7 @@ int main( int argc, const char* argv[] ) {
 		return -1;
 	}
 
-	n = sprintf( buf, "%s\n", argv[2] );
+	n = snprintf( buf, sizeof( buf ), "%s\n", argv[2] );
 	fwrite( buf, n, 1, f_out );
 
 
