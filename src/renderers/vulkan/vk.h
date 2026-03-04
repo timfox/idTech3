@@ -651,6 +651,7 @@ typedef struct {
 	VkDescriptorSet vegwind_descriptor;
 
 	VkDescriptorSet color_descriptor;
+	VkImageView post_fog_color_source;	/* last source for gamma (color_image or smaa_output) */
 	VkDescriptorSet depth_descriptor;
 	VkDescriptorSet smaa_edge_descriptor;
 	VkDescriptorSet smaa_blend_descriptor;

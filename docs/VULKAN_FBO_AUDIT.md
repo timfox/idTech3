@@ -263,3 +263,8 @@ The FBO pipeline is complex, with multiple conditional paths (volumetrics on/off
 - **All volumetric skip paths** now call this helper before returning: tier/no-world skip, missing-resources skip, MSAA-depth-incomplete skip.
 - **Success path** and **vk_end_frame fallback** both use the same helper.
 - This ensures gamma and luminance passes always sample the correct image, eliminating the solid-color bug when volumetrics are skipped.
+
+### Additional Fixes (March 2025 — r_fbo 1 solid rapidly-changing color)
+
+- **Main pass color clear**: FBO color attachment now uses `VK_ATTACHMENT_LOAD_OP_CLEAR` instead of `DONT_CARE` to avoid uninitialized or stale content that could produce solid/wrong colors.
+- **Belt-and-suspenders descriptor update**: `vk.post_fog_color_source` tracks the last source (color_image or smaa_output) used for gamma. Right before the gamma pass, `vk_update_post_fog_descriptors()` is called again with that source (or `color_image_view` if unset) to ensure the descriptor is never stale.
