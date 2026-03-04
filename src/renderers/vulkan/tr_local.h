@@ -1615,6 +1615,7 @@ extern cvar_t	*r_volumetricFogDenoiseSigma;
 extern cvar_t	*r_volumetricFogAniso;
 extern cvar_t	*r_volumetricFogSteps;
 extern cvar_t	*r_volumetricFogZExponent;
+extern cvar_t	*r_volumetricFogSliceMode;
 extern cvar_t	*r_volumetricFogMaxDistance;
 extern cvar_t	*r_volumetricFogJitter;
 extern cvar_t	*r_volumetricFogTemporalWeight;

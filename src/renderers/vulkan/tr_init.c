@@ -251,6 +251,7 @@ cvar_t	*r_volumetricFogDenoiseSigma;
 cvar_t	*r_volumetricFogAniso;
 cvar_t	*r_volumetricFogSteps;
 cvar_t	*r_volumetricFogZExponent;
+cvar_t	*r_volumetricFogSliceMode;
 cvar_t	*r_volumetricFogMaxDistance;
 cvar_t	*r_volumetricFogJitter;
 cvar_t	*r_volumetricFogTemporalWeight;
@@ -2417,6 +2418,10 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_volumetricFogZExponent, "1.0", "8.0", CV_FLOAT );
 	ri.Cvar_SetDescription( r_volumetricFogZExponent, "Exponent used for volumetric depth-slice distribution (higher values allocate more slices near camera)." );
 	ri.Cvar_SetGroup( r_volumetricFogZExponent, CVG_RENDERER );
+	r_volumetricFogSliceMode = ri.Cvar_Get( "r_volumetricFogSliceMode", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogSliceMode, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_volumetricFogSliceMode, "Slice distribution: 0=exponential (more near camera), 1=linear (equal spacing), 2=logarithmic (more in distance)." );
+	ri.Cvar_SetGroup( r_volumetricFogSliceMode, CVG_RENDERER );
 
 	r_volumetricFogMaxDistance = ri.Cvar_Get( "r_volumetricFogMaxDistance", "4096", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogMaxDistance, "1", "65536", CV_FLOAT );

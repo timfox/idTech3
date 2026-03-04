@@ -144,6 +144,10 @@ ffmpeg play <file>      # Play a video file
 
 # Local CI validation (shader compile + Vulkan build + smoke test)
 ./scripts/validate_ci_build.sh
+
+# CTest (requires build first; runs smoke test)
+cd build-vk-Release && ctest -V
+# or: make test
 ```
 
 ## IDE Setup

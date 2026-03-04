@@ -23,9 +23,13 @@ Sprite-based volumetric fog:
 #include "cl_mobilefog.h"
 #include "cl_particles.h"
 #include <math.h>
+#include <stdio.h>
 
 static cvar_t *r_mobileFog;
 static cvar_t *r_volumetricFogTier;
+static cvar_t *r_volumetricFogDensity;
+static cvar_t *r_volumetricFogTint;
+static cvar_t *r_volumetricFogHeightFalloff;
 static cvar_t *r_mobileFogDensity;
 static cvar_t *r_mobileFogHeight;
 static cvar_t *r_mobileFogHeightFalloff;
@@ -50,6 +54,9 @@ void MobileFog_Init( void ) {
 	Cvar_SetDescription( r_volumetricFogTier,
 		"Volumetric fog quality tier: 0=full froxel, 1=reduced, 2=mobile height fog, 3=mobile sprites, 4=off." );
 
+	r_volumetricFogDensity = Cvar_Get( "r_volumetricFogDensity", "0.6", CVAR_ARCHIVE );
+	r_volumetricFogTint = Cvar_Get( "r_volumetricFogTint", "1 1 1", CVAR_ARCHIVE );
+	r_volumetricFogHeightFalloff = Cvar_Get( "r_volumetricFogHeightFalloff", "0.015", CVAR_ARCHIVE );
 	r_mobileFogDensity = Cvar_Get( "r_mobileFogDensity", "0.015", CVAR_ARCHIVE );
 	r_mobileFogHeight = Cvar_Get( "r_mobileFogHeight", "0", CVAR_ARCHIVE );
 	r_mobileFogHeightFalloff = Cvar_Get( "r_mobileFogHeightFalloff", "0.5", CVAR_ARCHIVE );
@@ -80,6 +87,9 @@ void MobileFog_Shutdown( void ) {
 
 mobileFogMode_t MobileFog_GetMode( void ) {
 	if ( !fogInitialized ) return MOBILE_FOG_NONE;
+	if ( r_volumetricFogTier && r_volumetricFogTier->integer == 4 ) {
+		return MOBILE_FOG_NONE;
+	}
 	if ( r_volumetricFogTier && r_volumetricFogTier->integer >= 2 && r_volumetricFogTier->integer <= 3 ) {
 		return ( r_volumetricFogTier->integer == 2 ) ? MOBILE_FOG_HEIGHT : MOBILE_FOG_SPRITES;
 	}
@@ -93,12 +103,33 @@ static void MobileFog_DrawHeightFog( const vec3_t viewOrigin ) {
 	float density, fogHeight, heightFalloff;
 	vec4_t fogColor;
 	float heightFactor;
+	qboolean useVolumetricParams = qfalse;
 
 	if ( !re.SetColor || !re.DrawStretchPic ) return;
 
-	density = r_mobileFogDensity->value;
-	fogHeight = r_mobileFogHeight->value;
-	heightFalloff = r_mobileFogHeightFalloff->value;
+	if ( r_volumetricFogTier && r_volumetricFogTier->integer >= 2 && r_volumetricFogTier->integer <= 3 ) {
+		useVolumetricParams = qtrue;
+	}
+	if ( useVolumetricParams && r_volumetricFogDensity && r_volumetricFogTint && r_volumetricFogHeightFalloff ) {
+		float tr, tg, tb;
+		density = r_volumetricFogDensity->value * 0.025f;
+		fogHeight = r_mobileFogHeight->value;
+		heightFalloff = r_volumetricFogHeightFalloff->value * 10.0f;
+		if ( sscanf( r_volumetricFogTint->string, "%f %f %f", &tr, &tg, &tb ) == 3 ) {
+			fogColor[0] = tr;
+			fogColor[1] = tg;
+			fogColor[2] = tb;
+		} else {
+			fogColor[0] = fogColor[1] = fogColor[2] = 1.0f;
+		}
+	} else {
+		density = r_mobileFogDensity->value;
+		fogHeight = r_mobileFogHeight->value;
+		heightFalloff = r_mobileFogHeightFalloff->value;
+		fogColor[0] = r_mobileFogColorR->value;
+		fogColor[1] = r_mobileFogColorG->value;
+		fogColor[2] = r_mobileFogColorB->value;
+	}
 
 	heightFactor = 1.0f;
 	if ( viewOrigin[2] > fogHeight ) {
@@ -109,9 +140,6 @@ static void MobileFog_DrawHeightFog( const vec3_t viewOrigin ) {
 	if ( fogStrength < 0.001f ) return;
 	if ( fogStrength > 0.95f ) fogStrength = 0.95f;
 
-	fogColor[0] = r_mobileFogColorR->value;
-	fogColor[1] = r_mobileFogColorG->value;
-	fogColor[2] = r_mobileFogColorB->value;
 	fogColor[3] = fogStrength;
 
 	re.SetColor( fogColor );
@@ -171,6 +199,9 @@ void MobileFog_Frame( const vec3_t viewOrigin, const vec3_t viewForward,
 	int mode;
 
 	if ( !fogInitialized ) return;
+	if ( r_volumetricFogTier && r_volumetricFogTier->integer == 4 ) {
+		return;
+	}
 	if ( r_volumetricFogTier && r_volumetricFogTier->integer >= 2 && r_volumetricFogTier->integer <= 3 ) {
 		mode = r_volumetricFogTier->integer;
 	} else if ( r_mobileFog ) {
