@@ -68,8 +68,9 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - HDR rendering with RGBA16F color targets
 - Bloom extraction with configurable threshold and knee
 - 4-pass Gaussian blur at progressively lower resolutions
-- ACES and Reinhard tonemapping
-- Exposure control
+- ACES, Reinhard, Filmic, and AgX tonemapping
+- Exposure control with per-frame push constant
+- Eye adaptation (`r_exposure_auto`): temporal blend toward target exposure (luminance pass planned)
 - Pre-exposure scaling
 
 ### Post-Processing
@@ -105,7 +106,9 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 | `r_hdr_lightmap_scale` | 2.0 | HDR lightmap intensity (1=normal, 2+=brighter for 8-bit lightmaps) |
 | `r_tonemap` | 2 | Tonemapping (0=none, 1=Reinhard, 2=ACES) |
 | `r_exposure` | 1.0 | Exposure multiplier |
-| `r_exposure_auto` | 0 | Eye adaptation (0=manual, 1=auto; full impl planned) |
+| `r_exposure_auto` | 0 | Eye adaptation (0=manual, 1=temporal blend toward target) |
+| `r_exposure_auto_target` | 0.5 | Target exposure for eye adaptation |
+| `r_exposure_auto_speed` | 2.0 | Adaptation speed (higher = faster) |
 | `r_atmosphere` | 1 | Procedural atmospheric sky (Rayleigh+Mie). Replaces grey sky when no HDR skybox. |
 | `r_skyboxHDR` | "" | Path to HDR EXR/PNG skybox panorama (empty = use atmosphere or map skybox). |
 | `r_ssao` | 0 | SSAO enable |

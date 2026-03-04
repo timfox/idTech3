@@ -105,7 +105,7 @@ CL_Frame(msec)
 
 ## JavaScript / UI Debug (Duktape)
 
-When `USE_DUKTAPE` is enabled, the engine provides a JavaScript runtime (`idtech3` namespace) with event callbacks (frame, menu_changed, ui_open, ui_close, etc.) and HUD bindings. For debugging UI and script issues:
+When `USE_DUKTAPE` is enabled, the engine provides a JavaScript runtime (`idtech3` namespace) with event callbacks and HUD bindings. **Game events** (emitted from snapshot parsing): `entity_spawn`, `entity_death`, `weapon_fire` — payloads include `entityNum`, `eType`, `attacker`, `weapon`. See [JS_HUD_DRAWING.md](JS_HUD_DRAWING.md#game-events). Other events: `frame`, `menu_changed`, `ui_open`, `ui_close`, `map_load`, `input_key`, `mouse_move`, etc. For debugging UI and script issues:
 
 - **`js_verbose`** (0/1): Toggle verbose info when at a menu.
 - **`js_verboseMenu`** (main|ingame|all|none|off): Which menu to show verbose for. Default `main`.
