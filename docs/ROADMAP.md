@@ -72,7 +72,7 @@
 - [x] Connect BSP geometry extraction to map loading for automatic navmesh
 - [x] PostFX specialization constants in vk.c gamma pipeline
 - [x] Wire SSR/atmosphere shaders into Vulkan render passes
-- [ ] Wire vegetation wind compute into Vulkan pipeline
+- [ ] Wire vegetation wind compute into Vulkan pipeline (shader compiled; pipeline dispatch pending vegetation vertex buffer)
 - [x] glTF GPU upload (MOD_GLTF, tess path, baseColorTexture shader, bounds)
 - [x] CBT-inspired GPU terrain tessellation (compute shader LOD, r_cbtTerrain)
 
