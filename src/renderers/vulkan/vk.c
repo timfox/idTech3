@@ -11507,7 +11507,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	frag_spec_data.transmission_texture_set = -1;
 	frag_spec_data.subsurface_texture_set = -1;
 	frag_spec_data.detail_texture_set = -1;
-	frag_spec_data.detail_scale = 4.0f;
+	frag_spec_data.detail_scale = ( r_detail_scale && r_detail_scale->value > 0.0f ) ? r_detail_scale->value : 4.0f;
 
 	if ( def->vk_pbr_flags & PBR_HAS_NORMALMAP )
 		frag_spec_data.normal_texture_set = 0;

@@ -61,6 +61,7 @@ cvar_t	*r_railCoreWidth;
 cvar_t	*r_railSegmentLength;
 
 cvar_t	*r_detailTextures;
+cvar_t	*r_detail_scale;
 
 cvar_t	*r_znear;
 cvar_t	*r_zproj;
@@ -1845,6 +1846,8 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_colorMipLevels, "Debugging tool to artificially color different mipmap levels so that they are more apparent." );
 	r_detailTextures = ri.Cvar_Get( "r_detailtextures", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_detailTextures, "Enables usage of shader stages flagged as detail." );
+	r_detail_scale = ri.Cvar_Get( "r_detail_scale", "4", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_detail_scale, "Tiling frequency for PBR detail maps (higher = more repetition)." );
 	r_texturebits = ri.Cvar_Get( "r_texturebits", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_texturebits, "Number of texture bits per texture." );
 
