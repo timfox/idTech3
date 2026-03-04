@@ -1598,6 +1598,8 @@ extern cvar_t	*r_post;
 extern cvar_t	*r_post_debug;
 extern cvar_t	*r_exposure;
 extern cvar_t	*r_hdr_lightmap_scale;
+extern cvar_t	*r_lightmap_srgb_decode;
+extern cvar_t	*r_pre_exposure_scale;
 extern cvar_t	*r_exposure_auto;
 extern cvar_t	*r_tonemap;
 extern cvar_t	*r_volumetricFog;

@@ -391,6 +391,13 @@ extern "C" void VkImgui_DrawPostFXPanel(void) {
 		}
 		float lmScale = VkImgui_CvarFloat( "r_hdr_lightmap_scale" );
 		VkImgui_CvarSlider( "HDR lightmap scale", "r_hdr_lightmap_scale", lmScale, 0.5f, 8.0f );
+		if ( VkImgui_CvarFloat( "r_hdr" ) > 0.0f ) {
+			bool lmSrgb = VkImgui_CvarFloat( "r_lightmap_srgb_decode" ) > 0.5f;
+			if ( ImGui::Checkbox( "Lightmap sRGB decode", &lmSrgb ) )
+				ri.Cvar_Set( "r_lightmap_srgb_decode", lmSrgb ? "1" : "0" );
+		}
+		float preExp = VkImgui_CvarFloat( "r_pre_exposure_scale" );
+		VkImgui_CvarSlider( "Pre-exposure scale", "r_pre_exposure_scale", preExp, 0.1f, 4.0f );
 	}
 
 	if (ImGui::CollapsingHeader("Lens Effects")) {
