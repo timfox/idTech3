@@ -23,6 +23,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "client.h"
 #include "cl_voip.h"
+#ifdef USE_DUKTAPE
+#include "js_debug.h"
+#include "../game/bg_public.h"
+#endif
 
 static const char *svc_strings[] = {
 	"svc_bad",
@@ -190,6 +194,52 @@ static void CL_ParsePacketEntities( msg_t *msg, const clSnapshot_t *oldframe, cl
 }
 
 
+#ifdef USE_DUKTAPE
+/*
+================
+CL_EmitJSEventsFromSnapshot
+
+Emits entity_spawn, entity_death, weapon_fire to JavaScript when
+a new snapshot is received. Enables scripts to react to gameplay.
+================
+*/
+static void CL_EmitJSEventsFromSnapshot( const clSnapshot_t *oldSnap, const clSnapshot_t *newSnap ) {
+	int i;
+	const entityState_t *es;
+	qboolean inOld[MAX_GENTITIES];
+
+	if ( !oldSnap || !oldSnap->valid ) {
+		Com_Memset( inOld, 0, sizeof( inOld ) );
+	} else {
+		Com_Memset( inOld, 0, sizeof( inOld ) );
+		for ( i = 0; i < oldSnap->numEntities; i++ ) {
+			es = &cl.parseEntities[ ( oldSnap->parseEntitiesNum + i ) & ( MAX_PARSE_ENTITIES - 1 ) ];
+			if ( es->number >= 0 && es->number < MAX_GENTITIES ) {
+				inOld[es->number] = qtrue;
+			}
+		}
+	}
+
+	for ( i = 0; i < newSnap->numEntities; i++ ) {
+		es = &cl.parseEntities[ ( newSnap->parseEntitiesNum + i ) & ( MAX_PARSE_ENTITIES - 1 ) ];
+		if ( es->number < 0 || es->number >= MAX_GENTITIES ) {
+			continue;
+		}
+
+		if ( !inOld[es->number] ) {
+			JsDebug_EmitEvent( "entity_spawn", NULL, NULL, es->number, es->eType );
+		}
+
+		if ( es->event == EV_DEATH1 || es->event == EV_DEATH2 || es->event == EV_DEATH3 ) {
+			JsDebug_EmitEvent( "entity_death", NULL, NULL, es->number, es->otherEntityNum );
+		}
+		if ( es->event == EV_FIRE_WEAPON ) {
+			JsDebug_EmitEvent( "weapon_fire", NULL, NULL, es->number, es->weapon );
+		}
+	}
+}
+#endif
+
 /*
 ================
 CL_ParseSnapshot
@@ -300,6 +350,10 @@ static void CL_ParseSnapshot( msg_t *msg ) {
 	for ( i = 0, n = newSnap.messageNum - oldMessageNum; i < n; i++ ) {
 		cl.snapshots[ ( oldMessageNum + i ) & PACKET_MASK ].valid = qfalse;
 	}
+
+#ifdef USE_DUKTAPE
+	CL_EmitJSEventsFromSnapshot( cl.snap.valid ? &cl.snap : NULL, &newSnap );
+#endif
 
 	// copy to the current good spot
 	cl.snap = newSnap;

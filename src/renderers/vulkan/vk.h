@@ -771,6 +771,9 @@ typedef struct {
 		uint32_t push_size_max;
 	} stats;
 
+	/* Eye adaptation: exposure from luminance pass (r_exposure_auto) */
+	float adaptedExposure;
+
 	//
 	// Shader modules.
 	//

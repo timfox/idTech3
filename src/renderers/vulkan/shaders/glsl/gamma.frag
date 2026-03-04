@@ -17,7 +17,7 @@ layout(constant_id = 7) const int ditherMode = 0;
 layout(constant_id = 8) const int depth_r = 255;
 layout(constant_id = 9) const int depth_g = 255;
 layout(constant_id = 10) const int depth_b = 255;
-layout(constant_id = 11) const float exposure = 1.0;
+layout(constant_id = 11) const float exposure = 1.0;  /* spec constant; paniniPC.exposure used at runtime */
 layout(constant_id = 12) const float bloom_knee = 0.5;
 layout(constant_id = 13) const int tonemap_mode = 2;
 layout(constant_id = 14) const int apply_srgb_gamma = 0;
@@ -44,6 +44,7 @@ layout(push_constant) uniform PaniniPC {
 	float paniniPad0;
 	float paniniPad1;
 	float paniniPad2;
+	float exposure;  /* per-frame (eye adaptation or r_exposure) */
 	vec4 srcUVScaleBias; // scale.xy, bias.xy
 } paniniPC;
 
@@ -284,7 +285,7 @@ void main() {
 	vec3 hdr = texture( texture0, uv ).rgb;
 	vec3 hdr_exposed = hdr * max( paniniPC.brightness, 0.0 );
 	if ( postprocess_enabled != 0 ) {
-		hdr_exposed *= exposure;
+		hdr_exposed *= max( paniniPC.exposure, 0.01 );
 		hdr_exposed *= preExposureScale;
 		hdr_exposed = applyBloomKnee( hdr_exposed );
 	}
@@ -335,8 +336,8 @@ void main() {
 		caHdr.r = texture( texture0, srcR ).r;
 		caHdr.g = ldr.g;
 		caHdr.b = texture( texture0, srcB ).b;
-		caHdr.r *= max( paniniPC.brightness, 0.0 ) * exposure * preExposureScale;
-		caHdr.b *= max( paniniPC.brightness, 0.0 ) * exposure * preExposureScale;
+		caHdr.r *= max( paniniPC.brightness, 0.0 ) * max( paniniPC.exposure, 0.01 ) * preExposureScale;
+		caHdr.b *= max( paniniPC.brightness, 0.0 ) * max( paniniPC.exposure, 0.01 ) * preExposureScale;
 		vec3 caTone;
 		caTone.r = doTonemap( vec3( caHdr.r ) ).r;
 		caTone.g = ldr.g;

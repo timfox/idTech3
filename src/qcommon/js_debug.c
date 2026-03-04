@@ -1362,6 +1362,24 @@ void JsDebug_EmitEvent( const char *eventName, const char *s0, const char *s1, i
 			duk_push_int( s_jsContext, i0 );
 			duk_put_prop_string( s_jsContext, -2, "catcher" );
 		}
+		if ( !Q_stricmp( eventName, "entity_spawn" ) ) {
+			duk_push_int( s_jsContext, i0 );
+			duk_put_prop_string( s_jsContext, -2, "entityNum" );
+			duk_push_int( s_jsContext, i1 );
+			duk_put_prop_string( s_jsContext, -2, "eType" );
+		}
+		if ( !Q_stricmp( eventName, "entity_death" ) ) {
+			duk_push_int( s_jsContext, i0 );
+			duk_put_prop_string( s_jsContext, -2, "entityNum" );
+			duk_push_int( s_jsContext, i1 );
+			duk_put_prop_string( s_jsContext, -2, "attacker" );
+		}
+		if ( !Q_stricmp( eventName, "weapon_fire" ) ) {
+			duk_push_int( s_jsContext, i0 );
+			duk_put_prop_string( s_jsContext, -2, "entityNum" );
+			duk_push_int( s_jsContext, i1 );
+			duk_put_prop_string( s_jsContext, -2, "weapon" );
+		}
 
 		if ( duk_pcall( s_jsContext, 1 ) != DUK_EXEC_SUCCESS ) {
 			const char *msg = duk_safe_to_string( s_jsContext, -1 );
