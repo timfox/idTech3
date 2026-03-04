@@ -15207,7 +15207,8 @@ void vk_end_frame( void )
 				cvar_t *r_hdr_var = ri.Cvar_Get( "r_hdr", "1", 0 );
 				if ( exp_auto && exp_auto->integer && r_hdr_var && r_hdr_var->integer &&
 					vk.luminance_pipeline != VK_NULL_HANDLE && vk.luminance_descriptor != VK_NULL_HANDLE &&
-					vk.luminance_image_view != VK_NULL_HANDLE && vk.luminance_staging_buffer != VK_NULL_HANDLE )
+					vk.luminance_image_view != VK_NULL_HANDLE && vk.luminance_staging_buffer != VK_NULL_HANDLE &&
+					vk.color_image_view != VK_NULL_HANDLE && vk.color_image_view != vk.luminance_image_view )
 				{
 					record_image_layout_transition( vk.cmd->command_buffer, vk.luminance_image, VK_IMAGE_ASPECT_COLOR_BIT,
 						VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
