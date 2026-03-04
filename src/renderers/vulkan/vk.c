@@ -1040,12 +1040,13 @@ static void vk_create_render_passes( void )
 	VkRenderPassCreateInfo desc;
 	VkFormat depth_format;
 	VkDevice device;
+	const qboolean fboActive = vk.fboActive;
 	uint32_t i;
 
 	depth_format = vk.depth_format;
 	device = vk.device;
 
-	if ( r_fbo->integer == 0 )
+	if ( !fboActive )
 	{
 		// presentation
 		attachments[0].flags = 0;
@@ -1110,7 +1111,7 @@ static void vk_create_render_passes( void )
 	colorResolveRefs[1].attachment = VK_ATTACHMENT_UNUSED;
 	colorResolveRefs[1].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-	if ( r_fbo->integer ) {
+	if ( fboActive ) {
 		// velocity buffer used for per-pixel reprojection.
 		attachments[2].flags = 0;
 		attachments[2].format = VK_FORMAT_R16G16_SFLOAT;
@@ -1127,7 +1128,7 @@ static void vk_create_render_passes( void )
 
 	Com_Memset( &subpass, 0, sizeof( subpass ) );
 	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-	subpass.colorAttachmentCount = r_fbo->integer ? 2 : 1;
+	subpass.colorAttachmentCount = fboActive ? 2 : 1;
 	subpass.pColorAttachments = colorRefs;
 	subpass.pDepthStencilAttachment = &depthRef0;
 	subpass.pResolveAttachments = NULL;
@@ -1140,7 +1141,7 @@ static void vk_create_render_passes( void )
 	desc.pSubpasses = &subpass;
 
 	desc.subpassCount = 1;
-	desc.attachmentCount = r_fbo->integer ? 3 : 2;
+	desc.attachmentCount = fboActive ? 3 : 2;
 
 	if ( vk.msaaActive )
 	{
@@ -1158,7 +1159,7 @@ static void vk_create_render_passes( void )
 		attachments[3].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		attachments[3].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-		if ( r_fbo->integer ) {
+		if ( fboActive ) {
 			attachments[4].flags = 0;
 			attachments[4].format = VK_FORMAT_R16G16_SFLOAT;
 			attachments[4].samples = vkSamples;
@@ -1202,7 +1203,7 @@ static void vk_create_render_passes( void )
 	deps[2].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;			// What access scopes are waiting on the dependency
 	deps[2].dependencyFlags = 0;
 
-	if ( r_fbo->integer == 0 )
+	if ( !fboActive )
 	{
 		desc.dependencyCount = 1;
 		desc.pDependencies = &deps[2];
@@ -1241,7 +1242,7 @@ static void vk_create_render_passes( void )
 		// post-bloom pass
 		// color buffer
 		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD; // load from previous pass
-		if ( r_fbo->integer ) {
+		if ( fboActive ) {
 			attachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 			attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 		}
@@ -1254,7 +1255,7 @@ static void vk_create_render_passes( void )
 			// msaa render target
 			attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 			attachments[3].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-			if ( r_fbo->integer ) {
+			if ( fboActive ) {
 				attachments[4].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 				attachments[4].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 			}
@@ -1295,7 +1296,7 @@ static void vk_create_render_passes( void )
 		}
 	}
 
-	if ( r_ssao && r_ssao->integer && r_fbo->integer )
+	if ( r_ssao && r_ssao->integer && fboActive )
 	{
 		// ssao render pass
 		desc.attachmentCount = 1;
@@ -5714,7 +5715,7 @@ static void vk_create_framebuffers( void )
 	{
 		desc.renderPass = vk.render_pass.main;
 		desc.attachmentCount = 2;
-		if ( r_fbo->integer == 0 )
+		if ( !vk.fboActive )
 		{
 			desc.width = gls.windowWidth;
 			desc.height = gls.windowHeight;
@@ -6335,6 +6336,7 @@ void vk_initialize( void )
 	vk.windowAdjusted = qfalse;
 	vk.blitX0 = vk.blitY0 = 0;
 	vk.smaaActive = qfalse;
+	vk.msaaActive = qfalse;
 
 	vk_set_render_scale();
 
@@ -12081,7 +12083,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 		}
 	}
 
-	main_motion_target = ( r_fbo->integer &&
+	main_motion_target = ( vk.fboActive &&
 		( renderPassIndex == RENDER_PASS_MAIN || renderPassIndex == RENDER_PASS_POST_BLOOM ) ) ? VK_TRUE : VK_FALSE;
 	attachment_blend_states[0] = attachment_blend_state;
 	Com_Memset( &attachment_blend_states[1], 0, sizeof( attachment_blend_states[1] ) );
@@ -13123,6 +13125,9 @@ static void vk_update_depth_range( Vk_Depth_Range depth_range )
 		}
 
 		area = (uint64_t)r.extent.width * (uint64_t)r.extent.height;
+		if ( area == 0 ) {
+			return;
+		}
 		bestArea = vk_scene_src_rect_valid ? (uint64_t)vk_scene_src_rect.extent.width * (uint64_t)vk_scene_src_rect.extent.height : 0u;
 		if ( !vk_scene_src_rect_valid || area > bestArea ) {
 			vk_scene_src_rect = r;
@@ -13228,7 +13233,7 @@ static void vk_begin_render_pass( VkRenderPass renderPass, VkFramebuffer frameBu
 		clear_values[1].depthStencil.depth = 1.0;
 #endif
 		if ( vk.renderPassIndex == RENDER_PASS_MAIN || vk.renderPassIndex == RENDER_PASS_POST_BLOOM ) {
-			if ( r_fbo->integer ) {
+			if ( vk.fboActive ) {
 				clear_values[2].color.float32[0] = 0.0f;
 				clear_values[2].color.float32[1] = 0.0f;
 				clear_values[2].color.float32[2] = 0.0f;
@@ -14524,6 +14529,7 @@ static void vk_volumetric_fog_pass( void )
 		vk_prev_matrices_valid = qfalse;
 		vk_prev_volumetric_time_valid = qfalse;
 		Com_Memset( &vk_volumetric_validation_state, 0, sizeof( vk_volumetric_validation_state ) );
+		backEnd.doneFog = qtrue;
 		return;
 	}
 	if ( vk.msaaActive &&
@@ -14543,6 +14549,7 @@ static void vk_volumetric_fog_pass( void )
 		vk_prev_matrices_valid = qfalse;
 		vk_prev_volumetric_time_valid = qfalse;
 		Com_Memset( &vk_volumetric_validation_state, 0, sizeof( vk_volumetric_validation_state ) );
+		backEnd.doneFog = qtrue;
 		return;
 	}
 
@@ -15407,9 +15414,27 @@ void vk_end_frame( void )
 				}
 				panini_push.exposure = expVal;
 			}
-			if ( vk_scene_src_rect_valid ) {
+			if ( vk_scene_src_rect_valid &&
+				vk_scene_src_rect.offset.x >= 0 &&
+				vk_scene_src_rect.offset.y >= 0 &&
+				vk_scene_src_rect.extent.width > 0 &&
+				vk_scene_src_rect.extent.height > 0 &&
+				(uint32_t)vk_scene_src_rect.offset.x < srcTexW &&
+				(uint32_t)vk_scene_src_rect.offset.y < srcTexH ) {
 				srcRect = vk_scene_src_rect;
+				if ( (uint32_t)srcRect.offset.x + srcRect.extent.width > srcTexW ) {
+					srcRect.extent.width = srcTexW - (uint32_t)srcRect.offset.x;
+				}
+				if ( (uint32_t)srcRect.offset.y + srcRect.extent.height > srcTexH ) {
+					srcRect.extent.height = srcTexH - (uint32_t)srcRect.offset.y;
+				}
 			} else {
+				srcRect.offset.x = 0;
+				srcRect.offset.y = 0;
+				srcRect.extent.width = srcTexW;
+				srcRect.extent.height = srcTexH;
+			}
+			if ( srcRect.extent.width == 0 || srcRect.extent.height == 0 ) {
 				srcRect.offset.x = 0;
 				srcRect.offset.y = 0;
 				srcRect.extent.width = srcTexW;
