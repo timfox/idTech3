@@ -1098,14 +1098,9 @@ static void vk_create_render_passes( void )
 		attachments[0].format = vk.color_format;
 		attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
 
-#ifdef USE_BUFFER_CLEAR
-		if ( vk.msaaActive )
-			attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;	// Assuming this will be completely overwritten
-		else
-			attachments[ 0 ].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-#else
-		attachments[ 0 ].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;	// Assuming this will be completely overwritten
-#endif
+		/* Always clear FBO color to avoid solid/wrong colors from uninitialized or stale content
+		 * (fixes r_fbo 1 solid rapidly-changing color bug). */
+		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 
 		attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;   // needed for next render pass
 		attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -3681,6 +3676,7 @@ static void vk_update_color_descriptor_image( VkImageView color_view )
  */
 static void vk_update_post_fog_descriptors( VkImageView color_source )
 {
+	vk.post_fog_color_source = color_source;
 	vk_update_color_descriptor_image( color_source );
 	if ( vk.luminance_descriptor != VK_NULL_HANDLE && vk.luminance_image_view != VK_NULL_HANDLE &&
 		color_source != VK_NULL_HANDLE && color_source != vk.luminance_image_view ) {
@@ -3745,6 +3741,7 @@ void vk_update_attachment_descriptors( void ) {
 		desc.pTexelBufferView = NULL;
 
 		qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+		vk.post_fog_color_source = vk.color_image_view;
 
 		// screenmap
 		sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
@@ -9317,6 +9314,7 @@ static void vk_destroy_attachments( void )
 		qvkDestroyImageView( vk.device, vk.color_image_view, NULL );
 		vk.color_image = VK_NULL_HANDLE;
 		vk.color_image_view = VK_NULL_HANDLE;
+		vk.post_fog_color_source = VK_NULL_HANDLE;
 	}
 	if ( vk.fog_scene_image ) {
 		qvkDestroyImage( vk.device, vk.fog_scene_image, NULL );
@@ -15997,6 +15995,15 @@ void vk_end_frame( void )
 
 			vk.renderScaleX = 1.0;
 			vk.renderScaleY = 1.0;
+
+			/* Belt-and-suspenders: ensure gamma samples correct image (avoids solid-color bug) */
+			{
+				VkImageView src = vk.post_fog_color_source;
+				if ( src == VK_NULL_HANDLE )
+					src = vk.color_image_view;
+				if ( src != VK_NULL_HANDLE )
+					vk_update_post_fog_descriptors( src );
+			}
 
 			vk_begin_render_pass( vk.render_pass.gamma, vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ], qfalse, vk.renderWidth, vk.renderHeight );
 			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.gamma_pipeline );
