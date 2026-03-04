@@ -138,11 +138,14 @@ def join_indexes(base, indexes):
 
 def compile_individual_shaders():
     print("Compiling standalone GLSL stages...")
+    # Shaders that need Vulkan reversed-depth define (matches vk.h USE_REVERSED_DEPTH)
+    reversed_depth_shaders = {"atmosphere.frag"}
     for stage, ext in (("vert", ".vert"), ("frag", ".frag"), ("geom", ".geom")):
         for path in sorted(glsl_dir.glob(f"*{ext}")):
             base = path.name[: -len(ext)]
             array_name = f"{base}_{stage}_spv"
-            compile_shader(stage, path.name, array_name)
+            extra_defines = "-DUSE_REVERSED_DEPTH" if path.name in reversed_depth_shaders else ""
+            compile_shader(stage, path.name, array_name, defines=extra_defines)
 
 def compile_template_shaders():
     print("Compiling template-driven shaders...")
