@@ -72,7 +72,7 @@
 - [x] Connect BSP geometry extraction to map loading for automatic navmesh
 - [x] PostFX specialization constants in vk.c gamma pipeline
 - [x] Wire SSR/atmosphere shaders into Vulkan render passes
-- [ ] Wire vegetation wind compute into Vulkan pipeline (shader compiled; pipeline dispatch pending vegetation vertex buffer)
+- [x] Wire vegetation wind compute into Vulkan pipeline (surfaceparm vegetation, real geometry from tess)
 - [x] SMAA when volumetrics skipped (r_volumetricFog 0, tier off, no world with world)
 - [x] glTF GPU upload (MOD_GLTF, tess path, baseColorTexture shader, bounds)
 - [x] CBT-inspired GPU terrain tessellation (compute shader LOD, r_cbtTerrain)
@@ -81,10 +81,10 @@
 - [x] GPU occlusion culling (r_occlusionCulling, entity bbox queries, previous-frame visibility)
 - [x] Texture compression (BC7/KTX2)
 - [x] Optional USD format for entities and shaders (com_usdEntities, com_usdShaders; GPLv2 parser)
-- [ ] DTLS network encryption
+- [x] DTLS network encryption (USE_DTLS=ON, net_dtls/net_dtls_key cvars; AES-256-GCM)
 - [x] clang-tidy / cppcheck static analysis (CI job, continue-on-error)
 
-### Long-Term
-- [ ] RTX ray tracing
-- [ ] iOS Metal backend
-- [ ] WebAssembly + WebGPU
+### Long-Term (future work, not in active development)
+- [ ] RTX ray tracing — hardware-accelerated ray tracing on NVIDIA RTX GPUs
+- [ ] iOS Metal backend — native Metal renderer for iOS/macOS
+- [ ] WebAssembly + WebGPU — browser deployment via Emscripten + WebGPU

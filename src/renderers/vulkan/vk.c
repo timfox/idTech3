@@ -75,6 +75,9 @@ typedef struct {
 	float srcUVScaleBias[4]; // scale.xy, bias.xy
 } VkPostProcessPushConstants;
 
+#define VEGWIND_MAX_VERTS 16384
+#define VEGWIND_VERTEX_STRIDE 32  /* positionFlex + normalPhase */
+
 static int vkSamples = VK_SAMPLE_COUNT_1_BIT;
 static int vkMaxSamples = VK_SAMPLE_COUNT_1_BIT;
 static VkRect2D vk_scene_src_rect;
@@ -1340,6 +1343,33 @@ static void vk_create_render_passes( void )
 
 		VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.ssao_combine ) );
 		SET_OBJECT_NAME( vk.render_pass.ssao_combine, "render pass - ssao_combine", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
+	}
+
+	if ( PostFX_SSR_IsEnabled() && fboActive )
+	{
+		// ssr render pass (output to ssr_image, same format as color)
+		desc.attachmentCount = 1;
+
+		colorRef0.attachment = 0;
+		colorRef0.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+		Com_Memset( &subpass, 0, sizeof( subpass ) );
+		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		subpass.colorAttachmentCount = 1;
+		subpass.pColorAttachments = &colorRef0;
+
+		attachments[0].flags = 0;
+		attachments[0].format = vk.color_format;
+		attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		attachments[0].initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+		VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.ssr ) );
+		SET_OBJECT_NAME( vk.render_pass.ssr, "render pass - ssr", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
 	}
 
 	if ( vk.fboActive )
@@ -3682,6 +3712,27 @@ void vk_update_attachment_descriptors( void ) {
 			qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
 		}
 
+		if ( PostFX_SSR_IsEnabled() && vk.ssr_image_view )
+		{
+			// ssr set 0: color texture
+			sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+			sd.max_lod_1_0 = qtrue;
+			sd.noAnisotropy = qtrue;
+			info.sampler = vk_find_sampler( &sd );
+			info.imageView = vk.color_image_view;
+			info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			desc.dstSet = vk.ssr_descriptor[0];
+			qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+
+			// ssr set 1: depth texture
+			sd.gl_mag_filter = sd.gl_min_filter = GL_NEAREST;
+			info.sampler = vk_find_sampler( &sd );
+			info.imageView = vk.depth_image_view;
+			info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+			desc.dstSet = vk.ssr_descriptor[1];
+			qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+		}
+
 		// bloom images
 		if ( r_bloom->integer )
 		{
@@ -4305,6 +4356,11 @@ void vk_init_descriptors( void )
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.ssao_blur_descriptor ) );
 		}
 
+		if ( PostFX_SSR_IsEnabled() ) {
+			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.ssr_descriptor[0] ) );
+			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.ssr_descriptor[1] ) );
+		}
+
 		if ( r_bloom->integer )
 		{
 			for ( i = 0; i < ARRAY_LEN( vk.bloom_image_descriptor ); i++ )
@@ -4832,6 +4888,7 @@ static void vk_create_shader_modules( void )
 	vk.modules.ssao_combine_fs = SHADER_MODULE( ssao_combine_frag_spv );
 	vk.modules.ssao_debug_fs = SHADER_MODULE( ssao_debug_frag_spv );
 	vk.modules.ssao_depth_debug_fs = SHADER_MODULE( ssao_depth_debug_frag_spv );
+	vk.modules.ssr_fs = SHADER_MODULE( ssr_frag_spv );
 
 	SET_OBJECT_NAME( vk.modules.bloom_fs, "bloom extraction fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.blur_fs, "gaussian blur fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
@@ -4841,6 +4898,7 @@ static void vk_create_shader_modules( void )
 	SET_OBJECT_NAME( vk.modules.ssao_combine_fs, "ssao combine fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.ssao_debug_fs, "ssao debug fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.ssao_depth_debug_fs, "ssao depth debug fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	SET_OBJECT_NAME( vk.modules.ssr_fs, "ssr fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 
 	vk.modules.gamma_fs = SHADER_MODULE( gamma_frag_spv );
 	vk.modules.gamma_vs = SHADER_MODULE( gamma_vert_spv );
@@ -5162,6 +5220,9 @@ void vk_update_post_process_pipelines( void )
 			vk_create_post_process_pipeline( 7, glConfig.vidWidth, glConfig.vidHeight );
 			vk_create_post_process_pipeline( 8, glConfig.vidWidth, glConfig.vidHeight );
 			vk_create_post_process_pipeline( 9, glConfig.vidWidth, glConfig.vidHeight );
+		}
+		if ( PostFX_SSR_IsEnabled() ) {
+			vk_create_post_process_pipeline( 13, glConfig.vidWidth, glConfig.vidHeight );
 		}
 		vk_create_atmosphere_pipeline();
 	}
@@ -5510,6 +5571,12 @@ static void vk_create_attachments( void )
 				usage, &vk.ssao_blur_image, &vk.ssao_blur_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 		}
 
+		// ssr (same format as color)
+		if ( PostFX_SSR_IsEnabled() ) {
+			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
+				usage, &vk.ssr_image, &vk.ssr_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
+		}
+
         // cubemap
         if ( vk.cubemapActive ) {
             usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -5630,7 +5697,7 @@ static void vk_create_attachments( void )
 	//vk_alloc_attachments();
 
 	create_depth_attachment( glConfig.vidWidth, glConfig.vidHeight, vkSamples, &vk.depth_image, &vk.depth_image_view,
-		(vk.fboActive && r_bloom->integer) || (r_ssao && r_ssao->integer) ? qfalse : qtrue );
+		(vk.fboActive && r_bloom->integer) || (r_ssao && r_ssao->integer) || (PostFX_SSR_IsEnabled()) ? qfalse : qtrue );
 
 	vk_alloc_attachments();
 	vk_create_sun_shadow_resources();
@@ -6002,6 +6069,17 @@ static void vk_create_framebuffers( void )
 		SET_OBJECT_NAME( vk.framebuffers.ssao_combine, "framebuffer - ssao_combine", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
 	}
 
+	if ( PostFX_SSR_IsEnabled() && vk.render_pass.ssr != VK_NULL_HANDLE && vk.ssr_image_view )
+	{
+		desc.renderPass = vk.render_pass.ssr;
+		desc.attachmentCount = 1;
+		desc.width = glConfig.vidWidth;
+		desc.height = glConfig.vidHeight;
+		framebuffer_attachments[0] = vk.ssr_image_view;
+		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.ssr ) );
+		SET_OBJECT_NAME( vk.framebuffers.ssr, "framebuffer - ssr", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+	}
+
 	if ( vk.render_pass.volumetric != VK_NULL_HANDLE ) {
 		desc.renderPass = vk.render_pass.volumetric;
 		desc.attachmentCount = 1;
@@ -6147,6 +6225,11 @@ static void vk_destroy_framebuffers( void ) {
 	if ( vk.framebuffers.ssao_combine != VK_NULL_HANDLE ) {
 		qvkDestroyFramebuffer( vk.device, vk.framebuffers.ssao_combine, NULL );
 		vk.framebuffers.ssao_combine = VK_NULL_HANDLE;
+	}
+
+	if ( vk.framebuffers.ssr != VK_NULL_HANDLE ) {
+		qvkDestroyFramebuffer( vk.device, vk.framebuffers.ssr, NULL );
+		vk.framebuffers.ssr = VK_NULL_HANDLE;
 	}
 
 	if ( vk.framebuffers.volumetric[0] != VK_NULL_HANDLE ) {
@@ -6975,6 +7058,25 @@ void vk_initialize( void )
 		VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &cbt_layout_desc, NULL, &vk.cbt_terrain_layout ) );
 	}
 
+	/* Vegetation wind: storage buffer for VegetationVertex (positionFlex + normalPhase) */
+	if ( vk.modules.vegetation_wind_cs != VK_NULL_HANDLE ) {
+		VkDescriptorSetLayoutBinding vegwind_binding;
+		VkDescriptorSetLayoutCreateInfo vegwind_layout_desc;
+
+		Com_Memset( &vegwind_binding, 0, sizeof( vegwind_binding ) );
+		vegwind_binding.binding = 0;
+		vegwind_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		vegwind_binding.descriptorCount = 1;
+		vegwind_binding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+		Com_Memset( &vegwind_layout_desc, 0, sizeof( vegwind_layout_desc ) );
+		vegwind_layout_desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		vegwind_layout_desc.bindingCount = 1;
+		vegwind_layout_desc.pBindings = &vegwind_binding;
+
+		VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &vegwind_layout_desc, NULL, &vk.vegwind_layout ) );
+	}
+
 			{
 				VkDescriptorSetLayoutBinding composite_bindings[9];
 			VkDescriptorSetLayoutCreateInfo composite_layout_desc;
@@ -7224,6 +7326,19 @@ void vk_initialize( void )
 		desc.pPushConstantRanges = NULL;
 		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_ssao_combine ) );
 		SET_OBJECT_NAME( vk.pipeline_layout_ssao_combine, "pipeline layout - ssao_combine", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
+
+		// ssr layout (set 0: color, set 1: depth, push constants: 2 mat4 + 2 vec4 = 160 bytes)
+		set_layouts[0] = vk.set_layout_sampler;
+		set_layouts[1] = vk.set_layout_sampler;
+		desc.setLayoutCount = 2;
+		desc.pSetLayouts = set_layouts;
+		push_range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		push_range.offset = 0;
+		push_range.size = 160;
+		desc.pushConstantRangeCount = 1;
+		desc.pPushConstantRanges = &push_range;
+		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_ssr ) );
+		SET_OBJECT_NAME( vk.pipeline_layout_ssr, "pipeline layout - ssr", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
 
 		/* Atmosphere: push constants only (7 vec4s = 112 bytes) */
 		desc.setLayoutCount = 0;
@@ -7620,6 +7735,85 @@ static void vk_create_volumetric_pipelines( void )
 			ri.Printf( PRINT_ALL, "[VK] CBT terrain tessellation pipeline created (r_cbtTerrain)\n" );
 		}
 	}
+
+	if ( vk.modules.vegetation_wind_cs != VK_NULL_HANDLE && vk.vegwind_layout != VK_NULL_HANDLE ) {
+		VkPipelineShaderStageCreateInfo stage;
+		VkComputePipelineCreateInfo desc;
+		VkPipelineLayoutCreateInfo layout_desc;
+		VkPushConstantRange push_range;
+
+		Com_Memset( &layout_desc, 0, sizeof( layout_desc ) );
+		layout_desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		layout_desc.setLayoutCount = 1;
+		layout_desc.pSetLayouts = &vk.vegwind_layout;
+		push_range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		push_range.offset = 0;
+		push_range.size = 80; /* 4 vec4 + 4 uint */
+		layout_desc.pushConstantRangeCount = 1;
+		layout_desc.pPushConstantRanges = &push_range;
+		VK_CHECK( qvkCreatePipelineLayout( vk.device, &layout_desc, NULL, &vk.pipeline_layout_vegwind ) );
+		SET_OBJECT_NAME( vk.pipeline_layout_vegwind, "pipeline layout - vegwind", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
+
+		Com_Memset( &stage, 0, sizeof( stage ) );
+		Com_Memset( &desc, 0, sizeof( desc ) );
+		stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+		stage.module = vk.modules.vegetation_wind_cs;
+		stage.pName = "main";
+		desc.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+		desc.stage = stage;
+		desc.layout = vk.pipeline_layout_vegwind;
+		if ( qvkCreateComputePipelines( vk.device, VK_NULL_HANDLE, 1, &desc, NULL, &vk.vegwind_pipeline ) == VK_SUCCESS ) {
+			SET_OBJECT_NAME( vk.vegwind_pipeline, "pipeline - vegetation wind compute", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
+
+			/* Storage buffer for VegetationVertex (32 bytes/vertex); max VEGWIND_MAX_VERTS */
+			{
+				VkBufferCreateInfo buf_desc;
+				VkMemoryRequirements mem_req;
+				VkMemoryAllocateInfo alloc_info;
+				VkDescriptorSetAllocateInfo set_alloc;
+				VkWriteDescriptorSet write_desc;
+				VkDescriptorBufferInfo buf_info;
+				const VkDeviceSize vegwind_buf_size = (VkDeviceSize)VEGWIND_MAX_VERTS * VEGWIND_VERTEX_STRIDE;
+
+				Com_Memset( &buf_desc, 0, sizeof( buf_desc ) );
+				buf_desc.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+				buf_desc.size = vegwind_buf_size;
+				buf_desc.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+				buf_desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+				VK_CHECK( qvkCreateBuffer( vk.device, &buf_desc, NULL, &vk.vegwind_vertex_buffer ) );
+
+				qvkGetBufferMemoryRequirements( vk.device, vk.vegwind_vertex_buffer, &mem_req );
+				Com_Memset( &alloc_info, 0, sizeof( alloc_info ) );
+				alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+				alloc_info.allocationSize = mem_req.size;
+				alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits,
+					VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+				VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.vegwind_vertex_memory ) );
+				VK_CHECK( qvkBindBufferMemory( vk.device, vk.vegwind_vertex_buffer, vk.vegwind_vertex_memory, 0 ) );
+
+				Com_Memset( &set_alloc, 0, sizeof( set_alloc ) );
+				set_alloc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+				set_alloc.descriptorPool = vk.descriptor_pool;
+				set_alloc.descriptorSetCount = 1;
+				set_alloc.pSetLayouts = &vk.vegwind_layout;
+				VK_CHECK( qvkAllocateDescriptorSets( vk.device, &set_alloc, &vk.vegwind_descriptor ) );
+
+				buf_info.buffer = vk.vegwind_vertex_buffer;
+				buf_info.offset = 0;
+				buf_info.range = vegwind_buf_size;
+				Com_Memset( &write_desc, 0, sizeof( write_desc ) );
+				write_desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				write_desc.dstSet = vk.vegwind_descriptor;
+				write_desc.dstBinding = 0;
+				write_desc.dstArrayElement = 0;
+				write_desc.descriptorCount = 1;
+				write_desc.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+				write_desc.pBufferInfo = &buf_info;
+				qvkUpdateDescriptorSets( vk.device, 1, &write_desc, 0, NULL );
+			}
+		}
+	}
 }
 
 static void vk_destroy_volumetric_pipelines( void )
@@ -7684,7 +7878,135 @@ static void vk_destroy_volumetric_pipelines( void )
 		qvkDestroyPipelineLayout( vk.device, vk.cbt_terrain_compute_layout, NULL );
 		vk.cbt_terrain_compute_layout = VK_NULL_HANDLE;
 	}
+	if ( vk.vegwind_pipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.vegwind_pipeline, NULL );
+		vk.vegwind_pipeline = VK_NULL_HANDLE;
+	}
+	if ( vk.pipeline_layout_vegwind != VK_NULL_HANDLE ) {
+		qvkDestroyPipelineLayout( vk.device, vk.pipeline_layout_vegwind, NULL );
+		vk.pipeline_layout_vegwind = VK_NULL_HANDLE;
+	}
+	if ( vk.vegwind_vertex_buffer != VK_NULL_HANDLE ) {
+		qvkDestroyBuffer( vk.device, vk.vegwind_vertex_buffer, NULL );
+		vk.vegwind_vertex_buffer = VK_NULL_HANDLE;
+	}
+	if ( vk.vegwind_vertex_memory != VK_NULL_HANDLE ) {
+		qvkFreeMemory( vk.device, vk.vegwind_vertex_memory, NULL );
+		vk.vegwind_vertex_memory = VK_NULL_HANDLE;
+	}
+	if ( vk.vegwind_layout != VK_NULL_HANDLE ) {
+		qvkDestroyDescriptorSetLayout( vk.device, vk.vegwind_layout, NULL );
+		vk.vegwind_layout = VK_NULL_HANDLE;
+	}
 }
+
+typedef struct {
+	float positionFlex[4];
+	float normalPhase[4];
+} vegwind_vertex_t;
+
+static vegwind_vertex_t vegwind_staging[VEGWIND_MAX_VERTS];
+static int vegwind_staging_count;
+
+void vk_vegetation_clear_staging( void )
+{
+	vegwind_staging_count = 0;
+}
+
+void vk_vegetation_add_from_tess( int oldVertexCount, int newVertexCount )
+{
+	int i, n, count;
+	float flex, phase;
+
+	if ( newVertexCount <= oldVertexCount || vegwind_staging_count >= VEGWIND_MAX_VERTS )
+		return;
+
+	n = newVertexCount - oldVertexCount;
+	count = VEGWIND_MAX_VERTS - vegwind_staging_count;
+	if ( n > count )
+		n = count;
+
+	for ( i = 0; i < n; i++ ) {
+		int v = oldVertexCount + i;
+		vegwind_vertex_t *dst = &vegwind_staging[vegwind_staging_count + i];
+
+		dst->positionFlex[0] = tess.xyz[v][0];
+		dst->positionFlex[1] = tess.xyz[v][1];
+		dst->positionFlex[2] = tess.xyz[v][2];
+		/* flexibility: 0=rigid root, 1=flexible tip; use normal Y for grass (up=flexible) */
+		flex = tess.normal[v][1];
+		dst->positionFlex[3] = ( flex > 0.0f ) ? Com_Clamp( 0.0f, 1.0f, flex ) : 0.5f;
+
+		dst->normalPhase[0] = tess.normal[v][0];
+		dst->normalPhase[1] = tess.normal[v][1];
+		dst->normalPhase[2] = tess.normal[v][2];
+		/* phase offset for variation (hash from position) */
+		phase = ( tess.xyz[v][0] * 12.9898f + tess.xyz[v][2] * 78.233f );
+		dst->normalPhase[3] = phase - floorf( phase );
+	}
+
+	vegwind_staging_count += n;
+}
+
+void vk_vegetation_wind_dispatch( void )
+{
+	typedef struct {
+		float windDirection[4];
+		float windParams[4];
+		float gustParams[4];
+		float timeParams[4];
+		uint32_t vertexCount;
+		uint32_t pad0;
+		uint32_t pad1;
+		uint32_t pad2;
+	} vegwind_push_t;
+
+	vegwind_push_t push;
+	uint32_t groupCount;
+	const uint32_t localSize = 64;
+
+	if ( !PostFX_VegWind_IsEnabled() || vk.vegwind_pipeline == VK_NULL_HANDLE ||
+		vk.vegwind_descriptor == VK_NULL_HANDLE )
+	{
+		return;
+	}
+
+	vk_end_render_pass();
+
+	PostFX_VegWind_GetWindDir( &push.windDirection[0], &push.windDirection[1], &push.windDirection[2] );
+	push.windDirection[3] = PostFX_VegWind_GetWindStrength();
+	push.windParams[0] = PostFX_VegWind_GetPrimaryFreq();
+	push.windParams[1] = PostFX_VegWind_GetPrimaryAmp();
+	push.windParams[2] = PostFX_VegWind_GetDetailFreq();
+	push.windParams[3] = PostFX_VegWind_GetDetailAmp();
+	push.gustParams[0] = PostFX_VegWind_GetGustFreq();
+	push.gustParams[1] = PostFX_VegWind_GetGustAmp();
+	push.gustParams[2] = 0.0f;
+	push.gustParams[3] = 0.0f;
+	push.timeParams[0] = (float)ri.Milliseconds() / 1000.0f;
+	push.timeParams[1] = 0.0f;
+	push.timeParams[2] = 0.0f;
+	push.timeParams[3] = 0.0f;
+	push.vertexCount = vegwind_staging_count;
+	push.pad0 = push.pad1 = push.pad2 = 0;
+
+	if ( push.vertexCount > 0 && vk.vegwind_vertex_buffer != VK_NULL_HANDLE ) {
+		void *ptr;
+		VkDeviceSize uploadSize = (VkDeviceSize)push.vertexCount * VEGWIND_VERTEX_STRIDE;
+		if ( qvkMapMemory( vk.device, vk.vegwind_vertex_memory, 0, uploadSize, 0, &ptr ) == VK_SUCCESS ) {
+			Com_Memcpy( ptr, vegwind_staging, (size_t)uploadSize );
+			qvkUnmapMemory( vk.device, vk.vegwind_vertex_memory );
+		}
+	}
+
+	groupCount = ( push.vertexCount > 0 ) ? ( ( push.vertexCount + localSize - 1 ) / localSize ) : 1;
+
+	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.vegwind_pipeline );
+	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.pipeline_layout_vegwind, 0, 1, &vk.vegwind_descriptor, 0, NULL );
+	qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_vegwind, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( push ), &push );
+	qvkCmdDispatch( vk.cmd->command_buffer, groupCount, 1, 1 );
+}
+
 
 static qboolean Mat4Inverse( const float *m, float *out ) {
 	float tmp[16];
@@ -8895,6 +9217,13 @@ static void vk_destroy_attachments( void )
 		vk.ssao_blur_image_view = VK_NULL_HANDLE;
 	}
 
+	if ( vk.ssr_image ) {
+		qvkDestroyImage( vk.device, vk.ssr_image, NULL );
+		qvkDestroyImageView( vk.device, vk.ssr_image_view, NULL );
+		vk.ssr_image = VK_NULL_HANDLE;
+		vk.ssr_image_view = VK_NULL_HANDLE;
+	}
+
 	if ( vk.color_image ) {
 		qvkDestroyImage( vk.device, vk.color_image, NULL );
 		qvkDestroyImageView( vk.device, vk.color_image_view, NULL );
@@ -9067,6 +9396,11 @@ static void vk_destroy_render_passes( void )
 	if ( vk.render_pass.ssao_combine != VK_NULL_HANDLE ) {
 		qvkDestroyRenderPass( vk.device, vk.render_pass.ssao_combine, NULL );
 		vk.render_pass.ssao_combine = VK_NULL_HANDLE;
+	}
+
+	if ( vk.render_pass.ssr != VK_NULL_HANDLE ) {
+		qvkDestroyRenderPass( vk.device, vk.render_pass.ssr, NULL );
+		vk.render_pass.ssr = VK_NULL_HANDLE;
 	}
 
 	if ( vk.render_pass.volumetric != VK_NULL_HANDLE ) {
@@ -9312,6 +9646,7 @@ void vk_shutdown( refShutdownCode_t code )
 	}
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_ssao, NULL);
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_ssao_combine, NULL);
+	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_ssr, NULL);
 #ifdef USE_VK_PBR
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_brdflut, NULL);
 #endif
@@ -9488,6 +9823,7 @@ for (i = 0; i < 2; i++) {
 	qvkDestroyShaderModule(vk.device, vk.modules.ssao_combine_fs, NULL);
 	qvkDestroyShaderModule(vk.device, vk.modules.ssao_debug_fs, NULL);
 	qvkDestroyShaderModule(vk.device, vk.modules.ssao_depth_debug_fs, NULL);
+	qvkDestroyShaderModule(vk.device, vk.modules.ssr_fs, NULL);
 
 	qvkDestroyShaderModule(vk.device, vk.modules.gamma_vs, NULL);
 	qvkDestroyShaderModule(vk.device, vk.modules.gamma_fs, NULL);
@@ -10344,6 +10680,16 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			layout = vk.pipeline_layout_smaa;
 			samples = VK_SAMPLE_COUNT_1_BIT;
 			pipeline_name = "smaa compose pipeline";
+			target_format = vk.color_format;
+			blend = qfalse;
+			break;
+		case 13: // ssr
+			pipeline = &vk.ssr_pipeline;
+			fsmodule = vk.modules.ssr_fs;
+			renderpass = vk.render_pass.ssr;
+			layout = vk.pipeline_layout_ssr;
+			samples = VK_SAMPLE_COUNT_1_BIT;
+			pipeline_name = "ssr pipeline";
 			target_format = vk.color_format;
 			blend = qfalse;
 			break;
@@ -13419,6 +13765,112 @@ void vk_begin_ssao_combine_render_pass( void )
 	vk_begin_render_pass( vk.render_pass.ssao_combine, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
 }
 
+
+void vk_begin_ssr_render_pass( void )
+{
+	VkFramebuffer frameBuffer = vk.framebuffers.ssr;
+
+	vk.renderWidth = glConfig.vidWidth;
+	vk.renderHeight = glConfig.vidHeight;
+	vk.renderScaleX = vk.renderScaleY = 1.0f;
+
+	vk_begin_render_pass( vk.render_pass.ssr, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+}
+
+
+void vk_ssr_pass( void )
+{
+	typedef struct {
+		float projection[16];
+		float invProjection[16];
+		float params[4];   /* maxDistance, stepSize, thickness, fadeEdge */
+		float params2[4]; /* roughnessThreshold, intensity, pad, pad */
+	} vk_ssr_push_t;
+
+	VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+	vk_ssr_push_t push;
+
+	if ( !PostFX_SSR_IsEnabled() || !vk.fboActive || vk.render_pass.ssr == VK_NULL_HANDLE ||
+		vk.ssr_pipeline == VK_NULL_HANDLE || vk.ssr_image == VK_NULL_HANDLE )
+	{
+		return;
+	}
+
+	if ( vk.renderPassIndex == RENDER_PASS_SCREENMAP || vk.renderPassIndex == RENDER_PASS_SUN_SHADOW )
+	{
+		return;
+	}
+
+	if ( !backEnd.doneSurfaces || !backEnd.doneBloom )
+	{
+		return;
+	}
+
+	if ( glConfig.stencilBits > 0 )
+		depth_aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
+
+	vk_end_render_pass();
+
+	record_image_layout_transition( vk.cmd->command_buffer, vk.depth_image, depth_aspect,
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 0, 0 );
+
+	vk_begin_ssr_render_pass();
+	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.ssr_pipeline );
+	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_ssr, 0, 2, vk.ssr_descriptor, 0, NULL );
+
+	Com_Memcpy( push.projection, backEnd.viewParms.projectionMatrix, sizeof( push.projection ) );
+	{
+		float inv[16];
+		if ( !Mat4Inverse( backEnd.viewParms.projectionMatrix, inv ) )
+			Com_Memcpy( inv, backEnd.viewParms.projectionMatrix, sizeof( inv ) );
+		Com_Memcpy( push.invProjection, inv, sizeof( push.invProjection ) );
+	}
+	push.params[0] = PostFX_SSR_GetMaxDistance();
+	push.params[1] = PostFX_SSR_GetStepSize();
+	push.params[2] = PostFX_SSR_GetThickness();
+	push.params[3] = PostFX_SSR_GetFadeEdge();
+	push.params2[0] = PostFX_SSR_GetRoughnessThreshold();
+	push.params2[1] = PostFX_SSR_GetIntensity();
+	push.params2[2] = 0.0f;
+	push.params2[3] = 0.0f;
+
+	qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_ssr, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
+	vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
+	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+	vk_end_render_pass();
+
+	/* Copy ssr_image back to color */
+	record_image_layout_transition( vk.cmd->command_buffer, vk.ssr_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 0, 0 );
+	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0 );
+
+	{
+		VkImageCopy region;
+		Com_Memset( &region, 0, sizeof( region ) );
+		region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		region.srcSubresource.layerCount = 1;
+		region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		region.dstSubresource.layerCount = 1;
+		region.extent.width = vk.renderWidth;
+		region.extent.height = vk.renderHeight;
+		region.extent.depth = 1;
+		qvkCmdCopyImage( vk.cmd->command_buffer, vk.ssr_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			vk.color_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region );
+	}
+
+	record_image_layout_transition( vk.cmd->command_buffer, vk.ssr_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
+	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
+
+	record_image_layout_transition( vk.cmd->command_buffer, vk.depth_image, depth_aspect,
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 0, 0 );
+}
+
+
 qboolean vk_begin_sun_shadow_render_pass( void )
 {
 	VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
@@ -15134,6 +15586,10 @@ _retry:
 
 	backEnd.screenMapDone = qfalse;
 
+	if ( PostFX_VegWind_IsEnabled() ) {
+		vk_vegetation_wind_dispatch();
+	}
+
 	if ( vk_find_screenmap_drawsurfs() ) {
 		vk_begin_screenmap_render_pass();
 	} else {
@@ -15214,6 +15670,11 @@ void vk_end_frame( void )
 	if ( vk.fboActive )
 	{
 		vk.cmd->last_pipeline = VK_NULL_HANDLE; // do not restore clobbered descriptors in vk_bloom()
+
+		if ( PostFX_SSR_IsEnabled() )
+		{
+			vk_ssr_pass();
+		}
 
 		if ( r_bloom->integer )
 		{

@@ -90,6 +90,12 @@ cmake .. \
 
 Each codec is optional and detected via pkg-config. Missing libraries are reported as warnings and the codec is disabled gracefully.
 
+### DTLS Network Encryption
+```bash
+cmake .. -DUSE_DTLS=ON ...
+```
+Requires OpenSSL. When enabled, use `net_dtls 1` and `net_dtls_key <shared-secret>` (same on client and server) for AES-256-GCM encrypted game traffic.
+
 ## Build Outputs
 
 | Binary | Description |

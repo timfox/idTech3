@@ -423,6 +423,11 @@ void vk_begin_blur_render_pass( uint32_t index );
 void vk_begin_ssao_render_pass( void );
 void vk_begin_ssao_blur_render_pass( void );
 void vk_begin_ssao_combine_render_pass( void );
+void vk_begin_ssr_render_pass( void );
+void vk_ssr_pass( void );
+void vk_vegetation_wind_dispatch( void );
+void vk_vegetation_add_from_tess( int oldVertexCount, int newVertexCount );
+void vk_vegetation_clear_staging( void );
 qboolean vk_begin_sun_shadow_render_pass( void );
 void vk_end_sun_shadow_render_pass( void );
 
@@ -574,6 +579,7 @@ typedef struct {
 		VkRenderPass ssao;
 		VkRenderPass ssao_blur;
 		VkRenderPass ssao_combine;
+		VkRenderPass ssr;
 #ifdef VK_PBR_BRDFLUT
 		VkRenderPass brdflut;
 #endif
@@ -597,6 +603,7 @@ typedef struct {
 	VkPipelineLayout pipeline_layout_smaa;
 	VkPipelineLayout pipeline_layout_ssao;		// ssao (depth + push constants)
 	VkPipelineLayout pipeline_layout_ssao_combine;	// ssao combine (color + ao)
+	VkPipelineLayout pipeline_layout_ssr;		// ssr (color + depth + push constants)
 	VkPipelineLayout pipeline_layout_atmosphere;	// atmosphere (push constants only)
 #ifdef VK_PBR_BRDFLUT
 	VkPipelineLayout pipeline_layout_brdflut;
@@ -635,6 +642,13 @@ typedef struct {
 	VkPipelineLayout cbt_terrain_compute_layout;
 	VkPipeline cbt_terrain_compute_pipeline;
 
+	VkDescriptorSetLayout vegwind_layout;
+	VkPipelineLayout pipeline_layout_vegwind;
+	VkPipeline vegwind_pipeline;
+	VkBuffer vegwind_vertex_buffer;
+	VkDeviceMemory vegwind_vertex_memory;
+	VkDescriptorSet vegwind_descriptor;
+
 	VkDescriptorSet color_descriptor;
 	VkDescriptorSet depth_descriptor;
 	VkDescriptorSet smaa_edge_descriptor;
@@ -664,6 +678,9 @@ typedef struct {
 	VkImage ssao_blur_image;
 	VkImageView ssao_blur_image_view;
 	VkDescriptorSet ssao_blur_descriptor;
+	VkImage ssr_image;
+	VkImageView ssr_image_view;
+	VkDescriptorSet ssr_descriptor[2];	/* [0]=color, [1]=depth */
 	VkImage vao_mask_image;
 	VkImageView vao_mask_image_view;
 
@@ -715,6 +732,7 @@ typedef struct {
 		VkFramebuffer ssao;
 		VkFramebuffer ssao_blur;
 		VkFramebuffer ssao_combine;
+		VkFramebuffer ssr;
 		VkFramebuffer main[MAX_SWAPCHAIN_IMAGES];
 		VkFramebuffer gamma[MAX_SWAPCHAIN_IMAGES];
 		VkFramebuffer screenmap;
@@ -839,6 +857,7 @@ typedef struct {
 		VkShaderModule smaa_edge_fs;
 		VkShaderModule smaa_blend_fs;
 		VkShaderModule smaa_compose_fs;
+		VkShaderModule ssr_fs;
 
 		VkShaderModule fog_fs;
 		VkShaderModule fog_vs;
@@ -938,6 +957,7 @@ typedef struct {
 	VkPipeline ssao_combine_pipeline;
 	VkPipeline ssao_debug_pipeline;
 	VkPipeline ssao_depth_debug_pipeline;
+	VkPipeline ssr_pipeline;
 	VkPipeline atmosphere_pipeline;
 #ifdef VK_PBR_BRDFLUT
 	VkPipeline brdflut_pipeline;
