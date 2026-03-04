@@ -241,6 +241,8 @@ void vk_bind_generated_shaders( void ){
     vk_set_shader_name( vk.modules.volumetric_depth_resolve_msaa_cs, "volumetric_depth_resolve_msaa_cs" );
     vk.modules.luminance_cs = SHADER_MODULE( luminance_cs );
     vk_set_shader_name( vk.modules.luminance_cs, "luminance_cs" );
+    vk.modules.vegetation_wind_cs = SHADER_MODULE( vegetation_wind_cs );
+    vk_set_shader_name( vk.modules.vegetation_wind_cs, "vegetation_wind_cs" );
     vk.modules.cbt_terrain_cs = SHADER_MODULE( cbt_terrain_cs );
     vk_set_shader_name( vk.modules.cbt_terrain_cs, "cbt_terrain_cs" );
     vk.modules.terrain_vs = SHADER_MODULE( terrain_vs );

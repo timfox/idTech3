@@ -844,6 +844,7 @@ typedef struct {
 		VkShaderModule volumetric_fog_cs;
 		VkShaderModule volumetric_depth_resolve_msaa_cs;
 		VkShaderModule luminance_cs;
+		VkShaderModule vegetation_wind_cs;
 		VkShaderModule fluid_advect_cs;
 		VkShaderModule fluid_divergence_cs;
 		VkShaderModule fluid_pressure_cs;
