@@ -1872,3 +1872,10 @@ add_test(NAME smoke_test
 set_tests_properties(smoke_test PROPERTIES
 	LABELS "validation;smoke"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/release/idtech3_server")
+
+add_test(NAME check_artifacts
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/check_artifacts.sh ${CMAKE_SOURCE_DIR}/release
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(check_artifacts PROPERTIES
+	LABELS "validation;artifacts"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/release/idtech3_server")

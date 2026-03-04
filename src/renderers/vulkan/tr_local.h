@@ -1658,6 +1658,8 @@ extern cvar_t	*r_fogFluidAutoScaleMinResolution;
 extern cvar_t	*r_fogFluidAutoScaleMinIterations;
 extern cvar_t	*r_fogFluidFlowFieldStrength;
 extern cvar_t	*r_fogFluidFlowFieldScale;
+extern cvar_t	*r_fogFluidVorticity;
+extern cvar_t	*r_fogFluidBuoyancy;
 extern cvar_t	*r_volumetricFogValidation;
 extern cvar_t	*r_volumetricFogValidationPrintInterval;
 extern cvar_t	*r_volumetricFogForceCameraCut;

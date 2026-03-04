@@ -549,6 +549,8 @@ extern "C" void VkImgui_DrawVolumetricsPanel(void) {
 	if (ImGui::CollapsingHeader("Fluid Simulation")) {
 		float viscosity = VkImgui_CvarFloat( "r_fogFluidViscosity" );
 		float dissipation = VkImgui_CvarFloat( "r_fogFluidDissipation" );
+		float vorticity = VkImgui_CvarFloat( "r_fogFluidVorticity" );
+		float buoyancy = VkImgui_CvarFloat( "r_fogFluidBuoyancy" );
 		int fluidOn = ri.Cvar_VariableIntegerValue( "r_fogFluid" );
 		bool fluidEnabled = ( fluidOn != 0 );
 		if ( ImGui::Checkbox( "Enable Fluid Advection", &fluidEnabled ) ) {
@@ -556,6 +558,8 @@ extern "C" void VkImgui_DrawVolumetricsPanel(void) {
 		}
 		VkImgui_VolumetricsSlider( "Viscosity", "r_fogFluidViscosity", viscosity, 0.0f, 10.0f, "%.4f" );
 		VkImgui_VolumetricsSlider( "Dissipation", "r_fogFluidDissipation", dissipation, 0.0f, 1.0f, "%.4f" );
+		VkImgui_VolumetricsSlider( "Vorticity", "r_fogFluidVorticity", vorticity, 0.0f, 2.0f, "%.2f" );
+		VkImgui_VolumetricsSlider( "Buoyancy", "r_fogFluidBuoyancy", buoyancy, 0.0f, 4.0f, "%.2f" );
 	}
 
 	if (ImGui::CollapsingHeader("Noise")) {
