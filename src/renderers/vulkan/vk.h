@@ -57,7 +57,8 @@
 	#define VK_DESC_PBR_ANISOTROPY			14
 	#define VK_DESC_PBR_TRANSMISSION		15
 	#define VK_DESC_PBR_SUBSURFACE			16
-	#define VK_DESC_COUNT	17
+	#define VK_DESC_PBR_DETAIL				17
+	#define VK_DESC_COUNT	18
 #else
 	#define VK_DESC_COUNT   5
 #endif
@@ -305,7 +306,8 @@ typedef struct vkUniformCamera_s {
 #define PBR_HAS_ANISOTROPY		( 512 )
 #define PBR_HAS_TRANSMISSION	( 1024 )
 #define PBR_HAS_SUBSURFACE		( 2048 )
-#define PBR_HAS_IRRADIANCE		( 4096 )
+	#define PBR_HAS_IRRADIANCE		( 4096 )
+	#define PBR_HAS_DETAILMAP		( 8192 )
 
 #define PHYS_NONE				( 1 )
 #define PHYS_RMO				( 2 )

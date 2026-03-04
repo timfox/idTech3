@@ -1491,6 +1491,9 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 
 			if ( pStage->vk_pbr_flags & PBR_HAS_PHYSICALMAP || pStage->vk_pbr_flags & PBR_HAS_SPECULARMAP )
 				vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_PHYSICAL, pStage->physicalMap->descriptor, pStage->physicalMap );
+
+			if ( pStage->vk_pbr_flags & PBR_HAS_DETAILMAP )
+				vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_DETAIL, pStage->detailMap->descriptor, pStage->detailMap );
 			
 			// Commented out descriptor updates for removed PBR features
 			// if ( pStage->vk_pbr_flags & PBR_HAS_EMISSIVE )

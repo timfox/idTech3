@@ -53,6 +53,8 @@ struct Vk_Pipeline_FragSpecData {
 	int32_t anisotropy_texture_set;
 	int32_t transmission_texture_set;
 	int32_t subsurface_texture_set;
+	int32_t detail_texture_set;
+	float   detail_scale;
 #endif
 };
 
@@ -6712,7 +6714,7 @@ void vk_initialize( void )
 			pool_size[0].descriptorCount = MAX_DRAWIMAGES + 1 + 1 + 1 + 3 + 6 + VK_NUM_BLOOM_PASSES * 2 + 25; // color, screenmap, depth/ssao, volumetric descriptors (including fluid + telemetry), bloom descriptors, SMAA aux descriptors
 #ifdef USE_VK_PBR
         if ( vk.pbrActive )
-            pool_size[0].descriptorCount += 2 + ( MAX_DRAWIMAGES * 8 ); // brdf-lut + irradiance | MAX_DRAWIMAGES * (physical, normal, emissive, clearcoat, sheen, anisotropy, transmission, subsurface)
+            pool_size[0].descriptorCount += 2 + ( MAX_DRAWIMAGES * 9 ); // brdf-lut + irradiance | MAX_DRAWIMAGES * (physical, normal, emissive, clearcoat, sheen, anisotropy, transmission, subsurface, detail)
 #endif
 
 		pool_size[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
@@ -7087,6 +7089,7 @@ void vk_initialize( void )
 		set_layouts[14] = vk.set_layout_sampler; // anisotropy
 		set_layouts[15] = vk.set_layout_sampler; // transmission
 		set_layouts[16] = vk.set_layout_sampler; // subsurface
+		set_layouts[17] = vk.set_layout_sampler; // detail
 #endif
 		desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		desc.pNext = NULL;
@@ -11478,6 +11481,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	ADD_FRAG_SPEC( 31, deluxe_specular_scale );
 	ADD_FRAG_SPEC( 32, lightmap_scale );
 	ADD_FRAG_SPEC( 33, lightmap_srgb_decode );
+	ADD_FRAG_SPEC( 34, detail_texture_set );
+	ADD_FRAG_SPEC( 35, detail_scale );
 
 	// only use w value, specgloss maps are not supported
 	frag_spec_data.specularScale_x = def->specularScale[0];
@@ -11501,6 +11506,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	frag_spec_data.anisotropy_texture_set = -1;
 	frag_spec_data.transmission_texture_set = -1;
 	frag_spec_data.subsurface_texture_set = -1;
+	frag_spec_data.detail_texture_set = -1;
+	frag_spec_data.detail_scale = 4.0f;
 
 	if ( def->vk_pbr_flags & PBR_HAS_NORMALMAP )
 		frag_spec_data.normal_texture_set = 0;
@@ -11536,6 +11543,9 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 
 	if ( def->vk_pbr_flags & PBR_HAS_SUBSURFACE )
 		frag_spec_data.subsurface_texture_set = 0;
+
+	if ( def->vk_pbr_flags & PBR_HAS_DETAILMAP )
+		frag_spec_data.detail_texture_set = 0;
 #ifdef HDR_DELUXE_LIGHTMAP
 	if ( r_deluxeMapping->integer )
 	{

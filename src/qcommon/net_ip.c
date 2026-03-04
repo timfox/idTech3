@@ -29,6 +29,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
+#include "net_dtls.h"
+#include "net_sdr.h"
 
 #ifdef _WIN32
 #	include <winsock2.h>
@@ -1812,7 +1814,10 @@ void NET_Init( void ) {
 #endif
 
 	NET_Config( qtrue );
-	
+
+	NET_DTLS_Init();
+	NET_SDR_Init();
+
 	Cmd_AddCommand( "net_restart", NET_Restart_f );
 }
 
@@ -1826,6 +1831,9 @@ void NET_Shutdown( void ) {
 	if ( !networkingEnabled ) {
 		return;
 	}
+
+	NET_SDR_Shutdown();
+	NET_DTLS_Shutdown();
 
 	NET_Config( qfalse );
 
