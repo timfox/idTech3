@@ -258,6 +258,8 @@ static void VkImgui_DrawMenuBar(void) {
 			ImGui::MenuItem("PostFX", nullptr, (bool *)&vkWindows.postfx.open);
 			ImGui::MenuItem("Physics", nullptr, (bool *)&vkWindows.physics.open);
 			ImGui::MenuItem("Volumetrics", nullptr, (bool *)&vkWindows.volumetrics.open);
+			ImGui::MenuItem("Objects", nullptr, (bool *)&vkWindows.objects.open);
+			ImGui::MenuItem("Inspector", nullptr, (bool *)&vkWindows.inspector.open);
 			ImGui::EndMenu();
 		}
 
@@ -688,18 +690,36 @@ extern "C" void VkImgui_DrawShaderEditor(void) {
 }
 
 extern "C" void VkImgui_DrawObjects(void) {
-	static bool open = false;
-	if ( !open ) return;
-	ImGui::Begin( "Objects", (bool *)&open );
-	ImGui::TextDisabled( "Object browser is not implemented in this build." );
+	if ( !vkWindows.objects.open ) return;
+	ImGui::Begin( "Objects", (bool *)&vkWindows.objects.open );
+	ImGui::TextDisabled( "(?)" );
+	if ( ImGui::IsItemHovered() )
+		ImGui::SetTooltip( "Scene hierarchy (World, Entities, Models). Full implementation pending." );
+	ImGui::Separator();
+	if ( ImGui::TreeNodeEx( "World", ImGuiTreeNodeFlags_DefaultOpen ) ) {
+		ImGui::TextDisabled( "BSP surfaces" );
+		ImGui::TreePop();
+	}
+	if ( ImGui::TreeNodeEx( "Entities" ) ) {
+		ImGui::TextDisabled( "RefEntities" );
+		ImGui::TreePop();
+	}
+	if ( ImGui::TreeNodeEx( "Models" ) ) {
+		ImGui::TextDisabled( "Cached models" );
+		ImGui::TreePop();
+	}
 	ImGui::End();
 }
 
 extern "C" void VkImgui_DrawInspector(void) {
-	static bool open = false;
-	if ( !open ) return;
-	ImGui::Begin( "Inspector", (bool *)&open );
-	ImGui::TextDisabled( "Property inspector is not implemented in this build." );
+	if ( !vkWindows.inspector.open ) return;
+	ImGui::Begin( "Inspector", (bool *)&vkWindows.inspector.open );
+	ImGui::TextDisabled( "(?)" );
+	if ( ImGui::IsItemHovered() )
+		ImGui::SetTooltip( "Properties of selected object. Select in Objects panel. Full implementation pending." );
+	ImGui::Separator();
+	ImGui::Text( "No selection" );
+	ImGui::TextDisabled( "Select an object in the Objects panel." );
 	ImGui::End();
 }
 

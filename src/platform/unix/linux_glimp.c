@@ -2160,7 +2160,7 @@ Sys_SetClipboardBitmap
 */
 void Sys_SetClipboardBitmap( const byte *bitmap, int length )
 {
-	/* Stub: joystick hotplug not implemented. */
+	/* Stub: clipboard bitmap not implemented. */
 }
 
 
