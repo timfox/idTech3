@@ -65,13 +65,13 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - Optional procedural breathing demo (`r_morphBreath`, `r_morphBreathAmp`, `r_morphBreathFreq`)
 
 ### Bloom and HDR
-- HDR rendering with RGBA16F color targets
+- HDR rendering with RGBA16F, RGBA32F, or optional RGBA64F color targets (r_hdr 1, 2, or 3; 64-bit gated, falls back to 32F)
 - Bloom extraction with configurable threshold and knee
 - 4-pass Gaussian blur at progressively lower resolutions
 - ACES, Reinhard, Filmic, and AgX tonemapping
 - Exposure control with per-frame push constant
-- Eye adaptation (`r_exposure_auto`): temporal blend toward target exposure (luminance pass planned)
-- Pre-exposure scaling
+- Eye adaptation (`r_exposure_auto`): luminance pass + temporal blend; camera cut detection for fast snap
+- Pre-exposure scaling (`r_pre_exposure_scale`)
 
 ### Post-Processing
 - Panini projection with configurable parameters
@@ -102,8 +102,10 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 | `r_fogFluid` | 0 | Fluid-driven volumetric fog (0=off, 1=on). Vorticity/buoyancy: `r_fogFluidVorticity`, `r_fogFluidBuoyancy`. |
 | `r_bloom` | 0 | Bloom enable |
 | `r_bloom_threshold` | 0.6 | Bloom extraction threshold |
-| `r_hdr` | 0 | HDR format (0=off, 1=RGBA16F) |
+| `r_hdr` | 2 | HDR format (0=8-bit, 1=RGBA16F, 2=RGBA32F default, 3=RGBA64F optional/gated, -1=4-bit test) |
 | `r_hdr_lightmap_scale` | 2.0 | HDR lightmap intensity (1=normal, 2+=brighter for 8-bit lightmaps) |
+| `r_lightmap_srgb_decode` | 0 | When r_hdr 1/2: 0=linear (default), 1=sRGB→linear for gamma-encoded lightmaps |
+| `r_pre_exposure_scale` | 1.0 | Pre-exposure scale for bloom/tonemap pipeline |
 | `r_tonemap` | 2 | Tonemapping (0=none, 1=Reinhard, 2=ACES) |
 | `r_exposure` | 1.0 | Exposure multiplier |
 | `r_exposure_auto` | 0 | Eye adaptation (0=manual, 1=temporal blend toward target) |
@@ -120,6 +122,8 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 | `r_occlusionCulling` | 0 | GPU occlusion culling for entities (0=off, 1=on) |
 
 Legacy note: `r_vfog*` cvars are still registered in `vk_vfog.c` for compatibility, but the active volumetric pipeline reads `r_volumetricFog*`.
+
+See [HDR_GAPS.md](HDR_GAPS.md) for HDR pipeline gaps, risks, and render order.
 
 ### SDF Text Rendering
 - Signed Distance Field (SDF) fonts for resolution-independent sharp text

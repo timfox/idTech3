@@ -234,6 +234,8 @@ cvar_t	*r_post;
 cvar_t	*r_post_debug;
 cvar_t	*r_exposure;
 cvar_t	*r_hdr_lightmap_scale;
+cvar_t	*r_lightmap_srgb_decode;
+cvar_t	*r_pre_exposure_scale;
 cvar_t	*r_exposure_auto;
 cvar_t	*r_tonemap;
 cvar_t	*r_volumetricFog;
@@ -2325,6 +2327,16 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_hdr_lightmap_scale, "HDR lightmap intensity scale. 8-bit lightmaps multiplied by this for HDR-like brightness (1=normal, 2+=brighter)." );
 	ri.Cvar_SetGroup( r_hdr_lightmap_scale, CVG_RENDERER );
 
+	r_lightmap_srgb_decode = ri.Cvar_Get( "r_lightmap_srgb_decode", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_lightmap_srgb_decode, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_lightmap_srgb_decode, "When r_hdr 1/2: 0=lightmaps assumed linear (default), 1=sRGB->linear decode for gamma-encoded BSP lightmaps (q3map2 -gamma)." );
+	ri.Cvar_SetGroup( r_lightmap_srgb_decode, CVG_RENDERER );
+
+	r_pre_exposure_scale = ri.Cvar_Get( "r_pre_exposure_scale", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pre_exposure_scale, "0.1", "4.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_pre_exposure_scale, "Pre-exposure scale for bloom/tonemap pipeline. 1.0=neutral; use for HDR pipeline tweaks." );
+	ri.Cvar_SetGroup( r_pre_exposure_scale, CVG_RENDERER );
+
 	r_exposure_auto = ri.Cvar_Get( "r_exposure_auto", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_exposure_auto, "Eye adaptation: 0=manual r_exposure, 1=temporal adaptation toward r_exposure_auto_target. Luminance pass planned." );
 	ri.Cvar_SetGroup( r_exposure_auto, CVG_RENDERER );
@@ -2769,8 +2781,9 @@ static void R_Register( void )
 
 	r_fbo = ri.Cvar_Get( "r_fbo", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_fbo, "Use framebuffer objects, enables gamma correction in windowed mode and allows arbitrary video size and screenshot/video capture.\n Required for bloom, HDR rendering, anti-aliasing and greyscale effects." );
-	r_hdr = ri.Cvar_Get( "r_hdr", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
-	ri.Cvar_SetDescription(r_hdr, "Enables high dynamic range frame buffer texture format. Requires \\r_fbo 1.\n -1: 4-bit, for testing purposes, heavy color banding, might not work on all systems\n  0: 8 bit, default, moderate color banding with multi-stage shaders\n  1: 16 bit floating point (RGBA16F), highest precision\n" );
+	r_hdr = ri.Cvar_Get( "r_hdr", "2", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_hdr, "-1", "3", CV_INTEGER );
+	ri.Cvar_SetDescription(r_hdr, "HDR frame buffer format. Requires \\r_fbo 1.\n -1: 4-bit (B4G4R4A4), testing only\n  0: 8-bit, moderate banding\n  1: 16-bit float (RGBA16F)\n  2: 32-bit float (RGBA32F), default, fallback to 16F if unsupported\n  3: 64-bit float (RGBA64F), optional, requires shaderFloat64; falls back to 32F (64-bit fragment output not yet implemented)\n" );
 	r_bloom = ri.Cvar_Get( "r_bloom", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_bloom, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription(r_bloom, "Enables bloom post-processing effect. Requires \\r_fbo 1.");

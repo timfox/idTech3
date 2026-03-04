@@ -45,6 +45,7 @@ struct Vk_Pipeline_FragSpecData {
 	int32_t deluxe_mapping;
 	float deluxe_specular_scale;
 	float lightmap_scale;
+	int32_t lightmap_srgb_decode;  /* 1: sRGB->linear when BSP lightmaps gamma-encoded */
 	int32_t irradiance_texture_set;
 	int32_t emissive_texture_set;
 	int32_t clearcoat_texture_set;
@@ -2256,7 +2257,14 @@ static qboolean vk_blit_enabled( VkPhysicalDevice physical_device, const VkForma
 }
 
 
-static VkFormat get_hdr_format( VkFormat base_format )
+static qboolean vk_format_has_features( VkPhysicalDevice physical_device, VkFormat format, VkFormatFeatureFlags required )
+{
+	VkFormatProperties props;
+	qvkGetPhysicalDeviceFormatProperties( physical_device, format, &props );
+	return ( props.optimalTilingFeatures & required ) == required;
+}
+
+static VkFormat get_hdr_format( VkPhysicalDevice physical_device, VkFormat base_format )
 {
 	if ( r_fbo->integer == 0 ) {
 		return base_format;
@@ -2265,15 +2273,45 @@ static VkFormat get_hdr_format( VkFormat base_format )
 	switch ( r_hdr->integer ) {
 		case -1: return VK_FORMAT_B4G4R4A4_UNORM_PACK16;
 		case 1: return VK_FORMAT_R16G16B16A16_SFLOAT;
+		case 2: {
+			const VkFormatFeatureFlags required = VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT |
+				VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT |
+				VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
+			if ( vk_format_has_features( physical_device, VK_FORMAT_R32G32B32A32_SFLOAT, required ) ) {
+				return VK_FORMAT_R32G32B32A32_SFLOAT;
+			}
+			return VK_FORMAT_R16G16B16A16_SFLOAT;
+		}
+		case 3: {
+			/* Double-precision (64-bit float per channel). Optional in Vulkan; requires
+			 * shaderFloat64 and format support. Rarely supported as color render targets
+			 * on consumer GPUs. Fall back to RGBA32F if unsupported or if 64-bit fragment
+			 * output not yet implemented. */
+			VkPhysicalDeviceFeatures feat;
+			qvkGetPhysicalDeviceFeatures( physical_device, &feat );
+			if ( feat.shaderFloat64 ) {
+				const VkFormatFeatureFlags required = VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT |
+					VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT |
+					VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
+				if ( vk_format_has_features( physical_device, VK_FORMAT_R64G64B64A64_SFLOAT, required ) ) {
+					/* Format supported. Note: fragment shaders must output dvec4 to match;
+					 * current pipeline uses vec4. Until 64-bit shader path exists, fall back. */
+					ri.Printf( PRINT_DEVELOPER, "[VK] r_hdr 3: RGBA64F supported but 64-bit fragment output not implemented; using RGBA32F\n" );
+				}
+			}
+			/* Fall through to case 2 logic (RGBA32F with fallback to 16F) */
+			{
+				const VkFormatFeatureFlags required = VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT |
+					VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT |
+					VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
+				if ( vk_format_has_features( physical_device, VK_FORMAT_R32G32B32A32_SFLOAT, required ) ) {
+					return VK_FORMAT_R32G32B32A32_SFLOAT;
+				}
+				return VK_FORMAT_R16G16B16A16_SFLOAT;
+			}
+		}
 		default: return base_format;
 	}
-}
-
-static qboolean vk_format_has_features( VkPhysicalDevice physical_device, VkFormat format, VkFormatFeatureFlags required )
-{
-	VkFormatProperties props;
-	qvkGetPhysicalDeviceFormatProperties( physical_device, format, &props );
-	return ( props.optimalTilingFeatures & required ) == required;
 }
 
 static VkFormat get_bloom_format( VkPhysicalDevice physical_device, VkFormat fallback )
@@ -2419,7 +2457,7 @@ static void setup_surface_formats( VkPhysicalDevice physical_device )
 {
 	vk.depth_format = get_depth_format( physical_device );
 
-	vk.color_format = get_hdr_format( vk.base_format.format );
+	vk.color_format = get_hdr_format( physical_device, vk.base_format.format );
 
 	vk.capture_format = VK_FORMAT_R8G8B8A8_UNORM;
 
@@ -6282,6 +6320,7 @@ void vk_initialize( void )
 	vk.cmd = vk.tess + 0;
 	vk_reset_motion_history();
 	vk.adaptedExposure = 1.0f;
+	VectorClear( vk.prevViewOrigin );
 	vk.uniform_alignment = props.limits.minUniformBufferOffsetAlignment;
 	vk.uniform_item_size = PAD( sizeof( vkUniform_t ), (size_t)vk.uniform_alignment );
 #ifdef USE_VK_PBR	
@@ -9978,6 +10017,9 @@ static qboolean vk_surface_format_color_depth( VkFormat format, int *r, int *g, 
 			FORMAT_DEPTH(A1R5G5B5_UNORM_PACK16, 31, 31, 31)
 			FORMAT_DEPTH(R5G5B5A1_UNORM_PACK16, 31, 31, 31)
 			FORMAT_DEPTH(B5G5R5A1_UNORM_PACK16, 31, 31, 31)
+			FORMAT_DEPTH(R16G16B16A16_SFLOAT, 255, 255, 255)
+			FORMAT_DEPTH(R32G32B32A32_SFLOAT, 255, 255, 255)
+			FORMAT_DEPTH(R64G64B64A64_SFLOAT, 255, 255, 255)
 	default:
 		*r = 255; *g = 255; *b = 255; return qfalse;
 	}
@@ -10304,7 +10346,8 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	set_shader_stage_desc( shader_stages+1, VK_SHADER_STAGE_FRAGMENT_BIT, fsmodule, "main" );
 
 	frag_spec_data.gamma = 1.0f / (r_gamma->value);
-	frag_spec_data.preExposureScale = 1.0f;
+	frag_spec_data.preExposureScale = ( r_pre_exposure_scale && r_pre_exposure_scale->value > 0.0f ) ?
+		r_pre_exposure_scale->value : 1.0f;
 	frag_spec_data.greyscale = r_greyscale->value;
 	frag_spec_data.bloom_threshold = r_bloom_threshold->value;
 	frag_spec_data.bloom_intensity = r_bloom_intensity->value;
@@ -11432,6 +11475,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	ADD_FRAG_SPEC( 30, deluxe_mapping );
 	ADD_FRAG_SPEC( 31, deluxe_specular_scale );
 	ADD_FRAG_SPEC( 32, lightmap_scale );
+	ADD_FRAG_SPEC( 33, lightmap_srgb_decode );
 
 	// only use w value, specgloss maps are not supported
 	frag_spec_data.specularScale_x = def->specularScale[0];
@@ -11513,6 +11557,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 
 	frag_spec_data.lightmap_scale = ( r_hdr_lightmap_scale && r_hdr_lightmap_scale->value > 0.0f ) ?
 		r_hdr_lightmap_scale->value : 1.0f;
+
+	frag_spec_data.lightmap_srgb_decode = ( r_lightmap_srgb_decode && r_lightmap_srgb_decode->integer && r_hdr && r_hdr->integer > 0 ) ? 1 : 0;
 
 	frag_spec_info.mapEntryCount = spec_entry_count;
 	frag_spec_info.pMapEntries = spec_entries;
@@ -14440,8 +14486,11 @@ static void vk_atmosphere_pass( void )
 
 static void vk_volumetric_fog_pass( void )
 {
-	/* Atmosphere runs when enabled regardless of fog state */
-	vk_atmosphere_pass();
+	/* Atmosphere: only when we have a 3D world. Skip for menus, videos, RDF_NOWORLDMODEL
+	 * (depth is cleared to far; drawing sky over full screen would cover UI). */
+	if ( tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+		vk_atmosphere_pass();
+	}
 
 	if ( backEnd.doneFog ) {
 		return;
@@ -14927,29 +14976,34 @@ void vk_begin_frame( void )
 			cvar_t *auto_var = ri.Cvar_Get( "r_exposure_auto", "0", 0 );
 			cvar_t *target_var = ri.Cvar_Get( "r_exposure_auto_target", "0.5", CVAR_ARCHIVE_ND );
 			cvar_t *speed_var = ri.Cvar_Get( "r_exposure_auto_speed", "2.0", CVAR_ARCHIVE_ND );
-			if ( auto_var && auto_var->integer && target_var && speed_var && vk.luminance_staging_ptr ) {
-				float avgLogLum;
-				float sceneLum;
-				float targetExp;
+			if ( auto_var && auto_var->integer && target_var && speed_var ) {
 				float target = target_var->value > 0.0f ? target_var->value : 0.5f;
 				float speed = speed_var->value > 0.0f ? speed_var->value * 0.016f : 0.02f;
+				float targetExp = target;
 
-				avgLogLum = *(const float *)vk.luminance_staging_ptr;
-				/* Clamp to valid range: avoid NaN/Inf from bad readback or first-frame garbage */
-				if ( avgLogLum != avgLogLum || avgLogLum <= -20.0f || avgLogLum >= 20.0f ) {
-					avgLogLum = 0.0f;
+				/* Camera cut: large view jump → snap exposure for faster adaptation */
+				{
+					float dx = tr.refdef.vieworg[0] - vk.prevViewOrigin[0];
+					float dy = tr.refdef.vieworg[1] - vk.prevViewOrigin[1];
+					float dz = tr.refdef.vieworg[2] - vk.prevViewOrigin[2];
+					float distSq = dx * dx + dy * dy + dz * dz;
+					if ( distSq > 128.0f * 128.0f )
+						speed = 0.5f;  /* snap within ~2 frames */
 				}
-				sceneLum = powf( 2.0f, avgLogLum );
-				targetExp = ( sceneLum > 1e-6f ) ? ( target / sceneLum ) : 1.0f;
-				targetExp = ( targetExp < 0.01f ) ? 0.01f : ( targetExp > 10.0f ? 10.0f : targetExp );
+
+				if ( vk.luminance_staging_ptr ) {
+					float avgLogLum = *(const float *)vk.luminance_staging_ptr;
+					/* Clamp to valid range: avoid NaN/Inf from bad readback or first-frame garbage */
+					if ( avgLogLum != avgLogLum || avgLogLum <= -20.0f || avgLogLum >= 20.0f )
+						avgLogLum = 0.0f;
+					float sceneLum = powf( 2.0f, avgLogLum );
+					targetExp = ( sceneLum > 1e-6f ) ? ( target / sceneLum ) : 1.0f;
+					targetExp = ( targetExp < 0.01f ) ? 0.01f : ( targetExp > 10.0f ? 10.0f : targetExp );
+				}
+
 				vk.adaptedExposure += ( targetExp - vk.adaptedExposure ) * speed;
 				vk.adaptedExposure = ( vk.adaptedExposure < 0.01f ) ? 0.01f : ( vk.adaptedExposure > 10.0f ? 10.0f : vk.adaptedExposure );
-			} else if ( auto_var && auto_var->integer && target_var && speed_var ) {
-				/* Fallback when luminance pass not run: temporal blend toward target */
-				float target = target_var->value > 0.0f ? target_var->value : 0.5f;
-				float speed = speed_var->value > 0.0f ? speed_var->value * 0.016f : 0.02f;
-				vk.adaptedExposure += ( target - vk.adaptedExposure ) * speed;
-				vk.adaptedExposure = ( vk.adaptedExposure < 0.01f ) ? 0.01f : ( vk.adaptedExposure > 10.0f ? 10.0f : vk.adaptedExposure );
+				VectorCopy( tr.refdef.vieworg, vk.prevViewOrigin );
 			}
 		}
 	}
@@ -15206,10 +15260,18 @@ void vk_end_frame( void )
 		{
 			vk_end_render_pass();
 
-				if ( !backEnd.doneFog )
-				{
-					vk_volumetric_fog_pass();
-				}
+			if ( !backEnd.doneFog )
+			{
+				vk_volumetric_fog_pass();
+			}
+			else
+			{
+				/* Volumetrics skipped (menu, no world, tier off): ensure gamma pass
+				 * samples from correct source. vk_volumetric_fog_pass normally updates
+				 * color_descriptor; when skipped, it may still point at smaa_output
+				 * from a previous frame. */
+				vk_update_color_descriptor_image( vk.color_image_view );
+			}
 
 			/* Luminance pass for eye adaptation (r_exposure_auto) */
 			{

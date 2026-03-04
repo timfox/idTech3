@@ -174,6 +174,12 @@ layout (constant_id = 29) const int subsurface_texture_set = -1;
 layout (constant_id = 30) const int deluxe_mapping			= -1; // -1: deluxemapping off, 0: on, 1: on + bound
 layout (constant_id = 31) const float deluxe_specular_scale = 1.0;
 layout (constant_id = 32) const float lightmap_scale = 1.0;  // HDR lightmap intensity (1=normal, 2+=brighter)
+layout (constant_id = 33) const int lightmap_srgb_decode = 0;  // 1: sRGB->linear when BSP lightmaps are gamma-encoded
+
+vec3 lightmapDecode( vec3 c ) {
+	/* sRGB to linear: use when BSP lightmaps are gamma-encoded (q3map2 -gamma, etc.) */
+	return mix( c / 12.92, pow( ( c + 0.055 ) / 1.055, vec3( 2.4 ) ), step( 0.04045, c ) );
+}
 
 vec3 CalcNormal( in vec3 vertexNormal, in vec4 vertexTangent, in vec2 frag_tex_coord )
 {
@@ -838,7 +844,10 @@ void main() {
 
 	#if ( defined(USE_TX1) || defined(USE_TX2) )
 		if ( lightmap_texture_set >= 0 ) {
-			vec3 lightmapColor = texture(texture1, frag_tex_coord1).rgb * lightmap_scale;
+			vec3 raw = texture(texture1, frag_tex_coord1).rgb;
+			if ( lightmap_srgb_decode > 0 )
+				raw = lightmapDecode( raw );
+			vec3 lightmapColor = raw * lightmap_scale;
 
 			lightColor = lightmapColor * bias_color;
 			diffuse = color0;
