@@ -15266,11 +15266,41 @@ void vk_end_frame( void )
 			}
 			else
 			{
-				/* Volumetrics skipped (menu, no world, tier off): ensure gamma pass
-				 * samples from correct source. vk_volumetric_fog_pass normally updates
-				 * color_descriptor; when skipped, it may still point at smaa_output
-				 * from a previous frame. */
+				/* Volumetrics skipped (menu, no world, tier off): ensure gamma and
+				 * luminance passes sample from correct source. vk_volumetric_fog_pass
+				 * normally updates color_descriptor and luminance_descriptor; when
+				 * skipped, they may point at smaa_output from a previous frame. */
 				vk_update_color_descriptor_image( vk.color_image_view );
+				if ( vk.luminance_descriptor != VK_NULL_HANDLE && vk.luminance_image_view != VK_NULL_HANDLE &&
+					vk.color_image_view != VK_NULL_HANDLE && vk.color_image_view != vk.luminance_image_view ) {
+					VkDescriptorImageInfo lum_info[2];
+					VkWriteDescriptorSet lum_writes[2];
+					Vk_Sampler_Def sd_linear;
+					Com_Memset( &sd_linear, 0, sizeof( sd_linear ) );
+					sd_linear.gl_mag_filter = sd_linear.gl_min_filter = GL_LINEAR;
+					sd_linear.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+					sd_linear.noAnisotropy = qtrue;
+					Com_Memset( lum_info, 0, sizeof( lum_info ) );
+					lum_info[0].sampler = vk_find_sampler( &sd_linear );
+					lum_info[0].imageView = vk.color_image_view;
+					lum_info[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+					lum_info[1].imageView = vk.luminance_image_view;
+					lum_info[1].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+					Com_Memset( lum_writes, 0, sizeof( lum_writes ) );
+					lum_writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+					lum_writes[0].dstSet = vk.luminance_descriptor;
+					lum_writes[0].dstBinding = 0;
+					lum_writes[0].descriptorCount = 1;
+					lum_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+					lum_writes[0].pImageInfo = &lum_info[0];
+					lum_writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+					lum_writes[1].dstSet = vk.luminance_descriptor;
+					lum_writes[1].dstBinding = 1;
+					lum_writes[1].descriptorCount = 1;
+					lum_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+					lum_writes[1].pImageInfo = &lum_info[1];
+					qvkUpdateDescriptorSets( vk.device, 2, lum_writes, 0, NULL );
+				}
 			}
 
 			/* Luminance pass for eye adaptation (r_exposure_auto) */
