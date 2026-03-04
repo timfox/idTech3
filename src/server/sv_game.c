@@ -961,10 +961,10 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 		return FloatAsInt( ceil( VMF(1) ) );
 
 	case G_TESTPRINTINT:
-		return sprintf( VMA(1), "%i", (int)args[2] );
+		return Com_sprintf( VMA(1), MAX_STRING_CHARS, "%i", (int)args[2] );
 
 	case G_TESTPRINTFLOAT:
-		return sprintf( VMA(1), "%f", VMF(2) );
+		return Com_sprintf( VMA(1), MAX_STRING_CHARS, "%f", VMF(2) );
 
 	case G_CVAR_SETDESCRIPTION:
 		Cvar_SetDescription2( (const char*)VMA(1), (const char*)VMA(2) );

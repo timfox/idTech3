@@ -61,7 +61,7 @@ int main( int argc, const char* argv[] ) {
 		return -1;
 	}
 
-	n = sprintf( buf, "const unsigned char %s[%li] = {\n\t", argv[3], in_len );
+	n = snprintf( buf, sizeof( buf ), "const unsigned char %s[%li] = {\n\t", argv[3], (long)in_len );
 
 	fwrite( buf, n, 1, f_out );
 
@@ -69,7 +69,7 @@ int main( int argc, const char* argv[] ) {
 
 	while ( c != EOF ) {
 
-		n = sprintf( buf, "0x%.2X", c );
+		n = snprintf( buf, sizeof( buf ), "0x%.2X", (unsigned char)c );
 		fwrite( buf, n, 1, f_out );
 
 		c = fgetc( f_in );
@@ -89,7 +89,7 @@ int main( int argc, const char* argv[] ) {
 	fputs( "\n};\n", f_out );
 
 #if 0
-	n = sprintf( buf, "const int %s_size = %i;\n", argv[3], size );
+	n = snprintf( buf, sizeof( buf ), "const int %s_size = %i;\n", argv[3], size );
 	fwrite( buf, n, 1, f_out );
 #endif
 

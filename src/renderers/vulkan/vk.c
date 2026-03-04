@@ -2,6 +2,28 @@
 #include "vk.h"
 #include "vk_postfx.h"
 
+/* VK_EXT_extended_dynamic_state3: for vkCmdSetColorWriteMaskEXT (RB_ColorMask) */
+#ifndef VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT
+#define VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT 1000484000
+#endif
+#ifndef VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT
+#define VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT 1000484004
+#endif
+typedef struct VkPhysicalDeviceExtendedDynamicState3FeaturesEXT {
+	VkStructureType sType;
+	void *pNext;
+	VkBool32 extendedDynamicState3ColorWriteMask;
+} VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
+#ifndef PFN_vkCmdSetColorWriteMaskEXT
+typedef void (VKAPI_PTR *PFN_vkCmdSetColorWriteMaskEXT)(VkCommandBuffer commandBuffer, uint32_t firstAttachment, uint32_t attachmentCount, const VkColorComponentFlags *pColorWriteMasks);
+#endif
+
+/* r_hdr 3: 64-bit (RGBA64F) uses dvec4 fragment output; select HDR64 shaders when active */
+static inline qboolean vk_hdr64_active( void )
+{
+	return vk.color_format == VK_FORMAT_R64G64B64A64_SFLOAT;
+}
+
 /* GPU occlusion culling: visibility from previous frame (1=visible, 0=occluded) */
 uint64_t vk_entity_occlusion_visibility[MAX_REFENTITIES];
 static uint32_t vk_occlusion_last_entity_count;
@@ -142,6 +164,7 @@ static PFN_vkCmdPushConstants							qvkCmdPushConstants;
 static PFN_vkCmdSetDepthBias							qvkCmdSetDepthBias;
 static PFN_vkCmdSetScissor								qvkCmdSetScissor;
 static PFN_vkCmdSetViewport								qvkCmdSetViewport;
+static PFN_vkCmdSetColorWriteMaskEXT						qvkCmdSetColorWriteMaskEXT;
 static PFN_vkCmdWriteTimestamp							qvkCmdWriteTimestamp;
 static PFN_vkCmdResetQueryPool							qvkCmdResetQueryPool;
 static PFN_vkCmdBeginQuery								qvkCmdBeginQuery;
@@ -2317,9 +2340,9 @@ static VkFormat get_hdr_format( VkPhysicalDevice physical_device, VkFormat base_
 		}
 		case 3: {
 			/* Double-precision (64-bit float per channel). Optional in Vulkan; requires
-			 * shaderFloat64 and format support. Rarely supported as color render targets
-			 * on consumer GPUs. Fall back to RGBA32F if unsupported or if 64-bit fragment
-			 * output not yet implemented. */
+			 * shaderFloat64 and format support. glslangValidator does not support
+			 * dvec4/f64vec4 fragment shader outputs, so we fall back to RGBA32F until
+			 * compiler support is available. */
 			VkPhysicalDeviceFeatures feat;
 			qvkGetPhysicalDeviceFeatures( physical_device, &feat );
 			if ( feat.shaderFloat64 ) {
@@ -2327,12 +2350,10 @@ static VkFormat get_hdr_format( VkPhysicalDevice physical_device, VkFormat base_
 					VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT |
 					VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
 				if ( vk_format_has_features( physical_device, VK_FORMAT_R64G64B64A64_SFLOAT, required ) ) {
-					/* Format supported. Note: fragment shaders must output dvec4 to match;
-					 * current pipeline uses vec4. Until 64-bit shader path exists, fall back. */
-					ri.Printf( PRINT_DEVELOPER, "[VK] r_hdr 3: RGBA64F supported but 64-bit fragment output not implemented; using RGBA32F\n" );
+					ri.Printf( PRINT_DEVELOPER, "[VK] r_hdr 3: RGBA64F supported but glslang lacks dvec4 fragment output; using RGBA32F\n" );
 				}
 			}
-			/* Fall through to case 2 logic (RGBA32F with fallback to 16F) */
+			/* Fall back to RGBA32F (glslang dvec4 fragment output not yet supported) */
 			{
 				const VkFormatFeatureFlags required = VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT |
 					VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT |
@@ -2615,6 +2636,13 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		qboolean shaderQuadControl = qfalse;
 		qboolean shaderRelaxedExtInstr = qfalse;
 		qboolean shaderSubgroupUniformCF = qfalse;
+		qboolean extendedDynamicState3 = qfalse;
+#ifdef USE_VULKAN_RTX
+		qboolean rtxAccelStruct = qfalse;
+		qboolean rtxPipeline = qfalse;
+		qboolean rtxDeferredHostOps = qfalse;
+		qboolean rtxBufferDeviceAddress = qfalse;
+#endif
 #ifdef _DEBUG
 		qboolean timelineSemaphore = qfalse;
 		qboolean memoryModel = qfalse;
@@ -2696,9 +2724,22 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 				shaderQuadControl = qtrue;
 			} else if ( strcmp( ext, "VK_KHR_shader_relaxed_extended_instruction" ) == 0 ) {
 				shaderRelaxedExtInstr = qtrue;
-			} else if ( strcmp( ext, "VK_KHR_shader_subgroup_uniform_control_flow" ) == 0 ) {
-				shaderSubgroupUniformCF = qtrue;
+		} else if ( strcmp( ext, "VK_KHR_shader_subgroup_uniform_control_flow" ) == 0 ) {
+			shaderSubgroupUniformCF = qtrue;
+		} else if ( strcmp( ext, "VK_EXT_extended_dynamic_state3" ) == 0 ) {
+			extendedDynamicState3 = qtrue;
+		}
+#ifdef USE_VULKAN_RTX
+			else if ( strcmp( ext, VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME ) == 0 ) {
+				rtxAccelStruct = qtrue;
+			} else if ( strcmp( ext, VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME ) == 0 ) {
+				rtxPipeline = qtrue;
+			} else if ( strcmp( ext, "VK_KHR_deferred_host_operations" ) == 0 ) {
+				rtxDeferredHostOps = qtrue;
+			} else if ( strcmp( ext, VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME ) == 0 ) {
+				rtxBufferDeviceAddress = qtrue;
 			}
+#endif
 			// add this device extension to glConfig
 			if ( i != 0 ) {
 				if ( str + 1 >= end )
@@ -2813,6 +2854,20 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		if ( shaderQuadControl ) {
 			device_extension_list[ device_extension_count++ ] = "VK_KHR_shader_quad_control";
 		}
+		if ( extendedDynamicState3 ) {
+			device_extension_list[ device_extension_count++ ] = "VK_EXT_extended_dynamic_state3";
+			vk.colorWriteMaskDynamic = qtrue;
+			ri.Printf( PRINT_DEVELOPER, "  VK_EXT_extended_dynamic_state3: enabled (RB_ColorMask)\n" );
+		}
+#ifdef USE_VULKAN_RTX
+		if ( rtxAccelStruct && rtxPipeline && rtxDeferredHostOps && rtxBufferDeviceAddress && memoryRequirements2 ) {
+			device_extension_list[ device_extension_count++ ] = VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME;
+			device_extension_list[ device_extension_count++ ] = "VK_KHR_deferred_host_operations";
+			device_extension_list[ device_extension_count++ ] = VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME;
+			device_extension_list[ device_extension_count++ ] = VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME;
+			ri.Printf( PRINT_ALL, "[VK] Ray tracing extensions enabled (r_rtx available)\n" );
+		}
+#endif
 		(void)globalPriority; (void)shaderFloatControls2; (void)shaderMaximalReconvergence;
 		(void)shaderRelaxedExtInstr; (void)shaderSubgroupUniformCF; (void)legacyDithering;
 		(void)surfaceMaintenance1;
@@ -2838,6 +2893,9 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			features.shaderInt64 = VK_TRUE;
 		}
 #endif
+		if ( r_hdr && r_hdr->integer == 3 && device_features.shaderFloat64 ) {
+			features.shaderFloat64 = VK_TRUE;
+		}
 		if ( device_features.wideLines ) { // needed for RB_SurfaceAxis
 			features.wideLines = VK_TRUE;
 			vk.wideLines = qtrue;
@@ -2868,8 +2926,17 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		device_desc.ppEnabledExtensionNames = device_extension_list;
 		device_desc.pEnabledFeatures = &features;
 
+		/* VK_EXT_extended_dynamic_state3: color write mask for RB_ColorMask */
+		VkPhysicalDeviceExtendedDynamicState3FeaturesEXT extDynState3 = {0};
+		if ( extendedDynamicState3 ) {
+			extDynState3.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT;
+			extDynState3.pNext = NULL;
+			extDynState3.extendedDynamicState3ColorWriteMask = VK_TRUE;
+			device_desc.pNext = &extDynState3;
+		}
+
 #ifdef _DEBUG
-		pNextPtr = (const void **)&device_desc.pNext;
+		pNextPtr = (const void **)( extendedDynamicState3 ? &extDynState3.pNext : &device_desc.pNext );
 
 		if ( timelineSemaphore ) {
 			*pNextPtr = &timeline_semaphore;
@@ -3195,6 +3262,12 @@ static void init_vulkan_library( void )
 		INIT_DEVICE_FUNCTION_EXT(vkDebugMarkerSetObjectNameEXT)
 	}
 
+	if ( vk.colorWriteMaskDynamic ) {
+		INIT_DEVICE_FUNCTION_EXT(vkCmdSetColorWriteMaskEXT)
+		if ( !qvkCmdSetColorWriteMaskEXT )
+			vk.colorWriteMaskDynamic = qfalse;
+	}
+
 	INIT_DEVICE_FUNCTION_EXT(vkCmdClearColorImage)
 }
 
@@ -3260,6 +3333,7 @@ static void deinit_device_functions( void )
 	qvkCmdSetDepthBias							= NULL;
 	qvkCmdSetScissor							= NULL;
 	qvkCmdSetViewport							= NULL;
+	qvkCmdSetColorWriteMaskEXT					= NULL;
 	qvkCmdWriteTimestamp						= NULL;
 	qvkCmdBeginQuery							= NULL;
 	qvkCmdEndQuery								= NULL;
@@ -6487,6 +6561,11 @@ void vk_initialize( void )
 	} else {
 		vkSamples = VK_SAMPLE_COUNT_1_BIT;
 	}
+	if ( vk.smaaActive ) {
+		ri.Printf( PRINT_ALL, "...SMAA enabled (threshold %.2f, search steps %d)\n",
+			r_smaa_threshold ? r_smaa_threshold->value : 0.1f,
+			r_smaa_max_search_steps && r_smaa_max_search_steps->integer ? r_smaa_max_search_steps->integer : 16 );
+	}
 
 	vk.screenMapSamples = MIN( vkMaxSamples, VK_SAMPLE_COUNT_4_BIT );
 
@@ -7288,9 +7367,14 @@ void vk_initialize( void )
 		{
 			VkDescriptorSetLayout smaa_layouts[2];
 			VkPipelineLayoutCreateInfo smaa_desc;
+			VkPushConstantRange smaa_push_range;
 
 			smaa_layouts[0] = vk.set_layout_sampler;
 			smaa_layouts[1] = vk.set_layout_sampler;
+
+			smaa_push_range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+			smaa_push_range.offset = 0;
+			smaa_push_range.size = 16; /* threshold, localContrast, maxSearchSteps, pad */
 
 			Com_Memset( &smaa_desc, 0, sizeof( smaa_desc ) );
 			smaa_desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -7298,8 +7382,8 @@ void vk_initialize( void )
 			smaa_desc.flags = 0;
 			smaa_desc.setLayoutCount = ARRAY_LEN( smaa_layouts );
 			smaa_desc.pSetLayouts = smaa_layouts;
-			smaa_desc.pushConstantRangeCount = 0;
-			smaa_desc.pPushConstantRanges = NULL;
+			smaa_desc.pushConstantRangeCount = 1;
+			smaa_desc.pPushConstantRanges = &smaa_push_range;
 
 			VK_CHECK( qvkCreatePipelineLayout( vk.device, &smaa_desc, NULL, &vk.pipeline_layout_smaa ) );
 			SET_OBJECT_NAME( vk.pipeline_layout_smaa, "pipeline layout - smaa", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
@@ -7624,7 +7708,7 @@ static void vk_create_volumetric_composite_pipeline( void )
 	shader_stages[0].pName = "main";
 	shader_stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	shader_stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	shader_stages[1].module = vk.modules.volumetric_fog_fs;
+	shader_stages[1].module = vk_hdr64_active() ? vk.modules.volumetric_fog_fs_hdr64 : vk.modules.volumetric_fog_fs;
 	shader_stages[1].pName = "main";
 
 	VkPipelineVertexInputStateCreateInfo vertex_input;
@@ -7681,11 +7765,15 @@ static void vk_create_volumetric_composite_pipeline( void )
 	depth_state.depthTestEnable = VK_FALSE;
 	depth_state.depthWriteEnable = VK_FALSE;
 
-	VkDynamicState dynamic_states[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+	VkDynamicState dynamic_states[3] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+	uint32_t dynamic_state_count = 2;
+	if ( vk.colorWriteMaskDynamic ) {
+		dynamic_states[dynamic_state_count++] = VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT;
+	}
 	VkPipelineDynamicStateCreateInfo dynamic_state;
 	Com_Memset( &dynamic_state, 0, sizeof( dynamic_state ) );
 	dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-	dynamic_state.dynamicStateCount = ARRAY_LEN( dynamic_states );
+	dynamic_state.dynamicStateCount = dynamic_state_count;
 	dynamic_state.pDynamicStates = dynamic_states;
 
 	VkGraphicsPipelineCreateInfo desc;
@@ -10445,7 +10533,7 @@ static void vk_create_atmosphere_pipeline( void )
 	shader_stages[0].pName = "main";
 	shader_stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	shader_stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	shader_stages[1].module = vk.modules.atmosphere_fs;
+	shader_stages[1].module = vk_hdr64_active() ? vk.modules.atmosphere_fs_hdr64 : vk.modules.atmosphere_fs;
 	shader_stages[1].pName = "main";
 
 	Com_Memset( &vertex_input_state, 0, sizeof( vertex_input_state ) );
@@ -10527,7 +10615,11 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	VkPipelineDepthStencilStateCreateInfo depth_stencil_state;
 	VkPipelineViewportStateCreateInfo viewport_state;
 	VkPipelineDynamicStateCreateInfo dynamic_state;
-	VkDynamicState dynamic_state_array[2] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+	VkDynamicState dynamic_state_array[3] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+	uint32_t dynamic_state_count = 2;
+	if ( vk.colorWriteMaskDynamic ) {
+		dynamic_state_array[dynamic_state_count++] = VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT;
+	}
 	VkPipelineMultisampleStateCreateInfo multisample_state;
 	VkPipelineColorBlendStateCreateInfo blend_state;
 	VkPipelineColorBlendAttachmentState attachment_blend_state;
@@ -10655,7 +10747,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			break;
 		case 10: // smaa edge
 			pipeline = &vk.smaa_edge_pipeline;
-			fsmodule = vk.modules.smaa_edge_fs;
+			fsmodule = vk_hdr64_active() ? vk.modules.smaa_edge_fs_hdr64 : vk.modules.smaa_edge_fs;
 			renderpass = vk.render_pass.smaa_edge;
 			layout = vk.pipeline_layout_smaa;
 			samples = VK_SAMPLE_COUNT_1_BIT;
@@ -10665,7 +10757,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			break;
 		case 11: // smaa blend
 			pipeline = &vk.smaa_blend_pipeline;
-			fsmodule = vk.modules.smaa_blend_fs;
+			fsmodule = vk_hdr64_active() ? vk.modules.smaa_blend_fs_hdr64 : vk.modules.smaa_blend_fs;
 			renderpass = vk.render_pass.smaa_blend;
 			layout = vk.pipeline_layout_smaa;
 			samples = VK_SAMPLE_COUNT_1_BIT;
@@ -10675,7 +10767,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			break;
 		case 12: // smaa compose
 			pipeline = &vk.smaa_compose_pipeline;
-			fsmodule = vk.modules.smaa_compose_fs;
+			fsmodule = vk_hdr64_active() ? vk.modules.smaa_compose_fs_hdr64 : vk.modules.smaa_compose_fs;
 			renderpass = vk.render_pass.smaa_compose;
 			layout = vk.pipeline_layout_smaa;
 			samples = VK_SAMPLE_COUNT_1_BIT;
@@ -10685,7 +10777,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			break;
 		case 13: // ssr
 			pipeline = &vk.ssr_pipeline;
-			fsmodule = vk.modules.ssr_fs;
+			fsmodule = vk_hdr64_active() ? vk.modules.ssr_fs_hdr64 : vk.modules.ssr_fs;
 			renderpass = vk.render_pass.ssr;
 			layout = vk.pipeline_layout_ssr;
 			samples = VK_SAMPLE_COUNT_1_BIT;
@@ -10916,7 +11008,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
 	dynamic_state.pNext = NULL;
 	dynamic_state.flags = 0;
-	dynamic_state.dynamicStateCount = ARRAY_LEN( dynamic_state_array );
+	dynamic_state.dynamicStateCount = dynamic_state_count;
 	dynamic_state.pDynamicStates = dynamic_state_array;
 
 	//
@@ -11251,7 +11343,11 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	VkPipelineColorBlendAttachmentState attachment_blend_state;
 	VkPipelineColorBlendAttachmentState attachment_blend_states[2];
 	VkPipelineDynamicStateCreateInfo dynamic_state;
-	VkDynamicState dynamic_state_array[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+	VkDynamicState dynamic_state_array[3] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+	uint32_t main_dynamic_state_count = 2;
+	if ( vk.colorWriteMaskDynamic ) {
+		dynamic_state_array[main_dynamic_state_count++] = VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT;
+	}
 	VkGraphicsPipelineCreateInfo create_info;
 	VkPipeline pipeline;
 	VkPipelineShaderStageCreateInfo shader_stages[2];
@@ -11267,12 +11363,12 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 
 		case TYPE_SIGNLE_TEXTURE_LIGHTING:
 			vs_module = &vk.modules.vert.light[0];
-			fs_module = &vk.modules.frag.light[0][0];
+			fs_module = vk_hdr64_active() ? &vk.modules.frag.light_hdr64[0][0] : &vk.modules.frag.light[0][0];
 			break;
 
 		case TYPE_SIGNLE_TEXTURE_LIGHTING_LINEAR:
 			vs_module = &vk.modules.vert.light[0];
-			fs_module = &vk.modules.frag.light[1][0];
+			fs_module = vk_hdr64_active() ? &vk.modules.frag.light_hdr64[1][0] : &vk.modules.frag.light[1][0];
 			break;
 
 		case TYPE_SIGNLE_TEXTURE_DF:
@@ -11283,100 +11379,100 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 
 		case TYPE_SIGNLE_TEXTURE_FIXED_COLOR:
 			vs_module = &vk.modules.vert.fixed[use_pbr][0][0][0];
-			fs_module = &vk.modules.frag.fixed[use_pbr][0][0];
+			fs_module = vk_hdr64_active() ? &vk.modules.frag.fixed_hdr64[use_pbr][0][0] : &vk.modules.frag.fixed[use_pbr][0][0];
 			break;
 
 		case TYPE_SIGNLE_TEXTURE_FIXED_COLOR_ENV:
 			vs_module = &vk.modules.vert.fixed[use_pbr][0][1][0];
-			fs_module = &vk.modules.frag.fixed[use_pbr][0][0];
+			fs_module = vk_hdr64_active() ? &vk.modules.frag.fixed_hdr64[use_pbr][0][0] : &vk.modules.frag.fixed[use_pbr][0][0];
 			break;
 
 		case TYPE_SIGNLE_TEXTURE_ENT_COLOR:
 			vs_module = &vk.modules.vert.fixed[use_pbr][0][0][0];
-			fs_module = &vk.modules.frag.ent[use_pbr][0][0];
+			fs_module = vk_hdr64_active() ? &vk.modules.frag.ent_hdr64[use_pbr][0][0] : &vk.modules.frag.ent[use_pbr][0][0];
 			break;
 
 		case TYPE_SIGNLE_TEXTURE_ENT_COLOR_ENV:
 			vs_module = &vk.modules.vert.fixed[use_pbr][0][1][0];
-			fs_module = &vk.modules.frag.ent[use_pbr][0][0];
+			fs_module = vk_hdr64_active() ? &vk.modules.frag.ent_hdr64[use_pbr][0][0] : &vk.modules.frag.ent[use_pbr][0][0];
 			break;
 
 		case TYPE_SIGNLE_TEXTURE:
 			if ( def->hasFlowmap && !use_pbr ) {
 				const int fog = def->fog_stage ? 1 : 0;
 				vs_module = &vk.modules.vert.gen[0][0][0][0][fog];
-				fs_module = &vk.modules.frag.flowmap[fog];
+				fs_module = vk_hdr64_active() ? &vk.modules.frag.flowmap_hdr64[fog] : &vk.modules.frag.flowmap[fog];
 			} else {
 				vs_module = &vk.modules.vert.gen[use_pbr][0][0][0][0];
-				fs_module = &vk.modules.frag.gen[use_pbr][0][0][0];
+				fs_module = vk_hdr64_active() ? &vk.modules.frag.gen_hdr64[use_pbr][0][0][0] : &vk.modules.frag.gen[use_pbr][0][0][0];
 			}
 			break;
 
 		case TYPE_SIGNLE_TEXTURE_ENV:
 			vs_module = &vk.modules.vert.gen[use_pbr][0][0][1][0];
-			fs_module = &vk.modules.frag.gen[use_pbr][0][0][0];
+			fs_module = vk_hdr64_active() ? &vk.modules.frag.gen_hdr64[use_pbr][0][0][0] : &vk.modules.frag.gen[use_pbr][0][0][0];
 			break;
 
 		case TYPE_SIGNLE_TEXTURE_IDENTITY:
 			vs_module = &vk.modules.vert.ident1[use_pbr][0][0][0];
-			fs_module = &vk.modules.frag.ident1[use_pbr][0][0];
+			fs_module = vk_hdr64_active() ? &vk.modules.frag.ident1_hdr64[use_pbr][0][0] : &vk.modules.frag.ident1[use_pbr][0][0];
 			break;
 
 		case TYPE_SIGNLE_TEXTURE_IDENTITY_ENV:
 			vs_module = &vk.modules.vert.ident1[use_pbr][0][1][0];
-			fs_module = &vk.modules.frag.ident1[use_pbr][0][0];
+			fs_module = vk_hdr64_active() ? &vk.modules.frag.ident1_hdr64[use_pbr][0][0] : &vk.modules.frag.ident1[use_pbr][0][0];
 			break;
 
 		case TYPE_MULTI_TEXTURE_ADD2_IDENTITY:
 		case TYPE_MULTI_TEXTURE_MUL2_IDENTITY:
 			vs_module = &vk.modules.vert.ident1[use_pbr][1][0][0];
-			fs_module = &vk.modules.frag.ident1[use_pbr][1][0];
+			fs_module = vk_hdr64_active() ? &vk.modules.frag.ident1_hdr64[use_pbr][1][0] : &vk.modules.frag.ident1[use_pbr][1][0];
 			break;
 
 		case TYPE_MULTI_TEXTURE_ADD2_IDENTITY_ENV:
 		case TYPE_MULTI_TEXTURE_MUL2_IDENTITY_ENV:
 			vs_module = &vk.modules.vert.ident1[use_pbr][1][1][0];
-			fs_module = &vk.modules.frag.ident1[use_pbr][1][0];
+			fs_module = vk_hdr64_active() ? &vk.modules.frag.ident1_hdr64[use_pbr][1][0] : &vk.modules.frag.ident1[use_pbr][1][0];
 			break;
 
 		case TYPE_MULTI_TEXTURE_ADD2_FIXED_COLOR:
 		case TYPE_MULTI_TEXTURE_MUL2_FIXED_COLOR:
 			vs_module = &vk.modules.vert.fixed[use_pbr][1][0][0];
-			fs_module = &vk.modules.frag.fixed[use_pbr][1][0];
+			fs_module = vk_hdr64_active() ? &vk.modules.frag.fixed_hdr64[use_pbr][1][0] : &vk.modules.frag.fixed[use_pbr][1][0];
 			break;
 
 		case TYPE_MULTI_TEXTURE_ADD2_FIXED_COLOR_ENV:
 		case TYPE_MULTI_TEXTURE_MUL2_FIXED_COLOR_ENV:
 			vs_module = &vk.modules.vert.fixed[use_pbr][1][1][0];
-			fs_module = &vk.modules.frag.fixed[use_pbr][1][0];
+			fs_module = vk_hdr64_active() ? &vk.modules.frag.fixed_hdr64[use_pbr][1][0] : &vk.modules.frag.fixed[use_pbr][1][0];
 			break;
 
 		case TYPE_MULTI_TEXTURE_MUL2:
 		case TYPE_MULTI_TEXTURE_ADD2_1_1:
 		case TYPE_MULTI_TEXTURE_ADD2:
 			vs_module = &vk.modules.vert.gen[use_pbr][1][0][0][0];
-			fs_module = &vk.modules.frag.gen[use_pbr][1][0][0];
+			fs_module = vk_hdr64_active() ? &vk.modules.frag.gen_hdr64[use_pbr][1][0][0] : &vk.modules.frag.gen[use_pbr][1][0][0];
 			break;
 
 		case TYPE_MULTI_TEXTURE_MUL2_ENV:
 		case TYPE_MULTI_TEXTURE_ADD2_1_1_ENV:
 		case TYPE_MULTI_TEXTURE_ADD2_ENV:
 			vs_module = &vk.modules.vert.gen[use_pbr][1][0][1][0];
-			fs_module = &vk.modules.frag.gen[use_pbr][1][0][0];
+			fs_module = vk_hdr64_active() ? &vk.modules.frag.gen_hdr64[use_pbr][1][0][0] : &vk.modules.frag.gen[use_pbr][1][0][0];
 			break;
 
 		case TYPE_MULTI_TEXTURE_MUL3:
 		case TYPE_MULTI_TEXTURE_ADD3_1_1:
 		case TYPE_MULTI_TEXTURE_ADD3:
 			vs_module = &vk.modules.vert.gen[use_pbr][2][0][0][0];
-			fs_module = &vk.modules.frag.gen[use_pbr][2][0][0];
+			fs_module = vk_hdr64_active() ? &vk.modules.frag.gen_hdr64[use_pbr][2][0][0] : &vk.modules.frag.gen[use_pbr][2][0][0];
 			break;
 
 		case TYPE_MULTI_TEXTURE_MUL3_ENV:
 		case TYPE_MULTI_TEXTURE_ADD3_1_1_ENV:
 		case TYPE_MULTI_TEXTURE_ADD3_ENV:
 			vs_module = &vk.modules.vert.gen[use_pbr][2][0][1][0];
-			fs_module = &vk.modules.frag.gen[use_pbr][2][0][0];
+			fs_module = vk_hdr64_active() ? &vk.modules.frag.gen_hdr64[use_pbr][2][0][0] : &vk.modules.frag.gen[use_pbr][2][0][0];
 			break;
 
 		case TYPE_BLEND2_ADD:
@@ -11387,7 +11483,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 		case TYPE_BLEND2_MIX_ONE_MINUS_ALPHA:
 		case TYPE_BLEND2_DST_COLOR_SRC_ALPHA:
 			vs_module = &vk.modules.vert.gen[use_pbr][1][1][0][0];
-			fs_module = &vk.modules.frag.gen[use_pbr][1][1][0];
+			fs_module = vk_hdr64_active() ? &vk.modules.frag.gen_hdr64[use_pbr][1][1][0] : &vk.modules.frag.gen[use_pbr][1][1][0];
 			break;
 
 		case TYPE_BLEND2_ADD_ENV:
@@ -11398,7 +11494,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 		case TYPE_BLEND2_MIX_ONE_MINUS_ALPHA_ENV:
 		case TYPE_BLEND2_DST_COLOR_SRC_ALPHA_ENV:
 			vs_module = &vk.modules.vert.gen[use_pbr][1][1][1][0];
-			fs_module = &vk.modules.frag.gen[use_pbr][1][1][0];
+			fs_module = vk_hdr64_active() ? &vk.modules.frag.gen_hdr64[use_pbr][1][1][0] : &vk.modules.frag.gen[use_pbr][1][1][0];
 			break;
 
 		case TYPE_BLEND3_ADD:
@@ -11409,7 +11505,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 		case TYPE_BLEND3_MIX_ONE_MINUS_ALPHA:
 		case TYPE_BLEND3_DST_COLOR_SRC_ALPHA:
 			vs_module = &vk.modules.vert.gen[use_pbr][2][1][0][0];
-			fs_module = &vk.modules.frag.gen[use_pbr][2][1][0];
+			fs_module = vk_hdr64_active() ? &vk.modules.frag.gen_hdr64[use_pbr][2][1][0] : &vk.modules.frag.gen[use_pbr][2][1][0];
 			break;
 
 		case TYPE_BLEND3_ADD_ENV:
@@ -11420,7 +11516,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 		case TYPE_BLEND3_MIX_ONE_MINUS_ALPHA_ENV:
 		case TYPE_BLEND3_DST_COLOR_SRC_ALPHA_ENV:
 			vs_module = &vk.modules.vert.gen[use_pbr][2][1][1][0];
-			fs_module = &vk.modules.frag.gen[use_pbr][2][1][0];
+			fs_module = vk_hdr64_active() ? &vk.modules.frag.gen_hdr64[use_pbr][2][1][0] : &vk.modules.frag.gen[use_pbr][2][1][0];
 			break;
 
 		case TYPE_COLOR_BLACK:
@@ -11428,22 +11524,22 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 		case TYPE_COLOR_GREEN:
 		case TYPE_COLOR_RED:
 			vs_module = &vk.modules.color_vs;
-			fs_module = &vk.modules.color_fs;
+			fs_module = vk_hdr64_active() ? &vk.modules.color_fs_hdr64 : &vk.modules.color_fs;
 			break;
 
 		case TYPE_FOG_ONLY:
 			vs_module = &vk.modules.fog_vs;
-			fs_module = &vk.modules.fog_fs;
+			fs_module = vk_hdr64_active() ? &vk.modules.fog_fs_hdr64 : &vk.modules.fog_fs;
 			break;
 
 		case TYPE_DOT:
 			vs_module = &vk.modules.dot_vs;
-			fs_module = &vk.modules.dot_fs;
+			fs_module = vk_hdr64_active() ? &vk.modules.dot_fs_hdr64 : &vk.modules.dot_fs;
 			break;
 
 		case TYPE_OCCLUSION_BBOX:
 			vs_module = &vk.modules.color_vs;
-			fs_module = &vk.modules.color_fs;
+			fs_module = vk_hdr64_active() ? &vk.modules.color_fs_hdr64 : &vk.modules.color_fs;
 			break;
 
 		default:
@@ -12530,7 +12626,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
 	dynamic_state.pNext = NULL;
 	dynamic_state.flags = 0;
-	dynamic_state.dynamicStateCount = ARRAY_LEN( dynamic_state_array );
+	dynamic_state.dynamicStateCount = main_dynamic_state_count;
 	dynamic_state.pDynamicStates = dynamic_state_array;
 
 	create_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -13002,6 +13098,21 @@ void vk_clear_color( const vec4_t color ) {
 	qvkCmdClearAttachments( vk.cmd->command_buffer, 1, &attachment, 1, &clear_rect );
 }
 
+void vk_set_color_write_mask( qboolean r, qboolean g, qboolean b, qboolean a )
+{
+	VkColorComponentFlags mask;
+
+	if ( !vk.active || !vk.colorWriteMaskDynamic || !qvkCmdSetColorWriteMaskEXT )
+		return;
+
+	mask = 0;
+	if ( r ) mask |= VK_COLOR_COMPONENT_R_BIT;
+	if ( g ) mask |= VK_COLOR_COMPONENT_G_BIT;
+	if ( b ) mask |= VK_COLOR_COMPONENT_B_BIT;
+	if ( a ) mask |= VK_COLOR_COMPONENT_A_BIT;
+
+	qvkCmdSetColorWriteMaskEXT( vk.cmd->command_buffer, 0, 1, &mask );
+}
 
 void vk_clear_depth( qboolean clear_stencil ) {
 
@@ -14882,6 +14993,13 @@ static void vk_volumetric_composite_pass( void )
 	vk_end_render_pass();
 }
 
+typedef struct {
+	float threshold;
+	float localContrast;
+	int maxSearchSteps;
+	int pad;
+} SMAAPushConstants_t;
+
 static void vk_run_smaa_pass( VkPipeline pipeline, VkRenderPass pass, VkFramebuffer framebuffer, VkDescriptorSet color_descriptor, VkDescriptorSet aux_descriptor, uint32_t width, uint32_t height )
 {
 	if ( !pipeline || pass == VK_NULL_HANDLE || framebuffer == VK_NULL_HANDLE || vk.pipeline_layout_smaa == VK_NULL_HANDLE || color_descriptor == VK_NULL_HANDLE ) {
@@ -14891,6 +15009,16 @@ static void vk_run_smaa_pass( VkPipeline pipeline, VkRenderPass pass, VkFramebuf
 	vk_begin_render_pass( pass, framebuffer, qfalse, width, height );
 
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline );
+
+	{
+		SMAAPushConstants_t pc;
+		pc.threshold = r_smaa_threshold ? r_smaa_threshold->value : 0.1f;
+		pc.localContrast = r_smaa_local_contrast ? r_smaa_local_contrast->value : 2.0f;
+		pc.maxSearchSteps = ( r_smaa_max_search_steps && r_smaa_max_search_steps->integer >= 8 && r_smaa_max_search_steps->integer <= 32 )
+			? r_smaa_max_search_steps->integer : 16;
+		pc.pad = 0;
+		qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_smaa, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( pc ), &pc );
+	}
 
 	VkDescriptorSet descriptor_sets[2];
 	descriptor_sets[0] = color_descriptor;
@@ -15009,9 +15137,8 @@ static void vk_volumetric_fog_pass( void )
 		if ( tier >= 2 || tier == 4 || !r_volumetricFog->integer || !vk.fboActive ||
 			!tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
 			vk_reset_volumetric_history();
-			/* SMAA when volumetrics skipped: run if we have world and SMAA active */
-			if ( vk.smaaActive && tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) &&
-				vk.smaa_output_image_view != VK_NULL_HANDLE ) {
+			/* SMAA when volumetrics skipped: run if SMAA active (menus and in-game) */
+			if ( vk.smaaActive && vk.smaa_output_image_view != VK_NULL_HANDLE ) {
 				vk_smaa_passes();
 				vk_update_post_fog_descriptors( vk.smaa_output_image_view );
 			} else {
@@ -15048,8 +15175,7 @@ static void vk_volumetric_fog_pass( void )
 		vk_prev_matrices_valid = qfalse;
 		vk_prev_volumetric_time_valid = qfalse;
 		Com_Memset( &vk_volumetric_validation_state, 0, sizeof( vk_volumetric_validation_state ) );
-		if ( vk.smaaActive && tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) &&
-			vk.smaa_output_image_view != VK_NULL_HANDLE ) {
+		if ( vk.smaaActive && vk.smaa_output_image_view != VK_NULL_HANDLE ) {
 			vk_smaa_passes();
 			vk_update_post_fog_descriptors( vk.smaa_output_image_view );
 		} else {
@@ -15084,8 +15210,7 @@ static void vk_volumetric_fog_pass( void )
 		vk_prev_matrices_valid = qfalse;
 		vk_prev_volumetric_time_valid = qfalse;
 		Com_Memset( &vk_volumetric_validation_state, 0, sizeof( vk_volumetric_validation_state ) );
-		if ( vk.smaaActive && tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) &&
-			vk.smaa_output_image_view != VK_NULL_HANDLE ) {
+		if ( vk.smaaActive && vk.smaa_output_image_view != VK_NULL_HANDLE ) {
 			vk_smaa_passes();
 			vk_update_post_fog_descriptors( vk.smaa_output_image_view );
 		} else {
@@ -15286,6 +15411,13 @@ void vk_prepare_2d( void )
 		backEnd.doneFog = qtrue;
 		if ( vk.renderPassIndex == RENDER_PASS_MAIN ) {
 			vk_end_render_pass();
+			/* Ensure gamma/luminance sample correct source (avoids solid-color in menus). */
+			if ( vk.smaaActive && vk.smaa_output_image_view != VK_NULL_HANDLE ) {
+				vk_smaa_passes();
+				vk_update_post_fog_descriptors( vk.smaa_output_image_view );
+			} else {
+				vk_update_post_fog_descriptors( vk.color_image_view );
+			}
 			vk_begin_post_bloom_render_pass();
 		}
 		return;
@@ -15559,6 +15691,9 @@ _retry:
 	begin_info.pInheritanceInfo = NULL;
 
 	VK_CHECK( qvkBeginCommandBuffer( vk.cmd->command_buffer, &begin_info ) );
+
+	/* Default color write mask (all enabled) when using VK_EXT_extended_dynamic_state3 */
+	vk_set_color_write_mask( qtrue, qtrue, qtrue, qtrue );
 
 	// Ensure visibility of geometry buffers writes.
 	//record_buffer_memory_barrier( vk.cmd->command_buffer, vk.cmd->vertex_buffer, vk.geometry_buffer_size, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_ACCESS_HOST_WRITE_BIT, VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT );
@@ -15856,8 +15991,9 @@ void vk_end_frame( void )
 				}
 			}
 
-			vk.renderWidth = gls.windowWidth;
-			vk.renderHeight = gls.windowHeight;
+			/* Gamma pass: render to swapchain (window size). Use vid dimensions as fallback if window is 0 (minimized). */
+			vk.renderWidth = ( gls.windowWidth > 0 ) ? gls.windowWidth : glConfig.vidWidth;
+			vk.renderHeight = ( gls.windowHeight > 0 ) ? gls.windowHeight : glConfig.vidHeight;
 
 			vk.renderScaleX = 1.0;
 			vk.renderScaleY = 1.0;
@@ -17652,7 +17788,11 @@ static void vk_create_prefilter_pipeline( filterDef *def )
 	VkPipelineColorBlendAttachmentState		attachment_blend_state = {0};
 	VkPipelineColorBlendStateCreateInfo		blend_state = {0};
 	VkPipelineDynamicStateCreateInfo		dynamic_state;
-	VkDynamicState							dynamic_state_array[2] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+	VkDynamicState							dynamic_state_array[3] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+	uint32_t								prefilter_dyn_count = 2;
+	if ( vk.colorWriteMaskDynamic ) {
+		dynamic_state_array[prefilter_dyn_count++] = VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT;
+	}
 	VkGraphicsPipelineCreateInfo			create_info = {0};
 	VkPipelineLayoutCreateInfo				pipeline_layout;
 	VkPushConstantRange						push_range;
@@ -17713,7 +17853,7 @@ static void vk_create_prefilter_pipeline( filterDef *def )
 	dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
     dynamic_state.pNext = NULL;
     dynamic_state.flags = 0;  
-	dynamic_state.dynamicStateCount = ARRAY_LEN( dynamic_state_array );
+	dynamic_state.dynamicStateCount = prefilter_dyn_count;
     dynamic_state.pDynamicStates = dynamic_state_array;
 	
 	vertex_input_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;

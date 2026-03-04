@@ -82,9 +82,12 @@
 - [x] Texture compression (BC7/KTX2)
 - [x] Optional USD format for entities and shaders (com_usdEntities, com_usdShaders; GPLv2 parser)
 - [x] DTLS network encryption (USE_DTLS=ON, net_dtls/net_dtls_key cvars; AES-256-GCM)
+- [x] Steam SDR (USE_STEAM_NETWORKING=ON, Steamworks SDK; net_sdr 1, connect steam:STEAMID)
+- [x] Steam API + Steam Deck (USE_STEAM=ON; achievements, overlay, rich presence, Deck auto-detect, steamdeck.cfg)
 - [x] clang-tidy / cppcheck static analysis (CI job, continue-on-error)
 
 ### Long-Term (future work, not in active development)
-- [ ] RTX ray tracing — hardware-accelerated ray tracing on NVIDIA RTX GPUs
-- [ ] iOS Metal backend — native Metal renderer for iOS/macOS
+- [ ] Vulkan RTX — VK_KHR_ray_tracing_pipeline integration (BLAS/TLAS, raygen/miss/closest-hit). See docs/RENDERERS_FUTURE.md.
+- [ ] Metal renderer — native Metal backend for macOS/iOS (Apple Silicon). See docs/RENDERERS_FUTURE.md.
+- [ ] DXR renderer — DirectX 12 + DirectX Raytracing for Windows. See docs/RENDERERS_FUTURE.md.
 - [ ] WebAssembly + WebGPU — browser deployment via Emscripten + WebGPU

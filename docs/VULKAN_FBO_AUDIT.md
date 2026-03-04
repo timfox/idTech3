@@ -58,7 +58,7 @@
 - **r_hdr 0**: `vk.base_format.format` (8-bit)
 - **r_hdr 1**: RGBA16F
 - **r_hdr 2**: RGBA32F (fallback to 16F if unsupported)
-- **r_hdr 3**: RGBA64F (not implemented; falls back to 32F)
+- **r_hdr 3**: RGBA64F (shaderFloat64 enabled when supported; fragment shaders still vec4, falls back to 32F)
 
 ### Layout Transitions (fboActive)
 - Main pass: `initialLayout = SHADER_READ_ONLY_OPTIMAL`, `finalLayout = SHADER_READ_ONLY_OPTIMAL`
@@ -184,8 +184,8 @@ vk_update_color_descriptor_image( vk.color_image_view );
 - `vid_restart`
 - If still broken: `r_fbo 0` as workaround
 
-### Identified Gaps
-1. **SMAA when volumetrics skipped**: Volumetrics-skipped path always uses `color_image_view`. SMAA is never run in that path. If user expects SMAA in menus/no-world, they will not get it — but that is a missing-feature, not a solid-color bug.
+### Identified Gaps (Fixed)
+1. **SMAA when volumetrics skipped**: Fixed. SMAA now runs when volumetrics are skipped (tier off, resources missing, MSAA incomplete) and in menus/no-world (`vk_prepare_2d` menu path). Descriptors updated in all paths.
 2. **Luminance when volumetrics skipped**: Luminance binding 0 is set to `color_image_view`. If `r_exposure_auto` is on and luminance was previously fed from `smaa_output`, the luminance pass now reads from `color_image_view`. That is correct for the current frame.
 3. **Layout transition when volumetrics skipped**: The main/post_bloom pass leaves `color_image` in `SHADER_READ_ONLY_OPTIMAL` (finalLayout). No explicit transition is needed before gamma. Layout handling appears correct.
 
@@ -216,16 +216,16 @@ vk_update_color_descriptor_image( vk.color_image_view );
 
 ## Identified Bugs and Risks
 
-### High Priority
-1. **Stale descriptor when volumetrics skip early**: If `vk_volumetric_fog_pass` returns early (e.g. `backEnd.doneFog`, tier off, missing resources), it sets `backEnd.doneFog = qtrue` and returns. The caller’s `else` branch then updates descriptors. Flow appears correct, but any path that skips volumetrics without running the fallback could leave stale descriptors.
+### High Priority (Fixed)
+1. **Stale descriptor when volumetrics skip early** (fixed): If `vk_volumetric_fog_pass` returns early (e.g. `backEnd.doneFog`, tier off, missing resources), it sets `backEnd.doneFog = qtrue` and returns. The caller’s `else` branch then updates descriptors. Fixed: vk_prepare_2d menu path now calls vk_update_post_fog_descriptors. All skip paths update descriptors.
 2. **Potential layout/transition gap**: When volumetrics are skipped, no explicit transition is recorded for `color_image` before gamma. The render pass `finalLayout` should handle this; worth validating with Vulkan validation layers.
 
-### Medium Priority
-3. **SMAA when volumetrics skipped**: Fixed. SMAA now runs when volumetrics are skipped (tier off, r_volumetricFog 0, missing resources) if tr.world and SMAA active. Depth layout restored for next frame.
+### Medium Priority (Fixed)
+3. **SMAA when volumetrics skipped**: Fixed. SMAA now runs when volumetrics are skipped (tier off, r_volumetricFog 0, missing resources) and in menus/no-world. Descriptors updated in all paths.
 4. **r_exposure_auto + r_volumetricFog 0**: QUICKSTART suggests disabling both. Luminance pass runs independently; if there is a bug in luminance or tone mapping, it could contribute to solid/wrong colors.
 
-### Low Priority
-5. **gls vs glConfig size mismatch**: Gamma uses `gls.windowWidth/Height`; main uses `glConfig.vidWidth/Height`. Verify these are in sync in all configurations.
+### Low Priority (Addressed)
+5. **gls vs glConfig size mismatch**: Gamma uses `gls.windowWidth/Height` (swapchain size); main uses `glConfig.vidWidth/Height` (render resolution). Intentional: gamma samples color_image (vid size) and outputs to swapchain (window size). Fallback to vid dimensions when window is 0 (minimized).
 
 ---
 
@@ -237,7 +237,7 @@ vk_update_color_descriptor_image( vk.color_image_view );
 
 ### Post-Process
 - **Unify descriptor update**: Factor descriptor updates into a single function used by both volumetric and non-volumetric paths to avoid divergence.
-- **SMAA when volumetrics skipped**: Optionally run SMAA even when volumetrics are skipped, so menus and no-world still get antialiasing.
+- **SMAA when volumetrics skipped**: Implemented. SMAA runs in menus and when volumetrics are skipped.
 - **Logging**: Add `PRINT_DEVELOPER` logs when volumetrics are skipped and descriptors are updated, to aid debugging.
 
 ### Deferred / Forward+

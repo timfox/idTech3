@@ -3,11 +3,15 @@
 layout(set = 0, binding = 0) uniform sampler2D colorTexture;
 layout(set = 1, binding = 0) uniform sampler2D previousStageTexture;
 
+layout(push_constant) uniform SMAAParams {
+    float threshold;
+    float localContrast;
+    int maxSearchSteps;
+    int _pad;
+} pc;
+
 layout(location = 0) in vec2 frag_tex_coord;
 layout(location = 0) out vec4 out_edge;
-
-const float SMAA_THRESHOLD = 0.05;
-const float SMAA_LOCAL_CONTRAST_ADAPTATION = 2.0;
 
 vec4 texelSize;
 
@@ -33,7 +37,7 @@ void main()
     float Lbottom= rgb2luma(texture(colorTexture, uv + vec2(0.0,  texel.y)).rgb);
 
     vec4 delta = abs(vec4(L) - vec4(Lleft, Ltop, Lright, Lbottom));
-    vec2 edges = step(vec2(SMAA_THRESHOLD), delta.xy);
+    vec2 edges = step(vec2(pc.threshold), delta.xy);
 
     if (dot(edges, vec2(1.0)) == 0.0) {
         discard;
@@ -46,7 +50,7 @@ void main()
     float maxDelta = max(max(delta2.x, delta2.y), max(delta2.z, delta2.w));
     maxDelta = max(maxDelta, max(delta.z, delta.w));
 
-    edges *= step(vec2(maxDelta * (1.0 / SMAA_LOCAL_CONTRAST_ADAPTATION)), delta.xy);
+    edges *= step(vec2(maxDelta * (1.0 / pc.localContrast)), delta.xy);
 
     out_edge = vec4(edges, 0.0, 1.0);
 }

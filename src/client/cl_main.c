@@ -3326,6 +3326,29 @@ static void CL_CheckUserinfo( void ) {
 
 /*
 ==================
+CL_Steam_UpdateRichPresence
+Updates Steam rich presence based on client state.
+==================
+*/
+static void CL_Steam_UpdateRichPresence( void ) {
+	if ( !Steam_IsInitialized() )
+		return;
+	if ( cls.state == CA_ACTIVE ) {
+		if ( clc.demoplaying )
+			Steam_SetRichPresence( "status", "Playing demo" );
+		else if ( cls.servername[0] )
+			Steam_SetRichPresence( "status", cls.servername );
+		else
+			Steam_SetRichPresence( "status", "In game" );
+	} else if ( cls.state == CA_CONNECTING || cls.state == CA_CHALLENGING ) {
+		Steam_SetRichPresence( "status", "Connecting..." );
+	} else {
+		Steam_SetRichPresence( "status", "In menu" );
+	}
+}
+
+/*
+==================
 CL_Frame
 ==================
 */
@@ -3476,6 +3499,7 @@ void CL_Frame( int msec, int realMsec ) {
 	CL_VoIP_Frame();
 	WS_Frame();
 	Steam_Frame();
+	CL_Steam_UpdateRichPresence();
 
 	Con_RunConsole();
 }

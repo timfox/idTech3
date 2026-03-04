@@ -550,6 +550,10 @@ qboolean NET_CompareBaseAdrMask( const netadr_t *a, const netadr_t *b, unsigned 
 			netmask = 128;
 	}
 #endif
+#ifdef USE_STEAM_NETWORKING
+	else if (a->type == NA_STEAMID)
+		return (a->ipv.steamid == b->ipv.steamid);
+#endif
 	else
 	{
 		Com_Printf ("%s: bad address type\n", __func__);
@@ -598,6 +602,10 @@ const char *NET_AdrToString( const netadr_t *a )
 		Q_strncpyz( s, "loopback", sizeof( s ) );
 	else if (a->type == NA_BOT)
 		Q_strncpyz( s, "bot", sizeof( s ) );
+#ifdef USE_STEAM_NETWORKING
+	else if (a->type == NA_STEAMID)
+		Com_sprintf( s, sizeof( s ), "steam:%llu", (unsigned long long)a->ipv.steamid );
+#endif
 #ifdef USE_IPV6
 	else if (a->type == NA_IP || a->type == NA_IP6)
 #else
@@ -627,6 +635,10 @@ const char *NET_AdrToStringwPort( const netadr_t *a )
 	else if(a->type == NA_IP6)
 		Com_sprintf(s, sizeof(s), "[%s]:%hu", NET_AdrToString(a), ntohs(a->port));
 #endif
+#ifdef USE_STEAM_NETWORKING
+	else if (a->type == NA_STEAMID)
+		Com_sprintf(s, sizeof(s), "steam:%llu", (unsigned long long)a->ipv.steamid);
+#endif
 
 	return s;
 }
@@ -646,6 +658,10 @@ qboolean NET_CompareAdr( const netadr_t *a, const netadr_t *b )
 		if (a->port == b->port)
 			return qtrue;
 	}
+#ifdef USE_STEAM_NETWORKING
+	else if (a->type == NA_STEAMID)
+		return qtrue;
+#endif
 	else
 		return qtrue;
 		
@@ -697,6 +713,11 @@ static qboolean NET_GetPacket( netadr_t *net_from, msg_t *net_message, const fd_
 	sockaddr_t	from;
 	socklen_t	fromlen;
 	int		err;
+
+#ifdef USE_STEAM_NETWORKING
+	if ( NET_SDR_ReceivePacket( net_from, net_message ) )
+		return qtrue;
+#endif
 
 	if(ip_socket != INVALID_SOCKET && FD_ISSET(ip_socket, fdr))
 	{
@@ -1953,6 +1974,14 @@ qboolean NET_Sleep( int timeout )
 		timeout = 0;
 
 	FD_ZERO( &fdr );
+
+#ifdef USE_STEAM_NETWORKING
+	NET_SDR_Frame();
+	if ( NET_SDR_HasPacket() ) {
+		NET_Event( &fdr );
+		return qfalse;
+	}
+#endif
 
 	if ( ip_socket != INVALID_SOCKET )
 	{

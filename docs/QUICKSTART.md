@@ -50,6 +50,10 @@ The default renderer is Vulkan. To use OpenGL instead:
 ./idtech3 +set r_renderer opengl
 ```
 
+## Steam Deck
+
+When running under Steam on Steam Deck, the engine auto-detects the device and loads `base/steamdeck.cfg` (gamepad enabled, Vulkan, 60 FPS cap). Ensure `steamdeck.cfg` exists in your base folder. Build with `-DUSE_STEAM=ON -DSTEAMWORKS_SDK=/path/to/sdk` for full Steam API support.
+
 ## Troubleshooting
 
 - **"No game data"** — Ensure `baseq3/` (or `base/`) exists with at least one `.pk3` file.

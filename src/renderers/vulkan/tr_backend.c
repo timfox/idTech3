@@ -1983,13 +1983,13 @@ void RB_ShowImages( void ) {
 =============
 RB_ColorMask
 =============
-* Deferred: requires VK_EXT_extended_dynamic_state3 for vkCmdSetColorWriteMaskEXT.
+* Uses VK_EXT_extended_dynamic_state3 (vkCmdSetColorWriteMaskEXT) when available.
 */
 static const void *RB_ColorMask( const void *data )
 {
 	const colorMaskCommand_t *cmd = data;
 #ifdef USE_VULKAN
-	/* Stub: not implemented for Vulkan. */
+	vk_set_color_write_mask( cmd->rgba[0], cmd->rgba[1], cmd->rgba[2], cmd->rgba[3] );
 #else
 	qglColorMask( cmd->rgba[0], cmd->rgba[1], cmd->rgba[2], cmd->rgba[3] );
 #endif
