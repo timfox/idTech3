@@ -33,6 +33,7 @@ float    PostFX_SSR_GetIntensity(void);
 qboolean PostFX_Atmosphere_IsEnabled(void);
 void     PostFX_Atmosphere_GetSunDirection(float *x, float *y, float *z);
 float    PostFX_Atmosphere_GetSunIntensity(void);
+float    PostFX_Atmosphere_GetScale(void);
 float    PostFX_Atmosphere_GetRayleighHeight(void);
 float    PostFX_Atmosphere_GetMieHeight(void);
 float    PostFX_Atmosphere_GetMieG(void);

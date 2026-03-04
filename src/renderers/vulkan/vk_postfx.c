@@ -28,6 +28,7 @@ static cvar_t *r_atmosphere_sunDirX;
 static cvar_t *r_atmosphere_sunDirY;
 static cvar_t *r_atmosphere_sunDirZ;
 static cvar_t *r_atmosphere_sunIntensity;
+static cvar_t *r_atmosphere_scale;
 static cvar_t *r_atmosphere_rayleighHeight;
 static cvar_t *r_atmosphere_mieHeight;
 static cvar_t *r_atmosphere_mieG;
@@ -69,6 +70,7 @@ void PostFX_RegisterCvars(void) {
 	r_atmosphere_sunDirY     = ri.Cvar_Get("r_atmosphere_sunDirY",     "0.8",  CVAR_ARCHIVE);
 	r_atmosphere_sunDirZ     = ri.Cvar_Get("r_atmosphere_sunDirZ",     "0.5",  CVAR_ARCHIVE);
 	r_atmosphere_sunIntensity = ri.Cvar_Get("r_atmosphere_sunIntensity", "22.0", CVAR_ARCHIVE);
+	r_atmosphere_scale = ri.Cvar_Get("r_atmosphere_scale", "4.0", CVAR_ARCHIVE);
 	r_atmosphere_rayleighHeight = ri.Cvar_Get("r_atmosphere_rayleighHeight", "8000", CVAR_ARCHIVE);
 	r_atmosphere_mieHeight   = ri.Cvar_Get("r_atmosphere_mieHeight",   "1200", CVAR_ARCHIVE);
 	r_atmosphere_mieG        = ri.Cvar_Get("r_atmosphere_mieG",        "0.76", CVAR_ARCHIVE);
@@ -118,6 +120,7 @@ void PostFX_Atmosphere_GetSunDirection(float *x, float *y, float *z) {
 	if (z) *z = r_atmosphere_sunDirZ ? r_atmosphere_sunDirZ->value : 0.5f;
 }
 float PostFX_Atmosphere_GetSunIntensity(void) { return r_atmosphere_sunIntensity ? r_atmosphere_sunIntensity->value : 22.0f; }
+float PostFX_Atmosphere_GetScale(void) { return r_atmosphere_scale ? r_atmosphere_scale->value : 4.0f; }
 float PostFX_Atmosphere_GetRayleighHeight(void) { return r_atmosphere_rayleighHeight ? r_atmosphere_rayleighHeight->value : 8000.0f; }
 float PostFX_Atmosphere_GetMieHeight(void) { return r_atmosphere_mieHeight ? r_atmosphere_mieHeight->value : 1200.0f; }
 float PostFX_Atmosphere_GetMieG(void) { return r_atmosphere_mieG ? r_atmosphere_mieG->value : 0.76f; }

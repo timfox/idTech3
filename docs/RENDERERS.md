@@ -110,6 +110,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 | `r_exposure_auto_target` | 0.5 | Target exposure for eye adaptation |
 | `r_exposure_auto_speed` | 2.0 | Adaptation speed (higher = faster) |
 | `r_atmosphere` | 1 | Procedural atmospheric sky (Rayleigh+Mie). Replaces grey sky when no HDR skybox. |
+| `r_atmosphere_scale` | 4.0 | HDR scale multiplier for sky brightness. Works with auto exposure; increase if sky appears dark. |
 | `r_skyboxHDR` | "" | Path to HDR EXR/PNG skybox panorama (empty = use atmosphere or map skybox). |
 | `r_ssao` | 0 | SSAO enable |
 | `r_firstPersonFov` | 90 | Horizontal FOV (degrees) for first-person primitives (range 50–150) |
