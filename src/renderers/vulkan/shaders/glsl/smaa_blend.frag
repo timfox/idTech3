@@ -3,10 +3,15 @@
 layout(set = 0, binding = 0) uniform sampler2D colorTexture;
 layout(set = 1, binding = 0) uniform sampler2D edgeTexture;
 
+layout(push_constant) uniform SMAAParams {
+    float threshold;
+    float localContrast;
+    int maxSearchSteps;
+    int _pad;
+} pc;
+
 layout(location = 0) in vec2 frag_tex_coord;
 layout(location = 0) out vec4 out_weight;
-
-const int SMAA_MAX_SEARCH_STEPS = 16;
 
 vec2 texelSize;
 
@@ -17,42 +22,50 @@ void init() {
 
 float searchXLeft(vec2 uv) {
     vec2 e = vec2(0.0, 1.0);
-    for (int i = 0; i < SMAA_MAX_SEARCH_STEPS; i++) {
+    int maxSteps = pc.maxSearchSteps;
+    for (int i = 0; i < 32; i++) {
+        if (i >= maxSteps) break;
         e = texture(edgeTexture, uv).rg;
         uv -= vec2(2.0 * texelSize.x, 0.0);
         if (e.r < 0.5 || e.g > 0.5) break;
     }
-    return -(2.0 * float(SMAA_MAX_SEARCH_STEPS)) + 2.0 * (uv.x / texelSize.x);
+    return -(2.0 * float(maxSteps)) + 2.0 * (uv.x / texelSize.x);
 }
 
 float searchXRight(vec2 uv) {
     vec2 e = vec2(0.0, 1.0);
-    for (int i = 0; i < SMAA_MAX_SEARCH_STEPS; i++) {
+    int maxSteps = pc.maxSearchSteps;
+    for (int i = 0; i < 32; i++) {
+        if (i >= maxSteps) break;
         e = texture(edgeTexture, uv).rg;
         uv += vec2(2.0 * texelSize.x, 0.0);
         if (e.r < 0.5 || e.g > 0.5) break;
     }
-    return 2.0 * float(SMAA_MAX_SEARCH_STEPS) - 2.0 + 2.0 * (uv.x / texelSize.x);
+    return 2.0 * float(maxSteps) - 2.0 + 2.0 * (uv.x / texelSize.x);
 }
 
 float searchYUp(vec2 uv) {
     vec2 e = vec2(1.0, 0.0);
-    for (int i = 0; i < SMAA_MAX_SEARCH_STEPS; i++) {
+    int maxSteps = pc.maxSearchSteps;
+    for (int i = 0; i < 32; i++) {
+        if (i >= maxSteps) break;
         e = texture(edgeTexture, uv).rg;
         uv -= vec2(0.0, 2.0 * texelSize.y);
         if (e.g < 0.5 || e.r > 0.5) break;
     }
-    return -(2.0 * float(SMAA_MAX_SEARCH_STEPS)) + 2.0 * (uv.y / texelSize.y);
+    return -(2.0 * float(maxSteps)) + 2.0 * (uv.y / texelSize.y);
 }
 
 float searchYDown(vec2 uv) {
     vec2 e = vec2(1.0, 0.0);
-    for (int i = 0; i < SMAA_MAX_SEARCH_STEPS; i++) {
+    int maxSteps = pc.maxSearchSteps;
+    for (int i = 0; i < 32; i++) {
+        if (i >= maxSteps) break;
         e = texture(edgeTexture, uv).rg;
         uv += vec2(0.0, 2.0 * texelSize.y);
         if (e.g < 0.5 || e.r > 0.5) break;
     }
-    return 2.0 * float(SMAA_MAX_SEARCH_STEPS) - 2.0 + 2.0 * (uv.y / texelSize.y);
+    return 2.0 * float(maxSteps) - 2.0 + 2.0 * (uv.y / texelSize.y);
 }
 
 float computeAreaWeight(float d1, float d2) {

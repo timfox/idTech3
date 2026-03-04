@@ -400,6 +400,11 @@ int Com_MD5Addr( const netadr_t *addr, int timestamp )
 			MD5Update( &ctx_in, addr->ipv._6, 16 ); 
 			break;
 #endif
+#ifdef USE_STEAM_NETWORKING
+		case NA_STEAMID:
+			MD5Update( &ctx_in, (const byte *)&addr->ipv.steamid, sizeof( addr->ipv.steamid ) );
+			break;
+#endif
 		default:
 			break;
 	}

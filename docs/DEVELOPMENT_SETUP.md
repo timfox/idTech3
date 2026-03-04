@@ -90,6 +90,19 @@ cmake .. \
 
 Each codec is optional and detected via pkg-config. Missing libraries are reported as warnings and the codec is disabled gracefully.
 
+### Steam API and SDR (Steam Datagram Relay)
+```bash
+# Full Steam API (achievements, overlay, rich presence, Steam Deck detection)
+cmake .. -DUSE_STEAM=ON -DSTEAMWORKS_SDK=/path/to/steamworks_sdk ...
+
+# Steam SDR transport (implies USE_STEAM when SDK found)
+cmake .. -DUSE_STEAM_NETWORKING=ON -DSTEAMWORKS_SDK=/path/to/steamworks_sdk ...
+```
+Requires Steamworks SDK with `steam_api.h` (and `isteamnetworkingsockets.h` for SDR). Set `STEAMWORKS_SDK` to the SDK root.
+
+- **USE_STEAM**: Achievements, overlay, rich presence, Steam Deck auto-detection. When Deck is detected, `base/steamdeck.cfg` is auto-exec'd.
+- **USE_STEAM_NETWORKING**: SDR transport. Use `net_sdr 1` at runtime. Connect via `connect steam:STEAMID` when server advertises its SteamID.
+
 ### DTLS Network Encryption
 ```bash
 cmake .. -DUSE_DTLS=ON ...

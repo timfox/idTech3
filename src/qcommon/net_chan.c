@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "q_shared.h"
 #include "qcommon.h"
+#include "net_sdr.h"
 
 /*
 
@@ -717,6 +718,11 @@ void NET_SendPacket( netsrc_t sock, int length, const void *data, const netadr_t
 		NET_SendLoopPacket( sock, length, data );
 	}
 #endif
+#ifdef USE_STEAM_NETWORKING
+	else if ( NET_SDR_UseForAddress( to ) && NET_SDR_SendPacket( sock, length, data, to ) ) {
+		return;
+	}
+#endif
 	else {
 		Sys_SendPacket( length, data, to );
 	}
@@ -800,6 +806,21 @@ int NET_StringToAdr( const char *s, netadr_t *a, netadrtype_t family )
 		// as NA_LOOPBACK doesn't require ports report port was given.
 		return 1;
 	}
+
+#ifdef USE_STEAM_NETWORKING
+	if ( !Q_stricmpn( s, "steam:", 6 ) ) {
+		unsigned long long steamid;
+		Com_Memset( a, 0, sizeof( *a ) );
+		if ( sscanf( s + 6, "%llu", &steamid ) == 1 ) {
+			a->type = NA_STEAMID;
+			a->ipv.steamid = steamid;
+			a->port = 0;
+			return 1;
+		}
+		a->type = NA_BAD;
+		return 0;
+	}
+#endif
 
 	Q_strncpyz( base, s, sizeof( base ) );
 	

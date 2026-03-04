@@ -11,11 +11,12 @@
  * Ray-marches through the depth buffer in screen space to find
  * reflection hit points. Uses hierarchical tracing with binary
  * search refinement for performance and accuracy.
+ *
+ * Normals are derived from depth gradients (no G-buffer required).
  */
 
 layout(set = 0, binding = 0) uniform sampler2D colorTexture;
 layout(set = 1, binding = 0) uniform sampler2D depthTexture;
-layout(set = 2, binding = 0) uniform sampler2D normalTexture;
 
 layout(location = 0) in vec2 frag_tex_coord;
 layout(location = 0) out vec4 out_color;
@@ -41,6 +42,26 @@ vec2 projectToScreen(vec3 viewPos) {
 	return (clip.xy / clip.w) * 0.5 + 0.5;
 }
 
+/* Derive view-space normal from depth using central differences (no G-buffer). */
+vec3 normalFromDepth(vec2 uv, vec2 invSize) {
+	float d = texture(depthTexture, uv).r;
+	float dx = texture(depthTexture, uv + vec2(invSize.x, 0.0)).r;
+	float dy = texture(depthTexture, uv + vec2(0.0, invSize.y)).r;
+	float dxm = texture(depthTexture, uv - vec2(invSize.x, 0.0)).r;
+	float dym = texture(depthTexture, uv - vec2(0.0, invSize.y)).r;
+
+	vec3 p = viewFromDepth(uv, d);
+	vec3 px = viewFromDepth(uv + vec2(invSize.x, 0.0), dx);
+	vec3 py = viewFromDepth(uv + vec2(0.0, invSize.y), dy);
+	vec3 pxm = viewFromDepth(uv - vec2(invSize.x, 0.0), dxm);
+	vec3 pym = viewFromDepth(uv - vec2(0.0, invSize.y), dym);
+
+	vec3 ddx = (px - pxm) * 0.5;
+	vec3 ddy = (py - pym) * 0.5;
+	vec3 normal = normalize(cross(ddx, ddy));
+	return normal;
+}
+
 void main() {
 	float rawDepth = texture(depthTexture, frag_tex_coord).r;
 	vec3 sceneColor = texture(colorTexture, frag_tex_coord).rgb;
@@ -58,7 +79,8 @@ void main() {
 	}
 
 	vec3 viewPos = viewFromDepth(frag_tex_coord, rawDepth);
-	vec3 normal = texture(normalTexture, frag_tex_coord).xyz * 2.0 - 1.0;
+	vec2 invSize = vec2(1.0) / textureSize(depthTexture, 0);
+	vec3 normal = normalFromDepth(frag_tex_coord, invSize);
 
 	if (length(normal) < 0.1) {
 		out_color = vec4(sceneColor, 1.0);

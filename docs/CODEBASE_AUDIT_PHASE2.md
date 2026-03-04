@@ -42,15 +42,15 @@
 
 ### Project code (non-external)
 
-| Location | Issue | Recommendation |
-|----------|-------|----------------|
-| `vk.c:455,541` | `sprintf(buf, "mode#%x" / "code %i")` | Use `Com_sprintf` with buffer size |
-| `sv_client.c:403,405` | `sprintf(str, "connected (%s)...", country/tld)` | `str` points into `reliableCommands`; use `Com_sprintf` with explicit size |
-| `tr_arb.c:652,1265` | `sprintf(s, ...)` for shader/gen | Use `Com_sprintf` |
-| `tr_vbo.c:205,211,214` | `sprintf(b, ...)` for ARB program | Use `Com_sprintf` |
-| `vm.c` (many) | `sprintf(errMsg, ...)` / `sprintf(errBuf, ...)` | Error strings; verify `errMsg`/`errBuf` size and use `Com_sprintf` |
-| `cl_curl.c:764,766` | `sprintf(dl->progress, ...)` | `dl->progress[MAX_OSPATH+64]`; use `Com_sprintf` |
-| `bindshader.c:26`, `bin2hex.c:64,72,92` | Build tools | Lower risk; still prefer bounded variants |
+| Location | Issue | Status |
+|----------|-------|--------|
+| `cl_cgame.c:735,737` | `sprintf` in VM traps | ✅ Fixed: `Com_sprintf` with `MAX_STRING_CHARS` |
+| `sv_game.c:964,967` | `sprintf` in VM traps | ✅ Fixed: `Com_sprintf` with `MAX_STRING_CHARS` |
+| `be_ai_chat.c:951,969` | `sprintf` for chat tokens | ✅ Fixed: `Com_sprintf` / `Q_strncpyz` with bounds |
+| `l_precomp.c` (5 places) | `sprintf(token.string, ...)` | ✅ Fixed: `Com_sprintf` with `MAX_TOKEN` |
+| `bindshader.c:26`, `bin2hex.c` | Build tools | ✅ Fixed: `snprintf` with `sizeof(buf)` |
+| `tr_arb.c`, `tr_vbo.c` | Already use `Com_sprintf` / `Q_strcat` | ✅ No change needed |
+| `vk.c`, `sv_client.c`, `vm.c`, `cl_curl.c` | See audit | Pending |
 
 ---
 

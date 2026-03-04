@@ -28,10 +28,12 @@ This document serves as the **constitutional contract** for the idTech3 engine f
 - ✅ **Performance**: Minimal overhead when disabled
 
 #### Ray Tracing (RTX)
-- ✅ **Hardware Support**: NVIDIA RTX GPUs with automatic detection
-- ✅ **Quality Levels**: Multiple quality presets (performance/balanced/quality)
-- ✅ **Fallback**: Graceful degradation on non-RTX hardware
-- ✅ **Integration**: Seamless blending with rasterization
+- 🔶 **Planned**: Vulkan `VK_KHR_ray_tracing_pipeline` scaffolding; extensions probed
+- ⏳ **Hardware Support**: NVIDIA RTX / AMD RDNA2+ via Vulkan RT or DXR
+- ⏳ **Quality Levels**: Multiple presets (performance/balanced/quality)
+- ⏳ **Fallback**: Graceful degradation on non-RT hardware
+- ⏳ **Integration**: Hybrid raster + RT (shadows/reflections) or full RT path
+- See [docs/RENDERERS_FUTURE.md](docs/RENDERERS_FUTURE.md)
 
 #### Modern C/C++ Standards
 - ✅ **C23 Features**: Modern language constructs where beneficial

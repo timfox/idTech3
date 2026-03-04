@@ -26,7 +26,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "q_shared.h"
 #include "qcommon.h"
-#include "net_ip.h"
 #include "net_dtls.h"
 #include <openssl/evp.h>
 #include <openssl/rand.h>
