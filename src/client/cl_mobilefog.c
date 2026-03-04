@@ -116,9 +116,9 @@ static void MobileFog_DrawHeightFog( const vec3_t viewOrigin ) {
 		fogHeight = r_mobileFogHeight->value;
 		heightFalloff = r_volumetricFogHeightFalloff->value * 10.0f;
 		if ( sscanf( r_volumetricFogTint->string, "%f %f %f", &tr, &tg, &tb ) == 3 ) {
-			fogColor[0] = tr;
-			fogColor[1] = tg;
-			fogColor[2] = tb;
+			fogColor[0] = ( tr < 0.0f ) ? 0.0f : ( tr > 4.0f ? 4.0f : tr );
+			fogColor[1] = ( tg < 0.0f ) ? 0.0f : ( tg > 4.0f ? 4.0f : tg );
+			fogColor[2] = ( tb < 0.0f ) ? 0.0f : ( tb > 4.0f ? 4.0f : tb );
 		} else {
 			fogColor[0] = fogColor[1] = fogColor[2] = 1.0f;
 		}
