@@ -1578,6 +1578,7 @@ extern	cvar_t	*r_drawworld;			// disable/enable world rendering
 extern	cvar_t	*r_occlusionCulling;	// GPU occlusion culling for entities (0=off, 1=on, default 0)
 extern	cvar_t	*r_speeds;				// various levels of information display
 extern  cvar_t	*r_detailTextures;		// enables/disables detail texturing stages
+extern  cvar_t	*r_detail_scale;			// tiling frequency for PBR detail maps
 extern	cvar_t	*r_novis;				// disable/enable usage of PVS
 extern	cvar_t	*r_nocull;
 extern	cvar_t	*r_facePlaneCull;		// enables culling of planar surfaces with back side test
