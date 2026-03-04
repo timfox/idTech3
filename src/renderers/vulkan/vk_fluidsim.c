@@ -49,19 +49,23 @@ void FluidSim_RegisterCvars(void) {
 	r_fluidsim_iterations = ri.Cvar_Get("r_fluidsim_iterations", "40",     CVAR_ARCHIVE);
 	ri.Cvar_CheckRange( r_fluidsim_iterations, "1", "64", CV_INTEGER );
 
-	ri.Printf(PRINT_ALL, "Navier-Stokes fluid sim: cvars registered (r_fluidsim %s)\n",
-		r_fluidsim->integer ? "enabled" : "disabled");
+	ri.Cvar_SetDescription(r_fluidsim, "Deprecated: use r_fogFluid to enable fluid-driven volumetric fog.");
+	ri.Printf(PRINT_ALL, "Navier-Stokes fluid sim: cvars registered (r_fogFluid controls enable)\n");
 }
 
 qboolean FluidSim_IsEnabled(void) {
-	return r_fluidsim && r_fluidsim->integer > 0;
+	return r_fogFluid && r_fogFluid->integer > 0;
 }
 
 float FluidSim_GetViscosity(void) { return r_fluidsim_viscosity ? r_fluidsim_viscosity->value : 0.0001f; }
 float FluidSim_GetDiffusion(void) { return r_fluidsim_diffusion ? r_fluidsim_diffusion->value : 0.0001f; }
 float FluidSim_GetDissipation(void) { return r_fluidsim_dissipation ? r_fluidsim_dissipation->value : 0.995f; }
-float FluidSim_GetBuoyancy(void) { return r_fluidsim_buoyancy ? r_fluidsim_buoyancy->value : 1.0f; }
-float FluidSim_GetVorticity(void) { return r_fluidsim_vorticity ? r_fluidsim_vorticity->value : 0.3f; }
+float FluidSim_GetBuoyancy(void) {
+	return r_fogFluidBuoyancy ? r_fogFluidBuoyancy->value : (r_fluidsim_buoyancy ? r_fluidsim_buoyancy->value : 1.0f);
+}
+float FluidSim_GetVorticity(void) {
+	return r_fogFluidVorticity ? r_fogFluidVorticity->value : (r_fluidsim_vorticity ? r_fluidsim_vorticity->value : 0.3f);
+}
 float FluidSim_GetGridScale(void) { return r_fluidsim_gridScale ? r_fluidsim_gridScale->value : 1.0f; }
 int   FluidSim_GetJacobiIterations(void) { return r_fluidsim_iterations ? r_fluidsim_iterations->integer : FLUID_JACOBI_ITERS; }
 

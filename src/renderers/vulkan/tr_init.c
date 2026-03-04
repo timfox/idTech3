@@ -294,6 +294,8 @@ cvar_t	*r_fogFluidAutoScaleMinResolution;
 cvar_t	*r_fogFluidAutoScaleMinIterations;
 cvar_t	*r_fogFluidFlowFieldStrength;
 cvar_t	*r_fogFluidFlowFieldScale;
+cvar_t	*r_fogFluidVorticity;
+cvar_t	*r_fogFluidBuoyancy;
 cvar_t	*r_volumetricFogValidation;
 cvar_t	*r_volumetricFogValidationPrintInterval;
 cvar_t	*r_volumetricFogForceCameraCut;
@@ -2626,6 +2628,16 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_fogFluidFlowFieldScale, "0.0001", "1.0", CV_FLOAT );
 	ri.Cvar_SetDescription( r_fogFluidFlowFieldScale, "World-space scale for the art-driven flow field sampled from 3D fog noise." );
 	ri.Cvar_SetGroup( r_fogFluidFlowFieldScale, CVG_RENDERER );
+
+	r_fogFluidVorticity = ri.Cvar_Get( "r_fogFluidVorticity", "0.3", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_fogFluidVorticity, "0.0", "2.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_fogFluidVorticity, "Vorticity confinement strength for fluid simulation (replaces r_fluidsim_vorticity)." );
+	ri.Cvar_SetGroup( r_fogFluidVorticity, CVG_RENDERER );
+
+	r_fogFluidBuoyancy = ri.Cvar_Get( "r_fogFluidBuoyancy", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_fogFluidBuoyancy, "0.0", "4.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_fogFluidBuoyancy, "Buoyancy force strength for fluid simulation (replaces r_fluidsim_buoyancy)." );
+	ri.Cvar_SetGroup( r_fogFluidBuoyancy, CVG_RENDERER );
 
 	r_volumetricFogValidation = ri.Cvar_Get( "r_volumetricFogValidation", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogValidation, "0", "1", CV_INTEGER );

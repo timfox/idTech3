@@ -81,7 +81,7 @@
 - [x] Texture compression (BC7/KTX2)
 - [x] Optional USD format for entities and shaders (com_usdEntities, com_usdShaders; GPLv2 parser)
 - [ ] DTLS network encryption
-- [ ] clang-tidy / cppcheck static analysis
+- [x] clang-tidy / cppcheck static analysis (CI job, continue-on-error)
 
 ### Long-Term
 - [ ] RTX ray tracing

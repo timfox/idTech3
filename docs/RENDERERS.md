@@ -39,7 +39,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - 2D velocity, density, and pressure fields (resolution derived from froxel grid)
 - Emitter system (up to 16 emitters) for smoke, fire, fog injection
 - Wind and buoyancy forces
-- Cvars: `r_fluidsim`, `r_fluidsim_viscosity`, `r_fluidsim_dissipation`, etc.
+- Cvars: `r_fogFluid` (enable), `r_fogFluidViscosity`, `r_fogFluidDissipation`, `r_fogFluidVorticity`, `r_fogFluidBuoyancy`, etc. Legacy `r_fluidsim*` deprecated.
 
 ### Shadow Mapping
 - Cascaded shadow maps (CSM) for directional/sun light
@@ -99,7 +99,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 | `r_volumetricFog` | 0 | Volumetric fog enable (0=off, 1=on) |
 | `r_volumetricFogDensity` | 0.35 | Volumetric density multiplier |
 | `r_volumetricFogQuality` | 2 | Quality tier (0=low, 1=medium, 2=high, 3=ultra; latched) |
-| `r_fluidsim` | 0 | Fluid simulation (0=off, 1=on) |
+| `r_fogFluid` | 0 | Fluid-driven volumetric fog (0=off, 1=on). Vorticity/buoyancy: `r_fogFluidVorticity`, `r_fogFluidBuoyancy`. |
 | `r_bloom` | 0 | Bloom enable |
 | `r_bloom_threshold` | 0.6 | Bloom extraction threshold |
 | `r_hdr` | 0 | HDR format (0=off, 1=RGBA16F) |
