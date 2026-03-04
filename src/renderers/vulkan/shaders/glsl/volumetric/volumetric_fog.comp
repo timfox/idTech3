@@ -160,14 +160,33 @@ float getSliceExponent() {
     return max(params.sliceParams.z, 1.0);
 }
 
+/* qualityParams.y: 0=exponential (more near), 1=linear, 2=logarithmic (more in distance) */
 float depthFromSliceNorm(float sliceNorm, float nearPlane, float farPlane) {
-    float expNorm = pow(Saturate(sliceNorm), getSliceExponent());
+    float s = Saturate(sliceNorm);
+    float mode = floor(params.qualityParams.y + 0.5);
+    if (mode <= 0.5) {
+        float expNorm = pow(s, getSliceExponent());
+        return nearPlane * pow(farPlane / nearPlane, expNorm);
+    }
+    if (mode <= 1.5) {
+        return mix(nearPlane, farPlane, s);
+    }
+    float invExp = 1.0 / max(getSliceExponent(), 1.0);
+    float expNorm = pow(s, invExp);
     return nearPlane * pow(farPlane / nearPlane, expNorm);
 }
 
 float sliceNormFromDepth(float depth, float nearPlane, float farPlane) {
-    float ratio = log(max(depth / nearPlane, 1e-4)) / max(log(farPlane / nearPlane), 1e-5);
-    return pow(Saturate(ratio), 1.0 / getSliceExponent());
+    float mode = floor(params.qualityParams.y + 0.5);
+    if (mode <= 0.5) {
+        float r = log(max(depth / nearPlane, 1e-4)) / max(log(farPlane / nearPlane), 1e-5);
+        return pow(Saturate(r), 1.0 / getSliceExponent());
+    }
+    if (mode <= 1.5) {
+        return Saturate((depth - nearPlane) / max(farPlane - nearPlane, 1e-5));
+    }
+    float r = log(max(depth / nearPlane, 1e-4)) / max(log(farPlane / nearPlane), 1e-5);
+    return pow(Saturate(r), getSliceExponent());
 }
 
 vec3 reconstructViewRay(vec2 uv) {

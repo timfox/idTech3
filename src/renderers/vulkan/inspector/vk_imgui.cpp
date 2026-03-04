@@ -502,6 +502,14 @@ extern "C" void VkImgui_DrawVolumetricsPanel(void) {
 		VkImgui_VolumetricsSlider( "Extinction Scale", "r_volumetricFogExtinctionScale", extinctionScale, 0.1f, 10.0f );
 		float blendDist = VkImgui_CvarFloat( "r_volumetricFogBlendDistance" );
 		VkImgui_VolumetricsSlider( "Volume Blend Distance", "r_volumetricFogBlendDistance", blendDist, 0.0f, 256.0f, "%.0f" );
+		int sliceMode = (int)VkImgui_CvarFloat( "r_volumetricFogSliceMode" );
+		if ( sliceMode < 0 || sliceMode > 2 ) sliceMode = 0;
+		const char *sliceModes[] = { "Exponential (near)", "Linear", "Logarithmic (far)" };
+		if ( ImGui::Combo( "Slice Distribution", &sliceMode, sliceModes, 3 ) ) {
+			ri.Cvar_SetValue( "r_volumetricFogSliceMode", (float)sliceMode );
+		}
+		ImGui::SameLine();
+		ImGui::SetTooltip( "Depth-slice allocation: Exponential=more near camera, Linear=equal spacing, Logarithmic=more in distance." );
 	}
 
 	if (ImGui::CollapsingHeader("Sphere Volumes (Debug)")) {

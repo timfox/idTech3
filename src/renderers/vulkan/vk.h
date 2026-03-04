@@ -607,6 +607,15 @@ typedef struct {
 	VkDescriptorSet volumetric_compute_descriptor;
 	VkDescriptorSet volumetric_composite_descriptor;
 	VkDescriptorSet volumetric_depth_resolve_descriptor;
+	VkDescriptorSetLayout luminance_layout;
+	VkDescriptorSet luminance_descriptor;
+	VkPipelineLayout luminance_pipeline_layout;
+	VkPipeline luminance_pipeline;
+	VkImage luminance_image;
+	VkImageView luminance_image_view;
+	VkBuffer luminance_staging_buffer;
+	VkDeviceMemory luminance_staging_memory;
+	void *luminance_staging_ptr;
 	VkDescriptorSet volumetric_fluid_descriptor;
 	VkPipelineLayout volumetric_compute_pipeline_layout;
 	VkPipelineLayout volumetric_composite_pipeline_layout;
@@ -834,6 +843,7 @@ typedef struct {
 		VkShaderModule volumetric_fog_fs;
 		VkShaderModule volumetric_fog_cs;
 		VkShaderModule volumetric_depth_resolve_msaa_cs;
+		VkShaderModule luminance_cs;
 		VkShaderModule fluid_advect_cs;
 		VkShaderModule fluid_divergence_cs;
 		VkShaderModule fluid_pressure_cs;

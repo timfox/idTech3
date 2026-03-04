@@ -109,7 +109,17 @@ float getSliceExponent() {
 }
 
 float depthFromSliceNorm(float sliceNorm, float nearPlane, float farPlane) {
-    float expNorm = pow(saturate(sliceNorm), getSliceExponent());
+    float s = saturate(sliceNorm);
+    float mode = floor(params.qualityParams.y + 0.5);
+    if (mode <= 0.5) {
+        float expNorm = pow(s, getSliceExponent());
+        return nearPlane * pow(farPlane / nearPlane, expNorm);
+    }
+    if (mode <= 1.5) {
+        return mix(nearPlane, farPlane, s);
+    }
+    float invExp = 1.0 / max(getSliceExponent(), 1.0);
+    float expNorm = pow(s, invExp);
     return nearPlane * pow(farPlane / nearPlane, expNorm);
 }
 

@@ -1863,3 +1863,12 @@ if(Python3_Interpreter_FOUND)
 else()
 	message(STATUS "Python3 not found: vk_shader_regen/vk_shader_check targets are unavailable.")
 endif()
+
+# --- CTest validation ---
+enable_testing()
+add_test(NAME smoke_test
+	COMMAND ${CMAKE_SOURCE_DIR}/scripts/smoke_test.sh ${CMAKE_SOURCE_DIR}/release
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(smoke_test PROPERTIES
+	LABELS "validation;smoke"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/release/idtech3_server")
