@@ -54,5 +54,5 @@ The default renderer is Vulkan. To use OpenGL instead:
 
 - **"No game data"** — Ensure `baseq3/` (or `base/`) exists with at least one `.pk3` file.
 - **Black screen / no render** — Try OpenGL: `+set r_renderer opengl`
-- **Solid color / dark brown / faint grid / no UI** — Ensure FBO is enabled: `+set r_fbo 1` then `vid_restart`. Disable eye adaptation if needed: `r_exposure_auto 0`. If you see a faint grid, ensure debug views are off: `r_fogDebug 0` and `r_froxelDebug 0`.
+- **Solid color / dark brown / dark green / no UI** — Try: `r_exposure_auto 0` (disables eye adaptation), `r_volumetricFog 0` (disables volumetrics), then `vid_restart`. Ensure FBO is enabled: `+set r_fbo 1`. If still broken, try `r_fbo 0` as a workaround (disables HDR/post-processing).
 - **Missing libraries** — On Linux, install SDL2, OpenAL, and Vulkan drivers for your GPU.
