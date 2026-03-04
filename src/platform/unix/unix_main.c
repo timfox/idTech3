@@ -1072,9 +1072,16 @@ static const char *Sys_BinName( const char *arg0 )
 		Q_strncpyz( dst, arg0, PATH_MAX );
 	}
 #else
-
-#warning Sys_BinName not implemented
-	Q_strncpyz( dst, arg0, PATH_MAX );
+	/* Fallback: try /proc/self/exe (Linux-style), then /proc/curproc/file (BSD), else arg0 */
+	{
+		int n = readlink( "/proc/self/exe", dst, PATH_MAX - 1 );
+		if ( n < 0 || n >= PATH_MAX )
+			n = readlink( "/proc/curproc/file", dst, PATH_MAX - 1 );
+		if ( n >= 0 && n < PATH_MAX )
+			dst[ n ] = '\0';
+		else
+			Q_strncpyz( dst, arg0, PATH_MAX );
+	}
 #endif
 
 #else // DEBUG

@@ -107,6 +107,14 @@ typedef struct {
 	struct {
 		qboolean    open;
 	} volumetrics;
+
+	struct {
+		qboolean    open;
+	} objects;
+
+	struct {
+		qboolean    open;
+	} inspector;
 } vkImguiWindows_t;
 
 typedef struct {

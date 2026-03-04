@@ -221,7 +221,7 @@ vk_update_color_descriptor_image( vk.color_image_view );
 2. **Potential layout/transition gap**: When volumetrics are skipped, no explicit transition is recorded for `color_image` before gamma. The render pass `finalLayout` should handle this; worth validating with Vulkan validation layers.
 
 ### Medium Priority
-3. **SMAA not run when volumetrics skipped**: SMAA only runs inside `vk_volumetric_fog_pass`. Menus, no-world, and tier-off cases never get SMAA. Documented behavior, but could surprise users.
+3. **SMAA when volumetrics skipped**: Fixed. SMAA now runs when volumetrics are skipped (tier off, r_volumetricFog 0, missing resources) if tr.world and SMAA active. Depth layout restored for next frame.
 4. **r_exposure_auto + r_volumetricFog 0**: QUICKSTART suggests disabling both. Luminance pass runs independently; if there is a bug in luminance or tone mapping, it could contribute to solid/wrong colors.
 
 ### Low Priority

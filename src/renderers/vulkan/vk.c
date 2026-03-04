@@ -14557,7 +14557,24 @@ static void vk_volumetric_fog_pass( void )
 		if ( tier >= 2 || tier == 4 || !r_volumetricFog->integer || !vk.fboActive ||
 			!tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
 			vk_reset_volumetric_history();
-			vk_update_post_fog_descriptors( vk.color_image_view );
+			/* SMAA when volumetrics skipped: run if we have world and SMAA active */
+			if ( vk.smaaActive && tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) &&
+				vk.smaa_output_image_view != VK_NULL_HANDLE ) {
+				vk_smaa_passes();
+				vk_update_post_fog_descriptors( vk.smaa_output_image_view );
+			} else {
+				vk_update_post_fog_descriptors( vk.color_image_view );
+			}
+			/* Restore depth layout if atmosphere ran (tr.world) */
+			if ( tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+				VkImageAspectFlags da = VK_IMAGE_ASPECT_DEPTH_BIT;
+				if ( glConfig.stencilBits > 0 ) da |= VK_IMAGE_ASPECT_STENCIL_BIT;
+				record_image_layout_transition( vk.cmd->command_buffer, vk.depth_image, da,
+					VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+					VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+					VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+					VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT );
+			}
 			backEnd.doneFog = qtrue;
 			return;
 		}
@@ -14579,7 +14596,22 @@ static void vk_volumetric_fog_pass( void )
 		vk_prev_matrices_valid = qfalse;
 		vk_prev_volumetric_time_valid = qfalse;
 		Com_Memset( &vk_volumetric_validation_state, 0, sizeof( vk_volumetric_validation_state ) );
-		vk_update_post_fog_descriptors( vk.color_image_view );
+		if ( vk.smaaActive && tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) &&
+			vk.smaa_output_image_view != VK_NULL_HANDLE ) {
+			vk_smaa_passes();
+			vk_update_post_fog_descriptors( vk.smaa_output_image_view );
+		} else {
+			vk_update_post_fog_descriptors( vk.color_image_view );
+		}
+		if ( tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+			VkImageAspectFlags da = VK_IMAGE_ASPECT_DEPTH_BIT;
+			if ( glConfig.stencilBits > 0 ) da |= VK_IMAGE_ASPECT_STENCIL_BIT;
+			record_image_layout_transition( vk.cmd->command_buffer, vk.depth_image, da,
+				VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+				VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT );
+		}
 		backEnd.doneFog = qtrue;
 		return;
 	}
@@ -14600,7 +14632,22 @@ static void vk_volumetric_fog_pass( void )
 		vk_prev_matrices_valid = qfalse;
 		vk_prev_volumetric_time_valid = qfalse;
 		Com_Memset( &vk_volumetric_validation_state, 0, sizeof( vk_volumetric_validation_state ) );
-		vk_update_post_fog_descriptors( vk.color_image_view );
+		if ( vk.smaaActive && tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) &&
+			vk.smaa_output_image_view != VK_NULL_HANDLE ) {
+			vk_smaa_passes();
+			vk_update_post_fog_descriptors( vk.smaa_output_image_view );
+		} else {
+			vk_update_post_fog_descriptors( vk.color_image_view );
+		}
+		if ( tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+			VkImageAspectFlags da = VK_IMAGE_ASPECT_DEPTH_BIT;
+			if ( glConfig.stencilBits > 0 ) da |= VK_IMAGE_ASPECT_STENCIL_BIT;
+			record_image_layout_transition( vk.cmd->command_buffer, vk.depth_image, da,
+				VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+				VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT );
+		}
 		backEnd.doneFog = qtrue;
 		return;
 	}

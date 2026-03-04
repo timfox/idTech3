@@ -45,6 +45,7 @@ static cvar_t *in_forceCharset;
 #ifdef USE_JOYSTICK
 static SDL_GameController *gamepad;
 static SDL_Joystick *stick = NULL;
+static int joystick_hotplug_watch_added = 0;
 #endif
 
 static qboolean mouseAvailable = qfalse;
@@ -536,6 +537,34 @@ struct
 
 /*
 ===============
+IN_InitJoystick (forward decl for hotplug callback)
+===============
+*/
+static void IN_InitJoystick( void );
+
+/*
+===============
+IN_JoystickHotplugWatch
+===============
+Called when a joystick is added or removed. Re-initializes to pick up changes.
+*/
+static int IN_JoystickHotplugWatch( void *userdata, SDL_Event *event )
+{
+	(void)userdata;
+	if ( event->type == SDL_JOYDEVICEADDED || event->type == SDL_JOYDEVICEREMOVED )
+	{
+		IN_InitJoystick();
+		if ( event->type == SDL_JOYDEVICEADDED )
+			Com_DPrintf( "Joystick hotplug: device added, re-initialized\n" );
+		else
+			Com_DPrintf( "Joystick hotplug: device removed, re-initialized\n" );
+	}
+	return 0;
+}
+
+
+/*
+===============
 IN_InitJoystick
 ===============
 */
@@ -630,6 +659,14 @@ static void IN_InitJoystick( void )
 
 	SDL_JoystickEventState(SDL_QUERY);
 	SDL_GameControllerEventState(SDL_QUERY);
+
+	/* Register hotplug callback if joystick is active */
+	if ( in_joystick->integer && !joystick_hotplug_watch_added )
+	{
+		SDL_AddEventWatch( IN_JoystickHotplugWatch, NULL );
+		joystick_hotplug_watch_added = 1;
+		Com_DPrintf( "Joystick hotplug: event watch registered\n" );
+	}
 }
 
 
@@ -656,6 +693,12 @@ static void IN_ShutdownJoystick( void )
 	{
 		SDL_JoystickClose(stick);
 		stick = NULL;
+	}
+
+	if ( joystick_hotplug_watch_added )
+	{
+		SDL_DelEventWatch( IN_JoystickHotplugWatch, NULL );
+		joystick_hotplug_watch_added = 0;
 	}
 
 	SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
