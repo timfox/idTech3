@@ -14417,7 +14417,8 @@ static void vk_atmosphere_pass( void )
 	pc.mie[0] = 21e-6f; pc.mie[1] = PostFX_Atmosphere_GetMieG(); pc.mie[2] = 0.0f; pc.mie[3] = 0.0f;
 	pc.atmParams[0] = PostFX_Atmosphere_GetRayleighHeight();
 	pc.atmParams[1] = PostFX_Atmosphere_GetMieHeight();
-	pc.atmParams[2] = 0.0f; pc.atmParams[3] = 0.0f;
+	pc.atmParams[2] = 0.0f;
+	pc.atmParams[3] = PostFX_Atmosphere_GetScale();
 	pc.viewOrigin[0] = pc.viewOrigin[1] = pc.viewOrigin[2] = 0.0f; pc.viewOrigin[3] = 1.0f;
 
 	qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_atmosphere, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( pc ), &pc );

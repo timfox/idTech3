@@ -332,10 +332,12 @@ extern "C" void VkImgui_DrawPostFXPanel(void) {
 			float sunY = VkImgui_CvarFloat( "r_atmosphere_sunDirY" );
 			float sunZ = VkImgui_CvarFloat( "r_atmosphere_sunDirZ" );
 			float sunInt = VkImgui_CvarFloat( "r_atmosphere_sunIntensity" );
+			float atmScale = VkImgui_CvarFloat( "r_atmosphere_scale" );
 			VkImgui_CvarSlider( "Sun dir X", "r_atmosphere_sunDirX", sunX, -1.0f, 1.0f );
 			VkImgui_CvarSlider( "Sun dir Y", "r_atmosphere_sunDirY", sunY, -1.0f, 1.0f );
 			VkImgui_CvarSlider( "Sun dir Z", "r_atmosphere_sunDirZ", sunZ, -1.0f, 1.0f );
 			VkImgui_CvarSlider( "Sun intensity", "r_atmosphere_sunIntensity", sunInt, 1.0f, 100.0f );
+			VkImgui_CvarSlider( "Sky scale (HDR)", "r_atmosphere_scale", atmScale, 0.5f, 16.0f );
 		}
 	}
 

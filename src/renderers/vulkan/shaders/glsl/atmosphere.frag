@@ -76,6 +76,7 @@ void main() {
 	float sunIntensity = atm.sunColor.w;
 	float rayleighHeight = atm.atmosphereParams.x;
 	float mieHeight = atm.atmosphereParams.y;
+	float scale = max(atm.atmosphereParams.w, 0.01);
 
 	vec3 rayleighBeta = atm.rayleighCoeffs.xyz;
 	vec3 mieBeta = vec3(mieScale);
@@ -129,7 +130,7 @@ void main() {
 		}
 	}
 
-	vec3 color = sunIntensity * (phaseR * rayleighBeta * totalRayleigh + phaseM * mieBeta * totalMie);
+	vec3 color = scale * sunIntensity * (phaseR * rayleighBeta * totalRayleigh + phaseM * mieBeta * totalMie);
 
 	out_color = vec4(color, 1.0);
 }
