@@ -1705,6 +1705,16 @@ qboolean vk_create_subsurface_texture( shaderStage_t *stage, const char *name, i
 	return qtrue;
 }
 
+qboolean vk_create_detail_texture( shaderStage_t *stage, const char *name, imgFlags_t flags )
+{
+	stage->detailMap = R_FindImageFile( name, flags, 0 );
+	if ( !stage->detailMap )
+		return qfalse;
+
+	stage->vk_pbr_flags |= PBR_HAS_DETAILMAP;
+	return qtrue;
+}
+
 qboolean vk_create_phyisical_texture( shaderStage_t *stage, const char *name, imgFlags_t flags )
 {
 	char	packedName[MAX_QPATH];

@@ -591,6 +591,8 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 	char				bufferAnisotropyTextureName[MAX_QPATH];
 	char				bufferTransmissionTextureName[MAX_QPATH];
 	char				bufferSubsurfaceTextureName[MAX_QPATH];
+	char				bufferDetailTextureName[MAX_QPATH];
+	bufferDetailTextureName[0] = '\0';
 #endif
 
 	stage->active = qfalse;
@@ -613,6 +615,7 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 	stage->anisotropyMap = NULL;
 	stage->transmissionMap = NULL;
 	stage->subsurfaceMap = NULL;
+	stage->detailMap = NULL;
 
 	Vector4Set( stage->emissiveScale, 1.0f, 1.0f, 1.0f, 1.0f );
 	Vector4Set( stage->clearcoatScale, 1.0f, 1.0f, 1.0f, 1.0f );
@@ -917,6 +920,22 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 				continue;
 			}
 			Q_strncpyz( bufferSubsurfaceTextureName, token, sizeof(bufferSubsurfaceTextureName) );
+		}
+		else if ( !Q_stricmp( token, "detailMap" ) )
+		{
+			token = COM_ParseExt( text, qfalse );
+			if ( !token[0] )
+			{
+				ri.Printf( PRINT_WARNING, "WARNING: missing parameter for 'detailMap' keyword in shader '%s'\n", shader.name );
+				return qfalse;
+			}
+			if ( !Q_stricmp( token, "$whiteimage" ) )
+			{
+				stage->detailMap = tr.whiteImage;
+				stage->vk_pbr_flags |= PBR_HAS_DETAILMAP;
+				continue;
+			}
+			Q_strncpyz( bufferDetailTextureName, token, sizeof(bufferDetailTextureName) );
 		}
 #endif
 		//
@@ -1891,6 +1910,17 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			Q_strcat( bufferSubsurfaceTextureName, MAX_QPATH, "_subsurface" );
 			stage->subsurfaceMapType = PHYS_SUBSURFACE;
 			vk_create_subsurface_texture( stage, bufferSubsurfaceTextureName, flags );
+		}
+
+		// load defined detail map (high-frequency tiling overlay)
+		if ( bufferDetailTextureName[0] )
+			vk_create_detail_texture( stage, bufferDetailTextureName, flags );
+
+		// scan for a potential detail map
+		if ( !stage->detailMap && physicalAlbedo ) {
+			COM_StripExtension( physicalAlbedoName, bufferDetailTextureName, MAX_QPATH );
+			Q_strcat( bufferDetailTextureName, MAX_QPATH, "_detail" );
+			vk_create_detail_texture( stage, bufferDetailTextureName, flags );
 		}
 
 		// Only treat basecolor as sRGB when the stage is actually using PBR features.
@@ -3139,6 +3169,7 @@ static int CollapseMultitexture( unsigned int st0bits, shaderStage_t *st0, shade
 		st0->vk_pbr_flags = st1->vk_pbr_flags;
 		st0->normalMap = st1->normalMap;
 		st0->physicalMap = st1->physicalMap;
+		st0->detailMap = st1->detailMap;
 		Vector4Copy( st1->specularScale, st0->specularScale );
 		Vector4Copy( st1->normalScale, st0->normalScale );
 	}

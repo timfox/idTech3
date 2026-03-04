@@ -21,7 +21,7 @@ volumetric effects, and dynamic light-emitting particles.
 extern "C" {
 #endif
 
-#define MAX_PARTICLES           8192
+#define MAX_PARTICLES           131072	// Xash3D-style pool (was 8192)
 #define MAX_PARTICLE_ANIMS      8
 #define MAX_PARTICLE_ANIM_FRAMES 64
 

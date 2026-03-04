@@ -28,7 +28,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define MAX_REAL_DLIGHTS	(MAX_DLIGHTS*2)
 #define MAX_LITSURFS		(MAX_DRAWSURFS)
 
-#define MAX_TEXTURE_SIZE	2048 // must be less or equal to 32768
+#define MAX_TEXTURE_SIZE	32768	// max index texture size (was 2048)
 
 #define USE_VBO
 #define USE_TESS_NEEDS_NORMAL
@@ -52,7 +52,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 typedef uint32_t glIndex_t;
 
-#define	REFENTITYNUM_BITS	12	// as we actually using only 1 bit for dlight mask in opengl1 renderer
+#define	REFENTITYNUM_BITS	12	// 4095 ref entities; supports 512 beams/rails (sort key limit)
 #define	REFENTITYNUM_MASK	((1<<REFENTITYNUM_BITS) - 1)
 // the last N-bit number (2^REFENTITYNUM_BITS - 1) is reserved for the special world refentity,
 //  and this is reflected by the value of MAX_REFENTITIES (which therefore is not a power-of-2)

@@ -108,7 +108,7 @@ typedef enum {
 
 typedef uint32_t glIndex_t;
 
-#define	REFENTITYNUM_BITS	12	// as we actually using only 1 bit for dlight mask in opengl1 renderer
+#define	REFENTITYNUM_BITS	12	// 4095 ref entities; supports 512 beams/rails (sort key limit)
 #define	REFENTITYNUM_MASK	((1<<REFENTITYNUM_BITS) - 1)
 // the last N-bit number (2^REFENTITYNUM_BITS - 1) is reserved for the special world refentity,
 //  and this is reflected by the value of MAX_REFENTITIES (which therefore is not a power-of-2)
@@ -448,6 +448,7 @@ typedef struct {
 	image_t			*anisotropyMap;
 	image_t			*transmissionMap;
 	image_t			*subsurfaceMap;
+	image_t			*detailMap;
 
 	uint32_t		normalMapType;
 	uint32_t		physicalMapType;
@@ -1901,6 +1902,7 @@ qboolean vk_create_sheen_texture( shaderStage_t *stage, const char *albedoMapNam
 qboolean vk_create_anisotropy_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
 qboolean vk_create_transmission_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
 qboolean vk_create_subsurface_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
+qboolean vk_create_detail_texture( shaderStage_t *stage, const char *name, imgFlags_t flags );
 image_t *vk_create_pbr_albedo_srgb( const char *albedoMapName, imgFlags_t flags );
 #endif
 

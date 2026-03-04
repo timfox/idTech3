@@ -147,6 +147,7 @@ layout(set = 13, binding = 0) uniform sampler2D sheen_texture;
 layout(set = 14, binding = 0) uniform sampler2D anisotropy_texture;
 layout(set = 15, binding = 0) uniform sampler2D transmission_texture;
 layout(set = 16, binding = 0) uniform sampler2D subsurface_texture;
+layout(set = 17, binding = 0) uniform sampler2D detail_texture;
 
 // prob use ubo for specularScale & normalScale ..
 layout (constant_id = 11) const float specularScale_x = 1.0;
@@ -175,6 +176,8 @@ layout (constant_id = 30) const int deluxe_mapping			= -1; // -1: deluxemapping 
 layout (constant_id = 31) const float deluxe_specular_scale = 1.0;
 layout (constant_id = 32) const float lightmap_scale = 1.0;  // HDR lightmap intensity (1=normal, 2+=brighter)
 layout (constant_id = 33) const int lightmap_srgb_decode = 0;  // 1: sRGB->linear when BSP lightmaps are gamma-encoded
+layout (constant_id = 34) const int detail_texture_set = -1;    // 0: detail map active
+layout (constant_id = 35) const float detail_scale = 4.0;       // tiling frequency for detail UV
 
 vec3 lightmapDecode( vec3 c ) {
 	/* sRGB to linear: use when BSP lightmaps are gamma-encoded (q3map2 -gamma, etc.) */
@@ -923,6 +926,12 @@ void main() {
 		vec4 subTex = texture( subsurface_texture, frag_tex_coord0 );
 		subsurfaceColor *= subTex.rgb;
 		subsurfaceStrength *= subTex.a;
+	}
+
+	/* detail map: high-frequency tiling overlay (multiply blend, 0.5 gray = 1.0) */
+	if ( detail_texture_set >= 0 ) {
+		vec3 detailSample = texture( detail_texture, frag_tex_coord0 * detail_scale ).rgb;
+		diffuse.rgb *= mix( vec3( 1.0 ), detailSample * 2.0, 0.5 );
 	}
 
 	ambientColor *= AO;

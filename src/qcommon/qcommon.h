@@ -151,7 +151,7 @@ NET
 
 #define	MAX_PACKET_USERCMDS		32		// max number of usercmd_t in a packet
 
-#define	MAX_SNAPSHOT_ENTITIES	256
+#define	MAX_SNAPSHOT_ENTITIES	2048	// visible entities per packet (was 256)
 
 #define	PORT_ANY			-1
 
