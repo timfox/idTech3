@@ -96,6 +96,8 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 ### Key Cvars
 | Cvar | Default | Description |
 |------|---------|-------------|
+| `r_fbo` | 1 | Framebuffer objects (required for HDR, bloom, post-process) |
+| `r_renderMode` | 0 | Rendering path: 0=forward, 1=deferred (placeholder), 2=forward+ (placeholder) |
 | `r_volumetricFog` | 0 | Volumetric fog enable (0=off, 1=on) |
 | `r_volumetricFogDensity` | 0.35 | Volumetric density multiplier |
 | `r_volumetricFogQuality` | 2 | Quality tier (0=low, 1=medium, 2=high, 3=ultra; latched) |
