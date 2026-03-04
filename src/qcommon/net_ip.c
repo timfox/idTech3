@@ -660,6 +660,30 @@ qboolean NET_IsLocalAddress( const netadr_t *adr )
 
 //=============================================================================
 
+#ifdef USE_DTLS
+/*
+ * Process DTLS-encrypted packet: decrypt in place, update net_message.
+ * Returns qfalse to drop packet (auth failure), qtrue to continue.
+ */
+static qboolean NET_DTLS_ProcessIncoming( netadr_t *net_from, msg_t *net_message, int ret )
+{
+	byte dec_buf[MAX_PACKETLEN];
+	int dec_len;
+
+	if ( !NET_DTLS_IsEnabled() || ret < 4 || *(const int32_t *)net_message->data != DTLS_MAGIC )
+		return qtrue;
+
+	dec_len = NET_DTLS_Decrypt( net_from, net_message->data, ret, dec_buf, sizeof( dec_buf ) );
+	if ( dec_len <= 0 )
+		return qfalse;
+
+	Com_Memcpy( net_message->data, dec_buf, dec_len );
+	net_message->cursize = dec_len;
+	net_message->readcount = 0;
+	return qtrue;
+}
+#endif
+
 /*
 ==================
 NET_GetPacket
@@ -714,6 +738,10 @@ static qboolean NET_GetPacket( netadr_t *net_from, msg_t *net_message, const fd_
 			}
 
 			net_message->cursize = ret;
+#ifdef USE_DTLS
+			if ( !NET_DTLS_ProcessIncoming( net_from, net_message, ret ) )
+				return qfalse;
+#endif
 			return qtrue;
 		}
 	}
@@ -742,8 +770,12 @@ static qboolean NET_GetPacket( netadr_t *net_from, msg_t *net_message, const fd_
 				Com_Printf( "Oversize packet from %s\n", NET_AdrToString( net_from ) );
 				return qfalse;
 			}
-			
+
 			net_message->cursize = ret;
+#ifdef USE_DTLS
+			if ( !NET_DTLS_ProcessIncoming( net_from, net_message, ret ) )
+				return qfalse;
+#endif
 			return qtrue;
 		}
 	}
@@ -773,6 +805,10 @@ static qboolean NET_GetPacket( netadr_t *net_from, msg_t *net_message, const fd_
 			}
 
 			net_message->cursize = ret;
+#ifdef USE_DTLS
+			if ( !NET_DTLS_ProcessIncoming( net_from, net_message, ret ) )
+				return qfalse;
+#endif
 			return qtrue;
 		}
 	}
@@ -792,6 +828,10 @@ Sys_SendPacket
 void Sys_SendPacket( int length, const void *data, const netadr_t *to ) {
 	int ret = SOCKET_ERROR;
 	sockaddr_t addr;
+#ifdef USE_DTLS
+	byte enc_buf[MAX_PACKETLEN + 64];
+	int enc_len;
+#endif
 
 	switch ( to->type ) {
 		case NA_BROADCAST:
@@ -821,6 +861,14 @@ void Sys_SendPacket( int length, const void *data, const netadr_t *to ) {
 #endif
 
 	NetadrToSockadr( to, &addr );
+
+#ifdef USE_DTLS
+	enc_len = NET_DTLS_Encrypt( to, (const byte *)data, length, enc_buf, sizeof( enc_buf ) );
+	if ( enc_len > 0 ) {
+		data = enc_buf;
+		length = enc_len;
+	}
+#endif
 
 	if ( usingSocks && to->type == NA_IP ) {
 		socks5_udp_request_t cmd;

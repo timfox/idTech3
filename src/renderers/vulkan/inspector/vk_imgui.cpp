@@ -411,6 +411,21 @@ extern "C" void VkImgui_DrawPostFXPanel(void) {
 		VkImgui_CvarSlider( "Film Grain", "r_filmGrain", grain, 0.0f, 1.0f );
 	}
 
+	if (ImGui::CollapsingHeader("Detail Textures")) {
+		int dtOn = ri.Cvar_VariableIntegerValue( "r_detailtextures" );
+		bool dtEnabled = ( dtOn != 0 );
+		if ( ImGui::Checkbox( "Enable detail maps", &dtEnabled ) ) {
+			ri.Cvar_Set( "r_detailtextures", dtEnabled ? "1" : "0" );
+		}
+		ImGui::SameLine();
+		ImGui::TextDisabled( "(?)" );
+		if ( ImGui::IsItemHovered() ) {
+			ImGui::SetTooltip( "High-frequency tiling overlay for PBR materials. Use detailMap in shaders or _detail suffix." );
+		}
+		float dtScale = VkImgui_CvarFloat( "r_detail_scale" );
+		VkImgui_CvarSlider( "Detail scale (tiling)", "r_detail_scale", dtScale, 0.5f, 32.0f );
+	}
+
 	if (ImGui::CollapsingHeader("SSR")) {
 		int ssrOn = ri.Cvar_VariableIntegerValue( "r_ssr" );
 		bool ssrEnabled = ( ssrOn != 0 );

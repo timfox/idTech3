@@ -27,6 +27,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #ifdef USE_DTLS
 
+#define DTLS_MAGIC 0x44544C53  /* "DTLS" - packet header for encrypted payload */
+
 /*
  * DTLS (Datagram TLS) encryption for game traffic.
  * Optional layer that encrypts/decrypts packets when net_dtls cvar is enabled.
@@ -49,6 +51,8 @@ qboolean NET_DTLS_IsEnabled( void );
 #define NET_DTLS_Init()           ((void)0)
 #define NET_DTLS_Shutdown()       ((void)0)
 #define NET_DTLS_IsEnabled()      (qfalse)
+#define NET_DTLS_Encrypt(a,b,c,d,e)  (-1)
+#define NET_DTLS_Decrypt(a,b,c,d,e)  (-1)
 
 #endif /* USE_DTLS */
 
