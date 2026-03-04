@@ -118,7 +118,10 @@ def compile_shader(stage, source, array_name, binding_expr=None, defines=""):
         sys.exit(f"Shader source missing: {input_path}")
     tmp_spv = generated_dir / f"tmp_{task_counter:04d}.spv"
     defines_list = defines.split() if defines else []
-    cmd = [str(glslang), "-S", stage, "-V", "-o", str(tmp_spv), str(input_path)] + defines_list
+    # --target-env vulkan1.2: explicit Vulkan context (avoids OpenGL/ES semantics; 64-bit
+    # fragment outputs are disallowed in OpenGL ARB_gpu_shader_fp64 but glslang still
+    # rejects them even for Vulkan target as of glslang 15.x)
+    cmd = [str(glslang), "-S", stage, "-V", "--target-env", "vulkan1.2", "-o", str(tmp_spv), str(input_path)] + defines_list
     print(f"  compiling {array_name}")
     subprocess.run(cmd, check=True)
     subprocess.run([str(bin2hex), str(tmp_spv), f"+{data_file}", array_name], check=True)
@@ -230,6 +233,12 @@ def compile_template_shaders():
 
 compile_individual_shaders()
 compile_template_shaders()
+
+# HDR64 (64-bit) shader variants: glslang applies OpenGL/ES restriction (ARB_gpu_shader_fp64
+# disallows 64-bit fragment outputs) even in Vulkan target. Vulkan SPIR-V supports 64-bit
+# formats (VK_FORMAT_R64G64B64A64_SFLOAT). When glslang adds Vulkan-specific support for
+# dvec4 fragment outputs, re-enable compile_hdr64_shaders() and return RGBA64F from get_hdr_format.
+
 compile_shader("vert", "volumetric/volumetric_fog.vert", "volumetric_fog_vs", binding_expr="vk.modules.volumetric_fog_vs")
 compile_shader("frag", "volumetric/volumetric_fog.frag", "volumetric_fog_fs", binding_expr="vk.modules.volumetric_fog_fs")
 compile_shader("comp", "volumetric/volumetric_fog.comp", "volumetric_fog_cs", binding_expr="vk.modules.volumetric_fog_cs")

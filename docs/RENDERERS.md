@@ -55,11 +55,11 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - Compute runs at frame start; visual integration (draw from modified buffer) is a future enhancement
 
 ### RB_ColorMask (Vulkan)
-- **Deferred**: Requires `VK_EXT_extended_dynamic_state3` for `vkCmdSetColorWriteMaskEXT`. Currently stubbed; color mask commands are ignored.
+- **Implemented**: Uses `VK_EXT_extended_dynamic_state3` when available. Enables `vkCmdSetColorWriteMaskEXT` for shadow volumes and other color-mask use cases. Gracefully no-ops when the extension is not supported.
 
 ### Anti-Aliasing
-- SMAA (Sub-pixel Morphological Anti-Aliasing) with edge detection, blend weight, and compose passes
-- MSAA support (configurable sample count)
+- **SMAA** (Sub-pixel Morphological Anti-Aliasing): edge detection, blend weight, and compose passes. Cvars: `r_ext_smaa` (enable), `r_smaa_threshold` (0.01–0.5, default 0.1), `r_smaa_local_contrast` (1–4, default 2), `r_smaa_max_search_steps` (8–32, default 16). Requires `r_fbo 1`.
+- **MSAA**: Multi-sample anti-aliasing for geometry edges. Cvar `r_ext_multisample` (0|2|4|6|8). Requires `r_fbo 1`. MSAA and SMAA can be used together: MSAA handles geometry edges, SMAA handles alpha/transparency edges.
 
 ### Screen-Space Ambient Occlusion (SSAO)
 - Hemisphere sampling with configurable radius, bias, intensity
@@ -163,3 +163,11 @@ Features:
 - Fog volumes (distance-based)
 
 The OpenGL renderer does not include PBR, volumetric fog, SSAO, SMAA, bloom, fluid simulation, or IQM morph target evaluation.
+
+## Future Renderers (Planned)
+
+See [RENDERERS_FUTURE.md](RENDERERS_FUTURE.md) for architecture and implementation plans:
+
+- **Vulkan RTX**: `VK_KHR_ray_tracing_pipeline` integration. Build with `-DUSE_VULKAN_RTX=ON`. Cvar `r_rtx` (0–3) reserved.
+- **Metal**: Native Metal renderer for macOS/iOS (Apple Silicon). Option `USE_METAL_RENDERER` reserved.
+- **DXR**: DirectX 12 + DirectX Raytracing for Windows. Option `USE_DXR_RENDERER` reserved.

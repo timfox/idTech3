@@ -3592,7 +3592,7 @@ static void AAS_Reachability_JumpPad(void)
 		VectorSubtract ( ent2origin, origin, velocity);
 		dist = VectorNormalize( velocity);
 		forward = dist / time;
-		// FIXME: why multiply by 1.1
+		// Legacy: 1.1 overshoot factor for trigger_push (commented block)
 		forward *= 1.1;
 		VectorScale(velocity, forward, velocity);
 		velocity[2] = time * gravity;

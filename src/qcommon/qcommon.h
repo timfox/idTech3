@@ -167,6 +167,9 @@ typedef enum {
 	NA_IP6,
 	NA_MULTICAST6,
 #endif
+#ifdef USE_STEAM_NETWORKING
+	NA_STEAMID,					// Steam Datagram Relay (SteamID in ipv.steamid)
+#endif
 	NA_UNSPEC
 } netadrtype_t;
 
@@ -185,6 +188,9 @@ typedef struct {
 		byte	_4[4];
 #ifdef USE_IPV6
 		byte	_6[16];
+#endif
+#ifdef USE_STEAM_NETWORKING
+		uint64_t	steamid;	/* when type == NA_STEAMID */
 #endif
 	} ipv;
 	uint16_t	port;

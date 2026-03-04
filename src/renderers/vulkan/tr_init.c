@@ -165,6 +165,10 @@ cvar_t	*r_renderHeight;
 cvar_t	*r_renderScale;
 cvar_t	*r_ext_supersample;
 cvar_t	*r_ext_smaa;
+cvar_t	*r_smaa_threshold;
+cvar_t	*r_smaa_local_contrast;
+cvar_t	*r_smaa_max_search_steps;
+cvar_t	*r_rtx;
 
 #endif // USE_VULKAN
 
@@ -2790,7 +2794,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_renderMode, "Rendering path. Requires vid_restart.\n 0: Forward (default)\n 1: Deferred (placeholder)\n 2: Forward+ (placeholder)\nDeferred and forward+ would need G-buffers, light culling, and separate passes; they are not implemented yet." );
 	r_hdr = ri.Cvar_Get( "r_hdr", "2", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_hdr, "-1", "3", CV_INTEGER );
-	ri.Cvar_SetDescription(r_hdr, "HDR frame buffer format. Requires \\r_fbo 1.\n -1: 4-bit (B4G4R4A4), testing only\n  0: 8-bit, moderate banding\n  1: 16-bit float (RGBA16F)\n  2: 32-bit float (RGBA32F), default, fallback to 16F if unsupported\n  3: 64-bit float (RGBA64F), optional, requires shaderFloat64; falls back to 32F (64-bit fragment output not yet implemented)\n" );
+	ri.Cvar_SetDescription(r_hdr, "HDR frame buffer format. Requires \\r_fbo 1.\n -1: 4-bit (B4G4R4A4), testing only\n  0: 8-bit, moderate banding\n  1: 16-bit float (RGBA16F)\n  2: 32-bit float (RGBA32F), default, fallback to 16F if unsupported\n  3: 64-bit float (RGBA64F), optional; falls back to 32F (glslang lacks dvec4 fragment output support)\n" );
 	r_bloom = ri.Cvar_Get( "r_bloom", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_bloom, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription(r_bloom, "Enables bloom post-processing effect. Requires \\r_fbo 1.");
@@ -2840,6 +2844,22 @@ static void R_Register( void )
 	r_ext_smaa = ri.Cvar_Get( "r_ext_smaa", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_smaa, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ext_smaa, "Enables SMAA post-processing, requires \\r_fbo 1." );
+
+	r_smaa_threshold = ri.Cvar_Get( "r_smaa_threshold", "0.1", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_smaa_threshold, "0.01", "0.5", CV_FLOAT );
+	ri.Cvar_SetDescription( r_smaa_threshold, "SMAA edge detection threshold (lower = more edges, higher = fewer)." );
+
+	r_smaa_local_contrast = ri.Cvar_Get( "r_smaa_local_contrast", "2.0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_smaa_local_contrast, "1.0", "4.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_smaa_local_contrast, "SMAA local contrast adaptation factor." );
+
+	r_smaa_max_search_steps = ri.Cvar_Get( "r_smaa_max_search_steps", "16", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_smaa_max_search_steps, "8", "32", CV_INTEGER );
+	ri.Cvar_SetDescription( r_smaa_max_search_steps, "SMAA blend search steps (higher = better quality, more cost)." );
+
+	r_rtx = ri.Cvar_Get( "r_rtx", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_rtx, "0", "3", CV_INTEGER );
+	ri.Cvar_SetDescription( r_rtx, "Ray tracing (0=off, 1=shadows, 2=reflections, 3=full). Requires USE_VULKAN_RTX build and RT-capable GPU. See docs/RENDERERS_FUTURE.md." );
 #if 0
 	r_ext_alpha_to_coverage = ri.Cvar_Get( "r_ext_alpha_to_coverage", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_alpha_to_coverage, "0", "1", CV_INTEGER );

@@ -410,6 +410,7 @@ void vk_create_pipelines( void );
 
 void vk_clear_color( const vec4_t color );
 void vk_clear_depth( qboolean clear_stencil );
+void vk_set_color_write_mask( qboolean r, qboolean g, qboolean b, qboolean a );
 void vk_begin_frame( void );
 void vk_end_frame( void );
 void vk_present_frame( void );
@@ -835,6 +836,20 @@ typedef struct {
 			VkShaderModule ent[1][2];    // tx[0], fog[0,1]
 #endif
 			VkShaderModule light[2][2];  // linear[0,1] fog[0,1]
+			/* r_hdr 3 (64-bit) variants; used when color_format is RGBA64F */
+#ifdef USE_VK_PBR
+			VkShaderModule gen_hdr64[2][3][2][2];
+			VkShaderModule ident1_hdr64[2][2][2];
+			VkShaderModule fixed_hdr64[2][2][2];
+			VkShaderModule ent_hdr64[2][1][2];
+#else
+			VkShaderModule gen_hdr64[3][2][2];
+			VkShaderModule ident1_hdr64[2][2];
+			VkShaderModule fixed_hdr64[2][2];
+			VkShaderModule ent_hdr64[1][2];
+#endif
+			VkShaderModule light_hdr64[2][2];
+			VkShaderModule flowmap_hdr64[2];
 		} frag;
 
 
@@ -863,6 +878,17 @@ typedef struct {
 		VkShaderModule fog_vs;
 		VkShaderModule volumetric_fog_vs;
 		VkShaderModule volumetric_fog_fs;
+		/* r_hdr 3 (64-bit) variants */
+		VkShaderModule color_fs_hdr64;
+		VkShaderModule fog_fs_hdr64;
+		VkShaderModule atmosphere_fs_hdr64;
+		VkShaderModule dot_fs_hdr64;
+		VkShaderModule terrain_fs_hdr64;
+		VkShaderModule smaa_edge_fs_hdr64;
+		VkShaderModule smaa_blend_fs_hdr64;
+		VkShaderModule smaa_compose_fs_hdr64;
+		VkShaderModule ssr_fs_hdr64;
+		VkShaderModule volumetric_fog_fs_hdr64;
 		VkShaderModule volumetric_fog_cs;
 		VkShaderModule volumetric_depth_resolve_msaa_cs;
 		VkShaderModule luminance_cs;
@@ -970,6 +996,7 @@ typedef struct {
 	qboolean fragmentStores;
 	qboolean dedicatedAllocation;
 	qboolean debugMarkers;
+	qboolean colorWriteMaskDynamic;
 
 	float maxAnisotropy;
 	float maxLod;

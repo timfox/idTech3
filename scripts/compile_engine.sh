@@ -267,14 +267,17 @@ echo ""
 echo "Copying engine binaries and renderer .so files to $RELEASE_DIR..."
 mkdir -p "$RELEASE_DIR"
 
-# Game data (minimal): ensure base/default.cfg exists in release.
+# Game data (minimal): ensure base/default.cfg and steamdeck.cfg exist in release.
 # The engine reads base/default.cfg very early (before +set fs_game is applied).
+# steamdeck.cfg is auto-exec'd when Steam Deck is detected.
+mkdir -p "$RELEASE_DIR/base"
 if [ -d "$PROJECT_ROOT/base" ]; then
-  mkdir -p "$RELEASE_DIR/base"
-  # Copy only small text assets; keep this conservative.
   if [ -f "$PROJECT_ROOT/base/default.cfg" ]; then
     cp -f "$PROJECT_ROOT/base/default.cfg" "$RELEASE_DIR/base/default.cfg"
   fi
+fi
+if [ -f "$PROJECT_ROOT/config/steamdeck.cfg" ]; then
+  cp -f "$PROJECT_ROOT/config/steamdeck.cfg" "$RELEASE_DIR/base/steamdeck.cfg"
 fi
 
 # Client
