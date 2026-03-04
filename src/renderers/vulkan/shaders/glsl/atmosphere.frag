@@ -65,8 +65,14 @@ float opticalDepth(vec3 origin, vec3 dir, float rayLength, float scaleHeight) {
 }
 
 void main() {
-	/* Depth test (LESS_OR_EQUAL, frag 1.0) culls geometry; only sky pixels pass */
+	/* Depth test: only sky pixels pass (no geometry).
+	 * Standard depth: far=1.0, use LESS_OR_EQUAL frag=1.0.
+	 * Reversed depth: far=0.0, use EQUAL frag=0.0 so we pass only where stored==0.0. */
+#ifdef USE_REVERSED_DEPTH
+	gl_FragDepth = 0.0;
+#else
 	gl_FragDepth = 1.0;
+#endif
 	vec2 uv = frag_tex_coord * 2.0 - 1.0;
 	vec3 rayDir = normalize(vec3(uv.x, uv.y, -1.0));
 

@@ -10051,7 +10051,12 @@ static void vk_create_atmosphere_pipeline( void )
 	depth_stencil_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 	depth_stencil_state.depthTestEnable = VK_TRUE;
 	depth_stencil_state.depthWriteEnable = VK_FALSE;
+#ifdef USE_REVERSED_DEPTH
+	/* Reversed depth: far=0.0. Pass only where stored==0.0 (sky). Shader outputs gl_FragDepth=0.0. */
+	depth_stencil_state.depthCompareOp = VK_COMPARE_OP_EQUAL;
+#else
 	depth_stencil_state.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+#endif
 
 	Com_Memset( &attachment_blend, 0, sizeof( attachment_blend ) );
 	attachment_blend.blendEnable = VK_TRUE;
@@ -14930,7 +14935,11 @@ void vk_begin_frame( void )
 				float speed = speed_var->value > 0.0f ? speed_var->value * 0.016f : 0.02f;
 
 				avgLogLum = *(const float *)vk.luminance_staging_ptr;
-				sceneLum = ( avgLogLum > -20.0f && avgLogLum < 20.0f ) ? powf( 2.0f, avgLogLum ) : 0.5f;
+				/* Clamp to valid range: avoid NaN/Inf from bad readback or first-frame garbage */
+				if ( avgLogLum != avgLogLum || avgLogLum <= -20.0f || avgLogLum >= 20.0f ) {
+					avgLogLum = 0.0f;
+				}
+				sceneLum = powf( 2.0f, avgLogLum );
 				targetExp = ( sceneLum > 1e-6f ) ? ( target / sceneLum ) : 1.0f;
 				targetExp = ( targetExp < 0.01f ) ? 0.01f : ( targetExp > 10.0f ? 10.0f : targetExp );
 				vk.adaptedExposure += ( targetExp - vk.adaptedExposure ) * speed;
