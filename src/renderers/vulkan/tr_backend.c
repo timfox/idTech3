@@ -627,10 +627,21 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 
 	backEnd.pc.c_surfaces += numDrawSurfs;
 
+#ifdef USE_VULKAN
+	vk_vegetation_clear_staging();
+#endif
+
 	for (i = 0, drawSurf = drawSurfs ; i < numDrawSurfs ; i++, drawSurf++) {
 		if ( drawSurf->sort == oldSort ) {
 			// fast path, same as previous sort
-			rb_surfaceTable[ *drawSurf->surface ]( drawSurf->surface );
+			{
+				int oldNumVertexes = tess.numVertexes;
+				rb_surfaceTable[ *drawSurf->surface ]( drawSurf->surface );
+#ifdef USE_VULKAN
+				if ( oldShader && ( oldShader->surfaceFlags & SURF_VEGETATION ) )
+					vk_vegetation_add_from_tess( oldNumVertexes, tess.numVertexes );
+#endif
+			}
 			continue;
 		}
 
@@ -808,7 +819,14 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 		}
 
 		// add the triangles for this surface
-		rb_surfaceTable[ *drawSurf->surface ]( drawSurf->surface );
+		{
+			int oldNumVertexes = tess.numVertexes;
+			rb_surfaceTable[ *drawSurf->surface ]( drawSurf->surface );
+#ifdef USE_VULKAN
+			if ( shader && ( shader->surfaceFlags & SURF_VEGETATION ) )
+				vk_vegetation_add_from_tess( oldNumVertexes, tess.numVertexes );
+#endif
+		}
 	}
 
 	// draw the contents of the last shader batch
@@ -1965,6 +1983,7 @@ void RB_ShowImages( void ) {
 =============
 RB_ColorMask
 =============
+* Deferred: requires VK_EXT_extended_dynamic_state3 for vkCmdSetColorWriteMaskEXT.
 */
 static const void *RB_ColorMask( const void *data )
 {

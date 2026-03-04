@@ -47,6 +47,16 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - Point light shadow cubemap array (6 faces per light)
 - Per-frame shadow matrix computation
 
+### Vegetation Wind (Vulkan)
+- GPU compute shader deforms vertices for grass, leaves, foliage
+- Surfaces with `surfaceparm vegetation` in shaders feed the VegetationVertex buffer
+- Flexibility from vertex normal Y; phase from position hash
+- Cvars: `r_vegWind` (PostFX panel), wind direction/strength, primary/detail frequency and amplitude
+- Compute runs at frame start; visual integration (draw from modified buffer) is a future enhancement
+
+### RB_ColorMask (Vulkan)
+- **Deferred**: Requires `VK_EXT_extended_dynamic_state3` for `vkCmdSetColorWriteMaskEXT`. Currently stubbed; color mask commands are ignored.
+
 ### Anti-Aliasing
 - SMAA (Sub-pixel Morphological Anti-Aliasing) with edge detection, blend weight, and compose passes
 - MSAA support (configurable sample count)
