@@ -2862,7 +2862,9 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		} else if ( strcmp( ext, "VK_KHR_shader_subgroup_uniform_control_flow" ) == 0 ) {
 			shaderSubgroupUniformCF = qtrue;
 		} else if ( strcmp( ext, "VK_EXT_extended_dynamic_state3" ) == 0 ) {
-			extendedDynamicState3 = qtrue;
+			/* Disabled: validation/driver issues with VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT
+			 * (VUID-09423, VUID-pDynamicStates-parameter). RB_ColorMask falls back to full mask. */
+			/* extendedDynamicState3 = qtrue; */
 		}
 #ifdef USE_VULKAN_RTX
 			else if ( strcmp( ext, VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME ) == 0 ) {
@@ -2992,11 +2994,14 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			}
 			device_extension_list[ device_extension_count++ ] = "VK_KHR_shader_quad_control";
 		}
-		if ( extendedDynamicState3 ) {
+		/* VK_EXT_extended_dynamic_state3 disabled: validation errors (VUID-09423, VUID-pDynamicStates-parameter)
+		 * and OIT crash. RB_ColorMask falls back to full mask. */
+		if ( qfalse && extendedDynamicState3 ) {
 			device_extension_list[ device_extension_count++ ] = "VK_EXT_extended_dynamic_state3";
 			vk.colorWriteMaskDynamic = qtrue;
 			ri.Printf( PRINT_DEVELOPER, "  VK_EXT_extended_dynamic_state3: enabled (RB_ColorMask)\n" );
 		}
+		vk.colorWriteMaskDynamic = qfalse;
 #ifdef USE_VULKAN_RTX
 		if ( rtxAccelStruct && rtxPipeline && rtxDeferredHostOps && rtxBufferDeviceAddress && memoryRequirements2 ) {
 			device_extension_list[ device_extension_count++ ] = VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME;
@@ -3051,6 +3056,10 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		if ( r_ext_texture_filter_anisotropic->integer && device_features.samplerAnisotropy ) {
 			features.samplerAnisotropy = VK_TRUE;
 			vk.samplerAnisotropy = qtrue;
+		}
+		/* Required for 2-attachment pipelines (main/post_bloom) with different blend per attachment (VUID-00605) */
+		if ( device_features.independentBlend ) {
+			features.independentBlend = VK_TRUE;
 		}
 
 		device_desc.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -11207,6 +11216,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	VkPipelineMultisampleStateCreateInfo multisample_state;
 	VkPipelineColorBlendStateCreateInfo blend_state;
 	VkPipelineColorBlendAttachmentState attachment_blend_state;
+	VkPipelineColorBlendAttachmentState attachment_blend_states[2]; /* post_bloom has 2 color att when fboActive */
 	VkGraphicsPipelineCreateInfo create_info;
 	VkViewport viewport;
 	VkRect2D scissor;
@@ -11676,8 +11686,16 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	blend_state.flags = 0;
 	blend_state.logicOpEnable = VK_FALSE;
 	blend_state.logicOp = VK_LOGIC_OP_COPY;
-	blend_state.attachmentCount = 1;
-	blend_state.pAttachments = &attachment_blend_state;
+	/* post_bloom render pass has 2 color attachments when fboActive; pipeline must match (VUID-07609) */
+	if ( renderpass == vk.render_pass.post_bloom && vk.fboActive ) {
+		Com_Memcpy( attachment_blend_states, &attachment_blend_state, sizeof( attachment_blend_state ) );
+		Com_Memcpy( attachment_blend_states + 1, &attachment_blend_state, sizeof( attachment_blend_state ) );
+		blend_state.attachmentCount = 2;
+		blend_state.pAttachments = attachment_blend_states;
+	} else {
+		blend_state.attachmentCount = 1;
+		blend_state.pAttachments = &attachment_blend_state;
+	}
 	blend_state.blendConstants[0] = 0.0f;
 	blend_state.blendConstants[1] = 0.0f;
 	blend_state.blendConstants[2] = 0.0f;
@@ -14536,7 +14554,8 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 	if ( !r_oit || !r_oit->integer || !r_fbo || !r_fbo->integer || !vk.fboActive ||
 		vk.render_pass.oit_accum == VK_NULL_HANDLE || vk.render_pass.oit_resolve == VK_NULL_HANDLE ||
 		vk.framebuffers.oit_accum == VK_NULL_HANDLE || vk.framebuffers.oit_resolve == VK_NULL_HANDLE ||
-		vk.oit_resolve_pipeline == VK_NULL_HANDLE ||
+		vk.oit_resolve_pipeline == VK_NULL_HANDLE || vk.oit_accum_pipeline == VK_NULL_HANDLE ||
+		vk.oit_opaque_descriptor == VK_NULL_HANDLE || vk.oit_accum_descriptor == VK_NULL_HANDLE ||
 		vk.fog_scene_image_view == VK_NULL_HANDLE || vk.oit_accum_image_view == VK_NULL_HANDLE )
 		return;
 
@@ -16458,8 +16477,9 @@ _retry:
 
 	VK_CHECK( qvkBeginCommandBuffer( vk.cmd->command_buffer, &begin_info ) );
 
-	/* Default color write mask (all enabled) when using VK_EXT_extended_dynamic_state3 */
-	vk_set_color_write_mask( qtrue, qtrue, qtrue, qtrue );
+		/* Default color write mask (all enabled) when using VK_EXT_extended_dynamic_state3 */
+		if ( vk.colorWriteMaskDynamic && qvkCmdSetColorWriteMaskEXT )
+			vk_set_color_write_mask( qtrue, qtrue, qtrue, qtrue );
 
 	// Ensure visibility of geometry buffers writes.
 	//record_buffer_memory_barrier( vk.cmd->command_buffer, vk.cmd->vertex_buffer, vk.geometry_buffer_size, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_ACCESS_HOST_WRITE_BIT, VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT );
@@ -16932,8 +16952,14 @@ void vk_end_frame( void )
 								/* Eye adaptation: use vk.adaptedExposure when luminance pass has run */
 								expVal = vk.adaptedExposure > 0.0f ? vk.adaptedExposure : expVal;
 							}
+							/* No-world (menu): avoid overly dark HDR tonemap; use min 1.0 exposure */
+							if ( ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) && expVal < 1.0f )
+								expVal = 1.0f;
 							panini_push.exposure = expVal;
 						}
+						/* No-world (menu): boost brightness to counteract overall darkness (vignette/post chain) */
+						if ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) )
+							panini_push.brightness *= 1.5f;
 						if ( vk_scene_src_rect_valid &&
 							vk_scene_src_rect.offset.x >= 0 &&
 							vk_scene_src_rect.offset.y >= 0 &&
