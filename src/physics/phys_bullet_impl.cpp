@@ -185,7 +185,14 @@ extern "C" void Phys_Shutdown_Impl(void) {
 	for (i = 0; i < bs.dmmCount; i++)
 		if (bs.dmmObjects[i].elements) { delete[] bs.dmmObjects[i].elements; bs.dmmObjects[i].elements = nullptr; }
 	delete bs.world; delete bs.solver; delete bs.broadphase; delete bs.dispatcher; delete bs.collisionConfig;
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wclass-memaccess"
+#endif
 	memset(&bs, 0, sizeof(bs));
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 }
 
 extern "C" void Phys_StepSimulation_Impl(float dt) {
@@ -388,7 +395,14 @@ extern "C" physRagdollHandle_t Phys_CreateRagdoll_Impl(const physRagdollDef_t *d
 	if (!bs.initialized || bs.ragdollCount >= PHYS_MAX_RAGDOLLS) return -1;
 	int idx = bs.ragdollCount++;
 	PhysRagdoll *rag = &bs.ragdolls[idx];
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wclass-memaccess"
+#endif
 	memset(rag, 0, sizeof(*rag));
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 	rag->muscleStiffness = def->jointStiffness > 0 ? def->jointStiffness : 0.8f;
 	rag->muscleDamping = def->jointDamping > 0 ? def->jointDamping : 0.4f;
 	rag->balanceForce = def->balanceForce > 0 ? def->balanceForce : 100.0f;

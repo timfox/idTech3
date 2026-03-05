@@ -362,6 +362,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 						depthBits = 16;
 					else if (depthBits == 16)
 						depthBits = 8;
+					__attribute__((fallthrough));
 				case 3 :
 					if (stencilBits == 24)
 						stencilBits = 16;

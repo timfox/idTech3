@@ -682,7 +682,7 @@ jobHandle_t Jobs_ParallelFor( jobFunc_t func, void *data, uint32_t count, uint32
 		}
 
 		jobSlot_t *bs = slot_get( bh );
-		bs->func    = (jobFunc_t)(void *)func;
+		bs->func    = func;
 		bs->data    = &batchPool[bidx];
 		bs->count   = batchPool[bidx].start;
 		bs->priority = priority;
