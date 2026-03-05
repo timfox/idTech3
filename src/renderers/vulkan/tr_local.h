@@ -1684,6 +1684,7 @@ extern cvar_t	*r_fogShadowPcfRadius;
 extern cvar_t	*r_fogShadowMaxDistance;
 extern cvar_t	*r_fogShadowPadding;
 extern cvar_t	*r_fogDebug;
+extern cvar_t	*r_fboDebug;
 extern cvar_t	*r_froxelDebug;
 extern cvar_t	*r_vk_swapchain_srgb;
 extern cvar_t	*r_vk_pipeline_debug;
