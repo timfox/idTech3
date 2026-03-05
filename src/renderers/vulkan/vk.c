@@ -3954,6 +3954,11 @@ void vk_update_attachment_descriptors( void ) {
 			info.imageView = vk.ssao_blur_image_view;
 			desc.dstSet = vk.ssao_blur_descriptor;
 			qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+			if ( vk.fog_scene_image_view ) {
+				info.imageView = vk.fog_scene_image_view;
+				desc.dstSet = vk.ssao_scene_descriptor;
+				qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+			}
 		}
 
 		if ( PostFX_SSR_IsEnabled() && vk.ssr_image_view )
@@ -4598,6 +4603,7 @@ void vk_init_descriptors( void )
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.depth_descriptor ) );
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.ssao_descriptor ) );
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.ssao_blur_descriptor ) );
+			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.ssao_scene_descriptor ) );
 		}
 
 		if ( PostFX_SSR_IsEnabled() ) {
@@ -10870,10 +10876,10 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			pipeline = &vk.ssao_combine_pipeline;
 			fsmodule = vk.modules.ssao_combine_fs;
 			renderpass = vk.render_pass.ssao_combine;
-			layout = vk.pipeline_layout_post_process;
+			layout = vk.pipeline_layout_ssao_combine;
 			samples = VK_SAMPLE_COUNT_1_BIT;
 			pipeline_name = "ssao combine pipeline";
-			target_format = vk.capture_format;
+			target_format = vk.color_format;
 			blend = qfalse;
 			break;
 		case 8: // ssao debug
@@ -16070,7 +16076,34 @@ void vk_end_frame( void )
 				qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 				vk_end_render_pass();
 
-				// ssao combine
+				// ssao combine: copy scene to fog_scene to avoid read-modify-write on color_image
+				{
+					VkImageCopy copy_region;
+					Com_Memset( &copy_region, 0, sizeof( copy_region ) );
+					copy_region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+					copy_region.srcSubresource.layerCount = 1;
+					copy_region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+					copy_region.dstSubresource.layerCount = 1;
+					copy_region.extent.width = glConfig.vidWidth;
+					copy_region.extent.height = glConfig.vidHeight;
+					copy_region.extent.depth = 1;
+					record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
+						VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+						VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
+					record_image_layout_transition( vk.cmd->command_buffer, vk.fog_scene_image, VK_IMAGE_ASPECT_COLOR_BIT,
+						VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+						VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
+					qvkCmdCopyImage( vk.cmd->command_buffer,
+						vk.color_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+						vk.fog_scene_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+						1, &copy_region );
+					record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
+						VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+						VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
+					record_image_layout_transition( vk.cmd->command_buffer, vk.fog_scene_image, VK_IMAGE_ASPECT_COLOR_BIT,
+						VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+						VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
+				}
 				vk_begin_ssao_combine_render_pass();
 				if ( r_ssaoDebugView && r_ssaoDebugView->integer == 2 ) {
 					qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.ssao_depth_debug_pipeline );
@@ -16078,7 +16111,12 @@ void vk_end_frame( void )
 					} else {
 						qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 							( r_ssaoDebugView && r_ssaoDebugView->integer ) ? vk.ssao_debug_pipeline : vk.ssao_combine_pipeline );
-						qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.ssao_blur_descriptor, 0, NULL );
+						if ( r_ssaoDebugView && r_ssaoDebugView->integer ) {
+							qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.ssao_blur_descriptor, 0, NULL );
+						} else {
+							VkDescriptorSet ssao_combine_sets[2] = { vk.ssao_scene_descriptor, vk.ssao_blur_descriptor };
+							qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_ssao_combine, 0, 2, ssao_combine_sets, 0, NULL );
+						}
 					}
 					vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
 					qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );

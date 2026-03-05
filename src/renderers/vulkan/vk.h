@@ -680,6 +680,7 @@ typedef struct {
 	VkImage ssao_blur_image;
 	VkImageView ssao_blur_image_view;
 	VkDescriptorSet ssao_blur_descriptor;
+	VkDescriptorSet ssao_scene_descriptor;	/* scene copy for combine (avoids read-modify-write) */
 	VkImage ssr_image;
 	VkImageView ssr_image_view;
 	VkDescriptorSet ssr_descriptor[2];	/* [0]=color, [1]=depth */

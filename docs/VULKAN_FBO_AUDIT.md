@@ -268,3 +268,9 @@ The FBO pipeline is complex, with multiple conditional paths (volumetrics on/off
 
 - **Main pass color clear**: FBO color attachment now uses `VK_ATTACHMENT_LOAD_OP_CLEAR` instead of `DONT_CARE` to avoid uninitialized or stale content that could produce solid/wrong colors.
 - **Belt-and-suspenders descriptor update**: `vk.post_fog_color_source` tracks the last source (color_image or smaa_output) used for gamma. Right before the gamma pass, `vk_update_post_fog_descriptors()` is called again with that source (or `color_image_view` if unset) to ensure the descriptor is never stale.
+
+### SSAO Combine Fix (March 2025 — FBO color/post-process broken)
+
+- **SSAO combine overwrote scene**: The ssao_combine shader previously output only the AO map (`vec4(ao,ao,ao,1)`), replacing the full scene with a grayscale AO image. Fixed to multiply scene × AO: `out_color = vec4(scene * ao, 1.0)`.
+- **Pipeline and descriptors**: ssao_combine now uses `pipeline_layout_ssao_combine` (2 sets: scene + AO), `vk.color_format` for output, and binds `ssao_scene_descriptor` + `ssao_blur_descriptor`.
+- **Read-modify-write avoidance**: Before combine, `color_image` is copied to `fog_scene_image`; the combine samples from `fog_scene_image` and writes to `color_image`, avoiding undefined behavior from sampling and writing the same image in one pass.
