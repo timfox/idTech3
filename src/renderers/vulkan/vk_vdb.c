@@ -40,6 +40,7 @@ typedef struct {
 
 static vdbGrid_t grids[VDB_MAX_GRIDS];
 static int numGrids = 0;
+static vdbHandle_t boundFogDensityHandle = VDB_INVALID_HANDLE;
 static cvar_t *r_vdb;
 
 #define VALID_GRID(h) ((h) >= 0 && (h) < numGrids && grids[(h)].active)
@@ -258,8 +259,13 @@ qboolean VDB_UploadToGPU( vdbHandle_t h ) {
 
 qboolean VDB_BindAsFogDensity( vdbHandle_t h ) {
 	if ( !VALID_GRID( h ) ) return qfalse;
+	boundFogDensityHandle = h;
 	ri.Printf( PRINT_ALL, "VDB: grid %d bound as fog density source\n", h );
 	return qtrue;
+}
+
+vdbHandle_t VDB_GetBoundFogDensityHandle( void ) {
+	return boundFogDensityHandle;
 }
 
 int VDB_GetGridCount( void ) {

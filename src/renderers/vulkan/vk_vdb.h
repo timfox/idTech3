@@ -57,7 +57,7 @@ void        VDB_SampleVec3( vdbHandle_t handle, float x, float y, float z, float
 
 qboolean    VDB_UploadToGPU( vdbHandle_t handle );
 qboolean    VDB_BindAsFogDensity( vdbHandle_t handle );
-
+vdbHandle_t VDB_GetBoundFogDensityHandle( void );
 int         VDB_GetGridCount( void );
 
 #ifdef __cplusplus

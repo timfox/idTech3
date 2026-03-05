@@ -191,21 +191,33 @@ The engine already has:
 
 ---
 
+## Implemented (March 2025)
+
+| Area | Status |
+|------|--------|
+| Halton jitter | Compute and composite use halton2() for depth/slice jitter |
+| Volume shapes | Cylinder (type 2) and cone (type 3); cvars r_volumetricFogCylinder*, r_volumetricFogCone* |
+| Multi-scattering | Dual-lobe phase (gAmbient=-0.2), ambient multi-scatter term |
+| Fog color/lighting | Height-based color (GetFogColorAtHeight), cooler at altitude |
+| Shadow quality | Stochastic PCF jitter (frame-based offset) in ComputeShadow |
+| Temporal stability | Variance-guided blend in ReprojectHistory |
+| VDB API | VDB_GetBoundFogDensityHandle() for future GPU integration |
+
 ## Priority Matrix
 
 | Area | Impact | Effort | Dependencies |
 |------|--------|--------|--------------|
 | Froxel culling | High | Medium | None |
-| Jitter refinements | Medium | Low | None |
+| Jitter refinements | Medium | Low | Done |
 | Transparent compositing | High | Medium | OIT |
-| Multi-scatter approx | Medium | Low | None |
-| Shadow quality | Medium | Medium | None |
+| Multi-scatter approx | Medium | Low | Done |
+| Shadow quality | Medium | Medium | Done |
 | Slice distribution | Medium | Low | None |
-| VDB integration | High | Medium | OpenVDB |
-| Fog color/lighting | Medium | Low | None |
-| Temporal/denoise | High | Medium | None |
+| VDB integration | High | Medium | OpenVDB, 3D texture upload |
+| Fog color/lighting | Medium | Low | Done |
+| Temporal/denoise | High | Medium | Done |
 | Performance tiers | High | Medium | None |
-| Volume shapes | Medium | Medium | None |
+| Volume shapes | Medium | Medium | Done |
 | Debug/authoring | Low | Low | None |
 
 ---

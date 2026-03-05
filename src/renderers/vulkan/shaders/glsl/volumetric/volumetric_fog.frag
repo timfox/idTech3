@@ -73,6 +73,18 @@ float hash12(vec2 p) {
     return fract((p3.x + p3.y) * p3.z);
 }
 
+float halton2(int index) {
+    float result = 0.0;
+    float f = 0.5;
+    int i = index;
+    while (i > 0) {
+        result += f * float(i & 1);
+        i /= 2;
+        f *= 0.5;
+    }
+    return result;
+}
+
 float saturate(float v) {
     return clamp(v, 0.0, 1.0);
 }
@@ -297,7 +309,9 @@ void main() {
     sceneDepth = min(sceneDepth, maxDistance);
 
     vec3 scene = texture(sceneColor, v_UV).rgb;
-    float jitter = (hash12(gl_FragCoord.xy + frameIndex) - 0.5) * jitterStrength;
+    int px = int(gl_FragCoord.x), py = int(gl_FragCoord.y);
+    int haltonIdx = px + py * 4096 + int(frameIndex) * 256;
+    float jitter = (halton2(haltonIdx % 256) - 0.5) * jitterStrength;
 
     if (fogDebug == 1) {
         float sliceNorm = clamp(log(max(sceneDepth / nearPlane, 1e-4)) / max(log(farPlane / nearPlane), 1e-5), 0.0, 1.0);
