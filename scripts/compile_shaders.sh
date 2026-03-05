@@ -106,10 +106,22 @@ for path in (data_file, binding_file):
         path.unlink()
 
 glslang = Path(os.environ["GLSLANG_VALIDATOR"])
-bin2hex = Path(os.environ["BIN2HEX"])
 
 bindings = []
 task_counter = 0
+
+def append_shader_data(spv_path, array_name):
+    data = spv_path.read_bytes()
+    with data_file.open("a", encoding="utf-8") as f:
+        f.write(f"const unsigned char {array_name}[{len(data)}] = {{\n")
+        for offset in range(0, len(data), 16):
+            chunk = data[offset:offset + 16]
+            bytes_text = ", ".join(f"0x{byte:02X}" for byte in chunk)
+            f.write(f"\t{bytes_text}")
+            if offset + 16 < len(data):
+                f.write(",")
+            f.write("\n")
+        f.write("};\n")
 
 def compile_shader(stage, source, array_name, binding_expr=None, defines=""):
     global task_counter
@@ -124,7 +136,7 @@ def compile_shader(stage, source, array_name, binding_expr=None, defines=""):
     cmd = [str(glslang), "-S", stage, "-V", "--target-env", "vulkan1.2", "-o", str(tmp_spv), str(input_path)] + defines_list
     print(f"  compiling {array_name}")
     subprocess.run(cmd, check=True)
-    subprocess.run([str(bin2hex), str(tmp_spv), f"+{data_file}", array_name], check=True)
+    append_shader_data(tmp_spv, array_name)
     if binding_expr:
         bindings.append((binding_expr, array_name))
     try:

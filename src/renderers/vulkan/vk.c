@@ -11205,6 +11205,7 @@ static void vk_create_oit_accum_pipeline( void )
 	}
 
 	/* Gen vertex layout: position, color, texcoord (TYPE_SIGNLE_TEXTURE) */
+	Com_Memset( &vertex_input, 0, sizeof( vertex_input ) );
 	Com_Memset( bindings, 0, sizeof( bindings ) );
 	bindings[0].binding = 0;
 	bindings[0].stride = sizeof( vec4_t );
@@ -11236,6 +11237,7 @@ static void vk_create_oit_accum_pipeline( void )
 	vertex_input.vertexAttributeDescriptionCount = 3;
 	vertex_input.pVertexAttributeDescriptions = attribs;
 
+	Com_Memset( shader_stages, 0, sizeof( shader_stages ) );
 	shader_stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	shader_stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
 	shader_stages[0].module = vk.modules.oit_accum_vs;
@@ -17091,9 +17093,12 @@ void vk_end_frame( void )
 								expVal = 1.0f;
 							panini_push.exposure = expVal;
 						}
-						/* No-world (menu): boost brightness to counteract overall darkness (vignette/post chain) */
-						if ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) )
-							panini_push.brightness *= 1.5f;
+						if ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+							/* Menus/cinematics are authored as LDR overlays; don't run the HDR film pipeline on them. */
+							panini_push.brightness = 1.0f;
+							panini_push.exposure = 1.0f;
+							panini_push.paniniPad1 = 1.0f;
+						}
 						if ( vk_scene_src_rect_valid &&
 							vk_scene_src_rect.offset.x >= 0 &&
 							vk_scene_src_rect.offset.y >= 0 &&

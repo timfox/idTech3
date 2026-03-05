@@ -294,20 +294,22 @@ void main() {
 	     isinf( hdr.r ) || isinf( hdr.g ) || isinf( hdr.b ) ) {
 		hdr = vec3( 0.0 );
 	}
+	bool noWorldLdr = paniniPC.paniniPad1 > 0.5;
+	bool postActive = postprocess_enabled != 0 && !noWorldLdr;
 	vec3 hdr_exposed = hdr * max( paniniPC.brightness, 0.0 );
-	if ( postprocess_enabled != 0 ) {
+	if ( postActive ) {
 		hdr_exposed *= max( paniniPC.exposure, 0.01 );
 		hdr_exposed *= preExposureScale;
 		hdr_exposed = applyBloomKnee( hdr_exposed );
 	}
 
 	vec3 tonemapped = hdr_exposed;
-	if ( postprocess_enabled != 0 ) {
+	if ( postActive ) {
 		tonemapped = doTonemap( tonemapped );
 	}
 
 	vec3 ldr;
-	if ( postprocess_enabled != 0 && post_debug != 0 ) {
+	if ( postActive && post_debug != 0 ) {
 		if ( post_debug == 1 ) {
 			ldr = clamp( hdr_exposed, 0.0, 10.0 ) * 0.1;
 		} else {
@@ -320,14 +322,14 @@ void main() {
 		ldr = clamp( tonemapped, 0.0, 1.0 );
 
 		/* Contrast: pivot around 0.5 */
-		if ( postprocess_enabled != 0 && post_contrast != 1.0 ) {
+		if ( postActive && post_contrast != 1.0 ) {
 			float c = clamp( post_contrast, 0.0, 4.0 );
 			ldr = ( ldr - 0.5 ) * c + 0.5;
 			ldr = clamp( ldr, 0.0, 1.0 );
 		}
 
 		/* Saturation: 1.0=neutral, >1=boost chroma, <1=desaturate. Replaces fixed satBoost. */
-		if ( postprocess_enabled != 0 && post_saturation != 1.0 ) {
+		if ( postActive && post_saturation != 1.0 ) {
 			float sat = clamp( post_saturation, 0.0, 3.0 );
 			float lum = dot( ldr, sRGB );
 			ldr = clamp( vec3(lum) + sat * ( ldr - vec3(lum) ), 0.0, 1.0 );
@@ -344,7 +346,7 @@ void main() {
 		}
 	}
 
-	if ( chromatic_aberration > 0.0 && postprocess_enabled != 0 ) {
+	if ( chromatic_aberration > 0.0 && postActive ) {
 		vec2 caUV = uvLogical;
 		vec2 caOffset = (caUV - 0.5) * chromatic_aberration * 0.01;
 		vec2 srcR = to_src_uv( caUV + caOffset );
@@ -362,7 +364,7 @@ void main() {
 		ldr = clamp( caTone, 0.0, 1.0 );
 	}
 
-	if ( outline_strength > 0.0 && postprocess_enabled != 0 ) {
+	if ( outline_strength > 0.0 && postActive ) {
 		vec2 outlineTexel = 1.0 / vec2( textureSize( texture0, 0 ) );
 		float lumC  = dot( textureLod( texture0, uv, 0.0 ).rgb, vec3(0.299, 0.587, 0.114) );
 		float lumL  = dot( textureLod( texture0, uv + vec2(-outlineTexel.x, 0.0), 0.0 ).rgb, vec3(0.299, 0.587, 0.114) );
@@ -376,7 +378,7 @@ void main() {
 		ldr = mix( ldr, vec3(0.0), outlineMask * outline_strength );
 	}
 
-	if ( vignette_intensity > 0.0 && postprocess_enabled != 0 ) {
+	if ( vignette_intensity > 0.0 && postActive ) {
 		vec2 vigUV = uvLogical * 2.0 - 1.0;
 		float vigDist = length( vigUV );
 		float vig = 1.0 - smoothstep( vignette_radius, vignette_radius + 0.5, vigDist );
@@ -386,7 +388,7 @@ void main() {
 
 	/* Film grain: film_look = Source-style (luminance-dependent, soft-light);
 	   else film_grain = simple additive. */
-	if ( film_look != 0 && postprocess_enabled != 0 ) {
+	if ( film_look != 0 && postActive ) {
 		/* Source Engine–style film grain (DoD:S, L4D): luminance-dependent, fine-grained,
 		   soft-light blend. Grain peaks in mid-tones, fades in shadows/highlights.
 		   r_filmGrain scales intensity (0.5–1.5x) when film_look is on. */
@@ -418,7 +420,7 @@ void main() {
 			? ( 2.0 * base.b * blend.b + base.b * base.b * ( 1.0 - 2.0 * blend.b ) )
 			: ( sqrt( base.b ) * ( 2.0 * blend.b - 1.0 ) + 2.0 * base.b * ( 1.0 - blend.b ) );
 		ldr = clamp( result, 0.0, 1.0 );
-	} else if ( film_grain > 0.0 && postprocess_enabled != 0 ) {
+	} else if ( film_grain > 0.0 && postActive ) {
 		/* Simple additive grain when film_look is off */
 		float t = paniniPC.paniniPad0;
 		float grainSeed = fract( sin( dot( gl_FragCoord.xy + vec2( t * 173.0, t * 79.0 ), vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );

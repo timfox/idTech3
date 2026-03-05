@@ -751,6 +751,8 @@ R_ComputeColors
 void R_ComputeColors( const int b, color4ub_t *dest, const shaderStage_t *pStage )
 {
 	int		i;
+	const float identityLight = backEnd.projection2D ? 1.0f : tr.identityLight;
+	const byte identityLightByte = backEnd.projection2D ? 255 : tr.identityLightByte;
 
 	if ( tess.numVertexes == 0 )
 		return;
@@ -814,7 +816,7 @@ void R_ComputeColors( const int b, color4ub_t *dest, const shaderStage_t *pStage
 			break;
 		default:
 		case CGEN_IDENTITY_LIGHTING:
-			Com_Memset( dest, tr.identityLightByte, tess.numVertexes * 4 );
+			Com_Memset( dest, identityLightByte, tess.numVertexes * 4 );
 			break;
 		case CGEN_LIGHTING_DIFFUSE:
 			RB_CalcDiffuseColor( ( unsigned char * ) dest );
@@ -828,7 +830,7 @@ void R_ComputeColors( const int b, color4ub_t *dest, const shaderStage_t *pStage
 			}
 			break;
 		case CGEN_VERTEX:
-			if ( tr.identityLight == 1 )
+			if ( identityLight == 1 )
 			{
 				Com_Memcpy( dest, tess.vertexColors, tess.numVertexes * sizeof( tess.vertexColors[0] ) );
 			}
@@ -836,15 +838,15 @@ void R_ComputeColors( const int b, color4ub_t *dest, const shaderStage_t *pStage
 			{
 				for ( i = 0; i < tess.numVertexes; i++ )
 				{
-					dest[i].rgba[0] = tess.vertexColors[i].rgba[0] * tr.identityLight;
-					dest[i].rgba[1] = tess.vertexColors[i].rgba[1] * tr.identityLight;
-					dest[i].rgba[2] = tess.vertexColors[i].rgba[2] * tr.identityLight;
+					dest[i].rgba[0] = tess.vertexColors[i].rgba[0] * identityLight;
+					dest[i].rgba[1] = tess.vertexColors[i].rgba[1] * identityLight;
+					dest[i].rgba[2] = tess.vertexColors[i].rgba[2] * identityLight;
 					dest[i].rgba[3] = tess.vertexColors[i].rgba[3];
 				}
 			}
 			break;
 		case CGEN_ONE_MINUS_VERTEX:
-			if ( tr.identityLight == 1 )
+			if ( identityLight == 1 )
 			{
 				for ( i = 0; i < tess.numVertexes; i++ )
 				{
@@ -857,9 +859,9 @@ void R_ComputeColors( const int b, color4ub_t *dest, const shaderStage_t *pStage
 			{
 				for ( i = 0; i < tess.numVertexes; i++ )
 				{
-					dest[i].rgba[0] = ( 255 - tess.vertexColors[i].rgba[0] ) * tr.identityLight;
-					dest[i].rgba[1] = ( 255 - tess.vertexColors[i].rgba[1] ) * tr.identityLight;
-					dest[i].rgba[2] = ( 255 - tess.vertexColors[i].rgba[2] ) * tr.identityLight;
+					dest[i].rgba[0] = ( 255 - tess.vertexColors[i].rgba[0] ) * identityLight;
+					dest[i].rgba[1] = ( 255 - tess.vertexColors[i].rgba[1] ) * identityLight;
+					dest[i].rgba[2] = ( 255 - tess.vertexColors[i].rgba[2] ) * identityLight;
 				}
 			}
 			break;
@@ -891,7 +893,7 @@ void R_ComputeColors( const int b, color4ub_t *dest, const shaderStage_t *pStage
 	case AGEN_SKIP:
 		break;
 	case AGEN_IDENTITY:
-		if ( ( pStage->bundle[b].rgbGen == CGEN_VERTEX && tr.identityLight != 1 ) ||
+		if ( ( pStage->bundle[b].rgbGen == CGEN_VERTEX && identityLight != 1 ) ||
 			 pStage->bundle[b].rgbGen != CGEN_VERTEX ) {
 			for ( i = 0; i < tess.numVertexes; i++ ) {
 				dest[i].rgba[3] = 255;

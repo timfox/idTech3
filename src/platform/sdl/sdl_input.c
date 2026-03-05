@@ -463,6 +463,7 @@ IN_DeactivateMouse
 static void IN_DeactivateMouse( void )
 {
 	const char* drv = SDL_GetCurrentVideoDriver();
+	qboolean uiActive = ( Key_GetCatcher() & KEYCATCH_UI ) ? qtrue : qfalse;
 
 	if ( !mouseAvailable )
 		return;
@@ -492,10 +493,10 @@ static void IN_DeactivateMouse( void )
 		mouseActive = qfalse;
 	}
 
-	// Always show the cursor when the mouse is disabled,
-	// but not when fullscreen
-	if ( !glw_state.isFullscreen )
-		SDL_ShowCursor( SDL_TRUE );
+	/* In menu/UI mode the engine draws its own cursor, so hide the OS cursor to avoid
+	 * a second pointer drifting away from the in-game one. Keep fullscreen non-UI
+	 * paths hidden as well to match captured-mouse behavior. */
+	SDL_ShowCursor( uiActive ? SDL_FALSE : ( glw_state.isFullscreen ? SDL_FALSE : SDL_TRUE ) );
 }
 
 
@@ -1282,7 +1283,7 @@ void HandleEvents( void )
 				break;
 
 			case SDL_MOUSEMOTION:
-				if( mouseActive )
+				if( mouseActive || ( Key_GetCatcher() & KEYCATCH_UI ) )
 				{
 					if( !e.motion.xrel && !e.motion.yrel )
 						break;
