@@ -16674,99 +16674,107 @@ void vk_end_frame( void )
 					} else if ( gamma_src == VK_NULL_HANDLE ) {
 						ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW "[VK][fbo] gamma pass skipped: no valid color source (post_fog or color_image)\n" );
 					} else {
-				/* Belt-and-suspenders: ensure color_descriptor samples correct source before gamma */
+						/* Belt-and-suspenders: ensure color_descriptor samples correct source before gamma */
 						vk_update_color_descriptor_image( gamma_src );
-				vk_begin_render_pass( vk.render_pass.gamma, vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ], qfalse, vk.renderWidth, vk.renderHeight );
-				qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.gamma_pipeline );
-				qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
+						vk_begin_render_pass( vk.render_pass.gamma, vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ], qfalse, vk.renderWidth, vk.renderHeight );
+						qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.gamma_pipeline );
+						qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
 
-			VkPostProcessPushConstants panini_push = { 0 };
-			uint32_t srcTexW = ( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u;
-			uint32_t srcTexH = ( glConfig.vidHeight > 0 ) ? (uint32_t)glConfig.vidHeight : 1u;
-			VkRect2D srcRect;
-			{
-			int lensPreset = r_paniniLensPreset ? r_paniniLensPreset->integer : 0;
-			float presetAmount = r_panini ? r_panini->value : 0.0f;
-			float presetD = r_panini_d ? r_panini_d->value : 1.0f;
-			float presetS = r_panini_s ? r_panini_s->value : 0.25f;
-			float presetFov = r_panini_theta ? r_panini_theta->value : 90.0f;
-			float presetZoom = r_panini_zoom ? r_panini_zoom->value : 1.0f;
-			float presetBright = r_paniniBrightness ? r_paniniBrightness->value : 1.0f;
+						VkPostProcessPushConstants panini_push = { 0 };
+						uint32_t srcTexW = ( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u;
+						uint32_t srcTexH = ( glConfig.vidHeight > 0 ) ? (uint32_t)glConfig.vidHeight : 1u;
+						VkRect2D srcRect;
+						{
+							int lensPreset = r_paniniLensPreset ? r_paniniLensPreset->integer : 0;
+							float presetAmount = r_panini ? r_panini->value : 0.0f;
+							float presetD = r_panini_d ? r_panini_d->value : 1.0f;
+							float presetS = r_panini_s ? r_panini_s->value : 0.25f;
+							float presetFov = r_panini_theta ? r_panini_theta->value : 90.0f;
+							float presetZoom = r_panini_zoom ? r_panini_zoom->value : 1.0f;
+							float presetBright = r_paniniBrightness ? r_paniniBrightness->value : 1.0f;
 
-			switch (lensPreset) {
-				case 1: presetAmount=1.0f; presetD=1.0f; presetS=0.2f; presetFov=120.0f; presetZoom=1.15f; presetBright=1.2f; break;
-				case 2: presetAmount=1.0f; presetD=1.2f; presetS=0.35f; presetFov=150.0f; presetZoom=1.25f; presetBright=1.25f; break;
-				case 3: presetAmount=0.0f; presetD=0.0f; presetS=0.0f; presetFov=90.0f; presetZoom=1.0f; break;
-				case 4: presetAmount=0.4f; presetD=0.3f; presetS=0.05f; presetFov=84.0f; presetZoom=1.0f; break;
-				case 5: presetAmount=0.2f; presetD=0.15f; presetS=0.02f; presetFov=63.0f; presetZoom=1.0f; break;
-				case 6: presetAmount=1.0f; presetD=1.5f; presetS=0.5f; presetFov=170.0f; presetZoom=1.4f; presetBright=1.3f; break;
-				case 7: presetAmount=0.8f; presetD=0.8f; presetS=0.15f; presetFov=110.0f; presetZoom=1.1f; break;
-				default: break;
-			}
+							switch ( lensPreset ) {
+								case 1: presetAmount=1.0f; presetD=1.0f; presetS=0.2f; presetFov=120.0f; presetZoom=1.15f; presetBright=1.2f; break;
+								case 2: presetAmount=1.0f; presetD=1.2f; presetS=0.35f; presetFov=150.0f; presetZoom=1.25f; presetBright=1.25f; break;
+								case 3: presetAmount=0.0f; presetD=0.0f; presetS=0.0f; presetFov=90.0f; presetZoom=1.0f; break;
+								case 4: presetAmount=0.4f; presetD=0.3f; presetS=0.05f; presetFov=84.0f; presetZoom=1.0f; break;
+								case 5: presetAmount=0.2f; presetD=0.15f; presetS=0.02f; presetFov=63.0f; presetZoom=1.0f; break;
+								case 6: presetAmount=1.0f; presetD=1.5f; presetS=0.5f; presetFov=170.0f; presetZoom=1.4f; presetBright=1.3f; break;
+								case 7: presetAmount=0.8f; presetD=0.8f; presetS=0.15f; presetFov=110.0f; presetZoom=1.1f; break;
+								default: break;
+							}
 
-			panini_push.paniniAmount = presetAmount;
-			panini_push.paniniD = presetD;
-			panini_push.paniniS = presetS;
-			panini_push.fovXDeg = backEnd.viewParms.fovX > 1.0f ? backEnd.viewParms.fovX : presetFov;
-			panini_push.paniniZoom = presetZoom;
-			panini_push.brightness = presetBright;
-			}
-			panini_push.aspect = vk.renderHeight > 0 ? ( (float)vk.renderWidth / (float)vk.renderHeight ) : 1.0f;
-			panini_push.paniniBorderMode = r_panini_border ? (float)r_panini_border->integer : 0.0f;
-			panini_push.paniniDebugMode = r_panini_debug ? (float)r_panini_debug->integer : 0.0f;
-			panini_push.paniniPad0 = (float)backEnd.refdef.time * 0.001f;
-			panini_push.paniniPad1 = 0.0f;
-			panini_push.paniniPad2 = 0.0f;
-			{
-				cvar_t *r_exposure_auto_var = ri.Cvar_Get( "r_exposure_auto", "0", 0 );
-				float expVal = ( r_exposure && r_exposure->value > 0.0f ) ? r_exposure->value : 1.0f;
-				if ( r_exposure_auto_var && r_exposure_auto_var->integer ) {
-					/* Eye adaptation: use vk.adaptedExposure when luminance pass has run */
-					expVal = vk.adaptedExposure > 0.0f ? vk.adaptedExposure : expVal;
-				}
-				panini_push.exposure = expVal;
-			}
-			if ( vk_scene_src_rect_valid &&
-				vk_scene_src_rect.offset.x >= 0 &&
-				vk_scene_src_rect.offset.y >= 0 &&
-				vk_scene_src_rect.extent.width > 0 &&
-				vk_scene_src_rect.extent.height > 0 &&
-				(uint32_t)vk_scene_src_rect.offset.x < srcTexW &&
-				(uint32_t)vk_scene_src_rect.offset.y < srcTexH ) {
-				srcRect = vk_scene_src_rect;
-				if ( (uint32_t)srcRect.offset.x + srcRect.extent.width > srcTexW ) {
-					srcRect.extent.width = srcTexW - (uint32_t)srcRect.offset.x;
-				}
-				if ( (uint32_t)srcRect.offset.y + srcRect.extent.height > srcTexH ) {
-					srcRect.extent.height = srcTexH - (uint32_t)srcRect.offset.y;
-				}
-			} else {
-				srcRect.offset.x = 0;
-				srcRect.offset.y = 0;
-				srcRect.extent.width = srcTexW;
-				srcRect.extent.height = srcTexH;
-			}
-			if ( srcRect.extent.width == 0 || srcRect.extent.height == 0 ) {
-				srcRect.offset.x = 0;
-				srcRect.offset.y = 0;
-				srcRect.extent.width = srcTexW;
-				srcRect.extent.height = srcTexH;
-			}
-			panini_push.srcUVScaleBias[0] = (float)srcRect.extent.width / (float)srcTexW;
-			panini_push.srcUVScaleBias[1] = (float)srcRect.extent.height / (float)srcTexH;
-			panini_push.srcUVScaleBias[2] = (float)srcRect.offset.x / (float)srcTexW;
-			panini_push.srcUVScaleBias[3] = (float)srcRect.offset.y / (float)srcTexH;
+							panini_push.paniniAmount = presetAmount;
+							panini_push.paniniD = presetD;
+							panini_push.paniniS = presetS;
+							panini_push.fovXDeg = backEnd.viewParms.fovX > 1.0f ? backEnd.viewParms.fovX : presetFov;
+							panini_push.paniniZoom = presetZoom;
+							panini_push.brightness = presetBright;
+						}
+						panini_push.aspect = vk.renderHeight > 0 ? ( (float)vk.renderWidth / (float)vk.renderHeight ) : 1.0f;
+						panini_push.paniniBorderMode = r_panini_border ? (float)r_panini_border->integer : 0.0f;
+						panini_push.paniniDebugMode = r_panini_debug ? (float)r_panini_debug->integer : 0.0f;
+						panini_push.paniniPad0 = (float)backEnd.refdef.time * 0.001f;
+						panini_push.paniniPad1 = 0.0f;
+						panini_push.paniniPad2 = 0.0f;
+						{
+							cvar_t *r_exposure_auto_var = ri.Cvar_Get( "r_exposure_auto", "0", 0 );
+							float expVal = ( r_exposure && r_exposure->value > 0.0f ) ? r_exposure->value : 1.0f;
+							if ( r_exposure_auto_var && r_exposure_auto_var->integer ) {
+								/* Eye adaptation: use vk.adaptedExposure when luminance pass has run */
+								expVal = vk.adaptedExposure > 0.0f ? vk.adaptedExposure : expVal;
+							}
+							panini_push.exposure = expVal;
+						}
+						if ( vk_scene_src_rect_valid &&
+							vk_scene_src_rect.offset.x >= 0 &&
+							vk_scene_src_rect.offset.y >= 0 &&
+							vk_scene_src_rect.extent.width > 0 &&
+							vk_scene_src_rect.extent.height > 0 &&
+							(uint32_t)vk_scene_src_rect.offset.x < srcTexW &&
+							(uint32_t)vk_scene_src_rect.offset.y < srcTexH ) {
+							srcRect = vk_scene_src_rect;
+							if ( (uint32_t)srcRect.offset.x + srcRect.extent.width > srcTexW ) {
+								srcRect.extent.width = srcTexW - (uint32_t)srcRect.offset.x;
+							}
+							if ( (uint32_t)srcRect.offset.y + srcRect.extent.height > srcTexH ) {
+								srcRect.extent.height = srcTexH - (uint32_t)srcRect.offset.y;
+							}
+						} else {
+							srcRect.offset.x = 0;
+							srcRect.offset.y = 0;
+							srcRect.extent.width = srcTexW;
+							srcRect.extent.height = srcTexH;
+						}
+						if ( srcRect.extent.width == 0 || srcRect.extent.height == 0 ) {
+							srcRect.offset.x = 0;
+							srcRect.offset.y = 0;
+							srcRect.extent.width = srcTexW;
+							srcRect.extent.height = srcTexH;
+						}
+						panini_push.srcUVScaleBias[0] = (float)srcRect.extent.width / (float)srcTexW;
+						panini_push.srcUVScaleBias[1] = (float)srcRect.extent.height / (float)srcTexH;
+						panini_push.srcUVScaleBias[2] = (float)srcRect.offset.x / (float)srcTexW;
+						panini_push.srcUVScaleBias[3] = (float)srcRect.offset.y / (float)srcTexH;
 
-			qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_post_process, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( panini_push ), &panini_push );
+						qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_post_process, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( panini_push ), &panini_push );
 
-			vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
-			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
-		}
-	}
-
-				vk_end_render_pass();
+						vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
+						qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+						vk_end_render_pass();
 					}
 				}
+			}
+		}
+	}
+	else
+	{
+		/* r_fbo 0 path: we started the main render pass in vk_start_frame().
+		 * There is no post-process chain, so ensure the main render pass is
+		 * terminated before ending the command buffer to avoid validation errors
+		 * or undefined behavior on submission. */
+		vk_end_render_pass();
+	}
 
 	VK_CHECK( qvkEndCommandBuffer( vk.cmd->command_buffer ) );
 
