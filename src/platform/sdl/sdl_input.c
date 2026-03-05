@@ -966,8 +966,8 @@ static void IN_JoyMove( void )
 	total = SDL_JoystickNumButtons(stick);
 	if (total > 0)
 	{
-		if (total > ARRAY_LEN(stick_state.buttons))
-			total = ARRAY_LEN(stick_state.buttons);
+		if ( total > 0 && (size_t)total > ARRAY_LEN(stick_state.buttons) )
+			total = (int)ARRAY_LEN(stick_state.buttons);
 		for (i = 0; i < total; i++)
 		{
 			qboolean pressed = (SDL_JoystickGetButton(stick, i) != 0);
