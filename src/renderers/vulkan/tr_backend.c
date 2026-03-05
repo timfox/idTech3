@@ -66,11 +66,11 @@ void GL_Bind( image_t *image ) {
 		image = tr.dlightImage;
 	}
 
-	//if ( glState.currenttextures[glState.currenttmu] != texnum ) {
-		image->frameUsed = tr.frameCount;
-		vk_update_descriptor( glState.currenttmu + VK_DESC_TEXTURE_BASE, image->descriptor );
+	if ( !image )
+		return;
 
-	//}
+	image->frameUsed = tr.frameCount;
+	vk_update_descriptor( glState.currenttmu + VK_DESC_TEXTURE_BASE, image->descriptor );
 #else
 	GLuint texnum;
 

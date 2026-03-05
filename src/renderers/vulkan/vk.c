@@ -10428,14 +10428,13 @@ void vk_release_resources( void ) {
 
 	Com_Memset( &vk_world, 0, sizeof( vk_world ) );
 
-	// Reset geometry buffers offsets
+	// Reset geometry buffers offsets for all command buffers (avoid stale offsets on next frame)
 	for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ ) {
 		vk.tess[i].uniform_read_offset = 0;
 		vk.tess[i].vertex_buffer_offset = 0;
+		Com_Memset( vk.tess[i].buf_offset, 0, sizeof( vk.tess[i].buf_offset ) );
+		Com_Memset( vk.tess[i].vbo_offset, 0, sizeof( vk.tess[i].vbo_offset ) );
 	}
-
-	Com_Memset( vk.cmd->buf_offset, 0, sizeof( vk.cmd->buf_offset ) );
-	Com_Memset( vk.cmd->vbo_offset, 0, sizeof( vk.cmd->vbo_offset ) );
 
 	Com_Memset( &vk.stats, 0, sizeof( vk.stats ) );
 }
@@ -14138,10 +14137,12 @@ void vk_bind_descriptor_sets( void )
 	count = end - start + 1;
 
 	// fill NULL descriptor gaps
-	for ( i = start + 1; i < end; i++ ) {
-		if ( vk.cmd->descriptor_set.current[i] == VK_NULL_HANDLE ) {
-			vk.cmd->descriptor_set.current[i] = tr.whiteImage->descriptor;
-			vk.cmd->descriptor_set.image[i] = tr.whiteImage;
+	if ( tr.whiteImage ) {
+		for ( i = start + 1; i < end; i++ ) {
+			if ( vk.cmd->descriptor_set.current[i] == VK_NULL_HANDLE ) {
+				vk.cmd->descriptor_set.current[i] = tr.whiteImage->descriptor;
+				vk.cmd->descriptor_set.image[i] = tr.whiteImage;
+			}
 		}
 	}
 
@@ -14433,7 +14434,13 @@ void vk_begin_main_render_pass( void )
 
 void vk_begin_post_bloom_render_pass( void )
 {
-	VkFramebuffer frameBuffer = vk.framebuffers.main[ vk.cmd->swapchain_image_index ];
+	VkFramebuffer frameBuffer;
+
+	if ( !vk.cmd || vk.cmd->swapchain_image_index >= MAX_SWAPCHAIN_IMAGES )
+		return;
+	frameBuffer = vk.framebuffers.main[ vk.cmd->swapchain_image_index ];
+	if ( frameBuffer == VK_NULL_HANDLE )
+		return;
 
 	vk.renderPassIndex = RENDER_PASS_POST_BLOOM;
 
@@ -16343,6 +16350,10 @@ void vk_begin_frame( void )
 	if ( vk.frame_count++ ) // might happen during stereo rendering
 		return;
 
+	/* Ensure render pass state is clean; avoids stale vk_in_render_pass from
+	 * previous frame error/early-exit causing draws outside a render pass. */
+	vk_in_render_pass = qfalse;
+
 	if (PostFX_NeedsPipelineUpdate()) {
 		vk_update_post_process_pipelines();
 	}
@@ -16766,10 +16777,16 @@ void vk_end_frame( void )
 					vk_barrier_post_fog_source_for_sampling( post_fog_src, "vk_end_frame pre-luminance/gamma" );
 				}
 
-				/* Luminance pass for eye adaptation (r_exposure_auto) */
+				/* Luminance pass for eye adaptation (r_exposure_auto).
+				 * Skip for no-world (cinematic/menu) when r_fboCinematic 0 — workaround for
+				 * VK_ERROR_DEVICE_LOST on some drivers during intro cinematics. */
 				{
 					cvar_t *exp_auto = ri.Cvar_Get( "r_exposure_auto", "0", 0 );
-					if ( exp_auto && exp_auto->integer && r_hdr && r_hdr->integer &&
+					cvar_t *fbo_cinematic = ri.Cvar_Get( "r_fboCinematic", "1", 0 );
+					qboolean allow_cinematic_luminance = ( tr.world != NULL ) || ( fbo_cinematic && fbo_cinematic->integer );
+					if ( vk.cmd && vk.cmd->command_buffer != VK_NULL_HANDLE &&
+						exp_auto && exp_auto->integer && r_hdr && r_hdr->integer &&
+						allow_cinematic_luminance &&
 						vk.luminance_pipeline != VK_NULL_HANDLE && vk.luminance_descriptor != VK_NULL_HANDLE &&
 						vk.luminance_image_view != VK_NULL_HANDLE && vk.luminance_staging_buffer != VK_NULL_HANDLE &&
 						post_fog_src != VK_NULL_HANDLE && post_fog_src != vk.luminance_image_view )

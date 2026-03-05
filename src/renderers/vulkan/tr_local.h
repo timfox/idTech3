@@ -1549,6 +1549,7 @@ extern cvar_t	*r_ssaoBlurRadius;
 extern cvar_t	*r_ssaoDebugView;
 extern cvar_t	*r_oit;
 extern cvar_t	*r_fbo;
+extern cvar_t	*r_fboCinematic;
 extern cvar_t	*r_renderMode;
 extern cvar_t	*r_hdr;
 extern cvar_t	*r_bloom;

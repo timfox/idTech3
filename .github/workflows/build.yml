@@ -216,13 +216,17 @@ jobs:
           retention-days: 5
 
   ubuntu-x86_64:
-    name: ${{ matrix.btype }} Ubuntu x86_64
+    name: ${{ matrix.btype }} Ubuntu x86_64 ${{ matrix.cc }}
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        cc: [gcc]
+        cc: [gcc, clang]
         btype: [Release, Debug]
+        exclude:
+          # Clang Debug: covered by asan job
+          - cc: clang
+            btype: Debug
 
     steps:
       - name: Install tools
@@ -230,7 +234,8 @@ jobs:
           sudo rm -f /etc/apt/sources.list.d/azure-cli.list
           sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list
           sudo apt-get -qq update
-          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools python3
+          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev clang
+          sudo apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools python3
 
       - uses: actions/checkout@v4
 
@@ -244,13 +249,17 @@ jobs:
           CFLAGS: "-DSKIP_IDPAK_CHECK=1"
           CXXFLAGS: "-DSKIP_IDPAK_CHECK=1"
         run: |
+          CMAKE_EXTRA=""
+          if [ "${{ matrix.cc }}" = "clang" ]; then
+            CMAKE_EXTRA="-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++"
+          fi
           mkdir -p build-vk-${{ matrix.btype }}
-          cmake -S . -B build-vk-${{ matrix.btype }} \
+          cmake -S . -B build-vk-${{ matrix.btype }} $CMAKE_EXTRA \
             -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
             -DCI_BUILD=OFF \
             -DUSE_STB_TRUETYPE=ON \
             -DBUILD_FREETYPE=ON \
-            -DENABLE_FORTIFY_SOURCE=OFF \
+            -DENABLE_FORTIFY_SOURCE=ON \
             -DENABLE_ASAN=OFF \
             -DBUILD_SERVER=ON \
             -DUSE_VULKAN=ON \
@@ -268,13 +277,17 @@ jobs:
           CFLAGS: "-DSKIP_IDPAK_CHECK=1"
           CXXFLAGS: "-DSKIP_IDPAK_CHECK=1"
         run: |
+          CMAKE_EXTRA=""
+          if [ "${{ matrix.cc }}" = "clang" ]; then
+            CMAKE_EXTRA="-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++"
+          fi
           mkdir -p build-gl-${{ matrix.btype }}
-          cmake -S . -B build-gl-${{ matrix.btype }} \
+          cmake -S . -B build-gl-${{ matrix.btype }} $CMAKE_EXTRA \
             -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
             -DCI_BUILD=OFF \
             -DUSE_STB_TRUETYPE=ON \
             -DBUILD_FREETYPE=ON \
-            -DENABLE_FORTIFY_SOURCE=OFF \
+            -DENABLE_FORTIFY_SOURCE=ON \
             -DENABLE_ASAN=OFF \
             -DBUILD_SERVER=ON \
             -DUSE_VULKAN=ON \
@@ -305,6 +318,85 @@ jobs:
           path: bin
           if-no-files-found: error
           retention-days: 5
+
+  ubuntu-asan:
+    name: Ubuntu x86_64 ASAN (Debug)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Install tools
+        run: |
+          sudo apt-get -qq update
+          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools python3
+
+      - uses: actions/checkout@v4
+
+      - name: Build Vulkan (ASAN)
+        env:
+          CFLAGS: "-DSKIP_IDPAK_CHECK=1"
+          CXXFLAGS: "-DSKIP_IDPAK_CHECK=1"
+        run: |
+          mkdir -p build-vk-asan
+          cmake -S . -B build-vk-asan \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCI_BUILD=OFF \
+            -DUSE_STB_TRUETYPE=ON \
+            -DBUILD_FREETYPE=ON \
+            -DENABLE_FORTIFY_SOURCE=OFF \
+            -DENABLE_ASAN=ON \
+            -DBUILD_SERVER=ON \
+            -DUSE_VULKAN=ON \
+            -DRENDERER_DEFAULT=vulkan \
+            -DSKIP_IDPAK_CHECK=ON \
+            -DSKIP_SHADER_REGEN=ON \
+            -Wno-dev
+          cmake --build build-vk-asan -j$(nproc)
+
+      - name: Smoke test (ASAN)
+        run: |
+          mkdir -p release
+          cp -f build-vk-asan/idtech3* release/ || true
+          chmod +x scripts/smoke_test.sh
+          ./scripts/smoke_test.sh release
+
+  asan:
+    name: AddressSanitizer (Debug)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Install tools
+        run: |
+          sudo apt-get -qq update
+          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools python3
+
+      - uses: actions/checkout@v4
+
+      - name: Build with ASAN
+        env:
+          CFLAGS: "-DSKIP_IDPAK_CHECK=1"
+          CXXFLAGS: "-DSKIP_IDPAK_CHECK=1"
+        run: |
+          ./scripts/compile_shaders.sh
+          mkdir -p build-asan
+          cmake -S . -B build-asan -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCI_BUILD=OFF \
+            -DUSE_STB_TRUETYPE=ON \
+            -DBUILD_FREETYPE=ON \
+            -DENABLE_FORTIFY_SOURCE=OFF \
+            -DENABLE_ASAN=ON \
+            -DBUILD_SERVER=ON \
+            -DUSE_VULKAN=ON \
+            -DRENDERER_DEFAULT=vulkan \
+            -DSKIP_IDPAK_CHECK=ON \
+            -DSKIP_SHADER_REGEN=ON \
+            -Wno-dev
+          cmake --build build-asan -j$(nproc)
+
+      - name: Smoke test (ASAN)
+        run: |
+          mkdir -p release
+          cp -f build-asan/idtech3* release/ || true
+          chmod +x scripts/smoke_test.sh
+          ./scripts/smoke_test.sh release
 
   static-analysis:
     name: Static analysis (clang-tidy, cppcheck)

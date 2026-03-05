@@ -1548,7 +1548,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				if ( def.vk_pbr_flags & PBR_HAS_DELUXEMAP1 )
 					vk_update_descriptor(  VK_DESC_PBR_DELUXE, pStage->bundle[1].deluxeMap->descriptor );
 
-				else if ( !(def.vk_pbr_flags & PBR_HAS_DELUXEMAP0) )
+				else if ( !(def.vk_pbr_flags & PBR_HAS_DELUXEMAP0) && tr.whiteImage )
 					vk_update_descriptor(  VK_DESC_PBR_DELUXE, tr.whiteImage->descriptor );
 				}
 			#endif
