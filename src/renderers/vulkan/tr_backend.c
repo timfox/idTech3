@@ -652,8 +652,12 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 		}
 		if ( backEnd.drawSurfFilter ) {
 			unsigned stageBits = shader->stages[0] ? shader->stages[0]->stateBits : 0;
-			qboolean transparent = ( ( stageBits & GLS_SRCBLEND_BITS ) == GLS_SRCBLEND_SRC_ALPHA &&
-				( stageBits & GLS_DSTBLEND_BITS ) == GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA );
+			unsigned srcBlend = stageBits & GLS_SRCBLEND_BITS;
+			unsigned dstBlend = stageBits & GLS_DSTBLEND_BITS;
+			qboolean transparent = (
+				( srcBlend == GLS_SRCBLEND_SRC_ALPHA && dstBlend == GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA ) ||
+				( srcBlend == GLS_SRCBLEND_ONE && dstBlend == GLS_DSTBLEND_ONE )
+			);
 			if ( backEnd.drawSurfFilter == 1 && transparent )
 				continue;  /* opaque only: skip transparent */
 			if ( backEnd.drawSurfFilter == 2 && !transparent )

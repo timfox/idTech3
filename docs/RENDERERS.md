@@ -2,7 +2,7 @@
 
 ## Vulkan Renderer (Primary)
 
-The Vulkan 1.4 renderer is the primary rendering backend, built as a shared library (`idtech3_vulkan.so`).
+The Vulkan 1.4 renderer is the primary rendering backend, built as a shared library (`idtech3_vulkan.so`). Requests Vulkan 1.4 when available; validation layers (Khronos, then LUNARG fallback) are enabled in debug builds on all platforms.
 
 ### Physically Based Rendering (PBR)
 - Metalness/roughness workflow with Cook-Torrance BRDF
@@ -58,11 +58,19 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - **Implemented**: Uses `VK_EXT_extended_dynamic_state3` when available. Enables `vkCmdSetColorWriteMaskEXT` for shadow volumes and other color-mask use cases. Gracefully no-ops when the extension is not supported.
 
 ### Anti-Aliasing
-- **SMAA** (Sub-pixel Morphological Anti-Aliasing): edge detection, blend weight, and compose passes. Cvars: `r_ext_smaa` (enable), `r_smaa_preset` (0=Custom, 1=Low, 2=Medium, 3=High, 4=Ultra), `r_smaa_threshold` (0.01–0.5), `r_smaa_local_contrast` (1–4), `r_smaa_max_search_steps` (8–32). Preset overrides manual params when non-zero. Edge detection uses HDR-safe luma and corner rounding. Requires `r_fbo 1`.
-- **MSAA**: Multi-sample anti-aliasing for geometry edges. Cvar `r_ext_multisample` (0|2|4|6|8). Requires `r_fbo 1`. MSAA and SMAA can be used together: MSAA handles geometry edges, SMAA handles alpha/transparency edges.
+- **SMAA** (Sub-pixel Morphological Anti-Aliasing): edge detection, blend weight, and compose passes. Cvars: `r_ext_smaa` (enable), `r_smaa_preset` (0=Custom, 1=Low, 2=Medium, 3=High, 4=Ultra), `r_smaa_threshold` (0.01–0.5), `r_smaa_local_contrast` (1–4), `r_smaa_max_search_steps` (8–32), `r_smaa_corner_rounding` (0–1). Preset overrides manual params when non-zero. Edge detection uses max(left,right) and max(top,bottom) deltas (reference SMAA), HDR-safe luma, configurable corner rounding, and explicit LOD 0 sampling. Requires `r_fbo 1`.
+- **MSAA**: Multi-sample anti-aliasing for geometry edges. Cvar `r_ext_multisample` (0|2|4|8|16). Requires `r_fbo 1`. `r_msaa_sample_shading` enables per-sample shading for better alpha/specular quality (~2x fragment cost). `r_ext_alpha_to_coverage` improves alpha-tested surfaces (foliage, grates) when MSAA is on. MSAA and SMAA can be used together: MSAA handles geometry edges, SMAA handles alpha/transparency edges.
+
+### Order-Independent Transparency (OIT)
+- Weighted Blended OIT (WBOIT) for correct blending of overlapping transparent surfaces
+- Cvar `r_oit` (0=off, 1=on). Requires `r_fbo 1` and `vid_restart` after changing
+- Opaque surfaces drawn first; transparent surfaces (alpha blend and additive) accumulated, then resolved
+- Depth testing against opaque scene when MSAA off (transparent behind walls discarded)
+- Additive blend (ONE/ONE) surfaces included for particles, sparks, etc.
 
 ### Screen-Space Ambient Occlusion (SSAO)
-- Hemisphere sampling with configurable radius, bias, intensity
+- Hemisphere sampling with Halton(2,3) low-discrepancy sequence for better distribution and less noise
+- Configurable radius, bias, intensity, power, sample count
 - Separable blur pass
 - Combine pass with debug visualization modes
 
@@ -76,7 +84,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 
 ### Bloom and HDR
 - HDR rendering with RGBA16F, RGBA32F, or optional RGBA64F color targets (r_hdr 1, 2, or 3; 64-bit gated, falls back to 32F)
-- Bloom extraction with configurable threshold and knee
+- Bloom extraction with soft knee (Karis/UE4 style): `r_bloom_threshold`, `r_bloomKnee` for smooth highlight rolloff
 - 4-pass Gaussian blur at progressively lower resolutions
 - ACES, Reinhard, Filmic, and AgX tonemapping
 - Exposure control with per-frame push constant
@@ -89,6 +97,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - Greyscale mode
 - sRGB gamma correction
 - Debug views (pre-tonemap HDR, luminance heatmap)
+- Shader robustness: NaN/Inf guard in gamma pass, explicit `textureLod(..., 0.0)` in post-process shaders (gamma, blur, bloom, blend, SSAO), `to_src_uv` zero-scale fallback
 
 ### First Person Rendering
 - Custom FOV for first-person primitives (arms, weapons) separate from scene FOV
@@ -106,7 +115,8 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 ### Key Cvars
 | Cvar | Default | Description |
 |------|---------|-------------|
-| `r_fbo` | 1 | Framebuffer objects (required for HDR, bloom, post-process) |
+| `r_fbo` | 1 | Framebuffer objects (required for PBR, HDR, bloom, MSAA, SMAA, SSAO). Use vid_restart after changing. |
+| `r_pbr` | 1 | Physically Based Rendering (metalness/roughness, IBL). Requires r_fbo 1. |
 | `r_renderMode` | 0 | Rendering path: 0=forward, 1=deferred (placeholder), 2=forward+ (placeholder). Deferred and forward+ would need G-buffers, light culling, and separate passes; they are not implemented yet. |
 | `r_volumetricFog` | 0 | Volumetric fog enable (0=off, 1=on) |
 | `r_volumetricFogDensity` | 0.35 | Volumetric density multiplier |
@@ -123,6 +133,8 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 | `r_exposure_auto` | 0 | Eye adaptation (0=manual, 1=temporal blend toward target) |
 | `r_exposure_auto_target` | 0.5 | Target exposure for eye adaptation |
 | `r_exposure_auto_speed` | 2.0 | Adaptation speed (higher = faster) |
+| `r_post_contrast` | 1.0 | Post-tonemap contrast (1=neutral, >1=punchier, <1=flatter) |
+| `r_post_saturation` | 1.0 | Post-tonemap saturation (1=neutral, >1=vivid, <1=desaturated) |
 | `r_atmosphere` | 1 | Procedural atmospheric sky (Rayleigh+Mie). Replaces grey sky when no HDR skybox. |
 | `r_atmosphere_scale` | 4.0 | HDR scale multiplier for sky brightness. Works with auto exposure; increase if sky appears dark. |
 | `r_skyboxHDR` | "" | Path to HDR EXR/PNG skybox panorama (empty = use atmosphere or map skybox). |

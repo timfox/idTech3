@@ -31,10 +31,10 @@ static uint32_t vk_occlusion_last_entity_count;
 #include "vk_terrain.h"
 #include <stddef.h>
 
-#if defined (_DEBUG)
-#if defined (_WIN32)
+#if defined( _DEBUG )
 #define USE_VK_VALIDATION
-#include <windows.h> // for win32 debug callback
+#if defined( _WIN32 )
+#include <windows.h> /* for win32 debug callback */
 #endif
 #endif
 
@@ -1368,8 +1368,9 @@ static void vk_create_render_passes( void )
 
 	if ( r_oit && r_oit->integer && fboActive )
 	{
-		/* OIT accumulation pass: RGBA16F, clear to (0,0,0,0), additive blend */
-		desc.attachmentCount = 1;
+		/* OIT accumulation pass: RGBA16F, clear to (0,0,0,0), additive blend.
+		 * Depth attachment (when MSAA off): depth-test transparents against opaque scene. */
+		desc.attachmentCount = ( vkSamples == VK_SAMPLE_COUNT_1_BIT ) ? 2 : 1;
 		colorRef0.attachment = 0;
 		colorRef0.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		Com_Memset( &subpass, 0, sizeof( subpass ) );
@@ -1385,6 +1386,22 @@ static void vk_create_render_passes( void )
 		attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		attachments[0].initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		if ( vkSamples == VK_SAMPLE_COUNT_1_BIT ) {
+			attachments[1].flags = 0;
+			attachments[1].format = depth_format;
+			attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
+			attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+			attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			attachments[1].stencilLoadOp = glConfig.stencilBits ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+			attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			attachments[1].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			depthRef0.attachment = 1;
+			depthRef0.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			subpass.pDepthStencilAttachment = &depthRef0;
+		} else {
+			subpass.pDepthStencilAttachment = NULL;
+		}
 		VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.oit_accum ) );
 		SET_OBJECT_NAME( vk.render_pass.oit_accum, "render pass - oit_accum", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
 
@@ -2187,8 +2204,9 @@ static qboolean used_instance_extension( const char *ext )
 static void create_instance( void )
 {
 #ifdef USE_VK_VALIDATION
-	const char* validation_layer_name = "VK_LAYER_LUNARG_standard_validation";
-	const char* validation_layer_name2 = "VK_LAYER_KHRONOS_validation";
+	/* Prefer Khronos validation (modern); LUNARG is deprecated. */
+	const char* validation_layer_name = "VK_LAYER_KHRONOS_validation";
+	const char* validation_layer_name2 = "VK_LAYER_LUNARG_standard_validation";
 #endif
 	VkInstanceCreateInfo desc;
 	VkInstanceCreateFlags flags;
@@ -6416,10 +6434,12 @@ static void vk_create_framebuffers( void )
 	if ( r_oit && r_oit->integer && vk.render_pass.oit_accum != VK_NULL_HANDLE && vk.oit_accum_image_view )
 	{
 		desc.renderPass = vk.render_pass.oit_accum;
-		desc.attachmentCount = 1;
+		desc.attachmentCount = ( vkSamples == VK_SAMPLE_COUNT_1_BIT && vk.depth_image_view ) ? 2 : 1;
 		desc.width = glConfig.vidWidth;
 		desc.height = glConfig.vidHeight;
 		framebuffer_attachments[0] = vk.oit_accum_image_view;
+		if ( desc.attachmentCount == 2 )
+			framebuffer_attachments[1] = vk.depth_image_view;
 		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.oit_accum ) );
 		SET_OBJECT_NAME( vk.framebuffers.oit_accum, "framebuffer - oit_accum", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
 
@@ -6852,12 +6872,18 @@ void vk_initialize( void )
 
 	if ( /*vk.fboActive &&*/ vk.msaaActive ) {
 		VkSampleCountFlags mask = vkMaxSamples;
-		vkSamples = MAX( log2pad( r_ext_multisample->integer, 1 ), VK_SAMPLE_COUNT_2_BIT );
+		int req = r_ext_multisample->integer;
+		if ( req < 2 ) req = 2;
+		else if ( req == 3 || req == 5 || req == 6 || req == 7 ) req = ( req <= 4 ) ? 4 : 8;
+		else if ( req > 16 ) req = 16;
+		vkSamples = MAX( log2pad( req, 1 ), VK_SAMPLE_COUNT_2_BIT );
 		while ( (VkSampleCountFlags)vkSamples > mask )
 				vkSamples >>= 1;
-		ri.Printf( PRINT_ALL, "...using %ix MSAA\n", vkSamples );
+		vk.msaaSampleShading = ( r_msaa_sample_shading && r_msaa_sample_shading->integer ) ? qtrue : qfalse;
+		ri.Printf( PRINT_ALL, "...using %ix MSAA%s\n", vkSamples, vk.msaaSampleShading ? " (sample shading)" : "" );
 	} else {
 		vkSamples = VK_SAMPLE_COUNT_1_BIT;
+		vk.msaaSampleShading = qfalse;
 	}
 	if ( vk.smaaActive ) {
 			int p = r_smaa_preset && r_smaa_preset->integer >= 1 && r_smaa_preset->integer <= 4 ? r_smaa_preset->integer : 0;
@@ -6865,6 +6891,9 @@ void vk_initialize( void )
 			float thresh = p ? ( p == 1 ? 0.15f : p == 2 ? 0.1f : p == 3 ? 0.08f : 0.05f ) : ( r_smaa_threshold ? r_smaa_threshold->value : 0.1f );
 			int search = p ? ( p == 1 ? 8 : p == 2 ? 16 : p == 3 ? 24 : 32 ) : ( r_smaa_max_search_steps && r_smaa_max_search_steps->integer ? r_smaa_max_search_steps->integer : 16 );
 			ri.Printf( PRINT_ALL, "...SMAA enabled (preset=%s, threshold %.2f, search %d)\n", preset_name, thresh, search );
+	}
+	if ( vk.msaaActive && vk.smaaActive ) {
+		ri.Printf( PRINT_ALL, "...MSAA (geometry) + SMAA (alpha/transparency) for best edge quality\n" );
 	}
 
 	vk.screenMapSamples = MIN( vkMaxSamples, VK_SAMPLE_COUNT_4_BIT );
@@ -6947,7 +6976,7 @@ void vk_initialize( void )
 	vk.pbrActive = qfalse;
 	if ( r_pbr->integer ) {
 		if ( !vk.fboActive ) {
-			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "PBR: disabled (requires \\r_fbo 1)\n" S_COLOR_WHITE );
+			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "PBR: disabled (requires r_fbo 1). Use: set r_fbo 1; vid_restart\n" S_COLOR_WHITE );
 		} else if ( vk.maxBoundDescriptorSets < 10 ) {
 			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "PBR: disabled (insufficient descriptor sets: have %u, need >= 10)\n" S_COLOR_WHITE,
 				(unsigned)vk.maxBoundDescriptorSets );
@@ -11057,9 +11086,15 @@ static void vk_create_oit_accum_pipeline( void )
 
 	Com_Memset( &depth_stencil, 0, sizeof( depth_stencil ) );
 	depth_stencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-	/* OIT accum framebuffer has no depth attachment; depth weight uses gl_FragCoord.z */
-	depth_stencil.depthTestEnable = VK_FALSE;
-	depth_stencil.depthWriteEnable = VK_FALSE;
+	/* When MSAA off: depth-test transparents against opaque scene. Weight uses gl_FragCoord.z. */
+	if ( vkSamples == VK_SAMPLE_COUNT_1_BIT ) {
+		depth_stencil.depthTestEnable = VK_TRUE;
+		depth_stencil.depthWriteEnable = VK_FALSE;
+		depth_stencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+	} else {
+		depth_stencil.depthTestEnable = VK_FALSE;
+		depth_stencil.depthWriteEnable = VK_FALSE;
+	}
 	depth_stencil.depthBoundsTestEnable = VK_FALSE;
 	depth_stencil.stencilTestEnable = VK_FALSE;
 
@@ -11131,7 +11166,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	VkGraphicsPipelineCreateInfo create_info;
 	VkViewport viewport;
 	VkRect2D scissor;
-	VkSpecializationMapEntry spec_entries[24];
+	VkSpecializationMapEntry spec_entries[26];
 	VkSpecializationInfo frag_spec_info;
 	VkPipeline *pipeline;
 	VkShaderModule fsmodule;
@@ -11167,6 +11202,8 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 		float outline_strength;    /* constant_id = 21 */
 		float outline_threshold;   /* constant_id = 22 */
 		int film_look;             /* constant_id = 23 */
+		float post_contrast;       /* constant_id = 24 */
+		float post_saturation;    /* constant_id = 25 */
 	} frag_spec_data;
 
 	switch ( program_index ) {
@@ -11370,6 +11407,12 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 		frag_spec_data.outline_strength = r_outline ? r_outline->value : 0.0f;
 		frag_spec_data.outline_threshold = r_outlineThreshold ? r_outlineThreshold->value : 0.15f;
 	}
+	{
+		cvar_t *r_post_contrast = ri.Cvar_Get( "r_post_contrast", "1.0", CVAR_ARCHIVE_ND );
+		cvar_t *r_post_saturation = ri.Cvar_Get( "r_post_saturation", "1.0", CVAR_ARCHIVE_ND );
+		frag_spec_data.post_contrast = ( r_post_contrast && r_post_contrast->value > 0.0f ) ? r_post_contrast->value : 1.0f;
+		frag_spec_data.post_saturation = ( r_post_saturation && r_post_saturation->value >= 0.0f ) ? r_post_saturation->value : 1.0f;
+	}
 
 	if ( !vk_surface_format_color_depth( vk.present_format.format, &frag_spec_data.depth_r, &frag_spec_data.depth_g, &frag_spec_data.depth_b ) )
 		ri.Printf( PRINT_ALL, "Format %s not recognized, dither to assume 8bpc\n", vk_format_string( vk.base_format.format ) );
@@ -11470,7 +11513,15 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	spec_entries[23].offset = offsetof( struct PostProcess_FragSpecData, film_look );
 	spec_entries[23].size = sizeof( frag_spec_data.film_look );
 
-	frag_spec_info.mapEntryCount = 24;
+	spec_entries[24].constantID = 24;
+	spec_entries[24].offset = offsetof( struct PostProcess_FragSpecData, post_contrast );
+	spec_entries[24].size = sizeof( frag_spec_data.post_contrast );
+
+	spec_entries[25].constantID = 25;
+	spec_entries[25].offset = offsetof( struct PostProcess_FragSpecData, post_saturation );
+	spec_entries[25].size = sizeof( frag_spec_data.post_saturation );
+
+	frag_spec_info.mapEntryCount = 26;
 	frag_spec_info.pMapEntries = spec_entries;
 	frag_spec_info.dataSize = sizeof( frag_spec_data );
 	frag_spec_info.pData = &frag_spec_data;
@@ -12958,7 +13009,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 		multisample_state.rasterizationSamples = (VkSampleCountFlagBits)vkSamples;
 	}
 
-	multisample_state.sampleShadingEnable = VK_FALSE;
+	multisample_state.sampleShadingEnable = ( vk.msaaSampleShading && multisample_state.rasterizationSamples != VK_SAMPLE_COUNT_1_BIT ) ? VK_TRUE : VK_FALSE;
 	multisample_state.minSampleShading = 1.0f;
 	multisample_state.pSampleMask = NULL;
 	multisample_state.alphaToCoverageEnable = alphaToCoverage;
@@ -14248,6 +14299,10 @@ static void vk_begin_render_pass( VkRenderPass renderPass, VkFramebuffer frameBu
 {
 	VkRenderPassBeginInfo render_pass_begin_info;
 	VkClearValue clear_values[5];
+
+	/* Avoid zero-sized render area (validation error / undefined behavior) */
+	if ( width == 0 ) width = 1u;
+	if ( height == 0 ) height = 1u;
 
 	// Begin render pass.
 
@@ -15607,7 +15662,7 @@ typedef struct {
 	float threshold;
 	float localContrast;
 	int maxSearchSteps;
-	int pad;
+	float corner_rounding;
 } SMAAPushConstants_t;
 
 static void vk_run_smaa_pass( VkPipeline pipeline, VkRenderPass pass, VkFramebuffer framebuffer, VkDescriptorSet color_descriptor, VkDescriptorSet aux_descriptor, uint32_t width, uint32_t height )
@@ -15637,7 +15692,8 @@ static void vk_run_smaa_pass( VkPipeline pipeline, VkRenderPass pass, VkFramebuf
 			pc.maxSearchSteps = ( r_smaa_max_search_steps && r_smaa_max_search_steps->integer >= 8 && r_smaa_max_search_steps->integer <= 32 )
 				? r_smaa_max_search_steps->integer : 16;
 		}
-		pc.pad = 0;
+		pc.corner_rounding = ( r_smaa_corner_rounding && r_smaa_corner_rounding->value >= 0.0f ) ?
+			( r_smaa_corner_rounding->value <= 1.0f ? r_smaa_corner_rounding->value : 1.0f ) : 0.2f;
 		qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_smaa, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( pc ), &pc );
 	}
 
@@ -15671,14 +15727,21 @@ static void vk_run_smaa_pass( VkPipeline pipeline, VkRenderPass pass, VkFramebuf
 
 static void vk_smaa_passes( void )
 {
+	uint32_t w, h;
+
 	if ( !vk.smaaActive ) {
 		return;
 	}
+	if ( vk.color_image_view == VK_NULL_HANDLE || vk.smaa_output_image_view == VK_NULL_HANDLE ) {
+		return;
+	}
+	w = ( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u;
+	h = ( glConfig.vidHeight > 0 ) ? (uint32_t)glConfig.vidHeight : 1u;
 
 	/* Edge: set0=scene(color_image). Blend: set0=edges(smaa_edge). Compose: set0=scene, set1=blend. */
-	vk_run_smaa_pass( vk.smaa_edge_pipeline, vk.render_pass.smaa_edge, vk.framebuffers.smaa_edge, vk.smaa_edge_descriptor, vk.smaa_edge_descriptor, glConfig.vidWidth, glConfig.vidHeight );
-	vk_run_smaa_pass( vk.smaa_blend_pipeline, vk.render_pass.smaa_blend, vk.framebuffers.smaa_blend, vk.smaa_blend_descriptor, vk.smaa_blend_descriptor, glConfig.vidWidth, glConfig.vidHeight );
-	vk_run_smaa_pass( vk.smaa_compose_pipeline, vk.render_pass.smaa_compose, vk.framebuffers.smaa_compose, vk.smaa_edge_descriptor, vk.smaa_compose_descriptor, glConfig.vidWidth, glConfig.vidHeight );
+	vk_run_smaa_pass( vk.smaa_edge_pipeline, vk.render_pass.smaa_edge, vk.framebuffers.smaa_edge, vk.smaa_edge_descriptor, vk.smaa_edge_descriptor, w, h );
+	vk_run_smaa_pass( vk.smaa_blend_pipeline, vk.render_pass.smaa_blend, vk.framebuffers.smaa_blend, vk.smaa_blend_descriptor, vk.smaa_blend_descriptor, w, h );
+	vk_run_smaa_pass( vk.smaa_compose_pipeline, vk.render_pass.smaa_compose, vk.framebuffers.smaa_compose, vk.smaa_edge_descriptor, vk.smaa_compose_descriptor, w, h );
 }
 
 static void vk_reset_volumetric_history( void )
@@ -16493,7 +16556,7 @@ void vk_end_frame( void )
 				qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.ssao_blur_pipeline );
 				qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_ssao, 0, 1, &vk.ssao_descriptor, 0, NULL );
 
-				push.params[0] = (float)r_ssaoBlurRadius->integer;
+				push.params[0] = ( r_ssaoBlurRadius && r_ssaoBlurRadius->integer >= 0 ) ? (float)r_ssaoBlurRadius->integer : 2.0f;
 				push.params[1] = 0.0f;
 				push.params[2] = 0.0f;
 				push.params[3] = 0.0f;
@@ -16503,15 +16566,18 @@ void vk_end_frame( void )
 				vk_end_render_pass();
 
 				// ssao combine: copy scene to fog_scene to avoid read-modify-write on color_image
+				if ( vk.fog_scene_image != VK_NULL_HANDLE && vk.color_image != VK_NULL_HANDLE )
 				{
 					VkImageCopy copy_region;
+					uint32_t copy_w = ( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u;
+					uint32_t copy_h = ( glConfig.vidHeight > 0 ) ? (uint32_t)glConfig.vidHeight : 1u;
 					Com_Memset( &copy_region, 0, sizeof( copy_region ) );
 					copy_region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 					copy_region.srcSubresource.layerCount = 1;
 					copy_region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 					copy_region.dstSubresource.layerCount = 1;
-					copy_region.extent.width = glConfig.vidWidth;
-					copy_region.extent.height = glConfig.vidHeight;
+					copy_region.extent.width = copy_w;
+					copy_region.extent.height = copy_h;
 					copy_region.extent.depth = 1;
 					record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 						VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
@@ -16530,10 +16596,12 @@ void vk_end_frame( void )
 						VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 						VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
 				}
-				vk_begin_ssao_combine_render_pass();
-				if ( r_ssaoDebugView && r_ssaoDebugView->integer == 2 ) {
-					qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.ssao_depth_debug_pipeline );
-					qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.depth_descriptor, 0, NULL );
+				if ( vk.fog_scene_image_view != VK_NULL_HANDLE && vk.ssao_scene_descriptor != VK_NULL_HANDLE && vk.ssao_blur_descriptor != VK_NULL_HANDLE )
+				{
+					vk_begin_ssao_combine_render_pass();
+					if ( r_ssaoDebugView && r_ssaoDebugView->integer == 2 ) {
+						qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.ssao_depth_debug_pipeline );
+						qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.depth_descriptor, 0, NULL );
 					} else {
 						qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 							( r_ssaoDebugView && r_ssaoDebugView->integer ) ? vk.ssao_debug_pipeline : vk.ssao_combine_pipeline );
@@ -16547,43 +16615,43 @@ void vk_end_frame( void )
 					vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
 					qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 					vk_end_render_pass();
-
-					// SSAO samples depth as read-only; restore the depth image layout for later passes
-					// and for the next frame's main render pass.
-					record_image_layout_transition( vk.cmd->command_buffer, vk.depth_image, depth_aspect,
-						VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
-						VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 0, 0 );
+				}
+				/* SSAO samples depth as read-only; restore layout for later passes and next frame.
+				 * Must run unconditionally after SSAO block (even when combine was skipped). */
+				record_image_layout_transition( vk.cmd->command_buffer, vk.depth_image, depth_aspect,
+					VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+					VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 0, 0 );
 				}
 			}
 
 			if ( backEnd.screenshotMask && vk.capture.image )
 			{
-				VkImageView capture_src = VK_NULL_HANDLE;
+				VkImageView capture_src = vk.color_image_view;
+				uint32_t cap_w = ( gls.captureWidth > 0 ) ? (uint32_t)gls.captureWidth : 1u;
+				uint32_t cap_h = ( gls.captureHeight > 0 ) ? (uint32_t)gls.captureHeight : 1u;
 
 				vk_end_render_pass();
 
 				/* Capture runs before vk_volumetric_fog_pass; at this point the current
 				 * frame's scene is in color_image. Use color_image_view (not post_fog
 				 * source which may be from the previous frame). */
-				capture_src = vk.color_image_view;
-				if ( capture_src != VK_NULL_HANDLE ) {
+				if ( capture_src != VK_NULL_HANDLE &&
+					vk.render_pass.capture != VK_NULL_HANDLE && vk.framebuffers.capture != VK_NULL_HANDLE ) {
 					vk_update_color_descriptor_image( capture_src );
 					vk_barrier_post_fog_source_for_sampling( capture_src, "vk_end_frame pre-capture" );
-					if ( r_fboDebug && r_fboDebug->integer >= 2 ) {
+					if ( r_fboDebug && r_fboDebug->integer >= 2 && vk_fbo_debug_throttle() ) {
 						ri.Printf( PRINT_DEVELOPER, "[VK][fbo] capture source -> %s view=0x%llx\n",
 							vk_post_fog_source_name( capture_src ),
 							(unsigned long long)(uintptr_t)capture_src );
 					}
+
+					vk_begin_render_pass( vk.render_pass.capture, vk.framebuffers.capture, qfalse, cap_w, cap_h );
+					qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.capture_pipeline );
+					qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
+					vk_set_fullscreen_viewport_scissor( cap_w, cap_h );
+					qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 				}
-
-				// render to capture FBO
-				vk_begin_render_pass( vk.render_pass.capture, vk.framebuffers.capture, qfalse, gls.captureWidth, gls.captureHeight );
-				qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.capture_pipeline );
-			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
-
-			vk_set_fullscreen_viewport_scissor( gls.captureWidth, gls.captureHeight );
-			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
-		}
+			}
 
 			if ( !ri.CL_IsMinimized() )
 			{
@@ -16703,12 +16771,17 @@ void vk_end_frame( void )
 					VkImageView gamma_src = ( post_fog_src != VK_NULL_HANDLE ) ? post_fog_src : vk.color_image_view;
 					if ( vk.gamma_pipeline == VK_NULL_HANDLE || vk.color_descriptor == VK_NULL_HANDLE ||
 						vk.render_pass.gamma == VK_NULL_HANDLE ||
+						vk.cmd->swapchain_image_index >= MAX_SWAPCHAIN_IMAGES ||
 						vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ] == VK_NULL_HANDLE ||
 						vk.renderWidth == 0 || vk.renderHeight == 0 ) {
-						ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW "[VK][fbo] gamma pass skipped: missing pipeline/descriptor/renderpass/framebuffer or zero size (%dx%d)\n",
-							vk.renderWidth, vk.renderHeight );
+						if ( vk_fbo_debug_throttle() ) {
+							ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW "[VK][fbo] gamma pass skipped: missing pipeline/descriptor/renderpass/framebuffer or zero size (%dx%d)\n",
+								vk.renderWidth, vk.renderHeight );
+						}
 					} else if ( gamma_src == VK_NULL_HANDLE ) {
-						ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW "[VK][fbo] gamma pass skipped: no valid color source (post_fog or color_image)\n" );
+						if ( vk_fbo_debug_throttle() ) {
+							ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW "[VK][fbo] gamma pass skipped: no valid color source (post_fog or color_image)\n" );
+						}
 					} else {
 						/* Belt-and-suspenders: ensure color_descriptor samples correct source before gamma */
 						vk_update_color_descriptor_image( gamma_src );
