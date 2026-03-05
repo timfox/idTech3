@@ -14042,10 +14042,10 @@ void vk_bind_descriptor_sets( void )
 #endif
 
 	if ( backEnd.oitAccumPass && vk.pipeline_layout_oit_accum != VK_NULL_HANDLE ) {
-		/* OIT accum uses only set 0 (tex0) */
-		if ( vk.cmd->descriptor_set.current[0] != VK_NULL_HANDLE ) {
+		/* OIT accum set 0 = tex0; main pipeline has tex0 at VK_DESC_TEXTURE0 (index 1) */
+		if ( vk.cmd->descriptor_set.current[VK_DESC_TEXTURE0] != VK_NULL_HANDLE ) {
 			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-				vk.pipeline_layout_oit_accum, 0, 1, vk.cmd->descriptor_set.current + 0, 0, NULL );
+				vk.pipeline_layout_oit_accum, 0, 1, vk.cmd->descriptor_set.current + VK_DESC_TEXTURE0, 0, NULL );
 		}
 	} else {
 		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout, start, count, vk.cmd->descriptor_set.current + start, offset_count, offsets );
