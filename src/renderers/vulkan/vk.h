@@ -424,6 +424,8 @@ void vk_begin_blur_render_pass( uint32_t index );
 void vk_begin_ssao_render_pass( void );
 void vk_begin_ssao_blur_render_pass( void );
 void vk_begin_ssao_combine_render_pass( void );
+struct drawSurfsCommand_s;
+void vk_oit_pass( const struct drawSurfsCommand_s *cmd );
 void vk_begin_ssr_render_pass( void );
 void vk_ssr_pass( void );
 void vk_vegetation_wind_dispatch( void );
@@ -580,6 +582,8 @@ typedef struct {
 		VkRenderPass ssao;
 		VkRenderPass ssao_blur;
 		VkRenderPass ssao_combine;
+		VkRenderPass oit_accum;
+		VkRenderPass oit_resolve;
 		VkRenderPass ssr;
 #ifdef VK_PBR_BRDFLUT
 		VkRenderPass brdflut;
@@ -604,6 +608,8 @@ typedef struct {
 	VkPipelineLayout pipeline_layout_smaa;
 	VkPipelineLayout pipeline_layout_ssao;		// ssao (depth + push constants)
 	VkPipelineLayout pipeline_layout_ssao_combine;	// ssao combine (color + ao)
+	VkPipelineLayout pipeline_layout_oit_resolve;	// oit resolve (opaque + accum)
+	VkPipelineLayout pipeline_layout_oit_accum;	// oit accum (sampler + push constants)
 	VkPipelineLayout pipeline_layout_ssr;		// ssr (color + depth + push constants)
 	VkPipelineLayout pipeline_layout_atmosphere;	// atmosphere (push constants only)
 #ifdef VK_PBR_BRDFLUT
@@ -681,6 +687,10 @@ typedef struct {
 	VkImageView ssao_blur_image_view;
 	VkDescriptorSet ssao_blur_descriptor;
 	VkDescriptorSet ssao_scene_descriptor;	/* scene copy for combine (avoids read-modify-write) */
+	VkImage oit_accum_image;
+	VkImageView oit_accum_image_view;
+	VkDescriptorSet oit_opaque_descriptor;	/* opaque copy for OIT resolve */
+	VkDescriptorSet oit_accum_descriptor;
 	VkImage ssr_image;
 	VkImageView ssr_image_view;
 	VkDescriptorSet ssr_descriptor[2];	/* [0]=color, [1]=depth */
@@ -735,6 +745,8 @@ typedef struct {
 		VkFramebuffer ssao;
 		VkFramebuffer ssao_blur;
 		VkFramebuffer ssao_combine;
+		VkFramebuffer oit_accum;
+		VkFramebuffer oit_resolve;
 		VkFramebuffer ssr;
 		VkFramebuffer main[MAX_SWAPCHAIN_IMAGES];
 		VkFramebuffer gamma[MAX_SWAPCHAIN_IMAGES];
@@ -865,6 +877,9 @@ typedef struct {
 		VkShaderModule ssao_fs;
 		VkShaderModule ssao_blur_fs;
 		VkShaderModule ssao_combine_fs;
+		VkShaderModule oit_accum_vs;
+		VkShaderModule oit_accum_fs;
+		VkShaderModule oit_resolve_fs;
 		VkShaderModule ssao_debug_fs;
 		VkShaderModule ssao_depth_debug_fs;
 
@@ -983,6 +998,8 @@ typedef struct {
 	VkPipeline ssao_pipeline;
 	VkPipeline ssao_blur_pipeline;
 	VkPipeline ssao_combine_pipeline;
+	VkPipeline oit_accum_pipeline;	/* WBOIT accumulation for transparent surfaces */
+	VkPipeline oit_resolve_pipeline;
 	VkPipeline ssao_debug_pipeline;
 	VkPipeline ssao_depth_debug_pipeline;
 	VkPipeline ssr_pipeline;
