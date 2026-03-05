@@ -211,7 +211,14 @@ extern "C" void VkImgui_Initialize(void) {
 	if (vkImguiState.active) return;
 
 	imguiContext = ImGui::CreateContext();
-	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+	ImGuiIO &io = ImGui::GetIO();
+	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+	/* Build font atlas so ImGui can render text. Required when backend does not set
+	 * ImGuiBackendFlags_RendererHasTextures. Avoids "font atlas is not built" assert. */
+	unsigned char *fontPixels = nullptr;
+	int fontW = 0, fontH = 0;
+	io.Fonts->GetTexDataAsRGBA32(&fontPixels, &fontW, &fontH);
+	(void)fontPixels; (void)fontW; (void)fontH; /* backend would upload to GPU and call SetTexID */
 	VkImgui_DarkTheme();
 
 	memset(&vkInspector, 0, sizeof(vkInspector));
