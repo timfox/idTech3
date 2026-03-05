@@ -3811,8 +3811,7 @@ static qboolean vk_fbo_debug_throttle( void )
 
 static void vk_log_post_fog_rebind( const char *reason, VkImageView color_source )
 {
-	if ( r_fboDebug && r_fboDebug->integer >= 1 &&
-		( r_fboDebug->integer < 2 || vk_fbo_debug_throttle() ) ) {
+	if ( r_fboDebug && r_fboDebug->integer >= 1 && vk_fbo_debug_throttle() ) {
 		ri.Printf( PRINT_DEVELOPER, "[VK][fbo] %s -> %s view=0x%llx\n",
 			reason ? reason : "post-fog source rebind",
 			vk_post_fog_source_name( color_source ),
@@ -3936,8 +3935,7 @@ static void vk_update_post_fog_descriptors( VkImageView color_source )
 		updated_luminance = qtrue;
 	}
 
-	if ( r_fboDebug && r_fboDebug->integer >= 1 &&
-		( r_fboDebug->integer >= 2 ? vk_fbo_debug_throttle() : ( old_source != color_source ) ) ) {
+	if ( r_fboDebug && r_fboDebug->integer >= 1 && vk_fbo_debug_throttle() ) {
 		ri.Printf( PRINT_DEVELOPER,
 			"[VK][fbo] post-fog descriptors: %s -> %s view=0x%llx luminance=%s\n",
 			vk_post_fog_source_name( old_source ),
