@@ -11,8 +11,8 @@ layout(location = 0) in vec2 frag_tex_coord;
 layout(location = 0) out vec4 out_color;
 
 void main() {
-	vec3 opaque = texture(opaqueTex, frag_tex_coord).rgb;
-	vec4 accum = texture(oitAccumTex, frag_tex_coord);
+	vec3 opaque = textureLod(opaqueTex, frag_tex_coord, 0.0).rgb;
+	vec4 accum = textureLod(oitAccumTex, frag_tex_coord, 0.0);
 	vec3 oit_color = accum.rgb;
 	float weight = accum.a;
 

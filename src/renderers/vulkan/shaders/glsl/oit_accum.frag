@@ -18,7 +18,7 @@ layout(location = 1) in vec4 frag_color0;
 layout(location = 0) out vec4 out_color;
 
 void main() {
-	vec4 base = texture(tex0, frag_tex_coord0) * frag_color0;
+	vec4 base = textureLod(tex0, frag_tex_coord0, 0.0) * frag_color0;
 	float alpha = base.a;
 	if (alpha < 0.01) discard;
 
