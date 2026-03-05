@@ -39,6 +39,10 @@ static int	cvar_group[ CVG_MAX ];
 static	cvar_t	*hashTable[FILE_HASH_SIZE];
 static	qboolean cvar_sort = qfalse;
 
+#define CVAR_CONFLICT_WARNED_MAX 8
+static struct { char name[32]; } cvar_conflict_warned[CVAR_CONFLICT_WARNED_MAX];
+static int cvar_conflict_warned_count = 0;
+
 /*
 ================
 return a hash value for the filename
@@ -436,8 +440,20 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, int flags ) {
 			Z_Free( var->resetString );
 			var->resetString = CopyString( var_value );
 		} else if ( var_value[0] && strcmp( var->resetString, var_value ) ) {
-			Com_DPrintf( "Warning: cvar \"%s\" given initial values: \"%s\" and \"%s\"\n",
-				var_name, var->resetString, var_value );
+			int i;
+			for ( i = 0; i < cvar_conflict_warned_count; i++ ) {
+				if ( Q_stricmp( cvar_conflict_warned[i].name, var_name ) == 0 )
+					break;
+			}
+			if ( i >= cvar_conflict_warned_count ) {
+				Com_DPrintf( "Warning: cvar \"%s\" given initial values: \"%s\" and \"%s\"\n",
+					var_name, var->resetString, var_value );
+				if ( cvar_conflict_warned_count < CVAR_CONFLICT_WARNED_MAX ) {
+					Q_strncpyz( cvar_conflict_warned[cvar_conflict_warned_count].name, var_name,
+						sizeof( cvar_conflict_warned[0].name ) );
+					cvar_conflict_warned_count++;
+				}
+			}
 		}
 
 		// if we have a latched string, take that value now
