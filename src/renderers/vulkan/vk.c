@@ -1988,9 +1988,15 @@ static void vk_clean_staging_buffer( void )
 #ifdef USE_UPLOAD_QUEUE
 static qboolean vk_wait_staging_buffer( void )
 {
+	if ( vk.device_lost ) {
+		return qfalse;
+	}
 	if ( vk.aux_fence_wait ) {
 		VkResult res = qvkWaitForFences( vk.device, 1, &vk.aux_fence, VK_TRUE, 5 * 1000000000ULL );
 		if ( res != VK_SUCCESS ) {
+			if ( res == VK_ERROR_DEVICE_LOST ) {
+				vk.device_lost = qtrue;
+			}
 			ri.Error( ERR_FATAL, "vkWaitForFences() failed with %s at %s", vk_result_string( res ), __FUNCTION__ );
 		}
 		qvkResetFences( vk.device, 1, &vk.aux_fence );
@@ -2011,6 +2017,9 @@ static void vk_flush_staging_buffer( qboolean final )
 	VkSubmitInfo submit_info;
 	VkResult res;
 
+	if ( vk.device_lost ) {
+		return;
+	}
 	if ( vk.staging_buffer.offset == 0 ) {
 		return;
 	}
@@ -2048,15 +2057,30 @@ static void vk_flush_staging_buffer( qboolean final )
 		submit_info.signalSemaphoreCount = 1;
 		submit_info.pSignalSemaphores = &vk.image_uploaded2;
 		vk.image_uploaded = vk.image_uploaded2;
-		VK_CHECK( qvkQueueSubmit( vk.queue, 1, &submit_info, vk.aux_fence ) );
+		res = qvkQueueSubmit( vk.queue, 1, &submit_info, vk.aux_fence );
+		if ( res != VK_SUCCESS ) {
+			if ( res == VK_ERROR_DEVICE_LOST ) {
+				vk.device_lost = qtrue;
+			}
+			ri.Error( ERR_FATAL, "Vulkan: qvkQueueSubmit (staging) returned %s", vk_result_string( res ) );
+		}
 		vk.aux_fence_wait = qtrue;
 	} else {
 		// if submission before another upload then do explicit wait
 		submit_info.signalSemaphoreCount = 0;
 		submit_info.pSignalSemaphores = NULL;
-		VK_CHECK( qvkQueueSubmit( vk.queue, 1, &submit_info, vk.aux_fence ) );
+		res = qvkQueueSubmit( vk.queue, 1, &submit_info, vk.aux_fence );
+		if ( res != VK_SUCCESS ) {
+			if ( res == VK_ERROR_DEVICE_LOST ) {
+				vk.device_lost = qtrue;
+			}
+			ri.Error( ERR_FATAL, "Vulkan: qvkQueueSubmit (staging) returned %s", vk_result_string( res ) );
+		}
 		res = qvkWaitForFences( vk.device, 1, &vk.aux_fence, VK_TRUE, 5 * 1000000000ULL );
 		if ( res != VK_SUCCESS ) {
+			if ( res == VK_ERROR_DEVICE_LOST ) {
+				vk.device_lost = qtrue;
+			}
 			ri.Error( ERR_FATAL, "vkWaitForFences() failed with %s at %s", vk_result_string( res ), __FUNCTION__ );
 		}
 		qvkResetFences( vk.device, 1, &vk.aux_fence );
@@ -10031,6 +10055,10 @@ void vk_shutdown( refShutdownCode_t code )
 	if ( qvkQueuePresentKHR == NULL ) { // not fully initialized
 		goto __cleanup;
 	}
+	if ( vk.device_lost ) {
+		/* GPU lost; skip per-resource destroy (they fail), go straight to vkDestroyDevice */
+		goto __cleanup;
+	}
 
 	vk_destroy_framebuffers();
 
@@ -10335,12 +10363,18 @@ __cleanup:
 
 void vk_wait_idle( void )
 {
+	if ( vk.device_lost ) {
+		return;
+	}
 	VK_CHECK( qvkDeviceWaitIdle( vk.device ) );
 }
 
 
 void vk_queue_wait_idle( void )
 {
+	if ( vk.device_lost ) {
+		return;
+	}
 	VK_CHECK( qvkQueueWaitIdle( vk.queue ) );
 }
 
@@ -10348,6 +10382,9 @@ void vk_queue_wait_idle( void )
 void vk_release_resources( void ) {
 	int i, j;
 
+	if ( vk.device_lost ) {
+		return;  /* GPU lost; skip cleanup to avoid recursive VK_ERROR_DEVICE_LOST */
+	}
 	vk_wait_idle();
 
 	for ( i = 0; i < vk_world.num_image_chunks; i++ )
@@ -16262,6 +16299,9 @@ void vk_begin_frame( void )
 	VkCommandBufferBeginInfo begin_info;
 	VkResult res;
 
+	if ( vk.device_lost ) {
+		return;
+	}
 	if ( vk.frame_count++ ) // might happen during stereo rendering
 		return;
 
@@ -16283,8 +16323,8 @@ void vk_begin_frame( void )
 		res = qvkWaitForFences( vk.device, 1, &vk.cmd->rendering_finished_fence, VK_FALSE, 1e10 );
 		if ( res != VK_SUCCESS ) {
 			if ( res == VK_ERROR_DEVICE_LOST ) {
-				// silently discard previous command buffer
-				ri.Printf( PRINT_WARNING, "Vulkan: %s returned %s", "vkWaitForFences", vk_result_string( res ) );
+				vk.device_lost = qtrue;
+				ri.Error( ERR_FATAL, "Vulkan: %s returned %s (GPU lost)", "vkWaitForFences", vk_result_string( res ) );
 			}
 			else {
 				ri.Error( ERR_FATAL, "Vulkan: %s returned %s", "vkWaitForFences", vk_result_string( res ) );
@@ -16940,7 +16980,15 @@ void vk_end_frame( void )
 		submit_info.pSignalSemaphores = NULL;
 	}
 
-	VK_CHECK( qvkQueueSubmit( vk.queue, 1, &submit_info, vk.cmd->rendering_finished_fence ) );
+	{
+		VkResult sub_res = qvkQueueSubmit( vk.queue, 1, &submit_info, vk.cmd->rendering_finished_fence );
+		if ( sub_res != VK_SUCCESS ) {
+			if ( sub_res == VK_ERROR_DEVICE_LOST ) {
+				vk.device_lost = qtrue;
+			}
+			ri.Error( ERR_FATAL, "Vulkan: qvkQueueSubmit returned %s", vk_result_string( sub_res ) );
+		}
+	}
 	vk.cmd->waitForFence = qtrue;
 
 	// presentation may take undefined time to complete, we can't measure it in a reliable way
@@ -17055,6 +17103,9 @@ void vk_read_pixels( byte *buffer, uint32_t width, uint32_t height )
 	uint32_t i, n;
 	qboolean invalidate_ptr;
 
+	if ( vk.device_lost ) {
+		return;
+	}
 	VK_CHECK( qvkWaitForFences( vk.device, 1, &vk.cmd->rendering_finished_fence, VK_FALSE, 1e12 ) );
 
 	if ( vk.fboActive ) {
