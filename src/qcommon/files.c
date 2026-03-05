@@ -3138,7 +3138,7 @@ static pack_t *FS_LoadZipFile( const char *zipfile )
 			unzGetCurrentFileInfoPosition( uf, &curFile->pos );
 			curFile->size = file_info.uncompressed_size;
 			curFile->name = namePtr;
-			strcpy( curFile->name, filename_inzip );
+			Q_strncpyz( curFile->name, filename_inzip, MAX_ZPATH );
 			namePtr += strlen( filename_inzip ) + 1;
 
 			// update hash table

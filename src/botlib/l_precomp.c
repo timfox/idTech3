@@ -472,10 +472,10 @@ static int PC_StringizeTokens( const token_t *tokens, token_t *token )
 		len = (int)strlen( t->string );
 		if ( (size_t) len + total >= sizeof( token->string ) - 1 ) // reserve space for '"' and '\0'
 			return qfalse;
-		strcpy( token->string + total, t->string );
+		Q_strncpyz( token->string + total, t->string, sizeof( token->string ) - total );
 		total += len;
 	}
-	strcpy( token->string + total, "\"" );
+	Q_strncpyz( token->string + total, "\"", sizeof( token->string ) - total );
 
 	return qtrue;
 } //end of the function PC_StringizeTokens
