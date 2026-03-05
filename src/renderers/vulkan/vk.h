@@ -700,7 +700,7 @@ typedef struct {
 
 	VkImage depth_image;
 	VkImageView depth_image_view;
-	VkImageView depth_image_view_sampler;	/* depth-only view for descriptor sampling (VUID-01976); NULL if depth has no stencil */
+	VkImageView depth_image_view_sample;	/* depth-only view for sampling/descriptors (VUID-01976) */
 
 	VkImage msaa_image;
 	VkImageView msaa_image_view;

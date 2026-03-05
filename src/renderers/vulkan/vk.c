@@ -785,6 +785,11 @@ static void record_image_layout_transition( VkCommandBuffer command_buffer, VkIm
 	}
 	if ( dst_stage_override != 0 ) {
 		dst_stage = dst_stage_override;
+		/* If the caller forces compute or other non-fragment stages, strip input-attachment access
+		 * (only valid with fragment stages) to satisfy stage/access compatibility. */
+		if ( dst_stage & VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT ) {
+			barrier.dstAccessMask &= ~VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+		}
 	}
 
 	/* VUID-02820: INPUT_ATTACHMENT_READ_BIT only valid for fragment stage; remove when dst is compute-only */
@@ -4086,7 +4091,7 @@ void vk_update_attachment_descriptors( void ) {
 			sd.max_lod_1_0 = qtrue;
 			sd.noAnisotropy = qtrue;
 			info.sampler = vk_find_sampler( &sd );
-			info.imageView = vk.depth_image_view_sampler ? vk.depth_image_view_sampler : vk.depth_image_view;
+			info.imageView = vk.depth_image_view_sample ? vk.depth_image_view_sample : vk.depth_image_view;
 			info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 			desc.dstSet = vk.depth_descriptor;
 			qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
@@ -4139,7 +4144,7 @@ void vk_update_attachment_descriptors( void ) {
 			// ssr set 1: depth texture (use depth-only view when available for VUID-01976)
 			sd.gl_mag_filter = sd.gl_min_filter = GL_NEAREST;
 			info.sampler = vk_find_sampler( &sd );
-			info.imageView = vk.depth_image_view_sampler ? vk.depth_image_view_sampler : vk.depth_image_view;
+			info.imageView = vk.depth_image_view_sample ? vk.depth_image_view_sample : vk.depth_image_view;
 			info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 			desc.dstSet = vk.ssr_descriptor[1];
 			qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
@@ -4224,7 +4229,7 @@ static void vk_update_volumetric_descriptors( void )
 	params_buffer.offset = 0;
 	params_buffer.range = sizeof( volumetric_params_t );
 
-	volumetric_depth_view = vk.depth_image_view_sampler ? vk.depth_image_view_sampler : vk.depth_image_view;
+	volumetric_depth_view = vk.depth_image_view_sample ? vk.depth_image_view_sample : vk.depth_image_view;
 	volumetric_depth_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 	if ( vk.msaaActive && vk.volumetric_depth_view != VK_NULL_HANDLE ) {
 		volumetric_depth_view = vk.volumetric_depth_view;
@@ -4577,7 +4582,7 @@ static void vk_update_volumetric_descriptors( void )
 
 		Com_Memset( resolve_info, 0, sizeof( resolve_info ) );
 		resolve_info[0].sampler = vk.froxel_depth_sampler;
-		resolve_info[0].imageView = vk.depth_image_view_sampler ? vk.depth_image_view_sampler : vk.depth_image_view;
+		resolve_info[0].imageView = vk.depth_image_view_sample ? vk.depth_image_view_sample : vk.depth_image_view;
 		resolve_info[0].imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 		resolve_info[1].imageView = vk.volumetric_depth_view;
 		resolve_info[1].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -5952,6 +5957,34 @@ static void create_depth_attachment( uint32_t width, uint32_t height, VkSampleCo
 #endif
 }
 
+static void vk_create_depth_sample_view( void )
+{
+	VkImageViewCreateInfo view_desc;
+
+	if ( vk.depth_image_view_sample != VK_NULL_HANDLE ) {
+		qvkDestroyImageView( vk.device, vk.depth_image_view_sample, NULL );
+		vk.depth_image_view_sample = VK_NULL_HANDLE;
+	}
+
+	if ( vk.depth_image == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	Com_Memset( &view_desc, 0, sizeof( view_desc ) );
+	view_desc.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	view_desc.image = vk.depth_image;
+	view_desc.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	view_desc.format = vk.depth_format;
+	view_desc.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+	view_desc.subresourceRange.baseMipLevel = 0;
+	view_desc.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
+	view_desc.subresourceRange.baseArrayLayer = 0;
+	view_desc.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+
+	VK_CHECK( qvkCreateImageView( vk.device, &view_desc, NULL, &vk.depth_image_view_sample ) );
+	SET_OBJECT_NAME( vk.depth_image_view_sample, "depth sample view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+}
+
 
 static void vk_create_attachments( void )
 {
@@ -6132,25 +6165,7 @@ static void vk_create_attachments( void )
 		(vk.fboActive && r_bloom->integer) || (r_ssao && r_ssao->integer) || (PostFX_SSR_IsEnabled()) ? qfalse : qtrue );
 
 	vk_alloc_attachments();
-
-	/* Create depth-only view for descriptor sampling when main depth has stencil (VUID-VkDescriptorImageInfo-imageView-01976) */
-	vk.depth_image_view_sampler = VK_NULL_HANDLE;
-	if ( vk.depth_image != VK_NULL_HANDLE && vk.depth_image_view != VK_NULL_HANDLE && glConfig.stencilBits > 0 ) {
-		VkImageViewCreateInfo view_desc;
-		Com_Memset( &view_desc, 0, sizeof( view_desc ) );
-		view_desc.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		view_desc.image = vk.depth_image;
-		view_desc.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		view_desc.format = vk.depth_format;
-		view_desc.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-		view_desc.subresourceRange.baseMipLevel = 0;
-		view_desc.subresourceRange.levelCount = 1;
-		view_desc.subresourceRange.baseArrayLayer = 0;
-		view_desc.subresourceRange.layerCount = 1;
-		if ( qvkCreateImageView( vk.device, &view_desc, NULL, &vk.depth_image_view_sampler ) == VK_SUCCESS )
-			SET_OBJECT_NAME( vk.depth_image_view_sampler, "depth attachment (sampler)", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
-	}
-
+	vk_create_depth_sample_view();
 	vk_create_sun_shadow_resources();
 	vk_create_local_shadow_resources();
 
@@ -9829,12 +9844,12 @@ static void vk_destroy_attachments( void )
 		vk.msaa_image_view = VK_NULL_HANDLE;
 	}
 
-	qvkDestroyImage( vk.device, vk.depth_image, NULL );
-	if ( vk.depth_image_view_sampler != VK_NULL_HANDLE ) {
-		qvkDestroyImageView( vk.device, vk.depth_image_view_sampler, NULL );
-		vk.depth_image_view_sampler = VK_NULL_HANDLE;
+	if ( vk.depth_image_view_sample != VK_NULL_HANDLE ) {
+		qvkDestroyImageView( vk.device, vk.depth_image_view_sample, NULL );
+		vk.depth_image_view_sample = VK_NULL_HANDLE;
 	}
 	qvkDestroyImageView( vk.device, vk.depth_image_view, NULL );
+	qvkDestroyImage( vk.device, vk.depth_image, NULL );
 	vk.depth_image = VK_NULL_HANDLE;
 	vk.depth_image_view = VK_NULL_HANDLE;
 
