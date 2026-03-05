@@ -182,7 +182,8 @@ typedef struct {
 	char					renderer_string[MAX_STRING_CHARS];
 	char					vendor_string[MAX_STRING_CHARS];
 	char					version_string[MAX_STRING_CHARS];
-	char					extensions_string[BIG_INFO_STRING];
+	/* ABI: keep 8192 so glconfig_t size stays 11324 for mod compatibility */
+	char					extensions_string[8192];
 
 	int						maxTextureSize;			// queried from GL
 	int						numTextureUnits;		// multitexture ability
