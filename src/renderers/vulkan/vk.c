@@ -16769,7 +16769,6 @@ void vk_end_frame( void )
 				}
 			}
 		}
-	}
 	else
 	{
 		/* r_fbo 0 path: we started the main render pass in vk_start_frame().
