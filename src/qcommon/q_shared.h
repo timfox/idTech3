@@ -284,7 +284,7 @@ typedef int		clipHandle_t;
 
 #define MAX_USERINFO_LENGTH (MAX_INFO_STRING-13) // incl. length of 'connect ""' or 'userinfo ""' and reserving one byte to avoid q3msgboom
 													
-#define	BIG_INFO_STRING		8192  // used for system info key only
+#define	BIG_INFO_STRING		16384  // used for system info; 16K for mods with many cvars (voteflags, etc.)
 #define	BIG_INFO_KEY		  8192
 #define	BIG_INFO_VALUE		8192
 

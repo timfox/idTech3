@@ -3849,10 +3849,16 @@ void Com_Init( char *commandLine ) {
 	Com_InitZoneMemory();
 	Cmd_Init();
 
-	// get the developer cvar set as early as possible
+	// get the developer cvar set as early as possible (com_developer is alias for developer)
 	Com_StartupVariable( "developer" );
+	Com_StartupVariable( "com_developer" );
 	com_developer = Cvar_Get( "developer", "0", CVAR_TEMP );
 	Cvar_CheckRange( com_developer, NULL, NULL, CV_INTEGER );
+	{
+		cvar_t *com_dev = Cvar_FindVar( "com_developer" );
+		if ( com_dev && com_dev->integer )
+			Cvar_Set2( "developer", com_dev->string, qfalse );
+	}
 
 	Com_StartupVariable( "vm_rtChecks" );
 	vm_rtChecks = Cvar_Get( "vm_rtChecks", "15", CVAR_INIT | CVAR_PROTECTED );
