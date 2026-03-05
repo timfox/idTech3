@@ -1043,6 +1043,10 @@ static void R_LevelShot( void ) {
 	float		xScale, yScale;
 	int			xx, yy;
 
+	if ( !tr.world || !tr.world->baseName ) {
+		ri.Printf( PRINT_WARNING, "Levelshot requires a loaded map.\n" );
+		return;
+	}
 	Com_sprintf(checkname, sizeof(checkname), "levelshots/%s.tga", tr.world->baseName);
 
 	allsource = RB_ReadPixels(0, 0, gls.captureWidth, gls.captureHeight, &offset, &padlen, 0 );

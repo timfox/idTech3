@@ -308,7 +308,9 @@ static void R_SetupEntityLightingGrid( trRefEntity_t *ent, world_t *world ) {
 	R_ClearSHCoeffs( ent->shCoeffs );
 	ent->shLightingValid = qfalse;
 
-	assert( world->lightGridData ); // NULL with -nolight maps
+	if ( !world->lightGridData ) {
+		return; /* -nolight maps: no grid, leave lighting zeroed */
+	}
 
 	// trilerp the light value
 	gridStep[0] = 8;
