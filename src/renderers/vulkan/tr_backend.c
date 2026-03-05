@@ -591,7 +591,7 @@ static void RB_LightingPass( void );
 RB_RenderDrawSurfList
 ==================
 */
-static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
+void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 	shader_t		*shader, *oldShader;
 	int				fogNum;
 	int				entityNum, oldEntityNum;
@@ -649,6 +649,15 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 #ifdef USE_VULKAN
 		if ( backEnd.depthOnlyWorldPass && entityNum != REFENTITYNUM_WORLD ) {
 			continue;  /* occlusion pass: world depth only */
+		}
+		if ( backEnd.drawSurfFilter ) {
+			unsigned stageBits = shader->stages[0] ? shader->stages[0]->stateBits : 0;
+			qboolean transparent = ( ( stageBits & GLS_SRCBLEND_BITS ) == GLS_SRCBLEND_SRC_ALPHA &&
+				( stageBits & GLS_DSTBLEND_BITS ) == GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA );
+			if ( backEnd.drawSurfFilter == 1 && transparent )
+				continue;  /* opaque only: skip transparent */
+			if ( backEnd.drawSurfFilter == 2 && !transparent )
+				continue;  /* transparent only: skip opaque */
 		}
 		if ( ( vk.renderPassIndex == RENDER_PASS_SCREENMAP || vk.renderPassIndex == RENDER_PASS_SUN_SHADOW ) &&
 			entityNum != REFENTITYNUM_WORLD && backEnd.refdef.entities[ entityNum ].e.renderfx & RF_DEPTHHACK ) {
@@ -1722,6 +1731,8 @@ static const void *RB_DrawSurfs( const void *data ) {
 
 	backEnd.refdef = cmd->refdef;
 	backEnd.viewParms = cmd->viewParms;
+	backEnd.drawSurfFilter = 0;
+	backEnd.oitAccumPass = qfalse;
 
 #ifdef USE_VBO
 	VBO_UnBind();
