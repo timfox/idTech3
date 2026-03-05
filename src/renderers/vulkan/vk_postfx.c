@@ -141,6 +141,7 @@ float PostFX_VegWind_GetWindStrength(void) { return r_vegWind_strength ? r_vegWi
 
 static float lastVignette = 0, lastVigRadius = 0, lastChromAb = 0, lastGrain = 0;
 static int lastFilmLook = 0;
+static float lastPostContrast = 1.0f, lastPostSaturation = 1.0f;
 
 qboolean PostFX_NeedsPipelineUpdate(void) {
 	float v = r_vignette ? r_vignette->value : 0;
@@ -148,12 +149,19 @@ qboolean PostFX_NeedsPipelineUpdate(void) {
 	float c = r_chromaticAberration ? r_chromaticAberration->value : 0;
 	float g = r_filmGrain ? r_filmGrain->value : 0;
 	int filmLook = ( r_filmLook && r_filmLook->integer ) ? 1 : 0;
-	if (v != lastVignette || vr != lastVigRadius || c != lastChromAb || g != lastGrain || filmLook != lastFilmLook) {
+	cvar_t *r_post_contrast = ri.Cvar_Get( "r_post_contrast", "1.0", 0 );
+	cvar_t *r_post_saturation = ri.Cvar_Get( "r_post_saturation", "1.0", 0 );
+	float pc = ( r_post_contrast && r_post_contrast->value > 0.0f ) ? r_post_contrast->value : 1.0f;
+	float ps = ( r_post_saturation && r_post_saturation->value >= 0.0f ) ? r_post_saturation->value : 1.0f;
+	if (v != lastVignette || vr != lastVigRadius || c != lastChromAb || g != lastGrain || filmLook != lastFilmLook ||
+	    pc != lastPostContrast || ps != lastPostSaturation) {
 		lastVignette = v;
 		lastVigRadius = vr;
 		lastChromAb = c;
 		lastGrain = g;
 		lastFilmLook = filmLook;
+		lastPostContrast = pc;
+		lastPostSaturation = ps;
 		return qtrue;
 	}
 	return qfalse;

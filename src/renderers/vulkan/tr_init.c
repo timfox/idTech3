@@ -170,6 +170,7 @@ cvar_t	*r_smaa_preset;
 cvar_t	*r_smaa_threshold;
 cvar_t	*r_smaa_local_contrast;
 cvar_t	*r_smaa_max_search_steps;
+cvar_t	*r_smaa_corner_rounding;
 cvar_t	*r_rtx;
 
 #endif // USE_VULKAN
@@ -205,6 +206,7 @@ cvar_t	*r_ignoreGLErrors;
 //cvar_t	*r_stencilbits;
 cvar_t	*r_texturebits;
 cvar_t	*r_ext_multisample;
+cvar_t	*r_msaa_sample_shading;
 cvar_t	*r_ext_alpha_to_coverage;
 
 cvar_t	*r_drawBuffer;
@@ -1877,7 +1879,9 @@ static void R_Register( void )
 #endif
 #if defined (USE_VULKAN) && defined (USE_VK_PBR)
 	r_pbr = ri.Cvar_Get("r_pbr", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
-	ri.Cvar_SetDescription( r_pbr, "Enables Physically Based Rendering. \nRequires " S_COLOR_CYAN "\\r_fbo 1 \n" S_COLOR_GREEN "Advised " S_COLOR_CYAN "\\r_vbo 1 " S_COLOR_GREEN "for static world geometry " S_COLOR_WHITE "*optional" );
+	ri.Cvar_SetDescription( r_pbr, "Enables Physically Based Rendering (metalness/roughness, IBL, Cook-Torrance BRDF).\n"
+		"Requires " S_COLOR_CYAN "\\r_fbo 1" S_COLOR_WHITE " (vid_restart after changing).\n"
+		"Advised " S_COLOR_CYAN "\\r_vbo 1" S_COLOR_GREEN " for static world geometry (optional)." );
 
 	r_pbr_shExtract = ri.Cvar_Get( "r_pbr_shExtract", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_pbr_shExtract, "Extract SH coefficients from generated irradiance cubemaps for PBR." );
@@ -2383,6 +2387,17 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_post_debug, "Debug view for the post-process pass: 0=final, 1=pre-tonemap HDR, 2=luminance heatmap, 97=panini logical UV, 98=panini remapped source UV, 99=panini logical OOB mask." );
 	ri.Cvar_SetGroup( r_post_debug, CVG_RENDERER );
 
+	{
+		cvar_t *r_post_contrast = ri.Cvar_Get( "r_post_contrast", "1.0", CVAR_ARCHIVE_ND );
+		cvar_t *r_post_saturation = ri.Cvar_Get( "r_post_saturation", "1.0", CVAR_ARCHIVE_ND );
+		ri.Cvar_CheckRange( r_post_contrast, "0.25", "4.0", CV_FLOAT );
+		ri.Cvar_CheckRange( r_post_saturation, "0.0", "3.0", CV_FLOAT );
+		ri.Cvar_SetDescription( r_post_contrast, "Post-process contrast (1.0=neutral, >1=punchier, <1=flatter)." );
+		ri.Cvar_SetDescription( r_post_saturation, "Post-process saturation (1.0=neutral, >1=vivid, <1=desaturated)." );
+		ri.Cvar_SetGroup( r_post_contrast, CVG_RENDERER );
+		ri.Cvar_SetGroup( r_post_saturation, CVG_RENDERER );
+	}
+
 	r_volumetricFog = ri.Cvar_Get( "r_volumetricFog", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_volumetricFog, "Enable the volumetric fog compute/composite passes before tonemapping." );
 	ri.Cvar_SetGroup( r_volumetricFog, CVG_RENDERER );
@@ -2850,7 +2865,8 @@ static void R_Register( void )
 	r_device->modified = qfalse;
 
 	r_fbo = ri.Cvar_Get( "r_fbo", "1", CVAR_ARCHIVE | CVAR_LATCH );
-	ri.Cvar_SetDescription( r_fbo, "Use framebuffer objects, enables gamma correction in windowed mode and allows arbitrary video size and screenshot/video capture.\n Required for bloom, HDR rendering, anti-aliasing and greyscale effects." );
+	ri.Cvar_SetDescription( r_fbo, "Framebuffer objects for offscreen rendering. Required for PBR, HDR, bloom, MSAA, SMAA, SSAO, gamma correction.\n"
+		"Use vid_restart after changing. Default 1 recommended." );
 	r_renderMode = ri.Cvar_Get( "r_renderMode", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_renderMode, "0", "2", CV_INTEGER );
 	ri.Cvar_SetDescription( r_renderMode, "Rendering path. Requires vid_restart.\n 0: Forward (default)\n 1: Deferred (placeholder)\n 2: Forward+ (placeholder)\nDeferred and forward+ would need G-buffers, light culling, and separate passes; they are not implemented yet." );
@@ -2900,8 +2916,12 @@ static void R_Register( void )
 	}
 
 	r_ext_multisample = ri.Cvar_Get( "r_ext_multisample", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
-	ri.Cvar_CheckRange( r_ext_multisample, "0", "64", CV_INTEGER );
-	ri.Cvar_SetDescription( r_ext_multisample, "For anti-aliasing geometry edges, valid values: 0|2|4|6|8. Requires \\r_fbo 1." );
+	ri.Cvar_CheckRange( r_ext_multisample, "0", "16", CV_INTEGER );
+	ri.Cvar_SetDescription( r_ext_multisample, "MSAA sample count for geometry edges: 0=off, 2|4|8|16. Requires \\r_fbo 1. Use with SMAA for alpha edges." );
+
+	r_msaa_sample_shading = ri.Cvar_Get( "r_msaa_sample_shading", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_msaa_sample_shading, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_msaa_sample_shading, "Per-sample shading when MSAA on: improves alpha edges and specular, ~2x fragment cost. Requires \\r_ext_multisample 2+." );
 
 	r_ext_supersample = ri.Cvar_Get( "r_ext_supersample", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_supersample, "0", "1", CV_INTEGER );
@@ -2927,13 +2947,17 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_smaa_max_search_steps, "8", "32", CV_INTEGER );
 	ri.Cvar_SetDescription( r_smaa_max_search_steps, "SMAA blend search steps (higher = better quality, more cost). Used when r_smaa_preset 0." );
 
+	r_smaa_corner_rounding = ri.Cvar_Get( "r_smaa_corner_rounding", "0.2", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_smaa_corner_rounding, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_smaa_corner_rounding, "SMAA corner rounding strength (0=off, 1=full). Attenuates edges at L-corners for smoother silhouettes." );
+
 	r_rtx = ri.Cvar_Get( "r_rtx", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_rtx, "0", "3", CV_INTEGER );
 	ri.Cvar_SetDescription( r_rtx, "Ray tracing (0=off, 1=shadows, 2=reflections, 3=full). Requires USE_VULKAN_RTX build and RT-capable GPU. See docs/RENDERERS_FUTURE.md." );
 #if 0
 	r_ext_alpha_to_coverage = ri.Cvar_Get( "r_ext_alpha_to_coverage", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_alpha_to_coverage, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_ext_alpha_to_coverage, "Enables alpha-to-coverage multisampling, requires \\r_fbo 1." );
+	ri.Cvar_SetDescription( r_ext_alpha_to_coverage, "Alpha-to-coverage for alpha-tested surfaces (foliage, grates) when MSAA is on. Requires \\r_fbo 1 and \\r_ext_multisample 2+." );
 #endif
 
 	r_renderWidth = ri.Cvar_Get( "r_renderWidth", "800", CVAR_ARCHIVE_ND | CVAR_LATCH );

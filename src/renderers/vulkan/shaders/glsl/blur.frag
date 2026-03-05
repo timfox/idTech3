@@ -25,11 +25,11 @@ void main()
 	vec2 inner = vec2( offset1_x, offset1_y );
 	vec2 outer = vec2( offset2_x, offset2_y );
 
-	vec3 base = texture( texture0, tex_coord0 ).rgb * 0.27344
-		+ texture( texture0, tex_coord0 + inner ).rgb * 0.32813
-		+ texture( texture0, tex_coord0 - inner ).rgb * 0.32813
-		+ texture( texture0, tex_coord0 + outer ).rgb * 0.03516
-		+ texture( texture0, tex_coord0 - outer ).rgb * 0.03516;
+	vec3 base = textureLod( texture0, tex_coord0, 0.0 ).rgb * 0.27344
+		+ textureLod( texture0, tex_coord0 + inner, 0.0 ).rgb * 0.32813
+		+ textureLod( texture0, tex_coord0 - inner, 0.0 ).rgb * 0.32813
+		+ textureLod( texture0, tex_coord0 + outer, 0.0 ).rgb * 0.03516
+		+ textureLod( texture0, tex_coord0 - outer, 0.0 ).rgb * 0.03516;
 
 	out_color = vec4( base, 1.0 );
 }

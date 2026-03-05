@@ -1123,6 +1123,7 @@ typedef struct {
 	qboolean fboActive;
 	qboolean blitEnabled;
 	qboolean msaaActive;
+	qboolean msaaSampleShading;	/* per-sample shading when MSAA on (better alpha/specular, higher cost) */
 	qboolean smaaActive;
 #ifdef USE_VK_PBR
 	qboolean pbrActive;

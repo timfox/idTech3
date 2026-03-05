@@ -30,6 +30,8 @@ layout(constant_id = 20) const int postprocess_enabled = 1;
 layout(constant_id = 21) const float outline_strength = 0.0;
 layout(constant_id = 22) const float outline_threshold = 0.15;
 layout(constant_id = 23) const int film_look = 0;
+layout(constant_id = 24) const float post_contrast = 1.0;
+layout(constant_id = 25) const float post_saturation = 1.0;
 
 layout(push_constant) uniform PaniniPC {
 	float paniniAmount;
@@ -138,7 +140,11 @@ bool finite2( vec2 v ) {
 }
 
 vec2 to_src_uv( vec2 uv01 ) {
-	return uv01 * paniniPC.srcUVScaleBias.xy + paniniPC.srcUVScaleBias.zw;
+	vec2 scale = paniniPC.srcUVScaleBias.xy;
+	vec2 bias = paniniPC.srcUVScaleBias.zw;
+	if ( scale.x <= 0.0 || scale.y <= 0.0 )
+		return uv01;
+	return uv01 * scale + bias;
 }
 
 vec3 reconstructRay( vec2 uv, float fovYRadians, float aspect ) {
@@ -282,7 +288,12 @@ void main() {
 	}
 
 	uv = to_src_uv( uvLogical );
-	vec3 hdr = texture( texture0, uv ).rgb;
+	vec3 hdr = textureLod( texture0, uv, 0.0 ).rgb;
+	/* Guard against NaN/Inf from upstream (bad shader, uninitialized, etc.) */
+	if ( isnan( hdr.r ) || isnan( hdr.g ) || isnan( hdr.b ) ||
+	     isinf( hdr.r ) || isinf( hdr.g ) || isinf( hdr.b ) ) {
+		hdr = vec3( 0.0 );
+	}
 	vec3 hdr_exposed = hdr * max( paniniPC.brightness, 0.0 );
 	if ( postprocess_enabled != 0 ) {
 		hdr_exposed *= max( paniniPC.exposure, 0.01 );
@@ -308,12 +319,18 @@ void main() {
 	} else {
 		ldr = clamp( tonemapped, 0.0, 1.0 );
 
-		/* Saturation recovery — compensate for tonemap desaturation.
-		   Boosts chroma by pulling colors away from their luminance. */
-		if ( postprocess_enabled != 0 ) {
-			float satBoost = 1.15;
+		/* Contrast: pivot around 0.5 */
+		if ( postprocess_enabled != 0 && post_contrast != 1.0 ) {
+			float c = clamp( post_contrast, 0.0, 4.0 );
+			ldr = ( ldr - 0.5 ) * c + 0.5;
+			ldr = clamp( ldr, 0.0, 1.0 );
+		}
+
+		/* Saturation: 1.0=neutral, >1=boost chroma, <1=desaturate. Replaces fixed satBoost. */
+		if ( postprocess_enabled != 0 && post_saturation != 1.0 ) {
+			float sat = clamp( post_saturation, 0.0, 3.0 );
 			float lum = dot( ldr, sRGB );
-			ldr = clamp( vec3(lum) + satBoost * ( ldr - vec3(lum) ), 0.0, 1.0 );
+			ldr = clamp( vec3(lum) + sat * ( ldr - vec3(lum) ), 0.0, 1.0 );
 		}
 
 		if ( greyscale == 1.0 ) {
@@ -333,9 +350,9 @@ void main() {
 		vec2 srcR = to_src_uv( caUV + caOffset );
 		vec2 srcB = to_src_uv( caUV - caOffset );
 		vec3 caHdr;
-		caHdr.r = texture( texture0, srcR ).r;
+		caHdr.r = textureLod( texture0, srcR, 0.0 ).r;
 		caHdr.g = ldr.g;
-		caHdr.b = texture( texture0, srcB ).b;
+		caHdr.b = textureLod( texture0, srcB, 0.0 ).b;
 		caHdr.r *= max( paniniPC.brightness, 0.0 ) * max( paniniPC.exposure, 0.01 ) * preExposureScale;
 		caHdr.b *= max( paniniPC.brightness, 0.0 ) * max( paniniPC.exposure, 0.01 ) * preExposureScale;
 		vec3 caTone;
@@ -347,11 +364,11 @@ void main() {
 
 	if ( outline_strength > 0.0 && postprocess_enabled != 0 ) {
 		vec2 outlineTexel = 1.0 / vec2( textureSize( texture0, 0 ) );
-		float lumC  = dot( texture( texture0, uv ).rgb, vec3(0.299, 0.587, 0.114) );
-		float lumL  = dot( texture( texture0, uv + vec2(-outlineTexel.x, 0.0) ).rgb, vec3(0.299, 0.587, 0.114) );
-		float lumR  = dot( texture( texture0, uv + vec2( outlineTexel.x, 0.0) ).rgb, vec3(0.299, 0.587, 0.114) );
-		float lumU  = dot( texture( texture0, uv + vec2(0.0, -outlineTexel.y) ).rgb, vec3(0.299, 0.587, 0.114) );
-		float lumD  = dot( texture( texture0, uv + vec2(0.0,  outlineTexel.y) ).rgb, vec3(0.299, 0.587, 0.114) );
+		float lumC  = dot( textureLod( texture0, uv, 0.0 ).rgb, vec3(0.299, 0.587, 0.114) );
+		float lumL  = dot( textureLod( texture0, uv + vec2(-outlineTexel.x, 0.0), 0.0 ).rgb, vec3(0.299, 0.587, 0.114) );
+		float lumR  = dot( textureLod( texture0, uv + vec2( outlineTexel.x, 0.0), 0.0 ).rgb, vec3(0.299, 0.587, 0.114) );
+		float lumU  = dot( textureLod( texture0, uv + vec2(0.0, -outlineTexel.y), 0.0 ).rgb, vec3(0.299, 0.587, 0.114) );
+		float lumD  = dot( textureLod( texture0, uv + vec2(0.0,  outlineTexel.y), 0.0 ).rgb, vec3(0.299, 0.587, 0.114) );
 		float edgeH = abs( lumL - lumR );
 		float edgeV = abs( lumU - lumD );
 		float edge  = sqrt( edgeH * edgeH + edgeV * edgeV );

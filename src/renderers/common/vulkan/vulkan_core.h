@@ -6335,6 +6335,10 @@ VKAPI_ATTR uint64_t VKAPI_CALL vkGetDeviceMemoryOpaqueCaptureAddress(
 // Vulkan 1.3 version number
 #define VK_API_VERSION_1_3 VK_MAKE_API_VERSION(0, 1, 3, 0)// Patch version should always be set to 0
 
+#define VK_VERSION_1_4 1
+// Vulkan 1.4 version number
+#define VK_API_VERSION_1_4 VK_MAKE_API_VERSION(0, 1, 4, 0)
+
 typedef uint64_t VkFlags64;
 VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkPrivateDataSlot)
 

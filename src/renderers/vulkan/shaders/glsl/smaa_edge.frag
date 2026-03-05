@@ -7,7 +7,7 @@ layout(push_constant) uniform SMAAParams {
     float threshold;
     float localContrast;
     int maxSearchSteps;
-    int _pad;
+    float corner_rounding;
 } pc;
 
 layout(location = 0) in vec2 frag_tex_coord;
@@ -32,35 +32,38 @@ void main()
     vec2 uv = frag_tex_coord;
     vec2 texel = texelSize.xy;
 
-    float L       = rgb2luma(texture(colorTexture, uv).rgb);
-    float Lleft   = rgb2luma(texture(colorTexture, uv + vec2(-texel.x, 0.0)).rgb);
-    float Ltop    = rgb2luma(texture(colorTexture, uv + vec2(0.0, -texel.y)).rgb);
-    float Lright  = rgb2luma(texture(colorTexture, uv + vec2( texel.x, 0.0)).rgb);
-    float Lbottom = rgb2luma(texture(colorTexture, uv + vec2(0.0,  texel.y)).rgb);
+    float L       = rgb2luma(textureLod(colorTexture, uv, 0.0).rgb);
+    float Lleft   = rgb2luma(textureLod(colorTexture, uv + vec2(-texel.x, 0.0), 0.0).rgb);
+    float Ltop    = rgb2luma(textureLod(colorTexture, uv + vec2(0.0, -texel.y), 0.0).rgb);
+    float Lright  = rgb2luma(textureLod(colorTexture, uv + vec2( texel.x, 0.0), 0.0).rgb);
+    float Lbottom = rgb2luma(textureLod(colorTexture, uv + vec2(0.0,  texel.y), 0.0).rgb);
 
     vec4 delta = abs(vec4(L) - vec4(Lleft, Ltop, Lright, Lbottom));
-    vec2 edges = step(vec2(pc.threshold), delta.xy);
+    /* Horizontal edge: max of left|right deltas; vertical: max of top|bottom (reference SMAA) */
+    vec2 deltaMax = vec2(max(delta.x, delta.z), max(delta.y, delta.w));
+    vec2 edges = step(vec2(pc.threshold), deltaMax);
 
     if (dot(edges, vec2(1.0)) == 0.0) {
         discard;
     }
 
-    float LleftLeft  = rgb2luma(texture(colorTexture, uv + vec2(-2.0 * texel.x, 0.0)).rgb);
-    float LtopTop    = rgb2luma(texture(colorTexture, uv + vec2(0.0, -2.0 * texel.y)).rgb);
+    float LleftLeft  = rgb2luma(textureLod(colorTexture, uv + vec2(-2.0 * texel.x, 0.0), 0.0).rgb);
+    float LtopTop    = rgb2luma(textureLod(colorTexture, uv + vec2(0.0, -2.0 * texel.y), 0.0).rgb);
 
     vec4 delta2 = abs(vec4(Lleft, Ltop, Lleft, Ltop) - vec4(LleftLeft, LtopTop, Lright, Lbottom));
     float maxDelta = max(max(delta2.x, delta2.y), max(delta2.z, delta2.w));
     maxDelta = max(maxDelta, max(delta.z, delta.w));
 
-    edges *= step(vec2(maxDelta * (1.0 / pc.localContrast)), delta.xy);
+    edges *= step(vec2(maxDelta * (1.0 / pc.localContrast)), deltaMax);
 
-    /* Corner rounding: slight attenuation at L-corners for smoother silhouettes */
-    float LleftTop  = rgb2luma(texture(colorTexture, uv + vec2(-texel.x, -texel.y)).rgb);
-    float LrightTop = rgb2luma(texture(colorTexture, uv + vec2( texel.x, -texel.y)).rgb);
-    float LleftBot  = rgb2luma(texture(colorTexture, uv + vec2(-texel.x,  texel.y)).rgb);
-    float LrightBot = rgb2luma(texture(colorTexture, uv + vec2( texel.x,  texel.y)).rgb);
+    /* Corner rounding: attenuation at L-corners for smoother silhouettes (scaled by corner_rounding) */
+    float LleftTop  = rgb2luma(textureLod(colorTexture, uv + vec2(-texel.x, -texel.y), 0.0).rgb);
+    float LrightTop = rgb2luma(textureLod(colorTexture, uv + vec2( texel.x, -texel.y), 0.0).rgb);
+    float LleftBot  = rgb2luma(textureLod(colorTexture, uv + vec2(-texel.x,  texel.y), 0.0).rgb);
+    float LrightBot = rgb2luma(textureLod(colorTexture, uv + vec2( texel.x,  texel.y), 0.0).rgb);
     vec4 deltaC = abs(vec4(L) - vec4(LleftTop, LrightTop, LleftBot, LrightBot));
-    float corner = 1.0 - 0.2 * smoothstep(pc.threshold, pc.threshold * 2.0, min(min(deltaC.x, deltaC.y), min(deltaC.z, deltaC.w)));
+    float cornerMin = min(min(deltaC.x, deltaC.y), min(deltaC.z, deltaC.w));
+    float corner = 1.0 - pc.corner_rounding * smoothstep(pc.threshold, pc.threshold * 2.0, cornerMin);
     edges *= corner;
 
     out_edge = vec4(edges, 0.0, 1.0);
