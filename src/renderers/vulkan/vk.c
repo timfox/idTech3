@@ -15918,6 +15918,7 @@ static void vk_volumetric_fog_pass( void )
 	/* Render pass finalLayout=SHADER_READ_ONLY transitions color_image automatically on end. */
 
 	if ( vk.smaaActive && tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+		vk_barrier_post_fog_source_for_sampling( vk.color_image_view, "volumetric pre-SMAA" );
 		vk_smaa_passes();
 		vk_update_post_fog_descriptors( vk.smaa_output_image_view ? vk.smaa_output_image_view : vk.color_image_view );
 	} else {
@@ -16566,6 +16567,8 @@ void vk_end_frame( void )
 					 * Skip paths run SMAA before 2D; we fix by running it here instead. */
 					if ( vk.smaaActive && vk.smaa_output_image_view != VK_NULL_HANDLE )
 					{
+						/* Ensure color_image is ready for SMAA edge pass sampling (post_bloom just ended) */
+						vk_barrier_post_fog_source_for_sampling( vk.color_image_view, "vk_end_frame pre-SMAA" );
 						vk_smaa_passes();
 						vk_log_post_fog_rebind( "end_frame SMAA (scene+2D)", vk.smaa_output_image_view );
 						vk_update_post_fog_descriptors( vk.smaa_output_image_view );
