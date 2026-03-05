@@ -194,6 +194,7 @@ OIT re-enabled after wiring the OIT accum pipeline. When `r_oit 1` + `r_fbo 1`: 
 4. **Volumetric render pass finalLayout (March 2025)**: The volumetric composite pass previously used `finalLayout=COLOR_ATTACHMENT_OPTIMAL`, leaving `color_image` in the wrong layout for gamma sampling. Fixed: `finalLayout` set to `SHADER_READ_ONLY_OPTIMAL` so the image is correctly transitioned when the pass ends. Removed redundant explicit layout transition after composite.
 5. **Gamma pass descriptor (March 2025)**: Added belt-and-suspenders `vk_update_color_descriptor_image()` immediately before the gamma pass, using `post_fog_src` or `color_image_view` fallback, ensuring the gamma shader always samples the correct source.
 6. **Gamma framebuffer dimensions (March 2025)**: Gamma framebuffer now uses `vk.swapchain_extent` when valid, ensuring it matches swapchain image dimensions. Gamma pass viewport uses the same extent. Zero-size guard added to skip gamma when dimensions are invalid.
+7. **SMAA blend pass descriptor (March 2025)**: The blend pass was receiving `smaa_edge_descriptor` (scene/color_image) for set 0 when it expects edges (`smaa_edge`). Fixed to pass `smaa_blend_descriptor` (points to smaa_edge_image_view) for both sets. This caused garbage/single-color when SMAA ran (menu and volumetric paths).
 
 ---
 

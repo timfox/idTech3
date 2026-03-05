@@ -15645,8 +15645,9 @@ static void vk_smaa_passes( void )
 		return;
 	}
 
+	/* Edge: set0=scene(color_image). Blend: set0=edges(smaa_edge). Compose: set0=scene, set1=blend. */
 	vk_run_smaa_pass( vk.smaa_edge_pipeline, vk.render_pass.smaa_edge, vk.framebuffers.smaa_edge, vk.smaa_edge_descriptor, vk.smaa_edge_descriptor, glConfig.vidWidth, glConfig.vidHeight );
-	vk_run_smaa_pass( vk.smaa_blend_pipeline, vk.render_pass.smaa_blend, vk.framebuffers.smaa_blend, vk.smaa_edge_descriptor, vk.smaa_blend_descriptor, glConfig.vidWidth, glConfig.vidHeight );
+	vk_run_smaa_pass( vk.smaa_blend_pipeline, vk.render_pass.smaa_blend, vk.framebuffers.smaa_blend, vk.smaa_blend_descriptor, vk.smaa_blend_descriptor, glConfig.vidWidth, glConfig.vidHeight );
 	vk_run_smaa_pass( vk.smaa_compose_pipeline, vk.render_pass.smaa_compose, vk.framebuffers.smaa_compose, vk.smaa_edge_descriptor, vk.smaa_compose_descriptor, glConfig.vidWidth, glConfig.vidHeight );
 }
 
