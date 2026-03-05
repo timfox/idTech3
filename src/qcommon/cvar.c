@@ -2029,7 +2029,10 @@ void Cvar_Register( vmCvar_t *vmCvar, const char *varName, const char *defaultVa
 			}
 		}
 	} else {
-		cv = Cvar_Get( varName, defaultValue, flags | CVAR_VM_CREATED );
+		/* Use engine's existing default when cvar already exists to avoid
+		 * "given initial values X and Y" warning (e.g. r_hdr: Vulkan=2, game=1). */
+		const char *def = ( cv && cv->resetString && cv->resetString[0] ) ? cv->resetString : defaultValue;
+		cv = Cvar_Get( varName, def, flags | CVAR_VM_CREATED );
 	}
 
 	if (!vmCvar)
