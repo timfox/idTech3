@@ -1321,6 +1321,8 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 
 		for ( i = 0;  i < (int)pStage->numTexBundles; i++ ) {
 			if ( pStage->bundle[i].image[0] != NULL ) {
+				/* Pipeline requires set 0 (uniforms); ensure we push for any textured draw (e.g. cinematic). */
+				pushUniform = qtrue;
 				GL_SelectTexture( i );
 				R_BindAnimatedImage( &pStage->bundle[i] );
 				if ( tess_flags & ( TESS_ST0 << i ) ) {
