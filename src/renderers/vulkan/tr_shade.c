@@ -1679,6 +1679,8 @@ static void VK_SetLightParams( vkUniform_t *ubo, const dlight_t *dl ) {
 		VectorCopy( dl->color, ubo->light.color );
 
 	radius = dl->radius;
+	if ( radius < 0.001f )
+		radius = 0.001f;
 
 	// vertex data
 	VectorCopy( backEnd.or.viewOrigin, ubo->eyePos ); ubo->eyePos[3] = 0.0f;
