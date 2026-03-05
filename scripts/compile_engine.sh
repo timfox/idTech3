@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: ./compile_engine.sh [game_name] [Debug|Release] [clean] [quiet] [coverage] [vulkan] [opengl] [freetype] [lua] [duktape|no-duktape] [system-duktape] [skipshaders] [mac-app <target> [arch]] [mac-ub2 [notarize]]
+# Usage: ./compile_engine.sh [game_name] [Debug|Release] [clean] [quiet] [coverage] [asan] [vulkan] [opengl] [freetype] [lua] [duktape|no-duktape] [system-duktape] [skipshaders] [mac-app <target> [arch]] [mac-ub2 [notarize]]
 # Notes:
 # - build type defaults to Release
 # - vulkan and opengl are mutually exclusive
@@ -22,6 +22,7 @@ GAME_NAME="idtech3"
 BUILD_TYPE="Release"
 CLEAN=0
 COVERAGE=0
+ASAN=0
 QUIET=0
 SKIP_SHADERS=0
 MAC_APP=0
@@ -64,6 +65,11 @@ while [[ $# -gt 0 ]]; do
       ;;
     coverage|cov)
       COVERAGE=1
+      shift
+      ;;
+    asan)
+      ASAN=1
+      BUILD_TYPE="Debug"
       shift
       ;;
     quiet|-q|--quiet|q|silent|-s|--silent)
@@ -207,8 +213,8 @@ fi
 CMAKE_FLAGS=(
   "-DCMAKE_BUILD_TYPE=${BUILD_TYPE}"
   "-DUSE_STB_TRUETYPE=ON"
-  "-DENABLE_FORTIFY_SOURCE=OFF"
-  "-DENABLE_ASAN=OFF"
+  "-DENABLE_FORTIFY_SOURCE=ON"
+  "-DENABLE_ASAN=$([ "$ASAN" -eq 1 ] && echo ON || echo OFF)"
   "-DBUILD_SERVER=ON"
   "-DUSE_VULKAN=ON"
   "-Wno-dev"

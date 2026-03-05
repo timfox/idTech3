@@ -334,6 +334,7 @@ cvar_t	*r_fogShadowMaxDistance;
 cvar_t	*r_fogShadowPadding;
 cvar_t	*r_fogDebug;
 cvar_t	*r_fboDebug;
+cvar_t	*r_fboCinematic;
 cvar_t	*r_froxelDebug;
 cvar_t	*r_vk_swapchain_srgb;
 cvar_t	*r_intensity;
@@ -2810,6 +2811,11 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_fboDebug, "0", "4", CV_INTEGER );
 	ri.Cvar_SetDescription( r_fboDebug, "FBO diagnostics (all levels throttled to 1/sec):\n 0 - off\n 1 - descriptor source changes\n 2 - gamma/layout\n 3 - pipeline state\n 4 - one-time troubleshooting tips when FBO broken (r_oit 0, r_exposure_auto 0, etc)." );
 	ri.Cvar_SetGroup( r_fboDebug, CVG_RENDERER );
+
+	r_fboCinematic = ri.Cvar_Get( "r_fboCinematic", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_fboCinematic, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fboCinematic, "Use full FBO pipeline for cinematics/menus (no world). 0=skip luminance compute (workaround for VK_ERROR_DEVICE_LOST on some drivers)." );
+	ri.Cvar_SetGroup( r_fboCinematic, CVG_RENDERER );
 
 	r_froxelDebug = ri.Cvar_Get( "r_froxelDebug", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_froxelDebug, "0", "5", CV_INTEGER );

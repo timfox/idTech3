@@ -2671,6 +2671,10 @@ static void R_RenderCubemapSide( int cubemapIndex, int cubemapSide, qboolean sub
 	(void)bounce;
 	refdef_t refdef;
 	viewParms_t	parms;
+
+	if ( cubemapIndex < 0 || cubemapIndex >= tr.numCubemaps )
+		return;
+
 	Com_Memset( &refdef, 0, sizeof( refdef) );
 	VectorCopy( tr.cubemaps[cubemapIndex].origin, refdef.vieworg );
 	refdef.fov_x = 90;
@@ -2736,7 +2740,8 @@ static void R_RenderCubemapSide( int cubemapIndex, int cubemapSide, qboolean sub
 	parms.targetCube = &tr.cubemaps[cubemapIndex];
 	parms.targetCubeLayer = cubemapSide;
 	R_RenderView( &parms );
-	RE_EndScene();
+	if ( !subscene )
+		RE_EndScene();
 }
 static void R_RenderAllCubemaps( void )
 {

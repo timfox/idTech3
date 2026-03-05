@@ -14,6 +14,9 @@ Use this checklist before tagging or publishing a release.
 ### Smoke Test
 - [ ] **Smoke test passes**: `./scripts/smoke_test.sh release` (run after build; requires `idtech3` and `idtech3_server` in `release/`)
 
+### Unit Tests
+- [ ] **Unit tests pass**: `cd build-vk-Release && ctest -R unit -V` (or run full `ctest`)
+
 ### CI
 - [ ] **All CI jobs pass**: Push to `main` or open a PR and verify all builds succeed (Windows MSYS, Windows MSVC, Ubuntu x86_64, Ubuntu ARM, macOS, Android)
 

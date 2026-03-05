@@ -1,6 +1,6 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.24)
 
-PROJECT(idtech3 LANGUAGES C CXX)
+PROJECT(idtech3 VERSION 1.0.0 LANGUAGES C CXX)
 
 if(NOT ANDROID)
   find_package(Threads REQUIRED)
@@ -22,6 +22,8 @@ set(CMAKE_C_EXTENSIONS OFF)
 option(C_STANDARD_STRICT "Enable the stricter warning set for engine builds" ON)
 option(CI_BUILD "Enable CI-specific behaviors such as warnings-as-errors" OFF)
 option(USE_FLUX "Enable FLUX.2 image generation support" ON)
+option(ENABLE_FORTIFY_SOURCE "Enable _FORTIFY_SOURCE=2 buffer overflow protection (GCC/Clang)" ON)
+option(ENABLE_ASAN "Enable AddressSanitizer for memory error detection (Debug builds)" OFF)
 
 if(C_STANDARD_STRICT)
   if(MSVC)
@@ -53,6 +55,19 @@ if(CI_BUILD)
     # For GCC/Clang, disable problematic warnings for CI
     add_compile_options(-Wno-unused-function -Wno-shadow -Wno-cast-qual -Wno-vla)
   endif()
+endif()
+
+# Security: buffer overflow protection (GCC/Clang; not MSVC)
+if(ENABLE_FORTIFY_SOURCE AND NOT MSVC)
+  add_compile_options(-D_FORTIFY_SOURCE=2)
+  message(STATUS "FORTIFY_SOURCE=2 enabled (buffer overflow protection)")
+endif()
+
+# Sanitizers: AddressSanitizer for memory error detection (Debug only)
+if(ENABLE_ASAN AND CMAKE_BUILD_TYPE STREQUAL "Debug" AND NOT MSVC)
+  add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
+  add_link_options(-fsanitize=address)
+  message(STATUS "AddressSanitizer enabled (memory error detection)")
 endif()
 
 # --- Begin FindSDL2.cmake
@@ -1997,3 +2012,12 @@ add_test(NAME check_artifacts
 set_tests_properties(check_artifacts PROPERTIES
 	LABELS "validation;artifacts"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/release/idtech3_server")
+
+# --- Unit tests ---
+option(BUILD_UNIT_TESTS "Build unit tests" ON)
+if(BUILD_UNIT_TESTS)
+	add_executable(unit_macros tests/unit/test_macros.c)
+	target_include_directories(unit_macros PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	add_test(NAME unit_macros COMMAND unit_macros)
+	set_tests_properties(unit_macros PROPERTIES LABELS "unit;validation")
+endif()
