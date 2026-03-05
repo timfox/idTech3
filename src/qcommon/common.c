@@ -3855,9 +3855,9 @@ void Com_Init( char *commandLine ) {
 	com_developer = Cvar_Get( "developer", "0", CVAR_TEMP );
 	Cvar_CheckRange( com_developer, NULL, NULL, CV_INTEGER );
 	{
-		cvar_t *com_dev = Cvar_FindVar( "com_developer" );
-		if ( com_dev && com_dev->integer )
-			Cvar_Set2( "developer", com_dev->string, qfalse );
+		const char *com_dev_val = Cvar_VariableString( "com_developer" );
+		if ( com_dev_val && com_dev_val[0] && com_dev_val[0] != '0' )
+			Cvar_Set2( "developer", com_dev_val, qfalse );
 	}
 
 	Com_StartupVariable( "vm_rtChecks" );
