@@ -1069,6 +1069,7 @@ typedef struct {
 	VkSampler fog_noise_sampler;
 	VkImage sun_shadow_image;
 	VkImageView sun_shadow_view;
+	VkImageView sun_shadow_sample_view;
 	VkDeviceMemory sun_shadow_memory;
 	VkImage sun_shadow_color_image;
 	VkImageView sun_shadow_color_view;
@@ -1079,12 +1080,14 @@ typedef struct {
 	VkSampler sun_shadow_sampler;
 	VkImage local_spot_shadow_atlas_image;
 	VkImageView local_spot_shadow_atlas_view;
+	VkImageView local_spot_shadow_atlas_sample_view;
 	VkDeviceMemory local_spot_shadow_atlas_memory;
 	VkImage local_spot_shadow_color_image;
 	VkImageView local_spot_shadow_color_view;
 	VkDeviceMemory local_spot_shadow_color_memory;
 	VkImage local_point_shadow_array_image;
 	VkImageView local_point_shadow_array_view;
+	VkImageView local_point_shadow_array_sample_view;
 	VkDeviceMemory local_point_shadow_array_memory;
 	VkImage local_point_shadow_color_array_image;
 	VkImageView local_point_shadow_color_array_view;

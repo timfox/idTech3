@@ -4239,8 +4239,8 @@ static void vk_update_volumetric_descriptors( void )
 	if ( vk.volumetric_compute_descriptor != VK_NULL_HANDLE &&
 		vk.froxel_volume_view && vk.froxel_history_view && vk.froxel_light_view &&
 		vk.froxel_extinction_view && vk.froxel_clamp_view &&
-		volumetric_depth_view && vk.fog_noise_view && vk.sun_shadow_view &&
-		vk.local_spot_shadow_atlas_view && vk.local_point_shadow_array_view && vk.motion_vector_view &&
+		volumetric_depth_view && vk.fog_noise_view && vk.sun_shadow_sample_view &&
+		vk.local_spot_shadow_atlas_sample_view && vk.local_point_shadow_array_sample_view && vk.motion_vector_view &&
 		vk.fluid_velocity_views[0] && vk.fluid_velocity_views[1] &&
 		vk.fluid_density_views[0] && vk.fluid_density_views[1] &&
 		vk.volumetric_telemetry_view )
@@ -4302,17 +4302,17 @@ static void vk_update_volumetric_descriptors( void )
 
 		Com_Memset( &shadow_info, 0, sizeof( shadow_info ) );
 		shadow_info.sampler = vk.sun_shadow_sampler;
-		shadow_info.imageView = vk.sun_shadow_view;
+		shadow_info.imageView = vk.sun_shadow_sample_view;
 		shadow_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 
 		Com_Memset( &local_spot_shadow_info, 0, sizeof( local_spot_shadow_info ) );
 		local_spot_shadow_info.sampler = vk.sun_shadow_sampler;
-		local_spot_shadow_info.imageView = vk.local_spot_shadow_atlas_view;
+		local_spot_shadow_info.imageView = vk.local_spot_shadow_atlas_sample_view;
 		local_spot_shadow_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 
 		Com_Memset( &local_point_shadow_info, 0, sizeof( local_point_shadow_info ) );
 		local_point_shadow_info.sampler = vk.sun_shadow_sampler;
-		local_point_shadow_info.imageView = vk.local_point_shadow_array_view;
+		local_point_shadow_info.imageView = vk.local_point_shadow_array_sample_view;
 		local_point_shadow_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 
 		Com_Memset( &motion_sd, 0, sizeof( motion_sd ) );
@@ -4450,7 +4450,7 @@ static void vk_update_volumetric_descriptors( void )
 
 	if ( vk.volumetric_composite_descriptor != VK_NULL_HANDLE &&
 		vk.fog_scene_image_view && volumetric_depth_view && vk.froxel_volume_view && vk.froxel_extinction_view &&
-		vk.motion_vector_view && vk.local_spot_shadow_atlas_view && vk.local_point_shadow_array_view &&
+		vk.motion_vector_view && vk.local_spot_shadow_atlas_sample_view && vk.local_point_shadow_array_sample_view &&
 		vk.volumetric_telemetry_view )
 	{
 		VkDescriptorImageInfo composite_info[8];
@@ -4516,12 +4516,12 @@ static void vk_update_volumetric_descriptors( void )
 
 		// localSpotShadowMap (binding 6)
 		composite_info[5].sampler = vk_find_sampler( &shadow_sd );
-		composite_info[5].imageView = vk.local_spot_shadow_atlas_view;
+		composite_info[5].imageView = vk.local_spot_shadow_atlas_sample_view;
 		composite_info[5].imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 
 		// localPointShadowMap (binding 7)
 		composite_info[6].sampler = vk_find_sampler( &shadow_sd );
-		composite_info[6].imageView = vk.local_point_shadow_array_view;
+		composite_info[6].imageView = vk.local_point_shadow_array_sample_view;
 		composite_info[6].imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 
 		// telemetryTexture (binding 8)
@@ -4698,9 +4698,9 @@ static void vk_update_volumetric_descriptors( void )
 			"[VK][fog] descriptors computeSet=0x%llx storage=GENERAL history=GENERAL light=GENERAL ext=GENERAL clamp=GENERAL noiseView=0x%llx sunShadow=0x%llx localSpot=0x%llx localPoint=0x%llx motionView=0x%llx depthView=0x%llx compositeSet=0x%llx sceneView=0x%llx\n",
 			(unsigned long long)(uintptr_t)vk.volumetric_compute_descriptor,
 			(unsigned long long)(uintptr_t)vk.fog_noise_view,
-			(unsigned long long)(uintptr_t)vk.sun_shadow_view,
-			(unsigned long long)(uintptr_t)vk.local_spot_shadow_atlas_view,
-			(unsigned long long)(uintptr_t)vk.local_point_shadow_array_view,
+			(unsigned long long)(uintptr_t)vk.sun_shadow_sample_view,
+			(unsigned long long)(uintptr_t)vk.local_spot_shadow_atlas_sample_view,
+			(unsigned long long)(uintptr_t)vk.local_point_shadow_array_sample_view,
 			(unsigned long long)(uintptr_t)vk.motion_vector_view,
 			(unsigned long long)(uintptr_t)volumetric_depth_view,
 			(unsigned long long)(uintptr_t)vk.volumetric_composite_descriptor,
@@ -5983,6 +5983,39 @@ static void vk_create_depth_sample_view( void )
 
 	VK_CHECK( qvkCreateImageView( vk.device, &view_desc, NULL, &vk.depth_image_view_sample ) );
 	SET_OBJECT_NAME( vk.depth_image_view_sample, "depth sample view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+}
+
+static void vk_create_depth_only_image_view( VkImage image, VkFormat format, VkImageViewType view_type,
+	uint32_t base_array_layer, uint32_t layer_count, VkImageView *out_view, const char *name )
+{
+	VkImageViewCreateInfo view_desc;
+
+	if ( out_view == NULL ) {
+		return;
+	}
+	if ( *out_view != VK_NULL_HANDLE ) {
+		qvkDestroyImageView( vk.device, *out_view, NULL );
+		*out_view = VK_NULL_HANDLE;
+	}
+	if ( image == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	Com_Memset( &view_desc, 0, sizeof( view_desc ) );
+	view_desc.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	view_desc.image = image;
+	view_desc.viewType = view_type;
+	view_desc.format = format;
+	view_desc.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+	view_desc.subresourceRange.baseMipLevel = 0;
+	view_desc.subresourceRange.levelCount = 1;
+	view_desc.subresourceRange.baseArrayLayer = base_array_layer;
+	view_desc.subresourceRange.layerCount = layer_count;
+
+	VK_CHECK( qvkCreateImageView( vk.device, &view_desc, NULL, out_view ) );
+	if ( name != NULL ) {
+		SET_OBJECT_NAME( *out_view, name, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+	}
 }
 
 
@@ -8826,6 +8859,10 @@ static void vk_destroy_sun_shadow_resources( void )
 		qvkDestroyImageView( vk.device, vk.sun_shadow_view, NULL );
 		vk.sun_shadow_view = VK_NULL_HANDLE;
 	}
+	if ( vk.sun_shadow_sample_view ) {
+		qvkDestroyImageView( vk.device, vk.sun_shadow_sample_view, NULL );
+		vk.sun_shadow_sample_view = VK_NULL_HANDLE;
+	}
 	if ( vk.sun_shadow_memory ) {
 		qvkFreeMemory( vk.device, vk.sun_shadow_memory, NULL );
 		vk.sun_shadow_memory = VK_NULL_HANDLE;
@@ -8940,6 +8977,8 @@ static void vk_create_sun_shadow_resources( void )
 	view_info.format = vk.depth_format;
 	view_info.subresourceRange.aspectMask = depth_aspect;
 	VK_CHECK( qvkCreateImageView( vk.device, &view_info, NULL, &vk.sun_shadow_view ) );
+	vk_create_depth_only_image_view( vk.sun_shadow_image, vk.depth_format, VK_IMAGE_VIEW_TYPE_2D,
+		0, 1, &vk.sun_shadow_sample_view, "sun shadow sample view" );
 
 	view_info.image = vk.sun_shadow_color_image;
 	view_info.format = vk.color_format;
@@ -8984,6 +9023,10 @@ static void vk_destroy_local_shadow_resources( void )
 		qvkDestroyImageView( vk.device, vk.local_spot_shadow_atlas_view, NULL );
 		vk.local_spot_shadow_atlas_view = VK_NULL_HANDLE;
 	}
+	if ( vk.local_spot_shadow_atlas_sample_view ) {
+		qvkDestroyImageView( vk.device, vk.local_spot_shadow_atlas_sample_view, NULL );
+		vk.local_spot_shadow_atlas_sample_view = VK_NULL_HANDLE;
+	}
 	if ( vk.local_spot_shadow_atlas_memory ) {
 		qvkFreeMemory( vk.device, vk.local_spot_shadow_atlas_memory, NULL );
 		vk.local_spot_shadow_atlas_memory = VK_NULL_HANDLE;
@@ -9009,6 +9052,10 @@ static void vk_destroy_local_shadow_resources( void )
 	if ( vk.local_point_shadow_array_view ) {
 		qvkDestroyImageView( vk.device, vk.local_point_shadow_array_view, NULL );
 		vk.local_point_shadow_array_view = VK_NULL_HANDLE;
+	}
+	if ( vk.local_point_shadow_array_sample_view ) {
+		qvkDestroyImageView( vk.device, vk.local_point_shadow_array_sample_view, NULL );
+		vk.local_point_shadow_array_sample_view = VK_NULL_HANDLE;
 	}
 	if ( vk.local_point_shadow_array_memory ) {
 		qvkFreeMemory( vk.device, vk.local_point_shadow_array_memory, NULL );
@@ -9158,6 +9205,8 @@ static void vk_create_local_shadow_resources( void )
 	view_info.format = vk.depth_format;
 	view_info.subresourceRange.aspectMask = depth_aspect;
 	VK_CHECK( qvkCreateImageView( vk.device, &view_info, NULL, &vk.local_spot_shadow_atlas_view ) );
+	vk_create_depth_only_image_view( vk.local_spot_shadow_atlas_image, vk.depth_format, VK_IMAGE_VIEW_TYPE_2D,
+		0, 1, &vk.local_spot_shadow_atlas_sample_view, "local spot shadow atlas sample view" );
 
 	view_info.image = vk.local_spot_shadow_color_image;
 	view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
@@ -9171,6 +9220,8 @@ static void vk_create_local_shadow_resources( void )
 	view_info.subresourceRange.aspectMask = depth_aspect;
 	view_info.subresourceRange.layerCount = point_layers;
 	VK_CHECK( qvkCreateImageView( vk.device, &view_info, NULL, &vk.local_point_shadow_array_view ) );
+	vk_create_depth_only_image_view( vk.local_point_shadow_array_image, vk.depth_format, VK_IMAGE_VIEW_TYPE_2D_ARRAY,
+		0, point_layers, &vk.local_point_shadow_array_sample_view, "local point shadow array sample view" );
 
 	view_info.image = vk.local_point_shadow_color_array_image;
 	view_info.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
