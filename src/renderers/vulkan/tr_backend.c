@@ -1765,6 +1765,14 @@ static const void *RB_DrawSurfs( const void *data ) {
 	}
 #endif
 
+#ifdef USE_VULKAN
+	if ( r_oit && r_oit->integer && r_fbo && r_fbo->integer ) {
+		backEnd.drawSurfFilter = 1; /* opaque only */
+		RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
+		backEnd.drawSurfFilter = 0;
+		vk_oit_pass( cmd );
+	} else
+#endif
 	RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
 
 #ifdef USE_VBO

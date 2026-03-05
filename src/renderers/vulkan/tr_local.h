@@ -1304,6 +1304,10 @@ typedef struct {
 	qboolean doneFog;
 	qboolean depthOnlyWorldPass;	/* for occlusion culling: render world depth only, skip entities */
 
+	/* OIT: 0=draw all, 1=opaque only, 2=transparent only */
+	int drawSurfFilter;
+	qboolean oitAccumPass;		/* when set, use OIT accumulation pipeline for transparent surfaces */
+
 	/* First-person rendering: custom FOV and anti-clipping scale */
 	qboolean useFirstPersonProjection;
 	float firstPersonProjectionMatrix[16];
@@ -1543,6 +1547,7 @@ extern cvar_t	*r_ssaoPower;
 extern cvar_t	*r_ssaoSamples;
 extern cvar_t	*r_ssaoBlurRadius;
 extern cvar_t	*r_ssaoDebugView;
+extern cvar_t	*r_oit;
 extern cvar_t	*r_fbo;
 extern cvar_t	*r_renderMode;
 extern cvar_t	*r_hdr;
@@ -2076,6 +2081,7 @@ void RB_ShadowTessEnd( void );
 void RB_ShadowFinish( void );
 void RB_ProjectionShadowDeform( void );
 #ifdef USE_VULKAN
+void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs );
 void RB_RenderVolumetricShadowView( const viewParms_t *shadowViewParms, drawSurf_t *drawSurfs, int numDrawSurfs );
 #endif
 

@@ -42,9 +42,8 @@ This document tracks implementation of 10 features from recent Siggraph papers, 
 - Buffers: `oit_accum_image` (RGBA16F), packed (color*w, w)
 
 ### Status (March 2025)
-- **Implemented**: Cvar `r_oit`, draw surf filter (opaque/transparent), OIT resolve pass, OIT accum pass, copy/resolve pipeline. Shaders `oit_accum.vert`/`oit_accum.frag`, `oit_resolve.frag` exist.
-- **Disabled**: OIT draw-path integration in `RB_DrawSurfs` was reverted to fix FBO (r_fbo 1) rendering. The OIT path was ending the main pass and switching to post_bloom mid-frame, which could break the post-process pipeline. OIT infrastructure (passes, buffers, resolve pipeline) remains but is not invoked.
-- **Pending**: Re-enable OIT path after validating FBO stability; wire OIT accum pipeline (`vk.oit_accum_pipeline`) for transparent geometry.
+- **Implemented**: Cvar `r_oit`, draw surf filter (opaque/transparent), OIT resolve pass, OIT accum pass, copy/resolve pipeline. OIT accum pipeline (`vk.oit_accum_pipeline`) with `oit_accum.vert`/`oit_accum.frag`, additive blend, gen vertex layout (position, color, texcoord). OIT draw path re-enabled in `RB_DrawSurfs` when `r_oit 1` + `r_fbo 1`.
+- **Flow**: Opaque surfaces drawn first; `vk_oit_pass` copies opaque to fog_scene, runs OIT accum (transparent surfaces with WBOIT), resolves opaque + accum to main color, resumes post_bloom for sun/flares.
 
 ### Files
 - `vk.c`: OIT passes, buffers, pipelines, `vk_oit_pass()`

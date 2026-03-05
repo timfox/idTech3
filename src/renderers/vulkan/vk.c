@@ -1366,6 +1366,37 @@ static void vk_create_render_passes( void )
 		SET_OBJECT_NAME( vk.render_pass.ssao_combine, "render pass - ssao_combine", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
 	}
 
+	if ( r_oit && r_oit->integer && fboActive )
+	{
+		/* OIT accumulation pass: RGBA16F, clear to (0,0,0,0), additive blend */
+		desc.attachmentCount = 1;
+		colorRef0.attachment = 0;
+		colorRef0.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		Com_Memset( &subpass, 0, sizeof( subpass ) );
+		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		subpass.colorAttachmentCount = 1;
+		subpass.pColorAttachments = &colorRef0;
+		attachments[0].flags = 0;
+		attachments[0].format = VK_FORMAT_R16G16B16A16_SFLOAT;
+		attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		attachments[0].initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.oit_accum ) );
+		SET_OBJECT_NAME( vk.render_pass.oit_accum, "render pass - oit_accum", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
+
+		/* OIT resolve pass: composite opaque + accum to main color */
+		attachments[0].format = vk.color_format;
+		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachments[0].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		attachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.oit_resolve ) );
+		SET_OBJECT_NAME( vk.render_pass.oit_resolve, "render pass - oit_resolve", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
+	}
+
 	if ( PostFX_SSR_IsEnabled() && fboActive )
 	{
 		// ssr render pass (output to ssr_image, same format as color)
@@ -3960,6 +3991,18 @@ void vk_update_attachment_descriptors( void ) {
 				qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
 			}
 		}
+		if ( r_oit && r_oit->integer ) {
+			if ( vk.fog_scene_image_view ) {
+				info.imageView = vk.fog_scene_image_view;
+				desc.dstSet = vk.oit_opaque_descriptor;
+				qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+			}
+			if ( vk.oit_accum_image_view ) {
+				info.imageView = vk.oit_accum_image_view;
+				desc.dstSet = vk.oit_accum_descriptor;
+				qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+			}
+		}
 
 		if ( PostFX_SSR_IsEnabled() && vk.ssr_image_view )
 		{
@@ -4605,6 +4648,10 @@ void vk_init_descriptors( void )
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.ssao_blur_descriptor ) );
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.ssao_scene_descriptor ) );
 		}
+		if ( r_oit && r_oit->integer ) {
+			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.oit_opaque_descriptor ) );
+			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.oit_accum_descriptor ) );
+		}
 
 		if ( PostFX_SSR_IsEnabled() ) {
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.ssr_descriptor[0] ) );
@@ -5136,6 +5183,9 @@ static void vk_create_shader_modules( void )
 	vk.modules.ssao_fs = SHADER_MODULE( ssao_frag_spv );
 	vk.modules.ssao_blur_fs = SHADER_MODULE( ssao_blur_frag_spv );
 	vk.modules.ssao_combine_fs = SHADER_MODULE( ssao_combine_frag_spv );
+	vk.modules.oit_accum_vs = SHADER_MODULE( oit_accum_vert_spv );
+	vk.modules.oit_accum_fs = SHADER_MODULE( oit_accum_frag_spv );
+	vk.modules.oit_resolve_fs = SHADER_MODULE( oit_resolve_frag_spv );
 	vk.modules.ssao_debug_fs = SHADER_MODULE( ssao_debug_frag_spv );
 	vk.modules.ssao_depth_debug_fs = SHADER_MODULE( ssao_depth_debug_frag_spv );
 	vk.modules.ssr_fs = SHADER_MODULE( ssr_frag_spv );
@@ -5431,6 +5481,7 @@ static void vk_alloc_persistent_pipelines( void )
 
 void vk_create_blur_pipeline( uint32_t index, uint32_t width, uint32_t height, qboolean horizontal_pass );
 static void vk_create_atmosphere_pipeline( void );
+static void vk_create_oit_accum_pipeline( void );
 
 void vk_update_post_process_pipelines( void )
 {
@@ -5470,6 +5521,10 @@ void vk_update_post_process_pipelines( void )
 			vk_create_post_process_pipeline( 7, glConfig.vidWidth, glConfig.vidHeight );
 			vk_create_post_process_pipeline( 8, glConfig.vidWidth, glConfig.vidHeight );
 			vk_create_post_process_pipeline( 9, glConfig.vidWidth, glConfig.vidHeight );
+		}
+		if ( r_oit && r_oit->integer ) {
+			vk_create_post_process_pipeline( 20, glConfig.vidWidth, glConfig.vidHeight );
+			vk_create_oit_accum_pipeline();
 		}
 		if ( PostFX_SSR_IsEnabled() ) {
 			vk_create_post_process_pipeline( 13, glConfig.vidWidth, glConfig.vidHeight );
@@ -5819,6 +5874,11 @@ static void vk_create_attachments( void )
 				usage, &vk.ssao_image, &vk.ssao_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.ssao_format,
 				usage, &vk.ssao_blur_image, &vk.ssao_blur_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
+		}
+		if ( r_oit && r_oit->integer ) {
+			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R16G16B16A16_SFLOAT,
+				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+				&vk.oit_accum_image, &vk.oit_accum_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 		}
 
 		// ssr (same format as color)
@@ -6319,6 +6379,22 @@ static void vk_create_framebuffers( void )
 		SET_OBJECT_NAME( vk.framebuffers.ssao_combine, "framebuffer - ssao_combine", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
 	}
 
+	if ( r_oit && r_oit->integer && vk.render_pass.oit_accum != VK_NULL_HANDLE && vk.oit_accum_image_view )
+	{
+		desc.renderPass = vk.render_pass.oit_accum;
+		desc.attachmentCount = 1;
+		desc.width = glConfig.vidWidth;
+		desc.height = glConfig.vidHeight;
+		framebuffer_attachments[0] = vk.oit_accum_image_view;
+		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.oit_accum ) );
+		SET_OBJECT_NAME( vk.framebuffers.oit_accum, "framebuffer - oit_accum", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+
+		desc.renderPass = vk.render_pass.oit_resolve;
+		framebuffer_attachments[0] = vk.color_image_view;
+		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.oit_resolve ) );
+		SET_OBJECT_NAME( vk.framebuffers.oit_resolve, "framebuffer - oit_resolve", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+	}
+
 	if ( PostFX_SSR_IsEnabled() && vk.render_pass.ssr != VK_NULL_HANDLE && vk.ssr_image_view )
 	{
 		desc.renderPass = vk.render_pass.ssr;
@@ -6475,6 +6551,14 @@ static void vk_destroy_framebuffers( void ) {
 	if ( vk.framebuffers.ssao_combine != VK_NULL_HANDLE ) {
 		qvkDestroyFramebuffer( vk.device, vk.framebuffers.ssao_combine, NULL );
 		vk.framebuffers.ssao_combine = VK_NULL_HANDLE;
+	}
+	if ( vk.framebuffers.oit_accum != VK_NULL_HANDLE ) {
+		qvkDestroyFramebuffer( vk.device, vk.framebuffers.oit_accum, NULL );
+		vk.framebuffers.oit_accum = VK_NULL_HANDLE;
+	}
+	if ( vk.framebuffers.oit_resolve != VK_NULL_HANDLE ) {
+		qvkDestroyFramebuffer( vk.device, vk.framebuffers.oit_resolve, NULL );
+		vk.framebuffers.oit_resolve = VK_NULL_HANDLE;
 	}
 
 	if ( vk.framebuffers.ssr != VK_NULL_HANDLE ) {
@@ -7586,6 +7670,30 @@ void vk_initialize( void )
 		desc.pPushConstantRanges = NULL;
 		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_ssao_combine ) );
 		SET_OBJECT_NAME( vk.pipeline_layout_ssao_combine, "pipeline layout - ssao_combine", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
+
+		if ( r_oit && r_oit->integer && vk.fboActive ) {
+			/* OIT resolve: set 0 = opaque, set 1 = accum */
+			set_layouts[0] = vk.set_layout_sampler;
+			set_layouts[1] = vk.set_layout_sampler;
+			desc.setLayoutCount = 2;
+			desc.pSetLayouts = set_layouts;
+			desc.pushConstantRangeCount = 0;
+			desc.pPushConstantRanges = NULL;
+			VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_oit_resolve ) );
+			SET_OBJECT_NAME( vk.pipeline_layout_oit_resolve, "pipeline layout - oit_resolve", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
+
+			/* OIT accum: set 0 = tex0, push constants = mvp + prevMvp (128 bytes) */
+			set_layouts[0] = vk.set_layout_sampler;
+			desc.setLayoutCount = 1;
+			desc.pSetLayouts = set_layouts;
+			push_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+			push_range.offset = 0;
+			push_range.size = 128; /* 2 * mat4 */
+			desc.pushConstantRangeCount = 1;
+			desc.pPushConstantRanges = &push_range;
+			VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_oit_accum ) );
+			SET_OBJECT_NAME( vk.pipeline_layout_oit_accum, "pipeline layout - oit_accum", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
+		}
 
 		// ssr layout (set 0: color, set 1: depth, push constants: 2 mat4 + 2 vec4 = 160 bytes)
 		set_layouts[0] = vk.set_layout_sampler;
@@ -9480,6 +9588,12 @@ static void vk_destroy_attachments( void )
 		vk.ssao_blur_image = VK_NULL_HANDLE;
 		vk.ssao_blur_image_view = VK_NULL_HANDLE;
 	}
+	if ( vk.oit_accum_image ) {
+		qvkDestroyImage( vk.device, vk.oit_accum_image, NULL );
+		qvkDestroyImageView( vk.device, vk.oit_accum_image_view, NULL );
+		vk.oit_accum_image = VK_NULL_HANDLE;
+		vk.oit_accum_image_view = VK_NULL_HANDLE;
+	}
 
 	if ( vk.ssr_image ) {
 		qvkDestroyImage( vk.device, vk.ssr_image, NULL );
@@ -9662,6 +9776,14 @@ static void vk_destroy_render_passes( void )
 		qvkDestroyRenderPass( vk.device, vk.render_pass.ssao_combine, NULL );
 		vk.render_pass.ssao_combine = VK_NULL_HANDLE;
 	}
+	if ( vk.render_pass.oit_accum != VK_NULL_HANDLE ) {
+		qvkDestroyRenderPass( vk.device, vk.render_pass.oit_accum, NULL );
+		vk.render_pass.oit_accum = VK_NULL_HANDLE;
+	}
+	if ( vk.render_pass.oit_resolve != VK_NULL_HANDLE ) {
+		qvkDestroyRenderPass( vk.device, vk.render_pass.oit_resolve, NULL );
+		vk.render_pass.oit_resolve = VK_NULL_HANDLE;
+	}
 
 	if ( vk.render_pass.ssr != VK_NULL_HANDLE ) {
 		qvkDestroyRenderPass( vk.device, vk.render_pass.ssr, NULL );
@@ -9803,6 +9925,14 @@ static void vk_destroy_pipelines( qboolean resetCounter )
 		qvkDestroyPipeline( vk.device, vk.ssao_depth_debug_pipeline, NULL );
 		vk.ssao_depth_debug_pipeline = VK_NULL_HANDLE;
 	}
+	if ( vk.oit_resolve_pipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.oit_resolve_pipeline, NULL );
+		vk.oit_resolve_pipeline = VK_NULL_HANDLE;
+	}
+	if ( vk.oit_accum_pipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.oit_accum_pipeline, NULL );
+		vk.oit_accum_pipeline = VK_NULL_HANDLE;
+	}
 
 #ifdef VK_PBR_BRDFLUT
     if( vk.brdflut_pipeline != VK_NULL_HANDLE ) {
@@ -9911,6 +10041,14 @@ void vk_shutdown( refShutdownCode_t code )
 	}
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_ssao, NULL);
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_ssao_combine, NULL);
+	if ( vk.pipeline_layout_oit_resolve != VK_NULL_HANDLE ) {
+		qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_oit_resolve, NULL);
+		vk.pipeline_layout_oit_resolve = VK_NULL_HANDLE;
+	}
+	if ( vk.pipeline_layout_oit_accum != VK_NULL_HANDLE ) {
+		qvkDestroyPipelineLayout( vk.device, vk.pipeline_layout_oit_accum, NULL );
+		vk.pipeline_layout_oit_accum = VK_NULL_HANDLE;
+	}
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_ssr, NULL);
 #ifdef USE_VK_PBR
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_brdflut, NULL);
@@ -10783,6 +10921,156 @@ static void vk_create_atmosphere_pipeline( void )
 	SET_OBJECT_NAME( vk.atmosphere_pipeline, "atmosphere pipeline", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
 }
 
+static void vk_create_oit_accum_pipeline( void )
+{
+	VkPipelineVertexInputStateCreateInfo vertex_input;
+	VkVertexInputBindingDescription bindings[3];
+	VkVertexInputAttributeDescription attribs[3];
+	VkPipelineShaderStageCreateInfo shader_stages[2];
+	VkPipelineInputAssemblyStateCreateInfo input_assembly;
+	VkPipelineRasterizationStateCreateInfo rasterization;
+	VkPipelineMultisampleStateCreateInfo multisample;
+	VkPipelineDepthStencilStateCreateInfo depth_stencil;
+	VkPipelineColorBlendAttachmentState blend_attachment;
+	VkPipelineColorBlendStateCreateInfo blend_state;
+	VkPipelineViewportStateCreateInfo viewport_state;
+	VkDynamicState dynamic_states[3] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+	VkPipelineDynamicStateCreateInfo dynamic_state;
+	VkGraphicsPipelineCreateInfo create_info;
+	VkViewport viewport = { 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f };
+	VkRect2D scissor = { { 0, 0 }, { 1, 1 } };
+
+	if ( vk.pipeline_layout_oit_accum == VK_NULL_HANDLE || vk.render_pass.oit_accum == VK_NULL_HANDLE ||
+		vk.modules.oit_accum_vs == VK_NULL_HANDLE || vk.modules.oit_accum_fs == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	if ( vk.oit_accum_pipeline != VK_NULL_HANDLE ) {
+		vk_wait_idle();
+		qvkDestroyPipeline( vk.device, vk.oit_accum_pipeline, NULL );
+		vk.oit_accum_pipeline = VK_NULL_HANDLE;
+	}
+
+	/* Gen vertex layout: position, color, texcoord (TYPE_SIGNLE_TEXTURE) */
+	Com_Memset( bindings, 0, sizeof( bindings ) );
+	bindings[0].binding = 0;
+	bindings[0].stride = sizeof( vec4_t );
+	bindings[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+	bindings[1].binding = 1;
+	bindings[1].stride = sizeof( color4ub_t );
+	bindings[1].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+	bindings[2].binding = 2;
+	bindings[2].stride = sizeof( vec2_t );
+	bindings[2].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+	Com_Memset( attribs, 0, sizeof( attribs ) );
+	attribs[0].location = 0;
+	attribs[0].binding = 0;
+	attribs[0].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+	attribs[0].offset = 0;
+	attribs[1].location = 1;
+	attribs[1].binding = 1;
+	attribs[1].format = VK_FORMAT_R8G8B8A8_UNORM;
+	attribs[1].offset = 0;
+	attribs[2].location = 2;
+	attribs[2].binding = 2;
+	attribs[2].format = VK_FORMAT_R32G32_SFLOAT;
+	attribs[2].offset = 0;
+
+	vertex_input.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	vertex_input.vertexBindingDescriptionCount = 3;
+	vertex_input.pVertexBindingDescriptions = bindings;
+	vertex_input.vertexAttributeDescriptionCount = 3;
+	vertex_input.pVertexAttributeDescriptions = attribs;
+
+	shader_stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	shader_stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+	shader_stages[0].module = vk.modules.oit_accum_vs;
+	shader_stages[0].pName = "main";
+	shader_stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	shader_stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	shader_stages[1].module = vk.modules.oit_accum_fs;
+	shader_stages[1].pName = "main";
+
+	Com_Memset( &input_assembly, 0, sizeof( input_assembly ) );
+	input_assembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+	input_assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	input_assembly.primitiveRestartEnable = VK_FALSE;
+
+	Com_Memset( &viewport_state, 0, sizeof( viewport_state ) );
+	viewport_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	viewport_state.viewportCount = 1;
+	viewport_state.pViewports = &viewport;
+	viewport_state.scissorCount = 1;
+	viewport_state.pScissors = &scissor;
+
+	Com_Memset( &rasterization, 0, sizeof( rasterization ) );
+	rasterization.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	rasterization.polygonMode = VK_POLYGON_MODE_FILL;
+	rasterization.cullMode = VK_CULL_MODE_NONE;
+	rasterization.frontFace = VK_FRONT_FACE_CLOCKWISE;
+	rasterization.lineWidth = 1.0f;
+
+	Com_Memset( &multisample, 0, sizeof( multisample ) );
+	multisample.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+	Com_Memset( &depth_stencil, 0, sizeof( depth_stencil ) );
+	depth_stencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+	/* OIT accum framebuffer has no depth attachment; depth weight uses gl_FragCoord.z */
+	depth_stencil.depthTestEnable = VK_FALSE;
+	depth_stencil.depthWriteEnable = VK_FALSE;
+	depth_stencil.depthBoundsTestEnable = VK_FALSE;
+	depth_stencil.stencilTestEnable = VK_FALSE;
+
+	/* Additive blend for WBOIT: accum += (color*w, w) */
+	Com_Memset( &blend_attachment, 0, sizeof( blend_attachment ) );
+	blend_attachment.blendEnable = VK_TRUE;
+	blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+	blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+	blend_attachment.colorBlendOp = VK_BLEND_OP_ADD;
+	blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+	blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+	blend_attachment.alphaBlendOp = VK_BLEND_OP_ADD;
+	blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
+	Com_Memset( &blend_state, 0, sizeof( blend_state ) );
+	blend_state.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	blend_state.attachmentCount = 1;
+	blend_state.pAttachments = &blend_attachment;
+
+	{
+		uint32_t dyn_count = 2;
+		if ( vk.colorWriteMaskDynamic ) {
+			dynamic_states[dyn_count++] = VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT;
+		}
+		dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+		dynamic_state.dynamicStateCount = dyn_count;
+		dynamic_state.pDynamicStates = dynamic_states;
+	}
+
+	Com_Memset( &create_info, 0, sizeof( create_info ) );
+	create_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	create_info.stageCount = 2;
+	create_info.pStages = shader_stages;
+	create_info.pVertexInputState = &vertex_input;
+	create_info.pInputAssemblyState = &input_assembly;
+	create_info.pViewportState = &viewport_state;
+	create_info.pRasterizationState = &rasterization;
+	create_info.pMultisampleState = &multisample;
+	create_info.pDepthStencilState = &depth_stencil;
+	create_info.pColorBlendState = &blend_state;
+	create_info.pDynamicState = &dynamic_state;
+	create_info.layout = vk.pipeline_layout_oit_accum;
+	create_info.renderPass = vk.render_pass.oit_accum;
+	create_info.subpass = 0;
+
+	if ( qvkCreateGraphicsPipelines( vk.device, vk.pipelineCache, 1, &create_info, NULL, &vk.oit_accum_pipeline ) == VK_SUCCESS ) {
+		SET_OBJECT_NAME( vk.oit_accum_pipeline, "pipeline - oit accum", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
+		ri.Printf( PRINT_ALL, "[VK] OIT accum pipeline created (r_oit 1)\n" );
+	}
+}
+
 void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_t height )
 {
 	VkPipelineShaderStageCreateInfo shader_stages[2];
@@ -10900,6 +11188,18 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			samples = VK_SAMPLE_COUNT_1_BIT;
 			pipeline_name = "ssao depth debug pipeline";
 			target_format = vk.capture_format;
+			blend = qfalse;
+			break;
+		case 20: // oit resolve
+			if ( vk.pipeline_layout_oit_resolve == VK_NULL_HANDLE )
+				return;
+			pipeline = &vk.oit_resolve_pipeline;
+			fsmodule = vk.modules.oit_resolve_fs;
+			renderpass = vk.render_pass.oit_resolve;
+			layout = vk.pipeline_layout_oit_resolve;
+			samples = VK_SAMPLE_COUNT_1_BIT;
+			pipeline_name = "oit resolve pipeline";
+			target_format = vk.color_format;
 			blend = qfalse;
 			break;
 		case 2: // final bloom blend
@@ -13325,6 +13625,7 @@ void vk_clear_depth( qboolean clear_stencil ) {
 
 void vk_update_mvp( const float *m ) {
 	vkMvpPushConstants_t push_constants;
+	VkPipelineLayout layout;
 
 	//
 	// Specify push constants.
@@ -13336,7 +13637,9 @@ void vk_update_mvp( const float *m ) {
 	}
 	get_prev_mvp_transform( push_constants.prev_mvp );
 
-	qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof( push_constants ), &push_constants );
+	layout = ( backEnd.oitAccumPass && vk.pipeline_layout_oit_accum != VK_NULL_HANDLE ) ?
+		vk.pipeline_layout_oit_accum : vk.pipeline_layout;
+	qvkCmdPushConstants( vk.cmd->command_buffer, layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof( push_constants ), &push_constants );
 
 	vk.stats.push_size += sizeof( push_constants );
 }
@@ -13679,10 +13982,12 @@ void vk_bind_descriptor_sets( void )
 	uint32_t start, end, count, i;
 
 	start = vk.cmd->descriptor_set.start;
-	if ( start == ~0U )
+	if ( start == ~0U && !backEnd.oitAccumPass )
 		return;
 
-	end = vk.cmd->descriptor_set.end;
+	end = backEnd.oitAccumPass ? 0 : vk.cmd->descriptor_set.end;
+	if ( backEnd.oitAccumPass )
+		start = 0;
 
 	offset_count = 0;
 	if ( start == VK_DESC_UNIFORM ) {
@@ -13736,7 +14041,15 @@ void vk_bind_descriptor_sets( void )
 	}
 #endif
 
-	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout, start, count, vk.cmd->descriptor_set.current + start, offset_count, offsets );
+	if ( backEnd.oitAccumPass && vk.pipeline_layout_oit_accum != VK_NULL_HANDLE ) {
+		/* OIT accum uses only set 0 (tex0) */
+		if ( vk.cmd->descriptor_set.current[0] != VK_NULL_HANDLE ) {
+			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+				vk.pipeline_layout_oit_accum, 0, 1, vk.cmd->descriptor_set.current + 0, 0, NULL );
+		}
+	} else {
+		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout, start, count, vk.cmd->descriptor_set.current + start, offset_count, offsets );
+	}
 
 	vk.cmd->descriptor_set.end = 0;
 	vk.cmd->descriptor_set.start = ~0U;
@@ -13746,14 +14059,20 @@ void vk_bind_descriptor_sets( void )
 void vk_bind_pipeline( uint32_t pipeline ) {
 	VkPipeline vkpipe;
 
-	vkpipe = vk_gen_pipeline( pipeline );
+	if ( backEnd.oitAccumPass && vk.oit_accum_pipeline != VK_NULL_HANDLE ) {
+		vkpipe = vk.oit_accum_pipeline;
+	} else {
+		vkpipe = vk_gen_pipeline( pipeline );
+	}
 
 	if ( vkpipe != vk.cmd->last_pipeline ) {
 		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkpipe );
 		vk.cmd->last_pipeline = vkpipe;
 	}
 
-	vk_world.dirty_depth_attachment |= ( vk.pipelines[ pipeline ].def.state_bits & GLS_DEPTHMASK_TRUE );
+	if ( !backEnd.oitAccumPass ) {
+		vk_world.dirty_depth_attachment |= ( vk.pipelines[ pipeline ].def.state_bits & GLS_DEPTHMASK_TRUE );
+	}
 }
 
 static void vk_update_depth_range( Vk_Depth_Range depth_range )
@@ -14051,6 +14370,80 @@ void vk_begin_ssao_combine_render_pass( void )
 	vk.renderScaleX = vk.renderScaleY = 1.0f;
 
 	vk_begin_render_pass( vk.render_pass.ssao_combine, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+}
+
+
+void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
+{
+	VkImageCopy copy_region;
+	VkClearValue clear_val;
+
+	if ( !r_oit || !r_oit->integer || !r_fbo || !r_fbo->integer || !vk.fboActive ||
+		vk.render_pass.oit_accum == VK_NULL_HANDLE || vk.render_pass.oit_resolve == VK_NULL_HANDLE ||
+		vk.framebuffers.oit_accum == VK_NULL_HANDLE || vk.framebuffers.oit_resolve == VK_NULL_HANDLE ||
+		vk.oit_resolve_pipeline == VK_NULL_HANDLE ||
+		vk.fog_scene_image_view == VK_NULL_HANDLE || vk.oit_accum_image_view == VK_NULL_HANDLE )
+		return;
+
+	vk_end_render_pass();
+
+	/* Copy opaque scene to fog_scene for resolve */
+	Com_Memset( &copy_region, 0, sizeof( copy_region ) );
+	copy_region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	copy_region.srcSubresource.layerCount = 1;
+	copy_region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	copy_region.dstSubresource.layerCount = 1;
+	copy_region.extent.width = glConfig.vidWidth;
+	copy_region.extent.height = glConfig.vidHeight;
+	copy_region.extent.depth = 1;
+	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
+	record_image_layout_transition( vk.cmd->command_buffer, vk.fog_scene_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
+	qvkCmdCopyImage( vk.cmd->command_buffer,
+		vk.color_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		vk.fog_scene_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		1, &copy_region );
+	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
+	record_image_layout_transition( vk.cmd->command_buffer, vk.fog_scene_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
+
+	/* OIT accum pass: draw transparent surfaces (when oit_accum_pipeline ready) */
+	Com_Memset( &clear_val, 0, sizeof( clear_val ) );
+	vk_begin_render_pass( vk.render_pass.oit_accum, vk.framebuffers.oit_accum, qtrue, glConfig.vidWidth, glConfig.vidHeight );
+	if ( vk.oit_accum_pipeline ) {
+		backEnd.oitAccumPass = qtrue;
+		backEnd.drawSurfFilter = 2;
+		RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
+		backEnd.oitAccumPass = qfalse;
+		backEnd.drawSurfFilter = 0;
+	}
+	vk_end_render_pass();
+
+	/* OIT resolve: composite opaque + accum to main color */
+	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT );
+	vk_begin_render_pass( vk.render_pass.oit_resolve, vk.framebuffers.oit_resolve, qfalse, glConfig.vidWidth, glConfig.vidHeight );
+	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.oit_resolve_pipeline );
+	{
+		VkDescriptorSet sets[2] = { vk.oit_opaque_descriptor, vk.oit_accum_descriptor };
+		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_oit_resolve, 0, 2, sets, 0, NULL );
+	}
+	vk_set_fullscreen_viewport_scissor( glConfig.vidWidth, glConfig.vidHeight );
+	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+	vk_end_render_pass();
+	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
+
+	/* Resume main pass for sun, flares, etc. */
+	vk_begin_post_bloom_render_pass();
 }
 
 

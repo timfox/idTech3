@@ -184,8 +184,8 @@ vk_update_color_descriptor_image( vk.color_image_view );
 - `vid_restart`
 - If still broken: `r_fbo 0` as workaround
 
-### OIT Draw Path Reverted (March 2025)
-The OIT (Order-Independent Transparency) draw-path integration in `RB_DrawSurfs` was disabled to fix FBO. When `r_oit 1` was on, the flow split opaque/transparent draws, ended the main pass, ran OIT resolve, and resumed in post_bloom. This mid-frame pass switching could leave the pipeline in an inconsistent state. With OIT disabled, FBO uses the original single-pass draw flow.
+### OIT Draw Path (March 2025)
+OIT re-enabled after wiring the OIT accum pipeline. When `r_oit 1` + `r_fbo 1`: opaque surfaces drawn first, then `vk_oit_pass` runs OIT accum (transparent surfaces with WBOIT), resolves to main color, then resumes post_bloom. The OIT accum pipeline uses `oit_accum.vert`/`oit_accum.frag` with additive blend and gen vertex layout.
 
 ### Identified Gaps (Fixed)
 1. **SMAA when volumetrics skipped**: Fixed. SMAA now runs when volumetrics are skipped (tier off, resources missing, MSAA incomplete) and in menus/no-world (`vk_prepare_2d` menu path). Descriptors updated in all paths.
