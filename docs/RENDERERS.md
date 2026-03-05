@@ -41,6 +41,11 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - Wind and buoyancy forces
 - Cvars: `r_fogFluid` (enable), `r_fogFluidViscosity`, `r_fogFluidDissipation`, `r_fogFluidVorticity`, `r_fogFluidBuoyancy`, etc. Legacy `r_fluidsim*` deprecated.
 
+### Lighting Robustness
+- PBR Smith GGX visibility: division-by-zero guard at grazing angles (`CalcVisibility`)
+- Dynamic light radius: clamped to minimum 0.001 before `1/r²` to avoid inf
+- Light grid: `lightGridSize` clamped to ≥1 before inverse to avoid division by zero
+
 ### Shadow Mapping
 - Cascaded shadow maps (CSM) for directional/sun light
 - Spot light shadow atlas

@@ -257,7 +257,8 @@ float CalcVisibility( in float NL, in float NE, in float alpha )
 	float lambdaE = NL * sqrt((-NE * alphaSq + NE) * NE + alphaSq);
 	float lambdaL = NE * sqrt((-NL * alphaSq + NL) * NL + alphaSq);
 
-	return 0.5 / (lambdaE + lambdaL);
+	/* Guard against division by zero at grazing angles (lambdaE+lambdaL ~ 0) */
+	return 0.5 / max( lambdaE + lambdaL, 1e-7 );
 }
 
 flat float glintDebugD = 0.0;

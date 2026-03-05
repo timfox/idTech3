@@ -2064,6 +2064,10 @@ static void R_LoadLightGrid( const lump_t *l ) {
 
 	w = &s_worldData;
 
+	for ( i = 0; i < 3; i++ ) {
+		if ( w->lightGridSize[i] < 1.0f )
+			w->lightGridSize[i] = 1.0f;
+	}
 	w->lightGridInverseSize[0] = 1.0f / w->lightGridSize[0];
 	w->lightGridInverseSize[1] = 1.0f / w->lightGridSize[1];
 	w->lightGridInverseSize[2] = 1.0f / w->lightGridSize[2];
