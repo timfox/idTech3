@@ -724,7 +724,7 @@ void Info_Print( const char *s ) {
 			break;
 
 		if ( value[0] == '\0' )
-			strcpy( value, "MISSING VALUE" );
+			Q_strncpyz( value, "MISSING VALUE", sizeof( value ) );
 
 		Com_Printf( "%-20s %s\n", key, value );
 
