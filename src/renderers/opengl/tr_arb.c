@@ -2052,6 +2052,13 @@ void FBO_PostProcess( void )
 
 	minimized = ri.CL_IsMinimized();
 
+	if ( !programCompiled ) {
+		if ( !minimized ) {
+			FBO_BlitToBackBuffer( fboReadIndex );
+		}
+		return;
+	}
+
 	if ( r_bloom->integer && programCompiled && qglActiveTextureARB ) {
 		if ( FBO_Bloom( gamma, obScale, !minimized ) ) {
 			return;

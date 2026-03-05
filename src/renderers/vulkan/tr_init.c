@@ -319,6 +319,7 @@ cvar_t	*r_fogShadowPcfRadius;
 cvar_t	*r_fogShadowMaxDistance;
 cvar_t	*r_fogShadowPadding;
 cvar_t	*r_fogDebug;
+cvar_t	*r_fboDebug;
 cvar_t	*r_froxelDebug;
 cvar_t	*r_vk_swapchain_srgb;
 cvar_t	*r_intensity;
@@ -2733,6 +2734,11 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_fogDebug, "0", "13", CV_INTEGER );
 	ri.Cvar_SetDescription( r_fogDebug, "Volumetric fog debug view: 0=off, 1=froxel coords, 2=extinction slice, 3=scattering slice, 4=temporal validity/weight, 5=integrated transmittance, 6=sun-shadow debug slice, 7=motion magnitude/threshold, 8=local spot-shadow visibility, 9=local point-shadow visibility, 10=camera-cut/reset state, 11=GPU safety telemetry counters, 12=perf budget/autoscale state, 13=fog contribution heatmap." );
 	ri.Cvar_SetGroup( r_fogDebug, CVG_RENDERER );
+
+	r_fboDebug = ri.Cvar_Get( "r_fboDebug", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_fboDebug, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fboDebug, "FBO diagnostics:\n 0 - off\n 1 - log descriptor source changes and volumetric skip reasons\n 2 - verbose per-frame gamma scaling/layout diagnostics (PRINT_DEVELOPER)." );
+	ri.Cvar_SetGroup( r_fboDebug, CVG_RENDERER );
 
 	r_froxelDebug = ri.Cvar_Get( "r_froxelDebug", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_froxelDebug, "0", "5", CV_INTEGER );

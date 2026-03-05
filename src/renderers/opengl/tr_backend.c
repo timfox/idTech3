@@ -520,6 +520,14 @@ static void RB_BeginDrawingView( void ) {
 	// clear relevant buffers
 	clearBits = GL_DEPTH_BUFFER_BIT;
 
+#ifdef USE_FBO
+	// Offscreen FBO content is undefined unless we explicitly clear color.
+	if ( fboEnabled ) {
+		clearBits |= GL_COLOR_BUFFER_BIT;
+		qglClearColor( 0.0f, 0.0f, 0.0f, 1.0f );
+	}
+#endif
+
 	if ( r_shadows->integer == 2 )
 	{
 		clearBits |= GL_STENCIL_BUFFER_BIT;

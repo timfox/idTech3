@@ -520,6 +520,9 @@ const char *vk_format_string( VkFormat format )
 		CASE_STR( VK_FORMAT_B4G4R4A4_UNORM_PACK16 );
 		CASE_STR( VK_FORMAT_R4G4B4A4_UNORM_PACK16 );
 		CASE_STR( VK_FORMAT_R16G16B16A16_UNORM );
+		CASE_STR( VK_FORMAT_R16G16B16A16_SFLOAT );
+		CASE_STR( VK_FORMAT_R32G32B32A32_SFLOAT );
+		CASE_STR( VK_FORMAT_R64G64B64A64_SFLOAT );
 		CASE_STR( VK_FORMAT_A2B10G10R10_UNORM_PACK32 );
 		CASE_STR( VK_FORMAT_A2R10G10B10_UNORM_PACK32 );
 		CASE_STR( VK_FORMAT_B10G11R11_UFLOAT_PACK32 );
@@ -2315,49 +2318,94 @@ static qboolean vk_format_has_features( VkPhysicalDevice physical_device, VkForm
 	return ( props.optimalTilingFeatures & required ) == required;
 }
 
+static qboolean vk_hdr_format_supported( VkPhysicalDevice physical_device, VkFormat format )
+{
+	const VkFormatFeatureFlags required = VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT |
+		VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT |
+		VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
+	return vk_format_has_features( physical_device, format, required );
+}
+
 static VkFormat get_hdr_format( VkPhysicalDevice physical_device, VkFormat base_format )
 {
+	const int hdr_mode = r_hdr ? r_hdr->integer : 0;
+	const VkFormat hdr16 = VK_FORMAT_R16G16B16A16_SFLOAT;
+	const VkFormat hdr32 = VK_FORMAT_R32G32B32A32_SFLOAT;
+	const VkFormat hdr64 = VK_FORMAT_R64G64B64A64_SFLOAT;
+
 	if ( r_fbo->integer == 0 ) {
 		return base_format;
 	}
 
-	switch ( r_hdr->integer ) {
-		case -1: return VK_FORMAT_B4G4R4A4_UNORM_PACK16;
-		case 1: return VK_FORMAT_R16G16B16A16_SFLOAT;
-		case 2: {
-			const VkFormatFeatureFlags required = VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT |
-				VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT |
-				VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
-			if ( vk_format_has_features( physical_device, VK_FORMAT_R32G32B32A32_SFLOAT, required ) ) {
-				return VK_FORMAT_R32G32B32A32_SFLOAT;
+	switch ( hdr_mode ) {
+		case -1:
+			if ( vk_hdr_format_supported( physical_device, VK_FORMAT_B4G4R4A4_UNORM_PACK16 ) ) {
+				return VK_FORMAT_B4G4R4A4_UNORM_PACK16;
 			}
-			return VK_FORMAT_R16G16B16A16_SFLOAT;
+			ri.Printf( PRINT_WARNING, "[VK][fbo] r_hdr -1 requested %s but it's unsupported; falling back to %s\n",
+				vk_format_string( VK_FORMAT_B4G4R4A4_UNORM_PACK16 ),
+				vk_format_string( base_format ) );
+			return base_format;
+		case 1:
+			if ( vk_hdr_format_supported( physical_device, hdr16 ) ) {
+				return hdr16;
+			}
+			ri.Printf( PRINT_WARNING, "[VK][fbo] r_hdr 1 requested %s but it's unsupported; falling back to %s\n",
+				vk_format_string( hdr16 ),
+				vk_format_string( base_format ) );
+			return base_format;
+		case 2: {
+			if ( vk_hdr_format_supported( physical_device, hdr32 ) ) {
+				return hdr32;
+			}
+			if ( vk_hdr_format_supported( physical_device, hdr16 ) ) {
+				ri.Printf( PRINT_WARNING, "[VK][fbo] r_hdr 2 requested %s but it's unsupported; falling back to %s\n",
+					vk_format_string( hdr32 ),
+					vk_format_string( hdr16 ) );
+				return hdr16;
+			}
+			ri.Printf( PRINT_WARNING, "[VK][fbo] r_hdr 2 requested %s/%s but both are unsupported; falling back to %s\n",
+				vk_format_string( hdr32 ),
+				vk_format_string( hdr16 ),
+				vk_format_string( base_format ) );
+			return base_format;
 		}
 		case 3: {
-			/* Double-precision (64-bit float per channel). Optional in Vulkan; requires
-			 * shaderFloat64 and format support. glslangValidator does not support
-			 * dvec4/f64vec4 fragment shader outputs, so we fall back to RGBA32F until
-			 * compiler support is available. */
 			VkPhysicalDeviceFeatures feat;
+			qboolean shader64_supported;
+			qboolean format64_supported;
+
 			qvkGetPhysicalDeviceFeatures( physical_device, &feat );
-			if ( feat.shaderFloat64 ) {
-				const VkFormatFeatureFlags required = VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT |
-					VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT |
-					VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
-				if ( vk_format_has_features( physical_device, VK_FORMAT_R64G64B64A64_SFLOAT, required ) ) {
-					ri.Printf( PRINT_DEVELOPER, "[VK] r_hdr 3: RGBA64F supported but glslang lacks dvec4 fragment output; using RGBA32F\n" );
-				}
+			shader64_supported = feat.shaderFloat64 ? qtrue : qfalse;
+			format64_supported = vk_hdr_format_supported( physical_device, hdr64 );
+
+			/* RGBA64F color attachments require 64-bit shader outputs (dvec4), but the
+			 * current toolchain path does not emit compatible fragment outputs. Keep the
+			 * explicit check and deterministic fallback chain. */
+			if ( shader64_supported && format64_supported ) {
+				ri.Printf( PRINT_WARNING, "[VK][fbo] r_hdr 3: %s is supported, but shader toolchain lacks dvec4 fragment output; falling back\n",
+					vk_format_string( hdr64 ) );
 			}
-			/* Fall back to RGBA32F (glslang dvec4 fragment output not yet supported) */
-			{
-				const VkFormatFeatureFlags required = VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT |
-					VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT |
-					VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
-				if ( vk_format_has_features( physical_device, VK_FORMAT_R32G32B32A32_SFLOAT, required ) ) {
-					return VK_FORMAT_R32G32B32A32_SFLOAT;
-				}
-				return VK_FORMAT_R16G16B16A16_SFLOAT;
+			else if ( !shader64_supported || !format64_supported ) {
+				ri.Printf( PRINT_WARNING, "[VK][fbo] r_hdr 3 unavailable (shaderFloat64=%s format=%s); falling back\n",
+					shader64_supported ? "yes" : "no",
+					format64_supported ? "yes" : "no" );
 			}
+
+			if ( vk_hdr_format_supported( physical_device, hdr32 ) ) {
+				return hdr32;
+			}
+			if ( vk_hdr_format_supported( physical_device, hdr16 ) ) {
+				ri.Printf( PRINT_WARNING, "[VK][fbo] r_hdr 3 fallback %s unsupported; using %s\n",
+					vk_format_string( hdr32 ),
+					vk_format_string( hdr16 ) );
+				return hdr16;
+			}
+			ri.Printf( PRINT_WARNING, "[VK][fbo] r_hdr 3 fallback %s/%s unsupported; using %s\n",
+				vk_format_string( hdr32 ),
+				vk_format_string( hdr16 ),
+				vk_format_string( base_format ) );
+			return base_format;
 		}
 		default: return base_format;
 	}
@@ -2507,6 +2555,21 @@ static void setup_surface_formats( VkPhysicalDevice physical_device )
 	vk.depth_format = get_depth_format( physical_device );
 
 	vk.color_format = get_hdr_format( physical_device, vk.base_format.format );
+
+	if ( r_fbo && r_fbo->integer ) {
+		const int hdr_mode = r_hdr ? r_hdr->integer : 0;
+		if ( r_fboDebug && r_fboDebug->integer >= 1 ) {
+			ri.Printf( PRINT_DEVELOPER, "[VK][fbo] hdr select r_hdr=%d base=%s color=%s present=%s\n",
+				hdr_mode,
+				vk_format_string( vk.base_format.format ),
+				vk_format_string( vk.color_format ),
+				vk_format_string( vk.present_format.format ) );
+		}
+		if ( hdr_mode > 0 && vk.color_format == vk.base_format.format ) {
+			ri.Printf( PRINT_WARNING, "[VK][fbo] r_hdr %d fell back to base format %s\n",
+				hdr_mode, vk_format_string( vk.base_format.format ) );
+		}
+	}
 
 	vk.capture_format = VK_FORMAT_R8G8B8A8_UNORM;
 
@@ -3669,6 +3732,97 @@ static void vk_update_color_descriptor_image( VkImageView color_view )
 	qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
 }
 
+static const char *vk_post_fog_source_name( VkImageView color_source )
+{
+	if ( color_source == vk.color_image_view ) {
+		return "color_image";
+	}
+	if ( color_source == vk.smaa_output_image_view ) {
+		return "smaa_output";
+	}
+	if ( color_source == vk.fog_scene_image_view ) {
+		return "fog_scene";
+	}
+	if ( color_source == VK_NULL_HANDLE ) {
+		return "null";
+	}
+	return "unknown_view";
+}
+
+static VkImage vk_post_fog_source_image( VkImageView color_source )
+{
+	if ( color_source == vk.color_image_view ) {
+		return vk.color_image;
+	}
+	if ( color_source == vk.smaa_output_image_view ) {
+		return vk.smaa_output_image;
+	}
+	if ( color_source == vk.fog_scene_image_view ) {
+		return vk.fog_scene_image;
+	}
+	return VK_NULL_HANDLE;
+}
+
+static void vk_log_post_fog_rebind( const char *reason, VkImageView color_source )
+{
+	if ( r_fboDebug && r_fboDebug->integer >= 1 ) {
+		ri.Printf( PRINT_DEVELOPER, "[VK][fbo] %s -> %s view=0x%llx\n",
+			reason ? reason : "post-fog source rebind",
+			vk_post_fog_source_name( color_source ),
+			(unsigned long long)(uintptr_t)color_source );
+	}
+}
+
+/*
+ * Explicit postprocess source visibility barrier.
+ * Keep layout in SHADER_READ_ONLY and enforce availability of previous
+ * color-attachment writes for luminance/gamma sampling.
+ */
+static void vk_barrier_post_fog_source_for_sampling( VkImageView color_source, const char *reason )
+{
+	VkImage image;
+	VkImageMemoryBarrier barrier;
+
+	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	image = vk_post_fog_source_image( color_source );
+	if ( image == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	Com_Memset( &barrier, 0, sizeof( barrier ) );
+	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.image = image;
+	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	barrier.subresourceRange.baseMipLevel = 0;
+	barrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
+	barrier.subresourceRange.baseArrayLayer = 0;
+	barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+	barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+	barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+	qvkCmdPipelineBarrier(
+		vk.cmd->command_buffer,
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		0, 0, NULL, 0, NULL, 1, &barrier );
+
+	if ( r_fboDebug && r_fboDebug->integer >= 2 ) {
+		ri.Printf( PRINT_DEVELOPER,
+			"[VK][fbo] post-fog source barrier (%s): %s image=0x%llx view=0x%llx\n",
+			reason ? reason : "unspecified",
+			vk_post_fog_source_name( color_source ),
+			(unsigned long long)(uintptr_t)image,
+			(unsigned long long)(uintptr_t)color_source );
+	}
+}
+
 /*
  * Update color_descriptor and luminance_descriptor to sample from color_source.
  * Call from both volumetric and non-volumetric paths so gamma/luminance always
@@ -3676,6 +3830,14 @@ static void vk_update_color_descriptor_image( VkImageView color_view )
  */
 static void vk_update_post_fog_descriptors( VkImageView color_source )
 {
+	VkImageView old_source;
+	qboolean updated_luminance = qfalse;
+
+	if ( color_source == VK_NULL_HANDLE ) {
+		color_source = vk.color_image_view;
+	}
+
+	old_source = vk.post_fog_color_source;
 	vk.post_fog_color_source = color_source;
 	vk_update_color_descriptor_image( color_source );
 	if ( vk.luminance_descriptor != VK_NULL_HANDLE && vk.luminance_image_view != VK_NULL_HANDLE &&
@@ -3707,6 +3869,17 @@ static void vk_update_post_fog_descriptors( VkImageView color_source )
 		lum_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 		lum_writes[1].pImageInfo = &lum_info[1];
 		qvkUpdateDescriptorSets( vk.device, 2, lum_writes, 0, NULL );
+		updated_luminance = qtrue;
+	}
+
+	if ( r_fboDebug && r_fboDebug->integer >= 1 &&
+		( r_fboDebug->integer >= 2 || old_source != color_source ) ) {
+		ri.Printf( PRINT_DEVELOPER,
+			"[VK][fbo] post-fog descriptors: %s -> %s view=0x%llx luminance=%s\n",
+			vk_post_fog_source_name( old_source ),
+			vk_post_fog_source_name( color_source ),
+			(unsigned long long)(uintptr_t)color_source,
+			updated_luminance ? "updated" : "unchanged" );
 	}
 }
 
@@ -15138,8 +15311,10 @@ static void vk_volumetric_fog_pass( void )
 			/* SMAA when volumetrics skipped: run if SMAA active (menus and in-game) */
 			if ( vk.smaaActive && vk.smaa_output_image_view != VK_NULL_HANDLE ) {
 				vk_smaa_passes();
+				vk_log_post_fog_rebind( "volumetric skipped (tier/off/no-world): SMAA source", vk.smaa_output_image_view );
 				vk_update_post_fog_descriptors( vk.smaa_output_image_view );
 			} else {
+				vk_log_post_fog_rebind( "volumetric skipped (tier/off/no-world): color source", vk.color_image_view );
 				vk_update_post_fog_descriptors( vk.color_image_view );
 			}
 			/* Restore depth layout if atmosphere ran (tr.world) */
@@ -15175,8 +15350,10 @@ static void vk_volumetric_fog_pass( void )
 		Com_Memset( &vk_volumetric_validation_state, 0, sizeof( vk_volumetric_validation_state ) );
 		if ( vk.smaaActive && vk.smaa_output_image_view != VK_NULL_HANDLE ) {
 			vk_smaa_passes();
+			vk_log_post_fog_rebind( "volumetric skipped (missing resources): SMAA source", vk.smaa_output_image_view );
 			vk_update_post_fog_descriptors( vk.smaa_output_image_view );
 		} else {
+			vk_log_post_fog_rebind( "volumetric skipped (missing resources): color source", vk.color_image_view );
 			vk_update_post_fog_descriptors( vk.color_image_view );
 		}
 		if ( tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
@@ -15210,8 +15387,10 @@ static void vk_volumetric_fog_pass( void )
 		Com_Memset( &vk_volumetric_validation_state, 0, sizeof( vk_volumetric_validation_state ) );
 		if ( vk.smaaActive && vk.smaa_output_image_view != VK_NULL_HANDLE ) {
 			vk_smaa_passes();
+			vk_log_post_fog_rebind( "volumetric skipped (MSAA depth resolve missing): SMAA source", vk.smaa_output_image_view );
 			vk_update_post_fog_descriptors( vk.smaa_output_image_view );
 		} else {
+			vk_log_post_fog_rebind( "volumetric skipped (MSAA depth resolve missing): color source", vk.color_image_view );
 			vk_update_post_fog_descriptors( vk.color_image_view );
 		}
 		if ( tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
@@ -15412,8 +15591,10 @@ void vk_prepare_2d( void )
 			/* Ensure gamma/luminance sample correct source (avoids solid-color in menus). */
 			if ( vk.smaaActive && vk.smaa_output_image_view != VK_NULL_HANDLE ) {
 				vk_smaa_passes();
+				vk_log_post_fog_rebind( "prepare_2d no-world: SMAA source", vk.smaa_output_image_view );
 				vk_update_post_fog_descriptors( vk.smaa_output_image_view );
 			} else {
+				vk_log_post_fog_rebind( "prepare_2d no-world: color source", vk.color_image_view );
 				vk_update_post_fog_descriptors( vk.color_image_view );
 			}
 			vk_begin_post_bloom_render_pass();
@@ -15911,103 +16092,141 @@ void vk_end_frame( void )
 				}
 			}
 
-		if ( backEnd.screenshotMask && vk.capture.image )
-		{
-			vk_end_render_pass();
+			if ( backEnd.screenshotMask && vk.capture.image )
+			{
+				VkImageView capture_src = VK_NULL_HANDLE;
 
-			// render to capture FBO
-			vk_begin_render_pass( vk.render_pass.capture, vk.framebuffers.capture, qfalse, gls.captureWidth, gls.captureHeight );
-			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.capture_pipeline );
+				vk_end_render_pass();
+
+				/* Capture can run before vk_volumetric_fog_pass in vk_end_frame. Rebind the
+				 * descriptor explicitly so capture never samples a stale source from a
+				 * previous frame. */
+				if ( backEnd.doneFog ) {
+					capture_src = vk.post_fog_color_source;
+				} else {
+					capture_src = vk.color_image_view;
+				}
+				if ( capture_src == VK_NULL_HANDLE ) {
+					capture_src = vk.color_image_view;
+				}
+				if ( capture_src != VK_NULL_HANDLE ) {
+					vk_update_color_descriptor_image( capture_src );
+					vk_barrier_post_fog_source_for_sampling( capture_src, "vk_end_frame pre-capture" );
+					if ( r_fboDebug && r_fboDebug->integer >= 2 ) {
+						ri.Printf( PRINT_DEVELOPER, "[VK][fbo] capture source -> %s view=0x%llx\n",
+							vk_post_fog_source_name( capture_src ),
+							(unsigned long long)(uintptr_t)capture_src );
+					}
+				}
+
+				// render to capture FBO
+				vk_begin_render_pass( vk.render_pass.capture, vk.framebuffers.capture, qfalse, gls.captureWidth, gls.captureHeight );
+				qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.capture_pipeline );
 			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
 
 			vk_set_fullscreen_viewport_scissor( gls.captureWidth, gls.captureHeight );
 			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 		}
 
-		if ( !ri.CL_IsMinimized() )
-		{
-			vk_end_render_pass();
+			if ( !ri.CL_IsMinimized() )
+			{
+				VkImageView post_fog_src = VK_NULL_HANDLE;
 
-			if ( !backEnd.doneFog )
-			{
-				vk_volumetric_fog_pass();
-			}
-			else
-			{
-				/* Volumetrics skipped (menu, no world, tier off): ensure gamma and
-				 * luminance passes sample from correct source. vk_volumetric_fog_pass
-				 * normally updates descriptors; when skipped, they may point at
-				 * smaa_output from a previous frame. */
-				vk_update_post_fog_descriptors( vk.color_image_view );
-			}
+				vk_end_render_pass();
 
-			/* Luminance pass for eye adaptation (r_exposure_auto) */
-			{
-				cvar_t *exp_auto = ri.Cvar_Get( "r_exposure_auto", "0", 0 );
-				cvar_t *r_hdr_var = ri.Cvar_Get( "r_hdr", "1", 0 );
-				if ( exp_auto && exp_auto->integer && r_hdr_var && r_hdr_var->integer &&
-					vk.luminance_pipeline != VK_NULL_HANDLE && vk.luminance_descriptor != VK_NULL_HANDLE &&
-					vk.luminance_image_view != VK_NULL_HANDLE && vk.luminance_staging_buffer != VK_NULL_HANDLE &&
-					vk.color_image_view != VK_NULL_HANDLE && vk.color_image_view != vk.luminance_image_view )
+				if ( !backEnd.doneFog )
 				{
-					record_image_layout_transition( vk.cmd->command_buffer, vk.luminance_image, VK_IMAGE_ASPECT_COLOR_BIT,
-						VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
-						VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
-
-					qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.luminance_pipeline );
-					qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-						vk.luminance_pipeline_layout, 0, 1, &vk.luminance_descriptor, 0, NULL );
-					qvkCmdDispatch( vk.cmd->command_buffer, 1, 1, 1 );
-
-					record_image_layout_transition( vk.cmd->command_buffer, vk.luminance_image, VK_IMAGE_ASPECT_COLOR_BIT,
-						VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-						VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
-
-					{
-						VkBufferImageCopy region;
-						Com_Memset( &region, 0, sizeof( region ) );
-						region.bufferOffset = 0;
-						region.bufferRowLength = 0;
-						region.bufferImageHeight = 0;
-						region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-						region.imageSubresource.mipLevel = 0;
-						region.imageSubresource.baseArrayLayer = 0;
-						region.imageSubresource.layerCount = 1;
-						region.imageOffset.x = 0;
-						region.imageOffset.y = 0;
-						region.imageOffset.z = 0;
-						region.imageExtent.width = 1;
-						region.imageExtent.height = 1;
-						region.imageExtent.depth = 1;
-						qvkCmdCopyImageToBuffer( vk.cmd->command_buffer, vk.luminance_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-							vk.luminance_staging_buffer, 1, &region );
-					}
-
-					record_image_layout_transition( vk.cmd->command_buffer, vk.luminance_image, VK_IMAGE_ASPECT_COLOR_BIT,
-						VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
-						VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
+					vk_volumetric_fog_pass();
 				}
-			}
+				else
+				{
+					/* Volumetrics skipped (menu, no world, tier off): force color_image
+					 * as source so luminance/gamma do not keep stale SMAA source from a
+					 * previous frame. */
+					post_fog_src = vk.color_image_view;
+					vk_log_post_fog_rebind( "end_frame volumetric skipped (backEnd.doneFog)", post_fog_src );
+				}
 
-			/* Gamma pass: render to swapchain (window size). Use vid dimensions as fallback if window is 0 (minimized). */
-			vk.renderWidth = ( gls.windowWidth > 0 ) ? gls.windowWidth : glConfig.vidWidth;
-			vk.renderHeight = ( gls.windowHeight > 0 ) ? gls.windowHeight : glConfig.vidHeight;
+				if ( post_fog_src == VK_NULL_HANDLE ) {
+					post_fog_src = vk.post_fog_color_source;
+				}
+				if ( post_fog_src == VK_NULL_HANDLE ) {
+					post_fog_src = vk.color_image_view;
+				}
+				if ( post_fog_src != VK_NULL_HANDLE ) {
+					vk_update_post_fog_descriptors( post_fog_src );
+					vk_barrier_post_fog_source_for_sampling( post_fog_src, "vk_end_frame pre-luminance/gamma" );
+				}
 
-			vk.renderScaleX = 1.0;
-			vk.renderScaleY = 1.0;
+				/* Luminance pass for eye adaptation (r_exposure_auto) */
+				{
+					cvar_t *exp_auto = ri.Cvar_Get( "r_exposure_auto", "0", 0 );
+					cvar_t *r_hdr_var = ri.Cvar_Get( "r_hdr", "1", 0 );
+					if ( exp_auto && exp_auto->integer && r_hdr_var && r_hdr_var->integer &&
+						vk.luminance_pipeline != VK_NULL_HANDLE && vk.luminance_descriptor != VK_NULL_HANDLE &&
+						vk.luminance_image_view != VK_NULL_HANDLE && vk.luminance_staging_buffer != VK_NULL_HANDLE &&
+						post_fog_src != VK_NULL_HANDLE && post_fog_src != vk.luminance_image_view )
+					{
+						record_image_layout_transition( vk.cmd->command_buffer, vk.luminance_image, VK_IMAGE_ASPECT_COLOR_BIT,
+							VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
+							VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
 
-			/* Belt-and-suspenders: ensure gamma samples correct image (avoids solid-color bug) */
-			{
-				VkImageView src = vk.post_fog_color_source;
-				if ( src == VK_NULL_HANDLE )
-					src = vk.color_image_view;
-				if ( src != VK_NULL_HANDLE )
-					vk_update_post_fog_descriptors( src );
-			}
+						qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.luminance_pipeline );
+						qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+							vk.luminance_pipeline_layout, 0, 1, &vk.luminance_descriptor, 0, NULL );
+						qvkCmdDispatch( vk.cmd->command_buffer, 1, 1, 1 );
 
-			vk_begin_render_pass( vk.render_pass.gamma, vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ], qfalse, vk.renderWidth, vk.renderHeight );
-			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.gamma_pipeline );
-			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
+						record_image_layout_transition( vk.cmd->command_buffer, vk.luminance_image, VK_IMAGE_ASPECT_COLOR_BIT,
+							VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+							VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
+
+						{
+							VkBufferImageCopy region;
+							Com_Memset( &region, 0, sizeof( region ) );
+							region.bufferOffset = 0;
+							region.bufferRowLength = 0;
+							region.bufferImageHeight = 0;
+							region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+							region.imageSubresource.mipLevel = 0;
+							region.imageSubresource.baseArrayLayer = 0;
+							region.imageSubresource.layerCount = 1;
+							region.imageOffset.x = 0;
+							region.imageOffset.y = 0;
+							region.imageOffset.z = 0;
+							region.imageExtent.width = 1;
+							region.imageExtent.height = 1;
+							region.imageExtent.depth = 1;
+							qvkCmdCopyImageToBuffer( vk.cmd->command_buffer, vk.luminance_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+								vk.luminance_staging_buffer, 1, &region );
+						}
+
+						record_image_layout_transition( vk.cmd->command_buffer, vk.luminance_image, VK_IMAGE_ASPECT_COLOR_BIT,
+							VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
+							VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
+					}
+				}
+
+				/* Gamma pass: render to swapchain (window size). Use vid dimensions as fallback if window is 0 (minimized). */
+				vk.renderWidth = ( gls.windowWidth > 0 ) ? gls.windowWidth : glConfig.vidWidth;
+				vk.renderHeight = ( gls.windowHeight > 0 ) ? gls.windowHeight : glConfig.vidHeight;
+
+				vk.renderScaleX = 1.0;
+				vk.renderScaleY = 1.0;
+				if ( r_fboDebug && r_fboDebug->integer >= 2 ) {
+					const float sx = ( glConfig.vidWidth > 0 ) ? (float)vk.renderWidth / (float)glConfig.vidWidth : 1.0f;
+					const float sy = ( glConfig.vidHeight > 0 ) ? (float)vk.renderHeight / (float)glConfig.vidHeight : 1.0f;
+					ri.Printf( PRINT_DEVELOPER,
+						"[VK][fbo] gamma target=%dx%d source=%dx%d window=%dx%d src=%s scale=%.3fx%.3f\n",
+						vk.renderWidth, vk.renderHeight,
+						glConfig.vidWidth, glConfig.vidHeight,
+						gls.windowWidth, gls.windowHeight,
+						vk_post_fog_source_name( post_fog_src ),
+						sx, sy );
+				}
+
+				vk_begin_render_pass( vk.render_pass.gamma, vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ], qfalse, vk.renderWidth, vk.renderHeight );
+				qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.gamma_pipeline );
+				qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
 
 			VkPostProcessPushConstants panini_push = { 0 };
 			uint32_t srcTexW = ( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u;
