@@ -2987,6 +2987,9 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			device_extension_list[ device_extension_count++ ] = "VK_KHR_present_wait";
 		}
 		if ( shaderQuadControl ) {
+			if ( shaderMaximalReconvergence ) {
+				device_extension_list[ device_extension_count++ ] = "VK_KHR_shader_maximal_reconvergence";
+			}
 			device_extension_list[ device_extension_count++ ] = "VK_KHR_shader_quad_control";
 		}
 		if ( extendedDynamicState3 ) {
@@ -9441,7 +9444,7 @@ static void vk_create_froxel_images( void )
 	create_info_fluid_velocity.arrayLayers = 1;
 	create_info_fluid_velocity.samples = VK_SAMPLE_COUNT_1_BIT;
 	create_info_fluid_velocity.tiling = VK_IMAGE_TILING_OPTIMAL;
-	create_info_fluid_velocity.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	create_info_fluid_velocity.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 	create_info_fluid_velocity.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	create_info_fluid_velocity.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
