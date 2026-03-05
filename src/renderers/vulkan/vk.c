@@ -1439,7 +1439,8 @@ static void vk_create_render_passes( void )
 		attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		attachments[0].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		attachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		/* finalLayout SHADER_READ_ONLY so gamma/luminance can sample after vk_end_render_pass */
+		attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 		desc.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
 		desc.pNext = NULL;
@@ -6201,11 +6202,13 @@ static void vk_create_framebuffers( void )
 				vk.framebuffers.atmosphere[n] = VK_NULL_HANDLE;
 			}
 
-			// gamma correction
+			// gamma correction: use swapchain extent so framebuffer matches swapchain image dimensions
 			desc.renderPass = vk.render_pass.gamma;
 			desc.attachmentCount = 1;
-			desc.width = gls.windowWidth;
-			desc.height = gls.windowHeight;
+			desc.width = vk.swapchain_extent_valid ? vk.swapchain_extent.width : (uint32_t)gls.windowWidth;
+			desc.height = vk.swapchain_extent_valid ? vk.swapchain_extent.height : (uint32_t)gls.windowHeight;
+			if ( desc.width == 0 ) desc.width = (uint32_t)glConfig.vidWidth;
+			if ( desc.height == 0 ) desc.height = (uint32_t)glConfig.vidHeight;
 			framebuffer_attachments[0] = vk.swapchain_image_views[n];
 			VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.gamma[n] ) );
 
@@ -15928,9 +15931,7 @@ static void vk_volumetric_fog_pass( void )
 	vk_volumetric_composite_pass();
 	vk_write_volumetric_timestamp( VK_VOLUMETRY_QUERY_AFTER_COMPOSITE, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT );
 
-	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
+	/* Render pass finalLayout=SHADER_READ_ONLY transitions color_image automatically on end. */
 
 	if ( vk.smaaActive && tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
 		vk_smaa_passes();
@@ -16639,9 +16640,14 @@ void vk_end_frame( void )
 					}
 				}
 
-				/* Gamma pass: render to swapchain (window size). Use vid dimensions as fallback if window is 0 (minimized). */
-				vk.renderWidth = ( gls.windowWidth > 0 ) ? gls.windowWidth : glConfig.vidWidth;
-				vk.renderHeight = ( gls.windowHeight > 0 ) ? gls.windowHeight : glConfig.vidHeight;
+				/* Gamma pass: use swapchain extent to match gamma framebuffer; fallback to window/vid. */
+				if ( vk.swapchain_extent_valid && vk.swapchain_extent.width > 0 && vk.swapchain_extent.height > 0 ) {
+					vk.renderWidth = vk.swapchain_extent.width;
+					vk.renderHeight = vk.swapchain_extent.height;
+				} else {
+					vk.renderWidth = ( gls.windowWidth > 0 ) ? gls.windowWidth : glConfig.vidWidth;
+					vk.renderHeight = ( gls.windowHeight > 0 ) ? gls.windowHeight : glConfig.vidHeight;
+				}
 
 				vk.renderScaleX = 1.0;
 				vk.renderScaleY = 1.0;
@@ -16668,9 +16674,18 @@ void vk_end_frame( void )
 
 				if ( vk.gamma_pipeline == VK_NULL_HANDLE || vk.color_descriptor == VK_NULL_HANDLE ||
 					vk.render_pass.gamma == VK_NULL_HANDLE || !vk.framebuffers.gamma ||
-					vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ] == VK_NULL_HANDLE ) {
-					ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW "[VK][fbo] gamma pass skipped: missing pipeline/descriptor/renderpass/framebuffer\n" );
+					vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ] == VK_NULL_HANDLE ||
+					vk.renderWidth == 0 || vk.renderHeight == 0 ) {
+					ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW "[VK][fbo] gamma pass skipped: missing pipeline/descriptor/renderpass/framebuffer or zero size (%dx%d)\n",
+						vk.renderWidth, vk.renderHeight );
 				} else {
+				/* Belt-and-suspenders: ensure color_descriptor samples correct source before gamma */
+				{
+					VkImageView gamma_src = ( post_fog_src != VK_NULL_HANDLE ) ? post_fog_src : vk.color_image_view;
+					if ( gamma_src != VK_NULL_HANDLE ) {
+						vk_update_color_descriptor_image( gamma_src );
+					}
+				}
 				vk_begin_render_pass( vk.render_pass.gamma, vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ], qfalse, vk.renderWidth, vk.renderHeight );
 				qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.gamma_pipeline );
 				qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
@@ -17956,6 +17971,70 @@ static void vk_update_volumetric_params( void )
 			params.volumeColorDensity[local_volume_count][3] = sphereDensity;
 			params.volumeTypeParams[local_volume_count][0] = 1.0f;
 			params.volumeTypeParams[local_volume_count][1] = sphereRadius;
+			params.volumeTypeParams[local_volume_count][2] = -1.0f;
+			params.volumeTypeParams[local_volume_count][3] = 0.0f;
+			local_volume_count++;
+		}
+	}
+
+	/* Optional cylinder volume from r_volumetricFogCylinder* cvars */
+	{
+		float base[3] = { 0.0f, 0.0f, 0.0f };
+		float top[3] = { 0.0f, 0.0f, 128.0f };
+		float radius, density;
+		int cylinderOn;
+		cylinderOn = r_volumetricFogCylinder ? r_volumetricFogCylinder->integer : 0;
+		if ( cylinderOn && local_volume_count < VK_VOLUMETRIC_MAX_VOLUMES ) {
+			sscanf( ri.Cvar_VariableString( "r_volumetricFogCylinderBase" ), "%f %f %f", &base[0], &base[1], &base[2] );
+			sscanf( ri.Cvar_VariableString( "r_volumetricFogCylinderTop" ), "%f %f %f", &top[0], &top[1], &top[2] );
+			radius = r_volumetricFogCylinderRadius ? r_volumetricFogCylinderRadius->value : 64.0f;
+			density = r_volumetricFogCylinderDensity ? r_volumetricFogCylinderDensity->value : fog_density * 0.5f;
+			params.volumeBoundsMin[local_volume_count][0] = base[0];
+			params.volumeBoundsMin[local_volume_count][1] = base[1];
+			params.volumeBoundsMin[local_volume_count][2] = base[2];
+			params.volumeBoundsMin[local_volume_count][3] = 0.0f;
+			params.volumeBoundsMax[local_volume_count][0] = top[0];
+			params.volumeBoundsMax[local_volume_count][1] = top[1];
+			params.volumeBoundsMax[local_volume_count][2] = top[2];
+			params.volumeBoundsMax[local_volume_count][3] = 0.0f;
+			params.volumeColorDensity[local_volume_count][0] = params.fogColor[0];
+			params.volumeColorDensity[local_volume_count][1] = params.fogColor[1];
+			params.volumeColorDensity[local_volume_count][2] = params.fogColor[2];
+			params.volumeColorDensity[local_volume_count][3] = density;
+			params.volumeTypeParams[local_volume_count][0] = 2.0f;
+			params.volumeTypeParams[local_volume_count][1] = radius;
+			params.volumeTypeParams[local_volume_count][2] = -1.0f;
+			params.volumeTypeParams[local_volume_count][3] = 0.0f;
+			local_volume_count++;
+		}
+	}
+
+	/* Optional cone volume from r_volumetricFogCone* cvars */
+	{
+		float apex[3] = { 0.0f, 0.0f, 64.0f };
+		float base[3] = { 0.0f, 0.0f, 0.0f };
+		float radius, density;
+		int coneOn;
+		coneOn = r_volumetricFogCone ? r_volumetricFogCone->integer : 0;
+		if ( coneOn && local_volume_count < VK_VOLUMETRIC_MAX_VOLUMES ) {
+			sscanf( ri.Cvar_VariableString( "r_volumetricFogConeApex" ), "%f %f %f", &apex[0], &apex[1], &apex[2] );
+			sscanf( ri.Cvar_VariableString( "r_volumetricFogConeBase" ), "%f %f %f", &base[0], &base[1], &base[2] );
+			radius = r_volumetricFogConeRadius ? r_volumetricFogConeRadius->value : 96.0f;
+			density = r_volumetricFogConeDensity ? r_volumetricFogConeDensity->value : fog_density * 0.5f;
+			params.volumeBoundsMin[local_volume_count][0] = apex[0];
+			params.volumeBoundsMin[local_volume_count][1] = apex[1];
+			params.volumeBoundsMin[local_volume_count][2] = apex[2];
+			params.volumeBoundsMin[local_volume_count][3] = 0.0f;
+			params.volumeBoundsMax[local_volume_count][0] = base[0];
+			params.volumeBoundsMax[local_volume_count][1] = base[1];
+			params.volumeBoundsMax[local_volume_count][2] = base[2];
+			params.volumeBoundsMax[local_volume_count][3] = 0.0f;
+			params.volumeColorDensity[local_volume_count][0] = params.fogColor[0];
+			params.volumeColorDensity[local_volume_count][1] = params.fogColor[1];
+			params.volumeColorDensity[local_volume_count][2] = params.fogColor[2];
+			params.volumeColorDensity[local_volume_count][3] = density;
+			params.volumeTypeParams[local_volume_count][0] = 3.0f;
+			params.volumeTypeParams[local_volume_count][1] = radius;
 			params.volumeTypeParams[local_volume_count][2] = -1.0f;
 			params.volumeTypeParams[local_volume_count][3] = 0.0f;
 			local_volume_count++;

@@ -191,6 +191,9 @@ OIT re-enabled after wiring the OIT accum pipeline. When `r_oit 1` + `r_fbo 1`: 
 1. **SMAA when volumetrics skipped**: Fixed. SMAA now runs when volumetrics are skipped (tier off, resources missing, MSAA incomplete) and in menus/no-world (`vk_prepare_2d` menu path). Descriptors updated in all paths.
 2. **Luminance when volumetrics skipped**: Luminance binding 0 is set to `color_image_view`. If `r_exposure_auto` is on and luminance was previously fed from `smaa_output`, the luminance pass now reads from `color_image_view`. That is correct for the current frame.
 3. **Layout transition when volumetrics skipped**: The main/post_bloom pass leaves `color_image` in `SHADER_READ_ONLY_OPTIMAL` (finalLayout). No explicit transition is needed before gamma. Layout handling appears correct.
+4. **Volumetric render pass finalLayout (March 2025)**: The volumetric composite pass previously used `finalLayout=COLOR_ATTACHMENT_OPTIMAL`, leaving `color_image` in the wrong layout for gamma sampling. Fixed: `finalLayout` set to `SHADER_READ_ONLY_OPTIMAL` so the image is correctly transitioned when the pass ends. Removed redundant explicit layout transition after composite.
+5. **Gamma pass descriptor (March 2025)**: Added belt-and-suspenders `vk_update_color_descriptor_image()` immediately before the gamma pass, using `post_fog_src` or `color_image_view` fallback, ensuring the gamma shader always samples the correct source.
+6. **Gamma framebuffer dimensions (March 2025)**: Gamma framebuffer now uses `vk.swapchain_extent` when valid, ensuring it matches swapchain image dimensions. Gamma pass viewport uses the same extent. Zero-size guard added to skip gamma when dimensions are invalid.
 
 ---
 

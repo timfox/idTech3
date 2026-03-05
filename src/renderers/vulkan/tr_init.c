@@ -255,6 +255,16 @@ cvar_t	*r_volumetricFogSphere;
 cvar_t	*r_volumetricFogSphereCenter;
 cvar_t	*r_volumetricFogSphereRadius;
 cvar_t	*r_volumetricFogSphereDensity;
+cvar_t	*r_volumetricFogCylinder;
+cvar_t	*r_volumetricFogCylinderBase;
+cvar_t	*r_volumetricFogCylinderTop;
+cvar_t	*r_volumetricFogCylinderRadius;
+cvar_t	*r_volumetricFogCylinderDensity;
+cvar_t	*r_volumetricFogCone;
+cvar_t	*r_volumetricFogConeApex;
+cvar_t	*r_volumetricFogConeBase;
+cvar_t	*r_volumetricFogConeRadius;
+cvar_t	*r_volumetricFogConeDensity;
 cvar_t	*r_volumetricFogDenoise;
 cvar_t	*r_volumetricFogDenoiseSigma;
 cvar_t	*r_volumetricFogAniso;
@@ -2418,6 +2428,50 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_volumetricFogSphereDensity, "0", "1", CV_FLOAT );
 	ri.Cvar_SetDescription( r_volumetricFogSphereDensity, "Sphere fog density." );
 	ri.Cvar_SetGroup( r_volumetricFogSphereDensity, CVG_RENDERER );
+
+	r_volumetricFogCylinder = ri.Cvar_Get( "r_volumetricFogCylinder", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_volumetricFogCylinder, "Enable debug cylinder fog volume (1=on)." );
+	ri.Cvar_SetGroup( r_volumetricFogCylinder, CVG_RENDERER );
+
+	r_volumetricFogCylinderBase = ri.Cvar_Get( "r_volumetricFogCylinderBase", "0 0 0", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_volumetricFogCylinderBase, "Cylinder base center (x y z)." );
+	ri.Cvar_SetGroup( r_volumetricFogCylinderBase, CVG_RENDERER );
+
+	r_volumetricFogCylinderTop = ri.Cvar_Get( "r_volumetricFogCylinderTop", "0 0 128", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_volumetricFogCylinderTop, "Cylinder top center (x y z)." );
+	ri.Cvar_SetGroup( r_volumetricFogCylinderTop, CVG_RENDERER );
+
+	r_volumetricFogCylinderRadius = ri.Cvar_Get( "r_volumetricFogCylinderRadius", "64", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogCylinderRadius, "1", "1024", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogCylinderRadius, "Cylinder radius." );
+	ri.Cvar_SetGroup( r_volumetricFogCylinderRadius, CVG_RENDERER );
+
+	r_volumetricFogCylinderDensity = ri.Cvar_Get( "r_volumetricFogCylinderDensity", "0.01", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogCylinderDensity, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogCylinderDensity, "Cylinder fog density." );
+	ri.Cvar_SetGroup( r_volumetricFogCylinderDensity, CVG_RENDERER );
+
+	r_volumetricFogCone = ri.Cvar_Get( "r_volumetricFogCone", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_volumetricFogCone, "Enable debug cone fog volume (1=on)." );
+	ri.Cvar_SetGroup( r_volumetricFogCone, CVG_RENDERER );
+
+	r_volumetricFogConeApex = ri.Cvar_Get( "r_volumetricFogConeApex", "0 0 64", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_volumetricFogConeApex, "Cone apex (x y z)." );
+	ri.Cvar_SetGroup( r_volumetricFogConeApex, CVG_RENDERER );
+
+	r_volumetricFogConeBase = ri.Cvar_Get( "r_volumetricFogConeBase", "0 0 0", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_volumetricFogConeBase, "Cone base center (x y z)." );
+	ri.Cvar_SetGroup( r_volumetricFogConeBase, CVG_RENDERER );
+
+	r_volumetricFogConeRadius = ri.Cvar_Get( "r_volumetricFogConeRadius", "96", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogConeRadius, "1", "1024", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogConeRadius, "Cone base radius." );
+	ri.Cvar_SetGroup( r_volumetricFogConeRadius, CVG_RENDERER );
+
+	r_volumetricFogConeDensity = ri.Cvar_Get( "r_volumetricFogConeDensity", "0.01", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogConeDensity, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_volumetricFogConeDensity, "Cone fog density." );
+	ri.Cvar_SetGroup( r_volumetricFogConeDensity, CVG_RENDERER );
 
 	r_volumetricFogDenoise = ri.Cvar_Get( "r_volumetricFogDenoise", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_volumetricFogDenoise, "Enable Gaussian spatial denoise on volumetric fog (0=off, 1=on)." );
