@@ -148,3 +148,5 @@ Run with `r_fboDebug 2` and `com_developer 1` to see which path is taken and whi
 - **FBO startup log**: When `r_fbo 1`, log "FBO enabled (HDR, post-process, gamma, PBR-ready)" at init.
 - **Attachment init**: Call `vk_update_post_fog_descriptors(color_image_view)` when updating attachment descriptors so luminance_descriptor is initialized for eye adaptation.
 - **Gamma pass guards**: Skip gamma when `post_fog_src` and `color_image_view` are both null; skip when pipeline/descriptor/renderpass/framebuffer missing or zero size.
+- **Gamma pass barrier (belt-and-suspenders)**: Call `vk_barrier_post_fog_source_for_sampling(gamma_src)` immediately before the gamma pass when gamma_src is valid, ensuring color-attachment writes are visible to the fragment shader.
+- **SMAA blend pass descriptors**: Blend pass set 0 = scene (color_image) for texelSize, set 1 = edge map. Use `smaa_edge_descriptor` (color) and `smaa_blend_descriptor` (edge) instead of both blend.

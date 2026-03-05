@@ -15738,9 +15738,9 @@ static void vk_smaa_passes( void )
 	w = ( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u;
 	h = ( glConfig.vidHeight > 0 ) ? (uint32_t)glConfig.vidHeight : 1u;
 
-	/* Edge: set0=scene(color_image). Blend: set0=edges(smaa_edge). Compose: set0=scene, set1=blend. */
+	/* Edge: set0=scene(color_image). Blend: set0=scene(texelSize), set1=edges. Compose: set0=scene, set1=blend. */
 	vk_run_smaa_pass( vk.smaa_edge_pipeline, vk.render_pass.smaa_edge, vk.framebuffers.smaa_edge, vk.smaa_edge_descriptor, vk.smaa_edge_descriptor, w, h );
-	vk_run_smaa_pass( vk.smaa_blend_pipeline, vk.render_pass.smaa_blend, vk.framebuffers.smaa_blend, vk.smaa_blend_descriptor, vk.smaa_blend_descriptor, w, h );
+	vk_run_smaa_pass( vk.smaa_blend_pipeline, vk.render_pass.smaa_blend, vk.framebuffers.smaa_blend, vk.smaa_edge_descriptor, vk.smaa_blend_descriptor, w, h );
 	vk_run_smaa_pass( vk.smaa_compose_pipeline, vk.render_pass.smaa_compose, vk.framebuffers.smaa_compose, vk.smaa_edge_descriptor, vk.smaa_compose_descriptor, w, h );
 }
 
@@ -16783,7 +16783,8 @@ void vk_end_frame( void )
 							ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW "[VK][fbo] gamma pass skipped: no valid color source (post_fog or color_image)\n" );
 						}
 					} else {
-						/* Belt-and-suspenders: ensure color_descriptor samples correct source before gamma */
+						/* Belt-and-suspenders: barrier before gamma sampling; ensure color_descriptor is correct */
+						vk_barrier_post_fog_source_for_sampling( gamma_src, "vk_end_frame pre-gamma (gamma_src)" );
 						vk_update_color_descriptor_image( gamma_src );
 						vk_begin_render_pass( vk.render_pass.gamma, vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ], qfalse, vk.renderWidth, vk.renderHeight );
 						qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.gamma_pipeline );
