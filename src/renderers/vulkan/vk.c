@@ -6844,9 +6844,11 @@ void vk_initialize( void )
 		vkSamples = VK_SAMPLE_COUNT_1_BIT;
 	}
 	if ( vk.smaaActive ) {
-		ri.Printf( PRINT_ALL, "...SMAA enabled (threshold %.2f, search steps %d)\n",
-			r_smaa_threshold ? r_smaa_threshold->value : 0.1f,
-			r_smaa_max_search_steps && r_smaa_max_search_steps->integer ? r_smaa_max_search_steps->integer : 16 );
+			int p = r_smaa_preset && r_smaa_preset->integer >= 1 && r_smaa_preset->integer <= 4 ? r_smaa_preset->integer : 0;
+			const char *preset_name = ( p == 1 ) ? "Low" : ( p == 2 ) ? "Medium" : ( p == 3 ) ? "High" : ( p == 4 ) ? "Ultra" : "Custom";
+			float thresh = p ? ( p == 1 ? 0.15f : p == 2 ? 0.1f : p == 3 ? 0.08f : 0.05f ) : ( r_smaa_threshold ? r_smaa_threshold->value : 0.1f );
+			int search = p ? ( p == 1 ? 8 : p == 2 ? 16 : p == 3 ? 24 : 32 ) : ( r_smaa_max_search_steps && r_smaa_max_search_steps->integer ? r_smaa_max_search_steps->integer : 16 );
+			ri.Printf( PRINT_ALL, "...SMAA enabled (preset=%s, threshold %.2f, search %d)\n", preset_name, thresh, search );
 	}
 
 	vk.screenMapSamples = MIN( vkMaxSamples, VK_SAMPLE_COUNT_4_BIT );
@@ -15604,10 +15606,21 @@ static void vk_run_smaa_pass( VkPipeline pipeline, VkRenderPass pass, VkFramebuf
 
 	{
 		SMAAPushConstants_t pc;
-		pc.threshold = r_smaa_threshold ? r_smaa_threshold->value : 0.1f;
-		pc.localContrast = r_smaa_local_contrast ? r_smaa_local_contrast->value : 2.0f;
-		pc.maxSearchSteps = ( r_smaa_max_search_steps && r_smaa_max_search_steps->integer >= 8 && r_smaa_max_search_steps->integer <= 32 )
-			? r_smaa_max_search_steps->integer : 16;
+		int preset = ( r_smaa_preset && r_smaa_preset->integer >= 1 && r_smaa_preset->integer <= 4 ) ? r_smaa_preset->integer : 0;
+		if ( preset ) {
+			/* Quality presets: threshold, localContrast, maxSearchSteps */
+			static const float preset_threshold[5]  = { 0.0f, 0.15f, 0.1f, 0.08f, 0.05f };
+			static const float preset_contrast[5]   = { 0.0f, 2.0f, 2.0f, 2.2f, 2.5f };
+			static const int   preset_search[5]     = { 0, 8, 16, 24, 32 };
+			pc.threshold = preset_threshold[preset];
+			pc.localContrast = preset_contrast[preset];
+			pc.maxSearchSteps = preset_search[preset];
+		} else {
+			pc.threshold = r_smaa_threshold ? r_smaa_threshold->value : 0.1f;
+			pc.localContrast = r_smaa_local_contrast ? r_smaa_local_contrast->value : 2.0f;
+			pc.maxSearchSteps = ( r_smaa_max_search_steps && r_smaa_max_search_steps->integer >= 8 && r_smaa_max_search_steps->integer <= 32 )
+				? r_smaa_max_search_steps->integer : 16;
+		}
 		pc.pad = 0;
 		qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_smaa, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( pc ), &pc );
 	}
@@ -16589,8 +16602,7 @@ void vk_end_frame( void )
 				/* Luminance pass for eye adaptation (r_exposure_auto) */
 				{
 					cvar_t *exp_auto = ri.Cvar_Get( "r_exposure_auto", "0", 0 );
-					cvar_t *r_hdr_var = ri.Cvar_Get( "r_hdr", "1", 0 );
-					if ( exp_auto && exp_auto->integer && r_hdr_var && r_hdr_var->integer &&
+					if ( exp_auto && exp_auto->integer && r_hdr && r_hdr->integer &&
 						vk.luminance_pipeline != VK_NULL_HANDLE && vk.luminance_descriptor != VK_NULL_HANDLE &&
 						vk.luminance_image_view != VK_NULL_HANDLE && vk.luminance_staging_buffer != VK_NULL_HANDLE &&
 						post_fog_src != VK_NULL_HANDLE && post_fog_src != vk.luminance_image_view )

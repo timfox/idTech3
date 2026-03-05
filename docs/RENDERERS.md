@@ -58,7 +58,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - **Implemented**: Uses `VK_EXT_extended_dynamic_state3` when available. Enables `vkCmdSetColorWriteMaskEXT` for shadow volumes and other color-mask use cases. Gracefully no-ops when the extension is not supported.
 
 ### Anti-Aliasing
-- **SMAA** (Sub-pixel Morphological Anti-Aliasing): edge detection, blend weight, and compose passes. Cvars: `r_ext_smaa` (enable), `r_smaa_threshold` (0.01–0.5, default 0.1), `r_smaa_local_contrast` (1–4, default 2), `r_smaa_max_search_steps` (8–32, default 16). Requires `r_fbo 1`.
+- **SMAA** (Sub-pixel Morphological Anti-Aliasing): edge detection, blend weight, and compose passes. Cvars: `r_ext_smaa` (enable), `r_smaa_preset` (0=Custom, 1=Low, 2=Medium, 3=High, 4=Ultra), `r_smaa_threshold` (0.01–0.5), `r_smaa_local_contrast` (1–4), `r_smaa_max_search_steps` (8–32). Preset overrides manual params when non-zero. Edge detection uses HDR-safe luma and corner rounding. Requires `r_fbo 1`.
 - **MSAA**: Multi-sample anti-aliasing for geometry edges. Cvar `r_ext_multisample` (0|2|4|6|8). Requires `r_fbo 1`. MSAA and SMAA can be used together: MSAA handles geometry edges, SMAA handles alpha/transparency edges.
 
 ### Screen-Space Ambient Occlusion (SSAO)

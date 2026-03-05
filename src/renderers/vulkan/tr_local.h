@@ -1560,6 +1560,7 @@ extern cvar_t	*r_bloomKnee;
 extern cvar_t	*r_ext_multisample;
 extern cvar_t	*r_ext_supersample;
 extern cvar_t	*r_ext_smaa;
+extern cvar_t	*r_smaa_preset;
 extern cvar_t	*r_smaa_threshold;
 extern cvar_t	*r_smaa_local_contrast;
 extern cvar_t	*r_smaa_max_search_steps;
