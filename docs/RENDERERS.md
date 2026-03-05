@@ -16,6 +16,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 
 ### Volumetric Fog
 - Froxel-based volumetric lighting (configurable grid: default 160x90x64)
+- Composite robustness: NaN/Inf guard on final output; explicit textureLod for scene/depth/froxel sampling
 - Multi-stage compute pipeline: density, volume, local lights, sun light, temporal blend
 - Exponential height fog with noise turbulence (FBM)
 - Henyey-Greenstein phase function for anisotropic scattering

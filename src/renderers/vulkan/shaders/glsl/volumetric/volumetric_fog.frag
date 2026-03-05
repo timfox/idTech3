@@ -290,7 +290,7 @@ int findFirstShadowedLightIndex(bool wantSpot) {
 }
 
 void main() {
-    float depthSample = texture(depthTexture, v_UV).r;
+    float depthSample = textureLod(depthTexture, v_UV, 0.0).r;
     int depthMode = int(clamp(floor(params.miscParams.y + 0.5), 0.0, 2.0));
     int fogDebug = int(clamp(floor(params.gridDim.w + 0.5), 0.0, 13.0));
     float frameIndex = params.miscParams.z;
@@ -308,7 +308,7 @@ void main() {
     float maxDistance = max(params.sliceParams.w, nearPlane + 1.0);
     sceneDepth = min(sceneDepth, maxDistance);
 
-    vec3 scene = texture(sceneColor, v_UV).rgb;
+    vec3 scene = textureLod(sceneColor, v_UV, 0.0).rgb;
     int px = int(gl_FragCoord.x), py = int(gl_FragCoord.y);
     int haltonIdx = px + py * 4096 + int(frameIndex) * 256;
     float jitter = (halton2(haltonIdx % 256) - 0.5) * jitterStrength;
@@ -319,12 +319,12 @@ void main() {
         return;
     }
     if (fogDebug == 2) {
-        float sigma = texture(froxelExtinction, vec3(v_UV, 0.5)).r;
+        float sigma = textureLod(froxelExtinction, vec3(v_UV, 0.5), 0.0).r;
         fragColor = vec4(sigma, sigma, sigma, 1.0);
         return;
     }
     if (fogDebug == 3) {
-        vec3 scatter = texture(froxelScattering, vec3(v_UV, 0.5)).rgb;
+        vec3 scatter = textureLod(froxelScattering, vec3(v_UV, 0.5), 0.0).rgb;
         fragColor = vec4(scatter, 1.0);
         return;
     }
@@ -356,12 +356,12 @@ void main() {
         if (t1 > t0) {
             float sCenter = (float(step) + 0.5 * float(advance) + jitter) / float(marchCount);
             vec3 uvw = vec3(v_UV, clamp(sCenter, 0.0, 1.0));
-            float sigmaT = texture(froxelExtinction, uvw).r;
+            float sigmaT = textureLod(froxelExtinction, uvw, 0.0).r;
             if (!isFinite1(sigmaT)) {
                 sigmaT = 0.0;
             }
             sigmaT = clamp(sigmaT, 0.0, 6.0);
-            vec3 scatterSource = max(texture(froxelScattering, uvw).rgb, vec3(0.0));
+            vec3 scatterSource = max(textureLod(froxelScattering, uvw, 0.0).rgb, vec3(0.0));
 
             float dt = t1 - t0;
             float prevT = transmittance;
@@ -381,12 +381,12 @@ void main() {
         return;
     }
     if (fogDebug == 6) {
-        vec3 scatter = texture(froxelScattering, vec3(v_UV, 0.5)).rgb;
+        vec3 scatter = textureLod(froxelScattering, vec3(v_UV, 0.5), 0.0).rgb;
         fragColor = vec4(scatter, 1.0);
         return;
     }
     if (fogDebug == 7) {
-        vec2 motion = texture(motionTexture, v_UV).rg;
+        vec2 motion = textureLod(motionTexture, v_UV, 0.0).rg;
         float threshold = max(params.temporalParams.x, 1e-5);
         float motionMag = length(motion);
         float motionNorm = clamp(motionMag / threshold, 0.0, 1.0);
@@ -443,6 +443,11 @@ void main() {
     }
 
     vec3 outRgb = scene * transmittance + fogRadiance;
+    /* Guard against NaN/Inf from upstream (compute, bad params, etc.) */
+    if ( isnan( outRgb.r ) || isnan( outRgb.g ) || isnan( outRgb.b ) ||
+         isinf( outRgb.r ) || isinf( outRgb.g ) || isinf( outRgb.b ) ) {
+        outRgb = scene;
+    }
     if (fogDebug == 13) {
         vec3 fogDelta = outRgb - scene;
         float fogAmount = clamp(dot(abs(fogDelta), vec3(0.3333)) * 6.0, 0.0, 1.0);
