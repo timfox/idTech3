@@ -11172,7 +11172,10 @@ static void vk_create_oit_accum_pipeline( void )
 		if ( vk.colorWriteMaskDynamic ) {
 			dynamic_states[dyn_count++] = VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT;
 		}
+		Com_Memset( &dynamic_state, 0, sizeof( dynamic_state ) );
 		dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+		dynamic_state.pNext = NULL;
+		dynamic_state.flags = 0;
 		dynamic_state.dynamicStateCount = dyn_count;
 		dynamic_state.pDynamicStates = dynamic_states;
 	}
