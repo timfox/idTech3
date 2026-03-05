@@ -166,6 +166,7 @@ cvar_t	*r_renderHeight;
 cvar_t	*r_renderScale;
 cvar_t	*r_ext_supersample;
 cvar_t	*r_ext_smaa;
+cvar_t	*r_smaa_preset;
 cvar_t	*r_smaa_threshold;
 cvar_t	*r_smaa_local_contrast;
 cvar_t	*r_smaa_max_search_steps;
@@ -2910,17 +2911,21 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_ext_smaa, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ext_smaa, "Enables SMAA post-processing, requires \\r_fbo 1." );
 
+	r_smaa_preset = ri.Cvar_Get( "r_smaa_preset", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_smaa_preset, "0", "4", CV_INTEGER );
+	ri.Cvar_SetDescription( r_smaa_preset, "SMAA quality preset: 0=Custom, 1=Low, 2=Medium, 3=High, 4=Ultra. Overrides threshold/localContrast/searchSteps when non-zero." );
+
 	r_smaa_threshold = ri.Cvar_Get( "r_smaa_threshold", "0.1", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_smaa_threshold, "0.01", "0.5", CV_FLOAT );
-	ri.Cvar_SetDescription( r_smaa_threshold, "SMAA edge detection threshold (lower = more edges, higher = fewer)." );
+	ri.Cvar_SetDescription( r_smaa_threshold, "SMAA edge detection threshold (lower = more edges, higher = fewer). Used when r_smaa_preset 0." );
 
 	r_smaa_local_contrast = ri.Cvar_Get( "r_smaa_local_contrast", "2.0", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_smaa_local_contrast, "1.0", "4.0", CV_FLOAT );
-	ri.Cvar_SetDescription( r_smaa_local_contrast, "SMAA local contrast adaptation factor." );
+	ri.Cvar_SetDescription( r_smaa_local_contrast, "SMAA local contrast adaptation factor. Used when r_smaa_preset 0." );
 
 	r_smaa_max_search_steps = ri.Cvar_Get( "r_smaa_max_search_steps", "16", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_smaa_max_search_steps, "8", "32", CV_INTEGER );
-	ri.Cvar_SetDescription( r_smaa_max_search_steps, "SMAA blend search steps (higher = better quality, more cost)." );
+	ri.Cvar_SetDescription( r_smaa_max_search_steps, "SMAA blend search steps (higher = better quality, more cost). Used when r_smaa_preset 0." );
 
 	r_rtx = ri.Cvar_Get( "r_rtx", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_rtx, "0", "3", CV_INTEGER );

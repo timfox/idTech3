@@ -43,9 +43,10 @@ void main()
     }
     blendingWeight /= totalWeight;
 
+    /* Explicit LOD 0 for sharp sampling; blend neighbors with computed weights */
     vec4 color = vec4(0.0);
-    color += blendingWeight.x * texture(colorTexture, uv + blendingOffset.xy);
-    color += blendingWeight.y * texture(colorTexture, uv + blendingOffset.zw);
+    color += blendingWeight.x * textureLod(colorTexture, uv + blendingOffset.xy, 0.0);
+    color += blendingWeight.y * textureLod(colorTexture, uv + blendingOffset.zw, 0.0);
 
     out_color = color;
 }
