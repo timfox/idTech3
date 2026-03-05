@@ -407,6 +407,51 @@ extern "C" void VkImgui_DrawPostFXPanel(void) {
 		}
 		float preExp = VkImgui_CvarFloat( "r_pre_exposure_scale" );
 		VkImgui_CvarSlider( "Pre-exposure scale", "r_pre_exposure_scale", preExp, 0.1f, 4.0f );
+		float postContrast = VkImgui_CvarFloat( "r_post_contrast" );
+		float postSaturation = VkImgui_CvarFloat( "r_post_saturation" );
+		VkImgui_CvarSlider( "Contrast", "r_post_contrast", postContrast, 0.25f, 4.0f );
+		VkImgui_CvarSlider( "Saturation", "r_post_saturation", postSaturation, 0.0f, 3.0f );
+	}
+
+	if (ImGui::CollapsingHeader("PBR")) {
+		bool pbrOn = ri.Cvar_VariableIntegerValue( "r_pbr" ) != 0;
+		if ( ImGui::Checkbox( "Enable PBR", &pbrOn ) ) {
+			ri.Cvar_Set( "r_pbr", pbrOn ? "1" : "0" );
+		}
+		ImGui::SameLine();
+		ImGui::TextDisabled( "(?)" );
+		if ( ImGui::IsItemHovered() )
+			ImGui::SetTooltip( "Physically Based Rendering. Requires r_fbo 1. Changes need vid_restart." );
+		bool fboOn = ri.Cvar_VariableIntegerValue( "r_fbo" ) != 0;
+		if ( !fboOn && pbrOn ) {
+			ImGui::SameLine();
+			ImGui::TextColored( ImVec4( 1.0f, 0.5f, 0.0f, 1.0f ), "r_fbo 1 required" );
+		}
+	}
+
+	if (ImGui::CollapsingHeader("Anti-Aliasing")) {
+		int msaa = ri.Cvar_VariableIntegerValue( "r_ext_multisample" );
+		const char *msaaModes[] = { "Off", "2x", "4x", "8x", "16x" };
+		int msaaIdx = ( msaa <= 0 ) ? 0 : ( msaa <= 2 ) ? 1 : ( msaa <= 4 ) ? 2 : ( msaa <= 8 ) ? 3 : 4;
+		if ( ImGui::Combo( "MSAA", &msaaIdx, msaaModes, 5 ) ) {
+			int v = ( msaaIdx == 0 ) ? 0 : ( msaaIdx == 1 ) ? 2 : ( msaaIdx == 2 ) ? 4 : ( msaaIdx == 3 ) ? 8 : 16;
+			ri.Cvar_Set( "r_ext_multisample", va( "%d", v ) );
+		}
+		if ( msaa > 0 ) {
+			bool sampleShading = ri.Cvar_VariableIntegerValue( "r_msaa_sample_shading" ) != 0;
+			if ( ImGui::Checkbox( "Sample shading (better alpha, ~2x cost)", &sampleShading ) )
+				ri.Cvar_Set( "r_msaa_sample_shading", sampleShading ? "1" : "0" );
+			bool alphaToCov = ri.Cvar_VariableIntegerValue( "r_ext_alpha_to_coverage" ) != 0;
+			if ( ImGui::Checkbox( "Alpha-to-coverage (foliage, grates)", &alphaToCov ) )
+				ri.Cvar_Set( "r_ext_alpha_to_coverage", alphaToCov ? "1" : "0" );
+		}
+		bool smaaOn = ri.Cvar_VariableIntegerValue( "r_ext_smaa" ) != 0;
+		if ( ImGui::Checkbox( "SMAA (post-process)", &smaaOn ) )
+			ri.Cvar_Set( "r_ext_smaa", smaaOn ? "1" : "0" );
+		ImGui::SameLine();
+		ImGui::TextDisabled( "(?)" );
+		if ( ImGui::IsItemHovered() )
+			ImGui::SetTooltip( "MSAA + SMAA: geometry + alpha edges. MSAA/SMAA changes need vid_restart." );
 	}
 
 	if (ImGui::CollapsingHeader("Lens Effects")) {

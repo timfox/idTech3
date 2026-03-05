@@ -7,7 +7,7 @@ layout(push_constant) uniform SMAAParams {
     float threshold;
     float localContrast;
     int maxSearchSteps;
-    int _pad;
+    float corner_rounding;
 } pc;
 
 layout(location = 0) in vec2 frag_tex_coord;
@@ -25,7 +25,7 @@ float searchXLeft(vec2 uv) {
     int maxSteps = pc.maxSearchSteps;
     for (int i = 0; i < 32; i++) {
         if (i >= maxSteps) break;
-        e = texture(edgeTexture, uv).rg;
+        e = textureLod(edgeTexture, uv, 0.0).rg;
         uv -= vec2(2.0 * texelSize.x, 0.0);
         if (e.r < 0.5 || e.g > 0.5) break;
     }
@@ -37,7 +37,7 @@ float searchXRight(vec2 uv) {
     int maxSteps = pc.maxSearchSteps;
     for (int i = 0; i < 32; i++) {
         if (i >= maxSteps) break;
-        e = texture(edgeTexture, uv).rg;
+        e = textureLod(edgeTexture, uv, 0.0).rg;
         uv += vec2(2.0 * texelSize.x, 0.0);
         if (e.r < 0.5 || e.g > 0.5) break;
     }
@@ -49,7 +49,7 @@ float searchYUp(vec2 uv) {
     int maxSteps = pc.maxSearchSteps;
     for (int i = 0; i < 32; i++) {
         if (i >= maxSteps) break;
-        e = texture(edgeTexture, uv).rg;
+        e = textureLod(edgeTexture, uv, 0.0).rg;
         uv -= vec2(0.0, 2.0 * texelSize.y);
         if (e.g < 0.5 || e.r > 0.5) break;
     }
@@ -61,7 +61,7 @@ float searchYDown(vec2 uv) {
     int maxSteps = pc.maxSearchSteps;
     for (int i = 0; i < 32; i++) {
         if (i >= maxSteps) break;
-        e = texture(edgeTexture, uv).rg;
+        e = textureLod(edgeTexture, uv, 0.0).rg;
         uv += vec2(0.0, 2.0 * texelSize.y);
         if (e.g < 0.5 || e.r > 0.5) break;
     }
@@ -81,15 +81,15 @@ void main()
     vec2 uv = frag_tex_coord;
     vec4 weights = vec4(0.0);
 
-    vec2 e = texture(edgeTexture, uv).rg;
+    vec2 e = textureLod(edgeTexture, uv, 0.0).rg;
 
     if (e.g > 0.5) {
         float startX = uv.x / texelSize.x;
         float dLeft  = startX - searchXLeft(uv - vec2(texelSize.x * 0.5, 0.0));
         float dRight = searchXRight(uv + vec2(texelSize.x * 0.5, 0.0)) - startX;
 
-        float eLeft  = texture(edgeTexture, uv - vec2((dLeft  - 0.5) * texelSize.x, 0.0)).r;
-        float eRight = texture(edgeTexture, uv + vec2((dRight + 0.5) * texelSize.x, 0.0)).r;
+        float eLeft  = textureLod(edgeTexture, uv - vec2((dLeft  - 0.5) * texelSize.x, 0.0), 0.0).r;
+        float eRight = textureLod(edgeTexture, uv + vec2((dRight + 0.5) * texelSize.x, 0.0), 0.0).r;
 
         float w = computeAreaWeight(dLeft, dRight);
         weights.x = w * eLeft;
@@ -101,8 +101,8 @@ void main()
         float dUp   = startY - searchYUp(uv - vec2(0.0, texelSize.y * 0.5));
         float dDown = searchYDown(uv + vec2(0.0, texelSize.y * 0.5)) - startY;
 
-        float eUp   = texture(edgeTexture, uv - vec2(0.0, (dUp   - 0.5) * texelSize.y)).g;
-        float eDown = texture(edgeTexture, uv + vec2(0.0, (dDown + 0.5) * texelSize.y)).g;
+        float eUp   = textureLod(edgeTexture, uv - vec2(0.0, (dUp   - 0.5) * texelSize.y), 0.0).g;
+        float eDown = textureLod(edgeTexture, uv + vec2(0.0, (dDown + 0.5) * texelSize.y), 0.0).g;
 
         float w = computeAreaWeight(dUp, dDown);
         weights.y = w * eUp;

@@ -14,9 +14,9 @@ layout(push_constant) uniform SSAOParams {
 void main()
 {
 	int radius = int(pc.params.x);
-	if (radius <= 0) {
-		float ao = texture(ssaoTex, frag_tex_coord).r;
-		out_color = vec4(ao, ao, ao, 1.0);
+	if ( radius <= 0 ) {
+		float ao = textureLod( ssaoTex, frag_tex_coord, 0.0 ).r;
+		out_color = vec4( ao, ao, ao, 1.0 );
 		return;
 	}
 
@@ -33,7 +33,7 @@ void main()
 				continue;
 			}
 			float w = 1.0 - (abs(float(x)) + abs(float(y))) / (float(radius) * 2.0 + 1.0);
-			float ao = texture(ssaoTex, frag_tex_coord + vec2(x, y) * texel).r;
+			float ao = textureLod( ssaoTex, frag_tex_coord + vec2( x, y ) * texel, 0.0 ).r;
 			sum += ao * w;
 			weightSum += w;
 		}

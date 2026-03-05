@@ -8,7 +8,7 @@ layout(location = 0) out vec4 out_color;
 
 void main()
 {
-	vec3 scene = texture(sceneTex, frag_tex_coord).rgb;
-	float ao = texture(ssaoTex, frag_tex_coord).r;
-	out_color = vec4(scene * ao, 1.0);
+	vec3 scene = textureLod( sceneTex, frag_tex_coord, 0.0 ).rgb;
+	float ao = textureLod( ssaoTex, frag_tex_coord, 0.0 ).r;
+	out_color = vec4( scene * ao, 1.0 );
 }

@@ -13,13 +13,13 @@ void main()
     vec2 texel = vec2(1.0 / float(sz.x), 1.0 / float(sz.y));
 
     vec4 a;
-    a.x = texture(blendTexture, uv + vec2( texel.x, 0.0)).w; // right  (w = bottom-right weight)
-    a.y = texture(blendTexture, uv + vec2(0.0,  texel.y)).y; // below  (y = top weight)
-    a.z = texture(blendTexture, uv).z;                        // center (z = right weight)
-    a.w = texture(blendTexture, uv).x;                        // center (x = left weight)
+    a.x = textureLod(blendTexture, uv + vec2( texel.x, 0.0), 0.0).w; // right  (w = bottom-right weight)
+    a.y = textureLod(blendTexture, uv + vec2(0.0,  texel.y), 0.0).y; // below  (y = top weight)
+    a.z = textureLod(blendTexture, uv, 0.0).z;                        // center (z = right weight)
+    a.w = textureLod(blendTexture, uv, 0.0).x;                        // center (x = left weight)
 
     if (dot(a, vec4(1.0)) < 1e-5) {
-        out_color = texture(colorTexture, uv);
+        out_color = textureLod(colorTexture, uv, 0.0);
         return;
     }
 
@@ -38,7 +38,7 @@ void main()
 
     float totalWeight = blendingWeight.x + blendingWeight.y;
     if (totalWeight < 1e-5) {
-        out_color = texture(colorTexture, uv);
+        out_color = textureLod(colorTexture, uv, 0.0);
         return;
     }
     blendingWeight /= totalWeight;

@@ -19,7 +19,8 @@ layout(constant_id = 4) const float factor = 0.5;
 
 void main()
 {
-	vec3 base = texture(texture0, tex_coord).rgb + texture(texture1, tex_coord).rgb + texture(texture2, tex_coord).rgb + texture(texture3, tex_coord).rgb;
+	vec3 base = textureLod( texture0, tex_coord, 0.0 ).rgb + textureLod( texture1, tex_coord, 0.0 ).rgb
+		+ textureLod( texture2, tex_coord, 0.0 ).rgb + textureLod( texture3, tex_coord, 0.0 ).rgb;
 
 	if ( dot(base,base) == 0.0 )
 	{
