@@ -2096,10 +2096,10 @@ void IN_Frame( void )
 	IN_JoyMove();
 #endif
 
-	if ( Key_GetCatcher() & KEYCATCH_CONSOLE ) {
-		// temporarily deactivate if not in the game and
-		// running on the desktop with multimonitor configuration
-		if ( !glw_state.cdsFullscreen || glw_state.monitorCount > 1 ) {
+	if ( Key_GetCatcher() & ( KEYCATCH_CONSOLE | KEYCATCH_UI ) ) {
+		/* Release mouse and show cursor when console or menu is open. */
+		if ( !glw_state.cdsFullscreen || glw_state.monitorCount > 1 ||
+		     ( Key_GetCatcher() & KEYCATCH_UI ) ) {
 			IN_DeactivateMouse();
 			return;
 		}

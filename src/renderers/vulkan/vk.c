@@ -3963,7 +3963,8 @@ void vk_update_attachment_descriptors( void ) {
 		desc.pTexelBufferView = NULL;
 
 		qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
-		vk.post_fog_color_source = vk.color_image_view;
+		/* Ensure post-fog and luminance descriptors are initialized for gamma/eye-adaptation */
+		vk_update_post_fog_descriptors( vk.color_image_view );
 
 		// screenmap
 		sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
@@ -6823,6 +6824,7 @@ void vk_initialize( void )
 		if ( r_ext_multisample->integer ) {
 			vk.msaaActive = qtrue;
 		}
+		ri.Printf( PRINT_ALL, "...FBO enabled (HDR, post-process, gamma, PBR-ready)\n" );
 	} else {
 		vk.fboActive = qfalse;
 	}
@@ -16661,20 +16663,19 @@ void vk_end_frame( void )
 						(unsigned long long)(uintptr_t)vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ] );
 				}
 
-				if ( vk.gamma_pipeline == VK_NULL_HANDLE || vk.color_descriptor == VK_NULL_HANDLE ||
-					vk.render_pass.gamma == VK_NULL_HANDLE ||
-					vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ] == VK_NULL_HANDLE ||
-					vk.renderWidth == 0 || vk.renderHeight == 0 ) {
-					ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW "[VK][fbo] gamma pass skipped: missing pipeline/descriptor/renderpass/framebuffer or zero size (%dx%d)\n",
-						vk.renderWidth, vk.renderHeight );
-				} else {
-				/* Belt-and-suspenders: ensure color_descriptor samples correct source before gamma */
 				{
 					VkImageView gamma_src = ( post_fog_src != VK_NULL_HANDLE ) ? post_fog_src : vk.color_image_view;
-					if ( gamma_src != VK_NULL_HANDLE ) {
+					if ( vk.gamma_pipeline == VK_NULL_HANDLE || vk.color_descriptor == VK_NULL_HANDLE ||
+						vk.render_pass.gamma == VK_NULL_HANDLE ||
+						vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ] == VK_NULL_HANDLE ||
+						vk.renderWidth == 0 || vk.renderHeight == 0 ) {
+						ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW "[VK][fbo] gamma pass skipped: missing pipeline/descriptor/renderpass/framebuffer or zero size (%dx%d)\n",
+							vk.renderWidth, vk.renderHeight );
+					} else if ( gamma_src == VK_NULL_HANDLE ) {
+						ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW "[VK][fbo] gamma pass skipped: no valid color source (post_fog or color_image)\n" );
+					} else {
+				/* Belt-and-suspenders: ensure color_descriptor samples correct source before gamma */
 						vk_update_color_descriptor_image( gamma_src );
-					}
-				}
 				vk_begin_render_pass( vk.render_pass.gamma, vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ], qfalse, vk.renderWidth, vk.renderHeight );
 				qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.gamma_pipeline );
 				qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
@@ -16764,6 +16765,7 @@ void vk_end_frame( void )
 	}
 
 				vk_end_render_pass();
+					}
 				}
 
 	VK_CHECK( qvkEndCommandBuffer( vk.cmd->command_buffer ) );

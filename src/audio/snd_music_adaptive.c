@@ -104,13 +104,15 @@ void Music_Update(float intensity, float dt) {
 			}
 		}
 
+		/* Hysteresis to prevent rapid stop/start when intensity oscillates.
+		 * Start when bestVol > 0.15; stop only when bestVol < 0.02. */
 		static int lastActiveLayer = -1;
-		if (bestLayer != lastActiveLayer && bestLayer >= 0 && bestVol > 0.1f) {
+		if (bestLayer != lastActiveLayer && bestLayer >= 0 && bestVol > 0.15f) {
 			if (layers[bestLayer].track[0]) {
 				S_StartBackgroundTrack(layers[bestLayer].track, layers[bestLayer].looping ? layers[bestLayer].track : "");
 			}
 			lastActiveLayer = bestLayer;
-		} else if (bestLayer < 0 || bestVol < 0.05f) {
+		} else if (bestLayer < 0 || bestVol < 0.02f) {
 			if (lastActiveLayer >= 0) {
 				S_StopBackgroundTrack();
 				lastActiveLayer = -1;
