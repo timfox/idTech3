@@ -16658,11 +16658,11 @@ void vk_end_frame( void )
 						(unsigned long long)(uintptr_t)vk.color_descriptor,
 						(unsigned long long)(uintptr_t)vk.pipeline_layout_post_process,
 						(unsigned long long)(uintptr_t)vk.render_pass.gamma,
-						(unsigned long long)(uintptr_t)( vk.framebuffers.gamma ? vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ] : (VkFramebuffer)0 ) );
+						(unsigned long long)(uintptr_t)vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ] );
 				}
 
 				if ( vk.gamma_pipeline == VK_NULL_HANDLE || vk.color_descriptor == VK_NULL_HANDLE ||
-					vk.render_pass.gamma == VK_NULL_HANDLE || !vk.framebuffers.gamma ||
+					vk.render_pass.gamma == VK_NULL_HANDLE ||
 					vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ] == VK_NULL_HANDLE ||
 					vk.renderWidth == 0 || vk.renderHeight == 0 ) {
 					ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW "[VK][fbo] gamma pass skipped: missing pipeline/descriptor/renderpass/framebuffer or zero size (%dx%d)\n",

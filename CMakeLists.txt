@@ -1564,6 +1564,10 @@ if(USE_IMGUI)
   enable_language(CXX)
   set(IMGUI_SRCS
     src/renderers/vulkan/inspector/vk_imgui.cpp
+    ${EXTERNAL_SRC}/cimgui/imgui/imgui.cpp
+    ${EXTERNAL_SRC}/cimgui/imgui/imgui_draw.cpp
+    ${EXTERNAL_SRC}/cimgui/imgui/imgui_tables.cpp
+    ${EXTERNAL_SRC}/cimgui/imgui/imgui_widgets.cpp
   )
   set(IMGUI_INCLUDE_DIRS
     ${EXTERNAL_SRC}/cimgui/imgui
