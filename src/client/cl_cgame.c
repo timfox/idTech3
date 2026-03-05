@@ -44,6 +44,40 @@ static void CL_GetGameState( gameState_t *gs ) {
 	*gs = cl.gameState;
 }
 
+typedef struct {
+	int  stringOffsets[1024];
+	char stringData[16000];
+	int  dataCount;
+} legacyGameState_t;
+
+static void CL_GetLegacyGameState( legacyGameState_t *gs ) {
+	int i;
+
+	Com_Memset( gs, 0, sizeof( *gs ) );
+	gs->dataCount = 1;
+
+	for ( i = 0; i < (int)ARRAY_LEN( gs->stringOffsets ) && i < MAX_CONFIGSTRINGS; i++ ) {
+		const int offset = cl.gameState.stringOffsets[i];
+		const char *s;
+		size_t len;
+
+		if ( !offset ) {
+			continue;
+		}
+
+		s = cl.gameState.stringData + offset;
+		len = strlen( s );
+		if ( gs->dataCount + (int)len + 1 > (int)sizeof( gs->stringData ) ) {
+			Com_Printf( S_COLOR_YELLOW "WARNING: truncating legacy cgame gamestate at configstring %d\n", i );
+			break;
+		}
+
+		gs->stringOffsets[i] = gs->dataCount;
+		Com_Memcpy( gs->stringData + gs->dataCount, s, len + 1 );
+		gs->dataCount += (int)len + 1;
+	}
+}
+
 
 /*
 ====================
@@ -675,8 +709,12 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 		CL_GetGlconfig( VMA(1) );
 		return 0;
 	case CG_GETGAMESTATE:
-		VM_CHECKBOUNDS( cgvm, args[1], sizeof( gameState_t ) );
-		CL_GetGameState( VMA(1) );
+		if ( cgvm->dllHandle && *FS_GetCurrentGameDir() ) {
+			CL_GetLegacyGameState( VMA(1) );
+		} else {
+			VM_CHECKBOUNDS( cgvm, args[1], sizeof( gameState_t ) );
+			CL_GetGameState( VMA(1) );
+		}
 		return 0;
 	case CG_GETCURRENTSNAPSHOTNUMBER:
 		CL_GetCurrentSnapshotNumber( VMA(1), VMA(2) );
