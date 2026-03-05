@@ -2399,7 +2399,7 @@ static void R_Register( void )
 	}
 
 	r_volumetricFog = ri.Cvar_Get( "r_volumetricFog", "1", CVAR_ARCHIVE_ND );
-	ri.Cvar_SetDescription( r_volumetricFog, "Enable the volumetric fog compute/composite passes before tonemapping." );
+	ri.Cvar_SetDescription( r_volumetricFog, "Enable the volumetric fog compute/composite passes before tonemapping. Requires r_fbo 1." );
 	ri.Cvar_SetGroup( r_volumetricFog, CVG_RENDERER );
 
 	r_volumetricFogDensity = ri.Cvar_Get( "r_volumetricFogDensity", "0.6", CVAR_ARCHIVE_ND );
