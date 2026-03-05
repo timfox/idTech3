@@ -243,6 +243,11 @@ OIT re-enabled after wiring the OIT accum pipeline. When `r_oit 1` + `r_fbo 1`: 
 - **SMAA when volumetrics skipped**: Implemented. SMAA runs in menus and when volumetrics are skipped.
 - **Logging**: Add `PRINT_DEVELOPER` logs when volumetrics are skipped and descriptors are updated, to aid debugging.
 
+### Post-Process Pipeline Enhancements (March 2025)
+- **Centralized post-fog source**: `vk_get_post_fog_source()` returns the correct `VkImageView` for luminance/gamma based on `backEnd.doneFog` and `vk.post_fog_color_source`. Used in `vk_end_frame` to avoid redundant logic.
+- **r_fboDebug level 3**: Pipeline state logging (gamma pipeline, color_descriptor, layout, render pass, framebuffer handles) for debugging FBO issues.
+- **Defensive null checks**: Gamma pass skips and logs a warning if pipeline, descriptor, render pass, or framebuffer is null, avoiding crashes when resources are missing.
+
 ### Deferred / Forward+
 - Current design is forward-only. No change recommended unless deferred/Forward+ is a stated goal.
 - If adding deferred later, keep the FBO/descriptor design in mind to avoid similar descriptor/layout issues.

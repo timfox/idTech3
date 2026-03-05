@@ -3805,6 +3805,24 @@ static void vk_log_post_fog_rebind( const char *reason, VkImageView color_source
 }
 
 /*
+ * Centralized post-fog source selection for luminance/gamma passes.
+ * When volumetrics are skipped (menu, no world, tier off), force color_image
+ * so descriptors do not keep stale SMAA source from a previous frame.
+ * Returns the VkImageView to sample for post-fog effects.
+ */
+static VkImageView vk_get_post_fog_source( void )
+{
+	if ( backEnd.doneFog ) {
+		/* Volumetrics skipped: use color_image_view to avoid stale smaa_output */
+		return vk.color_image_view;
+	}
+	if ( vk.post_fog_color_source != VK_NULL_HANDLE ) {
+		return vk.post_fog_color_source;
+	}
+	return vk.color_image_view;
+}
+
+/*
  * Explicit postprocess source visibility barrier.
  * Keep layout in SHADER_READ_ONLY and enforce availability of previous
  * color-attachment writes for luminance/gamma sampling.
@@ -16529,17 +16547,10 @@ void vk_end_frame( void )
 
 				vk_end_render_pass();
 
-				/* Capture can run before vk_volumetric_fog_pass in vk_end_frame. Rebind the
-				 * descriptor explicitly so capture never samples a stale source from a
-				 * previous frame. */
-				if ( backEnd.doneFog ) {
-					capture_src = vk.post_fog_color_source;
-				} else {
-					capture_src = vk.color_image_view;
-				}
-				if ( capture_src == VK_NULL_HANDLE ) {
-					capture_src = vk.color_image_view;
-				}
+				/* Capture runs before vk_volumetric_fog_pass; at this point the current
+				 * frame's scene is in color_image. Use color_image_view (not post_fog
+				 * source which may be from the previous frame). */
+				capture_src = vk.color_image_view;
 				if ( capture_src != VK_NULL_HANDLE ) {
 					vk_update_color_descriptor_image( capture_src );
 					vk_barrier_post_fog_source_for_sampling( capture_src, "vk_end_frame pre-capture" );
@@ -16561,7 +16572,7 @@ void vk_end_frame( void )
 
 			if ( !ri.CL_IsMinimized() )
 			{
-				VkImageView post_fog_src = VK_NULL_HANDLE;
+				VkImageView post_fog_src;
 
 				vk_end_render_pass();
 
@@ -16571,19 +16582,10 @@ void vk_end_frame( void )
 				}
 				else
 				{
-					/* Volumetrics skipped (menu, no world, tier off): force color_image
-					 * as source so luminance/gamma do not keep stale SMAA source from a
-					 * previous frame. */
-					post_fog_src = vk.color_image_view;
-					vk_log_post_fog_rebind( "end_frame volumetric skipped (backEnd.doneFog)", post_fog_src );
+					vk_log_post_fog_rebind( "end_frame volumetric skipped (backEnd.doneFog)", vk.color_image_view );
 				}
 
-				if ( post_fog_src == VK_NULL_HANDLE ) {
-					post_fog_src = vk.post_fog_color_source;
-				}
-				if ( post_fog_src == VK_NULL_HANDLE ) {
-					post_fog_src = vk.color_image_view;
-				}
+				post_fog_src = vk_get_post_fog_source();
 				if ( post_fog_src != VK_NULL_HANDLE ) {
 					vk_update_post_fog_descriptors( post_fog_src );
 					vk_barrier_post_fog_source_for_sampling( post_fog_src, "vk_end_frame pre-luminance/gamma" );
@@ -16654,7 +16656,21 @@ void vk_end_frame( void )
 						vk_post_fog_source_name( post_fog_src ),
 						sx, sy );
 				}
+				if ( r_fboDebug && r_fboDebug->integer >= 3 ) {
+					ri.Printf( PRINT_DEVELOPER,
+						"[VK][fbo] gamma pipeline=0x%llx color_desc=0x%llx layout=0x%llx rp=0x%llx fb=0x%llx\n",
+						(unsigned long long)(uintptr_t)vk.gamma_pipeline,
+						(unsigned long long)(uintptr_t)vk.color_descriptor,
+						(unsigned long long)(uintptr_t)vk.pipeline_layout_post_process,
+						(unsigned long long)(uintptr_t)vk.render_pass.gamma,
+						(unsigned long long)(uintptr_t)( vk.framebuffers.gamma ? vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ] : (VkFramebuffer)0 ) );
+				}
 
+				if ( vk.gamma_pipeline == VK_NULL_HANDLE || vk.color_descriptor == VK_NULL_HANDLE ||
+					vk.render_pass.gamma == VK_NULL_HANDLE || !vk.framebuffers.gamma ||
+					vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ] == VK_NULL_HANDLE ) {
+					ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW "[VK][fbo] gamma pass skipped: missing pipeline/descriptor/renderpass/framebuffer\n" );
+				} else {
 				vk_begin_render_pass( vk.render_pass.gamma, vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ], qfalse, vk.renderWidth, vk.renderHeight );
 				qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.gamma_pipeline );
 				qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
@@ -16743,7 +16759,8 @@ void vk_end_frame( void )
 		}
 	}
 
-	vk_end_render_pass();
+				vk_end_render_pass();
+				}
 
 	VK_CHECK( qvkEndCommandBuffer( vk.cmd->command_buffer ) );
 
