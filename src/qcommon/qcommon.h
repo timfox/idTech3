@@ -33,12 +33,18 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #endif
 #endif
 
-/* C99 defines __func__ */
-#if __STDC_VERSION__ < 199901L 
-#if __GNUC__ >= 2 || _MSC_VER >= 1300 
-#define __func__ __FUNCTION__ 
-#else 
-#define __func__ "(unknown)" 
+/* C99 defines __func__; C++11 and later define it */
+#if defined(__cplusplus)
+#if __cplusplus >= 201103L
+/* __func__ is standard in C++11+ */
+#else
+#define __func__ __FUNCTION__
+#endif
+#elif !defined(__STDC_VERSION__) || __STDC_VERSION__ < 199901L
+#if defined(__GNUC__) && __GNUC__ >= 2 || defined(_MSC_VER) && _MSC_VER >= 1300
+#define __func__ __FUNCTION__
+#else
+#define __func__ "(unknown)"
 #endif
 #endif
 

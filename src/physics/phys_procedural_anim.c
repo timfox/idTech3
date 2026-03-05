@@ -112,7 +112,7 @@ static float ProcAnim_ComputeBalance(procAnimController_t *ctrl) {
 
 static void ProcAnim_ApplyBalanceForces(procAnimController_t *ctrl, float dt) {
 	physTransform_t pelvis, lfoot, rfoot;
-	vec3_t supportCenter, corrective, damping, zero;
+	vec3_t supportCenter, corrective, damping;
 	float stiffness, dampCoeff;
 
 	Phys_RagdollGetBoneTransform(ctrl->ragdoll, PROCANIM_BONE_PELVIS, &pelvis);
@@ -135,14 +135,13 @@ static void ProcAnim_ApplyBalanceForces(procAnimController_t *ctrl, float dt) {
 	damping[2] = -ctrl->comVelocity[2] * dampCoeff;
 
 	VectorAdd(corrective, damping, corrective);
-	VectorSet(zero, 0, 0, 0);
 
 	Phys_RagdollApplyImpact(ctrl->ragdoll, pelvis.position, corrective, 50.0f);
 }
 
 static void ProcAnim_ApplyBraceReaction(procAnimController_t *ctrl, float dt) {
 	physTransform_t pelvis;
-	vec3_t braceTarget, zero;
+	vec3_t braceTarget;
 	float extension;
 
 	(void)dt;
@@ -156,7 +155,6 @@ static void ProcAnim_ApplyBraceReaction(procAnimController_t *ctrl, float dt) {
 	braceTarget[2] += ctrl->comVelocity[2] * extension * 50.0f;
 	braceTarget[1] -= 20.0f;
 
-	VectorSet(zero, 0, 0, 0);
 	Phys_RagdollReach(ctrl->ragdoll, PROCANIM_BONE_LOWER_ARM_L, braceTarget, ctrl->config.grabStrength * 0.5f);
 	Phys_RagdollReach(ctrl->ragdoll, PROCANIM_BONE_LOWER_ARM_R, braceTarget, ctrl->config.grabStrength * 0.5f);
 }
@@ -345,12 +343,11 @@ void ProcAnim_Update(procAnimHandle_t handle, float dt) {
 
 		case PROCANIM_STATE_GETUP: {
 			physTransform_t pelvis;
-			vec3_t upForce, zero;
+			vec3_t upForce;
 
 			Phys_RagdollGetBoneTransform(ctrl->ragdoll, PROCANIM_BONE_PELVIS, &pelvis);
 
 			VectorSet(upForce, 0, ctrl->config.getupSpeed * 200.0f * dt, 0);
-			VectorSet(zero, 0, 0, 0);
 			Phys_RagdollApplyImpact(ctrl->ragdoll, pelvis.position, upForce, 30.0f);
 
 			ctrl->muscleStiffness += dt * ctrl->config.balanceRecoverySpeed;

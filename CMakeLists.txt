@@ -29,21 +29,25 @@ if(C_STANDARD_STRICT)
   if(MSVC)
     add_compile_options(/W4)
   else()
-    set(C_STRICT_WARNINGS
+    # Flags valid for both C and C++
+    set(C_CXX_STRICT_WARNINGS
       -Wall
       -Wextra
       -Wpedantic
       -Wshadow
-      -Wstrict-prototypes
-      -Wmissing-prototypes
-      -Wold-style-definition
       -Wformat=2
       -Wundef
       -Wcast-qual
       -Wpointer-arith
       -Wvla
     )
-    add_compile_options(${C_STRICT_WARNINGS})
+    add_compile_options(${C_CXX_STRICT_WARNINGS})
+    # C-only flags (not valid for C++) - apply per-flag so generator expr expands
+    add_compile_options(
+      $<$<COMPILE_LANGUAGE:C>:-Wstrict-prototypes>
+      $<$<COMPILE_LANGUAGE:C>:-Wmissing-prototypes>
+      $<$<COMPILE_LANGUAGE:C>:-Wold-style-definition>
+    )
   endif()
 endif()
 
@@ -848,12 +852,12 @@ if(USE_ZLIB)
     endif()
     if(TARGET zlibstatic)
       target_compile_definitions(zlibstatic PRIVATE ZLIB_CONST)
-      target_compile_definitions(zlibstatic PRIVATE _LFS64_LARGEFILE=1 _LARGEFILE64_SOURCE=1 Z_LARGE64=1)
+      target_compile_definitions(zlibstatic PRIVATE _LFS64_LARGEFILE=1 _LARGEFILE64_SOURCE=1)
       set_property(TARGET zlibstatic PROPERTY POSITION_INDEPENDENT_CODE ON)
     endif()
     if(TARGET zlib)
       target_compile_definitions(zlib PRIVATE ZLIB_CONST)
-      target_compile_definitions(zlib PRIVATE _LFS64_LARGEFILE=1 _LARGEFILE64_SOURCE=1 Z_LARGE64=1)
+      target_compile_definitions(zlib PRIVATE _LFS64_LARGEFILE=1 _LARGEFILE64_SOURCE=1)
       set_property(TARGET zlib PROPERTY POSITION_INDEPENDENT_CODE ON)
     endif()
   endif()
