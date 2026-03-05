@@ -27,6 +27,9 @@ static inline qboolean vk_hdr64_active( void )
 /* GPU occlusion culling: visibility from previous frame (1=visible, 0=occluded) */
 uint64_t vk_entity_occlusion_visibility[MAX_REFENTITIES];
 static uint32_t vk_occlusion_last_entity_count;
+
+/* Render pass state: set by vk_begin_render_pass / vk_end_render_pass */
+static qboolean vk_in_render_pass;
 #include "vk_fluidsim.h"
 #include "vk_terrain.h"
 #include <stddef.h>
@@ -8435,6 +8438,8 @@ void vk_vegetation_wind_dispatch( void )
 	{
 		return;
 	}
+	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE )
+		return;
 
 	vk_end_render_pass();
 
@@ -13588,6 +13593,8 @@ void vk_occlusion_draw_entity_bboxes( const struct drawSurfsCommand_s *cmd )
 	int i, n;
 	const drawSurfsCommand_t *c = (const drawSurfsCommand_t *)cmd;
 
+	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE )
+		return;
 	if ( vk.occlusion_query_pool == VK_NULL_HANDLE || vk.occlusion_bbox_pipeline == 0 ||
 		!qvkCmdBeginQuery || !qvkCmdEndQuery || !qvkCmdResetQueryPool )
 		return;
@@ -13688,6 +13695,8 @@ void vk_clear_color( const vec4_t color ) {
 
 	if ( !vk.active )
 		return;
+	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE || !vk_in_render_pass )
+		return;
 
 	attachment.colorAttachment = 0;
 	attachment.clearValue.color.float32[0] = color[0];
@@ -13725,6 +13734,8 @@ void vk_clear_depth( qboolean clear_stencil ) {
 	VkClearRect clear_rect[1];
 
 	if ( !vk.active )
+		return;
+	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE || !vk_in_render_pass )
 		return;
 
 	if ( vk_world.dirty_depth_attachment == 0 )
@@ -14273,6 +14284,8 @@ void vk_draw_geometry( Vk_Depth_Range depth_range, qboolean indexed ) {
 		// geometry buffer overflow happened this frame
 		return;
 	}
+	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE || !vk_in_render_pass )
+		return;
 
 	vk_bind_descriptor_sets();
 
@@ -14299,6 +14312,8 @@ void vk_draw_dot( uint32_t storage_offset )
 		// geometry buffer overflow happened this frame
 		return;
 	}
+	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE || !vk_in_render_pass )
+		return;
 
 	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_storage, VK_DESC_STORAGE, 1, &vk.storage.descriptor, 1, &storage_offset );
 
@@ -14308,8 +14323,6 @@ void vk_draw_dot( uint32_t storage_offset )
 	qvkCmdDraw( vk.cmd->command_buffer, tess.numVertexes, 1, 0, 0 );
 }
 
-
-static qboolean vk_in_render_pass;
 
 static void vk_set_fullscreen_viewport_scissor( uint32_t width, uint32_t height )
 {
@@ -16155,6 +16168,9 @@ static void vk_begin_screenmap_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.screenmap;
 
+	if ( frameBuffer == VK_NULL_HANDLE || vk.render_pass.screenmap == VK_NULL_HANDLE )
+		return;
+
 	vk.renderPassIndex = RENDER_PASS_SCREENMAP;
 
 	vk.renderWidth = vk.screenMapWidth;
@@ -16271,6 +16287,10 @@ void vk_validate_pbr_ibl_resources( void )
 void vk_end_render_pass( void )
 {
 	if ( !vk_in_render_pass ) {
+		return;
+	}
+	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
+		vk_in_render_pass = qfalse;
 		return;
 	}
 
@@ -18375,6 +18395,9 @@ qboolean vk_bloom( void )
 	if ( !backEnd.doneFog ) {
 		vk_volumetric_fog_pass();
 	}
+
+	/* Ensure color_image is ready for sampling before bloom extract */
+	vk_barrier_post_fog_source_for_sampling( vk.color_image_view, "pre-bloom-extract" );
 
 	// bloom extraction
 	vk_begin_bloom_extract_render_pass();
