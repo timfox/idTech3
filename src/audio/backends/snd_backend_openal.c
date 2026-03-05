@@ -2101,6 +2101,11 @@ Cvar_CheckRange( s_khz, "0", "48", CV_INTEGER );
 
 // VOIP Capture Support
 #ifdef USE_OPUS
+void SNDDMA_StartCapture( void );
+int SNDDMA_AvailableCaptureSamples( void );
+void SNDDMA_Capture( int samples, byte *data );
+void SNDDMA_StopCapture( void );
+
 void SNDDMA_StartCapture( void ) {
 	if ( !alCaptureDevice ) {
 		return;
