@@ -16096,6 +16096,20 @@ void vk_prepare_2d( void )
 		cvar_t *tierCvar = ri.Cvar_Get( "r_volumetricFogTier", "0", 0 );
 		if ( tierCvar ) tier = tierCvar->integer;
 		if ( !vk.fboActive || !r_volumetricFog || !r_volumetricFog->integer || tier >= 2 || tier == 4 || backEnd.doneFog ) {
+			/* Early exit for non-fog path; but if no render pass is active and we have
+			 * no world (cinematic/menu-only), we must start one so 2D can draw. */
+			if ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+				if ( vk.cmd && vk.cmd->command_buffer != VK_NULL_HANDLE && !vk_in_render_pass &&
+					vk.cmd->swapchain_image_index < MAX_SWAPCHAIN_IMAGES &&
+					vk.render_pass.post_bloom != VK_NULL_HANDLE &&
+					vk.framebuffers.main[ vk.cmd->swapchain_image_index ] != VK_NULL_HANDLE ) {
+					vk_reset_volumetric_history();
+					backEnd.doneFog = qtrue;
+					vk_log_post_fog_rebind( "prepare_2d no-world (no pass): color source (SMAA after 2D)", vk.color_image_view );
+					vk_update_post_fog_descriptors( vk.color_image_view );
+					vk_begin_post_bloom_render_pass();
+				}
+			}
 			return;
 		}
 	}
