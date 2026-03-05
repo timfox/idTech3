@@ -625,7 +625,7 @@ typedef struct {
 	VkDescriptorSet volumetric_composite_descriptor;
 	VkDescriptorSet volumetric_depth_resolve_descriptor;
 	VkDescriptorSetLayout luminance_layout;
-	VkDescriptorSet luminance_descriptor;
+	VkDescriptorSet luminance_descriptor[NUM_COMMAND_BUFFERS];	/* per-frame (VUID-03047) */
 	VkPipelineLayout luminance_pipeline_layout;
 	VkPipeline luminance_pipeline;
 	VkImage luminance_image;
@@ -657,7 +657,7 @@ typedef struct {
 	VkDeviceMemory vegwind_vertex_memory;
 	VkDescriptorSet vegwind_descriptor;
 
-	VkDescriptorSet color_descriptor;
+	VkDescriptorSet color_descriptor[NUM_COMMAND_BUFFERS];	/* per-frame (VUID-03047) */
 	VkImageView post_fog_color_source;	/* last source for gamma (color_image or smaa_output) */
 	VkDescriptorSet depth_descriptor;
 	VkDescriptorSet smaa_edge_descriptor;
@@ -700,6 +700,7 @@ typedef struct {
 
 	VkImage depth_image;
 	VkImageView depth_image_view;
+	VkImageView depth_image_view_sampler;	/* depth-only view for descriptor sampling (VUID-01976); NULL if depth has no stencil */
 
 	VkImage msaa_image;
 	VkImageView msaa_image_view;
