@@ -3813,10 +3813,9 @@ static void vk_log_post_fog_rebind( const char *reason, VkImageView color_source
  */
 static VkImageView vk_get_post_fog_source( void )
 {
-	if ( backEnd.doneFog ) {
-		/* Volumetrics skipped: use color_image_view to avoid stale smaa_output */
-		return vk.color_image_view;
-	}
+	/* Use post_fog_color_source when set (SMAA output or color); else color_image_view.
+	 * When volumetrics skipped, post_fog is set by vk_volumetric_fog_pass skip paths or
+	 * vk_end_frame menu SMAA path. Avoid stale smaa_output by ensuring all paths set it. */
 	if ( vk.post_fog_color_source != VK_NULL_HANDLE ) {
 		return vk.post_fog_color_source;
 	}
@@ -15729,15 +15728,9 @@ static void vk_volumetric_fog_pass( void )
 		if ( tier >= 2 || tier == 4 || !r_volumetricFog->integer || !vk.fboActive ||
 			!tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
 			vk_reset_volumetric_history();
-			/* SMAA when volumetrics skipped: run if SMAA active (menus and in-game) */
-			if ( vk.smaaActive && vk.smaa_output_image_view != VK_NULL_HANDLE ) {
-				vk_smaa_passes();
-				vk_log_post_fog_rebind( "volumetric skipped (tier/off/no-world): SMAA source", vk.smaa_output_image_view );
-				vk_update_post_fog_descriptors( vk.smaa_output_image_view );
-			} else {
-				vk_log_post_fog_rebind( "volumetric skipped (tier/off/no-world): color source", vk.color_image_view );
-				vk_update_post_fog_descriptors( vk.color_image_view );
-			}
+			/* SMAA runs in vk_end_frame after 2D overlays; set color for now */
+			vk_log_post_fog_rebind( "volumetric skipped (tier/off/no-world)", vk.color_image_view );
+			vk_update_post_fog_descriptors( vk.color_image_view );
 			/* Restore depth layout if atmosphere ran (tr.world) */
 			if ( tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
 				VkImageAspectFlags da = VK_IMAGE_ASPECT_DEPTH_BIT;
@@ -15769,14 +15762,8 @@ static void vk_volumetric_fog_pass( void )
 		vk_prev_matrices_valid = qfalse;
 		vk_prev_volumetric_time_valid = qfalse;
 		Com_Memset( &vk_volumetric_validation_state, 0, sizeof( vk_volumetric_validation_state ) );
-		if ( vk.smaaActive && vk.smaa_output_image_view != VK_NULL_HANDLE ) {
-			vk_smaa_passes();
-			vk_log_post_fog_rebind( "volumetric skipped (missing resources): SMAA source", vk.smaa_output_image_view );
-			vk_update_post_fog_descriptors( vk.smaa_output_image_view );
-		} else {
-			vk_log_post_fog_rebind( "volumetric skipped (missing resources): color source", vk.color_image_view );
-			vk_update_post_fog_descriptors( vk.color_image_view );
-		}
+		vk_log_post_fog_rebind( "volumetric skipped (missing resources)", vk.color_image_view );
+		vk_update_post_fog_descriptors( vk.color_image_view );
 		if ( tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
 			VkImageAspectFlags da = VK_IMAGE_ASPECT_DEPTH_BIT;
 			if ( glConfig.stencilBits > 0 ) da |= VK_IMAGE_ASPECT_STENCIL_BIT;
@@ -15806,14 +15793,8 @@ static void vk_volumetric_fog_pass( void )
 		vk_prev_matrices_valid = qfalse;
 		vk_prev_volumetric_time_valid = qfalse;
 		Com_Memset( &vk_volumetric_validation_state, 0, sizeof( vk_volumetric_validation_state ) );
-		if ( vk.smaaActive && vk.smaa_output_image_view != VK_NULL_HANDLE ) {
-			vk_smaa_passes();
-			vk_log_post_fog_rebind( "volumetric skipped (MSAA depth resolve missing): SMAA source", vk.smaa_output_image_view );
-			vk_update_post_fog_descriptors( vk.smaa_output_image_view );
-		} else {
-			vk_log_post_fog_rebind( "volumetric skipped (MSAA depth resolve missing): color source", vk.color_image_view );
-			vk_update_post_fog_descriptors( vk.color_image_view );
-		}
+		vk_log_post_fog_rebind( "volumetric skipped (MSAA depth resolve missing)", vk.color_image_view );
+		vk_update_post_fog_descriptors( vk.color_image_view );
 		if ( tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
 			VkImageAspectFlags da = VK_IMAGE_ASPECT_DEPTH_BIT;
 			if ( glConfig.stencilBits > 0 ) da |= VK_IMAGE_ASPECT_STENCIL_BIT;
@@ -16007,15 +15988,10 @@ void vk_prepare_2d( void )
 		backEnd.doneFog = qtrue;
 		if ( vk.renderPassIndex == RENDER_PASS_MAIN ) {
 			vk_end_render_pass();
-			/* Ensure gamma/luminance sample correct source (avoids solid-color in menus). */
-			if ( vk.smaaActive && vk.smaa_output_image_view != VK_NULL_HANDLE ) {
-				vk_smaa_passes();
-				vk_log_post_fog_rebind( "prepare_2d no-world: SMAA source", vk.smaa_output_image_view );
-				vk_update_post_fog_descriptors( vk.smaa_output_image_view );
-			} else {
-				vk_log_post_fog_rebind( "prepare_2d no-world: color source", vk.color_image_view );
-				vk_update_post_fog_descriptors( vk.color_image_view );
-			}
+			/* No-world (menu): do NOT run SMAA here — 2D overlays are drawn in post_bloom.
+			 * SMAA runs in vk_end_frame after 2D so scene+2D get anti-aliased. */
+			vk_log_post_fog_rebind( "prepare_2d no-world: color source (SMAA after 2D)", vk.color_image_view );
+			vk_update_post_fog_descriptors( vk.color_image_view );
 			vk_begin_post_bloom_render_pass();
 		}
 		return;
@@ -16584,7 +16560,19 @@ void vk_end_frame( void )
 				}
 				else
 				{
-					vk_log_post_fog_rebind( "end_frame volumetric skipped (backEnd.doneFog)", vk.color_image_view );
+					/* Volumetrics skipped: run SMAA after 2D overlays (scene+2D in color_image).
+					 * Skip paths run SMAA before 2D; we fix by running it here instead. */
+					if ( vk.smaaActive && vk.smaa_output_image_view != VK_NULL_HANDLE )
+					{
+						vk_smaa_passes();
+						vk_log_post_fog_rebind( "end_frame SMAA (scene+2D)", vk.smaa_output_image_view );
+						vk_update_post_fog_descriptors( vk.smaa_output_image_view );
+					}
+					else
+					{
+						vk_log_post_fog_rebind( "end_frame volumetric skipped (backEnd.doneFog)", vk.color_image_view );
+						vk_update_post_fog_descriptors( vk.color_image_view );
+					}
 				}
 
 				post_fog_src = vk_get_post_fog_source();

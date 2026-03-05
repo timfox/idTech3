@@ -196,6 +196,8 @@ OIT re-enabled after wiring the OIT accum pipeline. When `r_oit 1` + `r_fbo 1`: 
 6. **Gamma framebuffer dimensions (March 2025)**: Gamma framebuffer now uses `vk.swapchain_extent` when valid, ensuring it matches swapchain image dimensions. Gamma pass viewport uses the same extent. Zero-size guard added to skip gamma when dimensions are invalid.
 7. **SMAA blend pass descriptor (March 2025)**: The blend pass was receiving `smaa_edge_descriptor` (scene/color_image) for set 0 when it expects edges (`smaa_edge`). Fixed to pass `smaa_blend_descriptor` (points to smaa_edge_image_view) for both sets. This caused garbage/single-color when SMAA ran (menu and volumetric paths).
 
+8. **SMAA after 2D overlays (March 2025)**: SMAA was running before post_bloom (2D overlays), so the gamma pass sampled smaa_output which lacked UI. Fixed: SMAA now runs in vk_end_frame after post_bloom ends, so scene+2D are anti-aliased. Removed SMAA from vk_volumetric_fog_pass skip paths; vk_get_post_fog_source uses post_fog_color_source when set.
+
 ---
 
 ## 7. Deferred vs Forward Architecture
