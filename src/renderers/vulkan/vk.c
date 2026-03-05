@@ -6825,6 +6825,9 @@ void vk_initialize( void )
 			vk.msaaActive = qtrue;
 		}
 		ri.Printf( PRINT_ALL, "...FBO enabled (HDR, post-process, gamma, PBR-ready)\n" );
+		if ( r_fboDebug && r_fboDebug->integer >= 4 ) {
+			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "[VK][fbo] Troubleshooting: if seeing solid/wrong colors, try r_oit 0 r_exposure_auto 0 r_ext_smaa 0 r_ssao 0 then vid_restart\n" S_COLOR_WHITE );
+		}
 	} else {
 		vk.fboActive = qfalse;
 	}
@@ -16229,24 +16232,29 @@ void vk_begin_frame( void )
 				float speed = speed_var->value > 0.0f ? speed_var->value * 0.016f : 0.02f;
 				float targetExp = target;
 
-				/* Camera cut: large view jump → snap exposure for faster adaptation */
-				{
+				/* No-world (menu): use fixed exposure 1.0 to avoid rapid color changes from
+				 * menu animations driving luminance; prevents solid/rapidly-changing screen. */
+				if ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+					targetExp = 1.0f;
+					speed = 0.1f;  /* slower blend toward 1.0 when entering menu */
+				} else {
+					/* Camera cut: large view jump → snap exposure for faster adaptation */
 					float dx = tr.refdef.vieworg[0] - vk.prevViewOrigin[0];
 					float dy = tr.refdef.vieworg[1] - vk.prevViewOrigin[1];
 					float dz = tr.refdef.vieworg[2] - vk.prevViewOrigin[2];
 					float distSq = dx * dx + dy * dy + dz * dz;
 					if ( distSq > 128.0f * 128.0f )
 						speed = 0.5f;  /* snap within ~2 frames */
-				}
 
-				if ( vk.luminance_staging_ptr ) {
-					float avgLogLum = *(const float *)vk.luminance_staging_ptr;
-					/* Clamp to valid range: avoid NaN/Inf from bad readback or first-frame garbage */
-					if ( avgLogLum != avgLogLum || avgLogLum <= -20.0f || avgLogLum >= 20.0f )
-						avgLogLum = 0.0f;
-					float sceneLum = powf( 2.0f, avgLogLum );
-					targetExp = ( sceneLum > 1e-6f ) ? ( target / sceneLum ) : 1.0f;
-					targetExp = ( targetExp < 0.01f ) ? 0.01f : ( targetExp > 10.0f ? 10.0f : targetExp );
+					if ( vk.luminance_staging_ptr ) {
+						float avgLogLum = *(const float *)vk.luminance_staging_ptr;
+						/* Clamp to valid range: avoid NaN/Inf from bad readback or first-frame garbage */
+						if ( avgLogLum != avgLogLum || avgLogLum <= -20.0f || avgLogLum >= 20.0f )
+							avgLogLum = 0.0f;
+						float sceneLum = powf( 2.0f, avgLogLum );
+						targetExp = ( sceneLum > 1e-6f ) ? ( target / sceneLum ) : 1.0f;
+						targetExp = ( targetExp < 0.01f ) ? 0.01f : ( targetExp > 10.0f ? 10.0f : targetExp );
+					}
 				}
 
 				vk.adaptedExposure += ( targetExp - vk.adaptedExposure ) * speed;
