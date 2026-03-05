@@ -2793,7 +2793,7 @@ static void R_Register( void )
 
 	r_fboDebug = ri.Cvar_Get( "r_fboDebug", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_fboDebug, "0", "4", CV_INTEGER );
-	ri.Cvar_SetDescription( r_fboDebug, "FBO diagnostics:\n 0 - off\n 1 - log descriptor source changes and volumetric skip reasons\n 2 - verbose per-frame gamma scaling/layout diagnostics (PRINT_DEVELOPER)\n 3 - pipeline state (gamma pipeline, descriptor, render pass handles)\n 4 - one-time troubleshooting tips when FBO broken (r_oit 0, r_exposure_auto 0, etc)." );
+	ri.Cvar_SetDescription( r_fboDebug, "FBO diagnostics:\n 0 - off\n 1 - log descriptor source changes and volumetric skip reasons\n 2 - verbose gamma/layout (throttled to 1/sec)\n 3 - pipeline state (throttled to 1/sec)\n 4 - one-time troubleshooting tips when FBO broken (r_oit 0, r_exposure_auto 0, etc)." );
 	ri.Cvar_SetGroup( r_fboDebug, CVG_RENDERER );
 
 	r_froxelDebug = ri.Cvar_Get( "r_froxelDebug", "0", CVAR_ARCHIVE_ND );

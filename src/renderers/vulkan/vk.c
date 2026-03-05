@@ -3795,9 +3795,24 @@ static VkImage vk_post_fog_source_image( VkImageView color_source )
 	return VK_NULL_HANDLE;
 }
 
+/*
+ * Throttle r_fboDebug 2/3 per-frame logs to at most once per second.
+ * Avoids console spam when debugging FBO pipeline.
+ */
+static qboolean vk_fbo_debug_throttle( void )
+{
+	static unsigned int last_ms = 0;
+	unsigned int now = ri.Milliseconds();
+	if ( now - last_ms < 1000 )
+		return qfalse;
+	last_ms = now;
+	return qtrue;
+}
+
 static void vk_log_post_fog_rebind( const char *reason, VkImageView color_source )
 {
-	if ( r_fboDebug && r_fboDebug->integer >= 1 ) {
+	if ( r_fboDebug && r_fboDebug->integer >= 1 &&
+		( r_fboDebug->integer < 2 || vk_fbo_debug_throttle() ) ) {
 		ri.Printf( PRINT_DEVELOPER, "[VK][fbo] %s -> %s view=0x%llx\n",
 			reason ? reason : "post-fog source rebind",
 			vk_post_fog_source_name( color_source ),
@@ -3862,7 +3877,7 @@ static void vk_barrier_post_fog_source_for_sampling( VkImageView color_source, c
 		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 		0, 0, NULL, 0, NULL, 1, &barrier );
 
-	if ( r_fboDebug && r_fboDebug->integer >= 2 ) {
+	if ( r_fboDebug && r_fboDebug->integer >= 2 && vk_fbo_debug_throttle() ) {
 		ri.Printf( PRINT_DEVELOPER,
 			"[VK][fbo] post-fog source barrier (%s): %s image=0x%llx view=0x%llx\n",
 			reason ? reason : "unspecified",
@@ -3922,7 +3937,7 @@ static void vk_update_post_fog_descriptors( VkImageView color_source )
 	}
 
 	if ( r_fboDebug && r_fboDebug->integer >= 1 &&
-		( r_fboDebug->integer >= 2 || old_source != color_source ) ) {
+		( r_fboDebug->integer >= 2 ? vk_fbo_debug_throttle() : ( old_source != color_source ) ) ) {
 		ri.Printf( PRINT_DEVELOPER,
 			"[VK][fbo] post-fog descriptors: %s -> %s view=0x%llx luminance=%s\n",
 			vk_post_fog_source_name( old_source ),
@@ -16665,7 +16680,7 @@ void vk_end_frame( void )
 
 				vk.renderScaleX = 1.0;
 				vk.renderScaleY = 1.0;
-				if ( r_fboDebug && r_fboDebug->integer >= 2 ) {
+				if ( r_fboDebug && r_fboDebug->integer >= 2 && vk_fbo_debug_throttle() ) {
 					const float sx = ( glConfig.vidWidth > 0 ) ? (float)vk.renderWidth / (float)glConfig.vidWidth : 1.0f;
 					const float sy = ( glConfig.vidHeight > 0 ) ? (float)vk.renderHeight / (float)glConfig.vidHeight : 1.0f;
 					ri.Printf( PRINT_DEVELOPER,
@@ -16676,7 +16691,7 @@ void vk_end_frame( void )
 						vk_post_fog_source_name( post_fog_src ),
 						sx, sy );
 				}
-				if ( r_fboDebug && r_fboDebug->integer >= 3 ) {
+				if ( r_fboDebug && r_fboDebug->integer >= 3 && vk_fbo_debug_throttle() ) {
 					ri.Printf( PRINT_DEVELOPER,
 						"[VK][fbo] gamma pipeline=0x%llx color_desc=0x%llx layout=0x%llx rp=0x%llx fb=0x%llx\n",
 						(unsigned long long)(uintptr_t)vk.gamma_pipeline,
