@@ -602,6 +602,7 @@ typedef struct {
 	VkDescriptorSetLayout set_layout_sampler;	// combined image sampler
 	VkDescriptorSetLayout set_layout_uniform;	// dynamic uniform buffer
 	VkDescriptorSetLayout set_layout_storage;	// feedback buffer
+	VkDescriptorSetLayout set_layout_postfx_uniform;	// post-process params uniform buffer
 
 	VkPipelineLayout pipeline_layout;			// default shaders
 	VkPipelineLayout pipeline_layout_storage;	// flare test shader layout
@@ -634,6 +635,9 @@ typedef struct {
 	VkBuffer luminance_staging_buffer;
 	VkDeviceMemory luminance_staging_memory;
 	void *luminance_staging_ptr;
+	VkBuffer postfx_params_buffer[NUM_COMMAND_BUFFERS];
+	VkDeviceMemory postfx_params_memory[NUM_COMMAND_BUFFERS];
+	void *postfx_params_ptr[NUM_COMMAND_BUFFERS];
 	VkDescriptorSet volumetric_fluid_descriptor;
 	VkPipelineLayout volumetric_compute_pipeline_layout;
 	VkPipelineLayout volumetric_composite_pipeline_layout;
@@ -662,6 +666,7 @@ typedef struct {
 	VkDescriptorSet post_color_descriptor[NUM_COMMAND_BUFFERS];	/* per-frame mutable post-fog/gamma source */
 	VkImageView post_fog_color_source;	/* last source for gamma (color_image or smaa_output) */
 	VkDescriptorSet depth_descriptor;
+	VkDescriptorSet postfx_params_descriptor[NUM_COMMAND_BUFFERS];
 	VkDescriptorSet smaa_edge_descriptor;
 	VkDescriptorSet smaa_blend_descriptor;
 	VkDescriptorSet smaa_compose_descriptor;

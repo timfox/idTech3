@@ -50,6 +50,15 @@ static cvar_t *r_vignette_radius;
 static cvar_t *r_chromaticAberration;
 static cvar_t *r_filmGrain;
 static cvar_t *r_filmLook;
+static cvar_t *r_motionBlur;
+static cvar_t *r_motionBlurStrength;
+static cvar_t *r_motionBlurMaxRadius;
+static cvar_t *r_motionBlurSamples;
+static cvar_t *r_depthOfField;
+static cvar_t *r_dofFocusDistance;
+static cvar_t *r_dofFocusRange;
+static cvar_t *r_dofAperture;
+static cvar_t *r_dofMaxBlur;
 
 /*
 ===============
@@ -92,12 +101,30 @@ void PostFX_RegisterCvars(void) {
 	r_chromaticAberration    = ri.Cvar_Get("r_chromaticAberration",    "0.22", CVAR_ARCHIVE);
 	r_filmGrain              = ri.Cvar_Get("r_filmGrain",              "0.75", CVAR_ARCHIVE);
 	r_filmLook               = ri.Cvar_Get("r_filmLook",               "0",    CVAR_ARCHIVE);
+	r_motionBlur             = ri.Cvar_Get("r_motionBlur",             "0",    CVAR_ARCHIVE_ND);
+	r_motionBlurStrength     = ri.Cvar_Get("r_motionBlurStrength",     "1.0",  CVAR_ARCHIVE_ND);
+	r_motionBlurMaxRadius    = ri.Cvar_Get("r_motionBlurMaxRadius",    "24.0", CVAR_ARCHIVE_ND);
+	r_motionBlurSamples      = ri.Cvar_Get("r_motionBlurSamples",      "12",   CVAR_ARCHIVE_ND);
+	r_depthOfField           = ri.Cvar_Get("r_depthOfField",           "0",    CVAR_ARCHIVE_ND);
+	r_dofFocusDistance       = ri.Cvar_Get("r_dofFocusDistance",       "768.0", CVAR_ARCHIVE_ND);
+	r_dofFocusRange          = ri.Cvar_Get("r_dofFocusRange",          "192.0", CVAR_ARCHIVE_ND);
+	r_dofAperture            = ri.Cvar_Get("r_dofAperture",            "1.4",  CVAR_ARCHIVE_ND);
+	r_dofMaxBlur             = ri.Cvar_Get("r_dofMaxBlur",             "18.0", CVAR_ARCHIVE_ND);
 
 	ri.Cvar_SetDescription( r_vignette, "Vignette strength for post-processing lens darkening." );
 	ri.Cvar_SetDescription( r_vignette_radius, "Vignette inner radius before edge darkening starts." );
 	ri.Cvar_SetDescription( r_chromaticAberration, "Chromatic aberration strength for lens separation." );
 	ri.Cvar_SetDescription( r_filmGrain, "Film grain intensity for post-process pass." );
 	ri.Cvar_SetDescription( r_filmLook, "Source Engine–style film grain: luminance-dependent, fine-grained, soft-light blend (DoD:S, L4D quality)." );
+	ri.Cvar_SetDescription( r_motionBlur, "Enables camera-reprojection motion blur in the Vulkan post pass." );
+	ri.Cvar_SetDescription( r_motionBlurStrength, "Scales camera motion blur strength." );
+	ri.Cvar_SetDescription( r_motionBlurMaxRadius, "Maximum camera motion blur radius in pixels." );
+	ri.Cvar_SetDescription( r_motionBlurSamples, "Camera motion blur sample count." );
+	ri.Cvar_SetDescription( r_depthOfField, "Enables thin-lens depth of field in the Vulkan post pass." );
+	ri.Cvar_SetDescription( r_dofFocusDistance, "Depth of field focus distance in world units from the camera." );
+	ri.Cvar_SetDescription( r_dofFocusRange, "In-focus band width around the focus distance." );
+	ri.Cvar_SetDescription( r_dofAperture, "Depth of field aperture scale; higher values increase blur." );
+	ri.Cvar_SetDescription( r_dofMaxBlur, "Maximum depth of field blur radius in pixels." );
 
 	ri.Printf(PRINT_ALL, "PostFX: cvars registered (SSR %s, Atmosphere %s, VegWind %s)\n",
 		r_ssr->integer ? "on" : "off",
@@ -172,3 +199,12 @@ float PostFX_GetVignetteRadius(void) { return r_vignette_radius ? r_vignette_rad
 float PostFX_GetChromaticAberration(void) { return r_chromaticAberration ? r_chromaticAberration->value : 0.0f; }
 float PostFX_GetFilmGrain(void) { return r_filmGrain ? r_filmGrain->value : 0.0f; }
 int PostFX_GetFilmLook(void) { return ( r_filmLook && r_filmLook->integer ) ? 1 : 0; }
+qboolean PostFX_MotionBlur_IsEnabled(void) { return r_motionBlur && r_motionBlur->integer > 0; }
+float PostFX_MotionBlur_GetStrength(void) { return r_motionBlurStrength ? r_motionBlurStrength->value : 1.0f; }
+float PostFX_MotionBlur_GetMaxRadius(void) { return r_motionBlurMaxRadius ? r_motionBlurMaxRadius->value : 24.0f; }
+int PostFX_MotionBlur_GetSamples(void) { return r_motionBlurSamples ? r_motionBlurSamples->integer : 12; }
+qboolean PostFX_DepthOfField_IsEnabled(void) { return r_depthOfField && r_depthOfField->integer > 0; }
+float PostFX_DepthOfField_GetFocusDistance(void) { return r_dofFocusDistance ? r_dofFocusDistance->value : 768.0f; }
+float PostFX_DepthOfField_GetFocusRange(void) { return r_dofFocusRange ? r_dofFocusRange->value : 192.0f; }
+float PostFX_DepthOfField_GetAperture(void) { return r_dofAperture ? r_dofAperture->value : 1.4f; }
+float PostFX_DepthOfField_GetMaxBlur(void) { return r_dofMaxBlur ? r_dofMaxBlur->value : 18.0f; }
