@@ -615,6 +615,15 @@ static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 
 	uiFullscreen = (uivm && VM_Call( uivm, 0, UI_IS_FULLSCREEN ));
 
+	// Menu-only / fullscreen-UI frames may not redraw every pixel before translucent
+	// UI elements land. Clear the frame first so stale console contents cannot bleed
+	// through from the previous swapchain image.
+	if ( uiFullscreen || cls.state < CA_LOADING ) {
+		re.SetColor( g_color_table[ ColorIndex( COLOR_BLACK ) ] );
+		re.DrawStretchPic( 0, 0, cls.glconfig.vidWidth, cls.glconfig.vidHeight, 0, 0, 0, 0, cls.whiteShader );
+		re.SetColor( NULL );
+	}
+
 	// wide aspect ratio screens need to have the sides cleared
 	// unless they are displaying game renderings
 	if ( uiFullscreen || cls.state < CA_LOADING ) {
