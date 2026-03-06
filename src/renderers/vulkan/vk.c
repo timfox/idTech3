@@ -2,6 +2,7 @@
 #include "vk.h"
 #include "vk_postfx.h"
 #include "vk_skybox_hdr.h"
+#include <math.h>
 
 /* VK_EXT_extended_dynamic_state3: for vkCmdSetColorWriteMaskEXT (RB_ColorMask) */
 #ifndef VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT
@@ -9990,6 +9991,7 @@ static void vk_destroy_attachments( void )
 	uint32_t i;
 
 	vk_destroy_volumetric_params_buffer();
+	vk_destroy_postfx_params_buffers();
 	vk_destroy_froxel_images();
 	vk_destroy_sun_shadow_resources();
 	vk_destroy_local_shadow_resources();
@@ -16954,6 +16956,7 @@ void vk_begin_frame( void )
 #endif
 
 	vk.cmd = &vk.tess[ vk.cmd_index ];
+	vk_update_postfx_params( vk.cmd_index );
 
 	if ( vk.cmd->waitForFence ) {
 		vk.cmd->waitForFence = qfalse;
@@ -18147,8 +18150,8 @@ static void vk_update_postfx_params( uint32_t cmd_index )
 	params.motionBlur[3] = Com_Clamp( 0.0f, 64.0f, PostFX_MotionBlur_GetMaxRadius() );
 	params.depthOfField[0] = PostFX_DepthOfField_IsEnabled() ? 1.0f : 0.0f;
 	params.depthOfField[1] = Com_Clamp( 0.0f, 8.0f, PostFX_DepthOfField_GetAperture() );
-	params.depthOfField[2] = max( PostFX_DepthOfField_GetFocusDistance(), 0.0f );
-	params.depthOfField[3] = max( PostFX_DepthOfField_GetFocusRange(), 1.0f );
+	params.depthOfField[2] = fmaxf( PostFX_DepthOfField_GetFocusDistance(), 0.0f );
+	params.depthOfField[3] = fmaxf( PostFX_DepthOfField_GetFocusRange(), 1.0f );
 	params.frameInfo[0] = Com_Clamp( 0.0f, 64.0f, PostFX_DepthOfField_GetMaxBlur() );
 	params.frameInfo[1] = ( vk.renderWidth > 0 ) ? ( 1.0f / (float)vk.renderWidth ) : 0.0f;
 	params.frameInfo[2] = ( vk.renderHeight > 0 ) ? ( 1.0f / (float)vk.renderHeight ) : 0.0f;
