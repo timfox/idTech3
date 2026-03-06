@@ -7138,6 +7138,7 @@ void vk_initialize( void )
 	vk_reset_motion_history();
 	vk.adaptedExposure = 1.0f;
 	VectorClear( vk.prevViewOrigin );
+	vk.prevClientState = CA_UNINITIALIZED;
 	vk.uniform_alignment = props.limits.minUniformBufferOffsetAlignment;
 	vk.uniform_item_size = PAD( sizeof( vkUniform_t ), (size_t)vk.uniform_alignment );
 #ifdef USE_VK_PBR	
@@ -16942,15 +16943,19 @@ void vk_begin_frame( void )
 			cvar_t *target_var = ri.Cvar_Get( "r_exposure_auto_target", "0.5", CVAR_ARCHIVE_ND );
 			cvar_t *speed_var = ri.Cvar_Get( "r_exposure_auto_speed", "2.0", CVAR_ARCHIVE_ND );
 			if ( auto_var && auto_var->integer && target_var && speed_var ) {
+				int clientState = ri.CL_GetState ? ri.CL_GetState() : CA_ACTIVE;
+				qboolean stateTransition = ( clientState != vk.prevClientState );
+				qboolean stableGameplayState = ( clientState == CA_ACTIVE );
 				float target = target_var->value > 0.0f ? target_var->value : 0.5f;
 				float speed = speed_var->value > 0.0f ? speed_var->value * 0.016f : 0.02f;
 				float targetExp = target;
 
-				/* No-world (menu): use fixed exposure 1.0 to avoid rapid color changes from
-				 * menu animations driving luminance; prevents solid/rapidly-changing screen. */
-				if ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+				/* Freeze adaptation during non-gameplay/loading/cinematic frames.
+				 * These contain menus, loading art, and other 2D overlays that should not
+				 * steer world exposure. */
+				if ( !stableGameplayState || !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
 					targetExp = 1.0f;
-					speed = 0.1f;  /* slower blend toward 1.0 when entering menu */
+					speed = stateTransition ? 0.35f : 0.12f;
 				} else {
 					/* Camera cut: large view jump → snap exposure for faster adaptation */
 					float dx = tr.refdef.vieworg[0] - vk.prevViewOrigin[0];
@@ -16969,11 +16974,27 @@ void vk_begin_frame( void )
 						targetExp = ( sceneLum > 1e-6f ) ? ( target / sceneLum ) : 1.0f;
 						targetExp = ( targetExp < 0.01f ) ? 0.01f : ( targetExp > 10.0f ? 10.0f : targetExp );
 					}
+
+					/* Bright-scene transitions need to recover much faster than dark-scene
+					 * transitions or the frame stays blown out after deaths/view changes. */
+					if ( vk.adaptedExposure > 0.0f ) {
+						float ratio = targetExp / vk.adaptedExposure;
+						if ( ratio < 0.75f ) {
+							speed = ( speed < 0.25f ) ? 0.25f : speed;
+						} else if ( ratio > 1.5f ) {
+							speed = ( speed < 0.08f ) ? 0.08f : speed;
+						}
+					}
+
+					if ( stateTransition ) {
+						speed = ( speed < 0.30f ) ? 0.30f : speed;
+					}
 				}
 
 				vk.adaptedExposure += ( targetExp - vk.adaptedExposure ) * speed;
 				vk.adaptedExposure = ( vk.adaptedExposure < 0.01f ) ? 0.01f : ( vk.adaptedExposure > 10.0f ? 10.0f : vk.adaptedExposure );
 				VectorCopy( tr.refdef.vieworg, vk.prevViewOrigin );
+				vk.prevClientState = clientState;
 			}
 		}
 	}
@@ -17335,7 +17356,9 @@ void vk_end_frame( void )
 				{
 					cvar_t *exp_auto = ri.Cvar_Get( "r_exposure_auto", "0", 0 );
 					cvar_t *fbo_cinematic = ri.Cvar_Get( "r_fboCinematic", "1", 0 );
-					qboolean allow_cinematic_luminance = ( tr.world != NULL ) || ( fbo_cinematic && fbo_cinematic->integer );
+					int clientState = ri.CL_GetState ? ri.CL_GetState() : CA_ACTIVE;
+					qboolean allow_cinematic_luminance = ( clientState == CA_ACTIVE && tr.world != NULL ) ||
+						( clientState == CA_CINEMATIC && fbo_cinematic && fbo_cinematic->integer );
 					if ( vk.cmd && vk.cmd->command_buffer != VK_NULL_HANDLE &&
 						exp_auto && exp_auto->integer && r_hdr && r_hdr->integer &&
 						allow_cinematic_luminance &&
