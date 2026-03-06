@@ -1708,7 +1708,7 @@ static void vk_create_render_passes( void )
 
 	// screenmap resolve/color buffer
 	attachments[0].flags = 0;
-	attachments[0].format = vk.color_format;
+	attachments[0].format = vk.base_format.format;
 	attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
 #ifdef USE_BUFFER_CLEAR
 	if ( vk.screenMapSamples > VK_SAMPLE_COUNT_1_BIT )
@@ -1773,7 +1773,7 @@ static void vk_create_render_passes( void )
 
 	if ( vk.screenMapSamples > VK_SAMPLE_COUNT_1_BIT ) {
 		attachments[3].flags = 0;
-		attachments[3].format = vk.color_format;
+		attachments[3].format = vk.base_format.format;
 		attachments[3].samples = vk.screenMapSamples;
 #ifdef USE_BUFFER_CLEAR
 		attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -6168,14 +6168,14 @@ static void vk_create_attachments( void )
 
 		// screenmap-msaa
 		if ( vk.screenMapSamples > VK_SAMPLE_COUNT_1_BIT ) {
-			create_color_attachment( vk.screenMapWidth, vk.screenMapHeight, vk.screenMapSamples, vk.color_format,
+			create_color_attachment( vk.screenMapWidth, vk.screenMapHeight, vk.screenMapSamples, vk.base_format.format,
 				sampledColorUsage, &vk.screenMap.color_image_msaa, &vk.screenMap.color_image_view_msaa, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, qtrue, 0 );
 			create_color_attachment( vk.screenMapWidth, vk.screenMapHeight, vk.screenMapSamples, VK_FORMAT_R16G16_SFLOAT,
 				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &vk.screenMap.motion_image_msaa, &vk.screenMap.motion_image_view_msaa, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, qtrue, 0 );
 		}
 
 		// screenmap/msaa-resolve
-		create_color_attachment( vk.screenMapWidth, vk.screenMapHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
+		create_color_attachment( vk.screenMapWidth, vk.screenMapHeight, VK_SAMPLE_COUNT_1_BIT, vk.base_format.format,
 			sampledColorUsage, &vk.screenMap.color_image, &vk.screenMap.color_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 		create_color_attachment( vk.screenMapWidth, vk.screenMapHeight, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R16G16_SFLOAT,
 			VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &vk.screenMap.motion_image, &vk.screenMap.motion_image_view, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, qtrue, 0 );

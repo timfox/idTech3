@@ -412,7 +412,7 @@ qboolean SkyboxHDR_LoadCubeFaces(const char *baseName) {
 
 void SkyboxHDR_Unload(void) {
 	int f;
-	if (skybox.hdrData) { free(skybox.hdrData); skybox.hdrData = NULL; }
+	if (skybox.hdrData) { Z_Free(skybox.hdrData); skybox.hdrData = NULL; }
 	for (f = 0; f < 6; f++) {
 		if (skybox.cubeFaces[f]) { Z_Free(skybox.cubeFaces[f]); skybox.cubeFaces[f] = NULL; }
 		if (skybox.irradianceFaces[f]) { Z_Free(skybox.irradianceFaces[f]); skybox.irradianceFaces[f] = NULL; }

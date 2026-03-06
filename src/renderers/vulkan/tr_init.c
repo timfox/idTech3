@@ -2938,7 +2938,7 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_ext_supersample, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ext_supersample, "Super-sample anti-aliasing, requires \\r_fbo 1." );
 
-	r_screenMapScale = ri.Cvar_Get( "r_screenMapScale", "2", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	r_screenMapScale = ri.Cvar_Get( "r_screenMapScale", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_screenMapScale, "1", "16", CV_INTEGER );
 	ri.Cvar_SetDescription( r_screenMapScale, "Downscale divisor for screenMap reflections/refractions. 1=full res, 2=half res, 4=quarter res, 8=eighth res, 16=legacy. Requires vid_restart." );
 
