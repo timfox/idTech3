@@ -696,6 +696,8 @@ static void record_image_layout_transition( VkCommandBuffer command_buffer, VkIm
 	VkImageLayout old_layout, VkImageLayout new_layout, uint32_t src_stage_override, uint32_t dst_stage_override ) {
 	VkImageMemoryBarrier barrier;
 	uint32_t src_stage, dst_stage;
+	VkAccessFlags supported_src_access = 0;
+	VkAccessFlags supported_dst_access = 0;
 
 	switch ( old_layout ) {
 		case VK_IMAGE_LAYOUT_UNDEFINED:
@@ -814,6 +816,84 @@ static void record_image_layout_transition( VkCommandBuffer command_buffer, VkIm
 		barrier.dstAccessMask &= ~VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
 	}
 
+	if ( src_stage & VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT ) {
+		supported_src_access |= VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
+	}
+	if ( src_stage & VK_PIPELINE_STAGE_VERTEX_INPUT_BIT ) {
+		supported_src_access |= VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+	}
+	if ( src_stage & ( VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+		VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT |
+		VK_PIPELINE_STAGE_TESSELLATION_EVALUATION_SHADER_BIT |
+		VK_PIPELINE_STAGE_GEOMETRY_SHADER_BIT |
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT ) ) {
+		supported_src_access |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+	}
+	if ( src_stage & VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT ) {
+		supported_src_access |= VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+	}
+	if ( src_stage & VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT ) {
+		supported_src_access |= VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	}
+	if ( src_stage & ( VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT ) ) {
+		supported_src_access |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+	}
+	if ( src_stage & VK_PIPELINE_STAGE_TRANSFER_BIT ) {
+		supported_src_access |= VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+	}
+	if ( src_stage & VK_PIPELINE_STAGE_HOST_BIT ) {
+		supported_src_access |= VK_ACCESS_HOST_READ_BIT | VK_ACCESS_HOST_WRITE_BIT;
+	}
+
+	if ( dst_stage & VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT ) {
+		supported_dst_access |= VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
+	}
+	if ( dst_stage & VK_PIPELINE_STAGE_VERTEX_INPUT_BIT ) {
+		supported_dst_access |= VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+	}
+	if ( dst_stage & ( VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+		VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT |
+		VK_PIPELINE_STAGE_TESSELLATION_EVALUATION_SHADER_BIT |
+		VK_PIPELINE_STAGE_GEOMETRY_SHADER_BIT |
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT ) ) {
+		supported_dst_access |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+	}
+	if ( dst_stage & VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT ) {
+		supported_dst_access |= VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+	}
+	if ( dst_stage & VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT ) {
+		supported_dst_access |= VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	}
+	if ( dst_stage & ( VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT ) ) {
+		supported_dst_access |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+	}
+	if ( dst_stage & VK_PIPELINE_STAGE_TRANSFER_BIT ) {
+		supported_dst_access |= VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+	}
+	if ( dst_stage & VK_PIPELINE_STAGE_HOST_BIT ) {
+		supported_dst_access |= VK_ACCESS_HOST_READ_BIT | VK_ACCESS_HOST_WRITE_BIT;
+	}
+
+	if ( src_stage == VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT ) {
+		barrier.srcAccessMask = VK_ACCESS_NONE;
+	} else {
+		barrier.srcAccessMask &= supported_src_access;
+		if ( old_layout == VK_IMAGE_LAYOUT_GENERAL &&
+			( src_stage & VK_PIPELINE_STAGE_TRANSFER_BIT ) != 0 &&
+			barrier.srcAccessMask == 0 ) {
+			barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+		}
+	}
+
+	barrier.dstAccessMask &= supported_dst_access;
+	if ( new_layout == VK_IMAGE_LAYOUT_GENERAL &&
+		( dst_stage & VK_PIPELINE_STAGE_TRANSFER_BIT ) != 0 &&
+		barrier.dstAccessMask == 0 ) {
+		barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+	}
+
 	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 	barrier.pNext = NULL;
 	//barrier.srcAccessMask = src_access_flags;
@@ -830,6 +910,20 @@ static void record_image_layout_transition( VkCommandBuffer command_buffer, VkIm
 	barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
 
 	qvkCmdPipelineBarrier( command_buffer, src_stage, dst_stage, 0, 0, NULL, 0, NULL, 1, &barrier );
+}
+
+static void record_depth_image_layout_transition( VkCommandBuffer command_buffer, VkImageAspectFlags image_aspect_flags,
+	VkImageLayout new_layout, uint32_t src_stage_override, uint32_t dst_stage_override ) {
+	if ( vk.depth_image == VK_NULL_HANDLE ) {
+		return;
+	}
+	if ( vk.depth_image_layout == new_layout ) {
+		return;
+	}
+
+	record_image_layout_transition( command_buffer, vk.depth_image, image_aspect_flags,
+		vk.depth_image_layout, new_layout, src_stage_override, dst_stage_override );
+	vk.depth_image_layout = new_layout;
 }
 
 
@@ -6257,6 +6351,7 @@ static void vk_create_attachments( void )
 
 	create_depth_attachment( glConfig.vidWidth, glConfig.vidHeight, vkSamples, &vk.depth_image, &vk.depth_image_view,
 		(vk.fboActive && r_bloom->integer) || (r_ssao && r_ssao->integer) || (PostFX_SSR_IsEnabled()) ? qfalse : qtrue );
+	vk.depth_image_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 	vk_alloc_attachments();
 	vk_create_depth_sample_view();
@@ -9985,6 +10080,7 @@ static void vk_destroy_attachments( void )
 	qvkDestroyImage( vk.device, vk.depth_image, NULL );
 	vk.depth_image = VK_NULL_HANDLE;
 	vk.depth_image_view = VK_NULL_HANDLE;
+	vk.depth_image_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 
 	if ( vk.screenMap.color_image ) {
 		qvkDestroyImage( vk.device, vk.screenMap.color_image, NULL );
@@ -15101,8 +15197,7 @@ void vk_ssr_pass( void )
 
 	vk_end_render_pass();
 
-	record_image_layout_transition( vk.cmd->command_buffer, vk.depth_image, depth_aspect,
-		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+	record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
 		VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 0, 0 );
 
 	vk_begin_ssr_render_pass();
@@ -15155,8 +15250,7 @@ void vk_ssr_pass( void )
 	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
 
-	record_image_layout_transition( vk.cmd->command_buffer, vk.depth_image, depth_aspect,
-		VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+	record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
 		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 0, 0 );
 }
 
@@ -16287,8 +16381,7 @@ static void vk_atmosphere_pass( void )
 		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT );
 
-	record_image_layout_transition( vk.cmd->command_buffer, vk.depth_image, depth_aspect,
-		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+	record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
 		VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
 		VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT );
 
@@ -16348,8 +16441,7 @@ static void vk_volumetric_fog_pass( void )
 			if ( tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
 				VkImageAspectFlags da = VK_IMAGE_ASPECT_DEPTH_BIT;
 				if ( glConfig.stencilBits > 0 ) da |= VK_IMAGE_ASPECT_STENCIL_BIT;
-				record_image_layout_transition( vk.cmd->command_buffer, vk.depth_image, da,
-					VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+				record_depth_image_layout_transition( vk.cmd->command_buffer, da,
 					VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 					VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 					VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT );
@@ -16380,8 +16472,7 @@ static void vk_volumetric_fog_pass( void )
 		if ( tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
 			VkImageAspectFlags da = VK_IMAGE_ASPECT_DEPTH_BIT;
 			if ( glConfig.stencilBits > 0 ) da |= VK_IMAGE_ASPECT_STENCIL_BIT;
-			record_image_layout_transition( vk.cmd->command_buffer, vk.depth_image, da,
-				VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+			record_depth_image_layout_transition( vk.cmd->command_buffer, da,
 				VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT );
@@ -16411,8 +16502,7 @@ static void vk_volumetric_fog_pass( void )
 		if ( tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
 			VkImageAspectFlags da = VK_IMAGE_ASPECT_DEPTH_BIT;
 			if ( glConfig.stencilBits > 0 ) da |= VK_IMAGE_ASPECT_STENCIL_BIT;
-			record_image_layout_transition( vk.cmd->command_buffer, vk.depth_image, da,
-				VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+			record_depth_image_layout_transition( vk.cmd->command_buffer, da,
 				VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT );
@@ -16426,8 +16516,7 @@ static void vk_volumetric_fog_pass( void )
 		depth_aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
 	}
 
-	record_image_layout_transition( vk.cmd->command_buffer, vk.depth_image, depth_aspect,
-		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+	record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
 		VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
 		VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
@@ -16537,8 +16626,7 @@ static void vk_volumetric_fog_pass( void )
 	}
 
 	// Restore depth layout for the next frame's main render pass clears/attachments.
-	record_image_layout_transition( vk.cmd->command_buffer, vk.depth_image, depth_aspect,
-		VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+	record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
 		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 		VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT );
@@ -17073,8 +17161,7 @@ void vk_end_frame( void )
 
 				vk_end_render_pass();
 
-				record_image_layout_transition( vk.cmd->command_buffer, vk.depth_image, depth_aspect,
-					VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+				record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
 					VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 0, 0 );
 
 				// ssao
@@ -17169,8 +17256,7 @@ void vk_end_frame( void )
 				}
 				/* SSAO samples depth as read-only; restore layout for later passes and next frame.
 				 * Must run unconditionally after SSAO block (even when combine was skipped). */
-				record_image_layout_transition( vk.cmd->command_buffer, vk.depth_image, depth_aspect,
-					VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+				record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
 					VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 0, 0 );
 				}
 			}

@@ -141,11 +141,20 @@ static void R_BindAnimatedImage( const textureBundle_t *bundle ) {
 		return;
 	}
 
-	if ( bundle->isScreenMap /*&& backEnd.viewParms.frameSceneNum == 1*/ ) {
-		if ( !backEnd.screenMapDone )
+	if ( bundle->isScreenMap ) {
+		/*
+		 * Match the legacy renderer's screenMap behavior: only sample the captured
+		 * screen texture for the primary in-world scene once the dedicated capture
+		 * pass has completed. Any other scene/pass falls back to black so we do not
+		 * feed stale or recursive screen contents back into reflective materials.
+		 */
+		if ( backEnd.viewParms.frameSceneNum != 1 ||
+			vk.renderPassIndex == RENDER_PASS_SCREENMAP ||
+			!backEnd.screenMapDone ) {
 			GL_Bind( tr.blackImage );
-		else
+		} else {
 			vk_update_descriptor( glState.currenttmu + VK_DESC_TEXTURE_BASE, vk.screenMap.color_descriptor );
+		}
 		return;
 	}
 
