@@ -861,15 +861,17 @@ Key_SetCatcher
 */
 void Key_SetCatcher( int catcher )
 {
-#ifdef USE_DUKTAPE
 	const int oldCatchers = keyCatchers;
-#endif
 
 	// If the catcher state is changing, clear all key states
 	if ( catcher != keyCatchers )
 		Key_ClearStates();
 
 	keyCatchers = catcher;
+
+	if ( !( oldCatchers & KEYCATCH_UI ) && ( catcher & KEYCATCH_UI ) ) {
+		Con_ClearNotify();
+	}
 
 #ifdef USE_DUKTAPE
 	if ( !( oldCatchers & KEYCATCH_UI ) && ( catcher & KEYCATCH_UI ) ) {

@@ -911,16 +911,23 @@ Con_DrawConsole
 ==================
 */
 void Con_DrawConsole( void ) {
+	const int catcher = Key_GetCatcher();
 
 	// check for console width changes from a vid mode change
 	Con_CheckResize();
 
 	// if disconnected, render console full screen
 	if ( cls.state == CA_DISCONNECTED ) {
-		if ( !( Key_GetCatcher( ) & (KEYCATCH_UI | KEYCATCH_CGAME)) ) {
+		if ( !( catcher & (KEYCATCH_UI | KEYCATCH_CGAME)) ) {
 			Con_DrawSolidConsole( 1.0 );
 			return;
 		}
+	}
+
+	// In-game menus should not inherit notify text or closing console animation
+	// unless the console is explicitly open on top of the UI.
+	if ( ( catcher & KEYCATCH_UI ) && !( catcher & KEYCATCH_CONSOLE ) ) {
+		return;
 	}
 
 	if ( con.displayFrac ) {
