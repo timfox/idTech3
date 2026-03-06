@@ -832,6 +832,7 @@ typedef struct {
 	/* Eye adaptation: exposure from luminance pass (r_exposure_auto) */
 	float adaptedExposure;
 	vec3_t prevViewOrigin;  /* for camera cut detection (snap exposure on large view jump) */
+	vec3_t prevViewForward; /* viewaxis[2] for angle-change detection (e.g. death cam tilt) */
 	int prevClientState;
 
 	//

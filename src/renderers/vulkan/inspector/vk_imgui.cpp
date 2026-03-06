@@ -739,7 +739,11 @@ extern "C" void VkImgui_DrawVolumetricsPanel(void) {
 			ImGui::SameLine();
 			ImGui::TextDisabled( "(?)" );
 			if ( ImGui::IsItemHovered() )
-				ImGui::SetTooltip( "Stencil shadows require r_stencilbits 8 and vid_restart." );
+				ImGui::SetTooltip( "Stencil shadows require r_stencilbits 8 and vid_restart. Polygon offset reduces thin black lines and single-pixel artifacts." );
+			float svFactor = VkImgui_CvarFloat( "r_shadowVolumeOffsetFactor" );
+			float svUnits = VkImgui_CvarFloat( "r_shadowVolumeOffsetUnits" );
+			VkImgui_VolumetricsSlider( "Shadow volume offset factor", "r_shadowVolumeOffsetFactor", svFactor, 0.0f, 8.0f );
+			VkImgui_VolumetricsSlider( "Shadow volume offset units", "r_shadowVolumeOffsetUnits", svUnits, 0.0f, 8.0f );
 		}
 		int shadowsOn = ri.Cvar_VariableIntegerValue( "r_fog_shadows" );
 		bool shadowsEnabled = ( shadowsOn != 0 );
