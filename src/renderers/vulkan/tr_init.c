@@ -2387,7 +2387,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_post, "Toggle the HDR post-processing pipeline (1=tonemap + gamma pass, 0=pass-through)." );
 	ri.Cvar_SetGroup( r_post, CVG_RENDERER );
 
-	r_post_debug = ri.Cvar_Get( "r_post_debug", "0", CVAR_ARCHIVE_ND );
+	r_post_debug = ri.Cvar_Get( "r_post_debug", "0", CVAR_TEMP );
 	ri.Cvar_CheckRange( r_post_debug, "0", "99", CV_INTEGER );
 	ri.Cvar_SetDescription( r_post_debug, "Debug view for the post-process pass: 0=final, 1=pre-tonemap HDR, 2=luminance heatmap, 97=panini logical UV, 98=panini remapped source UV, 99=panini logical OOB mask." );
 	ri.Cvar_SetGroup( r_post_debug, CVG_RENDERER );

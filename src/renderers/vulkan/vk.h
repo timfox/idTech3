@@ -712,9 +712,13 @@ typedef struct {
 		VkDescriptorSet color_descriptor;
 		VkImage color_image;
 		VkImageView color_image_view;
+		VkImage motion_image;
+		VkImageView motion_image_view;
 
 		VkImage color_image_msaa;
 		VkImageView color_image_view_msaa;
+		VkImage motion_image_msaa;
+		VkImageView motion_image_view_msaa;
 
 		VkImage depth_image;
 		VkImageView depth_image_view;
