@@ -870,7 +870,11 @@ void Key_SetCatcher( int catcher )
 	keyCatchers = catcher;
 
 	if ( !( oldCatchers & KEYCATCH_UI ) && ( catcher & KEYCATCH_UI ) ) {
-		Con_ClearNotify();
+		if ( !( catcher & KEYCATCH_CONSOLE ) ) {
+			Con_Close();
+		} else {
+			Con_ClearNotify();
+		}
 	}
 
 #ifdef USE_DUKTAPE
