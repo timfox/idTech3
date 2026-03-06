@@ -311,6 +311,11 @@ void RB_ShadowFinish( void ) {
 		return;
 	}
 	if ( glConfig.stencilBits < 4 ) {
+		static qboolean warned;
+		if ( !warned ) {
+			ri.Printf( PRINT_WARNING, "Stencil shadows disabled: stencil %d bits (need 8). Set r_stencilbits 8 and vid_restart.\n", glConfig.stencilBits );
+			warned = qtrue;
+		}
 		return;
 	}
 

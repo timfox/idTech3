@@ -374,6 +374,47 @@ extern "C" void VkImgui_DrawPostFXPanel(void) {
 		}
 	}
 
+	if (ImGui::CollapsingHeader("SSAO / HBAO")) {
+		int ssaoOn = ri.Cvar_VariableIntegerValue( "r_ssao" );
+		bool ssaoEnabled = ( ssaoOn != 0 );
+		if ( ImGui::Checkbox( "Enable SSAO/HBAO", &ssaoEnabled ) ) {
+			ri.Cvar_Set( "r_ssao", ssaoEnabled ? "1" : "0" );
+		}
+		if ( ssaoEnabled ) {
+			ImGui::SameLine();
+			ImGui::TextDisabled( "(?)" );
+			if ( ImGui::IsItemHovered() )
+				ImGui::SetTooltip( "Screen-space ambient occlusion. Requires r_fbo 1. vid_restart after toggle." );
+			int method = ri.Cvar_VariableIntegerValue( "r_ssaoMethod" );
+			const char *methods[] = { "SSAO (sphere)", "HBAO (horizon)" };
+			if ( ImGui::Combo( "Method", &method, methods, 2 ) )
+				ri.Cvar_Set( "r_ssaoMethod", va( "%d", method ) );
+			if ( method == 1 ) {
+				int dirs = ri.Cvar_VariableIntegerValue( "r_hbaoDirections" );
+				int steps = ri.Cvar_VariableIntegerValue( "r_hbaoSteps" );
+				if ( ImGui::SliderInt( "HBAO Directions", &dirs, 4, 16 ) )
+					ri.Cvar_Set( "r_hbaoDirections", va( "%d", dirs ) );
+				if ( ImGui::SliderInt( "HBAO Steps", &steps, 2, 8 ) )
+					ri.Cvar_Set( "r_hbaoSteps", va( "%d", steps ) );
+			} else {
+				int samples = ri.Cvar_VariableIntegerValue( "r_ssaoSamples" );
+				if ( ImGui::SliderInt( "SSAO Samples", &samples, 4, 32 ) )
+					ri.Cvar_Set( "r_ssaoSamples", va( "%d", samples ) );
+			}
+			float radius = VkImgui_CvarFloat( "r_ssaoRadius" );
+			float bias = VkImgui_CvarFloat( "r_ssaoBias" );
+			float intensity = VkImgui_CvarFloat( "r_ssaoIntensity" );
+			float power = VkImgui_CvarFloat( "r_ssaoPower" );
+			VkImgui_CvarSlider( "Radius", "r_ssaoRadius", radius, 0.1f, 4.0f );
+			VkImgui_CvarSlider( "Bias", "r_ssaoBias", bias, 0.0f, 0.1f, "%.4f" );
+			VkImgui_CvarSlider( "Intensity", "r_ssaoIntensity", intensity, 0.0f, 4.0f );
+			VkImgui_CvarSlider( "Power", "r_ssaoPower", power, 0.5f, 4.0f );
+			int blurRadius = ri.Cvar_VariableIntegerValue( "r_ssaoBlurRadius" );
+			if ( ImGui::SliderInt( "Blur Radius", &blurRadius, 0, 8 ) )
+				ri.Cvar_Set( "r_ssaoBlurRadius", va( "%d", blurRadius ) );
+		}
+	}
+
 	if (ImGui::CollapsingHeader("Tonemapping", ImGuiTreeNodeFlags_DefaultOpen)) {
 		int tonemap = ri.Cvar_VariableIntegerValue( "r_tonemap" );
 		float exposure = VkImgui_CvarFloat( "r_exposure" );
@@ -688,6 +729,18 @@ extern "C" void VkImgui_DrawVolumetricsPanel(void) {
 	}
 
 	if (ImGui::CollapsingHeader("Shadows")) {
+		int cgShadows = ri.Cvar_VariableIntegerValue( "cg_shadows" );
+		const char *cgShadowModes[] = { "Off", "Blob", "Stencil", "Planar" };
+		int cgShadowIdx = ( cgShadows < 0 || cgShadows > 3 ) ? 0 : cgShadows;
+		if ( ImGui::Combo( "Entity Shadows (cg_shadows)", &cgShadowIdx, cgShadowModes, 4 ) ) {
+			ri.Cvar_Set( "cg_shadows", va( "%d", cgShadowIdx ) );
+		}
+		if ( cgShadowIdx == 2 ) {
+			ImGui::SameLine();
+			ImGui::TextDisabled( "(?)" );
+			if ( ImGui::IsItemHovered() )
+				ImGui::SetTooltip( "Stencil shadows require r_stencilbits 8 and vid_restart." );
+		}
 		int shadowsOn = ri.Cvar_VariableIntegerValue( "r_fog_shadows" );
 		bool shadowsEnabled = ( shadowsOn != 0 );
 		if ( ImGui::Checkbox( "Sun Shadows in Fog", &shadowsEnabled ) ) {
