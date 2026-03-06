@@ -6034,13 +6034,17 @@ static void vk_create_attachments( void )
 	/* Note: Could preallocate first image chunk in attachment memory pool. */
 	if ( vk.fboActive ) {
 
-		VkImageUsageFlags usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+		const VkImageUsageFlags sampledColorUsage =
+			VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+		const VkImageUsageFlags copyableColorUsage =
+			VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+			VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
 		// bloom
 		if ( r_bloom->integer ) {
 			uint32_t width = gls.captureWidth;
 			uint32_t height = gls.captureHeight;
-			VkImageUsageFlags bloomUsage = usage | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+			VkImageUsageFlags bloomUsage = copyableColorUsage;
 
 			create_color_attachment( width, height, VK_SAMPLE_COUNT_1_BIT, vk.bloom_format,
 				bloomUsage, &vk.bloom_image[0], &vk.bloom_image_view[0], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
@@ -6059,9 +6063,9 @@ static void vk_create_attachments( void )
 		// ssao
 		if ( r_ssao && r_ssao->integer ) {
 			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.ssao_format,
-				usage, &vk.ssao_image, &vk.ssao_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
+				sampledColorUsage, &vk.ssao_image, &vk.ssao_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.ssao_format,
-				usage, &vk.ssao_blur_image, &vk.ssao_blur_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
+				sampledColorUsage, &vk.ssao_blur_image, &vk.ssao_blur_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 		}
 		if ( r_oit && r_oit->integer ) {
 			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R16G16B16A16_SFLOAT,
@@ -6072,29 +6076,25 @@ static void vk_create_attachments( void )
 		// ssr (same format as color)
 		if ( PostFX_SSR_IsEnabled() ) {
 			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
-				usage, &vk.ssr_image, &vk.ssr_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
+				copyableColorUsage, &vk.ssr_image, &vk.ssr_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 		}
 
         // cubemap
         if ( vk.cubemapActive ) {
-            usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-
             create_color_attachment( REF_CUBEMAP_SIZE, REF_CUBEMAP_SIZE, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
-                usage, &vk.cubeMap.color_image, &vk.cubeMap.color_image_view[0], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT );
+                sampledColorUsage, &vk.cubeMap.color_image, &vk.cubeMap.color_image_view[0], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT );
 
             if ( vk.msaaActive )
                 create_color_attachment( REF_CUBEMAP_SIZE, REF_CUBEMAP_SIZE, (VkSampleCountFlagBits)vkSamples, vk.color_format,
-                    usage, &vk.cubeMap.color_image_msaa, &vk.cubeMap.color_image_view_msaa[0], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qtrue, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT );
+                    sampledColorUsage, &vk.cubeMap.color_image_msaa, &vk.cubeMap.color_image_view_msaa[0], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qtrue, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT );
             
             create_depth_attachment( REF_CUBEMAP_SIZE, REF_CUBEMAP_SIZE, (VkSampleCountFlagBits)vkSamples,
                     &vk.cubeMap.depth_image, &vk.cubeMap.depth_image_view, qtrue );
-        
-            usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
         }
 
 		// post-processing/msaa-resolve
 			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
-				usage, &vk.color_image, &vk.color_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
+				copyableColorUsage, &vk.color_image, &vk.color_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 			// scene copy sampled by volumetric composite (avoids read/write feedback on vk.color_image)
 				create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
 					VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
@@ -6114,12 +6114,12 @@ static void vk_create_attachments( void )
 		// screenmap-msaa
 		if ( vk.screenMapSamples > VK_SAMPLE_COUNT_1_BIT ) {
 			create_color_attachment( vk.screenMapWidth, vk.screenMapHeight, vk.screenMapSamples, vk.color_format,
-				usage, &vk.screenMap.color_image_msaa, &vk.screenMap.color_image_view_msaa, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, qtrue, 0 );
+				sampledColorUsage, &vk.screenMap.color_image_msaa, &vk.screenMap.color_image_view_msaa, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, qtrue, 0 );
 		}
 
 		// screenmap/msaa-resolve
 		create_color_attachment( vk.screenMapWidth, vk.screenMapHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
-			usage, &vk.screenMap.color_image, &vk.screenMap.color_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
+			sampledColorUsage, &vk.screenMap.color_image, &vk.screenMap.color_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 
 		// screenmap depth
 		create_depth_attachment( vk.screenMapWidth, vk.screenMapHeight, vk.screenMapSamples, &vk.screenMap.depth_image, &vk.screenMap.depth_image_view, qtrue );
@@ -6131,9 +6131,9 @@ static void vk_create_attachments( void )
 
 		if ( r_ext_supersample->integer ) {
 			// capture buffer
-			usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 			create_color_attachment( gls.captureWidth, gls.captureHeight, VK_SAMPLE_COUNT_1_BIT, vk.capture_format,
-				usage, &vk.capture.image, &vk.capture.image_view, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, qfalse, 0 );
+				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+				&vk.capture.image, &vk.capture.image_view, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, qfalse, 0 );
 		}
 
 		if ( vk.smaaActive ) {
@@ -6183,10 +6183,8 @@ static void vk_create_attachments( void )
         // BRDF LUT
         if( vk.pbrActive ) {
             uint32_t size = 512;
-            usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-            
             create_color_attachment( size, size, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R16G16_SFLOAT,
-                usage, &vk.brdflut_image, &vk.brdflut_image_view , VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
+                sampledColorUsage, &vk.brdflut_image, &vk.brdflut_image_view , VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
         }
 #endif
 
@@ -16269,19 +16267,18 @@ static void vk_volumetric_fog_pass( void )
 void vk_prepare_2d( void )
 {
 	/* Cinematic/menu-only: no world, no RC_DRAW_SURFS, so no render pass was ever started.
-	 * We must start post_bloom so 2D (RB_StretchPic) can draw. Do this first, before any
-	 * volumetric logic, so it works regardless of r_fbo/r_volumetricFog. */
+	 * Start a fresh main pass here so 2D can draw on a cleared color target instead of
+	 * inheriting stale swapchain/FBO contents from a previous frame. */
 	if ( ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) && !vk_in_render_pass ) {
 		if ( vk.cmd && vk.cmd->command_buffer != VK_NULL_HANDLE &&
 			vk.cmd->swapchain_image_index < MAX_SWAPCHAIN_IMAGES &&
-			vk.render_pass.post_bloom != VK_NULL_HANDLE &&
+			vk.render_pass.main != VK_NULL_HANDLE &&
 			vk.framebuffers.main[ vk.cmd->swapchain_image_index ] != VK_NULL_HANDLE &&
 			vk.fboActive ) {
 			vk_reset_volumetric_history();
 			backEnd.doneFog = qtrue;
-			vk_log_post_fog_rebind( "prepare_2d no-world (no pass): color source (SMAA after 2D)", vk.color_image_view );
-			vk_update_post_fog_descriptors( vk.color_image_view );
-			vk_begin_post_bloom_render_pass();
+			vk_scene_src_rect_valid = qfalse;
+			vk_begin_main_render_pass();
 		}
 		return;
 	}
