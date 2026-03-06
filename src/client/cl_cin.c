@@ -59,6 +59,7 @@ extern	int		s_rawend;
 
 static void RoQ_init( void );
 static void CIN_SetLooping (int handle, qboolean loop);
+static void CIN_ShutdownCurrent( void );
 
 /******************************************************************************
 *
@@ -1224,10 +1225,10 @@ static void RoQ_init( void )
 *
 ******************************************************************************/
 
-static void RoQShutdown( void ) {
+static void CIN_ShutdownCurrent( void ) {
 	const char *s;
 
-	if (!cinTable[currentHandle].buf) {
+	if ( currentHandle < 0 || currentHandle >= MAX_VIDEO_HANDLES ) {
 		return;
 	}
 
@@ -1241,6 +1242,10 @@ static void RoQShutdown( void ) {
 		FS_FCloseFile( cinTable[currentHandle].iFile );
 		cinTable[currentHandle].iFile = FS_INVALID_HANDLE;
 	}
+	if ( cinTable[currentHandle].modernDecoder ) {
+		CIN_Modern_Close( cinTable[currentHandle].modernDecoder );
+		cinTable[currentHandle].modernDecoder = NULL;
+	}
 
 	if (cinTable[currentHandle].alterGameState) {
 		cls.state = CA_DISCONNECTED;
@@ -1253,8 +1258,10 @@ static void RoQShutdown( void ) {
 			Cbuf_ExecuteText( EXEC_APPEND, va("%s\n", s) );
 			Cvar_Set( "nextmap", "" );
 		}
-		CL_handle = -1;
+			CL_handle = -1;
 	}
+	cinTable[currentHandle].buf = NULL;
+	cinTable[currentHandle].dirty = qfalse;
 	cinTable[currentHandle].fileName[0] = '\0';
 	currentHandle = -1;
 }
@@ -1271,13 +1278,14 @@ e_status CIN_StopCinematic( int handle ) {
 
 	Com_DPrintf("trFMV::stop(), closing %s\n", cinTable[currentHandle].fileName);
 
-	if (cinTable[currentHandle].modernDecoder) {
-		CIN_Modern_Close(cinTable[currentHandle].modernDecoder);
-		cinTable[currentHandle].modernDecoder = NULL;
-		cinTable[currentHandle].buf = NULL;
-		cinTable[currentHandle].status = FMV_EOF;
-		return FMV_EOF;
-	}
+		if (cinTable[currentHandle].modernDecoder) {
+			CIN_Modern_Close(cinTable[currentHandle].modernDecoder);
+			cinTable[currentHandle].modernDecoder = NULL;
+			cinTable[currentHandle].buf = NULL;
+			cinTable[currentHandle].status = FMV_EOF;
+			CIN_ShutdownCurrent();
+			return FMV_EOF;
+		}
 
 	if (!cinTable[currentHandle].buf) {
 		return FMV_EOF;
@@ -1289,7 +1297,7 @@ e_status CIN_StopCinematic( int handle ) {
 		}
 	}
 	cinTable[currentHandle].status = FMV_EOF;
-	RoQShutdown();
+	CIN_ShutdownCurrent();
 
 	return FMV_EOF;
 }
@@ -1336,22 +1344,46 @@ e_status CIN_RunCinematic( int handle )
 	if (cinTable[currentHandle].modernDecoder) {
 		cinModernDecoder_t *dec = cinTable[currentHandle].modernDecoder;
 		cinFrame_t frame;
-		Com_Memset(&frame, 0, sizeof(frame));
+		cinAudio_t audio;
+		qboolean gotVideoFrame = qfalse;
 
-		if (CIN_Modern_DecodeFrame(dec, &frame, NULL)) {
-			if (frame.valid && frame.data) {
+		while ( 1 ) {
+			Com_Memset( &frame, 0, sizeof( frame ) );
+			Com_Memset( &audio, 0, sizeof( audio ) );
+
+			if ( !CIN_Modern_DecodeFrame( dec, &frame, &audio ) ) {
+				break;
+			}
+
+			if ( audio.samples && audio.sampleCount > 0 && !cinTable[currentHandle].silent ) {
+				S_RawSamples(
+					audio.sampleCount,
+					audio.sampleRate,
+					audio.bytesPerSample,
+					audio.channels,
+					audio.samples,
+					s_volume ? s_volume->value : 1.0f );
+			}
+
+			if ( frame.valid && frame.data ) {
 				cinTable[currentHandle].buf = frame.data;
 				cinTable[currentHandle].drawX = frame.width;
 				cinTable[currentHandle].drawY = frame.height;
 				cinTable[currentHandle].CIN_WIDTH = frame.width;
 				cinTable[currentHandle].CIN_HEIGHT = frame.height;
 				cinTable[currentHandle].dirty = qtrue;
+				gotVideoFrame = qtrue;
+				break;
 			}
-		} else if (dec->isEof && dec->isEof(dec)) {
+		}
+
+		if ( !gotVideoFrame && dec->isEof && dec->isEof( dec ) ) {
 			if (cinTable[currentHandle].looping) {
 				CIN_Modern_Seek(dec, 0);
 			} else {
 				cinTable[currentHandle].status = FMV_EOF;
+				CIN_ShutdownCurrent();
+				return FMV_EOF;
 			}
 		}
 
@@ -1386,7 +1418,7 @@ e_status CIN_RunCinematic( int handle )
 	  if (cinTable[currentHandle].looping) {
 		RoQReset();
 	  } else {
-		RoQShutdown();
+		CIN_ShutdownCurrent();
 		return FMV_EOF;
 	  }
 	}

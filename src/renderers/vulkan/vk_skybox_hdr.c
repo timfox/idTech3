@@ -26,6 +26,7 @@ static cvar_t *r_skyboxHDR_rotation;
 static cvar_t *r_skyboxHDR_intensity;
 
 extern void R_LoadEXR_HDR(const char *filename, float **pic, int *width, int *height);
+extern void R_LoadHDR_Float(const char *filename, float **pic, int *width, int *height);
 
 #define PI_F 3.14159265358979323846f
 #define SH_C0 0.28209479177387814347f
@@ -63,6 +64,22 @@ static void SkyboxHDR_ResetSH( void ) {
 		Vector4Set( skybox.shCoeffs[i], 0.0f, 0.0f, 0.0f, 0.0f );
 	}
 	skybox.hasSHCoeffs = qfalse;
+}
+
+static qboolean SkyboxHDR_LoadPanoramaImage( const char *filename, float **pic, int *width, int *height ) {
+	const char *ext = COM_GetExtension( filename );
+
+	*pic = NULL;
+	*width = 0;
+	*height = 0;
+
+	if ( ext && !Q_stricmp( ext, "hdr" ) ) {
+		R_LoadHDR_Float( filename, pic, width, height );
+	} else {
+		R_LoadEXR_HDR( filename, pic, width, height );
+	}
+
+	return ( *pic != NULL && *width > 0 && *height > 0 );
 }
 
 static void SkyboxHDR_DestroyGPUImages( void ) {
@@ -323,8 +340,7 @@ qboolean SkyboxHDR_Load(const char *filename, skyboxProjection_t projection) {
 
 	SkyboxHDR_Unload();
 
-	R_LoadEXR_HDR(filename, &hdrData, &w, &h);
-	if (!hdrData || w <= 0 || h <= 0) {
+	if ( !SkyboxHDR_LoadPanoramaImage( filename, &hdrData, &w, &h ) ) {
 		ri.Printf(PRINT_WARNING, "SkyboxHDR: could not load %s\n", filename);
 		return qfalse;
 	}
@@ -366,8 +382,11 @@ qboolean SkyboxHDR_LoadCubeFaces(const char *baseName) {
 		float *faceData = NULL;
 		int w, h;
 
-		Com_sprintf(faceName, sizeof(faceName), "%s%s.exr", baseName, faceSuffix[f]);
-		R_LoadEXR_HDR(faceName, &faceData, &w, &h);
+			Com_sprintf(faceName, sizeof(faceName), "%s%s.exr", baseName, faceSuffix[f]);
+			if ( !SkyboxHDR_LoadPanoramaImage( faceName, &faceData, &w, &h ) ) {
+				Com_sprintf(faceName, sizeof(faceName), "%s%s.hdr", baseName, faceSuffix[f]);
+				SkyboxHDR_LoadPanoramaImage( faceName, &faceData, &w, &h );
+			}
 
 		if (!faceData) {
 			ri.Printf(PRINT_WARNING, "SkyboxHDR: missing face %s\n", faceName);

@@ -23,8 +23,10 @@ libavutil, and libswscale.
 
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <libavutil/channel_layout.h>
 #include <libavutil/imgutils.h>
 #include <libavutil/opt.h>
+#include <libavutil/samplefmt.h>
 #include <libswscale/swscale.h>
 
 typedef struct {
@@ -66,6 +68,9 @@ static qboolean ffmpeg_isEof(cinModernDecoder_t *dec);
 
 static int ffmpeg_io_read(void *opaque, uint8_t *buf, int bufSize);
 static int64_t ffmpeg_io_seek(void *opaque, int64_t offset, int whence);
+static qboolean ffmpeg_decode_audio_frame(ffmpegContext_t *ctx, cinAudio_t *audio);
+static int ffmpeg_convert_audio_sample(enum AVSampleFormat format, const uint8_t *sampleData);
+static const uint8_t *ffmpeg_audio_sample_ptr(const AVFrame *frame, enum AVSampleFormat format, int channels, int sampleIndex, int channelIndex, int bytesPerSample);
 
 static int ffmpeg_io_read(void *opaque, uint8_t *buf, int bufSize) {
 	ffmpegContext_t *ctx = (ffmpegContext_t *)opaque;
@@ -127,6 +132,150 @@ static int64_t ffmpeg_io_seek(void *opaque, int64_t offset, int whence) {
 
 	ctx->fileOffset = newOffset;
 	return ctx->fileOffset;
+}
+
+static int ffmpeg_convert_audio_sample(enum AVSampleFormat format, const uint8_t *sampleData) {
+	switch ( format ) {
+		case AV_SAMPLE_FMT_U8:
+		case AV_SAMPLE_FMT_U8P:
+			return ( (int)( *sampleData ) - 128 ) << 8;
+
+		case AV_SAMPLE_FMT_S16:
+		case AV_SAMPLE_FMT_S16P:
+			return *(const int16_t *)sampleData;
+
+		case AV_SAMPLE_FMT_S32:
+		case AV_SAMPLE_FMT_S32P:
+			return *(const int32_t *)sampleData >> 16;
+
+		case AV_SAMPLE_FMT_FLT:
+		case AV_SAMPLE_FMT_FLTP: {
+			float value = *(const float *)sampleData;
+			int sample;
+			if ( value > 1.0f ) {
+				value = 1.0f;
+			} else if ( value < -1.0f ) {
+				value = -1.0f;
+			}
+			sample = (int)( value * 32767.0f );
+			if ( sample < -32768 ) {
+				sample = -32768;
+			} else if ( sample > 32767 ) {
+				sample = 32767;
+			}
+			return sample;
+		}
+
+		case AV_SAMPLE_FMT_DBL:
+		case AV_SAMPLE_FMT_DBLP: {
+			double value = *(const double *)sampleData;
+			int sample;
+			if ( value > 1.0 ) {
+				value = 1.0;
+			} else if ( value < -1.0 ) {
+				value = -1.0;
+			}
+			sample = (int)( value * 32767.0 );
+			if ( sample < -32768 ) {
+				sample = -32768;
+			} else if ( sample > 32767 ) {
+				sample = 32767;
+			}
+			return sample;
+		}
+
+		default:
+			return 0;
+	}
+}
+
+static const uint8_t *ffmpeg_audio_sample_ptr(const AVFrame *frame, enum AVSampleFormat format, int channels, int sampleIndex, int channelIndex, int bytesPerSample) {
+	if ( av_sample_fmt_is_planar( format ) ) {
+		return frame->extended_data[channelIndex] + ( sampleIndex * bytesPerSample );
+	}
+
+	return frame->extended_data[0] + ( ( sampleIndex * channels + channelIndex ) * bytesPerSample );
+}
+
+static qboolean ffmpeg_decode_audio_frame(ffmpegContext_t *ctx, cinAudio_t *audio) {
+	AVFrame *audioFrame;
+	enum AVSampleFormat format;
+	int inputChannels;
+	int outputChannels;
+	int bytesPerSample;
+	int outputBytes;
+	int sampleIndex;
+	int channelIndex;
+	int16_t *dst;
+	int ret;
+
+	if ( !ctx || !ctx->audioCodecCtx || !audio ) {
+		return qfalse;
+	}
+
+	audioFrame = av_frame_alloc();
+	if ( !audioFrame ) {
+		return qfalse;
+	}
+
+	ret = avcodec_receive_frame( ctx->audioCodecCtx, audioFrame );
+	if ( ret < 0 ) {
+		av_frame_free( &audioFrame );
+		return qfalse;
+	}
+
+	format = (enum AVSampleFormat)audioFrame->format;
+	inputChannels = audioFrame->ch_layout.nb_channels;
+	if ( inputChannels <= 0 && ctx->audioCodecCtx ) {
+		inputChannels = ctx->audioCodecCtx->ch_layout.nb_channels;
+	}
+	if ( inputChannels <= 0 ) {
+		inputChannels = 1;
+	}
+
+	bytesPerSample = av_get_bytes_per_sample( format );
+	if ( bytesPerSample <= 0 || audioFrame->nb_samples <= 0 ) {
+		av_frame_free( &audioFrame );
+		return qfalse;
+	}
+
+	outputChannels = inputChannels >= 2 ? 2 : 1;
+	outputBytes = audioFrame->nb_samples * outputChannels * (int)sizeof( int16_t );
+	if ( outputBytes > ctx->audioBufferSize ) {
+		if ( ctx->audioBuffer ) {
+			Z_Free( ctx->audioBuffer );
+		}
+		ctx->audioBuffer = (byte *)Z_Malloc( outputBytes );
+		if ( !ctx->audioBuffer ) {
+			ctx->audioBufferSize = 0;
+			av_frame_free( &audioFrame );
+			return qfalse;
+		}
+		ctx->audioBufferSize = outputBytes;
+	}
+
+	dst = (int16_t *)ctx->audioBuffer;
+	for ( sampleIndex = 0; sampleIndex < audioFrame->nb_samples; sampleIndex++ ) {
+		if ( outputChannels == 1 ) {
+			const uint8_t *src = ffmpeg_audio_sample_ptr( audioFrame, format, inputChannels, sampleIndex, 0, bytesPerSample );
+			dst[sampleIndex] = (int16_t)ffmpeg_convert_audio_sample( format, src );
+			continue;
+		}
+
+		for ( channelIndex = 0; channelIndex < outputChannels; channelIndex++ ) {
+			const uint8_t *src = ffmpeg_audio_sample_ptr( audioFrame, format, inputChannels, sampleIndex, channelIndex, bytesPerSample );
+			dst[sampleIndex * outputChannels + channelIndex] = (int16_t)ffmpeg_convert_audio_sample( format, src );
+		}
+	}
+
+	audio->samples = ctx->audioBuffer;
+	audio->sampleCount = audioFrame->nb_samples;
+	audio->sampleRate = audioFrame->sample_rate > 0 ? audioFrame->sample_rate : ctx->audioCodecCtx->sample_rate;
+	audio->channels = outputChannels;
+	audio->bytesPerSample = (int)sizeof( int16_t );
+
+	av_frame_free( &audioFrame );
+	return qtrue;
 }
 
 /*
@@ -372,6 +521,12 @@ static qboolean ffmpeg_decodeFrame(cinModernDecoder_t *dec, cinFrame_t *frame, c
 	}
 
 	ctx = (ffmpegContext_t *)dec->context;
+	if ( frame ) {
+		Com_Memset( frame, 0, sizeof( *frame ) );
+	}
+	if ( audio ) {
+		Com_Memset( audio, 0, sizeof( *audio ) );
+	}
 
 	if (ctx->eof) {
 		return qfalse;
@@ -426,20 +581,13 @@ static qboolean ffmpeg_decodeFrame(cinModernDecoder_t *dec, cinFrame_t *frame, c
 			return qtrue;
 		}
 
-		if (ctx->packet->stream_index == ctx->audioStreamIdx && ctx->audioCodecCtx && audio) {
-			ret = avcodec_send_packet(ctx->audioCodecCtx, ctx->packet);
-			if (ret >= 0) {
-				AVFrame *audioFrame = av_frame_alloc();
-				ret = avcodec_receive_frame(ctx->audioCodecCtx, audioFrame);
-				if (ret >= 0) {
-					audio->sampleCount = audioFrame->nb_samples;
-					audio->sampleRate = audioFrame->sample_rate;
-					audio->channels = audioFrame->ch_layout.nb_channels;
-					audio->bytesPerSample = 2;
+			if (ctx->packet->stream_index == ctx->audioStreamIdx && ctx->audioCodecCtx && audio) {
+				ret = avcodec_send_packet(ctx->audioCodecCtx, ctx->packet);
+				if (ret >= 0 && ffmpeg_decode_audio_frame(ctx, audio)) {
+					av_packet_unref(ctx->packet);
+					return qtrue;
 				}
-				av_frame_free(&audioFrame);
 			}
-		}
 
 		av_packet_unref(ctx->packet);
 	}
