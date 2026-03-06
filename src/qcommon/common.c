@@ -632,7 +632,7 @@ qboolean Com_EarlyParseCmdLine( char *commandLine, char *console_title, int titl
 Com_SafeMode
 
 Check for "safe" on the command line, which will
-skip loading of q3config.cfg
+skip loading of config.cfg
 ===================
 */
 qboolean Com_SafeMode( void ) {
@@ -2114,7 +2114,7 @@ static void Com_InitZoneMemory( void ) {
 	cvar_t	*cv;
 
 	// Please note: com_zoneMegs can only be set on the command line, and
-	// not in q3config.cfg or Com_StartupVariable, as they haven't been
+	// not in config.cfg or Com_StartupVariable, as they haven't been
 	// executed by this point. It's a chicken and egg problem. We need the
 	// memory manager configured to handle those places where you would
 	// configure the memory manager.
@@ -3056,7 +3056,7 @@ static void Com_ExecuteCfg( void )
 
 	if (!Com_SafeMode())
 	{
-		// skip the q3config.cfg and autoexec.cfg if "safe" is on the command line
+		// skip config.cfg and autoexec.cfg if "safe" is on the command line
 		Cbuf_ExecuteText(EXEC_NOW, "exec " Q3CONFIG_CFG "\n");
 		Cbuf_Execute();
 		Cbuf_ExecuteText(EXEC_NOW, "exec autoexec.cfg\n");
