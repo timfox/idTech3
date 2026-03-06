@@ -4932,7 +4932,7 @@ static void FS_Startup( void ) {
 FS_ParseGameInfo
 
 Parses gameinfo.txt (Source Engine style) from the game root directory
-and extracts the title field to set the window title.
+and extracts the title and bumper1 fields (title for window, bumper1 for intro cinematic).
 =====================
 */
 static void FS_ParseGameInfo( void )
@@ -4947,7 +4947,9 @@ static void FS_ParseGameInfo( void )
 		// gameinfo.txt not found, use default title
 		return;
 	}
-	
+
+	cl_bumper1[0] = '\0';
+
 	// Simple parser: look for "title" followed by quoted string
 	const char *p = buffer;
 	const char *end = buffer + len;
@@ -5007,7 +5009,36 @@ static void FS_ParseGameInfo( void )
 			}
 		}
 	}
-	
+
+	// Find "bumper1" keyword (intro cinematic override)
+	p = buffer;
+	while ( p < end - 7 ) {
+		if ( Q_strncmp( p, "bumper1", 7 ) == 0 ) {
+			p += 7;
+			while ( p < end && ( *p == ' ' || *p == '\t' ) ) {
+				p++;
+			}
+			if ( p < end && *p == '"' ) {
+				p++;
+				const char *bumperStart = p;
+				while ( p < end && *p != '"' && *p != '\n' && *p != '\r' ) {
+					p++;
+				}
+				if ( p < end && *p == '"' ) {
+					int bumperLen = (int)( p - bumperStart );
+					if ( bumperLen > 0 && bumperLen < MAX_CVAR_VALUE_STRING ) {
+						Q_strncpyz( cl_bumper1, bumperStart, bumperLen + 1 );
+						if ( Com_LogVerbosity() >= 1 ) {
+							LOG_FS( "Parsed gameinfo.txt: bumper1 = \"%s\"\n", cl_bumper1 );
+						}
+					}
+					break;
+				}
+			}
+		}
+		p++;
+	}
+
 	FS_FreeFile( buffer );
 }
 
