@@ -2892,19 +2892,19 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_ssao, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ssao, "Enables screen-space ambient occlusion (SSAO). Requires \\r_fbo 1." );
 
-	r_ssaoRadius = ri.Cvar_Get( "r_ssaoRadius", "16.0", CVAR_ARCHIVE_ND );
+	r_ssaoRadius = ri.Cvar_Get( "r_ssaoRadius", "8.0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_ssaoRadius, "1.0", "128.0", CV_FLOAT );
 	ri.Cvar_SetDescription( r_ssaoRadius, "SSAO sample radius in view space units (higher = broader occlusion)." );
 
-	r_ssaoBias = ri.Cvar_Get( "r_ssaoBias", "0.5", CVAR_ARCHIVE_ND );
+	r_ssaoBias = ri.Cvar_Get( "r_ssaoBias", "0.75", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_ssaoBias, "0.0", "4.0", CV_FLOAT );
 	ri.Cvar_SetDescription( r_ssaoBias, "SSAO depth bias to reduce self-occlusion." );
 
-	r_ssaoIntensity = ri.Cvar_Get( "r_ssaoIntensity", "1.0", CVAR_ARCHIVE_ND );
+	r_ssaoIntensity = ri.Cvar_Get( "r_ssaoIntensity", "0.35", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_ssaoIntensity, "0.0", "4.0", CV_FLOAT );
 	ri.Cvar_SetDescription( r_ssaoIntensity, "SSAO intensity multiplier." );
 
-	r_ssaoPower = ri.Cvar_Get( "r_ssaoPower", "1.5", CVAR_ARCHIVE_ND );
+	r_ssaoPower = ri.Cvar_Get( "r_ssaoPower", "1.15", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_ssaoPower, "0.5", "4.0", CV_FLOAT );
 	ri.Cvar_SetDescription( r_ssaoPower, "SSAO contrast shaping power (higher = darker occlusion)." );
 
