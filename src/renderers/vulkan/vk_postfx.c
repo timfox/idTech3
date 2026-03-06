@@ -22,6 +22,7 @@ static cvar_t *r_ssr_thickness;
 static cvar_t *r_ssr_fadeEdge;
 static cvar_t *r_ssr_roughnessThreshold;
 static cvar_t *r_ssr_intensity;
+static cvar_t *r_ssr_maxDepthGradient;
 
 static cvar_t *r_atmosphere;
 static cvar_t *r_atmosphere_sunDirX;
@@ -73,6 +74,8 @@ void PostFX_RegisterCvars(void) {
 	r_ssr_fadeEdge           = ri.Cvar_Get("r_ssr_fadeEdge",           "0.2",  CVAR_ARCHIVE);
 	r_ssr_roughnessThreshold = ri.Cvar_Get("r_ssr_roughnessThreshold", "0.5",  CVAR_ARCHIVE);
 	r_ssr_intensity          = ri.Cvar_Get("r_ssr_intensity",          "0.8",  CVAR_ARCHIVE);
+	r_ssr_maxDepthGradient   = ri.Cvar_Get("r_ssr_maxDepthGradient",   "0.08", CVAR_ARCHIVE);
+	ri.Cvar_SetDescription( r_ssr_maxDepthGradient, "Skip SSR at depth edges (object silhouettes, horizon) to reduce thin line artifacts. Lower = stricter." );
 
 	r_atmosphere             = ri.Cvar_Get("r_atmosphere",             "1",    CVAR_ARCHIVE);
 	r_atmosphere_sunDirX     = ri.Cvar_Get("r_atmosphere_sunDirX",     "0.3",  CVAR_ARCHIVE);
@@ -139,6 +142,7 @@ float PostFX_SSR_GetThickness(void) { return r_ssr_thickness ? r_ssr_thickness->
 float PostFX_SSR_GetFadeEdge(void) { return r_ssr_fadeEdge ? r_ssr_fadeEdge->value : 0.2f; }
 float PostFX_SSR_GetRoughnessThreshold(void) { return r_ssr_roughnessThreshold ? r_ssr_roughnessThreshold->value : 0.5f; }
 float PostFX_SSR_GetIntensity(void) { return r_ssr_intensity ? r_ssr_intensity->value : 0.8f; }
+float PostFX_SSR_GetMaxDepthGradient(void) { return r_ssr_maxDepthGradient ? r_ssr_maxDepthGradient->value : 0.08f; }
 
 qboolean PostFX_Atmosphere_IsEnabled(void) { return r_atmosphere && r_atmosphere->integer > 0; }
 void PostFX_Atmosphere_GetSunDirection(float *x, float *y, float *z) {

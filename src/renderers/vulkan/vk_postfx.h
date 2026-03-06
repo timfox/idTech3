@@ -29,6 +29,7 @@ float    PostFX_SSR_GetThickness(void);
 float    PostFX_SSR_GetFadeEdge(void);
 float    PostFX_SSR_GetRoughnessThreshold(void);
 float    PostFX_SSR_GetIntensity(void);
+float    PostFX_SSR_GetMaxDepthGradient(void);
 
 qboolean PostFX_Atmosphere_IsEnabled(void);
 void     PostFX_Atmosphere_GetSunDirection(float *x, float *y, float *z);
