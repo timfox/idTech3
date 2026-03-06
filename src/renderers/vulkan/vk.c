@@ -5568,7 +5568,7 @@ static void vk_alloc_persistent_pipelines( void )
 		vk.skybox_pipeline = vk_find_pipeline_ext( 0, &def, qtrue );
 	}
 
-	// stencil shadows (polygon offset reduces z-fight at silhouette edges → fewer thin black lines)
+	// stencil shadows (polygon offset pushes volume forward to reduce thin black lines)
 	{
 		cullType_t cull_types[2] = { CT_FRONT_SIDED, CT_BACK_SIDED };
 		qboolean mirror_flags[2] = { qfalse, qtrue };
@@ -13569,18 +13569,18 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 		rasterization_state.depthBiasEnable = VK_TRUE;
 		rasterization_state.depthBiasClamp = 0.0f;
 		if ( def->shadow_phase == SHADOW_EDGES ) {
-			/* Shadow volumes: push geometry back to avoid z-fight with object silhouette
-			 * (reduces thin black lines and single-pixel artifacts at stencil boundaries). */
-			cvar_t *sv_factor = ri.Cvar_Get( "r_shadowVolumeOffsetFactor", "2", CVAR_ARCHIVE_ND );
-			cvar_t *sv_units = ri.Cvar_Get( "r_shadowVolumeOffsetUnits", "2", CVAR_ARCHIVE_ND );
-			float factor = sv_factor ? sv_factor->value : 2.0f;
-			float units = sv_units ? sv_units->value : 2.0f;
+			/* Shadow volumes: push geometry forward (toward camera) to avoid z-fight with
+			 * object silhouette. Back direction caused large black triangles. */
+			cvar_t *sv_factor = ri.Cvar_Get( "r_shadowVolumeOffsetFactor", "1", CVAR_ARCHIVE_ND );
+			cvar_t *sv_units = ri.Cvar_Get( "r_shadowVolumeOffsetUnits", "1", CVAR_ARCHIVE_ND );
+			float factor = sv_factor ? sv_factor->value : 1.0f;
+			float units = sv_units ? sv_units->value : 1.0f;
 #ifdef USE_REVERSED_DEPTH
-			rasterization_state.depthBiasConstantFactor = -units;
-			rasterization_state.depthBiasSlopeFactor = -factor;
-#else
 			rasterization_state.depthBiasConstantFactor = units;
 			rasterization_state.depthBiasSlopeFactor = factor;
+#else
+			rasterization_state.depthBiasConstantFactor = -units;
+			rasterization_state.depthBiasSlopeFactor = -factor;
 #endif
 		} else {
 #ifdef USE_REVERSED_DEPTH
@@ -15859,7 +15859,7 @@ static qboolean vk_build_local_shadow_view_axes(
 	vec3_t up;
 	float viewerMatrix[16];
 	float lightView[16];
-	float nearPlane = ( r_znear ) ? r_znear->value : 4.0f;
+	float nearPlane = ( r_znear ) ? r_znear->value : 8.0f;
 
 	if ( !shadowParms || !outViewProj ) {
 		return qfalse;
@@ -18418,7 +18418,7 @@ static void vk_update_volumetric_params( void )
 	float g_aniso = r_volumetricFogAniso ? r_volumetricFogAniso->value : 0.0f;
 	float fog_density = r_volumetricFogDensity ? r_volumetricFogDensity->value : 0.0f;
 	float height_falloff = r_volumetricFogHeightFalloff ? r_volumetricFogHeightFalloff->value : 0.0f;
-	float near_plane = ( r_znear ) ? r_znear->value : 4.0f;
+	float near_plane = ( r_znear ) ? r_znear->value : 8.0f;
 	float far_plane = backEnd.viewParms.zFar;
 	float z_exponent = ( r_volumetricFogZExponent ) ? r_volumetricFogZExponent->value : 1.5f;
 	float max_distance = ( r_volumetricFogMaxDistance ) ? r_volumetricFogMaxDistance->value : 4096.0f;
