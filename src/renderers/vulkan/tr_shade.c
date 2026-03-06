@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_shade.c
 
 #include "tr_local.h"
+#include "vk_skybox_hdr.h"
 
 extern cvar_t *r_shLighting;
 extern cvar_t *r_shWorldLighting;
@@ -1422,6 +1423,10 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				VkDescriptorSet brdfDescriptor = vk.brdflut_image_descriptor ? vk.brdflut_image_descriptor : fallback2D;
 				VkDescriptorSet envDescriptor = fallbackCube;
 				VkDescriptorSet irradianceDescriptor = fallbackCube;
+				const VkDescriptorSet hdrEnvDescriptor = SkyboxHDR_GetPrefilteredDescriptor();
+				const VkDescriptorSet hdrIrradianceDescriptor = SkyboxHDR_GetIrradianceDescriptor();
+				const qboolean hdrSkyboxReady = ( hdrEnvDescriptor != VK_NULL_HANDLE && hdrIrradianceDescriptor != VK_NULL_HANDLE );
+				qboolean usingHdrSkybox = qfalse;
 
 				if ( !vk.brdflut_image_descriptor && !warnedMissingBrdfLut ) {
 					ri.Printf( PRINT_WARNING, "PBR IBL: BRDF LUT descriptor unavailable, using fallback texture\n" );
@@ -1441,8 +1446,18 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 						R_UpdatePBRCubemapDebugCvar( -1, dbgPos );
 					}
 
-					// Use stage-provided SH when no cubemap is available.
-					Com_Memcpy( block.shCoeffs, pStage->shCoeffs, sizeof( block.shCoeffs ) );
+					if ( backEnd.viewParms.targetCube == NULL && hdrSkyboxReady ) {
+						envDescriptor = hdrEnvDescriptor;
+						irradianceDescriptor = hdrIrradianceDescriptor;
+						usingHdrSkybox = qtrue;
+						if ( !SkyboxHDR_CopySHCoeffs( block.shCoeffs ) ) {
+							Com_Memcpy( block.shCoeffs, pStage->shCoeffs, sizeof( block.shCoeffs ) );
+						}
+					}
+					if ( !usingHdrSkybox ) {
+						// Use stage-provided SH when no cubemap is available.
+						Com_Memcpy( block.shCoeffs, pStage->shCoeffs, sizeof( block.shCoeffs ) );
+					}
 				}
 				else {
 					vec3_t dbgPos;
@@ -1474,8 +1489,32 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 						} else {
 							Com_Memcpy( block.shCoeffs, pStage->shCoeffs, sizeof( block.shCoeffs ) );
 						}
+
+						if ( hdrSkyboxReady ) {
+							if ( !cube->prefiltered_image ) {
+								envDescriptor = hdrEnvDescriptor;
+								usingHdrSkybox = qtrue;
+							}
+							if ( !cube->irradiance_image ) {
+								irradianceDescriptor = hdrIrradianceDescriptor;
+								usingHdrSkybox = qtrue;
+							}
+							if ( !cube->hasSHCoeffs && usingHdrSkybox ) {
+								SkyboxHDR_CopySHCoeffs( block.shCoeffs );
+							}
+						}
 					} else {
-						Com_Memcpy( block.shCoeffs, pStage->shCoeffs, sizeof( block.shCoeffs ) );
+						if ( hdrSkyboxReady ) {
+							envDescriptor = hdrEnvDescriptor;
+							irradianceDescriptor = hdrIrradianceDescriptor;
+							usingHdrSkybox = qtrue;
+							if ( !SkyboxHDR_CopySHCoeffs( block.shCoeffs ) ) {
+								Com_Memcpy( block.shCoeffs, pStage->shCoeffs, sizeof( block.shCoeffs ) );
+							}
+						}
+						if ( !usingHdrSkybox ) {
+							Com_Memcpy( block.shCoeffs, pStage->shCoeffs, sizeof( block.shCoeffs ) );
+						}
 					}
 				}
 
@@ -1483,10 +1522,18 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 					vk_update_descriptor_if_changed( VK_DESC_PBR_BRDFLUT, brdfDescriptor );
 				}
 				if ( envDescriptor ) {
-					vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_CUBEMAP, envDescriptor, cube ? cube->prefiltered_image : NULL );
+					if ( usingHdrSkybox ) {
+						vk_update_descriptor_if_changed( VK_DESC_PBR_CUBEMAP, envDescriptor );
+					} else {
+						vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_CUBEMAP, envDescriptor, cube ? cube->prefiltered_image : NULL );
+					}
 				}
 				if ( irradianceDescriptor ) {
-					vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_IRRADIANCE, irradianceDescriptor, cube ? cube->irradiance_image : NULL );
+					if ( usingHdrSkybox ) {
+						vk_update_descriptor_if_changed( VK_DESC_PBR_IRRADIANCE, irradianceDescriptor );
+					} else {
+						vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_IRRADIANCE, irradianceDescriptor, cube ? cube->irradiance_image : NULL );
+					}
 				}
 			}
 				

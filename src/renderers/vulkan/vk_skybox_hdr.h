@@ -31,6 +31,7 @@ Pipeline:
 extern "C" {
 #endif
 
+#include "../common/vulkan/vulkan.h"
 #include "../common/tr_types.h"
 
 #define SKYBOX_HDR_CUBEMAP_SIZE  512
@@ -70,6 +71,8 @@ typedef struct skyboxHDR_s {
 	float               rotation;
 	float               tintR, tintG, tintB;
 	float               intensity;
+	vec4_t              shCoeffs[9];
+	qboolean            hasSHCoeffs;
 } skyboxHDR_t;
 
 void SkyboxHDR_Init(void);
@@ -86,6 +89,10 @@ void SkyboxHDR_GeneratePrefiltered(void);
 
 const skyboxHDR_t *SkyboxHDR_Get(void);
 qboolean           SkyboxHDR_IsLoaded(void);
+void               SkyboxHDR_UpdateRuntime(void);
+VkDescriptorSet    SkyboxHDR_GetPrefilteredDescriptor(void);
+VkDescriptorSet    SkyboxHDR_GetIrradianceDescriptor(void);
+qboolean           SkyboxHDR_CopySHCoeffs(vec4_t out[9]);
 
 void SkyboxHDR_SetExposure(float exposure);
 void SkyboxHDR_SetRotation(float degrees);

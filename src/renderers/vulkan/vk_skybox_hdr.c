@@ -17,6 +17,9 @@ irradiance and prefiltered mip chains for PBR IBL lighting.
 #include <math.h>
 
 static skyboxHDR_t skybox;
+static image_t skyboxPrefilteredImage;
+static image_t skyboxIrradianceImage;
+static qboolean skyboxLoadFailed;
 static cvar_t *r_skyboxHDR;
 static cvar_t *r_skyboxHDR_exposure;
 static cvar_t *r_skyboxHDR_rotation;
@@ -25,32 +28,139 @@ static cvar_t *r_skyboxHDR_intensity;
 extern void R_LoadEXR_HDR(const char *filename, float **pic, int *width, int *height);
 
 #define PI_F 3.14159265358979323846f
+#define SH_C0 0.28209479177387814347f
+#define SH_C1 0.48860251190291992159f
+#define SH_C2 1.09254843059207907054f
+#define SH_C3 0.31539156525252000603f
+#define SH_C4 0.54627421529603953527f
 
-void SkyboxHDR_RegisterCvars(void) {
-	r_skyboxHDR = ri.Cvar_Get("r_skyboxHDR", "", CVAR_ARCHIVE);
-	ri.Cvar_SetDescription(r_skyboxHDR, "Path to HDR EXR/PNG skybox panorama (empty = disabled).");
+static char skyboxPrefilteredName[] = "*skyboxHDRPrefiltered";
+static char skyboxIrradianceName[] = "*skyboxHDRIrradiance";
 
-	r_skyboxHDR_exposure = ri.Cvar_Get("r_skyboxHDR_exposure", "1.0", CVAR_ARCHIVE);
-	ri.Cvar_SetDescription(r_skyboxHDR_exposure, "Exposure multiplier for HDR skybox.");
+static float SkyboxHDR_SHBasis( int index, const vec3_t dir ) {
+	const float x = dir[0];
+	const float y = dir[1];
+	const float z = dir[2];
 
-	r_skyboxHDR_rotation = ri.Cvar_Get("r_skyboxHDR_rotation", "0.0", CVAR_ARCHIVE);
-	ri.Cvar_SetDescription(r_skyboxHDR_rotation, "Rotation of HDR skybox in degrees around Y axis.");
-
-	r_skyboxHDR_intensity = ri.Cvar_Get("r_skyboxHDR_intensity", "1.0", CVAR_ARCHIVE);
-	ri.Cvar_SetDescription(r_skyboxHDR_intensity, "IBL lighting intensity multiplier from HDR skybox.");
+	switch ( index ) {
+		case 0: return SH_C0;
+		case 1: return SH_C1 * y;
+		case 2: return SH_C1 * z;
+		case 3: return SH_C1 * x;
+		case 4: return SH_C2 * x * y;
+		case 5: return SH_C2 * y * z;
+		case 6: return SH_C3 * ( 3.0f * z * z - 1.0f );
+		case 7: return SH_C2 * x * z;
+		case 8: return SH_C4 * ( x * x - y * y );
+		default: return 0.0f;
+	}
 }
 
-void SkyboxHDR_Init(void) {
-	Com_Memset(&skybox, 0, sizeof(skybox));
-	SkyboxHDR_RegisterCvars();
-	skybox.exposure = 1.0f;
-	skybox.intensity = 1.0f;
-	skybox.tintR = skybox.tintG = skybox.tintB = 1.0f;
-	ri.Printf(PRINT_ALL, "HDR Skybox system initialized\n");
+static void SkyboxHDR_ResetSH( void ) {
+	int i;
+
+	for ( i = 0; i < 9; i++ ) {
+		Vector4Set( skybox.shCoeffs[i], 0.0f, 0.0f, 0.0f, 0.0f );
+	}
+	skybox.hasSHCoeffs = qfalse;
 }
 
-void SkyboxHDR_Shutdown(void) {
-	SkyboxHDR_Unload();
+static void SkyboxHDR_DestroyGPUImages( void ) {
+	vk_destroy_image_resources( &skyboxPrefilteredImage.handle, &skyboxPrefilteredImage.view );
+	vk_destroy_image_resources( &skyboxIrradianceImage.handle, &skyboxIrradianceImage.view );
+}
+
+static void SkyboxHDR_InitGPUImage( image_t *image, char *name, int size, int mipLevels ) {
+	if ( !image ) {
+		return;
+	}
+
+	if ( image->imgName == NULL ) {
+		Com_Memset( image, 0, sizeof( *image ) );
+		image->imgName = name;
+		image->imgName2 = name;
+		image->wrapClampMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		image->type = 0;
+	}
+
+	image->flags = IMGFLAG_CUBEMAP | IMGFLAG_CLAMPTOEDGE;
+	if ( mipLevels > 1 ) {
+		image->flags |= IMGFLAG_MIPMAP;
+	}
+	image->width = size;
+	image->height = size;
+	image->uploadWidth = size;
+	image->uploadHeight = size;
+	image->layers = 6;
+	image->internalFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
+
+	vk_create_image( image, size, size, mipLevels );
+}
+
+static void SkyboxHDR_ResampleFace( const float *src, int srcSize, float *dst, int dstSize ) {
+	int y;
+	int x;
+
+	for ( y = 0; y < dstSize; y++ ) {
+		for ( x = 0; x < dstSize; x++ ) {
+			const int srcX = ( x * srcSize ) / dstSize;
+			const int srcY = ( y * srcSize ) / dstSize;
+			const int srcIdx = ( srcY * srcSize + srcX ) * 4;
+			const int dstIdx = ( y * dstSize + x ) * 4;
+
+			dst[dstIdx + 0] = src[srcIdx + 0];
+			dst[dstIdx + 1] = src[srcIdx + 1];
+			dst[dstIdx + 2] = src[srcIdx + 2];
+			dst[dstIdx + 3] = src[srcIdx + 3];
+		}
+	}
+}
+
+static byte *SkyboxHDR_BuildUploadBuffer( float *faces[6], int baseSize, int mipLevels, int *outSize ) {
+	byte *buffer;
+	byte *dst;
+	int totalSize = 0;
+	int mip;
+	int mipSize = baseSize;
+
+	for ( mip = 0; mip < mipLevels; mip++ ) {
+		totalSize += 6 * mipSize * mipSize * 4 * (int)sizeof( float );
+		mipSize >>= 1;
+		if ( mipSize < 1 ) {
+			mipSize = 1;
+		}
+	}
+
+	buffer = (byte *)ri.Hunk_AllocateTempMemory( totalSize );
+	dst = buffer;
+	mipSize = baseSize;
+
+	for ( mip = 0; mip < mipLevels; mip++ ) {
+		int face;
+
+		for ( face = 0; face < 6; face++ ) {
+			const int bytes = mipSize * mipSize * 4 * (int)sizeof( float );
+			float *dstFace = (float *)dst;
+
+			if ( !faces[face] ) {
+				Com_Memset( dstFace, 0, bytes );
+			} else if ( mip == 0 ) {
+				Com_Memcpy( dstFace, faces[face], bytes );
+			} else {
+				SkyboxHDR_ResampleFace( faces[face], baseSize, dstFace, mipSize );
+			}
+
+			dst += bytes;
+		}
+
+		mipSize >>= 1;
+		if ( mipSize < 1 ) {
+			mipSize = 1;
+		}
+	}
+
+	*outSize = totalSize;
+	return buffer;
 }
 
 static void SkyboxHDR_SampleEquirect(const float *data, int w, int h, const float *dir, float *outRGB) {
@@ -94,6 +204,117 @@ static void SkyboxHDR_DirFromCubeFace(int face, float u, float v, float *dir) {
 
 	float len = sqrtf(dir[0]*dir[0] + dir[1]*dir[1] + dir[2]*dir[2]);
 	if (len > 0) { dir[0] /= len; dir[1] /= len; dir[2] /= len; }
+}
+
+static void SkyboxHDR_ExtractSHCoeffs( void ) {
+	float totalWeight = 0.0f;
+	int face;
+	int y;
+	int x;
+
+	SkyboxHDR_ResetSH();
+
+	if ( !skybox.cubeFaces[0] || skybox.cubeSize <= 0 ) {
+		return;
+	}
+
+	for ( face = 0; face < 6; face++ ) {
+		for ( y = 0; y < skybox.cubeSize; y++ ) {
+			for ( x = 0; x < skybox.cubeSize; x++ ) {
+				const float u = ((float)x + 0.5f) / (float)skybox.cubeSize * 2.0f - 1.0f;
+				const float v = ((float)y + 0.5f) / (float)skybox.cubeSize * 2.0f - 1.0f;
+				const float weight = 4.0f / powf( 1.0f + u * u + v * v, 1.5f );
+				vec3_t dir;
+				const int idx = ( y * skybox.cubeSize + x ) * 4;
+				int i;
+
+				SkyboxHDR_DirFromCubeFace( face, ((float)x + 0.5f) / (float)skybox.cubeSize, ((float)y + 0.5f) / (float)skybox.cubeSize, dir );
+
+				for ( i = 0; i < 9; i++ ) {
+					const float basis = SkyboxHDR_SHBasis( i, dir );
+					skybox.shCoeffs[i][0] += skybox.cubeFaces[face][idx + 0] * basis * weight;
+					skybox.shCoeffs[i][1] += skybox.cubeFaces[face][idx + 1] * basis * weight;
+					skybox.shCoeffs[i][2] += skybox.cubeFaces[face][idx + 2] * basis * weight;
+				}
+
+				totalWeight += weight;
+			}
+		}
+	}
+
+	if ( totalWeight > 0.0f ) {
+		const float norm = ( 4.0f * PI_F ) / totalWeight;
+		int i;
+
+		for ( i = 0; i < 9; i++ ) {
+			skybox.shCoeffs[i][0] *= norm;
+			skybox.shCoeffs[i][1] *= norm;
+			skybox.shCoeffs[i][2] *= norm;
+		}
+
+		skybox.hasSHCoeffs = qtrue;
+	}
+}
+
+static qboolean SkyboxHDR_UploadGPUImages( void ) {
+	byte *prefilterBuffer;
+	byte *irradianceBuffer;
+	int prefilterSize;
+	int irradianceSize;
+
+	if ( !skybox.loaded || !skybox.prefilteredFaces[0] || !skybox.irradianceFaces[0] ) {
+		return qfalse;
+	}
+
+	SkyboxHDR_InitGPUImage( &skyboxPrefilteredImage, skyboxPrefilteredName, skybox.prefilteredSize, skybox.prefilteredMips );
+	SkyboxHDR_InitGPUImage( &skyboxIrradianceImage, skyboxIrradianceName, skybox.irradianceSize, 1 );
+
+	prefilterBuffer = SkyboxHDR_BuildUploadBuffer( skybox.prefilteredFaces, skybox.prefilteredSize, skybox.prefilteredMips, &prefilterSize );
+	irradianceBuffer = SkyboxHDR_BuildUploadBuffer( skybox.irradianceFaces, skybox.irradianceSize, 1, &irradianceSize );
+
+	vk_upload_cubemap_mip_data( &skyboxPrefilteredImage, skybox.prefilteredSize, skybox.prefilteredMips,
+		prefilterBuffer, prefilterSize, 4 * (int)sizeof( float ), qfalse );
+	vk_upload_cubemap_mip_data( &skyboxIrradianceImage, skybox.irradianceSize, 1,
+		irradianceBuffer, irradianceSize, 4 * (int)sizeof( float ), qfalse );
+
+	ri.Hunk_FreeTempMemory( irradianceBuffer );
+	ri.Hunk_FreeTempMemory( prefilterBuffer );
+
+	SkyboxHDR_ExtractSHCoeffs();
+	return qtrue;
+}
+
+void SkyboxHDR_RegisterCvars(void) {
+	r_skyboxHDR = ri.Cvar_Get("r_skyboxHDR", "", CVAR_ARCHIVE);
+	ri.Cvar_SetDescription(r_skyboxHDR, "Path to HDR EXR/PNG skybox panorama (empty = disabled).");
+
+	r_skyboxHDR_exposure = ri.Cvar_Get("r_skyboxHDR_exposure", "1.0", CVAR_ARCHIVE);
+	ri.Cvar_SetDescription(r_skyboxHDR_exposure, "Exposure multiplier for HDR skybox.");
+
+	r_skyboxHDR_rotation = ri.Cvar_Get("r_skyboxHDR_rotation", "0.0", CVAR_ARCHIVE);
+	ri.Cvar_SetDescription(r_skyboxHDR_rotation, "Rotation of HDR skybox in degrees around Y axis.");
+
+	r_skyboxHDR_intensity = ri.Cvar_Get("r_skyboxHDR_intensity", "1.0", CVAR_ARCHIVE);
+	ri.Cvar_SetDescription(r_skyboxHDR_intensity, "IBL lighting intensity multiplier from HDR skybox.");
+}
+
+void SkyboxHDR_Init(void) {
+	Com_Memset(&skybox, 0, sizeof(skybox));
+	Com_Memset(&skyboxPrefilteredImage, 0, sizeof(skyboxPrefilteredImage));
+	Com_Memset(&skyboxIrradianceImage, 0, sizeof(skyboxIrradianceImage));
+	SkyboxHDR_RegisterCvars();
+	skybox.exposure = 1.0f;
+	skybox.intensity = 1.0f;
+	skybox.tintR = skybox.tintG = skybox.tintB = 1.0f;
+	skyboxLoadFailed = qfalse;
+	SkyboxHDR_ResetSH();
+	ri.Printf(PRINT_ALL, "HDR Skybox system initialized\n");
+}
+
+void SkyboxHDR_Shutdown(void) {
+	SkyboxHDR_DestroyGPUImages();
+	SkyboxHDR_Unload();
+	skyboxLoadFailed = qfalse;
 }
 
 qboolean SkyboxHDR_Load(const char *filename, skyboxProjection_t projection) {
@@ -163,6 +384,7 @@ qboolean SkyboxHDR_LoadCubeFaces(const char *baseName) {
 
 	SkyboxHDR_GenerateIrradiance();
 	SkyboxHDR_GeneratePrefiltered();
+	SkyboxHDR_ExtractSHCoeffs();
 
 	ri.Printf(PRINT_ALL, "SkyboxHDR: loaded 6 cubemap faces from %s (%dx%d)\n",
 		baseName, skybox.cubeSize, skybox.cubeSize);
@@ -177,6 +399,7 @@ void SkyboxHDR_Unload(void) {
 		if (skybox.irradianceFaces[f]) { Z_Free(skybox.irradianceFaces[f]); skybox.irradianceFaces[f] = NULL; }
 		if (skybox.prefilteredFaces[f]) { Z_Free(skybox.prefilteredFaces[f]); skybox.prefilteredFaces[f] = NULL; }
 	}
+	SkyboxHDR_ResetSH();
 	skybox.loaded = qfalse;
 }
 
@@ -327,6 +550,80 @@ void SkyboxHDR_GeneratePrefiltered(void) {
 
 const skyboxHDR_t *SkyboxHDR_Get(void) { return &skybox; }
 qboolean SkyboxHDR_IsLoaded(void) { return skybox.loaded; }
+
+void SkyboxHDR_UpdateRuntime(void) {
+	qboolean changed;
+
+	if ( vk.device == VK_NULL_HANDLE || !r_skyboxHDR ) {
+		return;
+	}
+
+	changed = r_skyboxHDR->modified;
+	changed = changed || ( r_skyboxHDR_exposure && r_skyboxHDR_exposure->modified );
+	changed = changed || ( r_skyboxHDR_rotation && r_skyboxHDR_rotation->modified );
+	changed = changed || ( r_skyboxHDR_intensity && r_skyboxHDR_intensity->modified );
+
+	if ( !changed ) {
+		if ( !r_skyboxHDR->string[0] ) {
+			return;
+		}
+		if ( skybox.loaded &&
+			skyboxPrefilteredImage.handle != VK_NULL_HANDLE &&
+			skyboxIrradianceImage.handle != VK_NULL_HANDLE ) {
+			return;
+		}
+		if ( skyboxLoadFailed ) {
+			return;
+		}
+	}
+
+	if ( !r_skyboxHDR->string[0] ) {
+		if ( skybox.loaded || skyboxPrefilteredImage.handle != VK_NULL_HANDLE || skyboxIrradianceImage.handle != VK_NULL_HANDLE ) {
+			ri.Printf( PRINT_ALL, "SkyboxHDR: disabled\n" );
+		}
+		SkyboxHDR_DestroyGPUImages();
+		SkyboxHDR_Unload();
+		skyboxLoadFailed = qfalse;
+	} else {
+		skyboxLoadFailed = qfalse;
+		if ( !SkyboxHDR_Load( r_skyboxHDR->string, SKYBOX_PROJ_EQUIRECTANGULAR ) ) {
+			SkyboxHDR_DestroyGPUImages();
+			SkyboxHDR_Unload();
+			skyboxLoadFailed = qtrue;
+		} else if ( !SkyboxHDR_UploadGPUImages() ) {
+			ri.Printf( PRINT_WARNING, "SkyboxHDR: failed to upload GPU cubemaps for %s\n", r_skyboxHDR->string );
+			SkyboxHDR_DestroyGPUImages();
+			SkyboxHDR_Unload();
+			skyboxLoadFailed = qtrue;
+		} else {
+			ri.Printf( PRINT_ALL, "SkyboxHDR: GPU cubemaps ready for %s\n", r_skyboxHDR->string );
+		}
+	}
+
+	r_skyboxHDR->modified = qfalse;
+	if ( r_skyboxHDR_exposure ) r_skyboxHDR_exposure->modified = qfalse;
+	if ( r_skyboxHDR_rotation ) r_skyboxHDR_rotation->modified = qfalse;
+	if ( r_skyboxHDR_intensity ) r_skyboxHDR_intensity->modified = qfalse;
+}
+
+VkDescriptorSet SkyboxHDR_GetPrefilteredDescriptor(void) {
+	return ( skybox.loaded && skyboxPrefilteredImage.handle != VK_NULL_HANDLE && skyboxPrefilteredImage.descriptor != VK_NULL_HANDLE )
+		? skyboxPrefilteredImage.descriptor : VK_NULL_HANDLE;
+}
+
+VkDescriptorSet SkyboxHDR_GetIrradianceDescriptor(void) {
+	return ( skybox.loaded && skyboxIrradianceImage.handle != VK_NULL_HANDLE && skyboxIrradianceImage.descriptor != VK_NULL_HANDLE )
+		? skyboxIrradianceImage.descriptor : VK_NULL_HANDLE;
+}
+
+qboolean SkyboxHDR_CopySHCoeffs(vec4_t out[9]) {
+	if ( !out || !skybox.hasSHCoeffs ) {
+		return qfalse;
+	}
+
+	Com_Memcpy( out, skybox.shCoeffs, sizeof( skybox.shCoeffs ) );
+	return qtrue;
+}
 
 void SkyboxHDR_SetExposure(float e) { skybox.exposure = e > 0 ? e : 0.01f; }
 void SkyboxHDR_SetRotation(float d) { skybox.rotation = d; }
