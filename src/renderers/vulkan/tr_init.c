@@ -2314,6 +2314,14 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_offsetFactor, "Offset factor for shaders with polygonOffset stages." );
 	r_offsetUnits = ri.Cvar_Get( "r_offsetunits", "-1", CVAR_CHEAT | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_offsetUnits, "Offset units for shaders with polygonOffset stages." );
+	{
+		cvar_t *sv = ri.Cvar_Get( "r_shadowVolumeOffsetFactor", "2", CVAR_ARCHIVE_ND );
+		ri.Cvar_SetDescription( sv, "Depth bias factor for stencil shadow volumes (reduces thin black lines at silhouette edges)." );
+	}
+	{
+		cvar_t *sv = ri.Cvar_Get( "r_shadowVolumeOffsetUnits", "2", CVAR_ARCHIVE_ND );
+		ri.Cvar_SetDescription( sv, "Depth bias units for stencil shadow volumes." );
+	}
 	r_drawBuffer = ri.Cvar_Get( "r_drawBuffer", "GL_BACK", CVAR_CHEAT );
 	ri.Cvar_SetDescription( r_drawBuffer, "Sets which frame buffer to draw into." );
 	r_lockpvs = ri.Cvar_Get ("r_lockpvs", "0", CVAR_CHEAT);

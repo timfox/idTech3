@@ -5568,14 +5568,14 @@ static void vk_alloc_persistent_pipelines( void )
 		vk.skybox_pipeline = vk_find_pipeline_ext( 0, &def, qtrue );
 	}
 
-	// stencil shadows
+	// stencil shadows (polygon offset reduces z-fight at silhouette edges → fewer thin black lines)
 	{
 		cullType_t cull_types[2] = { CT_FRONT_SIDED, CT_BACK_SIDED };
 		qboolean mirror_flags[2] = { qfalse, qtrue };
 		int i, j;
 
 		Com_Memset(&def, 0, sizeof(def));
-		def.polygon_offset = qfalse;
+		def.polygon_offset = qtrue;
 		def.state_bits = 0;
 		def.shader_type = TYPE_SIGNLE_TEXTURE;
 		def.shadow_phase = SHADOW_EDGES;
@@ -7177,6 +7177,7 @@ void vk_initialize( void )
 	vk_reset_motion_history();
 	vk.adaptedExposure = 1.0f;
 	VectorClear( vk.prevViewOrigin );
+	VectorSet( vk.prevViewForward, 0.0f, 0.0f, -1.0f );  /* sentinel until first frame */
 	vk.prevClientState = CA_UNINITIALIZED;
 	vk.uniform_alignment = props.limits.minUniformBufferOffsetAlignment;
 	vk.uniform_item_size = PAD( sizeof( vkUniform_t ), (size_t)vk.uniform_alignment );
@@ -13567,13 +13568,29 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	if ( def->polygon_offset ) {
 		rasterization_state.depthBiasEnable = VK_TRUE;
 		rasterization_state.depthBiasClamp = 0.0f;
+		if ( def->shadow_phase == SHADOW_EDGES ) {
+			/* Shadow volumes: push geometry back to avoid z-fight with object silhouette
+			 * (reduces thin black lines and single-pixel artifacts at stencil boundaries). */
+			cvar_t *sv_factor = ri.Cvar_Get( "r_shadowVolumeOffsetFactor", "2", CVAR_ARCHIVE_ND );
+			cvar_t *sv_units = ri.Cvar_Get( "r_shadowVolumeOffsetUnits", "2", CVAR_ARCHIVE_ND );
+			float factor = sv_factor ? sv_factor->value : 2.0f;
+			float units = sv_units ? sv_units->value : 2.0f;
 #ifdef USE_REVERSED_DEPTH
-		rasterization_state.depthBiasConstantFactor = -r_offsetUnits->value;
-		rasterization_state.depthBiasSlopeFactor = -r_offsetFactor->value;
+			rasterization_state.depthBiasConstantFactor = -units;
+			rasterization_state.depthBiasSlopeFactor = -factor;
 #else
-		rasterization_state.depthBiasConstantFactor = r_offsetUnits->value;
-		rasterization_state.depthBiasSlopeFactor = r_offsetFactor->value;
+			rasterization_state.depthBiasConstantFactor = units;
+			rasterization_state.depthBiasSlopeFactor = factor;
 #endif
+		} else {
+#ifdef USE_REVERSED_DEPTH
+			rasterization_state.depthBiasConstantFactor = -r_offsetUnits->value;
+			rasterization_state.depthBiasSlopeFactor = -r_offsetFactor->value;
+#else
+			rasterization_state.depthBiasConstantFactor = r_offsetUnits->value;
+			rasterization_state.depthBiasSlopeFactor = r_offsetFactor->value;
+#endif
+		}
 	} else {
 		rasterization_state.depthBiasEnable = VK_FALSE;
 		rasterization_state.depthBiasClamp = 0.0f;
@@ -17003,12 +17020,17 @@ void vk_begin_frame( void )
 					targetExp = 1.0f;
 					speed = stateTransition ? 0.35f : 0.12f;
 				} else {
-					/* Camera cut: large view jump → snap exposure for faster adaptation */
+					/* Camera cut: large view jump or view angle change (e.g. death cam tilt) →
+					 * snap exposure for faster adaptation. Relaxed threshold (64 vs 128) and
+					 * angle change help detect death-cam without large position jump. */
 					float dx = tr.refdef.vieworg[0] - vk.prevViewOrigin[0];
 					float dy = tr.refdef.vieworg[1] - vk.prevViewOrigin[1];
 					float dz = tr.refdef.vieworg[2] - vk.prevViewOrigin[2];
 					float distSq = dx * dx + dy * dy + dz * dz;
-					qboolean cameraCut = ( distSq > 128.0f * 128.0f );
+					float dotForward = DotProduct( tr.refdef.viewaxis[2], vk.prevViewForward );
+					qboolean posCut = ( distSq > 64.0f * 64.0f );
+					qboolean angleCut = ( dotForward < 0.85f );  /* ~30° view change */
+					qboolean cameraCut = posCut || angleCut;
 					if ( cameraCut )
 						speed = 0.5f;  /* snap within ~2 frames */
 
@@ -17048,6 +17070,7 @@ void vk_begin_frame( void )
 				vk.adaptedExposure += ( targetExp - vk.adaptedExposure ) * speed;
 				vk.adaptedExposure = ( vk.adaptedExposure < 0.01f ) ? 0.01f : ( vk.adaptedExposure > 10.0f ? 10.0f : vk.adaptedExposure );
 				VectorCopy( tr.refdef.vieworg, vk.prevViewOrigin );
+				VectorCopy( tr.refdef.viewaxis[2], vk.prevViewForward );
 				vk.prevClientState = clientState;
 			}
 		}
