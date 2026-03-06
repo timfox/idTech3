@@ -17975,13 +17975,6 @@ static qboolean vk_get_ibl_fog_color( vec3_t out )
 	}
 
 	if ( bestIndex < 0 ) {
-		if ( SkyboxHDR_CopySHCoeffs( hdrSh ) ) {
-			out[0] = hdrSh[0][0];
-			out[1] = hdrSh[0][1];
-			out[2] = hdrSh[0][2];
-			vk_normalize_rgb_luma_safe( out );
-			return qtrue;
-		}
 		return qfalse;
 	}
 

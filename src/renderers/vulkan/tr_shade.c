@@ -1425,7 +1425,15 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				VkDescriptorSet irradianceDescriptor = fallbackCube;
 				const VkDescriptorSet hdrEnvDescriptor = SkyboxHDR_GetPrefilteredDescriptor();
 				const VkDescriptorSet hdrIrradianceDescriptor = SkyboxHDR_GetIrradianceDescriptor();
-				const qboolean hdrSkyboxReady = ( hdrEnvDescriptor != VK_NULL_HANDLE && hdrIrradianceDescriptor != VK_NULL_HANDLE );
+				/*
+				 * The runtime HDR skybox is a global fallback for maps that do not provide
+				 * cubemaps. Mixing it into a map that already has local cubemaps produces
+				 * visibly inconsistent lighting/reflections, so keep it out of the map IBL
+				 * path entirely once any cubemap data exists.
+				 */
+				const qboolean hdrSkyboxReady = ( tr.numCubemaps <= 0 &&
+					hdrEnvDescriptor != VK_NULL_HANDLE &&
+					hdrIrradianceDescriptor != VK_NULL_HANDLE );
 				qboolean usingHdrSkybox = qfalse;
 
 				if ( !vk.brdflut_image_descriptor && !warnedMissingBrdfLut ) {
@@ -1490,19 +1498,6 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 							Com_Memcpy( block.shCoeffs, pStage->shCoeffs, sizeof( block.shCoeffs ) );
 						}
 
-						if ( hdrSkyboxReady ) {
-							if ( !cube->prefiltered_image ) {
-								envDescriptor = hdrEnvDescriptor;
-								usingHdrSkybox = qtrue;
-							}
-							if ( !cube->irradiance_image ) {
-								irradianceDescriptor = hdrIrradianceDescriptor;
-								usingHdrSkybox = qtrue;
-							}
-							if ( !cube->hasSHCoeffs && usingHdrSkybox ) {
-								SkyboxHDR_CopySHCoeffs( block.shCoeffs );
-							}
-						}
 					} else {
 						if ( hdrSkyboxReady ) {
 							envDescriptor = hdrEnvDescriptor;
