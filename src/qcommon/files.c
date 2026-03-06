@@ -431,6 +431,30 @@ static qboolean FS_PakIsPure( const pack_t *pack ) {
 	return qtrue;
 }
 
+/*
+=================
+FS_AllowLoosePureFile
+
+Pure mode should source game content from approved pack archives. Keep the
+historical exceptions for local config/data files so writable state remains
+usable without relaxing media purity.
+=================
+*/
+static qboolean FS_AllowLoosePureFile( const char *filename ) {
+	const char *ext;
+
+	if ( !fs_numServerPaks ) {
+		return qtrue;
+	}
+
+	ext = COM_GetExtension( filename );
+	if ( !ext || !*ext ) {
+		return qfalse;
+	}
+
+	return ( !Q_stricmp( ext, "cfg" ) || !Q_stricmp( ext, "dat" ) ) ? qtrue : qfalse;
+}
+
 
 /*
 =================
@@ -1666,7 +1690,7 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 					}
 					pakFile = pakFile->next;
 				} while ( pakFile != NULL );
-			} else if ( search->dir && search->policy != DIR_DENY ) {
+			} else if ( search->dir && search->policy != DIR_DENY && FS_AllowLoosePureFile( filename ) ) {
 				dir = search->dir;
 				netpath = FS_BuildOSPath( dir->path, dir->gamedir, filename );
 				temp = Sys_FOpen( netpath, "rb" );
@@ -1708,7 +1732,7 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 				}
 				pakFile = pakFile->next;
 			} while ( pakFile != NULL );
-		} else if ( search->dir && search->policy != DIR_DENY ) {
+		} else if ( search->dir && search->policy != DIR_DENY && FS_AllowLoosePureFile( filename ) ) {
 			// check a file in the directory tree
 			dir = search->dir;
 
