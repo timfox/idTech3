@@ -7482,7 +7482,7 @@ void vk_initialize( void )
 				ri.Printf( PRINT_ALL, "[VK]   Ray Tracing         : not available\n" );
 #endif
 				ri.Printf( PRINT_ALL, "[VK]   Compute Pipelines   : enabled\n" );
-				ri.Printf( PRINT_ALL, "[VK]   First Person Rendering : enabled (r_firstPersonFov, r_firstPersonScale)\n" );
+				ri.Printf( PRINT_ALL, "[VK]   First Person Rendering : enabled (r_firstPersonFov, r_firstPersonScale, r_firstPersonZNear)\n" );
 			}
 		}
 	}

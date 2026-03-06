@@ -661,7 +661,7 @@ void R_SetupFirstPersonProjection( viewParms_t *dest, float *outProjection )
 	height = ymax - ymin;
 
 	Com_Memcpy( outProjection, dest->projectionMatrix, sizeof( float ) * 16 );
-	/* overwrite XY scaling from custom FOV; keep Z from original */
+	/* overwrite XY scaling from custom FOV */
 	outProjection[0]  = 2.0f * zProj / width;
 	outProjection[4]  = 0.0f;
 	outProjection[8]  = ( xmax + xmin + 2.0f * stereoSep ) / width;
@@ -670,6 +670,19 @@ void R_SetupFirstPersonProjection( viewParms_t *dest, float *outProjection )
 	outProjection[5]  = 2.0f * zProj / height;
 	outProjection[9]  = ( ymax + ymin ) / height;
 	outProjection[13] = 0.0f;
+	/* use smaller near plane for first-person to avoid clipping arms/weapons */
+	{
+		const float zNear = r_firstPersonZNear->value;
+		const float zFar = dest->zFar;
+		const float zNearClamped = ( zNear < 0.01f ) ? 0.01f : ( ( zNear > 8.0f ) ? 8.0f : zNear );
+		const float depth = zFar - zNearClamped;
+		if ( depth > 0.1f ) {
+			outProjection[2]  = 0.0f;
+			outProjection[6]  = 0.0f;
+			outProjection[10] = -( zFar + zNearClamped ) / depth;
+			outProjection[14] = -2.0f * zFar * zNearClamped / depth;
+		}
+	}
 }
 
 

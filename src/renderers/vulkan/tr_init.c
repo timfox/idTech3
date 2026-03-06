@@ -70,6 +70,7 @@ cvar_t	*r_firstPersonFov;
 cvar_t	*r_firstPersonScale;
 cvar_t	*r_firstPersonFovEnabled;
 cvar_t	*r_firstPersonScaleEnabled;
+cvar_t	*r_firstPersonZNear;
 
 cvar_t	*r_skipBackEnd;
 
@@ -2070,7 +2071,7 @@ static void R_Register( void )
 	r_stereoSeparation = ri.Cvar_Get( "r_stereoSeparation", "64", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_stereoSeparation, "Control eye separation. Resulting separation is \\r_zproj divided by this value in standard units." );
 	r_firstPersonFov = ri.Cvar_Get( "r_firstPersonFov", "90", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_firstPersonFov, "50", "150", CV_FLOAT );
+	ri.Cvar_CheckRange( r_firstPersonFov, "1", "179", CV_FLOAT );
 	ri.Cvar_SetDescription( r_firstPersonFov, "Horizontal field of view (degrees) for first-person primitives (arms, weapons). 0 = use scene FOV." );
 	ri.Cvar_SetGroup( r_firstPersonFov, CVG_RENDERER );
 	r_firstPersonScale = ri.Cvar_Get( "r_firstPersonScale", "1.0", CVAR_ARCHIVE_ND );
@@ -2085,6 +2086,10 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_firstPersonScaleEnabled, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_firstPersonScaleEnabled, "0 = no scale; 1 = apply r_firstPersonScale for anti-clipping." );
 	ri.Cvar_SetGroup( r_firstPersonScaleEnabled, CVG_RENDERER );
+	r_firstPersonZNear = ri.Cvar_Get( "r_firstPersonZNear", "0.5", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_firstPersonZNear, "0.01", "8", CV_FLOAT );
+	ri.Cvar_SetDescription( r_firstPersonZNear, "Near clip plane for first-person primitives (arms, weapons). Smaller values reduce clipping of close geometry." );
+	ri.Cvar_SetGroup( r_firstPersonZNear, CVG_RENDERER );
 	r_ignoreGLErrors = ri.Cvar_Get( "r_ignoreGLErrors", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_ignoreGLErrors, "Ignore OpenGL errors." );
 	r_teleporterFlash = ri.Cvar_Get( "r_teleporterFlash", "1", CVAR_ARCHIVE );

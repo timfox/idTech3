@@ -1226,6 +1226,7 @@ extern cvar_t	*r_firstPersonFov;			// FOV for first-person primitives
 extern cvar_t	*r_firstPersonScale;			// anti-clipping scale for first-person primitives
 extern cvar_t	*r_firstPersonFovEnabled;		// use custom FOV for first-person
 extern cvar_t	*r_firstPersonScaleEnabled;		// apply scale for first-person anti-clipping
+extern cvar_t	*r_firstPersonZNear;			// near clip plane for first-person (reduces clipping)
 
 extern cvar_t	*r_lodbias;				// push/pull LOD transitions
 extern cvar_t	*r_lodscale;
