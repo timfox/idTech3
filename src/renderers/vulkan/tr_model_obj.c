@@ -59,6 +59,13 @@ qhandle_t R_RegisterOBJ(const char *name, model_t *mod) {
 	(void)fileData;
 	(void)fileSize;
 
+	fileSize = ri.FS_ReadFile( name, &fileData );
+	if ( fileSize <= 0 || !fileData ) {
+		ri.Printf( PRINT_DEVELOPER, "OBJ: Could not read %s\n", name );
+		return 0;
+	}
+	ri.FS_FreeFile( fileData );
+
 	ret = tinyobj_parse_obj(&attrib, &shapes, &numShapes,
 		&materials, &numMaterials,
 		name, obj_file_reader, NULL, TINYOBJ_FLAG_TRIANGULATE);

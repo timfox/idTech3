@@ -2389,9 +2389,12 @@ static void FS_ParseGameInfo( void );
 
 static pack_t *pakHashTable[ PK3_HASH_SIZE ];
 
+static qboolean FS_IsBaseGame( const char *game );
+
 #ifdef USE_PK3_CACHE_FILE
 
-#define CACHE_FILE_NAME "pk3cache.dat"
+#define CACHE_FILE_NAME_PK3 "pk3cache.dat"
+#define CACHE_FILE_NAME_ORB "orbcache.dat"
 
 #define CACHE_SYNC_CONDITION ( fs_paksReaded + fs_paksSkipped + fs_paksReleased >= 8 )
 
@@ -2441,6 +2444,62 @@ typedef struct pk3cacheFileItem_s {
 } pk3cacheFileItem_t;
 
 #pragma pack( pop )
+
+static qboolean FS_DirectoryHasOrbPak( const char *root, const char *gamedir ) {
+	char **orbfiles;
+	char path[MAX_OSPATH];
+	int numOrbFiles = 0;
+	qboolean found;
+
+	if ( !root || !root[0] || !gamedir || !gamedir[0] ) {
+		return qfalse;
+	}
+
+	Q_strncpyz( path, FS_BuildOSPath( root, gamedir, NULL ), sizeof( path ) );
+	orbfiles = Sys_ListFiles( path, ".orb", NULL, &numOrbFiles, 0 );
+	found = ( numOrbFiles > 0 );
+	if ( orbfiles ) {
+		Sys_FreeFileList( orbfiles );
+	}
+
+	return found;
+}
+
+static qboolean FS_ShouldUseOrbCacheFile( void ) {
+	int i;
+
+	for ( i = 0; i < basegame_cnt; i++ ) {
+		if ( FS_DirectoryHasOrbPak( fs_steampath ? fs_steampath->string : NULL, basegames[i] ) ||
+			 FS_DirectoryHasOrbPak( fs_basepath ? fs_basepath->string : NULL, basegames[i] ) ||
+			 FS_DirectoryHasOrbPak( fs_homepath ? fs_homepath->string : NULL, basegames[i] ) ) {
+			return qtrue;
+		}
+#ifdef __APPLE__
+		if ( FS_DirectoryHasOrbPak( fs_apppath ? fs_apppath->string : NULL, basegames[i] ) ) {
+			return qtrue;
+		}
+#endif
+	}
+
+	if ( fs_gamedirvar && fs_gamedirvar->string[0] != '\0' && !FS_IsBaseGame( fs_gamedirvar->string ) ) {
+		if ( FS_DirectoryHasOrbPak( fs_steampath ? fs_steampath->string : NULL, fs_gamedirvar->string ) ||
+			 FS_DirectoryHasOrbPak( fs_basepath ? fs_basepath->string : NULL, fs_gamedirvar->string ) ||
+			 FS_DirectoryHasOrbPak( fs_homepath ? fs_homepath->string : NULL, fs_gamedirvar->string ) ) {
+			return qtrue;
+		}
+#ifdef __APPLE__
+		if ( FS_DirectoryHasOrbPak( fs_apppath ? fs_apppath->string : NULL, fs_gamedirvar->string ) ) {
+			return qtrue;
+		}
+#endif
+	}
+
+	return qfalse;
+}
+
+static const char *FS_GetCacheFileName( void ) {
+	return FS_ShouldUseOrbCacheFile() ? CACHE_FILE_NAME_ORB : CACHE_FILE_NAME_PK3;
+}
 
 #endif // USE_PK3_CACHE_FILE
 
@@ -2907,7 +2966,7 @@ Called at the end of FS_Startup() after releasing unused paks
 */
 static qboolean FS_SaveCache( void )
 {
-	const char *filename = CACHE_FILE_NAME;
+	const char *filename = FS_GetCacheFileName();
 	const char *ospath;
 	const searchpath_t *sp;
 	FILE *f;
@@ -2971,7 +3030,7 @@ Called at FS_Startup() before loading any pk3 file
 */
 static void FS_LoadCache( void )
 {
-	const char *filename = CACHE_FILE_NAME;
+	const char *filename = FS_GetCacheFileName();
 	const char *ospath;
 	FILE *f;
 
@@ -2987,8 +3046,13 @@ static void FS_LoadCache( void )
 	ospath = FS_BuildOSPath( fs_homepath->string, filename, NULL );
 
 	f = Sys_FOpen( ospath, "rb" );
-	if ( f == NULL )
+	if ( f == NULL && !Q_stricmp( filename, CACHE_FILE_NAME_ORB ) ) {
+		ospath = FS_BuildOSPath( fs_homepath->string, CACHE_FILE_NAME_PK3, NULL );
+		f = Sys_FOpen( ospath, "rb" );
+	}
+	if ( f == NULL ) {
 		return;
+	}
 
 	if ( !FS_ValidateCacheHeader( f ) )
 	{

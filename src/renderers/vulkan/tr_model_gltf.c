@@ -56,7 +56,7 @@ qboolean R_LoadGLTF(const char *filename, gltfModel_t *model) {
 
 	fileSize = ri.FS_ReadFile(filename, &fileData);
 	if (fileSize <= 0 || !fileData) {
-		ri.Printf(PRINT_WARNING, "glTF: Could not read %s\n", filename);
+		ri.Printf(PRINT_DEVELOPER, "glTF: Could not read %s\n", filename);
 		return qfalse;
 	}
 

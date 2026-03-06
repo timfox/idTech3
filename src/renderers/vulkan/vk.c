@@ -793,6 +793,21 @@ static void record_image_layout_transition( VkCommandBuffer command_buffer, VkIm
 		}
 	}
 
+	/* Depth read-only can mean shader sampling or depth attachment reads. When callers
+	 * override the stage to fragment tests, switch the access mask accordingly. */
+	if ( old_layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL ) {
+		if ( src_stage & ( VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT ) ) {
+			barrier.srcAccessMask &= ~VK_ACCESS_SHADER_READ_BIT;
+			barrier.srcAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+		}
+	}
+	if ( new_layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL ) {
+		if ( dst_stage & ( VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT ) ) {
+			barrier.dstAccessMask &= ~VK_ACCESS_SHADER_READ_BIT;
+			barrier.dstAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+		}
+	}
+
 	/* VUID-02820: INPUT_ATTACHMENT_READ_BIT only valid for fragment stage; remove when dst is compute-only */
 	if ( ( dst_stage & VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT ) == 0 &&
 	     ( barrier.dstAccessMask & VK_ACCESS_INPUT_ATTACHMENT_READ_BIT ) ) {
@@ -1720,16 +1735,29 @@ static void vk_create_render_passes( void )
 	attachments[1].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 	attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
+	// screenmap dummy motion buffer so shaders with location=1 output match the subpass
+	attachments[2].flags = 0;
+	attachments[2].format = VK_FORMAT_R16G16_SFLOAT;
+	attachments[2].samples = VK_SAMPLE_COUNT_1_BIT;
+	attachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	attachments[2].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	attachments[2].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	attachments[2].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	attachments[2].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
 	colorRef0.attachment = 0;
 	colorRef0.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	colorRefs[1].attachment = 2;
+	colorRefs[1].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 	depthRef0.attachment = 1;
 	depthRef0.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 	Com_Memset( &subpass, 0, sizeof( subpass ) );
 	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-	subpass.colorAttachmentCount = 1;
-	subpass.pColorAttachments = &colorRef0;
+	subpass.colorAttachmentCount = 2;
+	subpass.pColorAttachments = colorRefs;
 	subpass.pDepthStencilAttachment = &depthRef0;
 
 	Com_Memset( &desc, 0, sizeof( desc ) );
@@ -1739,35 +1767,50 @@ static void vk_create_render_passes( void )
 	desc.pAttachments = attachments;
 	desc.pSubpasses = &subpass;
 	desc.subpassCount = 1;
-	desc.attachmentCount = 2;
+	desc.attachmentCount = 3;
 	desc.dependencyCount = 2;
 	desc.pDependencies = deps;
 
 	if ( vk.screenMapSamples > VK_SAMPLE_COUNT_1_BIT ) {
-
-		attachments[2].flags = 0;
-		attachments[2].format = vk.color_format;
-		attachments[2].samples = vk.screenMapSamples;
+		attachments[3].flags = 0;
+		attachments[3].format = vk.color_format;
+		attachments[3].samples = vk.screenMapSamples;
 #ifdef USE_BUFFER_CLEAR
-		attachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 #else
-		attachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 #endif
-		attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		attachments[2].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		attachments[2].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		attachments[2].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		attachments[2].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		attachments[3].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		attachments[3].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachments[3].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		attachments[3].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		attachments[3].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-		desc.attachmentCount = 3;
+		attachments[4].flags = 0;
+		attachments[4].format = VK_FORMAT_R16G16_SFLOAT;
+		attachments[4].samples = vk.screenMapSamples;
+#ifdef USE_BUFFER_CLEAR
+		attachments[4].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+#else
+		attachments[4].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+#endif
+		attachments[4].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		attachments[4].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachments[4].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		attachments[4].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		attachments[4].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-		colorRef0.attachment = 2; // screenmap msaa image attachment
-		colorRef0.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		desc.attachmentCount = 5;
 
-		colorResolveRef.attachment = 0; // screenmap resolve image attachment
-		colorResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		colorRefs[0].attachment = 3; // screenmap msaa image attachment
+		colorRefs[1].attachment = 4; // screenmap msaa motion attachment
 
-		subpass.pResolveAttachments = &colorResolveRef;
+		colorResolveRefs[0].attachment = 0; // screenmap resolve image attachment
+		colorResolveRefs[0].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		colorResolveRefs[1].attachment = VK_ATTACHMENT_UNUSED;
+		colorResolveRefs[1].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+		subpass.pResolveAttachments = colorResolveRefs;
 	}
 
 	VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.screenmap ) );
@@ -6127,11 +6170,15 @@ static void vk_create_attachments( void )
 		if ( vk.screenMapSamples > VK_SAMPLE_COUNT_1_BIT ) {
 			create_color_attachment( vk.screenMapWidth, vk.screenMapHeight, vk.screenMapSamples, vk.color_format,
 				sampledColorUsage, &vk.screenMap.color_image_msaa, &vk.screenMap.color_image_view_msaa, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, qtrue, 0 );
+			create_color_attachment( vk.screenMapWidth, vk.screenMapHeight, vk.screenMapSamples, VK_FORMAT_R16G16_SFLOAT,
+				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &vk.screenMap.motion_image_msaa, &vk.screenMap.motion_image_view_msaa, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, qtrue, 0 );
 		}
 
 		// screenmap/msaa-resolve
 		create_color_attachment( vk.screenMapWidth, vk.screenMapHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
 			sampledColorUsage, &vk.screenMap.color_image, &vk.screenMap.color_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
+		create_color_attachment( vk.screenMapWidth, vk.screenMapHeight, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R16G16_SFLOAT,
+			VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &vk.screenMap.motion_image, &vk.screenMap.motion_image_view, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, qtrue, 0 );
 
 		// screenmap depth
 		create_depth_attachment( vk.screenMapWidth, vk.screenMapHeight, vk.screenMapSamples, &vk.screenMap.depth_image, &vk.screenMap.depth_image_view, qtrue );
@@ -6400,15 +6447,18 @@ static void vk_create_framebuffers( void )
 	{
 		// screenmap
 		desc.renderPass = vk.render_pass.screenmap;
-		desc.attachmentCount = 2;
+		desc.attachmentCount = 3;
 		desc.width = vk.screenMapWidth;
 		desc.height = vk.screenMapHeight;
 		framebuffer_attachments[0] = vk.screenMap.color_image_view;
 		framebuffer_attachments[1] = vk.screenMap.depth_image_view;
+		framebuffer_attachments[2] = vk.screenMap.motion_image_view;
 		if ( vk.screenMapSamples > VK_SAMPLE_COUNT_1_BIT )
 		{
-			desc.attachmentCount = 3;
-			framebuffer_attachments[2] = vk.screenMap.color_image_view_msaa;
+			desc.attachmentCount = 5;
+			framebuffer_attachments[2] = vk.screenMap.motion_image_view;
+			framebuffer_attachments[3] = vk.screenMap.color_image_view_msaa;
+			framebuffer_attachments[4] = vk.screenMap.motion_image_view_msaa;
 		}
 		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.screenmap ) );
 		SET_OBJECT_NAME( vk.framebuffers.screenmap, "framebuffer - screenmap", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
@@ -9927,11 +9977,25 @@ static void vk_destroy_attachments( void )
 		vk.screenMap.color_image_view = VK_NULL_HANDLE;
 	}
 
+	if ( vk.screenMap.motion_image ) {
+		qvkDestroyImage( vk.device, vk.screenMap.motion_image, NULL );
+		qvkDestroyImageView( vk.device, vk.screenMap.motion_image_view, NULL );
+		vk.screenMap.motion_image = VK_NULL_HANDLE;
+		vk.screenMap.motion_image_view = VK_NULL_HANDLE;
+	}
+
 	if ( vk.screenMap.color_image_msaa ) {
 		qvkDestroyImage( vk.device, vk.screenMap.color_image_msaa, NULL );
 		qvkDestroyImageView( vk.device, vk.screenMap.color_image_view_msaa, NULL );
 		vk.screenMap.color_image_msaa = VK_NULL_HANDLE;
 		vk.screenMap.color_image_view_msaa = VK_NULL_HANDLE;
+	}
+
+	if ( vk.screenMap.motion_image_msaa ) {
+		qvkDestroyImage( vk.device, vk.screenMap.motion_image_msaa, NULL );
+		qvkDestroyImageView( vk.device, vk.screenMap.motion_image_view_msaa, NULL );
+		vk.screenMap.motion_image_msaa = VK_NULL_HANDLE;
+		vk.screenMap.motion_image_view_msaa = VK_NULL_HANDLE;
 	}
 
 	if ( vk.screenMap.depth_image ) {
@@ -10691,7 +10755,7 @@ void vk_create_image( image_t *image, int width, int height, int mip_levels ) {
 		desc.arrayLayers = image->layers;
 		desc.samples = VK_SAMPLE_COUNT_1_BIT;
 		desc.tiling = VK_IMAGE_TILING_OPTIMAL;
-		desc.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+		desc.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 		desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		desc.queueFamilyIndexCount = 0;
 		desc.pQueueFamilyIndices = NULL;
@@ -11243,6 +11307,8 @@ static void vk_create_atmosphere_pipeline( void )
 	VkPipelineMultisampleStateCreateInfo multisample_state;
 	VkPipelineColorBlendStateCreateInfo blend_state;
 	VkPipelineColorBlendAttachmentState attachment_blend;
+	VkDynamicState dynamic_states[2];
+	VkPipelineDynamicStateCreateInfo dynamic_state;
 	VkGraphicsPipelineCreateInfo create_info;
 	VkViewport viewport;
 	VkRect2D scissor;
@@ -11314,6 +11380,13 @@ static void vk_create_atmosphere_pipeline( void )
 	multisample_state.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 	multisample_state.rasterizationSamples = (VkSampleCountFlagBits)vkSamples;
 
+	dynamic_states[0] = VK_DYNAMIC_STATE_VIEWPORT;
+	dynamic_states[1] = VK_DYNAMIC_STATE_SCISSOR;
+	Com_Memset( &dynamic_state, 0, sizeof( dynamic_state ) );
+	dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	dynamic_state.dynamicStateCount = ARRAY_LEN( dynamic_states );
+	dynamic_state.pDynamicStates = dynamic_states;
+
 	Com_Memset( &create_info, 0, sizeof( create_info ) );
 	create_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 	create_info.stageCount = 2;
@@ -11325,6 +11398,7 @@ static void vk_create_atmosphere_pipeline( void )
 	create_info.pMultisampleState = &multisample_state;
 	create_info.pDepthStencilState = &depth_stencil_state;
 	create_info.pColorBlendState = &blend_state;
+	create_info.pDynamicState = &dynamic_state;
 	create_info.layout = vk.pipeline_layout_atmosphere;
 	create_info.renderPass = vk.render_pass.atmosphere;
 	create_info.subpass = 0;
@@ -13501,6 +13575,9 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 
 	main_motion_target = ( vk.fboActive &&
 		( renderPassIndex == RENDER_PASS_MAIN || renderPassIndex == RENDER_PASS_POST_BLOOM ) ) ? VK_TRUE : VK_FALSE;
+	if ( renderPassIndex == RENDER_PASS_SCREENMAP ) {
+		main_motion_target = VK_TRUE;
+	}
 	attachment_blend_states[0] = attachment_blend_state;
 	Com_Memset( &attachment_blend_states[1], 0, sizeof( attachment_blend_states[1] ) );
 	attachment_blend_states[1].blendEnable = VK_FALSE;
@@ -13578,6 +13655,10 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 		create_info.renderPass = vk.render_pass.screenmap;
 	else if ( renderPassIndex == RENDER_PASS_SUN_SHADOW )
 		create_info.renderPass = vk.render_pass.sun_shadow;
+	else if ( renderPassIndex == RENDER_PASS_POST_BLOOM )
+		create_info.renderPass = vk.render_pass.post_bloom;
+	else if ( renderPassIndex == RENDER_PASS_CUBEMAP )
+		create_info.renderPass = vk.render_pass.cubemap;
 	else
 		create_info.renderPass = vk.render_pass.main;
 
@@ -14434,30 +14515,23 @@ void vk_bind_descriptor_sets( void )
 {
 	uint32_t offsets[VK_DESC_UNIFORM_COUNT], offset_count;
 	uint32_t start, end, count, i;
+	uint32_t bound_set_count = MIN( (uint32_t)VK_DESC_COUNT, vk.maxBoundDescriptorSets );
 
 	start = vk.cmd->descriptor_set.start;
 	if ( start == ~0U && !backEnd.oitAccumPass ) {
 		if ( vk.cmd->last_pipeline == VK_NULL_HANDLE ) {
-			uint32_t highest = ~0U;
-
 			if ( vk.cmd->descriptor_set.current[VK_DESC_UNIFORM] == VK_NULL_HANDLE &&
 				vk.cmd->uniform_descriptor != VK_NULL_HANDLE )
 			{
 				vk.cmd->descriptor_set.current[VK_DESC_UNIFORM] = vk.cmd->uniform_descriptor;
 			}
 
-			for ( i = 0; i < VK_DESC_COUNT; i++ ) {
-				if ( vk.cmd->descriptor_set.current[i] != VK_NULL_HANDLE ) {
-					highest = i;
-				}
-			}
-
-			if ( highest == ~0U ) {
+			if ( bound_set_count == 0 || vk.cmd->descriptor_set.current[VK_DESC_UNIFORM] == VK_NULL_HANDLE ) {
 				return;
 			}
 
 			start = 0;
-			end = highest;
+			end = bound_set_count - 1;
 		} else {
 			return;
 		}
@@ -14535,6 +14609,27 @@ void vk_bind_descriptor_sets( void )
 	vk.cmd->descriptor_set.start = ~0U;
 }
 
+static void vk_force_descriptor_rebind( void )
+{
+	uint32_t bound_set_count = MIN( (uint32_t)VK_DESC_COUNT, vk.maxBoundDescriptorSets );
+
+	if ( !vk.cmd || backEnd.oitAccumPass ) {
+		return;
+	}
+
+	if ( vk.cmd->descriptor_set.current[VK_DESC_UNIFORM] == VK_NULL_HANDLE &&
+		vk.cmd->uniform_descriptor != VK_NULL_HANDLE ) {
+		vk.cmd->descriptor_set.current[VK_DESC_UNIFORM] = vk.cmd->uniform_descriptor;
+	}
+
+	if ( bound_set_count == 0 || vk.cmd->descriptor_set.current[VK_DESC_UNIFORM] == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	vk.cmd->descriptor_set.start = 0;
+	vk.cmd->descriptor_set.end = bound_set_count - 1;
+}
+
 
 void vk_bind_pipeline( uint32_t pipeline ) {
 	VkPipeline vkpipe;
@@ -14548,6 +14643,7 @@ void vk_bind_pipeline( uint32_t pipeline ) {
 	if ( vkpipe != vk.cmd->last_pipeline ) {
 		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkpipe );
 		vk.cmd->last_pipeline = vkpipe;
+		vk_force_descriptor_rebind();
 	}
 
 	if ( !backEnd.oitAccumPass ) {
@@ -14731,7 +14827,11 @@ static void vk_begin_render_pass( VkRenderPass renderPass, VkFramebuffer frameBu
 				clear_count = vk.msaaActive ? 3 : 2;
 			}
 		} else if ( vk.renderPassIndex == RENDER_PASS_SCREENMAP ) {
-			clear_count = ( vk.screenMapSamples > VK_SAMPLE_COUNT_1_BIT ) ? 3 : 2;
+			clear_values[2].color.float32[0] = 0.0f;
+			clear_values[2].color.float32[1] = 0.0f;
+			clear_values[2].color.float32[2] = 0.0f;
+			clear_values[2].color.float32[3] = 0.0f;
+			clear_count = ( vk.screenMapSamples > VK_SAMPLE_COUNT_1_BIT ) ? 5 : 3;
 		} else if ( vk.renderPassIndex == RENDER_PASS_SUN_SHADOW ) {
 			clear_count = 2;
 		} else {
@@ -16165,6 +16265,11 @@ static void vk_atmosphere_pass( void )
 
 	depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
 	if ( glConfig.stencilBits > 0 ) depth_aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
+
+	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT );
 
 	record_image_layout_transition( vk.cmd->command_buffer, vk.depth_image, depth_aspect,
 		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
