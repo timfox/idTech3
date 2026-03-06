@@ -1549,6 +1549,7 @@ extern cvar_t	*r_ssaoSamples;
 extern cvar_t	*r_ssaoMethod;
 extern cvar_t	*r_hbaoDirections;
 extern cvar_t	*r_hbaoSteps;
+extern cvar_t	*r_ssaoMaxDepthGradient;
 extern cvar_t	*r_ssaoBlurRadius;
 extern cvar_t	*r_ssaoDebugView;
 extern cvar_t	*r_oit;

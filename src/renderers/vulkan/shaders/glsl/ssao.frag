@@ -9,7 +9,7 @@ layout(push_constant) uniform SSAOParams {
 	vec4 projInfo; // invProj00, invProj11, proj10, proj14
 	vec4 params;   // radius, bias, intensity, power
 	vec4 misc;     // samples, invWidth, invHeight, depthIsReversed
-	vec4 misc2;    // method, hbaoDirections, hbaoSteps, reserved
+	vec4 misc2;    // method, hbaoDirections, hbaoSteps, maxDepthGradient
 } pc;
 
 float halton2( int i ) {
@@ -173,6 +173,22 @@ void main() {
 	if ( ( pc.misc.w > 0.5 && depth <= 0.001 ) || ( pc.misc.w <= 0.5 && depth >= 0.999 ) ) {
 		out_color = vec4( 1.0 );
 		return;
+	}
+
+	/* At depth discontinuities (object edges, silhouettes), dFdx/dFdy gradients are
+	 * unreliable and produce halos. Reject pixels where neighbor depth differs too much. */
+	float maxDepthGradient = pc.misc2.w;
+	if ( maxDepthGradient > 0.0 ) {
+		vec2 invSize = vec2( pc.misc.y, pc.misc.z );
+		float dx = textureLod( depthTex, frag_tex_coord + vec2( invSize.x, 0.0 ), 0.0 ).r;
+		float dy = textureLod( depthTex, frag_tex_coord + vec2( 0.0, invSize.y ), 0.0 ).r;
+		float dxm = textureLod( depthTex, frag_tex_coord - vec2( invSize.x, 0.0 ), 0.0 ).r;
+		float dym = textureLod( depthTex, frag_tex_coord - vec2( 0.0, invSize.y ), 0.0 ).r;
+		float maxDiff = max( max( abs( dx - depth ), abs( dxm - depth ) ), max( abs( dy - depth ), abs( dym - depth ) ) );
+		if ( maxDiff > maxDepthGradient ) {
+			out_color = vec4( 1.0 );
+			return;
+		}
 	}
 
 	vec3 viewPos = reconstructViewPos( frag_tex_coord, depth );

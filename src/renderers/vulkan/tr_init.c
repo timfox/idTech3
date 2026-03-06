@@ -162,6 +162,7 @@ cvar_t	*r_ssaoSamples;
 cvar_t	*r_ssaoMethod;
 cvar_t	*r_hbaoDirections;
 cvar_t	*r_hbaoSteps;
+cvar_t	*r_ssaoMaxDepthGradient;
 cvar_t	*r_ssaoBlurRadius;
 cvar_t	*r_oit;
 cvar_t	*r_ssaoDebugView;
@@ -2942,6 +2943,10 @@ static void R_Register( void )
 	r_hbaoSteps = ri.Cvar_Get( "r_hbaoSteps", "4", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_hbaoSteps, "2", "8", CV_INTEGER );
 	ri.Cvar_SetDescription( r_hbaoSteps, "HBAO steps along each ray (higher = broader, slower)." );
+
+	r_ssaoMaxDepthGradient = ri.Cvar_Get( "r_ssaoMaxDepthGradient", "0.08", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_ssaoMaxDepthGradient, "0.0", "0.5", CV_FLOAT );
+	ri.Cvar_SetDescription( r_ssaoMaxDepthGradient, "Skip SSAO at depth edges (object silhouettes) to reduce halos. 0=disabled, lower=stricter." );
 
 	r_ssaoBlurRadius = ri.Cvar_Get( "r_ssaoBlurRadius", "2", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_ssaoBlurRadius, "0", "8", CV_INTEGER );
