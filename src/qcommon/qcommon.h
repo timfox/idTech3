@@ -943,6 +943,7 @@ extern char cl_cdkey[34];
 // customizable client window title
 extern char cl_title[ MAX_CVAR_VALUE_STRING ];
 extern char con_title[ MAX_CVAR_VALUE_STRING ];
+extern char cl_bumper1[ MAX_CVAR_VALUE_STRING ];
 
 extern	int	CPU_Flags;
 
