@@ -8044,7 +8044,7 @@ void vk_initialize( void )
 		desc.pSetLayouts = set_layouts;
 		push_range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 		push_range.offset = 0;
-		push_range.size = 48; // ssao push constants
+		push_range.size = 64; // ao push constants
 		desc.pushConstantRangeCount = 1;
 		desc.pPushConstantRanges = &push_range;
 		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_ssao ) );
@@ -17147,6 +17147,7 @@ void vk_end_frame( void )
 					float projInfo[4]; // invProj00, invProj11, proj10, proj14
 					float params[4];   // radius, bias, intensity, power
 					float misc[4];     // samples, invWidth, invHeight, depthIsReversed
+					float misc2[4];    // method, hbaoDirections, hbaoSteps, reserved
 				} vk_ssao_push_t;
 
 				vk_ssao_push_t push;
@@ -17183,6 +17184,10 @@ void vk_end_frame( void )
 				push.misc[1] = ( glConfig.vidWidth > 0 ) ? 1.0f / (float)glConfig.vidWidth : 1.0f;
 				push.misc[2] = ( glConfig.vidHeight > 0 ) ? 1.0f / (float)glConfig.vidHeight : 1.0f;
 				push.misc[3] = depthIsReversed;
+				push.misc2[0] = (float)( r_ssaoMethod ? r_ssaoMethod->integer : 0 );
+				push.misc2[1] = (float)( r_hbaoDirections ? r_hbaoDirections->integer : 8 );
+				push.misc2[2] = (float)( r_hbaoSteps ? r_hbaoSteps->integer : 4 );
+				push.misc2[3] = 0.0f;
 
 				qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_ssao, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
 				vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
