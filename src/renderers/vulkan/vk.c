@@ -14105,6 +14105,11 @@ static qboolean vk_entity_requires_no_motion( const trRefEntity_t *ent )
 	if ( ent->e.backlerp > 0.001f ) {
 		return qtrue;
 	}
+	// Entities with custom shaders may have vertex deformation (tcMod, deform, etc.)
+	// that we cannot reproduce from model matrix alone; use zero motion.
+	if ( ent->e.customShader ) {
+		return qtrue;
+	}
 	return qfalse;
 }
 
@@ -17287,7 +17292,7 @@ void vk_end_frame( void )
 				push.misc2[0] = (float)( r_ssaoMethod ? r_ssaoMethod->integer : 0 );
 				push.misc2[1] = (float)( r_hbaoDirections ? r_hbaoDirections->integer : 8 );
 				push.misc2[2] = (float)( r_hbaoSteps ? r_hbaoSteps->integer : 4 );
-				push.misc2[3] = 0.0f;
+				push.misc2[3] = ( r_ssaoMaxDepthGradient && r_ssaoMaxDepthGradient->value > 0.0f ) ? r_ssaoMaxDepthGradient->value : 0.0f;
 
 				qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_ssao, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
 				vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );

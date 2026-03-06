@@ -93,3 +93,26 @@ Both feed into linear HDR; no conflict.
 ## 8. HDR UI
 
 **Current**: When `RDF_NOWORLDMODEL` or no world (menus, player config, videos), the gamma pass sets `paniniPad1 = 1.0`, which disables the HDR film pipeline (`noWorldLdr`). UI is **composited after tonemap**—menus and 2D overlays are authored as LDR and rendered on top of the (possibly tonemapped) framebuffer. Brightness and exposure are forced to 1.0 for these frames to avoid darkening or blowing out UI. No HDR-specific scaling or correction for UI; it is drawn in the same LDR output space as the gamma pass.
+
+---
+
+## 9. Screen-Space Effects: SSAO, SSR, Volumetric Fog
+
+### 9.1 SSAO Edge Halos
+
+**Issue**: Normals are derived from depth gradients (`dFdx`/`dFdy`). At depth discontinuities (object silhouettes, horizon), gradients are unreliable and produce dark/light halos.
+
+**Mitigation**: `r_ssaoMaxDepthGradient` (default 0.08). Pixels where neighbor depth differs more than this threshold output full AO (1.0) instead of computing from bad normals. Set to 0 to disable. Lower = stricter edge rejection.
+
+### 9.2 SSR Depth Discontinuities
+
+**Issue**: Same depth-derived normal problem. Thin black/white lines can appear at object edges.
+
+**Mitigation**: `r_ssr_maxDepthGradient` (default 0.08). SSR skips pixels at depth edges. Lower = stricter; may reduce reflection coverage near silhouettes.
+
+### 9.3 Volumetric Fog Artifacts
+
+**Sources**:
+- **Transparent/alpha-tested**: Fog compositing assumes opaque depth; foliage, fences, grates can show incorrect fog density at alpha edges.
+- **Temporal reprojection**: When view is nearly static (e.g. death cam), accumulated history can drift. Periodic camera cut (`vk_near_static_view_frames` ~90) resets history.
+- **Motion vectors**: Animated entities without previous-frame skinning output zero velocity; entities with `customShader` (vertex deformation) also use zero motion to avoid ghosting.
