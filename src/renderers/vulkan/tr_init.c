@@ -2368,7 +2368,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_pre_exposure_scale, "Pre-exposure scale for bloom/tonemap pipeline. 1.0=neutral; use for HDR pipeline tweaks." );
 	ri.Cvar_SetGroup( r_pre_exposure_scale, CVG_RENDERER );
 
-	r_exposure_auto = ri.Cvar_Get( "r_exposure_auto", "0", CVAR_ARCHIVE_ND );
+	r_exposure_auto = ri.Cvar_Get( "r_exposure_auto", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_exposure_auto, "Eye adaptation: 0=manual r_exposure, 1=temporal adaptation toward r_exposure_auto_target. Luminance pass planned." );
 	ri.Cvar_SetGroup( r_exposure_auto, CVG_RENDERER );
 	{
