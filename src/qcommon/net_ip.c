@@ -1113,7 +1113,11 @@ static SOCKET NET_IPSocket( const char *net_interface, int port, int *err ) {
 	}
 
 	if( bind( newsocket, (void *)&address, sizeof(address) ) == SOCKET_ERROR ) {
-		Com_Printf( "WARNING: NET_IPSocket: bind: %s\n", NET_ErrorString() );
+		if ( socketError == EADDRINUSE ) {
+			Com_DPrintf( "NET_IPSocket: bind: %s\n", NET_ErrorString() );
+		} else {
+			Com_Printf( "WARNING: NET_IPSocket: bind: %s\n", NET_ErrorString() );
+		}
 		*err = socketError;
 		closesocket( newsocket );
 		return INVALID_SOCKET;
@@ -1195,7 +1199,11 @@ static SOCKET NET_IP6Socket( const char *net_interface, int port, struct sockadd
 	}
 
 	if( bind( newsocket, (void *)&address, sizeof(address) ) == SOCKET_ERROR ) {
-		Com_Printf( "WARNING: NET_IP6Socket: bind: %s\n", NET_ErrorString() );
+		if ( socketError == EADDRINUSE ) {
+			Com_DPrintf( "NET_IP6Socket: bind: %s\n", NET_ErrorString() );
+		} else {
+			Com_Printf( "WARNING: NET_IP6Socket: bind: %s\n", NET_ErrorString() );
+		}
 		*err = socketError;
 		closesocket( newsocket );
 		return INVALID_SOCKET;
@@ -1633,11 +1641,14 @@ static void NET_OpenIP( void ) {
 		for( i = 0 ; i < 10 ; i++ )
 		{
 			ip6_socket = NET_IP6Socket(net_ip6->string, port6 + i, &boundto, &err);
-			if (ip6_socket != INVALID_SOCKET)
-			{
-				Cvar_SetIntegerValue( "net_port6", port6 + i );
-				break;
-			}
+				if (ip6_socket != INVALID_SOCKET)
+				{
+					Cvar_SetIntegerValue( "net_port6", port6 + i );
+					if ( i > 0 ) {
+						Com_Printf( "NET: using fallback IPv6 port %d\n", port6 + i );
+					}
+					break;
+				}
 			else
 			{
 				if(err == EAFNOSUPPORT)
@@ -1651,13 +1662,16 @@ static void NET_OpenIP( void ) {
 
 	if(net_enabled->integer & NET_ENABLEV4)
 	{
-		for( i = 0 ; i < 10 ; i++ ) {
-			ip_socket = NET_IPSocket( net_ip->string, port + i, &err );
-			if (ip_socket != INVALID_SOCKET) {
-				Cvar_SetIntegerValue( "net_port", port + i );
+			for( i = 0 ; i < 10 ; i++ ) {
+				ip_socket = NET_IPSocket( net_ip->string, port + i, &err );
+				if (ip_socket != INVALID_SOCKET) {
+					Cvar_SetIntegerValue( "net_port", port + i );
+					if ( i > 0 ) {
+						Com_Printf( "NET: using fallback IPv4 port %d\n", port + i );
+					}
 
-				if (net_socksEnabled->integer)
-					NET_OpenSocks( port + i );
+					if (net_socksEnabled->integer)
+						NET_OpenSocks( port + i );
 
 				break;
 			}

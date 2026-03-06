@@ -161,3 +161,40 @@ void R_LoadHDR(const char *filename, byte **pic, int *width, int *height) {
 	Z_Free(hdrData);
 	*pic = out; *width = w; *height = h;
 }
+
+void R_LoadHDR_Float(const char *filename, float **pic, int *width, int *height) {
+	void *fileData;
+	int fileSize, w, h, dataOff, numPixels;
+	float *hdrData;
+
+	*pic = NULL;
+	*width = 0;
+	*height = 0;
+
+	fileSize = FS_ReadFile(filename, &fileData);
+	if (fileSize <= 0 || !fileData) {
+		return;
+	}
+
+	if (!HDR_ReadHeader((const byte *)fileData, fileSize, &w, &h, &dataOff)) {
+		Com_Printf(S_COLOR_YELLOW "HDR: invalid header in %s\n", filename);
+		FS_FreeFile(fileData);
+		return;
+	}
+
+	numPixels = w * h;
+	hdrData = (float *)Z_Malloc(numPixels * 4 * sizeof(float));
+
+	if (!HDR_DecodeRLE((const byte *)fileData, fileSize, dataOff, w, h, hdrData)) {
+		Com_Printf(S_COLOR_YELLOW "HDR: decode error in %s\n", filename);
+		Z_Free(hdrData);
+		FS_FreeFile(fileData);
+		return;
+	}
+
+	FS_FreeFile(fileData);
+
+	*pic = hdrData;
+	*width = w;
+	*height = h;
+}

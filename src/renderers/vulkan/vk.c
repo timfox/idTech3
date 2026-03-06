@@ -14436,8 +14436,32 @@ void vk_bind_descriptor_sets( void )
 	uint32_t start, end, count, i;
 
 	start = vk.cmd->descriptor_set.start;
-	if ( start == ~0U && !backEnd.oitAccumPass )
-		return;
+	if ( start == ~0U && !backEnd.oitAccumPass ) {
+		if ( vk.cmd->last_pipeline == VK_NULL_HANDLE ) {
+			uint32_t highest = ~0U;
+
+			if ( vk.cmd->descriptor_set.current[VK_DESC_UNIFORM] == VK_NULL_HANDLE &&
+				vk.cmd->uniform_descriptor != VK_NULL_HANDLE )
+			{
+				vk.cmd->descriptor_set.current[VK_DESC_UNIFORM] = vk.cmd->uniform_descriptor;
+			}
+
+			for ( i = 0; i < VK_DESC_COUNT; i++ ) {
+				if ( vk.cmd->descriptor_set.current[i] != VK_NULL_HANDLE ) {
+					highest = i;
+				}
+			}
+
+			if ( highest == ~0U ) {
+				return;
+			}
+
+			start = 0;
+			end = highest;
+		} else {
+			return;
+		}
+	}
 
 	end = backEnd.oitAccumPass ? 0 : vk.cmd->descriptor_set.end;
 	if ( backEnd.oitAccumPass )
@@ -14454,7 +14478,7 @@ void vk_bind_descriptor_sets( void )
 
 	// fill NULL descriptor gaps
 	if ( tr.whiteImage ) {
-		for ( i = start + 1; i < end; i++ ) {
+		for ( i = start + 1; i <= end; i++ ) {
 			if ( vk.cmd->descriptor_set.current[i] == VK_NULL_HANDLE ) {
 				vk.cmd->descriptor_set.current[i] = tr.whiteImage->descriptor;
 				vk.cmd->descriptor_set.image[i] = tr.whiteImage;
