@@ -3707,6 +3707,10 @@ static qboolean CL_IsMininized( void ) {
 	return gw_minimized;
 }
 
+static int CL_GetState( void ) {
+	return cls.state;
+}
+
 
 /*
 ============
@@ -3877,6 +3881,7 @@ static void CL_InitRef( void ) {
 	rimp.CL_LoadJPG = CL_LoadJPG;
 
 	rimp.CL_IsMinimized = CL_IsMininized;
+	rimp.CL_GetState = CL_GetState;
 	rimp.CL_SetScaling = CL_SetScaling;
 
 	rimp.Sys_SetClipboardBitmap = Sys_SetClipboardBitmap;
