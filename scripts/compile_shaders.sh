@@ -42,6 +42,11 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Resolve GENERATED_DIR to absolute path so Python (cwd=SHADER_DIR) writes to the correct location
+if [[ "$GENERATED_DIR" != /* ]]; then
+  GENERATED_DIR="$PROJECT_ROOT/$GENERATED_DIR"
+fi
+
 GLSLANG_VALIDATOR="${GLSLANG_VALIDATOR:-$(command -v glslangValidator || true)}"
 if [[ -z "$GLSLANG_VALIDATOR" ]]; then
   echo "Error: glslangValidator was not found in PATH. Install the Vulkan SDK or set GLSLANG_VALIDATOR." >&2

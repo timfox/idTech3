@@ -2062,7 +2062,7 @@ static void R_Register( void )
 
 	r_flares = ri.Cvar_Get ("r_flares", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_flares, "Enables corona effects on light sources." );
-	r_znear = ri.Cvar_Get( "r_znear", "4", CVAR_CHEAT );
+	r_znear = ri.Cvar_Get( "r_znear", "8", CVAR_CHEAT );
 	ri.Cvar_CheckRange( r_znear, "0.001", "200", CV_FLOAT );
 	ri.Cvar_SetDescription( r_znear, "Viewport distance from view origin (how close objects can be to the player before they're clipped out of the scene)." );
 	r_zproj = ri.Cvar_Get( "r_zproj", "64", CVAR_ARCHIVE_ND );
@@ -2315,11 +2315,11 @@ static void R_Register( void )
 	r_offsetUnits = ri.Cvar_Get( "r_offsetunits", "-1", CVAR_CHEAT | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_offsetUnits, "Offset units for shaders with polygonOffset stages." );
 	{
-		cvar_t *sv = ri.Cvar_Get( "r_shadowVolumeOffsetFactor", "2", CVAR_ARCHIVE_ND );
-		ri.Cvar_SetDescription( sv, "Depth bias factor for stencil shadow volumes (reduces thin black lines at silhouette edges)." );
+		cvar_t *sv = ri.Cvar_Get( "r_shadowVolumeOffsetFactor", "1", CVAR_ARCHIVE_ND );
+		ri.Cvar_SetDescription( sv, "Depth bias factor for stencil shadow volumes (reduces thin black lines; push forward)." );
 	}
 	{
-		cvar_t *sv = ri.Cvar_Get( "r_shadowVolumeOffsetUnits", "2", CVAR_ARCHIVE_ND );
+		cvar_t *sv = ri.Cvar_Get( "r_shadowVolumeOffsetUnits", "1", CVAR_ARCHIVE_ND );
 		ri.Cvar_SetDescription( sv, "Depth bias units for stencil shadow volumes." );
 	}
 	r_drawBuffer = ri.Cvar_Get( "r_drawBuffer", "GL_BACK", CVAR_CHEAT );

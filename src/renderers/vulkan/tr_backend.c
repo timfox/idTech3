@@ -1506,7 +1506,7 @@ static qboolean RB_BuildSunShadowView( const drawSurfsCommand_t *cmd, viewParms_
 		return qfalse;
 	}
 
-	nearPlane = ( r_znear ) ? r_znear->value : 4.0f;
+	nearPlane = ( r_znear ) ? r_znear->value : 8.0f;
 	if ( nearPlane < 0.1f ) {
 		nearPlane = 0.1f;
 	}
