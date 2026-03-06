@@ -8043,6 +8043,11 @@ void vk_initialize( void )
 
 		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_post_process ) );
 
+		/* Blend pipeline: 4 sampler sets for texture0..texture3 (blend.frag). Must not reuse postfx_uniform. */
+		set_layouts[0] = vk.set_layout_sampler;
+		set_layouts[1] = vk.set_layout_sampler;
+		set_layouts[2] = vk.set_layout_sampler;
+		set_layouts[3] = vk.set_layout_sampler;
 		desc.setLayoutCount = VK_NUM_BLOOM_PASSES;
 		desc.pushConstantRangeCount = 0;
 		desc.pPushConstantRanges = NULL;
