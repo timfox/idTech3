@@ -512,7 +512,7 @@ Cvar_CheckRange( s_doppler, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( s_muteWhenMinimized, "Mutes all audio while game is minimized." );
 
 #ifdef USE_OPENAL
-	s_openal = Cvar_Get( "s_openal", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	s_openal = Cvar_Get( "s_openal", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	Cvar_CheckRange( s_openal, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( s_openal, "Enables the OpenAL audio backend (requires restart)." );
 	

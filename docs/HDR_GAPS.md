@@ -38,6 +38,21 @@ This document tracks known gaps, risks, and mitigations in the Vulkan HDR render
 
 **Mitigation**: Camera cut detection—when view origin jumps >128 units, eye adaptation uses 4× faster blend (0.5) to snap within ~2 frames. Prevents slow adaptation after teleports or level loads.
 
+**Death blowout**: On camera cut (e.g. death camera jump), target exposure is capped by `r_exposure_auto_cap_on_cut` (default 0.75) to avoid blowing out when the view suddenly faces a bright sky. Set to 0 to disable the cap.
+
+## 6.5b Wobble / Underwater-like Distortion
+
+Post-processing effects that can produce a "wobble" or underwater feel (especially during death or cutscenes):
+
+| Cvar | Default | Effect |
+|------|---------|--------|
+| `r_chromaticAberration` | 0.22 | RGB separation on edges; can look like lens distortion. Set to 0 to disable. |
+| `r_filmGrain` | 0.75 | Adds noise; with `r_filmLook` can create soft-light grain. Set to 0 to disable. |
+| `r_paniniBarrelDistortion` | 0.0 | Barrel/pincushion warp. Non-zero adds visible distortion. |
+| `cg_underwaterFovWarp` | 0 (OSP) | FOV warping when in water. If a mod enables it incorrectly, can cause wobble when not underwater. |
+
+If the camera feels like it's underwater when it isn't, try `r_chromaticAberration 0` and `cg_underwaterFovWarp 0` (if using OSP).
+
 ## 6.6 HDR Skybox vs Procedural Sky
 
 - **HDR skybox**: EXR/HDR with `r_skyboxHDR_exposure`, `r_skyboxHDR_intensity`

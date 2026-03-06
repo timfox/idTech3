@@ -2377,8 +2377,11 @@ static void R_Register( void )
 	{
 		cvar_t *exp_target = ri.Cvar_Get( "r_exposure_auto_target", "0.5", CVAR_ARCHIVE_ND );
 		cvar_t *exp_speed = ri.Cvar_Get( "r_exposure_auto_speed", "2.0", CVAR_ARCHIVE_ND );
+		cvar_t *exp_cap_cut = ri.Cvar_Get( "r_exposure_auto_cap_on_cut", "0.75", CVAR_ARCHIVE_ND );
+		ri.Cvar_CheckRange( exp_cap_cut, "0.1", "2.0", CV_FLOAT );
 		ri.Cvar_SetDescription( exp_target, "Target exposure for eye adaptation (r_exposure_auto 1)." );
 		ri.Cvar_SetDescription( exp_speed, "Eye adaptation speed (higher = faster)." );
+		ri.Cvar_SetDescription( exp_cap_cut, "Max exposure on camera cut (e.g. death). Reduces blowout when view suddenly jumps to bright sky. 0=disable cap." );
 	}
 
 	r_tonemap = ri.Cvar_Get( "r_tonemap", "3", CVAR_ARCHIVE_ND );
