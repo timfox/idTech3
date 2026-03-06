@@ -1201,7 +1201,7 @@ static void R_LevelShot( void ) {
 	float		xScale, yScale;
 	int			xx, yy;
 
-	if ( !tr.world || !tr.world->baseName ) {
+	if ( !tr.world || !tr.world->baseName[0] ) {
 		ri.Printf( PRINT_WARNING, "Levelshot requires a loaded map.\n" );
 		return;
 	}
@@ -2751,7 +2751,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_volumetricFogForceCameraCut, "One-shot debug trigger to force a volumetric camera-cut history reset on the next frame." );
 	ri.Cvar_SetGroup( r_volumetricFogForceCameraCut, CVG_RENDERER );
 
-	r_volumetricFogPerfTimers = ri.Cvar_Get( "r_volumetricFogPerfTimers", "1", CVAR_ARCHIVE_ND );
+	r_volumetricFogPerfTimers = ri.Cvar_Get( "r_volumetricFogPerfTimers", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogPerfTimers, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_volumetricFogPerfTimers, "Enable Vulkan timestamp profiling for volumetric fog stages and fluid auto-scaling." );
 	ri.Cvar_SetGroup( r_volumetricFogPerfTimers, CVG_RENDERER );

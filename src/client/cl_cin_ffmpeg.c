@@ -31,6 +31,7 @@ typedef struct {
 	AVFormatContext    *formatCtx;
 	AVCodecContext     *videoCodecCtx;
 	AVCodecContext     *audioCodecCtx;
+	AVIOContext        *avioCtx;
 	struct SwsContext  *swsCtx;
 	AVFrame            *frame;
 	AVFrame            *rgbaFrame;
@@ -45,6 +46,13 @@ typedef struct {
 	byte               *audioBuffer;
 	int                 audioBufferSize;
 
+	byte               *fileData;
+	int                 fileSize;
+	int                 fileOffset;
+
+	byte               *avioBuffer;
+	int                 avioBufferSize;
+
 	qboolean            eof;
 	double              timeBase;
 	int64_t             startPts;
@@ -55,6 +63,71 @@ static qboolean ffmpeg_decodeFrame(cinModernDecoder_t *dec, cinFrame_t *frame, c
 static void     ffmpeg_seek(cinModernDecoder_t *dec, int timeMs);
 static void     ffmpeg_close(cinModernDecoder_t *dec);
 static qboolean ffmpeg_isEof(cinModernDecoder_t *dec);
+
+static int ffmpeg_io_read(void *opaque, uint8_t *buf, int bufSize);
+static int64_t ffmpeg_io_seek(void *opaque, int64_t offset, int whence);
+
+static int ffmpeg_io_read(void *opaque, uint8_t *buf, int bufSize) {
+	ffmpegContext_t *ctx = (ffmpegContext_t *)opaque;
+	int remaining;
+	int toRead;
+
+	if (!ctx || !ctx->fileData || bufSize <= 0) {
+		return AVERROR_EOF;
+	}
+
+	remaining = ctx->fileSize - ctx->fileOffset;
+	if (remaining <= 0) {
+		return AVERROR_EOF;
+	}
+
+	toRead = bufSize;
+	if (toRead > remaining) {
+		toRead = remaining;
+	}
+
+	Com_Memcpy(buf, ctx->fileData + ctx->fileOffset, toRead);
+	ctx->fileOffset += toRead;
+
+	return toRead;
+}
+
+static int64_t ffmpeg_io_seek(void *opaque, int64_t offset, int whence) {
+	ffmpegContext_t *ctx = (ffmpegContext_t *)opaque;
+	int newOffset;
+
+	if (!ctx) {
+		return -1;
+	}
+
+	if (whence == AVSEEK_SIZE) {
+		return ctx->fileSize;
+	}
+
+	switch (whence & ~AVSEEK_FORCE) {
+		case SEEK_SET:
+			newOffset = (int)offset;
+			break;
+		case SEEK_CUR:
+			newOffset = ctx->fileOffset + (int)offset;
+			break;
+		case SEEK_END:
+			newOffset = ctx->fileSize + (int)offset;
+			break;
+		default:
+			return -1;
+	}
+
+	if (newOffset < 0) {
+		newOffset = 0;
+	}
+	if (newOffset > ctx->fileSize) {
+		newOffset = ctx->fileSize;
+	}
+
+	ctx->fileOffset = newOffset;
+	return ctx->fileOffset;
+}
 
 /*
 ===============
@@ -80,29 +153,72 @@ static qboolean ffmpeg_open(cinModernDecoder_t *dec, const char *filename, fileH
 	ffmpegContext_t *ctx;
 	const AVCodec *videoCodec = NULL;
 	const AVCodec *audioCodec = NULL;
+	int openedInput = 0;
 	int ret;
-
-	(void)file;
-	(void)fileSize;
 
 	ctx = (ffmpegContext_t *)Z_Malloc(sizeof(ffmpegContext_t));
 	Com_Memset(ctx, 0, sizeof(*ctx));
 	ctx->videoStreamIdx = -1;
 	ctx->audioStreamIdx = -1;
+	ctx->avioBufferSize = 64 * 1024;
 
-	ret = avformat_open_input(&ctx->formatCtx, filename, NULL, NULL);
+	if (file == FS_INVALID_HANDLE || fileSize <= 0) {
+		Com_Printf(S_COLOR_RED "FFmpeg: Invalid file handle for %s\n", filename);
+		goto fail;
+	}
+
+	ctx->fileSize = fileSize;
+	ctx->fileData = (byte *)Z_Malloc(ctx->fileSize);
+	if (!ctx->fileData) {
+		Com_Printf(S_COLOR_RED "FFmpeg: Could not allocate %d bytes for %s\n", ctx->fileSize, filename);
+		goto fail;
+	}
+
+	if (FS_Read(ctx->fileData, ctx->fileSize, file) != ctx->fileSize) {
+		Com_Printf(S_COLOR_RED "FFmpeg: Could not read %s from virtual filesystem\n", filename);
+		goto fail;
+	}
+	ctx->fileOffset = 0;
+
+	ctx->avioBuffer = (byte *)av_malloc(ctx->avioBufferSize);
+	if (!ctx->avioBuffer) {
+		Com_Printf(S_COLOR_RED "FFmpeg: Could not allocate AVIO buffer for %s\n", filename);
+		goto fail;
+	}
+
+	ctx->avioCtx = avio_alloc_context(
+		ctx->avioBuffer,
+		ctx->avioBufferSize,
+		0,
+		ctx,
+		ffmpeg_io_read,
+		NULL,
+		ffmpeg_io_seek);
+	if (!ctx->avioCtx) {
+		Com_Printf(S_COLOR_RED "FFmpeg: Could not create custom IO for %s\n", filename);
+		goto fail;
+	}
+
+	ctx->formatCtx = avformat_alloc_context();
+	if (!ctx->formatCtx) {
+		Com_Printf(S_COLOR_RED "FFmpeg: Could not allocate format context for %s\n", filename);
+		goto fail;
+	}
+
+	ctx->formatCtx->pb = ctx->avioCtx;
+	ctx->formatCtx->flags |= AVFMT_FLAG_CUSTOM_IO;
+
+	ret = avformat_open_input(&ctx->formatCtx, NULL, NULL, NULL);
 	if (ret < 0) {
 		Com_Printf(S_COLOR_RED "FFmpeg: Could not open %s\n", filename);
-		Z_Free(ctx);
-		return qfalse;
+		goto fail;
 	}
+	openedInput = 1;
 
 	ret = avformat_find_stream_info(ctx->formatCtx, NULL);
 	if (ret < 0) {
 		Com_Printf(S_COLOR_RED "FFmpeg: Could not find stream info in %s\n", filename);
-		avformat_close_input(&ctx->formatCtx);
-		Z_Free(ctx);
-		return qfalse;
+		goto fail;
 	}
 
 	ctx->videoStreamIdx = av_find_best_stream(ctx->formatCtx, AVMEDIA_TYPE_VIDEO, -1, -1, &videoCodec, 0);
@@ -110,30 +226,31 @@ static qboolean ffmpeg_open(cinModernDecoder_t *dec, const char *filename, fileH
 
 	if (ctx->videoStreamIdx < 0) {
 		Com_Printf(S_COLOR_RED "FFmpeg: No video stream found in %s\n", filename);
-		avformat_close_input(&ctx->formatCtx);
-		Z_Free(ctx);
-		return qfalse;
+		goto fail;
 	}
 
 	ctx->videoCodecCtx = avcodec_alloc_context3(videoCodec);
+	if (!ctx->videoCodecCtx) {
+		Com_Printf(S_COLOR_RED "FFmpeg: Could not allocate video codec context for %s\n", filename);
+		goto fail;
+	}
 	avcodec_parameters_to_context(ctx->videoCodecCtx, ctx->formatCtx->streams[ctx->videoStreamIdx]->codecpar);
 
 	ret = avcodec_open2(ctx->videoCodecCtx, videoCodec, NULL);
 	if (ret < 0) {
 		Com_Printf(S_COLOR_RED "FFmpeg: Could not open video codec for %s\n", filename);
-		avcodec_free_context(&ctx->videoCodecCtx);
-		avformat_close_input(&ctx->formatCtx);
-		Z_Free(ctx);
-		return qfalse;
+		goto fail;
 	}
 
 	if (ctx->audioStreamIdx >= 0 && audioCodec) {
 		ctx->audioCodecCtx = avcodec_alloc_context3(audioCodec);
-		avcodec_parameters_to_context(ctx->audioCodecCtx, ctx->formatCtx->streams[ctx->audioStreamIdx]->codecpar);
-		if (avcodec_open2(ctx->audioCodecCtx, audioCodec, NULL) < 0) {
-			avcodec_free_context(&ctx->audioCodecCtx);
-			ctx->audioCodecCtx = NULL;
-			ctx->audioStreamIdx = -1;
+		if (ctx->audioCodecCtx) {
+			avcodec_parameters_to_context(ctx->audioCodecCtx, ctx->formatCtx->streams[ctx->audioStreamIdx]->codecpar);
+			if (avcodec_open2(ctx->audioCodecCtx, audioCodec, NULL) < 0) {
+				avcodec_free_context(&ctx->audioCodecCtx);
+				ctx->audioCodecCtx = NULL;
+				ctx->audioStreamIdx = -1;
+			}
 		}
 	}
 
@@ -157,15 +274,27 @@ static qboolean ffmpeg_open(cinModernDecoder_t *dec, const char *filename, fileH
 	ctx->frame = av_frame_alloc();
 	ctx->rgbaFrame = av_frame_alloc();
 	ctx->packet = av_packet_alloc();
+	if (!ctx->frame || !ctx->rgbaFrame || !ctx->packet) {
+		Com_Printf(S_COLOR_RED "FFmpeg: Could not allocate decode buffers for %s\n", filename);
+		goto fail;
+	}
 
 	ctx->frameBufferSize = dec->width * dec->height * 4;
 	ctx->frameBuffer = (byte *)Z_Malloc(ctx->frameBufferSize);
+	if (!ctx->frameBuffer) {
+		Com_Printf(S_COLOR_RED "FFmpeg: Could not allocate frame buffer for %s\n", filename);
+		goto fail;
+	}
 
 	ctx->rgbaFrame->format = AV_PIX_FMT_RGBA;
 	ctx->rgbaFrame->width = dec->width;
 	ctx->rgbaFrame->height = dec->height;
-	av_image_alloc(ctx->rgbaFrame->data, ctx->rgbaFrame->linesize,
+	ret = av_image_alloc(ctx->rgbaFrame->data, ctx->rgbaFrame->linesize,
 		dec->width, dec->height, AV_PIX_FMT_RGBA, 32);
+	if (ret < 0) {
+		Com_Printf(S_COLOR_RED "FFmpeg: Could not allocate RGBA image for %s\n", filename);
+		goto fail;
+	}
 
 	ctx->swsCtx = sws_getContext(
 		dec->width, dec->height, ctx->videoCodecCtx->pix_fmt,
@@ -174,8 +303,7 @@ static qboolean ffmpeg_open(cinModernDecoder_t *dec, const char *filename, fileH
 
 	if (!ctx->swsCtx) {
 		Com_Printf(S_COLOR_RED "FFmpeg: Could not create scaler for %s\n", filename);
-		ffmpeg_close(dec);
-		return qfalse;
+		goto fail;
 	}
 
 	dec->context = ctx;
@@ -186,6 +314,48 @@ static qboolean ffmpeg_open(cinModernDecoder_t *dec, const char *filename, fileH
 		videoCodec->name);
 
 	return qtrue;
+
+fail:
+	if (ctx->swsCtx) {
+		sws_freeContext(ctx->swsCtx);
+	}
+	if (ctx->rgbaFrame) {
+		if (ctx->rgbaFrame->data[0]) {
+			av_freep(&ctx->rgbaFrame->data[0]);
+		}
+		av_frame_free(&ctx->rgbaFrame);
+	}
+	if (ctx->frame) {
+		av_frame_free(&ctx->frame);
+	}
+	if (ctx->packet) {
+		av_packet_free(&ctx->packet);
+	}
+	if (ctx->videoCodecCtx) {
+		avcodec_free_context(&ctx->videoCodecCtx);
+	}
+	if (ctx->audioCodecCtx) {
+		avcodec_free_context(&ctx->audioCodecCtx);
+	}
+	if (openedInput && ctx->formatCtx) {
+		avformat_close_input(&ctx->formatCtx);
+	} else if (ctx->formatCtx) {
+		avformat_free_context(ctx->formatCtx);
+		ctx->formatCtx = NULL;
+	}
+	if (ctx->avioCtx) {
+		av_freep(&ctx->avioCtx->buffer);
+		avio_context_free(&ctx->avioCtx);
+		ctx->avioBuffer = NULL;
+	}
+	if (ctx->fileData) {
+		Z_Free(ctx->fileData);
+	}
+	if (ctx->frameBuffer) {
+		Z_Free(ctx->frameBuffer);
+	}
+	Z_Free(ctx);
+	return qfalse;
 }
 
 /*
@@ -341,11 +511,19 @@ static void ffmpeg_close(cinModernDecoder_t *dec) {
 	if (ctx->formatCtx) {
 		avformat_close_input(&ctx->formatCtx);
 	}
+	if (ctx->avioCtx) {
+		av_freep(&ctx->avioCtx->buffer);
+		avio_context_free(&ctx->avioCtx);
+		ctx->avioBuffer = NULL;
+	}
 	if (ctx->frameBuffer) {
 		Z_Free(ctx->frameBuffer);
 	}
 	if (ctx->audioBuffer) {
 		Z_Free(ctx->audioBuffer);
+	}
+	if (ctx->fileData) {
+		Z_Free(ctx->fileData);
 	}
 
 	Z_Free(ctx);

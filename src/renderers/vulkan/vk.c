@@ -15218,7 +15218,7 @@ static void vk_update_volumetric_perf_queries( void )
 			print_interval = 1;
 		}
 		if ( ( vk.volumetric_frame % (uint32_t)print_interval ) == 0u ) {
-			ri.Printf( PRINT_ALL,
+			ri.Printf( PRINT_DEVELOPER,
 				"[VK][fog][perf] total=%.3fms fluid=%.3fms clear=%.3f global=%.3f volume=%.3f fluidInject=%.3f sun=%.3f local=%.3f temporal=%.3f scale=%.3f iters=%d\n",
 				vk.volumetric_total_ms,
 				vk.volumetric_fluid_ms,
@@ -17096,26 +17096,13 @@ void vk_end_frame( void )
 							panini_push.exposure = 1.0f;
 							panini_push.paniniPad1 = 1.0f;
 						}
-						if ( vk_scene_src_rect_valid &&
-							vk_scene_src_rect.offset.x >= 0 &&
-							vk_scene_src_rect.offset.y >= 0 &&
-							vk_scene_src_rect.extent.width > 0 &&
-							vk_scene_src_rect.extent.height > 0 &&
-							(uint32_t)vk_scene_src_rect.offset.x < srcTexW &&
-							(uint32_t)vk_scene_src_rect.offset.y < srcTexH ) {
-							srcRect = vk_scene_src_rect;
-							if ( (uint32_t)srcRect.offset.x + srcRect.extent.width > srcTexW ) {
-								srcRect.extent.width = srcTexW - (uint32_t)srcRect.offset.x;
-							}
-							if ( (uint32_t)srcRect.offset.y + srcRect.extent.height > srcTexH ) {
-								srcRect.extent.height = srcTexH - (uint32_t)srcRect.offset.y;
-							}
-						} else {
-							srcRect.offset.x = 0;
-							srcRect.offset.y = 0;
-							srcRect.extent.width = srcTexW;
-							srcRect.extent.height = srcTexH;
-						}
+						/* Always sample the full scene source image here.
+						 * Cropping to the largest tracked 3D viewport can stretch partial
+						 * loading/menu/game frames to the full screen after post-process. */
+						srcRect.offset.x = 0;
+						srcRect.offset.y = 0;
+						srcRect.extent.width = srcTexW;
+						srcRect.extent.height = srcTexH;
 						if ( srcRect.extent.width == 0 || srcRect.extent.height == 0 ) {
 							srcRect.offset.x = 0;
 							srcRect.offset.y = 0;
