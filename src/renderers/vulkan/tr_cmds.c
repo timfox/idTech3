@@ -20,6 +20,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 #include "tr_local.h"
+#include "vk_skybox_hdr.h"
 #ifdef USE_IMGUI
 void VkImgui_Initialize( void );
 void VkImgui_BeginFrame( void );
@@ -320,6 +321,12 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 	if ( !tr.registered ) {
 		return;
 	}
+
+#ifdef USE_VULKAN
+	if ( stereoFrame == STEREO_CENTER ) {
+		SkyboxHDR_UpdateRuntime();
+	}
+#endif
 
 #ifdef USE_IMGUI
 	if ( stereoFrame == STEREO_CENTER ) {

@@ -390,6 +390,7 @@ void vk_queue_wait_idle( void );
 //
 void vk_create_image( image_t *image, int width, int height, int mip_levels );
 void vk_upload_image_data( image_t *image, int x, int y, int width, int height, int miplevels, byte *pixels, int size, qboolean update );
+void vk_upload_cubemap_mip_data( image_t *image, int face_size, int miplevels, const byte *pixels, int size, int bytes_per_pixel, qboolean update );
 void vk_upload_compressed_image_data( image_t *image, int width, int height, int miplevels, byte *pixels, int size, qboolean update );
 void vk_update_descriptor_set( image_t *image, qboolean mipmap );
 void vk_destroy_image_resources( VkImage *image, VkImageView *imageView );
@@ -657,7 +658,8 @@ typedef struct {
 	VkDeviceMemory vegwind_vertex_memory;
 	VkDescriptorSet vegwind_descriptor;
 
-	VkDescriptorSet color_descriptor[NUM_COMMAND_BUFFERS];	/* per-frame (VUID-03047) */
+	VkDescriptorSet color_descriptor[NUM_COMMAND_BUFFERS];	/* per-frame base scene color (VUID-03047) */
+	VkDescriptorSet post_color_descriptor[NUM_COMMAND_BUFFERS];	/* per-frame mutable post-fog/gamma source */
 	VkImageView post_fog_color_source;	/* last source for gamma (color_image or smaa_output) */
 	VkDescriptorSet depth_descriptor;
 	VkDescriptorSet smaa_edge_descriptor;

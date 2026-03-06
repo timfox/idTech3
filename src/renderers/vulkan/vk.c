@@ -1,6 +1,7 @@
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_postfx.h"
+#include "vk_skybox_hdr.h"
 
 /* VK_EXT_extended_dynamic_state3: for vkCmdSetColorWriteMaskEXT (RB_ColorMask) */
 #ifndef VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT
@@ -3816,9 +3817,9 @@ void vk_destroy_samplers( void )
 }
 
 
-static void vk_update_color_descriptor_image( VkImageView color_view )
+static void vk_write_color_descriptor_image( VkDescriptorSet descriptor, VkImageView color_view )
 {
-	if ( !vk.cmd || vk.color_descriptor[vk.cmd_index] == VK_NULL_HANDLE || color_view == VK_NULL_HANDLE ) {
+	if ( descriptor == VK_NULL_HANDLE || color_view == VK_NULL_HANDLE ) {
 		return;
 	}
 
@@ -3837,7 +3838,7 @@ static void vk_update_color_descriptor_image( VkImageView color_view )
 	info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 	desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	desc.dstSet = vk.color_descriptor[vk.cmd_index];
+	desc.dstSet = descriptor;
 	desc.dstBinding = 0;
 	desc.dstArrayElement = 0;
 	desc.descriptorCount = 1;
@@ -3848,6 +3849,15 @@ static void vk_update_color_descriptor_image( VkImageView color_view )
 	desc.pTexelBufferView = NULL;
 
 	qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+}
+
+static void vk_update_color_descriptor_image( VkImageView color_view )
+{
+	if ( !vk.cmd ) {
+		return;
+	}
+
+	vk_write_color_descriptor_image( vk.post_color_descriptor[vk.cmd_index], color_view );
 }
 
 static const char *vk_post_fog_source_name( VkImageView color_source )
@@ -3973,9 +3983,8 @@ static void vk_barrier_post_fog_source_for_sampling( VkImageView color_source, c
 }
 
 /*
- * Update color_descriptor and luminance_descriptor to sample from color_source.
- * Call from both volumetric and non-volumetric paths so gamma/luminance always
- * sample the correct image (avoids solid-color bug when volumetrics skip).
+ * Update the mutable post-fog descriptor and luminance descriptors to sample
+ * from color_source so gamma and eye adaptation always read the correct image.
  */
 static void vk_update_post_fog_descriptors( VkImageView color_source )
 {
@@ -4068,8 +4077,9 @@ void vk_update_attachment_descriptors( void ) {
 		for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ ) {
 			desc.dstSet = vk.color_descriptor[i];
 			qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+			vk_write_color_descriptor_image( vk.post_color_descriptor[i], vk.color_image_view );
 		}
-		/* Ensure post-fog and luminance descriptors are initialized for gamma/eye-adaptation */
+		/* Ensure post-fog and luminance descriptors are initialized for gamma/eye-adaptation. */
 		vk_update_post_fog_descriptors( vk.color_image_view );
 
 		// screenmap
@@ -4765,8 +4775,10 @@ void vk_init_descriptors( void )
 		alloc.descriptorSetCount = 1;
 		alloc.pSetLayouts = &vk.set_layout_sampler;
 
-		for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ )
-			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.color_descriptor[i] ) );
+			for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ ) {
+				VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.color_descriptor[i] ) );
+				VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.post_color_descriptor[i] ) );
+			}
 
 		if ( r_ssao && r_ssao->integer ) {
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.depth_descriptor ) );
@@ -6717,6 +6729,12 @@ static void vk_destroy_framebuffers( void ) {
 				qvkDestroyFramebuffer( vk.device, vk.framebuffers.main[n], NULL );
 			}
 			vk.framebuffers.main[n] = VK_NULL_HANDLE;
+		}
+		if ( vk.framebuffers.atmosphere[n] != VK_NULL_HANDLE ) {
+			if ( n == 0 ) {
+				qvkDestroyFramebuffer( vk.device, vk.framebuffers.atmosphere[n], NULL );
+			}
+			vk.framebuffers.atmosphere[n] = VK_NULL_HANDLE;
 		}
 		if ( vk.framebuffers.gamma[n] != VK_NULL_HANDLE ) {
 			qvkDestroyFramebuffer( vk.device, vk.framebuffers.gamma[n], NULL );
@@ -10029,6 +10047,10 @@ static void vk_destroy_render_passes( void )
 		qvkDestroyRenderPass( vk.device, vk.render_pass.volumetric, NULL );
 		vk.render_pass.volumetric = VK_NULL_HANDLE;
 	}
+	if ( vk.render_pass.atmosphere != VK_NULL_HANDLE ) {
+		qvkDestroyRenderPass( vk.device, vk.render_pass.atmosphere, NULL );
+		vk.render_pass.atmosphere = VK_NULL_HANDLE;
+	}
 
 	if ( vk.render_pass.screenmap != VK_NULL_HANDLE ) {
 		qvkDestroyRenderPass( vk.device, vk.render_pass.screenmap, NULL );
@@ -10112,6 +10134,14 @@ static void vk_destroy_pipelines( qboolean resetCounter )
 	if ( vk.capture_pipeline ) {
 		qvkDestroyPipeline( vk.device, vk.capture_pipeline, NULL );
 		vk.capture_pipeline = VK_NULL_HANDLE;
+	}
+	if ( vk.ssr_pipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.ssr_pipeline, NULL );
+		vk.ssr_pipeline = VK_NULL_HANDLE;
+	}
+	if ( vk.atmosphere_pipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.atmosphere_pipeline, NULL );
+		vk.atmosphere_pipeline = VK_NULL_HANDLE;
 	}
 
 	if ( vk.bloom_extract_pipeline != VK_NULL_HANDLE ) {
@@ -10229,6 +10259,8 @@ void vk_shutdown( refShutdownCode_t code )
 	}
 #endif
 
+	SkyboxHDR_Shutdown();
+
 	if ( vk.pipelineCache != VK_NULL_HANDLE ) {
 		qvkDestroyPipelineCache( vk.device, vk.pipelineCache, NULL );
 		vk.pipelineCache = VK_NULL_HANDLE;
@@ -10293,6 +10325,10 @@ void vk_shutdown( refShutdownCode_t code )
 		vk.pipeline_layout_oit_accum = VK_NULL_HANDLE;
 	}
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_ssr, NULL);
+	if ( vk.pipeline_layout_atmosphere != VK_NULL_HANDLE ) {
+		qvkDestroyPipelineLayout( vk.device, vk.pipeline_layout_atmosphere, NULL );
+		vk.pipeline_layout_atmosphere = VK_NULL_HANDLE;
+	}
 #ifdef USE_VK_PBR
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_brdflut, NULL);
 #endif
@@ -10452,43 +10488,61 @@ for (i = 0; i < 2; i++) {
 		}
 	}
 
-	qvkDestroyShaderModule( vk.device, vk.modules.color_fs, NULL );
-	qvkDestroyShaderModule( vk.device, vk.modules.color_vs, NULL );
+	#define VK_DESTROY_SHADER_MODULE_FIELD(field) \
+		do { \
+			if ( (field) != VK_NULL_HANDLE ) { \
+				qvkDestroyShaderModule( vk.device, (field), NULL ); \
+				(field) = VK_NULL_HANDLE; \
+			} \
+		} while ( 0 )
 
-	qvkDestroyShaderModule(vk.device, vk.modules.fog_vs, NULL);
-	qvkDestroyShaderModule(vk.device, vk.modules.fog_fs, NULL);
-
-	qvkDestroyShaderModule(vk.device, vk.modules.dot_vs, NULL);
-	qvkDestroyShaderModule(vk.device, vk.modules.dot_fs, NULL);
-
-	qvkDestroyShaderModule(vk.device, vk.modules.bloom_fs, NULL);
-	qvkDestroyShaderModule(vk.device, vk.modules.blur_fs, NULL);
-	qvkDestroyShaderModule(vk.device, vk.modules.blend_fs, NULL);
-	qvkDestroyShaderModule(vk.device, vk.modules.ssao_fs, NULL);
-	qvkDestroyShaderModule(vk.device, vk.modules.ssao_blur_fs, NULL);
-	qvkDestroyShaderModule(vk.device, vk.modules.ssao_combine_fs, NULL);
-	qvkDestroyShaderModule(vk.device, vk.modules.ssao_debug_fs, NULL);
-	qvkDestroyShaderModule(vk.device, vk.modules.ssao_depth_debug_fs, NULL);
-	qvkDestroyShaderModule(vk.device, vk.modules.ssr_fs, NULL);
-
-	qvkDestroyShaderModule(vk.device, vk.modules.gamma_vs, NULL);
-	qvkDestroyShaderModule(vk.device, vk.modules.gamma_fs, NULL);
-	qvkDestroyShaderModule(vk.device, vk.modules.smaa_edge_fs, NULL);
-	qvkDestroyShaderModule(vk.device, vk.modules.smaa_blend_fs, NULL);
-	qvkDestroyShaderModule(vk.device, vk.modules.smaa_compose_fs, NULL);
-	qvkDestroyShaderModule(vk.device, vk.modules.volumetric_fog_vs, NULL);
-	qvkDestroyShaderModule(vk.device, vk.modules.volumetric_fog_fs, NULL);
-	qvkDestroyShaderModule(vk.device, vk.modules.volumetric_fog_cs, NULL);
-	qvkDestroyShaderModule(vk.device, vk.modules.volumetric_depth_resolve_msaa_cs, NULL);
-	qvkDestroyShaderModule(vk.device, vk.modules.luminance_cs, NULL);
-	qvkDestroyShaderModule(vk.device, vk.modules.fluid_advect_cs, NULL);
-	qvkDestroyShaderModule(vk.device, vk.modules.fluid_divergence_cs, NULL);
-	qvkDestroyShaderModule(vk.device, vk.modules.fluid_pressure_cs, NULL);
-	qvkDestroyShaderModule(vk.device, vk.modules.fluid_gradient_cs, NULL);
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.color_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.color_vs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.fog_vs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.fog_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.dot_vs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.dot_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.bloom_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.blur_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.blend_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.ssao_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.ssao_blur_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.ssao_combine_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.oit_accum_vs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.oit_accum_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.oit_resolve_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.ssao_debug_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.ssao_depth_debug_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.ssr_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.gamma_vs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.gamma_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.atmosphere_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.smaa_edge_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.smaa_blend_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.smaa_compose_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.volumetric_fog_vs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.volumetric_fog_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.volumetric_fog_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.volumetric_depth_resolve_msaa_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.luminance_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.vegetation_wind_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.fluid_advect_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.fluid_divergence_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.fluid_pressure_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.fluid_gradient_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.cbt_terrain_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.terrain_vs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.terrain_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.filtercube_vs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.filtercube_gm );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.irradiancecube_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.prefilterenvmap_fs );
 
 #ifdef USE_VK_PBR
-	qvkDestroyShaderModule(vk.device, vk.modules.brdflut_fs, NULL);
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.brdflut_fs );
 #endif
+
+	#undef VK_DESTROY_SHADER_MODULE_FIELD
 
 __cleanup:
 	if ( vk.device != VK_NULL_HANDLE ) {
@@ -10870,6 +10924,113 @@ void vk_upload_image_data( image_t *image, int x, int y, int width, int height, 
 	if ( buf != pixels ) {
 		ri.Hunk_FreeTempMemory( buf );
 	}
+}
+
+void vk_upload_cubemap_mip_data( image_t *image, int face_size, int miplevels, const byte *pixels, int size, int bytes_per_pixel, qboolean update ) {
+	VkCommandBuffer command_buffer;
+	VkBufferImageCopy regions[64];
+	int num_regions = 0;
+	int buffer_size = 0;
+	int mip;
+	int face;
+	int width = face_size;
+	int height = face_size;
+
+	if ( !image || !pixels || !( image->flags & IMGFLAG_CUBEMAP ) || face_size <= 0 || miplevels <= 0 || bytes_per_pixel <= 0 ) {
+		return;
+	}
+
+	for ( mip = 0; mip < miplevels && num_regions < (int)ARRAY_LEN( regions ); mip++ ) {
+		const int face_bytes = width * height * bytes_per_pixel;
+
+		for ( face = 0; face < 6 && num_regions < (int)ARRAY_LEN( regions ); face++ ) {
+			VkBufferImageCopy region;
+
+			Com_Memset( &region, 0, sizeof( region ) );
+			region.bufferOffset = buffer_size;
+			region.bufferRowLength = 0;
+			region.bufferImageHeight = 0;
+			region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			region.imageSubresource.mipLevel = mip;
+			region.imageSubresource.baseArrayLayer = face;
+			region.imageSubresource.layerCount = 1;
+			region.imageOffset.x = 0;
+			region.imageOffset.y = 0;
+			region.imageOffset.z = 0;
+			region.imageExtent.width = width;
+			region.imageExtent.height = height;
+			region.imageExtent.depth = 1;
+			regions[num_regions++] = region;
+
+			buffer_size += face_bytes;
+		}
+
+		width >>= 1;
+		height >>= 1;
+		if ( width < 1 ) width = 1;
+		if ( height < 1 ) height = 1;
+	}
+
+	if ( buffer_size > size ) {
+		ri.Printf( PRINT_WARNING, "vk_upload_cubemap_mip_data: buffer underrun for %s (%d > %d)\n",
+			image->imgName ? image->imgName : "<unnamed cubemap>", buffer_size, size );
+		return;
+	}
+
+#ifdef USE_UPLOAD_QUEUE
+	if ( vk_wait_staging_buffer() ) {
+	}
+
+	if ( vk.staging_buffer.size - vk.staging_buffer.offset < (VkDeviceSize)buffer_size ) {
+		vk_flush_staging_buffer( qfalse );
+	}
+
+	if ( vk.staging_buffer.size < (VkDeviceSize)buffer_size ) {
+		vk_alloc_staging_buffer( buffer_size );
+	}
+
+	for ( mip = 0; mip < num_regions; mip++ ) {
+		regions[mip].bufferOffset += vk.staging_buffer.offset;
+	}
+
+	Com_Memcpy( vk.staging_buffer.ptr + vk.staging_buffer.offset, pixels, buffer_size );
+
+	if ( vk.staging_buffer.offset == 0 ) {
+		VkCommandBufferBeginInfo begin_info;
+		begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		begin_info.pNext = NULL;
+		begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+		begin_info.pInheritanceInfo = NULL;
+		VK_CHECK( qvkBeginCommandBuffer( vk.staging_command_buffer, &begin_info ) );
+	}
+
+	vk.staging_buffer.offset += buffer_size;
+	command_buffer = vk.staging_command_buffer;
+#else
+	if ( vk.staging_buffer.size < (VkDeviceSize)buffer_size ) {
+		vk_alloc_staging_buffer( buffer_size );
+	}
+
+	Com_Memcpy( vk.staging_buffer.ptr, pixels, buffer_size );
+	command_buffer = begin_command_buffer();
+#endif
+
+	if ( update ) {
+		record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0 );
+	} else {
+		record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT,
+			VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_HOST_BIT, 0 );
+	}
+
+	qvkCmdCopyBufferToImage( command_buffer, vk.staging_buffer.handle, image->handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, num_regions, regions );
+
+	record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
+
+#ifndef USE_UPLOAD_QUEUE
+	end_command_buffer( command_buffer, __func__ );
+#endif
 }
 
 /*
@@ -16878,11 +17039,10 @@ void vk_end_frame( void )
 				vk_end_render_pass();
 
 				/* Capture runs before vk_volumetric_fog_pass; at this point the current
-				 * frame's scene is in color_image. Use color_image_view (not post_fog
-				 * source which may be from the previous frame). */
+				 * frame's scene is in color_image. Use color_image_view, not a cached
+				 * post-fog source that may still reference the previous frame. */
 				if ( capture_src != VK_NULL_HANDLE &&
 					vk.render_pass.capture != VK_NULL_HANDLE && vk.framebuffers.capture != VK_NULL_HANDLE ) {
-					vk_update_color_descriptor_image( capture_src );
 					vk_barrier_post_fog_source_for_sampling( capture_src, "vk_end_frame pre-capture" );
 					if ( r_fboDebug && r_fboDebug->integer >= 2 && vk_fbo_debug_throttle() ) {
 						ri.Printf( PRINT_DEVELOPER, "[VK][fbo] capture source -> %s view=0x%llx\n",
@@ -17012,7 +17172,7 @@ void vk_end_frame( void )
 					ri.Printf( PRINT_DEVELOPER,
 						"[VK][fbo] gamma pipeline=0x%llx color_desc=0x%llx layout=0x%llx rp=0x%llx fb=0x%llx\n",
 						(unsigned long long)(uintptr_t)vk.gamma_pipeline,
-						(unsigned long long)(uintptr_t)vk.color_descriptor[vk.cmd_index],
+						(unsigned long long)(uintptr_t)vk.post_color_descriptor[vk.cmd_index],
 						(unsigned long long)(uintptr_t)vk.pipeline_layout_post_process,
 						(unsigned long long)(uintptr_t)vk.render_pass.gamma,
 						(unsigned long long)(uintptr_t)vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ] );
@@ -17020,7 +17180,7 @@ void vk_end_frame( void )
 
 				{
 					VkImageView gamma_src = ( post_fog_src != VK_NULL_HANDLE ) ? post_fog_src : vk.color_image_view;
-					if ( vk.gamma_pipeline == VK_NULL_HANDLE || vk.color_descriptor[vk.cmd_index] == VK_NULL_HANDLE ||
+					if ( vk.gamma_pipeline == VK_NULL_HANDLE || vk.post_color_descriptor[vk.cmd_index] == VK_NULL_HANDLE ||
 						vk.render_pass.gamma == VK_NULL_HANDLE ||
 						vk.cmd->swapchain_image_index >= MAX_SWAPCHAIN_IMAGES ||
 						vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ] == VK_NULL_HANDLE ||
@@ -17034,12 +17194,13 @@ void vk_end_frame( void )
 							ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW "[VK][fbo] gamma pass skipped: no valid color source (post_fog or color_image)\n" );
 						}
 					} else {
-						/* Belt-and-suspenders: barrier before gamma sampling; ensure color_descriptor is correct */
+						/* Update only the post-process descriptor; the base scene descriptor may
+						 * already be bound earlier in this command buffer. */
 						vk_barrier_post_fog_source_for_sampling( gamma_src, "vk_end_frame pre-gamma (gamma_src)" );
 						vk_update_color_descriptor_image( gamma_src );
 						vk_begin_render_pass( vk.render_pass.gamma, vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ], qfalse, vk.renderWidth, vk.renderHeight );
 						qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.gamma_pipeline );
-						qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor[vk.cmd_index], 0, NULL );
+						qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.post_color_descriptor[vk.cmd_index], 0, NULL );
 
 						VkPostProcessPushConstants panini_push = { 0 };
 						uint32_t srcTexW = ( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u;
@@ -17637,8 +17798,16 @@ static qboolean vk_get_ibl_fog_color( vec3_t out )
 	int bestIndex = -1;
 	float bestDistSq = 0.0f;
 	const float *pos = backEnd.viewParms.or.origin;
+	vec4_t hdrSh[9];
 
 	if ( !tr.cubemaps || tr.numCubemaps <= 0 ) {
+		if ( SkyboxHDR_CopySHCoeffs( hdrSh ) ) {
+			out[0] = hdrSh[0][0];
+			out[1] = hdrSh[0][1];
+			out[2] = hdrSh[0][2];
+			vk_normalize_rgb_luma_safe( out );
+			return qtrue;
+		}
 		return qfalse;
 	}
 
@@ -17661,6 +17830,13 @@ static qboolean vk_get_ibl_fog_color( vec3_t out )
 	}
 
 	if ( bestIndex < 0 ) {
+		if ( SkyboxHDR_CopySHCoeffs( hdrSh ) ) {
+			out[0] = hdrSh[0][0];
+			out[1] = hdrSh[0][1];
+			out[2] = hdrSh[0][2];
+			vk_normalize_rgb_luma_safe( out );
+			return qtrue;
+		}
 		return qfalse;
 	}
 

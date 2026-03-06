@@ -1157,12 +1157,11 @@ static void RB_SetGL2D( void ) {
 RE_StretchRaw
 
 Note: Function is screen/bitmap related, not strictly backend.
-Stretches a raw 32 bit power of 2 bitmap image over the given screen rectangle.
-Used for cinematics.
+Stretches a raw 32 bit bitmap image over the given screen rectangle.
+Used for cinematics. Modern video decoders can produce non-power-of-two frames.
 =============
 */
 void RE_StretchRaw( int x, int y, int w, int h, int cols, int rows, byte *data, int client, qboolean dirty ) {
-	int			i, j;
 	int			start, end;
 
 	if ( !tr.registered ) {
@@ -1172,16 +1171,6 @@ void RE_StretchRaw( int x, int y, int w, int h, int cols, int rows, byte *data, 
 	start = 0;
 	if ( r_speeds->integer ) {
 		start = ri.Milliseconds();
-	}
-
-	// make sure rows and cols are powers of 2
-	for ( i = 0 ; ( 1 << i ) < cols ; i++ ) {
-	}
-	for ( j = 0 ; ( 1 << j ) < rows ; j++ ) {
-	}
-
-	if ( ( 1 << i ) != cols || ( 1 << j ) != rows ) {
-		ri.Error( ERR_DROP, "%s(): size not a power of 2: %i by %i", __func__, cols, rows );
 	}
 
 	RE_UploadCinematic( w, h, cols, rows, data, client, dirty );
