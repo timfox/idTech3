@@ -17003,7 +17003,8 @@ void vk_begin_frame( void )
 					float dy = tr.refdef.vieworg[1] - vk.prevViewOrigin[1];
 					float dz = tr.refdef.vieworg[2] - vk.prevViewOrigin[2];
 					float distSq = dx * dx + dy * dy + dz * dz;
-					if ( distSq > 128.0f * 128.0f )
+					qboolean cameraCut = ( distSq > 128.0f * 128.0f );
+					if ( cameraCut )
 						speed = 0.5f;  /* snap within ~2 frames */
 
 					if ( vk.luminance_staging_ptr ) {
@@ -17014,6 +17015,13 @@ void vk_begin_frame( void )
 						float sceneLum = powf( 2.0f, avgLogLum );
 						targetExp = ( sceneLum > 1e-6f ) ? ( target / sceneLum ) : 1.0f;
 						targetExp = ( targetExp < 0.01f ) ? 0.01f : ( targetExp > 10.0f ? 10.0f : targetExp );
+					}
+					/* On camera cut (e.g. death), luminance is stale; cap exposure to avoid blowout when suddenly viewing bright sky */
+					{
+						cvar_t *cap_var = ri.Cvar_Get( "r_exposure_auto_cap_on_cut", "0.75", 0 );
+						float cap = cap_var ? cap_var->value : 0.75f;
+						if ( cameraCut && cap > 0.0f && targetExp > cap )
+							targetExp = cap;
 					}
 
 					/* Bright-scene transitions need to recover much faster than dark-scene
