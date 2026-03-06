@@ -1558,6 +1558,7 @@ extern cvar_t	*r_bloom_intensity;
 extern cvar_t	*r_bloom_threshold_mode;
 extern cvar_t	*r_bloom_modulate;
 extern cvar_t	*r_bloomKnee;
+extern cvar_t	*r_screenMapScale;
 extern cvar_t	*r_ext_multisample;
 extern cvar_t	*r_msaa_sample_shading;
 extern cvar_t	*r_ext_supersample;

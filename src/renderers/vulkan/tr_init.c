@@ -164,6 +164,7 @@ cvar_t	*r_ssaoDebugView;
 cvar_t	*r_renderWidth;
 cvar_t	*r_renderHeight;
 cvar_t	*r_renderScale;
+cvar_t	*r_screenMapScale;
 cvar_t	*r_ext_supersample;
 cvar_t	*r_ext_smaa;
 cvar_t	*r_smaa_preset;
@@ -2936,6 +2937,10 @@ static void R_Register( void )
 	r_ext_supersample = ri.Cvar_Get( "r_ext_supersample", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_supersample, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ext_supersample, "Super-sample anti-aliasing, requires \\r_fbo 1." );
+
+	r_screenMapScale = ri.Cvar_Get( "r_screenMapScale", "2", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_screenMapScale, "1", "16", CV_INTEGER );
+	ri.Cvar_SetDescription( r_screenMapScale, "Downscale divisor for screenMap reflections/refractions. 1=full res, 2=half res, 4=quarter res, 8=eighth res, 16=legacy. Requires vid_restart." );
 
 	r_ext_smaa = ri.Cvar_Get( "r_ext_smaa", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_smaa, "0", "1", CV_INTEGER );
