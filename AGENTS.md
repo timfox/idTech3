@@ -36,3 +36,7 @@ Build artifacts go to `build-vk-Release/` or `build-gl-Release/` and are copied 
 - **Dedicated server**: `./release/idtech3_server +set dedicated 1 +set com_hunkMegs 64`
 - **Client** (requires display): `./release/idtech3`
 - Both require game data in a `base/` directory to do anything meaningful.
+
+### Game data / base
+
+- **Standalone full conversion**: Do not assume Q3A, OpenArena, or other generic bases. The base is either Unwaking or a game explicitly defined by the user.
