@@ -544,7 +544,7 @@ static void RB_BeginDrawingView( void ) {
 	SetViewportAndScissor();
 
 #ifdef USE_VULKAN
-	vk_clear_depth( qtrue );
+	vk_clear_depth( r_shadows->integer == 2 ? qtrue : qfalse );
 #else
 	// ensures that depth writes are enabled for the depth clear
 	GL_State( GLS_DEFAULT );
