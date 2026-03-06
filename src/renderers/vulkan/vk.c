@@ -7103,13 +7103,25 @@ void vk_initialize( void )
 
 	vk.screenMapSamples = MIN( vkMaxSamples, VK_SAMPLE_COUNT_4_BIT );
 
-	vk.screenMapWidth = (float) glConfig.vidWidth / 16.0;
+	{
+		uint32_t screenMapScale = 2;
+		if ( r_screenMapScale && r_screenMapScale->integer > 0 ) {
+			screenMapScale = (uint32_t)r_screenMapScale->integer;
+		}
+
+		vk.screenMapWidth = ( glConfig.vidWidth + screenMapScale - 1 ) / screenMapScale;
+		vk.screenMapHeight = ( glConfig.vidHeight + screenMapScale - 1 ) / screenMapScale;
+	}
+
 	if ( vk.screenMapWidth < 4 )
 		vk.screenMapWidth = 4;
 
-	vk.screenMapHeight = (float) glConfig.vidHeight / 16.0;
 	if ( vk.screenMapHeight < 4 )
 		vk.screenMapHeight = 4;
+
+	ri.Printf( PRINT_ALL, "...screenMap size: %ux%u (r_screenMapScale %d)\n",
+		vk.screenMapWidth, vk.screenMapHeight,
+		( r_screenMapScale && r_screenMapScale->integer > 0 ) ? r_screenMapScale->integer : 2 );
 
 	vk.defaults.geometry_size = VERTEX_BUFFER_SIZE;
 	vk.defaults.staging_size = STAGING_BUFFER_SIZE;
