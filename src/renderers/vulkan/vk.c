@@ -101,6 +101,15 @@ typedef struct {
 	float srcUVScaleBias[4]; // scale.xy, bias.xy
 } VkPostProcessPushConstants;
 
+typedef struct {
+	float invViewProj[16];
+	float prevViewProj[16];
+	float viewMatrix[16];
+	float motionBlur[4];   /* enabled, strength, samples, maxRadius */
+	float depthOfField[4]; /* enabled, aperture, focusDistance, focusRange */
+	float frameInfo[4];    /* dofMaxBlur, texelSize.x, texelSize.y, motionValid */
+} VkPostFXParams;
+
 #define VEGWIND_MAX_VERTS 16384
 #define VEGWIND_VERTEX_STRIDE 32  /* positionFlex + normalPhase */
 
@@ -377,6 +386,9 @@ static void vk_create_volumetric_pipelines( void );
 static void vk_create_volumetric_params_buffer( void );
 static void vk_destroy_volumetric_params_buffer( void );
 static void vk_update_volumetric_params( void );
+static void vk_create_postfx_params_buffers( void );
+static void vk_destroy_postfx_params_buffers( void );
+static void vk_update_postfx_params( uint32_t cmd_index );
 static void vk_fluid_simulation_pass( float delta_time );
 static void vk_resolve_volumetric_depth_msaa( void );
 static qboolean vk_begin_local_spot_shadow_render_pass( void );
@@ -388,6 +400,7 @@ static qboolean vk_build_local_spot_shadow_view( const dlight_t *dl, int viewpor
 static qboolean vk_build_local_point_shadow_view( const dlight_t *dl, int face, int viewportSize, viewParms_t *shadowParms, float *outViewProj );
 static qboolean vk_render_local_volumetric_shadow_view( const viewParms_t *shadowParms, qboolean pointShadow, int pointFaceLayer );
 static void vk_reset_motion_history( void );
+static qboolean Mat4Inverse( const float *m, float *out );
 
 static float vk_prev_view_matrix[16];
 static float vk_prev_projection_matrix[16];
@@ -4867,6 +4880,8 @@ void vk_init_descriptors( void )
 	VkWriteDescriptorSet desc;
 	uint32_t i;
 
+	vk_create_postfx_params_buffers();
+
 	alloc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	alloc.pNext = NULL;
 	alloc.descriptorPool = vk.descriptor_pool;
@@ -4920,9 +4935,9 @@ void vk_init_descriptors( void )
 				VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.color_descriptor[i] ) );
 				VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.post_color_descriptor[i] ) );
 			}
+		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.depth_descriptor ) );
 
 		if ( r_ssao && r_ssao->integer ) {
-			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.depth_descriptor ) );
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.ssao_descriptor ) );
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.ssao_blur_descriptor ) );
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.ssao_scene_descriptor ) );
@@ -4963,6 +4978,11 @@ void vk_init_descriptors( void )
 		// cubemap
 		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.cubeMap.color_descriptor ) );
 
+		alloc.pSetLayouts = &vk.set_layout_postfx_uniform;
+		for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ ) {
+			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.postfx_params_descriptor[i] ) );
+		}
+
 		alloc.pSetLayouts = &vk.volumetric_compute_layout;
 		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.volumetric_compute_descriptor ) );
 
@@ -4981,6 +5001,24 @@ void vk_init_descriptors( void )
 			if ( vk.volumetric_fluid_layout != VK_NULL_HANDLE ) {
 				alloc.pSetLayouts = &vk.volumetric_fluid_layout;
 				VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.volumetric_fluid_descriptor ) );
+			}
+
+			for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ ) {
+				VkDescriptorBufferInfo postfx_info;
+				VkWriteDescriptorSet postfx_desc;
+
+				postfx_info.buffer = vk.postfx_params_buffer[i];
+				postfx_info.offset = 0;
+				postfx_info.range = sizeof( VkPostFXParams );
+
+				Com_Memset( &postfx_desc, 0, sizeof( postfx_desc ) );
+				postfx_desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				postfx_desc.dstSet = vk.postfx_params_descriptor[i];
+				postfx_desc.dstBinding = 0;
+				postfx_desc.descriptorCount = 1;
+				postfx_desc.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+				postfx_desc.pBufferInfo = &postfx_info;
+				qvkUpdateDescriptorSets( vk.device, 1, &postfx_desc, 0, NULL );
 			}
 
 			vk_update_attachment_descriptors();
@@ -7581,7 +7619,7 @@ void vk_initialize( void )
 			pool_size[3].descriptorCount = 22 + NUM_COMMAND_BUFFERS;	/* luminance[N] binding 1 */
 
 		pool_size[4].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		pool_size[4].descriptorCount = 8;
+		pool_size[4].descriptorCount = 8 + NUM_COMMAND_BUFFERS;
 
 		for ( j = 0, maxSets = 0; j < ARRAY_LEN( pool_size ); j++ ) {
 			maxSets += pool_size[j].descriptorCount;
@@ -7603,6 +7641,7 @@ void vk_initialize( void )
 	vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &vk.set_layout_sampler );
 	vk_create_uniform_layout( &vk.set_layout_uniform );
 	vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, &vk.set_layout_storage );
+	vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, &vk.set_layout_postfx_uniform );
 	//vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_SHADER_STAGE_FRAGMENT_BIT, &vk.set_layout_input );
 
 		{
@@ -7985,10 +8024,9 @@ void vk_initialize( void )
 		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_storage ) );
 
 		// post-processing pipeline
-		set_layouts[0] = vk.set_layout_sampler; // sampler
-		set_layouts[1] = vk.set_layout_sampler; // sampler
-		set_layouts[2] = vk.set_layout_sampler; // sampler
-		set_layouts[3] = vk.set_layout_sampler; // sampler
+		set_layouts[0] = vk.set_layout_sampler;        // color sampler
+		set_layouts[1] = vk.set_layout_sampler;        // depth / secondary sampler
+		set_layouts[2] = vk.set_layout_postfx_uniform; // per-frame postfx params
 
 		push_range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 		push_range.offset = 0;
@@ -7997,7 +8035,7 @@ void vk_initialize( void )
 		desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		desc.pNext = NULL;
 		desc.flags = 0;
-		desc.setLayoutCount = 1;
+		desc.setLayoutCount = 3;
 		desc.pSetLayouts = set_layouts;
 		desc.pushConstantRangeCount = 1;
 		desc.pPushConstantRanges = &push_range;
@@ -18017,6 +18055,129 @@ static void vk_create_volumetric_params_buffer( void )
 	vk_prev_volumetric_time_valid = qfalse;
 	vk_volumetric_noise_time = 0.0f;
 	Com_Memset( &vk_volumetric_validation_state, 0, sizeof( vk_volumetric_validation_state ) );
+}
+
+static void vk_destroy_postfx_params_buffers( void )
+{
+	uint32_t i;
+
+	for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ ) {
+		if ( vk.postfx_params_memory[i] != VK_NULL_HANDLE ) {
+			if ( vk.postfx_params_ptr[i] ) {
+				qvkUnmapMemory( vk.device, vk.postfx_params_memory[i] );
+				vk.postfx_params_ptr[i] = NULL;
+			}
+			qvkFreeMemory( vk.device, vk.postfx_params_memory[i], NULL );
+			vk.postfx_params_memory[i] = VK_NULL_HANDLE;
+		}
+		if ( vk.postfx_params_buffer[i] != VK_NULL_HANDLE ) {
+			qvkDestroyBuffer( vk.device, vk.postfx_params_buffer[i], NULL );
+			vk.postfx_params_buffer[i] = VK_NULL_HANDLE;
+		}
+		vk.postfx_params_descriptor[i] = VK_NULL_HANDLE;
+	}
+}
+
+static void vk_create_postfx_params_buffers( void )
+{
+	uint32_t i;
+
+	for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ ) {
+		VkBufferCreateInfo desc;
+		VkMemoryRequirements mem_req;
+		VkMemoryAllocateInfo alloc_info;
+
+		if ( vk.postfx_params_buffer[i] != VK_NULL_HANDLE ) {
+			continue;
+		}
+
+		Com_Memset( &desc, 0, sizeof( desc ) );
+		desc.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		desc.size = sizeof( VkPostFXParams );
+		desc.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+		desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+		VK_CHECK( qvkCreateBuffer( vk.device, &desc, NULL, &vk.postfx_params_buffer[i] ) );
+		qvkGetBufferMemoryRequirements( vk.device, vk.postfx_params_buffer[i], &mem_req );
+
+		Com_Memset( &alloc_info, 0, sizeof( alloc_info ) );
+		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		alloc_info.allocationSize = mem_req.size;
+		alloc_info.memoryTypeIndex = find_memory_type(
+			mem_req.memoryTypeBits,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+
+		VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.postfx_params_memory[i] ) );
+		VK_CHECK( qvkBindBufferMemory( vk.device, vk.postfx_params_buffer[i], vk.postfx_params_memory[i], 0 ) );
+		VK_CHECK( qvkMapMemory( vk.device, vk.postfx_params_memory[i], 0, mem_req.size, 0, &vk.postfx_params_ptr[i] ) );
+		Com_Memset( vk.postfx_params_ptr[i], 0, sizeof( VkPostFXParams ) );
+	}
+}
+
+static void vk_update_postfx_params( uint32_t cmd_index )
+{
+	VkPostFXParams params;
+	const float *projection;
+	const float *view;
+	float viewProj[16];
+	qboolean motion_valid = qfalse;
+
+	if ( cmd_index >= NUM_COMMAND_BUFFERS || !vk.postfx_params_ptr[cmd_index] ) {
+		return;
+	}
+
+	Com_Memset( &params, 0, sizeof( params ) );
+
+	params.invViewProj[0] = 1.0f;
+	params.invViewProj[5] = 1.0f;
+	params.invViewProj[10] = 1.0f;
+	params.invViewProj[15] = 1.0f;
+	params.prevViewProj[0] = 1.0f;
+	params.prevViewProj[5] = 1.0f;
+	params.prevViewProj[10] = 1.0f;
+	params.prevViewProj[15] = 1.0f;
+	params.viewMatrix[0] = 1.0f;
+	params.viewMatrix[5] = 1.0f;
+	params.viewMatrix[10] = 1.0f;
+	params.viewMatrix[15] = 1.0f;
+
+	params.motionBlur[0] = PostFX_MotionBlur_IsEnabled() ? 1.0f : 0.0f;
+	params.motionBlur[1] = PostFX_MotionBlur_GetStrength();
+	params.motionBlur[2] = (float)Com_Clamp( 4, 32, PostFX_MotionBlur_GetSamples() );
+	params.motionBlur[3] = Com_Clamp( 0.0f, 64.0f, PostFX_MotionBlur_GetMaxRadius() );
+	params.depthOfField[0] = PostFX_DepthOfField_IsEnabled() ? 1.0f : 0.0f;
+	params.depthOfField[1] = Com_Clamp( 0.0f, 8.0f, PostFX_DepthOfField_GetAperture() );
+	params.depthOfField[2] = max( PostFX_DepthOfField_GetFocusDistance(), 0.0f );
+	params.depthOfField[3] = max( PostFX_DepthOfField_GetFocusRange(), 1.0f );
+	params.frameInfo[0] = Com_Clamp( 0.0f, 64.0f, PostFX_DepthOfField_GetMaxBlur() );
+	params.frameInfo[1] = ( vk.renderWidth > 0 ) ? ( 1.0f / (float)vk.renderWidth ) : 0.0f;
+	params.frameInfo[2] = ( vk.renderHeight > 0 ) ? ( 1.0f / (float)vk.renderHeight ) : 0.0f;
+
+	if ( backEnd.projection2D || !tr.world || backEnd.viewParms.portalView != PV_NONE ) {
+		Com_Memcpy( vk.postfx_params_ptr[cmd_index], &params, sizeof( params ) );
+		return;
+	}
+
+	projection = backEnd.useFirstPersonProjection ? backEnd.firstPersonProjectionMatrix : backEnd.viewParms.projectionMatrix;
+	view = backEnd.viewParms.world.modelViewMatrix;
+
+	myGlMultMatrix( view, projection, viewProj );
+	Com_Memcpy( params.viewMatrix, view, sizeof( params.viewMatrix ) );
+
+	if ( !Mat4Inverse( viewProj, params.invViewProj ) ) {
+		Com_Memcpy( params.invViewProj, viewProj, sizeof( params.invViewProj ) );
+	}
+
+	if ( vk_prev_matrices_valid ) {
+		Com_Memcpy( params.prevViewProj, vk_prev_viewproj_matrix, sizeof( params.prevViewProj ) );
+		motion_valid = qtrue;
+	} else {
+		Com_Memcpy( params.prevViewProj, viewProj, sizeof( params.prevViewProj ) );
+	}
+
+	params.frameInfo[3] = motion_valid ? 1.0f : 0.0f;
+
+	Com_Memcpy( vk.postfx_params_ptr[cmd_index], &params, sizeof( params ) );
 }
 
 static qboolean vk_parse_rgb_string( const char *s, vec3_t out )

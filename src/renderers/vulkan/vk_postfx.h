@@ -54,6 +54,15 @@ float    PostFX_GetVignetteRadius(void);
 float    PostFX_GetChromaticAberration(void);
 float    PostFX_GetFilmGrain(void);
 int      PostFX_GetFilmLook(void);
+qboolean PostFX_MotionBlur_IsEnabled(void);
+float    PostFX_MotionBlur_GetStrength(void);
+float    PostFX_MotionBlur_GetMaxRadius(void);
+int      PostFX_MotionBlur_GetSamples(void);
+qboolean PostFX_DepthOfField_IsEnabled(void);
+float    PostFX_DepthOfField_GetFocusDistance(void);
+float    PostFX_DepthOfField_GetFocusRange(void);
+float    PostFX_DepthOfField_GetAperture(void);
+float    PostFX_DepthOfField_GetMaxBlur(void);
 
 #ifdef __cplusplus
 }
