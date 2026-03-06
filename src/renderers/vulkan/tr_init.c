@@ -158,6 +158,9 @@ cvar_t	*r_ssaoBias;
 cvar_t	*r_ssaoIntensity;
 cvar_t	*r_ssaoPower;
 cvar_t	*r_ssaoSamples;
+cvar_t	*r_ssaoMethod;
+cvar_t	*r_hbaoDirections;
+cvar_t	*r_hbaoSteps;
 cvar_t	*r_ssaoBlurRadius;
 cvar_t	*r_oit;
 cvar_t	*r_ssaoDebugView;
@@ -2912,6 +2915,18 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_ssaoSamples, "4", "32", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ssaoSamples, "SSAO sample count (higher = smoother, slower)." );
 
+	r_ssaoMethod = ri.Cvar_Get( "r_ssaoMethod", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_ssaoMethod, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_ssaoMethod, "Ambient occlusion method.\n 0: SSAO\n 1: HBAO" );
+
+	r_hbaoDirections = ri.Cvar_Get( "r_hbaoDirections", "8", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hbaoDirections, "4", "16", CV_INTEGER );
+	ri.Cvar_SetDescription( r_hbaoDirections, "HBAO ray directions per pixel (higher = smoother, slower)." );
+
+	r_hbaoSteps = ri.Cvar_Get( "r_hbaoSteps", "4", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hbaoSteps, "2", "8", CV_INTEGER );
+	ri.Cvar_SetDescription( r_hbaoSteps, "HBAO steps along each ray (higher = broader, slower)." );
+
 	r_ssaoBlurRadius = ri.Cvar_Get( "r_ssaoBlurRadius", "2", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_ssaoBlurRadius, "0", "8", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ssaoBlurRadius, "SSAO blur radius in pixels (0 disables blur)." );
@@ -2923,7 +2938,7 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_ssaoDebugView, "0", "2", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ssaoDebugView, "SSAO debug view:\n 0: off\n 1: show AO only\n 2: show depth" );
 	if ( r_ssao->integer ) {
-		ri.Printf( PRINT_ALL, "SSAO enabled.\n" );
+		ri.Printf( PRINT_ALL, "%s enabled.\n", ( r_ssaoMethod && r_ssaoMethod->integer ) ? "HBAO" : "SSAO" );
 	}
 
 	r_ext_multisample = ri.Cvar_Get( "r_ext_multisample", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
