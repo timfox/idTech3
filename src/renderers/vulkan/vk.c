@@ -4127,6 +4127,10 @@ void vk_update_attachment_descriptors( void ) {
 
 		// screenmap
 		sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+		/* screenMap UVs routinely go out of range on reflective surfaces.
+		 * Clamp-to-edge smears the screen border across water/refraction planes,
+		 * which shows up as the wide bright/dark bands in-game. */
+		sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
 		sd.max_lod_1_0 = qfalse;
 		sd.noAnisotropy = qtrue;
 

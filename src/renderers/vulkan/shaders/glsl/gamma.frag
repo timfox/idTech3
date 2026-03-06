@@ -388,7 +388,7 @@ void main() {
 
 	/* Film grain: film_look = Source-style (luminance-dependent, soft-light);
 	   else film_grain = simple additive. */
-	if ( film_look != 0 && postActive ) {
+	if ( film_look != 0 && film_grain > 0.0 && postActive ) {
 		/* Source Engine–style film grain (DoD:S, L4D): luminance-dependent, fine-grained,
 		   soft-light blend. Grain peaks in mid-tones, fades in shadows/highlights.
 		   r_filmGrain scales intensity (0.5–1.5x) when film_look is on. */
@@ -404,7 +404,7 @@ void main() {
 		float lum = dot( ldr, sRGB );
 		float midTone = lum * ( 1.0 - lum ) * 4.0;  /* 0 at 0/1, max 1 at 0.5 */
 		float lumMask = smoothstep( 0.0, 0.06, lum ) * smoothstep( 1.0, 0.35, lum );
-		float intensity = 0.5 + film_grain * 0.5;  /* 0.5–1.0 when film_grain 0–1 */
+		float intensity = clamp( film_grain, 0.0, 1.0 );
 		float grainStrength = 0.12 * intensity * midTone * lumMask;
 		/* Soft-light blend: blend = 0.5 + grain, so 0.5 = neutral */
 		vec3 blend = vec3( 0.5 + grainRaw * grainStrength );
