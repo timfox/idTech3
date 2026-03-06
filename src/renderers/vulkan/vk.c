@@ -408,6 +408,7 @@ static float vk_prev_projection_matrix[16];
 static float vk_prev_viewproj_matrix[16];
 static qboolean vk_prev_matrices_valid = qfalse;
 static int vk_prev_volumetric_time_ms = 0;
+static int vk_near_static_view_frames = 0;  /* consecutive frames with view_delta < threshold */
 static qboolean vk_prev_volumetric_time_valid = qfalse;
 static float vk_volumetric_noise_time = 0.0f;
 static float vk_prev_entity_model_matrices[MAX_REFENTITIES][16];
@@ -16422,6 +16423,7 @@ static void vk_reset_volumetric_history( void )
 	vk_prev_matrices_valid = qfalse;
 	vk_prev_volumetric_time_valid = qfalse;
 	vk_volumetric_noise_time = 0.0f;
+	vk_near_static_view_frames = 0;
 	Com_Memset( &vk_volumetric_validation_state, 0, sizeof( vk_volumetric_validation_state ) );
 }
 
@@ -18051,6 +18053,7 @@ static void vk_destroy_volumetric_params_buffer( void )
 	vk_prev_matrices_valid = qfalse;
 	vk_prev_volumetric_time_valid = qfalse;
 	vk_volumetric_noise_time = 0.0f;
+	vk_near_static_view_frames = 0;
 	Com_Memset( &vk_volumetric_validation_state, 0, sizeof( vk_volumetric_validation_state ) );
 }
 
@@ -18485,6 +18488,21 @@ static void vk_update_volumetric_params( void )
 		const float view_proj_delta = vk_matrix_max_abs_diff( params.viewProj, vk_prev_viewproj_matrix );
 		if ( view_delta > 0.25f || view_proj_delta > 0.35f || backEnd.viewParms.portalView != PV_NONE ) {
 			camera_cut = qtrue;
+			vk_near_static_view_frames = 0;
+		} else {
+			/* When view is nearly static (e.g. death cam) for many frames, temporal reprojection
+			 * can accumulate subtle errors and cause visible wobble. Periodically reset history. */
+			const float near_static_thresh = 0.03f;
+			const int near_static_reset_frames = 90;  /* ~1.5s at 60fps */
+			if ( view_delta < near_static_thresh && view_proj_delta < near_static_thresh * 1.5f ) {
+				vk_near_static_view_frames++;
+				if ( vk_near_static_view_frames >= near_static_reset_frames ) {
+					camera_cut = qtrue;
+					vk_near_static_view_frames = 0;
+				}
+			} else {
+				vk_near_static_view_frames = 0;
+			}
 		}
 	}
 	if ( r_volumetricFogForceCameraCut && r_volumetricFogForceCameraCut->integer > 0 ) {
@@ -18495,6 +18513,7 @@ static void vk_update_volumetric_params( void )
 	if ( camera_cut ) {
 		vk.has_prev_volumetric = qfalse;
 		vk_volumetric_validation_state.camera_cut_events++;
+		vk_near_static_view_frames = 0;
 	}
 	if ( vk_prev_matrices_valid && !camera_cut ) {
 		Com_Memcpy( params.prevView, vk_prev_view_matrix, sizeof( params.prevView ) );
