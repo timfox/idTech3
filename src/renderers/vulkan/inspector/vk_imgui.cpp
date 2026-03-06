@@ -531,10 +531,14 @@ extern "C" void VkImgui_DrawPostFXPanel(void) {
 		float stepSz = VkImgui_CvarFloat( "r_ssr_stepSize" );
 		float thick = VkImgui_CvarFloat( "r_ssr_thickness" );
 		float ssrInt = VkImgui_CvarFloat( "r_ssr_intensity" );
+		float maxGrad = VkImgui_CvarFloat( "r_ssr_maxDepthGradient" );
 		VkImgui_CvarSlider( "Max Distance", "r_ssr_maxDistance", maxDist, 10.0f, 500.0f );
 		VkImgui_CvarSlider( "Step Size", "r_ssr_stepSize", stepSz, 0.1f, 5.0f );
 		VkImgui_CvarSlider( "Thickness", "r_ssr_thickness", thick, 0.1f, 5.0f );
 		VkImgui_CvarSlider( "Intensity", "r_ssr_intensity", ssrInt, 0.0f, 1.0f );
+		VkImgui_CvarSlider( "Max depth gradient", "r_ssr_maxDepthGradient", maxGrad, 0.01f, 0.5f, "%.3f" );
+		if ( ImGui::IsItemHovered() )
+			ImGui::SetTooltip( "Skip SSR at depth edges (object silhouettes, horizon) to reduce thin line artifacts. Lower = stricter." );
 	}
 
 	ImGui::EndChild();

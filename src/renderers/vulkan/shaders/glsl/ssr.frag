@@ -42,13 +42,22 @@ vec2 projectToScreen(vec3 viewPos) {
 	return (clip.xy / clip.w) * 0.5 + 0.5;
 }
 
-/* Derive view-space normal from depth using central differences (no G-buffer). */
-vec3 normalFromDepth(vec2 uv, vec2 invSize) {
+/* Derive view-space normal from depth using central differences (no G-buffer).
+ * At depth discontinuities (object edges, horizon), gradients are unreliable and
+ * produce thin black/white lines. Reject pixels where neighbor depth differs too much. */
+vec3 normalFromDepth(vec2 uv, vec2 invSize, float maxDepthGradient, out bool valid) {
 	float d = texture(depthTexture, uv).r;
 	float dx = texture(depthTexture, uv + vec2(invSize.x, 0.0)).r;
 	float dy = texture(depthTexture, uv + vec2(0.0, invSize.y)).r;
 	float dxm = texture(depthTexture, uv - vec2(invSize.x, 0.0)).r;
 	float dym = texture(depthTexture, uv - vec2(0.0, invSize.y)).r;
+
+	/* Skip SSR at depth edges (object silhouettes, horizon) to avoid thin line artifacts */
+	float maxDiff = max(max(abs(dx - d), abs(dxm - d)), max(abs(dy - d), abs(dym - d)));
+	if (maxDiff > maxDepthGradient) {
+		valid = false;
+		return vec3(0.0);
+	}
 
 	vec3 p = viewFromDepth(uv, d);
 	vec3 px = viewFromDepth(uv + vec2(invSize.x, 0.0), dx);
@@ -59,6 +68,7 @@ vec3 normalFromDepth(vec2 uv, vec2 invSize) {
 	vec3 ddx = (px - pxm) * 0.5;
 	vec3 ddy = (py - pym) * 0.5;
 	vec3 normal = normalize(cross(ddx, ddy));
+	valid = true;
 	return normal;
 }
 
@@ -72,6 +82,7 @@ void main() {
 	float fadeEdge = ssr.params.w;
 	float roughnessThreshold = ssr.params2.x;
 	float intensity = ssr.params2.y;
+	float maxDepthGradient = ssr.params2.z;
 
 	if (rawDepth <= 0.0 || rawDepth >= 1.0) {
 		out_color = vec4(sceneColor, 1.0);
@@ -80,9 +91,10 @@ void main() {
 
 	vec3 viewPos = viewFromDepth(frag_tex_coord, rawDepth);
 	vec2 invSize = vec2(1.0) / textureSize(depthTexture, 0);
-	vec3 normal = normalFromDepth(frag_tex_coord, invSize);
+	bool normalValid;
+	vec3 normal = normalFromDepth(frag_tex_coord, invSize, maxDepthGradient, normalValid);
 
-	if (length(normal) < 0.1) {
+	if (!normalValid || length(normal) < 0.1) {
 		out_color = vec4(sceneColor, 1.0);
 		return;
 	}
