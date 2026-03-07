@@ -891,6 +891,7 @@ typedef struct {
 		VkShaderModule blend_fs;
 
 		VkShaderModule ssao_fs;
+		VkShaderModule hbao_fs;
 		VkShaderModule ssao_blur_fs;
 		VkShaderModule ssao_combine_fs;
 		VkShaderModule oit_accum_vs;
@@ -1012,6 +1013,7 @@ typedef struct {
 	VkPipeline smaa_blend_pipeline;
 	VkPipeline smaa_compose_pipeline;
 	VkPipeline ssao_pipeline;
+	VkPipeline hbao_pipeline;
 	VkPipeline ssao_blur_pipeline;
 	VkPipeline ssao_combine_pipeline;
 	VkPipeline oit_accum_pipeline;	/* WBOIT accumulation for transparent surfaces */
