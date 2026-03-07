@@ -445,6 +445,7 @@ void vk_draw_dot( uint32_t storage_offset );
 
 void vk_read_pixels( byte* buffer, uint32_t width, uint32_t height ); // screenshots
 qboolean vk_bloom( void );
+qboolean vk_ssao_pass( void );
 
 qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size );
 void vk_update_mvp( const float *m );

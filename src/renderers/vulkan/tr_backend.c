@@ -2070,6 +2070,10 @@ static const void *RB_FinishBloom( const void *data )
 	// Finalize volumetrics before entering 2D/HUD/console phase.
 	vk_prepare_2d();
 
+	/* SSAO before bloom so AO darkens the scene before bloom extraction. */
+	if ( r_ssao && r_ssao->integer ) {
+		vk_ssao_pass();
+	}
 	if ( r_bloom->integer ) {
 		vk_bloom();
 	}
@@ -2158,6 +2162,7 @@ static const void *RB_SwapBuffers( const void *data ) {
 	backEnd.drawConsole = qfalse;
 #ifdef USE_VULKAN
 	backEnd.doneBloom = qfalse;
+	backEnd.doneSSAO = qfalse;
 #endif
 
 	return (const void *)(cmd + 1);

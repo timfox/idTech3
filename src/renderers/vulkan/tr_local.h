@@ -1302,6 +1302,7 @@ typedef struct {
 	qboolean screenMapDone;
 	qboolean doneBloom;
 	qboolean doneFog;
+	qboolean doneSSAO;
 	qboolean depthOnlyWorldPass;	/* for occlusion culling: render world depth only, skip entities */
 
 	/* OIT: 0=draw all, 1=opaque only, 2=transparent only */
