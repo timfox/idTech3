@@ -59,7 +59,7 @@ If the camera feels like it's underwater when it isn't, try `r_chromaticAberrati
 
 ## 6.6 HDR Skybox vs Procedural Sky
 
-- **HDR skybox**: EXR/HDR with `r_skyboxHDR_exposure`, `r_skyboxHDR_intensity`
+- **HDR skybox**: EXR or Radiance .hdr with `r_skyboxHDR_exposure`, `r_skyboxHDR_intensity`
 - **Procedural**: `r_atmosphere`, `r_atmosphere_scale`
 
 Both feed into linear HDR; no conflict.
