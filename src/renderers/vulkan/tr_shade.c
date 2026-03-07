@@ -1757,8 +1757,11 @@ static void VK_SetLightParams( vkUniform_t *ubo, const dlight_t *dl ) {
 uint32_t vk_append_uniform( const void *uniform_data, size_t size, uint32_t min_offset ) {
 	const uint32_t offset = PAD(vk.cmd->vertex_buffer_offset, (VkDeviceSize)vk.uniform_alignment);
 
-	if ( offset + min_offset > vk.geometry_buffer_size )
+	if ( offset + min_offset > vk.geometry_buffer_size ) {
+		/* Schedule geometry buffer resize; callers must skip draw when ~0U returned */
+		vk.geometry_buffer_size_new = (VkDeviceSize)log2pad( (unsigned int)( offset + min_offset ), 1 );
 		return ~0U;
+	}
 
 	Com_Memcpy( vk.cmd->vertex_buffer_ptr + offset, uniform_data, size );
 	vk.cmd->vertex_buffer_offset = offset + min_offset;
@@ -1796,6 +1799,12 @@ static uint32_t vk_push_uniform_cached( const vkUniform_t *u )
 
 uint32_t vk_push_uniform( const vkUniform_t *ubo ) {
 	const uint32_t offset = vk_append_uniform( ubo, sizeof(*ubo), (VkDeviceSize)vk.uniform_item_size );
+
+	if ( offset == ~0U ) {
+		/* Uniform buffer overflow; vk_append_uniform already set geometry_buffer_size_new.
+		 * Do not update descriptors with invalid offset; callers must skip the draw. */
+		return ~0U;
+	}
 
 	vk_reset_descriptor( VK_DESC_UNIFORM );
 	vk_update_descriptor( VK_DESC_UNIFORM, vk.cmd->uniform_descriptor );

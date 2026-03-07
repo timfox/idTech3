@@ -4189,7 +4189,7 @@ static void vk_update_post_fog_descriptors( VkImageView color_source )
 
 	if ( r_fboDebug && r_fboDebug->integer >= 1 && vk_fbo_debug_throttle() ) {
 		ri.Printf( PRINT_DEVELOPER,
-			"[VK][fbo] post-fog descriptors: %s -> %s view=0x%llx luminance=%s\n",
+			"[VK][fbo] post_fog_color_source: %s -> %s view=0x%llx luminance=%s\n",
 			vk_post_fog_source_name( old_source ),
 			vk_post_fog_source_name( color_source ),
 			(unsigned long long)(uintptr_t)color_source,
@@ -7205,7 +7205,7 @@ void vk_initialize( void )
 		}
 		ri.Printf( PRINT_ALL, "...FBO enabled (HDR, post-process, gamma, PBR-ready)\n" );
 		if ( r_fboDebug && r_fboDebug->integer >= 4 ) {
-			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "[VK][fbo] Troubleshooting: if seeing solid/wrong colors, try r_oit 0 r_exposure_auto 0 r_ext_smaa 0 r_ssao 0 then vid_restart\n" S_COLOR_WHITE );
+			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "[VK][fbo] Troubleshooting: if seeing solid/wrong colors, try r_oit 0 r_volumetricFog 0 r_exposure_auto 0 r_ext_smaa 0 r_ssao 0 then vid_restart\n" S_COLOR_WHITE );
 		}
 	} else {
 		vk.fboActive = qfalse;
@@ -17523,6 +17523,16 @@ void vk_end_frame( void )
 
 				{
 					VkImageView gamma_src = ( post_fog_src != VK_NULL_HANDLE ) ? post_fog_src : vk.color_image_view;
+					if ( r_fboDebug && r_fboDebug->integer >= 1 && vk_fbo_debug_throttle() ) {
+						VkImageView expected = vk_get_post_fog_source();
+						if ( gamma_src != expected || gamma_src != vk.post_fog_color_source ) {
+							ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+								"[VK][fbo] gamma source mismatch: gamma_src=%s post_fog_color_source=%s expected=%s\n",
+								vk_post_fog_source_name( gamma_src ),
+								vk_post_fog_source_name( vk.post_fog_color_source ),
+								vk_post_fog_source_name( expected ) );
+						}
+					}
 					if ( vk.gamma_pipeline == VK_NULL_HANDLE || vk.post_color_descriptor[vk.cmd_index] == VK_NULL_HANDLE ||
 						vk.render_pass.gamma == VK_NULL_HANDLE ||
 						vk.cmd->swapchain_image_index >= MAX_SWAPCHAIN_IMAGES ||
@@ -17612,6 +17622,19 @@ void vk_end_frame( void )
 							srcRect.offset.y = 0;
 							srcRect.extent.width = srcTexW;
 							srcRect.extent.height = srcTexH;
+						}
+						/* Validate srcRect stays within image bounds and produces sensible UVs */
+						if ( (int32_t)srcRect.offset.x < 0 ) srcRect.offset.x = 0;
+						if ( (int32_t)srcRect.offset.y < 0 ) srcRect.offset.y = 0;
+						if ( srcRect.offset.x + srcRect.extent.width > srcTexW )
+							srcRect.extent.width = ( srcTexW > srcRect.offset.x ) ? (uint32_t)( srcTexW - srcRect.offset.x ) : 0u;
+						if ( srcRect.offset.y + srcRect.extent.height > srcTexH )
+							srcRect.extent.height = ( srcTexH > srcRect.offset.y ) ? (uint32_t)( srcTexH - srcRect.offset.y ) : 0u;
+						if ( srcRect.extent.width == 0 || srcRect.extent.height == 0 ) {
+							srcRect.offset.x = 0;
+							srcRect.offset.y = 0;
+							srcRect.extent.width = srcTexW > 0 ? srcTexW : 1u;
+							srcRect.extent.height = srcTexH > 0 ? srcTexH : 1u;
 						}
 						panini_push.srcUVScaleBias[0] = (float)srcRect.extent.width / (float)srcTexW;
 						panini_push.srcUVScaleBias[1] = (float)srcRect.extent.height / (float)srcTexH;
