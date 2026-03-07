@@ -57,6 +57,14 @@ Post-processing effects that can produce a "wobble" or underwater feel (especial
 
 If the camera feels like it's underwater when it isn't, try `r_chromaticAberration 0` and `cg_underwaterFovWarp 0` (if using OSP).
 
+## 6.5c Death-State and Console Artifacts
+
+**Single-pixel artifacts when console is open**: Film grain (`r_filmGrain`, default 0.75) adds per-pixel noise across the screen. Set `r_filmGrain 0` to eliminate. Chromatic aberration can also cause fine color fringing.
+
+**Streaky/smudged visuals when dead**: Volumetric fog temporal reprojection accumulates when the death camera is nearly static. A periodic camera cut resets history after ~1.5 s of static view. If artifacts persist, try `r_volumetricFog 0` to confirm, or `r_volumetricFogForceCameraCut 1` to force an immediate reset (debug).
+
+**Quick isolation**: `r_filmGrain 0 r_volumetricFog 0 r_oit 0 r_ssao 0 r_ssr 0` then `vid_restart` to narrow down the source.
+
 ## 6.6 HDR Skybox vs Procedural Sky
 
 - **HDR skybox**: EXR or Radiance .hdr with `r_skyboxHDR_exposure`, `r_skyboxHDR_intensity`

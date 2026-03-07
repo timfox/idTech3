@@ -7208,7 +7208,7 @@ void vk_initialize( void )
 		}
 		ri.Printf( PRINT_ALL, "...FBO enabled (HDR, post-process, gamma, PBR-ready)\n" );
 		if ( r_fboDebug && r_fboDebug->integer >= 4 ) {
-			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "[VK][fbo] Troubleshooting: if seeing solid/wrong colors, try r_oit 0 r_volumetricFog 0 r_exposure_auto 0 r_ext_smaa 0 r_ssao 0 then vid_restart\n" S_COLOR_WHITE );
+			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "[VK][fbo] Troubleshooting: solid/wrong colors: r_oit 0 r_volumetricFog 0 r_exposure_auto 0 r_ext_smaa 0 r_ssao 0. Single-pixel noise: r_filmGrain 0. Death streaks: r_volumetricFog 0. Then vid_restart\n" S_COLOR_WHITE );
 		}
 	} else {
 		vk.fboActive = qfalse;
@@ -18556,7 +18556,7 @@ static void vk_update_volumetric_params( void )
 			/* When view is nearly static (e.g. death cam) for many frames, temporal reprojection
 			 * can accumulate subtle errors and cause visible wobble. Periodically reset history. */
 			const float near_static_thresh = 0.03f;
-			const int near_static_reset_frames = 90;  /* ~1.5s at 60fps */
+			const int near_static_reset_frames = 60;  /* ~1s at 60fps; faster reset for death cam */
 			if ( view_delta < near_static_thresh && view_proj_delta < near_static_thresh * 1.5f ) {
 				vk_near_static_view_frames++;
 				if ( vk_near_static_view_frames >= near_static_reset_frames ) {
