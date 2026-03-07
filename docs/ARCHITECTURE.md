@@ -97,11 +97,13 @@ CL_Frame(msec)
 1. Shadow passes (sun CSM, spot atlas, point cubemaps)
 2. Main render pass (PBR materials, per-pixel lighting)
 3. Volumetric fog (froxel compute, fluid sim, temporal)
-4. SSAO (sample → blur → combine)
+4. SSAO/HBAO (sample → blur → combine into color; runs before bloom for AO-darkened bloom)
 5. Bloom (extract → multi-pass blur → blend)
 6. SMAA (edge → blend → compose)
 7. Post-processing (tonemapping, panini, lens effects)
 8. Present
+
+SSAO and bloom are culled for menus/cinematics (RDF_NOWORLDMODEL).
 
 ## JavaScript / UI Debug (Duktape)
 
