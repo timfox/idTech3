@@ -360,10 +360,14 @@ qboolean SkyboxHDR_Load(const char *filename, skyboxProjection_t projection) {
 	SkyboxHDR_GenerateIrradiance();
 	SkyboxHDR_GeneratePrefiltered();
 
-	ri.Printf(PRINT_ALL, "SkyboxHDR: loaded %s (%dx%d, %s projection)\n",
-		filename, w, h,
-		projection == SKYBOX_PROJ_EQUIRECTANGULAR ? "equirectangular" :
-		projection == SKYBOX_PROJ_SPHERICAL_MIRROR ? "spherical" : "cubemap");
+	{
+		const char *ext = COM_GetExtension( filename );
+		const char *fmt = ( ext && !Q_stricmp( ext, "hdr" ) ) ? "Radiance .hdr" : "EXR";
+		ri.Printf( PRINT_ALL, "SkyboxHDR: loaded %s (%dx%d, %s, %s projection)\n",
+			filename, w, h, fmt,
+			projection == SKYBOX_PROJ_EQUIRECTANGULAR ? "equirectangular" :
+			projection == SKYBOX_PROJ_SPHERICAL_MIRROR ? "spherical" : "cubemap" );
+	}
 
 	return qtrue;
 }
