@@ -17252,159 +17252,11 @@ void vk_end_frame( void )
 			vk_bloom();
 		}
 
-		if ( r_ssao && r_ssao->integer )
+		/* SSAO runs in RB_FinishBloom before bloom; only run here if not yet done (e.g. no RC_FINISHBLOOM). */
+		if ( r_ssao && r_ssao->integer && !backEnd.doneSSAO )
 		{
-			static qboolean warned_msaa = qfalse;
-
-			if ( vk.msaaActive )
-			{
-				if ( !warned_msaa )
-				{
-					ri.Printf( PRINT_WARNING, "Vulkan: SSAO disabled while MSAA is enabled (no depth resolve yet)\n" );
-					warned_msaa = qtrue;
-				}
-			}
-			else
-			{
-				typedef struct {
-					float projInfo[4]; // invProj00, invProj11, proj10, proj14
-					float params[4];   // radius, bias, intensity, power
-					float misc[4];     // samples, invWidth, invHeight, depthIsReversed
-					float misc2[4];    // method, hbaoDirections, hbaoSteps, reserved
-				} vk_ssao_push_t;
-
-				vk_ssao_push_t push;
-				VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
-#ifdef USE_REVERSED_DEPTH
-				const float depthIsReversed = 1.0f;
-#else
-				const float depthIsReversed = 0.0f;
-#endif
-				if ( glConfig.stencilBits > 0 )
-					depth_aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
-
-				vk_end_render_pass();
-
-				record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
-					VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 0, 0 );
-
-				// ssao or hbao
-				vk_begin_ssao_render_pass();
-				if ( r_ssaoMethod && r_ssaoMethod->integer && vk.hbao_pipeline != VK_NULL_HANDLE ) {
-					qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.hbao_pipeline );
-				} else {
-					qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.ssao_pipeline );
-				}
-				qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_ssao, 0, 1, &vk.depth_descriptor, 0, NULL );
-
-				push.projInfo[0] = ( backEnd.viewParms.projectionMatrix[0] != 0.0f ) ? 1.0f / backEnd.viewParms.projectionMatrix[0] : 1.0f;
-				push.projInfo[1] = ( backEnd.viewParms.projectionMatrix[5] != 0.0f ) ? 1.0f / backEnd.viewParms.projectionMatrix[5] : 1.0f;
-				push.projInfo[2] = backEnd.viewParms.projectionMatrix[10];
-				push.projInfo[3] = backEnd.viewParms.projectionMatrix[14];
-
-				if ( r_ssaoMethod && r_ssaoMethod->integer ) {
-					/* HBAO: radius in UV (0.01-0.5), angleBias in radians, intensity, power */
-					push.params[0] = ( r_ssaoRadius->value > 0.0f ) ? r_ssaoRadius->value / 100.0f : 0.1f;
-					push.params[1] = ( r_ssaoBias->value > 0.0f ) ? r_ssaoBias->value * 0.01f : 0.04f;
-					push.params[2] = r_ssaoIntensity->value;
-					push.params[3] = r_ssaoPower->value;
-					push.misc[0] = (float)( r_hbaoDirections ? r_hbaoDirections->integer : 8 );
-					push.misc[1] = (float)( r_hbaoSteps ? r_hbaoSteps->integer : 8 );
-					push.misc[2] = ( glConfig.vidWidth > 0 ) ? 1.0f / (float)glConfig.vidWidth : 1.0f;
-					if ( depthIsReversed > 0.5f )
-						push.misc[2] = -push.misc[2];
-					push.misc[3] = ( glConfig.vidHeight > 0 ) ? 1.0f / (float)glConfig.vidHeight : 1.0f;
-				} else {
-					push.params[0] = r_ssaoRadius->value;
-					push.params[1] = r_ssaoBias->value;
-					push.params[2] = r_ssaoIntensity->value;
-					push.params[3] = r_ssaoPower->value;
-					push.misc[0] = (float)r_ssaoSamples->integer;
-					push.misc[1] = ( glConfig.vidWidth > 0 ) ? 1.0f / (float)glConfig.vidWidth : 1.0f;
-					push.misc[2] = ( glConfig.vidHeight > 0 ) ? 1.0f / (float)glConfig.vidHeight : 1.0f;
-					push.misc[3] = depthIsReversed;
-					push.misc2[0] = (float)( r_ssaoMethod ? r_ssaoMethod->integer : 0 );
-					push.misc2[1] = (float)( r_hbaoDirections ? r_hbaoDirections->integer : 8 );
-					push.misc2[2] = (float)( r_hbaoSteps ? r_hbaoSteps->integer : 4 );
-					push.misc2[3] = ( r_ssaoMaxDepthGradient && r_ssaoMaxDepthGradient->value > 0.0f ) ? r_ssaoMaxDepthGradient->value : 0.0f;
-				}
-
-				qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_ssao, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
-				vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
-				qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
-				vk_end_render_pass();
-
-				// ssao blur
-				vk_begin_ssao_blur_render_pass();
-				qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.ssao_blur_pipeline );
-				qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_ssao, 0, 1, &vk.ssao_descriptor, 0, NULL );
-
-				push.params[0] = ( r_ssaoBlurRadius && r_ssaoBlurRadius->integer >= 0 ) ? (float)r_ssaoBlurRadius->integer : 2.0f;
-				push.params[1] = 0.0f;
-				push.params[2] = 0.0f;
-				push.params[3] = 0.0f;
-				qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_ssao, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
-				vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
-				qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
-				vk_end_render_pass();
-
-				// ssao combine: copy scene to fog_scene to avoid read-modify-write on color_image
-				if ( vk.fog_scene_image != VK_NULL_HANDLE && vk.color_image != VK_NULL_HANDLE )
-				{
-					VkImageCopy copy_region;
-					uint32_t copy_w = ( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u;
-					uint32_t copy_h = ( glConfig.vidHeight > 0 ) ? (uint32_t)glConfig.vidHeight : 1u;
-					Com_Memset( &copy_region, 0, sizeof( copy_region ) );
-					copy_region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-					copy_region.srcSubresource.layerCount = 1;
-					copy_region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-					copy_region.dstSubresource.layerCount = 1;
-					copy_region.extent.width = copy_w;
-					copy_region.extent.height = copy_h;
-					copy_region.extent.depth = 1;
-					record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
-						VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-						VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
-					record_image_layout_transition( vk.cmd->command_buffer, vk.fog_scene_image, VK_IMAGE_ASPECT_COLOR_BIT,
-						VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-						VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
-					qvkCmdCopyImage( vk.cmd->command_buffer,
-						vk.color_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-						vk.fog_scene_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-						1, &copy_region );
-					record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
-						VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-						VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
-					record_image_layout_transition( vk.cmd->command_buffer, vk.fog_scene_image, VK_IMAGE_ASPECT_COLOR_BIT,
-						VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-						VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
-				}
-				if ( vk.fog_scene_image_view != VK_NULL_HANDLE && vk.ssao_scene_descriptor != VK_NULL_HANDLE && vk.ssao_blur_descriptor != VK_NULL_HANDLE )
-				{
-					vk_begin_ssao_combine_render_pass();
-					if ( r_ssaoDebugView && r_ssaoDebugView->integer == 2 ) {
-						qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.ssao_depth_debug_pipeline );
-						qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.depth_descriptor, 0, NULL );
-					} else {
-						qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-							( r_ssaoDebugView && r_ssaoDebugView->integer ) ? vk.ssao_debug_pipeline : vk.ssao_combine_pipeline );
-						if ( r_ssaoDebugView && r_ssaoDebugView->integer ) {
-							qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.ssao_blur_descriptor, 0, NULL );
-						} else {
-							VkDescriptorSet ssao_combine_sets[2] = { vk.ssao_scene_descriptor, vk.ssao_blur_descriptor };
-							qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_ssao_combine, 0, 2, ssao_combine_sets, 0, NULL );
-						}
-					}
-					vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
-					qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
-					vk_end_render_pass();
-				}
-				/* SSAO samples depth as read-only; restore layout for later passes and next frame.
-				 * Must run unconditionally after SSAO block (even when combine was skipped). */
-				record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
-					VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 0, 0 );
-				}
-			}
+			vk_ssao_pass();
+		}
 
 			if ( backEnd.screenshotMask && vk.capture.image )
 			{
@@ -17661,10 +17513,14 @@ void vk_end_frame( void )
 						/* Validate srcRect stays within image bounds and produces sensible UVs */
 						if ( (int32_t)srcRect.offset.x < 0 ) srcRect.offset.x = 0;
 						if ( (int32_t)srcRect.offset.y < 0 ) srcRect.offset.y = 0;
-						if ( srcRect.offset.x + srcRect.extent.width > srcTexW )
-							srcRect.extent.width = ( srcTexW > srcRect.offset.x ) ? (uint32_t)( srcTexW - srcRect.offset.x ) : 0u;
-						if ( srcRect.offset.y + srcRect.extent.height > srcTexH )
-							srcRect.extent.height = ( srcTexH > srcRect.offset.y ) ? (uint32_t)( srcTexH - srcRect.offset.y ) : 0u;
+						{
+							const uint32_t offX = (uint32_t)srcRect.offset.x;
+							const uint32_t offY = (uint32_t)srcRect.offset.y;
+							if ( offX + srcRect.extent.width > srcTexW )
+								srcRect.extent.width = ( srcTexW > offX ) ? ( srcTexW - offX ) : 0u;
+							if ( offY + srcRect.extent.height > srcTexH )
+								srcRect.extent.height = ( srcTexH > offY ) ? ( srcTexH - offY ) : 0u;
+						}
 						if ( srcRect.extent.width == 0 || srcRect.extent.height == 0 ) {
 							srcRect.offset.x = 0;
 							srcRect.offset.y = 0;
@@ -19258,6 +19114,162 @@ static void vk_update_volumetric_params( void )
 }
 
 
+/*
+ * SSAO/HBAO pass. Runs before bloom so AO darkens the scene before bloom extraction.
+ * Skip for menus/cinematics (RDF_NOWORLDMODEL) and when MSAA is active.
+ */
+qboolean vk_ssao_pass( void )
+{
+	static qboolean warned_msaa = qfalse;
+
+	if ( backEnd.doneSSAO || !r_ssao || !r_ssao->integer || !vk.fboActive || !backEnd.doneSurfaces )
+		return qfalse;
+	/* Pass culling: skip expensive SSAO for menus, cinematics, no-world */
+	if ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) )
+		return qfalse;
+	if ( vk.msaaActive ) {
+		if ( !warned_msaa ) {
+			ri.Printf( PRINT_WARNING, "Vulkan: SSAO disabled while MSAA is enabled (no depth resolve yet)\n" );
+			warned_msaa = qtrue;
+		}
+		return qfalse;
+	}
+
+	{
+		typedef struct {
+			float projInfo[4];
+			float params[4];
+			float misc[4];
+			float misc2[4];
+		} vk_ssao_push_t;
+
+		vk_ssao_push_t push;
+		VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+#ifdef USE_REVERSED_DEPTH
+		const float depthIsReversed = 1.0f;
+#else
+		const float depthIsReversed = 0.0f;
+#endif
+		if ( glConfig.stencilBits > 0 )
+			depth_aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
+
+		vk_end_render_pass();
+
+		record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
+			VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 0, 0 );
+
+		vk_begin_ssao_render_pass();
+		if ( r_ssaoMethod && r_ssaoMethod->integer && vk.hbao_pipeline != VK_NULL_HANDLE ) {
+			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.hbao_pipeline );
+		} else {
+			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.ssao_pipeline );
+		}
+		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_ssao, 0, 1, &vk.depth_descriptor, 0, NULL );
+
+		push.projInfo[0] = ( backEnd.viewParms.projectionMatrix[0] != 0.0f ) ? 1.0f / backEnd.viewParms.projectionMatrix[0] : 1.0f;
+		push.projInfo[1] = ( backEnd.viewParms.projectionMatrix[5] != 0.0f ) ? 1.0f / backEnd.viewParms.projectionMatrix[5] : 1.0f;
+		push.projInfo[2] = backEnd.viewParms.projectionMatrix[10];
+		push.projInfo[3] = backEnd.viewParms.projectionMatrix[14];
+
+		if ( r_ssaoMethod && r_ssaoMethod->integer ) {
+			push.params[0] = ( r_ssaoRadius->value > 0.0f ) ? r_ssaoRadius->value / 100.0f : 0.1f;
+			push.params[1] = ( r_ssaoBias->value > 0.0f ) ? r_ssaoBias->value * 0.01f : 0.04f;
+			push.params[2] = r_ssaoIntensity->value;
+			push.params[3] = r_ssaoPower->value;
+			push.misc[0] = (float)( r_hbaoDirections ? r_hbaoDirections->integer : 8 );
+			push.misc[1] = (float)( r_hbaoSteps ? r_hbaoSteps->integer : 8 );
+			push.misc[2] = ( glConfig.vidWidth > 0 ) ? 1.0f / (float)glConfig.vidWidth : 1.0f;
+			if ( depthIsReversed > 0.5f )
+				push.misc[2] = -push.misc[2];
+			push.misc[3] = ( glConfig.vidHeight > 0 ) ? 1.0f / (float)glConfig.vidHeight : 1.0f;
+		} else {
+			push.params[0] = r_ssaoRadius->value;
+			push.params[1] = r_ssaoBias->value;
+			push.params[2] = r_ssaoIntensity->value;
+			push.params[3] = r_ssaoPower->value;
+			push.misc[0] = (float)r_ssaoSamples->integer;
+			push.misc[1] = ( glConfig.vidWidth > 0 ) ? 1.0f / (float)glConfig.vidWidth : 1.0f;
+			push.misc[2] = ( glConfig.vidHeight > 0 ) ? 1.0f / (float)glConfig.vidHeight : 1.0f;
+			push.misc[3] = depthIsReversed;
+			push.misc2[0] = (float)( r_ssaoMethod ? r_ssaoMethod->integer : 0 );
+			push.misc2[1] = (float)( r_hbaoDirections ? r_hbaoDirections->integer : 8 );
+			push.misc2[2] = (float)( r_hbaoSteps ? r_hbaoSteps->integer : 4 );
+			push.misc2[3] = ( r_ssaoMaxDepthGradient && r_ssaoMaxDepthGradient->value > 0.0f ) ? r_ssaoMaxDepthGradient->value : 0.0f;
+		}
+
+		qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_ssao, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
+		vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
+		qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+		vk_end_render_pass();
+
+		vk_begin_ssao_blur_render_pass();
+		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.ssao_blur_pipeline );
+		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_ssao, 0, 1, &vk.ssao_descriptor, 0, NULL );
+
+		push.params[0] = ( r_ssaoBlurRadius && r_ssaoBlurRadius->integer >= 0 ) ? (float)r_ssaoBlurRadius->integer : 2.0f;
+		push.params[1] = push.params[2] = push.params[3] = 0.0f;
+		qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_ssao, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
+		vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
+		qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+		vk_end_render_pass();
+
+		if ( vk.fog_scene_image != VK_NULL_HANDLE && vk.color_image != VK_NULL_HANDLE ) {
+			VkImageCopy copy_region;
+			uint32_t copy_w = ( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u;
+			uint32_t copy_h = ( glConfig.vidHeight > 0 ) ? (uint32_t)glConfig.vidHeight : 1u;
+			Com_Memset( &copy_region, 0, sizeof( copy_region ) );
+			copy_region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			copy_region.srcSubresource.layerCount = 1;
+			copy_region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			copy_region.dstSubresource.layerCount = 1;
+			copy_region.extent.width = copy_w;
+			copy_region.extent.height = copy_h;
+			copy_region.extent.depth = 1;
+			record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
+			record_image_layout_transition( vk.cmd->command_buffer, vk.fog_scene_image, VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
+			qvkCmdCopyImage( vk.cmd->command_buffer,
+				vk.color_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				vk.fog_scene_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+				1, &copy_region );
+			record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
+			record_image_layout_transition( vk.cmd->command_buffer, vk.fog_scene_image, VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
+		}
+		if ( vk.fog_scene_image_view != VK_NULL_HANDLE && vk.ssao_scene_descriptor != VK_NULL_HANDLE && vk.ssao_blur_descriptor != VK_NULL_HANDLE ) {
+			vk_begin_ssao_combine_render_pass();
+			if ( r_ssaoDebugView && r_ssaoDebugView->integer == 2 ) {
+				qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.ssao_depth_debug_pipeline );
+				qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.depth_descriptor, 0, NULL );
+			} else {
+				qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+					( r_ssaoDebugView && r_ssaoDebugView->integer ) ? vk.ssao_debug_pipeline : vk.ssao_combine_pipeline );
+				if ( r_ssaoDebugView && r_ssaoDebugView->integer ) {
+					qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.ssao_blur_descriptor, 0, NULL );
+				} else {
+					VkDescriptorSet ssao_combine_sets[2] = { vk.ssao_scene_descriptor, vk.ssao_blur_descriptor };
+					qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_ssao_combine, 0, 2, ssao_combine_sets, 0, NULL );
+				}
+			}
+			vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
+			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+			vk_end_render_pass();
+		}
+		record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
+			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 0, 0 );
+	}
+
+	backEnd.doneSSAO = qtrue;
+	return qtrue;
+}
+
+
 qboolean vk_bloom( void )
 {
 	uint32_t i;
@@ -19270,6 +19282,11 @@ qboolean vk_bloom( void )
 	}
 
 	if ( backEnd.doneBloom || !backEnd.doneSurfaces || !vk.fboActive )
+	{
+		return qfalse;
+	}
+	/* Pass culling: skip bloom for menus/cinematics (no 3D world) */
+	if ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) )
 	{
 		return qfalse;
 	}
