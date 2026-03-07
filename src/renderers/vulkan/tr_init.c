@@ -154,16 +154,16 @@ cvar_t	*r_bloom_threshold_mode;
 cvar_t	*r_bloom_modulate;
 cvar_t	*r_bloomKnee;
 cvar_t	*r_ssao;
+cvar_t	*r_ssaoMethod;
 cvar_t	*r_ssaoRadius;
 cvar_t	*r_ssaoBias;
 cvar_t	*r_ssaoIntensity;
 cvar_t	*r_ssaoPower;
 cvar_t	*r_ssaoSamples;
-cvar_t	*r_ssaoMethod;
-cvar_t	*r_hbaoDirections;
-cvar_t	*r_hbaoSteps;
 cvar_t	*r_ssaoMaxDepthGradient;
 cvar_t	*r_ssaoBlurRadius;
+cvar_t	*r_hbaoDirections;
+cvar_t	*r_hbaoSteps;
 cvar_t	*r_oit;
 cvar_t	*r_ssaoDebugView;
 cvar_t	*r_renderWidth;
@@ -2912,6 +2912,10 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_ssao, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ssao, "Enables screen-space ambient occlusion (SSAO). Requires \\r_fbo 1." );
 
+	r_ssaoMethod = ri.Cvar_Get( "r_ssaoMethod", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_ssaoMethod, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_ssaoMethod, "AO algorithm: 0=SSAO (hemisphere), 1=HBAO (horizon-based). Requires vid_restart." );
+
 	r_ssaoRadius = ri.Cvar_Get( "r_ssaoRadius", "8.0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_ssaoRadius, "1.0", "128.0", CV_FLOAT );
 	ri.Cvar_SetDescription( r_ssaoRadius, "SSAO sample radius in view space units (higher = broader occlusion)." );
@@ -2932,17 +2936,13 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_ssaoSamples, "4", "32", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ssaoSamples, "SSAO sample count (higher = smoother, slower)." );
 
-	r_ssaoMethod = ri.Cvar_Get( "r_ssaoMethod", "1", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_ssaoMethod, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_ssaoMethod, "Ambient occlusion method.\n 0: SSAO\n 1: HBAO" );
-
 	r_hbaoDirections = ri.Cvar_Get( "r_hbaoDirections", "8", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_hbaoDirections, "4", "16", CV_INTEGER );
-	ri.Cvar_SetDescription( r_hbaoDirections, "HBAO ray directions per pixel (higher = smoother, slower)." );
+	ri.Cvar_SetDescription( r_hbaoDirections, "HBAO ray directions (4=fast, 8=default, 16=quality)." );
 
-	r_hbaoSteps = ri.Cvar_Get( "r_hbaoSteps", "4", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_hbaoSteps, "2", "8", CV_INTEGER );
-	ri.Cvar_SetDescription( r_hbaoSteps, "HBAO steps along each ray (higher = broader, slower)." );
+	r_hbaoSteps = ri.Cvar_Get( "r_hbaoSteps", "8", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hbaoSteps, "4", "16", CV_INTEGER );
+	ri.Cvar_SetDescription( r_hbaoSteps, "HBAO steps per direction (4=fast, 8=default, 16=quality)." );
 
 	r_ssaoMaxDepthGradient = ri.Cvar_Get( "r_ssaoMaxDepthGradient", "0.08", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_ssaoMaxDepthGradient, "0.0", "0.5", CV_FLOAT );

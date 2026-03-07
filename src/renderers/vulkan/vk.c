@@ -5501,6 +5501,7 @@ static void vk_create_shader_modules( void )
 	vk.modules.blur_fs = SHADER_MODULE( blur_frag_spv );
 	vk.modules.blend_fs = SHADER_MODULE( blend_frag_spv );
 	vk.modules.ssao_fs = SHADER_MODULE( ssao_frag_spv );
+	vk.modules.hbao_fs = SHADER_MODULE( hbao_frag_spv );
 	vk.modules.ssao_blur_fs = SHADER_MODULE( ssao_blur_frag_spv );
 	vk.modules.ssao_combine_fs = SHADER_MODULE( ssao_combine_frag_spv );
 	vk.modules.oit_accum_vs = SHADER_MODULE( oit_accum_vert_spv );
@@ -5514,6 +5515,7 @@ static void vk_create_shader_modules( void )
 	SET_OBJECT_NAME( vk.modules.blur_fs, "gaussian blur fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.blend_fs, "final bloom blend fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.ssao_fs, "ssao fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	SET_OBJECT_NAME( vk.modules.hbao_fs, "hbao fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.ssao_blur_fs, "ssao blur fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.ssao_combine_fs, "ssao combine fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.ssao_debug_fs, "ssao debug fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
@@ -5837,6 +5839,7 @@ void vk_update_post_process_pipelines( void )
 
 		if ( r_ssao && r_ssao->integer ) {
 			vk_create_post_process_pipeline( 5, glConfig.vidWidth, glConfig.vidHeight );
+			vk_create_post_process_pipeline( 21, glConfig.vidWidth, glConfig.vidHeight );
 			vk_create_post_process_pipeline( 6, glConfig.vidWidth, glConfig.vidHeight );
 			vk_create_post_process_pipeline( 7, glConfig.vidWidth, glConfig.vidHeight );
 			vk_create_post_process_pipeline( 8, glConfig.vidWidth, glConfig.vidHeight );
@@ -10394,6 +10397,10 @@ static void vk_destroy_pipelines( qboolean resetCounter )
 		qvkDestroyPipeline( vk.device, vk.ssao_pipeline, NULL );
 		vk.ssao_pipeline = VK_NULL_HANDLE;
 	}
+	if ( vk.hbao_pipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.hbao_pipeline, NULL );
+		vk.hbao_pipeline = VK_NULL_HANDLE;
+	}
 
 	if ( vk.ssao_blur_pipeline != VK_NULL_HANDLE ) {
 		qvkDestroyPipeline( vk.device, vk.ssao_blur_pipeline, NULL );
@@ -10730,6 +10737,7 @@ for (i = 0; i < 2; i++) {
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.blur_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.blend_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.ssao_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.hbao_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.ssao_blur_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.ssao_combine_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.oit_accum_vs );
@@ -11807,6 +11815,16 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			layout = vk.pipeline_layout_ssao;
 			samples = VK_SAMPLE_COUNT_1_BIT;
 			pipeline_name = "ssao pipeline";
+			target_format = vk.capture_format;
+			blend = qfalse;
+			break;
+		case 21: // hbao
+			pipeline = &vk.hbao_pipeline;
+			fsmodule = vk.modules.hbao_fs;
+			renderpass = vk.render_pass.ssao;
+			layout = vk.pipeline_layout_ssao;
+			samples = VK_SAMPLE_COUNT_1_BIT;
+			pipeline_name = "hbao pipeline";
 			target_format = vk.capture_format;
 			blend = qfalse;
 			break;
@@ -17270,9 +17288,13 @@ void vk_end_frame( void )
 				record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
 					VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 0, 0 );
 
-				// ssao
+				// ssao or hbao
 				vk_begin_ssao_render_pass();
-				qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.ssao_pipeline );
+				if ( r_ssaoMethod && r_ssaoMethod->integer && vk.hbao_pipeline != VK_NULL_HANDLE ) {
+					qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.hbao_pipeline );
+				} else {
+					qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.ssao_pipeline );
+				}
 				qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_ssao, 0, 1, &vk.depth_descriptor, 0, NULL );
 
 				push.projInfo[0] = ( backEnd.viewParms.projectionMatrix[0] != 0.0f ) ? 1.0f / backEnd.viewParms.projectionMatrix[0] : 1.0f;
@@ -17280,19 +17302,32 @@ void vk_end_frame( void )
 				push.projInfo[2] = backEnd.viewParms.projectionMatrix[10];
 				push.projInfo[3] = backEnd.viewParms.projectionMatrix[14];
 
-				push.params[0] = r_ssaoRadius->value;
-				push.params[1] = r_ssaoBias->value;
-				push.params[2] = r_ssaoIntensity->value;
-				push.params[3] = r_ssaoPower->value;
-
-				push.misc[0] = (float)r_ssaoSamples->integer;
-				push.misc[1] = ( glConfig.vidWidth > 0 ) ? 1.0f / (float)glConfig.vidWidth : 1.0f;
-				push.misc[2] = ( glConfig.vidHeight > 0 ) ? 1.0f / (float)glConfig.vidHeight : 1.0f;
-				push.misc[3] = depthIsReversed;
-				push.misc2[0] = (float)( r_ssaoMethod ? r_ssaoMethod->integer : 0 );
-				push.misc2[1] = (float)( r_hbaoDirections ? r_hbaoDirections->integer : 8 );
-				push.misc2[2] = (float)( r_hbaoSteps ? r_hbaoSteps->integer : 4 );
-				push.misc2[3] = ( r_ssaoMaxDepthGradient && r_ssaoMaxDepthGradient->value > 0.0f ) ? r_ssaoMaxDepthGradient->value : 0.0f;
+				if ( r_ssaoMethod && r_ssaoMethod->integer ) {
+					/* HBAO: radius in UV (0.01-0.5), angleBias in radians, intensity, power */
+					push.params[0] = ( r_ssaoRadius->value > 0.0f ) ? r_ssaoRadius->value / 100.0f : 0.1f;
+					push.params[1] = ( r_ssaoBias->value > 0.0f ) ? r_ssaoBias->value * 0.01f : 0.04f;
+					push.params[2] = r_ssaoIntensity->value;
+					push.params[3] = r_ssaoPower->value;
+					push.misc[0] = (float)( r_hbaoDirections ? r_hbaoDirections->integer : 8 );
+					push.misc[1] = (float)( r_hbaoSteps ? r_hbaoSteps->integer : 8 );
+					push.misc[2] = ( glConfig.vidWidth > 0 ) ? 1.0f / (float)glConfig.vidWidth : 1.0f;
+					if ( depthIsReversed > 0.5f )
+						push.misc[2] = -push.misc[2];
+					push.misc[3] = ( glConfig.vidHeight > 0 ) ? 1.0f / (float)glConfig.vidHeight : 1.0f;
+				} else {
+					push.params[0] = r_ssaoRadius->value;
+					push.params[1] = r_ssaoBias->value;
+					push.params[2] = r_ssaoIntensity->value;
+					push.params[3] = r_ssaoPower->value;
+					push.misc[0] = (float)r_ssaoSamples->integer;
+					push.misc[1] = ( glConfig.vidWidth > 0 ) ? 1.0f / (float)glConfig.vidWidth : 1.0f;
+					push.misc[2] = ( glConfig.vidHeight > 0 ) ? 1.0f / (float)glConfig.vidHeight : 1.0f;
+					push.misc[3] = depthIsReversed;
+					push.misc2[0] = (float)( r_ssaoMethod ? r_ssaoMethod->integer : 0 );
+					push.misc2[1] = (float)( r_hbaoDirections ? r_hbaoDirections->integer : 8 );
+					push.misc2[2] = (float)( r_hbaoSteps ? r_hbaoSteps->integer : 4 );
+					push.misc2[3] = ( r_ssaoMaxDepthGradient && r_ssaoMaxDepthGradient->value > 0.0f ) ? r_ssaoMaxDepthGradient->value : 0.0f;
+				}
 
 				qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_ssao, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
 				vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );

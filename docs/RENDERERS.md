@@ -74,9 +74,10 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - Depth testing against opaque scene when MSAA off (transparent behind walls discarded)
 - Additive blend (ONE/ONE) surfaces included for particles, sparks, etc.
 
-### Screen-Space Ambient Occlusion (SSAO)
-- Hemisphere sampling with Halton(2,3) low-discrepancy sequence for better distribution and less noise
-- Configurable radius, bias, intensity, power, sample count
+### Screen-Space Ambient Occlusion (SSAO / HBAO)
+- **SSAO** (`r_ssaoMethod 0`): Hemisphere sampling with Halton(2,3) low-discrepancy sequence for better distribution and less noise
+- **HBAO** (`r_ssaoMethod 1`): Horizon-Based Ambient Occlusion — raymarches depth in multiple directions, tracks horizon angles; higher quality with fewer samples
+- Configurable radius, bias, intensity, power; SSAO sample count or HBAO directions/steps
 - Separable blur pass
 - Combine pass with debug visualization modes
 
@@ -145,7 +146,10 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 | `r_atmosphere` | 1 | Procedural atmospheric sky (Rayleigh+Mie). Replaces grey sky when no HDR skybox. |
 | `r_atmosphere_scale` | 4.0 | HDR scale multiplier for sky brightness. Works with auto exposure; increase if sky appears dark. |
 | `r_skyboxHDR` | "" | Path to HDR EXR/PNG skybox panorama (empty = use atmosphere or map skybox). |
-| `r_ssao` | 0 | SSAO enable |
+| `r_ssao` | 0 | SSAO/HBAO enable |
+| `r_ssaoMethod` | 0 | AO algorithm: 0=SSAO (hemisphere), 1=HBAO (horizon-based). Requires vid_restart. |
+| `r_hbaoDirections` | 8 | HBAO ray directions (4=fast, 8=default, 16=quality) |
+| `r_hbaoSteps` | 8 | HBAO steps per direction (4=fast, 8=default, 16=quality) |
 | `r_firstPersonFov` | 90 | Horizontal FOV (degrees) for first-person primitives (range 1–179) |
 | `r_firstPersonScale` | 1.0 | Anti-clipping scale for first-person primitives |
 | `r_firstPersonZNear` | 0.5 | Near clip plane for first-person (smaller = less clipping of arms/weapons) |
