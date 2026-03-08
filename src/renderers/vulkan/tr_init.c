@@ -1723,7 +1723,7 @@ static void R_Quality_f( void )
 			ri.Cvar_Set( "r_ssaoMethod", "0" );
 			ri.Cvar_Set( "r_smaa_preset", "1" );
 			ri.Cvar_Set( "r_ssaoSamples", "12" );
-			ri.Cvar_Set( "r_sharpen", "0.15" );
+			ri.Cvar_Set( "r_sharpen", "0.0" );
 			ri.Printf( PRINT_ALL, "[VK] Quality preset: Medium\n" );
 			break;
 		case 2: /* High */
@@ -1738,7 +1738,7 @@ static void R_Quality_f( void )
 			ri.Cvar_Set( "r_hbaoDirections", "8" );
 			ri.Cvar_Set( "r_hbaoSteps", "8" );
 			ri.Cvar_Set( "r_ssaoSamples", "16" );
-			ri.Cvar_Set( "r_sharpen", "0.35" );
+			ri.Cvar_Set( "r_sharpen", "0.15" );
 			ri.Printf( PRINT_ALL, "[VK] Quality preset: High\n" );
 			break;
 		case 3: /* Ultra */
@@ -1753,7 +1753,7 @@ static void R_Quality_f( void )
 			ri.Cvar_Set( "r_hbaoDirections", "16" );
 			ri.Cvar_Set( "r_hbaoSteps", "16" );
 			ri.Cvar_Set( "r_ssaoSamples", "24" );
-			ri.Cvar_Set( "r_sharpen", "0.5" );
+			ri.Cvar_Set( "r_sharpen", "0.25" );
 			ri.Printf( PRINT_ALL, "[VK] Quality preset: Ultra\n" );
 			break;
 	}
@@ -2311,12 +2311,12 @@ static void R_Register( void )
 	//r_anaglyphMode = ri.Cvar_Get( "r_anaglyphMode", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	//ri.Cvar_SetDescription( r_anaglyphMode, "Enable rendering of anaglyph images. Valid options for 3D glasses types:\n 0: Disabled\n 1: Red-cyan\n 2: Red-blue\n 3: Red-green\n 4: Green-magenta" );
 
-	r_greyscale = ri.Cvar_Get( "r_greyscale", "0.22", CVAR_ARCHIVE_ND );
+	r_greyscale = ri.Cvar_Get( "r_greyscale", "0.0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_greyscale, "-1", "1", CV_FLOAT );
 	ri.Cvar_SetDescription( r_greyscale, "Desaturate rendered frame, requires \\r_fbo 1." );
 	ri.Cvar_SetGroup( r_greyscale, CVG_RENDERER );
 
-	r_dither = ri.Cvar_Get( "r_dither", "1", CVAR_ARCHIVE_ND );
+	r_dither = ri.Cvar_Get( "r_dither", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_dither, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription(r_dither, "Set dithering mode:\n 0 - disabled\n 1 - ordered\nRequires " S_COLOR_CYAN "\\r_fbo 1." );
 	ri.Cvar_SetGroup( r_dither, CVG_RENDERER );
