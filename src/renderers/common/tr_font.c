@@ -375,6 +375,15 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 	void *faceData;
 	int i, len;
 	char name[MAX_QPATH];
+	const char *effectiveFont = fontName;
+
+	/* r_font override: when UI requests "default" or "fonts/default", use r_font if set (e.g. fonts/Inter-Regular) */
+	if (fontName && (Q_stricmp(fontName, "default") == 0 || Q_stricmp(fontName, "fonts/default") == 0)) {
+		const char *rfont = ri.Cvar_VariableString("r_font");
+		if (rfont && rfont[0]) {
+			effectiveFont = rfont;
+		}
+	}
 
 	if (!fontName) {
 		ri.Printf(PRINT_ALL, "RE_RegisterFont: called with empty name\n");
@@ -393,8 +402,8 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 	/* --- Try name-based cache first: fonts/<fontbase>_<pointSize>.dat --- */
 	{
 		char namedDat[MAX_QPATH];
-		const char *baseName = fontName;
-		const char *slash = strrchr(fontName, '/');
+		const char *baseName = effectiveFont;
+		const char *slash = strrchr(effectiveFont, '/');
 		const char *dot;
 		if (slash) baseName = slash + 1;
 		dot = strrchr(baseName, '.');
@@ -479,9 +488,9 @@ try_freetype:
 		return;
 	}
 
-	len = ri.FS_ReadFile(fontName, &faceData);
+	len = ri.FS_ReadFile(effectiveFont, &faceData);
 	if (len <= 0) {
-		ri.Printf(PRINT_WARNING, "RE_RegisterFont: Unable to read font file '%s'\n", fontName);
+		ri.Printf(PRINT_WARNING, "RE_RegisterFont: Unable to read font file '%s'\n", effectiveFont);
 		return;
 	}
 

@@ -289,9 +289,13 @@ copy_to_release() {
   mkdir -p "$dest"
   mkdir -p "$dest/base"
 
-  # Game data (minimal): ensure base/default.cfg and steamdeck.cfg exist in release.
+  # Game data (minimal): ensure base/default.cfg, steamdeck.cfg, and fonts exist in release.
   if [ -d "$PROJECT_ROOT/base" ] && [ -f "$PROJECT_ROOT/base/default.cfg" ]; then
     cp -f "$PROJECT_ROOT/base/default.cfg" "$dest/base/default.cfg"
+  fi
+  if [ -d "$PROJECT_ROOT/base/fonts" ]; then
+    mkdir -p "$dest/base/fonts"
+    cp -f "$PROJECT_ROOT/base/fonts/"*.ttf "$dest/base/fonts/" 2>/dev/null || true
   fi
   if [ -f "$PROJECT_ROOT/config/steamdeck.cfg" ]; then
     cp -f "$PROJECT_ROOT/config/steamdeck.cfg" "$dest/base/steamdeck.cfg"
