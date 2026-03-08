@@ -23,6 +23,10 @@ layout(push_constant) uniform AtmospherePC {
 	vec4  mieParams;
 	vec4  atmosphereParams;
 	vec4  viewOrigin;
+	vec4  viewForward;
+	vec4  viewRight;
+	vec4  viewUp;
+	vec4  viewParams;
 } atm;
 
 const float PI = 3.14159265359;
@@ -74,7 +78,12 @@ void main() {
 	gl_FragDepth = 1.0;
 #endif
 	vec2 uv = frag_tex_coord * 2.0 - 1.0;
-	vec3 rayDir = normalize(vec3(uv.x, uv.y, -1.0));
+	vec3 forward = normalize(atm.viewForward.xyz);
+	vec3 right = normalize(atm.viewRight.xyz);
+	vec3 up = normalize(atm.viewUp.xyz);
+	float tanHalfX = max(atm.viewParams.x, 0.001);
+	float tanHalfY = max(atm.viewParams.y, 0.001);
+	vec3 rayDir = normalize(forward + uv.x * tanHalfX * right + uv.y * tanHalfY * up);
 
 	float rayleighScale = atm.rayleighCoeffs.w;
 	float mieScale = atm.mieParams.x;
@@ -88,7 +97,8 @@ void main() {
 	vec3 mieBeta = vec3(mieScale);
 	vec3 sunDir = normalize(atm.sunDirection.xyz);
 
-	vec3 origin = vec3(0.0, PLANET_RADIUS + 1.0, 0.0);
+	float observerHeight = max(atm.viewOrigin.z, 1.0);
+	vec3 origin = vec3(0.0, PLANET_RADIUS + observerHeight, 0.0);
 
 	vec2 atmoHit = raySphereIntersect(origin, rayDir, ATMOSPHERE_RADIUS);
 	if (atmoHit.y < 0.0) {
