@@ -474,11 +474,14 @@ enum {
 };
 static void vk_temporal_clear_frame_state( void );
 static void vk_temporal_request_reset( uint32_t reasons );
+static void vk_temporal_request_sticky_reset( uint32_t reasons );
 static qboolean vk_temporal_has_reason( uint32_t reasonMask );
 static qboolean vk_temporal_compute_shared_camera_cut( uint32_t *outReasons );
 static void vk_temporal_log_reset( uint32_t reasons, qboolean hardReset );
 static void vk_temporal_apply_resets( qboolean hardReset );
 static void vk_temporal_begin_frame( void );
+static void vk_temporal_commit_frame_state( void );
+static void vk_update_auto_exposure( void );
 static void vk_update_volumetric_perf_queries( void );
 static void vk_update_fluid_auto_scale( void );
 static void vk_write_volumetric_timestamp( uint32_t query_index, VkPipelineStageFlagBits stage );
@@ -515,6 +518,11 @@ static void vk_temporal_clear_frame_state( void )
 static void vk_temporal_request_reset( uint32_t reasons )
 {
 	vk.temporal.pendingResetReasons |= reasons;
+}
+
+static void vk_temporal_request_sticky_reset( uint32_t reasons )
+{
+	vk.temporal.stickyResetReasons |= reasons;
 }
 
 static qboolean vk_temporal_has_reason( uint32_t reasonMask )
@@ -597,12 +605,6 @@ static void vk_temporal_apply_resets( qboolean hardReset )
 	vk_reset_motion_history();
 	vk_reset_volumetric_history();
 	vk.adaptedExposure = 1.0f;
-	VectorCopy( tr.refdef.vieworg, vk.prevViewOrigin );
-	VectorCopy( tr.refdef.viewaxis[2], vk.prevViewForward );
-
-	if ( hardReset ) {
-		vk.temporal.worldWasValid = ( tr.world != NULL ) ? qtrue : qfalse;
-	}
 
 	vk_temporal_log_reset( reasons, hardReset );
 }
@@ -690,16 +692,8 @@ static qboolean vk_temporal_compute_shared_camera_cut( uint32_t *outReasons )
 	}
 
 	vk.temporal.sharedCameraCut = cameraCut;
-	vk.temporal.worldWasValid = worldValid;
-	vk.temporal.noWorldModel = noWorldModel;
-	vk.temporal.stableGameplayState = stableGameplayState;
-	vk.temporal.lastRenderWidth = (uint32_t)glConfig.vidWidth;
-	vk.temporal.lastRenderHeight = (uint32_t)glConfig.vidHeight;
-	vk.temporal.lastSwapchainWidth = vk.swapchain_extent_valid ? vk.swapchain_extent.width : 0u;
-	vk.temporal.lastSwapchainHeight = vk.swapchain_extent_valid ? vk.swapchain_extent.height : 0u;
-	Q_strncpyz( vk.temporal.worldName, ( worldValid && tr.world->name[0] ) ? tr.world->name : "", sizeof( vk.temporal.worldName ) );
 	if ( outReasons ) {
-		*outReasons = reasons;
+		*outReasons |= reasons;
 	}
 	return cameraCut;
 }
@@ -718,6 +712,8 @@ static void vk_temporal_begin_frame( void )
 	}
 	vk.temporal.frameIndex++;
 	vk_temporal_clear_frame_state();
+	reasons |= vk.temporal.stickyResetReasons;
+	vk.temporal.stickyResetReasons = 0u;
 
 	if ( vk.temporal.lastRenderWidth && vk.temporal.lastRenderHeight &&
 		( renderWidth != vk.temporal.lastRenderWidth || renderHeight != vk.temporal.lastRenderHeight ) ) {
@@ -731,8 +727,90 @@ static void vk_temporal_begin_frame( void )
 	vk_temporal_compute_shared_camera_cut( &reasons );
 	vk_temporal_request_reset( reasons );
 
-	hardReset = ( reasons & ~VK_TEMPORAL_RESET_CAMERA_CUT ) != 0u ? qtrue : qfalse;
+	hardReset = ( vk.temporal.pendingResetReasons & ~VK_TEMPORAL_RESET_CAMERA_CUT ) != 0u ? qtrue : qfalse;
 	vk_temporal_apply_resets( hardReset );
+}
+
+static void vk_temporal_commit_frame_state( void )
+{
+	const int clientState = ri.CL_GetState ? ri.CL_GetState() : CA_ACTIVE;
+	const qboolean worldValid = ( tr.world != NULL ) ? qtrue : qfalse;
+	const qboolean noWorldModel = ( backEnd.refdef.rdflags & RDF_NOWORLDMODEL ) ? qtrue : qfalse;
+
+	vk.prevClientState = clientState;
+	vk.temporal.worldWasValid = worldValid;
+	vk.temporal.noWorldModel = noWorldModel;
+	vk.temporal.stableGameplayState = ( clientState == CA_ACTIVE ) ? qtrue : qfalse;
+	vk.temporal.lastRenderWidth = (uint32_t)glConfig.vidWidth;
+	vk.temporal.lastRenderHeight = (uint32_t)glConfig.vidHeight;
+	vk.temporal.lastSwapchainWidth = vk.swapchain_extent_valid ? vk.swapchain_extent.width : 0u;
+	vk.temporal.lastSwapchainHeight = vk.swapchain_extent_valid ? vk.swapchain_extent.height : 0u;
+	Q_strncpyz( vk.temporal.worldName, ( worldValid && tr.world->name[0] ) ? tr.world->name : "", sizeof( vk.temporal.worldName ) );
+	VectorCopy( tr.refdef.vieworg, vk.prevViewOrigin );
+	VectorCopy( tr.refdef.viewaxis[2], vk.prevViewForward );
+}
+
+static void vk_update_auto_exposure( void )
+{
+	cvar_t *auto_var = ri.Cvar_Get( "r_exposure_auto", "0", 0 );
+	cvar_t *target_var = ri.Cvar_Get( "r_exposure_auto_target", "0.5", CVAR_ARCHIVE_ND );
+	cvar_t *speed_var = ri.Cvar_Get( "r_exposure_auto_speed", "2.0", CVAR_ARCHIVE_ND );
+
+	if ( !( auto_var && auto_var->integer && target_var && speed_var ) ) {
+		return;
+	}
+
+	{
+		int clientState = ri.CL_GetState ? ri.CL_GetState() : CA_ACTIVE;
+		qboolean stateTransition = ( clientState != vk.prevClientState );
+		qboolean stableGameplayState = vk.temporal.stableGameplayState;
+		qboolean hardReset = ( vk.temporal.appliedResetReasons & ~VK_TEMPORAL_RESET_CAMERA_CUT ) != 0u ? qtrue : qfalse;
+		qboolean cameraCut = vk.temporal.sharedCameraCut;
+		float target = target_var->value > 0.0f ? target_var->value : 0.5f;
+		float speed = speed_var->value > 0.0f ? speed_var->value * 0.016f : 0.02f;
+		float targetExp = target;
+
+		if ( !stableGameplayState || !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+			targetExp = 1.0f;
+			speed = stateTransition ? 0.35f : 0.12f;
+		} else if ( !hardReset && !cameraCut && vk.luminance_staging_ptr ) {
+			float avgLogLum = *(const float *)vk.luminance_staging_ptr;
+			if ( avgLogLum != avgLogLum || avgLogLum <= -20.0f || avgLogLum >= 20.0f )
+				avgLogLum = 0.0f;
+			{
+				float sceneLum = powf( 2.0f, avgLogLum );
+				targetExp = ( sceneLum > 1e-6f ) ? ( target / sceneLum ) : 1.0f;
+				targetExp = ( targetExp < 0.01f ) ? 0.01f : ( targetExp > 10.0f ? 10.0f : targetExp );
+			}
+		} else {
+			targetExp = 1.0f;
+		}
+
+		if ( cameraCut ) {
+			cvar_t *cap_var = ri.Cvar_Get( "r_exposure_auto_cap_on_cut", "0.75", 0 );
+			float cap = cap_var ? cap_var->value : 0.75f;
+			speed = 0.5f;
+			if ( cap > 0.0f && targetExp > cap ) {
+				targetExp = cap;
+			}
+		}
+
+		if ( !hardReset && vk.adaptedExposure > 0.0f ) {
+			float ratio = targetExp / vk.adaptedExposure;
+			if ( ratio < 0.75f ) {
+				speed = ( speed < 0.25f ) ? 0.25f : speed;
+			} else if ( ratio > 1.5f ) {
+				speed = ( speed < 0.08f ) ? 0.08f : speed;
+			}
+		}
+
+		if ( stateTransition ) {
+			speed = ( speed < 0.30f ) ? 0.30f : speed;
+		}
+
+		vk.adaptedExposure += ( targetExp - vk.adaptedExposure ) * speed;
+		vk.adaptedExposure = ( vk.adaptedExposure < 0.01f ) ? 0.01f : ( vk.adaptedExposure > 10.0f ? 10.0f : vk.adaptedExposure );
+	}
 }
 
 
@@ -7297,6 +7375,8 @@ static void vk_restart_swapchain( const char *funcname, VkResult res )
 #ifdef VK_PBR_BRDFLUT
 	vk_create_brfdlut();
 #endif
+
+	vk_temporal_request_sticky_reset( VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE );
 }
 
 
@@ -16756,10 +16836,7 @@ static void vk_volumetric_fog_pass( void )
 				(unsigned long long)(uintptr_t)vk.fog_scene_image,
 				(unsigned long long)(uintptr_t)vk.motion_vector_image );
 		}
-		vk.has_prev_volumetric = qfalse;
-		vk_prev_matrices_valid = qfalse;
-		vk_prev_volumetric_time_valid = qfalse;
-		Com_Memset( &vk_volumetric_validation_state, 0, sizeof( vk_volumetric_validation_state ) );
+		vk_reset_volumetric_history();
 		vk_log_post_fog_rebind( "volumetric skipped (missing resources)", vk.color_image_view );
 		vk_update_post_fog_descriptors( vk.color_image_view );
 		if ( tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
@@ -16786,10 +16863,7 @@ static void vk_volumetric_fog_pass( void )
 				(unsigned long long)(uintptr_t)vk.volumetric_depth_resolve_pipeline,
 				(unsigned long long)(uintptr_t)vk.volumetric_depth_resolve_descriptor );
 		}
-		vk.has_prev_volumetric = qfalse;
-		vk_prev_matrices_valid = qfalse;
-		vk_prev_volumetric_time_valid = qfalse;
-		Com_Memset( &vk_volumetric_validation_state, 0, sizeof( vk_volumetric_validation_state ) );
+		vk_reset_volumetric_history();
 		vk_log_post_fog_rebind( "volumetric skipped (MSAA depth resolve missing)", vk.color_image_view );
 		vk_update_post_fog_descriptors( vk.color_image_view );
 		if ( tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
@@ -16971,6 +17045,8 @@ static void vk_volumetric_fog_pass( void )
 
 void vk_prepare_2d( void )
 {
+	vk_prepare_frame_temporal_state();
+
 	/* Cinematic/menu-only: no world, no RC_DRAW_SURFS, so no render pass was ever started.
 	 * Start a fresh main pass here so 2D can draw on a cleared color target instead of
 	 * inheriting stale swapchain/FBO contents from a previous frame. */
@@ -17220,14 +17296,13 @@ void vk_begin_frame( void )
 
 	vk_begin_motion_frame();
 	vk.sun_shadow_valid = qfalse;
-	vk_temporal_begin_frame();
+	vk.temporal.preparedThisFrame = qfalse;
 
 #ifdef USE_UPLOAD_QUEUE
 	vk_flush_staging_buffer( qtrue );
 #endif
 
 	vk.cmd = &vk.tess[ vk.cmd_index ];
-	vk_update_postfx_params( vk.cmd_index );
 
 	if ( vk.cmd->waitForFence ) {
 		vk.cmd->waitForFence = qfalse;
@@ -17249,66 +17324,6 @@ void vk_begin_frame( void )
 		if ( r_occlusionCulling && r_occlusionCulling->integer ) {
 			vk_occlusion_readback();
 		}
-		/* Eye adaptation: read luminance from previous frame and compute exposure */
-			{
-				cvar_t *auto_var = ri.Cvar_Get( "r_exposure_auto", "0", 0 );
-				cvar_t *target_var = ri.Cvar_Get( "r_exposure_auto_target", "0.5", CVAR_ARCHIVE_ND );
-				cvar_t *speed_var = ri.Cvar_Get( "r_exposure_auto_speed", "2.0", CVAR_ARCHIVE_ND );
-				if ( auto_var && auto_var->integer && target_var && speed_var ) {
-					int clientState = ri.CL_GetState ? ri.CL_GetState() : CA_ACTIVE;
-					qboolean stateTransition = ( clientState != vk.prevClientState );
-					qboolean stableGameplayState = vk.temporal.stableGameplayState;
-					qboolean hardReset = ( vk.temporal.appliedResetReasons & ~VK_TEMPORAL_RESET_CAMERA_CUT ) != 0u ? qtrue : qfalse;
-					qboolean cameraCut = vk.temporal.sharedCameraCut;
-					float target = target_var->value > 0.0f ? target_var->value : 0.5f;
-					float speed = speed_var->value > 0.0f ? speed_var->value * 0.016f : 0.02f;
-					float targetExp = target;
-
-					if ( !stableGameplayState || !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
-						targetExp = 1.0f;
-						speed = stateTransition ? 0.35f : 0.12f;
-					} else if ( !hardReset && !cameraCut && vk.luminance_staging_ptr ) {
-						float avgLogLum = *(const float *)vk.luminance_staging_ptr;
-						if ( avgLogLum != avgLogLum || avgLogLum <= -20.0f || avgLogLum >= 20.0f )
-							avgLogLum = 0.0f;
-						{
-							float sceneLum = powf( 2.0f, avgLogLum );
-							targetExp = ( sceneLum > 1e-6f ) ? ( target / sceneLum ) : 1.0f;
-							targetExp = ( targetExp < 0.01f ) ? 0.01f : ( targetExp > 10.0f ? 10.0f : targetExp );
-						}
-					} else {
-						targetExp = 1.0f;
-					}
-
-					if ( cameraCut ) {
-						cvar_t *cap_var = ri.Cvar_Get( "r_exposure_auto_cap_on_cut", "0.75", 0 );
-						float cap = cap_var ? cap_var->value : 0.75f;
-						speed = 0.5f;
-						if ( cap > 0.0f && targetExp > cap ) {
-							targetExp = cap;
-						}
-					}
-
-					if ( !hardReset && vk.adaptedExposure > 0.0f ) {
-						float ratio = targetExp / vk.adaptedExposure;
-						if ( ratio < 0.75f ) {
-							speed = ( speed < 0.25f ) ? 0.25f : speed;
-						} else if ( ratio > 1.5f ) {
-							speed = ( speed < 0.08f ) ? 0.08f : speed;
-						}
-					}
-
-					if ( stateTransition ) {
-						speed = ( speed < 0.30f ) ? 0.30f : speed;
-					}
-
-					vk.adaptedExposure += ( targetExp - vk.adaptedExposure ) * speed;
-					vk.adaptedExposure = ( vk.adaptedExposure < 0.01f ) ? 0.01f : ( vk.adaptedExposure > 10.0f ? 10.0f : vk.adaptedExposure );
-					VectorCopy( tr.refdef.vieworg, vk.prevViewOrigin );
-					VectorCopy( tr.refdef.viewaxis[2], vk.prevViewForward );
-					vk.prevClientState = clientState;
-				}
-			}
 	}
 
 	if ( !ri.CL_IsMinimized() && !vk.cmd->swapchain_image_acquired ) {
@@ -17400,6 +17415,18 @@ vk_begin_main_render_pass();
 	vk.stats.push_size = 0;
 }
 
+void vk_prepare_frame_temporal_state( void )
+{
+	if ( vk.temporal.preparedThisFrame ) {
+		return;
+	}
+
+	vk_temporal_begin_frame();
+	vk_update_auto_exposure();
+	vk_update_postfx_params( vk.cmd_index );
+	vk.temporal.preparedThisFrame = qtrue;
+}
+
 
 static void vk_resize_geometry_buffer( void )
 {
@@ -17447,6 +17474,8 @@ void vk_end_frame( void )
 		// solution: re-record all commands again? (might be complicated though)
 		return;
 	}
+
+	vk_prepare_frame_temporal_state();
 
 	if ( vk.fboActive )
 	{
@@ -17841,6 +17870,7 @@ void vk_end_frame( void )
 		}
 	}
 	vk.cmd->waitForFence = qtrue;
+	vk_temporal_commit_frame_state();
 
 	// presentation may take undefined time to complete, we can't measure it in a reliable way
 	backEnd.pc.msec = ri.Milliseconds() - backEnd.pc.msec;
@@ -18193,13 +18223,8 @@ static void vk_destroy_volumetric_params_buffer( void )
 		qvkFreeMemory( vk.device, vk.volumetric_params_memory, NULL );
 		vk.volumetric_params_memory = VK_NULL_HANDLE;
 	}
-	vk.volumetric_frame = 0;
-	vk.has_prev_volumetric = qfalse;
-	vk_prev_matrices_valid = qfalse;
-	vk_prev_volumetric_time_valid = qfalse;
-	vk_volumetric_noise_time = 0.0f;
-	vk_near_static_view_frames = 0;
-	Com_Memset( &vk_volumetric_validation_state, 0, sizeof( vk_volumetric_validation_state ) );
+	vk_reset_volumetric_history();
+	vk_temporal_request_sticky_reset( VK_TEMPORAL_RESET_MISSING_PREV_DATA );
 }
 
 static void vk_create_volumetric_params_buffer( void )
@@ -18237,11 +18262,8 @@ static void vk_create_volumetric_params_buffer( void )
 	vk.volumetric_params_buffer_size = mem_req.size;
 
 	VK_CHECK( qvkMapMemory( vk.device, vk.volumetric_params_memory, 0, vk.volumetric_params_buffer_size, 0, &vk.volumetric_params_ptr ) );
-	vk.volumetric_frame = 0;
-	vk.has_prev_volumetric = qfalse;
-	vk_prev_volumetric_time_valid = qfalse;
-	vk_volumetric_noise_time = 0.0f;
-	Com_Memset( &vk_volumetric_validation_state, 0, sizeof( vk_volumetric_validation_state ) );
+	vk_reset_volumetric_history();
+	vk_temporal_request_sticky_reset( VK_TEMPORAL_RESET_MISSING_PREV_DATA );
 }
 
 static void vk_destroy_postfx_params_buffers( void )
