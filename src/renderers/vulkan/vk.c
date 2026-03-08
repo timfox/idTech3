@@ -9482,6 +9482,7 @@ static void vk_destroy_attachments( void )
 		vk.color_image = VK_NULL_HANDLE;
 		vk.color_image_view = VK_NULL_HANDLE;
 		vk.post_fog_color_source = VK_NULL_HANDLE;
+		vk.scene_post_fog_color_source = VK_NULL_HANDLE;
 	}
 	if ( vk.fog_scene_image ) {
 		qvkDestroyImage( vk.device, vk.fog_scene_image, NULL );
@@ -15856,7 +15857,8 @@ static void vk_volumetric_fog_pass( void )
 		if ( tier >= 2 || tier == 4 || !r_volumetricFog->integer || !vk.fboActive ||
 			!tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
 			vk_reset_volumetric_history();
-			/* SMAA runs in vk_end_frame after 2D overlays; set color for now */
+			/* Volumetrics are skipped; keep the scene source on color_image and leave 2D overlays untouched. */
+			vk_set_scene_post_fog_source( vk.color_image_view );
 			vk_log_post_fog_rebind( "volumetric skipped (tier/off/no-world)", vk.color_image_view );
 			vk_update_post_fog_descriptors( vk.color_image_view );
 			/* Restore depth layout if atmosphere ran (tr.world) */
@@ -15886,6 +15888,7 @@ static void vk_volumetric_fog_pass( void )
 				(unsigned long long)(uintptr_t)vk.motion_vector_image );
 		}
 		vk_reset_volumetric_history();
+		vk_set_scene_post_fog_source( vk.color_image_view );
 		vk_log_post_fog_rebind( "volumetric skipped (missing resources)", vk.color_image_view );
 		vk_update_post_fog_descriptors( vk.color_image_view );
 		if ( tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
@@ -15913,6 +15916,7 @@ static void vk_volumetric_fog_pass( void )
 				(unsigned long long)(uintptr_t)vk.volumetric_depth_resolve_descriptor );
 		}
 		vk_reset_volumetric_history();
+		vk_set_scene_post_fog_source( vk.color_image_view );
 		vk_log_post_fog_rebind( "volumetric skipped (MSAA depth resolve missing)", vk.color_image_view );
 		vk_update_post_fog_descriptors( vk.color_image_view );
 		if ( tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
@@ -15944,6 +15948,7 @@ static void vk_volumetric_fog_pass( void )
 	if ( r_volumetricFogSkipStatic && r_volumetricFogSkipStatic->integer &&
 		vk_near_static_view_frames >= 30 ) {
 		vk_reset_volumetric_history();
+		vk_set_scene_post_fog_source( vk.color_image_view );
 		vk_log_post_fog_rebind( "volumetric skipped (static view, death cam)", vk.color_image_view );
 		vk_update_post_fog_descriptors( vk.color_image_view );
 		if ( tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
@@ -16054,8 +16059,10 @@ static void vk_volumetric_fog_pass( void )
 	if ( vk.smaaActive && tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
 		vk_barrier_post_fog_source_for_sampling( vk.color_image_view, "volumetric pre-SMAA" );
 		vk_smaa_passes();
+		vk_set_scene_post_fog_source( vk.smaa_output_image_view ? vk.smaa_output_image_view : vk.color_image_view );
 		vk_update_post_fog_descriptors( vk.smaa_output_image_view ? vk.smaa_output_image_view : vk.color_image_view );
 	} else {
+		vk_set_scene_post_fog_source( vk.color_image_view );
 		vk_update_post_fog_descriptors( vk.color_image_view );
 	}
 
@@ -16107,6 +16114,7 @@ void vk_prepare_2d( void )
 			vk.fboActive ) {
 			vk_reset_volumetric_history();
 			backEnd.doneFog = qtrue;
+			vk_set_scene_post_fog_source( vk.color_image_view );
 			vk_scene_src_rect_valid = qfalse;
 			vk_begin_main_render_pass();
 		}
@@ -16141,11 +16149,11 @@ void vk_prepare_2d( void )
 	if ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
 		vk_reset_volumetric_history();
 		backEnd.doneFog = qtrue;
+		vk_set_scene_post_fog_source( vk.color_image_view );
 		if ( vk.renderPassIndex == RENDER_PASS_MAIN ) {
 			vk_end_render_pass();
-			/* No-world (menu): do NOT run SMAA here — 2D overlays are drawn in post_bloom.
-			 * SMAA runs in vk_end_frame after 2D so scene+2D get anti-aliased. */
-			vk_log_post_fog_rebind( "prepare_2d no-world: color source (SMAA after 2D)", vk.color_image_view );
+			/* No-world/menu path stays on color_image so console/UI remain crisp and stable. */
+			vk_log_post_fog_rebind( "prepare_2d no-world: color source", vk.color_image_view );
 			vk_update_post_fog_descriptors( vk.color_image_view );
 			vk_begin_post_bloom_render_pass();
 		}
@@ -16568,6 +16576,7 @@ void vk_end_frame( void )
 			if ( !ri.CL_IsMinimized() )
 			{
 				VkImageView post_fog_src;
+				VkImageView luminance_src;
 
 				vk_end_render_pass();
 
@@ -16577,24 +16586,12 @@ void vk_end_frame( void )
 				}
 				else
 				{
-					/* Volumetrics skipped: run SMAA after 2D overlays (scene+2D in color_image).
-					 * Skip paths run SMAA before 2D; we fix by running it here instead. */
-					if ( vk.smaaActive && vk.smaa_output_image_view != VK_NULL_HANDLE )
-					{
-						/* Ensure color_image is ready for SMAA edge pass sampling (post_bloom just ended) */
-						vk_barrier_post_fog_source_for_sampling( vk.color_image_view, "vk_end_frame pre-SMAA" );
-						vk_smaa_passes();
-						vk_log_post_fog_rebind( "end_frame SMAA (scene+2D)", vk.smaa_output_image_view );
-						vk_update_post_fog_descriptors( vk.smaa_output_image_view );
-					}
-					else
-					{
-						vk_log_post_fog_rebind( "end_frame volumetric skipped (backEnd.doneFog)", vk.color_image_view );
-						vk_update_post_fog_descriptors( vk.color_image_view );
-					}
+					vk_log_post_fog_rebind( "end_frame volumetric skipped (scene+2D on color_image)", vk.color_image_view );
+					vk_update_post_fog_descriptors( vk.color_image_view );
 				}
 
 				post_fog_src = vk_get_post_fog_source();
+				luminance_src = vk_get_luminance_source();
 				if ( post_fog_src != VK_NULL_HANDLE ) {
 					vk_update_post_fog_descriptors( post_fog_src );
 					vk_barrier_post_fog_source_for_sampling( post_fog_src, "vk_end_frame pre-luminance/gamma" );
@@ -16614,8 +16611,10 @@ void vk_end_frame( void )
 						allow_cinematic_luminance &&
 						vk.luminance_pipeline != VK_NULL_HANDLE && vk.luminance_descriptor[vk.cmd_index] != VK_NULL_HANDLE &&
 						vk.luminance_image_view != VK_NULL_HANDLE && vk.luminance_staging_buffer != VK_NULL_HANDLE &&
-						post_fog_src != VK_NULL_HANDLE && post_fog_src != vk.luminance_image_view )
+						luminance_src != VK_NULL_HANDLE && luminance_src != vk.luminance_image_view )
 					{
+						vk_update_luminance_descriptor_image( luminance_src );
+						vk_barrier_post_fog_source_for_sampling( luminance_src, "vk_end_frame pre-luminance (scene only)" );
 						record_image_layout_transition( vk.cmd->command_buffer, vk.luminance_image, VK_IMAGE_ASPECT_COLOR_BIT,
 							VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
 							VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
