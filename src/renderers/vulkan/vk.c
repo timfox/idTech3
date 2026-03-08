@@ -3,6 +3,8 @@
 #include "vk_postfx.h"
 #include "vk_post_fog.h"
 #include "vk_skybox_hdr.h"
+#include "vk_atmosphere.h"
+#include "vk_temporal.h"
 #include "vk_util.h"
 #include <math.h>
 
@@ -403,18 +405,8 @@ static const dlight_t *vk_get_volumetric_local_light( int local_index );
 static qboolean vk_build_local_spot_shadow_view( const dlight_t *dl, int viewportX, int viewportY, int viewportSize, viewParms_t *shadowParms, float *outViewProj );
 static qboolean vk_build_local_point_shadow_view( const dlight_t *dl, int face, int viewportSize, viewParms_t *shadowParms, float *outViewProj );
 static qboolean vk_render_local_volumetric_shadow_view( const viewParms_t *shadowParms, qboolean pointShadow, int pointFaceLayer );
-static void vk_reset_motion_history( void );
-static void vk_reset_volumetric_history( void );
 static qboolean Mat4Inverse( const float *m, float *out );
 
-static float vk_prev_view_matrix[16];
-static float vk_prev_projection_matrix[16];
-static float vk_prev_viewproj_matrix[16];
-static qboolean vk_prev_matrices_valid = qfalse;
-static int vk_prev_volumetric_time_ms = 0;
-static int vk_near_static_view_frames = 0;  /* consecutive frames with view_delta < threshold */
-static qboolean vk_prev_volumetric_time_valid = qfalse;
-static float vk_volumetric_noise_time = 0.0f;
 static float vk_prev_entity_model_matrices[MAX_REFENTITIES][16];
 static float vk_curr_entity_model_matrices[MAX_REFENTITIES][16];
 static int vk_prev_entity_model_handles[MAX_REFENTITIES];
@@ -423,31 +415,6 @@ static int vk_prev_entity_types[MAX_REFENTITIES];
 static int vk_curr_entity_types[MAX_REFENTITIES];
 static qboolean vk_prev_entity_model_valid[MAX_REFENTITIES];
 static qboolean vk_curr_entity_model_valid[MAX_REFENTITIES];
-typedef enum {
-	VK_TEMPORAL_RESET_NONE                 = 0,
-	VK_TEMPORAL_RESET_RENDERER_INIT        = 1u << 0,
-	VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE     = 1u << 1,
-	VK_TEMPORAL_RESET_RENDER_SIZE_CHANGE   = 1u << 2,
-	VK_TEMPORAL_RESET_WORLD_CHANGE         = 1u << 3,
-	VK_TEMPORAL_RESET_CLIENT_STATE_CHANGE  = 1u << 4,
-	VK_TEMPORAL_RESET_CAMERA_CUT           = 1u << 5,
-	VK_TEMPORAL_RESET_EXPLICIT_DEBUG       = 1u << 6,
-	VK_TEMPORAL_RESET_MISSING_PREV_DATA    = 1u << 7
-} vkTemporalResetReason;
-typedef struct {
-	uint32_t camera_cut_events;
-	uint32_t forced_camera_cut_events;
-	uint32_t local_shadow_ready_spot;
-	uint32_t local_shadow_ready_point;
-	uint32_t local_light_count;
-	uint32_t telemetry_nan_or_inf;
-	uint32_t telemetry_extinction_clamp_hits;
-	uint32_t telemetry_velocity_clamp_hits;
-	uint32_t telemetry_density_clamp_hits;
-	uint32_t telemetry_pressure_sanitize_hits;
-	uint32_t telemetry_temporal_rejects;
-} vk_volumetric_validation_state_t;
-static vk_volumetric_validation_state_t vk_volumetric_validation_state;
 enum {
 	VK_VOLUMETRY_COUNTER_NAN_OR_INF = 0,
 	VK_VOLUMETRY_COUNTER_EXTINCTION_CLAMP = 1,
@@ -472,16 +439,6 @@ enum {
 	VK_VOLUMETRY_QUERY_FOG_END = 12,
 	VK_VOLUMETRY_QUERY_USED = 13
 };
-static void vk_temporal_clear_frame_state( void );
-static void vk_temporal_request_reset( uint32_t reasons );
-static void vk_temporal_request_sticky_reset( uint32_t reasons );
-static qboolean vk_temporal_has_reason( uint32_t reasonMask );
-static qboolean vk_temporal_compute_shared_camera_cut( uint32_t *outReasons );
-static void vk_temporal_log_reset( uint32_t reasons, qboolean hardReset );
-static void vk_temporal_apply_resets( qboolean hardReset );
-static void vk_temporal_begin_frame( void );
-static void vk_temporal_commit_frame_state( void );
-static void vk_update_auto_exposure( void );
 static void vk_update_volumetric_perf_queries( void );
 static void vk_update_fluid_auto_scale( void );
 static void vk_write_volumetric_timestamp( uint32_t query_index, VkPipelineStageFlagBits stage );
@@ -491,328 +448,6 @@ static const float vk_local_shadow_flip_matrix[16] = {
 	0, 1, 0, 0,
 	0, 0, 0, 1
 };
-
-static const char *vk_temporal_reason_string( uint32_t reason )
-{
-	switch ( reason ) {
-		case VK_TEMPORAL_RESET_RENDERER_INIT: return "renderer_init";
-		case VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE: return "swapchain_change";
-		case VK_TEMPORAL_RESET_RENDER_SIZE_CHANGE: return "render_size_change";
-		case VK_TEMPORAL_RESET_WORLD_CHANGE: return "world_change";
-		case VK_TEMPORAL_RESET_CLIENT_STATE_CHANGE: return "client_state_change";
-		case VK_TEMPORAL_RESET_CAMERA_CUT: return "camera_cut";
-		case VK_TEMPORAL_RESET_EXPLICIT_DEBUG: return "explicit_debug";
-		case VK_TEMPORAL_RESET_MISSING_PREV_DATA: return "missing_prev_data";
-		default: return "unknown";
-	}
-}
-
-static void vk_temporal_clear_frame_state( void )
-{
-	vk.temporal.pendingResetReasons = 0u;
-	vk.temporal.appliedResetReasons = 0u;
-	vk.temporal.sharedCameraCut = qfalse;
-	vk.temporal.unreliableMotionThisFrame = qfalse;
-}
-
-static void vk_temporal_request_reset( uint32_t reasons )
-{
-	vk.temporal.pendingResetReasons |= reasons;
-}
-
-static void vk_temporal_request_sticky_reset( uint32_t reasons )
-{
-	vk.temporal.stickyResetReasons |= reasons;
-}
-
-static qboolean vk_temporal_has_reason( uint32_t reasonMask )
-{
-	return ( vk.temporal.appliedResetReasons & reasonMask ) != 0u ? qtrue : qfalse;
-}
-
-static void vk_temporal_log_reset( uint32_t reasons, qboolean hardReset )
-{
-	uint32_t knownReasons[] = {
-		VK_TEMPORAL_RESET_RENDERER_INIT,
-		VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE,
-		VK_TEMPORAL_RESET_RENDER_SIZE_CHANGE,
-		VK_TEMPORAL_RESET_WORLD_CHANGE,
-		VK_TEMPORAL_RESET_CLIENT_STATE_CHANGE,
-		VK_TEMPORAL_RESET_CAMERA_CUT,
-		VK_TEMPORAL_RESET_EXPLICIT_DEBUG,
-		VK_TEMPORAL_RESET_MISSING_PREV_DATA
-	};
-	char reasonBuf[256];
-	char *ptr = reasonBuf;
-	char *end = reasonBuf + sizeof( reasonBuf );
-	int i;
-
-	if ( !r_temporalDebug || r_temporalDebug->integer <= 0 || reasons == 0u ) {
-		return;
-	}
-
-	*ptr = '\0';
-	for ( i = 0; i < (int)ARRAY_LEN( knownReasons ); i++ ) {
-		const uint32_t reason = knownReasons[i];
-		const char *name;
-		size_t len;
-
-		if ( !( reasons & reason ) ) {
-			continue;
-		}
-		name = vk_temporal_reason_string( reason );
-		if ( ptr != reasonBuf && ptr + 1 < end ) {
-			*ptr++ = ',';
-		}
-		len = strlen( name );
-		if ( ptr + len >= end ) {
-			break;
-		}
-		Com_Memcpy( ptr, name, len );
-		ptr += len;
-		*ptr = '\0';
-	}
-
-	ri.Printf( PRINT_DEVELOPER, "[VK][temporal] reset=%s reasons=%s\n",
-		hardReset ? "hard" : "soft",
-		reasonBuf[0] ? reasonBuf : "none" );
-	if ( r_temporalDebug->integer >= 2 ) {
-		ri.Printf( PRINT_DEVELOPER,
-			"[VK][temporal] frame=%u cameraCut=%d invalidate={motion=1 volumetric=1 exposure=1} world=%s noWorld=%d gameplay=%d render=%ux%u swapchain=%ux%u\n",
-			vk.temporal.frameIndex,
-			vk.temporal.sharedCameraCut,
-			vk.temporal.worldName[0] ? vk.temporal.worldName : "<none>",
-			vk.temporal.noWorldModel,
-			vk.temporal.stableGameplayState,
-			vk.temporal.lastRenderWidth, vk.temporal.lastRenderHeight,
-			vk.temporal.lastSwapchainWidth, vk.temporal.lastSwapchainHeight );
-		ri.Printf( PRINT_DEVELOPER, "[VK][temporal] unreliableMotion=%d\n",
-			vk.temporal.unreliableMotionThisFrame );
-	}
-}
-
-static void vk_temporal_apply_resets( qboolean hardReset )
-{
-	const uint32_t reasons = vk.temporal.pendingResetReasons;
-
-	if ( reasons == 0u ) {
-		vk.temporal.appliedResetReasons = 0u;
-		return;
-	}
-
-	vk.temporal.appliedResetReasons = reasons;
-	vk.temporal.sharedCameraCut = ( reasons & VK_TEMPORAL_RESET_CAMERA_CUT ) != 0u ? qtrue : qfalse;
-	vk_reset_motion_history();
-	vk_reset_volumetric_history();
-	vk.adaptedExposure = 1.0f;
-
-	vk_temporal_log_reset( reasons, hardReset );
-}
-
-static qboolean vk_temporal_compute_shared_camera_cut( uint32_t *outReasons )
-{
-	uint32_t reasons = 0u;
-	int clientState = ri.CL_GetState ? ri.CL_GetState() : CA_ACTIVE;
-	qboolean stableGameplayState = ( clientState == CA_ACTIVE ) ? qtrue : qfalse;
-	qboolean stateTransition = ( clientState != vk.prevClientState ) ? qtrue : qfalse;
-	qboolean worldValid = ( tr.world != NULL ) ? qtrue : qfalse;
-	qboolean noWorldModel = ( backEnd.refdef.rdflags & RDF_NOWORLDMODEL ) ? qtrue : qfalse;
-	qboolean worldTransition = ( worldValid != vk.temporal.worldWasValid ) ? qtrue : qfalse;
-	qboolean noWorldTransition = ( noWorldModel != vk.temporal.noWorldModel ) ? qtrue : qfalse;
-	qboolean cameraCut = qfalse;
-
-	if ( !vk_prev_matrices_valid || !vk.temporal.worldWasValid ) {
-		reasons |= VK_TEMPORAL_RESET_MISSING_PREV_DATA;
-	}
-	if ( worldTransition || noWorldTransition ) {
-		reasons |= VK_TEMPORAL_RESET_WORLD_CHANGE;
-	}
-	if ( stateTransition || stableGameplayState != vk.temporal.stableGameplayState ) {
-		reasons |= VK_TEMPORAL_RESET_CLIENT_STATE_CHANGE;
-	}
-
-	if ( !stableGameplayState || !worldValid || noWorldModel ) {
-		cameraCut = stateTransition || worldTransition || noWorldTransition;
-		vk_near_static_view_frames = 0;
-	} else {
-		float dx = tr.refdef.vieworg[0] - vk.prevViewOrigin[0];
-		float dy = tr.refdef.vieworg[1] - vk.prevViewOrigin[1];
-		float dz = tr.refdef.vieworg[2] - vk.prevViewOrigin[2];
-		float distSq = dx * dx + dy * dy + dz * dz;
-		float dotForward = DotProduct( tr.refdef.viewaxis[2], vk.prevViewForward );
-		qboolean posCut = ( distSq > 64.0f * 64.0f );
-		qboolean angleCut = ( dotForward < 0.85f );
-		qboolean portalView = ( backEnd.viewParms.portalView != PV_NONE ) ? qtrue : qfalse;
-
-		if ( vk_prev_matrices_valid ) {
-			const float *projection = backEnd.viewParms.projectionMatrix;
-			const float *view = backEnd.viewParms.world.modelViewMatrix;
-			float viewProj[16];
-			float viewDelta;
-			float viewProjDelta;
-
-			myGlMultMatrix( view, projection, viewProj );
-			viewDelta = vk_matrix_max_abs_diff( view, vk_prev_view_matrix );
-			viewProjDelta = vk_matrix_max_abs_diff( viewProj, vk_prev_viewproj_matrix );
-			if ( viewDelta > 0.25f || viewProjDelta > 0.35f || portalView ) {
-				cameraCut = qtrue;
-				vk_near_static_view_frames = 0;
-			} else {
-				const float nearStaticThresh = 0.03f;
-				const int nearStaticResetFrames = 60;
-				if ( viewDelta < nearStaticThresh && viewProjDelta < nearStaticThresh * 1.5f ) {
-					vk_near_static_view_frames++;
-					if ( vk_near_static_view_frames >= nearStaticResetFrames ) {
-						cameraCut = qtrue;
-						vk_near_static_view_frames = 0;
-					}
-				} else {
-					vk_near_static_view_frames = 0;
-				}
-			}
-		} else {
-			cameraCut = qtrue;
-			vk_near_static_view_frames = 0;
-		}
-
-		if ( posCut || angleCut || portalView ) {
-			cameraCut = qtrue;
-		}
-	}
-
-	if ( r_volumetricFogForceCameraCut && r_volumetricFogForceCameraCut->integer > 0 ) {
-		reasons |= VK_TEMPORAL_RESET_EXPLICIT_DEBUG;
-		cameraCut = qtrue;
-		vk_volumetric_validation_state.forced_camera_cut_events++;
-		ri.Cvar_SetValue( "r_volumetricFogForceCameraCut", 0.0f );
-	}
-
-	if ( cameraCut ) {
-		reasons |= VK_TEMPORAL_RESET_CAMERA_CUT;
-	}
-
-	vk.temporal.sharedCameraCut = cameraCut;
-	if ( outReasons ) {
-		*outReasons |= reasons;
-	}
-	return cameraCut;
-}
-
-static void vk_temporal_begin_frame( void )
-{
-	uint32_t reasons = 0u;
-	uint32_t renderWidth = (uint32_t)glConfig.vidWidth;
-	uint32_t renderHeight = (uint32_t)glConfig.vidHeight;
-	uint32_t swapchainWidth = vk.swapchain_extent_valid ? vk.swapchain_extent.width : 0u;
-	uint32_t swapchainHeight = vk.swapchain_extent_valid ? vk.swapchain_extent.height : 0u;
-	qboolean hardReset;
-
-	if ( vk.temporal.frameIndex == 0u ) {
-		reasons |= VK_TEMPORAL_RESET_RENDERER_INIT;
-	}
-	vk.temporal.frameIndex++;
-	vk_temporal_clear_frame_state();
-	reasons |= vk.temporal.stickyResetReasons;
-	vk.temporal.stickyResetReasons = 0u;
-
-	if ( vk.temporal.lastRenderWidth && vk.temporal.lastRenderHeight &&
-		( renderWidth != vk.temporal.lastRenderWidth || renderHeight != vk.temporal.lastRenderHeight ) ) {
-		reasons |= VK_TEMPORAL_RESET_RENDER_SIZE_CHANGE;
-	}
-	if ( vk.temporal.lastSwapchainWidth && vk.temporal.lastSwapchainHeight &&
-		( swapchainWidth != vk.temporal.lastSwapchainWidth || swapchainHeight != vk.temporal.lastSwapchainHeight ) ) {
-		reasons |= VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE;
-	}
-
-	vk_temporal_compute_shared_camera_cut( &reasons );
-	vk_temporal_request_reset( reasons );
-
-	hardReset = ( vk.temporal.pendingResetReasons & ~VK_TEMPORAL_RESET_CAMERA_CUT ) != 0u ? qtrue : qfalse;
-	vk_temporal_apply_resets( hardReset );
-}
-
-static void vk_temporal_commit_frame_state( void )
-{
-	const int clientState = ri.CL_GetState ? ri.CL_GetState() : CA_ACTIVE;
-	const qboolean worldValid = ( tr.world != NULL ) ? qtrue : qfalse;
-	const qboolean noWorldModel = ( backEnd.refdef.rdflags & RDF_NOWORLDMODEL ) ? qtrue : qfalse;
-
-	vk.prevClientState = clientState;
-	vk.temporal.worldWasValid = worldValid;
-	vk.temporal.noWorldModel = noWorldModel;
-	vk.temporal.stableGameplayState = ( clientState == CA_ACTIVE ) ? qtrue : qfalse;
-	vk.temporal.lastRenderWidth = (uint32_t)glConfig.vidWidth;
-	vk.temporal.lastRenderHeight = (uint32_t)glConfig.vidHeight;
-	vk.temporal.lastSwapchainWidth = vk.swapchain_extent_valid ? vk.swapchain_extent.width : 0u;
-	vk.temporal.lastSwapchainHeight = vk.swapchain_extent_valid ? vk.swapchain_extent.height : 0u;
-	Q_strncpyz( vk.temporal.worldName, ( worldValid && tr.world->name[0] ) ? tr.world->name : "", sizeof( vk.temporal.worldName ) );
-	VectorCopy( tr.refdef.vieworg, vk.prevViewOrigin );
-	VectorCopy( tr.refdef.viewaxis[2], vk.prevViewForward );
-}
-
-static void vk_update_auto_exposure( void )
-{
-	cvar_t *auto_var = ri.Cvar_Get( "r_exposure_auto", "0", 0 );
-	cvar_t *target_var = ri.Cvar_Get( "r_exposure_auto_target", "0.5", CVAR_ARCHIVE_ND );
-	cvar_t *speed_var = ri.Cvar_Get( "r_exposure_auto_speed", "2.0", CVAR_ARCHIVE_ND );
-
-	if ( !( auto_var && auto_var->integer && target_var && speed_var ) ) {
-		return;
-	}
-
-	{
-		int clientState = ri.CL_GetState ? ri.CL_GetState() : CA_ACTIVE;
-		qboolean stateTransition = ( clientState != vk.prevClientState );
-		qboolean stableGameplayState = vk.temporal.stableGameplayState;
-		qboolean hardReset = ( vk.temporal.appliedResetReasons & ~VK_TEMPORAL_RESET_CAMERA_CUT ) != 0u ? qtrue : qfalse;
-		qboolean cameraCut = vk.temporal.sharedCameraCut;
-		float target = target_var->value > 0.0f ? target_var->value : 0.5f;
-		float speed = speed_var->value > 0.0f ? speed_var->value * 0.016f : 0.02f;
-		float targetExp = target;
-
-		if ( !stableGameplayState || !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
-			targetExp = 1.0f;
-			speed = stateTransition ? 0.35f : 0.12f;
-		} else if ( !hardReset && !cameraCut && vk.luminance_staging_ptr ) {
-			float avgLogLum = *(const float *)vk.luminance_staging_ptr;
-			if ( avgLogLum != avgLogLum || avgLogLum <= -20.0f || avgLogLum >= 20.0f )
-				avgLogLum = 0.0f;
-			{
-				float sceneLum = powf( 2.0f, avgLogLum );
-				targetExp = ( sceneLum > 1e-6f ) ? ( target / sceneLum ) : 1.0f;
-				targetExp = ( targetExp < 0.01f ) ? 0.01f : ( targetExp > 10.0f ? 10.0f : targetExp );
-			}
-		} else {
-			targetExp = 1.0f;
-		}
-
-		if ( cameraCut ) {
-			cvar_t *cap_var = ri.Cvar_Get( "r_exposure_auto_cap_on_cut", "0.75", 0 );
-			float cap = cap_var ? cap_var->value : 0.75f;
-			speed = 0.5f;
-			if ( cap > 0.0f && targetExp > cap ) {
-				targetExp = cap;
-			}
-		}
-
-		if ( !hardReset && vk.adaptedExposure > 0.0f ) {
-			float ratio = targetExp / vk.adaptedExposure;
-			if ( ratio < 0.75f ) {
-				speed = ( speed < 0.25f ) ? 0.25f : speed;
-			} else if ( ratio > 1.5f ) {
-				speed = ( speed < 0.08f ) ? 0.08f : speed;
-			}
-		}
-
-		if ( stateTransition ) {
-			speed = ( speed < 0.30f ) ? 0.30f : speed;
-		}
-
-		vk.adaptedExposure += ( targetExp - vk.adaptedExposure ) * speed;
-		vk.adaptedExposure = ( vk.adaptedExposure < 0.01f ) ? 0.01f : ( vk.adaptedExposure > 10.0f ? 10.0f : vk.adaptedExposure );
-	}
-}
-
 
 static uint32_t find_memory_type( uint32_t memory_type_bits, VkMemoryPropertyFlags properties ) {
 	VkPhysicalDeviceMemoryProperties memory_properties;
@@ -14352,7 +13987,7 @@ static void vk_begin_motion_frame( void )
 	}
 }
 
-static void vk_reset_motion_history( void )
+void vk_reset_motion_history( void )
 {
 	Com_Memset( vk_prev_entity_model_matrices, 0, sizeof( vk_prev_entity_model_matrices ) );
 	Com_Memset( vk_curr_entity_model_matrices, 0, sizeof( vk_curr_entity_model_matrices ) );
@@ -16724,7 +16359,7 @@ static void vk_smaa_passes( void )
 	vk_run_smaa_pass( vk.smaa_compose_pipeline, vk.render_pass.smaa_compose, vk.framebuffers.smaa_compose, vk.smaa_edge_descriptor, vk.smaa_compose_descriptor, w, h );
 }
 
-static void vk_reset_volumetric_history( void )
+void vk_reset_volumetric_history( void )
 {
 	vk.has_prev_volumetric = qfalse;
 	vk.volumetric_frame = 0;
@@ -16738,8 +16373,7 @@ static void vk_reset_volumetric_history( void )
 static void vk_atmosphere_pass( void )
 {
 	VkImageAspectFlags depth_aspect;
-	typedef struct { float sunDir[4]; float sunColor[4]; float rayleigh[4]; float mie[4]; float atmParams[4]; float viewOrigin[4]; } AtmospherePC_t;
-	AtmospherePC_t pc;
+	vkAtmospherePushConstants_t pc;
 
 	if ( !PostFX_Atmosphere_IsEnabled() || vk.atmosphere_pipeline == VK_NULL_HANDLE ||
 	     vk.render_pass.atmosphere == VK_NULL_HANDLE || vk.framebuffers.atmosphere[0] == VK_NULL_HANDLE ) {
@@ -16762,19 +16396,7 @@ static void vk_atmosphere_pass( void )
 		glConfig.vidWidth, glConfig.vidHeight );
 
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.atmosphere_pipeline );
-
-	PostFX_Atmosphere_GetSunDirection( &pc.sunDir[0], &pc.sunDir[1], &pc.sunDir[2] );
-	pc.sunDir[3] = 0.0f;
-	pc.sunColor[0] = pc.sunColor[1] = pc.sunColor[2] = 1.0f;
-	pc.sunColor[3] = PostFX_Atmosphere_GetSunIntensity();
-	pc.rayleigh[0] = 5.5e-6f; pc.rayleigh[1] = 13.0e-6f; pc.rayleigh[2] = 22.4e-6f;
-	pc.rayleigh[3] = 1.0f;
-	pc.mie[0] = 21e-6f; pc.mie[1] = PostFX_Atmosphere_GetMieG(); pc.mie[2] = 0.0f; pc.mie[3] = 0.0f;
-	pc.atmParams[0] = PostFX_Atmosphere_GetRayleighHeight();
-	pc.atmParams[1] = PostFX_Atmosphere_GetMieHeight();
-	pc.atmParams[2] = 0.0f;
-	pc.atmParams[3] = PostFX_Atmosphere_GetScale();
-	pc.viewOrigin[0] = pc.viewOrigin[1] = pc.viewOrigin[2] = 0.0f; pc.viewOrigin[3] = 1.0f;
+	vk_atmosphere_build_push_constants( &pc );
 
 	qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_atmosphere, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( pc ), &pc );
 
@@ -17422,7 +17044,7 @@ void vk_prepare_frame_temporal_state( void )
 	}
 
 	vk_temporal_begin_frame();
-	vk_update_auto_exposure();
+	vk_temporal_update_auto_exposure();
 	vk_update_postfx_params( vk.cmd_index );
 	vk.temporal.preparedThisFrame = qtrue;
 }
