@@ -398,6 +398,7 @@ void vk_bind_generated_shaders( void );
 void vk_update_attachment_descriptors( void );
 void vk_validate_pbr_ibl_resources( void );
 void vk_destroy_samplers( void );
+VkSampler vk_find_sampler( const Vk_Sampler_Def *def );
 
 uint32_t vk_find_pipeline_ext( uint32_t base, const Vk_Pipeline_Def *def, qboolean use );
 void vk_get_pipeline_def( uint32_t pipeline, Vk_Pipeline_Def *def );
@@ -830,6 +831,8 @@ typedef struct {
 		uint32_t push_size;
 		uint32_t push_size_max;
 	} stats;
+
+	qboolean inRenderPass;
 
 	/* Eye adaptation: exposure from luminance pass (r_exposure_auto) */
 	float adaptedExposure;

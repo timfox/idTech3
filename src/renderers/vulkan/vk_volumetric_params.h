@@ -65,6 +65,8 @@ typedef struct {
 	float telemetryParams1[4];
 } volumetric_params_t;
 
+void vk_update_volumetric_params( void );
+
 _Static_assert( ( sizeof( volumetric_params_t ) % 16 ) == 0, "volumetric_params_t must be 16-byte aligned in size" );
 #define VK_VOLUMETRIC_ASSERT_ALIGNED16(member) _Static_assert( ( offsetof( volumetric_params_t, member ) % 16 ) == 0, "volumetric_params_t::" #member " must be 16-byte aligned" )
 VK_VOLUMETRIC_ASSERT_ALIGNED16( invProj );

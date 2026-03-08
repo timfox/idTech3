@@ -5,6 +5,8 @@
 #include "vk_post_fog.h"
 #include "vk_skybox_hdr.h"
 #include "vk_atmosphere.h"
+#include "vk_image_layout.h"
+#include "vk_render_pass.h"
 #include "vk_temporal.h"
 #include "vk_volumetric_fog_color.h"
 #include "vk_volumetric_params.h"
@@ -37,8 +39,6 @@ static inline qboolean vk_hdr64_active( void )
 uint64_t vk_entity_occlusion_visibility[MAX_REFENTITIES];
 static uint32_t vk_occlusion_last_entity_count;
 
-/* Render pass state: set by vk_begin_render_pass / vk_end_render_pass */
-static qboolean vk_in_render_pass;
 #include "vk_fluidsim.h"
 #include "vk_terrain.h"
 #include <stddef.h>
@@ -261,7 +261,7 @@ uint32_t vk_find_pipeline_ext( uint32_t base, const Vk_Pipeline_Def *def, qboole
 #define VK_VOLUMETRIC_QUERY_SLOTS 16
 #define VK_VOLUMETRIC_QUERY_COUNT (VK_VOLUMETRIC_QUERY_SLOTS * NUM_COMMAND_BUFFERS)
 
-static VkSampler vk_find_sampler( const Vk_Sampler_Def *def );
+VkSampler vk_find_sampler( const Vk_Sampler_Def *def );
 static void vk_create_froxel_images( void );
 static void vk_update_volumetric_descriptors( void );
 static void vk_create_sun_shadow_resources( void );
@@ -271,7 +271,6 @@ static void vk_destroy_local_shadow_resources( void );
 static void vk_create_volumetric_pipelines( void );
 static void vk_create_volumetric_params_buffer( void );
 static void vk_destroy_volumetric_params_buffer( void );
-static void vk_update_volumetric_params( void );
 static void vk_create_postfx_params_buffers( void );
 static void vk_destroy_postfx_params_buffers( void );
 static void vk_fluid_simulation_pass( float delta_time );
@@ -549,241 +548,6 @@ static void end_command_buffer( VkCommandBuffer command_buffer, const char *loca
 	vk_queue_wait_idle();
 
 	qvkFreeCommandBuffers( vk.device, vk.command_pool, 1, cmdbuf );
-}
-
-
-static void record_image_layout_transition( VkCommandBuffer command_buffer, VkImage image, VkImageAspectFlags image_aspect_flags, 
-	VkImageLayout old_layout, VkImageLayout new_layout, uint32_t src_stage_override, uint32_t dst_stage_override ) {
-	VkImageMemoryBarrier barrier;
-	uint32_t src_stage, dst_stage;
-	VkAccessFlags supported_src_access = 0;
-	VkAccessFlags supported_dst_access = 0;
-
-	switch ( old_layout ) {
-		case VK_IMAGE_LAYOUT_UNDEFINED:
-			src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-			barrier.srcAccessMask = VK_ACCESS_NONE;
-			break;
-		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
-			src_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-			barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-			break;
-		case VK_IMAGE_LAYOUT_GENERAL:
-			src_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-			barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
-			break;
-		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
-			src_stage = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-			barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-			break;
-		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL:
-			src_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-			barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-			break;
-		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
-			src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-			barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-			break;
-		case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
-			src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-			barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-			break;
-		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
-			src_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-			barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-			break;
-		case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
-			src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-			barrier.srcAccessMask = VK_ACCESS_NONE;
-			break;
-		default:
-			ri.Error( ERR_DROP, "unsupported old layout %i", old_layout );
-			src_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-			barrier.srcAccessMask = VK_ACCESS_NONE;
-			break;
-	}
-
-	switch ( new_layout ) {
-		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
-			dst_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-			barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-			break;
-		case VK_IMAGE_LAYOUT_GENERAL:
-			dst_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-			barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
-			break;
-		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
-			dst_stage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-			barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-			break;
-		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL:
-			dst_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-			barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-			break;
-		case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
-			dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-			barrier.dstAccessMask = VK_ACCESS_NONE;
-			break;
-		case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
-			dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-			barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-			break;
-		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
-			dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-			barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-			break;
-		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
-			dst_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-			barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
-			break;
-		default:
-			ri.Error( ERR_DROP, "unsupported new layout %i", new_layout);
-			dst_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-			barrier.dstAccessMask = VK_ACCESS_NONE;
-			break;
-	}
-
-	if ( src_stage_override != 0 ) {
-		src_stage = src_stage_override;
-	}
-	if ( dst_stage_override != 0 ) {
-		dst_stage = dst_stage_override;
-		/* If the caller forces compute or other non-fragment stages, strip input-attachment access
-		 * (only valid with fragment stages) to satisfy stage/access compatibility. */
-		if ( dst_stage & VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT ) {
-			barrier.dstAccessMask &= ~VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
-		}
-	}
-
-	/* Depth read-only can mean shader sampling or depth attachment reads. When callers
-	 * override the stage to fragment tests, switch the access mask accordingly. */
-	if ( old_layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL ) {
-		if ( src_stage & ( VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT ) ) {
-			barrier.srcAccessMask &= ~VK_ACCESS_SHADER_READ_BIT;
-			barrier.srcAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
-		}
-	}
-	if ( new_layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL ) {
-		if ( dst_stage & ( VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT ) ) {
-			barrier.dstAccessMask &= ~VK_ACCESS_SHADER_READ_BIT;
-			barrier.dstAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
-		}
-	}
-
-	/* VUID-02820: INPUT_ATTACHMENT_READ_BIT only valid for fragment stage; remove when dst is compute-only */
-	if ( ( dst_stage & VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT ) == 0 &&
-	     ( barrier.dstAccessMask & VK_ACCESS_INPUT_ATTACHMENT_READ_BIT ) ) {
-		barrier.dstAccessMask &= ~VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
-	}
-
-	if ( src_stage & VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT ) {
-		supported_src_access |= VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
-	}
-	if ( src_stage & VK_PIPELINE_STAGE_VERTEX_INPUT_BIT ) {
-		supported_src_access |= VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
-	}
-	if ( src_stage & ( VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
-		VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT |
-		VK_PIPELINE_STAGE_TESSELLATION_EVALUATION_SHADER_BIT |
-		VK_PIPELINE_STAGE_GEOMETRY_SHADER_BIT |
-		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
-		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT ) ) {
-		supported_src_access |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
-	}
-	if ( src_stage & VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT ) {
-		supported_src_access |= VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
-	}
-	if ( src_stage & VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT ) {
-		supported_src_access |= VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-	}
-	if ( src_stage & ( VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT ) ) {
-		supported_src_access |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-	}
-	if ( src_stage & VK_PIPELINE_STAGE_TRANSFER_BIT ) {
-		supported_src_access |= VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
-	}
-	if ( src_stage & VK_PIPELINE_STAGE_HOST_BIT ) {
-		supported_src_access |= VK_ACCESS_HOST_READ_BIT | VK_ACCESS_HOST_WRITE_BIT;
-	}
-
-	if ( dst_stage & VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT ) {
-		supported_dst_access |= VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
-	}
-	if ( dst_stage & VK_PIPELINE_STAGE_VERTEX_INPUT_BIT ) {
-		supported_dst_access |= VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
-	}
-	if ( dst_stage & ( VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
-		VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT |
-		VK_PIPELINE_STAGE_TESSELLATION_EVALUATION_SHADER_BIT |
-		VK_PIPELINE_STAGE_GEOMETRY_SHADER_BIT |
-		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
-		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT ) ) {
-		supported_dst_access |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
-	}
-	if ( dst_stage & VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT ) {
-		supported_dst_access |= VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
-	}
-	if ( dst_stage & VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT ) {
-		supported_dst_access |= VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-	}
-	if ( dst_stage & ( VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT ) ) {
-		supported_dst_access |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-	}
-	if ( dst_stage & VK_PIPELINE_STAGE_TRANSFER_BIT ) {
-		supported_dst_access |= VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
-	}
-	if ( dst_stage & VK_PIPELINE_STAGE_HOST_BIT ) {
-		supported_dst_access |= VK_ACCESS_HOST_READ_BIT | VK_ACCESS_HOST_WRITE_BIT;
-	}
-
-	if ( src_stage == VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT ) {
-		barrier.srcAccessMask = VK_ACCESS_NONE;
-	} else {
-		barrier.srcAccessMask &= supported_src_access;
-		if ( old_layout == VK_IMAGE_LAYOUT_GENERAL &&
-			( src_stage & VK_PIPELINE_STAGE_TRANSFER_BIT ) != 0 &&
-			barrier.srcAccessMask == 0 ) {
-			barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
-		}
-	}
-
-	barrier.dstAccessMask &= supported_dst_access;
-	if ( new_layout == VK_IMAGE_LAYOUT_GENERAL &&
-		( dst_stage & VK_PIPELINE_STAGE_TRANSFER_BIT ) != 0 &&
-		barrier.dstAccessMask == 0 ) {
-		barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
-	}
-
-	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-	barrier.pNext = NULL;
-	//barrier.srcAccessMask = src_access_flags;
-	//barrier.dstAccessMask = dst_access_flags;
-	barrier.oldLayout = old_layout;
-	barrier.newLayout = new_layout;
-	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.image = image;
-	barrier.subresourceRange.aspectMask = image_aspect_flags;
-	barrier.subresourceRange.baseMipLevel = 0;
-	barrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
-	barrier.subresourceRange.baseArrayLayer = 0;
-	barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
-
-	qvkCmdPipelineBarrier( command_buffer, src_stage, dst_stage, 0, 0, NULL, 0, NULL, 1, &barrier );
-}
-
-static void record_depth_image_layout_transition( VkCommandBuffer command_buffer, VkImageAspectFlags image_aspect_flags,
-	VkImageLayout new_layout, uint32_t src_stage_override, uint32_t dst_stage_override ) {
-	if ( vk.depth_image == VK_NULL_HANDLE ) {
-		return;
-	}
-	if ( vk.depth_image_layout == new_layout ) {
-		return;
-	}
-
-	record_image_layout_transition( command_buffer, vk.depth_image, image_aspect_flags,
-		vk.depth_image_layout, new_layout, src_stage_override, dst_stage_override );
-	vk.depth_image_layout = new_layout;
 }
 
 
@@ -3697,7 +3461,7 @@ static void vk_update_uniform_descriptor( VkDescriptorSet descriptor, VkBuffer b
 }
 
 
-static VkSampler vk_find_sampler( const Vk_Sampler_Def *def ) {
+VkSampler vk_find_sampler( const Vk_Sampler_Def *def ) {
 	VkSamplerAddressMode address_mode;
 	VkSamplerCreateInfo desc;
 	VkSampler sampler;
@@ -3817,163 +3581,6 @@ void vk_destroy_samplers( void )
 }
 
 
-static void vk_write_color_descriptor_image( VkDescriptorSet descriptor, VkImageView color_view )
-{
-	if ( descriptor == VK_NULL_HANDLE || color_view == VK_NULL_HANDLE ) {
-		return;
-	}
-
-	VkDescriptorImageInfo info;
-	VkWriteDescriptorSet desc;
-	Vk_Sampler_Def sd;
-
-	Com_Memset( &sd, 0, sizeof( sd ) );
-	sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
-	sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	sd.max_lod_1_0 = qtrue;
-	sd.noAnisotropy = qtrue;
-
-	info.sampler = vk_find_sampler( &sd );
-	info.imageView = color_view;
-	info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-	desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	desc.dstSet = descriptor;
-	desc.dstBinding = 0;
-	desc.dstArrayElement = 0;
-	desc.descriptorCount = 1;
-	desc.pNext = NULL;
-	desc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	desc.pImageInfo = &info;
-	desc.pBufferInfo = NULL;
-	desc.pTexelBufferView = NULL;
-
-	qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
-}
-
-static void vk_update_color_descriptor_image( VkImageView color_view )
-{
-	if ( !vk.cmd ) {
-		return;
-	}
-
-	vk_write_color_descriptor_image( vk.post_color_descriptor[vk.cmd_index], color_view );
-}
-
-/*
- * Explicit postprocess source visibility barrier.
- * Keep layout in SHADER_READ_ONLY and enforce availability of previous
- * color-attachment writes for luminance/gamma sampling.
- */
-static void vk_barrier_post_fog_source_for_sampling( VkImageView color_source, const char *reason )
-{
-	VkImage image;
-	VkImageMemoryBarrier barrier;
-
-	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
-		return;
-	}
-
-	image = vk_post_fog_source_image( color_source );
-	if ( image == VK_NULL_HANDLE ) {
-		return;
-	}
-
-	Com_Memset( &barrier, 0, sizeof( barrier ) );
-	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-	barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.image = image;
-	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	barrier.subresourceRange.baseMipLevel = 0;
-	barrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
-	barrier.subresourceRange.baseArrayLayer = 0;
-	barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
-	barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
-	barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-	qvkCmdPipelineBarrier(
-		vk.cmd->command_buffer,
-		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
-		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		0, 0, NULL, 0, NULL, 1, &barrier );
-
-	if ( r_fboDebug && r_fboDebug->integer >= 2 && vk_post_fog_fbo_debug_throttle() ) {
-		ri.Printf( PRINT_DEVELOPER,
-			"[VK][fbo] post-fog source barrier (%s): %s image=0x%llx view=0x%llx\n",
-			reason ? reason : "unspecified",
-			vk_post_fog_source_name( color_source ),
-			(unsigned long long)(uintptr_t)image,
-			(unsigned long long)(uintptr_t)color_source );
-	}
-}
-
-/*
- * Update the mutable post-fog descriptor and luminance descriptors to sample
- * from color_source so gamma and eye adaptation always read the correct image.
- */
-static void vk_update_post_fog_descriptors( VkImageView color_source )
-{
-	VkImageView old_source;
-	qboolean updated_luminance = qfalse;
-
-	if ( color_source == VK_NULL_HANDLE ) {
-		color_source = vk.color_image_view;
-	}
-
-	old_source = vk.post_fog_color_source;
-	vk.post_fog_color_source = color_source;
-	vk_update_color_descriptor_image( color_source );
-	if ( vk.luminance_layout != VK_NULL_HANDLE && vk.luminance_image_view != VK_NULL_HANDLE &&
-		color_source != VK_NULL_HANDLE && color_source != vk.luminance_image_view ) {
-		VkDescriptorImageInfo lum_info[2];
-		VkWriteDescriptorSet lum_writes[2];
-		Vk_Sampler_Def sd_linear;
-		uint32_t start_idx = vk.cmd ? vk.cmd_index : 0;
-		uint32_t end_idx = vk.cmd ? vk.cmd_index + 1 : NUM_COMMAND_BUFFERS;
-		uint32_t idx;
-		Com_Memset( &sd_linear, 0, sizeof( sd_linear ) );
-		sd_linear.gl_mag_filter = sd_linear.gl_min_filter = GL_LINEAR;
-		sd_linear.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		sd_linear.noAnisotropy = qtrue;
-		Com_Memset( lum_info, 0, sizeof( lum_info ) );
-		lum_info[0].sampler = vk_find_sampler( &sd_linear );
-		lum_info[0].imageView = color_source;
-		lum_info[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		lum_info[1].imageView = vk.luminance_image_view;
-		lum_info[1].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-		Com_Memset( lum_writes, 0, sizeof( lum_writes ) );
-		lum_writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		lum_writes[0].dstBinding = 0;
-		lum_writes[0].descriptorCount = 1;
-		lum_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		lum_writes[0].pImageInfo = &lum_info[0];
-		lum_writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		lum_writes[1].dstBinding = 1;
-		lum_writes[1].descriptorCount = 1;
-		lum_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-		lum_writes[1].pImageInfo = &lum_info[1];
-		for ( idx = start_idx; idx < end_idx; idx++ ) {
-			lum_writes[0].dstSet = vk.luminance_descriptor[idx];
-			lum_writes[1].dstSet = vk.luminance_descriptor[idx];
-			qvkUpdateDescriptorSets( vk.device, 2, lum_writes, 0, NULL );
-		}
-		updated_luminance = qtrue;
-	}
-
-	if ( r_fboDebug && r_fboDebug->integer >= 1 && vk_post_fog_fbo_debug_throttle() ) {
-		ri.Printf( PRINT_DEVELOPER,
-			"[VK][fbo] post_fog_color_source: %s -> %s view=0x%llx luminance=%s\n",
-			vk_post_fog_source_name( old_source ),
-			vk_post_fog_source_name( color_source ),
-			(unsigned long long)(uintptr_t)color_source,
-			updated_luminance ? "updated" : "unchanged" );
-	}
-}
-
-
 void vk_update_attachment_descriptors( void ) {
 	uint32_t i;
 
@@ -4005,7 +3612,34 @@ void vk_update_attachment_descriptors( void ) {
 		for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ ) {
 			desc.dstSet = vk.color_descriptor[i];
 			qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
-			vk_write_color_descriptor_image( vk.post_color_descriptor[i], vk.color_image_view );
+			if ( vk.post_color_descriptor[i] != VK_NULL_HANDLE ) {
+				VkDescriptorImageInfo post_info;
+				VkWriteDescriptorSet post_desc;
+				Vk_Sampler_Def post_sd;
+
+				Com_Memset( &post_sd, 0, sizeof( post_sd ) );
+				post_sd.gl_mag_filter = post_sd.gl_min_filter = GL_LINEAR;
+				post_sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+				post_sd.max_lod_1_0 = qtrue;
+				post_sd.noAnisotropy = qtrue;
+
+				post_info.sampler = vk_find_sampler( &post_sd );
+				post_info.imageView = vk.color_image_view;
+				post_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+				post_desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				post_desc.dstSet = vk.post_color_descriptor[i];
+				post_desc.dstBinding = 0;
+				post_desc.dstArrayElement = 0;
+				post_desc.descriptorCount = 1;
+				post_desc.pNext = NULL;
+				post_desc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+				post_desc.pImageInfo = &post_info;
+				post_desc.pBufferInfo = NULL;
+				post_desc.pTexelBufferView = NULL;
+
+				qvkUpdateDescriptorSets( vk.device, 1, &post_desc, 0, NULL );
+			}
 		}
 		/* Ensure post-fog and luminance descriptors are initialized for gamma/eye-adaptation. */
 		vk_update_post_fog_descriptors( vk.color_image_view );
@@ -14085,7 +13719,7 @@ void vk_clear_color( const vec4_t color ) {
 
 	if ( !vk.active )
 		return;
-	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE || !vk_in_render_pass )
+	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE || !vk.inRenderPass )
 		return;
 
 	attachment.colorAttachment = 0;
@@ -14125,7 +13759,7 @@ void vk_clear_depth( qboolean clear_stencil ) {
 
 	if ( !vk.active )
 		return;
-	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE || !vk_in_render_pass )
+	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE || !vk.inRenderPass )
 		return;
 
 	if ( vk_world.dirty_depth_attachment == 0 )
@@ -14715,7 +14349,7 @@ void vk_draw_geometry( Vk_Depth_Range depth_range, qboolean indexed ) {
 		// geometry buffer overflow happened this frame
 		return;
 	}
-	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE || !vk_in_render_pass )
+	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE || !vk.inRenderPass )
 		return;
 
 	vk_bind_descriptor_sets();
@@ -14743,7 +14377,7 @@ void vk_draw_dot( uint32_t storage_offset )
 		// geometry buffer overflow happened this frame
 		return;
 	}
-	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE || !vk_in_render_pass )
+	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE || !vk.inRenderPass )
 		return;
 
 	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_storage, VK_DESC_STORAGE, 1, &vk.storage.descriptor, 1, &storage_offset );
@@ -14752,99 +14386,6 @@ void vk_draw_dot( uint32_t storage_offset )
 	vk_update_depth_range( DEPTH_RANGE_NORMAL );
 
 	qvkCmdDraw( vk.cmd->command_buffer, tess.numVertexes, 1, 0, 0 );
-}
-
-
-static void vk_set_fullscreen_viewport_scissor( uint32_t width, uint32_t height )
-{
-	VkViewport viewport;
-	VkRect2D scissor;
-
-	viewport.x = 0.0f;
-	viewport.y = 0.0f;
-	viewport.width = (float)width;
-	viewport.height = (float)height;
-	viewport.minDepth = 0.0f;
-	viewport.maxDepth = 1.0f;
-
-	scissor.offset.x = 0;
-	scissor.offset.y = 0;
-	scissor.extent.width = width;
-	scissor.extent.height = height;
-
-	qvkCmdSetViewport( vk.cmd->command_buffer, 0, 1, &viewport );
-	qvkCmdSetScissor( vk.cmd->command_buffer, 0, 1, &scissor );
-}
-
-static void vk_begin_render_pass( VkRenderPass renderPass, VkFramebuffer frameBuffer, qboolean clearValues, uint32_t width, uint32_t height )
-{
-	VkRenderPassBeginInfo render_pass_begin_info;
-	VkClearValue clear_values[5];
-
-	/* Avoid zero-sized render area (validation error / undefined behavior) */
-	if ( width == 0 ) width = 1u;
-	if ( height == 0 ) height = 1u;
-
-	// Begin render pass.
-
-	render_pass_begin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-	render_pass_begin_info.pNext = NULL;
-	render_pass_begin_info.renderPass = renderPass;
-	render_pass_begin_info.framebuffer = frameBuffer;
-	render_pass_begin_info.renderArea.offset.x = 0;
-	render_pass_begin_info.renderArea.offset.y = 0;
-	render_pass_begin_info.renderArea.extent.width = width;
-	render_pass_begin_info.renderArea.extent.height = height;
-
-	if ( clearValues ) {
-		uint32_t clear_count = 2;
-
-		// attachments layout for main pass when FBO is enabled:
-		// [0] resolve color, [1] depth, [2] motion resolve, [3] msaa color, [4] msaa motion
-		Com_Memset( clear_values, 0, sizeof( clear_values ) );
-		// Keep color clears black so uncovered regions are obvious and neutral in post-process debug.
-		clear_values[0].color.float32[0] = 0.0f;
-		clear_values[0].color.float32[1] = 0.0f;
-		clear_values[0].color.float32[2] = 0.0f;
-		clear_values[0].color.float32[3] = 1.0f;
-#ifndef USE_REVERSED_DEPTH
-		clear_values[1].depthStencil.depth = 1.0;
-#endif
-		if ( vk.renderPassIndex == RENDER_PASS_MAIN || vk.renderPassIndex == RENDER_PASS_POST_BLOOM ) {
-			if ( vk.fboActive ) {
-				clear_values[2].color.float32[0] = 0.0f;
-				clear_values[2].color.float32[1] = 0.0f;
-				clear_values[2].color.float32[2] = 0.0f;
-				clear_values[2].color.float32[3] = 0.0f;
-				clear_count = vk.msaaActive ? 5 : 3;
-			} else {
-				clear_count = vk.msaaActive ? 3 : 2;
-			}
-		} else if ( vk.renderPassIndex == RENDER_PASS_SCREENMAP ) {
-			clear_values[2].color.float32[0] = 0.0f;
-			clear_values[2].color.float32[1] = 0.0f;
-			clear_values[2].color.float32[2] = 0.0f;
-			clear_values[2].color.float32[3] = 0.0f;
-			clear_count = ( vk.screenMapSamples > VK_SAMPLE_COUNT_1_BIT ) ? 5 : 3;
-		} else if ( vk.renderPassIndex == RENDER_PASS_SUN_SHADOW ) {
-			clear_count = 2;
-		} else {
-			clear_count = vk.msaaActive ? 3 : 2;
-		}
-		render_pass_begin_info.clearValueCount = clear_count;
-		render_pass_begin_info.pClearValues = clear_values;
-
-		vk_world.dirty_depth_attachment = 0;
-	} else {
-		render_pass_begin_info.clearValueCount = 0;
-		render_pass_begin_info.pClearValues = NULL;
-	}
-
-	qvkCmdBeginRenderPass( vk.cmd->command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE );
-	vk_in_render_pass = qtrue;
-
-	vk.cmd->last_pipeline = VK_NULL_HANDLE;
-	vk.cmd->depth_range = DEPTH_RANGE_COUNT;
 }
 
 
@@ -14862,7 +14403,7 @@ void vk_begin_main_render_pass( void )
 	vk.renderScaleX = vk.renderScaleY = 1.0f;
 	vk_scene_src_rect_valid = qfalse;
 
-	vk_begin_render_pass( vk.render_pass.main, frameBuffer, qtrue, vk.renderWidth, vk.renderHeight );
+	vk_begin_render_pass_tracked( vk.render_pass.main, frameBuffer, qtrue, vk.renderWidth, vk.renderHeight );
 	vk.depth_image_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 }
 
@@ -14886,7 +14427,7 @@ void vk_begin_post_bloom_render_pass( void )
 	//vk.renderScaleY = (float)vk.renderHeight / (float)glConfig.vidHeight;
 	vk.renderScaleX = vk.renderScaleY = 1.0f;
 
-	vk_begin_render_pass( vk.render_pass.post_bloom, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+	vk_begin_render_pass_tracked( vk.render_pass.post_bloom, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
 	vk.depth_image_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 }
 
@@ -14904,7 +14445,7 @@ void vk_begin_bloom_extract_render_pass( void )
 	//vk.renderScaleY = (float)vk.renderHeight / (float)glConfig.vidHeight;
 	vk.renderScaleX = vk.renderScaleY = 1.0f;
 
-	vk_begin_render_pass( vk.render_pass.bloom_extract, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+	vk_begin_render_pass_tracked( vk.render_pass.bloom_extract, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
 }
 
 
@@ -14921,7 +14462,7 @@ void vk_begin_blur_render_pass( uint32_t index )
 	//vk.renderScaleY = (float)vk.renderHeight / (float)glConfig.vidHeight;
 	vk.renderScaleX = vk.renderScaleY = 1.0f;
 
-	vk_begin_render_pass( vk.render_pass.blur[ index ], frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+	vk_begin_render_pass_tracked( vk.render_pass.blur[ index ], frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
 }
 
 
@@ -14933,7 +14474,7 @@ void vk_begin_ssao_render_pass( void )
 	vk.renderHeight = glConfig.vidHeight;
 	vk.renderScaleX = vk.renderScaleY = 1.0f;
 
-	vk_begin_render_pass( vk.render_pass.ssao, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+	vk_begin_render_pass_tracked( vk.render_pass.ssao, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
 }
 
 
@@ -14945,7 +14486,7 @@ void vk_begin_ssao_blur_render_pass( void )
 	vk.renderHeight = glConfig.vidHeight;
 	vk.renderScaleX = vk.renderScaleY = 1.0f;
 
-	vk_begin_render_pass( vk.render_pass.ssao_blur, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+	vk_begin_render_pass_tracked( vk.render_pass.ssao_blur, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
 }
 
 
@@ -14957,7 +14498,7 @@ void vk_begin_ssao_combine_render_pass( void )
 	vk.renderHeight = glConfig.vidHeight;
 	vk.renderScaleX = vk.renderScaleY = 1.0f;
 
-	vk_begin_render_pass( vk.render_pass.ssao_combine, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+	vk_begin_render_pass_tracked( vk.render_pass.ssao_combine, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
 }
 
 
@@ -15004,7 +14545,7 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 
 	/* OIT accum pass: draw transparent surfaces (when oit_accum_pipeline ready) */
 	Com_Memset( &clear_val, 0, sizeof( clear_val ) );
-	vk_begin_render_pass( vk.render_pass.oit_accum, vk.framebuffers.oit_accum, qtrue, glConfig.vidWidth, glConfig.vidHeight );
+	vk_begin_render_pass_tracked( vk.render_pass.oit_accum, vk.framebuffers.oit_accum, qtrue, glConfig.vidWidth, glConfig.vidHeight );
 	if ( vk.oit_accum_pipeline ) {
 		backEnd.oitAccumPass = qtrue;
 		backEnd.drawSurfFilter = 2;
@@ -15018,7 +14559,7 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT );
-	vk_begin_render_pass( vk.render_pass.oit_resolve, vk.framebuffers.oit_resolve, qfalse, glConfig.vidWidth, glConfig.vidHeight );
+	vk_begin_render_pass_tracked( vk.render_pass.oit_resolve, vk.framebuffers.oit_resolve, qfalse, glConfig.vidWidth, glConfig.vidHeight );
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.oit_resolve_pipeline );
 	{
 		VkDescriptorSet sets[2] = { vk.oit_opaque_descriptor, vk.oit_accum_descriptor };
@@ -15044,7 +14585,7 @@ void vk_begin_ssr_render_pass( void )
 	vk.renderHeight = glConfig.vidHeight;
 	vk.renderScaleX = vk.renderScaleY = 1.0f;
 
-	vk_begin_render_pass( vk.render_pass.ssr, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+	vk_begin_render_pass_tracked( vk.render_pass.ssr, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
 }
 
 
@@ -15165,7 +14706,7 @@ qboolean vk_begin_sun_shadow_render_pass( void )
 	vk.renderWidth = vk.sun_shadow_width;
 	vk.renderHeight = vk.sun_shadow_height;
 	vk.renderScaleX = vk.renderScaleY = 1.0f;
-	vk_begin_render_pass( vk.render_pass.sun_shadow, vk.framebuffers.sun_shadow, qtrue, vk.renderWidth, vk.renderHeight );
+	vk_begin_render_pass_tracked( vk.render_pass.sun_shadow, vk.framebuffers.sun_shadow, qtrue, vk.renderWidth, vk.renderHeight );
 
 	if ( r_fogDebug && r_fogDebug->integer >= 1 && ( vk.volumetric_frame % 120u ) == 0u ) {
 		ri.Printf( PRINT_ALL, "[VK][fog] sun shadow pass begin %ux%u image=0x%llx\n",
@@ -15232,7 +14773,7 @@ static qboolean vk_begin_local_spot_shadow_render_pass( void )
 	vk.renderWidth = vk.local_spot_shadow_atlas_size;
 	vk.renderHeight = vk.local_spot_shadow_atlas_size;
 	vk.renderScaleX = vk.renderScaleY = 1.0f;
-	vk_begin_render_pass( vk.render_pass.local_spot_shadow, vk.framebuffers.local_spot_shadow, qtrue, vk.renderWidth, vk.renderHeight );
+	vk_begin_render_pass_tracked( vk.render_pass.local_spot_shadow, vk.framebuffers.local_spot_shadow, qtrue, vk.renderWidth, vk.renderHeight );
 
 	return qtrue;
 }
@@ -15287,7 +14828,7 @@ static qboolean vk_begin_local_point_shadow_render_pass( int faceLayer )
 	vk.renderWidth = vk.local_point_shadow_face_size;
 	vk.renderHeight = vk.local_point_shadow_face_size;
 	vk.renderScaleX = vk.renderScaleY = 1.0f;
-	vk_begin_render_pass( vk.render_pass.local_point_shadow, vk.framebuffers.local_point_shadow[faceLayer], qtrue, vk.renderWidth, vk.renderHeight );
+	vk_begin_render_pass_tracked( vk.render_pass.local_point_shadow, vk.framebuffers.local_point_shadow[faceLayer], qtrue, vk.renderWidth, vk.renderHeight );
 
 	return qtrue;
 }
@@ -15322,7 +14863,7 @@ static void vk_begin_volumetric_render_pass( void )
 	vk.renderHeight = glConfig.vidHeight;
 	vk.renderScaleX = vk.renderScaleY = 1.0f;
 
-	vk_begin_render_pass( vk.render_pass.volumetric, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+	vk_begin_render_pass_tracked( vk.render_pass.volumetric, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
 }
 
 static void vk_resolve_volumetric_depth_msaa( void )
@@ -16170,7 +15711,7 @@ static void vk_run_smaa_pass( VkPipeline pipeline, VkRenderPass pass, VkFramebuf
 		return;
 	}
 
-	vk_begin_render_pass( pass, framebuffer, qfalse, width, height );
+	vk_begin_render_pass_tracked( pass, framebuffer, qfalse, width, height );
 
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline );
 
@@ -16277,7 +15818,7 @@ static void vk_atmosphere_pass( void )
 		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT );
 
-	vk_begin_render_pass( vk.render_pass.atmosphere, vk.framebuffers.atmosphere[ vk.cmd->swapchain_image_index ], qtrue,
+	vk_begin_render_pass_tracked( vk.render_pass.atmosphere, vk.framebuffers.atmosphere[ vk.cmd->swapchain_image_index ], qtrue,
 		glConfig.vidWidth, glConfig.vidHeight );
 
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.atmosphere_pipeline );
@@ -16558,7 +16099,7 @@ void vk_prepare_2d( void )
 	/* Cinematic/menu-only: no world, no RC_DRAW_SURFS, so no render pass was ever started.
 	 * Start a fresh main pass here so 2D can draw on a cleared color target instead of
 	 * inheriting stale swapchain/FBO contents from a previous frame. */
-	if ( ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) && !vk_in_render_pass ) {
+	if ( ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) && !vk.inRenderPass ) {
 		if ( vk.cmd && vk.cmd->command_buffer != VK_NULL_HANDLE &&
 			vk.cmd->swapchain_image_index < MAX_SWAPCHAIN_IMAGES &&
 			vk.render_pass.main != VK_NULL_HANDLE &&
@@ -16581,7 +16122,7 @@ void vk_prepare_2d( void )
 			return;
 		}
 	}
-	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE || !vk_in_render_pass ) {
+	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE || !vk.inRenderPass ) {
 		return;
 	}
 	if ( vk.cmd->swapchain_image_index >= MAX_SWAPCHAIN_IMAGES ) {
@@ -16634,7 +16175,7 @@ static void vk_begin_screenmap_render_pass( void )
 	vk.renderScaleX = (float)vk.renderWidth / (float)glConfig.vidWidth;
 	vk.renderScaleY = (float)vk.renderHeight / (float)glConfig.vidHeight;
 
-	vk_begin_render_pass( vk.render_pass.screenmap, frameBuffer, qtrue, vk.renderWidth, vk.renderHeight );
+	vk_begin_render_pass_tracked( vk.render_pass.screenmap, frameBuffer, qtrue, vk.renderWidth, vk.renderHeight );
 }
 
 #ifdef VK_CUBEMAP
@@ -16648,7 +16189,7 @@ void vk_begin_cubemap_render_pass( void )
     vk.renderHeight = REF_CUBEMAP_SIZE;
     vk.renderScaleX = vk.renderScaleY = 1.0f;
 
-    vk_begin_render_pass(vk.render_pass.cubemap, frameBuffer, qtrue, vk.renderWidth, vk.renderHeight);
+    vk_begin_render_pass_tracked(vk.render_pass.cubemap, frameBuffer, qtrue, vk.renderWidth, vk.renderHeight);
 }
 
 #endif
@@ -16741,16 +16282,7 @@ void vk_validate_pbr_ibl_resources( void )
 
 void vk_end_render_pass( void )
 {
-	if ( !vk_in_render_pass ) {
-		return;
-	}
-	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
-		vk_in_render_pass = qfalse;
-		return;
-	}
-
-	qvkCmdEndRenderPass( vk.cmd->command_buffer );
-	vk_in_render_pass = qfalse;
+	vk_end_render_pass_tracked();
 
 //	vk.renderPassIndex = RENDER_PASS_MAIN;
 }
@@ -16794,9 +16326,9 @@ void vk_begin_frame( void )
 	if ( vk.frame_count++ ) // might happen during stereo rendering
 		return;
 
-	/* Ensure render pass state is clean; avoids stale vk_in_render_pass from
+	/* Ensure render pass state is clean; avoids stale vk.inRenderPass from
 	 * previous frame error/early-exit causing draws outside a render pass. */
-	vk_in_render_pass = qfalse;
+	vk.inRenderPass = qfalse;
 
 	if (PostFX_NeedsPipelineUpdate()) {
 		vk_update_post_process_pipelines();
@@ -17025,7 +16557,7 @@ void vk_end_frame( void )
 							(unsigned long long)(uintptr_t)capture_src );
 					}
 
-					vk_begin_render_pass( vk.render_pass.capture, vk.framebuffers.capture, qfalse, cap_w, cap_h );
+					vk_begin_render_pass_tracked( vk.render_pass.capture, vk.framebuffers.capture, qfalse, cap_w, cap_h );
 					qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.capture_pipeline );
 					qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor[vk.cmd_index], 0, NULL );
 					vk_set_fullscreen_viewport_scissor( cap_w, cap_h );
@@ -17194,7 +16726,7 @@ void vk_end_frame( void )
 							record_depth_image_layout_transition( vk.cmd->command_buffer, da,
 								VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 0, 0 );
 						}
-						vk_begin_render_pass( vk.render_pass.gamma, vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ], qfalse, vk.renderWidth, vk.renderHeight );
+						vk_begin_render_pass_tracked( vk.render_pass.gamma, vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ], qfalse, vk.renderWidth, vk.renderHeight );
 						qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.gamma_pipeline );
 						{
 							VkDescriptorSet gamma_sets[3] = {
@@ -17830,783 +17362,6 @@ static void vk_create_postfx_params_buffers( void )
 		Com_Memset( vk.postfx_params_ptr[i], 0, sizeof( VkPostFXParams ) );
 	}
 }
-
-static void vk_update_volumetric_params( void )
-{
-	if ( !vk.volumetric_params_ptr ) {
-		return;
-	}
-
-	volumetric_params_t params;
-	Com_Memset( &params, 0, sizeof( params ) );
-
-	const float *projection = backEnd.viewParms.projectionMatrix;
-	const float *view = backEnd.viewParms.world.modelViewMatrix;
-	const int now_ms = backEnd.refdef.time;
-	int depth_mode = r_volumetricFogDepthMode ? r_volumetricFogDepthMode->integer : 1;
-	int fog_steps = r_volumetricFogSteps ? r_volumetricFogSteps->integer : 32;
-	int quality = r_volumetricFogQuality ? r_volumetricFogQuality->integer : 2;
-	int local_light_count = 0;
-	int local_volume_count = 0;
-	float temporal_weight = r_volumetricFogTemporalWeight ? r_volumetricFogTemporalWeight->value : 0.0f;
-	float jitter_amount = r_volumetricFogJitter ? r_volumetricFogJitter->value : 0.0f;
-	float sun_intensity = r_volumetricFogSunIntensity ? r_volumetricFogSunIntensity->value : 1.0f;
-	float ambient_intensity = r_volumetricFogAmbientIntensity ? r_volumetricFogAmbientIntensity->value : 1.0f;
-	float noise_scale = r_volumetricFogNoiseScale ? r_volumetricFogNoiseScale->value : 0.0125f;
-	float noise_strength = r_volumetricFogNoiseStrength ? r_volumetricFogNoiseStrength->value : 0.85f;
-	float noise_threshold = r_volumetricFogNoiseThreshold ? r_volumetricFogNoiseThreshold->value : 0.2f;
-	float g_aniso = r_volumetricFogAniso ? r_volumetricFogAniso->value : 0.0f;
-	float fog_density = r_volumetricFogDensity ? r_volumetricFogDensity->value : 0.0f;
-	float height_falloff = r_volumetricFogHeightFalloff ? r_volumetricFogHeightFalloff->value : 0.0f;
-	float near_plane = ( r_znear ) ? r_znear->value : 8.0f;
-	float far_plane = backEnd.viewParms.zFar;
-	float z_exponent = ( r_volumetricFogZExponent ) ? r_volumetricFogZExponent->value : 1.5f;
-	float max_distance = ( r_volumetricFogMaxDistance ) ? r_volumetricFogMaxDistance->value : 4096.0f;
-	float reprojection_threshold = ( r_volumetricFogHistoryVelocityThreshold ) ? r_volumetricFogHistoryVelocityThreshold->value :
-		( ( r_volumetricFogReprojectionThreshold ) ? r_volumetricFogReprojectionThreshold->value : 0.075f );
-	float firefly_clamp = ( r_volumetricFogFireflyClamp ) ? r_volumetricFogFireflyClamp->value : 8.0f;
-	float transmittance_cutoff = ( r_volumetricFogTransmittanceCutoff ) ? r_volumetricFogTransmittanceCutoff->value : 0.01f;
-	float wind_speed = ( r_volumetricFogWindSpeed ) ? r_volumetricFogWindSpeed->value : 1.0f;
-	float fluid_dt;
-	float fluid_viscosity = ( r_fogFluidViscosity ) ? r_fogFluidViscosity->value : 0.05f;
-	float fluid_dissipation = ( r_fogFluidDissipation ) ? r_fogFluidDissipation->value : 0.985f;
-	float fluid_force = ( r_fogFluidForceScale ) ? r_fogFluidForceScale->value : 1.0f;
-	float fluid_velocity_clamp = ( r_fogFluidVelocityClamp ) ? r_fogFluidVelocityClamp->value : 96.0f;
-	float fluid_effective_scale = 1.0f;
-	float fluid_target_ms = ( r_fogFluidTargetMs ) ? r_fogFluidTargetMs->value : 1.2f;
-	float fluid_flow_strength = ( r_fogFluidFlowFieldStrength ) ? r_fogFluidFlowFieldStrength->value : 0.35f;
-	float fluid_flow_scale = ( r_fogFluidFlowFieldScale ) ? r_fogFluidFlowFieldScale->value : 0.004f;
-	float temporal_stability = ( r_volumetricFogTemporalStability ) ? r_volumetricFogTemporalStability->value : 0.7f;
-	float shadow_contrast = ( r_volumetricFogShadowContrast ) ? r_volumetricFogShadowContrast->value : 1.35f;
-	int fog_showcase = ( r_volumetricFogShowcase ) ? r_volumetricFogShowcase->integer : 0;
-	int fluid_wrap = ( r_fogFluidWrap ) ? r_fogFluidWrap->integer : 0;
-	int fluid_quality = ( r_fogFluidQuality ) ? r_fogFluidQuality->integer : 2;
-	int fluid_pressure_iterations = ( r_fogFluidPressureIterations ) ? r_fogFluidPressureIterations->integer : 12;
-	int fluid_active_width = (int)vk.fluid_width;
-	int fluid_active_height = (int)vk.fluid_height;
-	qboolean fluid_autoscale_enabled = qfalse;
-	qboolean fluid_enabled = ( r_fogFluid && r_fogFluid->integer && vk.fluid_width > 0 && vk.fluid_height > 0 ) ? qtrue : qfalse;
-	float delta_time = 1.0f / 60.0f;
-	qboolean camera_cut = vk.temporal.sharedCameraCut;
-	vec3_t fog_min = { -2048.0f, -2048.0f, -256.0f };
-	vec3_t fog_max = {  2048.0f,  2048.0f, 1024.0f };
-	vec3_t noise_scroll = { 0.03f, 0.01f, 0.02f };
-	vec3_t wind_dir = { 1.0f, 0.0f, 0.0f };
-	vec3_t motion_dir = { 1.0f, 0.0f, 0.0f };
-
-	if ( vk_prev_volumetric_time_valid ) {
-		int dt = now_ms - vk_prev_volumetric_time_ms;
-		if ( dt < 0 || dt > 1000 ) {
-			dt = 16;
-		}
-		delta_time = (float)dt * 0.001f;
-	}
-		fluid_dt = delta_time;
-		if ( fluid_dt < 0.0f ) {
-			fluid_dt = 0.0f;
-		}
-		if ( fluid_dt > ( 1.0f / 30.0f ) ) {
-			fluid_dt = 1.0f / 30.0f;
-		}
-	vk_prev_volumetric_time_ms = now_ms;
-	vk_prev_volumetric_time_valid = qtrue;
-	vk_volumetric_noise_time += delta_time;
-
-	if ( !Mat4Inverse( projection, params.invProj ) ) {
-		Com_Memcpy( params.invProj, projection, sizeof( params.invProj ) );
-	}
-	if ( !Mat4Inverse( view, params.invView ) ) {
-		Com_Memcpy( params.invView, view, sizeof( params.invView ) );
-	}
-	Com_Memcpy( params.proj, projection, sizeof( params.proj ) );
-	myGlMultMatrix( view, projection, params.viewProj );
-	if ( camera_cut ) {
-		vk.has_prev_volumetric = qfalse;
-		vk_volumetric_validation_state.camera_cut_events++;
-		vk_near_static_view_frames = 0;
-	}
-	if ( vk_prev_matrices_valid && !camera_cut &&
-		!vk_temporal_has_reason( VK_TEMPORAL_RESET_MISSING_PREV_DATA | VK_TEMPORAL_RESET_RENDERER_INIT |
-			VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE | VK_TEMPORAL_RESET_RENDER_SIZE_CHANGE |
-			VK_TEMPORAL_RESET_WORLD_CHANGE | VK_TEMPORAL_RESET_CLIENT_STATE_CHANGE | VK_TEMPORAL_RESET_EXPLICIT_DEBUG ) ) {
-		Com_Memcpy( params.prevView, vk_prev_view_matrix, sizeof( params.prevView ) );
-		Com_Memcpy( params.prevViewProj, vk_prev_viewproj_matrix, sizeof( params.prevViewProj ) );
-	} else {
-		Com_Memcpy( params.prevView, view, sizeof( params.prevView ) );
-		Com_Memcpy( params.prevViewProj, params.viewProj, sizeof( params.prevViewProj ) );
-	}
-
-	params.viewOrigin[0] = backEnd.viewParms.or.origin[0];
-	params.viewOrigin[1] = backEnd.viewParms.or.origin[1];
-	params.viewOrigin[2] = backEnd.viewParms.or.origin[2];
-	params.viewOrigin[3] = ( r_volumetricFogBaseHeight ) ? r_volumetricFogBaseHeight->value : 0.0f;
-
-	params.sunDirection[0] = tr.sunDirection[0];
-	params.sunDirection[1] = tr.sunDirection[1];
-	params.sunDirection[2] = tr.sunDirection[2];
-	params.sunDirection[3] = 0.0f;
-
-	vk_get_volumetric_fog_color( params.fogColor );
-	{
-		float fog_intensity = ( r_volumetricFogIntensity ) ? r_volumetricFogIntensity->value : 1.0f;
-		params.fogColor[3] = ( fog_intensity > 0.001f ) ? fog_intensity : 0.001f;
-		if ( r_volumetricFog && r_volumetricFog->integer && r_fogDebug && r_fogDebug->integer > 0 && params.fogColor[3] < 1.0f ) {
-			params.fogColor[3] = 1.0f;
-		}
-		if ( fog_showcase == 1 && params.fogColor[3] < 1.5f ) {
-			params.fogColor[3] = 1.35f;
-		} else if ( fog_showcase == 2 && params.fogColor[3] < 2.0f ) {
-			params.fogColor[3] = 1.6f;
-		} else if ( fog_showcase >= 3 && params.fogColor[3] < 3.0f ) {
-			params.fogColor[3] = 2.2f;
-		}
-	}
-
-	if ( r_volumetricFogWorldMin && r_volumetricFogWorldMin->string ) {
-		if ( sscanf( r_volumetricFogWorldMin->string, "%f %f %f", &fog_min[0], &fog_min[1], &fog_min[2] ) != 3 ) {
-			ri.Printf( PRINT_WARNING, "r_volumetricFogWorldMin: expected 3 floats, using defaults\n" );
-		}
-	}
-	if ( r_volumetricFogWorldMax && r_volumetricFogWorldMax->string ) {
-		if ( sscanf( r_volumetricFogWorldMax->string, "%f %f %f", &fog_max[0], &fog_max[1], &fog_max[2] ) != 3 ) {
-			ri.Printf( PRINT_WARNING, "r_volumetricFogWorldMax: expected 3 floats, using defaults\n" );
-		}
-	}
-	/* Ensure valid AABB for fluid world mapping */
-	if ( fog_max[0] <= fog_min[0] + 1.0f ) fog_max[0] = fog_min[0] + 4096.0f;
-	if ( fog_max[1] <= fog_min[1] + 1.0f ) fog_max[1] = fog_min[1] + 4096.0f;
-	if ( fog_max[2] <= fog_min[2] + 1.0f ) fog_max[2] = fog_min[2] + 1280.0f;
-	if ( r_volumetricFogNoiseScroll && r_volumetricFogNoiseScroll->string ) {
-		vk_parse_rgb_string( r_volumetricFogNoiseScroll->string, noise_scroll );
-	}
-	if ( r_volumetricFogWindDirection && r_volumetricFogWindDirection->string ) {
-		vk_parse_rgb_string( r_volumetricFogWindDirection->string, wind_dir );
-	}
-
-	params.worldMin[0] = fog_min[0];
-	params.worldMin[1] = fog_min[1];
-	params.worldMin[2] = fog_min[2];
-	params.worldMin[3] = 0.0f;
-
-	params.worldMax[0] = fog_max[0];
-	params.worldMax[1] = fog_max[1];
-	params.worldMax[2] = fog_max[2];
-	params.worldMax[3] = 0.0f;
-	{
-		const float size_x = fog_max[0] - fog_min[0];
-		const float size_y = fog_max[1] - fog_min[1];
-		params.fluidWorldMap[0] = fog_min[0];
-		params.fluidWorldMap[1] = fog_min[1];
-		params.fluidWorldMap[2] = ( fabsf( size_x ) > 1e-6f ) ? ( 1.0f / size_x ) : 0.0f;
-		params.fluidWorldMap[3] = ( fabsf( size_y ) > 1e-6f ) ? ( 1.0f / size_y ) : 0.0f;
-	}
-
-	params.gridDim[0] = (float)vk.froxel_width;
-	params.gridDim[1] = (float)vk.froxel_height;
-	params.gridDim[2] = (float)vk.froxel_slices;
-	params.gridDim[3] = (float)( ( r_fogDebug ) ? r_fogDebug->integer : 0 );
-	params.phaseParams[0] = g_aniso;
-	params.phaseParams[1] = sun_intensity;
-	params.phaseParams[2] = ambient_intensity;
-	params.phaseParams[3] = shadow_contrast;
-	params.noiseParams[0] = noise_scale;
-	params.noiseParams[1] = noise_threshold;
-	params.noiseParams[2] = noise_strength;
-	params.noiseParams[3] = fluid_flow_scale;
-	params.noiseScroll[0] = 0.0f;
-	params.noiseScroll[1] = 0.0f;
-	params.noiseScroll[2] = 0.0f;
-	params.noiseScroll[3] = 0.0f;
-
-	if ( fog_steps < 1 ) {
-		fog_steps = 1;
-	} else if ( fog_steps > 256 ) {
-		fog_steps = 256;
-	}
-	if ( depth_mode < 0 ) {
-		depth_mode = 0;
-	} else if ( depth_mode > 2 ) {
-		depth_mode = 2;
-	}
-	if ( quality < 0 ) {
-		quality = 0;
-	} else if ( quality > 3 ) {
-		quality = 3;
-	}
-	if ( g_aniso < -0.999f ) {
-		params.phaseParams[0] = -0.999f;
-	} else if ( g_aniso > 0.999f ) {
-		params.phaseParams[0] = 0.999f;
-	}
-	if ( fog_density < 0.0f ) {
-		fog_density = 0.0f;
-	}
-	if ( height_falloff < 0.0f ) {
-		height_falloff = 0.0f;
-	}
-	if ( temporal_weight < 0.0f ) {
-		temporal_weight = 0.0f;
-	} else if ( temporal_weight > 1.0f ) {
-		temporal_weight = 1.0f;
-	}
-	if ( jitter_amount < 0.0f ) {
-		jitter_amount = 0.0f;
-	}
-	if ( noise_scale < 0.0f ) {
-		noise_scale = 0.0f;
-	}
-	if ( noise_threshold < 0.0f ) {
-		noise_threshold = 0.0f;
-	} else if ( noise_threshold > 1.0f ) {
-		noise_threshold = 1.0f;
-	}
-	if ( noise_strength < 0.0f ) {
-		noise_strength = 0.0f;
-	} else if ( noise_strength > 1.0f ) {
-		noise_strength = 1.0f;
-	}
-	if ( z_exponent < 1.0f ) {
-		z_exponent = 1.0f;
-	}
-	if ( max_distance < near_plane + 1.0f ) {
-		max_distance = near_plane + 1.0f;
-	}
-	if ( reprojection_threshold < 0.0f ) {
-		reprojection_threshold = 0.0f;
-	}
-	if ( firefly_clamp < 0.0f ) {
-		firefly_clamp = 0.0f;
-	}
-	if ( transmittance_cutoff < 0.0001f ) {
-		transmittance_cutoff = 0.0001f;
-	} else if ( transmittance_cutoff > 1.0f ) {
-		transmittance_cutoff = 1.0f;
-	}
-	if ( wind_speed < 0.0f ) {
-		wind_speed = 0.0f;
-	}
-	if ( fluid_quality < 0 ) {
-		fluid_quality = 0;
-	} else if ( fluid_quality > 3 ) {
-		fluid_quality = 3;
-	}
-	if ( fluid_viscosity < 0.0f ) {
-		fluid_viscosity = 0.0f;
-	}
-	if ( fluid_dissipation < 0.0f ) {
-		fluid_dissipation = 0.0f;
-	} else if ( fluid_dissipation > 1.0f ) {
-		fluid_dissipation = 1.0f;
-	}
-	if ( fluid_force < 0.0f ) {
-		fluid_force = 0.0f;
-	} else if ( fluid_force > 8.0f ) {
-		fluid_force = 8.0f;
-	}
-	if ( fluid_velocity_clamp < 1.0f ) {
-		fluid_velocity_clamp = 1.0f;
-	} else if ( fluid_velocity_clamp > 512.0f ) {
-		fluid_velocity_clamp = 512.0f;
-	}
-	if ( fluid_target_ms < 0.1f ) {
-		fluid_target_ms = 0.1f;
-	} else if ( fluid_target_ms > 8.0f ) {
-		fluid_target_ms = 8.0f;
-	}
-	if ( fluid_flow_strength < 0.0f ) {
-		fluid_flow_strength = 0.0f;
-	} else if ( fluid_flow_strength > 4.0f ) {
-		fluid_flow_strength = 4.0f;
-	}
-	if ( fluid_flow_scale < 0.0001f ) {
-		fluid_flow_scale = 0.0001f;
-	} else if ( fluid_flow_scale > 1.0f ) {
-		fluid_flow_scale = 1.0f;
-	}
-	if ( temporal_stability < 0.0f ) {
-		temporal_stability = 0.0f;
-	} else if ( temporal_stability > 1.0f ) {
-		temporal_stability = 1.0f;
-	}
-	if ( shadow_contrast < 0.5f ) {
-		shadow_contrast = 0.5f;
-	} else if ( shadow_contrast > 4.0f ) {
-		shadow_contrast = 4.0f;
-	}
-	if ( fog_showcase < 0 ) {
-		fog_showcase = 0;
-	} else if ( fog_showcase > 3 ) {
-		fog_showcase = 3;
-	}
-	if ( fog_showcase > 0 ) {
-		switch ( fog_showcase ) {
-			case 1:
-				fog_density = MAX( fog_density, 0.40f );
-				height_falloff = MIN( height_falloff, 0.25f );
-				sun_intensity = MAX( sun_intensity, 2.5f );
-				ambient_intensity = MAX( ambient_intensity, 1.0f );
-				noise_scale = MAX( noise_scale, 0.016f );
-				noise_strength = MAX( noise_strength, 0.90f );
-				noise_threshold = MIN( noise_threshold, 0.15f );
-				transmittance_cutoff = MIN( transmittance_cutoff, 0.006f );
-				break;
-			case 2:
-				fog_density = MAX( fog_density, 0.65f );
-				height_falloff = MIN( height_falloff, 0.15f );
-				sun_intensity = MAX( sun_intensity, 3.5f );
-				ambient_intensity = MAX( ambient_intensity, 1.2f );
-				noise_scale = MAX( noise_scale, 0.020f );
-				noise_strength = MAX( noise_strength, 0.95f );
-				noise_threshold = MIN( noise_threshold, 0.12f );
-				fluid_enabled = ( vk.fluid_width > 0 && vk.fluid_height > 0 ) ? qtrue : fluid_enabled;
-				fluid_force = MAX( fluid_force, 2.0f );
-				fluid_flow_strength = MAX( fluid_flow_strength, 0.9f );
-				fluid_velocity_clamp = MAX( fluid_velocity_clamp, 128.0f );
-				fluid_pressure_iterations = MAX( fluid_pressure_iterations, 16 );
-				fluid_dissipation = MAX( fluid_dissipation, 0.990f );
-				transmittance_cutoff = MIN( transmittance_cutoff, 0.004f );
-				break;
-			default:
-				fog_density = MAX( fog_density, 1.3f );
-				height_falloff = MIN( height_falloff, 0.06f );
-				sun_intensity = MAX( sun_intensity, 6.0f );
-				ambient_intensity = MAX( ambient_intensity, 1.8f );
-				noise_scale = MAX( noise_scale, 0.026f );
-				noise_strength = 1.0f;
-				noise_threshold = MIN( noise_threshold, 0.07f );
-				temporal_weight = MAX( temporal_weight, 0.9f );
-				fluid_enabled = ( vk.fluid_width > 0 && vk.fluid_height > 0 ) ? qtrue : fluid_enabled;
-				fluid_force = MAX( fluid_force, 3.0f );
-				fluid_flow_strength = MAX( fluid_flow_strength, 1.8f );
-				fluid_velocity_clamp = MAX( fluid_velocity_clamp, 192.0f );
-				fluid_pressure_iterations = MAX( fluid_pressure_iterations, 22 );
-				fluid_dissipation = MAX( fluid_dissipation, 0.994f );
-				transmittance_cutoff = MIN( transmittance_cutoff, 0.0015f );
-				break;
-		}
-	}
-	params.phaseParams[0] = g_aniso;
-	params.phaseParams[1] = sun_intensity;
-	params.phaseParams[2] = ambient_intensity;
-	params.phaseParams[3] = shadow_contrast;
-	if ( fluid_pressure_iterations < 1 ) {
-		fluid_pressure_iterations = 1;
-	} else if ( fluid_pressure_iterations > VK_FLUID_MAX_PRESSURE_ITERATIONS ) {
-		fluid_pressure_iterations = VK_FLUID_MAX_PRESSURE_ITERATIONS;
-	}
-	switch ( fluid_quality ) {
-		case 0:
-			fluid_pressure_iterations = MIN( fluid_pressure_iterations, 8 );
-			fluid_dissipation = MIN( fluid_dissipation, 0.970f );
-			break;
-		case 1:
-			fluid_pressure_iterations = MIN( fluid_pressure_iterations, 12 );
-			fluid_dissipation = MIN( fluid_dissipation, 0.982f );
-			break;
-		case 2:
-			fluid_pressure_iterations = MIN( fluid_pressure_iterations, 16 );
-			break;
-		default:
-			fluid_pressure_iterations = MIN( fluid_pressure_iterations, 20 );
-			fluid_dissipation = MIN( fluid_dissipation, 0.995f );
-			break;
-	}
-
-	fluid_autoscale_enabled = ( fluid_enabled && r_fogFluidAutoScale && r_fogFluidAutoScale->integer ) ? qtrue : qfalse;
-	if ( fluid_autoscale_enabled ) {
-		float min_resolution = ( r_fogFluidAutoScaleMinResolution ) ? r_fogFluidAutoScaleMinResolution->value : 0.45f;
-		if ( min_resolution < 0.125f ) {
-			min_resolution = 0.125f;
-		} else if ( min_resolution > 1.0f ) {
-			min_resolution = 1.0f;
-		}
-		fluid_effective_scale = vk.fluid_dynamic_resolution_scale;
-		if ( fluid_effective_scale < min_resolution ) {
-			fluid_effective_scale = min_resolution;
-		} else if ( fluid_effective_scale > 1.0f ) {
-			fluid_effective_scale = 1.0f;
-		}
-		if ( vk.fluid_dynamic_pressure_iterations > 0 ) {
-			fluid_pressure_iterations = MIN( fluid_pressure_iterations, vk.fluid_dynamic_pressure_iterations );
-		}
-	}
-
-	if ( fluid_enabled ) {
-		fluid_active_width = MAX( 8, (int)( (float)vk.fluid_width * fluid_effective_scale + 0.5f ) );
-		fluid_active_height = MAX( 8, (int)( (float)vk.fluid_height * fluid_effective_scale + 0.5f ) );
-		fluid_active_width = MIN( fluid_active_width, (int)vk.fluid_width );
-		fluid_active_height = MIN( fluid_active_height, (int)vk.fluid_height );
-		if ( fluid_active_width <= 0 || fluid_active_height <= 0 ) {
-			fluid_enabled = qfalse;
-		}
-	}
-	vk.fluid_active_width = fluid_enabled ? (uint32_t)fluid_active_width : 0u;
-	vk.fluid_active_height = fluid_enabled ? (uint32_t)fluid_active_height : 0u;
-
-	params.fluidParams0[0] = fluid_dt;
-	params.fluidParams0[1] = fluid_viscosity;
-	params.fluidParams0[2] = fluid_dissipation;
-	params.fluidParams0[3] = fluid_force;
-	params.fluidParams1[0] = fluid_velocity_clamp;
-	params.fluidParams1[1] = fluid_wrap ? 1.0f : 0.0f;
-	params.fluidParams1[2] = (float)fluid_pressure_iterations;
-	params.fluidParams1[3] = fluid_enabled ? 1.0f : 0.0f;
-	params.fluidParams2[0] = fluid_enabled ? (float)vk.fluid_active_width : 0.0f;
-	params.fluidParams2[1] = fluid_enabled ? (float)vk.fluid_active_height : 0.0f;
-	params.fluidParams2[2] = (float)( vk.fluid_velocity_index & 1u );
-	params.fluidParams2[3] = (float)( vk.fluid_density_index & 1u );
-
-	/* Upload emitter data to GPU */
-	{
-		int emCount = FluidSim_GetEmitterCount();
-		int i;
-		if ( emCount > 16 ) emCount = 16;
-		for ( i = 0; i < emCount; i++ ) {
-			const fluidEmitter_t *em = FluidSim_GetEmitter( i );
-			if ( !em ) continue;
-			params.fluidEmitters[i][0] = em->position[0];
-			params.fluidEmitters[i][1] = em->position[1];
-			params.fluidEmitters[i][2] = em->position[2];
-			params.fluidEmitters[i][3] = em->radius;
-			params.fluidEmitterData[i][0] = em->density;
-			params.fluidEmitterData[i][1] = em->temperature;
-			params.fluidEmitterData[i][2] = em->velocity[0];
-			params.fluidEmitterData[i][3] = em->velocity[1];
-		}
-		params.fluidEmitterCount[0] = (float)emCount;
-		params.fluidEmitterCount[1] = FluidSim_GetVorticity();
-		params.fluidEmitterCount[2] = FluidSim_GetBuoyancy();
-		params.fluidEmitterCount[3] = 0.0f;
-	}
-	if ( VectorLengthSquared( wind_dir ) < 1e-6f ) {
-		VectorSet( wind_dir, 1.0f, 0.0f, 0.0f );
-	}
-	VectorNormalize2( wind_dir, motion_dir );
-
-	params.densityParams[0] = fog_density;
-	params.densityParams[1] = height_falloff;
-	params.densityParams[2] = jitter_amount;
-	params.densityParams[3] = temporal_weight;
-
-	params.scatterParams[0] = r_volumetricFogAlbedo ? r_volumetricFogAlbedo->value : 0.95f;
-	params.scatterParams[1] = r_volumetricFogExtinctionScale ? r_volumetricFogExtinctionScale->value : 1.0f;
-	params.scatterParams[2] = r_volumetricFogBlendDistance ? r_volumetricFogBlendDistance->value : 0.0f;
-	params.scatterParams[3] = ( r_volumetricFogDenoise && r_volumetricFogDenoise->integer && r_volumetricFogDenoiseSigma ) ?
-		r_volumetricFogDenoiseSigma->value : 0.0f;
-
-	params.miscParams[0] = (float)fog_steps;
-	params.miscParams[1] = (float)depth_mode;
-	params.miscParams[2] = (float)vk.volumetric_frame;
-	params.miscParams[3] = ( vk.has_prev_volumetric && temporal_weight > 0.0f && !camera_cut ) ? 1.0f : 0.0f;
-	if ( near_plane < 0.001f ) {
-		near_plane = 0.001f;
-	}
-	if ( far_plane > max_distance ) {
-		far_plane = max_distance;
-	}
-	if ( far_plane <= near_plane + 1.0f ) {
-		far_plane = near_plane + 1.0f;
-	}
-	params.sliceParams[0] = near_plane;
-	params.sliceParams[1] = far_plane;
-	params.sliceParams[2] = z_exponent;
-	params.sliceParams[3] = max_distance;
-	params.noiseParams[0] = noise_scale;
-	params.noiseParams[1] = noise_threshold;
-	params.noiseParams[2] = noise_strength;
-	params.temporalParams[0] = reprojection_threshold;
-	params.temporalParams[1] = 0.02f + temporal_stability * 0.08f;
-	params.temporalParams[2] = firefly_clamp;
-	params.temporalParams[3] = camera_cut ? 1.0f : 0.0f;
-	params.qualityParams[0] = (float)quality;
-	params.qualityParams[1] = (float)( r_volumetricFogSliceMode ? r_volumetricFogSliceMode->integer : 0 );
-	params.qualityParams[2] = ( quality == 0 ) ? 0.65f : ( ( quality == 1 ) ? 0.8f : 0.9f );
-	params.qualityParams[3] = transmittance_cutoff;
-	params.windParams[0] = vk_volumetric_noise_time;
-	params.windParams[1] = delta_time;
-	params.windParams[2] = wind_speed;
-	params.windParams[3] = fluid_flow_strength;
-	params.noiseScroll[0] = noise_scroll[0] + motion_dir[0];
-	params.noiseScroll[1] = noise_scroll[1] + motion_dir[1];
-	params.noiseScroll[2] = noise_scroll[2] + motion_dir[2];
-
-	memset( params.volumeTypeParams, 0, sizeof( params.volumeTypeParams ) );
-	if ( tr.world && tr.world->fogs && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
-		for ( int i = 1; i < tr.world->numfogs && local_volume_count < VK_VOLUMETRIC_MAX_VOLUMES; i++ ) {
-			const fog_t *fog = &tr.world->fogs[i];
-			const float extent_x = fog->bounds[1][0] - fog->bounds[0][0];
-			const float extent_y = fog->bounds[1][1] - fog->bounds[0][1];
-			const float extent_z = fog->bounds[1][2] - fog->bounds[0][2];
-			float local_density = fog_density;
-
-			if ( extent_x <= 0.001f || extent_y <= 0.001f || extent_z <= 0.001f ) {
-				continue;
-			}
-
-			if ( fog->parms.depthForOpaque > 0.001f ) {
-				local_density *= ( 1.0f / fog->parms.depthForOpaque );
-			}
-			if ( local_density < 0.0f ) {
-				local_density = 0.0f;
-			}
-
-			params.volumeBoundsMin[local_volume_count][0] = fog->bounds[0][0];
-			params.volumeBoundsMin[local_volume_count][1] = fog->bounds[0][1];
-			params.volumeBoundsMin[local_volume_count][2] = fog->bounds[0][2];
-			params.volumeBoundsMin[local_volume_count][3] = 0.0f;
-
-			params.volumeBoundsMax[local_volume_count][0] = fog->bounds[1][0];
-			params.volumeBoundsMax[local_volume_count][1] = fog->bounds[1][1];
-			params.volumeBoundsMax[local_volume_count][2] = fog->bounds[1][2];
-			params.volumeBoundsMax[local_volume_count][3] = 0.0f;
-
-			params.volumeColorDensity[local_volume_count][0] = fog->color[0];
-			params.volumeColorDensity[local_volume_count][1] = fog->color[1];
-			params.volumeColorDensity[local_volume_count][2] = fog->color[2];
-			params.volumeColorDensity[local_volume_count][3] = local_density;
-			params.volumeTypeParams[local_volume_count][0] = 0.0f;
-			params.volumeTypeParams[local_volume_count][1] = 0.0f;
-			params.volumeTypeParams[local_volume_count][2] = -1.0f;
-			params.volumeTypeParams[local_volume_count][3] = 0.0f;
-			local_volume_count++;
-		}
-	}
-
-	/* Optional sphere volumes from r_volumetricFogSphere* cvars */
-	{
-		float sphereCenter[3] = { 0.0f, 0.0f, 0.0f };
-		float sphereRadius, sphereDensity;
-		int sphereOn;
-		sphereOn = r_volumetricFogSphere ? r_volumetricFogSphere->integer : 0;
-		if ( sphereOn && local_volume_count < VK_VOLUMETRIC_MAX_VOLUMES ) {
-			sscanf( ri.Cvar_VariableString( "r_volumetricFogSphereCenter" ), "%f %f %f",
-				&sphereCenter[0], &sphereCenter[1], &sphereCenter[2] );
-			sphereRadius = r_volumetricFogSphereRadius ? r_volumetricFogSphereRadius->value : 128.0f;
-			sphereDensity = r_volumetricFogSphereDensity ? r_volumetricFogSphereDensity->value : fog_density * 0.5f;
-			params.volumeBoundsMin[local_volume_count][0] = sphereCenter[0];
-			params.volumeBoundsMin[local_volume_count][1] = sphereCenter[1];
-			params.volumeBoundsMin[local_volume_count][2] = sphereCenter[2];
-			params.volumeBoundsMin[local_volume_count][3] = 0.0f;
-			params.volumeBoundsMax[local_volume_count][0] = sphereRadius;
-			params.volumeBoundsMax[local_volume_count][1] = 0.0f;
-			params.volumeBoundsMax[local_volume_count][2] = 0.0f;
-			params.volumeBoundsMax[local_volume_count][3] = 0.0f;
-			params.volumeColorDensity[local_volume_count][0] = params.fogColor[0];
-			params.volumeColorDensity[local_volume_count][1] = params.fogColor[1];
-			params.volumeColorDensity[local_volume_count][2] = params.fogColor[2];
-			params.volumeColorDensity[local_volume_count][3] = sphereDensity;
-			params.volumeTypeParams[local_volume_count][0] = 1.0f;
-			params.volumeTypeParams[local_volume_count][1] = sphereRadius;
-			params.volumeTypeParams[local_volume_count][2] = -1.0f;
-			params.volumeTypeParams[local_volume_count][3] = 0.0f;
-			local_volume_count++;
-		}
-	}
-
-	/* Optional cylinder volume from r_volumetricFogCylinder* cvars */
-	{
-		float base[3] = { 0.0f, 0.0f, 0.0f };
-		float top[3] = { 0.0f, 0.0f, 128.0f };
-		float radius, density;
-		int cylinderOn;
-		cylinderOn = r_volumetricFogCylinder ? r_volumetricFogCylinder->integer : 0;
-		if ( cylinderOn && local_volume_count < VK_VOLUMETRIC_MAX_VOLUMES ) {
-			sscanf( ri.Cvar_VariableString( "r_volumetricFogCylinderBase" ), "%f %f %f", &base[0], &base[1], &base[2] );
-			sscanf( ri.Cvar_VariableString( "r_volumetricFogCylinderTop" ), "%f %f %f", &top[0], &top[1], &top[2] );
-			radius = r_volumetricFogCylinderRadius ? r_volumetricFogCylinderRadius->value : 64.0f;
-			density = r_volumetricFogCylinderDensity ? r_volumetricFogCylinderDensity->value : fog_density * 0.5f;
-			params.volumeBoundsMin[local_volume_count][0] = base[0];
-			params.volumeBoundsMin[local_volume_count][1] = base[1];
-			params.volumeBoundsMin[local_volume_count][2] = base[2];
-			params.volumeBoundsMin[local_volume_count][3] = 0.0f;
-			params.volumeBoundsMax[local_volume_count][0] = top[0];
-			params.volumeBoundsMax[local_volume_count][1] = top[1];
-			params.volumeBoundsMax[local_volume_count][2] = top[2];
-			params.volumeBoundsMax[local_volume_count][3] = 0.0f;
-			params.volumeColorDensity[local_volume_count][0] = params.fogColor[0];
-			params.volumeColorDensity[local_volume_count][1] = params.fogColor[1];
-			params.volumeColorDensity[local_volume_count][2] = params.fogColor[2];
-			params.volumeColorDensity[local_volume_count][3] = density;
-			params.volumeTypeParams[local_volume_count][0] = 2.0f;
-			params.volumeTypeParams[local_volume_count][1] = radius;
-			params.volumeTypeParams[local_volume_count][2] = -1.0f;
-			params.volumeTypeParams[local_volume_count][3] = 0.0f;
-			local_volume_count++;
-		}
-	}
-
-	/* Optional cone volume from r_volumetricFogCone* cvars */
-	{
-		float apex[3] = { 0.0f, 0.0f, 64.0f };
-		float base[3] = { 0.0f, 0.0f, 0.0f };
-		float radius, density;
-		int coneOn;
-		coneOn = r_volumetricFogCone ? r_volumetricFogCone->integer : 0;
-		if ( coneOn && local_volume_count < VK_VOLUMETRIC_MAX_VOLUMES ) {
-			sscanf( ri.Cvar_VariableString( "r_volumetricFogConeApex" ), "%f %f %f", &apex[0], &apex[1], &apex[2] );
-			sscanf( ri.Cvar_VariableString( "r_volumetricFogConeBase" ), "%f %f %f", &base[0], &base[1], &base[2] );
-			radius = r_volumetricFogConeRadius ? r_volumetricFogConeRadius->value : 96.0f;
-			density = r_volumetricFogConeDensity ? r_volumetricFogConeDensity->value : fog_density * 0.5f;
-			params.volumeBoundsMin[local_volume_count][0] = apex[0];
-			params.volumeBoundsMin[local_volume_count][1] = apex[1];
-			params.volumeBoundsMin[local_volume_count][2] = apex[2];
-			params.volumeBoundsMin[local_volume_count][3] = 0.0f;
-			params.volumeBoundsMax[local_volume_count][0] = base[0];
-			params.volumeBoundsMax[local_volume_count][1] = base[1];
-			params.volumeBoundsMax[local_volume_count][2] = base[2];
-			params.volumeBoundsMax[local_volume_count][3] = 0.0f;
-			params.volumeColorDensity[local_volume_count][0] = params.fogColor[0];
-			params.volumeColorDensity[local_volume_count][1] = params.fogColor[1];
-			params.volumeColorDensity[local_volume_count][2] = params.fogColor[2];
-			params.volumeColorDensity[local_volume_count][3] = density;
-			params.volumeTypeParams[local_volume_count][0] = 3.0f;
-			params.volumeTypeParams[local_volume_count][1] = radius;
-			params.volumeTypeParams[local_volume_count][2] = -1.0f;
-			params.volumeTypeParams[local_volume_count][3] = 0.0f;
-			local_volume_count++;
-		}
-	}
-
-	for ( int i = 0; i < (int)backEnd.viewParms.num_dlights && local_light_count < VK_VOLUMETRIC_MAX_LIGHTS; i++ ) {
-		const dlight_t *dl = &backEnd.viewParms.dlights[i];
-		float radius = dl->radius;
-
-		if ( radius <= 0.001f ) {
-			continue;
-		}
-
-		params.lightPosRadius[local_light_count][0] = dl->origin[0];
-		params.lightPosRadius[local_light_count][1] = dl->origin[1];
-		params.lightPosRadius[local_light_count][2] = dl->origin[2];
-		params.lightPosRadius[local_light_count][3] = radius;
-
-		params.lightColorType[local_light_count][0] = MAX( dl->color[0], 0.0f );
-		params.lightColorType[local_light_count][1] = MAX( dl->color[1], 0.0f );
-		params.lightColorType[local_light_count][2] = MAX( dl->color[2], 0.0f );
-		params.lightColorType[local_light_count][3] = dl->linear ? 1.0f : 0.0f;
-		// Shadow type is consumed by the local-light injection stage:
-		// 0 = unshadowed, 1 = spot shadow path, 2 = point shadow path.
-		// Per-light shadow slot index is written later into lightExtra.w.
-		params.lightExtra[local_light_count][2] = ( r_fog_shadows && r_fog_shadows->integer ) ? ( dl->linear ? 1.0f : 2.0f ) : 0.0f;
-
-		if ( dl->linear ) {
-			vec3_t dir;
-			float len;
-
-			VectorSubtract( dl->origin2, dl->origin, dir );
-			len = VectorNormalize( dir );
-			if ( len <= 0.001f ) {
-				VectorSet( dir, 0.0f, 0.0f, -1.0f );
-				len = radius;
-			}
-
-			params.lightDirAngle[local_light_count][0] = dir[0];
-			params.lightDirAngle[local_light_count][1] = dir[1];
-			params.lightDirAngle[local_light_count][2] = dir[2];
-			params.lightDirAngle[local_light_count][3] = cosf( DEG2RAD( 35.0f ) );
-			params.lightExtra[local_light_count][0] = cosf( DEG2RAD( 20.0f ) );
-			params.lightExtra[local_light_count][1] = len;
-			params.lightExtra[local_light_count][3] = -1.0f;
-		} else {
-			params.lightDirAngle[local_light_count][0] = 0.0f;
-			params.lightDirAngle[local_light_count][1] = 0.0f;
-			params.lightDirAngle[local_light_count][2] = 0.0f;
-			params.lightDirAngle[local_light_count][3] = -1.0f;
-			params.lightExtra[local_light_count][0] = -1.0f;
-			params.lightExtra[local_light_count][1] = radius;
-			params.lightExtra[local_light_count][3] = -1.0f;
-		}
-
-		local_light_count++;
-	}
-	params.volumeCounts[0] = (float)local_volume_count;
-	params.volumeCounts[1] = (float)local_light_count;
-	params.volumeCounts[2] = vk.sun_shadow_valid ? 1.0f : 0.0f;
-	params.volumeCounts[3] = 0.0f;
-	params.passParams[0] = 0.0f;
-	params.passParams[1] = (float)( ( vk.froxel_width + 1 ) / 2 );
-	params.passParams[2] = (float)( ( vk.froxel_height + 1 ) / 2 );
-	params.passParams[3] = (float)vk.froxel_slices;
-
-	Matrix16Identity( params.sunShadowMatrix0 );
-	if ( vk.sun_shadow_valid ) {
-		Com_Memcpy( params.sunShadowMatrix0, vk.sun_shadow_matrix0, sizeof( params.sunShadowMatrix0 ) );
-	}
-	params.shadowParams0[0] = ( r_fogShadowBias ) ? r_fogShadowBias->value : 0.001f;
-	params.shadowParams0[1] = ( r_fogShadowPcfRadius ) ? r_fogShadowPcfRadius->value : 1.0f;
-	params.shadowParams0[2] = ( r_fog_shadows && r_fog_shadows->integer ) ? 1.0f : 0.0f;
-	params.shadowParams0[3] = vk.sun_shadow_valid ? 1.0f : 0.0f;
-	params.shadowMapSize0[0] = (float)vk.sun_shadow_width;
-	params.shadowMapSize0[1] = (float)vk.sun_shadow_height;
-	params.shadowMapSize0[2] = ( vk.sun_shadow_width > 0 ) ? ( 1.0f / (float)vk.sun_shadow_width ) : 0.0f;
-	params.shadowMapSize0[3] = ( vk.sun_shadow_height > 0 ) ? ( 1.0f / (float)vk.sun_shadow_height ) : 0.0f;
-	params.localSpotShadowMapSize[0] = (float)vk.local_spot_shadow_atlas_size;
-	params.localSpotShadowMapSize[1] = (float)vk.local_spot_shadow_atlas_size;
-	params.localSpotShadowMapSize[2] = ( vk.local_spot_shadow_atlas_size > 0 ) ? ( 1.0f / (float)vk.local_spot_shadow_atlas_size ) : 0.0f;
-	params.localSpotShadowMapSize[3] = ( vk.local_spot_shadow_atlas_size > 0 ) ? ( 1.0f / (float)vk.local_spot_shadow_atlas_size ) : 0.0f;
-	params.localPointShadowMapSize[0] = (float)vk.local_point_shadow_face_size;
-	params.localPointShadowMapSize[1] = (float)vk.local_point_shadow_face_size;
-	params.localPointShadowMapSize[2] = ( vk.local_point_shadow_face_size > 0 ) ? ( 1.0f / (float)vk.local_point_shadow_face_size ) : 0.0f;
-	params.localPointShadowMapSize[3] = (float)vk.local_point_shadow_capacity;
-	if ( params.shadowParams0[0] < 0.0f ) {
-		params.shadowParams0[0] = 0.0f;
-	}
-	if ( params.shadowParams0[1] < 0.0f ) {
-		params.shadowParams0[1] = 0.0f;
-	}
-
-	params.telemetryParams0[0] = (float)vk_volumetric_validation_state.telemetry_nan_or_inf;
-	params.telemetryParams0[1] = (float)vk_volumetric_validation_state.telemetry_extinction_clamp_hits;
-	params.telemetryParams0[2] = (float)vk_volumetric_validation_state.telemetry_temporal_rejects;
-	params.telemetryParams0[3] = fluid_target_ms;
-	params.telemetryParams1[0] = vk.volumetric_total_ms;
-	params.telemetryParams1[1] = vk.volumetric_fluid_ms;
-	params.telemetryParams1[2] = fluid_enabled ? fluid_effective_scale : 0.0f;
-	params.telemetryParams1[3] = fluid_enabled ? (float)fluid_pressure_iterations : 0.0f;
-
-	if ( r_fogDebug && r_fogDebug->integer > 0 && ( vk.volumetric_frame % 120u ) == 0u ) {
-		ri.Printf( PRINT_ALL,
-			"[VK][fog] params grid=(%.0f %.0f %.0f %.0f) phase=(%.3f %.3f %.3f %.0f) misc=(%.0f %.0f %.3f %.0f) density=(%.5f %.5f %.5f %.5f) fogColor=(%.3f %.3f %.3f %.3f) worldMin=(%.1f %.1f %.1f) worldMax=(%.1f %.1f %.1f)\n",
-			params.gridDim[0], params.gridDim[1], params.gridDim[2], params.gridDim[3],
-			params.phaseParams[0], params.phaseParams[1], params.phaseParams[2], params.phaseParams[3],
-			params.miscParams[0], params.miscParams[1], params.miscParams[2], params.miscParams[3],
-			params.densityParams[0], params.densityParams[1], params.densityParams[2], params.densityParams[3],
-			params.fogColor[0], params.fogColor[1], params.fogColor[2], params.fogColor[3],
-			params.worldMin[0], params.worldMin[1], params.worldMin[2],
-			params.worldMax[0], params.worldMax[1], params.worldMax[2] );
-		ri.Printf( PRINT_ALL, "[VK][fog] viewOrigin=(%.2f %.2f %.2f %.2f) sunDir=(%.3f %.3f %.3f)\n",
-			params.viewOrigin[0], params.viewOrigin[1], params.viewOrigin[2], params.viewOrigin[3],
-			params.sunDirection[0], params.sunDirection[1], params.sunDirection[2] );
-		ri.Printf( PRINT_ALL, "[VK][fog] frame=%u hasHistory=%.0f jitter=%.3f\n",
-			vk.volumetric_frame, params.miscParams[3], jitter_amount );
-		ri.Printf( PRINT_ALL, "[VK][fog] slice near=%.3f far=%.1f zExp=%.3f maxDist=%.1f\n",
-			params.sliceParams[0], params.sliceParams[1], params.sliceParams[2], params.sliceParams[3] );
-		ri.Printf( PRINT_ALL, "[VK][fog] noise scale=%.5f threshold=%.3f strength=%.3f windDir=(%.3f %.3f %.3f) windSpeed=%.3f dt=%.4f\n",
-			params.noiseParams[0], params.noiseParams[1], params.noiseParams[2],
-			params.noiseScroll[0], params.noiseScroll[1], params.noiseScroll[2],
-			params.windParams[2], params.windParams[1] );
-		ri.Printf( PRINT_ALL, "[VK][fog] fluid enabled=%.0f grid=%.0fx%.0f dt=%.4f visc=%.4f diss=%.4f force=%.3f iters=%.0f clamp=%.2f wrap=%.0f velIdx=%.0f denIdx=%.0f\n",
-			params.fluidParams1[3], params.fluidParams2[0], params.fluidParams2[1], params.fluidParams0[0],
-			params.fluidParams0[1], params.fluidParams0[2], params.fluidParams0[3], params.fluidParams1[2],
-			params.fluidParams1[0], params.fluidParams1[1], params.fluidParams2[2], params.fluidParams2[3] );
-		ri.Printf( PRINT_ALL, "[VK][fog] showcase preset=%d\n", fog_showcase );
-		ri.Printf( PRINT_ALL, "[VK][fog] reprojection threshold=%.4f depthEps=%.4f fireflyClamp=%.3f cameraCut=%.0f quality=%.0f checkerboard=%.0f transCut=%.4f volumes=%.0f lights=%.0f\n",
-			params.temporalParams[0], params.temporalParams[1], params.temporalParams[2], params.temporalParams[3],
-			params.qualityParams[0], params.qualityParams[1], params.qualityParams[3], params.volumeCounts[0], params.volumeCounts[1] );
-		ri.Printf( PRINT_ALL, "[VK][fog] sun shadow enabled=%.0f valid=%.0f bias=%.6f pcf=%.3f size=%.0fx%.0f\n",
-			params.shadowParams0[2], params.shadowParams0[3], params.shadowParams0[0], params.shadowParams0[1],
-			params.shadowMapSize0[0], params.shadowMapSize0[1] );
-	}
-
-	Com_Memcpy( vk.volumetric_params_ptr, &params, sizeof( params ) );
-	Com_Memcpy( vk_prev_view_matrix, view, sizeof( vk_prev_view_matrix ) );
-	Com_Memcpy( vk_prev_projection_matrix, projection, sizeof( vk_prev_projection_matrix ) );
-	Com_Memcpy( vk_prev_viewproj_matrix, params.viewProj, sizeof( vk_prev_viewproj_matrix ) );
-	vk_prev_matrices_valid = qtrue;
-
-	vk.volumetric_frame++;
-}
-
 
 /*
  * SSAO/HBAO pass. Runs before bloom so AO darkens the scene before bloom extraction.
