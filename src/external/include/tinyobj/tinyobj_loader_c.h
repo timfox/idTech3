@@ -550,31 +550,6 @@ static char *my_strndup(const char *s, size_t len) {
   return d;
 }
 
-char *dynamic_fgets(char **buf, size_t *size, FILE *file) {
-  char *offset;
-  char *ret;
-  size_t old_size;
-
-  if (!(ret = fgets(*buf, (int)*size, file))) {
-    return ret;
-  }
-
-  if (NULL != strchr(*buf, '\n')) {
-    return ret;
-  }
-
-  do {
-    old_size = *size;
-    *size *= 2;
-    *buf = (char*)TINYOBJ_REALLOC_SIZED(*buf, old_size, *size);
-    offset = &((*buf)[old_size - 1]);
-
-    ret = fgets(offset, (int)(old_size + 1), file);
-  } while(ret && (NULL == strchr(*buf, '\n')));
-
-  return ret;
-}
-
 static void initMaterial(tinyobj_material_t *material) {
   int i;
   material->name = NULL;
@@ -1349,7 +1324,7 @@ static size_t basename_len(const char *filename, size_t filename_length) {
   /* On Windows, the directory delimiter is '\' and both it and '/' is
    * reserved by the filesystem. On *nix platforms, only the '/' character 
    * is reserved, so account for the two cases separately. */
-  #if _WIN32
+  #if defined(_WIN32)
     while (p[-1] != '/' && p[-1] != '\\') {
       if (p == filename) {
         count = filename_length;

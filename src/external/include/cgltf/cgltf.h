@@ -1494,7 +1494,7 @@ cgltf_result cgltf_load_buffers(const cgltf_options* options, cgltf_data* data, 
 			return cgltf_result_data_too_short;
 		}
 
-		data->buffers[0].data = (void*)data->bin;
+		data->buffers[0].data = (void*)(uintptr_t)data->bin;
 		data->buffers[0].data_free_method = cgltf_data_free_method_none;
 	}
 
