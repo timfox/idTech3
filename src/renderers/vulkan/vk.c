@@ -6,6 +6,7 @@
 #include "vk_skybox_hdr.h"
 #include "vk_atmosphere.h"
 #include "vk_temporal.h"
+#include "vk_volumetric_params.h"
 #include "vk_util.h"
 #include <math.h>
 
@@ -256,121 +257,8 @@ static uint32_t vk_alloc_pipeline( const Vk_Pipeline_Def *def );
 static VkPipeline vk_gen_pipeline( uint32_t index );
 uint32_t vk_find_pipeline_ext( uint32_t base, const Vk_Pipeline_Def *def, qboolean use );
 
-#define VK_FROXEL_DEFAULT_WIDTH 160
-#define VK_FROXEL_DEFAULT_HEIGHT 90
-#define VK_FROXEL_DEFAULT_SLICES 96
-#define VK_FLUID_DEFAULT_RESOLUTION_SCALE 0.5f
-#define VK_FLUID_MAX_PRESSURE_ITERATIONS 64
-#define VK_VOLUMETRIC_MAX_VOLUMES 24
-#define VK_VOLUMETRIC_MAX_LIGHTS 32
 #define VK_VOLUMETRIC_QUERY_SLOTS 16
 #define VK_VOLUMETRIC_QUERY_COUNT (VK_VOLUMETRIC_QUERY_SLOTS * NUM_COMMAND_BUFFERS)
-#define VK_VOLUMETRIC_TELEMETRY_COUNTERS 8
-
-typedef struct {
-	float invProj[16];
-	float invView[16];
-	float proj[16];
-	float viewProj[16];
-	float prevView[16];
-	float prevViewProj[16];
-	float viewOrigin[4];
-	float sunDirection[4];
-	float fogColor[4];
-	float densityParams[4];
-	float worldMin[4];
-	float worldMax[4];
-	float gridDim[4];
-	float miscParams[4];
-	float sliceParams[4];
-	float phaseParams[4];
-	float scatterParams[4];  /* [0]=albedo, [1]=extinctionScale, [2-3]=reserved */
-	float noiseParams[4];
-	float noiseScroll[4];
-	float temporalParams[4];
-	float qualityParams[4];
-	float windParams[4];
-	float volumeCounts[4];
-	float passParams[4];
-	float volumeBoundsMin[VK_VOLUMETRIC_MAX_VOLUMES][4];
-	float volumeBoundsMax[VK_VOLUMETRIC_MAX_VOLUMES][4];
-	float volumeColorDensity[VK_VOLUMETRIC_MAX_VOLUMES][4];
-	float volumeTypeParams[VK_VOLUMETRIC_MAX_VOLUMES][4];  /* .x=type(0=box,1=sphere), .y=radius, .z=blendDist(-1=global), .w=albedo(0=global) */
-	float lightPosRadius[VK_VOLUMETRIC_MAX_LIGHTS][4];
-	float lightColorType[VK_VOLUMETRIC_MAX_LIGHTS][4];
-	float lightDirAngle[VK_VOLUMETRIC_MAX_LIGHTS][4];
-	float lightExtra[VK_VOLUMETRIC_MAX_LIGHTS][4];
-	float sunShadowMatrix0[16];
-	float shadowParams0[4];
-	float shadowMapSize0[4];
-	float localSpotShadowMatrix[VK_VOLUMETRIC_MAX_LIGHTS][16];
-	float localPointShadowMatrix[VK_VOLUMETRIC_MAX_LIGHTS][6][16];
-	float localShadowAtlasUv[VK_VOLUMETRIC_MAX_LIGHTS][4];
-	float localSpotShadowMapSize[4];
-	float localPointShadowMapSize[4];
-	float fluidParams0[4];
-	float fluidParams1[4];
-	float fluidParams2[4];
-	float fluidWorldMap[4];
-	float fluidEmitters[16][4];  /* pos.xyz + radius, up to 16 emitters */
-	float fluidEmitterData[16][4]; /* density, temperature, vel.x, vel.y per emitter */
-	float fluidEmitterCount[4]; /* [0]=count, [1..3]=reserved */
-	float telemetryParams0[4];
-	float telemetryParams1[4];
-} volumetric_params_t;
-
-_Static_assert( ( sizeof( volumetric_params_t ) % 16 ) == 0, "volumetric_params_t must be 16-byte aligned in size" );
-#define VK_VOLUMETRIC_ASSERT_ALIGNED16(member) _Static_assert( ( offsetof( volumetric_params_t, member ) % 16 ) == 0, "volumetric_params_t::" #member " must be 16-byte aligned" )
-VK_VOLUMETRIC_ASSERT_ALIGNED16( invProj );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( invView );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( proj );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( viewProj );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( prevView );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( prevViewProj );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( viewOrigin );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( sunDirection );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( fogColor );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( densityParams );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( worldMin );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( worldMax );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( gridDim );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( miscParams );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( sliceParams );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( phaseParams );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( scatterParams );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( noiseParams );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( noiseScroll );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( temporalParams );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( qualityParams );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( windParams );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( volumeCounts );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( passParams );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( volumeBoundsMin );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( volumeBoundsMax );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( volumeColorDensity );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( volumeTypeParams );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( lightPosRadius );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( lightColorType );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( lightDirAngle );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( lightExtra );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( sunShadowMatrix0 );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( shadowParams0 );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( shadowMapSize0 );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( localSpotShadowMatrix );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( localPointShadowMatrix );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( localShadowAtlasUv );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( localSpotShadowMapSize );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( localPointShadowMapSize );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( fluidParams0 );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( fluidParams1 );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( fluidParams2 );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( fluidWorldMap );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( fluidEmitters );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( fluidEmitterData );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( fluidEmitterCount );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( telemetryParams0 );
-VK_VOLUMETRIC_ASSERT_ALIGNED16( telemetryParams1 );
-#undef VK_VOLUMETRIC_ASSERT_ALIGNED16
 
 static VkSampler vk_find_sampler( const Vk_Sampler_Def *def );
 static void vk_create_froxel_images( void );
@@ -1652,8 +1540,11 @@ static void vk_create_render_passes( void )
 		atm_att[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 		atm_att[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 		atm_att[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-		atm_att[1].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-		atm_att[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+		/* Main/post-bloom leave the shared depth buffer in attachment layout.
+		 * Let the render pass perform the internal transition to read-only depth
+		 * for the subpass, then return it to attachment layout on exit. */
+		atm_att[1].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		atm_att[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 		atm_color_ref.attachment = 0;
 		atm_color_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -8034,12 +7925,12 @@ void vk_initialize( void )
 		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_ssr ) );
 		SET_OBJECT_NAME( vk.pipeline_layout_ssr, "pipeline layout - ssr", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
 
-		/* Atmosphere: push constants only (7 vec4s = 112 bytes) */
+		/* Atmosphere: push constants only (10 vec4s = 160 bytes) */
 		desc.setLayoutCount = 0;
 		desc.pSetLayouts = NULL;
 		push_range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 		push_range.offset = 0;
-		push_range.size = 112;
+		push_range.size = sizeof( vkAtmospherePushConstants_t );
 		desc.pushConstantRangeCount = 1;
 		desc.pPushConstantRanges = &push_range;
 		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_atmosphere ) );
@@ -14971,6 +14862,7 @@ void vk_begin_main_render_pass( void )
 	vk_scene_src_rect_valid = qfalse;
 
 	vk_begin_render_pass( vk.render_pass.main, frameBuffer, qtrue, vk.renderWidth, vk.renderHeight );
+	vk.depth_image_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 }
 
 
@@ -14994,6 +14886,7 @@ void vk_begin_post_bloom_render_pass( void )
 	vk.renderScaleX = vk.renderScaleY = 1.0f;
 
 	vk_begin_render_pass( vk.render_pass.post_bloom, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+	vk.depth_image_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 }
 
 
@@ -16371,16 +16264,17 @@ static void vk_atmosphere_pass( void )
 	}
 
 	depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
-	if ( glConfig.stencilBits > 0 ) depth_aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
+	if ( glConfig.stencilBits > 0 ) {
+		depth_aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
+	}
+
+	record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 0, 0 );
 
 	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT );
-
-	record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
-		VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
-		VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT );
 
 	vk_begin_render_pass( vk.render_pass.atmosphere, vk.framebuffers.atmosphere[ vk.cmd->swapchain_image_index ], qtrue,
 		glConfig.vidWidth, glConfig.vidHeight );
@@ -16394,6 +16288,7 @@ static void vk_atmosphere_pass( void )
 	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 
 	vk_end_render_pass();
+	vk.depth_image_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
