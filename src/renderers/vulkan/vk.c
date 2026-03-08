@@ -15684,6 +15684,13 @@ static void vk_fluid_simulation_pass( float delta_time )
 	if ( vk.volumetric_params_ptr == NULL ) {
 		return;
 	}
+	/* Guard: ensure all fluid images exist before dispatching (avoids Bus error on some drivers) */
+	if ( vk.fluid_velocity_images[0] == VK_NULL_HANDLE || vk.fluid_velocity_images[1] == VK_NULL_HANDLE ||
+	     vk.fluid_density_images[0] == VK_NULL_HANDLE || vk.fluid_density_images[1] == VK_NULL_HANDLE ||
+	     vk.fluid_pressure_images[0] == VK_NULL_HANDLE || vk.fluid_pressure_images[1] == VK_NULL_HANDLE ||
+	     vk.fluid_divergence_image == VK_NULL_HANDLE ) {
+		return;
+	}
 
 	volumetric_params_t *params_rw = (volumetric_params_t *)vk.volumetric_params_ptr;
 	if ( params_rw->fluidParams1[3] < 0.5f ) {
