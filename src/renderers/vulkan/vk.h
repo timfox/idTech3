@@ -1264,3 +1264,10 @@ typedef struct {
 
 extern Vk_Instance	vk;				// shouldn't be cleared during ref re-init
 extern Vk_World		vk_world;		// this data is cleared during ref re-init
+
+/* Vulkan function pointers (loaded at init, used by vk_image_layout.c, vk_render_pass.c) */
+extern PFN_vkCmdBeginRenderPass		qvkCmdBeginRenderPass;
+extern PFN_vkCmdEndRenderPass		qvkCmdEndRenderPass;
+extern PFN_vkCmdPipelineBarrier		qvkCmdPipelineBarrier;
+extern PFN_vkCmdSetScissor			qvkCmdSetScissor;
+extern PFN_vkCmdSetViewport			qvkCmdSetViewport;
