@@ -1592,6 +1592,7 @@ extern cvar_t	*r_glintDMax;
 extern cvar_t	*r_renderWidth;
 extern cvar_t	*r_renderHeight;
 extern cvar_t	*r_renderScale;
+extern cvar_t	*r_temporalDebug;
 #endif
 
 extern cvar_t	*r_dlightBacks;			// dlight non-facing surfaces for continuity

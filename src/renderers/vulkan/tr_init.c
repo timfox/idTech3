@@ -169,6 +169,7 @@ cvar_t	*r_ssaoDebugView;
 cvar_t	*r_renderWidth;
 cvar_t	*r_renderHeight;
 cvar_t	*r_renderScale;
+cvar_t	*r_temporalDebug;
 cvar_t	*r_screenMapScale;
 cvar_t	*r_ext_supersample;
 cvar_t	*r_ext_smaa;
@@ -3130,7 +3131,10 @@ static void R_Register( void )
 		" 2 - nearest filtering, preserve aspect ratio (black bars on sides)\n"
 		" 3 - linear filtering, stretch to full size\n"
 		" 4 - linear filtering, preserve aspect ratio (black bars on sides)\n" );
-#endif // USE_VULKAN
+	r_temporalDebug = ri.Cvar_Get( "r_temporalDebug", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_temporalDebug, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_temporalDebug, "Temporal diagnostics:\n 0 - off\n 1 - log temporal reset reasons\n 2 - log reset reasons plus shared camera-cut and invalidated consumers." );
+	#endif // USE_VULKAN
 
 	// Register modular subsystem cvars
 	VFog_RegisterCvars();

@@ -835,6 +835,21 @@ typedef struct {
 	vec3_t prevViewOrigin;  /* for camera cut detection (snap exposure on large view jump) */
 	vec3_t prevViewForward; /* viewaxis[2] for angle-change detection (e.g. death cam tilt) */
 	int prevClientState;
+	struct {
+		uint32_t pendingResetReasons;
+		uint32_t appliedResetReasons;
+		qboolean sharedCameraCut;
+		qboolean unreliableMotionThisFrame;
+		qboolean worldWasValid;
+		qboolean noWorldModel;
+		qboolean stableGameplayState;
+		uint32_t lastRenderWidth;
+		uint32_t lastRenderHeight;
+		uint32_t lastSwapchainWidth;
+		uint32_t lastSwapchainHeight;
+		char worldName[MAX_QPATH];
+		uint32_t frameIndex;
+	} temporal;
 
 	//
 	// Shader modules.

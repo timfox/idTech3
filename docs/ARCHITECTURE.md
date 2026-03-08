@@ -94,16 +94,23 @@ CL_Frame(msec)
 
 ## Renderer Pipeline (Vulkan)
 
-1. Shadow passes (sun CSM, spot atlas, point cubemaps)
-2. Main render pass (PBR materials, per-pixel lighting)
-3. Volumetric fog (froxel compute, fluid sim, temporal)
-4. SSAO/HBAO (sample → blur → combine into color; runs before bloom for AO-darkened bloom)
-5. Bloom (extract → multi-pass blur → blend)
-6. SMAA (edge → blend → compose)
-7. Post-processing (tonemapping, panini, lens effects)
-8. Present
+The shipping Vulkan renderer is **forward-only** with a layered HDR/post-processing pipeline.
 
-SSAO and bloom are culled for menus/cinematics (RDF_NOWORLDMODEL).
+1. Shadow passes (sun CSM, spot atlas, point cubemaps)
+2. Main forward scene pass
+3. Optional OIT resolve for transparent surfaces
+4. SSR
+5. Bloom
+6. SSAO/HBAO
+7. Atmosphere + volumetric fog
+8. SMAA
+9. Luminance / eye adaptation
+10. Gamma / tonemap / lens effects
+11. Present
+
+`r_renderMode 1/2` are placeholders only; there is no shipping deferred or Forward+ renderer yet.
+
+For the 2026 renderer direction, see [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_2026_ARCHITECTURE_PASS.md).
 
 ## JavaScript / UI Debug (Duktape)
 

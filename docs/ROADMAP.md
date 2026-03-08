@@ -68,6 +68,11 @@
 
 ## Remaining Work
 
+### Renderer 2026 Architecture Pass
+- [ ] Lighting scalability: move Vulkan from legacy dynamic-light selection toward clustered Forward+; decouple Vulkan light scale from `MAX_DLIGHTS` and surface-bit assumptions. See `docs/RENDERER_2026_ARCHITECTURE_PASS.md`.
+- [ ] Temporal robustness: introduce shared history invalidation and stronger motion-vector coverage before adding TAA/upscaling or RT reuse systems. See `docs/RENDERER_2026_ARCHITECTURE_PASS.md`.
+- [ ] Platform strategy: keep Vulkan primary, freeze OpenGL as compatibility-only, prioritize Metal ahead of DXR, and treat RTX as a Vulkan feature tier. See `docs/RENDERER_2026_ARCHITECTURE_PASS.md`.
+
 ### Short-Term (completed)
 - [x] Connect BSP geometry extraction to map loading for automatic navmesh
 - [x] PostFX specialization constants in vk.c gamma pipeline

@@ -4,6 +4,12 @@
 
 The Vulkan 1.4 renderer is the primary rendering backend, built as a shared library (`idtech3_vulkan.so`). Requests Vulkan 1.4 when available; validation layers (Khronos, then LUNARG fallback) are enabled in debug builds on all platforms.
 
+### Current Architecture
+- Forward renderer with a large HDR/post-processing stack
+- No shipping deferred or Forward+ path yet; `r_renderMode 1/2` remain placeholders
+- Vulkan is the primary feature backend; OpenGL is compatibility fallback
+- See [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_2026_ARCHITECTURE_PASS.md) for the focused 2026 renderer direction
+
 ### Physically Based Rendering (PBR)
 - Metalness/roughness workflow with Cook-Torrance BRDF
 - Image-based lighting (IBL) with prefiltered environment maps
@@ -61,7 +67,9 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - Compute runs at frame start; visual integration (draw from modified buffer) is a future enhancement
 
 ### RB_ColorMask (Vulkan)
-- **Implemented**: Uses `VK_EXT_extended_dynamic_state3` when available. Enables `vkCmdSetColorWriteMaskEXT` for shadow volumes and other color-mask use cases. Gracefully no-ops when the extension is not supported.
+- `RB_ColorMask` is wired through `vk_set_color_write_mask()`, but the `VK_EXT_extended_dynamic_state3` path is currently disabled due to validation/driver issues.
+- Current behavior falls back to full color writes when the dynamic mask path is unavailable.
+- Treat this as partial infrastructure rather than a production-ready Vulkan parity feature.
 
 ### Anti-Aliasing
 - **SMAA** (Sub-pixel Morphological Anti-Aliasing): edge detection, blend weight, and compose passes. Cvars: `r_ext_smaa` (enable), `r_smaa_preset` (0=Custom, 1=Low, 2=Medium, 3=High, 4=Ultra), `r_smaa_threshold` (0.01–0.5), `r_smaa_local_contrast` (1–4), `r_smaa_max_search_steps` (8–32), `r_smaa_corner_rounding` (0–1). Preset overrides manual params when non-zero. Edge detection uses max(left,right) and max(top,bottom) deltas (reference SMAA), HDR-safe luma, configurable corner rounding, and explicit LOD 0 sampling. Requires `r_fbo 1`.
@@ -197,3 +205,5 @@ See [RENDERERS_FUTURE.md](RENDERERS_FUTURE.md) for architecture and implementati
 - **Vulkan RTX**: `VK_KHR_ray_tracing_pipeline` integration. Build with `-DUSE_VULKAN_RTX=ON`. Cvar `r_rtx` (0–3) reserved.
 - **Metal**: Native Metal renderer for macOS/iOS (Apple Silicon). Option `USE_METAL_RENDERER` reserved.
 - **DXR**: DirectX 12 + DirectX Raytracing for Windows. Option `USE_DXR_RENDERER` reserved.
+
+For practical renderer direction and priority order, see [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_2026_ARCHITECTURE_PASS.md).
