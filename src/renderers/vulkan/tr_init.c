@@ -327,6 +327,7 @@ cvar_t	*r_fogFluidBuoyancy;
 cvar_t	*r_volumetricFogValidation;
 cvar_t	*r_volumetricFogValidationPrintInterval;
 cvar_t	*r_volumetricFogForceCameraCut;
+cvar_t	*r_volumetricFogSkipStatic;
 cvar_t	*r_volumetricFogPerfTimers;
 cvar_t	*r_volumetricFogPerfPrintInterval;
 cvar_t	*r_volumetricFogTemporalStability;
@@ -2772,6 +2773,11 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_volumetricFogForceCameraCut, "One-shot debug trigger to force a volumetric camera-cut history reset on the next frame." );
 	ri.Cvar_SetGroup( r_volumetricFogForceCameraCut, CVG_RENDERER );
 
+	r_volumetricFogSkipStatic = ri.Cvar_Get( "r_volumetricFogSkipStatic", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogSkipStatic, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_volumetricFogSkipStatic, "Skip volumetric fog when view is nearly static (e.g. death cam). Prevents gradient/streak artifacts. 0=always run fog." );
+	ri.Cvar_SetGroup( r_volumetricFogSkipStatic, CVG_RENDERER );
+
 	r_volumetricFogPerfTimers = ri.Cvar_Get( "r_volumetricFogPerfTimers", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogPerfTimers, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_volumetricFogPerfTimers, "Enable Vulkan timestamp profiling for volumetric fog stages and fluid auto-scaling." );
@@ -2904,11 +2910,11 @@ static void R_Register( void )
 	r_hdr = ri.Cvar_Get( "r_hdr", "2", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_hdr, "-1", "3", CV_INTEGER );
 	ri.Cvar_SetDescription(r_hdr, "HDR frame buffer format. Requires \\r_fbo 1.\n -1: 4-bit (B4G4R4A4), testing only\n  0: 8-bit, moderate banding\n  1: 16-bit float (RGBA16F)\n  2: 32-bit float (RGBA32F), default, fallback to 16F if unsupported\n  3: 64-bit float (RGBA64F), optional; falls back to 32F (glslang lacks dvec4 fragment output support)\n" );
-	r_bloom = ri.Cvar_Get( "r_bloom", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	r_bloom = ri.Cvar_Get( "r_bloom", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_bloom, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription(r_bloom, "Enables bloom post-processing effect. Requires \\r_fbo 1.");
 
-	r_ssao = ri.Cvar_Get( "r_ssao", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	r_ssao = ri.Cvar_Get( "r_ssao", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ssao, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ssao, "Enables screen-space ambient occlusion (SSAO). Requires \\r_fbo 1." );
 

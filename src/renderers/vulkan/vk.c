@@ -1,6 +1,7 @@
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_postfx.h"
+#include "vk_post_fog.h"
 #include "vk_skybox_hdr.h"
 #include <math.h>
 
@@ -4012,78 +4013,6 @@ static void vk_update_color_descriptor_image( VkImageView color_view )
 	vk_write_color_descriptor_image( vk.post_color_descriptor[vk.cmd_index], color_view );
 }
 
-static const char *vk_post_fog_source_name( VkImageView color_source )
-{
-	if ( color_source == vk.color_image_view ) {
-		return "color_image";
-	}
-	if ( color_source == vk.smaa_output_image_view ) {
-		return "smaa_output";
-	}
-	if ( color_source == vk.fog_scene_image_view ) {
-		return "fog_scene";
-	}
-	if ( color_source == VK_NULL_HANDLE ) {
-		return "null";
-	}
-	return "unknown_view";
-}
-
-static VkImage vk_post_fog_source_image( VkImageView color_source )
-{
-	if ( color_source == vk.color_image_view ) {
-		return vk.color_image;
-	}
-	if ( color_source == vk.smaa_output_image_view ) {
-		return vk.smaa_output_image;
-	}
-	if ( color_source == vk.fog_scene_image_view ) {
-		return vk.fog_scene_image;
-	}
-	return VK_NULL_HANDLE;
-}
-
-/*
- * Throttle r_fboDebug 2/3 per-frame logs to at most once per second.
- * Avoids console spam when debugging FBO pipeline.
- */
-static qboolean vk_fbo_debug_throttle( void )
-{
-	static unsigned int last_ms = 0;
-	unsigned int now = ri.Milliseconds();
-	if ( now - last_ms < 1000 )
-		return qfalse;
-	last_ms = now;
-	return qtrue;
-}
-
-static void vk_log_post_fog_rebind( const char *reason, VkImageView color_source )
-{
-	if ( r_fboDebug && r_fboDebug->integer >= 1 && vk_fbo_debug_throttle() ) {
-		ri.Printf( PRINT_DEVELOPER, "[VK][fbo] %s -> %s view=0x%llx\n",
-			reason ? reason : "post-fog source rebind",
-			vk_post_fog_source_name( color_source ),
-			(unsigned long long)(uintptr_t)color_source );
-	}
-}
-
-/*
- * Centralized post-fog source selection for luminance/gamma passes.
- * When volumetrics are skipped (menu, no world, tier off), force color_image
- * so descriptors do not keep stale SMAA source from a previous frame.
- * Returns the VkImageView to sample for post-fog effects.
- */
-static VkImageView vk_get_post_fog_source( void )
-{
-	/* Use post_fog_color_source when set (SMAA output or color); else color_image_view.
-	 * When volumetrics skipped, post_fog is set by vk_volumetric_fog_pass skip paths or
-	 * vk_end_frame menu SMAA path. Avoid stale smaa_output by ensuring all paths set it. */
-	if ( vk.post_fog_color_source != VK_NULL_HANDLE ) {
-		return vk.post_fog_color_source;
-	}
-	return vk.color_image_view;
-}
-
 /*
  * Explicit postprocess source visibility barrier.
  * Keep layout in SHADER_READ_ONLY and enforce availability of previous
@@ -4124,7 +4053,7 @@ static void vk_barrier_post_fog_source_for_sampling( VkImageView color_source, c
 		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 		0, 0, NULL, 0, NULL, 1, &barrier );
 
-	if ( r_fboDebug && r_fboDebug->integer >= 2 && vk_fbo_debug_throttle() ) {
+	if ( r_fboDebug && r_fboDebug->integer >= 2 && vk_post_fog_fbo_debug_throttle() ) {
 		ri.Printf( PRINT_DEVELOPER,
 			"[VK][fbo] post-fog source barrier (%s): %s image=0x%llx view=0x%llx\n",
 			reason ? reason : "unspecified",
@@ -4187,7 +4116,7 @@ static void vk_update_post_fog_descriptors( VkImageView color_source )
 		updated_luminance = qtrue;
 	}
 
-	if ( r_fboDebug && r_fboDebug->integer >= 1 && vk_fbo_debug_throttle() ) {
+	if ( r_fboDebug && r_fboDebug->integer >= 1 && vk_post_fog_fbo_debug_throttle() ) {
 		ri.Printf( PRINT_DEVELOPER,
 			"[VK][fbo] post_fog_color_source: %s -> %s view=0x%llx luminance=%s\n",
 			vk_post_fog_source_name( old_source ),
@@ -16612,6 +16541,24 @@ static void vk_volumetric_fog_pass( void )
 	vk_resolve_volumetric_depth_msaa();
 	vk_update_volumetric_params();
 
+	/* Skip volumetrics when view is nearly static (death cam) to avoid gradient/streak artifacts */
+	if ( r_volumetricFogSkipStatic && r_volumetricFogSkipStatic->integer &&
+		vk_near_static_view_frames >= 30 ) {
+		vk_reset_volumetric_history();
+		vk_log_post_fog_rebind( "volumetric skipped (static view, death cam)", vk.color_image_view );
+		vk_update_post_fog_descriptors( vk.color_image_view );
+		if ( tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+			VkImageAspectFlags da = VK_IMAGE_ASPECT_DEPTH_BIT;
+			if ( glConfig.stencilBits > 0 ) da |= VK_IMAGE_ASPECT_STENCIL_BIT;
+			record_depth_image_layout_transition( vk.cmd->command_buffer, da,
+				VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT );
+		}
+		backEnd.doneFog = qtrue;
+		return;
+	}
+
 	vk_volumetric_validation_state.telemetry_nan_or_inf = 0;
 	vk_volumetric_validation_state.telemetry_extinction_clamp_hits = 0;
 	vk_volumetric_validation_state.telemetry_velocity_clamp_hits = 0;
@@ -17272,7 +17219,7 @@ void vk_end_frame( void )
 				if ( capture_src != VK_NULL_HANDLE &&
 					vk.render_pass.capture != VK_NULL_HANDLE && vk.framebuffers.capture != VK_NULL_HANDLE ) {
 					vk_barrier_post_fog_source_for_sampling( capture_src, "vk_end_frame pre-capture" );
-					if ( r_fboDebug && r_fboDebug->integer >= 2 && vk_fbo_debug_throttle() ) {
+					if ( r_fboDebug && r_fboDebug->integer >= 2 && vk_post_fog_fbo_debug_throttle() ) {
 						ri.Printf( PRINT_DEVELOPER, "[VK][fbo] capture source -> %s view=0x%llx\n",
 							vk_post_fog_source_name( capture_src ),
 							(unsigned long long)(uintptr_t)capture_src );
@@ -17387,7 +17334,7 @@ void vk_end_frame( void )
 
 				vk.renderScaleX = 1.0;
 				vk.renderScaleY = 1.0;
-				if ( r_fboDebug && r_fboDebug->integer >= 2 && vk_fbo_debug_throttle() ) {
+				if ( r_fboDebug && r_fboDebug->integer >= 2 && vk_post_fog_fbo_debug_throttle() ) {
 					const float sx = ( glConfig.vidWidth > 0 ) ? (float)vk.renderWidth / (float)glConfig.vidWidth : 1.0f;
 					const float sy = ( glConfig.vidHeight > 0 ) ? (float)vk.renderHeight / (float)glConfig.vidHeight : 1.0f;
 					ri.Printf( PRINT_DEVELOPER,
@@ -17398,7 +17345,7 @@ void vk_end_frame( void )
 						vk_post_fog_source_name( post_fog_src ),
 						sx, sy );
 				}
-				if ( r_fboDebug && r_fboDebug->integer >= 3 && vk_fbo_debug_throttle() ) {
+				if ( r_fboDebug && r_fboDebug->integer >= 3 && vk_post_fog_fbo_debug_throttle() ) {
 					ri.Printf( PRINT_DEVELOPER,
 						"[VK][fbo] gamma pipeline=0x%llx color_desc=0x%llx layout=0x%llx rp=0x%llx fb=0x%llx\n",
 						(unsigned long long)(uintptr_t)vk.gamma_pipeline,
@@ -17410,7 +17357,7 @@ void vk_end_frame( void )
 
 				{
 					VkImageView gamma_src = ( post_fog_src != VK_NULL_HANDLE ) ? post_fog_src : vk.color_image_view;
-					if ( r_fboDebug && r_fboDebug->integer >= 1 && vk_fbo_debug_throttle() ) {
+					if ( r_fboDebug && r_fboDebug->integer >= 1 && vk_post_fog_fbo_debug_throttle() ) {
 						VkImageView expected = vk_get_post_fog_source();
 						if ( gamma_src != expected || gamma_src != vk.post_fog_color_source ) {
 							ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
@@ -17425,12 +17372,12 @@ void vk_end_frame( void )
 						vk.cmd->swapchain_image_index >= MAX_SWAPCHAIN_IMAGES ||
 						vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ] == VK_NULL_HANDLE ||
 						vk.renderWidth == 0 || vk.renderHeight == 0 ) {
-						if ( vk_fbo_debug_throttle() ) {
+						if ( vk_post_fog_fbo_debug_throttle() ) {
 							ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW "[VK][fbo] gamma pass skipped: missing pipeline/descriptor/renderpass/framebuffer or zero size (%dx%d)\n",
 								vk.renderWidth, vk.renderHeight );
 						}
 					} else if ( gamma_src == VK_NULL_HANDLE ) {
-						if ( vk_fbo_debug_throttle() ) {
+						if ( vk_post_fog_fbo_debug_throttle() ) {
 							ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW "[VK][fbo] gamma pass skipped: no valid color source (post_fog or color_image)\n" );
 						}
 					} else {
