@@ -20,6 +20,44 @@ static int vk_curr_entity_types[MAX_REFENTITIES];
 static qboolean vk_prev_entity_model_valid[MAX_REFENTITIES];
 static qboolean vk_curr_entity_model_valid[MAX_REFENTITIES];
 
+static uint32_t vk_get_render_target_width( void )
+{
+	if ( vk.renderWidth > 0 ) {
+		return vk.renderWidth;
+	}
+	if ( glConfig.vidWidth > 0 ) {
+		return (uint32_t)glConfig.vidWidth;
+	}
+	return 1u;
+}
+
+static uint32_t vk_get_render_target_height( void )
+{
+	if ( vk.renderHeight > 0 ) {
+		return vk.renderHeight;
+	}
+	if ( glConfig.vidHeight > 0 ) {
+		return (uint32_t)glConfig.vidHeight;
+	}
+	return 1u;
+}
+
+static float vk_get_2d_logical_width( void )
+{
+	if ( glConfig.vidWidth > 0 ) {
+		return (float)glConfig.vidWidth;
+	}
+	return (float)vk_get_render_target_width();
+}
+
+static float vk_get_2d_logical_height( void )
+{
+	if ( glConfig.vidHeight > 0 ) {
+		return (float)glConfig.vidHeight;
+	}
+	return (float)vk_get_render_target_height();
+}
+
 void vk_reset_scene_src_rect_tracking( void )
 {
 	vk_scene_src_rect_valid = qfalse;
@@ -92,11 +130,33 @@ static void vk_get_viewport( VkViewport *viewport, Vk_Depth_Range depth_range )
 void vk_get_scissor_rect( VkRect2D *r )
 {
 	if ( backEnd.viewParms.portalView != PV_NONE ) {
-		r->offset.x = backEnd.viewParms.scissorX;
-		r->offset.y = glConfig.vidHeight - backEnd.viewParms.scissorY - backEnd.viewParms.scissorHeight;
-		r->extent.width = backEnd.viewParms.scissorWidth;
-		r->extent.height = backEnd.viewParms.scissorHeight;
+		const uint32_t targetWidth = vk_get_render_target_width();
+		const uint32_t targetHeight = vk_get_render_target_height();
+		r->offset.x = (int32_t)( (float)backEnd.viewParms.scissorX * vk.renderScaleX );
+		r->offset.y = (int32_t)( (float)targetHeight -
+			(float)( backEnd.viewParms.scissorY + backEnd.viewParms.scissorHeight ) * vk.renderScaleY );
+		r->extent.width = (uint32_t)( (float)backEnd.viewParms.scissorWidth * vk.renderScaleX );
+		r->extent.height = (uint32_t)( (float)backEnd.viewParms.scissorHeight * vk.renderScaleY );
+		if ( r->offset.x < 0 ) {
+			r->offset.x = 0;
+		}
+		if ( r->offset.y < 0 ) {
+			r->offset.y = 0;
+		}
+		if ( (uint32_t)r->offset.x >= targetWidth || (uint32_t)r->offset.y >= targetHeight ) {
+			r->extent.width = 0;
+			r->extent.height = 0;
+			return;
+		}
+		if ( (uint32_t)r->offset.x + r->extent.width > targetWidth ) {
+			r->extent.width = targetWidth - (uint32_t)r->offset.x;
+		}
+		if ( (uint32_t)r->offset.y + r->extent.height > targetHeight ) {
+			r->extent.height = targetHeight - (uint32_t)r->offset.y;
+		}
 	} else {
+		const uint32_t targetWidth = vk_get_render_target_width();
+		const uint32_t targetHeight = vk_get_render_target_height();
 		vk_get_viewport_rect( r );
 
 		if ( r->offset.x < 0 ) {
@@ -106,11 +166,17 @@ void vk_get_scissor_rect( VkRect2D *r )
 			r->offset.y = 0;
 		}
 
-		if ( (uint32_t)r->offset.x + r->extent.width > (uint32_t)glConfig.vidWidth ) {
-			r->extent.width = (uint32_t)glConfig.vidWidth - r->offset.x;
+		if ( (uint32_t)r->offset.x >= targetWidth || (uint32_t)r->offset.y >= targetHeight ) {
+			r->extent.width = 0;
+			r->extent.height = 0;
+			return;
 		}
-		if ( (uint32_t)r->offset.y + r->extent.height > (uint32_t)glConfig.vidHeight ) {
-			r->extent.height = (uint32_t)glConfig.vidHeight - r->offset.y;
+
+		if ( (uint32_t)r->offset.x + r->extent.width > targetWidth ) {
+			r->extent.width = targetWidth - (uint32_t)r->offset.x;
+		}
+		if ( (uint32_t)r->offset.y + r->extent.height > targetHeight ) {
+			r->extent.height = targetHeight - (uint32_t)r->offset.y;
 		}
 	}
 }
@@ -124,8 +190,8 @@ static void vk_get_projection_matrix_vk( const float *projection_matrix, float *
 static void vk_get_mvp_transform( float *mvp )
 {
 	if ( backEnd.projection2D ) {
-		float mvp0 = 2.0f / glConfig.vidWidth;
-		float mvp5 = 2.0f / glConfig.vidHeight;
+		float mvp0 = 2.0f / vk_get_2d_logical_width();
+		float mvp5 = 2.0f / vk_get_2d_logical_height();
 
 		mvp[0]  =  mvp0; mvp[1]  =  0.0f; mvp[2]  = 0.0f; mvp[3]  = 0.0f;
 		mvp[4]  =  0.0f; mvp[5]  =  mvp5; mvp[6]  = 0.0f; mvp[7]  = 0.0f;

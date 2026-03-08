@@ -2196,7 +2196,6 @@ static const void *RB_PrefilterEnvMap( const void *data )
 	// finish any 2D drawing if needed
 	if ( tess.numIndexes )
 		RB_EndSurface();
-	RB_SetGL2D();
 	if ( !cmd->cubemap->prefiltered_image )
 		cmd->cubemap->prefiltered_image = R_CreateImage( 
 			va("cubemap prefiltered - %s", cmd->cubemap->name ), NULL,

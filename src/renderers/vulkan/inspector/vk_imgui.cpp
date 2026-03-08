@@ -16,6 +16,7 @@ Architecture inspired by EternalJK's pbr-rtx-inspector (Sunny JK).
 #define VK_NO_PROTOTYPES
 #define IMGUI_DEFINE_MATH_OPERATORS
 
+#include <float.h>
 #include <imgui.h>
 #include <imgui_internal.h>
 
@@ -23,6 +24,8 @@ extern "C" {
 #include "../../qcommon/q_shared.h"
 #include "../../renderers/common/tr_types.h"
 #include "../../renderers/common/tr_public.h"
+
+extern glconfig_t glConfig;
 }
 
 #include "vk_imgui.h"
@@ -48,6 +51,38 @@ vkImguiWindows_t     vkWindows;
 vkImguiGlobal_t      vkImguiState;
 
 static ImGuiContext *imguiContext = nullptr;
+static int imguiLastFrameTimeMs = 0;
+
+static void VkImgui_SetCurrentContext( void )
+{
+	if ( imguiContext ) {
+		ImGui::SetCurrentContext( imguiContext );
+	}
+}
+
+static void VkImgui_PrepareIO( void )
+{
+	ImGuiIO &io = ImGui::GetIO();
+	const int windowWidth = ( glConfig.vidWidth > 0 ) ? glConfig.vidWidth : 0;
+	const int windowHeight = ( glConfig.vidHeight > 0 ) ? glConfig.vidHeight : 0;
+	const int nowMs = ri.Milliseconds();
+	float deltaSeconds = 1.0f / 60.0f;
+
+	if ( imguiLastFrameTimeMs > 0 && nowMs > imguiLastFrameTimeMs ) {
+		deltaSeconds = (float)( nowMs - imguiLastFrameTimeMs ) * 0.001f;
+	}
+	if ( deltaSeconds <= 0.0f ) {
+		deltaSeconds = 1.0f / 60.0f;
+	}
+
+	io.DisplaySize = ImVec2( (float)( windowWidth >= 0 ? windowWidth : 0 ),
+		(float)( windowHeight >= 0 ? windowHeight : 0 ) );
+	io.DisplayFramebufferScale = ImVec2( 1.0f, 1.0f );
+	io.DeltaTime = deltaSeconds;
+	io.MousePos = ImVec2( -FLT_MAX, -FLT_MAX );
+
+	imguiLastFrameTimeMs = nowMs;
+}
 
 typedef struct {
 	float threshold;
@@ -211,6 +246,7 @@ extern "C" void VkImgui_Initialize(void) {
 	if (vkImguiState.active) return;
 
 	imguiContext = ImGui::CreateContext();
+	VkImgui_SetCurrentContext();
 	ImGuiIO &io = ImGui::GetIO();
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 	/* Build font atlas so ImGui can render text. Required when backend does not set
@@ -229,21 +265,26 @@ extern "C" void VkImgui_Initialize(void) {
 
 	vkImguiState.active = qtrue;
 	vkImguiState.inputState = qfalse;
+	imguiLastFrameTimeMs = 0;
 }
 
 extern "C" void VkImgui_Shutdown(void) {
 	if (!vkImguiState.active) return;
 
 	if (imguiContext) {
+		VkImgui_SetCurrentContext();
 		ImGui::DestroyContext(imguiContext);
 		imguiContext = nullptr;
 	}
 
 	memset(&vkImguiState, 0, sizeof(vkImguiState));
+	imguiLastFrameTimeMs = 0;
 }
 
 extern "C" void VkImgui_BeginFrame(void) {
 	if (!vkImguiState.active) return;
+	VkImgui_SetCurrentContext();
+	VkImgui_PrepareIO();
 	ImGui::NewFrame();
 }
 
@@ -838,6 +879,7 @@ extern "C" void VkImgui_DrawInspector(void) {
 
 extern "C" void VkImgui_Draw(void) {
 	if (!vkImguiState.active) return;
+	VkImgui_SetCurrentContext();
 
 	ImGuiWindowFlags dockFlags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
 		ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |

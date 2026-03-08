@@ -868,11 +868,13 @@ typedef struct {
 		uint32_t appliedResetReasons;
 		uint32_t stickyResetReasons;
 		qboolean preparedThisFrame;
+		qboolean hasValidLuminance;
 		qboolean sharedCameraCut;
 		qboolean unreliableMotionThisFrame;
 		qboolean worldWasValid;
 		qboolean noWorldModel;
 		qboolean stableGameplayState;
+		float filteredAvgLogLuminance;
 		uint32_t lastRenderWidth;
 		uint32_t lastRenderHeight;
 		uint32_t lastSwapchainWidth;

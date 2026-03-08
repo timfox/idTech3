@@ -125,9 +125,8 @@ static void R_OBJ_ResolveTexturePath(const char *objName, const char *texName,
 	}
 }
 
-extern qhandle_t R_RegisterOBJ(const char *name, model_t *mod);
-
-qhandle_t R_RegisterOBJ(const char *name, model_t *mod) {
+static qboolean R_LoadOBJ( model_t *mod, int lod, const char *name )
+{
 	tinyobj_attrib_t attrib;
 	tinyobj_shape_t *shapes = NULL;
 	size_t numShapes = 0;
@@ -156,7 +155,7 @@ qhandle_t R_RegisterOBJ(const char *name, model_t *mod) {
 
 	if (ret != TINYOBJ_SUCCESS) {
 		ri.Printf(PRINT_WARNING, "OBJ: parse error in %s\n", name);
-		return 0;
+		return qfalse;
 	}
 
 	numVerts = (int)attrib.num_face_num_verts;
@@ -167,7 +166,7 @@ qhandle_t R_RegisterOBJ(const char *name, model_t *mod) {
 		tinyobj_shapes_free(shapes, numShapes);
 		tinyobj_materials_free(materials, numMaterials);
 		ri.Printf(PRINT_WARNING, "OBJ: no geometry in %s\n", name);
-		return 0;
+		return qfalse;
 	}
 
 	/* Compute bounds from vertex data */
@@ -370,12 +369,71 @@ qhandle_t R_RegisterOBJ(const char *name, model_t *mod) {
 
 	mod->type = MOD_MESH;
 	mod->dataSize = 0;
-	mod->md3[0] = md3;
+	mod->md3[lod] = md3;
 
 	tinyobj_attrib_free(&attrib);
 	tinyobj_shapes_free(shapes, numShapes);
 	tinyobj_materials_free(materials, numMaterials);
 
-	ri.Printf(PRINT_ALL, "OBJ: loaded %s (%d verts, %d tris)\n", name, numVerts, numTris);
-	return mod->index;
+	ri.Printf(PRINT_ALL, "OBJ: loaded %s [lod %d] (%d verts, %d tris)\n", name, lod, numVerts, numTris);
+	return qtrue;
+}
+
+extern qhandle_t R_RegisterOBJ(const char *name, model_t *mod);
+
+qhandle_t R_RegisterOBJ(const char *name, model_t *mod) {
+	union {
+		void *v;
+	} buf;
+	char filename[MAX_QPATH], namebuf[MAX_QPATH + 20];
+	char *fext, defex[] = "obj";
+	int lod;
+	int numLoaded = 0;
+
+	Q_strncpyz( filename, name, sizeof( filename ) );
+
+	fext = strchr( filename, '.' );
+	if ( !fext ) {
+		fext = defex;
+	} else {
+		*fext = '\0';
+		fext++;
+	}
+
+	for ( lod = MD3_MAX_LODS - 1; lod >= 0; lod-- ) {
+		qboolean loaded;
+
+		if ( lod ) {
+			Com_sprintf( namebuf, sizeof( namebuf ), "%s_%d.%s", filename, lod, fext );
+		} else {
+			Com_sprintf( namebuf, sizeof( namebuf ), "%s.%s", filename, fext );
+		}
+
+		ri.FS_ReadFile( namebuf, &buf.v );
+		if ( !buf.v ) {
+			continue;
+		}
+		ri.FS_FreeFile( buf.v );
+
+		loaded = R_LoadOBJ( mod, lod, namebuf );
+		if ( loaded ) {
+			mod->numLods++;
+			numLoaded++;
+		} else {
+			break;
+		}
+	}
+
+	if ( numLoaded ) {
+		for ( lod--; lod >= 0; lod-- ) {
+			mod->numLods++;
+			mod->md3[lod] = mod->md3[lod + 1];
+		}
+
+		return mod->index;
+	}
+
+	ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW "%s: couldn't load %s\n", __func__, name );
+	mod->type = MOD_BAD;
+	return 0;
 }

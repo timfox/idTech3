@@ -5,6 +5,7 @@
 #include "vk_post_fog.h"
 #include "vk_postfx.h"
 #include "vk_render_pass.h"
+#include "vk_temporal.h"
 #include "vk_volumetric_pass.h"
 
 typedef struct {
@@ -257,6 +258,12 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 {
 	VkImageView gamma_src = ( post_fog_src != VK_NULL_HANDLE ) ? post_fog_src : vk.color_image_view;
 
+	/*
+	 * Consume exposure as part of the frame-end post chain rather than the
+	 * scene/2D transition path. This keeps adaptation tied to gamma, not to
+	 * whichever subsystem first prepared temporal state for the frame.
+	 */
+	vk_temporal_update_auto_exposure();
 	vk_end_frame_update_gamma_target();
 
 	if ( r_fboDebug && r_fboDebug->integer >= 2 && vk_post_fog_fbo_debug_throttle() ) {

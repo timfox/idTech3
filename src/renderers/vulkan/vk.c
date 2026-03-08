@@ -15636,7 +15636,6 @@ void vk_prepare_frame_temporal_state( void )
 	}
 
 	vk_temporal_begin_frame();
-	vk_temporal_update_auto_exposure();
 	vk_update_postfx_params( vk.cmd_index );
 	vk.temporal.preparedThisFrame = qtrue;
 }
