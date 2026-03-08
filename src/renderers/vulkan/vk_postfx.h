@@ -64,6 +64,7 @@ float    PostFX_DepthOfField_GetFocusDistance(void);
 float    PostFX_DepthOfField_GetFocusRange(void);
 float    PostFX_DepthOfField_GetAperture(void);
 float    PostFX_DepthOfField_GetMaxBlur(void);
+float    PostFX_GetSharpen(void);
 
 #ifdef __cplusplus
 }

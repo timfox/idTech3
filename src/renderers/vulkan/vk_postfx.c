@@ -60,6 +60,7 @@ static cvar_t *r_dofFocusDistance;
 static cvar_t *r_dofFocusRange;
 static cvar_t *r_dofAperture;
 static cvar_t *r_dofMaxBlur;
+static cvar_t *r_sharpen;
 
 /*
 ===============
@@ -113,6 +114,8 @@ void PostFX_RegisterCvars(void) {
 	r_dofFocusRange          = ri.Cvar_Get("r_dofFocusRange",          "192.0", CVAR_ARCHIVE_ND);
 	r_dofAperture            = ri.Cvar_Get("r_dofAperture",            "1.4",  CVAR_ARCHIVE_ND);
 	r_dofMaxBlur             = ri.Cvar_Get("r_dofMaxBlur",             "18.0", CVAR_ARCHIVE_ND);
+	r_sharpen                = ri.Cvar_Get("r_sharpen",                "0.35", CVAR_ARCHIVE);
+	ri.Cvar_CheckRange( r_sharpen, "0.0", "1.5", CV_FLOAT );
 
 	ri.Cvar_SetDescription( r_vignette, "Vignette strength for post-processing lens darkening." );
 	ri.Cvar_SetDescription( r_vignette_radius, "Vignette inner radius before edge darkening starts." );
@@ -128,6 +131,7 @@ void PostFX_RegisterCvars(void) {
 	ri.Cvar_SetDescription( r_dofFocusRange, "In-focus band width around the focus distance." );
 	ri.Cvar_SetDescription( r_dofAperture, "Depth of field aperture scale; higher values increase blur." );
 	ri.Cvar_SetDescription( r_dofMaxBlur, "Maximum depth of field blur radius in pixels." );
+	ri.Cvar_SetDescription( r_sharpen, "Post-process sharpen strength (0=off, 0.35=default, 0.5+=strong). Recovers detail lost by AA/tonemap." );
 
 	ri.Printf(PRINT_ALL, "PostFX: cvars registered (SSR %s, Atmosphere %s, VegWind %s)\n",
 		r_ssr->integer ? "on" : "off",
@@ -170,7 +174,7 @@ void PostFX_VegWind_GetWindDir(float *x, float *y, float *z) {
 }
 float PostFX_VegWind_GetWindStrength(void) { return r_vegWind_strength ? r_vegWind_strength->value : 1.0f; }
 
-static float lastVignette = 0, lastVigRadius = 0, lastChromAb = 0, lastGrain = 0;
+static float lastVignette = 0, lastVigRadius = 0, lastChromAb = 0, lastGrain = 0, lastSharpen = 0;
 static int lastFilmLook = 0;
 static float lastPostContrast = 1.0f, lastPostSaturation = 1.0f;
 
@@ -179,17 +183,19 @@ qboolean PostFX_NeedsPipelineUpdate(void) {
 	float vr = r_vignette_radius ? r_vignette_radius->value : 0;
 	float c = r_chromaticAberration ? r_chromaticAberration->value : 0;
 	float g = r_filmGrain ? r_filmGrain->value : 0;
+	float s = r_sharpen ? r_sharpen->value : 0;
 	int filmLook = ( r_filmLook && r_filmLook->integer ) ? 1 : 0;
 	cvar_t *r_post_contrast = ri.Cvar_Get( "r_post_contrast", "1.0", 0 );
 	cvar_t *r_post_saturation = ri.Cvar_Get( "r_post_saturation", "1.0", 0 );
 	float pc = ( r_post_contrast && r_post_contrast->value > 0.0f ) ? r_post_contrast->value : 1.0f;
 	float ps = ( r_post_saturation && r_post_saturation->value >= 0.0f ) ? r_post_saturation->value : 1.0f;
 	if (v != lastVignette || vr != lastVigRadius || c != lastChromAb || g != lastGrain || filmLook != lastFilmLook ||
-	    pc != lastPostContrast || ps != lastPostSaturation) {
+	    s != lastSharpen || pc != lastPostContrast || ps != lastPostSaturation) {
 		lastVignette = v;
 		lastVigRadius = vr;
 		lastChromAb = c;
 		lastGrain = g;
+		lastSharpen = s;
 		lastFilmLook = filmLook;
 		lastPostContrast = pc;
 		lastPostSaturation = ps;
@@ -212,3 +218,4 @@ float PostFX_DepthOfField_GetFocusDistance(void) { return r_dofFocusDistance ? r
 float PostFX_DepthOfField_GetFocusRange(void) { return r_dofFocusRange ? r_dofFocusRange->value : 192.0f; }
 float PostFX_DepthOfField_GetAperture(void) { return r_dofAperture ? r_dofAperture->value : 1.4f; }
 float PostFX_DepthOfField_GetMaxBlur(void) { return r_dofMaxBlur ? r_dofMaxBlur->value : 18.0f; }
+float PostFX_GetSharpen(void) { return r_sharpen ? r_sharpen->value : 0.0f; }

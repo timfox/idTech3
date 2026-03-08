@@ -1678,6 +1678,88 @@ static void VkInfo_f( void )
 	ri.Printf(PRINT_ALL, "image chunks: %i\n", vk_world.num_image_chunks );
 }
 
+/*
+===============
+R_Quality_f
+===============
+Apply AAA-style quality presets: 0=Low, 1=Medium, 2=High, 3=Ultra.
+Requires vid_restart for some settings to take effect.
+*/
+static void R_Quality_f( void )
+{
+	const int argc = ri.Cmd_Argc();
+	const char *arg = ( argc > 1 ) ? ri.Cmd_Argv( 1 ) : "";
+	int preset = ( arg[0] >= '0' && arg[0] <= '3' ) ? ( arg[0] - '0' ) : -1;
+
+	if ( preset < 0 ) {
+		ri.Printf( PRINT_ALL,
+			"usage: r_quality <0|1|2|3>\n"
+			"  0 = Low    : Volumetric fog off, SSAO off, bloom off, SMAA off, SSR off\n"
+			"  1 = Medium : Fog/SSAO/bloom/SMAA on (low quality), SSR off\n"
+			"  2 = High   : Fog/SSAO/bloom/SMAA on (high quality), HBAO, SSR off\n"
+			"  3 = Ultra  : All effects on, HBAO, SSR on, max quality\n"
+			"Run vid_restart after changing for full effect.\n" );
+		return;
+	}
+
+	switch ( preset ) {
+		case 0: /* Low */
+			ri.Cvar_Set( "r_volumetricFog", "0" );
+			ri.Cvar_Set( "r_ssao", "0" );
+			ri.Cvar_Set( "r_bloom", "0" );
+			ri.Cvar_Set( "r_ext_smaa", "0" );
+			ri.Cvar_Set( "r_ssr", "0" );
+			ri.Cvar_Set( "r_sharpen", "0.0" );
+			ri.Cvar_Set( "r_exposure_auto", "0" );
+			ri.Printf( PRINT_ALL, "[VK] Quality preset: Low (performance)\n" );
+			break;
+		case 1: /* Medium */
+			ri.Cvar_Set( "r_volumetricFog", "1" );
+			ri.Cvar_Set( "r_ssao", "1" );
+			ri.Cvar_Set( "r_bloom", "1" );
+			ri.Cvar_Set( "r_ext_smaa", "1" );
+			ri.Cvar_Set( "r_ssr", "0" );
+			ri.Cvar_Set( "r_volumetricFogQuality", "1" );
+			ri.Cvar_Set( "r_ssaoMethod", "0" );
+			ri.Cvar_Set( "r_smaa_preset", "1" );
+			ri.Cvar_Set( "r_ssaoSamples", "12" );
+			ri.Cvar_Set( "r_sharpen", "0.15" );
+			ri.Printf( PRINT_ALL, "[VK] Quality preset: Medium\n" );
+			break;
+		case 2: /* High */
+			ri.Cvar_Set( "r_volumetricFog", "1" );
+			ri.Cvar_Set( "r_ssao", "1" );
+			ri.Cvar_Set( "r_bloom", "1" );
+			ri.Cvar_Set( "r_ext_smaa", "1" );
+			ri.Cvar_Set( "r_ssr", "0" );
+			ri.Cvar_Set( "r_volumetricFogQuality", "2" );
+			ri.Cvar_Set( "r_ssaoMethod", "1" );
+			ri.Cvar_Set( "r_smaa_preset", "2" );
+			ri.Cvar_Set( "r_hbaoDirections", "8" );
+			ri.Cvar_Set( "r_hbaoSteps", "8" );
+			ri.Cvar_Set( "r_ssaoSamples", "16" );
+			ri.Cvar_Set( "r_sharpen", "0.35" );
+			ri.Printf( PRINT_ALL, "[VK] Quality preset: High\n" );
+			break;
+		case 3: /* Ultra */
+			ri.Cvar_Set( "r_volumetricFog", "1" );
+			ri.Cvar_Set( "r_ssao", "1" );
+			ri.Cvar_Set( "r_bloom", "1" );
+			ri.Cvar_Set( "r_ext_smaa", "1" );
+			ri.Cvar_Set( "r_ssr", "1" );
+			ri.Cvar_Set( "r_volumetricFogQuality", "3" );
+			ri.Cvar_Set( "r_ssaoMethod", "1" );
+			ri.Cvar_Set( "r_smaa_preset", "3" );
+			ri.Cvar_Set( "r_hbaoDirections", "16" );
+			ri.Cvar_Set( "r_hbaoSteps", "16" );
+			ri.Cvar_Set( "r_ssaoSamples", "24" );
+			ri.Cvar_Set( "r_sharpen", "0.5" );
+			ri.Printf( PRINT_ALL, "[VK] Quality preset: Ultra\n" );
+			break;
+	}
+	ri.Printf( PRINT_ALL, "Run vid_restart for full effect.\n" );
+}
+
 static void VkVolumetricValidate_f( void )
 {
 	const int argc = ri.Cmd_Argc();
@@ -1846,6 +1928,7 @@ static void R_Register( void )
 #ifdef USE_VULKAN
 	ri.Cmd_AddCommand( "vkinfo", VkInfo_f );
 	ri.Cmd_AddCommand( "vkVolumetricValidate", VkVolumetricValidate_f );
+	ri.Cmd_AddCommand( "r_quality", R_Quality_f );
 #endif
 
 	//
@@ -2766,7 +2849,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_fogFluidBuoyancy, "Buoyancy force strength for fluid simulation (replaces r_fluidsim_buoyancy)." );
 	ri.Cvar_SetGroup( r_fogFluidBuoyancy, CVG_RENDERER );
 
-	r_volumetricFogValidation = ri.Cvar_Get( "r_volumetricFogValidation", "0", CVAR_ARCHIVE_ND );
+	r_volumetricFogValidation = ri.Cvar_Get( "r_volumetricFogValidation", "0", CVAR_TEMP );
 	ri.Cvar_CheckRange( r_volumetricFogValidation, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_volumetricFogValidation, "Enable periodic runtime validation logging for volumetric fog checklist checks." );
 	ri.Cvar_SetGroup( r_volumetricFogValidation, CVG_RENDERER );
@@ -2841,10 +2924,17 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_fogShadowPadding, "World-space XY padding added to volumetric sun shadow cascade bounds." );
 	ri.Cvar_SetGroup( r_fogShadowPadding, CVG_RENDERER );
 
-	r_fogDebug = ri.Cvar_Get( "r_fogDebug", "0", CVAR_ARCHIVE_ND );
+	r_fogDebug = ri.Cvar_Get( "r_fogDebug", "0", CVAR_TEMP );
 	ri.Cvar_CheckRange( r_fogDebug, "0", "13", CV_INTEGER );
 	ri.Cvar_SetDescription( r_fogDebug, "Volumetric fog debug view: 0=off, 1=froxel coords, 2=extinction slice, 3=scattering slice, 4=temporal validity/weight, 5=integrated transmittance, 6=sun-shadow debug slice, 7=motion magnitude/threshold, 8=local spot-shadow visibility, 9=local point-shadow visibility, 10=camera-cut/reset state, 11=GPU safety telemetry counters, 12=perf budget/autoscale state, 13=fog contribution heatmap." );
 	ri.Cvar_SetGroup( r_fogDebug, CVG_RENDERER );
+
+	/* Fog debug must not persist: reset if loaded from stale config */
+	if ( r_fogDebug->integer > 0 || r_volumetricFogValidation->integer > 0 ) {
+		ri.Cvar_Set( "r_fogDebug", "0" );
+		ri.Cvar_Set( "r_volumetricFogValidation", "0" );
+		ri.Printf( PRINT_ALL, "[VK][fog] Fog debug was enabled in config; reset to normal. Use vkVolumetricValidate for debug views.\n" );
+	}
 
 	r_fboDebug = ri.Cvar_Get( "r_fboDebug", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_fboDebug, "0", "4", CV_INTEGER );
