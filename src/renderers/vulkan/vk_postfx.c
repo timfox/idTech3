@@ -100,10 +100,10 @@ void PostFX_RegisterCvars(void) {
 	r_vegWind_dirZ           = ri.Cvar_Get("r_vegWind_dirZ",           "0.3",  CVAR_ARCHIVE);
 	r_vegWind_strength       = ri.Cvar_Get("r_vegWind_strength",       "1.0",  CVAR_ARCHIVE);
 
-	r_vignette               = ri.Cvar_Get("r_vignette",               "0.55", CVAR_ARCHIVE);
+	r_vignette               = ri.Cvar_Get("r_vignette",               "0.0",  CVAR_ARCHIVE);
 	r_vignette_radius        = ri.Cvar_Get("r_vignette_radius",        "0.60", CVAR_ARCHIVE);
-	r_chromaticAberration    = ri.Cvar_Get("r_chromaticAberration",    "0.22", CVAR_ARCHIVE);
-	r_filmGrain              = ri.Cvar_Get("r_filmGrain",              "0.75", CVAR_ARCHIVE);
+	r_chromaticAberration    = ri.Cvar_Get("r_chromaticAberration",    "0.0",  CVAR_ARCHIVE);
+	r_filmGrain              = ri.Cvar_Get("r_filmGrain",              "0.0",  CVAR_ARCHIVE);
 	r_filmLook               = ri.Cvar_Get("r_filmLook",               "0",    CVAR_ARCHIVE);
 	r_motionBlur             = ri.Cvar_Get("r_motionBlur",             "0",    CVAR_ARCHIVE_ND);
 	r_motionBlurStrength     = ri.Cvar_Get("r_motionBlurStrength",     "1.0",  CVAR_ARCHIVE_ND);
@@ -114,7 +114,7 @@ void PostFX_RegisterCvars(void) {
 	r_dofFocusRange          = ri.Cvar_Get("r_dofFocusRange",          "192.0", CVAR_ARCHIVE_ND);
 	r_dofAperture            = ri.Cvar_Get("r_dofAperture",            "1.4",  CVAR_ARCHIVE_ND);
 	r_dofMaxBlur             = ri.Cvar_Get("r_dofMaxBlur",             "18.0", CVAR_ARCHIVE_ND);
-	r_sharpen                = ri.Cvar_Get("r_sharpen",                "0.35", CVAR_ARCHIVE);
+	r_sharpen                = ri.Cvar_Get("r_sharpen",                "0.0",  CVAR_ARCHIVE);
 	ri.Cvar_CheckRange( r_sharpen, "0.0", "1.5", CV_FLOAT );
 
 	ri.Cvar_SetDescription( r_vignette, "Vignette strength for post-processing lens darkening." );
@@ -131,7 +131,7 @@ void PostFX_RegisterCvars(void) {
 	ri.Cvar_SetDescription( r_dofFocusRange, "In-focus band width around the focus distance." );
 	ri.Cvar_SetDescription( r_dofAperture, "Depth of field aperture scale; higher values increase blur." );
 	ri.Cvar_SetDescription( r_dofMaxBlur, "Maximum depth of field blur radius in pixels." );
-	ri.Cvar_SetDescription( r_sharpen, "Post-process sharpen strength (0=off, 0.35=default, 0.5+=strong). Recovers detail lost by AA/tonemap." );
+	ri.Cvar_SetDescription( r_sharpen, "Post-process sharpen strength (0=off, 0.15=subtle, 0.3+=strong). Recovers detail lost by AA/tonemap." );
 
 	ri.Printf(PRINT_ALL, "PostFX: cvars registered (SSR %s, Atmosphere %s, VegWind %s)\n",
 		r_ssr->integer ? "on" : "off",
