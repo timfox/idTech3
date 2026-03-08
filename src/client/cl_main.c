@@ -3783,6 +3783,7 @@ static void CL_InitRef( void ) {
 	rendererLib = Sys_LoadLibrary( ospath );
 	if ( !rendererLib )
 	{
+		Com_Printf( S_COLOR_YELLOW "Failed to load renderer from %s: %s\n", ospath, Sys_GetLoadLibraryError() );
 		Cvar_ForceReset( "cl_renderer" );
 		/* sanitize renderer name for the retry as well */
 		{
@@ -3807,7 +3808,7 @@ static void CL_InitRef( void ) {
 		rendererLib = Sys_LoadLibrary( ospath );
 		if ( !rendererLib )
 		{
-			Com_Error( ERR_FATAL, "Failed to load renderer %s", dllName );
+			Com_Error( ERR_FATAL, "Failed to load renderer %s: %s", dllName, Sys_GetLoadLibraryError() );
 		}
 	}
 

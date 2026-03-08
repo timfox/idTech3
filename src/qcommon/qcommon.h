@@ -1356,6 +1356,7 @@ qboolean Sys_LowPhysicalMemory( void );
 int Sys_MonkeyShouldBeSpanked( void );
 
 void *Sys_LoadLibrary( const char *name );
+const char *Sys_GetLoadLibraryError( void );
 void *Sys_LoadFunction( void *handle, const char *name );
 int   Sys_LoadFunctionErrors( void );
 void  Sys_UnloadLibrary( void *handle );
