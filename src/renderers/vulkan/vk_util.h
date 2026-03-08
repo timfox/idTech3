@@ -9,10 +9,14 @@ Vulkan renderer utility helpers: parsing, matrix math, color normalization.
 #pragma once
 
 #include "../common/tr_types.h"
+#include "../common/vulkan/vulkan.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* VkPresentModeKHR to string for logging. */
+const char *vk_present_mode_string( VkPresentModeKHR mode );
 
 /* Parse "r g b" string into vec3. Returns qfalse on parse failure. */
 qboolean vk_parse_rgb_string( const char *s, vec3_t out );

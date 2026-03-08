@@ -506,21 +506,6 @@ static uint32_t find_memory_type2( uint32_t memory_type_bits, VkMemoryPropertyFl
 }
 
 
-static const char *pmode_to_str( VkPresentModeKHR mode )
-{
-	static char buf[32];
-
-	switch ( mode ) {
-		case VK_PRESENT_MODE_IMMEDIATE_KHR: return "IMMEDIATE";
-		case VK_PRESENT_MODE_MAILBOX_KHR: return "MAILBOX";
-		case VK_PRESENT_MODE_FIFO_KHR: return "FIFO";
-		case VK_PRESENT_MODE_FIFO_RELAXED_KHR: return "FIFO_RELAXED";
-		case VK_PRESENT_MODE_FIFO_LATEST_READY_EXT: return "FIFO_LATEST_READY";
-		default: Com_sprintf( buf, sizeof( buf ), "mode#%x", mode ); return buf;
-	};
-}
-
-
 #define CASE_STR(x) case (x): return #x
 
 const char *vk_format_string( VkFormat format )
@@ -1009,7 +994,7 @@ static void vk_create_swapchain( VkPhysicalDevice physical_device, VkDevice devi
 	}
 	for ( i = 0; i < present_mode_count; i++ ) {
 		if ( verbose ) {
-			ri.Printf( PRINT_ALL, " %s", pmode_to_str( present_modes[i] ) );
+			ri.Printf( PRINT_ALL, " %s", vk_present_mode_string( present_modes[i] ) );
 		}
 		if ( present_modes[i] == VK_PRESENT_MODE_MAILBOX_KHR )
 			mailbox_supported = qtrue;
@@ -1059,7 +1044,7 @@ static void vk_create_swapchain( VkPhysicalDevice physical_device, VkDevice devi
 	}
 
 	if ( verbose ) {
-		ri.Printf( PRINT_ALL, "...selected presentation mode: %s, image count: %i\n", pmode_to_str( present_mode ), image_count );
+		ri.Printf( PRINT_ALL, "...selected presentation mode: %s, image count: %i\n", vk_present_mode_string( present_mode ), image_count );
 	}
 
 	// create swap chain

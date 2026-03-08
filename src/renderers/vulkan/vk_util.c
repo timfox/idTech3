@@ -9,6 +9,20 @@ Vulkan renderer utility helpers: parsing, matrix math, color normalization.
 #include "tr_local.h"
 #include "vk_util.h"
 
+const char *vk_present_mode_string( VkPresentModeKHR mode )
+{
+	static char buf[32];
+
+	switch ( mode ) {
+		case VK_PRESENT_MODE_IMMEDIATE_KHR: return "IMMEDIATE";
+		case VK_PRESENT_MODE_MAILBOX_KHR: return "MAILBOX";
+		case VK_PRESENT_MODE_FIFO_KHR: return "FIFO";
+		case VK_PRESENT_MODE_FIFO_RELAXED_KHR: return "FIFO_RELAXED";
+		case VK_PRESENT_MODE_FIFO_LATEST_READY_EXT: return "FIFO_LATEST_READY";
+		default: Com_sprintf( buf, sizeof( buf ), "mode#%x", mode ); return buf;
+	}
+}
+
 qboolean vk_parse_rgb_string( const char *s, vec3_t out )
 {
 	float r, g, b;
