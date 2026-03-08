@@ -197,6 +197,7 @@ typedef enum {
 	RENDER_PASS_SCREENMAP,
 	RENDER_PASS_SUN_SHADOW,
 	RENDER_PASS_POST_BLOOM,
+	RENDER_PASS_UI_OVERLAY,
 	RENDER_PASS_CUBEMAP,
 	RENDER_PASS_COUNT
 } renderPass_t;
@@ -422,6 +423,7 @@ void vk_prepare_frame_temporal_state( void );
 void vk_end_render_pass( void );
 void vk_begin_main_render_pass( void );
 void vk_begin_post_bloom_render_pass( void );
+void vk_begin_ui_overlay_render_pass( void );
 void vk_begin_bloom_extract_render_pass( void );
 void vk_begin_blur_render_pass( uint32_t index );
 void vk_begin_ssao_render_pass( void );
@@ -580,10 +582,12 @@ typedef struct {
 		VkRenderPass local_spot_shadow;
 		VkRenderPass local_point_shadow;
 		VkRenderPass gamma;
+		VkRenderPass overlay_compose;
 		VkRenderPass capture;
 		VkRenderPass bloom_extract;
 		VkRenderPass blur[VK_NUM_BLOOM_PASSES*2]; // horizontal-vertical pairs
 		VkRenderPass post_bloom;
+		VkRenderPass ui_overlay;
 		VkRenderPass ssao;
 		VkRenderPass ssao_blur;
 		VkRenderPass ssao_combine;
@@ -677,6 +681,8 @@ typedef struct {
 
 	VkImage color_image;
 	VkImageView color_image_view;
+	VkImage ui_overlay_image;
+	VkImageView ui_overlay_image_view;
 	VkImage fog_scene_image;
 	VkImageView fog_scene_image_view;
 	VkImage smaa_edge_image;
@@ -716,6 +722,8 @@ typedef struct {
 
 	VkImage msaa_image;
 	VkImageView msaa_image_view;
+	VkImage ui_overlay_msaa_image;
+	VkImageView ui_overlay_msaa_image_view;
 
 	// screenMap
 	struct {
@@ -768,6 +776,7 @@ typedef struct {
 		VkFramebuffer ssr;
 		VkFramebuffer main[MAX_SWAPCHAIN_IMAGES];
 		VkFramebuffer gamma[MAX_SWAPCHAIN_IMAGES];
+		VkFramebuffer overlay_compose[MAX_SWAPCHAIN_IMAGES];
 		VkFramebuffer screenmap;
 		VkFramebuffer capture;
 #ifdef VK_PBR_BRDFLUT
@@ -779,6 +788,7 @@ typedef struct {
 		VkFramebuffer smaa_compose;
 		VkFramebuffer volumetric[MAX_SWAPCHAIN_IMAGES];
 		VkFramebuffer atmosphere[MAX_SWAPCHAIN_IMAGES];
+		VkFramebuffer ui_overlay[MAX_SWAPCHAIN_IMAGES];
 		VkFramebuffer sun_shadow;
 		VkFramebuffer local_spot_shadow;
 		VkFramebuffer local_point_shadow[MAX_DLIGHTS * 6];
@@ -924,6 +934,7 @@ typedef struct {
 		VkShaderModule ssao_depth_debug_fs;
 
 		VkShaderModule gamma_fs;
+		VkShaderModule overlay_compose_fs;
 		VkShaderModule gamma_vs;
 		VkShaderModule atmosphere_fs;
 		VkShaderModule smaa_edge_fs;
@@ -1028,6 +1039,7 @@ typedef struct {
 	VkQueryPool occlusion_query_pool;
 
 	VkPipeline gamma_pipeline;
+	VkPipeline overlay_compose_pipeline;
 	VkPipeline capture_pipeline;
 	VkPipeline bloom_extract_pipeline;
 	VkPipeline blur_pipeline[VK_NUM_BLOOM_PASSES*2]; // horizontal & vertical pairs
@@ -1051,6 +1063,7 @@ typedef struct {
 
 	uint32_t frame_count;
 	qboolean active;
+	qboolean uiOverlayActive;
 	qboolean wideLines;
 	qboolean samplerAnisotropy;
 	qboolean fragmentStores;

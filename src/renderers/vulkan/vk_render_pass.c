@@ -52,10 +52,14 @@ void vk_begin_render_pass_tracked( VkRenderPass renderPass, VkFramebuffer frameB
 		clear_values[0].color.float32[1] = 0.0f;
 		clear_values[0].color.float32[2] = 0.0f;
 		clear_values[0].color.float32[3] = 1.0f;
+		if ( vk.renderPassIndex == RENDER_PASS_UI_OVERLAY ) {
+			clear_values[0].color.float32[3] = 0.0f;
+		}
 #ifndef USE_REVERSED_DEPTH
 		clear_values[1].depthStencil.depth = 1.0;
 #endif
-		if ( vk.renderPassIndex == RENDER_PASS_MAIN || vk.renderPassIndex == RENDER_PASS_POST_BLOOM ) {
+		if ( vk.renderPassIndex == RENDER_PASS_MAIN || vk.renderPassIndex == RENDER_PASS_POST_BLOOM ||
+			vk.renderPassIndex == RENDER_PASS_UI_OVERLAY ) {
 			if ( vk.fboActive ) {
 				clear_values[2].color.float32[0] = 0.0f;
 				clear_values[2].color.float32[1] = 0.0f;

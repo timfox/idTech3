@@ -1283,6 +1283,110 @@ static void vk_create_render_passes( void )
 	VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.gamma ) );
 	SET_OBJECT_NAME( vk.render_pass.gamma, "render pass - gamma", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
 
+	// LDR UI overlay composite on top of the tonemapped swapchain image.
+	attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+	attachments[0].initialLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+	attachments[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+	VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.overlay_compose ) );
+	SET_OBJECT_NAME( vk.render_pass.overlay_compose, "render pass - overlay compose", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
+
+	// Separate 2D/UI overlay target. Keep attachment compatibility with post_bloom so
+	// existing 2D draw pipelines can render here while preserving alpha coverage.
+	{
+		VkAttachmentDescription ui_attachments[5];
+		VkAttachmentReference ui_color_refs[2];
+		VkAttachmentReference ui_depth_ref;
+		VkAttachmentReference ui_resolve_refs[2];
+		VkSubpassDescription ui_subpass;
+		VkRenderPassCreateInfo ui_desc;
+
+		Com_Memcpy( ui_attachments, attachments, sizeof( ui_attachments ) );
+		ui_attachments[0].format = vk.color_format;
+		ui_attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+		ui_attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		ui_attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		ui_attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		ui_attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		ui_attachments[0].initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		ui_attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+		ui_attachments[1].format = depth_format;
+		ui_attachments[1].samples = vkSamples;
+		ui_attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+		ui_attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		ui_attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+		ui_attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		ui_attachments[1].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		ui_attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+		ui_attachments[2].format = VK_FORMAT_R16G16_SFLOAT;
+		ui_attachments[2].samples = VK_SAMPLE_COUNT_1_BIT;
+		ui_attachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		ui_attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		ui_attachments[2].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		ui_attachments[2].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		ui_attachments[2].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		ui_attachments[2].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+		ui_color_refs[0].attachment = 0;
+		ui_color_refs[0].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		ui_color_refs[1].attachment = 2;
+		ui_color_refs[1].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		ui_depth_ref.attachment = 1;
+		ui_depth_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+		Com_Memset( &ui_subpass, 0, sizeof( ui_subpass ) );
+		ui_subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		ui_subpass.colorAttachmentCount = 2;
+		ui_subpass.pColorAttachments = ui_color_refs;
+		ui_subpass.pDepthStencilAttachment = &ui_depth_ref;
+
+		Com_Memset( &ui_desc, 0, sizeof( ui_desc ) );
+		ui_desc.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+		ui_desc.pNext = NULL;
+		ui_desc.flags = 0;
+		ui_desc.pAttachments = ui_attachments;
+		ui_desc.attachmentCount = 3;
+		ui_desc.pSubpasses = &ui_subpass;
+		ui_desc.subpassCount = 1;
+		ui_desc.dependencyCount = 2;
+		ui_desc.pDependencies = deps;
+
+		if ( vk.msaaActive ) {
+			ui_attachments[3].format = vk.color_format;
+			ui_attachments[3].samples = vkSamples;
+			ui_attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			ui_attachments[3].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			ui_attachments[3].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+			ui_attachments[3].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			ui_attachments[3].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			ui_attachments[3].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+			ui_attachments[4].format = VK_FORMAT_R16G16_SFLOAT;
+			ui_attachments[4].samples = vkSamples;
+			ui_attachments[4].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			ui_attachments[4].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			ui_attachments[4].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+			ui_attachments[4].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			ui_attachments[4].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			ui_attachments[4].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+			ui_color_refs[0].attachment = 3;
+			ui_color_refs[1].attachment = 4;
+
+			ui_resolve_refs[0].attachment = 0;
+			ui_resolve_refs[0].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			ui_resolve_refs[1].attachment = 2;
+			ui_resolve_refs[1].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			ui_subpass.pResolveAttachments = ui_resolve_refs;
+			ui_desc.attachmentCount = 5;
+		}
+
+		VK_CHECK( qvkCreateRenderPass( device, &ui_desc, NULL, &vk.render_pass.ui_overlay ) );
+		SET_OBJECT_NAME( vk.render_pass.ui_overlay, "render pass - ui overlay", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
+	}
+
 	/* Atmosphere pass: additive fullscreen overlay for sky (depth test culls geometry) */
 	{
 		VkAttachmentDescription atm_att[2];
@@ -4933,10 +5037,12 @@ static void vk_create_shader_modules( void )
 	SET_OBJECT_NAME( vk.modules.ssr_fs, "ssr fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 
 	vk.modules.gamma_fs = SHADER_MODULE( gamma_frag_spv );
+	vk.modules.overlay_compose_fs = SHADER_MODULE( overlay_compose_frag_spv );
 	vk.modules.gamma_vs = SHADER_MODULE( gamma_vert_spv );
 	vk.modules.atmosphere_fs = SHADER_MODULE( atmosphere_frag_spv );
 
 	SET_OBJECT_NAME( vk.modules.gamma_fs, "gamma post-processing fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	SET_OBJECT_NAME( vk.modules.overlay_compose_fs, "overlay compose fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.gamma_vs, "gamma post-processing vertex module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.atmosphere_fs, "atmosphere fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 
@@ -5220,6 +5326,9 @@ void vk_update_post_process_pipelines( void )
 	if ( vk.fboActive ) {
 		// update gamma shader
 		vk_create_post_process_pipeline( 0, 0, 0 );
+		if ( vk.ui_overlay_image != VK_NULL_HANDLE ) {
+			vk_create_post_process_pipeline( 22, glConfig.vidWidth, glConfig.vidHeight );
+		}
 		if ( vk.capture.image ) {
 			// update capture pipeline
 			vk_create_post_process_pipeline( 3, gls.captureWidth, gls.captureHeight );
@@ -5701,6 +5810,9 @@ static void vk_create_attachments( void )
 		// post-processing/msaa-resolve
 			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
 				copyableColorUsage, &vk.color_image, &vk.color_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
+			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
+				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+				&vk.ui_overlay_image, &vk.ui_overlay_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 			// scene copy sampled by volumetric composite (avoids read/write feedback on vk.color_image)
 				create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
 					VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
@@ -5737,6 +5849,8 @@ static void vk_create_attachments( void )
 		if ( vk.msaaActive ) {
 			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, vkSamples, vk.color_format,
 				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &vk.msaa_image, &vk.msaa_image_view, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, qtrue, 0 );
+			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, vkSamples, vk.color_format,
+				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &vk.ui_overlay_msaa_image, &vk.ui_overlay_msaa_image_view, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, qtrue, 0 );
 		}
 
 		if ( r_ext_supersample->integer ) {
@@ -5823,6 +5937,8 @@ static void vk_create_attachments( void )
 
 		SET_OBJECT_NAME( vk.color_image, "color attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
 		SET_OBJECT_NAME( vk.color_image_view, "color attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+		SET_OBJECT_NAME( vk.ui_overlay_image, "ui overlay attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+		SET_OBJECT_NAME( vk.ui_overlay_image_view, "ui overlay attachment view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 		SET_OBJECT_NAME( vk.fog_scene_image, "fog scene copy", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
 		SET_OBJECT_NAME( vk.fog_scene_image_view, "fog scene copy view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 			SET_OBJECT_NAME( vk.volumetric_depth_image, "volumetric depth resolve", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
@@ -5844,6 +5960,12 @@ static void vk_create_attachments( void )
 			}
 			if ( vk.motion_vector_msaa_view ) {
 				SET_OBJECT_NAME( vk.motion_vector_msaa_view, "volumetric motion vectors msaa view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+			}
+			if ( vk.ui_overlay_msaa_image ) {
+				SET_OBJECT_NAME( vk.ui_overlay_msaa_image, "ui overlay attachment msaa", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+			}
+			if ( vk.ui_overlay_msaa_image_view ) {
+				SET_OBJECT_NAME( vk.ui_overlay_msaa_image_view, "ui overlay attachment msaa view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 			}
 			SET_OBJECT_NAME( vk.sun_shadow_image, "sun shadow depth", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
 	SET_OBJECT_NAME( vk.sun_shadow_view, "sun shadow depth view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
@@ -5992,11 +6114,37 @@ static void vk_create_framebuffers( void )
 			VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.gamma[n] ) );
 
 			SET_OBJECT_NAME( vk.framebuffers.gamma[n], "framebuffer - gamma-correction", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+
+			desc.renderPass = vk.render_pass.overlay_compose;
+			desc.attachmentCount = 1;
+			framebuffer_attachments[0] = vk.swapchain_image_views[n];
+			VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.overlay_compose[n] ) );
+			SET_OBJECT_NAME( vk.framebuffers.overlay_compose[n], "framebuffer - overlay compose", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
 		}
 	}
 
 	if ( vk.fboActive )
 	{
+		if ( vk.render_pass.ui_overlay != VK_NULL_HANDLE && vk.ui_overlay_image_view != VK_NULL_HANDLE ) {
+			desc.renderPass = vk.render_pass.ui_overlay;
+			desc.width = glConfig.vidWidth;
+			desc.height = glConfig.vidHeight;
+			desc.attachmentCount = 3;
+			framebuffer_attachments[0] = vk.ui_overlay_image_view;
+			framebuffer_attachments[1] = vk.depth_image_view;
+			framebuffer_attachments[2] = vk.motion_vector_view;
+			if ( vk.msaaActive ) {
+				desc.attachmentCount = 5;
+				framebuffer_attachments[3] = vk.ui_overlay_msaa_image_view;
+				framebuffer_attachments[4] = vk.motion_vector_msaa_view;
+			}
+			VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.ui_overlay[0] ) );
+			SET_OBJECT_NAME( vk.framebuffers.ui_overlay[0], "framebuffer - ui overlay", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+			for ( n = 1; (uint32_t)n < vk.swapchain_image_count; n++ ) {
+				vk.framebuffers.ui_overlay[n] = vk.framebuffers.ui_overlay[0];
+			}
+		}
+
 		// screenmap
 		desc.renderPass = vk.render_pass.screenmap;
 		desc.attachmentCount = 3;
@@ -6407,6 +6555,12 @@ static void vk_destroy_framebuffers( void ) {
 		qvkDestroyFramebuffer( vk.device, vk.framebuffers.capture, NULL );
 		vk.framebuffers.capture = VK_NULL_HANDLE;
 	}
+	if ( vk.framebuffers.ui_overlay[0] != VK_NULL_HANDLE ) {
+		qvkDestroyFramebuffer( vk.device, vk.framebuffers.ui_overlay[0], NULL );
+		for ( n = 0; (uint32_t)n < vk.swapchain_image_count; n++ ) {
+			vk.framebuffers.ui_overlay[n] = VK_NULL_HANDLE;
+		}
+	}
 
 	if ( vk.framebuffers.smaa_edge != VK_NULL_HANDLE ) {
 		qvkDestroyFramebuffer( vk.device, vk.framebuffers.smaa_edge, NULL );
@@ -6445,6 +6599,12 @@ static void vk_destroy_framebuffers( void ) {
         }
     }
 #endif
+	for ( n = 0; n < ARRAY_LEN( vk.framebuffers.overlay_compose ); n++ ) {
+		if ( vk.framebuffers.overlay_compose[n] != VK_NULL_HANDLE ) {
+			qvkDestroyFramebuffer( vk.device, vk.framebuffers.overlay_compose[n], NULL );
+			vk.framebuffers.overlay_compose[n] = VK_NULL_HANDLE;
+		}
+	}
 }
 
 
@@ -9484,6 +9644,12 @@ static void vk_destroy_attachments( void )
 		vk.post_fog_color_source = VK_NULL_HANDLE;
 		vk.scene_post_fog_color_source = VK_NULL_HANDLE;
 	}
+	if ( vk.ui_overlay_image ) {
+		qvkDestroyImage( vk.device, vk.ui_overlay_image, NULL );
+		qvkDestroyImageView( vk.device, vk.ui_overlay_image_view, NULL );
+		vk.ui_overlay_image = VK_NULL_HANDLE;
+		vk.ui_overlay_image_view = VK_NULL_HANDLE;
+	}
 	if ( vk.fog_scene_image ) {
 		qvkDestroyImage( vk.device, vk.fog_scene_image, NULL );
 		qvkDestroyImageView( vk.device, vk.fog_scene_image_view, NULL );
@@ -9535,6 +9701,12 @@ static void vk_destroy_attachments( void )
 		qvkDestroyImageView( vk.device, vk.msaa_image_view, NULL );
 		vk.msaa_image = VK_NULL_HANDLE;
 		vk.msaa_image_view = VK_NULL_HANDLE;
+	}
+	if ( vk.ui_overlay_msaa_image ) {
+		qvkDestroyImage( vk.device, vk.ui_overlay_msaa_image, NULL );
+		qvkDestroyImageView( vk.device, vk.ui_overlay_msaa_image_view, NULL );
+		vk.ui_overlay_msaa_image = VK_NULL_HANDLE;
+		vk.ui_overlay_msaa_image_view = VK_NULL_HANDLE;
 	}
 
 	if ( vk.depth_image_view_sample != VK_NULL_HANDLE ) {
@@ -9655,6 +9827,10 @@ static void vk_destroy_render_passes( void )
 		qvkDestroyRenderPass( vk.device, vk.render_pass.post_bloom, NULL );
 		vk.render_pass.post_bloom = VK_NULL_HANDLE;
 	}
+	if ( vk.render_pass.ui_overlay != VK_NULL_HANDLE ) {
+		qvkDestroyRenderPass( vk.device, vk.render_pass.ui_overlay, NULL );
+		vk.render_pass.ui_overlay = VK_NULL_HANDLE;
+	}
 
 	if ( vk.render_pass.ssao != VK_NULL_HANDLE ) {
 		qvkDestroyRenderPass( vk.device, vk.render_pass.ssao, NULL );
@@ -9715,6 +9891,10 @@ static void vk_destroy_render_passes( void )
 		qvkDestroyRenderPass( vk.device, vk.render_pass.gamma, NULL );
 		vk.render_pass.gamma = VK_NULL_HANDLE;
 	}
+	if ( vk.render_pass.overlay_compose != VK_NULL_HANDLE ) {
+		qvkDestroyRenderPass( vk.device, vk.render_pass.overlay_compose, NULL );
+		vk.render_pass.overlay_compose = VK_NULL_HANDLE;
+	}
 
 	if ( vk.render_pass.capture != VK_NULL_HANDLE ) {
 		qvkDestroyRenderPass( vk.device, vk.render_pass.capture, NULL );
@@ -9770,6 +9950,10 @@ static void vk_destroy_pipelines( qboolean resetCounter )
 	if ( vk.gamma_pipeline ) {
 		qvkDestroyPipeline( vk.device, vk.gamma_pipeline, NULL );
 		vk.gamma_pipeline = VK_NULL_HANDLE;
+	}
+	if ( vk.overlay_compose_pipeline ) {
+		qvkDestroyPipeline( vk.device, vk.overlay_compose_pipeline, NULL );
+		vk.overlay_compose_pipeline = VK_NULL_HANDLE;
 	}
 
 	if ( vk.capture_pipeline ) {
@@ -10162,6 +10346,7 @@ for (i = 0; i < 2; i++) {
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.ssr_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.gamma_vs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.gamma_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.overlay_compose_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.atmosphere_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.smaa_edge_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.smaa_blend_fs );
@@ -11181,6 +11366,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	VkSampleCountFlagBits samples;
 	const char *pipeline_name;
 	qboolean blend;
+	qboolean alpha_composite = qfalse;
 
 	struct PostProcess_FragSpecData {
 		float gamma;           /* constant_id = 0  */
@@ -11355,6 +11541,17 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			target_format = vk.color_format;
 			blend = qfalse;
 			break;
+		case 22: // overlay composite
+			pipeline = &vk.overlay_compose_pipeline;
+			fsmodule = vk.modules.overlay_compose_fs;
+			renderpass = vk.render_pass.overlay_compose;
+			layout = vk.pipeline_layout_post_process;
+			samples = VK_SAMPLE_COUNT_1_BIT;
+			pipeline_name = "overlay compose pipeline";
+			target_format = vk.present_format.format;
+			blend = qtrue;
+			alpha_composite = qtrue;
+			break;
 #ifdef VK_PBR_BRDFLUT
         case 4: // generate brdf LUT
             pipeline = &vk.brdflut_pipeline;
@@ -11377,6 +11574,10 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			target_format = vk.present_format.format;
 			blend = qfalse;
 			break;
+	}
+
+	if ( program_index != 22 ) {
+		alpha_composite = qfalse;
 	}
 
 	if ( *pipeline != VK_NULL_HANDLE ) {
@@ -11632,8 +11833,17 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	attachment_blend_state.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 	if ( blend ) {
 		attachment_blend_state.blendEnable = VK_TRUE;
-		attachment_blend_state.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
-		attachment_blend_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+		if ( alpha_composite ) {
+			attachment_blend_state.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+			attachment_blend_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+			attachment_blend_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+			attachment_blend_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+			attachment_blend_state.colorBlendOp = VK_BLEND_OP_ADD;
+			attachment_blend_state.alphaBlendOp = VK_BLEND_OP_ADD;
+		} else {
+			attachment_blend_state.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+			attachment_blend_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+		}
 	} else {
 		attachment_blend_state.blendEnable = VK_FALSE;
 	}
@@ -13176,6 +13386,14 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 		attachment_blend_state.dstAlphaBlendFactor = attachment_blend_state.dstColorBlendFactor;
 		attachment_blend_state.colorBlendOp = VK_BLEND_OP_ADD;
 		attachment_blend_state.alphaBlendOp = VK_BLEND_OP_ADD;
+		if ( renderPassIndex == RENDER_PASS_UI_OVERLAY &&
+			attachment_blend_state.srcColorBlendFactor == VK_BLEND_FACTOR_SRC_ALPHA &&
+			attachment_blend_state.dstColorBlendFactor == VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA ) {
+			/* Preserve overlay coverage so the final composite can alpha-blend on top of the
+			 * already-tonemapped scene. RGB stays premultiplied; alpha tracks accumulated coverage. */
+			attachment_blend_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+			attachment_blend_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+		}
 
 		if ( def->allow_discard ) {
 			// try to reduce pixel fillrate for transparent surfaces, this yields 1..10% fps increase when multisampling in enabled
@@ -13188,7 +13406,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	}
 
 	main_motion_target = ( vk.fboActive &&
-		( renderPassIndex == RENDER_PASS_MAIN || renderPassIndex == RENDER_PASS_POST_BLOOM ) ) ? VK_TRUE : VK_FALSE;
+		( renderPassIndex == RENDER_PASS_MAIN || renderPassIndex == RENDER_PASS_POST_BLOOM ||
+			renderPassIndex == RENDER_PASS_UI_OVERLAY ) ) ? VK_TRUE : VK_FALSE;
 	if ( renderPassIndex == RENDER_PASS_SCREENMAP ) {
 		main_motion_target = VK_TRUE;
 	}
@@ -13271,6 +13490,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 		create_info.renderPass = vk.render_pass.sun_shadow;
 	else if ( renderPassIndex == RENDER_PASS_POST_BLOOM )
 		create_info.renderPass = vk.render_pass.post_bloom;
+	else if ( renderPassIndex == RENDER_PASS_UI_OVERLAY )
+		create_info.renderPass = vk.render_pass.ui_overlay;
 	else if ( renderPassIndex == RENDER_PASS_CUBEMAP )
 		create_info.renderPass = vk.render_pass.cubemap;
 	else
@@ -14429,6 +14650,30 @@ void vk_begin_post_bloom_render_pass( void )
 	vk.renderScaleX = vk.renderScaleY = 1.0f;
 
 	vk_begin_render_pass_tracked( vk.render_pass.post_bloom, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+	vk.depth_image_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+}
+
+void vk_begin_ui_overlay_render_pass( void )
+{
+	VkFramebuffer frameBuffer;
+
+	if ( !vk.cmd || vk.cmd->swapchain_image_index >= MAX_SWAPCHAIN_IMAGES ) {
+		return;
+	}
+
+	frameBuffer = vk.framebuffers.ui_overlay[ vk.cmd->swapchain_image_index ];
+	if ( frameBuffer == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	vk.renderPassIndex = RENDER_PASS_UI_OVERLAY;
+	vk.renderWidth = glConfig.vidWidth;
+	vk.renderHeight = glConfig.vidHeight;
+	vk.renderScaleX = 1.0f;
+	vk.renderScaleY = 1.0f;
+	vk.uiOverlayActive = qtrue;
+
+	vk_begin_render_pass_tracked( vk.render_pass.ui_overlay, frameBuffer, qtrue, vk.renderWidth, vk.renderHeight );
 	vk.depth_image_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 }
 
@@ -16121,15 +16366,6 @@ void vk_prepare_2d( void )
 		return;
 	}
 
-	// Run volumetrics before switching to 2D so UI/console/HUD are not fogged.
-	{
-		int tier = 0;
-		cvar_t *tierCvar = ri.Cvar_Get( "r_volumetricFogTier", "0", 0 );
-		if ( tierCvar ) tier = tierCvar->integer;
-		if ( !vk.fboActive || !r_volumetricFog || !r_volumetricFog->integer || tier >= 2 || tier == 4 || backEnd.doneFog ) {
-			return;
-		}
-	}
 	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE || !vk.inRenderPass ) {
 		return;
 	}
@@ -16160,11 +16396,35 @@ void vk_prepare_2d( void )
 		return;
 	}
 
-	vk_end_render_pass();
-	vk_volumetric_fog_pass();
+	{
+		int tier = 0;
+		qboolean runFogPass = qfalse;
+		cvar_t *tierCvar = ri.Cvar_Get( "r_volumetricFogTier", "0", 0 );
+		if ( tierCvar ) {
+			tier = tierCvar->integer;
+		}
+		runFogPass = ( vk.fboActive && !backEnd.doneFog && r_volumetricFog && r_volumetricFog->integer &&
+			tier < 2 && tier != 4 );
 
-	// Resume drawing for 2D overlays.
-	vk_begin_post_bloom_render_pass();
+		vk_end_render_pass();
+		if ( runFogPass ) {
+			vk_volumetric_fog_pass();
+		} else {
+			vk_reset_volumetric_history();
+			backEnd.doneFog = qtrue;
+			vk_set_scene_post_fog_source( vk.color_image_view );
+			vk_log_post_fog_rebind( "prepare_2d split (scene source)", vk.color_image_view );
+			vk_update_post_fog_descriptors( vk.color_image_view );
+		}
+	}
+
+	// Resume drawing for 2D overlays on a separate post-tonemap target when available.
+	if ( vk.render_pass.ui_overlay != VK_NULL_HANDLE &&
+		vk.framebuffers.ui_overlay[ vk.cmd->swapchain_image_index ] != VK_NULL_HANDLE ) {
+		vk_begin_ui_overlay_render_pass();
+	} else {
+		vk_begin_post_bloom_render_pass();
+	}
 }
 
 
@@ -16345,6 +16605,7 @@ void vk_begin_frame( void )
 	vk_begin_motion_frame();
 	vk.sun_shadow_valid = qfalse;
 	vk.temporal.preparedThisFrame = qfalse;
+	vk.uiOverlayActive = qfalse;
 
 #ifdef USE_UPLOAD_QUEUE
 	vk_flush_staging_buffer( qtrue );
@@ -16831,6 +17092,23 @@ void vk_end_frame( void )
 						vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
 						qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 						vk_end_render_pass();
+
+						if ( vk.uiOverlayActive &&
+							vk.ui_overlay_image_view != VK_NULL_HANDLE &&
+							vk.overlay_compose_pipeline != VK_NULL_HANDLE &&
+							vk.render_pass.overlay_compose != VK_NULL_HANDLE &&
+							vk.framebuffers.overlay_compose[ vk.cmd->swapchain_image_index ] != VK_NULL_HANDLE ) {
+							vk_update_color_descriptor_image( vk.ui_overlay_image_view );
+							vk_begin_render_pass_tracked( vk.render_pass.overlay_compose,
+								vk.framebuffers.overlay_compose[ vk.cmd->swapchain_image_index ],
+								qfalse, vk.renderWidth, vk.renderHeight );
+							qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.overlay_compose_pipeline );
+							qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+								vk.pipeline_layout_post_process, 0, 1, &vk.post_color_descriptor[vk.cmd_index], 0, NULL );
+							vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
+							qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+							vk_end_render_pass();
+						}
 					}
 				}
 			}
