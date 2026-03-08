@@ -1702,8 +1702,8 @@ static void R_Register( void )
 	r_printShaders = ri.Cvar_Get( "r_printShaders", "0", 0 );
 	ri.Cvar_SetDescription( r_printShaders, "Debugging tool to print on console of the number of shaders used." );
 	r_saveFontData = ri.Cvar_Get( "r_saveFontData", "0", 0 );
-	ri.Cvar_Get( "r_font", "", CVAR_ARCHIVE );
-	ri.Cvar_SetDescription( ri.Cvar_Get( "r_font", "", CVAR_ARCHIVE ), "Custom TrueType font file for UI text (e.g. fonts/myfont.ttf). Empty = default bitmap font." );
+	ri.Cvar_Get( "r_font", "fonts/Inter-Regular.ttf", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( ri.Cvar_Get( "r_font", "fonts/Inter-Regular.ttf", CVAR_ARCHIVE ), "Custom TrueType font for UI text (e.g. fonts/Inter-Regular.ttf). Overrides 'fonts/default' when set. Empty = legacy bitmap font." );
 	ri.Cvar_Get( "r_consoleFont", "", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( ri.Cvar_Get( "r_consoleFont", "", CVAR_ARCHIVE ), "Custom TrueType font for the console (e.g. fonts/consolefont.ttf). Empty = default." );
 	ri.Cvar_Get( "r_fontSize", "16", CVAR_ARCHIVE );

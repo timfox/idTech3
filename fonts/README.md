@@ -1,16 +1,23 @@
-This directory hosts the TrueType fonts the renderer uses with `BUILD_FREETYPE`.
-Source Sans 3 is downloaded during configure so the console has a modern glyph set.
-Place any custom `.ttf` files here and rerun the game; the loader checks `fonts/` before system directories.
-This directory contains the TrueType fonts the renderer uses when `BUILD_FREETYPE` is enabled.
-Source Sans 3 is downloaded automatically during configuration and serves as the default font for the console/UI.
-Drop any other `.ttf` files here if you prefer a different typography; the loader scans `fonts/` before searching system directories.
-This directory holds the TrueType fonts used for FreeType font generation.
+# Fonts
 
-Source Sans 3 (regular + bold) is downloaded automatically when you configure the project with FreeType enabled. The renderer falls back to those fonts when rendering UI text.
+This directory and `base/fonts/` hold TrueType fonts used by the renderer when `BUILD_FREETYPE` is enabled.
 
-If your environment lacks network access or you prefer different fonts, place replacement `.ttf` files here and rerun the renderer. The font loader will scan this folder before checking system paths.
-This folder hosts the TrueType fonts used by the renderer when `BUILD_FREETYPE` is enabled.
+## Default: Inter
 
-Two Source Sans 3 fonts (`SourceSans3-Regular.ttf` and `SourceSans3-Bold.ttf`) are downloaded automatically by CMake when they are missing, so you usually do not need to add files manually.
+**Inter** (v4.1) is the default UI font. When `r_font` is set to `fonts/Inter-Regular.ttf` (the default), all UI text that requests `fonts/default` uses Inter.
 
-If you prefer other fonts, place them here and update your UI scripts accordingly. The renderer will pick the first available font in `fonts/` before falling back to common system fonts (DejaVu, Liberation, Arial, etc.).
+- **Automatic download**: CMake downloads Inter to `base/fonts/` during configure when the font files are missing.
+- **Files**: `Inter-Regular.ttf`, `Inter-Bold.ttf` (in `base/fonts/`)
+- **License**: SIL Open Font License 1.1
+
+## Custom fonts
+
+- **r_font**: Set to a path like `fonts/MyFont.ttf` to override the default. Use `r_font ""` to fall back to the legacy bitmap font.
+- **r_consoleFont**: Separate font for the console (e.g. `fonts/consolefont.ttf`).
+- **r_fontSize**: Point size for custom fonts (default 16).
+
+Place `.ttf` files in `base/fonts/` so the game can find them. The compile script copies `base/fonts/*.ttf` to the release directory.
+
+## SDF fonts (HUD)
+
+For resolution-independent SDF text (`r_sdfEnable 1`), use `r_sdfFont` with a BMFont `.fnt` metrics file and matching atlas texture. Generate these from Inter (or any TTF) using tools like msdfgen, Hiero, or fontbm.
