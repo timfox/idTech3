@@ -1685,13 +1685,21 @@ static void VkVolumetricValidate_f( void )
 
 	if ( !mode[0] ) {
 		ri.Printf( PRINT_ALL,
-			"usage: vkVolumetricValidate <camera|ghosting|localspot|localpoint|msaa|checklist>\n"
+			"usage: vkVolumetricValidate <camera|ghosting|localspot|localpoint|msaa|checklist|reset>\n"
 			"  camera [captureName]       : force one camera-cut reset and show reset overlay.\n"
 			"  ghosting [captureName]     : show motion-vector threshold debug for fast camera tests.\n"
 			"  localspot [captureName]    : show local spot-shadow visibility debug.\n"
 			"  localpoint [captureName]   : show local point-shadow visibility debug.\n"
 			"  msaa [capture base [msaa]] : queue off/on MSAA parity screenshots (+ optional sample count).\n"
-			"  checklist                  : print exact validation commands for the final checklist.\n" );
+			"  checklist                  : print exact validation commands for the final checklist.\n"
+			"  reset                      : restore normal fog (r_fogDebug 0, r_volumetricFogValidation 0).\n" );
+		return;
+	}
+
+	if ( !Q_stricmp( mode, "reset" ) ) {
+		ri.Cvar_Set( "r_fogDebug", "0" );
+		ri.Cvar_Set( "r_volumetricFogValidation", "0" );
+		ri.Printf( PRINT_ALL, "[VK][fog] fog debug disabled: normal fog restored.\n" );
 		return;
 	}
 
@@ -1702,7 +1710,7 @@ static void VkVolumetricValidate_f( void )
 		if ( argc > 2 && ri.Cmd_Argv( 2 )[0] ) {
 			ri.Cmd_ExecuteText( EXEC_APPEND, va( "screenshotJPEG %s\n", ri.Cmd_Argv( 2 ) ) );
 		}
-		ri.Printf( PRINT_ALL, "[VK][fog] validation camera-cut armed: debug=10, forceCut=1\n" );
+		ri.Printf( PRINT_ALL, "[VK][fog] validation camera-cut armed: debug=10, forceCut=1. When done: vkVolumetricValidate reset\n" );
 		return;
 	}
 
@@ -1712,7 +1720,7 @@ static void VkVolumetricValidate_f( void )
 		if ( argc > 2 && ri.Cmd_Argv( 2 )[0] ) {
 			ri.Cmd_ExecuteText( EXEC_APPEND, va( "screenshotJPEG %s\n", ri.Cmd_Argv( 2 ) ) );
 		}
-		ri.Printf( PRINT_ALL, "[VK][fog] validation ghosting view enabled: debug=7 (motion magnitude / threshold)\n" );
+		ri.Printf( PRINT_ALL, "[VK][fog] validation ghosting view enabled: debug=7 (motion magnitude / threshold). When done: vkVolumetricValidate reset\n" );
 		return;
 	}
 
@@ -1723,7 +1731,7 @@ static void VkVolumetricValidate_f( void )
 		if ( argc > 2 && ri.Cmd_Argv( 2 )[0] ) {
 			ri.Cmd_ExecuteText( EXEC_APPEND, va( "screenshotJPEG %s\n", ri.Cmd_Argv( 2 ) ) );
 		}
-		ri.Printf( PRINT_ALL, "[VK][fog] validation local spot shadow view enabled: debug=8\n" );
+		ri.Printf( PRINT_ALL, "[VK][fog] validation local spot shadow view enabled: debug=8. When done: vkVolumetricValidate reset\n" );
 		return;
 	}
 
@@ -1734,7 +1742,7 @@ static void VkVolumetricValidate_f( void )
 		if ( argc > 2 && ri.Cmd_Argv( 2 )[0] ) {
 			ri.Cmd_ExecuteText( EXEC_APPEND, va( "screenshotJPEG %s\n", ri.Cmd_Argv( 2 ) ) );
 		}
-		ri.Printf( PRINT_ALL, "[VK][fog] validation local point shadow view enabled: debug=9\n" );
+		ri.Printf( PRINT_ALL, "[VK][fog] validation local point shadow view enabled: debug=9. When done: vkVolumetricValidate reset\n" );
 		return;
 	}
 
