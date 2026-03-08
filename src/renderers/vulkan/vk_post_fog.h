@@ -20,6 +20,7 @@ const char *vk_post_fog_source_name( VkImageView color_source );
 VkImage      vk_post_fog_source_image( VkImageView color_source );
 VkImageView  vk_get_post_fog_source( void );
 VkImageView  vk_get_luminance_source( void );
+void        vk_reset_post_fog_frame_state( void );
 void        vk_set_scene_post_fog_source( VkImageView color_source );
 void        vk_log_post_fog_rebind( const char *reason, VkImageView color_source );
 void        vk_update_color_descriptor_image( VkImageView color_view );

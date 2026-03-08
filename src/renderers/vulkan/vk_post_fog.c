@@ -256,3 +256,21 @@ VkImageView vk_get_luminance_source( void )
 	}
 	return vk.color_image_view;
 }
+
+void vk_reset_post_fog_frame_state( void )
+{
+	VkImageView default_source = vk.color_image_view;
+
+	vk.post_fog_color_source = default_source;
+	vk.scene_post_fog_color_source = default_source;
+
+	if ( default_source == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	vk_update_color_descriptor_image( default_source );
+	if ( vk.luminance_layout != VK_NULL_HANDLE && vk.luminance_image_view != VK_NULL_HANDLE &&
+		default_source != vk.luminance_image_view ) {
+		vk_update_luminance_descriptor_image( default_source );
+	}
+}
