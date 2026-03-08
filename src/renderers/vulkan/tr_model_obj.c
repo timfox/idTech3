@@ -27,28 +27,207 @@ typedef struct {
 	void *mtlBuf;
 } obj_read_ctx_t;
 
+static qboolean R_OBJ_IsRelativePath( const char *path )
+{
+	if ( !path || !path[0] ) {
+		return qfalse;
+	}
+
+	if ( path[0] == '/' || path[0] == '\\' ) {
+		return qfalse;
+	}
+
+	if ( path[1] == ':' ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+static void R_OBJ_ResolveRelativePath( const char *baseName, const char *relativeName,
+	char *out, int outSize )
+{
+	char dir[MAX_QPATH];
+	int i, len;
+
+	if ( !relativeName || !relativeName[0] ) {
+		*out = '\0';
+		return;
+	}
+
+	if ( !baseName || !baseName[0] || !R_OBJ_IsRelativePath( relativeName ) ) {
+		Q_strncpyz( out, relativeName, outSize );
+		return;
+	}
+
+	len = (int)strlen( baseName );
+	for ( i = len - 1; i >= 0; i-- ) {
+		if ( baseName[i] == '/' || baseName[i] == '\\' ) {
+			break;
+		}
+	}
+
+	if ( i >= 0 && (size_t)( i + 2 ) <= sizeof( dir ) ) {
+		Q_strncpyz( dir, baseName, (size_t)( i + 2 ) );
+		Com_sprintf( out, outSize, "%s%s", dir, relativeName );
+	} else {
+		Q_strncpyz( out, relativeName, outSize );
+	}
+}
+
+static int R_OBJ_ReadSourceFile( const char *filename, const char *obj_filename, void **dataOut )
+{
+	int size;
+
+	*dataOut = NULL;
+	size = ri.FS_ReadFile( filename, dataOut );
+	if ( size > 0 && *dataOut ) {
+		return size;
+	}
+
+	if ( obj_filename && R_OBJ_IsRelativePath( filename ) ) {
+		char resolved[MAX_QPATH];
+		void *resolvedData = NULL;
+
+		R_OBJ_ResolveRelativePath( obj_filename, filename, resolved, sizeof( resolved ) );
+		size = ri.FS_ReadFile( resolved, &resolvedData );
+		if ( size > 0 && resolvedData ) {
+			*dataOut = resolvedData;
+			return size;
+		}
+	}
+
+	return 0;
+}
+
+static char *R_OBJ_SanitizeTextBuffer( const char *input, size_t inputLen, size_t *outLen )
+{
+	const unsigned char *src = (const unsigned char *)input;
+	size_t srcPos = 0;
+	size_t dstPos = 0;
+	size_t allocLen;
+	char *out;
+
+	if ( !input || inputLen == 0 ) {
+		return NULL;
+	}
+
+	if ( inputLen >= 3 && src[0] == 0xEF && src[1] == 0xBB && src[2] == 0xBF ) {
+		srcPos = 3;
+	}
+
+	allocLen = inputLen * 4 + 1;
+	out = (char *)ri.Malloc( (int)allocLen );
+	if ( !out ) {
+		return NULL;
+	}
+
+	while ( srcPos < inputLen ) {
+		size_t lineStart = srcPos;
+		size_t lineEnd = srcPos;
+		size_t lineLen;
+		const char *line;
+		const char *trimmed;
+
+		while ( lineEnd < inputLen && src[lineEnd] != '\n' && src[lineEnd] != '\r' ) {
+			lineEnd++;
+		}
+
+		lineLen = lineEnd - lineStart;
+		line = input + lineStart;
+		trimmed = line;
+		while ( (size_t)( trimmed - line ) < lineLen && ( *trimmed == ' ' || *trimmed == '\t' ) ) {
+			trimmed++;
+		}
+
+		if ( (size_t)( trimmed - line ) + 2 <= lineLen && trimmed[0] == 'l' &&
+			( trimmed[1] == ' ' || trimmed[1] == '\t' ) ) {
+			/* Drop line primitives. The renderer only consumes mesh triangles,
+			 * and tinyobj's line parser asserts on polyline forms. */
+		} else if ( (size_t)( trimmed - line ) + 2 <= lineLen && trimmed[0] == 'f' &&
+			( trimmed[1] == ' ' || trimmed[1] == '\t' ) && lineLen < 8192 ) {
+			char lineBuf[8192];
+			char *tokens[256];
+			int tokenCount = 0;
+			char *token;
+			size_t i;
+
+			Com_Memcpy( lineBuf, line, lineLen );
+			lineBuf[lineLen] = '\0';
+
+			token = strtok( lineBuf, " \t" );
+			while ( token && tokenCount < (int)ARRAY_LEN( tokens ) ) {
+				tokens[tokenCount++] = token;
+				token = strtok( NULL, " \t" );
+			}
+
+			if ( tokenCount > 16 ) {
+				for ( i = 2; i + 1 < (size_t)tokenCount; i++ ) {
+					dstPos += Com_sprintf( out + dstPos, (int)( allocLen - dstPos ),
+						"f %s %s %s\n", tokens[1], tokens[i], tokens[i + 1] );
+				}
+			} else {
+				for ( i = 0; i < lineLen && dstPos + 1 < allocLen; i++ ) {
+					out[dstPos++] = ( line[i] == '\0' ) ? ' ' : line[i];
+				}
+				out[dstPos++] = '\n';
+			}
+		} else {
+			size_t i;
+			for ( i = 0; i < lineLen && dstPos + 1 < allocLen; i++ ) {
+				unsigned char ch = (unsigned char)line[i];
+				if ( ch == '\0' ) {
+					ch = ' ';
+				}
+				out[dstPos++] = (char)ch;
+			}
+			out[dstPos++] = '\n';
+		}
+
+		srcPos = lineEnd;
+		while ( srcPos < inputLen && ( src[srcPos] == '\n' || src[srcPos] == '\r' ) ) {
+			srcPos++;
+		}
+	}
+
+	out[dstPos] = '\0';
+	if ( outLen ) {
+		*outLen = dstPos + 1;
+	}
+
+	return out;
+}
+
 static void obj_file_reader(void *ctx, const char *filename, int is_mtl,
                             const char *obj_filename, char **buf, size_t *len) {
 	void *data;
 	int size;
 	obj_read_ctx_t *readCtx = (obj_read_ctx_t *)ctx;
+	char *sanitized;
+	size_t sanitizedLen;
 
-	(void)obj_filename;
-
-	size = ri.FS_ReadFile(filename, &data);
+	size = R_OBJ_ReadSourceFile( filename, obj_filename, &data );
 	if (size <= 0 || !data) {
 		*buf = NULL;
 		*len = 0;
 		return;
 	}
 
-	*buf = (char *)data;
-	*len = (size_t)size;
+	sanitized = R_OBJ_SanitizeTextBuffer( (const char *)data, (size_t)size, &sanitizedLen );
+	ri.FS_FreeFile( data );
+	if ( !sanitized || sanitizedLen <= 1 ) {
+		*buf = NULL;
+		*len = 0;
+		return;
+	}
+
+	*buf = sanitized;
+	*len = sanitizedLen;
 
 	if (is_mtl) {
-		readCtx->mtlBuf = data;
+		readCtx->mtlBuf = sanitized;
 	} else {
-		readCtx->objBuf = data;
+		readCtx->objBuf = sanitized;
 	}
 }
 
@@ -147,10 +326,10 @@ static qboolean R_LoadOBJ( model_t *mod, int lod, const char *name )
 		name, obj_file_reader, &readCtx, TINYOBJ_FLAG_TRIANGULATE);
 
 	if (readCtx.objBuf) {
-		ri.FS_FreeFile(readCtx.objBuf);
+		ri.Free(readCtx.objBuf);
 	}
 	if (readCtx.mtlBuf) {
-		ri.FS_FreeFile(readCtx.mtlBuf);
+		ri.Free(readCtx.mtlBuf);
 	}
 
 	if (ret != TINYOBJ_SUCCESS) {

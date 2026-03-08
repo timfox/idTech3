@@ -15,5 +15,6 @@ typedef struct {
 } vkAtmospherePushConstants_t;
 
 void vk_atmosphere_build_push_constants( vkAtmospherePushConstants_t *pc );
+void vk_atmosphere_pass( void );
 
 #endif
