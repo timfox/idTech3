@@ -459,16 +459,19 @@ static void RB_Hyperspace( void ) {
 		// do initialization shit
 	}
 
-	if ( tess.shader != tr.whiteShader ) {
-		RB_EndSurface();
+	RB_SetGL2D();
+
+	if ( tess.shader != tr.whiteShader || backEnd.currentEntity != &backEnd.entity2D ) {
+		if ( tess.numIndexes ) {
+			RB_EndSurface();
+		}
+		backEnd.currentEntity = &backEnd.entity2D;
 		RB_BeginSurface( tr.whiteShader, 0 );
 	}
 
 #ifdef USE_VBO
 	VBO_UnBind();
 #endif
-
-	RB_SetGL2D();
 
 	if ( r_teleporterFlash->integer == 0 ) {
 		c.rgba[0] = c.rgba[1] = c.rgba[2] = 0; // fade to black
@@ -1123,12 +1126,23 @@ static void RB_SetGL2D( void ) {
 #endif
 
 	backEnd.projection2D = qtrue;
+	backEnd.currentEntity = &backEnd.entity2D;
 
 #ifdef USE_VULKAN
 	vk_update_mvp( NULL );
 
 	// force depth range and viewport/scissor updates
 	vk.cmd->depth_range = DEPTH_RANGE_COUNT;
+
+	/*
+	 * Match the legacy 2D contract even though Vulkan does not drive fixed-function
+	 * GL state directly: 2D expects no depth test, standard alpha blending, and
+	 * two-sided culling semantics.
+	 */
+	glState.glStateBits = GLS_DEPTHTEST_DISABLE |
+		GLS_SRCBLEND_SRC_ALPHA |
+		GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA;
+	GL_Cull( CT_TWO_SIDED );
 #else
 	// set 2D virtual screen size
 	qglViewport( 0, 0, glConfig.vidWidth, glConfig.vidHeight );
@@ -1258,8 +1272,15 @@ static const void *RB_StretchPic( const void *data ) {
 
 	cmd = (const stretchPicCommand_t *)data;
 
+	if ( !backEnd.projection2D ) {
+		if ( tess.numIndexes ) {
+			RB_EndSurface();
+		}
+		RB_SetGL2D();
+	}
+
 	shader = cmd->shader;
-	if ( shader != tess.shader ) {
+	if ( shader != tess.shader || backEnd.currentEntity != &backEnd.entity2D ) {
 		if ( tess.numIndexes ) {
 			RB_EndSurface();
 		}
@@ -1270,14 +1291,6 @@ static const void *RB_StretchPic( const void *data ) {
 #ifdef USE_VBO
 	VBO_UnBind();
 #endif
-
-	if ( !backEnd.projection2D ) {
-#ifdef USE_VULKAN
-		// Keep volumetric fog behind all subsequent 2D/HUD draws.
-		vk_prepare_2d();
-#endif
-		RB_SetGL2D();
-	}
 
 	RB_AddQuadStamp2( cmd->x, cmd->y, cmd->w, cmd->h, cmd->s1, cmd->t1, cmd->s2, cmd->t2, backEnd.color2D );
 

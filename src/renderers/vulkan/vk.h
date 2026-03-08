@@ -385,6 +385,7 @@ void vk_release_resources( void );
 
 void vk_wait_idle( void );
 void vk_queue_wait_idle( void );
+VkSampleCountFlagBits vk_get_main_rasterization_samples( void );
 
 //
 // Resources allocation.
@@ -419,6 +420,10 @@ void vk_end_frame( void );
 void vk_present_frame( void );
 void vk_prepare_2d( void );
 void vk_prepare_frame_temporal_state( void );
+void vk_reset_scene_src_rect_tracking( void );
+void vk_begin_motion_frame( void );
+void vk_get_scissor_rect( VkRect2D *r );
+void vk_update_depth_range( Vk_Depth_Range depth_range );
 
 void vk_end_render_pass( void );
 void vk_begin_main_render_pass( void );
@@ -453,6 +458,14 @@ qboolean vk_ssao_pass( void );
 
 qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size );
 void vk_update_mvp( const float *m );
+
+extern PFN_vkCmdBindDescriptorSets qvkCmdBindDescriptorSets;
+extern PFN_vkCmdBindPipeline qvkCmdBindPipeline;
+extern PFN_vkCmdCopyImageToBuffer qvkCmdCopyImageToBuffer;
+extern PFN_vkCmdDispatch qvkCmdDispatch;
+extern PFN_vkCmdDraw qvkCmdDraw;
+extern PFN_vkCreateGraphicsPipelines qvkCreateGraphicsPipelines;
+extern PFN_vkDestroyPipeline qvkDestroyPipeline;
 
 uint32_t vk_tess_index( uint32_t numIndexes, const void *src );
 void *vk_alloc_storage( size_t size, uint32_t *offset );
@@ -1283,6 +1296,7 @@ extern Vk_World		vk_world;		// this data is cleared during ref re-init
 extern PFN_vkCmdBeginRenderPass		qvkCmdBeginRenderPass;
 extern PFN_vkCmdEndRenderPass		qvkCmdEndRenderPass;
 extern PFN_vkCmdPipelineBarrier		qvkCmdPipelineBarrier;
+extern PFN_vkCmdPushConstants		qvkCmdPushConstants;
 extern PFN_vkCmdSetScissor			qvkCmdSetScissor;
 extern PFN_vkCmdSetViewport			qvkCmdSetViewport;
 extern PFN_vkUpdateDescriptorSets	qvkUpdateDescriptorSets;

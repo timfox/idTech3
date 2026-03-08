@@ -1,0 +1,331 @@
+#include "tr_local.h"
+#include "vk.h"
+#include "vk_temporal.h"
+#include "vk_view_state.h"
+
+typedef struct vkMvpPushConstants_s {
+	float mvp[16];
+	float prev_mvp[16];
+} vkMvpPushConstants_t;
+
+static VkRect2D vk_scene_src_rect;
+static qboolean vk_scene_src_rect_valid;
+
+static float vk_prev_entity_model_matrices[MAX_REFENTITIES][16];
+static float vk_curr_entity_model_matrices[MAX_REFENTITIES][16];
+static int vk_prev_entity_model_handles[MAX_REFENTITIES];
+static int vk_curr_entity_model_handles[MAX_REFENTITIES];
+static int vk_prev_entity_types[MAX_REFENTITIES];
+static int vk_curr_entity_types[MAX_REFENTITIES];
+static qboolean vk_prev_entity_model_valid[MAX_REFENTITIES];
+static qboolean vk_curr_entity_model_valid[MAX_REFENTITIES];
+
+void vk_reset_scene_src_rect_tracking( void )
+{
+	vk_scene_src_rect_valid = qfalse;
+}
+
+static void vk_get_viewport_rect( VkRect2D *r )
+{
+	if ( backEnd.projection2D ) {
+		r->offset.x = 0;
+		r->offset.y = 0;
+		r->extent.width = vk.renderWidth;
+		r->extent.height = vk.renderHeight;
+	} else {
+		r->offset.x = backEnd.viewParms.viewportX * vk.renderScaleX;
+		r->offset.y = vk.renderHeight - ( backEnd.viewParms.viewportY + backEnd.viewParms.viewportHeight ) * vk.renderScaleY;
+		r->extent.width = (float)backEnd.viewParms.viewportWidth * vk.renderScaleX;
+		r->extent.height = (float)backEnd.viewParms.viewportHeight * vk.renderScaleY;
+	}
+}
+
+static void vk_get_viewport( VkViewport *viewport, Vk_Depth_Range depth_range )
+{
+	VkRect2D r;
+
+	vk_get_viewport_rect( &r );
+
+	viewport->x = (float)r.offset.x;
+	viewport->y = (float)r.offset.y;
+	viewport->width = (float)r.extent.width;
+	viewport->height = (float)r.extent.height;
+
+	switch ( depth_range ) {
+		default:
+#ifdef USE_REVERSED_DEPTH
+			viewport->minDepth = 0.0f;
+			viewport->maxDepth = 1.0f;
+			break;
+		case DEPTH_RANGE_ZERO:
+			viewport->minDepth = 1.0f;
+			viewport->maxDepth = 1.0f;
+			break;
+		case DEPTH_RANGE_ONE:
+			viewport->minDepth = 0.0f;
+			viewport->maxDepth = 0.0f;
+			break;
+		case DEPTH_RANGE_WEAPON:
+			viewport->minDepth = 0.6f;
+			viewport->maxDepth = 1.0f;
+			break;
+#else
+			viewport->minDepth = 0.0f;
+			viewport->maxDepth = 1.0f;
+			break;
+		case DEPTH_RANGE_ZERO:
+			viewport->minDepth = 0.0f;
+			viewport->maxDepth = 0.0f;
+			break;
+		case DEPTH_RANGE_ONE:
+			viewport->minDepth = 1.0f;
+			viewport->maxDepth = 1.0f;
+			break;
+		case DEPTH_RANGE_WEAPON:
+			viewport->minDepth = 0.0f;
+			viewport->maxDepth = 0.3f;
+			break;
+#endif
+	}
+}
+
+void vk_get_scissor_rect( VkRect2D *r )
+{
+	if ( backEnd.viewParms.portalView != PV_NONE ) {
+		r->offset.x = backEnd.viewParms.scissorX;
+		r->offset.y = glConfig.vidHeight - backEnd.viewParms.scissorY - backEnd.viewParms.scissorHeight;
+		r->extent.width = backEnd.viewParms.scissorWidth;
+		r->extent.height = backEnd.viewParms.scissorHeight;
+	} else {
+		vk_get_viewport_rect( r );
+
+		if ( r->offset.x < 0 ) {
+			r->offset.x = 0;
+		}
+		if ( r->offset.y < 0 ) {
+			r->offset.y = 0;
+		}
+
+		if ( (uint32_t)r->offset.x + r->extent.width > (uint32_t)glConfig.vidWidth ) {
+			r->extent.width = (uint32_t)glConfig.vidWidth - r->offset.x;
+		}
+		if ( (uint32_t)r->offset.y + r->extent.height > (uint32_t)glConfig.vidHeight ) {
+			r->extent.height = (uint32_t)glConfig.vidHeight - r->offset.y;
+		}
+	}
+}
+
+static void vk_get_projection_matrix_vk( const float *projection_matrix, float *projection_vk )
+{
+	Com_Memcpy( projection_vk, projection_matrix, sizeof( float ) * 16 );
+	projection_vk[5] = -projection_matrix[5];
+}
+
+static void vk_get_mvp_transform( float *mvp )
+{
+	if ( backEnd.projection2D ) {
+		float mvp0 = 2.0f / glConfig.vidWidth;
+		float mvp5 = 2.0f / glConfig.vidHeight;
+
+		mvp[0]  =  mvp0; mvp[1]  =  0.0f; mvp[2]  = 0.0f; mvp[3]  = 0.0f;
+		mvp[4]  =  0.0f; mvp[5]  =  mvp5; mvp[6]  = 0.0f; mvp[7]  = 0.0f;
+#ifdef USE_REVERSED_DEPTH
+		mvp[8]  =  0.0f; mvp[9]  =  0.0f; mvp[10] = 0.0f; mvp[11] = 0.0f;
+		mvp[12] = -1.0f; mvp[13] = -1.0f; mvp[14] = 1.0f; mvp[15] = 1.0f;
+#else
+		mvp[8]  =  0.0f; mvp[9]  =  0.0f; mvp[10] = 1.0f; mvp[11] = 0.0f;
+		mvp[12] = -1.0f; mvp[13] = -1.0f; mvp[14] = 0.0f; mvp[15] = 1.0f;
+#endif
+	} else {
+		float proj[16];
+		const float *projection = backEnd.useFirstPersonProjection
+			? backEnd.firstPersonProjectionMatrix
+			: backEnd.viewParms.projectionMatrix;
+		vk_get_projection_matrix_vk( projection, proj );
+		myGlMultMatrix( vk_world.modelview_transform, proj, mvp );
+	}
+}
+
+void vk_begin_motion_frame( void )
+{
+	for ( int i = 0; i < MAX_REFENTITIES; i++ ) {
+		if ( vk_curr_entity_model_valid[i] ) {
+			Com_Memcpy( vk_prev_entity_model_matrices[i], vk_curr_entity_model_matrices[i], sizeof( vk_prev_entity_model_matrices[i] ) );
+			vk_prev_entity_model_handles[i] = vk_curr_entity_model_handles[i];
+			vk_prev_entity_types[i] = vk_curr_entity_types[i];
+			vk_prev_entity_model_valid[i] = qtrue;
+		} else {
+			vk_prev_entity_model_valid[i] = qfalse;
+		}
+		vk_curr_entity_model_valid[i] = qfalse;
+	}
+}
+
+void vk_reset_motion_history( void )
+{
+	Com_Memset( vk_prev_entity_model_matrices, 0, sizeof( vk_prev_entity_model_matrices ) );
+	Com_Memset( vk_curr_entity_model_matrices, 0, sizeof( vk_curr_entity_model_matrices ) );
+	Com_Memset( vk_prev_entity_model_handles, 0, sizeof( vk_prev_entity_model_handles ) );
+	Com_Memset( vk_curr_entity_model_handles, 0, sizeof( vk_curr_entity_model_handles ) );
+	Com_Memset( vk_prev_entity_types, 0, sizeof( vk_prev_entity_types ) );
+	Com_Memset( vk_curr_entity_types, 0, sizeof( vk_curr_entity_types ) );
+	Com_Memset( vk_prev_entity_model_valid, 0, sizeof( vk_prev_entity_model_valid ) );
+	Com_Memset( vk_curr_entity_model_valid, 0, sizeof( vk_curr_entity_model_valid ) );
+}
+
+static int vk_get_current_entity_motion_index( void )
+{
+	const trRefEntity_t *ent = backEnd.currentEntity;
+	const trRefEntity_t *base = backEnd.refdef.entities;
+
+	if ( !ent || ent == &tr.worldEntity || !base || backEnd.refdef.num_entities <= 0 ) {
+		return -1;
+	}
+	if ( ent < base || ent >= base + backEnd.refdef.num_entities ) {
+		return -1;
+	}
+	return (int)( ent - base );
+}
+
+static qboolean vk_entity_requires_no_motion( const trRefEntity_t *ent )
+{
+	qboolean markUnreliable = qfalse;
+
+	if ( !ent ) {
+		return qfalse;
+	}
+	if ( ent->e.frame != ent->e.oldframe ) {
+		markUnreliable = qtrue;
+	}
+	if ( !markUnreliable && ent->e.backlerp > 0.001f ) {
+		markUnreliable = qtrue;
+	}
+	if ( !markUnreliable && ent->e.customShader ) {
+		markUnreliable = qtrue;
+	}
+	if ( markUnreliable ) {
+		if ( !vk.temporal.unreliableMotionThisFrame && r_temporalDebug && r_temporalDebug->integer >= 2 ) {
+			ri.Printf( PRINT_DEVELOPER, "[VK][temporal] unreliable motion for entity type=%d customShader=%d frame=%d oldframe=%d backlerp=%.3f\n",
+				ent->e.reType, ent->e.customShader, ent->e.frame, ent->e.oldframe, ent->e.backlerp );
+		}
+		vk.temporal.unreliableMotionThisFrame = qtrue;
+		return qtrue;
+	}
+	return qfalse;
+}
+
+static void vk_get_prev_mvp_transform( float *prev_mvp )
+{
+	float prev_model[16];
+	float prev_model_view[16];
+	float prev_proj[16];
+	int motion_index;
+
+	if ( backEnd.projection2D || !vk_prev_matrices_valid ) {
+		vk_get_mvp_transform( prev_mvp );
+		return;
+	}
+
+	Com_Memcpy( prev_model, backEnd.or.modelMatrix, sizeof( prev_model ) );
+
+	motion_index = vk_get_current_entity_motion_index();
+	if ( motion_index >= 0 && backEnd.currentEntity && backEnd.currentEntity->e.reType == RT_MODEL ) {
+		if ( !vk_curr_entity_model_valid[motion_index] ) {
+			Com_Memcpy( vk_curr_entity_model_matrices[motion_index], backEnd.or.modelMatrix, sizeof( vk_curr_entity_model_matrices[motion_index] ) );
+			vk_curr_entity_model_handles[motion_index] = backEnd.currentEntity->e.hModel;
+			vk_curr_entity_types[motion_index] = (int)backEnd.currentEntity->e.reType;
+			vk_curr_entity_model_valid[motion_index] = qtrue;
+		}
+
+		if ( !vk_entity_requires_no_motion( backEnd.currentEntity ) &&
+			vk_prev_entity_model_valid[motion_index] &&
+			vk_prev_entity_model_handles[motion_index] == backEnd.currentEntity->e.hModel &&
+			vk_prev_entity_types[motion_index] == (int)backEnd.currentEntity->e.reType ) {
+			Com_Memcpy( prev_model, vk_prev_entity_model_matrices[motion_index], sizeof( prev_model ) );
+		}
+	}
+
+	myGlMultMatrix( prev_model, vk_prev_view_matrix, prev_model_view );
+	vk_get_projection_matrix_vk( vk_prev_projection_matrix, prev_proj );
+	myGlMultMatrix( prev_model_view, prev_proj, prev_mvp );
+}
+
+void vk_update_mvp( const float *m )
+{
+	vkMvpPushConstants_t push_constants;
+	VkPipelineLayout layout;
+
+	if ( m ) {
+		Com_Memcpy( push_constants.mvp, m, sizeof( push_constants.mvp ) );
+	} else {
+		vk_get_mvp_transform( push_constants.mvp );
+	}
+	vk_get_prev_mvp_transform( push_constants.prev_mvp );
+
+	layout = ( backEnd.oitAccumPass && vk.pipeline_layout_oit_accum != VK_NULL_HANDLE ) ?
+		vk.pipeline_layout_oit_accum : vk.pipeline_layout;
+	qvkCmdPushConstants( vk.cmd->command_buffer, layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof( push_constants ), &push_constants );
+
+	vk.stats.push_size += sizeof( push_constants );
+}
+
+void vk_update_depth_range( Vk_Depth_Range depth_range )
+{
+	if ( vk.cmd->depth_range != depth_range ) {
+		VkRect2D scissor_rect;
+		VkViewport viewport;
+
+		vk.cmd->depth_range = depth_range;
+
+		vk_get_scissor_rect( &scissor_rect );
+
+		if ( memcmp( &vk.cmd->scissor_rect, &scissor_rect, sizeof( scissor_rect ) ) != 0 ) {
+			qvkCmdSetScissor( vk.cmd->command_buffer, 0, 1, &scissor_rect );
+			vk.cmd->scissor_rect = scissor_rect;
+		}
+
+		vk_get_viewport( &viewport, depth_range );
+		qvkCmdSetViewport( vk.cmd->command_buffer, 0, 1, &viewport );
+	}
+
+	if ( !backEnd.projection2D &&
+		( vk.renderPassIndex == RENDER_PASS_MAIN || vk.renderPassIndex == RENDER_PASS_POST_BLOOM ) ) {
+		VkRect2D r;
+		uint32_t maxW = ( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u;
+		uint32_t maxH = ( glConfig.vidHeight > 0 ) ? (uint32_t)glConfig.vidHeight : 1u;
+		uint64_t area;
+		uint64_t bestArea;
+
+		vk_get_viewport_rect( &r );
+
+		if ( r.offset.x < 0 ) {
+			int dx = -r.offset.x;
+			r.offset.x = 0;
+			r.extent.width = ( r.extent.width > (uint32_t)dx ) ? ( r.extent.width - (uint32_t)dx ) : 0u;
+		}
+		if ( r.offset.y < 0 ) {
+			int dy = -r.offset.y;
+			r.offset.y = 0;
+			r.extent.height = ( r.extent.height > (uint32_t)dy ) ? ( r.extent.height - (uint32_t)dy ) : 0u;
+		}
+		if ( (uint32_t)r.offset.x >= maxW || (uint32_t)r.offset.y >= maxH ) {
+			return;
+		}
+		if ( (uint32_t)r.offset.x + r.extent.width > maxW ) {
+			r.extent.width = maxW - (uint32_t)r.offset.x;
+		}
+		if ( (uint32_t)r.offset.y + r.extent.height > maxH ) {
+			r.extent.height = maxH - (uint32_t)r.offset.y;
+		}
+
+		area = (uint64_t)r.extent.width * (uint64_t)r.extent.height;
+		if ( area == 0 ) {
+			return;
+		}
+		bestArea = vk_scene_src_rect_valid ? (uint64_t)vk_scene_src_rect.extent.width * (uint64_t)vk_scene_src_rect.extent.height : 0u;
+		if ( !vk_scene_src_rect_valid || area > bestArea ) {
+			vk_scene_src_rect = r;
+			vk_scene_src_rect_valid = qtrue;
+		}
+	}
+}
