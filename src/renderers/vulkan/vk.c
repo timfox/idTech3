@@ -7,6 +7,7 @@
 #include "vk_atmosphere.h"
 #include "vk_image_layout.h"
 #include "vk_render_pass.h"
+#include "vk_scene_pass.h"
 #include "vk_temporal.h"
 #include "vk_volumetric_fog_color.h"
 #include "vk_volumetric_params.h"
@@ -116,6 +117,11 @@ static int vkSamples = VK_SAMPLE_COUNT_1_BIT;
 static int vkMaxSamples = VK_SAMPLE_COUNT_1_BIT;
 static VkRect2D vk_scene_src_rect;
 static qboolean vk_scene_src_rect_valid;
+
+void vk_reset_scene_src_rect_tracking( void )
+{
+	vk_scene_src_rect_valid = qfalse;
+}
 
 static VkInstance vk_instance = VK_NULL_HANDLE;
 static VkSurfaceKHR vk_surface = VK_NULL_HANDLE;
@@ -14611,70 +14617,15 @@ void vk_draw_dot( uint32_t storage_offset )
 }
 
 
-void vk_begin_main_render_pass( void )
+static void vk_begin_2d_overlay_or_fallback( void )
 {
-	VkFramebuffer frameBuffer = vk.framebuffers.main[ vk.cmd->swapchain_image_index ];
-
-	vk.renderPassIndex = RENDER_PASS_MAIN;
-
-	vk.renderWidth = glConfig.vidWidth;
-	vk.renderHeight = glConfig.vidHeight;
-
-	//vk.renderScaleX = (float)vk.renderWidth / (float)glConfig.vidWidth;
-	//vk.renderScaleY = (float)vk.renderHeight / (float)glConfig.vidHeight;
-	vk.renderScaleX = vk.renderScaleY = 1.0f;
-	vk_scene_src_rect_valid = qfalse;
-
-	vk_begin_render_pass_tracked( vk.render_pass.main, frameBuffer, qtrue, vk.renderWidth, vk.renderHeight );
-	vk.depth_image_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-}
-
-
-void vk_begin_post_bloom_render_pass( void )
-{
-	VkFramebuffer frameBuffer;
-
-	if ( !vk.cmd || vk.cmd->swapchain_image_index >= MAX_SWAPCHAIN_IMAGES )
-		return;
-	frameBuffer = vk.framebuffers.main[ vk.cmd->swapchain_image_index ];
-	if ( frameBuffer == VK_NULL_HANDLE )
-		return;
-
-	vk.renderPassIndex = RENDER_PASS_POST_BLOOM;
-
-	vk.renderWidth = glConfig.vidWidth;
-	vk.renderHeight = glConfig.vidHeight;
-
-	//vk.renderScaleX = (float)vk.renderWidth / (float)glConfig.vidWidth;
-	//vk.renderScaleY = (float)vk.renderHeight / (float)glConfig.vidHeight;
-	vk.renderScaleX = vk.renderScaleY = 1.0f;
-
-	vk_begin_render_pass_tracked( vk.render_pass.post_bloom, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
-	vk.depth_image_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-}
-
-void vk_begin_ui_overlay_render_pass( void )
-{
-	VkFramebuffer frameBuffer;
-
-	if ( !vk.cmd || vk.cmd->swapchain_image_index >= MAX_SWAPCHAIN_IMAGES ) {
-		return;
-	}
-
-	frameBuffer = vk.framebuffers.ui_overlay[ vk.cmd->swapchain_image_index ];
-	if ( frameBuffer == VK_NULL_HANDLE ) {
-		return;
-	}
-
-	vk.renderPassIndex = RENDER_PASS_UI_OVERLAY;
-	vk.renderWidth = glConfig.vidWidth;
-	vk.renderHeight = glConfig.vidHeight;
-	vk.renderScaleX = 1.0f;
-	vk.renderScaleY = 1.0f;
-	vk.uiOverlayActive = qtrue;
-
-	vk_begin_render_pass_tracked( vk.render_pass.ui_overlay, frameBuffer, qtrue, vk.renderWidth, vk.renderHeight );
-	vk.depth_image_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	/*
+	 * Legacy 2D/UI shaders can depend on destination color/alpha semantics from the
+	 * scene-backed target. Until the separate overlay path is made blend-compatible
+	 * with those assumptions, keep 2D rendering on the main post-bloom target.
+	 */
+	vk.uiOverlayActive = qfalse;
+	vk_begin_post_bloom_render_pass();
 }
 
 
@@ -16359,9 +16310,13 @@ void vk_prepare_2d( void )
 			vk.fboActive ) {
 			vk_reset_volumetric_history();
 			backEnd.doneFog = qtrue;
-			vk_set_scene_post_fog_source( vk.color_image_view );
 			vk_scene_src_rect_valid = qfalse;
 			vk_begin_main_render_pass();
+			vk_end_render_pass();
+			vk_set_scene_post_fog_source( vk.color_image_view );
+			vk_log_post_fog_rebind( "prepare_2d no-world initial scene source", vk.color_image_view );
+			vk_update_post_fog_descriptors( vk.color_image_view );
+			vk_begin_2d_overlay_or_fallback();
 		}
 		return;
 	}
@@ -16386,13 +16341,10 @@ void vk_prepare_2d( void )
 		vk_reset_volumetric_history();
 		backEnd.doneFog = qtrue;
 		vk_set_scene_post_fog_source( vk.color_image_view );
-		if ( vk.renderPassIndex == RENDER_PASS_MAIN ) {
-			vk_end_render_pass();
-			/* No-world/menu path stays on color_image so console/UI remain crisp and stable. */
-			vk_log_post_fog_rebind( "prepare_2d no-world: color source", vk.color_image_view );
-			vk_update_post_fog_descriptors( vk.color_image_view );
-			vk_begin_post_bloom_render_pass();
-		}
+		vk_end_render_pass();
+		vk_log_post_fog_rebind( "prepare_2d no-world scene source", vk.color_image_view );
+		vk_update_post_fog_descriptors( vk.color_image_view );
+		vk_begin_2d_overlay_or_fallback();
 		return;
 	}
 
@@ -16409,6 +16361,8 @@ void vk_prepare_2d( void )
 		vk_end_render_pass();
 		if ( runFogPass ) {
 			vk_volumetric_fog_pass();
+			vk_log_post_fog_rebind( "prepare_2d split (scene+2D on color_image)", vk.color_image_view );
+			vk_update_post_fog_descriptors( vk.color_image_view );
 		} else {
 			vk_reset_volumetric_history();
 			backEnd.doneFog = qtrue;
@@ -16419,12 +16373,7 @@ void vk_prepare_2d( void )
 	}
 
 	// Resume drawing for 2D overlays on a separate post-tonemap target when available.
-	if ( vk.render_pass.ui_overlay != VK_NULL_HANDLE &&
-		vk.framebuffers.ui_overlay[ vk.cmd->swapchain_image_index ] != VK_NULL_HANDLE ) {
-		vk_begin_ui_overlay_render_pass();
-	} else {
-		vk_begin_post_bloom_render_pass();
-	}
+	vk_begin_2d_overlay_or_fallback();
 }
 
 
@@ -16660,6 +16609,7 @@ _retry:
 	begin_info.pInheritanceInfo = NULL;
 
 	VK_CHECK( qvkBeginCommandBuffer( vk.cmd->command_buffer, &begin_info ) );
+	vk_reset_post_fog_frame_state();
 
 		/* Default color write mask (all enabled) when using VK_EXT_extended_dynamic_state3 */
 		if ( vk.colorWriteMaskDynamic && qvkCmdSetColorWriteMaskEXT )
@@ -17108,6 +17058,7 @@ void vk_end_frame( void )
 							vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
 							qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 							vk_end_render_pass();
+							vk_update_color_descriptor_image( gamma_src );
 						}
 					}
 				}
