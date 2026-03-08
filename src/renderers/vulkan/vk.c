@@ -15029,48 +15029,6 @@ void vk_reset_volumetric_history( void )
 	Com_Memset( &vk_volumetric_validation_state, 0, sizeof( vk_volumetric_validation_state ) );
 }
 
-static void vk_atmosphere_pass( void )
-{
-	VkImageAspectFlags depth_aspect;
-	vkAtmospherePushConstants_t pc;
-
-	if ( !PostFX_Atmosphere_IsEnabled() || vk.atmosphere_pipeline == VK_NULL_HANDLE ||
-	     vk.render_pass.atmosphere == VK_NULL_HANDLE || vk.framebuffers.atmosphere[0] == VK_NULL_HANDLE ) {
-		return;
-	}
-
-	depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
-	if ( glConfig.stencilBits > 0 ) {
-		depth_aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
-	}
-
-	record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
-		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 0, 0 );
-
-	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT );
-
-	vk_begin_render_pass_tracked( vk.render_pass.atmosphere, vk.framebuffers.atmosphere[ vk.cmd->swapchain_image_index ], qtrue,
-		glConfig.vidWidth, glConfig.vidHeight );
-
-	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.atmosphere_pipeline );
-	vk_atmosphere_build_push_constants( &pc );
-
-	qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_atmosphere, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( pc ), &pc );
-
-	vk_set_fullscreen_viewport_scissor( glConfig.vidWidth, glConfig.vidHeight );
-	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
-
-	vk_end_render_pass();
-	vk.depth_image_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
-}
-
 void vk_volumetric_fog_pass( void )
 {
 	/* Atmosphere: only when we have a 3D world. Skip for menus, videos, RDF_NOWORLDMODEL
