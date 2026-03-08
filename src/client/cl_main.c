@@ -28,6 +28,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cl_voip.h"
 #include "cl_mumble.h"
 #include "cl_superhud.h"
+#include "ui_css.h"
 #include "cl_websocket.h"
 #include "cl_steam.h"
 #include "cl_menuvideo.h"
