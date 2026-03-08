@@ -111,6 +111,7 @@ typedef struct {
 	float motionBlur[4];   /* enabled, strength, samples, maxRadius */
 	float depthOfField[4]; /* enabled, aperture, focusDistance, focusRange */
 	float frameInfo[4];    /* dofMaxBlur, texelSize.x, texelSize.y, motionValid */
+	float depthParams[2];  /* zNear, zFar for linear depth and velocity */
 } VkPostFXParams;
 
 #define VEGWIND_MAX_VERTS 16384
@@ -11672,7 +11673,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	VkGraphicsPipelineCreateInfo create_info;
 	VkViewport viewport;
 	VkRect2D scissor;
-	VkSpecializationMapEntry spec_entries[26];
+	VkSpecializationMapEntry spec_entries[27];
 	VkSpecializationInfo frag_spec_info;
 	VkPipeline *pipeline;
 	VkShaderModule fsmodule;
@@ -11709,7 +11710,8 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 		float outline_threshold;   /* constant_id = 22 */
 		int film_look;             /* constant_id = 23 */
 		float post_contrast;       /* constant_id = 24 */
-		float post_saturation;    /* constant_id = 25 */
+		float post_saturation;     /* constant_id = 25 */
+		float sharpen;             /* constant_id = 26 */
 	} frag_spec_data;
 
 	switch ( program_index ) {
@@ -11929,6 +11931,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 		frag_spec_data.post_contrast = ( r_post_contrast && r_post_contrast->value > 0.0f ) ? r_post_contrast->value : 1.0f;
 		frag_spec_data.post_saturation = ( r_post_saturation && r_post_saturation->value >= 0.0f ) ? r_post_saturation->value : 1.0f;
 	}
+	frag_spec_data.sharpen = PostFX_GetSharpen();
 
 	if ( !vk_surface_format_color_depth( vk.present_format.format, &frag_spec_data.depth_r, &frag_spec_data.depth_g, &frag_spec_data.depth_b ) )
 		ri.Printf( PRINT_ALL, "Format %s not recognized, dither to assume 8bpc\n", vk_format_string( vk.base_format.format ) );
@@ -12037,7 +12040,11 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	spec_entries[25].offset = offsetof( struct PostProcess_FragSpecData, post_saturation );
 	spec_entries[25].size = sizeof( frag_spec_data.post_saturation );
 
-	frag_spec_info.mapEntryCount = 26;
+	spec_entries[26].constantID = 26;
+	spec_entries[26].offset = offsetof( struct PostProcess_FragSpecData, sharpen );
+	spec_entries[26].size = sizeof( frag_spec_data.sharpen );
+
+	frag_spec_info.mapEntryCount = 27;
 	frag_spec_info.pMapEntries = spec_entries;
 	frag_spec_info.dataSize = sizeof( frag_spec_data );
 	frag_spec_info.pData = &frag_spec_data;
@@ -17378,9 +17385,25 @@ void vk_end_frame( void )
 						 * already be bound earlier in this command buffer. */
 						vk_barrier_post_fog_source_for_sampling( gamma_src, "vk_end_frame pre-gamma (gamma_src)" );
 						vk_update_color_descriptor_image( gamma_src );
+						/* Ensure depth is readable for motion blur / DOF when enabled */
+						if ( vk.depth_image != VK_NULL_HANDLE &&
+							( PostFX_MotionBlur_IsEnabled() || PostFX_DepthOfField_IsEnabled() ) &&
+							tr.world && !( backEnd.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+							VkImageAspectFlags da = VK_IMAGE_ASPECT_DEPTH_BIT;
+							if ( glConfig.stencilBits > 0 ) da |= VK_IMAGE_ASPECT_STENCIL_BIT;
+							record_depth_image_layout_transition( vk.cmd->command_buffer, da,
+								VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 0, 0 );
+						}
 						vk_begin_render_pass( vk.render_pass.gamma, vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ], qfalse, vk.renderWidth, vk.renderHeight );
 						qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.gamma_pipeline );
-						qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.post_color_descriptor[vk.cmd_index], 0, NULL );
+						{
+							VkDescriptorSet gamma_sets[3] = {
+								vk.post_color_descriptor[vk.cmd_index],
+								vk.depth_descriptor,
+								vk.postfx_params_descriptor[vk.cmd_index]
+							};
+							qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 3, gamma_sets, 0, NULL );
+						}
 
 						VkPostProcessPushConstants panini_push = { 0 };
 						uint32_t srcTexW = ( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u;
@@ -18077,6 +18100,14 @@ static void vk_update_postfx_params( uint32_t cmd_index )
 	}
 
 	params.frameInfo[3] = motion_valid ? 1.0f : 0.0f;
+
+	{
+		float zNear = ( r_znear && r_znear->value > 0.0f ) ? r_znear->value : 8.0f;
+		float zFar = backEnd.viewParms.zFar;
+		if ( zFar <= zNear ) zFar = zNear + 100.0f;
+		params.depthParams[0] = zNear;
+		params.depthParams[1] = zFar;
+	}
 
 	Com_Memcpy( vk.postfx_params_ptr[cmd_index], &params, sizeof( params ) );
 }
@@ -19197,7 +19228,14 @@ qboolean vk_bloom( void )
 	// bloom extraction
 	vk_begin_bloom_extract_render_pass();
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.bloom_extract_pipeline );
-	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor[vk.cmd_index], 0, NULL );
+	{
+		VkDescriptorSet bloom_sets[3] = {
+			vk.color_descriptor[vk.cmd_index],
+			vk.depth_descriptor,
+			vk.postfx_params_descriptor[vk.cmd_index]
+		};
+		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 3, bloom_sets, 0, NULL );
+	}
 	vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
 	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 	vk_end_render_pass();

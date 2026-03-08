@@ -103,6 +103,8 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - Ordered dithering (8x8 Bayer matrix)
 - Greyscale mode
 - sRGB gamma correction
+- **Camera motion blur**: Per-pixel velocity from depth + prev/curr view-proj; samples along motion vector. Cvars: `r_motionBlur`, `r_motionBlurStrength`, `r_motionBlurMaxRadius`, `r_motionBlurSamples`.
+- **Depth of field**: Circle-of-confusion from linear depth; radial blur for out-of-focus areas. Cvars: `r_depthOfField`, `r_dofFocusDistance`, `r_dofFocusRange`, `r_dofAperture`, `r_dofMaxBlur`.
 - Debug views (pre-tonemap HDR, luminance heatmap)
 - Shader robustness: NaN/Inf guard in gamma pass, explicit `textureLod(..., 0.0)` in post-process shaders (gamma, blur, bloom, blend, SSAO), `to_src_uv` zero-scale fallback
 
