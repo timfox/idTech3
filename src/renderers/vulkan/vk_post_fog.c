@@ -88,6 +88,51 @@ void vk_update_color_descriptor_image( VkImageView color_view )
 	vk_write_color_descriptor_image( vk.post_color_descriptor[vk.cmd_index], color_view );
 }
 
+void vk_update_luminance_descriptor_image( VkImageView color_view )
+{
+	VkDescriptorImageInfo lum_info[2];
+	VkWriteDescriptorSet lum_writes[2];
+	Vk_Sampler_Def sd_linear;
+	uint32_t start_idx;
+	uint32_t end_idx;
+	uint32_t idx;
+
+	if ( vk.luminance_layout == VK_NULL_HANDLE || vk.luminance_image_view == VK_NULL_HANDLE ||
+		color_view == VK_NULL_HANDLE || color_view == vk.luminance_image_view ) {
+		return;
+	}
+
+	start_idx = vk.cmd ? vk.cmd_index : 0;
+	end_idx = vk.cmd ? vk.cmd_index + 1 : NUM_COMMAND_BUFFERS;
+
+	Com_Memset( &sd_linear, 0, sizeof( sd_linear ) );
+	sd_linear.gl_mag_filter = sd_linear.gl_min_filter = GL_LINEAR;
+	sd_linear.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	sd_linear.noAnisotropy = qtrue;
+	Com_Memset( lum_info, 0, sizeof( lum_info ) );
+	lum_info[0].sampler = vk_find_sampler( &sd_linear );
+	lum_info[0].imageView = color_view;
+	lum_info[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	lum_info[1].imageView = vk.luminance_image_view;
+	lum_info[1].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+	Com_Memset( lum_writes, 0, sizeof( lum_writes ) );
+	lum_writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	lum_writes[0].dstBinding = 0;
+	lum_writes[0].descriptorCount = 1;
+	lum_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	lum_writes[0].pImageInfo = &lum_info[0];
+	lum_writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	lum_writes[1].dstBinding = 1;
+	lum_writes[1].descriptorCount = 1;
+	lum_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	lum_writes[1].pImageInfo = &lum_info[1];
+	for ( idx = start_idx; idx < end_idx; idx++ ) {
+		lum_writes[0].dstSet = vk.luminance_descriptor[idx];
+		lum_writes[1].dstSet = vk.luminance_descriptor[idx];
+		qvkUpdateDescriptorSets( vk.device, 2, lum_writes, 0, NULL );
+	}
+}
+
 VkImage vk_post_fog_source_image( VkImageView color_source )
 {
 	if ( color_source == vk.color_image_view ) {
@@ -157,6 +202,11 @@ void vk_log_post_fog_rebind( const char *reason, VkImageView color_source )
 	}
 }
 
+void vk_set_scene_post_fog_source( VkImageView color_source )
+{
+	vk.scene_post_fog_color_source = color_source ? color_source : vk.color_image_view;
+}
+
 void vk_update_post_fog_descriptors( VkImageView color_source )
 {
 	VkImageView old_source;
@@ -171,39 +221,7 @@ void vk_update_post_fog_descriptors( VkImageView color_source )
 	vk_update_color_descriptor_image( color_source );
 	if ( vk.luminance_layout != VK_NULL_HANDLE && vk.luminance_image_view != VK_NULL_HANDLE &&
 		color_source != VK_NULL_HANDLE && color_source != vk.luminance_image_view ) {
-		VkDescriptorImageInfo lum_info[2];
-		VkWriteDescriptorSet lum_writes[2];
-		Vk_Sampler_Def sd_linear;
-		uint32_t start_idx = vk.cmd ? vk.cmd_index : 0;
-		uint32_t end_idx = vk.cmd ? vk.cmd_index + 1 : NUM_COMMAND_BUFFERS;
-		uint32_t idx;
-
-		Com_Memset( &sd_linear, 0, sizeof( sd_linear ) );
-		sd_linear.gl_mag_filter = sd_linear.gl_min_filter = GL_LINEAR;
-		sd_linear.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		sd_linear.noAnisotropy = qtrue;
-		Com_Memset( lum_info, 0, sizeof( lum_info ) );
-		lum_info[0].sampler = vk_find_sampler( &sd_linear );
-		lum_info[0].imageView = color_source;
-		lum_info[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		lum_info[1].imageView = vk.luminance_image_view;
-		lum_info[1].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-		Com_Memset( lum_writes, 0, sizeof( lum_writes ) );
-		lum_writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		lum_writes[0].dstBinding = 0;
-		lum_writes[0].descriptorCount = 1;
-		lum_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		lum_writes[0].pImageInfo = &lum_info[0];
-		lum_writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		lum_writes[1].dstBinding = 1;
-		lum_writes[1].descriptorCount = 1;
-		lum_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-		lum_writes[1].pImageInfo = &lum_info[1];
-		for ( idx = start_idx; idx < end_idx; idx++ ) {
-			lum_writes[0].dstSet = vk.luminance_descriptor[idx];
-			lum_writes[1].dstSet = vk.luminance_descriptor[idx];
-			qvkUpdateDescriptorSets( vk.device, 2, lum_writes, 0, NULL );
-		}
+		vk_update_luminance_descriptor_image( color_source );
 		updated_luminance = qtrue;
 	}
 
@@ -222,6 +240,17 @@ void vk_update_post_fog_descriptors( VkImageView color_source )
  */
 VkImageView vk_get_post_fog_source( void )
 {
+	if ( vk.post_fog_color_source != VK_NULL_HANDLE ) {
+		return vk.post_fog_color_source;
+	}
+	return vk.color_image_view;
+}
+
+VkImageView vk_get_luminance_source( void )
+{
+	if ( vk.scene_post_fog_color_source != VK_NULL_HANDLE ) {
+		return vk.scene_post_fog_color_source;
+	}
 	if ( vk.post_fog_color_source != VK_NULL_HANDLE ) {
 		return vk.post_fog_color_source;
 	}
