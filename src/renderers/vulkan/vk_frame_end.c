@@ -320,9 +320,7 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 	vk_barrier_post_fog_source_for_sampling( gamma_src, "vk_end_frame pre-gamma (gamma_src)" );
 	vk_update_color_descriptor_image( gamma_src );
 
-	if ( vk.depth_image != VK_NULL_HANDLE &&
-		( PostFX_MotionBlur_IsEnabled() || PostFX_DepthOfField_IsEnabled() ) &&
-		tr.world && !( backEnd.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+	if ( vk.depth_image != VK_NULL_HANDLE ) {
 		VkImageAspectFlags da = VK_IMAGE_ASPECT_DEPTH_BIT;
 		if ( glConfig.stencilBits > 0 ) {
 			da |= VK_IMAGE_ASPECT_STENCIL_BIT;

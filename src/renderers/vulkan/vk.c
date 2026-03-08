@@ -15047,21 +15047,8 @@ void vk_volumetric_fog_pass( void )
 		if ( tierCvar ) tier = tierCvar->integer;
 		if ( tier >= 2 || tier == 4 || !r_volumetricFog->integer || !vk.fboActive ||
 			!tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
-			vk_reset_volumetric_history();
-			/* Volumetrics are skipped; keep the scene source on color_image and leave 2D overlays untouched. */
-			vk_set_scene_post_fog_source( vk.color_image_view );
-			vk_log_post_fog_rebind( "volumetric skipped (tier/off/no-world)", vk.color_image_view );
-			vk_update_post_fog_descriptors( vk.color_image_view );
-			/* Restore depth layout if atmosphere ran (tr.world) */
-			if ( tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
-				VkImageAspectFlags da = VK_IMAGE_ASPECT_DEPTH_BIT;
-				if ( glConfig.stencilBits > 0 ) da |= VK_IMAGE_ASPECT_STENCIL_BIT;
-				record_depth_image_layout_transition( vk.cmd->command_buffer, da,
-					VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-					VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-					VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT );
-			}
-			backEnd.doneFog = qtrue;
+			vk_volumetric_skip_cleanup( "volumetric skipped (tier/off/no-world)",
+				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
 			return;
 		}
 	}
@@ -15078,19 +15065,8 @@ void vk_volumetric_fog_pass( void )
 				(unsigned long long)(uintptr_t)vk.fog_scene_image,
 				(unsigned long long)(uintptr_t)vk.motion_vector_image );
 		}
-		vk_reset_volumetric_history();
-		vk_set_scene_post_fog_source( vk.color_image_view );
-		vk_log_post_fog_rebind( "volumetric skipped (missing resources)", vk.color_image_view );
-		vk_update_post_fog_descriptors( vk.color_image_view );
-		if ( tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
-			VkImageAspectFlags da = VK_IMAGE_ASPECT_DEPTH_BIT;
-			if ( glConfig.stencilBits > 0 ) da |= VK_IMAGE_ASPECT_STENCIL_BIT;
-			record_depth_image_layout_transition( vk.cmd->command_buffer, da,
-				VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT );
-		}
-		backEnd.doneFog = qtrue;
+		vk_volumetric_skip_cleanup( "volumetric skipped (missing resources)",
+			VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
 		return;
 	}
 	if ( vk.msaaActive &&
@@ -15106,19 +15082,8 @@ void vk_volumetric_fog_pass( void )
 				(unsigned long long)(uintptr_t)vk.volumetric_depth_resolve_pipeline,
 				(unsigned long long)(uintptr_t)vk.volumetric_depth_resolve_descriptor );
 		}
-		vk_reset_volumetric_history();
-		vk_set_scene_post_fog_source( vk.color_image_view );
-		vk_log_post_fog_rebind( "volumetric skipped (MSAA depth resolve missing)", vk.color_image_view );
-		vk_update_post_fog_descriptors( vk.color_image_view );
-		if ( tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
-			VkImageAspectFlags da = VK_IMAGE_ASPECT_DEPTH_BIT;
-			if ( glConfig.stencilBits > 0 ) da |= VK_IMAGE_ASPECT_STENCIL_BIT;
-			record_depth_image_layout_transition( vk.cmd->command_buffer, da,
-				VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT );
-		}
-		backEnd.doneFog = qtrue;
+		vk_volumetric_skip_cleanup( "volumetric skipped (MSAA depth resolve missing)",
+			VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
 		return;
 	}
 
@@ -15138,19 +15103,8 @@ void vk_volumetric_fog_pass( void )
 	/* Skip volumetrics when view is nearly static (death cam) to avoid gradient/streak artifacts */
 	if ( r_volumetricFogSkipStatic && r_volumetricFogSkipStatic->integer &&
 		vk_near_static_view_frames >= 30 ) {
-		vk_reset_volumetric_history();
-		vk_set_scene_post_fog_source( vk.color_image_view );
-		vk_log_post_fog_rebind( "volumetric skipped (static view, death cam)", vk.color_image_view );
-		vk_update_post_fog_descriptors( vk.color_image_view );
-		if ( tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
-			VkImageAspectFlags da = VK_IMAGE_ASPECT_DEPTH_BIT;
-			if ( glConfig.stencilBits > 0 ) da |= VK_IMAGE_ASPECT_STENCIL_BIT;
-			record_depth_image_layout_transition( vk.cmd->command_buffer, da,
-				VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT );
-		}
-		backEnd.doneFog = qtrue;
+		vk_volumetric_skip_cleanup( "volumetric skipped (static view, death cam)",
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
 		return;
 	}
 
