@@ -1732,6 +1732,7 @@ static const void *RB_DrawSurfs( const void *data ) {
 #endif
 
 #ifdef USE_VULKAN
+	vk_prepare_frame_temporal_state();
 	RB_RenderSunShadowMap( cmd );
 #endif
 

@@ -416,6 +416,7 @@ void vk_begin_frame( void );
 void vk_end_frame( void );
 void vk_present_frame( void );
 void vk_prepare_2d( void );
+void vk_prepare_frame_temporal_state( void );
 
 void vk_end_render_pass( void );
 void vk_begin_main_render_pass( void );
@@ -838,6 +839,8 @@ typedef struct {
 	struct {
 		uint32_t pendingResetReasons;
 		uint32_t appliedResetReasons;
+		uint32_t stickyResetReasons;
+		qboolean preparedThisFrame;
 		qboolean sharedCameraCut;
 		qboolean unreliableMotionThisFrame;
 		qboolean worldWasValid;
