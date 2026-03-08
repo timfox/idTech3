@@ -61,7 +61,7 @@ If the camera feels like it's underwater when it isn't, try `r_chromaticAberrati
 
 **Single-pixel artifacts when console is open**: Film grain (`r_filmGrain`, default 0.75) adds per-pixel noise across the screen. Set `r_filmGrain 0` to eliminate. Chromatic aberration can also cause fine color fringing.
 
-**Streaky/smudged visuals when dead**: Volumetric fog temporal reprojection accumulates when the death camera is nearly static. A periodic camera cut resets history after ~1.5 s of static view. If artifacts persist, try `r_volumetricFog 0` to confirm, or `r_volumetricFogForceCameraCut 1` to force an immediate reset (debug).
+**Streaky/smudged visuals when dead**: Volumetric fog temporal reprojection accumulates when the death camera is nearly static. `r_volumetricFogSkipStatic` (default 1) skips volumetrics when the view has been static for ~0.5 s, preventing the gradient/streak artifact. Set to 0 to always run fog. If artifacts persist, try `r_volumetricFog 0` to confirm, or `r_volumetricFogForceCameraCut 1` to force an immediate reset (debug).
 
 **Quick isolation**: `r_filmGrain 0 r_volumetricFog 0 r_oit 0 r_ssao 0 r_ssr 0` then `vid_restart` to narrow down the source.
 

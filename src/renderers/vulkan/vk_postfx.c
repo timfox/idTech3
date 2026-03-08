@@ -67,7 +67,7 @@ PostFX_RegisterCvars
 ===============
 */
 void PostFX_RegisterCvars(void) {
-	r_ssr                    = ri.Cvar_Get("r_ssr",                    "0",    CVAR_ARCHIVE);
+	r_ssr                    = ri.Cvar_Get("r_ssr",                    "1",    CVAR_ARCHIVE);
 	r_ssr_maxDistance        = ri.Cvar_Get("r_ssr_maxDistance",        "100",  CVAR_ARCHIVE);
 	r_ssr_stepSize           = ri.Cvar_Get("r_ssr_stepSize",           "1.0",  CVAR_ARCHIVE);
 	r_ssr_thickness          = ri.Cvar_Get("r_ssr_thickness",          "0.5",  CVAR_ARCHIVE);

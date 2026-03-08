@@ -1701,6 +1701,7 @@ extern cvar_t	*r_fogFluidBuoyancy;
 extern cvar_t	*r_volumetricFogValidation;
 extern cvar_t	*r_volumetricFogValidationPrintInterval;
 extern cvar_t	*r_volumetricFogForceCameraCut;
+extern cvar_t	*r_volumetricFogSkipStatic;
 extern cvar_t	*r_volumetricFogPerfTimers;
 extern cvar_t	*r_volumetricFogPerfPrintInterval;
 extern cvar_t	*r_volumetricFogTemporalStability;

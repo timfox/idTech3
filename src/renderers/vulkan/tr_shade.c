@@ -1757,6 +1757,7 @@ static void VK_SetLightParams( vkUniform_t *ubo, const dlight_t *dl ) {
 uint32_t vk_append_uniform( const void *uniform_data, size_t size, uint32_t min_offset ) {
 	const uint32_t offset = PAD(vk.cmd->vertex_buffer_offset, (VkDeviceSize)vk.uniform_alignment);
 
+
 	if ( offset + min_offset > vk.geometry_buffer_size ) {
 		/* Schedule geometry buffer resize; callers must skip draw when ~0U returned */
 		vk.geometry_buffer_size_new = (VkDeviceSize)log2pad( (unsigned int)( offset + min_offset ), 1 );
