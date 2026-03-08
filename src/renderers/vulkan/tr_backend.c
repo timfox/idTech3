@@ -1786,7 +1786,7 @@ static const void *RB_DrawSurfs( const void *data ) {
 	VBO_UnBind();
 #endif
 
-	if ( r_drawSun->integer ) {
+	if ( 0 && r_drawSun->integer ) { /* sun drawing disabled */
 		RB_DrawSun( 0.1f, tr.sunShader );
 	}
 
