@@ -588,6 +588,13 @@ typedef struct {
 	int base_level_height;
 } Image_Upload_Data;
 
+static void free_image_upload_data( Image_Upload_Data *upload_data ) {
+	if ( upload_data->buffer != NULL ) {
+		ri.Free( upload_data->buffer );
+		upload_data->buffer = NULL;
+	}
+}
+
 static void generate_image_upload_data( image_t *image, byte *data, Image_Upload_Data *upload_data ) {
 	
 	qboolean mipmap = (image->flags & IMGFLAG_MIPMAP) ? qtrue : qfalse;
@@ -634,13 +641,13 @@ static void generate_image_upload_data( image_t *image, byte *data, Image_Upload
 		scaled_height >>= 1;
 	}
 
-	upload_data->buffer = (byte*) ri.Hunk_AllocateTempMemory( 2 * 4 * scaled_width * scaled_height );
+	upload_data->buffer = (byte*) ri.Malloc( 2 * 4 * scaled_width * scaled_height );
 	if ( data == NULL ) {
 		Com_Memset( upload_data->buffer, 0, 2 * 4 * scaled_width * scaled_height );
 	}
 
 	if ( ( scaled_width != width || scaled_height != height ) && data ) {
-		resampled_buffer = (byte*) ri.Hunk_AllocateTempMemory( scaled_width * scaled_height * 4 );
+		resampled_buffer = (byte*) ri.Malloc( scaled_width * scaled_height * 4 );
 		ResampleTexture ((unsigned*)data, width, height, (unsigned*)resampled_buffer, scaled_width, scaled_height);
 		data = resampled_buffer;
 	}
@@ -692,7 +699,7 @@ static void generate_image_upload_data( image_t *image, byte *data, Image_Upload
 		}
 
 		if ( resampled_buffer != NULL ) {
-			ri.Hunk_FreeTempMemory( resampled_buffer );
+			ri.Free( resampled_buffer );
 		}
 
 		return;	//return upload_data;
@@ -711,7 +718,7 @@ static void generate_image_upload_data( image_t *image, byte *data, Image_Upload
 
 	// At this point width == scaled_width and height == scaled_height.
 
-	scaled_buffer = (unsigned int*) ri.Hunk_AllocateTempMemory( sizeof( unsigned ) * scaled_width * scaled_height );
+	scaled_buffer = (unsigned int*) ri.Malloc( sizeof( unsigned ) * scaled_width * scaled_height );
 	Com_Memcpy(scaled_buffer, data, scaled_width * scaled_height * 4);
 
 	if ( !(image->flags & IMGFLAG_NOLIGHTSCALE ) ) {
@@ -748,10 +755,10 @@ static void generate_image_upload_data( image_t *image, byte *data, Image_Upload
 
 	upload_data->mip_levels = miplevel + 1;
 
-	ri.Hunk_FreeTempMemory( scaled_buffer );
+	ri.Free( scaled_buffer );
 
 	if ( resampled_buffer != NULL )
-		ri.Hunk_FreeTempMemory( resampled_buffer );
+		ri.Free( resampled_buffer );
 }
 
 static void vk_upload_cube( image_t *image ) {
@@ -805,7 +812,7 @@ static void upload_vk_image( image_t *image, byte *pic ) {
 	vk_create_image( image, w, h, upload_data.mip_levels );
 	vk_upload_image_data( image, 0, 0, w, h, upload_data.mip_levels, upload_data.buffer, upload_data.buffer_size, qfalse );
 
-	ri.Hunk_FreeTempMemory( upload_data.buffer );
+	free_image_upload_data( &upload_data );
 }
 
 static void upload_vk_image_compressed( image_t *image, byte *data, int width, int height, int format, int size ) {
@@ -2598,7 +2605,7 @@ qboolean R_ReloadTexture( const char *name ) {
 				vk_upload_image_data(image, 0, 0, width, height, upload_data.mip_levels,
 					upload_data.buffer, upload_data.buffer_size, qfalse);
 
-				ri.Hunk_FreeTempMemory(upload_data.buffer);
+				free_image_upload_data( &upload_data );
 				ri.Free(pic);
 				ri.Printf(PRINT_DEVELOPER, "Reloaded texture: %s\n", name);
 				return qtrue;
