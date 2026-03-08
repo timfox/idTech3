@@ -1789,16 +1789,46 @@ static void allocate_and_bind_image_memory(VkImage image) {
 
 	qvkGetImageMemoryRequirements(vk.device, image, &memory_requirements);
 
-	if ( memory_requirements.size > vk.image_chunk_size ) {
-		ri.Error( ERR_FATAL, "Vulkan: could not allocate memory, image is too large (%ikbytes).",
-			(int)(memory_requirements.size/1024) );
+	if (vk_world.num_image_chunks >= MAX_IMAGE_CHUNKS) {
+		ri.Error(ERR_FATAL, "Vulkan: image chunk limit has been reached" );
 	}
 
 	chunk = NULL;
 
+	/* Oversized image: allocate a dedicated chunk instead of failing.
+	 * Merged lightmaps and large cubemaps can exceed IMAGE_CHUNK_SIZE (32MB). */
+	if ( memory_requirements.size > vk.image_chunk_size ) {
+		VkMemoryAllocateInfo alloc_info;
+		VkDeviceMemory memory;
+
+		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		alloc_info.pNext = NULL;
+		alloc_info.allocationSize = memory_requirements.size;
+		alloc_info.memoryTypeIndex = find_memory_type( memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+
+		VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &memory ) );
+
+		chunk = &vk_world.image_chunks[vk_world.num_image_chunks];
+		chunk->memory = memory;
+		chunk->used = memory_requirements.size;
+
+		ri.Printf( PRINT_DEVELOPER, "Vulkan: allocated dedicated %ikB for oversized image\n",
+			(int)(memory_requirements.size / 1024) );
+
+		SET_OBJECT_NAME( memory, va( "image memory chunk %i (oversized)", vk_world.num_image_chunks ), VK_DEBUG_REPORT_OBJECT_TYPE_DEVICE_MEMORY_EXT );
+
+		vk_world.num_image_chunks++;
+
+		VK_CHECK( qvkBindImageMemory( vk.device, image, chunk->memory, 0 ) );
+		return;
+	}
+
 	// Try to find an existing chunk of sufficient capacity.
 	alignment = memory_requirements.alignment;
 	for ( i = 0; i < vk_world.num_image_chunks; i++ ) {
+		/* Skip dedicated oversized chunks; they have no free space. */
+		if ( vk_world.image_chunks[i].used > vk.image_chunk_size )
+			continue;
 		// ensure that memory region has proper alignment
 		VkDeviceSize offset = PAD( vk_world.image_chunks[i].used, alignment );
 
@@ -1813,10 +1843,6 @@ static void allocate_and_bind_image_memory(VkImage image) {
 	if (chunk == NULL) {
 		VkMemoryAllocateInfo alloc_info;
 		VkDeviceMemory memory;
-
-		if (vk_world.num_image_chunks >= MAX_IMAGE_CHUNKS) {
-			ri.Error(ERR_FATAL, "Vulkan: image chunk limit has been reached" );
-		}
 
 		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 		alloc_info.pNext = NULL;
