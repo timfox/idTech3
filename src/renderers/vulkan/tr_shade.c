@@ -1381,6 +1381,15 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			pipeline = pStage->vk_pipeline[fog_stage];
 		}
 
+		if ( backEnd.projection2D ) {
+			Vk_Pipeline_Def uiDef;
+			vk_get_pipeline_def( pipeline, &uiDef );
+			uiDef.state_bits |= GLS_DEPTHTEST_DISABLE;
+			uiDef.state_bits &= ~GLS_DEPTHMASK_TRUE;
+			uiDef.face_culling = CT_TWO_SIDED;
+			pipeline = vk_find_pipeline_ext( 0, &uiDef, qfalse );
+		}
+
 #ifdef USE_VK_PBR
 		Vk_Pipeline_Def	def;
 		vk_get_pipeline_def( pipeline, &def );

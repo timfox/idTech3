@@ -127,6 +127,8 @@ static void vk_temporal_apply_resets( qboolean hardReset )
 	vk_reset_motion_history();
 	vk_reset_volumetric_history();
 	vk.adaptedExposure = 1.0f;
+	vk.temporal.hasValidLuminance = qfalse;
+	vk.temporal.filteredAvgLogLuminance = 0.0f;
 
 	vk_temporal_log_reset( reasons, hardReset );
 }
@@ -291,20 +293,52 @@ void vk_temporal_update_auto_exposure( void )
 		float target = target_var->value > 0.0f ? target_var->value : 0.5f;
 		float speed = speed_var->value > 0.0f ? speed_var->value * 0.016f : 0.02f;
 		float targetExp = target;
+		qboolean luminanceValid = qfalse;
+		float avgLogLum = 0.0f;
 
 		if ( !stableGameplayState || !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+			vk.temporal.hasValidLuminance = qfalse;
+			vk.temporal.filteredAvgLogLuminance = 0.0f;
 			targetExp = 1.0f;
 			speed = stateTransition ? 0.35f : 0.12f;
 		} else if ( !hardReset && !cameraCut && vk.luminance_staging_ptr ) {
-			float avgLogLum = *(const float *)vk.luminance_staging_ptr;
-			if ( avgLogLum != avgLogLum || avgLogLum <= -20.0f || avgLogLum >= 20.0f )
-				avgLogLum = 0.0f;
-			{
-				float sceneLum = powf( 2.0f, avgLogLum );
-				targetExp = ( sceneLum > 1e-6f ) ? ( target / sceneLum ) : 1.0f;
-				targetExp = ( targetExp < 0.01f ) ? 0.01f : ( targetExp > 10.0f ? 10.0f : targetExp );
+			avgLogLum = *(const float *)vk.luminance_staging_ptr;
+			if ( avgLogLum == avgLogLum && avgLogLum > -20.0f && avgLogLum < 20.0f ) {
+				luminanceValid = qtrue;
+			}
+
+			if ( luminanceValid ) {
+				if ( vk.temporal.hasValidLuminance ) {
+					float delta = avgLogLum - vk.temporal.filteredAvgLogLuminance;
+					const float maxStep = 0.35f;
+					const float smoothing = 0.20f;
+
+					if ( delta > maxStep ) {
+						avgLogLum = vk.temporal.filteredAvgLogLuminance + maxStep;
+					} else if ( delta < -maxStep ) {
+						avgLogLum = vk.temporal.filteredAvgLogLuminance - maxStep;
+					}
+
+					avgLogLum = vk.temporal.filteredAvgLogLuminance +
+						( avgLogLum - vk.temporal.filteredAvgLogLuminance ) * smoothing;
+				}
+
+				vk.temporal.filteredAvgLogLuminance = avgLogLum;
+				vk.temporal.hasValidLuminance = qtrue;
+
+				{
+					float sceneLum = powf( 2.0f, vk.temporal.filteredAvgLogLuminance );
+					targetExp = ( sceneLum > 1e-6f ) ? ( target / sceneLum ) : 1.0f;
+					targetExp = ( targetExp < 0.01f ) ? 0.01f : ( targetExp > 10.0f ? 10.0f : targetExp );
+				}
+			} else {
+				targetExp = 1.0f;
 			}
 		} else {
+			if ( hardReset || cameraCut ) {
+				vk.temporal.hasValidLuminance = qfalse;
+				vk.temporal.filteredAvgLogLuminance = 0.0f;
+			}
 			targetExp = 1.0f;
 		}
 

@@ -3,16 +3,36 @@
 #include "vk_render_pass.h"
 #include "vk_scene_pass.h"
 
+static void vk_configure_scene_pass_dimensions( void )
+{
+	uint32_t logicalWidth = ( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u;
+	uint32_t logicalHeight = ( glConfig.vidHeight > 0 ) ? (uint32_t)glConfig.vidHeight : 1u;
+	uint32_t targetWidth = logicalWidth;
+	uint32_t targetHeight = logicalHeight;
+
+	if ( !vk.fboActive ) {
+		if ( vk.swapchain_extent_valid && vk.swapchain_extent.width > 0 && vk.swapchain_extent.height > 0 ) {
+			targetWidth = vk.swapchain_extent.width;
+			targetHeight = vk.swapchain_extent.height;
+		} else {
+			targetWidth = ( gls.windowWidth > 0 ) ? (uint32_t)gls.windowWidth : logicalWidth;
+			targetHeight = ( gls.windowHeight > 0 ) ? (uint32_t)gls.windowHeight : logicalHeight;
+		}
+	}
+
+	vk.renderWidth = targetWidth;
+	vk.renderHeight = targetHeight;
+	vk.renderScaleX = ( logicalWidth > 0 ) ? ( (float)targetWidth / (float)logicalWidth ) : 1.0f;
+	vk.renderScaleY = ( logicalHeight > 0 ) ? ( (float)targetHeight / (float)logicalHeight ) : 1.0f;
+}
+
 void vk_begin_main_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.main[ vk.cmd->swapchain_image_index ];
 
 	vk.renderPassIndex = RENDER_PASS_MAIN;
 
-	vk.renderWidth = glConfig.vidWidth;
-	vk.renderHeight = glConfig.vidHeight;
-	vk.renderScaleX = 1.0f;
-	vk.renderScaleY = 1.0f;
+	vk_configure_scene_pass_dimensions();
 	vk_reset_scene_src_rect_tracking();
 
 	vk_begin_render_pass_tracked( vk.render_pass.main, frameBuffer, qtrue, vk.renderWidth, vk.renderHeight );
@@ -33,10 +53,7 @@ void vk_begin_post_bloom_render_pass( void )
 	}
 
 	vk.renderPassIndex = RENDER_PASS_POST_BLOOM;
-	vk.renderWidth = glConfig.vidWidth;
-	vk.renderHeight = glConfig.vidHeight;
-	vk.renderScaleX = 1.0f;
-	vk.renderScaleY = 1.0f;
+	vk_configure_scene_pass_dimensions();
 
 	vk_begin_render_pass_tracked( vk.render_pass.post_bloom, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
 	vk.depth_image_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
@@ -56,10 +73,7 @@ void vk_begin_ui_overlay_render_pass( void )
 	}
 
 	vk.renderPassIndex = RENDER_PASS_UI_OVERLAY;
-	vk.renderWidth = glConfig.vidWidth;
-	vk.renderHeight = glConfig.vidHeight;
-	vk.renderScaleX = 1.0f;
-	vk.renderScaleY = 1.0f;
+	vk_configure_scene_pass_dimensions();
 	vk.uiOverlayActive = qtrue;
 
 	vk_begin_render_pass_tracked( vk.render_pass.ui_overlay, frameBuffer, qtrue, vk.renderWidth, vk.renderHeight );
