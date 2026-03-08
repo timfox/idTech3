@@ -55,7 +55,7 @@ TODOs/FIXMEs in `src/external/` are from third-party code (duktape, zstd, cjson,
 
 | Item | Location | Status |
 |------|----------|--------|
-| RB_ColorMask (Vulkan) | tr_backend.c | ✅ Implemented: uses VK_EXT_extended_dynamic_state3 when available. vk_set_color_write_mask() in vk.c. |
+| RB_ColorMask (Vulkan) | tr_backend.c | Partial: `vk_set_color_write_mask()` exists, but the VK_EXT_extended_dynamic_state3 path is currently disabled due to validation/driver issues; Vulkan falls back to full color writes. |
 | r_renderMode 1/2 | tr_init.c | Deferred/Forward+ placeholders; need G-buffers, light culling. Documented in cvar description. |
 | r_hdr 3 64-bit output | vk.c | Infrastructure in place (vk_hdr64_active, _hdr64 modules, pipeline selection). glslangValidator rejects dvec4/f64vec4 fragment shader outputs. Falls back to RGBA32F. When glslang adds support, compile HDR64 variants and return RGBA64F from get_hdr_format. |
 | Vegetation wind draw | vk.c | Compute runs; wind-modified buffer not yet used for rendering. Future enhancement. |
