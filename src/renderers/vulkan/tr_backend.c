@@ -2238,21 +2238,9 @@ void RB_ExecuteRenderCommands( const void *data ) {
 
 		switch ( *(const int *)data ) {
 		case RC_SET_COLOR:
-#ifdef USE_VULKAN
-			// Force volumetrics to be finalized before any 2D command stream begins.
-			// This keeps HUD/console layers above fog regardless of command ordering.
-			if ( backEnd.doneSurfaces && !backEnd.doneFog ) {
-				vk_prepare_2d();
-			}
-#endif
 			data = RB_SetColor( data );
 			break;
 		case RC_STRETCH_PIC:
-#ifdef USE_VULKAN
-			if ( backEnd.doneSurfaces && !backEnd.doneFog ) {
-				vk_prepare_2d();
-			}
-#endif
 			data = RB_StretchPic( data );
 			break;
 		case RC_DRAW_SURFS:

@@ -1,5 +1,19 @@
 #include "tr_local.h"
 #include "vk.h"
+#include "vk_postfx.h"
+
+#ifndef VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT
+#define VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT 1000484004
+#endif
+
+#define VK_POST_PROCESS_CHECK( function_call ) do { \
+	VkResult vk_post_process_res__ = ( function_call ); \
+	if ( vk_post_process_res__ < 0 ) { \
+		ri.Error( ERR_FATAL, "Vulkan: %s returned code %d", #function_call, (int)vk_post_process_res__ ); \
+	} \
+} while ( 0 )
+
+#define VK_POST_PROCESS_SET_OBJECT_NAME( obj, objName, objType ) ( (void)(obj), (void)(objName), (void)(objType) )
 
 static inline qboolean vk_post_process_hdr64_active( void )
 {
@@ -592,7 +606,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	create_info.basePipelineHandle = VK_NULL_HANDLE;
 	create_info.basePipelineIndex = -1;
 
-	VK_CHECK( qvkCreateGraphicsPipelines( vk.device, VK_NULL_HANDLE, 1, &create_info, NULL, pipeline ) );
+	VK_POST_PROCESS_CHECK( qvkCreateGraphicsPipelines( vk.device, VK_NULL_HANDLE, 1, &create_info, NULL, pipeline ) );
 
-	SET_OBJECT_NAME( *pipeline, pipeline_name, VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
+	VK_POST_PROCESS_SET_OBJECT_NAME( *pipeline, pipeline_name, VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
 }
