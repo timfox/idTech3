@@ -6,6 +6,7 @@
 #include "vk_skybox_hdr.h"
 #include "vk_atmosphere.h"
 #include "vk_temporal.h"
+#include "vk_volumetric_fog_color.h"
 #include "vk_volumetric_params.h"
 #include "vk_util.h"
 #include <math.h>
@@ -17827,133 +17828,6 @@ static void vk_create_postfx_params_buffers( void )
 		VK_CHECK( qvkBindBufferMemory( vk.device, vk.postfx_params_buffer[i], vk.postfx_params_memory[i], 0 ) );
 		VK_CHECK( qvkMapMemory( vk.device, vk.postfx_params_memory[i], 0, mem_req.size, 0, &vk.postfx_params_ptr[i] ) );
 		Com_Memset( vk.postfx_params_ptr[i], 0, sizeof( VkPostFXParams ) );
-	}
-}
-
-static qboolean vk_get_ibl_fog_color( vec3_t out )
-{
-	int i;
-	int bestIndex = -1;
-	float bestDistSq = 0.0f;
-	const float *pos = backEnd.viewParms.or.origin;
-	vec4_t hdrSh[9];
-
-	if ( !tr.cubemaps || tr.numCubemaps <= 0 ) {
-		if ( SkyboxHDR_CopySHCoeffs( hdrSh ) ) {
-			out[0] = hdrSh[0][0];
-			out[1] = hdrSh[0][1];
-			out[2] = hdrSh[0][2];
-			vk_normalize_rgb_luma_safe( out );
-			return qtrue;
-		}
-		return qfalse;
-	}
-
-	for ( i = 0; i < tr.numCubemaps; i++ ) {
-		vec3_t delta;
-		float distSq;
-		const cubemap_t *cube = &tr.cubemaps[i];
-
-		if ( !cube->hasSHCoeffs ) {
-			continue;
-		}
-
-		VectorSubtract( pos, cube->origin, delta );
-		distSq = VectorLengthSquared( delta );
-
-		if ( bestIndex == -1 || distSq < bestDistSq ) {
-			bestIndex = i;
-			bestDistSq = distSq;
-		}
-	}
-
-	if ( bestIndex < 0 ) {
-		return qfalse;
-	}
-
-	out[0] = tr.cubemaps[bestIndex].shCoeffs[0][0];
-	out[1] = tr.cubemaps[bestIndex].shCoeffs[0][1];
-	out[2] = tr.cubemaps[bestIndex].shCoeffs[0][2];
-	vk_normalize_rgb_luma_safe( out );
-	return qtrue;
-}
-
-static void vk_get_volumetric_fog_color( vec4_t out )
-{
-	int i;
-	vec3_t base;
-	float maxc;
-	vec3_t tint = { 1.0f, 1.0f, 1.0f };
-	const int colorMode = ( r_volumetricFogColorMode ) ? r_volumetricFogColorMode->integer : 0;
-	qboolean foundFogVolume = qfalse;
-
-	// Default to a "tint" derived from the sky light, but clamp it to LDR range.
-	// tr.sunLight can include intensity (q3map_sun), which would otherwise
-	// blow out the volumetric contribution (especially with bloom enabled).
-	VectorCopy( tr.sunLight, base );
-	maxc = MAX( base[0], MAX( base[1], base[2] ) );
-	if ( maxc <= 0.0f ) {
-		VectorSet( base, 1.0f, 1.0f, 1.0f );
-	} else if ( maxc > 1.0f ) {
-		VectorScale( base, 1.0f / maxc, base );
-	}
-	Vector4Set( out, base[0], base[1], base[2], 1.0f );
-
-	if ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
-		// Still allow user tinting when there's no world (menus, cinematics, etc.)
-		if ( r_volumetricFogTint && vk_parse_rgb_string( r_volumetricFogTint->string, tint ) ) {
-			out[0] *= tint[0];
-			out[1] *= tint[1];
-			out[2] *= tint[2];
-		}
-		return;
-	}
-
-	if ( colorMode == 1 ) {
-		if ( r_volumetricFogTint && vk_parse_rgb_string( r_volumetricFogTint->string, tint ) ) {
-			out[0] = tint[0];
-			out[1] = tint[1];
-			out[2] = tint[2];
-		}
-		out[3] = 1.0f;
-		return;
-	}
-
-	for ( i = 1; i < tr.world->numfogs; i++ ) {
-		const fog_t *fog = &tr.world->fogs[ i ];
-		const float *o = backEnd.viewParms.or.origin;
-
-		if ( o[0] < fog->bounds[0][0] || o[0] > fog->bounds[1][0] ) {
-			continue;
-		}
-		if ( o[1] < fog->bounds[0][1] || o[1] > fog->bounds[1][1] ) {
-			continue;
-		}
-		if ( o[2] < fog->bounds[0][2] || o[2] > fog->bounds[1][2] ) {
-			continue;
-		}
-
-		Vector4Copy( fog->color, out );
-		foundFogVolume = qtrue;
-		break;
-	}
-
-	// In IBL mode, use the nearest cubemap's SH (average irradiance) when not inside a fog volume.
-	if ( colorMode == 2 && !foundFogVolume ) {
-		vec3_t ibl;
-		if ( vk_get_ibl_fog_color( ibl ) ) {
-			out[0] = ibl[0];
-			out[1] = ibl[1];
-			out[2] = ibl[2];
-			out[3] = 1.0f;
-		}
-	}
-
-	// Apply user tint in modes 0 and 2.
-	if ( r_volumetricFogTint && vk_parse_rgb_string( r_volumetricFogTint->string, tint ) ) {
-		out[0] *= tint[0];
-		out[1] *= tint[1];
-		out[2] *= tint[2];
 	}
 }
 
