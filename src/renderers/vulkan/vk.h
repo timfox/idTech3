@@ -1271,3 +1271,4 @@ extern PFN_vkCmdEndRenderPass		qvkCmdEndRenderPass;
 extern PFN_vkCmdPipelineBarrier		qvkCmdPipelineBarrier;
 extern PFN_vkCmdSetScissor			qvkCmdSetScissor;
 extern PFN_vkCmdSetViewport			qvkCmdSetViewport;
+extern PFN_vkUpdateDescriptorSets	qvkUpdateDescriptorSets;

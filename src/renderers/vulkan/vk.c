@@ -235,7 +235,7 @@ static PFN_vkResetFences								qvkResetFences;
 static PFN_vkGetQueryPoolResults						qvkGetQueryPoolResults;
 static PFN_vkResetQueryPoolEXT							qvkResetQueryPoolEXT;
 static PFN_vkUnmapMemory								qvkUnmapMemory;
-static PFN_vkUpdateDescriptorSets						qvkUpdateDescriptorSets;
+PFN_vkUpdateDescriptorSets							qvkUpdateDescriptorSets;
 static PFN_vkWaitForFences								qvkWaitForFences;
 static PFN_vkAcquireNextImageKHR						qvkAcquireNextImageKHR;
 static PFN_vkCreateSwapchainKHR							qvkCreateSwapchainKHR;

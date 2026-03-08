@@ -76,7 +76,7 @@ static void vk_write_color_descriptor_image( VkDescriptorSet descriptor, VkImage
 	desc.pBufferInfo = NULL;
 	desc.pTexelBufferView = NULL;
 
-	vkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+	qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
 }
 
 void vk_update_color_descriptor_image( VkImageView color_view )
@@ -131,7 +131,7 @@ void vk_barrier_post_fog_source_for_sampling( VkImageView color_source, const ch
 	barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
 	barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-	vkCmdPipelineBarrier(
+	qvkCmdPipelineBarrier(
 		vk.cmd->command_buffer,
 		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
 		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -202,7 +202,7 @@ void vk_update_post_fog_descriptors( VkImageView color_source )
 		for ( idx = start_idx; idx < end_idx; idx++ ) {
 			lum_writes[0].dstSet = vk.luminance_descriptor[idx];
 			lum_writes[1].dstSet = vk.luminance_descriptor[idx];
-			vkUpdateDescriptorSets( vk.device, 2, lum_writes, 0, NULL );
+			qvkUpdateDescriptorSets( vk.device, 2, lum_writes, 0, NULL );
 		}
 		updated_luminance = qtrue;
 	}
