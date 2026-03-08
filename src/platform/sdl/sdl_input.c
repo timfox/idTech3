@@ -51,6 +51,11 @@ static int joystick_hotplug_watch_added = 0;
 static qboolean mouseAvailable = qfalse;
 static qboolean mouseActive = qfalse;
 
+/* Last absolute mouse position when in UI mode (ungrabbed). Used to compute deltas
+ * from SDL_MOUSEMOTION x,y so the UI cursor tracks correctly after warp-to-center. */
+static int last_ui_mouse_x = -1;
+static int last_ui_mouse_y = -1;
+
 static cvar_t *in_mouse;
 
 #ifdef USE_JOYSTICK
@@ -478,9 +483,15 @@ static void IN_DeactivateMouse( void )
 		SDL_SetWindowGrab( SDL_window, SDL_FALSE );
 		SDL_SetRelativeMouseMode( SDL_FALSE );
 
-		if ( gw_active )
-			SDL_WarpMouseInWindow( SDL_window, glw_state.window_width / 2, glw_state.window_height / 2 );
-		else
+		if ( gw_active ) {
+			int cx = glw_state.window_width / 2;
+			int cy = glw_state.window_height / 2;
+			SDL_WarpMouseInWindow( SDL_window, cx, cy );
+			/* Set last to 0 so the warp's motion event produces delta (cx,cy), moving
+			 * the UI cursor from 0,0 to center. */
+			last_ui_mouse_x = 0;
+			last_ui_mouse_y = 0;
+		} else
 		{
 			if ( glw_state.isFullscreen )
 				SDL_ShowCursor( SDL_TRUE );
@@ -1285,9 +1296,27 @@ void HandleEvents( void )
 			case SDL_MOUSEMOTION:
 				if( mouseActive || ( Key_GetCatcher() & KEYCATCH_UI ) )
 				{
-					if( !e.motion.xrel && !e.motion.yrel )
-						break;
-					Com_QueueEvent( in_eventTime, SE_MOUSE, e.motion.xrel, e.motion.yrel, 0, NULL );
+					int dx, dy;
+					if ( mouseActive ) {
+						/* Grabbed: use relative deltas */
+						if( !e.motion.xrel && !e.motion.yrel )
+							break;
+						dx = e.motion.xrel;
+						dy = e.motion.yrel;
+					} else {
+						/* UI mode, ungrabbed: use absolute position to compute delta.
+						 * Ensures cursor tracks correctly after warp-to-center and when
+						 * mouse re-enters window. */
+						int prev_x = ( last_ui_mouse_x < 0 ) ? 0 : last_ui_mouse_x;
+						int prev_y = ( last_ui_mouse_y < 0 ) ? 0 : last_ui_mouse_y;
+						last_ui_mouse_x = e.motion.x;
+						last_ui_mouse_y = e.motion.y;
+						dx = e.motion.x - prev_x;
+						dy = e.motion.y - prev_y;
+						if ( !dx && !dy )
+							break;
+					}
+					Com_QueueEvent( in_eventTime, SE_MOUSE, dx, dy, 0, NULL );
 				}
 				break;
 
