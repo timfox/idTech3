@@ -7,6 +7,25 @@
 #include "vk_volumetric_params.h"
 #include <math.h>
 
+static void vk_tint_local_fog_volume_color( vec3_t io ) {
+	const int colorMode = ( r_volumetricFogColorMode ) ? r_volumetricFogColorMode->integer : 0;
+	vec3_t tint;
+
+	if ( colorMode == 1 && r_volumetricFogTint && vk_parse_fog_tint_string( r_volumetricFogTint->string, tint ) ) {
+		VectorCopy( tint, io );
+	} else if ( r_volumetricFogTint && vk_parse_fog_tint_string( r_volumetricFogTint->string, tint ) ) {
+		io[0] *= tint[0];
+		io[1] *= tint[1];
+		io[2] *= tint[2];
+	}
+
+	if ( r_fogTint && vk_parse_fog_tint_string( r_fogTint->string, tint ) ) {
+		io[0] *= tint[0];
+		io[1] *= tint[1];
+		io[2] *= tint[2];
+	}
+}
+
 static qboolean vk_volumetric_mat4_inverse( const float *m, float *out )
 {
 	float tmp[16];
@@ -552,10 +571,13 @@ void vk_update_volumetric_params( void )
 			const float extent_y = fog->bounds[1][1] - fog->bounds[0][1];
 			const float extent_z = fog->bounds[1][2] - fog->bounds[0][2];
 			float local_density = fog_density;
+			vec3_t local_color;
 
 			if ( extent_x <= 0.001f || extent_y <= 0.001f || extent_z <= 0.001f ) continue;
 			if ( fog->parms.depthForOpaque > 0.001f ) local_density *= ( 1.0f / fog->parms.depthForOpaque );
 			if ( local_density < 0.0f ) local_density = 0.0f;
+			VectorCopy( fog->color, local_color );
+			vk_tint_local_fog_volume_color( local_color );
 
 			params.volumeBoundsMin[local_volume_count][0] = fog->bounds[0][0];
 			params.volumeBoundsMin[local_volume_count][1] = fog->bounds[0][1];
@@ -565,9 +587,9 @@ void vk_update_volumetric_params( void )
 			params.volumeBoundsMax[local_volume_count][1] = fog->bounds[1][1];
 			params.volumeBoundsMax[local_volume_count][2] = fog->bounds[1][2];
 			params.volumeBoundsMax[local_volume_count][3] = 0.0f;
-			params.volumeColorDensity[local_volume_count][0] = fog->color[0];
-			params.volumeColorDensity[local_volume_count][1] = fog->color[1];
-			params.volumeColorDensity[local_volume_count][2] = fog->color[2];
+			params.volumeColorDensity[local_volume_count][0] = local_color[0];
+			params.volumeColorDensity[local_volume_count][1] = local_color[1];
+			params.volumeColorDensity[local_volume_count][2] = local_color[2];
 			params.volumeColorDensity[local_volume_count][3] = local_density;
 			params.volumeTypeParams[local_volume_count][0] = 0.0f;
 			params.volumeTypeParams[local_volume_count][1] = 0.0f;

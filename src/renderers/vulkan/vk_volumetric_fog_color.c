@@ -3,6 +3,23 @@
 #include "vk_util.h"
 #include "vk_volumetric_fog_color.h"
 
+static void vk_apply_optional_tint( const cvar_t *tintCvar, vec3_t io, qboolean override ) {
+	vec3_t tint;
+
+	if ( !tintCvar || !vk_parse_fog_tint_string( tintCvar->string, tint ) ) {
+		return;
+	}
+
+	if ( override ) {
+		VectorCopy( tint, io );
+		return;
+	}
+
+	io[0] *= tint[0];
+	io[1] *= tint[1];
+	io[2] *= tint[2];
+}
+
 static qboolean vk_get_ibl_fog_color( vec3_t out )
 {
 	int i;
@@ -56,7 +73,6 @@ void vk_get_volumetric_fog_color( vec4_t out )
 	int i;
 	vec3_t base;
 	float maxc;
-	vec3_t tint = { 1.0f, 1.0f, 1.0f };
 	const int colorMode = ( r_volumetricFogColorMode ) ? r_volumetricFogColorMode->integer : 0;
 	qboolean foundFogVolume = qfalse;
 
@@ -70,20 +86,14 @@ void vk_get_volumetric_fog_color( vec4_t out )
 	Vector4Set( out, base[0], base[1], base[2], 1.0f );
 
 	if ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
-		if ( r_volumetricFogTint && vk_parse_rgb_string( r_volumetricFogTint->string, tint ) ) {
-			out[0] *= tint[0];
-			out[1] *= tint[1];
-			out[2] *= tint[2];
-		}
+		vk_apply_optional_tint( r_volumetricFogTint, out, qfalse );
+		vk_apply_optional_tint( r_fogTint, out, qfalse );
 		return;
 	}
 
 	if ( colorMode == 1 ) {
-		if ( r_volumetricFogTint && vk_parse_rgb_string( r_volumetricFogTint->string, tint ) ) {
-			out[0] = tint[0];
-			out[1] = tint[1];
-			out[2] = tint[2];
-		}
+		vk_apply_optional_tint( r_volumetricFogTint, out, qtrue );
+		vk_apply_optional_tint( r_fogTint, out, qfalse );
 		out[3] = 1.0f;
 		return;
 	}
@@ -117,9 +127,6 @@ void vk_get_volumetric_fog_color( vec4_t out )
 		}
 	}
 
-	if ( r_volumetricFogTint && vk_parse_rgb_string( r_volumetricFogTint->string, tint ) ) {
-		out[0] *= tint[0];
-		out[1] *= tint[1];
-		out[2] *= tint[2];
-	}
+	vk_apply_optional_tint( r_volumetricFogTint, out, qfalse );
+	vk_apply_optional_tint( r_fogTint, out, qfalse );
 }
