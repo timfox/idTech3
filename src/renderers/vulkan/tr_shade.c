@@ -1967,11 +1967,29 @@ void RB_StageIteratorGeneric( void )
 
 	// now do fog
 	if ( !worldShOverride && tess.fogNum && tess.shader->fogPass && !fogCollapse ) {
+		int i;
+		qboolean hasAlphaTest = qfalse;
+		for ( i = 0; i < MAX_SHADER_STAGES; i++ ) {
+			const shaderStage_t *stage = tess.xstages[i];
+			if ( !stage ) {
+				break;
+			}
+			if ( stage->stateBits & GLS_ATEST_BITS ) {
+				hasAlphaTest = qtrue;
+				break;
+			}
+		}
+		/*
+		 * Fog-only pass does not preserve cutout alpha; skip it for alpha-tested
+		 * shaders to avoid fullscreen quad-like fog artifacts on foliage.
+		 */
+		if ( !hasAlphaTest ) {
 #ifdef USE_VULKAN
-		RB_FogPass( rebindIndex );
+			RB_FogPass( rebindIndex );
 #else
-		RB_FogPass();
+			RB_FogPass();
 #endif
+		}
 	}
 }
 
