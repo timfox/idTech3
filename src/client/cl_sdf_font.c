@@ -52,6 +52,22 @@ static cvar_t *r_sdfSmoothing;
 
 #define VALID_FONT(h) ((h) >= 0 && (h) < numFonts && fonts[(h)].active)
 
+static int SDF_FindFreeSlot( void ) {
+	int i;
+
+	for ( i = 0; i < numFonts; i++ ) {
+		if ( !fonts[i].active ) {
+			return i;
+		}
+	}
+
+	if ( numFonts >= SDF_MAX_FONTS ) {
+		return SDF_INVALID_HANDLE;
+	}
+
+	return numFonts++;
+}
+
 static const sdfGlyph_t *SDF_FindGlyph( const sdfFont_t *font, uint32_t codepoint ) {
 	int i;
 
@@ -238,9 +254,11 @@ sdfFontHandle_t SDF_LoadFont( const char *name, const char *atlasImage, const ch
 		return SDF_INVALID_HANDLE;
 	}
 
-	if ( numFonts >= SDF_MAX_FONTS ) return SDF_INVALID_HANDLE;
-
-	slot = numFonts++;
+	slot = SDF_FindFreeSlot();
+	if ( slot == SDF_INVALID_HANDLE ) {
+		Com_Printf( S_COLOR_YELLOW "SDF: no free font slots for '%s'\n", name );
+		return SDF_INVALID_HANDLE;
+	}
 	Com_Memset( &fonts[slot], 0, sizeof( sdfFont_t ) );
 	Q_strncpyz( fonts[slot].name, name, sizeof( fonts[slot].name ) );
 
@@ -250,7 +268,7 @@ sdfFontHandle_t SDF_LoadFont( const char *name, const char *atlasImage, const ch
 	}
 	if ( !fonts[slot].atlasShader ) {
 		Com_Printf( S_COLOR_YELLOW "SDF: atlas '%s' not found\n", atlasImage );
-		numFonts--;
+		Com_Memset( &fonts[slot], 0, sizeof( fonts[slot] ) );
 		return SDF_INVALID_HANDLE;
 	}
 
@@ -258,21 +276,21 @@ sdfFontHandle_t SDF_LoadFont( const char *name, const char *atlasImage, const ch
 	len = FS_ReadFile( metricsFile, &buf );
 	if ( len <= 0 || !buf ) {
 		Com_Printf( S_COLOR_YELLOW "SDF: metrics '%s' not found\n", metricsFile );
-		numFonts--;
+		Com_Memset( &fonts[slot], 0, sizeof( fonts[slot] ) );
 		return SDF_INVALID_HANDLE;
 	}
 	if ( len > SDF_MAX_METRICS_FILE_SIZE ) {
 		Com_Printf( S_COLOR_YELLOW "SDF: metrics '%s' too large (%d bytes, max %d)\n",
 			metricsFile, len, SDF_MAX_METRICS_FILE_SIZE );
 		FS_FreeFile( buf );
-		numFonts--;
+		Com_Memset( &fonts[slot], 0, sizeof( fonts[slot] ) );
 		return SDF_INVALID_HANDLE;
 	}
 
 	if ( !SDF_ParseFNT( &fonts[slot], (const char *)buf ) ) {
 		Com_Printf( S_COLOR_YELLOW "SDF: failed to parse '%s'\n", metricsFile );
 		FS_FreeFile( buf );
-		numFonts--;
+		Com_Memset( &fonts[slot], 0, sizeof( fonts[slot] ) );
 		return SDF_INVALID_HANDLE;
 	}
 
