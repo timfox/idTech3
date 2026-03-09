@@ -1,5 +1,6 @@
 /*
 ===========================================================================
+
 Copyright (C) 1999-2005 Id Software, Inc.
 
 This file is part of Quake III Arena source code.
@@ -18,6 +19,7 @@ You should have received a copy of the GNU General Public License
 along with Quake III Arena source code; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
+
 */
 // tr_font.c
 // 
@@ -375,19 +377,17 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 	void *faceData;
 	int i, len;
 	char name[MAX_QPATH];
-	const char *effectiveFont = fontName;
-
-	/* r_font override: when UI requests "default" or "fonts/default", use r_font if set (e.g. fonts/Inter-Regular) */
-	if (fontName && (Q_stricmp(fontName, "default") == 0 || Q_stricmp(fontName, "fonts/default") == 0)) {
-		const char *rfont = ri.Cvar_VariableString("r_font");
-		if (rfont && rfont[0]) {
-			effectiveFont = rfont;
-		}
-	}
+	const char *resolvedFontName;
 
 	if (!fontName) {
 		ri.Printf(PRINT_ALL, "RE_RegisterFont: called with empty name\n");
 		return;
+	}
+
+	resolvedFontName = fontName;
+	if ( !Q_stricmp( fontName, "fonts/impact.ttf" ) || !Q_stricmp( fontName, "impact.ttf" ) ) {
+		resolvedFontName = "fonts/Inter-Bold.ttf";
+		ri.Printf( PRINT_WARNING, "RE_RegisterFont: Falling back from '%s' to '%s'\n", fontName, resolvedFontName );
 	}
 
 	if (pointSize <= 0) {
@@ -402,8 +402,8 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 	/* --- Try name-based cache first: fonts/<fontbase>_<pointSize>.dat --- */
 	{
 		char namedDat[MAX_QPATH];
-		const char *baseName = effectiveFont;
-		const char *slash = strrchr(effectiveFont, '/');
+		const char *baseName = resolvedFontName;
+		const char *slash = strrchr(resolvedFontName, '/');
 		const char *dot;
 		if (slash) baseName = slash + 1;
 		dot = strrchr(baseName, '.');
@@ -488,9 +488,9 @@ try_freetype:
 		return;
 	}
 
-	len = ri.FS_ReadFile(effectiveFont, &faceData);
+	len = ri.FS_ReadFile(resolvedFontName, &faceData);
 	if (len <= 0) {
-		ri.Printf(PRINT_WARNING, "RE_RegisterFont: Unable to read font file '%s'\n", effectiveFont);
+		ri.Printf(PRINT_WARNING, "RE_RegisterFont: Unable to read font file '%s'\n", resolvedFontName);
 		return;
 	}
 
