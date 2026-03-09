@@ -26,6 +26,33 @@ static void vk_tint_local_fog_volume_color( vec3_t io ) {
 	}
 }
 
+static float vk_compute_global_base_density( float rawDensity, int fogShowcase, qboolean hasLocalFogVolumes ) {
+	float scale = 1.0f / 1024.0f;
+	float density;
+
+	if ( rawDensity <= 0.0f ) {
+		return 0.0f;
+	}
+
+	switch ( fogShowcase ) {
+		case 1: scale = 1.0f / 256.0f; break;
+		case 2: scale = 1.0f / 128.0f; break;
+		case 3: scale = 1.0f / 64.0f; break;
+		default: break;
+	}
+
+	/*
+	 * Map-local fog volumes already provide scene density. Keep any global haze
+	 * contribution conservative in non-showcase mode to avoid blackouts.
+	 */
+	if ( hasLocalFogVolumes && fogShowcase <= 0 ) {
+		scale *= 0.5f;
+	}
+
+	density = rawDensity * scale;
+	return Com_Clamp( 0.0f, 0.02f, density );
+}
+
 static qboolean vk_volumetric_mat4_inverse( const float *m, float *out )
 {
 	float tmp[16];
@@ -211,6 +238,7 @@ void vk_update_volumetric_params( void )
 	int fluid_active_height = (int)vk.fluid_height;
 	qboolean fluid_autoscale_enabled = qfalse;
 	qboolean fluid_enabled = ( r_fogFluid && r_fogFluid->integer && vk.fluid_width > 0 && vk.fluid_height > 0 ) ? qtrue : qfalse;
+	qboolean has_map_fog_volumes = ( tr.world && tr.world->fogs && tr.world->numfogs > 1 && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) ? qtrue : qfalse;
 	float delta_time = 1.0f / 60.0f;
 	qboolean camera_cut = vk.temporal.sharedCameraCut;
 	vec3_t fog_min = { -2048.0f, -2048.0f, -256.0f };
@@ -524,7 +552,7 @@ void vk_update_volumetric_params( void )
 	}
 	VectorNormalize2( wind_dir, motion_dir );
 
-	params.densityParams[0] = fog_density;
+	params.densityParams[0] = vk_compute_global_base_density( fog_density, fog_showcase, has_map_fog_volumes );
 	params.densityParams[1] = height_falloff;
 	params.densityParams[2] = jitter_amount;
 	params.densityParams[3] = temporal_weight;
@@ -576,6 +604,7 @@ void vk_update_volumetric_params( void )
 			if ( extent_x <= 0.001f || extent_y <= 0.001f || extent_z <= 0.001f ) continue;
 			if ( fog->parms.depthForOpaque > 0.001f ) local_density *= ( 1.0f / fog->parms.depthForOpaque );
 			if ( local_density < 0.0f ) local_density = 0.0f;
+			if ( local_density > 0.05f ) local_density = 0.05f;
 			VectorCopy( fog->color, local_color );
 			vk_tint_local_fog_volume_color( local_color );
 
