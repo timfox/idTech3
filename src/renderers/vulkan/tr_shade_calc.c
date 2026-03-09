@@ -22,15 +22,16 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_shade_calc.c
 
 #include "tr_local.h"
+#include "vk_util.h"
 
 static void RB_ApplyFogTint( vec4_t color ) {
-	float tint[3];
+	vec3_t tint;
 
 	if ( !r_fogTint || !r_fogTint->string[0] ) {
 		return;
 	}
 
-	if ( sscanf( r_fogTint->string, "%f %f %f", &tint[0], &tint[1], &tint[2] ) != 3 ) {
+	if ( !vk_parse_fog_tint_string( r_fogTint->string, tint ) ) {
 		return;
 	}
 

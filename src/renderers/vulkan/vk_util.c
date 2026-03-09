@@ -41,6 +41,47 @@ qboolean vk_parse_rgb_string( const char *s, vec3_t out )
 	return qtrue;
 }
 
+qboolean vk_parse_fog_tint_string( const char *s, vec3_t out )
+{
+	char buf[128];
+	float r, g, b;
+	float maxc;
+	char *p;
+
+	if ( !s || !s[0] ) {
+		return qfalse;
+	}
+
+	Q_strncpyz( buf, s, sizeof( buf ) );
+	for ( p = buf; *p; ++p ) {
+		if ( *p == ',' || *p == ';' || *p == '\t' ) {
+			*p = ' ';
+		}
+	}
+
+	if ( sscanf( buf, "%f %f %f", &r, &g, &b ) != 3 ) {
+		return qfalse;
+	}
+
+	maxc = MAX( r, MAX( g, b ) );
+	if ( maxc > 1.5f ) {
+		r *= ( 1.0f / 255.0f );
+		g *= ( 1.0f / 255.0f );
+		b *= ( 1.0f / 255.0f );
+	}
+
+	out[0] = Com_Clamp( 0.0f, 4.0f, r );
+	out[1] = Com_Clamp( 0.0f, 4.0f, g );
+	out[2] = Com_Clamp( 0.0f, 4.0f, b );
+
+	/* Treat all-zero as "no tint" to avoid accidental full black fog. */
+	if ( out[0] <= 0.0001f && out[1] <= 0.0001f && out[2] <= 0.0001f ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
 float vk_matrix_max_abs_diff( const float *a, const float *b )
 {
 	float max_diff = 0.0f;

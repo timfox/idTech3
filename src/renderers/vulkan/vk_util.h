@@ -21,6 +21,13 @@ const char *vk_present_mode_string( VkPresentModeKHR mode );
 /* Parse "r g b" string into vec3. Returns qfalse on parse failure. */
 qboolean vk_parse_rgb_string( const char *s, vec3_t out );
 
+/*
+ * Parse fog tint string into vec3.
+ * Accepts "r g b" and "r,g,b"; values above 1.5 are treated as 0..255 and normalized.
+ * Returns qfalse for invalid/disabled (near-zero) tint.
+ */
+qboolean vk_parse_fog_tint_string( const char *s, vec3_t out );
+
 /* Maximum absolute difference between two 4x4 matrices (float[16]). */
 float vk_matrix_max_abs_diff( const float *a, const float *b );
 

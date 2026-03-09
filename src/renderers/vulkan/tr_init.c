@@ -2894,9 +2894,9 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_volumetricFogShadowContrast, "Shadow contrast shaping for volumetric sun/local light scattering." );
 	ri.Cvar_SetGroup( r_volumetricFogShadowContrast, CVG_RENDERER );
 
-	r_volumetricFogShowcase = ri.Cvar_Get( "r_volumetricFogShowcase", "1", CVAR_ARCHIVE_ND );
+	r_volumetricFogShowcase = ri.Cvar_Get( "r_volumetricFogShowcase", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogShowcase, "0", "3", CV_INTEGER );
-	ri.Cvar_SetDescription( r_volumetricFogShowcase, "Showcase presets for visibly stronger fog in regular maps: 0=off, 1=cinematic haze, 2=heavy shafts, 3=full-force stress test." );
+	ri.Cvar_SetDescription( r_volumetricFogShowcase, "Showcase presets for visibly stronger fog in regular maps: 0=off (default), 1=cinematic haze, 2=heavy shafts, 3=full-force stress test." );
 	ri.Cvar_SetGroup( r_volumetricFogShowcase, CVG_RENDERER );
 
 	r_fog_shadows = ri.Cvar_Get( "r_fog_shadows", "0", CVAR_ARCHIVE_ND );
