@@ -702,7 +702,7 @@ static void Cmd_TokenizeString2( const char *text_in, qboolean ignoreQuotes ) {
 	char sanitizedInput[MAX_CMD_BUFFER];
 
 #ifdef TKN_DBG
-	// FIXME: Debug hook for tokenization - this is a temporary debugging aid.
+	/* Debug hook for tokenization. */
 	// Consider implementing proper tokenization debugging with structured output
 	// (token boundaries, types, etc.) rather than just printing the input string.
 	Com_DPrintf("Cmd_TokenizeString: %s\n", text_in);
@@ -1190,10 +1190,12 @@ void Cmd_Init( void ) {
 	extern void Cmd_JsList_f(void);
 	extern void Cmd_JsDump_f(void);
 	extern void Cmd_JsExec_f(void);
+	extern void Cmd_JsClearErrors_f(void);
 	extern void JsDebug_InitCvars(void);
 	Cmd_AddCommand("js_reload", Cmd_JsReload_f);
 	Cmd_AddCommand("js_list", Cmd_JsList_f);
 	Cmd_AddCommand("js_dump", Cmd_JsDump_f);
 	Cmd_AddCommand("js_exec", Cmd_JsExec_f);
+	Cmd_AddCommand("js_clearErrors", Cmd_JsClearErrors_f);
 	JsDebug_InitCvars();
 }

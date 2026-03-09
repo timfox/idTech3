@@ -29,6 +29,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define  NUM_CON_TIMES  4
 
 #define  CON_TEXTSIZE   65536
+#define  CON_LINEBUF_SIZE ( ( MAX_CONSOLE_WIDTH * 3 ) + 4 )
 
 int bigchar_width;
 int bigchar_height;
@@ -73,9 +74,63 @@ cvar_t		*con_conspeed;
 cvar_t		*con_autoclear;
 cvar_t		*con_notifytime;
 cvar_t		*con_scale;
+cvar_t		*con_opacity;
 cvar_t		*con_inputMode;
+cvar_t		*con_showVersion;
+cvar_t		*con_drawInput;
 
 int			g_console_field_width;
+
+static char Con_ColorCodeForIndex( int colorIndex ) {
+	if ( colorIndex >= 0 && colorIndex <= 9 ) {
+		return (char)( '0' + colorIndex );
+	}
+	if ( colorIndex >= 10 && colorIndex < 36 ) {
+		return (char)( 'a' + ( colorIndex - 10 ) );
+	}
+	if ( colorIndex >= 36 && colorIndex < 62 ) {
+		return (char)( 'A' + ( colorIndex - 36 ) );
+	}
+
+	return COLOR_WHITE;
+}
+
+static void Con_LineToString( const short *text, int width, char *out, size_t outSize ) {
+	int i;
+	int lastNonSpace = -1;
+	int currentColor = ColorIndex( COLOR_WHITE );
+	size_t outPos = 0;
+
+	if ( !text || !out || outSize < 2 ) {
+		return;
+	}
+
+	for ( i = 0; i < width; i++ ) {
+		if ( ( text[i] & 0xff ) != ' ' ) {
+			lastNonSpace = i;
+		}
+	}
+
+	if ( lastNonSpace < 0 ) {
+		out[0] = '\0';
+		return;
+	}
+
+	for ( i = 0; i <= lastNonSpace && outPos + 1 < outSize; i++ ) {
+		const int colorIndex = ( text[i] >> 8 ) & 63;
+		const char ch = (char)( text[i] & 0xff );
+
+		if ( colorIndex != currentColor && outPos + 3 < outSize ) {
+			out[outPos++] = Q_COLOR_ESCAPE;
+			out[outPos++] = Con_ColorCodeForIndex( colorIndex );
+			currentColor = colorIndex;
+		}
+
+		out[outPos++] = ch;
+	}
+
+	out[outPos] = '\0';
+}
 
 /*
 ================
@@ -295,6 +350,8 @@ void Con_CheckResize( void )
 	}
 
 	scale = con_scale->value;
+	if ( scale < 0.5f ) scale = 0.5f;
+	if ( scale > 8.0f ) scale = 8.0f;
 
 	con.viswidth = cls.glconfig.vidWidth;
 
@@ -404,6 +461,9 @@ void Con_Init( void )
 	con_scale = Cvar_Get( "con_scale", "1", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( con_scale, "0.5", "8", CV_FLOAT );
 	Cvar_SetDescription( con_scale, "Console font size scale." );
+	con_opacity = Cvar_Get( "con_opacity", "1", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( con_opacity, "0", "1", CV_FLOAT );
+	Cvar_SetDescription( con_opacity, "Console background opacity (0=transparent, 1=opaque)." );
 	con_inputMode = Cvar_Get( "con_inputMode", "3", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( con_inputMode, "0", "3", CV_INTEGER );
 	Cvar_SetDescription( con_inputMode,
@@ -413,6 +473,10 @@ void Con_Init( void )
 		" 2 - chat-first (bare text always chat; commands require \\ or /)\n"
 		" 3 - smart (bare text becomes a command only if it matches a registered command)"
 	);
+	con_showVersion = Cvar_Get( "con_showVersion", "1", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( con_showVersion, "Show engine version at bottom of console. Set to 0 for custom game branding." );
+	con_drawInput = Cvar_Get( "con_drawInput", "1", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( con_drawInput, "Draw console input line (] prompt and cursor). Set to 0 to hide (e.g. for custom game UIs)." );
 
 	Field_Clear( &g_consoleField );
 	g_consoleField.widthInChars = g_console_field_width;
@@ -653,7 +717,8 @@ static void Con_DrawInput( void ) {
 
 	re.SetColor( con.color );
 
-	SCR_DrawSmallChar( con.xadjust + 1 * smallchar_width, y, ']' );
+	SCR_DrawSmallStringExt( con.xadjust + smallchar_width, y, "]",
+		g_color_table[ ColorIndex( COLOR_WHITE ) ], qtrue, qtrue );
 
 	Field_Draw( &g_consoleField, con.xadjust + 2 * smallchar_width, y,
 		SCREEN_WIDTH - 3 * smallchar_width, qtrue, qtrue );
@@ -669,16 +734,14 @@ Draws the last few lines of output transparently over the game top
 */
 static void Con_DrawNotify( void )
 {
-	int		x, v;
+	int		v;
 	short	*text;
 	int		i;
 	int		time;
 	int		skip;
-	int		currentColorIndex;
-	int		colorIndex;
+	char	lineBuf[CON_LINEBUF_SIZE];
 
-	currentColorIndex = ColorIndex( COLOR_WHITE );
-	re.SetColor( g_color_table[ currentColorIndex ] );
+	re.SetColor( g_color_table[ ColorIndex( COLOR_WHITE ) ] );
 
 	v = 0;
 	for (i= con.current-NUM_CON_TIMES+1 ; i<=con.current ; i++)
@@ -697,16 +760,10 @@ static void Con_DrawNotify( void )
 			continue;
 		}
 
-		for (x = 0 ; x < con.linewidth ; x++) {
-			if ( ( text[x] & 0xff ) == ' ' ) {
-				continue;
-			}
-			colorIndex = ( text[x] >> 8 ) & 63;
-			if ( currentColorIndex != colorIndex ) {
-				currentColorIndex = colorIndex;
-				re.SetColor( g_color_table[ colorIndex ] );
-			}
-			SCR_DrawSmallChar( cl_conXOffset->integer + con.xadjust + (x+1)*smallchar_width, v, text[x] & 0xff );
+		Con_LineToString( text, con.linewidth, lineBuf, sizeof( lineBuf ) );
+		if ( lineBuf[0] ) {
+			SCR_DrawSmallStringExt( cl_conXOffset->integer + con.xadjust + smallchar_width, v,
+				lineBuf, g_color_table[ ColorIndex( COLOR_WHITE ) ], qfalse, qfalse );
 		}
 
 		v += smallchar_height;
@@ -759,10 +816,9 @@ static void Con_DrawSolidConsole( float frac ) {
 	short			*text;
 	int				row;
 	int				lines;
-	int				currentColorIndex;
-	int				colorIndex;
 	float			yf, wf;
 	char			buf[ MAX_CVAR_VALUE_STRING ], *v[4];
+	char			lineBuf[CON_LINEBUF_SIZE];
 
 	lines = cls.glconfig.vidHeight * frac;
 	if ( lines <= 0 )
@@ -802,24 +858,20 @@ static void Con_DrawSolidConsole( float frac ) {
 			re.SetColor( conColorValue );
 			re.DrawStretchPic( 0, 0, wf, yf, 0, 0, 1, 1, cls.whiteShader );
 		} else {
-			re.SetColor( g_color_table[ ColorIndex( COLOR_WHITE ) ] );
+			float bgColor[4];
+			float op = con_opacity && con_opacity->value >= 0.0f ? con_opacity->value : 1.0f;
+			if ( op > 1.0f ) op = 1.0f;
+			bgColor[0] = bgColor[1] = bgColor[2] = 1.0f;
+			bgColor[3] = op;
+			re.SetColor( bgColor );
 			re.DrawStretchPic( 0, 0, wf, yf, 0, 0, 1, 1, cls.consoleShader );
 		}
 
 	}
 
-	re.SetColor( g_color_table[ ColorIndex( COLOR_RED ) ] );
-	re.DrawStretchPic( 0, yf, wf, 2, 0, 0, 1, 1, cls.whiteShader );
-
-	//y = yf;
-
-	// draw the version number
-	SCR_DrawSmallString( cls.glconfig.vidWidth - ( ARRAY_LEN( Q3_VERSION ) ) * smallchar_width,
-		lines - smallchar_height, Q3_VERSION, ARRAY_LEN( Q3_VERSION ) - 1 );
-
 	// draw the text
 	con.vislines = lines;
-	rows = lines / smallchar_width - 1;	// rows of text to draw
+	rows = lines / smallchar_height - 1;	// rows of text to draw
 
 	y = lines - (smallchar_height * 3);
 
@@ -829,9 +881,10 @@ static void Con_DrawSolidConsole( float frac ) {
 	if ( con.display != con.current )
 	{
 		// draw arrows to show the buffer is backscrolled
-		re.SetColor( g_color_table[ ColorIndex( COLOR_RED ) ] );
-		for ( x = 0 ; x < con.linewidth ; x += 4 )
-			SCR_DrawSmallChar( con.xadjust + (x+1)*smallchar_width, y, '^' );
+		for ( x = 0 ; x < con.linewidth ; x += 4 ) {
+			SCR_DrawSmallStringExt( con.xadjust + ( x + 1 ) * smallchar_width, y, "^",
+				g_color_table[ ColorIndex( COLOR_RED ) ], qtrue, qtrue );
+		}
 		y -= smallchar_height;
 		row--;
 	}
@@ -839,20 +892,12 @@ static void Con_DrawSolidConsole( float frac ) {
 #ifdef USE_CURL
 	if ( download.progress[ 0 ] ) 
 	{
-		currentColorIndex = ColorIndex( COLOR_CYAN );
-		re.SetColor( g_color_table[ currentColorIndex ] );
-
-		i = strlen( download.progress );
-		for ( x = 0 ; x < i ; x++ ) 
-		{
-			SCR_DrawSmallChar( ( x + 1 ) * smallchar_width,
-				lines - smallchar_height, download.progress[x] );
-		}
+		SCR_DrawSmallStringExt( smallchar_width, lines - smallchar_height,
+			download.progress, g_color_table[ ColorIndex( COLOR_CYAN ) ], qtrue, qtrue );
 	}
 #endif
 
-	currentColorIndex = ColorIndex( COLOR_WHITE );
-	re.SetColor( g_color_table[ currentColorIndex ] );
+	re.SetColor( g_color_table[ ColorIndex( COLOR_WHITE ) ] );
 
 	for ( i = 0 ; i < rows ; i++, y -= smallchar_height, row-- )
 	{
@@ -865,24 +910,24 @@ static void Con_DrawSolidConsole( float frac ) {
 		}
 
 		text = con.text + (row % con.totallines) * con.linewidth;
-
-		for ( x = 0 ; x < con.linewidth ; x++ ) {
-			// skip rendering whitespace
-			if ( ( text[x] & 0xff ) == ' ' ) {
-				continue;
-			}
-			// track color changes
-			colorIndex = ( text[ x ] >> 8 ) & 63;
-			if ( currentColorIndex != colorIndex ) {
-				currentColorIndex = colorIndex;
-				re.SetColor( g_color_table[ colorIndex ] );
-			}
-			SCR_DrawSmallChar( con.xadjust + (x + 1) * smallchar_width, y, text[x] & 0xff );
+		Con_LineToString( text, con.linewidth, lineBuf, sizeof( lineBuf ) );
+		if ( lineBuf[0] ) {
+			SCR_DrawSmallStringExt( con.xadjust + smallchar_width, y, lineBuf,
+				g_color_table[ ColorIndex( COLOR_WHITE ) ], qfalse, qfalse );
 		}
 	}
 
-	// draw the input prompt, user text, and cursor if desired
-	Con_DrawInput();
+	// draw the input line (optional; game can disable via con_drawInput 0)
+	if ( con_drawInput->integer )
+		Con_DrawInput();
+
+	// draw version at bottom (optional; game can disable via con_showVersion 0)
+	if ( con_showVersion->integer && com_version && com_version->string[0] )
+	{
+		re.SetColor( g_color_table[ ColorIndex( COLOR_WHITE ) ] );
+		SCR_DrawSmallString( con.xadjust + smallchar_width, lines - smallchar_height,
+			com_version->string, (int)strlen( com_version->string ) );
+	}
 
 	re.SetColor( NULL );
 }
@@ -894,16 +939,23 @@ Con_DrawConsole
 ==================
 */
 void Con_DrawConsole( void ) {
+	const int catcher = Key_GetCatcher();
 
 	// check for console width changes from a vid mode change
 	Con_CheckResize();
 
 	// if disconnected, render console full screen
 	if ( cls.state == CA_DISCONNECTED ) {
-		if ( !( Key_GetCatcher( ) & (KEYCATCH_UI | KEYCATCH_CGAME)) ) {
+		if ( !( catcher & (KEYCATCH_UI | KEYCATCH_CGAME)) ) {
 			Con_DrawSolidConsole( 1.0 );
 			return;
 		}
+	}
+
+	// In-game menus should not inherit notify text or closing console animation
+	// unless the console is explicitly open on top of the UI.
+	if ( ( catcher & KEYCATCH_UI ) && !( catcher & KEYCATCH_CONSOLE ) ) {
+		return;
 	}
 
 	if ( con.displayFrac ) {

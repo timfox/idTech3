@@ -290,6 +290,7 @@
     <ClCompile Include="..\..\client\cl_avi.c" />
     <ClCompile Include="..\..\client\cl_cgame.c" />
     <ClCompile Include="..\..\client\cl_cin.c" />
+    <ClCompile Include="..\..\client\cl_cin_modern.c" />
     <ClCompile Include="..\..\client\cl_console.c" />
     <ClCompile Include="..\..\client\cl_curl.c" />
     <ClCompile Include="..\..\client\cl_input.c" />
@@ -298,6 +299,13 @@
     </ClCompile>
     <ClCompile Include="..\..\client\cl_keys.c" />
     <ClCompile Include="..\..\client\cl_main.c" />
+    <ClCompile Include="..\..\client\cl_emoji.c" />
+    <ClCompile Include="..\..\client\cl_osp.c" />
+    <ClCompile Include="..\..\client\cl_voip.c" />
+    <ClCompile Include="..\..\client\cl_websocket.c" />
+    <ClCompile Include="..\..\client\cl_steam.c" />
+    <ClCompile Include="..\..\client\cl_superhud.c" />
+    <ClCompile Include="..\..\client\cl_mumble.c" />
     <ClCompile Include="..\..\client\cl_net_chan.c" />
     <ClCompile Include="..\..\client\cl_parse.c" />
     <ClCompile Include="..\..\client\cl_scrn.c" />
@@ -319,6 +327,8 @@
     <ClCompile Include="..\..\qcommon\cm_test.c" />
     <ClCompile Include="..\..\qcommon\cm_trace.c" />
     <ClCompile Include="..\..\qcommon\common.c" />
+    <ClCompile Include="..\..\qcommon\jobs.c" />
+    <ClCompile Include="..\..\qcommon\q_utf8.c" />
     <ClCompile Include="..\..\qcommon\cvar.c" />
     <ClCompile Include="..\..\qcommon\files.c" />
     <ClCompile Include="..\..\qcommon\history.c" />
@@ -353,6 +363,7 @@
     <ClCompile Include="..\..\server\sv_filter.c" />
     <ClCompile Include="..\..\server\sv_game.c" />
     <ClCompile Include="..\..\server\sv_init.c" />
+    <ClCompile Include="..\..\server\sv_enhanced.c" />
     <ClCompile Include="..\..\server\sv_main.c" />
     <ClCompile Include="..\..\server\sv_net_chan.c" />
     <ClCompile Include="..\..\server\sv_snapshot.c" />
@@ -368,6 +379,7 @@
     <ClCompile Include="..\win_gamma.c" />
     <ClCompile Include="..\win_glimp.c" />
     <ClCompile Include="..\win_qgl.c" />
+    <ClCompile Include="..\..\physics\phys_bullet.c" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\..\asm\snd_mix_x64.asm">
@@ -407,9 +419,9 @@
     <ClInclude Include="..\..\qcommon\surfaceflags.h" />
     <ClInclude Include="..\..\qcommon\unzip.h" />
     <ClInclude Include="..\..\qcommon\vm_local.h" />
-    <ClInclude Include="..\..\renderers\openglrenderer\qgl.h" />
-    <ClInclude Include="..\..\renderers\rendercommon\tr_public.h" />
-    <ClInclude Include="..\..\renderers\rendercommon\tr_types.h" />
+    <ClInclude Include="..\..\renderers\opengl\qgl.h" />
+    <ClInclude Include="..\..\renderers\common\tr_public.h" />
+    <ClInclude Include="..\..\renderers\common\tr_types.h" />
     <ClInclude Include="..\..\server\server.h" />
     <ClInclude Include="..\..\ui\ui_public.h" />
     <ClInclude Include="..\resource.h" />
@@ -427,7 +439,7 @@
       <Project>{a410161f-ae9f-485d-a01f-5294891430a6}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
-    <ProjectReference Include="renderer.vcxproj">
+    <ProjectReference Include="opengl.vcxproj">
       <Project>{AB424155-FBED-4D8D-B007-5B6CF93EA395}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>

@@ -1,0 +1,112 @@
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(binding = 0) uniform sampler2D depthTexture;
+layout(binding = 1, rg16f) uniform image2D motionVectors;
+
+const int MAX_VOLUMES = 24;
+const int MAX_LIGHTS = 32;
+
+layout(std140, binding = 2) uniform VolumetricParams {
+    mat4 invProj;
+    mat4 invView;
+    mat4 proj;
+    mat4 viewProj;
+    mat4 prevView;
+    mat4 prevViewProj;
+    vec4 viewOrigin;
+    vec4 sunDirection;
+    vec4 fogColor;
+    vec4 densityParams;
+    vec4 worldMin;
+    vec4 worldMax;
+    vec4 gridDim;
+    vec4 miscParams;
+    vec4 sliceParams;
+    vec4 phaseParams;
+    vec4 scatterParams;
+    vec4 noiseParams;
+    vec4 noiseScroll;
+    vec4 temporalParams;
+    vec4 qualityParams;
+    vec4 windParams;
+    vec4 volumeCounts;
+    vec4 passParams;
+    vec4 volumeBoundsMin[MAX_VOLUMES];
+    vec4 volumeBoundsMax[MAX_VOLUMES];
+    vec4 volumeColorDensity[MAX_VOLUMES];
+    vec4 volumeTypeParams[MAX_VOLUMES];
+    vec4 lightPosRadius[MAX_LIGHTS];
+    vec4 lightColorType[MAX_LIGHTS];
+    vec4 lightDirAngle[MAX_LIGHTS];
+    vec4 lightExtra[MAX_LIGHTS];
+    mat4 sunShadowMatrix0;
+    vec4 shadowParams0;
+    vec4 shadowMapSize0;
+} params;
+
+float decodeClipZ(float depthSample, int depthMode) {
+    if (depthMode == 0) {
+        return depthSample * 2.0 - 1.0;
+    }
+    if (depthMode == 1) {
+        return (1.0 - depthSample) * 2.0 - 1.0;
+    }
+    return 0.0;
+}
+
+float getNearPlane() {
+    return max(params.sliceParams.x, 0.001);
+}
+
+float getFarPlane(float nearPlane) {
+    return max(params.sliceParams.y, nearPlane + 1.0);
+}
+
+vec3 reconstructViewPos(vec2 uv, float depthSample, int depthMode) {
+    float nearPlane = getNearPlane();
+    float farPlane = getFarPlane(nearPlane);
+
+    if (depthMode == 2) {
+        float linearDepth = depthSample;
+        if (linearDepth <= 1.0) {
+            linearDepth = mix(nearPlane, farPlane, clamp(linearDepth, 0.0, 1.0));
+        }
+        vec3 viewRay = normalize((params.invProj * vec4(uv * 2.0 - 1.0, 1.0, 1.0)).xyz);
+        float viewDistance = linearDepth / max(-viewRay.z, 1e-4);
+        return viewRay * viewDistance;
+    }
+
+    vec4 clip = vec4(uv * 2.0 - 1.0, decodeClipZ(depthSample, depthMode), 1.0);
+    vec4 view = params.invProj * clip;
+    return view.xyz / max(abs(view.w), 1e-6);
+}
+
+void main() {
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 imageSize = imageSize(motionVectors);
+
+    if (pixel.x >= imageSize.x || pixel.y >= imageSize.y) {
+        return;
+    }
+
+    vec2 uv = (vec2(pixel) + 0.5) / vec2(imageSize);
+    float depthSample = texture(depthTexture, uv).r;
+    int depthMode = int(clamp(floor(params.miscParams.y + 0.5), 0.0, 2.0));
+
+    vec3 viewPos = reconstructViewPos(uv, depthSample, depthMode);
+    vec3 worldPos = (params.invView * vec4(viewPos, 1.0)).xyz;
+
+    vec4 currClip = params.viewProj * vec4(worldPos, 1.0);
+    vec4 prevClip = params.prevViewProj * vec4(worldPos, 1.0);
+
+    vec2 motion = vec2(0.0);
+    if (abs(currClip.w) > 1e-6 && abs(prevClip.w) > 1e-6) {
+        vec2 currUV = currClip.xy / currClip.w * 0.5 + 0.5;
+        vec2 prevUV = prevClip.xy / prevClip.w * 0.5 + 0.5;
+        motion = currUV - prevUV;
+    }
+
+    imageStore(motionVectors, pixel, vec4(motion, 0.0, 0.0));
+}

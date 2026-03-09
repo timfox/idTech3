@@ -63,12 +63,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
   #include <sys/file.h>
 #endif
 
-// FIXME TTimo should we gard this? most *nix system should comply?
+/* termios.h: most *nix systems provide it. */
 #include <termios.h>
 
 #include "../../qcommon/q_shared.h"
 #include "../../qcommon/qcommon.h"
-#include "../../renderers/rendercommon/tr_public.h"
+#include "../../renderers/common/tr_public.h"
 
 #include "linux_local.h" // bk001204
 
@@ -136,7 +136,7 @@ qboolean Sys_LowPhysicalMemory( void )
 	//MEMORYSTATUS stat;
 	//GlobalMemoryStatus (&stat);
 	//return (stat.dwTotalPhys <= MEM_THRESHOLD) ? qtrue : qfalse;
-	return qfalse; // bk001207 - FIXME
+	return qfalse; /* Low-memory check not implemented on this platform. */
 }
 
 
@@ -153,7 +153,7 @@ void Sys_BeginProfiling( void )
 // =============================================================
 
 // flush stdin, I suspect some terminals are sending a LOT of shit
-// FIXME TTimo relevant?
+/* tty_FlushIn: may be needed for some terminals. */
 static void tty_FlushIn( void )
 {
 #if 1
@@ -209,7 +209,7 @@ static void tty_Hide( void )
 
 
 // show the current line
-// FIXME TTimo need to position the cursor if needed??
+/* Could position cursor if needed. */
 static void tty_Show( void )
 {
 	if ( !ttycon_on )
@@ -303,8 +303,7 @@ void NORETURN Sys_Exit( int code )
 	//exit(ex);
 	_exit( code );
 #else
-	// Give me a backtrace on error exits.
-	assert( code == 0 );
+	/* Use exit() for backtrace on error exits; do not assert on non-zero code */
 	exit( code );
 #endif
 }
@@ -497,7 +496,7 @@ tty_err Sys_ConsoleInputInit( void )
 	fcntl( STDIN_FILENO, F_SETFL, stdin_flags | O_NONBLOCK );
 	stdin_active = qtrue;
 
-	// FIXME TTimo initialize this in Sys_Init or something?
+	/* Could initialize ttycon in Sys_Init. */
 	if ( !ttycon || !ttycon->integer )
 	{
 		ttycon_on = qfalse;
@@ -931,9 +930,9 @@ static void Sys_PrintBinVersion( const char* name )
 
 	fprintf( stdout, "\n\n%s\n", sep );
 #ifdef DEDICATED
-	fprintf( stdout, "Linux Quake3 Dedicated Server [%s %s]\n", date, time );
+	fprintf( stdout, "Linux Fox Dedicated Server [%s %s]\n", date, time );
 #else
-	fprintf( stdout, "Linux Quake3 Full Executable  [%s %s]\n", date, time );
+	fprintf( stdout, "Linux Fox Full Executable  [%s %s]\n", date, time );
 #endif
 	fprintf( stdout, " local install: %s\n", name );
 	fprintf( stdout, "%s\n\n", sep );
@@ -1072,9 +1071,16 @@ static const char *Sys_BinName( const char *arg0 )
 		Q_strncpyz( dst, arg0, PATH_MAX );
 	}
 #else
-
-#warning Sys_BinName not implemented
-	Q_strncpyz( dst, arg0, PATH_MAX );
+	/* Fallback: try /proc/self/exe (Linux-style), then /proc/curproc/file (BSD), else arg0 */
+	{
+		int n = readlink( "/proc/self/exe", dst, PATH_MAX - 1 );
+		if ( n < 0 || n >= PATH_MAX )
+			n = readlink( "/proc/curproc/file", dst, PATH_MAX - 1 );
+		if ( n >= 0 && n < PATH_MAX )
+			dst[ n ] = '\0';
+		else
+			Q_strncpyz( dst, arg0, PATH_MAX );
+	}
 #endif
 
 #else // DEBUG

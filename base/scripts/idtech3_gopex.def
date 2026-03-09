@@ -1,0 +1,134 @@
+/*
+===========================================================================
+Copyright (C) 2026 Gopex LLC. All rights reserved.
+
+Entity definitions for idTech3Radiant editor.
+Defines new entity types for engine features:
+  - Director zones and spawn points
+  - DMM destructible objects
+  - Projected lights (flashlights)
+  - Cloth simulation
+  - HDR skybox configuration
+  - Background map cameras
+  - Choreography marks
+  - Response rule triggers
+===========================================================================
+*/
+
+/*QUAKED info_director_zone (0.5 0.0 1.0) (-8 -8 -8) (8 8 8)
+AI Director threat zone.
+Places a pacing zone that affects spawn budgets and intensity.
+--------- KEYS ---------
+targetname : zone name for Lua reference
+threat : threat level (0=none, 1=low, 2=medium, 3=high, 4=extreme)
+budget_mult : spawn budget multiplier (default 1.0)
+--------- NOTES ---------
+Draw the zone bounds using the brush-defined AABB.
+The Director uses these zones to adjust spawn frequency.
+*/
+
+/*QUAKED info_director_spawn (1.0 0.5 0.0) (-16 -16 -24) (16 16 32)
+AI Director spawn point.
+Enemies spawn here when the Director triggers a wave.
+--------- KEYS ---------
+spawn_type : Director spawn type name (e.g. "zombie", "runner")
+min_intensity : minimum Director intensity to activate (0.0-1.0)
+max_intensity : maximum Director intensity to activate (0.0-1.0)
+--------- NOTES ---------
+Place multiple spawn points throughout the map.
+The Director selects spawn points based on player proximity and intensity.
+*/
+
+/*QUAKED func_destructible (0.8 0.4 0.0) ?
+DMM destructible object.
+A brush entity that can be damaged, deformed, and fractured.
+--------- KEYS ---------
+dmm_material : material type (0=wood, 1=glass, 2=thin_metal, 3=thick_metal, 4=concrete, 5=stone, 6=ice, 7=plastic)
+dmm_health : hit points before fracture (default 100)
+dmm_fracture_mode : fracture pattern (0=voronoi, 2=splinter, 3=shatter, 5=crumble, 6=tear)
+dmm_min_fragments : min fragment count (default 4)
+dmm_max_fragments : max fragment count (default 12)
+dmm_break_sound : sound shader on destruction
+dmm_stress_sound : sound shader on damage
+--------- NOTES ---------
+Common presets:
+  Wood door: material=0, health=150, fracture=2 (splinter)
+  Glass pane: material=1, health=20, fracture=3 (shatter)
+  Concrete wall: material=4, health=500, fracture=5 (crumble)
+*/
+
+/*QUAKED light_projected (0.8 0.8 0.2) (-8 -8 -8) (8 8 8) SHADOWS VOLUMETRIC
+Projected spotlight / flashlight.
+A spotlight with optional shadow casting and volumetric cone.
+--------- KEYS ---------
+_color : light color (RGB, default 1 1 1)
+light : intensity (default 300)
+cone_angle : spotlight cone angle in degrees (default 45)
+range : light range (default 512)
+cookie : projected texture shader (optional)
+volumetric_density : fog density inside cone (default 0.1)
+--------- SPAWNFLAGS ---------
+SHADOWS : enable shadow casting
+VOLUMETRIC : enable volumetric cone rendering
+*/
+
+/*QUAKED func_cloth (0.4 0.8 0.4) ?
+Cloth simulation surface.
+A brush entity that simulates cloth physics at runtime.
+--------- KEYS ---------
+width : grid width in particles (default 16)
+height : grid height in particles (default 16)
+spacing : distance between particles (default 4)
+pin_edge : pinned edge (0=top, 1=bottom, 2=left, 3=right)
+wind_strength : wind force (default 0)
+wind_dir : wind direction vector
+material : cloth material shader
+--------- NOTES ---------
+The brush defines the cloth's initial flat shape.
+Pin one edge for hanging cloth (flags, banners, curtains).
+Pin two corners for stretched cloth (tarps, canopies).
+*/
+
+/*QUAKED info_bgmap_camera (0.0 0.5 1.0) (-8 -8 -8) (8 8 8)
+Background map camera point.
+Defines a camera position for menu background map flythroughs.
+--------- KEYS ---------
+fov : field of view (default 90)
+time : time in cycle at this point (seconds)
+target : targetname of next camera point
+--------- NOTES ---------
+Chain camera points using target/targetname.
+The engine interpolates smoothly between points.
+*/
+
+/*QUAKED info_choreo_mark (0.5 0.0 0.5) (-4 -4 -4) (4 4 4)
+Choreography position mark.
+Marks a position used by scripted scene sequences.
+--------- KEYS ---------
+targetname : reference name for scene scripts
+scene : scene name this mark belongs to
+actor : actor name positioned here
+*/
+
+/*QUAKED trigger_response (0.5 0.5 0.0) ?
+Response rule trigger volume.
+When a player enters this brush, triggers a dialogue response concept.
+--------- KEYS ---------
+concept : response concept to evaluate (e.g. "entered_danger_zone")
+zone : zone name for response context
+--------- NOTES ---------
+Use with the Response Rules system (g_response.h).
+The concept is evaluated against all registered rules.
+*/
+
+/*QUAKED info_navmesh_config (0.0 1.0 0.5) (-8 -8 -8) (8 8 8)
+Navigation mesh configuration entity.
+One per map. Overrides default Recast navmesh generation parameters.
+--------- KEYS ---------
+cell_size : rasterization cell size (default 0.3)
+cell_height : rasterization cell height (default 0.2)
+agent_height : agent height (default 2.0)
+agent_radius : agent radius (default 0.6)
+agent_max_climb : max step height (default 0.9)
+agent_max_slope : max walkable slope degrees (default 45)
+*/

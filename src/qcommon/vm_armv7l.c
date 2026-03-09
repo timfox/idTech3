@@ -23,7 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 ARMv7l VM by Ludwig Nussel <ludwig.nussel@suse.de>
 
-TODO: optimization
+Note: Further optimization possible.
 
 Docu:
 http://www.coranac.com/tonc/text/asm.htm

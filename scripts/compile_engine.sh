@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: ./compile_engine.sh [game_name] [Debug|Release] [clean] [quiet] [coverage] [vulkan] [opengl] [freetype] [lua] [duktape|no-duktape] [system-duktape] [mac-app <target> [arch]] [mac-ub2 [notarize]]
+# Usage: ./compile_engine.sh [game_name] [Debug|Release] [clean] [quiet] [coverage] [asan] [vulkan] [opengl] [freetype] [lua] [duktape|no-duktape] [system-duktape] [skipshaders] [--out DIR] [mac-app <target> [arch]] [mac-ub2 [notarize]]
 # Notes:
 # - build type defaults to Release
 # - vulkan and opengl are mutually exclusive
-# - if neither is specified: defaults to OpenGL
+# - if neither is specified: defaults to Vulkan
 # - mac-app wraps the legacy bundle script (requires release|debug target, optional architecture)
 # - mac-ub2 compiles universal-2 binaries (release only) and can optionally notarize
 # - first unrecognized arg becomes game_name
@@ -22,12 +22,15 @@ GAME_NAME="idtech3"
 BUILD_TYPE="Release"
 CLEAN=0
 COVERAGE=0
+ASAN=0
 QUIET=0
+SKIP_SHADERS=0
 MAC_APP=0
 MAC_APP_TARGET=""
 MAC_APP_ARCH=""
 MAC_UB2=0
 MAC_UB2_NOTARIZE=0
+EXTRA_OUT_DIR=""
 MAC_HAS_LIPO="$(command -v lipo || true)"
 MAC_HAS_CP="$(command -v cp || true)"
 
@@ -65,8 +68,17 @@ while [[ $# -gt 0 ]]; do
       COVERAGE=1
       shift
       ;;
+    asan)
+      ASAN=1
+      BUILD_TYPE="Debug"
+      shift
+      ;;
     quiet|-q|--quiet|q|silent|-s|--silent)
       QUIET=1
+      shift
+      ;;
+    skipshaders|skip-shaders|skip_shaders)
+      SKIP_SHADERS=1
       shift
       ;;
     vulkan)
@@ -103,6 +115,15 @@ while [[ $# -gt 0 ]]; do
       ;;
     vendored-duktape|vendored_duktape|no-system-duktape|nosystemduktape)
       SYSTEM_DUKTAPE=0
+      shift
+      ;;
+    --out|--output|--dir)
+      if [[ $# -lt 2 ]]; then
+        echo "Error: $1 requires a directory argument." >&2
+        exit 1
+      fi
+      EXTRA_OUT_DIR="$2"
+      shift
       shift
       ;;
     mac-app)
@@ -150,9 +171,9 @@ if [ "$VULKAN" -eq 1 ] && [ "$OPENGL" -eq 1 ]; then
   exit 1
 fi
 
-# Default to OpenGL if neither specified
+# Default to Vulkan if neither specified
 if [ "$VULKAN" -eq 0 ] && [ "$OPENGL" -eq 0 ]; then
-  OPENGL=1
+  VULKAN=1
 fi
 
 # Renderer-specific build directory (prevents cache collisions)
@@ -166,6 +187,7 @@ echo "Building id Tech 3 engine (${BUILD_TYPE})..."
 echo "Project root: $PROJECT_ROOT"
 echo "Build dir:    $BUILD_DIR"
 echo "Release dir:  $RELEASE_DIR"
+[[ -n "$EXTRA_OUT_DIR" ]] && echo "Extra out:    $EXTRA_OUT_DIR"
 
 if [ "$CLEAN" -eq 1 ]; then
   echo "Cleaning build directory..."
@@ -184,12 +206,30 @@ else
   CORES=4
 fi
 
+if [[ "$SKIP_SHADERS" -eq 1 ]]; then
+  echo "Skipping Vulkan shader compilation/apply (skipshaders requested)."
+elif [[ "$VULKAN" -eq 1 ]]; then
+  SHADER_SCRIPT="$PROJECT_ROOT/scripts/compile_shaders.sh"
+  if [[ -x "$SHADER_SCRIPT" ]]; then
+    echo "Compiling and applying Vulkan shaders..."
+    "$SHADER_SCRIPT" --apply
+  else
+    echo "Warning: shader compile script not found or not executable: $SHADER_SCRIPT" >&2
+  fi
+else
+  echo "Skipping Vulkan shader compilation/apply for OpenGL build."
+fi
+
 # CMake flags
 CMAKE_FLAGS=(
   "-DCMAKE_BUILD_TYPE=${BUILD_TYPE}"
   "-DUSE_STB_TRUETYPE=ON"
-  "-DENABLE_FORTIFY_SOURCE=OFF"
-  "-DENABLE_ASAN=OFF"
+  "-DUSE_FFMPEG=ON"
+  "-DUSE_DAV1D=ON"
+  "-DUSE_VPX=ON"
+  "-DUSE_THEORA=ON"
+  "-DENABLE_FORTIFY_SOURCE=ON"
+  "-DENABLE_ASAN=$([ "$ASAN" -eq 1 ] && echo ON || echo OFF)"
   "-DBUILD_SERVER=ON"
   "-DUSE_VULKAN=ON"
   "-Wno-dev"
@@ -244,71 +284,81 @@ fi
 echo ""
 echo "Build completed. Binaries are in $BUILD_DIR"
 
+copy_to_release() {
+  local dest="$1"
+  mkdir -p "$dest"
+  mkdir -p "$dest/base"
+
+  # Game data (minimal): ensure base/default.cfg, steamdeck.cfg, and fonts exist in release.
+  if [ -d "$PROJECT_ROOT/base" ] && [ -f "$PROJECT_ROOT/base/default.cfg" ]; then
+    cp -f "$PROJECT_ROOT/base/default.cfg" "$dest/base/default.cfg"
+  fi
+  if [ -d "$PROJECT_ROOT/base/fonts" ]; then
+    mkdir -p "$dest/base/fonts"
+    cp -f "$PROJECT_ROOT/base/fonts/"*.ttf "$dest/base/fonts/" 2>/dev/null || true
+  fi
+  if [ -f "$PROJECT_ROOT/config/steamdeck.cfg" ]; then
+    cp -f "$PROJECT_ROOT/config/steamdeck.cfg" "$dest/base/steamdeck.cfg"
+  fi
+
+  # Client
+  if [ -f "$BUILD_DIR/idtech3.x86_64" ]; then
+    cp -f "$BUILD_DIR/idtech3.x86_64" "$dest/${GAME_NAME}.x86_64"
+    echo "Copied client -> $dest/${GAME_NAME}.x86_64"
+  fi
+  if [ -f "$BUILD_DIR/idtech3" ]; then
+    cp -f "$BUILD_DIR/idtech3" "$dest/${GAME_NAME}"
+    echo "Copied client -> $dest/${GAME_NAME}"
+  fi
+
+  # Server
+  if [ -f "$BUILD_DIR/idtech3_server.x86_64" ]; then
+    cp -f "$BUILD_DIR/idtech3_server.x86_64" "$dest/${GAME_NAME}_server.x86_64"
+    echo "Copied server -> $dest/${GAME_NAME}_server.x86_64"
+  fi
+  if [ -f "$BUILD_DIR/idtech3_server" ]; then
+    cp -f "$BUILD_DIR/idtech3_server" "$dest/${GAME_NAME}_server"
+    echo "Copied server -> $dest/${GAME_NAME}_server"
+  fi
+
+  # Renderers
+  shopt -s nullglob
+  for sofile in "$BUILD_DIR"/idtech3_*.so; do
+    base="$(basename "$sofile")"
+    cp -f "$sofile" "$dest/$base"
+    echo "Copied renderer -> $dest/$base"
+  done
+  shopt -u nullglob
+
+  # FLUX CLI helper
+  if [ -f "$BUILD_DIR/flux_cli" ]; then
+    cp -f "$BUILD_DIR/flux_cli" "$dest/flux_cli"
+    echo "Copied flux_cli -> $dest/flux_cli"
+  elif [ -f "$BUILD_DIR/src/external/src/cflux2/flux_cli" ]; then
+    cp -f "$BUILD_DIR/src/external/src/cflux2/flux_cli" "$dest/flux_cli"
+    echo "Copied flux_cli -> $dest/flux_cli"
+  fi
+  if [ -f "$BUILD_DIR/flux_cli.x86_64" ]; then
+    cp -f "$BUILD_DIR/flux_cli.x86_64" "$dest/flux_cli.x86_64"
+    echo "Copied flux_cli -> $dest/flux_cli.x86_64"
+  fi
+
+  # ImGui shared
+  if [ -f "$BUILD_DIR/libimgui_shared.so" ]; then
+    cp -f "$BUILD_DIR/libimgui_shared.so" "$dest/"
+    echo "Copied libimgui_shared.so to $dest/"
+  fi
+}
+
 echo ""
 echo "Copying engine binaries and renderer .so files to $RELEASE_DIR..."
-mkdir -p "$RELEASE_DIR"
+copy_to_release "$RELEASE_DIR"
 
-# Game data (minimal): ensure base/default.cfg exists in release.
-# The engine reads base/default.cfg very early (before +set fs_game is applied).
-if [ -d "$PROJECT_ROOT/base" ]; then
-  mkdir -p "$RELEASE_DIR/base"
-  # Copy only small text assets; keep this conservative.
-  if [ -f "$PROJECT_ROOT/base/default.cfg" ]; then
-    cp -f "$PROJECT_ROOT/base/default.cfg" "$RELEASE_DIR/base/default.cfg"
-  fi
-fi
-
-# Client
-if [ -f "$BUILD_DIR/idtech3.x86_64" ]; then
-  cp -f "$BUILD_DIR/idtech3.x86_64" "$RELEASE_DIR/${GAME_NAME}.x86_64"
-  echo "Copied client -> $RELEASE_DIR/${GAME_NAME}.x86_64"
-fi
-
-
-if [ -f "$BUILD_DIR/idtech3" ]; then
-  cp -f "$BUILD_DIR/idtech3" "$RELEASE_DIR/${GAME_NAME}"
-  echo "Copied client -> $RELEASE_DIR/${GAME_NAME}"
-fi
-
-# Server
-if [ -f "$BUILD_DIR/idtech3_server.x86_64" ]; then
-  cp -f "$BUILD_DIR/idtech3_server.x86_64" "$RELEASE_DIR/${GAME_NAME}_server.x86_64"
-  echo "Copied server -> $RELEASE_DIR/${GAME_NAME}_server.x86_64"
-fi
-
-
-if [ -f "$BUILD_DIR/idtech3_server" ]; then
-  cp -f "$BUILD_DIR/idtech3_server" "$RELEASE_DIR/${GAME_NAME}_server"
-  echo "Copied server -> $RELEASE_DIR/${GAME_NAME}_server"
-fi
-
-
-# Renderers
-shopt -s nullglob
-for sofile in "$BUILD_DIR"/idtech3_*.so; do
-  base="$(basename "$sofile")"
-  cp -f "$sofile" "$RELEASE_DIR/$base"
-  echo "Copied renderer -> $RELEASE_DIR/$base"
-done
-shopt -u nullglob
-
-# FLUX CLI helper (external generation)
-if [ -f "$BUILD_DIR/flux_cli" ]; then
-  cp -f "$BUILD_DIR/flux_cli" "$RELEASE_DIR/flux_cli"
-  echo "Copied flux_cli -> $RELEASE_DIR/flux_cli"
-elif [ -f "$BUILD_DIR/src/external/src/cflux2/flux_cli" ]; then
-  cp -f "$BUILD_DIR/src/external/src/cflux2/flux_cli" "$RELEASE_DIR/flux_cli"
-  echo "Copied flux_cli -> $RELEASE_DIR/flux_cli"
-fi
-if [ -f "$BUILD_DIR/flux_cli.x86_64" ]; then
-  cp -f "$BUILD_DIR/flux_cli.x86_64" "$RELEASE_DIR/flux_cli.x86_64"
-  echo "Copied flux_cli -> $RELEASE_DIR/flux_cli.x86_64"
-fi
-
-# ImGui shared
-if [ -f "$BUILD_DIR/libimgui_shared.so" ]; then
-  cp -f "$BUILD_DIR/libimgui_shared.so" "$RELEASE_DIR/"
-  echo "Copied libimgui_shared.so to $RELEASE_DIR/"
+if [[ -n "$EXTRA_OUT_DIR" ]]; then
+  echo ""
+  echo "Copying engine binaries to extra output dir: $EXTRA_OUT_DIR"
+  copy_to_release "$EXTRA_OUT_DIR"
+  echo "✓ Extra artifacts ready in $EXTRA_OUT_DIR"
 fi
 
 # Coverage

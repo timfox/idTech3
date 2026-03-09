@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cl_cgame.c  -- client system interaction with client game
 
 #include "client.h"
+#include "../physics/phys_bullet.h"
 #ifdef USE_DUKTAPE
 #include "../qcommon/js_debug.h"
 #endif
@@ -41,6 +42,40 @@ CL_GetGameState
 */
 static void CL_GetGameState( gameState_t *gs ) {
 	*gs = cl.gameState;
+}
+
+typedef struct {
+	int  stringOffsets[1024];
+	char stringData[16000];
+	int  dataCount;
+} legacyGameState_t;
+
+static void CL_GetLegacyGameState( legacyGameState_t *gs ) {
+	int i;
+
+	Com_Memset( gs, 0, sizeof( *gs ) );
+	gs->dataCount = 1;
+
+	for ( i = 0; i < (int)ARRAY_LEN( gs->stringOffsets ) && i < MAX_CONFIGSTRINGS; i++ ) {
+		const int offset = cl.gameState.stringOffsets[i];
+		const char *s;
+		size_t len;
+
+		if ( !offset ) {
+			continue;
+		}
+
+		s = cl.gameState.stringData + offset;
+		len = strlen( s );
+		if ( gs->dataCount + (int)len + 1 > (int)sizeof( gs->stringData ) ) {
+			Com_Printf( S_COLOR_YELLOW "WARNING: truncating legacy cgame gamestate at configstring %d\n", i );
+			break;
+		}
+
+		gs->stringOffsets[i] = gs->dataCount;
+		Com_Memcpy( gs->stringData + gs->dataCount, s, len + 1 );
+		gs->dataCount += (int)len + 1;
+	}
 }
 
 
@@ -148,7 +183,7 @@ static qboolean CL_GetSnapshot( int snapshotNumber, snapshot_t *snapshot ) {
 			cl.parseEntities[ ( clSnap->parseEntitiesNum + i ) & (MAX_PARSE_ENTITIES-1) ];
 	}
 
-	// FIXME: configstring changes and server commands!!!
+	/* Note: configstring changes and server commands may need coordination. */
 
 	return qtrue;
 }
@@ -439,6 +474,31 @@ static qboolean CL_GetValue( char* value, int valueSize, const char* key ) {
 		return qtrue;
 	}
 
+	if ( !Q_stricmp( key, "trap_Phys_CreateBody" ) ) {
+		Com_sprintf( value, valueSize, "%i", CG_PHYS_CREATEBODY );
+		return qtrue;
+	}
+	if ( !Q_stricmp( key, "trap_Phys_DestroyBody" ) ) {
+		Com_sprintf( value, valueSize, "%i", CG_PHYS_DESTROYBODY );
+		return qtrue;
+	}
+	if ( !Q_stricmp( key, "trap_Phys_ApplyImpulse" ) ) {
+		Com_sprintf( value, valueSize, "%i", CG_PHYS_APPLYIMPULSE );
+		return qtrue;
+	}
+	if ( !Q_stricmp( key, "trap_Phys_GetBodyTransform" ) ) {
+		Com_sprintf( value, valueSize, "%i", CG_PHYS_GETBODYTRANSFORM );
+		return qtrue;
+	}
+	if ( !Q_stricmp( key, "trap_Phys_RayCast" ) ) {
+		Com_sprintf( value, valueSize, "%i", CG_PHYS_RAYCAST );
+		return qtrue;
+	}
+	if ( !Q_stricmp( key, "trap_EmitJSEvent" ) ) {
+		Com_sprintf( value, valueSize, "%i", CG_EMIT_JSEVENT );
+		return qtrue;
+	}
+
 	if ( !Q_stricmp( key, "trap_Cvar_SetDescription_Q3E" ) ) {
 		Com_sprintf( value, valueSize, "%i", CG_CVAR_SETDESCRIPTION );
 		return qtrue;
@@ -531,7 +591,7 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 		return 0;
 	case CG_UPDATESCREEN:
 		// this is used during lengthy level loading, so pump message loop
-		// Com_EventLoop();	// FIXME: if a server restarts here, BAD THINGS HAPPEN!
+		/* Com_EventLoop(); if server restarts here, client state may be inconsistent. */
 		// We can't call Com_EventLoop here, a restart will crash and this _does_ happen
 		// if there is a map change while we are downloading at pk3.
 		// ZOID
@@ -539,6 +599,7 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 		return 0;
 	case CG_CM_LOADMAP:
 		CL_CM_LoadMap( VMA(1) );
+		Phys_LoadBSPCollision();
 		return 0;
 	case CG_CM_NUMINLINEMODELS:
 		return CM_NumInlineModels();
@@ -648,8 +709,12 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 		CL_GetGlconfig( VMA(1) );
 		return 0;
 	case CG_GETGAMESTATE:
-		VM_CHECKBOUNDS( cgvm, args[1], sizeof( gameState_t ) );
-		CL_GetGameState( VMA(1) );
+		if ( cgvm->dllHandle && *FS_GetCurrentGameDir() ) {
+			CL_GetLegacyGameState( VMA(1) );
+		} else {
+			VM_CHECKBOUNDS( cgvm, args[1], sizeof( gameState_t ) );
+			CL_GetGameState( VMA(1) );
+		}
 		return 0;
 	case CG_GETCURRENTSNAPSHOTNUMBER:
 		CL_GetCurrentSnapshotNumber( VMA(1), VMA(2) );
@@ -705,9 +770,9 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 	case CG_CEIL:
 		return FloatAsInt( ceil( VMF(1) ) );
 	case CG_TESTPRINTINT:
-		return sprintf( VMA(1), "%i", (int)args[2] );
+		return Com_sprintf( VMA(1), MAX_STRING_CHARS, "%i", (int)args[2] );
 	case CG_TESTPRINTFLOAT:
-		return sprintf( VMA(1), "%f", VMF(2) );
+		return Com_sprintf( VMA(1), MAX_STRING_CHARS, "%f", VMF(2) );
 	case CG_ACOS:
 		return FloatAsInt( Q_acos( VMF(1) ) );
 
@@ -794,6 +859,51 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 	case CG_TRAP_GETVALUE:
 		VM_CHECKBOUNDS( cgvm, args[1], args[2] );
 		return CL_GetValue( VMA(1), args[2], VMA(3) );
+
+	/* ---- Physics syscalls (Gopex) ---- */
+
+	case CG_PHYS_CREATEBODY:
+		return Phys_CreateBody( (const physBodyDef_t *)VMA(1) );
+
+	case CG_PHYS_DESTROYBODY:
+		Phys_DestroyBody( (physBodyHandle_t)args[1] );
+		return 0;
+
+	case CG_PHYS_APPLYFORCEBODY:
+		Phys_ApplyForce( (physBodyHandle_t)args[1], (const float *)VMA(2), (const float *)VMA(3) );
+		return 0;
+
+	case CG_PHYS_APPLYIMPULSE:
+		Phys_ApplyImpulse( (physBodyHandle_t)args[1], (const float *)VMA(2), (const float *)VMA(3) );
+		return 0;
+
+	case CG_PHYS_GETBODYTRANSFORM:
+		Phys_GetBodyTransform( (physBodyHandle_t)args[1], (physTransform_t *)VMA(2) );
+		return 0;
+
+	case CG_PHYS_SETBODYTRANSFORM:
+		Phys_SetBodyTransform( (physBodyHandle_t)args[1], (const float *)VMA(2), (const float *)VMA(3) );
+		return 0;
+
+	case CG_PHYS_SETBODYVELOCITY:
+		Phys_SetBodyVelocity( (physBodyHandle_t)args[1], (const float *)VMA(2), (const float *)VMA(3) );
+		return 0;
+
+	case CG_PHYS_STEPSIMULATION:
+		Phys_StepSimulation( VMF(1) );
+		return 0;
+
+	case CG_PHYS_RAYCAST:
+		return Phys_RayCast( (const float *)VMA(1), (const float *)VMA(2), (physRayResult_t *)VMA(3) );
+
+	case CG_PHYS_LOADBSPCOLLISION:
+		return Phys_LoadBSPCollision();
+
+#ifdef USE_DUKTAPE
+	case CG_EMIT_JSEVENT:
+		JsDebug_EmitEvent( (const char *)VMA(1), (const char *)VMA(2), (const char *)VMA(3), args[4], args[5] );
+		return 0;
+#endif
 
 	default:
 		Com_Error( ERR_DROP, "Bad cgame system trap: %ld", (long int) args[0] );
@@ -980,7 +1090,7 @@ static void CL_AdjustTimeDelta( void ) {
 
 	if ( deltaDelta > RESET_TIME ) {
 		cl.serverTimeDelta = newDelta;
-		cl.oldServerTime = cl.snap.serverTime;	// FIXME: is this a problem for cgame?
+		cl.oldServerTime = cl.snap.serverTime;	/* May affect cgame time delta. */
 		cl.serverTime = cl.snap.serverTime;
 		if ( cl_showTimeDelta->integer ) {
 			Com_Printf( "<RESET> " );

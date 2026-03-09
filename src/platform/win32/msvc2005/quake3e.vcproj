@@ -777,7 +777,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\openglrenderer\qgl.h"
+				RelativePath="..\..\renderers\opengl\qgl.h"
 				>
 			</File>
 			<File
@@ -805,15 +805,15 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\openglrenderer\tr_local.h"
+				RelativePath="..\..\renderers\opengl\tr_local.h"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\rendercommon\tr_public.h"
+				RelativePath="..\..\renderers\common\tr_public.h"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\rendercommon\tr_types.h"
+				RelativePath="..\..\renderers\common\tr_types.h"
 				>
 			</File>
 			<File

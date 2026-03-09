@@ -1,0 +1,94 @@
+/*
+ * Copyright (C) 2026 Gopex LLC. All rights reserved.
+ * Android build configuration for id Tech 3 engine.
+ */
+
+apply plugin: 'com.android.application'
+
+android {
+    namespace "com.gopex.idtech3"
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.gopex.idtech3"
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName "1.0.0"
+
+        externalNativeBuild {
+            cmake {
+                arguments "-DBUILD_SERVER=OFF",
+                    "-DUSE_VULKAN=ON",
+                    "-DUSE_RENDERER_DLOPEN=OFF",
+                    "-DRENDERER_DEFAULT=vulkan",
+                    "-DSKIP_IDPAK_CHECK=ON",
+                    "-DSKIP_SHADER_REGEN=ON",
+                    "-DUSE_SDL=OFF",
+                    "-DUSE_OPENAL=OFF",
+                    "-DUSE_CURL=OFF",
+                    "-DUSE_LUA=OFF",
+                    "-DUSE_DUKTAPE=OFF",
+                    "-DUSE_FFMPEG=OFF",
+                    "-DUSE_DAV1D=OFF",
+                    "-DUSE_VPX=OFF",
+                    "-DUSE_THEORA=OFF",
+                    "-DUSE_FLUX=OFF",
+                    "-DUSE_RECAST_NAV=OFF",
+                    "-DUSE_BULLET_PHYSICS=OFF",
+                    "-DBUILD_FREETYPE=OFF",
+                    "-DUSE_STB_TRUETYPE=ON",
+                    "-DENABLE_FORTIFY_SOURCE=OFF",
+                    "-DENABLE_ASAN=OFF",
+                    "-DCI_BUILD=OFF"
+            }
+        }
+
+        ndk {
+            abiFilters 'arm64-v8a', 'armeabi-v7a'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    externalNativeBuild {
+        cmake {
+            path "../../CMakeLists.txt"
+            version "3.31.6"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            jniDebuggable true
+        }
+    }
+
+    sourceSets {
+        main {
+            java.srcDirs = ['src/main/java']
+        }
+    }
+
+    lint {
+        abortOnError false
+    }
+
+    ndkVersion "27.0.12077973"
+}
+
+configurations.all {
+    exclude group: "org.jetbrains.kotlin", module: "kotlin-stdlib-jdk7"
+    exclude group: "org.jetbrains.kotlin", module: "kotlin-stdlib-jdk8"
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+}

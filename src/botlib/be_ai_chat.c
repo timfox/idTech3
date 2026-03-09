@@ -939,7 +939,7 @@ static int BotLoadChatMessage( source_t *source, char *chatmessagestring, int si
 				SourceError( source, "chat message too long" );
 				return qfalse;
 			}
-			strcpy( &ptr[curlen], token.string );
+			Q_strncpyz( &ptr[curlen], token.string, size - curlen );
 		}
 		//variable string
 		else if ( token.type == TT_NUMBER && ( token.subtype & TT_INTEGER ) )
@@ -948,13 +948,13 @@ static int BotLoadChatMessage( source_t *source, char *chatmessagestring, int si
 			int intlen;
 
 			len = strlen( ptr );
-			intlen = sprintf( intbuf, "%cv%ld%c", ESCAPE_CHAR, token.intvalue, ESCAPE_CHAR );
+			intlen = Com_sprintf( intbuf, sizeof( intbuf ), "%cv%ld%c", ESCAPE_CHAR, (long)token.intvalue, ESCAPE_CHAR );
 			if ( len + intlen + 1 > size )
 			{
 				SourceError( source, "chat message too long" );
 				return qfalse;
 			}
-			strcpy( &ptr[len], intbuf );
+			Q_strncpyz( &ptr[len], intbuf, size - len );
 			//sprintf( &ptr[len], "%cv%ld%c", ESCAPE_CHAR, token.intvalue, ESCAPE_CHAR );
 		}
 		//random string
@@ -966,7 +966,7 @@ static int BotLoadChatMessage( source_t *source, char *chatmessagestring, int si
 				SourceError( source, "chat message too long" );
 				return qfalse;
 			}
-			sprintf( &ptr[len], "%cr%s%c", ESCAPE_CHAR, token.string, ESCAPE_CHAR );
+			Com_sprintf( &ptr[len], size - len, "%cr%s%c", ESCAPE_CHAR, token.string, ESCAPE_CHAR );
 		}
 		else
 		{

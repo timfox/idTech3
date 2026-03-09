@@ -1,0 +1,108 @@
+#version 450
+
+/*
+ * Copyright (C) 2026 Gopex LLC. All rights reserved.
+ *
+ * This file is original work by Gopex LLC and is not derived from
+ * existing id Tech 3 / ioquake3 code.
+ * The engine framework is based on id Tech 3 (GPLv2).
+ *
+ * Compute-shader-driven vegetation wind animation (Northlight-style).
+ *
+ * Deforms vegetation vertex positions via GPU compute before the
+ * vertex shader runs. Uses layered procedural noise to simulate:
+ *   - Primary sway (large-scale trunk/branch movement)
+ *   - Secondary sway (medium-scale branch oscillation)
+ *   - Detail flutter (leaf/grass tip noise)
+ *
+ * Vertex color channels encode vegetation properties:
+ *   R = trunk flexibility (0=rigid root, 1=flexible tip)
+ *   G = branch phase offset
+ *   B = leaf flutter intensity
+ *   A = vegetation type (0=grass, 0.5=bush, 1.0=tree)
+ *
+ * Wind is driven by a global wind vector + turbulence field,
+ * with gusts modeled as time-varying directional impulses.
+ */
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+struct VegetationVertex {
+	vec4 positionFlex;
+	vec4 normalPhase;
+};
+
+layout(std430, binding = 0) buffer VertexBuffer {
+	VegetationVertex vertices[];
+};
+
+layout(push_constant) uniform WindPC {
+	vec4  windDirection;
+	vec4  windParams;
+	vec4  gustParams;
+	vec4  timeParams;
+	uint  vertexCount;
+	uint  pad0;
+	uint  pad1;
+	uint  pad2;
+} wind;
+
+float hash(vec2 p) {
+	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+float noise2D(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	float a = hash(i);
+	float b = hash(i + vec2(1.0, 0.0));
+	float c = hash(i + vec2(0.0, 1.0));
+	float d = hash(i + vec2(1.0, 1.0));
+	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+void main() {
+	uint idx = gl_GlobalInvocationID.x;
+	if (idx >= wind.vertexCount) return;
+
+	VegetationVertex v = vertices[idx];
+
+	vec3 pos = v.positionFlex.xyz;
+	float flexibility = v.positionFlex.w;
+	float phaseOffset = v.normalPhase.w;
+
+	float time = wind.timeParams.x;
+	float primaryFreq = wind.windParams.x;
+	float primaryAmp = wind.windParams.y;
+	float detailFreq = wind.windParams.z;
+	float detailAmp = wind.windParams.w;
+
+	float gustFreq = wind.gustParams.x;
+	float gustAmp = wind.gustParams.y;
+	float gustDuration = wind.gustParams.z;
+
+	vec3 windDir = normalize(wind.windDirection.xyz);
+	float windStrength = wind.windDirection.w;
+
+	float primaryPhase = time * primaryFreq + phaseOffset;
+	float primarySway = sin(primaryPhase) * cos(primaryPhase * 0.7 + 1.3);
+	primarySway *= primaryAmp * flexibility * windStrength;
+
+	float secondaryPhase = time * primaryFreq * 2.3 + phaseOffset * 3.7;
+	float secondarySway = sin(secondaryPhase) * 0.3;
+	secondarySway *= primaryAmp * flexibility * flexibility * windStrength;
+
+	float detailNoise = noise2D(pos.xz * detailFreq + time * 2.0) * 2.0 - 1.0;
+	float detailDisp = detailNoise * detailAmp * flexibility * flexibility * flexibility;
+
+	float gustPhase = time * gustFreq;
+	float gustEnvelope = pow(max(sin(gustPhase), 0.0), 4.0) * gustAmp;
+	float gustDisp = gustEnvelope * flexibility * windStrength;
+
+	vec3 totalDisp = windDir * (primarySway + secondarySway + gustDisp);
+	totalDisp.y += detailDisp * 0.3;
+	totalDisp += cross(windDir, vec3(0, 1, 0)) * detailDisp;
+
+	vertices[idx].positionFlex.xyz = pos + totalDisp;
+}

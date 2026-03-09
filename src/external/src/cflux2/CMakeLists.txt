@@ -146,7 +146,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
         $<$<C_COMPILER_ID:GNU>:-Wno-discarded-qualifiers>
         $<$<C_COMPILER_ID:Clang>:-Wno-ignored-qualifiers>
         -Wno-format-truncation
-        -Wno-stringop-truncation)
+        $<$<C_COMPILER_ID:GNU>:-Wno-stringop-truncation>)
 endif()
 
 # Set C standard

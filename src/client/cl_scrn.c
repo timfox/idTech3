@@ -22,6 +22,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cl_scrn.c -- master for refresh, status bar, console, chat, notify, etc
 
 #include "client.h"
+#include "cl_emoji.h"
+#include "cl_voip.h"
+#include "cl_menuvideo.h"
+#include "cl_superhud.h"
+#include "cl_sdf_font.h"
+#include "../qcommon/q_utf8.h"
 
 static qboolean	scr_initialized;		// ready to draw
 
@@ -58,66 +64,40 @@ Adjusted for resolution and screen aspect ratio
 ================
 */
 void SCR_AdjustFrom640( float *x, float *y, float *w, float *h ) {
-	float	xscale;
-	float	yscale;
-	float	aspectRatio;
-	float	baseAspectRatio;
+	float scale;
+	float offsetX;
+	float offsetY;
+	float uiScale;
 
-	// Calculate aspect ratios
-	aspectRatio = (float)cls.glconfig.vidWidth / (float)cls.glconfig.vidHeight;
-	baseAspectRatio = 640.0f / 480.0f; // 4:3 aspect ratio
-
-	// For widescreen displays, we want to scale to fit height and center horizontally
-	if ( aspectRatio > baseAspectRatio ) {
-		// Widescreen: scale to fit height, center horizontally
-		yscale = cls.glconfig.vidHeight / 480.0f;
-		xscale = yscale; // Use same scale for consistent UI proportions
-
-		// Center horizontally
-		if ( x ) {
-			float scaledWidth = 640.0f * xscale;
-			float offset = (cls.glconfig.vidWidth - scaledWidth) * 0.5f;
-			*x = *x * xscale + offset;
-		}
-		if ( w ) {
-			*w *= xscale;
-		}
-	} else {
-		// Tall screen or 4:3: scale to fit width
-		xscale = cls.glconfig.vidWidth / 640.0f;
-		yscale = xscale; // Maintain aspect ratio
-
-		if ( x ) {
-			*x *= xscale;
-		}
-		if ( w ) {
-			*w *= xscale;
+	scale = (float)cls.glconfig.vidWidth / 640.0f;
+	{
+		const float yScale = (float)cls.glconfig.vidHeight / 480.0f;
+		if ( yScale < scale ) {
+			scale = yScale;
 		}
 	}
 
-	// Apply vertical scaling
+	offsetX = ( cls.glconfig.vidWidth - ( 640.0f * scale ) ) * 0.5f;
+	offsetY = ( cls.glconfig.vidHeight - ( 480.0f * scale ) ) * 0.5f;
+
+	uiScale = 1.0f;
+	if ( ui_scale ) {
+		uiScale = Com_Clamp( 0.5f, 4.0f, ui_scale->value );
+	}
+
+	if ( x ) {
+		const float vx = ( ( *x - 320.0f ) * uiScale ) + 320.0f;
+		*x = ( vx * scale ) + offsetX;
+	}
 	if ( y ) {
-		*y *= yscale;
+		const float vy = ( ( *y - 240.0f ) * uiScale ) + 240.0f;
+		*y = ( vy * scale ) + offsetY;
+	}
+	if ( w ) {
+		*w = ( *w * uiScale ) * scale;
 	}
 	if ( h ) {
-		*h *= yscale;
-	}
-
-	// Apply UI scale factor for higher resolutions
-	if ( ui_scale ) {
-		float scale = ui_scale->value;
-		if ( x ) {
-			*x *= scale;
-		}
-		if ( y ) {
-			*y *= scale;
-		}
-		if ( w ) {
-			*w *= scale;
-		}
-		if ( h ) {
-			*h *= scale;
-		}
+		*h = ( *h * uiScale ) * scale;
 	}
 }
 
@@ -225,26 +205,47 @@ void SCR_DrawSmallChar( int x, int y, int ch ) {
 
 /*
 ** SCR_DrawSmallString
-** small string are drawn at native screen resolution
+** small string are drawn at native screen resolution.
+** Uses SDF when enabled for resolution-independent sharp text.
 */
 void SCR_DrawSmallString( int x, int y, const char *s, int len ) {
-	int row, col, ch, i;
+	int row, col, ch;
 	float frow, fcol;
 	float size;
+	const char *end;
+	vec4_t white = { 1.0f, 1.0f, 1.0f, 1.0f };
 
 	if ( y < -smallchar_height ) {
 		return;
 	}
 
+	if ( SDF_IsEnabled() && len > 0 && len < 1024 ) {
+		char buf[1024];
+		int n = len;
+		if ( n >= (int)sizeof( buf ) ) n = (int)sizeof( buf ) - 1;
+		Com_Memcpy( buf, s, (size_t)n );
+		buf[n] = '\0';
+		if ( SDF_DrawStringExt( x, y, (float)smallchar_height, buf, white, qtrue, qtrue ) ) {
+			return;
+		}
+	}
+
 	size = 0.0625;
+	end = s + len;
 
-	for ( i = 0; i < len; i++ ) {
-		ch = *s++ & 255;
-		row = ch>>4;
-		col = ch&15;
+	while ( s < end && *s ) {
+		if ( (unsigned char)*s >= 0x80 ) {
+			uint32_t cp = Q_UTF8_Decode( &s );
+			ch = ( cp < 256 ) ? (int)( cp & 0xFF ) : '?';
+		} else {
+			ch = (unsigned char)*s;
+			s++;
+		}
+		row = ch >> 4;
+		col = ch & 15;
 
-		frow = row*0.0625;
-		fcol = col*0.0625;
+		frow = row * 0.0625;
+		fcol = col * 0.0625;
 
 		re.DrawStretchPic( x, y, smallchar_width, smallchar_height,
 						   fcol, frow, fcol + size, frow + size, 
@@ -270,6 +271,11 @@ void SCR_DrawStringExt( int x, int y, float size, const char *string, const floa
 	vec4_t		color;
 	const char	*s;
 	int			xx;
+	const float	clampedSize = Com_Clamp( 1.0f, 256.0f, size );
+
+	if ( SDF_DrawStringExt( x, y, clampedSize, string, setColor, forceColor, noColorEscape ) ) {
+		return;
+	}
 
 	// draw the drop shadow
 	color[0] = color[1] = color[2] = 0.0;
@@ -278,21 +284,34 @@ void SCR_DrawStringExt( int x, int y, float size, const char *string, const floa
 	s = string;
 	xx = x;
 	while ( *s ) {
+		int ch;
 		if ( !noColorEscape && Q_IsColorString( s ) ) {
 			s += 2;
 			continue;
 		}
-		SCR_DrawChar( xx+2, y+2, size, *s );
-		xx += size;
-		s++;
+		if ( (unsigned char)*s >= 0x80 ) {
+			uint32_t cp = Q_UTF8_Decode( &s );
+			if ( CL_Emoji_IsEnabled() && Q_UTF8_IsEmoji( cp ) ) {
+				xx += (int)clampedSize;
+				continue;
+			}
+			ch = ( cp < 256 ) ? (int)( cp & 0xFF ) : '?';
+		} else {
+			ch = (unsigned char)*s;
+			s++;
+		}
+		SCR_DrawChar( xx+2, y+2, clampedSize, ch );
+		xx += (int)clampedSize;
 	}
 
 
 	// draw the colored text
 	s = string;
 	xx = x;
+	Com_Memcpy( color, setColor, sizeof( color ) );
 	re.SetColor( setColor );
 	while ( *s ) {
+		int ch;
 		if ( Q_IsColorString( s ) ) {
 			if ( !forceColor ) {
 				Com_Memcpy( color, g_color_table[ ColorIndexFromChar( *(s+1) ) ], sizeof( color ) );
@@ -304,9 +323,20 @@ void SCR_DrawStringExt( int x, int y, float size, const char *string, const floa
 				continue;
 			}
 		}
-		SCR_DrawChar( xx, y, size, *s );
-		xx += size;
-		s++;
+		if ( (unsigned char)*s >= 0x80 ) {
+			uint32_t cp = Q_UTF8_Decode( &s );
+			if ( CL_Emoji_IsEnabled() && Q_UTF8_IsEmoji( cp ) && CL_Emoji_DrawChar( xx, y, clampedSize, clampedSize, cp ) ) {
+				re.SetColor( forceColor ? setColor : color );
+				xx += (int)clampedSize;
+				continue;
+			}
+			ch = ( cp < 256 ) ? (int)( cp & 0xFF ) : '?';
+		} else {
+			ch = (unsigned char)*s;
+			s++;
+		}
+		SCR_DrawChar( xx, y, clampedSize, ch );
+		xx += (int)clampedSize;
 	}
 	re.SetColor( NULL );
 }
@@ -331,7 +361,7 @@ void SCR_DrawBigString( int x, int y, const char *s, float alpha, qboolean noCol
 SCR_DrawSmallString[Color]
 
 Draws a multi-colored string with a drop shadow, optionally forcing
-to a fixed color.
+to a fixed color. Uses SDF when enabled for resolution-independent sharp text.
 ==================
 */
 void SCR_DrawSmallStringExt( int x, int y, const char *string, const float *setColor, qboolean forceColor,
@@ -339,8 +369,14 @@ void SCR_DrawSmallStringExt( int x, int y, const char *string, const float *setC
 	vec4_t		color;
 	const char	*s;
 	int			xx;
+	int			ch;
+	const float	sdfSize = (float)smallchar_height;
 
-	// draw the colored text
+	if ( SDF_IsEnabled() && SDF_DrawStringExt( x, y, sdfSize, string, setColor, forceColor, noColorEscape ) ) {
+		return;
+	}
+
+	// draw the colored text (bitmap fallback)
 	s = string;
 	xx = x;
 	re.SetColor( setColor );
@@ -356,9 +392,15 @@ void SCR_DrawSmallStringExt( int x, int y, const char *string, const float *setC
 				continue;
 			}
 		}
-		SCR_DrawSmallChar( xx, y, *s );
+		if ( (unsigned char)*s >= 0x80 ) {
+			uint32_t cp = Q_UTF8_Decode( &s );
+			ch = ( cp < 256 ) ? (int)( cp & 0xFF ) : '?';
+		} else {
+			ch = (unsigned char)*s;
+			s++;
+		}
+		SCR_DrawSmallChar( xx, y, ch );
 		xx += smallchar_width;
-		s++;
 	}
 	re.SetColor( NULL );
 }
@@ -413,16 +455,16 @@ static void SCR_DrawDemoRecording( void ) {
 	pos = FS_FTell( clc.recordfile );
 
 	if (cl_drawRecording->integer == 1) {
-		sprintf(string, "RECORDING %s: %ik", clc.recordNameShort, pos / 1024);
+		Com_sprintf( string, sizeof( string ), "RECORDING %s: %ik", clc.recordNameShort, pos / 1024 );
 		SCR_DrawStringExt(320 - strlen(string) * 4, 20, 8, string, g_color_table[ColorIndex(COLOR_WHITE)], qtrue, qfalse);
 	} else if (cl_drawRecording->integer == 2) {
-		sprintf(string, "RECORDING: %ik", pos / 1024);
+		Com_sprintf( string, sizeof( string ), "RECORDING: %ik", pos / 1024 );
 		SCR_DrawStringExt(320 - strlen(string) * 4, 20, 8, string, g_color_table[ColorIndex(COLOR_WHITE)], qtrue, qfalse);
 	}
 }
 
 
-#ifdef USE_VOIP
+#ifdef USE_OPUS
 /*
 =================
 SCR_DrawVoipMeter
@@ -433,20 +475,18 @@ static void SCR_DrawVoipMeter( void ) {
 	char	string[256];
 	int limit, i;
 
-	if (!cl_voipShowMeter->integer)
+	if ( !CL_VoIP_GetShowMeter() )
 		return;  // player doesn't want to show meter at all.
-	else if (!cl_voipSend->integer)
+	else if ( !CL_VoIP_IsSending() )
 		return;  // not recording at the moment.
-	else if (clc.state != CA_ACTIVE)
+	else if ( cls.state != CA_ACTIVE )
 		return;  // not connected to a server.
-	else if (!clc.voipEnabled)
-		return;  // server doesn't support VoIP.
-	else if (clc.demoplaying)
+	else if ( clc.demoplaying )
 		return;  // playing back a demo.
-	else if (!cl_voip->integer)
+	else if ( !CL_VoIP_IsEnabled() )
 		return;  // client has VoIP support disabled.
 
-	limit = (int) (clc.voipPower * 10.0f);
+	limit = (int) ( CL_VoIP_GetPower() * 10.0f );
 	if (limit > 10)
 		limit = 10;
 
@@ -456,7 +496,7 @@ static void SCR_DrawVoipMeter( void ) {
 		buffer[i++] = ' ';
 	buffer[i] = '\0';
 
-	sprintf( string, "VoIP: [%s]", buffer );
+	Com_sprintf( string, sizeof( string ), "VoIP: [%s]", buffer );
 	SCR_DrawStringExt( 320 - strlen( string ) * 4, 10, 8, string, g_color_table[ ColorIndex( COLOR_WHITE ) ], qtrue, qfalse );
 }
 #endif
@@ -532,9 +572,18 @@ void SCR_Init( void ) {
 	cl_graphheight = Cvar_Get ("graphheight", "32", CVAR_CHEAT);
 	cl_graphscale = Cvar_Get ("graphscale", "1", CVAR_CHEAT);
 	cl_graphshift = Cvar_Get ("graphshift", "0", CVAR_CHEAT);
-	ui_scale = Cvar_Get ("ui_scale", "1.0", CVAR_ARCHIVE_ND);
+	ui_scale = Cvar_Get( "ui_scale", "1.0", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( ui_scale, "0.5", "4.0", CV_FLOAT );
-	Cvar_SetDescription( ui_scale, "UI scale factor for high-resolution displays" );
+	Cvar_SetDescription( ui_scale, "UI scale factor for menus and HUD. Increase for 4K/ultra-wide displays." );
+
+	{
+		cvar_t *ui_open_tab = Cvar_Get( "ui_open_tab", "", CVAR_ARCHIVE_ND );
+		Cvar_SetDescription( ui_open_tab, "Requested tab when opening main menu (credits, audio, gameplay). Set by engine for 'open <tab>' fallback; UI should read and clear when switching." );
+		/* This cvar is a one-shot request channel and should never persist between boots. */
+		if ( ui_open_tab->string[0] ) {
+			Cvar_Set( "ui_open_tab", "" );
+		}
+	}
 
 	scr_initialized = qtrue;
 }
@@ -595,46 +644,51 @@ static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 			VM_Call( uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_MAIN );
 			CL_JsNotifyMenuChanged( UIMENU_MAIN );
 			break;
-		case CA_CONNECTING:
-		case CA_CHALLENGING:
-		case CA_CONNECTED:
-			// connecting clients will only show the connection dialog
-			// refresh to update the time
-			VM_Call( uivm, 1, UI_REFRESH, cls.realtime );
-			VM_Call( uivm, 1, UI_DRAW_CONNECT_SCREEN, qfalse );
-			break;
-		case CA_LOADING:
-		case CA_PRIMED:
-			// draw the game information screen and loading progress
-			if ( cgvm ) {
+			case CA_CONNECTING:
+			case CA_CHALLENGING:
+			case CA_CONNECTED:
+				// connecting clients will only show the connection dialog
+				// refresh to update the time
+				VM_Call( uivm, 1, UI_REFRESH, cls.realtime );
+				VM_Call( uivm, 1, UI_DRAW_CONNECT_SCREEN, qfalse );
+				break;
+			case CA_LOADING:
+			case CA_PRIMED:
+				// draw the game information screen and loading progress
+				if ( cgvm ) {
+					CL_CGameRendering( stereoFrame );
+				}
+				// also draw the connection information, so it doesn't
+				// flash away too briefly on local or lan games
+				// refresh to update the time
+				VM_Call( uivm, 1, UI_REFRESH, cls.realtime );
+				VM_Call( uivm, 1, UI_DRAW_CONNECT_SCREEN, qtrue );
+				break;
+			case CA_ACTIVE:
+				// always supply STEREO_CENTER as vieworg offset is now done by the engine.
 				CL_CGameRendering( stereoFrame );
-			}
-			// also draw the connection information, so it doesn't
-			// flash away too briefly on local or lan games
-			// refresh to update the time
-			VM_Call( uivm, 1, UI_REFRESH, cls.realtime );
-			VM_Call( uivm, 1, UI_DRAW_CONNECT_SCREEN, qtrue );
-			break;
-		case CA_ACTIVE:
-			// always supply STEREO_CENTER as vieworg offset is now done by the engine.
-			CL_CGameRendering( stereoFrame );
-			SCR_DrawDemoRecording();
-#ifdef USE_VOIP
-			SCR_DrawVoipMeter();
+				SHUD_Render( cls.glconfig.vidWidth, cls.glconfig.vidHeight );
+				SCR_DrawDemoRecording();
+#ifdef USE_OPUS
+				SCR_DrawVoipMeter();
 #endif
-			// PBR cubemap selection overlay (renderer-updated cvar string).
-			if ( Cvar_VariableIntegerValue( "r_pbr_showCubemap" ) ) {
-				const char *info = Cvar_VariableString( "r_pbr_cubemapInfo" );
-				if ( info && info[0] ) {
+				// PBR cubemap selection overlay (renderer-updated cvar string).
+				if ( Cvar_VariableIntegerValue( "r_pbr_showCubemap" ) ) {
+					const char *info = Cvar_VariableString( "r_pbr_cubemapInfo" );
+					if ( info && info[0] ) {
 					SCR_DrawSmallString( 8, 64, info, (int)strlen( info ) );
 				} else {
 					const char *fallback = "PBR cubemap: (no data)";
 					SCR_DrawSmallString( 8, 64, fallback, (int)strlen( fallback ) );
+					}
 				}
-			}
-			break;
+				break;
 		}
 	}
+
+	// menu background video draws behind the UI
+	MenuVideo_Frame();
+	MenuVideo_Draw();
 
 	// the menu draws next
 	if ( Key_GetCatcher( ) & KEYCATCH_UI && uivm ) {
@@ -688,7 +742,6 @@ void SCR_UpdateScreen( void ) {
 	// that case.
 	if ( uivm )
 	{
-		// XXX
 		int in_anaglyphMode = Cvar_VariableIntegerValue("r_anaglyphMode");
 		// if running in stereo, we need to draw the frame twice
 		if ( cls.glconfig.stereoEnabled || in_anaglyphMode) {

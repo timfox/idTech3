@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "q_shared.h"
 #include "qcommon.h"
+#include "jobs.h"
 #ifdef USE_DUKTAPE
 #include "js_debug.h"
 #endif
@@ -92,7 +93,12 @@ static cvar_t *com_buildScript;	// for automated data building scripts
 #ifndef DEDICATED
 static cvar_t	*com_introPlayed;
 cvar_t	*com_skipIdLogo;
-
+cvar_t	*com_skipIntroLogo;
+cvar_t	*com_skipBumper1;
+cvar_t	*com_skipBumper2;
+cvar_t	*com_skipBumper3;
+cvar_t	*com_skipBumper4;
+cvar_t	*com_skipBumper5;
 cvar_t	*cl_paused;
 cvar_t	*cl_packetdelay;
 cvar_t	*com_cl_running;
@@ -551,6 +557,7 @@ static void Com_ParseCommandLine( char *commandLine ) {
 
 char cl_title[ MAX_CVAR_VALUE_STRING ] = CLIENT_WINDOW_TITLE;
 char con_title[ MAX_CVAR_VALUE_STRING ] = CONSOLE_WINDOW_TITLE;
+char cl_bumper1[ MAX_CVAR_VALUE_STRING ] = { 0 };
 
 /*
 ===================
@@ -625,7 +632,7 @@ qboolean Com_EarlyParseCmdLine( char *commandLine, char *console_title, int titl
 Com_SafeMode
 
 Check for "safe" on the command line, which will
-skip loading of q3config.cfg
+skip loading of config.cfg
 ===================
 */
 qboolean Com_SafeMode( void ) {
@@ -723,7 +730,7 @@ void Info_Print( const char *s ) {
 			break;
 
 		if ( value[0] == '\0' )
-			strcpy( value, "MISSING VALUE" );
+			Q_strncpyz( value, "MISSING VALUE", sizeof( value ) );
 
 		Com_Printf( "%-20s %s\n", key, value );
 
@@ -2107,7 +2114,7 @@ static void Com_InitZoneMemory( void ) {
 	cvar_t	*cv;
 
 	// Please note: com_zoneMegs can only be set on the command line, and
-	// not in q3config.cfg or Com_StartupVariable, as they haven't been
+	// not in config.cfg or Com_StartupVariable, as they haven't been
 	// executed by this point. It's a chicken and egg problem. We need the
 	// memory manager configured to handle those places where you would
 	// configure the memory manager.
@@ -3049,7 +3056,7 @@ static void Com_ExecuteCfg( void )
 
 	if (!Com_SafeMode())
 	{
-		// skip the q3config.cfg and autoexec.cfg if "safe" is on the command line
+		// skip config.cfg and autoexec.cfg if "safe" is on the command line
 		Cbuf_ExecuteText(EXEC_NOW, "exec " Q3CONFIG_CFG "\n");
 		Cbuf_Execute();
 		Cbuf_ExecuteText(EXEC_NOW, "exec autoexec.cfg\n");
@@ -3198,7 +3205,7 @@ qboolean Com_CDKeyValidate( const char *key, const char *checksum ) {
 		}
 	}
 
-	sprintf(chs, "%02x", sum);
+	Com_sprintf( chs, sizeof( chs ), "%02x", sum );
 
 	if (checksum && !Q_stricmp(chs, checksum)) {
 		return qtrue;
@@ -3848,10 +3855,16 @@ void Com_Init( char *commandLine ) {
 	Com_InitZoneMemory();
 	Cmd_Init();
 
-	// get the developer cvar set as early as possible
+	// get the developer cvar set as early as possible (com_developer is alias for developer)
 	Com_StartupVariable( "developer" );
+	Com_StartupVariable( "com_developer" );
 	com_developer = Cvar_Get( "developer", "0", CVAR_TEMP );
 	Cvar_CheckRange( com_developer, NULL, NULL, CV_INTEGER );
+	{
+		const char *com_dev_val = Cvar_VariableString( "com_developer" );
+		if ( com_dev_val && com_dev_val[0] && com_dev_val[0] != '0' )
+			Cvar_Set2( "developer", com_dev_val, qfalse );
+	}
 
 	Com_StartupVariable( "vm_rtChecks" );
 	vm_rtChecks = Cvar_Get( "vm_rtChecks", "15", CVAR_INIT | CVAR_PROTECTED );
@@ -3988,6 +4001,18 @@ void Com_Init( char *commandLine ) {
 	Cvar_SetDescription( com_introPlayed, "Skips the introduction cinematic." );
 	com_skipIdLogo  = Cvar_Get( "com_skipIdLogo", "0", CVAR_ARCHIVE );
 	Cvar_SetDescription( com_skipIdLogo, "Skip playing Id Software logo cinematic at startup." );
+	com_skipIntroLogo = Cvar_Get( "com_skipIntroLogo", "0", CVAR_ARCHIVE );
+	Cvar_SetDescription( com_skipIntroLogo, "Skip playing intro cinematic at startup." );
+	com_skipBumper1 = Cvar_Get( "com_skipBumper1", "0", CVAR_ARCHIVE );
+	Cvar_SetDescription( com_skipBumper1, "Skip playing bumper1 cinematic at startup." );
+	com_skipBumper2 = Cvar_Get( "com_skipBumper2", "0", CVAR_ARCHIVE );
+	Cvar_SetDescription( com_skipBumper2, "Skip playing bumper2 cinematic at startup." );
+	com_skipBumper3 = Cvar_Get( "com_skipBumper3", "0", CVAR_ARCHIVE );
+	Cvar_SetDescription( com_skipBumper3, "Skip playing bumper3 cinematic at startup." );
+	com_skipBumper4 = Cvar_Get( "com_skipBumper4", "0", CVAR_ARCHIVE );
+	Cvar_SetDescription( com_skipBumper4, "Skip playing bumper4 cinematic at startup." );
+	com_skipBumper5 = Cvar_Get( "com_skipBumper5", "0", CVAR_ARCHIVE );
+	Cvar_SetDescription( com_skipBumper5, "Skip playing bumper5 cinematic at startup." );
 #endif
 
 	if ( com_dedicated->integer ) {
@@ -4097,8 +4122,13 @@ void Com_Init( char *commandLine ) {
 		// if the user didn't give any commands, run default action
 		if ( !com_dedicated->integer ) {
 #ifndef DEDICATED
-			if ( !com_skipIdLogo || !com_skipIdLogo->integer )
-				Cbuf_AddText( "cinematic idlogo.RoQ\n" );
+			if ( !com_skipIdLogo || !com_skipIdLogo->integer || !com_skipIntroLogo || !com_skipIntroLogo->integer || !com_skipBumper1 || !com_skipBumper1->integer ) {
+				const char *intro = ( cl_bumper1[0] != '\0' ) ? cl_bumper1 : "idlogo.RoQ";
+				if ( cl_bumper1[0] != '\0' && Com_LogVerbosity() >= 1 ) {
+					Com_Printf( "Using gameinfo bumper1 intro: %s\n", intro );
+				}
+				Cbuf_AddText( va( "cinematic %s\n", intro ) );
+			}
 			if( !com_introPlayed->integer ) {
 				Cvar_Set( com_introPlayed->name, "1" );
 				Cvar_Set( "nextmap", "cinematic intro.RoQ" );
@@ -4126,6 +4156,8 @@ void Com_Init( char *commandLine ) {
 #endif
 
 	com_fullyInitialized = qtrue;
+
+	Jobs_Init();
 
 	Com_Printf( "--- Common Initialization Complete ---\n" );
 
@@ -4583,6 +4615,8 @@ Com_Shutdown
 =================
 */
 static void Com_Shutdown( void ) {
+	Jobs_Shutdown();
+
 	if ( logfile != FS_INVALID_HANDLE ) {
 		FS_FCloseFile( logfile );
 		logfile = FS_INVALID_HANDLE;

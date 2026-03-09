@@ -1,0 +1,175 @@
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(binding = 0) uniform sampler2D velocityA;
+layout(binding = 1) uniform sampler2D velocityB;
+layout(binding = 2, rgba16f) uniform image2D velocityAWrite;
+layout(binding = 3, rgba16f) uniform image2D velocityBWrite;
+layout(binding = 4) uniform sampler2D densityA;
+layout(binding = 5) uniform sampler2D densityB;
+layout(binding = 6, r16f) uniform image2D densityAWrite;
+layout(binding = 7, r16f) uniform image2D densityBWrite;
+layout(binding = 8) uniform sampler2D pressureA;
+layout(binding = 9) uniform sampler2D pressureB;
+layout(binding = 10, r16f) uniform image2D pressureAWrite;
+layout(binding = 11, r16f) uniform image2D pressureBWrite;
+layout(binding = 12, r16f) uniform image2D divergenceWrite;
+layout(binding = 13) uniform sampler2D divergenceRead;
+layout(binding = 15, r32ui) uniform uimage2D telemetryCounters;
+
+const int MAX_VOLUMES = 24;
+const int MAX_LIGHTS = 32;
+
+layout(std140, binding = 14) uniform VolumetricParams {
+    mat4 invProj;
+    mat4 invView;
+    mat4 proj;
+    mat4 viewProj;
+    mat4 prevView;
+    mat4 prevViewProj;
+    vec4 viewOrigin;
+    vec4 sunDirection;
+    vec4 fogColor;
+    vec4 densityParams;
+    vec4 worldMin;
+    vec4 worldMax;
+    vec4 gridDim;
+    vec4 miscParams;
+    vec4 sliceParams;
+    vec4 phaseParams;
+    vec4 scatterParams;
+    vec4 noiseParams;
+    vec4 noiseScroll;
+    vec4 temporalParams;
+    vec4 qualityParams;
+    vec4 windParams;
+    vec4 volumeCounts;
+    vec4 passParams;
+    vec4 volumeBoundsMin[MAX_VOLUMES];
+    vec4 volumeBoundsMax[MAX_VOLUMES];
+    vec4 volumeColorDensity[MAX_VOLUMES];
+    vec4 volumeTypeParams[MAX_VOLUMES];
+    vec4 lightPosRadius[MAX_LIGHTS];
+    vec4 lightColorType[MAX_LIGHTS];
+    vec4 lightDirAngle[MAX_LIGHTS];
+    vec4 lightExtra[MAX_LIGHTS];
+    mat4 sunShadowMatrix0;
+    vec4 shadowParams0;
+    vec4 shadowMapSize0;
+    mat4 localSpotShadowMatrix[MAX_LIGHTS];
+    mat4 localPointShadowMatrix[MAX_LIGHTS][6];
+    vec4 localShadowAtlasUv[MAX_LIGHTS];
+    vec4 localSpotShadowMapSize;
+    vec4 localPointShadowMapSize;
+    vec4 fluidParams0;
+    vec4 fluidParams1;
+    vec4 fluidParams2;
+    vec4 fluidWorldMap;
+    vec4 fluidEmitters[16];
+    vec4 fluidEmitterData[16];
+    vec4 fluidEmitterCount;
+    vec4 telemetryParams0;
+    vec4 telemetryParams1;
+} params;
+
+const int TELEMETRY_NAN_INF = 0;
+const int TELEMETRY_VELOCITY_CLAMP = 2;
+
+void TelemetryIncrement(int counterIndex) {
+    imageAtomicAdd(telemetryCounters, ivec2(counterIndex, 0), 1u);
+}
+
+ivec2 fluidDim() {
+    return ivec2(max(params.fluidParams2.xy, vec2(1.0)));
+}
+
+bool wrapMode() {
+    return params.fluidParams1.y > 0.5;
+}
+
+bool finite1(float v) {
+    return !(isnan(v) || isinf(v));
+}
+
+ivec2 wrapCoord(ivec2 c, ivec2 dim) {
+    int x = c.x % dim.x;
+    int y = c.y % dim.y;
+    if (x < 0) {
+        x += dim.x;
+    }
+    if (y < 0) {
+        y += dim.y;
+    }
+    return ivec2(x, y);
+}
+
+vec2 fetchVelocity(int index, ivec2 coord, ivec2 dim, bool wrap) {
+    ivec2 c = wrap ? wrapCoord(coord, dim) : clamp(coord, ivec2(0), dim - ivec2(1));
+    vec2 v = (index == 0) ? texelFetch(velocityA, c, 0).xy : texelFetch(velocityB, c, 0).xy;
+    if (!finite1(v.x) || !finite1(v.y)) {
+        return vec2(0.0);
+    }
+    return v;
+}
+
+float fetchPressure(int index, ivec2 coord, ivec2 dim, bool wrap) {
+    ivec2 c = wrap ? wrapCoord(coord, dim) : clamp(coord, ivec2(0), dim - ivec2(1));
+    float p = (index == 0) ? texelFetch(pressureA, c, 0).x : texelFetch(pressureB, c, 0).x;
+    if (!finite1(p)) {
+        return 0.0;
+    }
+    return p;
+}
+
+void storeVelocity(int index, ivec2 coord, vec2 velocity) {
+    vec2 v = velocity;
+    if (!finite1(v.x) || !finite1(v.y)) {
+        TelemetryIncrement(TELEMETRY_NAN_INF);
+        v = vec2(0.0);
+    }
+    float maxVelocity = max(params.fluidParams1.x, 1.0);
+    float mag = length(v);
+    if (mag > maxVelocity) {
+        v *= maxVelocity / mag;
+        TelemetryIncrement(TELEMETRY_VELOCITY_CLAMP);
+    }
+    if (index == 0) {
+        imageStore(velocityAWrite, coord, vec4(v, 0.0, 0.0));
+    } else {
+        imageStore(velocityBWrite, coord, vec4(v, 0.0, 0.0));
+    }
+}
+
+void main() {
+    ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 dim = fluidDim();
+    if (coord.x >= dim.x || coord.y >= dim.y) {
+        return;
+    }
+
+    int op = int(clamp(floor(params.passParams.x + 0.5), 0.0, 16.0));
+    if (op != 4) {
+        return;
+    }
+
+    int velocityReadIndex = int(clamp(floor(params.passParams.y + 0.5), 0.0, 1.0));
+    int velocityWriteIndex = int(clamp(floor(params.passParams.z + 0.5), 0.0, 1.0));
+    int pressureIndex = int(clamp(floor(params.passParams.w + 0.5), 0.0, 1.0));
+    bool wrap = wrapMode();
+
+    if (!wrap && (coord.x <= 0 || coord.y <= 0 || coord.x >= dim.x - 1 || coord.y >= dim.y - 1)) {
+        storeVelocity(velocityWriteIndex, coord, vec2(0.0));
+        return;
+    }
+
+    vec2 velocity = fetchVelocity(velocityReadIndex, coord, dim, wrap);
+    float pL = fetchPressure(pressureIndex, coord + ivec2(-1, 0), dim, wrap);
+    float pR = fetchPressure(pressureIndex, coord + ivec2( 1, 0), dim, wrap);
+    float pB = fetchPressure(pressureIndex, coord + ivec2( 0,-1), dim, wrap);
+    float pT = fetchPressure(pressureIndex, coord + ivec2( 0, 1), dim, wrap);
+
+    vec2 pressureGradient = vec2(pR - pL, pT - pB) * 0.5;
+    vec2 projected = velocity - pressureGradient;
+    storeVelocity(velocityWriteIndex, coord, projected);
+}

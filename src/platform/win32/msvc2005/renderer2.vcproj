@@ -326,7 +326,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\rendercommon\tr_font.c"
+				RelativePath="..\..\renderers\common\tr_font.c"
 				>
 			</File>
 			<File
@@ -338,7 +338,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\rendercommon\tr_image_bmp.c"
+				RelativePath="..\..\renderers\common\tr_image_bmp.c"
 				>
 			</File>
 			<File
@@ -346,19 +346,19 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\rendercommon\tr_image_jpg.c"
+				RelativePath="..\..\renderers\common\tr_image_jpg.c"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\rendercommon\tr_image_pcx.c"
+				RelativePath="..\..\renderers\common\tr_image_pcx.c"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\rendercommon\tr_image_png.c"
+				RelativePath="..\..\renderers\common\tr_image_png.c"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\rendercommon\tr_image_tga.c"
+				RelativePath="..\..\renderers\common\tr_image_tga.c"
 				>
 			</File>
 			<File
@@ -390,7 +390,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\rendercommon\tr_noise.c"
+				RelativePath="..\..\renderers\common\tr_noise.c"
 				>
 			</File>
 			<File
@@ -471,7 +471,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\openglrenderer\tr_common.h"
+				RelativePath="..\..\renderers\opengl\tr_common.h"
 				>
 			</File>
 			<File
@@ -499,11 +499,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\rendercommon\tr_public.h"
+				RelativePath="..\..\renderers\common\tr_public.h"
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderers\rendercommon\tr_types.h"
+				RelativePath="..\..\renderers\common\tr_types.h"
 				>
 			</File>
 			<File

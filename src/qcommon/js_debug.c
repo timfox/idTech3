@@ -28,6 +28,20 @@ static cvar_t *js_disableFaultyCallbacks;
 static cvar_t *js_requireCache;
 static cvar_t *js_compatTarget;
 static cvar_t *js_autoInit;
+static cvar_t *js_verbose;
+static cvar_t *js_verboseMenu;
+
+/* Current UI menu (UIMENU_*), set by client when menu changes */
+static int s_jsCurrentMenu = -1;
+
+#define MAX_JS_ERROR_LOG 8
+#define JS_ERROR_MSG_LEN 192
+static struct {
+	char msg[JS_ERROR_MSG_LEN];
+	int count;
+} s_jsErrorLog[MAX_JS_ERROR_LOG];
+static int s_jsErrorLogHead;
+static int s_jsErrorTotalCount;
 
 static qboolean JsDebug_OpenState( void );
 static qboolean JsDebug_LoadScript( const char *scriptPath );
@@ -73,6 +87,37 @@ static void JsDebug_InitPolicyCvars( void ) {
 		js_autoInit = Cvar_Get( "js_autoInit", "1", CVAR_ARCHIVE_ND );
 		Cvar_SetDescription( js_autoInit, "Initialize JavaScript runtime automatically at startup (0=manual via js_reload, 1=auto)." );
 	}
+	if ( !js_verbose ) {
+		js_verbose = Cvar_Get( "js_verbose", "0", CVAR_ARCHIVE_ND );
+		Cvar_SetDescription( js_verbose, "Toggle verbose UI/JS debug info when at a menu (0=off, 1=on)." );
+	}
+	if ( !js_verboseMenu ) {
+		js_verboseMenu = Cvar_Get( "js_verboseMenu", "main", CVAR_ARCHIVE_ND );
+		Cvar_SetDescription( js_verboseMenu, "Which menu to show verbose info: main, ingame, all, or none." );
+	}
+}
+
+void JsDebug_SetCurrentMenu( int menu ) {
+	s_jsCurrentMenu = menu;
+}
+
+static void JsDebug_RecordError( const char *context, const char *msg ) {
+	(void)context;
+	int i;
+	if ( !msg || !msg[0] ) {
+		msg = "(unknown error)";
+	}
+	s_jsErrorTotalCount++;
+	for ( i = 0; i < MAX_JS_ERROR_LOG; i++ ) {
+		if ( s_jsErrorLog[i].count > 0 && !Q_stricmp( s_jsErrorLog[i].msg, msg ) ) {
+			s_jsErrorLog[i].count++;
+			return;
+		}
+	}
+	i = s_jsErrorLogHead % MAX_JS_ERROR_LOG;
+	Q_strncpyz( s_jsErrorLog[i].msg, msg, JS_ERROR_MSG_LEN );
+	s_jsErrorLog[i].count = 1;
+	s_jsErrorLogHead++;
 }
 
 void JsDebug_InitCvars( void ) {
@@ -94,7 +139,10 @@ static qboolean JsDebug_IsSupportedEvent( const char *eventName ) {
 		!Q_stricmp( eventName, "menu_changed" ) ||
 		!Q_stricmp( eventName, "input_key" ) ||
 		!Q_stricmp( eventName, "mouse_move" ) ||
-		!Q_stricmp( eventName, "console_open" ) );
+		!Q_stricmp( eventName, "console_open" ) ||
+		!Q_stricmp( eventName, "entity_spawn" ) ||
+		!Q_stricmp( eventName, "entity_death" ) ||
+		!Q_stricmp( eventName, "weapon_fire" ) );
 }
 
 static qboolean JsDebug_IsAllowedScriptPath( const char *path ) {
@@ -139,6 +187,17 @@ static int JsDebug_ClampInt( int value, int minValue, int maxValue ) {
 		return maxValue;
 	}
 	return value;
+}
+
+static qboolean JsDebug_IsAllowedLatchedCvar( const char *name ) {
+	if ( !name || !name[0] ) {
+		return qfalse;
+	}
+
+	/* Allow common video mode/fullscreen toggles while keeping other latched cvars protected. */
+	return ( !Q_stricmp( name, "r_fullscreen" ) ||
+		!Q_stricmp( name, "r_mode" ) ||
+		!Q_stricmp( name, "r_modeFullscreen" ) );
 }
 
 static qboolean JsDebug_IsSafePath( const char *path ) {
@@ -192,7 +251,10 @@ static qboolean JsDebug_IsCvarSetAllowed( const char *name ) {
 	}
 
 	if ( mode < 3 ) {
-		if ( flags & ( CVAR_ROM | CVAR_INIT | CVAR_PROTECTED | CVAR_PRIVATE | CVAR_CHEAT | CVAR_LATCH ) ) {
+		if ( flags & ( CVAR_ROM | CVAR_INIT | CVAR_PROTECTED | CVAR_PRIVATE | CVAR_CHEAT ) ) {
+			return qfalse;
+		}
+		if ( ( flags & CVAR_LATCH ) && !JsDebug_IsAllowedLatchedCvar( name ) ) {
 			return qfalse;
 		}
 		if ( flags & ( CVAR_USERINFO | CVAR_SERVERINFO | CVAR_SYSTEMINFO ) ) {
@@ -201,6 +263,53 @@ static qboolean JsDebug_IsCvarSetAllowed( const char *name ) {
 	}
 
 	return qtrue;
+}
+
+static void JsDebug_SanitizeExecCommandName( const char *cmd, char *out, size_t outSize ) {
+	const char *src;
+	const char *tail;
+	char token[MAX_TOKEN_CHARS];
+	size_t tokenLen = 0;
+
+	if ( !out || outSize == 0 ) {
+		return;
+	}
+
+	out[0] = '\0';
+	if ( !cmd || !cmd[0] ) {
+		return;
+	}
+
+	src = cmd;
+	while ( *src && *src <= ' ' ) {
+		src++;
+	}
+
+	/* Extract first token (command name), then strip Quake color codes from it. */
+	while ( src[tokenLen] && src[tokenLen] > ' ' && src[tokenLen] != ';' && src[tokenLen] != '\n' && src[tokenLen] != '\r' ) {
+		if ( tokenLen + 1 >= sizeof( token ) ) {
+			break;
+		}
+		token[tokenLen] = src[tokenLen];
+		tokenLen++;
+	}
+	token[tokenLen] = '\0';
+
+	if ( tokenLen == 0 ) {
+		Q_strncpyz( out, cmd, outSize );
+		return;
+	}
+
+	Q_CleanStr( token );
+	tail = src + tokenLen;
+
+	if ( !token[0] ) {
+		/* If command token was only color codes, keep original input. */
+		Q_strncpyz( out, cmd, outSize );
+		return;
+	}
+
+	Com_sprintf( out, outSize, "%s%s", token, tail );
 }
 
 static qboolean JsDebug_GetEventCallbacksArray( duk_context *ctx, const char *eventName, qboolean create ) {
@@ -261,15 +370,25 @@ static void JsDebug_ClearTrackedScripts( void ) {
 }
 
 static void JsDebug_CloseState( void ) {
+	int i;
 	if ( s_jsContext ) {
 		duk_destroy_heap( s_jsContext );
 		s_jsContext = NULL;
+	}
+	s_jsCurrentMenu = -1;
+	s_jsErrorTotalCount = 0;
+	s_jsErrorLogHead = 0;
+	for ( i = 0; i < MAX_JS_ERROR_LOG; i++ ) {
+		s_jsErrorLog[i].msg[0] = '\0';
+		s_jsErrorLog[i].count = 0;
 	}
 }
 
 static void JsDebug_PrintJsError( const char *prefix ) {
 	const char *msg = duk_safe_to_string( s_jsContext, -1 );
-	Com_Printf( S_COLOR_RED "JavaScript: %s: %s\n", prefix, msg ? msg : "(unknown error)" );
+	const char *err = msg ? msg : "(unknown error)";
+	Com_Printf( S_COLOR_RED "JavaScript: %s: %s\n", prefix, err );
+	JsDebug_RecordError( prefix, err );
 	duk_pop( s_jsContext );
 }
 
@@ -312,6 +431,7 @@ static duk_ret_t Js_Binding_CvarSet( duk_context *ctx ) {
 static duk_ret_t Js_Binding_Exec( duk_context *ctx ) {
 	const char *cmd = duk_require_string( ctx, 0 );
 	const char *mode = ( duk_get_top( ctx ) > 1 ) ? duk_safe_to_string( ctx, 1 ) : "append";
+	char sanitizedCmd[MAX_STRING_CHARS];
 	cbufExec_t when = EXEC_APPEND;
 
 	if ( mode && !Q_stricmp( mode, "now" ) ) {
@@ -324,20 +444,26 @@ static duk_ret_t Js_Binding_Exec( duk_context *ctx ) {
 		return duk_error( ctx, DUK_ERR_ERROR, "exec denied for mode '%s' (js_allowExec=%d)", mode ? mode : "append", js_allowExec ? js_allowExec->integer : 0 );
 	}
 
-	Cbuf_ExecuteText( when, cmd );
+	JsDebug_SanitizeExecCommandName( cmd, sanitizedCmd, sizeof( sanitizedCmd ) );
+	Cbuf_ExecuteText( when, sanitizedCmd );
 	return 0;
 }
 
 static duk_ret_t Js_Binding_ReadFile( duk_context *ctx ) {
 	const char *path = duk_require_string( ctx, 0 );
 	void *buffer = NULL;
-	const int len = FS_ReadFile( path, &buffer );
+	int len;
 
 	if ( !JsDebug_IsSafePath( path ) ) {
 		return duk_error( ctx, DUK_ERR_ERROR, "unsafe path '%s'", path );
 	}
 
+	len = FS_ReadFile( path, &buffer );
+
 	if ( len < 0 ) {
+		if ( buffer ) {
+			FS_FreeFile( buffer );
+		}
 		duk_push_null( ctx );
 		return 1;
 	}
@@ -713,8 +839,152 @@ static duk_ret_t Js_Binding_Off( duk_context *ctx ) {
 	return 1;
 }
 
+/* ========== Timer system (setTimeout/setInterval) ========== */
+
+#define MAX_JS_TIMERS 32
+typedef struct {
+	int     id;
+	int     fireTime;
+	int     interval;
+	qboolean active;
+	qboolean repeating;
+} jsTimer_t;
+static jsTimer_t jsTimers[MAX_JS_TIMERS];
+static int jsTimerNextId = 1;
+
+static duk_ret_t Js_Binding_SetTimeout( duk_context *ctx ) {
+	int i, delay;
+	if ( !duk_is_function( ctx, 0 ) ) return duk_error( ctx, DUK_ERR_TYPE_ERROR, "callback must be a function" );
+	delay = duk_require_int( ctx, 1 );
+	for ( i = 0; i < MAX_JS_TIMERS; i++ ) {
+		if ( !jsTimers[i].active ) {
+			jsTimers[i].id = jsTimerNextId++;
+			jsTimers[i].fireTime = Sys_Milliseconds() + delay;
+			jsTimers[i].interval = 0;
+			jsTimers[i].active = qtrue;
+			jsTimers[i].repeating = qfalse;
+			duk_push_global_stash( ctx );
+			duk_dup( ctx, 0 );
+			duk_put_prop_string( ctx, -2, va( "\xff""timer_%d", jsTimers[i].id ) );
+			duk_pop( ctx );
+			duk_push_int( ctx, jsTimers[i].id );
+			return 1;
+		}
+	}
+	duk_push_int( ctx, -1 );
+	return 1;
+}
+
+static duk_ret_t Js_Binding_SetInterval( duk_context *ctx ) {
+	int i, delay;
+	if ( !duk_is_function( ctx, 0 ) ) return duk_error( ctx, DUK_ERR_TYPE_ERROR, "callback must be a function" );
+	delay = duk_require_int( ctx, 1 );
+	if ( delay < 16 ) delay = 16;
+	for ( i = 0; i < MAX_JS_TIMERS; i++ ) {
+		if ( !jsTimers[i].active ) {
+			jsTimers[i].id = jsTimerNextId++;
+			jsTimers[i].fireTime = Sys_Milliseconds() + delay;
+			jsTimers[i].interval = delay;
+			jsTimers[i].active = qtrue;
+			jsTimers[i].repeating = qtrue;
+			duk_push_global_stash( ctx );
+			duk_dup( ctx, 0 );
+			duk_put_prop_string( ctx, -2, va( "\xff""timer_%d", jsTimers[i].id ) );
+			duk_pop( ctx );
+			duk_push_int( ctx, jsTimers[i].id );
+			return 1;
+		}
+	}
+	duk_push_int( ctx, -1 );
+	return 1;
+}
+
+static duk_ret_t Js_Binding_ClearTimer( duk_context *ctx ) {
+	int id = duk_require_int( ctx, 0 );
+	int i;
+	for ( i = 0; i < MAX_JS_TIMERS; i++ ) {
+		if ( jsTimers[i].active && jsTimers[i].id == id ) {
+			jsTimers[i].active = qfalse;
+			duk_push_global_stash( ctx );
+			duk_del_prop_string( ctx, -1, va( "\xff""timer_%d", id ) );
+			duk_pop( ctx );
+			break;
+		}
+	}
+	return 0;
+}
+
+/* ========== Engine info queries ========== */
+
+static duk_ret_t Js_Binding_GetEngineInfo( duk_context *ctx ) {
+	duk_push_object( ctx );
+	duk_push_string( ctx, Q3_VERSION );
+	duk_put_prop_string( ctx, -2, "version" );
+	duk_push_string( ctx, OS_STRING );
+	duk_put_prop_string( ctx, -2, "platform" );
+	duk_push_string( ctx, ARCH_STRING );
+	duk_put_prop_string( ctx, -2, "arch" );
+	duk_push_int( ctx, Sys_Milliseconds() );
+	duk_put_prop_string( ctx, -2, "uptime" );
+	return 1;
+}
+
+static duk_ret_t Js_Binding_GetMilliseconds( duk_context *ctx ) {
+	(void)ctx;
+	duk_push_int( ctx, Sys_Milliseconds() );
+	return 1;
+}
+
+/* ========== HUD drawing extensions ========== */
+
+#ifndef DEDICATED
+static duk_ret_t Js_Binding_HudSetColor( duk_context *ctx ) {
+	vec4_t color;
+	color[0] = (float)duk_require_number( ctx, 0 );
+	color[1] = (float)duk_require_number( ctx, 1 );
+	color[2] = (float)duk_require_number( ctx, 2 );
+	color[3] = ( duk_get_top( ctx ) > 3 ) ? (float)duk_to_number( ctx, 3 ) : 1.0f;
+	re.SetColor( color );
+	return 0;
+}
+
+static duk_ret_t Js_Binding_HudDrawRect( duk_context *ctx ) {
+	float x = (float)duk_require_number( ctx, 0 );
+	float y = (float)duk_require_number( ctx, 1 );
+	float w = (float)duk_require_number( ctx, 2 );
+	float h = (float)duk_require_number( ctx, 3 );
+	re.DrawStretchPic( x, y, w, h, 0, 0, 1, 1, cls.whiteShader );
+	return 0;
+}
+
+static duk_ret_t Js_Binding_HudResetColor( duk_context *ctx ) {
+	(void)ctx;
+	re.SetColor( NULL );
+	return 0;
+}
+
+static duk_ret_t Js_Binding_GetScreenSize( duk_context *ctx ) {
+	duk_push_object( ctx );
+	duk_push_int( ctx, cls.glconfig.vidWidth );
+	duk_put_prop_string( ctx, -2, "width" );
+	duk_push_int( ctx, cls.glconfig.vidHeight );
+	duk_put_prop_string( ctx, -2, "height" );
+	return 1;
+}
+#endif
+
 static void JsDebug_RegisterBindings( void ) {
 	duk_push_global_object( s_jsContext );
+
+	/* Standard JS globals */
+	duk_push_c_function( s_jsContext, Js_Binding_SetTimeout, 2 );
+	duk_put_prop_string( s_jsContext, -2, "setTimeout" );
+	duk_push_c_function( s_jsContext, Js_Binding_SetInterval, 2 );
+	duk_put_prop_string( s_jsContext, -2, "setInterval" );
+	duk_push_c_function( s_jsContext, Js_Binding_ClearTimer, 1 );
+	duk_put_prop_string( s_jsContext, -2, "clearTimeout" );
+	duk_push_c_function( s_jsContext, Js_Binding_ClearTimer, 1 );
+	duk_put_prop_string( s_jsContext, -2, "clearInterval" );
 
 	duk_push_c_function( s_jsContext, Js_Binding_Print, DUK_VARARGS );
 	duk_put_prop_string( s_jsContext, -2, "print" );
@@ -769,7 +1039,25 @@ static void JsDebug_RegisterBindings( void ) {
 
 	duk_push_c_function( s_jsContext, Js_Binding_HudDrawText, DUK_VARARGS );
 	duk_put_prop_string( s_jsContext, -2, "hudDrawText" );
+
+	duk_push_c_function( s_jsContext, Js_Binding_HudSetColor, DUK_VARARGS );
+	duk_put_prop_string( s_jsContext, -2, "hudSetColor" );
+
+	duk_push_c_function( s_jsContext, Js_Binding_HudDrawRect, 4 );
+	duk_put_prop_string( s_jsContext, -2, "hudDrawRect" );
+
+	duk_push_c_function( s_jsContext, Js_Binding_HudResetColor, 0 );
+	duk_put_prop_string( s_jsContext, -2, "hudResetColor" );
+
+	duk_push_c_function( s_jsContext, Js_Binding_GetScreenSize, 0 );
+	duk_put_prop_string( s_jsContext, -2, "getScreenSize" );
 #endif
+
+	duk_push_c_function( s_jsContext, Js_Binding_GetEngineInfo, 0 );
+	duk_put_prop_string( s_jsContext, -2, "getEngineInfo" );
+
+	duk_push_c_function( s_jsContext, Js_Binding_GetMilliseconds, 0 );
+	duk_put_prop_string( s_jsContext, -2, "getMilliseconds" );
 
 	duk_push_string( s_jsContext, "Duktape" );
 	duk_put_prop_string( s_jsContext, -2, "engine" );
@@ -875,6 +1163,35 @@ void JsDebug_Frame( int msec, int realMsec ) {
 		return;
 	}
 
+	/* Process timers */
+	{
+		int now = Sys_Milliseconds();
+		int ti;
+		for ( ti = 0; ti < MAX_JS_TIMERS; ti++ ) {
+			if ( !jsTimers[ti].active ) continue;
+			if ( now >= jsTimers[ti].fireTime ) {
+				duk_push_global_stash( s_jsContext );
+				if ( duk_get_prop_string( s_jsContext, -1, va( "\xff""timer_%d", jsTimers[ti].id ) ) && duk_is_function( s_jsContext, -1 ) ) {
+					if ( duk_pcall( s_jsContext, 0 ) != 0 ) {
+						const char *err = duk_safe_to_string( s_jsContext, -1 );
+						Com_Printf( S_COLOR_YELLOW "JS timer %d error: %s\n", jsTimers[ti].id, err ? err : "(unknown)" );
+						JsDebug_RecordError( "timer", err ? err : "(unknown error)" );
+					}
+				}
+				duk_pop_2( s_jsContext );
+
+				if ( jsTimers[ti].repeating ) {
+					jsTimers[ti].fireTime = now + jsTimers[ti].interval;
+				} else {
+					jsTimers[ti].active = qfalse;
+					duk_push_global_stash( s_jsContext );
+					duk_del_prop_string( s_jsContext, -1, va( "\xff""timer_%d", jsTimers[ti].id ) );
+					duk_pop( s_jsContext );
+				}
+			}
+		}
+	}
+
 	JsDebug_InitPolicyCvars();
 	if ( !js_allowEvents || !js_allowEvents->integer ) {
 		return;
@@ -904,7 +1221,9 @@ void JsDebug_Frame( int msec, int realMsec ) {
 		duk_push_int( s_jsContext, realMsec );
 		if ( duk_pcall( s_jsContext, 2 ) != DUK_EXEC_SUCCESS ) {
 			const char *msg = duk_safe_to_string( s_jsContext, -1 );
-			Com_Printf( S_COLOR_RED "JavaScript: frame callback error: %s\n", msg ? msg : "(unknown error)" );
+			const char *err = msg ? msg : "(unknown error)";
+			Com_Printf( S_COLOR_RED "JavaScript: frame callback error: %s\n", err );
+			JsDebug_RecordError( "frame", err );
 			if ( js_disableFaultyCallbacks && js_disableFaultyCallbacks->integer ) {
 				duk_pop( s_jsContext );
 				duk_push_undefined( s_jsContext );
@@ -916,6 +1235,50 @@ void JsDebug_Frame( int msec, int realMsec ) {
 	}
 
 	duk_pop( s_jsContext );
+
+	/* Verbose UI/JS info when at a menu */
+	if ( js_verbose && js_verbose->integer && js_verboseMenu && js_verboseMenu->string && js_verboseMenu->string[0] ) {
+		static int s_lastVerboseMs = 0;
+		const int now = Sys_Milliseconds();
+		qboolean match = qfalse;
+		const char *menuStr = js_verboseMenu->string;
+
+		if ( !Q_stricmp( menuStr, "all" ) ) {
+			match = ( s_jsCurrentMenu >= 0 );
+		} else if ( !Q_stricmp( menuStr, "main" ) ) {
+			match = ( s_jsCurrentMenu == 1 );
+		} else if ( !Q_stricmp( menuStr, "ingame" ) ) {
+			match = ( s_jsCurrentMenu == 2 );
+		} else if ( !Q_stricmp( menuStr, "none" ) ) {
+			match = ( s_jsCurrentMenu == 0 );
+		} else if ( !Q_stricmp( menuStr, "off" ) ) {
+			match = qfalse;
+		} else {
+			match = ( s_jsCurrentMenu >= 0 );
+		}
+
+		if ( match && now - s_lastVerboseMs >= 1000 ) {
+			s_lastVerboseMs = now;
+			Com_Printf( "JavaScript verbose: menu=%d callbacks frame=%d menu_changed=%d ui_open=%d ui_close=%d",
+				s_jsCurrentMenu,
+				JsDebug_EventCallbackCount( "frame" ),
+				JsDebug_EventCallbackCount( "menu_changed" ),
+				JsDebug_EventCallbackCount( "ui_open" ),
+				JsDebug_EventCallbackCount( "ui_close" ) );
+			if ( s_jsErrorTotalCount > 0 ) {
+				int ei, n;
+				Com_Printf( " errors=%d", s_jsErrorTotalCount );
+				for ( ei = 0, n = 0; ei < MAX_JS_ERROR_LOG && n < 3; ei++ ) {
+					int idx = ( s_jsErrorLogHead - 1 - ei + MAX_JS_ERROR_LOG * 2 ) % MAX_JS_ERROR_LOG;
+					if ( s_jsErrorLog[idx].count > 0 ) {
+						Com_Printf( " [%.64s x%d]", s_jsErrorLog[idx].msg, s_jsErrorLog[idx].count );
+						n++;
+					}
+				}
+			}
+			Com_Printf( "\n" );
+		}
+	}
 }
 
 void JsDebug_EmitEvent( const char *eventName, const char *s0, const char *s1, int i0, int i1 ) {
@@ -999,10 +1362,30 @@ void JsDebug_EmitEvent( const char *eventName, const char *s0, const char *s1, i
 			duk_push_int( s_jsContext, i0 );
 			duk_put_prop_string( s_jsContext, -2, "catcher" );
 		}
+		if ( !Q_stricmp( eventName, "entity_spawn" ) ) {
+			duk_push_int( s_jsContext, i0 );
+			duk_put_prop_string( s_jsContext, -2, "entityNum" );
+			duk_push_int( s_jsContext, i1 );
+			duk_put_prop_string( s_jsContext, -2, "eType" );
+		}
+		if ( !Q_stricmp( eventName, "entity_death" ) ) {
+			duk_push_int( s_jsContext, i0 );
+			duk_put_prop_string( s_jsContext, -2, "entityNum" );
+			duk_push_int( s_jsContext, i1 );
+			duk_put_prop_string( s_jsContext, -2, "attacker" );
+		}
+		if ( !Q_stricmp( eventName, "weapon_fire" ) ) {
+			duk_push_int( s_jsContext, i0 );
+			duk_put_prop_string( s_jsContext, -2, "entityNum" );
+			duk_push_int( s_jsContext, i1 );
+			duk_put_prop_string( s_jsContext, -2, "weapon" );
+		}
 
 		if ( duk_pcall( s_jsContext, 1 ) != DUK_EXEC_SUCCESS ) {
 			const char *msg = duk_safe_to_string( s_jsContext, -1 );
-			Com_Printf( S_COLOR_RED "JavaScript: %s callback error: %s\n", eventName, msg ? msg : "(unknown error)" );
+			const char *err = msg ? msg : "(unknown error)";
+			Com_Printf( S_COLOR_RED "JavaScript: %s callback error: %s\n", eventName, err );
+			JsDebug_RecordError( eventName, err );
 			if ( js_disableFaultyCallbacks && js_disableFaultyCallbacks->integer ) {
 				duk_pop( s_jsContext );
 				duk_push_undefined( s_jsContext );
@@ -1073,6 +1456,17 @@ void Cmd_JsReload_f( void ) {
 	Com_Printf( "JavaScript: loaded %d script(s), %d failure(s)\n", successCount, failureCount );
 }
 
+void Cmd_JsClearErrors_f( void ) {
+	int i;
+	s_jsErrorTotalCount = 0;
+	s_jsErrorLogHead = 0;
+	for ( i = 0; i < MAX_JS_ERROR_LOG; i++ ) {
+		s_jsErrorLog[i].msg[0] = '\0';
+		s_jsErrorLog[i].count = 0;
+	}
+	Com_Printf( "JavaScript: error log cleared\n" );
+}
+
 void Cmd_JsList_f( void ) {
 	int i;
 
@@ -1108,6 +1502,11 @@ void Cmd_JsList_f( void ) {
 		JsDebug_EventCallbackCount( "input_key" ),
 		JsDebug_EventCallbackCount( "mouse_move" ),
 		JsDebug_EventCallbackCount( "console_open" ) );
+	Com_Printf( "JavaScript: verbose js_verbose=%d js_verboseMenu=%s currentMenu=%d errors=%d (use js_clearErrors to reset)\n",
+		js_verbose ? js_verbose->integer : 0,
+		js_verboseMenu ? js_verboseMenu->string : "main",
+		s_jsCurrentMenu,
+		s_jsErrorTotalCount );
 	Com_Printf( "JavaScript: tracked scripts (%d)\n", s_jsTrackedCount );
 
 	for ( i = 0; i < s_jsTrackedCount; i++ ) {
@@ -1192,6 +1591,10 @@ void Cmd_JsDump_f( void ) {
 	Com_Printf( "JavaScript support is disabled in this build. Configure with -DUSE_DUKTAPE=ON.\n" );
 }
 
+void Cmd_JsClearErrors_f( void ) {
+	Com_Printf( "JavaScript support is disabled in this build. Configure with -DUSE_DUKTAPE=ON.\n" );
+}
+
 void Cmd_JsExec_f( void ) {
 	Com_Printf( "JavaScript support is disabled in this build. Configure with -DUSE_DUKTAPE=ON.\n" );
 }
@@ -1207,6 +1610,10 @@ void JsDebug_EmitEvent( const char *eventName, const char *s0, const char *s1, i
 	(void)s1;
 	(void)i0;
 	(void)i1;
+}
+
+void JsDebug_SetCurrentMenu( int menu ) {
+	(void)menu;
 }
 
 #endif

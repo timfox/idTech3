@@ -399,10 +399,11 @@ static void SV_InjectLocation( const char *tld, const char *country ) {
 				cmd = svs.clients[i].reliableCommands[n & (MAX_RELIABLE_COMMANDS-1)];
 				str = strstr( cmd, "connected\n\"" );
 				if ( str && str[11] == '\0' && str < cmd + 512 ) {
+					const int rem = (int)( (const char *)cmd + MAX_STRING_CHARS - str );
 					if ( *tld == '\0' )
-						sprintf( str, S_COLOR_WHITE "connected (%s)\n\"", country );
+						Com_sprintf( str, rem, S_COLOR_WHITE "connected (%s)\n\"", country );
 					else
-						sprintf( str, S_COLOR_WHITE "connected (" S_COLOR_RED "%s" S_COLOR_WHITE ", %s)\n\"", tld, country );
+						Com_sprintf( str, rem, S_COLOR_WHITE "connected (" S_COLOR_RED "%s" S_COLOR_WHITE ", %s)\n\"", tld, country );
 					break;
 				}
 			}
@@ -777,7 +778,7 @@ gotnewcl:
 
 	newcl->longstr = longstr;
 
-	strcpy( newcl->tld, tld );
+	Q_strncpyz( newcl->tld, tld, sizeof( newcl->tld ) );
 	newcl->country = SV_FindCountry( newcl->tld );
 
 	SV_UserinfoChanged( newcl, qtrue, qfalse ); // update userinfo, do not run filter
@@ -1279,8 +1280,7 @@ static void SV_NextDownload_f( client_t *cl )
 		return;
 	}
 	// We aren't getting an acknowledge for the correct block, drop the client
-	// FIXME: this is bad... the client will never parse the disconnect message
-	//			because the cgame isn't loaded yet
+	/* Known limitation: client may not parse disconnect if cgame not loaded yet. */
 	SV_DropClient( cl, "broken download" );
 }
 
@@ -1583,7 +1583,7 @@ int SV_SendDownloadMessages( void )
 =================
 SV_Disconnect_f
 
-The client is going to disconnect, so remove the connection immediately  FIXME: move to game?
+The client is going to disconnect, so remove the connection immediately.
 =================
 */
 static void SV_Disconnect_f( client_t *cl ) {
@@ -2376,6 +2376,48 @@ void SV_ExecuteClientMessage( client_t *cl, msg_t *msg ) {
 		SV_UserMove( cl, msg, qtrue );
 	} else if ( c == clc_moveNoDelta ) {
 		SV_UserMove( cl, msg, qfalse );
+	} else if ( c == clc_voipOpus || c == clc_voipSpeex ) {
+		/* VoIP relay: read encoded audio and forward to clients (proximity-filtered when sv_voipProximity > 0) */
+		int voipLen = MSG_ReadShort( msg );
+		if ( voipLen > 0 && voipLen <= 4000 ) {
+			byte voipData[4000];
+			int sender = (int)( cl - svs.clients );
+			int i;
+			float prox = sv_voipProximity ? sv_voipProximity->value : 0.0f;
+			vec3_t senderOrigin;
+
+			MSG_ReadData( msg, voipData, voipLen );
+
+			/* Sender position for proximity check (0 = global relay) */
+			if ( prox > 0.0f && cl->gentity ) {
+				VectorCopy( cl->gentity->r.currentOrigin, senderOrigin );
+			} else {
+				prox = 0.0f; /* no position or disabled: relay to all */
+			}
+
+			for ( i = 0; i < sv.maxclients; i++ ) {
+				client_t *dst = &svs.clients[i];
+				if ( dst == cl || dst->state < CS_ACTIVE ) continue;
+				if ( dst->netchan.remoteAddress.type == NA_BOT ) continue;
+
+				if ( prox > 0.0f && dst->gentity ) {
+					float d = Distance( senderOrigin, dst->gentity->r.currentOrigin );
+					if ( d > prox ) continue; /* out of range */
+				}
+
+				SV_SendServerCommand( dst, "voip %d %d %s", sender, voipLen, "" );
+				{
+					msg_t relay;
+					byte relayBuf[4096];
+					MSG_Init( &relay, relayBuf, sizeof( relayBuf ) );
+					MSG_WriteByte( &relay, svc_voipOpus );
+					MSG_WriteByte( &relay, sender );
+					MSG_WriteShort( &relay, voipLen );
+					MSG_WriteData( &relay, voipData, voipLen );
+					SV_Netchan_Transmit( dst, &relay );
+				}
+			}
+		}
 	} else if ( c != clc_EOF ) {
 		Com_Printf( "WARNING: bad command byte %i for client %i\n", c, (int) (cl - svs.clients) );
 	}

@@ -771,6 +771,11 @@ static qboolean UI_GetValue( char* value, int valueSize, const char* key ) {
 		return qtrue;
 	}
 
+	if ( !Q_stricmp( key, "trap_R_DrawString" ) ) {
+		Com_sprintf( value, valueSize, "%i", UI_R_DRAWSTRING );
+		return qtrue;
+	}
+
 	if ( !Q_stricmp( key, "trap_Cvar_SetDescription_Q3E" ) ) {
 		Com_sprintf( value, valueSize, "%i", UI_CVAR_SETDESCRIPTION );
 		return qtrue;
@@ -918,6 +923,15 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 	case UI_R_DRAWSTRETCHPIC:
 		re.DrawStretchPic( VMF(1), VMF(2), VMF(3), VMF(4), VMF(5), VMF(6), VMF(7), VMF(8), args[9] );
 		return 0;
+
+	case UI_R_DRAWSTRING: {
+		const float *color = ( args[5] ) ? (const float *)VMA(5) : g_color_table[ ColorIndex( COLOR_WHITE ) ];
+		if ( args[5] ) {
+			VM_CHECKBOUNDS( uivm, args[5], 16 );
+		}
+		SCR_DrawStringExt( args[1], args[2], (float)args[3], (const char *)VMA(4), color, qfalse, qfalse );
+		return 0;
+	}
 
 	case UI_R_MODELBOUNDS:
 		re.ModelBounds( args[1], VMA(2), VMA(3) );

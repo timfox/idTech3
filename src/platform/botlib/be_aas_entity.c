@@ -45,7 +45,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define MASK_SOLID		CONTENTS_PLAYERCLIP
 
-//FIXME: these might change
+/* Entity bounds might change. */
 enum {
 	ET_GENERAL,
 	ET_PLAYER,
@@ -120,7 +120,7 @@ int AAS_UpdateEntity(int entnum, bot_entitystate_t *state)
 			relink = qtrue;
 		} //end if
 		//get the mins and maxs of the model
-		//FIXME: rotate mins and maxs
+		/* Could rotate mins and maxs. */
 		AAS_BSPModelMinsMaxsOrigin(ent->i.modelindex, ent->i.angles, ent->i.mins, ent->i.maxs, NULL);
 	} //end if
 	else if (ent->i.solid == SOLID_BBOX)

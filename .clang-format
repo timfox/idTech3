@@ -1,0 +1,39 @@
+# ClangFormat config for idTech3 engine
+# Use: clang-format -i <file> or pre-commit hook
+# See: https://clang.llvm.org/docs/ClangFormatStyleOptions.html
+
+BasedOnStyle: LLVM
+Language: Cpp
+
+# Match project convention: tabs for indentation
+UseTab: ForIndentation
+TabWidth: 4
+
+# Line length (common default)
+ColumnLimit: 120
+
+# Braces
+BreakBeforeBraces: Attach
+AllowShortBlocksOnASingleLine: Empty
+AllowShortFunctionsOnASingleLine: Empty
+
+# Indentation
+IndentCaseLabels: true
+IndentPPDirectives: BeforeHash
+
+# Spacing
+SpaceAfterCStyleCast: false
+SpaceBeforeParens: ControlStatements
+SpacesInParentheses: false
+
+# Align
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+
+# Includes
+SortIncludes: true
+IncludeBlocks: Regroup
+
+# Continuation
+ContinuationIndentWidth: 4

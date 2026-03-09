@@ -1,6 +1,10 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.24)
 
-PROJECT(idtech3 LANGUAGES C)
+PROJECT(idtech3 VERSION 1.0.0 LANGUAGES C CXX)
+
+if(NOT ANDROID)
+  find_package(Threads REQUIRED)
+endif()
 
 if("c_std_23" IN_LIST CMAKE_C_COMPILE_FEATURES)
     set(CMAKE_C_STANDARD 23)
@@ -18,26 +22,32 @@ set(CMAKE_C_EXTENSIONS OFF)
 option(C_STANDARD_STRICT "Enable the stricter warning set for engine builds" ON)
 option(CI_BUILD "Enable CI-specific behaviors such as warnings-as-errors" OFF)
 option(USE_FLUX "Enable FLUX.2 image generation support" ON)
+option(ENABLE_FORTIFY_SOURCE "Enable _FORTIFY_SOURCE=2 buffer overflow protection (GCC/Clang)" ON)
+option(ENABLE_ASAN "Enable AddressSanitizer for memory error detection (Debug builds)" OFF)
 
 if(C_STANDARD_STRICT)
   if(MSVC)
     add_compile_options(/W4)
   else()
-    set(C_STRICT_WARNINGS
+    # Flags valid for both C and C++
+    set(C_CXX_STRICT_WARNINGS
       -Wall
       -Wextra
       -Wpedantic
       -Wshadow
-      -Wstrict-prototypes
-      -Wmissing-prototypes
-      -Wold-style-definition
       -Wformat=2
       -Wundef
       -Wcast-qual
       -Wpointer-arith
       -Wvla
     )
-    add_compile_options(${C_STRICT_WARNINGS})
+    add_compile_options(${C_CXX_STRICT_WARNINGS})
+    # C-only flags (not valid for C++) - apply per-flag so generator expr expands
+    add_compile_options(
+      $<$<COMPILE_LANGUAGE:C>:-Wstrict-prototypes>
+      $<$<COMPILE_LANGUAGE:C>:-Wmissing-prototypes>
+      $<$<COMPILE_LANGUAGE:C>:-Wold-style-definition>
+    )
   endif()
 endif()
 
@@ -49,6 +59,19 @@ if(CI_BUILD)
     # For GCC/Clang, disable problematic warnings for CI
     add_compile_options(-Wno-unused-function -Wno-shadow -Wno-cast-qual -Wno-vla)
   endif()
+endif()
+
+# Security: buffer overflow protection (GCC/Clang; not MSVC)
+if(ENABLE_FORTIFY_SOURCE AND NOT MSVC)
+  add_compile_options(-D_FORTIFY_SOURCE=2)
+  message(STATUS "FORTIFY_SOURCE=2 enabled (buffer overflow protection)")
+endif()
+
+# Sanitizers: AddressSanitizer for memory error detection (Debug only)
+if(ENABLE_ASAN AND CMAKE_BUILD_TYPE STREQUAL "Debug" AND NOT MSVC)
+  add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
+  add_link_options(-fsanitize=address)
+  message(STATUS "AddressSanitizer enabled (memory error detection)")
 endif()
 
 # --- Begin FindSDL2.cmake
@@ -729,6 +752,7 @@ OPTION(USE_MP3 "Enable MP3 codec support" ON)
 OPTION(USE_ZLIB "Enable zlib support (vendored)" ON)
 OPTION(USE_LIBPNG "Enable libpng support (vendored)" ON)
 OPTION(USE_GLM "Enable glm headers (vendored)" ON)
+OPTION(USE_LIBRSVG "Enable SVG image loading via librsvg/cairo backend" ON)
 OPTION(USE_SYSTEM_JPEG "" OFF)
 OPTION(USE_RENDERER_DLOPEN "" ON)
 if(WIN32 AND USE_RENDERER_DLOPEN)
@@ -747,8 +771,32 @@ else()
 endif()
 OPTION(SKIP_IDPAK_CHECK "Skip checking for original Quake III pak files (pak0.pk3)" ON)
 OPTION(BUILD_FREETYPE "Enable FreeType-powered font rendering / font generation" ON)
+if(BUILD_FREETYPE AND NOT ANDROID)
+	include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/DownloadInterFonts.cmake)
+endif()
+OPTION(USE_DTLS "Enable DTLS encryption for game network traffic" OFF)
+OPTION(USE_STEAM "Enable Steam API (achievements, overlay, rich presence, Deck detection)" OFF)
+OPTION(USE_STEAM_NETWORKING "Enable Steam Datagram Relay (SDR) transport" OFF)
+OPTION(USE_VULKAN_RTX "Enable Vulkan ray tracing (VK_KHR_ray_tracing_*); requires RT-capable GPU" OFF)
+OPTION(USE_METAL_RENDERER "Build native Metal renderer (Apple only)" OFF)
+OPTION(USE_DXR_RENDERER "Build DirectX 12 + DXR renderer (Windows only)" OFF)
 
-SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules)
+if(USE_METAL_RENDERER)
+  if(NOT APPLE)
+    message(WARNING "USE_METAL_RENDERER is Apple-only; disabling.")
+    set(USE_METAL_RENDERER OFF CACHE BOOL "" FORCE)
+  else()
+    message(WARNING "Metal renderer not yet implemented (docs/RENDERERS_FUTURE.md); option reserved for future use.")
+  endif()
+endif()
+if(USE_DXR_RENDERER)
+  if(NOT WIN32)
+    message(WARNING "USE_DXR_RENDERER is Windows-only; disabling.")
+    set(USE_DXR_RENDERER OFF CACHE BOOL "" FORCE)
+  else()
+    message(WARNING "DXR renderer not yet implemented (docs/RENDERERS_FUTURE.md); option reserved for future use.")
+  endif()
+endif()
 
 set(EXTERNAL_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/src/external")
 set(EXTERNAL_SRC "${EXTERNAL_ROOT}/src")
@@ -760,7 +808,24 @@ set(EXTERNAL_ZLIB_SRC "${EXTERNAL_SRC}/zlib")
 set(EXTERNAL_LIBPNG_SRC "${EXTERNAL_SRC}/libpng")
 set(EXTERNAL_GLM_INCLUDE "${EXTERNAL_SRC}/glm")
 
-if(UNIX AND NOT APPLE)
+set(HAVE_LIBRSVG FALSE)
+if(USE_LIBRSVG)
+  find_package(PkgConfig QUIET)
+  if(PKG_CONFIG_FOUND)
+    pkg_check_modules(LIBRSVG QUIET IMPORTED_TARGET librsvg-2.0)
+    pkg_check_modules(CAIRO QUIET IMPORTED_TARGET cairo)
+    if(LIBRSVG_FOUND AND CAIRO_FOUND)
+      set(HAVE_LIBRSVG TRUE)
+      message(STATUS "SVG loader: enabled (librsvg + cairo)")
+    else()
+      message(STATUS "SVG loader: disabled (install librsvg2-dev and libcairo2-dev)")
+    endif()
+  else()
+    message(STATUS "SVG loader: disabled (pkg-config not available)")
+  endif()
+endif()
+
+if(UNIX AND NOT APPLE AND NOT ANDROID)
   find_package(X11 REQUIRED)
   if(TARGET X11::X11)
     set(IDTECH3_X11_LIBS X11::X11)
@@ -790,12 +855,12 @@ if(USE_ZLIB)
     endif()
     if(TARGET zlibstatic)
       target_compile_definitions(zlibstatic PRIVATE ZLIB_CONST)
-      target_compile_definitions(zlibstatic PRIVATE _LFS64_LARGEFILE=1 _LARGEFILE64_SOURCE=1 Z_LARGE64=1)
+      target_compile_definitions(zlibstatic PRIVATE _LFS64_LARGEFILE=1 _LARGEFILE64_SOURCE=1)
       set_property(TARGET zlibstatic PROPERTY POSITION_INDEPENDENT_CODE ON)
     endif()
     if(TARGET zlib)
       target_compile_definitions(zlib PRIVATE ZLIB_CONST)
-      target_compile_definitions(zlib PRIVATE _LFS64_LARGEFILE=1 _LARGEFILE64_SOURCE=1 Z_LARGE64=1)
+      target_compile_definitions(zlib PRIVATE _LFS64_LARGEFILE=1 _LARGEFILE64_SOURCE=1)
       set_property(TARGET zlib PROPERTY POSITION_INDEPENDENT_CODE ON)
     endif()
   endif()
@@ -844,6 +909,56 @@ endif()
 AUX_SOURCE_DIRECTORY(src/qcommon QCOMMON_SRCS)
 # exclude platform-dependent QVM JIT compilers; add the active backend below
 list(FILTER QCOMMON_SRCS EXCLUDE REGEX ".*vm_(aarch64|armv7l|powerpc|x86)\\.c")
+# exclude optional network modules; add when options enabled
+list(FILTER QCOMMON_SRCS EXCLUDE REGEX ".*net_dtls\\.c")
+list(FILTER QCOMMON_SRCS EXCLUDE REGEX ".*net_sdr\\.c")
+
+# USE_DTLS: DTLS encryption (requires OpenSSL)
+set(USE_DTLS_FOUND FALSE)
+if(USE_DTLS)
+  find_package(OpenSSL QUIET)
+  if(OpenSSL_FOUND)
+    list(APPEND QCOMMON_SRCS src/qcommon/net_dtls.c)
+    set(USE_DTLS_FOUND TRUE)
+    message(STATUS "DTLS: enabled (OpenSSL)")
+  else()
+    message(WARNING "USE_DTLS requested but OpenSSL not found; DTLS disabled")
+  endif()
+endif()
+
+# USE_STEAM / USE_STEAM_NETWORKING: Steam API and SDR (requires Steamworks SDK)
+set(STEAMWORKS_FOUND FALSE)
+if(USE_STEAM OR USE_STEAM_NETWORKING)
+  if(USE_STEAM_NETWORKING)
+    list(APPEND QCOMMON_SRCS src/qcommon/net_sdr.c)
+  endif()
+  find_path(STEAMWORKS_INCLUDE_DIR steam/steam_api.h
+    HINTS $ENV{STEAMWORKS_SDK} $ENV{STEAMWORKS_SDK}/public
+    PATH_SUFFIXES include)
+  if(STEAMWORKS_INCLUDE_DIR)
+    find_library(STEAMWORKS_LIBRARY steam_api
+      HINTS $ENV{STEAMWORKS_SDK} $ENV{STEAMWORKS_SDK}/redistributable_bin
+      PATH_SUFFIXES linux64 linux32 win64)
+    if(STEAMWORKS_LIBRARY)
+      set(STEAMWORKS_FOUND TRUE)
+      message(STATUS "Steam SDR: Steamworks SDK found (${STEAMWORKS_INCLUDE_DIR})")
+    endif()
+  endif()
+  if(NOT STEAMWORKS_FOUND)
+    if(USE_STEAM_NETWORKING)
+      message(WARNING "USE_STEAM_NETWORKING requested but Steamworks SDK not found. Set STEAMWORKS_SDK. SDR will use stub (no-op).")
+    endif()
+    if(USE_STEAM)
+      message(WARNING "USE_STEAM requested but Steamworks SDK not found. Set STEAMWORKS_SDK.")
+    endif()
+  endif()
+  if(STEAMWORKS_FOUND)
+    set(STEAMWORKS_AVAILABLE 1)
+  else()
+    set(STEAMWORKS_AVAILABLE 0)
+  endif()
+endif()
+
 # add platform-dependent QVM bytecode compilers
 IF(CMAKE_SYSTEM_PROCESSOR MATCHES AMD64|x86|i*86)
 	IF(CMAKE_SYSTEM_PROCESSOR MATCHES AMD64)
@@ -903,7 +1018,6 @@ if(USE_GLM)
 endif()
 
 AUX_SOURCE_DIRECTORY(src/server SERVER_SRCS)
-list(REMOVE_ITEM SERVER_SRCS src/server/sv_rankings.c)
 
 # universal binary
 ADD_LIBRARY(qcommon OBJECT ${QCOMMON_SRCS} ${SERVER_SRCS})
@@ -925,6 +1039,17 @@ endif()
 if(USE_DUKTAPE AND DUKTAPE_FOUND)
   target_compile_definitions(qcommon PRIVATE USE_DUKTAPE)
   target_include_directories(qcommon PRIVATE ${DUKTAPE_INCLUDE_DIR})
+endif()
+if(USE_DTLS_FOUND)
+  target_compile_definitions(qcommon PRIVATE USE_DTLS=1)
+  target_include_directories(qcommon PRIVATE ${OPENSSL_INCLUDE_DIR})
+  target_link_libraries(qcommon PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+endif()
+if(USE_STEAM_NETWORKING)
+  target_compile_definitions(qcommon PRIVATE USE_STEAM_NETWORKING=1 STEAMWORKS_AVAILABLE=${STEAMWORKS_AVAILABLE})
+  if(STEAMWORKS_FOUND)
+    target_include_directories(qcommon PRIVATE ${STEAMWORKS_INCLUDE_DIR})
+  endif()
 endif()
 
 # dedicated server
@@ -948,6 +1073,23 @@ endif()
 if(USE_DUKTAPE AND DUKTAPE_FOUND)
   target_compile_definitions(qcommon_ded PRIVATE USE_DUKTAPE)
   target_include_directories(qcommon_ded PRIVATE ${DUKTAPE_INCLUDE_DIR})
+endif()
+if(USE_DTLS_FOUND)
+  target_compile_definitions(qcommon_ded PRIVATE USE_DTLS=1)
+  target_include_directories(qcommon_ded PRIVATE ${OPENSSL_INCLUDE_DIR})
+  target_link_libraries(qcommon_ded PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+endif()
+if(USE_STEAM_NETWORKING)
+  target_compile_definitions(qcommon_ded PRIVATE USE_STEAM_NETWORKING=1)
+endif()
+if(USE_STEAM_NETWORKING AND STEAMWORKS_FOUND)
+  target_compile_definitions(client PRIVATE USE_STEAM_NETWORKING=1 USE_STEAM=1)
+  target_include_directories(client PRIVATE ${STEAMWORKS_INCLUDE_DIR})
+  message(STATUS "Steam: full API + SDR enabled")
+elseif(USE_STEAM AND STEAMWORKS_FOUND)
+  target_compile_definitions(client PRIVATE USE_STEAM=1)
+  target_include_directories(client PRIVATE ${STEAMWORKS_INCLUDE_DIR})
+  message(STATUS "Steam: API enabled (achievements, overlay, rich presence, Deck)")
 endif()
 
 # Apply SKIP_IDPAK_CHECK to qcommon targets that compile files.c
@@ -993,13 +1135,30 @@ list(APPEND CLIENT_SRCS
   src/audio/codecs/snd_codec_opus.c
   src/audio/codecs/snd_codec_flac.c
   src/audio/codecs/snd_codec_webm.c
-  src/audio/backends/snd_backend_openal.c
   src/audio/backends/snd_backend_null.c
-  src/audio/effects/snd_efx.c
 )
+if(USE_OPENAL)
+  list(APPEND CLIENT_SRCS src/audio/backends/snd_backend_openal.c)
+  list(APPEND CLIENT_SRCS src/audio/effects/snd_efx.c)
+endif()
 if(USE_SDL)
   list(APPEND CLIENT_SRCS src/audio/backends/snd_backend_sdl.c)
 endif()
+list(APPEND CLIENT_SRCS
+  src/audio/snd_music_adaptive.c
+  src/game/g_director.c
+  src/game/g_response.c
+  src/game/g_choreography.c
+  src/game/g_dismember.c
+  src/game/g_facial.c
+  src/game/g_horde.c
+  src/game/g_goap.c
+  src/game/g_aiml.c
+  src/game/g_entity_bridge.c
+  src/game/g_lua_bindings.c
+  src/client/cl_map_background.c
+  src/client/cl_window_title.c
+)
 # include architecture-specific assembly implementations (snd_mix etc)
 # Only include x86/x86_64 assembly files on x86/x86_64 architectures on Unix-like systems
 # Assembly is disabled on Windows due to preprocessor macro issues with MSYS2/MinGW
@@ -1051,6 +1210,86 @@ if(NOT USE_WEBM OR NOT WEBM_FOUND)
   list(REMOVE_ITEM CLIENT_SRCS src/audio/codecs/snd_codec_webm.c)
 endif()
 
+# --- Modern video codec support ---
+option(USE_FFMPEG "Enable FFmpeg video codec support (requires system libavcodec)" ON)
+option(USE_DAV1D "Enable dav1d AV1 video codec support (requires system libdav1d)" ON)
+option(USE_VPX "Enable libvpx VP8/VP9 video codec support (requires system libvpx)" ON)
+option(USE_THEORA "Enable Theora video codec support (requires system libtheora)" ON)
+
+set(FFMPEG_FOUND FALSE)
+set(DAV1D_FOUND FALSE)
+set(VPX_FOUND FALSE)
+set(THEORA_FOUND FALSE)
+
+if(USE_FFMPEG)
+  find_package(PkgConfig QUIET)
+  if(PKG_CONFIG_FOUND)
+    pkg_check_modules(FFMPEG_PKG QUIET libavcodec libavformat libavutil libswscale libswresample)
+    if(FFMPEG_PKG_FOUND)
+      set(FFMPEG_FOUND TRUE)
+      message(STATUS "FFmpeg video codec: enabled (${FFMPEG_PKG_LINK_LIBRARIES})")
+    endif()
+  endif()
+  if(NOT FFMPEG_FOUND)
+    message(WARNING "FFmpeg requested but pkg-config could not find libavcodec/libavformat/libavutil/libswscale/libswresample; FFmpeg codec disabled.")
+    list(REMOVE_ITEM CLIENT_SRCS src/client/cl_cin_ffmpeg.c)
+  endif()
+else()
+  list(REMOVE_ITEM CLIENT_SRCS src/client/cl_cin_ffmpeg.c)
+endif()
+
+if(USE_DAV1D)
+  find_package(PkgConfig QUIET)
+  if(PKG_CONFIG_FOUND)
+    pkg_check_modules(DAV1D_PKG QUIET dav1d)
+    if(DAV1D_PKG_FOUND)
+      set(DAV1D_FOUND TRUE)
+      message(STATUS "dav1d AV1 codec: enabled (${DAV1D_PKG_LINK_LIBRARIES})")
+    endif()
+  endif()
+  if(NOT DAV1D_FOUND)
+    message(WARNING "dav1d requested but not found; AV1 codec disabled.")
+    list(REMOVE_ITEM CLIENT_SRCS src/client/cl_cin_dav1d.c)
+  endif()
+else()
+  list(REMOVE_ITEM CLIENT_SRCS src/client/cl_cin_dav1d.c)
+endif()
+
+if(USE_VPX)
+  find_package(PkgConfig QUIET)
+  if(PKG_CONFIG_FOUND)
+    pkg_check_modules(VPX_PKG QUIET vpx)
+    if(VPX_PKG_FOUND)
+      set(VPX_FOUND TRUE)
+      message(STATUS "libvpx VP8/VP9 codec: enabled (${VPX_PKG_LINK_LIBRARIES})")
+    endif()
+  endif()
+  if(NOT VPX_FOUND)
+    message(WARNING "libvpx requested but not found; VP8/VP9 codec disabled.")
+    list(REMOVE_ITEM CLIENT_SRCS src/client/cl_cin_vpx.c)
+  endif()
+else()
+  list(REMOVE_ITEM CLIENT_SRCS src/client/cl_cin_vpx.c)
+endif()
+
+if(USE_THEORA)
+  find_package(PkgConfig QUIET)
+  if(PKG_CONFIG_FOUND)
+    pkg_check_modules(THEORA_PKG QUIET theoradec)
+    if(THEORA_PKG_FOUND)
+      set(THEORA_FOUND TRUE)
+      message(STATUS "Theora codec: enabled (${THEORA_PKG_LINK_LIBRARIES})")
+    endif()
+  endif()
+  if(NOT THEORA_FOUND)
+    message(WARNING "Theora requested but libtheoradec not found; Theora codec disabled.")
+    list(REMOVE_ITEM CLIENT_SRCS src/client/cl_cin_theora.c)
+  endif()
+else()
+  list(REMOVE_ITEM CLIENT_SRCS src/client/cl_cin_theora.c)
+endif()
+# --- End modern video codec support ---
+
 #ADD_LIBRARY(client OBJECT ${CLIENT_SRCS})
 
 # jpeg
@@ -1096,26 +1335,34 @@ ENDIF()
 
 # renderers
 set(RENDERER_COMMON_SRCS
-	src/renderers/rendercommon/tr_font_stub.c  # placeholder, will be replaced below
-	src/renderers/rendercommon/tr_image_bmp.c
-	src/renderers/rendercommon/tr_image_jpg.c
-	src/renderers/rendercommon/tr_image_pcx.c
-	src/renderers/rendercommon/tr_image_png.c
-	src/renderers/rendercommon/tr_image_tga.c
-	src/renderers/rendercommon/tr_noise.c
+	src/renderers/common/tr_font_stub.c  # placeholder, will be replaced below
+	src/renderers/common/tr_image_bmp.c
+	src/renderers/common/tr_image_jpg.c
+	src/renderers/common/tr_image_pcx.c
+	src/renderers/common/tr_image_png.c
+	src/renderers/common/tr_image_tga.c
+	src/renderers/common/tr_image_hdr.c
+	src/renderers/common/tr_image_qoi.c
+	src/renderers/common/tr_image_dds.c
+	src/renderers/common/tr_image_svg.c
+	src/renderers/common/tr_image_ktx2.c
+	src/renderers/common/tr_noise.c
 )
 IF(BUILD_FREETYPE)
-	list(REMOVE_ITEM RENDERER_COMMON_SRCS src/renderers/rendercommon/tr_font_stub.c)
-	list(APPEND RENDERER_COMMON_SRCS src/renderers/rendercommon/tr_font.c)
+	list(REMOVE_ITEM RENDERER_COMMON_SRCS src/renderers/common/tr_font_stub.c)
+	list(APPEND RENDERER_COMMON_SRCS src/renderers/common/tr_font.c)
 ELSE()
 	# Keep tr_font_stub.c
 ENDIF()
-AUX_SOURCE_DIRECTORY(src/renderers/openglrenderer RENDERER_GL_SRCS)
-AUX_SOURCE_DIRECTORY(src/renderers/vulkanrenderer RENDERER_VK_SRCS)
+AUX_SOURCE_DIRECTORY(src/renderers/opengl RENDERER_GL_SRCS)
+AUX_SOURCE_DIRECTORY(src/renderers/vulkan RENDERER_VK_SRCS)
+# Exclude generated shader blobs to avoid duplicate symbols with committed spirv/ copies
+list(FILTER RENDERER_VK_SRCS EXCLUDE REGEX ".*/shaders/spirv/generated/shader_data\\.c$")
+list(FILTER RENDERER_VK_SRCS EXCLUDE REGEX ".*/shaders/spirv/generated/shader_binding\\.c$")
 list(APPEND RENDERER_VK_SRCS
-    src/renderers/vulkanrenderer/utils/mikktspace/mikktspace.c
+    src/renderers/vulkan/utils/mikktspace/mikktspace.c
 )
-set(VK_SHADER_DIR "${CMAKE_SOURCE_DIR}/src/renderers/vulkanrenderer/shaders")
+set(VK_SHADER_DIR "${CMAKE_SOURCE_DIR}/src/renderers/vulkan/shaders")
 set(VK_SPIRV_DIR "${VK_SHADER_DIR}/spirv")
 set(VK_GEN_DIR "${VK_SPIRV_DIR}/generated")
 
@@ -1123,10 +1370,11 @@ set(VK_SHADER_DATA_GEN "${VK_GEN_DIR}/shader_data.c")
 set(VK_SHADER_BINDING_GEN "${VK_GEN_DIR}/shader_binding.c")
 set(VK_SHADER_GENERATED_SRCS ${VK_SHADER_DATA_GEN} ${VK_SHADER_BINDING_GEN})
 
-file(GLOB VK_SHADER_GLSL_FILES
+file(GLOB_RECURSE VK_SHADER_GLSL_FILES
   "${VK_SHADER_DIR}/glsl/*.frag"
   "${VK_SHADER_DIR}/glsl/*.vert"
   "${VK_SHADER_DIR}/glsl/*.geom"
+  "${VK_SHADER_DIR}/glsl/*.comp"
   "${VK_SHADER_DIR}/glsl/*.tmpl"
 )
 
@@ -1135,29 +1383,35 @@ set(VK_SHADER_TOOL_SOURCES
   "${VK_SHADER_DIR}/tools/bindshader.c"
 )
 
-add_custom_command(
-  OUTPUT ${VK_SHADER_GENERATED_SRCS}
-  COMMAND "${CMAKE_SOURCE_DIR}/scripts/compile_shaders.sh"
-          --generated-dir "${VK_GEN_DIR}"
-  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-  DEPENDS
-    "${CMAKE_SOURCE_DIR}/scripts/compile_shaders.sh"
-    ${VK_SHADER_GLSL_FILES}
-    ${VK_SHADER_TOOL_SOURCES}
-  COMMENT "Generating Vulkan shader blobs"
-  VERBATIM
-)
+option(SKIP_SHADER_REGEN "Skip shader regeneration, use pre-committed generated shaders" OFF)
 
-add_custom_target(vk_shaders_autogen
-  DEPENDS ${VK_SHADER_GENERATED_SRCS}
-)
+if(SKIP_SHADER_REGEN)
+  message(STATUS "Shader regeneration: SKIPPED (using pre-committed shaders)")
+  add_custom_target(vk_shaders_autogen)
+else()
+  add_custom_command(
+    OUTPUT ${VK_SHADER_GENERATED_SRCS}
+    COMMAND "${CMAKE_SOURCE_DIR}/scripts/compile_shaders.sh"
+            --generated-dir "${VK_GEN_DIR}"
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    DEPENDS
+      "${CMAKE_SOURCE_DIR}/scripts/compile_shaders.sh"
+      ${VK_SHADER_GLSL_FILES}
+      ${VK_SHADER_TOOL_SOURCES}
+    COMMENT "Generating Vulkan shader blobs"
+    VERBATIM
+  )
+  add_custom_target(vk_shaders_autogen
+    DEPENDS ${VK_SHADER_GENERATED_SRCS}
+  )
+endif()
 # Suppress shadow warnings for MikkTSpace third-party code
 if(MSVC)
-    set_source_files_properties(src/renderers/vulkanrenderer/utils/mikktspace/mikktspace.c PROPERTIES
+    set_source_files_properties(src/renderers/vulkan/utils/mikktspace/mikktspace.c PROPERTIES
         COMPILE_OPTIONS "/wd4456;/wd4457;/wd4458;/wd4459"
     )
 else()
-    set_source_files_properties(src/renderers/vulkanrenderer/utils/mikktspace/mikktspace.c PROPERTIES
+    set_source_files_properties(src/renderers/vulkan/utils/mikktspace/mikktspace.c PROPERTIES
         COMPILE_OPTIONS "-Wno-shadow"
     )
 endif()
@@ -1172,7 +1426,7 @@ if(NOT USE_RENDERER_DLOPEN)
 	endif()
 endif()
 IF(USE_RENDERER_DLOPEN)
-	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_RENDERER_DLOPEN RENDERER_PREFIX="${RENDERER_PREFIX}" RENDERER_DEFAULT=${RENDERER_DEFAULT})
+	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_RENDERER_DLOPEN RENDERER_PREFIX="${RENDERER_PREFIX}")
 
 	ADD_LIBRARY(${RENDERER_PREFIX}_opengl${RENDEXT} SHARED ${RENDERER_GL_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
 	TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE USE_RENDERER_DLOPEN RENDERER_OPENGL)
@@ -1182,10 +1436,20 @@ IF(USE_RENDERER_DLOPEN)
 
 	ADD_LIBRARY(${RENDERER_PREFIX}_vulkan${RENDEXT} SHARED ${RENDERER_VK_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
 	TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_RENDERER_DLOPEN RENDERER_VULKAN)
+	if(USE_VULKAN_RTX)
+	  target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_VULKAN_RTX=1)
+	  message(STATUS "Vulkan RTX: ray tracing extensions will be requested when available")
+	endif()
 	add_dependencies(${RENDERER_PREFIX}_vulkan${RENDEXT} vk_shaders_autogen)
 	IF(BUILD_FREETYPE)
 		target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE idtech3_freetype)
 	ENDIF()
+	if(HAVE_LIBRSVG)
+		target_compile_definitions(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE USE_LIBRSVG)
+		target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_LIBRSVG)
+		target_link_libraries(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE PkgConfig::LIBRSVG PkgConfig::CAIRO)
+		target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE PkgConfig::LIBRSVG PkgConfig::CAIRO)
+	endif()
 	if(WIN32)
 		target_link_libraries(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE qcommon m ${CMAKE_DL_LIBS})
 		target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE qcommon m ${CMAKE_DL_LIBS})
@@ -1213,16 +1477,27 @@ ELSE()
 	IF(USE_VULKAN)
 		ADD_LIBRARY(${RENDERER_PREFIX}_vulkan OBJECT ${RENDERER_VK_SRCS} ${RENDERER_COMMON_SRCS})
 		TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan PRIVATE RENDERER_VULKAN)
+		if(USE_VULKAN_RTX)
+		  target_compile_definitions(${RENDERER_PREFIX}_vulkan PRIVATE USE_VULKAN_RTX=1)
+		endif()
 		add_dependencies(${RENDERER_PREFIX}_vulkan vk_shaders_autogen)
 		IF(BUILD_FREETYPE)
 			target_link_libraries(${RENDERER_PREFIX}_vulkan PRIVATE idtech3_freetype)
 		ENDIF()
+		if(HAVE_LIBRSVG)
+			target_compile_definitions(${RENDERER_PREFIX}_vulkan PRIVATE USE_LIBRSVG)
+			target_link_libraries(${RENDERER_PREFIX}_vulkan PRIVATE PkgConfig::LIBRSVG PkgConfig::CAIRO)
+		endif()
 	ELSE()
 		ADD_LIBRARY(${RENDERER_PREFIX}_opengl OBJECT ${RENDERER_GL_SRCS} ${RENDERER_COMMON_SRCS})
 		TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_opengl PRIVATE RENDERER_OPENGL)
 		IF(BUILD_FREETYPE)
 			target_link_libraries(${RENDERER_PREFIX}_opengl PRIVATE idtech3_freetype)
 		ENDIF()
+		if(HAVE_LIBRSVG)
+			target_compile_definitions(${RENDERER_PREFIX}_opengl PRIVATE USE_LIBRSVG)
+			target_link_libraries(${RENDERER_PREFIX}_opengl PRIVATE PkgConfig::LIBRSVG PkgConfig::CAIRO)
+		endif()
 	ENDIF()
 ENDIF()
 
@@ -1272,8 +1547,78 @@ if(USE_GLM)
   endif()
 endif()
 
+# EXR image loading via tinyexr -- built as separate static lib to avoid
+# duplicate TINYEXR_IMPLEMENTATION symbols when both renderers are loaded
+enable_language(CXX)
+add_library(exr_loader STATIC src/renderers/common/tr_image_exr.cpp)
+target_include_directories(exr_loader PRIVATE ${EXTERNAL_INCLUDE}/tinyexr ${CMAKE_SOURCE_DIR}/src)
+target_include_directories(exr_loader PRIVATE ${EXTERNAL_ZLIB_SRC})
+set_property(TARGET exr_loader PROPERTY POSITION_INDEPENDENT_CODE ON)
+if(NOT MSVC)
+  target_compile_options(exr_loader PRIVATE -Wno-old-style-cast -Wno-sign-compare)
+endif()
+if(TARGET ZLIB::ZLIB)
+  target_link_libraries(exr_loader PRIVATE ZLIB::ZLIB)
+endif()
+if(USE_RENDERER_DLOPEN)
+  target_link_libraries(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE exr_loader)
+  target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE exr_loader)
+else()
+  if(USE_VULKAN)
+    target_link_libraries(${RENDERER_PREFIX}_vulkan PRIVATE exr_loader)
+  else()
+    target_link_libraries(${RENDERER_PREFIX}_opengl PRIVATE exr_loader)
+  endif()
+endif()
+
+# cgltf include for glTF 2.0 model loading
+if(USE_RENDERER_DLOPEN)
+  target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${EXTERNAL_INCLUDE}/cgltf)
+else()
+  if(USE_VULKAN)
+    target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${EXTERNAL_INCLUDE}/cgltf)
+  endif()
+endif()
+
+# --- ImGui Inspector (optional, requires C++) ---
+option(USE_IMGUI "Enable ImGui inspector overlay" ON)
+if(USE_IMGUI)
+  enable_language(CXX)
+  set(IMGUI_SRCS
+    src/renderers/vulkan/inspector/vk_imgui.cpp
+    ${EXTERNAL_SRC}/cimgui/imgui/imgui.cpp
+    ${EXTERNAL_SRC}/cimgui/imgui/imgui_draw.cpp
+    ${EXTERNAL_SRC}/cimgui/imgui/imgui_tables.cpp
+    ${EXTERNAL_SRC}/cimgui/imgui/imgui_widgets.cpp
+  )
+  set(IMGUI_INCLUDE_DIRS
+    ${EXTERNAL_SRC}/cimgui/imgui
+    ${EXTERNAL_SRC}/cimgui/imgui/backends
+    ${EXTERNAL_SRC}/cimgui
+    ${CMAKE_SOURCE_DIR}/src/renderers/common
+  )
+  if(USE_RENDERER_DLOPEN)
+    target_sources(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${IMGUI_SRCS})
+    target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${IMGUI_INCLUDE_DIRS})
+    target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_IMGUI)
+  else()
+    if(USE_VULKAN)
+      target_sources(${RENDERER_PREFIX}_vulkan PRIVATE ${IMGUI_SRCS})
+      target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${IMGUI_INCLUDE_DIRS})
+      target_compile_definitions(${RENDERER_PREFIX}_vulkan PRIVATE USE_IMGUI)
+    endif()
+  endif()
+  message(STATUS "ImGui Inspector: enabled")
+endif()
+
 # common function, window system
-IF(UNIX)
+IF(ANDROID)
+	SET(Q3_SRCS
+		src/platform/unix/unix_shared.c
+		src/platform/android/android_stubs.c
+		src/platform/android/android_main.c)
+	SET(Q3_UI_SRCS "")
+ELSEIF(UNIX)
 	SET (Q3_SRCS
 		src/platform/unix/unix_main.c
 		src/platform/unix/unix_shared.c
@@ -1346,13 +1691,17 @@ ELSEIF(WIN32)
 
 # Audio backends/effects are built with the client module only.
 
+IF(Q3_UI_SRCS)
 ADD_LIBRARY(q3ui OBJECT ${Q3_UI_SRCS})
+ENDIF()
 
 if(USE_LOCAL_HEADERS)
-	target_include_directories(q3ui PRIVATE ${EXTERNAL_SDL_INCLUDE_DIR})
+	if(TARGET q3ui)
+		target_include_directories(q3ui PRIVATE ${EXTERNAL_SDL_INCLUDE_DIR})
+	endif()
 	target_include_directories(client PRIVATE ${EXTERNAL_SDL_INCLUDE_DIR})
 endif()
-IF(USE_SDL)
+IF(USE_SDL AND TARGET q3ui)
 	if(SDL2_INCLUDE_DIRS)
 		target_include_directories(q3ui PRIVATE ${SDL2_INCLUDE_DIRS})
 	elseif(SDL2_INCLUDE_DIR)
@@ -1368,29 +1717,37 @@ IF(NOT MSVC)
 		if(NOT SDL2_FOUND)
 		  message(FATAL_ERROR "SDL2 could not be found. Please install or set SDL2_DIR/SDL2_PATH.")
 		endif()
-		TARGET_LINK_LIBRARIES(q3ui SDL2::Main)
+		if(TARGET q3ui)
+			TARGET_LINK_LIBRARIES(q3ui SDL2::Main)
+		endif()
 		TARGET_LINK_LIBRARIES(client PRIVATE SDL2::Core)
 		if(SDL2_INCLUDE_DIRS)
 			target_include_directories(client PRIVATE ${SDL2_INCLUDE_DIRS})
 		elseif(SDL2_INCLUDE_DIR)
 			target_include_directories(client PRIVATE ${SDL2_INCLUDE_DIR})
 		endif()
-	ELSEIF(UNIX)
+	ELSEIF(UNIX AND NOT ANDROID)
 		find_package (X11 REQUIRED)
-		TARGET_LINK_LIBRARIES(q3ui ${X11_LIBRARIES})
+		if(TARGET q3ui)
+			TARGET_LINK_LIBRARIES(q3ui ${X11_LIBRARIES})
+		endif()
 	ENDIF()
 ENDIF()
 
-target_include_directories(q3ui PRIVATE ${CMAKE_SOURCE_DIR}/src/audio)
+if(TARGET q3ui)
+	target_include_directories(q3ui PRIVATE ${CMAKE_SOURCE_DIR}/src/audio)
+endif()
 
 IF(USE_OPENAL)
 	if(NOT OPENAL_FOUND)
 	  message(FATAL_ERROR "OpenAL could not be found. Please install or set OPENAL paths.")
 	endif()
-	TARGET_COMPILE_DEFINITIONS(q3ui PRIVATE USE_OPENAL)
+	if(TARGET q3ui)
+		TARGET_COMPILE_DEFINITIONS(q3ui PRIVATE USE_OPENAL)
+		TARGET_COMPILE_DEFINITIONS(q3ui PRIVATE USE_OPENAL_EFX)
+		target_include_directories(q3ui PRIVATE ${OPENAL_INCLUDE_DIR})
+	endif()
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_OPENAL)
-	TARGET_COMPILE_DEFINITIONS(q3ui PRIVATE USE_OPENAL_EFX)
-	target_include_directories(q3ui PRIVATE ${OPENAL_INCLUDE_DIR})
 	target_include_directories(client PRIVATE ${OPENAL_INCLUDE_DIR})
 ENDIF()
 
@@ -1425,13 +1782,40 @@ if(USE_WEBM)
 endif()
 
 IF(USE_VULKAN)
-	TARGET_COMPILE_DEFINITIONS(q3ui PRIVATE USE_VULKAN_API)
+	if(TARGET q3ui)
+		TARGET_COMPILE_DEFINITIONS(q3ui PRIVATE USE_VULKAN_API)
+	endif()
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_VULKAN_API)
 ENDIF()
 
 IF(USE_MP3)
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_MP3)
 ENDIF()
+
+# --- Modern video codec compile definitions and link libraries ---
+if(FFMPEG_FOUND)
+  TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_FFMPEG)
+  target_include_directories(client PRIVATE ${FFMPEG_PKG_INCLUDE_DIRS})
+  target_link_libraries(client PRIVATE ${FFMPEG_PKG_LINK_LIBRARIES})
+endif()
+
+if(DAV1D_FOUND)
+  TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_DAV1D)
+  target_include_directories(client PRIVATE ${DAV1D_PKG_INCLUDE_DIRS})
+  target_link_libraries(client PRIVATE ${DAV1D_PKG_LINK_LIBRARIES})
+endif()
+
+if(VPX_FOUND)
+  TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_VPX)
+  target_include_directories(client PRIVATE ${VPX_PKG_INCLUDE_DIRS})
+  target_link_libraries(client PRIVATE ${VPX_PKG_LINK_LIBRARIES})
+endif()
+
+if(THEORA_FOUND)
+  TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_THEORA)
+  target_include_directories(client PRIVATE ${THEORA_PKG_INCLUDE_DIRS})
+  target_link_libraries(client PRIVATE ${THEORA_PKG_LINK_LIBRARIES})
+endif()
 
 # Ensure GNU-style --export-dynamic is not present in global linker flags on macOS
 if(APPLE)
@@ -1443,10 +1827,88 @@ if(APPLE)
   endif()
 endif()
 
-# client executable
+# --- Recast Navigation module ---
+option(USE_RECAST_NAV "Enable Recast/Detour navigation mesh" ON)
+if(USE_RECAST_NAV)
+  enable_language(CXX)
+  file(GLOB RECAST_SRCS
+    src/external/src/recast/Recast/Source/*.cpp
+    src/external/src/recast/Detour/Source/*.cpp
+    src/external/src/recast/DetourCrowd/Source/*.cpp
+    src/external/src/recast/DetourTileCache/Source/*.cpp
+  )
+  ADD_LIBRARY(recast_nav STATIC ${RECAST_SRCS} src/navigation/nav_recast.cpp src/navigation/nav_bsp_extract.c)
+  target_include_directories(recast_nav PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/external/src/recast/Recast/Include
+    ${CMAKE_SOURCE_DIR}/src/external/src/recast/Detour/Include
+    ${CMAKE_SOURCE_DIR}/src/external/src/recast/DetourCrowd/Include
+    ${CMAKE_SOURCE_DIR}/src/external/src/recast/DetourTileCache/Include
+    ${CMAKE_SOURCE_DIR}/src/navigation
+  )
+  set_property(TARGET recast_nav PROPERTY POSITION_INDEPENDENT_CODE ON)
+  if(NOT MSVC)
+    target_compile_options(recast_nav PRIVATE -Wno-unused-parameter -Wno-sign-compare -Wno-cast-qual -Wno-shadow)
+  endif()
+  message(STATUS "Recast Navigation: enabled")
+endif()
 
-ADD_EXECUTABLE(${CNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
-TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE qcommon botlib client q3ui)
+# --- Bullet Physics module ---
+option(USE_BULLET_PHYSICS "Enable Bullet Physics integration" ON)
+set(PHYSICS_SRCS
+  src/physics/phys_bullet.c
+  src/physics/phys_procedural_anim.c
+  src/physics/phys_dmm.c
+  src/physics/phys_ik.c
+  src/physics/phys_dmm_materials.c
+  src/physics/phys_cloth.c
+)
+
+set(BULLET_FOUND FALSE)
+if(USE_BULLET_PHYSICS)
+  find_package(PkgConfig QUIET)
+  if(PKG_CONFIG_FOUND)
+    pkg_check_modules(BULLET_PKG QUIET bullet)
+    if(BULLET_PKG_FOUND)
+      set(BULLET_FOUND TRUE)
+      list(APPEND PHYSICS_SRCS src/physics/phys_bullet_impl.cpp)
+      message(STATUS "Bullet Physics: enabled with C++ backend")
+    endif()
+  endif()
+  if(NOT BULLET_FOUND)
+    message(STATUS "Bullet Physics: C wrapper only (install libbullet-dev for full backend)")
+  endif()
+endif()
+
+ADD_LIBRARY(phys_module OBJECT ${PHYSICS_SRCS})
+target_include_directories(phys_module PRIVATE ${CMAKE_SOURCE_DIR}/src/physics)
+if(NOT MSVC)
+  target_compile_options(phys_module PRIVATE -Wno-unused-parameter)
+endif()
+if(BULLET_FOUND)
+  target_compile_definitions(phys_module PRIVATE USE_BULLET_PHYSICS_IMPL)
+  target_include_directories(phys_module PRIVATE ${BULLET_PKG_INCLUDE_DIRS})
+  target_link_libraries(phys_module ${BULLET_PKG_LINK_LIBRARIES})
+  enable_language(CXX)
+endif()
+
+# client executable / shared library
+
+IF(ANDROID)
+	ADD_LIBRARY(${CNAME}${BINEXT} SHARED ${Q3_SRCS})
+ELSE()
+	ADD_EXECUTABLE(${CNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
+ENDIF()
+if(TARGET q3ui)
+	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE qcommon botlib client q3ui phys_module)
+else()
+	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE qcommon botlib client phys_module)
+endif()
+if(TARGET Threads::Threads)
+  TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE Threads::Threads)
+endif()
+if(USE_RECAST_NAV AND TARGET recast_nav)
+  TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE recast_nav)
+endif()
 if(USE_FLUX)
 	TARGET_COMPILE_DEFINITIONS(${CNAME}${BINEXT} PRIVATE USE_FLUX)
 	if(TARGET cflux2)
@@ -1473,34 +1935,48 @@ IF(NOT USE_RENDERER_DLOPEN)
 	ENDIF()
 ENDIF()
 
-# dedicated server executable
+# dedicated server executable (not built on Android)
 
+IF(NOT ANDROID)
 ADD_EXECUTABLE(${DNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
 TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE qcommon_ded botlib)
+if(TARGET Threads::Threads)
+  TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE Threads::Threads)
+endif()
 #TARGET_LINK_OPTIONS(${DNAME} PRIVATE -fno-pie) # v3.13+
 
 if(UNIX AND NOT MSVC AND NOT APPLE)
   target_link_options(${DNAME}${BINEXT} PRIVATE "-Wl,--export-dynamic")
 endif()
+ENDIF() # NOT ANDROID (server target block)
 
 if(USE_LUA AND LUA_FOUND)
   TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ${LUA_LINK_LIBRARIES})
-  TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE ${LUA_LINK_LIBRARIES})
+  if(NOT ANDROID)
+    TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE ${LUA_LINK_LIBRARIES})
+  endif()
 endif()
 if(USE_DUKTAPE AND DUKTAPE_FOUND)
   TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ${DUKTAPE_LINK_LIBRARIES})
-  TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE ${DUKTAPE_LINK_LIBRARIES})
+  if(NOT ANDROID)
+    TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE ${DUKTAPE_LINK_LIBRARIES})
+  endif()
+endif()
+if((USE_STEAM OR USE_STEAM_NETWORKING) AND STEAMWORKS_FOUND)
+  TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ${STEAMWORKS_LIBRARY})
 endif()
 
 IF(WIN32)
 	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE winmm comctl32 ws2_32)
 	TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE winmm comctl32 ws2_32)
-ELSE()
+ELSEIF(NOT ANDROID)
 	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE m ${CMAKE_DL_LIBS})
 	TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE m ${CMAKE_DL_LIBS})
+ELSE()
+	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE m ${CMAKE_DL_LIBS} log android OpenSLES aaudio)
 ENDIF()
 
-if(UNIX AND NOT APPLE AND IDTECH3_X11_LIBS)
+if(UNIX AND NOT APPLE AND NOT ANDROID AND IDTECH3_X11_LIBS)
 	if(IDTECH3_X11_INCLUDE)
 		target_include_directories(${CNAME}${BINEXT} PRIVATE ${IDTECH3_X11_INCLUDE})
 		target_include_directories(${DNAME}${BINEXT} PRIVATE ${IDTECH3_X11_INCLUDE})
@@ -1526,4 +2002,29 @@ if(Python3_Interpreter_FOUND)
 		COMMENT "Checking Vulkan generated shader blobs are up-to-date with GLSL")
 else()
 	message(STATUS "Python3 not found: vk_shader_regen/vk_shader_check targets are unavailable.")
+endif()
+
+# --- CTest validation ---
+enable_testing()
+add_test(NAME smoke_test
+	COMMAND ${CMAKE_SOURCE_DIR}/scripts/smoke_test.sh ${CMAKE_SOURCE_DIR}/release
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(smoke_test PROPERTIES
+	LABELS "validation;smoke"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/release/idtech3_server")
+
+add_test(NAME check_artifacts
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/check_artifacts.sh ${CMAKE_SOURCE_DIR}/release
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(check_artifacts PROPERTIES
+	LABELS "validation;artifacts"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/release/idtech3_server")
+
+# --- Unit tests ---
+option(BUILD_UNIT_TESTS "Build unit tests" ON)
+if(BUILD_UNIT_TESTS)
+	add_executable(unit_macros tests/unit/test_macros.c)
+	target_include_directories(unit_macros PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	add_test(NAME unit_macros COMMAND unit_macros)
+	set_tests_properties(unit_macros PROPERTIES LABELS "unit;validation")
 endif()

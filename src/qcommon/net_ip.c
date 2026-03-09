@@ -29,6 +29,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
+#include "net_dtls.h"
+#include "net_sdr.h"
 
 #ifdef _WIN32
 #	include <winsock2.h>
@@ -246,7 +248,7 @@ NET_ErrorString
 */
 static char *NET_ErrorString( void ) {
 #ifdef _WIN32
-	//FIXME: replace with FormatMessage?
+	/* Windows: could use FormatMessage for localized strings. */
 	switch( socketError ) {
 		case WSAEINTR: return "WSAEINTR";
 		case WSAEBADF: return "WSAEBADF";
@@ -548,6 +550,10 @@ qboolean NET_CompareBaseAdrMask( const netadr_t *a, const netadr_t *b, unsigned 
 			netmask = 128;
 	}
 #endif
+#ifdef USE_STEAM_NETWORKING
+	else if (a->type == NA_STEAMID)
+		return (a->ipv.steamid == b->ipv.steamid);
+#endif
 	else
 	{
 		Com_Printf ("%s: bad address type\n", __func__);
@@ -593,9 +599,13 @@ const char *NET_AdrToString( const netadr_t *a )
 	static char s[NET_ADDRSTRMAXLEN];
 
 	if (a->type == NA_LOOPBACK)
-		strcpy( s, "loopback" );
+		Q_strncpyz( s, "loopback", sizeof( s ) );
 	else if (a->type == NA_BOT)
-		strcpy( s, "bot" );
+		Q_strncpyz( s, "bot", sizeof( s ) );
+#ifdef USE_STEAM_NETWORKING
+	else if (a->type == NA_STEAMID)
+		Com_sprintf( s, sizeof( s ), "steam:%llu", (unsigned long long)a->ipv.steamid );
+#endif
 #ifdef USE_IPV6
 	else if (a->type == NA_IP || a->type == NA_IP6)
 #else
@@ -616,14 +626,18 @@ const char *NET_AdrToStringwPort( const netadr_t *a )
 	static char s[NET_ADDRSTRMAXLEN];
 
 	if (a->type == NA_LOOPBACK)
-		strcpy( s, "loopback" );
+		Q_strncpyz( s, "loopback", sizeof( s ) );
 	else if (a->type == NA_BOT)
-		strcpy( s, "bot" );
+		Q_strncpyz( s, "bot", sizeof( s ) );
 	else if(a->type == NA_IP)
 		Com_sprintf(s, sizeof(s), "%s:%hu", NET_AdrToString(a), ntohs(a->port));
 #ifdef USE_IPV6
 	else if(a->type == NA_IP6)
 		Com_sprintf(s, sizeof(s), "[%s]:%hu", NET_AdrToString(a), ntohs(a->port));
+#endif
+#ifdef USE_STEAM_NETWORKING
+	else if (a->type == NA_STEAMID)
+		Com_sprintf(s, sizeof(s), "steam:%llu", (unsigned long long)a->ipv.steamid);
 #endif
 
 	return s;
@@ -644,6 +658,10 @@ qboolean NET_CompareAdr( const netadr_t *a, const netadr_t *b )
 		if (a->port == b->port)
 			return qtrue;
 	}
+#ifdef USE_STEAM_NETWORKING
+	else if (a->type == NA_STEAMID)
+		return qtrue;
+#endif
 	else
 		return qtrue;
 		
@@ -658,6 +676,30 @@ qboolean NET_IsLocalAddress( const netadr_t *adr )
 
 //=============================================================================
 
+#ifdef USE_DTLS
+/*
+ * Process DTLS-encrypted packet: decrypt in place, update net_message.
+ * Returns qfalse to drop packet (auth failure), qtrue to continue.
+ */
+static qboolean NET_DTLS_ProcessIncoming( netadr_t *net_from, msg_t *net_message, int ret )
+{
+	byte dec_buf[MAX_PACKETLEN];
+	int dec_len;
+
+	if ( !NET_DTLS_IsEnabled() || ret < 4 || *(const int32_t *)net_message->data != DTLS_MAGIC )
+		return qtrue;
+
+	dec_len = NET_DTLS_Decrypt( net_from, net_message->data, ret, dec_buf, sizeof( dec_buf ) );
+	if ( dec_len <= 0 )
+		return qfalse;
+
+	Com_Memcpy( net_message->data, dec_buf, dec_len );
+	net_message->cursize = dec_len;
+	net_message->readcount = 0;
+	return qtrue;
+}
+#endif
+
 /*
 ==================
 NET_GetPacket
@@ -671,6 +713,11 @@ static qboolean NET_GetPacket( netadr_t *net_from, msg_t *net_message, const fd_
 	sockaddr_t	from;
 	socklen_t	fromlen;
 	int		err;
+
+#ifdef USE_STEAM_NETWORKING
+	if ( NET_SDR_ReceivePacket( net_from, net_message ) )
+		return qtrue;
+#endif
 
 	if(ip_socket != INVALID_SOCKET && FD_ISSET(ip_socket, fdr))
 	{
@@ -712,6 +759,10 @@ static qboolean NET_GetPacket( netadr_t *net_from, msg_t *net_message, const fd_
 			}
 
 			net_message->cursize = ret;
+#ifdef USE_DTLS
+			if ( !NET_DTLS_ProcessIncoming( net_from, net_message, ret ) )
+				return qfalse;
+#endif
 			return qtrue;
 		}
 	}
@@ -740,8 +791,12 @@ static qboolean NET_GetPacket( netadr_t *net_from, msg_t *net_message, const fd_
 				Com_Printf( "Oversize packet from %s\n", NET_AdrToString( net_from ) );
 				return qfalse;
 			}
-			
+
 			net_message->cursize = ret;
+#ifdef USE_DTLS
+			if ( !NET_DTLS_ProcessIncoming( net_from, net_message, ret ) )
+				return qfalse;
+#endif
 			return qtrue;
 		}
 	}
@@ -771,6 +826,10 @@ static qboolean NET_GetPacket( netadr_t *net_from, msg_t *net_message, const fd_
 			}
 
 			net_message->cursize = ret;
+#ifdef USE_DTLS
+			if ( !NET_DTLS_ProcessIncoming( net_from, net_message, ret ) )
+				return qfalse;
+#endif
 			return qtrue;
 		}
 	}
@@ -790,6 +849,10 @@ Sys_SendPacket
 void Sys_SendPacket( int length, const void *data, const netadr_t *to ) {
 	int ret = SOCKET_ERROR;
 	sockaddr_t addr;
+#ifdef USE_DTLS
+	byte enc_buf[MAX_PACKETLEN + 64];
+	int enc_len;
+#endif
 
 	switch ( to->type ) {
 		case NA_BROADCAST:
@@ -819,6 +882,14 @@ void Sys_SendPacket( int length, const void *data, const netadr_t *to ) {
 #endif
 
 	NetadrToSockadr( to, &addr );
+
+#ifdef USE_DTLS
+	enc_len = NET_DTLS_Encrypt( to, (const byte *)data, length, enc_buf, sizeof( enc_buf ) );
+	if ( enc_len > 0 ) {
+		data = enc_buf;
+		length = enc_len;
+	}
+#endif
 
 	if ( usingSocks && to->type == NA_IP ) {
 		socks5_udp_request_t cmd;
@@ -921,7 +992,12 @@ qboolean Sys_IsLANAddress( const netadr_t *adr ) {
 #ifdef USE_IPV6
 			else if ( adr->type == NA_IP6 || adr->type == NA_MULTICAST6 )
 			{
-				// TODO? should we check the scope_id here?
+				/* For link-local addresses (fe80::/10), scope_id identifies the
+				 * interface; addresses on different interfaces are not on same LAN. */
+				if ( ( adr->ipv._6[0] == 0xfe && ( adr->ipv._6[1] & 0xc0 ) == 0x80 )
+					&& adr->scope_id != ( (struct sockaddr_in6 *) &localIP[index].addr )->sin6_scope_id ) {
+					continue;
+				}
 
 				compareip = (byte *) &((struct sockaddr_in6 *) &localIP[index].addr)->sin6_addr;
 				comparemask = (byte *) &((struct sockaddr_in6 *) &localIP[index].netmask)->sin6_addr;
@@ -1037,7 +1113,11 @@ static SOCKET NET_IPSocket( const char *net_interface, int port, int *err ) {
 	}
 
 	if( bind( newsocket, (void *)&address, sizeof(address) ) == SOCKET_ERROR ) {
-		Com_Printf( "WARNING: NET_IPSocket: bind: %s\n", NET_ErrorString() );
+		if ( socketError == EADDRINUSE ) {
+			Com_DPrintf( "NET_IPSocket: bind: %s\n", NET_ErrorString() );
+		} else {
+			Com_Printf( "WARNING: NET_IPSocket: bind: %s\n", NET_ErrorString() );
+		}
 		*err = socketError;
 		closesocket( newsocket );
 		return INVALID_SOCKET;
@@ -1119,7 +1199,11 @@ static SOCKET NET_IP6Socket( const char *net_interface, int port, struct sockadd
 	}
 
 	if( bind( newsocket, (void *)&address, sizeof(address) ) == SOCKET_ERROR ) {
-		Com_Printf( "WARNING: NET_IP6Socket: bind: %s\n", NET_ErrorString() );
+		if ( socketError == EADDRINUSE ) {
+			Com_DPrintf( "NET_IP6Socket: bind: %s\n", NET_ErrorString() );
+		} else {
+			Com_Printf( "WARNING: NET_IP6Socket: bind: %s\n", NET_ErrorString() );
+		}
 		*err = socketError;
 		closesocket( newsocket );
 		return INVALID_SOCKET;
@@ -1557,11 +1641,14 @@ static void NET_OpenIP( void ) {
 		for( i = 0 ; i < 10 ; i++ )
 		{
 			ip6_socket = NET_IP6Socket(net_ip6->string, port6 + i, &boundto, &err);
-			if (ip6_socket != INVALID_SOCKET)
-			{
-				Cvar_SetIntegerValue( "net_port6", port6 + i );
-				break;
-			}
+				if (ip6_socket != INVALID_SOCKET)
+				{
+					Cvar_SetIntegerValue( "net_port6", port6 + i );
+					if ( i > 0 ) {
+						Com_Printf( "NET: using fallback IPv6 port %d\n", port6 + i );
+					}
+					break;
+				}
 			else
 			{
 				if(err == EAFNOSUPPORT)
@@ -1575,13 +1662,16 @@ static void NET_OpenIP( void ) {
 
 	if(net_enabled->integer & NET_ENABLEV4)
 	{
-		for( i = 0 ; i < 10 ; i++ ) {
-			ip_socket = NET_IPSocket( net_ip->string, port + i, &err );
-			if (ip_socket != INVALID_SOCKET) {
-				Cvar_SetIntegerValue( "net_port", port + i );
+			for( i = 0 ; i < 10 ; i++ ) {
+				ip_socket = NET_IPSocket( net_ip->string, port + i, &err );
+				if (ip_socket != INVALID_SOCKET) {
+					Cvar_SetIntegerValue( "net_port", port + i );
+					if ( i > 0 ) {
+						Com_Printf( "NET: using fallback IPv4 port %d\n", port + i );
+					}
 
-				if (net_socksEnabled->integer)
-					NET_OpenSocks( port + i );
+					if (net_socksEnabled->integer)
+						NET_OpenSocks( port + i );
 
 				break;
 			}
@@ -1807,7 +1897,10 @@ void NET_Init( void ) {
 #endif
 
 	NET_Config( qtrue );
-	
+
+	NET_DTLS_Init();
+	NET_SDR_Init();
+
 	Cmd_AddCommand( "net_restart", NET_Restart_f );
 }
 
@@ -1821,6 +1914,9 @@ void NET_Shutdown( void ) {
 	if ( !networkingEnabled ) {
 		return;
 	}
+
+	NET_SDR_Shutdown();
+	NET_DTLS_Shutdown();
 
 	NET_Config( qfalse );
 
@@ -1892,6 +1988,14 @@ qboolean NET_Sleep( int timeout )
 		timeout = 0;
 
 	FD_ZERO( &fdr );
+
+#ifdef USE_STEAM_NETWORKING
+	NET_SDR_Frame();
+	if ( NET_SDR_HasPacket() ) {
+		NET_Event( &fdr );
+		return qfalse;
+	}
+#endif
 
 	if ( ip_socket != INVALID_SOCKET )
 	{

@@ -13,7 +13,7 @@ Install Visual Studio Community Edition 2017 or later and compile `quake3e` proj
 
 Copy resulting exe from `src/platform/win32/msvc2017/output` directory
 
-To compile with Vulkan backend - clean solution, right click on `quake3e` project, find `Project Dependencies` and select `renderervk` instead of `renderer`
+To compile with Vulkan backend - clean solution, right click on `quake3e` project, find `Project Dependencies` and select `vulkan` instead of `renderer`
 
 ---
 
@@ -228,7 +228,59 @@ Or let the helper script do it:
 ./scripts/compile_engine.sh freetype vulkan
 ```
 
-The flag targets the renderer code under `src/renderers/rendercommon/tr_font.c`, links with your platform’s FreeType library, and defines `BUILD_FREETYPE` for the build. Make sure the FreeType headers/libraries (`libfreetype6-dev`, `freetype-devel`, etc.) are installed before you configure the project.
+The flag targets the renderer code under `src/renderers/common/tr_font.c`, links with your platform’s FreeType library, and defines `BUILD_FREETYPE` for the build. Make sure the FreeType headers/libraries (`libfreetype6-dev`, `freetype-devel`, etc.) are installed before you configure the project.
+
+---
+
+### SDF HUD text rendering
+
+The client includes an SDF (signed-distance-field) HUD text path that can render UTF-8 glyphs from BMFont metrics + atlas assets.
+
+Runtime cvars:
+
+- `r_sdfEnable` (`0/1`) - enable SDF text path for supported HUD string rendering.
+- `r_sdfFont` - base font path (for example `fonts/myfont` expects `fonts/myfont.fnt` and atlas image).
+- `r_sdfFontMetrics` - optional explicit `.fnt` path override.
+- `r_sdfFontAtlas` - optional explicit atlas image path override.
+- `r_sdfSmoothing` - edge smoothing width hint for SDF content.
+
+Behavior:
+
+- When enabled and the configured SDF assets are valid, supported string draws use SDF glyph quads.
+- If assets are missing/invalid or a glyph cannot be resolved, the renderer falls back to legacy bitmap text.
+- Emoji rendering compatibility is preserved via the existing emoji atlas path.
+
+---
+
+### SVG image loading (librsvg)
+
+The renderer can optionally rasterize `.svg` assets via **librsvg + cairo**.
+
+Enable it with:
+
+```bash
+cmake -S . -B build -DUSE_LIBRSVG=ON ..
+```
+
+If dependencies are missing, CMake automatically disables the SVG loader and prints a status line.
+
+Typical Linux packages:
+
+- `librsvg2-dev`
+- `libcairo2-dev`
+- `pkg-config`
+
+Runtime controls:
+
+- `r_svgRasterScale` (default `1.0`) - rasterization scale multiplier.
+- `r_svgMaxRasterSize` (default `4096`) - max rasterized width/height in pixels.
+- `r_svgMaxFileBytes` (default `2097152`) - max accepted SVG source size.
+
+Security behavior:
+
+- Loads from virtual filesystem paths only.
+- External resource resolution is disabled via empty base URI.
+- Oversized files/raster targets are rejected safely with warnings.
 
 ---
 

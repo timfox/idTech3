@@ -1,0 +1,2 @@
+rootProject.name = "idTech3"
+include ':app'

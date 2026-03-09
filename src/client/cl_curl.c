@@ -328,6 +328,9 @@ void CL_cURL_BeginDownload( const char *localName, const char *remoteURL )
 	if ( com_developer->integer )
 		qcurl_easy_setopt_warn( clc.downloadCURL, CURLOPT_VERBOSE, 1 );
 	qcurl_easy_setopt_warn(clc.downloadCURL, CURLOPT_URL, clc.downloadURL);
+#ifdef CURL_HTTP_VERSION_2TLS
+	qcurl_easy_setopt_warn(clc.downloadCURL, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2TLS);
+#endif
 	qcurl_easy_setopt_warn(clc.downloadCURL, CURLOPT_TRANSFERTEXT, 0);
 	qcurl_easy_setopt_warn(clc.downloadCURL, CURLOPT_REFERER, va("ioQ3://%s",
 		NET_AdrToString(&clc.serverAddress)));
@@ -703,11 +706,11 @@ static const char *sizeToString( int size )
 {
 	static char buf[ 32 ];
 	if ( size < 1024 ) {
-		sprintf( buf, "%iB", size );
+		Com_sprintf( buf, sizeof( buf ), "%iB", size );
 	} else if ( size < 1024*1024 ) {
-		sprintf( buf, "%iKB", size / 1024 );
+		Com_sprintf( buf, sizeof( buf ), "%iKB", size / 1024 );
 	} else {
-		sprintf( buf, "%i.%iMB", size / (1024*1024), (size / (1024*1024/10 )) % 10 );
+		Com_sprintf( buf, sizeof( buf ), "%i.%iMB", size / (1024*1024), (size / (1024*1024/10 )) % 10 );
 	}
 	return buf;
 }
@@ -758,9 +761,9 @@ static int Com_DL_CallbackProgress( void *data, double dltotal, double dlnow, do
 #else
 		percentage = ( dlnow / dltotal ) * 100.0;
 #endif
-		sprintf( dl->progress, " downloading %s: %s (%i%%)", dl->Name, sizeToString( dl->Count ), (int)percentage );
+		Com_sprintf( dl->progress, sizeof( dl->progress ), " downloading %s: %s (%i%%)", dl->Name, sizeToString( dl->Count ), (int)percentage );
 	} else {
-		sprintf( dl->progress, " downloading %s: %s", dl->Name, sizeToString( dl->Count ) );
+		Com_sprintf( dl->progress, sizeof( dl->progress ), " downloading %s: %s", dl->Name, sizeToString( dl->Count ) );
 	}
 
 #if CURL_AT_LEAST_VERSION(7, 55, 0)
@@ -891,8 +894,8 @@ static size_t Com_DL_HeaderCallback( void *ptr, size_t size, size_t nmemb, void 
 			// strip extension
 			FS_StripExt( name, ".pk3" );
 
-			// store in
-			strcpy( dl->Name, name );
+			// store in (Q_strncpyz: Content-Disposition is server-controlled)
+			Q_strncpyz( dl->Name, name, sizeof( dl->Name ) );
 		}
 	}
 
@@ -988,6 +991,9 @@ qboolean Com_DL_Begin( download_t *dl, const char *localName, const char *remote
 		dl->func.easy_setopt( dl->cURL, CURLOPT_VERBOSE, 1 );
 
 	dl->func.easy_setopt( dl->cURL, CURLOPT_URL, dl->URL );
+#ifdef CURL_HTTP_VERSION_2TLS
+	dl->func.easy_setopt( dl->cURL, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2TLS );
+#endif
 	dl->func.easy_setopt( dl->cURL, CURLOPT_TRANSFERTEXT, 0 );
 	//dl->func.easy_setopt( dl->cURL, CURLOPT_REFERER, "q3a://127.0.0.1" );
 	dl->func.easy_setopt( dl->cURL, CURLOPT_REFERER, dl->URL );
@@ -1118,7 +1124,7 @@ qboolean Com_DL_Perform( download_t *dl )
 			} 
 			else if ( clc.demoplaying )
 			{
-				// FIXME: there might be better solution than vid_restart
+				/* Note: vid_restart may not be ideal; alternatives could be explored. */
 				cls.startCgame = qtrue;
 				Cbuf_ExecuteText( EXEC_APPEND, "vid_restart\n" );
 			}
@@ -1131,7 +1137,7 @@ qboolean Com_DL_Perform( download_t *dl )
 		dl->func.easy_getinfo( msg->easy_handle, CURLINFO_RESPONSE_CODE, &code );
 		Com_Printf( S_COLOR_RED "Download Error: %s Code: %ld\n",
 			dl->func.easy_strerror( msg->data.result ), code );
-		strcpy( name, dl->TempName );
+		Q_strncpyz( name, dl->TempName, sizeof( name ) );
 		Com_DL_Cleanup( dl );
 		FS_Remove( name );
 		if ( autoDownload )

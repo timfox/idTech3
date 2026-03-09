@@ -1,0 +1,42 @@
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(binding = 0) uniform sampler2D hdrColorTexture;
+layout(binding = 1, r32f) uniform writeonly image2D luminanceOutput;
+
+const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
+
+shared float s_logLum[256];
+
+void main() {
+	uint lx = gl_LocalInvocationID.x;
+	uint ly = gl_LocalInvocationID.y;
+	uint li = ly * 16u + lx;
+
+	/* Sample HDR at 16x16 sparse grid across full image (1 work group) */
+	float fx = (float(lx) + 0.5) / 16.0;
+	float fy = (float(ly) + 0.5) / 16.0;
+	vec2 uv = vec2(fx, fy);
+	vec3 rgb = texture(hdrColorTexture, uv).rgb;
+	float lum = max(dot(rgb, LUMA), 1e-6);
+	float logLum = log2(lum);
+	s_logLum[li] = logLum;
+
+	barrier();
+	memoryBarrierShared();
+
+	/* Parallel reduction: 256 -> 1 */
+	for (uint s = 128u; s > 0u; s >>= 1u) {
+		if (li < s) {
+			s_logLum[li] += s_logLum[li + s];
+		}
+		barrier();
+		memoryBarrierShared();
+	}
+
+	if (li == 0u) {
+		float avgLogLum = s_logLum[0] / 256.0;
+		imageStore(luminanceOutput, ivec2(0, 0), vec4(avgLogLum, 0.0, 0.0, 1.0));
+	}
+}
