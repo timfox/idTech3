@@ -23,6 +23,28 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "tr_local.h"
 
+static color4ub_t RB_TintedFogColor( const fog_t *fog ) {
+	color4ub_t color;
+	float tint[3];
+	byte alpha;
+
+	color = fog->colorInt;
+	if ( !r_fogTint || !r_fogTint->string[0] ) {
+		return color;
+	}
+	if ( sscanf( r_fogTint->string, "%f %f %f", &tint[0], &tint[1], &tint[2] ) != 3 ) {
+		return color;
+	}
+
+	alpha = color.rgba[3];
+	color.rgba[0] = (byte)Com_Clamp( 0, 255, (int)( (float)color.rgba[0] * tint[0] ) );
+	color.rgba[1] = (byte)Com_Clamp( 0, 255, (int)( (float)color.rgba[1] * tint[1] ) );
+	color.rgba[2] = (byte)Com_Clamp( 0, 255, (int)( (float)color.rgba[2] * tint[2] ) );
+	color.rgba[3] = alpha;
+
+	return color;
+}
+
 extern cvar_t *r_shLighting;
 extern cvar_t *r_shWorldLighting;
 extern cvar_t *r_shDebugView;
@@ -559,10 +581,11 @@ Blends a fog texture on top of everything else
 */
 static void RB_FogPass( void ) {
 	const fog_t *fog = tr.world->fogs + tess.fogNum;
+	const color4ub_t fogColor = RB_TintedFogColor( fog );
 	int i;
 
 	for ( i = 0; i < tess.numVertexes; i++ ) {
-		tess.svars.colors[i] = fog->colorInt;
+		tess.svars.colors[i] = fogColor;
 	}
 
 	RB_CalcFogTexCoords( ( float * ) tess.svars.texcoords[0] );
@@ -709,11 +732,13 @@ void R_ComputeColors( const shaderStage_t *pStage )
 		case CGEN_FOG:
 			{
 				const fog_t *fog;
+				color4ub_t fogColor;
 
 				fog = tr.world->fogs + tess.fogNum;
+				fogColor = RB_TintedFogColor( fog );
 
 				for ( i = 0; i < tess.numVertexes; i++ ) {
-					tess.svars.colors[i] = fog->colorInt;
+					tess.svars.colors[i] = fogColor;
 				}
 			}
 			break;

@@ -356,6 +356,7 @@ cvar_t	*r_lodCurveError;
 cvar_t	*r_overBrightBits;
 cvar_t	*r_mapOverBrightBits;
 cvar_t	*r_mapGreyScale;
+cvar_t	*r_fogTint;
 
 cvar_t	*r_debugSurface;
 cvar_t	*r_simpleMipMaps;
@@ -2097,6 +2098,9 @@ static void R_Register( void )
 	r_mapGreyScale = ri.Cvar_Get( "r_mapGreyScale", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_mapGreyScale, "-1", "1", CV_FLOAT );
 	ri.Cvar_SetDescription(r_mapGreyScale, "Desaturate world map textures only, works independently from \\r_greyscale, negative values only desaturate lightmaps.");
+
+	r_fogTint = ri.Cvar_Get( "r_fogTint", "1 1 1", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_fogTint, "Legacy map fog RGB tint multiplier (3 floats). Applied at render time to non-volumetric fog." );
 
 	r_subdivisions = ri.Cvar_Get( "r_subdivisions", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription(r_subdivisions, "Distance to subdivide bezier curved surfaces. Higher values mean less subdivision and less geometric complexity.");

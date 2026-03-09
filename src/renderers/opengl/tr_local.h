@@ -557,6 +557,7 @@ typedef struct {
 	qboolean	eyeOutside;
 	vec4_t		fogDistanceVector;
 	vec4_t		fogDepthVector;
+	vec4_t		fogColorBuffer;
 	const float *fogColor; // vec4_t
 } fogProgramParms_t;
 
@@ -1324,6 +1325,7 @@ extern	cvar_t	*r_ignoreGLErrors;
 extern	cvar_t	*r_overBrightBits;
 extern	cvar_t	*r_mapOverBrightBits;
 extern	cvar_t	*r_mapGreyScale;
+extern	cvar_t	*r_fogTint;
 
 extern	cvar_t	*r_debugSurface;
 extern	cvar_t	*r_simpleMipMaps;
