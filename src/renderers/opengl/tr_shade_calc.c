@@ -22,6 +22,22 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_shade_calc.c
 
 #include "tr_local.h"
+
+static void RB_ApplyFogTint( vec4_t color ) {
+	float tint[3];
+
+	if ( !r_fogTint || !r_fogTint->string[0] ) {
+		return;
+	}
+
+	if ( sscanf( r_fogTint->string, "%f %f %f", &tint[0], &tint[1], &tint[2] ) != 3 ) {
+		return;
+	}
+
+	color[0] *= tint[0];
+	color[1] *= tint[1];
+	color[2] *= tint[2];
+}
 // -EC-: avoid using ri.ftol
 #define	WAVEVALUE( table, base, amplitude, phase, freq )  ((base) + table[ (int64_t)( ( ( (phase) + tess.shaderTime * (freq) ) * FUNCTABLE_SIZE ) ) & FUNCTABLE_MASK ] * (amplitude))
 
@@ -967,7 +983,9 @@ const fogProgramParms_t *RB_CalcFogProgramParms( void )
 	}
 
 	parm.fogDistanceVector[3] += 1.0/512;
-	parm.fogColor = fog->color;
+	Vector4Copy( fog->color, parm.fogColorBuffer );
+	RB_ApplyFogTint( parm.fogColorBuffer );
+	parm.fogColor = parm.fogColorBuffer;
 
 	return &parm;
 }

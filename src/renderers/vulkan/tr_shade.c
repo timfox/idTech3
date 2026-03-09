@@ -22,6 +22,28 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_shade.c
 
 #include "tr_local.h"
+
+static color4ub_t RB_TintedFogColor( const fog_t *fog ) {
+	color4ub_t color;
+	float tint[3];
+	float alpha;
+
+	color = fog->colorInt;
+	if ( !r_fogTint || !r_fogTint->string[0] ) {
+		return color;
+	}
+	if ( sscanf( r_fogTint->string, "%f %f %f", &tint[0], &tint[1], &tint[2] ) != 3 ) {
+		return color;
+	}
+
+	alpha = (float)color.rgba[3];
+	color.rgba[0] = (byte)Com_Clamp( 0, 255, (int)( (float)color.rgba[0] * tint[0] ) );
+	color.rgba[1] = (byte)Com_Clamp( 0, 255, (int)( (float)color.rgba[1] * tint[1] ) );
+	color.rgba[2] = (byte)Com_Clamp( 0, 255, (int)( (float)color.rgba[2] * tint[2] ) );
+	color.rgba[3] = (byte)alpha;
+
+	return color;
+}
 #include "vk_skybox_hdr.h"
 
 extern cvar_t *r_shLighting;
@@ -709,10 +731,11 @@ static void RB_FogPass( qboolean rebindIndex ) {
 	vk_draw_geometry( DEPTH_RANGE_NORMAL, qtrue );
 #else
 	const fog_t	*fog = tr.world->fogs + tess.fogNum;
+	const color4ub_t fogColor = RB_TintedFogColor( fog );
 	int	i;
 
 	for ( i = 0; i < tess.numVertexes; i++ ) {
-		tess.svars.colors[0][i] = fog->colorInt;
+		tess.svars.colors[0][i] = fogColor;
 	}
 
 	RB_CalcFogTexCoords( ( float * ) tess.svars.texcoords[0] );
@@ -878,9 +901,10 @@ void R_ComputeColors( const int b, color4ub_t *dest, const shaderStage_t *pStage
 		case CGEN_FOG:
 			{
 				const fog_t *fog = tr.world->fogs + tess.fogNum;
+				const color4ub_t fogColor = RB_TintedFogColor( fog );
 
 				for ( i = 0; i < tess.numVertexes; i++ ) {
-					dest[i] = fog->colorInt;
+					dest[i] = fogColor;
 				}
 			}
 			break;
