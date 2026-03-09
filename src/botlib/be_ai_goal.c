@@ -88,7 +88,7 @@ typedef struct campspot_s
 	struct campspot_s *next;
 } campspot_t;
 
-//FIXME: these are game specific
+/* These are game-specific. */
 typedef enum {
 	GT_FFA,				// free for all
 	GT_TOURNAMENT,		// one on one tournament
@@ -176,7 +176,7 @@ typedef struct bot_goalstate_s
 	float avoidgoaltimes[MAX_AVOIDGOALS];		//times to avoid the goals
 } bot_goalstate_t;
 
-static bot_goalstate_t *botgoalstates[MAX_CLIENTS + 1]; // FIXME: init?
+static bot_goalstate_t *botgoalstates[MAX_CLIENTS + 1]; /* Initialized on first use */
 //item configuration
 static itemconfig_t *itemconfig = NULL;
 //level items
@@ -1056,7 +1056,7 @@ void BotUpdateEntityItems(void)
 		if (!modelindex) continue;
 		//get info about the entity
 		AAS_EntityInfo(ent, &entinfo);
-		//FIXME: don't do this
+		/* Could avoid this. */
 		//skip all floating items for now
 		//if (entinfo.groundent != ENTITYNUM_WORLD) continue;
 		//if the entity is still moving
@@ -1351,7 +1351,7 @@ int BotChooseLTGItem(int goalstate, vec3_t origin, int *inventory, int travelfla
 		//if the item is not in a possible goal area
 		if (!li->goalareanum)
 			continue;
-		//FIXME: is this a good thing? added this for items that never spawned into the game (f.i. CTF flags in obelisk)
+		/* For items that never spawned (e.g. CTF flags in obelisk). */
 		if (!li->entitynum && !(li->flags & IFL_ROAM))
 			continue;
 		//get the fuzzy weight function for this item
@@ -1522,7 +1522,7 @@ int BotChooseNBGItem(int goalstate, vec3_t origin, int *inventory, int travelfla
 		//if the item is in a possible goal area
 		if (!li->goalareanum)
 			continue;
-		//FIXME: is this a good thing? added this for items that never spawned into the game (f.i. CTF flags in obelisk)
+		/* For items that never spawned (e.g. CTF flags in obelisk). */
 		if (!li->entitynum && !(li->flags & IFL_ROAM))
 			continue;
 		//get the fuzzy weight function for this item

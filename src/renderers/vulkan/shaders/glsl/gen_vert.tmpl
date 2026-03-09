@@ -1,0 +1,280 @@
+#version 450
+
+#ifdef USE_TX2
+#define USE_TX1
+#endif
+
+#ifdef USE_CL2
+#define USE_CL1
+#endif
+
+// 128 bytes
+layout(push_constant) uniform Transform {
+	mat4 mvp;
+	mat4 prevMvp;
+};
+
+#if defined(USE_FOG) || defined(USE_ENV)
+layout(set = 0, binding = 0) uniform UBO {
+	// light/env parameters:
+	vec4 eyePos;				// vertex
+#ifdef USE_ENT_COLOR
+	vec4 entColor0;				// fragment: ent.color[0]
+	vec4 entColor1;				// fragment: ent.color[1]
+	vec4 entColor2;				// fragment: ent.color[2]
+#else
+	vec4 lightPos;				// vertex: light origin
+	vec4 lightColor;			// fragment: rgb + 1/(r*r)
+	vec4 lightVector;			// fragment: linear dynamic light
+#endif
+#ifdef USE_FOG
+	// fog parameters:
+	vec4 fogDistanceVector;		// vertex
+	vec4 fogDepthVector;		// vertex
+	vec4 fogEyeT;				// vertex
+	vec4 fogColor;				// fragment
+#endif
+};
+#endif
+
+layout(set = 0, binding = 2) readonly buffer IQMSkinBuffer {
+	float iqmSkinData[];
+};
+
+layout(set = 0, binding = 3) readonly buffer IQMMorphBuffer {
+	float iqmMorphData[];
+};
+
+layout(location = 0) in vec4 in_position;
+
+#ifndef USE_ENV
+layout(location = 2) in vec2 in_tex_coord0;
+#endif
+
+#ifdef USE_TX1
+layout(location = 3) in vec2 in_tex_coord1;
+#endif
+#ifdef USE_TX2
+layout(location = 4) in vec2 in_tex_coord2;
+#endif
+
+#if defined(USE_ENV) || defined(USE_VK_PBR)
+layout(location = 5) in vec4 in_normal;
+#endif
+
+#if defined (USE_CLX_IDENT) || defined (USE_FIXED_COLOR)
+// use either 1.0 or fixed (rgb+a) color from spec.constants
+#else
+layout(location = 1) in vec4 in_color0;
+#ifdef USE_CL1
+layout(location = 6) in vec4 in_color1;
+#endif
+#ifdef USE_CL2
+layout(location = 7) in vec4 in_color2;
+#endif
+
+layout(location = 0) out vec4 frag_color0;
+#ifdef USE_CL1
+layout(location = 5) out vec4 frag_color1;
+#endif
+#ifdef USE_CL2
+layout(location = 6) out vec4 frag_color2;
+#endif
+#endif
+
+layout(location = 1) out vec2 frag_tex_coord0;
+#ifdef USE_TX1
+layout(location = 2) out vec2 frag_tex_coord1;
+#endif
+#ifdef USE_TX2
+layout(location = 3) out vec2 frag_tex_coord2;
+#endif
+
+#ifdef USE_FOG
+layout(location = 4) out vec2 fog_tex_coord;
+#endif
+
+#ifdef USE_VK_PBR
+layout(set = 0, binding = 1) uniform UBO_Camera {
+	vec4 u_ViewOrigin;
+	mat4 u_ModelMatrix;
+};
+
+layout(location = 8) in vec4 in_tangent;
+layout(location = 9) in vec4 in_lightdir;
+
+layout(location = 9) out vec4 var_Normal;
+layout(location = 10) out vec4 var_LightDir;
+layout(location = 11) out vec4 var_ViewDir;
+layout(location = 12) out vec4 var_Tangent;
+
+#endif
+
+layout(location = 13) out vec4 var_CurrentClip;
+layout(location = 14) out vec4 var_PrevClip;
+
+out gl_PerVertex {
+	vec4 gl_Position;
+};
+
+const uint IQM_GPU_META_TAG = 0xAB000000u;
+const uint IQM_GPU_INDEX_MASK = 0x00000FFFu;
+const uint IQM_GPU_MORPH_SHIFT = 12u;
+
+bool IQMDecodeMeta( float packedFloat, out int skinIndex, out int morphIndex ) {
+	uint packed = floatBitsToUint( packedFloat );
+	if ( ( packed & 0xFF000000u ) != IQM_GPU_META_TAG ) {
+		skinIndex = -1;
+		morphIndex = -1;
+		return false;
+	}
+
+	skinIndex = int( packed & IQM_GPU_INDEX_MASK );
+	morphIndex = int( ( packed >> IQM_GPU_MORPH_SHIFT ) & IQM_GPU_INDEX_MASK );
+	return true;
+}
+
+vec3 IQMSkinPosition( int skinIndex, vec3 position ) {
+	int base = 1 + skinIndex * 12;
+	return vec3(
+		iqmSkinData[base + 0] * position.x + iqmSkinData[base + 1] * position.y + iqmSkinData[base + 2] * position.z + iqmSkinData[base + 3],
+		iqmSkinData[base + 4] * position.x + iqmSkinData[base + 5] * position.y + iqmSkinData[base + 6] * position.z + iqmSkinData[base + 7],
+		iqmSkinData[base + 8] * position.x + iqmSkinData[base + 9] * position.y + iqmSkinData[base + 10] * position.z + iqmSkinData[base + 11]
+	);
+}
+
+vec3 IQMSkinNormal( int skinIndex, int skinCount, vec3 normal ) {
+	int base = 1 + skinCount * 12 + skinIndex * 9;
+	return vec3(
+		iqmSkinData[base + 0] * normal.x + iqmSkinData[base + 1] * normal.y + iqmSkinData[base + 2] * normal.z,
+		iqmSkinData[base + 3] * normal.x + iqmSkinData[base + 4] * normal.y + iqmSkinData[base + 5] * normal.z,
+		iqmSkinData[base + 6] * normal.x + iqmSkinData[base + 7] * normal.y + iqmSkinData[base + 8] * normal.z
+	);
+}
+
+vec3 IQMMorphDeltaPos( int morphIndex, int morphStage ) {
+	int base = 6 + morphIndex * (4 * 6) + morphStage * 6;
+	return vec3( iqmMorphData[base + 0], iqmMorphData[base + 1], iqmMorphData[base + 2] );
+}
+
+vec3 IQMMorphDeltaNormal( int morphIndex, int morphStage ) {
+	int base = 6 + morphIndex * (4 * 6) + morphStage * 6;
+	return vec3( iqmMorphData[base + 3], iqmMorphData[base + 4], iqmMorphData[base + 5] );
+}
+
+void main() {
+	vec3 position = in_position.xyz;
+	#ifdef USE_VK_PBR
+		vec3 tangent = in_tangent.xyz;
+	#endif
+	#if defined(USE_ENV) || defined(USE_VK_PBR)
+		vec3 normal = in_normal.xyz;
+	#endif
+
+	int skinIndex;
+	int morphIndex;
+	int skinCount = int( iqmSkinData[0] );
+
+	if ( IQMDecodeMeta( in_position.w, skinIndex, morphIndex ) && skinIndex >= 0 && skinIndex < skinCount ) {
+		int morphCount = int( iqmMorphData[0] );
+		int activeCount = min( int( iqmMorphData[1] ), 4 );
+		vec3 morphPosition = position;
+		#if defined(USE_ENV) || defined(USE_VK_PBR)
+			vec3 morphNormal = normal;
+		#endif
+
+		if ( morphIndex >= 0 && morphIndex < morphCount && activeCount > 0 ) {
+			for ( int k = 0; k < 4; k++ ) {
+				if ( k >= activeCount ) {
+					break;
+				}
+				float weight = iqmMorphData[2 + k];
+				morphPosition += IQMMorphDeltaPos( morphIndex, k ) * weight;
+				#if defined(USE_ENV) || defined(USE_VK_PBR)
+					morphNormal += IQMMorphDeltaNormal( morphIndex, k ) * weight;
+				#endif
+			}
+			#if defined(USE_ENV) || defined(USE_VK_PBR)
+				morphNormal = normalize( morphNormal );
+			#endif
+		}
+
+		position = IQMSkinPosition( skinIndex, morphPosition );
+		#if defined(USE_ENV) || defined(USE_VK_PBR)
+			normal = normalize( IQMSkinNormal( skinIndex, skinCount, morphNormal ) );
+		#endif
+	}
+
+	vec4 currClip = mvp * vec4(position, 1.0);
+	vec4 prevClip = prevMvp * vec4(position, 1.0);
+	gl_Position = currClip;
+	var_CurrentClip = currClip;
+	var_PrevClip = prevClip;
+
+#if defined (USE_CLX_IDENT) || defined (USE_FIXED_COLOR)
+	// use either 1.0 or fixed (rgb+a) color from spec.constants
+#else
+	frag_color0 = in_color0;
+#ifdef USE_CL1
+	frag_color1 = in_color1;
+#endif
+#ifdef USE_CL2
+	frag_color2 = in_color2;
+#endif
+#endif
+
+#ifdef USE_ENV
+	vec3 viewer = normalize(eyePos.xyz - position);
+	float d = dot(normal, viewer);
+	vec2 reflected = normal.yz * 2 * d - viewer.yz;
+
+	frag_tex_coord0.s = 0.5 + reflected.x * 0.5;
+	frag_tex_coord0.t = 0.5 - reflected.y * 0.5;
+#else
+	frag_tex_coord0 = in_tex_coord0;
+#endif
+
+#ifdef USE_TX1
+	frag_tex_coord1 = in_tex_coord1;
+#endif
+#ifdef USE_TX2
+	frag_tex_coord2 = in_tex_coord2;
+#endif
+
+#ifdef USE_FOG
+	float s = dot(position, fogDistanceVector.xyz) + fogDistanceVector.w;
+	float t = dot(position, fogDepthVector.xyz) + fogDepthVector.w;
+
+	if ( fogEyeT.y == 1.0 ) {
+		if ( t < 0.0 ) {
+			t = 1.0 / 32.0;
+		} else {
+			t = 31.0 / 32.0;
+		}
+	} else {
+		if ( t < 1.0 ) {
+			t = 1.0 / 32.0;
+		} else {
+			t = 1.0 / 32.0 + (30.0 / 32.0 * t) / ( t - fogEyeT.x );
+		}
+	}
+
+	fog_tex_coord = vec2(s, t);
+#endif // USE_FOG
+
+#if defined(USE_VK_PBR)
+	position		= (u_ModelMatrix * vec4(position, 1.0)).xyz;
+	normal			= normalize(mat3(u_ModelMatrix) * normal);
+
+	vec3 viewDir = u_ViewOrigin.xyz - position;
+
+	vec3 L	= in_lightdir.xyz * 2.0 - vec3(1.0);
+	L		= ( u_ModelMatrix * vec4( L, 0.0 ) ).xyz;
+	L		= normalize( ( L * 0.5 ) + vec3( 0.5 ) );
+
+	var_LightDir	= vec4(L, 0.0);
+	var_Normal		= vec4(normal, 0.0);
+	var_ViewDir		= vec4(viewDir, 0.0);
+	var_Tangent		= vec4(tangent, in_tangent.w);
+#endif
+}

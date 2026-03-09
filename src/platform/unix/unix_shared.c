@@ -364,17 +364,21 @@ Sys_Pwd
 const char *Sys_Pwd( void ) 
 {
 	static char pwd[ MAX_OSPATH ];
+	ssize_t n;
 
 	if ( pwd[0] )
 		return pwd;
 
-	// more reliable, linux-specific
-	if ( readlink( "/proc/self/exe", pwd, sizeof( pwd ) - 1 ) != -1 )
+	/* Prefer executable directory over CWD so renderer loads correctly when run from any directory */
+#if defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__)
+	n = readlink( "/proc/self/exe", pwd, sizeof( pwd ) - 1 );
+	if ( n > 0 && n < (ssize_t)sizeof( pwd ) )
 	{
-		pwd[ sizeof( pwd ) - 1 ] = '\0';
+		pwd[n] = '\0';
 		dirname( pwd );
 		return pwd;
 	}
+#endif
 
 	if ( !getcwd( pwd, sizeof( pwd ) ) )
 	{
@@ -404,9 +408,9 @@ const char *Sys_DefaultHomePath( void )
 	{
 		Q_strncpyz( homePath, p, sizeof( homePath ) );
 #ifdef MACOS_X
-		Q_strcat( homePath, sizeof(homePath), "/Library/Application Support/Quake3" );
+		Q_strcat( homePath, sizeof(homePath), "/Library/Application Support/Fox" );
 #else
-		Q_strcat( homePath, sizeof( homePath ), "/.q3a" );
+		Q_strcat( homePath, sizeof( homePath ), "/.fox" );
 #endif
 		if ( mkdir( homePath, 0750 ) ) 
 		{
@@ -486,8 +490,20 @@ void *Sys_LoadLibrary( const char *name )
 		Com_Error( ERR_FATAL, "Sys_LoadLibrary: Unable to load library with '%s' extension", ext );
 	}
 
-	handle = dlopen( name, RTLD_NOW );
+	handle = dlopen( name, RTLD_NOW | RTLD_GLOBAL );
 	return handle;
+}
+
+
+/*
+=================
+Sys_GetLoadLibraryError
+=================
+*/
+const char *Sys_GetLoadLibraryError( void )
+{
+	const char *err = dlerror();
+	return err ? err : "unknown error";
 }
 
 

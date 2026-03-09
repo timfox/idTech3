@@ -22,13 +22,24 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cl_main.c  -- client main loop
 
 #include "client.h"
+#include "cl_gameframe.h"
+#include "cl_emoji.h"
+#include "cl_osp.h"
+#include "cl_voip.h"
+#include "cl_mumble.h"
+#include "cl_superhud.h"
+#include "ui_css.h"
+#include "cl_websocket.h"
+#include "cl_steam.h"
+#include "cl_menuvideo.h"
+#include "cl_sdf_font.h"
 #ifdef USE_DUKTAPE
 #include "../qcommon/js_debug.h"
 #endif
 #include <limits.h>
 #ifdef USE_FLUX
 #include "flux.h"
-#if defined(USE_SDL)
+#if USE_SDL
 #include <SDL2/SDL_thread.h>
 #else
 typedef struct SDL_Thread SDL_Thread;
@@ -114,9 +125,88 @@ void CL_JsNotifyMenuChanged( int menu ) {
 	}
 
 	JsDebug_EmitEvent( "menu_changed", menuName, NULL, menu, 0 );
+	JsDebug_SetCurrentMenu( menu );
 #else
 	(void)menu;
 #endif
+}
+
+static qboolean CL_SetActiveMenuByName( const char *name ) {
+	int menu = -1;
+
+	if ( !uivm || !name || !name[0] ) {
+		return qfalse;
+	}
+
+	if ( !Q_stricmp( name, "none" ) || !Q_stricmp( name, "close" ) ) {
+		menu = UIMENU_NONE;
+	} else if ( !Q_stricmp( name, "main" ) || !Q_stricmp( name, "menu" ) || !Q_stricmp( name, "home" ) ) {
+		menu = UIMENU_MAIN;
+	} else if ( !Q_stricmp( name, "ingame" ) || !Q_stricmp( name, "pause" ) ) {
+		menu = UIMENU_INGAME;
+	} else if ( !Q_stricmp( name, "need_cd" ) || !Q_stricmp( name, "needcd" ) ) {
+		menu = UIMENU_NEED_CD;
+	} else if ( !Q_stricmp( name, "bad_cd_key" ) || !Q_stricmp( name, "badcdkey" ) ) {
+		menu = UIMENU_BAD_CD_KEY;
+	} else if ( !Q_stricmp( name, "team" ) ) {
+		menu = UIMENU_TEAM;
+	} else if ( !Q_stricmp( name, "postgame" ) ) {
+		menu = UIMENU_POSTGAME;
+	}
+
+	if ( menu < 0 ) {
+		return qfalse;
+	}
+
+	VM_Call( uivm, 1, UI_SET_ACTIVE_MENU, menu );
+	CL_JsNotifyMenuChanged( menu );
+	return qtrue;
+}
+
+static void CL_Open_f( void ) {
+	char target[MAX_TOKEN_CHARS];
+
+	if ( Cmd_Argc() < 2 ) {
+		if ( !CL_SetActiveMenuByName( "main" ) ) {
+			Com_Printf( "open: UI is not available\n" );
+		}
+		return;
+	}
+
+	Q_strncpyz( target, Cmd_Argv( 1 ), sizeof( target ) );
+	Q_CleanStr( target );
+
+	if ( !target[0] ) {
+		Com_Printf( "open: empty target\n" );
+		return;
+	}
+
+	/* First handle direct menu ids locally. */
+	if ( CL_SetActiveMenuByName( target ) ) {
+		Cvar_Set( "ui_open_tab", "" );
+		return;
+	}
+
+	/* Preserve the VM-driven UI path for custom menu commands/scripts. */
+	if ( uivm && UI_GameCommand() ) {
+		return;
+	}
+
+	/* Keep legacy JS "open <tab>" flows alive by advertising a menu_changed event. */
+#ifdef USE_DUKTAPE
+	JsDebug_EmitEvent( "menu_changed", target, NULL, -1, 0 );
+#endif
+
+	/* Common tabs live under main menu in most UI scripts. Set ui_open_tab
+	 * so the UI can switch to the requested tab when main menu opens. */
+	if ( !Q_stricmp( target, "credits" ) || !Q_stricmp( target, "audio" ) || !Q_stricmp( target, "gameplay" ) ) {
+		Cvar_Set( "ui_open_tab", target );
+		CL_SetActiveMenuByName( "main" );
+		return;
+	}
+
+	Cvar_Set( "ui_open_tab", "" );
+	Com_Printf( "open: unhandled target '%s'\n", target );
 }
 
 #ifdef USE_FLUX
@@ -838,12 +928,12 @@ static void CL_Record_f( void ) {
 		ext = COM_GetExtension( demoName );
 		if ( *ext ) {
 			// strip demo extension
-			sprintf( demoExt, "%s%d", DEMOEXT, OLD_PROTOCOL_VERSION );
+			Com_sprintf( demoExt, sizeof( demoExt ), "%s%d", DEMOEXT, OLD_PROTOCOL_VERSION );
 			if ( Q_stricmp( ext, demoExt ) == 0 ) {
 				*(strrchr( demoName, '.' )) = '\0';
 			} else {
 				// check both protocols
-				sprintf( demoExt, "%s%d", DEMOEXT, NEW_PROTOCOL_VERSION );
+				Com_sprintf( demoExt, sizeof( demoExt ), "%s%d", DEMOEXT, NEW_PROTOCOL_VERSION );
 				if ( Q_stricmp( ext, demoExt ) == 0 ) {
 					*(strrchr( demoName, '.' )) = '\0';
 				}
@@ -2007,8 +2097,8 @@ static void CL_SendPureChecksums( void ) {
 		return;
 
 	// if we are pure we need to send back a command with our referenced pk3 checksums
-	len = sprintf( cMsg, "cp %d ", cl.serverId );
-	strcpy( cMsg + len, FS_ReferencedPakPureChecksums( sizeof( cMsg ) - len - 1 ) );
+	len = Com_sprintf( cMsg, sizeof( cMsg ), "cp %d ", cl.serverId );
+	Q_strncpyz( cMsg + len, FS_ReferencedPakPureChecksums( sizeof( cMsg ) - len - 1 ), sizeof( cMsg ) - len );
 
 	CL_AddReliableCommand( cMsg, qfalse );
 }
@@ -2519,7 +2609,7 @@ Resend a connect message if the last one has timed out
 */
 static void CL_CheckForResend( void ) {
 	int		port, len;
-	char	info[MAX_INFO_STRING*2]; // larger buffer to detect overflows
+	char	info[BIG_INFO_STRING]; // Cvar_InfoString(CVAR_USERINFO) can use BIG_INFO_STRING
 	char	data[MAX_INFO_STRING];
 	qboolean	notOverflowed;
 	qboolean	infoTruncated;
@@ -2558,6 +2648,10 @@ static void CL_CheckForResend( void ) {
 
 		infoTruncated = qfalse;
 		Q_strncpyz( info, Cvar_InfoString( CVAR_USERINFO, &infoTruncated ), sizeof( info ) );
+		if ( strlen( info ) > MAX_USERINFO_LENGTH ) {
+			info[ MAX_USERINFO_LENGTH ] = '\0';
+			notOverflowed = qfalse;
+		}
 
 		// remove some non-important keys that may cause overflow during connection
 		if ( strlen( info ) > MAX_USERINFO_LENGTH - 64 ) {
@@ -3105,7 +3199,7 @@ void CL_PacketEvent( const netadr_t *from, msg_t *msg ) {
 			Com_Printf( "%s:sequenced packet without connection\n",
 				NET_AdrToStringwPort( from ) );
 		}
-		// FIXME: send a client disconnect?
+		/* Note: Could send explicit client disconnect. */
 		return;
 	}
 
@@ -3216,18 +3310,43 @@ static void CL_CheckUserinfo( void ) {
 	{
 		qboolean infoTruncated = qfalse;
 		const char *info;
+		char truncated[ MAX_USERINFO_LENGTH + 1 ];
 
 		cvar_modifiedFlags &= ~CVAR_USERINFO;
 
 		info = Cvar_InfoString( CVAR_USERINFO, &infoTruncated );
+		Q_strncpyz( truncated, info, sizeof( truncated ) );
 		if ( strlen( info ) > MAX_USERINFO_LENGTH || infoTruncated ) {
 			Com_Printf( S_COLOR_YELLOW "WARNING: oversize userinfo, you might be not able to play on remote server!\n" );
 		}
 
-		CL_AddReliableCommand( va( "userinfo \"%s\"", info ), qfalse );
+		CL_AddReliableCommand( va( "userinfo \"%s\"", truncated ), qfalse );
 	}
 }
 
+
+/*
+==================
+CL_Steam_UpdateRichPresence
+Updates Steam rich presence based on client state.
+==================
+*/
+static void CL_Steam_UpdateRichPresence( void ) {
+	if ( !Steam_IsInitialized() )
+		return;
+	if ( cls.state == CA_ACTIVE ) {
+		if ( clc.demoplaying )
+			Steam_SetRichPresence( "status", "Playing demo" );
+		else if ( cls.servername[0] )
+			Steam_SetRichPresence( "status", cls.servername );
+		else
+			Steam_SetRichPresence( "status", "In game" );
+	} else if ( cls.state == CA_CONNECTING || cls.state == CA_CHALLENGING ) {
+		Steam_SetRichPresence( "status", "Connecting..." );
+	} else {
+		Steam_SetRichPresence( "status", "In menu" );
+	}
+}
 
 /*
 ==================
@@ -3369,11 +3488,19 @@ void CL_Frame( int msec, int realMsec ) {
 	cls.framecount++;
 	SCR_UpdateScreen();
 
+	// advance cinematic before audio so ROQ/video samples are mixed this frame
+	SCR_RunCinematic();
+
 	// update audio
 	S_Update( realMsec );
 
-	// advance local effects for next frame
-	SCR_RunCinematic();
+	// tick all gameplay subsystems (physics, navigation, particles, director, music)
+	CL_GameFrame( (float)msec * 0.001f );
+
+	CL_VoIP_Frame();
+	WS_Frame();
+	Steam_Frame();
+	CL_Steam_UpdateRichPresence();
 
 	Con_RunConsole();
 }
@@ -3581,6 +3708,10 @@ static qboolean CL_IsMininized( void ) {
 	return gw_minimized;
 }
 
+static int CL_GetState( void ) {
+	return cls.state;
+}
+
 
 /*
 ============
@@ -3652,6 +3783,7 @@ static void CL_InitRef( void ) {
 	rendererLib = Sys_LoadLibrary( ospath );
 	if ( !rendererLib )
 	{
+		Com_Printf( S_COLOR_YELLOW "Failed to load renderer from %s: %s\n", ospath, Sys_GetLoadLibraryError() );
 		Cvar_ForceReset( "cl_renderer" );
 		/* sanitize renderer name for the retry as well */
 		{
@@ -3676,7 +3808,7 @@ static void CL_InitRef( void ) {
 		rendererLib = Sys_LoadLibrary( ospath );
 		if ( !rendererLib )
 		{
-			Com_Error( ERR_FATAL, "Failed to load renderer %s", dllName );
+			Com_Error( ERR_FATAL, "Failed to load renderer %s: %s", dllName, Sys_GetLoadLibraryError() );
 		}
 	}
 
@@ -3751,6 +3883,7 @@ static void CL_InitRef( void ) {
 	rimp.CL_LoadJPG = CL_LoadJPG;
 
 	rimp.CL_IsMinimized = CL_IsMininized;
+	rimp.CL_GetState = CL_GetState;
 	rimp.CL_SetScaling = CL_SetScaling;
 
 	rimp.Sys_SetClipboardBitmap = Sys_SetClipboardBitmap;
@@ -3810,6 +3943,15 @@ static void CL_SetModel_f( void ) {
 		Cvar_VariableStringBuffer( "model", name, sizeof( name ) );
 		Com_Printf( "model is set to %s\n", name );
 	}
+}
+
+static void CL_FovAlias_f( void ) {
+	if ( Cmd_Argc() > 1 ) {
+		Cvar_Set( "cg_fov", Cmd_Argv( 1 ) );
+		return;
+	}
+
+	Com_Printf( "cg_fov is \"%s\"\n", Cvar_VariableString( "cg_fov" ) );
 }
 
 
@@ -4365,6 +4507,7 @@ void CL_Init( void ) {
 	Cmd_AddCommand ("fs_openedList", CL_OpenedPK3List_f );
 	Cmd_AddCommand ("fs_referencedList", CL_ReferencedPK3List_f );
 	Cmd_AddCommand ("model", CL_SetModel_f );
+	Cmd_AddCommand ("r_fov", CL_FovAlias_f );
 	Cmd_AddCommand ("video", CL_Video_f );
 	Cmd_AddCommand ("video-pipe", CL_Video_f );
 	Cmd_SetCommandCompletionFunc( "video", CL_CompleteVideoName );
@@ -4373,6 +4516,7 @@ void CL_Init( void ) {
 	Cmd_AddCommand ("systeminfo", CL_Systeminfo_f );
 	Cmd_AddCommand ("playername", CL_SetPlayerName_f );
 	Cmd_AddCommand ("setname", CL_SetPlayerName_f );
+	Cmd_AddCommand ("open", CL_Open_f );
 #ifdef USE_FLUX
 	Cmd_AddCommand ("flux_generate", CL_FluxGenerate_f );
 	Cmd_AddCommand ("flux_status", CL_FluxStatus_f );
@@ -4411,6 +4555,18 @@ void CL_Init( void ) {
 	Com_Printf( "FLUX.2 image generation: not available (compiled without USE_FLUX)\n" );
 #endif
 
+	CL_InitGameSystems();
+
+	CL_Emoji_Init();
+	CL_OSP_Init();
+	CL_VoIP_Init();
+	CL_Mumble_Init();
+	SHUD_Init();
+	WS_Init();
+	Steam_Init();
+	MenuVideo_Init();
+	SDF_Init();
+
 	Com_Printf( "----- Client Initialization Complete -----\n" );
 }
 
@@ -4439,6 +4595,9 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 
 	noGameRestart = quit;
 	CL_Disconnect( qfalse );
+	SDF_Shutdown();
+	SHUD_Shutdown();
+	MenuVideo_Shutdown();
 
 	// clear and mute all sounds until next registration
 	S_DisableSounds();
@@ -4451,7 +4610,7 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 
 #ifdef USE_FLUX
 	// Clean up any running FLUX jobs
-#if defined(USE_SDL)
+#if USE_SDL
 	if (flux_job.thread) {
 		SDL_WaitThread(flux_job.thread, NULL);
 		flux_job.thread = NULL;
@@ -4486,11 +4645,13 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 	Cmd_RemoveCommand ("fs_openedList");
 	Cmd_RemoveCommand ("fs_referencedList");
 	Cmd_RemoveCommand ("model");
+	Cmd_RemoveCommand ("r_fov");
 	Cmd_RemoveCommand ("video");
 	Cmd_RemoveCommand ("stopvideo");
 	Cmd_RemoveCommand ("serverinfo");
 	Cmd_RemoveCommand ("systeminfo");
 	Cmd_RemoveCommand ("modelist");
+	Cmd_RemoveCommand ("open");
 
 #ifdef USE_CURL
 	Com_DL_Cleanup( &download );
@@ -4923,7 +5084,7 @@ static void CL_GlobalServers_f( void ) {
 		int numAddress = 0;
 
 		for ( i = 1; i <= MAX_MASTER_SERVERS; i++ ) {
-			sprintf( command, "sv_master%d", i );
+			Com_sprintf( command, sizeof( command ), "sv_master%d", i );
 			masteraddress = Cvar_VariableString( command );
 
 			if ( !*masteraddress )
@@ -4941,7 +5102,7 @@ static void CL_GlobalServers_f( void ) {
 		return;
 	}
 
-	sprintf( command, "sv_master%d", masterNum );
+	Com_sprintf( command, sizeof( command ), "sv_master%d", masterNum );
 	masteraddress = Cvar_VariableString( command );
 
 	if ( !*masteraddress )
@@ -5399,7 +5560,7 @@ static void CL_ShowIP_f( void ) {
 FLUX Generation Thread Function
 ==================
 */
-#if defined(USE_SDL)
+#if USE_SDL
 static int CL_FluxGenerationThread(void *data) {
 	flux_job_t *job = (flux_job_t *)data;
 	flux_ctx *ctx = NULL;
@@ -5556,7 +5717,7 @@ static int CL_FluxGenerationThread(void *data) {
 
 	if (!image->data || image->width <= 0 || image->height <= 0) {
 		Com_Printf("FLUX: Invalid image data - data:%p width:%d height:%d\n",
-			image->data, image->width, image->height);
+			(void *)image->data, image->width, image->height);
 		Q_strncpyz(job->error_msg, "Generated image is invalid", sizeof(job->error_msg));
 		flux_image_free(image);
 		flux_free(ctx);
@@ -5657,7 +5818,7 @@ static void CL_FluxGenerate_f( void ) {
 
 	// Choose generation mode based on cvar
 	if (cl_flux_async->integer) {
-#if defined(USE_SDL)
+#if USE_SDL
 		// Asynchronous (background) mode
 		goto async_generation;
 #else
@@ -5669,7 +5830,7 @@ static void CL_FluxGenerate_f( void ) {
 		goto sync_generation;
 	}
 
-#if defined(USE_SDL)
+#if USE_SDL
 async_generation:
 	// Asynchronous generation code
 
@@ -5897,7 +6058,7 @@ static void CL_FluxCancel_f( void ) {
 		flux_job.status = FLUX_JOB_FAILED;
 		Q_strncpyz(flux_job.error_msg, "Generation cancelled by user", sizeof(flux_job.error_msg));
 
-#if defined(USE_SDL)
+#if USE_SDL
 		if (flux_job.thread) {
 			// Wait for thread to finish
 			int thread_result = 0;
@@ -6077,7 +6238,7 @@ static void CL_FluxView_f( void ) {
 			flux_image_free(flux_job.result);
 			flux_job.result = NULL;
 		}
-#if defined(USE_SDL)
+#if USE_SDL
 		if (flux_job.thread) {
 			SDL_WaitThread(flux_job.thread, NULL);
 			flux_job.thread = NULL;

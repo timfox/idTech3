@@ -54,7 +54,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "unix_glw.h"
 
 #ifdef USE_OPENGL_API
-#include "../renderers/openglrenderer/qgl.h"
+#include "../renderers/opengl/qgl.h"
 #endif
 
 #include <X11/Xlib.h>
@@ -2053,7 +2053,7 @@ void IN_Init( void )
 	Cvar_SetDescription( in_joystick, "Whether or not joystick support is on." );
 	// bk001130 - changed this to match win32
 	in_joystickDebug = Cvar_Get( "in_debugjoystick", "0", CVAR_TEMP );
-	joy_threshold = Cvar_Get( "joy_threshold", "0.15", CVAR_ARCHIVE_ND ); // FIXME: in_joythreshold
+	joy_threshold = Cvar_Get( "joy_threshold", "0.15", CVAR_ARCHIVE_ND ); /* Could rename to in_joythreshold */
 	Cvar_SetDescription( joy_threshold, "Threshold of joystick moving distance." );
 
 	IN_StartupJoystick(); // bk001130 - from cvs1.17 (mkv)
@@ -2096,10 +2096,10 @@ void IN_Frame( void )
 	IN_JoyMove();
 #endif
 
-	if ( Key_GetCatcher() & KEYCATCH_CONSOLE ) {
-		// temporarily deactivate if not in the game and
-		// running on the desktop with multimonitor configuration
-		if ( !glw_state.cdsFullscreen || glw_state.monitorCount > 1 ) {
+	if ( Key_GetCatcher() & ( KEYCATCH_CONSOLE | KEYCATCH_UI ) ) {
+		/* Release mouse and show cursor when console or menu is open. */
+		if ( !glw_state.cdsFullscreen || glw_state.monitorCount > 1 ||
+		     ( Key_GetCatcher() & KEYCATCH_UI ) ) {
 			IN_DeactivateMouse();
 			return;
 		}
@@ -2160,13 +2160,13 @@ Sys_SetClipboardBitmap
 */
 void Sys_SetClipboardBitmap( const byte *bitmap, int length )
 {
-	// TODO: implement
+	/* Stub: clipboard bitmap not implemented. */
 }
 
 
 #ifdef USE_JOYSTICK
 // bk010216 - added stubs for non-Linux UNIXes here
-// FIXME - use NO_JOYSTICK or something else generic
+/* Could use NO_JOYSTICK or generic define. */
 
 #if (defined( __FreeBSD__ ) || defined( __sun)) // rb010123
 void IN_StartupJoystick( void ) {}

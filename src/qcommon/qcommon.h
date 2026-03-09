@@ -33,12 +33,18 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #endif
 #endif
 
-/* C99 defines __func__ */
-#if __STDC_VERSION__ < 199901L 
-#if __GNUC__ >= 2 || _MSC_VER >= 1300 
-#define __func__ __FUNCTION__ 
-#else 
-#define __func__ "(unknown)" 
+/* C99 defines __func__; C++11 and later define it */
+#if defined(__cplusplus)
+#if __cplusplus >= 201103L
+/* __func__ is standard in C++11+ */
+#else
+#define __func__ __FUNCTION__
+#endif
+#elif !defined(__STDC_VERSION__) || __STDC_VERSION__ < 199901L
+#if defined(__GNUC__) && __GNUC__ >= 2 || defined(_MSC_VER) && _MSC_VER >= 1300
+#define __func__ __FUNCTION__
+#else
+#define __func__ "(unknown)"
 #endif
 #endif
 
@@ -151,7 +157,7 @@ NET
 
 #define	MAX_PACKET_USERCMDS		32		// max number of usercmd_t in a packet
 
-#define	MAX_SNAPSHOT_ENTITIES	256
+#define	MAX_SNAPSHOT_ENTITIES	2048	// visible entities per packet (was 256)
 
 #define	PORT_ANY			-1
 
@@ -166,6 +172,9 @@ typedef enum {
 #ifdef USE_IPV6
 	NA_IP6,
 	NA_MULTICAST6,
+#endif
+#ifdef USE_STEAM_NETWORKING
+	NA_STEAMID,					// Steam Datagram Relay (SteamID in ipv.steamid)
 #endif
 	NA_UNSPEC
 } netadrtype_t;
@@ -185,6 +194,9 @@ typedef struct {
 		byte	_4[4];
 #ifdef USE_IPV6
 		byte	_6[16];
+#endif
+#ifdef USE_STEAM_NETWORKING
+		uint64_t	steamid;	/* when type == NA_STEAMID */
 #endif
 	} ipv;
 	uint16_t	port;
@@ -696,11 +708,11 @@ typedef enum {
 #define	MAX_FOUND_FILES		0x5000
 
 #ifdef DEDICATED
-#define Q3CONFIG_CFG "q3config_server.cfg"
-#define CONSOLE_HISTORY_FILE "q3history_server"
+#define Q3CONFIG_CFG "config_server.cfg"
+#define CONSOLE_HISTORY_FILE "history_server.cfg"
 #else
-#define Q3CONFIG_CFG "q3config.cfg"
-#define CONSOLE_HISTORY_FILE "q3history"
+#define Q3CONFIG_CFG "config.cfg"
+#define CONSOLE_HISTORY_FILE "history.cfg"
 #endif
 
 typedef	time_t fileTime_t;
@@ -931,6 +943,7 @@ extern char cl_cdkey[34];
 // customizable client window title
 extern char cl_title[ MAX_CVAR_VALUE_STRING ];
 extern char con_title[ MAX_CVAR_VALUE_STRING ];
+extern char cl_bumper1[ MAX_CVAR_VALUE_STRING ];
 
 extern	int	CPU_Flags;
 
@@ -1343,6 +1356,7 @@ qboolean Sys_LowPhysicalMemory( void );
 int Sys_MonkeyShouldBeSpanked( void );
 
 void *Sys_LoadLibrary( const char *name );
+const char *Sys_GetLoadLibraryError( void );
 void *Sys_LoadFunction( void *handle, const char *name );
 int   Sys_LoadFunctionErrors( void );
 void  Sys_UnloadLibrary( void *handle );

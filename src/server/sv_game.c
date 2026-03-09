@@ -135,7 +135,7 @@ static void SV_SetBrushModel( sharedEntity_t *ent, const char *name ) {
 
 	ent->r.contents = -1;		// we don't know exactly what is in the brushes
 
-	SV_LinkEntity( ent );		// FIXME: remove
+	SV_LinkEntity( ent );		/* Could be moved to game module. */
 }
 
 
@@ -299,6 +299,54 @@ static void SV_GetUsercmd( int clientNum, usercmd_t *cmd ) {
 	}
 }
 
+static qboolean SV_UseLegacyNativeEntityNums( void ) {
+	return gvm && gvm->entryPoint && sv.num_entities > 0 && sv.num_entities <= 1024;
+}
+
+static int SV_LegacyEntityNumNone( void ) {
+	return sv.num_entities - 1;
+}
+
+static int SV_LegacyEntityNumWorld( void ) {
+	return sv.num_entities - 2;
+}
+
+static int SV_GameEntityNumToEngine( int entityNum ) {
+	if ( !SV_UseLegacyNativeEntityNums() ) {
+		return entityNum;
+	}
+
+	if ( entityNum == SV_LegacyEntityNumNone() ) {
+		return ENTITYNUM_NONE;
+	}
+
+	if ( entityNum == SV_LegacyEntityNumWorld() ) {
+		return ENTITYNUM_WORLD;
+	}
+
+	return entityNum;
+}
+
+static int SV_EngineEntityNumToGame( int entityNum ) {
+	if ( !SV_UseLegacyNativeEntityNums() ) {
+		return entityNum;
+	}
+
+	if ( entityNum == ENTITYNUM_NONE ) {
+		return SV_LegacyEntityNumNone();
+	}
+
+	if ( entityNum == ENTITYNUM_WORLD ) {
+		return SV_LegacyEntityNumWorld();
+	}
+
+	if ( entityNum < 0 || entityNum >= sv.num_entities ) {
+		return SV_LegacyEntityNumNone();
+	}
+
+	return entityNum;
+}
+
 
 //==============================================
 
@@ -453,13 +501,27 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 	case G_ENTITY_CONTACTCAPSULE:
 		return SV_EntityContact( VMA(1), VMA(2), VMA(3), /*int capsule*/ qtrue );
 	case G_TRACE:
-		SV_Trace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5), args[6], args[7], /*int capsule*/ qfalse );
+		{
+			trace_t trace;
+
+			SV_Trace( &trace, VMA(2), VMA(3), VMA(4), VMA(5),
+				SV_GameEntityNumToEngine( args[6] ), args[7], /*int capsule*/ qfalse );
+			trace.entityNum = SV_EngineEntityNumToGame( trace.entityNum );
+			*(trace_t *)VMA(1) = trace;
+		}
 		return 0;
 	case G_TRACECAPSULE:
-		SV_Trace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5), args[6], args[7], /*int capsule*/ qtrue );
+		{
+			trace_t trace;
+
+			SV_Trace( &trace, VMA(2), VMA(3), VMA(4), VMA(5),
+				SV_GameEntityNumToEngine( args[6] ), args[7], /*int capsule*/ qtrue );
+			trace.entityNum = SV_EngineEntityNumToGame( trace.entityNum );
+			*(trace_t *)VMA(1) = trace;
+		}
 		return 0;
 	case G_POINT_CONTENTS:
-		return SV_PointContents( VMA(1), args[2] );
+		return SV_PointContents( VMA(1), SV_GameEntityNumToEngine( args[2] ) );
 	case G_SET_BRUSH_MODEL:
 		SV_SetBrushModel( VMA(1), VMA(2) );
 		return 0;
@@ -961,10 +1023,10 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 		return FloatAsInt( ceil( VMF(1) ) );
 
 	case G_TESTPRINTINT:
-		return sprintf( VMA(1), "%i", (int)args[2] );
+		return Com_sprintf( VMA(1), MAX_STRING_CHARS, "%i", (int)args[2] );
 
 	case G_TESTPRINTFLOAT:
-		return sprintf( VMA(1), "%f", VMF(2) );
+		return Com_sprintf( VMA(1), MAX_STRING_CHARS, "%f", VMF(2) );
 
 	case G_CVAR_SETDESCRIPTION:
 		Cvar_SetDescription2( (const char*)VMA(1), (const char*)VMA(2) );
@@ -1085,7 +1147,7 @@ Called on a normal map change, not on a map_restart
 */
 void SV_InitGameProgs( void ) {
 	cvar_t	*var;
-	//FIXME these are temp while I make bots run in vm
+	/* Temporary: bots will run in VM. */
 	extern int	bot_enable;
 
 	var = Cvar_Get( "bot_enable", "1", CVAR_LATCH );

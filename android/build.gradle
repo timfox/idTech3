@@ -1,0 +1,29 @@
+buildscript {
+    // AGP 8.7.3 requires Java 11+ (Java 17 recommended). Fail early with clear guidance.
+    def javaVersion = org.gradle.api.JavaVersion.current()
+    if (javaVersion < org.gradle.api.JavaVersion.VERSION_11) {
+        throw new RuntimeException("""
+Android Gradle Plugin 8.7.3 requires Java 11 or higher (Java 17 recommended).
+Current JVM: ${javaVersion}
+
+To fix:
+  1. Install JDK 17: sudo apt install openjdk-17-jdk  (Linux)
+  2. Set JAVA_HOME: export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+  3. Or add to android/gradle.properties: org.gradle.java.home=/path/to/jdk17
+""")
+    }
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.7.3'
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}

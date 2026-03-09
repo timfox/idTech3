@@ -439,8 +439,12 @@ static void VM_LoadSymbols( vm_t *vm ) {
 	}
 
 	COM_StripExtension(vm->name, name, sizeof(name));
-	Com_sprintf( symbols, sizeof( symbols ), "vm/%s.map", name );
+	Com_sprintf( symbols, sizeof( symbols ), "modules/%s.map", name );
 	FS_ReadFile( symbols, &mapfile.v );
+	if ( !mapfile.c ) {
+		Com_sprintf( symbols, sizeof( symbols ), "vm/%s.map", name );
+		FS_ReadFile( symbols, &mapfile.v );
+	}
 	if ( !mapfile.c ) {
 		Com_Printf( "Couldn't load symbol file: %s\n", symbols );
 		return;
@@ -583,12 +587,15 @@ static int Load_JTS( vm_t *vm, uint32_t crc32, void *data, int vmPakIndex ) {
 	int			length;
 	fileHandle_t fh;
 
-	// load the image
-	Com_sprintf( filename, sizeof(filename), "vm/%s.jts", vm->name );
+	// load the image: try modules/ first, then vm/
+	Com_sprintf( filename, sizeof(filename), "modules/%s.jts", vm->name );
+	length = FS_FOpenFileRead( filename, &fh, qtrue );
+	if ( fh == FS_INVALID_HANDLE ) {
+		Com_sprintf( filename, sizeof(filename), "vm/%s.jts", vm->name );
+		length = FS_FOpenFileRead( filename, &fh, qtrue );
+	}
 	if ( data )
 		Com_Printf( "Loading jts file %s...\n", filename );
-
-	length = FS_FOpenFileRead( filename, &fh, qtrue );
 
 	if ( fh == FS_INVALID_HANDLE ) {
 		if ( data )
@@ -663,19 +670,19 @@ static char *VM_ValidateHeader( vmHeader_t *header, int fileSize )
 
 	// truncated
 	if ( (size_t) fileSize < ( sizeof( vmHeader_t ) - sizeof( int32_t ) ) ) {
-		sprintf( errMsg, "truncated image header (%i bytes long)", fileSize );
+		Com_sprintf( errMsg, sizeof( errMsg ), "truncated image header (%i bytes long)", fileSize );
 		return errMsg;
 	}
 
 	// bad magic
 	if ( LittleLong( header->vmMagic ) != VM_MAGIC && LittleLong( header->vmMagic ) != VM_MAGIC_VER2 ) {
-		sprintf( errMsg, "bad file magic %08x", LittleLong( header->vmMagic ) );
+		Com_sprintf( errMsg, sizeof( errMsg ), "bad file magic %08x", LittleLong( header->vmMagic ) );
 		return errMsg;
 	}
 
 	// truncated
 	if ( (size_t) fileSize < sizeof( vmHeader_t ) && LittleLong( header->vmMagic ) != VM_MAGIC_VER2 ) {
-		sprintf( errMsg, "truncated image header (%i bytes long)", fileSize );
+		Com_sprintf( errMsg, sizeof( errMsg ), "truncated image header (%i bytes long)", fileSize );
 		return errMsg;
 	}
 
@@ -689,38 +696,38 @@ static char *VM_ValidateHeader( vmHeader_t *header, int fileSize )
 
 	// bad code offset
 	if ( header->codeOffset >= fileSize ) {
-		sprintf( errMsg, "bad code segment offset %i", header->codeOffset );
+		Com_sprintf( errMsg, sizeof( errMsg ), "bad code segment offset %i", header->codeOffset );
 		return errMsg;
 	}
 
 	// bad code length
 	if ( header->codeLength <= 0 || header->codeOffset + header->codeLength > fileSize ) {
-		sprintf( errMsg, "bad code segment length %i", header->codeLength );
+		Com_sprintf( errMsg, sizeof( errMsg ), "bad code segment length %i", header->codeLength );
 		return errMsg;
 	}
 
 	// bad data offset
 	if ( header->dataOffset >= fileSize || header->dataOffset != header->codeOffset + header->codeLength ) {
-		sprintf( errMsg, "bad data segment offset %i", header->dataOffset );
+		Com_sprintf( errMsg, sizeof( errMsg ), "bad data segment offset %i", header->dataOffset );
 		return errMsg;
 	}
 
 	// bad data length
 	if ( header->dataOffset + header->dataLength > fileSize )  {
-		sprintf( errMsg, "bad data segment length %i", header->dataLength );
+		Com_sprintf( errMsg, sizeof( errMsg ), "bad data segment length %i", header->dataLength );
 		return errMsg;
 	}
 
 	if ( header->vmMagic == VM_MAGIC_VER2 ) {
 		// bad lit/jtrg length
 		if ( header->dataOffset + header->dataLength + header->litLength + header->jtrgLength != fileSize ) {
-			sprintf( errMsg, "bad lit/jtrg segment length" );
+			Com_sprintf( errMsg, sizeof( errMsg ), "bad lit/jtrg segment length" );
 			return errMsg;
 		}
 	}
 	// bad lit length
 	else if ( header->dataOffset + header->dataLength + header->litLength != fileSize ) {
-		sprintf( errMsg, "bad lit segment length %i", header->litLength );
+		Com_sprintf( errMsg, sizeof( errMsg ), "bad lit segment length %i", header->litLength );
 		return errMsg;
 	}
 
@@ -756,12 +763,16 @@ static vmHeader_t *VM_LoadQVM( vm_t *vm, qboolean alloc ) {
 	vmHeader_t			*header;
 	int					vmPakIndex;
 
-	// load the image
-	Com_sprintf( filename, sizeof(filename), "vm/%s.qvm", vm->name );
+	// load the image: try modules/ first, then vm/
+	Com_sprintf( filename, sizeof(filename), "modules/%s.qvm", vm->name );
+	length = FS_ReadFile( filename, (void **)&header );
+	if ( !header || length <= 0 ) {
+		Com_sprintf( filename, sizeof(filename), "vm/%s.qvm", vm->name );
+		length = FS_ReadFile( filename, (void **)&header );
+	}
 	if ( !vm->silentQVM ) {
 		Com_Printf( "Loading vm file %s...\n", filename );
 	}
-	length = FS_ReadFile( filename, (void **)&header );
 	if ( !header ) {
 		if ( !vm->silentQVM ) {
 			Com_Printf( "Failed.\n" );
@@ -1108,12 +1119,12 @@ const char *VM_LoadInstructions( const byte *code_pos, int codeLength, int instr
 	for ( i = 0; i < instructionCount; i++, ci++, op1 = op0 ) {
 		op0 = *code_pos;
 		if ( op0 < 0 || op0 >= OP_MAX ) {
-			sprintf( errBuf, "bad opcode %02X at offset %d", op0, (int)(code_pos - code_start) );
+			Com_sprintf( errBuf, sizeof( errBuf ), "bad opcode %02X at offset %d", op0, (int)(code_pos - code_start) );
 			return errBuf;
 		}
 		n = ops[ op0 ].size;
 		if ( code_pos + 1 + n  > code_end ) {
-			sprintf( errBuf, "code_pos > code_end" );
+			Com_sprintf( errBuf, sizeof( errBuf ), "code_pos > code_end" );
 			return errBuf;
 		}
 		code_pos++;
@@ -1193,11 +1204,11 @@ const char *VM_CheckInstructions( instruction_t *buf,
 	for ( i = 0; i < instructionCount; i++, ci++ ) {
 		opStack += ops[ ci->op ].stack;
 		if ( opStack < 0 ) {
-			sprintf( errBuf, "opStack underflow at %i", i );
+			Com_sprintf( errBuf, sizeof( errBuf ), "opStack underflow at %i", i );
 			return errBuf;
 		}
 		if ( opStack >= PROC_OPSTACK_SIZE * 4 ) {
-			sprintf( errBuf, "opStack overflow at %i", i );
+			Com_sprintf( errBuf, sizeof( errBuf ), "opStack overflow at %i", i );
 			return errBuf;
 		}
 	}
@@ -1249,17 +1260,17 @@ const char *VM_CheckInstructions( instruction_t *buf,
 		if ( op0 == OP_ENTER ) {
 			// missing block end
 			if ( proc || ( pstack && op1 != OP_LEAVE ) ) {
-				sprintf( errBuf, "missing proc end before %i", i );
+				Com_sprintf( errBuf, sizeof( errBuf ), "missing proc end before %i", i );
 				return errBuf;
 			}
 			if ( ci->opStack != 0 ) {
 				v = ci->opStack;
-				sprintf( errBuf, "bad entry opstack %i at %i", v, i );
+				Com_sprintf( errBuf, sizeof( errBuf ), "bad entry opstack %i at %i", v, i );
 				return errBuf;
 			}
 			v = ci->value;
 			if ( v < 0 || v >= PROGRAM_STACK_SIZE || (v & 3) ) {
-				sprintf( errBuf, "bad entry programStack %i at %i", v, i );
+				Com_sprintf( errBuf, sizeof( errBuf ), "bad entry programStack %i at %i", v, i );
 				return errBuf;
 			}
 
@@ -1280,7 +1291,7 @@ const char *VM_CheckInstructions( instruction_t *buf,
 			}
 
 			if ( endp == 0 ) {
-				sprintf( errBuf, "missing end proc for %i", i );
+				Com_sprintf( errBuf, sizeof( errBuf ), "missing end proc for %i", i );
 				return errBuf;
 			}
 
@@ -1296,23 +1307,23 @@ const char *VM_CheckInstructions( instruction_t *buf,
 			// bad return programStack
 			if ( pstack != ci->value ) {
 				v = ci->value;
-				sprintf( errBuf, "bad programStack %i at %i", v, i );
+				Com_sprintf( errBuf, sizeof( errBuf ), "bad programStack %i at %i", v, i );
 				return errBuf;
 			}
 			// bad opStack before return
 			if ( ci->opStack != 4 ) {
 				v = ci->opStack;
-				sprintf( errBuf, "bad opStack %i at %i", v, i );
+				Com_sprintf( errBuf, sizeof( errBuf ), "bad opStack %i at %i", v, i );
 				return errBuf;
 			}
 			v = ci->value;
 			if ( v < 0 || v >= PROGRAM_STACK_SIZE || (v & 3) ) {
-				sprintf( errBuf, "bad return programStack %i at %i", v, i );
+				Com_sprintf( errBuf, sizeof( errBuf ), "bad return programStack %i at %i", v, i );
 				return errBuf;
 			}
 			if ( op1 == OP_PUSH ) {
 				if ( proc == NULL ) {
-					sprintf( errBuf, "unexpected proc end at %i", i );
+					Com_sprintf( errBuf, sizeof( errBuf ), "unexpected proc end at %i", i );
 					return errBuf;
 				}
 				proc = NULL;
@@ -1327,18 +1338,18 @@ const char *VM_CheckInstructions( instruction_t *buf,
 			v = ci->value;
 			// conditional jumps should have opStack >= 8
 			if ( ci->opStack < 8 ) {
-				sprintf( errBuf, "bad jump opStack %i at %i", ci->opStack, i );
+				Com_sprintf( errBuf, sizeof( errBuf ), "bad jump opStack %i at %i", ci->opStack, i );
 				return errBuf;
 			}
 			//if ( v >= header->instructionCount ) {
 			// allow only local proc jumps
 			if ( v < startp || v > endp ) {
-				sprintf( errBuf, "jump target %i at %i is out of range (%i,%i)", v, i-1, startp, endp );
+				Com_sprintf( errBuf, sizeof( errBuf ), "jump target %i at %i is out of range (%i,%i)", v, i-1, startp, endp );
 				return errBuf;
 			}
 			if ( buf[v].opStack != ci->opStack - 8 ) {
 				n = buf[v].opStack;
-				sprintf( errBuf, "jump target %i has bad opStack %i", v, n );
+				Com_sprintf( errBuf, sizeof( errBuf ), "jump target %i has bad opStack %i", v, n );
 				return errBuf;
 			}
 			// mark jump target
@@ -1350,28 +1361,28 @@ const char *VM_CheckInstructions( instruction_t *buf,
 		if ( op0 == OP_JUMP ) {
 			// jumps should have opStack >= 4
 			if ( ci->opStack < 4 ) {
-				sprintf( errBuf, "bad jump opStack %i at %i", ci->opStack, i );
+				Com_sprintf( errBuf, sizeof( errBuf ), "bad jump opStack %i at %i", ci->opStack, i );
 				return errBuf;
 			}
 			if ( op1 == OP_CONST ) {
 				v = buf[i-1].value;
 				// allow only local jumps
 				if ( v < startp || v > endp ) {
-					sprintf( errBuf, "jump target %i at %i is out of range (%i,%i)", v, i-1, startp, endp );
+					Com_sprintf( errBuf, sizeof( errBuf ), "jump target %i at %i is out of range (%i,%i)", v, i-1, startp, endp );
 					return errBuf;
 				}
 				if ( buf[v].opStack != ci->opStack - 4 ) {
 					n = buf[v].opStack;
-					sprintf( errBuf, "jump target %i has bad opStack %i", v, n );
+					Com_sprintf( errBuf, sizeof( errBuf ), "jump target %i has bad opStack %i", v, n );
 					return errBuf;
 				}
 				if ( buf[v].op == OP_ENTER ) {
 					n = buf[v].op;
-					sprintf( errBuf, "jump target %i has bad opcode %s", v, opname[ n ] );
+					Com_sprintf( errBuf, sizeof( errBuf ), "jump target %i has bad opcode %s", v, opname[ n ] );
 					return errBuf;
 				}
 				if ( v == (i-1) ) {
-					sprintf( errBuf, "self loop at %i", v );
+					Com_sprintf( errBuf, sizeof( errBuf ), "self loop at %i", v );
 					return errBuf;
 				}
 				// mark jump target
@@ -1387,7 +1398,7 @@ const char *VM_CheckInstructions( instruction_t *buf,
 
 		if ( op0 == OP_CALL ) {
 			if ( ci->opStack < 4 ) {
-				sprintf( errBuf, "bad call opStack at %i", i );
+				Com_sprintf( errBuf, sizeof( errBuf ), "bad call opStack at %i", i );
 				return errBuf;
 			}
 			if ( op1 == OP_CONST ) {
@@ -1395,16 +1406,16 @@ const char *VM_CheckInstructions( instruction_t *buf,
 				// analyse only local function calls
 				if ( v >= 0 ) {
 					if ( v >= instructionCount ) {
-						sprintf( errBuf, "call target %i is out of range", v );
+						Com_sprintf( errBuf, sizeof( errBuf ), "call target %i is out of range", v );
 						return errBuf;
 					}
 					if ( buf[v].op != OP_ENTER ) {
 						n = buf[v].op;
-						sprintf( errBuf, "call target %i has bad opcode %s", v, opname[ n ] );
+						Com_sprintf( errBuf, sizeof( errBuf ), "call target %i has bad opcode %s", v, opname[ n ] );
 						return errBuf;
 					}
 					if ( v == 0 ) {
-						sprintf( errBuf, "explicit vmMain call inside VM at %i", i );
+						Com_sprintf( errBuf, sizeof( errBuf ), "explicit vmMain call inside VM at %i", i );
 						return errBuf;
 					}
 					// mark jump target
@@ -1417,12 +1428,12 @@ const char *VM_CheckInstructions( instruction_t *buf,
 		if ( ci->op == OP_ARG ) {
 			v = ci->value & 255;
 			if ( proc == NULL ) {
-				sprintf( errBuf, "missing proc frame for %s %i at %i", opname[ ci->op ], v, i );
+				Com_sprintf( errBuf, sizeof( errBuf ), "missing proc frame for %s %i at %i", opname[ ci->op ], v, i );
 				return errBuf;
 			}
 			// argument can't exceed programStack frame
 			if ( v < 8 || v > pstack - 4 || (v & 3) ) {
-				sprintf( errBuf, "bad argument address %i at %i", v, i );
+				Com_sprintf( errBuf, sizeof( errBuf ), "bad argument address %i at %i", v, i );
 				return errBuf;
 			}
 			continue;
@@ -1431,12 +1442,12 @@ const char *VM_CheckInstructions( instruction_t *buf,
 		if ( ci->op == OP_LOCAL ) {
 			v = ci->value;
 			if ( proc == NULL ) {
-				sprintf( errBuf, "missing proc frame for %s %i at %i", opname[ ci->op ], v, i );
+				Com_sprintf( errBuf, sizeof( errBuf ), "missing proc frame for %s %i at %i", opname[ ci->op ], v, i );
 				return errBuf;
 			}
 			if ( (ci+1)->op == OP_LOAD4 || (ci+1)->op == OP_LOAD2 || (ci+1)->op == OP_LOAD1 ) {
 				if ( !safe_address( ci, proc, dataLength ) ) {
-					sprintf( errBuf, "bad %s address %i at %i", opname[ ci->op ], v, i );
+					Com_sprintf( errBuf, sizeof( errBuf ), "bad %s address %i at %i", opname[ ci->op ], v, i );
 					return errBuf;
 				}
 			}
@@ -1446,7 +1457,7 @@ const char *VM_CheckInstructions( instruction_t *buf,
 		if ( ci->op == OP_LOAD4 && op1 == OP_CONST ) {
 			v = (ci-1)->value;
 			if ( v < 0 || v > dataLength - 4 ) {
-				sprintf( errBuf, "bad %s address %i at %i", opname[ ci->op ], v, i - 1 );
+				Com_sprintf( errBuf, sizeof( errBuf ), "bad %s address %i at %i", opname[ ci->op ], v, i - 1 );
 				return errBuf;
 			}
 			continue;
@@ -1455,7 +1466,7 @@ const char *VM_CheckInstructions( instruction_t *buf,
 		if ( ci->op == OP_LOAD2 && op1 == OP_CONST ) {
 			v = (ci-1)->value;
 			if ( v < 0 || v > dataLength - 2 ) {
-				sprintf( errBuf, "bad %s address %i at %i", opname[ ci->op ], v, i - 1 );
+				Com_sprintf( errBuf, sizeof( errBuf ), "bad %s address %i at %i", opname[ ci->op ], v, i - 1 );
 				return errBuf;
 			}
 			continue;
@@ -1464,7 +1475,7 @@ const char *VM_CheckInstructions( instruction_t *buf,
 		if ( ci->op == OP_LOAD1 && op1 == OP_CONST ) {
 			v =  (ci-1)->value;
 			if ( v < 0 || v > dataLength - 1 ) {
-				sprintf( errBuf, "bad %s address %i at %i", opname[ ci->op ], v, i - 1 );
+				Com_sprintf( errBuf, sizeof( errBuf ), "bad %s address %i at %i", opname[ ci->op ], v, i - 1 );
 				return errBuf;
 			}
 			continue;
@@ -1478,7 +1489,7 @@ const char *VM_CheckInstructions( instruction_t *buf,
 					safe_stores++;
 					continue;
 				} else {
-					sprintf( errBuf, "bad %s address %i at %i", opname[ ci->op ], x->value, (int)(x - buf) );
+					Com_sprintf( errBuf, sizeof( errBuf ), "bad %s address %i at %i", opname[ ci->op ], x->value, (int)(x - buf) );
 					return errBuf;
 				}
 			}
@@ -1492,12 +1503,12 @@ const char *VM_CheckInstructions( instruction_t *buf,
 			int safe = 0;
 			v = ci->value;
 			if ( v >= dataLength ) {
-				sprintf( errBuf, "bad count %i for block copy at %i", v, i - 1 );
+				Com_sprintf( errBuf, sizeof( errBuf ), "bad count %i for block copy at %i", v, i - 1 );
 				return errBuf;
 			}
 			if ( src->op == OP_LOCAL || src->op == OP_CONST ) {
 				if ( !safe_address( src, proc, dataLength ) ) {
-					sprintf( errBuf, "bad src for block copy at %i", (int)(dst - buf) );
+					Com_sprintf( errBuf, sizeof( errBuf ), "bad src for block copy at %i", (int)(dst - buf) );
 					return errBuf;
 				}
 				src->safe = 1;
@@ -1505,7 +1516,7 @@ const char *VM_CheckInstructions( instruction_t *buf,
 			}
 			if ( dst->op == OP_LOCAL || dst->op == OP_CONST ) {
 				if ( !safe_address( dst, proc, dataLength ) ) {
-					sprintf( errBuf, "bad dst for block copy at %i", (int)(dst - buf) );
+					Com_sprintf( errBuf, sizeof( errBuf ), "bad dst for block copy at %i", (int)(dst - buf) );
 					return errBuf;
 				}
 				dst->safe = 1;
@@ -1524,7 +1535,7 @@ const char *VM_CheckInstructions( instruction_t *buf,
 	}
 
 	if ( op1 != OP_UNDEF && op1 != OP_LEAVE ) {
-		sprintf( errBuf, "missing return instruction at the end of the image" );
+		Com_sprintf( errBuf, sizeof( errBuf ), "missing return instruction at the end of the image" );
 		return errBuf;
 	}
 
@@ -1706,6 +1717,20 @@ Used to load a development dll instead of a virtual machine
 TTimo: added some verbosity in debug
 =================
 */
+static void *VM_TryLoadNativeModule( const char *moduleName, char *filename, int filenameSize ) {
+	void		*libHandle;
+
+	Com_sprintf( filename, filenameSize, "%s.so", moduleName );
+	libHandle = FS_LoadLibrary( filename );
+	if ( libHandle ) {
+		return libHandle;
+	}
+
+	Com_sprintf( filename, filenameSize, "%s" ARCH_STRING DLL_EXT, moduleName );
+	libHandle = FS_LoadLibrary( filename );
+	return libHandle;
+}
+
 static void * QDECL loadNative( const char *name, vmMainFunc_t *entryPoint, dllSyscall_t systemcalls ) {
 
 	char		filename[ MAX_QPATH ];
@@ -1715,27 +1740,64 @@ static void * QDECL loadNative( const char *name, vmMainFunc_t *entryPoint, dllS
 	void		*vmMainAddr;
 	qboolean	isGenericModule = qfalse;
 
-	// For ui, game, cgame, qagame modules, try generic name first
-	if ( Q_stricmp( name, "ui" ) == 0 || Q_stricmp( name, "game" ) == 0 || Q_stricmp( name, "cgame" ) == 0 || Q_stricmp( name, "qagame" ) == 0 ) {
+	// For ui, game, cgame, qagame and custom aliases, try generic names first.
+	if ( Q_stricmp( name, "ui" ) == 0 || Q_stricmp( name, "game" ) == 0 || Q_stricmp( name, "cgame" ) == 0 ||
+		 Q_stricmp( name, "qagame" ) == 0 || Q_stricmp( name, "frontend" ) == 0 ||
+		 Q_stricmp( name, "client" ) == 0 || Q_stricmp( name, "server" ) == 0 ) {
 		isGenericModule = qtrue;
 
-		// Try the module name with .so extension first
-		Com_sprintf( filename, sizeof( filename ), "%s.so", name );
-		libHandle = FS_LoadLibrary( filename );
+		libHandle = VM_TryLoadNativeModule( name, filename, sizeof( filename ) );
 		if ( libHandle ) {
 			goto loadSuccess;
 		}
 
-		// For qagame, also try "game.so" as an alias
+		// qagame has historically been loaded from game.* as an alias.
 		if ( Q_stricmp( name, "qagame" ) == 0 ) {
-			Com_sprintf( filename, sizeof( filename ), "game.so" );
-			libHandle = FS_LoadLibrary( filename );
+			libHandle = VM_TryLoadNativeModule( "game", filename, sizeof( filename ) );
 			if ( libHandle ) {
 				goto loadSuccess;
 			}
 		}
 
-		// Generic name failed, fall back to platform-specific name
+		// Support renamed native modules for this project.
+		if ( Q_stricmp( name, "qagame" ) == 0 || Q_stricmp( name, "game" ) == 0 ) {
+			libHandle = VM_TryLoadNativeModule( "server", filename, sizeof( filename ) );
+			if ( libHandle ) {
+				goto loadSuccess;
+			}
+		}
+		if ( Q_stricmp( name, "cgame" ) == 0 ) {
+			libHandle = VM_TryLoadNativeModule( "client", filename, sizeof( filename ) );
+			if ( libHandle ) {
+				goto loadSuccess;
+			}
+		}
+		if ( Q_stricmp( name, "ui" ) == 0 ) {
+			libHandle = VM_TryLoadNativeModule( "frontend", filename, sizeof( filename ) );
+			if ( libHandle ) {
+				goto loadSuccess;
+			}
+		}
+		if ( Q_stricmp( name, "server" ) == 0 ) {
+			libHandle = VM_TryLoadNativeModule( "game", filename, sizeof( filename ) );
+			if ( libHandle ) {
+				goto loadSuccess;
+			}
+		}
+		if ( Q_stricmp( name, "client" ) == 0 ) {
+			libHandle = VM_TryLoadNativeModule( "cgame", filename, sizeof( filename ) );
+			if ( libHandle ) {
+				goto loadSuccess;
+			}
+		}
+		if ( Q_stricmp( name, "frontend" ) == 0 ) {
+			libHandle = VM_TryLoadNativeModule( "ui", filename, sizeof( filename ) );
+			if ( libHandle ) {
+				goto loadSuccess;
+			}
+		}
+
+		// All alternate names failed, fall back to platform-specific original name
 	}
 
 	// Try platform-specific name

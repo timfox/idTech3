@@ -472,10 +472,10 @@ static int PC_StringizeTokens( const token_t *tokens, token_t *token )
 		len = (int)strlen( t->string );
 		if ( (size_t) len + total >= sizeof( token->string ) - 1 ) // reserve space for '"' and '\0'
 			return qfalse;
-		strcpy( token->string + total, t->string );
+		Q_strncpyz( token->string + total, t->string, sizeof( token->string ) - total );
 		total += len;
 	}
-	strcpy( token->string + total, "\"" );
+	Q_strncpyz( token->string + total, "\"", sizeof( token->string ) - total );
 
 	return qtrue;
 } //end of the function PC_StringizeTokens
@@ -508,7 +508,7 @@ static int PC_MergeTokens(token_t *t1, token_t *t2)
 		strcat(t1->string, &t2->string[1]);
 		return qtrue;
 	}
-	//FIXME: merging of two number of the same sub type
+	/* Could merge two numbers of same subtype. */
 	return qfalse;
 } //end of the function PC_MergeTokens
 //============================================================================
@@ -731,7 +731,7 @@ static int PC_ExpandBuiltinDefine(source_t *source, token_t *deftoken, define_t 
 	{
 		case BUILTIN_LINE:
 		{
-			sprintf(token->string, "%d", deftoken->line);
+			Com_sprintf(token->string, MAX_TOKEN, "%d", deftoken->line);
 #ifdef NUMBERVALUE
 			token->intvalue = deftoken->line;
 			token->floatvalue = deftoken->line;
@@ -2464,7 +2464,7 @@ static int PC_Directive_eval(source_t *source)
 	token.whitespace_p = source->scriptstack->script_p;
 	token.endwhitespace_p = source->scriptstack->script_p;
 	token.linescrossed = 0;
-	sprintf(token.string, "%d", abs(value));
+	Com_sprintf(token.string, MAX_TOKEN, "%d", abs(value));
 	token.type = TT_NUMBER;
 	token.subtype = TT_INTEGER|TT_LONG|TT_DECIMAL;
 	PC_UnreadSourceToken(source, &token);
@@ -2487,7 +2487,7 @@ static int PC_Directive_evalfloat(source_t *source)
 	token.whitespace_p = source->scriptstack->script_p;
 	token.endwhitespace_p = source->scriptstack->script_p;
 	token.linescrossed = 0;
-	sprintf(token.string, "%1.2f", fabs(value));
+	Com_sprintf(token.string, MAX_TOKEN, "%1.2f", fabs(value));
 	token.type = TT_NUMBER;
 	token.subtype = TT_FLOAT|TT_LONG|TT_DECIMAL;
 	PC_UnreadSourceToken(source, &token);
@@ -2569,7 +2569,7 @@ static int PC_DollarDirective_evalint(source_t *source)
 	token.whitespace_p = source->scriptstack->script_p;
 	token.endwhitespace_p = source->scriptstack->script_p;
 	token.linescrossed = 0;
-	sprintf(token.string, "%d", abs(value));
+	Com_sprintf(token.string, MAX_TOKEN, "%d", abs(value));
 	token.type = TT_NUMBER;
 	token.subtype = TT_INTEGER|TT_LONG|TT_DECIMAL;
 
@@ -2600,7 +2600,7 @@ static int PC_DollarDirective_evalfloat(source_t *source)
 	token.whitespace_p = source->scriptstack->script_p;
 	token.endwhitespace_p = source->scriptstack->script_p;
 	token.linescrossed = 0;
-	sprintf(token.string, "%1.2f", fabs(value));
+	Com_sprintf(token.string, MAX_TOKEN, "%1.2f", fabs(value));
 	token.type = TT_NUMBER;
 	token.subtype = TT_FLOAT|TT_LONG|TT_DECIMAL;
 

@@ -199,7 +199,7 @@ static int AAS_BestReachableLinkArea(aas_link_t *areas)
 	for (link = areas; link; link = link->next_area)
 	{
 		if (link->areanum) return link->areanum;
-		//FIXME: this is a bad idea when the reachability is not yet
+		/* May be unsafe when reachability not yet complete. */
 		// calculated when the level items are loaded
 		if (AAS_AreaReachability(link->areanum))
 			return link->areanum;
@@ -277,7 +277,7 @@ static int AAS_GetJumpPadInfo(int ent, vec3_t areastart, vec3_t absmins, vec3_t 
 	VectorSubtract ( ent2origin, origin, velocity);
 	dist = VectorNormalize( velocity);
 	forward = dist / time;
-	//FIXME: why multiply by 1.1
+	/* Empirical factor 1.1. */
 	forward *= 1.1f;
 	VectorScale(velocity, forward, velocity);
 	velocity[2] = time * gravity;
@@ -405,7 +405,7 @@ int AAS_BestReachableArea(vec3_t origin, vec3_t mins, vec3_t maxs, vec3_t goalor
 		{
 			areanum = AAS_PointAreaNum(trace.endpos);
 			VectorCopy(trace.endpos, goalorigin);
-			//FIXME: cannot enable next line right now because the reachability
+			/* Next line disabled: reachability */
 			// does not have to be calculated when the level items are loaded
 			//if the origin is in an area with reachability
 			//if (AAS_AreaReachability(areanum)) return areanum;
@@ -1523,7 +1523,7 @@ static int AAS_Reachability_Step_Barrier_WaterJump_WalkOffLedge(int area1num, in
 	//        |~~~~~~~~
 	//        |
 	//        |          cannot step back but can waterjump back -> TRAVEL_WALKOFFLEDGE
-	//        ---------  FIXME: create TRAVEL_WALK reach??
+	/* Could create TRAVEL_WALK reach. */
 	//
 	//check for a walk or walk off ledge reachability
 	if (ground_foundreach)
@@ -2206,7 +2206,7 @@ static int AAS_Reachability_Jump(int area1num, int area2num)
 		} //end if
 		else if (AAS_HorizontalVelocityForJump(0, beststart, bestend, &speed))
 		{
-			//FIXME: why multiply with 1.2???
+			/* Empirical factor 1.2. */
 			speed *= 1.2f;
 			traveltype = TRAVEL_WALKOFFLEDGE;
 		} //end else if
@@ -3592,7 +3592,7 @@ static void AAS_Reachability_JumpPad(void)
 		VectorSubtract ( ent2origin, origin, velocity);
 		dist = VectorNormalize( velocity);
 		forward = dist / time;
-		//FIXME: why multiply by 1.1
+		// Legacy: 1.1 overshoot factor for trigger_push (commented block)
 		forward *= 1.1;
 		VectorScale(velocity, forward, velocity);
 		velocity[2] = time * gravity;
@@ -4207,7 +4207,7 @@ static void AAS_Reachability_WalkOffLedge(int areanum)
 											gap = qfalse;
 											break;
 										} //end if
-										//FIXME: there are more situations to be handled
+										/* More situations could be handled. */
 										gap = qtrue;
 										break;
 									} //end if

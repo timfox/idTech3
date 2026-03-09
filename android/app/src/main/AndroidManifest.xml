@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copyright (C) 2026 Gopex LLC. All rights reserved.
+  Android manifest for id Tech 3 engine.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:installLocation="auto">
+
+    <!-- Vulkan hardware (optional — engine has OpenGL fallback) -->
+    <uses-feature android:name="android.hardware.vulkan.level" android:version="0" android:required="false" />
+    <uses-feature android:name="android.hardware.vulkan.version" android:version="0x00401000" android:required="false" />
+
+    <!-- Input devices (all optional) -->
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.hardware.gamepad" android:required="false" />
+
+    <!-- Permissions -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <application
+        android:allowBackup="true"
+        android:hardwareAccelerated="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:appCategory="game"
+        android:isGame="true"
+        android:hasCode="true"
+        android:largeHeap="true"
+        tools:targetApi="tiramisu">
+
+        <activity
+            android:name=".GameActivity"
+            android:exported="true"
+            android:configChanges="layoutDirection|locale|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation"
+            android:screenOrientation="sensorLandscape"
+            android:launchMode="singleTask">
+
+            <meta-data android:name="android.app.lib_name" android:value="idtech3" />
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

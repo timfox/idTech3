@@ -512,7 +512,7 @@ Cvar_CheckRange( s_doppler, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( s_muteWhenMinimized, "Mutes all audio while game is minimized." );
 
 #ifdef USE_OPENAL
-	s_openal = Cvar_Get( "s_openal", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	s_openal = Cvar_Get( "s_openal", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	Cvar_CheckRange( s_openal, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( s_openal, "Enables the OpenAL audio backend (requires restart)." );
 	
@@ -573,7 +573,7 @@ Cvar_CheckRange( s_doppler, "0", "1", CV_INTEGER );
 
 	s_openalVoipSpatial = Cvar_Get( "s_openalVoipSpatial", "1", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( s_openalVoipSpatial, "0", "1", CV_INTEGER );
-	Cvar_SetDescription( s_openalVoipSpatial, "Route VOIP through spatial OpenAL sources." );
+	Cvar_SetDescription( s_openalVoipSpatial, "Route VOIP through spatial OpenAL sources for proximity voice chat." );
 
 	s_openalVoipGain = Cvar_Get( "s_openalVoipGain", "1.0", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( s_openalVoipGain, "0", "2", CV_FLOAT );

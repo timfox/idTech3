@@ -39,6 +39,10 @@ static int	cvar_group[ CVG_MAX ];
 static	cvar_t	*hashTable[FILE_HASH_SIZE];
 static	qboolean cvar_sort = qfalse;
 
+#define CVAR_CONFLICT_WARNED_MAX 8
+static struct { char name[32]; } cvar_conflict_warned[CVAR_CONFLICT_WARNED_MAX];
+static int cvar_conflict_warned_count = 0;
+
 /*
 ================
 return a hash value for the filename
@@ -277,7 +281,7 @@ static const char *Cvar_Validate( cvar_t *var, const char *value, qboolean warn 
 				if ( !Cvar_IsIntegral( value ) ) {
 					if ( warn )
 						Com_Printf( "WARNING: cvar '%s' must be integral", var->name );
-					sprintf( intbuf, "%i", atoi( value ) );
+					Com_sprintf( intbuf, sizeof( intbuf ), "%i", atoi( value ) );
 					value = intbuf; // new value
 				}
 				valuei = atoi( value );
@@ -307,7 +311,7 @@ static const char *Cvar_Validate( cvar_t *var, const char *value, qboolean warn 
 			}
 		} // Q_isanumber
 	} // CV_INTEGER || CV_FLOAT
-	// TODO: stringlist
+	/* Could add stringlist type. */
 	else if ( var->validator == CV_FSPATH ) {
 		// check for directory traversal patterns
 		if ( FS_InvalidGameDir( value ) ) {
@@ -359,7 +363,7 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, int flags ) {
 		var_name = "BADNAME";
 	}
 
-#if 0 // FIXME: values with backslash happen
+#if 0 /* Values with backslash need special handling */
 	if ( !Cvar_ValidateString( var_value ) ) {
 		Com_Printf("invalid cvar value string: %s\n", var_value );
 		var_value = "BADVALUE";
@@ -436,8 +440,20 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, int flags ) {
 			Z_Free( var->resetString );
 			var->resetString = CopyString( var_value );
 		} else if ( var_value[0] && strcmp( var->resetString, var_value ) ) {
-			Com_DPrintf( "Warning: cvar \"%s\" given initial values: \"%s\" and \"%s\"\n",
-				var_name, var->resetString, var_value );
+			int i;
+			for ( i = 0; i < cvar_conflict_warned_count; i++ ) {
+				if ( Q_stricmp( cvar_conflict_warned[i].name, var_name ) == 0 )
+					break;
+			}
+			if ( i >= cvar_conflict_warned_count ) {
+				Com_DPrintf( "Warning: cvar \"%s\" given initial values: \"%s\" and \"%s\"\n",
+					var_name, var->resetString, var_value );
+				if ( cvar_conflict_warned_count < CVAR_CONFLICT_WARNED_MAX ) {
+					Q_strncpyz( cvar_conflict_warned[cvar_conflict_warned_count].name, var_name,
+						sizeof( cvar_conflict_warned[0].name ) );
+					cvar_conflict_warned_count++;
+				}
+			}
 		}
 
 		// if we have a latched string, take that value now
@@ -635,7 +651,7 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 		var_name = "BADNAME";
 	}
 
-#if 0	// FIXME
+#if 0	/* Disabled block */
 	if ( value && !Cvar_ValidateString( value ) ) {
 		Com_Printf("invalid cvar value string: %s\n", value );
 		var_value = "BADVALUE";
@@ -833,7 +849,7 @@ Cvar_SetIntegerValue
 void Cvar_SetIntegerValue( const char *var_name, int value ) {
 	char	val[32];
 
-	sprintf( val, "%i", value );
+	Com_sprintf( val, sizeof( val ), "%i", value );
 	Cvar_Set( var_name, val );
 }
 
@@ -1210,7 +1226,7 @@ static void Cvar_Op( funcType_t ftype, int *ival, float *fval )
 		case FT_MOD:
 			if ( imod ) {
 				*ival %= imod;
-				*fval = (float)( (int)*fval % imod ); // FIXME: use float
+				*fval = (float)( (int)*fval % imod ); /* Integer mod; float mod could be used. */
 			}
 			break;
 
@@ -1299,7 +1315,7 @@ static void Cvar_Func_f( void ) {
 	if ( !cvar ) {
 		if ( !AllowEmptyCvar( ftype ) )	{
 			Com_Printf( "Cvar '%s' does not exist.\n", cvar_name );
-			return; // FIXME: allow cvar creation for some functions?
+			return; /* Could allow cvar creation for some functions. */
 		}
 	} else if ( cvar->flags & ( CVAR_INIT | CVAR_ROM | CVAR_PROTECTED ) ) {
 		Com_Printf( "Cvar '%s' is write-protected.\n", cvar_name );
@@ -1320,12 +1336,12 @@ static void Cvar_Func_f( void ) {
 		Cvar_Op( ftype, &ival, &fval ); // apply modification
 	
 	if ( cvar && cvar->validator == CV_INTEGER ) {
-		sprintf( value, "%i", ival );
+		Com_sprintf( value, sizeof( value ), "%i", ival );
 	} else {
 		if ( (int)fval == fval )
-			sprintf( value, "%i", (int)fval );
+			Com_sprintf( value, sizeof( value ), "%i", (int)fval );
 		else
-			sprintf( value, "%f", fval );
+			Com_sprintf( value, sizeof( value ), "%f", fval );
 	}
 
 	Cvar_Set2( cvar_name, value, qfalse );
@@ -1749,6 +1765,7 @@ Cvar_InfoString
 const char *Cvar_InfoString( int bit, qboolean *truncated )
 {
 	static char	info[ MAX_INFO_STRING ];
+	static char	info_big[ BIG_INFO_STRING ];
 	const cvar_t *user_vars[ MAX_CVARS ];
 	const cvar_t *vm_vars[ MAX_CVARS ];
 	const cvar_t *var;
@@ -1756,6 +1773,12 @@ const char *Cvar_InfoString( int bit, qboolean *truncated )
 	int vm_count;
 	int i;
 	qboolean allSet;
+	int slen;
+	char *buf;
+
+	/* CVAR_USERINFO often has many mod-added keys (videoflags, voteflags, etc.) */
+	slen = ( bit == CVAR_USERINFO ) ? BIG_INFO_STRING : MAX_INFO_STRING;
+	buf = ( bit == CVAR_USERINFO ) ? info_big : info;
 
 	// sort to get more predictable output
 	if ( cvar_sort )
@@ -1764,7 +1787,7 @@ const char *Cvar_InfoString( int bit, qboolean *truncated )
 		Cvar_Sort();
 	}
 
-	info[0] = '\0';
+	buf[0] = '\0';
 	user_count = 0;
 	vm_count = 0;
 	allSet = qtrue; // this will be qfalse on overflow
@@ -1783,7 +1806,7 @@ const char *Cvar_InfoString( int bit, qboolean *truncated )
 			}
 			else
 			{
-				allSet &= Info_SetValueForKey( info, var->name, var->string );
+				allSet &= Info_SetValueForKey_s( buf, slen, var->name, var->string );
 			}
 		}
 	}
@@ -1792,14 +1815,14 @@ const char *Cvar_InfoString( int bit, qboolean *truncated )
 	for ( i = 0; i < vm_count; i++ )
 	{
 		var = vm_vars[ i ];
-		allSet &= Info_SetValueForKey( info, var->name, var->string );
+		allSet &= Info_SetValueForKey_s( buf, slen, var->name, var->string );
 	}
 
 	// add user-created cvars
 	for ( i = 0; i < user_count; i++ )
 	{
 		var = user_vars[ i ];
-		allSet &= Info_SetValueForKey( info, var->name, var->string );
+		allSet &= Info_SetValueForKey_s( buf, slen, var->name, var->string );
 	}
 
 	if ( truncated )
@@ -1807,7 +1830,7 @@ const char *Cvar_InfoString( int bit, qboolean *truncated )
 		*truncated = !allSet;
 	}
 
-	return info;
+	return buf;
 }
 
 
@@ -2022,7 +2045,10 @@ void Cvar_Register( vmCvar_t *vmCvar, const char *varName, const char *defaultVa
 			}
 		}
 	} else {
-		cv = Cvar_Get( varName, defaultValue, flags | CVAR_VM_CREATED );
+		/* Use engine's existing default when cvar already exists to avoid
+		 * "given initial values X and Y" warning (e.g. r_hdr: Vulkan=2, game=1). */
+		const char *def = ( cv && cv->resetString && cv->resetString[0] ) ? cv->resetString : defaultValue;
+		cv = Cvar_Get( varName, def, flags | CVAR_VM_CREATED );
 	}
 
 	if (!vmCvar)

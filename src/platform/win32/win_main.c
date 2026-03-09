@@ -516,6 +516,24 @@ void *Sys_LoadLibrary( const char *name )
 
 /*
 =================
+Sys_GetLoadLibraryError
+=================
+*/
+const char *Sys_GetLoadLibraryError( void )
+{
+	static char buf[256];
+	DWORD err = GetLastError();
+	if ( err != 0 && FormatMessageA( FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+		NULL, err, MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ), buf, sizeof( buf ), NULL ) )
+	{
+		return buf;
+	}
+	return "unknown error";
+}
+
+
+/*
+=================
 Sys_LoadFunction
 =================
 */
@@ -712,7 +730,7 @@ static const char *GetExceptionName( DWORD code )
 		default: break;
 	}
 
-	sprintf( buf, "0x%08X", (unsigned int)code );
+	Com_sprintf( buf, sizeof( buf ), "0x%08X", (unsigned int)code );
 	return buf;
 }
 

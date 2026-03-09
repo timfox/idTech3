@@ -1,0 +1,157 @@
+#version 450
+
+// 128 bytes
+layout(push_constant) uniform Transform {
+	mat4 mvp;
+	mat4 prevMvp;
+};
+
+layout(set = 0, binding = 0) uniform UBO {
+	// light/env parameters:
+	vec4 eyePos;				// vertex
+	vec4 lightPos;				// vertex: light origin
+	vec4 lightColor;			// fragment: rgb + 1/(r*r)
+	vec4 lightVector;			// fragment: linear dynamic light
+#ifdef USE_FOG
+	// fog parameters:
+	vec4 fogDistanceVector;		// vertex
+	vec4 fogDepthVector;		// vertex
+	vec4 fogEyeT;				// vertex
+	vec4 fogColor;				// fragment
+#endif
+};
+
+layout(set = 0, binding = 2) readonly buffer IQMSkinBuffer {
+	float iqmSkinData[];
+};
+
+layout(set = 0, binding = 3) readonly buffer IQMMorphBuffer {
+	float iqmMorphData[];
+};
+
+layout(location = 0) in vec4 in_position;
+layout(location = 1) in vec2 in_tex_coord;
+layout(location = 2) in vec4 in_normal;
+
+layout(location = 0) out vec2 frag_tex_coord;
+layout(location = 1) out vec3 N; // normal array
+layout(location = 2) out vec4 L; // object-space light vector
+layout(location = 3) out vec4 V; // object-space view vector
+
+#ifdef USE_FOG
+layout(location = 4) out vec2 fog_tex_coord;
+#endif
+
+layout(location = 13) out vec4 var_CurrentClip;
+layout(location = 14) out vec4 var_PrevClip;
+
+out gl_PerVertex {
+	vec4 gl_Position;
+};
+
+const uint IQM_GPU_META_TAG = 0xAB000000u;
+const uint IQM_GPU_INDEX_MASK = 0x00000FFFu;
+const uint IQM_GPU_MORPH_SHIFT = 12u;
+
+bool IQMDecodeMeta( float packedFloat, out int skinIndex, out int morphIndex ) {
+	uint packed = floatBitsToUint( packedFloat );
+	if ( ( packed & 0xFF000000u ) != IQM_GPU_META_TAG ) {
+		skinIndex = -1;
+		morphIndex = -1;
+		return false;
+	}
+
+	skinIndex = int( packed & IQM_GPU_INDEX_MASK );
+	morphIndex = int( ( packed >> IQM_GPU_MORPH_SHIFT ) & IQM_GPU_INDEX_MASK );
+	return true;
+}
+
+vec3 IQMSkinPosition( int skinIndex, vec3 position ) {
+	int base = 1 + skinIndex * 12;
+	return vec3(
+		iqmSkinData[base + 0] * position.x + iqmSkinData[base + 1] * position.y + iqmSkinData[base + 2] * position.z + iqmSkinData[base + 3],
+		iqmSkinData[base + 4] * position.x + iqmSkinData[base + 5] * position.y + iqmSkinData[base + 6] * position.z + iqmSkinData[base + 7],
+		iqmSkinData[base + 8] * position.x + iqmSkinData[base + 9] * position.y + iqmSkinData[base + 10] * position.z + iqmSkinData[base + 11]
+	);
+}
+
+vec3 IQMSkinNormal( int skinIndex, int skinCount, vec3 normal ) {
+	int base = 1 + skinCount * 12 + skinIndex * 9;
+	return vec3(
+		iqmSkinData[base + 0] * normal.x + iqmSkinData[base + 1] * normal.y + iqmSkinData[base + 2] * normal.z,
+		iqmSkinData[base + 3] * normal.x + iqmSkinData[base + 4] * normal.y + iqmSkinData[base + 5] * normal.z,
+		iqmSkinData[base + 6] * normal.x + iqmSkinData[base + 7] * normal.y + iqmSkinData[base + 8] * normal.z
+	);
+}
+
+vec3 IQMMorphDeltaPos( int morphIndex, int morphStage ) {
+	int base = 6 + morphIndex * (4 * 6) + morphStage * 6;
+	return vec3( iqmMorphData[base + 0], iqmMorphData[base + 1], iqmMorphData[base + 2] );
+}
+
+vec3 IQMMorphDeltaNormal( int morphIndex, int morphStage ) {
+	int base = 6 + morphIndex * (4 * 6) + morphStage * 6;
+	return vec3( iqmMorphData[base + 3], iqmMorphData[base + 4], iqmMorphData[base + 5] );
+}
+
+void main() {
+	vec3 position = in_position.xyz;
+	vec3 normal = in_normal.xyz;
+	int skinIndex;
+	int morphIndex;
+	int skinCount = int( iqmSkinData[0] );
+
+	if ( IQMDecodeMeta( in_position.w, skinIndex, morphIndex ) && skinIndex >= 0 && skinIndex < skinCount ) {
+		int morphCount = int( iqmMorphData[0] );
+		int activeCount = min( int( iqmMorphData[1] ), 4 );
+		vec3 morphPosition = position;
+		vec3 morphNormal = normal;
+
+		if ( morphIndex >= 0 && morphIndex < morphCount && activeCount > 0 ) {
+			for ( int k = 0; k < 4; k++ ) {
+				if ( k >= activeCount ) {
+					break;
+				}
+				float weight = iqmMorphData[2 + k];
+				morphPosition += IQMMorphDeltaPos( morphIndex, k ) * weight;
+				morphNormal += IQMMorphDeltaNormal( morphIndex, k ) * weight;
+			}
+			morphNormal = normalize( morphNormal );
+		}
+
+		position = IQMSkinPosition( skinIndex, morphPosition );
+		normal = normalize( IQMSkinNormal( skinIndex, skinCount, morphNormal ) );
+	}
+
+	vec4 currClip = mvp * vec4(position, 1.0);
+	vec4 prevClip = prevMvp * vec4(position, 1.0);
+	gl_Position = currClip;
+	var_CurrentClip = currClip;
+	var_PrevClip = prevClip;
+
+	frag_tex_coord = in_tex_coord;
+	N = normal;
+	L = lightPos - vec4(position, 1.0);
+	V = eyePos - vec4(position, 1.0);
+
+#ifdef USE_FOG
+	float s = dot(position, fogDistanceVector.xyz) + fogDistanceVector.w;
+	float t = dot(position, fogDepthVector.xyz) + fogDepthVector.w;
+
+	if ( fogEyeT.y == 1.0 ) {
+		if ( t < 0.0 ) {
+			t = 1.0 / 32.0;
+		} else {
+			t = 31.0 / 32.0;
+		}
+	} else {
+		if ( t < 1.0 ) {
+			t = 1.0 / 32.0;
+		} else {
+			t = 1.0 / 32.0 + (30.0 / 32.0 * t) / ( t - fogEyeT.x );
+		}
+	}
+
+	fog_tex_coord = vec2(s, t);
+#endif
+}

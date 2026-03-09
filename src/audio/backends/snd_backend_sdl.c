@@ -37,6 +37,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../../qcommon/q_shared.h"
 #include "../snd_local.h"
 #include "../../client/client.h"
+#include "../../client/cl_voip.h"
 
 qboolean snd_inited = qfalse;
 
@@ -52,7 +53,7 @@ static int dmasize = 0;
 
 static SDL_AudioDeviceID sdlPlaybackDevice;
 
-#if defined USE_VOIP && SDL_VERSION_ATLEAST( 2, 0, 5 )
+#if defined USE_OPUS && defined USE_SDL && !defined USE_OPENAL && SDL_VERSION_ATLEAST( 2, 0, 5 )
 #define USE_SDL_AUDIO_CAPTURE
 
 static SDL_AudioDeviceID sdlCaptureDevice;
@@ -189,12 +190,12 @@ static int SNDDMA_KHzToHz( int khz )
 {
 	switch ( khz )
 	{
-		default:
-		case 22: return 22050;
 		case 48: return 48000;
 		case 44: return 44100;
+		case 22: return 22050;
 		case 11: return 11025;
 		case  8: return  8000;
+		default: return 44100;  /* fallback: at least 44 kHz */
 	}
 }
 
@@ -246,7 +247,7 @@ qboolean SNDDMA_Init( void )
 
 	desired.freq = SNDDMA_KHzToHz( s_khz->integer );
 	if ( desired.freq == 0 )
-		desired.freq = 22050;
+		desired.freq = 44100;
 
 	tmp = s_sdlBits->integer;
 	if ( tmp < 16 )
@@ -312,10 +313,10 @@ qboolean SNDDMA_Init( void )
 	dma.buffer = calloc(1, dmasize);
 
 #ifdef USE_SDL_AUDIO_CAPTURE
-	// !!! FIXME: some of these SDL_OpenAudioDevice() values should be cvars.
+	/* Some SDL_OpenAudioDevice values could be cvars. */
 	s_sdlCapture = Cvar_Get( "s_sdlCapture", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	Cvar_SetDescription( s_sdlCapture, "Set to 1 to enable SDL audio capture." );
-	// !!! FIXME: pulseaudio capture records audio the entire time the program is running. https://bugzilla.libsdl.org/show_bug.cgi?id=4087
+	/* PulseAudio capture records entire runtime; see SDL bug 4087. */
 	if (Q_stricmp(SDL_GetCurrentAudioDriver(), "pulseaudio") == 0)
 	{
 		Com_Printf("SDL audio capture support disabled for pulseaudio (https://bugzilla.libsdl.org/show_bug.cgi?id=4087)\n");
@@ -332,13 +333,13 @@ qboolean SNDDMA_Init( void )
 #endif
 	else
 	{
-		/* !!! FIXME: list available devices and let cvar specify one, like OpenAL does */
+		/* Could list devices and let cvar specify one, like OpenAL. */
 		SDL_AudioSpec spec;
 		SDL_zero(spec);
 		spec.freq = 48000;
 		spec.format = AUDIO_S16SYS;
 		spec.channels = 1;
-		spec.samples = VOIP_MAX_PACKET_SAMPLES * 4;
+		spec.samples = VOIP_FRAME_SAMPLES * 4;
 		sdlCaptureDevice = SDL_OpenAudioDevice(NULL, SDL_TRUE, &spec, NULL, 0);
 		Com_Printf( "SDL capture device %s.\n",
 				    (sdlCaptureDevice == 0) ? "failed to open" : "opened");
@@ -438,40 +439,30 @@ void SNDDMA_BeginPainting( void )
 }
 
 
-#ifdef USE_VOIP
+#if defined USE_OPUS && defined USE_SDL_AUDIO_CAPTURE
 void SNDDMA_StartCapture(void)
 {
-#ifdef USE_SDL_AUDIO_CAPTURE
 	if (sdlCaptureDevice)
 	{
 		SDL_ClearQueuedAudio(sdlCaptureDevice);
 		SDL_PauseAudioDevice(sdlCaptureDevice, 0);
 	}
-#endif
 }
-
 
 int SNDDMA_AvailableCaptureSamples(void)
 {
-#ifdef USE_SDL_AUDIO_CAPTURE
 	// divided by 2 to convert from bytes to (mono16) samples.
 	return sdlCaptureDevice ? (SDL_GetQueuedAudioSize(sdlCaptureDevice) / 2) : 0;
-#else
-	return 0;
-#endif
 }
-
 
 void SNDDMA_Capture(int samples, byte *data)
 {
-#ifdef USE_SDL_AUDIO_CAPTURE
 	// multiplied by 2 to convert from (mono16) samples to bytes.
 	if (sdlCaptureDevice)
 	{
 		SDL_DequeueAudio(sdlCaptureDevice, data, samples * 2);
 	}
 	else
-#endif
 	{
 		SDL_memset(data, '\0', samples * 2);
 	}
@@ -479,18 +470,14 @@ void SNDDMA_Capture(int samples, byte *data)
 
 void SNDDMA_StopCapture(void)
 {
-#ifdef USE_SDL_AUDIO_CAPTURE
 	if (sdlCaptureDevice)
 	{
 		SDL_PauseAudioDevice(sdlCaptureDevice, 1);
 	}
-#endif
 }
 
 void SNDDMA_MasterGain( float val )
 {
-#ifdef USE_SDL_AUDIO_CAPTURE
 	sdlMasterGain = val;
-#endif
 }
 #endif

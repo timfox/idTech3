@@ -76,7 +76,7 @@ should still function correctly, but all file writes will fail (harmlessly).
 
 The "home path" is the path used for all write access. On win32 systems we have "base path"
 == "home path", but on *nix systems the base installation is usually read-only, and
-"home path" points to ~/.q3a or similar
+"home path" points to ~/.fox or similar
 
 The user can also install custom mods and content in "home path", so it should be searched
 along with "home path" and "cd path" for game content.
@@ -110,7 +110,7 @@ automatically restricts where game media can come from to prevent add-ons from w
 After the paths are initialized, quake will look for the product.txt file.  If not
 found and verified, the game will run in restricted mode.  In restricted mode, only 
 files contained in demoq3/pak0.pk3 will be available for loading, and only if the zip header is
-verified to not have been modified.  A single exception is made for q3config.cfg.  Files
+verified to not have been modified.  A single exception is made for config.cfg.  Files
 can still be written out in restricted mode, so screenshots and demos are allowed.
 Restricted mode can be tested by setting "+set fs_restrict 1" on the command line, even
 if there is a valid product.txt under the basepath or cdpath.
@@ -168,7 +168,7 @@ load the file with a request to cache.  Only one file will be kept cached at a t
 so any models that are going to be referenced by both subsystems should alternate
 between the CM_ load function and the ref load function.
 
-TODO: A qpath that starts with a leading slash will always refer to the base game, even if another
+Note: A qpath with leading slash refers to base game even when another
 game is currently active.  This allows character models, skins, and sounds to be downloaded
 to a common directory no matter which game is active.
 
@@ -198,7 +198,7 @@ Read / write config to floppy option.
 
 Different version coexistence?
 
-When building a pak file, make sure a q3config.cfg isn't present in it,
+When building a pak file, make sure a config.cfg isn't present in it,
 or configs will never get loaded from disk!
 
   todo:
@@ -418,7 +418,7 @@ static qboolean FS_PakIsPure( const pack_t *pack ) {
 	int i;
 	if ( fs_numServerPaks ) {
 		for ( i = 0 ; i < fs_numServerPaks ; i++ ) {
-			// FIXME: also use hashed file names
+			/* Could also use hashed file names. */
 			// NOTE TTimo: a pk3 with same checksum but different name would be validated too
 			//   I don't see this as allowing for any exploit, it would only happen if the client does manips of its file names 'not a bug'
 			if ( pack->checksum == fs_serverPaks[i] ) {
@@ -429,6 +429,30 @@ static qboolean FS_PakIsPure( const pack_t *pack ) {
 	}
 #endif
 	return qtrue;
+}
+
+/*
+=================
+FS_AllowLoosePureFile
+
+Pure mode should source game content from approved pack archives. Keep the
+historical exceptions for local config/data files so writable state remains
+usable without relaxing media purity.
+=================
+*/
+static qboolean FS_AllowLoosePureFile( const char *filename ) {
+	const char *ext;
+
+	if ( !fs_numServerPaks ) {
+		return qtrue;
+	}
+
+	ext = COM_GetExtension( filename );
+	if ( !ext || !*ext ) {
+		return qfalse;
+	}
+
+	return ( !Q_stricmp( ext, "cfg" ) || !Q_stricmp( ext, "dat" ) ) ? qtrue : qfalse;
 }
 
 
@@ -633,7 +657,7 @@ static qboolean FS_CreatePath( const char *OSPath ) {
 	char	*ofs;
 	
 	// make absolutely sure that it can't back up the path
-	// FIXME: is c: allowed???
+	/* Check whether c: or other drive letters are allowed. */
 	if ( FS_CheckDirTraversal( OSPath ) ) {
 		Com_Printf( "WARNING: refusing to create relative path \"%s\"\n", OSPath );
 		return qtrue;
@@ -1421,6 +1445,36 @@ qboolean FS_StripExt( char *filename, const char *ext )
 }
 
 
+static const char *fs_pakExtensions[] = { ".pk3", ".zip", ".orb" };
+static const int fs_pakExtensionCount = ARRAY_LEN( fs_pakExtensions );
+
+static qboolean FS_IsPakFile( const char *filename, size_t namelen )
+{
+	int i;
+
+	for ( i = 0; i < fs_pakExtensionCount; i++ ) {
+		if ( FS_IsExt( filename, fs_pakExtensions[i], namelen ) ) {
+			return qtrue;
+		}
+	}
+
+	return qfalse;
+}
+
+static qboolean FS_StripPakExt( char *filename )
+{
+	int i;
+
+	for ( i = 0; i < fs_pakExtensionCount; i++ ) {
+		if ( FS_StripExt( filename, fs_pakExtensions[i] ) ) {
+			return qtrue;
+		}
+	}
+
+	return qfalse;
+}
+
+
 static const char *FS_HasExt( const char *fileName, const char **extList, int extCount ) 
 {
 	const char *e;
@@ -1636,7 +1690,7 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 					}
 					pakFile = pakFile->next;
 				} while ( pakFile != NULL );
-			} else if ( search->dir && search->policy != DIR_DENY ) {
+			} else if ( search->dir && search->policy != DIR_DENY && FS_AllowLoosePureFile( filename ) ) {
 				dir = search->dir;
 				netpath = FS_BuildOSPath( dir->path, dir->gamedir, filename );
 				temp = Sys_FOpen( netpath, "rb" );
@@ -1678,7 +1732,7 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 				}
 				pakFile = pakFile->next;
 			} while ( pakFile != NULL );
-		} else if ( search->dir && search->policy != DIR_DENY ) {
+		} else if ( search->dir && search->policy != DIR_DENY && FS_AllowLoosePureFile( filename ) ) {
 			// check a file in the directory tree
 			dir = search->dir;
 
@@ -1945,7 +1999,7 @@ int FS_Seek( fileHandle_t f, long offset, fsOrigin_t origin ) {
 	}
 
 	if ( fsh[f].zipFile == qtrue ) {
-		//FIXME: this is really, really crappy
+		/* Workaround: zip handling could be improved. */
 		//(but better than what was here before)
 		byte	buffer[PK3_SEEK_BUFFER_SIZE];
 		int		remainder;
@@ -2335,9 +2389,12 @@ static void FS_ParseGameInfo( void );
 
 static pack_t *pakHashTable[ PK3_HASH_SIZE ];
 
+static qboolean FS_IsBaseGame( const char *game );
+
 #ifdef USE_PK3_CACHE_FILE
 
-#define CACHE_FILE_NAME "pk3cache.dat"
+#define CACHE_FILE_NAME_PK3 "pk3cache.dat"
+#define CACHE_FILE_NAME_ORB "orbcache.dat"
 
 #define CACHE_SYNC_CONDITION ( fs_paksReaded + fs_paksSkipped + fs_paksReleased >= 8 )
 
@@ -2387,6 +2444,62 @@ typedef struct pk3cacheFileItem_s {
 } pk3cacheFileItem_t;
 
 #pragma pack( pop )
+
+static qboolean FS_DirectoryHasOrbPak( const char *root, const char *gamedir ) {
+	char **orbfiles;
+	char path[MAX_OSPATH];
+	int numOrbFiles = 0;
+	qboolean found;
+
+	if ( !root || !root[0] || !gamedir || !gamedir[0] ) {
+		return qfalse;
+	}
+
+	Q_strncpyz( path, FS_BuildOSPath( root, gamedir, NULL ), sizeof( path ) );
+	orbfiles = Sys_ListFiles( path, ".orb", NULL, &numOrbFiles, 0 );
+	found = ( numOrbFiles > 0 );
+	if ( orbfiles ) {
+		Sys_FreeFileList( orbfiles );
+	}
+
+	return found;
+}
+
+static qboolean FS_ShouldUseOrbCacheFile( void ) {
+	int i;
+
+	for ( i = 0; i < basegame_cnt; i++ ) {
+		if ( FS_DirectoryHasOrbPak( fs_steampath ? fs_steampath->string : NULL, basegames[i] ) ||
+			 FS_DirectoryHasOrbPak( fs_basepath ? fs_basepath->string : NULL, basegames[i] ) ||
+			 FS_DirectoryHasOrbPak( fs_homepath ? fs_homepath->string : NULL, basegames[i] ) ) {
+			return qtrue;
+		}
+#ifdef __APPLE__
+		if ( FS_DirectoryHasOrbPak( fs_apppath ? fs_apppath->string : NULL, basegames[i] ) ) {
+			return qtrue;
+		}
+#endif
+	}
+
+	if ( fs_gamedirvar && fs_gamedirvar->string[0] != '\0' && !FS_IsBaseGame( fs_gamedirvar->string ) ) {
+		if ( FS_DirectoryHasOrbPak( fs_steampath ? fs_steampath->string : NULL, fs_gamedirvar->string ) ||
+			 FS_DirectoryHasOrbPak( fs_basepath ? fs_basepath->string : NULL, fs_gamedirvar->string ) ||
+			 FS_DirectoryHasOrbPak( fs_homepath ? fs_homepath->string : NULL, fs_gamedirvar->string ) ) {
+			return qtrue;
+		}
+#ifdef __APPLE__
+		if ( FS_DirectoryHasOrbPak( fs_apppath ? fs_apppath->string : NULL, fs_gamedirvar->string ) ) {
+			return qtrue;
+		}
+#endif
+	}
+
+	return qfalse;
+}
+
+static const char *FS_GetCacheFileName( void ) {
+	return FS_ShouldUseOrbCacheFile() ? CACHE_FILE_NAME_ORB : CACHE_FILE_NAME_PK3;
+}
 
 #endif // USE_PK3_CACHE_FILE
 
@@ -2723,7 +2836,7 @@ static qboolean FS_LoadPakFromFile( FILE *f )
 		basename++;
 
 	Q_strncpyz( pakBase, basename, sizeof( pakBase ) );
-	FS_StripExt( pakBase, ".pk3" );
+	FS_StripPakExt( pakBase );
 	pakBaseLen = (int) strlen( pakBase ) + 1;
 	pakBaseLen = PAD( pakBaseLen, sizeof( int ) );
 
@@ -2853,7 +2966,7 @@ Called at the end of FS_Startup() after releasing unused paks
 */
 static qboolean FS_SaveCache( void )
 {
-	const char *filename = CACHE_FILE_NAME;
+	const char *filename = FS_GetCacheFileName();
 	const char *ospath;
 	const searchpath_t *sp;
 	FILE *f;
@@ -2917,7 +3030,7 @@ Called at FS_Startup() before loading any pk3 file
 */
 static void FS_LoadCache( void )
 {
-	const char *filename = CACHE_FILE_NAME;
+	const char *filename = FS_GetCacheFileName();
 	const char *ospath;
 	FILE *f;
 
@@ -2933,8 +3046,13 @@ static void FS_LoadCache( void )
 	ospath = FS_BuildOSPath( fs_homepath->string, filename, NULL );
 
 	f = Sys_FOpen( ospath, "rb" );
-	if ( f == NULL )
+	if ( f == NULL && !Q_stricmp( filename, CACHE_FILE_NAME_ORB ) ) {
+		ospath = FS_BuildOSPath( fs_homepath->string, CACHE_FILE_NAME_PK3, NULL );
+		f = Sys_FOpen( ospath, "rb" );
+	}
+	if ( f == NULL ) {
 		return;
+	}
 
 	if ( !FS_ValidateCacheHeader( f ) )
 	{
@@ -3082,8 +3200,8 @@ static pack_t *FS_LoadZipFile( const char *zipfile )
 	Com_Memcpy( pack->pakFilename, zipfile, fileNameLen );
 	Com_Memcpy( pack->pakBasename, basename, baseNameLen );
 
-	// strip .pk3 if needed
-	FS_StripExt( pack->pakBasename, ".pk3" );
+	// strip pak extension if needed
+	FS_StripPakExt( pack->pakBasename );
 
 	unzGoToFirstFile( uf );
 	curFile = pack->buildBuffer;
@@ -3108,7 +3226,7 @@ static pack_t *FS_LoadZipFile( const char *zipfile )
 			unzGetCurrentFileInfoPosition( uf, &curFile->pos );
 			curFile->size = file_info.uncompressed_size;
 			curFile->name = namePtr;
-			strcpy( curFile->name, filename_inzip );
+			Q_strncpyz( curFile->name, filename_inzip, MAX_ZPATH );
 			namePtr += strlen( filename_inzip ) + 1;
 
 			// update hash table
@@ -3580,7 +3698,7 @@ mkv: Naive implementation. Concatenates three lists into a
      new list, and frees the old lists from the heap.
 bk001129 - from cvs1.17 (mkv)
 
-FIXME TTimo those two should move to common.c next to Sys_ListFiles
+Note: Could move to common.c next to Sys_ListFiles.
 =======================
  */
 static unsigned int Sys_CountFileList( char **list )
@@ -4187,8 +4305,8 @@ static void FS_AddGameDirectory( const char *path, const char *dir ) {
 	// find all pak files in this directory
 	Q_strncpyz( curpath, FS_BuildOSPath( path, dir, NULL ), sizeof( curpath ) );
 
-	// Get .pk3 files
-	pakfiles = Sys_ListFiles( curpath, ".pk3", NULL, &numfiles, 0 );
+	// Get pak files (.pk3/.zip/.orb)
+	pakfiles = Sys_ListFiles( curpath, NULL, NULL, &numfiles, 0 );
 
 	if ( numfiles >= 2 )
 		FS_SortFileList( pakfiles, numfiles - 1 );
@@ -4226,16 +4344,16 @@ static void FS_AddGameDirectory( const char *path, const char *dir ) {
 		if ( pakwhich ) {
 
 			len = strlen( pakfiles[pakfilesi] );
-			if ( !FS_IsExt( pakfiles[pakfilesi], ".pk3", len ) ) {
-				// not a pk3 file
+			if ( !FS_IsPakFile( pakfiles[pakfilesi], len ) ) {
+				// not a pak file
 				pakfilesi++;
 				continue;
 			}
 
-			// The next .pk3 file is before the next .pk3dir
+			// The next pak file is before the next .pk3dir
 			pakfile = FS_BuildOSPath( path, dir, pakfiles[pakfilesi] );
 			if ( (pak = FS_LoadZipFile( pakfile ) ) == NULL ) {
-				// This isn't a .pk3! Next!
+				// This isn't a pak file! Next!
 				pakfilesi++;
 				continue;
 			}
@@ -4262,7 +4380,7 @@ static void FS_AddGameDirectory( const char *path, const char *dir ) {
 
 			len = strlen(pakdirs[pakdirsi]);
 
-			// The next .pk3dir is before the next .pk3 file
+			// The next .pk3dir is before the next pak file
 			// But wait, this could be any directory, we're filtering to only ending with ".pk3dir" here.
 			if (!FS_IsExt(pakdirs[pakdirsi], ".pk3dir", len)) {
 				// This isn't a .pk3dir! Next!
@@ -4902,39 +5020,24 @@ static void FS_Startup( void ) {
 FS_ParseGameInfo
 
 Parses gameinfo.txt (Source Engine style) from the game root directory
-and extracts the title field to set the window title.
+and extracts the title and bumper1 fields (title for window, bumper1 for intro cinematic).
 =====================
 */
 static void FS_ParseGameInfo( void )
 {
 	char *buffer;
 	int len;
-	const char *gameDir;
-	char gameInfoPath[MAX_OSPATH];
-	
-	// Determine game directory (fs_game if set, otherwise fs_basegame)
-	if ( fs_gamedirvar->string[0] != '\0' ) {
-		gameDir = fs_gamedirvar->string;
-	} else {
-		gameDir = fs_basegame->string;
-	}
-	
-	// Try to find gameinfo.txt in the game directory
-	// Check in basepath first
-	Com_sprintf( gameInfoPath, sizeof( gameInfoPath ), "%s/%s/gameinfo.txt", fs_basepath->string, gameDir );
-	len = FS_ReadFile( gameInfoPath, (void **)&buffer );
-	
-	// If not found in basepath, try homepath
-	if ( !buffer && fs_homepath->string[0] && Q_stricmp( fs_homepath->string, fs_basepath->string ) ) {
-		Com_sprintf( gameInfoPath, sizeof( gameInfoPath ), "%s/%s/gameinfo.txt", fs_homepath->string, gameDir );
-		len = FS_ReadFile( gameInfoPath, (void **)&buffer );
-	}
-	
+
+	// Find gameinfo.txt via the filesystem (current game dir is already in search paths)
+	len = FS_ReadFile( "gameinfo.txt", (void **)&buffer );
+
 	if ( !buffer || len <= 0 ) {
 		// gameinfo.txt not found, use default title
 		return;
 	}
-	
+
+	cl_bumper1[0] = '\0';
+
 	// Simple parser: look for "title" followed by quoted string
 	const char *p = buffer;
 	const char *end = buffer + len;
@@ -4994,7 +5097,36 @@ static void FS_ParseGameInfo( void )
 			}
 		}
 	}
-	
+
+	// Find "bumper1" keyword (intro cinematic override)
+	p = buffer;
+	while ( p < end - 7 ) {
+		if ( Q_strncmp( p, "bumper1", 7 ) == 0 ) {
+			p += 7;
+			while ( p < end && ( *p == ' ' || *p == '\t' ) ) {
+				p++;
+			}
+			if ( p < end && *p == '"' ) {
+				p++;
+				const char *bumperStart = p;
+				while ( p < end && *p != '"' && *p != '\n' && *p != '\r' ) {
+					p++;
+				}
+				if ( p < end && *p == '"' ) {
+					int bumperLen = (int)( p - bumperStart );
+					if ( bumperLen > 0 && bumperLen < MAX_CVAR_VALUE_STRING ) {
+						Q_strncpyz( cl_bumper1, bumperStart, bumperLen + 1 );
+						if ( Com_LogVerbosity() >= 1 ) {
+							LOG_FS( "Parsed gameinfo.txt: bumper1 = \"%s\"\n", cl_bumper1 );
+						}
+					}
+					break;
+				}
+			}
+		}
+		p++;
+	}
+
 	FS_FreeFile( buffer );
 }
 
@@ -5047,9 +5179,9 @@ const char *FS_LoadedPakChecksums( qboolean *overflowed ) {
 			continue;
 
 		if ( info[0] )
-			len = sprintf( buf, " %i", search->pack->checksum );
+			len = Com_sprintf( buf, sizeof( buf ), " %i", search->pack->checksum );
 		else
-			len = sprintf( buf, "%i", search->pack->checksum );
+			len = Com_sprintf( buf, sizeof( buf ), "%i", search->pack->checksum );
 
 		if ( s + len > max ) {
 			*overflowed = qtrue;
@@ -5525,7 +5657,7 @@ void FS_Restart( int checksumFeed ) {
 
 	// new check before safeMode
 	if ( Q_stricmp(fs_gamedirvar->string, lastValidGame) && execConfig ) {
-		// skip the q3config.cfg if "safe" is on the command line
+			// skip config.cfg if "safe" is on the command line
 		if ( !Com_SafeMode() ) {
 			Cbuf_AddText( "exec " Q3CONFIG_CFG "\n" );
 		}
@@ -5875,39 +6007,51 @@ void *FS_LoadLibrary( const char *name )
 		if ( sp ) {
 			// Try both naming conventions: "uix86_64.so" and "ui.x86_64.so"
 			// Check if name matches pattern like "uiARCH.so" and try "ui.ARCH.so"
+			// Look in modules/ first, then vm/
 			if ( nameLen > 7 && nameLen < MAX_QPATH - 1 ) {
 				if ( Q_strncmp(name, "ui", 2) == 0 && Q_strncmp(name + nameLen - 3, ".so", 3) == 0 ) {
 					// Convert "uix86_64.so" -> "ui.x86_64.so"
 					Com_sprintf( dottedName, sizeof( dottedName ), "ui.%s", name + 2 );
-					Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", dottedName );
-					const char *fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath );
-					libHandle = Sys_LoadLibrary( fn );
+					Com_sprintf( vmPath, sizeof( vmPath ), "modules/%s", dottedName );
+					libHandle = Sys_LoadLibrary( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
+					if ( !libHandle ) {
+						Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", dottedName );
+						libHandle = Sys_LoadLibrary( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
+					}
 				} else if ( Q_strncmp(name, "cgame", 5) == 0 && Q_strncmp(name + nameLen - 3, ".so", 3) == 0 ) {
 					// Convert "cgamex86_64.so" -> "cgame.x86_64.so"
 					Com_sprintf( dottedName, sizeof( dottedName ), "cgame.%s", name + 5 );
-					Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", dottedName );
-					const char *fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath );
-					libHandle = Sys_LoadLibrary( fn );
+					Com_sprintf( vmPath, sizeof( vmPath ), "modules/%s", dottedName );
+					libHandle = Sys_LoadLibrary( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
+					if ( !libHandle ) {
+						Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", dottedName );
+						libHandle = Sys_LoadLibrary( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
+					}
 				} else if ( Q_strncmp(name, "qagame", 6) == 0 && Q_strncmp(name + nameLen - 3, ".so", 3) == 0 ) {
 					// Convert "qagamex86_64.so" -> "qagame.x86_64.so"
 					Com_sprintf( dottedName, sizeof( dottedName ), "qagame.%s", name + 6 );
-					Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", dottedName );
-					const char *fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath );
-					libHandle = Sys_LoadLibrary( fn );
+					Com_sprintf( vmPath, sizeof( vmPath ), "modules/%s", dottedName );
+					libHandle = Sys_LoadLibrary( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
+					if ( !libHandle ) {
+						Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", dottedName );
+						libHandle = Sys_LoadLibrary( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
+					}
 				}
 			}
 			
-			// Try vm/ subdirectory with original name
+			// Try modules/ first, then vm/ subdirectory with original name
 			if ( !libHandle ) {
-				Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", name );
-				const char *fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath );
-				libHandle = Sys_LoadLibrary( fn );
+				Com_sprintf( vmPath, sizeof( vmPath ), "modules/%s", name );
+				libHandle = Sys_LoadLibrary( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
+				if ( !libHandle ) {
+					Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", name );
+					libHandle = Sys_LoadLibrary( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
+				}
 			}
 			
 			// Finally try directly in gamedir (legacy location)
 			if ( !libHandle ) {
-				const char *fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, name );
-				libHandle = Sys_LoadLibrary( fn );
+				libHandle = Sys_LoadLibrary( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, name ) );
 			}
 			sp = sp->next;
 		}

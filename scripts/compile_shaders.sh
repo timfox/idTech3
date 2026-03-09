@@ -14,7 +14,7 @@ else
   exit 1
 fi
 
-SHADER_DIR="$PROJECT_ROOT/src/renderers/vulkanrenderer/shaders"
+SHADER_DIR="$PROJECT_ROOT/src/renderers/vulkan/shaders"
 SPIRV_DIR="$SHADER_DIR/spirv"
 TOOLS_DIR="$SHADER_DIR/tools"
 
@@ -41,6 +41,11 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+# Resolve GENERATED_DIR to absolute path so Python (cwd=SHADER_DIR) writes to the correct location
+if [[ "$GENERATED_DIR" != /* ]]; then
+  GENERATED_DIR="$PROJECT_ROOT/$GENERATED_DIR"
+fi
 
 GLSLANG_VALIDATOR="${GLSLANG_VALIDATOR:-$(command -v glslangValidator || true)}"
 if [[ -z "$GLSLANG_VALIDATOR" ]]; then
@@ -106,10 +111,22 @@ for path in (data_file, binding_file):
         path.unlink()
 
 glslang = Path(os.environ["GLSLANG_VALIDATOR"])
-bin2hex = Path(os.environ["BIN2HEX"])
 
 bindings = []
 task_counter = 0
+
+def append_shader_data(spv_path, array_name):
+    data = spv_path.read_bytes()
+    with data_file.open("a", encoding="utf-8") as f:
+        f.write(f"const unsigned char {array_name}[{len(data)}] = {{\n")
+        for offset in range(0, len(data), 16):
+            chunk = data[offset:offset + 16]
+            bytes_text = ", ".join(f"0x{byte:02X}" for byte in chunk)
+            f.write(f"\t{bytes_text}")
+            if offset + 16 < len(data):
+                f.write(",")
+            f.write("\n")
+        f.write("};\n")
 
 def compile_shader(stage, source, array_name, binding_expr=None, defines=""):
     global task_counter
@@ -118,10 +135,13 @@ def compile_shader(stage, source, array_name, binding_expr=None, defines=""):
         sys.exit(f"Shader source missing: {input_path}")
     tmp_spv = generated_dir / f"tmp_{task_counter:04d}.spv"
     defines_list = defines.split() if defines else []
-    cmd = [str(glslang), "-S", stage, "-V", "-o", str(tmp_spv), str(input_path)] + defines_list
+    # --target-env vulkan1.2: explicit Vulkan context (avoids OpenGL/ES semantics; 64-bit
+    # fragment outputs are disallowed in OpenGL ARB_gpu_shader_fp64 but glslang still
+    # rejects them even for Vulkan target as of glslang 15.x)
+    cmd = [str(glslang), "-S", stage, "-V", "--target-env", "vulkan1.2", "-o", str(tmp_spv), str(input_path)] + defines_list
     print(f"  compiling {array_name}")
     subprocess.run(cmd, check=True)
-    subprocess.run([str(bin2hex), str(tmp_spv), f"+{data_file}", array_name], check=True)
+    append_shader_data(tmp_spv, array_name)
     if binding_expr:
         bindings.append((binding_expr, array_name))
     try:
@@ -138,15 +158,22 @@ def join_indexes(base, indexes):
 
 def compile_individual_shaders():
     print("Compiling standalone GLSL stages...")
+    # Shaders that need Vulkan reversed-depth define (matches vk.h USE_REVERSED_DEPTH)
+    reversed_depth_shaders = {"atmosphere.frag", "oit_accum.frag"}
     for stage, ext in (("vert", ".vert"), ("frag", ".frag"), ("geom", ".geom")):
         for path in sorted(glsl_dir.glob(f"*{ext}")):
             base = path.name[: -len(ext)]
             array_name = f"{base}_{stage}_spv"
-            compile_shader(stage, path.name, array_name)
+            extra_defines = "-DUSE_REVERSED_DEPTH" if path.name in reversed_depth_shaders else ""
+            compile_shader(stage, path.name, array_name, defines=extra_defines)
 
 def compile_template_shaders():
     print("Compiling template-driven shaders...")
     compile_shader("frag", "gen_frag.tmpl", "frag_tx0_df", defines="-DUSE_CLX_IDENT -DUSE_ATEST -DUSE_DF")
+
+    # flowmap water shaders (flow vectors offset texture UVs)
+    compile_shader("frag", "gen_frag.tmpl", "frag_tx0_flowmap", binding_expr="vk.modules.frag.flowmap[0]", defines="-DUSE_FLOWMAP -DUSE_ATEST")
+    compile_shader("frag", "gen_frag.tmpl", "frag_tx0_flowmap_fog", binding_expr="vk.modules.frag.flowmap[1]", defines="-DUSE_FLOWMAP -DUSE_ATEST -DUSE_FOG")
 
     compile_shader("vert", "light_vert.tmpl", "vert_light")
     compile_shader("vert", "light_vert.tmpl", "vert_light_fog", defines="-DUSE_FOG")
@@ -223,6 +250,25 @@ def compile_template_shaders():
 
 compile_individual_shaders()
 compile_template_shaders()
+
+# HDR64 (64-bit) shader variants: glslang applies OpenGL/ES restriction (ARB_gpu_shader_fp64
+# disallows 64-bit fragment outputs) even in Vulkan target. Vulkan SPIR-V supports 64-bit
+# formats (VK_FORMAT_R64G64B64A64_SFLOAT). When glslang adds Vulkan-specific support for
+# dvec4 fragment outputs, re-enable compile_hdr64_shaders() and return RGBA64F from get_hdr_format.
+
+compile_shader("vert", "volumetric/volumetric_fog.vert", "volumetric_fog_vs", binding_expr="vk.modules.volumetric_fog_vs")
+compile_shader("frag", "volumetric/volumetric_fog.frag", "volumetric_fog_fs", binding_expr="vk.modules.volumetric_fog_fs")
+compile_shader("comp", "volumetric/volumetric_fog.comp", "volumetric_fog_cs", binding_expr="vk.modules.volumetric_fog_cs")
+compile_shader("comp", "volumetric/fluid_advect.comp", "fluid_advect_cs", binding_expr="vk.modules.fluid_advect_cs")
+compile_shader("comp", "volumetric/fluid_divergence.comp", "fluid_divergence_cs", binding_expr="vk.modules.fluid_divergence_cs")
+compile_shader("comp", "volumetric/fluid_pressure.comp", "fluid_pressure_cs", binding_expr="vk.modules.fluid_pressure_cs")
+compile_shader("comp", "volumetric/fluid_gradient.comp", "fluid_gradient_cs", binding_expr="vk.modules.fluid_gradient_cs")
+compile_shader("comp", "volumetric/depth_resolve_msaa.comp", "volumetric_depth_resolve_msaa_cs", binding_expr="vk.modules.volumetric_depth_resolve_msaa_cs")
+compile_shader("comp", "postfx/luminance.comp", "luminance_cs", binding_expr="vk.modules.luminance_cs")
+compile_shader("comp", "vegetation_wind.comp", "vegetation_wind_cs", binding_expr="vk.modules.vegetation_wind_cs")
+compile_shader("comp", "terrain/cbt_terrain.comp", "cbt_terrain_cs", binding_expr="vk.modules.cbt_terrain_cs")
+compile_shader("vert", "terrain/terrain.vert", "terrain_vs", binding_expr="vk.modules.terrain_vs")
+compile_shader("frag", "terrain/terrain.frag", "terrain_fs", binding_expr="vk.modules.terrain_fs")
 
 with binding_file.open("w") as f:
     f.write("// this file is autogenerated during shader compilation\n")

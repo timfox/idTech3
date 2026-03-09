@@ -22,6 +22,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cl_parse.c  -- parse a message received from the server
 
 #include "client.h"
+#include "cl_voip.h"
+#ifdef USE_DUKTAPE
+#include "js_debug.h"
+#include "../game/bg_public.h"
+#endif
 
 static const char *svc_strings[] = {
 	"svc_bad",
@@ -189,6 +194,52 @@ static void CL_ParsePacketEntities( msg_t *msg, const clSnapshot_t *oldframe, cl
 }
 
 
+#ifdef USE_DUKTAPE
+/*
+================
+CL_EmitJSEventsFromSnapshot
+
+Emits entity_spawn, entity_death, weapon_fire to JavaScript when
+a new snapshot is received. Enables scripts to react to gameplay.
+================
+*/
+static void CL_EmitJSEventsFromSnapshot( const clSnapshot_t *oldSnap, const clSnapshot_t *newSnap ) {
+	int i;
+	const entityState_t *es;
+	qboolean inOld[MAX_GENTITIES];
+
+	if ( !oldSnap || !oldSnap->valid ) {
+		Com_Memset( inOld, 0, sizeof( inOld ) );
+	} else {
+		Com_Memset( inOld, 0, sizeof( inOld ) );
+		for ( i = 0; i < oldSnap->numEntities; i++ ) {
+			es = &cl.parseEntities[ ( oldSnap->parseEntitiesNum + i ) & ( MAX_PARSE_ENTITIES - 1 ) ];
+			if ( es->number >= 0 && es->number < MAX_GENTITIES ) {
+				inOld[es->number] = qtrue;
+			}
+		}
+	}
+
+	for ( i = 0; i < newSnap->numEntities; i++ ) {
+		es = &cl.parseEntities[ ( newSnap->parseEntitiesNum + i ) & ( MAX_PARSE_ENTITIES - 1 ) ];
+		if ( es->number < 0 || es->number >= MAX_GENTITIES ) {
+			continue;
+		}
+
+		if ( !inOld[es->number] ) {
+			JsDebug_EmitEvent( "entity_spawn", NULL, NULL, es->number, es->eType );
+		}
+
+		if ( es->event == EV_DEATH1 || es->event == EV_DEATH2 || es->event == EV_DEATH3 ) {
+			JsDebug_EmitEvent( "entity_death", NULL, NULL, es->number, es->otherEntityNum );
+		}
+		if ( es->event == EV_FIRE_WEAPON ) {
+			JsDebug_EmitEvent( "weapon_fire", NULL, NULL, es->number, es->weapon );
+		}
+	}
+}
+#endif
+
 /*
 ================
 CL_ParseSnapshot
@@ -299,6 +350,10 @@ static void CL_ParseSnapshot( msg_t *msg ) {
 	for ( i = 0, n = newSnap.messageNum - oldMessageNum; i < n; i++ ) {
 		cl.snapshots[ ( oldMessageNum + i ) & PACKET_MASK ].valid = qfalse;
 	}
+
+#ifdef USE_DUKTAPE
+	CL_EmitJSEventsFromSnapshot( cl.snap.valid ? &cl.snap : NULL, &newSnap );
+#endif
 
 	// copy to the current good spot
 	cl.snap = newSnap;
@@ -829,6 +884,33 @@ static void CL_ParseCommandString( msg_t *msg ) {
 
 /*
 =====================
+CL_ParseVoip
+
+Read VoIP packet from server message and hand to decoder.
+Format: sender (byte), voipLen (short), voipData (voipLen bytes).
+=====================
+*/
+static void CL_ParseVoip( msg_t *msg, qboolean speex ) {
+	int sender;
+	int voipLen;
+	byte voipData[4000];
+
+	(void)speex;
+
+	sender = MSG_ReadByte( msg );
+	voipLen = MSG_ReadShort( msg );
+	if ( voipLen <= 0 || voipLen > (int)sizeof( voipData ) ) {
+		return;
+	}
+	if ( msg->readcount + voipLen > msg->cursize ) {
+		return;
+	}
+	MSG_ReadData( msg, voipData, voipLen );
+	CL_VoIP_ParsePacket( sender, voipData, voipLen );
+}
+
+/*
+=====================
 CL_ParseServerMessage
 =====================
 */
@@ -905,7 +987,7 @@ void CL_ParseServerMessage( msg_t *msg ) {
 			break;
 		case svc_voipSpeex: // ioq3 extension
 			clc.dm68compat = qfalse;
-#ifdef USE_VOIP
+#ifdef USE_OPUS
 			CL_ParseVoip( msg, qtrue );
 			break;
 #else
@@ -913,8 +995,8 @@ void CL_ParseServerMessage( msg_t *msg ) {
 #endif
 		case svc_voipOpus: // ioq3 extension
 			clc.dm68compat = qfalse;
-#ifdef USE_VOIP
-			CL_ParseVoip( msg, !clc.voipEnabled );
+#ifdef USE_OPUS
+			CL_ParseVoip( msg, qfalse );
 			break;
 #else
 			return;

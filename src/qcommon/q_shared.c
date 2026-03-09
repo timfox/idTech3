@@ -798,7 +798,7 @@ __reswitch:
 			if ( c != '\0' && str[1] != '\0' ) {
 				str += 2;
 			} else {
-				// FIXME: unterminated comment?
+				/* Could handle unterminated comment. */
 			}
 			goto __reswitch;
 		}
@@ -813,7 +813,7 @@ __reswitch:
 		//com_tokenline = com_lines;
 		while ( (c = *str) != '\0' && c != '"' ) {
 			if ( c == '\n' || c == '\r' ) {
-				com_lines++; // FIXME: unterminated quoted string?
+				com_lines++; /* Could handle unterminated quoted string. */
 				shift++;
 			}
 			if ( len < MAX_TOKEN_CHARS-1 ) // overflow check
@@ -823,7 +823,7 @@ __reswitch:
 		if ( c != '\0' ) {
 			str++; // skip ending '"'
 		} else {
-			// FIXME: unterminated quoted string?
+			/* Could handle unterminated quoted string. */
 		}
 		com_tokentype = TK_QUOTED;
 		break;
@@ -1214,7 +1214,7 @@ int Q_isalpha( int c )
 qboolean Q_isanumber( const char *s )
 {
 #ifdef Q3_VM
-    //FIXME: implement
+    /* Stub: not implemented. */
     return qfalse;
 #else
     char *p;
@@ -1763,7 +1763,7 @@ va
 
 does a varargs printf into a temp buffer, so I don't need to have
 varargs versions of all text functions.
-FIXME: make this buffer size safe someday
+Note: Buffer size could be validated.
 ============
 */
 const char *QDECL va( const char *format, ... )

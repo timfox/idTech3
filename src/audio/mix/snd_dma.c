@@ -280,7 +280,7 @@ static sfx_t *S_FindName( const char *name ) {
 	
 	sfx = &s_knownSfx[i];
 	Com_Memset (sfx, 0, sizeof(*sfx));
-	strcpy (sfx->soundName, name);
+	Q_strncpyz( sfx->soundName, name, sizeof( sfx->soundName ) );
 
 	sfx->next = sfxHash[hash];
 	sfxHash[hash] = sfx;
@@ -1312,8 +1312,8 @@ static void S_OpenBackgroundStream( const char *filename ) {
 		return;
 	}
 
-	if( s_backgroundStream->info.channels != 2 || s_backgroundStream->info.rate != 22050 ) {
-		Com_Printf(S_COLOR_YELLOW "WARNING: music file %s is not 22k stereo\n", filename );
+	if ( s_backgroundStream->info.channels != 2 ) {
+		Com_Printf( S_COLOR_YELLOW "WARNING: music file %s is not stereo\n", filename );
 	}
 }
 
@@ -1502,9 +1502,9 @@ qboolean S_Base_Init( soundInterface_t *si ) {
 		return qfalse;
 	}
 
-	s_khz = Cvar_Get( "s_khz", "22", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	s_khz = Cvar_Get( "s_khz", "44", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	Cvar_CheckRange( s_khz, "0", "48", CV_INTEGER );
-	Cvar_SetDescription( s_khz, "Specifies the sound sampling rate, (8, 11, 22, 44, 48) in kHz. Default value is 22." );
+	Cvar_SetDescription( s_khz, "Specifies the sound sampling rate, (8, 11, 22, 44, 48) in kHz. Default value is 44." );
 
 	switch( s_khz->integer ) {
 		case 48:

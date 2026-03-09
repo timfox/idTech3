@@ -1,0 +1,18 @@
+// Water flowmap sample shader (extended .shaderx)
+// Copy to base/scripts/water_flowmap.shaderx
+// Requires: base/textures/flowmap/flowmap.png, base/textures/water/water.png (or your water texture)
+
+textures/water/flowmap_water
+{
+	surfaceparm water
+	surfaceparm nonsolid
+	surfaceparm trans
+	cull disable
+	{
+		clampmap textures/water/water
+		flowmapTex textures/flowmap/flowmap
+		flowSpeed 0.05
+		rgbGen identity
+		alphaGen identity
+	}
+}

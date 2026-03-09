@@ -1,0 +1,293 @@
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(binding = 0) uniform sampler2D velocityA;
+layout(binding = 1) uniform sampler2D velocityB;
+layout(binding = 2, rgba16f) uniform image2D velocityAWrite;
+layout(binding = 3, rgba16f) uniform image2D velocityBWrite;
+layout(binding = 4) uniform sampler2D densityA;
+layout(binding = 5) uniform sampler2D densityB;
+layout(binding = 6, r16f) uniform image2D densityAWrite;
+layout(binding = 7, r16f) uniform image2D densityBWrite;
+layout(binding = 8) uniform sampler2D pressureA;
+layout(binding = 9) uniform sampler2D pressureB;
+layout(binding = 10, r16f) uniform image2D pressureAWrite;
+layout(binding = 11, r16f) uniform image2D pressureBWrite;
+layout(binding = 12, r16f) uniform image2D divergenceWrite;
+layout(binding = 13) uniform sampler2D divergenceRead;
+layout(binding = 15, r32ui) uniform uimage2D telemetryCounters;
+
+const int MAX_VOLUMES = 24;
+const int MAX_LIGHTS = 32;
+
+layout(std140, binding = 14) uniform VolumetricParams {
+    mat4 invProj;
+    mat4 invView;
+    mat4 proj;
+    mat4 viewProj;
+    mat4 prevView;
+    mat4 prevViewProj;
+    vec4 viewOrigin;
+    vec4 sunDirection;
+    vec4 fogColor;
+    vec4 densityParams;
+    vec4 worldMin;
+    vec4 worldMax;
+    vec4 gridDim;
+    vec4 miscParams;
+    vec4 sliceParams;
+    vec4 phaseParams;
+    vec4 scatterParams;
+    vec4 noiseParams;
+    vec4 noiseScroll;
+    vec4 temporalParams;
+    vec4 qualityParams;
+    vec4 windParams;
+    vec4 volumeCounts;
+    vec4 passParams;
+    vec4 volumeBoundsMin[MAX_VOLUMES];
+    vec4 volumeBoundsMax[MAX_VOLUMES];
+    vec4 volumeColorDensity[MAX_VOLUMES];
+    vec4 volumeTypeParams[MAX_VOLUMES];
+    vec4 lightPosRadius[MAX_LIGHTS];
+    vec4 lightColorType[MAX_LIGHTS];
+    vec4 lightDirAngle[MAX_LIGHTS];
+    vec4 lightExtra[MAX_LIGHTS];
+    mat4 sunShadowMatrix0;
+    vec4 shadowParams0;
+    vec4 shadowMapSize0;
+    mat4 localSpotShadowMatrix[MAX_LIGHTS];
+    mat4 localPointShadowMatrix[MAX_LIGHTS][6];
+    vec4 localShadowAtlasUv[MAX_LIGHTS];
+    vec4 localSpotShadowMapSize;
+    vec4 localPointShadowMapSize;
+    vec4 fluidParams0;
+    vec4 fluidParams1;
+    vec4 fluidParams2;
+    vec4 fluidWorldMap;
+    vec4 fluidEmitters[16];
+    vec4 fluidEmitterData[16];
+    vec4 fluidEmitterCount;
+    vec4 telemetryParams0;
+    vec4 telemetryParams1;
+} params;
+
+const int TELEMETRY_NAN_INF = 0;
+const int TELEMETRY_EXTINCTION_CLAMP = 1;
+const int TELEMETRY_VELOCITY_CLAMP = 2;
+const int TELEMETRY_DENSITY_CLAMP = 3;
+const int TELEMETRY_PRESSURE_SANITIZE = 4;
+const int TELEMETRY_TEMPORAL_REJECT = 5;
+
+void TelemetryIncrement(int counterIndex) {
+    imageAtomicAdd(telemetryCounters, ivec2(counterIndex, 0), 1u);
+}
+
+float hash12(vec2 p) {
+    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+}
+
+vec2 safeNormalize(vec2 v) {
+    float m = length(v);
+    if (m > 1e-6) {
+        return v / m;
+    }
+    return vec2(0.0);
+}
+
+ivec2 fluidDim() {
+    return ivec2(max(params.fluidParams2.xy, vec2(1.0)));
+}
+
+bool wrapMode() {
+    return params.fluidParams1.y > 0.5;
+}
+
+vec2 adjustUV(vec2 uv) {
+    return wrapMode() ? fract(uv) : clamp(uv, 0.0, 1.0);
+}
+
+bool atBoundary(ivec2 coord, ivec2 dim) {
+    if (wrapMode()) {
+        return false;
+    }
+    return (coord.x <= 0 || coord.y <= 0 || coord.x >= dim.x - 1 || coord.y >= dim.y - 1);
+}
+
+bool finite1(float v) {
+    return !(isnan(v) || isinf(v));
+}
+
+vec2 sampleVelocity(int index, vec2 uv) {
+    vec2 s = adjustUV(uv);
+    return (index == 0) ? texture(velocityA, s).xy : texture(velocityB, s).xy;
+}
+
+float sampleDensity(int index, vec2 uv) {
+    vec2 s = adjustUV(uv);
+    return (index == 0) ? texture(densityA, s).x : texture(densityB, s).x;
+}
+
+void storeVelocity(int index, ivec2 coord, vec2 value) {
+    if (index == 0) {
+        imageStore(velocityAWrite, coord, vec4(value, 0.0, 0.0));
+    } else {
+        imageStore(velocityBWrite, coord, vec4(value, 0.0, 0.0));
+    }
+}
+
+void storeDensity(int index, ivec2 coord, float value) {
+    float d = value;
+    if (!finite1(d)) {
+        TelemetryIncrement(TELEMETRY_NAN_INF);
+        d = 0.0;
+    }
+    float clamped = clamp(d, 0.0, 1.0);
+    if (abs(clamped - d) > 1e-5) {
+        TelemetryIncrement(TELEMETRY_DENSITY_CLAMP);
+    }
+    vec4 v = vec4(clamped, 0.0, 0.0, 0.0);
+    if (index == 0) {
+        imageStore(densityAWrite, coord, v);
+    } else {
+        imageStore(densityBWrite, coord, v);
+    }
+}
+
+vec2 sampleVelocityLaplacian(int index, vec2 uv, vec2 invDim) {
+    vec2 vL = sampleVelocity(index, uv - vec2(invDim.x, 0.0));
+    vec2 vR = sampleVelocity(index, uv + vec2(invDim.x, 0.0));
+    vec2 vB = sampleVelocity(index, uv - vec2(0.0, invDim.y));
+    vec2 vT = sampleVelocity(index, uv + vec2(0.0, invDim.y));
+    vec2 vC = sampleVelocity(index, uv);
+    return (vL + vR + vB + vT - 4.0 * vC);
+}
+
+float computeCurl(int readIdx, vec2 uv, vec2 invDim) {
+    float vR = sampleVelocity(readIdx, uv + vec2(invDim.x, 0.0)).y;
+    float vL = sampleVelocity(readIdx, uv - vec2(invDim.x, 0.0)).y;
+    float vT = sampleVelocity(readIdx, uv + vec2(0.0, invDim.y)).x;
+    float vB = sampleVelocity(readIdx, uv - vec2(0.0, invDim.y)).x;
+    return 0.5 * ((vR - vL) - (vT - vB));
+}
+
+vec2 vorticityConfinement(int readIdx, vec2 uv, vec2 invDim, float epsilon) {
+    if (epsilon < 1e-6) return vec2(0.0);
+    float curlC = computeCurl(readIdx, uv, invDim);
+    float curlR = computeCurl(readIdx, uv + vec2(invDim.x, 0.0), invDim);
+    float curlL = computeCurl(readIdx, uv - vec2(invDim.x, 0.0), invDim);
+    float curlT = computeCurl(readIdx, uv + vec2(0.0, invDim.y), invDim);
+    float curlB = computeCurl(readIdx, uv - vec2(0.0, invDim.y), invDim);
+    vec2 grad = vec2(abs(curlR) - abs(curlL), abs(curlT) - abs(curlB)) * 0.5;
+    vec2 N = safeNormalize(grad);
+    return epsilon * vec2(N.y, -N.x) * curlC;
+}
+
+vec2 fluidForce(vec2 uv, int readIdx, vec2 invDim) {
+    vec2 wind = safeNormalize(params.noiseScroll.xy);
+    vec2 sunPush = safeNormalize(params.sunDirection.xy);
+    float t = params.windParams.x;
+    float n = hash12(uv * 173.0 + vec2(t * 0.37, t * 0.19));
+    float a = n * 6.2831853;
+    vec2 curl = vec2(cos(a), sin(a));
+    vec2 base = (wind + sunPush * 0.35 + curl * 0.5) * params.fluidParams0.w;
+
+    float vorticityEpsilon = params.fluidEmitterCount.y;
+    base += vorticityConfinement(readIdx, uv, invDim, vorticityEpsilon);
+
+    float buoyancy = params.fluidEmitterCount.z;
+    if (buoyancy > 1e-6) {
+        float density = sampleDensity(readIdx, uv);
+        base.y += buoyancy * density;
+    }
+
+    return base;
+}
+
+void main() {
+    ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 dim = fluidDim();
+    if (coord.x >= dim.x || coord.y >= dim.y) {
+        return;
+    }
+
+    int op = int(clamp(floor(params.passParams.x + 0.5), 0.0, 16.0));
+    int readIndex = int(clamp(floor(params.passParams.y + 0.5), 0.0, 1.0));
+    int writeIndex = int(clamp(floor(params.passParams.z + 0.5), 0.0, 1.0));
+    int velocityIndexForDensity = int(clamp(floor(params.passParams.w + 0.5), 0.0, 1.0));
+
+    vec2 invDim = 1.0 / vec2(dim);
+    vec2 uv = (vec2(coord) + 0.5) * invDim;
+    float dt = max(params.fluidParams0.x, 0.0);
+
+    if (op == 0) {
+        if (atBoundary(coord, dim)) {
+            storeVelocity(writeIndex, coord, vec2(0.0));
+            return;
+        }
+
+        vec2 vel = sampleVelocity(readIndex, uv);
+        vec2 backUV = uv - vel * dt * invDim;
+        vec2 advected = sampleVelocity(readIndex, backUV);
+        vec2 lap = sampleVelocityLaplacian(readIndex, backUV, invDim);
+        vec2 force = fluidForce(uv, readIndex, invDim);
+        float viscosity = max(params.fluidParams0.y, 0.0);
+        vec2 nextVel = advected + (viscosity * dt) * lap + force * dt;
+
+        int emCount = int(params.fluidEmitterCount.x);
+        for (int ei = 0; ei < emCount && ei < 16; ei++) {
+            vec2 emPos = params.fluidEmitters[ei].xy;
+            float emRadius = max(params.fluidEmitters[ei].w, 0.001);
+            vec2 emVel = params.fluidEmitterData[ei].zw;
+            vec2 worldPos = params.fluidWorldMap.xy + uv * (vec2(1.0) / max(params.fluidWorldMap.zw, vec2(1e-6)));
+            float dist = length(worldPos - emPos);
+            float falloff = 1.0 - smoothstep(0.0, emRadius, dist);
+            nextVel += emVel * falloff * dt;
+        }
+
+        float velMax = max(params.fluidParams1.x, 1.0);
+        float m = length(nextVel);
+        if (m > velMax) {
+            nextVel *= velMax / m;
+            TelemetryIncrement(TELEMETRY_VELOCITY_CLAMP);
+        }
+        if (!finite1(nextVel.x) || !finite1(nextVel.y)) {
+            TelemetryIncrement(TELEMETRY_NAN_INF);
+            nextVel = vec2(0.0);
+        }
+
+        storeVelocity(writeIndex, coord, nextVel);
+        return;
+    }
+
+    if (op == 1) {
+        vec2 vel = sampleVelocity(velocityIndexForDensity, uv);
+        vec2 backUV = uv - vel * dt * invDim;
+        float d = sampleDensity(readIndex, backUV);
+        d *= clamp(params.fluidParams0.z, 0.0, 1.0);
+
+        float injectNoise = hash12(uv * 251.0 + vec2(params.windParams.x * 0.11, params.windParams.x * 0.17));
+        d += injectNoise * params.fluidParams0.w * 0.0025;
+
+        int emitterCount = int(params.fluidEmitterCount.x);
+        for (int ei = 0; ei < emitterCount && ei < 16; ei++) {
+            vec2 emPos = params.fluidEmitters[ei].xy;
+            float emRadius = max(params.fluidEmitters[ei].w, 0.001);
+            float emDensity = params.fluidEmitterData[ei].x;
+            vec2 worldPos = params.fluidWorldMap.xy + uv * (vec2(1.0) / max(params.fluidWorldMap.zw, vec2(1e-6)));
+            float dist = length(worldPos - emPos);
+            float falloff = 1.0 - smoothstep(0.0, emRadius, dist);
+            d += emDensity * falloff * dt;
+        }
+
+        if (!wrapMode() && atBoundary(coord, dim)) {
+            d *= 0.98;
+        }
+
+        storeDensity(writeIndex, coord, d);
+        return;
+    }
+}

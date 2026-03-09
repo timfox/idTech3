@@ -63,7 +63,7 @@ IDI_ICON1               ICON    DISCARDABLE     "qe3.ico"
 
 STRINGTABLE DISCARDABLE 
 BEGIN
-    IDS_STRING1             "Quake3"
+    IDS_STRING1             "Fox"
 END
 
 #endif    // English (U.S.) resources

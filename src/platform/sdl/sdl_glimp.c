@@ -21,7 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "../../client/client.h"
-#include "../../renderers/rendercommon/tr_public.h"
+#include "../../renderers/common/tr_public.h"
 #include "sdl_glw.h"
 #include "sdl_icon.h"
 
@@ -115,10 +115,15 @@ void GLimp_Minimize( void )
 ===============
 GLimp_LogComment
 ===============
+Writes renderer debug comments to the log file when glw_state.log_fp is set.
+Platform function used by both OpenGL and Vulkan renderers.
 */
 void GLimp_LogComment( const char *comment )
 {
-	(void)comment;
+	if ( glw_state.log_fp )
+	{
+		fprintf( glw_state.log_fp, "%s", comment );
+	}
 }
 
 
@@ -218,7 +223,6 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 	int colorBits, depthBits, stencilBits;
 	int i;
 	SDL_DisplayMode desktopMode;
-	SDL_DisplayMode displayMode;
 	int display;
 	int x;
 	int y;
@@ -358,6 +362,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 						depthBits = 16;
 					else if (depthBits == 16)
 						depthBits = 8;
+					__attribute__((fallthrough));
 				case 3 :
 					if (stencilBits == 24)
 						stencilBits = 16;

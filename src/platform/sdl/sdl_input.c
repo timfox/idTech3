@@ -45,10 +45,16 @@ static cvar_t *in_forceCharset;
 #ifdef USE_JOYSTICK
 static SDL_GameController *gamepad;
 static SDL_Joystick *stick = NULL;
+static int joystick_hotplug_watch_added = 0;
 #endif
 
 static qboolean mouseAvailable = qfalse;
 static qboolean mouseActive = qfalse;
+
+/* Last absolute mouse position when in UI mode (ungrabbed). Used to compute deltas
+ * from SDL_MOUSEMOTION x,y so the UI cursor tracks correctly after warp-to-center. */
+static int last_ui_mouse_x = -1;
+static int last_ui_mouse_y = -1;
 
 static cvar_t *in_mouse;
 
@@ -118,8 +124,7 @@ static void IN_PrintKey( const SDL_Keysym *keysym, keyNum_t key, qboolean down )
 ===============
 IN_IsConsoleKey
 
-TODO: If the SDL_Scancode situation improves, use it instead of
-      both of these methods
+Could use SDL_Scancode when situation improves instead of both methods.
 ===============
 */
 static qboolean IN_IsConsoleKey( keyNum_t key, int character )
@@ -350,7 +355,7 @@ static keyNum_t IN_TranslateSDLToQ3Key( SDL_Keysym *keysym, qboolean down )
 				if( !( keysym->sym & SDLK_SCANCODE_MASK ) && keysym->scancode <= 95 )
 				{
 					// Map Unicode characters to 95 world keys using the key's scan code.
-					// FIXME: There aren't enough world keys to cover all the scancodes.
+					/* World keys may not cover all scancodes. */
 					// Maybe create a map of scancode to quake key at start up and on
 					// key map change; allocate world key numbers as needed similar
 					// to SDL 1.2.
@@ -463,6 +468,7 @@ IN_DeactivateMouse
 static void IN_DeactivateMouse( void )
 {
 	const char* drv = SDL_GetCurrentVideoDriver();
+	qboolean uiActive = ( Key_GetCatcher() & KEYCATCH_UI ) ? qtrue : qfalse;
 
 	if ( !mouseAvailable )
 		return;
@@ -477,9 +483,15 @@ static void IN_DeactivateMouse( void )
 		SDL_SetWindowGrab( SDL_window, SDL_FALSE );
 		SDL_SetRelativeMouseMode( SDL_FALSE );
 
-		if ( gw_active )
-			SDL_WarpMouseInWindow( SDL_window, glw_state.window_width / 2, glw_state.window_height / 2 );
-		else
+		if ( gw_active ) {
+			int cx = glw_state.window_width / 2;
+			int cy = glw_state.window_height / 2;
+			SDL_WarpMouseInWindow( SDL_window, cx, cy );
+			/* Set last to 0 so the warp's motion event produces delta (cx,cy), moving
+			 * the UI cursor from 0,0 to center. */
+			last_ui_mouse_x = 0;
+			last_ui_mouse_y = 0;
+		} else
 		{
 			if ( glw_state.isFullscreen )
 				SDL_ShowCursor( SDL_TRUE );
@@ -492,10 +504,10 @@ static void IN_DeactivateMouse( void )
 		mouseActive = qfalse;
 	}
 
-	// Always show the cursor when the mouse is disabled,
-	// but not when fullscreen
-	if ( !glw_state.isFullscreen )
-		SDL_ShowCursor( SDL_TRUE );
+	/* In menu/UI mode the engine draws its own cursor, so hide the OS cursor to avoid
+	 * a second pointer drifting away from the in-game one. Keep fullscreen non-UI
+	 * paths hidden as well to match captured-mouse behavior. */
+	SDL_ShowCursor( uiActive ? SDL_FALSE : ( glw_state.isFullscreen ? SDL_FALSE : SDL_TRUE ) );
 }
 
 
@@ -533,6 +545,34 @@ struct
 	int oldaaxes[MAX_JOYSTICK_AXIS];
 	unsigned int oldhats;
 } stick_state;
+
+
+/*
+===============
+IN_InitJoystick (forward decl for hotplug callback)
+===============
+*/
+static void IN_InitJoystick( void );
+
+/*
+===============
+IN_JoystickHotplugWatch
+===============
+Called when a joystick is added or removed. Re-initializes to pick up changes.
+*/
+static int IN_JoystickHotplugWatch( void *userdata, SDL_Event *event )
+{
+	(void)userdata;
+	if ( event->type == SDL_JOYDEVICEADDED || event->type == SDL_JOYDEVICEREMOVED )
+	{
+		IN_InitJoystick();
+		if ( event->type == SDL_JOYDEVICEADDED )
+			Com_DPrintf( "Joystick hotplug: device added, re-initialized\n" );
+		else
+			Com_DPrintf( "Joystick hotplug: device removed, re-initialized\n" );
+	}
+	return 0;
+}
 
 
 /*
@@ -631,6 +671,14 @@ static void IN_InitJoystick( void )
 
 	SDL_JoystickEventState(SDL_QUERY);
 	SDL_GameControllerEventState(SDL_QUERY);
+
+	/* Register hotplug callback if joystick is active */
+	if ( in_joystick->integer && !joystick_hotplug_watch_added )
+	{
+		SDL_AddEventWatch( IN_JoystickHotplugWatch, NULL );
+		joystick_hotplug_watch_added = 1;
+		Com_DPrintf( "Joystick hotplug: event watch registered\n" );
+	}
 }
 
 
@@ -657,6 +705,12 @@ static void IN_ShutdownJoystick( void )
 	{
 		SDL_JoystickClose(stick);
 		stick = NULL;
+	}
+
+	if ( joystick_hotplug_watch_added )
+	{
+		SDL_DelEventWatch( IN_JoystickHotplugWatch, NULL );
+		joystick_hotplug_watch_added = 0;
 	}
 
 	SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
@@ -910,7 +964,7 @@ static void IN_JoyMove( void )
 		}
 		if (balldx || balldy)
 		{
-			// !!! FIXME: is this good for stick balls, or just mice?
+			/* May need adjustment for stick balls vs mice. */
 			// Scale like the mouse input...
 			if (abs(balldx) > 1)
 				balldx *= 2;
@@ -924,8 +978,8 @@ static void IN_JoyMove( void )
 	total = SDL_JoystickNumButtons(stick);
 	if (total > 0)
 	{
-		if (total > ARRAY_LEN(stick_state.buttons))
-			total = ARRAY_LEN(stick_state.buttons);
+		if ( total > 0 && (size_t)total > ARRAY_LEN(stick_state.buttons) )
+			total = (int)ARRAY_LEN(stick_state.buttons);
 		for (i = 0; i < total; i++)
 		{
 			qboolean pressed = (SDL_JoystickGetButton(stick, i) != 0);
@@ -1109,7 +1163,7 @@ static const char *eventName( SDL_WindowEventID event )
 		case SDL_WINDOWEVENT_TAKE_FOCUS: return "TAKE_FOCUS";
 		case SDL_WINDOWEVENT_HIT_TEST: return "HIT_TEST"; 
 		default:
-			sprintf( buf, "EVENT#%i", event );
+			Com_sprintf( buf, sizeof( buf ), "EVENT#%i", event );
 			return buf;
 	}
 }
@@ -1240,11 +1294,29 @@ void HandleEvents( void )
 				break;
 
 			case SDL_MOUSEMOTION:
-				if( mouseActive )
+				if( mouseActive || ( Key_GetCatcher() & KEYCATCH_UI ) )
 				{
-					if( !e.motion.xrel && !e.motion.yrel )
-						break;
-					Com_QueueEvent( in_eventTime, SE_MOUSE, e.motion.xrel, e.motion.yrel, 0, NULL );
+					int dx, dy;
+					if ( mouseActive ) {
+						/* Grabbed: use relative deltas */
+						if( !e.motion.xrel && !e.motion.yrel )
+							break;
+						dx = e.motion.xrel;
+						dy = e.motion.yrel;
+					} else {
+						/* UI mode, ungrabbed: use absolute position to compute delta.
+						 * Ensures cursor tracks correctly after warp-to-center and when
+						 * mouse re-enters window. */
+						int prev_x = ( last_ui_mouse_x < 0 ) ? 0 : last_ui_mouse_x;
+						int prev_y = ( last_ui_mouse_y < 0 ) ? 0 : last_ui_mouse_y;
+						last_ui_mouse_x = e.motion.x;
+						last_ui_mouse_y = e.motion.y;
+						dx = e.motion.x - prev_x;
+						dy = e.motion.y - prev_y;
+						if ( !dx && !dy )
+							break;
+					}
+					Com_QueueEvent( in_eventTime, SE_MOUSE, dx, dy, 0, NULL );
 				}
 				break;
 
@@ -1352,10 +1424,12 @@ void IN_Frame( void )
 	IN_JoyMove();
 #endif
 
-	if ( Key_GetCatcher() & KEYCATCH_CONSOLE ) {
-		// temporarily deactivate if not in the game and
-		// running on the desktop with multimonitor configuration
-		if ( !glw_state.isFullscreen || glw_state.monitorCount > 1 ) {
+	if ( Key_GetCatcher() & ( KEYCATCH_CONSOLE | KEYCATCH_UI ) ) {
+		/* Release mouse and show cursor when console or menu is open.
+		 * In fullscreen single-monitor, console may keep grab for consistency;
+		 * menu always releases so user can click UI elements. */
+		if ( !glw_state.isFullscreen || glw_state.monitorCount > 1 ||
+		     ( Key_GetCatcher() & KEYCATCH_UI ) ) {
 			IN_DeactivateMouse();
 			return;
 		}

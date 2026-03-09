@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Simple "3" text representing id Tech 3 -->
+    <path
+        android:fillColor="#E94560"
+        android:pathData="M36,30 L72,30 L72,36 L42,36 L42,48 L66,48 L66,54 L42,54 L42,72 L72,72 L72,78 L36,78 Z" />
+</vector>

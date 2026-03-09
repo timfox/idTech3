@@ -131,7 +131,7 @@ static int eval_node( const filter_node_t *node )
 			{
 				qtime_t t;
 				Com_RealTime( &t );
-				sprintf( node->p1, "%04i-%02i-%02i %02i:%02i",
+				Com_sprintf( node->p1, sizeof( filterDate ), "%04i-%02i-%02i %02i:%02i",
 					t.tm_year + 1900, t.tm_mon + 1, t.tm_mday,
 					t.tm_hour, t.tm_min );
 				filterDateMsec = filterCurrMsec;
@@ -221,7 +221,7 @@ static void dump_nodes( const filter_node_t *node, int level, int skip_tagged, F
 		{
 			if ( *node->p1 )
 			{
-				n = sprintf( buf, "drop \"%s\"", node->p1 );
+				n = Com_sprintf( buf, sizeof( buf ), "drop \"%s\"", node->p1 );
 				fwrite( buf, n, 1, f );
 			} else
 				fwrite( "drop", 4, 1, f );
@@ -234,7 +234,7 @@ static void dump_nodes( const filter_node_t *node, int level, int skip_tagged, F
 			{
 				if ( node->fop == FOP_LT ) // do not print default action for dates
 					s = "";
-				n = sprintf( buf, "date %s\"%s\"", s, node->p2.string );
+				n = Com_sprintf( buf, sizeof( buf ), "date %s\"%s\"", s, node->p2.string );
 			}
 			else
 			{
@@ -244,13 +244,13 @@ static void dump_nodes( const filter_node_t *node, int level, int skip_tagged, F
 				if ( node->is_string )
 				{
 					if ( node->is_quoted )
-						n = sprintf( buf, "%s %s\"%s\"", node->p1, s, node->p2.string );
+						n = Com_sprintf( buf, sizeof( buf ), "%s %s\"%s\"", node->p1, s, node->p2.string );
 					else
-						n = sprintf( buf, "%s %s%s", node->p1, s, node->p2.string );
+						n = Com_sprintf( buf, sizeof( buf ), "%s %s%s", node->p1, s, node->p2.string );
 				}
 				else
 				{
-					n = sprintf( buf, "%s %s%i", node->p1, s, node->p2.integer );
+					n = Com_sprintf( buf, sizeof( buf ), "%s %s%i", node->p1, s, node->p2.integer );
 				}
 			}
 
@@ -500,7 +500,7 @@ static filter_node_t *new_node( const char *p1, const char *p2, filter_op fop, i
 		else
 			node->p2.string = (char*)( node + 1 );
 
-		strcpy( node->p2.string, p2 );
+		Q_strncpyz( node->p2.string, p2, len2 );
 	}
 	else // integer/action parameter
 	{
@@ -718,7 +718,7 @@ static qboolean parse_file( const char *filename )
 
 	// initialize date string
 	Com_RealTime( &t );
-	sprintf( filterDate, "%04i-%02i-%02i %02i:%02i",
+	Com_sprintf( filterDate, sizeof( filterDate ), "%04i-%02i-%02i %02i:%02i",
 		t.tm_year + 1900, t.tm_mon + 1, t.tm_mday,
 		t.tm_hour, t.tm_min );
 
@@ -1073,7 +1073,7 @@ void SV_AddFilter_f( void )
 	if ( *reason )
 		Com_sprintf( buf, sizeof( buf ), " drop \"%s\"", reason );
 	else
-		strcpy( buf, " drop" );
+		Q_strncpyz( buf, " drop", sizeof( buf ) );
 
 	Q_strcat( cmd, sizeof( cmd ), buf );
 

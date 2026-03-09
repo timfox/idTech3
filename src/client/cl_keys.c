@@ -108,7 +108,7 @@ static void Field_VariableSizeDraw( field_t *edit, int x, int y, int width, int 
 			}
 		}
 		// scroll marker
-		// FIXME: force white color?
+		/* Could force white color. */
 		if ( str[0] ) {
 			str[0] = '<';
 		}
@@ -119,7 +119,8 @@ static void Field_VariableSizeDraw( field_t *edit, int x, int y, int width, int 
 		SCR_DrawSmallStringExt( x, y, str, g_color_table[ ColorIndexFromChar( curColor ) ],
 			qfalse, noColorEscape );
 		if ( len > drawLen + prestep ) {
-			SCR_DrawSmallChar( x + ( edit->widthInChars - 1 ) * size, y, '>' );
+			SCR_DrawSmallStringExt( x + ( edit->widthInChars - 1 ) * size, y, ">",
+				g_color_table[ ColorIndex( COLOR_WHITE ) ], qtrue, qtrue );
 		}
 	} else {
 		if ( len > drawLen + prestep ) {
@@ -861,15 +862,21 @@ Key_SetCatcher
 */
 void Key_SetCatcher( int catcher )
 {
-#ifdef USE_DUKTAPE
 	const int oldCatchers = keyCatchers;
-#endif
 
 	// If the catcher state is changing, clear all key states
 	if ( catcher != keyCatchers )
 		Key_ClearStates();
 
 	keyCatchers = catcher;
+
+	if ( !( oldCatchers & KEYCATCH_UI ) && ( catcher & KEYCATCH_UI ) ) {
+		if ( !( catcher & KEYCATCH_CONSOLE ) ) {
+			Con_Close();
+		} else {
+			Con_ClearNotify();
+		}
+	}
 
 #ifdef USE_DUKTAPE
 	if ( !( oldCatchers & KEYCATCH_UI ) && ( catcher & KEYCATCH_UI ) ) {

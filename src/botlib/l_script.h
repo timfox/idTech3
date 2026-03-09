@@ -36,8 +36,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //use dollar sign also as punctuation
 #define DOLLAR
 
-//maximum token length
-#define MAX_TOKEN					1024
+//maximum token length (menu exec strings can exceed 1024)
+#define MAX_TOKEN					4096
 
 #if defined(BSPC) && !defined(QDECL)
 #define QDECL

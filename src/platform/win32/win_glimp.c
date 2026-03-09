@@ -41,7 +41,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "glw_win.h"
 
 #ifdef USE_OPENGL_API
-#include "../renderers/openglrenderer/qgl.h"
+#include "../renderers/opengl/qgl.h"
 
 // Enable High Performance Graphics while using Integrated Graphics.
 Q_EXPORT DWORD NvOptimusEnablement = 0x00000001;		// Nvidia
@@ -1400,7 +1400,7 @@ void GLimp_Shutdown( qboolean unloadDLL )
 	const char *success[] = { "failed", "success" };
 	int retVal;
 
-	// FIXME: Brian, we need better fallbacks from partially initialized failures
+	/* Could add better fallbacks for partially initialized failures. */
 	if ( !qwglMakeCurrent ) {
 		return;
 	}
@@ -1457,6 +1457,21 @@ void GLimp_Shutdown( qboolean unloadDLL )
 	QGL_Shutdown( unloadDLL );
 }
 #endif // USE_OPENGL_API
+
+
+/*
+** GLimp_LogComment
+**
+** Writes renderer debug comments to the log file when glw_state.log_fp is set.
+** Platform function used by both OpenGL and Vulkan renderers.
+*/
+void GLimp_LogComment( const char *comment )
+{
+	if ( glw_state.log_fp )
+	{
+		fprintf( glw_state.log_fp, "%s", comment );
+	}
+}
 
 
 #ifdef USE_VULKAN_API

@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "server.h"
+#include "sv_enhanced.h"
 
 serverStatic_t	svs;				// persistant server info
 server_t		sv;					// local server
@@ -56,6 +57,7 @@ cvar_t	*sv_lanForceRate; // dedicated 1 (LAN) server forces local client rates t
 
 cvar_t *sv_levelTimeReset;
 cvar_t *sv_filter;
+cvar_t *sv_voipProximity;
 
 #ifdef USE_BANS
 cvar_t	*sv_banFile;
@@ -102,7 +104,7 @@ static const char *SV_ExpandNewlines( const char *in ) {
 ======================
 SV_ReplacePendingServerCommands
 
-FIXME: This is ugly
+Note: Could refactor for clarity.
 ======================
 */
 #if 0 // unused
@@ -1342,7 +1344,7 @@ void SV_Frame( int msec ) {
 	if ( sv.time > (12*3600*1000) && ( sv_levelTimeReset->integer == 0 || sv.time > 0x40000000 ) ) {
 		if ( svs.clients ) {
 			for ( i = 0; i < sv.maxclients; i++ ) {
-				// FIXME: deal with bots (reconnect?)
+				/* Bots may need reconnect handling. */
 				if ( svs.clients[i].state != CS_FREE && svs.clients[i].netchan.remoteAddress.type != NA_BOT ) {
 					break;
 				}
@@ -1389,6 +1391,9 @@ void SV_Frame( int msec ) {
 
 		// let everything in the world think and move
 		VM_Call( gvm, 1, GAME_RUN_FRAME, sv.time );
+
+		// record entity positions for backward reconciliation
+		SV_Unlagged_Record( sv.time );
 	}
 
 	if ( com_speeds->integer ) {
