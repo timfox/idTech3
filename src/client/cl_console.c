@@ -88,6 +88,9 @@ static char Con_ColorCodeForIndex( int colorIndex ) {
 	if ( colorIndex >= 10 && colorIndex < 36 ) {
 		return (char)( 'a' + ( colorIndex - 10 ) );
 	}
+	if ( colorIndex >= 36 && colorIndex < 62 ) {
+		return (char)( 'A' + ( colorIndex - 36 ) );
+	}
 
 	return COLOR_WHITE;
 }
@@ -714,7 +717,8 @@ static void Con_DrawInput( void ) {
 
 	re.SetColor( con.color );
 
-	SCR_DrawSmallChar( con.xadjust + 1 * smallchar_width, y, ']' );
+	SCR_DrawSmallStringExt( con.xadjust + smallchar_width, y, "]",
+		g_color_table[ ColorIndex( COLOR_WHITE ) ], qtrue, qtrue );
 
 	Field_Draw( &g_consoleField, con.xadjust + 2 * smallchar_width, y,
 		SCREEN_WIDTH - 3 * smallchar_width, qtrue, qtrue );
@@ -877,9 +881,10 @@ static void Con_DrawSolidConsole( float frac ) {
 	if ( con.display != con.current )
 	{
 		// draw arrows to show the buffer is backscrolled
-		re.SetColor( g_color_table[ ColorIndex( COLOR_RED ) ] );
-		for ( x = 0 ; x < con.linewidth ; x += 4 )
-			SCR_DrawSmallChar( con.xadjust + (x+1)*smallchar_width, y, '^' );
+		for ( x = 0 ; x < con.linewidth ; x += 4 ) {
+			SCR_DrawSmallStringExt( con.xadjust + ( x + 1 ) * smallchar_width, y, "^",
+				g_color_table[ ColorIndex( COLOR_RED ) ], qtrue, qtrue );
+		}
 		y -= smallchar_height;
 		row--;
 	}

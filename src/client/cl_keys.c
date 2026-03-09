@@ -119,7 +119,8 @@ static void Field_VariableSizeDraw( field_t *edit, int x, int y, int width, int 
 		SCR_DrawSmallStringExt( x, y, str, g_color_table[ ColorIndexFromChar( curColor ) ],
 			qfalse, noColorEscape );
 		if ( len > drawLen + prestep ) {
-			SCR_DrawSmallChar( x + ( edit->widthInChars - 1 ) * size, y, '>' );
+			SCR_DrawSmallStringExt( x + ( edit->widthInChars - 1 ) * size, y, ">",
+				g_color_table[ ColorIndex( COLOR_WHITE ) ], qtrue, qtrue );
 		}
 	} else {
 		if ( len > drawLen + prestep ) {
