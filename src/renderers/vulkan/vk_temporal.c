@@ -116,6 +116,7 @@ static void vk_temporal_log_reset( uint32_t reasons, qboolean hardReset )
 static void vk_temporal_apply_resets( qboolean hardReset )
 {
 	const uint32_t reasons = vk.temporal.pendingResetReasons;
+	const float manualExposure = ( r_exposure && r_exposure->value > 0.0f ) ? r_exposure->value : 1.0f;
 
 	if ( reasons == 0u ) {
 		vk.temporal.appliedResetReasons = 0u;
@@ -126,7 +127,7 @@ static void vk_temporal_apply_resets( qboolean hardReset )
 	vk.temporal.sharedCameraCut = ( reasons & VK_TEMPORAL_RESET_CAMERA_CUT ) != 0u ? qtrue : qfalse;
 	vk_reset_motion_history();
 	vk_reset_volumetric_history();
-	vk.adaptedExposure = 1.0f;
+	vk.adaptedExposure = manualExposure;
 	vk.temporal.hasValidLuminance = qfalse;
 	vk.temporal.filteredAvgLogLuminance = 0.0f;
 
@@ -292,14 +293,17 @@ void vk_temporal_update_auto_exposure( void )
 		qboolean cameraCut = vk.temporal.sharedCameraCut;
 		float target = target_var->value > 0.0f ? target_var->value : 0.5f;
 		float speed = speed_var->value > 0.0f ? speed_var->value * 0.016f : 0.02f;
-		float targetExp = target;
+		const float manualExposure = ( r_exposure && r_exposure->value > 0.0f ) ? r_exposure->value : 1.0f;
+		const float minExposure = manualExposure * 0.5f > 0.25f ? manualExposure * 0.5f : 0.25f;
+		const float maxExposure = manualExposure * 4.0f < 4.0f ? 4.0f : manualExposure * 4.0f;
+		float targetExp = manualExposure;
 		qboolean luminanceValid = qfalse;
 		float avgLogLum = 0.0f;
 
 		if ( !stableGameplayState || !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
 			vk.temporal.hasValidLuminance = qfalse;
 			vk.temporal.filteredAvgLogLuminance = 0.0f;
-			targetExp = 1.0f;
+			targetExp = manualExposure;
 			speed = stateTransition ? 0.35f : 0.12f;
 		} else if ( !hardReset && !cameraCut && vk.luminance_staging_ptr ) {
 			avgLogLum = *(const float *)vk.luminance_staging_ptr;
@@ -328,18 +332,18 @@ void vk_temporal_update_auto_exposure( void )
 
 				{
 					float sceneLum = powf( 2.0f, vk.temporal.filteredAvgLogLuminance );
-					targetExp = ( sceneLum > 1e-6f ) ? ( target / sceneLum ) : 1.0f;
-					targetExp = ( targetExp < 0.01f ) ? 0.01f : ( targetExp > 10.0f ? 10.0f : targetExp );
+					targetExp = ( sceneLum > 1e-6f ) ? ( target / sceneLum ) : manualExposure;
+					targetExp = ( targetExp < minExposure ) ? minExposure : ( targetExp > maxExposure ? maxExposure : targetExp );
 				}
 			} else {
-				targetExp = 1.0f;
+				targetExp = manualExposure;
 			}
 		} else {
 			if ( hardReset || cameraCut ) {
 				vk.temporal.hasValidLuminance = qfalse;
 				vk.temporal.filteredAvgLogLuminance = 0.0f;
 			}
-			targetExp = 1.0f;
+			targetExp = manualExposure;
 		}
 
 		if ( cameraCut ) {
@@ -365,6 +369,6 @@ void vk_temporal_update_auto_exposure( void )
 		}
 
 		vk.adaptedExposure += ( targetExp - vk.adaptedExposure ) * speed;
-		vk.adaptedExposure = ( vk.adaptedExposure < 0.01f ) ? 0.01f : ( vk.adaptedExposure > 10.0f ? 10.0f : vk.adaptedExposure );
+		vk.adaptedExposure = ( vk.adaptedExposure < minExposure ) ? minExposure : ( vk.adaptedExposure > maxExposure ? maxExposure : vk.adaptedExposure );
 	}
 }
