@@ -5,13 +5,30 @@
 #include "vk_temporal.h"
 #include "vk_volumetric_pass.h"
 
+static qboolean vk_can_use_2d_overlay_path( void )
+{
+	if ( !vk.fboActive ) {
+		return qfalse;
+	}
+	if ( !vk.cmd || vk.cmd->swapchain_image_index >= MAX_SWAPCHAIN_IMAGES ) {
+		return qfalse;
+	}
+	if ( vk.render_pass.ui_overlay == VK_NULL_HANDLE ||
+		vk.ui_overlay_image_view == VK_NULL_HANDLE ||
+		vk.framebuffers.ui_overlay[ vk.cmd->swapchain_image_index ] == VK_NULL_HANDLE ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
 static void vk_begin_2d_overlay_or_fallback( void )
 {
-	/*
-	 * Legacy 2D/UI shaders can depend on destination color/alpha semantics from the
-	 * scene-backed target. Until the separate overlay path is made blend-compatible
-	 * with those assumptions, keep 2D rendering on the main post-bloom target.
-	 */
+	if ( vk_can_use_2d_overlay_path() ) {
+		vk_begin_ui_overlay_render_pass();
+		return;
+	}
+
 	vk.uiOverlayActive = qfalse;
 	vk_begin_post_bloom_render_pass();
 }

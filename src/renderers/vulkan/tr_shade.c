@@ -2126,6 +2126,14 @@ void RB_EndSurface( void ) {
 	//
 	// call off to shader specific tess end function
 	//
+#ifdef USE_VULKAN
+	if ( backEnd.projection2D ) {
+		backEnd.currentEntity = &backEnd.entity2D;
+		backEnd.useFirstPersonProjection = qfalse;
+		tess.depthRange = DEPTH_RANGE_NORMAL;
+		vk_update_mvp( NULL );
+	}
+#endif
 	R_IQMCommitSurfaceBatch();
 	tess.shader->optimalStageIteratorFunc();
 
