@@ -29,6 +29,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define  NUM_CON_TIMES  4
 
 #define  CON_TEXTSIZE   65536
+#define  CON_LINEBUF_SIZE ( ( MAX_CONSOLE_WIDTH * 3 ) + 4 )
 
 int bigchar_width;
 int bigchar_height;
@@ -79,6 +80,54 @@ cvar_t		*con_showVersion;
 cvar_t		*con_drawInput;
 
 int			g_console_field_width;
+
+static char Con_ColorCodeForIndex( int colorIndex ) {
+	if ( colorIndex >= 0 && colorIndex <= 9 ) {
+		return (char)( '0' + colorIndex );
+	}
+	if ( colorIndex >= 10 && colorIndex < 36 ) {
+		return (char)( 'a' + ( colorIndex - 10 ) );
+	}
+
+	return COLOR_WHITE;
+}
+
+static void Con_LineToString( const short *text, int width, char *out, size_t outSize ) {
+	int i;
+	int lastNonSpace = -1;
+	int currentColor = ColorIndex( COLOR_WHITE );
+	size_t outPos = 0;
+
+	if ( !text || !out || outSize < 2 ) {
+		return;
+	}
+
+	for ( i = 0; i < width; i++ ) {
+		if ( ( text[i] & 0xff ) != ' ' ) {
+			lastNonSpace = i;
+		}
+	}
+
+	if ( lastNonSpace < 0 ) {
+		out[0] = '\0';
+		return;
+	}
+
+	for ( i = 0; i <= lastNonSpace && outPos + 1 < outSize; i++ ) {
+		const int colorIndex = ( text[i] >> 8 ) & 63;
+		const char ch = (char)( text[i] & 0xff );
+
+		if ( colorIndex != currentColor && outPos + 3 < outSize ) {
+			out[outPos++] = Q_COLOR_ESCAPE;
+			out[outPos++] = Con_ColorCodeForIndex( colorIndex );
+			currentColor = colorIndex;
+		}
+
+		out[outPos++] = ch;
+	}
+
+	out[outPos] = '\0';
+}
 
 /*
 ================
@@ -681,16 +730,14 @@ Draws the last few lines of output transparently over the game top
 */
 static void Con_DrawNotify( void )
 {
-	int		x, v;
+	int		v;
 	short	*text;
 	int		i;
 	int		time;
 	int		skip;
-	int		currentColorIndex;
-	int		colorIndex;
+	char	lineBuf[CON_LINEBUF_SIZE];
 
-	currentColorIndex = ColorIndex( COLOR_WHITE );
-	re.SetColor( g_color_table[ currentColorIndex ] );
+	re.SetColor( g_color_table[ ColorIndex( COLOR_WHITE ) ] );
 
 	v = 0;
 	for (i= con.current-NUM_CON_TIMES+1 ; i<=con.current ; i++)
@@ -709,16 +756,10 @@ static void Con_DrawNotify( void )
 			continue;
 		}
 
-		for (x = 0 ; x < con.linewidth ; x++) {
-			if ( ( text[x] & 0xff ) == ' ' ) {
-				continue;
-			}
-			colorIndex = ( text[x] >> 8 ) & 63;
-			if ( currentColorIndex != colorIndex ) {
-				currentColorIndex = colorIndex;
-				re.SetColor( g_color_table[ colorIndex ] );
-			}
-			SCR_DrawSmallChar( cl_conXOffset->integer + con.xadjust + (x+1)*smallchar_width, v, text[x] & 0xff );
+		Con_LineToString( text, con.linewidth, lineBuf, sizeof( lineBuf ) );
+		if ( lineBuf[0] ) {
+			SCR_DrawSmallStringExt( cl_conXOffset->integer + con.xadjust + smallchar_width, v,
+				lineBuf, g_color_table[ ColorIndex( COLOR_WHITE ) ], qfalse, qfalse );
 		}
 
 		v += smallchar_height;
@@ -771,10 +812,9 @@ static void Con_DrawSolidConsole( float frac ) {
 	short			*text;
 	int				row;
 	int				lines;
-	int				currentColorIndex;
-	int				colorIndex;
 	float			yf, wf;
 	char			buf[ MAX_CVAR_VALUE_STRING ], *v[4];
+	char			lineBuf[CON_LINEBUF_SIZE];
 
 	lines = cls.glconfig.vidHeight * frac;
 	if ( lines <= 0 )
@@ -847,20 +887,12 @@ static void Con_DrawSolidConsole( float frac ) {
 #ifdef USE_CURL
 	if ( download.progress[ 0 ] ) 
 	{
-		currentColorIndex = ColorIndex( COLOR_CYAN );
-		re.SetColor( g_color_table[ currentColorIndex ] );
-
-		i = strlen( download.progress );
-		for ( x = 0 ; x < i ; x++ ) 
-		{
-			SCR_DrawSmallChar( ( x + 1 ) * smallchar_width,
-				lines - smallchar_height, download.progress[x] );
-		}
+		SCR_DrawSmallStringExt( smallchar_width, lines - smallchar_height,
+			download.progress, g_color_table[ ColorIndex( COLOR_CYAN ) ], qtrue, qtrue );
 	}
 #endif
 
-	currentColorIndex = ColorIndex( COLOR_WHITE );
-	re.SetColor( g_color_table[ currentColorIndex ] );
+	re.SetColor( g_color_table[ ColorIndex( COLOR_WHITE ) ] );
 
 	for ( i = 0 ; i < rows ; i++, y -= smallchar_height, row-- )
 	{
@@ -873,19 +905,10 @@ static void Con_DrawSolidConsole( float frac ) {
 		}
 
 		text = con.text + (row % con.totallines) * con.linewidth;
-
-		for ( x = 0 ; x < con.linewidth ; x++ ) {
-			// skip rendering whitespace
-			if ( ( text[x] & 0xff ) == ' ' ) {
-				continue;
-			}
-			// track color changes
-			colorIndex = ( text[ x ] >> 8 ) & 63;
-			if ( currentColorIndex != colorIndex ) {
-				currentColorIndex = colorIndex;
-				re.SetColor( g_color_table[ colorIndex ] );
-			}
-			SCR_DrawSmallChar( con.xadjust + (x + 1) * smallchar_width, y, text[x] & 0xff );
+		Con_LineToString( text, con.linewidth, lineBuf, sizeof( lineBuf ) );
+		if ( lineBuf[0] ) {
+			SCR_DrawSmallStringExt( con.xadjust + smallchar_width, y, lineBuf,
+				g_color_table[ ColorIndex( COLOR_WHITE ) ], qfalse, qfalse );
 		}
 	}
 
