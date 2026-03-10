@@ -18,6 +18,7 @@
 #include "vk_validation.h"
 #include "vk_sync.h"
 #include "vk_cmd.h"
+#include "vk_device.h"
 #include <math.h>
 
 /* VK_EXT_extended_dynamic_state3: for vkCmdSetColorWriteMaskEXT (RB_ColorMask) */
@@ -140,14 +141,14 @@ static PFN_vkDestroyInstance							qvkDestroyInstance;
 static PFN_vkEnumerateDeviceExtensionProperties			qvkEnumerateDeviceExtensionProperties;
 static PFN_vkEnumeratePhysicalDevices					qvkEnumeratePhysicalDevices;
 static PFN_vkGetDeviceProcAddr							qvkGetDeviceProcAddr;
-static PFN_vkGetPhysicalDeviceFeatures					qvkGetPhysicalDeviceFeatures;
-static PFN_vkGetPhysicalDeviceFormatProperties			qvkGetPhysicalDeviceFormatProperties;
+PFN_vkGetPhysicalDeviceFeatures					qvkGetPhysicalDeviceFeatures;
+PFN_vkGetPhysicalDeviceFormatProperties			qvkGetPhysicalDeviceFormatProperties;
 PFN_vkGetPhysicalDeviceMemoryProperties			qvkGetPhysicalDeviceMemoryProperties;
 static PFN_vkGetPhysicalDeviceProperties				qvkGetPhysicalDeviceProperties;
 static PFN_vkGetPhysicalDeviceQueueFamilyProperties		qvkGetPhysicalDeviceQueueFamilyProperties;
 static PFN_vkDestroySurfaceKHR							qvkDestroySurfaceKHR;
 static PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR	qvkGetPhysicalDeviceSurfaceCapabilitiesKHR;
-static PFN_vkGetPhysicalDeviceSurfaceFormatsKHR			qvkGetPhysicalDeviceSurfaceFormatsKHR;
+PFN_vkGetPhysicalDeviceSurfaceFormatsKHR			qvkGetPhysicalDeviceSurfaceFormatsKHR;
 static PFN_vkGetPhysicalDeviceSurfacePresentModesKHR	qvkGetPhysicalDeviceSurfacePresentModesKHR;
 static PFN_vkGetPhysicalDeviceSurfaceSupportKHR			qvkGetPhysicalDeviceSurfaceSupportKHR;
 #ifdef USE_VK_VALIDATION
@@ -200,7 +201,7 @@ static PFN_vkCreatePipelineLayout						qvkCreatePipelineLayout;
 static PFN_vkCreatePipelineCache						qvkCreatePipelineCache;
 static PFN_vkCreateQueryPool							qvkCreateQueryPool;
 static PFN_vkCreateRenderPass							qvkCreateRenderPass;
-static PFN_vkCreateSampler								qvkCreateSampler;
+PFN_vkCreateSampler								qvkCreateSampler;
 PFN_vkCreateSemaphore							qvkCreateSemaphore;
 static PFN_vkCreateShaderModule							qvkCreateShaderModule;
 static PFN_vkDestroyBuffer								qvkDestroyBuffer;
@@ -217,7 +218,7 @@ static PFN_vkDestroyPipelineCache						qvkDestroyPipelineCache;
 static PFN_vkDestroyPipelineLayout						qvkDestroyPipelineLayout;
 static PFN_vkDestroyQueryPool							qvkDestroyQueryPool;
 static PFN_vkDestroyRenderPass							qvkDestroyRenderPass;
-static PFN_vkDestroySampler								qvkDestroySampler;
+PFN_vkDestroySampler								qvkDestroySampler;
 PFN_vkDestroySemaphore							qvkDestroySemaphore;
 static PFN_vkDestroyShaderModule						qvkDestroyShaderModule;
 static PFN_vkDeviceWaitIdle								qvkDeviceWaitIdle;
@@ -266,7 +267,6 @@ uint32_t vk_find_pipeline_ext( uint32_t base, const Vk_Pipeline_Def *def, qboole
 #define VK_VOLUMETRIC_QUERY_SLOTS 16
 #define VK_VOLUMETRIC_QUERY_COUNT (VK_VOLUMETRIC_QUERY_SLOTS * NUM_COMMAND_BUFFERS)
 
-VkSampler vk_find_sampler( const Vk_Sampler_Def *def );
 static void vk_create_froxel_images( void );
 static void vk_update_volumetric_descriptors( void );
 static void vk_create_sun_shadow_resources( void );
@@ -1957,325 +1957,6 @@ static void create_instance( void )
 }
 
 
-static VkFormat get_depth_format( VkPhysicalDevice physical_device ) {
-	VkFormatProperties props;
-	VkFormat formats[2];
-	int i;
-
-	if ( glConfig.stencilBits > 0 ) {
-		formats[0] = glConfig.depthBits == 16 ? VK_FORMAT_D16_UNORM_S8_UINT : VK_FORMAT_D24_UNORM_S8_UINT;
-		formats[1] = VK_FORMAT_D32_SFLOAT_S8_UINT;
-	} else {
-		formats[0] = glConfig.depthBits == 16 ? VK_FORMAT_D16_UNORM : VK_FORMAT_X8_D24_UNORM_PACK32;
-		formats[1] = VK_FORMAT_D32_SFLOAT;
-	}
-
-	for ( i = 0; (size_t) i < ARRAY_LEN( formats ); i++ ) {
-		qvkGetPhysicalDeviceFormatProperties( physical_device, formats[i], &props );
-		if ( ( props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT ) != 0 ) {
-			return formats[i];
-		}
-	}
-
-	ri.Error( ERR_FATAL, "get_depth_format: failed to find depth attachment format" );
-	return VK_FORMAT_UNDEFINED; // never get here
-}
-
-
-// Check if we can use vkCmdBlitImage for the given source and destination image formats.
-static qboolean vk_blit_enabled( VkPhysicalDevice physical_device, const VkFormat srcFormat, const VkFormat dstFormat )
-{
-	VkFormatProperties formatProps;
-
-	qvkGetPhysicalDeviceFormatProperties( physical_device, srcFormat, &formatProps );
-	if ( ( formatProps.optimalTilingFeatures & VK_FORMAT_FEATURE_BLIT_SRC_BIT ) == 0 ) {
-		return qfalse;
-	}
-
-	qvkGetPhysicalDeviceFormatProperties( physical_device, dstFormat, &formatProps );
-	if ( ( formatProps.linearTilingFeatures & VK_FORMAT_FEATURE_BLIT_DST_BIT ) == 0 ) {
-		return qfalse;
-	}
-
-	return qtrue;
-}
-
-
-static qboolean vk_format_has_features( VkPhysicalDevice physical_device, VkFormat format, VkFormatFeatureFlags required )
-{
-	VkFormatProperties props;
-	qvkGetPhysicalDeviceFormatProperties( physical_device, format, &props );
-	return ( props.optimalTilingFeatures & required ) == required;
-}
-
-static qboolean vk_hdr_format_supported( VkPhysicalDevice physical_device, VkFormat format )
-{
-	const VkFormatFeatureFlags required = VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT |
-		VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT |
-		VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
-	return vk_format_has_features( physical_device, format, required );
-}
-
-static VkFormat get_hdr_format( VkPhysicalDevice physical_device, VkFormat base_format )
-{
-	const int hdr_mode = r_hdr ? r_hdr->integer : 0;
-	const VkFormat hdr16 = VK_FORMAT_R16G16B16A16_SFLOAT;
-	const VkFormat hdr32 = VK_FORMAT_R32G32B32A32_SFLOAT;
-	const VkFormat hdr64 = VK_FORMAT_R64G64B64A64_SFLOAT;
-
-	if ( r_fbo->integer == 0 ) {
-		return base_format;
-	}
-
-	switch ( hdr_mode ) {
-		case -1:
-			if ( vk_hdr_format_supported( physical_device, VK_FORMAT_B4G4R4A4_UNORM_PACK16 ) ) {
-				return VK_FORMAT_B4G4R4A4_UNORM_PACK16;
-			}
-			ri.Printf( PRINT_WARNING, "[VK][fbo] r_hdr -1 requested %s but it's unsupported; falling back to %s\n",
-				vk_format_string( VK_FORMAT_B4G4R4A4_UNORM_PACK16 ),
-				vk_format_string( base_format ) );
-			return base_format;
-		case 1:
-			if ( vk_hdr_format_supported( physical_device, hdr16 ) ) {
-				return hdr16;
-			}
-			ri.Printf( PRINT_WARNING, "[VK][fbo] r_hdr 1 requested %s but it's unsupported; falling back to %s\n",
-				vk_format_string( hdr16 ),
-				vk_format_string( base_format ) );
-			return base_format;
-		case 2: {
-			if ( vk_hdr_format_supported( physical_device, hdr32 ) ) {
-				return hdr32;
-			}
-			if ( vk_hdr_format_supported( physical_device, hdr16 ) ) {
-				ri.Printf( PRINT_WARNING, "[VK][fbo] r_hdr 2 requested %s but it's unsupported; falling back to %s\n",
-					vk_format_string( hdr32 ),
-					vk_format_string( hdr16 ) );
-				return hdr16;
-			}
-			ri.Printf( PRINT_WARNING, "[VK][fbo] r_hdr 2 requested %s/%s but both are unsupported; falling back to %s\n",
-				vk_format_string( hdr32 ),
-				vk_format_string( hdr16 ),
-				vk_format_string( base_format ) );
-			return base_format;
-		}
-		case 3: {
-			VkPhysicalDeviceFeatures feat;
-			qboolean shader64_supported;
-			qboolean format64_supported;
-
-			qvkGetPhysicalDeviceFeatures( physical_device, &feat );
-			shader64_supported = feat.shaderFloat64 ? qtrue : qfalse;
-			format64_supported = vk_hdr_format_supported( physical_device, hdr64 );
-
-			/* RGBA64F color attachments require 64-bit shader outputs (dvec4), but the
-			 * current toolchain path does not emit compatible fragment outputs. Keep the
-			 * explicit check and deterministic fallback chain. */
-			if ( shader64_supported && format64_supported ) {
-				ri.Printf( PRINT_WARNING, "[VK][fbo] r_hdr 3: %s is supported, but shader toolchain lacks dvec4 fragment output; falling back\n",
-					vk_format_string( hdr64 ) );
-			}
-			else if ( !shader64_supported || !format64_supported ) {
-				ri.Printf( PRINT_WARNING, "[VK][fbo] r_hdr 3 unavailable (shaderFloat64=%s format=%s); falling back\n",
-					shader64_supported ? "yes" : "no",
-					format64_supported ? "yes" : "no" );
-			}
-
-			if ( vk_hdr_format_supported( physical_device, hdr32 ) ) {
-				return hdr32;
-			}
-			if ( vk_hdr_format_supported( physical_device, hdr16 ) ) {
-				ri.Printf( PRINT_WARNING, "[VK][fbo] r_hdr 3 fallback %s unsupported; using %s\n",
-					vk_format_string( hdr32 ),
-					vk_format_string( hdr16 ) );
-				return hdr16;
-			}
-			ri.Printf( PRINT_WARNING, "[VK][fbo] r_hdr 3 fallback %s/%s unsupported; using %s\n",
-				vk_format_string( hdr32 ),
-				vk_format_string( hdr16 ),
-				vk_format_string( base_format ) );
-			return base_format;
-		}
-		default: return base_format;
-	}
-}
-
-static VkFormat get_bloom_format( VkPhysicalDevice physical_device, VkFormat fallback )
-{
-	const VkFormat preferred[] = {
-		VK_FORMAT_A2B10G10R10_UNORM_PACK32,
-		VK_FORMAT_A2R10G10B10_UNORM_PACK32,
-		VK_FORMAT_B10G11R11_UFLOAT_PACK32
-	};
-	const VkFormatFeatureFlags required = VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT |
-		VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT |
-		VK_FORMAT_FEATURE_BLIT_SRC_BIT |
-		VK_FORMAT_FEATURE_BLIT_DST_BIT |
-		VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
-	uint32_t i;
-
-	for ( i = 0; i < ARRAY_LEN( preferred ); i++ ) {
-		const VkFormat fmt = preferred[i];
-		if ( fmt == fallback ) {
-			return fmt;
-		}
-		if ( vk_format_has_features( physical_device, fmt, required ) ) {
-			return fmt;
-		}
-	}
-
-	return fallback;
-}
-
-typedef struct {
-	int bits;
-	VkFormat rgb;
-	VkFormat bgr;
-} present_format_t;
-
-static const present_format_t present_formats[] = {
-	//{12, VK_FORMAT_B4G4R4A4_UNORM_PACK16, VK_FORMAT_R4G4B4A4_UNORM_PACK16},
-	//{15, VK_FORMAT_B5G5R5A1_UNORM_PACK16, VK_FORMAT_R5G5B5A1_UNORM_PACK16},
-	{16, VK_FORMAT_B5G6R5_UNORM_PACK16, VK_FORMAT_R5G6B5_UNORM_PACK16},
-	{24, VK_FORMAT_B8G8R8A8_SRGB, VK_FORMAT_R8G8B8A8_SRGB},
-	{30, VK_FORMAT_A2B10G10R10_UNORM_PACK32, VK_FORMAT_A2R10G10B10_UNORM_PACK32},
-	//{32, VK_FORMAT_B10G11R11_UFLOAT_PACK32, VK_FORMAT_B10G11R11_UFLOAT_PACK32}
-};
-
-static void get_present_format( int present_bits, VkFormat *bgr, VkFormat *rgb ) {
-	const present_format_t *pf, *sel;
-	int i;
-
-	sel = NULL;
-	pf = present_formats;
-	for ( i = 0; (size_t) i < ARRAY_LEN( present_formats ); i++, pf++ ) {
-		if ( pf->bits <= present_bits  ) {
-			sel = pf;
-		}
-	}
-	if ( !sel ) {
-		*bgr = VK_FORMAT_B8G8R8A8_UNORM;
-		*rgb = VK_FORMAT_R8G8B8A8_UNORM;
-	} else {
-		*bgr = sel->bgr;
-		*rgb = sel->rgb;
-	}
-}
-
-
-static qboolean vk_select_surface_format( VkPhysicalDevice physical_device, VkSurfaceKHR surface )
-{
-	VkFormat base_bgr, base_rgb;
-	VkFormat ext_bgr, ext_rgb;
-	VkSurfaceFormatKHR *candidates;
-	uint32_t format_count;
-	VkResult res;
-
-	res = qvkGetPhysicalDeviceSurfaceFormatsKHR( physical_device, surface, &format_count, NULL );
-	if ( res < 0 ) {
-		ri.Printf( PRINT_ERROR, "vkGetPhysicalDeviceSurfaceFormatsKHR returned %s\n", vk_result_string( res ) );
-		return qfalse;
-	}
-
-	if ( format_count == 0 ) {
-		ri.Printf( PRINT_ERROR, "...no surface formats found\n" );
-		return qfalse;
-	}
-
-	candidates = (VkSurfaceFormatKHR*)ri.Malloc( format_count * sizeof(VkSurfaceFormatKHR) );
-
-	VK_CHECK( qvkGetPhysicalDeviceSurfaceFormatsKHR( physical_device, surface, &format_count, candidates ) );
-
-	get_present_format( 24, &base_bgr, &base_rgb );
-
-	if ( r_fbo->integer ) {
-		get_present_format( r_presentBits->integer, &ext_bgr, &ext_rgb );
-	} else {
-		ext_bgr = base_bgr;
-		ext_rgb = base_rgb;
-	}
-
-	if ( format_count == 1 && candidates[0].format == VK_FORMAT_UNDEFINED ) {
-		// special case that means we can choose any format
-		vk.base_format.format = base_bgr;
-		vk.base_format.colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
-		vk.present_format.format = ext_bgr;
-		vk.present_format.colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
-	}
-	else {
-		uint32_t i;
-		for ( i = 0; i < format_count; i++ ) {
-			if ( ( candidates[i].format == base_bgr || candidates[i].format == base_rgb ) && candidates[i].colorSpace == VK_COLORSPACE_SRGB_NONLINEAR_KHR ) {
-				vk.base_format = candidates[i];
-				break;
-			}
-		}
-		if ( i == format_count ) {
-			vk.base_format = candidates[0];
-		}
-		for ( i = 0; i < format_count; i++ ) {
-			if ( ( candidates[i].format == ext_bgr || candidates[i].format == ext_rgb ) && candidates[i].colorSpace == VK_COLORSPACE_SRGB_NONLINEAR_KHR ) {
-				vk.present_format = candidates[i];
-				break;
-			}
-		}
-		if ( i == format_count ) {
-			vk.present_format = vk.base_format;
-		}
-	}
-
-	if ( !r_fbo->integer ) {
-		vk.present_format = vk.base_format;
-	}
-
-	if ( r_vk_swapchain_srgb ) {
-		ri.Cvar_Set( "r_vk_swapchain_srgb", vk_format_is_srgb( vk.present_format.format ) ? "1" : "0" );
-	}
-
-	ri.Free( candidates );
-
-	return qtrue;
-}
-
-
-static void setup_surface_formats( VkPhysicalDevice physical_device )
-{
-	vk.depth_format = get_depth_format( physical_device );
-
-	vk.color_format = get_hdr_format( physical_device, vk.base_format.format );
-
-	if ( r_fbo && r_fbo->integer ) {
-		const int hdr_mode = r_hdr ? r_hdr->integer : 0;
-		if ( r_fboDebug && r_fboDebug->integer >= 1 ) {
-			ri.Printf( PRINT_DEVELOPER, "[VK][fbo] hdr select r_hdr=%d base=%s color=%s present=%s\n",
-				hdr_mode,
-				vk_format_string( vk.base_format.format ),
-				vk_format_string( vk.color_format ),
-				vk_format_string( vk.present_format.format ) );
-		}
-		if ( hdr_mode > 0 && vk.color_format == vk.base_format.format ) {
-			ri.Printf( PRINT_WARNING, "[VK][fbo] r_hdr %d fell back to base format %s\n",
-				hdr_mode, vk_format_string( vk.base_format.format ) );
-		}
-	}
-
-	vk.capture_format = VK_FORMAT_R8G8B8A8_UNORM;
-
-	// Prefer a higher-precision bloom chain to avoid blocky quantization artifacts
-	// around bright highlights when the main color format is 8-bit.
-	vk.bloom_format = get_bloom_format( physical_device, vk.color_format );
-	vk.ssao_format = VK_FORMAT_R8_UNORM;
-
-	vk.blitEnabled = vk_blit_enabled( physical_device, vk.color_format, vk.capture_format );
-
-	if ( !vk.blitEnabled )
-	{
-		vk.capture_format = vk.color_format;
-	}
-}
-
-
 static const char *renderer_name( const VkPhysicalDeviceProperties *props ) {
 	static char buf[sizeof( props->deviceName ) + 64];
 	const char *device_type;
@@ -2311,7 +1992,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		return qfalse;
 	}
 
-	setup_surface_formats( physical_device );
+	vk_setup_surface_formats( physical_device );
 
 	// select queue family
 	{
@@ -2477,9 +2158,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		} else if ( strcmp( ext, "VK_KHR_shader_subgroup_uniform_control_flow" ) == 0 ) {
 			shaderSubgroupUniformCF = qtrue;
 		} else if ( strcmp( ext, "VK_EXT_extended_dynamic_state3" ) == 0 ) {
-			/* Disabled: validation/driver issues with VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT
-			 * (VUID-09423, VUID-pDynamicStates-parameter). RB_ColorMask falls back to full mask. */
-			/* extendedDynamicState3 = qtrue; */
+			extendedDynamicState3 = qtrue;
 		}
 #ifdef USE_VULKAN_RTX
 			else if ( strcmp( ext, VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME ) == 0 ) {
@@ -2612,14 +2291,13 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			}
 			device_extension_list[ device_extension_count++ ] = "VK_KHR_shader_quad_control";
 		}
-		/* VK_EXT_extended_dynamic_state3 disabled: validation errors (VUID-09423, VUID-pDynamicStates-parameter)
-		 * and OIT crash. RB_ColorMask falls back to full mask. */
-		if ( qfalse && extendedDynamicState3 ) {
+		if ( extendedDynamicState3 && r_vk_colorWriteMaskDynamic && r_vk_colorWriteMaskDynamic->integer ) {
 			device_extension_list[ device_extension_count++ ] = "VK_EXT_extended_dynamic_state3";
 			vk.colorWriteMaskDynamic = qtrue;
 			ri.Printf( PRINT_DEVELOPER, "  VK_EXT_extended_dynamic_state3: enabled (RB_ColorMask)\n" );
+		} else {
+			vk.colorWriteMaskDynamic = qfalse;
 		}
-		vk.colorWriteMaskDynamic = qfalse;
 #ifdef USE_VULKAN_RTX
 		if ( rtxAccelStruct && rtxPipeline && rtxDeferredHostOps && rtxBufferDeviceAddress && memoryRequirements2 ) {
 			device_extension_list[ device_extension_count++ ] = VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME;
@@ -2878,7 +2556,7 @@ static void init_vulkan_library( void )
 
 		// create surface
 		if ( !ri.VK_CreateSurface( vk_instance, &vk_surface ) ) {
-			ri.Error( ERR_FATAL, "Error creating Vulkan surface" );
+			ri.Error( ERR_FATAL, "Error creating Vulkan surface (see SDL_Vulkan_CreateSurface message above)" );
 			return;
 		}
 	} // vk_instance == VK_NULL_HANDLE
@@ -3293,126 +2971,6 @@ static void vk_update_uniform_descriptor( VkDescriptorSet descriptor, VkBuffer b
 		VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC );
 
 	qvkUpdateDescriptorSets(vk.device, VK_DESC_UNIFORM_COUNT, desc, 0, NULL);
-}
-
-
-VkSampler vk_find_sampler( const Vk_Sampler_Def *def ) {
-	VkSamplerAddressMode address_mode;
-	VkSamplerCreateInfo desc;
-	VkSampler sampler;
-	VkFilter mag_filter;
-	VkFilter min_filter;
-	VkSamplerMipmapMode mipmap_mode;
-	float maxLod;
-	int i;
-
-	// Look for sampler among existing samplers.
-	for ( i = 0; i < vk.samplers.count; i++ ) {
-		const Vk_Sampler_Def *cur_def = &vk.samplers.def[i];
-		if ( memcmp( cur_def, def, sizeof( *def ) ) == 0 ) {
-			return vk.samplers.handle[i];
-		}
-	}
-
-	// Create new sampler.
-	if ( vk.samplers.count >= MAX_VK_SAMPLERS ) {
-		ri.Error( ERR_DROP, "vk_find_sampler: MAX_VK_SAMPLERS hit\n" );
-		// return VK_NULL_HANDLE;
-	}
-
-	address_mode = def->address_mode;
-
-	if (def->gl_mag_filter == GL_NEAREST) {
-		mag_filter = VK_FILTER_NEAREST;
-	} else if (def->gl_mag_filter == GL_LINEAR) {
-		mag_filter = VK_FILTER_LINEAR;
-	} else {
-		ri.Error(ERR_FATAL, "vk_find_sampler: invalid gl_mag_filter");
-		return VK_NULL_HANDLE;
-	}
-
-	maxLod = vk.maxLod;
-
-	if (def->gl_min_filter == GL_NEAREST) {
-		min_filter = VK_FILTER_NEAREST;
-		mipmap_mode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-		maxLod = 0.25f; // used to emulate OpenGL's GL_LINEAR/GL_NEAREST minification filter
-	} else if (def->gl_min_filter == GL_LINEAR) {
-		min_filter = VK_FILTER_LINEAR;
-		mipmap_mode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-		maxLod = 0.25f; // used to emulate OpenGL's GL_LINEAR/GL_NEAREST minification filter
-	} else if (def->gl_min_filter == GL_NEAREST_MIPMAP_NEAREST) {
-		min_filter = VK_FILTER_NEAREST;
-		mipmap_mode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-	} else if (def->gl_min_filter == GL_LINEAR_MIPMAP_NEAREST) {
-		min_filter = VK_FILTER_LINEAR;
-		mipmap_mode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-	} else if (def->gl_min_filter == GL_NEAREST_MIPMAP_LINEAR) {
-		min_filter = VK_FILTER_NEAREST;
-		mipmap_mode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-	} else if (def->gl_min_filter == GL_LINEAR_MIPMAP_LINEAR) {
-		min_filter = VK_FILTER_LINEAR;
-		mipmap_mode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-	} else {
-		ri.Error(ERR_FATAL, "vk_find_sampler: invalid gl_min_filter");
-		return VK_NULL_HANDLE;
-	}
-
-	if ( def->max_lod_1_0 ) {
-		maxLod = 1.0f;
-	}
-
-	desc.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-	desc.pNext = NULL;
-	desc.flags = 0;
-	desc.magFilter = mag_filter;
-	desc.minFilter = min_filter;
-	desc.mipmapMode = mipmap_mode;
-	desc.addressModeU = address_mode;
-	desc.addressModeV = address_mode;
-	desc.addressModeW = address_mode;
-	desc.mipLodBias = r_mipLodBias->value;
-
-	if ( def->noAnisotropy || mipmap_mode == VK_SAMPLER_MIPMAP_MODE_NEAREST || mag_filter == VK_FILTER_NEAREST ) {
-		desc.anisotropyEnable = VK_FALSE;
-		desc.maxAnisotropy = 1.0f;
-	} else {
-		desc.anisotropyEnable = (r_ext_texture_filter_anisotropic->integer && vk.samplerAnisotropy) ? VK_TRUE : VK_FALSE;
-		if ( desc.anisotropyEnable ) {
-			desc.maxAnisotropy = MIN( r_ext_max_anisotropy->integer, vk.maxAnisotropy );
-		}
-	}
-
-	desc.compareEnable = VK_FALSE;
-	desc.compareOp = VK_COMPARE_OP_ALWAYS;
-	desc.minLod = 0.0f;
-	desc.maxLod = (maxLod == vk.maxLod) ? VK_LOD_CLAMP_NONE : maxLod;
-	desc.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
-	desc.unnormalizedCoordinates = VK_FALSE;
-
-	VK_CHECK( qvkCreateSampler( vk.device, &desc, NULL, &sampler ) );
-
-	SET_OBJECT_NAME( sampler, va( "image sampler %i", vk.samplers.count ), VK_DEBUG_REPORT_OBJECT_TYPE_SAMPLER_EXT );
-
-	vk.samplers.def[ vk.samplers.count ] = *def;
-	vk.samplers.handle[ vk.samplers.count ] = sampler;
-	vk.samplers.count++;
-
-	return sampler;
-}
-
-
-void vk_destroy_samplers( void )
-{
-	int i;
-
-	for ( i = 0; i < vk.samplers.count; i++ ) {
-		qvkDestroySampler( vk.device, vk.samplers.handle[i], NULL );
-		memset( &vk.samplers.def[i], 0x0, sizeof( vk.samplers.def[i] ) );
-		vk.samplers.handle[i] = VK_NULL_HANDLE;
-	}
-
-	vk.samplers.count = 0;
 }
 
 
@@ -6311,7 +5869,7 @@ static void vk_restart_swapchain( const char *funcname, VkResult res )
 #endif
 
 	vk_select_surface_format( vk.physical_device, vk_surface );
-	setup_surface_formats( vk.physical_device );
+	vk_setup_surface_formats( vk.physical_device );
 
 	vk_create_sync_primitives();
 	vk_create_swapchain( vk.physical_device, vk.device, vk_surface, vk.present_format, &vk.swapchain, qfalse );
@@ -9612,9 +9170,15 @@ void vk_shutdown( refShutdownCode_t code )
 		vk.occlusion_query_pool = VK_NULL_HANDLE;
 	}
 
-	qvkDestroyCommandPool( vk.device, vk.command_pool, NULL );
+	if ( vk.command_pool != VK_NULL_HANDLE && qvkDestroyCommandPool != NULL ) {
+		qvkDestroyCommandPool( vk.device, vk.command_pool, NULL );
+		vk.command_pool = VK_NULL_HANDLE;
+	}
 
-	qvkDestroyDescriptorPool(vk.device, vk.descriptor_pool, NULL);
+	if ( vk.descriptor_pool != VK_NULL_HANDLE && qvkDestroyDescriptorPool != NULL ) {
+		qvkDestroyDescriptorPool( vk.device, vk.descriptor_pool, NULL );
+		vk.descriptor_pool = VK_NULL_HANDLE;
+	}
 
 	qvkDestroyDescriptorSetLayout(vk.device, vk.set_layout_sampler, NULL);
 	qvkDestroyDescriptorSetLayout(vk.device, vk.set_layout_uniform, NULL);
@@ -9644,10 +9208,22 @@ void vk_shutdown( refShutdownCode_t code )
 		vk.cbt_terrain_layout = VK_NULL_HANDLE;
 	}
 
-	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout, NULL);
-	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_storage, NULL);
-	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_post_process, NULL);
-	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_blend, NULL);
+	if ( vk.pipeline_layout != VK_NULL_HANDLE && qvkDestroyPipelineLayout != NULL ) {
+		qvkDestroyPipelineLayout( vk.device, vk.pipeline_layout, NULL );
+		vk.pipeline_layout = VK_NULL_HANDLE;
+	}
+	if ( vk.pipeline_layout_storage != VK_NULL_HANDLE && qvkDestroyPipelineLayout != NULL ) {
+		qvkDestroyPipelineLayout( vk.device, vk.pipeline_layout_storage, NULL );
+		vk.pipeline_layout_storage = VK_NULL_HANDLE;
+	}
+	if ( vk.pipeline_layout_post_process != VK_NULL_HANDLE && qvkDestroyPipelineLayout != NULL ) {
+		qvkDestroyPipelineLayout( vk.device, vk.pipeline_layout_post_process, NULL );
+		vk.pipeline_layout_post_process = VK_NULL_HANDLE;
+	}
+	if ( vk.pipeline_layout_blend != VK_NULL_HANDLE && qvkDestroyPipelineLayout != NULL ) {
+		qvkDestroyPipelineLayout( vk.device, vk.pipeline_layout_blend, NULL );
+		vk.pipeline_layout_blend = VK_NULL_HANDLE;
+	}
 	if ( vk.pipeline_layout_smaa != VK_NULL_HANDLE ) {
 		qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_smaa, NULL);
 		vk.pipeline_layout_smaa = VK_NULL_HANDLE;

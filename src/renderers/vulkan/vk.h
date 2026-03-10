@@ -1303,8 +1303,11 @@ typedef struct {
 extern Vk_Instance	vk;				// shouldn't be cleared during ref re-init
 extern Vk_World		vk_world;		// this data is cleared during ref re-init
 
-/* Vulkan function pointers (loaded at init, used by vk_sync.c, vk_image_layout.c, vk_render_pass.c) */
+/* Vulkan function pointers (loaded at init, used by vk_sync.c, vk_image_layout.c, vk_render_pass.c, vk_device.c) */
 extern PFN_vkGetPhysicalDeviceMemoryProperties qvkGetPhysicalDeviceMemoryProperties;
+extern PFN_vkGetPhysicalDeviceFormatProperties qvkGetPhysicalDeviceFormatProperties;
+extern PFN_vkGetPhysicalDeviceSurfaceFormatsKHR qvkGetPhysicalDeviceSurfaceFormatsKHR;
+extern PFN_vkGetPhysicalDeviceFeatures qvkGetPhysicalDeviceFeatures;
 extern PFN_vkCreateSemaphore			qvkCreateSemaphore;
 extern PFN_vkCreateFence				qvkCreateFence;
 extern PFN_vkDestroySemaphore		qvkDestroySemaphore;
