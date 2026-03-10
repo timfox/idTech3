@@ -96,6 +96,18 @@ const char *vk_format_string( VkFormat format )
 		return buf;
 	}
 }
+
+qboolean vk_format_is_srgb( VkFormat format )
+{
+	switch ( format ) {
+		case VK_FORMAT_B8G8R8A8_SRGB:
+		case VK_FORMAT_R8G8B8A8_SRGB:
+		case VK_FORMAT_A8B8G8R8_SRGB_PACK32:
+			return qtrue;
+		default:
+			return qfalse;
+	}
+}
 #undef CASE_STR
 
 uint32_t vk_find_memory_type( VkPhysicalDevice physical_device, uint32_t memory_type_bits, VkMemoryPropertyFlags properties )
