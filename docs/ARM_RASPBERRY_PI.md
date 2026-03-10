@@ -1,0 +1,48 @@
+# ARM / Raspberry Pi Support
+
+This document describes ARM and Raspberry Pi support for the idTech3 engine.
+
+## Raspberry Pi 4 / 5 with Vulkan (V3DV)
+
+Raspberry Pi OS ships Mesa V3DV (Vulkan 1.3) by default on Pi 4 and 5. The engine supports Vulkan on these devices.
+
+### Known Issues
+
+- **"Couldn't get a visual"**: On ARM + X11, SDL may fail to create a Vulkan window. The engine now defaults to the X11 video driver on ARM when using Vulkan.
+- **KMS/DRM**: Vulkan with SDL's KMSDRM backend has known issues on Raspberry Pi (see [SDL#3997](https://github.com/libsdl-org/SDL/issues/3997)). Use X11 instead.
+
+### Recommended Setup
+
+1. **Use X11**: Run under X11 (default desktop session). If you get "Couldn't get a visual", set:
+   ```
+   set r_vid_driver x11
+   vid_restart
+   ```
+   Or run with: `SDL_VIDEODRIVER=x11 ./idtech3`
+
+2. **r_vid_driver cvar**: The engine supports `r_vid_driver` (auto, x11, wayland, kmsdrm). On ARM with Vulkan, "auto" defaults to "x11" for compatibility. Requires `vid_restart` to take effect.
+
+3. **Performance**: On RPi4, the Vulkan driver has poor GLSL shader performance. The engine disables high-quality dynamic lights by default (`r_dlightMode 0`) on ARM. You can try `r_dlightMode 1` for per-pixel lights if performance allows.
+
+### Build for ARM
+
+```bash
+# Native on Raspberry Pi
+./scripts/compile_engine.sh vulkan
+
+# Cross-compile from x86 (example)
+mkdir build-rpi && cd build-rpi
+cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/arm64-toolchain.cmake ..
+make -j4
+```
+
+### Debugging
+
+- **SDL video driver**: The engine prints `SDL video driver: x11` (or wayland, kmsdrm) at startup.
+- **Vulkan load**: If Vulkan fails, the engine prints `SDL_GetError()` output.
+- **Environment**: Use `SDL_DEBUG=1 SDL_VIDEODRIVER=x11 ./idtech3` for verbose SDL output.
+
+## Platform Notes
+
+- **Android**: Uses a separate Vulkan init path (`android_main.c`).
+- **Wayland**: May work on ARM; if you see visual issues, try `r_vid_driver x11`.

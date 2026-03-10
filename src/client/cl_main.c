@@ -400,6 +400,7 @@ cvar_t *r_glDriver;
 cvar_t *r_displayRefresh;
 cvar_t *r_fullscreen;
 cvar_t *r_mode;
+cvar_t *r_vid_driver;
 cvar_t *r_modeFullscreen;
 cvar_t *r_customwidth;
 cvar_t *r_customheight;
@@ -4237,6 +4238,9 @@ static void CL_InitGLimp_Cvars( void )
 	r_noborder = Cvar_Get( "r_noborder", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	Cvar_CheckRange( r_noborder, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( r_noborder, "Setting to 1 will remove window borders and title bar in windowed mode, hold ALT to drag & drop it with opened console." );
+
+	r_vid_driver = Cvar_Get( "r_vid_driver", "auto", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	Cvar_SetDescription( r_vid_driver, "SDL video driver: auto, x11, wayland, kmsdrm. On ARM/Raspberry Pi with Vulkan, use x11 if you get 'Couldn't get a visual'. Requires vid_restart." );
 
 	r_mode = Cvar_Get( "r_mode", "-2", CVAR_ARCHIVE | CVAR_LATCH );
 	Cvar_CheckRange( r_mode, "-2", va( "%i", s_numVidModes-1 ), CV_INTEGER );

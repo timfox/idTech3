@@ -1154,6 +1154,7 @@ list(APPEND CLIENT_SRCS
   src/game/g_horde.c
   src/game/g_goap.c
   src/game/g_aiml.c
+  src/game/g_bt.c
   src/game/g_entity_bridge.c
   src/game/g_lua_bindings.c
   src/client/cl_map_background.c
@@ -1301,6 +1302,7 @@ IF(USE_SYSTEM_JPEG)
 		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_FLUX)
 		target_include_directories(client PRIVATE ${EXTERNAL_ROOT}/src/cflux2)
 	endif()
+	target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR}/src/game)
 	if(USE_OPUS)
 		target_compile_definitions(client PRIVATE INCLUDE_INTTYPES_H=1 INCLUDE_SYS_TYPES_H=1)
 	endif()
@@ -1319,6 +1321,8 @@ ELSE()
 	endif()
 	# Ensure client can find qcommon headers needed by some client-side modules (eg. mp3)
 	target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR}/src/qcommon ${EXTERNAL_JPEG_SRC_DIR})
+	# ECS (EnTT) - alternative to gentity
+	target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR}/src/game)
 	# Audio module headers (moved from client/)
 	target_include_directories(client PRIVATE
 		${CMAKE_SOURCE_DIR}/src/audio
@@ -1853,6 +1857,19 @@ if(USE_RECAST_NAV)
   message(STATUS "Recast Navigation: enabled")
 endif()
 
+# --- ECS (EnTT) module - alternative to gentity ---
+enable_language(CXX)
+ADD_LIBRARY(ecs_module STATIC src/game/ecs.cpp)
+target_include_directories(ecs_module PRIVATE
+  ${EXTERNAL_INCLUDE}/entt/single_include
+  ${CMAKE_SOURCE_DIR}/src/game
+  ${CMAKE_SOURCE_DIR}/src/qcommon
+)
+if(NOT MSVC)
+  target_compile_options(ecs_module PRIVATE -Wno-unused-parameter)
+endif()
+message(STATUS "ECS (EnTT): enabled")
+
 # --- Bullet Physics module ---
 option(USE_BULLET_PHYSICS "Enable Bullet Physics integration" ON)
 set(PHYSICS_SRCS
@@ -1909,6 +1926,9 @@ if(TARGET Threads::Threads)
 endif()
 if(USE_RECAST_NAV AND TARGET recast_nav)
   TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE recast_nav)
+endif()
+if(TARGET ecs_module)
+  TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ecs_module)
 endif()
 if(USE_FLUX)
 	TARGET_COMPILE_DEFINITIONS(${CNAME}${BINEXT} PRIVATE USE_FLUX)

@@ -427,6 +427,7 @@ extern	cvar_t	*r_displayRefresh;
 extern	cvar_t	*r_fullscreen;
 extern	cvar_t	*r_mode;
 extern	cvar_t	*r_modeFullscreen;
+extern	cvar_t	*r_vid_driver;
 extern	cvar_t	*r_customwidth;
 extern	cvar_t	*r_customheight;
 extern	cvar_t	*r_customPixelAspect;

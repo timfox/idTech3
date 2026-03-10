@@ -35,7 +35,9 @@ Ticks all gameplay subsystems each client frame:
 #include "../game/g_dismember.h"
 #include "../game/g_goap.h"
 #include "../game/g_aiml.h"
+#include "../game/g_bt.h"
 #include "../game/g_lua_bindings.h"
+#include "../game/ecs.h"
 #include "../audio/snd_music_adaptive.h"
 
 static qboolean gameSystemsInitialized = qfalse;
@@ -44,6 +46,7 @@ static int activeNavMesh = -1;
 static cvar_t *cl_physicsEnabled;
 static cvar_t *cl_navEnabled;
 static cvar_t *cl_particlesEnabled;
+static cvar_t *cl_btEnabled;
 
 extern void Nav_BSP_ClearGeometry(void);
 extern int  Nav_BSP_AddVertex(float x, float y, float z);
@@ -134,6 +137,7 @@ void CL_InitGameSystems(void) {
 	cl_physicsEnabled  = Cvar_Get("cl_physicsEnabled",  "1", CVAR_ARCHIVE);
 	cl_navEnabled      = Cvar_Get("cl_navEnabled",      "1", CVAR_ARCHIVE);
 	cl_particlesEnabled = Cvar_Get("cl_particlesEnabled","1", CVAR_ARCHIVE);
+	cl_btEnabled       = Cvar_Get("cl_btEnabled",       "1", CVAR_ARCHIVE);
 
 	if (!Phys_Init()) {
 		Com_Printf(S_COLOR_YELLOW "Warning: Physics not available, physics-dependent systems will be limited\n");
@@ -149,6 +153,8 @@ void CL_InitGameSystems(void) {
 	Dismember_Init();
 	GOAP_Init();
 	AIML_Init();
+	BT_Init();
+	ECS_Init();
 	MobileFog_Init();
 	BgMap_Init();
 	WinTitle_Init();
@@ -156,7 +162,7 @@ void CL_InitGameSystems(void) {
 	Cmd_AddCommand("buildnavmesh", CL_BuildNavMesh_f);
 
 	gameSystemsInitialized = qtrue;
-	Com_Printf("Game systems initialized (physics, navigation, particles, AI, audio)\n");
+	Com_Printf("Game systems initialized (physics, navigation, particles, AI, BT, audio)\n");
 }
 
 void CL_ShutdownGameSystems(void) {
@@ -173,6 +179,8 @@ void CL_ShutdownGameSystems(void) {
 	Horde_Shutdown();
 	Dismember_Shutdown();
 	GOAP_Shutdown();
+	BT_Shutdown();
+	ECS_Shutdown();
 	BgMap_Shutdown();
 
 	activeNavMesh = -1;
@@ -216,6 +224,8 @@ void CL_GameFrame(float frametime) {
 	Face_Update(frametime);
 	Dismember_Update(frametime);
 	GOAP_Update(frametime);
+	if (cl_btEnabled && cl_btEnabled->integer)
+		BT_Update(frametime);
 	Choreo_Update(frametime);
 
 	/* Horde_Update needs actual player position -- game code should
