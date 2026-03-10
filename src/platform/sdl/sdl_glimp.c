@@ -447,7 +447,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 		if ( ( SDL_window = SDL_CreateWindow( cl_title, x, y, config->vidWidth, config->vidHeight, flags ) ) == NULL )
 		{
 			const char *sdl_err = SDL_GetError();
-			Com_Printf( "SDL_CreateWindow failed: %s\n", ( sdl_err && sdl_err[0] ) ? sdl_err : "(no SDL error)" );
+			Com_Printf( "[VK] SDL_CreateWindow failed: %s\n", ( sdl_err && sdl_err[0] ) ? sdl_err : "(no SDL error)" );
 			continue;
 		}
 
@@ -547,8 +547,8 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 	else
 	{
 		const char *sdl_err = SDL_GetError();
-		Com_Printf( "Couldn't get a visual: %s\n", ( sdl_err && sdl_err[0] ) ? sdl_err : "(no SDL error string)" );
-		Com_Printf( "SDL video driver: %s\n", SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "(none)" );
+		Com_Printf( "[VK] Couldn't get a visual: %s\n", ( sdl_err && sdl_err[0] ) ? sdl_err : "(no SDL error string)" );
+		Com_Printf( "[VK] SDL video driver: %s\n", SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "(none)" );
 		return RSERR_INVALID_MODE;
 	}
 
@@ -741,9 +741,9 @@ void VKimp_Init( glconfig_t *config )
 
 	Com_DPrintf( "VKimp_Init()\n" );
 
-	Com_Printf( "SDL video driver: %s\n", SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "(none)" );
+	Com_Printf( "[VK] SDL video driver: %s\n", SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "(none)" );
 	if ( SDL_Vulkan_LoadLibrary( NULL ) != 0 )
-		Com_Printf( "SDL Vulkan load check: %s\n", SDL_GetError() );
+		Com_Printf( "[VK] SDL Vulkan load check: %s\n", SDL_GetError() );
 	/* else leave loaded for window creation and GetVkGetInstanceProcAddr */
 
 	in_nograb = Cvar_Get( "in_nograb", "0", CVAR_ARCHIVE );
