@@ -444,7 +444,8 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 
 		if ( ( SDL_window = SDL_CreateWindow( cl_title, x, y, config->vidWidth, config->vidHeight, flags ) ) == NULL )
 		{
-			Com_Printf( "SDL_CreateWindow failed: %s\n", SDL_GetError() );
+			const char *sdl_err = SDL_GetError();
+			Com_Printf( "SDL_CreateWindow failed: %s\n", ( sdl_err && sdl_err[0] ) ? sdl_err : "(no SDL error)" );
 			continue;
 		}
 
@@ -543,7 +544,8 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 	}
 	else
 	{
-		Com_Printf( "Couldn't get a visual: %s\n", SDL_GetError() );
+		const char *sdl_err = SDL_GetError();
+		Com_Printf( "Couldn't get a visual: %s\n", ( sdl_err && sdl_err[0] ) ? sdl_err : "(no SDL error string)" );
 		Com_Printf( "SDL video driver: %s\n", SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "(none)" );
 		return RSERR_INVALID_MODE;
 	}
@@ -815,8 +817,8 @@ qboolean VK_CreateSurface( VkInstance instance, VkSurfaceKHR *surface )
 {
 	if ( SDL_Vulkan_CreateSurface( SDL_window, instance, surface ) == SDL_TRUE )
 		return qtrue;
-	else
-		return qfalse;
+	Com_Printf( "SDL_Vulkan_CreateSurface failed: %s\n", SDL_GetError() );
+	return qfalse;
 }
 
 
