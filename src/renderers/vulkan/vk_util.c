@@ -7,7 +7,96 @@ Vulkan renderer utility helpers: parsing, matrix math, color normalization.
 */
 
 #include "tr_local.h"
+#include "vk.h"
 #include "vk_util.h"
+
+#define CASE_STR(x) case (x): return #x
+
+const char *vk_result_string( VkResult code )
+{
+	static char buffer[32];
+
+	switch ( code ) {
+		CASE_STR( VK_SUCCESS );
+		CASE_STR( VK_NOT_READY );
+		CASE_STR( VK_TIMEOUT );
+		CASE_STR( VK_EVENT_SET );
+		CASE_STR( VK_EVENT_RESET );
+		CASE_STR( VK_INCOMPLETE );
+		CASE_STR( VK_ERROR_OUT_OF_HOST_MEMORY );
+		CASE_STR( VK_ERROR_OUT_OF_DEVICE_MEMORY );
+		CASE_STR( VK_ERROR_INITIALIZATION_FAILED );
+		CASE_STR( VK_ERROR_DEVICE_LOST );
+		CASE_STR( VK_ERROR_MEMORY_MAP_FAILED );
+		CASE_STR( VK_ERROR_LAYER_NOT_PRESENT );
+		CASE_STR( VK_ERROR_EXTENSION_NOT_PRESENT );
+		CASE_STR( VK_ERROR_FEATURE_NOT_PRESENT );
+		CASE_STR( VK_ERROR_INCOMPATIBLE_DRIVER );
+		CASE_STR( VK_ERROR_TOO_MANY_OBJECTS );
+		CASE_STR( VK_ERROR_FORMAT_NOT_SUPPORTED );
+		CASE_STR( VK_ERROR_FRAGMENTED_POOL );
+		CASE_STR( VK_ERROR_UNKNOWN );
+		CASE_STR( VK_ERROR_OUT_OF_POOL_MEMORY );
+		CASE_STR( VK_ERROR_INVALID_EXTERNAL_HANDLE );
+		CASE_STR( VK_ERROR_FRAGMENTATION );
+		CASE_STR( VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS );
+		CASE_STR( VK_ERROR_SURFACE_LOST_KHR );
+		CASE_STR( VK_ERROR_NATIVE_WINDOW_IN_USE_KHR );
+		CASE_STR( VK_SUBOPTIMAL_KHR );
+		CASE_STR( VK_ERROR_OUT_OF_DATE_KHR );
+		CASE_STR( VK_ERROR_INCOMPATIBLE_DISPLAY_KHR );
+		CASE_STR( VK_ERROR_VALIDATION_FAILED_EXT );
+		CASE_STR( VK_ERROR_INVALID_SHADER_NV );
+		CASE_STR( VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT );
+		CASE_STR( VK_ERROR_NOT_PERMITTED_EXT );
+		CASE_STR( VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT );
+		CASE_STR( VK_THREAD_IDLE_KHR );
+		CASE_STR( VK_THREAD_DONE_KHR );
+		CASE_STR( VK_OPERATION_DEFERRED_KHR );
+		CASE_STR( VK_OPERATION_NOT_DEFERRED_KHR );
+		CASE_STR( VK_PIPELINE_COMPILE_REQUIRED_EXT );
+	default:
+		Com_sprintf( buffer, sizeof( buffer ), "code %i", code );
+		return buffer;
+	}
+}
+#undef CASE_STR
+
+uint32_t vk_find_memory_type( VkPhysicalDevice physical_device, uint32_t memory_type_bits, VkMemoryPropertyFlags properties )
+{
+	VkPhysicalDeviceMemoryProperties memory_properties;
+	uint32_t i;
+
+	qvkGetPhysicalDeviceMemoryProperties( physical_device, &memory_properties );
+
+	for ( i = 0; i < memory_properties.memoryTypeCount; i++ ) {
+		if ( ( memory_type_bits & ( 1u << i ) ) != 0 &&
+			( memory_properties.memoryTypes[i].propertyFlags & properties ) == properties ) {
+			return i;
+		}
+	}
+	ri.Error( ERR_FATAL, "Vulkan: failed to find matching memory type with requested properties" );
+	return ~0U;
+}
+
+uint32_t vk_find_memory_type2( VkPhysicalDevice physical_device, uint32_t memory_type_bits, VkMemoryPropertyFlags properties, VkMemoryPropertyFlags *outprops )
+{
+	VkPhysicalDeviceMemoryProperties memory_properties;
+	uint32_t i;
+
+	qvkGetPhysicalDeviceMemoryProperties( physical_device, &memory_properties );
+
+	for ( i = 0; i < memory_properties.memoryTypeCount; i++ ) {
+		if ( ( memory_type_bits & ( 1u << i ) ) != 0 &&
+			( memory_properties.memoryTypes[i].propertyFlags & properties ) == properties ) {
+			if ( outprops ) {
+				*outprops = memory_properties.memoryTypes[i].propertyFlags;
+			}
+			return i;
+		}
+	}
+	return ~0U;
+}
 
 const char *vk_present_mode_string( VkPresentModeKHR mode )
 {

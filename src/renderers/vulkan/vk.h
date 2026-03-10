@@ -3,6 +3,14 @@
 #include <stddef.h>
 #include "../common/vulkan/vulkan.h"
 #include "tr_common.h"
+#include "vk_util.h"
+
+#define VK_CHECK( function_call ) do { \
+	VkResult _res_ = (function_call); \
+	if ( _res_ < 0 ) { \
+		ri.Error( ERR_FATAL, "Vulkan: %s returned %s", #function_call, vk_result_string( _res_ ) ); \
+	} \
+} while(0)
 
 #define MAX_SWAPCHAIN_IMAGES 8
 #define MIN_SWAPCHAIN_IMAGES_IMM 3
@@ -368,6 +376,9 @@ static const textureMapType_t textureMapTypes[] = {
 // debug report callback.  Copies at most `bufsize` bytes into `buffer`.
 // Returns qtrue when a message was consumed.
 qboolean vk_consume_validation_error( char *buffer, size_t bufsize );
+
+// Debug: set object name for Vulkan debugger/profiler (no-op if extension unavailable).
+void vk_set_object_name( uint64_t obj, const char *objName, VkDebugReportObjectTypeEXT objType );
 
 // Initializes VK_Instance structure.
 // After calling this function we get fully functional vulkan subsystem.
@@ -1294,7 +1305,12 @@ typedef struct {
 extern Vk_Instance	vk;				// shouldn't be cleared during ref re-init
 extern Vk_World		vk_world;		// this data is cleared during ref re-init
 
-/* Vulkan function pointers (loaded at init, used by vk_image_layout.c, vk_render_pass.c) */
+/* Vulkan function pointers (loaded at init, used by vk_sync.c, vk_image_layout.c, vk_render_pass.c) */
+extern PFN_vkGetPhysicalDeviceMemoryProperties qvkGetPhysicalDeviceMemoryProperties;
+extern PFN_vkCreateSemaphore			qvkCreateSemaphore;
+extern PFN_vkCreateFence				qvkCreateFence;
+extern PFN_vkDestroySemaphore		qvkDestroySemaphore;
+extern PFN_vkDestroyFence			qvkDestroyFence;
 extern PFN_vkCmdBeginRenderPass		qvkCmdBeginRenderPass;
 extern PFN_vkCmdEndRenderPass		qvkCmdEndRenderPass;
 extern PFN_vkCmdPipelineBarrier		qvkCmdPipelineBarrier;

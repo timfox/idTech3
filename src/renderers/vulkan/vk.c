@@ -15,6 +15,8 @@
 #include "vk_volumetric_params.h"
 #include "vk_volumetric_pass.h"
 #include "vk_util.h"
+#include "vk_validation.h"
+#include "vk_sync.h"
 #include <math.h>
 
 /* VK_EXT_extended_dynamic_state3: for vkCmdSetColorWriteMaskEXT (RB_ColorMask) */
@@ -139,7 +141,7 @@ static PFN_vkEnumeratePhysicalDevices					qvkEnumeratePhysicalDevices;
 static PFN_vkGetDeviceProcAddr							qvkGetDeviceProcAddr;
 static PFN_vkGetPhysicalDeviceFeatures					qvkGetPhysicalDeviceFeatures;
 static PFN_vkGetPhysicalDeviceFormatProperties			qvkGetPhysicalDeviceFormatProperties;
-static PFN_vkGetPhysicalDeviceMemoryProperties			qvkGetPhysicalDeviceMemoryProperties;
+PFN_vkGetPhysicalDeviceMemoryProperties			qvkGetPhysicalDeviceMemoryProperties;
 static PFN_vkGetPhysicalDeviceProperties				qvkGetPhysicalDeviceProperties;
 static PFN_vkGetPhysicalDeviceQueueFamilyProperties		qvkGetPhysicalDeviceQueueFamilyProperties;
 static PFN_vkDestroySurfaceKHR							qvkDestroySurfaceKHR;
@@ -187,7 +189,7 @@ static PFN_vkCreateBuffer								qvkCreateBuffer;
 static PFN_vkCreateCommandPool							qvkCreateCommandPool;
 static PFN_vkCreateDescriptorPool						qvkCreateDescriptorPool;
 static PFN_vkCreateDescriptorSetLayout					qvkCreateDescriptorSetLayout;
-static PFN_vkCreateFence								qvkCreateFence;
+PFN_vkCreateFence								qvkCreateFence;
 static PFN_vkCreateFramebuffer							qvkCreateFramebuffer;
 static PFN_vkCreateComputePipelines						qvkCreateComputePipelines;
 PFN_vkCreateGraphicsPipelines					qvkCreateGraphicsPipelines;
@@ -198,14 +200,14 @@ static PFN_vkCreatePipelineCache						qvkCreatePipelineCache;
 static PFN_vkCreateQueryPool							qvkCreateQueryPool;
 static PFN_vkCreateRenderPass							qvkCreateRenderPass;
 static PFN_vkCreateSampler								qvkCreateSampler;
-static PFN_vkCreateSemaphore							qvkCreateSemaphore;
+PFN_vkCreateSemaphore							qvkCreateSemaphore;
 static PFN_vkCreateShaderModule							qvkCreateShaderModule;
 static PFN_vkDestroyBuffer								qvkDestroyBuffer;
 static PFN_vkDestroyCommandPool							qvkDestroyCommandPool;
 static PFN_vkDestroyDescriptorPool						qvkDestroyDescriptorPool;
 static PFN_vkDestroyDescriptorSetLayout					qvkDestroyDescriptorSetLayout;
 static PFN_vkDestroyDevice								qvkDestroyDevice;
-static PFN_vkDestroyFence								qvkDestroyFence;
+PFN_vkDestroyFence								qvkDestroyFence;
 static PFN_vkDestroyFramebuffer							qvkDestroyFramebuffer;
 static PFN_vkDestroyImage								qvkDestroyImage;
 static PFN_vkDestroyImageView							qvkDestroyImageView;
@@ -215,7 +217,7 @@ static PFN_vkDestroyPipelineLayout						qvkDestroyPipelineLayout;
 static PFN_vkDestroyQueryPool							qvkDestroyQueryPool;
 static PFN_vkDestroyRenderPass							qvkDestroyRenderPass;
 static PFN_vkDestroySampler								qvkDestroySampler;
-static PFN_vkDestroySemaphore							qvkDestroySemaphore;
+PFN_vkDestroySemaphore							qvkDestroySemaphore;
 static PFN_vkDestroyShaderModule						qvkDestroyShaderModule;
 static PFN_vkDeviceWaitIdle								qvkDeviceWaitIdle;
 static PFN_vkEndCommandBuffer							qvkEndCommandBuffer;
@@ -321,42 +323,6 @@ static const float vk_local_shadow_flip_matrix[16] = {
 	0, 0, 0, 1
 };
 
-static uint32_t find_memory_type( uint32_t memory_type_bits, VkMemoryPropertyFlags properties ) {
-	VkPhysicalDeviceMemoryProperties memory_properties;
-	uint32_t i;
-
-	qvkGetPhysicalDeviceMemoryProperties( vk.physical_device, &memory_properties );
-
-	for ( i = 0; i < memory_properties.memoryTypeCount; i++ ) {
-		if ((memory_type_bits & (1 << i)) != 0 &&
-			(memory_properties.memoryTypes[i].propertyFlags & properties) == properties) {
-			return i;
-		}
-	}
-	ri.Error( ERR_FATAL, "Vulkan: failed to find matching memory type with requested properties" );
-	return ~0U;
-}
-
-
-static uint32_t find_memory_type2( uint32_t memory_type_bits, VkMemoryPropertyFlags properties, VkMemoryPropertyFlags *outprops ) {
-	VkPhysicalDeviceMemoryProperties memory_properties;
-	uint32_t i;
-
-	qvkGetPhysicalDeviceMemoryProperties( vk.physical_device, &memory_properties );
-
-	for ( i = 0; i < memory_properties.memoryTypeCount; i++ ) {
-		if ( (memory_type_bits & (1 << i)) != 0 && (memory_properties.memoryTypes[i].propertyFlags & properties) == properties ) {
-			if ( outprops ) {
-				*outprops = memory_properties.memoryTypes[i].propertyFlags;
-			}
-			return i;
-		}
-	}
-
-	return ~0U;
-}
-
-
 #define CASE_STR(x) case (x): return #x
 
 const char *vk_format_string( VkFormat format )
@@ -395,63 +361,6 @@ const char *vk_format_string( VkFormat format )
 		Com_sprintf( buf, sizeof( buf ), "#%i", format );
 		return buf;
 	}
-}
-
-
-static const char *vk_result_string( VkResult code ) {
-	static char buffer[32];
-
-	switch ( code ) {
-		CASE_STR( VK_SUCCESS );
-		CASE_STR( VK_NOT_READY );
-		CASE_STR( VK_TIMEOUT );
-		CASE_STR( VK_EVENT_SET );
-		CASE_STR( VK_EVENT_RESET );
-		CASE_STR( VK_INCOMPLETE );
-		CASE_STR( VK_ERROR_OUT_OF_HOST_MEMORY );
-		CASE_STR( VK_ERROR_OUT_OF_DEVICE_MEMORY );
-		CASE_STR( VK_ERROR_INITIALIZATION_FAILED );
-		CASE_STR( VK_ERROR_DEVICE_LOST );
-		CASE_STR( VK_ERROR_MEMORY_MAP_FAILED );
-		CASE_STR( VK_ERROR_LAYER_NOT_PRESENT );
-		CASE_STR( VK_ERROR_EXTENSION_NOT_PRESENT );
-		CASE_STR( VK_ERROR_FEATURE_NOT_PRESENT );
-		CASE_STR( VK_ERROR_INCOMPATIBLE_DRIVER );
-		CASE_STR( VK_ERROR_TOO_MANY_OBJECTS );
-		CASE_STR( VK_ERROR_FORMAT_NOT_SUPPORTED );
-		CASE_STR( VK_ERROR_FRAGMENTED_POOL );
-		CASE_STR( VK_ERROR_UNKNOWN );
-		CASE_STR( VK_ERROR_OUT_OF_POOL_MEMORY );
-		CASE_STR( VK_ERROR_INVALID_EXTERNAL_HANDLE );
-		CASE_STR( VK_ERROR_FRAGMENTATION );
-		CASE_STR( VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS );
-		CASE_STR( VK_ERROR_SURFACE_LOST_KHR );
-		CASE_STR( VK_ERROR_NATIVE_WINDOW_IN_USE_KHR );
-		CASE_STR( VK_SUBOPTIMAL_KHR );
-		CASE_STR( VK_ERROR_OUT_OF_DATE_KHR );
-		CASE_STR( VK_ERROR_INCOMPATIBLE_DISPLAY_KHR );
-		CASE_STR( VK_ERROR_VALIDATION_FAILED_EXT );
-		CASE_STR( VK_ERROR_INVALID_SHADER_NV );
-		CASE_STR( VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT );
-		CASE_STR( VK_ERROR_NOT_PERMITTED_EXT );
-		CASE_STR( VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT );
-		CASE_STR( VK_THREAD_IDLE_KHR );
-		CASE_STR( VK_THREAD_DONE_KHR );
-		CASE_STR( VK_OPERATION_DEFERRED_KHR );
-		CASE_STR( VK_OPERATION_NOT_DEFERRED_KHR );
-		CASE_STR( VK_PIPELINE_COMPILE_REQUIRED_EXT );
-	default:
-		Com_sprintf( buffer, sizeof( buffer ), "code %i", code );
-		return buffer;
-	}
-}
-#undef CASE_STR
-
-#define VK_CHECK( function_call ) { \
-	VkResult _res_ = function_call; \
-	if ( _res_ < 0 ) { \
-		ri.Error( ERR_FATAL, "Vulkan: %s returned %s", #function_call, vk_result_string( _res_ ) ); \
-	} \
 }
 
 
@@ -548,7 +457,7 @@ static void end_command_buffer( VkCommandBuffer command_buffer, const char *loca
 // debug markers
 #define SET_OBJECT_NAME(obj,objName,objType) vk_set_object_name( (uint64_t)(obj), (objName), (objType) )
 
-static void vk_set_object_name( uint64_t obj, const char *objName, VkDebugReportObjectTypeEXT objType )
+void vk_set_object_name( uint64_t obj, const char *objName, VkDebugReportObjectTypeEXT objType )
 {
 	if ( qvkDebugMarkerSetObjectNameEXT && obj )
 	{
@@ -1804,7 +1713,7 @@ static void allocate_and_bind_image_memory(VkImage image) {
 		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 		alloc_info.pNext = NULL;
 		alloc_info.allocationSize = memory_requirements.size;
-		alloc_info.memoryTypeIndex = find_memory_type( memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+		alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 
 		VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &memory ) );
 
@@ -1847,7 +1756,7 @@ static void allocate_and_bind_image_memory(VkImage image) {
 		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 		alloc_info.pNext = NULL;
 		alloc_info.allocationSize = vk.image_chunk_size;
-		alloc_info.memoryTypeIndex = find_memory_type( memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+		alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 
 		VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &memory ) );
 
@@ -2019,7 +1928,7 @@ static void vk_alloc_staging_buffer( VkDeviceSize size )
 
 	qvkGetBufferMemoryRequirements( vk.device, vk.staging_buffer.handle, &memory_requirements );
 
-	memory_type = find_memory_type( memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+	memory_type = vk_find_memory_type( vk.physical_device, memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
 
 	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	alloc_info.pNext = NULL;
@@ -2037,63 +1946,6 @@ static void vk_alloc_staging_buffer( VkDeviceSize size )
 	SET_OBJECT_NAME( vk.staging_buffer.handle, "staging buffer", VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT );
 	SET_OBJECT_NAME( vk.staging_buffer.memory, "staging buffer memory", VK_DEBUG_REPORT_OBJECT_TYPE_DEVICE_MEMORY_EXT );
 }
-
-
-#ifdef USE_VK_VALIDATION
-static qboolean vk_validation_error_pending = qfalse;
-static char vk_validation_error_message[512];
-
-static const char *vk_debug_report_severity( VkDebugReportFlagsEXT flags ) {
-	if ( flags & VK_DEBUG_REPORT_ERROR_BIT_EXT ) {
-		return "ERROR";
-	}
-	if ( flags & VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT ) {
-		return "PERFORMANCE WARNING";
-	}
-	if ( flags & VK_DEBUG_REPORT_WARNING_BIT_EXT ) {
-		return "WARNING";
-	}
-	return "INFO";
-}
-
-static void vk_record_validation_error( VkDebugReportFlagsEXT flags, const char *message ) {
-	const char *severity = vk_debug_report_severity( flags );
-	const char *msg = message ? message : "<no message>";
-
-	Com_sprintf( vk_validation_error_message, sizeof( vk_validation_error_message ), "%s: %s", severity, msg );
-	vk_validation_error_pending = qtrue;
-}
-
-static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT object_type, uint64_t object, size_t location,
-	int32_t message_code, const char* layer_prefix, const char* message, void* user_data) {
-	if ( flags & (VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT) ) {
-		vk_record_validation_error( flags, message );
-	}
-#ifdef _WIN32
-	MessageBoxA( 0, message, layer_prefix, MB_ICONWARNING );
-	OutputDebugString(message);
-	OutputDebugString("\n");
-	DebugBreak();
-#endif
-	return VK_FALSE;
-}
-
-qboolean vk_consume_validation_error( char *buffer, size_t bufsize ) {
-	if ( !vk_validation_error_pending ) {
-		return qfalse;
-	}
-
-	Q_strncpyz( buffer, vk_validation_error_message, bufsize );
-	vk_validation_error_pending = qfalse;
-	return qtrue;
-}
-#else
-qboolean vk_consume_validation_error( char *buffer, size_t bufsize ) {
-	(void)buffer;
-	(void)bufsize;
-	return qfalse;
-}
-#endif
 
 
 static qboolean used_instance_extension( const char *ext )
@@ -3158,7 +3010,7 @@ static void init_vulkan_library( void )
 			desc.flags = VK_DEBUG_REPORT_WARNING_BIT_EXT |
 				VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT |
 				VK_DEBUG_REPORT_ERROR_BIT_EXT;
-			desc.pfnCallback = &debug_callback;
+			desc.pfnCallback = &vk_validation_debug_callback;
 			desc.pUserData = NULL;
 
 			VK_CHECK( qvkCreateDebugReportCallbackEXT( vk_instance, &desc, NULL, &vk_debug_callback ) );
@@ -4607,7 +4459,7 @@ static void vk_create_geometry_buffers( VkDeviceSize size )
 	}
 
 	memory_type_bits = vb_memory_requirements.memoryTypeBits;
-	memory_type = find_memory_type( memory_type_bits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+	memory_type = vk_find_memory_type( vk.physical_device, memory_type_bits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
 
 	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	alloc_info.pNext = NULL;
@@ -4660,7 +4512,7 @@ static void vk_create_storage_buffer( uint32_t size )
 	qvkGetBufferMemoryRequirements( vk.device, vk.storage.buffer, &memory_requirements );
 
 	memory_type_bits = memory_requirements.memoryTypeBits;
-	memory_type = find_memory_type( memory_type_bits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+	memory_type = vk_find_memory_type( vk.physical_device, memory_type_bits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
 
 	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	alloc_info.pNext = NULL;
@@ -4728,7 +4580,7 @@ qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size )
 	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	alloc_info.pNext = NULL;
 	alloc_info.allocationSize = allocationSize;
-	alloc_info.memoryTypeIndex = find_memory_type( memory_type_bits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, memory_type_bits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.vbo.buffer_memory ) );
 	qvkBindBufferMemory( vk.device, vk.vbo.vertex_buffer, vk.vbo.buffer_memory, vertex_buffer_offset );
 
@@ -4800,7 +4652,7 @@ qboolean vk_create_gltf_buffers( const byte *vboData, int vboSize, const uint32_
 	VK_CHECK( qvkCreateBuffer( vk.device, &desc, NULL, &idxBuf ) );
 
 	qvkGetBufferMemoryRequirements( vk.device, vertBuf, &memReq );
-	memType = find_memory_type( memReq.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	memType = vk_find_memory_type( vk.physical_device, memReq.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 	Com_Memset( &allocInfo, 0, sizeof( allocInfo ) );
 	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	allocInfo.allocationSize = memReq.size;
@@ -4810,7 +4662,7 @@ qboolean vk_create_gltf_buffers( const byte *vboData, int vboSize, const uint32_
 
 	qvkGetBufferMemoryRequirements( vk.device, idxBuf, &memReq );
 	allocInfo.allocationSize = memReq.size;
-	allocInfo.memoryTypeIndex = find_memory_type( memReq.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	allocInfo.memoryTypeIndex = vk_find_memory_type( vk.physical_device, memReq.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 	VK_CHECK( qvkAllocateMemory( vk.device, &allocInfo, NULL, &idxMem ) );
 	qvkBindBufferMemory( vk.device, idxBuf, idxMem, 0 );
 
@@ -5464,12 +5316,12 @@ static void vk_alloc_attachments( void )
 
 	if ( num_attachments == 1 && attachments[ 0 ].usage & VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT ) {
 		// try lazy memory
-		memoryTypeIndex = find_memory_type2( memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT, NULL );
+		memoryTypeIndex = vk_find_memory_type2( vk.physical_device, memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT, NULL );
 		if ( memoryTypeIndex == ~0U ) {
-			memoryTypeIndex = find_memory_type( memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+			memoryTypeIndex = vk_find_memory_type( vk.physical_device, memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 		}
 	} else {
-		memoryTypeIndex = find_memory_type( memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+		memoryTypeIndex = vk_find_memory_type( vk.physical_device, memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 	}
 
 #ifdef _DEBUG
@@ -5917,7 +5769,7 @@ static void vk_create_attachments( void )
 			Com_Memset( &alloc_info, 0, sizeof( alloc_info ) );
 			alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 			alloc_info.allocationSize = mem_reqs.size;
-			alloc_info.memoryTypeIndex = find_memory_type( mem_reqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+			alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, mem_reqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
 			VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.luminance_staging_memory ) );
 			VK_CHECK( qvkBindBufferMemory( vk.device, vk.luminance_staging_buffer, vk.luminance_staging_memory, 0 ) );
 			VK_CHECK( qvkMapMemory( vk.device, vk.luminance_staging_memory, 0, 4, 0, &vk.luminance_staging_ptr ) );
@@ -6404,89 +6256,6 @@ static void vk_create_framebuffers( void )
 	}
 	#endif
 	}
-}
-
-
-static void vk_create_sync_primitives( void ) {
-	VkSemaphoreCreateInfo desc;
-	VkFenceCreateInfo fence_desc;
-	uint32_t i;
-
-	desc.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-	desc.pNext = NULL;
-	desc.flags = 0;
-
-#ifdef USE_UPLOAD_QUEUE
-	VK_CHECK( qvkCreateSemaphore( vk.device, &desc, NULL, &vk.image_uploaded2 ) );
-#endif
-
-	// all commands submitted
-	for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ )
-	{
-		desc.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-		desc.pNext = NULL;
-		desc.flags = 0;
-
-		// swapchain image acquired
-		VK_CHECK( qvkCreateSemaphore( vk.device, &desc, NULL, &vk.tess[i].image_acquired ) );
-
-#ifdef USE_UPLOAD_QUEUE
-		// second semaphore to synchronize additional tasks (e.g. image upload)
-		VK_CHECK( qvkCreateSemaphore( vk.device, &desc, NULL, &vk.tess[i].rendering_finished2 ) );
-#endif
-		fence_desc.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-		fence_desc.pNext = NULL;
-		//fence_desc.flags = VK_FENCE_CREATE_SIGNALED_BIT; // so it can be used to start rendering
-		fence_desc.flags = 0; // non-signalled state
-
-		VK_CHECK( qvkCreateFence( vk.device, &fence_desc, NULL, &vk.tess[i].rendering_finished_fence ) );
-		vk.tess[i].waitForFence = qfalse;
-
-		SET_OBJECT_NAME( vk.tess[i].image_acquired, va( "image_acquired semaphore %i", i ), VK_DEBUG_REPORT_OBJECT_TYPE_SEMAPHORE_EXT );
-#ifdef USE_UPLOAD_QUEUE
-		SET_OBJECT_NAME( vk.tess[i].rendering_finished2, va( "rendering_finished2 semaphore %i", i ), VK_DEBUG_REPORT_OBJECT_TYPE_SEMAPHORE_EXT );
-#endif
-		SET_OBJECT_NAME( vk.tess[i].rendering_finished_fence, va( "rendering_finished fence %i", i ), VK_DEBUG_REPORT_OBJECT_TYPE_FENCE_EXT );
-	}
-
-	fence_desc.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-	fence_desc.pNext = NULL;
-	fence_desc.flags = 0;
-
-#ifdef USE_UPLOAD_QUEUE
-	VK_CHECK( qvkCreateFence( vk.device, &fence_desc, NULL, &vk.aux_fence ) );
-	SET_OBJECT_NAME( vk.aux_fence, "aux fence", VK_DEBUG_REPORT_OBJECT_TYPE_FENCE_EXT );
-
-	vk.rendering_finished = VK_NULL_HANDLE;
-	vk.image_uploaded = VK_NULL_HANDLE;
-	vk.aux_fence_wait = qfalse;
-#endif
-}
-
-
-static void vk_destroy_sync_primitives( void  ) {
-	uint32_t i;
-
-#ifdef USE_UPLOAD_QUEUE
-	qvkDestroySemaphore( vk.device, vk.image_uploaded2, NULL );
-#endif
-
-	for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ ) {
-		qvkDestroySemaphore( vk.device, vk.tess[i].image_acquired, NULL );
-#ifdef USE_UPLOAD_QUEUE
-		qvkDestroySemaphore( vk.device, vk.tess[i].rendering_finished2, NULL );
-#endif
-		qvkDestroyFence( vk.device, vk.tess[i].rendering_finished_fence, NULL );
-		vk.tess[i].waitForFence = qfalse;
-		vk.tess[i].swapchain_image_acquired = qfalse;
-	}
-
-#ifdef USE_UPLOAD_QUEUE
-	qvkDestroyFence( vk.device, vk.aux_fence, NULL );
-
-	vk.rendering_finished = VK_NULL_HANDLE;
-	vk.image_uploaded = VK_NULL_HANDLE;
-#endif
 }
 
 
@@ -8191,7 +7960,7 @@ static void vk_create_volumetric_pipelines( void )
 				Com_Memset( &alloc_info, 0, sizeof( alloc_info ) );
 				alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 				alloc_info.allocationSize = mem_req.size;
-				alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits,
+				alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, mem_req.memoryTypeBits,
 					VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
 				VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.vegwind_vertex_memory ) );
 				VK_CHECK( qvkBindBufferMemory( vk.device, vk.vegwind_vertex_buffer, vk.vegwind_vertex_memory, 0 ) );
@@ -8607,7 +8376,7 @@ static void vk_create_fog_noise_texture( void )
 	Com_Memset( &alloc_info, 0, sizeof( alloc_info ) );
 	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	alloc_info.allocationSize = mem_req.size;
-	alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.fog_noise_memory ) );
 	VK_CHECK( qvkBindImageMemory( vk.device, vk.fog_noise_image, vk.fog_noise_memory, 0 ) );
 
@@ -8632,7 +8401,7 @@ static void vk_create_fog_noise_texture( void )
 	Com_Memset( &alloc_info, 0, sizeof( alloc_info ) );
 	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	alloc_info.allocationSize = mem_req.size;
-	alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits,
+	alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, mem_req.memoryTypeBits,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
 	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &staging_memory ) );
 	VK_CHECK( qvkBindBufferMemory( vk.device, staging_buffer, staging_memory, 0 ) );
@@ -8770,7 +8539,7 @@ static void vk_create_sun_shadow_resources( void )
 	Com_Memset( &alloc_info, 0, sizeof( alloc_info ) );
 	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	alloc_info.allocationSize = mem_req.size;
-	alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.sun_shadow_memory ) );
 	VK_CHECK( qvkBindImageMemory( vk.device, vk.sun_shadow_image, vk.sun_shadow_memory, 0 ) );
 
@@ -8781,7 +8550,7 @@ static void vk_create_sun_shadow_resources( void )
 
 	qvkGetImageMemoryRequirements( vk.device, vk.sun_shadow_color_image, &mem_req );
 	alloc_info.allocationSize = mem_req.size;
-	alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.sun_shadow_color_memory ) );
 	VK_CHECK( qvkBindImageMemory( vk.device, vk.sun_shadow_color_image, vk.sun_shadow_color_memory, 0 ) );
 
@@ -8977,7 +8746,7 @@ static void vk_create_local_shadow_resources( void )
 	Com_Memset( &alloc_info, 0, sizeof( alloc_info ) );
 	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	alloc_info.allocationSize = mem_req.size;
-	alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.local_spot_shadow_atlas_memory ) );
 	VK_CHECK( qvkBindImageMemory( vk.device, vk.local_spot_shadow_atlas_image, vk.local_spot_shadow_atlas_memory, 0 ) );
 
@@ -8986,7 +8755,7 @@ static void vk_create_local_shadow_resources( void )
 	VK_CHECK( qvkCreateImage( vk.device, &image_info, NULL, &vk.local_spot_shadow_color_image ) );
 	qvkGetImageMemoryRequirements( vk.device, vk.local_spot_shadow_color_image, &mem_req );
 	alloc_info.allocationSize = mem_req.size;
-	alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.local_spot_shadow_color_memory ) );
 	VK_CHECK( qvkBindImageMemory( vk.device, vk.local_spot_shadow_color_image, vk.local_spot_shadow_color_memory, 0 ) );
 
@@ -8999,7 +8768,7 @@ static void vk_create_local_shadow_resources( void )
 
 	qvkGetImageMemoryRequirements( vk.device, vk.local_point_shadow_array_image, &mem_req );
 	alloc_info.allocationSize = mem_req.size;
-	alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.local_point_shadow_array_memory ) );
 	VK_CHECK( qvkBindImageMemory( vk.device, vk.local_point_shadow_array_image, vk.local_point_shadow_array_memory, 0 ) );
 
@@ -9009,7 +8778,7 @@ static void vk_create_local_shadow_resources( void )
 
 	qvkGetImageMemoryRequirements( vk.device, vk.local_point_shadow_color_array_image, &mem_req );
 	alloc_info.allocationSize = mem_req.size;
-	alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.local_point_shadow_color_array_memory ) );
 	VK_CHECK( qvkBindImageMemory( vk.device, vk.local_point_shadow_color_array_image, vk.local_point_shadow_color_array_memory, 0 ) );
 
@@ -9414,7 +9183,7 @@ static void vk_create_froxel_images( void )
 	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	alloc_info.pNext = NULL;
 	alloc_info.allocationSize = mem_req.size;
-	alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.froxel_volume_memory ) );
 	VK_CHECK( qvkBindImageMemory( vk.device, vk.froxel_volume_image, vk.froxel_volume_memory, 0 ) );
 
@@ -9422,7 +9191,7 @@ static void vk_create_froxel_images( void )
 
 	qvkGetImageMemoryRequirements( vk.device, vk.froxel_history_image, &mem_req );
 	alloc_info.allocationSize = mem_req.size;
-	alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.froxel_history_memory ) );
 	VK_CHECK( qvkBindImageMemory( vk.device, vk.froxel_history_image, vk.froxel_history_memory, 0 ) );
 
@@ -9430,7 +9199,7 @@ static void vk_create_froxel_images( void )
 
 	qvkGetImageMemoryRequirements( vk.device, vk.froxel_light_image, &mem_req );
 	alloc_info.allocationSize = mem_req.size;
-	alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.froxel_light_memory ) );
 	VK_CHECK( qvkBindImageMemory( vk.device, vk.froxel_light_image, vk.froxel_light_memory, 0 ) );
 
@@ -9438,7 +9207,7 @@ static void vk_create_froxel_images( void )
 
 	qvkGetImageMemoryRequirements( vk.device, vk.froxel_extinction_image, &mem_req );
 	alloc_info.allocationSize = mem_req.size;
-	alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.froxel_extinction_memory ) );
 	VK_CHECK( qvkBindImageMemory( vk.device, vk.froxel_extinction_image, vk.froxel_extinction_memory, 0 ) );
 
@@ -9446,7 +9215,7 @@ static void vk_create_froxel_images( void )
 
 	qvkGetImageMemoryRequirements( vk.device, vk.froxel_clamp_image, &mem_req );
 	alloc_info.allocationSize = mem_req.size;
-	alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.froxel_clamp_memory ) );
 	VK_CHECK( qvkBindImageMemory( vk.device, vk.froxel_clamp_image, vk.froxel_clamp_memory, 0 ) );
 
@@ -9454,21 +9223,21 @@ static void vk_create_froxel_images( void )
 		VK_CHECK( qvkCreateImage( vk.device, &create_info_fluid_velocity, NULL, &vk.fluid_velocity_images[i] ) );
 		qvkGetImageMemoryRequirements( vk.device, vk.fluid_velocity_images[i], &mem_req );
 		alloc_info.allocationSize = mem_req.size;
-		alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+		alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 		VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.fluid_velocity_memory[i] ) );
 		VK_CHECK( qvkBindImageMemory( vk.device, vk.fluid_velocity_images[i], vk.fluid_velocity_memory[i], 0 ) );
 
 		VK_CHECK( qvkCreateImage( vk.device, &create_info_fluid_scalar, NULL, &vk.fluid_density_images[i] ) );
 		qvkGetImageMemoryRequirements( vk.device, vk.fluid_density_images[i], &mem_req );
 		alloc_info.allocationSize = mem_req.size;
-		alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+		alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 		VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.fluid_density_memory[i] ) );
 		VK_CHECK( qvkBindImageMemory( vk.device, vk.fluid_density_images[i], vk.fluid_density_memory[i], 0 ) );
 
 		VK_CHECK( qvkCreateImage( vk.device, &create_info_fluid_scalar, NULL, &vk.fluid_pressure_images[i] ) );
 		qvkGetImageMemoryRequirements( vk.device, vk.fluid_pressure_images[i], &mem_req );
 		alloc_info.allocationSize = mem_req.size;
-		alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+		alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 		VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.fluid_pressure_memory[i] ) );
 		VK_CHECK( qvkBindImageMemory( vk.device, vk.fluid_pressure_images[i], vk.fluid_pressure_memory[i], 0 ) );
 	}
@@ -9476,14 +9245,14 @@ static void vk_create_froxel_images( void )
 	VK_CHECK( qvkCreateImage( vk.device, &create_info_fluid_scalar, NULL, &vk.fluid_divergence_image ) );
 	qvkGetImageMemoryRequirements( vk.device, vk.fluid_divergence_image, &mem_req );
 	alloc_info.allocationSize = mem_req.size;
-	alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.fluid_divergence_memory ) );
 	VK_CHECK( qvkBindImageMemory( vk.device, vk.fluid_divergence_image, vk.fluid_divergence_memory, 0 ) );
 
 	VK_CHECK( qvkCreateImage( vk.device, &create_info_telemetry, NULL, &vk.volumetric_telemetry_image ) );
 	qvkGetImageMemoryRequirements( vk.device, vk.volumetric_telemetry_image, &mem_req );
 	alloc_info.allocationSize = mem_req.size;
-	alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.volumetric_telemetry_memory ) );
 	VK_CHECK( qvkBindImageMemory( vk.device, vk.volumetric_telemetry_image, vk.volumetric_telemetry_memory, 0 ) );
 
@@ -15898,15 +15667,15 @@ void vk_read_pixels( byte *buffer, uint32_t width, uint32_t height )
 
 	// host_cached bit is desirable for fast reads
 	memory_reqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
-	alloc_info.memoryTypeIndex = find_memory_type2( memory_requirements.memoryTypeBits, memory_reqs, &memory_flags );
+	alloc_info.memoryTypeIndex = vk_find_memory_type2( vk.physical_device, memory_requirements.memoryTypeBits, memory_reqs, &memory_flags );
 	if ( alloc_info.memoryTypeIndex == ~0U ) {
 		// try less explicit flags, without host_coherent
 		memory_reqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
-		alloc_info.memoryTypeIndex = find_memory_type2( memory_requirements.memoryTypeBits, memory_reqs, &memory_flags );
+		alloc_info.memoryTypeIndex = vk_find_memory_type2( vk.physical_device, memory_requirements.memoryTypeBits, memory_reqs, &memory_flags );
 		if ( alloc_info.memoryTypeIndex == ~0U ) {
 			// slowest case
 			memory_reqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-			alloc_info.memoryTypeIndex = find_memory_type2( memory_requirements.memoryTypeBits, memory_reqs, &memory_flags );
+			alloc_info.memoryTypeIndex = vk_find_memory_type2( vk.physical_device, memory_requirements.memoryTypeBits, memory_reqs, &memory_flags );
 			if ( alloc_info.memoryTypeIndex == ~0U ) {
 				ri.Error( ERR_FATAL, "%s(): failed to find matching memory type for image capture", __func__ );
 			}
@@ -16117,7 +15886,7 @@ static void vk_create_volumetric_params_buffer( void )
 	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	alloc_info.pNext = NULL;
 	alloc_info.allocationSize = mem_req.size;
-	alloc_info.memoryTypeIndex = find_memory_type( mem_req.memoryTypeBits,
+	alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, mem_req.memoryTypeBits,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
 
 	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.volumetric_params_memory ) );
@@ -16176,7 +15945,7 @@ static void vk_create_postfx_params_buffers( void )
 		Com_Memset( &alloc_info, 0, sizeof( alloc_info ) );
 		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 		alloc_info.allocationSize = mem_req.size;
-		alloc_info.memoryTypeIndex = find_memory_type(
+		alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device,
 			mem_req.memoryTypeBits,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
 
@@ -16656,7 +16425,7 @@ static void vk_create_prefilter_framebuffer( filterDef *def ) {
 	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	alloc_info.pNext = NULL;
 	alloc_info.allocationSize = memory_requirements.size;
-	alloc_info.memoryTypeIndex = find_memory_type( memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 			
 	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &def->offscreen.memory ) );
 	VK_CHECK( qvkBindImageMemory( vk.device, def->offscreen.image, def->offscreen.memory, 0 ) );
@@ -16951,7 +16720,7 @@ static void vk_create_readback_buffer( VkDeviceSize size, VkBuffer *buffer, VkDe
 	VkMemoryAllocateInfo alloc_info = { 0 };
 	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	alloc_info.allocationSize = mem_reqs.size;
-	alloc_info.memoryTypeIndex = find_memory_type( mem_reqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+	alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, mem_reqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
 	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, memory ) );
 	VK_CHECK( qvkBindBufferMemory( vk.device, *buffer, *memory, 0 ) );
 
