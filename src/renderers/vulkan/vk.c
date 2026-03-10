@@ -1665,6 +1665,9 @@ static void allocate_and_bind_image_memory(VkImage image) {
 
 static void vk_clean_staging_buffer( void )
 {
+	if ( vk.device == VK_NULL_HANDLE || qvkDestroyBuffer == NULL ) {
+		return;
+	}
 	if ( vk.staging_buffer.handle != VK_NULL_HANDLE ) {
 		qvkDestroyBuffer( vk.device, vk.staging_buffer.handle, NULL );
 		vk.staging_buffer.handle = VK_NULL_HANDLE;
@@ -9900,6 +9903,9 @@ __cleanup:
 
 void vk_wait_idle( void )
 {
+	if ( vk.device == VK_NULL_HANDLE || qvkDeviceWaitIdle == NULL ) {
+		return;
+	}
 	if ( vk.device_lost ) {
 		return;
 	}
@@ -9914,6 +9920,9 @@ VkSampleCountFlagBits vk_get_main_rasterization_samples( void )
 
 void vk_queue_wait_idle( void )
 {
+	if ( vk.queue == VK_NULL_HANDLE || qvkQueueWaitIdle == NULL ) {
+		return;
+	}
 	if ( vk.device_lost ) {
 		return;
 	}
@@ -9924,6 +9933,9 @@ void vk_queue_wait_idle( void )
 void vk_release_resources( void ) {
 	int i, j;
 
+	if ( vk.device == VK_NULL_HANDLE ) {
+		return;  /* Vulkan never initialized (e.g. VKimp_Init failed) */
+	}
 	if ( vk.device_lost ) {
 		return;  /* GPU lost; skip cleanup to avoid recursive VK_ERROR_DEVICE_LOST */
 	}
@@ -10504,6 +10516,9 @@ void vk_update_descriptor_set( image_t *image, qboolean mipmap ) {
 
 void vk_destroy_image_resources( VkImage *image, VkImageView *imageView )
 {
+	if ( vk.device == VK_NULL_HANDLE || qvkDestroyImage == NULL || qvkDestroyImageView == NULL ) {
+		return;
+	}
 	if ( image != NULL ) {
 		if ( *image != VK_NULL_HANDLE ) {
 			qvkDestroyImage( vk.device, *image, NULL );
