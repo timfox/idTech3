@@ -493,8 +493,6 @@ void vk_bind_descriptor_sets( void );
 
 void vk_update_post_process_pipelines( void );
 
-const char *vk_format_string( VkFormat format );
-
 void VBO_PrepareQueues( void );
 void VBO_RenderIBOItems( void );
 void VBO_ClearQueue( void );
