@@ -36,5 +36,6 @@ Use this checklist before tagging or publishing a release.
 
 - [ ] Tag created with version (e.g. `v1.0.0`)
 - [ ] GitHub Release created (draft first, then publish)
-- [ ] CI `release-attach` job uploads build artifacts to the release
+- [ ] **Publish release** — this triggers the CI build workflow; the `release-attach` job will build binaries for all platforms (Windows, Linux, macOS, Android) and attach them to the release. Allow 15–30 minutes for all platform archives to appear.
+- [ ] Verify all platform archives are attached to the release
 - [ ] Announcement (if applicable)

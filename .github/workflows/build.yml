@@ -722,15 +722,17 @@ jobs:
       - name: Create release archives
         run: |
           mkdir -p dist
-          tag="${GITHUB_REF#refs/tags/}"
+          tag="${{ github.event.release.tag_name }}"
           for dir in artifacts/*/; do
             name=$(basename "$dir")
             zip -r "dist/idtech3-${tag}-${name}.zip" "$dir"
           done
           ls -la dist/
 
-      - uses: softprops/action-gh-release@v2
+      - name: Attach binaries to release
+        uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.release.tag_name }}
           files: dist/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
