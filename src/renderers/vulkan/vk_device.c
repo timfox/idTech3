@@ -316,3 +316,22 @@ void vk_setup_surface_formats( VkPhysicalDevice physical_device )
 		vk.capture_format = vk.color_format;
 	}
 }
+
+const char *vk_device_renderer_name( const VkPhysicalDeviceProperties *props )
+{
+	static char buf[sizeof( props->deviceName ) + 64];
+	const char *device_type;
+
+	switch ( props->deviceType ) {
+		case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU: device_type = "Integrated"; break;
+		case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU: device_type = "Discrete"; break;
+		case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU: device_type = "Virtual"; break;
+		case VK_PHYSICAL_DEVICE_TYPE_CPU: device_type = "CPU"; break;
+		default: device_type = "OTHER"; break;
+	}
+
+	Com_sprintf( buf, sizeof( buf ), "%s %s, 0x%04x",
+		device_type, props->deviceName, props->deviceID );
+
+	return buf;
+}

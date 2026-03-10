@@ -27,6 +27,9 @@ qboolean vk_select_surface_format( VkPhysicalDevice physical_device, VkSurfaceKH
  * Call after vk_select_surface_format. */
 void vk_setup_surface_formats( VkPhysicalDevice physical_device );
 
+/* Format physical device properties as human-readable string (e.g. "Discrete NVIDIA GeForce RTX 3080, 0x2206"). */
+const char *vk_device_renderer_name( const VkPhysicalDeviceProperties *props );
+
 #ifdef __cplusplus
 }
 #endif

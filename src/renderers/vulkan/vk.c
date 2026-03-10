@@ -1720,25 +1720,6 @@ static void create_instance( void )
 }
 
 
-static const char *renderer_name( const VkPhysicalDeviceProperties *props ) {
-	static char buf[sizeof( props->deviceName ) + 64];
-	const char *device_type;
-
-	switch ( props->deviceType ) {
-		case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU: device_type = "Integrated"; break;
-		case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU: device_type = "Discrete"; break;
-		case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU: device_type = "Virtual"; break;
-		case VK_PHYSICAL_DEVICE_TYPE_CPU: device_type = "CPU"; break;
-		default: device_type = "OTHER"; break;
-	}
-
-	Com_sprintf( buf, sizeof( buf ), "%s %s, 0x%04x",
-		device_type, props->deviceName, props->deviceID );
-
-	return buf;
-}
-
-
 static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_index ) {
 
 #ifdef _DEBUG
@@ -2343,7 +2324,7 @@ static void init_vulkan_library( void )
 	ri.Printf( PRINT_ALL, ".......................\nAvailable physical devices:\n" );
 	for ( i = 0; (uint32_t) i < device_count; i++ ) {
 		qvkGetPhysicalDeviceProperties( physical_devices[ i ], &props );
-		ri.Printf( PRINT_ALL, " %i: %s\n", i, renderer_name( &props ) );
+		ri.Printf( PRINT_ALL, " %i: %s\n", i, vk_device_renderer_name( &props ) );
 		if ( device_index == -1 && props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ) {
 			device_index = i;
 		} else if ( device_index == -2 && props.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU ) {
@@ -5978,7 +5959,7 @@ void vk_initialize( void )
 	}
 
 	Q_strncpyz( glConfig.vendor_string, vendor_name, sizeof( glConfig.vendor_string ) );
-	Q_strncpyz( glConfig.renderer_string, renderer_name( &props ), sizeof( glConfig.renderer_string ) );
+	Q_strncpyz( glConfig.renderer_string, vk_device_renderer_name( &props ), sizeof( glConfig.renderer_string ) );
 
 	SET_OBJECT_NAME( (intptr_t)vk.device, glConfig.renderer_string, VK_DEBUG_REPORT_OBJECT_TYPE_DEVICE_EXT );
 
@@ -6004,7 +5985,7 @@ void vk_initialize( void )
 			ri.Printf( PRINT_ALL, "[VK] VK_Init\n" );
 			ri.Printf( PRINT_ALL, "[VK]   API Version : %d.%d.%d\n", major, minor, patch );
 			ri.Printf( PRINT_ALL, "[VK]   Driver      : %s\n", driver_version );
-			ri.Printf( PRINT_ALL, "[VK]   GPU         : %s\n", renderer_name( &props ) );
+			ri.Printf( PRINT_ALL, "[VK]   GPU         : %s\n", vk_device_renderer_name( &props ) );
 			if ( vramMB > 0 ) {
 				ri.Printf( PRINT_ALL, "[VK]   VRAM        : %u MB\n", vramMB );
 			}
