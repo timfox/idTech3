@@ -17,6 +17,7 @@
 #include "vk_util.h"
 #include "vk_validation.h"
 #include "vk_sync.h"
+#include "vk_cmd.h"
 #include <math.h>
 
 /* VK_EXT_extended_dynamic_state3: for vkCmdSetColorWriteMaskEXT (RB_ColorMask) */
@@ -153,10 +154,10 @@ static PFN_vkGetPhysicalDeviceSurfaceSupportKHR			qvkGetPhysicalDeviceSurfaceSup
 static PFN_vkCreateDebugReportCallbackEXT				qvkCreateDebugReportCallbackEXT;
 static PFN_vkDestroyDebugReportCallbackEXT				qvkDestroyDebugReportCallbackEXT;
 #endif
-static PFN_vkAllocateCommandBuffers						qvkAllocateCommandBuffers;
+PFN_vkAllocateCommandBuffers						qvkAllocateCommandBuffers;
 static PFN_vkAllocateDescriptorSets						qvkAllocateDescriptorSets;
 static PFN_vkAllocateMemory								qvkAllocateMemory;
-static PFN_vkBeginCommandBuffer							qvkBeginCommandBuffer;
+PFN_vkBeginCommandBuffer							qvkBeginCommandBuffer;
 static PFN_vkBindBufferMemory							qvkBindBufferMemory;
 static PFN_vkBindImageMemory							qvkBindImageMemory;
 PFN_vkCmdBeginRenderPass								qvkCmdBeginRenderPass;
@@ -220,9 +221,9 @@ static PFN_vkDestroySampler								qvkDestroySampler;
 PFN_vkDestroySemaphore							qvkDestroySemaphore;
 static PFN_vkDestroyShaderModule						qvkDestroyShaderModule;
 static PFN_vkDeviceWaitIdle								qvkDeviceWaitIdle;
-static PFN_vkEndCommandBuffer							qvkEndCommandBuffer;
+PFN_vkEndCommandBuffer							qvkEndCommandBuffer;
 static PFN_vkFlushMappedMemoryRanges					qvkFlushMappedMemoryRanges;
-static PFN_vkFreeCommandBuffers							qvkFreeCommandBuffers;
+PFN_vkFreeCommandBuffers							qvkFreeCommandBuffers;
 static PFN_vkFreeDescriptorSets							qvkFreeDescriptorSets;
 static PFN_vkFreeMemory									qvkFreeMemory;
 static PFN_vkGetBufferMemoryRequirements				qvkGetBufferMemoryRequirements;
@@ -231,7 +232,7 @@ static PFN_vkGetImageMemoryRequirements					qvkGetImageMemoryRequirements;
 static PFN_vkGetImageSubresourceLayout					qvkGetImageSubresourceLayout;
 static PFN_vkInvalidateMappedMemoryRanges				qvkInvalidateMappedMemoryRanges;
 static PFN_vkMapMemory									qvkMapMemory;
-static PFN_vkQueueSubmit								qvkQueueSubmit;
+PFN_vkQueueSubmit								qvkQueueSubmit;
 static PFN_vkQueueWaitIdle								qvkQueueWaitIdle;
 static PFN_vkResetCommandBuffer							qvkResetCommandBuffer;
 static PFN_vkResetDescriptorPool						qvkResetDescriptorPool;
@@ -287,8 +288,6 @@ static const dlight_t *vk_get_volumetric_local_light( int local_index );
 static qboolean vk_build_local_spot_shadow_view( const dlight_t *dl, int viewportX, int viewportY, int viewportSize, viewParms_t *shadowParms, float *outViewProj );
 static qboolean vk_build_local_point_shadow_view( const dlight_t *dl, int face, int viewportSize, viewParms_t *shadowParms, float *outViewProj );
 static qboolean vk_render_local_volumetric_shadow_view( const viewParms_t *shadowParms, qboolean pointShadow, int pointFaceLayer );
-static qboolean Mat4Inverse( const float *m, float *out );
-
 enum {
 	VK_VOLUMETRY_COUNTER_NAN_OR_INF = 0,
 	VK_VOLUMETRY_COUNTER_EXTINCTION_CLAMP = 1,
@@ -343,74 +342,6 @@ static VkFlags get_composite_alpha( VkCompositeAlphaFlagsKHR flags )
 	return compositeFlags[0];
 }
 */
-
-
-static VkCommandBuffer begin_command_buffer( void )
-{
-	VkCommandBufferBeginInfo begin_info;
-	VkCommandBufferAllocateInfo alloc_info;
-	VkCommandBuffer command_buffer;
-
-	alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	alloc_info.pNext = NULL;
-	alloc_info.commandPool = vk.command_pool;
-	alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	alloc_info.commandBufferCount = 1;
-	VK_CHECK( qvkAllocateCommandBuffers( vk.device, &alloc_info, &command_buffer ) );
-
-	begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	begin_info.pNext = NULL;
-	begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-	begin_info.pInheritanceInfo = NULL;
-
-	VK_CHECK( qvkBeginCommandBuffer( command_buffer, &begin_info ) );
-
-	return command_buffer;
-}
-
-
-static void end_command_buffer( VkCommandBuffer command_buffer, const char *location )
-{
-	(void)location;
-#ifdef USE_UPLOAD_QUEUE
-	const VkPipelineStageFlags wait_dst_stage_mask = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-	VkSemaphore waits;
-#endif
-	VkSubmitInfo submit_info;
-	VkCommandBuffer cmdbuf[1];
-
-	cmdbuf[0] = command_buffer;
-
-	VK_CHECK( qvkEndCommandBuffer( command_buffer ) );
-
-	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submit_info.pNext = NULL;
-#ifdef USE_UPLOAD_QUEUE
-	if ( vk.rendering_finished != VK_NULL_HANDLE ) {
-		waits = vk.rendering_finished;
-		vk.rendering_finished = VK_NULL_HANDLE;
-		submit_info.waitSemaphoreCount = 1;
-		submit_info.pWaitSemaphores = &waits;
-		submit_info.pWaitDstStageMask = &wait_dst_stage_mask;
-	} else 
-#endif
-	{
-		submit_info.waitSemaphoreCount = 0;
-		submit_info.pWaitSemaphores = NULL;
-		submit_info.pWaitDstStageMask = NULL;
-	}
-
-	submit_info.commandBufferCount = 1;
-	submit_info.pCommandBuffers = cmdbuf;
-	submit_info.signalSemaphoreCount = 0;
-	submit_info.pSignalSemaphores = NULL;
-
-	VK_CHECK( qvkQueueSubmit( vk.queue, 1, &submit_info, VK_NULL_HANDLE ) );
-
-	vk_queue_wait_idle();
-
-	qvkFreeCommandBuffers( vk.device, vk.command_pool, 1, cmdbuf );
-}
 
 
 // debug markers
@@ -596,7 +527,7 @@ static void vk_create_swapchain( VkPhysicalDevice physical_device, VkDevice devi
 	}
 
 	if ( vk.initSwapchainLayout != VK_IMAGE_LAYOUT_UNDEFINED ) {
-		VkCommandBuffer command_buffer = begin_command_buffer();
+		VkCommandBuffer command_buffer = vk_begin_command_buffer();
 
 		for ( i = 0; (uint32_t) i < vk.swapchain_image_count; i++ ) {
 			record_image_layout_transition( command_buffer, vk.swapchain_images[i],
@@ -604,7 +535,7 @@ static void vk_create_swapchain( VkPhysicalDevice physical_device, VkDevice devi
 				VK_IMAGE_LAYOUT_UNDEFINED, vk.initSwapchainLayout, 0, 0 );
 		}
 
-		end_command_buffer( command_buffer, __func__ );
+		vk_end_command_buffer( command_buffer, __func__ );
 	}
 }
 
@@ -4555,12 +4486,12 @@ qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size )
 			uploadSize = (VkDeviceSize) vbo_size - uploadDone;
 		}
 		memcpy(vk.staging_buffer.ptr + 0, vbo_data + uploadDone, uploadSize);
-		command_buffer = begin_command_buffer();
+		command_buffer = vk_begin_command_buffer();
 		copyRegion[0].srcOffset = 0;
 		copyRegion[0].dstOffset = uploadDone;
 		copyRegion[0].size = uploadSize;
 		qvkCmdCopyBuffer( command_buffer, vk.staging_buffer.handle, vk.vbo.vertex_buffer, 1, &copyRegion[0] );
-		end_command_buffer( command_buffer, __func__ );
+		vk_end_command_buffer( command_buffer, __func__ );
 		uploadDone += uploadSize;
 	}
 
@@ -4636,7 +4567,7 @@ qboolean vk_create_gltf_buffers( const byte *vboData, int vboSize, const uint32_
 	Com_Memcpy( vk.staging_buffer.ptr, vboData, vboSize );
 	Com_Memcpy( vk.staging_buffer.ptr + vboSize, idxData, (size_t)idxSize );
 
-	cmd = begin_command_buffer();
+	cmd = vk_begin_command_buffer();
 	copyRegion.srcOffset = 0;
 	copyRegion.dstOffset = 0;
 	copyRegion.size = (VkDeviceSize)vboSize;
@@ -4645,7 +4576,7 @@ qboolean vk_create_gltf_buffers( const byte *vboData, int vboSize, const uint32_
 	copyRegion.dstOffset = 0;
 	copyRegion.size = idxSize;
 	qvkCmdCopyBuffer( cmd, vk.staging_buffer.handle, idxBuf, 1, &copyRegion );
-	end_command_buffer( cmd, __func__ );
+	vk_end_command_buffer( cmd, __func__ );
 
 	*outVertexBuffer = vertBuf;
 	*outIndexBuffer = idxBuf;
@@ -5344,7 +5275,7 @@ static void vk_alloc_attachments( void )
 	}
 
 	// perform layout transition
-	command_buffer = begin_command_buffer();
+	command_buffer = vk_begin_command_buffer();
 	for ( i = 0; i < num_attachments; i++ ) {
 		record_image_layout_transition( command_buffer,
 			attachments[i].descriptor,
@@ -5353,7 +5284,7 @@ static void vk_alloc_attachments( void )
 			attachments[i].image_layout,
 			0, 0 );
 	}
-	end_command_buffer( command_buffer, __func__ );
+	vk_end_command_buffer( command_buffer, __func__ );
 
 	num_attachments = 0;
 }
@@ -8140,135 +8071,6 @@ void vk_vegetation_wind_dispatch( void )
 	qvkCmdDispatch( vk.cmd->command_buffer, groupCount, 1, 1 );
 }
 
-
-static qboolean Mat4Inverse( const float *m, float *out ) {
-	float tmp[16];
-	tmp[0] = m[5]  * m[10] * m[15] -
-	         m[5]  * m[11] * m[14] -
-	         m[9]  * m[6]  * m[15] +
-	         m[9]  * m[7]  * m[14] +
-	         m[13] * m[6]  * m[11] -
-	         m[13] * m[7]  * m[10];
-
-	tmp[4] = -m[4]  * m[10] * m[15] +
-	          m[4]  * m[11] * m[14] +
-	          m[8]  * m[6]  * m[15] -
-	          m[8]  * m[7]  * m[14] -
-	          m[12] * m[6]  * m[11] +
-	          m[12] * m[7]  * m[10];
-
-	tmp[8] = m[4]  * m[9] * m[15] -
-	         m[4]  * m[11] * m[13] -
-	         m[8]  * m[5] * m[15] +
-	         m[8]  * m[7] * m[13] +
-	         m[12] * m[5] * m[11] -
-	         m[12] * m[7] * m[9];
-
-	tmp[12] = -m[4]  * m[9] * m[14] +
-	           m[4]  * m[10] * m[13] +
-	           m[8]  * m[5] * m[14] -
-	           m[8]  * m[6] * m[13] -
-	           m[12] * m[5] * m[10] +
-	           m[12] * m[6] * m[9];
-
-	tmp[1] = -m[1]  * m[10] * m[15] +
-	          m[1]  * m[11] * m[14] +
-	          m[9]  * m[2] * m[15] -
-	          m[9]  * m[3] * m[14] -
-	          m[13] * m[2] * m[11] +
-	          m[13] * m[3] * m[10];
-
-	tmp[5] = m[0]  * m[10] * m[15] -
-	         m[0]  * m[11] * m[14] -
-	         m[8]  * m[2] * m[15] +
-	         m[8]  * m[3] * m[14] +
-	         m[12] * m[2] * m[11] -
-	         m[12] * m[3] * m[10];
-
-	tmp[9] = -m[0]  * m[9] * m[15] +
-	          m[0]  * m[11] * m[13] +
-	          m[8]  * m[1] * m[15] -
-	          m[8]  * m[3] * m[13] -
-	          m[12] * m[1] * m[11] +
-	          m[12] * m[3] * m[9];
-
-	tmp[13] = m[0]  * m[9] * m[14] -
-	          m[0]  * m[10] * m[13] -
-	          m[8]  * m[1] * m[14] +
-	          m[8]  * m[2] * m[13] +
-	          m[12] * m[1] * m[10] -
-	          m[12] * m[2] * m[9];
-
-	tmp[2] = m[1]  * m[6] * m[15] -
-	         m[1]  * m[7] * m[14] -
-	         m[5]  * m[2] * m[15] +
-	         m[5]  * m[3] * m[14] +
-	         m[13] * m[2] * m[7] -
-	         m[13] * m[3] * m[6];
-
-	tmp[6] = -m[0]  * m[6] * m[15] +
-	          m[0]  * m[7] * m[14] +
-	          m[4]  * m[2] * m[15] -
-	          m[4]  * m[3] * m[14] -
-	          m[12] * m[2] * m[7] +
-	          m[12] * m[3] * m[6];
-
-	tmp[10] = m[0]  * m[5] * m[15] -
-	          m[0]  * m[7] * m[13] -
-	          m[4]  * m[1] * m[15] +
-	          m[4]  * m[3] * m[13] +
-	          m[12] * m[1] * m[7] -
-	          m[12] * m[3] * m[5];
-
-	tmp[14] = -m[0]  * m[5] * m[14] +
-	           m[0]  * m[6] * m[13] +
-	           m[4]  * m[1] * m[14] -
-	           m[4]  * m[2] * m[13] -
-	           m[12] * m[1] * m[6] +
-	           m[12] * m[2] * m[5];
-
-	tmp[3] = -m[1] * m[6] * m[11] +
-	          m[1] * m[7] * m[10] +
-	          m[5] * m[2] * m[11] -
-	          m[5] * m[3] * m[10] -
-	          m[9] * m[2] * m[7] +
-	          m[9] * m[3] * m[6];
-
-	tmp[7] = m[0] * m[6] * m[11] -
-	         m[0] * m[7] * m[10] -
-	         m[4] * m[2] * m[11] +
-	         m[4] * m[3] * m[10] +
-	         m[8] * m[2] * m[7] -
-	         m[8] * m[3] * m[6];
-
-	tmp[11] = -m[0] * m[5] * m[11] +
-	           m[0] * m[7] * m[9] +
-	           m[4] * m[1] * m[11] -
-	           m[4] * m[3] * m[9] -
-	           m[8] * m[1] * m[7] +
-	           m[8] * m[3] * m[5];
-
-	tmp[15] = m[0] * m[5] * m[10] -
-	          m[0] * m[6] * m[9] -
-	          m[4] * m[1] * m[10] +
-	          m[4] * m[2] * m[9] +
-	          m[8] * m[1] * m[6] -
-	          m[8] * m[2] * m[5];
-
-	float det = m[0] * tmp[0] + m[1] * tmp[4] + m[2] * tmp[8] + m[3] * tmp[12];
-
-	if ( fabs( det ) < 1e-9f ) {
-		return qfalse;
-	}
-
-	det = 1.0f / det;
-
-	for ( int i = 0; i < 16; ++i ) {
-		out[i] = tmp[i] * det;
-	}
-	return qtrue;
-}
-
 static uint32_t vk_noise_hash3( uint32_t x, uint32_t y, uint32_t z )
 {
 	uint32_t h = x * 374761393u + y * 668265263u + z * 2246822519u;
@@ -8377,13 +8179,13 @@ static void vk_create_fog_noise_texture( void )
 	copy_region.imageExtent.height = (uint32_t)noise_dim;
 	copy_region.imageExtent.depth = (uint32_t)noise_dim;
 
-	command_buffer = begin_command_buffer();
+	command_buffer = vk_begin_command_buffer();
 	record_image_layout_transition( command_buffer, vk.fog_noise_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
 	qvkCmdCopyBufferToImage( command_buffer, staging_buffer, vk.fog_noise_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy_region );
 	record_image_layout_transition( command_buffer, vk.fog_noise_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
-	end_command_buffer( command_buffer, __func__ );
+	vk_end_command_buffer( command_buffer, __func__ );
 
 	qvkDestroyBuffer( vk.device, staging_buffer, NULL );
 	qvkFreeMemory( vk.device, staging_memory, NULL );
@@ -8532,12 +8334,12 @@ static void vk_create_sun_shadow_resources( void )
 	view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	VK_CHECK( qvkCreateImageView( vk.device, &view_info, NULL, &vk.sun_shadow_color_view ) );
 
-	cmd = begin_command_buffer();
+	cmd = vk_begin_command_buffer();
 	record_image_layout_transition( cmd, vk.sun_shadow_color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
 	record_image_layout_transition( cmd, vk.sun_shadow_image, depth_aspect,
 		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
-	end_command_buffer( cmd, __func__ );
+	vk_end_command_buffer( cmd, __func__ );
 
 	vk.sun_shadow_color_msaa_image = VK_NULL_HANDLE;
 	vk.sun_shadow_color_msaa_view = VK_NULL_HANDLE;
@@ -8795,7 +8597,7 @@ static void vk_create_local_shadow_resources( void )
 		VK_CHECK( qvkCreateImageView( vk.device, &view_info, NULL, &vk.local_point_shadow_color_face_views[layer] ) );
 	}
 
-	cmd = begin_command_buffer();
+	cmd = vk_begin_command_buffer();
 	record_image_layout_transition( cmd, vk.local_spot_shadow_color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
 	record_image_layout_transition( cmd, vk.local_spot_shadow_atlas_image, depth_aspect,
@@ -8804,7 +8606,7 @@ static void vk_create_local_shadow_resources( void )
 		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
 	record_image_layout_transition( cmd, vk.local_point_shadow_array_image, depth_aspect,
 		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
-	end_command_buffer( cmd, __func__ );
+	vk_end_command_buffer( cmd, __func__ );
 }
 
 static void vk_destroy_froxel_images( void )
@@ -9284,7 +9086,7 @@ static void vk_create_froxel_images( void )
 	fluid_view_info.format = VK_FORMAT_R32_UINT;
 	VK_CHECK( qvkCreateImageView( vk.device, &fluid_view_info, NULL, &vk.volumetric_telemetry_view ) );
 
-	VkCommandBuffer command_buffer = begin_command_buffer();
+	VkCommandBuffer command_buffer = vk_begin_command_buffer();
 	VkImageSubresourceRange fluid_clear_range;
 	VkClearColorValue fluid_clear_color;
 	record_image_layout_transition( command_buffer, vk.froxel_volume_image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
@@ -9311,7 +9113,7 @@ static void vk_create_froxel_images( void )
 	}
 	qvkCmdClearColorImage( command_buffer, vk.fluid_divergence_image, VK_IMAGE_LAYOUT_GENERAL, &fluid_clear_color, 1, &fluid_clear_range );
 	qvkCmdClearColorImage( command_buffer, vk.volumetric_telemetry_image, VK_IMAGE_LAYOUT_GENERAL, &fluid_clear_color, 1, &fluid_clear_range );
-	end_command_buffer( command_buffer, __func__ );
+	vk_end_command_buffer( command_buffer, __func__ );
 
 	vk_create_fog_noise_texture();
 }
@@ -10492,7 +10294,7 @@ void vk_upload_image_data( image_t *image, int x, int y, int width, int height, 
 
 	Com_Memcpy( vk.staging_buffer.ptr, buf, buffer_size );
 
-	command_buffer = begin_command_buffer();
+	command_buffer = vk_begin_command_buffer();
 	// record_buffer_memory_barrier( command_buffer, vk_world.staging_buffer, VK_WHOLE_SIZE, 0, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_HOST_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT );
 	if ( update ) {
 		record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0 );
@@ -10501,7 +10303,7 @@ void vk_upload_image_data( image_t *image, int x, int y, int width, int height, 
 	}
 	qvkCmdCopyBufferToImage( command_buffer, vk.staging_buffer.handle, image->handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, num_regions, regions );
 	record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
-	end_command_buffer( command_buffer, __func__ );
+	vk_end_command_buffer( command_buffer, __func__ );
 #endif
 
 	if ( buf != pixels ) {
@@ -10595,7 +10397,7 @@ void vk_upload_cubemap_mip_data( image_t *image, int face_size, int miplevels, c
 	}
 
 	Com_Memcpy( vk.staging_buffer.ptr, pixels, buffer_size );
-	command_buffer = begin_command_buffer();
+	command_buffer = vk_begin_command_buffer();
 #endif
 
 	if ( update ) {
@@ -10612,7 +10414,7 @@ void vk_upload_cubemap_mip_data( image_t *image, int face_size, int miplevels, c
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
 
 #ifndef USE_UPLOAD_QUEUE
-	end_command_buffer( command_buffer, __func__ );
+	vk_end_command_buffer( command_buffer, __func__ );
 #endif
 }
 
@@ -10688,7 +10490,7 @@ void vk_upload_compressed_image_data( image_t *image, int width, int height, int
 		vk_alloc_staging_buffer( size );
 	}
 	Com_Memcpy( vk.staging_buffer.ptr, pixels, size );
-	command_buffer = begin_command_buffer();
+	command_buffer = vk_begin_command_buffer();
 #endif
 
 	if ( update ) {
@@ -10700,7 +10502,7 @@ void vk_upload_compressed_image_data( image_t *image, int width, int height, int
 	record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
 
 #ifndef USE_UPLOAD_QUEUE
-	end_command_buffer( command_buffer, __func__ );
+	vk_end_command_buffer( command_buffer, __func__ );
 #endif
 }
 
@@ -13607,7 +13409,7 @@ void vk_ssr_pass( void )
 	Com_Memcpy( push.projection, backEnd.viewParms.projectionMatrix, sizeof( push.projection ) );
 	{
 		float inv[16];
-		if ( !Mat4Inverse( backEnd.viewParms.projectionMatrix, inv ) )
+		if ( !vk_mat4_inverse( backEnd.viewParms.projectionMatrix, inv ) )
 			Com_Memcpy( inv, backEnd.viewParms.projectionMatrix, sizeof( inv ) );
 		Com_Memcpy( push.invProjection, inv, sizeof( push.invProjection ) );
 	}
@@ -15031,7 +14833,7 @@ void vk_create_brfdlut( void )
     VkRect2D                scissor_rect;
     uint32_t                size;
 
-    command_buffer = begin_command_buffer();
+    command_buffer = vk_begin_command_buffer();
     size = 512;
     
     begin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -15065,7 +14867,7 @@ void vk_create_brfdlut( void )
     qvkCmdDraw( command_buffer, 4, 1, 0, 0 );	
     qvkCmdEndRenderPass( command_buffer );
 
-    end_command_buffer( command_buffer, __func__  );
+    vk_end_command_buffer( command_buffer, __func__  );
 }
 #endif
 
@@ -15638,7 +15440,7 @@ void vk_read_pixels( byte *buffer, uint32_t width, uint32_t height )
 	VK_CHECK(qvkAllocateMemory(vk.device, &alloc_info, NULL, &memory));
 	VK_CHECK(qvkBindImageMemory(vk.device, dstImage, memory, 0));
 
-	command_buffer = begin_command_buffer();
+	command_buffer = vk_begin_command_buffer();
 
 	if ( srcImageLayout != VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL ) {
 		record_image_layout_transition( command_buffer, srcImage,
@@ -15653,9 +15455,9 @@ void vk_read_pixels( byte *buffer, uint32_t width, uint32_t height )
 		VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0 );
 
-	// end_command_buffer( command_buffer, __func__  );
+	// vk_end_command_buffer( command_buffer, __func__  );
 
-	// command_buffer = begin_command_buffer();
+	// command_buffer = vk_begin_command_buffer();
 
 	if ( vk.blitEnabled ) {
 		VkImageBlit region;
@@ -15695,7 +15497,7 @@ void vk_read_pixels( byte *buffer, uint32_t width, uint32_t height )
 		qvkCmdCopyImage( command_buffer, srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region );
 	}
 
-	end_command_buffer( command_buffer, __func__ );
+	vk_end_command_buffer( command_buffer, __func__ );
 
 	// Copy data from destination image to memory buffer.
 	subresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -15774,14 +15576,14 @@ void vk_read_pixels( byte *buffer, uint32_t width, uint32_t height )
 
 	// restore previous layout
 	if ( srcImageLayout != VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL ) {
-		command_buffer = begin_command_buffer();
+		command_buffer = vk_begin_command_buffer();
 
 		record_image_layout_transition( command_buffer, srcImage,
 			VK_IMAGE_ASPECT_COLOR_BIT,
 			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 			srcImageLayout, 0, 0 );
 
-		end_command_buffer( command_buffer, "restore layout" );
+		vk_end_command_buffer( command_buffer, "restore layout" );
 	}
 }
 
@@ -16412,12 +16214,12 @@ static void vk_create_prefilter_framebuffer( filterDef *def ) {
 	}
 
 
-	command_buffer = begin_command_buffer();
+	command_buffer = vk_begin_command_buffer();
 	record_image_layout_transition( command_buffer, def->offscreen.image, VK_IMAGE_ASPECT_COLOR_BIT, 
 		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
 		0, 0 );
 
-	end_command_buffer( command_buffer, __func__  );
+	vk_end_command_buffer( command_buffer, __func__  );
 }
 
 static void vk_create_prefilter_pipeline( filterDef *def ) 
@@ -16600,7 +16402,7 @@ void vk_clear_cube_color( image_t *image, VkClearColorValue color )
 	desc.baseArrayLayer = 0;
 	desc.layerCount     = VK_REMAINING_ARRAY_LAYERS; //image->layers;
 
-	command_buffer = begin_command_buffer();
+	command_buffer = vk_begin_command_buffer();
 
 	record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, 
 		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0 );
@@ -16611,7 +16413,7 @@ void vk_clear_cube_color( image_t *image, VkClearColorValue color )
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 		0, 0 );
 
-	end_command_buffer( command_buffer, __func__ );
+	vk_end_command_buffer( command_buffer, __func__ );
 }
 
 static void vk_copy_to_cubemap( filterDef *def, VkImage *image, uint32_t mipLevel, uint32_t size, VkCommandBuffer command_buffer ) 
@@ -16753,7 +16555,7 @@ static qboolean vk_extract_sh_coeffs( const image_t *irradiance_image, vec4_t sh
 	// Create staging buffer for readback
 	vk_create_readback_buffer( bufferSize, &stagingBuffer, &stagingMemory, &data );
 
-	command_buffer = begin_command_buffer();
+	command_buffer = vk_begin_command_buffer();
 
 	// Transition image to transfer src
 	record_image_layout_transition( command_buffer, irradiance_image->handle, VK_IMAGE_ASPECT_COLOR_BIT,
@@ -16778,7 +16580,7 @@ static qboolean vk_extract_sh_coeffs( const image_t *irradiance_image, vec4_t sh
 	record_image_layout_transition( command_buffer, irradiance_image->handle, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
 
-	end_command_buffer( command_buffer, "sh extraction" );
+	vk_end_command_buffer( command_buffer, "sh extraction" );
 
 	pixels = (float *)data;
 
@@ -16853,11 +16655,11 @@ void vk_generate_cubemaps( cubemap_t *cube )
 
 	vk_end_render_pass();
 
-	command_buffer = begin_command_buffer();
+	command_buffer = vk_begin_command_buffer();
 	record_image_layout_transition( command_buffer, vk.cubeMap.color_image, VK_IMAGE_ASPECT_COLOR_BIT, 
 		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
 		0, 0 );
-	end_command_buffer( command_buffer, __func__  );
+	vk_end_command_buffer( command_buffer, __func__  );
 
 	for ( i = 0; i < PREFILTEREDENV + 1; i++ ) 
 	{
@@ -16938,11 +16740,11 @@ void vk_generate_cubemaps( cubemap_t *cube )
 	}
 #endif
 
-	command_buffer = begin_command_buffer();
+	command_buffer = vk_begin_command_buffer();
 	record_image_layout_transition( command_buffer, vk.cubeMap.color_image, VK_IMAGE_ASPECT_COLOR_BIT, 
 		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
 		0, 0 );
-	end_command_buffer( command_buffer, __func__  );
+	vk_end_command_buffer( command_buffer, __func__  );
 
 	vk_begin_main_render_pass();
 }
