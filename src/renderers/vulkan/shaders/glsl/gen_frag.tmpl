@@ -127,6 +127,18 @@ layout (constant_id = 10) const int acff = 0; // NONE, RGB, RGBA, ALPHA
 #ifdef USE_VK_PBR
 #define PI 3.1415926535897932384626433832795
 
+/*
+ * PBR / Fresnel – research references (2023–2026)
+ * -----------------------------------------------
+ * • Belcour et al. SIGGRAPH 2020: "Bringing an Accurate Fresnel to Real-Time Rendering:
+ *   a Preintegrable Decomposition" – RGBA LUT for accurate Fresnel; Schlick is an approx.
+ * • Ichikawa et al. CVPR 2023: "Fresnel Microfacet BRDF" – unifies surface/body reflection.
+ * • EGSR 2025: "Perceived Quality of BRDF Models" – ITP color space correlates with quality.
+ * • SIGGRAPH 2025 PBS Course (Weidlich): "Bridging the Gap Between Offline and Real Time
+ *   with Neural Materials" – offline vs real-time material fidelity.
+ * • 2026: Neural irradiance, Gaussian splatting, SER; PBR core (GGX, Schlick) remains standard.
+ */
+
 #extension GL_GOOGLE_include_directive : require
 #include "glint_ndf.glsl"
 
@@ -233,6 +245,15 @@ vec3 CalcDiffuse( in vec3 diffuse, in float NE, in float NL,
 	if ( useDisneyDiffuse )
 		return Diffuse_Burley( diffuse, NE, NL, LH, roughness );
 	return Diffuse_Lambert( diffuse );
+}
+
+// F0 from IOR (Belcour/Gulbrandsen): F0 = ((n1-n2)/(n1+n2))^2 for dielectrics.
+// n1=1 (air), n2=IOR. e.g. IOR 1.5 -> F0 ~0.04. Use when material provides explicit IOR.
+float F0_from_IOR( in float ior )
+{
+	float n = clamp( ior, 1.0, 3.0 );
+	float f = ( 1.0 - n ) / ( 1.0 + n );
+	return f * f;
 }
 
 // Schlick Fresnel (2025 PBR standard). F0 = reflectance at normal incidence.
@@ -912,6 +933,7 @@ void main() {
 			ORMS.xyzw *= vec4( specularScale_z, specularScale_w, specularScale_x, specularScale_y );
 			metalness = clamp( ORMS.z, 0.0, 1.0 );
 
+			// 0.04 ≈ F0_from_IOR(1.5); use F0_from_IOR when material has explicit IOR (Belcour 2020).
 			float dielectricF0 = 0.04 * clamp( ORMS.w, 0.0, 1.0 );
 			specular.rgb = mix( vec3( dielectricF0 ), diffuse.rgb, metalness );
 			diffuse.rgb *= vec3( 1.0 - metalness );
