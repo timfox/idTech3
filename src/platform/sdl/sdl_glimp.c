@@ -539,6 +539,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 	else
 	{
 		Com_Printf( "Couldn't get a visual: %s\n", SDL_GetError() );
+		Com_Printf( "SDL video driver: %s\n", SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "(none)" );
 		return RSERR_INVALID_MODE;
 	}
 
