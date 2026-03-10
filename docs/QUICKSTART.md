@@ -4,7 +4,21 @@ Get the idTech3 engine running with game data in a few steps.
 
 ## 1. Download
 
-Get the latest release from [Releases](https://github.com/timfox/idTech3/releases). Download the archive for your platform (e.g. `idtech3-v1.0.0-linux-x86_64.zip`).
+Get the latest release from [Releases](https://github.com/timfox/idTech3/releases). Download the archive for your platform:
+
+| Platform | Archive |
+|----------|---------|
+| Linux x86_64 | `idtech3-<tag>-linux-x86_64.zip` |
+| Linux ARM64 (aarch64) | `idtech3-<tag>-linux-aarch64.zip` |
+| Linux ARMv7 | `idtech3-<tag>-linux-armv7.zip` |
+| Windows x64 (MSVC) | `idtech3-<tag>-windows-msvc-x86_64.zip` |
+| Windows ARM64 (MSVC) | `idtech3-<tag>-windows-msvc-arm64.zip` |
+| Windows x64 (MinGW) | `idtech3-<tag>-windows-gcc-x86_64.zip` |
+| macOS Apple Silicon | `idtech3-<tag>-macos-aarch64.zip` |
+| Android arm64-v8a | `idtech3-<tag>-android-arm64-v8a.zip` |
+| Android armeabi-v7a | `idtech3-<tag>-android-armeabi-v7a.zip` |
+
+Binaries are built by CI when a release is published; allow 15–30 minutes after publishing for all platform archives to appear.
 
 Extract the archive. You should see:
 - `idtech3` (or `idtech3.exe` on Windows) — game client
