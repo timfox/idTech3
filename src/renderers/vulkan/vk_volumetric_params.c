@@ -53,136 +53,6 @@ static float vk_compute_global_base_density( float rawDensity, int fogShowcase, 
 	return Com_Clamp( 0.0f, 0.02f, density );
 }
 
-static qboolean vk_volumetric_mat4_inverse( const float *m, float *out )
-{
-	float tmp[16];
-	float det;
-	int i;
-
-	tmp[0] = m[5]  * m[10] * m[15] -
-	         m[5]  * m[11] * m[14] -
-	         m[9]  * m[6]  * m[15] +
-	         m[9]  * m[7]  * m[14] +
-	         m[13] * m[6]  * m[11] -
-	         m[13] * m[7]  * m[10];
-
-	tmp[4] = -m[4]  * m[10] * m[15] +
-	          m[4]  * m[11] * m[14] +
-	          m[8]  * m[6]  * m[15] -
-	          m[8]  * m[7]  * m[14] -
-	          m[12] * m[6]  * m[11] +
-	          m[12] * m[7]  * m[10];
-
-	tmp[8] = m[4]  * m[9] * m[15] -
-	         m[4]  * m[11] * m[13] -
-	         m[8]  * m[5] * m[15] +
-	         m[8]  * m[7] * m[13] +
-	         m[12] * m[5] * m[11] -
-	         m[12] * m[7] * m[9];
-
-	tmp[12] = -m[4]  * m[9] * m[14] +
-	           m[4]  * m[10] * m[13] +
-	           m[8]  * m[5] * m[14] -
-	           m[8]  * m[6] * m[13] -
-	           m[12] * m[5] * m[10] +
-	           m[12] * m[6] * m[9];
-
-	tmp[1] = -m[1]  * m[10] * m[15] +
-	          m[1]  * m[11] * m[14] +
-	          m[9]  * m[2] * m[15] -
-	          m[9]  * m[3] * m[14] -
-	          m[13] * m[2] * m[11] +
-	          m[13] * m[3] * m[10];
-
-	tmp[5] = m[0]  * m[10] * m[15] -
-	         m[0]  * m[11] * m[14] -
-	         m[8]  * m[2] * m[15] +
-	         m[8]  * m[3] * m[14] +
-	         m[12] * m[2] * m[11] -
-	         m[12] * m[3] * m[10];
-
-	tmp[9] = -m[0]  * m[9] * m[15] +
-	          m[0]  * m[11] * m[13] +
-	          m[8]  * m[1] * m[15] -
-	          m[8]  * m[3] * m[13] -
-	          m[12] * m[1] * m[11] +
-	          m[12] * m[3] * m[9];
-
-	tmp[13] = m[0]  * m[9] * m[14] -
-	          m[0]  * m[10] * m[13] -
-	          m[8]  * m[1] * m[14] +
-	          m[8]  * m[2] * m[13] +
-	          m[12] * m[1] * m[10] -
-	          m[12] * m[2] * m[9];
-
-	tmp[2] = m[1]  * m[6] * m[15] -
-	         m[1]  * m[7] * m[14] -
-	         m[5]  * m[2] * m[15] +
-	         m[5]  * m[3] * m[14] +
-	         m[13] * m[2] * m[7] -
-	         m[13] * m[3] * m[6];
-
-	tmp[6] = -m[0]  * m[6] * m[15] +
-	          m[0]  * m[7] * m[14] +
-	          m[4]  * m[2] * m[15] -
-	          m[4]  * m[3] * m[14] -
-	          m[12] * m[2] * m[7] +
-	          m[12] * m[3] * m[6];
-
-	tmp[10] = m[0]  * m[5] * m[15] -
-	          m[0]  * m[7] * m[13] -
-	          m[4]  * m[1] * m[15] +
-	          m[4]  * m[3] * m[13] +
-	          m[12] * m[1] * m[7] -
-	          m[12] * m[3] * m[5];
-
-	tmp[14] = -m[0]  * m[5] * m[14] +
-	           m[0]  * m[6] * m[13] +
-	           m[4]  * m[1] * m[14] -
-	           m[4]  * m[2] * m[13] -
-	           m[12] * m[1] * m[6] +
-	           m[12] * m[2] * m[5];
-
-	tmp[3] = -m[1] * m[6] * m[11] +
-	          m[1] * m[7] * m[10] +
-	          m[5] * m[2] * m[11] -
-	          m[5] * m[3] * m[10] -
-	          m[9] * m[2] * m[7] +
-	          m[9] * m[3] * m[6];
-
-	tmp[7] = m[0] * m[6] * m[11] -
-	         m[0] * m[7] * m[10] -
-	         m[4] * m[2] * m[11] +
-	         m[4] * m[3] * m[10] +
-	         m[8] * m[2] * m[7] -
-	         m[8] * m[3] * m[6];
-
-	tmp[11] = -m[0] * m[5] * m[11] +
-	           m[0] * m[7] * m[9] +
-	           m[4] * m[1] * m[11] -
-	           m[4] * m[3] * m[9] -
-	           m[8] * m[1] * m[7] +
-	           m[8] * m[3] * m[5];
-
-	tmp[15] = m[0] * m[5] * m[10] -
-	          m[0] * m[6] * m[9] -
-	          m[4] * m[1] * m[10] +
-	          m[4] * m[2] * m[9] +
-	          m[8] * m[1] * m[6] -
-	          m[8] * m[2] * m[5];
-
-	det = m[0] * tmp[0] + m[1] * tmp[4] + m[2] * tmp[8] + m[3] * tmp[12];
-	if ( fabsf( det ) < 1e-9f ) {
-		return qfalse;
-	}
-
-	det = 1.0f / det;
-	for ( i = 0; i < 16; i++ ) {
-		out[i] = tmp[i] * det;
-	}
-	return qtrue;
-}
-
 void vk_update_volumetric_params( void )
 {
 	if ( !vk.volumetric_params_ptr ) {
@@ -265,10 +135,10 @@ void vk_update_volumetric_params( void )
 	vk_prev_volumetric_time_valid = qtrue;
 	vk_volumetric_noise_time += delta_time;
 
-	if ( !vk_volumetric_mat4_inverse( projection, params.invProj ) ) {
+	if ( !vk_mat4_inverse( projection, params.invProj ) ) {
 		Com_Memcpy( params.invProj, projection, sizeof( params.invProj ) );
 	}
-	if ( !vk_volumetric_mat4_inverse( view, params.invView ) ) {
+	if ( !vk_mat4_inverse( view, params.invView ) ) {
 		Com_Memcpy( params.invView, view, sizeof( params.invView ) );
 	}
 	Com_Memcpy( params.proj, projection, sizeof( params.proj ) );
