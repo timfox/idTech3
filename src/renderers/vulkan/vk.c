@@ -2262,7 +2262,6 @@ static void get_present_format( int present_bits, VkFormat *bgr, VkFormat *rgb )
 	}
 }
 
-static qboolean vk_format_is_srgb( VkFormat format );
 
 static qboolean vk_select_surface_format( VkPhysicalDevice physical_device, VkSurfaceKHR surface )
 {
@@ -10769,18 +10768,6 @@ static void set_shader_stage_desc(VkPipelineShaderStageCreateInfo *desc, VkShade
 	desc->module = shader_module;
 	desc->pName = entry;
 	desc->pSpecializationInfo = NULL;
-}
-
-
-static qboolean vk_format_is_srgb( VkFormat format ) {
-	switch ( format ) {
-		case VK_FORMAT_B8G8R8A8_SRGB:
-		case VK_FORMAT_R8G8B8A8_SRGB:
-		case VK_FORMAT_A8B8G8R8_SRGB_PACK32:
-			return qtrue;
-		default:
-			return qfalse;
-	}
 }
 
 

@@ -24,6 +24,9 @@ const char *vk_result_string( VkResult code );
 /* VkFormat to string for logging. */
 const char *vk_format_string( VkFormat format );
 
+/* True if format is sRGB (e.g. VK_FORMAT_B8G8R8A8_SRGB). */
+qboolean vk_format_is_srgb( VkFormat format );
+
 /* Find memory type index for allocation. Aborts on failure. */
 uint32_t vk_find_memory_type( VkPhysicalDevice physical_device, uint32_t memory_type_bits, VkMemoryPropertyFlags properties );
 
