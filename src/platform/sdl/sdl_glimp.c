@@ -339,6 +339,11 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 	if ( depthBits < 24 )
 		stencilBits = 0;
 
+#ifdef USE_VULKAN_API
+	if ( vulkan )
+		SDL_GL_ResetAttributes();  /* avoid OpenGL visual hints interfering with Vulkan window on X11/aarch64 */
+#endif
+
 	for ( i = 0; i < 16; i++ )
 	{
 		int testColorBits, testDepthBits, testStencilBits;
