@@ -538,7 +538,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 	}
 	else
 	{
-		Com_Printf( "Couldn't get a visual\n" );
+		Com_Printf( "Couldn't get a visual: %s\n", SDL_GetError() );
 		return RSERR_INVALID_MODE;
 	}
 
