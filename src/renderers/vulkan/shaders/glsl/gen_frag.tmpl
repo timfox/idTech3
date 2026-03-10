@@ -37,7 +37,7 @@ layout(set = 0, binding = 0) uniform UBO {
 	vec4 pbrTransmissionScale;
 	vec4 pbrSubsurfaceColor;
 	vec4 pbrSubsurfaceParams;
-	vec4 pbrAdvancedParams; // x: multi-scatter toggle, y: multi-scatter strength
+	vec4 pbrAdvancedParams; // x: multi-scatter toggle, y: multi-scatter strength, z: roughness Fresnel
 	vec4 pbrGlintParams0;
 	vec4 pbrGlintParams1;
 	vec4 pbrGlintFlags;
@@ -235,10 +235,21 @@ vec3 CalcDiffuse( in vec3 diffuse, in float NE, in float NL,
 	return Diffuse_Lambert( diffuse );
 }
 
-vec3 F_Schlick( in vec3 SpecularColor, in float VH )
+// Schlick Fresnel (2025 PBR standard). F0 = reflectance at normal incidence.
+// F = F0 + (1 - F0) * (1 - V·H)^5. Use Pow5 for consistency with Disney diffuse.
+vec3 F_Schlick( in vec3 F0, in float VH )
 {
-	float Fc = pow(1 - VH, 5);
-	return SpecularColor + (1.0 - SpecularColor) * Fc;
+	float Fc = Pow5( 1.0 - clamp( VH, 0.0, 1.0 ) );
+	return F0 + ( 1.0 - F0 ) * Fc;
+}
+
+// Roughness-dependent Fresnel (Disney/Epic): very rough surfaces attenuate grazing Fresnel.
+// Use when pbrAdvancedParams.z > 0.5 for improved energy conservation on rough materials.
+vec3 F_SchlickRoughness( in vec3 F0, in float VH, in float roughness )
+{
+	float Fc = Pow5( 1.0 - clamp( VH, 0.0, 1.0 ) );
+	float atten = 1.0 - roughness * roughness;  // attenuate Fresnel kick for rough surfaces
+	return F0 + ( 1.0 - F0 ) * Fc * atten;
 }
 
 float D_GGX( in float NH, in float alpha )
@@ -279,7 +290,9 @@ vec3 CalcSpecular( in vec3 specular, in vec3 H, in float NH, in float NL,
 	}
 
 	float alpha = max( roughness * roughness, 0.001 );
-	vec3  F = F_Schlick(specular, VH);
+	vec3  F = ( pbrAdvancedParams.z > 0.5 )
+		? F_SchlickRoughness( specular, VH, roughness )
+		: F_Schlick( specular, VH );
 	float D = D_GGX(NH, alpha);
 	float V = CalcVisibility(NL, NE, alpha);
 
@@ -956,7 +969,11 @@ void main() {
 
 	float NH = clamp( dot( N, H ), 0.0, 1.0 );
 	float VH = clamp( dot( E, H ), 0.0, 1.0 );
-	vec3  kS = clamp( F_Schlick( specular.rgb, VH ), vec3(0.0), vec3(1.0) );
+	vec3  kS = clamp(
+		( pbrAdvancedParams.z > 0.5 )
+			? F_SchlickRoughness( specular.rgb, VH, roughness )
+			: F_Schlick( specular.rgb, VH ),
+		vec3(0.0), vec3(1.0) );
 	vec3  kD = ( vec3( 1.0 ) - kS ) * ( 1.0 - metalness );
 	Fd *= kD;
 

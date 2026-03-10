@@ -107,6 +107,7 @@ cvar_t	*r_pbr_debug;
 cvar_t	*r_pbr_packedPreferred;
 cvar_t	*r_pbr_multiScatter;
 cvar_t	*r_pbr_multiScatterStrength;
+cvar_t	*r_pbr_fresnelRoughness;
 cvar_t	*r_glint;
 cvar_t	*r_glintMode;
 cvar_t	*r_glintDensity;
@@ -136,6 +137,7 @@ cvar_t	*r_deluxeSpecular;
 #endif
 #endif
 cvar_t   *r_vk_pipeline_debug;
+cvar_t	*r_vk_colorWriteMaskDynamic;
 cvar_t	*r_morph;
 cvar_t	*r_morphMaxActive;
 cvar_t	*r_morphLodStart;
@@ -2066,6 +2068,10 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_pbr_multiScatterStrength, "0.0", "2.0", CV_FLOAT );
 	ri.Cvar_SetDescription( r_pbr_multiScatterStrength, "Scales specular IBL multiple-scattering compensation intensity." );
 
+	r_pbr_fresnelRoughness = ri.Cvar_Get( "r_pbr_fresnelRoughness", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbr_fresnelRoughness, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pbr_fresnelRoughness, "Enable roughness-dependent Fresnel (2025 PBR). Attenuates grazing Fresnel on rough surfaces for better energy conservation." );
+
 	r_baseNormalX	= ri.Cvar_Get("r_baseNormalX",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );
 	r_baseNormalY	= ri.Cvar_Get("r_baseNormalY",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );
 	r_baseParallax	= ri.Cvar_Get("r_baseParallax",		"0.05",	CVAR_ARCHIVE | CVAR_LATCH );
@@ -2962,6 +2968,10 @@ static void R_Register( void )
 	r_vk_pipeline_debug = ri.Cvar_Get( "r_vk_pipeline_debug", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_vk_pipeline_debug, "Print Vulkan pipeline creation info (discard mode, shader type, fog, etc)." );
 	ri.Cvar_SetGroup( r_vk_pipeline_debug, CVG_RENDERER );
+
+	r_vk_colorWriteMaskDynamic = ri.Cvar_Get( "r_vk_colorWriteMaskDynamic", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_vk_colorWriteMaskDynamic, "Enable VK_EXT_extended_dynamic_state3 for RB_ColorMask. Requires vid_restart. Disabled by default (OIT crash on some drivers)." );
+	ri.Cvar_SetGroup( r_vk_colorWriteMaskDynamic, CVG_RENDERER );
 
 	if ( glConfig.vidWidth )
 		return;

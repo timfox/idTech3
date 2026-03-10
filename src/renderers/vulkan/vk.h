@@ -271,7 +271,7 @@ typedef struct vkUniform_s {
 	vec4_t pbrTransmissionScale;
 	vec4_t pbrSubsurfaceColor;
 	vec4_t pbrSubsurfaceParams;
-	vec4_t pbrAdvancedParams; // x: multi-scatter toggle, y: multi-scatter strength
+	vec4_t pbrAdvancedParams; // x: multi-scatter toggle, y: multi-scatter strength, z: roughness Fresnel
 	vec4_t pbrGlintParams0;
 	vec4_t pbrGlintParams1;
 	vec4_t pbrGlintFlags;
@@ -1321,3 +1321,7 @@ extern PFN_vkBeginCommandBuffer		qvkBeginCommandBuffer;
 extern PFN_vkEndCommandBuffer		qvkEndCommandBuffer;
 extern PFN_vkQueueSubmit			qvkQueueSubmit;
 extern PFN_vkFreeCommandBuffers		qvkFreeCommandBuffers;
+extern PFN_vkCreateSampler			qvkCreateSampler;
+extern PFN_vkDestroySampler			qvkDestroySampler;
+extern PFN_vkCreateSampler			qvkCreateSampler;
+extern PFN_vkDestroySampler			qvkDestroySampler;
