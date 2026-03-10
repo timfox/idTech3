@@ -9562,14 +9562,11 @@ void vk_shutdown( refShutdownCode_t code )
 	int i, j, k, l;
 #endif
 
-	if ( qvkQueuePresentKHR == NULL ) { // not fully initialized
+	if ( qvkQueuePresentKHR == NULL ) { /* not fully initialized */
 		goto __cleanup;
 	}
-	if ( vk.device_lost ) {
-		/* GPU lost; skip per-resource destroy (they fail), go straight to vkDestroyDevice */
-		goto __cleanup;
-	}
-
+	/* Always run full destroy sequence for VUID-05137 compliance.
+	 * When device_lost, destroy calls may return VK_ERROR_DEVICE_LOST but we still attempt them. */
 	vk_destroy_framebuffers();
 
 	vk_destroy_pipelines( qtrue ); // reset counter

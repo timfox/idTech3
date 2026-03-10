@@ -709,7 +709,7 @@ jobs:
 
   release-attach:
     name: Attach artifacts to release
-    if: github.event_name == 'release' && github.event.action == 'published'
+    if: always() && !cancelled() && github.event_name == 'release' && github.event.action == 'published'
     needs: [windows-msys, windows-msvc, ubuntu-x86_64, ubuntu-arm, macos, android]
     runs-on: ubuntu-24.04
     permissions:
@@ -720,16 +720,20 @@ jobs:
           path: artifacts
 
       - name: Create release archives
+        id: archive
         run: |
           mkdir -p dist
           tag="${{ github.event.release.tag_name }}"
           for dir in artifacts/*/; do
+            [ -d "$dir" ] || continue
             name=$(basename "$dir")
             zip -r "dist/idtech3-${tag}-${name}.zip" "$dir"
           done
           ls -la dist/
+          echo "count=$(ls dist/*.zip 2>/dev/null | wc -l | tr -d ' ')" >> $GITHUB_OUTPUT
 
       - name: Attach binaries to release
+        if: steps.archive.outputs.count != '0'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.release.tag_name }}
