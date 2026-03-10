@@ -593,6 +593,12 @@ static rserr_t GLimp_StartDriverAndSetMode( int mode, const char *modeFS, qboole
 	{
 		const char *driverName;
 
+#ifdef USE_VULKAN_API
+		if ( vulkan ) {
+			SDL_SetHint( SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR, "0" );
+		}
+#endif
+
 		if ( SDL_Init( SDL_INIT_VIDEO ) != 0 )
 		{
 			Com_Printf( "SDL_Init( SDL_INIT_VIDEO ) FAILED (%s)\n", SDL_GetError() );
