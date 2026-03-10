@@ -1524,6 +1524,7 @@ extern cvar_t	*r_pbr_debug;
 extern cvar_t	*r_pbr_packedPreferred;
 extern cvar_t	*r_pbr_multiScatter;
 extern cvar_t	*r_pbr_multiScatterStrength;
+extern cvar_t	*r_pbr_fresnelRoughness;
 #ifdef VK_CUBEMAP
 extern cvar_t	*r_pbr_iblIrradianceSize;
 extern cvar_t	*r_pbr_iblPrefilterSize;
@@ -1720,6 +1721,7 @@ extern cvar_t	*r_fboDebug;
 extern cvar_t	*r_froxelDebug;
 extern cvar_t	*r_vk_swapchain_srgb;
 extern cvar_t	*r_vk_pipeline_debug;
+extern cvar_t	*r_vk_colorWriteMaskDynamic;
 extern cvar_t	*r_morph;
 extern cvar_t	*r_morphMaxActive;
 extern cvar_t	*r_morphLodStart;
