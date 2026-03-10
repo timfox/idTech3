@@ -444,7 +444,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 
 		if ( ( SDL_window = SDL_CreateWindow( cl_title, x, y, config->vidWidth, config->vidHeight, flags ) ) == NULL )
 		{
-			Com_DPrintf( "SDL_CreateWindow failed: %s\n", SDL_GetError() );
+			Com_Printf( "SDL_CreateWindow failed: %s\n", SDL_GetError() );
 			continue;
 		}
 
@@ -731,6 +731,11 @@ void VKimp_Init( glconfig_t *config )
 
 	Com_DPrintf( "VKimp_Init()\n" );
 
+	Com_Printf( "SDL video driver: %s\n", SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "(none)" );
+	if ( SDL_Vulkan_LoadLibrary( NULL ) != 0 )
+		Com_Printf( "SDL Vulkan load check: %s\n", SDL_GetError() );
+	/* else leave loaded for window creation and GetVkGetInstanceProcAddr */
+
 	in_nograb = Cvar_Get( "in_nograb", "0", CVAR_ARCHIVE );
 	Cvar_SetDescription( in_nograb, "Do not capture mouse in game, may be useful during online streaming." );
 
@@ -747,7 +752,7 @@ void VKimp_Init( glconfig_t *config )
 	{
 		if ( err == RSERR_FATAL_ERROR )
 		{
-			Com_Error( ERR_FATAL, "VKimp_Init() - could not load Vulkan subsystem" );
+			Com_Error( ERR_FATAL, "VKimp_Init() - could not load Vulkan subsystem: %s", SDL_GetError() );
 			return;
 		}
 
@@ -756,8 +761,7 @@ void VKimp_Init( glconfig_t *config )
 		err = GLimp_StartDriverAndSetMode( 3, "", r_fullscreen->integer, qtrue /* Vulkan */ );
 		if( err != RSERR_OK )
 		{
-			// Nothing worked, give up
-			Com_Error( ERR_FATAL, "VKimp_Init() - could not load Vulkan subsystem" );
+			Com_Error( ERR_FATAL, "VKimp_Init() - could not load Vulkan subsystem: %s", SDL_GetError() );
 			return;
 		}
 	}
