@@ -3,7 +3,11 @@
 Copyright (C) 1999-2005 Id Software, Inc.
 
 This file is part of Quake III Arena source code.
+*/
 
+#define _GNU_SOURCE
+
+/*
 Quake III Arena source code is free software; you can redistribute it
 and/or modify it under the terms of the GNU General Public License as
 published by the Free Software Foundation; either version 2 of the License,
@@ -27,6 +31,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #if defined(_WIN32) && defined(_MSC_VER)
 #include <windows.h>
+#else
+#include <stdlib.h>
 #endif
 
 #ifdef USE_VULKAN_API
@@ -592,12 +598,28 @@ static rserr_t GLimp_StartDriverAndSetMode( int mode, const char *modeFS, qboole
 	if ( !SDL_WasInit( SDL_INIT_VIDEO ) )
 	{
 		const char *driverName;
+		const char *vidDriver;
 
+		vidDriver = r_vid_driver ? r_vid_driver->string : "auto";
+#if defined(__arm__) || defined(__aarch64__)
+		/* Raspberry Pi / ARM: Vulkan with KMSDRM has known issues; prefer X11 */
+		if ( vulkan && ( !vidDriver || !vidDriver[0] || ( Q_stricmp( vidDriver, "auto" ) == 0 ) ) )
+			vidDriver = "x11";
+#endif
 #ifdef USE_VULKAN_API
 		if ( vulkan ) {
 			SDL_SetHint( SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR, "0" );
 		}
 #endif
+		if ( vidDriver && vidDriver[0] && Q_stricmp( vidDriver, "auto" ) != 0 ) {
+#ifndef _WIN32
+			{
+				static char envBuf[64];
+				Com_sprintf( envBuf, sizeof( envBuf ), "SDL_VIDEODRIVER=%s", vidDriver );
+				putenv( envBuf );
+			}
+#endif
+		}
 
 		if ( SDL_Init( SDL_INIT_VIDEO ) != 0 )
 		{
