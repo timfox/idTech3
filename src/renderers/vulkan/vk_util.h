@@ -46,6 +46,9 @@ qboolean vk_parse_fog_tint_string( const char *s, vec3_t out );
 /* Maximum absolute difference between two 4x4 matrices (float[16]). */
 float vk_matrix_max_abs_diff( const float *a, const float *b );
 
+/* Invert 4x4 matrix m into out. Returns qfalse if singular (det near zero). */
+qboolean vk_mat4_inverse( const float *m, float *out );
+
 /* Normalize RGB by max component; if zero, set to (1,1,1). */
 void vk_normalize_rgb_luma_safe( vec3_t io );
 
