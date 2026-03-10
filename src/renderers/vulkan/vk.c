@@ -19,6 +19,7 @@
 #include "vk_sync.h"
 #include "vk_cmd.h"
 #include "vk_device.h"
+#include "vk_swapchain.h"
 #include <math.h>
 
 /* VK_EXT_extended_dynamic_state3: for vkCmdSetColorWriteMaskEXT (RB_ColorMask) */
@@ -147,9 +148,9 @@ PFN_vkGetPhysicalDeviceMemoryProperties			qvkGetPhysicalDeviceMemoryProperties;
 static PFN_vkGetPhysicalDeviceProperties				qvkGetPhysicalDeviceProperties;
 static PFN_vkGetPhysicalDeviceQueueFamilyProperties		qvkGetPhysicalDeviceQueueFamilyProperties;
 static PFN_vkDestroySurfaceKHR							qvkDestroySurfaceKHR;
-static PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR	qvkGetPhysicalDeviceSurfaceCapabilitiesKHR;
+PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR	qvkGetPhysicalDeviceSurfaceCapabilitiesKHR;
 PFN_vkGetPhysicalDeviceSurfaceFormatsKHR			qvkGetPhysicalDeviceSurfaceFormatsKHR;
-static PFN_vkGetPhysicalDeviceSurfacePresentModesKHR	qvkGetPhysicalDeviceSurfacePresentModesKHR;
+PFN_vkGetPhysicalDeviceSurfacePresentModesKHR	qvkGetPhysicalDeviceSurfacePresentModesKHR;
 static PFN_vkGetPhysicalDeviceSurfaceSupportKHR			qvkGetPhysicalDeviceSurfaceSupportKHR;
 #ifdef USE_VK_VALIDATION
 static PFN_vkCreateDebugReportCallbackEXT				qvkCreateDebugReportCallbackEXT;
@@ -196,7 +197,7 @@ static PFN_vkCreateFramebuffer							qvkCreateFramebuffer;
 static PFN_vkCreateComputePipelines						qvkCreateComputePipelines;
 PFN_vkCreateGraphicsPipelines					qvkCreateGraphicsPipelines;
 static PFN_vkCreateImage								qvkCreateImage;
-static PFN_vkCreateImageView							qvkCreateImageView;
+PFN_vkCreateImageView							qvkCreateImageView;
 static PFN_vkCreatePipelineLayout						qvkCreatePipelineLayout;
 static PFN_vkCreatePipelineCache						qvkCreatePipelineCache;
 static PFN_vkCreateQueryPool							qvkCreateQueryPool;
@@ -244,9 +245,9 @@ static PFN_vkUnmapMemory								qvkUnmapMemory;
 PFN_vkUpdateDescriptorSets							qvkUpdateDescriptorSets;
 static PFN_vkWaitForFences								qvkWaitForFences;
 static PFN_vkAcquireNextImageKHR						qvkAcquireNextImageKHR;
-static PFN_vkCreateSwapchainKHR							qvkCreateSwapchainKHR;
+PFN_vkCreateSwapchainKHR							qvkCreateSwapchainKHR;
 static PFN_vkDestroySwapchainKHR						qvkDestroySwapchainKHR;
-static PFN_vkGetSwapchainImagesKHR						qvkGetSwapchainImagesKHR;
+PFN_vkGetSwapchainImagesKHR						qvkGetSwapchainImagesKHR;
 static PFN_vkQueuePresentKHR							qvkQueuePresentKHR;
 
 static PFN_vkGetBufferMemoryRequirements2KHR			qvkGetBufferMemoryRequirements2KHR;
@@ -361,244 +362,6 @@ void vk_set_object_name( uint64_t obj, const char *objName, VkDebugReportObjectT
 	}
 }
 
-
-static void vk_create_swapchain( VkPhysicalDevice physical_device, VkDevice device, VkSurfaceKHR surface, VkSurfaceFormatKHR surface_format, VkSwapchainKHR *swapchain, qboolean verbose ) {
-	VkImageViewCreateInfo view;
-	VkSurfaceCapabilitiesKHR surface_caps;
-	VkExtent2D image_extent;
-	uint32_t present_mode_count, i;
-	VkPresentModeKHR present_mode;
-	VkPresentModeKHR *present_modes;
-	uint32_t image_count;
-	VkSwapchainCreateInfoKHR desc;
-	qboolean mailbox_supported = qfalse;
-	qboolean immediate_supported = qfalse;
-	qboolean fifo_relaxed_supported = qfalse;
-	int v;
-
-	VK_CHECK( qvkGetPhysicalDeviceSurfaceCapabilitiesKHR( physical_device, surface, &surface_caps ) );
-
-	image_extent = surface_caps.currentExtent;
-	if ( image_extent.width == 0xffffffff && image_extent.height == 0xffffffff ) {
-		image_extent.width = MIN( surface_caps.maxImageExtent.width, MAX( surface_caps.minImageExtent.width, (uint32_t) glConfig.vidWidth ) );
-		image_extent.height = MIN( surface_caps.maxImageExtent.height, MAX( surface_caps.minImageExtent.height, (uint32_t) glConfig.vidHeight ) );
-	}
-
-	vk.clearAttachment = qtrue;
-
-	if ( !vk.fboActive ) {
-		// VK_IMAGE_USAGE_TRANSFER_DST_BIT is required by image clear operations.
-		if ( ( surface_caps.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_DST_BIT ) == 0 ) {
-			vk.clearAttachment = qfalse;
-			ri.Printf( PRINT_WARNING, "VK_IMAGE_USAGE_TRANSFER_DST_BIT is not supported by the swapchain, \\r_clear might not work\n" );
-		}
-		// VK_IMAGE_USAGE_TRANSFER_SRC_BIT is required in order to take screenshots.
-		if ((surface_caps.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) == 0) {
-			ri.Error(ERR_FATAL, "create_swapchain: VK_IMAGE_USAGE_TRANSFER_SRC_BIT is not supported by the swapchain");
-		}
-	}
-
-	// determine present mode and swapchain image count
-	VK_CHECK(qvkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_count, NULL));
-
-	present_modes = (VkPresentModeKHR *) ri.Malloc( present_mode_count * sizeof( VkPresentModeKHR ) );
-	VK_CHECK(qvkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_count, present_modes));
-
-	if ( verbose ) {
-		ri.Printf( PRINT_ALL, "...presentation modes:" );
-	}
-	for ( i = 0; i < present_mode_count; i++ ) {
-		if ( verbose ) {
-			ri.Printf( PRINT_ALL, " %s", vk_present_mode_string( present_modes[i] ) );
-		}
-		if ( present_modes[i] == VK_PRESENT_MODE_MAILBOX_KHR )
-			mailbox_supported = qtrue;
-		else if ( present_modes[i] == VK_PRESENT_MODE_IMMEDIATE_KHR )
-			immediate_supported = qtrue;
-		else if ( present_modes[i] == VK_PRESENT_MODE_FIFO_RELAXED_KHR )
-			fifo_relaxed_supported = qtrue;
-	}
-	if ( verbose ) {
-		ri.Printf( PRINT_ALL, "\n" );
-	}
-
-	ri.Free( present_modes );
-
-	if ( ( v = ri.Cvar_VariableIntegerValue( "r_swapInterval" ) ) != 0 ) {
-		if ( v == 2 && mailbox_supported )
-			present_mode = VK_PRESENT_MODE_MAILBOX_KHR;
-		else if ( fifo_relaxed_supported )
-			present_mode = VK_PRESENT_MODE_FIFO_RELAXED_KHR;
-		else
-			present_mode = VK_PRESENT_MODE_FIFO_KHR;
-		image_count = MAX( MIN_SWAPCHAIN_IMAGES_FIFO, surface_caps.minImageCount );
-	} else {
-		if ( immediate_supported ) {
-			present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
-			image_count = MAX( MIN_SWAPCHAIN_IMAGES_IMM, surface_caps.minImageCount );
-		} else if ( mailbox_supported ) {
-			present_mode = VK_PRESENT_MODE_MAILBOX_KHR;
-			image_count = MAX( MIN_SWAPCHAIN_IMAGES_MAILBOX, surface_caps.minImageCount );
-		} else if ( fifo_relaxed_supported ) {
-			present_mode = VK_PRESENT_MODE_FIFO_RELAXED_KHR;
-			image_count = MAX( MIN_SWAPCHAIN_IMAGES_FIFO, surface_caps.minImageCount );
-		} else {
-			present_mode = VK_PRESENT_MODE_FIFO_KHR;
-			image_count = MAX( MIN_SWAPCHAIN_IMAGES_FIFO, surface_caps.minImageCount );
-		}
-	}
-
-	if ( image_count < 2 ) {
-		image_count = 2;
-	}
-
-	if ( surface_caps.maxImageCount == 0 && present_mode == VK_PRESENT_MODE_FIFO_KHR ) {
-		image_count = MAX( MIN_SWAPCHAIN_IMAGES_FIFO_0, surface_caps.minImageCount );
-	} else if ( surface_caps.maxImageCount > 0 ) {
-		image_count = MIN( MIN( image_count, surface_caps.maxImageCount ), MAX_SWAPCHAIN_IMAGES );
-	}
-
-	if ( verbose ) {
-		ri.Printf( PRINT_ALL, "...selected presentation mode: %s, image count: %i\n", vk_present_mode_string( present_mode ), image_count );
-	}
-
-	// create swap chain
-	desc.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-	desc.pNext = NULL;
-	desc.flags = 0;
-	desc.surface = surface;
-	desc.minImageCount = image_count;
-	desc.imageFormat = surface_format.format;
-	desc.imageColorSpace = surface_format.colorSpace;
-	desc.imageExtent = image_extent;
-	vk.swapchain_extent = image_extent;
-	vk.swapchain_extent_valid = qtrue;
-	desc.imageArrayLayers = 1;
-	desc.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-	if ( !vk.fboActive ) {
-		desc.imageUsage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-	}
-	desc.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	desc.queueFamilyIndexCount = 0;
-	desc.pQueueFamilyIndices = NULL;
-	desc.preTransform = surface_caps.currentTransform;
-	//desc.compositeAlpha = get_composite_alpha( surface_caps.supportedCompositeAlpha );
-	desc.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-	desc.presentMode = present_mode;
-	desc.clipped = VK_TRUE;
-	desc.oldSwapchain = VK_NULL_HANDLE;
-
-	VK_CHECK( qvkCreateSwapchainKHR( device, &desc, NULL, swapchain ) );
-
-	VK_CHECK( qvkGetSwapchainImagesKHR( vk.device, vk.swapchain, &vk.swapchain_image_count, NULL ) );
-	vk.swapchain_image_count = MIN( vk.swapchain_image_count, MAX_SWAPCHAIN_IMAGES );
-	VK_CHECK( qvkGetSwapchainImagesKHR( vk.device, vk.swapchain, &vk.swapchain_image_count, vk.swapchain_images ) );
-
-	for ( i = 0; (uint32_t) i < vk.swapchain_image_count; i++ ) {
-		view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		view.pNext = NULL;
-		view.flags = 0;
-		view.image = vk.swapchain_images[i];
-		view.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		view.format = vk.present_format.format;
-		view.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-		view.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-		view.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-		view.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-		view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		view.subresourceRange.baseMipLevel = 0;
-		view.subresourceRange.levelCount = 1;
-		view.subresourceRange.baseArrayLayer = 0;
-		view.subresourceRange.layerCount = 1;
-
-		VK_CHECK( qvkCreateImageView( vk.device, &view, NULL, &vk.swapchain_image_views[i] ) );
-
-		SET_OBJECT_NAME( vk.swapchain_images[i], va( "swapchain image %i", i ), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
-		SET_OBJECT_NAME( vk.swapchain_image_views[i], va( "swapchain image %i", i ), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
-	}
-
-	for ( i = 0; (uint32_t) i < vk.swapchain_image_count; i++ ) {
-		VkSemaphoreCreateInfo s;
-		s.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-		s.pNext = NULL;
-		s.flags = 0;
-		VK_CHECK( qvkCreateSemaphore( vk.device, &s, NULL, &vk.swapchain_rendering_finished[i] ) );
-		SET_OBJECT_NAME( vk.swapchain_rendering_finished[i], va( "swapchain_rendering_finished semaphore %i", i ), VK_DEBUG_REPORT_OBJECT_TYPE_SEMAPHORE_EXT );
-	}
-
-	if ( vk.initSwapchainLayout != VK_IMAGE_LAYOUT_UNDEFINED ) {
-		VkCommandBuffer command_buffer = vk_begin_command_buffer();
-
-		for ( i = 0; (uint32_t) i < vk.swapchain_image_count; i++ ) {
-			record_image_layout_transition( command_buffer, vk.swapchain_images[i],
-				VK_IMAGE_ASPECT_COLOR_BIT,
-				VK_IMAGE_LAYOUT_UNDEFINED, vk.initSwapchainLayout, 0, 0 );
-		}
-
-		vk_end_command_buffer( command_buffer, __func__ );
-	}
-}
-
-static qboolean vk_query_surface_extent( VkExtent2D *extent ) {
-	VkSurfaceCapabilitiesKHR caps;
-
-	if ( qvkGetPhysicalDeviceSurfaceCapabilitiesKHR( vk.physical_device, vk_surface, &caps ) != VK_SUCCESS ) {
-		return qfalse;
-	}
-
-	if ( caps.currentExtent.width == UINT32_MAX && caps.currentExtent.height == UINT32_MAX ) {
-		extent->width = (uint32_t) gls.windowWidth;
-		extent->height = (uint32_t) gls.windowHeight;
-	}
-	else {
-		extent->width = caps.currentExtent.width;
-		extent->height = caps.currentExtent.height;
-	}
-
-	if ( extent->width == 0 || extent->height == 0 ) {
-		return qfalse;
-	}
-
-	return qtrue;
-}
-
-static void vk_log_swapchain_recreation( VkResult res, const VkExtent2D *old_extent, const VkExtent2D *new_extent ) {
-	uint32_t old_width = vk.swapchain_extent_valid && old_extent ? old_extent->width : 0;
-	uint32_t old_height = vk.swapchain_extent_valid && old_extent ? old_extent->height : 0;
-	uint32_t new_width = new_extent ? new_extent->width : 0;
-	uint32_t new_height = new_extent ? new_extent->height : 0;
-	static int last_print_ms = -1;
-	static VkResult last_res = VK_SUCCESS;
-	static uint32_t last_old_width, last_old_height, last_new_width, last_new_height;
-	static int last_fullscreen, last_refresh;
-	const int now_ms = ri.Milliseconds();
-	const qboolean same_as_last =
-		( res == last_res ) &&
-		( old_width == last_old_width ) &&
-		( old_height == last_old_height ) &&
-		( new_width == last_new_width ) &&
-		( new_height == last_new_height ) &&
-		( (int)glConfig.isFullscreen == last_fullscreen ) &&
-		( glConfig.displayFrequency == last_refresh );
-
-	// Avoid spam when the driver repeatedly returns SUBOPTIMAL_KHR with unchanged
-	// swapchain metrics (common on some WMs/compositors).
-	if ( same_as_last && last_print_ms >= 0 ) {
-		return;
-	}
-
-	ri.Printf( PRINT_WARNING, "vk_present_frame(): %s old=%ux%u new=%ux%u fullscreen=%d refresh=%d\n",
-		vk_result_string( res ), old_width, old_height, new_width, new_height, glConfig.isFullscreen, glConfig.displayFrequency );
-
-	last_print_ms = now_ms;
-	last_res = res;
-	last_old_width = old_width;
-	last_old_height = old_height;
-	last_new_width = new_width;
-	last_new_height = new_height;
-	last_fullscreen = (int)glConfig.isFullscreen;
-	last_refresh = glConfig.displayFrequency;
-}
 
 static void vk_create_render_passes( void )
 {
@@ -14848,7 +14611,7 @@ void vk_present_frame( void )
 		case VK_SUCCESS:
 			break;
 		case VK_SUBOPTIMAL_KHR:
-			new_extent_valid = vk_query_surface_extent( &new_extent );
+			new_extent_valid = vk_query_surface_extent( vk.physical_device, vk_surface, &new_extent );
 			vk_log_swapchain_recreation( res, &vk.swapchain_extent, new_extent_valid ? &new_extent : NULL );
 			if ( new_extent_valid && ( !vk.swapchain_extent_valid ||
 					new_extent.width != vk.swapchain_extent.width ||
@@ -14858,7 +14621,7 @@ void vk_present_frame( void )
 			}
 			break;
 		case VK_ERROR_OUT_OF_DATE_KHR:
-			new_extent_valid = vk_query_surface_extent( &new_extent );
+			new_extent_valid = vk_query_surface_extent( vk.physical_device, vk_surface, &new_extent );
 			vk_log_swapchain_recreation( res, &vk.swapchain_extent, new_extent_valid ? &new_extent : NULL );
 			vk_restart_swapchain( __func__, res );
 			return;
