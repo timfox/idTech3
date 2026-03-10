@@ -1582,7 +1582,8 @@ endif()
 
 # --- ImGui Inspector (optional, requires C++) ---
 option(USE_IMGUI "Enable ImGui inspector overlay" ON)
-if(USE_IMGUI)
+# Disable on macOS: imgui C++ headers get pulled into C compilation units, causing "unknown type name 'constexpr'" errors.
+if(USE_IMGUI AND NOT APPLE)
   enable_language(CXX)
   set(IMGUI_SRCS
     src/renderers/vulkan/inspector/vk_imgui.cpp
