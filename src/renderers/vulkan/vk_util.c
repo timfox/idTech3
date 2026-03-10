@@ -361,6 +361,45 @@ qboolean vk_mat4_inverse( const float *m, float *out )
 	return qtrue;
 }
 
+uint32_t vk_noise_hash3( uint32_t x, uint32_t y, uint32_t z )
+{
+	uint32_t h = x * 374761393u + y * 668265263u + z * 2246822519u;
+	h = ( h ^ ( h >> 13 ) ) * 1274126177u;
+	return h ^ ( h >> 16 );
+}
+
+qboolean vk_used_instance_extension( const char *ext )
+{
+	const char *u;
+
+	/* allow all VK_*_surface extensions */
+	u = strrchr( ext, '_' );
+	if ( u && Q_stricmp( u + 1, "surface" ) == 0 )
+		return qtrue;
+
+	if ( Q_stricmp( ext, VK_KHR_DISPLAY_EXTENSION_NAME ) == 0 )
+		return qtrue; /* needed for KMSDRM instances/devices? */
+
+	if ( Q_stricmp( ext, VK_KHR_SWAPCHAIN_EXTENSION_NAME ) == 0 )
+		return qtrue;
+
+#ifdef USE_VK_VALIDATION
+	if ( Q_stricmp( ext, VK_EXT_DEBUG_REPORT_EXTENSION_NAME ) == 0 )
+		return qtrue;
+#endif
+
+	if ( Q_stricmp( ext, VK_EXT_DEBUG_UTILS_EXTENSION_NAME ) == 0 )
+		return qtrue;
+
+	if ( Q_stricmp( ext, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME ) == 0 )
+		return qtrue;
+
+	if ( Q_stricmp( ext, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME ) == 0 )
+		return qtrue;
+
+	return qfalse;
+}
+
 void vk_normalize_rgb_luma_safe( vec3_t io )
 {
 	float maxc = MAX( io[0], MAX( io[1], io[2] ) );

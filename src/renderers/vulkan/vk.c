@@ -1838,39 +1838,6 @@ static void vk_alloc_staging_buffer( VkDeviceSize size )
 }
 
 
-static qboolean used_instance_extension( const char *ext )
-{
-	const char *u;
-
-	// allow all VK_*_surface extensions
-	u = strrchr( ext, '_' );
-	if ( u && Q_stricmp( u + 1, "surface" ) == 0 )
-		return qtrue;
-
-	if ( Q_stricmp( ext, VK_KHR_DISPLAY_EXTENSION_NAME ) == 0 )
-		return qtrue; // needed for KMSDRM instances/devices?
-
-	if ( Q_stricmp( ext, VK_KHR_SWAPCHAIN_EXTENSION_NAME ) == 0 )
-		return qtrue;
-
-#ifdef USE_VK_VALIDATION
-	if ( Q_stricmp( ext, VK_EXT_DEBUG_REPORT_EXTENSION_NAME ) == 0 )
-		return qtrue;
-#endif
-
-	if ( Q_stricmp( ext, VK_EXT_DEBUG_UTILS_EXTENSION_NAME ) == 0 )
-		return qtrue;
-
-	if ( Q_stricmp( ext, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME ) == 0 )
-		return qtrue;
-
-	if ( Q_stricmp( ext, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME ) == 0 )
-		return qtrue;
-
-	return qfalse;
-}
-
-
 static void create_instance( void )
 {
 #ifdef USE_VK_VALIDATION
@@ -1898,7 +1865,7 @@ static void create_instance( void )
 	for ( i = 0; i < count; i++ ) {
 		const char *ext = extension_properties[i].extensionName;
 
-		if ( !used_instance_extension( ext ) ) {
+		if ( !vk_used_instance_extension( ext ) ) {
 			continue;
 		}
 
@@ -8069,13 +8036,6 @@ void vk_vegetation_wind_dispatch( void )
 	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.pipeline_layout_vegwind, 0, 1, &vk.vegwind_descriptor, 0, NULL );
 	qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_vegwind, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( push ), &push );
 	qvkCmdDispatch( vk.cmd->command_buffer, groupCount, 1, 1 );
-}
-
-static uint32_t vk_noise_hash3( uint32_t x, uint32_t y, uint32_t z )
-{
-	uint32_t h = x * 374761393u + y * 668265263u + z * 2246822519u;
-	h = ( h ^ ( h >> 13 ) ) * 1274126177u;
-	return h ^ ( h >> 16 );
 }
 
 static void vk_create_fog_noise_texture( void )

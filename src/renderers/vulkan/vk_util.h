@@ -52,6 +52,12 @@ qboolean vk_mat4_inverse( const float *m, float *out );
 /* Normalize RGB by max component; if zero, set to (1,1,1). */
 void vk_normalize_rgb_luma_safe( vec3_t io );
 
+/* 3D noise hash for volumetric fog. */
+uint32_t vk_noise_hash3( uint32_t x, uint32_t y, uint32_t z );
+
+/* Returns qtrue if extension name is one we request for the instance. */
+qboolean vk_used_instance_extension( const char *ext );
+
 #ifdef __cplusplus
 }
 #endif
