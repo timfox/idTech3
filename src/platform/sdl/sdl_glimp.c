@@ -226,7 +226,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 	int display;
 	int x;
 	int y;
-	Uint32 flags = SDL_WINDOW_SHOWN;
+	Uint32 flags = SDL_WINDOW_SHOWN | SDL_WINDOW_ALLOW_HIGHDPI;
 
 #ifdef USE_VULKAN_API
 	if ( vulkan ) {
@@ -315,7 +315,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 		flags |= SDL_WINDOW_BORDERLESS;
 	}
 
-	//flags |= SDL_WINDOW_ALLOW_HIGHDPI;
+	flags |= SDL_WINDOW_ALLOW_HIGHDPI;
 
 	colorBits = r_colorbits->value;
 
@@ -340,8 +340,10 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 		stencilBits = 0;
 
 #ifdef USE_VULKAN_API
-	if ( vulkan )
+	if ( vulkan ) {
 		SDL_GL_ResetAttributes();  /* avoid OpenGL visual hints interfering with Vulkan window on X11/aarch64 */
+		SDL_SetHint( SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR, "0" );
+	}
 #endif
 
 	for ( i = 0; i < 16; i++ )
