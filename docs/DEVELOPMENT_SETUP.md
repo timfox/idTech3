@@ -64,6 +64,34 @@ The primary build script is `scripts/compile_engine.sh`.
 ./scripts/compile_engine.sh vulkan quiet
 ```
 
+### Building for Multiple Platforms
+
+**Native builds** (run on each target):
+- **x86_64**: Run the script on an x86_64 Linux machine.
+- **aarch64**: Run the script on an aarch64 Linux machine (e.g. Raspberry Pi 5, ARM server).
+
+```bash
+./scripts/compile_engine.sh vulkan
+```
+
+**Cross-compilation** (x86_64 host → Linux aarch64 target):
+```bash
+# Install cross-compiler
+sudo apt-get install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
+# Cross-compile for aarch64 (experimental; may fail without ARM sysroot for SDL2/OpenAL)
+./scripts/compile_engine.sh vulkan aarch64
+```
+
+Outputs go to `release/` with `.aarch64` suffix (e.g. `idtech3.aarch64`, `idtech3_server.aarch64`). Cross-compilation disables FFmpeg/AV1/VPX/Theora and may fail if SDL2/OpenAL cannot be found for the target.
+
+**Build both x86_64 and aarch64** (native + cross, if cross-compiler installed):
+```bash
+./scripts/compile_engine.sh all-linux vulkan
+```
+
+**GitHub Actions** produces binaries for all platforms (Linux x86_64, Linux aarch64/armv7, macOS, Windows). Download artifacts from workflow runs for ready-to-use binaries when cross-compilation is not set up locally.
+
 ### CMake Direct
 ```bash
 mkdir -p build && cd build
@@ -76,6 +104,17 @@ cmake .. \
   -DSKIP_IDPAK_CHECK=ON \
   -Wno-dev
 cmake --build . -j$(nproc)
+```
+
+**Cross-compile for Linux aarch64** (manual):
+```bash
+cmake -S . -B build-aarch64 \
+  -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/linux-aarch64.cmake \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DUSE_VULKAN=ON \
+  -DSKIP_IDPAK_CHECK=ON \
+  -Wno-dev
+cmake --build build-aarch64 -j$(nproc)
 ```
 
 ### Enabling Video Codecs

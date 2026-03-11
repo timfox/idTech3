@@ -8,7 +8,8 @@ Raspberry Pi OS ships Mesa V3DV (Vulkan 1.3) by default on Pi 4 and 5. The engin
 
 ### Known Issues
 
-- **"Couldn't get a visual"**: On ARM + X11, SDL may fail to create a Vulkan window. The engine now defaults to the X11 video driver on ARM when using Vulkan.
+- **"Couldn't get a visual" / "could not load Vulkan subsystem"**: On ARM + X11, SDL may fail to create a Vulkan window. The engine defaults to X11 on ARM, but Vulkan surface creation can still fail on some setups.
+  - **Workaround**: Use the OpenGL renderer instead: `./idtech3.aarch64 +set cl_renderer opengl` (or `./idtech3 +set cl_renderer opengl`).
 - **KMS/DRM**: Vulkan with SDL's KMSDRM backend has known issues on Raspberry Pi (see [SDL#3997](https://github.com/libsdl-org/SDL/issues/3997)). Use X11 instead.
 - **r_mode -2 fails on RPi5**: Desktop resolution mode may fail. The engine automatically tries r_mode 3 (640x480), r_mode -1 (custom 640x480), r_mode -1 (800x600), windowed mode, and wayland (if x11 failed) as fallbacks. Successful fallbacks are persisted to config.
 
@@ -39,14 +40,21 @@ Raspberry Pi OS ships Mesa V3DV (Vulkan 1.3) by default on Pi 4 and 5. The engin
 ### Build for ARM
 
 ```bash
-# Native on Raspberry Pi
+# Native on Raspberry Pi (recommended)
 ./scripts/compile_engine.sh vulkan
 
-# Cross-compile from x86 (example)
-mkdir build-rpi && cd build-rpi
-cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/arm64-toolchain.cmake ..
-make -j4
+# Cross-compile from x86_64 (requires gcc-aarch64-linux-gnu)
+sudo apt-get install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+./scripts/compile_engine.sh vulkan aarch64
+
+# Or use CMake directly with the toolchain
+cmake -S . -B build-aarch64 \
+  -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/linux-aarch64.cmake \
+  -DCMAKE_BUILD_TYPE=Release -DUSE_VULKAN=ON -DSKIP_IDPAK_CHECK=ON -Wno-dev
+cmake --build build-aarch64 -j$(nproc)
 ```
+
+See [DEVELOPMENT_SETUP.md](DEVELOPMENT_SETUP.md#building-for-multiple-platforms) for full platform build options.
 
 ### Debugging
 
