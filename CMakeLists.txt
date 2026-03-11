@@ -390,7 +390,7 @@ if(USE_DUKTAPE)
     target_include_directories(js_runtime_internal PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/external/duktape")
     set_property(TARGET js_runtime_internal PROPERTY POSITION_INDEPENDENT_CODE ON)
     if(NOT MSVC)
-      target_compile_options(js_runtime_internal PRIVATE -fno-strict-aliasing)
+      target_compile_options(js_runtime_internal PRIVATE -fno-strict-aliasing -Wno-format-nonliteral -Wno-unused-but-set-variable)
     endif()
 
     set(DUKTAPE_FOUND TRUE)
@@ -519,6 +519,7 @@ if(USE_OPUS)
       if(NOT MSVC)
         target_compile_options(opus PRIVATE
           -Wno-vla
+          -Wno-cast-align
           -Wno-undef
           -Wno-cast-qual
           -Wno-missing-prototypes
@@ -587,6 +588,9 @@ if(USE_FLAC)
       set(FLAC_LIBRARY FLAC::FLAC)
     elseif(TARGET FLAC)
       set(FLAC_LIBRARY FLAC)
+    endif()
+    if(TARGET FLAC AND NOT MSVC)
+      target_compile_options(FLAC PRIVATE -Wno-cast-qual -Wno-format-nonliteral -Wno-static-in-inline)
     endif()
     set(FLAC_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/external/src/flac/include)
     if(TARGET benchmark_residual)
@@ -857,6 +861,9 @@ if(USE_ZLIB)
       target_compile_definitions(zlibstatic PRIVATE ZLIB_CONST)
       target_compile_definitions(zlibstatic PRIVATE _LFS64_LARGEFILE=1 _LARGEFILE64_SOURCE=1)
       set_property(TARGET zlibstatic PROPERTY POSITION_INDEPENDENT_CODE ON)
+      if(NOT MSVC)
+        target_compile_options(zlibstatic PRIVATE -Wno-format-nonliteral)
+      endif()
     endif()
     if(TARGET zlib)
       target_compile_definitions(zlib PRIVATE ZLIB_CONST)

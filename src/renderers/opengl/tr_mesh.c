@@ -292,7 +292,7 @@ void R_AddMD3Surfaces( trRefEntity_t *ent ) {
 	qboolean		personalModel;
 #ifdef USE_PMLIGHT
 	dlight_t		*dl;
-	int				n;
+	unsigned int	n;
 	dlight_t		*dlights[ ARRAY_LEN( backEndData->dlights ) ];
 	int				numDlights;
 #endif

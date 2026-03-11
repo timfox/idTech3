@@ -71,7 +71,7 @@ static qhandle_t R_RegisterMD3(const char *name, model_t *mod)
 		if ( !buf.v )
 			continue;
 
-		if ( fileSize < sizeof( md3Header_t ) ) {
+		if ( fileSize < (int)sizeof( md3Header_t ) ) {
 			ri.Printf( PRINT_WARNING, "%s: truncated header for %s\n", __func__, name );
 			ri.FS_FreeFile( buf.v );
 			break;
