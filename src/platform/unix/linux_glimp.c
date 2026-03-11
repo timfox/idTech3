@@ -1817,6 +1817,17 @@ static qboolean GLW_LoadOpenGL( const char *name )
 					Cvar_Set( "r_customWidth", "640" );
 					Cvar_Set( "r_customHeight", "480" );
 					err = GLW_StartDriverAndSetMode( -1, "", fullscreen, qfalse /* vulkan */ );
+					if ( err == RSERR_OK )
+						Cvar_Set( "r_mode", "-1" );
+				}
+				if ( err != RSERR_OK )
+				{
+					Com_Printf( "r_mode -1 (640x480) failed, trying 800x600\n" );
+					Cvar_Set( "r_customWidth", "800" );
+					Cvar_Set( "r_customHeight", "600" );
+					err = GLW_StartDriverAndSetMode( -1, "", fullscreen, qfalse /* vulkan */ );
+					if ( err == RSERR_OK )
+						Cvar_Set( "r_mode", "-1" );
 				}
 				if ( err != RSERR_OK && fullscreen )
 				{
@@ -1983,6 +1994,17 @@ static qboolean GLW_LoadVulkan( void )
 			Cvar_Set( "r_customWidth", "640" );
 			Cvar_Set( "r_customHeight", "480" );
 			err = GLW_StartDriverAndSetMode( -1, "", fullscreen, qtrue /* vulkan */ );
+			if ( err == RSERR_OK )
+				Cvar_Set( "r_mode", "-1" );
+		}
+		if ( err != RSERR_OK && err != RSERR_FATAL_ERROR )
+		{
+			Com_Printf( "r_mode -1 (640x480) failed, trying 800x600\n" );
+			Cvar_Set( "r_customWidth", "800" );
+			Cvar_Set( "r_customHeight", "600" );
+			err = GLW_StartDriverAndSetMode( -1, "", fullscreen, qtrue /* vulkan */ );
+			if ( err == RSERR_OK )
+				Cvar_Set( "r_mode", "-1" );
 		}
 		if ( err != RSERR_OK && err != RSERR_FATAL_ERROR && fullscreen )
 		{

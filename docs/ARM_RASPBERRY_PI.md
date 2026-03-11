@@ -10,7 +10,7 @@ Raspberry Pi OS ships Mesa V3DV (Vulkan 1.3) by default on Pi 4 and 5. The engin
 
 - **"Couldn't get a visual"**: On ARM + X11, SDL may fail to create a Vulkan window. The engine now defaults to the X11 video driver on ARM when using Vulkan.
 - **KMS/DRM**: Vulkan with SDL's KMSDRM backend has known issues on Raspberry Pi (see [SDL#3997](https://github.com/libsdl-org/SDL/issues/3997)). Use X11 instead.
-- **r_mode -2 fails on RPi5**: Desktop resolution mode may fail. The engine automatically tries r_mode 3 (640x480), r_mode -1 (custom 640x480), and windowed mode as fallbacks.
+- **r_mode -2 fails on RPi5**: Desktop resolution mode may fail. The engine automatically tries r_mode 3 (640x480), r_mode -1 (custom 640x480), r_mode -1 (800x600), windowed mode, and wayland (if x11 failed) as fallbacks. Successful fallbacks are persisted to config.
 
 ### Recommended Setup
 
@@ -21,7 +21,7 @@ Raspberry Pi OS ships Mesa V3DV (Vulkan 1.3) by default on Pi 4 and 5. The engin
    ```
    Or run with: `SDL_VIDEODRIVER=x11 ./idtech3`
 
-2. **r_vid_driver cvar**: The engine supports `r_vid_driver` (auto, x11, wayland, kmsdrm). On ARM with Vulkan, "auto" defaults to "x11" for compatibility. Requires `vid_restart` to take effect.
+2. **r_vid_driver cvar**: The engine supports `r_vid_driver` (auto, x11, wayland, kmsdrm). On ARM with Vulkan, "auto" defaults to "x11" for compatibility. If x11 fails, the engine automatically retries with wayland. Requires `vid_restart` to take effect.
 
 3. **If display still fails**: Try launching with explicit safe settings:
    ```
