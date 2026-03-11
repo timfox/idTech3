@@ -560,6 +560,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	blend_state.flags = 0;
 	blend_state.logicOpEnable = VK_FALSE;
 	blend_state.logicOp = VK_LOGIC_OP_COPY;
+	/* VUID-07609: blend attachmentCount must match subpass colorAttachmentCount */
 	if ( renderpass == vk.render_pass.post_bloom && vk.fboActive ) {
 		Com_Memcpy( attachment_blend_states, &attachment_blend_state, sizeof( attachment_blend_state ) );
 		Com_Memcpy( attachment_blend_states + 1, &attachment_blend_state, sizeof( attachment_blend_state ) );

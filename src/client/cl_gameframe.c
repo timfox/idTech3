@@ -37,7 +37,9 @@ Ticks all gameplay subsystems each client frame:
 #include "../game/g_aiml.h"
 #include "../game/g_bt.h"
 #include "../game/g_lua_bindings.h"
+#ifdef USE_ECS
 #include "../game/ecs.h"
+#endif
 #include "../audio/snd_music_adaptive.h"
 
 static qboolean gameSystemsInitialized = qfalse;
@@ -154,7 +156,9 @@ void CL_InitGameSystems(void) {
 	GOAP_Init();
 	AIML_Init();
 	BT_Init();
+#ifdef USE_ECS
 	ECS_Init();
+#endif
 	MobileFog_Init();
 	BgMap_Init();
 	WinTitle_Init();
@@ -180,7 +184,9 @@ void CL_ShutdownGameSystems(void) {
 	Dismember_Shutdown();
 	GOAP_Shutdown();
 	BT_Shutdown();
+#ifdef USE_ECS
 	ECS_Shutdown();
+#endif
 	BgMap_Shutdown();
 
 	activeNavMesh = -1;

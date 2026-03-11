@@ -60,6 +60,9 @@ void vk_destroy_sync_primitives( void )
 {
 	uint32_t i;
 
+	if ( vk.device == VK_NULL_HANDLE )
+		return;
+
 #ifdef USE_UPLOAD_QUEUE
 	qvkDestroySemaphore( vk.device, vk.image_uploaded2, NULL );
 #endif
