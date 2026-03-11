@@ -120,6 +120,14 @@ jobs:
           cmake --build build-gl-${{ matrix.btype }} -j$(nproc)
           cp -f build-gl-${{ matrix.btype }}/idtech3* bin/ || true
 
+      - name: Smoke test
+        if: ${{ github.event_name != 'release' && matrix.btype != 'Debug' }}
+        run: |
+          mkdir -p release
+          cp -f bin/idtech3* release/ || true
+          chmod +x scripts/smoke_test.sh
+          ./scripts/smoke_test.sh release
+
       - uses: actions/upload-artifact@v4
         if: matrix.cc == 'gcc' && matrix.btype == 'Release'
         with:
@@ -256,7 +264,7 @@ jobs:
           mkdir -p build-vk-${{ matrix.btype }}
           cmake -S . -B build-vk-${{ matrix.btype }} $CMAKE_EXTRA \
             -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
-            -DCI_BUILD=OFF \
+            -DCI_BUILD=${{ (matrix.cc == 'gcc' && matrix.btype == 'Release') && 'ON' || 'OFF' }} \
             -DUSE_STB_TRUETYPE=ON \
             -DBUILD_FREETYPE=ON \
             -DENABLE_FORTIFY_SOURCE=ON \
@@ -525,6 +533,11 @@ jobs:
             test -n "$(ls -A "$OUTDIR")"
             ls -al "$OUTDIR"
 
+            mkdir -p release
+            cp -f "$OUTDIR"/idtech3* release/ || true
+            chmod +x scripts/smoke_test.sh
+            ./scripts/smoke_test.sh release
+
       - uses: actions/upload-artifact@v4
         if: matrix.cc == 'gcc' && matrix.btype == 'Release'
         with:
@@ -616,6 +629,14 @@ jobs:
             -Wno-dev
           cmake --build build-gl-${{ matrix.btype }} -j$(sysctl -n hw.logicalcpu)
           cp -f build-gl-${{ matrix.btype }}/idtech3* bin/ || true
+
+      - name: Smoke test
+        if: ${{ github.event_name != 'release' && matrix.btype != 'Debug' }}
+        run: |
+          mkdir -p release
+          cp -f bin/idtech3* release/ || true
+          chmod +x scripts/smoke_test.sh
+          ./scripts/smoke_test.sh release
 
       - uses: actions/upload-artifact@v4
         if: matrix.cc == 'clang' && matrix.btype == 'Release'
