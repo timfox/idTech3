@@ -61,6 +61,7 @@ jobs:
             ${{ matrix.prefix }}-cmake
             ${{ matrix.prefix }}-ninja
             ${{ matrix.prefix }}-pkgconf
+            ${{ matrix.prefix }}-coreutils
             ${{ matrix.prefix }}-SDL2
             ${{ matrix.prefix }}-openal
             ${{ matrix.prefix }}-freetype
@@ -125,7 +126,7 @@ jobs:
         with:
           name: windows-${{ matrix.cc }}-${{ matrix.arch }}
           path: bin
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 5
 
   windows-msvc:
@@ -530,7 +531,7 @@ jobs:
         with:
           name: linux-${{ matrix.arch }}
           path: bin
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 5
 
   macos:
@@ -708,7 +709,7 @@ jobs:
         with:
           name: android-${{ matrix.abi }}
           path: bin
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 5
 
   release-attach:
