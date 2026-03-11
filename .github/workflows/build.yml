@@ -56,13 +56,13 @@ jobs:
           install: >-
             base-devel
             coreutils
+            file
             ${{ matrix.prefix }}-binutils
             ${{ matrix.prefix }}-make
             ${{ matrix.prefix }}-${{ matrix.cc }}
             ${{ matrix.prefix }}-cmake
             ${{ matrix.prefix }}-ninja
             ${{ matrix.prefix }}-pkgconf
-            coreutils
             ${{ matrix.prefix }}-SDL2
             ${{ matrix.prefix }}-openal
             ${{ matrix.prefix }}-freetype
@@ -89,7 +89,7 @@ jobs:
             -DBUILD_FREETYPE=ON \
             -DENABLE_FORTIFY_SOURCE=OFF \
             -DENABLE_ASAN=OFF \
-            -DBUILD_SERVER=OFF \
+            -DBUILD_SERVER=ON \
             -DUSE_VULKAN=ON \
             -DRENDERER_DEFAULT=vulkan \
             -DSKIP_IDPAK_CHECK=ON \
@@ -113,7 +113,7 @@ jobs:
             -DBUILD_FREETYPE=ON \
             -DENABLE_FORTIFY_SOURCE=OFF \
             -DENABLE_ASAN=OFF \
-            -DBUILD_SERVER=OFF \
+            -DBUILD_SERVER=ON \
             -DUSE_VULKAN=ON \
             -DRENDERER_DEFAULT=opengl \
             -DSKIP_IDPAK_CHECK=ON \
@@ -526,13 +526,13 @@ jobs:
               -DBUILD_FREETYPE=ON \
               -DENABLE_FORTIFY_SOURCE=OFF \
               -DENABLE_ASAN=OFF \
-              -DBUILD_SERVER=OFF \
+              -DBUILD_SERVER=ON \
               -DUSE_VULKAN=ON \
               -DRENDERER_DEFAULT=vulkan \
               -DSKIP_IDPAK_CHECK=ON \
-            -DSKIP_SHADER_REGEN=ON \
-            -Wno-dev
-          cmake --build build-vk-${{ matrix.btype }} -j"$(nproc)"
+              -DSKIP_SHADER_REGEN=ON \
+              -Wno-dev
+            cmake --build build-vk-${{ matrix.btype }} -j"$(nproc)"
 
             find "build-vk-${{ matrix.btype }}" -maxdepth 2 -type f -name 'idtech3*' -print -exec cp -f {} "$OUTDIR/" \;
 
@@ -544,13 +544,13 @@ jobs:
               -DBUILD_FREETYPE=ON \
               -DENABLE_FORTIFY_SOURCE=OFF \
               -DENABLE_ASAN=OFF \
-              -DBUILD_SERVER=OFF \
+              -DBUILD_SERVER=ON \
               -DUSE_VULKAN=ON \
               -DRENDERER_DEFAULT=opengl \
               -DSKIP_IDPAK_CHECK=ON \
-            -DSKIP_SHADER_REGEN=ON \
-            -Wno-dev
-          cmake --build build-gl-${{ matrix.btype }} -j"$(nproc)"
+              -DSKIP_SHADER_REGEN=ON \
+              -Wno-dev
+            cmake --build build-gl-${{ matrix.btype }} -j"$(nproc)"
 
             find "build-gl-${{ matrix.btype }}" -maxdepth 2 -type f -name 'idtech3*' -print -exec cp -f {} "$OUTDIR/" \;
 

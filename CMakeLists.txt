@@ -1875,6 +1875,10 @@ set(ECS_CPP "${CMAKE_SOURCE_DIR}/src/game/ecs.cpp")
 if(EXISTS "${ECS_CPP}")
   enable_language(CXX)
   ADD_LIBRARY(ecs_module STATIC ${ECS_CPP})
+  set_target_properties(ecs_module PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+  )
   target_include_directories(ecs_module PRIVATE
     ${EXTERNAL_INCLUDE}/entt/single_include
     ${CMAKE_SOURCE_DIR}/src/game

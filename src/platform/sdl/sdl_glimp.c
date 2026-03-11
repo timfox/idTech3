@@ -556,6 +556,9 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 		const char *sdl_err = SDL_GetError();
 		Com_Printf( "[VK] Couldn't get a visual: %s\n", ( sdl_err && sdl_err[0] ) ? sdl_err : "(no SDL error string)" );
 		Com_Printf( "[VK] SDL video driver: %s\n", SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "(none)" );
+#if defined(__arm__) || defined(__aarch64__)
+		Com_Printf( S_COLOR_YELLOW "[VK] On ARM, Vulkan may be unavailable. Try: ./idtech3.aarch64 +set cl_renderer opengl\n" );
+#endif
 		return RSERR_INVALID_MODE;
 	}
 
@@ -897,11 +900,19 @@ void VKimp_Init( glconfig_t *config )
 
 		if ( err == RSERR_FATAL_ERROR )
 		{
+#if defined(__arm__) || defined(__aarch64__)
+			Com_Printf( S_COLOR_YELLOW "Vulkan failed on ARM. Try: ./idtech3.aarch64 +set cl_renderer opengl\n" );
+#endif
 			Com_Error( ERR_FATAL, "VKimp_Init() - could not load Vulkan subsystem: %s", SDL_GetError() );
 			return;
 		}
 		if ( err != RSERR_OK )
 		{
+#if defined(__arm__) || defined(__aarch64__)
+			Com_Printf( S_COLOR_YELLOW "Vulkan failed on ARM. Try OpenGL instead:\n" );
+			Com_Printf( "  ./idtech3.aarch64 +set cl_renderer opengl\n" );
+			Com_Printf( "  Or: SDL_VIDEODRIVER=x11 ./idtech3.aarch64 +set cl_renderer opengl\n" );
+#endif
 			Com_Error( ERR_FATAL, "VKimp_Init() - could not load Vulkan subsystem: %s", SDL_GetError() );
 			return;
 		}

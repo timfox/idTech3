@@ -31,16 +31,18 @@ echo "Release dir: $RELEASE_DIR"
 echo ""
 
 # --- Binary existence checks ---
-# Resolve binary path (handle Windows .exe)
+# Resolve binary path (handle Windows .exe and arch suffixes: .x64, .x86_64, .aarch64)
 bin_path() {
   local bin="$1"
-  if [ -f "$RELEASE_DIR/$bin" ]; then
-    echo "$RELEASE_DIR/$bin"
-  elif [ -f "$RELEASE_DIR/$bin.exe" ]; then
-    echo "$RELEASE_DIR/$bin.exe"
-  else
-    echo ""
-  fi
+  local base="$RELEASE_DIR/$bin"
+  # Try: idtech3, idtech3.exe, idtech3.x64, idtech3.x64.exe, idtech3.x86_64, idtech3.aarch64
+  for candidate in "$base" "$base.exe" "$base.x64" "$base.x64.exe" "$base.x86_64" "$base.x86_64.exe" "$base.aarch64"; do
+    if [ -f "$candidate" ]; then
+      echo "$candidate"
+      return
+    fi
+  done
+  echo ""
 }
 
 echo "Binary checks:"
@@ -53,12 +55,12 @@ for bin in idtech3 idtech3_server; do
   fi
 done
 
-for lib in idtech3_vulkan.so idtech3_opengl.so idtech3_vulkan.dylib idtech3_opengl.dylib; do
+for lib in idtech3_vulkan.so idtech3_opengl.so idtech3_vulkan.dylib idtech3_opengl.dylib idtech3_vulkan.dll idtech3_opengl.dll; do
   if [ -f "$RELEASE_DIR/$lib" ]; then
     pass "$lib exists"
   fi
 done
-if [ ! -f "$RELEASE_DIR/idtech3_vulkan.so" ] && [ ! -f "$RELEASE_DIR/idtech3_vulkan.dylib" ]; then
+if [ ! -f "$RELEASE_DIR/idtech3_vulkan.so" ] && [ ! -f "$RELEASE_DIR/idtech3_vulkan.dylib" ] && [ ! -f "$RELEASE_DIR/idtech3_vulkan.dll" ]; then
   warn "renderer libs not found (may be statically linked)"
 fi
 
