@@ -127,6 +127,12 @@ void Defer_Flush( void ) {
 
 	if ( !deferInitialized ) return;
 
+#if defined(_MSC_VER)
+	if ( deferCount <= 0 ) return;
+#else
+	if ( atomic_load_explicit( &deferCount, memory_order_acquire ) <= 0 ) return;
+#endif
+
 	DEFER_LOCK();
 
 #if defined(_MSC_VER)
