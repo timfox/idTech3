@@ -271,6 +271,11 @@ if [ "$SKIP_IDPAK" -eq 1 ]; then
   echo "CMake: SKIP_IDPAK_CHECK=ON"
 fi
 
+if command -v ccache &>/dev/null; then
+  CMAKE_FLAGS+=("-DCMAKE_C_COMPILER_LAUNCHER=ccache" "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache")
+  echo "CMake: ccache enabled (faster incremental builds)"
+fi
+
 echo "Running CMake configuration..."
 cmake -S "$PROJECT_ROOT" -B "$BUILD_DIR" "${CMAKE_FLAGS[@]}"
 
