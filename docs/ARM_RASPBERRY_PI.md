@@ -10,6 +10,7 @@ Raspberry Pi OS ships Mesa V3DV (Vulkan 1.3) by default on Pi 4 and 5. The engin
 
 - **"Couldn't get a visual"**: On ARM + X11, SDL may fail to create a Vulkan window. The engine now defaults to the X11 video driver on ARM when using Vulkan.
 - **KMS/DRM**: Vulkan with SDL's KMSDRM backend has known issues on Raspberry Pi (see [SDL#3997](https://github.com/libsdl-org/SDL/issues/3997)). Use X11 instead.
+- **r_mode -2 fails on RPi5**: Desktop resolution mode may fail. The engine automatically tries r_mode 3 (640x480), r_mode -1 (custom 640x480), and windowed mode as fallbacks.
 
 ### Recommended Setup
 
@@ -22,7 +23,13 @@ Raspberry Pi OS ships Mesa V3DV (Vulkan 1.3) by default on Pi 4 and 5. The engin
 
 2. **r_vid_driver cvar**: The engine supports `r_vid_driver` (auto, x11, wayland, kmsdrm). On ARM with Vulkan, "auto" defaults to "x11" for compatibility. Requires `vid_restart` to take effect.
 
-3. **Performance**: On RPi4, the Vulkan driver has poor GLSL shader performance. The engine disables high-quality dynamic lights by default (`r_dlightMode 0`) on ARM. You can try `r_dlightMode 1` for per-pixel lights if performance allows.
+3. **If display still fails**: Try launching with explicit safe settings:
+   ```
+   ./idtech3 +set r_mode -1 +set r_customWidth 640 +set r_customHeight 480 +set r_fullscreen 0
+   ```
+   This forces a 640x480 windowed mode, which often works when desktop/fullscreen modes fail.
+
+4. **Performance**: On RPi4, the Vulkan driver has poor GLSL shader performance. The engine disables high-quality dynamic lights by default (`r_dlightMode 0`) on ARM. You can try `r_dlightMode 1` for per-pixel lights if performance allows.
 
 ### Build for ARM
 
