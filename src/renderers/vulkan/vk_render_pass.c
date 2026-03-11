@@ -2,8 +2,7 @@
 #include "vk.h"
 #include "vk_postfx.h"
 #include "vk_render_pass.h"
-
-#define SET_OBJECT_NAME(obj,objName,objType) vk_set_object_name( (uint64_t)(obj), (objName), (objType) )
+#include "vk_validation.h"
 
 void vk_set_fullscreen_viewport_scissor( uint32_t width, uint32_t height )
 {
