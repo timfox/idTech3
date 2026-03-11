@@ -16,6 +16,7 @@ static cvar_t *r_cbtTerrainGrid;
 
 void CBTerrain_RegisterCvars( void ) {
 	r_cbtTerrain = ri.Cvar_Get( "r_cbtTerrain", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_cbtTerrain, "GPU-driven terrain tessellation (CBT-style LOD). Experimental." );
 	r_cbtTerrainScale = ri.Cvar_Get( "r_cbtTerrainScale", "256", CVAR_ARCHIVE );
 	r_cbtTerrainGrid = ri.Cvar_Get( "r_cbtTerrainGrid", "32", CVAR_ARCHIVE );
 

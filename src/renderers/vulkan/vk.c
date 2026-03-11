@@ -2113,9 +2113,9 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		device_desc.ppEnabledExtensionNames = device_extension_list;
 		device_desc.pEnabledFeatures = &features;
 
-		/* VK_EXT_extended_dynamic_state3: color write mask for RB_ColorMask */
+		/* VK_EXT_extended_dynamic_state3: color write mask for RB_ColorMask (VUID-09423) */
 		VkPhysicalDeviceExtendedDynamicState3FeaturesEXT extDynState3 = {0};
-		if ( extendedDynamicState3 ) {
+		if ( extendedDynamicState3 && r_vk_colorWriteMaskDynamic && r_vk_colorWriteMaskDynamic->integer ) {
 			extDynState3.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT;
 			extDynState3.pNext = NULL;
 			extDynState3.extendedDynamicState3ColorWriteMask = VK_TRUE;
@@ -2123,7 +2123,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		}
 
 #ifdef _DEBUG
-		pNextPtr = (const void **)( extendedDynamicState3 ? &extDynState3.pNext : &device_desc.pNext );
+		pNextPtr = (const void **)( ( extendedDynamicState3 && vk.colorWriteMaskDynamic ) ? &extDynState3.pNext : &device_desc.pNext );
 
 		if ( timelineSemaphore ) {
 			*pNextPtr = &timeline_semaphore;
@@ -2806,8 +2806,10 @@ void vk_update_attachment_descriptors( void ) {
 			info.sampler = vk_find_sampler( &sd );
 			info.imageView = vk.depth_image_view_sample ? vk.depth_image_view_sample : vk.depth_image_view;
 			info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-			desc.dstSet = vk.depth_descriptor;
-			qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+			for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ ) {
+				desc.dstSet = vk.depth_descriptor[i];
+				qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+			}
 
 			// ssao output
 			sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
@@ -3484,7 +3486,8 @@ void vk_init_descriptors( void )
 				VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.color_descriptor[i] ) );
 				VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.post_color_descriptor[i] ) );
 			}
-		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.depth_descriptor ) );
+		for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ )
+			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.depth_descriptor[i] ) );
 
 		if ( r_ssao && r_ssao->integer ) {
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.ssao_descriptor ) );
@@ -6129,7 +6132,7 @@ void vk_initialize( void )
 		uint32_t j, maxSets;
 
 		pool_size[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			pool_size[0].descriptorCount = MAX_DRAWIMAGES + NUM_COMMAND_BUFFERS + NUM_COMMAND_BUFFERS + 1 + 3 + 6 + VK_NUM_BLOOM_PASSES * 2 + 25; // color[N], luminance[N], screenmap, depth/ssao, volumetric, bloom, SMAA
+			pool_size[0].descriptorCount = MAX_DRAWIMAGES + NUM_COMMAND_BUFFERS + NUM_COMMAND_BUFFERS + NUM_COMMAND_BUFFERS + 3 + 6 + VK_NUM_BLOOM_PASSES * 2 + 25; // color[N], post_color[N], depth[N], screenmap, ssao, volumetric, bloom, SMAA
 #ifdef USE_VK_PBR
         if ( vk.pbrActive )
             pool_size[0].descriptorCount += 2 + ( MAX_DRAWIMAGES * 9 ); // brdf-lut + irradiance | MAX_DRAWIMAGES * (physical, normal, emissive, clearcoat, sheen, anisotropy, transmission, subsurface, detail)
@@ -8870,6 +8873,9 @@ void vk_shutdown( refShutdownCode_t code )
 	if ( qvkQueuePresentKHR == NULL ) { /* not fully initialized */
 		goto __cleanup;
 	}
+	/* VUID-05137: ensure GPU finished before destroying resources */
+	if ( !vk.device_lost && qvkDeviceWaitIdle )
+		qvkDeviceWaitIdle( vk.device );
 	/* Always run full destroy sequence for VUID-05137 compliance.
 	 * When device_lost, destroy calls may return VK_ERROR_DEVICE_LOST but we still attempt them. */
 	vk_destroy_framebuffers();
@@ -11893,6 +11899,8 @@ void vk_occlusion_readback( void )
 	if ( n <= 0 || n > MAX_REFENTITIES )
 		return;
 
+	/* VUID-09401: queries must be reset before use. vk_occlusion_draw_entity_bboxes resets
+	 * before begin/end. If we never drew this frame, skip readback (queries may be uninitialized). */
 	res = qvkGetQueryPoolResults( vk.device, vk.occlusion_query_pool, 0, n,
 		sizeof( vk_entity_occlusion_visibility ), vk_entity_occlusion_visibility,
 		sizeof( uint64_t ), VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT );
@@ -13076,7 +13084,9 @@ static void vk_update_fluid_auto_scale( void )
 static void vk_update_volumetric_perf_queries( void )
 {
 	uint64_t query_values[ VK_VOLUMETRIC_QUERY_SLOTS ];
-	const uint32_t query_base = vk.cmd_index * VK_VOLUMETRIC_QUERY_SLOTS;
+	/* Read from the frame that just completed (cmd_index was advanced at end of previous frame) */
+	const uint32_t read_slot = ( vk.cmd_index + NUM_COMMAND_BUFFERS - 1 ) % NUM_COMMAND_BUFFERS;
+	const uint32_t query_base = read_slot * VK_VOLUMETRIC_QUERY_SLOTS;
 	const VkResult query_result = qvkGetQueryPoolResults( vk.device,
 		vk.volumetric_query_pool,
 		query_base,
@@ -14313,6 +14323,12 @@ _retry:
 	VK_CHECK( qvkBeginCommandBuffer( vk.cmd->command_buffer, &begin_info ) );
 	vk_reset_post_fog_frame_state();
 
+	/* VUID-09401: reset volumetric queries before first use when host reset ext unavailable */
+	if ( vk.volumetric_query_pool != VK_NULL_HANDLE && !qvkResetQueryPoolEXT && qvkCmdResetQueryPool ) {
+		const uint32_t qbase = vk.cmd_index * VK_VOLUMETRIC_QUERY_SLOTS;
+		qvkCmdResetQueryPool( vk.cmd->command_buffer, vk.volumetric_query_pool, qbase, VK_VOLUMETRY_QUERY_USED );
+	}
+
 		/* Default color write mask (all enabled) when using VK_EXT_extended_dynamic_state3 */
 		if ( vk.colorWriteMaskDynamic && qvkCmdSetColorWriteMaskEXT )
 			vk_set_color_write_mask( qtrue, qtrue, qtrue, qtrue );
@@ -15046,7 +15062,7 @@ qboolean vk_ssao_pass( void )
 		} else {
 			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.ssao_pipeline );
 		}
-		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_ssao, 0, 1, &vk.depth_descriptor, 0, NULL );
+		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_ssao, 0, 1, &vk.depth_descriptor[vk.cmd_index], 0, NULL );
 
 		push.projInfo[0] = ( backEnd.viewParms.projectionMatrix[0] != 0.0f ) ? 1.0f / backEnd.viewParms.projectionMatrix[0] : 1.0f;
 		push.projInfo[1] = ( backEnd.viewParms.projectionMatrix[5] != 0.0f ) ? 1.0f / backEnd.viewParms.projectionMatrix[5] : 1.0f;
@@ -15128,7 +15144,7 @@ qboolean vk_ssao_pass( void )
 			vk_begin_ssao_combine_render_pass();
 			if ( r_ssaoDebugView && r_ssaoDebugView->integer == 2 ) {
 				qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.ssao_depth_debug_pipeline );
-				qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.depth_descriptor, 0, NULL );
+				qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.depth_descriptor[vk.cmd_index], 0, NULL );
 			} else {
 				qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 					( r_ssaoDebugView && r_ssaoDebugView->integer ) ? vk.ssao_debug_pipeline : vk.ssao_combine_pipeline );
@@ -15187,7 +15203,7 @@ qboolean vk_bloom( void )
 	{
 		VkDescriptorSet bloom_sets[3] = {
 			vk.color_descriptor[vk.cmd_index],
-			vk.depth_descriptor,
+			vk.depth_descriptor[vk.cmd_index],
 			vk.postfx_params_descriptor[vk.cmd_index]
 		};
 		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 3, bloom_sets, 0, NULL );

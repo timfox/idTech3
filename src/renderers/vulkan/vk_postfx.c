@@ -69,6 +69,7 @@ PostFX_RegisterCvars
 */
 void PostFX_RegisterCvars(void) {
 	r_ssr                    = ri.Cvar_Get("r_ssr",                    "1",    CVAR_ARCHIVE);
+	ri.Cvar_SetDescription( r_ssr, "Screen-space reflections. Requires r_fbo 1." );
 	r_ssr_maxDistance        = ri.Cvar_Get("r_ssr_maxDistance",        "100",  CVAR_ARCHIVE);
 	r_ssr_stepSize           = ri.Cvar_Get("r_ssr_stepSize",           "1.0",  CVAR_ARCHIVE);
 	r_ssr_thickness          = ri.Cvar_Get("r_ssr_thickness",          "0.5",  CVAR_ARCHIVE);
@@ -79,6 +80,7 @@ void PostFX_RegisterCvars(void) {
 	ri.Cvar_SetDescription( r_ssr_maxDepthGradient, "Skip SSR at depth edges (object silhouettes, horizon) to reduce thin line artifacts. Lower = stricter." );
 
 	r_atmosphere             = ri.Cvar_Get("r_atmosphere",             "1",    CVAR_ARCHIVE);
+	ri.Cvar_SetDescription( r_atmosphere, "Atmospheric scattering for sky and fog. Requires r_fbo 1." );
 	r_atmosphere_sunDirX     = ri.Cvar_Get("r_atmosphere_sunDirX",     "0.3",  CVAR_ARCHIVE);
 	r_atmosphere_sunDirY     = ri.Cvar_Get("r_atmosphere_sunDirY",     "0.8",  CVAR_ARCHIVE);
 	r_atmosphere_sunDirZ     = ri.Cvar_Get("r_atmosphere_sunDirZ",     "0.5",  CVAR_ARCHIVE);
@@ -89,6 +91,7 @@ void PostFX_RegisterCvars(void) {
 	r_atmosphere_mieG        = ri.Cvar_Get("r_atmosphere_mieG",        "0.76", CVAR_ARCHIVE);
 
 	r_vegWind                = ri.Cvar_Get("r_vegWind",                "0",    CVAR_ARCHIVE);
+	ri.Cvar_SetDescription( r_vegWind, "Vegetation wind animation for foliage shaders." );
 	r_vegWind_primaryFreq    = ri.Cvar_Get("r_vegWind_primaryFreq",    "1.2",  CVAR_ARCHIVE);
 	r_vegWind_primaryAmp     = ri.Cvar_Get("r_vegWind_primaryAmp",     "0.06", CVAR_ARCHIVE);
 	r_vegWind_detailFreq     = ri.Cvar_Get("r_vegWind_detailFreq",     "0.15", CVAR_ARCHIVE);

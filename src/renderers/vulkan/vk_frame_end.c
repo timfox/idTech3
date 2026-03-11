@@ -334,7 +334,7 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 	{
 		VkDescriptorSet gamma_sets[3] = {
 			vk.post_color_descriptor[vk.cmd_index],
-			vk.depth_descriptor,
+			vk.depth_descriptor[vk.cmd_index],
 			vk.postfx_params_descriptor[vk.cmd_index]
 		};
 		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 3, gamma_sets, 0, NULL );
