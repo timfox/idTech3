@@ -8,6 +8,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - Forward renderer with a large HDR/post-processing stack
 - No shipping deferred or Forward+ path yet; `r_renderMode 1/2` remain placeholders
 - Vulkan is the primary feature backend; OpenGL is compatibility fallback
+- **Shared temporal reset policy** (`vk_temporal.c`): centralizes history invalidation for volumetrics, motion vectors, exposure. Resize, map load, camera cut, and missing prev-frame data trigger resets. Ready for future TAA/upscaler integration.
 - See [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_2026_ARCHITECTURE_PASS.md) for the focused 2026 renderer direction
 
 ### Physically Based Rendering (PBR)

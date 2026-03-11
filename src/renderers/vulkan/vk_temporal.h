@@ -3,6 +3,14 @@
 
 #include "vk.h"
 
+/*
+ * Shared temporal reset policy (RENDERER_2026 Phase 1).
+ * Centralizes history invalidation for volumetrics, motion vectors, exposure,
+ * and future TAA/upscaler consumers. Call vk_temporal_request_sticky_reset()
+ * when resize, map load, camera cut, or missing prev-frame data is detected.
+ * vk_temporal_apply_resets() runs at frame start and clears motion history,
+ * volumetric froxel history, and exposure state.
+ */
 typedef enum {
 	VK_TEMPORAL_RESET_NONE                 = 0,
 	VK_TEMPORAL_RESET_RENDERER_INIT        = 1u << 0,
