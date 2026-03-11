@@ -242,10 +242,18 @@ jobs:
           sudo rm -f /etc/apt/sources.list.d/azure-cli.list
           sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list
           sudo apt-get -qq update
-          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev clang
+          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev clang ccache
           sudo apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools python3
 
       - uses: actions/checkout@v4
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-ubuntu-x64-${{ matrix.cc }}-${{ matrix.btype }}-${{ github.sha }}
+          restore-keys: |
+            ccache-ubuntu-x64-${{ matrix.cc }}-${{ matrix.btype }}-
 
       - name: Verify shader compilation
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
@@ -263,6 +271,8 @@ jobs:
           fi
           mkdir -p build-vk-${{ matrix.btype }}
           cmake -S . -B build-vk-${{ matrix.btype }} $CMAKE_EXTRA \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
             -DCI_BUILD=${{ (matrix.cc == 'gcc' && matrix.btype == 'Release') && 'ON' || 'OFF' }} \
             -DUSE_STB_TRUETYPE=ON \
@@ -291,6 +301,8 @@ jobs:
           fi
           mkdir -p build-gl-${{ matrix.btype }}
           cmake -S . -B build-gl-${{ matrix.btype }} $CMAKE_EXTRA \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
             -DCI_BUILD=OFF \
             -DUSE_STB_TRUETYPE=ON \
@@ -414,10 +426,18 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get -qq update
-          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev clang-tidy cppcheck
+          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev clang-tidy cppcheck ccache
           sudo apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools python3
 
       - uses: actions/checkout@v4
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-static-${{ github.sha }}
+          restore-keys: |
+            ccache-static-
 
       - name: Build (compile_commands.json)
         env:
@@ -426,6 +446,8 @@ jobs:
         run: |
           mkdir -p build-static
           cmake -S . -B build-static -G Ninja \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
             -DCI_BUILD=OFF \
