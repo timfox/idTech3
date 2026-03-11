@@ -61,7 +61,7 @@ jobs:
             ${{ matrix.prefix }}-cmake
             ${{ matrix.prefix }}-ninja
             ${{ matrix.prefix }}-pkgconf
-            ${{ matrix.prefix }}-coreutils
+            coreutils
             ${{ matrix.prefix }}-SDL2
             ${{ matrix.prefix }}-openal
             ${{ matrix.prefix }}-freetype
