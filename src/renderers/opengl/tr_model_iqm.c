@@ -39,9 +39,9 @@ static qboolean IQM_CheckRange( iqmHeader_t *header, int offset,
 	// doesn't fit into the file
 	return ( count <= 0 ||
 		 offset <= 0 ||
-		 offset > header->filesize ||
+		 (unsigned int)offset > header->filesize ||
 		 offset + count * size < 0 ||
-		 offset + count * size > header->filesize );
+		 (unsigned int)( offset + count * size ) > header->filesize );
 }
 // "multiply" 3x4 matrices, these are assumed to be the top 3 rows
 // of a 4x4 matrix with the last row = (0 0 0 1)
@@ -196,7 +196,7 @@ qboolean R_LoadIQM( model_t *mod, void *buffer, int filesize, const char *mod_na
 		float *f;
 	} blendWeights;
 
-	if( filesize < sizeof(iqmHeader_t) ) {
+	if( filesize < (int)sizeof(iqmHeader_t) ) {
 		return qfalse;
 	}
 
@@ -213,7 +213,7 @@ qboolean R_LoadIQM( model_t *mod, void *buffer, int filesize, const char *mod_na
 	}
 
 	LL( header->filesize );
-	if( header->filesize > filesize || header->filesize > 16<<20 ) {
+	if( header->filesize > (unsigned int)filesize || header->filesize > 16u<<20 ) {
 		return qfalse;
 	}
 
