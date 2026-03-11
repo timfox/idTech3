@@ -31,30 +31,45 @@ echo "Release dir: $RELEASE_DIR"
 echo ""
 
 # --- Binary existence checks ---
+# Resolve binary path (handle Windows .exe)
+bin_path() {
+  local bin="$1"
+  if [ -f "$RELEASE_DIR/$bin" ]; then
+    echo "$RELEASE_DIR/$bin"
+  elif [ -f "$RELEASE_DIR/$bin.exe" ]; then
+    echo "$RELEASE_DIR/$bin.exe"
+  else
+    echo ""
+  fi
+}
+
 echo "Binary checks:"
 for bin in idtech3 idtech3_server; do
-  if [ -f "$RELEASE_DIR/$bin" ]; then
+  path="$(bin_path "$bin")"
+  if [ -n "$path" ]; then
     pass "$bin exists"
   else
     fail "$bin not found"
   fi
 done
 
-for lib in idtech3_vulkan.so idtech3_opengl.so; do
+for lib in idtech3_vulkan.so idtech3_opengl.so idtech3_vulkan.dylib idtech3_opengl.dylib; do
   if [ -f "$RELEASE_DIR/$lib" ]; then
     pass "$lib exists"
-  else
-    warn "$lib not found (renderer may be statically linked)"
   fi
 done
+if [ ! -f "$RELEASE_DIR/idtech3_vulkan.so" ] && [ ! -f "$RELEASE_DIR/idtech3_vulkan.dylib" ]; then
+  warn "renderer libs not found (may be statically linked)"
+fi
 
 echo ""
 
 # --- Binary format checks ---
 echo "Format checks:"
 for bin in idtech3 idtech3_server; do
-  if [ -f "$RELEASE_DIR/$bin" ]; then
-    filetype="$(file -b "$RELEASE_DIR/$bin" 2>/dev/null || echo "unknown")"
+  path="$(bin_path "$bin")"
+  if [ -n "$path" ]; then
+    filetype="$(file -b "$path" 2>/dev/null || echo "unknown")"
     if echo "$filetype" | grep -q "ELF\|Mach-O\|PE32"; then
       pass "$bin is a valid executable ($filetype)"
     else
@@ -67,8 +82,9 @@ echo ""
 
 # --- Dedicated server startup test ---
 echo "Server startup test:"
-if [ -f "$RELEASE_DIR/idtech3_server" ]; then
-  output="$(timeout 5 "$RELEASE_DIR/idtech3_server" +set dedicated 1 +set com_hunkMegs 64 +quit 2>&1 || true)"
+SERVER_PATH="$(bin_path "idtech3_server")"
+if [ -n "$SERVER_PATH" ]; then
+  output="$(timeout 5 "$SERVER_PATH" +set dedicated 1 +set com_hunkMegs 64 +quit 2>&1 || true)"
 
   if echo "$output" | grep -q "id Tech 3"; then
     pass "Server identifies as id Tech 3"
@@ -90,6 +106,7 @@ if [ -f "$RELEASE_DIR/idtech3_server" ]; then
 else
   fail "idtech3_server not found, cannot run startup test"
 fi
+
 
 echo ""
 

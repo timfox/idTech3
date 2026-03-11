@@ -188,15 +188,26 @@ See [HDR_GAPS.md](HDR_GAPS.md) for HDR pipeline gaps, risks, and render order.
 
 The OpenGL renderer provides compatibility for systems without Vulkan support. It implements the same `refexport_t` interface with classic OpenGL fixed-function and shader-based rendering.
 
-Features:
-- Classic Quake III Arena rendering
-- Multi-texture support
-- Vertex and fragment programs
-- Dynamic lighting
-- Stencil shadows
-- Fog volumes (distance-based)
+### OpenGL vs Vulkan Feature Parity
 
-The OpenGL renderer does not include PBR, volumetric fog, SSAO, SMAA, bloom, fluid simulation, or IQM morph target evaluation.
+| Feature | Vulkan | OpenGL |
+|---------|--------|--------|
+| PBR (metalness/roughness, IBL) | ✓ | — |
+| Volumetric fog | ✓ | — |
+| SSAO / HBAO | ✓ | — |
+| SMAA | ✓ | — |
+| Bloom, HDR tonemapping | ✓ | — |
+| OIT (order-independent transparency) | ✓ | — |
+| IQM morph targets | ✓ | — |
+| Fluid simulation (fog) | ✓ | — |
+| Vegetation wind (GPU compute) | ✓ | — |
+| SDF text | ✓ | ✓ |
+| Dynamic lighting | ✓ | ✓ |
+| Stencil shadows | ✓ | ✓ |
+| Fog volumes | ✓ | ✓ |
+| Multi-texture, vertex/fragment programs | ✓ | ✓ |
+
+OpenGL is the compatibility fallback; Vulkan is the primary feature backend. Use Vulkan when available for PBR, HDR, and advanced effects.
 
 ## Future Renderers (Planned)
 
