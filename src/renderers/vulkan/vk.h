@@ -1325,6 +1325,7 @@ extern PFN_vkCmdPushConstants		qvkCmdPushConstants;
 extern PFN_vkCmdSetScissor			qvkCmdSetScissor;
 extern PFN_vkCmdSetViewport			qvkCmdSetViewport;
 extern PFN_vkUpdateDescriptorSets	qvkUpdateDescriptorSets;
+extern PFN_vkCreateDescriptorSetLayout qvkCreateDescriptorSetLayout;
 extern PFN_vkAllocateCommandBuffers	qvkAllocateCommandBuffers;
 extern PFN_vkBeginCommandBuffer		qvkBeginCommandBuffer;
 extern PFN_vkEndCommandBuffer		qvkEndCommandBuffer;
