@@ -255,7 +255,7 @@ static PFN_vkQueuePresentKHR							qvkQueuePresentKHR;
 static PFN_vkGetBufferMemoryRequirements2KHR			qvkGetBufferMemoryRequirements2KHR;
 static PFN_vkGetImageMemoryRequirements2KHR				qvkGetImageMemoryRequirements2KHR;
 
-static PFN_vkDebugMarkerSetObjectNameEXT				qvkDebugMarkerSetObjectNameEXT;
+PFN_vkDebugMarkerSetObjectNameEXT				qvkDebugMarkerSetObjectNameEXT;
 
 static PFN_vkCmdClearColorImage								qvkCmdClearColorImage;
 
@@ -347,24 +347,7 @@ static VkFlags get_composite_alpha( VkCompositeAlphaFlagsKHR flags )
 */
 
 
-// debug markers
-#define SET_OBJECT_NAME(obj,objName,objType) vk_set_object_name( (uint64_t)(obj), (objName), (objType) )
-
-void vk_set_object_name( uint64_t obj, const char *objName, VkDebugReportObjectTypeEXT objType )
-{
-	if ( qvkDebugMarkerSetObjectNameEXT && obj )
-	{
-		VkDebugMarkerObjectNameInfoEXT info;
-		info.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_NAME_INFO_EXT;
-		info.pNext = NULL;
-		info.objectType = objType;
-		info.object = obj;
-		info.pObjectName = objName;
-		qvkDebugMarkerSetObjectNameEXT( vk.device, &info );
-	}
-}
-
-
+/* vk_set_object_name, SET_OBJECT_NAME moved to vk_validation.c */
 /* vk_create_render_passes moved to vk_render_pass.c */
 static void allocate_and_bind_image_memory(VkImage image) {
 	VkMemoryRequirements memory_requirements;

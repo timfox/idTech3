@@ -1343,3 +1343,4 @@ extern PFN_vkResetFences				qvkResetFences;
 extern PFN_vkResetCommandBuffer		qvkResetCommandBuffer;
 extern PFN_vkCreateDescriptorSetLayout qvkCreateDescriptorSetLayout;
 extern PFN_vkCreateRenderPass qvkCreateRenderPass;
+extern PFN_vkDebugMarkerSetObjectNameEXT qvkDebugMarkerSetObjectNameEXT;
