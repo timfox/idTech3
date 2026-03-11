@@ -113,6 +113,7 @@ void vk_end_render_pass_tracked( void )
 }
 void vk_create_render_passes( void )
 {
+	VkSampleCountFlagBits vkSamples = vk_get_main_rasterization_samples();
 	VkAttachmentDescription attachments[5]; // color resolve | depth | motion resolve | msaa color | msaa motion
 	VkAttachmentReference colorResolveRefs[2];
 	VkAttachmentReference colorResolveRef;
@@ -168,7 +169,7 @@ void vk_create_render_passes( void )
 	// depth buffer
 	attachments[1].flags = 0;
 	attachments[1].format = depth_format;
-	attachments[1].samples = vk_get_main_rasterization_samples();
+	attachments[1].samples = vkSamples;
 	attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; // Need empty depth buffer before use
 	attachments[1].stencilLoadOp = glConfig.stencilBits ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -226,7 +227,7 @@ void vk_create_render_passes( void )
 	{
 		attachments[3].flags = 0;
 		attachments[3].format = vk.color_format;
-		attachments[3].samples = vk_get_main_rasterization_samples();
+		attachments[3].samples = vkSamples;
 #ifdef USE_BUFFER_CLEAR
 		attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 #else
@@ -241,7 +242,7 @@ void vk_create_render_passes( void )
 		if ( fboActive ) {
 			attachments[4].flags = 0;
 			attachments[4].format = VK_FORMAT_R16G16_SFLOAT;
-			attachments[4].samples = vk_get_main_rasterization_samples();
+			attachments[4].samples = vkSamples;
 #ifdef USE_BUFFER_CLEAR
 			attachments[4].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 #else
@@ -423,7 +424,7 @@ void vk_create_render_passes( void )
 	{
 		/* OIT accumulation pass: RGBA16F, clear to (0,0,0,0), additive blend.
 		 * Depth attachment (when MSAA off): depth-test transparents against opaque scene. */
-		desc.attachmentCount = ( vk_get_main_rasterization_samples() == VK_SAMPLE_COUNT_1_BIT ) ? 2 : 1;
+		desc.attachmentCount = ( vkSamples == VK_SAMPLE_COUNT_1_BIT ) ? 2 : 1;
 		colorRef0.attachment = 0;
 		colorRef0.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		Com_Memset( &subpass, 0, sizeof( subpass ) );
@@ -439,7 +440,7 @@ void vk_create_render_passes( void )
 		attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		attachments[0].initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		if ( vk_get_main_rasterization_samples() == VK_SAMPLE_COUNT_1_BIT ) {
+		if ( vkSamples == VK_SAMPLE_COUNT_1_BIT ) {
 			attachments[1].flags = 0;
 			attachments[1].format = depth_format;
 			attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
@@ -616,7 +617,7 @@ void vk_create_render_passes( void )
 		ui_attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 		ui_attachments[1].format = depth_format;
-		ui_attachments[1].samples = vk_get_main_rasterization_samples();
+		ui_attachments[1].samples = vkSamples;
 		ui_attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 		ui_attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		ui_attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
@@ -659,7 +660,7 @@ void vk_create_render_passes( void )
 
 		if ( vk.msaaActive ) {
 			ui_attachments[3].format = vk.color_format;
-			ui_attachments[3].samples = vk_get_main_rasterization_samples();
+			ui_attachments[3].samples = vkSamples;
 			ui_attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 			ui_attachments[3].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 			ui_attachments[3].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -668,7 +669,7 @@ void vk_create_render_passes( void )
 			ui_attachments[3].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 			ui_attachments[4].format = VK_FORMAT_R16G16_SFLOAT;
-			ui_attachments[4].samples = vk_get_main_rasterization_samples();
+			ui_attachments[4].samples = vkSamples;
 			ui_attachments[4].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 			ui_attachments[4].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 			ui_attachments[4].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -701,14 +702,14 @@ void vk_create_render_passes( void )
 
 		Com_Memset( atm_att, 0, sizeof( atm_att ) );
 		atm_att[0].format = vk.color_format;
-		atm_att[0].samples = (VkSampleCountFlagBits)vk_get_main_rasterization_samples();
+		atm_att[0].samples = vkSamples;
 		atm_att[0].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 		atm_att[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 		atm_att[0].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		atm_att[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 		atm_att[1].format = vk.depth_format;
-		atm_att[1].samples = (VkSampleCountFlagBits)vk_get_main_rasterization_samples();
+		atm_att[1].samples = vkSamples;
 		atm_att[1].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 		atm_att[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 		atm_att[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
@@ -1007,7 +1008,7 @@ void vk_create_render_passes( void )
         {   			
 			desc.attachmentCount = 2;
 			attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-			attachments[1].samples = vk_get_main_rasterization_samples();
+			attachments[1].samples = vkSamples;
 
 			colorRef0.attachment = 0;
 			colorRef0.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -1023,7 +1024,7 @@ void vk_create_render_passes( void )
 
 			if ( vk.msaaActive ) {
 				desc.attachmentCount = 3;
-				attachments[2].samples = vk_get_main_rasterization_samples();
+				attachments[2].samples = vkSamples;
 				attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_STORE; 
 
 				colorRef0.attachment = 2; // msaa image attachment

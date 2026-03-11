@@ -34,6 +34,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #else
 #include <stdlib.h>
 #endif
+#include <string.h>
 
 #ifdef USE_VULKAN_API
 #	if defined(USE_LOCAL_HEADERS)
@@ -679,25 +680,84 @@ void GLimp_Init( glconfig_t *config )
 	r_stereoEnabled = Cvar_Get( "r_stereoEnabled", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	Cvar_SetDescription( r_stereoEnabled, "Enable stereo rendering for techniques like shutter glasses." );
 
-	// Create the window and set up the context
-	err = GLimp_StartDriverAndSetMode( r_mode->integer, r_modeFullscreen->string, r_fullscreen->integer, qfalse );
-	if ( err != RSERR_OK )
+	// Create the window and set up the context (with driver retry on ARM)
 	{
-		if ( err == RSERR_FATAL_ERROR )
+		int driverRetry;
+
+		err = GLimp_StartDriverAndSetMode( r_mode->integer, r_modeFullscreen->string, r_fullscreen->integer, qfalse );
+		if ( err != RSERR_OK && err != RSERR_FATAL_ERROR )
 		{
-			Com_Error( ERR_FATAL, "GLimp_Init() - could not load OpenGL subsystem" );
-			return;
+			if ( r_mode->integer != 3 || ( r_fullscreen->integer && atoi( r_modeFullscreen->string ) != 3 ) )
+			{
+				Com_Printf( "Setting \\r_mode %d failed, falling back on \\r_mode %d\n", r_mode->integer, 3 );
+				err = GLimp_StartDriverAndSetMode( 3, "", r_fullscreen->integer, qfalse );
+			}
+			if ( err != RSERR_OK )
+			{
+				Com_Printf( "r_mode 3 failed, trying r_mode -1 (640x480)\n" );
+				Cvar_Set( "r_customWidth", "640" );
+				Cvar_Set( "r_customHeight", "480" );
+				err = GLimp_StartDriverAndSetMode( -1, "", r_fullscreen->integer, qfalse );
+				if ( err == RSERR_OK )
+					Cvar_Set( "r_mode", "-1" );
+			}
+			if ( err != RSERR_OK )
+			{
+				Com_Printf( "r_mode -1 (640x480) failed, trying 800x600\n" );
+				Cvar_Set( "r_customWidth", "800" );
+				Cvar_Set( "r_customHeight", "600" );
+				err = GLimp_StartDriverAndSetMode( -1, "", r_fullscreen->integer, qfalse );
+				if ( err == RSERR_OK )
+					Cvar_Set( "r_mode", "-1" );
+			}
+			if ( err != RSERR_OK && r_fullscreen->integer )
+			{
+				Com_Printf( "Fullscreen failed, trying windowed mode\n" );
+				Cvar_Set( "r_fullscreen", "0" );
+				err = GLimp_StartDriverAndSetMode( 3, "", 0, qfalse );
+			}
 		}
 
-		if ( r_mode->integer != 3 || ( r_fullscreen->integer && atoi( r_modeFullscreen->string ) != 3 ) )
+		for ( driverRetry = 0; driverRetry < 2 && err != RSERR_OK && err != RSERR_FATAL_ERROR; driverRetry++ )
 		{
-			Com_Printf( "Setting \\r_mode %d failed, falling back on \\r_mode %d\n", r_mode->integer, 3 );
-			if ( GLimp_StartDriverAndSetMode( 3, "", r_fullscreen->integer, qfalse ) != RSERR_OK )
+#if defined(__arm__) || defined(__aarch64__)
 			{
-				// Nothing worked, give up
-				Com_Error( ERR_FATAL, "GLimp_Init() - could not load OpenGL subsystem" );
-				return;
+				const char *vidDriver = SDL_GetCurrentVideoDriver();
+				if ( driverRetry == 0 && vidDriver && strcmp( vidDriver, "x11" ) == 0 )
+			{
+				Com_Printf( "[GL] x11 failed, trying wayland\n" );
+				Cvar_Set( "r_vid_driver", "wayland" );
+				SDL_QuitSubSystem( SDL_INIT_VIDEO );
+				err = GLimp_StartDriverAndSetMode( r_mode->integer, r_modeFullscreen->string, r_fullscreen->integer, qfalse );
+				if ( err != RSERR_OK )
+					err = GLimp_StartDriverAndSetMode( 3, "", r_fullscreen->integer, qfalse );
+				if ( err != RSERR_OK )
+				{
+					Cvar_Set( "r_customWidth", "640" );
+					Cvar_Set( "r_customHeight", "480" );
+					err = GLimp_StartDriverAndSetMode( -1, "", r_fullscreen->integer, qfalse );
+				}
+				if ( err != RSERR_OK && r_fullscreen->integer )
+				{
+					Cvar_Set( "r_fullscreen", "0" );
+					err = GLimp_StartDriverAndSetMode( 3, "", 0, qfalse );
+				}
+				continue;
 			}
+			}
+#endif
+			break;
+		}
+
+		if ( err == RSERR_FATAL_ERROR )
+		{
+			Com_Error( ERR_FATAL, "GLimp_Init() - could not load OpenGL subsystem: %s", SDL_GetError() );
+			return;
+		}
+		if ( err != RSERR_OK )
+		{
+			Com_Error( ERR_FATAL, "GLimp_Init() - could not load OpenGL subsystem: %s", SDL_GetError() );
+			return;
 		}
 	}
 
@@ -778,20 +838,69 @@ void VKimp_Init( glconfig_t *config )
 	// feedback to renderer configuration
 	glw_state.config = config;
 
-	// Create the window and set up the context
-	err = GLimp_StartDriverAndSetMode( r_mode->integer, r_modeFullscreen->string, r_fullscreen->integer, qtrue /* Vulkan */ );
-	if ( err != RSERR_OK )
+	// Create the window and set up the context (with driver retry on ARM)
 	{
+		int driverRetry;
+
+		err = RSERR_UNKNOWN;
+		for ( driverRetry = 0; driverRetry < 2; driverRetry++ )
+		{
+			err = GLimp_StartDriverAndSetMode( r_mode->integer, r_modeFullscreen->string, r_fullscreen->integer, qtrue /* Vulkan */ );
+			if ( err != RSERR_OK && err != RSERR_FATAL_ERROR )
+			{
+				Com_Printf( "Setting r_mode %d failed, falling back on r_mode %d\n", r_mode->integer, 3 );
+
+				err = GLimp_StartDriverAndSetMode( 3, "", r_fullscreen->integer, qtrue /* Vulkan */ );
+			}
+			if ( err != RSERR_OK && err != RSERR_FATAL_ERROR )
+			{
+				Com_Printf( "r_mode 3 failed, trying r_mode -1 (640x480)\n" );
+				Cvar_Set( "r_customWidth", "640" );
+				Cvar_Set( "r_customHeight", "480" );
+				err = GLimp_StartDriverAndSetMode( -1, "", r_fullscreen->integer, qtrue /* Vulkan */ );
+				if ( err == RSERR_OK )
+					Cvar_Set( "r_mode", "-1" );
+			}
+			if ( err != RSERR_OK && err != RSERR_FATAL_ERROR )
+			{
+				Com_Printf( "r_mode -1 (640x480) failed, trying 800x600\n" );
+				Cvar_Set( "r_customWidth", "800" );
+				Cvar_Set( "r_customHeight", "600" );
+				err = GLimp_StartDriverAndSetMode( -1, "", r_fullscreen->integer, qtrue /* Vulkan */ );
+				if ( err == RSERR_OK )
+					Cvar_Set( "r_mode", "-1" );
+			}
+			if ( err != RSERR_OK && err != RSERR_FATAL_ERROR && r_fullscreen->integer )
+			{
+				Com_Printf( "Fullscreen failed, trying windowed mode\n" );
+				Cvar_Set( "r_fullscreen", "0" );
+				err = GLimp_StartDriverAndSetMode( 3, "", 0, qtrue /* Vulkan */ );
+			}
+			if ( err == RSERR_OK )
+				break;
+
+			/* On ARM: if x11 failed, try wayland as last resort */
+#if defined(__arm__) || defined(__aarch64__)
+			{
+				const char *vidDriver = SDL_GetCurrentVideoDriver();
+				if ( driverRetry == 0 && vidDriver && strcmp( vidDriver, "x11" ) == 0 )
+			{
+				Com_Printf( "[VK] x11 failed, trying wayland\n" );
+				Cvar_Set( "r_vid_driver", "wayland" );
+				SDL_QuitSubSystem( SDL_INIT_VIDEO );
+				continue;
+			}
+			}
+#endif
+			break;
+		}
+
 		if ( err == RSERR_FATAL_ERROR )
 		{
 			Com_Error( ERR_FATAL, "VKimp_Init() - could not load Vulkan subsystem: %s", SDL_GetError() );
 			return;
 		}
-
-		Com_Printf( "Setting r_mode %d failed, falling back on r_mode %d\n", r_mode->integer, 3 );
-
-		err = GLimp_StartDriverAndSetMode( 3, "", r_fullscreen->integer, qtrue /* Vulkan */ );
-		if( err != RSERR_OK )
+		if ( err != RSERR_OK )
 		{
 			Com_Error( ERR_FATAL, "VKimp_Init() - could not load Vulkan subsystem: %s", SDL_GetError() );
 			return;

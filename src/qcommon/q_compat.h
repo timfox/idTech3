@@ -4,7 +4,10 @@
 #define Q_STATIC_ASSERT_CONCAT_IMPL(a, b) a##b
 #define Q_STATIC_ASSERT_CONCAT(a, b) Q_STATIC_ASSERT_CONCAT_IMPL(a, b)
 
-#if !defined(_Static_assert) && (!defined(__STDC_VERSION__) || (__STDC_VERSION__ < 201112L))
+/* Only define _Static_assert for C. In C++, static_assert is a keyword and our macro
+ * would break C++ standard library headers (e.g. libc++ on macOS) when expressions
+ * contain commas. */
+#if !defined(__cplusplus) && !defined(_Static_assert) && (!defined(__STDC_VERSION__) || (__STDC_VERSION__ < 201112L))
 #  if defined(_MSC_VER)
 #    include <assert.h>
 #    if defined(static_assert)
@@ -25,7 +28,11 @@
 #endif
 
 #ifndef STATIC_ASSERT
-#  define STATIC_ASSERT(cond, msg) _Static_assert((cond), msg)
+#  if defined(__cplusplus)
+#    define STATIC_ASSERT(cond, msg) static_assert((cond), msg)
+#  else
+#    define STATIC_ASSERT(cond, msg) _Static_assert((cond), msg)
+#  endif
 #endif
 
 #ifndef ARRAY_LEN

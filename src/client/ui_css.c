@@ -71,7 +71,7 @@ static void skip_ws_and_comments( const char **pp ) {
 
 /* Parse #hex, #rgb, rgb(r,g,b), rgba(r,g,b,a) into vec4_t. Returns qfalse on parse error. */
 static qboolean parse_color( const char *s, vec4_t out ) {
-	int r, g, b, a;
+	int r, g, b;
 	float fr, fg, fb, fa;
 	if ( !s || !s[0] ) return qfalse;
 	out[0] = out[1] = out[2] = 1.0f;
