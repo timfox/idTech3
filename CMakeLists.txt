@@ -1416,7 +1416,7 @@ if(MSVC)
     )
 else()
     set_source_files_properties(src/renderers/vulkan/utils/mikktspace/mikktspace.c PROPERTIES
-        COMPILE_OPTIONS "-Wno-shadow"
+        COMPILE_OPTIONS "-Wno-shadow;-Wno-unused-but-set-variable"
     )
 endif()
 
