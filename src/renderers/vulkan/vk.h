@@ -379,6 +379,7 @@ qboolean vk_consume_validation_error( char *buffer, size_t bufsize );
 
 // Debug: set object name for Vulkan debugger/profiler (no-op if extension unavailable).
 void vk_set_object_name( uint64_t obj, const char *objName, VkDebugReportObjectTypeEXT objType );
+#define SET_OBJECT_NAME(obj, objName, objType) vk_set_object_name( (uint64_t)(obj), (objName), (objType) )
 
 // Initializes VK_Instance structure.
 // After calling this function we get fully functional vulkan subsystem.
@@ -476,6 +477,7 @@ extern PFN_vkCmdCopyImageToBuffer qvkCmdCopyImageToBuffer;
 extern PFN_vkCmdDispatch qvkCmdDispatch;
 extern PFN_vkCmdDraw qvkCmdDraw;
 extern PFN_vkCreateGraphicsPipelines qvkCreateGraphicsPipelines;
+extern PFN_vkCreateRenderPass qvkCreateRenderPass;
 extern PFN_vkDestroyPipeline qvkDestroyPipeline;
 
 uint32_t vk_tess_index( uint32_t numIndexes, const void *src );
@@ -1324,6 +1326,7 @@ extern PFN_vkCmdPushConstants		qvkCmdPushConstants;
 extern PFN_vkCmdSetScissor			qvkCmdSetScissor;
 extern PFN_vkCmdSetViewport			qvkCmdSetViewport;
 extern PFN_vkUpdateDescriptorSets	qvkUpdateDescriptorSets;
+extern PFN_vkCreateDescriptorSetLayout qvkCreateDescriptorSetLayout;
 extern PFN_vkAllocateCommandBuffers	qvkAllocateCommandBuffers;
 extern PFN_vkBeginCommandBuffer		qvkBeginCommandBuffer;
 extern PFN_vkEndCommandBuffer		qvkEndCommandBuffer;

@@ -312,10 +312,18 @@ static qboolean ffmpeg_decode_audio_frame(ffmpegContext_t *ctx, cinAudio_t *audi
 	}
 
 	outputPlanes[0] = ctx->audioBuffer;
+	/* swr_convert expects const uint8_t **; extended_data is uint8_t **. Cast is safe: we only read. */
+#if defined(__clang__) || defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-qual"
+#endif
 	ret = swr_convert(
 		ctx->swrCtx,
 		outputPlanes, outputSamples,
-		(const uint8_t *const *)ctx->audioFrame->extended_data, ctx->audioFrame->nb_samples );
+		(const uint8_t **)ctx->audioFrame->extended_data, ctx->audioFrame->nb_samples );
+#if defined(__clang__) || defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 	if ( ret <= 0 ) {
 		return qfalse;
 	}

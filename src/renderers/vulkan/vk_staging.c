@@ -62,7 +62,7 @@ qboolean vk_wait_staging_buffer( void )
 
 void vk_flush_staging_buffer( qboolean final )
 {
-	const VkPipelineStageFlags wait_dst_stage_mask = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+	VkPipelineStageFlags wait_dst_stage_mask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	VkSemaphore waits;
 	VkSubmitInfo submit_info;
 	VkResult res;

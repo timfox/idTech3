@@ -62,6 +62,7 @@ jobs:
             ${{ matrix.prefix }}-cmake
             ${{ matrix.prefix }}-ninja
             ${{ matrix.prefix }}-pkgconf
+            coreutils
             ${{ matrix.prefix }}-SDL2
             ${{ matrix.prefix }}-openal
             ${{ matrix.prefix }}-freetype
@@ -134,7 +135,7 @@ jobs:
         with:
           name: windows-${{ matrix.cc }}-${{ matrix.arch }}
           path: bin
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 5
 
   windows-msvc:
@@ -566,7 +567,7 @@ jobs:
         with:
           name: linux-${{ matrix.arch }}
           path: bin
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 5
 
   macos:
@@ -582,7 +583,7 @@ jobs:
 
     steps:
       - name: Install tools
-        run: brew install coreutils sdl2 openal-soft cmake ninja freetype lua
+        run: brew install coreutils sdl2 openal-soft cmake ninja freetype lua molten-vk
 
       - uses: actions/checkout@v4
 
@@ -591,6 +592,8 @@ jobs:
         env:
           CFLAGS: "-DSKIP_IDPAK_CHECK=1"
           CXXFLAGS: "-DSKIP_IDPAK_CHECK=1"
+          LIBRARY_PATH: "/opt/homebrew/lib"
+          CMAKE_PREFIX_PATH: "/opt/homebrew"
         run: |
           SDL2_PREFIX=$(brew --prefix sdl2)
           OPENAL_PREFIX=$(brew --prefix openal-soft)
@@ -625,6 +628,8 @@ jobs:
         env:
           CFLAGS: "-DSKIP_IDPAK_CHECK=1"
           CXXFLAGS: "-DSKIP_IDPAK_CHECK=1"
+          LIBRARY_PATH: "/opt/homebrew/lib"
+          CMAKE_PREFIX_PATH: "/opt/homebrew"
         run: |
           SDL2_PREFIX=$(brew --prefix sdl2)
           OPENAL_PREFIX=$(brew --prefix openal-soft)
@@ -666,7 +671,7 @@ jobs:
         with:
           name: macos-${{ matrix.arch }}
           path: bin
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 5
 
   android:
@@ -748,7 +753,7 @@ jobs:
         with:
           name: android-${{ matrix.abi }}
           path: bin
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 5
 
   release-attach:

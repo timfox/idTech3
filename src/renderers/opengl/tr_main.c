@@ -1227,7 +1227,7 @@ static qboolean R_MirrorViewBySurface( const drawSurf_t *drawSurf, int entityNum
 #ifdef USE_PMLIGHT
 	// create dedicated set for each view
 	if ( r_numdlights + oldParms.num_dlights <= ARRAY_LEN( backEndData->dlights ) ) {
-		int i;
+		unsigned int i;
 		newParms.dlights = oldParms.dlights + oldParms.num_dlights;
 		newParms.num_dlights = oldParms.num_dlights;
 		r_numdlights += oldParms.num_dlights;
@@ -1317,13 +1317,13 @@ R_Radix
 */
 static ID_INLINE void R_Radix( int byteIdx, int size, const drawSurf_t *source, drawSurf_t *dest )
 {
-  int           count[ 256 ] = { 0 };
-  int           index[ 256 ];
-  int           i;
-  unsigned char *sortKey;
-  unsigned char *end;
+  int                 count[ 256 ] = { 0 };
+  int                 index[ 256 ];
+  int                 i;
+  const unsigned char *sortKey;
+  const unsigned char *end;
 
-  sortKey = ( (unsigned char *)&source[ 0 ].sort ) + byteIdx;
+  sortKey = ( (const unsigned char *)&source[ 0 ].sort ) + byteIdx;
   end = sortKey + ( size * sizeof( drawSurf_t ) );
   for( ; sortKey < end; sortKey += sizeof( drawSurf_t ) )
     ++count[ *sortKey ];
@@ -1333,7 +1333,7 @@ static ID_INLINE void R_Radix( int byteIdx, int size, const drawSurf_t *source, 
   for( i = 1; i < 256; ++i )
     index[ i ] = index[ i - 1 ] + count[ i - 1 ];
 
-  sortKey = ( (unsigned char *)&source[ 0 ].sort ) + byteIdx;
+  sortKey = ( (const unsigned char *)&source[ 0 ].sort ) + byteIdx;
   for( i = 0; i < size; ++i, sortKey += sizeof( drawSurf_t ) )
     dest[ index[ *sortKey ]++ ] = source[ i ];
 }
@@ -1473,7 +1473,7 @@ void R_AddLitSurf( surfaceType_t *surface, shader_t *shader, int fogIndex )
 {
 	struct litSurf_s *litsurf;
 
-	if ( tr.refdef.numLitSurfs >= ARRAY_LEN( backEndData->litSurfs ) )
+	if ( tr.refdef.numLitSurfs >= (int)ARRAY_LEN( backEndData->litSurfs ) )
 		return;
 
 	tr.pc.c_lit_surfs++;
@@ -1599,10 +1599,11 @@ static void R_SortDrawSurfs( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 #endif
 	{
 		dlight_t *dl;
+		unsigned int di;
 		// all the lit surfaces are in a single queue
 		// but each light's surfaces are sorted within its subsection
-		for ( i = 0; i < tr.refdef.num_dlights; ++i ) { 
-			dl = &tr.refdef.dlights[ i ];
+		for ( di = 0; di < tr.refdef.num_dlights; ++di ) {
+			dl = &tr.refdef.dlights[ di ];
 			if ( dl->head ) {
 				R_SortLitsurfs( dl );
 			}
