@@ -477,6 +477,7 @@ extern PFN_vkCmdCopyImageToBuffer qvkCmdCopyImageToBuffer;
 extern PFN_vkCmdDispatch qvkCmdDispatch;
 extern PFN_vkCmdDraw qvkCmdDraw;
 extern PFN_vkCreateGraphicsPipelines qvkCreateGraphicsPipelines;
+extern PFN_vkCreateRenderPass qvkCreateRenderPass;
 extern PFN_vkDestroyPipeline qvkDestroyPipeline;
 
 uint32_t vk_tess_index( uint32_t numIndexes, const void *src );
