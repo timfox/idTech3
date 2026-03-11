@@ -238,9 +238,9 @@ static void emit_popad( void );
 #endif
 
 // DROP is used with and without variadic args.
-// Use __VA_OPT__ (C23/GCC9+/Clang) to swallow the comma when __VA_ARGS__ is empty.
+// Use __VA_OPT__ (C2x/C23, GCC9+, Clang7+) to swallow the comma when __VA_ARGS__ is empty.
 // Fall back to ##__VA_ARGS__ for older compilers (MSVC, older GCC in GNU mode).
-#if (defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202311L)) || \
+#if (defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202000L)) || \
     (defined(__GNUC__) && !defined(__clang__) && __GNUC__ >= 9) || \
     (defined(__clang__) && __clang_major__ >= 7)
 #define DROP( reason, ... ) \
@@ -548,7 +548,7 @@ static void emit_op_reg_base_index( int prefix, int opcode, uint32_t reg, uint32
 			SWAP_INT( index, base ); // swap index with base
 		} else {
 #ifndef DEBUG_INT
-			DROP( "incorrect index register", ) ;
+			DROP( "incorrect index register" ) ;
 #else
 			return; // R_ESP cannot be used as index register
 #endif
@@ -1533,7 +1533,7 @@ static void wipe_var_range( const var_addr_t *v )
 	uint32_t i;
 #ifdef DEBUG_VM
 	if ( v->size == 0 || v->base == 0 )
-		DROP( "incorrect variable setup", ) ;
+		DROP( "incorrect variable setup" ) ;
 #endif
 	// wipe all types of overlapping variables
 	for ( i = 0; i < ARRAY_LEN( rx_regs ); i++ ) {
@@ -4185,7 +4185,7 @@ __compile:
 				dec_opstack(); // opstack -= 4
 #ifdef DEBUG_VM
 				if ( opstack != 0 )
-					DROP( "opStack corrupted on OP_LEAVE", ) ;
+					DROP( "opStack corrupted on OP_LEAVE" ) ;
 #endif
 
 #ifdef RET_OPTIMIZE
