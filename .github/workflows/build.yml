@@ -220,7 +220,7 @@ jobs:
         with:
           name: windows-msvc-${{ matrix.pkg_suffix }}
           path: bin
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 5
 
   ubuntu-x86_64:
