@@ -379,6 +379,7 @@ qboolean vk_consume_validation_error( char *buffer, size_t bufsize );
 
 // Debug: set object name for Vulkan debugger/profiler (no-op if extension unavailable).
 void vk_set_object_name( uint64_t obj, const char *objName, VkDebugReportObjectTypeEXT objType );
+#define SET_OBJECT_NAME(obj, objName, objType) vk_set_object_name( (uint64_t)(obj), (objName), (objType) )
 
 // Initializes VK_Instance structure.
 // After calling this function we get fully functional vulkan subsystem.
@@ -1333,3 +1334,4 @@ extern PFN_vkCreateSampler			qvkCreateSampler;
 extern PFN_vkDestroySampler			qvkDestroySampler;
 extern PFN_vkCreateSampler			qvkCreateSampler;
 extern PFN_vkDestroySampler			qvkDestroySampler;
+extern PFN_vkDebugMarkerSetObjectNameEXT qvkDebugMarkerSetObjectNameEXT;
