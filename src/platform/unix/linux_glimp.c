@@ -1810,7 +1810,21 @@ static qboolean GLW_LoadOpenGL( const char *name )
 			{
 				Com_Printf( "Setting \\r_mode %d failed, falling back on \\r_mode %d\n", r_mode->integer, 3 );
 
-				if ( GLW_StartDriverAndSetMode( 3, "", fullscreen, qfalse /* vulkan */ ) != RSERR_OK )
+				err = GLW_StartDriverAndSetMode( 3, "", fullscreen, qfalse /* vulkan */ );
+				if ( err != RSERR_OK )
+				{
+					Com_Printf( "r_mode 3 failed, trying r_mode -1 (640x480)\n" );
+					Cvar_Set( "r_customWidth", "640" );
+					Cvar_Set( "r_customHeight", "480" );
+					err = GLW_StartDriverAndSetMode( -1, "", fullscreen, qfalse /* vulkan */ );
+				}
+				if ( err != RSERR_OK && fullscreen )
+				{
+					Com_Printf( "Fullscreen failed, trying windowed mode\n" );
+					Cvar_Set( "r_fullscreen", "0" );
+					err = GLW_StartDriverAndSetMode( 3, "", qfalse, qfalse /* vulkan */ );
+				}
+				if ( err != RSERR_OK )
 				{
 					goto fail;
 				}
@@ -1958,6 +1972,24 @@ static qboolean GLW_LoadVulkan( void )
 
 		// create the window and set up the context
 		err = GLW_StartDriverAndSetMode( r_mode->integer, r_modeFullscreen->string, fullscreen, qtrue /* vulkan */ );
+		if ( err != RSERR_OK && err != RSERR_FATAL_ERROR )
+		{
+			Com_Printf( "Setting \\r_mode %d failed, falling back on \\r_mode %d\n", r_mode->integer, 3 );
+			err = GLW_StartDriverAndSetMode( 3, "", fullscreen, qtrue /* vulkan */ );
+		}
+		if ( err != RSERR_OK && err != RSERR_FATAL_ERROR )
+		{
+			Com_Printf( "r_mode 3 failed, trying r_mode -1 (640x480)\n" );
+			Cvar_Set( "r_customWidth", "640" );
+			Cvar_Set( "r_customHeight", "480" );
+			err = GLW_StartDriverAndSetMode( -1, "", fullscreen, qtrue /* vulkan */ );
+		}
+		if ( err != RSERR_OK && err != RSERR_FATAL_ERROR && fullscreen )
+		{
+			Com_Printf( "Fullscreen failed, trying windowed mode\n" );
+			Cvar_Set( "r_fullscreen", "0" );
+			err = GLW_StartDriverAndSetMode( 3, "", qfalse, qtrue /* vulkan */ );
+		}
 		if ( err == RSERR_OK )
 		{
 			return qtrue;

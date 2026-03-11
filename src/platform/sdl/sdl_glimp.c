@@ -692,9 +692,22 @@ void GLimp_Init( glconfig_t *config )
 		if ( r_mode->integer != 3 || ( r_fullscreen->integer && atoi( r_modeFullscreen->string ) != 3 ) )
 		{
 			Com_Printf( "Setting \\r_mode %d failed, falling back on \\r_mode %d\n", r_mode->integer, 3 );
-			if ( GLimp_StartDriverAndSetMode( 3, "", r_fullscreen->integer, qfalse ) != RSERR_OK )
+			err = GLimp_StartDriverAndSetMode( 3, "", r_fullscreen->integer, qfalse );
+			if ( err != RSERR_OK )
 			{
-				// Nothing worked, give up
+				Com_Printf( "r_mode 3 failed, trying r_mode -1 (640x480)\n" );
+				Cvar_Set( "r_customWidth", "640" );
+				Cvar_Set( "r_customHeight", "480" );
+				err = GLimp_StartDriverAndSetMode( -1, "", r_fullscreen->integer, qfalse );
+			}
+			if ( err != RSERR_OK && r_fullscreen->integer )
+			{
+				Com_Printf( "Fullscreen failed, trying windowed mode\n" );
+				Cvar_Set( "r_fullscreen", "0" );
+				err = GLimp_StartDriverAndSetMode( 3, "", 0, qfalse );
+			}
+			if ( err != RSERR_OK )
+			{
 				Com_Error( ERR_FATAL, "GLimp_Init() - could not load OpenGL subsystem" );
 				return;
 			}
@@ -791,7 +804,20 @@ void VKimp_Init( glconfig_t *config )
 		Com_Printf( "Setting r_mode %d failed, falling back on r_mode %d\n", r_mode->integer, 3 );
 
 		err = GLimp_StartDriverAndSetMode( 3, "", r_fullscreen->integer, qtrue /* Vulkan */ );
-		if( err != RSERR_OK )
+		if ( err != RSERR_OK )
+		{
+			Com_Printf( "r_mode 3 failed, trying r_mode -1 (640x480)\n" );
+			Cvar_Set( "r_customWidth", "640" );
+			Cvar_Set( "r_customHeight", "480" );
+			err = GLimp_StartDriverAndSetMode( -1, "", r_fullscreen->integer, qtrue /* Vulkan */ );
+		}
+		if ( err != RSERR_OK && r_fullscreen->integer )
+		{
+			Com_Printf( "Fullscreen failed, trying windowed mode\n" );
+			Cvar_Set( "r_fullscreen", "0" );
+			err = GLimp_StartDriverAndSetMode( 3, "", 0, qtrue /* Vulkan */ );
+		}
+		if ( err != RSERR_OK )
 		{
 			Com_Error( ERR_FATAL, "VKimp_Init() - could not load Vulkan subsystem: %s", SDL_GetError() );
 			return;
