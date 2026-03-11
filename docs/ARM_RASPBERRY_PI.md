@@ -31,6 +31,11 @@ Raspberry Pi OS ships Mesa V3DV (Vulkan 1.3) by default on Pi 4 and 5. The engin
 
 4. **Performance**: On RPi4, the Vulkan driver has poor GLSL shader performance. The engine disables high-quality dynamic lights by default (`r_dlightMode 0`) on ARM. You can try `r_dlightMode 1` for per-pixel lights if performance allows.
 
+### Build Troubleshooting
+
+- **Missing libstdc++-14-dev**: On Ubuntu 24.04 cross-compiling ARM, install `libstdc++-14-dev` so Clang can link C++.
+- **Shader compilation**: Ensure `glslangValidator` and Python 3 are installed. Run `./scripts/compile_shaders.sh` before building.
+
 ### Build for ARM
 
 ```bash

@@ -1335,3 +1335,14 @@ extern PFN_vkDestroySampler			qvkDestroySampler;
 extern PFN_vkCreateSampler			qvkCreateSampler;
 extern PFN_vkDestroySampler			qvkDestroySampler;
 extern PFN_vkDebugMarkerSetObjectNameEXT qvkDebugMarkerSetObjectNameEXT;
+/* Staging buffer (vk_staging.c) */
+extern PFN_vkDestroyBuffer qvkDestroyBuffer;
+extern PFN_vkFreeMemory qvkFreeMemory;
+extern PFN_vkCreateBuffer qvkCreateBuffer;
+extern PFN_vkGetBufferMemoryRequirements qvkGetBufferMemoryRequirements;
+extern PFN_vkAllocateMemory qvkAllocateMemory;
+extern PFN_vkBindBufferMemory qvkBindBufferMemory;
+extern PFN_vkMapMemory qvkMapMemory;
+extern PFN_vkWaitForFences qvkWaitForFences;
+extern PFN_vkResetFences qvkResetFences;
+extern PFN_vkResetCommandBuffer qvkResetCommandBuffer;
