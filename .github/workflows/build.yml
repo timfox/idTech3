@@ -55,6 +55,7 @@ jobs:
         with:
           install: >-
             base-devel
+            coreutils
             ${{ matrix.prefix }}-binutils
             ${{ matrix.prefix }}-make
             ${{ matrix.prefix }}-${{ matrix.cc }}
@@ -529,8 +530,8 @@ jobs:
               -DRENDERER_DEFAULT=vulkan \
               -DSKIP_IDPAK_CHECK=ON \
             -DSKIP_SHADER_REGEN=ON \
-              -Wno-dev
-            cmake --build build-vk-${{ matrix.btype }} -j"$(nproc)"
+            -Wno-dev
+          cmake --build build-vk-${{ matrix.btype }} -j"$(nproc)"
 
             find "build-vk-${{ matrix.btype }}" -maxdepth 2 -type f -name 'idtech3*' -print -exec cp -f {} "$OUTDIR/" \;
 
@@ -547,8 +548,8 @@ jobs:
               -DRENDERER_DEFAULT=opengl \
               -DSKIP_IDPAK_CHECK=ON \
             -DSKIP_SHADER_REGEN=ON \
-              -Wno-dev
-            cmake --build build-gl-${{ matrix.btype }} -j"$(nproc)"
+            -Wno-dev
+          cmake --build build-gl-${{ matrix.btype }} -j"$(nproc)"
 
             find "build-gl-${{ matrix.btype }}" -maxdepth 2 -type f -name 'idtech3*' -print -exec cp -f {} "$OUTDIR/" \;
 
