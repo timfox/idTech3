@@ -3754,6 +3754,14 @@ static void CL_InitRef( void ) {
 	Com_Printf( "----- Initializing Renderer ----\n" );
 
 #if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
+#if defined(USE_VULKAN_API) && (defined(__arm__) || defined(__aarch64__))
+	/* SDL may lack Vulkan support on ARM (e.g. RPi system SDL); fall back to OpenGL */
+	if ( Q_stricmp( cl_renderer->string, "vulkan" ) == 0 && !GLimp_VulkanAvailable() )
+	{
+		Com_Printf( "[VK] Vulkan not available in SDL, falling back to OpenGL\n" );
+		Cvar_Set( "cl_renderer", "opengl" );
+	}
+#endif
 
 #if defined (__linux__) && defined(__i386__)
 #define REND_ARCH_STRING "x86"
@@ -4289,7 +4297,10 @@ static void CL_InitGLimp_Cvars( void )
 	cl_drawBuffer = Cvar_Get( "r_drawBuffer", "GL_BACK", CVAR_CHEAT );
 	Cvar_SetDescription( cl_drawBuffer, "Specifies buffer to draw from: GL_FRONT or GL_BACK." );
 #if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
-#ifdef RENDERER_DEFAULT
+#if defined(USE_VULKAN_API) && (defined(__arm__) || defined(__aarch64__))
+	/* ARM/RPi: default to OpenGL; many systems have SDL without Vulkan support */
+	cl_renderer = Cvar_Get( "cl_renderer", "opengl", CVAR_ARCHIVE | CVAR_LATCH );
+#elif defined(RENDERER_DEFAULT)
 	cl_renderer = Cvar_Get( "cl_renderer", XSTRING( RENDERER_DEFAULT ), CVAR_ARCHIVE | CVAR_LATCH );
 #else
 	cl_renderer = Cvar_Get( "cl_renderer", "opengl", CVAR_ARCHIVE | CVAR_LATCH );

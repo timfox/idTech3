@@ -818,6 +818,64 @@ void *GL_GetProcAddress( const char *symbol )
 #ifdef USE_VULKAN_API
 /*
 ===============
+GLimp_VulkanAvailable
+
+Probes whether SDL has Vulkan support for the current video driver.
+Used on ARM to avoid loading the Vulkan renderer when SDL was built
+without Vulkan or the platform has no Vulkan ICD.
+===============
+*/
+qboolean GLimp_VulkanAvailable( void )
+{
+	const char *vidDriver;
+	SDL_Window *probeWindow = NULL;
+	qboolean available = qfalse;
+
+	if ( !r_vid_driver )
+		return qfalse;
+
+	vidDriver = r_vid_driver->string;
+#if defined(__arm__) || defined(__aarch64__)
+	if ( !vidDriver || !vidDriver[0] || ( Q_stricmp( vidDriver, "auto" ) == 0 ) )
+		vidDriver = "x11";
+	else if ( Q_stricmp( vidDriver, "kmsdrm" ) == 0 )
+		vidDriver = "x11";
+#endif
+	if ( vidDriver && vidDriver[0] && Q_stricmp( vidDriver, "auto" ) != 0 )
+	{
+#ifndef _WIN32
+		static char envBuf[64];
+		Com_sprintf( envBuf, sizeof( envBuf ), "SDL_VIDEODRIVER=%s", vidDriver );
+		putenv( envBuf );
+#endif
+	}
+
+	if ( SDL_Init( SDL_INIT_VIDEO ) != 0 )
+		goto done;
+
+	if ( SDL_Vulkan_LoadLibrary( NULL ) != 0 )
+		goto done;
+
+	/* SDL_Vulkan_LoadLibrary can succeed while the video driver lacks Vulkan
+	 * support (e.g. RPi system SDL built without Vulkan). Probe with a real
+	 * window creation. */
+	SDL_GL_ResetAttributes();
+	SDL_SetHint( SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR, "0" );
+	probeWindow = SDL_CreateWindow( "", 0, 0, 1, 1,
+		SDL_WINDOW_VULKAN | SDL_WINDOW_HIDDEN );
+	available = ( probeWindow != NULL );
+	if ( probeWindow )
+		SDL_DestroyWindow( probeWindow );
+
+done:
+	if ( SDL_WasInit( SDL_INIT_VIDEO ) )
+		SDL_QuitSubSystem( SDL_INIT_VIDEO );
+	return available;
+}
+
+
+/*
+===============
 VKimp_Init
 
 This routine is responsible for initializing the OS specific portions
