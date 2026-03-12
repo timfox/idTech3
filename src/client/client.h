@@ -627,4 +627,6 @@ void	VKimp_Init( glconfig_t *config );
 void	VKimp_Shutdown( qboolean unloadDLL );
 void	*VK_GetInstanceProcAddr( VkInstance instance, const char *name );
 qboolean VK_CreateSurface( VkInstance instance, VkSurfaceKHR* pSurface );
+/** Returns qtrue if SDL has Vulkan support for the current video driver. Used for ARM fallback. */
+qboolean GLimp_VulkanAvailable( void );
 #endif
