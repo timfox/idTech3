@@ -561,6 +561,9 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 #if defined(__arm__) || defined(__aarch64__)
 		Com_Printf( S_COLOR_YELLOW "[VK] On ARM, Vulkan may be unavailable. Try: ./idtech3.aarch64 +set cl_renderer opengl\n" );
 #endif
+		/* SDL built without Vulkan: no point retrying modes/drivers */
+		if ( vulkan && sdl_err && strstr( sdl_err, "Vulkan support" ) != NULL )
+			return RSERR_FATAL_ERROR;
 		return RSERR_INVALID_MODE;
 	}
 
