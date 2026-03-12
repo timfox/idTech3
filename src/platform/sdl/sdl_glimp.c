@@ -974,7 +974,9 @@ void VKimp_Init( glconfig_t *config )
 		if ( err == RSERR_FATAL_ERROR )
 		{
 #if defined(__arm__) || defined(__aarch64__)
-			Com_Printf( S_COLOR_YELLOW "Vulkan failed on ARM. Use OpenGL: +set cl_renderer opengl\n" );
+			Com_Printf( S_COLOR_YELLOW "Vulkan failed on ARM. SDL needs Vulkan support.\n" );
+			Com_Printf( "  Build SDL with Vulkan: ./scripts/build_sdl_vulkan_rpi.sh\n" );
+			Com_Printf( "  Or use OpenGL: +set cl_renderer opengl\n" );
 #endif
 			Com_Error( ERR_FATAL, "VKimp_Init() - could not load Vulkan subsystem: %s", SDL_GetError() );
 			return;
@@ -982,8 +984,9 @@ void VKimp_Init( glconfig_t *config )
 		if ( err != RSERR_OK )
 		{
 #if defined(__arm__) || defined(__aarch64__)
-			Com_Printf( S_COLOR_YELLOW "Vulkan failed on ARM. SDL may lack Vulkan support (rebuild with -DSDL_VULKAN=ON).\n" );
-			Com_Printf( "  Use OpenGL: +set cl_renderer opengl\n" );
+			Com_Printf( S_COLOR_YELLOW "Vulkan failed on ARM. SDL may lack Vulkan support.\n" );
+			Com_Printf( "  Build SDL with Vulkan: ./scripts/build_sdl_vulkan_rpi.sh\n" );
+			Com_Printf( "  Or use OpenGL: +set cl_renderer opengl\n" );
 #endif
 			Com_Error( ERR_FATAL, "VKimp_Init() - could not load Vulkan subsystem: %s", SDL_GetError() );
 			return;
