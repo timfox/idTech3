@@ -659,6 +659,8 @@ static rserr_t GLimp_StartDriverAndSetMode( int mode, const char *modeFS, qboole
 		case RSERR_INVALID_MODE:
 			Com_Printf( "...WARNING: could not set the given mode (%d)\n", mode );
 			return err;
+		case RSERR_FATAL_ERROR:
+			return err;
 		default:
 			break;
 	}
