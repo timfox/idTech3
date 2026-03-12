@@ -3902,8 +3902,14 @@ static void CL_InitRef( void ) {
 	rimp.GLimp_InitGamma = GLimp_InitGamma;
 	rimp.GLimp_SetGamma = GLimp_SetGamma;
 
-	/* OpenGL API: always set when dlopen (OpenGL renderer can be loaded at runtime) */
-#if defined(USE_OPENGL_API) || (defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN)
+	/* OpenGL API: set when static OpenGL build, or when Vulkan build with dlopen (either renderer can load) */
+#if defined(USE_OPENGL_API)
+	rimp.GLimp_Init = GLimp_Init;
+	rimp.GLimp_Shutdown = GLimp_Shutdown;
+	rimp.GL_GetProcAddress = GL_GetProcAddress;
+	rimp.GLimp_EndFrame = GLimp_EndFrame;
+#elif defined(USE_VULKAN_API)
+	/* Vulkan build: OpenGL renderer can be loaded at runtime (e.g. ARM fallback) */
 	rimp.GLimp_Init = GLimp_Init;
 	rimp.GLimp_Shutdown = GLimp_Shutdown;
 	rimp.GL_GetProcAddress = GL_GetProcAddress;
