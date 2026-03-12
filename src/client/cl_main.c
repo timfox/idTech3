@@ -3902,8 +3902,8 @@ static void CL_InitRef( void ) {
 	rimp.GLimp_InitGamma = GLimp_InitGamma;
 	rimp.GLimp_SetGamma = GLimp_SetGamma;
 
-	// OpenGL API
-#ifdef USE_OPENGL_API
+	/* OpenGL API: always set when dlopen (OpenGL renderer can be loaded at runtime) */
+#if defined(USE_OPENGL_API) || (defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN)
 	rimp.GLimp_Init = GLimp_Init;
 	rimp.GLimp_Shutdown = GLimp_Shutdown;
 	rimp.GL_GetProcAddress = GL_GetProcAddress;
