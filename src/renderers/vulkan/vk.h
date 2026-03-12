@@ -5,6 +5,14 @@
 #include "tr_common.h"
 #include "vk_util.h"
 
+/* VK_EXT_extended_dynamic_state3: color write mask for RB_ColorMask */
+#ifndef VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT
+#define VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT 1000484004
+#endif
+#ifndef PFN_vkCmdSetColorWriteMaskEXT
+typedef void (VKAPI_PTR *PFN_vkCmdSetColorWriteMaskEXT)(VkCommandBuffer commandBuffer, uint32_t firstAttachment, uint32_t attachmentCount, const VkColorComponentFlags *pColorWriteMasks);
+#endif
+
 #define VK_CHECK( function_call ) do { \
 	VkResult _res_ = (function_call); \
 	if ( _res_ < 0 ) { \
@@ -402,6 +410,8 @@ VkSampleCountFlagBits vk_get_main_rasterization_samples( void );
 //
 // Resources allocation.
 //
+void vk_allocate_and_bind_image_memory( VkImage image );
+void vk_image_free_chunks( void );
 void vk_create_image( image_t *image, int width, int height, int mip_levels );
 void vk_upload_image_data( image_t *image, int x, int y, int width, int height, int miplevels, byte *pixels, int size, qboolean update );
 void vk_upload_cubemap_mip_data( image_t *image, int face_size, int miplevels, const byte *pixels, int size, int bytes_per_pixel, qboolean update );
@@ -1329,6 +1339,7 @@ extern PFN_vkUpdateDescriptorSets	qvkUpdateDescriptorSets;
 extern PFN_vkCreateDescriptorSetLayout qvkCreateDescriptorSetLayout;
 extern PFN_vkAllocateCommandBuffers	qvkAllocateCommandBuffers;
 extern PFN_vkBeginCommandBuffer		qvkBeginCommandBuffer;
+extern PFN_vkCmdCopyBuffer			qvkCmdCopyBuffer;
 extern PFN_vkEndCommandBuffer		qvkEndCommandBuffer;
 extern PFN_vkQueueSubmit			qvkQueueSubmit;
 extern PFN_vkFreeCommandBuffers		qvkFreeCommandBuffers;
@@ -1338,8 +1349,10 @@ extern PFN_vkCreateBuffer			qvkCreateBuffer;
 extern PFN_vkDestroyBuffer			qvkDestroyBuffer;
 extern PFN_vkFreeMemory				qvkFreeMemory;
 extern PFN_vkGetBufferMemoryRequirements qvkGetBufferMemoryRequirements;
+extern PFN_vkGetImageMemoryRequirements qvkGetImageMemoryRequirements;
 extern PFN_vkAllocateMemory			qvkAllocateMemory;
 extern PFN_vkBindBufferMemory		qvkBindBufferMemory;
+extern PFN_vkBindImageMemory			qvkBindImageMemory;
 extern PFN_vkMapMemory				qvkMapMemory;
 extern PFN_vkWaitForFences			qvkWaitForFences;
 extern PFN_vkResetFences				qvkResetFences;
