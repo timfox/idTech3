@@ -45,7 +45,22 @@ Raspberry Pi OS ships Mesa V3DV (Vulkan 1.3) by default on Pi 4 and 5. The engin
 
 ### Build SDL with Vulkan for Raspberry Pi
 
-Raspberry Pi OS ships SDL built without Vulkan. To use the Vulkan renderer, rebuild SDL from source:
+Raspberry Pi OS ships SDL built without Vulkan. To use the Vulkan renderer, rebuild SDL from source.
+
+**Automated (recommended):**
+
+```bash
+./scripts/build_sdl_vulkan_rpi.sh
+```
+
+This installs SDL to `/usr/local`. For a user install (no sudo for the engine):
+
+```bash
+./scripts/build_sdl_vulkan_rpi.sh --prefix $HOME/sdl2-vulkan-install
+# Then: LD_LIBRARY_PATH=$HOME/sdl2-vulkan-install/lib:$LD_LIBRARY_PATH ./release/idtech3.aarch64 +set cl_renderer vulkan
+```
+
+**Manual build** (if you prefer to run steps yourself):
 
 ```bash
 # 1. Install build deps and Vulkan headers (Mesa V3DV provides libvulkan at runtime)
