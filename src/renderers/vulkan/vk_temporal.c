@@ -127,6 +127,7 @@ static void vk_temporal_apply_resets( qboolean hardReset )
 	vk.temporal.sharedCameraCut = ( reasons & VK_TEMPORAL_RESET_CAMERA_CUT ) != 0u ? qtrue : qfalse;
 	vk_reset_motion_history();
 	vk_reset_volumetric_history();
+	vk_reset_occlusion_visibility();
 	vk.adaptedExposure = manualExposure;
 	vk.temporal.hasValidLuminance = qfalse;
 	vk.temporal.filteredAvgLogLuminance = 0.0f;

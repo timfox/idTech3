@@ -11288,6 +11288,12 @@ void vk_reset_volumetric_history( void )
 	Com_Memset( &vk_volumetric_validation_state, 0, sizeof( vk_volumetric_validation_state ) );
 }
 
+void vk_reset_occlusion_visibility( void )
+{
+	/* Stale visibility after camera cut / world change; treat all visible until next query */
+	Com_Memset( vk_entity_occlusion_visibility, 0xFF, sizeof( vk_entity_occlusion_visibility ) );
+}
+
 void vk_volumetric_fog_pass( void )
 {
 	/* Atmosphere: only when we have a 3D world. Skip for menus, videos, RDF_NOWORLDMODEL
