@@ -613,8 +613,8 @@ void	GLimp_Minimize( void );
 void	GLimp_LogComment( const char *comment );
 void	GLW_RestoreGamma( void );
 
-// OpenGL
-#ifdef USE_OPENGL_API
+// OpenGL (needed when USE_OPENGL_API or when USE_RENDERER_DLOPEN so OpenGL renderer can load)
+#if defined(USE_OPENGL_API) || (defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN)
 void	GLimp_Init( glconfig_t *config );
 void	GLimp_Shutdown( qboolean unloadDLL );
 void	GLimp_EndFrame( void );
