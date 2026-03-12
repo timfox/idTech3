@@ -145,8 +145,8 @@ Use **Vulkan as the primary renderer architecture**, freeze OpenGL as compatibil
 ## Phase 1: Foundation
 
 - **Fix doc/code drift and make the forward-only architecture explicit** — ✅ RENDERERS.md states "Forward renderer" and "No shipping deferred or Forward+ path yet; r_renderMode 1/2 remain placeholders".
-- **Create a shared temporal reset policy** — ✅ Implemented in `vk_temporal.c`. Central reset reasons (renderer_init, swapchain_change, world_change, camera_cut, etc.); `vk_temporal_apply_resets()` clears motion history, volumetric froxel history, and exposure. `vk_temporal_request_sticky_reset()` for subsystems to request invalidation.
-- Audit motion-vector coverage and history consumers.
+- **Create a shared temporal reset policy** — ✅ Implemented in `vk_temporal.c`. Central reset reasons (renderer_init, swapchain_change, world_change, camera_cut, etc.); `vk_temporal_apply_resets()` clears motion history, volumetric froxel history, occlusion visibility, and exposure. `vk_temporal_request_sticky_reset()` for subsystems to request invalidation.
+- **Audit motion-vector coverage and history consumers** — ✅ Documented. Motion vectors: main scene pass (gen_frag, light_frag, color.frag, fog.frag) via `vk_get_prev_mvp_transform`. Gaps: skinned/animated entities, viewmodel, `customShader` (vertex deformation), 2D/menus, first frame. Consumers: volumetric fog, exposure, motion blur. Occlusion culling now resets visibility on temporal reset (`vk_reset_occlusion_visibility`).
 
 ## Phase 2: Lighting Scale
 

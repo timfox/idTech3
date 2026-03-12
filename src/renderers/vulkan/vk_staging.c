@@ -49,7 +49,7 @@ qboolean vk_wait_staging_buffer( void )
 			}
 			ri.Error( ERR_FATAL, "vkWaitForFences() failed with %s at %s", vk_result_string( res ), __FUNCTION__ );
 		}
-		qvkResetFences( vk.device, 1, &vk.aux_fence );
+		VK_CHECK( qvkResetFences( vk.device, 1, &vk.aux_fence ) );
 		VK_CHECK( qvkResetCommandBuffer( vk.staging_command_buffer, 0 ) );
 		vk.staging_buffer.offset = 0; /* reset: command buffer cleared, staging starts at 0 */
 		vk.aux_fence_wait = qfalse;
@@ -128,7 +128,7 @@ void vk_flush_staging_buffer( qboolean final )
 			}
 			ri.Error( ERR_FATAL, "vkWaitForFences() failed with %s at %s", vk_result_string( res ), __FUNCTION__ );
 		}
-		qvkResetFences( vk.device, 1, &vk.aux_fence );
+		VK_CHECK( qvkResetFences( vk.device, 1, &vk.aux_fence ) );
 		VK_CHECK( qvkResetCommandBuffer( vk.staging_command_buffer, 0 ) );
 	}
 }

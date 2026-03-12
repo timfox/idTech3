@@ -55,5 +55,6 @@ qboolean vk_temporal_has_reason( uint32_t reasonMask );
 
 void vk_reset_motion_history( void );
 void vk_reset_volumetric_history( void );
+void vk_reset_occlusion_visibility( void );
 
 #endif
