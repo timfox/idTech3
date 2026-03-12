@@ -3120,24 +3120,7 @@ static void vk_destroy_framebuffers( void ) {
 }
 
 
-static void vk_destroy_swapchain( void ) {
-	uint32_t i;
-
-	vk.swapchain_extent_valid = qfalse;
-
-	for ( i = 0; (uint32_t) i < vk.swapchain_image_count; i++ ) {
-		if ( vk.swapchain_image_views[i] != VK_NULL_HANDLE ) {
-			qvkDestroyImageView( vk.device, vk.swapchain_image_views[i], NULL );
-			vk.swapchain_image_views[i] = VK_NULL_HANDLE;
-		}
-		if ( vk.swapchain_rendering_finished[i] != VK_NULL_HANDLE ) {
-			qvkDestroySemaphore( vk.device, vk.swapchain_rendering_finished[i], NULL );
-			vk.swapchain_rendering_finished[i] = VK_NULL_HANDLE;
-		}
-	}
-
-	qvkDestroySwapchainKHR( vk.device, vk.swapchain, NULL );
-}
+/* vk_destroy_swapchain moved to vk_swapchain.c */
 
 static void vk_destroy_attachments( void );
 static void vk_destroy_render_passes( void );
