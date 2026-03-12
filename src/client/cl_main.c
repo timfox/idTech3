@@ -52,6 +52,8 @@ cvar_t	*cl_motd;
 
 #if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
 static cvar_t *cl_renderer;
+static cvar_t *cl_renderer_force;
+static qboolean isValidRenderer( const char *s );
 #endif
 
 cvar_t	*rcon_client_password;
@@ -3751,15 +3753,37 @@ static void CL_InitRef( void ) {
 
 	CL_InitGLimp_Cvars();
 
+#if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
+	cl_renderer_force = Cvar_Get( "cl_renderer_force", "0", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_renderer_force, "When 1, skip Vulkan availability check on ARM (try Vulkan even if probe fails). Use with +set cl_renderer vulkan." );
+#endif
+
 	Com_Printf( "----- Initializing Renderer ----\n" );
 
 #if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
-#if defined(USE_VULKAN_API) && (defined(__arm__) || defined(__aarch64__))
-	/* SDL may lack Vulkan support on ARM (e.g. RPi system SDL); fall back to OpenGL */
-	if ( Q_stricmp( cl_renderer->string, "vulkan" ) == 0 && !GLimp_VulkanAvailable() )
+	/* "renderer" is an alias for cl_renderer (e.g. +set renderer vulkan) */
+	const char *rendererName = cl_renderer->string;
 	{
-		Com_Printf( "[VK] Vulkan not available in SDL, falling back to OpenGL\n" );
-		Cvar_Set( "cl_renderer", "opengl" );
+		const char *alt = Cvar_VariableString( "renderer" );
+		if ( alt && alt[0] && isValidRenderer( alt ) ) {
+			rendererName = alt;
+			Cvar_Set( "cl_renderer", alt );  /* sync so config saves correctly */
+		}
+	}
+
+#if defined(USE_VULKAN_API) && (defined(__arm__) || defined(__aarch64__))
+	/* SDL may lack Vulkan support on ARM (e.g. RPi system SDL); fall back to OpenGL unless forced */
+	if ( Q_stricmp( rendererName, "vulkan" ) == 0 && !GLimp_VulkanAvailable() )
+	{
+		if ( cl_renderer_force && cl_renderer_force->integer )
+			Com_Printf( "[VK] cl_renderer_force 1: attempting Vulkan despite probe failure\n" );
+		else
+		{
+			Com_Printf( "[VK] Vulkan not available in SDL, falling back to OpenGL\n" );
+			Cvar_Set( "cl_renderer", "opengl" );
+			Cvar_Set( "renderer", "opengl" );
+			rendererName = "opengl";
+		}
 	}
 #endif
 
@@ -3771,7 +3795,7 @@ static void CL_InitRef( void ) {
 
 	{
 		/* sanitize renderer name: strip surrounding single/double quotes if present */
-		const char *raw = cl_renderer->string;
+		const char *raw = rendererName;
 		char clean[64];
 		size_t rawlen = strlen(raw);
 		if ( rawlen >= 2 && ((raw[0] == '\"' && raw[rawlen-1] == '\"') || (raw[0] == '\'' && raw[rawlen-1] == '\'')) ) {
@@ -3794,6 +3818,7 @@ static void CL_InitRef( void ) {
 	{
 		Com_Printf( S_COLOR_YELLOW "Failed to load renderer from %s: %s\n", ospath, Sys_GetLoadLibraryError() );
 		Cvar_ForceReset( "cl_renderer" );
+		Cvar_ForceReset( "renderer" );
 		/* sanitize renderer name for the retry as well */
 		{
 			const char *raw = cl_renderer->string;
