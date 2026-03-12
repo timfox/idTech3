@@ -4239,10 +4239,24 @@ static void CL_InitGLimp_Cvars( void )
 	Cvar_CheckRange( r_noborder, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( r_noborder, "Setting to 1 will remove window borders and title bar in windowed mode, hold ALT to drag & drop it with opened console." );
 
+#if defined(__arm__) || defined(__aarch64__)
+	/* ARM/RPi: x11 default avoids Vulkan KMSDRM issues (SDL#3997) */
+	r_vid_driver = Cvar_Get( "r_vid_driver", "x11", CVAR_ARCHIVE_ND | CVAR_LATCH );
+#else
 	r_vid_driver = Cvar_Get( "r_vid_driver", "auto", CVAR_ARCHIVE_ND | CVAR_LATCH );
+#endif
 	Cvar_SetDescription( r_vid_driver, "SDL video driver: auto, x11, wayland, kmsdrm. On ARM/Raspberry Pi with Vulkan, use x11 if you get 'Couldn't get a visual'. Requires vid_restart." );
 
+#if defined(__arm__) || defined(__aarch64__)
+	/* RPi5: r_mode -2 (desktop) often fails; -1 with 640x480 is more reliable */
+	r_mode = Cvar_Get( "r_mode", "-1", CVAR_ARCHIVE | CVAR_LATCH );
+	r_customwidth = Cvar_Get( "r_customWidth", "640", CVAR_ARCHIVE | CVAR_LATCH );
+	r_customheight = Cvar_Get( "r_customHeight", "480", CVAR_ARCHIVE | CVAR_LATCH );
+#else
 	r_mode = Cvar_Get( "r_mode", "-2", CVAR_ARCHIVE | CVAR_LATCH );
+	r_customwidth = Cvar_Get( "r_customWidth", "1600", CVAR_ARCHIVE | CVAR_LATCH );
+	r_customheight = Cvar_Get( "r_customHeight", "1024", CVAR_ARCHIVE | CVAR_LATCH );
+#endif
 	Cvar_CheckRange( r_mode, "-2", va( "%i", s_numVidModes-1 ), CV_INTEGER );
 	Cvar_SetDescription( r_mode, "Set video mode:\n -2 - use current desktop resolution\n -1 - use \\r_customWidth and \\r_customHeight\n  0..N - enter \\modelist for details" );
 #ifdef _DEBUG
@@ -4255,10 +4269,8 @@ static void CL_InitGLimp_Cvars( void )
 	Cvar_SetDescription( r_fullscreen, "Fullscreen mode. Set to 0 for windowed mode." );
 	r_customPixelAspect = Cvar_Get( "r_customPixelAspect", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	Cvar_SetDescription( r_customPixelAspect, "Enables custom aspect of the screen, with \\r_mode -1." );
-	r_customwidth = Cvar_Get( "r_customWidth", "1600", CVAR_ARCHIVE | CVAR_LATCH );
 	Cvar_CheckRange( r_customwidth, "4", NULL, CV_INTEGER );
 	Cvar_SetDescription( r_customwidth, "Custom width to use with \\r_mode -1." );
-	r_customheight = Cvar_Get( "r_customHeight", "1024", CVAR_ARCHIVE | CVAR_LATCH );
 	Cvar_CheckRange( r_customheight, "4", NULL, CV_INTEGER );
 	Cvar_SetDescription( r_customheight, "Custom height to use with \\r_mode -1." );
 

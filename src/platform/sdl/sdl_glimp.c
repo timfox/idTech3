@@ -606,9 +606,17 @@ static rserr_t GLimp_StartDriverAndSetMode( int mode, const char *modeFS, qboole
 
 		vidDriver = r_vid_driver ? r_vid_driver->string : "auto";
 #if defined(__arm__) || defined(__aarch64__)
-		/* Raspberry Pi / ARM: Vulkan with KMSDRM has known issues; prefer X11 */
-		if ( vulkan && ( !vidDriver || !vidDriver[0] || ( Q_stricmp( vidDriver, "auto" ) == 0 ) ) )
-			vidDriver = "x11";
+		/* Raspberry Pi / ARM: Vulkan with KMSDRM has known issues (SDL#3997); force X11 */
+		if ( vulkan )
+		{
+			if ( !vidDriver || !vidDriver[0] || ( Q_stricmp( vidDriver, "auto" ) == 0 ) )
+				vidDriver = "x11";
+			else if ( Q_stricmp( vidDriver, "kmsdrm" ) == 0 )
+			{
+				Com_Printf( "[VK] ARM: KMSDRM has Vulkan issues, using X11 instead\n" );
+				vidDriver = "x11";
+			}
+		}
 #endif
 #ifdef USE_VULKAN_API
 		if ( vulkan ) {
