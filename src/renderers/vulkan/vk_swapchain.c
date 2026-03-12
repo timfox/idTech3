@@ -248,3 +248,24 @@ void vk_log_swapchain_recreation( VkResult res, const VkExtent2D *old_extent, co
 	last_fullscreen = (int)glConfig.isFullscreen;
 	last_refresh = glConfig.displayFrequency;
 }
+
+
+void vk_destroy_swapchain( void )
+{
+	uint32_t i;
+
+	vk.swapchain_extent_valid = qfalse;
+
+	for ( i = 0; (uint32_t) i < vk.swapchain_image_count; i++ ) {
+		if ( vk.swapchain_image_views[i] != VK_NULL_HANDLE ) {
+			qvkDestroyImageView( vk.device, vk.swapchain_image_views[i], NULL );
+			vk.swapchain_image_views[i] = VK_NULL_HANDLE;
+		}
+		if ( vk.swapchain_rendering_finished[i] != VK_NULL_HANDLE ) {
+			qvkDestroySemaphore( vk.device, vk.swapchain_rendering_finished[i], NULL );
+			vk.swapchain_rendering_finished[i] = VK_NULL_HANDLE;
+		}
+	}
+
+	qvkDestroySwapchainKHR( vk.device, vk.swapchain, NULL );
+}

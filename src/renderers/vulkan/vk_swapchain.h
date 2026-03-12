@@ -22,6 +22,9 @@ extern "C" {
 void vk_create_swapchain( VkPhysicalDevice physical_device, VkDevice device, VkSurfaceKHR surface,
 	VkSurfaceFormatKHR surface_format, VkSwapchainKHR *swapchain, qboolean verbose );
 
+/* Destroy swapchain, image views, and semaphores. Call before recreating swapchain. */
+void vk_destroy_swapchain( void );
+
 /* Query current surface extent. Returns qfalse on failure. */
 qboolean vk_query_surface_extent( VkPhysicalDevice physical_device, VkSurfaceKHR surface, VkExtent2D *extent );
 
