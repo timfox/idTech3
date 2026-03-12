@@ -6,12 +6,12 @@ This document describes ARM and Raspberry Pi support for the idTech3 engine.
 
 Raspberry Pi OS ships Mesa V3DV (Vulkan 1.3) by default on Pi 4 and 5. The engine supports Vulkan on these devices.
 
-### Known Issues
+### Known Issues (Mitigated)
 
-- **"Couldn't get a visual" / "could not load Vulkan subsystem"**: On ARM + X11, SDL may fail to create a Vulkan window. The engine defaults to X11 on ARM, but Vulkan surface creation can still fail on some setups.
-  - **Workaround**: Use the OpenGL renderer instead: `./idtech3.aarch64 +set cl_renderer opengl` (or `./idtech3 +set cl_renderer opengl`).
-- **KMS/DRM**: Vulkan with SDL's KMSDRM backend has known issues on Raspberry Pi (see [SDL#3997](https://github.com/libsdl-org/SDL/issues/3997)). Use X11 instead.
-- **r_mode -2 fails on RPi5**: Desktop resolution mode may fail. The engine automatically tries r_mode 3 (640x480), r_mode -1 (custom 640x480), r_mode -1 (800x600), windowed mode, and wayland (if x11 failed) as fallbacks. Successful fallbacks are persisted to config.
+- **"Couldn't get a visual" / "could not load Vulkan subsystem"**: On ARM + X11, SDL may fail to create a Vulkan window. The engine defaults to `r_vid_driver x11` on ARM and forces X11 when KMSDRM was selected (Vulkan has known issues with KMSDRM).
+  - **Workaround**: Use the OpenGL renderer: `./idtech3.aarch64 +set cl_renderer opengl`
+- **KMS/DRM**: Vulkan with SDL's KMSDRM backend has known issues on Raspberry Pi (see [SDL#3997](https://github.com/libsdl-org/SDL/issues/3997)). The engine automatically overrides to X11 when Vulkan is requested with KMSDRM on ARM.
+- **r_mode -2 fails on RPi5**: Desktop resolution mode may fail. On ARM, the engine defaults to `r_mode -1` with 640x480 for better reliability. Fallbacks (r_mode 3, -1 800x600, windowed, wayland) are also tried automatically.
 
 ### Recommended Setup
 
