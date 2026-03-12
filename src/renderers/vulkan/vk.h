@@ -1214,6 +1214,7 @@ typedef struct {
 
 	qboolean clearAttachment;		// requires VK_IMAGE_USAGE_TRANSFER_DST_BIT for swapchains
 	qboolean fboActive;
+	qboolean isV3DV;				/* Raspberry Pi Vulkan driver (V3DV); used for RPi5-friendly hints */
 	qboolean blitEnabled;
 	qboolean msaaActive;
 	qboolean msaaSampleShading;	/* per-sample shading when MSAA on (better alpha/specular, higher cost) */

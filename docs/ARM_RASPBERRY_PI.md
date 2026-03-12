@@ -34,7 +34,14 @@ Raspberry Pi OS ships Mesa V3DV (Vulkan 1.3) by default on Pi 4 and 5. The engin
    ```
    This forces a 640x480 windowed mode, which often works when desktop/fullscreen modes fail.
 
-4. **Performance**: On RPi4, the Vulkan driver has poor GLSL shader performance. The engine disables high-quality dynamic lights by default (`r_dlightMode 0`) on ARM. You can try `r_dlightMode 1` for per-pixel lights if performance allows.
+4. **Performance**: On RPi4/RPi5, the Vulkan driver (V3DV) has weaker shader performance. The engine disables high-quality dynamic lights by default (`r_dlightMode 0`) on ARM. You can try `r_dlightMode 1` for per-pixel lights if performance allows.
+
+5. **Vulkan RPi5 tuning**: When Vulkan runs on V3DV (Raspberry Pi), the engine detects it and suggests `r_rpi_profile 1`. This preset disables SSAO, volumetric fog, bloom, SMAA, SSR, and fog fluid for better frame rates. Run:
+   ```
+   set r_rpi_profile 1
+   vid_restart
+   ```
+   Or add `+set r_rpi_profile 1` to your launch command.
 
 ### Build SDL with Vulkan for Raspberry Pi
 

@@ -3130,6 +3130,25 @@ void vk_initialize( void )
 
 	qvkGetPhysicalDeviceProperties( vk.physical_device, &props );
 
+	vk.isV3DV = vk_device_is_v3dv( &props );
+	if ( vk.isV3DV ) {
+		cvar_t *r_rpi_profile = ri.Cvar_Get( "r_rpi_profile", "0", CVAR_ARCHIVE );
+		if ( r_rpi_profile->integer ) {
+			/* Apply RPi-friendly preset: Low quality + disable fluid sim */
+			ri.Cvar_Set( "r_volumetricFog", "0" );
+			ri.Cvar_Set( "r_ssao", "0" );
+			ri.Cvar_Set( "r_bloom", "0" );
+			ri.Cvar_Set( "r_ext_smaa", "0" );
+			ri.Cvar_Set( "r_ssr", "0" );
+			ri.Cvar_Set( "r_sharpen", "0.0" );
+			ri.Cvar_Set( "r_exposure_auto", "0" );
+			ri.Cvar_Set( "r_fogFluid", "0" );
+			ri.Printf( PRINT_ALL, "[VK] Raspberry Pi (V3DV) detected: applied r_rpi_profile preset\n" );
+		} else {
+			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "[VK] Raspberry Pi (V3DV) detected. For performance: set r_rpi_profile 1; vid_restart\n" S_COLOR_WHITE );
+		}
+	}
+
 	vk.cmd = vk.tess + 0;
 	vk_reset_motion_history();
 	vk.adaptedExposure = 1.0f;

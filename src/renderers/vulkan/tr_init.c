@@ -257,6 +257,7 @@ cvar_t	*r_lightmap_srgb_decode;
 cvar_t	*r_pre_exposure_scale;
 cvar_t	*r_exposure_auto;
 cvar_t	*r_tonemap;
+cvar_t	*r_rpi_profile;
 cvar_t	*r_volumetricFog;
 cvar_t	*r_volumetricFogDensity;
 cvar_t	*r_volumetricFogHeightFalloff;
@@ -2526,6 +2527,11 @@ static void R_Register( void )
 		ri.Cvar_SetGroup( r_post_contrast, CVG_RENDERER );
 		ri.Cvar_SetGroup( r_post_saturation, CVG_RENDERER );
 	}
+
+	r_rpi_profile = ri.Cvar_Get( "r_rpi_profile", "0", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_rpi_profile, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_rpi_profile, "Raspberry Pi (V3DV) performance preset. When 1, disables SSAO, volumetric fog, bloom, SMAA, SSR, fog fluid at Vulkan init. Requires vid_restart." );
+	ri.Cvar_SetGroup( r_rpi_profile, CVG_RENDERER );
 
 	r_volumetricFog = ri.Cvar_Get( "r_volumetricFog", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_volumetricFog, "Enable the volumetric fog compute/composite passes before tonemapping. Requires r_fbo 1." );
