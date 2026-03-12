@@ -335,3 +335,12 @@ const char *vk_device_renderer_name( const VkPhysicalDeviceProperties *props )
 
 	return buf;
 }
+
+qboolean vk_device_is_v3dv( const VkPhysicalDeviceProperties *props )
+{
+	/* V3DV (Mesa) reports "V3D 4.x" or "V3DV" in deviceName on Raspberry Pi 4/5 */
+	const char *name = props->deviceName;
+	if ( !name || !name[0] )
+		return qfalse;
+	return ( Q_stristr( name, "V3D" ) != NULL ) ? qtrue : qfalse;
+}
