@@ -1728,6 +1728,14 @@ static void *VM_TryLoadNativeModule( const char *moduleName, char *filename, int
 		return libHandle;
 	}
 
+	/* module.arch.so (e.g. client.aarch64.so, ui.x86_64.so) */
+	Com_sprintf( filename, filenameSize, "%s." ARCH_STRING DLL_EXT, moduleName );
+	libHandle = FS_LoadLibrary( filename );
+	if ( libHandle ) {
+		return libHandle;
+	}
+
+	/* modulearch.so (e.g. clientaarch64.so, uix86_64.so) */
 	Com_sprintf( filename, filenameSize, "%s" ARCH_STRING DLL_EXT, moduleName );
 	libHandle = FS_LoadLibrary( filename );
 	return libHandle;
@@ -1895,8 +1903,9 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 			return vm;
 		}
 
-		// Native DLL failed, silently fall back to QVM without reporting
-		vm->silentQVM = qtrue; // Flag to suppress QVM loading messages
+		// Native DLL failed, fall back to QVM
+		Com_Printf( "Native %s not found (tried modules/ and vm/), trying %s.qvm...\n", name, name );
+		vm->silentQVM = qtrue; // Flag to suppress redundant QVM loading messages
 	}
 
 	// never allow dll loading with a demo
