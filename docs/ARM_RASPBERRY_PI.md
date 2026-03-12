@@ -12,7 +12,7 @@ Raspberry Pi OS ships Mesa V3DV (Vulkan 1.3) by default on Pi 4 and 5. The engin
   - **Default renderer**: On ARM, `cl_renderer` defaults to `opengl` (not `vulkan`) because many systems ship SDL built without Vulkan support.
   - **Automatic fallback**: If you explicitly select Vulkan and SDL lacks Vulkan support, the engine falls back to OpenGL and prints `[VK] Vulkan not available in SDL, falling back to OpenGL`.
   - **Force Vulkan attempt**: `+set cl_renderer_force 1` skips the probe and tries Vulkan anyway. Use only if you have SDL built with `-DSDL_VULKAN=ON`.
-  - **SDL Vulkan requirement**: Raspberry Pi OS system SDL is often built without Vulkan. To use Vulkan, rebuild SDL from source with `cmake -DSDL_VULKAN=ON` or use a distro package that enables it.
+  - **SDL Vulkan requirement**: Raspberry Pi OS system SDL is often built without Vulkan. See [Build SDL with Vulkan](#build-sdl-with-vulkan-for-raspberry-pi) below.
   - **Manual fallback**: If Vulkan fails: `./idtech3.aarch64 +set cl_renderer opengl`
 - **KMS/DRM**: Vulkan with SDL's KMSDRM backend has known issues on Raspberry Pi (see [SDL#3997](https://github.com/libsdl-org/SDL/issues/3997)). The engine automatically overrides to X11 when Vulkan is requested with KMSDRM on ARM.
 - **r_mode -2 fails on RPi5**: Desktop resolution mode may fail. On ARM, the engine defaults to `r_mode -1` with 640x480 for better reliability. Fallbacks (r_mode 3, -1 800x600, windowed, wayland) are also tried automatically.
@@ -35,6 +35,55 @@ Raspberry Pi OS ships Mesa V3DV (Vulkan 1.3) by default on Pi 4 and 5. The engin
    This forces a 640x480 windowed mode, which often works when desktop/fullscreen modes fail.
 
 4. **Performance**: On RPi4, the Vulkan driver has poor GLSL shader performance. The engine disables high-quality dynamic lights by default (`r_dlightMode 0`) on ARM. You can try `r_dlightMode 1` for per-pixel lights if performance allows.
+
+### Build SDL with Vulkan for Raspberry Pi
+
+Raspberry Pi OS ships SDL built without Vulkan. To use the Vulkan renderer, rebuild SDL from source:
+
+```bash
+# 1. Install build deps and Vulkan headers (Mesa V3DV provides libvulkan at runtime)
+sudo apt-get install -y build-essential cmake ninja-build pkg-config \
+  libasound2-dev libdbus-1-dev libdrm-dev libgbm-dev libibus-1.0-dev \
+  libpulse-dev libudev-dev libx11-dev libxcb1-dev libxext-dev libxfixes-dev \
+  libxinerama-dev libxrandr-dev libxss-dev libxxf86vm-dev vulkan-headers
+
+# 2. Clone SDL (use release tag for stability)
+git clone https://github.com/libsdl-org/SDL.git -b release-2.30.0 sdl2-vulkan
+cd sdl2-vulkan
+
+# 3. Configure with Vulkan enabled
+mkdir build && cd build
+cmake .. -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_INSTALL_PREFIX=/usr/local \
+  -DSDL_VULKAN=ON \
+  -DSDL_X11=ON \
+  -DSDL_WAYLAND=ON
+
+# 4. Build and install
+ninja
+sudo ninja install
+sudo ldconfig
+```
+
+Then rebuild the engine and run with Vulkan:
+
+```bash
+cd /path/to/idTech3
+./scripts/compile_engine.sh vulkan
+./release/idtech3.aarch64 +set cl_renderer vulkan
+```
+
+To use your custom SDL without replacing the system one, install to a prefix and set `LD_LIBRARY_PATH`:
+
+```bash
+cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_INSTALL_PREFIX=$HOME/sdl2-vulkan-install \
+  -DSDL_VULKAN=ON -DSDL_X11=ON -DSDL_WAYLAND=ON
+ninja && ninja install
+# Run engine with:
+LD_LIBRARY_PATH=$HOME/sdl2-vulkan-install/lib:$LD_LIBRARY_PATH ./release/idtech3.aarch64 +set cl_renderer vulkan
+```
 
 ### Build Troubleshooting
 
