@@ -1,5 +1,6 @@
 #include "tr_local.h"
 #include "vk.h"
+#include "vk_instance.h"
 #include "vk_postfx.h"
 #include "vk_postfx_params.h"
 #include "vk_post_fog.h"
@@ -26,20 +27,9 @@
 #include "vk_descriptors.h"
 #include <math.h>
 
-/* VK_EXT_extended_dynamic_state3: for vkCmdSetColorWriteMaskEXT (RB_ColorMask) */
+/* VK_EXT_extended_dynamic_state3: struct for pipeline creation (VK_DYNAMIC_STATE_*, PFN in vk.h) */
 #ifndef VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT
 #define VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT 1000484000
-#endif
-#ifndef VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT
-#define VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT 1000484004
-#endif
-typedef struct VkPhysicalDeviceExtendedDynamicState3FeaturesEXT {
-	VkStructureType sType;
-	void *pNext;
-	VkBool32 extendedDynamicState3ColorWriteMask;
-} VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
-#ifndef PFN_vkCmdSetColorWriteMaskEXT
-typedef void (VKAPI_PTR *PFN_vkCmdSetColorWriteMaskEXT)(VkCommandBuffer commandBuffer, uint32_t firstAttachment, uint32_t attachmentCount, const VkColorComponentFlags *pColorWriteMasks);
 #endif
 
 /* r_hdr 3: 64-bit (RGBA64F) uses dvec4 fragment output; select HDR64 shaders when active */
@@ -128,138 +118,133 @@ typedef struct {
 static int vkSamples = VK_SAMPLE_COUNT_1_BIT;
 static int vkMaxSamples = VK_SAMPLE_COUNT_1_BIT;
 
-static VkInstance vk_instance = VK_NULL_HANDLE;
-static VkSurfaceKHR vk_surface = VK_NULL_HANDLE;
-
-#ifndef NDEBUG
-VkDebugReportCallbackEXT vk_debug_callback = VK_NULL_HANDLE;
-#endif
+/* vk_instance, vk_surface, vk_debug_callback defined in vk_instance.c */
 
 //
-// Vulkan API functions used by the renderer.
+// Vulkan API function pointers (defined here, assigned by vk_instance.c init)
 //
-static PFN_vkCreateInstance								qvkCreateInstance;
-static PFN_vkEnumerateInstanceExtensionProperties		qvkEnumerateInstanceExtensionProperties;
+PFN_vkCreateInstance								qvkCreateInstance;
+PFN_vkEnumerateInstanceExtensionProperties		qvkEnumerateInstanceExtensionProperties;
 
-static PFN_vkCreateDevice								qvkCreateDevice;
-static PFN_vkDestroyInstance							qvkDestroyInstance;
-static PFN_vkEnumerateDeviceExtensionProperties			qvkEnumerateDeviceExtensionProperties;
-static PFN_vkEnumeratePhysicalDevices					qvkEnumeratePhysicalDevices;
-static PFN_vkGetDeviceProcAddr							qvkGetDeviceProcAddr;
+PFN_vkCreateDevice								qvkCreateDevice;
+PFN_vkDestroyInstance							qvkDestroyInstance;
+PFN_vkEnumerateDeviceExtensionProperties			qvkEnumerateDeviceExtensionProperties;
+PFN_vkEnumeratePhysicalDevices					qvkEnumeratePhysicalDevices;
+PFN_vkGetDeviceProcAddr							qvkGetDeviceProcAddr;
 PFN_vkGetPhysicalDeviceFeatures					qvkGetPhysicalDeviceFeatures;
 PFN_vkGetPhysicalDeviceFormatProperties			qvkGetPhysicalDeviceFormatProperties;
 PFN_vkGetPhysicalDeviceMemoryProperties			qvkGetPhysicalDeviceMemoryProperties;
-static PFN_vkGetPhysicalDeviceProperties				qvkGetPhysicalDeviceProperties;
-static PFN_vkGetPhysicalDeviceQueueFamilyProperties		qvkGetPhysicalDeviceQueueFamilyProperties;
-static PFN_vkDestroySurfaceKHR							qvkDestroySurfaceKHR;
+PFN_vkGetPhysicalDeviceProperties				qvkGetPhysicalDeviceProperties;
+PFN_vkGetPhysicalDeviceQueueFamilyProperties		qvkGetPhysicalDeviceQueueFamilyProperties;
+PFN_vkDestroySurfaceKHR							qvkDestroySurfaceKHR;
 PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR	qvkGetPhysicalDeviceSurfaceCapabilitiesKHR;
 PFN_vkGetPhysicalDeviceSurfaceFormatsKHR			qvkGetPhysicalDeviceSurfaceFormatsKHR;
 PFN_vkGetPhysicalDeviceSurfacePresentModesKHR	qvkGetPhysicalDeviceSurfacePresentModesKHR;
-static PFN_vkGetPhysicalDeviceSurfaceSupportKHR			qvkGetPhysicalDeviceSurfaceSupportKHR;
+PFN_vkGetPhysicalDeviceSurfaceSupportKHR			qvkGetPhysicalDeviceSurfaceSupportKHR;
 #ifdef USE_VK_VALIDATION
-static PFN_vkCreateDebugReportCallbackEXT				qvkCreateDebugReportCallbackEXT;
-static PFN_vkDestroyDebugReportCallbackEXT				qvkDestroyDebugReportCallbackEXT;
+PFN_vkCreateDebugReportCallbackEXT				qvkCreateDebugReportCallbackEXT;
+PFN_vkDestroyDebugReportCallbackEXT				qvkDestroyDebugReportCallbackEXT;
 #endif
 PFN_vkAllocateCommandBuffers						qvkAllocateCommandBuffers;
-static PFN_vkAllocateDescriptorSets						qvkAllocateDescriptorSets;
+PFN_vkAllocateDescriptorSets						qvkAllocateDescriptorSets;
 PFN_vkAllocateMemory								qvkAllocateMemory;
 PFN_vkBeginCommandBuffer							qvkBeginCommandBuffer;
 PFN_vkBindBufferMemory							qvkBindBufferMemory;
-static PFN_vkBindImageMemory							qvkBindImageMemory;
+PFN_vkBindImageMemory							qvkBindImageMemory;
 PFN_vkCmdBeginRenderPass								qvkCmdBeginRenderPass;
 PFN_vkCmdBindDescriptorSets						qvkCmdBindDescriptorSets;
-static PFN_vkCmdBindIndexBuffer							qvkCmdBindIndexBuffer;
+PFN_vkCmdBindIndexBuffer							qvkCmdBindIndexBuffer;
 PFN_vkCmdBindPipeline							qvkCmdBindPipeline;
-static PFN_vkCmdBindVertexBuffers						qvkCmdBindVertexBuffers;
-static PFN_vkCmdBlitImage								qvkCmdBlitImage;
-static PFN_vkCmdClearAttachments						qvkCmdClearAttachments;
-static PFN_vkCmdCopyBuffer								qvkCmdCopyBuffer;
-static PFN_vkCmdCopyBufferToImage						qvkCmdCopyBufferToImage;
-static PFN_vkCmdCopyImage								qvkCmdCopyImage;
+PFN_vkCmdBindVertexBuffers						qvkCmdBindVertexBuffers;
+PFN_vkCmdBlitImage								qvkCmdBlitImage;
+PFN_vkCmdClearAttachments						qvkCmdClearAttachments;
+PFN_vkCmdCopyBuffer								qvkCmdCopyBuffer;
+PFN_vkCmdCopyBufferToImage						qvkCmdCopyBufferToImage;
+PFN_vkCmdCopyImage								qvkCmdCopyImage;
 PFN_vkCmdCopyImageToBuffer						qvkCmdCopyImageToBuffer;
 PFN_vkCmdDraw									qvkCmdDraw;
-static PFN_vkCmdDrawIndexed								qvkCmdDrawIndexed;
+PFN_vkCmdDrawIndexed								qvkCmdDrawIndexed;
 PFN_vkCmdDispatch								qvkCmdDispatch;
 PFN_vkCmdEndRenderPass									qvkCmdEndRenderPass;
-static PFN_vkCmdNextSubpass								qvkCmdNextSubpass;
+PFN_vkCmdNextSubpass								qvkCmdNextSubpass;
 PFN_vkCmdPipelineBarrier									qvkCmdPipelineBarrier;
 PFN_vkCmdPushConstants									qvkCmdPushConstants;
-static PFN_vkCmdSetDepthBias							qvkCmdSetDepthBias;
+PFN_vkCmdSetDepthBias							qvkCmdSetDepthBias;
 PFN_vkCmdSetScissor										qvkCmdSetScissor;
 PFN_vkCmdSetViewport										qvkCmdSetViewport;
-static PFN_vkCmdSetColorWriteMaskEXT						qvkCmdSetColorWriteMaskEXT;
-static PFN_vkCmdWriteTimestamp							qvkCmdWriteTimestamp;
-static PFN_vkCmdResetQueryPool							qvkCmdResetQueryPool;
-static PFN_vkCmdBeginQuery								qvkCmdBeginQuery;
-static PFN_vkCmdEndQuery								qvkCmdEndQuery;
+PFN_vkCmdSetColorWriteMaskEXT						qvkCmdSetColorWriteMaskEXT;
+PFN_vkCmdWriteTimestamp							qvkCmdWriteTimestamp;
+PFN_vkCmdResetQueryPool							qvkCmdResetQueryPool;
+PFN_vkCmdBeginQuery								qvkCmdBeginQuery;
+PFN_vkCmdEndQuery								qvkCmdEndQuery;
 PFN_vkCreateBuffer								qvkCreateBuffer;
-static PFN_vkCreateCommandPool							qvkCreateCommandPool;
-static PFN_vkCreateDescriptorPool						qvkCreateDescriptorPool;
+PFN_vkCreateCommandPool							qvkCreateCommandPool;
+PFN_vkCreateDescriptorPool						qvkCreateDescriptorPool;
 PFN_vkCreateDescriptorSetLayout					qvkCreateDescriptorSetLayout;
 PFN_vkCreateFence								qvkCreateFence;
-static PFN_vkCreateFramebuffer							qvkCreateFramebuffer;
-static PFN_vkCreateComputePipelines						qvkCreateComputePipelines;
+PFN_vkCreateFramebuffer							qvkCreateFramebuffer;
+PFN_vkCreateComputePipelines						qvkCreateComputePipelines;
 PFN_vkCreateGraphicsPipelines					qvkCreateGraphicsPipelines;
-static PFN_vkCreateImage								qvkCreateImage;
+PFN_vkCreateImage								qvkCreateImage;
 PFN_vkCreateImageView							qvkCreateImageView;
-static PFN_vkCreatePipelineLayout						qvkCreatePipelineLayout;
-static PFN_vkCreatePipelineCache						qvkCreatePipelineCache;
-static PFN_vkCreateQueryPool							qvkCreateQueryPool;
+PFN_vkCreatePipelineLayout						qvkCreatePipelineLayout;
+PFN_vkCreatePipelineCache						qvkCreatePipelineCache;
+PFN_vkCreateQueryPool							qvkCreateQueryPool;
 PFN_vkCreateRenderPass							qvkCreateRenderPass;
 PFN_vkCreateSampler								qvkCreateSampler;
 PFN_vkCreateSemaphore							qvkCreateSemaphore;
-static PFN_vkCreateShaderModule							qvkCreateShaderModule;
+PFN_vkCreateShaderModule							qvkCreateShaderModule;
 PFN_vkDestroyBuffer								qvkDestroyBuffer;
-static PFN_vkDestroyCommandPool							qvkDestroyCommandPool;
-static PFN_vkDestroyDescriptorPool						qvkDestroyDescriptorPool;
-static PFN_vkDestroyDescriptorSetLayout					qvkDestroyDescriptorSetLayout;
-static PFN_vkDestroyDevice								qvkDestroyDevice;
+PFN_vkDestroyCommandPool							qvkDestroyCommandPool;
+PFN_vkDestroyDescriptorPool						qvkDestroyDescriptorPool;
+PFN_vkDestroyDescriptorSetLayout					qvkDestroyDescriptorSetLayout;
+PFN_vkDestroyDevice								qvkDestroyDevice;
 PFN_vkDestroyFence								qvkDestroyFence;
-static PFN_vkDestroyFramebuffer							qvkDestroyFramebuffer;
-static PFN_vkDestroyImage								qvkDestroyImage;
-static PFN_vkDestroyImageView							qvkDestroyImageView;
+PFN_vkDestroyFramebuffer							qvkDestroyFramebuffer;
+PFN_vkDestroyImage								qvkDestroyImage;
+PFN_vkDestroyImageView							qvkDestroyImageView;
 PFN_vkDestroyPipeline							qvkDestroyPipeline;
-static PFN_vkDestroyPipelineCache						qvkDestroyPipelineCache;
-static PFN_vkDestroyPipelineLayout						qvkDestroyPipelineLayout;
-static PFN_vkDestroyQueryPool							qvkDestroyQueryPool;
-static PFN_vkDestroyRenderPass							qvkDestroyRenderPass;
+PFN_vkDestroyPipelineCache						qvkDestroyPipelineCache;
+PFN_vkDestroyPipelineLayout						qvkDestroyPipelineLayout;
+PFN_vkDestroyQueryPool							qvkDestroyQueryPool;
+PFN_vkDestroyRenderPass							qvkDestroyRenderPass;
 PFN_vkDestroySampler								qvkDestroySampler;
 PFN_vkDestroySemaphore							qvkDestroySemaphore;
-static PFN_vkDestroyShaderModule						qvkDestroyShaderModule;
-static PFN_vkDeviceWaitIdle								qvkDeviceWaitIdle;
+PFN_vkDestroyShaderModule						qvkDestroyShaderModule;
+PFN_vkDeviceWaitIdle								qvkDeviceWaitIdle;
 PFN_vkEndCommandBuffer							qvkEndCommandBuffer;
-static PFN_vkFlushMappedMemoryRanges					qvkFlushMappedMemoryRanges;
+PFN_vkFlushMappedMemoryRanges					qvkFlushMappedMemoryRanges;
 PFN_vkFreeCommandBuffers							qvkFreeCommandBuffers;
-static PFN_vkFreeDescriptorSets							qvkFreeDescriptorSets;
+PFN_vkFreeDescriptorSets							qvkFreeDescriptorSets;
 PFN_vkFreeMemory									qvkFreeMemory;
 PFN_vkGetBufferMemoryRequirements				qvkGetBufferMemoryRequirements;
-static PFN_vkGetDeviceQueue								qvkGetDeviceQueue;
-static PFN_vkGetImageMemoryRequirements					qvkGetImageMemoryRequirements;
-static PFN_vkGetImageSubresourceLayout					qvkGetImageSubresourceLayout;
-static PFN_vkInvalidateMappedMemoryRanges				qvkInvalidateMappedMemoryRanges;
+PFN_vkGetDeviceQueue								qvkGetDeviceQueue;
+PFN_vkGetImageMemoryRequirements					qvkGetImageMemoryRequirements;
+PFN_vkGetImageSubresourceLayout					qvkGetImageSubresourceLayout;
+PFN_vkInvalidateMappedMemoryRanges				qvkInvalidateMappedMemoryRanges;
 PFN_vkMapMemory									qvkMapMemory;
 PFN_vkQueueSubmit								qvkQueueSubmit;
-static PFN_vkQueueWaitIdle								qvkQueueWaitIdle;
+PFN_vkQueueWaitIdle								qvkQueueWaitIdle;
 PFN_vkResetCommandBuffer							qvkResetCommandBuffer;
-static PFN_vkResetDescriptorPool						qvkResetDescriptorPool;
+PFN_vkResetDescriptorPool						qvkResetDescriptorPool;
 PFN_vkResetFences								qvkResetFences;
-static PFN_vkGetQueryPoolResults						qvkGetQueryPoolResults;
-static PFN_vkResetQueryPoolEXT							qvkResetQueryPoolEXT;
-static PFN_vkUnmapMemory								qvkUnmapMemory;
+PFN_vkGetQueryPoolResults						qvkGetQueryPoolResults;
+PFN_vkResetQueryPoolEXT							qvkResetQueryPoolEXT;
+PFN_vkUnmapMemory								qvkUnmapMemory;
 PFN_vkUpdateDescriptorSets							qvkUpdateDescriptorSets;
 PFN_vkWaitForFences								qvkWaitForFences;
-static PFN_vkAcquireNextImageKHR						qvkAcquireNextImageKHR;
+PFN_vkAcquireNextImageKHR						qvkAcquireNextImageKHR;
 PFN_vkCreateSwapchainKHR							qvkCreateSwapchainKHR;
-static PFN_vkDestroySwapchainKHR						qvkDestroySwapchainKHR;
+PFN_vkDestroySwapchainKHR						qvkDestroySwapchainKHR;
 PFN_vkGetSwapchainImagesKHR						qvkGetSwapchainImagesKHR;
-static PFN_vkQueuePresentKHR							qvkQueuePresentKHR;
+PFN_vkQueuePresentKHR							qvkQueuePresentKHR;
 
-static PFN_vkGetBufferMemoryRequirements2KHR			qvkGetBufferMemoryRequirements2KHR;
-static PFN_vkGetImageMemoryRequirements2KHR				qvkGetImageMemoryRequirements2KHR;
+PFN_vkGetBufferMemoryRequirements2KHR			qvkGetBufferMemoryRequirements2KHR;
+PFN_vkGetImageMemoryRequirements2KHR				qvkGetImageMemoryRequirements2KHR;
 
 PFN_vkDebugMarkerSetObjectNameEXT				qvkDebugMarkerSetObjectNameEXT;
 
-static PFN_vkCmdClearColorImage								qvkCmdClearColorImage;
+PFN_vkCmdClearColorImage								qvkCmdClearColorImage;
 
 ////////////////////////////////////////////////////////////////////////////
 
@@ -349,1091 +334,7 @@ static VkFlags get_composite_alpha( VkCompositeAlphaFlagsKHR flags )
 */
 
 
-/* vk_set_object_name, SET_OBJECT_NAME moved to vk_validation.c */
-/* vk_create_render_passes moved to vk_render_pass.c */
-static void allocate_and_bind_image_memory(VkImage image) {
-	VkMemoryRequirements memory_requirements;
-	VkDeviceSize alignment;
-	ImageChunk *chunk;
-	int i;
-
-	qvkGetImageMemoryRequirements(vk.device, image, &memory_requirements);
-
-	if (vk_world.num_image_chunks >= MAX_IMAGE_CHUNKS) {
-		ri.Error(ERR_FATAL, "Vulkan: image chunk limit has been reached" );
-	}
-
-	chunk = NULL;
-
-	/* Oversized image: allocate a dedicated chunk instead of failing.
-	 * Merged lightmaps and large cubemaps can exceed IMAGE_CHUNK_SIZE (32MB). */
-	if ( memory_requirements.size > vk.image_chunk_size ) {
-		VkMemoryAllocateInfo alloc_info;
-		VkDeviceMemory memory;
-
-		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-		alloc_info.pNext = NULL;
-		alloc_info.allocationSize = memory_requirements.size;
-		alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
-
-		VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &memory ) );
-
-		chunk = &vk_world.image_chunks[vk_world.num_image_chunks];
-		chunk->memory = memory;
-		chunk->used = memory_requirements.size;
-
-		ri.Printf( PRINT_DEVELOPER, "Vulkan: allocated dedicated %ikB for oversized image\n",
-			(int)(memory_requirements.size / 1024) );
-
-		SET_OBJECT_NAME( memory, va( "image memory chunk %i (oversized)", vk_world.num_image_chunks ), VK_DEBUG_REPORT_OBJECT_TYPE_DEVICE_MEMORY_EXT );
-
-		vk_world.num_image_chunks++;
-
-		VK_CHECK( qvkBindImageMemory( vk.device, image, chunk->memory, 0 ) );
-		return;
-	}
-
-	// Try to find an existing chunk of sufficient capacity.
-	alignment = memory_requirements.alignment;
-	for ( i = 0; i < vk_world.num_image_chunks; i++ ) {
-		/* Skip dedicated oversized chunks; they have no free space. */
-		if ( vk_world.image_chunks[i].used > vk.image_chunk_size )
-			continue;
-		// ensure that memory region has proper alignment
-		VkDeviceSize offset = PAD( vk_world.image_chunks[i].used, alignment );
-
-		if ( offset + memory_requirements.size <= vk.image_chunk_size ) {
-			chunk = &vk_world.image_chunks[i];
-			chunk->used = offset + memory_requirements.size;
-			break;
-		}
-	}
-
-	// Allocate a new chunk in case we couldn't find suitable existing chunk.
-	if (chunk == NULL) {
-		VkMemoryAllocateInfo alloc_info;
-		VkDeviceMemory memory;
-
-		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-		alloc_info.pNext = NULL;
-		alloc_info.allocationSize = vk.image_chunk_size;
-		alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
-
-		VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &memory ) );
-
-		chunk = &vk_world.image_chunks[vk_world.num_image_chunks];
-		chunk->memory = memory;
-		chunk->used = memory_requirements.size;
-
-		SET_OBJECT_NAME( memory, va( "image memory chunk %i", vk_world.num_image_chunks ), VK_DEBUG_REPORT_OBJECT_TYPE_DEVICE_MEMORY_EXT );
-
-		vk_world.num_image_chunks++;
-	}
-
-	VK_CHECK(qvkBindImageMemory(vk.device, image, chunk->memory, chunk->used - memory_requirements.size));
-}
-
-
-static void create_instance( void )
-{
-#ifdef USE_VK_VALIDATION
-	/* Prefer Khronos validation (modern); LUNARG is deprecated. */
-	const char* validation_layer_name = "VK_LAYER_KHRONOS_validation";
-	const char* validation_layer_name2 = "VK_LAYER_LUNARG_standard_validation";
-#endif
-	VkInstanceCreateInfo desc;
-	VkInstanceCreateFlags flags;
-	VkExtensionProperties *extension_properties;
-	VkResult res;
-	const char **extension_names;
-	uint32_t i, n, count, extension_count;
-	VkApplicationInfo appInfo;
-
-	flags = 0;
-	count = 0;
-	extension_count = 0;
-	VK_CHECK(qvkEnumerateInstanceExtensionProperties(NULL, &count, NULL));
-
-	extension_properties = (VkExtensionProperties *)ri.Malloc(sizeof(VkExtensionProperties) * count);
-	extension_names = (const char**)ri.Malloc(sizeof(char *) * count);
-
-	VK_CHECK( qvkEnumerateInstanceExtensionProperties( NULL, &count, extension_properties ) );
-	for ( i = 0; i < count; i++ ) {
-		const char *ext = extension_properties[i].extensionName;
-
-		if ( !vk_used_instance_extension( ext ) ) {
-			continue;
-		}
-
-		// search for duplicates
-		for ( n = 0; n < extension_count; n++ ) {
-			if ( Q_stricmp( ext, extension_names[ n ] ) == 0 ) {
-				break;
-			}
-		}
-		if ( n != extension_count ) {
-			continue;
-		}
-
-		extension_names[ extension_count++ ] = ext;
-
-		if ( Q_stricmp( ext, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME ) == 0 ) {
-			flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
-		}
-
-		ri.Printf(PRINT_DEVELOPER, "instance extension: %s\n", ext);
-	}
-
-	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-	appInfo.pNext = NULL;
-	appInfo.pApplicationName = NULL; // Q3_VERSION;
-	appInfo.applicationVersion = 0x0;
-	appInfo.pEngineName = NULL;
-	appInfo.engineVersion = 0x0;
-#ifdef VK_API_VERSION_1_4
-	appInfo.apiVersion = VK_API_VERSION_1_4;
-#elif defined(VK_API_VERSION_1_3)
-	appInfo.apiVersion = VK_API_VERSION_1_3;
-#elif defined(VK_API_VERSION_1_2)
-	appInfo.apiVersion = VK_API_VERSION_1_2;
-#elif defined(VK_API_VERSION_1_1)
-	appInfo.apiVersion = VK_API_VERSION_1_1;
-#else
-	appInfo.apiVersion = VK_API_VERSION_1_0;
-#endif
-
-	// create instance
-	desc.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-	desc.pNext = NULL;
-	desc.flags = flags;
-	desc.pApplicationInfo = &appInfo;
-	desc.enabledExtensionCount = extension_count;
-	desc.ppEnabledExtensionNames = extension_names;
-
-#ifdef USE_VK_VALIDATION
-	desc.enabledLayerCount = 1;
-	desc.ppEnabledLayerNames = &validation_layer_name;
-
-	res = qvkCreateInstance( &desc, NULL, &vk_instance );
-
-	if ( res == VK_ERROR_LAYER_NOT_PRESENT ) {
-
-		desc.enabledLayerCount = 1;
-		desc.ppEnabledLayerNames = &validation_layer_name2;
-
-		res = qvkCreateInstance( &desc, NULL, &vk_instance );
-
-		if ( res == VK_ERROR_LAYER_NOT_PRESENT ) {
-
-			ri.Printf( PRINT_WARNING, "...validation layer is not available\n" );
-
-			// try without validation layer
-			desc.enabledLayerCount = 0;
-			desc.ppEnabledLayerNames = NULL;
-
-			res = qvkCreateInstance( &desc, NULL, &vk_instance );
-		}
-	}
-#else
-	desc.enabledLayerCount = 0;
-	desc.ppEnabledLayerNames = NULL;
-
-	res = qvkCreateInstance( &desc, NULL, &vk_instance );
-#endif
-
-	ri.Free( (void*)extension_names );
-	ri.Free( extension_properties );
-
-	if ( res != VK_SUCCESS ) {
-		ri.Error( ERR_FATAL, "Vulkan: instance creation failed with %s", vk_result_string( res ) );
-	}
-}
-
-
-static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_index ) {
-
-#ifdef _DEBUG
-	VkPhysicalDeviceTimelineSemaphoreFeatures timeline_semaphore;
-	VkPhysicalDeviceVulkanMemoryModelFeatures memory_model;
-	VkPhysicalDeviceBufferDeviceAddressFeatures devaddr_features;
-	VkPhysicalDevice8BitStorageFeatures storage_8bit_features;
-#endif
-
-	ri.Printf( PRINT_ALL, "...selected physical device: %i\n", device_index );
-
-	// select surface format
-	if ( !vk_select_surface_format( physical_device, vk_surface ) ) {
-		return qfalse;
-	}
-
-	vk_setup_surface_formats( physical_device );
-
-	// select queue family
-	{
-		VkQueueFamilyProperties *queue_families;
-		uint32_t queue_family_count;
-		uint32_t i;
-
-		qvkGetPhysicalDeviceQueueFamilyProperties( physical_device, &queue_family_count, NULL );
-		queue_families = (VkQueueFamilyProperties*)ri.Malloc( queue_family_count * sizeof( VkQueueFamilyProperties ) );
-		qvkGetPhysicalDeviceQueueFamilyProperties( physical_device, &queue_family_count, queue_families );
-
-		// select queue family with presentation and graphics support
-		vk.queue_family_index = ~0U;
-		for (i = 0; i < queue_family_count; i++) {
-			VkBool32 presentation_supported;
-			VK_CHECK( qvkGetPhysicalDeviceSurfaceSupportKHR( physical_device, i, vk_surface, &presentation_supported ) );
-
-			if (presentation_supported && (queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0) {
-				vk.queue_family_index = i;
-				break;
-			}
-		}
-
-		ri.Free( queue_families );
-
-		if ( vk.queue_family_index == ~0U ) {
-			ri.Printf( PRINT_ERROR, "...failed to find graphics queue family\n" );
-
-			return qfalse;
-		}
-	}
-
-	// create VkDevice
-	{
-		const char *device_extension_list[32];
-		uint32_t device_extension_count;
-		const char *ext, *end;
-		char *str;
-		const float priority = 1.0;
-		VkExtensionProperties *extension_properties;
-		VkDeviceQueueCreateInfo queue_desc;
-		VkPhysicalDeviceFeatures device_features;
-		VkPhysicalDeviceFeatures features;
-		VkDeviceCreateInfo device_desc;
-		VkResult res;
-		qboolean swapchainSupported = qfalse;
-		qboolean dedicatedAllocation = qfalse;
-		qboolean memoryRequirements2 = qfalse;
-		qboolean debugMarker = qfalse;
-		qboolean swapchainMaintenance1 = qfalse;
-		qboolean surfaceMaintenance1 = qfalse;
-		qboolean provokingVertex = qfalse;
-		qboolean nonSeamlessCubeMap = qfalse;
-		qboolean primTopoListRestart = qfalse;
-		qboolean legacyDithering = qfalse;
-		qboolean maintenance9 = qfalse;
-		qboolean shaderFma = qfalse;
-		qboolean portabilitySubset = qfalse;
-		qboolean dynamicRenderingLocalRead = qfalse;
-		qboolean globalPriority = qfalse;
-		qboolean lineRasterization = qfalse;
-		qboolean lineRasterizationExt = qfalse;
-		qboolean maintenance5 = qfalse;
-		qboolean maintenance8 = qfalse;
-		qboolean presentId = qfalse;
-		qboolean presentWait = qfalse;
-		qboolean hostQueryReset = qfalse;
-		qboolean shaderFloatControls2 = qfalse;
-		qboolean shaderMaximalReconvergence = qfalse;
-		qboolean shaderQuadControl = qfalse;
-		qboolean shaderRelaxedExtInstr = qfalse;
-		qboolean shaderSubgroupUniformCF = qfalse;
-		qboolean extendedDynamicState3 = qfalse;
-#ifdef USE_VULKAN_RTX
-		qboolean rtxAccelStruct = qfalse;
-		qboolean rtxPipeline = qfalse;
-		qboolean rtxDeferredHostOps = qfalse;
-		qboolean rtxBufferDeviceAddress = qfalse;
-#endif
-#ifdef _DEBUG
-		qboolean timelineSemaphore = qfalse;
-		qboolean memoryModel = qfalse;
-		qboolean devAddrFeat = qfalse;
-		qboolean storage8bit = qfalse;
-		const void** pNextPtr;
-#endif
-		uint32_t i, len, count = 0;
-
-		VK_CHECK( qvkEnumerateDeviceExtensionProperties( physical_device, NULL, &count, NULL ) );
-		extension_properties = (VkExtensionProperties*)ri.Malloc( count * sizeof( VkExtensionProperties ) );
-		VK_CHECK( qvkEnumerateDeviceExtensionProperties( physical_device, NULL, &count, extension_properties ) );
-
-		// fill glConfig.extensions_string
-		str = glConfig.extensions_string; *str = '\0';
-		end = &glConfig.extensions_string[ sizeof( glConfig.extensions_string ) - 1];
-
-		for ( i = 0; i < count; i++ ) {
-			ext = extension_properties[i].extensionName;
-			if ( strcmp( ext, VK_KHR_SWAPCHAIN_EXTENSION_NAME ) == 0 ) {
-				swapchainSupported = qtrue;
-			} else if ( strcmp( ext, VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME ) == 0 ) {
-				dedicatedAllocation = qtrue;
-			} else if ( strcmp( ext, VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME ) == 0 ) {
-				memoryRequirements2 = qtrue;
-			} else if ( strcmp( ext, VK_EXT_DEBUG_MARKER_EXTENSION_NAME ) == 0 ) {
-				debugMarker = qtrue;
-#ifdef _DEBUG
-			} else if ( strcmp( ext, VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME ) == 0 ) {
-				timelineSemaphore = qtrue;
-			} else if ( strcmp( ext, VK_KHR_VULKAN_MEMORY_MODEL_EXTENSION_NAME ) == 0 ) {
-				memoryModel = qtrue;
-			} else if ( strcmp( ext, VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME ) == 0 ) {
-				devAddrFeat = qtrue;
-			} else if ( strcmp( ext, VK_KHR_8BIT_STORAGE_EXTENSION_NAME ) == 0 ) {
-				storage8bit = qtrue;
-#endif
-			}
-			/* MoltenVK 1.2.7+ extensions */
-			if ( strcmp( ext, "VK_KHR_swapchain_maintenance1" ) == 0 ) {
-				swapchainMaintenance1 = qtrue;
-			} else if ( strcmp( ext, "VK_KHR_surface_maintenance1" ) == 0 ) {
-				surfaceMaintenance1 = qtrue;
-			} else if ( strcmp( ext, "VK_EXT_provoking_vertex" ) == 0 ) {
-				provokingVertex = qtrue;
-			} else if ( strcmp( ext, "VK_EXT_non_seamless_cube_map" ) == 0 ) {
-				nonSeamlessCubeMap = qtrue;
-			} else if ( strcmp( ext, "VK_EXT_primitive_topology_list_restart" ) == 0 ) {
-				primTopoListRestart = qtrue;
-			} else if ( strcmp( ext, "VK_EXT_legacy_dithering" ) == 0 ) {
-				legacyDithering = qtrue;
-			} else if ( strcmp( ext, "VK_KHR_maintenance9" ) == 0 ) {
-				maintenance9 = qtrue;
-			} else if ( strcmp( ext, "VK_KHR_shader_fma" ) == 0 ) {
-				shaderFma = qtrue;
-			} else if ( strcmp( ext, "VK_KHR_portability_subset" ) == 0 ) {
-				portabilitySubset = qtrue;
-			} else if ( strcmp( ext, "VK_KHR_dynamic_rendering_local_read" ) == 0 ) {
-				dynamicRenderingLocalRead = qtrue;
-			} else if ( strcmp( ext, "VK_KHR_global_priority" ) == 0 ) {
-				globalPriority = qtrue;
-			} else if ( strcmp( ext, "VK_KHR_line_rasterization" ) == 0 ) {
-				lineRasterization = qtrue;
-			} else if ( strcmp( ext, "VK_EXT_line_rasterization" ) == 0 ) {
-				lineRasterizationExt = qtrue;
-			} else if ( strcmp( ext, "VK_KHR_maintenance5" ) == 0 ) {
-				maintenance5 = qtrue;
-			} else if ( strcmp( ext, "VK_KHR_maintenance8" ) == 0 ) {
-				maintenance8 = qtrue;
-			} else if ( strcmp( ext, "VK_KHR_present_id" ) == 0 || strcmp( ext, "VK_KHR_present_id2" ) == 0 ) {
-				presentId = qtrue;
-			} else if ( strcmp( ext, "VK_KHR_present_wait" ) == 0 || strcmp( ext, "VK_KHR_present_wait2" ) == 0 ) {
-				presentWait = qtrue;
-			} else if ( strcmp( ext, VK_EXT_HOST_QUERY_RESET_EXTENSION_NAME ) == 0 ) {
-				hostQueryReset = qtrue;
-			} else if ( strcmp( ext, "VK_KHR_shader_float_controls2" ) == 0 ) {
-				shaderFloatControls2 = qtrue;
-			} else if ( strcmp( ext, "VK_KHR_shader_maximal_reconvergence" ) == 0 ) {
-				shaderMaximalReconvergence = qtrue;
-			} else if ( strcmp( ext, "VK_KHR_shader_quad_control" ) == 0 ) {
-				shaderQuadControl = qtrue;
-			} else if ( strcmp( ext, "VK_KHR_shader_relaxed_extended_instruction" ) == 0 ) {
-				shaderRelaxedExtInstr = qtrue;
-		} else if ( strcmp( ext, "VK_KHR_shader_subgroup_uniform_control_flow" ) == 0 ) {
-			shaderSubgroupUniformCF = qtrue;
-		} else if ( strcmp( ext, "VK_EXT_extended_dynamic_state3" ) == 0 ) {
-			extendedDynamicState3 = qtrue;
-		}
-#ifdef USE_VULKAN_RTX
-			else if ( strcmp( ext, VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME ) == 0 ) {
-				rtxAccelStruct = qtrue;
-			} else if ( strcmp( ext, VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME ) == 0 ) {
-				rtxPipeline = qtrue;
-			} else if ( strcmp( ext, "VK_KHR_deferred_host_operations" ) == 0 ) {
-				rtxDeferredHostOps = qtrue;
-			} else if ( strcmp( ext, VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME ) == 0 ) {
-				rtxBufferDeviceAddress = qtrue;
-			}
-#endif
-			// add this device extension to glConfig
-			if ( i != 0 ) {
-				if ( str + 1 >= end )
-					continue;
-				str = Q_stradd( str, " " );
-			}
-			len = (uint32_t)strlen( ext );
-			if ( str + len >= end )
-				continue;
-			str = Q_stradd( str, ext );
-		}
-
-		ri.Free( extension_properties );
-
-		device_extension_count = 0;
-
-		if ( !swapchainSupported ) {
-			ri.Printf( PRINT_ERROR, "...required device extension is not available: %s\n", VK_KHR_SWAPCHAIN_EXTENSION_NAME );
-			return qfalse;
-		}
-
-		if ( !memoryRequirements2 )
-			dedicatedAllocation = qfalse;
-		else
-			vk.dedicatedAllocation = dedicatedAllocation;
-
-#ifndef USE_DEDICATED_ALLOCATION
-		vk.dedicatedAllocation = qfalse;
-#endif
-
-		device_extension_list[ device_extension_count++ ] = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
-
-		if ( vk.dedicatedAllocation ) {
-			device_extension_list[ device_extension_count++ ] = VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME;
-			device_extension_list[ device_extension_count++ ] = VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME;
-		}
-
-		if ( debugMarker ) {
-			device_extension_list[ device_extension_count++ ] = VK_EXT_DEBUG_MARKER_EXTENSION_NAME;
-			vk.debugMarkers = qtrue;
-		}
-#ifdef _DEBUG
-		if ( timelineSemaphore ) {
-			device_extension_list[ device_extension_count++ ] = VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME;
-		}
-
-		if ( memoryModel ) {
-			device_extension_list[ device_extension_count++ ] = VK_KHR_VULKAN_MEMORY_MODEL_EXTENSION_NAME;
-		}
-
-		if ( devAddrFeat ) {
-			device_extension_list[ device_extension_count++ ] = VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME;
-		}
-
-		if ( storage8bit ) {
-			device_extension_list[ device_extension_count++ ] = VK_KHR_8BIT_STORAGE_EXTENSION_NAME;
-		}
-#endif // _DEBUG
-
-		/* MoltenVK 1.2.7+ extensions (enabled when available) */
-		if ( portabilitySubset ) {
-			device_extension_list[ device_extension_count++ ] = "VK_KHR_portability_subset";
-		}
-		if ( swapchainMaintenance1 ) {
-			device_extension_list[ device_extension_count++ ] = "VK_KHR_swapchain_maintenance1";
-			ri.Printf( PRINT_DEVELOPER, "  VK_KHR_swapchain_maintenance1: enabled\n" );
-		}
-		if ( provokingVertex ) {
-			device_extension_list[ device_extension_count++ ] = "VK_EXT_provoking_vertex";
-			ri.Printf( PRINT_DEVELOPER, "  VK_EXT_provoking_vertex: enabled\n" );
-		}
-		if ( nonSeamlessCubeMap ) {
-			device_extension_list[ device_extension_count++ ] = "VK_EXT_non_seamless_cube_map";
-			ri.Printf( PRINT_DEVELOPER, "  VK_EXT_non_seamless_cube_map: enabled\n" );
-		}
-		if ( primTopoListRestart ) {
-			device_extension_list[ device_extension_count++ ] = "VK_EXT_primitive_topology_list_restart";
-			ri.Printf( PRINT_DEVELOPER, "  VK_EXT_primitive_topology_list_restart: enabled\n" );
-		}
-		if ( maintenance9 ) {
-			device_extension_list[ device_extension_count++ ] = "VK_KHR_maintenance9";
-			ri.Printf( PRINT_DEVELOPER, "  VK_KHR_maintenance9: enabled\n" );
-		}
-		if ( shaderFma ) {
-			device_extension_list[ device_extension_count++ ] = "VK_KHR_shader_fma";
-			ri.Printf( PRINT_DEVELOPER, "  VK_KHR_shader_fma: enabled\n" );
-		}
-		if ( lineRasterization ) {
-			device_extension_list[ device_extension_count++ ] = "VK_KHR_line_rasterization";
-			ri.Printf( PRINT_DEVELOPER, "  VK_KHR_line_rasterization: enabled\n" );
-		} else if ( lineRasterizationExt ) {
-			device_extension_list[ device_extension_count++ ] = "VK_EXT_line_rasterization";
-			ri.Printf( PRINT_DEVELOPER, "  VK_EXT_line_rasterization: enabled\n" );
-		}
-		if ( maintenance5 ) {
-			device_extension_list[ device_extension_count++ ] = "VK_KHR_maintenance5";
-			ri.Printf( PRINT_DEVELOPER, "  VK_KHR_maintenance5: enabled\n" );
-		}
-		if ( maintenance8 ) {
-			device_extension_list[ device_extension_count++ ] = "VK_KHR_maintenance8";
-			ri.Printf( PRINT_DEVELOPER, "  VK_KHR_maintenance8: enabled\n" );
-		}
-		if ( dynamicRenderingLocalRead ) {
-			device_extension_list[ device_extension_count++ ] = "VK_KHR_dynamic_rendering_local_read";
-		}
-		if ( presentId ) {
-			device_extension_list[ device_extension_count++ ] = "VK_KHR_present_id";
-		}
-		if ( presentWait ) {
-			device_extension_list[ device_extension_count++ ] = "VK_KHR_present_wait";
-		}
-		if ( hostQueryReset ) {
-			device_extension_list[ device_extension_count++ ] = VK_EXT_HOST_QUERY_RESET_EXTENSION_NAME;
-		}
-		if ( shaderQuadControl ) {
-			if ( shaderMaximalReconvergence ) {
-				device_extension_list[ device_extension_count++ ] = "VK_KHR_shader_maximal_reconvergence";
-			}
-			device_extension_list[ device_extension_count++ ] = "VK_KHR_shader_quad_control";
-		}
-		if ( extendedDynamicState3 && r_vk_colorWriteMaskDynamic && r_vk_colorWriteMaskDynamic->integer ) {
-			device_extension_list[ device_extension_count++ ] = "VK_EXT_extended_dynamic_state3";
-			vk.colorWriteMaskDynamic = qtrue;
-			ri.Printf( PRINT_DEVELOPER, "  VK_EXT_extended_dynamic_state3: enabled (RB_ColorMask)\n" );
-		} else {
-			vk.colorWriteMaskDynamic = qfalse;
-		}
-#ifdef USE_VULKAN_RTX
-		if ( rtxAccelStruct && rtxPipeline && rtxDeferredHostOps && rtxBufferDeviceAddress && memoryRequirements2 ) {
-			device_extension_list[ device_extension_count++ ] = VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME;
-			device_extension_list[ device_extension_count++ ] = "VK_KHR_deferred_host_operations";
-			device_extension_list[ device_extension_count++ ] = VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME;
-			device_extension_list[ device_extension_count++ ] = VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME;
-			ri.Printf( PRINT_ALL, "[VK] Ray tracing extensions enabled (r_rtx available)\n" );
-		}
-#endif
-		(void)globalPriority; (void)shaderFloatControls2; (void)shaderMaximalReconvergence;
-		(void)shaderRelaxedExtInstr; (void)shaderSubgroupUniformCF; (void)legacyDithering;
-		(void)surfaceMaintenance1;
-		qvkGetPhysicalDeviceFeatures( physical_device, &device_features );
-
-		if ( device_features.fillModeNonSolid == VK_FALSE ) {
-			ri.Printf( PRINT_ERROR, "...fillModeNonSolid feature is not supported\n" );
-			return qfalse;
-		}
-
-		queue_desc.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-		queue_desc.pNext = NULL;
-		queue_desc.flags = 0;
-		queue_desc.queueFamilyIndex = vk.queue_family_index;
-		queue_desc.queueCount = 1;
-		queue_desc.pQueuePriorities = &priority;
-
-		Com_Memset( &features, 0, sizeof( features ) );
-		features.fillModeNonSolid = VK_TRUE;
-
-#ifdef _DEBUG
-		if ( device_features.shaderInt64 ) {
-			features.shaderInt64 = VK_TRUE;
-		}
-#endif
-		if ( r_hdr && r_hdr->integer == 3 && device_features.shaderFloat64 ) {
-			features.shaderFloat64 = VK_TRUE;
-		}
-		if ( device_features.wideLines ) { // needed for RB_SurfaceAxis
-			features.wideLines = VK_TRUE;
-			vk.wideLines = qtrue;
-		}
-
-		if ( device_features.fragmentStoresAndAtomics && device_features.vertexPipelineStoresAndAtomics ) {
-			features.vertexPipelineStoresAndAtomics = VK_TRUE;
-			features.fragmentStoresAndAtomics = VK_TRUE;
-			vk.fragmentStores = qtrue;
-		}
-#ifdef USE_VK_PBR
-		if ( device_features.geometryShader )
-			features.geometryShader = VK_TRUE;
-#endif
-		if ( r_ext_texture_filter_anisotropic->integer && device_features.samplerAnisotropy ) {
-			features.samplerAnisotropy = VK_TRUE;
-			vk.samplerAnisotropy = qtrue;
-		}
-		/* Required for 2-attachment pipelines (main/post_bloom) with different blend per attachment (VUID-00605) */
-		if ( device_features.independentBlend ) {
-			features.independentBlend = VK_TRUE;
-		}
-
-		device_desc.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-		device_desc.pNext = NULL;
-		device_desc.flags = 0;
-		device_desc.queueCreateInfoCount = 1;
-		device_desc.pQueueCreateInfos = &queue_desc;
-		device_desc.enabledLayerCount = 0;
-		device_desc.ppEnabledLayerNames = NULL;
-		device_desc.enabledExtensionCount = device_extension_count;
-		device_desc.ppEnabledExtensionNames = device_extension_list;
-		device_desc.pEnabledFeatures = &features;
-
-		/* VK_EXT_extended_dynamic_state3: color write mask for RB_ColorMask (VUID-09423) */
-		VkPhysicalDeviceExtendedDynamicState3FeaturesEXT extDynState3 = {0};
-		if ( extendedDynamicState3 && r_vk_colorWriteMaskDynamic && r_vk_colorWriteMaskDynamic->integer ) {
-			extDynState3.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT;
-			extDynState3.pNext = NULL;
-			extDynState3.extendedDynamicState3ColorWriteMask = VK_TRUE;
-			device_desc.pNext = &extDynState3;
-		}
-
-#ifdef _DEBUG
-		pNextPtr = (const void **)( ( extendedDynamicState3 && vk.colorWriteMaskDynamic ) ? &extDynState3.pNext : &device_desc.pNext );
-
-		if ( timelineSemaphore ) {
-			*pNextPtr = &timeline_semaphore;
-			timeline_semaphore.pNext = NULL;
-			timeline_semaphore.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
-			timeline_semaphore.timelineSemaphore = VK_TRUE;
-			pNextPtr = (const void **)&timeline_semaphore.pNext;
-		}
-
-		if ( memoryModel ) {
-			*pNextPtr = &memory_model;
-			memory_model.pNext = NULL;
-			memory_model.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_MEMORY_MODEL_FEATURES;
-			memory_model.vulkanMemoryModel = VK_TRUE;
-			memory_model.vulkanMemoryModelAvailabilityVisibilityChains = VK_FALSE;
-			memory_model.vulkanMemoryModelDeviceScope = VK_TRUE;
-			pNextPtr = (const void **)&memory_model.pNext;
-		}
-
-		if ( devAddrFeat ) {
-			*pNextPtr = &devaddr_features;
-			devaddr_features.pNext = NULL;
-			devaddr_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
-			devaddr_features.bufferDeviceAddress = VK_TRUE;
-			devaddr_features.bufferDeviceAddressCaptureReplay = VK_FALSE;
-			devaddr_features.bufferDeviceAddressMultiDevice = VK_FALSE;
-			pNextPtr = (const void **)&devaddr_features.pNext;
-		}
-
-		if ( storage8bit ) {
-			*pNextPtr = &storage_8bit_features;
-			storage_8bit_features.pNext = NULL;
-			storage_8bit_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_8BIT_STORAGE_FEATURES;
-			storage_8bit_features.storageBuffer8BitAccess = VK_TRUE;
-			storage_8bit_features.storagePushConstant8 = VK_FALSE;
-			storage_8bit_features.uniformAndStorageBuffer8BitAccess = VK_TRUE;
-			pNextPtr = (const void **)&storage_8bit_features.pNext;
-		}
-#endif
-		if ( hostQueryReset ) {
-			VkPhysicalDeviceHostQueryResetFeatures host_query;
-			const void *prev_next = device_desc.pNext;
-			Com_Memset( &host_query, 0, sizeof( host_query ) );
-			host_query.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES;
-			host_query.hostQueryReset = VK_TRUE;
-			host_query.pNext = prev_next ? (void *)(uintptr_t)prev_next : NULL;  /* chain; prev_next not modified */
-			device_desc.pNext = &host_query;
-		}
-		res = qvkCreateDevice( physical_device, &device_desc, NULL, &vk.device );
-		if ( res < 0 ) {
-			ri.Printf( PRINT_ERROR, "vkCreateDevice returned %s\n", vk_result_string( res ) );
-			return qfalse;
-		}
-	}
-
-	return qtrue;
-}
-
-
-#define INIT_INSTANCE_FUNCTION(func) \
-	do { \
-		void *_sym = ri.VK_GetInstanceProcAddr( vk_instance, #func ); \
-		Com_Memcpy( &q##func, &_sym, sizeof( q##func ) ); \
-		if ( q##func == NULL ) { \
-			ri.Error( ERR_FATAL, "Failed to find entrypoint %s", #func ); \
-		} \
-	} while ( 0 );
-
-#define INIT_INSTANCE_FUNCTION_EXT(func) \
-	do { \
-		void *_sym = ri.VK_GetInstanceProcAddr( vk_instance, #func ); \
-		Com_Memcpy( &q##func, &_sym, sizeof( q##func ) ); \
-	} while ( 0 );
-
-
-#define INIT_DEVICE_FUNCTION(func) \
-	do { \
-		PFN_vkVoidFunction _sym = qvkGetDeviceProcAddr( vk.device, #func ); \
-		Com_Memcpy( &q##func, &_sym, sizeof( q##func ) ); \
-		if ( q##func == NULL ) { \
-			ri.Error( ERR_FATAL, "Failed to find entrypoint %s", #func ); \
-		} \
-	} while ( 0 );
-
-#define INIT_DEVICE_FUNCTION_EXT(func) \
-	do { \
-		PFN_vkVoidFunction _sym = qvkGetDeviceProcAddr( vk.device, #func ); \
-		Com_Memcpy( &q##func, &_sym, sizeof( q##func ) ); \
-	} while ( 0 );
-
-
-static void vk_destroy_instance( void ) {
-	if ( vk_surface != VK_NULL_HANDLE ) {
-		if ( qvkDestroySurfaceKHR != NULL ) {
-			qvkDestroySurfaceKHR( vk_instance, vk_surface, NULL );
-		}
-		vk_surface = VK_NULL_HANDLE;
-	}
-
-#ifdef USE_VK_VALIDATION
-	if ( vk_debug_callback ) {
-		if ( qvkDestroyDebugReportCallbackEXT != NULL ) {
-			qvkDestroyDebugReportCallbackEXT( vk_instance, vk_debug_callback, NULL );
-		}
-		vk_debug_callback = VK_NULL_HANDLE;
-	}
-#endif
-
-	if ( vk_instance != VK_NULL_HANDLE ) {
-		if ( qvkDestroyInstance ) {
-			qvkDestroyInstance( vk_instance, NULL );
-		}
-		vk_instance = VK_NULL_HANDLE;
-	}
-}
-
-
-static void init_vulkan_library( void )
-{
-	VkPhysicalDeviceProperties props;
-	VkPhysicalDevice *physical_devices;
-	uint32_t device_count;
-	int device_index, i;
-	VkResult res;
-
-	Com_Memset( &vk, 0, sizeof( vk ) );
-
-	if ( vk_instance == VK_NULL_HANDLE ) {
-
-		// force cleanup
-		vk_destroy_instance();
-
-		// Get functions that do not depend on VkInstance (vk_instance == nullptr at this point).
-		INIT_INSTANCE_FUNCTION( vkCreateInstance )
-		INIT_INSTANCE_FUNCTION( vkEnumerateInstanceExtensionProperties )
-
-		// Get instance level functions.
-		create_instance();
-
-		INIT_INSTANCE_FUNCTION( vkCreateDevice )
-		INIT_INSTANCE_FUNCTION( vkDestroyInstance )
-		INIT_INSTANCE_FUNCTION( vkEnumerateDeviceExtensionProperties )
-		INIT_INSTANCE_FUNCTION( vkEnumeratePhysicalDevices )
-		INIT_INSTANCE_FUNCTION( vkGetDeviceProcAddr )
-		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceFeatures )
-		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceFormatProperties )
-		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceMemoryProperties )
-		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceProperties )
-		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceQueueFamilyProperties )
-		INIT_INSTANCE_FUNCTION( vkDestroySurfaceKHR )
-		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceSurfaceCapabilitiesKHR )
-		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceSurfaceFormatsKHR )
-		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceSurfacePresentModesKHR )
-		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceSurfaceSupportKHR )
-
-#ifdef USE_VK_VALIDATION
-		INIT_INSTANCE_FUNCTION_EXT( vkCreateDebugReportCallbackEXT )
-		INIT_INSTANCE_FUNCTION_EXT( vkDestroyDebugReportCallbackEXT )
-
-		// Create debug callback.
-		if ( qvkCreateDebugReportCallbackEXT && qvkDestroyDebugReportCallbackEXT ) {
-			VkDebugReportCallbackCreateInfoEXT desc;
-			desc.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
-			desc.pNext = NULL;
-			desc.flags = VK_DEBUG_REPORT_WARNING_BIT_EXT |
-				VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT |
-				VK_DEBUG_REPORT_ERROR_BIT_EXT;
-			desc.pfnCallback = &vk_validation_debug_callback;
-			desc.pUserData = NULL;
-
-			VK_CHECK( qvkCreateDebugReportCallbackEXT( vk_instance, &desc, NULL, &vk_debug_callback ) );
-		}
-#endif
-
-		// create surface
-		if ( !ri.VK_CreateSurface( vk_instance, &vk_surface ) ) {
-			ri.Error( ERR_FATAL, "Error creating Vulkan surface (see SDL_Vulkan_CreateSurface message above)" );
-			return;
-		}
-	} // vk_instance == VK_NULL_HANDLE
-
-	res = qvkEnumeratePhysicalDevices( vk_instance, &device_count, NULL );
-	if ( device_count == 0 ) {
-		ri.Error( ERR_FATAL, "Vulkan: no physical devices found" );
-		return;
-	}
-	else if ( res < 0 ) {
-		ri.Error( ERR_FATAL, "vkEnumeratePhysicalDevices returned %s", vk_result_string( res ) );
-		return;
-	}
-
-	physical_devices = (VkPhysicalDevice*)ri.Malloc( device_count * sizeof( VkPhysicalDevice ) );
-	VK_CHECK( qvkEnumeratePhysicalDevices( vk_instance, &device_count, physical_devices ) );
-
-	// initial physical device index
-	device_index = r_device->integer;
-
-	ri.Printf( PRINT_ALL, ".......................\nAvailable physical devices:\n" );
-	for ( i = 0; (uint32_t) i < device_count; i++ ) {
-		qvkGetPhysicalDeviceProperties( physical_devices[ i ], &props );
-		ri.Printf( PRINT_ALL, " %i: %s\n", i, vk_device_renderer_name( &props ) );
-		if ( device_index == -1 && props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ) {
-			device_index = i;
-		} else if ( device_index == -2 && props.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU ) {
-			device_index = i;
-		}
-	}
-	ri.Printf( PRINT_ALL, ".......................\n" );
-
-	vk.physical_device = VK_NULL_HANDLE;
-	for ( i = 0; (uint32_t) i < device_count; i++, device_index++ ) {
-		if ( device_index < 0 || (uint32_t)device_index >= device_count ) {
-			device_index = 0;
-		}
-		if ( vk_create_device( physical_devices[ device_index ], device_index ) ) {
-			vk.physical_device = physical_devices[ device_index ];
-			break;
-		}
-	}
-
-	ri.Free( physical_devices );
-
-	if ( vk.physical_device == VK_NULL_HANDLE ) {
-		ri.Error( ERR_FATAL, "Vulkan: unable to find any suitable physical device" );
-		return;
-	}
-
-	//
-	// Get device level functions.
-	//
-	INIT_DEVICE_FUNCTION(vkAllocateCommandBuffers)
-	INIT_DEVICE_FUNCTION(vkAllocateDescriptorSets)
-	INIT_DEVICE_FUNCTION(vkAllocateMemory)
-	INIT_DEVICE_FUNCTION(vkBeginCommandBuffer)
-	INIT_DEVICE_FUNCTION(vkBindBufferMemory)
-	INIT_DEVICE_FUNCTION(vkBindImageMemory)
-	INIT_DEVICE_FUNCTION(vkCmdBeginRenderPass)
-	INIT_DEVICE_FUNCTION(vkCmdBindDescriptorSets)
-	INIT_DEVICE_FUNCTION(vkCmdBindIndexBuffer)
-	INIT_DEVICE_FUNCTION(vkCmdBindPipeline)
-	INIT_DEVICE_FUNCTION(vkCmdBindVertexBuffers)
-	INIT_DEVICE_FUNCTION(vkCmdBlitImage)
-	INIT_DEVICE_FUNCTION(vkCmdClearAttachments)
-	INIT_DEVICE_FUNCTION(vkCmdCopyBuffer)
-	INIT_DEVICE_FUNCTION(vkCmdCopyBufferToImage)
-	INIT_DEVICE_FUNCTION(vkCmdCopyImage)
-	INIT_DEVICE_FUNCTION(vkCmdCopyImageToBuffer)
-	INIT_DEVICE_FUNCTION(vkCmdDraw)
-	INIT_DEVICE_FUNCTION(vkCmdDrawIndexed)
-	INIT_DEVICE_FUNCTION(vkCmdDispatch)
-	INIT_DEVICE_FUNCTION(vkCmdEndRenderPass)
-	INIT_DEVICE_FUNCTION(vkCmdNextSubpass)
-	INIT_DEVICE_FUNCTION(vkCmdPipelineBarrier)
-	INIT_DEVICE_FUNCTION(vkCmdPushConstants)
-	INIT_DEVICE_FUNCTION(vkCmdSetDepthBias)
-	INIT_DEVICE_FUNCTION(vkCmdSetScissor)
-	INIT_DEVICE_FUNCTION(vkCmdSetViewport)
-	INIT_DEVICE_FUNCTION(vkCmdWriteTimestamp)
-	INIT_DEVICE_FUNCTION(vkCmdBeginQuery)
-	INIT_DEVICE_FUNCTION(vkCmdEndQuery)
-	INIT_DEVICE_FUNCTION_EXT(vkCmdResetQueryPool)
-	INIT_DEVICE_FUNCTION(vkCreateBuffer)
-	INIT_DEVICE_FUNCTION(vkCreateCommandPool)
-	INIT_DEVICE_FUNCTION(vkCreateDescriptorPool)
-	INIT_DEVICE_FUNCTION(vkCreateDescriptorSetLayout)
-	INIT_DEVICE_FUNCTION(vkCreateFence)
-	INIT_DEVICE_FUNCTION(vkCreateFramebuffer)
-	INIT_DEVICE_FUNCTION(vkCreateComputePipelines)
-	INIT_DEVICE_FUNCTION(vkCreateGraphicsPipelines)
-	INIT_DEVICE_FUNCTION(vkCreateImage)
-	INIT_DEVICE_FUNCTION(vkCreateImageView)
-	INIT_DEVICE_FUNCTION(vkCreatePipelineCache)
-	INIT_DEVICE_FUNCTION(vkCreatePipelineLayout)
-	INIT_DEVICE_FUNCTION(vkCreateQueryPool)
-	INIT_DEVICE_FUNCTION(vkCreateRenderPass)
-	INIT_DEVICE_FUNCTION(vkCreateSampler)
-	INIT_DEVICE_FUNCTION(vkCreateSemaphore)
-	INIT_DEVICE_FUNCTION(vkCreateShaderModule)
-	INIT_DEVICE_FUNCTION(vkDestroyBuffer)
-	INIT_DEVICE_FUNCTION(vkDestroyCommandPool)
-	INIT_DEVICE_FUNCTION(vkDestroyDescriptorPool)
-	INIT_DEVICE_FUNCTION(vkDestroyDescriptorSetLayout)
-	INIT_DEVICE_FUNCTION(vkDestroyDevice)
-	INIT_DEVICE_FUNCTION(vkDestroyFence)
-	INIT_DEVICE_FUNCTION(vkDestroyFramebuffer)
-	INIT_DEVICE_FUNCTION(vkDestroyImage)
-	INIT_DEVICE_FUNCTION(vkDestroyImageView)
-	INIT_DEVICE_FUNCTION(vkDestroyPipeline)
-	INIT_DEVICE_FUNCTION(vkDestroyPipelineCache)
-	INIT_DEVICE_FUNCTION(vkDestroyPipelineLayout)
-	INIT_DEVICE_FUNCTION(vkDestroyQueryPool)
-	INIT_DEVICE_FUNCTION(vkDestroyRenderPass)
-	INIT_DEVICE_FUNCTION(vkDestroySampler)
-	INIT_DEVICE_FUNCTION(vkDestroySemaphore)
-	INIT_DEVICE_FUNCTION(vkDestroyShaderModule)
-	INIT_DEVICE_FUNCTION(vkDeviceWaitIdle)
-	INIT_DEVICE_FUNCTION(vkEndCommandBuffer)
-	INIT_DEVICE_FUNCTION(vkFlushMappedMemoryRanges)
-	INIT_DEVICE_FUNCTION(vkFreeCommandBuffers)
-	INIT_DEVICE_FUNCTION(vkFreeDescriptorSets)
-	INIT_DEVICE_FUNCTION(vkFreeMemory)
-	INIT_DEVICE_FUNCTION(vkGetBufferMemoryRequirements)
-	INIT_DEVICE_FUNCTION(vkGetDeviceQueue)
-	INIT_DEVICE_FUNCTION(vkGetImageMemoryRequirements)
-	INIT_DEVICE_FUNCTION(vkGetImageSubresourceLayout)
-	INIT_DEVICE_FUNCTION(vkInvalidateMappedMemoryRanges)
-	INIT_DEVICE_FUNCTION(vkMapMemory)
-	INIT_DEVICE_FUNCTION(vkQueueSubmit)
-	INIT_DEVICE_FUNCTION(vkQueueWaitIdle)
-	INIT_DEVICE_FUNCTION(vkResetCommandBuffer)
-	INIT_DEVICE_FUNCTION(vkResetDescriptorPool)
-	INIT_DEVICE_FUNCTION(vkResetFences)
-	INIT_DEVICE_FUNCTION(vkGetQueryPoolResults)
-	INIT_DEVICE_FUNCTION_EXT(vkResetQueryPoolEXT)
-	INIT_DEVICE_FUNCTION(vkUnmapMemory)
-	INIT_DEVICE_FUNCTION(vkUpdateDescriptorSets)
-	INIT_DEVICE_FUNCTION(vkWaitForFences)
-	INIT_DEVICE_FUNCTION(vkAcquireNextImageKHR)
-	INIT_DEVICE_FUNCTION(vkCreateSwapchainKHR)
-	INIT_DEVICE_FUNCTION(vkDestroySwapchainKHR)
-	INIT_DEVICE_FUNCTION(vkGetSwapchainImagesKHR)
-	INIT_DEVICE_FUNCTION(vkQueuePresentKHR)
-
-	if ( vk.dedicatedAllocation ) {
-		INIT_DEVICE_FUNCTION_EXT(vkGetBufferMemoryRequirements2KHR);
-		INIT_DEVICE_FUNCTION_EXT(vkGetImageMemoryRequirements2KHR);
-		if ( !qvkGetBufferMemoryRequirements2KHR || !qvkGetImageMemoryRequirements2KHR ) {
-			vk.dedicatedAllocation = qfalse;
-		}
-	}
-
-	if ( vk.debugMarkers ) {
-		INIT_DEVICE_FUNCTION_EXT(vkDebugMarkerSetObjectNameEXT)
-	}
-
-	if ( vk.colorWriteMaskDynamic ) {
-		INIT_DEVICE_FUNCTION_EXT(vkCmdSetColorWriteMaskEXT)
-		if ( !qvkCmdSetColorWriteMaskEXT )
-			vk.colorWriteMaskDynamic = qfalse;
-	}
-
-	INIT_DEVICE_FUNCTION_EXT(vkCmdClearColorImage)
-}
-
-#undef INIT_INSTANCE_FUNCTION
-#undef INIT_DEVICE_FUNCTION
-#undef INIT_DEVICE_FUNCTION_EXT
-
-static void deinit_instance_functions( void )
-{
-	qvkCreateInstance = NULL;
-	qvkEnumerateInstanceExtensionProperties = NULL;
-
-	// instance functions:
-	qvkCreateDevice = NULL;
-	qvkDestroyInstance = NULL;
-	qvkEnumerateDeviceExtensionProperties = NULL;
-	qvkEnumeratePhysicalDevices = NULL;
-	qvkGetDeviceProcAddr = NULL;
-	qvkGetPhysicalDeviceFeatures = NULL;
-	qvkGetPhysicalDeviceFormatProperties = NULL;
-	qvkGetPhysicalDeviceMemoryProperties = NULL;
-	qvkGetPhysicalDeviceProperties = NULL;
-	qvkGetPhysicalDeviceQueueFamilyProperties = NULL;
-	qvkDestroySurfaceKHR = NULL;
-	qvkGetPhysicalDeviceSurfaceCapabilitiesKHR = NULL;
-	qvkGetPhysicalDeviceSurfaceFormatsKHR = NULL;
-	qvkGetPhysicalDeviceSurfacePresentModesKHR = NULL;
-	qvkGetPhysicalDeviceSurfaceSupportKHR = NULL;
-#ifdef USE_VK_VALIDATION
-	qvkCreateDebugReportCallbackEXT = NULL;
-	qvkDestroyDebugReportCallbackEXT = NULL;
-#endif
-}
-
-
-static void deinit_device_functions( void )
-{
-	// device functions:
-	qvkAllocateCommandBuffers					= NULL;
-	qvkAllocateDescriptorSets					= NULL;
-	qvkAllocateMemory							= NULL;
-	qvkBeginCommandBuffer						= NULL;
-	qvkBindBufferMemory							= NULL;
-	qvkBindImageMemory							= NULL;
-	qvkCmdBeginRenderPass						= NULL;
-	qvkCmdBindDescriptorSets					= NULL;
-	qvkCmdBindIndexBuffer						= NULL;
-	qvkCmdBindPipeline							= NULL;
-	qvkCmdBindVertexBuffers						= NULL;
-	qvkCmdBlitImage								= NULL;
-	qvkCmdClearAttachments						= NULL;
-	qvkCmdCopyBuffer							= NULL;
-	qvkCmdCopyBufferToImage						= NULL;
-	qvkCmdCopyImage								= NULL;
-	qvkCmdCopyImageToBuffer						= NULL;
-	qvkCmdDraw									= NULL;
-	qvkCmdDrawIndexed							= NULL;
-	qvkCmdDispatch								= NULL;
-	qvkCmdEndRenderPass							= NULL;
-	qvkCmdNextSubpass							= NULL;
-	qvkCmdPipelineBarrier						= NULL;
-	qvkCmdPushConstants							= NULL;
-	qvkCmdSetDepthBias							= NULL;
-	qvkCmdSetScissor							= NULL;
-	qvkCmdSetViewport							= NULL;
-	qvkCmdSetColorWriteMaskEXT					= NULL;
-	qvkCmdWriteTimestamp						= NULL;
-	qvkCmdBeginQuery							= NULL;
-	qvkCmdEndQuery								= NULL;
-	qvkCmdResetQueryPool						= NULL;
-	qvkCreateBuffer								= NULL;
-	qvkCreateCommandPool						= NULL;
-	qvkCreateDescriptorPool						= NULL;
-	qvkCreateDescriptorSetLayout				= NULL;
-	qvkCreateFence								= NULL;
-	qvkCreateFramebuffer						= NULL;
-	qvkCreateComputePipelines					= NULL;
-	qvkCreateGraphicsPipelines					= NULL;
-	qvkCreateImage								= NULL;
-	qvkCreateImageView							= NULL;
-	qvkCreatePipelineCache						= NULL;
-	qvkCreatePipelineLayout						= NULL;
-	qvkCreateQueryPool							= NULL;
-	qvkCreateRenderPass							= NULL;
-	qvkCreateSampler							= NULL;
-	qvkCreateSemaphore							= NULL;
-	qvkCreateShaderModule						= NULL;
-	qvkDestroyBuffer							= NULL;
-	qvkDestroyCommandPool						= NULL;
-	qvkDestroyDescriptorPool					= NULL;
-	qvkDestroyDescriptorSetLayout				= NULL;
-	qvkDestroyDevice							= NULL;
-	qvkDestroyFence								= NULL;
-	qvkDestroyFramebuffer						= NULL;
-	qvkDestroyImage								= NULL;
-	qvkDestroyImageView							= NULL;
-	qvkDestroyPipeline							= NULL;
-	qvkDestroyPipelineCache						= NULL;
-	qvkDestroyPipelineLayout					= NULL;
-	qvkDestroyQueryPool							= NULL;
-	qvkDestroyRenderPass						= NULL;
-	qvkDestroySampler							= NULL;
-	qvkDestroySemaphore							= NULL;
-	qvkDestroyShaderModule						= NULL;
-	qvkDeviceWaitIdle							= NULL;
-	qvkEndCommandBuffer							= NULL;
-	qvkFlushMappedMemoryRanges					= NULL;
-	qvkFreeCommandBuffers						= NULL;
-	qvkFreeDescriptorSets						= NULL;
-	qvkFreeMemory								= NULL;
-	qvkGetBufferMemoryRequirements				= NULL;
-	qvkGetDeviceQueue							= NULL;
-	qvkGetImageMemoryRequirements				= NULL;
-	qvkGetImageSubresourceLayout				= NULL;
-	qvkInvalidateMappedMemoryRanges				= NULL;
-	qvkMapMemory								= NULL;
-	qvkQueueSubmit								= NULL;
-	qvkQueueWaitIdle							= NULL;
-	qvkResetCommandBuffer						= NULL;
-	qvkResetDescriptorPool						= NULL;
-	qvkResetFences								= NULL;
-	qvkGetQueryPoolResults						= NULL;
-	qvkResetQueryPoolEXT						= NULL;
-	qvkUnmapMemory								= NULL;
-	qvkUpdateDescriptorSets						= NULL;
-	qvkWaitForFences							= NULL;
-	qvkAcquireNextImageKHR						= NULL;
-	qvkCreateSwapchainKHR						= NULL;
-	qvkDestroySwapchainKHR						= NULL;
-	qvkGetSwapchainImagesKHR					= NULL;
-	qvkQueuePresentKHR							= NULL;
-
-	qvkGetBufferMemoryRequirements2KHR			= NULL;
-	qvkGetImageMemoryRequirements2KHR			= NULL;
-
-	qvkDebugMarkerSetObjectNameEXT				= NULL;
-	qvkCmdClearColorImage						= NULL;
-}
-
+/* create_instance, vk_create_device, vk_destroy_instance, init_vulkan_library, deinit_* moved to vk_instance.c */
 
 static VkShaderModule SHADER_MODULE(const uint8_t *bytes, const int count) {
 	VkShaderModuleCreateInfo desc;
@@ -2514,86 +1415,7 @@ qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size )
 }
 #endif
 
-/*
-===============
-vk_create_gltf_buffers
-===============
-Creates device-local vertex and index buffers for a glTF primitive.
-vboData: packed vertex data (xyz vec4, rgba u8, st vec2, normal vec4 per vertex)
-vboSize: total bytes
-idxData/idxCount: index buffer
-*/
-qboolean vk_create_gltf_buffers( const byte *vboData, int vboSize, const uint32_t *idxData, int idxCount,
-	VkBuffer *outVertexBuffer, VkBuffer *outIndexBuffer )
-{
-	VkBufferCreateInfo desc;
-	VkMemoryRequirements memReq;
-	VkMemoryAllocateInfo allocInfo;
-	VkDeviceMemory vertMem = VK_NULL_HANDLE, idxMem = VK_NULL_HANDLE;
-	VkBuffer vertBuf = VK_NULL_HANDLE, idxBuf = VK_NULL_HANDLE;
-	VkCommandBuffer cmd;
-	VkBufferCopy copyRegion;
-	VkDeviceSize idxSize;
-	uint32_t memType;
-
-	if ( !vboData || vboSize <= 0 || !idxData || idxCount <= 0 || !outVertexBuffer || !outIndexBuffer ) {
-		return qfalse;
-	}
-	idxSize = (VkDeviceSize)idxCount * sizeof( uint32_t );
-
-	Com_Memset( &desc, 0, sizeof( desc ) );
-	desc.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	desc.size = (VkDeviceSize)vboSize;
-	desc.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-	desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	VK_CHECK( qvkCreateBuffer( vk.device, &desc, NULL, &vertBuf ) );
-
-	desc.size = idxSize;
-	desc.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-	VK_CHECK( qvkCreateBuffer( vk.device, &desc, NULL, &idxBuf ) );
-
-	qvkGetBufferMemoryRequirements( vk.device, vertBuf, &memReq );
-	memType = vk_find_memory_type( vk.physical_device, memReq.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
-	Com_Memset( &allocInfo, 0, sizeof( allocInfo ) );
-	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	allocInfo.allocationSize = memReq.size;
-	allocInfo.memoryTypeIndex = memType;
-	VK_CHECK( qvkAllocateMemory( vk.device, &allocInfo, NULL, &vertMem ) );
-	qvkBindBufferMemory( vk.device, vertBuf, vertMem, 0 );
-
-	qvkGetBufferMemoryRequirements( vk.device, idxBuf, &memReq );
-	allocInfo.allocationSize = memReq.size;
-	allocInfo.memoryTypeIndex = vk_find_memory_type( vk.physical_device, memReq.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
-	VK_CHECK( qvkAllocateMemory( vk.device, &allocInfo, NULL, &idxMem ) );
-	qvkBindBufferMemory( vk.device, idxBuf, idxMem, 0 );
-
-	/* Upload via staging - need space for both vbo and index data */
-	if ( !vk.device || !vk.staging_buffer.ptr ||
-	     (VkDeviceSize)vboSize + idxSize > vk.staging_buffer.size ) {
-		qvkDestroyBuffer( vk.device, vertBuf, NULL );
-		qvkDestroyBuffer( vk.device, idxBuf, NULL );
-		qvkFreeMemory( vk.device, vertMem, NULL );
-		qvkFreeMemory( vk.device, idxMem, NULL );
-		return qfalse;
-	}
-	Com_Memcpy( vk.staging_buffer.ptr, vboData, vboSize );
-	Com_Memcpy( vk.staging_buffer.ptr + vboSize, idxData, (size_t)idxSize );
-
-	cmd = vk_begin_command_buffer();
-	copyRegion.srcOffset = 0;
-	copyRegion.dstOffset = 0;
-	copyRegion.size = (VkDeviceSize)vboSize;
-	qvkCmdCopyBuffer( cmd, vk.staging_buffer.handle, vertBuf, 1, &copyRegion );
-	copyRegion.srcOffset = (VkDeviceSize)vboSize;
-	copyRegion.dstOffset = 0;
-	copyRegion.size = idxSize;
-	qvkCmdCopyBuffer( cmd, vk.staging_buffer.handle, idxBuf, 1, &copyRegion );
-	vk_end_command_buffer( cmd, __func__ );
-
-	*outVertexBuffer = vertBuf;
-	*outIndexBuffer = idxBuf;
-	return qtrue;
-}
+/* vk_create_gltf_buffers moved to vk_gltf.c */
 
 #include "shaders/spirv/shader_data.c"
 #define SHADER_MODULE(name) SHADER_MODULE(name,sizeof(name))
@@ -4433,7 +3255,7 @@ void vk_initialize( void )
 	uint32_t patch;
 	uint32_t i;
 
-	init_vulkan_library();
+		vk_init_vulkan_library();
 
 	qvkGetDeviceQueue( vk.device, vk.queue_family_index, 0, &vk.queue );
 
@@ -7952,14 +6774,14 @@ __cleanup:
 		qvkDestroyDevice( vk.device, NULL );
 	}
 
-	deinit_device_functions();
+	vk_deinit_device_functions();
 
 	Com_Memset( &vk, 0, sizeof( vk ) );
 	Com_Memset( &vk_world, 0, sizeof( vk_world ) );
 	
 	if ( code != REF_KEEP_CONTEXT ) {
 		vk_destroy_instance();
-		deinit_instance_functions();
+		vk_deinit_instance_functions();
 	}
 }
 
@@ -8004,8 +6826,7 @@ void vk_release_resources( void ) {
 	}
 	vk_wait_idle();
 
-	for ( i = 0; i < vk_world.num_image_chunks; i++ )
-		qvkFreeMemory( vk.device, vk_world.image_chunks[i].memory, NULL );
+	vk_image_free_chunks();
 
 	vk_clean_staging_buffer();
 
@@ -8024,19 +6845,6 @@ void vk_release_resources( void ) {
 	vk.pipelines_count = vk.pipelines_world_base;
 
 	VK_CHECK( qvkResetDescriptorPool( vk.device, vk.descriptor_pool, 0 ) );
-
-	if ( vk_world.num_image_chunks > 1 ) {
-		// if we allocated more than 2 image chunks - use doubled default size
-		vk.image_chunk_size = (IMAGE_CHUNK_SIZE * 2);
-	}
-#if 0 // do not reduce chunk size
-	else if ( vk_world.num_image_chunks == 1 ) {
-		// otherwise set to default if used less than a half
-		if ( vk_world.image_chunks[0].used < ( IMAGE_CHUNK_SIZE - (IMAGE_CHUNK_SIZE / 10) ) ) {
-			vk.image_chunk_size = IMAGE_CHUNK_SIZE;
-		}
-	}
-#endif
 
 	Com_Memset( &vk_world, 0, sizeof( vk_world ) );
 
@@ -8116,7 +6924,7 @@ void vk_create_image( image_t *image, int width, int height, int mip_levels ) {
 
 		VK_CHECK( qvkCreateImage( vk.device, &desc, NULL, &image->handle ) );
 
-		allocate_and_bind_image_memory( image->handle );
+		vk_allocate_and_bind_image_memory( image->handle );
 	}
 
 	// create image view

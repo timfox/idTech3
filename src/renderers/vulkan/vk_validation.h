@@ -8,7 +8,9 @@
  */
 
 /* Debug: set object name for Vulkan debugger/profiler (no-op if extension unavailable). */
+#ifndef SET_OBJECT_NAME
 #define SET_OBJECT_NAME(obj, objName, objType) vk_set_object_name((uint64_t)(obj), (objName), (objType))
+#endif
 
 /* Callback for VkDebugReportCallbackEXT. Pass to vkCreateDebugReportCallbackEXT. */
 VKAPI_ATTR VkBool32 VKAPI_CALL vk_validation_debug_callback(
