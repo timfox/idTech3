@@ -776,6 +776,8 @@ static vmHeader_t *VM_LoadQVM( vm_t *vm, qboolean alloc ) {
 	if ( !header ) {
 		if ( !vm->silentQVM ) {
 			Com_Printf( "Failed.\n" );
+		} else {
+			Com_Printf( S_COLOR_YELLOW "VM_LoadQVM: %s.qvm not found (tried modules/ and vm/)\n", vm->name );
 		}
 		VM_Free( vm );
 		return NULL;
