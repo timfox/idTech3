@@ -63,11 +63,11 @@ This installs SDL to `/usr/local`. For a user install (no sudo for the engine):
 **Manual build** (if you prefer to run steps yourself):
 
 ```bash
-# 1. Install build deps and Vulkan headers (Mesa V3DV provides libvulkan at runtime)
+# 1. Install build deps (libvulkan-dev provides Vulkan headers; Mesa V3DV provides libvulkan at runtime)
 sudo apt-get install -y build-essential cmake ninja-build pkg-config \
   libasound2-dev libdbus-1-dev libdrm-dev libgbm-dev libibus-1.0-dev \
   libpulse-dev libudev-dev libx11-dev libxcb1-dev libxext-dev libxfixes-dev \
-  libxinerama-dev libxrandr-dev libxss-dev libxxf86vm-dev vulkan-headers
+  libxinerama-dev libxrandr-dev libxss-dev libxxf86vm-dev libvulkan-dev
 
 # 2. Clone SDL (use release tag for stability)
 git clone https://github.com/libsdl-org/SDL.git -b release-2.30.0 sdl2-vulkan
