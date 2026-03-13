@@ -7,14 +7,17 @@
 # Example: ./run_vulkan.sh +set fs_game unwaking +set cl_renderer vulkan
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Engine lives in release/ (sibling of scripts/ when run from repo, or same dir when copied to release/)
+RELEASE_DIR="$(cd "$SCRIPT_DIR/../release" 2>/dev/null && pwd)"
+[ -z "$RELEASE_DIR" ] && RELEASE_DIR="$SCRIPT_DIR"
 
 # Pick engine binary by architecture
 case "$(uname -m)" in
-  aarch64|arm64) ENGINE="${SCRIPT_DIR}/idtech3.aarch64" ;;
-  x86_64)       ENGINE="${SCRIPT_DIR}/idtech3" ;;
-  *)            ENGINE="${SCRIPT_DIR}/idtech3" ;;
+  aarch64|arm64) ENGINE="${RELEASE_DIR}/idtech3.aarch64" ;;
+  x86_64)       ENGINE="${RELEASE_DIR}/idtech3" ;;
+  *)            ENGINE="${RELEASE_DIR}/idtech3" ;;
 esac
-[ ! -x "$ENGINE" ] && ENGINE="${SCRIPT_DIR}/idtech3"
+[ ! -x "$ENGINE" ] && ENGINE="${RELEASE_DIR}/idtech3"
 
 # Prefer custom SDL: /usr/local (system install) or $HOME/sdl2-vulkan-install (user install)
 if [ -f "/usr/local/lib/libSDL2.so" ] || [ -f "/usr/local/lib/aarch64-linux-gnu/libSDL2.so" ]; then
