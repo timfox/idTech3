@@ -53,7 +53,13 @@ Raspberry Pi OS ships SDL built without Vulkan. To use the Vulkan renderer, rebu
 ./scripts/build_sdl_vulkan_rpi.sh
 ```
 
-This installs SDL to `/usr/local`. For a user install (no sudo for the engine):
+This installs SDL to `/usr/local`. Run the engine with `LD_LIBRARY_PATH` so it uses the custom SDL:
+
+```bash
+LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH ./release/idtech3.aarch64 +set cl_renderer vulkan
+```
+
+For a user install (no sudo for the engine):
 
 ```bash
 ./scripts/build_sdl_vulkan_rpi.sh --prefix $HOME/sdl2-vulkan-install
@@ -88,13 +94,21 @@ sudo ninja install
 sudo ldconfig
 ```
 
-Then rebuild the engine and run with Vulkan:
+Then rebuild the engine and run with Vulkan. **Use `LD_LIBRARY_PATH`** so the custom SDL is loaded instead of the system one:
 
 ```bash
 cd /path/to/idTech3
 ./scripts/compile_engine.sh vulkan
-./release/idtech3.aarch64 +set cl_renderer vulkan
+LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH ./release/idtech3.aarch64 +set cl_renderer vulkan
 ```
+
+If you used `--prefix $HOME/sdl2-vulkan-install`, use that path instead:
+
+```bash
+LD_LIBRARY_PATH=$HOME/sdl2-vulkan-install/lib:$LD_LIBRARY_PATH ./release/idtech3.aarch64 +set cl_renderer vulkan
+```
+
+To verify which SDL is used: `ldd ./release/idtech3.aarch64 | grep SDL` (should show your install path).
 
 To use your custom SDL without replacing the system one, install to a prefix and set `LD_LIBRARY_PATH`:
 
