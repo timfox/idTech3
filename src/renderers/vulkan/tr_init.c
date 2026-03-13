@@ -45,7 +45,9 @@ glstate_t	glState;
 glstatic_t	gls;
 
 #ifdef USE_VULKAN
+#include "vk_device.h"
 static void VkInfo_f( void );
+static void VulkanInfo_f( void );
 static void VkVolumetricValidate_f( void );
 #endif
 static void GfxInfo( void );
@@ -1683,6 +1685,49 @@ static void VkInfo_f( void )
 	ri.Printf(PRINT_ALL, "image chunks: %i\n", vk_world.num_image_chunks );
 }
 
+static void VulkanInfo_f( void )
+{
+	VkPhysicalDeviceProperties props;
+	char driver_version[64];
+
+	if ( !vk.physical_device ) {
+		ri.Printf( PRINT_ALL, "Vulkan not initialized.\n" );
+		return;
+	}
+
+	qvkGetPhysicalDeviceProperties( vk.physical_device, &props );
+
+	/* Decode driver version (vendor-specific encoding) */
+	switch ( props.vendorID ) {
+		case 0x10DE: /* NVIDIA */
+			Com_sprintf( driver_version, sizeof( driver_version ), "%u.%u.%u.%u",
+				(props.driverVersion >> 22) & 0x3FF,
+				(props.driverVersion >> 14) & 0x0FF,
+				(props.driverVersion >> 6) & 0x0FF,
+				(props.driverVersion >> 0) & 0x03F );
+			break;
+		default:
+			Com_sprintf( driver_version, sizeof( driver_version ), "%u.%u.%u",
+				(props.driverVersion >> 22),
+				(props.driverVersion >> 12) & 0x3FF,
+				(props.driverVersion >> 0) & 0xFFF );
+			break;
+	}
+
+	ri.Printf( PRINT_ALL, "======== Vulkan Info ========\n" );
+	ri.Printf( PRINT_ALL, "Device    : %s\n", vk_device_renderer_name( &props ) );
+	ri.Printf( PRINT_ALL, "API       : %u.%u.%u\n",
+		VK_VERSION_MAJOR( props.apiVersion ),
+		VK_VERSION_MINOR( props.apiVersion ),
+		VK_VERSION_PATCH( props.apiVersion ) );
+	ri.Printf( PRINT_ALL, "Driver    : %s\n", driver_version );
+	ri.Printf( PRINT_ALL, "Vendor ID : 0x%04X\n", props.vendorID );
+	ri.Printf( PRINT_ALL, "Device ID : 0x%04X\n", props.deviceID );
+	if ( vk_device_is_v3dv( &props ) )
+		ri.Printf( PRINT_ALL, "Platform  : Raspberry Pi (V3DV)\n" );
+	ri.Printf( PRINT_ALL, "==============================\n" );
+}
+
 /*
 ===============
 R_Quality_f
@@ -1932,6 +1977,7 @@ static void R_Register( void )
 	ri.Cmd_AddCommand( "gfxinfo", GfxInfo_f );
 #ifdef USE_VULKAN
 	ri.Cmd_AddCommand( "vkinfo", VkInfo_f );
+	ri.Cmd_AddCommand( "vulkaninfo", VulkanInfo_f );
 	ri.Cmd_AddCommand( "vkVolumetricValidate", VkVolumetricValidate_f );
 	ri.Cmd_AddCommand( "r_quality", R_Quality_f );
 #endif
@@ -3308,6 +3354,7 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	ri.Cmd_RemoveCommand( "shaderstate" );
 #ifdef USE_VULKAN
 	ri.Cmd_RemoveCommand( "vkinfo" );
+	ri.Cmd_RemoveCommand( "vulkaninfo" );
 	ri.Cmd_RemoveCommand( "vkVolumetricValidate" );
 #endif
 

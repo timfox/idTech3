@@ -19,8 +19,12 @@ sudo apt-get install cmake ninja-build pkg-config \
 
 ### Optional Video Codec Dependencies
 ```bash
+# Or use the install script:
+./scripts/install_video_codecs.sh
+
+# Manual install:
 # FFmpeg (H.264, H.265, VP9, AV1, and all FFmpeg-supported formats)
-sudo apt-get install libavcodec-dev libavformat-dev libavutil-dev libswscale-dev
+sudo apt-get install libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev
 
 # dav1d (high-performance AV1 decoder)
 sudo apt-get install libdav1d-dev
@@ -31,6 +35,8 @@ sudo apt-get install libvpx-dev
 # Theora
 sudo apt-get install libtheora-dev
 ```
+
+See [COMPATIBILITY.md](COMPATIBILITY.md) for platform-specific notes.
 
 ### macOS
 ```bash
