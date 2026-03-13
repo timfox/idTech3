@@ -1,6 +1,6 @@
 # ARM / Raspberry Pi Support
 
-This document describes ARM and Raspberry Pi support for the idTech3 engine.
+This document describes ARM and Raspberry Pi support for the idTech3 engine. See also [COMPATIBILITY.md](COMPATIBILITY.md) for platform-wide compatibility notes.
 
 ## Raspberry Pi 4 / 5 with Vulkan (V3DV)
 
@@ -9,7 +9,7 @@ Raspberry Pi OS ships Mesa V3DV (Vulkan 1.3) by default on Pi 4 and 5. The engin
 ### Known Issues (Mitigated)
 
 - **"Couldn't get a visual" / "could not load Vulkan subsystem"**: On ARM + X11, SDL may fail to create a Vulkan window. The engine defaults to `r_vid_driver x11` on ARM and forces X11 when KMSDRM was selected (Vulkan has known issues with KMSDRM).
-  - **Default renderer**: On ARM, `cl_renderer` defaults to `opengl` (not `vulkan`) because many systems ship SDL built without Vulkan support.
+  - **Default renderer**: The engine defaults to `vulkan`. On ARM, if SDL lacks Vulkan support, it automatically falls back to `opengl`.
   - **Automatic fallback**: If you explicitly select Vulkan and SDL lacks Vulkan support, the engine falls back to OpenGL and prints `[VK] Vulkan not available in SDL, falling back to OpenGL`.
   - **Force Vulkan attempt**: `+set cl_renderer_force 1` skips the probe and tries Vulkan anyway. Use only if you have SDL built with `-DSDL_VULKAN=ON`.
   - **SDL Vulkan requirement**: Raspberry Pi OS system SDL is often built without Vulkan. See [Build SDL with Vulkan](#build-sdl-with-vulkan-for-raspberry-pi) below.
@@ -53,11 +53,13 @@ Raspberry Pi OS ships SDL built without Vulkan. To use the Vulkan renderer, rebu
 ./scripts/build_sdl_vulkan_rpi.sh
 ```
 
-This installs SDL to `/usr/local`. Run the engine with `LD_LIBRARY_PATH` so it uses the custom SDL:
+This installs SDL to `/usr/local`. Run the engine with the `run_vulkan.sh` launcher (sets `LD_LIBRARY_PATH` automatically):
 
 ```bash
-LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH ./release/idtech3.aarch64 +set cl_renderer vulkan
+./release/run_vulkan.sh +set cl_renderer vulkan
 ```
+
+Or manually: `LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH ./release/idtech3.aarch64 +set cl_renderer vulkan`
 
 For a user install (no sudo for the engine):
 
@@ -121,10 +123,31 @@ ninja && ninja install
 LD_LIBRARY_PATH=$HOME/sdl2-vulkan-install/lib:$LD_LIBRARY_PATH ./release/idtech3.aarch64 +set cl_renderer vulkan
 ```
 
+### Video codecs (FFmpeg, AV1, VP8/VP9, Theora)
+
+To enable all video codecs (fixes "No decoder available for codec FFmpeg"), install the development packages and rebuild:
+
+```bash
+./scripts/install_video_codecs.sh
+./scripts/compile_engine.sh vulkan
+```
+
+This installs libavcodec-dev, libavformat-dev, libdav1d-dev, libvpx-dev, libtheora-dev. Build natively on the Raspberry Pi for codec support; cross-compilation disables codecs by default.
+
 ### Build Troubleshooting
 
 - **Missing libstdc++-14-dev**: On Ubuntu 24.04 cross-compiling ARM, install `libstdc++-14-dev` so Clang can link C++.
 - **Shader compilation**: Ensure `glslangValidator` and Python 3 are installed. Run `./scripts/compile_shaders.sh` before building.
+
+### Full setup (recommended)
+
+One script to install SDL with Vulkan and all video codecs:
+
+```bash
+./scripts/setup_rpi_full.sh
+./scripts/compile_engine.sh vulkan
+./release/run_vulkan.sh
+```
 
 ### Build for ARM
 

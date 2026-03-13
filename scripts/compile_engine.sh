@@ -19,6 +19,7 @@ LUA=0
 DUKTAPE=1
 SYSTEM_DUKTAPE=0
 CROSS_AARCH64=0
+CODECS_FOR_CROSS=0
 
 GAME_NAME="idtech3"
 BUILD_TYPE="Release"
@@ -97,6 +98,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     aarch64|cross-aarch64)
       CROSS_AARCH64=1
+      shift
+      ;;
+    codecs)
+      CODECS_FOR_CROSS=1
       shift
       ;;
     all-linux|both)
@@ -266,9 +271,11 @@ CMAKE_FLAGS=(
 )
 if [ "$CROSS_AARCH64" -eq 1 ]; then
   CMAKE_FLAGS+=("-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}")
-  # Cross-compilation: disable optional deps that may not have ARM packages
-  CMAKE_FLAGS+=("-DUSE_FFMPEG=OFF" "-DUSE_DAV1D=OFF" "-DUSE_VPX=OFF" "-DUSE_THEORA=OFF")
-  echo "CMake: cross-compile aarch64 (FFmpeg/AV1/VPX/Theora disabled for cross-build)"
+  # Cross-compilation: disable codecs by default (requires ARM sysroot with libavcodec-dev:arm64 etc)
+  if [ "$CODECS_FOR_CROSS" -eq 0 ]; then
+    CMAKE_FLAGS+=("-DUSE_FFMPEG=OFF" "-DUSE_DAV1D=OFF" "-DUSE_VPX=OFF" "-DUSE_THEORA=OFF")
+    echo "CMake: cross-compile aarch64 (FFmpeg/AV1/VPX/Theora disabled; add 'codecs' to try)"
+  fi
 fi
 
 if [ "$FREETYPE" -eq 1 ]; then
@@ -396,6 +403,13 @@ copy_to_release() {
   if [ -f "$BUILD_DIR/libimgui_shared.so" ]; then
     cp -f "$BUILD_DIR/libimgui_shared.so" "$dest/"
     echo "Copied libimgui_shared.so to $dest/"
+  fi
+
+  # Vulkan launcher (sets LD_LIBRARY_PATH for custom SDL on RPi)
+  if [ -f "$PROJECT_ROOT/scripts/run_vulkan.sh" ]; then
+    cp -f "$PROJECT_ROOT/scripts/run_vulkan.sh" "$dest/run_vulkan.sh"
+    chmod +x "$dest/run_vulkan.sh"
+    echo "Copied run_vulkan.sh -> $dest/run_vulkan.sh"
   fi
 }
 

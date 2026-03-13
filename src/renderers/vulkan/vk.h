@@ -1318,6 +1318,7 @@ extern Vk_World		vk_world;		// this data is cleared during ref re-init
 
 /* Vulkan function pointers (loaded at init, used by vk_sync.c, vk_image_layout.c, vk_render_pass.c, vk_device.c) */
 extern PFN_vkGetPhysicalDeviceMemoryProperties qvkGetPhysicalDeviceMemoryProperties;
+extern PFN_vkGetPhysicalDeviceProperties qvkGetPhysicalDeviceProperties;
 extern PFN_vkGetPhysicalDeviceFormatProperties qvkGetPhysicalDeviceFormatProperties;
 extern PFN_vkGetPhysicalDeviceSurfaceFormatsKHR qvkGetPhysicalDeviceSurfaceFormatsKHR;
 extern PFN_vkGetPhysicalDeviceFeatures qvkGetPhysicalDeviceFeatures;

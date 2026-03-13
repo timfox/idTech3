@@ -61,7 +61,7 @@ idtech3/
 
 The default renderer is Vulkan. To use OpenGL instead:
 ```bash
-./idtech3 +set r_renderer opengl
+./idtech3 +set cl_renderer opengl
 ```
 
 **PBR (Physically Based Rendering)** is on by default when using Vulkan with FBO. Ensure `r_fbo 1` (default) and `r_pbr 1` (default). If PBR is disabled at startup, the console will show why (e.g. "requires r_fbo 1"). Use `vid_restart` after changing these.
@@ -70,9 +70,21 @@ The default renderer is Vulkan. To use OpenGL instead:
 
 When running under Steam on Steam Deck, the engine auto-detects the device and loads `base/steamdeck.cfg` (gamepad enabled, Vulkan, 60 FPS cap). Ensure `steamdeck.cfg` exists in your base folder. Build with `-DUSE_STEAM=ON -DSTEAMWORKS_SDK=/path/to/sdk` for full Steam API support.
 
+## Raspberry Pi 5
+
+For full compatibility (Vulkan + video codecs), run the setup script before building:
+
+```bash
+./scripts/setup_rpi_full.sh
+./scripts/compile_engine.sh vulkan
+./release/run_vulkan.sh
+```
+
+See [ARM_RASPBERRY_PI.md](ARM_RASPBERRY_PI.md) for details.
+
 ## Troubleshooting
 
 - **"No game data"** — Ensure `baseq3/` (or `base/`) exists with at least one `.pk3` file.
-- **Black screen / no render** — Try OpenGL: `+set r_renderer opengl`
+- **Black screen / no render** — Try OpenGL: `+set cl_renderer opengl`
 - **Solid color / dark brown / dark green / no UI** — Ensure FBO is enabled: `+set r_fbo 1` and run `vid_restart`. If still broken, try `r_exposure_auto 0`, `r_volumetricFog 0`, then `vid_restart`. As last resort, `r_fbo 0` disables HDR/post-processing.
 - **Missing libraries** — On Linux, install SDL2, OpenAL, and Vulkan drivers for your GPU.

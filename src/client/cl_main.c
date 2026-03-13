@@ -4328,11 +4328,10 @@ static void CL_InitGLimp_Cvars( void )
 	cl_drawBuffer = Cvar_Get( "r_drawBuffer", "GL_BACK", CVAR_CHEAT );
 	Cvar_SetDescription( cl_drawBuffer, "Specifies buffer to draw from: GL_FRONT or GL_BACK." );
 #if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
-#if defined(USE_VULKAN_API) && (defined(__arm__) || defined(__aarch64__))
-	/* ARM/RPi: default to OpenGL; many systems have SDL without Vulkan support */
-	cl_renderer = Cvar_Get( "cl_renderer", "opengl", CVAR_ARCHIVE | CVAR_LATCH );
-#elif defined(RENDERER_DEFAULT)
+#if defined(RENDERER_DEFAULT)
 	cl_renderer = Cvar_Get( "cl_renderer", XSTRING( RENDERER_DEFAULT ), CVAR_ARCHIVE | CVAR_LATCH );
+#elif defined(USE_VULKAN_API)
+	cl_renderer = Cvar_Get( "cl_renderer", "vulkan", CVAR_ARCHIVE | CVAR_LATCH );
 #else
 	cl_renderer = Cvar_Get( "cl_renderer", "opengl", CVAR_ARCHIVE | CVAR_LATCH );
 #endif
