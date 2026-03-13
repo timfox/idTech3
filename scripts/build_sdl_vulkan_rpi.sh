@@ -45,15 +45,16 @@ echo "  Install: $([ $DO_INSTALL -eq 1 ] && echo yes || echo no)"
 echo ""
 
 # Check for build deps (Raspberry Pi OS / Debian / Ubuntu)
+# libvulkan-dev provides Vulkan headers (vulkan-headers is not in all Debian repos)
 if command -v apt-get &>/dev/null; then
   echo "Installing build dependencies..."
   sudo apt-get update
   sudo apt-get install -y build-essential cmake ninja-build pkg-config \
     libasound2-dev libdbus-1-dev libdrm-dev libgbm-dev libibus-1.0-dev \
     libpulse-dev libudev-dev libx11-dev libxcb1-dev libxext-dev libxfixes-dev \
-    libxinerama-dev libxrandr-dev libxss-dev libxxf86vm-dev vulkan-headers
+    libxinerama-dev libxrandr-dev libxss-dev libxxf86vm-dev libvulkan-dev
 else
-  echo "Note: apt-get not found. Install: cmake ninja-build pkg-config, libx11-dev, vulkan-headers, etc."
+  echo "Note: apt-get not found. Install: cmake ninja-build pkg-config, libx11-dev, libvulkan-dev, etc."
 fi
 
 # Clone or update SDL
