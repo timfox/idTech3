@@ -74,13 +74,16 @@ mkdir -p "$SDL_BUILD"
 cd "$SDL_BUILD"
 
 echo "Configuring SDL with Vulkan..."
+# Disable PipeWire to avoid API mismatch with newer PipeWire on Debian Trixie (SDL 2.30 vs pipewire 1.x)
+# PulseAudio/ALSA are used instead and work fine on RPi
 cmake "$SDL_SRC" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX="$PREFIX" \
   -DSDL_VULKAN=ON \
   -DSDL_X11=ON \
   -DSDL_WAYLAND=ON \
-  -DSDL_KMSDRM=ON
+  -DSDL_KMSDRM=ON \
+  -DSDL_PIPEWIRE=OFF
 
 echo "Building..."
 ninja
