@@ -96,9 +96,11 @@ if [[ $DO_INSTALL -eq 1 ]]; then
   fi
   echo ""
   echo "=== SDL with Vulkan installed ==="
-  echo "Rebuild the engine and run:"
+  echo "Rebuild the engine, then run with LD_LIBRARY_PATH so the custom SDL is used:"
   echo "  ./scripts/compile_engine.sh vulkan"
-  echo "  ./release/idtech3.aarch64 +set cl_renderer vulkan"
+  echo "  LD_LIBRARY_PATH=$PREFIX/lib:\$LD_LIBRARY_PATH ./release/idtech3.aarch64 +set cl_renderer vulkan"
+  echo ""
+  echo "If the system SDL is still used, verify: ldd ./release/idtech3.aarch64 | grep SDL"
 else
   echo ""
   echo "=== Build complete (not installed) ==="
