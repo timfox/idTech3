@@ -90,7 +90,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	VkGraphicsPipelineCreateInfo create_info;
 	VkViewport viewport;
 	VkRect2D scissor;
-	VkSpecializationMapEntry spec_entries[27];
+	VkSpecializationMapEntry spec_entries[29];
 	VkSpecializationInfo frag_spec_info;
 	VkPipeline *pipeline;
 	VkShaderModule fsmodule;
@@ -130,6 +130,8 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 		float post_contrast;
 		float post_saturation;
 		float sharpen;
+		float bloom_scatter;
+		int bloom_energy_preserve;
 	} frag_spec_data;
 
 	switch ( program_index ) {
@@ -365,6 +367,12 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 		frag_spec_data.post_saturation = ( r_post_saturation && r_post_saturation->value >= 0.0f ) ? r_post_saturation->value : 1.0f;
 	}
 	frag_spec_data.sharpen = PostFX_GetSharpen();
+	{
+		cvar_t *r_bloom_scatter = ri.Cvar_Get( "r_bloom_scatter", "0.72", CVAR_ARCHIVE_ND );
+		cvar_t *r_bloom_energy = ri.Cvar_Get( "r_bloom_energyPreserve", "1", CVAR_ARCHIVE_ND );
+		frag_spec_data.bloom_scatter = ( r_bloom_scatter && r_bloom_scatter->value > 0.0f ) ? r_bloom_scatter->value : 0.72f;
+		frag_spec_data.bloom_energy_preserve = ( r_bloom_energy && r_bloom_energy->integer ) ? 1 : 0;
+	}
 
 	if ( !vk_post_process_surface_format_color_depth( vk.present_format.format, &frag_spec_data.depth_r, &frag_spec_data.depth_g, &frag_spec_data.depth_b ) ) {
 		ri.Printf( PRINT_ALL, "Format %s not recognized, dither to assume 8bpc\n", vk_format_string( vk.base_format.format ) );
@@ -451,8 +459,14 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	spec_entries[26].constantID = 26;
 	spec_entries[26].offset = offsetof( struct PostProcess_FragSpecData, sharpen );
 	spec_entries[26].size = sizeof( frag_spec_data.sharpen );
+	spec_entries[27].constantID = 27;
+	spec_entries[27].offset = offsetof( struct PostProcess_FragSpecData, bloom_scatter );
+	spec_entries[27].size = sizeof( frag_spec_data.bloom_scatter );
+	spec_entries[28].constantID = 28;
+	spec_entries[28].offset = offsetof( struct PostProcess_FragSpecData, bloom_energy_preserve );
+	spec_entries[28].size = sizeof( frag_spec_data.bloom_energy_preserve );
 
-	frag_spec_info.mapEntryCount = 27;
+	frag_spec_info.mapEntryCount = 29;
 	frag_spec_info.pMapEntries = spec_entries;
 	frag_spec_info.dataSize = sizeof( frag_spec_data );
 	frag_spec_info.pData = &frag_spec_data;

@@ -18,6 +18,13 @@ void vk_update_postfx_params( uint32_t cmd_index )
 	cvar_t *r_post_saturation;
 	cvar_t *r_outline;
 	cvar_t *r_outlineThreshold;
+	cvar_t *r_autoExposure_target;
+	cvar_t *r_autoExposure_min;
+	cvar_t *r_autoExposure_max;
+	cvar_t *r_localExposure;
+	cvar_t *r_localExposure_strength;
+	cvar_t *r_localExposure_shadowClamp;
+	cvar_t *r_localExposure_highlightClamp;
 
 	if ( cmd_index >= NUM_COMMAND_BUFFERS || !vk.postfx_params_ptr[cmd_index] ) {
 		return;
@@ -107,6 +114,23 @@ void vk_update_postfx_params( uint32_t cmd_index )
 	params.lutParams[1] = ( PostFX_GetLUTImage() && PostFX_GetLUTImage() != tr.whiteImage ) ? 1.0f : 0.0f;
 	params.lutParams[2] = 32.0f;
 	params.lutParams[3] = ( r_gamma && r_gamma->value > 0.0f ) ? ( 1.0f / r_gamma->value ) : 1.0f;
+	r_autoExposure_target = ri.Cvar_Get( "r_exposure_auto_target", "1.0", 0 );
+	r_autoExposure_min = ri.Cvar_Get( "r_autoExposure_min", "0.5", 0 );
+	r_autoExposure_max = ri.Cvar_Get( "r_autoExposure_max", "4.0", 0 );
+	r_localExposure = ri.Cvar_Get( "r_localExposure", "1", 0 );
+	r_localExposure_strength = ri.Cvar_Get( "r_localExposure_strength", "0.35", 0 );
+	r_localExposure_shadowClamp = ri.Cvar_Get( "r_localExposure_shadowClamp", "1.5", 0 );
+	r_localExposure_highlightClamp = ri.Cvar_Get( "r_localExposure_highlightClamp", "1.5", 0 );
+	params.autoExposureParams[0] = vk.temporal.hasValidLuminance ? vk.temporal.filteredAvgLogLuminance :
+		log2f( fmaxf( 1e-4f, ( r_autoExposure_target ? r_autoExposure_target->value : 1.0f ) /
+			fmaxf( r_exposure ? r_exposure->value : 1.0f, 1e-4f ) ) );
+	params.autoExposureParams[1] = fmaxf( r_autoExposure_target ? r_autoExposure_target->value : 1.0f, 1e-4f );
+	params.autoExposureParams[2] = fmaxf( r_autoExposure_min ? r_autoExposure_min->value : 0.5f, 0.01f );
+	params.autoExposureParams[3] = fmaxf( r_autoExposure_max ? r_autoExposure_max->value : 4.0f, params.autoExposureParams[2] );
+	params.localExposureParams[0] = ( r_localExposure && r_localExposure->integer ) ? 1.0f : 0.0f;
+	params.localExposureParams[1] = Com_Clamp( 0.0f, 1.0f, r_localExposure_strength ? r_localExposure_strength->value : 0.35f );
+	params.localExposureParams[2] = Com_Clamp( 0.0f, 3.0f, r_localExposure_shadowClamp ? r_localExposure_shadowClamp->value : 1.5f );
+	params.localExposureParams[3] = Com_Clamp( 0.0f, 3.0f, r_localExposure_highlightClamp ? r_localExposure_highlightClamp->value : 1.5f );
 
 	if ( backEnd.projection2D || !tr.world || backEnd.viewParms.portalView != PV_NONE ) {
 		Com_Memcpy( vk.postfx_params_ptr[cmd_index], &params, sizeof( params ) );

@@ -23,6 +23,8 @@ layout(set = 2, binding = 0) uniform PostFXParams {
 	vec4 lensEffects1;     /* outlineStrength, outlineThreshold, filmLook, sharpen */
 	vec4 runtimeFlags;     /* greyscale, dither, postDebug, postEnabled */
 	vec4 lutParams;        /* lutIntensity, lutEnabled, lutStripDim, invGamma */
+	vec4 autoExposureParams; /* avgLogLum, targetLum, minExposure, maxExposure */
+	vec4 localExposureParams; /* enabled, strength, shadowClampEV, highlightClampEV */
 } postfx;
 layout(set = 3, binding = 0) uniform sampler2D lutTexture;
 
@@ -107,6 +109,11 @@ float postOutlineStrength( void ) { return max( postfx.lensEffects1.x, 0.0 ); }
 float postOutlineThreshold( void ) { return max( postfx.lensEffects1.y, 0.0 ); }
 int postFilmLook( void ) { return int( floor( postfx.lensEffects1.z + 0.5 ) ); }
 float postSharpenStrength( void ) { return max( postfx.lensEffects1.w, 0.0 ); }
+float postAvgLogLum( void ) { return postfx.autoExposureParams.x; }
+bool postLocalExposureEnabled( void ) { return postfx.localExposureParams.x > 0.5; }
+float postLocalExposureStrength( void ) { return clamp( postfx.localExposureParams.y, 0.0, 1.0 ); }
+float postLocalExposureShadowClamp( void ) { return max( postfx.localExposureParams.z, 0.0 ); }
+float postLocalExposureHighlightClamp( void ) { return max( postfx.localExposureParams.w, 0.0 ); }
 
 vec3 ACESFilm( vec3 x ) {
 	const float a = 2.51;
@@ -190,6 +197,34 @@ vec3 applyWhiteBalance( vec3 color ) {
 		1.0 + tint * 0.10,
 		1.0 - temperature * 0.12 - tint * 0.02 );
 	return max( color * balance, vec3( 0.0 ) );
+}
+
+float sampleHdrLogLum( vec2 uv ) {
+	vec3 sampleHdr = applyWhiteBalance( sanitizeHdr( textureLod( texture0, clamp( uv, 0.0, 1.0 ), 0.0 ).rgb ) );
+	return log2( max( dot( sampleHdr, sRGB ), 1e-4 ) );
+}
+
+vec3 applyLocalExposure( vec2 uv, vec3 hdr ) {
+	if ( !postLocalExposureEnabled() || postLocalExposureStrength() <= 0.0 ) {
+		return hdr;
+	}
+
+	vec2 texel = postfx.frameInfo.yz;
+	vec2 nearOffset = texel * 6.0;
+	vec2 farOffset = texel * 14.0;
+	float localLogLum = sampleHdrLogLum( uv ) * 0.34;
+	localLogLum += sampleHdrLogLum( uv + vec2( nearOffset.x, 0.0 ) ) * 0.14;
+	localLogLum += sampleHdrLogLum( uv - vec2( nearOffset.x, 0.0 ) ) * 0.14;
+	localLogLum += sampleHdrLogLum( uv + vec2( 0.0, nearOffset.y ) ) * 0.14;
+	localLogLum += sampleHdrLogLum( uv - vec2( 0.0, nearOffset.y ) ) * 0.14;
+	localLogLum += sampleHdrLogLum( uv + farOffset ) * 0.06;
+	localLogLum += sampleHdrLogLum( uv - farOffset ) * 0.06;
+	localLogLum += sampleHdrLogLum( uv + vec2( farOffset.x, -farOffset.y ) ) * 0.06;
+	localLogLum += sampleHdrLogLum( uv + vec2( -farOffset.x, farOffset.y ) ) * 0.06;
+
+	float deltaEv = ( postAvgLogLum() - localLogLum ) * postLocalExposureStrength();
+	deltaEv = clamp( deltaEv, -postLocalExposureHighlightClamp(), postLocalExposureShadowClamp() );
+	return hdr * exp2( deltaEv );
 }
 
 vec3 applyLiftGammaGain( vec3 ldr ) {
@@ -360,6 +395,9 @@ vec3 applyPostColorAdjust( vec3 ldr, bool postActive ) {
 
 vec3 samplePostLdr( vec2 uv, bool postActive ) {
 	vec3 sampleHdr = applyWhiteBalance( sanitizeHdr( textureLod( texture0, uv, 0.0 ).rgb ) );
+	if ( postActive ) {
+		sampleHdr = applyLocalExposure( uv, sampleHdr );
+	}
 	vec3 sampleExposed = sampleHdr * max( paniniPC.brightness, 0.0 );
 
 	if ( postActive ) {
@@ -520,6 +558,9 @@ void main() {
 	vec3 hdr = applyWhiteBalance( sanitizeHdr( textureLod( texture0, uv, 0.0 ).rgb ) );
 	bool noWorldLdr = paniniPC.paniniPad1 > 0.5;
 	bool postActive = postEnabled() && !noWorldLdr;
+	if ( postActive ) {
+		hdr = applyLocalExposure( uv, hdr );
+	}
 	vec3 hdr_exposed = hdr * max( paniniPC.brightness, 0.0 );
 	if ( postActive ) {
 		float exposureScale = exp2( postfx.colorBalance.z );
@@ -582,14 +623,20 @@ void main() {
 		vec2 caUV = uvLogical;
 		float exposureScale = exp2( postfx.colorBalance.z );
 		vec2 caOffset = (caUV - 0.5) * postChromaticAberration() * 0.01;
-		vec2 srcR = to_src_uv( caUV + caOffset );
-		vec2 srcB = to_src_uv( caUV - caOffset );
-		vec3 caHdr;
-		caHdr.r = applyWhiteBalance( textureLod( texture0, srcR, 0.0 ).rgb ).r;
-		caHdr.g = ldr.g;
-		caHdr.b = applyWhiteBalance( textureLod( texture0, srcB, 0.0 ).rgb ).b;
-		caHdr.r *= max( paniniPC.brightness, 0.0 ) * max( paniniPC.exposure * exposureScale, 0.01 ) * postPreExposureScale();
-		caHdr.b *= max( paniniPC.brightness, 0.0 ) * max( paniniPC.exposure * exposureScale, 0.01 ) * postPreExposureScale();
+			vec2 srcR = to_src_uv( caUV + caOffset );
+			vec2 srcB = to_src_uv( caUV - caOffset );
+			vec3 caHdr;
+			caHdr.r = applyWhiteBalance( textureLod( texture0, srcR, 0.0 ).rgb ).r;
+			caHdr.g = ldr.g;
+			caHdr.b = applyWhiteBalance( textureLod( texture0, srcB, 0.0 ).rgb ).b;
+			if ( postLocalExposureEnabled() ) {
+				caHdr.r *= exp2( clamp( ( postAvgLogLum() - sampleHdrLogLum( srcR ) ) * postLocalExposureStrength(),
+					-postLocalExposureHighlightClamp(), postLocalExposureShadowClamp() ) );
+				caHdr.b *= exp2( clamp( ( postAvgLogLum() - sampleHdrLogLum( srcB ) ) * postLocalExposureStrength(),
+					-postLocalExposureHighlightClamp(), postLocalExposureShadowClamp() ) );
+			}
+			caHdr.r *= max( paniniPC.brightness, 0.0 ) * max( paniniPC.exposure * exposureScale, 0.01 ) * postPreExposureScale();
+			caHdr.b *= max( paniniPC.brightness, 0.0 ) * max( paniniPC.exposure * exposureScale, 0.01 ) * postPreExposureScale();
 		vec3 caTone;
 		caTone.r = doTonemap( vec3( caHdr.r ) ).r;
 		caTone.g = ldr.g;

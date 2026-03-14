@@ -4,6 +4,7 @@
 #include "vk_image_layout.h"
 #include "vk_post_fog.h"
 #include "vk_postfx.h"
+#include "vk_postfx_params.h"
 #include "vk_render_pass.h"
 #include "vk_temporal.h"
 #include "vk_volumetric_pass.h"
@@ -128,6 +129,18 @@ void vk_end_frame_record_luminance_pass( VkImageView luminance_src )
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.luminance_pipeline );
 	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
 		vk.luminance_pipeline_layout, 0, 1, &vk.luminance_descriptor[vk.cmd_index], 0, NULL );
+	{
+		VkLuminancePushConstants meter;
+		cvar_t *lowPercent = ri.Cvar_Get( "r_autoExposure_lowPercent", "0.02", 0 );
+		cvar_t *highPercent = ri.Cvar_Get( "r_autoExposure_highPercent", "0.01", 0 );
+		cvar_t *centerWeight = ri.Cvar_Get( "r_autoExposure_centerWeight", "0.60", 0 );
+		meter.lowPercent = Com_Clamp( 0.0f, 0.45f, lowPercent ? lowPercent->value : 0.02f );
+		meter.highPercent = Com_Clamp( 0.0f, 0.45f, highPercent ? highPercent->value : 0.01f );
+		meter.centerWeight = Com_Clamp( 0.0f, 1.5f, centerWeight ? centerWeight->value : 0.60f );
+		meter.reserved = 0.0f;
+		qvkCmdPushConstants( vk.cmd->command_buffer, vk.luminance_pipeline_layout,
+			VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( meter ), &meter );
+	}
 	qvkCmdDispatch( vk.cmd->command_buffer, 1, 1, 1 );
 
 	record_image_layout_transition( vk.cmd->command_buffer, vk.luminance_image, VK_IMAGE_ASPECT_COLOR_BIT,
