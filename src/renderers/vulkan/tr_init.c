@@ -110,6 +110,8 @@ cvar_t	*r_pbr_packedPreferred;
 cvar_t	*r_pbr_multiScatter;
 cvar_t	*r_pbr_multiScatterStrength;
 cvar_t	*r_pbr_fresnelRoughness;
+cvar_t	*r_pbr_specularAA;
+cvar_t	*r_pbr_specularAAStrength;
 cvar_t	*r_glint;
 cvar_t	*r_glintMode;
 cvar_t	*r_glintDensity;
@@ -182,6 +184,10 @@ cvar_t	*r_smaa_threshold;
 cvar_t	*r_smaa_local_contrast;
 cvar_t	*r_smaa_max_search_steps;
 cvar_t	*r_smaa_corner_rounding;
+cvar_t	*r_taa;
+cvar_t	*r_taa_feedbackStationary;
+cvar_t	*r_taa_feedbackMotion;
+cvar_t	*r_taa_sharpen;
 cvar_t	*r_rtx;
 
 #endif // USE_VULKAN
@@ -218,6 +224,7 @@ cvar_t	*r_ignoreGLErrors;
 cvar_t	*r_texturebits;
 cvar_t	*r_ext_multisample;
 cvar_t	*r_msaa_sample_shading;
+cvar_t	*r_msaa_sample_shading_rate;
 cvar_t	*r_ext_alpha_to_coverage;
 
 cvar_t	*r_drawBuffer;
@@ -1754,59 +1761,164 @@ static void R_Quality_f( void )
 
 	switch ( preset ) {
 		case 0: /* Low */
+			ri.Cvar_Set( "r_taa", "0" );
 			ri.Cvar_Set( "r_volumetricFog", "0" );
 			ri.Cvar_Set( "r_ssao", "0" );
 			ri.Cvar_Set( "r_bloom", "0" );
 			ri.Cvar_Set( "r_ext_smaa", "0" );
+			ri.Cvar_Set( "r_ext_multisample", "0" );
+			ri.Cvar_Set( "r_msaa_sample_shading", "0" );
+			ri.Cvar_Set( "r_msaa_sample_shading_rate", "0.5" );
+			ri.Cvar_Set( "r_ext_alpha_to_coverage", "0" );
+			ri.Cvar_Set( "r_ext_supersample", "0" );
 			ri.Cvar_Set( "r_ssr", "0" );
 			ri.Cvar_Set( "r_sharpen", "0.0" );
 			ri.Cvar_Set( "r_exposure_auto", "0" );
 			ri.Printf( PRINT_ALL, "[VK] Quality preset: Low (performance)\n" );
 			break;
 		case 1: /* Medium */
+			ri.Cvar_Set( "r_taa", "0" );
 			ri.Cvar_Set( "r_volumetricFog", "1" );
 			ri.Cvar_Set( "r_ssao", "1" );
 			ri.Cvar_Set( "r_bloom", "1" );
 			ri.Cvar_Set( "r_ext_smaa", "1" );
+			ri.Cvar_Set( "r_ext_multisample", "0" );
+			ri.Cvar_Set( "r_msaa_sample_shading", "0" );
+			ri.Cvar_Set( "r_msaa_sample_shading_rate", "0.5" );
+			ri.Cvar_Set( "r_ext_alpha_to_coverage", "0" );
+			ri.Cvar_Set( "r_ext_supersample", "0" );
 			ri.Cvar_Set( "r_ssr", "0" );
 			ri.Cvar_Set( "r_volumetricFogQuality", "1" );
 			ri.Cvar_Set( "r_ssaoMethod", "0" );
-			ri.Cvar_Set( "r_smaa_preset", "1" );
+			ri.Cvar_Set( "r_smaa_preset", "2" );
 			ri.Cvar_Set( "r_ssaoSamples", "12" );
 			ri.Cvar_Set( "r_sharpen", "0.0" );
 			ri.Printf( PRINT_ALL, "[VK] Quality preset: Medium\n" );
 			break;
 		case 2: /* High */
+			ri.Cvar_Set( "r_taa", "0" );
 			ri.Cvar_Set( "r_volumetricFog", "1" );
 			ri.Cvar_Set( "r_ssao", "1" );
 			ri.Cvar_Set( "r_bloom", "1" );
 			ri.Cvar_Set( "r_ext_smaa", "1" );
+			ri.Cvar_Set( "r_ext_multisample", "4" );
+			ri.Cvar_Set( "r_msaa_sample_shading", "0" );
+			ri.Cvar_Set( "r_msaa_sample_shading_rate", "0.5" );
+			ri.Cvar_Set( "r_ext_alpha_to_coverage", "1" );
+			ri.Cvar_Set( "r_ext_supersample", "0" );
 			ri.Cvar_Set( "r_ssr", "0" );
 			ri.Cvar_Set( "r_volumetricFogQuality", "2" );
 			ri.Cvar_Set( "r_ssaoMethod", "1" );
-			ri.Cvar_Set( "r_smaa_preset", "2" );
+			ri.Cvar_Set( "r_smaa_preset", "3" );
 			ri.Cvar_Set( "r_hbaoDirections", "8" );
 			ri.Cvar_Set( "r_hbaoSteps", "8" );
 			ri.Cvar_Set( "r_ssaoSamples", "16" );
 			ri.Cvar_Set( "r_sharpen", "0.15" );
-			ri.Printf( PRINT_ALL, "[VK] Quality preset: High\n" );
+			ri.Printf( PRINT_ALL, "[VK] Quality preset: High (SMAA + 4x MSAA)\n" );
 			break;
 		case 3: /* Ultra */
+			ri.Cvar_Set( "r_taa", "0" );
 			ri.Cvar_Set( "r_volumetricFog", "1" );
 			ri.Cvar_Set( "r_ssao", "1" );
 			ri.Cvar_Set( "r_bloom", "1" );
 			ri.Cvar_Set( "r_ext_smaa", "1" );
+			ri.Cvar_Set( "r_ext_multisample", "4" );
+			ri.Cvar_Set( "r_msaa_sample_shading", "1" );
+			ri.Cvar_Set( "r_msaa_sample_shading_rate", "0.5" );
+			ri.Cvar_Set( "r_ext_alpha_to_coverage", "1" );
+			ri.Cvar_Set( "r_ext_supersample", "0" );
 			ri.Cvar_Set( "r_ssr", "1" );
 			ri.Cvar_Set( "r_volumetricFogQuality", "3" );
 			ri.Cvar_Set( "r_ssaoMethod", "1" );
-			ri.Cvar_Set( "r_smaa_preset", "3" );
+			ri.Cvar_Set( "r_smaa_preset", "4" );
 			ri.Cvar_Set( "r_hbaoDirections", "16" );
 			ri.Cvar_Set( "r_hbaoSteps", "16" );
 			ri.Cvar_Set( "r_ssaoSamples", "24" );
 			ri.Cvar_Set( "r_sharpen", "0.25" );
-			ri.Printf( PRINT_ALL, "[VK] Quality preset: Ultra\n" );
+			ri.Printf( PRINT_ALL, "[VK] Quality preset: Ultra (SMAA + 4x MSAA + sample shading)\n" );
 			break;
 	}
+	ri.Printf( PRINT_ALL, "Run vid_restart for full effect.\n" );
+}
+
+/*
+===============
+R_AAQuality_f
+===============
+Prefer high-quality spatial AA paths for Vulkan: SMAA, MSAA, and optional SSAA.
+*/
+static void R_AAQuality_f( void )
+{
+	const int argc = ri.Cmd_Argc();
+	const char *arg = ( argc > 1 ) ? ri.Cmd_Argv( 1 ) : "";
+	int preset = ( arg[0] >= '0' && arg[0] <= '4' ) ? ( arg[0] - '0' ) : -1;
+
+	if ( preset < 0 ) {
+		ri.Printf( PRINT_ALL,
+			"usage: r_aaQuality <0|1|2|3|4>\n"
+			"  0 = Off        : No AA\n"
+			"  1 = SMAA       : SMAA High, no MSAA\n"
+			"  2 = Balanced   : SMAA High + 2x MSAA\n"
+			"  3 = High       : SMAA Ultra + 4x MSAA\n"
+			"  4 = Extreme    : SMAA Ultra + 4x MSAA + sample shading + SSAA\n"
+			"TAA is disabled in all presets. Run vid_restart for full effect.\n" );
+		return;
+	}
+
+	ri.Cvar_Set( "r_taa", "0" );
+
+	switch ( preset ) {
+		case 0:
+			ri.Cvar_Set( "r_ext_smaa", "0" );
+			ri.Cvar_Set( "r_ext_multisample", "0" );
+			ri.Cvar_Set( "r_msaa_sample_shading", "0" );
+			ri.Cvar_Set( "r_msaa_sample_shading_rate", "0.5" );
+			ri.Cvar_Set( "r_ext_alpha_to_coverage", "0" );
+			ri.Cvar_Set( "r_ext_supersample", "0" );
+			ri.Printf( PRINT_ALL, "[VK] AA preset: Off\n" );
+			break;
+		case 1:
+			ri.Cvar_Set( "r_ext_smaa", "1" );
+			ri.Cvar_Set( "r_smaa_preset", "3" );
+			ri.Cvar_Set( "r_ext_multisample", "0" );
+			ri.Cvar_Set( "r_msaa_sample_shading", "0" );
+			ri.Cvar_Set( "r_msaa_sample_shading_rate", "0.5" );
+			ri.Cvar_Set( "r_ext_alpha_to_coverage", "0" );
+			ri.Cvar_Set( "r_ext_supersample", "0" );
+			ri.Printf( PRINT_ALL, "[VK] AA preset: SMAA High\n" );
+			break;
+		case 2:
+			ri.Cvar_Set( "r_ext_smaa", "1" );
+			ri.Cvar_Set( "r_smaa_preset", "3" );
+			ri.Cvar_Set( "r_ext_multisample", "2" );
+			ri.Cvar_Set( "r_msaa_sample_shading", "0" );
+			ri.Cvar_Set( "r_msaa_sample_shading_rate", "0.5" );
+			ri.Cvar_Set( "r_ext_alpha_to_coverage", "1" );
+			ri.Cvar_Set( "r_ext_supersample", "0" );
+			ri.Printf( PRINT_ALL, "[VK] AA preset: SMAA High + 2x MSAA\n" );
+			break;
+		case 3:
+			ri.Cvar_Set( "r_ext_smaa", "1" );
+			ri.Cvar_Set( "r_smaa_preset", "4" );
+			ri.Cvar_Set( "r_ext_multisample", "4" );
+			ri.Cvar_Set( "r_msaa_sample_shading", "0" );
+			ri.Cvar_Set( "r_msaa_sample_shading_rate", "0.5" );
+			ri.Cvar_Set( "r_ext_alpha_to_coverage", "1" );
+			ri.Cvar_Set( "r_ext_supersample", "0" );
+			ri.Printf( PRINT_ALL, "[VK] AA preset: SMAA Ultra + 4x MSAA\n" );
+			break;
+		case 4:
+			ri.Cvar_Set( "r_ext_smaa", "1" );
+			ri.Cvar_Set( "r_smaa_preset", "4" );
+			ri.Cvar_Set( "r_ext_multisample", "4" );
+			ri.Cvar_Set( "r_msaa_sample_shading", "1" );
+			ri.Cvar_Set( "r_msaa_sample_shading_rate", "1.0" );
+			ri.Cvar_Set( "r_ext_alpha_to_coverage", "1" );
+			ri.Cvar_Set( "r_ext_supersample", "1" );
+			ri.Printf( PRINT_ALL, "[VK] AA preset: Extreme spatial AA (SMAA Ultra + 4x MSAA + SSAA)\n" );
+			break;
+	}
+
 	ri.Printf( PRINT_ALL, "Run vid_restart for full effect.\n" );
 }
 
@@ -1980,6 +2092,7 @@ static void R_Register( void )
 	ri.Cmd_AddCommand( "vulkaninfo", VulkanInfo_f );
 	ri.Cmd_AddCommand( "vkVolumetricValidate", VkVolumetricValidate_f );
 	ri.Cmd_AddCommand( "r_quality", R_Quality_f );
+	ri.Cmd_AddCommand( "r_aaQuality", R_AAQuality_f );
 #endif
 
 	//
@@ -2118,6 +2231,14 @@ static void R_Register( void )
 	r_pbr_fresnelRoughness = ri.Cvar_Get( "r_pbr_fresnelRoughness", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_pbr_fresnelRoughness, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_pbr_fresnelRoughness, "Enable roughness-dependent Fresnel (2025 PBR). Attenuates grazing Fresnel on rough surfaces for better energy conservation." );
+
+	r_pbr_specularAA = ri.Cvar_Get( "r_pbr_specularAA", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbr_specularAA, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pbr_specularAA, "Enable normal-variance specular anti-aliasing for Vulkan PBR materials." );
+
+	r_pbr_specularAAStrength = ri.Cvar_Get( "r_pbr_specularAAStrength", "0.5", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbr_specularAAStrength, "0.0", "2.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_pbr_specularAAStrength, "Scales roughness stabilization from normal-map variance for modern BRDF materials." );
 
 	r_baseNormalX	= ri.Cvar_Get("r_baseNormalX",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );
 	r_baseNormalY	= ri.Cvar_Get("r_baseNormalY",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );
@@ -3198,6 +3319,9 @@ static void R_Register( void )
 	r_msaa_sample_shading = ri.Cvar_Get( "r_msaa_sample_shading", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_msaa_sample_shading, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_msaa_sample_shading, "Per-sample shading when MSAA on: improves alpha edges and specular, ~2x fragment cost. Requires \\r_ext_multisample 2+." );
+	r_msaa_sample_shading_rate = ri.Cvar_Get( "r_msaa_sample_shading_rate", "0.5", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_msaa_sample_shading_rate, "0.25", "1.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_msaa_sample_shading_rate, "Minimum fraction of MSAA samples shaded per fragment when \\r_msaa_sample_shading 1. 0.5 is a good quality/cost balance; 1.0 shades every sample." );
 
 	r_ext_supersample = ri.Cvar_Get( "r_ext_supersample", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_supersample, "0", "1", CV_INTEGER );
@@ -3211,7 +3335,7 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_ext_smaa, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ext_smaa, "Enables SMAA post-processing, requires \\r_fbo 1." );
 
-	r_smaa_preset = ri.Cvar_Get( "r_smaa_preset", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	r_smaa_preset = ri.Cvar_Get( "r_smaa_preset", "3", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_smaa_preset, "0", "4", CV_INTEGER );
 	ri.Cvar_SetDescription( r_smaa_preset, "SMAA quality preset: 0=Custom, 1=Low, 2=Medium, 3=High, 4=Ultra. Overrides threshold/localContrast/searchSteps when non-zero." );
 
@@ -3230,15 +3354,29 @@ static void R_Register( void )
 	r_smaa_corner_rounding = ri.Cvar_Get( "r_smaa_corner_rounding", "0.2", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_smaa_corner_rounding, "0", "1", CV_FLOAT );
 	ri.Cvar_SetDescription( r_smaa_corner_rounding, "SMAA corner rounding strength (0=off, 1=full). Attenuates edges at L-corners for smoother silhouettes." );
+	r_taa = ri.Cvar_Get( "r_taa", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_taa, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_taa, "Optional temporal resolve for Vulkan HDR post-processing. Disabled by default in favor of SMAA/MSAA paths." );
+	ri.Cvar_SetGroup( r_taa, CVG_RENDERER );
+	r_taa_feedbackStationary = ri.Cvar_Get( "r_taa_feedbackStationary", "0.92", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_taa_feedbackStationary, "0.0", "0.99", CV_FLOAT );
+	ri.Cvar_SetDescription( r_taa_feedbackStationary, "TAA history feedback for stable pixels. Higher = smoother, lower = more responsive." );
+	ri.Cvar_SetGroup( r_taa_feedbackStationary, CVG_RENDERER );
+	r_taa_feedbackMotion = ri.Cvar_Get( "r_taa_feedbackMotion", "0.72", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_taa_feedbackMotion, "0.0", "0.99", CV_FLOAT );
+	ri.Cvar_SetDescription( r_taa_feedbackMotion, "TAA history feedback for moving pixels. Lower helps reduce ghosting." );
+	ri.Cvar_SetGroup( r_taa_feedbackMotion, CVG_RENDERER );
+	r_taa_sharpen = ri.Cvar_Get( "r_taa_sharpen", "0.12", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_taa_sharpen, "0.0", "1.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_taa_sharpen, "Post-resolve sharpening amount applied inside the TAA pass." );
+	ri.Cvar_SetGroup( r_taa_sharpen, CVG_RENDERER );
 
 	r_rtx = ri.Cvar_Get( "r_rtx", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_rtx, "0", "3", CV_INTEGER );
 	ri.Cvar_SetDescription( r_rtx, "Ray tracing (0=off, 1=shadows, 2=reflections, 3=full). Requires USE_VULKAN_RTX build and RT-capable GPU. See docs/RENDERERS_FUTURE.md." );
-#if 0
-	r_ext_alpha_to_coverage = ri.Cvar_Get( "r_ext_alpha_to_coverage", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	r_ext_alpha_to_coverage = ri.Cvar_Get( "r_ext_alpha_to_coverage", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_alpha_to_coverage, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_ext_alpha_to_coverage, "Alpha-to-coverage for alpha-tested surfaces (foliage, grates) when MSAA is on. Requires \\r_fbo 1 and \\r_ext_multisample 2+." );
-#endif
+	ri.Cvar_SetDescription( r_ext_alpha_to_coverage, "Alpha-to-coverage for alpha-tested surfaces (foliage, grates) when MSAA is on. Enabled by default for Vulkan MSAA paths. Requires \\r_fbo 1 and \\r_ext_multisample 2+." );
 
 	r_renderWidth = ri.Cvar_Get( "r_renderWidth", "800", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_renderWidth, "96", NULL, CV_INTEGER );
@@ -3414,6 +3552,7 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	ri.Cmd_RemoveCommand( "vkinfo" );
 	ri.Cmd_RemoveCommand( "vulkaninfo" );
 	ri.Cmd_RemoveCommand( "vkVolumetricValidate" );
+	ri.Cmd_RemoveCommand( "r_aaQuality" );
 #endif
 
 	//if ( tr.registered ) {

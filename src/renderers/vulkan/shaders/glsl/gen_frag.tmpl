@@ -37,7 +37,7 @@ layout(set = 0, binding = 0) uniform UBO {
 	vec4 pbrTransmissionScale;
 	vec4 pbrSubsurfaceColor;
 	vec4 pbrSubsurfaceParams;
-	vec4 pbrAdvancedParams; // x: multi-scatter toggle, y: multi-scatter strength, z: roughness Fresnel
+	vec4 pbrAdvancedParams; // x: multi-scatter toggle, y: multi-scatter strength, z: roughness Fresnel, w: specular AA strength
 	vec4 pbrGlintParams0;
 	vec4 pbrGlintParams1;
 	vec4 pbrGlintFlags;
@@ -235,6 +235,21 @@ vec3 CalcNormal( in vec3 vertexNormal, in vec4 vertexTangent, in vec2 frag_tex_c
 	}else {
 		return normalize(vertexNormal);
 	}
+}
+
+float ApplySpecularAA( in float roughness, in vec3 N )
+{
+	if ( pbrAdvancedParams.w <= 0.0 || normal_texture_set < 0 ) {
+		return roughness;
+	}
+
+	vec3 dndx = dFdx( N );
+	vec3 dndy = dFdy( N );
+	float variance = min( dot( dndx, dndx ) + dot( dndy, dndy ), 0.5 );
+	float alpha = max( roughness * roughness, 0.0004 );
+
+	alpha = clamp( alpha + variance * pbrAdvancedParams.w, 0.0004, 1.0 );
+	return clamp( sqrt( alpha ), 0.02, 1.0 );
 }
 
 float WrapLambert( in float NL, in float w )
@@ -978,6 +993,7 @@ void main() {
 		float aniso = texture( anisotropy_texture, frag_tex_coord0 ).r * pbrAnisotropyScale.x;
 		roughness = mix( roughness, max( 0.02, roughness * ( 1.0 - aniso ) ), aniso );
 	}
+	roughness = ApplySpecularAA( roughness, N );
 	roughness = clamp( roughness, 0.02, 1.0 );
 
 	if ( emissive_texture_set >= 0 ) {

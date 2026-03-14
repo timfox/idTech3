@@ -82,6 +82,20 @@ void vk_begin_render_pass_tracked( VkRenderPass renderPass, VkFramebuffer frameB
 		} else {
 			clear_count = vk.msaaActive ? 3 : 2;
 		}
+		if ( renderPass == vk.render_pass.oit_accum ) {
+			clear_values[0].color.float32[0] = 0.0f;
+			clear_values[0].color.float32[1] = 0.0f;
+			clear_values[0].color.float32[2] = 0.0f;
+			clear_values[0].color.float32[3] = 0.0f;
+			clear_values[1].color.float32[0] = 1.0f;
+			clear_values[1].color.float32[1] = 1.0f;
+			clear_values[1].color.float32[2] = 1.0f;
+			clear_values[1].color.float32[3] = 1.0f;
+#ifndef USE_REVERSED_DEPTH
+			clear_values[2].depthStencil.depth = 1.0f;
+#endif
+			clear_count = vk.msaaActive ? 2 : 3;
+		}
 		render_pass_begin_info.clearValueCount = clear_count;
 		render_pass_begin_info.pClearValues = clear_values;
 
@@ -422,15 +436,21 @@ void vk_create_render_passes( void )
 
 	if ( r_oit && r_oit->integer && fboActive )
 	{
-		/* OIT accumulation pass: RGBA16F, clear to (0,0,0,0), additive blend.
-		 * Depth attachment (when MSAA off): depth-test transparents against opaque scene. */
-		desc.attachmentCount = ( vkSamples == VK_SAMPLE_COUNT_1_BIT ) ? 2 : 1;
+		/* OIT accumulation pass:
+		 *  RT0 = weighted color accumulation
+		 *  RT1 = revealage product
+		 *  Depth attachment (when MSAA off): hardware depth-test transparents against opaque scene.
+		 *  MSAA path uses resolved depth sampling in shader. */
+		desc.attachmentCount = ( vkSamples == VK_SAMPLE_COUNT_1_BIT ) ? 3 : 2;
 		colorRef0.attachment = 0;
 		colorRef0.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		colorRefs[0] = colorRef0;
+		colorRefs[1].attachment = 1;
+		colorRefs[1].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		Com_Memset( &subpass, 0, sizeof( subpass ) );
 		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		subpass.colorAttachmentCount = 1;
-		subpass.pColorAttachments = &colorRef0;
+		subpass.colorAttachmentCount = 2;
+		subpass.pColorAttachments = colorRefs;
 		attachments[0].flags = 0;
 		attachments[0].format = VK_FORMAT_R16G16B16A16_SFLOAT;
 		attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
@@ -440,17 +460,26 @@ void vk_create_render_passes( void )
 		attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		attachments[0].initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		attachments[1].flags = 0;
+		attachments[1].format = VK_FORMAT_R16_SFLOAT;
+		attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
+		attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		attachments[1].initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		attachments[1].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		if ( vkSamples == VK_SAMPLE_COUNT_1_BIT ) {
-			attachments[1].flags = 0;
-			attachments[1].format = depth_format;
-			attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
-			attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-			attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-			attachments[1].stencilLoadOp = glConfig.stencilBits ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-			attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-			attachments[1].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-			attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-			depthRef0.attachment = 1;
+			attachments[2].flags = 0;
+			attachments[2].format = depth_format;
+			attachments[2].samples = VK_SAMPLE_COUNT_1_BIT;
+			attachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+			attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			attachments[2].stencilLoadOp = glConfig.stencilBits ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+			attachments[2].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			attachments[2].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			attachments[2].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			depthRef0.attachment = 2;
 			depthRef0.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 			subpass.pDepthStencilAttachment = &depthRef0;
 		} else {
@@ -460,6 +489,10 @@ void vk_create_render_passes( void )
 		SET_OBJECT_NAME( vk.render_pass.oit_accum, "render pass - oit_accum", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
 
 		/* OIT resolve pass: composite opaque + accum to main color */
+		desc.attachmentCount = 1;
+		subpass.colorAttachmentCount = 1;
+		subpass.pColorAttachments = &colorRef0;
+		subpass.pDepthStencilAttachment = NULL;
 		attachments[0].format = vk.color_format;
 		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		attachments[0].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -830,6 +863,65 @@ void vk_create_render_passes( void )
 			VK_CHECK( qvkCreateRenderPass( device, &smaaDesc, NULL, smaaPasses[i] ) );
 			SET_OBJECT_NAME( *smaaPasses[i], smaaNames[i], VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
 		}
+	}
+
+	if ( vk.fboActive )
+	{
+		VkAttachmentDescription taaAttachment;
+		VkAttachmentReference taaColorRef;
+		VkSubpassDescription taaSubpass;
+		VkSubpassDependency taaDeps[2];
+		VkRenderPassCreateInfo taaDesc;
+
+		Com_Memset( &taaAttachment, 0, sizeof( taaAttachment ) );
+		taaAttachment.flags = 0;
+		taaAttachment.format = vk.color_format;
+		taaAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+		taaAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		taaAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		taaAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		taaAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		taaAttachment.initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		taaAttachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+		taaColorRef.attachment = 0;
+		taaColorRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+		Com_Memset( &taaSubpass, 0, sizeof( taaSubpass ) );
+		taaSubpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		taaSubpass.colorAttachmentCount = 1;
+		taaSubpass.pColorAttachments = &taaColorRef;
+
+		Com_Memset( taaDeps, 0, sizeof( taaDeps ) );
+		taaDeps[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+		taaDeps[0].dstSubpass = 0;
+		taaDeps[0].srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		taaDeps[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		taaDeps[0].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		taaDeps[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		taaDeps[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+		taaDeps[1].srcSubpass = 0;
+		taaDeps[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+		taaDeps[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		taaDeps[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+		taaDeps[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		taaDeps[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		taaDeps[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+		Com_Memset( &taaDesc, 0, sizeof( taaDesc ) );
+		taaDesc.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+		taaDesc.pNext = NULL;
+		taaDesc.flags = 0;
+		taaDesc.pAttachments = &taaAttachment;
+		taaDesc.attachmentCount = 1;
+		taaDesc.pSubpasses = &taaSubpass;
+		taaDesc.subpassCount = 1;
+		taaDesc.pDependencies = taaDeps;
+		taaDesc.dependencyCount = 2;
+
+		VK_CHECK( qvkCreateRenderPass( device, &taaDesc, NULL, &vk.render_pass.taa ) );
+		SET_OBJECT_NAME( vk.render_pass.taa, "render pass - taa", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
 	}
 
 	// screenmap

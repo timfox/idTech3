@@ -99,6 +99,80 @@ void vk_end_frame_prepare_post_process( VkImageView *post_fog_src, VkImageView *
 	}
 }
 
+void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *luminance_src )
+{
+	VkImageView taa_src;
+	VkImageView resolved_view;
+	uint32_t readIndex;
+	uint32_t writeIndex;
+	qboolean allow_taa;
+
+	if ( post_fog_src == NULL || luminance_src == NULL ) {
+		return;
+	}
+
+	taa_src = ( *post_fog_src != VK_NULL_HANDLE ) ? *post_fog_src : vk.color_image_view;
+	allow_taa = ( tr.world != NULL ) &&
+		( ( backEnd.refdef.rdflags & RDF_NOWORLDMODEL ) == 0 ) &&
+		( backEnd.viewParms.portalView == PV_NONE );
+
+	if ( !allow_taa ||
+		!( r_taa && r_taa->integer ) ||
+		vk.cmd == NULL || vk.cmd->command_buffer == VK_NULL_HANDLE ||
+		taa_src == VK_NULL_HANDLE ||
+		vk.taa_pipeline == VK_NULL_HANDLE ||
+		vk.render_pass.taa == VK_NULL_HANDLE ||
+		vk.post_color_descriptor[vk.cmd_index] == VK_NULL_HANDLE ||
+		vk.depth_descriptor[vk.cmd_index] == VK_NULL_HANDLE ||
+		vk.postfx_params_descriptor[vk.cmd_index] == VK_NULL_HANDLE ||
+		vk.framebuffers.taa[0] == VK_NULL_HANDLE ||
+		vk.framebuffers.taa[1] == VK_NULL_HANDLE ||
+		vk.taa_history_descriptor[0] == VK_NULL_HANDLE ||
+		vk.taa_history_descriptor[1] == VK_NULL_HANDLE ) {
+		if ( !allow_taa || !( r_taa && r_taa->integer ) ) {
+			vk_reset_taa_history();
+		}
+		return;
+	}
+
+	readIndex = vk.temporal.taaHistoryIndex & 1u;
+	writeIndex = 1u - readIndex;
+
+	vk_barrier_post_fog_source_for_sampling( taa_src, "vk_end_frame pre-taa (current)" );
+	if ( vk.temporal.hasValidTAAHistory ) {
+		vk_barrier_post_fog_source_for_sampling( vk.taa_history_image_view[readIndex], "vk_end_frame pre-taa (history)" );
+	}
+	vk_update_color_descriptor_image( taa_src );
+
+	vk_begin_render_pass_tracked( vk.render_pass.taa, vk.framebuffers.taa[writeIndex], qfalse,
+		( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u,
+		( glConfig.vidHeight > 0 ) ? (uint32_t)glConfig.vidHeight : 1u );
+	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.taa_pipeline );
+	{
+		VkDescriptorSet taa_sets[4] = {
+			vk.post_color_descriptor[vk.cmd_index],
+			vk.depth_descriptor[vk.cmd_index],
+			vk.postfx_params_descriptor[vk.cmd_index],
+			vk.taa_history_descriptor[readIndex]
+		};
+		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+			vk.pipeline_layout_post_process, 0, 4, taa_sets, 0, NULL );
+	}
+	vk_set_fullscreen_viewport_scissor(
+		( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u,
+		( glConfig.vidHeight > 0 ) ? (uint32_t)glConfig.vidHeight : 1u );
+	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+	vk_end_render_pass();
+
+	resolved_view = vk.taa_history_image_view[writeIndex];
+	vk.temporal.taaHistoryIndex = writeIndex;
+	vk.temporal.hasValidTAAHistory = qtrue;
+	*post_fog_src = resolved_view;
+	*luminance_src = resolved_view;
+	vk_set_scene_post_fog_source( resolved_view );
+	vk_update_post_fog_descriptors( resolved_view );
+}
+
 void vk_end_frame_record_luminance_pass( VkImageView luminance_src )
 {
 	cvar_t *exp_auto = ri.Cvar_Get( "r_exposure_auto", "0", 0 );

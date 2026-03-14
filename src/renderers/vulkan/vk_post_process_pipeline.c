@@ -289,6 +289,16 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			blend = qtrue;
 			alpha_composite = qtrue;
 			break;
+		case 23:
+			pipeline = &vk.taa_pipeline;
+			fsmodule = vk.modules.taa_fs;
+			renderpass = vk.render_pass.taa;
+			layout = vk.pipeline_layout_post_process;
+			samples = VK_SAMPLE_COUNT_1_BIT;
+			pipeline_name = "taa resolve pipeline";
+			target_format = vk.color_format;
+			blend = qfalse;
+			break;
 #ifdef VK_PBR_BRDFLUT
 		case 4:
 			pipeline = &vk.brdflut_pipeline;
