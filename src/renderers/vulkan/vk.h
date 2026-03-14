@@ -280,7 +280,7 @@ typedef struct vkUniform_s {
 	vec4_t pbrTransmissionScale;
 	vec4_t pbrSubsurfaceColor;
 	vec4_t pbrSubsurfaceParams;
-	vec4_t pbrAdvancedParams; // x: multi-scatter toggle, y: multi-scatter strength, z: roughness Fresnel
+	vec4_t pbrAdvancedParams; // x: multi-scatter toggle, y: multi-scatter strength, z: roughness Fresnel, w: specular AA strength
 	vec4_t pbrGlintParams0;
 	vec4_t pbrGlintParams1;
 	vec4_t pbrGlintFlags;
@@ -636,6 +636,7 @@ typedef struct {
 		VkRenderPass smaa_edge;
 		VkRenderPass smaa_blend;
 		VkRenderPass smaa_compose;
+		VkRenderPass taa;
 		VkRenderPass volumetric;
 		VkRenderPass atmosphere;
 	} render_pass;
@@ -653,8 +654,8 @@ typedef struct {
 	VkPipelineLayout pipeline_layout_smaa;
 	VkPipelineLayout pipeline_layout_ssao;		// ssao (depth + push constants)
 	VkPipelineLayout pipeline_layout_ssao_combine;	// ssao combine (color + ao)
-	VkPipelineLayout pipeline_layout_oit_resolve;	// oit resolve (opaque + accum)
-	VkPipelineLayout pipeline_layout_oit_accum;	// oit accum (sampler + push constants)
+	VkPipelineLayout pipeline_layout_oit_resolve;	// oit resolve (opaque + accum + revealage)
+	VkPipelineLayout pipeline_layout_oit_accum;	// oit accum (sampler + depth + push constants)
 	VkPipelineLayout pipeline_layout_ssr;		// ssr (color + depth + push constants)
 	VkPipelineLayout pipeline_layout_atmosphere;	// atmosphere (push constants only)
 #ifdef VK_PBR_BRDFLUT
@@ -709,10 +710,11 @@ typedef struct {
 	VkImageView post_fog_color_source;	/* last source for gamma (color_image or smaa_output) */
 	VkImageView scene_post_fog_color_source;	/* scene-only source for luminance/exposure before HUD/console */
 	VkDescriptorSet depth_descriptor[NUM_COMMAND_BUFFERS];	/* per-frame (VUID-03047) */
-	VkDescriptorSet postfx_params_descriptor[NUM_COMMAND_BUFFERS];
-	VkDescriptorSet smaa_edge_descriptor;
-	VkDescriptorSet smaa_blend_descriptor;
-	VkDescriptorSet smaa_compose_descriptor;
+		VkDescriptorSet postfx_params_descriptor[NUM_COMMAND_BUFFERS];
+		VkDescriptorSet smaa_edge_descriptor;
+		VkDescriptorSet smaa_blend_descriptor;
+		VkDescriptorSet smaa_compose_descriptor;
+		VkDescriptorSet taa_history_descriptor[2];
 
 	VkImage color_image;
 	VkImageView color_image_view;
@@ -722,10 +724,12 @@ typedef struct {
 	VkImageView fog_scene_image_view;
 	VkImage smaa_edge_image;
 	VkImageView smaa_edge_image_view;
-	VkImage smaa_blend_image;
-	VkImageView smaa_blend_image_view;
-	VkImage smaa_output_image;
-	VkImageView smaa_output_image_view;
+		VkImage smaa_blend_image;
+		VkImageView smaa_blend_image_view;
+		VkImage smaa_output_image;
+		VkImageView smaa_output_image_view;
+		VkImage taa_history_image[2];
+		VkImageView taa_history_image_view[2];
 
 	VkImage bloom_image[1+VK_NUM_BLOOM_PASSES*2];
 	VkImageView bloom_image_view[1+VK_NUM_BLOOM_PASSES*2];
@@ -742,8 +746,12 @@ typedef struct {
 	VkDescriptorSet ssao_scene_descriptor;	/* scene copy for combine (avoids read-modify-write) */
 	VkImage oit_accum_image;
 	VkImageView oit_accum_image_view;
+	VkImage oit_reveal_image;
+	VkImageView oit_reveal_image_view;
 	VkDescriptorSet oit_opaque_descriptor;	/* opaque copy for OIT resolve */
 	VkDescriptorSet oit_accum_descriptor;
+	VkDescriptorSet oit_reveal_descriptor;
+	VkDescriptorSet oit_depth_descriptor;
 	VkImage ssr_image;
 	VkImageView ssr_image_view;
 	VkDescriptorSet ssr_descriptor[2];	/* [0]=color, [1]=depth */
@@ -821,6 +829,7 @@ typedef struct {
 		VkFramebuffer smaa_edge;
 		VkFramebuffer smaa_blend;
 		VkFramebuffer smaa_compose;
+		VkFramebuffer taa[2];
 		VkFramebuffer volumetric[MAX_SWAPCHAIN_IMAGES];
 		VkFramebuffer atmosphere[MAX_SWAPCHAIN_IMAGES];
 		VkFramebuffer ui_overlay[MAX_SWAPCHAIN_IMAGES];
@@ -897,6 +906,8 @@ typedef struct {
 		qboolean noWorldModel;
 		qboolean stableGameplayState;
 		float filteredAvgLogLuminance;
+		qboolean hasValidTAAHistory;
+		uint32_t taaHistoryIndex;
 		uint32_t lastRenderWidth;
 		uint32_t lastRenderHeight;
 		uint32_t lastSwapchainWidth;
@@ -977,6 +988,7 @@ typedef struct {
 		VkShaderModule smaa_edge_fs;
 		VkShaderModule smaa_blend_fs;
 		VkShaderModule smaa_compose_fs;
+		VkShaderModule taa_fs;
 		VkShaderModule ssr_fs;
 
 		VkShaderModule fog_fs;
@@ -1084,6 +1096,7 @@ typedef struct {
 	VkPipeline smaa_edge_pipeline;
 	VkPipeline smaa_blend_pipeline;
 	VkPipeline smaa_compose_pipeline;
+	VkPipeline taa_pipeline;
 	VkPipeline ssao_pipeline;
 	VkPipeline hbao_pipeline;
 	VkPipeline ssao_blur_pipeline;

@@ -26,6 +26,7 @@ typedef struct {
 	float lutParams[4];        /* lutIntensity, lutEnabled, lutStripDim, reserved */
 	float autoExposureParams[4]; /* avgLogLum, targetLum, minExposure, maxExposure */
 	float localExposureParams[4]; /* enabled, strength, shadowClampEV, highlightClampEV */
+	float taaParams[4];        /* validHistory, stationaryFeedback, motionFeedback, sharpen */
 } VkPostFXParams;
 
 typedef struct {

@@ -25,6 +25,7 @@ layout(set = 2, binding = 0) uniform PostFXParams {
 	vec4 lutParams;        /* lutIntensity, lutEnabled, lutStripDim, invGamma */
 	vec4 autoExposureParams; /* avgLogLum, targetLum, minExposure, maxExposure */
 	vec4 localExposureParams; /* enabled, strength, shadowClampEV, highlightClampEV */
+	vec4 taaParams;        /* validHistory, stationaryFeedback, motionFeedback, sharpen */
 } postfx;
 layout(set = 3, binding = 0) uniform sampler2D lutTexture;
 

@@ -1439,7 +1439,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				( r_pbr_multiScatter && r_pbr_multiScatter->integer ) ? 1.0f : 0.0f,
 				( r_pbr_multiScatterStrength ? r_pbr_multiScatterStrength->value : 1.0f ),
 				( r_pbr_fresnelRoughness && r_pbr_fresnelRoughness->integer ) ? 1.0f : 0.0f,
-				0.0f );
+				( r_pbr_specularAA && r_pbr_specularAA->integer ) ? LerpClamp( ( r_pbr_specularAAStrength ? r_pbr_specularAAStrength->value : 0.5f ), 0.0f, 2.0f ) : 0.0f );
 
 			float glintDensityExp = r_glintDensity ? LerpClamp( r_glintDensity->value, -4.0f, 6.0f ) : 3.0f;
 			float glintDensity = 1000.0f * powf( 10.0f, glintDensityExp );

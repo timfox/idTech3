@@ -120,7 +120,7 @@ static void vk_temporal_log_reset( uint32_t reasons, qboolean hardReset )
 		reasonBuf[0] ? reasonBuf : "none" );
 	if ( r_temporalDebug->integer >= 2 ) {
 		ri.Printf( PRINT_DEVELOPER,
-			"[VK][temporal] frame=%u cameraCut=%d invalidate={motion=1 volumetric=1 exposure=1} world=%s noWorld=%d gameplay=%d render=%ux%u swapchain=%ux%u\n",
+			"[VK][temporal] frame=%u cameraCut=%d invalidate={motion=1 taa=1 volumetric=1 exposure=1} world=%s noWorld=%d gameplay=%d render=%ux%u swapchain=%ux%u\n",
 			vk.temporal.frameIndex,
 			vk.temporal.sharedCameraCut,
 			vk.temporal.worldName[0] ? vk.temporal.worldName : "<none>",
@@ -131,6 +131,12 @@ static void vk_temporal_log_reset( uint32_t reasons, qboolean hardReset )
 		ri.Printf( PRINT_DEVELOPER, "[VK][temporal] unreliableMotion=%d\n",
 			vk.temporal.unreliableMotionThisFrame );
 	}
+}
+
+void vk_reset_taa_history( void )
+{
+	vk.temporal.hasValidTAAHistory = qfalse;
+	vk.temporal.taaHistoryIndex = 0u;
 }
 
 static void vk_temporal_apply_resets( qboolean hardReset )
@@ -147,6 +153,7 @@ static void vk_temporal_apply_resets( qboolean hardReset )
 	vk.temporal.appliedResetReasons = reasons;
 	vk.temporal.sharedCameraCut = ( reasons & VK_TEMPORAL_RESET_CAMERA_CUT ) != 0u ? qtrue : qfalse;
 	vk_reset_motion_history();
+	vk_reset_taa_history();
 	vk_reset_volumetric_history();
 	vk_reset_occlusion_visibility();
 	if ( nonCameraReasons != 0u ) {

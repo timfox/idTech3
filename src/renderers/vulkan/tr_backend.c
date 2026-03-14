@@ -658,6 +658,7 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 			unsigned srcBlend = stageBits & GLS_SRCBLEND_BITS;
 			unsigned dstBlend = stageBits & GLS_DSTBLEND_BITS;
 			qboolean transparent = (
+				( shader->sort >= SS_BLEND0 && shader->sort <= SS_BLEND6 ) ||
 				( srcBlend == GLS_SRCBLEND_SRC_ALPHA && dstBlend == GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA ) ||
 				( srcBlend == GLS_SRCBLEND_ONE && dstBlend == GLS_DSTBLEND_ONE )
 			);
