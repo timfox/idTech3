@@ -29,6 +29,26 @@ static const char *vk_temporal_reason_string( uint32_t reason )
 	}
 }
 
+static float vk_matrix_rotation_max_abs_diff( const float *a, const float *b )
+{
+	static const int idx[] = {
+		0, 1, 2,
+		4, 5, 6,
+		8, 9, 10
+	};
+	float max_diff = 0.0f;
+	int i;
+
+	for ( i = 0; i < (int)ARRAY_LEN( idx ); i++ ) {
+		const float d = fabsf( a[idx[i]] - b[idx[i]] );
+		if ( d > max_diff ) {
+			max_diff = d;
+		}
+	}
+
+	return max_diff;
+}
+
 static void vk_temporal_clear_frame_state( void )
 {
 	vk.temporal.pendingResetReasons = 0u;
@@ -116,6 +136,7 @@ static void vk_temporal_log_reset( uint32_t reasons, qboolean hardReset )
 static void vk_temporal_apply_resets( qboolean hardReset )
 {
 	const uint32_t reasons = vk.temporal.pendingResetReasons;
+	const uint32_t nonCameraReasons = reasons & ~VK_TEMPORAL_RESET_CAMERA_CUT;
 	const float manualExposure = ( r_exposure && r_exposure->value > 0.0f ) ? r_exposure->value : 1.0f;
 
 	if ( reasons == 0u ) {
@@ -128,9 +149,11 @@ static void vk_temporal_apply_resets( qboolean hardReset )
 	vk_reset_motion_history();
 	vk_reset_volumetric_history();
 	vk_reset_occlusion_visibility();
-	vk.adaptedExposure = manualExposure;
-	vk.temporal.hasValidLuminance = qfalse;
-	vk.temporal.filteredAvgLogLuminance = 0.0f;
+	if ( nonCameraReasons != 0u ) {
+		vk.adaptedExposure = manualExposure;
+		vk.temporal.hasValidLuminance = qfalse;
+		vk.temporal.filteredAvgLogLuminance = 0.0f;
+	}
 
 	vk_temporal_log_reset( reasons, hardReset );
 }
@@ -165,32 +188,29 @@ static qboolean vk_temporal_compute_shared_camera_cut( uint32_t *outReasons )
 		float dy = tr.refdef.vieworg[1] - vk.prevViewOrigin[1];
 		float dz = tr.refdef.vieworg[2] - vk.prevViewOrigin[2];
 		float distSq = dx * dx + dy * dy + dz * dz;
-		float dotForward = DotProduct( tr.refdef.viewaxis[2], vk.prevViewForward );
-		qboolean posCut = ( distSq > 64.0f * 64.0f );
-		qboolean angleCut = ( dotForward < 0.85f );
+		float dotForward = DotProduct( tr.refdef.viewaxis[0], vk.prevViewForward );
+		qboolean posCut = ( distSq > 192.0f * 192.0f );
+		qboolean angleCut = ( dotForward < 0.55f );
 		qboolean portalView = ( backEnd.viewParms.portalView != PV_NONE ) ? qtrue : qfalse;
 
 		if ( vk_prev_matrices_valid ) {
 			const float *projection = backEnd.viewParms.projectionMatrix;
 			const float *view = backEnd.viewParms.world.modelViewMatrix;
-			float viewProj[16];
-			float viewDelta;
-			float viewProjDelta;
+			float viewRotDelta = vk_matrix_rotation_max_abs_diff( view, vk_prev_view_matrix );
+			float projDelta = vk_matrix_max_abs_diff( projection, vk_prev_projection_matrix );
 
-			myGlMultMatrix( view, projection, viewProj );
-			viewDelta = vk_matrix_max_abs_diff( view, vk_prev_view_matrix );
-			viewProjDelta = vk_matrix_max_abs_diff( viewProj, vk_prev_viewproj_matrix );
-			if ( viewDelta > 0.25f || viewProjDelta > 0.35f || portalView ) {
+			/*
+			 * Full 4x4 diffs include translation, which changes every movement frame.
+			 * That caused false camera-cut resets while simply walking.
+			 */
+			if ( projDelta > 0.05f || portalView ) {
 				cameraCut = qtrue;
 				vk_near_static_view_frames = 0;
 			} else {
-				const float nearStaticThresh = 0.03f;
-				const int nearStaticResetFrames = 60;
-				if ( viewDelta < nearStaticThresh && viewProjDelta < nearStaticThresh * 1.5f ) {
-					vk_near_static_view_frames++;
-					if ( vk_near_static_view_frames >= nearStaticResetFrames ) {
-						cameraCut = qtrue;
-						vk_near_static_view_frames = 0;
+				const float nearStaticRotThresh = 0.003f;
+				if ( viewRotDelta < nearStaticRotThresh && distSq < ( 0.5f * 0.5f ) && dotForward > 0.9990f ) {
+					if ( vk_near_static_view_frames < 600 ) {
+						vk_near_static_view_frames++;
 					}
 				} else {
 					vk_near_static_view_frames = 0;
@@ -273,13 +293,13 @@ void vk_temporal_commit_frame_state( void )
 	vk.temporal.lastSwapchainHeight = vk.swapchain_extent_valid ? vk.swapchain_extent.height : 0u;
 	Q_strncpyz( vk.temporal.worldName, ( worldValid && tr.world->name[0] ) ? tr.world->name : "", sizeof( vk.temporal.worldName ) );
 	VectorCopy( tr.refdef.vieworg, vk.prevViewOrigin );
-	VectorCopy( tr.refdef.viewaxis[2], vk.prevViewForward );
+	VectorCopy( tr.refdef.viewaxis[0], vk.prevViewForward );
 }
 
 void vk_temporal_update_auto_exposure( void )
 {
 	cvar_t *auto_var = ri.Cvar_Get( "r_exposure_auto", "0", 0 );
-	cvar_t *target_var = ri.Cvar_Get( "r_exposure_auto_target", "0.5", CVAR_ARCHIVE_ND );
+	cvar_t *target_var = ri.Cvar_Get( "r_exposure_auto_target", "1.0", CVAR_ARCHIVE_ND );
 	cvar_t *speed_var = ri.Cvar_Get( "r_exposure_auto_speed", "2.0", CVAR_ARCHIVE_ND );
 
 	if ( !( auto_var && auto_var->integer && target_var && speed_var ) ) {
@@ -292,11 +312,19 @@ void vk_temporal_update_auto_exposure( void )
 		qboolean stableGameplayState = vk.temporal.stableGameplayState;
 		qboolean hardReset = ( vk.temporal.appliedResetReasons & ~VK_TEMPORAL_RESET_CAMERA_CUT ) != 0u ? qtrue : qfalse;
 		qboolean cameraCut = vk.temporal.sharedCameraCut;
-		float target = target_var->value > 0.0f ? target_var->value : 0.5f;
+		qboolean significantCut = ( vk.temporal.appliedResetReasons &
+			( VK_TEMPORAL_RESET_RENDERER_INIT |
+			  VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE |
+			  VK_TEMPORAL_RESET_RENDER_SIZE_CHANGE |
+			  VK_TEMPORAL_RESET_WORLD_CHANGE |
+			  VK_TEMPORAL_RESET_CLIENT_STATE_CHANGE |
+			  VK_TEMPORAL_RESET_EXPLICIT_DEBUG |
+			  VK_TEMPORAL_RESET_MISSING_PREV_DATA ) ) ? qtrue : qfalse;
+		float target = target_var->value > 0.0f ? target_var->value : 1.0f;
 		float speed = speed_var->value > 0.0f ? speed_var->value * 0.016f : 0.02f;
 		const float manualExposure = ( r_exposure && r_exposure->value > 0.0f ) ? r_exposure->value : 1.0f;
-		const float minExposure = manualExposure * 0.5f > 0.25f ? manualExposure * 0.5f : 0.25f;
-		const float maxExposure = manualExposure * 4.0f < 4.0f ? 4.0f : manualExposure * 4.0f;
+		const float minExposure = manualExposure;
+		const float maxExposure = manualExposure * 6.0f < 6.0f ? 6.0f : manualExposure * 6.0f;
 		float targetExp = manualExposure;
 		qboolean luminanceValid = qfalse;
 		float avgLogLum = 0.0f;
@@ -306,7 +334,7 @@ void vk_temporal_update_auto_exposure( void )
 			vk.temporal.filteredAvgLogLuminance = 0.0f;
 			targetExp = manualExposure;
 			speed = stateTransition ? 0.35f : 0.12f;
-		} else if ( !hardReset && !cameraCut && vk.luminance_staging_ptr ) {
+		} else if ( !hardReset && ( !cameraCut || !significantCut ) && vk.luminance_staging_ptr ) {
 			avgLogLum = *(const float *)vk.luminance_staging_ptr;
 			if ( avgLogLum == avgLogLum && avgLogLum > -20.0f && avgLogLum < 20.0f ) {
 				luminanceValid = qtrue;
@@ -340,16 +368,16 @@ void vk_temporal_update_auto_exposure( void )
 				targetExp = manualExposure;
 			}
 		} else {
-			if ( hardReset || cameraCut ) {
+			if ( hardReset || ( cameraCut && significantCut ) ) {
 				vk.temporal.hasValidLuminance = qfalse;
 				vk.temporal.filteredAvgLogLuminance = 0.0f;
 			}
 			targetExp = manualExposure;
 		}
 
-		if ( cameraCut ) {
-			cvar_t *cap_var = ri.Cvar_Get( "r_exposure_auto_cap_on_cut", "0.75", 0 );
-			float cap = cap_var ? cap_var->value : 0.75f;
+		if ( cameraCut && significantCut ) {
+			cvar_t *cap_var = ri.Cvar_Get( "r_exposure_auto_cap_on_cut", "1.35", 0 );
+			float cap = cap_var ? cap_var->value : 1.35f;
 			speed = 0.5f;
 			if ( cap > 0.0f && targetExp > cap ) {
 				targetExp = cap;

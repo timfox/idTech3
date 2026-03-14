@@ -2152,7 +2152,7 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_mapGreyScale, "-1", "1", CV_FLOAT );
 	ri.Cvar_SetDescription(r_mapGreyScale, "Desaturate world map textures only, works independently from \\r_greyscale, negative values only desaturate lightmaps.");
 
-	r_fogTint = ri.Cvar_Get( "r_fogTint", "1 1 1", CVAR_ARCHIVE_ND );
+	r_fogTint = ri.Cvar_Get( "r_fogTint", "1.08 1.00 0.72", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_fogTint, "Legacy map fog RGB tint multiplier (3 floats). Applied at render time to non-volumetric fog." );
 
 	r_subdivisions = ri.Cvar_Get( "r_subdivisions", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
@@ -2515,7 +2515,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_bloomKnee, "Soft knee for the bloom extractor to control highlight rolloff." );
 	ri.Cvar_SetGroup( r_bloomKnee, CVG_RENDERER );
 
-	r_exposure = ri.Cvar_Get( "r_exposure", "0.82", CVAR_ARCHIVE_ND );
+	r_exposure = ri.Cvar_Get( "r_exposure", "1.15", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_exposure, "0.01", "10.0", CV_FLOAT );
 	ri.Cvar_SetDescription( r_exposure, "Linear exposure multiplier applied before tonemapping." );
 	ri.Cvar_SetGroup( r_exposure, CVG_RENDERER );
@@ -2539,16 +2539,16 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_exposure_auto, "Eye adaptation: 0=manual r_exposure, 1=temporal adaptation toward r_exposure_auto_target. Luminance pass planned." );
 	ri.Cvar_SetGroup( r_exposure_auto, CVG_RENDERER );
 	{
-		cvar_t *exp_target = ri.Cvar_Get( "r_exposure_auto_target", "0.5", CVAR_ARCHIVE_ND );
+		cvar_t *exp_target = ri.Cvar_Get( "r_exposure_auto_target", "1.0", CVAR_ARCHIVE_ND );
 		cvar_t *exp_speed = ri.Cvar_Get( "r_exposure_auto_speed", "2.0", CVAR_ARCHIVE_ND );
-		cvar_t *exp_cap_cut = ri.Cvar_Get( "r_exposure_auto_cap_on_cut", "0.75", CVAR_ARCHIVE_ND );
+		cvar_t *exp_cap_cut = ri.Cvar_Get( "r_exposure_auto_cap_on_cut", "1.35", CVAR_ARCHIVE_ND );
 		ri.Cvar_CheckRange( exp_cap_cut, "0.1", "2.0", CV_FLOAT );
 		ri.Cvar_SetDescription( exp_target, "Target exposure for eye adaptation (r_exposure_auto 1)." );
 		ri.Cvar_SetDescription( exp_speed, "Eye adaptation speed (higher = faster)." );
 		ri.Cvar_SetDescription( exp_cap_cut, "Max exposure on camera cut (e.g. death). Reduces blowout when view suddenly jumps to bright sky. 0=disable cap." );
 	}
 
-	r_tonemap = ri.Cvar_Get( "r_tonemap", "3", CVAR_ARCHIVE_ND );
+	r_tonemap = ri.Cvar_Get( "r_tonemap", "2", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_tonemap, "0", "4", CV_INTEGER );
 	ri.Cvar_SetDescription( r_tonemap, "Tonemapping: 0=off, 1=Reinhard, 2=ACES, 3=Filmic (Hable/Uncharted2), 4=AgX (punchy, saturated)." );
 	ri.Cvar_SetGroup( r_tonemap, CVG_RENDERER );
@@ -2564,8 +2564,8 @@ static void R_Register( void )
 	ri.Cvar_SetGroup( r_post_debug, CVG_RENDERER );
 
 	{
-		cvar_t *r_post_contrast = ri.Cvar_Get( "r_post_contrast", "1.0", CVAR_ARCHIVE_ND );
-		cvar_t *r_post_saturation = ri.Cvar_Get( "r_post_saturation", "1.0", CVAR_ARCHIVE_ND );
+		cvar_t *r_post_contrast = ri.Cvar_Get( "r_post_contrast", "0.92", CVAR_ARCHIVE_ND );
+		cvar_t *r_post_saturation = ri.Cvar_Get( "r_post_saturation", "1.05", CVAR_ARCHIVE_ND );
 		ri.Cvar_CheckRange( r_post_contrast, "0.25", "4.0", CV_FLOAT );
 		ri.Cvar_CheckRange( r_post_saturation, "0.0", "3.0", CV_FLOAT );
 		ri.Cvar_SetDescription( r_post_contrast, "Post-process contrast (1.0=neutral, >1=punchier, <1=flatter)." );
@@ -2598,7 +2598,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_volumetricFogAlbedo, "Single-scatter albedo (0=absorbing, 1=fully scattering). Controls scatter vs absorption ratio." );
 	ri.Cvar_SetGroup( r_volumetricFogAlbedo, CVG_RENDERER );
 
-	r_volumetricFogExtinctionScale = ri.Cvar_Get( "r_volumetricFogExtinctionScale", "1.0", CVAR_ARCHIVE_ND );
+	r_volumetricFogExtinctionScale = ri.Cvar_Get( "r_volumetricFogExtinctionScale", "0.65", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogExtinctionScale, "0.1", "10", CV_FLOAT );
 	ri.Cvar_SetDescription( r_volumetricFogExtinctionScale, "Scale for extinction coefficient. Multiplies density for beam attenuation." );
 	ri.Cvar_SetGroup( r_volumetricFogExtinctionScale, CVG_RENDERER );
@@ -2708,7 +2708,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_volumetricFogJitter, "Introduces sub-pixel jitter to the fog raymarch samples." );
 	ri.Cvar_SetGroup( r_volumetricFogJitter, CVG_RENDERER );
 
-	r_volumetricFogTemporalWeight = ri.Cvar_Get( "r_volumetricFogTemporalWeight", "0.85", CVAR_ARCHIVE_ND );
+	r_volumetricFogTemporalWeight = ri.Cvar_Get( "r_volumetricFogTemporalWeight", "0.72", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogTemporalWeight, "0", "1", CV_FLOAT );
 	ri.Cvar_SetDescription( r_volumetricFogTemporalWeight, "History blend weight for temporal reprojection (0 = no history)." );
 	ri.Cvar_SetGroup( r_volumetricFogTemporalWeight, CVG_RENDERER );
@@ -2728,12 +2728,12 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_volumetricFogFireflyClamp, "Optional luminance clamp used to suppress temporal fireflies (0 disables)." );
 	ri.Cvar_SetGroup( r_volumetricFogFireflyClamp, CVG_RENDERER );
 
-	r_volumetricFogColorMode = ri.Cvar_Get( "r_volumetricFogColorMode", "0", CVAR_ARCHIVE_ND );
+	r_volumetricFogColorMode = ri.Cvar_Get( "r_volumetricFogColorMode", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogColorMode, "0", "2", CV_INTEGER );
 	ri.Cvar_SetDescription( r_volumetricFogColorMode, "Volumetric fog color source: 0=map fog volume (fallback sun tint), 1=use r_volumetricFogTint, 2=use nearest IBL cubemap SH (fallback mode 0)." );
 	ri.Cvar_SetGroup( r_volumetricFogColorMode, CVG_RENDERER );
 
-	r_volumetricFogTint = ri.Cvar_Get( "r_volumetricFogTint", "1 1 1", CVAR_ARCHIVE_ND );
+	r_volumetricFogTint = ri.Cvar_Get( "r_volumetricFogTint", "1.08 1.00 0.72", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_volumetricFogTint, "Volumetric fog RGB tint (3 floats). Applied as a multiplier in modes 0 and 2, or used directly in mode 1." );
 	ri.Cvar_SetGroup( r_volumetricFogTint, CVG_RENDERER );
 
@@ -2779,12 +2779,12 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_volumetricFogDepthMode, "Volumetric depth decode mode: 0=standard 0..1, 1=reversed-Z 0..1, 2=linear viewZ packed." );
 	ri.Cvar_SetGroup( r_volumetricFogDepthMode, CVG_RENDERER );
 
-	r_volumetricFogSunIntensity = ri.Cvar_Get( "r_volumetricFogSunIntensity", "1.0", CVAR_ARCHIVE_ND );
+	r_volumetricFogSunIntensity = ri.Cvar_Get( "r_volumetricFogSunIntensity", "1.25", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogSunIntensity, "0", "64", CV_FLOAT );
 	ri.Cvar_SetDescription( r_volumetricFogSunIntensity, "Directional light intensity used by world-space volumetric scattering." );
 	ri.Cvar_SetGroup( r_volumetricFogSunIntensity, CVG_RENDERER );
 
-	r_volumetricFogAmbientIntensity = ri.Cvar_Get( "r_volumetricFogAmbientIntensity", "1.0", CVAR_ARCHIVE_ND );
+	r_volumetricFogAmbientIntensity = ri.Cvar_Get( "r_volumetricFogAmbientIntensity", "1.25", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogAmbientIntensity, "0", "64", CV_FLOAT );
 	ri.Cvar_SetDescription( r_volumetricFogAmbientIntensity, "Ambient light intensity used by world-space volumetric scattering." );
 	ri.Cvar_SetGroup( r_volumetricFogAmbientIntensity, CVG_RENDERER );
