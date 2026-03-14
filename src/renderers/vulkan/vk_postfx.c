@@ -329,12 +329,17 @@ qboolean PostFX_PostPipelinesNeedUpdate(void) {
 	int smaaState = ( r_ext_smaa && r_ext_smaa->integer ) ? 1 : 0;
 	int ssrState = ( r_ssr && r_ssr->integer ) ? 1 : 0;
 	int oitState = ( r_oit && r_oit->integer ) ? 1 : 0;
+	cvar_t *r_bloom_scatter = ri.Cvar_Get( "r_bloom_scatter", "0.72", 0 );
+	cvar_t *r_bloom_energy = ri.Cvar_Get( "r_bloom_energyPreserve", "1", 0 );
 
 	if ( ( r_bloom && r_bloom->modified ) ||
+		( r_bloom_intensity && r_bloom_intensity->modified ) ||
 		( r_bloom_threshold && r_bloom_threshold->modified ) ||
 		( r_bloom_threshold_mode && r_bloom_threshold_mode->modified ) ||
 		( r_bloom_modulate && r_bloom_modulate->modified ) ||
 		( r_bloomKnee && r_bloomKnee->modified ) ||
+		( r_bloom_scatter && r_bloom_scatter->modified ) ||
+		( r_bloom_energy && r_bloom_energy->modified ) ||
 		( r_ssao && r_ssao->modified ) ||
 		( r_ext_smaa && r_ext_smaa->modified ) ||
 		( r_oit && r_oit->modified ) )

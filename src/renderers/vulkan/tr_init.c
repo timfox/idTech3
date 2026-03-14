@@ -2536,16 +2536,74 @@ static void R_Register( void )
 	ri.Cvar_SetGroup( r_pre_exposure_scale, CVG_RENDERER );
 
 	r_exposure_auto = ri.Cvar_Get( "r_exposure_auto", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_SetDescription( r_exposure_auto, "Eye adaptation: 0=manual r_exposure, 1=temporal adaptation toward r_exposure_auto_target. Luminance pass planned." );
+	ri.Cvar_SetDescription( r_exposure_auto, "Eye adaptation: 0=manual r_exposure, 1=weighted percentile metering with temporal adaptation." );
 	ri.Cvar_SetGroup( r_exposure_auto, CVG_RENDERER );
 	{
 		cvar_t *exp_target = ri.Cvar_Get( "r_exposure_auto_target", "1.0", CVAR_ARCHIVE_ND );
 		cvar_t *exp_speed = ri.Cvar_Get( "r_exposure_auto_speed", "2.0", CVAR_ARCHIVE_ND );
 		cvar_t *exp_cap_cut = ri.Cvar_Get( "r_exposure_auto_cap_on_cut", "1.35", CVAR_ARCHIVE_ND );
+		cvar_t *exp_low_percent = ri.Cvar_Get( "r_autoExposure_lowPercent", "0.02", CVAR_ARCHIVE_ND );
+		cvar_t *exp_high_percent = ri.Cvar_Get( "r_autoExposure_highPercent", "0.01", CVAR_ARCHIVE_ND );
+		cvar_t *exp_center_weight = ri.Cvar_Get( "r_autoExposure_centerWeight", "0.60", CVAR_ARCHIVE_ND );
+		cvar_t *exp_speed_up = ri.Cvar_Get( "r_autoExposure_speedUp", "1.5", CVAR_ARCHIVE_ND );
+		cvar_t *exp_speed_down = ri.Cvar_Get( "r_autoExposure_speedDown", "3.0", CVAR_ARCHIVE_ND );
+		cvar_t *exp_min = ri.Cvar_Get( "r_autoExposure_min", "0.5", CVAR_ARCHIVE_ND );
+		cvar_t *exp_max = ri.Cvar_Get( "r_autoExposure_max", "4.0", CVAR_ARCHIVE_ND );
 		ri.Cvar_CheckRange( exp_cap_cut, "0.1", "2.0", CV_FLOAT );
+		ri.Cvar_CheckRange( exp_low_percent, "0.0", "0.45", CV_FLOAT );
+		ri.Cvar_CheckRange( exp_high_percent, "0.0", "0.45", CV_FLOAT );
+		ri.Cvar_CheckRange( exp_center_weight, "0.0", "1.5", CV_FLOAT );
+		ri.Cvar_CheckRange( exp_speed_up, "0.1", "10.0", CV_FLOAT );
+		ri.Cvar_CheckRange( exp_speed_down, "0.1", "10.0", CV_FLOAT );
+		ri.Cvar_CheckRange( exp_min, "0.05", "8.0", CV_FLOAT );
+		ri.Cvar_CheckRange( exp_max, "0.05", "16.0", CV_FLOAT );
 		ri.Cvar_SetDescription( exp_target, "Target exposure for eye adaptation (r_exposure_auto 1)." );
-		ri.Cvar_SetDescription( exp_speed, "Eye adaptation speed (higher = faster)." );
+		ri.Cvar_SetDescription( exp_speed, "Legacy eye adaptation speed control kept for compatibility." );
 		ri.Cvar_SetDescription( exp_cap_cut, "Max exposure on camera cut (e.g. death). Reduces blowout when view suddenly jumps to bright sky. 0=disable cap." );
+		ri.Cvar_SetDescription( exp_low_percent, "Low-end percentile discarded by auto exposure metering." );
+		ri.Cvar_SetDescription( exp_high_percent, "High-end percentile discarded by auto exposure metering." );
+		ri.Cvar_SetDescription( exp_center_weight, "Extra center bias for auto exposure metering." );
+		ri.Cvar_SetDescription( exp_speed_up, "How quickly exposure brightens when entering dark areas." );
+		ri.Cvar_SetDescription( exp_speed_down, "How quickly exposure darkens when entering bright areas." );
+		ri.Cvar_SetDescription( exp_min, "Minimum auto exposure clamp." );
+		ri.Cvar_SetDescription( exp_max, "Maximum auto exposure clamp." );
+		ri.Cvar_SetGroup( exp_low_percent, CVG_RENDERER );
+		ri.Cvar_SetGroup( exp_high_percent, CVG_RENDERER );
+		ri.Cvar_SetGroup( exp_center_weight, CVG_RENDERER );
+		ri.Cvar_SetGroup( exp_speed_up, CVG_RENDERER );
+		ri.Cvar_SetGroup( exp_speed_down, CVG_RENDERER );
+		ri.Cvar_SetGroup( exp_min, CVG_RENDERER );
+		ri.Cvar_SetGroup( exp_max, CVG_RENDERER );
+	}
+
+	{
+		cvar_t *local_exp = ri.Cvar_Get( "r_localExposure", "1", CVAR_ARCHIVE_ND );
+		cvar_t *local_exp_strength = ri.Cvar_Get( "r_localExposure_strength", "0.35", CVAR_ARCHIVE_ND );
+		cvar_t *local_exp_shadow = ri.Cvar_Get( "r_localExposure_shadowClamp", "1.5", CVAR_ARCHIVE_ND );
+		cvar_t *local_exp_highlight = ri.Cvar_Get( "r_localExposure_highlightClamp", "1.5", CVAR_ARCHIVE_ND );
+		ri.Cvar_CheckRange( local_exp, "0", "1", CV_INTEGER );
+		ri.Cvar_CheckRange( local_exp_strength, "0.0", "1.0", CV_FLOAT );
+		ri.Cvar_CheckRange( local_exp_shadow, "0.0", "3.0", CV_FLOAT );
+		ri.Cvar_CheckRange( local_exp_highlight, "0.0", "3.0", CV_FLOAT );
+		ri.Cvar_SetDescription( local_exp, "Local exposure compensation in the Vulkan tonemap pass." );
+		ri.Cvar_SetDescription( local_exp_strength, "Strength of local exposure compensation." );
+		ri.Cvar_SetDescription( local_exp_shadow, "Maximum brightening in EV for dark local regions." );
+		ri.Cvar_SetDescription( local_exp_highlight, "Maximum darkening in EV for bright local regions." );
+		ri.Cvar_SetGroup( local_exp, CVG_RENDERER );
+		ri.Cvar_SetGroup( local_exp_strength, CVG_RENDERER );
+		ri.Cvar_SetGroup( local_exp_shadow, CVG_RENDERER );
+		ri.Cvar_SetGroup( local_exp_highlight, CVG_RENDERER );
+	}
+
+	{
+		cvar_t *bloom_scatter = ri.Cvar_Get( "r_bloom_scatter", "0.72", CVAR_ARCHIVE_ND );
+		cvar_t *bloom_energy = ri.Cvar_Get( "r_bloom_energyPreserve", "1", CVAR_ARCHIVE_ND );
+		ri.Cvar_CheckRange( bloom_scatter, "0.1", "1.0", CV_FLOAT );
+		ri.Cvar_CheckRange( bloom_energy, "0", "1", CV_INTEGER );
+		ri.Cvar_SetDescription( bloom_scatter, "Bloom falloff between mip levels. Lower values keep the glow tighter." );
+		ri.Cvar_SetDescription( bloom_energy, "Normalize bloom mip weights to keep highlight energy more stable." );
+		ri.Cvar_SetGroup( bloom_scatter, CVG_RENDERER );
+		ri.Cvar_SetGroup( bloom_energy, CVG_RENDERER );
 	}
 
 	r_tonemap = ri.Cvar_Get( "r_tonemap", "3", CVAR_ARCHIVE_ND );

@@ -4241,8 +4241,16 @@ static void vk_create_volumetric_pipeline_layouts( void )
 	VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.volumetric_depth_resolve_pipeline_layout ) );
 
 	if ( vk.luminance_layout != VK_NULL_HANDLE ) {
+		VkPushConstantRange luminance_push_range;
+		luminance_push_range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		luminance_push_range.offset = 0;
+		luminance_push_range.size = sizeof( VkLuminancePushConstants );
 		desc.pSetLayouts = &vk.luminance_layout;
+		desc.pushConstantRangeCount = 1;
+		desc.pPushConstantRanges = &luminance_push_range;
 		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.luminance_pipeline_layout ) );
+		desc.pushConstantRangeCount = 0;
+		desc.pPushConstantRanges = NULL;
 	}
 
 	desc.pSetLayouts = &vk.volumetric_fluid_layout;

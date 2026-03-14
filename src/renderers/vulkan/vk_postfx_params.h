@@ -24,7 +24,16 @@ typedef struct {
 	float lensEffects1[4];     /* outlineStrength, outlineThreshold, filmLook, sharpen */
 	float runtimeFlags[4];     /* greyscale, dither, postDebug, postEnabled */
 	float lutParams[4];        /* lutIntensity, lutEnabled, lutStripDim, reserved */
+	float autoExposureParams[4]; /* avgLogLum, targetLum, minExposure, maxExposure */
+	float localExposureParams[4]; /* enabled, strength, shadowClampEV, highlightClampEV */
 } VkPostFXParams;
+
+typedef struct {
+	float lowPercent;
+	float highPercent;
+	float centerWeight;
+	float reserved;
+} VkLuminancePushConstants;
 
 void vk_update_postfx_params( uint32_t cmd_index );
 

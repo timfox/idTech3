@@ -301,6 +301,10 @@ void vk_temporal_update_auto_exposure( void )
 	cvar_t *auto_var = ri.Cvar_Get( "r_exposure_auto", "0", 0 );
 	cvar_t *target_var = ri.Cvar_Get( "r_exposure_auto_target", "1.0", CVAR_ARCHIVE_ND );
 	cvar_t *speed_var = ri.Cvar_Get( "r_exposure_auto_speed", "2.0", CVAR_ARCHIVE_ND );
+	cvar_t *speed_up_var = ri.Cvar_Get( "r_autoExposure_speedUp", "1.5", CVAR_ARCHIVE_ND );
+	cvar_t *speed_down_var = ri.Cvar_Get( "r_autoExposure_speedDown", "3.0", CVAR_ARCHIVE_ND );
+	cvar_t *min_var = ri.Cvar_Get( "r_autoExposure_min", "0.5", CVAR_ARCHIVE_ND );
+	cvar_t *max_var = ri.Cvar_Get( "r_autoExposure_max", "4.0", CVAR_ARCHIVE_ND );
 
 	if ( !( auto_var && auto_var->integer && target_var && speed_var ) ) {
 		return;
@@ -321,10 +325,14 @@ void vk_temporal_update_auto_exposure( void )
 			  VK_TEMPORAL_RESET_EXPLICIT_DEBUG |
 			  VK_TEMPORAL_RESET_MISSING_PREV_DATA ) ) ? qtrue : qfalse;
 		float target = target_var->value > 0.0f ? target_var->value : 1.0f;
-		float speed = speed_var->value > 0.0f ? speed_var->value * 0.016f : 0.02f;
+		float legacySpeed = speed_var->value > 0.0f ? speed_var->value * 0.016f : 0.02f;
+		float speedUp = speed_up_var && speed_up_var->value > 0.0f ? speed_up_var->value * 0.016f : legacySpeed;
+		float speedDown = speed_down_var && speed_down_var->value > 0.0f ? speed_down_var->value * 0.016f : legacySpeed;
+		float speed = legacySpeed;
 		const float manualExposure = ( r_exposure && r_exposure->value > 0.0f ) ? r_exposure->value : 1.0f;
-		const float minExposure = manualExposure;
-		const float maxExposure = manualExposure * 6.0f < 6.0f ? 6.0f : manualExposure * 6.0f;
+		const float minExposure = ( min_var && min_var->value > 0.0f ) ? min_var->value : manualExposure;
+		const float maxExposure = ( max_var && max_var->value >= minExposure ) ? max_var->value :
+			( manualExposure * 6.0f < 6.0f ? 6.0f : manualExposure * 6.0f );
 		float targetExp = manualExposure;
 		qboolean luminanceValid = qfalse;
 		float avgLogLum = 0.0f;
@@ -333,7 +341,7 @@ void vk_temporal_update_auto_exposure( void )
 			vk.temporal.hasValidLuminance = qfalse;
 			vk.temporal.filteredAvgLogLuminance = 0.0f;
 			targetExp = manualExposure;
-			speed = stateTransition ? 0.35f : 0.12f;
+			speed = stateTransition ? 0.35f : speedUp;
 		} else if ( !hardReset && ( !cameraCut || !significantCut ) && vk.luminance_staging_ptr ) {
 			avgLogLum = *(const float *)vk.luminance_staging_ptr;
 			if ( avgLogLum == avgLogLum && avgLogLum > -20.0f && avgLogLum < 20.0f ) {
@@ -385,11 +393,12 @@ void vk_temporal_update_auto_exposure( void )
 		}
 
 		if ( !hardReset && vk.adaptedExposure > 0.0f ) {
+			speed = ( targetExp > vk.adaptedExposure ) ? speedUp : speedDown;
 			float ratio = targetExp / vk.adaptedExposure;
 			if ( ratio < 0.75f ) {
-				speed = ( speed < 0.25f ) ? 0.25f : speed;
+				speed = ( speed < speedDown ) ? speedDown : speed;
 			} else if ( ratio > 1.5f ) {
-				speed = ( speed < 0.08f ) ? 0.08f : speed;
+				speed = ( speed < speedUp ) ? speedUp : speed;
 			}
 		}
 
