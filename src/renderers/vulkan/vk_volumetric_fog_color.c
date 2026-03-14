@@ -3,8 +3,33 @@
 #include "vk_util.h"
 #include "vk_volumetric_fog_color.h"
 
+static float vk_rgb_max_component( const vec3_t c )
+{
+	return MAX( c[0], MAX( c[1], c[2] ) );
+}
+
+static void vk_ensure_nonblack_fog_color( vec4_t io )
+{
+	vec3_t tint;
+	float maxc = vk_rgb_max_component( io );
+
+	if ( maxc >= 0.08f ) {
+		return;
+	}
+
+	if ( r_volumetricFogTint && vk_parse_fog_tint_string( r_volumetricFogTint->string, tint ) ) {
+		VectorCopy( tint, io );
+	} else if ( r_fogTint && vk_parse_fog_tint_string( r_fogTint->string, tint ) ) {
+		VectorCopy( tint, io );
+	} else {
+		VectorSet( io, 0.36f, 0.33f, 0.27f );
+	}
+	io[3] = 1.0f;
+}
+
 static void vk_apply_optional_tint( const cvar_t *tintCvar, vec3_t io, qboolean override ) {
 	vec3_t tint;
+	float maxc;
 
 	if ( !tintCvar || !vk_parse_fog_tint_string( tintCvar->string, tint ) ) {
 		return;
@@ -15,9 +40,18 @@ static void vk_apply_optional_tint( const cvar_t *tintCvar, vec3_t io, qboolean 
 		return;
 	}
 
-	io[0] *= tint[0];
-	io[1] *= tint[1];
-	io[2] *= tint[2];
+	maxc = vk_rgb_max_component( io );
+	if ( maxc < 0.05f ) {
+		/*
+		 * Multiplicative tint cannot recover near-black map fog colors.
+		 * Treat this as an override so artist tinting remains visible.
+		 */
+		VectorCopy( tint, io );
+	} else {
+		io[0] *= tint[0];
+		io[1] *= tint[1];
+		io[2] *= tint[2];
+	}
 }
 
 static qboolean vk_get_ibl_fog_color( vec3_t out )
@@ -88,6 +122,7 @@ void vk_get_volumetric_fog_color( vec4_t out )
 	if ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
 		vk_apply_optional_tint( r_volumetricFogTint, out, qfalse );
 		vk_apply_optional_tint( r_fogTint, out, qfalse );
+		vk_ensure_nonblack_fog_color( out );
 		return;
 	}
 
@@ -95,6 +130,7 @@ void vk_get_volumetric_fog_color( vec4_t out )
 		vk_apply_optional_tint( r_volumetricFogTint, out, qtrue );
 		vk_apply_optional_tint( r_fogTint, out, qfalse );
 		out[3] = 1.0f;
+		vk_ensure_nonblack_fog_color( out );
 		return;
 	}
 
@@ -129,4 +165,5 @@ void vk_get_volumetric_fog_color( vec4_t out )
 
 	vk_apply_optional_tint( r_volumetricFogTint, out, qfalse );
 	vk_apply_optional_tint( r_fogTint, out, qfalse );
+	vk_ensure_nonblack_fog_color( out );
 }
