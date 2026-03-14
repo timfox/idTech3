@@ -14,6 +14,7 @@ and color grading lens effects.
 
 #include "tr_local.h"
 #include "vk_postfx.h"
+#include "vk_util.h"
 
 static cvar_t *r_ssr;
 static cvar_t *r_ssr_maxDistance;
@@ -61,6 +62,63 @@ static cvar_t *r_dofFocusRange;
 static cvar_t *r_dofAperture;
 static cvar_t *r_dofMaxBlur;
 static cvar_t *r_sharpen;
+static cvar_t *r_grade_toe;
+static cvar_t *r_grade_shoulder;
+static cvar_t *r_grade_whitePoint;
+static cvar_t *r_grade_blackClip;
+static cvar_t *r_grade_highlightDesat;
+static cvar_t *r_grade_temperature;
+static cvar_t *r_grade_tint;
+static cvar_t *r_grade_exposureBias;
+static cvar_t *r_grade_contrast;
+static cvar_t *r_grade_contrastPivot;
+static cvar_t *r_grade_saturation;
+static cvar_t *r_grade_vibrance;
+static cvar_t *r_grade_shadowLift;
+static cvar_t *r_grade_midGamma;
+static cvar_t *r_grade_highlightGain;
+static cvar_t *r_grade_splitShadow;
+static cvar_t *r_grade_splitHighlight;
+static cvar_t *r_grade_splitBalance;
+static cvar_t *r_grade_splitStrength;
+static cvar_t *r_grade_lut;
+static cvar_t *r_grade_lutIntensity;
+
+static image_t *s_postfx_lut_image;
+static char s_postfx_lut_path[MAX_QPATH];
+
+static void PostFX_ParseRGBOrDefault( const cvar_t *cvar, vec3_t out, float defR, float defG, float defB )
+{
+	if ( cvar && cvar->string && vk_parse_rgb_string( cvar->string, out ) ) {
+		return;
+	}
+
+	out[0] = defR;
+	out[1] = defG;
+	out[2] = defB;
+}
+
+static void PostFX_UpdateLUTImage( void )
+{
+	const char *path = ( r_grade_lut && r_grade_lut->string ) ? r_grade_lut->string : "";
+
+	if ( !Q_stricmp( s_postfx_lut_path, path ) ) {
+		return;
+	}
+
+	Q_strncpyz( s_postfx_lut_path, path, sizeof( s_postfx_lut_path ) );
+	s_postfx_lut_image = tr.whiteImage;
+
+	if ( !path[0] ) {
+		return;
+	}
+
+	s_postfx_lut_image = R_FindImageFile( path, IMGFLAG_CLAMPTOEDGE | IMGFLAG_NOSCALE, 0 );
+	if ( s_postfx_lut_image == NULL ) {
+		ri.Printf( PRINT_WARNING, "PostFX: failed to load LUT image '%s', using neutral LUT\n", path );
+		s_postfx_lut_image = tr.whiteImage;
+	}
+}
 
 /*
 ===============
@@ -118,7 +176,43 @@ void PostFX_RegisterCvars(void) {
 	r_dofAperture            = ri.Cvar_Get("r_dofAperture",            "1.4",  CVAR_ARCHIVE_ND);
 	r_dofMaxBlur             = ri.Cvar_Get("r_dofMaxBlur",             "18.0", CVAR_ARCHIVE_ND);
 	r_sharpen                = ri.Cvar_Get("r_sharpen",                "0.0",  CVAR_ARCHIVE);
+	r_grade_toe              = ri.Cvar_Get("r_grade_toe",              "0.35", CVAR_ARCHIVE_ND);
+	r_grade_shoulder         = ri.Cvar_Get("r_grade_shoulder",         "0.22", CVAR_ARCHIVE_ND);
+	r_grade_whitePoint       = ri.Cvar_Get("r_grade_whitePoint",       "6.5",  CVAR_ARCHIVE_ND);
+	r_grade_blackClip        = ri.Cvar_Get("r_grade_blackClip",        "0.0",  CVAR_ARCHIVE_ND);
+	r_grade_highlightDesat   = ri.Cvar_Get("r_grade_highlightDesat",   "0.18", CVAR_ARCHIVE_ND);
+	r_grade_temperature      = ri.Cvar_Get("r_grade_temperature",      "0.0",  CVAR_ARCHIVE_ND);
+	r_grade_tint             = ri.Cvar_Get("r_grade_tint",             "0.0",  CVAR_ARCHIVE_ND);
+	r_grade_exposureBias     = ri.Cvar_Get("r_grade_exposureBias",     "0.0",  CVAR_ARCHIVE_ND);
+	r_grade_contrast         = ri.Cvar_Get("r_grade_contrast",         "1.0",  CVAR_ARCHIVE_ND);
+	r_grade_contrastPivot    = ri.Cvar_Get("r_grade_contrastPivot",    "0.38", CVAR_ARCHIVE_ND);
+	r_grade_saturation       = ri.Cvar_Get("r_grade_saturation",       "1.0",  CVAR_ARCHIVE_ND);
+	r_grade_vibrance         = ri.Cvar_Get("r_grade_vibrance",         "0.15", CVAR_ARCHIVE_ND);
+	r_grade_shadowLift       = ri.Cvar_Get("r_grade_shadowLift",       "0 0 0", CVAR_ARCHIVE_ND);
+	r_grade_midGamma         = ri.Cvar_Get("r_grade_midGamma",         "1 1 1", CVAR_ARCHIVE_ND);
+	r_grade_highlightGain    = ri.Cvar_Get("r_grade_highlightGain",    "1 1 1", CVAR_ARCHIVE_ND);
+	r_grade_splitShadow      = ri.Cvar_Get("r_grade_splitShadow",      "0.50 0.50 0.55", CVAR_ARCHIVE_ND);
+	r_grade_splitHighlight   = ri.Cvar_Get("r_grade_splitHighlight",   "1.0 0.95 0.90", CVAR_ARCHIVE_ND);
+	r_grade_splitBalance     = ri.Cvar_Get("r_grade_splitBalance",     "0.50", CVAR_ARCHIVE_ND);
+	r_grade_splitStrength    = ri.Cvar_Get("r_grade_splitStrength",    "0.0",  CVAR_ARCHIVE_ND);
+	r_grade_lut              = ri.Cvar_Get("r_grade_lut",              "",     CVAR_ARCHIVE_ND);
+	r_grade_lutIntensity     = ri.Cvar_Get("r_grade_lutIntensity",     "1.0",  CVAR_ARCHIVE_ND);
 	ri.Cvar_CheckRange( r_sharpen, "0.0", "1.5", CV_FLOAT );
+	ri.Cvar_CheckRange( r_grade_toe, "0.0", "1.0", CV_FLOAT );
+	ri.Cvar_CheckRange( r_grade_shoulder, "0.0", "1.0", CV_FLOAT );
+	ri.Cvar_CheckRange( r_grade_whitePoint, "0.5", "32.0", CV_FLOAT );
+	ri.Cvar_CheckRange( r_grade_blackClip, "0.0", "0.25", CV_FLOAT );
+	ri.Cvar_CheckRange( r_grade_highlightDesat, "0.0", "1.0", CV_FLOAT );
+	ri.Cvar_CheckRange( r_grade_temperature, "-1.0", "1.0", CV_FLOAT );
+	ri.Cvar_CheckRange( r_grade_tint, "-1.0", "1.0", CV_FLOAT );
+	ri.Cvar_CheckRange( r_grade_exposureBias, "-4.0", "4.0", CV_FLOAT );
+	ri.Cvar_CheckRange( r_grade_contrast, "0.25", "4.0", CV_FLOAT );
+	ri.Cvar_CheckRange( r_grade_contrastPivot, "0.1", "0.9", CV_FLOAT );
+	ri.Cvar_CheckRange( r_grade_saturation, "0.0", "3.0", CV_FLOAT );
+	ri.Cvar_CheckRange( r_grade_vibrance, "-1.0", "1.0", CV_FLOAT );
+	ri.Cvar_CheckRange( r_grade_splitBalance, "0.0", "1.0", CV_FLOAT );
+	ri.Cvar_CheckRange( r_grade_splitStrength, "0.0", "1.0", CV_FLOAT );
+	ri.Cvar_CheckRange( r_grade_lutIntensity, "0.0", "1.0", CV_FLOAT );
 
 	ri.Cvar_SetDescription( r_vignette, "Vignette strength for post-processing lens darkening." );
 	ri.Cvar_SetDescription( r_vignette_radius, "Vignette inner radius before edge darkening starts." );
@@ -135,6 +229,48 @@ void PostFX_RegisterCvars(void) {
 	ri.Cvar_SetDescription( r_dofAperture, "Depth of field aperture scale; higher values increase blur." );
 	ri.Cvar_SetDescription( r_dofMaxBlur, "Maximum depth of field blur radius in pixels." );
 	ri.Cvar_SetDescription( r_sharpen, "Post-process sharpen strength (0=off, 0.15=subtle, 0.3+=strong). Recovers detail lost by AA/tonemap." );
+	ri.Cvar_SetDescription( r_grade_toe, "Filmic tonemap toe strength for shadow rolloff." );
+	ri.Cvar_SetDescription( r_grade_shoulder, "Filmic tonemap shoulder strength for highlight compression." );
+	ri.Cvar_SetDescription( r_grade_whitePoint, "Filmic tonemap white point in scene-linear units." );
+	ri.Cvar_SetDescription( r_grade_blackClip, "Scene-linear black clip before tonemapping." );
+	ri.Cvar_SetDescription( r_grade_highlightDesat, "Highlight desaturation amount after filmic compression." );
+	ri.Cvar_SetDescription( r_grade_temperature, "White balance temperature adjustment (-1=cool, +1=warm)." );
+	ri.Cvar_SetDescription( r_grade_tint, "White balance tint adjustment (-1=green, +1=magenta)." );
+	ri.Cvar_SetDescription( r_grade_exposureBias, "Extra exposure bias in EV applied in the post pipeline." );
+	ri.Cvar_SetDescription( r_grade_contrast, "Primary post contrast multiplier." );
+	ri.Cvar_SetDescription( r_grade_contrastPivot, "Contrast pivot in display-referred space." );
+	ri.Cvar_SetDescription( r_grade_saturation, "Primary post saturation multiplier." );
+	ri.Cvar_SetDescription( r_grade_vibrance, "Selective saturation boost for muted colors." );
+	ri.Cvar_SetDescription( r_grade_shadowLift, "Shadow lift RGB vector, formatted as 'r g b'." );
+	ri.Cvar_SetDescription( r_grade_midGamma, "Midtone gamma RGB vector, formatted as 'r g b'." );
+	ri.Cvar_SetDescription( r_grade_highlightGain, "Highlight gain RGB vector, formatted as 'r g b'." );
+	ri.Cvar_SetDescription( r_grade_splitShadow, "Split-tone shadow tint RGB, formatted as 'r g b'." );
+	ri.Cvar_SetDescription( r_grade_splitHighlight, "Split-tone highlight tint RGB, formatted as 'r g b'." );
+	ri.Cvar_SetDescription( r_grade_splitBalance, "Split-tone balance between shadows and highlights." );
+	ri.Cvar_SetDescription( r_grade_splitStrength, "Split-tone blend strength." );
+	ri.Cvar_SetDescription( r_grade_lut, "Path to a 32x32x32 LUT packed as a 2D strip texture." );
+	ri.Cvar_SetDescription( r_grade_lutIntensity, "Blend strength for the active LUT." );
+	ri.Cvar_SetGroup( r_grade_toe, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_grade_shoulder, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_grade_whitePoint, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_grade_blackClip, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_grade_highlightDesat, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_grade_temperature, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_grade_tint, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_grade_exposureBias, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_grade_contrast, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_grade_contrastPivot, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_grade_saturation, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_grade_vibrance, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_grade_shadowLift, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_grade_midGamma, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_grade_highlightGain, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_grade_splitShadow, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_grade_splitHighlight, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_grade_splitBalance, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_grade_splitStrength, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_grade_lut, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_grade_lutIntensity, CVG_RENDERER );
 
 	ri.Printf(PRINT_ALL, "PostFX: cvars registered (SSR %s, Atmosphere %s, VegWind %s)\n",
 		r_ssr->integer ? "on" : "off",
@@ -177,33 +313,50 @@ void PostFX_VegWind_GetWindDir(float *x, float *y, float *z) {
 }
 float PostFX_VegWind_GetWindStrength(void) { return r_vegWind_strength ? r_vegWind_strength->value : 1.0f; }
 
-static float lastVignette = 0, lastVigRadius = 0, lastChromAb = 0, lastGrain = 0, lastSharpen = 0;
-static int lastFilmLook = 0;
-static float lastPostContrast = 1.0f, lastPostSaturation = 1.0f;
+static int lastBloomState = -1;
+static int lastSSAOState = -1;
+static int lastSMAAState = -1;
+static int lastSSRState = -1;
+static int lastOITState = -1;
 
 qboolean PostFX_NeedsPipelineUpdate(void) {
-	float v = r_vignette ? r_vignette->value : 0;
-	float vr = r_vignette_radius ? r_vignette_radius->value : 0;
-	float c = r_chromaticAberration ? r_chromaticAberration->value : 0;
-	float g = r_filmGrain ? r_filmGrain->value : 0;
-	float s = r_sharpen ? r_sharpen->value : 0;
-	int filmLook = ( r_filmLook && r_filmLook->integer ) ? 1 : 0;
-	cvar_t *r_post_contrast = ri.Cvar_Get( "r_post_contrast", "1.0", 0 );
-	cvar_t *r_post_saturation = ri.Cvar_Get( "r_post_saturation", "1.0", 0 );
-	float pc = ( r_post_contrast && r_post_contrast->value > 0.0f ) ? r_post_contrast->value : 1.0f;
-	float ps = ( r_post_saturation && r_post_saturation->value >= 0.0f ) ? r_post_saturation->value : 1.0f;
-	if (v != lastVignette || vr != lastVigRadius || c != lastChromAb || g != lastGrain || filmLook != lastFilmLook ||
-	    s != lastSharpen || pc != lastPostContrast || ps != lastPostSaturation) {
-		lastVignette = v;
-		lastVigRadius = vr;
-		lastChromAb = c;
-		lastGrain = g;
-		lastSharpen = s;
-		lastFilmLook = filmLook;
-		lastPostContrast = pc;
-		lastPostSaturation = ps;
+	return qfalse;
+}
+
+qboolean PostFX_PostPipelinesNeedUpdate(void) {
+	int bloomState = ( r_bloom && r_bloom->integer ) ? 1 : 0;
+	int ssaoState = ( r_ssao && r_ssao->integer ) ? 1 : 0;
+	int smaaState = ( r_ext_smaa && r_ext_smaa->integer ) ? 1 : 0;
+	int ssrState = ( r_ssr && r_ssr->integer ) ? 1 : 0;
+	int oitState = ( r_oit && r_oit->integer ) ? 1 : 0;
+
+	if ( ( r_bloom && r_bloom->modified ) ||
+		( r_bloom_threshold && r_bloom_threshold->modified ) ||
+		( r_bloom_threshold_mode && r_bloom_threshold_mode->modified ) ||
+		( r_bloom_modulate && r_bloom_modulate->modified ) ||
+		( r_bloomKnee && r_bloomKnee->modified ) ||
+		( r_ssao && r_ssao->modified ) ||
+		( r_ext_smaa && r_ext_smaa->modified ) ||
+		( r_oit && r_oit->modified ) )
+	{
+		lastBloomState = bloomState;
+		lastSSAOState = ssaoState;
+		lastSMAAState = smaaState;
+		lastSSRState = ssrState;
+		lastOITState = oitState;
 		return qtrue;
 	}
+
+	if ( bloomState != lastBloomState || ssaoState != lastSSAOState || smaaState != lastSMAAState ||
+		ssrState != lastSSRState || oitState != lastOITState ) {
+		lastBloomState = bloomState;
+		lastSSAOState = ssaoState;
+		lastSMAAState = smaaState;
+		lastSSRState = ssrState;
+		lastOITState = oitState;
+		return qtrue;
+	}
+
 	return qfalse;
 }
 
@@ -222,3 +375,67 @@ float PostFX_DepthOfField_GetFocusRange(void) { return r_dofFocusRange ? r_dofFo
 float PostFX_DepthOfField_GetAperture(void) { return r_dofAperture ? r_dofAperture->value : 1.4f; }
 float PostFX_DepthOfField_GetMaxBlur(void) { return r_dofMaxBlur ? r_dofMaxBlur->value : 18.0f; }
 float PostFX_GetSharpen(void) { return r_sharpen ? r_sharpen->value : 0.0f; }
+float PostFX_GetGradeToe(void) { return r_grade_toe ? r_grade_toe->value : 0.35f; }
+float PostFX_GetGradeShoulder(void) { return r_grade_shoulder ? r_grade_shoulder->value : 0.22f; }
+float PostFX_GetGradeWhitePoint(void) { return r_grade_whitePoint ? r_grade_whitePoint->value : 6.5f; }
+float PostFX_GetGradeBlackClip(void) { return r_grade_blackClip ? r_grade_blackClip->value : 0.0f; }
+float PostFX_GetGradeHighlightDesat(void) { return r_grade_highlightDesat ? r_grade_highlightDesat->value : 0.18f; }
+float PostFX_GetGradeTemperature(void) { return r_grade_temperature ? r_grade_temperature->value : 0.0f; }
+float PostFX_GetGradeTint(void) { return r_grade_tint ? r_grade_tint->value : 0.0f; }
+float PostFX_GetGradeExposureBias(void) { return r_grade_exposureBias ? r_grade_exposureBias->value : 0.0f; }
+float PostFX_GetGradeContrast(void) { return r_grade_contrast ? r_grade_contrast->value : 1.0f; }
+float PostFX_GetGradeContrastPivot(void) { return r_grade_contrastPivot ? r_grade_contrastPivot->value : 0.38f; }
+float PostFX_GetGradeSaturation(void) { return r_grade_saturation ? r_grade_saturation->value : 1.0f; }
+float PostFX_GetGradeVibrance(void) { return r_grade_vibrance ? r_grade_vibrance->value : 0.15f; }
+void PostFX_GetShadowLift(float *rgb) {
+	vec3_t parsed;
+	PostFX_ParseRGBOrDefault( r_grade_shadowLift, parsed, 0.0f, 0.0f, 0.0f );
+	if ( rgb ) {
+		rgb[0] = parsed[0];
+		rgb[1] = parsed[1];
+		rgb[2] = parsed[2];
+	}
+}
+void PostFX_GetMidGamma(float *rgb) {
+	vec3_t parsed;
+	PostFX_ParseRGBOrDefault( r_grade_midGamma, parsed, 1.0f, 1.0f, 1.0f );
+	if ( rgb ) {
+		rgb[0] = parsed[0];
+		rgb[1] = parsed[1];
+		rgb[2] = parsed[2];
+	}
+}
+void PostFX_GetHighlightGain(float *rgb) {
+	vec3_t parsed;
+	PostFX_ParseRGBOrDefault( r_grade_highlightGain, parsed, 1.0f, 1.0f, 1.0f );
+	if ( rgb ) {
+		rgb[0] = parsed[0];
+		rgb[1] = parsed[1];
+		rgb[2] = parsed[2];
+	}
+}
+void PostFX_GetSplitShadow(float *rgb) {
+	vec3_t parsed;
+	PostFX_ParseRGBOrDefault( r_grade_splitShadow, parsed, 0.50f, 0.50f, 0.55f );
+	if ( rgb ) {
+		rgb[0] = parsed[0];
+		rgb[1] = parsed[1];
+		rgb[2] = parsed[2];
+	}
+}
+void PostFX_GetSplitHighlight(float *rgb) {
+	vec3_t parsed;
+	PostFX_ParseRGBOrDefault( r_grade_splitHighlight, parsed, 1.0f, 0.95f, 0.90f );
+	if ( rgb ) {
+		rgb[0] = parsed[0];
+		rgb[1] = parsed[1];
+		rgb[2] = parsed[2];
+	}
+}
+float PostFX_GetSplitBalance(void) { return r_grade_splitBalance ? r_grade_splitBalance->value : 0.5f; }
+float PostFX_GetSplitStrength(void) { return r_grade_splitStrength ? r_grade_splitStrength->value : 0.0f; }
+float PostFX_GetLUTIntensity(void) { return r_grade_lutIntensity ? r_grade_lutIntensity->value : 1.0f; }
+image_t *PostFX_GetLUTImage(void) {
+	PostFX_UpdateLUTImage();
+	return s_postfx_lut_image ? s_postfx_lut_image : tr.whiteImage;
+}
