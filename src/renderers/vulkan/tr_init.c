@@ -2515,12 +2515,12 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_bloomKnee, "Soft knee for the bloom extractor to control highlight rolloff." );
 	ri.Cvar_SetGroup( r_bloomKnee, CVG_RENDERER );
 
-	r_exposure = ri.Cvar_Get( "r_exposure", "1.15", CVAR_ARCHIVE_ND );
+	r_exposure = ri.Cvar_Get( "r_exposure", "1.0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_exposure, "0.01", "10.0", CV_FLOAT );
 	ri.Cvar_SetDescription( r_exposure, "Linear exposure multiplier applied before tonemapping." );
 	ri.Cvar_SetGroup( r_exposure, CVG_RENDERER );
 
-	r_hdr_lightmap_scale = ri.Cvar_Get( "r_hdr_lightmap_scale", "2.0", CVAR_ARCHIVE_ND );
+	r_hdr_lightmap_scale = ri.Cvar_Get( "r_hdr_lightmap_scale", "1.0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_hdr_lightmap_scale, "0.5", "8.0", CV_FLOAT );
 	ri.Cvar_SetDescription( r_hdr_lightmap_scale, "HDR lightmap intensity scale. 8-bit lightmaps multiplied by this for HDR-like brightness (1=normal, 2+=brighter)." );
 	ri.Cvar_SetGroup( r_hdr_lightmap_scale, CVG_RENDERER );
@@ -2535,7 +2535,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_pre_exposure_scale, "Pre-exposure scale for bloom/tonemap pipeline. 1.0=neutral; use for HDR pipeline tweaks." );
 	ri.Cvar_SetGroup( r_pre_exposure_scale, CVG_RENDERER );
 
-	r_exposure_auto = ri.Cvar_Get( "r_exposure_auto", "1", CVAR_ARCHIVE_ND );
+	r_exposure_auto = ri.Cvar_Get( "r_exposure_auto", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_exposure_auto, "Eye adaptation: 0=manual r_exposure, 1=temporal adaptation toward r_exposure_auto_target. Luminance pass planned." );
 	ri.Cvar_SetGroup( r_exposure_auto, CVG_RENDERER );
 	{
@@ -2564,8 +2564,8 @@ static void R_Register( void )
 	ri.Cvar_SetGroup( r_post_debug, CVG_RENDERER );
 
 	{
-		cvar_t *r_post_contrast = ri.Cvar_Get( "r_post_contrast", "0.92", CVAR_ARCHIVE_ND );
-		cvar_t *r_post_saturation = ri.Cvar_Get( "r_post_saturation", "1.05", CVAR_ARCHIVE_ND );
+		cvar_t *r_post_contrast = ri.Cvar_Get( "r_post_contrast", "1.0", CVAR_ARCHIVE_ND );
+		cvar_t *r_post_saturation = ri.Cvar_Get( "r_post_saturation", "1.0", CVAR_ARCHIVE_ND );
 		ri.Cvar_CheckRange( r_post_contrast, "0.25", "4.0", CV_FLOAT );
 		ri.Cvar_CheckRange( r_post_saturation, "0.0", "3.0", CV_FLOAT );
 		ri.Cvar_SetDescription( r_post_contrast, "Post-process contrast (1.0=neutral, >1=punchier, <1=flatter)." );
@@ -2579,7 +2579,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_rpi_profile, "Raspberry Pi (V3DV) performance preset. When 1, disables SSAO, volumetric fog, bloom, SMAA, SSR, fog fluid at Vulkan init. Requires vid_restart." );
 	ri.Cvar_SetGroup( r_rpi_profile, CVG_RENDERER );
 
-	r_volumetricFog = ri.Cvar_Get( "r_volumetricFog", "1", CVAR_ARCHIVE_ND );
+	r_volumetricFog = ri.Cvar_Get( "r_volumetricFog", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_volumetricFog, "Enable the volumetric fog compute/composite passes before tonemapping. Requires r_fbo 1." );
 	ri.Cvar_SetGroup( r_volumetricFog, CVG_RENDERER );
 
@@ -3075,7 +3075,7 @@ static void R_Register( void )
 	r_hdr = ri.Cvar_Get( "r_hdr", "2", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_hdr, "-1", "3", CV_INTEGER );
 	ri.Cvar_SetDescription(r_hdr, "HDR frame buffer format. Requires \\r_fbo 1.\n -1: 4-bit (B4G4R4A4), testing only\n  0: 8-bit, moderate banding\n  1: 16-bit float (RGBA16F)\n  2: 32-bit float (RGBA32F), default, fallback to 16F if unsupported\n  3: 64-bit float (RGBA64F), optional; falls back to 32F (glslang lacks dvec4 fragment output support)\n" );
-	r_bloom = ri.Cvar_Get( "r_bloom", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	r_bloom = ri.Cvar_Get( "r_bloom", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_bloom, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription(r_bloom, "Enables bloom post-processing effect. Requires \\r_fbo 1.");
 

@@ -79,7 +79,7 @@ void PostFX_RegisterCvars(void) {
 	r_ssr_maxDepthGradient   = ri.Cvar_Get("r_ssr_maxDepthGradient",   "0.08", CVAR_ARCHIVE);
 	ri.Cvar_SetDescription( r_ssr_maxDepthGradient, "Skip SSR at depth edges (object silhouettes, horizon) to reduce thin line artifacts. Lower = stricter." );
 
-	r_atmosphere             = ri.Cvar_Get("r_atmosphere",             "1",    CVAR_ARCHIVE);
+	r_atmosphere             = ri.Cvar_Get("r_atmosphere",             "0",    CVAR_ARCHIVE);
 	ri.Cvar_SetDescription( r_atmosphere, "Atmospheric scattering for sky and fog. Requires r_fbo 1." );
 	r_atmosphere_sunDirX     = ri.Cvar_Get("r_atmosphere_sunDirX",     "0.3",  CVAR_ARCHIVE);
 	r_atmosphere_sunDirY     = ri.Cvar_Get("r_atmosphere_sunDirY",     "0.8",  CVAR_ARCHIVE);

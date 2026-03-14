@@ -1647,6 +1647,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 #ifdef USE_VK_PBR
 		if ( !is_pbr_surface && pStage->vk_pbr_flags ) {
 			def.vk_pbr_flags = 0;
+			def.lightmap_bundle = -1;
 			pipeline = vk_find_pipeline_ext( 0, &def, qfalse );
 		}
 #endif

@@ -3483,6 +3483,20 @@ static void FixRenderCommandList( int newShader ) {
 	}
 }
 
+#ifdef USE_VK_PBR
+static int R_VkLightmapBundleIndex( const shaderStage_t *stage ) {
+	int bundle;
+
+	for ( bundle = 0; bundle < (int)ARRAY_LEN( stage->bundle ); bundle++ ) {
+		if ( stage->bundle[ bundle ].lightmap != LIGHTMAP_INDEX_NONE ) {
+			return bundle;
+		}
+	}
+
+	return -1;
+}
+#endif
+
 
 static qboolean EqualACgen( const shaderStage_t *st1, const shaderStage_t *st2 )
 {
@@ -4246,6 +4260,7 @@ static shader_t *FinishShader( void ) {
 			shaderStage_t *pStage = &stages[i];
 			def.state_bits = pStage->stateBits;
 			def.vk_pbr_flags = 0;
+			def.lightmap_bundle = -1;
 			def.allow_discard = ( (pStage->stateBits & GLS_DEPTHMASK_TRUE) == 0 ) ? 1 : 0;
 
 			if ( pStage->mtEnv3 ) {
@@ -4440,13 +4455,16 @@ static shader_t *FinishShader( void ) {
 			if ( pStage->vk_pbr_flags && def.shader_type >= TYPE_GENERIC_BEGIN  )
 			{
 			#ifdef USE_VK_PBR
+				const int lightmapBundle = R_VkLightmapBundleIndex( pStage );
+
 				def.vk_pbr_flags = pStage->vk_pbr_flags;
 				pStage->tessFlags |= TESS_PBR;
 				shader.hasPBR = qtrue;
 
-				if ( hasLightmapStage )
+				if ( lightmapBundle >= 0 )
 				{
 					def.vk_pbr_flags |= PBR_HAS_LIGHTMAP;
+					def.lightmap_bundle = lightmapBundle;
 				}
 
 #ifdef HDR_DELUXE_LIGHTMAP

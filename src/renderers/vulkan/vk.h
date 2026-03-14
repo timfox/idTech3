@@ -233,6 +233,7 @@ typedef struct {
 
 #ifdef USE_VK_PBR
 	uint32_t				vk_pbr_flags;
+	int32_t					lightmap_bundle;
 	vec4_t					specularScale;
 	vec4_t					normalScale;
 #endif
