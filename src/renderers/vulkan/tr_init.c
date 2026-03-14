@@ -2548,9 +2548,9 @@ static void R_Register( void )
 		ri.Cvar_SetDescription( exp_cap_cut, "Max exposure on camera cut (e.g. death). Reduces blowout when view suddenly jumps to bright sky. 0=disable cap." );
 	}
 
-	r_tonemap = ri.Cvar_Get( "r_tonemap", "2", CVAR_ARCHIVE_ND );
+	r_tonemap = ri.Cvar_Get( "r_tonemap", "3", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_tonemap, "0", "4", CV_INTEGER );
-	ri.Cvar_SetDescription( r_tonemap, "Tonemapping: 0=off, 1=Reinhard, 2=ACES, 3=Filmic (Hable/Uncharted2), 4=AgX (punchy, saturated)." );
+	ri.Cvar_SetDescription( r_tonemap, "Tonemapping: 0=off, 1=Reinhard, 2=ACES, 3=Filmic (Hable/Uncharted2, default), 4=AgX (punchy, saturated)." );
 	ri.Cvar_SetGroup( r_tonemap, CVG_RENDERER );
 
 	r_post = ri.Cvar_Get( "r_post", "1", CVAR_ARCHIVE_ND );
