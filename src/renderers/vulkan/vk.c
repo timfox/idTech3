@@ -4006,6 +4006,7 @@ void vk_initialize( void )
 		set_layouts[0] = vk.set_layout_sampler;        // color sampler
 		set_layouts[1] = vk.set_layout_sampler;        // depth / secondary sampler
 		set_layouts[2] = vk.set_layout_postfx_uniform; // per-frame postfx params
+		set_layouts[3] = vk.set_layout_sampler;        // grading LUT sampler
 
 		push_range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 		push_range.offset = 0;
@@ -4014,7 +4015,7 @@ void vk_initialize( void )
 		desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		desc.pNext = NULL;
 		desc.flags = 0;
-		desc.setLayoutCount = 3;
+		desc.setLayoutCount = 4;
 		desc.pSetLayouts = set_layouts;
 		desc.pushConstantRangeCount = 1;
 		desc.pPushConstantRanges = &push_range;

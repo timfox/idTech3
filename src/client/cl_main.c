@@ -3647,6 +3647,15 @@ void CL_StartHunkUsers( void ) {
 					Cbuf_AddText( "\n" );
 				}
 			}
+
+			{
+				const char *postCfg = va( "maps/%s.post.cfg", mapname );
+				if ( FS_FileExists( postCfg ) ) {
+					Cbuf_AddText( va( "exec %s\n", postCfg ) );
+				} else if ( FS_FileExists( "maps/default.post.cfg" ) ) {
+					Cbuf_AddText( "exec maps/default.post.cfg\n" );
+				}
+			}
 		}
 	}
 
