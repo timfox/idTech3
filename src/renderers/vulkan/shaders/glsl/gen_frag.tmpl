@@ -196,6 +196,31 @@ vec3 lightmapDecode( vec3 c ) {
 	return mix( c / 12.92, pow( ( c + 0.055 ) / 1.055, vec3( 2.4 ) ), step( 0.04045, c ) );
 }
 
+vec2 lightmapTexCoord( void ) {
+#if defined(USE_TX2)
+	if ( lightmap_texture_set == 2 )
+		return frag_tex_coord2;
+#endif
+#if defined(USE_TX1)
+	if ( lightmap_texture_set == 1 )
+		return frag_tex_coord1;
+#endif
+	return frag_tex_coord0;
+}
+
+vec3 sampleLightmap( void ) {
+	const vec2 uv = lightmapTexCoord();
+#if defined(USE_TX2)
+	if ( lightmap_texture_set == 2 )
+		return texture( texture2, uv ).rgb;
+#endif
+#if defined(USE_TX1)
+	if ( lightmap_texture_set == 1 )
+		return texture( texture1, uv ).rgb;
+#endif
+	return texture( texture0, uv ).rgb;
+}
+
 vec3 CalcNormal( in vec3 vertexNormal, in vec4 vertexTangent, in vec2 frag_tex_coord )
 {
 	if ( normal_texture_set >= 0 ) {
@@ -882,7 +907,8 @@ void main() {
 
 	#if ( defined(USE_TX1) || defined(USE_TX2) )
 		if ( lightmap_texture_set >= 0 ) {
-			vec3 raw = texture(texture1, frag_tex_coord1).rgb;
+			const vec2 lmUv = lightmapTexCoord();
+			vec3 raw = sampleLightmap();
 			if ( lightmap_srgb_decode > 0 )
 				raw = lightmapDecode( raw );
 			vec3 lightmapColor = raw * lightmap_scale;
@@ -891,7 +917,7 @@ void main() {
 			diffuse = color0;
 
 			if ( deluxe_mapping > 0 )
-				L = ( texture(deluxe_texture, frag_tex_coord1).rgb - vec3(0.5) );
+				L = ( texture(deluxe_texture, lmUv).rgb - vec3(0.5) );
 		}
 		else {
 			lightColor = bias_color;

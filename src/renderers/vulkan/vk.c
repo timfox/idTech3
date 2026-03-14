@@ -8467,7 +8467,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 		frag_spec_data.env_texture_set = 0;
 
 	if ( def->vk_pbr_flags & PBR_HAS_LIGHTMAP )
-		frag_spec_data.lightmap_texture_set = 0;
+		frag_spec_data.lightmap_texture_set = def->lightmap_bundle;
 
 	if ( def->vk_pbr_flags & PBR_HAS_IRRADIANCE )
 		frag_spec_data.irradiance_texture_set = 0;
