@@ -2073,4 +2073,12 @@ if(BUILD_UNIT_TESTS)
 	target_include_directories(unit_macros PRIVATE ${CMAKE_SOURCE_DIR}/src)
 	add_test(NAME unit_macros COMMAND unit_macros)
 	set_tests_properties(unit_macros PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_vm_native_loader
+		tests/unit/test_vm_native_loader.c
+		src/qcommon/vm_native_loader.c
+	)
+	target_include_directories(unit_vm_native_loader PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	add_test(NAME unit_vm_native_loader COMMAND unit_vm_native_loader)
+	set_tests_properties(unit_vm_native_loader PROPERTIES LABELS "unit;validation")
 endif()

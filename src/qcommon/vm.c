@@ -35,6 +35,7 @@ and one exported function: Perform
 */
 
 #include "vm_local.h"
+#include "vm_native_loader.h"
 
 opcode_info_t ops[ OP_MAX ] =
 {
@@ -1720,25 +1721,20 @@ TTimo: added some verbosity in debug
 =================
 */
 static void *VM_TryLoadNativeModule( const char *moduleName, char *filename, int filenameSize ) {
-	void		*libHandle;
+	int candidateIndex;
 
-	Com_sprintf( filename, filenameSize, "%s.so", moduleName );
-	libHandle = FS_LoadLibrary( filename );
-	if ( libHandle ) {
-		return libHandle;
+	for ( candidateIndex = 0; candidateIndex < VM_NATIVE_MODULE_CANDIDATE_COUNT; ++candidateIndex ) {
+		void *libHandle;
+		if ( !VM_BuildNativeModuleCandidate( moduleName, candidateIndex, filename, filenameSize ) ) {
+			continue;
+		}
+		libHandle = FS_LoadLibrary( filename );
+		if ( libHandle ) {
+			return libHandle;
+		}
 	}
 
-	/* module.arch.so (e.g. client.aarch64.so, ui.x86_64.so) */
-	Com_sprintf( filename, filenameSize, "%s." ARCH_STRING DLL_EXT, moduleName );
-	libHandle = FS_LoadLibrary( filename );
-	if ( libHandle ) {
-		return libHandle;
-	}
-
-	/* modulearch.so (e.g. clientaarch64.so, uix86_64.so) */
-	Com_sprintf( filename, filenameSize, "%s" ARCH_STRING DLL_EXT, moduleName );
-	libHandle = FS_LoadLibrary( filename );
-	return libHandle;
+	return NULL;
 }
 
 static void * QDECL loadNative( const char *name, vmMainFunc_t *entryPoint, dllSyscall_t systemcalls ) {
