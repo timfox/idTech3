@@ -3,6 +3,7 @@
  * Run: ctest -R unit_vm_native_loader
  */
 #include <stdio.h>
+#include <stdarg.h>
 #include <string.h>
 
 #include "qcommon/vm_native_loader.h"
@@ -13,6 +14,33 @@
 		return 1; \
 	} \
 } while (0)
+
+/*
+ * Standalone unit target shim for vm_native_loader.c:
+ * provide Com_sprintf without linking the full engine runtime.
+ */
+int QDECL Com_sprintf( char *dest, int size, const char *fmt, ... ) {
+	int written;
+	va_list args;
+
+	va_start( args, fmt );
+	written = vsnprintf( dest, (size_t)size, fmt, args );
+	va_end( args );
+
+	if ( written < 0 ) {
+		if ( size > 0 ) {
+			dest[0] = '\0';
+		}
+		return 0;
+	}
+
+	if ( written >= size && size > 0 ) {
+		dest[size - 1] = '\0';
+		return size - 1;
+	}
+
+	return written;
+}
 
 static int test_candidate_order(void) {
 	char candidate[128];
