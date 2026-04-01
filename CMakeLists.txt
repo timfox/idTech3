@@ -2073,4 +2073,10 @@ if(BUILD_UNIT_TESTS)
 	target_include_directories(unit_macros PRIVATE ${CMAKE_SOURCE_DIR}/src)
 	add_test(NAME unit_macros COMMAND unit_macros)
 	set_tests_properties(unit_macros PROPERTIES LABELS "unit;validation")
+
+	add_test(NAME test_run_vulkan_path_resolution
+		COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_run_vulkan_path_resolution.sh
+			${CMAKE_SOURCE_DIR}/scripts/run_vulkan.sh
+		WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+	set_tests_properties(test_run_vulkan_path_resolution PROPERTIES LABELS "unit;scripts;validation")
 endif()
