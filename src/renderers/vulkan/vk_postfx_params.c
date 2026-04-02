@@ -2,6 +2,7 @@
 #include "vk.h"
 #include "vk_postfx.h"
 #include "vk_postfx_params.h"
+#include "vk_postfx_sanitize.h"
 #include "vk_temporal.h"
 #include "vk_util.h"
 #include <math.h>
@@ -121,20 +122,24 @@ void vk_update_postfx_params( uint32_t cmd_index )
 	r_localExposure_strength = ri.Cvar_Get( "r_localExposure_strength", "0.35", 0 );
 	r_localExposure_shadowClamp = ri.Cvar_Get( "r_localExposure_shadowClamp", "1.5", 0 );
 	r_localExposure_highlightClamp = ri.Cvar_Get( "r_localExposure_highlightClamp", "1.5", 0 );
-	params.autoExposureParams[0] = vk.temporal.hasValidLuminance ? vk.temporal.filteredAvgLogLuminance :
-		log2f( fmaxf( 1e-4f, ( r_autoExposure_target ? r_autoExposure_target->value : 1.0f ) /
-			fmaxf( r_exposure ? r_exposure->value : 1.0f, 1e-4f ) ) );
-	params.autoExposureParams[1] = fmaxf( r_autoExposure_target ? r_autoExposure_target->value : 1.0f, 1e-4f );
-	params.autoExposureParams[2] = fmaxf( r_autoExposure_min ? r_autoExposure_min->value : 0.5f, 0.01f );
-	params.autoExposureParams[3] = fmaxf( r_autoExposure_max ? r_autoExposure_max->value : 4.0f, params.autoExposureParams[2] );
+	vk_postfx_sanitize_auto_exposure_params(
+		vk.temporal.hasValidLuminance ? 1 : 0,
+		vk.temporal.filteredAvgLogLuminance,
+		r_autoExposure_target ? r_autoExposure_target->value : 1.0f,
+		r_exposure ? r_exposure->value : 1.0f,
+		r_autoExposure_min ? r_autoExposure_min->value : 0.5f,
+		r_autoExposure_max ? r_autoExposure_max->value : 4.0f,
+		params.autoExposureParams );
 	params.localExposureParams[0] = ( r_localExposure && r_localExposure->integer ) ? 1.0f : 0.0f;
 	params.localExposureParams[1] = Com_Clamp( 0.0f, 1.0f, r_localExposure_strength ? r_localExposure_strength->value : 0.35f );
 	params.localExposureParams[2] = Com_Clamp( 0.0f, 3.0f, r_localExposure_shadowClamp ? r_localExposure_shadowClamp->value : 1.5f );
 	params.localExposureParams[3] = Com_Clamp( 0.0f, 3.0f, r_localExposure_highlightClamp ? r_localExposure_highlightClamp->value : 1.5f );
-	params.taaParams[0] = vk.temporal.hasValidTAAHistory ? 1.0f : 0.0f;
-	params.taaParams[1] = Com_Clamp( 0.0f, 0.99f, r_taa_feedbackStationary ? r_taa_feedbackStationary->value : 0.92f );
-	params.taaParams[2] = Com_Clamp( 0.0f, 0.99f, r_taa_feedbackMotion ? r_taa_feedbackMotion->value : 0.72f );
-	params.taaParams[3] = Com_Clamp( 0.0f, 1.0f, r_taa_sharpen ? r_taa_sharpen->value : 0.12f );
+	vk_postfx_sanitize_taa_params(
+		vk.temporal.hasValidTAAHistory ? 1 : 0,
+		r_taa_feedbackStationary ? r_taa_feedbackStationary->value : 0.92f,
+		r_taa_feedbackMotion ? r_taa_feedbackMotion->value : 0.72f,
+		r_taa_sharpen ? r_taa_sharpen->value : 0.12f,
+		params.taaParams );
 
 	if ( backEnd.projection2D || !tr.world || backEnd.viewParms.portalView != PV_NONE ) {
 		Com_Memcpy( vk.postfx_params_ptr[cmd_index], &params, sizeof( params ) );

@@ -2073,4 +2073,12 @@ if(BUILD_UNIT_TESTS)
 	target_include_directories(unit_macros PRIVATE ${CMAKE_SOURCE_DIR}/src)
 	add_test(NAME unit_macros COMMAND unit_macros)
 	set_tests_properties(unit_macros PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_vk_postfx_sanitize
+		tests/unit/test_vk_postfx_sanitize.c
+		src/renderers/vulkan/vk_postfx_sanitize.c)
+	target_include_directories(unit_vk_postfx_sanitize PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_link_libraries(unit_vk_postfx_sanitize PRIVATE m)
+	add_test(NAME unit_vk_postfx_sanitize COMMAND unit_vk_postfx_sanitize)
+	set_tests_properties(unit_vk_postfx_sanitize PROPERTIES LABELS "unit;validation")
 endif()
