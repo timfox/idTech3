@@ -103,6 +103,8 @@ Primary entry point:
 
 Artifacts land under `release/` and `build-vk-Release/` (or `build-gl-Release/`). Run tests from the build directory: `ctest` or `make test`.
 
+Renderer discipline: [docs/RENDERER_CONFIDENCE.md](docs/RENDERER_CONFIDENCE.md), headless `./scripts/renderer_regression_check.sh`, visual pack specs under [docs/samples/renderer_regression/](docs/samples/renderer_regression/).
+
 ### Links
 
 * https://idtech3.com

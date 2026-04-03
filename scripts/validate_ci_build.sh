@@ -34,4 +34,8 @@ echo "3. Running smoke test..."
 ./scripts/smoke_test.sh release
 echo ""
 
+echo "4. Renderer regression check (repo + GLSL)..."
+./scripts/renderer_regression_check.sh
+echo ""
+
 echo "=== CI validation passed ==="
