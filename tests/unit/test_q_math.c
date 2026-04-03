@@ -101,14 +101,33 @@ static int test_plane_from_points(void)
 	vec3_t col2 = { 2, 0, 0 };
 	ok = PlaneFromPoints(plane, col0, col1, col2);
 	ASSERT(!ok, "PlaneFromPoints degenerate colinear");
+
+	/* Opposite winding: triangle (0,0,0)-(0,1,0)-(1,0,0) vs (0,0,0)-(1,0,0)-(0,1,0) */
+	vec3_t p0 = { 0, 0, 0 }, p1 = { 0, 1, 0 }, p2 = { 1, 0, 0 };
+	vec4_t pl1, pl2;
+	ASSERT(PlaneFromPoints(pl1, p0, p1, p2), "PlaneFromPoints winding A");
+	ASSERT(PlaneFromPoints(pl2, p0, p2, p1), "PlaneFromPoints winding B");
+	ASSERT_NEAR(pl1[0], -pl2[0], 0.02f, "PlaneFromPoints opposite nx");
+	ASSERT_NEAR(pl1[1], -pl2[1], 0.02f, "PlaneFromPoints opposite ny");
+	ASSERT_NEAR(pl1[2], -pl2[2], 0.02f, "PlaneFromPoints opposite nz");
+	ASSERT_NEAR(pl1[3], -pl2[3], 0.02f, "PlaneFromPoints opposite d");
 	return 0;
 }
 
 static int test_angles(void)
 {
 	ASSERT_NEAR(AngleNormalize360(370.0f), 10.0f, 0.01f, "AngleNormalize360");
+	ASSERT_NEAR(AngleNormalize360(-10.0f), 350.0f, 0.5f, "AngleNormalize360 negative");
+
 	ASSERT_NEAR(AngleNormalize180(190.0f), -170.0f, 0.01f, "AngleNormalize180");
+	ASSERT_NEAR(AngleNormalize180(-190.0f), 170.0f, 0.01f, "AngleNormalize180 negative");
+
 	ASSERT_NEAR(AngleDelta(10.0f, 350.0f), 20.0f, 0.01f, "AngleDelta wrap");
+	ASSERT_NEAR(AngleDelta(45.0f, 45.0f), 0.0f, 0.01f, "AngleDelta equal");
+
+	/* AngleMod snaps to 360/65536 grid */
+	float am = AngleMod(90.0f);
+	ASSERT_NEAR(am, 90.0f, 0.05f, "AngleMod 90");
 	return 0;
 }
 
@@ -184,6 +203,16 @@ static int test_plane_signbits_box(void)
 
 	pl.dist = 0.0f;
 	ASSERT(BoxOnPlaneSide(emins, emaxs, &pl) == 3, "BoxOnPlaneSide straddle X (dist=0)");
+
+	/* Non-axial: x+y=0 through origin splits [-1,1]^3 */
+	pl.normal[0] = 0.70710678f;
+	pl.normal[1] = 0.70710678f;
+	pl.normal[2] = 0.0f;
+	pl.dist = 0.0f;
+	pl.type = PLANE_NON_AXIAL;
+	SetPlaneSignbits(&pl);
+	int s = BoxOnPlaneSide(emins, emaxs, &pl);
+	ASSERT(s == 1 || s == 2 || s == 3, "BoxOnPlaneSide diagonal valid");
 	return 0;
 }
 
@@ -225,6 +254,39 @@ static int test_plane_type_macro(void)
 	return 0;
 }
 
+static int test_project_perpendicular_make_rotate(void)
+{
+	vec3_t n = { 0, 0, 1 };
+	vec3_t p = { 1, 2, 3 };
+	vec3_t dst;
+	ProjectPointOnPlane(dst, p, n);
+	ASSERT_NEAR(dst[0], 1.0f, 0.001f, "ProjectPointOnPlane xy");
+	ASSERT_NEAR(dst[1], 2.0f, 0.001f, "ProjectPointOnPlane xy");
+	ASSERT_NEAR(dst[2], 0.0f, 0.001f, "ProjectPointOnPlane z");
+
+	vec3_t src = { 1, 0, 0 };
+	vec3_t perp;
+	PerpendicularVector(perp, src);
+	ASSERT_NEAR(DotProduct(perp, src), 0.0f, 0.02f, "PerpendicularVector ortho");
+	ASSERT_NEAR(VectorLength(perp), 1.0f, 0.02f, "PerpendicularVector unit");
+
+	vec3_t fwd = { 0, 0, 1 };
+	vec3_t right, up;
+	MakeNormalVectors(fwd, right, up);
+	ASSERT_NEAR(DotProduct(right, fwd), 0.0f, 0.02f, "MakeNormalVectors r·f");
+	ASSERT_NEAR(DotProduct(up, fwd), 0.0f, 0.02f, "MakeNormalVectors u·f");
+	ASSERT_NEAR(DotProduct(right, up), 0.0f, 0.02f, "MakeNormalVectors r·u");
+
+	vec3_t axis = { 0, 0, 1 };
+	vec3_t pt = { 1, 0, 0 };
+	vec3_t out;
+	RotatePointAroundVector(out, axis, pt, 90.0f);
+	ASSERT_NEAR(out[0], 0.0f, 0.05f, "RotatePointAroundVector 90 x");
+	ASSERT_NEAR(out[1], 1.0f, 0.05f, "RotatePointAroundVector 90 y");
+	ASSERT_NEAR(out[2], 0.0f, 0.05f, "RotatePointAroundVector 90 z");
+	return 0;
+}
+
 int main(void)
 {
 	if (test_clamp()) return 1;
@@ -241,6 +303,7 @@ int main(void)
 	if (test_radius_clear_add_bounds()) return 1;
 	if (test_matrix_multiply()) return 1;
 	if (test_plane_type_macro()) return 1;
+	if (test_project_perpendicular_make_rotate()) return 1;
 
 	printf("PASS: unit_qmath\n");
 	return 0;
