@@ -205,11 +205,6 @@ float WrapLambert( in float NL, in float w )
 	return clamp((NL + w) / pow(1.0 + w, 2.0), 0.0, 1.0);
 }
 
-vec3 Diffuse_Lambert(in vec3 DiffuseColor)
-{
-	return DiffuseColor * (1.0 / PI);
-}
-
 float Pow5( in float x )
 {
 	float x2 = x * x;
@@ -228,11 +223,7 @@ vec3 Diffuse_Burley( in vec3 diffuseColor, in float NE, in float NL, in float LH
 vec3 CalcDiffuse( in vec3 diffuse, in float NE, in float NL,
 	in float LH, in float roughness )
 {
-	// Keep Lambert as a fallback during Disney diffuse rollout.
-	const bool useDisneyDiffuse = true;
-	if ( useDisneyDiffuse )
-		return Diffuse_Burley( diffuse, NE, NL, LH, roughness );
-	return Diffuse_Lambert( diffuse );
+	return Diffuse_Burley( diffuse, NE, NL, LH, roughness );
 }
 
 vec3 F_Schlick( in vec3 SpecularColor, in float VH )
