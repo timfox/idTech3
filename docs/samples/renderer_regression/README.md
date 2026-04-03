@@ -35,6 +35,7 @@ BSP path: `maps/<name>.bsp` inside the pk3.
 3. Pack `maps/*.bsp` (+ needed textures/shaders) into `z_renderer_regression.pk3` and drop into `base/`.
 4. Run through [RENDERER_CONFIDENCE.md](../../RENDERER_CONFIDENCE.md) manual list for each change that touches rendering.
 5. Optional: set `GAME_BASE` and uncomment lines in `OPTIONAL_GAME_ASSETS.txt` so `./scripts/renderer_regression_check.sh` fails CI if a regression map is missing from your content tree.
+6. **Runtime load (Phase D):** with a full `base/` (VM + game data) and `z_renderer_regression.pk3` installed, run `GAME_BASE=/abs/path/to/base ./scripts/renderer_regression_maps.sh` so each `rtest_*` map is exercised through the real dedicated-server path (see script header for `fs_basepath` / `fs_game` behavior).
 
 ## Related
 

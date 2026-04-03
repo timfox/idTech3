@@ -16,6 +16,7 @@ Use this checklist before tagging or publishing a release.
 
 ### Renderer regression (headless)
 - [ ] **Renderer regression check**: `./scripts/renderer_regression_check.sh` (docs + generated shader blobs + recursive GLSL; optional `GAME_BASE=...` with uncommented paths in `docs/samples/renderer_regression/OPTIONAL_GAME_ASSETS.txt` to require BSPs)
+- [ ] **Map load sanity** (when full `base/` + regression pk3 available): `GAME_BASE=/abs/path/to/base ./scripts/renderer_regression_maps.sh`
 - [ ] **Graphics changes**: run the manual short list in [docs/RENDERER_CONFIDENCE.md](RENDERER_CONFIDENCE.md) or the [visual regression pack](samples/renderer_regression/README.md) before release
 
 ### Unit Tests
