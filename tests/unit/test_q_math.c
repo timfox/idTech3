@@ -137,6 +137,94 @@ static int test_dir_byte_roundtrip(void)
 	return 0;
 }
 
+static int test_angle_subtract_lerp(void)
+{
+	ASSERT_NEAR(AngleSubtract(10.0f, 350.0f), 20.0f, 0.01f, "AngleSubtract wrap");
+	vec3_t v1 = { 350.0f, 0, 0 }, v2 = { 10.0f, 0, 0 }, v3;
+	AnglesSubtract(v1, v2, v3);
+	ASSERT_NEAR(v3[0], -20.0f, 0.01f, "AnglesSubtract");
+
+	ASSERT_NEAR(LerpAngle(0.0f, 90.0f, 0.5f), 45.0f, 0.01f, "LerpAngle simple");
+	/* 350 -> 10: to is adjusted to 370, midpoint 360 */
+	ASSERT_NEAR(LerpAngle(350.0f, 10.0f, 0.5f), 360.0f, 0.5f, "LerpAngle across wrap");
+	return 0;
+}
+
+static int test_q_crandom_bounds(void)
+{
+	int s = 42;
+	for (int i = 0; i < 20; i++) {
+		float x = Q_crandom(&s);
+		ASSERT(x >= -1.0f && x <= 1.0f, "Q_crandom range");
+	}
+	return 0;
+}
+
+static int test_plane_signbits_box(void)
+{
+	cplane_t pl;
+	VectorSet(pl.normal, -1.0f, 0.0f, 0.0f);
+	pl.dist = 0.0f;
+	pl.type = PLANE_X;
+	SetPlaneSignbits(&pl);
+	ASSERT(pl.signbits == 1, "SetPlaneSignbits x negative");
+
+	vec3_t emins = { -1, -1, -1 };
+	vec3_t emaxs = { 1, 1, 1 };
+	pl.normal[0] = 1.0f;
+	pl.normal[1] = pl.normal[2] = 0.0f;
+	pl.dist = 2.0f;
+	pl.type = PLANE_X;
+	SetPlaneSignbits(&pl);
+	/* Plane x=2: box [-1,1] entirely on one side -> 2 */
+	ASSERT(BoxOnPlaneSide(emins, emaxs, &pl) == 2, "BoxOnPlaneSide one side X (dist=2)");
+
+	pl.dist = -2.0f;
+	ASSERT(BoxOnPlaneSide(emins, emaxs, &pl) == 1, "BoxOnPlaneSide other side X (dist=-2)");
+
+	pl.dist = 0.0f;
+	ASSERT(BoxOnPlaneSide(emins, emaxs, &pl) == 3, "BoxOnPlaneSide straddle X (dist=0)");
+	return 0;
+}
+
+static int test_radius_clear_add_bounds(void)
+{
+	vec3_t mins = { 0, 0, 0 }, maxs = { 0, 0, 0 };
+	ClearBounds(mins, maxs);
+	vec3_t p = { 3, 4, 0 };
+	AddPointToBounds(p, mins, maxs);
+	ASSERT_NEAR(mins[0], 3.0f, 0.001f, "AddPointToBounds min");
+	ASSERT_NEAR(maxs[0], 3.0f, 0.001f, "AddPointToBounds max");
+	float r = RadiusFromBounds(mins, maxs);
+	ASSERT_NEAR(r, 5.0f, 0.02f, "RadiusFromBounds 3-4-0");
+	return 0;
+}
+
+static int test_matrix_multiply(void)
+{
+	float a[3][3] = { { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 } };
+	float b[3][3] = { { 0, 1, 0 }, { 0, 0, 1 }, { 1, 0, 0 } };
+	float o[3][3];
+	MatrixMultiply(a, b, o);
+	ASSERT_NEAR(o[0][0], 0.0f, 0.001f, "MatrixMultiply I*B row0");
+	ASSERT_NEAR(o[0][1], 1.0f, 0.001f, "MatrixMultiply I*B row0 col1");
+	return 0;
+}
+
+static int test_plane_type_macro(void)
+{
+	vec3_t nx = { 1, 0, 0 };
+	vec3_t ny = { 0, 1, 0 };
+	vec3_t nz = { 0, 0, 1 };
+	vec3_t d = { 1, 1, 1 };
+	VectorNormalize(d);
+	ASSERT(PlaneTypeForNormal(nx) == PLANE_X, "PlaneTypeForNormal X");
+	ASSERT(PlaneTypeForNormal(ny) == PLANE_Y, "PlaneTypeForNormal Y");
+	ASSERT(PlaneTypeForNormal(nz) == PLANE_Z, "PlaneTypeForNormal Z");
+	ASSERT(PlaneTypeForNormal(d) == PLANE_NON_AXIAL, "PlaneTypeForNormal diagonal");
+	return 0;
+}
+
 int main(void)
 {
 	if (test_clamp()) return 1;
@@ -147,6 +235,12 @@ int main(void)
 	if (test_angles()) return 1;
 	if (test_bounds()) return 1;
 	if (test_dir_byte_roundtrip()) return 1;
+	if (test_angle_subtract_lerp()) return 1;
+	if (test_q_crandom_bounds()) return 1;
+	if (test_plane_signbits_box()) return 1;
+	if (test_radius_clear_add_bounds()) return 1;
+	if (test_matrix_multiply()) return 1;
+	if (test_plane_type_macro()) return 1;
 
 	printf("PASS: unit_qmath\n");
 	return 0;
