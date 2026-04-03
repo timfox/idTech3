@@ -3,14 +3,14 @@ set -euo pipefail
 
 # Headless renderer regression checks (repo + optional game base).
 #
-# Phase A (always): verify regression docs, key generated shader blobs, and GLSL tree.
-# Phase B (optional): if GAME_BASE is set, require listed BSPs from OPTIONAL_GAME_ASSETS.txt.
+# Always: verify regression docs, key generated shader blobs, and GLSL tree.
+# Optional: if GAME_BASE is set, require listed BSPs from OPTIONAL_GAME_ASSETS.txt.
 #
 # Usage:
 #   ./scripts/renderer_regression_check.sh
 #   GAME_BASE=/path/to/game/base ./scripts/renderer_regression_check.sh
 #
-# Prerequisites: glslangValidator for GLSL phase (same as smoke_test.sh).
+# Prerequisites: glslangValidator for GLSL validation (same as smoke_test.sh).
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ -f "$SCRIPT_DIR/../CMakeLists.txt" ]; then
@@ -67,7 +67,7 @@ if command -v glslangValidator &>/dev/null; then
     pass "all $shader_count GLSL stages validate"
   fi
 else
-  echo "  ⚠ glslangValidator not found, skipping GLSL phase" >&2
+  echo "  ⚠ glslangValidator not found, skipping GLSL validation" >&2
 fi
 
 echo ""

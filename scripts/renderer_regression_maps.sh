@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Phase D — runtime map-load sanity for renderer regression BSPs (dedicated server).
+# Runtime map-load sanity for renderer regression BSPs (dedicated server).
 #
 # Requires a built idtech3_server and a game tree where fs_basepath/base/ contains
 # z_renderer_regression.pk3 (or loose maps/). GAME_BASE must be the **base** directory

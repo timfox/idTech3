@@ -23,7 +23,7 @@ Run these after any renderer, shader, or mikktspace change.
 | Full local CI parity | `./scripts/validate_ci_build.sh` | SPIR-V generation, Vulkan Release build, smoke test, renderer regression check. |
 | CMake smoke + artifacts | `ctest --output-on-failure` (from `build-vk-Release` or `build-gl-Release`) | Smoke, **renderer_regression_check**, artifacts, unit hooks. |
 | OpenGL matrix | `./scripts/compile_engine.sh opengl` then `ctest` in `build-gl-Release` | Fallback renderer still links and tests pass. |
-| Standalone GLSL | `./scripts/smoke_test.sh` (or smoke test phase inside `validate_ci_build.sh`) | Every `.vert`, `.frag`, `.geom`, and `.comp` under `src/renderers/vulkan/shaders/glsl/` validates with `glslangValidator` (recursive, including `volumetric/`, `terrain/`, `postfx/`). |
+| Standalone GLSL | `./scripts/smoke_test.sh` (or the smoke step inside `validate_ci_build.sh`) | Every `.vert`, `.frag`, `.geom`, and `.comp` under `src/renderers/vulkan/shaders/glsl/` validates with `glslangValidator` (recursive, including `volumetric/`, `terrain/`, `postfx/`). |
 
 Optional: `SKIP_IDPAK_CHECK=ON` is normal for engine-only trees; the dedicated server may exit with “no game data” after init — that is still a useful crash-free signal.
 
