@@ -22,7 +22,7 @@ Use consistent names so headless checks can optional-verify them (see `OPTIONAL_
 | `rtest_tangent` | 01 |
 | `rtest_pbr` | 02 |
 | `rtest_emissive` | 03 |
-| `rtest_vfog` | 04 |
+| `rtest_volumetric` | 04 |
 | `rtest_postfx` | 05 |
 | `rtest_parity` | 06 |
 

@@ -5,6 +5,6 @@
 # maps/rtest_tangent.bsp
 # maps/rtest_pbr.bsp
 # maps/rtest_emissive.bsp
-# maps/rtest_vfog.bsp
+# maps/rtest_volumetric.bsp
 # maps/rtest_postfx.bsp
 # maps/rtest_parity.bsp
