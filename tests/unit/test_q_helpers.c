@@ -54,40 +54,6 @@ static int test_hex_str(void)
 	return 0;
 }
 
-static int test_crc32(void)
-{
-	const byte data[] = { '1', '2', '3', '4', '5', '6', '7', '8', '9' };
-	unsigned a = crc32_buffer(data, sizeof(data));
-	unsigned b = crc32_buffer(data, sizeof(data));
-	ASSERT_EQ(a, b, "crc32_buffer deterministic");
-	ASSERT(a != 0U, "crc32_buffer nonzero");
-	return 0;
-}
-
-static int test_com_path(void)
-{
-	char path[] = "/foo/bar/quake.map";
-	ASSERT_STREQ(COM_SkipPath(path), "quake.map", "COM_SkipPath");
-
-	ASSERT_STREQ(COM_GetExtension("a.bsp"), "bsp", "COM_GetExtension");
-	ASSERT_STREQ(COM_GetExtension("noext"), "", "COM_GetExtension none");
-	ASSERT_STREQ(COM_GetExtension("/dir/.hidden"), "hidden", "COM_GetExtension dotfile");
-
-	char buf[64];
-	COM_StripExtension("maps/q3dm1.bsp", buf, sizeof(buf));
-	ASSERT_STREQ(buf, "maps/q3dm1", "COM_StripExtension");
-
-	ASSERT(COM_CompareExtension("x.pk3", ".pk3"), "COM_CompareExtension");
-	ASSERT(!COM_CompareExtension("x.bsp", ".pk3"), "COM_CompareExtension mismatch");
-
-	char de[32];
-	strcpy(de, "maps/foo");
-	COM_DefaultExtension(de, sizeof(de), ".bsp");
-	ASSERT_STREQ(de, "maps/foo.bsp", "COM_DefaultExtension");
-
-	return 0;
-}
-
 static int test_com_split(void)
 {
 	char line[] = "alpha beta gamma";
@@ -165,8 +131,6 @@ int main(void)
 {
 	if (test_com_clamp()) return 1;
 	if (test_hex_str()) return 1;
-	if (test_crc32()) return 1;
-	if (test_com_path()) return 1;
 	if (test_com_split()) return 1;
 	if (test_hash_value()) return 1;
 	if (test_hash_color()) return 1;

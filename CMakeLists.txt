@@ -2060,4 +2060,28 @@ if(BUILD_UNIT_TESTS)
 	endif()
 	add_test(NAME unit_qhelpers COMMAND unit_qhelpers)
 	set_tests_properties(unit_qhelpers PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_crc
+		tests/unit/test_crc.c
+		tests/stub_qcommon_min.c
+		src/qcommon/q_shared.c
+		src/qcommon/q_math.c)
+	target_include_directories(unit_crc PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_crc PRIVATE m)
+	endif()
+	add_test(NAME unit_crc COMMAND unit_crc)
+	set_tests_properties(unit_crc PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_pathutil
+		tests/unit/test_pathutil.c
+		tests/stub_qcommon_min.c
+		src/qcommon/q_shared.c
+		src/qcommon/q_math.c)
+	target_include_directories(unit_pathutil PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_pathutil PRIVATE m)
+	endif()
+	add_test(NAME unit_pathutil COMMAND unit_pathutil)
+	set_tests_properties(unit_pathutil PROPERTIES LABELS "unit;validation")
 endif()

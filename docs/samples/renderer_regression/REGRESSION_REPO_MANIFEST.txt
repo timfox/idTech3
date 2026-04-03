@@ -18,6 +18,8 @@ scripts/build_renderer_devdata.sh
 scripts/tools/gen_rtest_bsp.py
 tests/stub_qcommon_min.c
 tests/unit/test_q_helpers.c
+tests/unit/test_crc.c
+tests/unit/test_pathutil.c
 tests/unit/test_q_math.c
 tests/unit/test_surfaceflags.c
 tests/unit/test_macros.c
