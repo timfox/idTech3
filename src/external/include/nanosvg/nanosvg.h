@@ -1103,7 +1103,7 @@ error:
 // We roll our own string to float because the std library one uses locale and messes things up.
 static double nsvg__atof(const char* s)
 {
-	char* cur = (char*)s;
+	const char* cur = s;
 	char* end = NULL;
 	double res = 0.0, sign = 1.0;
 	long long intPart = 0, fracPart = 0;
@@ -1121,10 +1121,10 @@ static double nsvg__atof(const char* s)
 	if (nsvg__isdigit(*cur)) {
 		// Parse digit sequence
 		intPart = strtoll(cur, &end, 10);
-		if (cur != end) {
+		if (cur != (const char *)end) {
 			res = (double)intPart;
 			hasIntPart = 1;
-			cur = end;
+			cur = (const char *)end;
 		}
 	}
 
@@ -1132,12 +1132,13 @@ static double nsvg__atof(const char* s)
 	if (*cur == '.') {
 		cur++; // Skip '.'
 		if (nsvg__isdigit(*cur)) {
+			const char* const fracStart = cur;
 			// Parse digit sequence
 			fracPart = strtoll(cur, &end, 10);
-			if (cur != end) {
-				res += (double)fracPart / pow(10.0, (double)(end - cur));
+			if (cur != (const char *)end) {
+				res += (double)fracPart / pow(10.0, (double)((const char *)end - fracStart));
 				hasFracPart = 1;
-				cur = end;
+				cur = (const char *)end;
 			}
 		}
 	}
@@ -1151,7 +1152,7 @@ static double nsvg__atof(const char* s)
 		long expPart = 0;
 		cur++; // skip 'E'
 		expPart = strtol(cur, &end, 10); // Parse digit sequence with sign
-		if (cur != end) {
+		if (cur != (const char *)end) {
 			res *= pow(10.0, (double)expPart);
 		}
 	}
