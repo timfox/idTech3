@@ -98,17 +98,22 @@ echo "Shader checks:"
 if command -v glslangValidator &>/dev/null; then
   shader_errors=0
   shader_dir="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl"
+  shader_count=0
 
-  for shader in "$shader_dir"/*.vert "$shader_dir"/*.frag; do
-    [ -f "$shader" ] || continue
-    if ! glslangValidator -V "$shader" -o /dev/null 2>/dev/null; then
-      fail "Shader validation failed: $(basename "$shader")"
+  while IFS= read -r -d '' shader; do
+    shader_count=$((shader_count + 1))
+    rel="${shader#"$PROJECT_ROOT"/}"
+    if ! err="$(glslangValidator -V "$shader" -o /dev/null 2>&1)"; then
+      echo "$err" >&2
+      fail "Shader validation failed: $rel"
       shader_errors=$((shader_errors + 1))
     fi
-  done
+  done < <(find "$shader_dir" -type f \( -name '*.vert' -o -name '*.frag' -o -name '*.geom' -o -name '*.comp' \) -print0 | sort -z)
 
-  if [ "$shader_errors" -eq 0 ]; then
-    pass "All standalone shaders pass validation"
+  if [ "$shader_count" -eq 0 ]; then
+    fail "No GLSL stage files found under $shader_dir"
+  elif [ "$shader_errors" -eq 0 ]; then
+    pass "All $shader_count GLSL stage files pass validation (recursive)"
   fi
 else
   warn "glslangValidator not found, skipping shader validation"
