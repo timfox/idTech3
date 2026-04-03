@@ -67,6 +67,8 @@ for map in "${MAPS[@]}"; do
     +set dedicated 1 \
     +set fs_basepath "$INSTALL_ROOT" \
     +set fs_game "$BASE_NAME" \
+    +set vm_game 2 \
+    +set bot_enable 0 \
     +set com_hunkMegs 128 \
     +map "$map" \
     +quit 2>&1 || true)"

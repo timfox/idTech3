@@ -1,0 +1,7 @@
+The file docs/renderer_validation/devdata/rtest_base/vm/qagame.qvm (and the copy embedded in
+z_renderer_regression.pk3) is the qagame.qvm produced from ioquake3
+(https://github.com/ioquake/ioq3), GPLv2 or later, same as Quake III Arena mod code.
+
+Built with: CMake, BUILD_GAME_QVMS=ON, other targets OFF, Release/baseq3/vm/qagame.qvm
+
+Regenerate via ./scripts/build_renderer_devdata.sh if you prefer a local toolchain build.
