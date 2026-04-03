@@ -167,7 +167,14 @@ jobs:
           msbuild src\platform\win32\msvc2017\quake3e-ded.vcxproj ^
             %MSBUILD_COMMON% ^
             /p:TargetName=idtech3_server
-          if exist src\platform\win32\msvc2017\output\idtech3_server.exe copy /Y src\platform\win32\msvc2017\output\idtech3_server.exe bin\idtech3_server${{ matrix.suffix }}.exe
+          if errorlevel 1 exit /b 1
+          if not exist src\platform\win32\msvc2017\output\idtech3_server.exe (
+            echo ERROR: missing output\idtech3_server.exe after ded build
+            dir /b src\platform\win32\msvc2017\output 2>nul
+            exit /b 1
+          )
+          copy /Y src\platform\win32\msvc2017\output\idtech3_server.exe bin\idtech3_server${{ matrix.suffix }}.exe
+          if errorlevel 1 exit /b 1
           msbuild src\platform\win32\msvc2017\quake3e-ded.vcxproj ^
             %MSBUILD_COMMON% ^
             /t:Clean ^
@@ -176,11 +183,19 @@ jobs:
           rem --- OpenGL renderer + client ---
           msbuild src\platform\win32\msvc2017\opengl.vcxproj ^
             %MSBUILD_COMMON%
+          if errorlevel 1 exit /b 1
           msbuild src\platform\win32\msvc2017\quake3e.vcxproj ^
             %MSBUILD_COMMON% ^
             /p:TargetName=idtech3 ^
             /p:UseWasapi=0
-          if exist src\platform\win32\msvc2017\output\idtech3.exe copy /Y src\platform\win32\msvc2017\output\idtech3.exe bin\idtech3${{ matrix.suffix }}.exe
+          if errorlevel 1 exit /b 1
+          if not exist src\platform\win32\msvc2017\output\idtech3.exe (
+            echo ERROR: missing output\idtech3.exe after OpenGL client build
+            dir /b src\platform\win32\msvc2017\output 2>nul
+            exit /b 1
+          )
+          copy /Y src\platform\win32\msvc2017\output\idtech3.exe bin\idtech3${{ matrix.suffix }}.exe
+          if errorlevel 1 exit /b 1
           msbuild src\platform\win32\msvc2017\quake3e.vcxproj ^
             %MSBUILD_COMMON% ^
             /t:Clean ^
@@ -193,11 +208,19 @@ jobs:
           rem --- Vulkan renderer + client ---
           msbuild src\platform\win32\msvc2017\vulkan.vcxproj ^
             %MSBUILD_COMMON%
+          if errorlevel 1 exit /b 1
           msbuild src\platform\win32\msvc2017\quake3e.vcxproj ^
             %MSBUILD_COMMON% ^
             /p:TargetName=idtech3 ^
             /p:UseWasapi=0
-          if exist src\platform\win32\msvc2017\output\idtech3.exe copy /Y src\platform\win32\msvc2017\output\idtech3.exe bin\idtech3-vulkan${{ matrix.suffix }}.exe
+          if errorlevel 1 exit /b 1
+          if not exist src\platform\win32\msvc2017\output\idtech3.exe (
+            echo ERROR: missing output\idtech3.exe after Vulkan client build
+            dir /b src\platform\win32\msvc2017\output 2>nul
+            exit /b 1
+          )
+          copy /Y src\platform\win32\msvc2017\output\idtech3.exe bin\idtech3-vulkan${{ matrix.suffix }}.exe
+          if errorlevel 1 exit /b 1
           msbuild src\platform\win32\msvc2017\quake3e.vcxproj ^
             %MSBUILD_COMMON% ^
             /t:Clean ^
@@ -206,6 +229,62 @@ jobs:
           msbuild src\platform\win32\msvc2017\vulkan.vcxproj ^
             %MSBUILD_COMMON% ^
             /t:Clean
+
+          dir /b bin
+
+      - name: Verify MSVC staging (Release artifact prep)
+        if: ${{ matrix.btype == 'Release' }}
+        shell: pwsh
+        run: |
+          $root = $env:GITHUB_WORKSPACE
+          $bin = Join-Path $root 'bin'
+          $out = Join-Path $root 'src/platform/win32/msvc2017/output'
+          $sfx = '${{ matrix.suffix }}'
+
+          Write-Host "PWD: $(Get-Location)"
+          Write-Host "`n--- bin ---"
+          if (Test-Path -LiteralPath $bin) { Get-ChildItem -LiteralPath $bin -File | ForEach-Object { $_.Name } } else { Write-Host '(missing)' }
+          Write-Host "`n--- msvc2017/output ---"
+          if (Test-Path -LiteralPath $out) {
+            Get-ChildItem -LiteralPath $out -File -Filter '*.exe' -ErrorAction SilentlyContinue | ForEach-Object { $_.Name }
+          } else { Write-Host '(missing)' }
+
+          $need = @(
+            "idtech3_server$sfx.exe",
+            "idtech3$sfx.exe",
+            "idtech3-vulkan$sfx.exe"
+          )
+          $missing = @()
+          foreach ($n in $need) {
+            $p = Join-Path $bin $n
+            if (-not (Test-Path -LiteralPath $p)) { $missing += $n }
+          }
+
+          if ($missing.Count -gt 0) {
+            Write-Host "`nAttempting fallback copy from output\ ..."
+            New-Item -ItemType Directory -Force -Path $bin | Out-Null
+            $ded = Join-Path $out 'idtech3_server.exe'
+            $cli = Join-Path $out 'idtech3.exe'
+            if (Test-Path -LiteralPath $ded) {
+              Copy-Item -LiteralPath $ded -Destination (Join-Path $bin "idtech3_server$sfx.exe") -Force
+            }
+            if (Test-Path -LiteralPath $cli) {
+              Copy-Item -LiteralPath $cli -Destination (Join-Path $bin "idtech3$sfx.exe") -Force
+              Copy-Item -LiteralPath $cli -Destination (Join-Path $bin "idtech3-vulkan$sfx.exe") -Force
+            }
+            $missing = @()
+            foreach ($n in $need) {
+              if (-not (Test-Path -LiteralPath (Join-Path $bin $n))) { $missing += $n }
+            }
+          }
+
+          if ($missing.Count -gt 0) {
+            Write-Host "`nSearch idtech3*.exe under msvc2017:"
+            Get-ChildItem -Path (Join-Path $root 'src/platform/win32/msvc2017') -Recurse -File -Filter 'idtech3*.exe' -ErrorAction SilentlyContinue |
+              ForEach-Object { $_.FullName }
+            throw "Staging incomplete; missing in bin: $($missing -join ', ')"
+          }
+          Write-Host "`nStaging OK for artifact upload."
 
       - uses: actions/upload-artifact@v4
         if: ${{ matrix.btype == 'Release' }}
