@@ -207,6 +207,46 @@ jobs:
             %MSBUILD_COMMON% ^
             /t:Clean
 
+      # MSVC vcxproj uses platform-suffixed TargetName (e.g. quake3e.arm64.exe) when
+      # /p:TargetName=idtech3 does not override the evaluated default — copy fallbacks
+      # so upload-artifact always sees bin\*.exe on ARM64/x64.
+      - name: Stage MSVC binaries for artifact
+        if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:GITHUB_WORKSPACE 'src/platform/win32/msvc2017/output'
+          $bin = Join-Path $env:GITHUB_WORKSPACE 'bin'
+          New-Item -ItemType Directory -Force -Path $bin | Out-Null
+          $sfx = '${{ matrix.suffix }}'
+
+          function Stage-One {
+            param([string[]]$Names, [string]$DestFile)
+            $dest = Join-Path $bin $DestFile
+            if (Test-Path -LiteralPath $dest) { return }
+            foreach ($n in $Names) {
+              $src = Join-Path $out $n
+              if (Test-Path -LiteralPath $src) {
+                Copy-Item -LiteralPath $src -Destination $dest -Force
+                Write-Host "Staged $n -> $DestFile"
+                return
+              }
+            }
+          }
+
+          Write-Host "--- $out ---"
+          if (Test-Path -LiteralPath $out) {
+            Get-ChildItem -LiteralPath $out -File -ErrorAction SilentlyContinue | ForEach-Object { $_.Name }
+          } else {
+            Write-Host '(output dir missing)'
+          }
+
+          Stage-One @('idtech3_server.exe', "quake3e.ded$sfx.exe") "idtech3_server$sfx.exe"
+          Stage-One @('idtech3.exe', "quake3e$sfx.exe") "idtech3$sfx.exe"
+          Stage-One @('idtech3.exe', "quake3e$sfx.exe") "idtech3-vulkan$sfx.exe"
+
+          Write-Host "--- $bin ---"
+          Get-ChildItem -LiteralPath $bin -File -ErrorAction SilentlyContinue | ForEach-Object { $_.Name }
+
       - uses: actions/upload-artifact@v4
         if: ${{ matrix.btype == 'Release' }}
         with:
