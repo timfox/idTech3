@@ -10,6 +10,8 @@
 #include "qcommon/q_shared.h"
 #include "qcommon/qcommon.h"
 
+extern int gSTUB_SV_UTF8;
+
 #define ASSERT(cond, msg) do { \
 	if (!(cond)) { \
 		fprintf(stderr, "FAIL: %s\n", msg); \
@@ -137,6 +139,58 @@ static int test_oob_strings(void)
 	MSG_WriteString( &msg, "line1\nline2" );
 	MSG_BeginReadingOOB( &msg );
 	ASSERT_STREQ( MSG_ReadStringLine( &msg ), "line1", "ReadStringLine stops at newline" );
+
+	MSG_Clear( &msg );
+	MSG_WriteString( &msg, "" );
+	MSG_BeginReadingOOB( &msg );
+	ASSERT_STREQ( MSG_ReadString( &msg ), "", "empty WriteString" );
+	return 0;
+}
+
+static int test_write_string_utf8_stub_branches(void)
+{
+	byte buf[64];
+	msg_t msg;
+
+	/* High byte on wire: UTF-8 on keeps 0xff; legacy strips to '.' */
+	gSTUB_SV_UTF8 = 1;
+	MSG_ResetStringCvarCacheForTesting();
+	MSG_InitOOB( &msg, buf, (int)sizeof( buf ) );
+	MSG_WriteString( &msg, "x\xffy" );
+	MSG_BeginReadingOOB( &msg );
+	ASSERT_EQ( MSG_ReadByte( &msg ), (int)(unsigned char)'x', "utf8 on wire x" );
+	ASSERT_EQ( MSG_ReadByte( &msg ), 0xff, "utf8 on keeps high byte" );
+	ASSERT_EQ( MSG_ReadByte( &msg ), (int)(unsigned char)'y', "utf8 on wire y" );
+	ASSERT_EQ( MSG_ReadByte( &msg ), 0, "utf8 on nul" );
+
+	gSTUB_SV_UTF8 = 0;
+	MSG_ResetStringCvarCacheForTesting();
+	MSG_Clear( &msg );
+	MSG_WriteString( &msg, "x\xffy" );
+	MSG_BeginReadingOOB( &msg );
+	ASSERT_EQ( MSG_ReadByte( &msg ), (int)(unsigned char)'x', "utf8 off wire x" );
+	ASSERT_EQ( MSG_ReadByte( &msg ), (int)'.', "utf8 off strips high byte" );
+	ASSERT_EQ( MSG_ReadByte( &msg ), (int)(unsigned char)'y', "utf8 off wire y" );
+	ASSERT_EQ( MSG_ReadByte( &msg ), 0, "utf8 off nul" );
+
+	gSTUB_SV_UTF8 = 1;
+	MSG_ResetStringCvarCacheForTesting();
+	return 0;
+}
+
+static int test_bitstream_long_edges(void)
+{
+	byte buf[64];
+	msg_t msg;
+
+	MSG_Init( &msg, buf, (int)sizeof( buf ) );
+	MSG_Bitstream( &msg );
+	MSG_WriteLong( &msg, 0 );
+	MSG_WriteLong( &msg, (int)0x80000000 );
+
+	MSG_BeginReading( &msg );
+	ASSERT_EQ( MSG_ReadLong( &msg ), 0, "huffman long 0" );
+	ASSERT_EQ( MSG_ReadLong( &msg ), (int)0x80000000, "huffman long sign bit" );
 	return 0;
 }
 
@@ -321,6 +375,8 @@ int main( void )
 	if ( test_oob_endian_layout() ) return 1;
 	if ( test_oob_write_data_read_data() ) return 1;
 	if ( test_oob_strings() ) return 1;
+	if ( test_write_string_utf8_stub_branches() ) return 1;
+	if ( test_bitstream_long_edges() ) return 1;
 	if ( test_angle16_roundtrip() ) return 1;
 	if ( test_entitynum_bitstream() ) return 1;
 	if ( test_bitstream_roundtrip_short() ) return 1;

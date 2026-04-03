@@ -113,6 +113,8 @@ static int test_set_value_for_key_overwrite(void)
 	ASSERT_STREQ(Info_ValueForKey(buf, "rate"), "1", "rate 1");
 	ASSERT(Info_SetValueForKey(buf, "rate", "25000"), "overwrite rate");
 	ASSERT_STREQ(Info_ValueForKey(buf, "rate"), "25000", "rate overwritten");
+	ASSERT(Info_SetValueForKey(buf, "rate", "99"), "second overwrite rate");
+	ASSERT_STREQ(Info_ValueForKey(buf, "rate"), "99", "rate third value");
 	ASSERT_STREQ(Info_ValueForKey(buf, "name"), "", "no stray name");
 	return 0;
 }
@@ -156,6 +158,8 @@ static int test_set_value_for_key_invalid(void)
 	ASSERT(!Info_SetValueForKey(buf, "k", "v;bad"), "reject semicolon in value");
 	ASSERT(!Info_SetValueForKey(buf, "k", "q\"bad"), "reject quote in value");
 	ASSERT(!Info_SetValueForKey(buf, "k", "x\\y"), "reject backslash in value");
+	ASSERT(!Info_SetValueForKey(buf, "bad\"k", "1"), "reject quote in key");
+	ASSERT(!Info_ValidateKeyValue("\""), "kv reject lone quote");
 	ASSERT_STREQ(buf, "", "buf still empty after rejects");
 	return 0;
 }
@@ -188,6 +192,7 @@ static int test_validate(void)
 	ASSERT(Info_Validate("a\\b"), "validate backslash allowed");
 	ASSERT(!Info_Validate("say \"hi\""), "reject quote");
 	ASSERT(!Info_Validate("a;b"), "reject semicolon");
+	ASSERT(!Info_Validate("\""), "validate reject quote");
 
 	ASSERT(Info_ValidateKeyValue("ok_key"), "kv ok");
 	ASSERT(!Info_ValidateKeyValue("bad\\k"), "kv reject backslash");
@@ -203,6 +208,11 @@ static int test_tokenize_and_value_token(void)
 	ASSERT_STREQ(Info_ValueForKeyToken("name"), "tim", "token name");
 	ASSERT_STREQ(Info_ValueForKeyToken("rate"), "25000", "token rate");
 	ASSERT_STREQ(Info_ValueForKeyToken("missing"), "", "token missing");
+
+	/* Second tokenize replaces table */
+	Info_Tokenize("\\only\\x");
+	ASSERT_STREQ(Info_ValueForKeyToken("only"), "x", "tokenize replace only");
+	ASSERT_STREQ(Info_ValueForKeyToken("name"), "", "tokenize drops prior keys");
 	return 0;
 }
 
@@ -225,6 +235,16 @@ static int test_next_pair_iterate(void)
 			ASSERT_STREQ(v, "25000", "NextPair rate");
 	}
 	ASSERT_EQ(n, 2, "NextPair count");
+	return 0;
+}
+
+static int test_malformed_trailing_separator(void)
+{
+	/* Trailing \\ after last pair: parser returns empty for next key */
+	const char *s = "\\a\\1\\";
+
+	ASSERT_STREQ(Info_ValueForKey(s, "a"), "1", "trailing slash still finds a");
+	ASSERT_STREQ(Info_ValueForKey(s, "orphan"), "", "no orphan key");
 	return 0;
 }
 
@@ -259,6 +279,7 @@ int main(void)
 	if (test_validate()) return 1;
 	if (test_tokenize_and_value_token()) return 1;
 	if (test_next_pair_iterate()) return 1;
+	if (test_malformed_trailing_separator()) return 1;
 	if (test_empty_infostring()) return 1;
 	return 0;
 }

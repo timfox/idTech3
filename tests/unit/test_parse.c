@@ -75,6 +75,40 @@ static int test_parse_block_comment(void)
 	return 0;
 }
 
+static int test_parse_quote_then_comment(void)
+{
+	const char *s = "\"a\" /*c*/ b";
+	const char *p = s;
+
+	COM_BeginParseSession( "test" );
+	ASSERT_STREQ( COM_Parse( &p ), "a", "quoted then block" );
+	ASSERT_STREQ( COM_Parse( &p ), "b", "token after quoted+block" );
+	return 0;
+}
+
+static int test_parse_line_comment_after_token(void)
+{
+	/* Need whitespace before // or it is part of the same word token */
+	const char *s = "tok //not\nnext";
+	const char *p = s;
+
+	COM_BeginParseSession( "test" );
+	ASSERT_STREQ( COM_Parse( &p ), "tok", "token before spaced //" );
+	ASSERT_STREQ( COM_Parse( &p ), "next", "after line comment" );
+	return 0;
+}
+
+static int test_parse_empty_quoted(void)
+{
+	const char *s = "\"\" x";
+	const char *p = s;
+
+	COM_BeginParseSession( "test" );
+	ASSERT_STREQ( COM_Parse( &p ), "", "empty quotes" );
+	ASSERT_STREQ( COM_Parse( &p ), "x", "after empty quotes" );
+	return 0;
+}
+
 static int test_parse_ext_no_linebreak(void)
 {
 	const char *s = "first\nsecond";
@@ -183,6 +217,45 @@ static int test_skip_rest_of_line(void)
 	return 0;
 }
 
+static int test_skip_rest_of_line_at_eof(void)
+{
+	const char *s = "only";
+	const char *p = s;
+
+	COM_BeginParseSession( "test" );
+	SkipRestOfLine( &p );
+	ASSERT( *p == '\0', "skip at start eof" );
+	return 0;
+}
+
+static int test_skip_braced_depth_one(void)
+{
+	/* depth==1: caller already counted the opening '{'; scan until matching '}' */
+	const char *s = "a b } tail";
+	const char *p = s;
+
+	COM_BeginParseSession( "test" );
+	ASSERT( SkipBracedSection( &p, 1 ) == qtrue, "depth 1 after consuming open brace" );
+	ASSERT_STREQ( COM_Parse( &p ), "tail", "after depth-1 skip" );
+	return 0;
+}
+
+static int test_parse_complex_and_or(void)
+{
+	const char *s = "a && b || c";
+	const char *p = s;
+
+	COM_BeginParseSession( "test" );
+	ASSERT_STREQ( COM_ParseComplex( &p, qtrue ), "a", "and-or a" );
+	ASSERT_STREQ( COM_ParseComplex( &p, qtrue ), "&&", "&& token" );
+	ASSERT( com_tokentype == TK_AND, "TK_AND" );
+	ASSERT_STREQ( COM_ParseComplex( &p, qtrue ), "b", "and-or b" );
+	ASSERT_STREQ( COM_ParseComplex( &p, qtrue ), "||", "|| token" );
+	ASSERT( com_tokentype == TK_OR, "TK_OR" );
+	ASSERT_STREQ( COM_ParseComplex( &p, qtrue ), "c", "and-or c" );
+	return 0;
+}
+
 static int test_parse_null_input(void)
 {
 	const char *p = NULL;
@@ -199,13 +272,19 @@ int main( void )
 	if ( test_parse_quoted_spaces() ) return 1;
 	if ( test_parse_line_comment() ) return 1;
 	if ( test_parse_block_comment() ) return 1;
+	if ( test_parse_quote_then_comment() ) return 1;
+	if ( test_parse_line_comment_after_token() ) return 1;
+	if ( test_parse_empty_quoted() ) return 1;
 	if ( test_parse_ext_no_linebreak() ) return 1;
 	if ( test_parse_line_numbers() ) return 1;
 	if ( test_compress_comments_and_quotes() ) return 1;
 	if ( test_parse_complex_operators() ) return 1;
 	if ( test_parse_complex_newline_token() ) return 1;
 	if ( test_skip_braced_section() ) return 1;
+	if ( test_skip_braced_depth_one() ) return 1;
 	if ( test_skip_rest_of_line() ) return 1;
+	if ( test_skip_rest_of_line_at_eof() ) return 1;
+	if ( test_parse_complex_and_or() ) return 1;
 	if ( test_parse_null_input() ) return 1;
 	return 0;
 }
