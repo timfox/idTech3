@@ -2098,4 +2098,16 @@ if(BUILD_UNIT_TESTS)
 	endif()
 	add_test(NAME unit_msg COMMAND unit_msg)
 	set_tests_properties(unit_msg PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_info
+		tests/unit/test_info.c
+		tests/stub_qcommon_min.c
+		src/qcommon/q_shared.c
+		src/qcommon/q_math.c)
+	target_include_directories(unit_info PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_info PRIVATE m)
+	endif()
+	add_test(NAME unit_info COMMAND unit_info)
+	set_tests_properties(unit_info PROPERTIES LABELS "unit;validation")
 endif()
