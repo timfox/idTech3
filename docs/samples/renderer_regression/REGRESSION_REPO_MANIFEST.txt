@@ -16,6 +16,11 @@ scripts/renderer_regression_check.sh
 scripts/renderer_regression_maps.sh
 scripts/build_renderer_devdata.sh
 scripts/tools/gen_rtest_bsp.py
+tests/stub_qcommon_min.c
+tests/unit/test_q_helpers.c
+tests/unit/test_q_math.c
+tests/unit/test_surfaceflags.c
+tests/unit/test_macros.c
 docs/renderer_validation/NOTICE-ioquake3-qvm.txt
 docs/renderer_validation/devdata/README.md
 docs/renderer_validation/devdata/default.cfg

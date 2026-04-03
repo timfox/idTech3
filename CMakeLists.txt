@@ -2048,4 +2048,16 @@ if(BUILD_UNIT_TESTS)
 	target_include_directories(unit_surfaceflags PRIVATE ${CMAKE_SOURCE_DIR}/src)
 	add_test(NAME unit_surfaceflags COMMAND unit_surfaceflags)
 	set_tests_properties(unit_surfaceflags PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_qhelpers
+		tests/unit/test_q_helpers.c
+		tests/stub_qcommon_min.c
+		src/qcommon/q_shared.c
+		src/qcommon/q_math.c)
+	target_include_directories(unit_qhelpers PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_qhelpers PRIVATE m)
+	endif()
+	add_test(NAME unit_qhelpers COMMAND unit_qhelpers)
+	set_tests_properties(unit_qhelpers PROPERTIES LABELS "unit;validation")
 endif()
