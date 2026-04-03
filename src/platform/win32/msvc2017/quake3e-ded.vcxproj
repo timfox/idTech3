@@ -263,6 +263,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\qcommon\cmd.c" />
     <ClCompile Include="..\..\qcommon\cm_load.c" />
+    <ClCompile Include="..\..\qcommon\cm_bounds.c" />
     <ClCompile Include="..\..\qcommon\cm_patch.c" />
     <ClCompile Include="..\..\qcommon\cm_polylib.c" />
     <ClCompile Include="..\..\qcommon\cm_test.c" />
