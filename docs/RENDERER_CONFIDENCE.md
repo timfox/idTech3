@@ -108,9 +108,21 @@ A renderer change is not fully proven until:
 * the manual Vulkan/OpenGL pass is complete
 * findings are written down with concrete outcomes
 
+### First manual pass (strict)
+
+For the **first** full renderer proof run against regression content, treat the pass as complete only when:
+
+* `renderer_regression_check.sh` is green with the real `GAME_BASE`
+* `renderer_regression_maps.sh` is green for all six maps
+* `rtest_parity` has either acceptable Vulkan/OpenGL agreement or a **clearly written drift note** in findings
+* `rtest_volumetric` has either acceptable fog behavior or a **clearly written limitation/bug** in findings
+* every finding is recorded as **confirmed OK**, **bug to fix**, **known limitation**, or **needs more evidence** — not vague impressions
+
 ### Next automation step
 
 After the first manual pass is stable, add screenshot or framebuffer capture for 1–2 anchor scenes, starting with `rtest_parity` and `rtest_pbr`. Do not add this before the manual pass is producing stable, repeatable results.
+
+That sequence closes the gap between engine-side confidence and renderer evidence; run it before adding more unit tests or process churn.
 
 ## Repo discipline
 
