@@ -133,9 +133,9 @@
       <AdditionalDependencies>advapi32.lib;gdi32.lib;user32.lib;comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <ProgramDatabaseFile>$(IntDir)quake3e.ded-debug.pdb</ProgramDatabaseFile>
+      <ProgramDatabaseFile>$(IntDir)idtech3_server-debug.pdb</ProgramDatabaseFile>
       <GenerateMapFile>true</GenerateMapFile>
-      <MapFileName>$(IntDir)quake3e.ded-debug.map</MapFileName>
+      <MapFileName>$(IntDir)idtech3_server-debug.map</MapFileName>
       <StackReserveSize>4194304</StackReserveSize>
       <SubSystem>Windows</SubSystem>
       <MinimumRequiredVersion />
@@ -162,9 +162,9 @@
       <AdditionalDependencies>advapi32.lib;gdi32.lib;user32.lib;comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <ProgramDatabaseFile>$(IntDir)quake3e.ded-debug.x64.pdb</ProgramDatabaseFile>
+      <ProgramDatabaseFile>$(IntDir)idtech3_server-debug.pdb</ProgramDatabaseFile>
       <GenerateMapFile>true</GenerateMapFile>
-      <MapFileName>$(IntDir)quake3e.ded-debug.x64.map</MapFileName>
+      <MapFileName>$(IntDir)idtech3_server-debug.map</MapFileName>
       <StackReserveSize>4194304</StackReserveSize>
       <SubSystem>Windows</SubSystem>
     </Link>
@@ -190,9 +190,9 @@
       <AdditionalDependencies>advapi32.lib;gdi32.lib;user32.lib;comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <ProgramDatabaseFile>$(IntDir)quake3e.ded-debug.arm64.pdb</ProgramDatabaseFile>
+      <ProgramDatabaseFile>$(IntDir)idtech3_server-debug.pdb</ProgramDatabaseFile>
       <GenerateMapFile>true</GenerateMapFile>
-      <MapFileName>$(IntDir)quake3e.ded-debug.arm64.map</MapFileName>
+      <MapFileName>$(IntDir)idtech3_server-debug.map</MapFileName>
       <StackReserveSize>4194304</StackReserveSize>
       <SubSystem>Windows</SubSystem>
     </Link>
@@ -209,7 +209,7 @@
       <AdditionalDependencies>advapi32.lib;gdi32.lib;user32.lib;comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <GenerateMapFile>true</GenerateMapFile>
-      <MapFileName>$(IntDir)quake3e.ded.map</MapFileName>
+      <MapFileName>$(IntDir)idtech3_server.map</MapFileName>
       <StackReserveSize>4194304</StackReserveSize>
       <OptimizeReferences>true</OptimizeReferences>
       <SetChecksum>true</SetChecksum>
@@ -232,7 +232,7 @@
       <AdditionalDependencies>advapi32.lib;gdi32.lib;user32.lib;comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <GenerateMapFile>true</GenerateMapFile>
-      <MapFileName>$(IntDir)quake3e.ded.x64.map</MapFileName>
+      <MapFileName>$(IntDir)idtech3_server.map</MapFileName>
       <StackReserveSize>4194304</StackReserveSize>
       <OptimizeReferences>true</OptimizeReferences>
       <SetChecksum>true</SetChecksum>
@@ -252,7 +252,7 @@
       <AdditionalDependencies>advapi32.lib;gdi32.lib;user32.lib;comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <GenerateMapFile>true</GenerateMapFile>
-      <MapFileName>$(IntDir)quake3e.ded.arm64.map</MapFileName>
+      <MapFileName>$(IntDir)idtech3_server.map</MapFileName>
       <StackReserveSize>4194304</StackReserveSize>
       <OptimizeReferences>true</OptimizeReferences>
       <SetChecksum>true</SetChecksum>
