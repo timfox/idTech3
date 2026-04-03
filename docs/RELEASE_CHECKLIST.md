@@ -20,7 +20,7 @@ Use this checklist before tagging or publishing a release.
 - [ ] **Graphics changes**: run the manual short list in [docs/RENDERER_CONFIDENCE.md](RENDERER_CONFIDENCE.md) or the [visual regression pack](samples/renderer_regression/README.md) before release
 
 ### Unit Tests
-- [ ] **Unit tests pass**: `cd build-vk-Release && ctest -R unit -V` (or run full `ctest`)
+- [ ] **Unit tests pass**: `cd build-vk-Release && ctest -R unit -V` (includes `unit_macros`, `unit_qmath`, `unit_surfaceflags`; or run full `ctest`)
 
 ### CI
 - [ ] **All CI jobs pass**: Push to `main` or open a PR and verify all builds succeed (Windows MSYS, Windows MSVC, Ubuntu x86_64, Ubuntu ARM, macOS, Android)
