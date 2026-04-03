@@ -2084,4 +2084,18 @@ if(BUILD_UNIT_TESTS)
 	endif()
 	add_test(NAME unit_pathutil COMMAND unit_pathutil)
 	set_tests_properties(unit_pathutil PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_msg
+		tests/unit/test_msg.c
+		tests/stub_qcommon_min.c
+		tests/stub_msg_cvar.c
+		src/qcommon/msg.c
+		src/qcommon/huffman_static.c)
+	target_include_directories(unit_msg PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_compile_definitions(unit_msg PRIVATE DEDICATED)
+	if(NOT MSVC)
+		target_link_libraries(unit_msg PRIVATE m)
+	endif()
+	add_test(NAME unit_msg COMMAND unit_msg)
+	set_tests_properties(unit_msg PROPERTIES LABELS "unit;validation")
 endif()
