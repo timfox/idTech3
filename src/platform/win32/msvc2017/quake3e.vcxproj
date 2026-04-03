@@ -96,7 +96,7 @@
     <IntDir>.\build\$(ProjectName)_$(Configuration)_$(PlatformTarget)\</IntDir>
     <LinkIncremental>true</LinkIncremental>
     <EmbedManifest>false</EmbedManifest>
-    <TargetName>quake3e-debug</TargetName>
+    <TargetName>idtech3-debug</TargetName>
     <IncludePath>$(LibOggInclude);$(LibVorbisInclude);$(LibJpegInclude);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -104,7 +104,7 @@
     <IntDir>.\build\$(ProjectName)_$(Configuration)_$(PlatformTarget)\</IntDir>
     <LinkIncremental>true</LinkIncremental>
     <EmbedManifest>false</EmbedManifest>
-    <TargetName>quake3e-debug.x64</TargetName>
+    <TargetName>idtech3-debug</TargetName>
     <IncludePath>$(LibOggInclude);$(LibVorbisInclude);$(LibJpegInclude);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
@@ -112,28 +112,28 @@
     <EmbedManifest>false</EmbedManifest>
     <OutDir>.\output\</OutDir>
     <IntDir>.\build\$(ProjectName)_$(Configuration)_$(PlatformTarget)\</IntDir>
-    <TargetName>quake3e-debug.arm64</TargetName>
+    <TargetName>idtech3-debug</TargetName>
     <IncludePath>$(LibOggInclude);$(LibVorbisInclude);$(LibJpegInclude);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>.\output\</OutDir>
     <IntDir>.\build\$(ProjectName)_$(Configuration)_$(PlatformTarget)\</IntDir>
     <EmbedManifest>false</EmbedManifest>
-    <TargetName>quake3e</TargetName>
+    <TargetName>idtech3</TargetName>
     <IncludePath>$(LibOggInclude);$(LibVorbisInclude);$(LibJpegInclude);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>.\output\</OutDir>
     <IntDir>.\build\$(ProjectName)_$(Configuration)_$(PlatformTarget)\</IntDir>
     <EmbedManifest>false</EmbedManifest>
-    <TargetName>quake3e.x64</TargetName>
+    <TargetName>idtech3</TargetName>
     <IncludePath>$(LibOggInclude);$(LibVorbisInclude);$(LibJpegInclude);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <EmbedManifest>false</EmbedManifest>
     <OutDir>.\output\</OutDir>
     <IntDir>.\build\$(ProjectName)_$(Configuration)_$(PlatformTarget)\</IntDir>
-    <TargetName>quake3e.arm64</TargetName>
+    <TargetName>idtech3</TargetName>
     <IncludePath>$(LibOggInclude);$(LibVorbisInclude);$(LibJpegInclude);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
