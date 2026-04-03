@@ -2014,6 +2014,13 @@ set_tests_properties(smoke_test PROPERTIES
 	LABELS "validation;smoke"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/release/idtech3_server")
 
+add_test(NAME renderer_regression_check
+	COMMAND ${CMAKE_SOURCE_DIR}/scripts/renderer_regression_check.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(renderer_regression_check PROPERTIES
+	LABELS "validation;renderer"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/renderer_regression_check.sh")
+
 add_test(NAME check_artifacts
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/check_artifacts.sh ${CMAKE_SOURCE_DIR}/release
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

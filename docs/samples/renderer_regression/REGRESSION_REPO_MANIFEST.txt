@@ -1,0 +1,17 @@
+# Files that must exist in the engine repo for renderer regression discipline.
+# Used by scripts/renderer_regression_check.sh (repo phase).
+docs/RENDERER_CONFIDENCE.md
+docs/RELEASE_CHECKLIST.md
+docs/RENDERERS.md
+docs/samples/renderer_regression/README.md
+docs/samples/renderer_regression/OPTIONAL_GAME_ASSETS.txt
+docs/samples/renderer_regression/scenes/01_tangent_normals.md
+docs/samples/renderer_regression/scenes/02_pbr_metallic_roughness.md
+docs/samples/renderer_regression/scenes/03_emissive.md
+docs/samples/renderer_regression/scenes/04_volumetric_fog.md
+docs/samples/renderer_regression/scenes/05_postfx.md
+docs/samples/renderer_regression/scenes/06_vulkan_opengl_parity.md
+scripts/smoke_test.sh
+scripts/renderer_regression_check.sh
+src/renderers/vulkan/shaders/spirv/generated/shader_data.c
+src/renderers/vulkan/shaders/spirv/generated/shader_binding.c
