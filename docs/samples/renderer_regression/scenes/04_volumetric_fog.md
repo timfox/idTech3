@@ -1,5 +1,7 @@
 # Scene 04 — Volumetric fog
 
+Package as **`maps/rtest_volumetric.bsp`** (see pack README).
+
 ## Goal
 
 Exercise **froxel volumetrics**, sun/moon shaft stability, and interaction with shadows.
