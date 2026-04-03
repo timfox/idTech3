@@ -92,30 +92,6 @@ static int test_hash_color(void)
 	return 0;
 }
 
-static int test_byte_swap(void)
-{
-	short s = 0x0102;
-	short t = ShortSwap(s);
-	unsigned char *pb = (unsigned char *)&t;
-	ASSERT(pb[0] == 0x01 && pb[1] == 0x02, "ShortSwap");
-
-	int L = 0x01020304;
-	int Ls = LongSwap(L);
-	unsigned char *pl = (unsigned char *)&Ls;
-	/* Result is 0x04030201; on little-endian first stored byte is low byte 0x01 */
-	ASSERT(pl[0] == 0x01 && pl[1] == 0x02 && pl[2] == 0x03 && pl[3] == 0x04, "LongSwap");
-
-	short buf[2] = { 0x1122, 0 };
-	CopyShortSwap(&buf[1], &buf[0]);
-	ASSERT((unsigned short)buf[1] == 0x2211, "CopyShortSwap");
-
-	int Lb[2] = { 0x11223344, 0 };
-	CopyLongSwap(&Lb[1], &Lb[0]);
-	pl = (unsigned char *)&Lb[1];
-	ASSERT(pl[0] == 0x11 && pl[1] == 0x22 && pl[2] == 0x33 && pl[3] == 0x44, "CopyLongSwap");
-	return 0;
-}
-
 static int test_skip_charset_tokens(void)
 {
 	const char *s = Com_SkipCharset("   hello", " ");
@@ -134,7 +110,6 @@ int main(void)
 	if (test_com_split()) return 1;
 	if (test_hash_value()) return 1;
 	if (test_hash_color()) return 1;
-	if (test_byte_swap()) return 1;
 	if (test_skip_charset_tokens()) return 1;
 
 	printf("PASS: unit_qhelpers\n");

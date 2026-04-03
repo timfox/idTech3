@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "qcommon.h"
 
 static int pcount[256];
+static cvar_t *sv_utf8 = NULL;
 
 /*
 ==============================================================================
@@ -281,7 +282,6 @@ void MSG_WriteFloat( msg_t *sb, float f ) {
 void MSG_WriteString( msg_t *sb, const char *s ) {
 	int l, i;
 	char v;
-	static cvar_t *sv_utf8 = NULL;
 	qboolean allowUTF8;
 
 	if ( !sv_utf8 ) {
@@ -307,6 +307,10 @@ void MSG_WriteString( msg_t *sb, const char *s ) {
 	}
 
 	MSG_WriteChar( sb, '\0' );
+}
+
+void MSG_ResetStringCvarCacheForTesting( void ) {
+	sv_utf8 = NULL;
 }
 
 void MSG_WriteBigString( msg_t *sb, const char *s ) {
