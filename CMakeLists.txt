@@ -2110,4 +2110,15 @@ if(BUILD_UNIT_TESTS)
 	endif()
 	add_test(NAME unit_info COMMAND unit_info)
 	set_tests_properties(unit_info PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_cm_bounds
+		tests/unit/test_cm_bounds.c
+		src/qcommon/cm_bounds.c
+		src/qcommon/q_math.c)
+	target_include_directories(unit_cm_bounds PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_cm_bounds PRIVATE m)
+	endif()
+	add_test(NAME unit_cm_bounds COMMAND unit_cm_bounds)
+	set_tests_properties(unit_cm_bounds PROPERTIES LABELS "unit;validation")
 endif()
