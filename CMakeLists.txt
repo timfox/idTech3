@@ -2133,4 +2133,16 @@ if(BUILD_UNIT_TESTS)
 	endif()
 	add_test(NAME unit_parse COMMAND unit_parse)
 	set_tests_properties(unit_parse PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_endian
+		tests/unit/test_endian.c
+		tests/stub_qcommon_min.c
+		src/qcommon/q_shared.c
+		src/qcommon/q_math.c)
+	target_include_directories(unit_endian PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_endian PRIVATE m)
+	endif()
+	add_test(NAME unit_endian COMMAND unit_endian)
+	set_tests_properties(unit_endian PROPERTIES LABELS "unit;validation")
 endif()
