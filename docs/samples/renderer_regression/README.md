@@ -28,14 +28,46 @@ Use consistent names so headless checks can optional-verify them (see `OPTIONAL_
 
 BSP path: `maps/<name>.bsp` inside the pk3.
 
-## Workflow
+## Content bring-up and enforcement
+
+Until **`z_renderer_regression.pk3`** (with the six BSPs and minimal assets) lives in a real **`base/`** next to normal game data, the engine repo can only prove scripts, manifests, and GLSL syntax—not regression content or load paths.
+
+**1. Ship the pack** — Build the six maps, pack **`z_renderer_regression.pk3`**, install into **`base/`**. Keep the pk3 minimal and version it in your **game/content** repo.
+
+**2. File contract** — Uncomment the `maps/rtest_*.bsp` lines in [`OPTIONAL_GAME_ASSETS.txt`](OPTIONAL_GAME_ASSETS.txt), then:
+
+```bash
+GAME_BASE=/abs/path/to/base ./scripts/renderer_regression_check.sh
+```
+
+**3. Runtime contract** — After the file contract passes:
+
+```bash
+GAME_BASE=/abs/path/to/base ./scripts/renderer_regression_maps.sh
+```
+
+**4. Manual truth** — With both green, run the first full pass from [RENDERER_CONFIDENCE.md](../../RENDERER_CONFIDENCE.md): parity on `rtest_parity`, tangents on `rtest_tangent`, PBR on `rtest_pbr`, emissive on `rtest_emissive`, fog on `rtest_volumetric`, postFX on `rtest_postfx`. Goal: surface incompatibilities and fix or document them—not day-one perfection.
+
+**5. Merge law (renderer-adjacent changes)** — After content is online:
+
+```bash
+./scripts/compile_engine.sh vulkan
+./scripts/compile_engine.sh opengl
+cd build-vk-Release && ctest --output-on-failure
+cd ../build-gl-Release && ctest --output-on-failure
+GAME_BASE=/abs/path/to/base ./scripts/renderer_regression_check.sh
+GAME_BASE=/abs/path/to/base ./scripts/renderer_regression_maps.sh
+```
+
+Add the manual checklist when the change is visually meaningful.
+
+**6. Stronger visual automation** — Screenshot or framebuffer capture (e.g. anchor on `rtest_parity` and `rtest_pbr`) only after the pack, both scripts, and the manual pass are stable.
+
+## Workflow (authoring)
 
 1. Implement geometry and materials per scene doc (GtkRadiant, NetRadiant, Blender → export, etc.).
 2. Bake lighting as you normally would for your game; keep revision control on **map sources**, not necessarily on BSP in the engine repo.
 3. Pack `maps/*.bsp` (+ needed textures/shaders) into `z_renderer_regression.pk3` and drop into `base/`.
-4. Run through [RENDERER_CONFIDENCE.md](../../RENDERER_CONFIDENCE.md) manual list for each change that touches rendering.
-5. Optional: set `GAME_BASE` and uncomment lines in `OPTIONAL_GAME_ASSETS.txt` so `./scripts/renderer_regression_check.sh` fails CI if a regression map is missing from your content tree.
-6. **Runtime map load:** with a full `base/` (VM + game data) and `z_renderer_regression.pk3` installed, run `GAME_BASE=/abs/path/to/base ./scripts/renderer_regression_maps.sh` so each `rtest_*` map is exercised through the real dedicated-server path (see script header for `fs_basepath` / `fs_game` behavior).
 
 ## Related
 
