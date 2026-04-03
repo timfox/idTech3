@@ -12,6 +12,11 @@
 
 extern int gSTUB_SV_UTF8;
 
+/* Huffman path writes variable-length symbols; small stack buffers overflow
+ * cursize before msg.c sets overflowed, and HuffmanGetSymbol reads 4 bytes
+ * from buffer + (bitIndex>>3) — use ample space for Debug + FORTIFY CI. */
+enum { UNIT_MSG_BITBUF_BYTES = 4096 };
+
 #define ASSERT(cond, msg) do { \
 	if (!(cond)) { \
 		fprintf(stderr, "FAIL: %s\n", msg); \
@@ -180,7 +185,7 @@ static int test_write_string_utf8_stub_branches(void)
 
 static int test_bitstream_long_edges(void)
 {
-	byte buf[64];
+	byte buf[UNIT_MSG_BITBUF_BYTES];
 	msg_t msg;
 
 	MSG_Init( &msg, buf, (int)sizeof( buf ) );
@@ -209,7 +214,7 @@ static int test_angle16_roundtrip(void)
 
 static int test_entitynum_bitstream(void)
 {
-	byte buf[64];
+	byte buf[UNIT_MSG_BITBUF_BYTES];
 	msg_t msg;
 	const int n = (1 << (GENTITYNUM_BITS - 1)) - 1;
 
@@ -223,7 +228,7 @@ static int test_entitynum_bitstream(void)
 
 static int test_bitstream_roundtrip_short(void)
 {
-	byte buf[256];
+	byte buf[UNIT_MSG_BITBUF_BYTES];
 	msg_t msg;
 
 	MSG_Init( &msg, buf, (int)sizeof( buf ) );
@@ -240,7 +245,7 @@ static int test_bitstream_roundtrip_short(void)
 
 static int test_bitstream_char_negative_roundtrip(void)
 {
-	byte buf[256];
+	byte buf[UNIT_MSG_BITBUF_BYTES];
 	msg_t msg;
 
 	/* WriteChar masks to 8 bits; ReadChar reinterprets as signed char */
@@ -274,7 +279,7 @@ static int test_msg_hash_key(void)
 
 static int test_delta_usercmd_roundtrip(void)
 {
-	byte buf[256];
+	byte buf[UNIT_MSG_BITBUF_BYTES];
 	msg_t msg;
 	usercmd_t from, to;
 
@@ -322,7 +327,7 @@ static int test_delta_usercmd_roundtrip(void)
 
 static int test_delta_usercmd_no_change(void)
 {
-	byte buf[256];
+	byte buf[UNIT_MSG_BITBUF_BYTES];
 	msg_t msg;
 	usercmd_t a;
 
