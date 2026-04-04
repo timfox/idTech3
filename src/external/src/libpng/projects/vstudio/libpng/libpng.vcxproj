@@ -277,7 +277,8 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>zlib.lib</AdditionalDependencies>
+      <!-- Match zlib.vcxproj: $(OutDir)$(ConfigurationName)-$(PlatformName)-zlib.lib -->
+      <AdditionalDependencies>$(ConfigurationName)-$(PlatformName)-zlib.lib</AdditionalDependencies>
       <Version>16</Version>
       <AdditionalLibraryDirectories>$(OutDir)</AdditionalLibraryDirectories>
     </Link>
@@ -307,7 +308,8 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>zlib.lib</AdditionalDependencies>
+      <!-- Match zlib.vcxproj: $(OutDir)$(ConfigurationName)-$(PlatformName)-zlib.lib -->
+      <AdditionalDependencies>$(ConfigurationName)-$(PlatformName)-zlib.lib</AdditionalDependencies>
       <Version>16</Version>
       <AdditionalLibraryDirectories>$(OutDir)</AdditionalLibraryDirectories>
     </Link>
@@ -337,7 +339,8 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>zlib.lib</AdditionalDependencies>
+      <!-- Match zlib.vcxproj: $(OutDir)$(ConfigurationName)-$(PlatformName)-zlib.lib -->
+      <AdditionalDependencies>$(ConfigurationName)-$(PlatformName)-zlib.lib</AdditionalDependencies>
       <Version>16</Version>
       <AdditionalLibraryDirectories>$(OutDir)</AdditionalLibraryDirectories>
     </Link>
@@ -448,7 +451,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>zlib.lib</AdditionalDependencies>
+      <!-- Match zlib.vcxproj: $(OutDir)$(ConfigurationName)-$(PlatformName)-zlib.lib -->
+      <AdditionalDependencies>$(ConfigurationName)-$(PlatformName)-zlib.lib</AdditionalDependencies>
       <Version>16</Version>
       <AdditionalLibraryDirectories>$(OutDir)</AdditionalLibraryDirectories>
     </Link>
@@ -478,7 +482,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>zlib.lib</AdditionalDependencies>
+      <!-- Match zlib.vcxproj: $(OutDir)$(ConfigurationName)-$(PlatformName)-zlib.lib -->
+      <AdditionalDependencies>$(ConfigurationName)-$(PlatformName)-zlib.lib</AdditionalDependencies>
       <Version>16</Version>
       <AdditionalLibraryDirectories>$(OutDir)</AdditionalLibraryDirectories>
     </Link>
@@ -508,7 +513,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>zlib.lib</AdditionalDependencies>
+      <!-- Match zlib.vcxproj: $(OutDir)$(ConfigurationName)-$(PlatformName)-zlib.lib -->
+      <AdditionalDependencies>$(ConfigurationName)-$(PlatformName)-zlib.lib</AdditionalDependencies>
       <Version>16</Version>
       <AdditionalLibraryDirectories>$(OutDir)</AdditionalLibraryDirectories>
     </Link>
