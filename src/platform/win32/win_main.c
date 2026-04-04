@@ -492,6 +492,22 @@ LOAD/UNLOAD DLL
 */
 
 static int dll_err_count = 0;
+/* Last Win32 loader failure: other code may clear GetLastError before we log. */
+static DWORD s_lastLoadLibErr = 0;
+static DWORD s_lastGetProcErr = 0;
+static char s_lastGetProcName[96];
+
+/*
+=================
+Sys_ClearLoadLibraryStickyError
+=================
+*/
+void Sys_ClearLoadLibraryStickyError( void )
+{
+	s_lastLoadLibErr = 0;
+	s_lastGetProcErr = 0;
+	s_lastGetProcName[0] = '\0';
+}
 
 /*
 =================
@@ -503,6 +519,7 @@ void *Sys_LoadLibrary( const char *name )
 	const char *ext;
 	void *ret;
 	UINT prevErrMode;
+	DWORD err;
 
 	if ( !name || !*name )
 		return NULL;
@@ -518,7 +535,17 @@ void *Sys_LoadLibrary( const char *name )
 	SetLastError( 0 );
 	/* Always ANSI: paths from the filesystem are char*; UNICODE/AtoW combos differ across MSVC vs MinGW. */
 	ret = (void *)LoadLibraryA( name );
+	err = GetLastError();
 	SetErrorMode( prevErrMode );
+	if ( !ret ) {
+		s_lastLoadLibErr = err;
+		s_lastGetProcErr = 0;
+		s_lastGetProcName[0] = '\0';
+	} else {
+		s_lastLoadLibErr = 0;
+		s_lastGetProcErr = 0;
+		s_lastGetProcName[0] = '\0';
+	}
 	return ret;
 }
 
@@ -532,8 +559,31 @@ const char *Sys_GetLoadLibraryError( void )
 {
 	static char buf[384];
 	char msg[256];
-	DWORD err = GetLastError();
+	DWORD err;
 	size_t len;
+
+	/* DLL loaded but symbol missing (e.g. GetRefAPI): GetLastError is often stale by now */
+	if ( s_lastGetProcErr != 0 ) {
+		err = s_lastGetProcErr;
+		if ( FormatMessageA( FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+			NULL, err, MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ), msg, sizeof( msg ), NULL ) )
+		{
+			len = strlen( msg );
+			while ( len > 0 && ( msg[len-1] == '\n' || msg[len-1] == '\r' ) ) {
+				msg[--len] = '\0';
+			}
+			Com_sprintf( buf, sizeof( buf ), "GetProcAddress(\"%s\"): %s [WinErr=%lu 0x%08lX]",
+				s_lastGetProcName[0] ? s_lastGetProcName : "?",
+				msg, (unsigned long)err, (unsigned long)err );
+			return buf;
+		}
+		Com_sprintf( buf, sizeof( buf ), "GetProcAddress(\"%s\") WinErr=%lu 0x%08lX (FormatMessage failed)",
+			s_lastGetProcName[0] ? s_lastGetProcName : "?",
+			(unsigned long)err, (unsigned long)err );
+		return buf;
+	}
+
+	err = s_lastLoadLibErr ? s_lastLoadLibErr : GetLastError();
 
 	if ( err == 0 ) {
 		Com_sprintf( buf, sizeof( buf ), "no Win32 error set (GetLastError=0)" );
@@ -587,12 +637,19 @@ void *Sys_LoadFunction( void *handle, const char *name )
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic"
 #endif
+	SetLastError( 0 );
 	symbol = GetProcAddress( handle, name );
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
 #endif
-	if ( !symbol )
+	if ( !symbol ) {
+		s_lastGetProcErr = GetLastError();
+		Q_strncpyz( s_lastGetProcName, name, sizeof( s_lastGetProcName ) );
 		dll_err_count++;
+	} else {
+		s_lastGetProcErr = 0;
+		s_lastGetProcName[0] = '\0';
+	}
 
 	return symbol;
 }
