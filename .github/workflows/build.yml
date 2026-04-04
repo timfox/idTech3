@@ -127,6 +127,11 @@ jobs:
         shell: pwsh
         run: ./scripts/windows_native_compat_check.ps1 -BinDir bin
 
+      - name: Verify PE exports (renderer / game DLLs)
+        if: matrix.cc == 'gcc' && matrix.btype == 'Release'
+        shell: pwsh
+        run: ./scripts/windows_pe_exports_check.ps1 -BinDir bin -ExpectRendererDlls
+
       - uses: actions/upload-artifact@v4
         if: matrix.cc == 'gcc' && matrix.btype == 'Release'
         with:
@@ -297,6 +302,11 @@ jobs:
         if: ${{ matrix.btype == 'Release' }}
         shell: pwsh
         run: ./scripts/windows_native_compat_check.ps1 -BinDir bin
+
+      - name: Verify PE exports (static renderer — no plugin DLLs)
+        if: ${{ matrix.btype == 'Release' }}
+        shell: pwsh
+        run: ./scripts/windows_pe_exports_check.ps1 -BinDir bin -SkipRendererDlls
 
       - uses: actions/upload-artifact@v4
         if: ${{ matrix.btype == 'Release' }}
