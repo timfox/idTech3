@@ -130,6 +130,27 @@ function Get-PeExportNames {
     }
 }
 
+function Test-RequiredPeExport {
+    param(
+        [string[]] $ExportNames,
+        [string] $RequiredBaseName
+    )
+    foreach ($n in $ExportNames) {
+        if ([string]::Equals($n, $RequiredBaseName, [StringComparison]::Ordinal)) {
+            return $true
+        }
+        # MinGW __stdcall / PE decorators: GetRefAPI@N, _GetRefAPI@N, leading underscores
+        if ($n.StartsWith('_', [StringComparison]::Ordinal) -and $n.Substring(1).StartsWith($RequiredBaseName, [StringComparison]::Ordinal)) {
+            return $true
+        }
+        if ($n.StartsWith($RequiredBaseName, [StringComparison]::Ordinal) -and
+            ($n.Length -eq $RequiredBaseName.Length -or $n[$RequiredBaseName.Length] -eq '@')) {
+            return $true
+        }
+    }
+    return $false
+}
+
 function Assert-Exports {
     param(
         [string] $Path,
@@ -139,10 +160,8 @@ function Assert-Exports {
     if ($names.Count -eq 0) {
         throw "No exports found in $Path (not a PE DLL or no export table)"
     }
-    $set = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-    foreach ($n in $names) { [void]$set.Add($n) }
     foreach ($r in $Required) {
-        if (-not $set.Contains($r)) {
+        if (-not (Test-RequiredPeExport -ExportNames $names -RequiredBaseName $r)) {
             throw "Missing export '$r' in $Path (PE exports: $($names -join ', '))"
         }
     }
