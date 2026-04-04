@@ -372,10 +372,6 @@ static VkCommandBuffer begin_command_buffer( void )
 static void end_command_buffer( VkCommandBuffer command_buffer, const char *location )
 {
 	(void)location;
-#ifdef USE_UPLOAD_QUEUE
-	const VkPipelineStageFlags wait_dst_stage_mask = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-	VkSemaphore waits;
-#endif
 	VkSubmitInfo submit_info;
 	VkCommandBuffer cmdbuf[1];
 
@@ -385,20 +381,9 @@ static void end_command_buffer( VkCommandBuffer command_buffer, const char *loca
 
 	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	submit_info.pNext = NULL;
-#ifdef USE_UPLOAD_QUEUE
-	if ( vk.rendering_finished != VK_NULL_HANDLE ) {
-		waits = vk.rendering_finished;
-		vk.rendering_finished = VK_NULL_HANDLE;
-		submit_info.waitSemaphoreCount = 1;
-		submit_info.pWaitSemaphores = &waits;
-		submit_info.pWaitDstStageMask = &wait_dst_stage_mask;
-	} else 
-#endif
-	{
-		submit_info.waitSemaphoreCount = 0;
-		submit_info.pWaitSemaphores = NULL;
-		submit_info.pWaitDstStageMask = NULL;
-	}
+	submit_info.waitSemaphoreCount = 0;
+	submit_info.pWaitSemaphores = NULL;
+	submit_info.pWaitDstStageMask = NULL;
 
 	submit_info.commandBufferCount = 1;
 	submit_info.pCommandBuffers = cmdbuf;
@@ -1751,115 +1736,7 @@ static void vk_clean_staging_buffer( void )
 
 	vk.staging_buffer.ptr = NULL;
 	vk.staging_buffer.size = 0;
-#ifdef USE_UPLOAD_QUEUE
-	vk.staging_buffer.offset = 0;
-#endif
 }
-
-
-#ifdef USE_UPLOAD_QUEUE
-static qboolean vk_wait_staging_buffer( void )
-{
-	if ( vk.device_lost ) {
-		return qfalse;
-	}
-	if ( vk.aux_fence_wait ) {
-		VkResult res = qvkWaitForFences( vk.device, 1, &vk.aux_fence, VK_TRUE, 5 * 1000000000ULL );
-		if ( res != VK_SUCCESS ) {
-			if ( res == VK_ERROR_DEVICE_LOST ) {
-				vk.device_lost = qtrue;
-			}
-			ri.Error( ERR_FATAL, "vkWaitForFences() failed with %s at %s", vk_result_string( res ), __FUNCTION__ );
-		}
-		qvkResetFences( vk.device, 1, &vk.aux_fence );
-		VK_CHECK( qvkResetCommandBuffer( vk.staging_command_buffer, 0 ) );
-		vk.staging_buffer.offset = 0; /* reset: command buffer cleared, staging starts at 0 */
-		vk.aux_fence_wait = qfalse;
-		return qtrue;
-	} else {
-		return qfalse;
-	}
-}
-
-
-static void vk_flush_staging_buffer( qboolean final )
-{
-	const VkPipelineStageFlags wait_dst_stage_mask = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-	VkSemaphore waits;
-	VkSubmitInfo submit_info;
-	VkResult res;
-
-	if ( vk.device_lost ) {
-		return;
-	}
-	if ( vk.staging_buffer.offset == 0 ) {
-		return;
-	}
-
-	//ri.Printf( PRINT_WARNING, S_COLOR_CYAN ">>> flush %i bytes (final=%i)<<<\n", (int)vk_world.staging_buffer_offset, final );
-
-	vk.staging_buffer.offset = 0;
-
-	VK_CHECK( qvkEndCommandBuffer( vk.staging_command_buffer ) );
-
-	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submit_info.pNext = NULL;
-
-	if ( vk.rendering_finished != VK_NULL_HANDLE ) {
-		// first call after previous queue submission?
-		waits = vk.rendering_finished;
-		vk.rendering_finished = VK_NULL_HANDLE;
-		submit_info.waitSemaphoreCount = 1;
-		submit_info.pWaitSemaphores = &waits;
-		submit_info.pWaitDstStageMask = &wait_dst_stage_mask;
-	} else {
-		submit_info.waitSemaphoreCount = 0;
-		submit_info.pWaitSemaphores = NULL;
-		submit_info.pWaitDstStageMask = NULL;
-	}
-
-	submit_info.commandBufferCount = 1;
-	submit_info.pCommandBuffers = &vk.staging_command_buffer;
-
-	if ( vk.image_uploaded != VK_NULL_HANDLE ) {
-		ri.Error( ERR_FATAL, "Vulkan: incorrect state during image upload" );
-	}
-	if ( final ) {
-		// final submission before recording
-		submit_info.signalSemaphoreCount = 1;
-		submit_info.pSignalSemaphores = &vk.image_uploaded2;
-		vk.image_uploaded = vk.image_uploaded2;
-		res = qvkQueueSubmit( vk.queue, 1, &submit_info, vk.aux_fence );
-		if ( res != VK_SUCCESS ) {
-			if ( res == VK_ERROR_DEVICE_LOST ) {
-				vk.device_lost = qtrue;
-			}
-			ri.Error( ERR_FATAL, "Vulkan: qvkQueueSubmit (staging) returned %s", vk_result_string( res ) );
-		}
-		vk.aux_fence_wait = qtrue;
-	} else {
-		// if submission before another upload then do explicit wait
-		submit_info.signalSemaphoreCount = 0;
-		submit_info.pSignalSemaphores = NULL;
-		res = qvkQueueSubmit( vk.queue, 1, &submit_info, vk.aux_fence );
-		if ( res != VK_SUCCESS ) {
-			if ( res == VK_ERROR_DEVICE_LOST ) {
-				vk.device_lost = qtrue;
-			}
-			ri.Error( ERR_FATAL, "Vulkan: qvkQueueSubmit (staging) returned %s", vk_result_string( res ) );
-		}
-		res = qvkWaitForFences( vk.device, 1, &vk.aux_fence, VK_TRUE, 5 * 1000000000ULL );
-		if ( res != VK_SUCCESS ) {
-			if ( res == VK_ERROR_DEVICE_LOST ) {
-				vk.device_lost = qtrue;
-			}
-			ri.Error( ERR_FATAL, "vkWaitForFences() failed with %s at %s", vk_result_string( res ), __FUNCTION__ );
-		}
-		qvkResetFences( vk.device, 1, &vk.aux_fence );
-		VK_CHECK( qvkResetCommandBuffer( vk.staging_command_buffer, 0 ) );
-	}
-}
-#endif // USE_UPLOAD_QUEUE
 
 
 static void vk_alloc_staging_buffer( VkDeviceSize size )
@@ -1899,9 +1776,6 @@ static void vk_alloc_staging_buffer( VkDeviceSize size )
 
 	VK_CHECK(qvkMapMemory(vk.device, vk.staging_buffer.memory, 0, VK_WHOLE_SIZE, 0, &data));
 	vk.staging_buffer.ptr = (byte*)data;
-#ifdef USE_UPLOAD_QUEUE
-	vk.staging_buffer.offset = 0;
-#endif
 	SET_OBJECT_NAME( vk.staging_buffer.handle, "staging buffer", VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT );
 	SET_OBJECT_NAME( vk.staging_buffer.memory, "staging buffer memory", VK_DEBUG_REPORT_OBJECT_TYPE_DEVICE_MEMORY_EXT );
 }
@@ -4545,9 +4419,6 @@ qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size )
 
 	// staging buffers
 
-#ifdef USE_UPLOAD_QUEUE
-	vk_flush_staging_buffer( qfalse );
-#endif
 	// utilize existing staging buffer
 	uploadDone = 0;
 	while ( uploadDone < (VkDeviceSize) vbo_size ) {
@@ -6396,10 +6267,6 @@ static void vk_restart_swapchain( const char *funcname, VkResult res )
 		qvkResetCommandBuffer( vk.tess[i].command_buffer, 0 );
 	}
 
-#ifdef USE_UPLOAD_QUEUE
-	qvkResetCommandBuffer( vk.staging_command_buffer, 0 );
-#endif
-
 	vk_destroy_pipelines( qfalse );
 	vk_destroy_framebuffers();
 	vk_destroy_render_passes();
@@ -6839,20 +6706,6 @@ void vk_initialize( void )
 
 		SET_OBJECT_NAME( vk.command_pool, "command pool", VK_DEBUG_REPORT_OBJECT_TYPE_COMMAND_POOL_EXT );
 	}
-
-#ifdef USE_UPLOAD_QUEUE
-	{
-		VkCommandBufferAllocateInfo alloc_info;
-
-		alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		alloc_info.pNext = NULL;
-		alloc_info.commandPool = vk.command_pool;
-		alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		alloc_info.commandBufferCount = 1;
-
-		VK_CHECK( qvkAllocateCommandBuffers( vk.device, &alloc_info, &vk.staging_command_buffer ) );
-	}
-#endif
 
 	//
 	// Command buffers and color attachments.
@@ -10441,52 +10294,6 @@ void vk_upload_image_data( image_t *image, int x, int y, int width, int height, 
 		if (height < 1) height = 1;
 	}
 
-#ifdef USE_UPLOAD_QUEUE
-	if ( vk_wait_staging_buffer() ) {
-		// wait for vkQueueSubmit() completion before new upload
-	}
-
-	if ( vk.staging_buffer.size - vk.staging_buffer.offset < buffer_size ) {
-		// try to flush staging buffer and reset offset
-		vk_flush_staging_buffer( qfalse );
-	}
-
-	if ( vk.staging_buffer.size /* - vk_world.staging_buffer_offset */ < buffer_size ) {
-		// if still not enough - reallocate staging buffer
-		vk_alloc_staging_buffer( buffer_size );
-	}
-
-	for ( n = 0; n < num_regions; n++ ) {
-		regions[n].bufferOffset += vk.staging_buffer.offset;
-	}
-
-	Com_Memcpy( vk.staging_buffer.ptr + vk.staging_buffer.offset, buf, buffer_size );
-
-	if ( vk.staging_buffer.offset == 0 ) {
-		VkCommandBufferBeginInfo begin_info;
-		begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		begin_info.pNext = NULL;
-		begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-		begin_info.pInheritanceInfo = NULL;
-		VK_CHECK( qvkBeginCommandBuffer( vk.staging_command_buffer, &begin_info ) );
-	}
-
-	//ri.Printf( PRINT_WARNING, "batch @%6i + %i %s \n", (int)vk_world.staging_buffer_offset, (int)buffer_size, image->imgName );
-	vk.staging_buffer.offset += buffer_size;
-
-	command_buffer = vk.staging_command_buffer;
-
-	if ( update ) {
-		record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0 );
-	} else {
-		record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_HOST_BIT, 0 );
-	}
-
-	qvkCmdCopyBufferToImage( command_buffer, vk.staging_buffer.handle, image->handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, num_regions, regions );
-
-	// final transition after upload comleted
-	record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
-#else
 	if ( vk.staging_buffer.size < (VkDeviceSize) buffer_size ) {
 		vk_alloc_staging_buffer( buffer_size );
 	}
@@ -10503,7 +10310,6 @@ void vk_upload_image_data( image_t *image, int x, int y, int width, int height, 
 	qvkCmdCopyBufferToImage( command_buffer, vk.staging_buffer.handle, image->handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, num_regions, regions );
 	record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
 	end_command_buffer( command_buffer, __func__ );
-#endif
 
 	if ( buf != pixels ) {
 		ri.Hunk_FreeTempMemory( buf );
@@ -10561,43 +10367,12 @@ void vk_upload_cubemap_mip_data( image_t *image, int face_size, int miplevels, c
 		return;
 	}
 
-#ifdef USE_UPLOAD_QUEUE
-	if ( vk_wait_staging_buffer() ) {
-	}
-
-	if ( vk.staging_buffer.size - vk.staging_buffer.offset < (VkDeviceSize)buffer_size ) {
-		vk_flush_staging_buffer( qfalse );
-	}
-
-	if ( vk.staging_buffer.size < (VkDeviceSize)buffer_size ) {
-		vk_alloc_staging_buffer( buffer_size );
-	}
-
-	for ( mip = 0; mip < num_regions; mip++ ) {
-		regions[mip].bufferOffset += vk.staging_buffer.offset;
-	}
-
-	Com_Memcpy( vk.staging_buffer.ptr + vk.staging_buffer.offset, pixels, buffer_size );
-
-	if ( vk.staging_buffer.offset == 0 ) {
-		VkCommandBufferBeginInfo begin_info;
-		begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		begin_info.pNext = NULL;
-		begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-		begin_info.pInheritanceInfo = NULL;
-		VK_CHECK( qvkBeginCommandBuffer( vk.staging_command_buffer, &begin_info ) );
-	}
-
-	vk.staging_buffer.offset += buffer_size;
-	command_buffer = vk.staging_command_buffer;
-#else
 	if ( vk.staging_buffer.size < (VkDeviceSize)buffer_size ) {
 		vk_alloc_staging_buffer( buffer_size );
 	}
 
 	Com_Memcpy( vk.staging_buffer.ptr, pixels, buffer_size );
 	command_buffer = begin_command_buffer();
-#endif
 
 	if ( update ) {
 		record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT,
@@ -10612,9 +10387,7 @@ void vk_upload_cubemap_mip_data( image_t *image, int face_size, int miplevels, c
 	record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
 
-#ifndef USE_UPLOAD_QUEUE
 	end_command_buffer( command_buffer, __func__ );
-#endif
 }
 
 /*
@@ -10660,37 +10433,11 @@ void vk_upload_compressed_image_data( image_t *image, int width, int height, int
 			break;
 	}
 
-#ifdef USE_UPLOAD_QUEUE
-	if ( vk_wait_staging_buffer() ) {
-		vk_flush_staging_buffer( qfalse );
-	}
-	if ( vk.staging_buffer.size - vk.staging_buffer.offset < (VkDeviceSize)size ) {
-		vk_flush_staging_buffer( qfalse );
-	}
-	if ( vk.staging_buffer.size < (VkDeviceSize)size ) {
-		vk_alloc_staging_buffer( size );
-	}
-	for ( n = 0; n < num_regions; n++ ) {
-		regions[n].bufferOffset += vk.staging_buffer.offset;
-	}
-	Com_Memcpy( vk.staging_buffer.ptr + vk.staging_buffer.offset, pixels, size );
-	if ( vk.staging_buffer.offset == 0 ) {
-		VkCommandBufferBeginInfo begin_info;
-		begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		begin_info.pNext = NULL;
-		begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-		begin_info.pInheritanceInfo = NULL;
-		VK_CHECK( qvkBeginCommandBuffer( vk.staging_command_buffer, &begin_info ) );
-	}
-	vk.staging_buffer.offset += size;
-	command_buffer = vk.staging_command_buffer;
-#else
 	if ( vk.staging_buffer.size < (VkDeviceSize)size ) {
 		vk_alloc_staging_buffer( size );
 	}
 	Com_Memcpy( vk.staging_buffer.ptr, pixels, size );
 	command_buffer = begin_command_buffer();
-#endif
 
 	if ( update ) {
 		record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0 );
@@ -10700,9 +10447,7 @@ void vk_upload_compressed_image_data( image_t *image, int width, int height, int
 	qvkCmdCopyBufferToImage( command_buffer, vk.staging_buffer.handle, image->handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, num_regions, regions );
 	record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
 
-#ifndef USE_UPLOAD_QUEUE
 	end_command_buffer( command_buffer, __func__ );
-#endif
 }
 
 void vk_update_descriptor_set( image_t *image, qboolean mipmap ) {
@@ -15177,10 +14922,6 @@ void vk_begin_frame( void )
 	vk.temporal.preparedThisFrame = qfalse;
 	vk.uiOverlayActive = qfalse;
 
-#ifdef USE_UPLOAD_QUEUE
-	vk_flush_staging_buffer( qtrue );
-#endif
-
 	vk.cmd = &vk.tess[ vk.cmd_index ];
 
 	if ( vk.cmd->waitForFence ) {
@@ -15333,12 +15074,7 @@ static void vk_resize_geometry_buffer( void )
 
 void vk_end_frame( void )
 {
-#ifdef USE_UPLOAD_QUEUE
-	VkSemaphore waits[2], signals[2];
-	const VkPipelineStageFlags wait_dst_stage_mask[2] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-#else
 	const VkPipelineStageFlags wait_dst_stage_mask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-#endif
 	VkSubmitInfo submit_info;
 
 	if ( vk.frame_count == 0 )
@@ -15404,46 +15140,11 @@ void vk_end_frame( void )
 	submit_info.commandBufferCount = 1;
 	submit_info.pCommandBuffers = &vk.cmd->command_buffer;
 	if ( !ri.CL_IsMinimized() ) {
-#ifdef USE_UPLOAD_QUEUE
-		if ( vk.image_uploaded != VK_NULL_HANDLE ) {
-			waits[0] = vk.cmd->image_acquired;
-			waits[1] = vk.image_uploaded;
-			submit_info.waitSemaphoreCount = 2;
-			submit_info.pWaitSemaphores = &waits[0];
-			submit_info.pWaitDstStageMask = &wait_dst_stage_mask[0];
-			signals[0] = vk.swapchain_rendering_finished[ vk.cmd->swapchain_image_index ];
-			signals[1] = vk.cmd->rendering_finished2;
-			submit_info.signalSemaphoreCount = 2;
-			submit_info.pSignalSemaphores = &signals[0];
-
-			vk.rendering_finished = vk.cmd->rendering_finished2;
-			vk.image_uploaded = VK_NULL_HANDLE;
-		} else if ( vk.rendering_finished != VK_NULL_HANDLE ) {
-			waits[0] = vk.cmd->image_acquired;
-			waits[1] = vk.rendering_finished;
-			submit_info.waitSemaphoreCount = 2;
-			submit_info.pWaitSemaphores = &waits[0];
-			submit_info.pWaitDstStageMask = &wait_dst_stage_mask[0];
-			signals[0] = vk.swapchain_rendering_finished[ vk.cmd->swapchain_image_index ];
-			signals[1] = vk.cmd->rendering_finished2;
-			submit_info.signalSemaphoreCount = 2;
-			submit_info.pSignalSemaphores = &signals[0];
-
-			vk.rendering_finished = vk.cmd->rendering_finished2;
-		} else {
-			submit_info.waitSemaphoreCount = 1;
-			submit_info.pWaitSemaphores = &vk.cmd->image_acquired;
-			submit_info.pWaitDstStageMask = &wait_dst_stage_mask[0];
-			submit_info.signalSemaphoreCount = 1;
-			submit_info.pSignalSemaphores = &vk.swapchain_rendering_finished[ vk.cmd->swapchain_image_index ];
-		}
-#else
 		submit_info.waitSemaphoreCount = 1;
 		submit_info.pWaitSemaphores = &vk.cmd->image_acquired;
 		submit_info.pWaitDstStageMask = &wait_dst_stage_mask;
 		submit_info.signalSemaphoreCount = 1;
 		submit_info.pSignalSemaphores = &vk.swapchain_rendering_finished[ vk.cmd->swapchain_image_index ];
-#endif
 	} else {
 		submit_info.waitSemaphoreCount = 0;
 		submit_info.pWaitSemaphores = NULL;
