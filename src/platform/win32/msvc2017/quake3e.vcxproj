@@ -152,7 +152,8 @@
     </ClCompile>
     <ResourceCompile />
     <Link>
-      <AdditionalDependencies>comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-libpng16.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-zlib.lib;$(LibCurlVS2017)\lib32\libcurl_a_debug.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;libpng16.lib;zlib.lib;$(LibCurlVS2017)\lib32\libcurl_a_debug.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\..\..\..\external\src\libpng\projects\vstudio\libpng\$(Platform)\$(Configuration);$(ProjectDir)..\..\..\..\external\src\libpng\projects\vstudio\zlib\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <ProgramDatabaseFile>$(IntDir)idtech3-debug.pdb</ProgramDatabaseFile>
       <GenerateMapFile>true</GenerateMapFile>
@@ -176,7 +177,8 @@
     </ClCompile>
     <ResourceCompile />
     <Link>
-      <AdditionalDependencies>comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-libpng16.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-zlib.lib;$(LibCurlVS2017)\lib64\libcurl_a_debug.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;libpng16.lib;zlib.lib;$(LibCurlVS2017)\lib64\libcurl_a_debug.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\..\..\..\external\src\libpng\projects\vstudio\libpng\$(Platform)\$(Configuration);$(ProjectDir)..\..\..\..\external\src\libpng\projects\vstudio\zlib\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <ProgramDatabaseFile>$(IntDir)idtech3-debug.pdb</ProgramDatabaseFile>
       <GenerateMapFile>true</GenerateMapFile>
@@ -200,7 +202,8 @@
     </ClCompile>
     <ResourceCompile />
     <Link>
-      <AdditionalDependencies>advapi32.lib;comctl32.lib;gdi32.lib;ole32.lib;winmm.lib;wsock32.lib;ws2_32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-libpng16.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>advapi32.lib;comctl32.lib;gdi32.lib;ole32.lib;winmm.lib;wsock32.lib;ws2_32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;libpng16.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\..\..\..\external\src\libpng\projects\vstudio\libpng\$(Platform)\$(Configuration);$(ProjectDir)..\..\..\..\external\src\libpng\projects\vstudio\zlib\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <ProgramDatabaseFile>$(IntDir)idtech3-debug.pdb</ProgramDatabaseFile>
       <GenerateMapFile>true</GenerateMapFile>
@@ -220,7 +223,8 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-libpng16.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-zlib.lib;$(LibCurlVS2017)\lib32\libcurl_a.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;libpng16.lib;zlib.lib;$(LibCurlVS2017)\lib32\libcurl_a.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\..\..\..\external\src\libpng\projects\vstudio\libpng\$(Platform)\$(Configuration);$(ProjectDir)..\..\..\..\external\src\libpng\projects\vstudio\zlib\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <GenerateMapFile>true</GenerateMapFile>
       <MapFileName>$(IntDir)idtech3.map</MapFileName>
@@ -247,7 +251,8 @@
     </ClCompile>
     <Link>
       <AdditionalOptions>/DYNAMICBASE %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-libpng16.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-zlib.lib;$(LibCurlVS2017)\lib64\libcurl_a.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;libpng16.lib;zlib.lib;$(LibCurlVS2017)\lib64\libcurl_a.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\..\..\..\external\src\libpng\projects\vstudio\libpng\$(Platform)\$(Configuration);$(ProjectDir)..\..\..\..\external\src\libpng\projects\vstudio\zlib\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <GenerateMapFile>true</GenerateMapFile>
       <MapFileName>$(IntDir)idtech3.map</MapFileName>
@@ -272,7 +277,8 @@
     </ClCompile>
     <Link>
       <AdditionalOptions>/DYNAMICBASE %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>advapi32.lib;comctl32.lib;gdi32.lib;ole32.lib;winmm.lib;wsock32.lib;ws2_32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-libpng16.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>advapi32.lib;comctl32.lib;gdi32.lib;ole32.lib;winmm.lib;wsock32.lib;ws2_32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;libpng16.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\..\..\..\external\src\libpng\projects\vstudio\libpng\$(Platform)\$(Configuration);$(ProjectDir)..\..\..\..\external\src\libpng\projects\vstudio\zlib\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <GenerateMapFile>true</GenerateMapFile>
       <MapFileName>$(IntDir)idtech3.map</MapFileName>
