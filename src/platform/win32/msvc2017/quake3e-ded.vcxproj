@@ -287,6 +287,7 @@
     <ClCompile Include="..\..\qcommon\q_shared.c" />
     <ClCompile Include="..\..\qcommon\unzip.c" />
     <ClCompile Include="..\..\qcommon\vm.c" />
+    <ClCompile Include="..\..\qcommon\vm_native_module.c" />
     <ClCompile Include="..\..\qcommon\vm_aarch64.c">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
