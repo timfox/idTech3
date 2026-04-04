@@ -8,6 +8,20 @@
 #ifndef ZCONF_H
 #define ZCONF_H
 
+/* Defaults when this header is used without running zlib ./configure (MSVC
+ * libpng vcxproj, vendored tree). CMake builds still generate zconf.h in the
+ * build directory; this file must compile cleanly with -Wundef. */
+#ifndef HAVE_UNISTD_H
+#  if defined(_WIN32) && !defined(__MINGW32__) && !defined(__CYGWIN__)
+#    define HAVE_UNISTD_H 0
+#  else
+#    define HAVE_UNISTD_H 1
+#  endif
+#endif
+#ifndef HAVE_STDARG_H
+#  define HAVE_STDARG_H 1
+#endif
+
 /*
  * If you *really* need a unique prefix for all types and library functions,
  * compile with -DZ_PREFIX. The "standard" zlib should be compiled without it.
