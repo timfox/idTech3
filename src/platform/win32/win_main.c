@@ -501,6 +501,8 @@ Sys_LoadLibrary
 void *Sys_LoadLibrary( const char *name )
 {
 	const char *ext;
+	void *ret;
+	UINT prevErrMode;
 
 	if ( !name || !*name )
 		return NULL;
@@ -510,7 +512,13 @@ void *Sys_LoadLibrary( const char *name )
 		Com_Error( ERR_FATAL, "Sys_LoadLibrary: Unable to load library with '%s' extension", ext );
 	}
 
-	return (void *)LoadLibrary( AtoW( name ) );
+	/* Suppress modal "missing DLL" dialogs; log WinErr instead (compatibility / headless). */
+	prevErrMode = SetErrorMode( 0 );
+	SetErrorMode( prevErrMode | SEM_FAILCRITICALERRORS );
+	SetLastError( 0 );
+	ret = (void *)LoadLibraryW( AtoW( name ) );
+	SetErrorMode( prevErrMode );
+	return ret;
 }
 
 
@@ -521,14 +529,41 @@ Sys_GetLoadLibraryError
 */
 const char *Sys_GetLoadLibraryError( void )
 {
-	static char buf[256];
+	static char buf[384];
+	char msg[256];
 	DWORD err = GetLastError();
-	if ( err != 0 && FormatMessageA( FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-		NULL, err, MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ), buf, sizeof( buf ), NULL ) )
-	{
+	size_t len;
+
+	if ( err == 0 ) {
+		Com_sprintf( buf, sizeof( buf ), "no Win32 error set (GetLastError=0)" );
 		return buf;
 	}
-	return "unknown error";
+	if ( FormatMessageA( FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+		NULL, err, MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ), msg, sizeof( msg ), NULL ) )
+	{
+		/* Trim trailing CR/LF from FormatMessage */
+		len = strlen( msg );
+		while ( len > 0 && ( msg[len-1] == '\n' || msg[len-1] == '\r' ) ) {
+			msg[--len] = '\0';
+		}
+		Com_sprintf( buf, sizeof( buf ), "%s [WinErr=%lu 0x%08lX]", msg, (unsigned long)err, (unsigned long)err );
+		return buf;
+	}
+	Com_sprintf( buf, sizeof( buf ), "WinErr=%lu 0x%08lX (FormatMessage failed)", (unsigned long)err, (unsigned long)err );
+	return buf;
+}
+
+
+/*
+=================
+Sys_LogNativeLibraryLoadFailure
+=================
+*/
+void Sys_LogNativeLibraryLoadFailure( const char *fullPath )
+{
+	const char *detail = Sys_GetLoadLibraryError();
+	Com_Printf( S_COLOR_YELLOW "Native library load failed: \"%s\" — %s\n",
+		fullPath ? fullPath : "(null)", detail );
 }
 
 

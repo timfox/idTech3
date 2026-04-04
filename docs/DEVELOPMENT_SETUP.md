@@ -44,6 +44,10 @@ pacman -S base-devel mingw-w64-x86_64-{gcc,cmake,ninja,pkgconf,SDL2,openal,freet
 
 MinGW links SDL2/OpenAL/etc. dynamically. If you copy `idtech3.exe` outside MSYS2 (or ship a zip), run `./scripts/stage_mingw_runtime_dlls.sh bin` from a **MINGW64** shell after copying binaries into `bin/` so required `.dll` files sit next to the executables.
 
+**Native DLL / `.so` load failures:** run with `+set com_nativeLibraryDebug 1` on the command line (before configs that matter) so every failed `FS_LoadLibrary` attempt logs the **full path** and the OS loader message. On Windows, `Sys_GetLoadLibraryError` includes `WinErr=…` from `GetLastError` (e.g. missing dependency vs bad format).
+
+**PE architecture sanity:** from PowerShell, `pwsh ./scripts/windows_native_compat_check.ps1 -BinDir path\to\bin` fails if any `.exe`/`.dll` in the folder is not the same machine type as the reference executable (catches x86/x64/ARM64 mixups).
+
 ## Building
 
 The primary build script is `scripts/compile_engine.sh`.
