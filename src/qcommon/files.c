@@ -4829,7 +4829,7 @@ static void FS_Startup( void ) {
 	fs_debug = Cvar_Get( "fs_debug", "0", 0 );
 	Cvar_SetDescription( fs_debug, "Debugging tool for the filesystem. Run the game in debug mode. Prints additional information regarding read files into the console." );
 	com_nativeLibraryDebug = Cvar_Get( "com_nativeLibraryDebug", "0", 0 );
-	Cvar_SetDescription( com_nativeLibraryDebug, "Log every failed native library load attempt (full path + OS loader error). Use for Windows DLL / .so compatibility diagnosis." );
+	Cvar_SetDescription( com_nativeLibraryDebug, "Log every failed native library load attempt (full path + OS loader error). Windows keeps the last LoadLibrary/GetProcAddress error until the next native load. Use for DLL/.so compatibility diagnosis." );
 	if ( com_nativeLibraryDebug->integer ) {
 		Com_Printf( S_COLOR_CYAN "com_nativeLibraryDebug: logging failed native library load paths + loader errors.\n" );
 	}
