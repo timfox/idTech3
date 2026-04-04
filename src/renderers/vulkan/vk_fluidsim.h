@@ -21,7 +21,6 @@ extern "C" {
 #endif
 
 #define FLUID_GRID_SIZE      64
-#define FLUID_JACOBI_ITERS   40
 #define FLUID_WORKGROUP_SIZE  8
 #define MAX_FLUID_EMITTERS   16
 
@@ -34,17 +33,8 @@ typedef struct fluidEmitter_s {
 	float pad;
 } fluidEmitter_t;
 
-void      FluidSim_RegisterCvars(void);
-qboolean  FluidSim_IsEnabled(void);
-
-float     FluidSim_GetViscosity(void);
-float     FluidSim_GetDiffusion(void);
-float     FluidSim_GetDissipation(void);
 float     FluidSim_GetBuoyancy(void);
 float     FluidSim_GetVorticity(void);
-float     FluidSim_GetGridScale(void);
-int       FluidSim_GetJacobiIterations(void);
-void      FluidSim_GetWindForce(float *x, float *y, float *z);
 
 void      FluidSim_AddEmitter(const fluidEmitter_t *emitter);
 void      FluidSim_ClearEmitters(void);

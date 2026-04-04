@@ -18,11 +18,9 @@
 - **Parameters**: Viscosity, diffusion, dissipation, buoyancy, vorticity, wind
 - **Integration**: Fog fluid uses `r_fogFluid*` cvars; emitters from `FluidSim_*` API
 
-### Two Fluid Paths
-1. **r_fluidsim** – Standalone Navier-Stokes (FluidSim cvars, `FluidSim_GetJacobiIterations`)
-2. **r_fogFluid** – Fog-integrated fluid (r_fogFluid* cvars, `r_fogFluidPressureIterations`)
-
-Both share emitter data from `FluidSim_AddEmitter` / `FluidSim_GetEmitter`.
+### Fluid integration
+- **r_fogFluid** – Fog-integrated fluid (`r_fogFluid*` cvars, `r_fogFluidPressureIterations` for Jacobi iterations)
+- Emitters use `FluidSim_AddEmitter` / `FluidSim_GetEmitter` (API in `vk_fluidsim.c`).
 
 ## Audit Findings
 
@@ -39,13 +37,11 @@ Both share emitter data from `FluidSim_AddEmitter` / `FluidSim_GetEmitter`.
 
 2. **Emitter radius validation** (`vk_fluidsim.c`): Clamp negative radius to 0 in `FluidSim_AddEmitter` (shader already uses `max(radius, 0.001)`).
 
-3. **Jacobi iterations range** (`vk_fluidsim.c`): `Cvar_CheckRange(r_fluidsim_iterations, "1", "64", CV_INTEGER)` to prevent invalid iteration counts.
+3. **Jacobi iterations range** (`tr_init.c`): `Cvar_CheckRange(r_fogFluidPressureIterations, "1", "64", CV_INTEGER)` to prevent invalid iteration counts.
 
 ### 📋 Design Notes
-- **FluidSim_GetJacobiIterations** is used by the standalone `r_fluidsim` path; fog fluid uses `r_fogFluidPressureIterations`.
 - **Emitter position**: Shader uses `position.xy` for 2D world mapping; `fluidWorldMap` maps UV [0,1] to world (fog_min + uv × size).
 - **fluidEmitterData layout**: `[density, temperature, vel.x, vel.y]` per emitter; matches shader usage.
 
 ### ⚠️ Recommendations
-- Consider adding `Cvar_SetDescription` for FluidSim cvars (consistent with other renderer cvars).
 - RENDERERS.md states "64³ grid" for fluid; actual implementation is 2D (fluid_width × fluid_height). Consider doc update.
