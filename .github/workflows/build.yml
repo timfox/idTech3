@@ -146,18 +146,36 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [arm64, x64]
-        btype: [Release, Debug]
         include:
+          # vcxproj TargetName differs Debug vs Release; never pass /p:TargetName on msbuild (breaks zlib via ProjectReference).
           - arch: arm64
             platform: ARM64
             suffix: .arm64
             pkg_suffix: arm64
-
+            btype: Release
+            msvc_out_ded: idtech3_server.exe
+            msvc_out_cli: idtech3.exe
+          - arch: arm64
+            platform: ARM64
+            suffix: .arm64
+            pkg_suffix: arm64
+            btype: Debug
+            msvc_out_ded: idtech3_server-debug.exe
+            msvc_out_cli: idtech3-debug.exe
           - arch: x64
             platform: x64
             suffix: .x64
             pkg_suffix: x86_64
+            btype: Release
+            msvc_out_ded: idtech3_server.exe
+            msvc_out_cli: idtech3.exe
+          - arch: x64
+            platform: x64
+            suffix: .x64
+            pkg_suffix: x86_64
+            btype: Debug
+            msvc_out_ded: idtech3_server-debug.exe
+            msvc_out_cli: idtech3-debug.exe
 
     steps:
       - uses: microsoft/setup-msbuild@v2
@@ -175,22 +193,20 @@ jobs:
             /p:PlatformToolset=v143 ^
             /p:TreatWarningsAsErrors=false
 
-          rem --- Dedicated server ---
+          rem --- Dedicated server (TargetName is idtech3_server in vcxproj; do not pass /p:TargetName — it poisons ProjectReference builds like zlib) ---
           msbuild src\platform\win32\msvc2017\quake3e-ded.vcxproj ^
-            %MSBUILD_COMMON% ^
-            /p:TargetName=idtech3_server
+            %MSBUILD_COMMON%
           if errorlevel 1 exit /b 1
-          if not exist src\platform\win32\msvc2017\output\idtech3_server.exe (
-            echo ERROR: missing output\idtech3_server.exe after ded build
+          if not exist src\platform\win32\msvc2017\output\${{ matrix.msvc_out_ded }} (
+            echo ERROR: missing output\${{ matrix.msvc_out_ded }} after ded build
             dir /b src\platform\win32\msvc2017\output 2>nul
             exit /b 1
           )
-          copy /Y src\platform\win32\msvc2017\output\idtech3_server.exe bin\idtech3_server${{ matrix.suffix }}.exe
+          copy /Y src\platform\win32\msvc2017\output\${{ matrix.msvc_out_ded }} bin\idtech3_server${{ matrix.suffix }}.exe
           if errorlevel 1 exit /b 1
           msbuild src\platform\win32\msvc2017\quake3e-ded.vcxproj ^
             %MSBUILD_COMMON% ^
-            /t:Clean ^
-            /p:TargetName=idtech3_server
+            /t:Clean
 
           rem --- OpenGL renderer + client ---
           msbuild src\platform\win32\msvc2017\opengl.vcxproj ^
@@ -198,20 +214,18 @@ jobs:
           if errorlevel 1 exit /b 1
           msbuild src\platform\win32\msvc2017\quake3e.vcxproj ^
             %MSBUILD_COMMON% ^
-            /p:TargetName=idtech3 ^
             /p:UseWasapi=0
           if errorlevel 1 exit /b 1
-          if not exist src\platform\win32\msvc2017\output\idtech3.exe (
-            echo ERROR: missing output\idtech3.exe after OpenGL client build
+          if not exist src\platform\win32\msvc2017\output\${{ matrix.msvc_out_cli }} (
+            echo ERROR: missing output\${{ matrix.msvc_out_cli }} after OpenGL client build
             dir /b src\platform\win32\msvc2017\output 2>nul
             exit /b 1
           )
-          copy /Y src\platform\win32\msvc2017\output\idtech3.exe bin\idtech3${{ matrix.suffix }}.exe
+          copy /Y src\platform\win32\msvc2017\output\${{ matrix.msvc_out_cli }} bin\idtech3${{ matrix.suffix }}.exe
           if errorlevel 1 exit /b 1
           msbuild src\platform\win32\msvc2017\quake3e.vcxproj ^
             %MSBUILD_COMMON% ^
             /t:Clean ^
-            /p:TargetName=idtech3 ^
             /p:UseWasapi=0
           msbuild src\platform\win32\msvc2017\opengl.vcxproj ^
             %MSBUILD_COMMON% ^
@@ -223,20 +237,18 @@ jobs:
           if errorlevel 1 exit /b 1
           msbuild src\platform\win32\msvc2017\quake3e.vcxproj ^
             %MSBUILD_COMMON% ^
-            /p:TargetName=idtech3 ^
             /p:UseWasapi=0
           if errorlevel 1 exit /b 1
-          if not exist src\platform\win32\msvc2017\output\idtech3.exe (
-            echo ERROR: missing output\idtech3.exe after Vulkan client build
+          if not exist src\platform\win32\msvc2017\output\${{ matrix.msvc_out_cli }} (
+            echo ERROR: missing output\${{ matrix.msvc_out_cli }} after Vulkan client build
             dir /b src\platform\win32\msvc2017\output 2>nul
             exit /b 1
           )
-          copy /Y src\platform\win32\msvc2017\output\idtech3.exe bin\idtech3-vulkan${{ matrix.suffix }}.exe
+          copy /Y src\platform\win32\msvc2017\output\${{ matrix.msvc_out_cli }} bin\idtech3-vulkan${{ matrix.suffix }}.exe
           if errorlevel 1 exit /b 1
           msbuild src\platform\win32\msvc2017\quake3e.vcxproj ^
             %MSBUILD_COMMON% ^
             /t:Clean ^
-            /p:TargetName=idtech3 ^
             /p:UseWasapi=0
           msbuild src\platform\win32\msvc2017\vulkan.vcxproj ^
             %MSBUILD_COMMON% ^
@@ -275,8 +287,8 @@ jobs:
           if ($missing.Count -gt 0) {
             Write-Host "`nAttempting fallback copy from output\ ..."
             New-Item -ItemType Directory -Force -Path $bin | Out-Null
-            $ded = Join-Path $out 'idtech3_server.exe'
-            $cli = Join-Path $out 'idtech3.exe'
+            $ded = Join-Path $out '${{ matrix.msvc_out_ded }}'
+            $cli = Join-Path $out '${{ matrix.msvc_out_cli }}'
             if (Test-Path -LiteralPath $ded) {
               Copy-Item -LiteralPath $ded -Destination (Join-Path $bin "idtech3_server$sfx.exe") -Force
             }
