@@ -28,7 +28,7 @@ Use this checklist before tagging or publishing a release.
 ## Release Artifacts
 
 ### Binaries
-- [ ] Windows: `idtech3.exe`, `idtech3_server.exe`, `idtech3_vulkan*.exe`, `idtech3_opengl.so` (or equivalent)
+- [ ] Windows: `idtech3.exe`, `idtech3_server.exe`; **MSYS2/MinGW** artifacts also need bundled MinGW runtime `.dll` (CI runs `scripts/stage_mingw_runtime_dlls.sh`). **MSVC** builds static-link renderers (no `idtech3_vulkan.dll` / `idtech3_opengl.dll`).
 - [ ] Linux: `idtech3`, `idtech3_server`, `idtech3_vulkan.so`, `idtech3_opengl.so`
 - [ ] macOS: `idtech3`, `idtech3_server`, renderer plugins
 

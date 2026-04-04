@@ -96,6 +96,7 @@ jobs:
           cmake --build build-vk-${{ matrix.btype }} -j$(nproc)
           mkdir -p bin
           cp -f build-vk-${{ matrix.btype }}/idtech3* bin/ || true
+          bash ./scripts/stage_mingw_runtime_dlls.sh bin
 
       - name: Build OpenGL
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
@@ -119,6 +120,7 @@ jobs:
             -Wno-dev
           cmake --build build-gl-${{ matrix.btype }} -j$(nproc)
           cp -f build-gl-${{ matrix.btype }}/idtech3* bin/ || true
+          bash ./scripts/stage_mingw_runtime_dlls.sh bin
 
       - uses: actions/upload-artifact@v4
         if: matrix.cc == 'gcc' && matrix.btype == 'Release'
