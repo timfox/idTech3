@@ -149,6 +149,9 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <AdditionalIncludeDirectories>$(ZLibSrcDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <!-- C4061: zlib switch on enums; do not fail Release|x64 when parent enables /WX -->
+      <DisableSpecificWarnings>$(DisableSpecificWarnings);4061</DisableSpecificWarnings>
+      <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
   </ItemDefinitionGroup>
   <ImportGroup Label="ExtensionSettings">
@@ -241,7 +244,7 @@
       <Optimization>Disabled</Optimization>
       <BrowseInformation>true</BrowseInformation>
       <FunctionLevelLinking>true</FunctionLevelLinking>
-      <DisableSpecificWarnings>$(DisableSpecificWarnings);4127;4131;4242;4244</DisableSpecificWarnings>
+      <DisableSpecificWarnings>$(DisableSpecificWarnings);4061;4127;4131;4242;4244</DisableSpecificWarnings>
       <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
     <Link>
@@ -259,7 +262,7 @@
       <Optimization>Disabled</Optimization>
       <BrowseInformation>true</BrowseInformation>
       <FunctionLevelLinking>true</FunctionLevelLinking>
-      <DisableSpecificWarnings>$(DisableSpecificWarnings);4127;4131;4242;4244</DisableSpecificWarnings>
+      <DisableSpecificWarnings>$(DisableSpecificWarnings);4061;4127;4131;4242;4244</DisableSpecificWarnings>
       <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
     <Link>
@@ -277,7 +280,7 @@
       <Optimization>Disabled</Optimization>
       <BrowseInformation>true</BrowseInformation>
       <FunctionLevelLinking>true</FunctionLevelLinking>
-      <DisableSpecificWarnings>$(DisableSpecificWarnings);4127;4131;4242;4244</DisableSpecificWarnings>
+      <DisableSpecificWarnings>$(DisableSpecificWarnings);4061;4127;4131;4242;4244</DisableSpecificWarnings>
       <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
     <Link>
@@ -293,7 +296,7 @@
       <Optimization>Disabled</Optimization>
       <BrowseInformation>true</BrowseInformation>
       <FunctionLevelLinking>true</FunctionLevelLinking>
-      <DisableSpecificWarnings>$(DisableSpecificWarnings);4127;4131;4242;4244</DisableSpecificWarnings>
+      <DisableSpecificWarnings>$(DisableSpecificWarnings);4061;4127;4131;4242;4244</DisableSpecificWarnings>
       <TreatWarningAsError>false</TreatWarningAsError>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
@@ -311,7 +314,7 @@
       <Optimization>Disabled</Optimization>
       <BrowseInformation>true</BrowseInformation>
       <FunctionLevelLinking>true</FunctionLevelLinking>
-      <DisableSpecificWarnings>$(DisableSpecificWarnings);4127;4131;4242;4244</DisableSpecificWarnings>
+      <DisableSpecificWarnings>$(DisableSpecificWarnings);4061;4127;4131;4242;4244</DisableSpecificWarnings>
       <TreatWarningAsError>false</TreatWarningAsError>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
@@ -329,7 +332,7 @@
       <Optimization>Disabled</Optimization>
       <BrowseInformation>true</BrowseInformation>
       <FunctionLevelLinking>true</FunctionLevelLinking>
-      <DisableSpecificWarnings>$(DisableSpecificWarnings);4127;4131;4242;4244</DisableSpecificWarnings>
+      <DisableSpecificWarnings>$(DisableSpecificWarnings);4061;4127;4131;4242;4244</DisableSpecificWarnings>
       <TreatWarningAsError>false</TreatWarningAsError>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
@@ -348,7 +351,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <BrowseInformation>true</BrowseInformation>
       <FunctionLevelLinking>true</FunctionLevelLinking>
-      <DisableSpecificWarnings>$(DisableSpecificWarnings);4127;4131;4242;4244</DisableSpecificWarnings>
+      <DisableSpecificWarnings>$(DisableSpecificWarnings);4061;4127;4131;4242;4244</DisableSpecificWarnings>
       <TreatWarningAsError>false</TreatWarningAsError>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PreprocessorDefinitions>WIN32;NDEBUG;Z_SOLO;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -372,7 +375,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <BrowseInformation>true</BrowseInformation>
       <FunctionLevelLinking>true</FunctionLevelLinking>
-      <DisableSpecificWarnings>$(DisableSpecificWarnings);4127;4131;4242;4244</DisableSpecificWarnings>
+      <DisableSpecificWarnings>$(DisableSpecificWarnings);4061;4127;4131;4242;4244</DisableSpecificWarnings>
       <TreatWarningAsError>false</TreatWarningAsError>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PreprocessorDefinitions>WIN32;NDEBUG;Z_SOLO;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -396,7 +399,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <BrowseInformation>true</BrowseInformation>
       <FunctionLevelLinking>true</FunctionLevelLinking>
-      <DisableSpecificWarnings>$(DisableSpecificWarnings);4127;4131;4242;4244</DisableSpecificWarnings>
+      <DisableSpecificWarnings>$(DisableSpecificWarnings);4061;4127;4131;4242;4244</DisableSpecificWarnings>
       <TreatWarningAsError>false</TreatWarningAsError>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PreprocessorDefinitions>WIN32;NDEBUG;Z_SOLO;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -419,8 +422,8 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <BrowseInformation>true</BrowseInformation>
       <FunctionLevelLinking>true</FunctionLevelLinking>
-      <DisableSpecificWarnings>$(DisableSpecificWarnings);4127;4131;4242;4244</DisableSpecificWarnings>
-      <TreatWarningAsError>$(TreatWarningAsError)</TreatWarningAsError>
+      <DisableSpecificWarnings>$(DisableSpecificWarnings);4061;4127;4131;4242;4244</DisableSpecificWarnings>
+      <TreatWarningAsError>false</TreatWarningAsError>
       <PreprocessorDefinitions>WIN32;NDEBUG;Z_SOLO;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -444,8 +447,8 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <BrowseInformation>true</BrowseInformation>
       <FunctionLevelLinking>true</FunctionLevelLinking>
-      <DisableSpecificWarnings>$(DisableSpecificWarnings);4127;4131;4242;4244</DisableSpecificWarnings>
-      <TreatWarningAsError>$(TreatWarningAsError)</TreatWarningAsError>
+      <DisableSpecificWarnings>$(DisableSpecificWarnings);4061;4127;4131;4242;4244</DisableSpecificWarnings>
+      <TreatWarningAsError>false</TreatWarningAsError>
       <PreprocessorDefinitions>WIN32;NDEBUG;Z_SOLO;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -469,8 +472,8 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <BrowseInformation>true</BrowseInformation>
       <FunctionLevelLinking>true</FunctionLevelLinking>
-      <DisableSpecificWarnings>$(DisableSpecificWarnings);4127;4131;4242;4244</DisableSpecificWarnings>
-      <TreatWarningAsError>$(TreatWarningAsError)</TreatWarningAsError>
+      <DisableSpecificWarnings>$(DisableSpecificWarnings);4061;4127;4131;4242;4244</DisableSpecificWarnings>
+      <TreatWarningAsError>false</TreatWarningAsError>
       <PreprocessorDefinitions>WIN32;NDEBUG;Z_SOLO;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
