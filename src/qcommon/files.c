@@ -43,8 +43,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 extern void Sys_UpdateConsoleTitle( const char *title );
 #endif
 
-/* SDL provides this when USE_SDL; pure Win32 MSVC build uses win_main.c when USE_SDL=0 */
-#if !defined(DEDICATED) && (USE_SDL || (defined(_WIN32) && !USE_SDL))
+#if !defined(DEDICATED) && (USE_SDL || (defined(_WIN32) && (!defined(USE_SDL) || USE_SDL == 0)))
 extern void Sys_UpdateWindowTitle( const char *title );
 #endif
 
@@ -5094,8 +5093,7 @@ static void FS_ParseGameInfo( void )
 			Sys_UpdateConsoleTitle( consoleTitle );
 #endif
 
-#if !defined(DEDICATED) && (USE_SDL || (defined(_WIN32) && !USE_SDL))
-			// SDL or Win32 client: update main window title (not dedicated server)
+#if !defined(DEDICATED) && (USE_SDL || (defined(_WIN32) && (!defined(USE_SDL) || USE_SDL == 0)))
 			Sys_UpdateWindowTitle( title );
 #endif
 
