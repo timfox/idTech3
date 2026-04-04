@@ -477,6 +477,16 @@ static int dll_err_count = 0;
 
 /*
 =================
+Sys_ClearLoadLibraryStickyError
+=================
+*/
+void Sys_ClearLoadLibraryStickyError( void )
+{
+}
+
+
+/*
+=================
 Sys_LoadLibrary
 =================
 */

@@ -1361,6 +1361,8 @@ void *Sys_LoadLibrary( const char *name );
 const char *Sys_GetLoadLibraryError( void );
 /* After a failed Sys_LoadLibrary, log path + platform loader diagnostics (no-op if last load succeeded). */
 void Sys_LogNativeLibraryLoadFailure( const char *fullPath );
+/* Win32: clear sticky LoadLibrary/GetProcAddress error before a new attempt (no-op elsewhere). */
+void Sys_ClearLoadLibraryStickyError( void );
 void *Sys_LoadFunction( void *handle, const char *name );
 int   Sys_LoadFunctionErrors( void );
 void  Sys_UnloadLibrary( void *handle );

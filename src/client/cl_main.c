@@ -3780,6 +3780,7 @@ static void CL_InitRef( void ) {
 		}
 	}
 	ospath = FS_BuildOSPath( Sys_DefaultBasePath(), dllName, NULL );
+	Sys_ClearLoadLibraryStickyError();
 	rendererLib = Sys_LoadLibrary( ospath );
 	if ( !rendererLib )
 	{
@@ -3805,6 +3806,7 @@ static void CL_InitRef( void ) {
 			}
 		}
 		ospath = FS_BuildOSPath( Sys_DefaultBasePath(), dllName, NULL );
+		Sys_ClearLoadLibraryStickyError();
 		rendererLib = Sys_LoadLibrary( ospath );
 		if ( !rendererLib )
 		{
@@ -3818,7 +3820,12 @@ static void CL_InitRef( void ) {
 	}
 	if( !getRefAPI )
 	{
+#ifdef _WIN32
+		Com_Error( ERR_FATAL, "Can't load symbol GetRefAPI from renderer DLL (check exports / arch match): %s",
+			Sys_GetLoadLibraryError() );
+#else
 		Com_Error( ERR_FATAL, "Can't load symbol GetRefAPI" );
+#endif
 		return;
 	}
 
