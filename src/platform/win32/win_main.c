@@ -516,7 +516,11 @@ void *Sys_LoadLibrary( const char *name )
 	prevErrMode = SetErrorMode( 0 );
 	SetErrorMode( prevErrMode | SEM_FAILCRITICALERRORS );
 	SetLastError( 0 );
+#ifdef UNICODE
 	ret = (void *)LoadLibraryW( AtoW( name ) );
+#else
+	ret = (void *)LoadLibraryA( name );
+#endif
 	SetErrorMode( prevErrMode );
 	return ret;
 }
