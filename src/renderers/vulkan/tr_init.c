@@ -2846,12 +2846,12 @@ static void R_Register( void )
 
 	r_fogFluidVorticity = ri.Cvar_Get( "r_fogFluidVorticity", "0.3", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_fogFluidVorticity, "0.0", "2.0", CV_FLOAT );
-	ri.Cvar_SetDescription( r_fogFluidVorticity, "Vorticity confinement strength for fluid simulation (replaces r_fluidsim_vorticity)." );
+	ri.Cvar_SetDescription( r_fogFluidVorticity, "Vorticity confinement strength for fluid simulation." );
 	ri.Cvar_SetGroup( r_fogFluidVorticity, CVG_RENDERER );
 
 	r_fogFluidBuoyancy = ri.Cvar_Get( "r_fogFluidBuoyancy", "1.0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_fogFluidBuoyancy, "0.0", "4.0", CV_FLOAT );
-	ri.Cvar_SetDescription( r_fogFluidBuoyancy, "Buoyancy force strength for fluid simulation (replaces r_fluidsim_buoyancy)." );
+	ri.Cvar_SetDescription( r_fogFluidBuoyancy, "Buoyancy force strength for fluid simulation." );
 	ri.Cvar_SetGroup( r_fogFluidBuoyancy, CVG_RENDERER );
 
 	r_volumetricFogValidation = ri.Cvar_Get( "r_volumetricFogValidation", "0", CVAR_TEMP );
@@ -3142,7 +3142,6 @@ static void R_Register( void )
 
 	// Register modular subsystem cvars
 	VFog_RegisterCvars();
-	FluidSim_RegisterCvars();
 	CBTerrain_RegisterCvars();
 	PostFX_RegisterCvars();
 	VDB_Init();

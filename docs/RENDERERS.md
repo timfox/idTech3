@@ -48,7 +48,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - 2D velocity, density, and pressure fields (resolution derived from froxel grid)
 - Emitter system (up to 16 emitters) for smoke, fire, fog injection
 - Wind and buoyancy forces
-- Cvars: `r_fogFluid` (enable), `r_fogFluidViscosity`, `r_fogFluidDissipation`, `r_fogFluidVorticity`, `r_fogFluidBuoyancy`, etc. Legacy `r_fluidsim*` deprecated.
+- Cvars: `r_fogFluid` (enable), `r_fogFluidViscosity`, `r_fogFluidDissipation`, `r_fogFluidVorticity`, `r_fogFluidBuoyancy`, etc.
 
 ### Lighting Robustness
 - PBR Smith GGX visibility: division-by-zero guard at grazing angles (`CalcVisibility`)
