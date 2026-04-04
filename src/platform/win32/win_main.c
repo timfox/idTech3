@@ -623,6 +623,25 @@ void Sys_UnloadLibrary( void *handle )
 }
 
 
+#ifndef DEDICATED
+/*
+=================
+Sys_UpdateWindowTitle
+
+Used by cl_window_title / WinTitle_Update (matches SDL_SetWindowTitle path).
+=================
+*/
+void Sys_UpdateWindowTitle( const char *title )
+{
+	if ( !title || !*title || !g_wv.hWnd ) {
+		return;
+	}
+	/* Keep ANSI title path: char* from game code; avoids UNICODE/AtoW edge cases on MinGW. */
+	SetWindowTextA( g_wv.hWnd, title );
+}
+#endif /* !DEDICATED */
+
+
 /*
 =================
 Sys_SendKeyEvents
