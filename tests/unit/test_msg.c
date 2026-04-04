@@ -12,10 +12,9 @@
 
 extern int gSTUB_SV_UTF8;
 
-/* Huffman path writes variable-length symbols; small stack buffers overflow
- * cursize before msg.c sets overflowed, and HuffmanGetSymbol reads 4 bytes
- * from buffer + (bitIndex>>3) — use ample space for Debug + FORTIFY CI. */
-enum { UNIT_MSG_BITBUF_BYTES = 4096 };
+/* Huffman streams: MSG_WriteBits sets cursize = (bit>>3)+1, so a full bit
+ * stream needs headroom beyond the logical message length. Production pairs
+ * byte[MAX_MSGLEN_BUF] with MSG_Init(..., MAX_MSGLEN) — not sizeof(buf). */
 
 #define ASSERT(cond, msg) do { \
 	if (!(cond)) { \
@@ -185,10 +184,10 @@ static int test_write_string_utf8_stub_branches(void)
 
 static int test_bitstream_long_edges(void)
 {
-	byte buf[UNIT_MSG_BITBUF_BYTES];
+	byte buf[MAX_MSGLEN_BUF];
 	msg_t msg;
 
-	MSG_Init( &msg, buf, (int)sizeof( buf ) );
+	MSG_Init( &msg, buf, MAX_MSGLEN );
 	MSG_Bitstream( &msg );
 	MSG_WriteLong( &msg, 0 );
 	MSG_WriteLong( &msg, (int)0x80000000 );
@@ -214,11 +213,11 @@ static int test_angle16_roundtrip(void)
 
 static int test_entitynum_bitstream(void)
 {
-	byte buf[UNIT_MSG_BITBUF_BYTES];
+	byte buf[MAX_MSGLEN_BUF];
 	msg_t msg;
 	const int n = (1 << (GENTITYNUM_BITS - 1)) - 1;
 
-	MSG_Init( &msg, buf, (int)sizeof( buf ) );
+	MSG_Init( &msg, buf, MAX_MSGLEN );
 	MSG_Bitstream( &msg );
 	MSG_WriteBits( &msg, n, GENTITYNUM_BITS );
 	MSG_BeginReading( &msg );
@@ -228,10 +227,10 @@ static int test_entitynum_bitstream(void)
 
 static int test_bitstream_roundtrip_short(void)
 {
-	byte buf[UNIT_MSG_BITBUF_BYTES];
+	byte buf[MAX_MSGLEN_BUF];
 	msg_t msg;
 
-	MSG_Init( &msg, buf, (int)sizeof( buf ) );
+	MSG_Init( &msg, buf, MAX_MSGLEN );
 	MSG_Bitstream( &msg );
 	MSG_WriteShort( &msg, -12345 );
 	MSG_WriteShort( &msg, 32000 );
@@ -245,11 +244,11 @@ static int test_bitstream_roundtrip_short(void)
 
 static int test_bitstream_char_negative_roundtrip(void)
 {
-	byte buf[UNIT_MSG_BITBUF_BYTES];
+	byte buf[MAX_MSGLEN_BUF];
 	msg_t msg;
 
 	/* WriteChar masks to 8 bits; ReadChar reinterprets as signed char */
-	MSG_Init( &msg, buf, (int)sizeof( buf ) );
+	MSG_Init( &msg, buf, MAX_MSGLEN );
 	MSG_Bitstream( &msg );
 	MSG_WriteChar( &msg, -3 );
 
@@ -279,7 +278,7 @@ static int test_msg_hash_key(void)
 
 static int test_delta_usercmd_roundtrip(void)
 {
-	byte buf[UNIT_MSG_BITBUF_BYTES];
+	byte buf[MAX_MSGLEN_BUF];
 	msg_t msg;
 	usercmd_t from, to;
 
@@ -303,7 +302,7 @@ static int test_delta_usercmd_roundtrip(void)
 	from.weapon = 3;
 	to.weapon = 7;
 
-	MSG_Init( &msg, buf, (int)sizeof( buf ) );
+	MSG_Init( &msg, buf, MAX_MSGLEN );
 	MSG_Bitstream( &msg );
 	MSG_WriteDeltaUsercmdKey( &msg, 0x11223344, &from, &to );
 
@@ -327,7 +326,7 @@ static int test_delta_usercmd_roundtrip(void)
 
 static int test_delta_usercmd_no_change(void)
 {
-	byte buf[UNIT_MSG_BITBUF_BYTES];
+	byte buf[MAX_MSGLEN_BUF];
 	msg_t msg;
 	usercmd_t a;
 
@@ -340,7 +339,7 @@ static int test_delta_usercmd_no_change(void)
 	a.buttons = 4;
 	a.weapon = 5;
 
-	MSG_Init( &msg, buf, (int)sizeof( buf ) );
+	MSG_Init( &msg, buf, MAX_MSGLEN );
 	MSG_Bitstream( &msg );
 	MSG_WriteDeltaUsercmdKey( &msg, 0, &a, &a );
 
