@@ -313,6 +313,7 @@ static  const char  *basegame = ""; /* last value in array */
 
 static	char		fs_gamedir[MAX_OSPATH];	// this will be a single file name with no separators
 static	cvar_t		*fs_debug;
+static	cvar_t		*com_nativeLibraryDebug;
 static	cvar_t		*fs_homepath;
 
 #ifdef __APPLE__
@@ -4827,6 +4828,11 @@ static void FS_Startup( void ) {
 
 	fs_debug = Cvar_Get( "fs_debug", "0", 0 );
 	Cvar_SetDescription( fs_debug, "Debugging tool for the filesystem. Run the game in debug mode. Prints additional information regarding read files into the console." );
+	com_nativeLibraryDebug = Cvar_Get( "com_nativeLibraryDebug", "0", 0 );
+	Cvar_SetDescription( com_nativeLibraryDebug, "Log every failed native library load attempt (full path + OS loader error). Use for Windows DLL / .so compatibility diagnosis." );
+	if ( com_nativeLibraryDebug->integer ) {
+		Com_Printf( S_COLOR_CYAN "com_nativeLibraryDebug: logging failed native library load paths + loader errors.\n" );
+	}
 	fs_copyfiles = Cvar_Get( "fs_copyfiles", "0", CVAR_INIT );
 	Cvar_SetDescription( fs_copyfiles, "Whether or not to copy files when loading them into the game. Every file found in the cdpath will be copied over." );
 	fs_basepath = Cvar_Get( "fs_basepath", Sys_DefaultBasePath(), CVAR_INIT | CVAR_PROTECTED | CVAR_PRIVATE );
@@ -5987,6 +5993,28 @@ void FS_PipeClose( fileHandle_t f )
 
 /*
 =================
+FS_TryLoadLibraryPath
+
+Load native module; optionally log path + loader error (com_nativeLibraryDebug).
+=================
+*/
+static void *FS_TryLoadLibraryPath( const char *path )
+{
+	void *h;
+
+	if ( !path || !path[0] ) {
+		return NULL;
+	}
+	h = Sys_LoadLibrary( path );
+	if ( !h && com_nativeLibraryDebug && com_nativeLibraryDebug->integer ) {
+		Sys_LogNativeLibraryLoadFailure( path );
+	}
+	return h;
+}
+
+
+/*
+=================
 FS_LoadLibrary
 
 Tries to load libraries within known searchpaths
@@ -6013,28 +6041,28 @@ void *FS_LoadLibrary( const char *name )
 					// Convert "uix86_64.so" -> "ui.x86_64.so"
 					Com_sprintf( dottedName, sizeof( dottedName ), "ui.%s", name + 2 );
 					Com_sprintf( vmPath, sizeof( vmPath ), "modules/%s", dottedName );
-					libHandle = Sys_LoadLibrary( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
+					libHandle = FS_TryLoadLibraryPath( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
 					if ( !libHandle ) {
 						Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", dottedName );
-						libHandle = Sys_LoadLibrary( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
+						libHandle = FS_TryLoadLibraryPath( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
 					}
 				} else if ( Q_strncmp(name, "cgame", 5) == 0 && Q_strncmp(name + nameLen - 3, ".so", 3) == 0 ) {
 					// Convert "cgamex86_64.so" -> "cgame.x86_64.so"
 					Com_sprintf( dottedName, sizeof( dottedName ), "cgame.%s", name + 5 );
 					Com_sprintf( vmPath, sizeof( vmPath ), "modules/%s", dottedName );
-					libHandle = Sys_LoadLibrary( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
+					libHandle = FS_TryLoadLibraryPath( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
 					if ( !libHandle ) {
 						Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", dottedName );
-						libHandle = Sys_LoadLibrary( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
+						libHandle = FS_TryLoadLibraryPath( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
 					}
 				} else if ( Q_strncmp(name, "qagame", 6) == 0 && Q_strncmp(name + nameLen - 3, ".so", 3) == 0 ) {
 					// Convert "qagamex86_64.so" -> "qagame.x86_64.so"
 					Com_sprintf( dottedName, sizeof( dottedName ), "qagame.%s", name + 6 );
 					Com_sprintf( vmPath, sizeof( vmPath ), "modules/%s", dottedName );
-					libHandle = Sys_LoadLibrary( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
+					libHandle = FS_TryLoadLibraryPath( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
 					if ( !libHandle ) {
 						Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", dottedName );
-						libHandle = Sys_LoadLibrary( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
+						libHandle = FS_TryLoadLibraryPath( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
 					}
 				}
 			}
@@ -6042,16 +6070,16 @@ void *FS_LoadLibrary( const char *name )
 			// Try modules/ first, then vm/ subdirectory with original name
 			if ( !libHandle ) {
 				Com_sprintf( vmPath, sizeof( vmPath ), "modules/%s", name );
-				libHandle = Sys_LoadLibrary( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
+				libHandle = FS_TryLoadLibraryPath( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
 				if ( !libHandle ) {
 					Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", name );
-					libHandle = Sys_LoadLibrary( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
+					libHandle = FS_TryLoadLibraryPath( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath ) );
 				}
 			}
 			
 			// Finally try directly in gamedir (legacy location)
 			if ( !libHandle ) {
-				libHandle = Sys_LoadLibrary( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, name ) );
+				libHandle = FS_TryLoadLibraryPath( FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, name ) );
 			}
 			sp = sp->next;
 		}

@@ -1359,6 +1359,8 @@ int Sys_MonkeyShouldBeSpanked( void );
 
 void *Sys_LoadLibrary( const char *name );
 const char *Sys_GetLoadLibraryError( void );
+/* After a failed Sys_LoadLibrary, log path + platform loader diagnostics (no-op if last load succeeded). */
+void Sys_LogNativeLibraryLoadFailure( const char *fullPath );
 void *Sys_LoadFunction( void *handle, const char *name );
 int   Sys_LoadFunctionErrors( void );
 void  Sys_UnloadLibrary( void *handle );
