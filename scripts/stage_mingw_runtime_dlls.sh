@@ -23,9 +23,11 @@ if ! command -v objdump &>/dev/null; then
 fi
 
 shopt -s nullglob
-mapfile -t PE_FILES < <(
-  find "$BIN_DIR" -maxdepth 1 \( -name '*.exe' -o -name '*.dll' \) -type f 2>/dev/null | sort -u
-)
+# Avoid mapfile (not all MSYS2 bash builds ship with bash 4+ mapfile built-in)
+PE_FILES=()
+while IFS= read -r _pef; do
+  [[ -n "$_pef" ]] && PE_FILES+=( "$_pef" )
+done < <(find "$BIN_DIR" -maxdepth 1 \( -name '*.exe' -o -name '*.dll' \) -type f 2>/dev/null | sort -u)
 
 if [[ ${#PE_FILES[@]} -eq 0 ]]; then
   echo "No .exe/.dll under $BIN_DIR — nothing to stage"
@@ -69,9 +71,10 @@ while [[ "$changed" -eq 1 ]]; do
     done < <(objdump -p "$f" 2>/dev/null | sed -n 's/.*DLL Name: \(.*\)/\1/p')
   done
   # Refresh PE list so newly staged DLLs are scanned next round
-  mapfile -t PE_FILES < <(
-    find "$BIN_DIR" -maxdepth 1 \( -name '*.exe' -o -name '*.dll' \) -type f 2>/dev/null | sort -u
-  )
+  PE_FILES=()
+  while IFS= read -r _pef; do
+    [[ -n "$_pef" ]] && PE_FILES+=( "$_pef" )
+  done < <(find "$BIN_DIR" -maxdepth 1 \( -name '*.exe' -o -name '*.dll' \) -type f 2>/dev/null | sort -u)
 done
 
 echo "Done."

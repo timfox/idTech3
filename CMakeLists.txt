@@ -1473,6 +1473,11 @@ IF(USE_RENDERER_DLOPEN)
 	set(RENDERER_OUT_Vulkan "idtech3_vulkan")
 	set_target_properties(${RENDERER_PREFIX}_opengl${RENDEXT} PROPERTIES OUTPUT_NAME ${RENDERER_OUT_OPengl} PREFIX "")
 	set_target_properties(${RENDERER_PREFIX}_vulkan${RENDEXT} PROPERTIES OUTPUT_NAME ${RENDERER_OUT_Vulkan} PREFIX "")
+	# MinGW/PE: without this, renderer DLLs can link but export no symbols (GetRefAPI missing) — breaks dlopen on Windows.
+	if(WIN32)
+		set_target_properties(${RENDERER_PREFIX}_opengl${RENDEXT} ${RENDERER_PREFIX}_vulkan${RENDEXT}
+			PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+	endif()
 ELSE()
 	IF(USE_VULKAN)
 		ADD_LIBRARY(${RENDERER_PREFIX}_vulkan OBJECT ${RENDERER_VK_SRCS} ${RENDERER_COMMON_SRCS})
