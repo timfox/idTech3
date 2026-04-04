@@ -223,6 +223,13 @@
     <ClCompile Include="..\..\renderers\common\tr_image_pcx.c" />
     <ClCompile Include="..\..\renderers\common\tr_image_png.c" />
     <ClCompile Include="..\..\renderers\common\tr_image_tga.c" />
+    <ClCompile Include="..\..\renderers\common\tr_image_hdr.c" />
+    <ClCompile Include="..\..\renderers\common\tr_image_qoi.c" />
+    <ClCompile Include="..\..\renderers\common\tr_image_dds.c" />
+    <ClCompile Include="..\..\renderers\common\tr_image_svg.c" />
+    <ClCompile Include="..\..\renderers\common\tr_image_exr.cpp">
+      <AdditionalIncludeDirectories>..\..\external\include\tinyexr;..\..\external\src\zlib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
     <ClCompile Include="..\..\renderers\vulkan\tr_init.c" />
     <ClCompile Include="..\..\renderers\vulkan\tr_light.c" />
     <ClCompile Include="..\..\renderers\vulkan\tr_main.c" />
