@@ -34,8 +34,6 @@
 
 #define USE_REVERSED_DEPTH
 
-//#define USE_UPLOAD_QUEUE
-
 #define VK_NUM_BLOOM_PASSES 4
 
 #ifndef _DEBUG
@@ -526,9 +524,6 @@ typedef struct vk_tess_s {
 	VkSemaphore image_acquired;
 	uint32_t	swapchain_image_index;
 	qboolean	swapchain_image_acquired;
-#ifdef USE_UPLOAD_QUEUE
-	VkSemaphore rendering_finished2;
-#endif
 	VkFence rendering_finished_fence;
 	qboolean waitForFence;
 
@@ -590,9 +585,6 @@ typedef struct {
 	//uint32_t swapchain_image_index;
 
 	VkCommandPool command_pool;
-#ifdef USE_UPLOAD_QUEUE
-	VkCommandBuffer staging_command_buffer;
-#endif
 
 	VkDeviceMemory image_memory[ MAX_ATTACHMENTS_IN_POOL ];
 	uint32_t image_memory_count;
@@ -826,12 +818,6 @@ typedef struct {
 	float prev_zfar;
 	qboolean has_prev_volumetric;
 	uint32_t volumetric_frame;
-
-#ifdef USE_UPLOAD_QUEUE
-	VkSemaphore rendering_finished;	// reference to vk.cmd->rendering_finished2
-	VkSemaphore image_uploaded2;
-	VkSemaphore image_uploaded;		// reference to vk.image_uploaded2
-#endif
 
 	vk_tess_t tess[ NUM_COMMAND_BUFFERS ], *cmd;
 	int cmd_index;
@@ -1238,19 +1224,11 @@ typedef struct {
 
 	uint32_t maxBoundDescriptorSets;
 
-#ifdef USE_UPLOAD_QUEUE
-	VkFence aux_fence;
-	qboolean aux_fence_wait;
-#endif
-
 	struct staging_buffer_s {
 		VkBuffer handle;
 		VkDeviceMemory memory;
 		VkDeviceSize size;
 		byte *ptr; // pointer to mapped staging buffer
-#ifdef USE_UPLOAD_QUEUE
-		VkDeviceSize offset;
-#endif
 	} staging_buffer;
 
 	struct samplers_s {
