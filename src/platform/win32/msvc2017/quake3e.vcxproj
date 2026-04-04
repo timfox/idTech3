@@ -319,7 +319,26 @@
     <ClCompile Include="..\..\client\cl_gameframe.c" />
     <ClCompile Include="..\..\client\cl_menuvideo.c" />
     <ClCompile Include="..\..\client\cl_sdf_font.c" />
-    <ClCompile Include="..\..\audio\mix\snd_adpcm.c" />
+    <ClCompile Include="..\..\client\cl_particles.c" />
+    <ClCompile Include="..\..\client\cl_map_background.c" />
+    <ClCompile Include="..\..\client\cl_window_title.c" />
+    <ClCompile Include="..\..\client\cl_mobilefog.c" />
+    <ClCompile Include="..\..\game\g_director.c" />
+    <ClCompile Include="..\..\game\g_response.c" />
+    <ClCompile Include="..\..\game\g_choreography.c" />
+    <ClCompile Include="..\..\game\g_dismember.c" />
+    <ClCompile Include="..\..\game\g_facial.c" />
+    <ClCompile Include="..\..\game\g_horde.c" />
+    <ClCompile Include="..\..\game\g_goap.c" />
+    <ClCompile Include="..\..\game\g_aiml.c" />
+    <ClCompile Include="..\..\game\g_entity_bridge.c" />
+    <ClCompile Include="..\..\game\g_lua_bindings.c" />
+    <ClCompile Include="..\..\audio\snd_music_adaptive.c" />
+    <ClCompile Include="..\..\physics\phys_procedural_anim.c" />
+    <ClCompile Include="..\..\physics\phys_dmm.c" />
+    <ClCompile Include="..\..\physics\phys_ik.c" />
+    <ClCompile Include="..\..\physics\phys_dmm_materials.c" />
+    <ClCompile Include="..\..\physics\phys_cloth.c" />
     <ClCompile Include="..\..\audio\codecs\snd_codec.c" />
     <ClCompile Include="..\..\audio\codecs\snd_codec_ogg.c" />
     <ClCompile Include="..\..\audio\codecs\snd_codec_wav.c" />
@@ -390,6 +409,89 @@
     <ClCompile Include="..\win_glimp.c" />
     <ClCompile Include="..\win_qgl.c" />
     <ClCompile Include="..\..\..\physics\phys_bullet.c" />
+    <!-- recast_nav (matches CMake USE_RECAST_NAV) -->
+    <ClCompile Include="..\..\..\external\src\recast\Recast\Source\RecastAlloc.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Recast\Source\RecastArea.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Recast\Source\RecastAssert.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Recast\Source\RecastContour.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Recast\Source\Recast.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Recast\Source\RecastFilter.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Recast\Source\RecastLayers.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Recast\Source\RecastMesh.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Recast\Source\RecastMeshDetail.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Recast\Source\RecastRasterization.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Recast\Source\RecastRegion.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Detour\Source\DetourAlloc.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Detour\Source\DetourAssert.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Detour\Source\DetourCommon.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Detour\Source\DetourNavMeshBuilder.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Detour\Source\DetourNavMesh.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Detour\Source\DetourNavMeshQuery.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Detour\Source\DetourNode.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\DetourCrowd\Source\DetourCrowd.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\DetourCrowd\Source\DetourLocalBoundary.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\DetourCrowd\Source\DetourObstacleAvoidance.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\DetourCrowd\Source\DetourPathCorridor.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\DetourCrowd\Source\DetourPathQueue.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\DetourCrowd\Source\DetourProximityGrid.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\DetourTileCache\Source\DetourTileCacheBuilder.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\DetourTileCache\Source\DetourTileCache.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\navigation\nav_recast.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;..\..\..\navigation;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\navigation\nav_bsp_extract.c" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\..\asm\snd_mix_x64.asm">
