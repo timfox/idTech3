@@ -516,12 +516,8 @@ void *Sys_LoadLibrary( const char *name )
 	prevErrMode = SetErrorMode( 0 );
 	SetErrorMode( prevErrMode | SEM_FAILCRITICALERRORS );
 	SetLastError( 0 );
-	/* MinGW often leaves AtoW as identity even when UNICODE is defined; never pass char* to LoadLibraryW. */
-#if defined( UNICODE ) && defined( _MSC_VER ) && !defined( __MINGW32__ )
-	ret = (void *)LoadLibraryW( AtoW( name ) );
-#else
+	/* Always ANSI: paths from the filesystem are char*; UNICODE/AtoW combos differ across MSVC vs MinGW. */
 	ret = (void *)LoadLibraryA( name );
-#endif
 	SetErrorMode( prevErrMode );
 	return ret;
 }
