@@ -348,6 +348,7 @@
     <ClCompile Include="..\..\audio\mix\snd_mem.c" />
     <ClCompile Include="..\..\audio\mix\snd_mix.c" />
     <ClCompile Include="..\..\audio\mix\snd_wavelet.c" />
+    <ClCompile Include="..\..\audio\mix\snd_adpcm.c" />
     <ClCompile Include="..\..\qcommon\cmd.c" />
     <ClCompile Include="..\..\qcommon\cm_load.c" />
     <ClCompile Include="..\..\qcommon\cm_bounds.c" />
