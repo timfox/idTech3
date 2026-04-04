@@ -334,11 +334,11 @@
     <ClCompile Include="..\..\game\g_entity_bridge.c" />
     <ClCompile Include="..\..\game\g_lua_bindings.c" />
     <ClCompile Include="..\..\audio\snd_music_adaptive.c" />
-    <ClCompile Include="..\..\physics\phys_procedural_anim.c" />
-    <ClCompile Include="..\..\physics\phys_dmm.c" />
-    <ClCompile Include="..\..\physics\phys_ik.c" />
-    <ClCompile Include="..\..\physics\phys_dmm_materials.c" />
-    <ClCompile Include="..\..\physics\phys_cloth.c" />
+    <ClCompile Include="..\..\..\physics\phys_procedural_anim.c" />
+    <ClCompile Include="..\..\..\physics\phys_dmm.c" />
+    <ClCompile Include="..\..\..\physics\phys_ik.c" />
+    <ClCompile Include="..\..\..\physics\phys_dmm_materials.c" />
+    <ClCompile Include="..\..\..\physics\phys_cloth.c" />
     <ClCompile Include="..\..\audio\codecs\snd_codec.c" />
     <ClCompile Include="..\..\audio\codecs\snd_codec_ogg.c" />
     <ClCompile Include="..\..\audio\codecs\snd_codec_wav.c" />
