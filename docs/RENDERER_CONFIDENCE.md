@@ -38,6 +38,92 @@ These do not run in headless CI; use the **[visual regression pack](samples/rend
 5. **MSAA / SMAA / SSAO** — Spot-check toggles; watch for black screens, NaN tint, or resolution mismatches.
 6. **Emissive** and **volumetric fog** — See scene docs under `samples/renderer_regression/scenes/`.
 
+## Renderer proof loop
+
+Use this loop to move renderer work from “builds and scripts pass” to “actual rendered behavior is proven.”
+
+### 1. Install the regression pack
+
+Install `z_renderer_regression.pk3` into a real content tree so the engine can see the six regression maps exactly as documented under `docs/samples/renderer_regression/`. Use the devdata tree under `docs/renderer_validation/devdata/rtest_base/` or rebuild it with `./scripts/build_renderer_devdata.sh` if needed.
+
+### 2. Run the file contract
+
+Set `GAME_BASE` to the directory named `base` that contains the regression pack and required game data, then run:
+
+```bash
+GAME_BASE=/abs/path/to/base ./scripts/renderer_regression_check.sh
+```
+
+This proves the repo-side manifest, required files, and expected regression content layout are present. It does not prove client/GPU output.
+
+### 3. Run the runtime contract
+
+With the same `GAME_BASE`, run:
+
+```bash
+GAME_BASE=/abs/path/to/base ./scripts/renderer_regression_maps.sh
+```
+
+This proves each regression map can be loaded by `idtech3_server` without matching the scripted fatal/error signatures. It still does not prove the client frame.
+
+### 4. Run the manual GPU pass
+
+Run the client manually in both Vulkan and OpenGL and inspect the regression scenes using the guidance in this document and the scene specs under `docs/samples/renderer_regression/`.
+
+Priority order:
+
+1. `rtest_parity`
+2. `rtest_volumetric`
+3. `rtest_tangent`
+4. `rtest_pbr`
+5. `rtest_emissive`
+6. `rtest_postfx`
+
+Focus on:
+
+* Vulkan vs OpenGL agreement
+* tangent and normal-map seam behavior
+* roughness/metallic response
+* emissive and exposure/bloom interaction
+* volumetric fog behavior
+* postFX toggle correctness
+
+### 5. Record findings
+
+Record outcomes in `docs/renderer_validation/FINDINGS.md` or the active team equivalent. Every item should be classified as one of:
+
+* **confirmed OK**
+* **bug to fix**
+* **known limitation**
+* **needs more evidence**
+
+Do not record vague results like “looks fine.” Each note should identify the map, symptom, backend, and the likely subsystem when known.
+
+### Definition of success
+
+A renderer change is not fully proven until:
+
+* the file contract is green
+* the runtime contract is green
+* the manual Vulkan/OpenGL pass is complete
+* findings are written down with concrete outcomes
+
+### First manual pass (strict)
+
+For the **first** full renderer proof run against regression content, treat the pass as complete only when:
+
+* `renderer_regression_check.sh` is green with the real `GAME_BASE`
+* `renderer_regression_maps.sh` is green for all six maps
+* `rtest_parity` has either acceptable Vulkan/OpenGL agreement or a **clearly written drift note** in findings
+* `rtest_volumetric` has either acceptable fog behavior or a **clearly written limitation/bug** in findings
+* every finding is recorded as **confirmed OK**, **bug to fix**, **known limitation**, or **needs more evidence** — not vague impressions
+
+### Next automation step
+
+After the first manual pass is stable, add screenshot or framebuffer capture for 1–2 anchor scenes, starting with `rtest_parity` and `rtest_pbr`. Do not add this before the manual pass is producing stable, repeatable results.
+
+That sequence closes the gap between engine-side confidence and renderer evidence; run it before adding more unit tests or process churn.
+
 ## Repo discipline
 
 - Prefer **first-party** correctness and warning fixes; touch **vendored** code only when the fix is small and behavior-preserving (e.g. const correctness).

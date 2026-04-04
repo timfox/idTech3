@@ -1473,6 +1473,11 @@ IF(USE_RENDERER_DLOPEN)
 	set(RENDERER_OUT_Vulkan "idtech3_vulkan")
 	set_target_properties(${RENDERER_PREFIX}_opengl${RENDEXT} PROPERTIES OUTPUT_NAME ${RENDERER_OUT_OPengl} PREFIX "")
 	set_target_properties(${RENDERER_PREFIX}_vulkan${RENDEXT} PROPERTIES OUTPUT_NAME ${RENDERER_OUT_Vulkan} PREFIX "")
+	# MinGW/PE: without this, renderer DLLs can link but export no symbols (GetRefAPI missing) — breaks dlopen on Windows.
+	if(WIN32)
+		set_target_properties(${RENDERER_PREFIX}_opengl${RENDEXT} ${RENDERER_PREFIX}_vulkan${RENDEXT}
+			PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+	endif()
 ELSE()
 	IF(USE_VULKAN)
 		ADD_LIBRARY(${RENDERER_PREFIX}_vulkan OBJECT ${RENDERER_VK_SRCS} ${RENDERER_COMMON_SRCS})
@@ -2084,4 +2089,65 @@ if(BUILD_UNIT_TESTS)
 	endif()
 	add_test(NAME unit_pathutil COMMAND unit_pathutil)
 	set_tests_properties(unit_pathutil PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_msg
+		tests/unit/test_msg.c
+		tests/stub_qcommon_min.c
+		tests/stub_msg_cvar.c
+		src/qcommon/msg.c
+		src/qcommon/huffman_static.c)
+	target_include_directories(unit_msg PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_compile_definitions(unit_msg PRIVATE DEDICATED)
+	if(NOT MSVC)
+		target_link_libraries(unit_msg PRIVATE m)
+	endif()
+	add_test(NAME unit_msg COMMAND unit_msg)
+	set_tests_properties(unit_msg PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_info
+		tests/unit/test_info.c
+		tests/stub_qcommon_min.c
+		src/qcommon/q_shared.c
+		src/qcommon/q_math.c)
+	target_include_directories(unit_info PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_info PRIVATE m)
+	endif()
+	add_test(NAME unit_info COMMAND unit_info)
+	set_tests_properties(unit_info PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_cm_bounds
+		tests/unit/test_cm_bounds.c
+		src/qcommon/cm_bounds.c
+		src/qcommon/q_math.c)
+	target_include_directories(unit_cm_bounds PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_cm_bounds PRIVATE m)
+	endif()
+	add_test(NAME unit_cm_bounds COMMAND unit_cm_bounds)
+	set_tests_properties(unit_cm_bounds PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_parse
+		tests/unit/test_parse.c
+		tests/stub_qcommon_min.c
+		src/qcommon/q_shared.c
+		src/qcommon/q_math.c)
+	target_include_directories(unit_parse PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_parse PRIVATE m)
+	endif()
+	add_test(NAME unit_parse COMMAND unit_parse)
+	set_tests_properties(unit_parse PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_endian
+		tests/unit/test_endian.c
+		tests/stub_qcommon_min.c
+		src/qcommon/q_shared.c
+		src/qcommon/q_math.c)
+	target_include_directories(unit_endian PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_endian PRIVATE m)
+	endif()
+	add_test(NAME unit_endian COMMAND unit_endian)
+	set_tests_properties(unit_endian PROPERTIES LABELS "unit;validation")
 endif()

@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "qcommon.h"
 
 static int pcount[256];
+static cvar_t *sv_utf8 = NULL;
 
 /*
 ==============================================================================
@@ -109,16 +110,28 @@ void MSG_WriteBits( msg_t *msg, int value, int bits ) {
 	}
 	if (msg->oob) {
 		if ( bits == 8 ) {
+			if ( msg->cursize + 1 > msg->maxsize ) {
+				msg->overflowed = qtrue;
+				return;
+			}
 			msg->data[msg->cursize] = value;
 			msg->cursize += 1;
 			msg->bit += 8;
 		} else if ( bits == 16 ) {
 			short temp = value;
-			
+
+			if ( msg->cursize + 2 > msg->maxsize ) {
+				msg->overflowed = qtrue;
+				return;
+			}
 			CopyLittleShort(&msg->data[msg->cursize], &temp);
 			msg->cursize += 2;
 			msg->bit += 16;
 		} else if ( bits==32 ) {
+			if ( msg->cursize + 4 > msg->maxsize ) {
+				msg->overflowed = qtrue;
+				return;
+			}
 			CopyLittleLong(&msg->data[msg->cursize], &value);
 			msg->cursize += 4;
 			msg->bit += 32;
@@ -281,7 +294,6 @@ void MSG_WriteFloat( msg_t *sb, float f ) {
 void MSG_WriteString( msg_t *sb, const char *s ) {
 	int l, i;
 	char v;
-	static cvar_t *sv_utf8 = NULL;
 	qboolean allowUTF8;
 
 	if ( !sv_utf8 ) {
@@ -307,6 +319,10 @@ void MSG_WriteString( msg_t *sb, const char *s ) {
 	}
 
 	MSG_WriteChar( sb, '\0' );
+}
+
+void MSG_ResetStringCvarCacheForTesting( void ) {
+	sv_utf8 = NULL;
 }
 
 void MSG_WriteBigString( msg_t *sb, const char *s ) {

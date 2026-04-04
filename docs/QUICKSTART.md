@@ -9,7 +9,9 @@ Get the latest release from [Releases](https://github.com/timfox/idTech3/release
 Extract the archive. You should see:
 - `idtech3` (or `idtech3.exe` on Windows) — game client
 - `idtech3_server` (or `idtech3_server.exe`) — dedicated server
-- `idtech3_vulkan.so` / `idtech3_opengl.so` — renderer plugins (Linux)
+- **Linux**: `idtech3_vulkan.so` / `idtech3_opengl.so` — renderer plugins (when built with `USE_RENDERER_DLOPEN`)
+- **Windows (MSYS2/MinGW zip from CI)**: same `.exe` names plus several `.dll` files (SDL2, OpenAL, MinGW runtime). Keep them in the same folder as the executables.
+- **Windows (MSVC zip)**: renderers are usually linked into the client; you may only see the `.exe` files plus Visual C++ runtime requirements from your system.
 
 ## 2. Game Data
 
@@ -61,4 +63,4 @@ When running under Steam on Steam Deck, the engine auto-detects the device and l
 - **"No game data"** — Ensure `baseq3/` (or `base/`) exists with at least one `.pk3` file.
 - **Black screen / no render** — Try OpenGL: `+set r_renderer opengl`
 - **Solid color / dark brown / dark green / no UI** — Ensure FBO is enabled: `+set r_fbo 1` and run `vid_restart`. If still broken, try `r_exposure_auto 0`, `r_volumetricFog 0`, then `vid_restart`. As last resort, `r_fbo 0` disables HDR/post-processing.
-- **Missing libraries** — On Linux, install SDL2, OpenAL, and Vulkan drivers for your GPU.
+- **Missing libraries** — On Linux, install SDL2, OpenAL, and Vulkan drivers for your GPU. On Windows, if you copied only `idtech3.exe` out of a MinGW build folder, restore the accompanying `.dll` files from the same archive or re-run `./scripts/stage_mingw_runtime_dlls.sh bin` from an MSYS2 **MINGW64** shell after copying binaries into `bin/`.
