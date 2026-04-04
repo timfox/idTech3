@@ -624,13 +624,11 @@ void Sys_UnloadLibrary( void *handle )
 
 
 #ifndef DEDICATED
-/* SDL builds link sdl_glimp.c which already defines Sys_UpdateWindowTitle. */
-#if !USE_SDL
+/* SDL builds: sdl_glimp.c defines this. Pure Win32 (MSVC quake3e, no USE_SDL): provide it here. */
+#if !defined( USE_SDL ) || USE_SDL == 0
 /*
 =================
 Sys_UpdateWindowTitle
-
-Win32-only window title when not using the SDL video path (MSVC quake3e.vcxproj).
 =================
 */
 void Sys_UpdateWindowTitle( const char *title )
@@ -640,7 +638,7 @@ void Sys_UpdateWindowTitle( const char *title )
 	}
 	SetWindowTextA( g_wv.hWnd, title );
 }
-#endif /* !USE_SDL */
+#endif
 #endif /* !DEDICATED */
 
 

@@ -23,7 +23,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../snd_local.h"
 #include "win_local.h"
 
-#ifndef USE_SDL
+/* USE_SDL may be defined to 0 (CMake); #ifndef USE_SDL would wrongly skip this file. */
+#if !USE_SDL
 extern cvar_t *s_khz;
 
 qboolean dsound_init = qfalse;
@@ -1107,4 +1108,4 @@ void SNDDMA_Activate( void ) {
 	}
 }
 
-#endif // !USE_SDL
+#endif /* !USE_SDL */
