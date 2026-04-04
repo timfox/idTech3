@@ -61,15 +61,23 @@ jobs:
             ${{ matrix.prefix }}-cmake
             ${{ matrix.prefix }}-ninja
             ${{ matrix.prefix }}-pkgconf
-            ${{ matrix.prefix }}-SDL2
-            ${{ matrix.prefix }}-openal
-            ${{ matrix.prefix }}-freetype
-            ${{ matrix.prefix }}-lua
           msystem: ${{ matrix.msystem }}
           path-type: minimal
           release: false
-          update: false
-          cache: false
+          update: true
+          cache: true
+
+      - name: Install MSYS2 deps (retry on slow mirrors)
+        shell: msys2 {0}
+        run: |
+          set -e
+          pkgs="${{ matrix.prefix }}-SDL2 ${{ matrix.prefix }}-openal ${{ matrix.prefix }}-freetype ${{ matrix.prefix }}-lua"
+          for attempt in 1 2 3 4 5; do
+            pacman -S --needed --noconfirm $pkgs && exit 0
+            echo "pacman attempt $attempt failed, retrying in $((attempt * 20))s..."
+            sleep $((attempt * 20))
+          done
+          exit 1
 
       - uses: actions/checkout@v4
 
