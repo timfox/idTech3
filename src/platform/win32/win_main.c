@@ -516,7 +516,8 @@ void *Sys_LoadLibrary( const char *name )
 	prevErrMode = SetErrorMode( 0 );
 	SetErrorMode( prevErrMode | SEM_FAILCRITICALERRORS );
 	SetLastError( 0 );
-#ifdef UNICODE
+	/* MinGW often leaves AtoW as identity even when UNICODE is defined; never pass char* to LoadLibraryW. */
+#if defined( UNICODE ) && defined( _MSC_VER ) && !defined( __MINGW32__ )
 	ret = (void *)LoadLibraryW( AtoW( name ) );
 #else
 	ret = (void *)LoadLibraryA( name );
