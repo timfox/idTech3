@@ -486,9 +486,10 @@
       <LinkTimeCodeGeneration>true</LinkTimeCodeGeneration>
     </Lib>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(SolutionOutputDir)' != ''">
+  <!-- Stable import lib name for libpng / quake3e (always output\zlib.lib per config) -->
+  <ItemDefinitionGroup>
     <Lib>
-      <OutputFile>$(OutDir)$(ConfigurationName)-$(PlatformName)-$(TargetName).lib</OutputFile>
+      <OutputFile>$(OutDir)zlib.lib</OutputFile>
     </Lib>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
