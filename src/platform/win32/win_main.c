@@ -624,11 +624,13 @@ void Sys_UnloadLibrary( void *handle )
 
 
 #ifndef DEDICATED
+/* SDL builds link sdl_glimp.c which already defines Sys_UpdateWindowTitle. */
+#if !USE_SDL
 /*
 =================
 Sys_UpdateWindowTitle
 
-Used by cl_window_title / WinTitle_Update (matches SDL_SetWindowTitle path).
+Win32-only window title when not using the SDL video path (MSVC quake3e.vcxproj).
 =================
 */
 void Sys_UpdateWindowTitle( const char *title )
@@ -636,9 +638,9 @@ void Sys_UpdateWindowTitle( const char *title )
 	if ( !title || !*title || !g_wv.hWnd ) {
 		return;
 	}
-	/* Keep ANSI title path: char* from game code; avoids UNICODE/AtoW edge cases on MinGW. */
 	SetWindowTextA( g_wv.hWnd, title );
 }
+#endif /* !USE_SDL */
 #endif /* !DEDICATED */
 
 
