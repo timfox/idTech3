@@ -48,7 +48,7 @@ MinGW links SDL2/OpenAL/etc. dynamically. If you copy `idtech3.exe` outside MSYS
 
 **PE architecture sanity:** from PowerShell, `pwsh ./scripts/windows_native_compat_check.ps1 -BinDir path\to\bin` fails if any `.exe`/`.dll` in the folder is not the same machine type as the reference executable (catches x86/x64/ARM64 mixups).
 
-**PE export sanity:** `pwsh ./scripts/windows_pe_exports_check.ps1 -BinDir path\to\bin -ExpectRendererDlls` requires `idtech3_vulkan.dll` and `idtech3_opengl.dll` to export **`GetRefAPI`** (MinGW/CMake dlopen builds). MSVC static-renderer zips use `-SkipRendererDlls`. Any `qagame`/`cgame`/`ui`/… native `.dll` in the folder must export **`vmMain`** and **`dllEntry`**.
+**PE export sanity:** `pwsh ./scripts/windows_pe_exports_check.ps1 -BinDir path\to\bin` — use **`-SkipRendererDlls`** for Windows CMake/MSVC/MinGW artifacts (`USE_RENDERER_DLOPEN` is forced **off** on `WIN32`, so renderer plugins are not shipped as separate DLLs). Use **`-ExpectRendererDlls`** only for trees that actually ship `idtech3_vulkan.dll` / `idtech3_opengl.dll` (e.g. Linux dlopen builds). Any `qagame`/`cgame`/`ui`/… native `.dll` present in the folder must export **`vmMain`** and **`dllEntry`**.
 
 ## Building
 
