@@ -380,7 +380,7 @@
     <ClCompile Include="..\win_gamma.c" />
     <ClCompile Include="..\win_glimp.c" />
     <ClCompile Include="..\win_qgl.c" />
-    <ClCompile Include="..\..\physics\phys_bullet.c" />
+    <ClCompile Include="..\..\..\physics\phys_bullet.c" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\..\asm\snd_mix_x64.asm">
