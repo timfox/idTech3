@@ -42,6 +42,8 @@ brew install coreutils sdl2 openal-soft cmake ninja freetype lua
 pacman -S base-devel mingw-w64-x86_64-{gcc,cmake,ninja,pkgconf,SDL2,openal,freetype,lua}
 ```
 
+MinGW links SDL2/OpenAL/etc. dynamically. If you copy `idtech3.exe` outside MSYS2 (or ship a zip), run `./scripts/stage_mingw_runtime_dlls.sh bin` from a **MINGW64** shell after copying binaries into `bin/` so required `.dll` files sit next to the executables.
+
 ## Building
 
 The primary build script is `scripts/compile_engine.sh`.
