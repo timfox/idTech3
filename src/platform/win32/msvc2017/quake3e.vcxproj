@@ -316,9 +316,9 @@
     <ClCompile Include="..\..\client\cl_parse.c" />
     <ClCompile Include="..\..\client\cl_scrn.c" />
     <ClCompile Include="..\..\client\cl_ui.c" />
-    <ClCompile Include="..\..\platform\client\cl_gameframe.c" />
-    <ClCompile Include="..\..\platform\client\cl_menuvideo.c" />
-    <ClCompile Include="..\..\platform\client\cl_sdf_font.c" />
+    <ClCompile Include="..\client\cl_gameframe.c" />
+    <ClCompile Include="..\client\cl_menuvideo.c" />
+    <ClCompile Include="..\client\cl_sdf_font.c" />
     <ClCompile Include="..\..\audio\mix\snd_adpcm.c" />
     <ClCompile Include="..\..\audio\codecs\snd_codec.c" />
     <ClCompile Include="..\..\audio\codecs\snd_codec_ogg.c" />
