@@ -101,6 +101,8 @@ void MSG_WriteLong (msg_t *sb, int c);
 void MSG_WriteFloat (msg_t *sb, float f);
 void MSG_WriteString (msg_t *sb, const char *s);
 void MSG_WriteBigString (msg_t *sb, const char *s);
+/* Unit tests only: clears static cvar cache so stubbed Cvar_Get can change sv_utf8 behavior */
+void MSG_ResetStringCvarCacheForTesting( void );
 void MSG_WriteAngle16 (msg_t *sb, float f);
 int MSG_HashKey(const char *string, int maxlen);
 
@@ -1357,6 +1359,8 @@ int Sys_MonkeyShouldBeSpanked( void );
 
 void *Sys_LoadLibrary( const char *name );
 const char *Sys_GetLoadLibraryError( void );
+/* After a failed Sys_LoadLibrary, log path + platform loader diagnostics (no-op if last load succeeded). */
+void Sys_LogNativeLibraryLoadFailure( const char *fullPath );
 void *Sys_LoadFunction( void *handle, const char *name );
 int   Sys_LoadFunctionErrors( void );
 void  Sys_UnloadLibrary( void *handle );

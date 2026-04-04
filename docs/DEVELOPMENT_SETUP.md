@@ -42,6 +42,14 @@ brew install coreutils sdl2 openal-soft cmake ninja freetype lua
 pacman -S base-devel mingw-w64-x86_64-{gcc,cmake,ninja,pkgconf,SDL2,openal,freetype,lua}
 ```
 
+MinGW links SDL2/OpenAL/etc. dynamically. If you copy `idtech3.exe` outside MSYS2 (or ship a zip), run `./scripts/stage_mingw_runtime_dlls.sh bin` from a **MINGW64** shell after copying binaries into `bin/` so required `.dll` files sit next to the executables.
+
+**Native DLL / `.so` load failures:** run with `+set com_nativeLibraryDebug 1` on the command line (before configs that matter) so every failed `FS_LoadLibrary` attempt logs the **full path** and the OS loader message. On Windows, `Sys_GetLoadLibraryError` includes `WinErr=…` from `GetLastError` (e.g. missing dependency vs bad format).
+
+**PE architecture sanity:** from PowerShell, `pwsh ./scripts/windows_native_compat_check.ps1 -BinDir path\to\bin` fails if any `.exe`/`.dll` in the folder is not the same machine type as the reference executable (catches x86/x64/ARM64 mixups).
+
+**PE export sanity:** `pwsh ./scripts/windows_pe_exports_check.ps1 -BinDir path\to\bin` — use **`-SkipRendererDlls`** for Windows CMake/MSVC/MinGW artifacts (`USE_RENDERER_DLOPEN` is forced **off** on `WIN32`, so renderer plugins are not shipped as separate DLLs). Use **`-ExpectRendererDlls`** only for trees that actually ship `idtech3_vulkan.dll` / `idtech3_opengl.dll` (e.g. Linux dlopen builds). Any `qagame`/`cgame`/`ui`/… native `.dll` present in the folder must export **`vmMain`** and **`dllEntry`**.
+
 ## Building
 
 The primary build script is `scripts/compile_engine.sh`.
