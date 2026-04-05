@@ -59,6 +59,9 @@ src/
 │   ├── win32/           Windows
 │   └── sdl/             SDL2 (windowing, input, gamma)
 ├── qcommon/             Shared engine (VM, filesystem, network)
+│   ├── vm.c / vm_local.h         VM create, native load, QVM path
+│   ├── vm_native_module.c/h      Native `.so`/`.dll` filename candidates
+│   └── files.c                   FS_LoadLibrary search (modules/vm/gamedir)
 ├── server/              Dedicated server
 ├── botlib/              Bot AI (Q3 AAS pathfinding)
 └── external/            Vendored libraries
@@ -111,6 +114,24 @@ The shipping Vulkan renderer is **forward-only** with a layered HDR/post-process
 `r_renderMode 1/2` are placeholders only; there is no shipping deferred or Forward+ renderer yet.
 
 For the 2026 renderer direction, see [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_2026_ARCHITECTURE_PASS.md).
+
+## Native game modules (VM)
+
+When `fs_restrict` is **0** (default), `VM_Create` always tries a **native** shared library before falling back to a `.qvm` (`src/qcommon/vm.c`). Native load is disabled when `fs_restrict` is set (demo-style restriction).
+
+**Exported symbols:** the library must provide `dllEntry` and `vmMain` or the engine unloads it and continues to QVM.
+
+**Filename probes** (`VM_TryLoadNativeModule` + `VM_BuildNativeModuleCandidates` in `src/qcommon/vm_native_module.c`), in order:
+
+1. `<module>.so` (Linux/macOS-style name; still the first probe on Windows builds too)
+2. `<module>.<ARCH_STRING><DLL_EXT>` (e.g. `client.x86_64.so`, `uix86_64.dll` — `ARCH_STRING` / `DLL_EXT` from `q_platform.h`)
+3. `<module><ARCH_STRING><DLL_EXT>` (packed form, e.g. `clientx86_64.so`)
+
+**Alternate logical names** for the same VM slot: if those candidates fail, `loadNative` tries additional base names before the final platform-specific `name + ARCH_STRING + DLL_EXT` path. Examples: `qagame` tries `game` then `server`; `cgame` tries `client`; `ui` tries `frontend`; `server` tries `game`; `client` tries `cgame`; `frontend` tries `ui`.
+
+**Filesystem resolution** (`FS_LoadLibrary` in `src/qcommon/files.c`): for each static game directory on the search path, the engine tries `modules/<file>` then `vm/<file>`, then the file **directly in the gamedir** (legacy). If the requested name already looks like a dotted native (`ui.x86_64.dll`, `cgame.x86_64.so`, etc.), it also tries the dotted form under `modules/` and `vm/` for `ui`, `cgame`, and `qagame` prefixes.
+
+**Debugging failed loads:** `+set com_nativeLibraryDebug 1` logs each failed path and the OS loader message. See [DEVELOPMENT_SETUP.md](DEVELOPMENT_SETUP.md#prerequisites) (native DLL troubleshooting). Unit coverage: `ctest -R unit_vm_native_module` exercises candidate ordering.
 
 ## JavaScript / UI Debug (Duktape)
 
