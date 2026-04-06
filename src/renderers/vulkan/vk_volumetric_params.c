@@ -10,6 +10,7 @@
 static void vk_tint_local_fog_volume_color( vec3_t io ) {
 	const int colorMode = ( r_volumetricFogColorMode ) ? r_volumetricFogColorMode->integer : 0;
 	vec3_t tint;
+	float maxc;
 
 	if ( colorMode == 1 && r_volumetricFogTint && vk_parse_fog_tint_string( r_volumetricFogTint->string, tint ) ) {
 		VectorCopy( tint, io );
@@ -23,6 +24,15 @@ static void vk_tint_local_fog_volume_color( vec3_t io ) {
 		io[0] *= tint[0];
 		io[1] *= tint[1];
 		io[2] *= tint[2];
+	}
+
+	maxc = MAX( io[0], MAX( io[1], io[2] ) );
+	if ( maxc < 0.05f ) {
+		if ( r_volumetricFogTint && vk_parse_fog_tint_string( r_volumetricFogTint->string, tint ) ) {
+			VectorCopy( tint, io );
+		} else if ( r_fogTint && vk_parse_fog_tint_string( r_fogTint->string, tint ) ) {
+			VectorCopy( tint, io );
+		}
 	}
 }
 
@@ -46,141 +56,11 @@ static float vk_compute_global_base_density( float rawDensity, int fogShowcase, 
 	 * contribution conservative in non-showcase mode to avoid blackouts.
 	 */
 	if ( hasLocalFogVolumes && fogShowcase <= 0 ) {
-		scale *= 0.5f;
+		scale *= 0.35f;
 	}
 
 	density = rawDensity * scale;
-	return Com_Clamp( 0.0f, 0.02f, density );
-}
-
-static qboolean vk_volumetric_mat4_inverse( const float *m, float *out )
-{
-	float tmp[16];
-	float det;
-	int i;
-
-	tmp[0] = m[5]  * m[10] * m[15] -
-	         m[5]  * m[11] * m[14] -
-	         m[9]  * m[6]  * m[15] +
-	         m[9]  * m[7]  * m[14] +
-	         m[13] * m[6]  * m[11] -
-	         m[13] * m[7]  * m[10];
-
-	tmp[4] = -m[4]  * m[10] * m[15] +
-	          m[4]  * m[11] * m[14] +
-	          m[8]  * m[6]  * m[15] -
-	          m[8]  * m[7]  * m[14] -
-	          m[12] * m[6]  * m[11] +
-	          m[12] * m[7]  * m[10];
-
-	tmp[8] = m[4]  * m[9] * m[15] -
-	         m[4]  * m[11] * m[13] -
-	         m[8]  * m[5] * m[15] +
-	         m[8]  * m[7] * m[13] +
-	         m[12] * m[5] * m[11] -
-	         m[12] * m[7] * m[9];
-
-	tmp[12] = -m[4]  * m[9] * m[14] +
-	           m[4]  * m[10] * m[13] +
-	           m[8]  * m[5] * m[14] -
-	           m[8]  * m[6] * m[13] -
-	           m[12] * m[5] * m[10] +
-	           m[12] * m[6] * m[9];
-
-	tmp[1] = -m[1]  * m[10] * m[15] +
-	          m[1]  * m[11] * m[14] +
-	          m[9]  * m[2] * m[15] -
-	          m[9]  * m[3] * m[14] -
-	          m[13] * m[2] * m[11] +
-	          m[13] * m[3] * m[10];
-
-	tmp[5] = m[0]  * m[10] * m[15] -
-	         m[0]  * m[11] * m[14] -
-	         m[8]  * m[2] * m[15] +
-	         m[8]  * m[3] * m[14] +
-	         m[12] * m[2] * m[11] -
-	         m[12] * m[3] * m[10];
-
-	tmp[9] = -m[0]  * m[9] * m[15] +
-	          m[0]  * m[11] * m[13] +
-	          m[8]  * m[1] * m[15] -
-	          m[8]  * m[3] * m[13] -
-	          m[12] * m[1] * m[11] +
-	          m[12] * m[3] * m[9];
-
-	tmp[13] = m[0]  * m[9] * m[14] -
-	          m[0]  * m[10] * m[13] -
-	          m[8]  * m[1] * m[14] +
-	          m[8]  * m[2] * m[13] +
-	          m[12] * m[1] * m[10] -
-	          m[12] * m[2] * m[9];
-
-	tmp[2] = m[1]  * m[6] * m[15] -
-	         m[1]  * m[7] * m[14] -
-	         m[5]  * m[2] * m[15] +
-	         m[5]  * m[3] * m[14] +
-	         m[13] * m[2] * m[7] -
-	         m[13] * m[3] * m[6];
-
-	tmp[6] = -m[0]  * m[6] * m[15] +
-	          m[0]  * m[7] * m[14] +
-	          m[4]  * m[2] * m[15] -
-	          m[4]  * m[3] * m[14] -
-	          m[12] * m[2] * m[7] +
-	          m[12] * m[3] * m[6];
-
-	tmp[10] = m[0]  * m[5] * m[15] -
-	          m[0]  * m[7] * m[13] -
-	          m[4]  * m[1] * m[15] +
-	          m[4]  * m[3] * m[13] +
-	          m[12] * m[1] * m[7] -
-	          m[12] * m[3] * m[5];
-
-	tmp[14] = -m[0]  * m[5] * m[14] +
-	           m[0]  * m[6] * m[13] +
-	           m[4]  * m[1] * m[14] -
-	           m[4]  * m[2] * m[13] -
-	           m[12] * m[1] * m[6] +
-	           m[12] * m[2] * m[5];
-
-	tmp[3] = -m[1] * m[6] * m[11] +
-	          m[1] * m[7] * m[10] +
-	          m[5] * m[2] * m[11] -
-	          m[5] * m[3] * m[10] -
-	          m[9] * m[2] * m[7] +
-	          m[9] * m[3] * m[6];
-
-	tmp[7] = m[0] * m[6] * m[11] -
-	         m[0] * m[7] * m[10] -
-	         m[4] * m[2] * m[11] +
-	         m[4] * m[3] * m[10] +
-	         m[8] * m[2] * m[7] -
-	         m[8] * m[3] * m[6];
-
-	tmp[11] = -m[0] * m[5] * m[11] +
-	           m[0] * m[7] * m[9] +
-	           m[4] * m[1] * m[11] -
-	           m[4] * m[3] * m[9] -
-	           m[8] * m[1] * m[7] +
-	           m[8] * m[3] * m[5];
-
-	tmp[15] = m[0] * m[5] * m[10] -
-	          m[0] * m[6] * m[9] -
-	          m[4] * m[1] * m[10] +
-	          m[4] * m[2] * m[9] +
-	          m[8] * m[1] * m[6] -
-	          m[8] * m[2] * m[5];
-
-	det = m[0] * tmp[0] + m[1] * tmp[4] + m[2] * tmp[8] + m[3] * tmp[12];
-	if ( fabsf( det ) < 1e-9f ) {
-		return qfalse;
-	}
-
-	det = 1.0f / det;
-	for ( i = 0; i < 16; i++ ) {
-		out[i] = tmp[i] * det;
-	}
-	return qtrue;
+	return Com_Clamp( 0.0f, 0.0125f, density );
 }
 
 void vk_update_volumetric_params( void )
@@ -209,6 +89,7 @@ void vk_update_volumetric_params( void )
 	float noise_threshold = r_volumetricFogNoiseThreshold ? r_volumetricFogNoiseThreshold->value : 0.2f;
 	float g_aniso = r_volumetricFogAniso ? r_volumetricFogAniso->value : 0.0f;
 	float fog_density = r_volumetricFogDensity ? r_volumetricFogDensity->value : 0.0f;
+	float extinction_scale = r_volumetricFogExtinctionScale ? r_volumetricFogExtinctionScale->value : 1.0f;
 	float height_falloff = r_volumetricFogHeightFalloff ? r_volumetricFogHeightFalloff->value : 0.0f;
 	float near_plane = ( r_znear ) ? r_znear->value : 8.0f;
 	float far_plane = backEnd.viewParms.zFar;
@@ -265,10 +146,10 @@ void vk_update_volumetric_params( void )
 	vk_prev_volumetric_time_valid = qtrue;
 	vk_volumetric_noise_time += delta_time;
 
-	if ( !vk_volumetric_mat4_inverse( projection, params.invProj ) ) {
+	if ( !vk_mat4_inverse( projection, params.invProj ) ) {
 		Com_Memcpy( params.invProj, projection, sizeof( params.invProj ) );
 	}
-	if ( !vk_volumetric_mat4_inverse( view, params.invView ) ) {
+	if ( !vk_mat4_inverse( view, params.invView ) ) {
 		Com_Memcpy( params.invView, view, sizeof( params.invView ) );
 	}
 	Com_Memcpy( params.proj, projection, sizeof( params.proj ) );
@@ -387,6 +268,8 @@ void vk_update_volumetric_params( void )
 	else if ( noise_threshold > 1.0f ) noise_threshold = 1.0f;
 	if ( noise_strength < 0.0f ) noise_strength = 0.0f;
 	else if ( noise_strength > 1.0f ) noise_strength = 1.0f;
+	if ( extinction_scale < 0.05f ) extinction_scale = 0.05f;
+	else if ( extinction_scale > 10.0f ) extinction_scale = 10.0f;
 	if ( z_exponent < 1.0f ) z_exponent = 1.0f;
 	if ( max_distance < near_plane + 1.0f ) max_distance = near_plane + 1.0f;
 	if ( reprojection_threshold < 0.0f ) reprojection_threshold = 0.0f;
@@ -415,6 +298,13 @@ void vk_update_volumetric_params( void )
 	else if ( shadow_contrast > 4.0f ) shadow_contrast = 4.0f;
 	if ( fog_showcase < 0 ) fog_showcase = 0;
 	else if ( fog_showcase > 3 ) fog_showcase = 3;
+	if ( has_map_fog_volumes && fog_showcase <= 0 && extinction_scale > 0.55f ) {
+		/*
+		 * Dense local fog brushes plus high extinction can black out water/sky.
+		 * Cap extinction in normal gameplay mode; showcase modes can override.
+		 */
+		extinction_scale = 0.55f;
+	}
 
 	if ( fog_showcase > 0 ) {
 		switch ( fog_showcase ) {
@@ -557,7 +447,7 @@ void vk_update_volumetric_params( void )
 	params.densityParams[2] = jitter_amount;
 	params.densityParams[3] = temporal_weight;
 	params.scatterParams[0] = r_volumetricFogAlbedo ? r_volumetricFogAlbedo->value : 0.95f;
-	params.scatterParams[1] = r_volumetricFogExtinctionScale ? r_volumetricFogExtinctionScale->value : 1.0f;
+	params.scatterParams[1] = extinction_scale;
 	params.scatterParams[2] = r_volumetricFogBlendDistance ? r_volumetricFogBlendDistance->value : 0.0f;
 	params.scatterParams[3] = ( r_volumetricFogDenoise && r_volumetricFogDenoise->integer && r_volumetricFogDenoiseSigma ) ?
 		r_volumetricFogDenoiseSigma->value : 0.0f;
@@ -598,15 +488,27 @@ void vk_update_volumetric_params( void )
 			const float extent_x = fog->bounds[1][0] - fog->bounds[0][0];
 			const float extent_y = fog->bounds[1][1] - fog->bounds[0][1];
 			const float extent_z = fog->bounds[1][2] - fog->bounds[0][2];
+			const float local_density_cap = ( has_map_fog_volumes && fog_showcase <= 0 ) ? 0.012f : 0.03f;
 			float local_density = fog_density;
 			vec3_t local_color;
 
 			if ( extent_x <= 0.001f || extent_y <= 0.001f || extent_z <= 0.001f ) continue;
 			if ( fog->parms.depthForOpaque > 0.001f ) local_density *= ( 1.0f / fog->parms.depthForOpaque );
 			if ( local_density < 0.0f ) local_density = 0.0f;
-			if ( local_density > 0.05f ) local_density = 0.05f;
+			if ( local_density > local_density_cap ) local_density = local_density_cap;
 			VectorCopy( fog->color, local_color );
 			vk_tint_local_fog_volume_color( local_color );
+			{
+				const float local_maxc = MAX( local_color[0], MAX( local_color[1], local_color[2] ) );
+				if ( local_maxc < 0.05f ) {
+					vec3_t tint;
+					if ( r_volumetricFogTint && vk_parse_fog_tint_string( r_volumetricFogTint->string, tint ) ) {
+						VectorCopy( tint, local_color );
+					} else if ( r_fogTint && vk_parse_fog_tint_string( r_fogTint->string, tint ) ) {
+						VectorCopy( tint, local_color );
+					}
+				}
+			}
 
 			params.volumeBoundsMin[local_volume_count][0] = fog->bounds[0][0];
 			params.volumeBoundsMin[local_volume_count][1] = fog->bounds[0][1];

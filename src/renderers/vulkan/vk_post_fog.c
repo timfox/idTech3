@@ -39,6 +39,9 @@ const char *vk_post_fog_source_name( VkImageView color_source )
 	if ( color_source == vk.fog_scene_image_view ) {
 		return "fog_scene";
 	}
+	if ( color_source == vk.taa_history_image_view[0] || color_source == vk.taa_history_image_view[1] ) {
+		return "taa_history";
+	}
 	if ( color_source == VK_NULL_HANDLE ) {
 		return "null";
 	}
@@ -143,6 +146,12 @@ VkImage vk_post_fog_source_image( VkImageView color_source )
 	}
 	if ( color_source == vk.fog_scene_image_view ) {
 		return vk.fog_scene_image;
+	}
+	if ( color_source == vk.taa_history_image_view[0] ) {
+		return vk.taa_history_image[0];
+	}
+	if ( color_source == vk.taa_history_image_view[1] ) {
+		return vk.taa_history_image[1];
 	}
 	return VK_NULL_HANDLE;
 }

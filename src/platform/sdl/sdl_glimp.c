@@ -3,7 +3,11 @@
 Copyright (C) 1999-2005 Id Software, Inc.
 
 This file is part of Quake III Arena source code.
+*/
 
+#define _GNU_SOURCE
+
+/*
 Quake III Arena source code is free software; you can redistribute it
 and/or modify it under the terms of the GNU General Public License as
 published by the Free Software Foundation; either version 2 of the License,
@@ -27,7 +31,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #if defined(_WIN32) && defined(_MSC_VER)
 #include <windows.h>
+#else
+#include <stdlib.h>
 #endif
+#include <string.h>
 
 #ifdef USE_VULKAN_API
 #	if defined(USE_LOCAL_HEADERS)
@@ -226,7 +233,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 	int display;
 	int x;
 	int y;
-	Uint32 flags = SDL_WINDOW_SHOWN;
+	Uint32 flags = SDL_WINDOW_SHOWN | SDL_WINDOW_ALLOW_HIGHDPI;
 
 #ifdef USE_VULKAN_API
 	if ( vulkan ) {
@@ -315,7 +322,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 		flags |= SDL_WINDOW_BORDERLESS;
 	}
 
-	//flags |= SDL_WINDOW_ALLOW_HIGHDPI;
+	flags |= SDL_WINDOW_ALLOW_HIGHDPI;
 
 	colorBits = r_colorbits->value;
 
@@ -338,6 +345,13 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 	// do not allow stencil if Z-buffer depth likely won't contain it
 	if ( depthBits < 24 )
 		stencilBits = 0;
+
+#ifdef USE_VULKAN_API
+	if ( vulkan ) {
+		SDL_GL_ResetAttributes();  /* avoid OpenGL visual hints interfering with Vulkan window on X11/aarch64 */
+		SDL_SetHint( SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR, "0" );
+	}
+#endif
 
 	for ( i = 0; i < 16; i++ )
 	{
@@ -439,7 +453,10 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 
 		if ( ( SDL_window = SDL_CreateWindow( cl_title, x, y, config->vidWidth, config->vidHeight, flags ) ) == NULL )
 		{
-			Com_DPrintf( "SDL_CreateWindow failed: %s\n", SDL_GetError() );
+			const char *sdl_err = SDL_GetError();
+			/* Vulkan: same error every iteration; print once to avoid spam */
+			if ( !vulkan || i == 0 )
+				Com_Printf( "[VK] SDL_CreateWindow failed: %s\n", ( sdl_err && sdl_err[0] ) ? sdl_err : "(no SDL error)" );
 			continue;
 		}
 
@@ -538,7 +555,15 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 	}
 	else
 	{
-		Com_Printf( "Couldn't get a visual\n" );
+		const char *sdl_err = SDL_GetError();
+		Com_Printf( "[VK] Couldn't get a visual: %s\n", ( sdl_err && sdl_err[0] ) ? sdl_err : "(no SDL error string)" );
+		Com_Printf( "[VK] SDL video driver: %s\n", SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "(none)" );
+#if defined(__arm__) || defined(__aarch64__)
+		Com_Printf( S_COLOR_YELLOW "[VK] On ARM, Vulkan may be unavailable. Try: ./idtech3.aarch64 +set cl_renderer opengl\n" );
+#endif
+		/* SDL built without Vulkan: no point retrying modes/drivers */
+		if ( vulkan && sdl_err && strstr( sdl_err, "Vulkan support" ) != NULL )
+			return RSERR_FATAL_ERROR;
 		return RSERR_INVALID_MODE;
 	}
 
@@ -582,6 +607,36 @@ static rserr_t GLimp_StartDriverAndSetMode( int mode, const char *modeFS, qboole
 	if ( !SDL_WasInit( SDL_INIT_VIDEO ) )
 	{
 		const char *driverName;
+		const char *vidDriver;
+
+		vidDriver = r_vid_driver ? r_vid_driver->string : "auto";
+#if defined(__arm__) || defined(__aarch64__)
+		/* Raspberry Pi / ARM: Vulkan with KMSDRM has known issues (SDL#3997); force X11 */
+		if ( vulkan )
+		{
+			if ( !vidDriver || !vidDriver[0] || ( Q_stricmp( vidDriver, "auto" ) == 0 ) )
+				vidDriver = "x11";
+			else if ( Q_stricmp( vidDriver, "kmsdrm" ) == 0 )
+			{
+				Com_Printf( "[VK] ARM: KMSDRM has Vulkan issues, using X11 instead\n" );
+				vidDriver = "x11";
+			}
+		}
+#endif
+#ifdef USE_VULKAN_API
+		if ( vulkan ) {
+			SDL_SetHint( SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR, "0" );
+		}
+#endif
+		if ( vidDriver && vidDriver[0] && Q_stricmp( vidDriver, "auto" ) != 0 ) {
+#ifndef _WIN32
+			{
+				static char envBuf[64];
+				Com_sprintf( envBuf, sizeof( envBuf ), "SDL_VIDEODRIVER=%s", vidDriver );
+				putenv( envBuf );
+			}
+#endif
+		}
 
 		if ( SDL_Init( SDL_INIT_VIDEO ) != 0 )
 		{
@@ -603,6 +658,8 @@ static rserr_t GLimp_StartDriverAndSetMode( int mode, const char *modeFS, qboole
 			return err;
 		case RSERR_INVALID_MODE:
 			Com_Printf( "...WARNING: could not set the given mode (%d)\n", mode );
+			return err;
+		case RSERR_FATAL_ERROR:
 			return err;
 		default:
 			break;
@@ -641,25 +698,84 @@ void GLimp_Init( glconfig_t *config )
 	r_stereoEnabled = Cvar_Get( "r_stereoEnabled", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	Cvar_SetDescription( r_stereoEnabled, "Enable stereo rendering for techniques like shutter glasses." );
 
-	// Create the window and set up the context
-	err = GLimp_StartDriverAndSetMode( r_mode->integer, r_modeFullscreen->string, r_fullscreen->integer, qfalse );
-	if ( err != RSERR_OK )
+	// Create the window and set up the context (with driver retry on ARM)
 	{
-		if ( err == RSERR_FATAL_ERROR )
+		int driverRetry;
+
+		err = GLimp_StartDriverAndSetMode( r_mode->integer, r_modeFullscreen->string, r_fullscreen->integer, qfalse );
+		if ( err != RSERR_OK && err != RSERR_FATAL_ERROR )
 		{
-			Com_Error( ERR_FATAL, "GLimp_Init() - could not load OpenGL subsystem" );
-			return;
+			if ( r_mode->integer != 3 || ( r_fullscreen->integer && atoi( r_modeFullscreen->string ) != 3 ) )
+			{
+				Com_Printf( "Setting \\r_mode %d failed, falling back on \\r_mode %d\n", r_mode->integer, 3 );
+				err = GLimp_StartDriverAndSetMode( 3, "", r_fullscreen->integer, qfalse );
+			}
+			if ( err != RSERR_OK )
+			{
+				Com_Printf( "r_mode 3 failed, trying r_mode -1 (640x480)\n" );
+				Cvar_Set( "r_customWidth", "640" );
+				Cvar_Set( "r_customHeight", "480" );
+				err = GLimp_StartDriverAndSetMode( -1, "", r_fullscreen->integer, qfalse );
+				if ( err == RSERR_OK )
+					Cvar_Set( "r_mode", "-1" );
+			}
+			if ( err != RSERR_OK )
+			{
+				Com_Printf( "r_mode -1 (640x480) failed, trying 800x600\n" );
+				Cvar_Set( "r_customWidth", "800" );
+				Cvar_Set( "r_customHeight", "600" );
+				err = GLimp_StartDriverAndSetMode( -1, "", r_fullscreen->integer, qfalse );
+				if ( err == RSERR_OK )
+					Cvar_Set( "r_mode", "-1" );
+			}
+			if ( err != RSERR_OK && r_fullscreen->integer )
+			{
+				Com_Printf( "Fullscreen failed, trying windowed mode\n" );
+				Cvar_Set( "r_fullscreen", "0" );
+				err = GLimp_StartDriverAndSetMode( 3, "", 0, qfalse );
+			}
 		}
 
-		if ( r_mode->integer != 3 || ( r_fullscreen->integer && atoi( r_modeFullscreen->string ) != 3 ) )
+		for ( driverRetry = 0; driverRetry < 2 && err != RSERR_OK && err != RSERR_FATAL_ERROR; driverRetry++ )
 		{
-			Com_Printf( "Setting \\r_mode %d failed, falling back on \\r_mode %d\n", r_mode->integer, 3 );
-			if ( GLimp_StartDriverAndSetMode( 3, "", r_fullscreen->integer, qfalse ) != RSERR_OK )
+#if defined(__arm__) || defined(__aarch64__)
 			{
-				// Nothing worked, give up
-				Com_Error( ERR_FATAL, "GLimp_Init() - could not load OpenGL subsystem" );
-				return;
+				const char *vidDriver = SDL_GetCurrentVideoDriver();
+				if ( driverRetry == 0 && vidDriver && strcmp( vidDriver, "x11" ) == 0 )
+			{
+				Com_Printf( "[GL] x11 failed, trying wayland\n" );
+				Cvar_Set( "r_vid_driver", "wayland" );
+				SDL_QuitSubSystem( SDL_INIT_VIDEO );
+				err = GLimp_StartDriverAndSetMode( r_mode->integer, r_modeFullscreen->string, r_fullscreen->integer, qfalse );
+				if ( err != RSERR_OK )
+					err = GLimp_StartDriverAndSetMode( 3, "", r_fullscreen->integer, qfalse );
+				if ( err != RSERR_OK )
+				{
+					Cvar_Set( "r_customWidth", "640" );
+					Cvar_Set( "r_customHeight", "480" );
+					err = GLimp_StartDriverAndSetMode( -1, "", r_fullscreen->integer, qfalse );
+				}
+				if ( err != RSERR_OK && r_fullscreen->integer )
+				{
+					Cvar_Set( "r_fullscreen", "0" );
+					err = GLimp_StartDriverAndSetMode( 3, "", 0, qfalse );
+				}
+				continue;
 			}
+			}
+#endif
+			break;
+		}
+
+		if ( err == RSERR_FATAL_ERROR )
+		{
+			Com_Error( ERR_FATAL, "GLimp_Init() - could not load OpenGL subsystem: %s", SDL_GetError() );
+			return;
+		}
+		if ( err != RSERR_OK )
+		{
+			Com_Error( ERR_FATAL, "GLimp_Init() - could not load OpenGL subsystem: %s", SDL_GetError() );
+			return;
 		}
 	}
 
@@ -709,6 +825,64 @@ void *GL_GetProcAddress( const char *symbol )
 #ifdef USE_VULKAN_API
 /*
 ===============
+GLimp_VulkanAvailable
+
+Probes whether SDL has Vulkan support for the current video driver.
+Used on ARM to avoid loading the Vulkan renderer when SDL was built
+without Vulkan or the platform has no Vulkan ICD.
+===============
+*/
+qboolean GLimp_VulkanAvailable( void )
+{
+	const char *vidDriver;
+	SDL_Window *probeWindow = NULL;
+	qboolean available = qfalse;
+
+	if ( !r_vid_driver )
+		return qfalse;
+
+	vidDriver = r_vid_driver->string;
+#if defined(__arm__) || defined(__aarch64__)
+	if ( !vidDriver || !vidDriver[0] || ( Q_stricmp( vidDriver, "auto" ) == 0 ) )
+		vidDriver = "x11";
+	else if ( Q_stricmp( vidDriver, "kmsdrm" ) == 0 )
+		vidDriver = "x11";
+#endif
+	if ( vidDriver && vidDriver[0] && Q_stricmp( vidDriver, "auto" ) != 0 )
+	{
+#ifndef _WIN32
+		static char envBuf[64];
+		Com_sprintf( envBuf, sizeof( envBuf ), "SDL_VIDEODRIVER=%s", vidDriver );
+		putenv( envBuf );
+#endif
+	}
+
+	if ( SDL_Init( SDL_INIT_VIDEO ) != 0 )
+		goto done;
+
+	if ( SDL_Vulkan_LoadLibrary( NULL ) != 0 )
+		goto done;
+
+	/* SDL_Vulkan_LoadLibrary can succeed while the video driver lacks Vulkan
+	 * support (e.g. RPi system SDL built without Vulkan). Probe with a real
+	 * window creation. */
+	SDL_GL_ResetAttributes();
+	SDL_SetHint( SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR, "0" );
+	probeWindow = SDL_CreateWindow( "", 0, 0, 1, 1,
+		SDL_WINDOW_VULKAN | SDL_WINDOW_HIDDEN );
+	available = ( probeWindow != NULL );
+	if ( probeWindow )
+		SDL_DestroyWindow( probeWindow );
+
+done:
+	if ( SDL_WasInit( SDL_INIT_VIDEO ) )
+		SDL_QuitSubSystem( SDL_INIT_VIDEO );
+	return available;
+}
+
+
+/*
+===============
 VKimp_Init
 
 This routine is responsible for initializing the OS specific portions
@@ -725,6 +899,11 @@ void VKimp_Init( glconfig_t *config )
 
 	Com_DPrintf( "VKimp_Init()\n" );
 
+	Com_Printf( "[VK] SDL video driver: %s\n", SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "(none)" );
+	if ( SDL_Vulkan_LoadLibrary( NULL ) != 0 )
+		Com_Printf( "[VK] SDL Vulkan load check: %s\n", SDL_GetError() );
+	/* else leave loaded for window creation and GetVkGetInstanceProcAddr */
+
 	in_nograb = Cvar_Get( "in_nograb", "0", CVAR_ARCHIVE );
 	Cvar_SetDescription( in_nograb, "Do not capture mouse in game, may be useful during online streaming." );
 
@@ -735,23 +914,81 @@ void VKimp_Init( glconfig_t *config )
 	// feedback to renderer configuration
 	glw_state.config = config;
 
-	// Create the window and set up the context
-	err = GLimp_StartDriverAndSetMode( r_mode->integer, r_modeFullscreen->string, r_fullscreen->integer, qtrue /* Vulkan */ );
-	if ( err != RSERR_OK )
+	// Create the window and set up the context (with driver retry on ARM)
 	{
-		if ( err == RSERR_FATAL_ERROR )
+		int driverRetry;
+
+		err = RSERR_UNKNOWN;
+		for ( driverRetry = 0; driverRetry < 2; driverRetry++ )
 		{
-			Com_Error( ERR_FATAL, "VKimp_Init() - could not load Vulkan subsystem" );
-			return;
+			err = GLimp_StartDriverAndSetMode( r_mode->integer, r_modeFullscreen->string, r_fullscreen->integer, qtrue /* Vulkan */ );
+			if ( err != RSERR_OK && err != RSERR_FATAL_ERROR )
+			{
+				Com_Printf( "Setting r_mode %d failed, falling back on r_mode %d\n", r_mode->integer, 3 );
+
+				err = GLimp_StartDriverAndSetMode( 3, "", r_fullscreen->integer, qtrue /* Vulkan */ );
+			}
+			if ( err != RSERR_OK && err != RSERR_FATAL_ERROR )
+			{
+				Com_Printf( "r_mode 3 failed, trying r_mode -1 (640x480)\n" );
+				Cvar_Set( "r_customWidth", "640" );
+				Cvar_Set( "r_customHeight", "480" );
+				err = GLimp_StartDriverAndSetMode( -1, "", r_fullscreen->integer, qtrue /* Vulkan */ );
+				if ( err == RSERR_OK )
+					Cvar_Set( "r_mode", "-1" );
+			}
+			if ( err != RSERR_OK && err != RSERR_FATAL_ERROR )
+			{
+				Com_Printf( "r_mode -1 (640x480) failed, trying 800x600\n" );
+				Cvar_Set( "r_customWidth", "800" );
+				Cvar_Set( "r_customHeight", "600" );
+				err = GLimp_StartDriverAndSetMode( -1, "", r_fullscreen->integer, qtrue /* Vulkan */ );
+				if ( err == RSERR_OK )
+					Cvar_Set( "r_mode", "-1" );
+			}
+			if ( err != RSERR_OK && err != RSERR_FATAL_ERROR && r_fullscreen->integer )
+			{
+				Com_Printf( "Fullscreen failed, trying windowed mode\n" );
+				Cvar_Set( "r_fullscreen", "0" );
+				err = GLimp_StartDriverAndSetMode( 3, "", 0, qtrue /* Vulkan */ );
+			}
+			if ( err == RSERR_OK )
+				break;
+
+			/* On ARM: if x11 failed, try wayland as last resort */
+#if defined(__arm__) || defined(__aarch64__)
+			{
+				const char *vidDriver = SDL_GetCurrentVideoDriver();
+				if ( driverRetry == 0 && vidDriver && strcmp( vidDriver, "x11" ) == 0 )
+			{
+				Com_Printf( "[VK] x11 failed, trying wayland\n" );
+				Cvar_Set( "r_vid_driver", "wayland" );
+				SDL_QuitSubSystem( SDL_INIT_VIDEO );
+				continue;
+			}
+			}
+#endif
+			break;
 		}
 
-		Com_Printf( "Setting r_mode %d failed, falling back on r_mode %d\n", r_mode->integer, 3 );
-
-		err = GLimp_StartDriverAndSetMode( 3, "", r_fullscreen->integer, qtrue /* Vulkan */ );
-		if( err != RSERR_OK )
+		if ( err == RSERR_FATAL_ERROR )
 		{
-			// Nothing worked, give up
-			Com_Error( ERR_FATAL, "VKimp_Init() - could not load Vulkan subsystem" );
+#if defined(__arm__) || defined(__aarch64__)
+			Com_Printf( S_COLOR_YELLOW "Vulkan failed on ARM. SDL needs Vulkan support.\n" );
+			Com_Printf( "  Build SDL with Vulkan: ./scripts/build_sdl_vulkan_rpi.sh\n" );
+			Com_Printf( "  Or use OpenGL: +set cl_renderer opengl\n" );
+#endif
+			Com_Error( ERR_FATAL, "VKimp_Init() - could not load Vulkan subsystem: %s", SDL_GetError() );
+			return;
+		}
+		if ( err != RSERR_OK )
+		{
+#if defined(__arm__) || defined(__aarch64__)
+			Com_Printf( S_COLOR_YELLOW "Vulkan failed on ARM. SDL may lack Vulkan support.\n" );
+			Com_Printf( "  Build SDL with Vulkan: ./scripts/build_sdl_vulkan_rpi.sh\n" );
+			Com_Printf( "  Or use OpenGL: +set cl_renderer opengl\n" );
+#endif
+			Com_Error( ERR_FATAL, "VKimp_Init() - could not load Vulkan subsystem: %s", SDL_GetError() );
 			return;
 		}
 	}
@@ -805,8 +1042,8 @@ qboolean VK_CreateSurface( VkInstance instance, VkSurfaceKHR *surface )
 {
 	if ( SDL_Vulkan_CreateSurface( SDL_window, instance, surface ) == SDL_TRUE )
 		return qtrue;
-	else
-		return qfalse;
+	Com_Printf( "SDL_Vulkan_CreateSurface failed: %s\n", SDL_GetError() );
+	return qfalse;
 }
 
 

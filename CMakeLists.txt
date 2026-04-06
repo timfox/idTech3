@@ -390,7 +390,7 @@ if(USE_DUKTAPE)
     target_include_directories(js_runtime_internal PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/external/duktape")
     set_property(TARGET js_runtime_internal PROPERTY POSITION_INDEPENDENT_CODE ON)
     if(NOT MSVC)
-      target_compile_options(js_runtime_internal PRIVATE -fno-strict-aliasing)
+      target_compile_options(js_runtime_internal PRIVATE -fno-strict-aliasing -Wno-format-nonliteral -Wno-unused-but-set-variable)
     endif()
 
     set(DUKTAPE_FOUND TRUE)
@@ -519,6 +519,7 @@ if(USE_OPUS)
       if(NOT MSVC)
         target_compile_options(opus PRIVATE
           -Wno-vla
+          -Wno-cast-align
           -Wno-undef
           -Wno-cast-qual
           -Wno-missing-prototypes
@@ -587,6 +588,15 @@ if(USE_FLAC)
       set(FLAC_LIBRARY FLAC::FLAC)
     elseif(TARGET FLAC)
       set(FLAC_LIBRARY FLAC)
+    endif()
+    if(TARGET FLAC AND NOT MSVC)
+      target_compile_options(FLAC PRIVATE -Wno-cast-qual -Wno-format-nonliteral -Wno-static-in-inline -Wno-gnu-zero-variadic-macro-arguments)
+    endif()
+    if(TARGET grabbag AND NOT MSVC)
+      target_compile_options(grabbag PRIVATE -Wno-cast-qual -Wno-format-nonliteral)
+    endif()
+    if(TARGET getopt AND NOT MSVC)
+      target_compile_options(getopt PRIVATE -Wno-cast-qual -Wno-gnu-zero-variadic-macro-arguments)
     endif()
     set(FLAC_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/external/src/flac/include)
     if(TARGET benchmark_residual)
@@ -857,6 +867,9 @@ if(USE_ZLIB)
       target_compile_definitions(zlibstatic PRIVATE ZLIB_CONST)
       target_compile_definitions(zlibstatic PRIVATE _LFS64_LARGEFILE=1 _LARGEFILE64_SOURCE=1)
       set_property(TARGET zlibstatic PROPERTY POSITION_INDEPENDENT_CODE ON)
+      if(NOT MSVC)
+        target_compile_options(zlibstatic PRIVATE -Wno-format-nonliteral)
+      endif()
     endif()
     if(TARGET zlib)
       target_compile_definitions(zlib PRIVATE ZLIB_CONST)
@@ -1154,6 +1167,7 @@ list(APPEND CLIENT_SRCS
   src/game/g_horde.c
   src/game/g_goap.c
   src/game/g_aiml.c
+  src/game/g_bt.c
   src/game/g_entity_bridge.c
   src/game/g_lua_bindings.c
   src/client/cl_map_background.c
@@ -1301,6 +1315,7 @@ IF(USE_SYSTEM_JPEG)
 		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_FLUX)
 		target_include_directories(client PRIVATE ${EXTERNAL_ROOT}/src/cflux2)
 	endif()
+	target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR}/src/game)
 	if(USE_OPUS)
 		target_compile_definitions(client PRIVATE INCLUDE_INTTYPES_H=1 INCLUDE_SYS_TYPES_H=1)
 	endif()
@@ -1319,6 +1334,8 @@ ELSE()
 	endif()
 	# Ensure client can find qcommon headers needed by some client-side modules (eg. mp3)
 	target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR}/src/qcommon ${EXTERNAL_JPEG_SRC_DIR})
+	# ECS (EnTT) - alternative to gentity
+	target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR}/src/game)
 	# Audio module headers (moved from client/)
 	target_include_directories(client PRIVATE
 		${CMAKE_SOURCE_DIR}/src/audio
@@ -1412,7 +1429,7 @@ if(MSVC)
     )
 else()
     set_source_files_properties(src/renderers/vulkan/utils/mikktspace/mikktspace.c PROPERTIES
-        COMPILE_OPTIONS "-Wno-shadow"
+        COMPILE_OPTIONS "-Wno-shadow;-Wno-unused-but-set-variable"
     )
 endif()
 
@@ -1858,6 +1875,31 @@ if(USE_RECAST_NAV)
   message(STATUS "Recast Navigation: enabled")
 endif()
 
+# --- ECS (EnTT) module - alternative to gentity ---
+set(ECS_CPP "${CMAKE_SOURCE_DIR}/src/game/ecs.cpp")
+if(EXISTS "${ECS_CPP}")
+  enable_language(CXX)
+  ADD_LIBRARY(ecs_module STATIC ${ECS_CPP})
+  set_target_properties(ecs_module PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+  )
+  target_include_directories(ecs_module PRIVATE
+    ${EXTERNAL_INCLUDE}/entt/single_include
+    ${CMAKE_SOURCE_DIR}/src/game
+    ${CMAKE_SOURCE_DIR}/src/qcommon
+  )
+  if(NOT MSVC)
+    target_compile_options(ecs_module PRIVATE -Wno-unused-parameter)
+  endif()
+  set(ECS_MODULE_AVAILABLE TRUE)
+  add_compile_definitions(USE_ECS)
+  message(STATUS "ECS (EnTT): enabled")
+else()
+  set(ECS_MODULE_AVAILABLE FALSE)
+  message(STATUS "ECS (EnTT): disabled (src/game/ecs.cpp not found)")
+endif()
+
 # --- Bullet Physics module ---
 option(USE_BULLET_PHYSICS "Enable Bullet Physics integration" ON)
 set(PHYSICS_SRCS
@@ -1914,6 +1956,9 @@ if(TARGET Threads::Threads)
 endif()
 if(USE_RECAST_NAV AND TARGET recast_nav)
   TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE recast_nav)
+endif()
+if(TARGET ecs_module)
+  TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ecs_module)
 endif()
 if(USE_FLUX)
 	TARGET_COMPILE_DEFINITIONS(${CNAME}${BINEXT} PRIVATE USE_FLUX)

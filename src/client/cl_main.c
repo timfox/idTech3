@@ -52,6 +52,8 @@ cvar_t	*cl_motd;
 
 #if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
 static cvar_t *cl_renderer;
+static cvar_t *cl_renderer_force;
+static qboolean isValidRenderer( const char *s );
 #endif
 
 cvar_t	*rcon_client_password;
@@ -400,6 +402,7 @@ cvar_t *r_glDriver;
 cvar_t *r_displayRefresh;
 cvar_t *r_fullscreen;
 cvar_t *r_mode;
+cvar_t *r_vid_driver;
 cvar_t *r_modeFullscreen;
 cvar_t *r_customwidth;
 cvar_t *r_customheight;
@@ -3644,6 +3647,15 @@ void CL_StartHunkUsers( void ) {
 					Cbuf_AddText( "\n" );
 				}
 			}
+
+			{
+				const char *postCfg = va( "maps/%s.post.cfg", mapname );
+				if ( FS_FileExists( postCfg ) ) {
+					Cbuf_AddText( va( "exec %s\n", postCfg ) );
+				} else if ( FS_FileExists( "maps/default.post.cfg" ) ) {
+					Cbuf_AddText( "exec maps/default.post.cfg\n" );
+				}
+			}
 		}
 	}
 
@@ -3750,9 +3762,39 @@ static void CL_InitRef( void ) {
 
 	CL_InitGLimp_Cvars();
 
+#if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
+	cl_renderer_force = Cvar_Get( "cl_renderer_force", "0", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_renderer_force, "When 1, skip Vulkan availability check on ARM (try Vulkan even if probe fails). Use with +set cl_renderer vulkan." );
+#endif
+
 	Com_Printf( "----- Initializing Renderer ----\n" );
 
 #if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
+	/* "renderer" is an alias for cl_renderer (e.g. +set renderer vulkan) */
+	const char *rendererName = cl_renderer->string;
+	{
+		const char *alt = Cvar_VariableString( "renderer" );
+		if ( alt && alt[0] && isValidRenderer( alt ) ) {
+			rendererName = alt;
+			Cvar_Set( "cl_renderer", alt );  /* sync so config saves correctly */
+		}
+	}
+
+#if defined(USE_VULKAN_API) && (defined(__arm__) || defined(__aarch64__))
+	/* SDL may lack Vulkan support on ARM (e.g. RPi system SDL); fall back to OpenGL unless forced */
+	if ( Q_stricmp( rendererName, "vulkan" ) == 0 && !GLimp_VulkanAvailable() )
+	{
+		if ( cl_renderer_force && cl_renderer_force->integer )
+			Com_Printf( "[VK] cl_renderer_force 1: attempting Vulkan despite probe failure\n" );
+		else
+		{
+			Com_Printf( "[VK] Vulkan not available in SDL, falling back to OpenGL\n" );
+			Cvar_Set( "cl_renderer", "opengl" );
+			Cvar_Set( "renderer", "opengl" );
+			rendererName = "opengl";
+		}
+	}
+#endif
 
 #if defined (__linux__) && defined(__i386__)
 #define REND_ARCH_STRING "x86"
@@ -3762,7 +3804,7 @@ static void CL_InitRef( void ) {
 
 	{
 		/* sanitize renderer name: strip surrounding single/double quotes if present */
-		const char *raw = cl_renderer->string;
+		const char *raw = rendererName;
 		char clean[64];
 		size_t rawlen = strlen(raw);
 		if ( rawlen >= 2 && ((raw[0] == '\"' && raw[rawlen-1] == '\"') || (raw[0] == '\'' && raw[rawlen-1] == '\'')) ) {
@@ -3786,6 +3828,7 @@ static void CL_InitRef( void ) {
 	{
 		Com_Printf( S_COLOR_YELLOW "Failed to load renderer from %s: %s\n", ospath, Sys_GetLoadLibraryError() );
 		Cvar_ForceReset( "cl_renderer" );
+		Cvar_ForceReset( "renderer" );
 		/* sanitize renderer name for the retry as well */
 		{
 			const char *raw = cl_renderer->string;
@@ -3900,8 +3943,14 @@ static void CL_InitRef( void ) {
 	rimp.GLimp_InitGamma = GLimp_InitGamma;
 	rimp.GLimp_SetGamma = GLimp_SetGamma;
 
-	// OpenGL API
-#ifdef USE_OPENGL_API
+	/* OpenGL API: set when static OpenGL build, or when Vulkan build with dlopen (either renderer can load) */
+#if defined(USE_OPENGL_API)
+	rimp.GLimp_Init = GLimp_Init;
+	rimp.GLimp_Shutdown = GLimp_Shutdown;
+	rimp.GL_GetProcAddress = GL_GetProcAddress;
+	rimp.GLimp_EndFrame = GLimp_EndFrame;
+#elif defined(USE_VULKAN_API)
+	/* Vulkan build: OpenGL renderer can be loaded at runtime (e.g. ARM fallback) */
 	rimp.GLimp_Init = GLimp_Init;
 	rimp.GLimp_Shutdown = GLimp_Shutdown;
 	rimp.GL_GetProcAddress = GL_GetProcAddress;
@@ -4245,7 +4294,24 @@ static void CL_InitGLimp_Cvars( void )
 	Cvar_CheckRange( r_noborder, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( r_noborder, "Setting to 1 will remove window borders and title bar in windowed mode, hold ALT to drag & drop it with opened console." );
 
+#if defined(__arm__) || defined(__aarch64__)
+	/* ARM/RPi: x11 default avoids Vulkan KMSDRM issues (SDL#3997) */
+	r_vid_driver = Cvar_Get( "r_vid_driver", "x11", CVAR_ARCHIVE_ND | CVAR_LATCH );
+#else
+	r_vid_driver = Cvar_Get( "r_vid_driver", "auto", CVAR_ARCHIVE_ND | CVAR_LATCH );
+#endif
+	Cvar_SetDescription( r_vid_driver, "SDL video driver: auto, x11, wayland, kmsdrm. On ARM/Raspberry Pi with Vulkan, use x11 if you get 'Couldn't get a visual'. Requires vid_restart." );
+
+#if defined(__arm__) || defined(__aarch64__)
+	/* RPi5: r_mode -2 (desktop) often fails; -1 with 640x480 is more reliable */
+	r_mode = Cvar_Get( "r_mode", "-1", CVAR_ARCHIVE | CVAR_LATCH );
+	r_customwidth = Cvar_Get( "r_customWidth", "640", CVAR_ARCHIVE | CVAR_LATCH );
+	r_customheight = Cvar_Get( "r_customHeight", "480", CVAR_ARCHIVE | CVAR_LATCH );
+#else
 	r_mode = Cvar_Get( "r_mode", "-2", CVAR_ARCHIVE | CVAR_LATCH );
+	r_customwidth = Cvar_Get( "r_customWidth", "1600", CVAR_ARCHIVE | CVAR_LATCH );
+	r_customheight = Cvar_Get( "r_customHeight", "1024", CVAR_ARCHIVE | CVAR_LATCH );
+#endif
 	Cvar_CheckRange( r_mode, "-2", va( "%i", s_numVidModes-1 ), CV_INTEGER );
 	Cvar_SetDescription( r_mode, "Set video mode:\n -2 - use current desktop resolution\n -1 - use \\r_customWidth and \\r_customHeight\n  0..N - enter \\modelist for details" );
 #ifdef _DEBUG
@@ -4258,10 +4324,8 @@ static void CL_InitGLimp_Cvars( void )
 	Cvar_SetDescription( r_fullscreen, "Fullscreen mode. Set to 0 for windowed mode." );
 	r_customPixelAspect = Cvar_Get( "r_customPixelAspect", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	Cvar_SetDescription( r_customPixelAspect, "Enables custom aspect of the screen, with \\r_mode -1." );
-	r_customwidth = Cvar_Get( "r_customWidth", "1600", CVAR_ARCHIVE | CVAR_LATCH );
 	Cvar_CheckRange( r_customwidth, "4", NULL, CV_INTEGER );
 	Cvar_SetDescription( r_customwidth, "Custom width to use with \\r_mode -1." );
-	r_customheight = Cvar_Get( "r_customHeight", "1024", CVAR_ARCHIVE | CVAR_LATCH );
 	Cvar_CheckRange( r_customheight, "4", NULL, CV_INTEGER );
 	Cvar_SetDescription( r_customheight, "Custom height to use with \\r_mode -1." );
 
@@ -4280,8 +4344,10 @@ static void CL_InitGLimp_Cvars( void )
 	cl_drawBuffer = Cvar_Get( "r_drawBuffer", "GL_BACK", CVAR_CHEAT );
 	Cvar_SetDescription( cl_drawBuffer, "Specifies buffer to draw from: GL_FRONT or GL_BACK." );
 #if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
-#ifdef RENDERER_DEFAULT
+#if defined(RENDERER_DEFAULT)
 	cl_renderer = Cvar_Get( "cl_renderer", XSTRING( RENDERER_DEFAULT ), CVAR_ARCHIVE | CVAR_LATCH );
+#elif defined(USE_VULKAN_API)
+	cl_renderer = Cvar_Get( "cl_renderer", "vulkan", CVAR_ARCHIVE | CVAR_LATCH );
 #else
 	cl_renderer = Cvar_Get( "cl_renderer", "opengl", CVAR_ARCHIVE | CVAR_LATCH );
 #endif

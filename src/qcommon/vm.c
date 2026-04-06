@@ -777,6 +777,8 @@ static vmHeader_t *VM_LoadQVM( vm_t *vm, qboolean alloc ) {
 	if ( !header ) {
 		if ( !vm->silentQVM ) {
 			Com_Printf( "Failed.\n" );
+		} else {
+			Com_Printf( S_COLOR_YELLOW "VM_LoadQVM: %s.qvm not found (tried modules/ and vm/)\n", vm->name );
 		}
 		VM_Free( vm );
 		return NULL;
@@ -1898,8 +1900,9 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 			return vm;
 		}
 
-		// Native DLL failed, silently fall back to QVM without reporting
-		vm->silentQVM = qtrue; // Flag to suppress QVM loading messages
+		// Native DLL failed, fall back to QVM
+		Com_Printf( "Native %s not found (tried modules/ and vm/), trying %s.qvm...\n", name, name );
+		vm->silentQVM = qtrue; // Flag to suppress redundant QVM loading messages
 	}
 
 	// never allow dll loading with a demo

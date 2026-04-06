@@ -3,137 +3,8 @@
 #include "vk_postfx.h"
 #include "vk_postfx_params.h"
 #include "vk_temporal.h"
+#include "vk_util.h"
 #include <math.h>
-
-static qboolean vk_postfx_mat4_inverse( const float *m, float *out )
-{
-	float tmp[16];
-	float det;
-	int i;
-
-	tmp[0] = m[5]  * m[10] * m[15] -
-	         m[5]  * m[11] * m[14] -
-	         m[9]  * m[6]  * m[15] +
-	         m[9]  * m[7]  * m[14] +
-	         m[13] * m[6]  * m[11] -
-	         m[13] * m[7]  * m[10];
-
-	tmp[4] = -m[4]  * m[10] * m[15] +
-	          m[4]  * m[11] * m[14] +
-	          m[8]  * m[6]  * m[15] -
-	          m[8]  * m[7]  * m[14] -
-	          m[12] * m[6]  * m[11] +
-	          m[12] * m[7]  * m[10];
-
-	tmp[8] = m[4]  * m[9] * m[15] -
-	         m[4]  * m[11] * m[13] -
-	         m[8]  * m[5] * m[15] +
-	         m[8]  * m[7] * m[13] +
-	         m[12] * m[5] * m[11] -
-	         m[12] * m[7] * m[9];
-
-	tmp[12] = -m[4]  * m[9] * m[14] +
-	           m[4]  * m[10] * m[13] +
-	           m[8]  * m[5] * m[14] -
-	           m[8]  * m[6] * m[13] -
-	           m[12] * m[5] * m[10] +
-	           m[12] * m[6] * m[9];
-
-	tmp[1] = -m[1]  * m[10] * m[15] +
-	          m[1]  * m[11] * m[14] +
-	          m[9]  * m[2] * m[15] -
-	          m[9]  * m[3] * m[14] -
-	          m[13] * m[2] * m[11] +
-	          m[13] * m[3] * m[10];
-
-	tmp[5] = m[0]  * m[10] * m[15] -
-	         m[0]  * m[11] * m[14] -
-	         m[8]  * m[2] * m[15] +
-	         m[8]  * m[3] * m[14] +
-	         m[12] * m[2] * m[11] -
-	         m[12] * m[3] * m[10];
-
-	tmp[9] = -m[0]  * m[9] * m[15] +
-	          m[0]  * m[11] * m[13] +
-	          m[8]  * m[1] * m[15] -
-	          m[8]  * m[3] * m[13] -
-	          m[12] * m[1] * m[11] +
-	          m[12] * m[3] * m[9];
-
-	tmp[13] = m[0]  * m[9] * m[14] -
-	          m[0]  * m[10] * m[13] -
-	          m[8]  * m[1] * m[14] +
-	          m[8]  * m[2] * m[13] +
-	          m[12] * m[1] * m[10] -
-	          m[12] * m[2] * m[9];
-
-	tmp[2] = m[1]  * m[6] * m[15] -
-	         m[1]  * m[7] * m[14] -
-	         m[5]  * m[2] * m[15] +
-	         m[5]  * m[3] * m[14] +
-	         m[13] * m[2] * m[7] -
-	         m[13] * m[3] * m[6];
-
-	tmp[6] = -m[0]  * m[6] * m[15] +
-	          m[0]  * m[7] * m[14] +
-	          m[4]  * m[2] * m[15] -
-	          m[4]  * m[3] * m[14] -
-	          m[12] * m[2] * m[7] +
-	          m[12] * m[3] * m[6];
-
-	tmp[10] = m[0]  * m[5] * m[15] -
-	          m[0]  * m[7] * m[13] -
-	          m[4]  * m[1] * m[15] +
-	          m[4]  * m[3] * m[13] +
-	          m[12] * m[1] * m[7] -
-	          m[12] * m[3] * m[5];
-
-	tmp[14] = -m[0]  * m[5] * m[14] +
-	           m[0]  * m[6] * m[13] +
-	           m[4]  * m[1] * m[14] -
-	           m[4]  * m[2] * m[13] -
-	           m[12] * m[1] * m[6] +
-	           m[12] * m[2] * m[5];
-
-	tmp[3] = -m[1] * m[6] * m[11] +
-	          m[1] * m[7] * m[10] +
-	          m[5] * m[2] * m[11] -
-	          m[5] * m[3] * m[10] -
-	          m[9] * m[2] * m[7] +
-	          m[9] * m[3] * m[6];
-
-	tmp[7] = m[0] * m[6] * m[11] -
-	         m[0] * m[7] * m[10] -
-	         m[4] * m[2] * m[11] +
-	         m[4] * m[3] * m[10] +
-	         m[8] * m[2] * m[7] -
-	         m[8] * m[3] * m[6];
-
-	tmp[11] = -m[0] * m[5] * m[11] +
-	           m[0] * m[7] * m[9] +
-	           m[4] * m[1] * m[11] -
-	           m[4] * m[3] * m[9] -
-	           m[8] * m[1] * m[7] +
-	           m[8] * m[3] * m[5];
-
-	tmp[15] = m[0] * m[5] * m[10] -
-	          m[0] * m[6] * m[9] -
-	          m[4] * m[1] * m[10] +
-	          m[4] * m[2] * m[9] +
-	          m[8] * m[1] * m[6] -
-	          m[8] * m[2] * m[5];
-
-	det = m[0] * tmp[0] + m[1] * tmp[4] + m[2] * tmp[8] + m[3] * tmp[12];
-	if ( fabsf( det ) < 1e-9f ) {
-		return qfalse;
-	}
-
-	det = 1.0f / det;
-	for ( i = 0; i < 16; i++ ) {
-		out[i] = tmp[i] * det;
-	}
-	return qtrue;
-}
 
 void vk_update_postfx_params( uint32_t cmd_index )
 {
@@ -142,6 +13,18 @@ void vk_update_postfx_params( uint32_t cmd_index )
 	const float *view;
 	float viewProj[16];
 	qboolean motion_valid = qfalse;
+	vec3_t shadowLift, midGamma, highlightGain, splitShadow, splitHighlight;
+	cvar_t *r_post_contrast;
+	cvar_t *r_post_saturation;
+	cvar_t *r_outline;
+	cvar_t *r_outlineThreshold;
+	cvar_t *r_autoExposure_target;
+	cvar_t *r_autoExposure_min;
+	cvar_t *r_autoExposure_max;
+	cvar_t *r_localExposure;
+	cvar_t *r_localExposure_strength;
+	cvar_t *r_localExposure_shadowClamp;
+	cvar_t *r_localExposure_highlightClamp;
 
 	if ( cmd_index >= NUM_COMMAND_BUFFERS || !vk.postfx_params_ptr[cmd_index] ) {
 		return;
@@ -173,6 +56,85 @@ void vk_update_postfx_params( uint32_t cmd_index )
 	params.frameInfo[0] = Com_Clamp( 0.0f, 64.0f, PostFX_DepthOfField_GetMaxBlur() );
 	params.frameInfo[1] = ( vk.renderWidth > 0 ) ? ( 1.0f / (float)vk.renderWidth ) : 0.0f;
 	params.frameInfo[2] = ( vk.renderHeight > 0 ) ? ( 1.0f / (float)vk.renderHeight ) : 0.0f;
+	params.toneMapParams0[0] = Com_Clamp( 0.0f, 1.0f, PostFX_GetGradeToe() );
+	params.toneMapParams0[1] = Com_Clamp( 0.0f, 1.0f, PostFX_GetGradeShoulder() );
+	params.toneMapParams0[2] = Com_Clamp( 0.5f, 32.0f, PostFX_GetGradeWhitePoint() );
+	params.toneMapParams0[3] = Com_Clamp( 0.0f, 0.25f, PostFX_GetGradeBlackClip() );
+	params.toneMapParams1[0] = Com_Clamp( 0.0f, 1.0f, PostFX_GetGradeHighlightDesat() );
+	params.toneMapParams1[1] = Com_Clamp( 0.25f, 4.0f, PostFX_GetGradeContrast() );
+	params.toneMapParams1[2] = Com_Clamp( 0.1f, 0.9f, PostFX_GetGradeContrastPivot() );
+	params.toneMapParams1[3] = (float)( r_tonemap ? r_tonemap->integer : 3 );
+	params.colorBalance[0] = Com_Clamp( -1.0f, 1.0f, PostFX_GetGradeTemperature() );
+	params.colorBalance[1] = Com_Clamp( -1.0f, 1.0f, PostFX_GetGradeTint() );
+	params.colorBalance[2] = Com_Clamp( -4.0f, 4.0f, PostFX_GetGradeExposureBias() );
+	params.colorBalance[3] = ( r_pre_exposure_scale && r_pre_exposure_scale->value > 0.0f ) ? r_pre_exposure_scale->value : 1.0f;
+	r_post_contrast = ri.Cvar_Get( "r_post_contrast", "1.0", 0 );
+	r_post_saturation = ri.Cvar_Get( "r_post_saturation", "1.0", 0 );
+	r_outline = ri.Cvar_Get( "r_outline", "0", 0 );
+	r_outlineThreshold = ri.Cvar_Get( "r_outlineThreshold", "0.15", 0 );
+	params.colorGrade[0] = Com_Clamp( 0.0f, 3.0f, PostFX_GetGradeSaturation() );
+	params.colorGrade[1] = Com_Clamp( -1.0f, 1.0f, PostFX_GetGradeVibrance() );
+	params.colorGrade[2] = ( r_post_contrast && r_post_contrast->value > 0.0f ) ? r_post_contrast->value : 1.0f;
+	params.colorGrade[3] = ( r_post_saturation && r_post_saturation->value >= 0.0f ) ? r_post_saturation->value : 1.0f;
+	PostFX_GetShadowLift( shadowLift );
+	PostFX_GetMidGamma( midGamma );
+	PostFX_GetHighlightGain( highlightGain );
+	PostFX_GetSplitShadow( splitShadow );
+	PostFX_GetSplitHighlight( splitHighlight );
+	params.shadowsLift[0] = shadowLift[0];
+	params.shadowsLift[1] = shadowLift[1];
+	params.shadowsLift[2] = shadowLift[2];
+	params.midsGamma[0] = midGamma[0];
+	params.midsGamma[1] = midGamma[1];
+	params.midsGamma[2] = midGamma[2];
+	params.highlightsGain[0] = highlightGain[0];
+	params.highlightsGain[1] = highlightGain[1];
+	params.highlightsGain[2] = highlightGain[2];
+	params.splitShadow[0] = splitShadow[0];
+	params.splitShadow[1] = splitShadow[1];
+	params.splitShadow[2] = splitShadow[2];
+	params.splitShadow[3] = Com_Clamp( 0.0f, 1.0f, PostFX_GetSplitBalance() );
+	params.splitHighlight[0] = splitHighlight[0];
+	params.splitHighlight[1] = splitHighlight[1];
+	params.splitHighlight[2] = splitHighlight[2];
+	params.splitHighlight[3] = Com_Clamp( 0.0f, 1.0f, PostFX_GetSplitStrength() );
+	params.lensEffects0[0] = PostFX_GetVignetteIntensity();
+	params.lensEffects0[1] = PostFX_GetVignetteRadius();
+	params.lensEffects0[2] = PostFX_GetChromaticAberration();
+	params.lensEffects0[3] = PostFX_GetFilmGrain();
+	params.lensEffects1[0] = r_outline ? r_outline->value : 0.0f;
+	params.lensEffects1[1] = r_outlineThreshold ? r_outlineThreshold->value : 0.15f;
+	params.lensEffects1[2] = (float)PostFX_GetFilmLook();
+	params.lensEffects1[3] = PostFX_GetSharpen();
+	params.runtimeFlags[0] = r_greyscale ? r_greyscale->value : 0.0f;
+	params.runtimeFlags[1] = (float)( r_dither ? r_dither->integer : 0 );
+	params.runtimeFlags[2] = (float)( r_post_debug ? r_post_debug->integer : 0 );
+	params.runtimeFlags[3] = (float)( ( r_post && r_post->integer ) ? 1 : 0 );
+	params.lutParams[0] = Com_Clamp( 0.0f, 1.0f, PostFX_GetLUTIntensity() );
+	params.lutParams[1] = ( PostFX_GetLUTImage() && PostFX_GetLUTImage() != tr.whiteImage ) ? 1.0f : 0.0f;
+	params.lutParams[2] = 32.0f;
+	params.lutParams[3] = ( r_gamma && r_gamma->value > 0.0f ) ? ( 1.0f / r_gamma->value ) : 1.0f;
+	r_autoExposure_target = ri.Cvar_Get( "r_exposure_auto_target", "1.0", 0 );
+	r_autoExposure_min = ri.Cvar_Get( "r_autoExposure_min", "0.5", 0 );
+	r_autoExposure_max = ri.Cvar_Get( "r_autoExposure_max", "4.0", 0 );
+	r_localExposure = ri.Cvar_Get( "r_localExposure", "1", 0 );
+	r_localExposure_strength = ri.Cvar_Get( "r_localExposure_strength", "0.35", 0 );
+	r_localExposure_shadowClamp = ri.Cvar_Get( "r_localExposure_shadowClamp", "1.5", 0 );
+	r_localExposure_highlightClamp = ri.Cvar_Get( "r_localExposure_highlightClamp", "1.5", 0 );
+	params.autoExposureParams[0] = vk.temporal.hasValidLuminance ? vk.temporal.filteredAvgLogLuminance :
+		log2f( fmaxf( 1e-4f, ( r_autoExposure_target ? r_autoExposure_target->value : 1.0f ) /
+			fmaxf( r_exposure ? r_exposure->value : 1.0f, 1e-4f ) ) );
+	params.autoExposureParams[1] = fmaxf( r_autoExposure_target ? r_autoExposure_target->value : 1.0f, 1e-4f );
+	params.autoExposureParams[2] = fmaxf( r_autoExposure_min ? r_autoExposure_min->value : 0.5f, 0.01f );
+	params.autoExposureParams[3] = fmaxf( r_autoExposure_max ? r_autoExposure_max->value : 4.0f, params.autoExposureParams[2] );
+	params.localExposureParams[0] = ( r_localExposure && r_localExposure->integer ) ? 1.0f : 0.0f;
+	params.localExposureParams[1] = Com_Clamp( 0.0f, 1.0f, r_localExposure_strength ? r_localExposure_strength->value : 0.35f );
+	params.localExposureParams[2] = Com_Clamp( 0.0f, 3.0f, r_localExposure_shadowClamp ? r_localExposure_shadowClamp->value : 1.5f );
+	params.localExposureParams[3] = Com_Clamp( 0.0f, 3.0f, r_localExposure_highlightClamp ? r_localExposure_highlightClamp->value : 1.5f );
+	params.taaParams[0] = vk.temporal.hasValidTAAHistory ? 1.0f : 0.0f;
+	params.taaParams[1] = Com_Clamp( 0.0f, 0.99f, r_taa_feedbackStationary ? r_taa_feedbackStationary->value : 0.92f );
+	params.taaParams[2] = Com_Clamp( 0.0f, 0.99f, r_taa_feedbackMotion ? r_taa_feedbackMotion->value : 0.72f );
+	params.taaParams[3] = Com_Clamp( 0.0f, 1.0f, r_taa_sharpen ? r_taa_sharpen->value : 0.12f );
 
 	if ( backEnd.projection2D || !tr.world || backEnd.viewParms.portalView != PV_NONE ) {
 		Com_Memcpy( vk.postfx_params_ptr[cmd_index], &params, sizeof( params ) );
@@ -185,7 +147,7 @@ void vk_update_postfx_params( uint32_t cmd_index )
 	myGlMultMatrix( view, projection, viewProj );
 	Com_Memcpy( params.viewMatrix, view, sizeof( params.viewMatrix ) );
 
-	if ( !vk_postfx_mat4_inverse( viewProj, params.invViewProj ) ) {
+	if ( !vk_mat4_inverse( viewProj, params.invViewProj ) ) {
 		Com_Memcpy( params.invViewProj, viewProj, sizeof( params.invViewProj ) );
 	}
 

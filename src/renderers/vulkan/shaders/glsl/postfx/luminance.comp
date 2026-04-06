@@ -5,38 +5,84 @@ layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 layout(binding = 0) uniform sampler2D hdrColorTexture;
 layout(binding = 1, r32f) uniform writeonly image2D luminanceOutput;
 
+layout(push_constant) uniform LuminanceMetering {
+	float lowPercent;
+	float highPercent;
+	float centerWeight;
+	float reserved;
+} meter;
+
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
 
 shared float s_logLum[256];
+shared float s_weight[256];
+
+void swapSamples( uint a, uint b ) {
+	float lumA = s_logLum[a];
+	float lumB = s_logLum[b];
+	float weightA = s_weight[a];
+	float weightB = s_weight[b];
+	s_logLum[a] = lumB;
+	s_logLum[b] = lumA;
+	s_weight[a] = weightB;
+	s_weight[b] = weightA;
+}
 
 void main() {
 	uint lx = gl_LocalInvocationID.x;
 	uint ly = gl_LocalInvocationID.y;
 	uint li = ly * 16u + lx;
 
-	/* Sample HDR at 16x16 sparse grid across full image (1 work group) */
+	/* Sample HDR at 16x16 sparse grid across full image (1 work group). */
 	float fx = (float(lx) + 0.5) / 16.0;
 	float fy = (float(ly) + 0.5) / 16.0;
 	vec2 uv = vec2(fx, fy);
 	vec3 rgb = texture(hdrColorTexture, uv).rgb;
 	float lum = max(dot(rgb, LUMA), 1e-6);
 	float logLum = log2(lum);
+	vec2 centered = uv * 2.0 - 1.0;
+	float radial = clamp(1.0 - dot(centered, centered) * 0.5, 0.0, 1.0);
+	float weight = mix(1.0, 1.0 + max(meter.centerWeight, 0.0) * 3.0, radial * radial);
 	s_logLum[li] = logLum;
+	s_weight[li] = weight;
 
 	barrier();
 	memoryBarrierShared();
 
-	/* Parallel reduction: 256 -> 1 */
-	for (uint s = 128u; s > 0u; s >>= 1u) {
-		if (li < s) {
-			s_logLum[li] += s_logLum[li + s];
+	/* Bitonic sort so we can trim luminance percentiles before averaging. */
+	for (uint k = 2u; k <= 256u; k <<= 1u) {
+		for (uint j = k >> 1u; j > 0u; j >>= 1u) {
+			uint ixj = li ^ j;
+			if (ixj > li) {
+				bool ascending = (li & k) == 0u;
+				bool outOfOrder = ascending ? (s_logLum[li] > s_logLum[ixj]) : (s_logLum[li] < s_logLum[ixj]);
+				if (outOfOrder) {
+					swapSamples(li, ixj);
+				}
+			}
+			barrier();
+			memoryBarrierShared();
 		}
-		barrier();
-		memoryBarrierShared();
 	}
 
 	if (li == 0u) {
-		float avgLogLum = s_logLum[0] / 256.0;
+		float lowPercent = clamp(meter.lowPercent, 0.0, 0.45);
+		float highPercent = clamp(meter.highPercent, 0.0, 0.45);
+		int startIndex = int(floor(lowPercent * 256.0));
+		int endIndex = int(ceil((1.0 - highPercent) * 256.0));
+		float weightedSum = 0.0;
+		float weightSum = 0.0;
+		float avgLogLum;
+
+		startIndex = clamp(startIndex, 0, 255);
+		endIndex = clamp(endIndex, startIndex + 1, 256);
+
+		for (int i = startIndex; i < endIndex; ++i) {
+			weightedSum += s_logLum[i] * s_weight[i];
+			weightSum += s_weight[i];
+		}
+
+		avgLogLum = (weightSum > 0.0) ? (weightedSum / weightSum) : s_logLum[128];
 		imageStore(luminanceOutput, ivec2(0, 0), vec4(avgLogLum, 0.0, 0.0, 1.0));
 	}
 }

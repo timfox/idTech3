@@ -96,6 +96,18 @@ const char *vk_format_string( VkFormat format )
 		return buf;
 	}
 }
+
+qboolean vk_format_is_srgb( VkFormat format )
+{
+	switch ( format ) {
+		case VK_FORMAT_B8G8R8A8_SRGB:
+		case VK_FORMAT_R8G8B8A8_SRGB:
+		case VK_FORMAT_A8B8G8R8_SRGB_PACK32:
+			return qtrue;
+		default:
+			return qfalse;
+	}
+}
 #undef CASE_STR
 
 uint32_t vk_find_memory_type( VkPhysicalDevice physical_device, uint32_t memory_type_bits, VkMemoryPropertyFlags properties )
@@ -218,6 +230,174 @@ float vk_matrix_max_abs_diff( const float *a, const float *b )
 		}
 	}
 	return max_diff;
+}
+
+qboolean vk_mat4_inverse( const float *m, float *out )
+{
+	float tmp[16];
+	tmp[0] = m[5]  * m[10] * m[15] -
+	         m[5]  * m[11] * m[14] -
+	         m[9]  * m[6]  * m[15] +
+	         m[9]  * m[7]  * m[14] +
+	         m[13] * m[6]  * m[11] -
+	         m[13] * m[7]  * m[10];
+
+	tmp[4] = -m[4]  * m[10] * m[15] +
+	          m[4]  * m[11] * m[14] +
+	          m[8]  * m[6]  * m[15] -
+	          m[8]  * m[7]  * m[14] -
+	          m[12] * m[6]  * m[11] +
+	          m[12] * m[7]  * m[10];
+
+	tmp[8] = m[4]  * m[9] * m[15] -
+	         m[4]  * m[11] * m[13] -
+	         m[8]  * m[5] * m[15] +
+	         m[8]  * m[7] * m[13] +
+	         m[12] * m[5] * m[11] -
+	         m[12] * m[7] * m[9];
+
+	tmp[12] = -m[4]  * m[9] * m[14] +
+	           m[4]  * m[10] * m[13] +
+	           m[8]  * m[5] * m[14] -
+	           m[8]  * m[6] * m[13] -
+	           m[12] * m[5] * m[10] +
+	           m[12] * m[6] * m[9];
+
+	tmp[1] = -m[1]  * m[10] * m[15] +
+	          m[1]  * m[11] * m[14] +
+	          m[9]  * m[2] * m[15] -
+	          m[9]  * m[3] * m[14] -
+	          m[13] * m[2] * m[11] +
+	          m[13] * m[3] * m[10];
+
+	tmp[5] = m[0]  * m[10] * m[15] -
+	         m[0]  * m[11] * m[14] -
+	         m[8]  * m[2] * m[15] +
+	         m[8]  * m[3] * m[14] +
+	         m[12] * m[2] * m[11] -
+	         m[12] * m[3] * m[10];
+
+	tmp[9] = -m[0]  * m[9] * m[15] +
+	          m[0]  * m[11] * m[13] +
+	          m[8]  * m[1] * m[15] -
+	          m[8]  * m[3] * m[13] -
+	          m[12] * m[1] * m[11] +
+	          m[12] * m[3] * m[9];
+
+	tmp[13] = m[0]  * m[9] * m[14] -
+	          m[0]  * m[10] * m[13] -
+	          m[8]  * m[1] * m[14] +
+	          m[8]  * m[2] * m[13] +
+	          m[12] * m[1] * m[10] -
+	          m[12] * m[2] * m[9];
+
+	tmp[2] = m[1]  * m[6] * m[15] -
+	         m[1]  * m[7] * m[14] -
+	         m[5]  * m[2] * m[15] +
+	         m[5]  * m[3] * m[14] +
+	         m[13] * m[2] * m[7] -
+	         m[13] * m[3] * m[6];
+
+	tmp[6] = -m[0]  * m[6] * m[15] +
+	          m[0]  * m[7] * m[14] +
+	          m[4]  * m[2] * m[15] -
+	          m[4]  * m[3] * m[14] -
+	          m[12] * m[2] * m[7] +
+	          m[12] * m[3] * m[6];
+
+	tmp[10] = m[0]  * m[5] * m[15] -
+	          m[0]  * m[7] * m[13] -
+	          m[4]  * m[1] * m[15] +
+	          m[4]  * m[3] * m[13] +
+	          m[12] * m[1] * m[7] -
+	          m[12] * m[3] * m[5];
+
+	tmp[14] = -m[0]  * m[5] * m[14] +
+	           m[0]  * m[6] * m[13] +
+	           m[4]  * m[1] * m[14] -
+	           m[4]  * m[2] * m[13] -
+	           m[12] * m[1] * m[6] +
+	           m[12] * m[2] * m[5];
+
+	tmp[3] = -m[1] * m[6] * m[11] +
+	          m[1] * m[7] * m[10] +
+	          m[5] * m[2] * m[11] -
+	          m[5] * m[3] * m[10] -
+	          m[9] * m[2] * m[7] +
+	          m[9] * m[3] * m[6];
+
+	tmp[7] = m[0] * m[6] * m[11] -
+	         m[0] * m[7] * m[10] -
+	         m[4] * m[2] * m[11] +
+	         m[4] * m[3] * m[10] +
+	         m[8] * m[2] * m[7] -
+	         m[8] * m[3] * m[6];
+
+	tmp[11] = -m[0] * m[5] * m[11] +
+	           m[0] * m[7] * m[9] +
+	           m[4] * m[1] * m[11] -
+	           m[4] * m[3] * m[9] -
+	           m[8] * m[1] * m[7] +
+	           m[8] * m[3] * m[5];
+
+	tmp[15] = m[0] * m[5] * m[10] -
+	          m[0] * m[6] * m[9] -
+	          m[4] * m[1] * m[10] +
+	          m[4] * m[2] * m[9] +
+	          m[8] * m[1] * m[6] -
+	          m[8] * m[2] * m[5];
+
+	float det = m[0] * tmp[0] + m[1] * tmp[4] + m[2] * tmp[8] + m[3] * tmp[12];
+
+	if ( fabsf( det ) < 1e-9f ) {
+		return qfalse;
+	}
+
+	det = 1.0f / det;
+
+	for ( int i = 0; i < 16; ++i ) {
+		out[i] = tmp[i] * det;
+	}
+	return qtrue;
+}
+
+uint32_t vk_noise_hash3( uint32_t x, uint32_t y, uint32_t z )
+{
+	uint32_t h = x * 374761393u + y * 668265263u + z * 2246822519u;
+	h = ( h ^ ( h >> 13 ) ) * 1274126177u;
+	return h ^ ( h >> 16 );
+}
+
+qboolean vk_used_instance_extension( const char *ext )
+{
+	const char *u;
+
+	/* allow all VK_*_surface extensions */
+	u = strrchr( ext, '_' );
+	if ( u && Q_stricmp( u + 1, "surface" ) == 0 )
+		return qtrue;
+
+	if ( Q_stricmp( ext, VK_KHR_DISPLAY_EXTENSION_NAME ) == 0 )
+		return qtrue; /* needed for KMSDRM instances/devices? */
+
+	if ( Q_stricmp( ext, VK_KHR_SWAPCHAIN_EXTENSION_NAME ) == 0 )
+		return qtrue;
+
+#ifdef USE_VK_VALIDATION
+	if ( Q_stricmp( ext, VK_EXT_DEBUG_REPORT_EXTENSION_NAME ) == 0 )
+		return qtrue;
+#endif
+
+	if ( Q_stricmp( ext, VK_EXT_DEBUG_UTILS_EXTENSION_NAME ) == 0 )
+		return qtrue;
+
+	if ( Q_stricmp( ext, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME ) == 0 )
+		return qtrue;
+
+	if ( Q_stricmp( ext, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME ) == 0 )
+		return qtrue;
+
+	return qfalse;
 }
 
 void vk_normalize_rgb_luma_safe( vec3_t io )

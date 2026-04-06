@@ -26,12 +26,25 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 static void RB_ApplyFogTint( vec4_t color ) {
 	vec3_t tint;
+	float maxc;
 
 	if ( !r_fogTint || !r_fogTint->string[0] ) {
 		return;
 	}
 
 	if ( !vk_parse_fog_tint_string( r_fogTint->string, tint ) ) {
+		return;
+	}
+
+	maxc = MAX( color[0], MAX( color[1], color[2] ) );
+	if ( maxc < 0.05f ) {
+		/*
+		 * Legacy multiply tint cannot lift black fog colors.
+		 * Promote near-black fog to the requested tint so coloring is visible.
+		 */
+		color[0] = tint[0];
+		color[1] = tint[1];
+		color[2] = tint[2];
 		return;
 	}
 

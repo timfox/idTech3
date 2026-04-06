@@ -15,6 +15,7 @@ and color grading pipeline integration.
 #pragma once
 
 #include "../common/tr_types.h"
+#include "tr_local.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -50,6 +51,7 @@ void     PostFX_VegWind_GetWindDir(float *x, float *y, float *z);
 float    PostFX_VegWind_GetWindStrength(void);
 
 qboolean PostFX_NeedsPipelineUpdate(void);
+qboolean PostFX_PostPipelinesNeedUpdate(void);
 float    PostFX_GetVignetteIntensity(void);
 float    PostFX_GetVignetteRadius(void);
 float    PostFX_GetChromaticAberration(void);
@@ -65,6 +67,27 @@ float    PostFX_DepthOfField_GetFocusRange(void);
 float    PostFX_DepthOfField_GetAperture(void);
 float    PostFX_DepthOfField_GetMaxBlur(void);
 float    PostFX_GetSharpen(void);
+float    PostFX_GetGradeToe(void);
+float    PostFX_GetGradeShoulder(void);
+float    PostFX_GetGradeWhitePoint(void);
+float    PostFX_GetGradeBlackClip(void);
+float    PostFX_GetGradeHighlightDesat(void);
+float    PostFX_GetGradeTemperature(void);
+float    PostFX_GetGradeTint(void);
+float    PostFX_GetGradeExposureBias(void);
+float    PostFX_GetGradeContrast(void);
+float    PostFX_GetGradeContrastPivot(void);
+float    PostFX_GetGradeSaturation(void);
+float    PostFX_GetGradeVibrance(void);
+void     PostFX_GetShadowLift(float *rgb);
+void     PostFX_GetMidGamma(float *rgb);
+void     PostFX_GetHighlightGain(float *rgb);
+void     PostFX_GetSplitShadow(float *rgb);
+void     PostFX_GetSplitHighlight(float *rgb);
+float    PostFX_GetSplitBalance(void);
+float    PostFX_GetSplitStrength(void);
+float    PostFX_GetLUTIntensity(void);
+image_t *PostFX_GetLUTImage(void);
 
 #ifdef __cplusplus
 }
