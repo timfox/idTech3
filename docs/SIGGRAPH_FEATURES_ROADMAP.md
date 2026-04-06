@@ -69,8 +69,7 @@ This document tracks implementation of 10 features from recent Siggraph papers, 
 - Compute stages: density, volume, sun, local lights, clamp, temporal
 
 ### Files
-- `vk_vfog.c`, `vk_vfog.h`: Compute and composite logic
-- `volumetric_fog.comp`: Jitter, culling
+- `vk_volumetric_params.c`, `vk.c`, `volumetric_fog.comp`: Parameters, dispatch, jitter, culling
 
 ---
 

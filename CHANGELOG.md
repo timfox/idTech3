@@ -24,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - FORTIFY_SOURCE now enabled by default in Release builds (compile_engine.sh)
 - Vulkan cinematic path: r_fboCinematic cvar, vk_in_render_pass reset, luminance skip workaround
 
+### Removed
+- Legacy `r_vfog*` engine cvars and `vk_vfog.c`/`vk_vfog.h`: volumetric fog is configured only via `r_volumetricFog*` (and map/`r_fog*` as documented). Editor `worldspawn` keys `vfog_*` remain separate map data, not console cvars.
+
 ### Security
 - _FORTIFY_SOURCE=2 enabled for GCC/Clang Release builds when ENABLE_FORTIFY_SOURCE=ON
 

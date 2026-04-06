@@ -41,7 +41,6 @@ src/
 ├── renderers/
 │   ├── vulkan/            Vulkan 1.4 renderer
 │   │   ├── vk.c/h                Core pipeline + dispatch
-│   │   ├── vk_vfog.c/h           Volumetric fog module
 │   │   ├── vk_fluidsim.c/h       Fluid simulation module
 │   │   ├── vk_postfx.c/h         PostFX (SSR, atmosphere, wind)
 │   │   ├── vk_flashlight.c/h     Projected texture system
