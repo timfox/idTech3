@@ -53,6 +53,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 
 ### Lighting Robustness
 - PBR Smith GGX visibility: division-by-zero guard at grazing angles (`CalcVisibility`)
+- PBR anisotropy map: **direct** specular uses anisotropic GGX in the tangent frame when a map is bound; toggle with `r_pbr_anisotropicSpecular` (IBL remains isotropic). Regenerate SPIR-V after editing `gen_frag.tmpl` (`scripts/compile_shaders.sh`).
 - Dynamic light radius: clamped to minimum 0.001 before `1/r²` to avoid inf
 - Light grid: `lightGridSize` clamped to ≥1 before inverse to avoid division by zero
 

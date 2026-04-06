@@ -1459,7 +1459,8 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			Vector4Set( block.glintFlags,
 				( r_glint && r_glint->integer ) ? 1.0f : 0.0f,
 				( r_glintMode && r_glintMode->integer ) ? 1.0f : 0.0f,
-				0.0f, 0.0f );
+				( r_pbr_anisotropicSpecular && r_pbr_anisotropicSpecular->integer ) ? 1.0f : 0.0f,
+				0.0f );
 
 			{
 				const VkDescriptorSet fallback2D = ( tr.whiteImage ) ? tr.whiteImage->descriptor : VK_NULL_HANDLE;
