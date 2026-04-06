@@ -102,7 +102,7 @@ The engine already has:
 - **LOD by distance**: Coarser froxels in the distance; finer near camera
 - **Importance-based distribution**: Allocate more slices where density or light variation is high
 
-**Files**: `volumetric_fog.comp`, `vk_vfog.c` (grid setup), `VolumetricParams`
+**Files**: `volumetric_fog.comp`, `vk_volumetric_params.c` (grid setup), `VolumetricParams`
 
 ---
 
@@ -159,7 +159,7 @@ The engine already has:
 - **Per-tier culling aggressiveness**: Low tier = more aggressive froxel culling
 - **Budget-based auto-scale**: Already have `r_fogFluidTargetMs`; extend to full fog pipeline
 
-**Files**: `vk.c`, `vk_vfog.c`, `volumetric_fog.comp`, `volumetric_fog.frag`
+**Files**: `vk.c`, `vk_volumetric_params.c`, `volumetric_fog.comp`, `volumetric_fog.frag`
 
 ---
 
@@ -173,7 +173,7 @@ The engine already has:
 - **Mesh-based volumes**: Convex hull or signed distance for arbitrary shapes
 - **Blend modes**: Additive, multiplicative, max for overlapping volumes
 
-**Files**: `volumetric_fog.comp` (ApplyVolumeDensity), `VolumetricParams`, `vk_vfog.c`
+**Files**: `volumetric_fog.comp` (ApplyVolumeDensity), `VolumetricParams`, `vk_volumetric_params.c`
 
 ---
 
