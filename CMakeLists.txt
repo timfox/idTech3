@@ -2034,7 +2034,7 @@ set_tests_properties(check_artifacts PROPERTIES
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/release/idtech3_server")
 
 add_test(NAME test_run_vulkan_script
-	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_run_vulkan.sh
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_run_vulkan.sh ${CMAKE_SOURCE_DIR}/scripts/run_vulkan.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_run_vulkan_script PROPERTIES
 	LABELS "unit;scripts;validation")
