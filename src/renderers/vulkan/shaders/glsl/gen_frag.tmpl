@@ -312,6 +312,15 @@ float D_GGX( in float NH, in float alpha )
 	return alphaSq / (PI * d * d);
 }
 
+// Anisotropic GGX NDF (Filament / Burley-style): HoX = dot(H,T), HoY = dot(H,B), NoH = dot(N,H).
+// ax, ay are linear roughness along tangent X and bitangent Y (both > 0).
+float D_GGX_Anisotropic( in float NoH, in float HoX, in float HoY, in float ax, in float ay )
+{
+	float a2 = ax * ay;
+	float f = ( HoX * HoX ) / max( ax * ax, 1e-8 ) + ( HoY * HoY ) / max( ay * ay, 1e-8 ) + NoH * NoH;
+	return 1.0 / max( PI * a2 * f * f, 1e-12 );
+}
+
 float CalcVisibility( in float NL, in float NE, in float alpha )
 {
 	// Smith masking-shadowing using GGX lambda formulation with alpha.
@@ -331,7 +340,7 @@ float glintDebugWeight = 0.0;
 
 vec3 CalcSpecular( in vec3 specular, in vec3 H, in float NH, in float NL,
 	in float NE, float LH, in float VH, in float roughness,
-	in vec2 uv, in mat3 base )
+	in vec2 uv, in mat3 base, in float anisoAmount )
 {
 	if ( NL <= 0.0 || NE <= 0.0 || NH <= 0.0 ) {
 		glintDebugD = 0.0;
@@ -345,8 +354,27 @@ vec3 CalcSpecular( in vec3 specular, in vec3 H, in float NH, in float NL,
 	vec3  F = ( pbrAdvancedParams.z > 0.5 )
 		? F_SchlickRoughness( specular, VH, roughness )
 		: F_Schlick( specular, VH );
-	float D = D_GGX(NH, alpha);
-	float V = CalcVisibility(NL, NE, alpha);
+	float anisoDirectEnabled = pbrGlintFlags.z;
+	vec3 Tn = normalize( base[0] );
+	vec3 Bn = normalize( base[1] );
+	float HoX = dot( H, Tn );
+	float HoY = dot( H, Bn );
+	float D;
+	float V;
+	float aniso = clamp( anisoAmount, 0.0, 1.0 );
+	if ( anisoDirectEnabled > 0.5 && aniso > 1e-4 ) {
+		/* Elongate highlights along tangent: aspect < 1 => tighter along bitangent, wider along tangent */
+		float aspect = sqrt( max( 0.011111, 1.0 - 0.9 * aniso ) );
+		float ax = max( alpha / aspect, 1e-4 );
+		float ay = max( alpha * aspect, 1e-4 );
+		D = D_GGX_Anisotropic( NH, HoX, HoY, ax, ay );
+		/* Visibility: approximate isotropic Smith using geometric-mean roughness^2 (same units as alpha) */
+		float alphaVis = sqrt( max( ax * ay, 1e-8 ) );
+		V = CalcVisibility( NL, NE, alphaVis );
+	} else {
+		D = D_GGX( NH, alpha );
+		V = CalcVisibility( NL, NE, alpha );
+	}
 
 	glintDebugD = 0.0;
 	glintDebugLambda = 0.0;
@@ -980,9 +1008,9 @@ void main() {
 		}
 	}
 
+	float anisoAmount = 0.0;
 	if ( anisotropy_texture_set >= 0 ) {
-		float aniso = texture( anisotropy_texture, frag_tex_coord0 ).r * pbrAnisotropyScale.x;
-		roughness = mix( roughness, max( 0.02, roughness * ( 1.0 - aniso ) ), aniso );
+		anisoAmount = clamp( texture( anisotropy_texture, frag_tex_coord0 ).r * pbrAnisotropyScale.x, 0.0, 1.0 );
 	}
 	roughness = ApplySpecularAA( roughness, N );
 	roughness = clamp( roughness, 0.02, 1.0 );
@@ -1036,15 +1064,15 @@ void main() {
 	#if ( defined(USE_TX1) || defined(USE_TX2) )
 		if ( deluxe_mapping > -1 )
 		{
-			Fs = CalcSpecular( specular.rgb, H, NH, NL, NE, LH, VH, roughness, baseUV, shadingFrame ) * deluxe_specular_scale;
+			Fs = CalcSpecular( specular.rgb, H, NH, NL, NE, LH, VH, roughness, baseUV, shadingFrame, anisoAmount ) * deluxe_specular_scale;
 		}
 		else if ( deluxe_specular_scale != 0.0 )
 		{
-			Fs = CalcSpecular( specular.rgb, H, NH, NL, NE, LH, VH, roughness, baseUV, shadingFrame );
+			Fs = CalcSpecular( specular.rgb, H, NH, NL, NE, LH, VH, roughness, baseUV, shadingFrame, anisoAmount );
 		}
 	#else
 		/* PBR with single texture (tx0): compute direct specular for glint support */
-		Fs = CalcSpecular( specular.rgb, H, NH, NL, NE, LH, VH, roughness, baseUV, shadingFrame );
+		Fs = CalcSpecular( specular.rgb, H, NH, NL, NE, LH, VH, roughness, baseUV, shadingFrame, anisoAmount );
 	#endif
 
 
@@ -1113,7 +1141,7 @@ void main() {
 		vec4 cc = texture( clearcoat_texture, frag_tex_coord0 );
 		float ccStrength = cc.r * pbrClearcoatScale.x;
 		float ccRoughness = clamp( cc.g * pbrClearcoatScale.y, 0.02, 1.0 );
-		vec3 ccSpec = CalcSpecular( vec3(0.04), H, NH, NL, NE, LH, VH, ccRoughness, baseUV, shadingFrame );
+		vec3 ccSpec = CalcSpecular( vec3(0.04), H, NH, NL, NE, LH, VH, ccRoughness, baseUV, shadingFrame, 0.0 );
 		out_color.rgb += lightColor * ccSpec * ( attenuation * NL ) * ccStrength;
 	}
 

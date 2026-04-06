@@ -111,6 +111,7 @@ cvar_t	*r_pbr_multiScatterStrength;
 cvar_t	*r_pbr_fresnelRoughness;
 cvar_t	*r_pbr_specularAA;
 cvar_t	*r_pbr_specularAAStrength;
+cvar_t	*r_pbr_anisotropicSpecular;
 cvar_t	*r_glint;
 cvar_t	*r_glintMode;
 cvar_t	*r_glintDensity;
@@ -2238,6 +2239,11 @@ static void R_Register( void )
 	r_pbr_specularAAStrength = ri.Cvar_Get( "r_pbr_specularAAStrength", "0.5", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_pbr_specularAAStrength, "0.0", "2.0", CV_FLOAT );
 	ri.Cvar_SetDescription( r_pbr_specularAAStrength, "Scales roughness stabilization from normal-map variance for modern BRDF materials." );
+
+	r_pbr_anisotropicSpecular = ri.Cvar_Get( "r_pbr_anisotropicSpecular", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbr_anisotropicSpecular, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pbr_anisotropicSpecular,
+		"When 1 and an anisotropy map is bound, use anisotropic GGX for direct specular highlights (tangent-aligned). When 0, ignore anisotropy for direct lighting (IBL stays isotropic)." );
 
 	r_baseNormalX	= ri.Cvar_Get("r_baseNormalX",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );
 	r_baseNormalY	= ri.Cvar_Get("r_baseNormalY",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );

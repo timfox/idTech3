@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - FORTIFY_SOURCE now enabled by default in Release builds (compile_engine.sh)
 - Vulkan cinematic path: r_fboCinematic cvar, vk_in_render_pass reset, luminance skip workaround
+- Vulkan PBR: direct specular uses **anisotropic GGX** when an anisotropy map is bound (`r_pbr_anisotropicSpecular` default 1); replaces the old roughness-only blend. Re-run `scripts/compile_shaders.sh` after changing `gen_frag.tmpl`.
 
 ### Removed
 - Legacy `r_vfog*` engine cvars and `vk_vfog.c`/`vk_vfog.h`: volumetric fog is configured only via `r_volumetricFog*` (and map/`r_fog*` as documented). Editor `worldspawn` keys `vfog_*` remain separate map data, not console cvars.
