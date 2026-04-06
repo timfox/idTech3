@@ -57,6 +57,23 @@ if [[ -z "${IDTECH3_DEMO_ROOT:-}" ]]; then
 	fi
 fi
 
+# Common mistake: IDTECH3_DEMO_ROOT points at the client binary (…/release/idtech3)
+if [[ -n "${IDTECH3_DEMO_ROOT:-}" ]]; then
+	if [[ -f "$IDTECH3_DEMO_ROOT" ]]; then
+		case "$(basename "$IDTECH3_DEMO_ROOT")" in
+		idtech3|idtech3.exe)
+			echo "Note: playfield root was a file ($(basename "$IDTECH3_DEMO_ROOT")); using its directory as fs_basepath." >&2
+			IDTECH3_DEMO_ROOT="$(cd "$(dirname "$IDTECH3_DEMO_ROOT")" && pwd)"
+			;;
+		esac
+	fi
+	if [[ ! -d "$IDTECH3_DEMO_ROOT" ]]; then
+		echo "Not a directory: $IDTECH3_DEMO_ROOT" >&2
+		echo "Set IDTECH3_DEMO_ROOT to the folder that will contain base/ and idtech3_demo/ (often …/release or examples/demo_skeleton)." >&2
+		exit 2
+	fi
+fi
+
 if [[ -z "${IDTECH3_DEMO_ROOT:-}" ]]; then
 	echo "Could not find a playfield directory." >&2
 	echo "" >&2
@@ -68,11 +85,21 @@ if [[ -z "${IDTECH3_DEMO_ROOT:-}" ]]; then
 fi
 
 BASE_ROOT="$(cd "$IDTECH3_DEMO_ROOT" && pwd)"
+# Engine loads mods from fs_game/<name>/; pk3 must live as idtech3_demo/idtech3_demo.pk3.
+# If the user dropped idtech3_demo.pk3 next to base/, link it into place.
+mkdir -p "$BASE_ROOT/idtech3_demo"
 PK3="$BASE_ROOT/idtech3_demo/idtech3_demo.pk3"
+if [[ ! -f "$PK3" && -f "$BASE_ROOT/idtech3_demo.pk3" ]]; then
+	if ln -sf "../idtech3_demo.pk3" "$PK3" 2>/dev/null; then
+		echo "Linked $PK3 -> ../idtech3_demo.pk3 (flat layout)." >&2
+	fi
+fi
 if [[ ! -f "$PK3" ]]; then
 	echo "Missing demo mod: $PK3" >&2
-	echo "Build it: ./examples/demo_game/build_demo_pack.sh" >&2
-	echo "Then copy idtech3_demo.pk3 into idtech3_demo/ under your playfield." >&2
+	echo "Build: ./examples/demo_game/build_demo_pack.sh" >&2
+	echo "Then either:" >&2
+	echo "  cp build-vk-Release/idtech3_demo.pk3 \"$BASE_ROOT/idtech3_demo/\"" >&2
+	echo "  or run: ./examples/demo_skeleton/setup_demo_layout.sh \"$BASE_ROOT\"" >&2
 	exit 2
 fi
 
