@@ -35,8 +35,16 @@ elif [[ ! -f "$TARGET/idtech3_demo/idtech3_demo.pk3" ]]; then
 fi
 
 ABS="$(cd "$TARGET" && pwd)"
+ENV_LINE="IDTECH3_DEMO_ROOT=$ABS"
+TMP_ENV="$(mktemp)"
+{
+	grep -v '^IDTECH3_DEMO_ROOT=' "$TARGET/local.env" 2>/dev/null || true
+	printf '# Playfield root (updated by setup_demo_layout.sh)\n%s\n' "$ENV_LINE"
+} > "$TMP_ENV" && mv "$TMP_ENV" "$TARGET/local.env"
+
 echo ""
 echo "Playfield ready: $ABS"
 echo "  1. Add game .pk3 files → $ABS/base/   (see base/README.txt)"
-echo "  2. From repo root:     ./scripts/run_demo.sh"
+echo "  2. Launch (repo root): ./scripts/run_demo.sh"
+echo "     or:                ./examples/demo_skeleton/run_demo.sh"
 echo ""
