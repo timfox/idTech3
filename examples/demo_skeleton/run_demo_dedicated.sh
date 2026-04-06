@@ -47,10 +47,27 @@ if [[ -z "${IDTECH3_DEMO_ROOT:-}" ]]; then
 	exit 2
 fi
 
+if [[ -f "$IDTECH3_DEMO_ROOT" ]]; then
+	case "$(basename "$IDTECH3_DEMO_ROOT")" in
+	idtech3|idtech3_server|idtech3.exe|idtech3_server.exe)
+		echo "Note: playfield root was a binary path; using its directory as fs_basepath." >&2
+		IDTECH3_DEMO_ROOT="$(cd "$(dirname "$IDTECH3_DEMO_ROOT")" && pwd)"
+		;;
+	esac
+fi
+if [[ ! -d "$IDTECH3_DEMO_ROOT" ]]; then
+	echo "Not a directory: $IDTECH3_DEMO_ROOT" >&2
+	exit 2
+fi
+
 BASE_ROOT="$(cd "$IDTECH3_DEMO_ROOT" && pwd)"
+mkdir -p "$BASE_ROOT/idtech3_demo"
 PK3="$BASE_ROOT/idtech3_demo/idtech3_demo.pk3"
+if [[ ! -f "$PK3" && -f "$BASE_ROOT/idtech3_demo.pk3" ]]; then
+	ln -sf "../idtech3_demo.pk3" "$PK3" 2>/dev/null || true
+fi
 if [[ ! -f "$PK3" ]]; then
-	echo "Missing $PK3" >&2
+	echo "Missing $PK3 — build ./examples/demo_game/build_demo_pack.sh and copy pk3 into idtech3_demo/ (or place idtech3_demo.pk3 in playfield root)." >&2
 	exit 2
 fi
 
