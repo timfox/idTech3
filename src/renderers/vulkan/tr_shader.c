@@ -1361,6 +1361,14 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 				continue;
 			}
 			stage->sheenScale[2] = atof( token );
+			token = COM_ParseExt( text, qfalse );
+			if ( token[0] == 0 )
+			{
+				stage->sheenScale[3] = 0.5f;
+				stage->vk_pbr_flags |= PBR_HAS_SHEEN;
+				continue;
+			}
+			stage->sheenScale[3] = atof( token );
 			stage->vk_pbr_flags |= PBR_HAS_SHEEN;
 		}
 		else if ( !Q_stricmp( token, "anisotropyscale" ) )

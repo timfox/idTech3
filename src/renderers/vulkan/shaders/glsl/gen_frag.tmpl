@@ -263,6 +263,15 @@ float Pow5( in float x )
 	return x2 * x2 * x;
 }
 
+/* Charlie sheen distribution (cloth / fabric glancing lobe), roughness in (0,1] */
+float D_Charlie( in float nh, in float roughness )
+{
+	float r = clamp( roughness, 0.07, 1.0 );
+	float invR = 1.0 / r;
+	float sin2h = max( 1.0 - nh * nh, 0.0 );
+	return ( 2.0 + invR ) * pow( sin2h, invR * 0.5 ) / ( 2.0 * PI );
+}
+
 vec3 Diffuse_Burley( in vec3 diffuseColor, in float NE, in float NL, in float LH, in float roughness )
 {
 	// Disney 2012 diffuse term for direct lighting.
@@ -333,6 +342,19 @@ float CalcVisibility( in float NL, in float NE, in float alpha )
 	return 0.5 / max( lambdaE + lambdaL, 1e-7 );
 }
 
+// Anisotropic visibility (height-correlated Smith GGX), Filament-style formulation.
+// X/Y = tangent / bitangent; NoL, NoV on the same hemisphere as direct lighting.
+float CalcVisibilityAnisotropic( in float NoL, in float NoV,
+	in float XoL, in float YoL, in float XoV, in float YoV,
+	in float ax, in float ay )
+{
+	vec3 vA = vec3( ax * XoV, ay * YoV, NoV );
+	vec3 lA = vec3( ax * XoL, ay * YoL, NoL );
+	float lambdaV = NoL * length( vA );
+	float lambdaL = NoV * length( lA );
+	return 0.5 / max( lambdaV + lambdaL, 1e-7 );
+}
+
 float glintDebugD = 0.0;
 float glintDebugLambda = 0.0;
 float glintDebugComp = 0.0;
@@ -340,7 +362,8 @@ float glintDebugWeight = 0.0;
 
 vec3 CalcSpecular( in vec3 specular, in vec3 H, in float NH, in float NL,
 	in float NE, float LH, in float VH, in float roughness,
-	in vec2 uv, in mat3 base, in float anisoAmount )
+	in vec2 uv, in mat3 base, in float anisoAmount,
+	in vec3 Ldir, in vec3 Vdir )
 {
 	if ( NL <= 0.0 || NE <= 0.0 || NH <= 0.0 ) {
 		glintDebugD = 0.0;
@@ -368,9 +391,14 @@ vec3 CalcSpecular( in vec3 specular, in vec3 H, in float NH, in float NL,
 		float ax = max( alpha / aspect, 1e-4 );
 		float ay = max( alpha * aspect, 1e-4 );
 		D = D_GGX_Anisotropic( NH, HoX, HoY, ax, ay );
-		/* Visibility: approximate isotropic Smith using geometric-mean roughness^2 (same units as alpha) */
-		float alphaVis = sqrt( max( ax * ay, 1e-8 ) );
-		V = CalcVisibility( NL, NE, alphaVis );
+		vec3 Nn = normalize( base[2] );
+		float NoL = max( dot( Nn, Ldir ), 1e-5 );
+		float NoV = max( dot( Nn, Vdir ), 1e-5 );
+		float XoL = dot( Tn, Ldir );
+		float YoL = dot( Bn, Ldir );
+		float XoV = dot( Tn, Vdir );
+		float YoV = dot( Bn, Vdir );
+		V = CalcVisibilityAnisotropic( NoL, NoV, XoL, YoL, XoV, YoV, ax, ay );
 	} else {
 		D = D_GGX( NH, alpha );
 		V = CalcVisibility( NL, NE, alpha );
@@ -418,16 +446,26 @@ vec3 CalcSpecular( in vec3 specular, in vec3 H, in float NH, in float NL,
 
 
 vec3 CalcIBLContribution( in float roughness, in vec3 N, in vec3 E,
-	in float NE, in vec3 specular )
+	in float NE, in vec3 specular, in float iblAnisoStretch, in float anisoAmount )
 {
 	vec3 R = reflect(-E, N);
 	R.y *= -1.0f;
 	
 	uint envLevels = textureQueryLevels(env_texture);
 	float maxEnvLod = (envLevels > 0u) ? float(envLevels - 1u) : 0.0;
-	float envLod = min( roughness * 6.0, maxEnvLod );
+	float envRough = roughness;
+	if ( iblAnisoStretch > 1e-4 && anisoAmount > 1e-4 ) {
+		/* Same aspect as direct anisotropic GGX: blurrier reflections when stretched */
+		float aspect = sqrt( max( 0.011111, 1.0 - 0.9 * clamp( anisoAmount, 0.0, 1.0 ) ) );
+		float alpha = max( roughness * roughness, 0.001 );
+		float ax = max( alpha / aspect, 1e-4 );
+		float ay = max( alpha * aspect, 1e-4 );
+		float stretch = sqrt( max( ax / ay, ay / ax ) );
+		envRough = clamp( roughness * mix( 1.0, stretch, clamp( iblAnisoStretch, 0.0, 1.0 ) ), 0.02, 1.0 );
+	}
+	float envLod = min( envRough * 6.0, maxEnvLod );
 	vec3 cubeLightColor = textureLod(env_texture, R, envLod).rgb;
-	vec2 EnvBRDF = texture(brdflut_texture, vec2(NE, 1.0 - roughness)).rg;
+	vec2 EnvBRDF = texture(brdflut_texture, vec2(NE, 1.0 - envRough)).rg;
 	vec3 FssEss = (specular.rgb * EnvBRDF.x + EnvBRDF.y);
 
 	// Step 3 (Kulla-Conty): optional multiple-scattering compensation for specular IBL.
@@ -1064,15 +1102,15 @@ void main() {
 	#if ( defined(USE_TX1) || defined(USE_TX2) )
 		if ( deluxe_mapping > -1 )
 		{
-			Fs = CalcSpecular( specular.rgb, H, NH, NL, NE, LH, VH, roughness, baseUV, shadingFrame, anisoAmount ) * deluxe_specular_scale;
+			Fs = CalcSpecular( specular.rgb, H, NH, NL, NE, LH, VH, roughness, baseUV, shadingFrame, anisoAmount, L, E ) * deluxe_specular_scale;
 		}
 		else if ( deluxe_specular_scale != 0.0 )
 		{
-			Fs = CalcSpecular( specular.rgb, H, NH, NL, NE, LH, VH, roughness, baseUV, shadingFrame, anisoAmount );
+			Fs = CalcSpecular( specular.rgb, H, NH, NL, NE, LH, VH, roughness, baseUV, shadingFrame, anisoAmount, L, E );
 		}
 	#else
 		/* PBR with single texture (tx0): compute direct specular for glint support */
-		Fs = CalcSpecular( specular.rgb, H, NH, NL, NE, LH, VH, roughness, baseUV, shadingFrame, anisoAmount );
+		Fs = CalcSpecular( specular.rgb, H, NH, NL, NE, LH, VH, roughness, baseUV, shadingFrame, anisoAmount, L, E );
 	#endif
 
 
@@ -1087,7 +1125,7 @@ void main() {
 	}
 	vec3 iblSpec = vec3( 0.0 );
 	if ( env_texture_set >= 0 ) {
-		iblSpec = CalcIBLContribution( roughness, N, E, NE, specular.rgb * AO );
+		iblSpec = CalcIBLContribution( roughness, N, E, NE, specular.rgb * AO, pbrGlintFlags.w, anisoAmount );
 	}
 
 	vec3 debugDir = reflect( -E, N );
@@ -1134,23 +1172,30 @@ void main() {
 		out_color.rgb += iblSpec;
 	}
 
-	// legacy approximation kept intentionally for Step 2 scope containment.
-	// Step 2b pending: Disney clearcoat/sheen energy normalization.
-	// clearcoat lobe
+	// Clearcoat: second specular lobe on top; scale by (1 - max F0 of base) for approximate energy balance.
 	if ( clearcoat_texture_set >= 0 ) {
 		vec4 cc = texture( clearcoat_texture, frag_tex_coord0 );
-		float ccStrength = cc.r * pbrClearcoatScale.x;
+		float ccStrength = clamp( cc.r * pbrClearcoatScale.x, 0.0, 1.0 );
 		float ccRoughness = clamp( cc.g * pbrClearcoatScale.y, 0.02, 1.0 );
-		vec3 ccSpec = CalcSpecular( vec3(0.04), H, NH, NL, NE, LH, VH, ccRoughness, baseUV, shadingFrame, 0.0 );
+		vec3 ccSpec = CalcSpecular( vec3(0.04), H, NH, NL, NE, LH, VH, ccRoughness, baseUV, shadingFrame, 0.0, L, E );
+		float baseF0m = max( max( specular.r, specular.g ), specular.b );
+		float coatAtten = ( 1.0 - ccStrength ) * ( 1.0 - baseF0m );
+		out_color.rgb *= coatAtten;
 		out_color.rgb += lightColor * ccSpec * ( attenuation * NL ) * ccStrength;
 	}
 
-	// legacy approximation kept intentionally for Step 2 scope containment.
-	// Step 2b pending: Disney clearcoat/sheen energy normalization.
-	// sheen term
+	// Sheen: Charlie NDF + same Smith visibility form as base specular (no separate Fresnel here).
 	if ( sheen_texture_set >= 0 ) {
 		vec3 sheenColor = texture( sheen_texture, frag_tex_coord0 ).rgb * pbrSheenScale.rgb;
-		out_color.rgb += sheenColor * NL * 0.05;
+		float sheenRough = clamp( pbrSheenScale.w, 0.07, 1.0 );
+		float sheenWeight = clamp( max( max( sheenColor.r, sheenColor.g ), sheenColor.b ), 0.0, 1.0 );
+		if ( sheenWeight > 1e-5 && NL > 1e-5 && NE > 1e-5 && NH > 1e-5 ) {
+			float alphaS = max( sheenRough * sheenRough, 0.001 );
+			float sheenVis = CalcVisibility( NL, NE, alphaS );
+			float sheenD = D_Charlie( NH, sheenRough );
+			vec3 sheenSpec = sheenColor * sheenD * sheenVis;
+			out_color.rgb += lightColor * sheenSpec * ( attenuation * NL );
+		}
 	}
 
 	// subsurface term (Burley-style wrap approximation)

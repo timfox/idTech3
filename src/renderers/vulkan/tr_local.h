@@ -1528,6 +1528,7 @@ extern cvar_t	*r_pbr_fresnelRoughness;
 extern cvar_t	*r_pbr_specularAA;
 extern cvar_t	*r_pbr_specularAAStrength;
 extern cvar_t	*r_pbr_anisotropicSpecular;
+extern cvar_t	*r_pbr_iblAnisoStretch;
 #ifdef VK_CUBEMAP
 extern cvar_t	*r_pbr_iblIrradianceSize;
 extern cvar_t	*r_pbr_iblPrefilterSize;
