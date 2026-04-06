@@ -269,6 +269,7 @@
     <ClCompile Include="..\..\qcommon\cm_test.c" />
     <ClCompile Include="..\..\qcommon\cm_trace.c" />
     <ClCompile Include="..\..\qcommon\common.c" />
+    <ClCompile Include="..\..\qcommon\defer.c" />
     <ClCompile Include="..\..\qcommon\jobs.c" />
     <ClCompile Include="..\..\qcommon\q_utf8.c" />
     <ClCompile Include="..\..\qcommon\cvar.c" />
