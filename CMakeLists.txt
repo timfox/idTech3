@@ -2066,6 +2066,12 @@ set_tests_properties(check_artifacts PROPERTIES
 	LABELS "validation;artifacts"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/release/idtech3_server")
 
+add_test(NAME test_run_vulkan_launcher
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_run_vulkan.sh ${CMAKE_SOURCE_DIR}/scripts/run_vulkan.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_run_vulkan_launcher PROPERTIES
+	LABELS "unit;regression;scripts")
+
 # --- Unit tests ---
 option(BUILD_UNIT_TESTS "Build unit tests" ON)
 if(BUILD_UNIT_TESTS)
