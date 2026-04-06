@@ -288,7 +288,6 @@
     <ClCompile Include="..\..\..\renderers\vulkan\vk_validation.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_vbo.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_vdb.c" />
-    <ClCompile Include="..\..\..\renderers\vulkan\vk_vfog.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_view_state.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_volumetric_fog_color.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_volumetric_params.c" />
@@ -306,7 +305,6 @@
     <ClInclude Include="..\..\..\renderers\common\tr_types.h" />
     <ClInclude Include="..\..\..\renderers\vulkan\utils\mikktspace\mikktspace.h" />
     <ClInclude Include="..\..\..\renderers\vulkan\vk.h" />
-    <ClInclude Include="..\..\..\renderers\vulkan\vk_vfog.h" />
     <ClInclude Include="..\..\..\renderers\vulkan\vk_fluidsim.h" />
     <ClInclude Include="..\..\..\renderers\vulkan\vk_postfx.h" />
     <ClInclude Include="..\..\..\renderers\vulkan\tr_model_gltf.h" />

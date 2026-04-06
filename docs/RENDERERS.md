@@ -32,7 +32,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - Temporal reprojection for stable results
 - Integration with Navier-Stokes fluid simulation for dynamic fog
 - Shadowed volumetrics via sun CSM and local shadow maps
-- Cvars: `r_volumetricFog`, `r_volumetricFogDensity`, `r_volumetricFogHeightFalloff`, `r_volumetricFogNoiseScale`, `r_volumetricFogGridDim`, `r_volumetricFogQuality`, etc. (Note: `r_vfog*` cvars in vk_vfog.c are legacy/unused; the pipeline uses `r_volumetricFog*` exclusively.)
+- Cvars: `r_volumetricFog`, `r_volumetricFogDensity`, `r_volumetricFogHeightFalloff`, `r_volumetricFogNoiseScale`, `r_volumetricFogGridDim`, `r_volumetricFogQuality`, etc.
 
 ### Water Flowmap
 - Flowmap textures drive per-pixel UV offset for water surfaces (rivers, pools, wakes)
@@ -169,8 +169,6 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 | `r_firstPersonFovEnabled` | 1 | Use custom FOV for first-person (0=scene FOV) |
 | `r_firstPersonScaleEnabled` | 1 | Apply scale for anti-clipping (0=no scale) |
 | `r_occlusionCulling` | 0 | GPU occlusion culling for entities (0=off, 1=on) |
-
-Legacy note: `r_vfog*` cvars are still registered in `vk_vfog.c` for compatibility, but the active volumetric pipeline reads `r_volumetricFog*`.
 
 See [HDR_GAPS.md](HDR_GAPS.md) for HDR pipeline gaps, risks, and render order.
 

@@ -1,15 +1,15 @@
 # Volumetric Fog & Fluid Simulation Quality Audit
 
 **Date**: 2026-02-28  
-**Scope**: `vk_vfog.c`, `vk_fluidsim.c`, `vk.c` (volumetric/fluid paths), compute shaders
+**Scope**: `vk_volumetric_params.c`, `vk_fluidsim.c`, `vk.c` (volumetric/fluid paths), compute shaders
 
 ## Architecture Summary
 
-### Volumetric Fog (vk_vfog)
+### Volumetric Fog
 - **Froxel grid**: Configurable 3D grid (default 160×90×64) for ray marching
 - **Pipeline**: Compute pass → composite pass; temporal reprojection for stability
 - **Parameters**: Density, height falloff, scatter, anisotropy, noise, wind, fog color
-- **Integration**: Uses `r_volumetricFog*` and `r_fog*` cvars (separate from vk_vfog's `r_vfog*`)
+- **Integration**: Uses `r_volumetricFog*` and `r_fog*` cvars
 
 ### Fluid Simulation (vk_fluidsim)
 - **Algorithm**: Stable Fluids (Jos Stam 1999) – Semi-Lagrangian advection + Jacobi pressure solve
