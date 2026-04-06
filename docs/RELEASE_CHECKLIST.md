@@ -2,10 +2,13 @@
 
 Use this checklist before tagging or publishing a release.
 
+For a **stricter engine bar** (automated steps + optional content-backed maps), see [PRODUCTION_CERTIFICATION.md](PRODUCTION_CERTIFICATION.md) and run `./scripts/production_readiness.sh` (set `GAME_BASE` when you have a full `base/` tree).
+
 ## Pre-Release
 
 ### Build Validation
 - [ ] **Local CI validation** (optional): `./scripts/validate_ci_build.sh` runs shader compile, Vulkan build, and smoke test
+- [ ] **Production readiness orchestrator** (optional): `./scripts/production_readiness.sh` — extends validation with full `ctest` and, if `GAME_BASE` is set, `renderer_regression_maps.sh`
 - [ ] **Vulkan build**: `./scripts/compile_engine.sh vulkan` succeeds
 - [ ] **OpenGL build**: `./scripts/compile_engine.sh opengl` succeeds
 - [ ] **Debug build**: `./scripts/compile_engine.sh vulkan debug` succeeds
