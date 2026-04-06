@@ -109,6 +109,9 @@
     <ClCompile Include="..\..\renderers\vulkan\vk.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\renderers\vulkan\vk_procs.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\renderers\common\tr_noise.c">
       <Filter>Source Files</Filter>
     </ClCompile>
