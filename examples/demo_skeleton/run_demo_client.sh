@@ -24,12 +24,15 @@ Otherwise set IDTECH3_DEMO_ROOT in local.env (see demo_skeleton.env.example).
 
 Examples:
   ./scripts/run_demo.sh
+  ./examples/demo_skeleton/run_demo.sh
   ./examples/demo_skeleton/run_demo_client.sh
   ./run_demo_client.sh /opt/my-playfield +set r_fullscreen 0
 EOF
 	exit 0
 fi
 
+# Skeleton local.env must not override IDTECH3_DEMO_ROOT if the parent launcher already set it.
+SAVED_DEMO_ROOT="${IDTECH3_DEMO_ROOT:-}"
 ENV_FILE=""
 for cand in "$SCRIPT_DIR/local.env" "$SCRIPT_DIR/demo_skeleton.env" "${IDTECH3_DEMO_ENV:-}"; do
 	if [[ -n "$cand" && -f "$cand" ]]; then
@@ -42,6 +45,9 @@ if [[ -n "$ENV_FILE" ]]; then
 	# shellcheck source=/dev/null
 	source "$ENV_FILE"
 	set +a
+fi
+if [[ -n "$SAVED_DEMO_ROOT" ]]; then
+	IDTECH3_DEMO_ROOT="$SAVED_DEMO_ROOT"
 fi
 
 # First argument: explicit playfield root
@@ -85,6 +91,14 @@ if [[ -z "${IDTECH3_DEMO_ROOT:-}" ]]; then
 fi
 
 BASE_ROOT="$(cd "$IDTECH3_DEMO_ROOT" && pwd)"
+# Playfield-specific env (e.g. release/local.env after setup_demo_layout)
+if [[ -f "$BASE_ROOT/local.env" ]]; then
+	set -a
+	# shellcheck source=/dev/null
+	source "$BASE_ROOT/local.env"
+	set +a
+	BASE_ROOT="$(cd "$IDTECH3_DEMO_ROOT" && pwd)"
+fi
 # Engine loads mods from fs_game/<name>/; pk3 must live as idtech3_demo/idtech3_demo.pk3.
 # If the user dropped idtech3_demo.pk3 next to base/, link it into place.
 mkdir -p "$BASE_ROOT/idtech3_demo"

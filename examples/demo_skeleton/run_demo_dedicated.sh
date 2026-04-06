@@ -19,6 +19,7 @@ EOF
 	exit 0
 fi
 
+SAVED_DEMO_ROOT="${IDTECH3_DEMO_ROOT:-}"
 ENV_FILE=""
 for cand in "$SCRIPT_DIR/local.env" "$SCRIPT_DIR/demo_skeleton.env" "${IDTECH3_DEMO_ENV:-}"; do
 	if [[ -n "$cand" && -f "$cand" ]]; then
@@ -31,6 +32,9 @@ if [[ -n "$ENV_FILE" ]]; then
 	# shellcheck source=/dev/null
 	source "$ENV_FILE"
 	set +a
+fi
+if [[ -n "$SAVED_DEMO_ROOT" ]]; then
+	IDTECH3_DEMO_ROOT="$SAVED_DEMO_ROOT"
 fi
 
 if [[ -n "${1:-}" && "$1" != -* ]]; then
@@ -61,6 +65,13 @@ if [[ ! -d "$IDTECH3_DEMO_ROOT" ]]; then
 fi
 
 BASE_ROOT="$(cd "$IDTECH3_DEMO_ROOT" && pwd)"
+if [[ -f "$BASE_ROOT/local.env" ]]; then
+	set -a
+	# shellcheck source=/dev/null
+	source "$BASE_ROOT/local.env"
+	set +a
+	BASE_ROOT="$(cd "$IDTECH3_DEMO_ROOT" && pwd)"
+fi
 mkdir -p "$BASE_ROOT/idtech3_demo"
 PK3="$BASE_ROOT/idtech3_demo/idtech3_demo.pk3"
 if [[ ! -f "$PK3" && -f "$BASE_ROOT/idtech3_demo.pk3" ]]; then

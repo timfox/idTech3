@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 # One-command launcher: run idtech3 with the idtech3_demo mod using examples/demo_skeleton layout.
-# Prerequisite: game .pk3 files in examples/demo_skeleton/base/ and idtech3_demo.pk3 in examples/demo_skeleton/idtech3_demo/
+# Prerequisite: game .pk3 files under the playfield base/ (or baseq3/) and idtech3_demo.pk3 in idtech3_demo/
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REL_ENV="$ROOT/release/local.env"
+# setup_demo_layout.sh writes release/local.env with IDTECH3_DEMO_ROOT; pick it up if the user did not export
+if [[ -z "${IDTECH3_DEMO_ROOT:-}" && -f "$REL_ENV" ]]; then
+	set -a
+	# shellcheck source=/dev/null
+	source "$REL_ENV"
+	set +a
+fi
 exec "$ROOT/examples/demo_skeleton/run_demo_client.sh" "$@"
