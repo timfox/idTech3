@@ -33,6 +33,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <errno.h>
 #include <direct.h>
 #include <io.h>
+#include <stdio.h>
 
 
 #define MEM_THRESHOLD (96*1024*1024)
@@ -145,7 +146,24 @@ Sys_Print
 */
 void Sys_Print( const char *msg )
 {
+#ifdef DEDICATED
+	/* CI and headless runs capture stdout; dedicated build has no Win32 edit control yet at early init. */
+	if ( msg && *msg ) {
+		const char *p = msg;
+		while ( *p == '^' && p[1] >= '0' && p[1] <= '9' ) {
+			p += 2;
+		}
+		if ( p[0] == '*' && p[1] == '*' && p[2] == '*' ) {
+			fputs( p, stderr );
+		} else {
+			fputs( p, stdout );
+		}
+		fflush( stdout );
+		fflush( stderr );
+	}
+#else
 	Conbuf_AppendText( msg );
+#endif
 }
 
 void Sys_ShowErrorMessage( const char *title, const char *message )

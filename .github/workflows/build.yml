@@ -732,7 +732,7 @@ jobs:
             -DBUILD_FREETYPE=ON \
             -DENABLE_FORTIFY_SOURCE=OFF \
             -DENABLE_ASAN=OFF \
-            -DBUILD_SERVER=OFF \
+            -DBUILD_SERVER=ON \
             -DUSE_VULKAN=ON \
             -DRENDERER_DEFAULT=vulkan \
             -DSKIP_IDPAK_CHECK=ON \
@@ -743,6 +743,12 @@ jobs:
           cmake --build build-vk-${{ matrix.btype }} -j$(sysctl -n hw.logicalcpu)
           mkdir -p bin
           cp -f build-vk-${{ matrix.btype }}/idtech3* bin/ || true
+          # Bundle .app trees are directories; copy the actual Mach-O binaries for smoke_test / artifacts.
+          for app in build-vk-${{ matrix.btype }}/idtech3*.app; do
+            [ -d "$app" ] || continue
+            ex="$app/Contents/MacOS/$(basename "$app" .app)"
+            [ -f "$ex" ] && cp -f "$ex" bin/ || true
+          done
 
       - name: Build OpenGL
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
@@ -768,7 +774,7 @@ jobs:
             -DBUILD_FREETYPE=ON \
             -DENABLE_FORTIFY_SOURCE=OFF \
             -DENABLE_ASAN=OFF \
-            -DBUILD_SERVER=OFF \
+            -DBUILD_SERVER=ON \
             -DUSE_VULKAN=ON \
             -DRENDERER_DEFAULT=opengl \
             -DSKIP_IDPAK_CHECK=ON \
@@ -778,6 +784,11 @@ jobs:
             -Wno-dev
           cmake --build build-gl-${{ matrix.btype }} -j$(sysctl -n hw.logicalcpu)
           cp -f build-gl-${{ matrix.btype }}/idtech3* bin/ || true
+          for app in build-gl-${{ matrix.btype }}/idtech3*.app; do
+            [ -d "$app" ] || continue
+            ex="$app/Contents/MacOS/$(basename "$app" .app)"
+            [ -f "$ex" ] && cp -f "$ex" bin/ || true
+          done
 
       - name: Smoke test
         if: ${{ github.event_name != 'release' && matrix.btype != 'Debug' }}
