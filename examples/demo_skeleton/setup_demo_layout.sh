@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Create base/, idtech3_demo/, copy local.env example; optionally symlink pk3 from build dir.
+# Prepare examples/demo_skeleton for first run: dirs, env template, copy demo pk3 if built.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -7,13 +7,21 @@ TARGET="${1:-$SCRIPT_DIR}"
 
 mkdir -p "$TARGET/base" "$TARGET/idtech3_demo"
 
-if [[ ! -f "$TARGET/local.env" ]]; then
-	cp "$SCRIPT_DIR/demo_skeleton.env.example" "$TARGET/local.env"
-	echo "Wrote $TARGET/local.env — set IDTECH3_DEMO_ROOT=$(cd "$TARGET" && pwd)"
+if [[ ! -f "$TARGET/base/README.txt" && -f "$SCRIPT_DIR/base/README.txt" ]]; then
+	cp "$SCRIPT_DIR/base/README.txt" "$TARGET/base/README.txt"
+fi
+if [[ ! -f "$TARGET/idtech3_demo/README.txt" && -f "$SCRIPT_DIR/idtech3_demo/README.txt" ]]; then
+	cp "$SCRIPT_DIR/idtech3_demo/README.txt" "$TARGET/idtech3_demo/README.txt"
 fi
 
+if [[ ! -f "$TARGET/local.env" ]]; then
+	cp "$SCRIPT_DIR/demo_skeleton.env.example" "$TARGET/local.env"
+	echo "Created $TARGET/local.env (optional — defaults work if you use this folder as-is)"
+fi
+
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 BUILD_PK3=""
-for d in "$SCRIPT_DIR/../../build-vk-Release" "$SCRIPT_DIR/../../build-gl-Release"; do
+for d in "$REPO_ROOT/build-vk-Release" "$REPO_ROOT/build-gl-Release"; do
 	if [[ -f "$d/idtech3_demo.pk3" ]]; then
 		BUILD_PK3="$d/idtech3_demo.pk3"
 		break
@@ -23,8 +31,12 @@ if [[ -n "$BUILD_PK3" && ! -f "$TARGET/idtech3_demo/idtech3_demo.pk3" ]]; then
 	cp "$BUILD_PK3" "$TARGET/idtech3_demo/idtech3_demo.pk3"
 	echo "Copied idtech3_demo.pk3 from $(dirname "$BUILD_PK3")"
 elif [[ ! -f "$TARGET/idtech3_demo/idtech3_demo.pk3" ]]; then
-	echo "No idtech3_demo.pk3 yet — run: ./examples/demo_game/build_demo_pack.sh"
+	echo "Tip: run ./examples/demo_game/build_demo_pack.sh then re-run this script to copy idtech3_demo.pk3"
 fi
 
-echo "Layout ready under $TARGET"
-echo "Next: install game .pk3 files into $TARGET/base/ then run ./run_demo_client.sh (with local.env in examples/demo_skeleton or export IDTECH3_DEMO_ROOT)"
+ABS="$(cd "$TARGET" && pwd)"
+echo ""
+echo "Playfield ready: $ABS"
+echo "  1. Add game .pk3 files → $ABS/base/   (see base/README.txt)"
+echo "  2. From repo root:     ./scripts/run_demo.sh"
+echo ""

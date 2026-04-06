@@ -1,9 +1,23 @@
 #!/usr/bin/env bash
-# Headless-friendly: run idtech3_server with idtech3_demo over IDTECH3_DEMO_ROOT.
+# Headless: idtech3_server with idtech3_demo (same playfield layout as run_demo_client.sh).
+# Usage: ./run_demo_dedicated.sh [PLAYFIELD_DIR] [server args...]
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_RELEASE="$(cd "$SCRIPT_DIR/../../release" 2>/dev/null && pwd || true)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+REPO_RELEASE="$(cd "$REPO_ROOT/release" 2>/dev/null && pwd || true)"
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+	cat <<'EOF'
+Run idtech3_server with fs_game idtech3_demo (dedicated 1).
+
+Usage:
+  run_demo_dedicated.sh [PLAYFIELD_DIR] [args...]
+
+Default PLAYFIELD_DIR is this folder when it contains idtech3_demo/.
+EOF
+	exit 0
+fi
 
 ENV_FILE=""
 for cand in "$SCRIPT_DIR/local.env" "$SCRIPT_DIR/demo_skeleton.env" "${IDTECH3_DEMO_ENV:-}"; do
@@ -19,8 +33,17 @@ if [[ -n "$ENV_FILE" ]]; then
 	set +a
 fi
 
+if [[ -n "${1:-}" && "$1" != -* ]]; then
+	IDTECH3_DEMO_ROOT="$1"
+	shift
+fi
+
+if [[ -z "${IDTECH3_DEMO_ROOT:-}" && -d "$SCRIPT_DIR/idtech3_demo" ]]; then
+	IDTECH3_DEMO_ROOT="$SCRIPT_DIR"
+fi
+
 if [[ -z "${IDTECH3_DEMO_ROOT:-}" ]]; then
-	echo "Set IDTECH3_DEMO_ROOT (see demo_skeleton.env.example)" >&2
+	echo "Set IDTECH3_DEMO_ROOT or run from examples/demo_skeleton with idtech3_demo/ present." >&2
 	exit 2
 fi
 
@@ -31,6 +54,16 @@ if [[ ! -f "$PK3" ]]; then
 	exit 2
 fi
 
+BASE_DIR_NAME="${DEMO_BASE_DIR:-base}"
+if [[ ! -d "$BASE_ROOT/$BASE_DIR_NAME" ]]; then
+	if [[ "$BASE_DIR_NAME" == "base" && -d "$BASE_ROOT/baseq3" ]]; then
+		echo "Found baseq3/ but not base/. Set DEMO_BASE_DIR=baseq3 in local.env" >&2
+		exit 2
+	fi
+	echo "Missing $BASE_ROOT/$BASE_DIR_NAME" >&2
+	exit 2
+fi
+
 SERVER="${IDTECH3_SERVER:-}"
 if [[ -z "$SERVER" ]]; then
 	if [[ -x "$BASE_ROOT/idtech3_server" ]]; then
@@ -38,12 +71,16 @@ if [[ -z "$SERVER" ]]; then
 	elif [[ -n "$REPO_RELEASE" && -x "$REPO_RELEASE/idtech3_server" ]]; then
 		SERVER="$REPO_RELEASE/idtech3_server"
 	else
-		echo "No idtech3_server. Set IDTECH3_SERVER or copy idtech3_server next to data or use release/" >&2
+		echo "No idtech3_server. Build engine or set IDTECH3_SERVER in local.env" >&2
 		exit 2
 	fi
 fi
 
 MAP="${DEMO_MAP:-q3dm1}"
 EXTRA=( "$@" )
+BASEGAME_ARGS=()
+if [[ -n "${DEMO_BASE_DIR:-}" ]]; then
+	BASEGAME_ARGS=( +set fs_basegame "$DEMO_BASE_DIR" )
+fi
 
-exec "$SERVER" +set dedicated 1 +set fs_basepath "$BASE_ROOT" +set fs_game idtech3_demo +map "$MAP" "${EXTRA[@]}"
+exec "$SERVER" +set dedicated 1 +set fs_basepath "$BASE_ROOT" +set fs_game idtech3_demo "${BASEGAME_ARGS[@]}" +map "$MAP" "${EXTRA[@]}"

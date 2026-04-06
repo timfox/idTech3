@@ -10,7 +10,7 @@ Small, **copy-paste** workflows and templates for this engine repo. They do not 
 | [scripts/](scripts/) | Pointers to in-repo script and UI samples under `docs/samples/`. |
 | [title-repo/](title-repo/) | Templates for a **game** repo: platform cert, telemetry, soak, submissions. |
 | [demo_game/](demo_game/) | **Buildable** config mod `idtech3_demo.pk3` (+ optional helper) to toggle renderer cvars over a real `base/`. |
-| [demo_skeleton/](demo_skeleton/) | **Skeleton layout** + launch scripts to run `idtech3_demo` over your `base/` (no game data shipped). |
+| [demo_skeleton/](demo_skeleton/) | **Easiest demo run**: `./scripts/run_demo.sh` after adding game data to `demo_skeleton/base/` (see README). |
 
 See also:
 

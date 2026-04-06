@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- `examples/demo_skeleton/`: layout + `run_demo_client.sh` / `run_demo_dedicated.sh` / Windows `.bat` + `setup_demo_layout.sh` to run `idtech3_demo` over a user-provided `base/` (no game data in repo).
+- `examples/demo_skeleton/`: user-friendly demo playfield (`./scripts/run_demo.sh`, auto-detect layout, `baseq3` hint, help text); `scripts/run_demo.sh` entry point; `base/` + `idtech3_demo/` README stubs.
 - CTest `test_demo_game_pk3`: verifies `examples/demo_game` zip layout matches CMake packaging (no full `BUILD_EXAMPLE_DEMO_GAME` configure required).
 - Vulkan: `vk_procs.c` holds `qvk*` function pointer definitions (split from `vk.c`); `vk_instance.c` no longer duplicates `extern` declarations.
 - Vulkan: `vk_shader_modules.c` holds `vk_create_shader_modules` and includes `shader_data.c` / `shader_binding.c` (split from `vk.c`).

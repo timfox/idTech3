@@ -59,6 +59,17 @@ idtech3/
 ./idtech3_server +set dedicated 1 +set com_hunkMegs 128
 ```
 
+### Demo mod from source (optional)
+
+If you **build the engine from this repository**, you can use the **`idtech3_demo`** config mod without editing C code:
+
+1. `./examples/demo_game/build_demo_pack.sh` — builds `idtech3_demo.pk3`
+2. Put your licensed game `.pk3` files under **`examples/demo_skeleton/base/`**
+3. Copy the `.pk3` to **`examples/demo_skeleton/idtech3_demo/idtech3_demo.pk3`**, or run **`./examples/demo_skeleton/setup_demo_layout.sh`**
+4. From the repo root: **`./scripts/run_demo.sh`**
+
+Full walkthrough, **`baseq3`** layouts, and troubleshooting: [examples/demo_skeleton/README.md](../examples/demo_skeleton/README.md).
+
 ## 4. Renderer
 
 The default renderer is Vulkan. To use OpenGL instead:
