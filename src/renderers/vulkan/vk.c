@@ -76,14 +76,11 @@ struct Vk_Pipeline_FragSpecData {
 	float   normalScale_y;
 	float   normalScale_z;
 	float   normalScale_w;		// ..
+	/* Order must match gen_frag.tmpl specialization constant_id 19..35 (SPIR-V layout). */
 	int32_t normal_texture_set;
 	int32_t physical_texture_set;
 	int32_t env_texture_set;
 	int32_t lightmap_texture_set;
-	int32_t deluxe_mapping;
-	float deluxe_specular_scale;
-	float lightmap_scale;
-	int32_t lightmap_srgb_decode;  /* 1: sRGB->linear when BSP lightmaps gamma-encoded */
 	int32_t irradiance_texture_set;
 	int32_t emissive_texture_set;
 	int32_t clearcoat_texture_set;
@@ -91,6 +88,10 @@ struct Vk_Pipeline_FragSpecData {
 	int32_t anisotropy_texture_set;
 	int32_t transmission_texture_set;
 	int32_t subsurface_texture_set;
+	int32_t deluxe_mapping;
+	float deluxe_specular_scale;
+	float lightmap_scale;
+	int32_t lightmap_srgb_decode;  /* 1: sRGB->linear when BSP lightmaps gamma-encoded */
 	int32_t detail_texture_set;
 	float   detail_scale;
 #endif
@@ -8557,6 +8558,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	ADD_FRAG_SPEC( 16, normalScale_y );
 	ADD_FRAG_SPEC( 17, normalScale_z );
 	ADD_FRAG_SPEC( 18, normalScale_w );
+	/* constant_id order must match gen_frag.tmpl (19..35) */
 	ADD_FRAG_SPEC( 19, normal_texture_set );
 	ADD_FRAG_SPEC( 20, physical_texture_set );
 	ADD_FRAG_SPEC( 21, env_texture_set );
