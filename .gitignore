@@ -33,3 +33,7 @@ src/renderers/vulkan/shaders/spirv/generated/backups/
 android/.gradle/
 android/app/.cxx/
 android/local.properties
+
+# Local copies of examples/*/*.env.example (optional secrets / machine paths)
+/local_validation.env
+/game_base.env

@@ -1,0 +1,16 @@
+# Examples
+
+Small, **copy-paste** workflows and templates for this engine repo. They do not ship game data; point `GAME_BASE` at your own `base/` (or game-specific folder) when a step needs maps and VMs.
+
+| Path | Purpose |
+|------|---------|
+| [engine/](engine/) | Local build and automated validation (smoke, `ctest`, production readiness). |
+| [renderer/](renderer/) | Renderer regression and `GAME_BASE` environment template. |
+| [mods/](mods/) | Typical mod / `fs_game` layout and launch examples. |
+| [scripts/](scripts/) | Pointers to in-repo script and UI samples under `docs/samples/`. |
+
+See also:
+
+- [docs/QUICKSTART.md](../docs/QUICKSTART.md) — install release binaries and game data.
+- [docs/PRODUCTION_CERTIFICATION.md](../docs/PRODUCTION_CERTIFICATION.md) — tiered production bar.
+- [docs/samples/renderer_regression/README.md](../docs/samples/renderer_regression/README.md) — visual regression pack.

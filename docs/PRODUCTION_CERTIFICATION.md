@@ -57,6 +57,7 @@ If you are aiming for **AAA-style quality**:
 
 ## Related documents
 
+- [examples/README.md](../examples/README.md) — copy-paste workflows (build, validation, renderer, mods)  
 - [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) — tag and ship steps  
 - [RENDERER_CONFIDENCE.md](RENDERER_CONFIDENCE.md) — renderer automated + manual gates  
 - [QUICKSTART.md](QUICKSTART.md) — end-user runbook  
