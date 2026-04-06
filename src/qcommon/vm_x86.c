@@ -238,9 +238,11 @@ static void emit_popad( void );
 #endif
 
 // DROP is used with and without variadic args.
-// Prefer C23 __VA_OPT__ when available, otherwise fall back to widely-supported
-// '##__VA_ARGS__' extension (MSVC/GCC/Clang) to swallow the comma on empty args.
-#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202311L)
+// Use __VA_OPT__ (C2x/C23, GCC9+, Clang7+) to swallow the comma when __VA_ARGS__ is empty.
+// Fall back to ##__VA_ARGS__ for older compilers (MSVC, older GCC in GNU mode).
+#if (defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202000L)) || \
+    (defined(__GNUC__) && !defined(__clang__) && __GNUC__ >= 9) || \
+    (defined(__clang__) && __clang_major__ >= 7)
 #define DROP( reason, ... ) \
 	do { \
 		VM_FreeBuffers(); \

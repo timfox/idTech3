@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: ./compile_engine.sh [game_name] [Debug|Release] [clean] [quiet] [coverage] [asan] [vulkan] [opengl] [freetype] [lua] [duktape|no-duktape] [system-duktape] [skipshaders] [--out DIR] [mac-app <target> [arch]] [mac-ub2 [notarize]]
+# Usage: ./compile_engine.sh [game_name] [Debug|Release] [clean] [quiet] [coverage] [asan] [vulkan] [opengl] [aarch64] [freetype] [lua] [duktape|no-duktape] [system-duktape] [skipshaders] [--out DIR] [mac-app <target> [arch]] [mac-ub2 [notarize]]
 # Notes:
 # - build type defaults to Release
 # - vulkan and opengl are mutually exclusive
 # - if neither is specified: defaults to Vulkan
+# - aarch64: cross-compile for Linux aarch64 (requires gcc-aarch64-linux-gnu); may fail without ARM sysroot
 # - mac-app wraps the legacy bundle script (requires release|debug target, optional architecture)
 # - mac-ub2 compiles universal-2 binaries (release only) and can optionally notarize
 # - first unrecognized arg becomes game_name
@@ -17,6 +18,8 @@ FREETYPE=0
 LUA=0
 DUKTAPE=1
 SYSTEM_DUKTAPE=0
+CROSS_AARCH64=0
+CODECS_FOR_CROSS=0
 
 GAME_NAME="idtech3"
 BUILD_TYPE="Release"
@@ -92,6 +95,23 @@ while [[ $# -gt 0 ]]; do
     opengl)
       OPENGL=1
       shift
+      ;;
+    aarch64|cross-aarch64)
+      CROSS_AARCH64=1
+      shift
+      ;;
+    codecs)
+      CODECS_FOR_CROSS=1
+      shift
+      ;;
+    all-linux|both)
+      shift
+      echo "Building native (x86_64) first..."
+      "$0" "$@" vulkan || exit 1
+      echo ""
+      echo "Building aarch64 (cross-compile)..."
+      "$0" "$@" vulkan aarch64 || echo "Warning: aarch64 cross-build failed (install gcc-aarch64-linux-gnu; may need ARM sysroot)"
+      exit 0
       ;;
     freetype)
       FREETYPE=1
@@ -182,6 +202,21 @@ if [ "$VULKAN" -eq 1 ]; then
 else
   BUILD_DIR="$PROJECT_ROOT/build-gl-${BUILD_TYPE}"
 fi
+if [ "$CROSS_AARCH64" -eq 1 ]; then
+  BUILD_DIR="${BUILD_DIR}-aarch64"
+  if ! command -v aarch64-linux-gnu-gcc &>/dev/null; then
+    echo "Error: aarch64 cross-compiler not found. Install with:" >&2
+    echo "  sudo apt-get install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu" >&2
+    echo "  (Cross-compilation may still fail without ARM sysroot for SDL2/OpenAL.)" >&2
+    exit 1
+  fi
+  TOOLCHAIN_FILE="$PROJECT_ROOT/cmake/toolchains/linux-aarch64.cmake"
+  if [ ! -f "$TOOLCHAIN_FILE" ]; then
+    echo "Error: toolchain file not found: $TOOLCHAIN_FILE" >&2
+    exit 1
+  fi
+  echo "Cross-compiling for Linux aarch64 (toolchain: $TOOLCHAIN_FILE)"
+fi
 
 echo "Building id Tech 3 engine (${BUILD_TYPE})..."
 echo "Project root: $PROJECT_ROOT"
@@ -234,6 +269,14 @@ CMAKE_FLAGS=(
   "-DUSE_VULKAN=ON"
   "-Wno-dev"
 )
+if [ "$CROSS_AARCH64" -eq 1 ]; then
+  CMAKE_FLAGS+=("-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}")
+  # Cross-compilation: disable codecs by default (requires ARM sysroot with libavcodec-dev:arm64 etc)
+  if [ "$CODECS_FOR_CROSS" -eq 0 ]; then
+    CMAKE_FLAGS+=("-DUSE_FFMPEG=OFF" "-DUSE_DAV1D=OFF" "-DUSE_VPX=OFF" "-DUSE_THEORA=OFF")
+    echo "CMake: cross-compile aarch64 (FFmpeg/AV1/VPX/Theora disabled; add 'codecs' to try)"
+  fi
+fi
 
 if [ "$FREETYPE" -eq 1 ]; then
   CMAKE_FLAGS+=("-DBUILD_FREETYPE=ON")
@@ -271,6 +314,11 @@ if [ "$SKIP_IDPAK" -eq 1 ]; then
   echo "CMake: SKIP_IDPAK_CHECK=ON"
 fi
 
+if command -v ccache &>/dev/null; then
+  CMAKE_FLAGS+=("-DCMAKE_C_COMPILER_LAUNCHER=ccache" "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache")
+  echo "CMake: ccache enabled (faster incremental builds)"
+fi
+
 echo "Running CMake configuration..."
 cmake -S "$PROJECT_ROOT" -B "$BUILD_DIR" "${CMAKE_FLAGS[@]}"
 
@@ -306,6 +354,10 @@ copy_to_release() {
     cp -f "$BUILD_DIR/idtech3.x86_64" "$dest/${GAME_NAME}.x86_64"
     echo "Copied client -> $dest/${GAME_NAME}.x86_64"
   fi
+  if [ -f "$BUILD_DIR/idtech3.aarch64" ]; then
+    cp -f "$BUILD_DIR/idtech3.aarch64" "$dest/${GAME_NAME}.aarch64"
+    echo "Copied client -> $dest/${GAME_NAME}.aarch64"
+  fi
   if [ -f "$BUILD_DIR/idtech3" ]; then
     cp -f "$BUILD_DIR/idtech3" "$dest/${GAME_NAME}"
     echo "Copied client -> $dest/${GAME_NAME}"
@@ -315,6 +367,10 @@ copy_to_release() {
   if [ -f "$BUILD_DIR/idtech3_server.x86_64" ]; then
     cp -f "$BUILD_DIR/idtech3_server.x86_64" "$dest/${GAME_NAME}_server.x86_64"
     echo "Copied server -> $dest/${GAME_NAME}_server.x86_64"
+  fi
+  if [ -f "$BUILD_DIR/idtech3_server.aarch64" ]; then
+    cp -f "$BUILD_DIR/idtech3_server.aarch64" "$dest/${GAME_NAME}_server.aarch64"
+    echo "Copied server -> $dest/${GAME_NAME}_server.aarch64"
   fi
   if [ -f "$BUILD_DIR/idtech3_server" ]; then
     cp -f "$BUILD_DIR/idtech3_server" "$dest/${GAME_NAME}_server"
@@ -347,6 +403,13 @@ copy_to_release() {
   if [ -f "$BUILD_DIR/libimgui_shared.so" ]; then
     cp -f "$BUILD_DIR/libimgui_shared.so" "$dest/"
     echo "Copied libimgui_shared.so to $dest/"
+  fi
+
+  # Vulkan launcher (sets LD_LIBRARY_PATH for custom SDL on RPi)
+  if [ -f "$PROJECT_ROOT/scripts/run_vulkan.sh" ]; then
+    cp -f "$PROJECT_ROOT/scripts/run_vulkan.sh" "$dest/run_vulkan.sh"
+    chmod +x "$dest/run_vulkan.sh"
+    echo "Copied run_vulkan.sh -> $dest/run_vulkan.sh"
   fi
 }
 

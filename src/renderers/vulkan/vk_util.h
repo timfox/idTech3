@@ -24,6 +24,9 @@ const char *vk_result_string( VkResult code );
 /* VkFormat to string for logging. */
 const char *vk_format_string( VkFormat format );
 
+/* True if format is sRGB (e.g. VK_FORMAT_B8G8R8A8_SRGB). */
+qboolean vk_format_is_srgb( VkFormat format );
+
 /* Find memory type index for allocation. Aborts on failure. */
 uint32_t vk_find_memory_type( VkPhysicalDevice physical_device, uint32_t memory_type_bits, VkMemoryPropertyFlags properties );
 
@@ -43,8 +46,17 @@ qboolean vk_parse_fog_tint_string( const char *s, vec3_t out );
 /* Maximum absolute difference between two 4x4 matrices (float[16]). */
 float vk_matrix_max_abs_diff( const float *a, const float *b );
 
+/* Invert 4x4 matrix m into out. Returns qfalse if singular (det near zero). */
+qboolean vk_mat4_inverse( const float *m, float *out );
+
 /* Normalize RGB by max component; if zero, set to (1,1,1). */
 void vk_normalize_rgb_luma_safe( vec3_t io );
+
+/* 3D noise hash for volumetric fog. */
+uint32_t vk_noise_hash3( uint32_t x, uint32_t y, uint32_t z );
+
+/* Returns qtrue if extension name is one we request for the instance. */
+qboolean vk_used_instance_extension( const char *ext );
 
 #ifdef __cplusplus
 }

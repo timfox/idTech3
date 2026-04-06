@@ -5,6 +5,14 @@
 #include "tr_common.h"
 #include "vk_util.h"
 
+/* VK_EXT_extended_dynamic_state3: color write mask for RB_ColorMask */
+#ifndef VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT
+#define VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT 1000484004
+#endif
+#ifndef PFN_vkCmdSetColorWriteMaskEXT
+typedef void (VKAPI_PTR *PFN_vkCmdSetColorWriteMaskEXT)(VkCommandBuffer commandBuffer, uint32_t firstAttachment, uint32_t attachmentCount, const VkColorComponentFlags *pColorWriteMasks);
+#endif
+
 #define VK_CHECK( function_call ) do { \
 	VkResult _res_ = (function_call); \
 	if ( _res_ < 0 ) { \
@@ -223,6 +231,7 @@ typedef struct {
 
 #ifdef USE_VK_PBR
 	uint32_t				vk_pbr_flags;
+	int32_t					lightmap_bundle;
 	vec4_t					specularScale;
 	vec4_t					normalScale;
 #endif
@@ -269,7 +278,7 @@ typedef struct vkUniform_s {
 	vec4_t pbrTransmissionScale;
 	vec4_t pbrSubsurfaceColor;
 	vec4_t pbrSubsurfaceParams;
-	vec4_t pbrAdvancedParams; // x: multi-scatter toggle, y: multi-scatter strength
+	vec4_t pbrAdvancedParams; // x: multi-scatter toggle, y: multi-scatter strength, z: roughness Fresnel, w: specular AA strength
 	vec4_t pbrGlintParams0;
 	vec4_t pbrGlintParams1;
 	vec4_t pbrGlintFlags;
@@ -377,6 +386,7 @@ qboolean vk_consume_validation_error( char *buffer, size_t bufsize );
 
 // Debug: set object name for Vulkan debugger/profiler (no-op if extension unavailable).
 void vk_set_object_name( uint64_t obj, const char *objName, VkDebugReportObjectTypeEXT objType );
+#define SET_OBJECT_NAME(obj, objName, objType) vk_set_object_name( (uint64_t)(obj), (objName), (objType) )
 
 // Initializes VK_Instance structure.
 // After calling this function we get fully functional vulkan subsystem.
@@ -399,6 +409,8 @@ VkSampleCountFlagBits vk_get_main_rasterization_samples( void );
 //
 // Resources allocation.
 //
+void vk_allocate_and_bind_image_memory( VkImage image );
+void vk_image_free_chunks( void );
 void vk_create_image( image_t *image, int width, int height, int mip_levels );
 void vk_upload_image_data( image_t *image, int x, int y, int width, int height, int miplevels, byte *pixels, int size, qboolean update );
 void vk_upload_cubemap_mip_data( image_t *image, int face_size, int miplevels, const byte *pixels, int size, int bytes_per_pixel, qboolean update );
@@ -474,6 +486,7 @@ extern PFN_vkCmdCopyImageToBuffer qvkCmdCopyImageToBuffer;
 extern PFN_vkCmdDispatch qvkCmdDispatch;
 extern PFN_vkCmdDraw qvkCmdDraw;
 extern PFN_vkCreateGraphicsPipelines qvkCreateGraphicsPipelines;
+extern PFN_vkCreateRenderPass qvkCreateRenderPass;
 extern PFN_vkDestroyPipeline qvkDestroyPipeline;
 
 uint32_t vk_tess_index( uint32_t numIndexes, const void *src );
@@ -615,6 +628,7 @@ typedef struct {
 		VkRenderPass smaa_edge;
 		VkRenderPass smaa_blend;
 		VkRenderPass smaa_compose;
+		VkRenderPass taa;
 		VkRenderPass volumetric;
 		VkRenderPass atmosphere;
 	} render_pass;
@@ -632,8 +646,8 @@ typedef struct {
 	VkPipelineLayout pipeline_layout_smaa;
 	VkPipelineLayout pipeline_layout_ssao;		// ssao (depth + push constants)
 	VkPipelineLayout pipeline_layout_ssao_combine;	// ssao combine (color + ao)
-	VkPipelineLayout pipeline_layout_oit_resolve;	// oit resolve (opaque + accum)
-	VkPipelineLayout pipeline_layout_oit_accum;	// oit accum (sampler + push constants)
+	VkPipelineLayout pipeline_layout_oit_resolve;	// oit resolve (opaque + accum + revealage)
+	VkPipelineLayout pipeline_layout_oit_accum;	// oit accum (sampler + depth + push constants)
 	VkPipelineLayout pipeline_layout_ssr;		// ssr (color + depth + push constants)
 	VkPipelineLayout pipeline_layout_atmosphere;	// atmosphere (push constants only)
 #ifdef VK_PBR_BRDFLUT
@@ -687,11 +701,12 @@ typedef struct {
 	VkDescriptorSet post_color_descriptor[NUM_COMMAND_BUFFERS];	/* per-frame mutable post-fog/gamma source */
 	VkImageView post_fog_color_source;	/* last source for gamma (color_image or smaa_output) */
 	VkImageView scene_post_fog_color_source;	/* scene-only source for luminance/exposure before HUD/console */
-	VkDescriptorSet depth_descriptor;
-	VkDescriptorSet postfx_params_descriptor[NUM_COMMAND_BUFFERS];
-	VkDescriptorSet smaa_edge_descriptor;
-	VkDescriptorSet smaa_blend_descriptor;
-	VkDescriptorSet smaa_compose_descriptor;
+	VkDescriptorSet depth_descriptor[NUM_COMMAND_BUFFERS];	/* per-frame (VUID-03047) */
+		VkDescriptorSet postfx_params_descriptor[NUM_COMMAND_BUFFERS];
+		VkDescriptorSet smaa_edge_descriptor;
+		VkDescriptorSet smaa_blend_descriptor;
+		VkDescriptorSet smaa_compose_descriptor;
+		VkDescriptorSet taa_history_descriptor[2];
 
 	VkImage color_image;
 	VkImageView color_image_view;
@@ -701,10 +716,12 @@ typedef struct {
 	VkImageView fog_scene_image_view;
 	VkImage smaa_edge_image;
 	VkImageView smaa_edge_image_view;
-	VkImage smaa_blend_image;
-	VkImageView smaa_blend_image_view;
-	VkImage smaa_output_image;
-	VkImageView smaa_output_image_view;
+		VkImage smaa_blend_image;
+		VkImageView smaa_blend_image_view;
+		VkImage smaa_output_image;
+		VkImageView smaa_output_image_view;
+		VkImage taa_history_image[2];
+		VkImageView taa_history_image_view[2];
 
 	VkImage bloom_image[1+VK_NUM_BLOOM_PASSES*2];
 	VkImageView bloom_image_view[1+VK_NUM_BLOOM_PASSES*2];
@@ -721,8 +738,12 @@ typedef struct {
 	VkDescriptorSet ssao_scene_descriptor;	/* scene copy for combine (avoids read-modify-write) */
 	VkImage oit_accum_image;
 	VkImageView oit_accum_image_view;
+	VkImage oit_reveal_image;
+	VkImageView oit_reveal_image_view;
 	VkDescriptorSet oit_opaque_descriptor;	/* opaque copy for OIT resolve */
 	VkDescriptorSet oit_accum_descriptor;
+	VkDescriptorSet oit_reveal_descriptor;
+	VkDescriptorSet oit_depth_descriptor;
 	VkImage ssr_image;
 	VkImageView ssr_image_view;
 	VkDescriptorSet ssr_descriptor[2];	/* [0]=color, [1]=depth */
@@ -800,6 +821,7 @@ typedef struct {
 		VkFramebuffer smaa_edge;
 		VkFramebuffer smaa_blend;
 		VkFramebuffer smaa_compose;
+		VkFramebuffer taa[2];
 		VkFramebuffer volumetric[MAX_SWAPCHAIN_IMAGES];
 		VkFramebuffer atmosphere[MAX_SWAPCHAIN_IMAGES];
 		VkFramebuffer ui_overlay[MAX_SWAPCHAIN_IMAGES];
@@ -870,6 +892,8 @@ typedef struct {
 		qboolean noWorldModel;
 		qboolean stableGameplayState;
 		float filteredAvgLogLuminance;
+		qboolean hasValidTAAHistory;
+		uint32_t taaHistoryIndex;
 		uint32_t lastRenderWidth;
 		uint32_t lastRenderHeight;
 		uint32_t lastSwapchainWidth;
@@ -950,6 +974,7 @@ typedef struct {
 		VkShaderModule smaa_edge_fs;
 		VkShaderModule smaa_blend_fs;
 		VkShaderModule smaa_compose_fs;
+		VkShaderModule taa_fs;
 		VkShaderModule ssr_fs;
 
 		VkShaderModule fog_fs;
@@ -1057,6 +1082,7 @@ typedef struct {
 	VkPipeline smaa_edge_pipeline;
 	VkPipeline smaa_blend_pipeline;
 	VkPipeline smaa_compose_pipeline;
+	VkPipeline taa_pipeline;
 	VkPipeline ssao_pipeline;
 	VkPipeline hbao_pipeline;
 	VkPipeline ssao_blur_pipeline;
@@ -1188,6 +1214,7 @@ typedef struct {
 
 	qboolean clearAttachment;		// requires VK_IMAGE_USAGE_TRANSFER_DST_BIT for swapchains
 	qboolean fboActive;
+	qboolean isV3DV;				/* Raspberry Pi Vulkan driver (V3DV); used for RPi5-friendly hints */
 	qboolean blitEnabled;
 	qboolean msaaActive;
 	qboolean msaaSampleShading;	/* per-sample shading when MSAA on (better alpha/specular, higher cost) */
@@ -1281,8 +1308,19 @@ typedef struct {
 extern Vk_Instance	vk;				// shouldn't be cleared during ref re-init
 extern Vk_World		vk_world;		// this data is cleared during ref re-init
 
-/* Vulkan function pointers (loaded at init, used by vk_sync.c, vk_image_layout.c, vk_render_pass.c) */
+/* Vulkan function pointers (loaded at init, used by vk_sync.c, vk_image_layout.c, vk_render_pass.c, vk_device.c) */
 extern PFN_vkGetPhysicalDeviceMemoryProperties qvkGetPhysicalDeviceMemoryProperties;
+extern PFN_vkGetPhysicalDeviceProperties qvkGetPhysicalDeviceProperties;
+extern PFN_vkGetPhysicalDeviceFormatProperties qvkGetPhysicalDeviceFormatProperties;
+extern PFN_vkGetPhysicalDeviceSurfaceFormatsKHR qvkGetPhysicalDeviceSurfaceFormatsKHR;
+extern PFN_vkGetPhysicalDeviceFeatures qvkGetPhysicalDeviceFeatures;
+extern PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR qvkGetPhysicalDeviceSurfaceCapabilitiesKHR;
+extern PFN_vkGetPhysicalDeviceSurfacePresentModesKHR qvkGetPhysicalDeviceSurfacePresentModesKHR;
+extern PFN_vkCreateSwapchainKHR qvkCreateSwapchainKHR;
+extern PFN_vkDestroySwapchainKHR qvkDestroySwapchainKHR;
+extern PFN_vkGetSwapchainImagesKHR qvkGetSwapchainImagesKHR;
+extern PFN_vkCreateImageView qvkCreateImageView;
+extern PFN_vkDestroyImageView qvkDestroyImageView;
 extern PFN_vkCreateSemaphore			qvkCreateSemaphore;
 extern PFN_vkCreateFence				qvkCreateFence;
 extern PFN_vkDestroySemaphore		qvkDestroySemaphore;
@@ -1294,3 +1332,27 @@ extern PFN_vkCmdPushConstants		qvkCmdPushConstants;
 extern PFN_vkCmdSetScissor			qvkCmdSetScissor;
 extern PFN_vkCmdSetViewport			qvkCmdSetViewport;
 extern PFN_vkUpdateDescriptorSets	qvkUpdateDescriptorSets;
+extern PFN_vkCreateDescriptorSetLayout qvkCreateDescriptorSetLayout;
+extern PFN_vkAllocateCommandBuffers	qvkAllocateCommandBuffers;
+extern PFN_vkBeginCommandBuffer		qvkBeginCommandBuffer;
+extern PFN_vkCmdCopyBuffer			qvkCmdCopyBuffer;
+extern PFN_vkEndCommandBuffer		qvkEndCommandBuffer;
+extern PFN_vkQueueSubmit			qvkQueueSubmit;
+extern PFN_vkFreeCommandBuffers		qvkFreeCommandBuffers;
+extern PFN_vkCreateSampler			qvkCreateSampler;
+extern PFN_vkDestroySampler			qvkDestroySampler;
+extern PFN_vkCreateBuffer			qvkCreateBuffer;
+extern PFN_vkDestroyBuffer			qvkDestroyBuffer;
+extern PFN_vkFreeMemory				qvkFreeMemory;
+extern PFN_vkGetBufferMemoryRequirements qvkGetBufferMemoryRequirements;
+extern PFN_vkGetImageMemoryRequirements qvkGetImageMemoryRequirements;
+extern PFN_vkAllocateMemory			qvkAllocateMemory;
+extern PFN_vkBindBufferMemory		qvkBindBufferMemory;
+extern PFN_vkBindImageMemory			qvkBindImageMemory;
+extern PFN_vkMapMemory				qvkMapMemory;
+extern PFN_vkWaitForFences			qvkWaitForFences;
+extern PFN_vkResetFences				qvkResetFences;
+extern PFN_vkResetCommandBuffer		qvkResetCommandBuffer;
+extern PFN_vkCreateDescriptorSetLayout qvkCreateDescriptorSetLayout;
+extern PFN_vkCreateRenderPass qvkCreateRenderPass;
+extern PFN_vkDebugMarkerSetObjectNameEXT qvkDebugMarkerSetObjectNameEXT;

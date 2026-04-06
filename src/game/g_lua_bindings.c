@@ -14,6 +14,7 @@ methods matching the C API.
 Usage from Lua:
   Engine.Director.getIntensity(playerNum)
   Engine.Nav.findPath(startX, startY, startZ, endX, endY, endZ)
+  Engine.BT.createTree() / addNode(tree, type, {childIds}) / createAgent(tree)
   Engine.Physics.createBody({shape="box", mass=10, ...})
   Engine.Particles.emitSmoke(x, y, z, ...)
   Engine.Music.addLayer("music/combat.ogg", "action", 0.5, 1.0)
@@ -40,6 +41,9 @@ Usage from Lua:
 #include "g_dismember.h"
 #include "g_choreography.h"
 #include "g_response.h"
+#ifdef USE_ECS
+#include "ecs.h"
+#endif
 #include "../physics/phys_bullet.h"
 #include "../physics/phys_procedural_anim.h"
 #include "../physics/phys_ik.h"
@@ -343,9 +347,127 @@ static int l_aiml_getCategoryCount(lua_State *L) {
 	return 1;
 }
 
+/* ========== ECS bindings ========== */
+#ifdef USE_ECS
+
+static int l_ecs_create(lua_State *L) {
+	ecs_entity_t e = ECS_Create();
+	lua_pushinteger(L, (lua_Integer)e);
+	return 1;
+}
+static int l_ecs_destroy(lua_State *L) {
+	ECS_Destroy((ecs_entity_t)luaL_checkinteger(L, 1));
+	return 0;
+}
+static int l_ecs_valid(lua_State *L) {
+	lua_pushboolean(L, ECS_Valid((ecs_entity_t)luaL_checkinteger(L, 1)));
+	return 1;
+}
+static int l_ecs_count(lua_State *L) {
+	lua_pushinteger(L, (lua_Integer)ECS_Count());
+	return 1;
+}
+static int l_ecs_has(lua_State *L) {
+	ecs_entity_t e = (ecs_entity_t)luaL_checkinteger(L, 1);
+	ecs_component_id_t c = ECS_ComponentFromName(luaL_checkstring(L, 2));
+	lua_pushboolean(L, c < ECS_COMP_COUNT && ECS_Has(e, c));
+	return 1;
+}
+static int l_ecs_add(lua_State *L) {
+	ecs_entity_t e = (ecs_entity_t)luaL_checkinteger(L, 1);
+	ecs_component_id_t c = ECS_ComponentFromName(luaL_checkstring(L, 2));
+	if (c < ECS_COMP_COUNT) ECS_Add(e, c);
+	return 0;
+}
+static int l_ecs_remove(lua_State *L) {
+	ecs_entity_t e = (ecs_entity_t)luaL_checkinteger(L, 1);
+	ecs_component_id_t c = ECS_ComponentFromName(luaL_checkstring(L, 2));
+	if (c < ECS_COMP_COUNT) ECS_Remove(e, c);
+	return 0;
+}
+static int l_ecs_setPosition(lua_State *L) {
+	ECS_SetPosition((ecs_entity_t)luaL_checkinteger(L, 1),
+		(float)luaL_checknumber(L, 2), (float)luaL_checknumber(L, 3), (float)luaL_checknumber(L, 4));
+	return 0;
+}
+static int l_ecs_getPosition(lua_State *L) {
+	vec3_t v;
+	ECS_GetPosition((ecs_entity_t)luaL_checkinteger(L, 1), v);
+	lua_pushnumber(L, v[0]); lua_pushnumber(L, v[1]); lua_pushnumber(L, v[2]);
+	return 3;
+}
+static int l_ecs_setRotation(lua_State *L) {
+	ECS_SetRotation((ecs_entity_t)luaL_checkinteger(L, 1),
+		(float)luaL_checknumber(L, 2), (float)luaL_checknumber(L, 3), (float)luaL_checknumber(L, 4));
+	return 0;
+}
+static int l_ecs_getRotation(lua_State *L) {
+	vec3_t v;
+	ECS_GetRotation((ecs_entity_t)luaL_checkinteger(L, 1), v);
+	lua_pushnumber(L, v[0]); lua_pushnumber(L, v[1]); lua_pushnumber(L, v[2]);
+	return 3;
+}
+static int l_ecs_setScale(lua_State *L) {
+	ECS_SetScale((ecs_entity_t)luaL_checkinteger(L, 1),
+		(float)luaL_checknumber(L, 2), (float)luaL_checknumber(L, 3), (float)luaL_checknumber(L, 4));
+	return 0;
+}
+static int l_ecs_getScale(lua_State *L) {
+	vec3_t v;
+	ECS_GetScale((ecs_entity_t)luaL_checkinteger(L, 1), v);
+	lua_pushnumber(L, v[0]); lua_pushnumber(L, v[1]); lua_pushnumber(L, v[2]);
+	return 3;
+}
+static int l_ecs_setVelocity(lua_State *L) {
+	ECS_SetVelocity((ecs_entity_t)luaL_checkinteger(L, 1),
+		(float)luaL_checknumber(L, 2), (float)luaL_checknumber(L, 3), (float)luaL_checknumber(L, 4));
+	return 0;
+}
+static int l_ecs_getVelocity(lua_State *L) {
+	vec3_t v;
+	ECS_GetVelocity((ecs_entity_t)luaL_checkinteger(L, 1), v);
+	lua_pushnumber(L, v[0]); lua_pushnumber(L, v[1]); lua_pushnumber(L, v[2]);
+	return 3;
+}
+static int l_ecs_setHealth(lua_State *L) {
+	ECS_SetHealth((ecs_entity_t)luaL_checkinteger(L, 1), (float)luaL_checknumber(L, 2));
+	return 0;
+}
+static int l_ecs_getHealth(lua_State *L) {
+	lua_pushnumber(L, ECS_GetHealth((ecs_entity_t)luaL_checkinteger(L, 1)));
+	return 1;
+}
+static int l_ecs_setTag(lua_State *L) {
+	ECS_SetTag((ecs_entity_t)luaL_checkinteger(L, 1), luaL_optstring(L, 2, ""));
+	return 0;
+}
+static int l_ecs_getTag(lua_State *L) {
+	lua_pushstring(L, ECS_GetTag((ecs_entity_t)luaL_checkinteger(L, 1)));
+	return 1;
+}
+static int l_ecs_setGentityLink(lua_State *L) {
+	ECS_SetGentityLink((ecs_entity_t)luaL_checkinteger(L, 1), (int)luaL_checkinteger(L, 2));
+	return 0;
+}
+static int l_ecs_getGentityLink(lua_State *L) {
+	lua_pushinteger(L, ECS_GetGentityLink((ecs_entity_t)luaL_checkinteger(L, 1)));
+	return 1;
+}
+static int l_ecs_componentFromName(lua_State *L) {
+	lua_pushinteger(L, (lua_Integer)ECS_ComponentFromName(luaL_checkstring(L, 1)));
+	return 1;
+}
+static int l_ecs_componentName(lua_State *L) {
+	lua_pushstring(L, ECS_ComponentName((ecs_component_id_t)luaL_checkinteger(L, 1)));
+	return 1;
+}
+
+#endif /* USE_ECS */
+
 /* ========== GOAP bindings ========== */
 
 #include "g_goap.h"
+#include "g_bt.h"
 
 /* Actions */
 static int l_goap_registerAction(lua_State *L) {
@@ -517,6 +639,99 @@ static int l_goap_getAgentCount(lua_State *L) {
 	return 1;
 }
 
+/* ========== BT bindings ========== */
+
+static int l_bt_createTree(lua_State *L) {
+	lua_pushinteger(L, BT_CreateTree());
+	return 1;
+}
+static int l_bt_addNode(lua_State *L) {
+	int tree = (int)luaL_checkinteger(L, 1);
+	int type = (int)luaL_checkinteger(L, 2);
+	int childIds[BT_MAX_CHILDREN];
+	int n = 0, i, len;
+	if (lua_istable(L, 3)) {
+		lua_len(L, 3);
+		len = (int)lua_tointeger(L, -1);
+		lua_pop(L, 1);
+		for (i = 0; i < len && i < BT_MAX_CHILDREN; i++) {
+			lua_rawgeti(L, 3, i + 1);
+			childIds[n++] = (int)lua_tointeger(L, -1);
+			lua_pop(L, 1);
+		}
+	}
+	lua_pushinteger(L, BT_AddNode(tree, (btNodeType_t)type, n > 0 ? childIds : NULL, n));
+	return 1;
+}
+static int l_bt_setRoot(lua_State *L) {
+	BT_SetRoot((int)luaL_checkinteger(L, 1), (int)luaL_checkinteger(L, 2));
+	return 0;
+}
+static int l_bt_createAgent(lua_State *L) {
+	lua_pushinteger(L, BT_CreateAgent((int)luaL_checkinteger(L, 1)));
+	return 1;
+}
+static int l_bt_destroyAgent(lua_State *L) {
+	BT_DestroyAgent((int)luaL_checkinteger(L, 1));
+	return 0;
+}
+static int l_bt_setAgentEntity(lua_State *L) {
+	BT_SetAgentEntity((int)luaL_checkinteger(L, 1), (int)luaL_checkinteger(L, 2));
+	return 0;
+}
+static int l_bt_setAgentTarget(lua_State *L) {
+	vec3_t v;
+	v[0] = (float)luaL_checknumber(L, 2);
+	v[1] = (float)luaL_checknumber(L, 3);
+	v[2] = (float)luaL_checknumber(L, 4);
+	BT_SetAgentTarget((int)luaL_checkinteger(L, 1), v, (int)luaL_optinteger(L, 5, -1));
+	return 0;
+}
+static int l_bt_setAgentContext(lua_State *L) {
+	BT_SetAgentContext((int)luaL_checkinteger(L, 1),
+		(float)luaL_checknumber(L, 2),
+		(float)luaL_checknumber(L, 3),
+		(float)luaL_checknumber(L, 4));
+	return 0;
+}
+static int l_bt_setAnimOutput(lua_State *L) {
+	BT_SetAnimOutput((int)luaL_checkinteger(L, 1), (int)luaL_checkinteger(L, 2), (int)luaL_checkinteger(L, 3));
+	return 0;
+}
+static int l_bt_bbSetFloat(lua_State *L) {
+	BT_BBSetFloat((int)luaL_checkinteger(L, 1), luaL_checkstring(L, 2), (float)luaL_checknumber(L, 3));
+	return 0;
+}
+static int l_bt_bbGetFloat(lua_State *L) {
+	lua_pushnumber(L, BT_BBGetFloat((int)luaL_checkinteger(L, 1), luaL_checkstring(L, 2)));
+	return 1;
+}
+static int l_bt_bbSetInt(lua_State *L) {
+	BT_BBSetInt((int)luaL_checkinteger(L, 1), luaL_checkstring(L, 2), (int)luaL_checkinteger(L, 3));
+	return 0;
+}
+static int l_bt_bbGetInt(lua_State *L) {
+	lua_pushinteger(L, BT_BBGetInt((int)luaL_checkinteger(L, 1), luaL_checkstring(L, 2)));
+	return 1;
+}
+static int l_bt_linkHordeAgent(lua_State *L) {
+	BT_LinkHordeAgent((int)luaL_checkinteger(L, 1), (int)luaL_checkinteger(L, 2));
+	return 0;
+}
+static int l_bt_linkGOAPAgent(lua_State *L) {
+	BT_LinkGOAPAgent((int)luaL_checkinteger(L, 1), (int)luaL_checkinteger(L, 2));
+	return 0;
+}
+static int l_bt_getActiveCount(lua_State *L) {
+	(void)L;
+	lua_pushinteger(L, BT_GetActiveCount());
+	return 1;
+}
+static int l_bt_debugAgent(lua_State *L) {
+	BT_DebugPrintAgent((int)luaL_checkinteger(L, 1));
+	return 0;
+}
+
 /* ========== Registration ========== */
 
 static void registerTable(lua_State *L, const char *name, const luaL_Reg *funcs) {
@@ -668,6 +883,37 @@ void LuaBindings_RegisterAll(void *luaState) {
 	};
 	registerTable(L, "GOAP", goapFuncs);
 
+	static const luaL_Reg btFuncs[] = {
+		{"createTree", l_bt_createTree}, {"addNode", l_bt_addNode}, {"setRoot", l_bt_setRoot},
+		{"createAgent", l_bt_createAgent}, {"destroyAgent", l_bt_destroyAgent},
+		{"setAgentEntity", l_bt_setAgentEntity}, {"setAgentTarget", l_bt_setAgentTarget},
+		{"setAgentContext", l_bt_setAgentContext}, {"setAnimOutput", l_bt_setAnimOutput},
+		{"bbSetFloat", l_bt_bbSetFloat}, {"bbGetFloat", l_bt_bbGetFloat},
+		{"bbSetInt", l_bt_bbSetInt}, {"bbGetInt", l_bt_bbGetInt},
+		{"linkHordeAgent", l_bt_linkHordeAgent}, {"linkGOAPAgent", l_bt_linkGOAPAgent},
+		{"getActiveCount", l_bt_getActiveCount}, {"debugAgent", l_bt_debugAgent},
+		{NULL, NULL}
+	};
+	registerTable(L, "BT", btFuncs);
+
+#ifdef USE_ECS
+	static const luaL_Reg ecsFuncs[] = {
+		{"create", l_ecs_create}, {"destroy", l_ecs_destroy},
+		{"valid", l_ecs_valid}, {"count", l_ecs_count},
+		{"has", l_ecs_has}, {"add", l_ecs_add}, {"remove", l_ecs_remove},
+		{"setPosition", l_ecs_setPosition}, {"getPosition", l_ecs_getPosition},
+		{"setRotation", l_ecs_setRotation}, {"getRotation", l_ecs_getRotation},
+		{"setScale", l_ecs_setScale}, {"getScale", l_ecs_getScale},
+		{"setVelocity", l_ecs_setVelocity}, {"getVelocity", l_ecs_getVelocity},
+		{"setHealth", l_ecs_setHealth}, {"getHealth", l_ecs_getHealth},
+		{"setTag", l_ecs_setTag}, {"getTag", l_ecs_getTag},
+		{"setGentityLink", l_ecs_setGentityLink}, {"getGentityLink", l_ecs_getGentityLink},
+		{"componentFromName", l_ecs_componentFromName}, {"componentName", l_ecs_componentName},
+		{NULL, NULL}
+	};
+	registerTable(L, "ECS", ecsFuncs);
+#endif
+
 	static const luaL_Reg aimlFuncs[] = {
 		{"createBot", l_aiml_createBot},
 		{"destroyBot", l_aiml_destroyBot},
@@ -695,7 +941,7 @@ void LuaBindings_RegisterAll(void *luaState) {
 	registerTable(L, "VDB", vdbFuncs);
 
 	lua_setglobal(L, "Engine");
-	Com_Printf("Lua bindings registered: Engine.{Director,Nav,Physics,Particles,Music,Face,Horde,Dismember,Choreo,Response,GOAP}\n");
+	Com_Printf("Lua bindings registered: Engine.{Director,Nav,Physics,Particles,Music,Face,Horde,Dismember,Choreo,Response,GOAP,ECS}\n");
 }
 
 #else /* !USE_LUA */

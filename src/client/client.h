@@ -427,6 +427,7 @@ extern	cvar_t	*r_displayRefresh;
 extern	cvar_t	*r_fullscreen;
 extern	cvar_t	*r_mode;
 extern	cvar_t	*r_modeFullscreen;
+extern	cvar_t	*r_vid_driver;
 extern	cvar_t	*r_customwidth;
 extern	cvar_t	*r_customheight;
 extern	cvar_t	*r_customPixelAspect;
@@ -612,8 +613,8 @@ void	GLimp_Minimize( void );
 void	GLimp_LogComment( const char *comment );
 void	GLW_RestoreGamma( void );
 
-// OpenGL
-#ifdef USE_OPENGL_API
+// OpenGL (needed for static OpenGL build, or Vulkan build with dlopen so OpenGL renderer can load)
+#if defined(USE_OPENGL_API) || defined(USE_VULKAN_API)
 void	GLimp_Init( glconfig_t *config );
 void	GLimp_Shutdown( qboolean unloadDLL );
 void	GLimp_EndFrame( void );
@@ -626,4 +627,6 @@ void	VKimp_Init( glconfig_t *config );
 void	VKimp_Shutdown( qboolean unloadDLL );
 void	*VK_GetInstanceProcAddr( VkInstance instance, const char *name );
 qboolean VK_CreateSurface( VkInstance instance, VkSurfaceKHR* pSurface );
+/** Returns qtrue if SDL has Vulkan support for the current video driver. Used for ARM fallback. */
+qboolean GLimp_VulkanAvailable( void );
 #endif

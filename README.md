@@ -47,7 +47,7 @@ Ray tracing (Vulkan RT) is **scaffolded / in progress** — see `docs/RENDERERS_
 * Image format support: PNG, JPEG, TGA, BMP, DDS, WebP, HDR, OpenEXR (EXR), KTX, PKM, PVR
 
 **Image Generation** (optional):
-* FLUX.2/FLUX.1 C image generation (text-to-image from console, hot-reload, device selection; requires model files in game directory; Metal, BLAS, or pure C backend with graceful fallback)
+* FLUX.2/FLUX.1 C image generation (text-to-image from console, real-time hot-reload, device selection; supports flux1-schnell, flux1-dev, flux2-dev; requires model files in game directory; Metal, BLAS, or pure C backend with graceful fallback)
 
 **Networking**:
 * Full IPv6 and IPv4 dual-stack support (host, client, server)

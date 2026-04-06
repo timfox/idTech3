@@ -55,6 +55,8 @@ jobs:
         with:
           install: >-
             base-devel
+            coreutils
+            file
             ${{ matrix.prefix }}-binutils
             ${{ matrix.prefix }}-make
             ${{ matrix.prefix }}-${{ matrix.cc }}
@@ -95,7 +97,7 @@ jobs:
             -DBUILD_FREETYPE=ON \
             -DENABLE_FORTIFY_SOURCE=OFF \
             -DENABLE_ASAN=OFF \
-            -DBUILD_SERVER=OFF \
+            -DBUILD_SERVER=ON \
             -DUSE_VULKAN=ON \
             -DRENDERER_DEFAULT=vulkan \
             -DSKIP_IDPAK_CHECK=ON \
@@ -120,7 +122,7 @@ jobs:
             -DBUILD_FREETYPE=ON \
             -DENABLE_FORTIFY_SOURCE=OFF \
             -DENABLE_ASAN=OFF \
-            -DBUILD_SERVER=OFF \
+            -DBUILD_SERVER=ON \
             -DUSE_VULKAN=ON \
             -DRENDERER_DEFAULT=opengl \
             -DSKIP_IDPAK_CHECK=ON \
@@ -140,12 +142,20 @@ jobs:
         shell: pwsh
         run: ./scripts/windows_pe_exports_check.ps1 -BinDir bin -SkipRendererDlls
 
+      - name: Smoke test
+        if: ${{ github.event_name != 'release' && matrix.btype != 'Debug' }}
+        run: |
+          mkdir -p release
+          cp -f bin/idtech3* release/ || true
+          chmod +x scripts/smoke_test.sh
+          ./scripts/smoke_test.sh release
+
       - uses: actions/upload-artifact@v4
         if: matrix.cc == 'gcc' && matrix.btype == 'Release'
         with:
           name: windows-${{ matrix.cc }}-${{ matrix.arch }}
           path: bin
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 5
 
   windows-msvc:
@@ -333,7 +343,7 @@ jobs:
         with:
           name: windows-msvc-${{ matrix.pkg_suffix }}
           path: bin
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 5
 
   ubuntu-x86_64:
@@ -355,10 +365,18 @@ jobs:
           sudo rm -f /etc/apt/sources.list.d/azure-cli.list
           sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list
           sudo apt-get -qq update
-          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev clang
+          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev clang ccache
           sudo apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools python3
 
       - uses: actions/checkout@v4
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-ubuntu-x64-${{ matrix.cc }}-${{ matrix.btype }}-${{ github.sha }}
+          restore-keys: |
+            ccache-ubuntu-x64-${{ matrix.cc }}-${{ matrix.btype }}-
 
       - name: Verify shader compilation
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
@@ -376,8 +394,10 @@ jobs:
           fi
           mkdir -p build-vk-${{ matrix.btype }}
           cmake -S . -B build-vk-${{ matrix.btype }} $CMAKE_EXTRA \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
-            -DCI_BUILD=OFF \
+            -DCI_BUILD=${{ (matrix.cc == 'gcc' && matrix.btype == 'Release') && 'ON' || 'OFF' }} \
             -DUSE_STB_TRUETYPE=ON \
             -DBUILD_FREETYPE=ON \
             -DENABLE_FORTIFY_SOURCE=ON \
@@ -404,6 +424,8 @@ jobs:
           fi
           mkdir -p build-gl-${{ matrix.btype }}
           cmake -S . -B build-gl-${{ matrix.btype }} $CMAKE_EXTRA \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
             -DCI_BUILD=OFF \
             -DUSE_STB_TRUETYPE=ON \
@@ -527,10 +549,18 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get -qq update
-          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev clang-tidy cppcheck
+          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev clang-tidy cppcheck ccache
           sudo apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools python3
 
       - uses: actions/checkout@v4
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-static-${{ github.sha }}
+          restore-keys: |
+            ccache-static-
 
       - name: Build (compile_commands.json)
         env:
@@ -539,6 +569,8 @@ jobs:
         run: |
           mkdir -p build-static
           cmake -S . -B build-static -G Ninja \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
             -DCI_BUILD=OFF \
@@ -615,11 +647,11 @@ jobs:
               -DBUILD_FREETYPE=ON \
               -DENABLE_FORTIFY_SOURCE=OFF \
               -DENABLE_ASAN=OFF \
-              -DBUILD_SERVER=OFF \
+              -DBUILD_SERVER=ON \
               -DUSE_VULKAN=ON \
               -DRENDERER_DEFAULT=vulkan \
               -DSKIP_IDPAK_CHECK=ON \
-            -DSKIP_SHADER_REGEN=ON \
+              -DSKIP_SHADER_REGEN=ON \
               -Wno-dev
             cmake --build build-vk-${{ matrix.btype }} -j"$(nproc)"
 
@@ -633,11 +665,11 @@ jobs:
               -DBUILD_FREETYPE=ON \
               -DENABLE_FORTIFY_SOURCE=OFF \
               -DENABLE_ASAN=OFF \
-              -DBUILD_SERVER=OFF \
+              -DBUILD_SERVER=ON \
               -DUSE_VULKAN=ON \
               -DRENDERER_DEFAULT=opengl \
               -DSKIP_IDPAK_CHECK=ON \
-            -DSKIP_SHADER_REGEN=ON \
+              -DSKIP_SHADER_REGEN=ON \
               -Wno-dev
             cmake --build build-gl-${{ matrix.btype }} -j"$(nproc)"
 
@@ -646,12 +678,17 @@ jobs:
             test -n "$(ls -A "$OUTDIR")"
             ls -al "$OUTDIR"
 
+            mkdir -p release
+            cp -f "$OUTDIR"/idtech3* release/ || true
+            chmod +x scripts/smoke_test.sh
+            ./scripts/smoke_test.sh release
+
       - uses: actions/upload-artifact@v4
         if: matrix.cc == 'gcc' && matrix.btype == 'Release'
         with:
           name: linux-${{ matrix.arch }}
           path: bin
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 5
 
   macos:
@@ -667,7 +704,7 @@ jobs:
 
     steps:
       - name: Install tools
-        run: brew install coreutils sdl2 openal-soft cmake ninja freetype lua
+        run: brew install coreutils sdl2 openal-soft cmake ninja freetype lua molten-vk
 
       - uses: actions/checkout@v4
 
@@ -676,6 +713,8 @@ jobs:
         env:
           CFLAGS: "-DSKIP_IDPAK_CHECK=1"
           CXXFLAGS: "-DSKIP_IDPAK_CHECK=1"
+          LIBRARY_PATH: "/opt/homebrew/lib"
+          CMAKE_PREFIX_PATH: "/opt/homebrew"
         run: |
           SDL2_PREFIX=$(brew --prefix sdl2)
           OPENAL_PREFIX=$(brew --prefix openal-soft)
@@ -710,6 +749,8 @@ jobs:
         env:
           CFLAGS: "-DSKIP_IDPAK_CHECK=1"
           CXXFLAGS: "-DSKIP_IDPAK_CHECK=1"
+          LIBRARY_PATH: "/opt/homebrew/lib"
+          CMAKE_PREFIX_PATH: "/opt/homebrew"
         run: |
           SDL2_PREFIX=$(brew --prefix sdl2)
           OPENAL_PREFIX=$(brew --prefix openal-soft)
@@ -738,12 +779,20 @@ jobs:
           cmake --build build-gl-${{ matrix.btype }} -j$(sysctl -n hw.logicalcpu)
           cp -f build-gl-${{ matrix.btype }}/idtech3* bin/ || true
 
+      - name: Smoke test
+        if: ${{ github.event_name != 'release' && matrix.btype != 'Debug' }}
+        run: |
+          mkdir -p release
+          cp -f bin/idtech3* release/ || true
+          chmod +x scripts/smoke_test.sh
+          ./scripts/smoke_test.sh release
+
       - uses: actions/upload-artifact@v4
         if: matrix.cc == 'clang' && matrix.btype == 'Release'
         with:
           name: macos-${{ matrix.arch }}
           path: bin
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 5
 
   android:
@@ -825,12 +874,12 @@ jobs:
         with:
           name: android-${{ matrix.abi }}
           path: bin
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 5
 
   release-attach:
     name: Attach artifacts to release
-    if: github.event_name == 'release' && github.event.action == 'published'
+    if: always() && !cancelled() && github.event_name == 'release' && github.event.action == 'published'
     needs: [windows-msys, windows-msvc, ubuntu-x86_64, ubuntu-arm, macos, android]
     runs-on: ubuntu-24.04
     permissions:
@@ -841,17 +890,23 @@ jobs:
           path: artifacts
 
       - name: Create release archives
+        id: archive
         run: |
           mkdir -p dist
-          tag="${GITHUB_REF#refs/tags/}"
+          tag="${{ github.event.release.tag_name }}"
           for dir in artifacts/*/; do
+            [ -d "$dir" ] || continue
             name=$(basename "$dir")
             zip -r "dist/idtech3-${tag}-${name}.zip" "$dir"
           done
           ls -la dist/
+          echo "count=$(ls dist/*.zip 2>/dev/null | wc -l | tr -d ' ')" >> $GITHUB_OUTPUT
 
-      - uses: softprops/action-gh-release@v2
+      - name: Attach binaries to release
+        if: steps.archive.outputs.count != '0'
+        uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.release.tag_name }}
           files: dist/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

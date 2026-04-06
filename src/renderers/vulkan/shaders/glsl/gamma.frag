@@ -9,40 +9,39 @@ layout(set = 2, binding = 0) uniform PostFXParams {
 	vec4 motionBlur;   /* enabled, strength, samples, maxRadius */
 	vec4 depthOfField; /* enabled, aperture, focusDistance, focusRange */
 	vec4 frameInfo;    /* dofMaxBlur, texelSize.x, texelSize.y, motionValid */
-	vec2 depthParams;  /* zNear, zFar */
+	vec4 depthParams;  /* zNear, zFar */
+	vec4 toneMapParams0;   /* toe, shoulder, whitePoint, blackClip */
+	vec4 toneMapParams1;   /* highlightDesat, contrast, contrastPivot, legacyTonemapMode */
+	vec4 colorBalance;     /* temperature, tint, exposureBias, preExposureScale */
+	vec4 colorGrade;       /* saturation, vibrance, legacyContrast, legacySaturation */
+	vec4 shadowsLift;      /* rgb lift */
+	vec4 midsGamma;        /* rgb gamma */
+	vec4 highlightsGain;   /* rgb gain */
+	vec4 splitShadow;      /* rgb tint, balance */
+	vec4 splitHighlight;   /* rgb tint, strength */
+	vec4 lensEffects0;     /* vignette, vignetteRadius, chromaticAberration, filmGrain */
+	vec4 lensEffects1;     /* outlineStrength, outlineThreshold, filmLook, sharpen */
+	vec4 runtimeFlags;     /* greyscale, dither, postDebug, postEnabled */
+	vec4 lutParams;        /* lutIntensity, lutEnabled, lutStripDim, invGamma */
+	vec4 autoExposureParams; /* avgLogLum, targetLum, minExposure, maxExposure */
+	vec4 localExposureParams; /* enabled, strength, shadowClampEV, highlightClampEV */
+	vec4 taaParams;        /* validHistory, stationaryFeedback, motionFeedback, sharpen */
 } postfx;
+layout(set = 3, binding = 0) uniform sampler2D lutTexture;
 
 layout(location = 0) in vec2 frag_tex_coord;
 
 layout(location = 0) out vec4 out_color;
 
-layout(constant_id = 0) const float gamma = 1.0;
-layout(constant_id = 1) const float preExposureScale = 1.0;
-layout(constant_id = 2) const float greyscale = 0.0;
 layout(constant_id = 3) const float bloom_threshold = 0.6;
 layout(constant_id = 4) const float bloom_intensity = 0.5;
 layout(constant_id = 5) const int bloom_threshold_mode = 0;
 layout(constant_id = 6) const int bloom_modulate = 0;
-layout(constant_id = 7) const int ditherMode = 0;
 layout(constant_id = 8) const int depth_r = 255;
 layout(constant_id = 9) const int depth_g = 255;
 layout(constant_id = 10) const int depth_b = 255;
-layout(constant_id = 11) const float exposure = 1.0;  /* spec constant; paniniPC.exposure used at runtime */
 layout(constant_id = 12) const float bloom_knee = 0.5;
-layout(constant_id = 13) const int tonemap_mode = 2;
 layout(constant_id = 14) const int apply_srgb_gamma = 0;
-layout(constant_id = 15) const int post_debug = 0;
-layout(constant_id = 16) const float vignette_intensity = 0.0;
-layout(constant_id = 17) const float vignette_radius = 0.75;
-layout(constant_id = 18) const float chromatic_aberration = 0.0;
-layout(constant_id = 19) const float film_grain = 0.0;
-layout(constant_id = 20) const int postprocess_enabled = 1;
-layout(constant_id = 21) const float outline_strength = 0.0;
-layout(constant_id = 22) const float outline_threshold = 0.15;
-layout(constant_id = 23) const int film_look = 0;
-layout(constant_id = 24) const float post_contrast = 1.0;
-layout(constant_id = 25) const float post_saturation = 1.0;
-layout(constant_id = 26) const float sharpen_strength = 0.0;
 
 layout(push_constant) uniform PaniniPC {
 	float paniniAmount;
@@ -91,6 +90,32 @@ vec3 dither( vec3 color ) {
 	return dithered / depth;
 }
 
+float postPreExposureScale( void ) { return max( postfx.colorBalance.w, 0.001 ); }
+float postGreyscale( void ) { return postfx.runtimeFlags.x; }
+int postDitherMode( void ) { return int( floor( postfx.runtimeFlags.y + 0.5 ) ); }
+int postDebugMode( void ) { return int( floor( postfx.runtimeFlags.z + 0.5 ) ); }
+bool postEnabled( void ) { return postfx.runtimeFlags.w > 0.5; }
+int postTonemapMode( void ) { return int( floor( postfx.toneMapParams1.w + 0.5 ) ); }
+float postContrast( void ) { return max( postfx.toneMapParams1.y, 0.0 ); }
+float postContrastPivot( void ) { return clamp( postfx.toneMapParams1.z, 0.0, 1.0 ); }
+float postLegacyContrast( void ) { return max( postfx.colorGrade.z, 0.0 ); }
+float postSaturation( void ) { return max( postfx.colorGrade.x, 0.0 ) * max( postfx.colorGrade.w, 0.0 ); }
+float postVibrance( void ) { return clamp( postfx.colorGrade.y, -1.0, 1.0 ); }
+float postInvGamma( void ) { return max( postfx.lutParams.w, 1e-6 ); }
+float postVignetteIntensity( void ) { return max( postfx.lensEffects0.x, 0.0 ); }
+float postVignetteRadius( void ) { return max( postfx.lensEffects0.y, 0.0 ); }
+float postChromaticAberration( void ) { return max( postfx.lensEffects0.z, 0.0 ); }
+float postFilmGrain( void ) { return max( postfx.lensEffects0.w, 0.0 ); }
+float postOutlineStrength( void ) { return max( postfx.lensEffects1.x, 0.0 ); }
+float postOutlineThreshold( void ) { return max( postfx.lensEffects1.y, 0.0 ); }
+int postFilmLook( void ) { return int( floor( postfx.lensEffects1.z + 0.5 ) ); }
+float postSharpenStrength( void ) { return max( postfx.lensEffects1.w, 0.0 ); }
+float postAvgLogLum( void ) { return postfx.autoExposureParams.x; }
+bool postLocalExposureEnabled( void ) { return postfx.localExposureParams.x > 0.5; }
+float postLocalExposureStrength( void ) { return clamp( postfx.localExposureParams.y, 0.0, 1.0 ); }
+float postLocalExposureShadowClamp( void ) { return max( postfx.localExposureParams.z, 0.0 ); }
+float postLocalExposureHighlightClamp( void ) { return max( postfx.localExposureParams.w, 0.0 ); }
+
 vec3 ACESFilm( vec3 x ) {
 	const float a = 2.51;
 	const float b = 0.03;
@@ -104,19 +129,30 @@ vec3 Tonemap_Reinhard( vec3 x ) {
 	return x / ( x + vec3( 1.0 ) );
 }
 
-/* Filmic tonemap — preserves saturation better than ACES.
-   Based on John Hable's Uncharted 2 curve with tuned parameters. */
+float FilmicLuminanceCurve( float x, float toe, float shoulder, float whitePoint ) {
+	float safeWhite = max( whitePoint, 1e-4 );
+	float t = max( x / safeWhite, 0.0 );
+	float toePow = mix( 1.0, 2.4, clamp( toe, 0.0, 1.0 ) );
+	float shoulderStrength = mix( 0.45, 2.6, clamp( shoulder, 0.0, 1.0 ) );
+	float mapped = pow( t, toePow );
+	float normalizedWhite = 1.0 / ( 1.0 + shoulderStrength );
+	return clamp( ( mapped / ( mapped + shoulderStrength ) ) / normalizedWhite, 0.0, 1.0 );
+}
+
 vec3 Tonemap_Filmic( vec3 x ) {
-	const float A = 0.22;  /* shoulder strength */
-	const float B = 0.30;  /* linear strength */
-	const float C = 0.10;  /* linear angle */
-	const float D = 0.20;  /* toe strength */
-	const float E = 0.01;  /* toe numerator */
-	const float F = 0.30;  /* toe denominator */
-	vec3 mapped = ((x*(A*x+C*B)+D*E)/(x*(A*x+B)+D*F))-E/F;
-	const float W = 11.2;  /* linear white point */
-	float whiteScale = 1.0 / (((W*(A*W+C*B)+D*E)/(W*(A*W+B)+D*F))-E/F);
-	return clamp( mapped * whiteScale, 0.0, 1.0 );
+	float lum = max( dot( x, sRGB ), 1e-6 );
+	float blackClip = max( postfx.toneMapParams0.w, 0.0 );
+	float toe = clamp( postfx.toneMapParams0.x, 0.0, 1.0 );
+	float shoulder = clamp( postfx.toneMapParams0.y, 0.0, 1.0 );
+	float whitePoint = max( postfx.toneMapParams0.z, 0.5 );
+	float highlightDesat = clamp( postfx.toneMapParams1.x, 0.0, 1.0 );
+	float clippedLum = max( lum - blackClip, 0.0 );
+	float mappedLum = FilmicLuminanceCurve( clippedLum, toe, shoulder, whitePoint );
+	float scale = mappedLum / lum;
+	vec3 mapped = clamp( x * scale, 0.0, 1.0 );
+	float compression = clamp( 1.0 - mappedLum / max( clippedLum, 1e-5 ), 0.0, 1.0 );
+	float desat = compression * highlightDesat;
+	return mix( mapped, vec3( dot( mapped, sRGB ) ), desat );
 }
 
 /* AgX-inspired tonemap — punchy, saturated, modern look.
@@ -132,7 +168,7 @@ vec3 Tonemap_AgX( vec3 x ) {
 }
 
 vec3 linearToDisplay( vec3 x ) {
-	return pow( max( x, vec3( 0.0 ) ), vec3( max( gamma, 1e-6 ) ) );
+	return pow( max( x, vec3( 0.0 ) ), vec3( postInvGamma() ) );
 }
 
 vec3 sanitizeHdr( vec3 hdr ) {
@@ -152,6 +188,106 @@ vec3 applyBloomKnee( vec3 color ) {
 	float brightest = max( max( color.r, color.g ), color.b );
 	float factor = smoothstep( knee, knee + 0.5, brightest );
 	return mix( color, color * (1.0 - factor * 0.5), factor );
+}
+
+vec3 applyWhiteBalance( vec3 color ) {
+	float temperature = clamp( postfx.colorBalance.x, -1.0, 1.0 );
+	float tint = clamp( postfx.colorBalance.y, -1.0, 1.0 );
+	vec3 balance = vec3(
+		1.0 + temperature * 0.12 - tint * 0.02,
+		1.0 + tint * 0.10,
+		1.0 - temperature * 0.12 - tint * 0.02 );
+	return max( color * balance, vec3( 0.0 ) );
+}
+
+float sampleHdrLogLum( vec2 uv ) {
+	vec3 sampleHdr = applyWhiteBalance( sanitizeHdr( textureLod( texture0, clamp( uv, 0.0, 1.0 ), 0.0 ).rgb ) );
+	return log2( max( dot( sampleHdr, sRGB ), 1e-4 ) );
+}
+
+vec3 applyLocalExposure( vec2 uv, vec3 hdr ) {
+	if ( !postLocalExposureEnabled() || postLocalExposureStrength() <= 0.0 ) {
+		return hdr;
+	}
+
+	vec2 texel = postfx.frameInfo.yz;
+	vec2 nearOffset = texel * 6.0;
+	vec2 farOffset = texel * 14.0;
+	float localLogLum = sampleHdrLogLum( uv ) * 0.34;
+	localLogLum += sampleHdrLogLum( uv + vec2( nearOffset.x, 0.0 ) ) * 0.14;
+	localLogLum += sampleHdrLogLum( uv - vec2( nearOffset.x, 0.0 ) ) * 0.14;
+	localLogLum += sampleHdrLogLum( uv + vec2( 0.0, nearOffset.y ) ) * 0.14;
+	localLogLum += sampleHdrLogLum( uv - vec2( 0.0, nearOffset.y ) ) * 0.14;
+	localLogLum += sampleHdrLogLum( uv + farOffset ) * 0.06;
+	localLogLum += sampleHdrLogLum( uv - farOffset ) * 0.06;
+	localLogLum += sampleHdrLogLum( uv + vec2( farOffset.x, -farOffset.y ) ) * 0.06;
+	localLogLum += sampleHdrLogLum( uv + vec2( -farOffset.x, farOffset.y ) ) * 0.06;
+
+	float deltaEv = ( postAvgLogLum() - localLogLum ) * postLocalExposureStrength();
+	deltaEv = clamp( deltaEv, -postLocalExposureHighlightClamp(), postLocalExposureShadowClamp() );
+	return hdr * exp2( deltaEv );
+}
+
+vec3 applyLiftGammaGain( vec3 ldr ) {
+	float lum = dot( ldr, sRGB );
+	float shadowMask = 1.0 - smoothstep( 0.12, 0.45, lum );
+	float highlightMask = smoothstep( 0.45, 0.88, lum );
+	float midMask = max( 0.0, 1.0 - shadowMask - highlightMask );
+	vec3 lifted = clamp( ldr + postfx.shadowsLift.rgb * shadowMask, 0.0, 1.0 );
+	vec3 gammaAdjusted = pow( max( lifted, vec3( 1e-5 ) ), 1.0 / max( postfx.midsGamma.rgb, vec3( 1e-3 ) ) );
+	lifted = mix( lifted, gammaAdjusted, midMask );
+	lifted *= mix( vec3( 1.0 ), max( postfx.highlightsGain.rgb, vec3( 0.0 ) ), highlightMask );
+	return clamp( lifted, 0.0, 1.0 );
+}
+
+vec3 applySplitToning( vec3 ldr ) {
+	float strength = clamp( postfx.splitHighlight.w, 0.0, 1.0 );
+	float balance = clamp( postfx.splitShadow.w, 0.0, 1.0 );
+	if ( strength <= 0.0 ) {
+		return ldr;
+	}
+
+	float lum = dot( ldr, sRGB );
+	float shadowMask = 1.0 - smoothstep( max( balance - 0.25, 0.0 ), min( balance + 0.05, 1.0 ), lum );
+	float highlightMask = smoothstep( max( balance - 0.05, 0.0 ), min( balance + 0.25, 1.0 ), lum );
+	vec3 tinted = ldr;
+	tinted = mix( tinted, tinted * postfx.splitShadow.rgb, shadowMask * strength );
+	tinted = mix( tinted, tinted * postfx.splitHighlight.rgb, highlightMask * strength );
+	return clamp( tinted, 0.0, 1.0 );
+}
+
+vec3 applyVibrance( vec3 ldr ) {
+	float vibrance = postVibrance();
+	float minC = min( min( ldr.r, ldr.g ), ldr.b );
+	float maxC = max( max( ldr.r, ldr.g ), ldr.b );
+	float sat = maxC - minC;
+	float lum = dot( ldr, sRGB );
+	float amount = vibrance * ( 1.0 - sat ) * smoothstep( 0.05, 0.95, lum );
+	return clamp( vec3( lum ) + ( 1.0 + amount ) * ( ldr - vec3( lum ) ), 0.0, 1.0 );
+}
+
+vec3 sampleLUTStrip( vec3 ldr ) {
+	float lutIntensity = clamp( postfx.lutParams.x, 0.0, 1.0 );
+	float lutEnabled = postfx.lutParams.y;
+	if ( lutIntensity <= 0.0 || lutEnabled < 0.5 ) {
+		return ldr;
+	}
+
+	vec2 size = vec2( textureSize( lutTexture, 0 ) );
+	float dim = max( size.y, 1.0 );
+	if ( abs( size.x - dim * dim ) > 0.5 ) {
+		return ldr;
+	}
+
+	vec3 coord = clamp( ldr, 0.0, 1.0 ) * ( dim - 1.0 );
+	float slice = coord.b;
+	float slice0 = floor( slice );
+	float slice1 = min( slice0 + 1.0, dim - 1.0 );
+	float frac = slice - slice0;
+	vec2 uv0 = vec2( ( coord.r + slice0 * dim + 0.5 ) / size.x, ( coord.g + 0.5 ) / size.y );
+	vec2 uv1 = vec2( ( coord.r + slice1 * dim + 0.5 ) / size.x, ( coord.g + 0.5 ) / size.y );
+	vec3 graded = mix( textureLod( lutTexture, uv0, 0.0 ).rgb, textureLod( lutTexture, uv1, 0.0 ).rgb, frac );
+	return mix( ldr, graded, lutIntensity );
 }
 
 bool finite2( vec2 v ) {
@@ -227,41 +363,48 @@ vec3 paniniInverseDir( vec2 uvOut, float d, float s, float fovYRadians, float as
 }
 
 vec3 doTonemap( vec3 value ) {
-	if ( tonemap_mode == 2 ) {
+	int tonemapMode = postTonemapMode();
+	if ( tonemapMode == 2 ) {
 		return ACESFilm( value );
-	} else if ( tonemap_mode == 1 ) {
+	} else if ( tonemapMode == 1 ) {
 		return Tonemap_Reinhard( value );
-	} else if ( tonemap_mode == 3 ) {
+	} else if ( tonemapMode == 3 ) {
 		return Tonemap_Filmic( value );
-	} else if ( tonemap_mode == 4 ) {
+	} else if ( tonemapMode == 4 ) {
 		return Tonemap_AgX( value );
 	}
 	return value;
 }
 
 vec3 applyPostColorAdjust( vec3 ldr, bool postActive ) {
-	if ( postActive && post_contrast != 1.0 ) {
-		float c = clamp( post_contrast, 0.0, 4.0 );
-		ldr = ( ldr - 0.5 ) * c + 0.5;
+	if ( postActive ) {
+		float c = clamp( postContrast() * postLegacyContrast(), 0.0, 4.0 );
+		float pivot = postContrastPivot();
+		ldr = ( ldr - pivot ) * c + pivot;
 		ldr = clamp( ldr, 0.0, 1.0 );
-	}
-
-	if ( postActive && post_saturation != 1.0 ) {
-		float sat = clamp( post_saturation, 0.0, 3.0 );
+		ldr = applyVibrance( ldr );
+		float sat = clamp( postSaturation(), 0.0, 3.0 );
 		float lum = dot( ldr, sRGB );
 		ldr = clamp( vec3( lum ) + sat * ( ldr - vec3( lum ) ), 0.0, 1.0 );
+		ldr = applyLiftGammaGain( ldr );
+		ldr = applySplitToning( ldr );
+		ldr = sampleLUTStrip( ldr );
 	}
 
 	return ldr;
 }
 
 vec3 samplePostLdr( vec2 uv, bool postActive ) {
-	vec3 sampleHdr = sanitizeHdr( textureLod( texture0, uv, 0.0 ).rgb );
+	vec3 sampleHdr = applyWhiteBalance( sanitizeHdr( textureLod( texture0, uv, 0.0 ).rgb ) );
+	if ( postActive ) {
+		sampleHdr = applyLocalExposure( uv, sampleHdr );
+	}
 	vec3 sampleExposed = sampleHdr * max( paniniPC.brightness, 0.0 );
 
 	if ( postActive ) {
-		sampleExposed *= max( paniniPC.exposure, 0.01 );
-		sampleExposed *= preExposureScale;
+		float exposureScale = exp2( postfx.colorBalance.z );
+		sampleExposed *= max( paniniPC.exposure * exposureScale, 0.01 );
+		sampleExposed *= postPreExposureScale();
 		sampleExposed = applyBloomKnee( sampleExposed );
 		sampleExposed = doTonemap( sampleExposed );
 	}
@@ -350,8 +493,8 @@ void main() {
 	float paniniAmount = clamp( paniniPC.paniniAmount, 0.0, 1.0 );
 	int borderMode = int( clamp( floor( paniniPC.paniniBorderMode + 0.5 ), 0.0, 1.0 ) );
 	int paniniDebug = int( clamp( floor( paniniPC.paniniDebugMode + 0.5 ), 0.0, 1.0 ) );
-	int debugMode = post_debug;
-	bool debugInverse = ( postprocess_enabled != 0 ) && ( debugMode == 97 || debugMode == 98 || debugMode == 99 );
+	int debugMode = postDebugMode();
+	bool debugInverse = postEnabled() && ( debugMode == 97 || debugMode == 98 || debugMode == 99 );
 	bool doPaniniPath = paniniAmount > 0.0001 || debugInverse;
 	vec2 uvLogical = uv;
 
@@ -413,13 +556,17 @@ void main() {
 	}
 
 	uv = to_src_uv( uvLogical );
-	vec3 hdr = sanitizeHdr( textureLod( texture0, uv, 0.0 ).rgb );
+	vec3 hdr = applyWhiteBalance( sanitizeHdr( textureLod( texture0, uv, 0.0 ).rgb ) );
 	bool noWorldLdr = paniniPC.paniniPad1 > 0.5;
-	bool postActive = postprocess_enabled != 0 && !noWorldLdr;
+	bool postActive = postEnabled() && !noWorldLdr;
+	if ( postActive ) {
+		hdr = applyLocalExposure( uv, hdr );
+	}
 	vec3 hdr_exposed = hdr * max( paniniPC.brightness, 0.0 );
 	if ( postActive ) {
-		hdr_exposed *= max( paniniPC.exposure, 0.01 );
-		hdr_exposed *= preExposureScale;
+		float exposureScale = exp2( postfx.colorBalance.z );
+		hdr_exposed *= max( paniniPC.exposure * exposureScale, 0.01 );
+		hdr_exposed *= postPreExposureScale();
 		hdr_exposed = applyBloomKnee( hdr_exposed );
 	}
 
@@ -429,8 +576,8 @@ void main() {
 	}
 
 	vec3 ldr;
-	if ( postActive && post_debug != 0 ) {
-		if ( post_debug == 1 ) {
+	if ( postActive && debugMode != 0 ) {
+		if ( debugMode == 1 ) {
 			ldr = clamp( hdr_exposed, 0.0, 10.0 ) * 0.1;
 		} else {
 			float lum = max( max( hdr_exposed.r, hdr_exposed.g ), hdr_exposed.b );
@@ -441,7 +588,7 @@ void main() {
 	} else {
 		ldr = applyPostColorAdjust( clamp( tonemapped, 0.0, 1.0 ), postActive );
 
-		if ( postActive && sharpen_strength > 0.0 ) {
+		if ( postActive && postSharpenStrength() > 0.0 ) {
 			vec2 texel = 1.0 / vec2( textureSize( texture0, 0 ) );
 			vec3 ldrL = samplePostLdr( clamp( uv + vec2( -texel.x, 0.0 ), 0.0, 1.0 ), postActive );
 			vec3 ldrR = samplePostLdr( clamp( uv + vec2(  texel.x, 0.0 ), 0.0, 1.0 ), postActive );
@@ -450,7 +597,7 @@ void main() {
 			vec3 blur = ( ldrL + ldrR + ldrU + ldrD ) * 0.25;
 			float edge = max( dot( ldr, sRGB ) - dot( blur, sRGB ), 0.0 );
 			float adaptive = smoothstep( 0.01, 0.20, edge );
-			float strength = clamp( sharpen_strength, 0.0, 1.5 ) * mix( 0.25, 1.0, adaptive );
+			float strength = clamp( postSharpenStrength(), 0.0, 1.5 ) * mix( 0.25, 1.0, adaptive );
 			vec3 localMin = min( min( ldrL, ldrR ), min( ldrU, ldrD ) );
 			vec3 localMax = max( max( ldrL, ldrR ), max( ldrU, ldrD ) );
 			vec3 localRange = max( localMax - localMin, vec3( 0.02 ) );
@@ -462,28 +609,35 @@ void main() {
 		ldr = applyMotionBlur( ldr, uv, postActive );
 		ldr = applyDepthOfField( ldr, uv, postActive );
 
-		if ( greyscale == 1.0 ) {
+		if ( postGreyscale() == 1.0 ) {
 			ldr = vec3( dot( ldr, sRGB ) );
-		} else if ( greyscale != 0.0 ) {
+		} else if ( postGreyscale() != 0.0 ) {
 			vec3 luma = vec3( dot( ldr, sRGB ) );
-			ldr = mix( ldr, luma, greyscale );
+			ldr = mix( ldr, luma, postGreyscale() );
 		}
-		if ( ditherMode == 1 ) {
+		if ( postDitherMode() == 1 ) {
 			ldr = dither( ldr );
 		}
 	}
 
-	if ( chromatic_aberration > 0.0 && postActive ) {
+	if ( postChromaticAberration() > 0.0 && postActive ) {
 		vec2 caUV = uvLogical;
-		vec2 caOffset = (caUV - 0.5) * chromatic_aberration * 0.01;
-		vec2 srcR = to_src_uv( caUV + caOffset );
-		vec2 srcB = to_src_uv( caUV - caOffset );
-		vec3 caHdr;
-		caHdr.r = textureLod( texture0, srcR, 0.0 ).r;
-		caHdr.g = ldr.g;
-		caHdr.b = textureLod( texture0, srcB, 0.0 ).b;
-		caHdr.r *= max( paniniPC.brightness, 0.0 ) * max( paniniPC.exposure, 0.01 ) * preExposureScale;
-		caHdr.b *= max( paniniPC.brightness, 0.0 ) * max( paniniPC.exposure, 0.01 ) * preExposureScale;
+		float exposureScale = exp2( postfx.colorBalance.z );
+		vec2 caOffset = (caUV - 0.5) * postChromaticAberration() * 0.01;
+			vec2 srcR = to_src_uv( caUV + caOffset );
+			vec2 srcB = to_src_uv( caUV - caOffset );
+			vec3 caHdr;
+			caHdr.r = applyWhiteBalance( textureLod( texture0, srcR, 0.0 ).rgb ).r;
+			caHdr.g = ldr.g;
+			caHdr.b = applyWhiteBalance( textureLod( texture0, srcB, 0.0 ).rgb ).b;
+			if ( postLocalExposureEnabled() ) {
+				caHdr.r *= exp2( clamp( ( postAvgLogLum() - sampleHdrLogLum( srcR ) ) * postLocalExposureStrength(),
+					-postLocalExposureHighlightClamp(), postLocalExposureShadowClamp() ) );
+				caHdr.b *= exp2( clamp( ( postAvgLogLum() - sampleHdrLogLum( srcB ) ) * postLocalExposureStrength(),
+					-postLocalExposureHighlightClamp(), postLocalExposureShadowClamp() ) );
+			}
+			caHdr.r *= max( paniniPC.brightness, 0.0 ) * max( paniniPC.exposure * exposureScale, 0.01 ) * postPreExposureScale();
+			caHdr.b *= max( paniniPC.brightness, 0.0 ) * max( paniniPC.exposure * exposureScale, 0.01 ) * postPreExposureScale();
 		vec3 caTone;
 		caTone.r = doTonemap( vec3( caHdr.r ) ).r;
 		caTone.g = ldr.g;
@@ -491,7 +645,7 @@ void main() {
 		ldr = clamp( caTone, 0.0, 1.0 );
 	}
 
-	if ( outline_strength > 0.0 && postActive ) {
+	if ( postOutlineStrength() > 0.0 && postActive ) {
 		vec2 outlineTexel = 1.0 / vec2( textureSize( texture0, 0 ) );
 		float lumC  = dot( textureLod( texture0, uv, 0.0 ).rgb, vec3(0.299, 0.587, 0.114) );
 		float lumL  = dot( textureLod( texture0, uv + vec2(-outlineTexel.x, 0.0), 0.0 ).rgb, vec3(0.299, 0.587, 0.114) );
@@ -501,21 +655,21 @@ void main() {
 		float edgeH = abs( lumL - lumR );
 		float edgeV = abs( lumU - lumD );
 		float edge  = sqrt( edgeH * edgeH + edgeV * edgeV );
-		float outlineMask = smoothstep( outline_threshold * 0.5, outline_threshold, edge );
-		ldr = mix( ldr, vec3(0.0), outlineMask * outline_strength );
+		float outlineMask = smoothstep( postOutlineThreshold() * 0.5, postOutlineThreshold(), edge );
+		ldr = mix( ldr, vec3(0.0), outlineMask * postOutlineStrength() );
 	}
 
-	if ( vignette_intensity > 0.0 && postActive ) {
+	if ( postVignetteIntensity() > 0.0 && postActive ) {
 		vec2 vigUV = uvLogical * 2.0 - 1.0;
 		float vigDist = length( vigUV );
-		float vig = 1.0 - smoothstep( vignette_radius, vignette_radius + 0.5, vigDist );
-		vig = mix( 1.0, vig, vignette_intensity );
+		float vig = 1.0 - smoothstep( postVignetteRadius(), postVignetteRadius() + 0.5, vigDist );
+		vig = mix( 1.0, vig, postVignetteIntensity() );
 		ldr *= vig;
 	}
 
 	/* Film grain: film_look = Source-style (luminance-dependent, soft-light);
 	   else film_grain = simple additive. */
-	if ( film_look != 0 && film_grain > 0.0 && postActive ) {
+	if ( postFilmLook() != 0 && postFilmGrain() > 0.0 && postActive ) {
 		/* Source Engine–style film grain (DoD:S, L4D): luminance-dependent, fine-grained,
 		   soft-light blend. Grain peaks in mid-tones, fades in shadows/highlights.
 		   r_filmGrain scales intensity (0.5–1.5x) when film_look is on. */
@@ -531,7 +685,7 @@ void main() {
 		float lum = dot( ldr, sRGB );
 		float midTone = lum * ( 1.0 - lum ) * 4.0;  /* 0 at 0/1, max 1 at 0.5 */
 		float lumMask = smoothstep( 0.0, 0.06, lum ) * smoothstep( 1.0, 0.35, lum );
-		float intensity = clamp( film_grain, 0.0, 1.0 );
+		float intensity = clamp( postFilmGrain(), 0.0, 1.0 );
 		float grainStrength = 0.12 * intensity * midTone * lumMask;
 		/* Soft-light blend: blend = 0.5 + grain, so 0.5 = neutral */
 		vec3 blend = vec3( 0.5 + grainRaw * grainStrength );
@@ -547,11 +701,11 @@ void main() {
 			? ( 2.0 * base.b * blend.b + base.b * base.b * ( 1.0 - 2.0 * blend.b ) )
 			: ( sqrt( base.b ) * ( 2.0 * blend.b - 1.0 ) + 2.0 * base.b * ( 1.0 - blend.b ) );
 		ldr = clamp( result, 0.0, 1.0 );
-	} else if ( film_grain > 0.0 && postActive ) {
+	} else if ( postFilmGrain() > 0.0 && postActive ) {
 		/* Simple additive grain when film_look is off */
 		float t = paniniPC.paniniPad0;
 		float grainSeed = fract( sin( dot( gl_FragCoord.xy + vec2( t * 173.0, t * 79.0 ), vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
-		float grain = ( grainSeed - 0.5 ) * film_grain * 0.1;
+		float grain = ( grainSeed - 0.5 ) * postFilmGrain() * 0.1;
 		ldr += grain;
 		ldr = clamp( ldr, 0.0, 1.0 );
 	}

@@ -45,7 +45,9 @@ glstate_t	glState;
 glstatic_t	gls;
 
 #ifdef USE_VULKAN
+#include "vk_device.h"
 static void VkInfo_f( void );
+static void VulkanInfo_f( void );
 static void VkVolumetricValidate_f( void );
 #endif
 static void GfxInfo( void );
@@ -107,6 +109,9 @@ cvar_t	*r_pbr_debug;
 cvar_t	*r_pbr_packedPreferred;
 cvar_t	*r_pbr_multiScatter;
 cvar_t	*r_pbr_multiScatterStrength;
+cvar_t	*r_pbr_fresnelRoughness;
+cvar_t	*r_pbr_specularAA;
+cvar_t	*r_pbr_specularAAStrength;
 cvar_t	*r_glint;
 cvar_t	*r_glintMode;
 cvar_t	*r_glintDensity;
@@ -136,6 +141,7 @@ cvar_t	*r_deluxeSpecular;
 #endif
 #endif
 cvar_t   *r_vk_pipeline_debug;
+cvar_t	*r_vk_colorWriteMaskDynamic;
 cvar_t	*r_morph;
 cvar_t	*r_morphMaxActive;
 cvar_t	*r_morphLodStart;
@@ -178,6 +184,10 @@ cvar_t	*r_smaa_threshold;
 cvar_t	*r_smaa_local_contrast;
 cvar_t	*r_smaa_max_search_steps;
 cvar_t	*r_smaa_corner_rounding;
+cvar_t	*r_taa;
+cvar_t	*r_taa_feedbackStationary;
+cvar_t	*r_taa_feedbackMotion;
+cvar_t	*r_taa_sharpen;
 cvar_t	*r_rtx;
 
 #endif // USE_VULKAN
@@ -214,6 +224,7 @@ cvar_t	*r_ignoreGLErrors;
 cvar_t	*r_texturebits;
 cvar_t	*r_ext_multisample;
 cvar_t	*r_msaa_sample_shading;
+cvar_t	*r_msaa_sample_shading_rate;
 cvar_t	*r_ext_alpha_to_coverage;
 
 cvar_t	*r_drawBuffer;
@@ -255,6 +266,7 @@ cvar_t	*r_lightmap_srgb_decode;
 cvar_t	*r_pre_exposure_scale;
 cvar_t	*r_exposure_auto;
 cvar_t	*r_tonemap;
+cvar_t	*r_rpi_profile;
 cvar_t	*r_volumetricFog;
 cvar_t	*r_volumetricFogDensity;
 cvar_t	*r_volumetricFogHeightFalloff;
@@ -1680,6 +1692,49 @@ static void VkInfo_f( void )
 	ri.Printf(PRINT_ALL, "image chunks: %i\n", vk_world.num_image_chunks );
 }
 
+static void VulkanInfo_f( void )
+{
+	VkPhysicalDeviceProperties props;
+	char driver_version[64];
+
+	if ( !vk.physical_device ) {
+		ri.Printf( PRINT_ALL, "Vulkan not initialized.\n" );
+		return;
+	}
+
+	qvkGetPhysicalDeviceProperties( vk.physical_device, &props );
+
+	/* Decode driver version (vendor-specific encoding) */
+	switch ( props.vendorID ) {
+		case 0x10DE: /* NVIDIA */
+			Com_sprintf( driver_version, sizeof( driver_version ), "%u.%u.%u.%u",
+				(props.driverVersion >> 22) & 0x3FF,
+				(props.driverVersion >> 14) & 0x0FF,
+				(props.driverVersion >> 6) & 0x0FF,
+				(props.driverVersion >> 0) & 0x03F );
+			break;
+		default:
+			Com_sprintf( driver_version, sizeof( driver_version ), "%u.%u.%u",
+				(props.driverVersion >> 22),
+				(props.driverVersion >> 12) & 0x3FF,
+				(props.driverVersion >> 0) & 0xFFF );
+			break;
+	}
+
+	ri.Printf( PRINT_ALL, "======== Vulkan Info ========\n" );
+	ri.Printf( PRINT_ALL, "Device    : %s\n", vk_device_renderer_name( &props ) );
+	ri.Printf( PRINT_ALL, "API       : %u.%u.%u\n",
+		VK_VERSION_MAJOR( props.apiVersion ),
+		VK_VERSION_MINOR( props.apiVersion ),
+		VK_VERSION_PATCH( props.apiVersion ) );
+	ri.Printf( PRINT_ALL, "Driver    : %s\n", driver_version );
+	ri.Printf( PRINT_ALL, "Vendor ID : 0x%04X\n", props.vendorID );
+	ri.Printf( PRINT_ALL, "Device ID : 0x%04X\n", props.deviceID );
+	if ( vk_device_is_v3dv( &props ) )
+		ri.Printf( PRINT_ALL, "Platform  : Raspberry Pi (V3DV)\n" );
+	ri.Printf( PRINT_ALL, "==============================\n" );
+}
+
 /*
 ===============
 R_Quality_f
@@ -1706,59 +1761,164 @@ static void R_Quality_f( void )
 
 	switch ( preset ) {
 		case 0: /* Low */
+			ri.Cvar_Set( "r_taa", "0" );
 			ri.Cvar_Set( "r_volumetricFog", "0" );
 			ri.Cvar_Set( "r_ssao", "0" );
 			ri.Cvar_Set( "r_bloom", "0" );
 			ri.Cvar_Set( "r_ext_smaa", "0" );
+			ri.Cvar_Set( "r_ext_multisample", "0" );
+			ri.Cvar_Set( "r_msaa_sample_shading", "0" );
+			ri.Cvar_Set( "r_msaa_sample_shading_rate", "0.5" );
+			ri.Cvar_Set( "r_ext_alpha_to_coverage", "0" );
+			ri.Cvar_Set( "r_ext_supersample", "0" );
 			ri.Cvar_Set( "r_ssr", "0" );
 			ri.Cvar_Set( "r_sharpen", "0.0" );
 			ri.Cvar_Set( "r_exposure_auto", "0" );
 			ri.Printf( PRINT_ALL, "[VK] Quality preset: Low (performance)\n" );
 			break;
 		case 1: /* Medium */
+			ri.Cvar_Set( "r_taa", "0" );
 			ri.Cvar_Set( "r_volumetricFog", "1" );
 			ri.Cvar_Set( "r_ssao", "1" );
 			ri.Cvar_Set( "r_bloom", "1" );
 			ri.Cvar_Set( "r_ext_smaa", "1" );
+			ri.Cvar_Set( "r_ext_multisample", "0" );
+			ri.Cvar_Set( "r_msaa_sample_shading", "0" );
+			ri.Cvar_Set( "r_msaa_sample_shading_rate", "0.5" );
+			ri.Cvar_Set( "r_ext_alpha_to_coverage", "0" );
+			ri.Cvar_Set( "r_ext_supersample", "0" );
 			ri.Cvar_Set( "r_ssr", "0" );
 			ri.Cvar_Set( "r_volumetricFogQuality", "1" );
 			ri.Cvar_Set( "r_ssaoMethod", "0" );
-			ri.Cvar_Set( "r_smaa_preset", "1" );
+			ri.Cvar_Set( "r_smaa_preset", "2" );
 			ri.Cvar_Set( "r_ssaoSamples", "12" );
 			ri.Cvar_Set( "r_sharpen", "0.0" );
 			ri.Printf( PRINT_ALL, "[VK] Quality preset: Medium\n" );
 			break;
 		case 2: /* High */
+			ri.Cvar_Set( "r_taa", "0" );
 			ri.Cvar_Set( "r_volumetricFog", "1" );
 			ri.Cvar_Set( "r_ssao", "1" );
 			ri.Cvar_Set( "r_bloom", "1" );
 			ri.Cvar_Set( "r_ext_smaa", "1" );
+			ri.Cvar_Set( "r_ext_multisample", "4" );
+			ri.Cvar_Set( "r_msaa_sample_shading", "0" );
+			ri.Cvar_Set( "r_msaa_sample_shading_rate", "0.5" );
+			ri.Cvar_Set( "r_ext_alpha_to_coverage", "1" );
+			ri.Cvar_Set( "r_ext_supersample", "0" );
 			ri.Cvar_Set( "r_ssr", "0" );
 			ri.Cvar_Set( "r_volumetricFogQuality", "2" );
 			ri.Cvar_Set( "r_ssaoMethod", "1" );
-			ri.Cvar_Set( "r_smaa_preset", "2" );
+			ri.Cvar_Set( "r_smaa_preset", "3" );
 			ri.Cvar_Set( "r_hbaoDirections", "8" );
 			ri.Cvar_Set( "r_hbaoSteps", "8" );
 			ri.Cvar_Set( "r_ssaoSamples", "16" );
 			ri.Cvar_Set( "r_sharpen", "0.15" );
-			ri.Printf( PRINT_ALL, "[VK] Quality preset: High\n" );
+			ri.Printf( PRINT_ALL, "[VK] Quality preset: High (SMAA + 4x MSAA)\n" );
 			break;
 		case 3: /* Ultra */
+			ri.Cvar_Set( "r_taa", "0" );
 			ri.Cvar_Set( "r_volumetricFog", "1" );
 			ri.Cvar_Set( "r_ssao", "1" );
 			ri.Cvar_Set( "r_bloom", "1" );
 			ri.Cvar_Set( "r_ext_smaa", "1" );
+			ri.Cvar_Set( "r_ext_multisample", "4" );
+			ri.Cvar_Set( "r_msaa_sample_shading", "1" );
+			ri.Cvar_Set( "r_msaa_sample_shading_rate", "0.5" );
+			ri.Cvar_Set( "r_ext_alpha_to_coverage", "1" );
+			ri.Cvar_Set( "r_ext_supersample", "0" );
 			ri.Cvar_Set( "r_ssr", "1" );
 			ri.Cvar_Set( "r_volumetricFogQuality", "3" );
 			ri.Cvar_Set( "r_ssaoMethod", "1" );
-			ri.Cvar_Set( "r_smaa_preset", "3" );
+			ri.Cvar_Set( "r_smaa_preset", "4" );
 			ri.Cvar_Set( "r_hbaoDirections", "16" );
 			ri.Cvar_Set( "r_hbaoSteps", "16" );
 			ri.Cvar_Set( "r_ssaoSamples", "24" );
 			ri.Cvar_Set( "r_sharpen", "0.25" );
-			ri.Printf( PRINT_ALL, "[VK] Quality preset: Ultra\n" );
+			ri.Printf( PRINT_ALL, "[VK] Quality preset: Ultra (SMAA + 4x MSAA + sample shading)\n" );
 			break;
 	}
+	ri.Printf( PRINT_ALL, "Run vid_restart for full effect.\n" );
+}
+
+/*
+===============
+R_AAQuality_f
+===============
+Prefer high-quality spatial AA paths for Vulkan: SMAA, MSAA, and optional SSAA.
+*/
+static void R_AAQuality_f( void )
+{
+	const int argc = ri.Cmd_Argc();
+	const char *arg = ( argc > 1 ) ? ri.Cmd_Argv( 1 ) : "";
+	int preset = ( arg[0] >= '0' && arg[0] <= '4' ) ? ( arg[0] - '0' ) : -1;
+
+	if ( preset < 0 ) {
+		ri.Printf( PRINT_ALL,
+			"usage: r_aaQuality <0|1|2|3|4>\n"
+			"  0 = Off        : No AA\n"
+			"  1 = SMAA       : SMAA High, no MSAA\n"
+			"  2 = Balanced   : SMAA High + 2x MSAA\n"
+			"  3 = High       : SMAA Ultra + 4x MSAA\n"
+			"  4 = Extreme    : SMAA Ultra + 4x MSAA + sample shading + SSAA\n"
+			"TAA is disabled in all presets. Run vid_restart for full effect.\n" );
+		return;
+	}
+
+	ri.Cvar_Set( "r_taa", "0" );
+
+	switch ( preset ) {
+		case 0:
+			ri.Cvar_Set( "r_ext_smaa", "0" );
+			ri.Cvar_Set( "r_ext_multisample", "0" );
+			ri.Cvar_Set( "r_msaa_sample_shading", "0" );
+			ri.Cvar_Set( "r_msaa_sample_shading_rate", "0.5" );
+			ri.Cvar_Set( "r_ext_alpha_to_coverage", "0" );
+			ri.Cvar_Set( "r_ext_supersample", "0" );
+			ri.Printf( PRINT_ALL, "[VK] AA preset: Off\n" );
+			break;
+		case 1:
+			ri.Cvar_Set( "r_ext_smaa", "1" );
+			ri.Cvar_Set( "r_smaa_preset", "3" );
+			ri.Cvar_Set( "r_ext_multisample", "0" );
+			ri.Cvar_Set( "r_msaa_sample_shading", "0" );
+			ri.Cvar_Set( "r_msaa_sample_shading_rate", "0.5" );
+			ri.Cvar_Set( "r_ext_alpha_to_coverage", "0" );
+			ri.Cvar_Set( "r_ext_supersample", "0" );
+			ri.Printf( PRINT_ALL, "[VK] AA preset: SMAA High\n" );
+			break;
+		case 2:
+			ri.Cvar_Set( "r_ext_smaa", "1" );
+			ri.Cvar_Set( "r_smaa_preset", "3" );
+			ri.Cvar_Set( "r_ext_multisample", "2" );
+			ri.Cvar_Set( "r_msaa_sample_shading", "0" );
+			ri.Cvar_Set( "r_msaa_sample_shading_rate", "0.5" );
+			ri.Cvar_Set( "r_ext_alpha_to_coverage", "1" );
+			ri.Cvar_Set( "r_ext_supersample", "0" );
+			ri.Printf( PRINT_ALL, "[VK] AA preset: SMAA High + 2x MSAA\n" );
+			break;
+		case 3:
+			ri.Cvar_Set( "r_ext_smaa", "1" );
+			ri.Cvar_Set( "r_smaa_preset", "4" );
+			ri.Cvar_Set( "r_ext_multisample", "4" );
+			ri.Cvar_Set( "r_msaa_sample_shading", "0" );
+			ri.Cvar_Set( "r_msaa_sample_shading_rate", "0.5" );
+			ri.Cvar_Set( "r_ext_alpha_to_coverage", "1" );
+			ri.Cvar_Set( "r_ext_supersample", "0" );
+			ri.Printf( PRINT_ALL, "[VK] AA preset: SMAA Ultra + 4x MSAA\n" );
+			break;
+		case 4:
+			ri.Cvar_Set( "r_ext_smaa", "1" );
+			ri.Cvar_Set( "r_smaa_preset", "4" );
+			ri.Cvar_Set( "r_ext_multisample", "4" );
+			ri.Cvar_Set( "r_msaa_sample_shading", "1" );
+			ri.Cvar_Set( "r_msaa_sample_shading_rate", "1.0" );
+			ri.Cvar_Set( "r_ext_alpha_to_coverage", "1" );
+			ri.Cvar_Set( "r_ext_supersample", "1" );
+			ri.Printf( PRINT_ALL, "[VK] AA preset: Extreme spatial AA (SMAA Ultra + 4x MSAA + SSAA)\n" );
+			break;
+	}
+
 	ri.Printf( PRINT_ALL, "Run vid_restart for full effect.\n" );
 }
 
@@ -1929,8 +2089,10 @@ static void R_Register( void )
 	ri.Cmd_AddCommand( "gfxinfo", GfxInfo_f );
 #ifdef USE_VULKAN
 	ri.Cmd_AddCommand( "vkinfo", VkInfo_f );
+	ri.Cmd_AddCommand( "vulkaninfo", VulkanInfo_f );
 	ri.Cmd_AddCommand( "vkVolumetricValidate", VkVolumetricValidate_f );
 	ri.Cmd_AddCommand( "r_quality", R_Quality_f );
+	ri.Cmd_AddCommand( "r_aaQuality", R_AAQuality_f );
 #endif
 
 	//
@@ -2066,6 +2228,18 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_pbr_multiScatterStrength, "0.0", "2.0", CV_FLOAT );
 	ri.Cvar_SetDescription( r_pbr_multiScatterStrength, "Scales specular IBL multiple-scattering compensation intensity." );
 
+	r_pbr_fresnelRoughness = ri.Cvar_Get( "r_pbr_fresnelRoughness", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbr_fresnelRoughness, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pbr_fresnelRoughness, "Enable roughness-dependent Fresnel (2025 PBR). Attenuates grazing Fresnel on rough surfaces for better energy conservation." );
+
+	r_pbr_specularAA = ri.Cvar_Get( "r_pbr_specularAA", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbr_specularAA, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pbr_specularAA, "Enable normal-variance specular anti-aliasing for Vulkan PBR materials." );
+
+	r_pbr_specularAAStrength = ri.Cvar_Get( "r_pbr_specularAAStrength", "0.5", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbr_specularAAStrength, "0.0", "2.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_pbr_specularAAStrength, "Scales roughness stabilization from normal-map variance for modern BRDF materials." );
+
 	r_baseNormalX	= ri.Cvar_Get("r_baseNormalX",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );
 	r_baseNormalY	= ri.Cvar_Get("r_baseNormalY",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );
 	r_baseParallax	= ri.Cvar_Get("r_baseParallax",		"0.05",	CVAR_ARCHIVE | CVAR_LATCH );
@@ -2099,7 +2273,7 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_mapGreyScale, "-1", "1", CV_FLOAT );
 	ri.Cvar_SetDescription(r_mapGreyScale, "Desaturate world map textures only, works independently from \\r_greyscale, negative values only desaturate lightmaps.");
 
-	r_fogTint = ri.Cvar_Get( "r_fogTint", "1 1 1", CVAR_ARCHIVE_ND );
+	r_fogTint = ri.Cvar_Get( "r_fogTint", "1.08 1.00 0.72", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_fogTint, "Legacy map fog RGB tint multiplier (3 floats). Applied at render time to non-volumetric fog." );
 
 	r_subdivisions = ri.Cvar_Get( "r_subdivisions", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
@@ -2462,12 +2636,12 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_bloomKnee, "Soft knee for the bloom extractor to control highlight rolloff." );
 	ri.Cvar_SetGroup( r_bloomKnee, CVG_RENDERER );
 
-	r_exposure = ri.Cvar_Get( "r_exposure", "0.82", CVAR_ARCHIVE_ND );
+	r_exposure = ri.Cvar_Get( "r_exposure", "1.0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_exposure, "0.01", "10.0", CV_FLOAT );
 	ri.Cvar_SetDescription( r_exposure, "Linear exposure multiplier applied before tonemapping." );
 	ri.Cvar_SetGroup( r_exposure, CVG_RENDERER );
 
-	r_hdr_lightmap_scale = ri.Cvar_Get( "r_hdr_lightmap_scale", "2.0", CVAR_ARCHIVE_ND );
+	r_hdr_lightmap_scale = ri.Cvar_Get( "r_hdr_lightmap_scale", "1.0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_hdr_lightmap_scale, "0.5", "8.0", CV_FLOAT );
 	ri.Cvar_SetDescription( r_hdr_lightmap_scale, "HDR lightmap intensity scale. 8-bit lightmaps multiplied by this for HDR-like brightness (1=normal, 2+=brighter)." );
 	ri.Cvar_SetGroup( r_hdr_lightmap_scale, CVG_RENDERER );
@@ -2482,22 +2656,80 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_pre_exposure_scale, "Pre-exposure scale for bloom/tonemap pipeline. 1.0=neutral; use for HDR pipeline tweaks." );
 	ri.Cvar_SetGroup( r_pre_exposure_scale, CVG_RENDERER );
 
-	r_exposure_auto = ri.Cvar_Get( "r_exposure_auto", "1", CVAR_ARCHIVE_ND );
-	ri.Cvar_SetDescription( r_exposure_auto, "Eye adaptation: 0=manual r_exposure, 1=temporal adaptation toward r_exposure_auto_target. Luminance pass planned." );
+	r_exposure_auto = ri.Cvar_Get( "r_exposure_auto", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_exposure_auto, "Eye adaptation: 0=manual r_exposure, 1=weighted percentile metering with temporal adaptation." );
 	ri.Cvar_SetGroup( r_exposure_auto, CVG_RENDERER );
 	{
-		cvar_t *exp_target = ri.Cvar_Get( "r_exposure_auto_target", "0.5", CVAR_ARCHIVE_ND );
+		cvar_t *exp_target = ri.Cvar_Get( "r_exposure_auto_target", "1.0", CVAR_ARCHIVE_ND );
 		cvar_t *exp_speed = ri.Cvar_Get( "r_exposure_auto_speed", "2.0", CVAR_ARCHIVE_ND );
-		cvar_t *exp_cap_cut = ri.Cvar_Get( "r_exposure_auto_cap_on_cut", "0.75", CVAR_ARCHIVE_ND );
+		cvar_t *exp_cap_cut = ri.Cvar_Get( "r_exposure_auto_cap_on_cut", "1.35", CVAR_ARCHIVE_ND );
+		cvar_t *exp_low_percent = ri.Cvar_Get( "r_autoExposure_lowPercent", "0.02", CVAR_ARCHIVE_ND );
+		cvar_t *exp_high_percent = ri.Cvar_Get( "r_autoExposure_highPercent", "0.01", CVAR_ARCHIVE_ND );
+		cvar_t *exp_center_weight = ri.Cvar_Get( "r_autoExposure_centerWeight", "0.60", CVAR_ARCHIVE_ND );
+		cvar_t *exp_speed_up = ri.Cvar_Get( "r_autoExposure_speedUp", "1.5", CVAR_ARCHIVE_ND );
+		cvar_t *exp_speed_down = ri.Cvar_Get( "r_autoExposure_speedDown", "3.0", CVAR_ARCHIVE_ND );
+		cvar_t *exp_min = ri.Cvar_Get( "r_autoExposure_min", "0.5", CVAR_ARCHIVE_ND );
+		cvar_t *exp_max = ri.Cvar_Get( "r_autoExposure_max", "4.0", CVAR_ARCHIVE_ND );
 		ri.Cvar_CheckRange( exp_cap_cut, "0.1", "2.0", CV_FLOAT );
+		ri.Cvar_CheckRange( exp_low_percent, "0.0", "0.45", CV_FLOAT );
+		ri.Cvar_CheckRange( exp_high_percent, "0.0", "0.45", CV_FLOAT );
+		ri.Cvar_CheckRange( exp_center_weight, "0.0", "1.5", CV_FLOAT );
+		ri.Cvar_CheckRange( exp_speed_up, "0.1", "10.0", CV_FLOAT );
+		ri.Cvar_CheckRange( exp_speed_down, "0.1", "10.0", CV_FLOAT );
+		ri.Cvar_CheckRange( exp_min, "0.05", "8.0", CV_FLOAT );
+		ri.Cvar_CheckRange( exp_max, "0.05", "16.0", CV_FLOAT );
 		ri.Cvar_SetDescription( exp_target, "Target exposure for eye adaptation (r_exposure_auto 1)." );
-		ri.Cvar_SetDescription( exp_speed, "Eye adaptation speed (higher = faster)." );
+		ri.Cvar_SetDescription( exp_speed, "Legacy eye adaptation speed control kept for compatibility." );
 		ri.Cvar_SetDescription( exp_cap_cut, "Max exposure on camera cut (e.g. death). Reduces blowout when view suddenly jumps to bright sky. 0=disable cap." );
+		ri.Cvar_SetDescription( exp_low_percent, "Low-end percentile discarded by auto exposure metering." );
+		ri.Cvar_SetDescription( exp_high_percent, "High-end percentile discarded by auto exposure metering." );
+		ri.Cvar_SetDescription( exp_center_weight, "Extra center bias for auto exposure metering." );
+		ri.Cvar_SetDescription( exp_speed_up, "How quickly exposure brightens when entering dark areas." );
+		ri.Cvar_SetDescription( exp_speed_down, "How quickly exposure darkens when entering bright areas." );
+		ri.Cvar_SetDescription( exp_min, "Minimum auto exposure clamp." );
+		ri.Cvar_SetDescription( exp_max, "Maximum auto exposure clamp." );
+		ri.Cvar_SetGroup( exp_low_percent, CVG_RENDERER );
+		ri.Cvar_SetGroup( exp_high_percent, CVG_RENDERER );
+		ri.Cvar_SetGroup( exp_center_weight, CVG_RENDERER );
+		ri.Cvar_SetGroup( exp_speed_up, CVG_RENDERER );
+		ri.Cvar_SetGroup( exp_speed_down, CVG_RENDERER );
+		ri.Cvar_SetGroup( exp_min, CVG_RENDERER );
+		ri.Cvar_SetGroup( exp_max, CVG_RENDERER );
+	}
+
+	{
+		cvar_t *local_exp = ri.Cvar_Get( "r_localExposure", "1", CVAR_ARCHIVE_ND );
+		cvar_t *local_exp_strength = ri.Cvar_Get( "r_localExposure_strength", "0.35", CVAR_ARCHIVE_ND );
+		cvar_t *local_exp_shadow = ri.Cvar_Get( "r_localExposure_shadowClamp", "1.5", CVAR_ARCHIVE_ND );
+		cvar_t *local_exp_highlight = ri.Cvar_Get( "r_localExposure_highlightClamp", "1.5", CVAR_ARCHIVE_ND );
+		ri.Cvar_CheckRange( local_exp, "0", "1", CV_INTEGER );
+		ri.Cvar_CheckRange( local_exp_strength, "0.0", "1.0", CV_FLOAT );
+		ri.Cvar_CheckRange( local_exp_shadow, "0.0", "3.0", CV_FLOAT );
+		ri.Cvar_CheckRange( local_exp_highlight, "0.0", "3.0", CV_FLOAT );
+		ri.Cvar_SetDescription( local_exp, "Local exposure compensation in the Vulkan tonemap pass." );
+		ri.Cvar_SetDescription( local_exp_strength, "Strength of local exposure compensation." );
+		ri.Cvar_SetDescription( local_exp_shadow, "Maximum brightening in EV for dark local regions." );
+		ri.Cvar_SetDescription( local_exp_highlight, "Maximum darkening in EV for bright local regions." );
+		ri.Cvar_SetGroup( local_exp, CVG_RENDERER );
+		ri.Cvar_SetGroup( local_exp_strength, CVG_RENDERER );
+		ri.Cvar_SetGroup( local_exp_shadow, CVG_RENDERER );
+		ri.Cvar_SetGroup( local_exp_highlight, CVG_RENDERER );
+	}
+
+	{
+		cvar_t *bloom_scatter = ri.Cvar_Get( "r_bloom_scatter", "0.72", CVAR_ARCHIVE_ND );
+		cvar_t *bloom_energy = ri.Cvar_Get( "r_bloom_energyPreserve", "1", CVAR_ARCHIVE_ND );
+		ri.Cvar_CheckRange( bloom_scatter, "0.1", "1.0", CV_FLOAT );
+		ri.Cvar_CheckRange( bloom_energy, "0", "1", CV_INTEGER );
+		ri.Cvar_SetDescription( bloom_scatter, "Bloom falloff between mip levels. Lower values keep the glow tighter." );
+		ri.Cvar_SetDescription( bloom_energy, "Normalize bloom mip weights to keep highlight energy more stable." );
+		ri.Cvar_SetGroup( bloom_scatter, CVG_RENDERER );
+		ri.Cvar_SetGroup( bloom_energy, CVG_RENDERER );
 	}
 
 	r_tonemap = ri.Cvar_Get( "r_tonemap", "3", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_tonemap, "0", "4", CV_INTEGER );
-	ri.Cvar_SetDescription( r_tonemap, "Tonemapping: 0=off, 1=Reinhard, 2=ACES, 3=Filmic (Hable/Uncharted2), 4=AgX (punchy, saturated)." );
+	ri.Cvar_SetDescription( r_tonemap, "Tonemapping: 0=off, 1=Reinhard, 2=ACES, 3=Filmic (Hable/Uncharted2, default), 4=AgX (punchy, saturated)." );
 	ri.Cvar_SetGroup( r_tonemap, CVG_RENDERER );
 
 	r_post = ri.Cvar_Get( "r_post", "1", CVAR_ARCHIVE_ND );
@@ -2521,7 +2753,12 @@ static void R_Register( void )
 		ri.Cvar_SetGroup( r_post_saturation, CVG_RENDERER );
 	}
 
-	r_volumetricFog = ri.Cvar_Get( "r_volumetricFog", "1", CVAR_ARCHIVE_ND );
+	r_rpi_profile = ri.Cvar_Get( "r_rpi_profile", "0", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_rpi_profile, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_rpi_profile, "Raspberry Pi (V3DV) performance preset. When 1, disables SSAO, volumetric fog, bloom, SMAA, SSR, fog fluid at Vulkan init. Requires vid_restart." );
+	ri.Cvar_SetGroup( r_rpi_profile, CVG_RENDERER );
+
+	r_volumetricFog = ri.Cvar_Get( "r_volumetricFog", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_volumetricFog, "Enable the volumetric fog compute/composite passes before tonemapping. Requires r_fbo 1." );
 	ri.Cvar_SetGroup( r_volumetricFog, CVG_RENDERER );
 
@@ -2540,7 +2777,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_volumetricFogAlbedo, "Single-scatter albedo (0=absorbing, 1=fully scattering). Controls scatter vs absorption ratio." );
 	ri.Cvar_SetGroup( r_volumetricFogAlbedo, CVG_RENDERER );
 
-	r_volumetricFogExtinctionScale = ri.Cvar_Get( "r_volumetricFogExtinctionScale", "1.0", CVAR_ARCHIVE_ND );
+	r_volumetricFogExtinctionScale = ri.Cvar_Get( "r_volumetricFogExtinctionScale", "0.65", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogExtinctionScale, "0.1", "10", CV_FLOAT );
 	ri.Cvar_SetDescription( r_volumetricFogExtinctionScale, "Scale for extinction coefficient. Multiplies density for beam attenuation." );
 	ri.Cvar_SetGroup( r_volumetricFogExtinctionScale, CVG_RENDERER );
@@ -2650,7 +2887,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_volumetricFogJitter, "Introduces sub-pixel jitter to the fog raymarch samples." );
 	ri.Cvar_SetGroup( r_volumetricFogJitter, CVG_RENDERER );
 
-	r_volumetricFogTemporalWeight = ri.Cvar_Get( "r_volumetricFogTemporalWeight", "0.85", CVAR_ARCHIVE_ND );
+	r_volumetricFogTemporalWeight = ri.Cvar_Get( "r_volumetricFogTemporalWeight", "0.72", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogTemporalWeight, "0", "1", CV_FLOAT );
 	ri.Cvar_SetDescription( r_volumetricFogTemporalWeight, "History blend weight for temporal reprojection (0 = no history)." );
 	ri.Cvar_SetGroup( r_volumetricFogTemporalWeight, CVG_RENDERER );
@@ -2670,12 +2907,12 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_volumetricFogFireflyClamp, "Optional luminance clamp used to suppress temporal fireflies (0 disables)." );
 	ri.Cvar_SetGroup( r_volumetricFogFireflyClamp, CVG_RENDERER );
 
-	r_volumetricFogColorMode = ri.Cvar_Get( "r_volumetricFogColorMode", "0", CVAR_ARCHIVE_ND );
+	r_volumetricFogColorMode = ri.Cvar_Get( "r_volumetricFogColorMode", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogColorMode, "0", "2", CV_INTEGER );
 	ri.Cvar_SetDescription( r_volumetricFogColorMode, "Volumetric fog color source: 0=map fog volume (fallback sun tint), 1=use r_volumetricFogTint, 2=use nearest IBL cubemap SH (fallback mode 0)." );
 	ri.Cvar_SetGroup( r_volumetricFogColorMode, CVG_RENDERER );
 
-	r_volumetricFogTint = ri.Cvar_Get( "r_volumetricFogTint", "1 1 1", CVAR_ARCHIVE_ND );
+	r_volumetricFogTint = ri.Cvar_Get( "r_volumetricFogTint", "1.08 1.00 0.72", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_volumetricFogTint, "Volumetric fog RGB tint (3 floats). Applied as a multiplier in modes 0 and 2, or used directly in mode 1." );
 	ri.Cvar_SetGroup( r_volumetricFogTint, CVG_RENDERER );
 
@@ -2721,12 +2958,12 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_volumetricFogDepthMode, "Volumetric depth decode mode: 0=standard 0..1, 1=reversed-Z 0..1, 2=linear viewZ packed." );
 	ri.Cvar_SetGroup( r_volumetricFogDepthMode, CVG_RENDERER );
 
-	r_volumetricFogSunIntensity = ri.Cvar_Get( "r_volumetricFogSunIntensity", "1.0", CVAR_ARCHIVE_ND );
+	r_volumetricFogSunIntensity = ri.Cvar_Get( "r_volumetricFogSunIntensity", "1.25", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogSunIntensity, "0", "64", CV_FLOAT );
 	ri.Cvar_SetDescription( r_volumetricFogSunIntensity, "Directional light intensity used by world-space volumetric scattering." );
 	ri.Cvar_SetGroup( r_volumetricFogSunIntensity, CVG_RENDERER );
 
-	r_volumetricFogAmbientIntensity = ri.Cvar_Get( "r_volumetricFogAmbientIntensity", "1.0", CVAR_ARCHIVE_ND );
+	r_volumetricFogAmbientIntensity = ri.Cvar_Get( "r_volumetricFogAmbientIntensity", "1.25", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogAmbientIntensity, "0", "64", CV_FLOAT );
 	ri.Cvar_SetDescription( r_volumetricFogAmbientIntensity, "Ambient light intensity used by world-space volumetric scattering." );
 	ri.Cvar_SetGroup( r_volumetricFogAmbientIntensity, CVG_RENDERER );
@@ -2963,6 +3200,10 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_vk_pipeline_debug, "Print Vulkan pipeline creation info (discard mode, shader type, fog, etc)." );
 	ri.Cvar_SetGroup( r_vk_pipeline_debug, CVG_RENDERER );
 
+	r_vk_colorWriteMaskDynamic = ri.Cvar_Get( "r_vk_colorWriteMaskDynamic", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_vk_colorWriteMaskDynamic, "Enable VK_EXT_extended_dynamic_state3 for RB_ColorMask. Requires vid_restart. Disabled by default (OIT crash on some drivers)." );
+	ri.Cvar_SetGroup( r_vk_colorWriteMaskDynamic, CVG_RENDERER );
+
 	if ( glConfig.vidWidth )
 		return;
 
@@ -3013,7 +3254,7 @@ static void R_Register( void )
 	r_hdr = ri.Cvar_Get( "r_hdr", "2", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_hdr, "-1", "3", CV_INTEGER );
 	ri.Cvar_SetDescription(r_hdr, "HDR frame buffer format. Requires \\r_fbo 1.\n -1: 4-bit (B4G4R4A4), testing only\n  0: 8-bit, moderate banding\n  1: 16-bit float (RGBA16F)\n  2: 32-bit float (RGBA32F), default, fallback to 16F if unsupported\n  3: 64-bit float (RGBA64F), optional; falls back to 32F (glslang lacks dvec4 fragment output support)\n" );
-	r_bloom = ri.Cvar_Get( "r_bloom", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	r_bloom = ri.Cvar_Get( "r_bloom", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_bloom, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription(r_bloom, "Enables bloom post-processing effect. Requires \\r_fbo 1.");
 
@@ -3078,6 +3319,9 @@ static void R_Register( void )
 	r_msaa_sample_shading = ri.Cvar_Get( "r_msaa_sample_shading", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_msaa_sample_shading, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_msaa_sample_shading, "Per-sample shading when MSAA on: improves alpha edges and specular, ~2x fragment cost. Requires \\r_ext_multisample 2+." );
+	r_msaa_sample_shading_rate = ri.Cvar_Get( "r_msaa_sample_shading_rate", "0.5", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_msaa_sample_shading_rate, "0.25", "1.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_msaa_sample_shading_rate, "Minimum fraction of MSAA samples shaded per fragment when \\r_msaa_sample_shading 1. 0.5 is a good quality/cost balance; 1.0 shades every sample." );
 
 	r_ext_supersample = ri.Cvar_Get( "r_ext_supersample", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_supersample, "0", "1", CV_INTEGER );
@@ -3091,7 +3335,7 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_ext_smaa, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ext_smaa, "Enables SMAA post-processing, requires \\r_fbo 1." );
 
-	r_smaa_preset = ri.Cvar_Get( "r_smaa_preset", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	r_smaa_preset = ri.Cvar_Get( "r_smaa_preset", "3", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_smaa_preset, "0", "4", CV_INTEGER );
 	ri.Cvar_SetDescription( r_smaa_preset, "SMAA quality preset: 0=Custom, 1=Low, 2=Medium, 3=High, 4=Ultra. Overrides threshold/localContrast/searchSteps when non-zero." );
 
@@ -3110,15 +3354,29 @@ static void R_Register( void )
 	r_smaa_corner_rounding = ri.Cvar_Get( "r_smaa_corner_rounding", "0.2", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_smaa_corner_rounding, "0", "1", CV_FLOAT );
 	ri.Cvar_SetDescription( r_smaa_corner_rounding, "SMAA corner rounding strength (0=off, 1=full). Attenuates edges at L-corners for smoother silhouettes." );
+	r_taa = ri.Cvar_Get( "r_taa", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_taa, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_taa, "Optional temporal resolve for Vulkan HDR post-processing. Disabled by default in favor of SMAA/MSAA paths." );
+	ri.Cvar_SetGroup( r_taa, CVG_RENDERER );
+	r_taa_feedbackStationary = ri.Cvar_Get( "r_taa_feedbackStationary", "0.92", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_taa_feedbackStationary, "0.0", "0.99", CV_FLOAT );
+	ri.Cvar_SetDescription( r_taa_feedbackStationary, "TAA history feedback for stable pixels. Higher = smoother, lower = more responsive." );
+	ri.Cvar_SetGroup( r_taa_feedbackStationary, CVG_RENDERER );
+	r_taa_feedbackMotion = ri.Cvar_Get( "r_taa_feedbackMotion", "0.72", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_taa_feedbackMotion, "0.0", "0.99", CV_FLOAT );
+	ri.Cvar_SetDescription( r_taa_feedbackMotion, "TAA history feedback for moving pixels. Lower helps reduce ghosting." );
+	ri.Cvar_SetGroup( r_taa_feedbackMotion, CVG_RENDERER );
+	r_taa_sharpen = ri.Cvar_Get( "r_taa_sharpen", "0.12", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_taa_sharpen, "0.0", "1.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_taa_sharpen, "Post-resolve sharpening amount applied inside the TAA pass." );
+	ri.Cvar_SetGroup( r_taa_sharpen, CVG_RENDERER );
 
 	r_rtx = ri.Cvar_Get( "r_rtx", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_rtx, "0", "3", CV_INTEGER );
 	ri.Cvar_SetDescription( r_rtx, "Ray tracing (0=off, 1=shadows, 2=reflections, 3=full). Requires USE_VULKAN_RTX build and RT-capable GPU. See docs/RENDERERS_FUTURE.md." );
-#if 0
-	r_ext_alpha_to_coverage = ri.Cvar_Get( "r_ext_alpha_to_coverage", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	r_ext_alpha_to_coverage = ri.Cvar_Get( "r_ext_alpha_to_coverage", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_alpha_to_coverage, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_ext_alpha_to_coverage, "Alpha-to-coverage for alpha-tested surfaces (foliage, grates) when MSAA is on. Requires \\r_fbo 1 and \\r_ext_multisample 2+." );
-#endif
+	ri.Cvar_SetDescription( r_ext_alpha_to_coverage, "Alpha-to-coverage for alpha-tested surfaces (foliage, grates) when MSAA is on. Enabled by default for Vulkan MSAA paths. Requires \\r_fbo 1 and \\r_ext_multisample 2+." );
 
 	r_renderWidth = ri.Cvar_Get( "r_renderWidth", "800", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_renderWidth, "96", NULL, CV_INTEGER );
@@ -3291,7 +3549,9 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	ri.Cmd_RemoveCommand( "shaderstate" );
 #ifdef USE_VULKAN
 	ri.Cmd_RemoveCommand( "vkinfo" );
+	ri.Cmd_RemoveCommand( "vulkaninfo" );
 	ri.Cmd_RemoveCommand( "vkVolumetricValidate" );
+	ri.Cmd_RemoveCommand( "r_aaQuality" );
 #endif
 
 	//if ( tr.registered ) {

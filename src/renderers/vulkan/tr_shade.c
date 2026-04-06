@@ -1438,7 +1438,8 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			Vector4Set( block.advancedParams,
 				( r_pbr_multiScatter && r_pbr_multiScatter->integer ) ? 1.0f : 0.0f,
 				( r_pbr_multiScatterStrength ? r_pbr_multiScatterStrength->value : 1.0f ),
-				0.0f, 0.0f );
+				( r_pbr_fresnelRoughness && r_pbr_fresnelRoughness->integer ) ? 1.0f : 0.0f,
+				( r_pbr_specularAA && r_pbr_specularAA->integer ) ? LerpClamp( ( r_pbr_specularAAStrength ? r_pbr_specularAAStrength->value : 0.5f ), 0.0f, 2.0f ) : 0.0f );
 
 			float glintDensityExp = r_glintDensity ? LerpClamp( r_glintDensity->value, -4.0f, 6.0f ) : 3.0f;
 			float glintDensity = 1000.0f * powf( 10.0f, glintDensityExp );
@@ -1646,6 +1647,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 #ifdef USE_VK_PBR
 		if ( !is_pbr_surface && pStage->vk_pbr_flags ) {
 			def.vk_pbr_flags = 0;
+			def.lightmap_bundle = -1;
 			pipeline = vk_find_pipeline_ext( 0, &def, qfalse );
 		}
 #endif
@@ -1967,29 +1969,11 @@ void RB_StageIteratorGeneric( void )
 
 	// now do fog
 	if ( !worldShOverride && tess.fogNum && tess.shader->fogPass && !fogCollapse ) {
-		int i;
-		qboolean hasAlphaTest = qfalse;
-		for ( i = 0; i < MAX_SHADER_STAGES; i++ ) {
-			const shaderStage_t *stage = tess.xstages[i];
-			if ( !stage ) {
-				break;
-			}
-			if ( stage->stateBits & GLS_ATEST_BITS ) {
-				hasAlphaTest = qtrue;
-				break;
-			}
-		}
-		/*
-		 * Fog-only pass does not preserve cutout alpha; skip it for alpha-tested
-		 * shaders to avoid fullscreen quad-like fog artifacts on foliage.
-		 */
-		if ( !hasAlphaTest ) {
 #ifdef USE_VULKAN
-			RB_FogPass( rebindIndex );
+		RB_FogPass( rebindIndex );
 #else
-			RB_FogPass();
+		RB_FogPass();
 #endif
-		}
 	}
 }
 

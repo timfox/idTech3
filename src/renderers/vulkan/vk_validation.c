@@ -2,6 +2,20 @@
 #include "vk.h"
 #include "vk_validation.h"
 
+void vk_set_object_name( uint64_t obj, const char *objName, VkDebugReportObjectTypeEXT objType )
+{
+	if ( qvkDebugMarkerSetObjectNameEXT && obj )
+	{
+		VkDebugMarkerObjectNameInfoEXT info;
+		info.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_NAME_INFO_EXT;
+		info.pNext = NULL;
+		info.objectType = objType;
+		info.object = obj;
+		info.pObjectName = objName;
+		qvkDebugMarkerSetObjectNameEXT( vk.device, &info );
+	}
+}
+
 #ifdef USE_VK_VALIDATION
 static qboolean vk_validation_error_pending = qfalse;
 static char vk_validation_error_message[512];

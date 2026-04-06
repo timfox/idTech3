@@ -20,6 +20,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 #include "tr_local.h"
+#include "vk_postfx.h"
 #include "vk_skybox_hdr.h"
 #ifdef USE_IMGUI
 void VkImgui_Initialize( void );
@@ -456,7 +457,9 @@ void RE_EndFrame( int *frontEndMsec, int *backEndMsec ) {
 		}
 
 #ifdef USE_VULKAN
-		vk_update_post_process_pipelines();
+		if ( PostFX_PostPipelinesNeedUpdate() ) {
+			vk_update_post_process_pipelines();
+		}
 #endif
 
 		ri.Cvar_ResetGroup( CVG_RENDERER, qtrue /* reset modified flags */ );

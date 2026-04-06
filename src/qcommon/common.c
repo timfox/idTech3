@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "q_shared.h"
 #include "qcommon.h"
 #include "jobs.h"
+#include "defer.h"
 #ifdef USE_DUKTAPE
 #include "js_debug.h"
 #endif
@@ -4157,6 +4158,7 @@ void Com_Init( char *commandLine ) {
 
 	com_fullyInitialized = qtrue;
 
+	Defer_Init();
 	Jobs_Init();
 
 	Com_Printf( "--- Common Initialization Complete ---\n" );
@@ -4388,6 +4390,9 @@ void Com_Frame( qboolean noDelay ) {
 		return;			// an ERR_DROP was thrown
 	}
 
+	/* Run deferred callbacks from job workers / AI before frame logic */
+	Defer_Flush();
+
 	minMsec = 0; // silent compiler warning
 
 	// bk001204 - init to zero.
@@ -4615,7 +4620,9 @@ Com_Shutdown
 =================
 */
 static void Com_Shutdown( void ) {
+	Defer_Flush();
 	Jobs_Shutdown();
+	Defer_Shutdown();
 
 	if ( logfile != FS_INVALID_HANDLE ) {
 		FS_FCloseFile( logfile );

@@ -10,6 +10,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - Forward renderer with a large HDR/post-processing stack
 - No shipping deferred or Forward+ path yet; `r_renderMode 1/2` remain placeholders
 - Vulkan is the primary feature backend; OpenGL is compatibility fallback
+- **Shared temporal reset policy** (`vk_temporal.c`): centralizes history invalidation for volumetrics, motion vectors, exposure. Resize, map load, camera cut, and missing prev-frame data trigger resets. Ready for future TAA/upscaler integration.
 - See [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_2026_ARCHITECTURE_PASS.md) for the focused 2026 renderer direction
 
 ### Physically Based Rendering (PBR)
@@ -190,15 +191,26 @@ See [HDR_GAPS.md](HDR_GAPS.md) for HDR pipeline gaps, risks, and render order.
 
 The OpenGL renderer provides compatibility for systems without Vulkan support. It implements the same `refexport_t` interface with classic OpenGL fixed-function and shader-based rendering.
 
-Features:
-- Classic Quake III Arena rendering
-- Multi-texture support
-- Vertex and fragment programs
-- Dynamic lighting
-- Stencil shadows
-- Fog volumes (distance-based)
+### OpenGL vs Vulkan Feature Parity
 
-The OpenGL renderer does not include PBR, volumetric fog, SSAO, SMAA, bloom, fluid simulation, or IQM morph target evaluation.
+| Feature | Vulkan | OpenGL |
+|---------|--------|--------|
+| PBR (metalness/roughness, IBL) | ✓ | — |
+| Volumetric fog | ✓ | — |
+| SSAO / HBAO | ✓ | — |
+| SMAA | ✓ | — |
+| Bloom, HDR tonemapping | ✓ | — |
+| OIT (order-independent transparency) | ✓ | — |
+| IQM morph targets | ✓ | — |
+| Fluid simulation (fog) | ✓ | — |
+| Vegetation wind (GPU compute) | ✓ | — |
+| SDF text | ✓ | ✓ |
+| Dynamic lighting | ✓ | ✓ |
+| Stencil shadows | ✓ | ✓ |
+| Fog volumes | ✓ | ✓ |
+| Multi-texture, vertex/fragment programs | ✓ | ✓ |
+
+OpenGL is the compatibility fallback; Vulkan is the primary feature backend. Use Vulkan when available for PBR, HDR, and advanced effects.
 
 ## Future Renderers (Planned)
 
