@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- CTest `test_demo_game_pk3`: verifies `examples/demo_game` zip layout matches CMake packaging (no full `BUILD_EXAMPLE_DEMO_GAME` configure required).
 - CHANGELOG.md for release tracking
 - Semantic versioning in CMake (project VERSION 1.0.0)
 - ENABLE_FORTIFY_SOURCE option for buffer overflow protection (default ON)
