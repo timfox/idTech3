@@ -51,13 +51,16 @@ If you are aiming for **AAA-style quality**:
 ## How to move forward from current health
 
 1. **Run the orchestrator weekly on `main`**: `./scripts/production_readiness.sh`
-2. **Wire `GAME_BASE` in CI** (self-hosted or secret path) when you have a stable regression tree — this is the largest jump in confidence after “matrix green.”
-3. **Record GPU proof** once per renderer milestone (date, commit, maps, Vulkan vs OpenGL, screenshots or short capture links stored with the repo or internal wiki).
-4. **Tighten warnings** over time (`CI_BUILD=ON` on a reference configuration) so new code cannot regress silently.
+2. **Tier B on every `main` push**: enable [docs/renderer_validation/SELF_HOSTED_TIER_B.md](renderer_validation/SELF_HOSTED_TIER_B.md) — set variable `IDTECH3_GAME_BASE_PATH` and a self-hosted runner labeled `idtech3-tierb` (workflow `.github/workflows/renderer-tier-b.yml`).
+3. **Tier C**: record GPU proof using [docs/renderer_validation/TEMPLATE_TIER_C.md](renderer_validation/TEMPLATE_TIER_C.md) and the rolling log [docs/renderer_validation/FINDINGS.md](renderer_validation/FINDINGS.md).
+4. **Title repo**: copy [examples/title-repo/CERTIFICATION_CHECKLIST.md](examples/title-repo/CERTIFICATION_CHECKLIST.md) into your game repository for cert, telemetry, soak, and submission builds.
+5. **Tighten warnings** over time (`CI_BUILD=ON` on a reference configuration) so new code cannot regress silently.
 
 ## Related documents
 
+- [renderer_validation/README.md](renderer_validation/README.md) — Tier B self-hosted setup + Tier C templates  
 - [examples/README.md](../examples/README.md) — copy-paste workflows (build, validation, renderer, mods)  
+- [examples/title-repo/README.md](../examples/title-repo/README.md) — title certification checklist template  
 - [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) — tag and ship steps  
 - [RENDERER_CONFIDENCE.md](RENDERER_CONFIDENCE.md) — renderer automated + manual gates  
 - [QUICKSTART.md](QUICKSTART.md) — end-user runbook  
