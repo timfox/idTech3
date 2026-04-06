@@ -38,6 +38,8 @@ CI / pre-push: the repo test `test_demo_game_pk3` packs the same file set with `
 
 ## Install and run
 
+Quick path: use the **[demo skeleton](../demo_skeleton/README.md)** (`run_demo_client.sh`, `local.env`) for a ready folder layout and launch commands.
+
 1. Copy **`idtech3_demo.pk3`** into a mod folder next to your game data, e.g. `idtech3_demo/` beside `base/`:
 
    ```

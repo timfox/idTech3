@@ -37,3 +37,4 @@ android/local.properties
 # Local copies of examples/*/*.env.example (optional secrets / machine paths)
 /local_validation.env
 /game_base.env
+/examples/demo_skeleton/local.env

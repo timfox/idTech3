@@ -103,7 +103,7 @@ Primary entry point:
 
 Artifacts land under `release/` and `build-vk-Release/` (or `build-gl-Release/`). Run tests from the build directory: `ctest` or `make test`.
 
-**Examples** (copy-paste workflows): [examples/README.md](examples/README.md) — local validation, `GAME_BASE` templates, mod launch lines, pointers to `docs/samples/`. **Demo mod pack** (optional CMake): `-DBUILD_EXAMPLE_DEMO_GAME=ON` then build target `demo_game_pk3` → `idtech3_demo.pk3` ([examples/demo_game/README.md](examples/demo_game/README.md)).
+**Examples** (copy-paste workflows): [examples/README.md](examples/README.md) — local validation, `GAME_BASE` templates, mod launch lines, pointers to `docs/samples/`. **Demo mod pack** (optional CMake): `-DBUILD_EXAMPLE_DEMO_GAME=ON` then build target `demo_game_pk3` → `idtech3_demo.pk3` ([examples/demo_game/README.md](examples/demo_game/README.md)). **Run skeleton** (folder layout + scripts, no game data): [examples/demo_skeleton/README.md](examples/demo_skeleton/README.md).
 
 Renderer discipline: [docs/RENDERER_CONFIDENCE.md](docs/RENDERER_CONFIDENCE.md), headless `./scripts/renderer_regression_check.sh`, visual pack specs under [docs/samples/renderer_regression/](docs/samples/renderer_regression/).
 
