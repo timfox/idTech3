@@ -2090,6 +2090,13 @@ add_test(NAME test_run_vulkan_script
 set_tests_properties(test_run_vulkan_script PROPERTIES
 	LABELS "unit;scripts;validation")
 
+add_test(NAME test_demo_game_pk3
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_demo_game_pk3.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_demo_game_pk3 PROPERTIES
+	LABELS "scripts;validation;examples"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_demo_game_pk3.sh")
+
 # --- Unit tests ---
 option(BUILD_UNIT_TESTS "Build unit tests" ON)
 if(BUILD_UNIT_TESTS)

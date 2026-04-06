@@ -34,6 +34,8 @@ Or use the wrapper:
 ./examples/demo_game/build_demo_pack.sh
 ```
 
+CI / pre-push: the repo test `test_demo_game_pk3` packs the same file set with `cmake -E tar` (no full engine configure). Run `ctest -R test_demo_game_pk3` or `./tests/scripts/test_demo_game_pk3.sh`.
+
 ## Install and run
 
 1. Copy **`idtech3_demo.pk3`** into a mod folder next to your game data, e.g. `idtech3_demo/` beside `base/`:

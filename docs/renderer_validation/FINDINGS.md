@@ -14,6 +14,6 @@ Machine-verified checks that run without a full `GAME_BASE` or display server. *
 
 | Date | Commit | Checks | Notes |
 |------|--------|--------|-------|
-| 2026-04-06 | *see git log for this file* | `ctest` (unit + smoke), `smoke_test.sh`, `renderer_regression_check.sh` (no `GAME_BASE`) | Linux x86_64, Vulkan Release build dir. Confirms scripts + GLSL validation + dedicated smoke; **no** client framebuffer proof. SHA: `git log -1 --format=%H -- docs/renderer_validation/FINDINGS.md`. |
+| 2026-04-06 | *see git log for this file* | `ctest` (unit + smoke + demo pk3 layout), `smoke_test.sh`, `renderer_regression_check.sh` (no `GAME_BASE`) | Linux x86_64, Vulkan Release build dir. Confirms scripts + GLSL validation + dedicated smoke; **no** client framebuffer proof. SHA: `git log -1 --format=%H -- docs/renderer_validation/FINDINGS.md`. |
 
 When this table grows, consider one file per release (e.g. `FINDINGS_v1.0.2.md`).
