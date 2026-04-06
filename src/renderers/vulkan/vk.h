@@ -77,6 +77,8 @@ typedef void (VKAPI_PTR *PFN_vkCmdSetColorWriteMaskEXT)(VkCommandBuffer commandB
 	#define VK_DESC_COUNT   5
 #endif
 
+#include "vk_procs.h"
+
 #define VK_DESC_TEXTURE_BASE VK_DESC_TEXTURE0
 #define VK_DESC_FOG_ONLY     VK_DESC_TEXTURE1
 #define VK_DESC_FOG_DLIGHT   VK_DESC_TEXTURE1
@@ -479,15 +481,6 @@ qboolean vk_ssao_pass( void );
 
 qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size );
 void vk_update_mvp( const float *m );
-
-extern PFN_vkCmdBindDescriptorSets qvkCmdBindDescriptorSets;
-extern PFN_vkCmdBindPipeline qvkCmdBindPipeline;
-extern PFN_vkCmdCopyImageToBuffer qvkCmdCopyImageToBuffer;
-extern PFN_vkCmdDispatch qvkCmdDispatch;
-extern PFN_vkCmdDraw qvkCmdDraw;
-extern PFN_vkCreateGraphicsPipelines qvkCreateGraphicsPipelines;
-extern PFN_vkCreateRenderPass qvkCreateRenderPass;
-extern PFN_vkDestroyPipeline qvkDestroyPipeline;
 
 uint32_t vk_tess_index( uint32_t numIndexes, const void *src );
 void *vk_alloc_storage( size_t size, uint32_t *offset );
@@ -1307,52 +1300,3 @@ typedef struct {
 
 extern Vk_Instance	vk;				// shouldn't be cleared during ref re-init
 extern Vk_World		vk_world;		// this data is cleared during ref re-init
-
-/* Vulkan function pointers (loaded at init, used by vk_sync.c, vk_image_layout.c, vk_render_pass.c, vk_device.c) */
-extern PFN_vkGetPhysicalDeviceMemoryProperties qvkGetPhysicalDeviceMemoryProperties;
-extern PFN_vkGetPhysicalDeviceProperties qvkGetPhysicalDeviceProperties;
-extern PFN_vkGetPhysicalDeviceFormatProperties qvkGetPhysicalDeviceFormatProperties;
-extern PFN_vkGetPhysicalDeviceSurfaceFormatsKHR qvkGetPhysicalDeviceSurfaceFormatsKHR;
-extern PFN_vkGetPhysicalDeviceFeatures qvkGetPhysicalDeviceFeatures;
-extern PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR qvkGetPhysicalDeviceSurfaceCapabilitiesKHR;
-extern PFN_vkGetPhysicalDeviceSurfacePresentModesKHR qvkGetPhysicalDeviceSurfacePresentModesKHR;
-extern PFN_vkCreateSwapchainKHR qvkCreateSwapchainKHR;
-extern PFN_vkDestroySwapchainKHR qvkDestroySwapchainKHR;
-extern PFN_vkGetSwapchainImagesKHR qvkGetSwapchainImagesKHR;
-extern PFN_vkCreateImageView qvkCreateImageView;
-extern PFN_vkDestroyImageView qvkDestroyImageView;
-extern PFN_vkCreateSemaphore			qvkCreateSemaphore;
-extern PFN_vkCreateFence				qvkCreateFence;
-extern PFN_vkDestroySemaphore		qvkDestroySemaphore;
-extern PFN_vkDestroyFence			qvkDestroyFence;
-extern PFN_vkCmdBeginRenderPass		qvkCmdBeginRenderPass;
-extern PFN_vkCmdEndRenderPass		qvkCmdEndRenderPass;
-extern PFN_vkCmdPipelineBarrier		qvkCmdPipelineBarrier;
-extern PFN_vkCmdPushConstants		qvkCmdPushConstants;
-extern PFN_vkCmdSetScissor			qvkCmdSetScissor;
-extern PFN_vkCmdSetViewport			qvkCmdSetViewport;
-extern PFN_vkUpdateDescriptorSets	qvkUpdateDescriptorSets;
-extern PFN_vkCreateDescriptorSetLayout qvkCreateDescriptorSetLayout;
-extern PFN_vkAllocateCommandBuffers	qvkAllocateCommandBuffers;
-extern PFN_vkBeginCommandBuffer		qvkBeginCommandBuffer;
-extern PFN_vkCmdCopyBuffer			qvkCmdCopyBuffer;
-extern PFN_vkEndCommandBuffer		qvkEndCommandBuffer;
-extern PFN_vkQueueSubmit			qvkQueueSubmit;
-extern PFN_vkFreeCommandBuffers		qvkFreeCommandBuffers;
-extern PFN_vkCreateSampler			qvkCreateSampler;
-extern PFN_vkDestroySampler			qvkDestroySampler;
-extern PFN_vkCreateBuffer			qvkCreateBuffer;
-extern PFN_vkDestroyBuffer			qvkDestroyBuffer;
-extern PFN_vkFreeMemory				qvkFreeMemory;
-extern PFN_vkGetBufferMemoryRequirements qvkGetBufferMemoryRequirements;
-extern PFN_vkGetImageMemoryRequirements qvkGetImageMemoryRequirements;
-extern PFN_vkAllocateMemory			qvkAllocateMemory;
-extern PFN_vkBindBufferMemory		qvkBindBufferMemory;
-extern PFN_vkBindImageMemory			qvkBindImageMemory;
-extern PFN_vkMapMemory				qvkMapMemory;
-extern PFN_vkWaitForFences			qvkWaitForFences;
-extern PFN_vkResetFences				qvkResetFences;
-extern PFN_vkResetCommandBuffer		qvkResetCommandBuffer;
-extern PFN_vkCreateDescriptorSetLayout qvkCreateDescriptorSetLayout;
-extern PFN_vkCreateRenderPass qvkCreateRenderPass;
-extern PFN_vkDebugMarkerSetObjectNameEXT qvkDebugMarkerSetObjectNameEXT;

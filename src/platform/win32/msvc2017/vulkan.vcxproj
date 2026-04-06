@@ -257,6 +257,7 @@
     <ClCompile Include="..\..\..\renderers\vulkan\tr_world.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\utils\mikktspace\mikktspace.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_procs.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_2d_transition.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_atmosphere.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_cmd.c" />
