@@ -35,8 +35,16 @@ echo ""
 bin_path() {
   local bin="$1"
   local base="$RELEASE_DIR/$bin"
-  # Try: idtech3, idtech3.exe, idtech3.x64, idtech3.x64.exe, idtech3.x86_64, idtech3.aarch64
-  for candidate in "$base" "$base.exe" "$base.x64" "$base.x64.exe" "$base.x86_64" "$base.x86_64.exe" "$base.aarch64"; do
+  # Try: plain name, .exe, arch suffixes (Windows/Linux), macOS .app bundle executable
+  for candidate in \
+    "$base" "$base.exe" \
+    "$base.x64" "$base.x64.exe" "$base.x86_64" "$base.x86_64.exe" \
+    "$base.aarch64" "$base.arm" "$base.armv7l" \
+    "$base.aarch64.app/Contents/MacOS/$bin.aarch64" \
+    "$base.aarch64.app/Contents/MacOS/$bin" \
+    "$base.arm.app/Contents/MacOS/$bin.arm" \
+    "$base.arm.app/Contents/MacOS/$bin" \
+    "$base.app/Contents/MacOS/$bin"; do
     if [ -f "$candidate" ]; then
       echo "$candidate"
       return
