@@ -60,3 +60,9 @@ The Vulkan renderer uses texture view swizzles to remap file channels into that 
 - **BaseColor/Albedo** is treated as **sRGB** by the Vulkan PBR path; packed maps (AO/Rough/Metal/etc.) are treated as **linear**.
 - If you use plain `*_orm` (no “S”), keep **alpha = 1.0** in the file if possible, since alpha can influence dielectric specular intensity in the current shader.
 
+## Clearcoat, sheen, anisotropy (Vulkan)
+
+- **Clearcoat** (`clearcoatMap` + `clearcoatScale <strength> <roughness>`): direct lighting uses a second GGX lobe; the base color is dimmed by approximate energy conservation before the coat is added.
+- **Sheen** (`sheenMap` + `sheenScale <rgb>` or `sheenScale <r> <g> <b> [<roughness>]`): optional fourth value is **sheen roughness** (default `0.5`). The fragment shader uses a **Charlie** distribution with Smith visibility (not the old flat `NL * 0.05` term).
+- **Anisotropy map**: direct specular uses **anisotropic GGX** NDF and **anisotropic visibility** when `r_pbr_anisotropicSpecular` is 1. **IBL** can stretch roughness from the same map when `r_pbr_iblAnisoStretch` is greater than 0 (default 1).
+

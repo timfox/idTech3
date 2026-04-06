@@ -112,6 +112,7 @@ cvar_t	*r_pbr_fresnelRoughness;
 cvar_t	*r_pbr_specularAA;
 cvar_t	*r_pbr_specularAAStrength;
 cvar_t	*r_pbr_anisotropicSpecular;
+cvar_t	*r_pbr_iblAnisoStretch;
 cvar_t	*r_glint;
 cvar_t	*r_glintMode;
 cvar_t	*r_glintDensity;
@@ -1650,6 +1651,9 @@ static void VarInfo( void )
 	if ( r_glint && r_glint->integer ) {
 		ri.Printf( PRINT_ALL, "PBR glint NDF: enabled (r_glint 1)\n" );
 	}
+	if ( r_pbr_iblAnisoStretch && Q_fabs( r_pbr_iblAnisoStretch->value - 1.0f ) > 0.001f ) {
+		ri.Printf( PRINT_ALL, "PBR IBL anisotropy stretch: %.2f (r_pbr_iblAnisoStretch, default 1)\n", r_pbr_iblAnisoStretch->value );
+	}
 	if ( r_pbr_debug && r_pbr_debug->integer ) {
 		ri.Printf( PRINT_ALL, "PBR debug view: mode %d (1=direct,2=ibl spec,3=irradiance,4=env samples,5-8=glint)\n", r_pbr_debug->integer );
 	}
@@ -2244,6 +2248,11 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_pbr_anisotropicSpecular, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_pbr_anisotropicSpecular,
 		"When 1 and an anisotropy map is bound, use anisotropic GGX for direct specular highlights (tangent-aligned). When 0, ignore anisotropy for direct lighting (IBL stays isotropic)." );
+
+	r_pbr_iblAnisoStretch = ri.Cvar_Get( "r_pbr_iblAnisoStretch", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbr_iblAnisoStretch, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_pbr_iblAnisoStretch,
+		"When > 0 and an anisotropy map is bound, increase effective IBL roughness along the stretch direction (blurry elongated reflections). 0 = isotropic IBL sampling." );
 
 	r_baseNormalX	= ri.Cvar_Get("r_baseNormalX",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );
 	r_baseNormalY	= ri.Cvar_Get("r_baseNormalY",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );
