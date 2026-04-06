@@ -9,6 +9,7 @@ Small, **copy-paste** workflows and templates for this engine repo. They do not 
 | [mods/](mods/) | Typical mod / `fs_game` layout and launch examples. |
 | [scripts/](scripts/) | Pointers to in-repo script and UI samples under `docs/samples/`. |
 | [title-repo/](title-repo/) | Templates for a **game** repo: platform cert, telemetry, soak, submissions. |
+| [demo_game/](demo_game/) | **Buildable** config mod `idtech3_demo.pk3` (+ optional helper) to toggle renderer cvars over a real `base/`. |
 
 See also:
 

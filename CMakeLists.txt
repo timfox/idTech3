@@ -24,6 +24,7 @@ option(CI_BUILD "Enable CI-specific behaviors such as warnings-as-errors" OFF)
 option(USE_FLUX "Enable FLUX.2 image generation support" ON)
 option(ENABLE_FORTIFY_SOURCE "Enable _FORTIFY_SOURCE=2 buffer overflow protection (GCC/Clang)" ON)
 option(ENABLE_ASAN "Enable AddressSanitizer for memory error detection (Debug builds)" OFF)
+option(BUILD_EXAMPLE_DEMO_GAME "Build examples/demo_game (idtech3_demo.pk3 + helper)" OFF)
 
 if(C_STANDARD_STRICT)
   if(MSVC)
@@ -2213,4 +2214,9 @@ if(BUILD_UNIT_TESTS)
 	target_include_directories(unit_vm_native_module PRIVATE ${CMAKE_SOURCE_DIR}/src)
 	add_test(NAME unit_vm_native_module COMMAND unit_vm_native_module)
 	set_tests_properties(unit_vm_native_module PROPERTIES LABELS "unit;validation")
+endif()
+
+# Example mod pack (config-only .pk3); optional — see examples/demo_game/README.md
+if(BUILD_EXAMPLE_DEMO_GAME AND NOT ANDROID)
+	include("${CMAKE_SOURCE_DIR}/examples/demo_game/CMakeLists.txt")
 endif()
