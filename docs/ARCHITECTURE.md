@@ -43,6 +43,7 @@ src/
 │   │   ├── vk.c/h                Core pipeline + dispatch
 │   │   ├── vk_procs.c/h          `qvk*` Vulkan entry points (storage + declarations)
 │   │   ├── vk_shader_modules.c/h SPIR-V `VkShaderModule` creation + `vk_create_shader_modules`
+│   │   ├── vk_pipelines_persistent.c/h Long-lived pipelines (skybox, fog, debug tools)
 │   │   ├── vk_fluidsim.c/h       Fluid simulation module
 │   │   ├── vk_postfx.c/h         PostFX (SSR, atmosphere, wind)
 │   │   ├── vk_flashlight.c/h     Projected texture system

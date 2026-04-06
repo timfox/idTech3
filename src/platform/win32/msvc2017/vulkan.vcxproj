@@ -279,6 +279,7 @@
     <ClCompile Include="..\..\..\renderers\vulkan\vk_render_pass.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_sampler.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_shader_modules.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_pipelines_persistent.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_scene_pass.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_skybox_hdr.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_staging.c" />
