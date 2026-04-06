@@ -11,6 +11,7 @@ Vulkan surface, input, file system, and JNI bridge.
 
 #include "../../qcommon/q_shared.h"
 #include "../../qcommon/qcommon.h"
+#include "../../renderers/common/tr_types.h"
 #ifndef DEDICATED
 #include "../../client/keycodes.h"
 #endif
@@ -115,24 +116,22 @@ typedef struct {
 typedef VkResult (*PFN_vkCreateAndroidSurfaceKHR)(
 	VkInstance, const VkAndroidSurfaceCreateInfoKHR *, const void *, VkSurfaceKHR * );
 
-void VKimp_Init( void *config ) {
+void VKimp_Init( glconfig_t *config ) {
 	if ( !g_vulkanLib ) {
 		g_vulkanLib = dlopen( "libvulkan.so", RTLD_NOW | RTLD_LOCAL );
 	}
 
 	if ( config && g_window ) {
-		/* Set glconfig dimensions from the Android window */
-		typedef struct { int vidWidth; int vidHeight; } minConfig_t;
-		minConfig_t *gc = (minConfig_t *)config;
-		gc->vidWidth = g_windowWidth;
-		gc->vidHeight = g_windowHeight;
+		config->vidWidth = g_windowWidth;
+		config->vidHeight = g_windowHeight;
 	}
 
 	LOGI( "VKimp_Init: Vulkan %s, window %dx%d",
 		g_vulkanLib ? "loaded" : "FAILED", g_windowWidth, g_windowHeight );
 }
 
-void VKimp_Shutdown( void ) {
+void VKimp_Shutdown( qboolean unloadDLL ) {
+	(void)unloadDLL;
 	if ( g_vulkanLib ) {
 		dlclose( g_vulkanLib );
 		g_vulkanLib = NULL;
@@ -169,11 +168,45 @@ int VK_CreateSurface( void *instance, void *pSurface ) {
 	return 1;
 }
 
-/* ---- OpenGL stubs (Vulkan-only on Android) ---- */
+/* ---- OpenGL / window stubs (Vulkan path uses VKimp_*; symbols required at link) ---- */
 
-void GLimp_InitGamma( void *config ) { (void)config; }
-void GLimp_SetGamma( unsigned char *r, unsigned char *g, unsigned char *b ) {
-	(void)r; (void)g; (void)b;
+void GLimp_InitGamma( glconfig_t *config ) {
+	(void)config;
+}
+
+void GLimp_SetGamma( unsigned char red[256], unsigned char green[256], unsigned char blue[256] ) {
+	(void)red;
+	(void)green;
+	(void)blue;
+}
+
+void GLimp_Minimize( void ) {
+}
+
+void GLimp_LogComment( const char *comment ) {
+	(void)comment;
+}
+
+void GLimp_Init( glconfig_t *config ) {
+	if ( config ) {
+		config->isFullscreen = qfalse;
+	}
+}
+
+void GLimp_Shutdown( qboolean unloadDLL ) {
+	(void)unloadDLL;
+}
+
+void GLimp_EndFrame( void ) {
+}
+
+void *GL_GetProcAddress( const char *name ) {
+	(void)name;
+	return NULL;
+}
+
+qboolean GLimp_VulkanAvailable( void ) {
+	return qtrue;
 }
 
 /* ---- Audio Backend: AAudio (primary) + OpenSL ES (fallback) ---- */

@@ -1989,7 +1989,12 @@ ENDIF()
 # dedicated server executable (not built on Android)
 
 IF(NOT ANDROID)
+# Dedicated server must be a console subsystem on Windows so CI smoke tests can read stdout.
+IF(WIN32)
+ADD_EXECUTABLE(${DNAME}${BINEXT} ${Q3_SRCS})
+ELSE()
 ADD_EXECUTABLE(${DNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
+ENDIF()
 TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE qcommon_ded botlib)
 if(TARGET Threads::Threads)
   TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE Threads::Threads)
