@@ -8,6 +8,7 @@ Small, **copy-paste** workflows and templates for this engine repo. They do not 
 | [renderer/](renderer/) | Renderer regression and `GAME_BASE` environment template. |
 | [mods/](mods/) | Typical mod / `fs_game` layout and launch examples. |
 | [scripts/](scripts/) | Pointers to in-repo script and UI samples under `docs/samples/`. |
+| [title-repo/](title-repo/) | Templates for a **game** repo: platform cert, telemetry, soak, submissions. |
 
 See also:
 

@@ -42,6 +42,8 @@ These do not run in headless CI; use the **[visual regression pack](samples/rend
 
 Use this loop to move renderer work from “builds and scripts pass” to “actual rendered behavior is proven.”
 
+Record outcomes under [docs/renderer_validation/](renderer_validation/) (Tier C template and optional [FINDINGS.md](renderer_validation/FINDINGS.md)). For automated Tier B on `main`, see [docs/renderer_validation/SELF_HOSTED_TIER_B.md](renderer_validation/SELF_HOSTED_TIER_B.md).
+
 ### 1. Install the regression pack
 
 Install `z_renderer_regression.pk3` into a real content tree so the engine can see the six regression maps exactly as documented under `docs/samples/renderer_regression/`. Use the devdata tree under `docs/renderer_validation/devdata/rtest_base/` or rebuild it with `./scripts/build_renderer_devdata.sh` if needed.
