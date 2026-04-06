@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - CTest `test_demo_game_pk3`: verifies `examples/demo_game` zip layout matches CMake packaging (no full `BUILD_EXAMPLE_DEMO_GAME` configure required).
 - Vulkan: `vk_procs.c` holds `qvk*` function pointer definitions (split from `vk.c`); `vk_instance.c` no longer duplicates `extern` declarations.
+- Vulkan: `vk_shader_modules.c` holds `vk_create_shader_modules` and includes `shader_data.c` / `shader_binding.c` (split from `vk.c`).
 - CHANGELOG.md for release tracking
 - Semantic versioning in CMake (project VERSION 1.0.0)
 - ENABLE_FORTIFY_SOURCE option for buffer overflow protection (default ON)
