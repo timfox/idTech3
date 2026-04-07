@@ -23,7 +23,7 @@ Ray tracing (Vulkan RT) is **scaffolded / in progress** — see `docs/RENDERERS_
 * Spherical Harmonics lighting support
 * Screen Space Ambient Occlusion (SSAO)
 * High-quality SDF HUD text rendering with UTF-8 glyph support
-* Optional SVG asset rasterization backend (librsvg/cairo)
+* SVG asset rasterization (NanoSVG / NanoSVRast, built-in; no extra system libs)
 * Froxel-based Volumetric Lighting with 2D Navier–Stokes fluid solver
 * MSAA and SMAA anti-aliasing
 
@@ -58,12 +58,12 @@ Ray tracing (Vulkan RT) is **scaffolded / in progress** — see `docs/RENDERERS_
 * Reliable UDP virtual channel (sequenced/reliable message streams)
 * Asynchronous non-blocking networking (epoll/kqueue/libsockets abstractions)
 * Graceful automatic fallback to IPv4-only if stack or OS configuration requires
-* DTLS (Datagram TLS) support for secure UDP channels
+* DTLS (Datagram TLS) for secure UDP when enabled at runtime (`net_dtls` + `net_dtls_key`; OpenSSL linked when available at build time)
 * Optional TLS-secured remote console (off by default)
 * Console/logging for connection diagnostics and real-time network statistics
 
 **Systems** (game and engine extensions):
-* AIML chatbot scripting
+* AIML 2.1-oriented chatbot scripting (see `g_aiml.c` / Lua `Engine.AIML`)
 * GOAP (AI planning)
 * Flocking and boids (crowd AI)
 * Finite State Machines (FSM) and Behavior Trees
@@ -72,11 +72,11 @@ Ray tracing (Vulkan RT) is **scaffolded / in progress** — see `docs/RENDERERS_
 * Physics and collision (with optional Bullet Physics)
 * Multithreaded scheduler/task system
 * Entity-Component System (ECS, ENTT)
-* Replay and deterministic timing
-* Save/restore system
-* Dynamic dialogue and quests
+* Replay frame index tied to server snapshots (`engine_replay`; Lua `Engine.Replay`)
+* Save slot metadata + `save/engine_slot_*.txt` persistence (Lua `Engine.Save`)
+* Dynamic dialogue and quest stage tracking (Lua `Engine.Dialogue`, `Engine.Quest`)
 * Procedural/random systems
-* Statistics/telemetry tracking
+* Statistics / player telemetry counters (Lua `Engine.Telemetry`, cvar `engine_telemetry`; distinct from renderer GPU counters)
 * Debugging tools and overlays
 
 ### Platforms

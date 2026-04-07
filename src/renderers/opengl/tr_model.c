@@ -200,10 +200,18 @@ typedef struct
 	qhandle_t (*ModelLoader)( const char *, model_t * );
 } modelExtToLoaderMap_t;
 
+extern qhandle_t R_RegisterMeshImport( const char *name, model_t *mod );
+
 // Note that the ordering indicates the order of preference used
 // when there are multiple models of different formats available
 static modelExtToLoaderMap_t modelLoaders[ ] =
 {
+	{ "stl", R_RegisterMeshImport },
+	{ "dae", R_RegisterMeshImport },
+	{ "fbx", R_RegisterMeshImport },
+	{ "usd", R_RegisterMeshImport },
+	{ "usda", R_RegisterMeshImport },
+	{ "ma", R_RegisterMeshImport },
 	{ "iqm", R_RegisterIQM },
 	{ "mdr", R_RegisterMDR },
 	{ "md3", R_RegisterMD3 }

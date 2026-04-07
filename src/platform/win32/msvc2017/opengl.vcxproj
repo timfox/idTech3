@@ -233,6 +233,7 @@
     <ClCompile Include="..\..\..\renderers\opengl\tr_marks.c" />
     <ClCompile Include="..\..\..\renderers\opengl\tr_mesh.c" />
     <ClCompile Include="..\..\..\renderers\opengl\tr_model.c" />
+    <ClCompile Include="..\..\..\renderers\common\tr_model_mesh_import.c" />
     <ClCompile Include="..\..\..\renderers\opengl\tr_model_iqm.c" />
     <ClCompile Include="..\..\..\renderers\common\tr_noise.c" />
     <ClCompile Include="..\..\..\renderers\opengl\tr_scene.c" />

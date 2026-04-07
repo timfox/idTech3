@@ -73,7 +73,7 @@ jobs:
         shell: msys2 {0}
         run: |
           set -e
-          pkgs="${{ matrix.prefix }}-SDL2 ${{ matrix.prefix }}-openal ${{ matrix.prefix }}-freetype ${{ matrix.prefix }}-lua"
+          pkgs="${{ matrix.prefix }}-SDL2 ${{ matrix.prefix }}-openal ${{ matrix.prefix }}-freetype ${{ matrix.prefix }}-lua ${{ matrix.prefix }}-openssl"
           for attempt in 1 2 3 4 5; do
             pacman -S --needed --noconfirm $pkgs && exit 0
             echo "pacman attempt $attempt failed, retrying in $((attempt * 20))s..."
@@ -198,6 +198,14 @@ jobs:
     steps:
       - uses: microsoft/setup-msbuild@v2
       - uses: actions/checkout@v4
+
+      - name: Install OpenSSL (Win64) for DTLS
+        shell: cmd
+        run: |
+          choco install openssl -y --no-progress
+          if exist "C:\Program Files\OpenSSL-Win64" (
+            echo OPENSSL_ROOT_DIR=C:\Program Files\OpenSSL-Win64>> %GITHUB_ENV%
+          )
 
       - name: Build
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
@@ -366,7 +374,7 @@ jobs:
           sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list
           sudo apt-get -qq update
           sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev clang ccache
-          sudo apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools python3
+          sudo apt-get -y install libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools python3
 
       - uses: actions/checkout@v4
 
@@ -469,7 +477,7 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get -qq update
-          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools python3
+          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools python3
 
       - uses: actions/checkout@v4
 
@@ -508,7 +516,7 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get -qq update
-          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools python3
+          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools python3
 
       - uses: actions/checkout@v4
 
@@ -550,7 +558,7 @@ jobs:
         run: |
           sudo apt-get -qq update
           sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev clang-tidy cppcheck ccache
-          sudo apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools python3
+          sudo apt-get -y install libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools python3
 
       - uses: actions/checkout@v4
 
@@ -634,7 +642,7 @@ jobs:
 
             apt-get -qq update
             apt-get install -y make gcc g++ cmake ninja-build libstdc++-14-dev
-            apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools
+            apt-get -y install libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools
 
             OUTDIR="${GITHUB_WORKSPACE}/bin"
             mkdir -p "$OUTDIR"

@@ -246,6 +246,9 @@
     <ClCompile Include="..\..\..\renderers\vulkan\tr_marks.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\tr_mesh.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\tr_model.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\tr_model_obj.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\tr_model_md5.c" />
+    <ClCompile Include="..\..\..\renderers\common\tr_model_mesh_import.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\tr_model_iqm.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\tr_scene.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\tr_shade.c" />
