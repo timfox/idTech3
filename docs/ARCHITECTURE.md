@@ -53,6 +53,7 @@ src/
 │   │   ├── vk_occlusion.c/h       GPU occlusion queries + entity visibility buffer (split from vk.c)
 │   │   ├── vk_create_pipeline.c/h Vk_Pipeline_Def graphics pipeline factory + pipeline table lookup (split from vk.c)
 │   │   ├── vk_draw_state.c/h      Tess upload, vertex/index/descriptor/pipeline bind, draws (split from vk.c)
+│   │   ├── vk_volumetric_pipelines.c Volumetric fog / fluid / luminance / CBT / veg-wind pipeline setup (split from vk.c)
 │   │   ├── vk_fluidsim.c/h       Fluid simulation module
 │   │   ├── vk_postfx.c/h         PostFX (SSR, atmosphere, wind)
 │   │   ├── vk_flashlight.c/h     Projected texture system
