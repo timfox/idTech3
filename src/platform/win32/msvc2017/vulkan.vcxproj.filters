@@ -139,6 +139,9 @@
     <ClCompile Include="..\..\renderers\vulkan\vk_volumetric_pipelines.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\renderers\vulkan\vk_volumetric_internal.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\renderers\vulkan\vk_attachments.c">
       <Filter>Source Files</Filter>
     </ClCompile>
