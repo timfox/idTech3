@@ -265,6 +265,7 @@
     <ClCompile Include="..\..\..\renderers\vulkan\vk_device.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_flashlight.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_flares.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_attachments.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_framebuffers.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_frame_end.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_geometry.c" />

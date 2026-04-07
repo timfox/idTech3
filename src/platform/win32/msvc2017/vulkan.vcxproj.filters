@@ -118,6 +118,9 @@
     <ClCompile Include="..\..\renderers\vulkan\vk_pipelines_persistent.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\renderers\vulkan\vk_attachments.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\renderers\vulkan\vk_framebuffers.c">
       <Filter>Source Files</Filter>
     </ClCompile>
