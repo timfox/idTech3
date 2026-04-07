@@ -114,10 +114,6 @@ typedef uint32_t glIndex_t;
 //  and this is reflected by the value of MAX_REFENTITIES (which therefore is not a power-of-2)
 #define	MAX_REFENTITIES		((1<<REFENTITYNUM_BITS) - 1)
 #define	REFENTITYNUM_WORLD	((1<<REFENTITYNUM_BITS) - 1)
-#ifdef USE_VULKAN
-// GPU occlusion culling: visibility from previous frame (1=visible, 0=occluded).
-extern uint64_t vk_entity_occlusion_visibility[MAX_REFENTITIES];
-#endif
 // 14 bits
 // can't be increased without changing bit packing for drawsurfs
 // see QSORT_SHADERNUM_SHIFT
