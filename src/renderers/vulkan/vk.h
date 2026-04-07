@@ -5,6 +5,7 @@
 #include "tr_common.h"
 #include "vk_util.h"
 #include "vk_descriptor_sets.h"
+#include "vk_texture_image.h"
 
 /* VK_EXT_extended_dynamic_state3: color write mask for RB_ColorMask */
 #ifndef VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT
@@ -411,12 +412,6 @@ VkSampleCountFlagBits vk_get_main_rasterization_samples( void );
 //
 void vk_allocate_and_bind_image_memory( VkImage image );
 void vk_image_free_chunks( void );
-void vk_create_image( image_t *image, int width, int height, int mip_levels );
-void vk_upload_image_data( image_t *image, int x, int y, int width, int height, int miplevels, byte *pixels, int size, qboolean update );
-void vk_upload_cubemap_mip_data( image_t *image, int face_size, int miplevels, const byte *pixels, int size, int bytes_per_pixel, qboolean update );
-void vk_upload_compressed_image_data( image_t *image, int width, int height, int miplevels, byte *pixels, int size, qboolean update );
-void vk_update_descriptor_set( image_t *image, qboolean mipmap );
-void vk_destroy_image_resources( VkImage *image, VkImageView *imageView );
 void vk_bind_generated_shaders( void );
 void vk_validate_pbr_ibl_resources( void );
 void vk_destroy_samplers( void );

@@ -266,6 +266,7 @@
     <ClCompile Include="..\..\..\renderers\vulkan\vk_cmd.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_descriptors.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_descriptor_sets.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_texture_image.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_device.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_flashlight.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_flares.c" />
