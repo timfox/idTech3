@@ -8,4 +8,6 @@ Evidence for **Tier B** (automated + `GAME_BASE`) and **Tier C** (manual GPU / v
 | [TEMPLATE_TIER_C.md](TEMPLATE_TIER_C.md) | Copy per session; record date, commit, maps, Vulkan vs OpenGL, validation-layer result |
 | [FINDINGS.md](FINDINGS.md) | Rolling log: Tier C GPU sessions + optional Tier A automated baseline rows |
 
+**Local gap report:** from repo root, `./scripts/evidence_status.sh` (Tier A–D checklist vs current env).
+
 Related: [docs/RENDERER_CONFIDENCE.md](../RENDERER_CONFIDENCE.md), [docs/PRODUCTION_CERTIFICATION.md](../PRODUCTION_CERTIFICATION.md).

@@ -2,7 +2,7 @@
 
 Use this checklist before tagging or publishing a release.
 
-For a **stricter engine bar** (automated steps + optional content-backed maps), see [PRODUCTION_CERTIFICATION.md](PRODUCTION_CERTIFICATION.md) and run `./scripts/production_readiness.sh` (set `GAME_BASE` when you have a full `base/` tree).
+For a **stricter engine bar** (automated steps + optional content-backed maps), see [PRODUCTION_CERTIFICATION.md](PRODUCTION_CERTIFICATION.md) and run `./scripts/production_readiness.sh` (set `GAME_BASE` when you have a full `base/` tree). **Gap report:** `./scripts/evidence_status.sh`.
 
 ## Pre-Release
 

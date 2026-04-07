@@ -23,7 +23,10 @@ Run all commands from the **repository root** unless noted.
 ```bash
 ./scripts/smoke_test.sh release
 cd build-vk-Release && ctest --output-on-failure
+./scripts/evidence_status.sh
 ```
+
+`evidence_status.sh` prints Tier A–D gaps (build dirs, `GAME_BASE`, FINDINGS placeholder) — see [docs/PRODUCTION_CERTIFICATION.md](../../docs/PRODUCTION_CERTIFICATION.md).
 
 ## Full local CI parity + production orchestrator
 
