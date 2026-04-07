@@ -130,6 +130,9 @@
     <ClCompile Include="..\..\renderers\vulkan\vk_occlusion.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\renderers\vulkan\vk_create_pipeline.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\renderers\vulkan\vk_attachments.c">
       <Filter>Source Files</Filter>
     </ClCompile>

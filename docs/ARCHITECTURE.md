@@ -51,6 +51,7 @@ src/
 │   │   ├── vk_texture_image.c/h    Texture image create/upload + per-image descriptor (split from vk.c)
 │   │   ├── vk_pipeline_helpers.c/h Post-process pipelines: atmosphere, OIT accum, blur; vk_set_shader_stage_desc (split from vk.c)
 │   │   ├── vk_occlusion.c/h       GPU occlusion queries + entity visibility buffer (split from vk.c)
+│   │   ├── vk_create_pipeline.c/h Vk_Pipeline_Def graphics pipeline factory + pipeline table lookup (split from vk.c)
 │   │   ├── vk_fluidsim.c/h       Fluid simulation module
 │   │   ├── vk_postfx.c/h         PostFX (SSR, atmosphere, wind)
 │   │   ├── vk_flashlight.c/h     Projected texture system
