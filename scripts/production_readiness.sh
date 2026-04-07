@@ -97,5 +97,6 @@ else
 fi
 
 echo "=== Production readiness: automated steps complete ==="
-echo "Manual: complete Tier C in docs/PRODUCTION_CERTIFICATION.md (GPU proof, validation layers)."
+echo "Evidence gaps: ./scripts/evidence_status.sh"
+echo "Manual: Tier C in docs/PRODUCTION_CERTIFICATION.md (GPU proof, validation layers)."
 echo "Release: docs/RELEASE_CHECKLIST.md before tagging."

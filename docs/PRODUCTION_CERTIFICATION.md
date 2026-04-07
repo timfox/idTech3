@@ -48,6 +48,20 @@ If you are aiming for **AAA-style quality**:
 2. Add a **title-specific** checklist (your game repo): soak tests, telemetry, cert matrix per platform, and submission builds.
 3. Budget **fixed hardware labs** and **signed soak** (multi-hour sessions, memory leak checks, driver matrix).
 
+## Stricter evidence (recommended order)
+
+Tightening proof is mostly **feeding stable inputs** (same `GAME_BASE`, same regression maps, same hardware class) and **recording outcomes** so regressions are obvious.
+
+| Step | Gate | What to do |
+|------|------|------------|
+| 1 | Tier A | Keep GitHub matrix green; locally run `./scripts/production_readiness.sh` (optionally with `GAME_BASE` set). |
+| 2 | Tier B | Fix **`GAME_BASE`** on a machine you control; run `renderer_regression_check.sh` + `renderer_regression_maps.sh` on every release candidate. Automate on **`main`** via [SELF_HOSTED_TIER_B.md](renderer_validation/SELF_HOSTED_TIER_B.md) (`IDTECH3_GAME_BASE_PATH` + runner `idtech3-tierb`). |
+| 3 | Tier C | After Tier B is green, run the [RENDERER_CONFIDENCE.md](RENDERER_CONFIDENCE.md) proof loop on **Vulkan and OpenGL**; log rows in [FINDINGS.md](renderer_validation/FINDINGS.md) using [TEMPLATE_TIER_C.md](renderer_validation/TEMPLATE_TIER_C.md). |
+| 4 | Tier D | Tag only after [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md); attach build artifacts you actually smoke-tested. |
+| 5 | Title / AAA | Engine tiers **do not** replace platform cert: use [examples/title-repo/CERTIFICATION_CHECKLIST.md](../examples/title-repo/CERTIFICATION_CHECKLIST.md) in the **game** repo for telemetry, soak, and submission SKUs. |
+
+**Quick gap report (local):** `./scripts/evidence_status.sh` — prints what is configured vs skipped (read-only; no secrets).
+
 ## How to move forward from current health
 
 1. **Run the orchestrator weekly on `main`**: `./scripts/production_readiness.sh`
