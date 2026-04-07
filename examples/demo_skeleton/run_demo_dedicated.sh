@@ -100,9 +100,7 @@ shopt -s nullglob
 _base_pk3s=( "$BASE_ROOT/$BASE_DIR_NAME"/*.pk3 )
 shopt -u nullglob
 if [[ ${#_base_pk3s[@]} -eq 0 ]]; then
-	echo "No .pk3 files in $BASE_ROOT/$BASE_DIR_NAME — dedicated server needs full game data (maps, game VM) in base." >&2
-	echo "See: examples/demo_skeleton/base/README.txt" >&2
-	exit 2
+	echo "Note: no .pk3 in $BASE_ROOT/$BASE_DIR_NAME — +map will need qagame/maps from a full base." >&2
 fi
 
 SERVER="${IDTECH3_SERVER:-}"

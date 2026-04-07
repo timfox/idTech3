@@ -1,8 +1,9 @@
 Put your licensed game data here
 ================================
 
-You need the **full** game .pk3 set from a compatible title (maps, **ui.qvm**, **qagame**, etc.).
-The **idtech3_demo** mod is only extra configs — it will **not** run the client by itself.
+**Bare window (skeleton):** rebuild **idtech3_demo.pk3** from this repo; it ships a **native UI stub** in **vm/** so the client can open without **ui.qvm**.
+
+**Play maps / full menus:** add the **full** game .pk3 set from a compatible title (maps, **qagame**, retail UI if you want stock menus).
 
 Copy or symlink your game’s folder contents into this directory.
 

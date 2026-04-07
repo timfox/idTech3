@@ -6,12 +6,14 @@ This is **not** a standalone game: it is a **tiny mod** (`.pk3` of configs) you 
 
 | Artifact | Description |
 |----------|-------------|
-| `idtech3_demo.pk3` | Config mod: renderer cvars, **Duktape** `scripts/js/demo_hooks.js` (map_load / frame / HUD), and gameplay-system hints (`buildnavmesh`, `cl_*` cvars). |
+| `idtech3_demo.pk3` | Config mod + **minimal native UI** (`vm/ui<arch>.so` or `.dll` inside the zip): enough to open a window and draw placeholder text **without** retail `ui.qvm`. Also **Duktape** hooks and gameplay hints. |
 | `idtech3_demo_helper` | Optional tiny host binary that prints launch hints (built when `BUILD_EXAMPLE_DEMO_GAME=ON`). |
 
 ### “Playable” without custom qagame
 
-You still need **stock** `qagame` / maps from your `base/`. This mod adds:
+**Menus:** the pack includes a tiny **native `ui` shared library** (same API as `ui.qvm`) so the client can start with an **empty `base/`** — you get a window and on-screen hint text only.
+
+**In-game:** you still need **stock** `qagame` / maps from your `base/` to join a map or use full UI. This mod adds:
 
 1. **Renderer demo** — `demo_features.cfg` turns on PBR, volumetric fog, SSR, atmosphere, veg wind (Vulkan).
 2. **Lightweight game code** — `demo_hooks.js` registers `idtech3.on('map_load')` and `idtech3.on('frame')` and draws an occasional HUD line (proves the `idtech3` Duktape API in `src/qcommon/js_debug.c`).
@@ -34,7 +36,7 @@ Or use the wrapper:
 ./examples/demo_game/build_demo_pack.sh
 ```
 
-CI / pre-push: the repo test `test_demo_game_pk3` packs the same file set with `cmake -E tar` (no full engine configure). Run `ctest -R test_demo_game_pk3` or `./tests/scripts/test_demo_game_pk3.sh`.
+CI / pre-push: `test_demo_game_pk3` stages the same tree (configs + `cc`-built `vm/ui*.so` when available). Run `ctest -R test_demo_game_pk3` or `./tests/scripts/test_demo_game_pk3.sh`.
 
 ## Install and run
 

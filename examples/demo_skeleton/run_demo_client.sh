@@ -139,11 +139,8 @@ shopt -s nullglob
 _base_pk3s=( "$BASE_ROOT/$BASE_DIR_NAME"/*.pk3 )
 shopt -u nullglob
 if [[ ${#_base_pk3s[@]} -eq 0 ]]; then
-	echo "No .pk3 files in $BASE_ROOT/$BASE_DIR_NAME" >&2
-	echo "The client needs full game data there (e.g. Q3A pak0.pk3–pak8.pk3, or your title’s base packs) so ui.qvm can load." >&2
-	echo "idtech3_demo.pk3 is only a small config mod — it does not include the UI or maps." >&2
-	echo "See: examples/demo_skeleton/base/README.txt" >&2
-	exit 2
+	echo "Note: no .pk3 in $BASE_ROOT/$BASE_DIR_NAME — menus/maps need retail/base packs." >&2
+	echo "Rebuild idtech3_demo.pk3 (./examples/demo_game/build_demo_pack.sh) for the bundled native UI stub in vm/." >&2
 fi
 
 ENGINE="${IDTECH3_ENGINE:-}"

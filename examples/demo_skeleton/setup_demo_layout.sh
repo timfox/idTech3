@@ -44,7 +44,7 @@ TMP_ENV="$(mktemp)"
 
 echo ""
 echo "Playfield ready: $ABS"
-echo "  1. Add game .pk3 files → $ABS/base/   (see base/README.txt)"
+echo "  1. (Optional) Add game .pk3 files → $ABS/base/ for maps/menus; bare window works with empty base + rebuilt idtech3_demo.pk3"
 echo "  2. Launch (repo root): ./scripts/run_demo.sh"
 echo "     or:                ./examples/demo_skeleton/run_demo.sh"
 echo ""
