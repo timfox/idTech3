@@ -54,6 +54,7 @@ The scripts look for **`base/`** and **`idtech3_demo/`** next to themselves, so 
 |--------|------------|
 | “Missing … idtech3_demo.pk3” | Run Step 1 and copy the `.pk3` into `idtech3_demo/`. |
 | “No engine binary” | Build the engine (`./scripts/compile_engine.sh vulkan`) or set **`IDTECH3_ENGINE`** in `local.env` to your `idtech3` path. |
+| **`VM_Create on UI failed`** / **`ui.qvm not found`** | Your **`base/`** (or **`baseq3/`**) must contain the **full** game archives (e.g. Q3A **`pak0.pk3`** … **`pak8.pk3`**). The demo mod alone cannot start the client — it has no UI VM. |
 | “No game data” / missing maps | Add `.pk3` files under **`base/`** (or set **`DEMO_BASE_DIR`** — see below). |
 | Wrong renderer | Set **`DEMO_RENDERER=opengl`** in `local.env`, or run with `+set cl_renderer opengl`. |
 | Windows | Use **`run_demo_client.bat`** from the same folder layout; put **`idtech3.exe`** next to it or on `PATH`. |
