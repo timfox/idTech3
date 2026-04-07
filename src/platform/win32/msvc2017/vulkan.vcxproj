@@ -272,6 +272,7 @@
     <ClCompile Include="..\..\..\renderers\vulkan\vk_create_pipeline.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_draw_state.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_volumetric_pipelines.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_volumetric_internal.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_device.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_flashlight.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_flares.c" />
