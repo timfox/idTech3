@@ -45,6 +45,7 @@ src/
 │   │   ├── vk_shader_modules.c/h SPIR-V `VkShaderModule` creation + `vk_create_shader_modules`
 │   │   ├── vk_pipelines_persistent.c/h Long-lived pipelines (skybox, fog, debug tools)
 │   │   ├── vk_attachments.c/h    Render targets, pooled image memory, shadows, froxels (split from vk.c)
+│   │   ├── vk_resource_destroy.c/h VkRenderPass + long-lived pipeline teardown (split from vk.c)
 │   │   ├── vk_framebuffers.c/h       VkFramebuffer create/destroy (split from vk.c)
 │   │   ├── vk_fluidsim.c/h       Fluid simulation module
 │   │   ├── vk_postfx.c/h         PostFX (SSR, atmosphere, wind)
