@@ -11,4 +11,8 @@ if [[ -z "${IDTECH3_DEMO_ROOT:-}" && -f "$REL_ENV" ]]; then
 	source "$REL_ENV"
 	set +a
 fi
+if [[ -n "${IDTECH3_DEMO_ROOT:-}" && ! -d "$IDTECH3_DEMO_ROOT" ]]; then
+	echo "Warning: release/local.env sets invalid IDTECH3_DEMO_ROOT ($IDTECH3_DEMO_ROOT); ignoring" >&2
+	unset IDTECH3_DEMO_ROOT
+fi
 exec "$ROOT/examples/demo_skeleton/run_demo_client.sh" "$@"

@@ -46,8 +46,13 @@ if [[ -n "$ENV_FILE" ]]; then
 	source "$ENV_FILE"
 	set +a
 fi
-if [[ -n "$SAVED_DEMO_ROOT" ]]; then
+if [[ -n "$SAVED_DEMO_ROOT" && -d "$SAVED_DEMO_ROOT" ]]; then
 	IDTECH3_DEMO_ROOT="$SAVED_DEMO_ROOT"
+fi
+# Copied-from-example local.env often leaves a bogus IDTECH3_DEMO_ROOT; drop it so args/defaults work.
+if [[ -n "${IDTECH3_DEMO_ROOT:-}" && ! -d "$IDTECH3_DEMO_ROOT" ]]; then
+	echo "Warning: IDTECH3_DEMO_ROOT is not a directory ($IDTECH3_DEMO_ROOT) — fix or remove it in local.env" >&2
+	unset IDTECH3_DEMO_ROOT
 fi
 
 # First argument: explicit playfield root
@@ -91,13 +96,14 @@ if [[ -z "${IDTECH3_DEMO_ROOT:-}" ]]; then
 fi
 
 BASE_ROOT="$(cd "$IDTECH3_DEMO_ROOT" && pwd)"
-# Playfield-specific env (e.g. release/local.env after setup_demo_layout)
+# Playfield local.env may set DEMO_MAP, etc. It must not override the resolved playfield
+# (users sometimes leave a placeholder IDTECH3_DEMO_ROOT in local.env).
 if [[ -f "$BASE_ROOT/local.env" ]]; then
 	set -a
 	# shellcheck source=/dev/null
 	source "$BASE_ROOT/local.env"
 	set +a
-	BASE_ROOT="$(cd "$IDTECH3_DEMO_ROOT" && pwd)"
+	IDTECH3_DEMO_ROOT="$BASE_ROOT"
 fi
 # Engine loads mods from fs_game/<name>/; pk3 must live as idtech3_demo/idtech3_demo.pk3.
 # If the user dropped idtech3_demo.pk3 next to base/, link it into place.

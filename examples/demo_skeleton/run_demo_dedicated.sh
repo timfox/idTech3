@@ -33,8 +33,12 @@ if [[ -n "$ENV_FILE" ]]; then
 	source "$ENV_FILE"
 	set +a
 fi
-if [[ -n "$SAVED_DEMO_ROOT" ]]; then
+if [[ -n "$SAVED_DEMO_ROOT" && -d "$SAVED_DEMO_ROOT" ]]; then
 	IDTECH3_DEMO_ROOT="$SAVED_DEMO_ROOT"
+fi
+if [[ -n "${IDTECH3_DEMO_ROOT:-}" && ! -d "$IDTECH3_DEMO_ROOT" ]]; then
+	echo "Warning: IDTECH3_DEMO_ROOT is not a directory ($IDTECH3_DEMO_ROOT) — fix or remove it in local.env" >&2
+	unset IDTECH3_DEMO_ROOT
 fi
 
 if [[ -n "${1:-}" && "$1" != -* ]]; then
@@ -70,7 +74,7 @@ if [[ -f "$BASE_ROOT/local.env" ]]; then
 	# shellcheck source=/dev/null
 	source "$BASE_ROOT/local.env"
 	set +a
-	BASE_ROOT="$(cd "$IDTECH3_DEMO_ROOT" && pwd)"
+	IDTECH3_DEMO_ROOT="$BASE_ROOT"
 fi
 mkdir -p "$BASE_ROOT/idtech3_demo"
 PK3="$BASE_ROOT/idtech3_demo/idtech3_demo.pk3"
