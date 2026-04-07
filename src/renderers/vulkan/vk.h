@@ -36,6 +36,9 @@ typedef void (VKAPI_PTR *PFN_vkCmdSetColorWriteMaskEXT)(VkCommandBuffer commandB
 #define VERTEX_BUFFER_SIZE     (4 * 1024 * 1024)  /* by default */
 #define VERTEX_BUFFER_SIZE_HI  (8 * 1024 * 1024)
 
+#define VEGWIND_MAX_VERTS 16384
+#define VEGWIND_VERTEX_STRIDE 32  /* positionFlex + normalPhase */
+
 #define STAGING_BUFFER_SIZE    (2 * 1024 * 1024)  /* by default */
 #define STAGING_BUFFER_SIZE_HI (24 * 1024 * 1024) /* enough for max.texture size upload with all mip levels at once */
 
@@ -425,6 +428,7 @@ VkSampler vk_find_sampler( const Vk_Sampler_Def *def );
 
 void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_t height );
 void vk_create_pipelines( void );
+void vk_create_volumetric_pipelines( void );
 
 //
 // Rendering setup.
