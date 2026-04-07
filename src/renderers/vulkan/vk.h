@@ -4,6 +4,7 @@
 #include "../common/vulkan/vulkan.h"
 #include "tr_common.h"
 #include "vk_util.h"
+#include "vk_descriptor_sets.h"
 
 /* VK_EXT_extended_dynamic_state3: color write mask for RB_ColorMask */
 #ifndef VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT
@@ -394,9 +395,6 @@ void vk_set_object_name( uint64_t obj, const char *objName, VkDebugReportObjectT
 // After calling this function we get fully functional vulkan subsystem.
 void vk_initialize( void );
 
-// Called after initialization or renderer restart
-void vk_init_descriptors( void );
-
 // Shutdown vulkan subsystem by releasing resources acquired by Vk_Instance.
 void vk_shutdown( refShutdownCode_t code );
 
@@ -420,7 +418,6 @@ void vk_upload_compressed_image_data( image_t *image, int width, int height, int
 void vk_update_descriptor_set( image_t *image, qboolean mipmap );
 void vk_destroy_image_resources( VkImage *image, VkImageView *imageView );
 void vk_bind_generated_shaders( void );
-void vk_update_attachment_descriptors( void );
 void vk_validate_pbr_ibl_resources( void );
 void vk_destroy_samplers( void );
 VkSampler vk_find_sampler( const Vk_Sampler_Def *def );
