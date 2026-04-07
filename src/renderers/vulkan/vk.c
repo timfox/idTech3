@@ -1173,9 +1173,6 @@ qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size )
 
 	// staging buffers
 
-#ifdef USE_UPLOAD_QUEUE
-	vk_flush_staging_buffer( qfalse );
-#endif
 	// utilize existing staging buffer
 	uploadDone = 0;
 	while ( uploadDone < (VkDeviceSize) vbo_size ) {
@@ -1285,10 +1282,6 @@ static void vk_restart_swapchain( const char *funcname, VkResult res )
 	for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ ) {
 		qvkResetCommandBuffer( vk.tess[i].command_buffer, 0 );
 	}
-
-#ifdef USE_UPLOAD_QUEUE
-	qvkResetCommandBuffer( vk.staging_command_buffer, 0 );
-#endif
 
 	vk_destroy_pipelines( qfalse );
 	vk_destroy_framebuffers();
@@ -1753,20 +1746,6 @@ void vk_initialize( void )
 
 		SET_OBJECT_NAME( vk.command_pool, "command pool", VK_DEBUG_REPORT_OBJECT_TYPE_COMMAND_POOL_EXT );
 	}
-
-#ifdef USE_UPLOAD_QUEUE
-	{
-		VkCommandBufferAllocateInfo alloc_info;
-
-		alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		alloc_info.pNext = NULL;
-		alloc_info.commandPool = vk.command_pool;
-		alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		alloc_info.commandBufferCount = 1;
-
-		VK_CHECK( qvkAllocateCommandBuffers( vk.device, &alloc_info, &vk.staging_command_buffer ) );
-	}
-#endif
 
 	//
 	// Command buffers and color attachments.
@@ -3649,52 +3628,6 @@ void vk_upload_image_data( image_t *image, int x, int y, int width, int height, 
 		if (height < 1) height = 1;
 	}
 
-#ifdef USE_UPLOAD_QUEUE
-	if ( vk_wait_staging_buffer() ) {
-		// wait for vkQueueSubmit() completion before new upload
-	}
-
-	if ( vk.staging_buffer.size - vk.staging_buffer.offset < buffer_size ) {
-		// try to flush staging buffer and reset offset
-		vk_flush_staging_buffer( qfalse );
-	}
-
-	if ( vk.staging_buffer.size /* - vk_world.staging_buffer_offset */ < buffer_size ) {
-		// if still not enough - reallocate staging buffer
-		vk_alloc_staging_buffer( buffer_size );
-	}
-
-	for ( n = 0; n < num_regions; n++ ) {
-		regions[n].bufferOffset += vk.staging_buffer.offset;
-	}
-
-	Com_Memcpy( vk.staging_buffer.ptr + vk.staging_buffer.offset, buf, buffer_size );
-
-	if ( vk.staging_buffer.offset == 0 ) {
-		VkCommandBufferBeginInfo begin_info;
-		begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		begin_info.pNext = NULL;
-		begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-		begin_info.pInheritanceInfo = NULL;
-		VK_CHECK( qvkBeginCommandBuffer( vk.staging_command_buffer, &begin_info ) );
-	}
-
-	//ri.Printf( PRINT_WARNING, "batch @%6i + %i %s \n", (int)vk_world.staging_buffer_offset, (int)buffer_size, image->imgName );
-	vk.staging_buffer.offset += buffer_size;
-
-	command_buffer = vk.staging_command_buffer;
-
-	if ( update ) {
-		record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0 );
-	} else {
-		record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_HOST_BIT, 0 );
-	}
-
-	qvkCmdCopyBufferToImage( command_buffer, vk.staging_buffer.handle, image->handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, num_regions, regions );
-
-	// final transition after upload comleted
-	record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
-#else
 	if ( vk.staging_buffer.size < (VkDeviceSize) buffer_size ) {
 		vk_alloc_staging_buffer( buffer_size );
 	}
@@ -3711,7 +3644,6 @@ void vk_upload_image_data( image_t *image, int x, int y, int width, int height, 
 	qvkCmdCopyBufferToImage( command_buffer, vk.staging_buffer.handle, image->handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, num_regions, regions );
 	record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
 	vk_end_command_buffer( command_buffer, __func__ );
-#endif
 
 	if ( buf != pixels ) {
 		ri.Hunk_FreeTempMemory( buf );
@@ -3769,43 +3701,12 @@ void vk_upload_cubemap_mip_data( image_t *image, int face_size, int miplevels, c
 		return;
 	}
 
-#ifdef USE_UPLOAD_QUEUE
-	if ( vk_wait_staging_buffer() ) {
-	}
-
-	if ( vk.staging_buffer.size - vk.staging_buffer.offset < (VkDeviceSize)buffer_size ) {
-		vk_flush_staging_buffer( qfalse );
-	}
-
-	if ( vk.staging_buffer.size < (VkDeviceSize)buffer_size ) {
-		vk_alloc_staging_buffer( buffer_size );
-	}
-
-	for ( mip = 0; mip < num_regions; mip++ ) {
-		regions[mip].bufferOffset += vk.staging_buffer.offset;
-	}
-
-	Com_Memcpy( vk.staging_buffer.ptr + vk.staging_buffer.offset, pixels, buffer_size );
-
-	if ( vk.staging_buffer.offset == 0 ) {
-		VkCommandBufferBeginInfo begin_info;
-		begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		begin_info.pNext = NULL;
-		begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-		begin_info.pInheritanceInfo = NULL;
-		VK_CHECK( qvkBeginCommandBuffer( vk.staging_command_buffer, &begin_info ) );
-	}
-
-	vk.staging_buffer.offset += buffer_size;
-	command_buffer = vk.staging_command_buffer;
-#else
 	if ( vk.staging_buffer.size < (VkDeviceSize)buffer_size ) {
 		vk_alloc_staging_buffer( buffer_size );
 	}
 
 	Com_Memcpy( vk.staging_buffer.ptr, pixels, buffer_size );
 	command_buffer = vk_begin_command_buffer();
-#endif
 
 	if ( update ) {
 		record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT,
@@ -3820,9 +3721,7 @@ void vk_upload_cubemap_mip_data( image_t *image, int face_size, int miplevels, c
 	record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
 
-#ifndef USE_UPLOAD_QUEUE
 	vk_end_command_buffer( command_buffer, __func__ );
-#endif
 }
 
 /*
@@ -3868,37 +3767,11 @@ void vk_upload_compressed_image_data( image_t *image, int width, int height, int
 			break;
 	}
 
-#ifdef USE_UPLOAD_QUEUE
-	if ( vk_wait_staging_buffer() ) {
-		vk_flush_staging_buffer( qfalse );
-	}
-	if ( vk.staging_buffer.size - vk.staging_buffer.offset < (VkDeviceSize)size ) {
-		vk_flush_staging_buffer( qfalse );
-	}
-	if ( vk.staging_buffer.size < (VkDeviceSize)size ) {
-		vk_alloc_staging_buffer( size );
-	}
-	for ( n = 0; n < num_regions; n++ ) {
-		regions[n].bufferOffset += vk.staging_buffer.offset;
-	}
-	Com_Memcpy( vk.staging_buffer.ptr + vk.staging_buffer.offset, pixels, size );
-	if ( vk.staging_buffer.offset == 0 ) {
-		VkCommandBufferBeginInfo begin_info;
-		begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		begin_info.pNext = NULL;
-		begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-		begin_info.pInheritanceInfo = NULL;
-		VK_CHECK( qvkBeginCommandBuffer( vk.staging_command_buffer, &begin_info ) );
-	}
-	vk.staging_buffer.offset += size;
-	command_buffer = vk.staging_command_buffer;
-#else
 	if ( vk.staging_buffer.size < (VkDeviceSize)size ) {
 		vk_alloc_staging_buffer( size );
 	}
 	Com_Memcpy( vk.staging_buffer.ptr, pixels, size );
 	command_buffer = vk_begin_command_buffer();
-#endif
 
 	if ( update ) {
 		record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0 );
@@ -3908,9 +3781,7 @@ void vk_upload_compressed_image_data( image_t *image, int width, int height, int
 	qvkCmdCopyBufferToImage( command_buffer, vk.staging_buffer.handle, image->handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, num_regions, regions );
 	record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
 
-#ifndef USE_UPLOAD_QUEUE
 	vk_end_command_buffer( command_buffer, __func__ );
-#endif
 }
 
 void vk_update_descriptor_set( image_t *image, qboolean mipmap ) {
@@ -8433,10 +8304,6 @@ void vk_begin_frame( void )
 	vk.temporal.preparedThisFrame = qfalse;
 	vk.uiOverlayActive = qfalse;
 
-#ifdef USE_UPLOAD_QUEUE
-	vk_flush_staging_buffer( qtrue );
-#endif
-
 	vk.cmd = &vk.tess[ vk.cmd_index ];
 
 	if ( vk.cmd->waitForFence ) {
@@ -8617,12 +8484,7 @@ static void vk_resize_geometry_buffer( void )
 
 void vk_end_frame( void )
 {
-#ifdef USE_UPLOAD_QUEUE
-	VkSemaphore waits[2], signals[2];
-	const VkPipelineStageFlags wait_dst_stage_mask[2] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-#else
 	const VkPipelineStageFlags wait_dst_stage_mask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-#endif
 	VkSubmitInfo submit_info;
 
 	if ( vk.frame_count == 0 )
@@ -8689,46 +8551,11 @@ void vk_end_frame( void )
 	submit_info.commandBufferCount = 1;
 	submit_info.pCommandBuffers = &vk.cmd->command_buffer;
 	if ( !ri.CL_IsMinimized() ) {
-#ifdef USE_UPLOAD_QUEUE
-		if ( vk.image_uploaded != VK_NULL_HANDLE ) {
-			waits[0] = vk.cmd->image_acquired;
-			waits[1] = vk.image_uploaded;
-			submit_info.waitSemaphoreCount = 2;
-			submit_info.pWaitSemaphores = &waits[0];
-			submit_info.pWaitDstStageMask = &wait_dst_stage_mask[0];
-			signals[0] = vk.swapchain_rendering_finished[ vk.cmd->swapchain_image_index ];
-			signals[1] = vk.cmd->rendering_finished2;
-			submit_info.signalSemaphoreCount = 2;
-			submit_info.pSignalSemaphores = &signals[0];
-
-			vk.rendering_finished = vk.cmd->rendering_finished2;
-			vk.image_uploaded = VK_NULL_HANDLE;
-		} else if ( vk.rendering_finished != VK_NULL_HANDLE ) {
-			waits[0] = vk.cmd->image_acquired;
-			waits[1] = vk.rendering_finished;
-			submit_info.waitSemaphoreCount = 2;
-			submit_info.pWaitSemaphores = &waits[0];
-			submit_info.pWaitDstStageMask = &wait_dst_stage_mask[0];
-			signals[0] = vk.swapchain_rendering_finished[ vk.cmd->swapchain_image_index ];
-			signals[1] = vk.cmd->rendering_finished2;
-			submit_info.signalSemaphoreCount = 2;
-			submit_info.pSignalSemaphores = &signals[0];
-
-			vk.rendering_finished = vk.cmd->rendering_finished2;
-		} else {
-			submit_info.waitSemaphoreCount = 1;
-			submit_info.pWaitSemaphores = &vk.cmd->image_acquired;
-			submit_info.pWaitDstStageMask = &wait_dst_stage_mask[0];
-			submit_info.signalSemaphoreCount = 1;
-			submit_info.pSignalSemaphores = &vk.swapchain_rendering_finished[ vk.cmd->swapchain_image_index ];
-		}
-#else
 		submit_info.waitSemaphoreCount = 1;
 		submit_info.pWaitSemaphores = &vk.cmd->image_acquired;
 		submit_info.pWaitDstStageMask = &wait_dst_stage_mask;
 		submit_info.signalSemaphoreCount = 1;
 		submit_info.pSignalSemaphores = &vk.swapchain_rendering_finished[ vk.cmd->swapchain_image_index ];
-#endif
 	} else {
 		submit_info.waitSemaphoreCount = 0;
 		submit_info.pWaitSemaphores = NULL;
