@@ -47,6 +47,7 @@ src/
 │   │   ├── vk_attachments.c/h    Render targets, pooled image memory, shadows, froxels (split from vk.c)
 │   │   ├── vk_resource_destroy.c/h VkRenderPass + long-lived pipeline teardown (split from vk.c)
 │   │   ├── vk_framebuffers.c/h       VkFramebuffer create/destroy (split from vk.c)
+│   │   ├── vk_descriptor_sets.c/h    Descriptor pool alloc + attachment/volumetric writes (split from vk.c)
 │   │   ├── vk_fluidsim.c/h       Fluid simulation module
 │   │   ├── vk_postfx.c/h         PostFX (SSR, atmosphere, wind)
 │   │   ├── vk_flashlight.c/h     Projected texture system
