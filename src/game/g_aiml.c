@@ -424,7 +424,7 @@ aimlBotHandle_t AIML_CreateBot( const char *name ) {
 	bots[idx].active = qtrue;
 
 	AIML_SetBotProperty( idx, "name", name );
-	AIML_SetBotProperty( idx, "version", "1.0" );
+	AIML_SetBotProperty( idx, "version", "2.1" );
 
 	Com_Printf( "AIML: created bot '%s' (handle %d)\n", name, idx );
 	return idx;

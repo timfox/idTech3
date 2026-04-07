@@ -305,6 +305,7 @@ static int l_vdb_getGridCount(lua_State *L) {
 /* ========== AIML bindings ========== */
 
 #include "g_aiml.h"
+#include "g_engine_systems.h"
 
 static int l_aiml_createBot(lua_State *L) {
 	lua_pushinteger(L, AIML_CreateBot(luaL_checkstring(L, 1)));
@@ -344,6 +345,80 @@ static int l_aiml_resetUser(lua_State *L) {
 }
 static int l_aiml_getCategoryCount(lua_State *L) {
 	lua_pushinteger(L, AIML_GetCategoryCount((int)luaL_checkinteger(L, 1)));
+	return 1;
+}
+
+/* ========== Telemetry / replay / save / quest / dialogue ========== */
+
+static int l_telem_record(lua_State *L) {
+	EngineTelemetry_Record( luaL_checkstring( L, 1 ), luaL_checknumber( L, 2 ) );
+	return 0;
+}
+static int l_telem_get(lua_State *L) {
+	lua_pushnumber( L, EngineTelemetry_Get( luaL_checkstring( L, 1 ) ) );
+	return 1;
+}
+static int l_telem_clear(lua_State *L ) {
+	(void)L;
+	EngineTelemetry_Clear();
+	return 0;
+}
+
+static int l_replay_frame(lua_State *L ) {
+	lua_pushinteger( L, EngineReplay_GetFrameIndex() );
+	return 1;
+}
+static int l_replay_baseTime(lua_State *L ) {
+	lua_pushinteger( L, EngineReplay_GetBaseTime() );
+	return 1;
+}
+
+static int l_save_write(lua_State *L ) {
+	lua_pushboolean( L, EngineSave_WriteSlot( (int)luaL_checkinteger( L, 1 ), luaL_checkstring( L, 2 ) ) );
+	return 1;
+}
+static int l_save_read(lua_State *L ) {
+	char buf[128];
+	if ( EngineSave_ReadSlot( (int)luaL_checkinteger( L, 1 ), buf, sizeof( buf ) ) ) {
+		lua_pushstring( L, buf );
+	} else {
+		lua_pushnil( L );
+	}
+	return 1;
+}
+static int l_save_lastSlot(lua_State *L ) {
+	lua_pushinteger( L, EngineSave_LastSlot() );
+	return 1;
+}
+
+static int l_quest_add(lua_State *L ) {
+	lua_pushinteger( L, EngineQuest_Add( luaL_checkstring( L, 1 ), luaL_checkstring( L, 2 ), luaL_checkstring( L, 3 ) ) );
+	return 1;
+}
+static int l_quest_setStage(lua_State *L ) {
+	lua_pushboolean( L, EngineQuest_SetStage( luaL_checkstring( L, 1 ), luaL_checkstring( L, 2 ) ) );
+	return 1;
+}
+static int l_quest_getStage(lua_State *L ) {
+	lua_pushstring( L, EngineQuest_GetStage( luaL_checkstring( L, 1 ) ) );
+	return 1;
+}
+static int l_quest_count(lua_State *L ) {
+	lua_pushinteger( L, EngineQuest_Count() );
+	return 1;
+}
+
+static int l_dialogue_start(lua_State *L ) {
+	lua_pushinteger( L, EngineDialogue_Start( luaL_optstring( L, 1, "" ), luaL_checkstring( L, 2 ) ) );
+	return 1;
+}
+static int l_dialogue_clear(lua_State *L ) {
+	(void)L;
+	EngineDialogue_Clear();
+	return 0;
+}
+static int l_dialogue_count(lua_State *L ) {
+	lua_pushinteger( L, EngineDialogue_ActiveCount() );
 	return 1;
 }
 
@@ -929,6 +1004,46 @@ void LuaBindings_RegisterAll(void *luaState) {
 	};
 	registerTable(L, "AIML", aimlFuncs);
 
+	static const luaL_Reg telemetryFuncs[] = {
+		{"record", l_telem_record},
+		{"get", l_telem_get},
+		{"clear", l_telem_clear},
+		{NULL, NULL}
+	};
+	registerTable(L, "Telemetry", telemetryFuncs);
+
+	static const luaL_Reg replayFuncs[] = {
+		{"frameIndex", l_replay_frame},
+		{"baseTime", l_replay_baseTime},
+		{NULL, NULL}
+	};
+	registerTable(L, "Replay", replayFuncs);
+
+	static const luaL_Reg saveFuncs[] = {
+		{"writeSlot", l_save_write},
+		{"readSlot", l_save_read},
+		{"lastSlot", l_save_lastSlot},
+		{NULL, NULL}
+	};
+	registerTable(L, "Save", saveFuncs);
+
+	static const luaL_Reg questFuncs[] = {
+		{"add", l_quest_add},
+		{"setStage", l_quest_setStage},
+		{"getStage", l_quest_getStage},
+		{"count", l_quest_count},
+		{NULL, NULL}
+	};
+	registerTable(L, "Quest", questFuncs);
+
+	static const luaL_Reg dialogueFuncs[] = {
+		{"start", l_dialogue_start},
+		{"clear", l_dialogue_clear},
+		{"count", l_dialogue_count},
+		{NULL, NULL}
+	};
+	registerTable(L, "Dialogue", dialogueFuncs);
+
 	static const luaL_Reg vdbFuncs[] = {
 		{"load", l_vdb_load},
 		{"free", l_vdb_free},
@@ -941,7 +1056,7 @@ void LuaBindings_RegisterAll(void *luaState) {
 	registerTable(L, "VDB", vdbFuncs);
 
 	lua_setglobal(L, "Engine");
-	Com_Printf("Lua bindings registered: Engine.{Director,Nav,Physics,Particles,Music,Face,Horde,Dismember,Choreo,Response,GOAP,ECS}\n");
+	Com_Printf("Lua bindings registered: Engine.{Director,Nav,Physics,Particles,Music,Face,Horde,Dismember,Choreo,Response,GOAP,AIML,Telemetry,Replay,Save,Quest,Dialogue,ECS}\n");
 }
 
 #else /* !USE_LUA */
