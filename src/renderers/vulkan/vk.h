@@ -7,6 +7,7 @@
 #include "vk_descriptor_sets.h"
 #include "vk_texture_image.h"
 #include "vk_pipeline_helpers.h"
+#include "vk_occlusion.h"
 
 /* VK_EXT_extended_dynamic_state3: color write mask for RB_ColorMask */
 #ifndef VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT
@@ -498,11 +499,7 @@ void VBO_ClearQueue( void );
 qboolean vk_create_gltf_buffers( const byte *vboData, int vboSize, const uint32_t *idxData, int idxCount,
 	VkBuffer *outVertexBuffer, VkBuffer *outIndexBuffer );
 
-/* GPU occlusion culling for entities */
-struct drawSurfsCommand_s;
-void vk_occlusion_pass( const struct drawSurfsCommand_s *cmd );
-void vk_occlusion_readback( void );
-void vk_occlusion_draw_entity_bboxes( const struct drawSurfsCommand_s *cmd );
+/* GPU occlusion culling: vk_occlusion.h */
 
 // cubemap
 #ifdef VK_CUBEMAP
