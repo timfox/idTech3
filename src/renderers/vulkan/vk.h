@@ -6,6 +6,7 @@
 #include "vk_util.h"
 #include "vk_descriptor_sets.h"
 #include "vk_texture_image.h"
+#include "vk_pipeline_helpers.h"
 
 /* VK_EXT_extended_dynamic_state3: color write mask for RB_ColorMask */
 #ifndef VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT
