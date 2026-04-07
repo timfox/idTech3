@@ -254,6 +254,8 @@ typedef struct VK_Pipeline {
 	VkPipeline handle[ RENDER_PASS_COUNT ];
 } VK_Pipeline_t;
 
+#include "vk_create_pipeline.h"
+
 // this structure must be in sync with shader uniforms!
 typedef struct vkUniform_s {
 	// light/env parameters:
@@ -408,6 +410,7 @@ void vk_release_resources( void );
 void vk_wait_idle( void );
 void vk_queue_wait_idle( void );
 VkSampleCountFlagBits vk_get_main_rasterization_samples( void );
+float vk_get_msaa_min_sample_shading( void );
 
 //
 // Resources allocation.
@@ -418,9 +421,6 @@ void vk_bind_generated_shaders( void );
 void vk_validate_pbr_ibl_resources( void );
 void vk_destroy_samplers( void );
 VkSampler vk_find_sampler( const Vk_Sampler_Def *def );
-
-uint32_t vk_find_pipeline_ext( uint32_t base, const Vk_Pipeline_Def *def, qboolean use );
-void vk_get_pipeline_def( uint32_t pipeline, Vk_Pipeline_Def *def );
 
 void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_t height );
 void vk_create_pipelines( void );
