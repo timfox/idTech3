@@ -200,18 +200,49 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install OpenSSL (Win64) for DTLS
-        shell: cmd
+        shell: pwsh
         run: |
           choco install openssl -y --no-progress
-          if exist "C:\Program Files\OpenSSL-Win64" (
-            echo OPENSSL_ROOT_DIR=C:\Program Files\OpenSSL-Win64>> %GITHUB_ENV%
+          # GITHUB_ENV must not be written with unquoted paths containing spaces (cmd "echo a=b>>file" breaks at the first space).
+          $roots = @(
+            'C:\Program Files\OpenSSL-Win64',
+            'C:\Program Files\OpenSSL'
           )
+          $found = $null
+          foreach ($r in $roots) {
+            $evp = Join-Path $r 'include\openssl\evp.h'
+            if (Test-Path -LiteralPath $evp) {
+              $found = $r
+              break
+            }
+          }
+          if (-not $found) {
+            $dirs = Get-ChildItem -Path 'C:\Program Files' -Directory -Filter 'OpenSSL*' -ErrorAction SilentlyContinue
+            foreach ($d in $dirs) {
+              $evp = Join-Path $d.FullName 'include\openssl\evp.h'
+              if (Test-Path -LiteralPath $evp) { $found = $d.FullName; break }
+            }
+          }
+          if (-not $found) {
+            throw "OpenSSL install did not expose include/openssl/evp.h under Program Files (DTLS MSVC build needs headers)."
+          }
+          Write-Host "OPENSSL_ROOT_DIR=$found"
+          "OPENSSL_ROOT_DIR=$found" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Build
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
         shell: cmd
         run: |
           if not exist bin mkdir bin
+
+          if "%OPENSSL_ROOT_DIR%"=="" (
+            echo ERROR: OPENSSL_ROOT_DIR is not set — OpenSSL install/discovery step failed.
+            exit /b 1
+          )
+          if not exist "%OPENSSL_ROOT_DIR%\include\openssl\evp.h" (
+            echo ERROR: OpenSSL headers not found at "%OPENSSL_ROOT_DIR%\include\openssl\evp.h"
+            exit /b 1
+          )
 
           set MSBUILD_COMMON=/m ^
             /p:Configuration=${{ matrix.btype }} ^
