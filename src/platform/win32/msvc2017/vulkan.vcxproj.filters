@@ -148,6 +148,9 @@
     <ClCompile Include="..\..\renderers\vulkan\vk_shutdown.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\renderers\vulkan\vk_postfx_passes.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\renderers\vulkan\vk_attachments.c">
       <Filter>Source Files</Filter>
     </ClCompile>
