@@ -40,10 +40,6 @@ void vk_destroy_sync_primitives( void )
 	if ( vk.device == VK_NULL_HANDLE )
 		return;
 
-#ifdef USE_UPLOAD_QUEUE
-	qvkDestroySemaphore( vk.device, vk.image_uploaded2, NULL );
-#endif
-
 	for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ ) {
 		qvkDestroySemaphore( vk.device, vk.tess[i].image_acquired, NULL );
 		qvkDestroyFence( vk.device, vk.tess[i].rendering_finished_fence, NULL );

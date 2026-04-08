@@ -198,10 +198,6 @@ static void vk_restart_swapchain( const char *funcname, VkResult res )
 		qvkResetCommandBuffer( vk.tess[i].command_buffer, 0 );
 	}
 
-#ifdef USE_UPLOAD_QUEUE
-	qvkResetCommandBuffer( vk.staging_command_buffer, 0 );
-#endif
-
 	vk_destroy_pipelines( qfalse );
 	vk_destroy_framebuffers();
 	vk_destroy_render_passes();
@@ -665,20 +661,6 @@ void vk_initialize( void )
 
 		SET_OBJECT_NAME( vk.command_pool, "command pool", VK_DEBUG_REPORT_OBJECT_TYPE_COMMAND_POOL_EXT );
 	}
-
-#ifdef USE_UPLOAD_QUEUE
-	{
-		VkCommandBufferAllocateInfo alloc_info;
-
-		alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		alloc_info.pNext = NULL;
-		alloc_info.commandPool = vk.command_pool;
-		alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		alloc_info.commandBufferCount = 1;
-
-		VK_CHECK( qvkAllocateCommandBuffers( vk.device, &alloc_info, &vk.staging_command_buffer ) );
-	}
-#endif
 
 	//
 	// Command buffers and color attachments.
@@ -1789,10 +1771,6 @@ void vk_begin_frame( void )
 	vk.temporal.preparedThisFrame = qfalse;
 	vk.uiOverlayActive = qfalse;
 
-#ifdef USE_UPLOAD_QUEUE
-	vk_flush_staging_buffer( qtrue );
-#endif
-
 	vk.cmd = &vk.tess[ vk.cmd_index ];
 
 	if ( vk.cmd->waitForFence ) {
@@ -1973,12 +1951,7 @@ static void vk_resize_geometry_buffer( void )
 
 void vk_end_frame( void )
 {
-#ifdef USE_UPLOAD_QUEUE
-	VkSemaphore waits[2], signals[2];
-	const VkPipelineStageFlags wait_dst_stage_mask[2] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-#else
 	const VkPipelineStageFlags wait_dst_stage_mask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-#endif
 	VkSubmitInfo submit_info;
 
 	if ( vk.frame_count == 0 )
@@ -2045,46 +2018,11 @@ void vk_end_frame( void )
 	submit_info.commandBufferCount = 1;
 	submit_info.pCommandBuffers = &vk.cmd->command_buffer;
 	if ( !ri.CL_IsMinimized() ) {
-#ifdef USE_UPLOAD_QUEUE
-		if ( vk.image_uploaded != VK_NULL_HANDLE ) {
-			waits[0] = vk.cmd->image_acquired;
-			waits[1] = vk.image_uploaded;
-			submit_info.waitSemaphoreCount = 2;
-			submit_info.pWaitSemaphores = &waits[0];
-			submit_info.pWaitDstStageMask = &wait_dst_stage_mask[0];
-			signals[0] = vk.swapchain_rendering_finished[ vk.cmd->swapchain_image_index ];
-			signals[1] = vk.cmd->rendering_finished2;
-			submit_info.signalSemaphoreCount = 2;
-			submit_info.pSignalSemaphores = &signals[0];
-
-			vk.rendering_finished = vk.cmd->rendering_finished2;
-			vk.image_uploaded = VK_NULL_HANDLE;
-		} else if ( vk.rendering_finished != VK_NULL_HANDLE ) {
-			waits[0] = vk.cmd->image_acquired;
-			waits[1] = vk.rendering_finished;
-			submit_info.waitSemaphoreCount = 2;
-			submit_info.pWaitSemaphores = &waits[0];
-			submit_info.pWaitDstStageMask = &wait_dst_stage_mask[0];
-			signals[0] = vk.swapchain_rendering_finished[ vk.cmd->swapchain_image_index ];
-			signals[1] = vk.cmd->rendering_finished2;
-			submit_info.signalSemaphoreCount = 2;
-			submit_info.pSignalSemaphores = &signals[0];
-
-			vk.rendering_finished = vk.cmd->rendering_finished2;
-		} else {
-			submit_info.waitSemaphoreCount = 1;
-			submit_info.pWaitSemaphores = &vk.cmd->image_acquired;
-			submit_info.pWaitDstStageMask = &wait_dst_stage_mask[0];
-			submit_info.signalSemaphoreCount = 1;
-			submit_info.pSignalSemaphores = &vk.swapchain_rendering_finished[ vk.cmd->swapchain_image_index ];
-		}
-#else
 		submit_info.waitSemaphoreCount = 1;
 		submit_info.pWaitSemaphores = &vk.cmd->image_acquired;
 		submit_info.pWaitDstStageMask = &wait_dst_stage_mask;
 		submit_info.signalSemaphoreCount = 1;
 		submit_info.pSignalSemaphores = &vk.swapchain_rendering_finished[ vk.cmd->swapchain_image_index ];
-#endif
 	} else {
 		submit_info.waitSemaphoreCount = 0;
 		submit_info.pWaitSemaphores = NULL;

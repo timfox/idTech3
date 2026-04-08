@@ -23,7 +23,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_cmd.h"
-#include "vk_staging.h"
 #include "vk_util.h"
 
 #ifdef USE_VBO
@@ -76,9 +75,6 @@ qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size )
 	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.vbo.buffer_memory ) );
 	qvkBindBufferMemory( vk.device, vk.vbo.vertex_buffer, vk.vbo.buffer_memory, vertex_buffer_offset );
 
-#ifdef USE_UPLOAD_QUEUE
-	vk_flush_staging_buffer( qfalse );
-#endif
 	uploadDone = 0;
 	while ( uploadDone < (VkDeviceSize) vbo_size ) {
 		VkDeviceSize uploadSize = vk.staging_buffer.size;
