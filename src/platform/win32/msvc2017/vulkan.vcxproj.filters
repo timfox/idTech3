@@ -154,6 +154,9 @@
     <ClCompile Include="..\..\renderers\vulkan\vk_clear_attachments.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\renderers\vulkan\vk_cubemap_prefilter.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\renderers\vulkan\vk_attachments.c">
       <Filter>Source Files</Filter>
     </ClCompile>
