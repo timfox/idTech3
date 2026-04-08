@@ -276,6 +276,7 @@
     <ClCompile Include="..\..\..\renderers\vulkan\vk_volumetric_pass_compute.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_shutdown.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_postfx_passes.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_clear_attachments.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_device.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_flashlight.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_flares.c" />
