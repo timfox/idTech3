@@ -22,8 +22,85 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "tr_local.h"
 #include "vk.h"
+#include "vk_cmd.h"
+#include "vk_staging.h"
+#include "vk_util.h"
 
 #ifdef USE_VBO
+
+void vk_release_vbo( void )
+{
+	if ( vk.vbo.vertex_buffer )
+		qvkDestroyBuffer( vk.device, vk.vbo.vertex_buffer, NULL );
+	vk.vbo.vertex_buffer = VK_NULL_HANDLE;
+
+	if ( vk.vbo.buffer_memory )
+		qvkFreeMemory( vk.device, vk.vbo.buffer_memory, NULL );
+	vk.vbo.buffer_memory = VK_NULL_HANDLE;
+}
+
+qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size )
+{
+	VkMemoryRequirements vb_mem_reqs;
+	VkMemoryAllocateInfo alloc_info;
+	VkBufferCreateInfo desc;
+	VkDeviceSize vertex_buffer_offset;
+	VkDeviceSize allocationSize;
+	uint32_t memory_type_bits;
+	VkCommandBuffer command_buffer;
+	VkBufferCopy copyRegion[1];
+	VkDeviceSize uploadDone;
+
+	vk_release_vbo();
+
+	desc.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	desc.pNext = NULL;
+	desc.flags = 0;
+	desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	desc.queueFamilyIndexCount = 0;
+	desc.pQueueFamilyIndices = NULL;
+
+	desc.size = vbo_size;
+	desc.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+	VK_CHECK( qvkCreateBuffer( vk.device, &desc, NULL, &vk.vbo.vertex_buffer ) );
+
+	qvkGetBufferMemoryRequirements( vk.device, vk.vbo.vertex_buffer, &vb_mem_reqs );
+	vertex_buffer_offset = 0;
+	allocationSize = vertex_buffer_offset + vb_mem_reqs.size;
+	memory_type_bits = vb_mem_reqs.memoryTypeBits;
+
+	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	alloc_info.pNext = NULL;
+	alloc_info.allocationSize = allocationSize;
+	alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, memory_type_bits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.vbo.buffer_memory ) );
+	qvkBindBufferMemory( vk.device, vk.vbo.vertex_buffer, vk.vbo.buffer_memory, vertex_buffer_offset );
+
+#ifdef USE_UPLOAD_QUEUE
+	vk_flush_staging_buffer( qfalse );
+#endif
+	uploadDone = 0;
+	while ( uploadDone < (VkDeviceSize) vbo_size ) {
+		VkDeviceSize uploadSize = vk.staging_buffer.size;
+		if ( uploadDone + uploadSize > (VkDeviceSize) vbo_size ) {
+			uploadSize = (VkDeviceSize) vbo_size - uploadDone;
+		}
+		memcpy( vk.staging_buffer.ptr + 0, vbo_data + uploadDone, uploadSize );
+		command_buffer = vk_begin_command_buffer();
+		copyRegion[0].srcOffset = 0;
+		copyRegion[0].dstOffset = uploadDone;
+		copyRegion[0].size = uploadSize;
+		qvkCmdCopyBuffer( command_buffer, vk.staging_buffer.handle, vk.vbo.vertex_buffer, 1, &copyRegion[0] );
+		vk_end_command_buffer( command_buffer, __func__ );
+		uploadDone += uploadSize;
+	}
+
+	SET_OBJECT_NAME( vk.vbo.vertex_buffer, "static VBO", VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT );
+	SET_OBJECT_NAME( vk.vbo.buffer_memory, "static VBO memory", VK_DEBUG_REPORT_OBJECT_TYPE_DEVICE_MEMORY_EXT );
+
+	return qtrue;
+}
+
 
 /*
 

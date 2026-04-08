@@ -490,7 +490,10 @@ void vk_read_pixels( byte* buffer, uint32_t width, uint32_t height ); // screens
 qboolean vk_bloom( void );
 qboolean vk_ssao_pass( void );
 
+#ifdef USE_VBO
+void vk_release_vbo( void );
 qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size );
+#endif
 void vk_update_mvp( const float *m );
 
 void vk_update_post_process_pipelines( void );
