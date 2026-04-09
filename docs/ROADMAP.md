@@ -1,6 +1,15 @@
 # Development Roadmap
 
-## Current Status (next-gen-4)
+## Execution focus (main branch, 2026)
+
+Priorities that keep **CI green** and **README/build truth** aligned:
+
+1. **Watch GitHub Actions on `main`** — especially **Android** (CMake + Gradle `assembleDebug`, OpenSSL/Lua/FetchContent caches) and **MSYS curl**.
+2. **Renderer validation** — Tier B (self-hosted `GAME_BASE`) and Tier C (manual GPU notes) when you have hardware/content; keep `renderer_regression_check` passing on default CI.
+3. **glTF on Vulkan** — CPU path is feature-complete for clip + morph blending; next step is **GPU skinning/morph** or **OpenGL registration** if README promises parity.
+4. **Android product** — first-run / missing `base/` UX, optional APK artifact smoke (install + launch to “no game data” is OK).
+
+## Current Status (`main`)
 
 ### Renderer -- Complete
 - [x] Vulkan 1.4 with PBR (metalness/roughness, IBL, BRDF LUT)
@@ -51,15 +60,17 @@
 - [x] OpenEXR HDR image loading
 
 ### Assets -- Complete
-- [x] 7 model formats (glTF, OBJ, MD5, IQM, MDR, MD3)
+- [x] Multiple model formats (glTF primary on Vulkan; see `docs/GLTF.md` for caps; OpenGL has no full glTF path yet)
 - [x] 6 image formats (EXR, PNG, TGA, JPG, PCX, BMP)
 
 ### Integration -- Complete
 - [x] All 16 systems wired into game loop
 - [x] 64 Lua-callable engine functions
 - [x] ImGui inspector (optional)
-- [x] Android platform support
-- [x] CI for Linux, Windows, macOS, ARM
+- [x] Android platform support (NativeActivity, Vulkan lifecycle, touch HUD, logcat, optional `apkassets`)
+- [x] CI for Linux, Windows, macOS, ARM, **Android** (CMake cross-build + **Gradle debug APK** on Release matrix cells)
+- [x] **glTF (Vulkan):** runtime skeletal clip sampling, morph blending, mesh default weights, PBR qtangent recompute on tess path (`docs/GLTF.md`)
+- [x] **Android engine parity (no game pk3):** Lua, Duktape, curl, Recast, Bullet, FreeType, FLUX lib, DTLS via **static OpenSSL autobuild** when prefab not present
 
 ### Tooling -- Complete
 - [x] Smoke test script (10 checks)
@@ -67,6 +78,18 @@
 - [x] 8 documentation files
 
 ## Remaining Work
+
+### Next on the roadmap (ordered)
+
+| Priority | Item | Notes |
+|----------|------|--------|
+| P0 | **CI stability** | Fix any red matrix on `main`; Android OpenSSL/Lua first-build time — tune cache keys if needed |
+| P1 | **glTF GPU path** | Skinning/morph in shader or SSBO; reduce CPU tess cost for characters |
+| P1 | **Renderer validation** | Tier B/C as optional gates; expand regression scripts where headless allows |
+| P2 | **OpenGL glTF or README** | Either register glTF on OpenGL or document Vulkan-only clearly everywhere |
+| P2 | **Engine systems hardening** | Telemetry / replay / save / quest / dialogue — define stable APIs + minimal tests |
+| P3 | **GOAP content** | Data-driven actions; perf limits; debug draw |
+| P3 | **Vulkan architecture pass** | Clustered Forward+, motion history — see below |
 
 ### Renderer 2026 Architecture Pass
 - [ ] Lighting scalability: move Vulkan from legacy dynamic-light selection toward clustered Forward+; decouple Vulkan light scale from `MAX_DLIGHTS` and surface-bit assumptions. See `docs/RENDERER_2026_ARCHITECTURE_PASS.md`.
