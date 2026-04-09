@@ -1612,7 +1612,9 @@ IF(ANDROID)
 	SET(Q3_SRCS
 		src/platform/unix/unix_shared.c
 		src/platform/android/android_stubs.c
-		src/platform/android/android_main.c)
+		src/platform/android/android_main.c
+		src/platform/android/android_asset_bootstrap.c
+		src/platform/android/android_logcat.c)
 	SET(Q3_UI_SRCS "")
 ELSEIF(UNIX)
 	SET (Q3_SRCS
