@@ -386,6 +386,11 @@ endif()
 set(LUA_ANDROID_BUILT FALSE)
 if(ANDROID AND USE_LUA AND NOT LUA_FOUND)
   include(ExternalProject)
+  # Lua upstream ships a GNU Makefile; CMAKE_MAKE_PROGRAM is often Ninja on Android — use make.
+  find_program(LUA_ANDROID_MAKE_EXE NAMES make gmake)
+  if(NOT LUA_ANDROID_MAKE_EXE)
+    message(FATAL_ERROR "GNU make (make) is required to build Lua for Android but was not found in PATH.")
+  endif()
   set(_LUA_ANDROID_VER "5.4.7")
   set(_LUA_ANDROID_SHA "9fbf5e28ef86c69858f6d3d34eccc32e911c1a28b4120ff3e84aaa70cfbf1e30")
   set(_LUA_ANDROID_PREFIX "${CMAKE_BINARY_DIR}/lua-android")
@@ -395,7 +400,7 @@ if(ANDROID AND USE_LUA AND NOT LUA_FOUND)
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     CONFIGURE_COMMAND ""
     BUILD_COMMAND ${CMAKE_COMMAND} -E env "CC=${CMAKE_C_COMPILER}" "AR=${CMAKE_AR}" "RANLIB=${CMAKE_RANLIB}"
-      ${CMAKE_MAKE_PROGRAM} -C <SOURCE_DIR>/src liblua.a MYCFLAGS=-fPIC
+      ${LUA_ANDROID_MAKE_EXE} -C <SOURCE_DIR>/src liblua.a MYCFLAGS=-fPIC
     INSTALL_COMMAND ${CMAKE_COMMAND} -E make_directory "${_LUA_ANDROID_PREFIX}/lib" "${_LUA_ANDROID_PREFIX}/include"
       COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/src/liblua.a "${_LUA_ANDROID_PREFIX}/lib/liblua.a"
       COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/src/lua.h "${_LUA_ANDROID_PREFIX}/include/"
