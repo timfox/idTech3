@@ -1614,7 +1614,8 @@ IF(ANDROID)
 		src/platform/android/android_stubs.c
 		src/platform/android/android_main.c
 		src/platform/android/android_asset_bootstrap.c
-		src/platform/android/android_logcat.c)
+		src/platform/android/android_logcat.c
+		src/platform/android/android_touch_overlay.c)
 	SET(Q3_UI_SRCS "")
 ELSEIF(UNIX)
 	SET (Q3_SRCS

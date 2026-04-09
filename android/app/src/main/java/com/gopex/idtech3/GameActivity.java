@@ -3,7 +3,7 @@
  *
  * Android launcher activity for id Tech 3 engine.
  * Extends NativeActivity for direct native code execution.
- * Provides JNI bridge, lifecycle management, and immersive mode.
+ * Provides JNI bridge, lifecycle management, immersive mode, and touch HUD overlay.
  */
 
 package com.gopex.idtech3;
@@ -12,8 +12,11 @@ import android.app.NativeActivity;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.widget.FrameLayout;
 
 import java.io.File;
 
@@ -22,21 +25,58 @@ public class GameActivity extends NativeActivity {
 
     static {
         System.loadLibrary("idtech3");
+        nativeRegisterTouchOverlayJni();
     }
+
+    private TouchHudView touchHud;
+    private FrameLayout overlayRoot;
 
     public static native void nativeSetDataPath(String path);
     public static native void nativeSetHomePath(String path);
+
+    /** Register TouchOverlayBridge natives (FindClass from activity JNI context). */
+    private static native void nativeRegisterTouchOverlayJni();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setupWindow();
         setupPaths();
+        setupTouchOverlay();
 
         Log.i(TAG, "id Tech 3 engine starting");
         Log.i(TAG, "Device: " + Build.MANUFACTURER + " " + Build.MODEL);
         Log.i(TAG, "Android API: " + Build.VERSION.SDK_INT);
         Log.i(TAG, "ABI: " + Build.SUPPORTED_ABIS[0]);
+    }
+
+    private void setupTouchOverlay() {
+        ViewGroup decor = (ViewGroup) getWindow().getDecorView();
+        overlayRoot = new FrameLayout(this);
+        overlayRoot.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+        overlayRoot.setClickable(false);
+        overlayRoot.setFocusable(false);
+
+        touchHud = new TouchHudView(this);
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT);
+        touchHud.setLayoutParams(lp);
+        /* Let touches fall through except where HUD handles them */
+        touchHud.setClickable(false);
+
+        overlayRoot.addView(touchHud);
+        decor.addView(overlayRoot);
+    }
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        if (touchHud != null && touchHud.onOverlayTouch(ev)) {
+            return true;
+        }
+        return super.dispatchTouchEvent(ev);
     }
 
     @Override
