@@ -1038,18 +1038,98 @@ list(FILTER QCOMMON_SRCS EXCLUDE REGEX ".*net_sdr\\.c")
 
 # USE_DTLS: DTLS encryption (requires OpenSSL)
 set(USE_DTLS_FOUND FALSE)
+set(USE_DTLS_ANDROID_BUILT FALSE)
+set(OPENSSL_ANDROID_INTERFACE_TARGET "")
 if(USE_DTLS)
   find_package(OpenSSL QUIET)
   if(OpenSSL_FOUND)
     list(APPEND QCOMMON_SRCS src/qcommon/net_dtls.c)
     set(USE_DTLS_FOUND TRUE)
     message(STATUS "DTLS: enabled (OpenSSL ${OPENSSL_VERSION})")
-  else()
-    if(ANDROID)
-      message(WARNING "USE_DTLS is ON but OpenSSL was not found for this Android NDK build. Add OpenSSL for Android (e.g. prefab) or set OPENSSL_ROOT_DIR. DTLS disabled.")
+  elseif(ANDROID)
+    option(OPENSSL_ANDROID_AUTOBUILD "Build static OpenSSL from source for Android when find_package fails" ON)
+    if(OPENSSL_ANDROID_AUTOBUILD)
+      find_program(OPENSSL_ANDROID_MAKE_EXE NAMES make gmake)
+      find_program(OPENSSL_ANDROID_PERL_EXE NAMES perl)
+      if(NOT OPENSSL_ANDROID_MAKE_EXE OR NOT OPENSSL_ANDROID_PERL_EXE)
+        message(WARNING "USE_DTLS on Android needs Perl + GNU make to build OpenSSL; install or set OPENSSL_ROOT_DIR. DTLS disabled.")
+      else()
+        include(ExternalProject)
+        set(_OSSL_VER "3.0.15")
+        set(_OSSL_SHA "23c666d0edf20f14249b3d8f0368acaee9ab585b09e1de82107c66e1f3ec9533")
+        if(ANDROID_ABI STREQUAL "arm64-v8a")
+          set(_OSSL_OS "android-arm64")
+        elseif(ANDROID_ABI STREQUAL "armeabi-v7a")
+          set(_OSSL_OS "android-arm")
+        else()
+          set(_OSSL_OS "android-${ANDROID_ABI}")
+        endif()
+        set(_OSSL_PREFIX "${CMAKE_BINARY_DIR}/openssl-android")
+        set(_OSSL_API "${ANDROID_PLATFORM_LEVEL}")
+        if(NOT _OSSL_API OR _OSSL_API STREQUAL "")
+          set(_OSSL_API 26)
+        endif()
+        set(_OSSL_DL_EXTRA "")
+        if(ANDROID_DEPS_CACHE AND NOT ANDROID_DEPS_CACHE STREQUAL "")
+          set(_OSSL_DL "${ANDROID_DEPS_CACHE}/externalproject-downloads")
+          file(MAKE_DIRECTORY "${_OSSL_DL}")
+          set(_OSSL_DL_EXTRA DOWNLOAD_DIR "${_OSSL_DL}")
+        endif()
+        set(_NDK_ROOT "$ENV{ANDROID_NDK}")
+        if(NOT _NDK_ROOT AND DEFINED ANDROID_NDK)
+          set(_NDK_ROOT "${ANDROID_NDK}")
+        endif()
+        if(NOT _NDK_ROOT OR _NDK_ROOT STREQUAL "")
+          message(WARNING "USE_DTLS on Android: ANDROID_NDK not set; OpenSSL Configure may fail.")
+        endif()
+        ExternalProject_Add(openssl_android_ep
+          URL "https://www.openssl.org/source/openssl-${_OSSL_VER}.tar.gz"
+          URL_HASH "SHA256=${_OSSL_SHA}"
+          DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+          INSTALL_DIR "${_OSSL_PREFIX}"
+          ${_OSSL_DL_EXTRA}
+          CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env
+            "ANDROID_NDK_ROOT=${_NDK_ROOT}"
+            "PATH=$ENV{PATH}"
+            "CC=${CMAKE_C_COMPILER}"
+            "AR=${CMAKE_AR}"
+            "RANLIB=${CMAKE_RANLIB}"
+            ${CMAKE_COMMAND} -E chdir <SOURCE_DIR>
+            ${OPENSSL_ANDROID_PERL_EXE} ./Configure ${_OSSL_OS}
+            no-shared no-tests
+            -D__ANDROID_API__=${_OSSL_API}
+            --prefix=<INSTALL_DIR>
+            --openssldir=<INSTALL_DIR>/ssl
+          BUILD_COMMAND ${CMAKE_COMMAND} -E env
+            "ANDROID_NDK_ROOT=${_NDK_ROOT}"
+            ${CMAKE_COMMAND} -E chdir <SOURCE_DIR>
+            ${OPENSSL_ANDROID_MAKE_EXE} build_libs
+          INSTALL_COMMAND ${CMAKE_COMMAND} -E env
+            ${CMAKE_COMMAND} -E chdir <SOURCE_DIR>
+            ${OPENSSL_ANDROID_MAKE_EXE} install_sw
+          BUILD_BYPRODUCTS
+            "${_OSSL_PREFIX}/lib/libssl.a"
+            "${_OSSL_PREFIX}/lib/libcrypto.a"
+        )
+        add_library(openssl_android_iface INTERFACE)
+        target_include_directories(openssl_android_iface INTERFACE "${_OSSL_PREFIX}/include")
+        target_link_libraries(openssl_android_iface INTERFACE
+          "${_OSSL_PREFIX}/lib/libssl.a"
+          "${_OSSL_PREFIX}/lib/libcrypto.a"
+          dl)
+        add_dependencies(openssl_android_iface openssl_android_ep)
+        list(APPEND QCOMMON_SRCS src/qcommon/net_dtls.c)
+        set(USE_DTLS_FOUND TRUE)
+        set(USE_DTLS_ANDROID_BUILT TRUE)
+        set(OPENSSL_ANDROID_INTERFACE_TARGET openssl_android_iface)
+        set(OPENSSL_INCLUDE_DIR "${_OSSL_PREFIX}/include")
+        message(STATUS "DTLS: will build static OpenSSL ${_OSSL_VER} for Android (${_OSSL_OS}, ExternalProject)")
+      endif()
     else()
-      message(WARNING "USE_DTLS is ON but OpenSSL was not found (install libssl-dev / OpenSSL SDK). DTLS disabled for this configure.")
+      message(WARNING "USE_DTLS is ON but OpenSSL was not found for Android and OPENSSL_ANDROID_AUTOBUILD=OFF. Set OPENSSL_ROOT_DIR or enable autobuild.")
     endif()
+  elseif(NOT ANDROID AND NOT OpenSSL_FOUND)
+    message(WARNING "USE_DTLS is ON but OpenSSL was not found (install libssl-dev / OpenSSL SDK). DTLS disabled for this configure.")
   endif()
 endif()
 
@@ -1173,7 +1253,12 @@ endif()
 if(USE_DTLS_FOUND)
   target_compile_definitions(qcommon PRIVATE USE_DTLS=1)
   target_include_directories(qcommon PRIVATE ${OPENSSL_INCLUDE_DIR})
-  target_link_libraries(qcommon PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+  if(USE_DTLS_ANDROID_BUILT AND OPENSSL_ANDROID_INTERFACE_TARGET)
+    target_link_libraries(qcommon PRIVATE ${OPENSSL_ANDROID_INTERFACE_TARGET})
+    add_dependencies(qcommon openssl_android_ep)
+  else()
+    target_link_libraries(qcommon PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+  endif()
 endif()
 if(USE_STEAM_NETWORKING)
   target_compile_definitions(qcommon PRIVATE USE_STEAM_NETWORKING=1 STEAMWORKS_AVAILABLE=${STEAMWORKS_AVAILABLE})
@@ -1210,7 +1295,12 @@ endif()
 if(USE_DTLS_FOUND)
   target_compile_definitions(qcommon_ded PRIVATE USE_DTLS=1)
   target_include_directories(qcommon_ded PRIVATE ${OPENSSL_INCLUDE_DIR})
-  target_link_libraries(qcommon_ded PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+  if(USE_DTLS_ANDROID_BUILT AND OPENSSL_ANDROID_INTERFACE_TARGET)
+    target_link_libraries(qcommon_ded PRIVATE ${OPENSSL_ANDROID_INTERFACE_TARGET})
+    add_dependencies(qcommon_ded openssl_android_ep)
+  else()
+    target_link_libraries(qcommon_ded PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+  endif()
 endif()
 if(USE_STEAM_NETWORKING)
   target_compile_definitions(qcommon_ded PRIVATE USE_STEAM_NETWORKING=1)
@@ -2070,6 +2160,9 @@ ELSE()
 ENDIF()
 if(LUA_ANDROID_BUILT)
 	add_dependencies(${CNAME}${BINEXT} lua_android_ep)
+endif()
+if(ANDROID AND USE_DTLS_ANDROID_BUILT)
+	add_dependencies(${CNAME}${BINEXT} openssl_android_ep)
 endif()
 if(TARGET q3ui)
 	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE qcommon botlib client q3ui phys_module)
