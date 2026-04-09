@@ -465,6 +465,7 @@ void vk_present_frame( void );
 /* Swapchain + attachment teardown/recreate (Android surface recycle, swapchain restart) */
 void vk_teardown_presentation_targets( void );
 void vk_restore_presentation_targets( void );
+void vk_restart_swapchain( const char *funcname, VkResult res );
 void vk_prepare_2d( void );
 void vk_prepare_frame_temporal_state( void );
 void vk_reset_scene_src_rect_tracking( void );
