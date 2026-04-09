@@ -74,7 +74,7 @@ jobs:
         shell: msys2 {0}
         run: |
           set -e
-          pkgs="${{ matrix.prefix }}-SDL2 ${{ matrix.prefix }}-openal ${{ matrix.prefix }}-freetype ${{ matrix.prefix }}-lua ${{ matrix.prefix }}-openssl ${{ matrix.prefix }}-curl"
+          pkgs="${{ matrix.prefix }}-SDL2 ${{ matrix.prefix }}-openal ${{ matrix.prefix }}-freetype ${{ matrix.prefix }}-lua ${{ matrix.prefix }}-openssl ${{ matrix.prefix }}-curl ${{ matrix.prefix }}-bullet"
           for attempt in 1 2 3 4 5; do
             pacman -S --needed --noconfirm $pkgs && exit 0
             echo "pacman attempt $attempt failed, retrying in $((attempt * 20))s..."
@@ -406,7 +406,7 @@ jobs:
           sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list
           sudo apt-get -qq update
           sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev clang ccache
-          sudo apt-get -y install libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools python3
+          sudo apt-get -y install libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3
 
       - uses: actions/checkout@v4
 
@@ -509,7 +509,7 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get -qq update
-          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools python3
+          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3
 
       - uses: actions/checkout@v4
 
@@ -548,7 +548,7 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get -qq update
-          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools python3
+          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3
 
       - uses: actions/checkout@v4
 
@@ -590,7 +590,7 @@ jobs:
         run: |
           sudo apt-get -qq update
           sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev clang-tidy cppcheck ccache
-          sudo apt-get -y install libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools python3
+          sudo apt-get -y install libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3
 
       - uses: actions/checkout@v4
 
@@ -674,7 +674,7 @@ jobs:
 
             apt-get -qq update
             apt-get install -y make gcc g++ cmake ninja-build libstdc++-14-dev
-            apt-get -y install libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools
+            apt-get -y install libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools
 
             OUTDIR="${GITHUB_WORKSPACE}/bin"
             mkdir -p "$OUTDIR"
@@ -744,7 +744,7 @@ jobs:
 
     steps:
       - name: Install tools
-        run: brew install coreutils sdl2 openal-soft cmake ninja freetype lua molten-vk
+        run: brew install coreutils sdl2 openal-soft cmake ninja freetype lua molten-vk bullet pkgconf
 
       - uses: actions/checkout@v4
 
@@ -871,6 +871,14 @@ jobs:
         run: |
           sdkmanager --install "ndk;27.0.12077973" "cmake;3.22.1"
 
+      - name: Cache Android third-party downloads (Lua, FetchContent)
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.ci-android-deps
+          key: android-deps-${{ matrix.abi }}-lua-5.4.7-ft-2-13-2-${{ hashFiles('CMakeLists.txt') }}
+          restore-keys: |
+            android-deps-${{ matrix.abi }}-
+
       - name: Build ${{ matrix.btype }} (${{ matrix.abi }})
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
         working-directory: android
@@ -891,11 +899,13 @@ jobs:
           fi
 
           mkdir -p build-android-${{ matrix.btype }}-${{ matrix.abi }}
+          mkdir -p "${GITHUB_WORKSPACE}/.ci-android-deps"
           cmake -S .. -B build-android-${{ matrix.btype }}-${{ matrix.abi }} \
             -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
             -DANDROID_ABI="$ANDROID_ABI" \
             -DANDROID_PLATFORM=android-26 \
             -DANDROID_STL=c++_shared \
+            -DANDROID_DEPS_CACHE="${GITHUB_WORKSPACE}/.ci-android-deps" \
             -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
             -DBUILD_SERVER=OFF \
             -DUSE_VULKAN=ON \

@@ -2,6 +2,17 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.24)
 
 PROJECT(idtech3 VERSION 1.0.0 LANGUAGES C CXX)
 
+# Android: optional persistent cache for Lua tarball + FetchContent (FreeType). CI sets -DANDROID_DEPS_CACHE=...
+if(ANDROID)
+  set(ANDROID_DEPS_CACHE "" CACHE PATH
+    "If set, reuse this directory for Android third-party downloads (Lua ExternalProject, FetchContent). Speeds CI and clean rebuilds.")
+  if(ANDROID_DEPS_CACHE AND NOT ANDROID_DEPS_CACHE STREQUAL "")
+    file(MAKE_DIRECTORY "${ANDROID_DEPS_CACHE}")
+    set(FETCHCONTENT_BASE_DIR "${ANDROID_DEPS_CACHE}/fetchcontent" CACHE PATH "FetchContent base directory (Android deps cache)" FORCE)
+    message(STATUS "ANDROID_DEPS_CACHE: ${ANDROID_DEPS_CACHE}")
+  endif()
+endif()
+
 if(NOT ANDROID)
   find_package(Threads REQUIRED)
 endif()
@@ -394,10 +405,17 @@ if(ANDROID AND USE_LUA AND NOT LUA_FOUND)
   set(_LUA_ANDROID_VER "5.4.7")
   set(_LUA_ANDROID_SHA "9fbf5e28ef86c69858f6d3d34eccc32e911c1a28b4120ff3e84aaa70cfbf1e30")
   set(_LUA_ANDROID_PREFIX "${CMAKE_BINARY_DIR}/lua-android")
+  set(_LUA_EP_EXTRA "")
+  if(ANDROID_DEPS_CACHE AND NOT ANDROID_DEPS_CACHE STREQUAL "")
+    set(_LUA_DL_DIR "${ANDROID_DEPS_CACHE}/externalproject-downloads")
+    file(MAKE_DIRECTORY "${_LUA_DL_DIR}")
+    list(APPEND _LUA_EP_EXTRA DOWNLOAD_DIR "${_LUA_DL_DIR}")
+  endif()
   ExternalProject_Add(lua_android_ep
     URL "https://www.lua.org/ftp/lua-${_LUA_ANDROID_VER}.tar.gz"
     URL_HASH "SHA256=${_LUA_ANDROID_SHA}"
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    ${_LUA_EP_EXTRA}
     CONFIGURE_COMMAND ""
     BUILD_COMMAND ${CMAKE_COMMAND} -E env "CC=${CMAKE_C_COMPILER}" "AR=${CMAKE_AR}" "RANLIB=${CMAKE_RANLIB}"
       ${LUA_ANDROID_MAKE_EXE} -C <SOURCE_DIR>/src liblua.a MYCFLAGS=-fPIC
