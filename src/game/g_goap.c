@@ -15,6 +15,7 @@ that transitions world state to goal state.
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
 #include "g_goap.h"
+#include <string.h>
 
 static goapAction_t actions[GOAP_MAX_ACTIONS];
 static int numActions = 0;
@@ -23,14 +24,47 @@ static int numGoals = 0;
 static goapAgent_t agents[GOAP_MAX_AGENTS];
 static int numAgents = 0;
 
+static int goap_max_plan_iterations = 4096;
+static int goap_last_plan_iterations;
+static cvar_t *ai_goapMaxIterations;
+static cvar_t *ai_goapDebug;
+
 #define VALID_AGENT(h) ((h) >= 0 && (h) < numAgents && agents[(h)].active)
+
+void GOAP_SetMaxPlanIterations( int maxIterations ) {
+	goap_max_plan_iterations = ( maxIterations > 64 ) ? maxIterations : 64;
+}
+
+int GOAP_GetMaxPlanIterations( void ) {
+	return goap_max_plan_iterations;
+}
+
+int GOAP_GetLastPlanIterations( void ) {
+	return goap_last_plan_iterations;
+}
+
+void GOAP_ForceReplan( goapAgentHandle_t h ) {
+	if ( !VALID_AGENT( h ) ) {
+		return;
+	}
+	agents[h].currentPlan.valid = qfalse;
+	agents[h].replanTimer = agents[h].replanInterval;
+	agents[h].worldStateDirty = qtrue;
+}
 
 void GOAP_Init(void) {
 	Com_Memset(actions, 0, sizeof(actions));
 	Com_Memset(goals, 0, sizeof(goals));
 	Com_Memset(agents, 0, sizeof(agents));
 	numActions = numGoals = numAgents = 0;
-	Com_Printf("GOAP system initialized\n");
+	ai_goapMaxIterations = Cvar_Get( "ai_goapMaxIterations", "4096", CVAR_ARCHIVE );
+	Cvar_SetDescription( ai_goapMaxIterations,
+		"Max A* expansions per GOAP plan (higher = deeper search, more CPU)." );
+	ai_goapDebug = Cvar_Get( "ai_goapDebug", "0", CVAR_ARCHIVE );
+	Cvar_SetDescription( ai_goapDebug,
+		"Log GOAP planning failures and iteration counts when non-zero." );
+	Com_Printf( "GOAP system initialized (planner: A* + closed set, ai_goapMaxIterations=%d)\n",
+		goap_max_plan_iterations );
 }
 
 void GOAP_Shutdown(void) { numActions = numGoals = numAgents = 0; }
@@ -115,6 +149,9 @@ void GOAP_DestroyAgent(goapAgentHandle_t h) {
 
 void GOAP_SetAgentWorldState(goapAgentHandle_t h, int prop, int value) {
 	if (!VALID_AGENT(h) || prop < 0 || prop >= GOAP_MAX_STATE_PROPS) return;
+	if ( agents[h].worldState.values[prop] != value ) {
+		agents[h].worldStateDirty = qtrue;
+	}
 	agents[h].worldState.values[prop] = value;
 	agents[h].worldState.mask[prop] = 1;
 	if (prop >= agents[h].worldState.numProps) agents[h].worldState.numProps = prop + 1;
@@ -175,21 +212,60 @@ typedef struct {
 	int         pathLen;
 } goapNode_t;
 
-#define GOAP_MAX_OPEN 256
+typedef struct {
+	goapState_t state;
+	float       g;
+} goapClosedEntry_t;
+
+#define GOAP_MAX_OPEN 512
+#define GOAP_MAX_CLOSED 2048
+
+static qboolean GOAP_StateEqual( const goapState_t *a, const goapState_t *b ) {
+	return memcmp( a->values, b->values, sizeof( a->values ) ) == 0
+		&& memcmp( a->mask, b->mask, sizeof( a->mask ) ) == 0;
+}
+
+static int GOAP_OpenFindState( goapNode_t *open, int openCount, const goapState_t *s ) {
+	int i;
+	for ( i = 0; i < openCount; i++ ) {
+		if ( GOAP_StateEqual( &open[i].state, s ) ) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+static int GOAP_ClosedFind( goapClosedEntry_t *closed, int n, const goapState_t *s ) {
+	int i;
+	for ( i = 0; i < n; i++ ) {
+		if ( GOAP_StateEqual( &closed[i].state, s ) ) {
+			return i;
+		}
+	}
+	return -1;
+}
 
 qboolean GOAP_Plan(goapAgentHandle_t h, int goalId) {
 	goapAgent_t *agent;
 	goapGoal_t *goal;
 	goapNode_t open[GOAP_MAX_OPEN];
+	goapClosedEntry_t closed[GOAP_MAX_CLOSED];
 	int openCount = 0;
+	int closedCount = 0;
 	int i, best, ai;
+	int iteration;
 
 	if (!VALID_AGENT(h) || goalId < 0 || goalId >= numGoals) return qfalse;
 	agent = &agents[h];
 	goal = &goals[goalId];
 
+	if ( ai_goapMaxIterations && ai_goapMaxIterations->integer >= 64 ) {
+		goap_max_plan_iterations = ai_goapMaxIterations->integer;
+	}
+
 	agent->currentPlan.valid = qfalse;
 	agent->currentGoalId = goalId;
+	goap_last_plan_iterations = 0;
 
 	Com_Memcpy(&open[0].state, &agent->worldState, sizeof(goapState_t));
 	open[0].g = 0;
@@ -197,14 +273,34 @@ qboolean GOAP_Plan(goapAgentHandle_t h, int goalId) {
 	open[0].pathLen = 0;
 	openCount = 1;
 
-	for (int iteration = 0; iteration < 1000 && openCount > 0; iteration++) {
+	for ( iteration = 0; iteration < goap_max_plan_iterations && openCount > 0; iteration++ ) {
+		goapNode_t current;
+
 		best = 0;
 		for (i = 1; i < openCount; i++) {
-			if (open[i].f < open[best].f) best = i;
+			if (open[i].f < open[best].f || (open[i].f == open[best].f && open[i].g > open[best].g)) {
+				best = i;
+			}
 		}
 
-		goapNode_t current = open[best];
+		current = open[best];
 		open[best] = open[--openCount];
+		goap_last_plan_iterations = iteration + 1;
+
+		{
+			int ci = GOAP_ClosedFind( closed, closedCount, &current.state );
+			if ( ci >= 0 && closed[ci].g <= current.g ) {
+				continue;
+			}
+			if ( ci >= 0 ) {
+				closed[ci].g = current.g;
+			} else if ( closedCount < GOAP_MAX_CLOSED ) {
+				Com_Memcpy( &closed[closedCount].state, &current.state, sizeof( goapState_t ) );
+				closed[closedCount].g = current.g;
+				closedCount++;
+			}
+			/* If closed table is full, still expand (bounded by max iterations). */
+		}
 
 		if (GOAP_StateSatisfies(&current.state, &goal->desiredState)) {
 			agent->currentPlan.numSteps = current.pathLen;
@@ -212,6 +308,7 @@ qboolean GOAP_Plan(goapAgentHandle_t h, int goalId) {
 			agent->currentPlan.totalCost = current.g;
 			agent->currentPlan.goalId = goalId;
 			agent->currentPlan.valid = qtrue;
+			agent->worldStateDirty = qfalse;
 			for (i = 0; i < current.pathLen; i++) {
 				agent->currentPlan.steps[i].actionId = current.actionPath[i];
 				agent->currentPlan.steps[i].cost = actions[current.actionPath[i]].cost;
@@ -222,6 +319,7 @@ qboolean GOAP_Plan(goapAgentHandle_t h, int goalId) {
 		for (ai = 0; ai < agent->numAvailableActions; ai++) {
 			int actionId = agent->availableActions[ai];
 			goapAction_t *action = &actions[actionId];
+			goapNode_t succ;
 
 			if (!GOAP_MeetsPreconditions(action, &current.state, h)) continue;
 			if (current.pathLen >= GOAP_MAX_PLAN_STEPS) continue;
@@ -229,17 +327,40 @@ qboolean GOAP_Plan(goapAgentHandle_t h, int goalId) {
 			float actionCost = action->cost;
 			if (action->getDynamicCost) actionCost = action->getDynamicCost(h, &current.state);
 
-			if (openCount >= GOAP_MAX_OPEN) continue;
+			GOAP_ApplyEffects(&current.state, &action->effects, &succ.state);
+			succ.g = current.g + actionCost;
+			succ.f = succ.g + (float)GOAP_Heuristic(&succ.state, &goal->desiredState);
+			succ.pathLen = current.pathLen + 1;
+			Com_Memcpy(succ.actionPath, current.actionPath, current.pathLen * sizeof(int));
+			succ.actionPath[current.pathLen] = actionId;
 
-			goapNode_t *next = &open[openCount];
-			GOAP_ApplyEffects(&current.state, &action->effects, &next->state);
-			next->g = current.g + actionCost;
-			next->f = next->g + (float)GOAP_Heuristic(&next->state, &goal->desiredState);
-			next->pathLen = current.pathLen + 1;
-			Com_Memcpy(next->actionPath, current.actionPath, current.pathLen * sizeof(int));
-			next->actionPath[current.pathLen] = actionId;
-			openCount++;
+			{
+				int cj = GOAP_ClosedFind( closed, closedCount, &succ.state );
+				if ( cj >= 0 && closed[cj].g <= succ.g ) {
+					continue;
+				}
+			}
+
+			{
+				int oi = GOAP_OpenFindState( open, openCount, &succ.state );
+				if ( oi >= 0 ) {
+					if ( succ.g >= open[oi].g - 0.0001f ) {
+						continue;
+					}
+					open[oi] = succ;
+				} else {
+					if ( openCount >= GOAP_MAX_OPEN ) {
+						continue;
+					}
+					open[openCount++] = succ;
+				}
+			}
 		}
+	}
+
+	if ( ai_goapDebug && ai_goapDebug->integer ) {
+		Com_Printf( S_COLOR_YELLOW "GOAP_Plan: no solution (agent %d goal %s, expansions %i)\n",
+			h, GOAP_GetGoalName( goalId ), goap_last_plan_iterations );
 	}
 
 	return qfalse;
@@ -297,6 +418,16 @@ void GOAP_Update(float dt) {
 	for (i = 0; i < numAgents; i++) {
 		goapAgent_t *a = &agents[i];
 		if (!a->active) continue;
+
+		/* External world-state edits: invalidate and replan immediately (FEAR-style reactivity). */
+		if ( a->worldStateDirty ) {
+			a->currentPlan.valid = qfalse;
+			a->worldStateDirty = qfalse;
+			a->actionStatus = GOAP_ACTION_IDLE;
+			a->actionTimer = 0;
+			a->replanTimer = 0;
+			GOAP_AutoPlan( i );
+		}
 
 		/* Execute current action */
 		if (a->currentPlan.valid && !GOAP_IsPlanComplete(i)) {
@@ -445,11 +576,29 @@ void GOAP_SetActionRange(int id, float r) {
 
 /* ---- Default FPS action library ---- */
 
+/* Property indices MUST match GOAP_DefineProperty order below */
 enum {
-	PROP_ALIVE = 0, PROP_HAS_WEAPON, PROP_HAS_AMMO, PROP_HAS_HEALTH,
-	PROP_HAS_ARMOR, PROP_ENEMY_VISIBLE, PROP_ENEMY_DEAD, PROP_IN_COVER,
-	PROP_AT_PATROL_POINT, PROP_AT_ITEM, PROP_ENEMY_IN_RANGE,
-	PROP_LOW_HEALTH, PROP_COUNT
+	PROP_ALIVE = 0,
+	PROP_HAS_WEAPON,
+	PROP_HAS_AMMO,
+	PROP_HAS_HEALTH,
+	PROP_HAS_ARMOR,
+	PROP_ENEMY_VISIBLE,
+	PROP_ENEMY_DEAD,
+	PROP_IN_COVER,
+	PROP_AT_PATROL_POINT,
+	PROP_AT_ITEM,
+	PROP_ENEMY_IN_RANGE,
+	PROP_LOW_HEALTH,
+	PROP_UNDER_FIRE,
+	PROP_HAS_GRENADE,
+	PROP_GRENADE_READY,
+	PROP_CAN_SEE_ITEM,
+	PROP_CAN_REACH_ITEM,
+	PROP_NEEDS_SWITCH,
+	PROP_AT_SWITCH,
+	PROP_OBJECTIVE_DONE,
+	PROP_COUNT
 };
 
 void GOAP_RegisterDefaultActions(void) {
@@ -467,6 +616,14 @@ void GOAP_RegisterDefaultActions(void) {
 	GOAP_DefineProperty("at_item");
 	GOAP_DefineProperty("enemy_in_range");
 	GOAP_DefineProperty("low_health");
+	GOAP_DefineProperty("under_fire");
+	GOAP_DefineProperty("has_grenade");
+	GOAP_DefineProperty("grenade_ready");
+	GOAP_DefineProperty("can_see_item");
+	GOAP_DefineProperty("can_reach_item");
+	GOAP_DefineProperty("needs_switch");
+	GOAP_DefineProperty("at_switch");
+	GOAP_DefineProperty("objective_done");
 
 	id = GOAP_RegisterAction("attack", 2.0f);
 	GOAP_SetActionPrecondition(id, PROP_HAS_WEAPON, 1);
@@ -485,10 +642,44 @@ void GOAP_RegisterDefaultActions(void) {
 	GOAP_SetActionEffect(id, PROP_ENEMY_VISIBLE, 1);
 	GOAP_SetActionDuration(id, 8.0f);
 
+	/* F.E.A.R.-style: break line of fire / suppress reaction */
+	id = GOAP_RegisterAction("suppress_and_cover", 1.5f);
+	GOAP_SetActionPrecondition(id, PROP_UNDER_FIRE, 1);
+	GOAP_SetActionPrecondition(id, PROP_HAS_WEAPON, 1);
+	GOAP_SetActionPrecondition(id, PROP_HAS_AMMO, 1);
+	GOAP_SetActionEffect(id, PROP_IN_COVER, 1);
+	GOAP_SetActionEffect(id, PROP_UNDER_FIRE, 0);
+	GOAP_SetActionDuration(id, 1.2f);
+
 	id = GOAP_RegisterAction("take_cover", 3.0f);
 	GOAP_SetActionPrecondition(id, PROP_LOW_HEALTH, 1);
 	GOAP_SetActionEffect(id, PROP_IN_COVER, 1);
 	GOAP_SetActionDuration(id, 2.0f);
+
+	id = GOAP_RegisterAction("flank", 4.0f);
+	GOAP_SetActionPrecondition(id, PROP_ENEMY_VISIBLE, 1);
+	GOAP_SetActionPrecondition(id, PROP_IN_COVER, 1);
+	GOAP_SetActionEffect(id, PROP_ENEMY_IN_RANGE, 1);
+	GOAP_SetActionDuration(id, 6.0f);
+
+	id = GOAP_RegisterAction("grenade", 2.5f);
+	GOAP_SetActionPrecondition(id, PROP_HAS_GRENADE, 1);
+	GOAP_SetActionPrecondition(id, PROP_GRENADE_READY, 1);
+	GOAP_SetActionPrecondition(id, PROP_ENEMY_VISIBLE, 1);
+	GOAP_SetActionEffect(id, PROP_ENEMY_DEAD, 1);
+	GOAP_SetActionEffect(id, PROP_HAS_GRENADE, 0);
+	GOAP_SetActionEffect(id, PROP_GRENADE_READY, 0);
+	GOAP_SetActionDuration(id, 2.0f);
+
+	id = GOAP_RegisterAction("ready_grenade", 2.0f);
+	GOAP_SetActionPrecondition(id, PROP_HAS_GRENADE, 1);
+	GOAP_SetActionEffect(id, PROP_GRENADE_READY, 1);
+	GOAP_SetActionDuration(id, 0.8f);
+
+	id = GOAP_RegisterAction("find_grenade", 3.5f);
+	GOAP_SetActionEffect(id, PROP_HAS_GRENADE, 1);
+	GOAP_SetActionEffect(id, PROP_AT_ITEM, 1);
+	GOAP_SetActionDuration(id, 5.0f);
 
 	id = GOAP_RegisterAction("heal", 2.0f);
 	GOAP_SetActionPrecondition(id, PROP_HAS_HEALTH, 1);
@@ -523,7 +714,29 @@ void GOAP_RegisterDefaultActions(void) {
 	GOAP_SetActionEffect(id, PROP_ENEMY_VISIBLE, 0);
 	GOAP_SetActionDuration(id, 4.0f);
 
-	Com_Printf("GOAP: %d default actions registered\n", numActions);
+	/* Traversal / interaction (Tomb Raider–style puzzle flow, abstract world facts) */
+	id = GOAP_RegisterAction("survey_pickup", 2.0f);
+	GOAP_SetActionEffect(id, PROP_CAN_SEE_ITEM, 1);
+	GOAP_SetActionDuration(id, 2.5f);
+
+	id = GOAP_RegisterAction("move_to_pickup", 2.5f);
+	GOAP_SetActionPrecondition(id, PROP_CAN_SEE_ITEM, 1);
+	GOAP_SetActionEffect(id, PROP_CAN_REACH_ITEM, 1);
+	GOAP_SetActionDuration(id, 4.0f);
+
+	id = GOAP_RegisterAction("locate_switch", 3.0f);
+	GOAP_SetActionPrecondition(id, PROP_NEEDS_SWITCH, 1);
+	GOAP_SetActionEffect(id, PROP_AT_SWITCH, 1);
+	GOAP_SetActionDuration(id, 5.0f);
+
+	id = GOAP_RegisterAction("use_switch", 1.5f);
+	GOAP_SetActionPrecondition(id, PROP_AT_SWITCH, 1);
+	GOAP_SetActionPrecondition(id, PROP_NEEDS_SWITCH, 1);
+	GOAP_SetActionEffect(id, PROP_NEEDS_SWITCH, 0);
+	GOAP_SetActionEffect(id, PROP_OBJECTIVE_DONE, 1);
+	GOAP_SetActionDuration(id, 1.5f);
+
+	Com_Printf("GOAP: %d default actions registered (FPS + pressure + traversal)\n", numActions);
 }
 
 void GOAP_RegisterDefaultGoals(void) {
@@ -535,12 +748,18 @@ void GOAP_RegisterDefaultGoals(void) {
 	id = GOAP_RegisterGoal("survive", 8.0f);
 	GOAP_SetGoalState(id, PROP_LOW_HEALTH, 0);
 
+	id = GOAP_RegisterGoal("clear_pressure", 9.0f);
+	GOAP_SetGoalState(id, PROP_UNDER_FIRE, 0);
+
 	id = GOAP_RegisterGoal("get_armed", 6.0f);
 	GOAP_SetGoalState(id, PROP_HAS_WEAPON, 1);
 	GOAP_SetGoalState(id, PROP_HAS_AMMO, 1);
 
 	id = GOAP_RegisterGoal("patrol_area", 2.0f);
 	GOAP_SetGoalState(id, PROP_AT_PATROL_POINT, 1);
+
+	id = GOAP_RegisterGoal("solve_objective", 7.0f);
+	GOAP_SetGoalState(id, PROP_OBJECTIVE_DONE, 1);
 
 	Com_Printf("GOAP: %d default goals registered\n", numGoals);
 }
