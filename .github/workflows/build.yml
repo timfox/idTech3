@@ -939,6 +939,26 @@ jobs:
             -exec cp -f {} ../bin/ \;
           ls -la ../bin/
 
+      - name: Assemble debug APK (Gradle + ANDROID_DEPS_CACHE)
+        if: ${{ (github.event_name != 'release' || matrix.btype != 'Debug') && matrix.btype == 'Release' }}
+        working-directory: android
+        env:
+          ANDROID_DEPS_CACHE: ${{ github.workspace }}/.ci-android-deps
+          GIT_TERMINAL_PROMPT: 0
+        run: |
+          chmod +x ./gradlew
+          echo "sdk.dir=${ANDROID_SDK_ROOT}" > local.properties
+          ./gradlew assembleDebug --no-daemon -PandroidDepsCache="${ANDROID_DEPS_CACHE}"
+          ls -la app/build/outputs/apk/debug/ || true
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.btype == 'Release'
+        with:
+          name: android-apk-${{ matrix.abi }}
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn
+          retention-days: 5
+
       - uses: actions/upload-artifact@v4
         if: matrix.btype == 'Release'
         with:

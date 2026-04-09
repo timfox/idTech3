@@ -5,6 +5,14 @@
 
 apply plugin: 'com.android.application'
 
+/* Reuse third-party download cache (Lua, OpenSSL, FetchContent): -PandroidDepsCache=/path or ANDROID_DEPS_CACHE */
+def _androidDepsCache = {
+    def p = project.findProperty("androidDepsCache")
+    def e = System.getenv("ANDROID_DEPS_CACHE")
+    def s = (p != null && p.toString().trim()) ? p.toString().trim() : ((e != null && e.trim()) ? e.trim() : "")
+    return s
+}()
+
 android {
     namespace "com.gopex.idtech3"
     compileSdk 35
@@ -18,7 +26,8 @@ android {
 
         externalNativeBuild {
             cmake {
-                arguments "-DBUILD_SERVER=OFF",
+                def cmakeArgs = [
+                    "-DBUILD_SERVER=OFF",
                     "-DUSE_VULKAN=ON",
                     "-DUSE_RENDERER_DLOPEN=OFF",
                     "-DRENDERER_DEFAULT=vulkan",
@@ -41,6 +50,11 @@ android {
                     "-DENABLE_FORTIFY_SOURCE=OFF",
                     "-DENABLE_ASAN=OFF",
                     "-DCI_BUILD=OFF"
+                ]
+                if (_androidDepsCache) {
+                    cmakeArgs << "-DANDROID_DEPS_CACHE=${_androidDepsCache}"
+                }
+                arguments cmakeArgs
             }
         }
 
