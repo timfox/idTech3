@@ -992,6 +992,9 @@ typedef struct srfGLTFPrimitive_s {
 	int		numVertices;
 	uint32_t	*indices;
 	int		numIndices;
+	gltfMorphTarget_t *morphTargets; /* shared with model; NULL if none */
+	int		numMorphTargets;
+	int		meshIndex; /* model mesh for morph weight sampling / naming */
 	/* VBO: device-local buffers (VK_NULL_HANDLE = use tess path) */
 	VkBuffer	vbo_vertex;
 	VkBuffer	vbo_index;
@@ -1736,6 +1739,7 @@ extern cvar_t	*r_morphDebug;
 extern cvar_t	*r_morphBreath;
 extern cvar_t	*r_morphBreathAmp;
 extern cvar_t	*r_morphBreathFreq;
+extern cvar_t	*r_gltfAnim;
 
 extern	cvar_t	*r_nobind;						// turns off binding to appropriate textures
 extern	cvar_t	*r_singleShader;				// make most world faces use default shader

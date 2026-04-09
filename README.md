@@ -37,8 +37,8 @@ Ray tracing (Vulkan RT) is **scaffolded / in progress** — see `docs/RENDERERS_
 
 **Models**:
 * Model formats supported: MD3, MDR, IQM, OBJ, FBX, GLTF, USD (Universal Scene Description), Maya Ascii, Collada (DAE), STL
-* Blend Shapes (IQM); glTF morph data may load but **runtime morph blending is not implemented** — see [docs/GLTF.md](docs/GLTF.md)
-* **glTF / GLB**: Vulkan only; bind-pose skinning; **animation clips not sampled at runtime** — details: [docs/GLTF.md](docs/GLTF.md)
+* Blend Shapes (IQM); glTF morph targets blend on Vulkan (animation weights + `RE_SetEntityMorphWeight`) — see [docs/GLTF.md](docs/GLTF.md)
+* **glTF / GLB**: Vulkan only; CPU skinning with **clip playback** (`refEntity.frame` / `oldframe` / `backlerp`, `r_gltfAnim`) — details: [docs/GLTF.md](docs/GLTF.md)
 
 **Scripting**:
 * Support for Lua scripting

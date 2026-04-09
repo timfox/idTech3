@@ -151,6 +151,7 @@ cvar_t	*r_morphDebug;
 cvar_t	*r_morphBreath;
 cvar_t	*r_morphBreathAmp;
 cvar_t	*r_morphBreathFreq;
+cvar_t	*r_gltfAnim;
 cvar_t	*r_fbo;
 cvar_t	*r_renderMode;
 cvar_t	*r_hdr;
@@ -2347,6 +2348,11 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_morphBreathFreq, "Procedural breath frequency in Hz." );
 	ri.Cvar_SetGroup( r_morphBreathFreq, CVG_RENDERER );
 
+	r_gltfAnim = ri.Cvar_Get( "r_gltfAnim", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_gltfAnim, "0", "64", CV_FLOAT );
+	ri.Cvar_SetDescription( r_gltfAnim, "glTF clip playback: multiplies refEntity shaderTime for skeletal TRS and morph-weight sampling (frame/oldframe index clips, backlerp crossfades)." );
+	ri.Cvar_SetGroup( r_gltfAnim, CVG_RENDERER );
+
 	r_flares = ri.Cvar_Get ("r_flares", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_flares, "Enables corona effects on light sources." );
 	r_znear = ri.Cvar_Get( "r_znear", "8", CVAR_CHEAT );
@@ -3489,6 +3495,8 @@ void R_Init( void ) {
 		( r_morph && r_morph->integer ) ? "enabled" : "disabled",
 		IQM_MORPH_MAX_CHANNELS, IQM_MORPH_TOP_K,
 		r_morphMaxActive ? r_morphMaxActive->integer : IQM_MORPH_TOP_K );
+	ri.Printf( PRINT_ALL, "[VK][gltf] clip playback speed scale r_gltfAnim=%.3f\n",
+		r_gltfAnim ? r_gltfAnim->value : 1.0f );
 
 
 	max_polys = r_maxpolys ? r_maxpolys->integer : MAX_POLYS;

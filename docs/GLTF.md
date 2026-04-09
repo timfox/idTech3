@@ -20,20 +20,26 @@ Use the Vulkan build for glTF content.
 - **Skinned meshes (bind pose)**: skeleton from **first skin only** (`skins[0]`), inverse bind matrices, up to **4 influences** per vertex, joint indices/weights from standard attributes.
 - **Static mesh fast path**: when a primitive has **no skinning and no morph targets**, geometry can use **Vulkan VBOs** (`vk_create_gltf_buffers`) if creation succeeds. Toggle: **`r_gltfVBO`** (default `1`).
 
+## Runtime animation and morph (Vulkan)
+
+- **Clip selection**: `refEntity_t.frame` chooses the animation clip **by index** into `gltfModel_t.animations[]` (first clip = `0`). Use **`RF_WRAP_FRAMES`** so the index wraps modulo clip count; otherwise out-of-range indices clamp to clip `0`.
+- **Time**: clip time is `refEntity.shaderTime` (seconds) when set, else `refdef.time * 0.001f`, scaled by cvar **`r_gltfAnim`** (default `1`). Time **loops** by each clip’s stored duration.
+- **Cross-clip blend**: `oldframe` selects the second clip; **`backlerp`** blends joint TRS (and morph weights from weight tracks) between **current** and **old** clip at the **same** clock time.
+- **Skeletal sampling**: translation/rotation/scale channels on skin joints update local pose, then `world * inverseBindMatrix` skin matrices drive **CPU** skinning in `RB_GLTFSurface`.
+- **Morph weights**: primitives load **mesh `target_names`** when present; `RE_SetEntityMorphWeight(ent, name, w)` matches those names (same hash path as IQM). **glTF weight animation** channels on the mesh node add to the same weight array. Primitives still use the **tess path** (no VBO) when morph targets exist.
+
 ## Known limitations (important)
 
-### 1. Animation clips are not played
+### 1. Animation scope
 
-- Animation data is **parsed and stored** on the model (`gltfAnimation_t`, channels, keyframes, duration).
-- **Draw code does not sample animations.** Joint matrices come from `R_ComputeGLTFJointMatrices()`, which uses the skeleton’s **rest/bind TRS** and inverse bind matrices only.
-- **Expectation**: characters appear in **bind pose**, not animated over time, until a playback path is implemented.
+- Only **`skins[0]`** joint nodes receive TRS channels (same as skeleton load). Other animated nodes are ignored for skinning.
+- **Morph weight** animation must target the **mesh node** that owns the morph targets (glTF convention).
 
-### 2. Morph targets (blend shapes) are not blended
+### 2. Morph targets (blend shapes)
 
-- Morph target deltas may be **loaded** (per primitive, up to `GLTF_MAX_MORPH_TARGETS`).
-- The renderer **does not** apply morph weights at draw time; primitives with morph targets avoid the VBO fast path and still draw **base** geometry only.
+- Up to **`GLTF_MAX_MORPH_TARGETS`** (8) per primitive; tangents are not blended into the CPU tess path yet.
 
-### 3. Single skin
+### 3. Single skin (unchanged)
 
 - Only **`skins[0]`** is loaded. Multi-skin assets are not fully supported.
 
@@ -75,8 +81,7 @@ Larger assets are **silently clamped** during load.
 
 The README lists **GLTF** under model formats and mentions blend shapes for IQM/GLTF. For glTF specifically:
 
-- **Skeletal skinning** in bind pose: supported.
-- **Skeletal animation playback**: not yet.
-- **Blend shapes on glTF**: data may load; **runtime blending** not yet.
+- **Skeletal skinning** with **clip playback** (see above): supported on Vulkan when clips exist and `frame` selects a valid index.
+- **Blend shapes on glTF**: runtime blending via **animation weights** and/or **`RE_SetEntityMorphWeight`** when `target_names` are present.
 
 When implementing animation or morph playback, update this file and the README bullet so marketing and engineering stay in sync.
