@@ -12,6 +12,8 @@ Vulkan surface, input, file system, and JNI bridge.
 #include "../../qcommon/q_shared.h"
 #include "../../qcommon/qcommon.h"
 #include "../../renderers/common/tr_types.h"
+#include "android_surface_glue.h"
+#include "../../renderers/vulkan/vk_android_surface.h"
 #ifndef DEDICATED
 #include "../../client/keycodes.h"
 #endif
@@ -43,6 +45,12 @@ static volatile int     g_running = 0;
 static volatile int     g_paused = 0;
 static volatile int     g_windowReady = 0;
 static pthread_t        g_gameThread;
+static pthread_mutex_t  g_surfaceLock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t   g_surfaceCond = PTHREAD_COND_INITIALIZER;
+/* Token bumped on each window destroy; game thread must finish vk_Android_OnNativeWindowGoingAway before callback returns */
+static volatile uint32_t g_surfaceToken = 0;
+static volatile uint32_t g_surfaceAckToken = 0;
+static volatile int     g_surfaceOpPending = 0; /* 1=teardown, 2=recreate */
 static void             *g_vulkanLib = NULL;
 static char             g_dataPath[MAX_OSPATH] = "/sdcard/idtech3";
 static char             g_homePath[MAX_OSPATH] = "";
@@ -528,6 +536,55 @@ static int32_t onInputEvent( ANativeActivity *activity, AInputEvent *event ) {
 	return 0;
 }
 
+/* ---- Surface / Vulkan coordination (see vk_android_surface.c) ---- */
+
+qboolean Android_NativeWindowReady( void ) {
+	return g_windowReady ? qtrue : qfalse;
+}
+
+void Android_NativeWindowSize( int *width, int *height ) {
+	if ( width ) {
+		*width = g_windowWidth;
+	}
+	if ( height ) {
+		*height = g_windowHeight;
+	}
+}
+
+void Android_SurfaceThread_ProcessPending( void ) {
+	int op;
+
+	pthread_mutex_lock( &g_surfaceLock );
+	op = g_surfaceOpPending;
+	if ( op == 0 ) {
+		pthread_mutex_unlock( &g_surfaceLock );
+		return;
+	}
+	g_surfaceOpPending = 0;
+	pthread_mutex_unlock( &g_surfaceLock );
+
+	if ( op == 1 ) {
+		vk_Android_OnNativeWindowGoingAway();
+	} else if ( op == 2 ) {
+		vk_Android_OnNativeWindowReady();
+	}
+
+	pthread_mutex_lock( &g_surfaceLock );
+	g_surfaceAckToken = g_surfaceToken;
+	pthread_cond_broadcast( &g_surfaceCond );
+	pthread_mutex_unlock( &g_surfaceLock );
+}
+
+static void android_surface_request_op( int op ) {
+	pthread_mutex_lock( &g_surfaceLock );
+	g_surfaceToken++;
+	g_surfaceOpPending = op;
+	while ( g_surfaceAckToken != g_surfaceToken ) {
+		pthread_cond_wait( &g_surfaceCond, &g_surfaceLock );
+	}
+	pthread_mutex_unlock( &g_surfaceLock );
+}
+
 /* ---- Game thread ---- */
 
 static void *gameThreadFunc( void *arg ) {
@@ -559,6 +616,7 @@ static void *gameThreadFunc( void *arg ) {
 	int lastTime = Sys_Milliseconds();
 	while ( g_running ) {
 		if ( g_paused ) {
+			Android_SurfaceThread_ProcessPending();
 			usleep( 50000 );
 			lastTime = Sys_Milliseconds();
 			continue;
@@ -572,6 +630,7 @@ static void *gameThreadFunc( void *arg ) {
 		if ( msec > 200 ) msec = 200;
 
 		Android_PollInput();
+		Android_SurfaceThread_ProcessPending();
 		Com_Frame( msec );
 	}
 
@@ -616,10 +675,18 @@ static void onNativeWindowCreated( ANativeActivity *activity, ANativeWindow *win
 	g_windowHeight = ANativeWindow_getHeight( window );
 	g_windowReady = 1;
 	LOGI( "Window created: %dx%d", g_windowWidth, g_windowHeight );
+
+	if ( g_engineInitialized ) {
+		android_surface_request_op( 2 );
+	}
 }
 
 static void onNativeWindowDestroyed( ANativeActivity *activity, ANativeWindow *window ) {
 	(void)activity; (void)window;
+	/* Must destroy VkSurfaceKHR before returning — ANativeWindow* is invalid after this */
+	if ( g_engineInitialized ) {
+		android_surface_request_op( 1 );
+	}
 	g_windowReady = 0;
 	g_window = NULL;
 	LOGI( "Window destroyed" );
@@ -630,6 +697,7 @@ static void onNativeWindowResized( ANativeActivity *activity, ANativeWindow *win
 	g_windowWidth = ANativeWindow_getWidth( window );
 	g_windowHeight = ANativeWindow_getHeight( window );
 	LOGI( "Window resized: %dx%d", g_windowWidth, g_windowHeight );
+	/* Same ANativeWindow; swapchain recreation is handled by Vulkan on OUT_OF_DATE / suboptimal */
 }
 
 static void onDestroy( ANativeActivity *activity ) {
