@@ -13,9 +13,11 @@ Vulkan surface, input, file system, and JNI bridge.
 #include "../../qcommon/qcommon.h"
 #include "../../renderers/common/tr_types.h"
 #include "android_surface_glue.h"
+#include "android_asset_bootstrap.h"
 #include "../../renderers/vulkan/vk_android_surface.h"
 #ifndef DEDICATED
 #include "../../client/keycodes.h"
+#include "../../qcommon/qcommon.h"
 #endif
 #define Com_QueueEvent Sys_QueEvent
 #include <android/log.h>
@@ -57,6 +59,10 @@ static char             g_homePath[MAX_OSPATH] = "";
 static int              g_windowWidth = 1280;
 static int              g_windowHeight = 720;
 static int              g_engineInitialized = 0;
+/* Single-finger touch: relative deltas for CL_MouseEvent (mouselook + UI drag) */
+static qboolean         g_touchActive = qfalse;
+static float            g_touchLastX;
+static float            g_touchLastY;
 
 /* ---- Sys functions ---- */
 
@@ -482,13 +488,32 @@ static int32_t onInputEvent( ANativeActivity *activity, AInputEvent *event ) {
 			return 1;
 		}
 
-		/* Touch input → mouse */
-		if ( action == AMOTION_EVENT_ACTION_DOWN ) {
+		/* Touch → mouse button + relative motion (matches desktop mouse deltas) */
+		if ( action == AMOTION_EVENT_ACTION_DOWN || action == AMOTION_EVENT_ACTION_POINTER_DOWN ) {
+			g_touchActive = qtrue;
+			g_touchLastX = x;
+			g_touchLastY = y;
 			Com_QueueEvent( Sys_Milliseconds(), SE_KEY, K_MOUSE1, qtrue, 0, NULL );
-		} else if ( action == AMOTION_EVENT_ACTION_UP ) {
+		} else if ( action == AMOTION_EVENT_ACTION_UP || action == AMOTION_EVENT_ACTION_POINTER_UP ||
+			action == AMOTION_EVENT_ACTION_CANCEL ) {
+			g_touchActive = qfalse;
 			Com_QueueEvent( Sys_Milliseconds(), SE_KEY, K_MOUSE1, qfalse, 0, NULL );
+		} else if ( action == AMOTION_EVENT_ACTION_MOVE && g_touchActive ) {
+			float dx = x - g_touchLastX;
+			float dy = y - g_touchLastY;
+			float sens = 1.0f;
+			const char *ts;
+			g_touchLastX = x;
+			g_touchLastY = y;
+			ts = Cvar_VariableString( "com_androidTouchSens" );
+			if ( ts && ts[0] ) {
+				float v = Q_atof( ts );
+				if ( v > 0.0f ) {
+					sens = v;
+				}
+			}
+			Com_QueueEvent( Sys_Milliseconds(), SE_MOUSE, (int)( dx * sens ), (int)( dy * sens ), 0, NULL );
 		}
-		Com_QueueEvent( Sys_Milliseconds(), SE_MOUSE, (int)x, (int)y, 0, NULL );
 		return 1;
 	}
 
@@ -601,6 +626,9 @@ static void *gameThreadFunc( void *arg ) {
 		return NULL;
 	}
 
+	/* Optional: ship read-only game files under assets/apkassets/... in the APK */
+	Android_AssetBootstrapUnpack( g_assetManager, g_dataPath );
+
 	/* Initialize engine */
 	char cmdLine[256];
 	Com_sprintf( cmdLine, sizeof( cmdLine ),
@@ -710,6 +738,9 @@ static void onDestroy( ANativeActivity *activity ) {
 static void onPause( ANativeActivity *activity ) {
 	(void)activity;
 	g_paused = 1;
+#ifndef DEDICATED
+	gw_active = qfalse;
+#endif
 	if ( audioInitialized ) {
 		if ( audioBackendType == 1 && aaStream ) {
 			AAudioStream_requestPause( aaStream );
@@ -723,6 +754,9 @@ static void onPause( ANativeActivity *activity ) {
 static void onResume( ANativeActivity *activity ) {
 	(void)activity;
 	g_paused = 0;
+#ifndef DEDICATED
+	gw_active = qtrue;
+#endif
 	if ( audioInitialized ) {
 		if ( audioBackendType == 1 && aaStream ) {
 			AAudioStream_requestStart( aaStream );
