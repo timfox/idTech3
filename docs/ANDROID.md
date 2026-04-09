@@ -30,6 +30,10 @@ APKs output to `android/app/build/outputs/apk/`.
 
 Or open the `android/` directory in Android Studio.
 
+### CI (GitHub Actions)
+
+The **`android`** job in `.github/workflows/build.yml` cross-compiles with CMake using the **same feature toggles** as `android/app/build.gradle` (Lua, Duktape, curl, video flags, FLUX, Recast, Bullet, FreeType, DTLS). First configure in CI may **fetch** FreeType and the Lua tarball like a local Gradle build.
+
 ## Architecture
 
 ```
