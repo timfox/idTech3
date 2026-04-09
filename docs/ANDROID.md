@@ -68,7 +68,7 @@ The Android Gradle project passes these flags to the root `CMakeLists.txt` (see 
 - `USE_FLUX=ON` -- FLUX static library (generic backend on Android); **flux_cli** is not built on Android
 - `USE_RECAST_NAV=ON`, `USE_BULLET_PHYSICS=ON` -- same as desktop (Bullet full backend still needs a discoverable **libbullet** for the ABI)
 - `BUILD_FREETYPE=ON` -- FreeType: uses **FetchContent** from the official FreeType GitHub repo if `find_package(Freetype)` fails (first configure needs network)
-- `USE_DTLS=ON` -- links OpenSSL when **find_package(OpenSSL)** succeeds (often requires a prefab/OpenSSL for Android; otherwise DTLS stays off with a warning)
+- `USE_DTLS=ON` -- uses **find_package(OpenSSL)** when available; otherwise, with **`OPENSSL_ANDROID_AUTOBUILD=ON`** (default), CMake builds **static OpenSSL 3.0.x** via `ExternalProject` (needs **Perl** + **GNU make** on the host, plus `ANDROID_NDK`). Tarballs cache under `ANDROID_DEPS_CACHE` when set. Toggle off to require a prefab install and `OPENSSL_ROOT_DIR`.
 
 **Note:** The APK still does not ship **game** `.pk3` data; use external storage or `apkassets/` as documented below.
 

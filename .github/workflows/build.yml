@@ -875,7 +875,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/.ci-android-deps
-          key: android-deps-${{ matrix.abi }}-lua-5.4.7-ft-2-13-2-${{ hashFiles('CMakeLists.txt') }}
+          key: android-deps-${{ matrix.abi }}-ossl-3.0.15-lua-5.4.7-ft-${{ hashFiles('CMakeLists.txt') }}
           restore-keys: |
             android-deps-${{ matrix.abi }}-
 
@@ -886,7 +886,7 @@ jobs:
           GIT_TERMINAL_PROMPT: 0
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends make git
+          sudo apt-get install -y --no-install-recommends make git perl
           # Use direct CMake cross-compile instead of Gradle to avoid
           # wrapper/SDK bootstrapping complexity in CI.
           NDK_HOME="${ANDROID_NDK_HOME:-$ANDROID_SDK_ROOT/ndk/27.0.12077973}"
