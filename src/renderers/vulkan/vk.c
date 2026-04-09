@@ -14,7 +14,6 @@
 #include "vk_temporal.h"
 #include "vk_view_state.h"
 #include "vk_volumetric_fog_color.h"
-#include "vk_volumetric_params.h"
 #include "vk_volumetric_pass.h"
 #include "vk_volumetric_internal.h"
 #include "vk_util.h"
@@ -25,6 +24,7 @@
 #include "vk_cmd.h"
 #include "vk_device.h"
 #include "vk_swapchain.h"
+#include "vk_post_process_push.h"
 #include "vk_staging.h"
 #include "vk_descriptors.h"
 #include "vk_shader_modules.h"
@@ -57,23 +57,6 @@
 #endif
 
 /* Vk_Pipeline_FragSpecData + vk_create_pipeline / vk_find_pipeline_ext: vk_create_pipeline.c */
-
-typedef struct {
-	float paniniAmount;
-	float paniniD;
-	float paniniS;
-	float aspect;
-	float fovXDeg;
-	float paniniBorderMode;
-	float paniniDebugMode;
-	float brightness;
-	float paniniZoom;
-	float paniniPad0;
-	float paniniPad1;
-	float paniniPad2;
-	float exposure;  /* per-frame exposure (eye adaptation or r_exposure) */
-	float srcUVScaleBias[4]; // scale.xy, bias.xy
-} VkPostProcessPushConstants;
 
 static int vkSamples = VK_SAMPLE_COUNT_1_BIT;
 static int vkMaxSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -121,150 +104,14 @@ static VkFlags get_composite_alpha( VkCompositeAlphaFlagsKHR flags )
 /* vk_alloc_vbo / vk_release_vbo: vk_vbo.c */
 
 /* vk_create_gltf_buffers moved to vk_gltf.c; vk_create_shader_modules -> vk_shader_modules.c; vk_alloc_persistent_pipelines -> vk_pipelines_persistent.c */
-
-void vk_update_post_process_pipelines( void )
-{
-	if ( vk.fboActive ) {
-		// update gamma shader
-		vk_create_post_process_pipeline( 0, 0, 0 );
-		if ( vk.ui_overlay_image != VK_NULL_HANDLE ) {
-			vk_create_post_process_pipeline( 22, glConfig.vidWidth, glConfig.vidHeight );
-		}
-		if ( vk.capture.image ) {
-			// update capture pipeline
-			vk_create_post_process_pipeline( 3, gls.captureWidth, gls.captureHeight );
-		}
-		if ( vk.smaaActive ) {
-			vk_create_post_process_pipeline( 10, glConfig.vidWidth, glConfig.vidHeight );
-			vk_create_post_process_pipeline( 11, glConfig.vidWidth, glConfig.vidHeight );
-			vk_create_post_process_pipeline( 12, glConfig.vidWidth, glConfig.vidHeight );
-		}
-		vk_create_post_process_pipeline( 23, glConfig.vidWidth, glConfig.vidHeight );
-		if ( r_bloom->integer ) {
-			// update bloom shaders
-			uint32_t width = gls.captureWidth;
-			uint32_t height = gls.captureHeight;
-			uint32_t i;
-
-			vk_create_post_process_pipeline( 1, width, height ); // bloom extraction
-
-			for ( i = 0; i < ARRAY_LEN( vk.blur_pipeline ); i += 2 ) {
-				width /= 2;
-				height /= 2;
-				vk_create_blur_pipeline( i + 0, width, height, qtrue ); // horizontal
-				vk_create_blur_pipeline( i + 1, width, height, qfalse ); // vertical
-			}
-
-			vk_create_post_process_pipeline( 2, glConfig.vidWidth, glConfig.vidHeight ); // bloom blending
-		}
-
-		if ( r_ssao && r_ssao->integer ) {
-			vk_create_post_process_pipeline( 5, glConfig.vidWidth, glConfig.vidHeight );
-			vk_create_post_process_pipeline( 21, glConfig.vidWidth, glConfig.vidHeight );
-			vk_create_post_process_pipeline( 6, glConfig.vidWidth, glConfig.vidHeight );
-			vk_create_post_process_pipeline( 7, glConfig.vidWidth, glConfig.vidHeight );
-			vk_create_post_process_pipeline( 8, glConfig.vidWidth, glConfig.vidHeight );
-			vk_create_post_process_pipeline( 9, glConfig.vidWidth, glConfig.vidHeight );
-		}
-		if ( r_oit && r_oit->integer ) {
-			vk_create_post_process_pipeline( 20, glConfig.vidWidth, glConfig.vidHeight );
-			vk_create_oit_accum_pipeline();
-		}
-		if ( PostFX_SSR_IsEnabled() ) {
-			vk_create_post_process_pipeline( 13, glConfig.vidWidth, glConfig.vidHeight );
-		}
-		vk_create_atmosphere_pipeline();
-	}
-}
-
+/* vk_update_post_process_pipelines: vk_post_process_refresh.c */
 
 
 
 /* vk_create_framebuffers / vk_destroy_framebuffers: vk_framebuffers.c */
 
 /* vk_destroy_swapchain moved to vk_swapchain.c */
-
-/* Tear down swapchain + render targets (surface stays valid). Used by swapchain restart and Android. */
-void vk_teardown_presentation_targets( void )
-{
-	uint32_t i;
-
-	if ( vk.device == VK_NULL_HANDLE || qvkQueuePresentKHR == NULL ) {
-		return;
-	}
-
-	vk_wait_idle();
-
-	for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ ) {
-		if ( vk.tess[i].command_buffer != VK_NULL_HANDLE ) {
-			qvkResetCommandBuffer( vk.tess[i].command_buffer, 0 );
-		}
-	}
-
-#ifdef USE_UPLOAD_QUEUE
-	if ( vk.staging_command_buffer != VK_NULL_HANDLE ) {
-		qvkResetCommandBuffer( vk.staging_command_buffer, 0 );
-	}
-#endif
-
-	vk_destroy_pipelines( qfalse );
-	vk_destroy_framebuffers();
-	vk_destroy_render_passes();
-	vk_destroy_attachments();
-	vk_destroy_swapchain();
-	vk_destroy_sync_primitives();
-#ifdef VK_CUBEMAP
-	vk_destroy_cubemap_prefilter();
-#endif
-}
-
-/* Recreate swapchain and framebuffers after vk_teardown_presentation_targets (surface must exist). */
-void vk_restore_presentation_targets( void )
-{
-	if ( vk.device == VK_NULL_HANDLE || vk_surface == VK_NULL_HANDLE ) {
-		return;
-	}
-
-	vk_select_surface_format( vk.physical_device, vk_surface );
-	vk_setup_surface_formats( vk.physical_device );
-
-	vk_create_sync_primitives();
-	vk_create_swapchain( vk.physical_device, vk.device, vk_surface, vk.present_format, &vk.swapchain, qfalse );
-	vk_create_attachments();
-	vk_create_render_passes();
-	vk_create_framebuffers();
-
-#ifdef VK_PBR_BRDFLUT
-	vk_create_brdflut_pipeline();
-#endif
-#ifdef VK_CUBEMAP
-	vk_create_cubemap_prefilter();
-#endif
-	vk_update_attachment_descriptors();
-	vk_update_volumetric_descriptors();
-
-	vk_update_post_process_pipelines();
-
-#ifdef VK_PBR_BRDFLUT
-	vk_create_brfdlut();
-#endif
-
-	vk_temporal_request_sticky_reset( VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE );
-}
-
-static void vk_restart_swapchain( const char *funcname, VkResult res )
-{
-	(void)res;
-
-#ifdef _DEBUG
-	ri.Printf( PRINT_WARNING, "%s(%s): restarting swapchain...\n", funcname, vk_result_string( res ) );
-#else
-	ri.Printf( PRINT_WARNING, "%s(): restarting swapchain...\n", funcname );
-#endif
-
-	vk_teardown_presentation_targets();
-	vk_restore_presentation_targets();
-}
+/* vk_teardown_presentation_targets / vk_restore_presentation_targets / vk_restart_swapchain: vk_presentation.c */
 
 
 static void vk_set_render_scale( void )
@@ -1414,117 +1261,7 @@ void vk_create_brdflut_pipeline( void )
 #endif
 
 /* vk_create_volumetric_pipelines + helpers: vk_volumetric_pipelines.c */
-
-
-
-typedef struct {
-	float positionFlex[4];
-	float normalPhase[4];
-} vegwind_vertex_t;
-
-static vegwind_vertex_t vegwind_staging[VEGWIND_MAX_VERTS];
-static int vegwind_staging_count;
-
-void vk_vegetation_clear_staging( void )
-{
-	vegwind_staging_count = 0;
-}
-
-void vk_vegetation_add_from_tess( int oldVertexCount, int newVertexCount )
-{
-	int i, n, count;
-	float flex, phase;
-
-	if ( newVertexCount <= oldVertexCount || vegwind_staging_count >= VEGWIND_MAX_VERTS )
-		return;
-
-	n = newVertexCount - oldVertexCount;
-	count = VEGWIND_MAX_VERTS - vegwind_staging_count;
-	if ( n > count )
-		n = count;
-
-	for ( i = 0; i < n; i++ ) {
-		int v = oldVertexCount + i;
-		vegwind_vertex_t *dst = &vegwind_staging[vegwind_staging_count + i];
-
-		dst->positionFlex[0] = tess.xyz[v][0];
-		dst->positionFlex[1] = tess.xyz[v][1];
-		dst->positionFlex[2] = tess.xyz[v][2];
-		/* flexibility: 0=rigid root, 1=flexible tip; use normal Y for grass (up=flexible) */
-		flex = tess.normal[v][1];
-		dst->positionFlex[3] = ( flex > 0.0f ) ? Com_Clamp( 0.0f, 1.0f, flex ) : 0.5f;
-
-		dst->normalPhase[0] = tess.normal[v][0];
-		dst->normalPhase[1] = tess.normal[v][1];
-		dst->normalPhase[2] = tess.normal[v][2];
-		/* phase offset for variation (hash from position) */
-		phase = ( tess.xyz[v][0] * 12.9898f + tess.xyz[v][2] * 78.233f );
-		dst->normalPhase[3] = phase - floorf( phase );
-	}
-
-	vegwind_staging_count += n;
-}
-
-void vk_vegetation_wind_dispatch( void )
-{
-	typedef struct {
-		float windDirection[4];
-		float windParams[4];
-		float gustParams[4];
-		float timeParams[4];
-		uint32_t vertexCount;
-		uint32_t pad0;
-		uint32_t pad1;
-		uint32_t pad2;
-	} vegwind_push_t;
-
-	vegwind_push_t push;
-	uint32_t groupCount;
-	const uint32_t localSize = 64;
-
-	if ( !PostFX_VegWind_IsEnabled() || vk.vegwind_pipeline == VK_NULL_HANDLE ||
-		vk.vegwind_descriptor == VK_NULL_HANDLE )
-	{
-		return;
-	}
-	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE )
-		return;
-
-	vk_end_render_pass();
-
-	PostFX_VegWind_GetWindDir( &push.windDirection[0], &push.windDirection[1], &push.windDirection[2] );
-	push.windDirection[3] = PostFX_VegWind_GetWindStrength();
-	push.windParams[0] = PostFX_VegWind_GetPrimaryFreq();
-	push.windParams[1] = PostFX_VegWind_GetPrimaryAmp();
-	push.windParams[2] = PostFX_VegWind_GetDetailFreq();
-	push.windParams[3] = PostFX_VegWind_GetDetailAmp();
-	push.gustParams[0] = PostFX_VegWind_GetGustFreq();
-	push.gustParams[1] = PostFX_VegWind_GetGustAmp();
-	push.gustParams[2] = 0.0f;
-	push.gustParams[3] = 0.0f;
-	push.timeParams[0] = (float)ri.Milliseconds() / 1000.0f;
-	push.timeParams[1] = 0.0f;
-	push.timeParams[2] = 0.0f;
-	push.timeParams[3] = 0.0f;
-	push.vertexCount = vegwind_staging_count;
-	push.pad0 = push.pad1 = push.pad2 = 0;
-
-	if ( push.vertexCount > 0 && vk.vegwind_vertex_buffer != VK_NULL_HANDLE ) {
-		void *ptr;
-		VkDeviceSize uploadSize = (VkDeviceSize)push.vertexCount * VEGWIND_VERTEX_STRIDE;
-		if ( qvkMapMemory( vk.device, vk.vegwind_vertex_memory, 0, uploadSize, 0, &ptr ) == VK_SUCCESS ) {
-			Com_Memcpy( ptr, vegwind_staging, (size_t)uploadSize );
-			qvkUnmapMemory( vk.device, vk.vegwind_vertex_memory );
-		}
-	}
-
-	groupCount = ( push.vertexCount > 0 ) ? ( ( push.vertexCount + localSize - 1 ) / localSize ) : 1;
-
-	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.vegwind_pipeline );
-	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.pipeline_layout_vegwind, 0, 1, &vk.vegwind_descriptor, 0, NULL );
-	qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_vegwind, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( push ), &push );
-	qvkCmdDispatch( vk.cmd->command_buffer, groupCount, 1, 1 );
-}
+/* vk_vegetation_*: vk_vegetation_wind.c */
 
 /* vk_shutdown, vk_wait_idle, vk_queue_wait_idle, vk_release_resources: vk_shutdown.c */
 
@@ -2212,122 +1949,6 @@ void vk_present_frame( void )
 }
 
 /* vk_read_pixels: vk_read_pixels.c */
-
-void vk_destroy_volumetric_params_buffer( void )
-{
-	if ( vk.volumetric_params_ptr ) {
-		qvkUnmapMemory( vk.device, vk.volumetric_params_memory );
-		vk.volumetric_params_ptr = NULL;
-	}
-
-	if ( vk.volumetric_params_buffer != VK_NULL_HANDLE ) {
-		qvkDestroyBuffer( vk.device, vk.volumetric_params_buffer, NULL );
-		vk.volumetric_params_buffer = VK_NULL_HANDLE;
-		vk.volumetric_params_buffer_size = 0;
-	}
-
-	if ( vk.volumetric_params_memory != VK_NULL_HANDLE ) {
-		qvkFreeMemory( vk.device, vk.volumetric_params_memory, NULL );
-		vk.volumetric_params_memory = VK_NULL_HANDLE;
-	}
-	vk_reset_volumetric_history();
-	vk_temporal_request_sticky_reset( VK_TEMPORAL_RESET_MISSING_PREV_DATA );
-}
-
-void vk_create_volumetric_params_buffer( void )
-{
-	if ( vk.volumetric_params_buffer != VK_NULL_HANDLE ) {
-		return;
-	}
-
-	VkBufferCreateInfo desc;
-	VkMemoryRequirements mem_req;
-	VkMemoryAllocateInfo alloc_info;
-
-	desc.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	desc.pNext = NULL;
-	desc.flags = 0;
-	desc.size = sizeof( volumetric_params_t );
-	desc.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-	desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	desc.queueFamilyIndexCount = 0;
-	desc.pQueueFamilyIndices = NULL;
-
-	VK_CHECK( qvkCreateBuffer( vk.device, &desc, NULL, &vk.volumetric_params_buffer ) );
-
-	qvkGetBufferMemoryRequirements( vk.device, vk.volumetric_params_buffer, &mem_req );
-
-	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	alloc_info.pNext = NULL;
-	alloc_info.allocationSize = mem_req.size;
-	alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, mem_req.memoryTypeBits,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
-
-	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.volumetric_params_memory ) );
-	VK_CHECK( qvkBindBufferMemory( vk.device, vk.volumetric_params_buffer, vk.volumetric_params_memory, 0 ) );
-
-	vk.volumetric_params_buffer_size = mem_req.size;
-
-	VK_CHECK( qvkMapMemory( vk.device, vk.volumetric_params_memory, 0, vk.volumetric_params_buffer_size, 0, &vk.volumetric_params_ptr ) );
-	vk_reset_volumetric_history();
-	vk_temporal_request_sticky_reset( VK_TEMPORAL_RESET_MISSING_PREV_DATA );
-}
-
-void vk_destroy_postfx_params_buffers( void )
-{
-	uint32_t i;
-
-	for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ ) {
-		if ( vk.postfx_params_memory[i] != VK_NULL_HANDLE ) {
-			if ( vk.postfx_params_ptr[i] ) {
-				qvkUnmapMemory( vk.device, vk.postfx_params_memory[i] );
-				vk.postfx_params_ptr[i] = NULL;
-			}
-			qvkFreeMemory( vk.device, vk.postfx_params_memory[i], NULL );
-			vk.postfx_params_memory[i] = VK_NULL_HANDLE;
-		}
-		if ( vk.postfx_params_buffer[i] != VK_NULL_HANDLE ) {
-			qvkDestroyBuffer( vk.device, vk.postfx_params_buffer[i], NULL );
-			vk.postfx_params_buffer[i] = VK_NULL_HANDLE;
-		}
-		vk.postfx_params_descriptor[i] = VK_NULL_HANDLE;
-	}
-}
-
-void vk_create_postfx_params_buffers( void )
-{
-	uint32_t i;
-
-	for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ ) {
-		VkBufferCreateInfo desc;
-		VkMemoryRequirements mem_req;
-		VkMemoryAllocateInfo alloc_info;
-
-		if ( vk.postfx_params_buffer[i] != VK_NULL_HANDLE ) {
-			continue;
-		}
-
-		Com_Memset( &desc, 0, sizeof( desc ) );
-		desc.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-		desc.size = sizeof( VkPostFXParams );
-		desc.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-		desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-		VK_CHECK( qvkCreateBuffer( vk.device, &desc, NULL, &vk.postfx_params_buffer[i] ) );
-		qvkGetBufferMemoryRequirements( vk.device, vk.postfx_params_buffer[i], &mem_req );
-
-		Com_Memset( &alloc_info, 0, sizeof( alloc_info ) );
-		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-		alloc_info.allocationSize = mem_req.size;
-		alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device,
-			mem_req.memoryTypeBits,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
-
-		VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.postfx_params_memory[i] ) );
-		VK_CHECK( qvkBindBufferMemory( vk.device, vk.postfx_params_buffer[i], vk.postfx_params_memory[i], 0 ) );
-		VK_CHECK( qvkMapMemory( vk.device, vk.postfx_params_memory[i], 0, mem_req.size, 0, &vk.postfx_params_ptr[i] ) );
-		Com_Memset( vk.postfx_params_ptr[i], 0, sizeof( VkPostFXParams ) );
-	}
-}
+/* vk_*volumetric_params_buffer / vk_*postfx_params_buffers: vk_volumetric_postfx_buffers.c */
 
 /* Cubemap prefilter / vk_generate_cubemaps: vk_cubemap_prefilter.c */
