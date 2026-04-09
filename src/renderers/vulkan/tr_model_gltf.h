@@ -58,6 +58,9 @@ typedef struct gltfMesh_s {
 	char            name[MAX_QPATH];
 	gltfPrimitive_t *primitives;
 	int              numPrimitives;
+	/* glTF mesh.weights — static blend shape defaults shared by primitives */
+	float           defaultMorphWeights[GLTF_MAX_MORPH_TARGETS];
+	int              numDefaultMorphWeights;
 } gltfMesh_t;
 
 typedef struct gltfMaterial_s {

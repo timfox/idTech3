@@ -449,6 +449,20 @@ static qboolean gltf_load_meshes(const cgltf_data *data, gltfModel_t *model) {
 			Q_strncpyz(dstMesh->name, srcMesh->name, sizeof(dstMesh->name));
 		}
 
+		dstMesh->numDefaultMorphWeights = 0;
+		Com_Memset(dstMesh->defaultMorphWeights, 0, sizeof(dstMesh->defaultMorphWeights));
+		if (srcMesh->weights && srcMesh->weights_count > 0) {
+			int nw = (int)srcMesh->weights_count;
+			int wi;
+			if (nw > GLTF_MAX_MORPH_TARGETS) {
+				nw = GLTF_MAX_MORPH_TARGETS;
+			}
+			dstMesh->numDefaultMorphWeights = nw;
+			for (wi = 0; wi < nw; wi++) {
+				dstMesh->defaultMorphWeights[wi] = (float)srcMesh->weights[wi];
+			}
+		}
+
 		dstMesh->primitives = (gltfPrimitive_t *)ri.Hunk_Alloc(primCount * sizeof(gltfPrimitive_t), h_low);
 		dstMesh->numPrimitives = primCount;
 

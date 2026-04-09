@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_surf.c
 #include "tr_local.h"
 #include "tr_model_gltf.h"
+#include <math.h>
 
 /*
 
@@ -1521,6 +1522,105 @@ static void RB_SurfaceSkip( void *surf ) {
 	(void)surf;
 }
 
+#ifdef USE_VK_PBR
+/*
+================
+RB_GLTFRecomputeQtangentsForTessRange
+================
+MikkTSpace-style tangent basis from deformed positions + UV0 (after CPU morph/skin).
+Fills tess.qtangent and zeros lightdir for [vertBase, vertBase+numVerts).
+================
+*/
+static void RB_GLTFRecomputeQtangentsForTessRange( int vertBase, int numVerts, int indexStart, int numIndexes ) {
+	float (*tanAcc)[3];
+	float (*btAcc)[3];
+	int tri, k;
+
+	if ( numVerts <= 0 || numIndexes < 3 ) {
+		return;
+	}
+
+	tanAcc = (float (*)[3])ri.Hunk_AllocateTempMemory( numVerts * sizeof( *tanAcc ) );
+	btAcc = (float (*)[3])ri.Hunk_AllocateTempMemory( numVerts * sizeof( *btAcc ) );
+	Com_Memset( tanAcc, 0, numVerts * sizeof( *tanAcc ) );
+	Com_Memset( btAcc, 0, numVerts * sizeof( *btAcc ) );
+
+	for ( tri = 0; tri < numIndexes / 3; tri++ ) {
+		int ia = tess.indexes[indexStart + tri * 3 + 0];
+		int ib = tess.indexes[indexStart + tri * 3 + 1];
+		int ic = tess.indexes[indexStart + tri * 3 + 2];
+		vec3_t e1, e2, sdir, tdir;
+		vec2_t duv1, duv2;
+		float denom, f;
+		int corner;
+
+		VectorSubtract( tess.xyz[ib], tess.xyz[ia], e1 );
+		VectorSubtract( tess.xyz[ic], tess.xyz[ia], e2 );
+		duv1[0] = tess.texCoords[0][ib][0] - tess.texCoords[0][ia][0];
+		duv1[1] = tess.texCoords[0][ib][1] - tess.texCoords[0][ia][1];
+		duv2[0] = tess.texCoords[0][ic][0] - tess.texCoords[0][ia][0];
+		duv2[1] = tess.texCoords[0][ic][1] - tess.texCoords[0][ia][1];
+		denom = duv1[0] * duv2[1] - duv2[0] * duv1[1];
+		if ( fabsf( denom ) < 1e-12f ) {
+			continue;
+		}
+		f = 1.0f / denom;
+		sdir[0] = f * ( duv2[1] * e1[0] - duv1[1] * e2[0] );
+		sdir[1] = f * ( duv2[1] * e1[1] - duv1[1] * e2[1] );
+		sdir[2] = f * ( duv2[1] * e1[2] - duv1[1] * e2[2] );
+		tdir[0] = f * ( -duv2[0] * e1[0] + duv1[0] * e2[0] );
+		tdir[1] = f * ( -duv2[0] * e1[1] + duv1[0] * e2[1] );
+		tdir[2] = f * ( -duv2[0] * e1[2] + duv1[0] * e2[2] );
+
+		for ( corner = 0; corner < 3; corner++ ) {
+			int vx = ( corner == 0 ) ? ia : ( ( corner == 1 ) ? ib : ic );
+			int li;
+
+			if ( vx < vertBase || vx >= vertBase + numVerts ) {
+				continue;
+			}
+			li = vx - vertBase;
+			for ( k = 0; k < 3; k++ ) {
+				tanAcc[li][k] += sdir[k];
+				btAcc[li][k] += tdir[k];
+			}
+		}
+	}
+
+	for ( k = 0; k < numVerts; k++ ) {
+		int vi = vertBase + k;
+		vec3_t n, t, b, up;
+		float d;
+
+		VectorCopy( tess.normal[vi], n );
+		VectorNormalize( n );
+		d = DotProduct( n, tanAcc[k] );
+		t[0] = tanAcc[k][0] - n[0] * d;
+		t[1] = tanAcc[k][1] - n[1] * d;
+		t[2] = tanAcc[k][2] - n[2] * d;
+		if ( VectorLength( t ) < 1e-8f ) {
+			if ( fabsf( n[2] ) < 0.9f ) {
+				VectorSet( up, 0.0f, 0.0f, 1.0f );
+			} else {
+				VectorSet( up, 1.0f, 0.0f, 0.0f );
+			}
+			CrossProduct( n, up, t );
+		}
+		VectorNormalize( t );
+		CrossProduct( n, t, b );
+		d = DotProduct( b, btAcc[k] );
+		tess.qtangent[vi][0] = t[0];
+		tess.qtangent[vi][1] = t[1];
+		tess.qtangent[vi][2] = t[2];
+		tess.qtangent[vi][3] = ( d < 0.0f ) ? -1.0f : 1.0f;
+		Vector4Set( tess.lightdir[vi], 0.0f, 0.0f, 0.0f, 0.0f );
+	}
+
+	ri.Hunk_FreeTempMemory( btAcc );
+	ri.Hunk_FreeTempMemory( tanAcc );
+}
+#endif /* USE_VK_PBR */
+
 /*
 =============
 RB_GLTFSurface
@@ -1649,6 +1749,16 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 			}
 		}
 	}
+	if ( useMorph && model && surf->meshIndex >= 0 && surf->meshIndex < model->numMeshes ) {
+		const gltfMesh_t *gm = &model->meshes[surf->meshIndex];
+		int nw = gm->numDefaultMorphWeights;
+		if ( nw > surf->numMorphTargets ) {
+			nw = surf->numMorphTargets;
+		}
+		for ( i = 0; i < nw; i++ ) {
+			morphW[i] += gm->defaultMorphWeights[i];
+		}
+	}
 
 	haveJoints = ( qboolean )( surf->hasSkinning && model && model->skeleton.numJoints > 0 );
 	if ( haveJoints ) {
@@ -1757,10 +1867,18 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 
 	tess.numVertexes += surf->numVertices;
 
-	for ( j = 0; j < surf->numIndices; j++ ) {
-		tess.indexes[tess.numIndexes + j] = (glIndex_t)( base + surf->indices[j] );
+	{
+		int idxBase = tess.numIndexes;
+		for ( j = 0; j < surf->numIndices; j++ ) {
+			tess.indexes[tess.numIndexes + j] = (glIndex_t)( base + surf->indices[j] );
+		}
+		tess.numIndexes += surf->numIndices;
+#ifdef USE_VK_PBR
+		if ( vk.pbrActive && tess.shader && tess.shader->hasPBR ) {
+			RB_GLTFRecomputeQtangentsForTessRange( base, surf->numVertices, idxBase, surf->numIndices );
+		}
+#endif
 	}
-	tess.numIndexes += surf->numIndices;
 }
 
 void (*rb_surfaceTable[SF_NUM_SURFACE_TYPES])( void *) = {

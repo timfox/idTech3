@@ -26,7 +26,8 @@ Use the Vulkan build for glTF content.
 - **Time**: clip time is `refEntity.shaderTime` (seconds) when set, else `refdef.time * 0.001f`, scaled by cvar **`r_gltfAnim`** (default `1`). Time **loops** by each clip’s stored duration.
 - **Cross-clip blend**: `oldframe` selects the second clip; **`backlerp`** blends joint TRS (and morph weights from weight tracks) between **current** and **old** clip at the **same** clock time.
 - **Skeletal sampling**: translation/rotation/scale channels on skin joints update local pose, then `world * inverseBindMatrix` skin matrices drive **CPU** skinning in `RB_GLTFSurface`.
-- **Morph weights**: primitives load **mesh `target_names`** when present; `RE_SetEntityMorphWeight(ent, name, w)` matches those names (same hash path as IQM). **glTF weight animation** channels on the mesh node add to the same weight array. Primitives still use the **tess path** (no VBO) when morph targets exist.
+- **Morph weights**: primitives load **mesh `target_names`** when present; `RE_SetEntityMorphWeight(ent, name, w)` matches those names (same hash path as IQM). **glTF weight animation** channels on the mesh node add to the same weight array. **`mesh.weights`** default blend shape weights from the file are added as a baseline. Primitives still use the **tess path** (no VBO) when morph targets exist.
+- **PBR tangents**: after CPU morph + skinning, **qtangent** is recomputed from deformed positions and **TEXCOORD_0** when the bound shader is PBR (`vk.pbrActive` + `shader->hasPBR`), so normal-mapped materials stay consistent. This replaces reliance on static glTF tangents for that path; glTF **tangent morph deltas** are not applied as a separate vector (geometry still deforms via position/normal deltas).
 
 ## Known limitations (important)
 
@@ -37,7 +38,7 @@ Use the Vulkan build for glTF content.
 
 ### 2. Morph targets (blend shapes)
 
-- Up to **`GLTF_MAX_MORPH_TARGETS`** (8) per primitive; tangents are not blended into the CPU tess path yet.
+- Up to **`GLTF_MAX_MORPH_TARGETS`** (8) per primitive. **POSITION** and **NORMAL** deltas blend on the CPU; **TANGENT** morph deltas are not accumulated (PBR uses recomputed qtangent from the deformed mesh + UV0).
 
 ### 3. Single skin (unchanged)
 

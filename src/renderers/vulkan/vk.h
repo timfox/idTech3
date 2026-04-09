@@ -340,7 +340,8 @@ typedef struct vkUniformCamera_s {
 #define TESS_ENV   (512) // mark shader stage with environment mapping
 
 #ifdef USE_VK_PBR
-#define TESS_PBR   				( 1024 ) // PBR shader variant, qtangent vertex attribute and eyePos uniform
+/* Must not collide with TESS_ENT0 (1024). */
+#define TESS_PBR   				( 0x8000u ) // PBR shader variant, qtangent vertex attribute and eyePos uniform
 
 #define PBR_HAS_NORMALMAP		( 1 )
 #define PBR_HAS_PHYSICALMAP		( 2 )
