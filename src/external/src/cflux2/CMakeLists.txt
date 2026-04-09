@@ -113,7 +113,8 @@ target_include_directories(cflux2
 # Link libraries
 target_link_libraries(cflux2 PRIVATE ${FLUX_LINK_LIBRARIES})
 
-# CLI executable (external generator)
+# CLI executable (external generator) — not built on Android (JNI shared lib target only)
+if(NOT ANDROID)
 set(FLUX_CLI_SOURCES
     main.c
     flux_cli.c
@@ -148,6 +149,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
         -Wno-format-truncation
         $<$<C_COMPILER_ID:GNU>:-Wno-stringop-truncation>)
 endif()
+endif() # NOT ANDROID
 
 # Set C standard
 set_target_properties(cflux2 PROPERTIES
