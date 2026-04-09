@@ -14,6 +14,7 @@ Vulkan surface, input, file system, and JNI bridge.
 #include "../../renderers/common/tr_types.h"
 #include "android_surface_glue.h"
 #include "android_asset_bootstrap.h"
+#include "android_touch_overlay.h"
 #include "../../renderers/vulkan/vk_android_surface.h"
 #ifndef DEDICATED
 #include "../../client/keycodes.h"
@@ -644,6 +645,7 @@ static void *gameThreadFunc( void *arg ) {
 	int lastTime = Sys_Milliseconds();
 	while ( g_running ) {
 		if ( g_paused ) {
+			Android_TouchOverlay_PumpEvents();
 			Android_SurfaceThread_ProcessPending();
 			usleep( 50000 );
 			lastTime = Sys_Milliseconds();
@@ -658,6 +660,7 @@ static void *gameThreadFunc( void *arg ) {
 		if ( msec > 200 ) msec = 200;
 
 		Android_PollInput();
+		Android_TouchOverlay_PumpEvents();
 		Android_SurfaceThread_ProcessPending();
 		Com_Frame( msec );
 	}

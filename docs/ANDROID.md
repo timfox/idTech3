@@ -87,7 +87,8 @@ At startup, missing files are copied into `fs_basepath` (the same directory `Gam
 
 ## Input and console
 
-- **Touch**: drag sends **relative** mouse motion (like a PC mouse) for mouselook and UI; primary tap uses `K_MOUSE1`. Sensitivity: **`com_androidTouchSens`** (default `1.0`, archived).
+- **Touch HUD** (Java overlay): **left stick** = `+forward` / `+back` / `+moveleft` / `+moveright`; **right stick** = look (relative mouse deltas). **Buttons** (right column): Menu (`K_ESCAPE`), weapon next (`]` key event), sprint (`+speed`), jump (`+moveup`), fire (`+attack`). Touches **outside** sticks and buttons are passed to the engine (e.g. UI mouse with `K_MOUSE1`). JNI is registered at startup (`GameActivity.nativeRegisterTouchOverlayJni`); native side pumps the queue each frame (`Android_TouchOverlay_PumpEvents`).
+- **Raw touch** (full-screen): drag still sends **relative** mouse motion; primary tap uses `K_MOUSE1`. Sensitivity: **`com_androidTouchSens`** (default `1.0`, archived).
 - **Logcat**: `Com_Printf` output is mirrored to Android logcat (tag `idTech3`) with Q3 color codes stripped, in addition to `Sys_Print`.
 - **Focus**: **`gw_active`** is cleared on activity pause and set on resume so unfocused behavior (e.g. `com_maxfpsUnfocused`) matches the app lifecycle.
 
