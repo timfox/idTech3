@@ -32,7 +32,7 @@ Or open the `android/` directory in Android Studio.
 
 ### CI (GitHub Actions)
 
-The **`android`** job in `.github/workflows/build.yml` cross-compiles with CMake using the **same feature toggles** as `android/app/build.gradle` (Lua, Duktape, curl, video flags, FLUX, Recast, Bullet, FreeType, DTLS). First configure in CI may **fetch** FreeType and the Lua tarball like a local Gradle build.
+The **`android`** job in `.github/workflows/build.yml` cross-compiles with CMake **per ABI** using the **same feature toggles** as `android/app/build.gradle`. The separate **`android-apk`** job runs **`./gradlew assembleDebug`** once (universal APK with both ABIs), installs **CMake 3.31.6** and **platforms;android-35** to match `app/build.gradle`, accepts SDK licenses, and reuses **`.ci-android-deps`** for Lua/OpenSSL/FetchContent.
 
 **Local tip:** pass `-DANDROID_DEPS_CACHE=/path/to/dir` to CMake. For **Gradle**, set env **`ANDROID_DEPS_CACHE`** or use **`-PandroidDepsCache=/path`** so `externalNativeBuild` forwards the same flag (reuses Lua / OpenSSL / FreeType downloads).
 
