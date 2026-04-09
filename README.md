@@ -36,9 +36,9 @@ Ray tracing (Vulkan RT) is **scaffolded / in progress** — see `docs/RENDERERS_
 * Video codec support: RoQ, WebM (VP8/VP9), Ogg Theora, MP4 (H.264)
 
 **Models**:
-* Model formats supported: MD3, MDR, IQM, OBJ, FBX, GLTF, USD (Universal Scene Description), Maya Ascii, Collada (DAE), STL
-* Blend Shapes (IQM); glTF morph targets blend on Vulkan (animation weights + `RE_SetEntityMorphWeight`) — see [docs/GLTF.md](docs/GLTF.md)
-* **glTF / GLB**: Vulkan only; CPU skinning with **clip playback** (`refEntity.frame` / `oldframe` / `backlerp`, `r_gltfAnim`) — details: [docs/GLTF.md](docs/GLTF.md)
+* **Vulkan (primary):** MD3, MDR, IQM, **OBJ**, **glTF / GLB**, MD5, STL, DAE, FBX, USD / USDA, Maya Ascii (MA) — glTF details: [docs/GLTF.md](docs/GLTF.md)
+* **OpenGL (fallback):** MD3, MDR, IQM, STL, DAE, FBX, USD / USDA, MA via the shared mesh-import path — **no OBJ, glTF, or MD5** in the OpenGL renderer today (use Vulkan or convert)
+* Blend shapes: **IQM** on both renderers where enabled; **glTF** morph + clip playback on **Vulkan** only (animation weights + `RE_SetEntityMorphWeight`; `r_gltfAnim` for time) — [docs/GLTF.md](docs/GLTF.md)
 
 **Scripting**:
 * Support for Lua scripting

@@ -86,7 +86,7 @@ Priorities that keep **CI green** and **README/build truth** aligned:
 | P0 | **CI stability** | Fix any red matrix on `main`; Android OpenSSL/Lua first-build time — tune cache keys if needed |
 | P1 | **glTF GPU path** | Skinning/morph in shader or SSBO; reduce CPU tess cost for characters |
 | P1 | **Renderer validation** | Tier B/C as optional gates; expand regression scripts where headless allows |
-| P2 | **OpenGL glTF or README** | Either register glTF on OpenGL or document Vulkan-only clearly everywhere |
+| P2 | **OpenGL glTF / OBJ / MD5** | README now lists per-renderer formats; optional: wire loaders in OpenGL to match Vulkan |
 | P2 | **Engine systems hardening** | Telemetry / replay / save / quest / dialogue — define stable APIs + minimal tests |
 | P3 | **GOAP content** | Data-driven actions; perf limits; debug draw |
 | P3 | **Vulkan architecture pass** | Clustered Forward+, motion history — see below |
