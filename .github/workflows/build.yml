@@ -939,26 +939,6 @@ jobs:
             -exec cp -f {} ../bin/ \;
           ls -la ../bin/
 
-      - name: Assemble debug APK (Gradle + ANDROID_DEPS_CACHE)
-        if: ${{ (github.event_name != 'release' || matrix.btype != 'Debug') && matrix.btype == 'Release' }}
-        working-directory: android
-        env:
-          ANDROID_DEPS_CACHE: ${{ github.workspace }}/.ci-android-deps
-          GIT_TERMINAL_PROMPT: 0
-        run: |
-          chmod +x ./gradlew
-          echo "sdk.dir=${ANDROID_SDK_ROOT}" > local.properties
-          ./gradlew assembleDebug --no-daemon -PandroidDepsCache="${ANDROID_DEPS_CACHE}"
-          ls -la app/build/outputs/apk/debug/ || true
-
-      - uses: actions/upload-artifact@v4
-        if: matrix.btype == 'Release'
-        with:
-          name: android-apk-${{ matrix.abi }}
-          path: android/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: warn
-          retention-days: 5
-
       - uses: actions/upload-artifact@v4
         if: matrix.btype == 'Release'
         with:
@@ -967,10 +947,62 @@ jobs:
           if-no-files-found: warn
           retention-days: 5
 
+  # One universal debug APK (arm64-v8a + armeabi-v7a). Separated from per-ABI CMake matrix to avoid duplicate Gradle/OpenSSL builds.
+  android-apk:
+    name: Android debug APK (Gradle)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK, CMake (match app/build.gradle), SDK platform 35
+        run: |
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager --install "ndk;27.0.12077973" "cmake;3.31.6" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Cache Android third-party downloads
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.ci-android-deps
+          key: android-apk-deps-${{ hashFiles('CMakeLists.txt', 'android/app/build.gradle') }}
+          restore-keys: |
+            android-apk-deps-
+
+      - name: Assemble debug APK
+        if: ${{ github.event_name != 'release' }}
+        working-directory: android
+        env:
+          ANDROID_DEPS_CACHE: ${{ github.workspace }}/.ci-android-deps
+          GIT_TERMINAL_PROMPT: 0
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends make git perl
+          chmod +x ./gradlew
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME}}"
+          echo "sdk.dir=${SDK_ROOT}" > local.properties
+          ./gradlew assembleDebug --no-daemon -PandroidDepsCache="${ANDROID_DEPS_CACHE}"
+          ls -la app/build/outputs/apk/debug/
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ github.event_name != 'release' }}
+        with:
+          name: android-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn
+          retention-days: 5
+
   release-attach:
     name: Attach artifacts to release
     if: always() && !cancelled() && github.event_name == 'release' && github.event.action == 'published'
-    needs: [windows-msys, windows-msvc, ubuntu-x86_64, ubuntu-arm, macos, android]
+    needs: [windows-msys, windows-msvc, ubuntu-x86_64, ubuntu-arm, macos, android, android-apk]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
