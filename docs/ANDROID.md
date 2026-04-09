@@ -49,15 +49,22 @@ android/
 
 ## CMake Configuration
 
-The Android build passes these flags to the root CMakeLists.txt:
+The Android Gradle project passes these flags to the root `CMakeLists.txt` (see `android/app/build.gradle`):
 - `USE_VULKAN=ON` -- Vulkan renderer (primary)
 - `USE_RENDERER_DLOPEN=OFF` -- static linking
 - `SKIP_SHADER_REGEN=ON` -- use pre-committed shaders
-- `BUILD_SERVER=OFF` -- no dedicated server
+- `BUILD_SERVER=OFF` -- no dedicated server (same engine code paths as desktop minus ded binary)
 - `USE_SDL=OFF` -- NativeActivity + direct Vulkan/input
 - `USE_OPENAL=OFF` -- AAudio + OpenSL ES (native Android audio)
-- `USE_CURL=OFF`, `USE_LUA=OFF`, `USE_DUKTAPE=OFF` -- reduced feature set
-- `USE_RECAST_NAV=OFF`, `USE_BULLET_PHYSICS=OFF` -- optional
+- `USE_LUA=ON`, `USE_DUKTAPE=ON` -- scripting (Lua is built as a static library from upstream source on first configure; requires network once)
+- `USE_CURL=ON` -- HTTP client when the NDK provides **libcurl** under the sysroot (if missing, `cl_curl` is omitted with a CMake warning)
+- `USE_FFMPEG=ON`, `USE_DAV1D=ON`, `USE_VPX=ON`, `USE_THEORA=ON` -- same toggles as desktop; **pkg-config is usually absent** on Android, so these often disable at configure time unless you add prebuilt codec libraries and CMake hints
+- `USE_FLUX=ON` -- FLUX static library (generic backend on Android); **flux_cli** is not built on Android
+- `USE_RECAST_NAV=ON`, `USE_BULLET_PHYSICS=ON` -- same as desktop (Bullet full backend still needs a discoverable **libbullet** for the ABI)
+- `BUILD_FREETYPE=ON` -- FreeType: uses **FetchContent** from the official FreeType GitHub repo if `find_package(Freetype)` fails (first configure needs network)
+- `USE_DTLS=ON` -- links OpenSSL when **find_package(OpenSSL)** succeeds (often requires a prefab/OpenSSL for Android; otherwise DTLS stays off with a warning)
+
+**Note:** The APK still does not ship **game** `.pk3` data; use external storage or `apkassets/` as documented below.
 
 ## ABI Targets
 
