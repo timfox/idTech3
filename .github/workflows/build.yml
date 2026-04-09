@@ -21,6 +21,7 @@ on:
       - next-gen-4
       - next-gen-5
       - proximity-voice-chat
+      - 'cursor/**'
     paths-ignore:
       - '**/*.md'
       - '**/LICENSE*'
@@ -73,7 +74,7 @@ jobs:
         shell: msys2 {0}
         run: |
           set -e
-          pkgs="${{ matrix.prefix }}-SDL2 ${{ matrix.prefix }}-openal ${{ matrix.prefix }}-freetype ${{ matrix.prefix }}-lua ${{ matrix.prefix }}-openssl"
+          pkgs="${{ matrix.prefix }}-SDL2 ${{ matrix.prefix }}-openal ${{ matrix.prefix }}-freetype ${{ matrix.prefix }}-lua ${{ matrix.prefix }}-openssl ${{ matrix.prefix }}-curl"
           for attempt in 1 2 3 4 5; do
             pacman -S --needed --noconfirm $pkgs && exit 0
             echo "pacman attempt $attempt failed, retrying in $((attempt * 20))s..."
@@ -873,7 +874,11 @@ jobs:
       - name: Build ${{ matrix.btype }} (${{ matrix.abi }})
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
         working-directory: android
+        env:
+          GIT_TERMINAL_PROMPT: 0
         run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends make git
           # Use direct CMake cross-compile instead of Gradle to avoid
           # wrapper/SDK bootstrapping complexity in CI.
           NDK_HOME="${ANDROID_NDK_HOME:-$ANDROID_SDK_ROOT/ndk/27.0.12077973}"
