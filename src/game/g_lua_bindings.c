@@ -713,6 +713,22 @@ static int l_goap_getAgentCount(lua_State *L) {
 	lua_pushinteger(L, GOAP_GetAgentCount());
 	return 1;
 }
+static int l_goap_setMaxPlanIterations(lua_State *L) {
+	GOAP_SetMaxPlanIterations((int)luaL_checkinteger(L, 1));
+	return 0;
+}
+static int l_goap_getMaxPlanIterations(lua_State *L) {
+	lua_pushinteger(L, GOAP_GetMaxPlanIterations());
+	return 1;
+}
+static int l_goap_getLastPlanIterations(lua_State *L) {
+	lua_pushinteger(L, GOAP_GetLastPlanIterations());
+	return 1;
+}
+static int l_goap_forceReplan(lua_State *L) {
+	GOAP_ForceReplan((int)luaL_checkinteger(L, 1));
+	return 0;
+}
 
 /* ========== BT bindings ========== */
 
@@ -954,6 +970,10 @@ void LuaBindings_RegisterAll(void *luaState) {
 		{"getActionCount", l_goap_getActionCount},
 		{"getGoalCount", l_goap_getGoalCount},
 		{"getAgentCount", l_goap_getAgentCount},
+		{"setMaxPlanIterations", l_goap_setMaxPlanIterations},
+		{"getMaxPlanIterations", l_goap_getMaxPlanIterations},
+		{"getLastPlanIterations", l_goap_getLastPlanIterations},
+		{"forceReplan", l_goap_forceReplan},
 		{NULL, NULL}
 	};
 	registerTable(L, "GOAP", goapFuncs);
