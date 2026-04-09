@@ -148,6 +148,12 @@
     <ClCompile Include="..\..\renderers\vulkan\vk_shutdown.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\renderers\vulkan\vk_android_surface.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\renderers\vulkan\vk_read_pixels.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\renderers\vulkan\vk_postfx_passes.c">
       <Filter>Source Files</Filter>
     </ClCompile>

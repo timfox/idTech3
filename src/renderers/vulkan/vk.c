@@ -36,6 +36,10 @@
 #include "vk_pipeline_helpers.h"
 #include <math.h>
 
+#ifdef __ANDROID__
+#include "../../platform/android/android_surface_glue.h"
+#endif
+
 /* VK_EXT_extended_dynamic_state3: struct for pipeline creation (VK_DYNAMIC_STATE_*, PFN in vk.h) */
 #ifndef VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT
 #define VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT 1000484000
@@ -180,26 +184,27 @@ void vk_update_post_process_pipelines( void )
 
 /* vk_destroy_swapchain moved to vk_swapchain.c */
 
-
-static void vk_restart_swapchain( const char *funcname, VkResult res )
+/* Tear down swapchain + render targets (surface stays valid). Used by swapchain restart and Android. */
+void vk_teardown_presentation_targets( void )
 {
-	(void)res;
 	uint32_t i;
 
-#ifdef _DEBUG
-	ri.Printf( PRINT_WARNING, "%s(%s): restarting swapchain...\n", funcname, vk_result_string( res ) );
-#else
-	ri.Printf(PRINT_WARNING, "%s(): restarting swapchain...\n", funcname );
-#endif
+	if ( vk.device == VK_NULL_HANDLE || qvkQueuePresentKHR == NULL ) {
+		return;
+	}
 
 	vk_wait_idle();
 
 	for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ ) {
-		qvkResetCommandBuffer( vk.tess[i].command_buffer, 0 );
+		if ( vk.tess[i].command_buffer != VK_NULL_HANDLE ) {
+			qvkResetCommandBuffer( vk.tess[i].command_buffer, 0 );
+		}
 	}
 
 #ifdef USE_UPLOAD_QUEUE
-	qvkResetCommandBuffer( vk.staging_command_buffer, 0 );
+	if ( vk.staging_command_buffer != VK_NULL_HANDLE ) {
+		qvkResetCommandBuffer( vk.staging_command_buffer, 0 );
+	}
 #endif
 
 	vk_destroy_pipelines( qfalse );
@@ -208,9 +213,17 @@ static void vk_restart_swapchain( const char *funcname, VkResult res )
 	vk_destroy_attachments();
 	vk_destroy_swapchain();
 	vk_destroy_sync_primitives();
-#ifdef VK_CUBEMAP	
-    vk_destroy_cubemap_prefilter();
+#ifdef VK_CUBEMAP
+	vk_destroy_cubemap_prefilter();
 #endif
+}
+
+/* Recreate swapchain and framebuffers after vk_teardown_presentation_targets (surface must exist). */
+void vk_restore_presentation_targets( void )
+{
+	if ( vk.device == VK_NULL_HANDLE || vk_surface == VK_NULL_HANDLE ) {
+		return;
+	}
 
 	vk_select_surface_format( vk.physical_device, vk_surface );
 	vk_setup_surface_formats( vk.physical_device );
@@ -221,12 +234,11 @@ static void vk_restart_swapchain( const char *funcname, VkResult res )
 	vk_create_render_passes();
 	vk_create_framebuffers();
 
-	//vk_create_bloom_pipelines();
 #ifdef VK_PBR_BRDFLUT
-    vk_create_brdflut_pipeline();
+	vk_create_brdflut_pipeline();
 #endif
 #ifdef VK_CUBEMAP
-    vk_create_cubemap_prefilter();
+	vk_create_cubemap_prefilter();
 #endif
 	vk_update_attachment_descriptors();
 	vk_update_volumetric_descriptors();
@@ -238,6 +250,20 @@ static void vk_restart_swapchain( const char *funcname, VkResult res )
 #endif
 
 	vk_temporal_request_sticky_reset( VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE );
+}
+
+static void vk_restart_swapchain( const char *funcname, VkResult res )
+{
+	(void)res;
+
+#ifdef _DEBUG
+	ri.Printf( PRINT_WARNING, "%s(%s): restarting swapchain...\n", funcname, vk_result_string( res ) );
+#else
+	ri.Printf( PRINT_WARNING, "%s(): restarting swapchain...\n", funcname );
+#endif
+
+	vk_teardown_presentation_targets();
+	vk_restore_presentation_targets();
 }
 
 
@@ -2119,6 +2145,10 @@ void vk_present_frame( void )
 	VkExtent2D new_extent;
 	qboolean new_extent_valid;
 
+#ifdef __ANDROID__
+	Android_SurfaceThread_ProcessPending();
+#endif
+
 	if ( ri.CL_IsMinimized() || !vk.cmd->swapchain_image_acquired ) {
 		return;
 	}
@@ -2181,263 +2211,7 @@ void vk_present_frame( void )
 	vk.cmd = &vk.tess[ vk.cmd_index ];
 }
 
-
-static qboolean is_bgr( VkFormat format ) {
-	switch ( format ) {
-		case VK_FORMAT_B8G8R8A8_UNORM:
-		case VK_FORMAT_B8G8R8A8_SNORM:
-		case VK_FORMAT_B8G8R8A8_UINT:
-		case VK_FORMAT_B8G8R8A8_SINT:
-		case VK_FORMAT_B8G8R8A8_SRGB:
-		case VK_FORMAT_B4G4R4A4_UNORM_PACK16:
-			return qtrue;
-		default:
-			return qfalse;
-	}
-}
-
-
-void vk_read_pixels( byte *buffer, uint32_t width, uint32_t height )
-{
-	VkCommandBuffer command_buffer;
-	VkDeviceMemory memory;
-	VkMemoryRequirements memory_requirements;
-	VkMemoryPropertyFlags memory_reqs;
-	VkMemoryPropertyFlags memory_flags;
-	VkMemoryAllocateInfo alloc_info;
-	VkImageSubresource subresource;
-	VkSubresourceLayout layout;
-	VkImageCreateInfo desc;
-	VkImage srcImage;
-	VkImageLayout srcImageLayout;
-	VkImage dstImage;
-	byte *buffer_ptr;
-	byte *data;
-	uint32_t pixel_width;
-	uint32_t i, n;
-	qboolean invalidate_ptr;
-
-	if ( vk.device_lost ) {
-		return;
-	}
-	VK_CHECK( qvkWaitForFences( vk.device, 1, &vk.cmd->rendering_finished_fence, VK_FALSE, 1e12 ) );
-
-	if ( vk.fboActive ) {
-		if ( vk.capture.image ) {
-			// dedicated capture buffer
-			srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-			srcImage = vk.capture.image;
-		} else {
-			srcImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			srcImage = vk.color_image;
-		}
-	} else {
-		srcImageLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-		srcImage = vk.swapchain_images[ vk.cmd->swapchain_image_index ];
-	}
-
-	Com_Memset( &desc, 0, sizeof( desc ) );
-
-	// Create image in host visible memory to serve as a destination for framebuffer pixels.
-	desc.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	desc.pNext = NULL;
-	desc.flags = 0;
-	desc.imageType = VK_IMAGE_TYPE_2D;
-	desc.format = vk.capture_format;
-	desc.extent.width = width;
-	desc.extent.height = height;
-	desc.extent.depth = 1;
-	desc.mipLevels = 1;
-	desc.arrayLayers = 1;
-	desc.samples = VK_SAMPLE_COUNT_1_BIT;
-	desc.tiling = VK_IMAGE_TILING_LINEAR;
-	desc.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-	desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	desc.queueFamilyIndexCount = 0;
-	desc.pQueueFamilyIndices = NULL;
-	desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-
-	VK_CHECK( qvkCreateImage( vk.device, &desc, NULL, &dstImage ) );
-
-	qvkGetImageMemoryRequirements( vk.device, dstImage, &memory_requirements );
-
-	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	alloc_info.pNext = NULL;
-	alloc_info.allocationSize = memory_requirements.size;
-
-	// host_cached bit is desirable for fast reads
-	memory_reqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
-	alloc_info.memoryTypeIndex = vk_find_memory_type2( vk.physical_device, memory_requirements.memoryTypeBits, memory_reqs, &memory_flags );
-	if ( alloc_info.memoryTypeIndex == ~0U ) {
-		// try less explicit flags, without host_coherent
-		memory_reqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
-		alloc_info.memoryTypeIndex = vk_find_memory_type2( vk.physical_device, memory_requirements.memoryTypeBits, memory_reqs, &memory_flags );
-		if ( alloc_info.memoryTypeIndex == ~0U ) {
-			// slowest case
-			memory_reqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-			alloc_info.memoryTypeIndex = vk_find_memory_type2( vk.physical_device, memory_requirements.memoryTypeBits, memory_reqs, &memory_flags );
-			if ( alloc_info.memoryTypeIndex == ~0U ) {
-				ri.Error( ERR_FATAL, "%s(): failed to find matching memory type for image capture", __func__ );
-			}
-		}
-	}
-
-	if ( memory_flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT ) {
-		invalidate_ptr = qfalse;
-	} else {
-		 // according to specification - must be performed if host_coherent is not set
-		invalidate_ptr = qtrue;
-	}
-
-	VK_CHECK(qvkAllocateMemory(vk.device, &alloc_info, NULL, &memory));
-	VK_CHECK(qvkBindImageMemory(vk.device, dstImage, memory, 0));
-
-	command_buffer = vk_begin_command_buffer();
-
-	if ( srcImageLayout != VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL ) {
-		record_image_layout_transition( command_buffer, srcImage,
-			VK_IMAGE_ASPECT_COLOR_BIT,
-			srcImageLayout,
-			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-			0, 0);
-	}
-
-	record_image_layout_transition( command_buffer, dstImage,
-		VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_UNDEFINED,
-		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0 );
-
-	// vk_end_command_buffer( command_buffer, __func__  );
-
-	// command_buffer = vk_begin_command_buffer();
-
-	if ( vk.blitEnabled ) {
-		VkImageBlit region;
-
-		region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		region.srcSubresource.mipLevel = 0;
-		region.srcSubresource.baseArrayLayer = 0;
-		region.srcSubresource.layerCount = 1;
-		region.srcOffsets[0].x = 0;
-		region.srcOffsets[0].y = 0;
-		region.srcOffsets[0].z = 0;
-		region.srcOffsets[1].x = width;
-		region.srcOffsets[1].y = height;
-		region.srcOffsets[1].z = 1;
-		region.dstSubresource = region.srcSubresource;
-		region.dstOffsets[0] = region.srcOffsets[0];
-		region.dstOffsets[1] = region.srcOffsets[1];
-
-		qvkCmdBlitImage( command_buffer, srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region, VK_FILTER_NEAREST );
-
-	} else {
-		VkImageCopy region;
-
-		region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		region.srcSubresource.mipLevel = 0;
-		region.srcSubresource.baseArrayLayer = 0;
-		region.srcSubresource.layerCount = 1;
-		region.srcOffset.x = 0;
-		region.srcOffset.y = 0;
-		region.srcOffset.z = 0;
-		region.dstSubresource = region.srcSubresource;
-		region.dstOffset = region.srcOffset;
-		region.extent.width = width;
-		region.extent.height = height;
-		region.extent.depth = 1;
-
-		qvkCmdCopyImage( command_buffer, srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region );
-	}
-
-	vk_end_command_buffer( command_buffer, __func__ );
-
-	// Copy data from destination image to memory buffer.
-	subresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	subresource.mipLevel = 0;
-	subresource.arrayLayer = 0;
-
-	qvkGetImageSubresourceLayout( vk.device, dstImage, &subresource, &layout );
-
-	VK_CHECK( qvkMapMemory( vk.device, memory, 0, VK_WHOLE_SIZE, 0, (void**)&data ) );
-
-	if ( invalidate_ptr )
-	{
-		VkMappedMemoryRange range;
-		range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-		range.pNext = NULL;
-		range.memory = memory;
-		range.size = VK_WHOLE_SIZE;
-		range.offset = 0;
-		qvkInvalidateMappedMemoryRanges( vk.device, 1, &range );
-	}
-
-	data += layout.offset;
-
-	switch ( vk.capture_format ) {
-		case VK_FORMAT_B4G4R4A4_UNORM_PACK16: pixel_width = 2; break;
-		case VK_FORMAT_R16G16B16A16_UNORM: pixel_width = 8; break;
-		default: pixel_width = 4; break;
-	}
-
-	buffer_ptr = buffer + width * (height - 1) * 3;
-	for ( i = 0; i < height; i++ ) {
-		switch ( pixel_width ) {
-			case 2: {
-				uint16_t *src = (uint16_t*)data;
-				for ( n = 0; n < width; n++ ) {
-					buffer_ptr[n*3+0] = ((src[n]>>12)&0xF)<<4;
-					buffer_ptr[n*3+1] = ((src[n]>>8)&0xF)<<4;
-					buffer_ptr[n*3+2] = ((src[n]>>4)&0xF)<<4;
-				}
-			} break;
-
-			case 4: {
-				for ( n = 0; n < width; n++ ) {
-					Com_Memcpy( &buffer_ptr[n*3], &data[n*4], 3 );
-					//buffer_ptr[n*3+0] = data[n*4+0];
-					//buffer_ptr[n*3+1] = data[n*4+1];
-					//buffer_ptr[n*3+2] = data[n*4+2];
-				}
-			} break;
-
-			case 8: {
-				const uint16_t *src = (uint16_t*)data;
-				for ( n = 0; n < width; n++ ) {
-					buffer_ptr[n*3+0] = src[n*4+0]>>8;
-					buffer_ptr[n*3+1] = src[n*4+1]>>8;
-					buffer_ptr[n*3+2] = src[n*4+2]>>8;
-				}
-			} break;
-		}
-		buffer_ptr -= width * 3;
-		data += layout.rowPitch;
-	}
-
-	if ( is_bgr( vk.capture_format ) ) {
-		buffer_ptr = buffer;
-		for ( i = 0; i < width * height; i++ ) {
-			byte tmp = buffer_ptr[0];
-			buffer_ptr[0] = buffer_ptr[2];
-			buffer_ptr[2] = tmp;
-			buffer_ptr += 3;
-		}
-	}
-
-	qvkDestroyImage( vk.device, dstImage, NULL );
-	qvkFreeMemory( vk.device, memory, NULL );
-
-	// restore previous layout
-	if ( srcImageLayout != VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL ) {
-		command_buffer = vk_begin_command_buffer();
-
-		record_image_layout_transition( command_buffer, srcImage,
-			VK_IMAGE_ASPECT_COLOR_BIT,
-			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-			srcImageLayout, 0, 0 );
-
-		vk_end_command_buffer( command_buffer, "restore layout" );
-	}
-}
+/* vk_read_pixels: vk_read_pixels.c */
 
 void vk_destroy_volumetric_params_buffer( void )
 {

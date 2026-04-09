@@ -64,6 +64,10 @@ The Android build passes these flags to the root CMakeLists.txt:
 - `arm64-v8a` (primary, 64-bit ARM)
 - `armeabi-v7a` (legacy 32-bit ARM)
 
+## Surface lifecycle (rotation / background)
+
+When the `ANativeWindow` is destroyed (rotation, multi-window, going to background), Vulkan must destroy `VkSurfaceKHR` before the callback returns. The engine synchronizes the NativeActivity thread with the game thread: presentation targets are torn down, the surface is destroyed, and after a new window is created the surface and swapchain are recreated. A startup log line is emitted when the surface is restored (`log_verbosity` ≥ 1).
+
 ## Game Data
 
 Game data goes in app-specific external storage:

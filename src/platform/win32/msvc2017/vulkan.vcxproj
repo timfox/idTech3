@@ -303,6 +303,8 @@
     <ClCompile Include="..\..\..\renderers\vulkan\vk_skybox_hdr.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_staging.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_swapchain.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_android_surface.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_read_pixels.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_sync.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_temporal.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_terrain.c" />
