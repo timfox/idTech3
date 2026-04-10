@@ -4492,6 +4492,7 @@ static shader_t *FinishShader( void ) {
 				Vector4Copy( pStage->specularScale, def.specularScale );
 				Vector4Copy( pStage->normalScale, def.normalScale );
 				def.parallaxBias = pStage->parallaxBias;
+				def.pom_height_source = ( pStage->normalMapType == PHYS_NORMALHEIGHT ) ? 1 : 0;
 			#endif
 			}
 

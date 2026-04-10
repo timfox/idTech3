@@ -685,7 +685,7 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 	ADD_FRAG_SPEC( 16, normalScale_y );
 	ADD_FRAG_SPEC( 17, normalScale_z );
 	ADD_FRAG_SPEC( 18, normalScale_w );
-	/* constant_id order must match gen_frag.tmpl (19..38) */
+	/* constant_id order must match gen_frag.tmpl (19..39) */
 	ADD_FRAG_SPEC( 19, normal_texture_set );
 	ADD_FRAG_SPEC( 20, physical_texture_set );
 	ADD_FRAG_SPEC( 21, env_texture_set );
@@ -703,9 +703,10 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 	ADD_FRAG_SPEC( 33, lightmap_srgb_decode );
 	ADD_FRAG_SPEC( 34, detail_texture_set );
 	ADD_FRAG_SPEC( 35, detail_scale );
-	ADD_FRAG_SPEC( 36, pom_enabled );
-	ADD_FRAG_SPEC( 37, pom_max_steps );
-	ADD_FRAG_SPEC( 38, parallax_bias_shader );
+	ADD_FRAG_SPEC( 36, pom_height_source );
+	ADD_FRAG_SPEC( 37, pom_enabled );
+	ADD_FRAG_SPEC( 38, pom_max_steps );
+	ADD_FRAG_SPEC( 39, parallax_bias_shader );
 
 	// only use w value, specgloss maps are not supported
 	frag_spec_data.specularScale_x = def->specularScale[0];
@@ -732,14 +733,10 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 	frag_spec_data.detail_texture_set = -1;
 	frag_spec_data.detail_scale = ( r_detail_scale && r_detail_scale->value > 0.0f ) ? r_detail_scale->value : 4.0f;
 
+	frag_spec_data.pom_height_source = 0;
 	frag_spec_data.pom_enabled = 0;
 	frag_spec_data.pom_max_steps = 16;
 	frag_spec_data.parallax_bias_shader = def->parallaxBias;
-	if ( ( def->vk_pbr_flags & PBR_HAS_NORMALMAP ) && ( def->vk_pbr_flags & PBR_HAS_PHYSICALMAP ) &&
-		r_pom && r_pom->integer ) {
-		frag_spec_data.pom_enabled = 1;
-		frag_spec_data.pom_max_steps = r_pomSteps ? Com_Clamp( 4, 64, r_pomSteps->integer ) : 16;
-	}
 
 	if ( def->vk_pbr_flags & PBR_HAS_NORMALMAP )
 		frag_spec_data.normal_texture_set = 0;
@@ -755,9 +752,17 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 	if ( def->vk_pbr_flags & PBR_HAS_LIGHTMAP )
 		frag_spec_data.lightmap_texture_set = def->lightmap_bundle;
 
-	/* POM UV displacement is only reliable for the base UV set; skip when lightmaps drive texcoord1/2. */
-	if ( frag_spec_data.lightmap_texture_set >= 0 )
-		frag_spec_data.pom_enabled = 0;
+	if ( ( def->vk_pbr_flags & PBR_HAS_NORMALMAP ) && r_pom && r_pom->integer ) {
+		const qboolean heightFromOrm = ( ( def->vk_pbr_flags & PBR_HAS_PHYSICALMAP ) != 0 ) &&
+			( frag_spec_data.physical_texture_set == 0 );
+		const qboolean heightFromNormal = ( def->pom_height_source == 1 );
+
+		if ( heightFromOrm || heightFromNormal ) {
+			frag_spec_data.pom_enabled = 1;
+			frag_spec_data.pom_max_steps = r_pomSteps ? Com_Clamp( 4, 64, r_pomSteps->integer ) : 16;
+			frag_spec_data.pom_height_source = heightFromOrm ? 0 : 1;
+		}
+	}
 
 	if ( def->vk_pbr_flags & PBR_HAS_IRRADIANCE )
 		frag_spec_data.irradiance_texture_set = 0;

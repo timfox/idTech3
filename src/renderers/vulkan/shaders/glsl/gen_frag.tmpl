@@ -43,7 +43,7 @@ layout(set = 0, binding = 0) uniform UBO {
 	vec4 pbrGlintFlags;
 	vec4 pbrDebugMode; // x: debug mode selector
 	vec4 pbrShCoeffs[9];
-	vec4 pbrParallaxParams; // x=scale, y=shadow str, z=shadow steps (float), w=unused
+	vec4 pbrParallaxParams; // x=scale, y=shadow str, z=shadow steps (float), w=unused (reserved)
 #endif
 //#endif
 };
@@ -191,9 +191,10 @@ layout (constant_id = 32) const float lightmap_scale = 1.0;  // HDR lightmap int
 layout (constant_id = 33) const int lightmap_srgb_decode = 0;  // 1: sRGB->linear when BSP lightmaps are gamma-encoded
 layout (constant_id = 34) const int detail_texture_set = -1;    // 0: detail map active
 layout (constant_id = 35) const float detail_scale = 4.0;       // tiling frequency for detail UV
-layout (constant_id = 36) const int pom_enabled = 0;
-layout (constant_id = 37) const int pom_max_steps = 16;
-layout (constant_id = 38) const float parallax_bias_shader = 0.0;
+layout (constant_id = 36) const int pom_height_source = 0; // 0: ORM R (physical map), 1: normal map alpha (normalHeightMap)
+layout (constant_id = 37) const int pom_enabled = 0;
+layout (constant_id = 38) const int pom_max_steps = 16;
+layout (constant_id = 39) const float parallax_bias_shader = 0.0;
 
 vec3 lightmapDecode( vec3 c ) {
 	/* sRGB to linear: use when BSP lightmaps are gamma-encoded (q3map2 -gamma, etc.) */
@@ -225,8 +226,13 @@ vec3 sampleLightmap( void ) {
 	return texture( texture0, uv ).rgb;
 }
 
-float SamplePhysicalHeight( vec2 uv )
+float SampleParallaxHeight( vec2 uv )
 {
+	if ( pom_height_source == 1 ) {
+		if ( normal_texture_set < 0 )
+			return 0.0;
+		return clamp( texture( normal_texture, uv ).a, 0.0, 1.0 );
+	}
 	if ( physical_texture_set != 0 )
 		return 0.0;
 	return clamp( texture( physical_texture, uv ).r, 0.0, 1.0 );
@@ -242,7 +248,7 @@ vec2 ParallaxOcclusionMap( vec2 uv, vec3 viewDirTS, float heightScale, int maxSt
 	vec2 deltaUV = heightScale * vd.xy / ( dz * float( maxSteps ) );
 	float layerDepth = 1.0 / float( maxSteps );
 	float curLayerDepth = 0.0;
-	float curH = SamplePhysicalHeight( uv );
+	float curH = SampleParallaxHeight( uv );
 	float prevH = curH;
 	vec2 prevUV = uv;
 	int i;
@@ -253,7 +259,7 @@ vec2 ParallaxOcclusionMap( vec2 uv, vec3 viewDirTS, float heightScale, int maxSt
 		prevH = curH;
 		uv -= deltaUV;
 		curLayerDepth += layerDepth;
-		curH = SamplePhysicalHeight( uv );
+		curH = SampleParallaxHeight( uv );
 	}
 	vec2 p0 = prevUV;
 	vec2 p1 = uv;
@@ -271,7 +277,7 @@ float ParallaxSoftShadow( vec2 uv, vec3 lightDirTS, float heightScale, int shado
 	vec3 ld = normalize( lightDirTS );
 	if ( ld.z <= 0.001 )
 		return 1.0;
-	float h0 = SamplePhysicalHeight( uv );
+	float h0 = SampleParallaxHeight( uv );
 	float dz = max( ld.z, 0.05 );
 	vec2 delta = heightScale * ld.xy / ( dz * float( shadowSteps ) );
 	float sh = 1.0;
@@ -279,7 +285,7 @@ float ParallaxSoftShadow( vec2 uv, vec3 lightDirTS, float heightScale, int shado
 	int s;
 	for ( s = 1; s < shadowSteps; s++ ) {
 		vec2 suv = uv + delta * float( s );
-		float surf = SamplePhysicalHeight( suv );
+		float surf = SampleParallaxHeight( suv );
 		if ( surf + 0.005 > rayH ) {
 			sh *= clamp( 1.0 - ( surf - rayH ) * 8.0, 0.0, 1.0 );
 		}
@@ -1035,7 +1041,8 @@ void main() {
 
 	vec2 pbrSurfUV = frag_tex_coord0;
 	float pomSelfShadow = 1.0;
-	if ( pom_enabled != 0 && physical_texture_set == 0 && normal_texture_set >= 0 ) {
+	if ( pom_enabled != 0 && normal_texture_set >= 0 &&
+		( pom_height_source == 1 || physical_texture_set == 0 ) ) {
 		float hScale = normalScale_w * max( pbrParallaxParams.x, 0.0001 );
 		vec3 Tn = normalize( var_Tangent.xyz );
 		vec3 Bn = normalize( cross( var_Normal.xyz, Tn ) * var_Tangent.w );
