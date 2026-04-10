@@ -2,7 +2,7 @@
 ===========================================================================
 Copyright (C) 2026 Gopex LLC. All rights reserved.
 
-Post-process push constant layout shared by pipeline layout creation (vk.c)
+Post-process push constant layout shared by pipeline layout creation (vk_init_device.c)
 and gamma/TAA recording (vk_frame_end.c).
 ===========================================================================
 */
