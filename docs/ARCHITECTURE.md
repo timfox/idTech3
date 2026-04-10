@@ -40,7 +40,12 @@ src/
 │   └── snd_music_adaptive.c/h    Adaptive music layers
 ├── renderers/
 │   ├── vulkan/            Vulkan 1.4 renderer
-│   │   ├── vk.c/h                Core pipeline + dispatch
+│   │   ├── vk.h                  Core Vulkan state + public API (implementation split across vk_*.c)
+│   │   ├── vk_init_device.c      vk_initialize (device bootstrap after logical device)
+│   │   ├── vk_frame_submit.c     vk_begin_frame / vk_end_frame / vk_present_frame
+│   │   ├── vk_raster_samples.c   MSAA sample counts + vk_get_msaa_min_sample_shading
+│   │   ├── vk_sun_shadow_pass.c  Sun shadow map render pass
+│   │   ├── vk_pipelines_bootstrap.c vk_create_pipelines (+ BRDF LUT pipeline helper)
 │   │   ├── vk_procs.c/h          `qvk*` Vulkan entry points (storage + declarations)
 │   │   ├── vk_shader_modules.c/h SPIR-V `VkShaderModule` creation + `vk_create_shader_modules`
 │   │   ├── vk_pipelines_persistent.c/h Long-lived pipelines (skybox, fog, debug tools)

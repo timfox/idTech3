@@ -2,7 +2,7 @@
 ===========================================================================
 Copyright (C) 2026 Gopex LLC. All rights reserved.
 
-MSAA sample count state for main rasterization passes.
+MSAA sample count state and optional min sample shading rate for main passes.
 Extracted from vk.c for incremental modularization.
 ===========================================================================
 */
@@ -13,6 +13,16 @@ Extracted from vk.c for incremental modularization.
 
 static int vkSamples = VK_SAMPLE_COUNT_1_BIT;
 static int vkMaxSamples = VK_SAMPLE_COUNT_1_BIT;
+
+float vk_get_msaa_min_sample_shading( void )
+{
+	if ( !vk.msaaSampleShading ) {
+		return 1.0f;
+	}
+
+	return Com_Clamp( 0.25f, 1.0f,
+		r_msaa_sample_shading_rate ? r_msaa_sample_shading_rate->value : 0.5f );
+}
 
 VkSampleCountFlagBits vk_get_main_rasterization_max_samples( void )
 {
