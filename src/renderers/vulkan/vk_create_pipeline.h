@@ -50,6 +50,9 @@ struct Vk_Pipeline_FragSpecData {
 	int32_t lightmap_srgb_decode;
 	int32_t detail_texture_set;
 	float   detail_scale;
+	int32_t pom_enabled;
+	int32_t pom_max_steps;
+	float   parallax_bias_shader;
 #endif
 };
 

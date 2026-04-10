@@ -686,6 +686,7 @@ typedef struct vkPbrUniformBlock_s {
 	vec4_t glintParams1;
 	vec4_t glintFlags;
 	vec4_t shCoeffs[9];
+	vec4_t parallaxParams;
 } vkPbrUniformBlock_t;
 #endif
 
@@ -1462,6 +1463,12 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				( r_pbr_anisotropicSpecular && r_pbr_anisotropicSpecular->integer ) ? 1.0f : 0.0f,
 				( r_pbr_iblAnisoStretch ) ? LerpClamp( r_pbr_iblAnisoStretch->value, 0.0f, 1.0f ) : 0.0f );
 
+			Vector4Set( block.parallaxParams,
+				( r_pbr_pomScale && r_pbr_pomScale->value > 0.0f ) ? r_pbr_pomScale->value : 0.06f,
+				( r_pbr_pomShadow && r_pbr_pomShadow->value > 0.0f ) ? LerpClamp( r_pbr_pomShadow->value, 0.0f, 1.0f ) : 0.0f,
+				(float)( r_pbr_pomShadowSteps ? Com_Clamp( 2, 16, r_pbr_pomShadowSteps->integer ) : 6 ),
+				0.0f );
+
 			{
 				const VkDescriptorSet fallback2D = ( tr.whiteImage ) ? tr.whiteImage->descriptor : VK_NULL_HANDLE;
 				const VkDescriptorSet fallbackCube = ( tr.emptyCubemap ) ? tr.emptyCubemap->descriptor : VK_NULL_HANDLE;
@@ -1626,6 +1633,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				Vector4Copy( block.glintParams1, uniform.pbrGlintParams1 );
 				Vector4Copy( block.glintFlags, uniform.pbrGlintFlags );
 				Com_Memcpy( uniform.pbrShCoeffs, block.shCoeffs, sizeof( uniform.pbrShCoeffs ) );
+				Vector4Copy( block.parallaxParams, uniform.pbrParallaxParams );
 
 				vk_push_uniform_cached( &uniform );
 			}

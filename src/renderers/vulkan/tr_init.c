@@ -113,6 +113,11 @@ cvar_t	*r_pbr_specularAA;
 cvar_t	*r_pbr_specularAAStrength;
 cvar_t	*r_pbr_anisotropicSpecular;
 cvar_t	*r_pbr_iblAnisoStretch;
+cvar_t	*r_pbr_pom;
+cvar_t	*r_pbr_pomSteps;
+cvar_t	*r_pbr_pomScale;
+cvar_t	*r_pbr_pomShadow;
+cvar_t	*r_pbr_pomShadowSteps;
 cvar_t	*r_glint;
 cvar_t	*r_glintMode;
 cvar_t	*r_glintDensity;
@@ -2254,6 +2259,33 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_pbr_iblAnisoStretch, "0", "1", CV_FLOAT );
 	ri.Cvar_SetDescription( r_pbr_iblAnisoStretch,
 		"When > 0 and an anisotropy map is bound, increase effective IBL roughness along the stretch direction (blurry elongated reflections). 0 = isotropic IBL sampling." );
+
+	r_pbr_pom = ri.Cvar_Get( "r_pbr_pom", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbr_pom, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pbr_pom,
+		"Vulkan PBR: Parallax Occlusion Mapping when normal + packed ORM (physical) maps are bound. Uses height from ORM .r (occlusion channel). Shader keyword parallaxDepth / parallaxBias still tune per material." );
+
+	r_pbr_pomSteps = ri.Cvar_Get( "r_pbr_pomSteps", "16", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbr_pomSteps, "4", "64", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pbr_pomSteps, "POM ray-march step count (higher = sharper silhouettes, more GPU cost)." );
+
+	r_pbr_pomScale = ri.Cvar_Get( "r_pbr_pomScale", "0.06", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbr_pomScale, "0.0", "0.25", CV_FLOAT );
+	ri.Cvar_SetDescription( r_pbr_pomScale, "Global height scale multiplier for POM (material parallaxDepth still applies)." );
+
+	r_pbr_pomShadow = ri.Cvar_Get( "r_pbr_pomShadow", "0.35", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbr_pomShadow, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_pbr_pomShadow, "Approximate self-shadowing strength for POM (0 = off)." );
+
+	r_pbr_pomShadowSteps = ri.Cvar_Get( "r_pbr_pomShadowSteps", "6", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbr_pomShadowSteps, "2", "16", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pbr_pomShadowSteps, "POM self-shadow march steps along light direction in tangent space." );
+
+	ri.Printf( PRINT_ALL, "PBR POM: r_pbr_pom %s (steps %d, scale %.3f, shadow %.2f)\n",
+		( r_pbr_pom && r_pbr_pom->integer ) ? "on" : "off",
+		( r_pbr_pomSteps ? r_pbr_pomSteps->integer : 16 ),
+		( r_pbr_pomScale ? r_pbr_pomScale->value : 0.06f ),
+		( r_pbr_pomShadow ? r_pbr_pomShadow->value : 0.0f ) );
 
 	r_baseNormalX	= ri.Cvar_Get("r_baseNormalX",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );
 	r_baseNormalY	= ri.Cvar_Get("r_baseNormalY",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );

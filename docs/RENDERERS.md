@@ -21,6 +21,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - Spherical harmonics for diffuse irradiance
 - Multi-scatter energy compensation
 - **Glint NDF**: Procedural microfacet NDF for specular glints (replaces GGX D term on low-roughness surfaces). Cvars: `r_glint`, `r_glintMode`, `r_glintDensity`, `r_glintMicrofacetRoughness`, `r_glintPixelFilterSize`, `r_glintSampleBudget`, `r_glintMaxLodClamp`, `r_glintRoughnessLo`, `r_glintRoughnessHi`, `r_glintDMax`. Debug modes 5–8 via `r_pbr_debug`.
+- **Parallax Occlusion Mapping (POM)**: When a **normal map** and **packed ORM/physical map** (metalness/roughness workflow, `physical_texture_set == 0`) are both bound, the fragment shader ray-marches height from the physical map’s **occlusion (R)** channel to displace UVs for normal/ORM/detail/emissive/subsurface/anisotropy sampling and direct lighting self-shadowing. Disabled on lightmapped multi-UV PBR paths. Shader keywords `parallaxDepth` (height scale, stored in `normalScale[3]`) and `parallaxBias` still apply. Cvars: `r_pbr_pom` (master), `r_pbr_pomSteps`, `r_pbr_pomScale`, `r_pbr_pomShadow`, `r_pbr_pomShadowSteps`. Startup prints a one-line POM summary when PBR initializes.
 - See [PBR_TEXTURES.md](PBR_TEXTURES.md) for texture naming conventions
 
 ### Volumetric Fog
