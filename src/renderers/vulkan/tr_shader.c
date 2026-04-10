@@ -4491,6 +4491,7 @@ static shader_t *FinishShader( void ) {
 				// move this to ubo ..
 				Vector4Copy( pStage->specularScale, def.specularScale );
 				Vector4Copy( pStage->normalScale, def.normalScale );
+				def.parallaxBias = pStage->parallaxBias;
 			#endif
 			}
 

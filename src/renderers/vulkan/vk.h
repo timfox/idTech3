@@ -263,6 +263,7 @@ typedef struct {
 	int32_t					lightmap_bundle;
 	vec4_t					specularScale;
 	vec4_t					normalScale;
+	float					parallaxBias;
 #endif
 	unsigned int			hasFlowmap : 1;	// water flowmap: flow vectors offset texture UVs
 	int acff; // none, rgb, rgba, alpha
@@ -316,6 +317,8 @@ typedef struct vkUniform_s {
 	vec4_t pbrGlintFlags;
 	vec4_t pbrDebugMode; // x: debug mode selector
 	vec4_t pbrShCoeffs[9];
+	/* Parallax occlusion (POM): x=height scale, y=self-shadow strength, z=shadow ray steps (float bits as int), w=unused */
+	vec4_t pbrParallaxParams;
 #endif
 } vkUniform_t;
 
