@@ -435,6 +435,7 @@ void vk_release_resources( void );
 void vk_wait_idle( void );
 void vk_queue_wait_idle( void );
 VkSampleCountFlagBits vk_get_main_rasterization_samples( void );
+VkSampleCountFlagBits vk_get_main_rasterization_max_samples( void );
 float vk_get_msaa_min_sample_shading( void );
 
 //
