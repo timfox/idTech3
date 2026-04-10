@@ -1,7 +1,8 @@
 # Tier B: content-backed renderer checks (GAME_BASE) on every main push.
 #
-# This job runs only when a repository variable or secret provides the absolute path
+# This job runs only when a repository variable OR secret provides the absolute path
 # to a game **base** directory (see docs/renderer_validation/SELF_HOSTED_TIER_B.md).
+# Prefer variable IDTECH3_GAME_BASE_PATH; use secret of the same name if the path must not appear in Settings UI.
 #
 # Requires a self-hosted runner labeled `idtech3-tierb` (plus `self-hosted`) with:
 #   - GAME_BASE path readable on that machine
@@ -26,13 +27,13 @@ concurrency:
 jobs:
   gamebase-regression:
     name: Tier B (GAME_BASE regression)
-    # Skip when unset: forks and engine-only repos need no runner or variable.
-    # Set repository variable IDTECH3_GAME_BASE_PATH to an absolute path on the runner host.
-    if: ${{ vars.IDTECH3_GAME_BASE_PATH != '' }}
+    # Skip when unset: forks and engine-only repos need no runner or variable/secret.
+    # Set IDTECH3_GAME_BASE_PATH as a repository variable, or as a secret if you must hide the path string in the UI.
+    if: ${{ vars.IDTECH3_GAME_BASE_PATH != '' || secrets.IDTECH3_GAME_BASE_PATH != '' }}
     runs-on: [self-hosted, idtech3-tierb]
     env:
       DEBIAN_FRONTEND: noninteractive
-      GAME_BASE: ${{ vars.IDTECH3_GAME_BASE_PATH }}
+      GAME_BASE: ${{ vars.IDTECH3_GAME_BASE_PATH || secrets.IDTECH3_GAME_BASE_PATH }}
     steps:
       - uses: actions/checkout@v4
 
