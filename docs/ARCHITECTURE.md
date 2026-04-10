@@ -46,6 +46,7 @@ src/
 │   │   ├── vk_raster_samples.c   MSAA sample counts + vk_get_msaa_min_sample_shading
 │   │   ├── vk_sun_shadow_pass.c  Sun shadow map render pass
 │   │   ├── vk_pipelines_bootstrap.c vk_create_pipelines (+ BRDF LUT pipeline helper)
+│   │   ├── vk_pbr_ibl_validate.c   vk_validate_pbr_ibl_resources (startup IBL checks)
 │   │   ├── vk_procs.c/h          `qvk*` Vulkan entry points (storage + declarations)
 │   │   ├── vk_shader_modules.c/h SPIR-V `VkShaderModule` creation + `vk_create_shader_modules`
 │   │   ├── vk_pipelines_persistent.c/h Long-lived pipelines (skybox, fog, debug tools)
