@@ -1464,9 +1464,9 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				( r_pbr_iblAnisoStretch ) ? LerpClamp( r_pbr_iblAnisoStretch->value, 0.0f, 1.0f ) : 0.0f );
 
 			Vector4Set( block.parallaxParams,
-				( r_pbr_pomScale && r_pbr_pomScale->value > 0.0f ) ? r_pbr_pomScale->value : 0.06f,
-				( r_pbr_pomShadow && r_pbr_pomShadow->value > 0.0f ) ? LerpClamp( r_pbr_pomShadow->value, 0.0f, 1.0f ) : 0.0f,
-				(float)( r_pbr_pomShadowSteps ? Com_Clamp( 2, 16, r_pbr_pomShadowSteps->integer ) : 6 ),
+				( r_pomScale && r_pomScale->value > 0.0f ) ? r_pomScale->value : 0.06f,
+				( r_pomShadow && r_pomShadow->value > 0.0f ) ? LerpClamp( r_pomShadow->value, 0.0f, 1.0f ) : 0.0f,
+				(float)( r_pomShadowSteps ? Com_Clamp( 2, 16, r_pomShadowSteps->integer ) : 6 ),
 				0.0f );
 
 			{
