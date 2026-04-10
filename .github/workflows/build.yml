@@ -203,7 +203,14 @@ jobs:
       - name: Install OpenSSL (Win64) for DTLS
         shell: pwsh
         run: |
-          choco install openssl -y --no-progress
+          $ok = $false
+          for ($i = 1; $i -le 5; $i++) {
+            choco install openssl -y --no-progress
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+            Write-Host "choco attempt $i failed (exit $LASTEXITCODE), retrying in $($i * 20)s..."
+            Start-Sleep -Seconds ($i * 20)
+          }
+          if (-not $ok) { throw "choco install openssl failed after retries" }
           # GITHUB_ENV must not be written with unquoted paths containing spaces (cmd "echo a=b>>file" breaks at the first space).
           $roots = @(
             'C:\Program Files\OpenSSL-Win64',
@@ -404,9 +411,9 @@ jobs:
         run: |
           sudo rm -f /etc/apt/sources.list.d/azure-cli.list
           sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list
-          sudo apt-get -qq update
-          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev clang ccache
-          sudo apt-get -y install libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3
+          sudo apt-get -o Acquire::Retries=5 -qq update
+          sudo apt-get -o Acquire::Retries=5 -y install cmake ninja-build g++ libstdc++-14-dev clang ccache
+          sudo apt-get -o Acquire::Retries=5 -y install libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3
 
       - uses: actions/checkout@v4
 
@@ -414,7 +421,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.ccache
-          key: ccache-ubuntu-x64-${{ matrix.cc }}-${{ matrix.btype }}-${{ github.sha }}
+          # Avoid github.sha in key (new blob every commit); hash build roots + workflow when they change.
+          key: ccache-ubuntu-x64-${{ matrix.cc }}-${{ matrix.btype }}-${{ hashFiles('CMakeLists.txt', 'cmake/**', '.github/workflows/build.yml') }}
           restore-keys: |
             ccache-ubuntu-x64-${{ matrix.cc }}-${{ matrix.btype }}-
 
@@ -508,8 +516,8 @@ jobs:
     steps:
       - name: Install tools
         run: |
-          sudo apt-get -qq update
-          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3
+          sudo apt-get -o Acquire::Retries=5 -qq update
+          sudo apt-get -o Acquire::Retries=5 -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3
 
       - uses: actions/checkout@v4
 
@@ -547,8 +555,8 @@ jobs:
     steps:
       - name: Install tools
         run: |
-          sudo apt-get -qq update
-          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3
+          sudo apt-get -o Acquire::Retries=5 -qq update
+          sudo apt-get -o Acquire::Retries=5 -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3
 
       - uses: actions/checkout@v4
 
@@ -588,9 +596,9 @@ jobs:
     steps:
       - name: Install tools
         run: |
-          sudo apt-get -qq update
-          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev clang-tidy cppcheck ccache
-          sudo apt-get -y install libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3
+          sudo apt-get -o Acquire::Retries=5 -qq update
+          sudo apt-get -o Acquire::Retries=5 -y install cmake ninja-build g++ libstdc++-14-dev clang-tidy cppcheck ccache
+          sudo apt-get -o Acquire::Retries=5 -y install libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3
 
       - uses: actions/checkout@v4
 
@@ -598,7 +606,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.ccache
-          key: ccache-static-${{ github.sha }}
+          key: ccache-static-${{ hashFiles('CMakeLists.txt', 'cmake/**', '.github/workflows/build.yml') }}
           restore-keys: |
             ccache-static-
 
@@ -672,9 +680,9 @@ jobs:
               export LDFLAGS="-mfpu=neon -mfloat-abi=hard"
             fi
 
-            apt-get -qq update
-            apt-get install -y make gcc g++ cmake ninja-build libstdc++-14-dev
-            apt-get -y install libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools
+            apt-get -o Acquire::Retries=5 -qq update
+            apt-get -o Acquire::Retries=5 install -y make gcc g++ cmake ninja-build libstdc++-14-dev
+            apt-get -o Acquire::Retries=5 -y install libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools
 
             OUTDIR="${GITHUB_WORKSPACE}/bin"
             mkdir -p "$OUTDIR"
@@ -885,8 +893,8 @@ jobs:
         env:
           GIT_TERMINAL_PROMPT: 0
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends make git perl
+          sudo apt-get -o Acquire::Retries=5 update -qq
+          sudo apt-get -o Acquire::Retries=5 install -y --no-install-recommends make git perl
           # Use direct CMake cross-compile instead of Gradle to avoid
           # wrapper/SDK bootstrapping complexity in CI.
           NDK_HOME="${ANDROID_NDK_HOME:-$ANDROID_SDK_ROOT/ndk/27.0.12077973}"
@@ -983,8 +991,8 @@ jobs:
           ANDROID_DEPS_CACHE: ${{ github.workspace }}/.ci-android-deps
           GIT_TERMINAL_PROMPT: 0
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends make git perl
+          sudo apt-get -o Acquire::Retries=5 update -qq
+          sudo apt-get -o Acquire::Retries=5 install -y --no-install-recommends make git perl
           chmod +x ./gradlew
           SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME}}"
           echo "sdk.dir=${SDK_ROOT}" > local.properties
