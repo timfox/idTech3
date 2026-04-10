@@ -408,6 +408,11 @@ void RB_BeginSurface( shader_t *shader, int fogNum ) {
 	tess.fogNum = fogNum;
 #ifdef USE_VULKAN
 	tess.gltfDrawSurface = NULL;
+#ifdef USE_VK_PBR
+	tess.gltfUseGpuPipeline = qfalse;
+	tess.gltfGpuMorphActive = qfalse;
+	tess.gltfGpuMorphCount = 0;
+#endif
 #endif
 	vk_reset_iqm_storage_offsets();
 	R_IQMBeginSurfaceBatch();
@@ -1415,6 +1420,16 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			uiDef.face_culling = CT_TWO_SIDED;
 			pipeline = vk_find_pipeline_ext( 0, &uiDef, qfalse );
 		}
+
+#ifdef USE_VK_PBR
+		if ( tess.shader && tess.shader->hasPBR && pStage->vk_pbr_flags && tess.gltfUseGpuPipeline ) {
+			if ( backEnd.viewParms.portalView == PV_MIRROR ) {
+				pipeline = pStage->vk_mirror_pipeline_gltf_gpu[fog_stage];
+			} else {
+				pipeline = pStage->vk_pipeline_gltf_gpu[fog_stage];
+			}
+		}
+#endif
 
 #ifdef USE_VK_PBR
 		Vk_Pipeline_Def	def;

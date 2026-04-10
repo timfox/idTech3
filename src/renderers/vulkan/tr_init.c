@@ -157,6 +157,7 @@ cvar_t	*r_morphBreath;
 cvar_t	*r_morphBreathAmp;
 cvar_t	*r_morphBreathFreq;
 cvar_t	*r_gltfAnim;
+cvar_t	*r_gltfGpu;
 cvar_t	*r_fbo;
 cvar_t	*r_renderMode;
 cvar_t	*r_hdr;
@@ -2385,6 +2386,12 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_gltfAnim, "glTF clip playback: multiplies refEntity shaderTime for skeletal TRS and morph-weight sampling (frame/oldframe index clips, backlerp crossfades)." );
 	ri.Cvar_SetGroup( r_gltfAnim, CVG_RENDERER );
 
+	r_gltfGpu = ri.Cvar_Get( "r_gltfGpu", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_gltfGpu, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_gltfGpu,
+		"Vulkan PBR: GPU vertex skinning and morph for glTF (joint matrix SSBO + morph deltas; up to 4 morph targets per draw). Falls back to CPU tess when off or when entity morph channels are used." );
+	ri.Cvar_SetGroup( r_gltfGpu, CVG_RENDERER );
+
 	r_flares = ri.Cvar_Get ("r_flares", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_flares, "Enables corona effects on light sources." );
 	r_znear = ri.Cvar_Get( "r_znear", "8", CVAR_CHEAT );
@@ -3529,6 +3536,8 @@ void R_Init( void ) {
 		r_morphMaxActive ? r_morphMaxActive->integer : IQM_MORPH_TOP_K );
 	ri.Printf( PRINT_ALL, "[VK][gltf] clip playback speed scale r_gltfAnim=%.3f\n",
 		r_gltfAnim ? r_gltfAnim->value : 1.0f );
+	ri.Printf( PRINT_ALL, "[VK][gltf] GPU skin/morph path: %s (r_gltfGpu)\n",
+		( r_gltfGpu && r_gltfGpu->integer ) ? "on" : "off" );
 
 
 	max_polys = r_maxpolys ? r_maxpolys->integer : MAX_POLYS;

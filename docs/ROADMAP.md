@@ -6,7 +6,7 @@ Priorities that keep **CI green** and **README/build truth** aligned:
 
 1. **Watch GitHub Actions on `main`** — especially **Android** (CMake + Gradle `assembleDebug`, OpenSSL/Lua/FetchContent caches) and **MSYS curl**.
 2. **Renderer validation** — Tier B (self-hosted `GAME_BASE`) and Tier C (manual GPU notes) when you have hardware/content; keep `renderer_regression_check` passing on default CI.
-3. **glTF on Vulkan** — CPU path is feature-complete for clip + morph blending; next step is **GPU skinning/morph** or **OpenGL registration** if README promises parity.
+3. **glTF on Vulkan** — **GPU skinning/morph** (PBR + `r_gltfGpu`) is implemented; next polish: broader morph/entity-channel parity, optional qtangent recompute on GPU path, or **OpenGL registration** if README promises parity.
 4. **Android product** — first-run / missing `base/` UX, optional APK artifact smoke (install + launch to “no game data” is OK).
 
 ## Current Status (`main`)
@@ -69,7 +69,7 @@ Priorities that keep **CI green** and **README/build truth** aligned:
 - [x] ImGui inspector (optional)
 - [x] Android platform support (NativeActivity, Vulkan lifecycle, touch HUD, logcat, optional `apkassets`)
 - [x] CI for Linux, Windows, macOS, ARM, **Android** (CMake cross-build + **Gradle debug APK** on Release matrix cells)
-- [x] **glTF (Vulkan):** runtime skeletal clip sampling, morph blending, mesh default weights, PBR qtangent recompute on tess path (`docs/GLTF.md`)
+- [x] **glTF (Vulkan):** runtime skeletal clip sampling, morph blending, mesh default weights; **GPU skin/morph** on PBR path (`r_gltfGpu`); PBR qtangent recompute on **CPU** tess path (`docs/GLTF.md`)
 - [x] **Android engine parity (no game pk3):** Lua, Duktape, curl, Recast, Bullet, FreeType, FLUX lib, DTLS via **static OpenSSL autobuild** when prefab not present
 
 ### Tooling -- Complete
@@ -84,7 +84,7 @@ Priorities that keep **CI green** and **README/build truth** aligned:
 | Priority | Item | Notes |
 |----------|------|--------|
 | P0 | **CI stability** | Fix any red matrix on `main`; Android OpenSSL/Lua first-build time — tune cache keys if needed |
-| P1 | **glTF GPU path** | Skinning/morph in shader or SSBO; reduce CPU tess cost for characters |
+| P1 | **glTF GPU path (polish)** | Entity morph channels on GPU path; >4 morph weights; optional qtangent refresh; validate on real assets |
 | P1 | **Renderer validation** | Tier B/C as optional gates; expand regression scripts where headless allows |
 | P2 | **OpenGL glTF / OBJ / MD5** | README now lists per-renderer formats; optional: wire loaders in OpenGL to match Vulkan |
 | P2 | **Engine systems hardening** | Telemetry / replay / save / quest / dialogue — define stable APIs + minimal tests |

@@ -45,6 +45,17 @@ static void push_attr( uint32_t location, uint32_t binding, VkFormat format )
 }
 
 
+#ifdef USE_VK_PBR
+static VkShaderModule *vk_select_pbr_gen_vert( const Vk_Pipeline_Def *def, int use_pbr, int tx, int cl, int env )
+{
+	const int fog = def->fog_stage ? 1 : 0;
+	if ( def->pbr_vert_mode && use_pbr ) {
+		return &vk.modules.vert.gen_gltf_gpu[use_pbr][tx][cl][env][fog];
+	}
+	return &vk.modules.vert.gen[use_pbr][tx][cl][env][fog];
+}
+#endif
+
 VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassIndex, uint32_t def_index ) {
 	(void)def_index; // unused parameter
 	VkShaderModule *vs_module = NULL;
@@ -130,13 +141,13 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 				vs_module = &vk.modules.vert.gen[0][0][0][0][fog];
 				fs_module = vk_hdr64_active() ? &vk.modules.frag.flowmap_hdr64[fog] : &vk.modules.frag.flowmap[fog];
 			} else {
-				vs_module = &vk.modules.vert.gen[use_pbr][0][0][0][0];
+				vs_module = vk_select_pbr_gen_vert( def, use_pbr, 0, 0, 0 );
 				fs_module = vk_hdr64_active() ? &vk.modules.frag.gen_hdr64[use_pbr][0][0][0] : &vk.modules.frag.gen[use_pbr][0][0][0];
 			}
 			break;
 
 		case TYPE_SIGNLE_TEXTURE_ENV:
-			vs_module = &vk.modules.vert.gen[use_pbr][0][0][1][0];
+			vs_module = vk_select_pbr_gen_vert( def, use_pbr, 0, 0, 1 );
 			fs_module = vk_hdr64_active() ? &vk.modules.frag.gen_hdr64[use_pbr][0][0][0] : &vk.modules.frag.gen[use_pbr][0][0][0];
 			break;
 
@@ -177,28 +188,28 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 		case TYPE_MULTI_TEXTURE_MUL2:
 		case TYPE_MULTI_TEXTURE_ADD2_1_1:
 		case TYPE_MULTI_TEXTURE_ADD2:
-			vs_module = &vk.modules.vert.gen[use_pbr][1][0][0][0];
+			vs_module = vk_select_pbr_gen_vert( def, use_pbr, 1, 0, 0 );
 			fs_module = vk_hdr64_active() ? &vk.modules.frag.gen_hdr64[use_pbr][1][0][0] : &vk.modules.frag.gen[use_pbr][1][0][0];
 			break;
 
 		case TYPE_MULTI_TEXTURE_MUL2_ENV:
 		case TYPE_MULTI_TEXTURE_ADD2_1_1_ENV:
 		case TYPE_MULTI_TEXTURE_ADD2_ENV:
-			vs_module = &vk.modules.vert.gen[use_pbr][1][0][1][0];
+			vs_module = vk_select_pbr_gen_vert( def, use_pbr, 1, 0, 1 );
 			fs_module = vk_hdr64_active() ? &vk.modules.frag.gen_hdr64[use_pbr][1][0][0] : &vk.modules.frag.gen[use_pbr][1][0][0];
 			break;
 
 		case TYPE_MULTI_TEXTURE_MUL3:
 		case TYPE_MULTI_TEXTURE_ADD3_1_1:
 		case TYPE_MULTI_TEXTURE_ADD3:
-			vs_module = &vk.modules.vert.gen[use_pbr][2][0][0][0];
+			vs_module = vk_select_pbr_gen_vert( def, use_pbr, 2, 0, 0 );
 			fs_module = vk_hdr64_active() ? &vk.modules.frag.gen_hdr64[use_pbr][2][0][0] : &vk.modules.frag.gen[use_pbr][2][0][0];
 			break;
 
 		case TYPE_MULTI_TEXTURE_MUL3_ENV:
 		case TYPE_MULTI_TEXTURE_ADD3_1_1_ENV:
 		case TYPE_MULTI_TEXTURE_ADD3_ENV:
-			vs_module = &vk.modules.vert.gen[use_pbr][2][0][1][0];
+			vs_module = vk_select_pbr_gen_vert( def, use_pbr, 2, 0, 1 );
 			fs_module = vk_hdr64_active() ? &vk.modules.frag.gen_hdr64[use_pbr][2][0][0] : &vk.modules.frag.gen[use_pbr][2][0][0];
 			break;
 
@@ -209,7 +220,7 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 		case TYPE_BLEND2_MIX_ALPHA:
 		case TYPE_BLEND2_MIX_ONE_MINUS_ALPHA:
 		case TYPE_BLEND2_DST_COLOR_SRC_ALPHA:
-			vs_module = &vk.modules.vert.gen[use_pbr][1][1][0][0];
+			vs_module = vk_select_pbr_gen_vert( def, use_pbr, 1, 1, 0 );
 			fs_module = vk_hdr64_active() ? &vk.modules.frag.gen_hdr64[use_pbr][1][1][0] : &vk.modules.frag.gen[use_pbr][1][1][0];
 			break;
 
@@ -220,7 +231,7 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 		case TYPE_BLEND2_MIX_ALPHA_ENV:
 		case TYPE_BLEND2_MIX_ONE_MINUS_ALPHA_ENV:
 		case TYPE_BLEND2_DST_COLOR_SRC_ALPHA_ENV:
-			vs_module = &vk.modules.vert.gen[use_pbr][1][1][1][0];
+			vs_module = vk_select_pbr_gen_vert( def, use_pbr, 1, 1, 1 );
 			fs_module = vk_hdr64_active() ? &vk.modules.frag.gen_hdr64[use_pbr][1][1][0] : &vk.modules.frag.gen[use_pbr][1][1][0];
 			break;
 
@@ -231,7 +242,7 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 		case TYPE_BLEND3_MIX_ALPHA:
 		case TYPE_BLEND3_MIX_ONE_MINUS_ALPHA:
 		case TYPE_BLEND3_DST_COLOR_SRC_ALPHA:
-			vs_module = &vk.modules.vert.gen[use_pbr][2][1][0][0];
+			vs_module = vk_select_pbr_gen_vert( def, use_pbr, 2, 1, 0 );
 			fs_module = vk_hdr64_active() ? &vk.modules.frag.gen_hdr64[use_pbr][2][1][0] : &vk.modules.frag.gen[use_pbr][2][1][0];
 			break;
 
@@ -242,7 +253,7 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 		case TYPE_BLEND3_MIX_ALPHA_ENV:
 		case TYPE_BLEND3_MIX_ONE_MINUS_ALPHA_ENV:
 		case TYPE_BLEND3_DST_COLOR_SRC_ALPHA_ENV:
-			vs_module = &vk.modules.vert.gen[use_pbr][2][1][1][0];
+			vs_module = vk_select_pbr_gen_vert( def, use_pbr, 2, 1, 1 );
 			fs_module = vk_hdr64_active() ? &vk.modules.frag.gen_hdr64[use_pbr][2][1][0] : &vk.modules.frag.gen[use_pbr][2][1][0];
 			break;
 
@@ -1075,6 +1086,13 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 		{
 			push_bind( 5, sizeof( vec4_t ) );					// normals
 			push_attr( 5, 5, VK_FORMAT_R32G32B32A32_SFLOAT );
+		}
+
+		if ( def->pbr_vert_mode ) {
+			push_bind( 15, 4 ); /* glTF joint indices */
+			push_attr( 15, 15, VK_FORMAT_R8G8B8A8_UINT );
+			push_bind( 16, sizeof( vec4_t ) ); /* glTF joint weights */
+			push_attr( 16, 16, VK_FORMAT_R32G32B32A32_SFLOAT );
 		}
 
         push_bind( 8, sizeof( vec4_t ) );						// tangent
