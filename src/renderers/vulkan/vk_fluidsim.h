@@ -8,7 +8,7 @@ The engine framework is based on id Tech 3 (GPLv2).
 
 Navier-Stokes fluid simulation public API.
 Manages cvars and parameter interface for the GPU-based fluid
-simulation. Compute dispatch is handled by vk.c.
+simulation. Compute dispatch is in vk_volumetric_internal.c (fluid passes).
 ===========================================================================
 */
 

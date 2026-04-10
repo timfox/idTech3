@@ -82,3 +82,17 @@ rg 'TODO|FIXME' src --glob '!**/external/**'
 ```
 
 Expect **no matches** in first-party code until new comments are added. Third-party hits under `src/external/` remain out of scope for this triage doc.
+
+---
+
+## Documentation debt (stale `vk.c` references)
+
+Historical audits and roadmaps still name **`vk.c`** and obsolete line numbers. They are **not** accurate file pointers after the Vulkan split. Prefer **`docs/ARCHITECTURE.md`** for the current module list.
+
+To find remaining mentions:
+
+```bash
+rg 'vk\.c' docs --glob '*.md'
+```
+
+Update docs opportunistically when editing those files; a full rewrite of large audits (e.g. `VULKAN_FBO_AUDIT.md`) is optional.
