@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_surf.c
 #include "tr_local.h"
 #include "tr_model_gltf.h"
+#include "vk_draw_state.h"
 #include <math.h>
 
 /*
@@ -1661,23 +1662,6 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 	int animCur, animOld;
 	float timeCur, timeOld, backlerp;
 	float speed;
-
-	if ( surf->vbo_vertex != VK_NULL_HANDLE && surf->vbo_index != VK_NULL_HANDLE ) {
-		cvar_t *r_gltfVBO = ri.Cvar_Get( "r_gltfVBO", "1", CVAR_ARCHIVE );
-		if ( r_gltfVBO->integer ) {
-			/* VBO path: set gltfDrawSurface for vk_bind_geometry to use */
-			tess.gltfDrawSurface = surf;
-			tess.numVertexes = surf->numVertices;
-			tess.numIndexes = surf->numIndices;
-			return;
-		}
-	}
-
-	/* Tess path (skinning, morph targets, or VBO creation failed) */
-	tess.gltfDrawSurface = NULL;
-	RB_CHECKOVERFLOW( surf->numVertices, surf->numIndices );
-
-	base = tess.numVertexes;
 	ent = backEnd.currentEntity;
 	model = ( tr.currentModel && tr.currentModel->modelData )
 		? R_GetGLTFModelFromModelData( tr.currentModel->modelData ) : NULL;
@@ -1772,6 +1756,160 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 			R_ComputeGLTFJointMatrices( model, -1, 0.0f, jointMatrix );
 		}
 	}
+
+#ifdef USE_VK_PBR
+	if ( r_gltfGpu && r_gltfGpu->integer && vk.cmd && vk.pbrActive && tess.shader && tess.shader->hasPBR &&
+		surf->vbo_vertex != VK_NULL_HANDLE && surf->vbo_index != VK_NULL_HANDLE &&
+		( haveJoints || useMorph ) && !( useMorph && ent->morphChannelCount > 0 ) &&
+		surf->numVertices > 0 && surf->numVertices <= SHADER_MAX_VERTEXES ) {
+		qboolean gpuOk = qtrue;
+		int nj = ( model && model->skeleton.numJoints > 0 ) ? model->skeleton.numJoints : 0;
+		size_t skinFloats = 1u + (size_t)nj * 12u;
+		size_t skinBytes = skinFloats * sizeof( float );
+		uint32_t skinOff = 0;
+		float *skinPayload = (float *)vk_alloc_storage( skinBytes, &skinOff );
+		int morphN = surf->numMorphTargets;
+		float mwCopy[GLTF_MAX_MORPH_TARGETS];
+		int topMorphIdx[IQM_MORPH_TOP_K];
+		float topMorphW[IQM_MORPH_TOP_K];
+		int morphActive = 0;
+		int mk;
+		size_t morphFloats;
+		size_t morphBytes;
+		uint32_t morphOff = 0;
+		float *morphPayload;
+		uint32_t idxOff;
+
+		if ( !skinPayload ) {
+			gpuOk = qfalse;
+		} else {
+			skinPayload[0] = (float)nj;
+			if ( nj > 0 ) {
+				Com_Memcpy( skinPayload + 1, jointMatrix, (size_t)nj * 12u * sizeof( float ) );
+			}
+		}
+
+		if ( morphN > GLTF_MAX_MORPH_TARGETS ) {
+			morphN = GLTF_MAX_MORPH_TARGETS;
+		}
+		Com_Memcpy( mwCopy, morphW, sizeof( mwCopy ) );
+		for ( mk = 0; mk < IQM_MORPH_TOP_K; mk++ ) {
+			int best = -1;
+			float bestW = 0.0f;
+			for ( int ti = 0; ti < morphN; ti++ ) {
+				if ( mwCopy[ti] > bestW ) {
+					bestW = mwCopy[ti];
+					best = ti;
+				}
+			}
+			if ( best < 0 || bestW <= 1e-6f ) {
+				break;
+			}
+			topMorphIdx[morphActive] = best;
+			topMorphW[morphActive] = bestW;
+			morphActive++;
+			mwCopy[best] = 0.0f;
+		}
+
+		morphFloats = 6u + (size_t)surf->numVertices * (size_t)IQM_MORPH_TOP_K * 6u;
+		morphBytes = morphFloats * sizeof( float );
+		morphPayload = gpuOk ? (float *)vk_alloc_storage( morphBytes, &morphOff ) : NULL;
+		if ( gpuOk && !morphPayload ) {
+			gpuOk = qfalse;
+		}
+		if ( gpuOk ) {
+			morphPayload[0] = (float)surf->numVertices;
+			morphPayload[1] = (float)morphActive;
+			for ( mk = 0; mk < IQM_MORPH_TOP_K; mk++ ) {
+				morphPayload[2 + mk] = ( mk < morphActive ) ? topMorphW[mk] : 0.0f;
+			}
+			for ( i = 0; i < surf->numVertices; i++ ) {
+				for ( mk = 0; mk < morphActive; mk++ ) {
+					int tgt = topMorphIdx[mk];
+					size_t dst = (size_t)i * (size_t)IQM_MORPH_TOP_K * 6u + (size_t)mk * 6u;
+					const gltfMorphTarget_t *mt = &surf->morphTargets[tgt];
+					const float *dp = mt->deltaPosition ? ( mt->deltaPosition + i * 3 ) : NULL;
+					const float *dn = mt->deltaNormal ? ( mt->deltaNormal + i * 3 ) : NULL;
+					morphPayload[6 + dst + 0] = dp ? dp[0] : 0.0f;
+					morphPayload[6 + dst + 1] = dp ? dp[1] : 0.0f;
+					morphPayload[6 + dst + 2] = dp ? dp[2] : 0.0f;
+					morphPayload[6 + dst + 3] = dn ? dn[0] : 0.0f;
+					morphPayload[6 + dst + 4] = dn ? dn[1] : 0.0f;
+					morphPayload[6 + dst + 5] = dn ? dn[2] : 0.0f;
+				}
+				for ( mk = morphActive; mk < IQM_MORPH_TOP_K; mk++ ) {
+					size_t dst = (size_t)i * (size_t)IQM_MORPH_TOP_K * 6u + (size_t)mk * 6u;
+					Com_Memset( morphPayload + 6 + dst, 0, 6u * sizeof( float ) );
+				}
+			}
+		}
+
+		idxOff = vk_tess_index( surf->numIndices, surf->indices );
+		if ( gpuOk && idxOff == ~0U ) {
+			gpuOk = qfalse;
+		}
+
+		if ( !gpuOk ) {
+			vk_reset_iqm_storage_offsets();
+		} else {
+			vk_set_iqm_storage_offsets( skinOff, morphOff );
+			tess.gltfGpuMorphActive = ( morphActive > 0 ) ? qtrue : qfalse;
+			tess.gltfGpuMorphCount = morphActive;
+			for ( mk = 0; mk < IQM_MORPH_TOP_K; mk++ ) {
+				tess.gltfGpuMorphWeights[mk] = ( mk < morphActive ) ? topMorphW[mk] : 0.0f;
+			}
+			tess.gltfUseGpuPipeline = qtrue;
+			tess.gltfDrawSurface = surf;
+			tess.numVertexes = surf->numVertices;
+			tess.numIndexes = surf->numIndices;
+			vk_bind_index_buffer( vk.cmd->vertex_buffer, idxOff );
+
+			for ( i = 0; i < surf->numVertices; i++ ) {
+				v = &surf->vertices[i];
+				tess.xyz[i][0] = v->position[0];
+				tess.xyz[i][1] = v->position[1];
+				tess.xyz[i][2] = v->position[2];
+				tess.xyz[i][3] = R_GLTFPackGpuVertexMeta( i );
+				tess.normal[i][0] = v->normal[0];
+				tess.normal[i][1] = v->normal[1];
+				tess.normal[i][2] = v->normal[2];
+				tess.normal[i][3] = 0.0f;
+				tess.texCoords[0][i][0] = v->texCoord0[0];
+				tess.texCoords[0][i][1] = v->texCoord0[1];
+				tess.vertexColors[i].rgba[0] = (byte)( v->color[0] * 255 );
+				tess.vertexColors[i].rgba[1] = (byte)( v->color[1] * 255 );
+				tess.vertexColors[i].rgba[2] = (byte)( v->color[2] * 255 );
+				tess.vertexColors[i].rgba[3] = (byte)( v->color[3] * 255 );
+				tess.qtangent[i][0] = v->tangent[0];
+				tess.qtangent[i][1] = v->tangent[1];
+				tess.qtangent[i][2] = v->tangent[2];
+				tess.qtangent[i][3] = v->tangent[3];
+				Vector4Set( tess.lightdir[i], 0.0f, 0.0f, 0.0f, 0.0f );
+			}
+			return;
+		}
+	}
+	tess.gltfUseGpuPipeline = qfalse;
+	tess.gltfGpuMorphActive = qfalse;
+	tess.gltfGpuMorphCount = 0;
+#endif /* USE_VK_PBR */
+
+	if ( surf->vbo_vertex != VK_NULL_HANDLE && surf->vbo_index != VK_NULL_HANDLE ) {
+		cvar_t *r_gltfVBO = ri.Cvar_Get( "r_gltfVBO", "1", CVAR_ARCHIVE );
+		if ( r_gltfVBO->integer ) {
+			/* VBO path: set gltfDrawSurface for vk_bind_geometry to use */
+			tess.gltfDrawSurface = surf;
+			tess.numVertexes = surf->numVertices;
+			tess.numIndexes = surf->numIndices;
+			return;
+		}
+	}
+
+	/* Tess path (skinning, morph targets, or VBO creation failed) */
+	tess.gltfDrawSurface = NULL;
+	RB_CHECKOVERFLOW( surf->numVertices, surf->numIndices );
+
+	base = tess.numVertexes;
 
 	for ( i = 0; i < surf->numVertices; i++ ) {
 		vec3_t pos, nrm;

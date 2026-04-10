@@ -18,16 +18,17 @@ Use the Vulkan build for glTF content.
 - **Multiple meshes / primitives** per file (subject to caps below).
 - **Materials (partial)**: metallic-roughness base color, normal map, metallic-roughness texture, emissive, occlusion; factors and texture **URIs** are read. Base color drives the registered shader; extra maps are loaded where wired in `R_RegisterGLTF`.
 - **Skinned meshes (bind pose)**: skeleton from **first skin only** (`skins[0]`), inverse bind matrices, up to **4 influences** per vertex, joint indices/weights from standard attributes.
-- **Static mesh fast path**: when a primitive has **no skinning and no morph targets**, geometry can use **Vulkan VBOs** (`vk_create_gltf_buffers`) if creation succeeds. Toggle: **`r_gltfVBO`** (default `1`).
+- **Vulkan VBO path**: primitives upload **device-local** vertex/index buffers (`vk_create_gltf_buffers`) with **joint indices/weights** packed for optional GPU skinning. Toggle static draw without skin/morph: **`r_gltfVBO`** (default `1`).
 
 ## Runtime animation and morph (Vulkan)
 
 - **Clip selection**: `refEntity_t.frame` chooses the animation clip **by index** into `gltfModel_t.animations[]` (first clip = `0`). Use **`RF_WRAP_FRAMES`** so the index wraps modulo clip count; otherwise out-of-range indices clamp to clip `0`.
 - **Time**: clip time is `refEntity.shaderTime` (seconds) when set, else `refdef.time * 0.001f`, scaled by cvar **`r_gltfAnim`** (default `1`). Time **loops** by each clip’s stored duration.
 - **Cross-clip blend**: `oldframe` selects the second clip; **`backlerp`** blends joint TRS (and morph weights from weight tracks) between **current** and **old** clip at the **same** clock time.
-- **Skeletal sampling**: translation/rotation/scale channels on skin joints update local pose, then `world * inverseBindMatrix` skin matrices drive **CPU** skinning in `RB_GLTFSurface`.
-- **Morph weights**: primitives load **mesh `target_names`** when present; `RE_SetEntityMorphWeight(ent, name, w)` matches those names (same hash path as IQM). **glTF weight animation** channels on the mesh node add to the same weight array. **`mesh.weights`** default blend shape weights from the file are added as a baseline. Primitives still use the **tess path** (no VBO) when morph targets exist.
-- **PBR tangents**: after CPU morph + skinning, **qtangent** is recomputed from deformed positions and **TEXCOORD_0** when the bound shader is PBR (`vk.pbrActive` + `shader->hasPBR`), so normal-mapped materials stay consistent. This replaces reliance on static glTF tangents for that path; glTF **tangent morph deltas** are not applied as a separate vector (geometry still deforms via position/normal deltas).
+- **Skeletal sampling**: translation/rotation/scale channels on skin joints update local pose, then **`world * inverseBindMatrix`** joint matrices are computed each draw.
+- **GPU skin + morph (Vulkan PBR)**: when **`r_gltfGpu`** is `1`, **`vk.pbrActive`**, the surface shader is PBR, and the draw does **not** use entity morph channels (`RE_SetEntityMorphWeight` / `morphChannelCount`), `RB_GLTFSurface` uploads joint matrices to the same **SSBO slot** as IQM skin data, packs **top-4** morph targets by weight into the IQM-style morph buffer, and draws with **`USE_GLTF_GPU_SKIN`** vertex shaders (`gen_vert.tmpl`). Vertex count must be ≤ **`SHADER_MAX_VERTEXES`**. **Qtangent** comes from the static glTF tangents on this path (not recomputed per frame).
+- **CPU tess fallback**: used when GPU path is disabled, storage/index upload fails, entity morph channels are active, or for non-PBR shaders. After CPU morph + skinning, **qtangent** is recomputed from deformed positions and **TEXCOORD_0** when PBR is active.
+- **Morph weights**: primitives load **mesh `target_names`** when present; `RE_SetEntityMorphWeight(ent, name, w)` matches those names (same hash path as IQM). **glTF weight animation** channels on the mesh node add to the same weight array. **`mesh.weights`** default blend shape weights from the file are added as a baseline.
 
 ## Known limitations (important)
 
@@ -68,9 +69,10 @@ Larger assets are **silently clamped** during load.
 - The loader reads several **KHR-style fields** (e.g. clearcoat, sheen, transmission, IOR scalars) into `gltfMaterial_t`.
 - The **full** glTF extension stack is **not** guaranteed to match **every** nuance in the Vulkan PBR shaders. Treat extension fields as **forward-compatible data** until verified per material.
 
-### 7. CPU cost for skinned content
+### 7. GPU vs CPU path
 
-- If **skinning** or **morph** is flagged, the mesh goes through the **tessellation (CPU) path** in `RB_GLTFSurface` — no skinning GPU path for glTF in the current code.
+- **Skinned / morphed** primitives prefer the **GPU path** under Vulkan PBR when **`r_gltfGpu 1`** and constraints above are met; otherwise **`RB_GLTFSurface`** falls back to **CPU tess**.
+- **More than four** non-zero morph weights per vertex: GPU path keeps only the **four largest** weights per draw (same idea as IQM morph top-K).
 
 ## Engine references
 

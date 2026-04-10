@@ -431,6 +431,10 @@ typedef struct {
 
 	uint32_t		vk_pipeline[2]; // normal,fogged
 	uint32_t		vk_mirror_pipeline[2];
+#ifdef USE_VK_PBR
+	uint32_t		vk_pipeline_gltf_gpu[2];
+	uint32_t		vk_mirror_pipeline_gltf_gpu[2];
+#endif
 
 	uint32_t		vk_pipeline_df; // depthFragment
 	uint32_t		vk_mirror_pipeline_df;
@@ -1745,6 +1749,7 @@ extern cvar_t	*r_morphBreath;
 extern cvar_t	*r_morphBreathAmp;
 extern cvar_t	*r_morphBreathFreq;
 extern cvar_t	*r_gltfAnim;
+extern cvar_t	*r_gltfGpu;
 
 extern	cvar_t	*r_nobind;						// turns off binding to appropriate textures
 extern	cvar_t	*r_singleShader;				// make most world faces use default shader
@@ -2031,6 +2036,12 @@ typedef struct shaderCommands_s
 #ifdef USE_VULKAN
 	Vk_Depth_Range depthRange;
 	const struct srfGLTFPrimitive_s *gltfDrawSurface; /* when set, draw from glTF VBO instead of tess */
+#ifdef USE_VK_PBR
+	qboolean	gltfUseGpuPipeline; /* PBR + glTF VBO with GPU skin/morph (persists until next Tess_Begin) */
+	qboolean	gltfGpuMorphActive;
+	int		gltfGpuMorphCount;
+	float		gltfGpuMorphWeights[4];
+#endif
 #endif
 
 	// info extracted from current shader

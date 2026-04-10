@@ -261,6 +261,7 @@ typedef struct {
 #ifdef USE_VK_PBR
 	uint32_t				vk_pbr_flags;
 	int32_t					lightmap_bundle;
+	uint8_t					pbr_vert_mode; /* 0=default gen_vert, 1=glTF GPU skin+morph variant */
 	vec4_t					specularScale;
 	vec4_t					normalScale;
 	float					parallaxBias;
@@ -909,6 +910,7 @@ typedef struct {
 		struct {
 #ifdef USE_VK_PBR
 			VkShaderModule gen[2][3][2][2][2]; // pbr[0,1], tx[0,1,2], cl[0,1] env0[0,1] fog[0,1]
+			VkShaderModule gen_gltf_gpu[2][3][2][2][2]; /* +USE_GLTF_GPU_SKIN */
 			VkShaderModule ident1[2][2][2][2]; // pbr[0,1], tx[0,1], env0[0,1] fog[0,1]
 			VkShaderModule fixed[2][2][2][2];  // pbr[0,1], tx[0,1], env0[0,1] fog[0,1]
 #else

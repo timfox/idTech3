@@ -4499,6 +4499,19 @@ static shader_t *FinishShader( void ) {
 			pStage->vk_pipeline[0] = vk_find_pipeline_ext( 0, &def, qtrue );
 			def.mirror = qtrue;
 			pStage->vk_mirror_pipeline[0] = vk_find_pipeline_ext( 0, &def, qfalse );
+#ifdef USE_VK_PBR
+			if ( pStage->vk_pbr_flags ) {
+				Vk_Pipeline_Def gltfDef = def;
+				gltfDef.pbr_vert_mode = 1;
+				gltfDef.mirror = qfalse;
+				pStage->vk_pipeline_gltf_gpu[0] = vk_find_pipeline_ext( 0, &gltfDef, qtrue );
+				gltfDef.mirror = qtrue;
+				pStage->vk_mirror_pipeline_gltf_gpu[0] = vk_find_pipeline_ext( 0, &gltfDef, qfalse );
+			} else {
+				pStage->vk_pipeline_gltf_gpu[0] = pStage->vk_pipeline[0];
+				pStage->vk_mirror_pipeline_gltf_gpu[0] = pStage->vk_mirror_pipeline[0];
+			}
+#endif
 
 			if ( pStage->depthFragment ) {
 				def.mirror = qfalse;
@@ -4528,7 +4541,17 @@ static shader_t *FinishShader( void ) {
 
 				pStage->vk_pipeline[1] = vk_find_pipeline_ext( 0, &fog_def, qfalse );
 				pStage->vk_mirror_pipeline[1] = vk_find_pipeline_ext( 0, &fog_def_mirror, qfalse );
-
+#ifdef USE_VK_PBR
+				if ( pStage->vk_pbr_flags ) {
+					fog_def.pbr_vert_mode = 1;
+					fog_def_mirror.pbr_vert_mode = 1;
+					pStage->vk_pipeline_gltf_gpu[1] = vk_find_pipeline_ext( 0, &fog_def, qfalse );
+					pStage->vk_mirror_pipeline_gltf_gpu[1] = vk_find_pipeline_ext( 0, &fog_def_mirror, qfalse );
+				} else {
+					pStage->vk_pipeline_gltf_gpu[1] = pStage->vk_pipeline[1];
+					pStage->vk_mirror_pipeline_gltf_gpu[1] = pStage->vk_mirror_pipeline[1];
+				}
+#endif
 
 				pStage->bundle[0].adjustColorsForFog = ACFF_NONE; // will be handled in shader from now
 

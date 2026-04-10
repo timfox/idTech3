@@ -923,7 +923,7 @@ void vk_initialize( void )
 
 		push_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 		push_range.offset = 0;
-		push_range.size = 128; // current + previous MVP matrices
+		push_range.size = sizeof( float ) * 32; /* MVP + prev MVP + reserved padding (glTF GPU morph) */
 
 		// standard pipelines
 

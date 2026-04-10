@@ -137,6 +137,7 @@ typedef struct gltfModel_s {
 } gltfModel_t;
 
 qboolean R_LoadGLTF(const char *filename, gltfModel_t *model);
+float R_GLTFPackGpuVertexMeta( int morphVertexIndex );
 /* animIndex < 0 or out of range: bind pose. timeSeconds loops by clip duration. */
 void     R_ComputeGLTFJointMatrices(const gltfModel_t *model, int animIndex, float timeSeconds, float *outMatrices);
 /* blendTowardB: 0 = pose A only, 1 = pose B only (linear TRS + slerp rotation). Use for refEntity backlerp. */

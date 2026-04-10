@@ -17,6 +17,24 @@ skeleton, and animations into engine-native structures.
 
 #include "tr_local.h"
 #include "tr_model_gltf.h"
+
+#define GLTF_GPU_META_TAG	0xAC000000u
+#define GLTF_GPU_MORPH_INDEX_MASK	0x00000FFFu
+#define GLTF_GPU_NO_MORPH_VERTEX	0x0FFFu
+
+float R_GLTFPackGpuVertexMeta( int morphVertexIndex )
+{
+	uint32_t packed;
+	float out;
+
+	if ( morphVertexIndex < 0 || morphVertexIndex >= (int)GLTF_GPU_MORPH_INDEX_MASK ) {
+		packed = GLTF_GPU_META_TAG | GLTF_GPU_NO_MORPH_VERTEX;
+	} else {
+		packed = GLTF_GPU_META_TAG | ( (uint32_t)morphVertexIndex & GLTF_GPU_MORPH_INDEX_MASK );
+	}
+	Com_Memcpy( &out, &packed, sizeof( out ) );
+	return out;
+}
 #include "vk.h"
 #include <math.h>
 
@@ -1056,16 +1074,19 @@ qboolean R_RegisterGLTF(const char *name, model_t *mod) {
 				}
 			}
 
-			/* VBO: pack vertex data as separate arrays (xyz, rgba, st, normal) to match engine layout */
-			if (prim->numVertices > 0 && prim->numIndices > 0 && !surf->hasSkinning && !surf->hasMorphTargets) {
-				int offXyz, offRgba, offSt, offNorm;
-				vboSize = prim->numVertices * 16 + prim->numVertices * 4 + prim->numVertices * 8 + prim->numVertices * 16;
+			/* VBO: pack vertex data (xyz, rgba, st, normal; + joint indices + weights for GPU skin path) */
+			if (prim->numVertices > 0 && prim->numIndices > 0) {
+				int offXyz, offRgba, offSt, offNorm, offJoint, offWeight;
+				int n = prim->numVertices;
+				vboSize = n * 16 + n * 4 + n * 8 + n * 16 + n * 4 + n * 16;
 				vboPack = (byte *)ri.Hunk_AllocateTempMemory(vboSize);
 				offXyz = 0;
-				offRgba = prim->numVertices * 16;
-				offSt = offRgba + prim->numVertices * 4;
-				offNorm = offSt + prim->numVertices * 8;
-				for (vi = 0; vi < prim->numVertices; vi++) {
+				offRgba = n * 16;
+				offSt = offRgba + n * 4;
+				offNorm = offSt + n * 8;
+				offJoint = offNorm + n * 16;
+				offWeight = offJoint + n * 4;
+				for (vi = 0; vi < n; vi++) {
 					const gltfVertex_t *v = &prim->vertices[vi];
 					float *f;
 					byte *b;
@@ -1078,6 +1099,10 @@ qboolean R_RegisterGLTF(const char *name, model_t *mod) {
 					f[0] = v->texCoord0[0]; f[1] = v->texCoord0[1];
 					f = (float *)(vboPack + offNorm + vi * 16);
 					f[0] = v->normal[0]; f[1] = v->normal[1]; f[2] = v->normal[2]; f[3] = 0.0f;
+					b = vboPack + offJoint + vi * 4;
+					b[0] = v->joints[0]; b[1] = v->joints[1]; b[2] = v->joints[2]; b[3] = v->joints[3];
+					f = (float *)(vboPack + offWeight + vi * 16);
+					f[0] = v->weights[0]; f[1] = v->weights[1]; f[2] = v->weights[2]; f[3] = v->weights[3];
 				}
 				if (vk_create_gltf_buffers(vboPack, vboSize, prim->indices, prim->numIndices,
 					&surf->vbo_vertex, &surf->vbo_index)) {
@@ -1085,6 +1110,8 @@ qboolean R_RegisterGLTF(const char *name, model_t *mod) {
 					surf->vbo_vertex_offsets[1] = offRgba;
 					surf->vbo_vertex_offsets[2] = offSt;
 					surf->vbo_vertex_offsets[5] = offNorm;
+					surf->vbo_vertex_offsets[6] = offJoint;
+					surf->vbo_vertex_offsets[7] = offWeight;
 				}
 				ri.Hunk_FreeTempMemory(vboPack);
 			}
