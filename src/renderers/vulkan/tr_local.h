@@ -1533,11 +1533,11 @@ extern cvar_t	*r_pbr_iblIrradianceSize;
 extern cvar_t	*r_pbr_iblPrefilterSize;
 extern cvar_t	*r_pbr_showCubemap;
 extern cvar_t	*r_pbr_cubemapInfo;
-extern cvar_t	*r_pbr_pom;
-extern cvar_t	*r_pbr_pomSteps;
-extern cvar_t	*r_pbr_pomScale;
-extern cvar_t	*r_pbr_pomShadow;
-extern cvar_t	*r_pbr_pomShadowSteps;
+extern cvar_t	*r_pom;
+extern cvar_t	*r_pomSteps;
+extern cvar_t	*r_pomScale;
+extern cvar_t	*r_pomShadow;
+extern cvar_t	*r_pomShadowSteps;
 #endif
 extern cvar_t	*r_baseNormalX;
 extern cvar_t	*r_baseNormalY;

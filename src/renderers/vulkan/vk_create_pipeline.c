@@ -725,9 +725,9 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 	frag_spec_data.pom_max_steps = 16;
 	frag_spec_data.parallax_bias_shader = def->parallaxBias;
 	if ( ( def->vk_pbr_flags & PBR_HAS_NORMALMAP ) && ( def->vk_pbr_flags & PBR_HAS_PHYSICALMAP ) &&
-		r_pbr_pom && r_pbr_pom->integer ) {
+		r_pom && r_pom->integer ) {
 		frag_spec_data.pom_enabled = 1;
-		frag_spec_data.pom_max_steps = r_pbr_pomSteps ? Com_Clamp( 4, 64, r_pbr_pomSteps->integer ) : 16;
+		frag_spec_data.pom_max_steps = r_pomSteps ? Com_Clamp( 4, 64, r_pomSteps->integer ) : 16;
 	}
 
 	if ( def->vk_pbr_flags & PBR_HAS_NORMALMAP )
