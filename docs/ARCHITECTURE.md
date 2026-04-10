@@ -65,7 +65,7 @@ src/
 │   │   ├── vk_shutdown.c          vk_shutdown, wait-idle, release_resources (split from vk.c)
 │   │   ├── vk_postfx_passes.c     Bloom, SSAO/HBAO, OIT, SSR passes (split from vk.c)
 │   │   ├── vk_clear_attachments.c In-pass color/depth clear + dynamic color write mask (split from vk.c)
-│   │   ├── vk_cubemap_prefilter.c IBL cubemap prefilter, SH extraction, vk_generate_cubemaps (split from vk.c)
+│   │   ├── vk_cubemap_prefilter.c IBL cubemap prefilter, SH extraction, vk_generate_cubemaps, vk_begin_cubemap_render_pass, vk_create_brfdlut (split from legacy vk.c)
 │   │   ├── vk_fluidsim.c/h       Fluid simulation module
 │   │   ├── vk_postfx.c/h         PostFX (SSR, atmosphere, wind)
 │   │   ├── vk_flashlight.c/h     Projected texture system

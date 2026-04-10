@@ -98,7 +98,7 @@ Priorities that keep **CI green** and **README/build truth** aligned:
 
 ### Short-Term (completed)
 - [x] Connect BSP geometry extraction to map loading for automatic navmesh
-- [x] PostFX specialization constants in vk.c gamma pipeline
+- [x] PostFX specialization constants in gamma pipeline (vk_frame_end.c / post-process path)
 - [x] Wire SSR/atmosphere shaders into Vulkan render passes
 - [x] Wire vegetation wind compute into Vulkan pipeline (surfaceparm vegetation, real geometry from tess)
 - [x] SMAA when volumetrics skipped (r_volumetricFog 0, tier off, no world with world)
