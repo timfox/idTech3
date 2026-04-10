@@ -27,17 +27,20 @@ Example CLI when configuring the runner: `--labels self-hosted,Linux,X64,idtech3
 
 ## 4. Configure the path in GitHub
 
-The workflow reads **only** a repository **variable** (secrets are not used here so the `if:` gate can skip cleanly without a runner).
+The workflow enables when **either** a repository **variable** or **secret** named `IDTECH3_GAME_BASE_PATH` is set (non-empty). If **both** are set, the **variable** wins.
 
 | Kind | Name | Value |
 |------|------|--------|
-| **Actions variable** (required to enable Tier B) | `IDTECH3_GAME_BASE_PATH` | Absolute path on the runner host, e.g. `/data/idtech3-regression/base` |
+| **Actions variable** (recommended) | `IDTECH3_GAME_BASE_PATH` | Absolute path on the runner host, e.g. `/data/idtech3-regression/base` |
+| **Actions secret** (optional) | `IDTECH3_GAME_BASE_PATH` | Same path; use if you do not want the string visible under **Variables** (values are still visible in job logs as `env` unless you mask — see below) |
 
-**Repository → Settings → Secrets and variables → Actions → Variables**
+**Repository → Settings → Secrets and variables → Actions**
 
-If the path must not appear in GitHub at all, leave the variable **empty** and run Tier B only from your internal CI (same scripts), or add a private wrapper workflow that exports `GAME_BASE` on the runner before calling `./scripts/renderer_regression_*.sh`.
+**Masking:** If the path is sensitive, add it to **Organization or repository secrets → Actions** as a separate masking pattern only if GitHub supports your path shape; otherwise treat Tier B as running on a **trusted** self-hosted runner with disk paths that are not secret.
 
-Until `IDTECH3_GAME_BASE_PATH` is non-empty, the Tier B workflow **does not run** (job is skipped), so forks and engine-only repos stay green without a runner.
+If neither variable nor secret is set, the Tier B workflow **does not run** (job is skipped), so forks and engine-only repos stay green without a runner.
+
+**Alternative:** Leave GitHub unset and run the same two scripts from internal CI or a cron job on the runner machine (`GAME_BASE=... ./scripts/renderer_regression_check.sh` and `renderer_regression_maps.sh`).
 
 ## 5. Verify
 
