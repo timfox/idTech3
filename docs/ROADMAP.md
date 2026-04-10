@@ -86,7 +86,7 @@ Priorities that keep **CI green** and **README/build truth** aligned:
 | P0 | **CI stability** | Fix any red matrix on `main`; Android OpenSSL/Lua first-build time — tune cache keys if needed |
 | P1 | **glTF GPU path (polish)** | Entity morph channels on GPU path; >4 morph weights; optional qtangent refresh; validate on real assets |
 | P1 | **Renderer validation** | Tier B/C as optional gates; expand regression scripts where headless allows |
-| P2 | **OpenGL glTF / OBJ / MD5** | README now lists per-renderer formats; optional: wire loaders in OpenGL to match Vulkan |
+| P2 | **OpenGL glTF / OBJ / MD5** | README + docs state **Vulkan-only**; optional future: register same `MOD_*` types in OpenGL (thin path) |
 | P2 | **Engine systems hardening** | Telemetry / replay / save / quest / dialogue — define stable APIs + minimal tests |
 | P3 | **GOAP content** | Data-driven actions; perf limits; debug draw |
 | P3 | **Vulkan architecture pass** | Clustered Forward+, motion history — see below |
