@@ -4,10 +4,10 @@
 
 - **Loader**: `tr_model_gltf.c` parses glTF/GLB via cgltf, produces `gltfModel_t` (meshes, materials, skeleton, animations, morph targets).
 - **Registration**: `R_RegisterGLTF` sets `mod->type = MOD_GLTF`, stores `gltfRenderData_t` in `mod->modelData` (hunk), creates surfaces per primitive with material→shader mapping (baseColorTexture). Loads PBR textures (normal, metallic-roughness).
-- **VBO**: Static meshes (no skinning, no morph) get device-local vertex+index buffers via `vk_create_gltf_buffers`. `RB_GLTFSurface` uses VBO path when available.
-- **Rendering**: MOD_GLTF → `R_AddGLTFSurfaces` → `RB_GLTFSurface`. VBO path binds per-primitive buffers; tess path used for skinned/morph/fallback.
-- **Skeletal animation**: CPU skinning in `RB_GLTFSurface` when `hasSkinning`. `R_ComputeGLTFJointMatrices` / `R_ComputeGLTFJointMatricesBlend` sample TRS channels on `skins[0]` joints and multiply world * inverseBindMatrix.
-- **Morph targets**: Loaded from `primitive.targets`; CPU blend in tess path from glTF weight animation and/or `RE_SetEntityMorphWeight` (mesh `target_names`). GPU morph not implemented.
+- **VBO**: Primitives get device-local vertex+index buffers via `vk_create_gltf_buffers`, including **joint indices/weights** in the packed vertex layout for GPU skinning.
+- **Rendering**: MOD_GLTF → `R_AddGLTFSurfaces` → `RB_GLTFSurface`. **GPU path** (Vulkan PBR, `r_gltfGpu`): joint palette + IQM-layout morph SSBO, `USE_GLTF_GPU_SKIN` vertex shaders, indexed draw with VBO bindings. **CPU tess path**: fallback (entity morph channels, non-PBR, overflow, or `r_gltfGpu 0`).
+- **Skeletal animation**: Joint matrices from `R_ComputeGLTFJointMatrices` / `R_ComputeGLTFJointMatricesBlend`; applied on **GPU** on the PBR fast path or **CPU** in tess fallback.
+- **Morph targets**: Loaded from `primitive.targets`; **GPU** applies top-4 weights per draw on PBR path; **CPU** tess for remaining cases. See [GLTF.md](GLTF.md).
 - **Bounds**: Computed from mesh vertices; `R_GLTFModelBounds` used for culling and fog.
 
 ## Gaps (vs Northlight / Full glTF Support)
@@ -21,8 +21,8 @@
 | Material → shader | ✅ baseColorTexture → shader | PBR multi-texture bind at draw |
 | Render path | ✅ VBO + tess | - |
 | Bounds | ✅ `R_GLTFModelBounds` | - |
-| Skeletal animation | ✅ CPU skinning + TRS clip sampling | GPU skinning |
-| Morph targets | ✅ CPU blend (weights + entity) | GPU morph |
+| Skeletal animation | ✅ TRS clip sampling; GPU skin (PBR + `r_gltfGpu`) + CPU tess fallback | Optional polish |
+| Morph targets | ✅ GPU (top-4) + CPU tess (entity channels / fallback) | Optional polish |
 
 ## Implementation Steps
 
