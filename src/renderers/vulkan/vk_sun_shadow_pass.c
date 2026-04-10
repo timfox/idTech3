@@ -2,10 +2,8 @@
 ===========================================================================
 Copyright (C) 2026 Gopex LLC. All rights reserved.
 
-Legacy aggregation file for remaining Vulkan helpers not yet split out.
-vk_initialize: vk_init_device.c
-Frame submit/present: vk_frame_submit.c
-MSAA sample count: vk_raster_samples.c
+Sun shadow map render pass (depth-only) for volumetric lighting.
+Extracted from vk.c for incremental modularization.
 ===========================================================================
 */
 
@@ -14,16 +12,6 @@ MSAA sample count: vk_raster_samples.c
 #include "vk_image_layout.h"
 #include "vk_render_pass.h"
 #include "vk_scene_pass.h"
-
-float vk_get_msaa_min_sample_shading( void )
-{
-	if ( !vk.msaaSampleShading ) {
-		return 1.0f;
-	}
-
-	return Com_Clamp( 0.25f, 1.0f,
-		r_msaa_sample_shading_rate ? r_msaa_sample_shading_rate->value : 0.5f );
-}
 
 qboolean vk_begin_sun_shadow_render_pass( void )
 {
