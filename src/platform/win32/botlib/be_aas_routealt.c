@@ -43,7 +43,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "be_interface.h"
 #include "be_aas_def.h"
 
-#define ENABLE_ALTROUTING
 //#define ALTROUTE_DEBUG
 
 typedef struct midrangearea_s
@@ -101,9 +100,6 @@ int AAS_AlternativeRouteGoals(vec3_t start, int startareanum, vec3_t goal, int g
 										 int type)
 {
 	(void)goal;
-#ifndef ENABLE_ALTROUTING
-	return 0;
-#else
 	int i, j, bestareanum;
 	int numaltroutegoals, nummidrangeareas;
 	int starttime, goaltime, goaltraveltime;
@@ -206,7 +202,6 @@ int AAS_AlternativeRouteGoals(vec3_t start, int startareanum, vec3_t goal, int g
 	botimport.Print(PRT_MESSAGE, "alternative route goals in %d msec\n", Sys_MilliSeconds() - startmillisecs);
 #endif
 	return numaltroutegoals;
-#endif
 } //end of the function AAS_AlternativeRouteGoals
 //===========================================================================
 //
@@ -216,12 +211,10 @@ int AAS_AlternativeRouteGoals(vec3_t start, int startareanum, vec3_t goal, int g
 //===========================================================================
 void AAS_InitAlternativeRouting(void)
 {
-#ifdef ENABLE_ALTROUTING
 	if (midrangeareas) FreeMemory(midrangeareas);
 	midrangeareas = (midrangearea_t *) GetMemory(aasworld.numareas * sizeof(midrangearea_t));
 	if (clusterareas) FreeMemory(clusterareas);
 	clusterareas = (int *) GetMemory(aasworld.numareas * sizeof(int));
-#endif
 } //end of the function AAS_InitAlternativeRouting
 //===========================================================================
 //
@@ -231,11 +224,9 @@ void AAS_InitAlternativeRouting(void)
 //===========================================================================
 void AAS_ShutdownAlternativeRouting(void)
 {
-#ifdef ENABLE_ALTROUTING
 	if (midrangeareas) FreeMemory(midrangeareas);
 	midrangeareas = NULL;
 	if (clusterareas) FreeMemory(clusterareas);
 	clusterareas = NULL;
 	numclusterareas = 0;
-#endif
 } //end of the function AAS_ShutdownAlternativeRouting
