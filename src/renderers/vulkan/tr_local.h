@@ -1750,6 +1750,7 @@ extern cvar_t	*r_morphBreathAmp;
 extern cvar_t	*r_morphBreathFreq;
 extern cvar_t	*r_gltfAnim;
 extern cvar_t	*r_gltfGpu;
+extern cvar_t	*r_gltfGpuTangentFix;
 
 extern	cvar_t	*r_nobind;						// turns off binding to appropriate textures
 extern	cvar_t	*r_singleShader;				// make most world faces use default shader

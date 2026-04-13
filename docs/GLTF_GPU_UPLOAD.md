@@ -22,7 +22,7 @@
 | Render path | ✅ VBO + tess | - |
 | Bounds | ✅ `R_GLTFModelBounds` | - |
 | Skeletal animation | ✅ TRS clip sampling; GPU skin (PBR + `r_gltfGpu`) + CPU tess fallback | Optional polish |
-| Morph targets | ✅ GPU (top-8) + CPU tess (fallback) | Optional polish (qtangent on GPU path) |
+| Morph targets | ✅ GPU (top-8) + CPU tess (fallback) | **`r_gltfGpuTangentFix`**: GPU Gram–Schmidt T vs deformed N after skin+morph; optional full MikkTSpace qtangent |
 
 ## Implementation Steps
 
