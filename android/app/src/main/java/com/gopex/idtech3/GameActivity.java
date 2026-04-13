@@ -17,6 +17,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
+import android.widget.Toast;
 
 import java.io.File;
 
@@ -31,6 +32,8 @@ public class GameActivity extends NativeActivity {
     private TouchHudView touchHud;
     private FrameLayout overlayRoot;
 
+    private static native void nativeSetActivity(GameActivity activity);
+
     public static native void nativeSetDataPath(String path);
     public static native void nativeSetHomePath(String path);
 
@@ -40,6 +43,7 @@ public class GameActivity extends NativeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        nativeSetActivity(this);
         setupWindow();
         setupPaths();
         setupTouchOverlay();
@@ -130,6 +134,22 @@ public class GameActivity extends NativeActivity {
             | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
             | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
         );
+    }
+
+    /**
+     * Called from native when FS finds no pk3 (game thread). Shows a short on-screen hint
+     * with the writable base path; process may exit shortly after.
+     */
+    public void showNoGameDataToast(final String basePath) {
+        final String path = (basePath != null && !basePath.isEmpty()) ? basePath : "(unknown)";
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                String msg = "No game data. Copy .pk3 files to:\n" + path + "/base\n"
+                    + "(or add assets/apkassets/ in the APK — see apkassets/README.txt)";
+                Toast.makeText(GameActivity.this, msg, Toast.LENGTH_LONG).show();
+            }
+        });
     }
 
     private void setupPaths() {

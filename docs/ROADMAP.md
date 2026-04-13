@@ -7,7 +7,7 @@ Priorities that keep **CI green** and **README/build truth** aligned:
 1. **Watch GitHub Actions on `main`** — especially **Android** (CMake + Gradle `assembleDebug`, OpenSSL/Lua/FetchContent caches) and **MSYS curl**.
 2. **Renderer validation** — Tier B (self-hosted `GAME_BASE`) and Tier C (manual GPU notes) when you have hardware/content; keep `renderer_regression_check` passing on default CI (manifest + GLSL + **IQM_MORPH_TOP_K** C/GLSL parity).
 3. **glTF on Vulkan** — **GPU skinning/morph** (PBR + `r_gltfGpu`) uses **top-8** morph weights per draw (aligned with `GLTF_MAX_MORPH_TARGETS`), including **`RE_SetEntityMorphWeight`** with clip-driven weights; **`r_gltfGpuTangentFix`** (default on) re-orthonormalizes tangents on the GPU path after skin+morph; next polish: full **MikkTSpace**-style qtangent on GPU (neighborhood-aware) or **OpenGL registration** if README promises parity.
-4. **Android product** — first-run / missing `base/` UX, optional APK artifact smoke (install + launch to “no game data” is OK).
+4. **Android product** — missing `base/` / no pk3: logcat path + **Toast** with `…/base` and apkassets hint before exit; optional APK smoke.
 
 ## Current Status (`main`)
 
