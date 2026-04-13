@@ -216,52 +216,6 @@ void vk_upload_image_data( image_t *image, int x, int y, int width, int height, 
 		if (height < 1) height = 1;
 	}
 
-#ifdef USE_UPLOAD_QUEUE
-	if ( vk_wait_staging_buffer() ) {
-		// wait for vkQueueSubmit() completion before new upload
-	}
-
-	if ( vk.staging_buffer.size - vk.staging_buffer.offset < buffer_size ) {
-		// try to flush staging buffer and reset offset
-		vk_flush_staging_buffer( qfalse );
-	}
-
-	if ( vk.staging_buffer.size /* - vk_world.staging_buffer_offset */ < buffer_size ) {
-		// if still not enough - reallocate staging buffer
-		vk_alloc_staging_buffer( buffer_size );
-	}
-
-	for ( n = 0; n < num_regions; n++ ) {
-		regions[n].bufferOffset += vk.staging_buffer.offset;
-	}
-
-	Com_Memcpy( vk.staging_buffer.ptr + vk.staging_buffer.offset, buf, buffer_size );
-
-	if ( vk.staging_buffer.offset == 0 ) {
-		VkCommandBufferBeginInfo begin_info;
-		begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		begin_info.pNext = NULL;
-		begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-		begin_info.pInheritanceInfo = NULL;
-		VK_CHECK( qvkBeginCommandBuffer( vk.staging_command_buffer, &begin_info ) );
-	}
-
-	//ri.Printf( PRINT_WARNING, "batch @%6i + %i %s \n", (int)vk_world.staging_buffer_offset, (int)buffer_size, image->imgName );
-	vk.staging_buffer.offset += buffer_size;
-
-	command_buffer = vk.staging_command_buffer;
-
-	if ( update ) {
-		record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0 );
-	} else {
-		record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_HOST_BIT, 0 );
-	}
-
-	qvkCmdCopyBufferToImage( command_buffer, vk.staging_buffer.handle, image->handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, num_regions, regions );
-
-	// final transition after upload comleted
-	record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
-#else
 	if ( vk.staging_buffer.size < (VkDeviceSize) buffer_size ) {
 		vk_alloc_staging_buffer( buffer_size );
 	}
@@ -278,7 +232,6 @@ void vk_upload_image_data( image_t *image, int x, int y, int width, int height, 
 	qvkCmdCopyBufferToImage( command_buffer, vk.staging_buffer.handle, image->handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, num_regions, regions );
 	record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
 	vk_end_command_buffer( command_buffer, __func__ );
-#endif
 
 	if ( buf != pixels ) {
 		ri.Hunk_FreeTempMemory( buf );
@@ -336,43 +289,12 @@ void vk_upload_cubemap_mip_data( image_t *image, int face_size, int miplevels, c
 		return;
 	}
 
-#ifdef USE_UPLOAD_QUEUE
-	if ( vk_wait_staging_buffer() ) {
-	}
-
-	if ( vk.staging_buffer.size - vk.staging_buffer.offset < (VkDeviceSize)buffer_size ) {
-		vk_flush_staging_buffer( qfalse );
-	}
-
-	if ( vk.staging_buffer.size < (VkDeviceSize)buffer_size ) {
-		vk_alloc_staging_buffer( buffer_size );
-	}
-
-	for ( mip = 0; mip < num_regions; mip++ ) {
-		regions[mip].bufferOffset += vk.staging_buffer.offset;
-	}
-
-	Com_Memcpy( vk.staging_buffer.ptr + vk.staging_buffer.offset, pixels, buffer_size );
-
-	if ( vk.staging_buffer.offset == 0 ) {
-		VkCommandBufferBeginInfo begin_info;
-		begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		begin_info.pNext = NULL;
-		begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-		begin_info.pInheritanceInfo = NULL;
-		VK_CHECK( qvkBeginCommandBuffer( vk.staging_command_buffer, &begin_info ) );
-	}
-
-	vk.staging_buffer.offset += buffer_size;
-	command_buffer = vk.staging_command_buffer;
-#else
 	if ( vk.staging_buffer.size < (VkDeviceSize)buffer_size ) {
 		vk_alloc_staging_buffer( buffer_size );
 	}
 
 	Com_Memcpy( vk.staging_buffer.ptr, pixels, buffer_size );
 	command_buffer = vk_begin_command_buffer();
-#endif
 
 	if ( update ) {
 		record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT,
@@ -387,9 +309,7 @@ void vk_upload_cubemap_mip_data( image_t *image, int face_size, int miplevels, c
 	record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
 
-#ifndef USE_UPLOAD_QUEUE
 	vk_end_command_buffer( command_buffer, __func__ );
-#endif
 }
 
 /*
@@ -435,37 +355,11 @@ void vk_upload_compressed_image_data( image_t *image, int width, int height, int
 			break;
 	}
 
-#ifdef USE_UPLOAD_QUEUE
-	if ( vk_wait_staging_buffer() ) {
-		vk_flush_staging_buffer( qfalse );
-	}
-	if ( vk.staging_buffer.size - vk.staging_buffer.offset < (VkDeviceSize)size ) {
-		vk_flush_staging_buffer( qfalse );
-	}
-	if ( vk.staging_buffer.size < (VkDeviceSize)size ) {
-		vk_alloc_staging_buffer( size );
-	}
-	for ( n = 0; n < num_regions; n++ ) {
-		regions[n].bufferOffset += vk.staging_buffer.offset;
-	}
-	Com_Memcpy( vk.staging_buffer.ptr + vk.staging_buffer.offset, pixels, size );
-	if ( vk.staging_buffer.offset == 0 ) {
-		VkCommandBufferBeginInfo begin_info;
-		begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		begin_info.pNext = NULL;
-		begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-		begin_info.pInheritanceInfo = NULL;
-		VK_CHECK( qvkBeginCommandBuffer( vk.staging_command_buffer, &begin_info ) );
-	}
-	vk.staging_buffer.offset += size;
-	command_buffer = vk.staging_command_buffer;
-#else
 	if ( vk.staging_buffer.size < (VkDeviceSize)size ) {
 		vk_alloc_staging_buffer( size );
 	}
 	Com_Memcpy( vk.staging_buffer.ptr, pixels, size );
 	command_buffer = vk_begin_command_buffer();
-#endif
 
 	if ( update ) {
 		record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0 );
@@ -475,9 +369,7 @@ void vk_upload_compressed_image_data( image_t *image, int width, int height, int
 	qvkCmdCopyBufferToImage( command_buffer, vk.staging_buffer.handle, image->handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, num_regions, regions );
 	record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
 
-#ifndef USE_UPLOAD_QUEUE
 	vk_end_command_buffer( command_buffer, __func__ );
-#endif
 }
 
 void vk_update_descriptor_set( image_t *image, qboolean mipmap ) {
