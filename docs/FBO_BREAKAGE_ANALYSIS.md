@@ -6,30 +6,20 @@
 
 ---
 
-## 1. Most Likely Cause: OIT Descriptor Binding Bug
+## 1. OIT descriptor binding (historical bug, fixed)
 
-**Location**: `vk_draw_state.c` — `vk_bind_descriptor_sets()`, OIT accum branch
+**Location**: `vk_draw_state.c` — `vk_bind_descriptor_sets()`, `backEnd.oitAccumPass` / OIT accum branch (post-`vk.c` split).
 
-**Bug**: When `backEnd.oitAccumPass` is true, we bind `descriptor_set.current[0]` to pipeline set 0. But in the main pipeline layout:
-- **Set 0** = uniform buffer (fog/dlight) → `descriptor_set.current[0]`
-- **Set 1** = diffuse texture (tex0) → `descriptor_set.current[1]` = `descriptor_set.current[VK_DESC_TEXTURE0]`
+**What went wrong (March 2025)**: The OIT accum pipeline expects **set 0 = `tex0`**. The main layout uses **set 0 = uniform** and **`VK_DESC_TEXTURE0` for the diffuse map**, so binding `current[0]` in the accum pass fed the **uniform buffer** to a texture sampler → garbage or solid colors on transparent surfaces.
 
-The OIT accum pipeline expects **set 0 = sampler (tex0)**. We are binding the **uniform buffer** descriptor instead of the **texture** descriptor. The OIT accum fragment shader samples `tex0` at set 0 binding 0 — it would be sampling from uniform buffer data as if it were a texture, producing garbage or solid colors.
-
-**Fix**: Bind `descriptor_set.current[VK_DESC_TEXTURE0]` (index 1) for OIT accum, not `current[0]`:
-
-```c
-if ( vk.cmd->descriptor_set.current[VK_DESC_TEXTURE0] != VK_NULL_HANDLE ) {
-    qvkCmdBindDescriptorSets( ..., vk.cmd->descriptor_set.current + VK_DESC_TEXTURE0, ... );
-}
-```
+**Current code**: The accum path binds `vk.cmd->descriptor_set.current[VK_DESC_TEXTURE0]` for set 0 and optionally `vk.oit_depth_descriptor` for set 1. If OIT+FBO mis-renders reappear, re-audit this block and the OIT pipeline layout in-tree.
 
 ---
 
-## 2. When This Bug Triggers
+## 2. When the old bug showed up
 
-- **r_oit 1** + **r_fbo 1**: OIT path is used. Transparent surfaces are drawn in the OIT accum pass with the wrong descriptor → wrong/solid colors.
-- **r_oit 0**: OIT path is skipped. Normal flow; this bug does not apply.
+- **r_oit 1** + **r_fbo 1**: OIT accum ran with the wrong descriptor → broken transparent pass.
+- **r_oit 0**: OIT skipped; that specific failure mode did not apply.
 
 **If FBO is broken with r_oit 0**, the cause is elsewhere (see Section 4).
 
@@ -42,7 +32,7 @@ if ( vk.cmd->descriptor_set.current[VK_DESC_TEXTURE0] != VK_NULL_HANDLE ) {
 3. Sun, flares, etc. drawn in post_bloom.
 4. Rest of frame: volumetrics, SMAA, gamma, present.
 
-The mid-frame switch from main to post_bloom was previously identified as a risk. With the OIT accum pipeline wired, the flow is intended to work. The descriptor bug would corrupt transparent rendering specifically.
+The mid-frame switch from main to post_bloom was previously identified as a risk. With the OIT accum pipeline wired, the flow is intended to work. A bad OIT accum bind corrupts **transparent** rendering specifically.
 
 ---
 
@@ -72,7 +62,7 @@ vid_restart
 
 ---
 
-## 6. Recommended Fix
+## 6. If this regresses
 
-1. Fix OIT accum descriptor binding: use `VK_DESC_TEXTURE0` (index 1) instead of index 0.
-2. If FBO is still broken with r_oit 0, investigate descriptor chain, layout transitions, and gamma pass source.
+1. Confirm `vk_bind_descriptor_sets` still binds **`VK_DESC_TEXTURE0`** for OIT accum set 0 (and depth set 1 when present).
+2. If FBO is still broken with **r_oit 0**, investigate descriptor chain, layout transitions, and gamma pass source (see `docs/VULKAN_FBO_AUDIT.md`).
