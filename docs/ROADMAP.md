@@ -5,7 +5,7 @@
 Priorities that keep **CI green** and **README/build truth** aligned:
 
 1. **Watch GitHub Actions on `main`** — especially **Android** (CMake + Gradle `assembleDebug`, OpenSSL/Lua/FetchContent caches) and **MSYS curl**.
-2. **Renderer validation** — Tier B (self-hosted `GAME_BASE`) and Tier C (manual GPU notes) when you have hardware/content; keep `renderer_regression_check` passing on default CI.
+2. **Renderer validation** — Tier B (self-hosted `GAME_BASE`) and Tier C (manual GPU notes) when you have hardware/content; keep `renderer_regression_check` passing on default CI (manifest + GLSL + **IQM_MORPH_TOP_K** C/GLSL parity).
 3. **glTF on Vulkan** — **GPU skinning/morph** (PBR + `r_gltfGpu`) uses **top-8** morph weights per draw (aligned with `GLTF_MAX_MORPH_TARGETS`), including **`RE_SetEntityMorphWeight`** with clip-driven weights; next polish: optional **qtangent** recompute on GPU path or **OpenGL registration** if README promises parity.
 4. **Android product** — first-run / missing `base/` UX, optional APK artifact smoke (install + launch to “no game data” is OK).
 
@@ -85,7 +85,7 @@ Priorities that keep **CI green** and **README/build truth** aligned:
 |----------|------|--------|
 | P0 | **CI stability** | Fix any red matrix on `main`; Android OpenSSL/Lua first-build time — tune cache keys if needed |
 | P1 | **glTF GPU path (polish)** | Entity morph + top-8 GPU morph (done); optional qtangent on GPU path; validate on real assets |
-| P1 | **Renderer validation** | Tier B/C as optional gates; `renderer_regression_check` manifest includes **`docs/GLTF.md`**; expand scripts where headless allows |
+| P1 | **Renderer validation** | Tier B/C as optional gates; `renderer_regression_check`: manifest (**`docs/GLTF.md`**, **`docs/RENDERERS_FUTURE.md`**, Tier B doc), GLSL validate, **IQM_MORPH_TOP_K** parity |
 | P2 | **OpenGL glTF / OBJ / MD5** | README + docs state **Vulkan-only**; optional future: register same `MOD_*` types in OpenGL (thin path) |
 | P2 | **Engine systems hardening** | Telemetry / replay / save / quest / dialogue — define stable APIs + minimal tests |
 | P3 | **GOAP content** | Data-driven actions; perf limits; debug draw |

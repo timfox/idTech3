@@ -71,6 +71,22 @@ else
 fi
 
 echo ""
+echo "GPU morph SSBO: IQM_MORPH_TOP_K (C vs GLSL must match):"
+TR_LOCAL="$PROJECT_ROOT/src/renderers/vulkan/tr_local.h"
+GEN_VERT="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/gen_vert.tmpl"
+LIGHT_VERT="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/light_vert.tmpl"
+k_c="$(sed -n 's/^#define IQM_MORPH_TOP_K[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$TR_LOCAL" | head -1)"
+k_g="$(sed -n 's/^[[:space:]]*const int IQM_MORPH_TOP_K[[:space:]]*=[[:space:]]*\([0-9][0-9]*\).*;$/\1/p' "$GEN_VERT" | head -1)"
+k_l="$(sed -n 's/^[[:space:]]*const int IQM_MORPH_TOP_K[[:space:]]*=[[:space:]]*\([0-9][0-9]*\).*;$/\1/p' "$LIGHT_VERT" | head -1)"
+if [[ -z "$k_c" || -z "$k_g" || -z "$k_l" ]]; then
+  fail "could not parse IQM_MORPH_TOP_K from tr_local.h / gen_vert.tmpl / light_vert.tmpl"
+elif [[ "$k_c" != "$k_g" || "$k_c" != "$k_l" ]]; then
+  fail "IQM_MORPH_TOP_K mismatch: tr_local.h=$k_c gen_vert.tmpl=$k_g light_vert.tmpl=$k_l"
+else
+  pass "IQM_MORPH_TOP_K=$k_c (C + both vertex templates)"
+fi
+
+echo ""
 if [ -n "${GAME_BASE:-}" ]; then
   echo "Optional game base: $GAME_BASE"
   ASSETS_LIST="${GAME_ASSETS_LIST:-$PROJECT_ROOT/docs/samples/renderer_regression/OPTIONAL_GAME_ASSETS.txt}"
