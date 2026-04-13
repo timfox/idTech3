@@ -236,6 +236,7 @@ set(DUKTAPE_LINK_LIBRARIES "")
 set(DUKTAPE_EXTRA_LIBRARIES "")
 
 if(USE_LUA)
+if(NOT ANDROID)
   set(_LUA_HINT_PATHS
     $ENV{LUA_DIR}
     $ENV{LUA_PATH}
@@ -392,6 +393,7 @@ if(USE_LUA)
     endif()
   endif()
 endif()
+endif()
 
 # Android NDK: build static Lua from upstream source (no system pkg-config)
 set(LUA_ANDROID_BUILT FALSE)
@@ -404,21 +406,51 @@ if(ANDROID AND USE_LUA AND NOT LUA_FOUND)
   endif()
   set(_LUA_ANDROID_VER "5.4.7")
   set(_LUA_ANDROID_SHA "9fbf5e28ef86c69858f6d3d34eccc32e911c1a28b4120ff3e84aaa70cfbf1e30")
-  set(_LUA_ANDROID_PREFIX "${CMAKE_BINARY_DIR}/lua-android")
+  # One prefix per ABI — Gradle builds arm64 and armeabi-v7a in the same CMake binary dir; a shared
+  # "lua-android/" would leave the wrong-arch liblua.a from whichever ABI configured first.
+  set(_LUA_ANDROID_PREFIX "${CMAKE_BINARY_DIR}/lua-android-${ANDROID_ABI}")
   set(_LUA_EP_EXTRA "")
   if(ANDROID_DEPS_CACHE AND NOT ANDROID_DEPS_CACHE STREQUAL "")
     set(_LUA_DL_DIR "${ANDROID_DEPS_CACHE}/externalproject-downloads")
     file(MAKE_DIRECTORY "${_LUA_DL_DIR}")
     list(APPEND _LUA_EP_EXTRA DOWNLOAD_DIR "${_LUA_DL_DIR}")
   endif()
+  # Lua src/Makefile sets "AR= ar rcu" and invokes $(AR) target objs — AR must be "llvm-ar rcu", not bare llvm-ar.
+  # ANDROID may set CMAKE_C_COMPILER to bare NDK clang (no --target); without it, objects are host x86_64.
+  if(DEFINED ANDROID_PLATFORM_LEVEL AND NOT ANDROID_PLATFORM_LEVEL STREQUAL "")
+    set(_LUA_API "${ANDROID_PLATFORM_LEVEL}")
+  elseif(ANDROID_PLATFORM MATCHES "android-([0-9]+)")
+    set(_LUA_API "${CMAKE_MATCH_1}")
+  else()
+    set(_LUA_API "26")
+  endif()
+  if(ANDROID_ABI STREQUAL "arm64-v8a")
+    set(_LUA_CLANG_TARGET "aarch64-none-linux-android${_LUA_API}")
+  elseif(ANDROID_ABI STREQUAL "armeabi-v7a")
+    set(_LUA_CLANG_TARGET "armv7-none-linux-androideabi${_LUA_API}")
+  elseif(ANDROID_ABI STREQUAL "x86")
+    set(_LUA_CLANG_TARGET "i686-none-linux-android${_LUA_API}")
+  elseif(ANDROID_ABI STREQUAL "x86_64")
+    set(_LUA_CLANG_TARGET "x86_64-none-linux-android${_LUA_API}")
+  else()
+    set(_LUA_CLANG_TARGET "aarch64-none-linux-android${_LUA_API}")
+  endif()
+  set(_LUA_CC_WRAPPER "${CMAKE_C_COMPILER} --target=${_LUA_CLANG_TARGET}")
+  if(CMAKE_SYSROOT)
+    string(APPEND _LUA_CC_WRAPPER " --sysroot=${CMAKE_SYSROOT}")
+  endif()
+  set(_LUA_MAKE_CC "CC=${_LUA_CC_WRAPPER}")
+  set(_LUA_MAKE_AR "AR=${CMAKE_AR} rcu")
+  set(_LUA_MAKE_RANLIB "RANLIB=${CMAKE_RANLIB}")
   ExternalProject_Add(lua_android_ep
     URL "https://www.lua.org/ftp/lua-${_LUA_ANDROID_VER}.tar.gz"
     URL_HASH "SHA256=${_LUA_ANDROID_SHA}"
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     ${_LUA_EP_EXTRA}
     CONFIGURE_COMMAND ""
-    BUILD_COMMAND ${CMAKE_COMMAND} -E env "CC=${CMAKE_C_COMPILER}" "AR=${CMAKE_AR}" "RANLIB=${CMAKE_RANLIB}"
-      ${LUA_ANDROID_MAKE_EXE} -C <SOURCE_DIR>/src liblua.a MYCFLAGS=-fPIC
+    # Lua src/Makefile sets "CC= gcc" (not ?=); pass overrides on the make line (one argv each).
+    BUILD_COMMAND ${LUA_ANDROID_MAKE_EXE} -C <SOURCE_DIR>/src
+      ${_LUA_MAKE_CC} ${_LUA_MAKE_AR} ${_LUA_MAKE_RANLIB} liblua.a MYCFLAGS=-fPIC
     INSTALL_COMMAND ${CMAKE_COMMAND} -E make_directory "${_LUA_ANDROID_PREFIX}/lib" "${_LUA_ANDROID_PREFIX}/include"
       COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/src/liblua.a "${_LUA_ANDROID_PREFIX}/lib/liblua.a"
       COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/src/lua.h "${_LUA_ANDROID_PREFIX}/include/"
@@ -819,10 +851,12 @@ set(CURL_LIBRARIES "")
 set(CURL_INCLUDE_DIRS "")
 if(USE_CURL)
   if(ANDROID)
+    # Restrict search to the NDK sysroot only. NO_CMAKE_FIND_ROOT_PATH would search the
+    # host (e.g. /usr/include) and pull in glibc headers while compiling for Android.
     find_path(CURL_INCLUDE_DIR
       NAMES curl/curl.h
-      HINTS "${CMAKE_SYSROOT}/usr/include"
-      NO_CMAKE_FIND_ROOT_PATH)
+      PATHS "${CMAKE_SYSROOT}/usr/include"
+      NO_DEFAULT_PATH)
     if(CURL_INCLUDE_DIR)
       set(_CURL_ABI_DIR "")
       if(ANDROID_ABI STREQUAL "arm64-v8a")
@@ -838,8 +872,8 @@ if(USE_CURL)
       endif()
       find_library(CURL_LIBRARY
         NAMES curl libcurl
-        HINTS ${_CURL_LIB_HINTS}
-        NO_CMAKE_FIND_ROOT_PATH)
+        PATHS ${_CURL_LIB_HINTS}
+        NO_DEFAULT_PATH)
     endif()
     if(CURL_INCLUDE_DIR AND CURL_LIBRARY)
       set(CURL_FOUND TRUE)
@@ -1064,7 +1098,7 @@ if(USE_DTLS)
         else()
           set(_OSSL_OS "android-${ANDROID_ABI}")
         endif()
-        set(_OSSL_PREFIX "${CMAKE_BINARY_DIR}/openssl-android")
+        set(_OSSL_PREFIX "${CMAKE_BINARY_DIR}/openssl-android-${ANDROID_ABI}")
         set(_OSSL_API "${ANDROID_PLATFORM_LEVEL}")
         if(NOT _OSSL_API OR _OSSL_API STREQUAL "")
           set(_OSSL_API 26)
@@ -1535,6 +1569,19 @@ if(USE_THEORA)
   endif()
 else()
   list(REMOVE_ITEM CLIENT_SRCS src/client/cl_cin_theora.c)
+endif()
+
+# pkg-config resolves *host* FFmpeg/dav1d/vpx/Theora; never use those include paths for NDK targets.
+if(ANDROID)
+  set(FFMPEG_FOUND FALSE)
+  set(DAV1D_FOUND FALSE)
+  set(VPX_FOUND FALSE)
+  set(THEORA_FOUND FALSE)
+  list(REMOVE_ITEM CLIENT_SRCS src/client/cl_cin_ffmpeg.c)
+  list(REMOVE_ITEM CLIENT_SRCS src/client/cl_cin_dav1d.c)
+  list(REMOVE_ITEM CLIENT_SRCS src/client/cl_cin_vpx.c)
+  list(REMOVE_ITEM CLIENT_SRCS src/client/cl_cin_theora.c)
+  message(STATUS "Android: host pkg-config video codecs disabled (FFmpeg/dav1d/vpx/Theora); use vendor/NDK builds to re-enable")
 endif()
 # --- End modern video codec support ---
 
@@ -2144,7 +2191,7 @@ set(PHYSICS_SRCS
 )
 
 set(BULLET_FOUND FALSE)
-if(USE_BULLET_PHYSICS)
+if(USE_BULLET_PHYSICS AND NOT ANDROID)
   find_package(PkgConfig QUIET)
   if(PKG_CONFIG_FOUND)
     pkg_check_modules(BULLET_PKG QUIET bullet)
@@ -2157,6 +2204,8 @@ if(USE_BULLET_PHYSICS)
   if(NOT BULLET_FOUND)
     message(STATUS "Bullet Physics: C wrapper only (install libbullet-dev for full backend)")
   endif()
+elseif(USE_BULLET_PHYSICS AND ANDROID)
+  message(STATUS "Bullet Physics: C wrapper only on Android (no host pkg-config Bullet)")
 endif()
 
 ADD_LIBRARY(phys_module OBJECT ${PHYSICS_SRCS})
