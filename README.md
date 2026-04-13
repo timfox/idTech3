@@ -40,7 +40,7 @@ Ray tracing (Vulkan RT) is **scaffolded / in progress** — see `docs/RENDERERS_
 * **OpenGL (fallback):** MD3, MDR, IQM, STL, DAE, FBX, USD / USDA, MA via the shared mesh-import path — **no OBJ, glTF, or MD5** in the OpenGL renderer today (use Vulkan or convert)
 * Blend shapes: **IQM** on both renderers where enabled; **glTF** morph + clip playback on **Vulkan** only (animation weights + `RE_SetEntityMorphWeight`; `r_gltfAnim` for time) — [docs/GLTF.md](docs/GLTF.md)
 
-**Renderer truth (models):** Asset loaders for OBJ, glTF/GLB, and MD5 live under `src/renderers/vulkan/` and are wired only in the **Vulkan** renderer (`R_Register*` / `MOD_*` paths). The OpenGL tree does **not** register those types; choosing the OpenGL backend does **not** silently enable them. Same story for **glTF GPU skin/morph** (`r_gltfGpu`): Vulkan PBR only. See [docs/GLTF.md](docs/GLTF.md) and the OpenGL column in [docs/RENDERERS.md](docs/RENDERERS.md).
+**Renderer truth (models):** Asset loaders for OBJ, glTF/GLB, and MD5 live under `src/renderers/vulkan/` and are wired only in the **Vulkan** renderer (`R_Register*` / `MOD_*` paths). The OpenGL tree does **not** register those types; choosing the OpenGL backend does **not** silently enable them. Same story for **glTF GPU skin/morph** (`r_gltfGpu`): Vulkan PBR only; **`RE_SetEntityMorphWeight` feeds the same GPU top-4 morph selection** as clip-driven weights. See [docs/GLTF.md](docs/GLTF.md) and the OpenGL column in [docs/RENDERERS.md](docs/RENDERERS.md).
 
 **Scripting**:
 * Support for Lua scripting
