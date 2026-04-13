@@ -4,12 +4,14 @@
 **Context**: User reports `r_fbo 1` is "very broken" — solid colors, wrong rendering.  
 **Scope**: Full pipeline trace from `vk.fboActive` through main pass, post-process, and swapchain.
 
+**Historical note (2026)**: This audit predates the removal of monolithic `vk.c`. Line numbers below refer to that era. For current code, use `vk_init_device.c` (`vk.fboActive` from `r_fbo`), `vk_attachments.c` (`vk_alloc_attachments`), `vk_descriptor_sets.c`, `vk_post_fog.c`, and `docs/ARCHITECTURE.md`.
+
 ---
 
 ## 1. vk.fboActive — Where Set and What Triggers Recreation
 
 ### Where Set
-- **Location**: `vk.c` lines 6345–6353
+- **Location (current)**: `vk_init_device.c` — `vk.fboActive` set from `r_fbo` / `r_ext_multisample` during device init (formerly cited as `vk.c` ~6345–6353)
 - **Source**: `r_fbo->integer` cvar (CVAR_ARCHIVE | CVAR_LATCH)
 - **Logic**:
   ```c
@@ -25,7 +27,7 @@
 ### When FBO Resources Are Recreated
 - **vid_restart**: Triggers full Vulkan reinit; `r_fbo` is CVAR_LATCH so it takes effect on restart.
 - **vk_create_framebuffers()**: Called from `vk_create_window()` (line 6245) and swapchain recreation (line 7241).
-- **vk_alloc_attachments()**: Creates `vk.color_image`, `vk.fog_scene_image`, `vk.smaa_output_image`, etc., only when `vk.fboActive` (line 5443).
+- **vk_alloc_attachments()** (`vk_attachments.c`): Creates `vk.color_image`, `vk.fog_scene_image`, `vk.smaa_output_image`, etc., only when `vk.fboActive` (formerly ~5443 in legacy `vk.c`).
 - **Render passes**: Created in `vk_create_render_passes()`; main pass layout depends on `fboActive`.
 
 ### Critical Dependency
@@ -75,14 +77,14 @@
 - **Points to** (at different stages):
   - After volumetric + SMAA: `vk.smaa_output_image_view`
   - After volumetric, no SMAA: `vk.color_image_view`
-  - When volumetrics skipped: `vk.color_image_view` (fallback at 15290)
+  - When volumetrics skipped: `vk.color_image_view` (see volumetric-skip paths in `vk_post_fog.c` / related pass code)
 
 ### vk.luminance_descriptor
 - **Binding 0**: Input image (color or SMAA output) for luminance compute
 - **Binding 1**: `vk.luminance_image_view` (1×1 storage)
 - **Updated**:
-  - In `vk_volumetric_fog_pass()` (lines 14684–14711): `smaa_output` or `color_image_view`
-  - In volumetrics-skipped path (lines 15291–15321): `color_image_view` only
+  - In `vk_volumetric_fog_pass()` (now split across `vk_volumetric_pass_compute.c` / related modules): `smaa_output` or `color_image_view`
+  - In volumetrics-skipped path (`vk_post_fog.c` and callers): `color_image_view` only
 
 ### When Volumetrics Are Skipped
 - **luminance_descriptor binding 0** → `vk.color_image_view`

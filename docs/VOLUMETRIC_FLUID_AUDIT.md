@@ -1,7 +1,7 @@
 # Volumetric Fog & Fluid Simulation Quality Audit
 
 **Date**: 2026-02-28  
-**Scope**: `vk_volumetric_params.c`, `vk_fluidsim.c`, `vk.c` (volumetric/fluid paths), compute shaders
+**Scope**: `vk_volumetric_params.c`, `vk_fluidsim.c`, `vk_volumetric_pass_compute.c`, `vk_volumetric_internal.c` (volumetric/fluid paths), compute shaders
 
 ## Architecture Summary
 
@@ -33,7 +33,7 @@
 
 ### 🔧 Improvements Applied
 
-1. **Fog world AABB validation** (`vk.c`): If `r_volumetricFogWorldMax` ≤ `r_volumetricFogWorldMin` + 1 on any axis, clamp to valid extent to avoid zero/negative fluidWorldMap scale and division issues.
+1. **Fog world AABB validation** (`vk_volumetric_params.c`): If `r_volumetricFogWorldMax` ≤ `r_volumetricFogWorldMin` + 1 on any axis, clamp to valid extent to avoid zero/negative fluidWorldMap scale and division issues.
 
 2. **Emitter radius validation** (`vk_fluidsim.c`): Clamp negative radius to 0 in `FluidSim_AddEmitter` (shader already uses `max(radius, 0.001)`).
 
