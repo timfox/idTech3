@@ -1,15 +1,15 @@
 # Volumetric Fog & Fluid Simulation Quality Audit
 
 **Date**: 2026-02-28  
-**Scope**: `vk_vfog.c`, `vk_fluidsim.c`, `vk.c` (volumetric/fluid paths), compute shaders
+**Scope**: `vk_volumetric_params.c`, `vk_fluidsim.c`, `vk_volumetric_pass_compute.c`, `vk_volumetric_internal.c`, related `vk_volumetric_*.c`, compute shaders
 
 ## Architecture Summary
 
-### Volumetric Fog (vk_vfog)
+### Volumetric Fog
 - **Froxel grid**: Configurable 3D grid (default 160×90×64) for ray marching
 - **Pipeline**: Compute pass → composite pass; temporal reprojection for stability
 - **Parameters**: Density, height falloff, scatter, anisotropy, noise, wind, fog color
-- **Integration**: Uses `r_volumetricFog*` and `r_fog*` cvars (separate from vk_vfog's `r_vfog*`)
+- **Integration**: Uses `r_volumetricFog*` and `r_fog*` cvars
 
 ### Fluid Simulation (vk_fluidsim)
 - **Algorithm**: Stable Fluids (Jos Stam 1999) – Semi-Lagrangian advection + Jacobi pressure solve
@@ -18,11 +18,9 @@
 - **Parameters**: Viscosity, diffusion, dissipation, buoyancy, vorticity, wind
 - **Integration**: Fog fluid uses `r_fogFluid*` cvars; emitters from `FluidSim_*` API
 
-### Two Fluid Paths
-1. **r_fluidsim** – Standalone Navier-Stokes (FluidSim cvars, `FluidSim_GetJacobiIterations`)
-2. **r_fogFluid** – Fog-integrated fluid (r_fogFluid* cvars, `r_fogFluidPressureIterations`)
-
-Both share emitter data from `FluidSim_AddEmitter` / `FluidSim_GetEmitter`.
+### Fluid integration
+- **r_fogFluid** – Fog-integrated fluid (`r_fogFluid*` cvars, `r_fogFluidPressureIterations` for Jacobi iterations)
+- Emitters use `FluidSim_AddEmitter` / `FluidSim_GetEmitter` (API in `vk_fluidsim.c`).
 
 ## Audit Findings
 
@@ -35,17 +33,15 @@ Both share emitter data from `FluidSim_AddEmitter` / `FluidSim_GetEmitter`.
 
 ### 🔧 Improvements Applied
 
-1. **Fog world AABB validation** (`vk.c`): If `r_volumetricFogWorldMax` ≤ `r_volumetricFogWorldMin` + 1 on any axis, clamp to valid extent to avoid zero/negative fluidWorldMap scale and division issues.
+1. **Fog world AABB validation** (`vk_volumetric_params.c` in `vk_update_volumetric_params`): If `r_volumetricFogWorldMax` ≤ `r_volumetricFogWorldMin` + 1 on any axis, expand `fog_max` per axis (defaults add 4096/4096/1280) so `fluidWorldMap` scale stays finite and avoids zero/negative scale.
 
 2. **Emitter radius validation** (`vk_fluidsim.c`): Clamp negative radius to 0 in `FluidSim_AddEmitter` (shader already uses `max(radius, 0.001)`).
 
-3. **Jacobi iterations range** (`vk_fluidsim.c`): `Cvar_CheckRange(r_fluidsim_iterations, "1", "64", CV_INTEGER)` to prevent invalid iteration counts.
+3. **Jacobi iterations range** (`tr_init.c`): `Cvar_CheckRange(r_fogFluidPressureIterations, "1", "64", CV_INTEGER)` to prevent invalid iteration counts.
 
 ### 📋 Design Notes
-- **FluidSim_GetJacobiIterations** is used by the standalone `r_fluidsim` path; fog fluid uses `r_fogFluidPressureIterations`.
 - **Emitter position**: Shader uses `position.xy` for 2D world mapping; `fluidWorldMap` maps UV [0,1] to world (fog_min + uv × size).
 - **fluidEmitterData layout**: `[density, temperature, vel.x, vel.y]` per emitter; matches shader usage.
 
 ### ⚠️ Recommendations
-- Consider adding `Cvar_SetDescription` for FluidSim cvars (consistent with other renderer cvars).
 - RENDERERS.md states "64³ grid" for fluid; actual implementation is 2D (fluid_width × fluid_height). Consider doc update.

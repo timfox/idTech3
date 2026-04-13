@@ -3,7 +3,7 @@
 Copyright (C) 2026 Gopex LLC. All rights reserved.
 
 CBT-inspired GPU-driven terrain tessellation.
-Cvars and init. Pipeline/buffers in vk.c.
+Cvars and init. Descriptor layout in vk_init_device.c; CBT compute pipeline in vk_volumetric_pipelines.c.
 ===========================================================================
 */
 

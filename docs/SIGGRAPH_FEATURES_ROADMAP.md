@@ -3,6 +3,8 @@
 **Date**: March 2025  
 **Scope**: Real-time rendering techniques from SIGGRAPH 2024–2025 Advances in Real-Time Rendering.
 
+**Vulkan file map (2026)**: Monolithic `vk.c` was split. OIT and post paths: `vk_postfx_passes.c`, `vk_post_fog.c`, `vk_draw_state.c`. Volumetrics: `vk_volumetric_params.c`, `vk_volumetric_pass_compute.c`, `vk_volumetric_internal.c`. See `docs/ARCHITECTURE.md`.
+
 ---
 
 ## Overview
@@ -46,7 +48,7 @@ This document tracks implementation of 10 features from recent Siggraph papers, 
 - **Flow**: Opaque surfaces drawn first; `vk_oit_pass` copies opaque to fog_scene, runs OIT accum (transparent surfaces with WBOIT), resolves opaque + accum to main color, resumes post_bloom for sun/flares.
 
 ### Files
-- `vk.c`: OIT passes, buffers, pipelines, `vk_oit_pass()`
+- `vk_postfx_passes.c` (`vk_oit_pass`), `vk_attachments.c`, `vk_pipeline_helpers.c`, related `vk_*.c`: OIT passes, buffers, pipelines
 - `shaders/glsl/oit_accum.frag`, `oit_accum.vert`, `oit_resolve.frag`
 - `tr_backend.c`: Draw surf filter, `RB_RenderDrawSurfList` (non-static for OIT)
 
@@ -69,8 +71,7 @@ This document tracks implementation of 10 features from recent Siggraph papers, 
 - Compute stages: density, volume, sun, local lights, clamp, temporal
 
 ### Files
-- `vk_vfog.c`, `vk_vfog.h`: Compute and composite logic
-- `volumetric_fog.comp`: Jitter, culling
+- `vk_volumetric_params.c`, `vk_volumetric_pass_compute.c`, `volumetric_fog.comp`: Parameters, dispatch, jitter, culling
 
 ---
 
@@ -97,7 +98,7 @@ This document tracks implementation of 10 features from recent Siggraph papers, 
 
 ### Files
 - `tr_types.h`: MAX_DLIGHTS / MAX_MEGALIGHTS
-- `vk.c`: Tile light culling compute, pipeline
+- Future tile light culling would live under `vk_*.c` compute modules (not yet split as a single `vk.c` entry point)
 - `light_frag.tmpl`: Many-lights sampling path
 
 ---

@@ -267,5 +267,9 @@ void vk_destroy_swapchain( void )
 		}
 	}
 
-	qvkDestroySwapchainKHR( vk.device, vk.swapchain, NULL );
+	if ( vk.swapchain != VK_NULL_HANDLE && qvkDestroySwapchainKHR != NULL ) {
+		qvkDestroySwapchainKHR( vk.device, vk.swapchain, NULL );
+	}
+	vk.swapchain = VK_NULL_HANDLE;
+	vk.swapchain_image_count = 0;
 }

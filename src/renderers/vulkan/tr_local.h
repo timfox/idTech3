@@ -39,9 +39,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define USE_VBO				// store static world geometry in VBO
 #define USE_FOG_ONLY
 #define USE_FOG_COLLAPSE	// not compatible with legacy dlights
-#if defined (USE_VBO) && !defined(USE_FOG_ONLY)
-#define USE_FOG_ONLY
-#endif
 #define USE_LEGACY_DLIGHTS	// vq3 dynamic lights
 #define USE_PMLIGHT			// promode dynamic lights via \r_dlightMode 1|2
 #define MAX_REAL_DLIGHTS	(MAX_DLIGHTS*2)
@@ -114,10 +111,6 @@ typedef uint32_t glIndex_t;
 //  and this is reflected by the value of MAX_REFENTITIES (which therefore is not a power-of-2)
 #define	MAX_REFENTITIES		((1<<REFENTITYNUM_BITS) - 1)
 #define	REFENTITYNUM_WORLD	((1<<REFENTITYNUM_BITS) - 1)
-#ifdef USE_VULKAN
-// GPU occlusion culling: visibility from previous frame (1=visible, 0=occluded).
-extern uint64_t vk_entity_occlusion_visibility[MAX_REFENTITIES];
-#endif
 // 14 bits
 // can't be increased without changing bit packing for drawsurfs
 // see QSORT_SHADERNUM_SHIFT
@@ -145,7 +138,7 @@ typedef struct dlight_s {
 
 
 #define IQM_MORPH_MAX_CHANNELS 8
-#define IQM_MORPH_TOP_K 4
+#define IQM_MORPH_TOP_K 8
 #define IQM_MORPH_NAME_MAX 64
 
 // a trRefEntity_t has all the information passed in by
@@ -435,6 +428,10 @@ typedef struct {
 
 	uint32_t		vk_pipeline[2]; // normal,fogged
 	uint32_t		vk_mirror_pipeline[2];
+#ifdef USE_VK_PBR
+	uint32_t		vk_pipeline_gltf_gpu[2];
+	uint32_t		vk_mirror_pipeline_gltf_gpu[2];
+#endif
 
 	uint32_t		vk_pipeline_df; // depthFragment
 	uint32_t		vk_mirror_pipeline_df;
@@ -988,6 +985,9 @@ typedef struct srfIQModel_s {
 	int		morphSurfaceIndex;
 } srfIQModel_t;
 
+/* Vulkan: stores VkBuffer handles as opaque uint64 (VK_NULL_HANDLE = tess path). OpenGL: unused (0). */
+#define TR_GLTF_VBO_HANDLE_INVALID 0ULL
+
 // glTF primitive surface (VBO path or tess fallback; supports skinning and morph)
 typedef struct srfGLTFPrimitive_s {
 	surfaceType_t	surfaceType;
@@ -996,10 +996,12 @@ typedef struct srfGLTFPrimitive_s {
 	int		numVertices;
 	uint32_t	*indices;
 	int		numIndices;
-	/* VBO: device-local buffers (VK_NULL_HANDLE = use tess path) */
-	VkBuffer	vbo_vertex;
-	VkBuffer	vbo_index;
-	VkDeviceSize	vbo_vertex_offsets[10]; /* per-attribute offsets for xyz,rgba,st,normal */
+	gltfMorphTarget_t *morphTargets; /* shared with model; NULL if none */
+	int		numMorphTargets;
+	int		meshIndex; /* model mesh for morph weight sampling / naming */
+	uint64_t	vbo_vertex;
+	uint64_t	vbo_index;
+	uint64_t	vbo_vertex_offsets[10]; /* per-attribute offsets for xyz,rgba,st,normal */
 	int		materialIndex;
 	qboolean	hasSkinning;
 	qboolean	hasMorphTargets;
@@ -1503,7 +1505,6 @@ extern cvar_t	*r_fastsky;				// controls whether sky should be cleared or drawn
 extern cvar_t	*r_neatsky;				// nomip and nopicmip for skyboxes, cnq3 like look
 extern cvar_t	*r_drawSun;				// controls drawing of sun quad
 extern cvar_t	*r_dynamiclight;		// dynamic lights enabled/disabled
-extern cvar_t	*r_mergeLightmaps;
 #ifdef USE_PMLIGHT
 extern cvar_t	*r_dlightMode;			// 0 - vq3, 1 - pmlight
 //extern cvar_t	*r_dlightSpecPower;		// 1 - 32
@@ -1527,11 +1528,18 @@ extern cvar_t	*r_pbr_multiScatterStrength;
 extern cvar_t	*r_pbr_fresnelRoughness;
 extern cvar_t	*r_pbr_specularAA;
 extern cvar_t	*r_pbr_specularAAStrength;
+extern cvar_t	*r_pbr_anisotropicSpecular;
+extern cvar_t	*r_pbr_iblAnisoStretch;
 #ifdef VK_CUBEMAP
 extern cvar_t	*r_pbr_iblIrradianceSize;
 extern cvar_t	*r_pbr_iblPrefilterSize;
 extern cvar_t	*r_pbr_showCubemap;
 extern cvar_t	*r_pbr_cubemapInfo;
+extern cvar_t	*r_pom;
+extern cvar_t	*r_pomSteps;
+extern cvar_t	*r_pomScale;
+extern cvar_t	*r_pomShadow;
+extern cvar_t	*r_pomShadowSteps;
 #endif
 extern cvar_t	*r_baseNormalX;
 extern cvar_t	*r_baseNormalY;
@@ -1738,6 +1746,9 @@ extern cvar_t	*r_morphDebug;
 extern cvar_t	*r_morphBreath;
 extern cvar_t	*r_morphBreathAmp;
 extern cvar_t	*r_morphBreathFreq;
+extern cvar_t	*r_gltfAnim;
+extern cvar_t	*r_gltfGpu;
+extern cvar_t	*r_gltfGpuTangentFix;
 
 extern	cvar_t	*r_nobind;						// turns off binding to appropriate textures
 extern	cvar_t	*r_singleShader;				// make most world faces use default shader
@@ -1776,6 +1787,8 @@ extern	cvar_t	*r_skipBackEnd;
 extern	cvar_t	*r_greyscale;
 extern	cvar_t	*r_dither;
 extern	cvar_t	*r_presentBits;
+extern	cvar_t	*r_outline;
+extern	cvar_t	*r_outlineThreshold;
 
 extern	cvar_t	*r_ignoreGLErrors;
 
@@ -2024,6 +2037,12 @@ typedef struct shaderCommands_s
 #ifdef USE_VULKAN
 	Vk_Depth_Range depthRange;
 	const struct srfGLTFPrimitive_s *gltfDrawSurface; /* when set, draw from glTF VBO instead of tess */
+#ifdef USE_VK_PBR
+	qboolean	gltfUseGpuPipeline; /* PBR + glTF VBO with GPU skin/morph (persists until next Tess_Begin) */
+	qboolean	gltfGpuMorphActive;
+	int		gltfGpuMorphCount;
+	float		gltfGpuMorphWeights[IQM_MORPH_TOP_K];
+#endif
 #endif
 
 	// info extracted from current shader

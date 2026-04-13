@@ -1684,6 +1684,9 @@ static void R_AddEntitySurfaces( void ) {
 				case MOD_IQM:
 					R_AddIQMSurfaces( ent );
 					break;
+				case MOD_GLTF:
+					R_AddGLTFSurfaces( ent );
+					break;
 				case MOD_BRUSH:
 					R_AddBrushModelSurfaces( ent );
 					break;

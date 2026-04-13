@@ -36,7 +36,9 @@ Ticks all gameplay subsystems each client frame:
 #include "../game/g_goap.h"
 #include "../game/g_aiml.h"
 #include "../game/g_bt.h"
+#include "../game/g_engine_systems.h"
 #include "../game/g_lua_bindings.h"
+#include "client.h"
 #ifdef USE_ECS
 #include "../game/ecs.h"
 #endif
@@ -155,6 +157,11 @@ void CL_InitGameSystems(void) {
 	Dismember_Init();
 	GOAP_Init();
 	AIML_Init();
+	EngineTelemetry_Init();
+	EngineReplay_Init();
+	EngineSave_Init();
+	EngineQuest_Init();
+	EngineDialogue_Init();
 	BT_Init();
 #ifdef USE_ECS
 	ECS_Init();
@@ -183,6 +190,11 @@ void CL_ShutdownGameSystems(void) {
 	Horde_Shutdown();
 	Dismember_Shutdown();
 	GOAP_Shutdown();
+	EngineDialogue_Shutdown();
+	EngineQuest_Shutdown();
+	EngineSave_Shutdown();
+	EngineReplay_Shutdown();
+	EngineTelemetry_Shutdown();
 	BT_Shutdown();
 #ifdef USE_ECS
 	ECS_Shutdown();
@@ -196,6 +208,11 @@ void CL_ShutdownGameSystems(void) {
 
 void CL_GameFrame(float frametime) {
 	if (!gameSystemsInitialized) return;
+
+	if ( cl.snap.valid ) {
+		EngineReplay_BeginFrame( cl.snap.serverTime );
+		EngineTelemetry_Record( "serverTime", (double)cl.snap.serverTime );
+	}
 
 	if (cl_physicsEnabled && cl_physicsEnabled->integer) {
 		Phys_StepSimulation(frametime);
@@ -263,5 +280,9 @@ void CL_GameFrame(float frametime) {
 	{
 		vec3_t fwd = {1,0,0}, right = {0,1,0}, up = {0,0,1}, origin = {0,0,0};
 		MobileFog_Frame(origin, fwd, right, up, frametime);
+	}
+
+	if ( cl.snap.valid ) {
+		EngineReplay_EndFrame();
 	}
 }

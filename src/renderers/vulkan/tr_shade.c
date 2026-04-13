@@ -408,6 +408,11 @@ void RB_BeginSurface( shader_t *shader, int fogNum ) {
 	tess.fogNum = fogNum;
 #ifdef USE_VULKAN
 	tess.gltfDrawSurface = NULL;
+#ifdef USE_VK_PBR
+	tess.gltfUseGpuPipeline = qfalse;
+	tess.gltfGpuMorphActive = qfalse;
+	tess.gltfGpuMorphCount = 0;
+#endif
 #endif
 	vk_reset_iqm_storage_offsets();
 	R_IQMBeginSurfaceBatch();
@@ -686,6 +691,7 @@ typedef struct vkPbrUniformBlock_s {
 	vec4_t glintParams1;
 	vec4_t glintFlags;
 	vec4_t shCoeffs[9];
+	vec4_t parallaxParams;
 } vkPbrUniformBlock_t;
 #endif
 
@@ -1416,6 +1422,16 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		}
 
 #ifdef USE_VK_PBR
+		if ( tess.shader && tess.shader->hasPBR && pStage->vk_pbr_flags && tess.gltfUseGpuPipeline ) {
+			if ( backEnd.viewParms.portalView == PV_MIRROR ) {
+				pipeline = pStage->vk_mirror_pipeline_gltf_gpu[fog_stage];
+			} else {
+				pipeline = pStage->vk_pipeline_gltf_gpu[fog_stage];
+			}
+		}
+#endif
+
+#ifdef USE_VK_PBR
 		Vk_Pipeline_Def	def;
 		vk_get_pipeline_def( pipeline, &def );
 
@@ -1459,7 +1475,14 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			Vector4Set( block.glintFlags,
 				( r_glint && r_glint->integer ) ? 1.0f : 0.0f,
 				( r_glintMode && r_glintMode->integer ) ? 1.0f : 0.0f,
-				0.0f, 0.0f );
+				( r_pbr_anisotropicSpecular && r_pbr_anisotropicSpecular->integer ) ? 1.0f : 0.0f,
+				( r_pbr_iblAnisoStretch ) ? LerpClamp( r_pbr_iblAnisoStretch->value, 0.0f, 1.0f ) : 0.0f );
+
+			Vector4Set( block.parallaxParams,
+				( r_pomScale && r_pomScale->value > 0.0f ) ? r_pomScale->value : 0.06f,
+				( r_pomShadow && r_pomShadow->value > 0.0f ) ? LerpClamp( r_pomShadow->value, 0.0f, 1.0f ) : 0.0f,
+				(float)( r_pomShadowSteps ? Com_Clamp( 2, 16, r_pomShadowSteps->integer ) : 6 ),
+				0.0f );
 
 			{
 				const VkDescriptorSet fallback2D = ( tr.whiteImage ) ? tr.whiteImage->descriptor : VK_NULL_HANDLE;
@@ -1625,6 +1648,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				Vector4Copy( block.glintParams1, uniform.pbrGlintParams1 );
 				Vector4Copy( block.glintFlags, uniform.pbrGlintFlags );
 				Com_Memcpy( uniform.pbrShCoeffs, block.shCoeffs, sizeof( uniform.pbrShCoeffs ) );
+				Vector4Copy( block.parallaxParams, uniform.pbrParallaxParams );
 
 				vk_push_uniform_cached( &uniform );
 			}

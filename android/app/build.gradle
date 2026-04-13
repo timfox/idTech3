@@ -5,6 +5,14 @@
 
 apply plugin: 'com.android.application'
 
+/* Reuse third-party download cache (Lua, OpenSSL, FetchContent): -PandroidDepsCache=/path or ANDROID_DEPS_CACHE */
+def _androidDepsCache = {
+    def p = project.findProperty("androidDepsCache")
+    def e = System.getenv("ANDROID_DEPS_CACHE")
+    def s = (p != null && p.toString().trim()) ? p.toString().trim() : ((e != null && e.trim()) ? e.trim() : "")
+    return s
+}()
+
 android {
     namespace "com.gopex.idtech3"
     compileSdk 35
@@ -18,7 +26,8 @@ android {
 
         externalNativeBuild {
             cmake {
-                arguments "-DBUILD_SERVER=OFF",
+                def cmakeArgs = [
+                    "-DBUILD_SERVER=OFF",
                     "-DUSE_VULKAN=ON",
                     "-DUSE_RENDERER_DLOPEN=OFF",
                     "-DRENDERER_DEFAULT=vulkan",
@@ -26,21 +35,27 @@ android {
                     "-DSKIP_SHADER_REGEN=ON",
                     "-DUSE_SDL=OFF",
                     "-DUSE_OPENAL=OFF",
-                    "-DUSE_CURL=OFF",
-                    "-DUSE_LUA=OFF",
-                    "-DUSE_DUKTAPE=OFF",
-                    "-DUSE_FFMPEG=OFF",
-                    "-DUSE_DAV1D=OFF",
-                    "-DUSE_VPX=OFF",
-                    "-DUSE_THEORA=OFF",
-                    "-DUSE_FLUX=OFF",
-                    "-DUSE_RECAST_NAV=OFF",
-                    "-DUSE_BULLET_PHYSICS=OFF",
-                    "-DBUILD_FREETYPE=OFF",
-                    "-DUSE_STB_TRUETYPE=ON",
+                    "-DUSE_CURL=ON",
+                    "-DUSE_LUA=ON",
+                    "-DUSE_DUKTAPE=ON",
+                    "-DUSE_FFMPEG=ON",
+                    "-DUSE_DAV1D=ON",
+                    "-DUSE_VPX=ON",
+                    "-DUSE_THEORA=ON",
+                    "-DUSE_FLUX=ON",
+                    "-DUSE_RECAST_NAV=ON",
+                    "-DUSE_BULLET_PHYSICS=ON",
+                    "-DBUILD_FREETYPE=ON",
+                    "-DUSE_DTLS=ON",
                     "-DENABLE_FORTIFY_SOURCE=OFF",
                     "-DENABLE_ASAN=OFF",
                     "-DCI_BUILD=OFF"
+                ]
+                if (_androidDepsCache) {
+                    cmakeArgs << "-DANDROID_DEPS_CACHE=${_androidDepsCache}"
+                }
+                /* AGP 8+: arguments() expects varargs, not a single List */
+                arguments(*cmakeArgs)
             }
         }
 

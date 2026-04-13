@@ -1,5 +1,7 @@
 # Renderer Features
 
+For a **build + manual validation checklist** (CI parity, shader coverage, GPU passes), see [RENDERER_CONFIDENCE.md](RENDERER_CONFIDENCE.md).
+
 ## Vulkan Renderer (Primary)
 
 The Vulkan 1.4 renderer is the primary rendering backend, built as a shared library (`idtech3_vulkan.so`). Requests Vulkan 1.4 when available; validation layers (Khronos, then LUNARG fallback) are enabled in debug builds on all platforms.
@@ -19,6 +21,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - Spherical harmonics for diffuse irradiance
 - Multi-scatter energy compensation
 - **Glint NDF**: Procedural microfacet NDF for specular glints (replaces GGX D term on low-roughness surfaces). Cvars: `r_glint`, `r_glintMode`, `r_glintDensity`, `r_glintMicrofacetRoughness`, `r_glintPixelFilterSize`, `r_glintSampleBudget`, `r_glintMaxLodClamp`, `r_glintRoughnessLo`, `r_glintRoughnessHi`, `r_glintDMax`. Debug modes 5–8 via `r_pbr_debug`.
+- **Parallax Occlusion Mapping (POM)**: With `r_pom` on, height is ray-marched from **either** the packed ORM/physical map’s **occlusion (R)** channel (when a metalness/roughness physical map is bound) **or** the **normal map alpha** when the stage uses `normalHeightMap` (decouples height from AO). Base UVs (`texcoord0`) are displaced for normal/ORM/detail/emissive/subsurface/anisotropy sampling; lightmaps still sample their own UV set. Shader keywords `parallaxDepth` (height scale, stored in `normalScale[3]`) and `parallaxBias` still apply. Cvars: `r_pom`, `r_pomSteps`, `r_pomScale`, `r_pomShadow`, `r_pomShadowSteps`. Startup prints a one-line POM summary when PBR initializes.
 - See [PBR_TEXTURES.md](PBR_TEXTURES.md) for texture naming conventions
 
 ### Volumetric Fog
@@ -30,7 +33,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - Temporal reprojection for stable results
 - Integration with Navier-Stokes fluid simulation for dynamic fog
 - Shadowed volumetrics via sun CSM and local shadow maps
-- Cvars: `r_volumetricFog`, `r_volumetricFogDensity`, `r_volumetricFogHeightFalloff`, `r_volumetricFogNoiseScale`, `r_volumetricFogGridDim`, `r_volumetricFogQuality`, etc. (Note: `r_vfog*` cvars in vk_vfog.c are legacy/unused; the pipeline uses `r_volumetricFog*` exclusively.)
+- Cvars: `r_volumetricFog`, `r_volumetricFogDensity`, `r_volumetricFogHeightFalloff`, `r_volumetricFogNoiseScale`, `r_volumetricFogGridDim`, `r_volumetricFogQuality`, etc.
 
 ### Water Flowmap
 - Flowmap textures drive per-pixel UV offset for water surfaces (rivers, pools, wakes)
@@ -47,10 +50,12 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - 2D velocity, density, and pressure fields (resolution derived from froxel grid)
 - Emitter system (up to 16 emitters) for smoke, fire, fog injection
 - Wind and buoyancy forces
-- Cvars: `r_fogFluid` (enable), `r_fogFluidViscosity`, `r_fogFluidDissipation`, `r_fogFluidVorticity`, `r_fogFluidBuoyancy`, etc. Legacy `r_fluidsim*` deprecated.
+- Cvars: `r_fogFluid` (enable), `r_fogFluidViscosity`, `r_fogFluidDissipation`, `r_fogFluidVorticity`, `r_fogFluidBuoyancy`, etc.
 
 ### Lighting Robustness
 - PBR Smith GGX visibility: division-by-zero guard at grazing angles (`CalcVisibility`)
+- PBR anisotropy map: **direct** specular uses anisotropic GGX NDF and **anisotropic Smith visibility** when a map is bound (`r_pbr_anisotropicSpecular`). **IBL** can use the same map to **stretch** environment roughness (`r_pbr_iblAnisoStretch`, default 1). Regenerate SPIR-V after editing `gen_frag.tmpl` (`scripts/compile_shaders.sh`).
+- PBR clearcoat / sheen: clearcoat dims the base lobe before adding the coat; sheen uses a **Charlie** lobe with optional fourth `sheenScale` component for roughness (see [PBR_TEXTURES.md](PBR_TEXTURES.md)).
 - Dynamic light radius: clamped to minimum 0.001 before `1/r²` to avoid inf
 - Light grid: `lightGridSize` clamped to ≥1 before inverse to avoid division by zero
 
@@ -168,8 +173,6 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 | `r_firstPersonScaleEnabled` | 1 | Apply scale for anti-clipping (0=no scale) |
 | `r_occlusionCulling` | 0 | GPU occlusion culling for entities (0=off, 1=on) |
 
-Legacy note: `r_vfog*` cvars are still registered in `vk_vfog.c` for compatibility, but the active volumetric pipeline reads `r_volumetricFog*`.
-
 See [HDR_GAPS.md](HDR_GAPS.md) for HDR pipeline gaps, risks, and render order.
 
 ### SDF Text Rendering
@@ -193,6 +196,7 @@ The OpenGL renderer provides compatibility for systems without Vulkan support. I
 
 | Feature | Vulkan | OpenGL |
 |---------|--------|--------|
+| Model formats **glTF/GLB**, **OBJ**, **MD5** (registration + draw) | ✓ (full; GPU glTF options on Vulkan) | ✓ (CPU tess; no `r_gltfGpu`) |
 | PBR (metalness/roughness, IBL) | ✓ | — |
 | Volumetric fog | ✓ | — |
 | SSAO / HBAO | ✓ | — |

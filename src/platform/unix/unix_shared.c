@@ -477,6 +477,16 @@ static int dll_err_count = 0;
 
 /*
 =================
+Sys_ClearLoadLibraryStickyError
+=================
+*/
+void Sys_ClearLoadLibraryStickyError( void )
+{
+}
+
+
+/*
+=================
 Sys_LoadLibrary
 =================
 */
@@ -504,6 +514,19 @@ const char *Sys_GetLoadLibraryError( void )
 {
 	const char *err = dlerror();
 	return err ? err : "unknown error";
+}
+
+
+/*
+=================
+Sys_LogNativeLibraryLoadFailure
+=================
+*/
+void Sys_LogNativeLibraryLoadFailure( const char *fullPath )
+{
+	const char *detail = Sys_GetLoadLibraryError();
+	Com_Printf( S_COLOR_YELLOW "Native library load failed: \"%s\" — %s\n",
+		fullPath ? fullPath : "(null)", detail );
 }
 
 

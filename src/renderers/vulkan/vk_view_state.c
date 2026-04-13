@@ -6,6 +6,7 @@
 typedef struct vkMvpPushConstants_s {
 	float mvp[16];
 	float prev_mvp[16];
+	float reserved[8]; /* padding / future push data; size must match VkPushConstantRange in vk_init_device.c */
 } vkMvpPushConstants_t;
 
 static VkRect2D vk_scene_src_rect;
@@ -320,6 +321,8 @@ void vk_update_mvp( const float *m )
 {
 	vkMvpPushConstants_t push_constants;
 	VkPipelineLayout layout;
+
+	Com_Memset( &push_constants, 0, sizeof( push_constants ) );
 
 	if ( m ) {
 		Com_Memcpy( push_constants.mvp, m, sizeof( push_constants.mvp ) );

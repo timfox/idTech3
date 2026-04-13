@@ -33,6 +33,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <errno.h>
 #include <direct.h>
 #include <io.h>
+#include <stdio.h>
 
 
 #define MEM_THRESHOLD (96*1024*1024)
@@ -145,7 +146,24 @@ Sys_Print
 */
 void Sys_Print( const char *msg )
 {
+#ifdef DEDICATED
+	/* CI and headless runs capture stdout; dedicated build has no Win32 edit control yet at early init. */
+	if ( msg && *msg ) {
+		const char *p = msg;
+		while ( *p == '^' && p[1] >= '0' && p[1] <= '9' ) {
+			p += 2;
+		}
+		if ( p[0] == '*' && p[1] == '*' && p[2] == '*' ) {
+			fputs( p, stderr );
+		} else {
+			fputs( p, stdout );
+		}
+		fflush( stdout );
+		fflush( stderr );
+	}
+#else
 	Conbuf_AppendText( msg );
+#endif
 }
 
 void Sys_ShowErrorMessage( const char *title, const char *message )
@@ -492,6 +510,22 @@ LOAD/UNLOAD DLL
 */
 
 static int dll_err_count = 0;
+/* Last Win32 loader failure: other code may clear GetLastError before we log. */
+static DWORD s_lastLoadLibErr = 0;
+static DWORD s_lastGetProcErr = 0;
+static char s_lastGetProcName[96];
+
+/*
+=================
+Sys_ClearLoadLibraryStickyError
+=================
+*/
+void Sys_ClearLoadLibraryStickyError( void )
+{
+	s_lastLoadLibErr = 0;
+	s_lastGetProcErr = 0;
+	s_lastGetProcName[0] = '\0';
+}
 
 /*
 =================
@@ -501,6 +535,9 @@ Sys_LoadLibrary
 void *Sys_LoadLibrary( const char *name )
 {
 	const char *ext;
+	void *ret;
+	UINT prevErrMode;
+	DWORD err;
 
 	if ( !name || !*name )
 		return NULL;
@@ -510,7 +547,24 @@ void *Sys_LoadLibrary( const char *name )
 		Com_Error( ERR_FATAL, "Sys_LoadLibrary: Unable to load library with '%s' extension", ext );
 	}
 
-	return (void *)LoadLibrary( AtoW( name ) );
+	/* Suppress modal "missing DLL" dialogs; log WinErr instead (compatibility / headless). */
+	prevErrMode = SetErrorMode( 0 );
+	SetErrorMode( prevErrMode | SEM_FAILCRITICALERRORS );
+	SetLastError( 0 );
+	/* Always ANSI: paths from the filesystem are char*; UNICODE/AtoW combos differ across MSVC vs MinGW. */
+	ret = (void *)LoadLibraryA( name );
+	err = GetLastError();
+	SetErrorMode( prevErrMode );
+	if ( !ret ) {
+		s_lastLoadLibErr = err;
+		s_lastGetProcErr = 0;
+		s_lastGetProcName[0] = '\0';
+	} else {
+		s_lastLoadLibErr = 0;
+		s_lastGetProcErr = 0;
+		s_lastGetProcName[0] = '\0';
+	}
+	return ret;
 }
 
 
@@ -521,14 +575,64 @@ Sys_GetLoadLibraryError
 */
 const char *Sys_GetLoadLibraryError( void )
 {
-	static char buf[256];
-	DWORD err = GetLastError();
-	if ( err != 0 && FormatMessageA( FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-		NULL, err, MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ), buf, sizeof( buf ), NULL ) )
-	{
+	static char buf[384];
+	char msg[256];
+	DWORD err;
+	size_t len;
+
+	/* DLL loaded but symbol missing (e.g. GetRefAPI): GetLastError is often stale by now */
+	if ( s_lastGetProcErr != 0 ) {
+		err = s_lastGetProcErr;
+		if ( FormatMessageA( FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+			NULL, err, MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ), msg, sizeof( msg ), NULL ) )
+		{
+			len = strlen( msg );
+			while ( len > 0 && ( msg[len-1] == '\n' || msg[len-1] == '\r' ) ) {
+				msg[--len] = '\0';
+			}
+			Com_sprintf( buf, sizeof( buf ), "GetProcAddress(\"%s\"): %s [WinErr=%lu 0x%08lX]",
+				s_lastGetProcName[0] ? s_lastGetProcName : "?",
+				msg, (unsigned long)err, (unsigned long)err );
+			return buf;
+		}
+		Com_sprintf( buf, sizeof( buf ), "GetProcAddress(\"%s\") WinErr=%lu 0x%08lX (FormatMessage failed)",
+			s_lastGetProcName[0] ? s_lastGetProcName : "?",
+			(unsigned long)err, (unsigned long)err );
 		return buf;
 	}
-	return "unknown error";
+
+	err = s_lastLoadLibErr ? s_lastLoadLibErr : GetLastError();
+
+	if ( err == 0 ) {
+		Com_sprintf( buf, sizeof( buf ), "no Win32 error set (GetLastError=0)" );
+		return buf;
+	}
+	if ( FormatMessageA( FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+		NULL, err, MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ), msg, sizeof( msg ), NULL ) )
+	{
+		/* Trim trailing CR/LF from FormatMessage */
+		len = strlen( msg );
+		while ( len > 0 && ( msg[len-1] == '\n' || msg[len-1] == '\r' ) ) {
+			msg[--len] = '\0';
+		}
+		Com_sprintf( buf, sizeof( buf ), "%s [WinErr=%lu 0x%08lX]", msg, (unsigned long)err, (unsigned long)err );
+		return buf;
+	}
+	Com_sprintf( buf, sizeof( buf ), "WinErr=%lu 0x%08lX (FormatMessage failed)", (unsigned long)err, (unsigned long)err );
+	return buf;
+}
+
+
+/*
+=================
+Sys_LogNativeLibraryLoadFailure
+=================
+*/
+void Sys_LogNativeLibraryLoadFailure( const char *fullPath )
+{
+	const char *detail = Sys_GetLoadLibraryError();
+	Com_Printf( S_COLOR_YELLOW "Native library load failed: \"%s\" — %s\n",
+		fullPath ? fullPath : "(null)", detail );
 }
 
 
@@ -551,12 +655,19 @@ void *Sys_LoadFunction( void *handle, const char *name )
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic"
 #endif
+	SetLastError( 0 );
 	symbol = GetProcAddress( handle, name );
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
 #endif
-	if ( !symbol )
+	if ( !symbol ) {
+		s_lastGetProcErr = GetLastError();
+		Q_strncpyz( s_lastGetProcName, name, sizeof( s_lastGetProcName ) );
 		dll_err_count++;
+	} else {
+		s_lastGetProcErr = 0;
+		s_lastGetProcName[0] = '\0';
+	}
 
 	return symbol;
 }
@@ -585,6 +696,25 @@ void Sys_UnloadLibrary( void *handle )
 	if ( handle )
 		FreeLibrary( handle );
 }
+
+
+#ifndef DEDICATED
+/* SDL builds: sdl_glimp.c defines this. Pure Win32 (MSVC quake3e, no USE_SDL): provide it here. */
+#if !defined( USE_SDL ) || USE_SDL == 0
+/*
+=================
+Sys_UpdateWindowTitle
+=================
+*/
+void Sys_UpdateWindowTitle( const char *title )
+{
+	if ( !title || !*title || !g_wv.hWnd ) {
+		return;
+	}
+	SetWindowTextA( g_wv.hWnd, title );
+}
+#endif
+#endif /* !DEDICATED */
 
 
 /*

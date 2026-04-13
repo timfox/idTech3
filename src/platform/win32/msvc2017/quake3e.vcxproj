@@ -32,6 +32,10 @@
     <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <PropertyGroup>
+    <OpenSslRoot Condition="'$(OpenSslRoot)'==''">$(OPENSSL_ROOT_DIR)</OpenSslRoot>
+    <OpenSslRoot Condition="'$(OpenSslRoot)'==''">C:\Program Files\OpenSSL-Win64</OpenSslRoot>
+  </PropertyGroup>
+  <PropertyGroup>
     <ExternalRoot>..\..\external</ExternalRoot>
     <LibOggInclude>$(ExternalRoot)\src\ogg\include</LibOggInclude>
     <LibVorbisInclude>$(ExternalRoot)\src\vorbis\include</LibVorbisInclude>
@@ -68,7 +72,7 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>$(AudioIncludeDirectories);$(LibCurlInclude);$(LibJpegInclude);..\..\..\qcommon;..\..\..\external\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(AudioIncludeDirectories);$(LibCurlInclude);$(LibJpegInclude);..\..\..\qcommon;..\..\..\game;..\..\..\external\include\entt\single_include;..\..\..\external\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ImportGroup Label="ExtensionSettings">
@@ -96,7 +100,7 @@
     <IntDir>.\build\$(ProjectName)_$(Configuration)_$(PlatformTarget)\</IntDir>
     <LinkIncremental>true</LinkIncremental>
     <EmbedManifest>false</EmbedManifest>
-    <TargetName>quake3e-debug</TargetName>
+    <TargetName>idtech3-debug</TargetName>
     <IncludePath>$(LibOggInclude);$(LibVorbisInclude);$(LibJpegInclude);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -104,7 +108,7 @@
     <IntDir>.\build\$(ProjectName)_$(Configuration)_$(PlatformTarget)\</IntDir>
     <LinkIncremental>true</LinkIncremental>
     <EmbedManifest>false</EmbedManifest>
-    <TargetName>quake3e-debug.x64</TargetName>
+    <TargetName>idtech3-debug</TargetName>
     <IncludePath>$(LibOggInclude);$(LibVorbisInclude);$(LibJpegInclude);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
@@ -112,34 +116,34 @@
     <EmbedManifest>false</EmbedManifest>
     <OutDir>.\output\</OutDir>
     <IntDir>.\build\$(ProjectName)_$(Configuration)_$(PlatformTarget)\</IntDir>
-    <TargetName>quake3e-debug.arm64</TargetName>
+    <TargetName>idtech3-debug</TargetName>
     <IncludePath>$(LibOggInclude);$(LibVorbisInclude);$(LibJpegInclude);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>.\output\</OutDir>
     <IntDir>.\build\$(ProjectName)_$(Configuration)_$(PlatformTarget)\</IntDir>
     <EmbedManifest>false</EmbedManifest>
-    <TargetName>quake3e</TargetName>
+    <TargetName>idtech3</TargetName>
     <IncludePath>$(LibOggInclude);$(LibVorbisInclude);$(LibJpegInclude);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>.\output\</OutDir>
     <IntDir>.\build\$(ProjectName)_$(Configuration)_$(PlatformTarget)\</IntDir>
     <EmbedManifest>false</EmbedManifest>
-    <TargetName>quake3e.x64</TargetName>
+    <TargetName>idtech3</TargetName>
     <IncludePath>$(LibOggInclude);$(LibVorbisInclude);$(LibJpegInclude);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <EmbedManifest>false</EmbedManifest>
     <OutDir>.\output\</OutDir>
     <IntDir>.\build\$(ProjectName)_$(Configuration)_$(PlatformTarget)\</IntDir>
-    <TargetName>quake3e.arm64</TargetName>
+    <TargetName>idtech3</TargetName>
     <IncludePath>$(LibOggInclude);$(LibVorbisInclude);$(LibJpegInclude);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(AudioIncludeDirectories);$(LibCurlInclude);$(LibJpegInclude);..\..\..\qcommon;..\..\..\external\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_CURL;CURL_STATICLIB;USE_OPENGL_API;USE_VULKAN_API;USE_OGG_VORBIS;USE_WIN32_ASM;$(UseWASAPI);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(OpenSslRoot)\include;$(AudioIncludeDirectories);$(LibCurlInclude);$(LibJpegInclude);..\..\..\qcommon;..\..\..\game;..\..\..\external\include\entt\single_include;..\..\..\external\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_CURL;CURL_STATICLIB;USE_OPENGL_API;USE_VULKAN_API;USE_OGG_VORBIS;USE_WIN32_ASM;USE_ECS;USE_DTLS=1;$(UseWASAPI);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <BrowseInformation>true</BrowseInformation>
@@ -152,11 +156,12 @@
     </ClCompile>
     <ResourceCompile />
     <Link>
-      <AdditionalDependencies>comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-libpng16.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-zlib.lib;$(LibCurlVS2017)\lib32\libcurl_a_debug.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>libssl.lib;libcrypto.lib;comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;libpng16.lib;zlib.lib;$(LibCurlVS2017)\lib32\libcurl_a_debug.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(OpenSslRoot)\lib\VC\x86\MT;$(OpenSslRoot)\lib;$(OutDir);$(ProjectDir)..\..\..\..\src\external\src\libpng\projects\vstudio\libpng\$(Platform)\$(Configuration);$(ProjectDir)..\..\..\..\src\external\src\libpng\projects\vstudio\zlib\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
-      <ProgramDatabaseFile>$(IntDir)quake3e-debug.pdb</ProgramDatabaseFile>
+      <ProgramDatabaseFile>$(IntDir)idtech3-debug.pdb</ProgramDatabaseFile>
       <GenerateMapFile>true</GenerateMapFile>
-      <MapFileName>$(IntDir)quake3e-debug.map</MapFileName>
+      <MapFileName>$(IntDir)idtech3-debug.map</MapFileName>
       <StackReserveSize>4194304</StackReserveSize>
       <FixedBaseAddress>false</FixedBaseAddress>
       <SubSystem>Windows</SubSystem>
@@ -165,8 +170,8 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(AudioIncludeDirectories);$(LibCurlInclude);$(LibJpegInclude);..\..\..\qcommon;..\..\..\external\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_CURL;CURL_STATICLIB;USE_OPENGL_API;USE_VULKAN_API;USE_OGG_VORBIS;USE_WIN32_ASM;$(UseWASAPI);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(OpenSslRoot)\include;$(AudioIncludeDirectories);$(LibCurlInclude);$(LibJpegInclude);..\..\..\qcommon;..\..\..\game;..\..\..\external\include\entt\single_include;..\..\..\external\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_CURL;CURL_STATICLIB;USE_OPENGL_API;USE_VULKAN_API;USE_OGG_VORBIS;USE_WIN32_ASM;USE_ECS;USE_DTLS=1;$(UseWASAPI);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <BrowseInformation>true</BrowseInformation>
@@ -176,11 +181,12 @@
     </ClCompile>
     <ResourceCompile />
     <Link>
-      <AdditionalDependencies>comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-libpng16.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-zlib.lib;$(LibCurlVS2017)\lib64\libcurl_a_debug.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>libssl.lib;libcrypto.lib;comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;libpng16.lib;zlib.lib;$(LibCurlVS2017)\lib64\libcurl_a_debug.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(OpenSslRoot)\lib\VC\x64\MT;$(OpenSslRoot)\lib;$(OutDir);$(ProjectDir)..\..\..\..\src\external\src\libpng\projects\vstudio\libpng\$(Platform)\$(Configuration);$(ProjectDir)..\..\..\..\src\external\src\libpng\projects\vstudio\zlib\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
-      <ProgramDatabaseFile>$(IntDir)quake3e-debug.x64.pdb</ProgramDatabaseFile>
+      <ProgramDatabaseFile>$(IntDir)idtech3-debug.pdb</ProgramDatabaseFile>
       <GenerateMapFile>true</GenerateMapFile>
-      <MapFileName>$(IntDir)quake3e-debug.x64.map</MapFileName>
+      <MapFileName>$(IntDir)idtech3-debug.map</MapFileName>
       <StackReserveSize>4194304</StackReserveSize>
       <FixedBaseAddress>false</FixedBaseAddress>
     </Link>
@@ -188,8 +194,8 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(AudioIncludeDirectories);$(LibCurlInclude);$(LibJpegInclude);..\..\..\qcommon;..\..\..\external\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_OPENGL_API;USE_VULKAN_API;USE_OGG_VORBIS;$(UseWASAPI);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(AudioIncludeDirectories);$(LibCurlInclude);$(LibJpegInclude);..\..\..\qcommon;..\..\..\game;..\..\..\external\include\entt\single_include;..\..\..\external\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_OPENGL_API;USE_VULKAN_API;USE_OGG_VORBIS;USE_ECS;$(UseWASAPI);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <BrowseInformation>true</BrowseInformation>
@@ -200,11 +206,12 @@
     </ClCompile>
     <ResourceCompile />
     <Link>
-      <AdditionalDependencies>advapi32.lib;comctl32.lib;gdi32.lib;ole32.lib;winmm.lib;wsock32.lib;ws2_32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-libpng16.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>advapi32.lib;comctl32.lib;gdi32.lib;ole32.lib;winmm.lib;wsock32.lib;ws2_32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;libpng16.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(OutDir);$(ProjectDir)..\..\..\..\src\external\src\libpng\projects\vstudio\libpng\$(Platform)\$(Configuration);$(ProjectDir)..\..\..\..\src\external\src\libpng\projects\vstudio\zlib\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
-      <ProgramDatabaseFile>$(IntDir)quake3e-debug.arm64.pdb</ProgramDatabaseFile>
+      <ProgramDatabaseFile>$(IntDir)idtech3-debug.pdb</ProgramDatabaseFile>
       <GenerateMapFile>true</GenerateMapFile>
-      <MapFileName>$(IntDir)quake3e-debug.arm64.map</MapFileName>
+      <MapFileName>$(IntDir)idtech3-debug.map</MapFileName>
       <StackReserveSize>4194304</StackReserveSize>
       <FixedBaseAddress>false</FixedBaseAddress>
       <SubSystem>Windows</SubSystem>
@@ -212,18 +219,19 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(AudioIncludeDirectories);$(LibCurlInclude);$(LibJpegInclude);..\..\..\qcommon;..\..\..\external\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_WIN32;NDEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_SKIPIDLOGO;USE_CURL;CURL_STATICLIB;USE_OPENGL_API;USE_VULKAN_API;USE_OGG_VORBIS;USE_WIN32_ASM;$(UseWASAPI);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(OpenSslRoot)\include;$(AudioIncludeDirectories);$(LibCurlInclude);$(LibJpegInclude);..\..\..\qcommon;..\..\..\game;..\..\..\external\include\entt\single_include;..\..\..\external\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_WIN32;NDEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_SKIPIDLOGO;USE_CURL;CURL_STATICLIB;USE_OPENGL_API;USE_VULKAN_API;USE_OGG_VORBIS;USE_WIN32_ASM;USE_ECS;USE_DTLS=1;$(UseWASAPI);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>Level4</WarningLevel>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>NoExtensions</EnableEnhancedInstructionSet>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-libpng16.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-zlib.lib;$(LibCurlVS2017)\lib32\libcurl_a.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>libssl.lib;libcrypto.lib;comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;libpng16.lib;zlib.lib;$(LibCurlVS2017)\lib32\libcurl_a.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(OpenSslRoot)\lib\VC\x86\MT;$(OpenSslRoot)\lib;$(OutDir);$(ProjectDir)..\..\..\..\src\external\src\libpng\projects\vstudio\libpng\$(Platform)\$(Configuration);$(ProjectDir)..\..\..\..\src\external\src\libpng\projects\vstudio\zlib\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <GenerateMapFile>true</GenerateMapFile>
-      <MapFileName>$(IntDir)quake3e.map</MapFileName>
+      <MapFileName>$(IntDir)idtech3.map</MapFileName>
       <StackReserveSize>4194304</StackReserveSize>
       <OptimizeReferences>true</OptimizeReferences>
       <SetChecksum>true</SetChecksum>
@@ -238,8 +246,8 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(AudioIncludeDirectories);$(LibCurlInclude);$(LibJpegInclude);..\..\..\qcommon;..\..\..\external\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_WIN32;NDEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_SKIPIDLOGO;USE_CURL;CURL_STATICLIB;USE_OPENGL_API;USE_VULKAN_API;USE_OGG_VORBIS;USE_WIN32_ASM;$(UseWASAPI);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(OpenSslRoot)\include;$(AudioIncludeDirectories);$(LibCurlInclude);$(LibJpegInclude);..\..\..\qcommon;..\..\..\game;..\..\..\external\include\entt\single_include;..\..\..\external\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_WIN32;NDEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_SKIPIDLOGO;USE_CURL;CURL_STATICLIB;USE_OPENGL_API;USE_VULKAN_API;USE_OGG_VORBIS;USE_WIN32_ASM;USE_ECS;USE_DTLS=1;$(UseWASAPI);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>Level4</WarningLevel>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <AssemblerOutput>AssemblyAndSourceCode</AssemblerOutput>
@@ -247,10 +255,11 @@
     </ClCompile>
     <Link>
       <AdditionalOptions>/DYNAMICBASE %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-libpng16.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-zlib.lib;$(LibCurlVS2017)\lib64\libcurl_a.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>libssl.lib;libcrypto.lib;comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;libpng16.lib;zlib.lib;$(LibCurlVS2017)\lib64\libcurl_a.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(OpenSslRoot)\lib\VC\x64\MT;$(OpenSslRoot)\lib;$(OutDir);$(ProjectDir)..\..\..\..\src\external\src\libpng\projects\vstudio\libpng\$(Platform)\$(Configuration);$(ProjectDir)..\..\..\..\src\external\src\libpng\projects\vstudio\zlib\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <GenerateMapFile>true</GenerateMapFile>
-      <MapFileName>$(IntDir)quake3e.x64.map</MapFileName>
+      <MapFileName>$(IntDir)idtech3.map</MapFileName>
       <StackReserveSize>4194304</StackReserveSize>
       <SetChecksum>true</SetChecksum>
       <TargetMachine>MachineX64</TargetMachine>
@@ -264,18 +273,19 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(AudioIncludeDirectories);$(LibCurlInclude);$(LibJpegInclude);..\..\..\qcommon;..\..\..\external\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_WIN32;NDEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_SKIPIDLOGO;USE_OPENGL_API;USE_VULKAN_API;USE_OGG_VORBIS;$(UseWASAPI);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(AudioIncludeDirectories);$(LibCurlInclude);$(LibJpegInclude);..\..\..\qcommon;..\..\..\game;..\..\..\external\include\entt\single_include;..\..\..\external\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_WIN32;NDEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_SKIPIDLOGO;USE_OPENGL_API;USE_VULKAN_API;USE_OGG_VORBIS;USE_ECS;$(UseWASAPI);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>Level4</WarningLevel>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <AdditionalOptions>/DYNAMICBASE %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>advapi32.lib;comctl32.lib;gdi32.lib;ole32.lib;winmm.lib;wsock32.lib;ws2_32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-libpng16.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>advapi32.lib;comctl32.lib;gdi32.lib;ole32.lib;winmm.lib;wsock32.lib;ws2_32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;libpng16.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(OutDir);$(ProjectDir)..\..\..\..\src\external\src\libpng\projects\vstudio\libpng\$(Platform)\$(Configuration);$(ProjectDir)..\..\..\..\src\external\src\libpng\projects\vstudio\zlib\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <GenerateMapFile>true</GenerateMapFile>
-      <MapFileName>$(IntDir)quake3e.arm64.map</MapFileName>
+      <MapFileName>$(IntDir)idtech3.map</MapFileName>
       <StackReserveSize>4194304</StackReserveSize>
       <SetChecksum>true</SetChecksum>
       <FixedBaseAddress>false</FixedBaseAddress>
@@ -310,7 +320,34 @@
     <ClCompile Include="..\..\client\cl_parse.c" />
     <ClCompile Include="..\..\client\cl_scrn.c" />
     <ClCompile Include="..\..\client\cl_ui.c" />
-    <ClCompile Include="..\..\audio\mix\snd_adpcm.c" />
+    <ClCompile Include="..\..\client\cl_gameframe.c" />
+    <ClCompile Include="..\..\client\cl_menuvideo.c" />
+    <ClCompile Include="..\..\client\cl_sdf_font.c" />
+    <ClCompile Include="..\..\client\cl_particles.c" />
+    <ClCompile Include="..\..\client\cl_map_background.c" />
+    <ClCompile Include="..\..\client\cl_window_title.c" />
+    <ClCompile Include="..\..\client\cl_mobilefog.c" />
+    <ClCompile Include="..\..\game\g_director.c" />
+    <ClCompile Include="..\..\game\g_response.c" />
+    <ClCompile Include="..\..\game\g_choreography.c" />
+    <ClCompile Include="..\..\game\g_dismember.c" />
+    <ClCompile Include="..\..\game\g_facial.c" />
+    <ClCompile Include="..\..\game\g_horde.c" />
+    <ClCompile Include="..\..\game\g_goap.c" />
+    <ClCompile Include="..\..\game\g_aiml.c" />
+    <ClCompile Include="..\..\game\g_engine_systems.c" />
+    <ClCompile Include="..\..\game\g_bt.c" />
+    <ClCompile Include="..\..\game\g_entity_bridge.c" />
+    <ClCompile Include="..\..\game\g_lua_bindings.c" />
+    <ClCompile Include="..\..\game\ecs.cpp">
+      <LanguageStandard>stdcpp17</LanguageStandard>
+    </ClCompile>
+    <ClCompile Include="..\..\audio\snd_music_adaptive.c" />
+    <ClCompile Include="..\..\..\physics\phys_procedural_anim.c" />
+    <ClCompile Include="..\..\..\physics\phys_dmm.c" />
+    <ClCompile Include="..\..\..\physics\phys_ik.c" />
+    <ClCompile Include="..\..\..\physics\phys_dmm_materials.c" />
+    <ClCompile Include="..\..\..\physics\phys_cloth.c" />
     <ClCompile Include="..\..\audio\codecs\snd_codec.c" />
     <ClCompile Include="..\..\audio\codecs\snd_codec_ogg.c" />
     <ClCompile Include="..\..\audio\codecs\snd_codec_wav.c" />
@@ -320,13 +357,16 @@
     <ClCompile Include="..\..\audio\mix\snd_mem.c" />
     <ClCompile Include="..\..\audio\mix\snd_mix.c" />
     <ClCompile Include="..\..\audio\mix\snd_wavelet.c" />
+    <ClCompile Include="..\..\audio\mix\snd_adpcm.c" />
     <ClCompile Include="..\..\qcommon\cmd.c" />
     <ClCompile Include="..\..\qcommon\cm_load.c" />
+    <ClCompile Include="..\..\qcommon\cm_bounds.c" />
     <ClCompile Include="..\..\qcommon\cm_patch.c" />
     <ClCompile Include="..\..\qcommon\cm_polylib.c" />
     <ClCompile Include="..\..\qcommon\cm_test.c" />
     <ClCompile Include="..\..\qcommon\cm_trace.c" />
     <ClCompile Include="..\..\qcommon\common.c" />
+    <ClCompile Include="..\..\qcommon\defer.c" />
     <ClCompile Include="..\..\qcommon\jobs.c" />
     <ClCompile Include="..\..\qcommon\q_utf8.c" />
     <ClCompile Include="..\..\qcommon\cvar.c" />
@@ -341,11 +381,16 @@
     <ClCompile Include="..\..\qcommon\msg.c" />
     <ClCompile Include="..\..\qcommon\net_chan.c" />
     <ClCompile Include="..\..\qcommon\net_ip.c" />
+    <ClCompile Include="..\..\qcommon\net_dtls.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="..\..\qcommon\puff.c" />
     <ClCompile Include="..\..\qcommon\q_math.c" />
     <ClCompile Include="..\..\qcommon\q_shared.c" />
     <ClCompile Include="..\..\qcommon\unzip.c" />
     <ClCompile Include="..\..\qcommon\vm.c" />
+    <ClCompile Include="..\..\qcommon\vm_native_module.c" />
     <ClCompile Include="..\..\qcommon\vm_aarch64.c">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
@@ -379,7 +424,90 @@
     <ClCompile Include="..\win_gamma.c" />
     <ClCompile Include="..\win_glimp.c" />
     <ClCompile Include="..\win_qgl.c" />
-    <ClCompile Include="..\..\physics\phys_bullet.c" />
+    <ClCompile Include="..\..\..\physics\phys_bullet.c" />
+    <!-- recast_nav (matches CMake USE_RECAST_NAV) -->
+    <ClCompile Include="..\..\..\external\src\recast\Recast\Source\RecastAlloc.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Recast\Source\RecastArea.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Recast\Source\RecastAssert.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Recast\Source\RecastContour.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Recast\Source\Recast.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Recast\Source\RecastFilter.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Recast\Source\RecastLayers.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Recast\Source\RecastMesh.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Recast\Source\RecastMeshDetail.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Recast\Source\RecastRasterization.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Recast\Source\RecastRegion.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Detour\Source\DetourAlloc.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Detour\Source\DetourAssert.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Detour\Source\DetourCommon.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Detour\Source\DetourNavMeshBuilder.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Detour\Source\DetourNavMesh.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Detour\Source\DetourNavMeshQuery.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\Detour\Source\DetourNode.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\DetourCrowd\Source\DetourCrowd.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\DetourCrowd\Source\DetourLocalBoundary.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\DetourCrowd\Source\DetourObstacleAvoidance.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\DetourCrowd\Source\DetourPathCorridor.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\DetourCrowd\Source\DetourPathQueue.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\DetourCrowd\Source\DetourProximityGrid.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\DetourTileCache\Source\DetourTileCacheBuilder.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\src\recast\DetourTileCache\Source\DetourTileCache.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\navigation\nav_recast.cpp">
+      <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;..\..\..\navigation;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\..\navigation\nav_bsp_extract.c" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\..\asm\snd_mix_x64.asm">

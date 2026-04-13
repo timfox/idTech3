@@ -42,6 +42,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../client/keys.h"
 
+#ifdef __ANDROID__
+#include "../platform/android/android_logcat.h"
+#endif
+
 const int demo_protocols[] = { 66, 67, OLD_PROTOCOL_VERSION, NEW_PROTOCOL_VERSION, 0 };
 
 #define USE_MULTI_SEGMENT // allocate additional zone segments on demand
@@ -214,6 +218,9 @@ void FORMAT_PRINTF(1, 2) QDECL Com_Printf( const char *fmt, ... ) {
 
 	// echo to dedicated console and early console
 	Sys_Print( msg );
+#if defined( __ANDROID__ ) && !defined( DEDICATED )
+	Android_LogcatPrint( msg );
+#endif
 
 	// logfile
 	if ( com_logfile && com_logfile->integer ) {
@@ -3866,6 +3873,14 @@ void Com_Init( char *commandLine ) {
 		if ( com_dev_val && com_dev_val[0] && com_dev_val[0] != '0' )
 			Cvar_Set2( "developer", com_dev_val, qfalse );
 	}
+
+#if defined( __ANDROID__ ) && !defined( DEDICATED )
+	{
+		cvar_t *touchSens = Cvar_Get( "com_androidTouchSens", "1.0", CVAR_ARCHIVE );
+		Cvar_SetDescription( touchSens,
+			"Android: touch-drag sensitivity for relative mouse motion (mouselook / UI)." );
+	}
+#endif
 
 	Com_StartupVariable( "vm_rtChecks" );
 	vm_rtChecks = Cvar_Get( "vm_rtChecks", "15", CVAR_INIT | CVAR_PROTECTED );

@@ -11,8 +11,14 @@ Vulkan surface, input, file system, and JNI bridge.
 
 #include "../../qcommon/q_shared.h"
 #include "../../qcommon/qcommon.h"
+#include "../../renderers/common/tr_types.h"
+#include "android_surface_glue.h"
+#include "android_asset_bootstrap.h"
+#include "android_touch_overlay.h"
+#include "../../renderers/vulkan/vk_android_surface.h"
 #ifndef DEDICATED
 #include "../../client/keycodes.h"
+#include "../../qcommon/qcommon.h"
 #endif
 #define Com_QueueEvent Sys_QueEvent
 #include <android/log.h>
@@ -42,12 +48,24 @@ static volatile int     g_running = 0;
 static volatile int     g_paused = 0;
 static volatile int     g_windowReady = 0;
 static pthread_t        g_gameThread;
+static pthread_mutex_t  g_surfaceLock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t   g_surfaceCond = PTHREAD_COND_INITIALIZER;
+/* Token bumped on each window destroy; game thread must finish vk_Android_OnNativeWindowGoingAway before callback returns */
+static volatile uint32_t g_surfaceToken = 0;
+static volatile uint32_t g_surfaceAckToken = 0;
+static volatile int     g_surfaceOpPending = 0; /* 1=teardown, 2=recreate */
 static void             *g_vulkanLib = NULL;
 static char             g_dataPath[MAX_OSPATH] = "/sdcard/idtech3";
 static char             g_homePath[MAX_OSPATH] = "";
+/* Global ref to GameActivity for JNI from game thread (Toast / UI). */
+static jobject          g_javaActivity = NULL;
 static int              g_windowWidth = 1280;
 static int              g_windowHeight = 720;
 static int              g_engineInitialized = 0;
+/* Single-finger touch: relative deltas for CL_MouseEvent (mouselook + UI drag) */
+static qboolean         g_touchActive = qfalse;
+static float            g_touchLastX;
+static float            g_touchLastY;
 
 /* ---- Sys functions ---- */
 
@@ -82,9 +100,56 @@ const char *Sys_DefaultBasePath( void ) {
 
 qboolean Sys_LowPhysicalMemory( void ) { return qfalse; }
 void Sys_BeginProfiling( void ) {}
-void Sys_ShowErrorMessage( const char *msg, const char *title ) {
-	(void)title;
-	LOGE( "Error: %s", msg );
+static void Android_ShowNoGameDataToast( void ) {
+	JNIEnv *env = NULL;
+	jclass cls = NULL;
+	jmethodID mid;
+	jstring jpath;
+	JavaVM *vm;
+
+	if ( !g_javaActivity || !g_activity ) {
+		return;
+	}
+	vm = g_activity->vm;
+	if ( !vm ) {
+		return;
+	}
+	if ( ( *vm )->AttachCurrentThread( vm, &env, NULL ) != JNI_OK || !env ) {
+		return;
+	}
+	cls = ( *env )->GetObjectClass( env, g_javaActivity );
+	if ( !cls ) {
+		goto detach;
+	}
+	mid = ( *env )->GetMethodID( env, cls, "showNoGameDataToast", "(Ljava/lang/String;)V" );
+	if ( !mid ) {
+		goto detach;
+	}
+	jpath = ( *env )->NewStringUTF( env, g_dataPath );
+	if ( jpath ) {
+		( *env )->CallVoidMethod( env, g_javaActivity, mid, jpath );
+		( *env )->DeleteLocalRef( env, jpath );
+	}
+detach:
+	if ( cls ) {
+		( *env )->DeleteLocalRef( env, cls );
+	}
+	( *vm )->DetachCurrentThread( vm );
+}
+
+void Sys_ShowErrorMessage( const char *title, const char *message ) {
+	const char *msg = ( message && message[0] ) ? message : "Error";
+	const char *ttl = ( title && title[0] ) ? title : "";
+
+	LOGE( "%s: %s", ttl[0] ? ttl : "Error", msg );
+
+	if ( !Q_stricmp( msg, "No game data" ) ) {
+		LOGI( "No game data: copy .pk3 files into %s/base (or bundle under assets/apkassets/ for auto-unpack). See android/app/src/main/assets/apkassets/README.txt",
+			g_dataPath );
+		Android_ShowNoGameDataToast();
+		/* Toast posts to main thread; give user time to read before Sys_Quit exits the process. */
+		Sys_Sleep( 3500 );
+	}
 }
 void Sys_SetStatus( const char *format, ... ) { (void)format; }
 char *Sys_ConsoleInput( void ) { return NULL; }
@@ -115,24 +180,22 @@ typedef struct {
 typedef VkResult (*PFN_vkCreateAndroidSurfaceKHR)(
 	VkInstance, const VkAndroidSurfaceCreateInfoKHR *, const void *, VkSurfaceKHR * );
 
-void VKimp_Init( void *config ) {
+void VKimp_Init( glconfig_t *config ) {
 	if ( !g_vulkanLib ) {
 		g_vulkanLib = dlopen( "libvulkan.so", RTLD_NOW | RTLD_LOCAL );
 	}
 
 	if ( config && g_window ) {
-		/* Set glconfig dimensions from the Android window */
-		typedef struct { int vidWidth; int vidHeight; } minConfig_t;
-		minConfig_t *gc = (minConfig_t *)config;
-		gc->vidWidth = g_windowWidth;
-		gc->vidHeight = g_windowHeight;
+		config->vidWidth = g_windowWidth;
+		config->vidHeight = g_windowHeight;
 	}
 
 	LOGI( "VKimp_Init: Vulkan %s, window %dx%d",
 		g_vulkanLib ? "loaded" : "FAILED", g_windowWidth, g_windowHeight );
 }
 
-void VKimp_Shutdown( void ) {
+void VKimp_Shutdown( qboolean unloadDLL ) {
+	(void)unloadDLL;
 	if ( g_vulkanLib ) {
 		dlclose( g_vulkanLib );
 		g_vulkanLib = NULL;
@@ -169,11 +232,45 @@ int VK_CreateSurface( void *instance, void *pSurface ) {
 	return 1;
 }
 
-/* ---- OpenGL stubs (Vulkan-only on Android) ---- */
+/* ---- OpenGL / window stubs (Vulkan path uses VKimp_*; symbols required at link) ---- */
 
-void GLimp_InitGamma( void *config ) { (void)config; }
-void GLimp_SetGamma( unsigned char *r, unsigned char *g, unsigned char *b ) {
-	(void)r; (void)g; (void)b;
+void GLimp_InitGamma( glconfig_t *config ) {
+	(void)config;
+}
+
+void GLimp_SetGamma( unsigned char red[256], unsigned char green[256], unsigned char blue[256] ) {
+	(void)red;
+	(void)green;
+	(void)blue;
+}
+
+void GLimp_Minimize( void ) {
+}
+
+void GLimp_LogComment( const char *comment ) {
+	(void)comment;
+}
+
+void GLimp_Init( glconfig_t *config ) {
+	if ( config ) {
+		config->isFullscreen = qfalse;
+	}
+}
+
+void GLimp_Shutdown( qboolean unloadDLL ) {
+	(void)unloadDLL;
+}
+
+void GLimp_EndFrame( void ) {
+}
+
+void *GL_GetProcAddress( const char *name ) {
+	(void)name;
+	return NULL;
+}
+
+qboolean GLimp_VulkanAvailable( void ) {
+	return qtrue;
 }
 
 /* ---- Audio Backend: AAudio (primary) + OpenSL ES (fallback) ---- */
@@ -441,13 +538,32 @@ static int32_t onInputEvent( ANativeActivity *activity, AInputEvent *event ) {
 			return 1;
 		}
 
-		/* Touch input → mouse */
-		if ( action == AMOTION_EVENT_ACTION_DOWN ) {
+		/* Touch → mouse button + relative motion (matches desktop mouse deltas) */
+		if ( action == AMOTION_EVENT_ACTION_DOWN || action == AMOTION_EVENT_ACTION_POINTER_DOWN ) {
+			g_touchActive = qtrue;
+			g_touchLastX = x;
+			g_touchLastY = y;
 			Com_QueueEvent( Sys_Milliseconds(), SE_KEY, K_MOUSE1, qtrue, 0, NULL );
-		} else if ( action == AMOTION_EVENT_ACTION_UP ) {
+		} else if ( action == AMOTION_EVENT_ACTION_UP || action == AMOTION_EVENT_ACTION_POINTER_UP ||
+			action == AMOTION_EVENT_ACTION_CANCEL ) {
+			g_touchActive = qfalse;
 			Com_QueueEvent( Sys_Milliseconds(), SE_KEY, K_MOUSE1, qfalse, 0, NULL );
+		} else if ( action == AMOTION_EVENT_ACTION_MOVE && g_touchActive ) {
+			float dx = x - g_touchLastX;
+			float dy = y - g_touchLastY;
+			float sens = 1.0f;
+			const char *ts;
+			g_touchLastX = x;
+			g_touchLastY = y;
+			ts = Cvar_VariableString( "com_androidTouchSens" );
+			if ( ts && ts[0] ) {
+				float v = Q_atof( ts );
+				if ( v > 0.0f ) {
+					sens = v;
+				}
+			}
+			Com_QueueEvent( Sys_Milliseconds(), SE_MOUSE, (int)( dx * sens ), (int)( dy * sens ), 0, NULL );
 		}
-		Com_QueueEvent( Sys_Milliseconds(), SE_MOUSE, (int)x, (int)y, 0, NULL );
 		return 1;
 	}
 
@@ -495,6 +611,55 @@ static int32_t onInputEvent( ANativeActivity *activity, AInputEvent *event ) {
 	return 0;
 }
 
+/* ---- Surface / Vulkan coordination (see vk_android_surface.c) ---- */
+
+qboolean Android_NativeWindowReady( void ) {
+	return g_windowReady ? qtrue : qfalse;
+}
+
+void Android_NativeWindowSize( int *width, int *height ) {
+	if ( width ) {
+		*width = g_windowWidth;
+	}
+	if ( height ) {
+		*height = g_windowHeight;
+	}
+}
+
+void Android_SurfaceThread_ProcessPending( void ) {
+	int op;
+
+	pthread_mutex_lock( &g_surfaceLock );
+	op = g_surfaceOpPending;
+	if ( op == 0 ) {
+		pthread_mutex_unlock( &g_surfaceLock );
+		return;
+	}
+	g_surfaceOpPending = 0;
+	pthread_mutex_unlock( &g_surfaceLock );
+
+	if ( op == 1 ) {
+		vk_Android_OnNativeWindowGoingAway();
+	} else if ( op == 2 ) {
+		vk_Android_OnNativeWindowReady();
+	}
+
+	pthread_mutex_lock( &g_surfaceLock );
+	g_surfaceAckToken = g_surfaceToken;
+	pthread_cond_broadcast( &g_surfaceCond );
+	pthread_mutex_unlock( &g_surfaceLock );
+}
+
+static void android_surface_request_op( int op ) {
+	pthread_mutex_lock( &g_surfaceLock );
+	g_surfaceToken++;
+	g_surfaceOpPending = op;
+	while ( g_surfaceAckToken != g_surfaceToken ) {
+		pthread_cond_wait( &g_surfaceCond, &g_surfaceLock );
+	}
+	pthread_mutex_unlock( &g_surfaceLock );
+}
+
 /* ---- Game thread ---- */
 
 static void *gameThreadFunc( void *arg ) {
@@ -511,6 +676,9 @@ static void *gameThreadFunc( void *arg ) {
 		return NULL;
 	}
 
+	/* Optional: ship read-only game files under assets/apkassets/... in the APK */
+	Android_AssetBootstrapUnpack( g_assetManager, g_dataPath );
+
 	/* Initialize engine */
 	char cmdLine[256];
 	Com_sprintf( cmdLine, sizeof( cmdLine ),
@@ -526,6 +694,8 @@ static void *gameThreadFunc( void *arg ) {
 	int lastTime = Sys_Milliseconds();
 	while ( g_running ) {
 		if ( g_paused ) {
+			Android_TouchOverlay_PumpEvents();
+			Android_SurfaceThread_ProcessPending();
 			usleep( 50000 );
 			lastTime = Sys_Milliseconds();
 			continue;
@@ -539,6 +709,8 @@ static void *gameThreadFunc( void *arg ) {
 		if ( msec > 200 ) msec = 200;
 
 		Android_PollInput();
+		Android_TouchOverlay_PumpEvents();
+		Android_SurfaceThread_ProcessPending();
 		Com_Frame( msec );
 	}
 
@@ -583,10 +755,18 @@ static void onNativeWindowCreated( ANativeActivity *activity, ANativeWindow *win
 	g_windowHeight = ANativeWindow_getHeight( window );
 	g_windowReady = 1;
 	LOGI( "Window created: %dx%d", g_windowWidth, g_windowHeight );
+
+	if ( g_engineInitialized ) {
+		android_surface_request_op( 2 );
+	}
 }
 
 static void onNativeWindowDestroyed( ANativeActivity *activity, ANativeWindow *window ) {
 	(void)activity; (void)window;
+	/* Must destroy VkSurfaceKHR before returning — ANativeWindow* is invalid after this */
+	if ( g_engineInitialized ) {
+		android_surface_request_op( 1 );
+	}
 	g_windowReady = 0;
 	g_window = NULL;
 	LOGI( "Window destroyed" );
@@ -597,18 +777,30 @@ static void onNativeWindowResized( ANativeActivity *activity, ANativeWindow *win
 	g_windowWidth = ANativeWindow_getWidth( window );
 	g_windowHeight = ANativeWindow_getHeight( window );
 	LOGI( "Window resized: %dx%d", g_windowWidth, g_windowHeight );
+	/* Same ANativeWindow; swapchain recreation is handled by Vulkan on OUT_OF_DATE / suboptimal */
 }
 
 static void onDestroy( ANativeActivity *activity ) {
+	JNIEnv *env;
 	(void)activity;
 	g_running = 0;
 	pthread_join( g_gameThread, NULL );
+	if ( g_activity && g_activity->vm && g_javaActivity ) {
+		if ( ( *g_activity->vm )->AttachCurrentThread( g_activity->vm, &env, NULL ) == JNI_OK && env ) {
+			( *env )->DeleteGlobalRef( env, g_javaActivity );
+			( *g_activity->vm )->DetachCurrentThread( g_activity->vm );
+		}
+		g_javaActivity = NULL;
+	}
 	LOGI( "Activity destroyed" );
 }
 
 static void onPause( ANativeActivity *activity ) {
 	(void)activity;
 	g_paused = 1;
+#ifndef DEDICATED
+	gw_active = qfalse;
+#endif
 	if ( audioInitialized ) {
 		if ( audioBackendType == 1 && aaStream ) {
 			AAudioStream_requestPause( aaStream );
@@ -622,6 +814,9 @@ static void onPause( ANativeActivity *activity ) {
 static void onResume( ANativeActivity *activity ) {
 	(void)activity;
 	g_paused = 0;
+#ifndef DEDICATED
+	gw_active = qtrue;
+#endif
 	if ( audioInitialized ) {
 		if ( audioBackendType == 1 && aaStream ) {
 			AAudioStream_requestStart( aaStream );
@@ -633,6 +828,27 @@ static void onResume( ANativeActivity *activity ) {
 }
 
 /* ---- JNI bridge ---- */
+
+JNIEXPORT void JNICALL Java_com_gopex_idtech3_GameActivity_nativeSetActivity(
+	JNIEnv *env, jclass clazz, jobject activity );
+JNIEXPORT void JNICALL Java_com_gopex_idtech3_GameActivity_nativeSetDataPath(
+	JNIEnv *env, jobject obj, jstring path );
+JNIEXPORT void JNICALL Java_com_gopex_idtech3_GameActivity_nativeSetHomePath(
+	JNIEnv *env, jobject obj, jstring path );
+
+JNIEXPORT void JNICALL Java_com_gopex_idtech3_GameActivity_nativeSetActivity(
+	JNIEnv *env, jclass clazz, jobject activity )
+{
+	(void)clazz;
+	if ( g_javaActivity ) {
+		( *env )->DeleteGlobalRef( env, g_javaActivity );
+		g_javaActivity = NULL;
+	}
+	if ( activity ) {
+		g_javaActivity = ( *env )->NewGlobalRef( env, activity );
+		LOGI( "Java activity global ref set for UI callbacks" );
+	}
+}
 
 JNIEXPORT void JNICALL Java_com_gopex_idtech3_GameActivity_nativeSetDataPath(
 	JNIEnv *env, jobject obj, jstring path )

@@ -1361,6 +1361,14 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 				continue;
 			}
 			stage->sheenScale[2] = atof( token );
+			token = COM_ParseExt( text, qfalse );
+			if ( token[0] == 0 )
+			{
+				stage->sheenScale[3] = 0.5f;
+				stage->vk_pbr_flags |= PBR_HAS_SHEEN;
+				continue;
+			}
+			stage->sheenScale[3] = atof( token );
 			stage->vk_pbr_flags |= PBR_HAS_SHEEN;
 		}
 		else if ( !Q_stricmp( token, "anisotropyscale" ) )
@@ -3586,10 +3594,6 @@ static qboolean EqualTCgen( int bundle, const shaderStage_t *st1, const shaderSt
 	//	}
 	//}
 
-	//if ( b1->tcGen != TCGEN_LIGHTMAP && b1->lightmap != b2->lightmap && r_mergeLightmaps->integer ) {
-	//	return qfalse;
-	//}
-
 	if ( b1->numTexMods != b2->numTexMods ) {
 		return qfalse;
 	}
@@ -4483,6 +4487,8 @@ static shader_t *FinishShader( void ) {
 				// move this to ubo ..
 				Vector4Copy( pStage->specularScale, def.specularScale );
 				Vector4Copy( pStage->normalScale, def.normalScale );
+				def.parallaxBias = pStage->parallaxBias;
+				def.pom_height_source = ( pStage->normalMapType == PHYS_NORMALHEIGHT ) ? 1 : 0;
 			#endif
 			}
 
@@ -4490,6 +4496,20 @@ static shader_t *FinishShader( void ) {
 			pStage->vk_pipeline[0] = vk_find_pipeline_ext( 0, &def, qtrue );
 			def.mirror = qtrue;
 			pStage->vk_mirror_pipeline[0] = vk_find_pipeline_ext( 0, &def, qfalse );
+#ifdef USE_VK_PBR
+			if ( pStage->vk_pbr_flags ) {
+				Vk_Pipeline_Def gltfDef = def;
+				gltfDef.pbr_vert_mode = 1;
+				gltfDef.gltf_gpu_tangent_fixup = ( r_gltfGpuTangentFix && r_gltfGpuTangentFix->integer ) ? 1 : 0;
+				gltfDef.mirror = qfalse;
+				pStage->vk_pipeline_gltf_gpu[0] = vk_find_pipeline_ext( 0, &gltfDef, qtrue );
+				gltfDef.mirror = qtrue;
+				pStage->vk_mirror_pipeline_gltf_gpu[0] = vk_find_pipeline_ext( 0, &gltfDef, qfalse );
+			} else {
+				pStage->vk_pipeline_gltf_gpu[0] = pStage->vk_pipeline[0];
+				pStage->vk_mirror_pipeline_gltf_gpu[0] = pStage->vk_mirror_pipeline[0];
+			}
+#endif
 
 			if ( pStage->depthFragment ) {
 				def.mirror = qfalse;
@@ -4519,7 +4539,19 @@ static shader_t *FinishShader( void ) {
 
 				pStage->vk_pipeline[1] = vk_find_pipeline_ext( 0, &fog_def, qfalse );
 				pStage->vk_mirror_pipeline[1] = vk_find_pipeline_ext( 0, &fog_def_mirror, qfalse );
-
+#ifdef USE_VK_PBR
+				if ( pStage->vk_pbr_flags ) {
+					fog_def.pbr_vert_mode = 1;
+					fog_def_mirror.pbr_vert_mode = 1;
+					fog_def.gltf_gpu_tangent_fixup = ( r_gltfGpuTangentFix && r_gltfGpuTangentFix->integer ) ? 1 : 0;
+					fog_def_mirror.gltf_gpu_tangent_fixup = fog_def.gltf_gpu_tangent_fixup;
+					pStage->vk_pipeline_gltf_gpu[1] = vk_find_pipeline_ext( 0, &fog_def, qfalse );
+					pStage->vk_mirror_pipeline_gltf_gpu[1] = vk_find_pipeline_ext( 0, &fog_def_mirror, qfalse );
+				} else {
+					pStage->vk_pipeline_gltf_gpu[1] = pStage->vk_pipeline[1];
+					pStage->vk_mirror_pipeline_gltf_gpu[1] = pStage->vk_mirror_pipeline[1];
+				}
+#endif
 
 				pStage->bundle[0].adjustColorsForFog = ACFF_NONE; // will be handled in shader from now
 

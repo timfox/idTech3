@@ -1,0 +1,84 @@
+# Tier B: content-backed renderer checks (GAME_BASE) on every main push.
+#
+# This job runs only when a repository variable OR secret provides the absolute path
+# to a game **base** directory (see docs/renderer_validation/SELF_HOSTED_TIER_B.md).
+# Prefer variable IDTECH3_GAME_BASE_PATH; use secret of the same name if the path must not appear in Settings UI.
+#
+# Requires a self-hosted runner labeled `idtech3-tierb` (plus `self-hosted`) with:
+#   - GAME_BASE path readable on that machine
+#   - Build deps (same family as docs/DEVELOPMENT_SETUP.md for Linux)
+#   - glslangValidator for renderer_regression_check.sh
+#
+# Note: GitHub does not allow `secrets.*` in job-level `if:` (workflow validation fails).
+# A small ubuntu gate job evaluates var/secret in a step and sets `enabled` for the self-hosted job.
+
+name: renderer-tier-b
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: renderer-tier-b-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tier_b_gate:
+    name: Tier B gate (config check)
+    runs-on: ubuntu-24.04
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - id: check
+        env:
+          GAME_BASE_VAR: ${{ vars.IDTECH3_GAME_BASE_PATH }}
+          GAME_BASE_SECRET: ${{ secrets.IDTECH3_GAME_BASE_PATH }}
+        run: |
+          if [ -n "$GAME_BASE_VAR" ] || [ -n "$GAME_BASE_SECRET" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "Tier B: IDTECH3_GAME_BASE_PATH is set (variable and/or secret); self-hosted job will run."
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "Tier B: IDTECH3_GAME_BASE_PATH unset — skipping self-hosted regression (forks/engine-only repos)."
+          fi
+
+  gamebase-regression:
+    name: Tier B (GAME_BASE regression)
+    needs: tier_b_gate
+    if: needs.tier_b_gate.outputs.enabled == 'true'
+    runs-on: [self-hosted, idtech3-tierb]
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      # Variable wins if both are set (same rule as docs/renderer_validation/SELF_HOSTED_TIER_B.md).
+      GAME_BASE: ${{ vars.IDTECH3_GAME_BASE_PATH != '' && vars.IDTECH3_GAME_BASE_PATH || secrets.IDTECH3_GAME_BASE_PATH }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify GAME_BASE
+        run: |
+          set -euo pipefail
+          test -d "$GAME_BASE" || { echo "GAME_BASE is not a directory: $GAME_BASE" >&2; exit 1; }
+          echo "Using GAME_BASE=$GAME_BASE"
+
+      - name: Build Vulkan (Release)
+        env:
+          CFLAGS: "-DSKIP_IDPAK_CHECK=1"
+          CXXFLAGS: "-DSKIP_IDPAK_CHECK=1"
+        run: |
+          set -euo pipefail
+          ./scripts/compile_engine.sh vulkan
+
+      - name: Renderer regression check (repo + optional BSP)
+        run: |
+          set -euo pipefail
+          GAME_BASE="$GAME_BASE" ./scripts/renderer_regression_check.sh
+
+      - name: Renderer regression map load (dedicated)
+        run: |
+          set -euo pipefail
+          GAME_BASE="$GAME_BASE" ./scripts/renderer_regression_maps.sh
