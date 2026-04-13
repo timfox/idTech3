@@ -80,6 +80,8 @@ cvar_t	*r_skipBackEnd;
 cvar_t	*r_greyscale;
 cvar_t	*r_dither;
 cvar_t	*r_presentBits;
+cvar_t	*r_outline;
+cvar_t	*r_outlineThreshold;
 
 static cvar_t *r_ignorehwgamma;
 
@@ -2595,10 +2597,12 @@ static void R_Register( void )
 	ri.Cvar_Get( "r_svgMaxFileBytes", "2097152", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( ri.Cvar_Get( "r_svgMaxFileBytes", "2097152", CVAR_ARCHIVE ),
 		"Maximum accepted SVG source file size in bytes." );
-	ri.Cvar_Get( "r_outline", "0", CVAR_ARCHIVE );
-	ri.Cvar_SetDescription( ri.Cvar_Get( "r_outline", "0", CVAR_ARCHIVE ), "Edge-detection outline strength (0 = off, 0.5 = subtle, 1.0 = strong)." );
-	ri.Cvar_Get( "r_outlineThreshold", "0.15", CVAR_ARCHIVE );
-	ri.Cvar_SetDescription( ri.Cvar_Get( "r_outlineThreshold", "0.15", CVAR_ARCHIVE ), "Luminance edge threshold for outline detection." );
+	r_outline = ri.Cvar_Get( "r_outline", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_outline, "Edge-detection outline strength (0 = off, 0.5 = subtle, 1.0 = strong)." );
+	ri.Cvar_SetGroup( r_outline, CVG_RENDERER );
+	r_outlineThreshold = ri.Cvar_Get( "r_outlineThreshold", "0.15", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_outlineThreshold, "Luminance edge threshold for outline detection." );
+	ri.Cvar_SetGroup( r_outlineThreshold, CVG_RENDERER );
 	ri.Cvar_Get( "r_safeMode", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_SetDescription( ri.Cvar_Get( "r_safeMode", "0", CVAR_ARCHIVE | CVAR_LATCH ), "Safe mode: disables post-processing, bloom, SSAO, volumetric fog. Use if the engine crashes on startup." );
 
