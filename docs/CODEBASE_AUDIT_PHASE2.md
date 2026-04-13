@@ -48,6 +48,7 @@
 | `sv_game.c:964,967` | `sprintf` in VM traps | ✅ Fixed: `Com_sprintf` with `MAX_STRING_CHARS` |
 | `be_ai_chat.c:951,969` | `sprintf` for chat tokens | ✅ Fixed: `Com_sprintf` / `Q_strncpyz` with bounds |
 | `l_precomp.c` (5 places) | `sprintf(token.string, ...)` | ✅ Fixed: `Com_sprintf` with `MAX_TOKEN` |
+| `platform/botlib/l_precomp.c`, `platform/win32/botlib/l_precomp.c` (5 places each) | Duplicate tree still used `sprintf` on token strings | ✅ Fixed (2026-04-11): `Com_sprintf(..., MAX_TOKEN, ...)` to match `src/botlib/l_precomp.c` |
 | `bindshader.c:26`, `bin2hex.c` | Build tools | ✅ Fixed: `snprintf` with `sizeof(buf)` |
 | `tr_arb.c`, `tr_vbo.c` | Already use `Com_sprintf` / `Q_strcat` | ✅ No change needed |
 | Vulkan `vk_*.c` tree, `sv_client.c`, `vm.c`, `cl_curl.c` | First-party `sprintf` largely migrated to `Com_sprintf`; re-scan with `rg` on `src/` excluding `external/` | Triage new hits |
@@ -70,14 +71,11 @@
 
 ## 4. TODO / FIXME / XXX
 
-Approx. **150+** instances across `src/` (excluding most of `external/`). Notable areas:
+**First-party engine tree** (`src/` excluding `external/`): triage doc `docs/TODO_TRIAGE.md` tracks actionable items; a **2026-04-10** `rg 'TODO|FIXME' src --glob '!**/external/**'` pass reported **no literal `TODO`/`FIXME`** in client/game/qcommon/renderers/server/botlib/navigation/physics/platform/audio.
 
-- **Renderers**: `tr_backend.c`, `tr_shader.c`, `tr_init.c`, `tr_surface.c`, Vulkan backend
-- **Platform**: `unix_main.c`, `linux_glimp.c`
-- **Qcommon**: `files.c`, `q_shared.c`, `cvar.c`
-- **Game/server**: `sv_main.c`, `sv_game.c`
+**Third-party** (`src/external/`): many vendor `TODO`/`FIXME` strings remain; treat as upstream scope unless we vendor-patch.
 
-Many are legacy or low-priority; a pass to triage and resolve or document would help.
+Historical note: older “150+ TODO” counts mixed external trees; use the triage doc + scoped `rg` for current truth.
 
 ---
 
@@ -129,7 +127,7 @@ Phase 1 addressed model loaders, image creation, TLD, fog/color parsing, and sev
 
 - **2 high-priority** string safety fixes (curl download name, sound name).
 - **~15 medium-priority** `strcpy`/`sprintf`/`strcat` replacements for consistency.
-- **150+** TODO/FIXME items to triage.
+- **TODO/FIXME**: first-party tree triaged in `docs/TODO_TRIAGE.md` (no literal tags in engine dirs as of 2026-04-10 scan); external/vendor code excluded.
 - No critical memory leaks found in project code.
 
 Constitution principles (backward compatibility, no breaking changes, incremental fixes) are respected by these recommendations.
