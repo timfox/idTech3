@@ -2354,14 +2354,17 @@ add_test(NAME smoke_test
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(smoke_test PROPERTIES
 	LABELS "validation;smoke"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/release/idtech3_server")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/release/idtech3_server"
+	# Avoid parallel runs with renderer_regression_check (both hammer glslang; server startup is CPU-sensitive).
+	RESOURCE_LOCK "idtech3_headless_validation")
 
 add_test(NAME renderer_regression_check
 	COMMAND ${CMAKE_SOURCE_DIR}/scripts/renderer_regression_check.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(renderer_regression_check PROPERTIES
 	LABELS "validation;renderer"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/renderer_regression_check.sh")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/renderer_regression_check.sh"
+	RESOURCE_LOCK "idtech3_headless_validation")
 
 add_test(NAME check_artifacts
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/check_artifacts.sh ${CMAKE_SOURCE_DIR}/release
