@@ -18,7 +18,7 @@ Use Vulkan for **PBR GPU** glTF and maximum parity with advanced materials; Open
 - **Multiple meshes / primitives** per file (subject to caps below).
 - **Materials (partial)**: metallic-roughness base color, normal map, metallic-roughness texture, emissive, occlusion; factors and texture **URIs** are read. Base color drives the registered shader; extra maps are loaded where wired in `R_RegisterGLTF`.
 - **Skinned meshes (bind pose)**: skeleton from **first skin only** (`skins[0]`), inverse bind matrices, up to **4 influences** per vertex, joint indices/weights from standard attributes.
-- **Vulkan VBO path**: primitives upload **device-local** vertex/index buffers (`vk_create_gltf_buffers`) with **joint indices/weights** packed for optional GPU skinning. Toggle static draw without skin/morph: **`r_gltfVBO`** (default `1`).
+- **Vulkan VBO path**: primitives upload **device-local** vertex/index buffers (`vk_create_gltf_buffers`) with **joint indices/weights** packed for optional GPU skinning. When those buffers exist, the renderer uses them for static draws (skin/morph still use the tessellation path as needed).
 
 ## Runtime animation and morph (Vulkan)
 
