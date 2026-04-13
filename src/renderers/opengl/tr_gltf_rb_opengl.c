@@ -10,6 +10,20 @@ and R_AddGLTFSurfaces live in tr_model_gltf.c; Vulkan adds GPU/VBO paths there.
 #include "tr_local.h"
 #include <math.h>
 
+static qboolean RB_GLTF_ImagePathLooksLikeNormalMap( const char *path ) {
+	if ( !path || !path[0] ) {
+		return qfalse;
+	}
+	if ( Q_stristr( path, "norm" ) || Q_stristr( path, "bump" ) || Q_stristr( path, "nmap" ) ) {
+		return qtrue;
+	}
+	/* Q3-style: path/to/diffuse_n.tga next to diffuse.jpg */
+	if ( Q_stristr( path, "_n." ) ) {
+		return qtrue;
+	}
+	return qfalse;
+}
+
 static qboolean RB_GLTF_ShaderUsesNormalMap( const shader_t *sh ) {
 	int i, b;
 
@@ -26,7 +40,7 @@ static qboolean RB_GLTF_ShaderUsesNormalMap( const shader_t *sh ) {
 			int a;
 			for ( a = 0; a < tb->numImageAnimations && a < MAX_IMAGE_ANIMATIONS; a++ ) {
 				const image_t *img = tb->image[a];
-				if ( img && img->imgName && Q_stristr( img->imgName, "norm" ) ) {
+				if ( img && img->imgName && RB_GLTF_ImagePathLooksLikeNormalMap( img->imgName ) ) {
 					return qtrue;
 				}
 			}
