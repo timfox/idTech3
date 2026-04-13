@@ -263,6 +263,7 @@ typedef struct {
 	int32_t					lightmap_bundle;
 	uint8_t					pbr_vert_mode; /* 0=default gen_vert, 1=glTF GPU skin+morph variant */
 	uint8_t					gltf_gpu_tangent_fixup; /* 1=vertex shader re-orthonormalizes T vs deformed N (r_gltfGpuTangentFix) */
+	uint8_t					pom_height_source; /* 0=ORM R (physical map), 1=normal map alpha (normalHeightMap) */
 	vec4_t					specularScale;
 	vec4_t					normalScale;
 	float					parallaxBias;
