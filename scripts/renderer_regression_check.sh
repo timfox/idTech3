@@ -112,6 +112,18 @@ else
 fi
 
 echo ""
+echo "IQM_MORPH_TOP_K: OpenGL vs Vulkan tr_local.h (entity morph channel arrays):"
+TR_LOCAL_GL="$PROJECT_ROOT/src/renderers/opengl/tr_local.h"
+k_gl="$(sed -n 's/^#define IQM_MORPH_TOP_K[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$TR_LOCAL_GL" | head -1)"
+if [[ -z "$k_gl" || -z "$k_c" ]]; then
+  fail "could not parse IQM_MORPH_TOP_K from opengl/tr_local.h or vulkan/tr_local.h"
+elif [[ "$k_gl" != "$k_c" ]]; then
+  fail "IQM_MORPH_TOP_K mismatch: opengl/tr_local.h=$k_gl vulkan/tr_local.h=$k_c"
+else
+  pass "IQM_MORPH_TOP_K=$k_c (OpenGL + Vulkan tr_local.h)"
+fi
+
+echo ""
 if [ -n "${GAME_BASE:-}" ]; then
   echo "Optional game base: $GAME_BASE"
   ASSETS_LIST="${GAME_ASSETS_LIST:-$PROJECT_ROOT/docs/samples/renderer_regression/OPTIONAL_GAME_ASSETS.txt}"
