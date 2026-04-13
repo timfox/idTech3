@@ -272,11 +272,15 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 	base = tess.numVertexes;
 
 	for ( i = 0; i < surf->numVertices; i++ ) {
-		vec3_t pos, nrm;
+		vec3_t pos, nrm, tan;
+		float handed;
+		float ndt, tanLen;
 		v = &surf->vertices[i];
 
 		VectorCopy( v->position, pos );
 		VectorCopy( v->normal, nrm );
+		VectorSet( tan, v->tangent[0], v->tangent[1], v->tangent[2] );
+		handed = v->tangent[3];
 		if ( useMorph ) {
 			int ti;
 			for ( ti = 0; ti < surf->numMorphTargets; ti++ ) {
@@ -296,18 +300,24 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 					nrm[1] += w * mt->deltaNormal[i * 3 + 1];
 					nrm[2] += w * mt->deltaNormal[i * 3 + 2];
 				}
+				if ( mt->deltaTangent ) {
+					tan[0] += w * mt->deltaTangent[i * 3 + 0];
+					tan[1] += w * mt->deltaTangent[i * 3 + 1];
+					tan[2] += w * mt->deltaTangent[i * 3 + 2];
+				}
 			}
 			VectorNormalize( nrm );
 		}
 
 		if ( haveJoints ) {
-			vec3_t spos, snrm;
+			vec3_t spos, snrm, stan;
 			float w0 = v->weights[0], w1 = v->weights[1], w2 = v->weights[2], w3 = v->weights[3];
 			int j0 = v->joints[0], j1 = v->joints[1], j2 = v->joints[2], j3 = v->joints[3];
 			float *m0, *m1, *m2, *m3;
 
 			VectorClear( spos );
 			VectorClear( snrm );
+			VectorClear( stan );
 			if ( w0 > 0 && j0 < model->skeleton.numJoints ) {
 				m0 = &jointMatrix[j0 * 12];
 				spos[0] += w0 * ( m0[0] * pos[0] + m0[1] * pos[1] + m0[2] * pos[2] + m0[3] );
@@ -316,6 +326,9 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 				snrm[0] += w0 * ( m0[0] * nrm[0] + m0[1] * nrm[1] + m0[2] * nrm[2] );
 				snrm[1] += w0 * ( m0[4] * nrm[0] + m0[5] * nrm[1] + m0[6] * nrm[2] );
 				snrm[2] += w0 * ( m0[8] * nrm[0] + m0[9] * nrm[1] + m0[10] * nrm[2] );
+				stan[0] += w0 * ( m0[0] * tan[0] + m0[1] * tan[1] + m0[2] * tan[2] );
+				stan[1] += w0 * ( m0[4] * tan[0] + m0[5] * tan[1] + m0[6] * tan[2] );
+				stan[2] += w0 * ( m0[8] * tan[0] + m0[9] * tan[1] + m0[10] * tan[2] );
 			}
 			if ( w1 > 0 && j1 < model->skeleton.numJoints ) {
 				m1 = &jointMatrix[j1 * 12];
@@ -325,6 +338,9 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 				snrm[0] += w1 * ( m1[0] * nrm[0] + m1[1] * nrm[1] + m1[2] * nrm[2] );
 				snrm[1] += w1 * ( m1[4] * nrm[0] + m1[5] * nrm[1] + m1[6] * nrm[2] );
 				snrm[2] += w1 * ( m1[8] * nrm[0] + m1[9] * nrm[1] + m1[10] * nrm[2] );
+				stan[0] += w1 * ( m1[0] * tan[0] + m1[1] * tan[1] + m1[2] * tan[2] );
+				stan[1] += w1 * ( m1[4] * tan[0] + m1[5] * tan[1] + m1[6] * tan[2] );
+				stan[2] += w1 * ( m1[8] * tan[0] + m1[9] * tan[1] + m1[10] * tan[2] );
 			}
 			if ( w2 > 0 && j2 < model->skeleton.numJoints ) {
 				m2 = &jointMatrix[j2 * 12];
@@ -334,6 +350,9 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 				snrm[0] += w2 * ( m2[0] * nrm[0] + m2[1] * nrm[1] + m2[2] * nrm[2] );
 				snrm[1] += w2 * ( m2[4] * nrm[0] + m2[5] * nrm[1] + m2[6] * nrm[2] );
 				snrm[2] += w2 * ( m2[8] * nrm[0] + m2[9] * nrm[1] + m2[10] * nrm[2] );
+				stan[0] += w2 * ( m2[0] * tan[0] + m2[1] * tan[1] + m2[2] * tan[2] );
+				stan[1] += w2 * ( m2[4] * tan[0] + m2[5] * tan[1] + m2[6] * tan[2] );
+				stan[2] += w2 * ( m2[8] * tan[0] + m2[9] * tan[1] + m2[10] * tan[2] );
 			}
 			if ( w3 > 0 && j3 < model->skeleton.numJoints ) {
 				m3 = &jointMatrix[j3 * 12];
@@ -343,10 +362,37 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 				snrm[0] += w3 * ( m3[0] * nrm[0] + m3[1] * nrm[1] + m3[2] * nrm[2] );
 				snrm[1] += w3 * ( m3[4] * nrm[0] + m3[5] * nrm[1] + m3[6] * nrm[2] );
 				snrm[2] += w3 * ( m3[8] * nrm[0] + m3[9] * nrm[1] + m3[10] * nrm[2] );
+				stan[0] += w3 * ( m3[0] * tan[0] + m3[1] * tan[1] + m3[2] * tan[2] );
+				stan[1] += w3 * ( m3[4] * tan[0] + m3[5] * tan[1] + m3[6] * tan[2] );
+				stan[2] += w3 * ( m3[8] * tan[0] + m3[9] * tan[1] + m3[10] * tan[2] );
 			}
 			VectorNormalize( snrm );
 			VectorCopy( spos, pos );
 			VectorCopy( snrm, nrm );
+			VectorCopy( stan, tan );
+		}
+
+		/* Re-orthonormalize tangent vs final normal (matches Vulkan r_gltfGpuTangentFix idea). */
+		ndt = DotProduct( tan, nrm );
+		tan[0] -= ndt * nrm[0];
+		tan[1] -= ndt * nrm[1];
+		tan[2] -= ndt * nrm[2];
+		tanLen = VectorLength( tan );
+		if ( tanLen < 1e-8f ) {
+			VectorSet( tan, v->tangent[0], v->tangent[1], v->tangent[2] );
+			ndt = DotProduct( tan, nrm );
+			tan[0] -= ndt * nrm[0];
+			tan[1] -= ndt * nrm[1];
+			tan[2] -= ndt * nrm[2];
+			tanLen = VectorLength( tan );
+		}
+		if ( tanLen >= 1e-8f ) {
+			VectorScale( tan, 1.0f / tanLen, tan );
+		} else {
+			VectorSet( tan, v->tangent[0], v->tangent[1], v->tangent[2] );
+			if ( VectorNormalize( tan ) == 0.0f ) {
+				VectorSet( tan, 1.0f, 0.0f, 0.0f );
+			}
 		}
 
 		tess.xyz[base + i][0] = pos[0];
@@ -361,6 +407,11 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 		tess.vertexColors[base + i].rgba[1] = (byte)( v->color[1] * 255 );
 		tess.vertexColors[base + i].rgba[2] = (byte)( v->color[2] * 255 );
 		tess.vertexColors[base + i].rgba[3] = (byte)( v->color[3] * 255 );
+
+		tess.qtangent[base + i][0] = tan[0];
+		tess.qtangent[base + i][1] = tan[1];
+		tess.qtangent[base + i][2] = tan[2];
+		tess.qtangent[base + i][3] = handed;
 	}
 
 	tess.numVertexes += surf->numVertices;
@@ -375,14 +426,6 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 		if ( r_gltfCpuQtangent && r_gltfCpuQtangent->integer &&
 		     tess.shader && RB_GLTF_ShaderUsesNormalMap( tess.shader ) ) {
 			RB_GLTF_RecomputeQtangentsForTessRange( base, surf->numVertices, idxBase, surf->numIndices );
-		} else {
-			for ( j = 0; j < surf->numVertices; j++ ) {
-				const gltfVertex_t *vv = &surf->vertices[j];
-				tess.qtangent[base + j][0] = vv->tangent[0];
-				tess.qtangent[base + j][1] = vv->tangent[1];
-				tess.qtangent[base + j][2] = vv->tangent[2];
-				tess.qtangent[base + j][3] = vv->tangent[3];
-			}
 		}
 	}
 }
