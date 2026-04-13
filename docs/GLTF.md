@@ -7,7 +7,7 @@ This document describes **what the engine actually does today** for glTF / GLB a
 | Renderer | glTF / GLB |
 |----------|------------|
 | **Vulkan** | Yes — `.gltf` and `.glb` registered in `tr_model.c`, loaded via **cgltf** (`tr_model_gltf.c`). Full path: optional **device VBOs**, **PBR GPU** skin/morph (`r_gltfGpu`), qtangent recompute on CPU tess when needed. |
-| **OpenGL** | Yes — same loader and `MOD_GLTF` / `R_AddGLTFSurfaces`; draws via **CPU tessellation** in `tr_gltf_rb_opengl.c` (no `r_gltfGpu`, no Vulkan VBO upload). Morph evaluation gated by **`r_morph`**; clip timing uses **`r_gltfAnim`** (same as Vulkan). |
+| **OpenGL** | Yes — same loader and `MOD_GLTF` / `R_AddGLTFSurfaces`; draws via **CPU tessellation** in `tr_gltf_rb_opengl.c` (no `r_gltfGpu`, no Vulkan VBO upload). Morph: **`r_morph`**; clip timing: **`r_gltfAnim`**. When a bound shader’s texture image names contain **`norm`** (normal-map stage) and **`r_gltfCpuQtangent`** is `1` (default), **`tess.qtangent`** is recomputed from deformed positions + **TEXCOORD_0** (MikkTSpace-style, same math as Vulkan’s CPU tess path); otherwise bind-pose tangents from the asset are copied. **Shader selection**: if `normalTexture` is set, registration tries **`COM_StripExtension(normalTexture) + "_norm"`** before falling back to the base-color texture name (Q3-style `*_norm` shader next to the normal map image). |
 
 Use Vulkan for **PBR GPU** glTF and maximum parity with advanced materials; OpenGL is suitable for bringing glTF entities up on the compatibility backend.
 
@@ -16,7 +16,7 @@ Use Vulkan for **PBR GPU** glTF and maximum parity with advanced materials; Open
 - **Triangle meshes** with positions, normals, tangents, two UV sets, vertex colors.
 - **Indices** (indexed geometry).
 - **Multiple meshes / primitives** per file (subject to caps below).
-- **Materials (partial)**: metallic-roughness base color, normal map, metallic-roughness texture, emissive, occlusion; factors and texture **URIs** are read. Base color drives the registered shader; extra maps are loaded where wired in `R_RegisterGLTF`.
+- **Materials (partial)**: metallic-roughness base color, normal map, metallic-roughness texture, emissive, occlusion; factors and texture **URIs** are read. **Vulkan:** base color drives `RE_RegisterShaderNoMip` on the primitive. **OpenGL:** same, but if **`normalTexture`** is present the loader first tries a sibling **`_norm`** shader name derived from that path so normal-mapped `.shader` files are picked up when named like the stock Q3 convention.
 - **Skinned meshes (bind pose)**: skeleton from **first skin only** (`skins[0]`), inverse bind matrices, up to **4 influences** per vertex, joint indices/weights from standard attributes.
 - **Vulkan VBO path**: primitives upload **device-local** vertex/index buffers (`vk_create_gltf_buffers`) with **joint indices/weights** packed for optional GPU skinning. When those buffers exist, the renderer uses them for static draws (skin/morph still use the tessellation path as needed).
 
