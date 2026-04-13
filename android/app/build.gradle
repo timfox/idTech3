@@ -54,7 +54,8 @@ android {
                 if (_androidDepsCache) {
                     cmakeArgs << "-DANDROID_DEPS_CACHE=${_androidDepsCache}"
                 }
-                arguments cmakeArgs
+                /* AGP 8+: arguments() expects varargs, not a single List */
+                arguments(*cmakeArgs)
             }
         }
 
