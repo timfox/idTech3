@@ -21,6 +21,7 @@ skeleton, and animations into engine-native structures.
 /* glTF GPU path reuses IQM skin + morph SSBO layouts; keep caps aligned at compile time. */
 STATIC_ASSERT( GLTF_MAX_JOINTS == IQM_MAX_JOINTS, "GLTF_MAX_JOINTS must match IQM_MAX_JOINTS (shared skin matrix layout)" );
 STATIC_ASSERT( GLTF_MAX_MORPH_TARGETS == IQM_MORPH_TOP_K, "GLTF_MAX_MORPH_TARGETS must match IQM_MORPH_TOP_K (GPU morph top-K / SSBO)" );
+STATIC_ASSERT( IQM_MORPH_MAX_CHANNELS == IQM_MORPH_TOP_K, "IQM_MORPH_MAX_CHANNELS must match IQM_MORPH_TOP_K (glTF morph pending slots vs active top-K)" );
 
 #define GLTF_GPU_META_TAG	0xAC000000u
 #define GLTF_GPU_MORPH_INDEX_MASK	0x00000FFFu
