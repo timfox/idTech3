@@ -26,7 +26,7 @@ Use the Vulkan build for glTF content.
 - **Time**: clip time is `refEntity.shaderTime` (seconds) when set, else `refdef.time * 0.001f`, scaled by cvar **`r_gltfAnim`** (default `1`). Time **loops** by each clip’s stored duration.
 - **Cross-clip blend**: `oldframe` selects the second clip; **`backlerp`** blends joint TRS (and morph weights from weight tracks) between **current** and **old** clip at the **same** clock time.
 - **Skeletal sampling**: translation/rotation/scale channels on skin joints update local pose, then **`world * inverseBindMatrix`** joint matrices are computed each draw.
-- **GPU skin + morph (Vulkan PBR)**: when **`r_gltfGpu`** is `1`, **`vk.pbrActive`**, and the surface shader is PBR, `RB_GLTFSurface` uploads joint matrices to the same **SSBO slot** as IQM skin data, packs **top-4** morph targets by **combined** weight (glTF animation + **`RE_SetEntityMorphWeight`** / `morphChannelCount` + mesh defaults) into the IQM-style morph buffer, and draws with **`USE_GLTF_GPU_SKIN`** vertex shaders (`gen_vert.tmpl`). Vertex count must be ≤ **`SHADER_MAX_VERTEXES`**. **Qtangent** comes from the static glTF tangents on this path (not recomputed per frame).
+- **GPU skin + morph (Vulkan PBR)**: when **`r_gltfGpu`** is `1`, **`vk.pbrActive`**, and the surface shader is PBR, `RB_GLTFSurface` uploads joint matrices to the same **SSBO slot** as IQM skin data, packs **top-8** morph targets by **combined** weight (glTF animation + **`RE_SetEntityMorphWeight`** / `morphChannelCount` + mesh defaults) into the shared IQM-style morph SSBO (`IQM_MORPH_TOP_K`), and draws with **`USE_GLTF_GPU_SKIN`** vertex shaders (`gen_vert.tmpl`). Vertex count must be ≤ **`SHADER_MAX_VERTEXES`**. **Qtangent** comes from the static glTF tangents on this path (not recomputed per frame).
 - **CPU tess fallback**: used when GPU path is disabled, storage/index upload fails, or for non-PBR shaders. After CPU morph + skinning, **qtangent** is recomputed from deformed positions and **TEXCOORD_0** when PBR is active.
 - **Morph weights**: primitives load **mesh `target_names`** when present; `RE_SetEntityMorphWeight(ent, name, w)` matches those names (same hash path as IQM). **glTF weight animation** channels on the mesh node add to the same weight array. **`mesh.weights`** default blend shape weights from the file are added as a baseline.
 
@@ -72,7 +72,7 @@ Larger assets are **silently clamped** during load.
 ### 7. GPU vs CPU path
 
 - **Skinned / morphed** primitives prefer the **GPU path** under Vulkan PBR when **`r_gltfGpu 1`** and constraints above are met; otherwise **`RB_GLTFSurface`** falls back to **CPU tess**.
-- **More than four** non-zero morph weights per vertex: GPU path keeps only the **four largest** weights per draw (same idea as IQM morph top-K).
+- **More than eight** non-zero morph weights per vertex: GPU path keeps only the **eight largest** weights per draw (same cap as IQM `IQM_MORPH_TOP_K`; tune `r_morphMaxActive` for IQM batching only).
 
 ## Engine references
 

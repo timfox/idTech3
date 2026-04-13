@@ -52,6 +52,7 @@ out gl_PerVertex {
 const uint IQM_GPU_META_TAG = 0xAB000000u;
 const uint IQM_GPU_INDEX_MASK = 0x00000FFFu;
 const uint IQM_GPU_MORPH_SHIFT = 12u;
+const int IQM_MORPH_TOP_K = 8;
 
 bool IQMDecodeMeta( float packedFloat, out int skinIndex, out int morphIndex ) {
 	uint packed = floatBitsToUint( packedFloat );
@@ -85,12 +86,12 @@ vec3 IQMSkinNormal( int skinIndex, int skinCount, vec3 normal ) {
 }
 
 vec3 IQMMorphDeltaPos( int morphIndex, int morphStage ) {
-	int base = 6 + morphIndex * (4 * 6) + morphStage * 6;
+	int base = 2 + IQM_MORPH_TOP_K + morphIndex * (IQM_MORPH_TOP_K * 6) + morphStage * 6;
 	return vec3( iqmMorphData[base + 0], iqmMorphData[base + 1], iqmMorphData[base + 2] );
 }
 
 vec3 IQMMorphDeltaNormal( int morphIndex, int morphStage ) {
-	int base = 6 + morphIndex * (4 * 6) + morphStage * 6;
+	int base = 2 + IQM_MORPH_TOP_K + morphIndex * (IQM_MORPH_TOP_K * 6) + morphStage * 6;
 	return vec3( iqmMorphData[base + 3], iqmMorphData[base + 4], iqmMorphData[base + 5] );
 }
 
@@ -103,12 +104,12 @@ void main() {
 
 	if ( IQMDecodeMeta( in_position.w, skinIndex, morphIndex ) && skinIndex >= 0 && skinIndex < skinCount ) {
 		int morphCount = int( iqmMorphData[0] );
-		int activeCount = min( int( iqmMorphData[1] ), 4 );
+		int activeCount = min( int( iqmMorphData[1] ), IQM_MORPH_TOP_K );
 		vec3 morphPosition = position;
 		vec3 morphNormal = normal;
 
 		if ( morphIndex >= 0 && morphIndex < morphCount && activeCount > 0 ) {
-			for ( int k = 0; k < 4; k++ ) {
+			for ( int k = 0; k < IQM_MORPH_TOP_K; k++ ) {
 				if ( k >= activeCount ) {
 					break;
 				}
