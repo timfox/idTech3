@@ -1082,6 +1082,24 @@ if(USE_DTLS)
         if(NOT _NDK_ROOT OR _NDK_ROOT STREQUAL "")
           message(WARNING "USE_DTLS on Android: ANDROID_NDK not set; OpenSSL Configure may fail.")
         endif()
+        # OpenSSL 3 Configure expects NDK clang/gcc on PATH (NOTES-ANDROID.md). CMake's
+        # ANDROID_NDK_HOME / toolchain file do not put toolchains/llvm/prebuilt/.../bin on PATH.
+        set(_OSSL_PATH "$ENV{PATH}")
+        if(_NDK_ROOT AND IS_DIRECTORY "${_NDK_ROOT}/toolchains/llvm/prebuilt")
+          file(GLOB _ndk_llvm_prebuilt "${_NDK_ROOT}/toolchains/llvm/prebuilt/*")
+          list(LENGTH _ndk_llvm_prebuilt _ndk_pb_len)
+          if(_ndk_pb_len GREATER 0)
+            list(GET _ndk_llvm_prebuilt 0 _ndk_llvm_hostdir)
+            set(_ndk_llvm_bin "${_ndk_llvm_hostdir}/bin")
+            if(EXISTS "${_ndk_llvm_bin}")
+              if(CMAKE_HOST_WIN32)
+                set(_OSSL_PATH "${_ndk_llvm_bin};$ENV{PATH}")
+              else()
+                set(_OSSL_PATH "${_ndk_llvm_bin}:$ENV{PATH}")
+              endif()
+            endif()
+          endif()
+        endif()
         ExternalProject_Add(openssl_android_ep
           URL "https://www.openssl.org/source/openssl-${_OSSL_VER}.tar.gz"
           URL_HASH "SHA256=${_OSSL_SHA}"
@@ -1090,7 +1108,7 @@ if(USE_DTLS)
           ${_OSSL_DL_EXTRA}
           CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env
             "ANDROID_NDK_ROOT=${_NDK_ROOT}"
-            "PATH=$ENV{PATH}"
+            "PATH=${_OSSL_PATH}"
             "CC=${CMAKE_C_COMPILER}"
             "AR=${CMAKE_AR}"
             "RANLIB=${CMAKE_RANLIB}"
@@ -1102,9 +1120,11 @@ if(USE_DTLS)
             --openssldir=<INSTALL_DIR>/ssl
           BUILD_COMMAND ${CMAKE_COMMAND} -E env
             "ANDROID_NDK_ROOT=${_NDK_ROOT}"
+            "PATH=${_OSSL_PATH}"
             ${CMAKE_COMMAND} -E chdir <SOURCE_DIR>
             ${OPENSSL_ANDROID_MAKE_EXE} build_libs
           INSTALL_COMMAND ${CMAKE_COMMAND} -E env
+            "PATH=${_OSSL_PATH}"
             ${CMAKE_COMMAND} -E chdir <SOURCE_DIR>
             ${OPENSSL_ANDROID_MAKE_EXE} install_sw
           BUILD_BYPRODUCTS
