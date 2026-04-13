@@ -48,11 +48,14 @@ float R_GLTFPackGpuVertexMeta( int morphVertexIndex )
 #ifdef RENDERER_OPENGL
 /*
 OpenGL: glTF materials only carry texture paths; engine shaders are separate .shader files.
-If `textures/foo/bar.png` exists, try `textures/foo/bar_norm` when a normal map is listed
-(common Q3 naming); fall back to the base-color shader name.
+When `normalTexture` is set, try **`stripExtension(path) + "_norm"`** first. If that shader is
+missing and the stripped path ends with **`_n`** (e.g. `.../diffuse_n` from `diffuse_n.tga`),
+also try **`strip trailing _n` + `_norm`** so `foo_norm` shaders resolve. Fall back to the
+base-color texture shader name.
 */
 static shader_t *R_GLTF_RegisterSurfaceShader( const gltfMaterial_t *mat ) {
 	char normName[MAX_QPATH];
+	size_t len;
 	qhandle_t h;
 
 	if ( mat->normalTexture[0] ) {
@@ -61,6 +64,17 @@ static shader_t *R_GLTF_RegisterSurfaceShader( const gltfMaterial_t *mat ) {
 		h = RE_RegisterShaderNoMip( normName );
 		if ( h ) {
 			return R_GetShaderByHandle( h );
+		}
+		COM_StripExtension( mat->normalTexture, normName, sizeof( normName ) );
+		len = strlen( normName );
+		if ( len >= 2 && normName[len - 2] == '_' &&
+			( normName[len - 1] == 'n' || normName[len - 1] == 'N' ) ) {
+			normName[len - 2] = '\0';
+			Q_strcat( normName, sizeof( normName ), "_norm" );
+			h = RE_RegisterShaderNoMip( normName );
+			if ( h ) {
+				return R_GetShaderByHandle( h );
+			}
 		}
 	}
 	if ( mat->baseColorTexture[0] ) {
