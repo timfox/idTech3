@@ -2,11 +2,13 @@
 
 **Context**: FBO worked yesterday; now broken. Most recent change: OIT draw path re-enabled (commit 0d7afa9d).
 
+**Historical note (2026)**: Descriptor binding for this path lives in `vk_draw_state.c` (`vk_bind_descriptor_sets`); the monolithic `vk.c` no longer exists.
+
 ---
 
 ## 1. Most Likely Cause: OIT Descriptor Binding Bug
 
-**Location**: `vk.c` `vk_bind_descriptor_sets()`, OIT accum branch
+**Location**: `vk_draw_state.c` — `vk_bind_descriptor_sets()`, OIT accum branch
 
 **Bug**: When `backEnd.oitAccumPass` is true, we bind `descriptor_set.current[0]` to pipeline set 0. But in the main pipeline layout:
 - **Set 0** = uniform buffer (fog/dlight) → `descriptor_set.current[0]`

@@ -85,14 +85,12 @@ Expect **no matches** in first-party code until new comments are added. Third-pa
 
 ---
 
-## Documentation debt (stale `vk.c` references)
+## Documentation (post-`vk.c` split)
 
-Historical audits and roadmaps still name **`vk.c`** and obsolete line numbers. They are **not** accurate file pointers after the Vulkan split. Prefer **`docs/ARCHITECTURE.md`** for the current module list.
+Vulkan audits and roadmaps should point at **`vk_*.c`** modules and **`docs/ARCHITECTURE.md`**, not removed `vk.c` line numbers. A pass in April 2026 updated the main stale references (`VULKAN_FBO_AUDIT.md`, `FBO_BREAKAGE_ANALYSIS.md`, `SIGGRAPH_FEATURES_ROADMAP.md`, volumetric docs, `CODEBASE_AUDIT_PHASE2.md`).
 
-To find remaining mentions:
+To find any stragglers:
 
 ```bash
 rg 'vk\.c' docs --glob '*.md'
 ```
-
-Update docs opportunistically when editing those files; a full rewrite of large audits (e.g. `VULKAN_FBO_AUDIT.md`) is optional.

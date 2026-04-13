@@ -50,7 +50,7 @@
 | `l_precomp.c` (5 places) | `sprintf(token.string, ...)` | ✅ Fixed: `Com_sprintf` with `MAX_TOKEN` |
 | `bindshader.c:26`, `bin2hex.c` | Build tools | ✅ Fixed: `snprintf` with `sizeof(buf)` |
 | `tr_arb.c`, `tr_vbo.c` | Already use `Com_sprintf` / `Q_strcat` | ✅ No change needed |
-| `vk.c`, `sv_client.c`, `vm.c`, `cl_curl.c` | See audit | Pending |
+| Vulkan `vk_*.c` tree, `sv_client.c`, `vm.c`, `cl_curl.c` | First-party `sprintf` largely migrated to `Com_sprintf`; re-scan with `rg` on `src/` excluding `external/` | Triage new hits |
 
 ---
 
@@ -111,7 +111,7 @@ No critical leaks identified in project code; external libs not audited in depth
 ### P1 — Consistency and safety ✅ DONE
 
 3. **sv_client.c:403,405** — `sprintf` → `Com_sprintf` with buffer size.
-4. **vk.c:455,541** — `sprintf` → `Com_sprintf`.
+4. **Legacy `vk.c`** — `sprintf` → `Com_sprintf` (addressed when Vulkan was split; no `vk.c` today).
 5. **tr_bsp.c:2361** (Vulkan + OpenGL) — `strcpy` → `Com_Memcpy` + explicit null (BSP lump may lack terminator).
 6. **cl_curl.c:764,766** — `sprintf(dl->progress, ...)` → `Com_sprintf`.
 
