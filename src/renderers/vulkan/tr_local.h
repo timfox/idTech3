@@ -141,7 +141,7 @@ typedef struct dlight_s {
 
 
 #define IQM_MORPH_MAX_CHANNELS 8
-#define IQM_MORPH_TOP_K 4
+#define IQM_MORPH_TOP_K 8
 #define IQM_MORPH_NAME_MAX 64
 
 // a trRefEntity_t has all the information passed in by
@@ -2040,7 +2040,7 @@ typedef struct shaderCommands_s
 	qboolean	gltfUseGpuPipeline; /* PBR + glTF VBO with GPU skin/morph (persists until next Tess_Begin) */
 	qboolean	gltfGpuMorphActive;
 	int		gltfGpuMorphCount;
-	float		gltfGpuMorphWeights[4];
+	float		gltfGpuMorphWeights[IQM_MORPH_TOP_K];
 #endif
 #endif
 

@@ -6,7 +6,7 @@
 typedef struct vkMvpPushConstants_s {
 	float mvp[16];
 	float prev_mvp[16];
-	float gltf_morph_pad[8]; /* reserved; keeps push range 256B for glTF GPU morph SSBO compatibility */
+	float reserved[8]; /* padding / future push data; size must match VkPushConstantRange in vk_init_device.c */
 } vkMvpPushConstants_t;
 
 static VkRect2D vk_scene_src_rect;

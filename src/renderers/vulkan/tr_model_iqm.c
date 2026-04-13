@@ -1481,6 +1481,7 @@ void R_IQMBeginSurfaceBatch( void )
 
 void R_IQMCommitSurfaceBatch( void )
 {
+	int i;
 	size_t skinFloats;
 	size_t skinBytes;
 	size_t morphFloats;
@@ -1510,7 +1511,7 @@ void R_IQMCommitSurfaceBatch( void )
 	Com_Memcpy( skinPayload + 1 + (size_t)s_iqmGpuBatch.skinCount * 12u,
 		s_iqmGpuBatch.normalMatrices, (size_t)s_iqmGpuBatch.skinCount * 9u * sizeof( float ) );
 
-	morphFloats = 6u + (size_t)s_iqmGpuBatch.morphVertexCount * IQM_MORPH_TOP_K * 6u;
+	morphFloats = (size_t)( 2 + IQM_MORPH_TOP_K ) + (size_t)s_iqmGpuBatch.morphVertexCount * IQM_MORPH_TOP_K * 6u;
 	morphBytes = morphFloats * sizeof( float );
 	morphPayload = (float *)vk_alloc_storage( morphBytes, &morphOffset );
 	if ( !morphPayload ) {
@@ -1520,11 +1521,10 @@ void R_IQMCommitSurfaceBatch( void )
 
 	morphPayload[0] = (float)s_iqmGpuBatch.morphVertexCount;
 	morphPayload[1] = (float)s_iqmGpuBatch.activeCount;
-	morphPayload[2] = s_iqmGpuBatch.weights[0];
-	morphPayload[3] = s_iqmGpuBatch.weights[1];
-	morphPayload[4] = s_iqmGpuBatch.weights[2];
-	morphPayload[5] = s_iqmGpuBatch.weights[3];
-	Com_Memcpy( morphPayload + 6, s_iqmGpuBatch.morphDeltas,
+	for ( i = 0; i < IQM_MORPH_TOP_K; i++ ) {
+		morphPayload[2 + i] = s_iqmGpuBatch.weights[i];
+	}
+	Com_Memcpy( morphPayload + 2 + IQM_MORPH_TOP_K, s_iqmGpuBatch.morphDeltas,
 		(size_t)s_iqmGpuBatch.morphVertexCount * IQM_MORPH_TOP_K * 6u * sizeof( float ) );
 
 	vk_set_iqm_storage_offsets( skinOffset, morphOffset );
