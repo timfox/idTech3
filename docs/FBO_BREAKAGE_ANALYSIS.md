@@ -2,11 +2,13 @@
 
 **Context**: FBO worked yesterday; now broken. Most recent change: OIT draw path re-enabled (commit 0d7afa9d).
 
+**Historical note (2026)**: Descriptor binding for this path lives in `vk_draw_state.c` (`vk_bind_descriptor_sets`); the monolithic `vk.c` no longer exists.
+
 ---
 
 ## 1. OIT descriptor binding (historical bug, fixed)
 
-**Location**: `vk_draw_state.c` — `vk_bind_descriptor_sets()`, `backEnd.oitAccumPass` branch (Vulkan code was split out of the old monolithic `vk.c`).
+**Location**: `vk_draw_state.c` — `vk_bind_descriptor_sets()`, `backEnd.oitAccumPass` / OIT accum branch (post-`vk.c` split).
 
 **What went wrong (March 2025)**: The OIT accum pipeline expects **set 0 = `tex0`**. The main layout uses **set 0 = uniform** and **`VK_DESC_TEXTURE0` for the diffuse map**, so binding `current[0]` in the accum pass fed the **uniform buffer** to a texture sampler → garbage or solid colors on transparent surfaces.
 

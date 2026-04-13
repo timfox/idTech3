@@ -106,9 +106,6 @@
     <ClCompile Include="..\..\renderers\vulkan\tr_world.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\renderers\vulkan\vk.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\renderers\vulkan\vk_procs.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -116,6 +113,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\renderers\vulkan\vk_pipelines_persistent.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\renderers\vulkan\vk_pipelines_bootstrap.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\renderers\vulkan\vk_pbr_ibl_validate.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\renderers\vulkan\vk_descriptor_sets.c">
@@ -170,6 +173,30 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\renderers\vulkan\vk_framebuffers.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\renderers\vulkan\vk_init_device.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\renderers\vulkan\vk_frame_submit.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\renderers\vulkan\vk_post_process_refresh.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\renderers\vulkan\vk_raster_samples.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\renderers\vulkan\vk_presentation.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\renderers\vulkan\vk_sun_shadow_pass.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\renderers\vulkan\vk_volumetric_postfx_buffers.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\renderers\vulkan\vk_vegetation_wind.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\renderers\common\tr_noise.c">

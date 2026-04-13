@@ -196,7 +196,7 @@ The OpenGL renderer provides compatibility for systems without Vulkan support. I
 
 | Feature | Vulkan | OpenGL |
 |---------|--------|--------|
-| Model formats **glTF/GLB**, **OBJ**, **MD5** (registration + draw) | ✓ | — |
+| Model formats **glTF/GLB**, **OBJ**, **MD5** (registration + draw) | ✓ (full; GPU glTF options on Vulkan) | ✓ (CPU tess; no `r_gltfGpu`) |
 | PBR (metalness/roughness, IBL) | ✓ | — |
 | Volumetric fog | ✓ | — |
 | SSAO / HBAO | ✓ | — |

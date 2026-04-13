@@ -1759,8 +1759,8 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 
 #ifdef USE_VK_PBR
 	if ( r_gltfGpu && r_gltfGpu->integer && vk.cmd && vk.pbrActive && tess.shader && tess.shader->hasPBR &&
-		surf->vbo_vertex != VK_NULL_HANDLE && surf->vbo_index != VK_NULL_HANDLE &&
-		( haveJoints || useMorph ) && !( useMorph && ent->morphChannelCount > 0 ) &&
+		surf->vbo_vertex != TR_GLTF_VBO_HANDLE_INVALID && surf->vbo_index != TR_GLTF_VBO_HANDLE_INVALID &&
+		( haveJoints || useMorph ) &&
 		surf->numVertices > 0 && surf->numVertices <= SHADER_MAX_VERTEXES ) {
 		qboolean gpuOk = qtrue;
 		int nj = ( model && model->skeleton.numJoints > 0 ) ? model->skeleton.numJoints : 0;
@@ -1811,7 +1811,7 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 			mwCopy[best] = 0.0f;
 		}
 
-		morphFloats = 6u + (size_t)surf->numVertices * (size_t)IQM_MORPH_TOP_K * 6u;
+		morphFloats = (size_t)( 2 + IQM_MORPH_TOP_K ) + (size_t)surf->numVertices * (size_t)IQM_MORPH_TOP_K * 6u;
 		morphBytes = morphFloats * sizeof( float );
 		morphPayload = gpuOk ? (float *)vk_alloc_storage( morphBytes, &morphOff ) : NULL;
 		if ( gpuOk && !morphPayload ) {
@@ -1824,22 +1824,23 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 				morphPayload[2 + mk] = ( mk < morphActive ) ? topMorphW[mk] : 0.0f;
 			}
 			for ( i = 0; i < surf->numVertices; i++ ) {
+				const size_t morphBase = (size_t)( 2 + IQM_MORPH_TOP_K );
 				for ( mk = 0; mk < morphActive; mk++ ) {
 					int tgt = topMorphIdx[mk];
 					size_t dst = (size_t)i * (size_t)IQM_MORPH_TOP_K * 6u + (size_t)mk * 6u;
 					const gltfMorphTarget_t *mt = &surf->morphTargets[tgt];
 					const float *dp = mt->deltaPosition ? ( mt->deltaPosition + i * 3 ) : NULL;
 					const float *dn = mt->deltaNormal ? ( mt->deltaNormal + i * 3 ) : NULL;
-					morphPayload[6 + dst + 0] = dp ? dp[0] : 0.0f;
-					morphPayload[6 + dst + 1] = dp ? dp[1] : 0.0f;
-					morphPayload[6 + dst + 2] = dp ? dp[2] : 0.0f;
-					morphPayload[6 + dst + 3] = dn ? dn[0] : 0.0f;
-					morphPayload[6 + dst + 4] = dn ? dn[1] : 0.0f;
-					morphPayload[6 + dst + 5] = dn ? dn[2] : 0.0f;
+					morphPayload[morphBase + dst + 0] = dp ? dp[0] : 0.0f;
+					morphPayload[morphBase + dst + 1] = dp ? dp[1] : 0.0f;
+					morphPayload[morphBase + dst + 2] = dp ? dp[2] : 0.0f;
+					morphPayload[morphBase + dst + 3] = dn ? dn[0] : 0.0f;
+					morphPayload[morphBase + dst + 4] = dn ? dn[1] : 0.0f;
+					morphPayload[morphBase + dst + 5] = dn ? dn[2] : 0.0f;
 				}
 				for ( mk = morphActive; mk < IQM_MORPH_TOP_K; mk++ ) {
 					size_t dst = (size_t)i * (size_t)IQM_MORPH_TOP_K * 6u + (size_t)mk * 6u;
-					Com_Memset( morphPayload + 6 + dst, 0, 6u * sizeof( float ) );
+					Com_Memset( morphPayload + morphBase + dst, 0, 6u * sizeof( float ) );
 				}
 			}
 		}
@@ -1894,15 +1895,12 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 	tess.gltfGpuMorphCount = 0;
 #endif /* USE_VK_PBR */
 
-	if ( surf->vbo_vertex != VK_NULL_HANDLE && surf->vbo_index != VK_NULL_HANDLE ) {
-		cvar_t *r_gltfVBO = ri.Cvar_Get( "r_gltfVBO", "1", CVAR_ARCHIVE );
-		if ( r_gltfVBO->integer ) {
-			/* VBO path: set gltfDrawSurface for vk_bind_geometry to use */
-			tess.gltfDrawSurface = surf;
-			tess.numVertexes = surf->numVertices;
-			tess.numIndexes = surf->numIndices;
-			return;
-		}
+	if ( surf->vbo_vertex != TR_GLTF_VBO_HANDLE_INVALID && surf->vbo_index != TR_GLTF_VBO_HANDLE_INVALID ) {
+		/* VBO path: set gltfDrawSurface for vk_bind_geometry to use */
+		tess.gltfDrawSurface = surf;
+		tess.numVertexes = surf->numVertices;
+		tess.numIndexes = surf->numIndices;
+		return;
 	}
 
 	/* Tess path (skinning, morph targets, or VBO creation failed) */

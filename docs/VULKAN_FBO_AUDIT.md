@@ -4,14 +4,14 @@
 **Context**: User reports `r_fbo 1` is "very broken" — solid colors, wrong rendering.  
 **Scope**: Full pipeline trace from `vk.fboActive` through main pass, post-process, and swapchain.
 
-**Maintenance note (2026)**: The monolithic `vk.c` was split into `vk_*.c`. **Line numbers and some call sites below are historical**; use `docs/ARCHITECTURE.md` and `rg`/your editor to find symbols today (`vk_init_device.c`, `vk_attachments.c`, `vk_framebuffers.c`, `vk_presentation.c`, `vk_post_fog.c`, `vk_frame_end.c`, `vk_volumetric_pass_compute.c`, etc.).
+**Historical note (2026)**: This audit predates the removal of monolithic `vk.c`. **Line numbers and some call sites below are historical**; use `docs/ARCHITECTURE.md` and `rg` to find symbols today (`vk_init_device.c` for `vk.fboActive` from `r_fbo`, `vk_attachments.c` for `vk_alloc_attachments`, `vk_framebuffers.c`, `vk_presentation.c`, `vk_descriptor_sets.c`, `vk_post_fog.c`, `vk_frame_end.c`, `vk_volumetric_pass_compute.c`, etc.).
 
 ---
 
 ## 1. vk.fboActive — Where Set and What Triggers Recreation
 
 ### Where Set
-- **Location**: `vk_init_device.c` — `vk.fboActive` / `vk.msaaActive` from `r_fbo` and `r_ext_multisample` during `vk_initialize` (see `vk_init_device.c` around the `r_fbo->integer` branch).
+- **Location**: `vk_init_device.c` — `vk.fboActive` / `vk.msaaActive` from `r_fbo` and `r_ext_multisample` during device init (formerly cited as monolithic `vk.c` ~6345–6353).
 - **Source**: `r_fbo->integer` cvar (CVAR_ARCHIVE | CVAR_LATCH)
 - **Logic**:
   ```c
@@ -26,8 +26,8 @@
 
 ### When FBO Resources Are Recreated
 - **vid_restart**: Triggers full Vulkan reinit; `r_fbo` is CVAR_LATCH so it takes effect on restart.
-- **`vk_create_framebuffers()`**: `vk_framebuffers.c` — called from `vk_init_device.c` after swapchain + attachments + render passes, and from `vk_restore_presentation_targets()` in `vk_presentation.c` after swapchain rebuild.
-- **`vk_alloc_attachments()`** (static in `vk_attachments.c`): Allocates `vk.color_image`, `vk.fog_scene_image`, `vk.smaa_output_image`, etc., when `vk.fboActive` (invoked from `vk_create_attachments()` in the same file).
+- **`vk_create_framebuffers()`** (`vk_framebuffers.c`): Called from `vk_init_device.c` after swapchain + attachments + render passes, and from `vk_restore_presentation_targets()` in `vk_presentation.c` after swapchain rebuild (legacy `vk_create_window()` / swapchain paths were ~6245 / ~7241 in monolithic `vk.c`).
+- **`vk_alloc_attachments()`** (`vk_attachments.c`): Allocates `vk.color_image`, `vk.fog_scene_image`, `vk.smaa_output_image`, etc., when `vk.fboActive` (invoked from `vk_create_attachments()` in the same file; formerly ~5443 in legacy `vk.c`).
 - **Render passes**: `vk_create_render_passes()` in `vk_render_pass.c`; main pass layout depends on `fboActive`.
 
 ### Critical Dependency
@@ -77,14 +77,14 @@
 - **Points to** (at different stages):
   - After volumetric + SMAA: `vk.smaa_output_image_view`
   - After volumetric, no SMAA: `vk.color_image_view`
-  - When volumetrics skipped: `vk.color_image_view` (see end-of-frame / post-fog paths in `vk_post_fog.c` and `vk_frame_end.c`)
+  - When volumetrics skipped: `vk.color_image_view` (see end-of-frame / volumetric-skip paths in `vk_post_fog.c` and `vk_frame_end.c`)
 
 ### vk.luminance_descriptor
 - **Binding 0**: Input image (color or SMAA output) for luminance compute
 - **Binding 1**: `vk.luminance_image_view` (1×1 storage)
 - **Updated**:
-  - From `vk_volumetric_fog_pass()` in `vk_volumetric_pass_compute.c` (post-volumetric color source → luminance binding 0)
-  - When volumetrics are skipped or alternate paths run: `vk_update_luminance_descriptor_image()` in `vk_post_fog.c` / `vk_frame_end.c` with the same color source as gamma expects for that frame
+  - From `vk_volumetric_fog_pass()` in `vk_volumetric_pass_compute.c` (and related modules): post-volumetric color source → luminance binding 0 (`smaa_output` or `color_image_view`)
+  - When volumetrics are skipped: `vk_update_luminance_descriptor_image()` in `vk_post_fog.c` / `vk_frame_end.c` — `color_image_view` only, aligned with gamma for that frame
 
 ### When Volumetrics Are Skipped
 - **luminance_descriptor binding 0** → `vk.color_image_view`

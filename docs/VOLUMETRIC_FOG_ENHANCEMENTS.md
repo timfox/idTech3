@@ -4,6 +4,8 @@
 **Scope**: Additional areas to enhance the fog system toward cinematic-quality volumetric effects.  
 **Reference**: Techniques from Advances in Real-Time Rendering, SIGGRAPH talks, and production volumetric pipelines.
 
+**Vulkan paths (2026)**: Dispatch and composite logic are in `vk_volumetric_pass_compute.c`, `vk_volumetric_internal.c`, and related `vk_*.c` (not `vk.c`).
+
 ---
 
 ## Current State Summary
@@ -34,7 +36,7 @@ The engine already has:
 - **Indirect dispatch**: Build a list of active froxel indices; dispatch only those
 - **Workload buckets**: Sort froxels by estimated cost (e.g., shadowed vs unshadowed) for better GPU occupancy
 
-**Files**: `volumetric_fog.comp`, `vk.c` (dispatch logic), new compute pass for culling/bucketing
+**Files**: `volumetric_fog.comp`, `vk_volumetric_pass_compute.c` (dispatch), new compute pass for culling/bucketing
 
 ---
 
@@ -61,7 +63,7 @@ The engine already has:
 - **Per-pixel depth ordering**: Ray march fog up to first opaque surface; blend transparent surfaces with fog behind them
 - **OIT integration**: When OIT is active, fog should composite correctly with weighted-blended transparent layers (fog in front of, between, behind transparent objects)
 
-**Files**: `volumetric_fog.frag`, OIT resolve path in `vk.c`
+**Files**: `volumetric_fog.frag`, OIT resolve path in `vk_postfx_passes.c` / `vk_post_fog.c`
 
 ---
 
@@ -116,7 +118,7 @@ The engine already has:
 - **Animated VDB sequences**: Support frame-indexed VDB for explosions, smoke plumes
 - **VDB world-space mapping**: Proper transform from VDB voxel space to world
 
-**Files**: `vk_vdb.c`, `volumetric_fog.comp`, `vk.c` (descriptor binding)
+**Files**: `vk_vdb.c`, `volumetric_fog.comp`, `vk_descriptor_sets.c` / volumetric update helpers (descriptor binding)
 
 ---
 
@@ -159,7 +161,7 @@ The engine already has:
 - **Per-tier culling aggressiveness**: Low tier = more aggressive froxel culling
 - **Budget-based auto-scale**: Already have `r_fogFluidTargetMs`; extend to full fog pipeline
 
-**Files**: `vk.c`, `vk_volumetric_params.c`, `volumetric_fog.comp`, `volumetric_fog.frag`
+**Files**: `vk_volumetric_pass_compute.c`, `vk_volumetric_params.c`, `volumetric_fog.comp`, `volumetric_fog.frag`
 
 ---
 

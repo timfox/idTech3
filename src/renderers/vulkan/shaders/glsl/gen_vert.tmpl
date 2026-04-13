@@ -125,6 +125,7 @@ out gl_PerVertex {
 const uint IQM_GPU_META_TAG = 0xAB000000u;
 const uint IQM_GPU_INDEX_MASK = 0x00000FFFu;
 const uint IQM_GPU_MORPH_SHIFT = 12u;
+const int IQM_MORPH_TOP_K = 8;
 #ifdef USE_GLTF_GPU_SKIN
 const uint GLTF_GPU_META_TAG = 0xAC000000u;
 const uint GLTF_GPU_MORPH_VTX_MASK = 0x00000FFFu;
@@ -163,12 +164,12 @@ vec3 IQMSkinNormal( int skinIndex, int skinCount, vec3 normal ) {
 }
 
 vec3 IQMMorphDeltaPos( int morphIndex, int morphStage ) {
-	int base = 6 + morphIndex * (4 * 6) + morphStage * 6;
+	int base = 2 + IQM_MORPH_TOP_K + morphIndex * (IQM_MORPH_TOP_K * 6) + morphStage * 6;
 	return vec3( iqmMorphData[base + 0], iqmMorphData[base + 1], iqmMorphData[base + 2] );
 }
 
 vec3 IQMMorphDeltaNormal( int morphIndex, int morphStage ) {
-	int base = 6 + morphIndex * (4 * 6) + morphStage * 6;
+	int base = 2 + IQM_MORPH_TOP_K + morphIndex * (IQM_MORPH_TOP_K * 6) + morphStage * 6;
 	return vec3( iqmMorphData[base + 3], iqmMorphData[base + 4], iqmMorphData[base + 5] );
 }
 
@@ -182,6 +183,29 @@ vec3 GltfJointTransformNormal( int jointIndex, vec3 n ) {
 	);
 	return R * n;
 }
+
+#ifdef GLTF_GPU_TANGENT_FIX
+/* Linear blend of joint rotation only (same weights as position/normal skinning). */
+vec3 GltfSkinVector( int skinCount, uvec4 joints, vec4 wIn, vec3 v ) {
+	vec4 w = wIn;
+	float wsum = w.x + w.y + w.z + w.w;
+	if ( wsum > 1e-6 ) {
+		w /= wsum;
+	}
+	vec3 outv = vec3( 0.0 );
+	for ( int k = 0; k < 4; k++ ) {
+		if ( w[k] <= 0.0 ) {
+			continue;
+		}
+		int j = int( joints[k] );
+		if ( j < 0 || j >= skinCount ) {
+			continue;
+		}
+		outv += w[k] * GltfJointTransformNormal( j, v );
+	}
+	return outv;
+}
+#endif
 #endif
 
 void main() {
@@ -226,9 +250,9 @@ void main() {
 
 		int morphVtx = int( gltfPacked & GLTF_GPU_MORPH_VTX_MASK );
 		int mvCount = int( iqmMorphData[0] );
-		int activeMorph = min( int( iqmMorphData[1] ), 4 );
+		int activeMorph = min( int( iqmMorphData[1] ), IQM_MORPH_TOP_K );
 		if ( morphVtx < mvCount && morphVtx != int( GLTF_GPU_NO_MORPH_VTX ) && activeMorph > 0 ) {
-			for ( int mk = 0; mk < 4; mk++ ) {
+			for ( int mk = 0; mk < IQM_MORPH_TOP_K; mk++ ) {
 				if ( mk >= activeMorph ) {
 					break;
 				}
@@ -241,18 +265,25 @@ void main() {
 			}
 			normal = normalize( normal );
 		}
+#if defined(GLTF_GPU_TANGENT_FIX) && defined(USE_VK_PBR)
+		/* GPU path used bind-pose qtangent; after skin + morph, Gram–Schmidt T against final N. */
+		if ( skinCount > 0 ) {
+			vec3 st = GltfSkinVector( skinCount, in_gltf_joints, in_gltf_weights, tangent );
+			tangent = normalize( st - normal * dot( normal, st ) );
+		}
+#endif
 	} else
 #endif
 	if ( IQMDecodeMeta( in_position.w, skinIndex, morphIndex ) && skinIndex >= 0 && skinIndex < skinCount ) {
 		int morphCount = int( iqmMorphData[0] );
-		int activeCount = min( int( iqmMorphData[1] ), 4 );
+		int activeCount = min( int( iqmMorphData[1] ), IQM_MORPH_TOP_K );
 		vec3 morphPosition = position;
 		#if defined(USE_ENV) || defined(USE_VK_PBR)
 			vec3 morphNormal = normal;
 		#endif
 
 		if ( morphIndex >= 0 && morphIndex < morphCount && activeCount > 0 ) {
-			for ( int k = 0; k < 4; k++ ) {
+			for ( int k = 0; k < IQM_MORPH_TOP_K; k++ ) {
 				if ( k >= activeCount ) {
 					break;
 				}
