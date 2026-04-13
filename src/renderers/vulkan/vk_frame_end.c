@@ -3,28 +3,12 @@
 #include "vk_frame_end.h"
 #include "vk_image_layout.h"
 #include "vk_post_fog.h"
+#include "vk_post_process_push.h"
 #include "vk_postfx.h"
 #include "vk_postfx_params.h"
 #include "vk_render_pass.h"
 #include "vk_temporal.h"
 #include "vk_volumetric_pass.h"
-
-typedef struct {
-	float paniniAmount;
-	float paniniD;
-	float paniniS;
-	float aspect;
-	float fovXDeg;
-	float paniniBorderMode;
-	float paniniDebugMode;
-	float brightness;
-	float paniniZoom;
-	float paniniPad0;
-	float paniniPad1;
-	float paniniPad2;
-	float exposure;
-	float srcUVScaleBias[4];
-} VkPostProcessPushConstants;
 
 void vk_end_frame_record_capture_if_needed( void )
 {

@@ -642,7 +642,7 @@ static void SV_BanNum_f( void ) {
 }
 
 #endif // USE_BANS
-#endif // !COM_STANDALONE
+#endif // !STANDALONE
 
 #ifdef USE_BANS
 /*

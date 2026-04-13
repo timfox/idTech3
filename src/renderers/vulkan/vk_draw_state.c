@@ -153,18 +153,25 @@ void vk_bind_geometry( uint32_t flags )
 	if ( tess.gltfDrawSurface ) {
 		const struct srfGLTFPrimitive_s *surf = tess.gltfDrawSurface;
 		tess.gltfDrawSurface = NULL;
-		if ( surf->vbo_vertex != VK_NULL_HANDLE && surf->vbo_index != VK_NULL_HANDLE &&
+		if ( surf->vbo_vertex != TR_GLTF_VBO_HANDLE_INVALID && surf->vbo_index != TR_GLTF_VBO_HANDLE_INVALID &&
 		     surf->numVertices > 0 && surf->numIndices > 0 ) {
-			VkBuffer bufs[6];
-			VkDeviceSize offs[6];
-			bufs[0] = bufs[1] = bufs[2] = bufs[3] = bufs[4] = bufs[5] = surf->vbo_vertex;
-			offs[0] = surf->vbo_vertex_offsets[0];
-			offs[1] = surf->vbo_vertex_offsets[1];
-			offs[2] = surf->vbo_vertex_offsets[2];
-			offs[3] = offs[4] = 0; /* unused bindings */
-			offs[5] = surf->vbo_vertex_offsets[5];
-			qvkCmdBindVertexBuffers( vk.cmd->command_buffer, 0, 6, bufs, offs );
-			vk_bind_index_buffer( surf->vbo_index, 0 );
+			VkBuffer bufs[17];
+			VkDeviceSize offs[17];
+			VkBuffer vbo = (VkBuffer)(uintptr_t)surf->vbo_vertex;
+			VkBuffer ibo = (VkBuffer)(uintptr_t)surf->vbo_index;
+			int bi;
+			for ( bi = 0; bi < 17; bi++ ) {
+				bufs[bi] = vbo;
+				offs[bi] = 0;
+			}
+			offs[0] = (VkDeviceSize)surf->vbo_vertex_offsets[0];
+			offs[1] = (VkDeviceSize)surf->vbo_vertex_offsets[1];
+			offs[2] = (VkDeviceSize)surf->vbo_vertex_offsets[2];
+			offs[5] = (VkDeviceSize)surf->vbo_vertex_offsets[5];
+			offs[15] = (VkDeviceSize)surf->vbo_vertex_offsets[6];
+			offs[16] = (VkDeviceSize)surf->vbo_vertex_offsets[7];
+			qvkCmdBindVertexBuffers( vk.cmd->command_buffer, 0, 17, bufs, offs );
+			vk_bind_index_buffer( ibo, 0 );
 			vk.cmd->num_indexes = surf->numIndices;
 		} else {
 			vk.cmd->num_indexes = 0;

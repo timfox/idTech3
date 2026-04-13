@@ -11,6 +11,7 @@ Split from vk.c.
 #include "vk_image_layout.h"
 #include "vk_cmd.h"
 #include "vk_render_pass.h"
+#include "vk_scene_pass.h"
 #include "vk_pipeline_helpers.h"
 #include "vk_util.h"
 #include <math.h>
@@ -738,4 +739,70 @@ void vk_generate_cubemaps( cubemap_t *cube )
 	vk_begin_main_render_pass();
 }
 
+void vk_begin_cubemap_render_pass( void )
+{
+	VkFramebuffer frameBuffer = vk.framebuffers.cubemap[backEnd.viewParms.targetCubeLayer];
+
+	vk.renderPassIndex = RENDER_PASS_CUBEMAP;
+
+	vk.renderWidth = REF_CUBEMAP_SIZE;
+	vk.renderHeight = REF_CUBEMAP_SIZE;
+	vk.renderScaleX = vk.renderScaleY = 1.0f;
+
+	vk_begin_render_pass_tracked( vk.render_pass.cubemap, frameBuffer, qtrue, vk.renderWidth, vk.renderHeight );
+}
+
 #endif /* VK_CUBEMAP */
+
+#ifdef VK_PBR_BRDFLUT
+void vk_create_brfdlut( void )
+{
+	if ( !vk.pbrActive )
+		return;
+
+	{
+		VkRenderPassBeginInfo begin_info;
+		VkClearValue clear_values[1];
+		VkCommandBuffer command_buffer;
+		VkViewport viewport;
+		VkRect2D scissor_rect;
+		uint32_t size;
+
+		command_buffer = vk_begin_command_buffer();
+		size = 512;
+
+		begin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		begin_info.pNext = NULL;
+		begin_info.renderPass = vk.render_pass.brdflut;
+		begin_info.framebuffer = vk.framebuffers.brdflut;
+		begin_info.renderArea.offset.x = 0;
+		begin_info.renderArea.offset.y = 0;
+		begin_info.renderArea.extent.width = size;
+		begin_info.renderArea.extent.height = size;
+
+		Com_Memset( clear_values, 0, sizeof( clear_values ) );
+		clear_values[0].color.float32[3] = 1.0f;
+
+		begin_info.clearValueCount = 1;
+		begin_info.pClearValues = clear_values;
+
+		Com_Memset( &viewport, 0, sizeof( viewport ) );
+		viewport.width = viewport.height = (float)size;
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
+
+		Com_Memset( &scissor_rect, 0, sizeof( scissor_rect ) );
+		scissor_rect.extent.width = scissor_rect.extent.height = size;
+
+		qvkCmdBeginRenderPass( command_buffer, &begin_info, VK_SUBPASS_CONTENTS_INLINE );
+		qvkCmdSetScissor( command_buffer, 0, 1, &scissor_rect );
+		qvkCmdSetViewport( command_buffer, 0, 1, &viewport );
+		qvkCmdBindPipeline( command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.brdflut_pipeline );
+		qvkCmdBindDescriptorSets( command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_brdflut, 0, 1, &vk.brdflut_image_descriptor, 0, NULL );
+		qvkCmdDraw( command_buffer, 4, 1, 0, 0 );
+		qvkCmdEndRenderPass( command_buffer );
+
+		vk_end_command_buffer( command_buffer, __func__ );
+	}
+}
+#endif /* VK_PBR_BRDFLUT */

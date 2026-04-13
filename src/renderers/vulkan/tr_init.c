@@ -80,6 +80,8 @@ cvar_t	*r_skipBackEnd;
 cvar_t	*r_greyscale;
 cvar_t	*r_dither;
 cvar_t	*r_presentBits;
+cvar_t	*r_outline;
+cvar_t	*r_outlineThreshold;
 
 static cvar_t *r_ignorehwgamma;
 
@@ -89,7 +91,6 @@ cvar_t	*r_fastsky;
 cvar_t	*r_neatsky;
 cvar_t	*r_drawSun;
 cvar_t	*r_dynamiclight;
-cvar_t  *r_mergeLightmaps;
 #ifdef USE_PMLIGHT
 cvar_t	*r_dlightMode;
 cvar_t	*r_dlightScale;
@@ -113,6 +114,11 @@ cvar_t	*r_pbr_specularAA;
 cvar_t	*r_pbr_specularAAStrength;
 cvar_t	*r_pbr_anisotropicSpecular;
 cvar_t	*r_pbr_iblAnisoStretch;
+cvar_t	*r_pom;
+cvar_t	*r_pomSteps;
+cvar_t	*r_pomScale;
+cvar_t	*r_pomShadow;
+cvar_t	*r_pomShadowSteps;
 cvar_t	*r_glint;
 cvar_t	*r_glintMode;
 cvar_t	*r_glintDensity;
@@ -151,6 +157,9 @@ cvar_t	*r_morphDebug;
 cvar_t	*r_morphBreath;
 cvar_t	*r_morphBreathAmp;
 cvar_t	*r_morphBreathFreq;
+cvar_t	*r_gltfAnim;
+cvar_t	*r_gltfGpu;
+cvar_t	*r_gltfGpuTangentFix;
 cvar_t	*r_fbo;
 cvar_t	*r_renderMode;
 cvar_t	*r_hdr;
@@ -2142,8 +2151,6 @@ static void R_Register( void )
 	r_texturebits = ri.Cvar_Get( "r_texturebits", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_texturebits, "Number of texture bits per texture." );
 
-	r_mergeLightmaps = ri.Cvar_Get( "r_mergeLightmaps", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
-	ri.Cvar_SetDescription( r_mergeLightmaps, "Merge built-in small lightmaps into bigger lightmaps (atlases)." );
 #if defined (USE_VULKAN) && defined (USE_VBO)
 	r_vbo = ri.Cvar_Get( "r_vbo", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_vbo, "Use Vertex Buffer Objects to cache static map geometry, may improve FPS on modern GPUs, increases hunk memory usage by 15-30MB (map-dependent)." );
@@ -2254,6 +2261,33 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_pbr_iblAnisoStretch,
 		"When > 0 and an anisotropy map is bound, increase effective IBL roughness along the stretch direction (blurry elongated reflections). 0 = isotropic IBL sampling." );
 
+	r_pom = ri.Cvar_Get( "r_pom", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pom, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pom,
+		"Vulkan PBR: Parallax Occlusion Mapping when normal + packed ORM (physical) maps are bound. Height from ORM .r (occlusion). Per-material: parallaxDepth / parallaxBias in shader." );
+
+	r_pomSteps = ri.Cvar_Get( "r_pomSteps", "16", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pomSteps, "4", "64", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pomSteps, "POM ray-march step count (higher = sharper silhouettes, more GPU cost)." );
+
+	r_pomScale = ri.Cvar_Get( "r_pomScale", "0.06", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pomScale, "0.0", "0.25", CV_FLOAT );
+	ri.Cvar_SetDescription( r_pomScale, "Global height scale multiplier for POM (material parallaxDepth still applies)." );
+
+	r_pomShadow = ri.Cvar_Get( "r_pomShadow", "0.35", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pomShadow, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_pomShadow, "Approximate self-shadowing strength for POM (0 = off)." );
+
+	r_pomShadowSteps = ri.Cvar_Get( "r_pomShadowSteps", "6", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pomShadowSteps, "2", "16", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pomShadowSteps, "POM self-shadow march steps along light direction in tangent space." );
+
+	ri.Printf( PRINT_ALL, "POM: r_pom %s (steps %d, scale %.3f, shadow %.2f)\n",
+		( r_pom && r_pom->integer ) ? "on" : "off",
+		( r_pomSteps ? r_pomSteps->integer : 16 ),
+		( r_pomScale ? r_pomScale->value : 0.06f ),
+		( r_pomShadow ? r_pomShadow->value : 0.0f ) );
+
 	r_baseNormalX	= ri.Cvar_Get("r_baseNormalX",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );
 	r_baseNormalY	= ri.Cvar_Get("r_baseNormalY",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );
 	r_baseParallax	= ri.Cvar_Get("r_baseParallax",		"0.05",	CVAR_ARCHIVE | CVAR_LATCH );
@@ -2346,6 +2380,23 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_morphBreathFreq, "0.01", "8", CV_FLOAT );
 	ri.Cvar_SetDescription( r_morphBreathFreq, "Procedural breath frequency in Hz." );
 	ri.Cvar_SetGroup( r_morphBreathFreq, CVG_RENDERER );
+
+	r_gltfAnim = ri.Cvar_Get( "r_gltfAnim", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_gltfAnim, "0", "64", CV_FLOAT );
+	ri.Cvar_SetDescription( r_gltfAnim, "glTF clip playback: multiplies refEntity shaderTime for skeletal TRS and morph-weight sampling (frame/oldframe index clips, backlerp crossfades)." );
+	ri.Cvar_SetGroup( r_gltfAnim, CVG_RENDERER );
+
+	r_gltfGpu = ri.Cvar_Get( "r_gltfGpu", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_gltfGpu, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_gltfGpu,
+		"Vulkan PBR: GPU vertex skinning and morph for glTF (joint matrix SSBO + morph deltas; top-8 morph weights per draw, incl. RE_SetEntityMorphWeight). Falls back to CPU tess when off or constraints fail." );
+	ri.Cvar_SetGroup( r_gltfGpu, CVG_RENDERER );
+
+	r_gltfGpuTangentFix = ri.Cvar_Get( "r_gltfGpuTangentFix", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_gltfGpuTangentFix, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_gltfGpuTangentFix,
+		"Vulkan PBR glTF GPU path: re-orthonormalize tangent (Gram–Schmidt) after joint skin + morph so T matches deformed N (0=bind-pose qtangent only, legacy)." );
+	ri.Cvar_SetGroup( r_gltfGpuTangentFix, CVG_RENDERER );
 
 	r_flares = ri.Cvar_Get ("r_flares", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_flares, "Enables corona effects on light sources." );
@@ -2546,10 +2597,12 @@ static void R_Register( void )
 	ri.Cvar_Get( "r_svgMaxFileBytes", "2097152", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( ri.Cvar_Get( "r_svgMaxFileBytes", "2097152", CVAR_ARCHIVE ),
 		"Maximum accepted SVG source file size in bytes." );
-	ri.Cvar_Get( "r_outline", "0", CVAR_ARCHIVE );
-	ri.Cvar_SetDescription( ri.Cvar_Get( "r_outline", "0", CVAR_ARCHIVE ), "Edge-detection outline strength (0 = off, 0.5 = subtle, 1.0 = strong)." );
-	ri.Cvar_Get( "r_outlineThreshold", "0.15", CVAR_ARCHIVE );
-	ri.Cvar_SetDescription( ri.Cvar_Get( "r_outlineThreshold", "0.15", CVAR_ARCHIVE ), "Luminance edge threshold for outline detection." );
+	r_outline = ri.Cvar_Get( "r_outline", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_outline, "Edge-detection outline strength (0 = off, 0.5 = subtle, 1.0 = strong)." );
+	ri.Cvar_SetGroup( r_outline, CVG_RENDERER );
+	r_outlineThreshold = ri.Cvar_Get( "r_outlineThreshold", "0.15", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_outlineThreshold, "Luminance edge threshold for outline detection." );
+	ri.Cvar_SetGroup( r_outlineThreshold, CVG_RENDERER );
 	ri.Cvar_Get( "r_safeMode", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_SetDescription( ri.Cvar_Get( "r_safeMode", "0", CVAR_ARCHIVE | CVAR_LATCH ), "Safe mode: disables post-processing, bloom, SSAO, volumetric fog. Use if the engine crashes on startup." );
 
@@ -3489,6 +3542,12 @@ void R_Init( void ) {
 		( r_morph && r_morph->integer ) ? "enabled" : "disabled",
 		IQM_MORPH_MAX_CHANNELS, IQM_MORPH_TOP_K,
 		r_morphMaxActive ? r_morphMaxActive->integer : IQM_MORPH_TOP_K );
+	ri.Printf( PRINT_ALL, "[VK][gltf] clip playback speed scale r_gltfAnim=%.3f\n",
+		r_gltfAnim ? r_gltfAnim->value : 1.0f );
+	ri.Printf( PRINT_ALL, "[VK][gltf] GPU skin/morph path: %s (r_gltfGpu)\n",
+		( r_gltfGpu && r_gltfGpu->integer ) ? "on" : "off" );
+	ri.Printf( PRINT_ALL, "[VK][gltf] GPU tangent Gram–Schmidt after skin+morph: %s (r_gltfGpuTangentFix)\n",
+		( r_gltfGpuTangentFix && r_gltfGpuTangentFix->integer ) ? "on" : "off" );
 
 
 	max_polys = r_maxpolys ? r_maxpolys->integer : MAX_POLYS;

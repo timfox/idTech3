@@ -16,8 +16,6 @@ void vk_update_postfx_params( uint32_t cmd_index )
 	vec3_t shadowLift, midGamma, highlightGain, splitShadow, splitHighlight;
 	cvar_t *r_post_contrast;
 	cvar_t *r_post_saturation;
-	cvar_t *r_outline;
-	cvar_t *r_outlineThreshold;
 	cvar_t *r_autoExposure_target;
 	cvar_t *r_autoExposure_min;
 	cvar_t *r_autoExposure_max;
@@ -70,8 +68,6 @@ void vk_update_postfx_params( uint32_t cmd_index )
 	params.colorBalance[3] = ( r_pre_exposure_scale && r_pre_exposure_scale->value > 0.0f ) ? r_pre_exposure_scale->value : 1.0f;
 	r_post_contrast = ri.Cvar_Get( "r_post_contrast", "1.0", 0 );
 	r_post_saturation = ri.Cvar_Get( "r_post_saturation", "1.0", 0 );
-	r_outline = ri.Cvar_Get( "r_outline", "0", 0 );
-	r_outlineThreshold = ri.Cvar_Get( "r_outlineThreshold", "0.15", 0 );
 	params.colorGrade[0] = Com_Clamp( 0.0f, 3.0f, PostFX_GetGradeSaturation() );
 	params.colorGrade[1] = Com_Clamp( -1.0f, 1.0f, PostFX_GetGradeVibrance() );
 	params.colorGrade[2] = ( r_post_contrast && r_post_contrast->value > 0.0f ) ? r_post_contrast->value : 1.0f;

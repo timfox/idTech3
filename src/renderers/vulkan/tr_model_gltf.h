@@ -38,6 +38,7 @@ typedef struct gltfVertex_s {
 
 /* Morph target: delta position/normal per vertex */
 typedef struct gltfMorphTarget_s {
+	char    name[MAX_QPATH]; /* from mesh target_names when present */
 	float *deltaPosition;  /* numVertices * 3, or NULL */
 	float *deltaNormal;   /* numVertices * 3, or NULL */
 	float *deltaTangent;  /* numVertices * 3, or NULL (optional) */
@@ -57,6 +58,9 @@ typedef struct gltfMesh_s {
 	char            name[MAX_QPATH];
 	gltfPrimitive_t *primitives;
 	int              numPrimitives;
+	/* glTF mesh.weights — static blend shape defaults shared by primitives */
+	float           defaultMorphWeights[GLTF_MAX_MORPH_TARGETS];
+	int              numDefaultMorphWeights;
 } gltfMesh_t;
 
 typedef struct gltfMaterial_s {
@@ -100,11 +104,13 @@ typedef struct gltfSkeleton_s {
 } gltfSkeleton_t;
 
 typedef struct gltfAnimChannel_s {
-	int     jointIndex;
-	int     type;
+	int     jointIndex;   /* skin joint index, or -1 */
+	int     morphMeshIndex; /* model mesh index for morph weight animation, or -1 */
+	int     type;         /* cgltf_animation_path_type_* */
 	float  *times;
 	float  *values;
 	int     numKeyframes;
+	int     componentsPerKeyframe; /* 3 translation, 4 rotation, 3 scale, N weights */
 } gltfAnimChannel_t;
 
 typedef struct gltfAnimation_s {
@@ -131,7 +137,15 @@ typedef struct gltfModel_s {
 } gltfModel_t;
 
 qboolean R_LoadGLTF(const char *filename, gltfModel_t *model);
-void     R_ComputeGLTFJointMatrices(const gltfModel_t *model, float *outMatrices);
+float R_GLTFPackGpuVertexMeta( int morphVertexIndex );
+/* animIndex < 0 or out of range: bind pose. timeSeconds loops by clip duration. */
+void     R_ComputeGLTFJointMatrices(const gltfModel_t *model, int animIndex, float timeSeconds, float *outMatrices);
+/* blendTowardB: 0 = pose A only, 1 = pose B only (linear TRS + slerp rotation). Use for refEntity backlerp. */
+void     R_ComputeGLTFJointMatricesBlend(const gltfModel_t *model, int animA, float timeA, int animB, float timeB,
+	float blendTowardB, float *outMatrices);
+/* Fills outWeights[0..numTargets-1] for one mesh; returns qtrue if any weight channel affected this mesh. */
+qboolean R_SampleGLTFMeshMorphWeights(const gltfModel_t *model, int animIndex, float timeSeconds,
+	int meshIndex, float *outWeights, int numTargets);
 
 /* Returns gltfModel_t* from modelData when model is MOD_GLTF, else NULL */
 const gltfModel_t *R_GetGLTFModelFromModelData(const void *modelData);

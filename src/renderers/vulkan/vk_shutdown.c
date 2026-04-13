@@ -183,6 +183,12 @@ for (i = 0; i < 2; i++) {
                             qvkDestroyShaderModule(vk.device, vk.modules.vert.gen[i][j][k][l][m], NULL);
                             vk.modules.vert.gen[i][j][k][l][m] = VK_NULL_HANDLE;
                         }
+                        for ( int n = 0; n < 2; n++ ) {
+                            if (vk.modules.vert.gen_gltf_gpu[i][j][k][l][m][n] != VK_NULL_HANDLE) {
+                                qvkDestroyShaderModule(vk.device, vk.modules.vert.gen_gltf_gpu[i][j][k][l][m][n], NULL);
+                                vk.modules.vert.gen_gltf_gpu[i][j][k][l][m][n] = VK_NULL_HANDLE;
+                            }
+                        }
                     }
                 }
             }

@@ -1,6 +1,15 @@
 # Development Roadmap
 
-## Current Status (next-gen-4)
+## Execution focus (main branch, 2026)
+
+Priorities that keep **CI green** and **README/build truth** aligned:
+
+1. **Watch GitHub Actions on `main`** — especially **Android** (CMake + Gradle `assembleDebug`, OpenSSL/Lua/FetchContent caches) and **MSYS curl**.
+2. **Renderer validation** — Tier B (self-hosted `GAME_BASE`) and Tier C (manual GPU notes) when you have hardware/content; keep `renderer_regression_check` passing on default CI (manifest + GLSL + **IQM_MORPH_TOP_K** C/GLSL parity).
+3. **glTF on Vulkan** — **GPU skinning/morph** (PBR + `r_gltfGpu`) uses **top-8** morph weights per draw (aligned with `GLTF_MAX_MORPH_TARGETS`), including **`RE_SetEntityMorphWeight`** with clip-driven weights; **`r_gltfGpuTangentFix`** (default on) re-orthonormalizes tangents on the GPU path after skin+morph; next polish: full **MikkTSpace**-style qtangent on GPU (neighborhood-aware). **OpenGL** now registers glTF/OBJ/MD5 with a **CPU tess** path (no `r_gltfGpu`).
+4. **Android product** — missing `base/` / no pk3: logcat path + **Toast** with `…/base` and apkassets hint before exit; optional APK smoke.
+
+## Current Status (`main`)
 
 ### Renderer -- Complete
 - [x] Vulkan 1.4 with PBR (metalness/roughness, IBL, BRDF LUT)
@@ -51,15 +60,17 @@
 - [x] OpenEXR HDR image loading
 
 ### Assets -- Complete
-- [x] 7 model formats (glTF, OBJ, MD5, IQM, MDR, MD3)
+- [x] Multiple model formats (glTF primary on Vulkan for GPU path; OpenGL loads glTF/OBJ/MD5 with CPU tess — see `docs/GLTF.md`)
 - [x] 6 image formats (EXR, PNG, TGA, JPG, PCX, BMP)
 
 ### Integration -- Complete
 - [x] All 16 systems wired into game loop
 - [x] 64 Lua-callable engine functions
 - [x] ImGui inspector (optional)
-- [x] Android platform support
-- [x] CI for Linux, Windows, macOS, ARM
+- [x] Android platform support (NativeActivity, Vulkan lifecycle, touch HUD, logcat, optional `apkassets`)
+- [x] CI for Linux, Windows, macOS, ARM, **Android** (CMake cross-build + **Gradle debug APK** on Release matrix cells)
+- [x] **glTF (Vulkan):** runtime skeletal clip sampling, morph blending, mesh default weights; **GPU skin/morph** on PBR path (`r_gltfGpu`); PBR qtangent recompute on **CPU** tess path (`docs/GLTF.md`)
+- [x] **Android engine parity (no game pk3):** Lua, Duktape, curl, Recast, Bullet, FreeType, FLUX lib, DTLS via **static OpenSSL autobuild** when prefab not present
 
 ### Tooling -- Complete
 - [x] Smoke test script (10 checks)
@@ -68,6 +79,18 @@
 
 ## Remaining Work
 
+### Next on the roadmap (ordered)
+
+| Priority | Item | Notes |
+|----------|------|--------|
+| P0 | **CI stability** | Fix any red matrix on `main`; Android OpenSSL/Lua first-build time — tune cache keys if needed |
+| P1 | **glTF GPU path (polish)** | Entity morph + top-8 GPU morph (done); GPU tangent Gram–Schmidt after skin+morph via **`r_gltfGpuTangentFix`** (done); optional full MikkTSpace qtangent on GPU; validate on real assets |
+| P1 | **Renderer validation** | Tier B/C as optional gates; `renderer_regression_check`: manifest (**`docs/GLTF.md`**, **`docs/RENDERERS_FUTURE.md`**, Tier B doc), GLSL validate, **IQM_MORPH_TOP_K** parity |
+| P2 | **OpenGL glTF polish** | Registration + CPU tess done; optional: qtangent parity / perf on OpenGL glTF |
+| P2 | **Engine systems hardening** | Telemetry / replay / save / quest / dialogue — define stable APIs + minimal tests |
+| P3 | **GOAP content** | Data-driven actions; perf limits; debug draw |
+| P3 | **Vulkan architecture pass** | Clustered Forward+, motion history — see below |
+
 ### Renderer 2026 Architecture Pass
 - [ ] Lighting scalability: move Vulkan from legacy dynamic-light selection toward clustered Forward+; decouple Vulkan light scale from `MAX_DLIGHTS` and surface-bit assumptions. See `docs/RENDERER_2026_ARCHITECTURE_PASS.md`.
 - [ ] Temporal robustness: introduce shared history invalidation and stronger motion-vector coverage before adding TAA/upscaling or RT reuse systems. See `docs/RENDERER_2026_ARCHITECTURE_PASS.md`.
@@ -75,7 +98,7 @@
 
 ### Short-Term (completed)
 - [x] Connect BSP geometry extraction to map loading for automatic navmesh
-- [x] PostFX specialization constants in vk.c gamma pipeline
+- [x] PostFX specialization constants in gamma pipeline (vk_frame_end.c / post-process path)
 - [x] Wire SSR/atmosphere shaders into Vulkan render passes
 - [x] Wire vegetation wind compute into Vulkan pipeline (surfaceparm vegetation, real geometry from tess)
 - [x] SMAA when volumetrics skipped (r_volumetricFog 0, tier off, no world with world)

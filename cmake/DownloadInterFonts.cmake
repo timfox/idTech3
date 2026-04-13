@@ -9,7 +9,7 @@ set(INTER_FONTS_DIR "${CMAKE_SOURCE_DIR}/base/fonts")
 set(INTER_REGULAR "${INTER_FONTS_DIR}/Inter-Regular.ttf")
 set(INTER_BOLD "${INTER_FONTS_DIR}/Inter-Bold.ttf")
 
-if(BUILD_FREETYPE AND NOT ANDROID)
+if(BUILD_FREETYPE)
 	if(NOT EXISTS "${INTER_REGULAR}" OR NOT EXISTS "${INTER_BOLD}")
 		message(STATUS "Inter font: downloading v${INTER_VERSION} (missing from base/fonts/)")
 		set(INTER_ZIP "${CMAKE_BINARY_DIR}/Inter-${INTER_VERSION}.zip")

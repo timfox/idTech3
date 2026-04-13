@@ -4,12 +4,14 @@
 **Context**: User reports `r_fbo 1` is "very broken" — solid colors, wrong rendering.  
 **Scope**: Full pipeline trace from `vk.fboActive` through main pass, post-process, and swapchain.
 
+**Historical note (2026)**: This audit predates the removal of monolithic `vk.c`. **Line numbers and some call sites below are historical**; use `docs/ARCHITECTURE.md` and `rg` to find symbols today (`vk_init_device.c` for `vk.fboActive` from `r_fbo`, `vk_attachments.c` for `vk_alloc_attachments`, `vk_framebuffers.c`, `vk_presentation.c`, `vk_descriptor_sets.c`, `vk_post_fog.c`, `vk_frame_end.c`, `vk_volumetric_pass_compute.c`, etc.).
+
 ---
 
 ## 1. vk.fboActive — Where Set and What Triggers Recreation
 
 ### Where Set
-- **Location**: `vk.c` lines 6345–6353
+- **Location**: `vk_init_device.c` — `vk.fboActive` / `vk.msaaActive` from `r_fbo` and `r_ext_multisample` during device init (formerly cited as monolithic `vk.c` ~6345–6353).
 - **Source**: `r_fbo->integer` cvar (CVAR_ARCHIVE | CVAR_LATCH)
 - **Logic**:
   ```c
@@ -24,9 +26,9 @@
 
 ### When FBO Resources Are Recreated
 - **vid_restart**: Triggers full Vulkan reinit; `r_fbo` is CVAR_LATCH so it takes effect on restart.
-- **vk_create_framebuffers()**: Called from `vk_create_window()` (line 6245) and swapchain recreation (line 7241).
-- **vk_alloc_attachments()**: Creates `vk.color_image`, `vk.fog_scene_image`, `vk.smaa_output_image`, etc., only when `vk.fboActive` (line 5443).
-- **Render passes**: Created in `vk_create_render_passes()`; main pass layout depends on `fboActive`.
+- **`vk_create_framebuffers()`** (`vk_framebuffers.c`): Called from `vk_init_device.c` after swapchain + attachments + render passes, and from `vk_restore_presentation_targets()` in `vk_presentation.c` after swapchain rebuild (legacy `vk_create_window()` / swapchain paths were ~6245 / ~7241 in monolithic `vk.c`).
+- **`vk_alloc_attachments()`** (`vk_attachments.c`): Allocates `vk.color_image`, `vk.fog_scene_image`, `vk.smaa_output_image`, etc., when `vk.fboActive` (invoked from `vk_create_attachments()` in the same file; formerly ~5443 in legacy `vk.c`).
+- **Render passes**: `vk_create_render_passes()` in `vk_render_pass.c`; main pass layout depends on `fboActive`.
 
 ### Critical Dependency
 `r_fbo` is **CVAR_LATCH** — changes require `vid_restart` to take effect. No hot-swap of FBO on/off.
@@ -71,18 +73,18 @@
 ## 3. Descriptor Chain
 
 ### vk.color_descriptor
-- **Updated by**: `vk_update_color_descriptor_image(view)` and `vk_update_attachment_descriptors()`
+- **Updated by**: `vk_update_color_descriptor_image(view)` and `vk_update_attachment_descriptors()` (`vk_post_fog.c`, `vk_descriptor_sets.c`)
 - **Points to** (at different stages):
   - After volumetric + SMAA: `vk.smaa_output_image_view`
   - After volumetric, no SMAA: `vk.color_image_view`
-  - When volumetrics skipped: `vk.color_image_view` (fallback at 15290)
+  - When volumetrics skipped: `vk.color_image_view` (see end-of-frame / volumetric-skip paths in `vk_post_fog.c` and `vk_frame_end.c`)
 
 ### vk.luminance_descriptor
 - **Binding 0**: Input image (color or SMAA output) for luminance compute
 - **Binding 1**: `vk.luminance_image_view` (1×1 storage)
 - **Updated**:
-  - In `vk_volumetric_fog_pass()` (lines 14684–14711): `smaa_output` or `color_image_view`
-  - In volumetrics-skipped path (lines 15291–15321): `color_image_view` only
+  - From `vk_volumetric_fog_pass()` in `vk_volumetric_pass_compute.c` (and related modules): post-volumetric color source → luminance binding 0 (`smaa_output` or `color_image_view`)
+  - When volumetrics are skipped: `vk_update_luminance_descriptor_image()` in `vk_post_fog.c` / `vk_frame_end.c` — `color_image_view` only, aligned with gamma for that frame
 
 ### When Volumetrics Are Skipped
 - **luminance_descriptor binding 0** → `vk.color_image_view`
@@ -169,14 +171,8 @@ r_fbo 1:
 
 ## 6. Known Fixes and Guards
 
-### From Code Comments (lines 15287–15290)
-```c
-/* Volumetrics skipped (menu, no world, tier off): ensure gamma and
- * luminance passes sample from correct source. vk_volumetric_fog_pass
- * normally updates color_descriptor and luminance_descriptor; when
- * skipped, they may point at smaa_output from a previous frame. */
-vk_update_color_descriptor_image( vk.color_image_view );
-```
+### Descriptor refresh when volumetrics are skipped
+When the volumetric fog pass does not run, `color_descriptor` / `luminance_descriptor` must still target the HDR color the gamma pass will sample (see `vk_update_color_descriptor_image` / `vk_update_luminance_descriptor_image` in `vk_post_fog.c` and call sites in `vk_frame_end.c`, `vk_2d_transition.c`).
 
 ### QUICKSTART.md Workaround (line 57)
 - `r_exposure_auto 0` — disables eye adaptation

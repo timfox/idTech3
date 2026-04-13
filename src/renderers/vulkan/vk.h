@@ -261,8 +261,12 @@ typedef struct {
 #ifdef USE_VK_PBR
 	uint32_t				vk_pbr_flags;
 	int32_t					lightmap_bundle;
+	uint8_t					pbr_vert_mode; /* 0=default gen_vert, 1=glTF GPU skin+morph variant */
+	uint8_t					gltf_gpu_tangent_fixup; /* 1=vertex shader re-orthonormalizes T vs deformed N (r_gltfGpuTangentFix) */
+	uint8_t					pom_height_source; /* 0=ORM R (physical map), 1=normal map alpha (normalHeightMap) */
 	vec4_t					specularScale;
 	vec4_t					normalScale;
+	float					parallaxBias;
 #endif
 	unsigned int			hasFlowmap : 1;	// water flowmap: flow vectors offset texture UVs
 	int acff; // none, rgb, rgba, alpha
@@ -316,6 +320,8 @@ typedef struct vkUniform_s {
 	vec4_t pbrGlintFlags;
 	vec4_t pbrDebugMode; // x: debug mode selector
 	vec4_t pbrShCoeffs[9];
+	/* Parallax occlusion (POM): x=height scale, y=self-shadow strength, z=shadow ray steps (float bits as int), w=unused */
+	vec4_t pbrParallaxParams;
 #endif
 } vkUniform_t;
 
@@ -340,7 +346,8 @@ typedef struct vkUniformCamera_s {
 #define TESS_ENV   (512) // mark shader stage with environment mapping
 
 #ifdef USE_VK_PBR
-#define TESS_PBR   				( 1024 ) // PBR shader variant, qtangent vertex attribute and eyePos uniform
+/* Must not collide with TESS_ENT0 (1024). */
+#define TESS_PBR   				( 0x8000u ) // PBR shader variant, qtangent vertex attribute and eyePos uniform
 
 #define PBR_HAS_NORMALMAP		( 1 )
 #define PBR_HAS_PHYSICALMAP		( 2 )
@@ -434,6 +441,7 @@ void vk_release_resources( void );
 void vk_wait_idle( void );
 void vk_queue_wait_idle( void );
 VkSampleCountFlagBits vk_get_main_rasterization_samples( void );
+VkSampleCountFlagBits vk_get_main_rasterization_max_samples( void );
 float vk_get_msaa_min_sample_shading( void );
 
 //
@@ -460,6 +468,11 @@ void vk_set_color_write_mask( qboolean r, qboolean g, qboolean b, qboolean a );
 void vk_begin_frame( void );
 void vk_end_frame( void );
 void vk_present_frame( void );
+
+/* Swapchain + attachment teardown/recreate (Android surface recycle, swapchain restart) */
+void vk_teardown_presentation_targets( void );
+void vk_restore_presentation_targets( void );
+void vk_restart_swapchain( const char *funcname, VkResult res );
 void vk_prepare_2d( void );
 void vk_prepare_frame_temporal_state( void );
 void vk_reset_scene_src_rect_tracking( void );
@@ -899,6 +912,8 @@ typedef struct {
 		struct {
 #ifdef USE_VK_PBR
 			VkShaderModule gen[2][3][2][2][2]; // pbr[0,1], tx[0,1,2], cl[0,1] env0[0,1] fog[0,1]
+			/* +USE_GLTF_GPU_SKIN; last dim: 0=bind pose tangent, 1=r_gltfGpuTangentFix (skin+morph orthonormalize) */
+			VkShaderModule gen_gltf_gpu[2][3][2][2][2][2];
 			VkShaderModule ident1[2][2][2][2]; // pbr[0,1], tx[0,1], env0[0,1] fog[0,1]
 			VkShaderModule fixed[2][2][2][2];  // pbr[0,1], tx[0,1], env0[0,1] fog[0,1]
 #else
