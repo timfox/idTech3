@@ -36,10 +36,6 @@ VkCommandBuffer vk_begin_command_buffer( void )
 void vk_end_command_buffer( VkCommandBuffer command_buffer, const char *location )
 {
 	(void)location;
-#ifdef USE_UPLOAD_QUEUE
-	const VkPipelineStageFlags wait_dst_stage_mask = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-	VkSemaphore waits;
-#endif
 	VkSubmitInfo submit_info;
 	VkCommandBuffer cmdbuf[1];
 
@@ -49,20 +45,9 @@ void vk_end_command_buffer( VkCommandBuffer command_buffer, const char *location
 
 	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	submit_info.pNext = NULL;
-#ifdef USE_UPLOAD_QUEUE
-	if ( vk.rendering_finished != VK_NULL_HANDLE ) {
-		waits = vk.rendering_finished;
-		vk.rendering_finished = VK_NULL_HANDLE;
-		submit_info.waitSemaphoreCount = 1;
-		submit_info.pWaitSemaphores = &waits;
-		submit_info.pWaitDstStageMask = &wait_dst_stage_mask;
-	} else
-#endif
-	{
-		submit_info.waitSemaphoreCount = 0;
-		submit_info.pWaitSemaphores = NULL;
-		submit_info.pWaitDstStageMask = NULL;
-	}
+	submit_info.waitSemaphoreCount = 0;
+	submit_info.pWaitSemaphores = NULL;
+	submit_info.pWaitDstStageMask = NULL;
 
 	submit_info.commandBufferCount = 1;
 	submit_info.pCommandBuffers = cmdbuf;
