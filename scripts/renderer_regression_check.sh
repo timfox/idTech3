@@ -87,6 +87,18 @@ else
 fi
 
 echo ""
+echo "glTF morph cap: GLTF_MAX_MORPH_TARGETS vs IQM_MORPH_TOP_K (GPU SSBO packing):"
+GLTF_H="$PROJECT_ROOT/src/renderers/vulkan/tr_model_gltf.h"
+gltf_k="$(sed -n 's/^#define GLTF_MAX_MORPH_TARGETS[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$GLTF_H" | head -1)"
+if [[ -z "$gltf_k" || -z "$k_c" ]]; then
+  fail "could not parse GLTF_MAX_MORPH_TARGETS from tr_model_gltf.h or IQM_MORPH_TOP_K from tr_local.h"
+elif [[ "$gltf_k" != "$k_c" ]]; then
+  fail "GLTF_MAX_MORPH_TARGETS ($gltf_k) != IQM_MORPH_TOP_K ($k_c) — GPU morph SSBO layout will disagree with glTF loader"
+else
+  pass "GLTF_MAX_MORPH_TARGETS=$gltf_k matches IQM_MORPH_TOP_K"
+fi
+
+echo ""
 if [ -n "${GAME_BASE:-}" ]; then
   echo "Optional game base: $GAME_BASE"
   ASSETS_LIST="${GAME_ASSETS_LIST:-$PROJECT_ROOT/docs/samples/renderer_regression/OPTIONAL_GAME_ASSETS.txt}"
