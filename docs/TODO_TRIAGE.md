@@ -64,6 +64,15 @@ TODOs/FIXMEs in `src/external/` are from third-party code (duktape, zstd, cjson,
 | Vegetation wind draw | `vk_vegetation_wind.c` + draw path | Compute runs; wind-modified buffer not yet wired for final mesh draw. Future enhancement. |
 | Vulkan RTX | CMake `USE_VULKAN_RTX`, renderer init | Extensions can be requested when `USE_VULKAN_RTX=ON` and GPU supports them. Pipeline (BLAS/TLAS, shaders) not yet implemented. See `docs/RENDERERS_FUTURE.md`. |
 
+## Subsystem audit log (rolling)
+
+| Date | Scope | Notes |
+|------|--------|------|
+| 2026-04-11 | Network / downloads | `cl_curl.c`: `dl->Name` from `Content-Disposition` uses **`Q_strncpyz`** (Phase 2 P0 item remains fixed). |
+| 2026-04-11 | Botlib / preprocessor | **`src/botlib/l_precomp.c`** already bounded; duplicate **`src/platform/botlib/l_precomp.c`** and **`src/platform/win32/botlib/l_precomp.c`** aligned: `sprintf` → **`Com_sprintf(..., MAX_TOKEN, ...)`** (5 sites each). |
+| 2026-04-11 | Client / server / qcommon | `rg '\\b(TODO|FIXME)\\b' src/{client,server,qcommon}` — **no matches** (same triage expectation as 2026-04-10). |
+| 2026-04-11 | Renderer validation | `renderer_regression_check.sh` + manifest caps (`GLTF_MAX_*`, `IQM_*`) — CI-style parity checks on `main`. |
+
 ## Recommendations
 
 1. **net_sdr.c**: Full SDR implementation; requires `USE_STEAM_NETWORKING=ON` and Steamworks SDK.
