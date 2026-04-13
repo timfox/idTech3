@@ -19,11 +19,6 @@ extern "C" {
 void vk_clean_staging_buffer( void );
 void vk_alloc_staging_buffer( VkDeviceSize size );
 
-#ifdef USE_UPLOAD_QUEUE
-qboolean vk_wait_staging_buffer( void );
-void vk_flush_staging_buffer( qboolean final );
-#endif
-
 #ifdef __cplusplus
 }
 #endif

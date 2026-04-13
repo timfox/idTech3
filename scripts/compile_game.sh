@@ -55,6 +55,23 @@ for arg in "$@"; do
 done
 MOD_NAME=${MOD_NAME:-mymod}
 
+# Users often confuse renderer/backend names with mod names.
+_mod_lc="$(echo "$MOD_NAME" | tr '[:upper:]' '[:lower:]')"
+if [[ "$_mod_lc" == "vulkan" || "$_mod_lc" == "vk" || "$_mod_lc" == "opengl" || "$_mod_lc" == "gl" || "$_mod_lc" == "gles" ]]; then
+	echo "Error: \"$MOD_NAME\" is a renderer/backend, not a game mod under mods/<name>/gamesrc."
+	echo ""
+	echo "Build the engine (client + renderers):"
+	echo "  $SCRIPT_DIR/compile_engine.sh vulkan   # or: opengl"
+	echo ""
+	echo "Package the example demo mod (.pk3 only, no native game DLL):"
+	echo "  $PROJECT_ROOT/examples/demo_game/build_demo_pack.sh"
+	echo ""
+	echo "Compile a real mod from source (expects mods/$MOD_NAME/gamesrc/):"
+	echo "  $0 <mod_name>   # see mods/*/gamesrc"
+	exit 1
+fi
+unset _mod_lc
+
 MOD_ROOT="$PROJECT_ROOT/mods/$MOD_NAME"
 MOD_SOURCE_DIR="$MOD_ROOT/gamesrc"
 MOD_BUILD_DIR="$MOD_SOURCE_DIR/build"

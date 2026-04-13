@@ -29,6 +29,11 @@ Thread safety:
 #include "jobs.h"
 
 #if defined(_MSC_VER)
+/* CONDITION_VARIABLE / WakeConditionVariable require Vista+; q_platform.h defaults older. */
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
 /* Win32 threading via CreateThread + CRITICAL_SECTION + CONDITION_VARIABLE */
 #include <windows.h>
 

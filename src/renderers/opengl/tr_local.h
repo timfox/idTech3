@@ -45,6 +45,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define USE_VBO_GRID		/* put SF_GRID to VBO */
 #endif
 #include "tr_common.h"
+#include "../vulkan/tr_model_gltf.h"
 #include "iqm.h"
 #include "qgl.h"
 
@@ -83,6 +84,8 @@ typedef struct dlight_s {
 #endif
 } dlight_t;
 
+#define IQM_MORPH_MAX_CHANNELS 8
+#define IQM_MORPH_TOP_K 8
 
 // a trRefEntity_t has all the information passed in by
 // the client game, as well as some locally derived info
@@ -104,6 +107,13 @@ typedef struct {
 	vec3_t		shadowLightDir;	// normalized direction towards light
 #endif
 	qboolean	intShaderTime;
+	int			morphChannelCount;
+	uint32_t	morphChannelHashes[IQM_MORPH_MAX_CHANNELS];
+	float		morphChannelWeights[IQM_MORPH_MAX_CHANNELS];
+	int			morphActiveCount;
+	int			morphActiveTargetIndex[IQM_MORPH_TOP_K];
+	float		morphActiveWeight[IQM_MORPH_TOP_K];
+	float		morphDebugMaxAbsWeight;
 } trRefEntity_t;
 
 
@@ -610,6 +620,7 @@ typedef enum {
 	SF_MD3,
 	SF_MDR,
 	SF_IQM,
+	SF_GLTF,
 	SF_FLARE,
 	SF_ENTITY,				// beams, rails, lightning, etc that can be determined by entity
 
@@ -893,8 +904,28 @@ typedef enum {
 	MOD_BRUSH,
 	MOD_MESH,
 	MOD_MDR,
-	MOD_IQM
+	MOD_IQM,
+	MOD_GLTF
 } modtype_t;
+
+/* glTF primitive surface (CPU tess path on OpenGL; Vulkan may use GPU buffers) */
+typedef struct srfGLTFPrimitive_s {
+	surfaceType_t	surfaceType;
+	shader_t	*shader;
+	gltfVertex_t	*vertices;
+	int		numVertices;
+	uint32_t	*indices;
+	int		numIndices;
+	gltfMorphTarget_t *morphTargets;
+	int		numMorphTargets;
+	int		meshIndex;
+	uint64_t	vbo_vertex;
+	uint64_t	vbo_index;
+	uint64_t	vbo_vertex_offsets[10];
+	int		materialIndex;
+	qboolean	hasSkinning;
+	qboolean	hasMorphTargets;
+} srfGLTFPrimitive_t;
 
 typedef struct model_s {
 	char		name[MAX_QPATH];
@@ -904,7 +935,7 @@ typedef struct model_s {
 	int			dataSize;	// just for listing purposes
 	bmodel_t	*bmodel;		// only if type == MOD_BRUSH
 	md3Header_t	*md3[MD3_MAX_LODS];	// only if type == MOD_MESH
-	void	*modelData;			// only if type == (MOD_MDR | MOD_IQM)
+	void	*modelData;			// only if type == (MOD_MDR | MOD_IQM | MOD_GLTF)
 
 	int			 numLods;
 } model_t;
@@ -1238,7 +1269,6 @@ extern cvar_t	*r_fastsky;				// controls whether sky should be cleared or drawn
 extern cvar_t	*r_neatsky;				// nomip and nopicmip for skyboxes, cnq3 like look
 extern cvar_t	*r_drawSun;				// controls drawing of sun quad
 extern cvar_t	*r_dynamiclight;		// dynamic lights enabled/disabled
-extern cvar_t	*r_mergeLightmaps;
 #ifdef USE_PMLIGHT
 extern cvar_t	*r_dlightMode;			// 0 - vq3, 1 - pmlight
 extern cvar_t	*r_dlightSpecPower;		// 1 - 32
@@ -1250,6 +1280,8 @@ extern cvar_t	*r_dlightSaturation;	// 0.0 - 1.0
 #ifdef USE_VBO
 extern cvar_t	*r_vbo;
 #endif
+extern cvar_t	*r_morph;
+extern cvar_t	*r_gltfAnim;
 #ifdef USE_FBO
 extern cvar_t	*r_fbo;
 extern cvar_t	*r_hdr;
@@ -1749,7 +1781,10 @@ void R_MDRAddAnimSurfaces( trRefEntity_t *ent );
 void RB_MDRSurfaceAnim( mdrSurface_t *surface );
 qboolean R_LoadIQM (model_t *mod, void *buffer, int filesize, const char *name );
 void R_AddIQMSurfaces( trRefEntity_t *ent );
+void R_AddGLTFSurfaces( trRefEntity_t *ent );
+void R_GLTFModelBounds( const void *modelData, vec3_t mins, vec3_t maxs );
 void RB_IQMSurfaceAnim( const surfaceType_t *surface );
+void RB_GLTFSurface( const surfaceType_t *surface );
 int R_IQMLerpTag( orientation_t *tag, iqmData_t *data,
                   int startFrame, int endFrame,
                   float frac, const char *tagName );

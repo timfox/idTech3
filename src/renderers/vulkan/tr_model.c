@@ -205,6 +205,7 @@ typedef struct
 extern qhandle_t R_RegisterOBJ(const char *name, model_t *mod);
 extern qhandle_t R_RegisterMD5(const char *name, model_t *mod);
 extern qboolean  R_RegisterGLTF(const char *name, model_t *mod);
+extern qhandle_t R_RegisterMeshImport( const char *name, model_t *mod );
 
 static qhandle_t R_RegisterGLTF_Wrapper(const char *name, model_t *mod) {
 	return R_RegisterGLTF(name, mod) ? mod->index : 0;
@@ -215,6 +216,12 @@ static modelExtToLoaderMap_t modelLoaders[ ] =
 	{ "gltf", R_RegisterGLTF_Wrapper },
 	{ "glb",  R_RegisterGLTF_Wrapper },
 	{ "obj",  R_RegisterOBJ },
+	{ "stl",  R_RegisterMeshImport },
+	{ "dae",  R_RegisterMeshImport },
+	{ "fbx",  R_RegisterMeshImport },
+	{ "usd",  R_RegisterMeshImport },
+	{ "usda", R_RegisterMeshImport },
+	{ "ma",   R_RegisterMeshImport },
 	{ "md5mesh", R_RegisterMD5 },
 	{ "iqm",  R_RegisterIQM },
 	{ "mdr",  R_RegisterMDR },

@@ -34,4 +34,13 @@ echo "3. Running smoke test..."
 ./scripts/smoke_test.sh release
 echo ""
 
+echo "4. Renderer regression check (repo + GLSL)..."
+./scripts/renderer_regression_check.sh
+echo ""
+
+echo "5. Demo mod pack layout (idtech3_demo.pk3)..."
+chmod +x ./tests/scripts/test_demo_game_pk3.sh
+./tests/scripts/test_demo_game_pk3.sh
+echo ""
+
 echo "=== CI validation passed ==="

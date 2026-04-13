@@ -35,8 +35,16 @@ echo ""
 bin_path() {
   local bin="$1"
   local base="$RELEASE_DIR/$bin"
-  # Try: idtech3, idtech3.exe, idtech3.x64, idtech3.x64.exe, idtech3.x86_64, idtech3.aarch64
-  for candidate in "$base" "$base.exe" "$base.x64" "$base.x64.exe" "$base.x86_64" "$base.x86_64.exe" "$base.aarch64"; do
+  # Try: plain name, .exe, arch suffixes (Windows/Linux), macOS .app bundle executable
+  for candidate in \
+    "$base" "$base.exe" \
+    "$base.x64" "$base.x64.exe" "$base.x86_64" "$base.x86_64.exe" \
+    "$base.aarch64" "$base.arm" "$base.armv7l" \
+    "$base.aarch64.app/Contents/MacOS/$bin.aarch64" \
+    "$base.aarch64.app/Contents/MacOS/$bin" \
+    "$base.arm.app/Contents/MacOS/$bin.arm" \
+    "$base.arm.app/Contents/MacOS/$bin" \
+    "$base.app/Contents/MacOS/$bin"; do
     if [ -f "$candidate" ]; then
       echo "$candidate"
       return
@@ -86,7 +94,8 @@ echo ""
 echo "Server startup test:"
 SERVER_PATH="$(bin_path "idtech3_server")"
 if [ -n "$SERVER_PATH" ]; then
-  output="$(timeout 5 "$SERVER_PATH" +set dedicated 1 +set com_hunkMegs 64 +quit 2>&1 || true)"
+  # Parallel ctest (-j) can starve the server + duplicate glslang work; allow enough wall time.
+  output="$(timeout 25 "$SERVER_PATH" +set dedicated 1 +set com_hunkMegs 64 +quit 2>&1 || true)"
 
   if echo "$output" | grep -q "id Tech 3"; then
     pass "Server identifies as id Tech 3"
@@ -117,17 +126,22 @@ echo "Shader checks:"
 if command -v glslangValidator &>/dev/null; then
   shader_errors=0
   shader_dir="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl"
+  shader_count=0
 
-  for shader in "$shader_dir"/*.vert "$shader_dir"/*.frag; do
-    [ -f "$shader" ] || continue
-    if ! glslangValidator -V "$shader" -o /dev/null 2>/dev/null; then
-      fail "Shader validation failed: $(basename "$shader")"
+  while IFS= read -r -d '' shader; do
+    shader_count=$((shader_count + 1))
+    rel="${shader#"$PROJECT_ROOT"/}"
+    if ! err="$(glslangValidator -V "$shader" -o /dev/null 2>&1)"; then
+      echo "$err" >&2
+      fail "Shader validation failed: $rel"
       shader_errors=$((shader_errors + 1))
     fi
-  done
+  done < <(find "$shader_dir" -type f \( -name '*.vert' -o -name '*.frag' -o -name '*.geom' -o -name '*.comp' \) -print0 | sort -z)
 
-  if [ "$shader_errors" -eq 0 ]; then
-    pass "All standalone shaders pass validation"
+  if [ "$shader_count" -eq 0 ]; then
+    fail "No GLSL stage files found under $shader_dir"
+  elif [ "$shader_errors" -eq 0 ]; then
+    pass "All $shader_count GLSL stage files pass validation (recursive)"
   fi
 else
   warn "glslangValidator not found, skipping shader validation"

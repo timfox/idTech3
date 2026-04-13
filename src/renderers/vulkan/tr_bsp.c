@@ -521,12 +521,6 @@ static void R_LoadLightmaps( const lump_t *l, const lump_t *surfs ) {
 		}
 	}
 
-	if ( !r_mergeLightmaps->integer ) 
-	{
-		tr.worldDeluxeMapping = qfalse;
-		ri.Printf( PRINT_WARNING, "Deluxemapping requires cvar 'r_mergeLightmaps' to be enabled \n" );
-	}
-
 	if ( tr.worldDeluxeMapping )
 		numLightmaps >>= 1;
 #endif
@@ -534,7 +528,7 @@ static void R_LoadLightmaps( const lump_t *l, const lump_t *surfs ) {
 	// create all the lightmaps
 	tr.numLightmaps = numLightmaps;
 
-	if ( r_mergeLightmaps->integer && numLightmaps > 1 ) {
+	if ( numLightmaps > 1 ) {
 		// check for low texture sizes
 		if ( glConfig.maxTextureSize >= LIGHTMAP_LEN * 2 ) {
 			tr.mergeLightmaps = qtrue;
@@ -851,7 +845,7 @@ static void ParseFace( const dsurface_t *ds, const drawVert_t *verts, msurface_t
 			cv->points[i][8+j] = LittleFloat( verts[i].lightmap[j] );
 		}
 		R_ColorShiftLightingBytes( verts[i].color.rgba, (byte *)&cv->points[i][10], qtrue );
-		if ( lightmapNum >= 0 && r_mergeLightmaps->integer ) {
+		if ( lightmapNum >= 0 && tr.mergeLightmaps ) {
 			// adjust lightmap coords
 			cv->points[i][8] = cv->points[i][8] * tr.lightmapScale[0] + lightmapX;
 			cv->points[i][9] = cv->points[i][9] * tr.lightmapScale[1] + lightmapY;

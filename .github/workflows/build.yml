@@ -21,6 +21,7 @@ on:
       - next-gen-4
       - next-gen-5
       - proximity-voice-chat
+      - 'cursor/**'
     paths-ignore:
       - '**/*.md'
       - '**/LICENSE*'
@@ -63,15 +64,25 @@ jobs:
             ${{ matrix.prefix }}-cmake
             ${{ matrix.prefix }}-ninja
             ${{ matrix.prefix }}-pkgconf
-            ${{ matrix.prefix }}-SDL2
-            ${{ matrix.prefix }}-openal
-            ${{ matrix.prefix }}-freetype
-            ${{ matrix.prefix }}-lua
           msystem: ${{ matrix.msystem }}
           path-type: minimal
           release: false
-          update: false
-          cache: false
+          update: true
+          cache: true
+
+      - name: Install MSYS2 deps (retry on slow mirrors)
+        shell: msys2 {0}
+        run: |
+          set -e
+          pkgs="${{ matrix.prefix }}-SDL2 ${{ matrix.prefix }}-openal ${{ matrix.prefix }}-freetype ${{ matrix.prefix }}-lua ${{ matrix.prefix }}-openssl ${{ matrix.prefix }}-curl ${{ matrix.prefix }}-bullet"
+          for attempt in 1 2 3 4 5; do
+            # Refresh db + avoid spurious timeouts on congested mirrors (curl stack under pacman).
+            pacman -Sy --noconfirm || true
+            pacman -S --needed --noconfirm --disable-download-timeout $pkgs && exit 0
+            echo "pacman attempt $attempt failed, retrying in $((attempt * 20))s..."
+            sleep $((attempt * 20))
+          done
+          exit 1
 
       - uses: actions/checkout@v4
 
@@ -98,6 +109,7 @@ jobs:
           cmake --build build-vk-${{ matrix.btype }} -j$(nproc)
           mkdir -p bin
           cp -f build-vk-${{ matrix.btype }}/idtech3* bin/ || true
+          bash ./scripts/stage_mingw_runtime_dlls.sh bin
 
       - name: Build OpenGL
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
@@ -121,6 +133,17 @@ jobs:
             -Wno-dev
           cmake --build build-gl-${{ matrix.btype }} -j$(nproc)
           cp -f build-gl-${{ matrix.btype }}/idtech3* bin/ || true
+          bash ./scripts/stage_mingw_runtime_dlls.sh bin
+
+      - name: Verify PE architecture (native compat)
+        if: matrix.cc == 'gcc' && matrix.btype == 'Release'
+        shell: pwsh
+        run: ./scripts/windows_native_compat_check.ps1 -BinDir bin
+
+      - name: Verify PE exports (optional game DLLs; CMake disables dlopen renderer on Windows)
+        if: matrix.cc == 'gcc' && matrix.btype == 'Release'
+        shell: pwsh
+        run: ./scripts/windows_pe_exports_check.ps1 -BinDir bin -SkipRendererDlls
 
       - name: Smoke test
         if: ${{ github.event_name != 'release' && matrix.btype != 'Debug' }}
@@ -144,22 +167,77 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [arm64, x64]
-        btype: [Release, Debug]
         include:
+          # vcxproj TargetName differs Debug vs Release; never pass /p:TargetName on msbuild (breaks zlib via ProjectReference).
           - arch: arm64
             platform: ARM64
             suffix: .arm64
             pkg_suffix: arm64
-
+            btype: Release
+            msvc_out_ded: idtech3_server.exe
+            msvc_out_cli: idtech3.exe
+          - arch: arm64
+            platform: ARM64
+            suffix: .arm64
+            pkg_suffix: arm64
+            btype: Debug
+            msvc_out_ded: idtech3_server-debug.exe
+            msvc_out_cli: idtech3-debug.exe
           - arch: x64
             platform: x64
             suffix: .x64
             pkg_suffix: x86_64
+            btype: Release
+            msvc_out_ded: idtech3_server.exe
+            msvc_out_cli: idtech3.exe
+          - arch: x64
+            platform: x64
+            suffix: .x64
+            pkg_suffix: x86_64
+            btype: Debug
+            msvc_out_ded: idtech3_server-debug.exe
+            msvc_out_cli: idtech3-debug.exe
 
     steps:
       - uses: microsoft/setup-msbuild@v2
       - uses: actions/checkout@v4
+
+      - name: Install OpenSSL (Win64) for DTLS
+        shell: pwsh
+        run: |
+          $ok = $false
+          for ($i = 1; $i -le 5; $i++) {
+            choco install openssl -y --no-progress
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+            Write-Host "choco attempt $i failed (exit $LASTEXITCODE), retrying in $($i * 20)s..."
+            Start-Sleep -Seconds ($i * 20)
+          }
+          if (-not $ok) { throw "choco install openssl failed after retries" }
+          # GITHUB_ENV must not be written with unquoted paths containing spaces (cmd "echo a=b>>file" breaks at the first space).
+          $roots = @(
+            'C:\Program Files\OpenSSL-Win64',
+            'C:\Program Files\OpenSSL'
+          )
+          $found = $null
+          foreach ($r in $roots) {
+            $evp = Join-Path $r 'include\openssl\evp.h'
+            if (Test-Path -LiteralPath $evp) {
+              $found = $r
+              break
+            }
+          }
+          if (-not $found) {
+            $dirs = Get-ChildItem -Path 'C:\Program Files' -Directory -Filter 'OpenSSL*' -ErrorAction SilentlyContinue
+            foreach ($d in $dirs) {
+              $evp = Join-Path $d.FullName 'include\openssl\evp.h'
+              if (Test-Path -LiteralPath $evp) { $found = $d.FullName; break }
+            }
+          }
+          if (-not $found) {
+            throw "OpenSSL install did not expose include/openssl/evp.h under Program Files (DTLS MSVC build needs headers)."
+          }
+          Write-Host "OPENSSL_ROOT_DIR=$found"
+          "OPENSSL_ROOT_DIR=$found" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Build
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
@@ -167,34 +245,54 @@ jobs:
         run: |
           if not exist bin mkdir bin
 
+          if "%OPENSSL_ROOT_DIR%"=="" (
+            echo ERROR: OPENSSL_ROOT_DIR is not set — OpenSSL install/discovery step failed.
+            exit /b 1
+          )
+          if not exist "%OPENSSL_ROOT_DIR%\include\openssl\evp.h" (
+            echo ERROR: OpenSSL headers not found at "%OPENSSL_ROOT_DIR%\include\openssl\evp.h"
+            exit /b 1
+          )
+
           set MSBUILD_COMMON=/m ^
             /p:Configuration=${{ matrix.btype }} ^
             /p:Platform=${{ matrix.platform }} ^
             /p:PlatformToolset=v143 ^
             /p:TreatWarningsAsErrors=false
 
-          rem --- Dedicated server ---
+          rem --- Dedicated server (TargetName is idtech3_server in vcxproj; do not pass /p:TargetName — it poisons ProjectReference builds like zlib) ---
+          msbuild src\platform\win32\msvc2017\quake3e-ded.vcxproj ^
+            %MSBUILD_COMMON%
+          if errorlevel 1 exit /b 1
+          if not exist src\platform\win32\msvc2017\output\${{ matrix.msvc_out_ded }} (
+            echo ERROR: missing output\${{ matrix.msvc_out_ded }} after ded build
+            dir /b src\platform\win32\msvc2017\output 2>nul
+            exit /b 1
+          )
+          copy /Y src\platform\win32\msvc2017\output\${{ matrix.msvc_out_ded }} bin\idtech3_server${{ matrix.suffix }}.exe
+          if errorlevel 1 exit /b 1
           msbuild src\platform\win32\msvc2017\quake3e-ded.vcxproj ^
             %MSBUILD_COMMON% ^
-            /p:TargetName=idtech3_server
-          if exist src\platform\win32\msvc2017\output\idtech3_server.exe copy /Y src\platform\win32\msvc2017\output\idtech3_server.exe bin\idtech3_server${{ matrix.suffix }}.exe
-          msbuild src\platform\win32\msvc2017\quake3e-ded.vcxproj ^
-            %MSBUILD_COMMON% ^
-            /t:Clean ^
-            /p:TargetName=idtech3_server
+            /t:Clean
 
           rem --- OpenGL renderer + client ---
           msbuild src\platform\win32\msvc2017\opengl.vcxproj ^
             %MSBUILD_COMMON%
+          if errorlevel 1 exit /b 1
           msbuild src\platform\win32\msvc2017\quake3e.vcxproj ^
             %MSBUILD_COMMON% ^
-            /p:TargetName=idtech3 ^
             /p:UseWasapi=0
-          if exist src\platform\win32\msvc2017\output\idtech3.exe copy /Y src\platform\win32\msvc2017\output\idtech3.exe bin\idtech3${{ matrix.suffix }}.exe
+          if errorlevel 1 exit /b 1
+          if not exist src\platform\win32\msvc2017\output\${{ matrix.msvc_out_cli }} (
+            echo ERROR: missing output\${{ matrix.msvc_out_cli }} after OpenGL client build
+            dir /b src\platform\win32\msvc2017\output 2>nul
+            exit /b 1
+          )
+          copy /Y src\platform\win32\msvc2017\output\${{ matrix.msvc_out_cli }} bin\idtech3${{ matrix.suffix }}.exe
+          if errorlevel 1 exit /b 1
           msbuild src\platform\win32\msvc2017\quake3e.vcxproj ^
             %MSBUILD_COMMON% ^
             /t:Clean ^
-            /p:TargetName=idtech3 ^
             /p:UseWasapi=0
           msbuild src\platform\win32\msvc2017\opengl.vcxproj ^
             %MSBUILD_COMMON% ^
@@ -203,19 +301,91 @@ jobs:
           rem --- Vulkan renderer + client ---
           msbuild src\platform\win32\msvc2017\vulkan.vcxproj ^
             %MSBUILD_COMMON%
+          if errorlevel 1 exit /b 1
           msbuild src\platform\win32\msvc2017\quake3e.vcxproj ^
             %MSBUILD_COMMON% ^
-            /p:TargetName=idtech3 ^
             /p:UseWasapi=0
-          if exist src\platform\win32\msvc2017\output\idtech3.exe copy /Y src\platform\win32\msvc2017\output\idtech3.exe bin\idtech3-vulkan${{ matrix.suffix }}.exe
+          if errorlevel 1 exit /b 1
+          if not exist src\platform\win32\msvc2017\output\${{ matrix.msvc_out_cli }} (
+            echo ERROR: missing output\${{ matrix.msvc_out_cli }} after Vulkan client build
+            dir /b src\platform\win32\msvc2017\output 2>nul
+            exit /b 1
+          )
+          copy /Y src\platform\win32\msvc2017\output\${{ matrix.msvc_out_cli }} bin\idtech3-vulkan${{ matrix.suffix }}.exe
+          if errorlevel 1 exit /b 1
           msbuild src\platform\win32\msvc2017\quake3e.vcxproj ^
             %MSBUILD_COMMON% ^
             /t:Clean ^
-            /p:TargetName=idtech3 ^
             /p:UseWasapi=0
           msbuild src\platform\win32\msvc2017\vulkan.vcxproj ^
             %MSBUILD_COMMON% ^
             /t:Clean
+
+          dir /b bin
+
+      - name: Verify MSVC staging (Release artifact prep)
+        if: ${{ matrix.btype == 'Release' }}
+        shell: pwsh
+        run: |
+          $root = $env:GITHUB_WORKSPACE
+          $bin = Join-Path $root 'bin'
+          $out = Join-Path $root 'src/platform/win32/msvc2017/output'
+          $sfx = '${{ matrix.suffix }}'
+
+          Write-Host "PWD: $(Get-Location)"
+          Write-Host "`n--- bin ---"
+          if (Test-Path -LiteralPath $bin) { Get-ChildItem -LiteralPath $bin -File | ForEach-Object { $_.Name } } else { Write-Host '(missing)' }
+          Write-Host "`n--- msvc2017/output ---"
+          if (Test-Path -LiteralPath $out) {
+            Get-ChildItem -LiteralPath $out -File -Filter '*.exe' -ErrorAction SilentlyContinue | ForEach-Object { $_.Name }
+          } else { Write-Host '(missing)' }
+
+          $need = @(
+            "idtech3_server$sfx.exe",
+            "idtech3$sfx.exe",
+            "idtech3-vulkan$sfx.exe"
+          )
+          $missing = @()
+          foreach ($n in $need) {
+            $p = Join-Path $bin $n
+            if (-not (Test-Path -LiteralPath $p)) { $missing += $n }
+          }
+
+          if ($missing.Count -gt 0) {
+            Write-Host "`nAttempting fallback copy from output\ ..."
+            New-Item -ItemType Directory -Force -Path $bin | Out-Null
+            $ded = Join-Path $out '${{ matrix.msvc_out_ded }}'
+            $cli = Join-Path $out '${{ matrix.msvc_out_cli }}'
+            if (Test-Path -LiteralPath $ded) {
+              Copy-Item -LiteralPath $ded -Destination (Join-Path $bin "idtech3_server$sfx.exe") -Force
+            }
+            if (Test-Path -LiteralPath $cli) {
+              Copy-Item -LiteralPath $cli -Destination (Join-Path $bin "idtech3$sfx.exe") -Force
+              Copy-Item -LiteralPath $cli -Destination (Join-Path $bin "idtech3-vulkan$sfx.exe") -Force
+            }
+            $missing = @()
+            foreach ($n in $need) {
+              if (-not (Test-Path -LiteralPath (Join-Path $bin $n))) { $missing += $n }
+            }
+          }
+
+          if ($missing.Count -gt 0) {
+            Write-Host "`nSearch idtech3*.exe under msvc2017:"
+            Get-ChildItem -Path (Join-Path $root 'src/platform/win32/msvc2017') -Recurse -File -Filter 'idtech3*.exe' -ErrorAction SilentlyContinue |
+              ForEach-Object { $_.FullName }
+            throw "Staging incomplete; missing in bin: $($missing -join ', ')"
+          }
+          Write-Host "`nStaging OK for artifact upload."
+
+      - name: Verify PE architecture (native compat)
+        if: ${{ matrix.btype == 'Release' }}
+        shell: pwsh
+        run: ./scripts/windows_native_compat_check.ps1 -BinDir bin
+
+      - name: Verify PE exports (static renderer — no plugin DLLs)
+        if: ${{ matrix.btype == 'Release' }}
+        shell: pwsh
+        run: ./scripts/windows_pe_exports_check.ps1 -BinDir bin -SkipRendererDlls
 
       - uses: actions/upload-artifact@v4
         if: ${{ matrix.btype == 'Release' }}
@@ -243,9 +413,9 @@ jobs:
         run: |
           sudo rm -f /etc/apt/sources.list.d/azure-cli.list
           sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list
-          sudo apt-get -qq update
-          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev clang ccache
-          sudo apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools python3
+          sudo apt-get -o Acquire::Retries=5 -qq update
+          sudo apt-get -o Acquire::Retries=5 -y install cmake ninja-build g++ libstdc++-14-dev clang ccache
+          sudo apt-get -o Acquire::Retries=5 -y install libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3
 
       - uses: actions/checkout@v4
 
@@ -253,7 +423,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.ccache
-          key: ccache-ubuntu-x64-${{ matrix.cc }}-${{ matrix.btype }}-${{ github.sha }}
+          # Avoid github.sha in key (new blob every commit); hash build roots + workflow when they change.
+          key: ccache-ubuntu-x64-${{ matrix.cc }}-${{ matrix.btype }}-${{ hashFiles('CMakeLists.txt', 'cmake/**', '.github/workflows/build.yml') }}
           restore-keys: |
             ccache-ubuntu-x64-${{ matrix.cc }}-${{ matrix.btype }}-
 
@@ -347,8 +518,8 @@ jobs:
     steps:
       - name: Install tools
         run: |
-          sudo apt-get -qq update
-          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools python3
+          sudo apt-get -o Acquire::Retries=5 -qq update
+          sudo apt-get -o Acquire::Retries=5 -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3
 
       - uses: actions/checkout@v4
 
@@ -386,8 +557,8 @@ jobs:
     steps:
       - name: Install tools
         run: |
-          sudo apt-get -qq update
-          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools python3
+          sudo apt-get -o Acquire::Retries=5 -qq update
+          sudo apt-get -o Acquire::Retries=5 -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3
 
       - uses: actions/checkout@v4
 
@@ -427,9 +598,9 @@ jobs:
     steps:
       - name: Install tools
         run: |
-          sudo apt-get -qq update
-          sudo apt-get -y install cmake ninja-build g++ libstdc++-14-dev clang-tidy cppcheck ccache
-          sudo apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools python3
+          sudo apt-get -o Acquire::Retries=5 -qq update
+          sudo apt-get -o Acquire::Retries=5 -y install cmake ninja-build g++ libstdc++-14-dev clang-tidy cppcheck ccache
+          sudo apt-get -o Acquire::Retries=5 -y install libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3
 
       - uses: actions/checkout@v4
 
@@ -437,7 +608,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.ccache
-          key: ccache-static-${{ github.sha }}
+          key: ccache-static-${{ hashFiles('CMakeLists.txt', 'cmake/**', '.github/workflows/build.yml') }}
           restore-keys: |
             ccache-static-
 
@@ -511,9 +682,9 @@ jobs:
               export LDFLAGS="-mfpu=neon -mfloat-abi=hard"
             fi
 
-            apt-get -qq update
-            apt-get install -y make gcc g++ cmake ninja-build libstdc++-14-dev
-            apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools
+            apt-get -o Acquire::Retries=5 -qq update
+            apt-get -o Acquire::Retries=5 install -y make gcc g++ cmake ninja-build libstdc++-14-dev
+            apt-get -o Acquire::Retries=5 -y install libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools
 
             OUTDIR="${GITHUB_WORKSPACE}/bin"
             mkdir -p "$OUTDIR"
@@ -583,7 +754,16 @@ jobs:
 
     steps:
       - name: Install tools
-        run: brew install coreutils sdl2 openal-soft cmake ninja freetype lua molten-vk
+        run: |
+          set -e
+          for attempt in 1 2 3 4; do
+            if brew install coreutils sdl2 openal-soft cmake ninja freetype lua molten-vk bullet pkgconf; then
+              exit 0
+            fi
+            echo "brew install attempt $attempt failed, retrying in $((attempt * 20))s..."
+            sleep $((attempt * 20))
+          done
+          exit 1
 
       - uses: actions/checkout@v4
 
@@ -611,7 +791,7 @@ jobs:
             -DBUILD_FREETYPE=ON \
             -DENABLE_FORTIFY_SOURCE=OFF \
             -DENABLE_ASAN=OFF \
-            -DBUILD_SERVER=OFF \
+            -DBUILD_SERVER=ON \
             -DUSE_VULKAN=ON \
             -DRENDERER_DEFAULT=vulkan \
             -DSKIP_IDPAK_CHECK=ON \
@@ -622,6 +802,12 @@ jobs:
           cmake --build build-vk-${{ matrix.btype }} -j$(sysctl -n hw.logicalcpu)
           mkdir -p bin
           cp -f build-vk-${{ matrix.btype }}/idtech3* bin/ || true
+          # Bundle .app trees are directories; copy the actual Mach-O binaries for smoke_test / artifacts.
+          for app in build-vk-${{ matrix.btype }}/idtech3*.app; do
+            [ -d "$app" ] || continue
+            ex="$app/Contents/MacOS/$(basename "$app" .app)"
+            [ -f "$ex" ] && cp -f "$ex" bin/ || true
+          done
 
       - name: Build OpenGL
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
@@ -647,7 +833,7 @@ jobs:
             -DBUILD_FREETYPE=ON \
             -DENABLE_FORTIFY_SOURCE=OFF \
             -DENABLE_ASAN=OFF \
-            -DBUILD_SERVER=OFF \
+            -DBUILD_SERVER=ON \
             -DUSE_VULKAN=ON \
             -DRENDERER_DEFAULT=opengl \
             -DSKIP_IDPAK_CHECK=ON \
@@ -657,6 +843,11 @@ jobs:
             -Wno-dev
           cmake --build build-gl-${{ matrix.btype }} -j$(sysctl -n hw.logicalcpu)
           cp -f build-gl-${{ matrix.btype }}/idtech3* bin/ || true
+          for app in build-gl-${{ matrix.btype }}/idtech3*.app; do
+            [ -d "$app" ] || continue
+            ex="$app/Contents/MacOS/$(basename "$app" .app)"
+            [ -f "$ex" ] && cp -f "$ex" bin/ || true
+          done
 
       - name: Smoke test
         if: ${{ github.event_name != 'release' && matrix.btype != 'Debug' }}
@@ -697,12 +888,33 @@ jobs:
 
       - name: Install NDK
         run: |
-          sdkmanager --install "ndk;27.0.12077973" "cmake;3.22.1"
+          set -e
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          for attempt in 1 2 3 4 5; do
+            if sdkmanager --install "ndk;27.0.12077973" "cmake;3.22.1"; then
+              exit 0
+            fi
+            echo "sdkmanager attempt $attempt failed, retrying in $((attempt * 15))s..."
+            sleep $((attempt * 15))
+          done
+          exit 1
+
+      - name: Cache Android third-party downloads (Lua, FetchContent)
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.ci-android-deps
+          key: android-deps-${{ matrix.abi }}-${{ hashFiles('CMakeLists.txt', 'cmake/**', 'android/**', '.github/workflows/build.yml') }}
+          restore-keys: |
+            android-deps-${{ matrix.abi }}-
 
       - name: Build ${{ matrix.btype }} (${{ matrix.abi }})
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
         working-directory: android
+        env:
+          GIT_TERMINAL_PROMPT: 0
         run: |
+          sudo apt-get -o Acquire::Retries=5 update -qq
+          sudo apt-get -o Acquire::Retries=5 install -y --no-install-recommends make git perl
           # Use direct CMake cross-compile instead of Gradle to avoid
           # wrapper/SDK bootstrapping complexity in CI.
           NDK_HOME="${ANDROID_NDK_HOME:-$ANDROID_SDK_ROOT/ndk/27.0.12077973}"
@@ -715,32 +927,61 @@ jobs:
           fi
 
           mkdir -p build-android-${{ matrix.btype }}-${{ matrix.abi }}
-          cmake -S .. -B build-android-${{ matrix.btype }}-${{ matrix.abi }} \
-            -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
-            -DANDROID_ABI="$ANDROID_ABI" \
-            -DANDROID_PLATFORM=android-26 \
-            -DANDROID_STL=c++_shared \
-            -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
-            -DBUILD_SERVER=OFF \
-            -DUSE_VULKAN=ON \
-            -DUSE_RENDERER_DLOPEN=OFF \
-            -DRENDERER_DEFAULT=vulkan \
-            -DSKIP_IDPAK_CHECK=ON \
-            -DSKIP_SHADER_REGEN=ON \
-            -DUSE_SDL=OFF \
-            -DUSE_OPENAL=OFF \
-            -DUSE_CURL=OFF \
-            -DUSE_LUA=OFF \
-            -DUSE_DUKTAPE=OFF \
-            -DUSE_RECAST_NAV=OFF \
-            -DUSE_BULLET_PHYSICS=OFF \
-            -DBUILD_FREETYPE=OFF \
-            -DUSE_STB_TRUETYPE=ON \
-            -DENABLE_FORTIFY_SOURCE=OFF \
-            -DENABLE_ASAN=OFF \
-            -DCI_BUILD=OFF \
-            -Wno-dev
-          cmake --build build-android-${{ matrix.btype }}-${{ matrix.abi }} -j$(nproc)
+          mkdir -p "${GITHUB_WORKSPACE}/.ci-android-deps"
+          for attempt in 1 2 3; do
+            if cmake -S .. -B build-android-${{ matrix.btype }}-${{ matrix.abi }} \
+              -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
+              -DANDROID_ABI="$ANDROID_ABI" \
+              -DANDROID_PLATFORM=android-26 \
+              -DANDROID_STL=c++_shared \
+              -DANDROID_DEPS_CACHE="${GITHUB_WORKSPACE}/.ci-android-deps" \
+              -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
+              -DBUILD_SERVER=OFF \
+              -DUSE_VULKAN=ON \
+              -DUSE_RENDERER_DLOPEN=OFF \
+              -DRENDERER_DEFAULT=vulkan \
+              -DSKIP_IDPAK_CHECK=ON \
+              -DSKIP_SHADER_REGEN=ON \
+              -DUSE_SDL=OFF \
+              -DUSE_OPENAL=OFF \
+              -DUSE_CURL=ON \
+              -DUSE_LUA=ON \
+              -DUSE_DUKTAPE=ON \
+              -DUSE_FFMPEG=ON \
+              -DUSE_DAV1D=ON \
+              -DUSE_VPX=ON \
+              -DUSE_THEORA=ON \
+              -DUSE_FLUX=ON \
+              -DUSE_RECAST_NAV=ON \
+              -DUSE_BULLET_PHYSICS=ON \
+              -DBUILD_FREETYPE=ON \
+              -DUSE_DTLS=ON \
+              -DENABLE_FORTIFY_SOURCE=OFF \
+              -DENABLE_ASAN=OFF \
+              -DCI_BUILD=OFF \
+              -Wno-dev; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "cmake configure failed after 3 attempts"
+              exit 1
+            fi
+            echo "cmake configure attempt $attempt failed, cleaning build dir and retrying in $((attempt * 20))s..."
+            rm -rf "build-android-${{ matrix.btype }}-${{ matrix.abi }}"
+            mkdir -p "build-android-${{ matrix.btype }}-${{ matrix.abi }}"
+            sleep $((attempt * 20))
+          done
+          for attempt in 1 2 3; do
+            if cmake --build build-android-${{ matrix.btype }}-${{ matrix.abi }} -j$(nproc); then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "cmake --build failed after 3 attempts"
+              exit 1
+            fi
+            echo "cmake --build attempt $attempt failed, retrying in $((attempt * 25))s..."
+            sleep $((attempt * 25))
+          done
 
           mkdir -p ../bin
           find build-android-${{ matrix.btype }}-${{ matrix.abi }} -maxdepth 2 \
@@ -756,10 +997,80 @@ jobs:
           if-no-files-found: warn
           retention-days: 5
 
+  # One universal debug APK (arm64-v8a + armeabi-v7a). Separated from per-ABI CMake matrix to avoid duplicate Gradle/OpenSSL builds.
+  android-apk:
+    name: Android debug APK (Gradle)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK, CMake (match app/build.gradle), SDK platform 35
+        run: |
+          set -e
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          for attempt in 1 2 3 4 5; do
+            if sdkmanager --install "ndk;27.0.12077973" "cmake;3.31.6" "platforms;android-35" "build-tools;35.0.0"; then
+              exit 0
+            fi
+            echo "sdkmanager attempt $attempt failed, retrying in $((attempt * 15))s..."
+            sleep $((attempt * 15))
+          done
+          exit 1
+
+      - name: Cache Android third-party downloads
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.ci-android-deps
+          key: android-apk-deps-${{ hashFiles('CMakeLists.txt', 'android/app/build.gradle') }}
+          restore-keys: |
+            android-apk-deps-
+
+      - name: Assemble debug APK
+        if: ${{ github.event_name != 'release' }}
+        working-directory: android
+        env:
+          ANDROID_DEPS_CACHE: ${{ github.workspace }}/.ci-android-deps
+          GIT_TERMINAL_PROMPT: 0
+        run: |
+          sudo apt-get -o Acquire::Retries=5 update -qq
+          sudo apt-get -o Acquire::Retries=5 install -y --no-install-recommends make git perl
+          chmod +x ./gradlew
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME}}"
+          echo "sdk.dir=${SDK_ROOT}" > local.properties
+          for attempt in 1 2 3; do
+            if ./gradlew assembleDebug --no-daemon -PandroidDepsCache="${ANDROID_DEPS_CACHE}"; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "gradlew assembleDebug failed after 3 attempts"
+              exit 1
+            fi
+            echo "gradlew attempt $attempt failed, retrying in $((attempt * 30))s..."
+            sleep $((attempt * 30))
+          done
+          ls -la app/build/outputs/apk/debug/
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ github.event_name != 'release' }}
+        with:
+          name: android-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn
+          retention-days: 5
+
   release-attach:
     name: Attach artifacts to release
     if: always() && !cancelled() && github.event_name == 'release' && github.event.action == 'published'
-    needs: [windows-msys, windows-msvc, ubuntu-x86_64, ubuntu-arm, macos, android]
+    needs: [windows-msys, windows-msvc, ubuntu-x86_64, ubuntu-arm, macos, android, android-apk]
     runs-on: ubuntu-24.04
     permissions:
       contents: write

@@ -2,6 +2,17 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.24)
 
 PROJECT(idtech3 VERSION 1.0.0 LANGUAGES C CXX)
 
+# Android: optional persistent cache for Lua tarball + FetchContent (FreeType). CI sets -DANDROID_DEPS_CACHE=...
+if(ANDROID)
+  set(ANDROID_DEPS_CACHE "" CACHE PATH
+    "If set, reuse this directory for Android third-party downloads (Lua ExternalProject, FetchContent). Speeds CI and clean rebuilds.")
+  if(ANDROID_DEPS_CACHE AND NOT ANDROID_DEPS_CACHE STREQUAL "")
+    file(MAKE_DIRECTORY "${ANDROID_DEPS_CACHE}")
+    set(FETCHCONTENT_BASE_DIR "${ANDROID_DEPS_CACHE}/fetchcontent" CACHE PATH "FetchContent base directory (Android deps cache)" FORCE)
+    message(STATUS "ANDROID_DEPS_CACHE: ${ANDROID_DEPS_CACHE}")
+  endif()
+endif()
+
 if(NOT ANDROID)
   find_package(Threads REQUIRED)
 endif()
@@ -24,6 +35,7 @@ option(CI_BUILD "Enable CI-specific behaviors such as warnings-as-errors" OFF)
 option(USE_FLUX "Enable FLUX.2 image generation support" ON)
 option(ENABLE_FORTIFY_SOURCE "Enable _FORTIFY_SOURCE=2 buffer overflow protection (GCC/Clang)" ON)
 option(ENABLE_ASAN "Enable AddressSanitizer for memory error detection (Debug builds)" OFF)
+option(BUILD_EXAMPLE_DEMO_GAME "Build examples/demo_game (idtech3_demo.pk3 + helper)" OFF)
 
 if(C_STANDARD_STRICT)
   if(MSVC)
@@ -224,6 +236,7 @@ set(DUKTAPE_LINK_LIBRARIES "")
 set(DUKTAPE_EXTRA_LIBRARIES "")
 
 if(USE_LUA)
+if(NOT ANDROID)
   set(_LUA_HINT_PATHS
     $ENV{LUA_DIR}
     $ENV{LUA_PATH}
@@ -379,6 +392,81 @@ if(USE_LUA)
       list(APPEND LUA_LINK_LIBRARIES ${LUA_EXTRA_LIBRARIES})
     endif()
   endif()
+endif()
+endif()
+
+# Android NDK: build static Lua from upstream source (no system pkg-config)
+set(LUA_ANDROID_BUILT FALSE)
+if(ANDROID AND USE_LUA AND NOT LUA_FOUND)
+  include(ExternalProject)
+  # Lua upstream ships a GNU Makefile; CMAKE_MAKE_PROGRAM is often Ninja on Android — use make.
+  find_program(LUA_ANDROID_MAKE_EXE NAMES make gmake)
+  if(NOT LUA_ANDROID_MAKE_EXE)
+    message(FATAL_ERROR "GNU make (make) is required to build Lua for Android but was not found in PATH.")
+  endif()
+  set(_LUA_ANDROID_VER "5.4.7")
+  set(_LUA_ANDROID_SHA "9fbf5e28ef86c69858f6d3d34eccc32e911c1a28b4120ff3e84aaa70cfbf1e30")
+  # One prefix per ABI — Gradle builds arm64 and armeabi-v7a in the same CMake binary dir; a shared
+  # "lua-android/" would leave the wrong-arch liblua.a from whichever ABI configured first.
+  set(_LUA_ANDROID_PREFIX "${CMAKE_BINARY_DIR}/lua-android-${ANDROID_ABI}")
+  set(_LUA_EP_EXTRA "")
+  if(ANDROID_DEPS_CACHE AND NOT ANDROID_DEPS_CACHE STREQUAL "")
+    set(_LUA_DL_DIR "${ANDROID_DEPS_CACHE}/externalproject-downloads")
+    file(MAKE_DIRECTORY "${_LUA_DL_DIR}")
+    list(APPEND _LUA_EP_EXTRA DOWNLOAD_DIR "${_LUA_DL_DIR}")
+  endif()
+  # Lua src/Makefile sets "AR= ar rcu" and invokes $(AR) target objs — AR must be "llvm-ar rcu", not bare llvm-ar.
+  # ANDROID may set CMAKE_C_COMPILER to bare NDK clang (no --target); without it, objects are host x86_64.
+  if(DEFINED ANDROID_PLATFORM_LEVEL AND NOT ANDROID_PLATFORM_LEVEL STREQUAL "")
+    set(_LUA_API "${ANDROID_PLATFORM_LEVEL}")
+  elseif(ANDROID_PLATFORM MATCHES "android-([0-9]+)")
+    set(_LUA_API "${CMAKE_MATCH_1}")
+  else()
+    set(_LUA_API "26")
+  endif()
+  if(ANDROID_ABI STREQUAL "arm64-v8a")
+    set(_LUA_CLANG_TARGET "aarch64-none-linux-android${_LUA_API}")
+  elseif(ANDROID_ABI STREQUAL "armeabi-v7a")
+    set(_LUA_CLANG_TARGET "armv7-none-linux-androideabi${_LUA_API}")
+  elseif(ANDROID_ABI STREQUAL "x86")
+    set(_LUA_CLANG_TARGET "i686-none-linux-android${_LUA_API}")
+  elseif(ANDROID_ABI STREQUAL "x86_64")
+    set(_LUA_CLANG_TARGET "x86_64-none-linux-android${_LUA_API}")
+  else()
+    set(_LUA_CLANG_TARGET "aarch64-none-linux-android${_LUA_API}")
+  endif()
+  set(_LUA_CC_WRAPPER "${CMAKE_C_COMPILER} --target=${_LUA_CLANG_TARGET}")
+  if(CMAKE_SYSROOT)
+    string(APPEND _LUA_CC_WRAPPER " --sysroot=${CMAKE_SYSROOT}")
+  endif()
+  set(_LUA_MAKE_CC "CC=${_LUA_CC_WRAPPER}")
+  set(_LUA_MAKE_AR "AR=${CMAKE_AR} rcu")
+  set(_LUA_MAKE_RANLIB "RANLIB=${CMAKE_RANLIB}")
+  ExternalProject_Add(lua_android_ep
+    URL "https://www.lua.org/ftp/lua-${_LUA_ANDROID_VER}.tar.gz"
+    URL_HASH "SHA256=${_LUA_ANDROID_SHA}"
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    ${_LUA_EP_EXTRA}
+    CONFIGURE_COMMAND ""
+    # Lua src/Makefile sets "CC= gcc" (not ?=); pass overrides on the make line (one argv each).
+    BUILD_COMMAND ${LUA_ANDROID_MAKE_EXE} -C <SOURCE_DIR>/src
+      ${_LUA_MAKE_CC} ${_LUA_MAKE_AR} ${_LUA_MAKE_RANLIB} liblua.a MYCFLAGS=-fPIC
+    INSTALL_COMMAND ${CMAKE_COMMAND} -E make_directory "${_LUA_ANDROID_PREFIX}/lib" "${_LUA_ANDROID_PREFIX}/include"
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/src/liblua.a "${_LUA_ANDROID_PREFIX}/lib/liblua.a"
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/src/lua.h "${_LUA_ANDROID_PREFIX}/include/"
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/src/luaconf.h "${_LUA_ANDROID_PREFIX}/include/"
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/src/lauxlib.h "${_LUA_ANDROID_PREFIX}/include/"
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/src/lualib.h "${_LUA_ANDROID_PREFIX}/include/"
+    BUILD_BYPRODUCTS "${_LUA_ANDROID_PREFIX}/lib/liblua.a"
+  )
+  set(LUA_FOUND TRUE)
+  set(LUA_INCLUDE_DIR "${_LUA_ANDROID_PREFIX}/include")
+  set(LUA_LIBRARY "${_LUA_ANDROID_PREFIX}/lib/liblua.a")
+  set(LUA_LINK_LIBRARIES "${LUA_LIBRARY}")
+  set(LUA_VERSION_STRING "${_LUA_ANDROID_VER}")
+  set(LUA_VERSION_NUM 504)
+  set(LUA_ANDROID_BUILT TRUE)
+  message(STATUS "Lua for Android: will build static ${_LUA_ANDROID_VER} via ExternalProject (first build downloads tarball)")
 endif()
 
 if(USE_DUKTAPE)
@@ -756,13 +844,62 @@ OPTION(USE_SDL "" ON)
 OPTION(USE_OPENAL "Enable OpenAL audio backend" ON)
 OPTION(USE_CURL "" ON)
 OPTION(USE_LOCAL_HEADERS "" ON)
+
+# libcurl (HTTP/HTTPS downloads). Linked into client when found.
+set(CURL_FOUND FALSE)
+set(CURL_LIBRARIES "")
+set(CURL_INCLUDE_DIRS "")
+if(USE_CURL)
+  if(ANDROID)
+    # Restrict search to the NDK sysroot only. NO_CMAKE_FIND_ROOT_PATH would search the
+    # host (e.g. /usr/include) and pull in glibc headers while compiling for Android.
+    find_path(CURL_INCLUDE_DIR
+      NAMES curl/curl.h
+      PATHS "${CMAKE_SYSROOT}/usr/include"
+      NO_DEFAULT_PATH)
+    if(CURL_INCLUDE_DIR)
+      set(_CURL_ABI_DIR "")
+      if(ANDROID_ABI STREQUAL "arm64-v8a")
+        set(_CURL_ABI_DIR "aarch64-linux-android")
+      elseif(ANDROID_ABI STREQUAL "armeabi-v7a")
+        set(_CURL_ABI_DIR "arm-linux-androideabi")
+      endif()
+      set(_CURL_LIB_HINTS "")
+      if(_CURL_ABI_DIR AND DEFINED ANDROID_PLATFORM_LEVEL)
+        list(APPEND _CURL_LIB_HINTS
+          "${CMAKE_SYSROOT}/usr/lib/${_CURL_ABI_DIR}/${ANDROID_PLATFORM_LEVEL}"
+          "${CMAKE_SYSROOT}/usr/lib/${_CURL_ABI_DIR}")
+      endif()
+      find_library(CURL_LIBRARY
+        NAMES curl libcurl
+        PATHS ${_CURL_LIB_HINTS}
+        NO_DEFAULT_PATH)
+    endif()
+    if(CURL_INCLUDE_DIR AND CURL_LIBRARY)
+      set(CURL_FOUND TRUE)
+      set(CURL_INCLUDE_DIRS "${CURL_INCLUDE_DIR}")
+      set(CURL_LIBRARIES "${CURL_LIBRARY}")
+      message(STATUS "libcurl (Android): ${CURL_LIBRARY}")
+    else()
+      message(WARNING "USE_CURL is ON but libcurl was not found under the NDK sysroot. Install NDK curl or disable USE_CURL.")
+    endif()
+  else()
+    find_package(CURL QUIET)
+    if(CURL_FOUND)
+      set(CURL_INCLUDE_DIRS ${CURL_INCLUDE_DIRS})
+      set(CURL_LIBRARIES ${CURL_LIBRARIES})
+      message(STATUS "libcurl: ${CURL_LIBRARIES}")
+    else()
+      message(WARNING "USE_CURL is ON but CMake could not find CURL. Install libcurl development packages or disable USE_CURL.")
+    endif()
+  endif()
+endif()
 OPTION(USE_VULKAN "" ON)
 OPTION(USE_MP3 "Enable MP3 codec support" ON)
 #
 OPTION(USE_ZLIB "Enable zlib support (vendored)" ON)
 OPTION(USE_LIBPNG "Enable libpng support (vendored)" ON)
 OPTION(USE_GLM "Enable glm headers (vendored)" ON)
-OPTION(USE_LIBRSVG "Enable SVG image loading via librsvg/cairo backend" ON)
 OPTION(USE_SYSTEM_JPEG "" OFF)
 OPTION(USE_RENDERER_DLOPEN "" ON)
 if(WIN32 AND USE_RENDERER_DLOPEN)
@@ -781,10 +918,10 @@ else()
 endif()
 OPTION(SKIP_IDPAK_CHECK "Skip checking for original Quake III pak files (pak0.pk3)" ON)
 OPTION(BUILD_FREETYPE "Enable FreeType-powered font rendering / font generation" ON)
-if(BUILD_FREETYPE AND NOT ANDROID)
+if(BUILD_FREETYPE)
 	include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/DownloadInterFonts.cmake)
 endif()
-OPTION(USE_DTLS "Enable DTLS encryption for game network traffic" OFF)
+OPTION(USE_DTLS "Enable DTLS encryption for game network traffic (OpenSSL)" ON)
 OPTION(USE_STEAM "Enable Steam API (achievements, overlay, rich presence, Deck detection)" OFF)
 OPTION(USE_STEAM_NETWORKING "Enable Steam Datagram Relay (SDR) transport" OFF)
 OPTION(USE_VULKAN_RTX "Enable Vulkan ray tracing (VK_KHR_ray_tracing_*); requires RT-capable GPU" OFF)
@@ -817,23 +954,6 @@ set(EXTERNAL_JPEG_SRC_DIR "${EXTERNAL_SRC}/jpeg")
 set(EXTERNAL_ZLIB_SRC "${EXTERNAL_SRC}/zlib")
 set(EXTERNAL_LIBPNG_SRC "${EXTERNAL_SRC}/libpng")
 set(EXTERNAL_GLM_INCLUDE "${EXTERNAL_SRC}/glm")
-
-set(HAVE_LIBRSVG FALSE)
-if(USE_LIBRSVG)
-  find_package(PkgConfig QUIET)
-  if(PKG_CONFIG_FOUND)
-    pkg_check_modules(LIBRSVG QUIET IMPORTED_TARGET librsvg-2.0)
-    pkg_check_modules(CAIRO QUIET IMPORTED_TARGET cairo)
-    if(LIBRSVG_FOUND AND CAIRO_FOUND)
-      set(HAVE_LIBRSVG TRUE)
-      message(STATUS "SVG loader: enabled (librsvg + cairo)")
-    else()
-      message(STATUS "SVG loader: disabled (install librsvg2-dev and libcairo2-dev)")
-    endif()
-  else()
-    message(STATUS "SVG loader: disabled (pkg-config not available)")
-  endif()
-endif()
 
 if(UNIX AND NOT APPLE AND NOT ANDROID)
   find_package(X11 REQUIRED)
@@ -912,11 +1032,35 @@ if(USE_LIBPNG)
 endif()
 
 if(BUILD_FREETYPE)
-  find_package(Freetype REQUIRED)
+  if(ANDROID)
+    find_package(Freetype QUIET)
+    if(NOT Freetype_FOUND)
+      include(FetchContent)
+      set(FT_DISABLE_ZLIB ON CACHE BOOL "" FORCE)
+      set(FT_DISABLE_BZIP2 ON CACHE BOOL "" FORCE)
+      set(FT_DISABLE_PNG ON CACHE BOOL "" FORCE)
+      set(FT_DISABLE_HARFBUZZ ON CACHE BOOL "" FORCE)
+      set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+      FetchContent_Declare(freetype_android_fc
+        GIT_REPOSITORY https://github.com/freetype/freetype.git
+        GIT_TAG VER-2-13-2
+        GIT_SHALLOW TRUE
+      )
+      FetchContent_MakeAvailable(freetype_android_fc)
+    endif()
+  else()
+    find_package(Freetype REQUIRED)
+  endif()
   add_library(idtech3_freetype INTERFACE)
   target_compile_definitions(idtech3_freetype INTERFACE BUILD_FREETYPE)
-  target_include_directories(idtech3_freetype INTERFACE ${FREETYPE_INCLUDE_DIRS})
-  target_link_libraries(idtech3_freetype INTERFACE ${FREETYPE_LIBRARIES})
+  if(TARGET Freetype::Freetype)
+    target_link_libraries(idtech3_freetype INTERFACE Freetype::Freetype)
+  elseif(TARGET freetype)
+    target_link_libraries(idtech3_freetype INTERFACE freetype)
+  else()
+    target_include_directories(idtech3_freetype INTERFACE ${FREETYPE_INCLUDE_DIRS})
+    target_link_libraries(idtech3_freetype INTERFACE ${FREETYPE_LIBRARIES})
+  endif()
 endif()
 
 AUX_SOURCE_DIRECTORY(src/qcommon QCOMMON_SRCS)
@@ -928,14 +1072,118 @@ list(FILTER QCOMMON_SRCS EXCLUDE REGEX ".*net_sdr\\.c")
 
 # USE_DTLS: DTLS encryption (requires OpenSSL)
 set(USE_DTLS_FOUND FALSE)
+set(USE_DTLS_ANDROID_BUILT FALSE)
+set(OPENSSL_ANDROID_INTERFACE_TARGET "")
 if(USE_DTLS)
   find_package(OpenSSL QUIET)
   if(OpenSSL_FOUND)
     list(APPEND QCOMMON_SRCS src/qcommon/net_dtls.c)
     set(USE_DTLS_FOUND TRUE)
-    message(STATUS "DTLS: enabled (OpenSSL)")
-  else()
-    message(WARNING "USE_DTLS requested but OpenSSL not found; DTLS disabled")
+    message(STATUS "DTLS: enabled (OpenSSL ${OPENSSL_VERSION})")
+  elseif(ANDROID)
+    option(OPENSSL_ANDROID_AUTOBUILD "Build static OpenSSL from source for Android when find_package fails" ON)
+    if(OPENSSL_ANDROID_AUTOBUILD)
+      find_program(OPENSSL_ANDROID_MAKE_EXE NAMES make gmake)
+      find_program(OPENSSL_ANDROID_PERL_EXE NAMES perl)
+      if(NOT OPENSSL_ANDROID_MAKE_EXE OR NOT OPENSSL_ANDROID_PERL_EXE)
+        message(WARNING "USE_DTLS on Android needs Perl + GNU make to build OpenSSL; install or set OPENSSL_ROOT_DIR. DTLS disabled.")
+      else()
+        include(ExternalProject)
+        set(_OSSL_VER "3.0.15")
+        set(_OSSL_SHA "23c666d0edf20f14249b3d8f0368acaee9ab585b09e1de82107c66e1f3ec9533")
+        if(ANDROID_ABI STREQUAL "arm64-v8a")
+          set(_OSSL_OS "android-arm64")
+        elseif(ANDROID_ABI STREQUAL "armeabi-v7a")
+          set(_OSSL_OS "android-arm")
+        else()
+          set(_OSSL_OS "android-${ANDROID_ABI}")
+        endif()
+        set(_OSSL_PREFIX "${CMAKE_BINARY_DIR}/openssl-android-${ANDROID_ABI}")
+        set(_OSSL_API "${ANDROID_PLATFORM_LEVEL}")
+        if(NOT _OSSL_API OR _OSSL_API STREQUAL "")
+          set(_OSSL_API 26)
+        endif()
+        set(_OSSL_DL_EXTRA "")
+        if(ANDROID_DEPS_CACHE AND NOT ANDROID_DEPS_CACHE STREQUAL "")
+          set(_OSSL_DL "${ANDROID_DEPS_CACHE}/externalproject-downloads")
+          file(MAKE_DIRECTORY "${_OSSL_DL}")
+          set(_OSSL_DL_EXTRA DOWNLOAD_DIR "${_OSSL_DL}")
+        endif()
+        set(_NDK_ROOT "$ENV{ANDROID_NDK}")
+        if(NOT _NDK_ROOT AND DEFINED ANDROID_NDK)
+          set(_NDK_ROOT "${ANDROID_NDK}")
+        endif()
+        if(NOT _NDK_ROOT OR _NDK_ROOT STREQUAL "")
+          message(WARNING "USE_DTLS on Android: ANDROID_NDK not set; OpenSSL Configure may fail.")
+        endif()
+        # OpenSSL 3 Configure expects NDK clang/gcc on PATH (NOTES-ANDROID.md). CMake's
+        # ANDROID_NDK_HOME / toolchain file do not put toolchains/llvm/prebuilt/.../bin on PATH.
+        set(_OSSL_PATH "$ENV{PATH}")
+        if(_NDK_ROOT AND IS_DIRECTORY "${_NDK_ROOT}/toolchains/llvm/prebuilt")
+          file(GLOB _ndk_llvm_prebuilt "${_NDK_ROOT}/toolchains/llvm/prebuilt/*")
+          list(LENGTH _ndk_llvm_prebuilt _ndk_pb_len)
+          if(_ndk_pb_len GREATER 0)
+            list(GET _ndk_llvm_prebuilt 0 _ndk_llvm_hostdir)
+            set(_ndk_llvm_bin "${_ndk_llvm_hostdir}/bin")
+            if(EXISTS "${_ndk_llvm_bin}")
+              if(CMAKE_HOST_WIN32)
+                set(_OSSL_PATH "${_ndk_llvm_bin};$ENV{PATH}")
+              else()
+                set(_OSSL_PATH "${_ndk_llvm_bin}:$ENV{PATH}")
+              endif()
+            endif()
+          endif()
+        endif()
+        ExternalProject_Add(openssl_android_ep
+          URL "https://www.openssl.org/source/openssl-${_OSSL_VER}.tar.gz"
+          URL_HASH "SHA256=${_OSSL_SHA}"
+          DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+          INSTALL_DIR "${_OSSL_PREFIX}"
+          ${_OSSL_DL_EXTRA}
+          CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env
+            "ANDROID_NDK_ROOT=${_NDK_ROOT}"
+            "PATH=${_OSSL_PATH}"
+            "CC=${CMAKE_C_COMPILER}"
+            "AR=${CMAKE_AR}"
+            "RANLIB=${CMAKE_RANLIB}"
+            ${CMAKE_COMMAND} -E chdir <SOURCE_DIR>
+            ${OPENSSL_ANDROID_PERL_EXE} ./Configure ${_OSSL_OS}
+            no-shared no-tests
+            -D__ANDROID_API__=${_OSSL_API}
+            --prefix=<INSTALL_DIR>
+            --openssldir=<INSTALL_DIR>/ssl
+          BUILD_COMMAND ${CMAKE_COMMAND} -E env
+            "ANDROID_NDK_ROOT=${_NDK_ROOT}"
+            "PATH=${_OSSL_PATH}"
+            ${CMAKE_COMMAND} -E chdir <SOURCE_DIR>
+            ${OPENSSL_ANDROID_MAKE_EXE} build_libs
+          INSTALL_COMMAND ${CMAKE_COMMAND} -E env
+            "PATH=${_OSSL_PATH}"
+            ${CMAKE_COMMAND} -E chdir <SOURCE_DIR>
+            ${OPENSSL_ANDROID_MAKE_EXE} install_sw
+          BUILD_BYPRODUCTS
+            "${_OSSL_PREFIX}/lib/libssl.a"
+            "${_OSSL_PREFIX}/lib/libcrypto.a"
+        )
+        add_library(openssl_android_iface INTERFACE)
+        target_include_directories(openssl_android_iface INTERFACE "${_OSSL_PREFIX}/include")
+        target_link_libraries(openssl_android_iface INTERFACE
+          "${_OSSL_PREFIX}/lib/libssl.a"
+          "${_OSSL_PREFIX}/lib/libcrypto.a"
+          dl)
+        add_dependencies(openssl_android_iface openssl_android_ep)
+        list(APPEND QCOMMON_SRCS src/qcommon/net_dtls.c)
+        set(USE_DTLS_FOUND TRUE)
+        set(USE_DTLS_ANDROID_BUILT TRUE)
+        set(OPENSSL_ANDROID_INTERFACE_TARGET openssl_android_iface)
+        set(OPENSSL_INCLUDE_DIR "${_OSSL_PREFIX}/include")
+        message(STATUS "DTLS: will build static OpenSSL ${_OSSL_VER} for Android (${_OSSL_OS}, ExternalProject)")
+      endif()
+    else()
+      message(WARNING "USE_DTLS is ON but OpenSSL was not found for Android and OPENSSL_ANDROID_AUTOBUILD=OFF. Set OPENSSL_ROOT_DIR or enable autobuild.")
+    endif()
+  elseif(NOT ANDROID AND NOT OpenSSL_FOUND)
+    message(WARNING "USE_DTLS is ON but OpenSSL was not found (install libssl-dev / OpenSSL SDK). DTLS disabled for this configure.")
   endif()
 endif()
 
@@ -972,42 +1220,43 @@ if(USE_STEAM OR USE_STEAM_NETWORKING)
   endif()
 endif()
 
-# add platform-dependent QVM bytecode compilers
-IF(CMAKE_SYSTEM_PROCESSOR MATCHES AMD64|x86|i*86)
-	IF(CMAKE_SYSTEM_PROCESSOR MATCHES AMD64)
-		IF(WIN32)
-			SET(BINEXT .x64)
-		ELSE()
-			SET(BINEXT .x86_64)
-		ENDIF()
-		SET(RENDEXT _x86_64)
-	ELSE()
-		#SET(BINEXT .x86)
-		SET(RENDEXT _x86)
-	ENDIF()
+# add platform-dependent QVM bytecode compilers (unknown CPU = interpreter-only, NO_VM_COMPILED)
+set(NO_VM_COMPILED ON)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES AMD64|x86|i*86)
+	if(CMAKE_SYSTEM_PROCESSOR MATCHES AMD64)
+		if(WIN32)
+			set(BINEXT .x64)
+		else()
+			set(BINEXT .x86_64)
+		endif()
+		set(RENDEXT _x86_64)
+	else()
+		#set(BINEXT .x86)
+		set(RENDEXT _x86)
+	endif()
 	list(APPEND QCOMMON_SRCS src/qcommon/vm_x86.c)
-ELSEIF(CMAKE_SYSTEM_PROCESSOR MATCHES aarch64|arm64)
-	SET(BINEXT .aarch64)
-	SET(RENDEXT _aarch64)
+	set(NO_VM_COMPILED OFF)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES aarch64|arm64)
+	set(BINEXT .aarch64)
+	set(RENDEXT _aarch64)
 	list(APPEND QCOMMON_SRCS src/qcommon/vm_aarch64.c)
-ELSEIF(CMAKE_SYSTEM_PROCESSOR MATCHES arm*)
-	SET(BINEXT .arm)
-	SET(RENDEXT _arm)
+	set(NO_VM_COMPILED OFF)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES arm*)
+	set(BINEXT .arm)
+	set(RENDEXT _arm)
 	list(APPEND QCOMMON_SRCS src/qcommon/vm_armv7l.c)
-	ELSEIF(CMAKE_SYSTEM_PROCESSOR MATCHES "ppc64le|ppc64")
-		IF(CMAKE_SYSTEM_PROCESSOR MATCHES "ppc64le")
-			SET(BINEXT .ppc64le)
-			SET(RENDEXT _ppc64le)
-			list(APPEND QCOMMON_SRCS src/qcommon/vm_powerpc.c)
-		ELSE()
-			SET(BINEXT .ppc64)
-			SET(RENDEXT _ppc64)
-			list(APPEND QCOMMON_SRCS src/qcommon/vm_powerpc.c)
-		ENDIF()
-ELSE()
-	TARGET_COMPILE_DEFINITIONS(qcommon PRIVATE -DNO_VM_COMPILED)
-	TARGET_COMPILE_DEFINITIONS(qcommon_ded PRIVATE -DNO_VM_COMPILED)
-ENDIF()
+	set(NO_VM_COMPILED OFF)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "ppc64le|ppc64")
+	if(CMAKE_SYSTEM_PROCESSOR MATCHES "ppc64le")
+		set(BINEXT .ppc64le)
+		set(RENDEXT _ppc64le)
+	else()
+		set(BINEXT .ppc64)
+		set(RENDEXT _ppc64)
+	endif()
+	list(APPEND QCOMMON_SRCS src/qcommon/vm_powerpc.c)
+	set(NO_VM_COMPILED OFF)
+endif()
 
 # Normalize a simple arch identifier for renderer filenames (x86_64, x86, arm64, arm)
 if(CMAKE_SYSTEM_PROCESSOR MATCHES AMD64|x86_64|X86_64)
@@ -1049,6 +1298,9 @@ if(USE_LUA AND LUA_FOUND)
   target_compile_definitions(qcommon PRIVATE USE_LUA)
   target_include_directories(qcommon PRIVATE ${LUA_INCLUDE_DIR})
 endif()
+if(LUA_ANDROID_BUILT)
+  add_dependencies(qcommon lua_android_ep)
+endif()
 if(USE_DUKTAPE AND DUKTAPE_FOUND)
   target_compile_definitions(qcommon PRIVATE USE_DUKTAPE)
   target_include_directories(qcommon PRIVATE ${DUKTAPE_INCLUDE_DIR})
@@ -1056,7 +1308,12 @@ endif()
 if(USE_DTLS_FOUND)
   target_compile_definitions(qcommon PRIVATE USE_DTLS=1)
   target_include_directories(qcommon PRIVATE ${OPENSSL_INCLUDE_DIR})
-  target_link_libraries(qcommon PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+  if(USE_DTLS_ANDROID_BUILT AND OPENSSL_ANDROID_INTERFACE_TARGET)
+    target_link_libraries(qcommon PRIVATE ${OPENSSL_ANDROID_INTERFACE_TARGET})
+    add_dependencies(qcommon openssl_android_ep)
+  else()
+    target_link_libraries(qcommon PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+  endif()
 endif()
 if(USE_STEAM_NETWORKING)
   target_compile_definitions(qcommon PRIVATE USE_STEAM_NETWORKING=1 STEAMWORKS_AVAILABLE=${STEAMWORKS_AVAILABLE})
@@ -1083,6 +1340,9 @@ if(USE_LUA AND LUA_FOUND)
   target_compile_definitions(qcommon_ded PRIVATE USE_LUA)
   target_include_directories(qcommon_ded PRIVATE ${LUA_INCLUDE_DIR})
 endif()
+if(LUA_ANDROID_BUILT)
+  add_dependencies(qcommon_ded lua_android_ep)
+endif()
 if(USE_DUKTAPE AND DUKTAPE_FOUND)
   target_compile_definitions(qcommon_ded PRIVATE USE_DUKTAPE)
   target_include_directories(qcommon_ded PRIVATE ${DUKTAPE_INCLUDE_DIR})
@@ -1090,7 +1350,12 @@ endif()
 if(USE_DTLS_FOUND)
   target_compile_definitions(qcommon_ded PRIVATE USE_DTLS=1)
   target_include_directories(qcommon_ded PRIVATE ${OPENSSL_INCLUDE_DIR})
-  target_link_libraries(qcommon_ded PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+  if(USE_DTLS_ANDROID_BUILT AND OPENSSL_ANDROID_INTERFACE_TARGET)
+    target_link_libraries(qcommon_ded PRIVATE ${OPENSSL_ANDROID_INTERFACE_TARGET})
+    add_dependencies(qcommon_ded openssl_android_ep)
+  else()
+    target_link_libraries(qcommon_ded PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+  endif()
 endif()
 if(USE_STEAM_NETWORKING)
   target_compile_definitions(qcommon_ded PRIVATE USE_STEAM_NETWORKING=1)
@@ -1111,10 +1376,10 @@ if(SKIP_IDPAK_CHECK)
   TARGET_COMPILE_DEFINITIONS(qcommon_ded PRIVATE SKIP_IDPAK_CHECK=1)
 endif()
 
-IF(NO_VM_COMPILED)
-	TARGET_COMPILE_DEFINITIONS(qcommon PRIVATE NO_VM_COMPILED)
-	TARGET_COMPILE_DEFINITIONS(qcommon_ded PRIVATE NO_VM_COMPILED)
-ENDIF()
+if(NO_VM_COMPILED)
+	target_compile_definitions(qcommon PRIVATE NO_VM_COMPILED=1)
+	target_compile_definitions(qcommon_ded PRIVATE NO_VM_COMPILED=1)
+endif()
 
 # client + cURL
 # client sources
@@ -1167,6 +1432,7 @@ list(APPEND CLIENT_SRCS
   src/game/g_horde.c
   src/game/g_goap.c
   src/game/g_aiml.c
+  src/game/g_engine_systems.c
   src/game/g_bt.c
   src/game/g_entity_bridge.c
   src/game/g_lua_bindings.c
@@ -1201,8 +1467,11 @@ IF(UNIX AND CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64|x86|i.86|x86_64|X86_64")
     set(ASM_SRCS "")
   endif()
 ENDIF()
-IF(NOT USE_CURL)
+IF(NOT USE_CURL OR NOT CURL_FOUND)
 	list(REMOVE_ITEM CLIENT_SRCS src/client/cl_curl.c)
+ENDIF()
+IF(USE_CURL AND NOT CURL_FOUND)
+	message(WARNING "USE_CURL is ON but libcurl was not found; cl_curl disabled.")
 ENDIF()
 IF(NOT USE_MP3)
 	list(REMOVE_ITEM CLIENT_SRCS src/client/snd_codec_mp3.c)
@@ -1302,6 +1571,19 @@ if(USE_THEORA)
 else()
   list(REMOVE_ITEM CLIENT_SRCS src/client/cl_cin_theora.c)
 endif()
+
+# pkg-config resolves *host* FFmpeg/dav1d/vpx/Theora; never use those include paths for NDK targets.
+if(ANDROID)
+  set(FFMPEG_FOUND FALSE)
+  set(DAV1D_FOUND FALSE)
+  set(VPX_FOUND FALSE)
+  set(THEORA_FOUND FALSE)
+  list(REMOVE_ITEM CLIENT_SRCS src/client/cl_cin_ffmpeg.c)
+  list(REMOVE_ITEM CLIENT_SRCS src/client/cl_cin_dav1d.c)
+  list(REMOVE_ITEM CLIENT_SRCS src/client/cl_cin_vpx.c)
+  list(REMOVE_ITEM CLIENT_SRCS src/client/cl_cin_theora.c)
+  message(STATUS "Android: host pkg-config video codecs disabled (FFmpeg/dav1d/vpx/Theora); use vendor/NDK builds to re-enable")
+endif()
 # --- End modern video codec support ---
 
 #ADD_LIBRARY(client OBJECT ${CLIENT_SRCS})
@@ -1321,6 +1603,10 @@ IF(USE_SYSTEM_JPEG)
 	endif()
 	if(USE_GLM)
 		target_include_directories(client PRIVATE ${EXTERNAL_GLM_INCLUDE})
+	endif()
+	if(USE_CURL AND CURL_FOUND)
+		target_include_directories(client PRIVATE ${CURL_INCLUDE_DIRS})
+		target_link_libraries(client PRIVATE ${CURL_LIBRARIES})
 	endif()
 	TARGET_LINK_LIBRARIES(client ${JPEG_LIBRARIES})
 ELSE()
@@ -1348,6 +1634,10 @@ ELSE()
 	if(USE_GLM)
 		target_include_directories(client PRIVATE ${EXTERNAL_GLM_INCLUDE})
 	endif()
+	if(USE_CURL AND CURL_FOUND)
+		target_include_directories(client PRIVATE ${CURL_INCLUDE_DIRS})
+		target_link_libraries(client PRIVATE ${CURL_LIBRARIES})
+	endif()
 ENDIF()
 
 # renderers
@@ -1362,6 +1652,10 @@ set(RENDERER_COMMON_SRCS
 	src/renderers/common/tr_image_qoi.c
 	src/renderers/common/tr_image_dds.c
 	src/renderers/common/tr_image_svg.c
+	src/renderers/common/tr_model_mesh_import.c
+	src/renderers/vulkan/tr_model_gltf.c
+	src/renderers/vulkan/tr_model_obj.c
+	src/renderers/vulkan/tr_model_md5.c
 	src/renderers/common/tr_image_ktx2.c
 	src/renderers/common/tr_noise.c
 )
@@ -1446,6 +1740,7 @@ IF(USE_RENDERER_DLOPEN)
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_RENDERER_DLOPEN RENDERER_PREFIX="${RENDERER_PREFIX}")
 
 	ADD_LIBRARY(${RENDERER_PREFIX}_opengl${RENDEXT} SHARED ${RENDERER_GL_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
+	target_sources(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE src/renderers/opengl/tr_gltf_rb_opengl.c)
 	TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE USE_RENDERER_DLOPEN RENDERER_OPENGL)
 	IF(BUILD_FREETYPE)
 		target_link_libraries(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE idtech3_freetype)
@@ -1461,12 +1756,6 @@ IF(USE_RENDERER_DLOPEN)
 	IF(BUILD_FREETYPE)
 		target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE idtech3_freetype)
 	ENDIF()
-	if(HAVE_LIBRSVG)
-		target_compile_definitions(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE USE_LIBRSVG)
-		target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_LIBRSVG)
-		target_link_libraries(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE PkgConfig::LIBRSVG PkgConfig::CAIRO)
-		target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE PkgConfig::LIBRSVG PkgConfig::CAIRO)
-	endif()
 	if(WIN32)
 		target_link_libraries(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE qcommon m ${CMAKE_DL_LIBS})
 		target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE qcommon m ${CMAKE_DL_LIBS})
@@ -1490,6 +1779,11 @@ IF(USE_RENDERER_DLOPEN)
 	set(RENDERER_OUT_Vulkan "idtech3_vulkan")
 	set_target_properties(${RENDERER_PREFIX}_opengl${RENDEXT} PROPERTIES OUTPUT_NAME ${RENDERER_OUT_OPengl} PREFIX "")
 	set_target_properties(${RENDERER_PREFIX}_vulkan${RENDEXT} PROPERTIES OUTPUT_NAME ${RENDERER_OUT_Vulkan} PREFIX "")
+	# MinGW/PE: without this, renderer DLLs can link but export no symbols (GetRefAPI missing) — breaks dlopen on Windows.
+	if(WIN32)
+		set_target_properties(${RENDERER_PREFIX}_opengl${RENDEXT} ${RENDERER_PREFIX}_vulkan${RENDEXT}
+			PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+	endif()
 ELSE()
 	IF(USE_VULKAN)
 		ADD_LIBRARY(${RENDERER_PREFIX}_vulkan OBJECT ${RENDERER_VK_SRCS} ${RENDERER_COMMON_SRCS})
@@ -1501,20 +1795,13 @@ ELSE()
 		IF(BUILD_FREETYPE)
 			target_link_libraries(${RENDERER_PREFIX}_vulkan PRIVATE idtech3_freetype)
 		ENDIF()
-		if(HAVE_LIBRSVG)
-			target_compile_definitions(${RENDERER_PREFIX}_vulkan PRIVATE USE_LIBRSVG)
-			target_link_libraries(${RENDERER_PREFIX}_vulkan PRIVATE PkgConfig::LIBRSVG PkgConfig::CAIRO)
-		endif()
 	ELSE()
 		ADD_LIBRARY(${RENDERER_PREFIX}_opengl OBJECT ${RENDERER_GL_SRCS} ${RENDERER_COMMON_SRCS})
+		target_sources(${RENDERER_PREFIX}_opengl PRIVATE src/renderers/opengl/tr_gltf_rb_opengl.c)
 		TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_opengl PRIVATE RENDERER_OPENGL)
 		IF(BUILD_FREETYPE)
 			target_link_libraries(${RENDERER_PREFIX}_opengl PRIVATE idtech3_freetype)
 		ENDIF()
-		if(HAVE_LIBRSVG)
-			target_compile_definitions(${RENDERER_PREFIX}_opengl PRIVATE USE_LIBRSVG)
-			target_link_libraries(${RENDERER_PREFIX}_opengl PRIVATE PkgConfig::LIBRSVG PkgConfig::CAIRO)
-		endif()
 	ENDIF()
 ENDIF()
 
@@ -1591,9 +1878,13 @@ endif()
 # cgltf include for glTF 2.0 model loading
 if(USE_RENDERER_DLOPEN)
   target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${EXTERNAL_INCLUDE}/cgltf)
+  target_include_directories(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE ${EXTERNAL_INCLUDE}/cgltf)
 else()
   if(USE_VULKAN)
     target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${EXTERNAL_INCLUDE}/cgltf)
+  endif()
+  if(NOT USE_VULKAN)
+    target_include_directories(${RENDERER_PREFIX}_opengl PRIVATE ${EXTERNAL_INCLUDE}/cgltf)
   endif()
 endif()
 
@@ -1634,7 +1925,10 @@ IF(ANDROID)
 	SET(Q3_SRCS
 		src/platform/unix/unix_shared.c
 		src/platform/android/android_stubs.c
-		src/platform/android/android_main.c)
+		src/platform/android/android_main.c
+		src/platform/android/android_asset_bootstrap.c
+		src/platform/android/android_logcat.c
+		src/platform/android/android_touch_overlay.c)
 	SET(Q3_UI_SRCS "")
 ELSEIF(UNIX)
 	SET (Q3_SRCS
@@ -1705,7 +1999,7 @@ ELSEIF(WIN32)
 		IF(USE_VULKAN AND NOT USE_SDL)
 			list(APPEND Q3_UI_SRCS src/platform/win32/win_qvk.c)
 		ENDIF()
-	ENDIF(UNIX)
+ENDIF()
 
 # Audio backends/effects are built with the client module only.
 
@@ -1907,7 +2201,7 @@ set(PHYSICS_SRCS
 )
 
 set(BULLET_FOUND FALSE)
-if(USE_BULLET_PHYSICS)
+if(USE_BULLET_PHYSICS AND NOT ANDROID)
   find_package(PkgConfig QUIET)
   if(PKG_CONFIG_FOUND)
     pkg_check_modules(BULLET_PKG QUIET bullet)
@@ -1920,6 +2214,8 @@ if(USE_BULLET_PHYSICS)
   if(NOT BULLET_FOUND)
     message(STATUS "Bullet Physics: C wrapper only (install libbullet-dev for full backend)")
   endif()
+elseif(USE_BULLET_PHYSICS AND ANDROID)
+  message(STATUS "Bullet Physics: C wrapper only on Android (no host pkg-config Bullet)")
 endif()
 
 ADD_LIBRARY(phys_module OBJECT ${PHYSICS_SRCS})
@@ -1941,6 +2237,12 @@ IF(ANDROID)
 ELSE()
 	ADD_EXECUTABLE(${CNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
 ENDIF()
+if(LUA_ANDROID_BUILT)
+	add_dependencies(${CNAME}${BINEXT} lua_android_ep)
+endif()
+if(ANDROID AND USE_DTLS_ANDROID_BUILT)
+	add_dependencies(${CNAME}${BINEXT} openssl_android_ep)
+endif()
 if(TARGET q3ui)
 	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE qcommon botlib client q3ui phys_module)
 else()
@@ -1984,7 +2286,12 @@ ENDIF()
 # dedicated server executable (not built on Android)
 
 IF(NOT ANDROID)
+# Dedicated server must be a console subsystem on Windows so CI smoke tests can read stdout.
+IF(WIN32)
+ADD_EXECUTABLE(${DNAME}${BINEXT} ${Q3_SRCS})
+ELSE()
 ADD_EXECUTABLE(${DNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
+ENDIF()
 TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE qcommon_ded botlib)
 if(TARGET Threads::Threads)
   TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE Threads::Threads)
@@ -2057,7 +2364,17 @@ add_test(NAME smoke_test
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(smoke_test PROPERTIES
 	LABELS "validation;smoke"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/release/idtech3_server")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/release/idtech3_server"
+	# Avoid parallel runs with renderer_regression_check (both hammer glslang; server startup is CPU-sensitive).
+	RESOURCE_LOCK "idtech3_headless_validation")
+
+add_test(NAME renderer_regression_check
+	COMMAND ${CMAKE_SOURCE_DIR}/scripts/renderer_regression_check.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(renderer_regression_check PROPERTIES
+	LABELS "validation;renderer"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/renderer_regression_check.sh"
+	RESOURCE_LOCK "idtech3_headless_validation")
 
 add_test(NAME check_artifacts
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/check_artifacts.sh ${CMAKE_SOURCE_DIR}/release
@@ -2066,11 +2383,18 @@ set_tests_properties(check_artifacts PROPERTIES
 	LABELS "validation;artifacts"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/release/idtech3_server")
 
-add_test(NAME test_run_vulkan_launcher
+add_test(NAME test_run_vulkan_script
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_run_vulkan.sh ${CMAKE_SOURCE_DIR}/scripts/run_vulkan.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-set_tests_properties(test_run_vulkan_launcher PROPERTIES
-	LABELS "unit;regression;scripts")
+set_tests_properties(test_run_vulkan_script PROPERTIES
+	LABELS "unit;scripts;validation")
+
+add_test(NAME test_demo_game_pk3
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_demo_game_pk3.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_demo_game_pk3 PROPERTIES
+	LABELS "scripts;validation;examples"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_demo_game_pk3.sh")
 
 # --- Unit tests ---
 option(BUILD_UNIT_TESTS "Build unit tests" ON)
@@ -2079,4 +2403,126 @@ if(BUILD_UNIT_TESTS)
 	target_include_directories(unit_macros PRIVATE ${CMAKE_SOURCE_DIR}/src)
 	add_test(NAME unit_macros COMMAND unit_macros)
 	set_tests_properties(unit_macros PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_qmath tests/unit/test_q_math.c src/qcommon/q_math.c)
+	target_include_directories(unit_qmath PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_qmath PRIVATE m)
+	endif()
+	add_test(NAME unit_qmath COMMAND unit_qmath)
+	set_tests_properties(unit_qmath PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_surfaceflags tests/unit/test_surfaceflags.c)
+	target_include_directories(unit_surfaceflags PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	add_test(NAME unit_surfaceflags COMMAND unit_surfaceflags)
+	set_tests_properties(unit_surfaceflags PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_qhelpers
+		tests/unit/test_q_helpers.c
+		tests/stub_qcommon_min.c
+		src/qcommon/q_shared.c
+		src/qcommon/q_math.c)
+	target_include_directories(unit_qhelpers PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_qhelpers PRIVATE m)
+	endif()
+	add_test(NAME unit_qhelpers COMMAND unit_qhelpers)
+	set_tests_properties(unit_qhelpers PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_crc
+		tests/unit/test_crc.c
+		tests/stub_qcommon_min.c
+		src/qcommon/q_shared.c
+		src/qcommon/q_math.c)
+	target_include_directories(unit_crc PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_crc PRIVATE m)
+	endif()
+	add_test(NAME unit_crc COMMAND unit_crc)
+	set_tests_properties(unit_crc PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_pathutil
+		tests/unit/test_pathutil.c
+		tests/stub_qcommon_min.c
+		src/qcommon/q_shared.c
+		src/qcommon/q_math.c)
+	target_include_directories(unit_pathutil PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_pathutil PRIVATE m)
+	endif()
+	add_test(NAME unit_pathutil COMMAND unit_pathutil)
+	set_tests_properties(unit_pathutil PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_msg
+		tests/unit/test_msg.c
+		tests/stub_qcommon_min.c
+		tests/stub_msg_cvar.c
+		src/qcommon/msg.c
+		src/qcommon/huffman_static.c)
+	target_include_directories(unit_msg PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_compile_definitions(unit_msg PRIVATE DEDICATED)
+	if(NOT MSVC)
+		target_link_libraries(unit_msg PRIVATE m)
+	endif()
+	add_test(NAME unit_msg COMMAND unit_msg)
+	set_tests_properties(unit_msg PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_info
+		tests/unit/test_info.c
+		tests/stub_qcommon_min.c
+		src/qcommon/q_shared.c
+		src/qcommon/q_math.c)
+	target_include_directories(unit_info PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_info PRIVATE m)
+	endif()
+	add_test(NAME unit_info COMMAND unit_info)
+	set_tests_properties(unit_info PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_cm_bounds
+		tests/unit/test_cm_bounds.c
+		src/qcommon/cm_bounds.c
+		src/qcommon/q_math.c)
+	target_include_directories(unit_cm_bounds PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_cm_bounds PRIVATE m)
+	endif()
+	add_test(NAME unit_cm_bounds COMMAND unit_cm_bounds)
+	set_tests_properties(unit_cm_bounds PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_parse
+		tests/unit/test_parse.c
+		tests/stub_qcommon_min.c
+		src/qcommon/q_shared.c
+		src/qcommon/q_math.c)
+	target_include_directories(unit_parse PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_parse PRIVATE m)
+	endif()
+	add_test(NAME unit_parse COMMAND unit_parse)
+	set_tests_properties(unit_parse PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_endian
+		tests/unit/test_endian.c
+		tests/stub_qcommon_min.c
+		src/qcommon/q_shared.c
+		src/qcommon/q_math.c)
+	target_include_directories(unit_endian PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_endian PRIVATE m)
+	endif()
+	add_test(NAME unit_endian COMMAND unit_endian)
+	set_tests_properties(unit_endian PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_vm_native_module
+		tests/unit/test_vm_native_module.c
+		src/qcommon/vm_native_module.c)
+	target_include_directories(unit_vm_native_module PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	add_test(NAME unit_vm_native_module COMMAND unit_vm_native_module)
+	set_tests_properties(unit_vm_native_module PROPERTIES LABELS "unit;validation")
+endif()
+
+# Example mod pack (config-only .pk3); optional — see examples/demo_game/README.md
+if(BUILD_EXAMPLE_DEMO_GAME AND NOT ANDROID)
+	include("${CMAKE_SOURCE_DIR}/examples/demo_game/CMakeLists.txt")
 endif()
