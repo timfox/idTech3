@@ -1543,7 +1543,7 @@ static void R_Register( void )
 
 	r_gltfCpuQtangent = ri.Cvar_Get( "r_gltfCpuQtangent", "1", CVAR_ARCHIVE );
 	ri.Cvar_CheckRange( r_gltfCpuQtangent, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_gltfCpuQtangent, "OpenGL glTF CPU tess: after deform, recompute qtangent from positions + TEXCOORD_0 when the bound shader uses a normal-map image (name contains \"norm\")." );
+	ri.Cvar_SetDescription( r_gltfCpuQtangent, "OpenGL glTF CPU tess: after deform, recompute qtangent from positions + TEXCOORD_0 when stage texture paths look like a normal map (substrings norm, bump, nmap, or _n. before the extension)." );
 	ri.Cvar_SetGroup( r_gltfCpuQtangent, CVG_RENDERER );
 
 	ri.Printf( PRINT_ALL, "[GL] glTF: CPU tess; morph=%s; clip r_gltfAnim=%.3f; cpu qtangent=%s\n",
