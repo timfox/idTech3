@@ -5,7 +5,7 @@
 Priorities that keep **CI green** and **README/build truth** aligned:
 
 1. **Watch GitHub Actions on `main`** — especially **Android** (CMake + Gradle `assembleDebug`, OpenSSL/Lua/FetchContent caches) and **MSYS curl**.
-2. **Renderer validation** — Tier B (self-hosted `GAME_BASE`) and Tier C (manual GPU notes) when you have hardware/content; keep `renderer_regression_check` passing on default CI (manifest + GLSL + **IQM_MORPH_TOP_K** C/GLSL parity + **glTF vs IQM** joint/morph `#define` parity).
+2. **Renderer validation** — Tier B (self-hosted `GAME_BASE`) and Tier C (manual GPU notes) when you have hardware/content; keep `renderer_regression_check` passing on default CI (manifest + GLSL + **IQM_MORPH_TOP_K** C/GLSL parity + **glTF vs IQM** joint/morph `#define` parity + **OpenGL vs Vulkan** `IQM_MORPH_*` in `tr_local.h`).
 3. **glTF on Vulkan** — **GPU skinning/morph** (PBR + `r_gltfGpu`) uses **top-8** morph weights per draw (aligned with `GLTF_MAX_MORPH_TARGETS`), including **`RE_SetEntityMorphWeight`** with clip-driven weights; **`r_gltfGpuTangentFix`** (default on) re-orthonormalizes tangents on the GPU path after skin+morph; next polish: full **MikkTSpace**-style qtangent on GPU (neighborhood-aware). **OpenGL** now registers glTF/OBJ/MD5 with a **CPU tess** path (no `r_gltfGpu`).
 4. **Android product** — missing `base/` / no pk3: logcat path + **Toast** with `…/base` and apkassets hint before exit; optional APK smoke.
 
@@ -85,8 +85,8 @@ Priorities that keep **CI green** and **README/build truth** aligned:
 |----------|------|--------|
 | P0 | **CI stability** | Fix any red matrix on `main`; Android OpenSSL/Lua first-build time — tune cache keys if needed |
 | P1 | **glTF GPU path (polish)** | Entity morph + top-8 GPU morph (done); GPU tangent Gram–Schmidt after skin+morph via **`r_gltfGpuTangentFix`** (done); optional full MikkTSpace qtangent on GPU; validate on real assets |
-| P1 | **Renderer validation** | Tier B/C as optional gates; `renderer_regression_check`: manifest (**`docs/GLTF.md`**, **`docs/RENDERERS_FUTURE.md`**, Tier B doc), GLSL validate, **IQM_MORPH_TOP_K** parity, **GLTF_MAX_* vs IQM_*** header parity; **`tr_model_gltf.c`** `STATIC_ASSERT` for joint/morph caps |
-| P2 | **OpenGL glTF polish** | CPU tess + **`r_gltfCpuQtangent`** qtangent recompute when shader uses a `norm` image; **`_norm`** shader try from `normalTexture`; optional: wire qtangents into fixed-function tangents if a normal-mapped ARB path appears |
+| P1 | **Renderer validation** | Tier B/C as optional gates; `renderer_regression_check`: manifest (**`docs/GLTF.md`**, **`docs/RENDERERS_FUTURE.md`**, Tier B doc), GLSL validate, **IQM_MORPH_TOP_K** + **IQM_MORPH_MAX_CHANNELS** (OpenGL vs Vulkan `tr_local.h`), **GLTF_MAX_* vs IQM_*** header parity; **`tr_model_gltf.c`** `STATIC_ASSERT` for joint/morph caps + `IQM_MORPH_MAX_CHANNELS == IQM_MORPH_TOP_K` |
+| P2 | **OpenGL glTF polish** | CPU tess + **`r_gltfCpuQtangent`** qtangent recompute when stage textures look like a normal map (`norm` / `bump` / `nmap` / `_n.`); **`_norm`** shader try from `normalTexture`; optional: wire qtangents into fixed-function tangents if a normal-mapped ARB path appears |
 | P2 | **Engine systems hardening** | Telemetry / replay / save / quest / dialogue — define stable APIs + minimal tests |
 | P3 | **GOAP content** | Data-driven actions; perf limits; debug draw |
 | P3 | **Vulkan architecture pass** | Clustered Forward+, motion history — see below |
