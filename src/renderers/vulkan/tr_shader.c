@@ -3594,10 +3594,6 @@ static qboolean EqualTCgen( int bundle, const shaderStage_t *st1, const shaderSt
 	//	}
 	//}
 
-	//if ( b1->tcGen != TCGEN_LIGHTMAP && b1->lightmap != b2->lightmap && r_mergeLightmaps->integer ) {
-	//	return qfalse;
-	//}
-
 	if ( b1->numTexMods != b2->numTexMods ) {
 		return qfalse;
 	}
