@@ -1760,7 +1760,7 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 #ifdef USE_VK_PBR
 	if ( r_gltfGpu && r_gltfGpu->integer && vk.cmd && vk.pbrActive && tess.shader && tess.shader->hasPBR &&
 		surf->vbo_vertex != VK_NULL_HANDLE && surf->vbo_index != VK_NULL_HANDLE &&
-		( haveJoints || useMorph ) && !( useMorph && ent->morphChannelCount > 0 ) &&
+		( haveJoints || useMorph ) &&
 		surf->numVertices > 0 && surf->numVertices <= SHADER_MAX_VERTEXES ) {
 		qboolean gpuOk = qtrue;
 		int nj = ( model && model->skeleton.numJoints > 0 ) ? model->skeleton.numJoints : 0;

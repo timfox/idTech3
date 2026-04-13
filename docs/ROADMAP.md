@@ -6,7 +6,7 @@ Priorities that keep **CI green** and **README/build truth** aligned:
 
 1. **Watch GitHub Actions on `main`** — especially **Android** (CMake + Gradle `assembleDebug`, OpenSSL/Lua/FetchContent caches) and **MSYS curl**.
 2. **Renderer validation** — Tier B (self-hosted `GAME_BASE`) and Tier C (manual GPU notes) when you have hardware/content; keep `renderer_regression_check` passing on default CI.
-3. **glTF on Vulkan** — **GPU skinning/morph** (PBR + `r_gltfGpu`) is implemented; next polish: broader morph/entity-channel parity, optional qtangent recompute on GPU path, or **OpenGL registration** if README promises parity.
+3. **glTF on Vulkan** — **GPU skinning/morph** (PBR + `r_gltfGpu`) includes **`RE_SetEntityMorphWeight`** in the same top-4 morph selection as animation weights; next polish: **>4 active morph weights** (raise K or smarter packing), optional **qtangent** recompute on GPU path, or **OpenGL registration** if README promises parity.
 4. **Android product** — first-run / missing `base/` UX, optional APK artifact smoke (install + launch to “no game data” is OK).
 
 ## Current Status (`main`)
@@ -84,7 +84,7 @@ Priorities that keep **CI green** and **README/build truth** aligned:
 | Priority | Item | Notes |
 |----------|------|--------|
 | P0 | **CI stability** | Fix any red matrix on `main`; Android OpenSSL/Lua first-build time — tune cache keys if needed |
-| P1 | **glTF GPU path (polish)** | Entity morph channels on GPU path; >4 morph weights; optional qtangent refresh; validate on real assets |
+| P1 | **glTF GPU path (polish)** | Entity morph channels on GPU path (done); >4 morph weights; optional qtangent refresh; validate on real assets |
 | P1 | **Renderer validation** | Tier B/C as optional gates; expand regression scripts where headless allows |
 | P2 | **OpenGL glTF / OBJ / MD5** | README + docs state **Vulkan-only**; optional future: register same `MOD_*` types in OpenGL (thin path) |
 | P2 | **Engine systems hardening** | Telemetry / replay / save / quest / dialogue — define stable APIs + minimal tests |
