@@ -84,6 +84,8 @@ cvar_t	*r_dlightSaturation;
 
 #ifdef USE_VBO
 cvar_t	*r_vbo;
+cvar_t	*r_morph;
+cvar_t	*r_gltfAnim;
 #endif
 
 #ifdef USE_FBO
@@ -1531,6 +1533,20 @@ static void R_Register( void )
 	r_vbo = ri.Cvar_Get( "r_vbo", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_vbo, "Use Vertex Buffer Objects to cache static map geometry, may improve FPS on modern GPUs, increases hunk memory usage by 15-30MB (map-dependent)." );
 #endif
+
+	r_morph = ri.Cvar_Get( "r_morph", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_morph, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_morph, "Enable glTF morph target evaluation on OpenGL (CPU tess path)." );
+	ri.Cvar_SetGroup( r_morph, CVG_RENDERER );
+
+	r_gltfAnim = ri.Cvar_Get( "r_gltfAnim", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_gltfAnim, "0", "64", CV_FLOAT );
+	ri.Cvar_SetDescription( r_gltfAnim, "glTF clip playback: multiplies refEntity shaderTime for skeletal TRS and morph-weight sampling." );
+	ri.Cvar_SetGroup( r_gltfAnim, CVG_RENDERER );
+
+	ri.Printf( PRINT_ALL, "[GL] glTF: CPU tess path; morph r_morph=%s; clip speed r_gltfAnim=%.3f\n",
+		( r_morph && r_morph->integer ) ? "on" : "off",
+		r_gltfAnim ? r_gltfAnim->value : 1.0f );
 
 	r_mapGreyScale = ri.Cvar_Get( "r_mapGreyScale", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_mapGreyScale, "-1", "1", CV_FLOAT );

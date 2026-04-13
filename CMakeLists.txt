@@ -1652,6 +1652,9 @@ set(RENDERER_COMMON_SRCS
 	src/renderers/common/tr_image_dds.c
 	src/renderers/common/tr_image_svg.c
 	src/renderers/common/tr_model_mesh_import.c
+	src/renderers/vulkan/tr_model_gltf.c
+	src/renderers/vulkan/tr_model_obj.c
+	src/renderers/vulkan/tr_model_md5.c
 	src/renderers/common/tr_image_ktx2.c
 	src/renderers/common/tr_noise.c
 )
@@ -1736,6 +1739,7 @@ IF(USE_RENDERER_DLOPEN)
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_RENDERER_DLOPEN RENDERER_PREFIX="${RENDERER_PREFIX}")
 
 	ADD_LIBRARY(${RENDERER_PREFIX}_opengl${RENDEXT} SHARED ${RENDERER_GL_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
+	target_sources(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE src/renderers/opengl/tr_gltf_rb_opengl.c)
 	TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE USE_RENDERER_DLOPEN RENDERER_OPENGL)
 	IF(BUILD_FREETYPE)
 		target_link_libraries(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE idtech3_freetype)
@@ -1792,6 +1796,7 @@ ELSE()
 		ENDIF()
 	ELSE()
 		ADD_LIBRARY(${RENDERER_PREFIX}_opengl OBJECT ${RENDERER_GL_SRCS} ${RENDERER_COMMON_SRCS})
+		target_sources(${RENDERER_PREFIX}_opengl PRIVATE src/renderers/opengl/tr_gltf_rb_opengl.c)
 		TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_opengl PRIVATE RENDERER_OPENGL)
 		IF(BUILD_FREETYPE)
 			target_link_libraries(${RENDERER_PREFIX}_opengl PRIVATE idtech3_freetype)
@@ -1872,9 +1877,13 @@ endif()
 # cgltf include for glTF 2.0 model loading
 if(USE_RENDERER_DLOPEN)
   target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${EXTERNAL_INCLUDE}/cgltf)
+  target_include_directories(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE ${EXTERNAL_INCLUDE}/cgltf)
 else()
   if(USE_VULKAN)
     target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${EXTERNAL_INCLUDE}/cgltf)
+  endif()
+  if(NOT USE_VULKAN)
+    target_include_directories(${RENDERER_PREFIX}_opengl PRIVATE ${EXTERNAL_INCLUDE}/cgltf)
   endif()
 endif()
 

@@ -988,6 +988,9 @@ typedef struct srfIQModel_s {
 	int		morphSurfaceIndex;
 } srfIQModel_t;
 
+/* Vulkan: stores VkBuffer handles as opaque uint64 (VK_NULL_HANDLE = tess path). OpenGL: unused (0). */
+#define TR_GLTF_VBO_HANDLE_INVALID 0ULL
+
 // glTF primitive surface (VBO path or tess fallback; supports skinning and morph)
 typedef struct srfGLTFPrimitive_s {
 	surfaceType_t	surfaceType;
@@ -999,10 +1002,9 @@ typedef struct srfGLTFPrimitive_s {
 	gltfMorphTarget_t *morphTargets; /* shared with model; NULL if none */
 	int		numMorphTargets;
 	int		meshIndex; /* model mesh for morph weight sampling / naming */
-	/* VBO: device-local buffers (VK_NULL_HANDLE = use tess path) */
-	VkBuffer	vbo_vertex;
-	VkBuffer	vbo_index;
-	VkDeviceSize	vbo_vertex_offsets[10]; /* per-attribute offsets for xyz,rgba,st,normal */
+	uint64_t	vbo_vertex;
+	uint64_t	vbo_index;
+	uint64_t	vbo_vertex_offsets[10]; /* per-attribute offsets for xyz,rgba,st,normal */
 	int		materialIndex;
 	qboolean	hasSkinning;
 	qboolean	hasMorphTargets;

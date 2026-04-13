@@ -1759,7 +1759,7 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 
 #ifdef USE_VK_PBR
 	if ( r_gltfGpu && r_gltfGpu->integer && vk.cmd && vk.pbrActive && tess.shader && tess.shader->hasPBR &&
-		surf->vbo_vertex != VK_NULL_HANDLE && surf->vbo_index != VK_NULL_HANDLE &&
+		surf->vbo_vertex != TR_GLTF_VBO_HANDLE_INVALID && surf->vbo_index != TR_GLTF_VBO_HANDLE_INVALID &&
 		( haveJoints || useMorph ) &&
 		surf->numVertices > 0 && surf->numVertices <= SHADER_MAX_VERTEXES ) {
 		qboolean gpuOk = qtrue;
@@ -1895,7 +1895,7 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 	tess.gltfGpuMorphCount = 0;
 #endif /* USE_VK_PBR */
 
-	if ( surf->vbo_vertex != VK_NULL_HANDLE && surf->vbo_index != VK_NULL_HANDLE ) {
+	if ( surf->vbo_vertex != TR_GLTF_VBO_HANDLE_INVALID && surf->vbo_index != TR_GLTF_VBO_HANDLE_INVALID ) {
 		cvar_t *r_gltfVBO = ri.Cvar_Get( "r_gltfVBO", "1", CVAR_ARCHIVE );
 		if ( r_gltfVBO->integer ) {
 			/* VBO path: set gltfDrawSurface for vk_bind_geometry to use */

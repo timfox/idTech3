@@ -6,10 +6,10 @@ This document describes **what the engine actually does today** for glTF / GLB a
 
 | Renderer | glTF / GLB |
 |----------|------------|
-| **Vulkan** | Yes — `.gltf` and `.glb` registered in `tr_model.c`, loaded via **cgltf** (`tr_model_gltf.c`). |
-| **OpenGL** | **No** — there is no `R_RegisterGLTF` path in the OpenGL renderer. |
+| **Vulkan** | Yes — `.gltf` and `.glb` registered in `tr_model.c`, loaded via **cgltf** (`tr_model_gltf.c`). Full path: optional **device VBOs**, **PBR GPU** skin/morph (`r_gltfGpu`), qtangent recompute on CPU tess when needed. |
+| **OpenGL** | Yes — same loader and `MOD_GLTF` / `R_AddGLTFSurfaces`; draws via **CPU tessellation** in `tr_gltf_rb_opengl.c` (no `r_gltfGpu`, no Vulkan VBO upload). Morph evaluation gated by **`r_morph`**; clip timing uses **`r_gltfAnim`** (same as Vulkan). |
 
-Use the Vulkan build for glTF content.
+Use Vulkan for **PBR GPU** glTF and maximum parity with advanced materials; OpenGL is suitable for bringing glTF entities up on the compatibility backend.
 
 ## What works well
 
