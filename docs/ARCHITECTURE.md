@@ -70,7 +70,7 @@ src/
 │   │   ├── vk_postfx.c/h         PostFX (SSR, atmosphere, wind)
 │   │   ├── vk_flashlight.c/h     Projected texture system
 │   │   ├── vk_skybox_hdr.c/h     HDR EXR skybox + IBL
-│   │   ├── tr_model_gltf.c/h     glTF 2.0 loader (Vulkan only; see docs/GLTF.md)
+│   │   ├── tr_model_gltf.c/h     glTF 2.0 loader (shared; Vulkan GPU path + OpenGL CPU tess — see docs/GLTF.md)
 │   │   ├── tr_model_obj.c        OBJ loader
 │   │   ├── tr_model_md5.c        MD5 loader
 │   │   ├── inspector/             ImGui inspector overlay

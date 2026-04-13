@@ -80,6 +80,8 @@ cvar_t	*r_skipBackEnd;
 cvar_t	*r_greyscale;
 cvar_t	*r_dither;
 cvar_t	*r_presentBits;
+cvar_t	*r_outline;
+cvar_t	*r_outlineThreshold;
 
 static cvar_t *r_ignorehwgamma;
 
@@ -89,7 +91,6 @@ cvar_t	*r_fastsky;
 cvar_t	*r_neatsky;
 cvar_t	*r_drawSun;
 cvar_t	*r_dynamiclight;
-cvar_t  *r_mergeLightmaps;
 #ifdef USE_PMLIGHT
 cvar_t	*r_dlightMode;
 cvar_t	*r_dlightScale;
@@ -158,6 +159,7 @@ cvar_t	*r_morphBreathAmp;
 cvar_t	*r_morphBreathFreq;
 cvar_t	*r_gltfAnim;
 cvar_t	*r_gltfGpu;
+cvar_t	*r_gltfGpuTangentFix;
 cvar_t	*r_fbo;
 cvar_t	*r_renderMode;
 cvar_t	*r_hdr;
@@ -2149,8 +2151,6 @@ static void R_Register( void )
 	r_texturebits = ri.Cvar_Get( "r_texturebits", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_texturebits, "Number of texture bits per texture." );
 
-	r_mergeLightmaps = ri.Cvar_Get( "r_mergeLightmaps", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
-	ri.Cvar_SetDescription( r_mergeLightmaps, "Merge built-in small lightmaps into bigger lightmaps (atlases)." );
 #if defined (USE_VULKAN) && defined (USE_VBO)
 	r_vbo = ri.Cvar_Get( "r_vbo", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_vbo, "Use Vertex Buffer Objects to cache static map geometry, may improve FPS on modern GPUs, increases hunk memory usage by 15-30MB (map-dependent)." );
@@ -2389,8 +2389,14 @@ static void R_Register( void )
 	r_gltfGpu = ri.Cvar_Get( "r_gltfGpu", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_gltfGpu, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_gltfGpu,
-		"Vulkan PBR: GPU vertex skinning and morph for glTF (joint matrix SSBO + morph deltas; up to 4 morph targets per draw). Falls back to CPU tess when off or when entity morph channels are used." );
+		"Vulkan PBR: GPU vertex skinning and morph for glTF (joint matrix SSBO + morph deltas; top-8 morph weights per draw, incl. RE_SetEntityMorphWeight). Falls back to CPU tess when off or constraints fail." );
 	ri.Cvar_SetGroup( r_gltfGpu, CVG_RENDERER );
+
+	r_gltfGpuTangentFix = ri.Cvar_Get( "r_gltfGpuTangentFix", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_gltfGpuTangentFix, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_gltfGpuTangentFix,
+		"Vulkan PBR glTF GPU path: re-orthonormalize tangent (Gram–Schmidt) after joint skin + morph so T matches deformed N (0=bind-pose qtangent only, legacy)." );
+	ri.Cvar_SetGroup( r_gltfGpuTangentFix, CVG_RENDERER );
 
 	r_flares = ri.Cvar_Get ("r_flares", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_flares, "Enables corona effects on light sources." );
@@ -2591,10 +2597,12 @@ static void R_Register( void )
 	ri.Cvar_Get( "r_svgMaxFileBytes", "2097152", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( ri.Cvar_Get( "r_svgMaxFileBytes", "2097152", CVAR_ARCHIVE ),
 		"Maximum accepted SVG source file size in bytes." );
-	ri.Cvar_Get( "r_outline", "0", CVAR_ARCHIVE );
-	ri.Cvar_SetDescription( ri.Cvar_Get( "r_outline", "0", CVAR_ARCHIVE ), "Edge-detection outline strength (0 = off, 0.5 = subtle, 1.0 = strong)." );
-	ri.Cvar_Get( "r_outlineThreshold", "0.15", CVAR_ARCHIVE );
-	ri.Cvar_SetDescription( ri.Cvar_Get( "r_outlineThreshold", "0.15", CVAR_ARCHIVE ), "Luminance edge threshold for outline detection." );
+	r_outline = ri.Cvar_Get( "r_outline", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_outline, "Edge-detection outline strength (0 = off, 0.5 = subtle, 1.0 = strong)." );
+	ri.Cvar_SetGroup( r_outline, CVG_RENDERER );
+	r_outlineThreshold = ri.Cvar_Get( "r_outlineThreshold", "0.15", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_outlineThreshold, "Luminance edge threshold for outline detection." );
+	ri.Cvar_SetGroup( r_outlineThreshold, CVG_RENDERER );
 	ri.Cvar_Get( "r_safeMode", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_SetDescription( ri.Cvar_Get( "r_safeMode", "0", CVAR_ARCHIVE | CVAR_LATCH ), "Safe mode: disables post-processing, bloom, SSAO, volumetric fog. Use if the engine crashes on startup." );
 
@@ -3538,6 +3546,8 @@ void R_Init( void ) {
 		r_gltfAnim ? r_gltfAnim->value : 1.0f );
 	ri.Printf( PRINT_ALL, "[VK][gltf] GPU skin/morph path: %s (r_gltfGpu)\n",
 		( r_gltfGpu && r_gltfGpu->integer ) ? "on" : "off" );
+	ri.Printf( PRINT_ALL, "[VK][gltf] GPU tangent Gram–Schmidt after skin+morph: %s (r_gltfGpuTangentFix)\n",
+		( r_gltfGpuTangentFix && r_gltfGpuTangentFix->integer ) ? "on" : "off" );
 
 
 	max_polys = r_maxpolys ? r_maxpolys->integer : MAX_POLYS;

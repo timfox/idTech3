@@ -47,7 +47,7 @@ static void copy_one_asset( AAssetManager *mgr, const char *assetPath, const cha
 	AAsset *a = AAssetManager_open( mgr, assetPath, AASSET_MODE_STREAMING );
 	FILE *fp;
 	char dirbuf[MAX_OSPATH];
-	const char *slash;
+	char *slash;
 	long sz, rd;
 	char *buf;
 

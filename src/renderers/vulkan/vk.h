@@ -262,6 +262,7 @@ typedef struct {
 	uint32_t				vk_pbr_flags;
 	int32_t					lightmap_bundle;
 	uint8_t					pbr_vert_mode; /* 0=default gen_vert, 1=glTF GPU skin+morph variant */
+	uint8_t					gltf_gpu_tangent_fixup; /* 1=vertex shader re-orthonormalizes T vs deformed N (r_gltfGpuTangentFix) */
 	uint8_t					pom_height_source; /* 0=ORM R (physical map), 1=normal map alpha (normalHeightMap) */
 	vec4_t					specularScale;
 	vec4_t					normalScale;
@@ -911,7 +912,8 @@ typedef struct {
 		struct {
 #ifdef USE_VK_PBR
 			VkShaderModule gen[2][3][2][2][2]; // pbr[0,1], tx[0,1,2], cl[0,1] env0[0,1] fog[0,1]
-			VkShaderModule gen_gltf_gpu[2][3][2][2][2]; /* +USE_GLTF_GPU_SKIN */
+			/* +USE_GLTF_GPU_SKIN; last dim: 0=bind pose tangent, 1=r_gltfGpuTangentFix (skin+morph orthonormalize) */
+			VkShaderModule gen_gltf_gpu[2][3][2][2][2][2];
 			VkShaderModule ident1[2][2][2][2]; // pbr[0,1], tx[0,1], env0[0,1] fog[0,1]
 			VkShaderModule fixed[2][2][2][2];  // pbr[0,1], tx[0,1], env0[0,1] fog[0,1]
 #else

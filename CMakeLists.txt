@@ -236,6 +236,7 @@ set(DUKTAPE_LINK_LIBRARIES "")
 set(DUKTAPE_EXTRA_LIBRARIES "")
 
 if(USE_LUA)
+if(NOT ANDROID)
   set(_LUA_HINT_PATHS
     $ENV{LUA_DIR}
     $ENV{LUA_PATH}
@@ -392,6 +393,7 @@ if(USE_LUA)
     endif()
   endif()
 endif()
+endif()
 
 # Android NDK: build static Lua from upstream source (no system pkg-config)
 set(LUA_ANDROID_BUILT FALSE)
@@ -404,21 +406,51 @@ if(ANDROID AND USE_LUA AND NOT LUA_FOUND)
   endif()
   set(_LUA_ANDROID_VER "5.4.7")
   set(_LUA_ANDROID_SHA "9fbf5e28ef86c69858f6d3d34eccc32e911c1a28b4120ff3e84aaa70cfbf1e30")
-  set(_LUA_ANDROID_PREFIX "${CMAKE_BINARY_DIR}/lua-android")
+  # One prefix per ABI — Gradle builds arm64 and armeabi-v7a in the same CMake binary dir; a shared
+  # "lua-android/" would leave the wrong-arch liblua.a from whichever ABI configured first.
+  set(_LUA_ANDROID_PREFIX "${CMAKE_BINARY_DIR}/lua-android-${ANDROID_ABI}")
   set(_LUA_EP_EXTRA "")
   if(ANDROID_DEPS_CACHE AND NOT ANDROID_DEPS_CACHE STREQUAL "")
     set(_LUA_DL_DIR "${ANDROID_DEPS_CACHE}/externalproject-downloads")
     file(MAKE_DIRECTORY "${_LUA_DL_DIR}")
     list(APPEND _LUA_EP_EXTRA DOWNLOAD_DIR "${_LUA_DL_DIR}")
   endif()
+  # Lua src/Makefile sets "AR= ar rcu" and invokes $(AR) target objs — AR must be "llvm-ar rcu", not bare llvm-ar.
+  # ANDROID may set CMAKE_C_COMPILER to bare NDK clang (no --target); without it, objects are host x86_64.
+  if(DEFINED ANDROID_PLATFORM_LEVEL AND NOT ANDROID_PLATFORM_LEVEL STREQUAL "")
+    set(_LUA_API "${ANDROID_PLATFORM_LEVEL}")
+  elseif(ANDROID_PLATFORM MATCHES "android-([0-9]+)")
+    set(_LUA_API "${CMAKE_MATCH_1}")
+  else()
+    set(_LUA_API "26")
+  endif()
+  if(ANDROID_ABI STREQUAL "arm64-v8a")
+    set(_LUA_CLANG_TARGET "aarch64-none-linux-android${_LUA_API}")
+  elseif(ANDROID_ABI STREQUAL "armeabi-v7a")
+    set(_LUA_CLANG_TARGET "armv7-none-linux-androideabi${_LUA_API}")
+  elseif(ANDROID_ABI STREQUAL "x86")
+    set(_LUA_CLANG_TARGET "i686-none-linux-android${_LUA_API}")
+  elseif(ANDROID_ABI STREQUAL "x86_64")
+    set(_LUA_CLANG_TARGET "x86_64-none-linux-android${_LUA_API}")
+  else()
+    set(_LUA_CLANG_TARGET "aarch64-none-linux-android${_LUA_API}")
+  endif()
+  set(_LUA_CC_WRAPPER "${CMAKE_C_COMPILER} --target=${_LUA_CLANG_TARGET}")
+  if(CMAKE_SYSROOT)
+    string(APPEND _LUA_CC_WRAPPER " --sysroot=${CMAKE_SYSROOT}")
+  endif()
+  set(_LUA_MAKE_CC "CC=${_LUA_CC_WRAPPER}")
+  set(_LUA_MAKE_AR "AR=${CMAKE_AR} rcu")
+  set(_LUA_MAKE_RANLIB "RANLIB=${CMAKE_RANLIB}")
   ExternalProject_Add(lua_android_ep
     URL "https://www.lua.org/ftp/lua-${_LUA_ANDROID_VER}.tar.gz"
     URL_HASH "SHA256=${_LUA_ANDROID_SHA}"
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     ${_LUA_EP_EXTRA}
     CONFIGURE_COMMAND ""
-    BUILD_COMMAND ${CMAKE_COMMAND} -E env "CC=${CMAKE_C_COMPILER}" "AR=${CMAKE_AR}" "RANLIB=${CMAKE_RANLIB}"
-      ${LUA_ANDROID_MAKE_EXE} -C <SOURCE_DIR>/src liblua.a MYCFLAGS=-fPIC
+    # Lua src/Makefile sets "CC= gcc" (not ?=); pass overrides on the make line (one argv each).
+    BUILD_COMMAND ${LUA_ANDROID_MAKE_EXE} -C <SOURCE_DIR>/src
+      ${_LUA_MAKE_CC} ${_LUA_MAKE_AR} ${_LUA_MAKE_RANLIB} liblua.a MYCFLAGS=-fPIC
     INSTALL_COMMAND ${CMAKE_COMMAND} -E make_directory "${_LUA_ANDROID_PREFIX}/lib" "${_LUA_ANDROID_PREFIX}/include"
       COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/src/liblua.a "${_LUA_ANDROID_PREFIX}/lib/liblua.a"
       COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/src/lua.h "${_LUA_ANDROID_PREFIX}/include/"
@@ -819,10 +851,12 @@ set(CURL_LIBRARIES "")
 set(CURL_INCLUDE_DIRS "")
 if(USE_CURL)
   if(ANDROID)
+    # Restrict search to the NDK sysroot only. NO_CMAKE_FIND_ROOT_PATH would search the
+    # host (e.g. /usr/include) and pull in glibc headers while compiling for Android.
     find_path(CURL_INCLUDE_DIR
       NAMES curl/curl.h
-      HINTS "${CMAKE_SYSROOT}/usr/include"
-      NO_CMAKE_FIND_ROOT_PATH)
+      PATHS "${CMAKE_SYSROOT}/usr/include"
+      NO_DEFAULT_PATH)
     if(CURL_INCLUDE_DIR)
       set(_CURL_ABI_DIR "")
       if(ANDROID_ABI STREQUAL "arm64-v8a")
@@ -838,8 +872,8 @@ if(USE_CURL)
       endif()
       find_library(CURL_LIBRARY
         NAMES curl libcurl
-        HINTS ${_CURL_LIB_HINTS}
-        NO_CMAKE_FIND_ROOT_PATH)
+        PATHS ${_CURL_LIB_HINTS}
+        NO_DEFAULT_PATH)
     endif()
     if(CURL_INCLUDE_DIR AND CURL_LIBRARY)
       set(CURL_FOUND TRUE)
@@ -1064,7 +1098,7 @@ if(USE_DTLS)
         else()
           set(_OSSL_OS "android-${ANDROID_ABI}")
         endif()
-        set(_OSSL_PREFIX "${CMAKE_BINARY_DIR}/openssl-android")
+        set(_OSSL_PREFIX "${CMAKE_BINARY_DIR}/openssl-android-${ANDROID_ABI}")
         set(_OSSL_API "${ANDROID_PLATFORM_LEVEL}")
         if(NOT _OSSL_API OR _OSSL_API STREQUAL "")
           set(_OSSL_API 26)
@@ -1082,6 +1116,24 @@ if(USE_DTLS)
         if(NOT _NDK_ROOT OR _NDK_ROOT STREQUAL "")
           message(WARNING "USE_DTLS on Android: ANDROID_NDK not set; OpenSSL Configure may fail.")
         endif()
+        # OpenSSL 3 Configure expects NDK clang/gcc on PATH (NOTES-ANDROID.md). CMake's
+        # ANDROID_NDK_HOME / toolchain file do not put toolchains/llvm/prebuilt/.../bin on PATH.
+        set(_OSSL_PATH "$ENV{PATH}")
+        if(_NDK_ROOT AND IS_DIRECTORY "${_NDK_ROOT}/toolchains/llvm/prebuilt")
+          file(GLOB _ndk_llvm_prebuilt "${_NDK_ROOT}/toolchains/llvm/prebuilt/*")
+          list(LENGTH _ndk_llvm_prebuilt _ndk_pb_len)
+          if(_ndk_pb_len GREATER 0)
+            list(GET _ndk_llvm_prebuilt 0 _ndk_llvm_hostdir)
+            set(_ndk_llvm_bin "${_ndk_llvm_hostdir}/bin")
+            if(EXISTS "${_ndk_llvm_bin}")
+              if(CMAKE_HOST_WIN32)
+                set(_OSSL_PATH "${_ndk_llvm_bin};$ENV{PATH}")
+              else()
+                set(_OSSL_PATH "${_ndk_llvm_bin}:$ENV{PATH}")
+              endif()
+            endif()
+          endif()
+        endif()
         ExternalProject_Add(openssl_android_ep
           URL "https://www.openssl.org/source/openssl-${_OSSL_VER}.tar.gz"
           URL_HASH "SHA256=${_OSSL_SHA}"
@@ -1090,7 +1142,7 @@ if(USE_DTLS)
           ${_OSSL_DL_EXTRA}
           CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env
             "ANDROID_NDK_ROOT=${_NDK_ROOT}"
-            "PATH=$ENV{PATH}"
+            "PATH=${_OSSL_PATH}"
             "CC=${CMAKE_C_COMPILER}"
             "AR=${CMAKE_AR}"
             "RANLIB=${CMAKE_RANLIB}"
@@ -1102,9 +1154,11 @@ if(USE_DTLS)
             --openssldir=<INSTALL_DIR>/ssl
           BUILD_COMMAND ${CMAKE_COMMAND} -E env
             "ANDROID_NDK_ROOT=${_NDK_ROOT}"
+            "PATH=${_OSSL_PATH}"
             ${CMAKE_COMMAND} -E chdir <SOURCE_DIR>
             ${OPENSSL_ANDROID_MAKE_EXE} build_libs
           INSTALL_COMMAND ${CMAKE_COMMAND} -E env
+            "PATH=${_OSSL_PATH}"
             ${CMAKE_COMMAND} -E chdir <SOURCE_DIR>
             ${OPENSSL_ANDROID_MAKE_EXE} install_sw
           BUILD_BYPRODUCTS
@@ -1166,42 +1220,43 @@ if(USE_STEAM OR USE_STEAM_NETWORKING)
   endif()
 endif()
 
-# add platform-dependent QVM bytecode compilers
-IF(CMAKE_SYSTEM_PROCESSOR MATCHES AMD64|x86|i*86)
-	IF(CMAKE_SYSTEM_PROCESSOR MATCHES AMD64)
-		IF(WIN32)
-			SET(BINEXT .x64)
-		ELSE()
-			SET(BINEXT .x86_64)
-		ENDIF()
-		SET(RENDEXT _x86_64)
-	ELSE()
-		#SET(BINEXT .x86)
-		SET(RENDEXT _x86)
-	ENDIF()
+# add platform-dependent QVM bytecode compilers (unknown CPU = interpreter-only, NO_VM_COMPILED)
+set(NO_VM_COMPILED ON)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES AMD64|x86|i*86)
+	if(CMAKE_SYSTEM_PROCESSOR MATCHES AMD64)
+		if(WIN32)
+			set(BINEXT .x64)
+		else()
+			set(BINEXT .x86_64)
+		endif()
+		set(RENDEXT _x86_64)
+	else()
+		#set(BINEXT .x86)
+		set(RENDEXT _x86)
+	endif()
 	list(APPEND QCOMMON_SRCS src/qcommon/vm_x86.c)
-ELSEIF(CMAKE_SYSTEM_PROCESSOR MATCHES aarch64|arm64)
-	SET(BINEXT .aarch64)
-	SET(RENDEXT _aarch64)
+	set(NO_VM_COMPILED OFF)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES aarch64|arm64)
+	set(BINEXT .aarch64)
+	set(RENDEXT _aarch64)
 	list(APPEND QCOMMON_SRCS src/qcommon/vm_aarch64.c)
-ELSEIF(CMAKE_SYSTEM_PROCESSOR MATCHES arm*)
-	SET(BINEXT .arm)
-	SET(RENDEXT _arm)
+	set(NO_VM_COMPILED OFF)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES arm*)
+	set(BINEXT .arm)
+	set(RENDEXT _arm)
 	list(APPEND QCOMMON_SRCS src/qcommon/vm_armv7l.c)
-	ELSEIF(CMAKE_SYSTEM_PROCESSOR MATCHES "ppc64le|ppc64")
-		IF(CMAKE_SYSTEM_PROCESSOR MATCHES "ppc64le")
-			SET(BINEXT .ppc64le)
-			SET(RENDEXT _ppc64le)
-			list(APPEND QCOMMON_SRCS src/qcommon/vm_powerpc.c)
-		ELSE()
-			SET(BINEXT .ppc64)
-			SET(RENDEXT _ppc64)
-			list(APPEND QCOMMON_SRCS src/qcommon/vm_powerpc.c)
-		ENDIF()
-ELSE()
-	TARGET_COMPILE_DEFINITIONS(qcommon PRIVATE -DNO_VM_COMPILED)
-	TARGET_COMPILE_DEFINITIONS(qcommon_ded PRIVATE -DNO_VM_COMPILED)
-ENDIF()
+	set(NO_VM_COMPILED OFF)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "ppc64le|ppc64")
+	if(CMAKE_SYSTEM_PROCESSOR MATCHES "ppc64le")
+		set(BINEXT .ppc64le)
+		set(RENDEXT _ppc64le)
+	else()
+		set(BINEXT .ppc64)
+		set(RENDEXT _ppc64)
+	endif()
+	list(APPEND QCOMMON_SRCS src/qcommon/vm_powerpc.c)
+	set(NO_VM_COMPILED OFF)
+endif()
 
 # Normalize a simple arch identifier for renderer filenames (x86_64, x86, arm64, arm)
 if(CMAKE_SYSTEM_PROCESSOR MATCHES AMD64|x86_64|X86_64)
@@ -1321,10 +1376,10 @@ if(SKIP_IDPAK_CHECK)
   TARGET_COMPILE_DEFINITIONS(qcommon_ded PRIVATE SKIP_IDPAK_CHECK=1)
 endif()
 
-IF(NO_VM_COMPILED)
-	TARGET_COMPILE_DEFINITIONS(qcommon PRIVATE NO_VM_COMPILED)
-	TARGET_COMPILE_DEFINITIONS(qcommon_ded PRIVATE NO_VM_COMPILED)
-ENDIF()
+if(NO_VM_COMPILED)
+	target_compile_definitions(qcommon PRIVATE NO_VM_COMPILED=1)
+	target_compile_definitions(qcommon_ded PRIVATE NO_VM_COMPILED=1)
+endif()
 
 # client + cURL
 # client sources
@@ -1516,6 +1571,19 @@ if(USE_THEORA)
 else()
   list(REMOVE_ITEM CLIENT_SRCS src/client/cl_cin_theora.c)
 endif()
+
+# pkg-config resolves *host* FFmpeg/dav1d/vpx/Theora; never use those include paths for NDK targets.
+if(ANDROID)
+  set(FFMPEG_FOUND FALSE)
+  set(DAV1D_FOUND FALSE)
+  set(VPX_FOUND FALSE)
+  set(THEORA_FOUND FALSE)
+  list(REMOVE_ITEM CLIENT_SRCS src/client/cl_cin_ffmpeg.c)
+  list(REMOVE_ITEM CLIENT_SRCS src/client/cl_cin_dav1d.c)
+  list(REMOVE_ITEM CLIENT_SRCS src/client/cl_cin_vpx.c)
+  list(REMOVE_ITEM CLIENT_SRCS src/client/cl_cin_theora.c)
+  message(STATUS "Android: host pkg-config video codecs disabled (FFmpeg/dav1d/vpx/Theora); use vendor/NDK builds to re-enable")
+endif()
 # --- End modern video codec support ---
 
 #ADD_LIBRARY(client OBJECT ${CLIENT_SRCS})
@@ -1585,6 +1653,9 @@ set(RENDERER_COMMON_SRCS
 	src/renderers/common/tr_image_dds.c
 	src/renderers/common/tr_image_svg.c
 	src/renderers/common/tr_model_mesh_import.c
+	src/renderers/vulkan/tr_model_gltf.c
+	src/renderers/vulkan/tr_model_obj.c
+	src/renderers/vulkan/tr_model_md5.c
 	src/renderers/common/tr_image_ktx2.c
 	src/renderers/common/tr_noise.c
 )
@@ -1669,6 +1740,7 @@ IF(USE_RENDERER_DLOPEN)
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_RENDERER_DLOPEN RENDERER_PREFIX="${RENDERER_PREFIX}")
 
 	ADD_LIBRARY(${RENDERER_PREFIX}_opengl${RENDEXT} SHARED ${RENDERER_GL_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
+	target_sources(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE src/renderers/opengl/tr_gltf_rb_opengl.c)
 	TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE USE_RENDERER_DLOPEN RENDERER_OPENGL)
 	IF(BUILD_FREETYPE)
 		target_link_libraries(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE idtech3_freetype)
@@ -1725,6 +1797,7 @@ ELSE()
 		ENDIF()
 	ELSE()
 		ADD_LIBRARY(${RENDERER_PREFIX}_opengl OBJECT ${RENDERER_GL_SRCS} ${RENDERER_COMMON_SRCS})
+		target_sources(${RENDERER_PREFIX}_opengl PRIVATE src/renderers/opengl/tr_gltf_rb_opengl.c)
 		TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_opengl PRIVATE RENDERER_OPENGL)
 		IF(BUILD_FREETYPE)
 			target_link_libraries(${RENDERER_PREFIX}_opengl PRIVATE idtech3_freetype)
@@ -1805,9 +1878,13 @@ endif()
 # cgltf include for glTF 2.0 model loading
 if(USE_RENDERER_DLOPEN)
   target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${EXTERNAL_INCLUDE}/cgltf)
+  target_include_directories(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE ${EXTERNAL_INCLUDE}/cgltf)
 else()
   if(USE_VULKAN)
     target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${EXTERNAL_INCLUDE}/cgltf)
+  endif()
+  if(NOT USE_VULKAN)
+    target_include_directories(${RENDERER_PREFIX}_opengl PRIVATE ${EXTERNAL_INCLUDE}/cgltf)
   endif()
 endif()
 
@@ -2124,7 +2201,7 @@ set(PHYSICS_SRCS
 )
 
 set(BULLET_FOUND FALSE)
-if(USE_BULLET_PHYSICS)
+if(USE_BULLET_PHYSICS AND NOT ANDROID)
   find_package(PkgConfig QUIET)
   if(PKG_CONFIG_FOUND)
     pkg_check_modules(BULLET_PKG QUIET bullet)
@@ -2137,6 +2214,8 @@ if(USE_BULLET_PHYSICS)
   if(NOT BULLET_FOUND)
     message(STATUS "Bullet Physics: C wrapper only (install libbullet-dev for full backend)")
   endif()
+elseif(USE_BULLET_PHYSICS AND ANDROID)
+  message(STATUS "Bullet Physics: C wrapper only on Android (no host pkg-config Bullet)")
 endif()
 
 ADD_LIBRARY(phys_module OBJECT ${PHYSICS_SRCS})
@@ -2285,14 +2364,17 @@ add_test(NAME smoke_test
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(smoke_test PROPERTIES
 	LABELS "validation;smoke"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/release/idtech3_server")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/release/idtech3_server"
+	# Avoid parallel runs with renderer_regression_check (both hammer glslang; server startup is CPU-sensitive).
+	RESOURCE_LOCK "idtech3_headless_validation")
 
 add_test(NAME renderer_regression_check
 	COMMAND ${CMAKE_SOURCE_DIR}/scripts/renderer_regression_check.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(renderer_regression_check PROPERTIES
 	LABELS "validation;renderer"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/renderer_regression_check.sh")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/renderer_regression_check.sh"
+	RESOURCE_LOCK "idtech3_headless_validation")
 
 add_test(NAME check_artifacts
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/check_artifacts.sh ${CMAKE_SOURCE_DIR}/release

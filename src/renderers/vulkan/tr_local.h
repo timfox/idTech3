@@ -141,7 +141,7 @@ typedef struct dlight_s {
 
 
 #define IQM_MORPH_MAX_CHANNELS 8
-#define IQM_MORPH_TOP_K 4
+#define IQM_MORPH_TOP_K 8
 #define IQM_MORPH_NAME_MAX 64
 
 // a trRefEntity_t has all the information passed in by
@@ -988,6 +988,9 @@ typedef struct srfIQModel_s {
 	int		morphSurfaceIndex;
 } srfIQModel_t;
 
+/* Vulkan: stores VkBuffer handles as opaque uint64 (VK_NULL_HANDLE = tess path). OpenGL: unused (0). */
+#define TR_GLTF_VBO_HANDLE_INVALID 0ULL
+
 // glTF primitive surface (VBO path or tess fallback; supports skinning and morph)
 typedef struct srfGLTFPrimitive_s {
 	surfaceType_t	surfaceType;
@@ -999,10 +1002,9 @@ typedef struct srfGLTFPrimitive_s {
 	gltfMorphTarget_t *morphTargets; /* shared with model; NULL if none */
 	int		numMorphTargets;
 	int		meshIndex; /* model mesh for morph weight sampling / naming */
-	/* VBO: device-local buffers (VK_NULL_HANDLE = use tess path) */
-	VkBuffer	vbo_vertex;
-	VkBuffer	vbo_index;
-	VkDeviceSize	vbo_vertex_offsets[10]; /* per-attribute offsets for xyz,rgba,st,normal */
+	uint64_t	vbo_vertex;
+	uint64_t	vbo_index;
+	uint64_t	vbo_vertex_offsets[10]; /* per-attribute offsets for xyz,rgba,st,normal */
 	int		materialIndex;
 	qboolean	hasSkinning;
 	qboolean	hasMorphTargets;
@@ -1506,7 +1508,6 @@ extern cvar_t	*r_fastsky;				// controls whether sky should be cleared or drawn
 extern cvar_t	*r_neatsky;				// nomip and nopicmip for skyboxes, cnq3 like look
 extern cvar_t	*r_drawSun;				// controls drawing of sun quad
 extern cvar_t	*r_dynamiclight;		// dynamic lights enabled/disabled
-extern cvar_t	*r_mergeLightmaps;
 #ifdef USE_PMLIGHT
 extern cvar_t	*r_dlightMode;			// 0 - vq3, 1 - pmlight
 //extern cvar_t	*r_dlightSpecPower;		// 1 - 32
@@ -1750,6 +1751,7 @@ extern cvar_t	*r_morphBreathAmp;
 extern cvar_t	*r_morphBreathFreq;
 extern cvar_t	*r_gltfAnim;
 extern cvar_t	*r_gltfGpu;
+extern cvar_t	*r_gltfGpuTangentFix;
 
 extern	cvar_t	*r_nobind;						// turns off binding to appropriate textures
 extern	cvar_t	*r_singleShader;				// make most world faces use default shader
@@ -1788,6 +1790,8 @@ extern	cvar_t	*r_skipBackEnd;
 extern	cvar_t	*r_greyscale;
 extern	cvar_t	*r_dither;
 extern	cvar_t	*r_presentBits;
+extern	cvar_t	*r_outline;
+extern	cvar_t	*r_outlineThreshold;
 
 extern	cvar_t	*r_ignoreGLErrors;
 
@@ -2040,7 +2044,7 @@ typedef struct shaderCommands_s
 	qboolean	gltfUseGpuPipeline; /* PBR + glTF VBO with GPU skin/morph (persists until next Tess_Begin) */
 	qboolean	gltfGpuMorphActive;
 	int		gltfGpuMorphCount;
-	float		gltfGpuMorphWeights[4];
+	float		gltfGpuMorphWeights[IQM_MORPH_TOP_K];
 #endif
 #endif
 

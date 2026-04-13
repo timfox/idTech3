@@ -94,7 +94,8 @@ echo ""
 echo "Server startup test:"
 SERVER_PATH="$(bin_path "idtech3_server")"
 if [ -n "$SERVER_PATH" ]; then
-  output="$(timeout 5 "$SERVER_PATH" +set dedicated 1 +set com_hunkMegs 64 +quit 2>&1 || true)"
+  # Parallel ctest (-j) can starve the server + duplicate glslang work; allow enough wall time.
+  output="$(timeout 25 "$SERVER_PATH" +set dedicated 1 +set com_hunkMegs 64 +quit 2>&1 || true)"
 
   if echo "$output" | grep -q "id Tech 3"; then
     pass "Server identifies as id Tech 3"
