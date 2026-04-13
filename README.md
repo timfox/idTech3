@@ -37,10 +37,10 @@ Ray tracing (Vulkan RT) is **scaffolded / in progress** — see `docs/RENDERERS_
 
 **Models**:
 * **Vulkan (primary):** MD3, MDR, IQM, **OBJ**, **glTF / GLB**, MD5, STL, DAE, FBX, USD / USDA, Maya Ascii (MA) — glTF details: [docs/GLTF.md](docs/GLTF.md)
-* **OpenGL (fallback):** MD3, MDR, IQM, STL, DAE, FBX, USD / USDA, MA via the shared mesh-import path — **no OBJ, glTF, or MD5** in the OpenGL renderer today (use Vulkan or convert)
-* Blend shapes: **IQM** on both renderers where enabled; **glTF** morph + clip playback on **Vulkan** only (animation weights + `RE_SetEntityMorphWeight`; `r_gltfAnim` for time) — [docs/GLTF.md](docs/GLTF.md)
+* **OpenGL (fallback):** MD3, MDR, IQM, **OBJ**, **glTF / GLB**, **MD5**, STL, DAE, FBX, USD / USDA, MA — loaders live next to Vulkan under `src/renderers/vulkan/` and are linked into both renderer plugins; OpenGL uses the **CPU tessellation** path for glTF (no Vulkan-style device VBO upload or **`r_gltfGpu`** pipeline).
+* Blend shapes: **IQM** on both renderers where enabled; **glTF** morph + skeletal clips work on **both** renderers (CPU path on OpenGL; **`RE_SetEntityMorphWeight`** + `r_gltfAnim`; **`r_morph`** gates morph on OpenGL). **GPU** skin/morph + PBR extras remain **Vulkan** — [docs/GLTF.md](docs/GLTF.md)
 
-**Renderer truth (models):** Asset loaders for OBJ, glTF/GLB, and MD5 live under `src/renderers/vulkan/` and are wired only in the **Vulkan** renderer (`R_Register*` / `MOD_*` paths). The OpenGL tree does **not** register those types; choosing the OpenGL backend does **not** silently enable them. Same story for **glTF GPU skin/morph** (`r_gltfGpu`): Vulkan PBR only; **`RE_SetEntityMorphWeight`** and clip-driven weights share the same **top-8** GPU morph selection per draw (see [docs/GLTF.md](docs/GLTF.md)). See also the OpenGL column in [docs/RENDERERS.md](docs/RENDERERS.md).
+**Renderer truth (models):** OBJ, glTF/GLB, and MD5 share the same registration and `MOD_*` types in **both** backends. **glTF GPU skin/morph** (`r_gltfGpu`, SSBOs, tangent fix) is **Vulkan PBR only**; OpenGL tessellates on the CPU. **`RE_SetEntityMorphWeight`** and clip-driven weights use the same **top-8** selection on Vulkan’s GPU path (see [docs/GLTF.md](docs/GLTF.md)). See also the OpenGL column in [docs/RENDERERS.md](docs/RENDERERS.md).
 
 **Scripting**:
 * Support for Lua scripting

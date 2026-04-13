@@ -35,7 +35,9 @@ float R_GLTFPackGpuVertexMeta( int morphVertexIndex )
 	Com_Memcpy( &out, &packed, sizeof( out ) );
 	return out;
 }
+#ifdef RENDERER_VULKAN
 #include "vk.h"
+#endif
 #include <math.h>
 
 static qboolean gltf_load_materials(const cgltf_data *data, gltfModel_t *model);
@@ -1062,8 +1064,8 @@ qboolean R_RegisterGLTF(const char *name, model_t *mod) {
 			surf->materialIndex = prim->materialIndex;
 			surf->hasSkinning = (gltfModel.skeleton.numJoints > 0) ? qtrue : qfalse;
 			surf->hasMorphTargets = (prim->numMorphTargets > 0) ? qtrue : qfalse;
-			surf->vbo_vertex = VK_NULL_HANDLE;
-			surf->vbo_index = VK_NULL_HANDLE;
+			surf->vbo_vertex = TR_GLTF_VBO_HANDLE_INVALID;
+			surf->vbo_index = TR_GLTF_VBO_HANDLE_INVALID;
 			Com_Memset(surf->vbo_vertex_offsets, 0, sizeof(surf->vbo_vertex_offsets));
 
 			if (prim->materialIndex >= 0 && prim->materialIndex < gltfModel.numMaterials) {
@@ -1074,10 +1076,13 @@ qboolean R_RegisterGLTF(const char *name, model_t *mod) {
 				}
 			}
 
-			/* VBO: pack vertex data (xyz, rgba, st, normal; + joint indices + weights for GPU skin path) */
+			/* VBO: pack vertex data (Vulkan only; OpenGL uses CPU tess path) */
+#ifdef RENDERER_VULKAN
 			if (prim->numVertices > 0 && prim->numIndices > 0) {
 				int offXyz, offRgba, offSt, offNorm, offJoint, offWeight;
 				int n = prim->numVertices;
+				VkBuffer vb = VK_NULL_HANDLE;
+				VkBuffer ib = VK_NULL_HANDLE;
 				vboSize = n * 16 + n * 4 + n * 8 + n * 16 + n * 4 + n * 16;
 				vboPack = (byte *)ri.Hunk_AllocateTempMemory(vboSize);
 				offXyz = 0;
@@ -1105,16 +1110,19 @@ qboolean R_RegisterGLTF(const char *name, model_t *mod) {
 					f[0] = v->weights[0]; f[1] = v->weights[1]; f[2] = v->weights[2]; f[3] = v->weights[3];
 				}
 				if (vk_create_gltf_buffers(vboPack, vboSize, prim->indices, prim->numIndices,
-					&surf->vbo_vertex, &surf->vbo_index)) {
-					surf->vbo_vertex_offsets[0] = offXyz;
-					surf->vbo_vertex_offsets[1] = offRgba;
-					surf->vbo_vertex_offsets[2] = offSt;
-					surf->vbo_vertex_offsets[5] = offNorm;
-					surf->vbo_vertex_offsets[6] = offJoint;
-					surf->vbo_vertex_offsets[7] = offWeight;
+					&vb, &ib)) {
+					surf->vbo_vertex = (uint64_t)(uintptr_t)vb;
+					surf->vbo_index = (uint64_t)(uintptr_t)ib;
+					surf->vbo_vertex_offsets[0] = (uint64_t)offXyz;
+					surf->vbo_vertex_offsets[1] = (uint64_t)offRgba;
+					surf->vbo_vertex_offsets[2] = (uint64_t)offSt;
+					surf->vbo_vertex_offsets[5] = (uint64_t)offNorm;
+					surf->vbo_vertex_offsets[6] = (uint64_t)offJoint;
+					surf->vbo_vertex_offsets[7] = (uint64_t)offWeight;
 				}
 				ri.Hunk_FreeTempMemory(vboPack);
 			}
+#endif /* RENDERER_VULKAN */
 		}
 	}
 
