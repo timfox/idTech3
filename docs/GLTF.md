@@ -58,6 +58,8 @@ Defined in `tr_model_gltf.h`:
 
 Larger assets are **silently clamped** during load.
 
+**Parity with IQM / GPU path:** `tr_model_gltf.c` uses `STATIC_ASSERT` so **`GLTF_MAX_JOINTS` == `IQM_MAX_JOINTS`** and **`GLTF_MAX_MORPH_TARGETS` == `IQM_MORPH_TOP_K`** (same joint matrix and morph top-K packing as the Vulkan IQM/glTF GPU SSBO path). `scripts/renderer_regression_check.sh` re-checks both pairs from headers for CI without compiling the loader alone.
+
 ### 5. Textures and embedded images
 
 - Texture filenames are taken from **`image->uri`** when present.

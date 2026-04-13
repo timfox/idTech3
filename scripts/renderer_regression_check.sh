@@ -99,6 +99,19 @@ else
 fi
 
 echo ""
+echo "glTF joint cap: GLTF_MAX_JOINTS vs IQM_MAX_JOINTS (skin matrix layout):"
+IQM_H="$PROJECT_ROOT/src/renderers/vulkan/iqm.h"
+iqm_j="$(sed -n 's/^#define[[:space:]]*IQM_MAX_JOINTS[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$IQM_H" | head -1)"
+gltf_j="$(sed -n 's/^#define GLTF_MAX_JOINTS[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$GLTF_H" | head -1)"
+if [[ -z "$gltf_j" || -z "$iqm_j" ]]; then
+  fail "could not parse GLTF_MAX_JOINTS from tr_model_gltf.h or IQM_MAX_JOINTS from iqm.h"
+elif [[ "$gltf_j" != "$iqm_j" ]]; then
+  fail "GLTF_MAX_JOINTS ($gltf_j) != IQM_MAX_JOINTS ($iqm_j) — skinning matrix buffers disagree between glTF and IQM paths"
+else
+  pass "GLTF_MAX_JOINTS=$gltf_j matches IQM_MAX_JOINTS"
+fi
+
+echo ""
 if [ -n "${GAME_BASE:-}" ]; then
   echo "Optional game base: $GAME_BASE"
   ASSETS_LIST="${GAME_ASSETS_LIST:-$PROJECT_ROOT/docs/samples/renderer_regression/OPTIONAL_GAME_ASSETS.txt}"
