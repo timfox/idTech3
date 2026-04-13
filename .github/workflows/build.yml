@@ -76,7 +76,9 @@ jobs:
           set -e
           pkgs="${{ matrix.prefix }}-SDL2 ${{ matrix.prefix }}-openal ${{ matrix.prefix }}-freetype ${{ matrix.prefix }}-lua ${{ matrix.prefix }}-openssl ${{ matrix.prefix }}-curl ${{ matrix.prefix }}-bullet"
           for attempt in 1 2 3 4 5; do
-            pacman -S --needed --noconfirm $pkgs && exit 0
+            # Refresh db + avoid spurious timeouts on congested mirrors (curl stack under pacman).
+            pacman -Sy --noconfirm || true
+            pacman -S --needed --noconfirm --disable-download-timeout $pkgs && exit 0
             echo "pacman attempt $attempt failed, retrying in $((attempt * 20))s..."
             sleep $((attempt * 20))
           done
@@ -752,7 +754,16 @@ jobs:
 
     steps:
       - name: Install tools
-        run: brew install coreutils sdl2 openal-soft cmake ninja freetype lua molten-vk bullet pkgconf
+        run: |
+          set -e
+          for attempt in 1 2 3 4; do
+            if brew install coreutils sdl2 openal-soft cmake ninja freetype lua molten-vk bullet pkgconf; then
+              exit 0
+            fi
+            echo "brew install attempt $attempt failed, retrying in $((attempt * 20))s..."
+            sleep $((attempt * 20))
+          done
+          exit 1
 
       - uses: actions/checkout@v4
 
@@ -877,13 +888,22 @@ jobs:
 
       - name: Install NDK
         run: |
-          sdkmanager --install "ndk;27.0.12077973" "cmake;3.22.1"
+          set -e
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          for attempt in 1 2 3 4 5; do
+            if sdkmanager --install "ndk;27.0.12077973" "cmake;3.22.1"; then
+              exit 0
+            fi
+            echo "sdkmanager attempt $attempt failed, retrying in $((attempt * 15))s..."
+            sleep $((attempt * 15))
+          done
+          exit 1
 
       - name: Cache Android third-party downloads (Lua, FetchContent)
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/.ci-android-deps
-          key: android-deps-${{ matrix.abi }}-ossl-3.0.15-lua-5.4.7-ft-${{ hashFiles('CMakeLists.txt') }}
+          key: android-deps-${{ matrix.abi }}-${{ hashFiles('CMakeLists.txt', 'cmake/**', 'android/**', '.github/workflows/build.yml') }}
           restore-keys: |
             android-deps-${{ matrix.abi }}-
 
@@ -908,38 +928,60 @@ jobs:
 
           mkdir -p build-android-${{ matrix.btype }}-${{ matrix.abi }}
           mkdir -p "${GITHUB_WORKSPACE}/.ci-android-deps"
-          cmake -S .. -B build-android-${{ matrix.btype }}-${{ matrix.abi }} \
-            -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
-            -DANDROID_ABI="$ANDROID_ABI" \
-            -DANDROID_PLATFORM=android-26 \
-            -DANDROID_STL=c++_shared \
-            -DANDROID_DEPS_CACHE="${GITHUB_WORKSPACE}/.ci-android-deps" \
-            -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
-            -DBUILD_SERVER=OFF \
-            -DUSE_VULKAN=ON \
-            -DUSE_RENDERER_DLOPEN=OFF \
-            -DRENDERER_DEFAULT=vulkan \
-            -DSKIP_IDPAK_CHECK=ON \
-            -DSKIP_SHADER_REGEN=ON \
-            -DUSE_SDL=OFF \
-            -DUSE_OPENAL=OFF \
-            -DUSE_CURL=ON \
-            -DUSE_LUA=ON \
-            -DUSE_DUKTAPE=ON \
-            -DUSE_FFMPEG=ON \
-            -DUSE_DAV1D=ON \
-            -DUSE_VPX=ON \
-            -DUSE_THEORA=ON \
-            -DUSE_FLUX=ON \
-            -DUSE_RECAST_NAV=ON \
-            -DUSE_BULLET_PHYSICS=ON \
-            -DBUILD_FREETYPE=ON \
-            -DUSE_DTLS=ON \
-            -DENABLE_FORTIFY_SOURCE=OFF \
-            -DENABLE_ASAN=OFF \
-            -DCI_BUILD=OFF \
-            -Wno-dev
-          cmake --build build-android-${{ matrix.btype }}-${{ matrix.abi }} -j$(nproc)
+          for attempt in 1 2 3; do
+            if cmake -S .. -B build-android-${{ matrix.btype }}-${{ matrix.abi }} \
+              -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
+              -DANDROID_ABI="$ANDROID_ABI" \
+              -DANDROID_PLATFORM=android-26 \
+              -DANDROID_STL=c++_shared \
+              -DANDROID_DEPS_CACHE="${GITHUB_WORKSPACE}/.ci-android-deps" \
+              -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
+              -DBUILD_SERVER=OFF \
+              -DUSE_VULKAN=ON \
+              -DUSE_RENDERER_DLOPEN=OFF \
+              -DRENDERER_DEFAULT=vulkan \
+              -DSKIP_IDPAK_CHECK=ON \
+              -DSKIP_SHADER_REGEN=ON \
+              -DUSE_SDL=OFF \
+              -DUSE_OPENAL=OFF \
+              -DUSE_CURL=ON \
+              -DUSE_LUA=ON \
+              -DUSE_DUKTAPE=ON \
+              -DUSE_FFMPEG=ON \
+              -DUSE_DAV1D=ON \
+              -DUSE_VPX=ON \
+              -DUSE_THEORA=ON \
+              -DUSE_FLUX=ON \
+              -DUSE_RECAST_NAV=ON \
+              -DUSE_BULLET_PHYSICS=ON \
+              -DBUILD_FREETYPE=ON \
+              -DUSE_DTLS=ON \
+              -DENABLE_FORTIFY_SOURCE=OFF \
+              -DENABLE_ASAN=OFF \
+              -DCI_BUILD=OFF \
+              -Wno-dev; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "cmake configure failed after 3 attempts"
+              exit 1
+            fi
+            echo "cmake configure attempt $attempt failed, cleaning build dir and retrying in $((attempt * 20))s..."
+            rm -rf "build-android-${{ matrix.btype }}-${{ matrix.abi }}"
+            mkdir -p "build-android-${{ matrix.btype }}-${{ matrix.abi }}"
+            sleep $((attempt * 20))
+          done
+          for attempt in 1 2 3; do
+            if cmake --build build-android-${{ matrix.btype }}-${{ matrix.abi }} -j$(nproc); then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "cmake --build failed after 3 attempts"
+              exit 1
+            fi
+            echo "cmake --build attempt $attempt failed, retrying in $((attempt * 25))s..."
+            sleep $((attempt * 25))
+          done
 
           mkdir -p ../bin
           find build-android-${{ matrix.btype }}-${{ matrix.abi }} -maxdepth 2 \
@@ -973,8 +1015,16 @@ jobs:
 
       - name: Install NDK, CMake (match app/build.gradle), SDK platform 35
         run: |
+          set -e
           yes | sdkmanager --licenses >/dev/null 2>&1 || true
-          sdkmanager --install "ndk;27.0.12077973" "cmake;3.31.6" "platforms;android-35" "build-tools;35.0.0"
+          for attempt in 1 2 3 4 5; do
+            if sdkmanager --install "ndk;27.0.12077973" "cmake;3.31.6" "platforms;android-35" "build-tools;35.0.0"; then
+              exit 0
+            fi
+            echo "sdkmanager attempt $attempt failed, retrying in $((attempt * 15))s..."
+            sleep $((attempt * 15))
+          done
+          exit 1
 
       - name: Cache Android third-party downloads
         uses: actions/cache@v4
@@ -996,7 +1046,17 @@ jobs:
           chmod +x ./gradlew
           SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME}}"
           echo "sdk.dir=${SDK_ROOT}" > local.properties
-          ./gradlew assembleDebug --no-daemon -PandroidDepsCache="${ANDROID_DEPS_CACHE}"
+          for attempt in 1 2 3; do
+            if ./gradlew assembleDebug --no-daemon -PandroidDepsCache="${ANDROID_DEPS_CACHE}"; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "gradlew assembleDebug failed after 3 attempts"
+              exit 1
+            fi
+            echo "gradlew attempt $attempt failed, retrying in $((attempt * 30))s..."
+            sleep $((attempt * 30))
+          done
           ls -la app/build/outputs/apk/debug/
 
       - uses: actions/upload-artifact@v4
