@@ -201,17 +201,28 @@ typedef struct
 } modelExtToLoaderMap_t;
 
 extern qhandle_t R_RegisterMeshImport( const char *name, model_t *mod );
+extern qhandle_t R_RegisterOBJ( const char *name, model_t *mod );
+extern qhandle_t R_RegisterMD5( const char *name, model_t *mod );
+extern qboolean  R_RegisterGLTF( const char *name, model_t *mod );
+
+static qhandle_t R_RegisterGLTF_Wrapper( const char *name, model_t *mod ) {
+	return R_RegisterGLTF( name, mod ) ? mod->index : 0;
+}
 
 // Note that the ordering indicates the order of preference used
 // when there are multiple models of different formats available
 static modelExtToLoaderMap_t modelLoaders[ ] =
 {
+	{ "gltf", R_RegisterGLTF_Wrapper },
+	{ "glb", R_RegisterGLTF_Wrapper },
+	{ "obj", R_RegisterOBJ },
 	{ "stl", R_RegisterMeshImport },
 	{ "dae", R_RegisterMeshImport },
 	{ "fbx", R_RegisterMeshImport },
 	{ "usd", R_RegisterMeshImport },
 	{ "usda", R_RegisterMeshImport },
 	{ "ma", R_RegisterMeshImport },
+	{ "md5mesh", R_RegisterMD5 },
 	{ "iqm", R_RegisterIQM },
 	{ "mdr", R_RegisterMDR },
 	{ "md3", R_RegisterMD3 }
@@ -1201,6 +1212,9 @@ void R_ModelBounds( qhandle_t handle, vec3_t mins, vec3_t maxs ) {
 			VectorCopy(iqmData->bounds + 3, maxs);
 			return;
 		}
+	} else if ( model->type == MOD_GLTF ) {
+		R_GLTFModelBounds( model->modelData, mins, maxs );
+		return;
 	}
 
 	VectorClear( mins );

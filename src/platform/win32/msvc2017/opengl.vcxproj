@@ -83,7 +83,7 @@
   </ImportGroup>
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>$(LibPngInclude);$(ZlibInclude);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(LibPngInclude);$(ZlibInclude);$(ExternalRoot)\include\cgltf;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -234,6 +234,10 @@
     <ClCompile Include="..\..\..\renderers\opengl\tr_mesh.c" />
     <ClCompile Include="..\..\..\renderers\opengl\tr_model.c" />
     <ClCompile Include="..\..\..\renderers\common\tr_model_mesh_import.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\tr_model_gltf.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\tr_model_obj.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\tr_model_md5.c" />
+    <ClCompile Include="..\..\..\renderers\opengl\tr_gltf_rb_opengl.c" />
     <ClCompile Include="..\..\..\renderers\opengl\tr_model_iqm.c" />
     <ClCompile Include="..\..\..\renderers\common\tr_noise.c" />
     <ClCompile Include="..\..\..\renderers\opengl\tr_scene.c" />
@@ -254,6 +258,7 @@
     <ClInclude Include="..\..\..\renderers\opengl\qgl.h" />
     <ClInclude Include="..\..\..\renderers\opengl\tr_common.h" />
     <ClInclude Include="..\..\..\renderers\opengl\tr_local.h" />
+    <ClInclude Include="..\..\..\renderers\vulkan\tr_model_gltf.h" />
     <ClInclude Include="..\..\..\renderers\common\tr_public.h" />
     <ClInclude Include="..\..\..\renderers\common\tr_types.h" />
   </ItemGroup>
