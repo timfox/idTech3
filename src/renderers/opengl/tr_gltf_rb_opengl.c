@@ -10,6 +10,123 @@ and R_AddGLTFSurfaces live in tr_model_gltf.c; Vulkan adds GPU/VBO paths there.
 #include "tr_local.h"
 #include <math.h>
 
+static qboolean RB_GLTF_ShaderUsesNormalMap( const shader_t *sh ) {
+	int i, b;
+
+	if ( !sh || sh->defaultShader ) {
+		return qfalse;
+	}
+	for ( i = 0; i < sh->numUnfoggedPasses; i++ ) {
+		const shaderStage_t *st = sh->stages[i];
+		if ( !st || !st->active ) {
+			continue;
+		}
+		for ( b = 0; b < NUM_TEXTURE_BUNDLES; b++ ) {
+			const textureBundle_t *tb = &st->bundle[b];
+			int a;
+			for ( a = 0; a < tb->numImageAnimations && a < MAX_IMAGE_ANIMATIONS; a++ ) {
+				const image_t *img = tb->image[a];
+				if ( img && img->imgName && Q_stristr( img->imgName, "norm" ) ) {
+					return qtrue;
+				}
+			}
+		}
+	}
+	return qfalse;
+}
+
+/*
+MikkTSpace-style tangent basis from deformed positions + UV0 (matches Vulkan RB_GLTFRecomputeQtangentsForTessRange).
+Fills tess.qtangent[w] for base <= w < base+numVerts.
+*/
+static void RB_GLTF_RecomputeQtangentsForTessRange( int vertBase, int numVerts, int indexStart, int numIndexes ) {
+	float (*tanAcc)[3];
+	float (*btAcc)[3];
+	int tri, k;
+
+	if ( numVerts <= 0 || numIndexes < 3 ) {
+		return;
+	}
+
+	tanAcc = (float (*)[3])ri.Hunk_AllocateTempMemory( numVerts * sizeof( *tanAcc ) );
+	btAcc = (float (*)[3])ri.Hunk_AllocateTempMemory( numVerts * sizeof( *btAcc ) );
+	Com_Memset( tanAcc, 0, numVerts * sizeof( *tanAcc ) );
+	Com_Memset( btAcc, 0, numVerts * sizeof( *btAcc ) );
+
+	for ( tri = 0; tri < numIndexes / 3; tri++ ) {
+		int ia = tess.indexes[indexStart + tri * 3 + 0];
+		int ib = tess.indexes[indexStart + tri * 3 + 1];
+		int ic = tess.indexes[indexStart + tri * 3 + 2];
+		vec3_t e1, e2, sdir, tdir;
+		vec2_t duv1, duv2;
+		float denom, f;
+		int corner;
+
+		VectorSubtract( tess.xyz[ib], tess.xyz[ia], e1 );
+		VectorSubtract( tess.xyz[ic], tess.xyz[ia], e2 );
+		duv1[0] = tess.texCoords[0][ib][0] - tess.texCoords[0][ia][0];
+		duv1[1] = tess.texCoords[0][ib][1] - tess.texCoords[0][ia][1];
+		duv2[0] = tess.texCoords[0][ic][0] - tess.texCoords[0][ia][0];
+		duv2[1] = tess.texCoords[0][ic][1] - tess.texCoords[0][ia][1];
+		denom = duv1[0] * duv2[1] - duv2[0] * duv1[1];
+		if ( fabsf( denom ) < 1e-12f ) {
+			continue;
+		}
+		f = 1.0f / denom;
+		sdir[0] = f * ( duv2[1] * e1[0] - duv1[1] * e2[0] );
+		sdir[1] = f * ( duv2[1] * e1[1] - duv1[1] * e2[1] );
+		sdir[2] = f * ( duv2[1] * e1[2] - duv1[1] * e2[2] );
+		tdir[0] = f * ( -duv2[0] * e1[0] + duv1[0] * e2[0] );
+		tdir[1] = f * ( -duv2[0] * e1[1] + duv1[0] * e2[1] );
+		tdir[2] = f * ( -duv2[0] * e1[2] + duv1[0] * e2[2] );
+
+		for ( corner = 0; corner < 3; corner++ ) {
+			int vx = ( corner == 0 ) ? ia : ( ( corner == 1 ) ? ib : ic );
+			int li;
+
+			if ( vx < vertBase || vx >= vertBase + numVerts ) {
+				continue;
+			}
+			li = vx - vertBase;
+			for ( k = 0; k < 3; k++ ) {
+				tanAcc[li][k] += sdir[k];
+				btAcc[li][k] += tdir[k];
+			}
+		}
+	}
+
+	for ( k = 0; k < numVerts; k++ ) {
+		int vi = vertBase + k;
+		vec3_t n, t, b, up;
+		float d;
+
+		VectorCopy( tess.normal[vi], n );
+		VectorNormalize( n );
+		d = DotProduct( n, tanAcc[k] );
+		t[0] = tanAcc[k][0] - n[0] * d;
+		t[1] = tanAcc[k][1] - n[1] * d;
+		t[2] = tanAcc[k][2] - n[2] * d;
+		if ( VectorLength( t ) < 1e-8f ) {
+			if ( fabsf( n[2] ) < 0.9f ) {
+				VectorSet( up, 0.0f, 0.0f, 1.0f );
+			} else {
+				VectorSet( up, 1.0f, 0.0f, 0.0f );
+			}
+			CrossProduct( n, up, t );
+		}
+		VectorNormalize( t );
+		CrossProduct( n, t, b );
+		d = DotProduct( b, btAcc[k] );
+		tess.qtangent[vi][0] = t[0];
+		tess.qtangent[vi][1] = t[1];
+		tess.qtangent[vi][2] = t[2];
+		tess.qtangent[vi][3] = ( d < 0.0f ) ? -1.0f : 1.0f;
+	}
+
+	ri.Hunk_FreeTempMemory( btAcc );
+	ri.Hunk_FreeTempMemory( tanAcc );
+}
+
 static int RB_GLTFMorphIndexByHash( const gltfMorphTarget_t *targets, int num, uint32_t hash ) {
 	int i;
 	char lower[MAX_QPATH];
@@ -234,8 +351,24 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 
 	tess.numVertexes += surf->numVertices;
 
-	for ( j = 0; j < surf->numIndices; j++ ) {
-		tess.indexes[tess.numIndexes + j] = (glIndex_t)( base + surf->indices[j] );
+	{
+		int idxBase = tess.numIndexes;
+		for ( j = 0; j < surf->numIndices; j++ ) {
+			tess.indexes[tess.numIndexes + j] = (glIndex_t)( base + surf->indices[j] );
+		}
+		tess.numIndexes += surf->numIndices;
+
+		if ( r_gltfCpuQtangent && r_gltfCpuQtangent->integer &&
+		     tess.shader && RB_GLTF_ShaderUsesNormalMap( tess.shader ) ) {
+			RB_GLTF_RecomputeQtangentsForTessRange( base, surf->numVertices, idxBase, surf->numIndices );
+		} else {
+			for ( j = 0; j < surf->numVertices; j++ ) {
+				const gltfVertex_t *vv = &surf->vertices[j];
+				tess.qtangent[base + j][0] = vv->tangent[0];
+				tess.qtangent[base + j][1] = vv->tangent[1];
+				tess.qtangent[base + j][2] = vv->tangent[2];
+				tess.qtangent[base + j][3] = vv->tangent[3];
+			}
+		}
 	}
-	tess.numIndexes += surf->numIndices;
 }
