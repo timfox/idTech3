@@ -44,6 +44,34 @@ float R_GLTFPackGpuVertexMeta( int morphVertexIndex )
 #endif
 #include <math.h>
 
+#ifdef RENDERER_OPENGL
+/*
+OpenGL: glTF materials only carry texture paths; engine shaders are separate .shader files.
+If `textures/foo/bar.png` exists, try `textures/foo/bar_norm` when a normal map is listed
+(common Q3 naming); fall back to the base-color shader name.
+*/
+static shader_t *R_GLTF_RegisterSurfaceShader( const gltfMaterial_t *mat ) {
+	char normName[MAX_QPATH];
+	qhandle_t h;
+
+	if ( mat->normalTexture[0] ) {
+		COM_StripExtension( mat->normalTexture, normName, sizeof( normName ) );
+		Q_strcat( normName, sizeof( normName ), "_norm" );
+		h = RE_RegisterShaderNoMip( normName );
+		if ( h ) {
+			return R_GetShaderByHandle( h );
+		}
+	}
+	if ( mat->baseColorTexture[0] ) {
+		h = RE_RegisterShaderNoMip( mat->baseColorTexture );
+		if ( h ) {
+			return R_GetShaderByHandle( h );
+		}
+	}
+	return tr.defaultShader;
+}
+#endif
+
 static qboolean gltf_load_materials(const cgltf_data *data, gltfModel_t *model);
 static qboolean gltf_load_meshes(const cgltf_data *data, gltfModel_t *model);
 static qboolean gltf_load_skeleton(const cgltf_data *data, gltfModel_t *model);
@@ -1052,9 +1080,6 @@ qboolean R_RegisterGLTF(const char *name, model_t *mod) {
 		for (j = 0; j < mesh->numPrimitives; j++) {
 			gltfPrimitive_t *prim = &mesh->primitives[j];
 			srfGLTFPrimitive_t *surf = &rdata->surfaces[idx++];
-			int vi;
-			byte *vboPack;
-			int vboSize;
 
 			surf->surfaceType = SF_GLTF;
 			surf->vertices = prim->vertices;
@@ -1074,10 +1099,14 @@ qboolean R_RegisterGLTF(const char *name, model_t *mod) {
 
 			if (prim->materialIndex >= 0 && prim->materialIndex < gltfModel.numMaterials) {
 				gltfMaterial_t *mat = &rdata->model.materials[prim->materialIndex];
+#ifdef RENDERER_OPENGL
+				surf->shader = R_GLTF_RegisterSurfaceShader( mat );
+#else
 				if (mat->baseColorTexture[0]) {
 					qhandle_t h = RE_RegisterShaderNoMip(mat->baseColorTexture);
 					surf->shader = R_GetShaderByHandle(h);
 				}
+#endif
 			}
 
 			/* VBO: pack vertex data (Vulkan only; OpenGL uses CPU tess path) */
@@ -1085,6 +1114,9 @@ qboolean R_RegisterGLTF(const char *name, model_t *mod) {
 			if (prim->numVertices > 0 && prim->numIndices > 0) {
 				int offXyz, offRgba, offSt, offNorm, offJoint, offWeight;
 				int n = prim->numVertices;
+				int vi;
+				byte *vboPack;
+				int vboSize;
 				VkBuffer vb = VK_NULL_HANDLE;
 				VkBuffer ib = VK_NULL_HANDLE;
 				vboSize = n * 16 + n * 4 + n * 8 + n * 16 + n * 4 + n * 16;

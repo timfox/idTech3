@@ -85,6 +85,7 @@ cvar_t	*r_dlightSaturation;
 cvar_t	*r_vbo;
 cvar_t	*r_morph;
 cvar_t	*r_gltfAnim;
+cvar_t	*r_gltfCpuQtangent;
 #endif
 
 #ifdef USE_FBO
@@ -1540,9 +1541,15 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_gltfAnim, "glTF clip playback: multiplies refEntity shaderTime for skeletal TRS and morph-weight sampling." );
 	ri.Cvar_SetGroup( r_gltfAnim, CVG_RENDERER );
 
-	ri.Printf( PRINT_ALL, "[GL] glTF: CPU tess path; morph r_morph=%s; clip speed r_gltfAnim=%.3f\n",
+	r_gltfCpuQtangent = ri.Cvar_Get( "r_gltfCpuQtangent", "1", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_gltfCpuQtangent, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_gltfCpuQtangent, "OpenGL glTF CPU tess: after deform, recompute qtangent from positions + TEXCOORD_0 when the bound shader uses a normal-map image (name contains \"norm\")." );
+	ri.Cvar_SetGroup( r_gltfCpuQtangent, CVG_RENDERER );
+
+	ri.Printf( PRINT_ALL, "[GL] glTF: CPU tess; morph=%s; clip r_gltfAnim=%.3f; cpu qtangent=%s\n",
 		( r_morph && r_morph->integer ) ? "on" : "off",
-		r_gltfAnim ? r_gltfAnim->value : 1.0f );
+		r_gltfAnim ? r_gltfAnim->value : 1.0f,
+		( r_gltfCpuQtangent && r_gltfCpuQtangent->integer ) ? "on" : "off" );
 
 	r_mapGreyScale = ri.Cvar_Get( "r_mapGreyScale", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_mapGreyScale, "-1", "1", CV_FLOAT );
