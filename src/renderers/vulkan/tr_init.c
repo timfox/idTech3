@@ -2389,7 +2389,7 @@ static void R_Register( void )
 	r_gltfGpu = ri.Cvar_Get( "r_gltfGpu", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_gltfGpu, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_gltfGpu,
-		"Vulkan PBR: GPU vertex skinning and morph for glTF (joint matrix SSBO + morph deltas; up to 4 morph targets per draw). Falls back to CPU tess when off or when entity morph channels are used." );
+		"Vulkan PBR: GPU vertex skinning and morph for glTF (joint matrix SSBO + morph deltas; top-4 morph weights per draw, including RE_SetEntityMorphWeight channels). Falls back to CPU tess when off or constraints fail." );
 	ri.Cvar_SetGroup( r_gltfGpu, CVG_RENDERER );
 
 	r_flares = ri.Cvar_Get ("r_flares", "0", CVAR_ARCHIVE_ND );
