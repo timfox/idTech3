@@ -183,6 +183,29 @@ vec3 GltfJointTransformNormal( int jointIndex, vec3 n ) {
 	);
 	return R * n;
 }
+
+#ifdef GLTF_GPU_TANGENT_FIX
+/* Linear blend of joint rotation only (same weights as position/normal skinning). */
+vec3 GltfSkinVector( int skinCount, uvec4 joints, vec4 wIn, vec3 v ) {
+	vec4 w = wIn;
+	float wsum = w.x + w.y + w.z + w.w;
+	if ( wsum > 1e-6 ) {
+		w /= wsum;
+	}
+	vec3 outv = vec3( 0.0 );
+	for ( int k = 0; k < 4; k++ ) {
+		if ( w[k] <= 0.0 ) {
+			continue;
+		}
+		int j = int( joints[k] );
+		if ( j < 0 || j >= skinCount ) {
+			continue;
+		}
+		outv += w[k] * GltfJointTransformNormal( j, v );
+	}
+	return outv;
+}
+#endif
 #endif
 
 void main() {
@@ -242,6 +265,13 @@ void main() {
 			}
 			normal = normalize( normal );
 		}
+#if defined(GLTF_GPU_TANGENT_FIX) && defined(USE_VK_PBR)
+		/* GPU path used bind-pose qtangent; after skin + morph, Gram–Schmidt T against final N. */
+		if ( skinCount > 0 ) {
+			vec3 st = GltfSkinVector( skinCount, in_gltf_joints, in_gltf_weights, tangent );
+			tangent = normalize( st - normal * dot( normal, st ) );
+		}
+#endif
 	} else
 #endif
 	if ( IQMDecodeMeta( in_position.w, skinIndex, morphIndex ) && skinIndex >= 0 && skinIndex < skinCount ) {
