@@ -62,7 +62,7 @@ if [[ -n "${GAME_BASE:-}" ]]; then
 else
 	skip "GAME_BASE unset — export GAME_BASE=/abs/path/to/base for map-load scripts"
 fi
-info "GitHub Tier B: set repo variable IDTECH3_GAME_BASE_PATH + self-hosted runner (docs/renderer_validation/SELF_HOSTED_TIER_B.md)"
+info "GitHub Tier B: set repo variable or secret IDTECH3_GAME_BASE_PATH + self-hosted runner label idtech3-tierb (docs/renderer_validation/SELF_HOSTED_TIER_B.md)"
 echo ""
 
 echo "Tier C — Manual GPU / validation layers"

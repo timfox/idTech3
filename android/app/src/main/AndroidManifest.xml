@@ -7,7 +7,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:installLocation="auto">
 
-    <!-- Vulkan hardware (optional — engine has OpenGL fallback) -->
+    <!-- Vulkan (optional); Android client build uses Vulkan renderer -->
     <uses-feature android:name="android.hardware.vulkan.level" android:version="0" android:required="false" />
     <uses-feature android:name="android.hardware.vulkan.version" android:version="0x00401000" android:required="false" />
 

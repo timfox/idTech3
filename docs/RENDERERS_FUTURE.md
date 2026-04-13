@@ -26,7 +26,7 @@ This document outlines the architecture and implementation plan for three render
 
 ### Implementation Phases
 
-1. **Extension enablement** (vk.c device creation)
+1. **Extension enablement** (`vk_instance.c` / `vk_device.c` device creation)
    - Add ray tracing extensions to `device_extension_list` when available
    - Query `VkPhysicalDeviceRayTracingPipelinePropertiesKHR`
    - Load `vkCreateRayTracingPipelinesKHR`, `vkCmdTraceRaysKHR`, etc.

@@ -17,12 +17,254 @@ skeleton, and animations into engine-native structures.
 
 #include "tr_local.h"
 #include "tr_model_gltf.h"
+
+#define GLTF_GPU_META_TAG	0xAC000000u
+#define GLTF_GPU_MORPH_INDEX_MASK	0x00000FFFu
+#define GLTF_GPU_NO_MORPH_VERTEX	0x0FFFu
+
+float R_GLTFPackGpuVertexMeta( int morphVertexIndex )
+{
+	uint32_t packed;
+	float out;
+
+	if ( morphVertexIndex < 0 || morphVertexIndex >= (int)GLTF_GPU_MORPH_INDEX_MASK ) {
+		packed = GLTF_GPU_META_TAG | GLTF_GPU_NO_MORPH_VERTEX;
+	} else {
+		packed = GLTF_GPU_META_TAG | ( (uint32_t)morphVertexIndex & GLTF_GPU_MORPH_INDEX_MASK );
+	}
+	Com_Memcpy( &out, &packed, sizeof( out ) );
+	return out;
+}
+#ifdef RENDERER_VULKAN
 #include "vk.h"
+#endif
+#include <math.h>
 
 static qboolean gltf_load_materials(const cgltf_data *data, gltfModel_t *model);
 static qboolean gltf_load_meshes(const cgltf_data *data, gltfModel_t *model);
 static qboolean gltf_load_skeleton(const cgltf_data *data, gltfModel_t *model);
 static qboolean gltf_load_animations(const cgltf_data *data, gltfModel_t *model);
+
+typedef struct {
+	vec3_t trans;
+	vec4_t rot;
+	vec3_t scale;
+} gltfLocalJoint_t;
+
+static int gltf_mesh_index_from_node(const cgltf_data *data, const cgltf_node *node) {
+	if (!node || !node->mesh || !data) {
+		return -1;
+	}
+	return (int)(node->mesh - data->meshes);
+}
+
+static void gltf_quat_slerp(const vec4_t from, const vec4_t _to, float t, vec4_t out) {
+	float cosAngle, sinAngle, angle, b, l;
+	vec4_t to;
+	int i;
+
+	cosAngle = from[0] * _to[0] + from[1] * _to[1] + from[2] * _to[2] + from[3] * _to[3];
+	if (cosAngle < 0.0f) {
+		cosAngle = -cosAngle;
+		for (i = 0; i < 4; i++) {
+			to[i] = -_to[i];
+		}
+	} else {
+		Vector4Copy(_to, to);
+	}
+	if (cosAngle < 0.999999f) {
+		angle = acosf(cosAngle);
+		sinAngle = sinf(angle);
+		b = sinf((1.0f - t) * angle) / sinAngle;
+		l = sinf(t * angle) / sinAngle;
+	} else {
+		b = 1.0f - t;
+		l = t;
+	}
+	out[0] = from[0] * b + to[0] * l;
+	out[1] = from[1] * b + to[1] * l;
+	out[2] = from[2] * b + to[2] * l;
+	out[3] = from[3] * b + to[3] * l;
+}
+
+static float gltf_anim_wrap_time(float t, float duration) {
+	if (duration <= 0.0f) {
+		return 0.0f;
+	}
+	t = fmodf(t, duration);
+	if (t < 0.0f) {
+		t += duration;
+	}
+	return t;
+}
+
+static void gltf_sample_channel_scalar(const float *times, const float *values, int numKeys, int compsPerKey,
+	float time, float *outVal, int compOffset, int compCount) {
+	int k;
+
+	if (!times || !values || numKeys < 1 || compOffset + compCount > compsPerKey) {
+		return;
+	}
+	if (numKeys == 1) {
+		for (k = 0; k < compCount; k++) {
+			outVal[k] = values[compOffset + k];
+		}
+		return;
+	}
+	if (time <= times[0]) {
+		for (k = 0; k < compCount; k++) {
+			outVal[k] = values[compOffset + k];
+		}
+		return;
+	}
+	if (time >= times[numKeys - 1]) {
+		int base = (numKeys - 1) * compsPerKey + compOffset;
+		for (k = 0; k < compCount; k++) {
+			outVal[k] = values[base + k];
+		}
+		return;
+	}
+	for (k = 0; k < numKeys - 1; k++) {
+		if (time >= times[k] && time <= times[k + 1]) {
+			float t0 = times[k];
+			float t1 = times[k + 1];
+			float lerp = (t1 > t0) ? (time - t0) / (t1 - t0) : 0.0f;
+			int b0 = k * compsPerKey + compOffset;
+			int b1 = (k + 1) * compsPerKey + compOffset;
+			{
+				int c;
+				for (c = 0; c < compCount; c++) {
+					outVal[c] = values[b0 + c] * (1.0f - lerp) + values[b1 + c] * lerp;
+				}
+			}
+			return;
+		}
+	}
+}
+
+static void gltf_sample_channel_rotation(const float *times, const float *values, int numKeys, float time, vec4_t outQ) {
+	int k;
+
+	if (!times || !values || numKeys < 1) {
+		Vector4Set(outQ, 0, 0, 0, 1);
+		return;
+	}
+	if (numKeys == 1) {
+		Vector4Copy(&values[0], outQ);
+		return;
+	}
+	if (time <= times[0]) {
+		Vector4Copy(&values[0], outQ);
+		return;
+	}
+	if (time >= times[numKeys - 1]) {
+		Vector4Copy(&values[(numKeys - 1) * 4], outQ);
+		return;
+	}
+	for (k = 0; k < numKeys - 1; k++) {
+		if (time >= times[k] && time <= times[k + 1]) {
+			float t0 = times[k];
+			float t1 = times[k + 1];
+			float lerp = (t1 > t0) ? (time - t0) / (t1 - t0) : 0.0f;
+			const float *q0 = &values[k * 4];
+			const float *q1 = &values[(k + 1) * 4];
+			vec4_t v0, v1;
+			Vector4Copy(q0, v0);
+			Vector4Copy(q1, v1);
+			gltf_quat_slerp(v0, v1, lerp, outQ);
+			return;
+		}
+	}
+}
+
+static void gltf_init_local_pose_from_skeleton(const gltfModel_t *model, gltfLocalJoint_t *pose) {
+	int ji;
+
+	for (ji = 0; ji < model->skeleton.numJoints; ji++) {
+		const gltfJoint_t *j = &model->skeleton.joints[ji];
+		VectorCopy(j->translation, pose[ji].trans);
+		Vector4Copy(j->rotation, pose[ji].rot);
+		VectorCopy(j->scale, pose[ji].scale);
+	}
+}
+
+static void gltf_apply_animation_to_pose(const gltfModel_t *model, int animIndex, float timeSeconds, gltfLocalJoint_t *pose) {
+	const gltfAnimation_t *anim;
+	float t;
+	int ci;
+
+	if (!model || animIndex < 0 || animIndex >= model->numAnimations || !model->animations) {
+		return;
+	}
+	anim = &model->animations[animIndex];
+	t = gltf_anim_wrap_time(timeSeconds, anim->duration);
+
+	for (ci = 0; ci < anim->numChannels; ci++) {
+		const gltfAnimChannel_t *ch = &anim->channels[ci];
+		int ji = ch->jointIndex;
+
+		if (ji < 0 || ji >= model->skeleton.numJoints) {
+			continue;
+		}
+		switch (ch->type) {
+			case (int)cgltf_animation_path_type_translation: {
+				vec3_t v;
+				gltf_sample_channel_scalar(ch->times, ch->values, ch->numKeyframes, ch->componentsPerKeyframe,
+					t, v, 0, 3);
+				VectorCopy(v, pose[ji].trans);
+				break;
+			}
+			case (int)cgltf_animation_path_type_rotation: {
+				vec4_t q;
+				gltf_sample_channel_rotation(ch->times, ch->values, ch->numKeyframes, t, q);
+				Vector4Copy(q, pose[ji].rot);
+				break;
+			}
+			case (int)cgltf_animation_path_type_scale: {
+				vec3_t v;
+				gltf_sample_channel_scalar(ch->times, ch->values, ch->numKeyframes, ch->componentsPerKeyframe,
+					t, v, 0, 3);
+				VectorCopy(v, pose[ji].scale);
+				break;
+			}
+			default:
+				break;
+		}
+	}
+}
+
+static void gltf_blend_local_poses(const gltfModel_t *model, const gltfLocalJoint_t *a, const gltfLocalJoint_t *b,
+	float blendTowardB, gltfLocalJoint_t *out) {
+	int ji;
+	float w = blendTowardB;
+	float iw = 1.0f - w;
+
+	if (w <= 0.0f) {
+		for (ji = 0; ji < model->skeleton.numJoints; ji++) {
+			VectorCopy(a[ji].trans, out[ji].trans);
+			Vector4Copy(a[ji].rot, out[ji].rot);
+			VectorCopy(a[ji].scale, out[ji].scale);
+		}
+		return;
+	}
+	if (w >= 1.0f) {
+		for (ji = 0; ji < model->skeleton.numJoints; ji++) {
+			VectorCopy(b[ji].trans, out[ji].trans);
+			Vector4Copy(b[ji].rot, out[ji].rot);
+			VectorCopy(b[ji].scale, out[ji].scale);
+		}
+		return;
+	}
+	for (ji = 0; ji < model->skeleton.numJoints; ji++) {
+		out[ji].trans[0] = a[ji].trans[0] * iw + b[ji].trans[0] * w;
+		out[ji].trans[1] = a[ji].trans[1] * iw + b[ji].trans[1] * w;
+		out[ji].trans[2] = a[ji].trans[2] * iw + b[ji].trans[2] * w;
+		out[ji].scale[0] = a[ji].scale[0] * iw + b[ji].scale[0] * w;
+		out[ji].scale[1] = a[ji].scale[1] * iw + b[ji].scale[1] * w;
+		out[ji].scale[2] = a[ji].scale[2] * iw + b[ji].scale[2] * w;
+		gltf_quat_slerp(a[ji].rot, b[ji].rot, w, out[ji].rot);
+	}
+}
 
 typedef struct {
 	gltfModel_t model;
@@ -227,6 +469,20 @@ static qboolean gltf_load_meshes(const cgltf_data *data, gltfModel_t *model) {
 			Q_strncpyz(dstMesh->name, srcMesh->name, sizeof(dstMesh->name));
 		}
 
+		dstMesh->numDefaultMorphWeights = 0;
+		Com_Memset(dstMesh->defaultMorphWeights, 0, sizeof(dstMesh->defaultMorphWeights));
+		if (srcMesh->weights && srcMesh->weights_count > 0) {
+			int nw = (int)srcMesh->weights_count;
+			int wi;
+			if (nw > GLTF_MAX_MORPH_TARGETS) {
+				nw = GLTF_MAX_MORPH_TARGETS;
+			}
+			dstMesh->numDefaultMorphWeights = nw;
+			for (wi = 0; wi < nw; wi++) {
+				dstMesh->defaultMorphWeights[wi] = (float)srcMesh->weights[wi];
+			}
+		}
+
 		dstMesh->primitives = (gltfPrimitive_t *)ri.Hunk_Alloc(primCount * sizeof(gltfPrimitive_t), h_low);
 		dstMesh->numPrimitives = primCount;
 
@@ -319,19 +575,28 @@ static qboolean gltf_load_meshes(const cgltf_data *data, gltfModel_t *model) {
 				for (ti = 0; ti < dstPrim->numMorphTargets; ti++) {
 					const cgltf_morph_target *tgt = &srcPrim->targets[ti];
 					gltfMorphTarget_t *dst = &dstPrim->morphTargets[ti];
+					if (srcMesh->target_names && ti < (int)srcMesh->target_names_count && srcMesh->target_names[ti]) {
+						Q_strncpyz(dst->name, srcMesh->target_names[ti], sizeof(dst->name));
+					}
 					for (attri = 0; attri < (int)tgt->attributes_count; attri++) {
 						const cgltf_attribute *attr = &tgt->attributes[attri];
 						const cgltf_accessor *acc = attr->data;
 						float *dstArr = NULL;
-						if (attr->name && !Q_stricmp(attr->name, "POSITION")) {
-							dstArr = (float *)ri.Hunk_Alloc(vertCount * 3 * sizeof(float), h_low);
-							dst->deltaPosition = dstArr;
-						} else if (attr->name && !Q_stricmp(attr->name, "NORMAL")) {
-							dstArr = (float *)ri.Hunk_Alloc(vertCount * 3 * sizeof(float), h_low);
-							dst->deltaNormal = dstArr;
-						} else if (attr->name && !Q_stricmp(attr->name, "TANGENT")) {
-							dstArr = (float *)ri.Hunk_Alloc(vertCount * 3 * sizeof(float), h_low);
-							dst->deltaTangent = dstArr;
+						switch (attr->type) {
+							case cgltf_attribute_type_position:
+								dstArr = (float *)ri.Hunk_Alloc(vertCount * 3 * sizeof(float), h_low);
+								dst->deltaPosition = dstArr;
+								break;
+							case cgltf_attribute_type_normal:
+								dstArr = (float *)ri.Hunk_Alloc(vertCount * 3 * sizeof(float), h_low);
+								dst->deltaNormal = dstArr;
+								break;
+							case cgltf_attribute_type_tangent:
+								dstArr = (float *)ri.Hunk_Alloc(vertCount * 3 * sizeof(float), h_low);
+								dst->deltaTangent = dstArr;
+								break;
+							default:
+								break;
 						}
 						if (dstArr) {
 							for (vi = 0; vi < vertCount && vi < (int)acc->count; vi++) {
@@ -451,9 +716,17 @@ static qboolean gltf_load_animations(const cgltf_data *data, gltfModel_t *model)
 			gltfAnimChannel_t *dstCh = &dstAnim->channels[ci];
 			const cgltf_animation_sampler *sampler = srcCh->sampler;
 			int ki;
+			int compCount;
+			int nk;
+			int outFloats;
 
 			dstCh->jointIndex = -1;
-			if (srcCh->target_node && data->skins_count > 0) {
+			dstCh->morphMeshIndex = -1;
+			dstCh->componentsPerKeyframe = 0;
+
+			if (srcCh->target_path == cgltf_animation_path_type_weights) {
+				dstCh->morphMeshIndex = gltf_mesh_index_from_node(data, srcCh->target_node);
+			} else if (srcCh->target_node && data->skins_count > 0) {
 				const cgltf_skin *skin = &data->skins[0];
 				int ji;
 				for (ji = 0; ji < (int)skin->joints_count; ji++) {
@@ -466,6 +739,7 @@ static qboolean gltf_load_animations(const cgltf_data *data, gltfModel_t *model)
 
 			dstCh->type = (int)srcCh->target_path;
 			dstCh->numKeyframes = (int)sampler->input->count;
+			nk = dstCh->numKeyframes;
 
 			dstCh->times = (float *)ri.Hunk_Alloc(dstCh->numKeyframes * sizeof(float), h_low);
 			for (ki = 0; ki < dstCh->numKeyframes; ki++) {
@@ -475,7 +749,20 @@ static qboolean gltf_load_animations(const cgltf_data *data, gltfModel_t *model)
 				}
 			}
 
-			int compCount = (srcCh->target_path == cgltf_animation_path_type_rotation) ? 4 : 3;
+			if (srcCh->target_path == cgltf_animation_path_type_rotation) {
+				compCount = 4;
+			} else if (srcCh->target_path == cgltf_animation_path_type_weights) {
+				outFloats = (int)sampler->output->count;
+				if (nk > 0 && outFloats > 0 && (outFloats % nk) == 0) {
+					compCount = outFloats / nk;
+				} else {
+					compCount = 1;
+				}
+			} else {
+				compCount = 3;
+			}
+			dstCh->componentsPerKeyframe = compCount;
+
 			dstCh->values = (float *)ri.Hunk_Alloc(dstCh->numKeyframes * compCount * sizeof(float), h_low);
 			for (ki = 0; ki < dstCh->numKeyframes; ki++) {
 				cgltf_accessor_read_float(sampler->output, ki, &dstCh->values[ki * compCount], compCount);
@@ -533,15 +820,16 @@ static void gltf_mat34_mul_44(const float *a34, const float *b44, float *out34) 
 	out34[11] = a34[8]*b44[12] + a34[9]*b44[13] + a34[10]*b44[14] + a34[11]*b44[15];
 }
 
-/* Compute bind-pose joint matrices: skinMat[j] = world[j] * inverseBindMatrix[j], 3x4 per joint */
-void R_ComputeGLTFJointMatrices(const gltfModel_t *model, float *outMatrices) {
+/* skinMat[j] = world[j] * inverseBindMatrix[j], 3x4 row-major per joint */
+static void gltf_compute_skin_matrices_from_local_pose(const gltfModel_t *model, const gltfLocalJoint_t *pose, float *outMatrices) {
 	float world[GLTF_MAX_JOINTS][12];
 	int ji;
+
 	for (ji = 0; ji < model->skeleton.numJoints; ji++) {
 		const gltfJoint_t *j = &model->skeleton.joints[ji];
 		float local[12];
 		float local44[16];
-		gltf_joint_to_matrix(j->translation, j->rotation, j->scale, local);
+		gltf_joint_to_matrix(pose[ji].trans, pose[ji].rot, pose[ji].scale, local);
 		local44[0] = local[0]; local44[1] = local[1]; local44[2] = local[2]; local44[3] = local[3];
 		local44[4] = local[4]; local44[5] = local[5]; local44[6] = local[6]; local44[7] = local[7];
 		local44[8] = local[8]; local44[9] = local[9]; local44[10] = local[10]; local44[11] = local[11];
@@ -555,6 +843,77 @@ void R_ComputeGLTFJointMatrices(const gltfModel_t *model, float *outMatrices) {
 	for (ji = 0; ji < model->skeleton.numJoints; ji++) {
 		gltf_mat34_mul_44(world[ji], model->skeleton.joints[ji].inverseBindMatrix, &outMatrices[ji * 12]);
 	}
+}
+
+void R_ComputeGLTFJointMatrices(const gltfModel_t *model, int animIndex, float timeSeconds, float *outMatrices) {
+	gltfLocalJoint_t pose[GLTF_MAX_JOINTS];
+
+	if (!model || !outMatrices) {
+		return;
+	}
+	gltf_init_local_pose_from_skeleton(model, pose);
+	if (animIndex >= 0 && animIndex < model->numAnimations) {
+		gltf_apply_animation_to_pose(model, animIndex, timeSeconds, pose);
+	}
+	gltf_compute_skin_matrices_from_local_pose(model, pose, outMatrices);
+}
+
+void R_ComputeGLTFJointMatricesBlend(const gltfModel_t *model, int animA, float timeA, int animB, float timeB,
+	float blendTowardB, float *outMatrices) {
+	gltfLocalJoint_t poseA[GLTF_MAX_JOINTS];
+	gltfLocalJoint_t poseB[GLTF_MAX_JOINTS];
+	gltfLocalJoint_t blended[GLTF_MAX_JOINTS];
+
+	if (!model || !outMatrices) {
+		return;
+	}
+	gltf_init_local_pose_from_skeleton(model, poseA);
+	gltf_init_local_pose_from_skeleton(model, poseB);
+	if (animA >= 0 && animA < model->numAnimations) {
+		gltf_apply_animation_to_pose(model, animA, timeA, poseA);
+	}
+	if (animB >= 0 && animB < model->numAnimations) {
+		gltf_apply_animation_to_pose(model, animB, timeB, poseB);
+	}
+	gltf_blend_local_poses(model, poseA, poseB, blendTowardB, blended);
+	gltf_compute_skin_matrices_from_local_pose(model, blended, outMatrices);
+}
+
+qboolean R_SampleGLTFMeshMorphWeights(const gltfModel_t *model, int animIndex, float timeSeconds,
+	int meshIndex, float *outWeights, int numTargets) {
+	const gltfAnimation_t *anim;
+	float t;
+	int ci;
+	qboolean touched = qfalse;
+
+	if (!model || !outWeights || numTargets <= 0 || meshIndex < 0) {
+		return qfalse;
+	}
+	if (animIndex < 0 || animIndex >= model->numAnimations || !model->animations) {
+		return qfalse;
+	}
+	anim = &model->animations[animIndex];
+	t = gltf_anim_wrap_time(timeSeconds, anim->duration);
+
+	for (ci = 0; ci < anim->numChannels; ci++) {
+		const gltfAnimChannel_t *ch = &anim->channels[ci];
+		int ti;
+
+		if (ch->type != (int)cgltf_animation_path_type_weights) {
+			continue;
+		}
+		if (ch->morphMeshIndex != meshIndex) {
+			continue;
+		}
+		touched = qtrue;
+		for (ti = 0; ti < numTargets && ti < ch->componentsPerKeyframe; ti++) {
+			float w;
+			gltf_sample_channel_scalar(ch->times, ch->values, ch->numKeyframes, ch->componentsPerKeyframe,
+				t, &w, ti, 1);
+			outWeights[ti] += w;
+		}
+	}
+	return touched;
 }
 
 static int R_ComputeGLTFFogNum(const gltfModel_t *model, const trRefEntity_t *ent) {
@@ -698,12 +1057,15 @@ qboolean R_RegisterGLTF(const char *name, model_t *mod) {
 			surf->numVertices = prim->numVertices;
 			surf->indices = prim->indices;
 			surf->numIndices = prim->numIndices;
+			surf->morphTargets = prim->morphTargets;
+			surf->numMorphTargets = prim->numMorphTargets;
+			surf->meshIndex = i;
 			surf->shader = tr.defaultShader;
 			surf->materialIndex = prim->materialIndex;
 			surf->hasSkinning = (gltfModel.skeleton.numJoints > 0) ? qtrue : qfalse;
 			surf->hasMorphTargets = (prim->numMorphTargets > 0) ? qtrue : qfalse;
-			surf->vbo_vertex = VK_NULL_HANDLE;
-			surf->vbo_index = VK_NULL_HANDLE;
+			surf->vbo_vertex = TR_GLTF_VBO_HANDLE_INVALID;
+			surf->vbo_index = TR_GLTF_VBO_HANDLE_INVALID;
 			Com_Memset(surf->vbo_vertex_offsets, 0, sizeof(surf->vbo_vertex_offsets));
 
 			if (prim->materialIndex >= 0 && prim->materialIndex < gltfModel.numMaterials) {
@@ -714,16 +1076,22 @@ qboolean R_RegisterGLTF(const char *name, model_t *mod) {
 				}
 			}
 
-			/* VBO: pack vertex data as separate arrays (xyz, rgba, st, normal) to match engine layout */
-			if (prim->numVertices > 0 && prim->numIndices > 0 && !surf->hasSkinning && !surf->hasMorphTargets) {
-				int offXyz, offRgba, offSt, offNorm;
-				vboSize = prim->numVertices * 16 + prim->numVertices * 4 + prim->numVertices * 8 + prim->numVertices * 16;
+			/* VBO: pack vertex data (Vulkan only; OpenGL uses CPU tess path) */
+#ifdef RENDERER_VULKAN
+			if (prim->numVertices > 0 && prim->numIndices > 0) {
+				int offXyz, offRgba, offSt, offNorm, offJoint, offWeight;
+				int n = prim->numVertices;
+				VkBuffer vb = VK_NULL_HANDLE;
+				VkBuffer ib = VK_NULL_HANDLE;
+				vboSize = n * 16 + n * 4 + n * 8 + n * 16 + n * 4 + n * 16;
 				vboPack = (byte *)ri.Hunk_AllocateTempMemory(vboSize);
 				offXyz = 0;
-				offRgba = prim->numVertices * 16;
-				offSt = offRgba + prim->numVertices * 4;
-				offNorm = offSt + prim->numVertices * 8;
-				for (vi = 0; vi < prim->numVertices; vi++) {
+				offRgba = n * 16;
+				offSt = offRgba + n * 4;
+				offNorm = offSt + n * 8;
+				offJoint = offNorm + n * 16;
+				offWeight = offJoint + n * 4;
+				for (vi = 0; vi < n; vi++) {
 					const gltfVertex_t *v = &prim->vertices[vi];
 					float *f;
 					byte *b;
@@ -736,16 +1104,25 @@ qboolean R_RegisterGLTF(const char *name, model_t *mod) {
 					f[0] = v->texCoord0[0]; f[1] = v->texCoord0[1];
 					f = (float *)(vboPack + offNorm + vi * 16);
 					f[0] = v->normal[0]; f[1] = v->normal[1]; f[2] = v->normal[2]; f[3] = 0.0f;
+					b = vboPack + offJoint + vi * 4;
+					b[0] = v->joints[0]; b[1] = v->joints[1]; b[2] = v->joints[2]; b[3] = v->joints[3];
+					f = (float *)(vboPack + offWeight + vi * 16);
+					f[0] = v->weights[0]; f[1] = v->weights[1]; f[2] = v->weights[2]; f[3] = v->weights[3];
 				}
 				if (vk_create_gltf_buffers(vboPack, vboSize, prim->indices, prim->numIndices,
-					&surf->vbo_vertex, &surf->vbo_index)) {
-					surf->vbo_vertex_offsets[0] = offXyz;
-					surf->vbo_vertex_offsets[1] = offRgba;
-					surf->vbo_vertex_offsets[2] = offSt;
-					surf->vbo_vertex_offsets[5] = offNorm;
+					&vb, &ib)) {
+					surf->vbo_vertex = (uint64_t)(uintptr_t)vb;
+					surf->vbo_index = (uint64_t)(uintptr_t)ib;
+					surf->vbo_vertex_offsets[0] = (uint64_t)offXyz;
+					surf->vbo_vertex_offsets[1] = (uint64_t)offRgba;
+					surf->vbo_vertex_offsets[2] = (uint64_t)offSt;
+					surf->vbo_vertex_offsets[5] = (uint64_t)offNorm;
+					surf->vbo_vertex_offsets[6] = (uint64_t)offJoint;
+					surf->vbo_vertex_offsets[7] = (uint64_t)offWeight;
 				}
 				ri.Hunk_FreeTempMemory(vboPack);
 			}
+#endif /* RENDERER_VULKAN */
 		}
 	}
 

@@ -40,18 +40,37 @@ src/
 │   └── snd_music_adaptive.c/h    Adaptive music layers
 ├── renderers/
 │   ├── vulkan/            Vulkan 1.4 renderer
-│   │   ├── vk.c/h                Core pipeline + dispatch
+│   │   ├── vk.h                  Core Vulkan state + public API (implementation split across vk_*.c)
+│   │   ├── vk_init_device.c      vk_initialize (device bootstrap after logical device)
+│   │   ├── vk_frame_submit.c     vk_begin_frame / vk_end_frame / vk_present_frame
+│   │   ├── vk_raster_samples.c   MSAA sample counts + vk_get_msaa_min_sample_shading
+│   │   ├── vk_sun_shadow_pass.c  Sun shadow map render pass
+│   │   ├── vk_pipelines_bootstrap.c vk_create_pipelines (+ BRDF LUT pipeline helper)
+│   │   ├── vk_pbr_ibl_validate.c   vk_validate_pbr_ibl_resources (startup IBL checks)
 │   │   ├── vk_procs.c/h          `qvk*` Vulkan entry points (storage + declarations)
 │   │   ├── vk_shader_modules.c/h SPIR-V `VkShaderModule` creation + `vk_create_shader_modules`
 │   │   ├── vk_pipelines_persistent.c/h Long-lived pipelines (skybox, fog, debug tools)
 │   │   ├── vk_attachments.c/h    Render targets, pooled image memory, shadows, froxels (split from vk.c)
 │   │   ├── vk_resource_destroy.c/h VkRenderPass + long-lived pipeline teardown (split from vk.c)
 │   │   ├── vk_framebuffers.c/h       VkFramebuffer create/destroy (split from vk.c)
+│   │   ├── vk_descriptor_sets.c/h    Descriptor pool alloc + attachment/volumetric writes (split from vk.c)
+│   │   ├── vk_texture_image.c/h    Texture image create/upload + per-image descriptor (split from vk.c)
+│   │   ├── vk_pipeline_helpers.c/h Post-process pipelines: atmosphere, OIT accum, blur; vk_set_shader_stage_desc (split from vk.c)
+│   │   ├── vk_occlusion.c/h       GPU occlusion queries + entity visibility buffer (split from vk.c)
+│   │   ├── vk_create_pipeline.c/h Vk_Pipeline_Def graphics pipeline factory + pipeline table lookup (split from vk.c)
+│   │   ├── vk_draw_state.c/h      Tess upload, vertex/index/descriptor/pipeline bind, draws (split from vk.c)
+│   │   ├── vk_volumetric_pipelines.c Volumetric fog / fluid / luminance / CBT / veg-wind pipeline setup (split from vk.c)
+│   │   ├── vk_volumetric_internal.c/h MSAA depth resolve, fluid sim dispatch, volumetric perf queries (split from vk.c)
+│   │   ├── vk_volumetric_pass_compute.c Local volumetric shadows, froxel compute, composite, SMAA (split from vk.c)
+│   │   ├── vk_shutdown.c          vk_shutdown, wait-idle, release_resources (split from vk.c)
+│   │   ├── vk_postfx_passes.c     Bloom, SSAO/HBAO, OIT, SSR passes (split from vk.c)
+│   │   ├── vk_clear_attachments.c In-pass color/depth clear + dynamic color write mask (split from vk.c)
+│   │   ├── vk_cubemap_prefilter.c IBL cubemap prefilter, SH extraction, vk_generate_cubemaps, vk_begin_cubemap_render_pass, vk_create_brfdlut (split from legacy vk.c)
 │   │   ├── vk_fluidsim.c/h       Fluid simulation module
 │   │   ├── vk_postfx.c/h         PostFX (SSR, atmosphere, wind)
 │   │   ├── vk_flashlight.c/h     Projected texture system
 │   │   ├── vk_skybox_hdr.c/h     HDR EXR skybox + IBL
-│   │   ├── tr_model_gltf.c/h     glTF 2.0 loader
+│   │   ├── tr_model_gltf.c/h     glTF 2.0 loader (shared; Vulkan GPU path + OpenGL CPU tess — see docs/GLTF.md)
 │   │   ├── tr_model_obj.c        OBJ loader
 │   │   ├── tr_model_md5.c        MD5 loader
 │   │   ├── inspector/             ImGui inspector overlay

@@ -93,6 +93,7 @@ typedef struct goapAgent_s {
 	int             id;
 	qboolean        active;
 	goapState_t     worldState;
+	qboolean        worldStateDirty; /* external SetAgentWorldState: invalidate plan */
 	goapPlan_t      currentPlan;
 	int             currentGoalId;
 	int             availableActions[GOAP_MAX_ACTIONS];
@@ -109,6 +110,13 @@ typedef int goapAgentHandle_t;
 void GOAP_Init(void);
 void GOAP_Shutdown(void);
 void GOAP_Update(float dt);
+
+/* Max A* expansions per GOAP_Plan (default 4096). Higher = deeper search, more CPU. */
+void GOAP_SetMaxPlanIterations( int maxIterations );
+int  GOAP_GetMaxPlanIterations( void );
+/* Last GOAP_Plan expansion count (for tuning / debug). */
+int  GOAP_GetLastPlanIterations( void );
+void GOAP_ForceReplan( goapAgentHandle_t handle );
 
 int  GOAP_RegisterAction(const char *name, float cost);
 void GOAP_SetActionPrecondition(int actionId, int propIndex, int value);

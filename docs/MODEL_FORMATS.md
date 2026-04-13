@@ -23,12 +23,14 @@ When a model is requested without extension, the engine tries formats in this or
 
 ## glTF 2.0 Details
 
-Full PBR material support:
+**Renderer**: glTF loading and the full material/animation path are **Vulkan-only** (see [GLTF.md](GLTF.md)); OpenGL does not register `.gltf`/`.glb`.
+
+**Materials and animation (summary)**:
 - Base color, metallic/roughness, normal, emissive, occlusion maps
-- Extensions: clearcoat, sheen, transmission, IOR, emissive strength
-- Skeletal animation with joint hierarchy and inverse bind matrices
-- Keyframe animations (translation, rotation, scale)
-- GLB binary container support
+- Extensions: clearcoat, sheen, transmission, IOR, emissive strength (loader reads many KHR fields; shader coverage varies — see GLTF.md)
+- Skeletal animation with joint hierarchy and inverse bind matrices; runtime clip playback and GPU skin on Vulkan PBR when enabled
+- Keyframe animations (translation, rotation, scale) and morph targets (see GLTF.md for caps and `r_gltf*` cvars)
+- GLB binary container support (embedded bufferView images remain a known loader gap — prefer external images or see GLTF.md)
 
 ## MD5 Details
 

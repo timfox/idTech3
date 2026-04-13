@@ -364,12 +364,8 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	frag_spec_data.film_grain = PostFX_GetFilmGrain();
 	frag_spec_data.postprocess_enabled = ( r_post && r_post->integer ) ? 1 : 0;
 	frag_spec_data.film_look = PostFX_GetFilmLook();
-	{
-		cvar_t *r_outline = ri.Cvar_Get( "r_outline", "0", CVAR_ARCHIVE );
-		cvar_t *r_outlineThreshold = ri.Cvar_Get( "r_outlineThreshold", "0.15", CVAR_ARCHIVE );
-		frag_spec_data.outline_strength = r_outline ? r_outline->value : 0.0f;
-		frag_spec_data.outline_threshold = r_outlineThreshold ? r_outlineThreshold->value : 0.15f;
-	}
+	frag_spec_data.outline_strength = r_outline ? r_outline->value : 0.0f;
+	frag_spec_data.outline_threshold = r_outlineThreshold ? r_outlineThreshold->value : 0.15f;
 	{
 		cvar_t *r_post_contrast = ri.Cvar_Get( "r_post_contrast", "1.0", CVAR_ARCHIVE_ND );
 		cvar_t *r_post_saturation = ri.Cvar_Get( "r_post_saturation", "1.0", CVAR_ARCHIVE_ND );

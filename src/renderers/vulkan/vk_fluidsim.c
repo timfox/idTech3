@@ -7,7 +7,7 @@ existing id Tech 3 / ioquake3 code.
 The engine framework is based on id Tech 3 (GPLv2).
 
 Navier-Stokes fluid simulation emitter API for volumetric fog.
-Enable and tuning use r_fogFluid* cvars in tr_init.c; GPU compute dispatch is in vk.c.
+Enable and tuning use r_fogFluid* cvars in tr_init.c; GPU compute dispatch is in vk_volumetric_internal.c (fluid passes).
 ===========================================================================
 */
 

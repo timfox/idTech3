@@ -4,6 +4,10 @@
 #include "../common/vulkan/vulkan.h"
 #include "tr_common.h"
 #include "vk_util.h"
+#include "vk_descriptor_sets.h"
+#include "vk_texture_image.h"
+#include "vk_pipeline_helpers.h"
+#include "vk_occlusion.h"
 
 /* VK_EXT_extended_dynamic_state3: color write mask for RB_ColorMask */
 #ifndef VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT
@@ -32,6 +36,9 @@ typedef void (VKAPI_PTR *PFN_vkCmdSetColorWriteMaskEXT)(VkCommandBuffer commandB
 #define VERTEX_BUFFER_SIZE     (4 * 1024 * 1024)  /* by default */
 #define VERTEX_BUFFER_SIZE_HI  (8 * 1024 * 1024)
 
+#define VEGWIND_MAX_VERTS 16384
+#define VEGWIND_VERTEX_STRIDE 32  /* positionFlex + normalPhase */
+
 #define STAGING_BUFFER_SIZE    (2 * 1024 * 1024)  /* by default */
 #define STAGING_BUFFER_SIZE_HI (24 * 1024 * 1024) /* enough for max.texture size upload with all mip levels at once */
 
@@ -39,6 +46,26 @@ typedef void (VKAPI_PTR *PFN_vkCmdSetColorWriteMaskEXT)(VkCommandBuffer commandB
 #define MAX_IMAGE_CHUNKS 56
 
 #define NUM_COMMAND_BUFFERS 2	// number of command buffers / render semaphores / framebuffer sets
+
+#define VK_VOLUMETRIC_QUERY_SLOTS 16
+#define VK_VOLUMETRIC_QUERY_COUNT (VK_VOLUMETRIC_QUERY_SLOTS * NUM_COMMAND_BUFFERS)
+
+typedef enum {
+	VK_VOLUMETRY_QUERY_FOG_START = 0,
+	VK_VOLUMETRY_QUERY_AFTER_FLUID_SIM = 1,
+	VK_VOLUMETRY_QUERY_AFTER_CLEAR = 2,
+	VK_VOLUMETRY_QUERY_AFTER_GLOBAL_DENSITY = 3,
+	VK_VOLUMETRY_QUERY_AFTER_VOLUME_DENSITY = 4,
+	VK_VOLUMETRY_QUERY_AFTER_FLUID_DENSITY = 5,
+	VK_VOLUMETRY_QUERY_AFTER_SUN = 6,
+	VK_VOLUMETRY_QUERY_AFTER_LOCAL = 7,
+	VK_VOLUMETRY_QUERY_AFTER_CLAMP0 = 8,
+	VK_VOLUMETRY_QUERY_AFTER_CLAMP1 = 9,
+	VK_VOLUMETRY_QUERY_AFTER_TEMPORAL = 10,
+	VK_VOLUMETRY_QUERY_AFTER_COMPOSITE = 11,
+	VK_VOLUMETRY_QUERY_FOG_END = 12,
+	VK_VOLUMETRY_QUERY_USED = 13
+} vk_volumetry_query_index_t;
 
 #define USE_REVERSED_DEPTH
 
@@ -234,8 +261,12 @@ typedef struct {
 #ifdef USE_VK_PBR
 	uint32_t				vk_pbr_flags;
 	int32_t					lightmap_bundle;
+	uint8_t					pbr_vert_mode; /* 0=default gen_vert, 1=glTF GPU skin+morph variant */
+	uint8_t					gltf_gpu_tangent_fixup; /* 1=vertex shader re-orthonormalizes T vs deformed N (r_gltfGpuTangentFix) */
+	uint8_t					pom_height_source; /* 0=ORM R (physical map), 1=normal map alpha (normalHeightMap) */
 	vec4_t					specularScale;
 	vec4_t					normalScale;
+	float					parallaxBias;
 #endif
 	unsigned int			hasFlowmap : 1;	// water flowmap: flow vectors offset texture UVs
 	int acff; // none, rgb, rgba, alpha
@@ -249,6 +280,9 @@ typedef struct VK_Pipeline {
 	Vk_Pipeline_Def def;
 	VkPipeline handle[ RENDER_PASS_COUNT ];
 } VK_Pipeline_t;
+
+#include "vk_create_pipeline.h"
+#include "vk_draw_state.h"
 
 // this structure must be in sync with shader uniforms!
 typedef struct vkUniform_s {
@@ -286,6 +320,8 @@ typedef struct vkUniform_s {
 	vec4_t pbrGlintFlags;
 	vec4_t pbrDebugMode; // x: debug mode selector
 	vec4_t pbrShCoeffs[9];
+	/* Parallax occlusion (POM): x=height scale, y=self-shadow strength, z=shadow ray steps (float bits as int), w=unused */
+	vec4_t pbrParallaxParams;
 #endif
 } vkUniform_t;
 
@@ -310,7 +346,8 @@ typedef struct vkUniformCamera_s {
 #define TESS_ENV   (512) // mark shader stage with environment mapping
 
 #ifdef USE_VK_PBR
-#define TESS_PBR   				( 1024 ) // PBR shader variant, qtangent vertex attribute and eyePos uniform
+/* Must not collide with TESS_ENT0 (1024). */
+#define TESS_PBR   				( 0x8000u ) // PBR shader variant, qtangent vertex attribute and eyePos uniform
 
 #define PBR_HAS_NORMALMAP		( 1 )
 #define PBR_HAS_PHYSICALMAP		( 2 )
@@ -394,9 +431,6 @@ void vk_set_object_name( uint64_t obj, const char *objName, VkDebugReportObjectT
 // After calling this function we get fully functional vulkan subsystem.
 void vk_initialize( void );
 
-// Called after initialization or renderer restart
-void vk_init_descriptors( void );
-
 // Shutdown vulkan subsystem by releasing resources acquired by Vk_Instance.
 void vk_shutdown( refShutdownCode_t code );
 
@@ -407,29 +441,22 @@ void vk_release_resources( void );
 void vk_wait_idle( void );
 void vk_queue_wait_idle( void );
 VkSampleCountFlagBits vk_get_main_rasterization_samples( void );
+VkSampleCountFlagBits vk_get_main_rasterization_max_samples( void );
+float vk_get_msaa_min_sample_shading( void );
 
 //
 // Resources allocation.
 //
 void vk_allocate_and_bind_image_memory( VkImage image );
 void vk_image_free_chunks( void );
-void vk_create_image( image_t *image, int width, int height, int mip_levels );
-void vk_upload_image_data( image_t *image, int x, int y, int width, int height, int miplevels, byte *pixels, int size, qboolean update );
-void vk_upload_cubemap_mip_data( image_t *image, int face_size, int miplevels, const byte *pixels, int size, int bytes_per_pixel, qboolean update );
-void vk_upload_compressed_image_data( image_t *image, int width, int height, int miplevels, byte *pixels, int size, qboolean update );
-void vk_update_descriptor_set( image_t *image, qboolean mipmap );
-void vk_destroy_image_resources( VkImage *image, VkImageView *imageView );
 void vk_bind_generated_shaders( void );
-void vk_update_attachment_descriptors( void );
 void vk_validate_pbr_ibl_resources( void );
 void vk_destroy_samplers( void );
 VkSampler vk_find_sampler( const Vk_Sampler_Def *def );
 
-uint32_t vk_find_pipeline_ext( uint32_t base, const Vk_Pipeline_Def *def, qboolean use );
-void vk_get_pipeline_def( uint32_t pipeline, Vk_Pipeline_Def *def );
-
 void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_t height );
 void vk_create_pipelines( void );
+void vk_create_volumetric_pipelines( void );
 
 //
 // Rendering setup.
@@ -441,6 +468,11 @@ void vk_set_color_write_mask( qboolean r, qboolean g, qboolean b, qboolean a );
 void vk_begin_frame( void );
 void vk_end_frame( void );
 void vk_present_frame( void );
+
+/* Swapchain + attachment teardown/recreate (Android surface recycle, swapchain restart) */
+void vk_teardown_presentation_targets( void );
+void vk_restore_presentation_targets( void );
+void vk_restart_swapchain( const char *funcname, VkResult res );
 void vk_prepare_2d( void );
 void vk_prepare_frame_temporal_state( void );
 void vk_reset_scene_src_rect_tracking( void );
@@ -467,33 +499,15 @@ void vk_vegetation_clear_staging( void );
 qboolean vk_begin_sun_shadow_render_pass( void );
 void vk_end_sun_shadow_render_pass( void );
 
-void vk_bind_pipeline( uint32_t pipeline );
-void vk_bind_index( void );
-void vk_bind_index_ext( const int numIndexes, const uint32_t*indexes );
-void vk_bind_geometry( uint32_t flags );
-void vk_bind_lighting( int stage, int bundle );
-void vk_draw_geometry( Vk_Depth_Range depth_range, qboolean indexed );
-void vk_draw_dot( uint32_t storage_offset );
-
 void vk_read_pixels( byte* buffer, uint32_t width, uint32_t height ); // screenshots
 qboolean vk_bloom( void );
 qboolean vk_ssao_pass( void );
 
-qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size );
-void vk_update_mvp( const float *m );
-
-uint32_t vk_tess_index( uint32_t numIndexes, const void *src );
-void *vk_alloc_storage( size_t size, uint32_t *offset );
-void vk_set_iqm_storage_offsets( uint32_t skin_offset, uint32_t morph_offset );
-void vk_reset_iqm_storage_offsets( void );
-void vk_bind_index_buffer( VkBuffer buffer, uint32_t offset );
 #ifdef USE_VBO
-void vk_draw_indexed( uint32_t indexCount, uint32_t firstIndex );
+void vk_release_vbo( void );
+qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size );
 #endif
-void vk_reset_descriptor( int index );
-void vk_update_descriptor( int index, VkDescriptorSet descriptor );
-void vk_update_descriptor_offset( int index, uint32_t offset );
-void vk_bind_descriptor_sets( void );
+void vk_update_mvp( const float *m );
 
 void vk_update_post_process_pipelines( void );
 
@@ -505,11 +519,7 @@ void VBO_ClearQueue( void );
 qboolean vk_create_gltf_buffers( const byte *vboData, int vboSize, const uint32_t *idxData, int idxCount,
 	VkBuffer *outVertexBuffer, VkBuffer *outIndexBuffer );
 
-/* GPU occlusion culling for entities */
-struct drawSurfsCommand_s;
-void vk_occlusion_pass( const struct drawSurfsCommand_s *cmd );
-void vk_occlusion_readback( void );
-void vk_occlusion_draw_entity_bboxes( const struct drawSurfsCommand_s *cmd );
+/* GPU occlusion culling: vk_occlusion.h */
 
 // cubemap
 #ifdef VK_CUBEMAP
@@ -902,6 +912,8 @@ typedef struct {
 		struct {
 #ifdef USE_VK_PBR
 			VkShaderModule gen[2][3][2][2][2]; // pbr[0,1], tx[0,1,2], cl[0,1] env0[0,1] fog[0,1]
+			/* +USE_GLTF_GPU_SKIN; last dim: 0=bind pose tangent, 1=r_gltfGpuTangentFix (skin+morph orthonormalize) */
+			VkShaderModule gen_gltf_gpu[2][3][2][2][2][2];
 			VkShaderModule ident1[2][2][2][2]; // pbr[0,1], tx[0,1], env0[0,1] fog[0,1]
 			VkShaderModule fixed[2][2][2][2];  // pbr[0,1], tx[0,1], env0[0,1] fog[0,1]
 #else
