@@ -70,7 +70,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - Surfaces with `surfaceparm vegetation` in shaders feed the VegetationVertex buffer
 - Flexibility from vertex normal Y; phase from position hash
 - Cvars: `r_vegWind` (PostFX panel), wind direction/strength, primary/detail frequency and amplitude
-- Compute runs at frame start; visual integration (draw from modified buffer) is a future enhancement
+- Compute **dispatches after each vegetation tess batch** uploads staging (so the GPU sees the correct `vertexCount`). **Vertex shaders still draw from the original tess buffer** — binding the modified SSBO for final positions remains a future enhancement.
 
 ### RB_ColorMask (Vulkan)
 - `RB_ColorMask` is wired through `vk_set_color_write_mask()`, but the `VK_EXT_extended_dynamic_state3` path is currently disabled due to validation/driver issues.
