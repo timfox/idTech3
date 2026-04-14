@@ -70,6 +70,7 @@ TODOs/FIXMEs in `src/external/` are from third-party code (duktape, zstd, cjson,
 |------|--------|------|
 | 2026-04-11 | Network / downloads | `cl_curl.c`: `dl->Name` from `Content-Disposition` uses **`Q_strncpyz`** (Phase 2 P0 item remains fixed). |
 | 2026-04-11 | Botlib / preprocessor | **`src/botlib/l_precomp.c`** already bounded; duplicate **`src/platform/botlib/l_precomp.c`** and **`src/platform/win32/botlib/l_precomp.c`** aligned: `sprintf` → **`Com_sprintf(..., MAX_TOKEN, ...)`** (5 sites each). |
+| 2026-04-11 | Botlib / chat (Windows tree) | **`src/platform/win32/botlib/be_ai_chat.c`** `BotLoadChatMessage`: `sprintf`/`strcpy` → **`Com_sprintf` / `Q_strncpyz`** to match **`src/botlib/be_ai_chat.c`**; **`src/platform/botlib/be_ai_chat.c`** fixed-string append → **`Q_strncpyz`**. |
 | 2026-04-11 | Client / server / qcommon | `rg '\\b(TODO|FIXME)\\b' src/{client,server,qcommon}` — **no matches** (same triage expectation as 2026-04-10). |
 | 2026-04-11 | Renderer validation | `renderer_regression_check.sh` + manifest caps (`GLTF_MAX_*`, `IQM_*`) — CI-style parity checks on `main`. |
 

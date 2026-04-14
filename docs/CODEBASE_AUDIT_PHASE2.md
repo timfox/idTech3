@@ -47,6 +47,8 @@
 | `cl_cgame.c:735,737` | `sprintf` in VM traps | ✅ Fixed: `Com_sprintf` with `MAX_STRING_CHARS` |
 | `sv_game.c:964,967` | `sprintf` in VM traps | ✅ Fixed: `Com_sprintf` with `MAX_STRING_CHARS` |
 | `be_ai_chat.c:951,969` | `sprintf` for chat tokens | ✅ Fixed: `Com_sprintf` / `Q_strncpyz` with bounds |
+| `platform/win32/botlib/be_ai_chat.c` (same paths) | Duplicate tree still used `sprintf` / `strcpy` in `BotLoadChatMessage` | ✅ Fixed (2026-04-11): match `src/botlib/be_ai_chat.c` |
+| `platform/botlib/be_ai_chat.c` | `strcpy` for fixed string append in `BotLoadChatMessage` | ✅ Fixed (2026-04-11): `Q_strncpyz` |
 | `l_precomp.c` (5 places) | `sprintf(token.string, ...)` | ✅ Fixed: `Com_sprintf` with `MAX_TOKEN` |
 | `platform/botlib/l_precomp.c`, `platform/win32/botlib/l_precomp.c` (5 places each) | Duplicate tree still used `sprintf` on token strings | ✅ Fixed (2026-04-11): `Com_sprintf(..., MAX_TOKEN, ...)` to match `src/botlib/l_precomp.c` |
 | `bindshader.c:26`, `bin2hex.c` | Build tools | ✅ Fixed: `snprintf` with `sizeof(buf)` |
