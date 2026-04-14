@@ -23,6 +23,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "tr_local.h"
 #include "vk_util.h"
+#ifdef USE_VULKAN
+#include "vk_postfx.h"
+#endif
 
 static color4ub_t RB_TintedFogColor( const fog_t *fog ) {
 	color4ub_t color;
@@ -2187,6 +2190,14 @@ void RB_EndSurface( void ) {
 #endif
 	R_IQMCommitSurfaceBatch();
 	tess.shader->optimalStageIteratorFunc();
+
+#ifdef USE_VULKAN
+	/* Run veg-wind compute after this vegetation batch uploaded staging (vk_begin_frame is too early). */
+	if ( PostFX_VegWind_IsEnabled() && tess.shader && ( tess.shader->surfaceFlags & SURF_VEGETATION ) ) {
+		vk_vegetation_wind_dispatch();
+		vk_vegetation_clear_staging();
+	}
+#endif
 
 	//
 	// draw debugging stuff
