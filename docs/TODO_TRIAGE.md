@@ -61,7 +61,7 @@ TODOs/FIXMEs in `src/external/` are from third-party code (duktape, zstd, cjson,
 | RB_ColorMask (Vulkan) | tr_backend.c | Partial: `vk_set_color_write_mask()` exists, but the VK_EXT_extended_dynamic_state3 path is currently disabled due to validation/driver issues; Vulkan falls back to full color writes. |
 | r_renderMode 1/2 | tr_init.c | Deferred/Forward+ placeholders; need G-buffers, light culling. Documented in cvar description. |
 | r_hdr 3 64-bit output | `vk_post_process_pipeline.c`, HDR format helpers | Infrastructure in place (vk_hdr64_active, _hdr64 modules, pipeline selection). glslangValidator rejects dvec4/f64vec4 fragment shader outputs. Falls back to RGBA32F. When glslang adds support, compile HDR64 variants and return RGBA64F from get_hdr_format. |
-| Vegetation wind draw | `vk_vegetation_wind.c` + draw path | Compute runs; wind-modified buffer not yet wired for final mesh draw. Future enhancement. |
+| Vegetation wind draw | `vk_vegetation_wind.c` + draw path | Compute **dispatch** now runs **after** each `SURF_VEGETATION` tess batch (staging was previously uploaded *after* the misplaced `vk_begin_frame` dispatch, so GPU saw 0 verts). **Vertex shader still does not read** `vegwind_vertex_buffer` — deformed positions are not yet applied on draw. |
 | Vulkan RTX | CMake `USE_VULKAN_RTX`, renderer init | Extensions can be requested when `USE_VULKAN_RTX=ON` and GPU supports them. Pipeline (BLAS/TLAS, shaders) not yet implemented. See `docs/RENDERERS_FUTURE.md`. |
 
 ## Subsystem audit log (rolling)

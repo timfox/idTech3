@@ -173,9 +173,9 @@ _retry:
 
 	backEnd.screenMapDone = qfalse;
 
-	if ( PostFX_VegWind_IsEnabled() ) {
-		vk_vegetation_wind_dispatch();
-	}
+	/* Vegetation wind compute is dispatched from RB_EndSurface after SURF_VEGETATION
+	 * batches upload staging (see tr_shade.c); dispatch here at frame start would run
+	 * before tessellation and see vertexCount==0. */
 
 	if ( vk_find_screenmap_drawsurfs() ) {
 		vk_begin_screenmap_render_pass();
