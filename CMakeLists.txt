@@ -2415,6 +2415,12 @@ set_tests_properties(test_demo_game_pk3 PROPERTIES
 	LABELS "scripts;validation;examples"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_demo_game_pk3.sh")
 
+add_test(NAME test_compile_engine_lto
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_compile_engine_lto.sh ${CMAKE_SOURCE_DIR}/scripts/compile_engine.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_compile_engine_lto PROPERTIES
+	LABELS "unit;scripts;validation")
+
 # --- Unit tests ---
 option(BUILD_UNIT_TESTS "Build unit tests" ON)
 if(BUILD_UNIT_TESTS)
