@@ -1111,6 +1111,7 @@ typedef struct {
 	qboolean dedicatedAllocation;
 	qboolean debugMarkers;
 	qboolean colorWriteMaskDynamic;
+	qboolean meshShaderNV; /* VK_NV_mesh_shader enabled at device create (r_vk_meshShaderNV); no mesh pipelines yet */
 
 	float maxAnisotropy;
 	float maxLod;
