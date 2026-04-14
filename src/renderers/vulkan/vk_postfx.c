@@ -132,10 +132,14 @@ void PostFX_RegisterCvars(void) {
 	r_ssr_stepSize           = ri.Cvar_Get("r_ssr_stepSize",           "1.0",  CVAR_ARCHIVE);
 	r_ssr_thickness          = ri.Cvar_Get("r_ssr_thickness",          "0.5",  CVAR_ARCHIVE);
 	r_ssr_fadeEdge           = ri.Cvar_Get("r_ssr_fadeEdge",           "0.2",  CVAR_ARCHIVE);
-	r_ssr_roughnessThreshold = ri.Cvar_Get("r_ssr_roughnessThreshold", "0.5",  CVAR_ARCHIVE);
+	r_ssr_roughnessThreshold = ri.Cvar_Get("r_ssr_roughnessThreshold", "0",  CVAR_ARCHIVE);
 	r_ssr_intensity          = ri.Cvar_Get("r_ssr_intensity",          "0.8",  CVAR_ARCHIVE);
 	r_ssr_maxDepthGradient   = ri.Cvar_Get("r_ssr_maxDepthGradient",   "0.08", CVAR_ARCHIVE);
 	ri.Cvar_SetDescription( r_ssr_maxDepthGradient, "Skip SSR at depth edges (object silhouettes, horizon) to reduce thin line artifacts. Lower = stricter." );
+	ri.Cvar_SetDescription( r_ssr_roughnessThreshold,
+		"SSR view-dependent blend (no roughness buffer): 0=full intensity at all angles (legacy). "
+		"1=strongest at grazing angles only (Fresnel-style falloff). Intermediate values blend." );
+	ri.Cvar_CheckRange( r_ssr_roughnessThreshold, "0", "1", CV_FLOAT );
 
 	r_atmosphere             = ri.Cvar_Get("r_atmosphere",             "0",    CVAR_ARCHIVE);
 	ri.Cvar_SetDescription( r_atmosphere, "Atmospheric scattering for sky and fog. Requires r_fbo 1." );

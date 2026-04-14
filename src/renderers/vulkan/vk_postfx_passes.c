@@ -202,7 +202,7 @@ void vk_ssr_pass( void )
 		float projection[16];
 		float invProjection[16];
 		float params[4];   /* maxDistance, stepSize, thickness, fadeEdge */
-		float params2[4]; /* roughnessThreshold, intensity, pad, pad */
+		float params2[4]; /* roughnessThreshold (Fresnel blend), intensity, maxDepthGradient, pad */
 	} vk_ssr_push_t;
 
 	VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
