@@ -217,6 +217,11 @@ int Q_longjmp_c(void *, int);
 
 typedef unsigned char byte;
 
+/*
+ * Booleans: native engine uses C99/C23 bool as qboolean (modern, single-byte where
+ * the ABI allows). qtrue/qfalse remain the portable spellings for literals.
+ * Q3_VM (legacy bytecode tools) keeps enum-backed qboolean without stdbool.
+ */
 #ifdef Q3_VM
 typedef enum { qfalse = 0, qtrue } qboolean;
 #else

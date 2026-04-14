@@ -134,6 +134,7 @@ The renderer abstraction layer is **architecturally sensitive**:
 - **C**: C23 with modern features (designated initializers, constexpr, etc.)
 - **C++**: C++23 for complex systems (RAII, templates, smart pointers)
 - **Compatibility**: Code must compile with GCC 15+ and Clang 18+
+- **Booleans**: On native builds, **`qboolean` is `bool`** (from `<stdbool.h>`) and **`qtrue` / `qfalse`** expand to **`true` / `false`** (`q_shared.h`). Prefer **`qboolean`** for engine/game APIs and **`qtrue` / `qfalse`** in literals so code stays compatible with the legacy **`Q3_VM`** path, which still uses an enum-backed `qboolean`. Do not reintroduce **`typedef enum { qfalse, qtrue } qboolean`** for native targets.
 
 ### Naming Conventions
 
