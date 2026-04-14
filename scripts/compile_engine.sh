@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: ./compile_engine.sh [game_name] [Debug|Release] [clean] [quiet] [coverage] [asan] [vulkan] [opengl] [aarch64] [freetype] [lua] [duktape|no-duktape] [system-duktape] [skipshaders] [--out DIR] [mac-app <target> [arch]] [mac-ub2 [notarize]]
+# Usage: ./compile_engine.sh [game_name] [Debug|Release] [clean] [quiet] [coverage] [asan] [lto] [vulkan] [opengl] [aarch64] [freetype] [lua] [duktape|no-duktape] [system-duktape] [skipshaders] [--out DIR] [mac-app <target> [arch]] [mac-ub2 [notarize]]
 # Notes:
 # - build type defaults to Release
 # - vulkan and opengl are mutually exclusive
@@ -26,6 +26,7 @@ BUILD_TYPE="Release"
 CLEAN=0
 COVERAGE=0
 ASAN=0
+LTO=0
 QUIET=0
 SKIP_SHADERS=0
 MAC_APP=0
@@ -74,6 +75,10 @@ while [[ $# -gt 0 ]]; do
     asan)
       ASAN=1
       BUILD_TYPE="Debug"
+      shift
+      ;;
+    lto)
+      LTO=1
       shift
       ;;
     quiet|-q|--quiet|q|silent|-s|--silent)
@@ -265,6 +270,7 @@ CMAKE_FLAGS=(
   "-DUSE_THEORA=ON"
   "-DENABLE_FORTIFY_SOURCE=ON"
   "-DENABLE_ASAN=$([ "$ASAN" -eq 1 ] && echo ON || echo OFF)"
+  "-DENABLE_LTO=$([ "$LTO" -eq 1 ] && echo ON || echo OFF)"
   "-DBUILD_SERVER=ON"
   "-DUSE_VULKAN=ON"
   "-Wno-dev"
@@ -317,6 +323,10 @@ fi
 if command -v ccache &>/dev/null; then
   CMAKE_FLAGS+=("-DCMAKE_C_COMPILER_LAUNCHER=ccache" "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache")
   echo "CMake: ccache enabled (faster incremental builds)"
+fi
+
+if [ "$LTO" -eq 1 ]; then
+  echo "CMake: ENABLE_LTO=ON (IPO/LTO for Release/RelWithDebInfo on GCC/Clang; expect longer links)"
 fi
 
 echo "Running CMake configuration..."

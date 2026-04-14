@@ -73,6 +73,7 @@ TODOs/FIXMEs in `src/external/` are from third-party code (duktape, zstd, cjson,
 | 2026-04-11 | Botlib / chat (Windows tree) | **`src/platform/win32/botlib/be_ai_chat.c`** `BotLoadChatMessage`: `sprintf`/`strcpy` → **`Com_sprintf` / `Q_strncpyz`** to match **`src/botlib/be_ai_chat.c`**; **`src/platform/botlib/be_ai_chat.c`** fixed-string append → **`Q_strncpyz`**. |
 | 2026-04-11 | Client / server / qcommon | `rg '\\b(TODO|FIXME)\\b' src/{client,server,qcommon}` — **no matches** (same triage expectation as 2026-04-10). |
 | 2026-04-11 | Renderer validation | `renderer_regression_check.sh` + manifest caps (`GLTF_MAX_*`, `IQM_*`) — CI-style parity checks on `main`. |
+| 2026-04-11 | Build / link | Optional **`ENABLE_LTO`** (`./scripts/compile_engine.sh … lto`): CMake `CheckIPOSupported` + `CMAKE_INTERPROCEDURAL_OPTIMIZATION` for GCC/Clang Release/RelWithDebInfo; off by default. |
 
 ## Recommendations
 
