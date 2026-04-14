@@ -187,6 +187,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 	VkPhysicalDeviceBufferDeviceAddressFeatures devaddr_features;
 	VkPhysicalDevice8BitStorageFeatures storage_8bit_features;
 #endif
+	VkPhysicalDeviceMeshShaderFeaturesNV mesh_shader_features_nv;
 
 	ri.Printf( PRINT_ALL, "...selected physical device: %i\n", device_index );
 
@@ -229,7 +230,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 	}
 
 	{
-		const char *device_extension_list[32];
+		const char *device_extension_list[40];
 		uint32_t device_extension_count;
 		const char *ext, *end;
 		char *str;
@@ -268,6 +269,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		qboolean shaderRelaxedExtInstr = qfalse;
 		qboolean shaderSubgroupUniformCF = qfalse;
 		qboolean extendedDynamicState3 = qfalse;
+		qboolean nvMeshShader = qfalse;
 #ifdef USE_VULKAN_RTX
 		qboolean rtxAccelStruct = qfalse;
 		qboolean rtxPipeline = qfalse;
@@ -359,6 +361,8 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 				shaderSubgroupUniformCF = qtrue;
 			} else if ( strcmp( ext, "VK_EXT_extended_dynamic_state3" ) == 0 ) {
 				extendedDynamicState3 = qtrue;
+			} else if ( strcmp( ext, VK_NV_MESH_SHADER_EXTENSION_NAME ) == 0 ) {
+				nvMeshShader = qtrue;
 			}
 #ifdef USE_VULKAN_RTX
 			else if ( strcmp( ext, VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME ) == 0 ) {
@@ -385,6 +389,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		ri.Free( extension_properties );
 
 		device_extension_count = 0;
+		vk.meshShaderNV = qfalse;
 
 		if ( !swapchainSupported ) {
 			ri.Printf( PRINT_ERROR, "...required device extension is not available: %s\n", VK_KHR_SWAPCHAIN_EXTENSION_NAME );
@@ -505,6 +510,12 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			ri.Printf( PRINT_ALL, "[VK] Ray tracing extensions enabled (r_rtx available)\n" );
 		}
 #endif
+		if ( nvMeshShader && r_vk_meshShaderNV && r_vk_meshShaderNV->integer &&
+			device_extension_count < ARRAY_LEN( device_extension_list ) ) {
+			device_extension_list[ device_extension_count++ ] = VK_NV_MESH_SHADER_EXTENSION_NAME;
+			vk.meshShaderNV = qtrue;
+			ri.Printf( PRINT_ALL, "[VK] VK_NV_mesh_shader enabled (experimental; no mesh draw path yet)\n" );
+		}
 		(void)globalPriority; (void)shaderFloatControls2; (void)shaderMaximalReconvergence;
 		(void)shaderRelaxedExtInstr; (void)shaderSubgroupUniformCF; (void)legacyDithering;
 		(void)surfaceMaintenance1;
@@ -624,6 +635,17 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			host_query.pNext = prev_next ? (void *)(uintptr_t)prev_next : NULL;
 			device_desc.pNext = &host_query;
 		}
+
+		/* Chain last so _DEBUG / host_query pNext lists stay valid. */
+		if ( vk.meshShaderNV ) {
+			Com_Memset( &mesh_shader_features_nv, 0, sizeof( mesh_shader_features_nv ) );
+			mesh_shader_features_nv.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_NV;
+			mesh_shader_features_nv.pNext = (void *)(uintptr_t)device_desc.pNext;
+			mesh_shader_features_nv.taskShader = VK_FALSE;
+			mesh_shader_features_nv.meshShader = VK_TRUE;
+			device_desc.pNext = &mesh_shader_features_nv;
+		}
+
 		res = qvkCreateDevice( physical_device, &device_desc, NULL, &vk.device );
 		if ( res < 0 ) {
 			ri.Printf( PRINT_ERROR, "vkCreateDevice returned %s\n", vk_result_string( res ) );

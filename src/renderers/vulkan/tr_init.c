@@ -149,6 +149,7 @@ cvar_t	*r_deluxeSpecular;
 #endif
 cvar_t   *r_vk_pipeline_debug;
 cvar_t	*r_vk_colorWriteMaskDynamic;
+cvar_t	*r_vk_meshShaderNV;
 cvar_t	*r_morph;
 cvar_t	*r_morphMaxActive;
 cvar_t	*r_morphLodStart;
@@ -825,6 +826,8 @@ static void InitOpenGL( void )
 	} else {
 		ri.Error( ERR_FATAL, "Recursive error during Vulkan initialization" );
 	}
+	ri.Printf( PRINT_ALL, "[VK] GPU compute: enabled (volumetric fog, vegetation wind, etc.)\n" );
+	ri.Printf( PRINT_ALL, "[VK] NVIDIA DLSS / NGX: not integrated in-engine; use \\r_renderScale and HDR post paths, or GPU-driver upscaling\n" );
 #endif
 
 	// set default state
@@ -3270,6 +3273,12 @@ static void R_Register( void )
 	r_vk_colorWriteMaskDynamic = ri.Cvar_Get( "r_vk_colorWriteMaskDynamic", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_vk_colorWriteMaskDynamic, "Enable VK_EXT_extended_dynamic_state3 for RB_ColorMask. Requires vid_restart. Disabled by default (OIT crash on some drivers)." );
 	ri.Cvar_SetGroup( r_vk_colorWriteMaskDynamic, CVG_RENDERER );
+
+	r_vk_meshShaderNV = ri.Cvar_Get( "r_vk_meshShaderNV", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_vk_meshShaderNV, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_vk_meshShaderNV,
+		"Request VK_NV_mesh_shader at device creation (NVIDIA). Default off: extension is enabled for future mesh pipelines only; no draw path uses mesh shaders yet. Requires vid_restart." );
+	ri.Cvar_SetGroup( r_vk_meshShaderNV, CVG_RENDERER );
 
 	if ( glConfig.vidWidth )
 		return;
