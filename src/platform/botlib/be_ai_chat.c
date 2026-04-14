@@ -939,7 +939,7 @@ static int BotLoadChatMessage( source_t *source, char *chatmessagestring, int si
 				SourceError( source, "chat message too long" );
 				return qfalse;
 			}
-			strcpy( &ptr[curlen], token.string );
+			Q_strncpyz( &ptr[curlen], token.string, size - curlen );
 		}
 		//variable string
 		else if ( token.type == TT_NUMBER && ( token.subtype & TT_INTEGER ) )
