@@ -120,6 +120,15 @@ cmake .. \
 cmake --build . -j$(nproc)
 ```
 
+**Optional link-time optimization (LTO / IPO)** for shipping builds on **GCC or Clang** (longer links; not enabled in default CI):
+
+```bash
+./scripts/compile_engine.sh vulkan lto
+# or: cmake ... -DENABLE_LTO=ON
+```
+
+MSVC: `ENABLE_LTO` is currently not wired; use the Visual Studio LTO project settings if you need it there.
+
 **Cross-compile for Linux aarch64** (manual):
 ```bash
 cmake -S . -B build-aarch64 \

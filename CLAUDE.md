@@ -276,6 +276,10 @@ sudo apt-get install cmake clang-18 gcc-15 ninja-build
 
 # Clean build
 ./scripts/compile_engine.sh clean vulkan
+
+# Optional link-time optimization (Release/RelWithDebInfo; GCC/Clang; longer links)
+./scripts/compile_engine.sh vulkan lto
+# Equivalent: cmake -DENABLE_LTO=ON ... (see CMakeLists.txt; MSVC not wired for this option)
 ```
 
 #### Windows (Cross-Platform Validation)
