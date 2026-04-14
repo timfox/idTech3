@@ -195,7 +195,6 @@ void R_TransformDlights( int count, dlight_t *dl, orientationr_t *or) {
 }
 
 
-#ifdef USE_LEGACY_DLIGHTS
 /*
 =============
 R_DlightBmodel
@@ -249,7 +248,6 @@ void R_DlightBmodel( bmodel_t *bmodel ) {
 		}
 	}
 }
-#endif // USE_LEGACY_DLIGHTS
 
 
 /*

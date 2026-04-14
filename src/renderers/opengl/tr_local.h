@@ -23,7 +23,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef TR_LOCAL_H
 #define TR_LOCAL_H
 
-#define USE_LEGACY_DLIGHTS	// vq3 dynamic lights
 #define USE_PMLIGHT			// promode dynamic lights via \r_dlightMode 1|2
 #define MAX_REAL_DLIGHTS	(MAX_DLIGHTS*2)
 #define MAX_LITSURFS		(MAX_DRAWSURFS)
@@ -93,9 +92,7 @@ typedef struct {
 	refEntity_t	e;
 
 	float		axisLength;		// compensate for non-normalized axis
-#ifdef USE_LEGACY_DLIGHTS
 	int			needDlights;	// 1 for bmodels that touch a dlight
-#endif
 	qboolean	lightingCalculated;
 	vec3_t		lightDir;		// normalized direction towards light
 	vec3_t		ambientLight;	// color normalized to 0-255
@@ -701,9 +698,7 @@ typedef struct {
 	cplane_t	plane;
 
 	// dynamic lighting information
-#ifdef USE_LEGACY_DLIGHTS
 	int			dlightBits;
-#endif
 	int			vboItemIndex;
 	float		*normals;
 
@@ -721,9 +716,7 @@ typedef struct {
 	surfaceType_t	surfaceType;
 
 	// dynamic lighting information
-#ifdef USE_LEGACY_DLIGHTS
 	int				dlightBits;
-#endif
 	int				vboItemIndex;
 
 	// culling information (bounds could be used for culling)
@@ -1547,9 +1540,7 @@ typedef struct shaderCommands_s
 	vec2_t		texCoords[2][SHADER_MAX_VERTEXES] QALIGN(16);
 	vec2_t		texCoords00[SHADER_MAX_VERTEXES] QALIGN(16);
 	color4ub_t	vertexColors[SHADER_MAX_VERTEXES] QALIGN(16);
-#ifdef USE_LEGACY_DLIGHTS
 	int			vertexDlightBits[SHADER_MAX_VERTEXES] QALIGN(16);
-#endif
 	stageVars_t	svars QALIGN(16);
 
 	color4ub_t	constantColor255[SHADER_MAX_VERTEXES] QALIGN(16);
@@ -1562,9 +1553,7 @@ typedef struct shaderCommands_s
 	shader_t	*shader;
 	double		shaderTime;	// -EC- set to double for frameloss fix
 	int			fogNum;
-#ifdef USE_LEGACY_DLIGHTS
 	int			dlightBits;	// or together of all vertexDlightBits
-#endif
 	int			numIndexes;
 	int			numVertexes;
 
