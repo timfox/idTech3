@@ -1,0 +1,103 @@
+{
+  "version": 5,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 24,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "cacheVariables": {
+        "SKIP_IDPAK_CHECK": "ON",
+        "USE_VULKAN": "ON"
+      }
+    },
+    {
+      "name": "vulkan-release",
+      "inherits": "base",
+      "binaryDir": "${sourceDir}/build/presets/vulkan-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "RENDERER_DEFAULT": "vulkan"
+      }
+    },
+    {
+      "name": "vulkan-debug",
+      "inherits": "base",
+      "binaryDir": "${sourceDir}/build/presets/vulkan-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "RENDERER_DEFAULT": "vulkan"
+      }
+    },
+    {
+      "name": "opengl-release",
+      "inherits": "base",
+      "binaryDir": "${sourceDir}/build/presets/opengl-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "RENDERER_DEFAULT": "opengl"
+      }
+    },
+    {
+      "name": "opengl-debug",
+      "inherits": "base",
+      "binaryDir": "${sourceDir}/build/presets/opengl-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "RENDERER_DEFAULT": "opengl"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "build-vulkan-release",
+      "configurePreset": "vulkan-release"
+    },
+    {
+      "name": "build-vulkan-debug",
+      "configurePreset": "vulkan-debug"
+    },
+    {
+      "name": "build-opengl-release",
+      "configurePreset": "opengl-release"
+    },
+    {
+      "name": "build-opengl-debug",
+      "configurePreset": "opengl-debug"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "test-vulkan-release",
+      "configurePreset": "vulkan-release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "test-vulkan-debug",
+      "configurePreset": "vulkan-debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "test-opengl-release",
+      "configurePreset": "opengl-release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "test-opengl-debug",
+      "configurePreset": "opengl-debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

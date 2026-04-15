@@ -59,7 +59,6 @@ The Android Gradle project passes these flags to the root `CMakeLists.txt` (see 
 - `USE_VULKAN=ON` -- Vulkan renderer (primary)
 - `USE_RENDERER_DLOPEN=OFF` -- static linking
 - `SKIP_SHADER_REGEN=ON` -- use pre-committed shaders
-- `BUILD_SERVER=OFF` -- no dedicated server (same engine code paths as desktop minus ded binary)
 - `USE_SDL=OFF` -- NativeActivity + direct Vulkan/input
 - `USE_OPENAL=OFF` -- AAudio + OpenSL ES (native Android audio)
 - `USE_LUA=ON`, `USE_DUKTAPE=ON` -- scripting (Lua is built as a static library from upstream source on first configure; requires network once)
@@ -69,6 +68,8 @@ The Android Gradle project passes these flags to the root `CMakeLists.txt` (see 
 - `USE_RECAST_NAV=ON`, `USE_BULLET_PHYSICS=ON` -- same as desktop (Bullet full backend still needs a discoverable **libbullet** for the ABI)
 - `BUILD_FREETYPE=ON` -- FreeType: uses **FetchContent** from the official FreeType GitHub repo if `find_package(Freetype)` fails (first configure needs network)
 - `USE_DTLS=ON` -- uses **find_package(OpenSSL)** when available; otherwise, with **`OPENSSL_ANDROID_AUTOBUILD=ON`** (default), CMake builds **static OpenSSL 3.0.x** via `ExternalProject` (needs **Perl** + **GNU make** on the host, plus `ANDROID_NDK`). Tarballs cache under `ANDROID_DEPS_CACHE` when set. Toggle off to require a prefab install and `OPENSSL_ROOT_DIR`.
+
+Android builds do **not** produce a dedicated server binary; they compile the client-only mobile target from the same engine sources.
 
 **Note:** The APK still does not ship **game** `.pk3` data; use external storage or `apkassets/` as documented below.
 

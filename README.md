@@ -104,7 +104,15 @@ Primary entry point:
 ./scripts/compile_engine.sh vulkan debug
 ```
 
-Artifacts land under `release/` and `build-vk-Release/` (or `build-gl-Release/`). Run tests from the build directory: `ctest` or `make test`.
+For direct CMake workflows, the repo also ships `CMakePresets.json`:
+
+```bash
+cmake --preset vulkan-release
+cmake --build --preset build-vulkan-release
+ctest --preset test-vulkan-release
+```
+
+Artifacts land under `release/` and `build-vk-Release/` (or `build-gl-Release/`). The helper script is the canonical developer path because it stages `release/` automatically; presets are the preferred direct-CMake / IDE path.
 
 **Examples** (copy-paste workflows): [examples/README.md](examples/README.md) — local validation, `GAME_BASE` templates, mod launch lines, pointers to `docs/samples/`. **Demo mod pack** (optional CMake): `-DBUILD_EXAMPLE_DEMO_GAME=ON` then build target `demo_game_pk3` → `idtech3_demo.pk3` ([examples/demo_game/README.md](examples/demo_game/README.md)). **Run demo** from a source tree: `./scripts/run_demo.sh` — see [examples/demo_skeleton/README.md](examples/demo_skeleton/README.md).
 

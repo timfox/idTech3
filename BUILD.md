@@ -1,153 +1,216 @@
 ## Build Instructions
 
-## Toolchain Notes
+## Canonical build truth
 
-- CMake targets C23 when supported by the active compiler/toolchain and falls back to C17 otherwise.
-- Set `C_STANDARD_STRICT=OFF` to disable the strict warning set locally. CI uses strict warnings with warnings-as-errors.
+This repository is built and validated through **CMake**. The two supported entry points are:
 
-### windows/msvc
+1. **`./scripts/compile_engine.sh`** — canonical developer workflow; handles the common Vulkan/OpenGL configurations, stages artifacts into `release/`, and mirrors CI closely.
+2. **`cmake` / `cmake --preset`** — direct CMake workflow for IDEs, local iteration, and CI-style configure/build/test steps.
 
-Install Visual Studio Community Edition 2017 or later and compile `quake3e` project from solution
+Legacy `make`-first instructions are no longer the primary build path for this fork.
 
-`src/platform/win32/msvc2017/quake3e.sln`
+## Toolchain notes
 
-Copy resulting exe from `src/platform/win32/msvc2017/output` directory
+- CMake targets **C23** when supported by the active compiler/toolchain and falls back to **C17** otherwise.
+- Set `C_STANDARD_STRICT=OFF` to disable the stricter warning set locally. CI keeps strict warnings enabled.
+- The Vulkan path is the primary renderer configuration; OpenGL remains the compatibility fallback.
+- `SKIP_IDPAK_CHECK=ON` is the default expectation for source-tree builds in this repository.
 
-To compile with Vulkan backend - clean solution, right click on `quake3e` project, find `Project Dependencies` and select `vulkan` instead of `renderer`
+## Quick start
 
----
+### Canonical script
 
-### windows/msys2
+```bash
+# Vulkan + Release (recommended)
+./scripts/compile_engine.sh vulkan
 
-Install the build dependencies:
+# OpenGL + Release
+./scripts/compile_engine.sh opengl
 
-`MSYS2 MSYS`
+# Vulkan + Debug
+./scripts/compile_engine.sh vulkan debug
 
-* pacman -Syu
-* pacman -S make mingw-w64-x86_64-gcc mingw-w64-i686-gcc
+# Clean rebuild
+./scripts/compile_engine.sh clean vulkan
 
-Use `MSYS2 MINGW32` or `MSYS2 MINGW64` depending on your target system, then copy resulting binaries from created `build` directory or use command:
+# Optional shipping-style LTO build
+./scripts/compile_engine.sh vulkan lto
+```
 
-`make install DESTDIR=<path_to_game_files>`
+Artifacts are copied to `release/` and the build trees live under `build-vk-Release/`, `build-vk-Debug/`, `build-gl-Release/`, and `build-gl-Debug/`.
 
----
+### CMake presets
 
-### windows/mingw
+`CMakePresets.json` exposes the same common configurations without having to remember the cache flags:
 
-All build dependencies (libraries, headers) are bundled-in
+```bash
+cmake --preset vulkan-release
+cmake --build --preset build-vulkan-release
+ctest --preset test-vulkan-release
 
-Build with either `make ARCH=x86` or `make ARCH=x86_64` commands depending on your target system, then copy resulting binaries from created `build` directory or use command:
+cmake --preset vulkan-debug
+cmake --build --preset build-vulkan-debug
 
-`make install DESTDIR=<path_to_game_files>`
+cmake --preset opengl-release
+cmake --build --preset build-opengl-release
+```
 
----
+The presets intentionally use their own `build/presets/<name>/` trees so they do not collide with the helper script's `build-vk-*` / `build-gl-*` directories.
 
-### generic/ubuntu linux/bsd
+Use the script when you want staged artifacts in `release/` and the standard helper behavior. Use presets when you want direct CMake/IDE workflows.
 
-You may need to run the following commands to install packages (using fresh ubuntu-18.04 installation as example):
+### Direct CMake
 
-* sudo apt install make gcc libcurl4-openssl-dev mesa-common-dev
-* sudo apt install libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev
-* sudo apt install libsdl2-dev
-* sudo apt install libopenal-dev
+```bash
+cmake -S . -B build-vk-Release -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DRENDERER_DEFAULT=vulkan \
+  -DSKIP_IDPAK_CHECK=ON \
+  -DUSE_VULKAN=ON \
+  -Wno-dev
+cmake --build build-vk-Release -j"$(nproc)"
+ctest --test-dir build-vk-Release --output-on-failure -V
+```
 
-Build with: `make`
+## Platform setup
 
-Copy the resulting binaries from created `build` directory or use command:
+### Linux / BSD
 
-`make install DESTDIR=<path_to_game_files>`
+Primary development target:
 
----
+```bash
+sudo apt-get install cmake ninja-build pkg-config \
+  libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev \
+  libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev \
+  libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools \
+  libstdc++-14-dev
+```
 
-### Arch Linux
+Recommended compilers:
 
-The package `quake3e-git` can either be installed through your favourite AUR helper, or manually using these commands:
+- **Clang 18+**
+- **GCC 15+**
 
-Download the snapshot from AUR:
+Build with the canonical script or presets shown above.
 
-`curl -O https://aur.archlinux.org/cgit/aur.git/snapshot/quake3e-git.tar.gz`
+### Windows (MSYS2 + CMake)
 
-Extract the snapshot:
+Use a modern **MINGW64** shell and install the package set used by CI:
 
-`tar xfz quake3e-git.tar.gz`
+```bash
+pacman -S --needed \
+  mingw-w64-x86_64-gcc \
+  mingw-w64-x86_64-cmake \
+  mingw-w64-x86_64-ninja \
+  mingw-w64-x86_64-pkgconf \
+  mingw-w64-x86_64-SDL2 \
+  mingw-w64-x86_64-openal \
+  mingw-w64-x86_64-freetype \
+  mingw-w64-x86_64-lua \
+  mingw-w64-x86_64-openssl \
+  mingw-w64-x86_64-curl \
+  mingw-w64-x86_64-bullet
+```
 
-Enter the extracted directory:
+Then use:
 
-`cd quake3e-git`
+```bash
+cmake --preset vulkan-release
+cmake --build --preset build-vulkan-release
+```
 
-Build and install `quake3e-git`:
+If you stage Windows binaries into a `bin/` directory outside MSYS2, run `./scripts/stage_mingw_runtime_dlls.sh bin` from a MINGW64 shell so the required runtime `.dll` files sit next to the executables.
 
-`makepkg -risc`
+### Windows (MSVC solution files)
 
----
+The Visual Studio solution under `src/platform/win32/msvc2017/quake3e.sln` is still maintained for native MSVC workflows, but it is no longer the primary build truth for the repository.
 
-### raspberry pi os
+- Open the solution in Visual Studio 2022 or newer.
+- Build the desired configuration/platform.
+- Outputs land under `src/platform/win32/msvc2017/output/`.
 
-Install the build dependencies:
+Prefer the CMake path for documentation, CI parity, and cross-platform consistency.
 
-* apt install libsdl2-dev libxxf86dga-dev libcurl4-openssl-dev
+### macOS
 
-Build with: `make`
+Install dependencies:
 
-Copy the resulting binaries from created `build` directory or use command:
+```bash
+brew install coreutils sdl2 openal-soft cmake ninja freetype lua molten-vk bullet pkgconf
+```
 
-`make install DESTDIR=<path_to_game_files>`
+Then use the canonical script or presets:
 
----
+```bash
+./scripts/compile_engine.sh vulkan
+# or
+cmake --preset vulkan-release
+cmake --build --preset build-vulkan-release
+```
 
-### macos
+### Linux aarch64 / Raspberry Pi
 
-* install the official SDL2 framework to /Library/Frameworks
-* `brew install molten-vk` or install Vulkan SDK to use MoltenVK library
+For native ARM Linux builds, run the same script directly on the target machine:
 
-Build with: `make`
+```bash
+./scripts/compile_engine.sh vulkan
+```
 
-Copy the resulting binaries from created `build` directory
+For cross-compilation from x86_64 Linux:
 
----
+```bash
+sudo apt-get install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+./scripts/compile_engine.sh vulkan aarch64
+```
+
+Cross-build outputs are staged with `.aarch64` suffixes in `release/`. Video codecs are disabled by default for cross-builds and SDL/OpenAL discovery may still require a suitable ARM sysroot.
 
 ### ppc64le / ppc64 (PowerPC 64-bit)
 
-Install the same dependencies as generic Linux, then build normally.
+Install the same dependencies as Linux, then build with the canonical CMake flow. The PowerPC JIT (`src/qcommon/vm_powerpc.c`) supports optional ISA-level tuning through compiler flags:
 
-The PowerPC JIT (`src/qcommon/vm_powerpc.c`) supports optional ISA-level optimizations that are enabled by compiler target flags:
-
-- ISA 2.07 (POWER8): uses direct-move instructions (`mtvsrwa`, `mfvsrwz`, `xscvdpsxws`) to avoid memory round-trips in float/int conversions (`OP_CVIF`, `OP_CVFI`).
-- ISA 3.0 (POWER9): uses hardware modulo instructions (`modsw`, `moduw`) to optimize `OP_MODI` and `OP_MODU`.
+- ISA 2.07 (POWER8): direct-move instructions accelerate `OP_CVIF` / `OP_CVFI`.
+- ISA 3.0 (POWER9): hardware modulo instructions accelerate `OP_MODI` / `OP_MODU`.
 
 Examples:
 
-- `make CFLAGS='-mcpu=power8'`
-- `make CFLAGS='-mcpu=power9'`
-- `make CFLAGS='-mcpu=native'` (may reduce portability to older CPUs)
+```bash
+cmake -S . -B build-power8 -G Ninja -DCMAKE_C_FLAGS="-mcpu=power8" -DCMAKE_CXX_FLAGS="-mcpu=power8"
+cmake -S . -B build-power9 -G Ninja -DCMAKE_C_FLAGS="-mcpu=power9" -DCMAKE_CXX_FLAGS="-mcpu=power9"
+```
 
-Without an explicit `-mcpu`, optimization level depends on compiler defaults, and the JIT falls back to baseline sequences when newer ISA features are unavailable.
+Without an explicit `-mcpu`, optimization level depends on compiler defaults and the JIT falls back to baseline sequences when newer ISA features are unavailable.
 
----
+## Validation workflow
 
-Several Makefile options are available for linux/mingw/macos builds:
+The usual local validation sequence is:
 
-`BUILD_CLIENT=1` - build unified client/server executable, enabled by default
+```bash
+./scripts/compile_engine.sh vulkan
+cd build-vk-Release && ctest --output-on-failure -V
+cd ..
+./scripts/smoke_test.sh release
+```
 
-`BUILD_SERVER=1` - build dedicated server executable, enabled by default
+For a more CI-like local pass:
 
-`USE_SDL=0`- use SDL2 backend for video, audio, input subsystems, enabled by default, enforced for macos
+```bash
+./scripts/validate_ci_build.sh
+```
 
-`USE_VULKAN=1` - build vulkan modular renderer, enabled by default
+## Common cache variables
 
-`USE_OPENGL=1` - build opengl modular renderer, enabled by default
+These are the CMake switches most developers touch during local builds:
 
-`USE_OPENGL2=0` - build opengl2 modular renderer, disabled by default
+- `RENDERER_DEFAULT=vulkan|opengl`
+- `SKIP_IDPAK_CHECK=ON|OFF`
+- `ENABLE_LTO=ON|OFF`
+- `ENABLE_ASAN=ON|OFF` (Debug builds)
+- `BUILD_FREETYPE=ON|OFF`
+- `USE_LUA=ON|OFF`
+- `USE_DUKTAPE=ON|OFF`
 
-`USE_RENDERER_DLOPEN=1` - do not link single renderer into client binary, compile all enabled renderers as dynamic libraries and allow to switch them on the fly via `\cl_renderer` cvar, enabled by default
-
-`RENDERER_DEFAULT=opengl` - set default value for `\cl_renderer` cvar or use selected renderer for static build for `USE_RENDERER_DLOPEN=0`, valid options are `opengl`, `opengl2`, `vulkan`
-
-`USE_SYSTEM_JPEG=0` - use current system JPEG library, disabled by default
-
-Example:
-
-`make BUILD_SERVER=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan` - which means do not build dedicated binary, build client with single static vulkan renderer
+Platform-specific and feature-specific switches are documented below.
 
 ---
 
