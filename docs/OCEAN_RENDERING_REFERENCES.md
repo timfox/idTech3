@@ -21,3 +21,5 @@ This file records **accurate venues and titles** for commonly confused ocean-rel
 
 - Prefer **exact titles + venue + year** from ACM DL before adding references to roadmaps or comments.  
 - When implementing Gerstner waves, FFT oceans, or whitecaps, cite the **specific** paper whose math you follow (e.g. whitecaps paper vs. a MIG camera/reflection technique).
+
+See also **`docs/REALTIME_RENDERING_READING_LIST.md`** for a prioritized reading list with verified JCGT links.

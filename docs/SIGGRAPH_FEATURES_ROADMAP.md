@@ -238,6 +238,7 @@ This document tracks implementation of 10 features from recent Siggraph papers, 
 
 ## References
 
+- Prioritized reading list (SSR, volumetric fog, spec AA, MSM, WBOIT, stochastic culling, water): **`docs/REALTIME_RENDERING_READING_LIST.md`**
 - Ocean / water rendering bibliography corrections (MIG vs SIGGRAPH, poster titles, “Real-Time Ocean Rendering” as a label): **`docs/OCEAN_RENDERING_REFERENCES.md`**
 - [Advances in Real-Time Rendering 2025](https://advances.realtimerendering.com/s2025)
 - [Advances in Real-Time Rendering 2024](https://advances.realtimerendering.com/s2024)
