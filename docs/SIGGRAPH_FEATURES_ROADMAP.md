@@ -237,6 +237,7 @@ This document tracks implementation of 10 features from recent Siggraph papers, 
 
 ## References
 
+- Ocean / water rendering bibliography corrections (MIG vs SIGGRAPH, poster titles, “Real-Time Ocean Rendering” as a label): **`docs/OCEAN_RENDERING_REFERENCES.md`**
 - [Advances in Real-Time Rendering 2025](https://advances.realtimerendering.com/s2025)
 - [Advances in Real-Time Rendering 2024](https://advances.realtimerendering.com/s2024)
 - [Neural Light Grid (Activision)](https://research.activision.com/publications/2024/08/Neural_Light_Grid)
