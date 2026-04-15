@@ -297,16 +297,10 @@ static void RB_SurfaceTriangles( const srfTriangles_t *srf ) {
 	float		*texCoords0;
 	float		*texCoords1;
 	uint32_t	*color;
-#ifdef USE_LEGACY_DLIGHTS
 	int			dlightBits;
-#endif
 
 #ifdef USE_VBO
-#ifdef USE_LEGACY_DLIGHTS
 	if ( tess.allowVBO && srf->vboItemIndex && !srf->dlightBits ) {
-#else
-	if ( tess.allowVBO && srf->vboItemIndex ) {
-#endif
 		// transition to vbo render list
 		if ( tess.vboIndex == 0 ) {
 			RB_EndSurface();
@@ -327,10 +321,8 @@ static void RB_SurfaceTriangles( const srfTriangles_t *srf ) {
 
 	RB_CHECKOVERFLOW( srf->numVerts, srf->numIndexes );
 
-#ifdef USE_LEGACY_DLIGHTS
 	dlightBits = srf->dlightBits;
 	tess.dlightBits |= dlightBits;
-#endif
 
 	tess.surfType = SF_TRIANGLES;
 
@@ -376,11 +368,9 @@ static void RB_SurfaceTriangles( const srfTriangles_t *srf ) {
 
 		*color = dv->color.u32;
 	}
-#ifdef USE_LEGACY_DLIGHTS
 	for ( i = 0 ; i < srf->numVerts ; i++ ) {
 		tess.vertexDlightBits[ tess.numVertexes + i] = dlightBits;
 	}
-#endif
 	tess.numVertexes += srf->numVerts;
 }
 
@@ -853,16 +843,10 @@ static void RB_SurfaceFace( const srfSurfaceFace_t *surf ) {
 	int			ndx;
 	int			Bob;
 	int			numPoints;
-#ifdef USE_LEGACY_DLIGHTS
 	int			dlightBits;
-#endif
 
 #ifdef USE_VBO
-#ifdef USE_LEGACY_DLIGHTS
 	if ( tess.allowVBO && surf->vboItemIndex && !surf->dlightBits ) {
-#else
-	if ( tess.allowVBO && surf->vboItemIndex ) {
-#endif
 		// transition to vbo render list
 		if ( tess.vboIndex == 0 ) {
 			RB_EndSurface();
@@ -885,10 +869,8 @@ static void RB_SurfaceFace( const srfSurfaceFace_t *surf ) {
 
 	tess.surfType = SF_FACE;
 
-#ifdef USE_LEGACY_DLIGHTS
 	dlightBits = surf->dlightBits;
 	tess.dlightBits |= dlightBits;
-#endif
 
 	indices = ( const unsigned * ) ( ( const byte * ) surf + surf->ofsIndices );
 
@@ -929,9 +911,7 @@ static void RB_SurfaceFace( const srfSurfaceFace_t *surf ) {
 			tess.texCoords[1][ndx][1] = v[6];
 		}
 		memcpy( &tess.vertexColors[ndx], &v[7], sizeof( tess.vertexColors[ndx] ) );
-#ifdef USE_LEGACY_DLIGHTS
 		tess.vertexDlightBits[ndx] = dlightBits;
-#endif
 	}
 
 	tess.numVertexes += surf->numPoints;
@@ -1056,17 +1036,11 @@ static void RB_SurfaceGrid( srfGridMesh_t *cv ) {
 	float	lodError;
 	int		lodWidth, lodHeight;
 	int		numVertexes;
-#ifdef USE_LEGACY_DLIGHTS
 	int		dlightBits;
 	int		*vDlightBits;
-#endif
 
 #ifdef USE_VBO_GRID
-#ifdef USE_LEGACY_DLIGHTS
 	if ( tess.allowVBO && cv->vboItemIndex && !cv->dlightBits ) {
-#else
-	if ( tess.allowVBO && cv->vboItemIndex ) {
-#endif
 		// transition to vbo render list
 		if ( tess.vboIndex == 0 ) {
 			RB_EndSurface();
@@ -1089,10 +1063,8 @@ static void RB_SurfaceGrid( srfGridMesh_t *cv ) {
 #endif
 #endif
 
-#ifdef USE_LEGACY_DLIGHTS
 	dlightBits = cv->dlightBits;
 	tess.dlightBits |= dlightBits;
-#endif
 
 	tess.surfType = SF_GRID;
 
@@ -1176,9 +1148,7 @@ static void RB_SurfaceGrid( srfGridMesh_t *cv ) {
 		texCoords0 = tess.texCoords[0][numVertexes];
 		texCoords1 = tess.texCoords[1][numVertexes];
 		color = &tess.vertexColors[numVertexes].u32;
-#ifdef USE_LEGACY_DLIGHTS
 		vDlightBits = &tess.vertexDlightBits[numVertexes];
-#endif
 		for ( i = 0 ; i < rows ; i++ ) {
 			for ( j = 0 ; j < lodWidth ; j++ ) {
 				dv = cv->verts + heightTable[ used + i ] * cv->width
@@ -1207,9 +1177,7 @@ static void RB_SurfaceGrid( srfGridMesh_t *cv ) {
 					normal += 4;
 				}
 				*color = dv->color.u32;
-#ifdef USE_LEGACY_DLIGHTS
 				*vDlightBits++ = dlightBits;
-#endif
 				xyz += 4;
 				texCoords0 += 2;
 				color++;

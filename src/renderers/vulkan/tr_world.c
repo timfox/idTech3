@@ -241,7 +241,6 @@ static qboolean R_LightCullSurface( const surfaceType_t* surface, const dlight_t
 #endif // USE_PMLIGHT
 
 
-#ifdef USE_LEGACY_DLIGHTS
 static int R_DlightFace( srfSurfaceFace_t *face, int dlightBits ) {
 	float		d;
 	int			i;
@@ -352,7 +351,6 @@ static int R_DlightSurface( msurface_t *surf, int dlightBits ) {
 
 	return dlightBits;
 }
-#endif // USE_LEGACY_DLIGHTS
 
 
 /*
@@ -374,17 +372,13 @@ static void R_AddWorldSurface( msurface_t *surf, int dlightBits ) {
 	}
 
 #ifdef USE_PMLIGHT
-#ifdef USE_LEGACY_DLIGHTS
-	if ( r_dlightMode->integer ) 
-#endif
-	{
+	if ( r_dlightMode->integer ) {
 		surf->vcVisible = tr.viewCount;
 		R_AddDrawSurf( surf->data, surf->shader, surf->fogIndex, 0 );
 		return;
 	}
 #endif // USE_PMLIGHT
 
-#ifdef USE_LEGACY_DLIGHTS
 	// check for dlighting
 	if ( dlightBits ) {
 		dlightBits = R_DlightSurface( surf, dlightBits );
@@ -392,7 +386,6 @@ static void R_AddWorldSurface( msurface_t *surf, int dlightBits ) {
 	}
 
 	R_AddDrawSurf( surf->data, surf->shader, surf->fogIndex, dlightBits );
-#endif // USE_LEGACY_DLIGHTS
 }
 
 
@@ -530,10 +523,7 @@ void R_AddBrushModelSurfaces ( trRefEntity_t *ent ) {
 	}
 
 #ifdef USE_PMLIGHT
-#ifdef USE_LEGACY_DLIGHTS
-	if ( r_dlightMode->integer ) 
-#endif
-	{
+	if ( r_dlightMode->integer ) {
 		dlight_t *dl;
 		int s;
 
@@ -559,14 +549,12 @@ void R_AddBrushModelSurfaces ( trRefEntity_t *ent ) {
 	}
 #endif // USE_PMLIGHT
 
-#ifdef USE_LEGACY_DLIGHTS
 	R_SetupEntityLighting( &tr.refdef, ent );
 	R_DlightBmodel( bmodel );
 
 	for ( i = 0 ; i < bmodel->numSurfaces ; i++ ) {
 		R_AddWorldSurface( bmodel->firstSurface + i, tr.currentEntity->needDlights );
 	}
-#endif
 }
 
 
@@ -652,7 +640,6 @@ static void R_RecursiveWorldNode( mnode_t *node, unsigned int planeBits, unsigne
 		// determine which dlights are needed
 		newDlights[0] = 0;
 		newDlights[1] = 0;
-#ifdef USE_LEGACY_DLIGHTS
 #ifdef USE_PMLIGHT
 		if ( !r_dlightMode->integer )
 #endif
@@ -676,16 +663,13 @@ static void R_RecursiveWorldNode( mnode_t *node, unsigned int planeBits, unsigne
 				}
 			}
 		}
-#endif // USE_LEGACY_DLIGHTS
 
 		// recurse down the children, front side first
 		R_RecursiveWorldNode( node->children[0], planeBits, newDlights[0] );
 
 		// tail recurse
 		node = node->children[1];
-#ifdef USE_LEGACY_DLIGHTS
 		dlightBits = newDlights[1];
-#endif
 	} while ( 1 );
 
 	{
@@ -910,10 +894,8 @@ void R_AddWorldSurfaces( void ) {
 	R_RecursiveWorldNode( tr.world->nodes, 15, ( 1ULL << tr.refdef.num_dlights ) - 1 );
 
 #ifdef USE_PMLIGHT
-#ifdef USE_LEGACY_DLIGHTS
 	if ( !r_dlightMode->integer )
 		return;
-#endif // USE_LEGACY_DLIGHTS
 
 	// "transform" all the dlights so that dl->transformed is actually populated
 	// (even though HERE it's == dl->origin) so we can always use R_LightCullBounds

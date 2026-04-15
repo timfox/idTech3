@@ -1049,9 +1049,7 @@ typedef struct {
 	// dim 0 is based on dlight additive flag: 0 - not additive, 1 - additive
 	// dim 1 is directly a cullType_t enum value.
 	// dim 2 is a polygon offset value (0 - off, 1 - on).
-#ifdef USE_LEGACY_DLIGHTS
 	uint32_t dlight_pipelines[2][3][2];
-#endif
 
 	// cullType[3], polygonOffset[2], fogStage[2], absLight[2]
 #ifdef USE_PMLIGHT
