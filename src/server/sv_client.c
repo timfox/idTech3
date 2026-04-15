@@ -334,7 +334,7 @@ static void SV_SetTLD( char *str, const netadr_t *from, qboolean isLAN )
 
 	if ( isLAN )
 	{
-		strcpy( str, "**" );
+		Q_strncpyz( str, "**", 3 );
 		return;
 	}
 
