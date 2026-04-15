@@ -58,7 +58,7 @@ MinGW links SDL2/OpenAL/etc. dynamically. If you copy `idtech3.exe` outside MSYS
 
 ## Building
 
-The primary build script is `scripts/compile_engine.sh`.
+The primary build entry point is `scripts/compile_engine.sh`. The repository also ships `CMakePresets.json` for direct CMake / IDE workflows.
 
 ### Quick Start
 ```bash
@@ -77,6 +77,25 @@ The primary build script is `scripts/compile_engine.sh`.
 # Quiet build (suppress compiler output)
 ./scripts/compile_engine.sh vulkan quiet
 ```
+
+### CMake Presets
+```bash
+# Configure + build Vulkan Release
+cmake --preset vulkan-release
+cmake --build --preset build-vulkan-release
+
+# Run the matching ctest preset
+ctest --preset test-vulkan-release
+
+# Alternate configurations
+cmake --preset vulkan-debug
+cmake --preset opengl-release
+cmake --preset opengl-debug
+```
+
+Presets use dedicated `build/presets/<name>/` trees so they do not overwrite the helper script's `build-vk-*` / `build-gl-*` directories.
+
+Use the helper script when you want staged artifacts in `release/` and the same workflow documented throughout the repo. Use presets when you want direct CMake control or IDE integration.
 
 ### Building for Multiple Platforms
 
@@ -229,6 +248,9 @@ ffmpeg play <file>      # Play a video file
 # CTest (requires build first; runs smoke test)
 cd build-vk-Release && ctest -V
 # or: make test
+
+# CTest through presets
+ctest --preset test-vulkan-release
 ```
 
 ## IDE Setup

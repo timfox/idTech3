@@ -271,7 +271,6 @@ CMAKE_FLAGS=(
   "-DENABLE_FORTIFY_SOURCE=ON"
   "-DENABLE_ASAN=$([ "$ASAN" -eq 1 ] && echo ON || echo OFF)"
   "-DENABLE_LTO=$([ "$LTO" -eq 1 ] && echo ON || echo OFF)"
-  "-DBUILD_SERVER=ON"
   "-DUSE_VULKAN=ON"
   "-Wno-dev"
 )
