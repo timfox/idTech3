@@ -3286,7 +3286,7 @@ void Com_AppendCDKey( const char *filename ) {
 	FS_FCloseFile( f );
 
 	if ( Com_CDKeyValidate(buffer, NULL)) {
-		strcat( &cl_cdkey[16], buffer );
+		Q_strncpyz( &cl_cdkey[16], buffer, 17 );
 	} else {
 		Q_strncpyz( &cl_cdkey[16], "                ", 17 );
 	}
@@ -3413,7 +3413,7 @@ static void CPUID_EX( int func, int param, unsigned int *regs )
 
 #endif  // clang/gcc/mingw
 
-static void Sys_GetProcessorId( char *vendor )
+static void Sys_GetProcessorId( char *vendor, size_t vendorSize )
 {
 	uint32_t regs[4]; // EAX, EBX, ECX, EDX
 	uint32_t cpuid_level_ex;
@@ -3425,6 +3425,10 @@ static void Sys_GetProcessorId( char *vendor )
 #else
 	CPU_Flags = 0;
 #endif
+	if ( !vendor || vendorSize == 0 ) {
+		return;
+	}
+
 	vendor[0] = '\0';
 
 	CPUID( 0x80000000, regs );
@@ -3464,38 +3468,42 @@ static void Sys_GetProcessorId( char *vendor )
 	if ( regs[ 2 ] & ( 1 << 19 ) )
 		CPU_Flags |= CPU_SSE41;
 
-	if ( vendor ) {
-		if ( cpuid_level_ex >= 0x80000004 ) {
-			// read CPU Brand string
-			uint32_t i;
-			for ( i = 0x80000002; i <= 0x80000004; i++) {
-				CPUID( i, regs );
-				memcpy( vendor+0, (char*)&regs[0], 4 );
-				memcpy( vendor+4, (char*)&regs[1], 4 );
-				memcpy( vendor+8, (char*)&regs[2], 4 );
-				memcpy( vendor+12, (char*)&regs[3], 4 );
-				vendor[16] = '\0';
-				vendor += strlen( vendor );
-			}
-		} else {
-			const int print_flags = CPU_Flags;
-			vendor = Q_stradd( vendor, vendor_str );
-			if (print_flags) {
-				// print features
-				strcat(vendor, " w/");
-				if (print_flags & CPU_FCOM)
-					strcat(vendor, " CMOV");
-				if (print_flags & CPU_MMX)
-					strcat(vendor, " MMX");
-				if (print_flags & CPU_SSE)
-					strcat(vendor, " SSE");
-				if (print_flags & CPU_SSE2)
-					strcat(vendor, " SSE2");
-				//if ( CPU_Flags & CPU_SSE3 )
-				//	strcat( vendor, " SSE3" );
-				if (print_flags & CPU_SSE41)
-					strcat(vendor, " SSE4.1");
-			}
+	if ( cpuid_level_ex >= 0x80000004 ) {
+		// read CPU Brand string
+		char brand[48 + 1];
+		uint32_t i;
+		char *brand_write = brand;
+		brand[0] = '\0';
+
+		for ( i = 0x80000002; i <= 0x80000004; i++ ) {
+			CPUID( i, regs );
+			memcpy( brand_write + 0, (char*)&regs[0], 4 );
+			memcpy( brand_write + 4, (char*)&regs[1], 4 );
+			memcpy( brand_write + 8, (char*)&regs[2], 4 );
+			memcpy( brand_write + 12, (char*)&regs[3], 4 );
+			brand_write[16] = '\0';
+			brand_write += strlen( brand_write );
+		}
+
+		Q_strncpyz( vendor, brand, (int)vendorSize );
+	} else {
+		const int print_flags = CPU_Flags;
+		Q_strncpyz( vendor, vendor_str, (int)vendorSize );
+		if ( print_flags ) {
+			// print features
+			Q_strcat( vendor, (int)vendorSize, " w/" );
+			if ( print_flags & CPU_FCOM )
+				Q_strcat( vendor, (int)vendorSize, " CMOV" );
+			if ( print_flags & CPU_MMX )
+				Q_strcat( vendor, (int)vendorSize, " MMX" );
+			if ( print_flags & CPU_SSE )
+				Q_strcat( vendor, (int)vendorSize, " SSE" );
+			if ( print_flags & CPU_SSE2 )
+				Q_strcat( vendor, (int)vendorSize, " SSE2" );
+			//if ( CPU_Flags & CPU_SSE3 )
+			//	Q_strcat( vendor, (int)vendorSize, " SSE3" );
+			if ( print_flags & CPU_SSE41 )
+				Q_strcat( vendor, (int)vendorSize, " SSE4.1" );
 		}
 	}
 }
@@ -3546,9 +3554,9 @@ static void DetectCPUCoresConfig( void )
 
 #ifndef __linux__
 
-static void Sys_GetProcessorId( char *vendor )
+static void Sys_GetProcessorId( char *vendor, size_t vendorSize )
 {
-	Com_sprintf( vendor, 100, "%s", ARCH_STRING );
+	Com_sprintf( vendor, (int)vendorSize, "%s", ARCH_STRING );
 }
 
 #else // __linux__
@@ -3559,7 +3567,7 @@ static void Sys_GetProcessorId( char *vendor )
 #include <asm/hwcap.h>
 #endif
 
-static void Sys_GetProcessorId( char *vendor )
+static void Sys_GetProcessorId( char *vendor, size_t vendorSize )
 {
 #if arm32
 	const char *platform;
@@ -3578,31 +3586,31 @@ static void Sys_GetProcessorId( char *vendor )
 		}
 	}
 
-	Com_sprintf( vendor, 100, "ARM %s", platform );
+	Com_sprintf( vendor, (int)vendorSize, "ARM %s", platform );
 	hwcaps = getauxval( AT_HWCAP );
 	if ( hwcaps & ( HWCAP_IDIVA | HWCAP_VFPv3 ) ) {
-		strcat( vendor, " /w" );
+		Q_strcat( vendor, (int)vendorSize, " /w" );
 
 		if ( hwcaps & HWCAP_IDIVA ) {
 			CPU_Flags |= CPU_IDIVA;
-			strcat( vendor, " IDIVA" );
+			Q_strcat( vendor, (int)vendorSize, " IDIVA" );
 		}
 
 		if ( hwcaps & HWCAP_VFPv3 ) {
 			CPU_Flags |= CPU_VFPv3;
-			strcat( vendor, " VFPv3" );
+			Q_strcat( vendor, (int)vendorSize, " VFPv3" );
 		}
 
 		if ( ( CPU_Flags & ( CPU_ARMv7 | CPU_VFPv3 ) ) == ( CPU_ARMv7 | CPU_VFPv3 ) ) {
-			strcat( vendor, " QVM-bytecode" );
+			Q_strcat( vendor, (int)vendorSize, " QVM-bytecode" );
 		}
 	}
 #else // !arm32
 	CPU_Flags = 0;
 #if arm64
-	Com_sprintf( vendor, 100, "%s", ARCH_STRING );
+	Com_sprintf( vendor, (int)vendorSize, "%s", ARCH_STRING );
 #else
-	Com_sprintf( vendor, 128, "%s %s", ARCH_STRING, (const char*)getauxval( AT_PLATFORM ) );
+	Com_sprintf( vendor, (int)vendorSize, "%s %s", ARCH_STRING, (const char*)getauxval( AT_PLATFORM ) );
 #endif
 #endif // !arm32
 }
@@ -4103,7 +4111,7 @@ void Com_Init( char *commandLine ) {
 	if ( !Q_stricmp( Cvar_VariableString( "sys_cpustring" ), "detect" ) ) {
 		char vendor[128];
 		Com_Printf( "...detecting CPU, found " );
-		Sys_GetProcessorId( vendor );
+		Sys_GetProcessorId( vendor, sizeof( vendor ) );
 		Cvar_Set( "sys_cpustring", vendor );
 	}
 	Com_Printf( "%s\n", Cvar_VariableString( "sys_cpustring" ) );
