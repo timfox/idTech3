@@ -202,7 +202,7 @@ void vk_ssr_pass( void )
 		float projection[16];
 		float invProjection[16];
 		float params[4];   /* maxDistance, stepSize, thickness, fadeEdge */
-		float params2[4]; /* roughnessThreshold (Fresnel blend), intensity, maxDepthGradient, pad */
+		float params2[4]; /* roughnessThreshold (Fresnel blend), intensity, maxDepthGradient, fresnelExponent */
 	} vk_ssr_push_t;
 
 	VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
@@ -250,7 +250,7 @@ void vk_ssr_pass( void )
 	push.params2[0] = PostFX_SSR_GetRoughnessThreshold();
 	push.params2[1] = PostFX_SSR_GetIntensity();
 	push.params2[2] = PostFX_SSR_GetMaxDepthGradient();
-	push.params2[3] = 0.0f;
+	push.params2[3] = PostFX_SSR_GetFresnelExponent();
 
 	qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_ssr, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
 	vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );

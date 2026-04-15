@@ -22,6 +22,7 @@ static cvar_t *r_ssr_stepSize;
 static cvar_t *r_ssr_thickness;
 static cvar_t *r_ssr_fadeEdge;
 static cvar_t *r_ssr_roughnessThreshold;
+static cvar_t *r_ssr_fresnelExponent;
 static cvar_t *r_ssr_intensity;
 static cvar_t *r_ssr_maxDepthGradient;
 
@@ -140,6 +141,11 @@ void PostFX_RegisterCvars(void) {
 		"SSR view-dependent blend (no roughness buffer): 0=full intensity at all angles (legacy). "
 		"1=strongest at grazing angles only (Fresnel-style falloff). Intermediate values blend." );
 	ri.Cvar_CheckRange( r_ssr_roughnessThreshold, "0", "1", CV_FLOAT );
+
+	r_ssr_fresnelExponent = ri.Cvar_Get( "r_ssr_fresnelExponent", "2.5", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_ssr_fresnelExponent, "0.5", "8.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_ssr_fresnelExponent,
+		"When r_ssr_roughnessThreshold > 0: exponent on (1 - N·V) for grazing SSR weight. Higher = narrower grazing band." );
 
 	r_atmosphere             = ri.Cvar_Get("r_atmosphere",             "0",    CVAR_ARCHIVE);
 	ri.Cvar_SetDescription( r_atmosphere, "Atmospheric scattering for sky and fog. Requires r_fbo 1." );
@@ -290,6 +296,7 @@ float PostFX_SSR_GetFadeEdge(void) { return r_ssr_fadeEdge ? r_ssr_fadeEdge->val
 float PostFX_SSR_GetRoughnessThreshold(void) { return r_ssr_roughnessThreshold ? r_ssr_roughnessThreshold->value : 0.5f; }
 float PostFX_SSR_GetIntensity(void) { return r_ssr_intensity ? r_ssr_intensity->value : 0.8f; }
 float PostFX_SSR_GetMaxDepthGradient(void) { return r_ssr_maxDepthGradient ? r_ssr_maxDepthGradient->value : 0.08f; }
+float PostFX_SSR_GetFresnelExponent(void) { return r_ssr_fresnelExponent ? r_ssr_fresnelExponent->value : 2.5f; }
 
 qboolean PostFX_Atmosphere_IsEnabled(void) { return r_atmosphere && r_atmosphere->integer > 0; }
 void PostFX_Atmosphere_GetSunDirection(float *x, float *y, float *z) {

@@ -17,6 +17,7 @@
  * r_ssr_roughnessThreshold: optional view-dependent weight (no roughness buffer here).
  * When > 0, blends toward a grazing-angle emphasis (Fresnel-like) so SSR is stronger
  * at glancing views; 0 leaves intensity unchanged (default).
+ * r_ssr_fresnelExponent: exponent on (1 - N·V) when roughnessThreshold > 0 (see params2.w).
  */
 
 layout(set = 0, binding = 0) uniform sampler2D colorTexture;
@@ -87,6 +88,7 @@ void main() {
 	float roughnessThreshold = clamp(ssr.params2.x, 0.0, 1.0);
 	float intensity = ssr.params2.y;
 	float maxDepthGradient = ssr.params2.z;
+	float fresnelExponent = max(ssr.params2.w, 0.5);
 
 	if (rawDepth <= 0.0 || rawDepth >= 1.0) {
 		out_color = vec4(sceneColor, 1.0);
@@ -109,7 +111,7 @@ void main() {
 	float fresnelSSRWeight = 1.0;
 	if (roughnessThreshold > 0.0) {
 		float NdotV = clamp(dot(normal, normalize(-viewPos)), 0.0, 1.0);
-		float grazing = pow(max(1.0 - NdotV, 0.0), 2.5);
+		float grazing = pow(max(1.0 - NdotV, 0.0), fresnelExponent);
 		fresnelSSRWeight = mix(1.0, grazing, roughnessThreshold);
 	}
 	vec3 reflectDir = reflect(viewDir, normal);
