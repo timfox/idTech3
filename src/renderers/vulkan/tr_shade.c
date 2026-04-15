@@ -420,9 +420,7 @@ void RB_BeginSurface( shader_t *shader, int fogNum ) {
 	vk_reset_iqm_storage_offsets();
 	R_IQMBeginSurfaceBatch();
 
-#ifdef USE_LEGACY_DLIGHTS
 	tess.dlightBits = 0;		// will be OR'd in by surface functions
-#endif
 	tess.xstages = state->stages;
 	tess.numPasses = state->numUnfoggedPasses;
 
@@ -496,7 +494,6 @@ static void DrawMultitextured( const shaderCommands_t *input, int stage ) {
 #endif
 
 
-#ifdef USE_LEGACY_DLIGHTS
 /*
 ===================
 ProjectDlightTexture
@@ -671,7 +668,6 @@ static void ProjectDlightTexture( void ) {
 #endif
 }
 
-#endif // USE_LEGACY_DLIGHTS
 
 uint32_t vk_append_uniform( const void *uniform, size_t size, uint32_t min_offset );
 uint32_t vk_push_uniform( const vkUniform_t *uniform );
@@ -1979,7 +1975,6 @@ void RB_StageIteratorGeneric( void )
 	RB_IterateStagesGeneric( &tess, fogCollapse );
 
 	// now do any dynamic lighting needed
-#ifdef USE_LEGACY_DLIGHTS
 #ifdef USE_PMLIGHT
 	if ( r_dlightMode->integer == 0 )
 #endif
@@ -1992,7 +1987,6 @@ void RB_StageIteratorGeneric( void )
 #endif
 		}
 	}
-#endif // USE_LEGACY_DLIGHTS
 
 	// now do fog
 	if ( !worldShOverride && tess.fogNum && tess.shader->fogPass && !fogCollapse ) {

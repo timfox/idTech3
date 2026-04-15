@@ -348,9 +348,7 @@ void RB_BeginSurface( shader_t *shader, int fogNum ) {
 	tess.shader = state;
 	tess.fogNum = fogNum;
 
-#ifdef USE_LEGACY_DLIGHTS
 	tess.dlightBits = 0;		// will be OR'd in by surface functions
-#endif
 	tess.xstages = state->stages;
 	tess.numPasses = state->numUnfoggedPasses;
 
@@ -432,7 +430,6 @@ static void DrawMultitextured( const shaderCommands_t *input, int stage ) {
 }
 
 
-#ifdef USE_LEGACY_DLIGHTS
 /*
 ===================
 ProjectDlightTexture
@@ -569,7 +566,6 @@ static void ProjectDlightTexture( void ) {
 		backEnd.pc.c_dlightIndexes += numIndexes;
 	}
 }
-#endif // USE_LEGACY_DLIGHTS
 
 
 /*
@@ -1142,7 +1138,6 @@ void RB_StageIteratorGeneric( void )
 	//
 	// now do any dynamic lighting needed
 	//
-#ifdef USE_LEGACY_DLIGHTS
 #ifdef USE_PMLIGHT
 	if ( !r_dlightMode->integer )
 #endif
@@ -1150,7 +1145,6 @@ void RB_StageIteratorGeneric( void )
 	{
 		ProjectDlightTexture();
 	}
-#endif // USE_LEGACY_DLIGHTS
 
 	//
 	// now do fog

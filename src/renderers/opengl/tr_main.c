@@ -1594,7 +1594,6 @@ static void R_SortDrawSurfs( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 	}
 
 #ifdef USE_PMLIGHT
-#ifdef USE_LEGACY_DLIGHTS
 	if ( r_dlightMode->integer ) 
 #endif
 	{
@@ -1609,7 +1608,6 @@ static void R_SortDrawSurfs( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 			}
 		}
 	}
-#endif // USE_PMLIGHT
 
 	R_AddDrawSurfCmd( drawSurfs, numDrawSurfs );
 }
@@ -1632,9 +1630,7 @@ static void R_AddEntitySurfaces( void ) {
 			tr.currentEntityNum < tr.refdef.num_entities;
 			tr.currentEntityNum++ ) {
 		ent = tr.currentEntity = &tr.refdef.entities[tr.currentEntityNum];
-#ifdef USE_LEGACY_DLIGHTS
 		ent->needDlights = 0;
-#endif
 		// preshift the value we are going to OR into the drawsurf sort
 		tr.shiftedEntityNum = tr.currentEntityNum << QSORT_REFENTITYNUM_SHIFT;
 
