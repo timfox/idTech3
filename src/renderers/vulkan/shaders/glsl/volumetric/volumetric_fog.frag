@@ -309,6 +309,7 @@ void main() {
     sceneDepth = min(sceneDepth, maxDistance);
 
     vec3 scene = textureLod(sceneColor, v_UV, 0.0).rgb;
+    int compositeMode = int(clamp(floor(params.volumeCounts.w + 0.5), 0.0, 2.0));
     int px = int(gl_FragCoord.x), py = int(gl_FragCoord.y);
     int haltonIdx = px + py * 4096 + int(frameIndex) * 256;
     float jitter = (halton2(haltonIdx % 256) - 0.5) * jitterStrength;
@@ -442,7 +443,20 @@ void main() {
         return;
     }
 
-    vec3 outRgb = scene * transmittance + fogRadiance;
+    vec3 outRgb;
+    if (compositeMode == 1) {
+        /* Depth-aware in-scatter weight: attenuate fogRadiance when transmittance is high (near camera / clear air). */
+        float inScatterWeight = clamp(transmittance, 0.0, 1.0);
+        outRgb = scene * transmittance + fogRadiance * inScatterWeight;
+    } else {
+        outRgb = scene * transmittance + fogRadiance;
+    }
+    if (compositeMode == 2) {
+        float cap = max(params.temporalParams.z, 0.0);
+        if (cap > 0.0) {
+            outRgb = min(outRgb, vec3(cap));
+        }
+    }
     /* Guard against NaN/Inf from upstream (compute, bad params, etc.) */
     if ( isnan( outRgb.r ) || isnan( outRgb.g ) || isnan( outRgb.b ) ||
          isinf( outRgb.r ) || isinf( outRgb.g ) || isinf( outRgb.b ) ) {
