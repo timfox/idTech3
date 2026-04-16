@@ -303,10 +303,12 @@ static void vk_end_frame_fill_gamma_push_constants( VkPostProcessPushConstants *
 		push->paniniPad1 = 1.0f;
 	}
 
-	srcRect.offset.x = 0;
-	srcRect.offset.y = 0;
-	srcRect.extent.width = srcTexW;
-	srcRect.extent.height = srcTexH;
+	if ( !vk_get_scene_src_rect( &srcRect ) ) {
+		srcRect.offset.x = 0;
+		srcRect.offset.y = 0;
+		srcRect.extent.width = srcTexW;
+		srcRect.extent.height = srcTexH;
+	}
 
 	if ( (int32_t)srcRect.offset.x < 0 ) srcRect.offset.x = 0;
 	if ( (int32_t)srcRect.offset.y < 0 ) srcRect.offset.y = 0;
