@@ -169,13 +169,16 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT );
+	vk.renderWidth = fullWidth;
+	vk.renderHeight = fullHeight;
+	vk.renderScaleX = vk.renderScaleY = 1.0f;
 	vk_begin_render_pass_tracked( vk.render_pass.oit_resolve, vk.framebuffers.oit_resolve, qfalse, fullWidth, fullHeight );
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.oit_resolve_pipeline );
 	{
 		VkDescriptorSet sets[3] = { vk.oit_opaque_descriptor, vk.oit_accum_descriptor, vk.oit_reveal_descriptor };
 		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_oit_resolve, 0, 3, sets, 0, NULL );
 	}
-	vk_set_fullscreen_viewport_scissor( glConfig.vidWidth, glConfig.vidHeight );
+	vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
 	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 	vk_end_render_pass();
 	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
@@ -200,9 +203,12 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 void vk_begin_ssr_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.ssr;
+	uint32_t width = 0;
+	uint32_t height = 0;
 
-	vk.renderWidth = glConfig.vidWidth;
-	vk.renderHeight = glConfig.vidHeight;
+	vk_get_active_render_extent( &width, &height );
+	vk.renderWidth = width;
+	vk.renderHeight = height;
 	vk.renderScaleX = vk.renderScaleY = 1.0f;
 
 	vk_begin_render_pass_tracked( vk.render_pass.ssr, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
@@ -358,18 +364,18 @@ qboolean vk_ssao_pass( void )
 			push.params[3] = r_ssaoPower->value;
 			push.misc[0] = (float)( r_hbaoDirections ? r_hbaoDirections->integer : 8 );
 			push.misc[1] = (float)( r_hbaoSteps ? r_hbaoSteps->integer : 8 );
-			push.misc[2] = ( glConfig.vidWidth > 0 ) ? 1.0f / (float)glConfig.vidWidth : 1.0f;
+			push.misc[2] = ( vk.renderWidth > 0 ) ? 1.0f / (float)vk.renderWidth : 1.0f;
 			if ( depthIsReversed > 0.5f )
 				push.misc[2] = -push.misc[2];
-			push.misc[3] = ( glConfig.vidHeight > 0 ) ? 1.0f / (float)glConfig.vidHeight : 1.0f;
+			push.misc[3] = ( vk.renderHeight > 0 ) ? 1.0f / (float)vk.renderHeight : 1.0f;
 		} else {
 			push.params[0] = r_ssaoRadius->value;
 			push.params[1] = r_ssaoBias->value;
 			push.params[2] = r_ssaoIntensity->value;
 			push.params[3] = r_ssaoPower->value;
 			push.misc[0] = (float)r_ssaoSamples->integer;
-			push.misc[1] = ( glConfig.vidWidth > 0 ) ? 1.0f / (float)glConfig.vidWidth : 1.0f;
-			push.misc[2] = ( glConfig.vidHeight > 0 ) ? 1.0f / (float)glConfig.vidHeight : 1.0f;
+			push.misc[1] = ( vk.renderWidth > 0 ) ? 1.0f / (float)vk.renderWidth : 1.0f;
+			push.misc[2] = ( vk.renderHeight > 0 ) ? 1.0f / (float)vk.renderHeight : 1.0f;
 			push.misc[3] = depthIsReversed;
 			push.misc2[0] = (float)( r_ssaoMethod ? r_ssaoMethod->integer : 0 );
 			push.misc2[1] = (float)( r_hbaoDirections ? r_hbaoDirections->integer : 8 );
@@ -395,8 +401,8 @@ qboolean vk_ssao_pass( void )
 
 		if ( vk.fog_scene_image != VK_NULL_HANDLE && vk.color_image != VK_NULL_HANDLE ) {
 			VkImageCopy copy_region;
-			uint32_t copy_w = ( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u;
-			uint32_t copy_h = ( glConfig.vidHeight > 0 ) ? (uint32_t)glConfig.vidHeight : 1u;
+			uint32_t copy_w = vk.renderWidth > 0 ? (uint32_t)vk.renderWidth : 1u;
+			uint32_t copy_h = vk.renderHeight > 0 ? (uint32_t)vk.renderHeight : 1u;
 			Com_Memset( &copy_region, 0, sizeof( copy_region ) );
 			copy_region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 			copy_region.srcSubresource.layerCount = 1;
