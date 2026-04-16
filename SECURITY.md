@@ -52,7 +52,7 @@ If the report is accepted, we’ll coordinate a disclosure timeline with you. If
 - Vulnerabilities in third-party dependencies that do not affect this project’s builds
 - Issues requiring physical access only (unless they enable meaningful escalation)
 
-If you’re not sure, report it anyway—better a false alarm than a silent RCE gremlin.
+If you’re not sure, report it anyway-better a false alarm than a silent RCE gremlin.
 
 ## Coordinated Disclosure
 

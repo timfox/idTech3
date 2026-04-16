@@ -62,7 +62,7 @@ The Vulkan renderer uses texture view swizzles to remap file channels into that 
 
 ## Parallax occlusion mapping (Vulkan PBR)
 
-When a **normal map** and a packed **ORM/physical** map are both bound on the default PBR path, the fragment shader can **ray-march height** from the physical map’s **occlusion (R)** channel (height lives there for POM; `parallaxDepth` / `parallaxBias` still apply). Toggle and tuning: **`r_pom`**, **`r_pomSteps`**, **`r_pomScale`**, **`r_pomShadow`**, **`r_pomShadowSteps`** — see `tr_init.c` and [RENDERERS.md](RENDERERS.md). POM is disabled on some multi-UV / lightmapped PBR variants.
+When a **normal map** and a packed **ORM/physical** map are both bound on the default PBR path, the fragment shader can **ray-march height** from the physical map’s **occlusion (R)** channel (height lives there for POM; `parallaxDepth` / `parallaxBias` still apply). Toggle and tuning: **`r_pom`**, **`r_pomSteps`**, **`r_pomScale`**, **`r_pomShadow`**, **`r_pomShadowSteps`** - see `tr_init.c` and [RENDERERS.md](RENDERERS.md). POM is disabled on some multi-UV / lightmapped PBR variants.
 
 ## Clearcoat, sheen, anisotropy (Vulkan)
 

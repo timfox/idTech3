@@ -44,7 +44,7 @@ jobs:
             echo "Tier B: IDTECH3_GAME_BASE_PATH is set (variable and/or secret); self-hosted job will run."
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "Tier B: IDTECH3_GAME_BASE_PATH unset — skipping self-hosted regression (forks/engine-only repos)."
+            echo "Tier B: IDTECH3_GAME_BASE_PATH unset - skipping self-hosted regression (forks/engine-only repos)."
           fi
 
   gamebase-regression:

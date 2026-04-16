@@ -2,7 +2,7 @@
 ===========================================================================
 Copyright (C) 2026 Gopex LLC. All rights reserved.
 
-Android platform layer — NativeActivity lifecycle, game thread,
+Android platform layer - NativeActivity lifecycle, game thread,
 Vulkan surface, input, file system, and JNI bridge.
 ===========================================================================
 */
@@ -763,7 +763,7 @@ static void onNativeWindowCreated( ANativeActivity *activity, ANativeWindow *win
 
 static void onNativeWindowDestroyed( ANativeActivity *activity, ANativeWindow *window ) {
 	(void)activity; (void)window;
-	/* Must destroy VkSurfaceKHR before returning — ANativeWindow* is invalid after this */
+	/* Must destroy VkSurfaceKHR before returning - ANativeWindow* is invalid after this */
 	if ( g_engineInitialized ) {
 		android_surface_request_op( 1 );
 	}

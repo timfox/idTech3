@@ -51,7 +51,7 @@ if [[ -n "$SAVED_DEMO_ROOT" && -d "$SAVED_DEMO_ROOT" ]]; then
 fi
 # Copied-from-example local.env often leaves a bogus IDTECH3_DEMO_ROOT; drop it so args/defaults work.
 if [[ -n "${IDTECH3_DEMO_ROOT:-}" && ! -d "$IDTECH3_DEMO_ROOT" ]]; then
-	echo "Warning: IDTECH3_DEMO_ROOT is not a directory ($IDTECH3_DEMO_ROOT) — fix or remove it in local.env" >&2
+	echo "Warning: IDTECH3_DEMO_ROOT is not a directory ($IDTECH3_DEMO_ROOT) - fix or remove it in local.env" >&2
 	unset IDTECH3_DEMO_ROOT
 fi
 
@@ -139,7 +139,7 @@ shopt -s nullglob
 _base_pk3s=( "$BASE_ROOT/$BASE_DIR_NAME"/*.pk3 )
 shopt -u nullglob
 if [[ ${#_base_pk3s[@]} -eq 0 ]]; then
-	echo "Note: no .pk3 in $BASE_ROOT/$BASE_DIR_NAME — menus/maps need retail/base packs." >&2
+	echo "Note: no .pk3 in $BASE_ROOT/$BASE_DIR_NAME - menus/maps need retail/base packs." >&2
 	echo "Rebuild idtech3_demo.pk3 (./examples/demo_game/build_demo_pack.sh) for the bundled native UI stub in vm/." >&2
 fi
 

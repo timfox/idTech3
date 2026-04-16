@@ -193,7 +193,7 @@ if (-not $SkipRendererDlls) {
         Write-Host "OK: $gl exports GetRefAPI"
     }
     if (-not $ExpectRendererDlls -and -not $haveVk -and -not $haveGl) {
-        Write-Host "(No renderer DLLs in bin — static renderer build; skipped GetRefAPI check)"
+        Write-Host "(No renderer DLLs in bin - static renderer build; skipped GetRefAPI check)"
     }
 }
 
@@ -207,7 +207,7 @@ foreach ($g in $gameDlls) {
     Write-Host "OK: $($g.Name) exports vmMain, dllEntry"
 }
 if ($gameDlls.Count -eq 0) {
-    Write-Host "(No qagame/cgame/ui native DLLs in bin — skipped vmMain/dllEntry check)"
+    Write-Host "(No qagame/cgame/ui native DLLs in bin - skipped vmMain/dllEntry check)"
 }
 
 Write-Host "PE export check passed."

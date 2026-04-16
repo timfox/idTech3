@@ -8,7 +8,7 @@ For a **stricter engine bar** (automated steps + optional content-backed maps), 
 
 ### Build Validation
 - [ ] **Local CI validation** (optional): `./scripts/validate_ci_build.sh` runs shader compile, Vulkan build, and smoke test
-- [ ] **Production readiness orchestrator** (optional): `./scripts/production_readiness.sh` — extends validation with full `ctest` and, if `GAME_BASE` is set, `renderer_regression_maps.sh`
+- [ ] **Production readiness orchestrator** (optional): `./scripts/production_readiness.sh` - extends validation with full `ctest` and, if `GAME_BASE` is set, `renderer_regression_maps.sh`
 - [ ] **Vulkan build**: `./scripts/compile_engine.sh vulkan` succeeds
 - [ ] **OpenGL build**: `./scripts/compile_engine.sh opengl` succeeds
 - [ ] **Debug build**: `./scripts/compile_engine.sh vulkan debug` succeeds
@@ -44,6 +44,6 @@ For a **stricter engine bar** (automated steps + optional content-backed maps), 
 
 - [ ] Tag created with version (e.g. `v1.0.0`)
 - [ ] GitHub Release created (draft first, then publish)
-- [ ] **Publish release** — this triggers the CI build workflow; the `release-attach` job will build binaries for all platforms (Windows, Linux, macOS, Android) and attach them to the release. Allow 15–30 minutes for all platform archives to appear.
+- [ ] **Publish release** - this triggers the CI build workflow; the `release-attach` job will build binaries for all platforms (Windows, Linux, macOS, Android) and attach them to the release. Allow 15–30 minutes for all platform archives to appear.
 - [ ] Verify all platform archives are attached to the release
 - [ ] Announcement (if applicable)

@@ -1,12 +1,12 @@
-# Demo playfield — run the engine with the `idtech3_demo` mod
+# Demo playfield - run the engine with the `idtech3_demo` mod
 
-This is the **easiest path** to try renderer hooks and demo configs on top of **your** game data. The repo does not include maps or retail `.pk3` files — you add those once.
+This is the **easiest path** to try renderer hooks and demo configs on top of **your** game data. The repo does not include maps or retail `.pk3` files - you add those once.
 
 ---
 
 ## Quick start (three steps)
 
-### Step 1 — Build the demo mod (one file)
+### Step 1 - Build the demo mod (one file)
 
 From the **engine repository root**:
 
@@ -22,7 +22,7 @@ examples/demo_skeleton/idtech3_demo/idtech3_demo.pk3
 
 *(The first time, create the folder: `mkdir -p examples/demo_skeleton/idtech3_demo`.)*
 
-### Step 2 — Game data (optional for a bare window)
+### Step 2 - Game data (optional for a bare window)
 
 Create an empty **`base/`** (or use **`setup_demo_layout.sh`**) if you only want to **verify Vulkan/OpenGL + window**: **`idtech3_demo.pk3`** now includes a **minimal native `ui`** inside **`vm/`**.
 
@@ -30,7 +30,7 @@ Add your compatible game `.pk3` files under **`base/`** when you want **maps, re
 
 See **`base/README.txt`** if your game uses **`baseq3`** instead of **`base`**.
 
-### Step 3 — Run
+### Step 3 - Run
 
 From the repo root:
 
@@ -57,7 +57,7 @@ The scripts look for **`base/`** and **`idtech3_demo/`** next to themselves, so 
 | “Missing … idtech3_demo.pk3” | Run Step 1 and copy the `.pk3` into `idtech3_demo/`. |
 | “No engine binary” | Build the engine (`./scripts/compile_engine.sh vulkan`) or set **`IDTECH3_ENGINE`** in `local.env` to your `idtech3` path. |
 | **`VM_Create on UI failed`** / **`ui.qvm not found`** | Rebuild **`idtech3_demo.pk3`** (`./examples/demo_game/build_demo_pack.sh`) so **`vm/ui*.so`** (or **`.dll`**) is inside the zip. Older packs were config-only. |
-| “No game data” / missing maps | Add `.pk3` files under **`base/`** (or set **`DEMO_BASE_DIR`** — see below). |
+| “No game data” / missing maps | Add `.pk3` files under **`base/`** (or set **`DEMO_BASE_DIR`** - see below). |
 | Wrong renderer | Set **`DEMO_RENDERER=opengl`** in `local.env`, or run with `+set cl_renderer opengl`. |
 | Windows | Use **`run_demo_client.bat`** from the same folder layout; put **`idtech3.exe`** next to it or on `PATH`. |
 
@@ -76,7 +76,7 @@ examples/demo_skeleton/     ← IDTECH3_DEMO_ROOT (folder that contains the two 
 └── run_demo_client.bat     ← Windows
 ```
 
-**`fs_basepath`** is set to **IDTECH3_DEMO_ROOT** — the directory that **contains** `base/` and `idtech3_demo/`.
+**`fs_basepath`** is set to **IDTECH3_DEMO_ROOT** - the directory that **contains** `base/` and `idtech3_demo/`.
 
 ---
 
@@ -96,8 +96,8 @@ Copy **`demo_skeleton.env.example`** → **`local.env`** and adjust:
 
 ## Helpers
 
-- **`setup_demo_layout.sh`** — Creates `base/` and `idtech3_demo/`, copies `local.env` template, tries to copy `idtech3_demo.pk3` from a local build.
-- **`run_demo_dedicated.sh`** — Headless **`idtech3_server`** with the same paths (good for SSH/CI smoke).
+- **`setup_demo_layout.sh`** - Creates `base/` and `idtech3_demo/`, copies `local.env` template, tries to copy `idtech3_demo.pk3` from a local build.
+- **`run_demo_dedicated.sh`** - Headless **`idtech3_server`** with the same paths (good for SSH/CI smoke).
 
 ---
 
@@ -117,6 +117,6 @@ Only share **engine binaries** and **configs you built** (e.g. `idtech3_demo.pk3
 
 ## See also
 
-- [demo_game README](../demo_game/README.md) — what the mod does (cvars, JS hooks)
-- [QUICKSTART](../../docs/QUICKSTART.md) — releases and first run
-- [mods README](../mods/README.md) — `fs_game` details
+- [demo_game README](../demo_game/README.md) - what the mod does (cvars, JS hooks)
+- [QUICKSTART](../../docs/QUICKSTART.md) - releases and first run
+- [mods README](../mods/README.md) - `fs_game` details

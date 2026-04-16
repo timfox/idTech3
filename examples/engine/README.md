@@ -1,4 +1,4 @@
-# Engine examples — local build and validation
+# Engine examples - local build and validation
 
 Run all commands from the **repository root** unless noted.
 
@@ -26,7 +26,7 @@ cd build-vk-Release && ctest --output-on-failure
 ./scripts/evidence_status.sh
 ```
 
-`evidence_status.sh` prints Tier A–D gaps (build dirs, `GAME_BASE`, FINDINGS placeholder) — see [docs/PRODUCTION_CERTIFICATION.md](../../docs/PRODUCTION_CERTIFICATION.md).
+`evidence_status.sh` prints Tier A–D gaps (build dirs, `GAME_BASE`, FINDINGS placeholder) - see [docs/PRODUCTION_CERTIFICATION.md](../../docs/PRODUCTION_CERTIFICATION.md).
 
 ## Full local CI parity + production orchestrator
 

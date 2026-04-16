@@ -94,7 +94,7 @@ static void signal_handler( int sig )
 		fprintf( stderr, "\n" );
 	} else if ( sig == SIGSEGV ) {
 		fprintf( stderr, "\n" );
-		fprintf( stderr, " Segmentation fault — the engine accessed invalid memory.\n" );
+		fprintf( stderr, " Segmentation fault - the engine accessed invalid memory.\n" );
 		fprintf( stderr, " This is a bug. Please report it with:\n" );
 		fprintf( stderr, "   - The full console output above this message\n" );
 		fprintf( stderr, "   - Your GPU, driver version, and OS\n" );

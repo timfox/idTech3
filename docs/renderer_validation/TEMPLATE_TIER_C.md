@@ -1,4 +1,4 @@
-# Tier C manual session — template
+# Tier C manual session - template
 
 Copy this file to a dated entry (e.g. `tier_c_2026-04-06.md`) or append a section to [FINDINGS.md](FINDINGS.md).
 

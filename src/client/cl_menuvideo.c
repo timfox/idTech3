@@ -9,8 +9,8 @@ is active and no map is loaded, the video fills the screen behind the
 UI elements. When the player enters a game, the video stops.
 
 Usage:
-  r_menuVideo "video/menu_bg.roq"    — set video file
-  r_menuVideoLoop 1                  — loop playback (default)
+  r_menuVideo "video/menu_bg.roq"    - set video file
+  r_menuVideoLoop 1                  - loop playback (default)
 
 Supported formats: ROQ (native), plus any format supported by the
 modern cinematic system (AV1, WebM, Theora, FFmpeg).

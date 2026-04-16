@@ -246,7 +246,7 @@ jobs:
           if not exist bin mkdir bin
 
           if "%OPENSSL_ROOT_DIR%"=="" (
-            echo ERROR: OPENSSL_ROOT_DIR is not set — OpenSSL install/discovery step failed.
+            echo ERROR: OPENSSL_ROOT_DIR is not set - OpenSSL install/discovery step failed.
             exit /b 1
           )
           if not exist "%OPENSSL_ROOT_DIR%\include\openssl\evp.h" (
@@ -260,7 +260,7 @@ jobs:
             /p:PlatformToolset=v143 ^
             /p:TreatWarningsAsErrors=false
 
-          rem --- Dedicated server (TargetName is idtech3_server in vcxproj; do not pass /p:TargetName — it poisons ProjectReference builds like zlib) ---
+          rem --- Dedicated server (TargetName is idtech3_server in vcxproj; do not pass /p:TargetName - it poisons ProjectReference builds like zlib) ---
           msbuild src\platform\win32\msvc2017\quake3e-ded.vcxproj ^
             %MSBUILD_COMMON%
           if errorlevel 1 exit /b 1
@@ -382,7 +382,7 @@ jobs:
         shell: pwsh
         run: ./scripts/windows_native_compat_check.ps1 -BinDir bin
 
-      - name: Verify PE exports (static renderer — no plugin DLLs)
+      - name: Verify PE exports (static renderer - no plugin DLLs)
         if: ${{ matrix.btype == 'Release' }}
         shell: pwsh
         run: ./scripts/windows_pe_exports_check.ps1 -BinDir bin -SkipRendererDlls

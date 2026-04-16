@@ -1,4 +1,4 @@
-# Scene 03 — Emissive
+# Scene 03 - Emissive
 
 ## Goal
 

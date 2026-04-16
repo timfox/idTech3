@@ -21,9 +21,9 @@ Get the latest release from [Releases](https://github.com/timfox/idTech3/release
 Binaries are built by CI when a release is published; allow 15–30 minutes after publishing for all platform archives to appear.
 
 Extract the archive. You should see:
-- `idtech3` (or `idtech3.exe` on Windows) — game client
-- `idtech3_server` (or `idtech3_server.exe`) — dedicated server
-- **Linux**: `idtech3_vulkan.so` / `idtech3_opengl.so` — renderer plugins (when built with `USE_RENDERER_DLOPEN`)
+- `idtech3` (or `idtech3.exe` on Windows) - game client
+- `idtech3_server` (or `idtech3_server.exe`) - dedicated server
+- **Linux**: `idtech3_vulkan.so` / `idtech3_opengl.so` - renderer plugins (when built with `USE_RENDERER_DLOPEN`)
 - **Windows (MSYS2/MinGW zip from CI)**: same `.exe` names plus several `.dll` files (SDL2, OpenAL, MinGW runtime). Keep them in the same folder as the executables.
 - **Windows (MSVC zip)**: renderers are usually linked into the client; you may only see the `.exe` files plus Visual C++ runtime requirements from your system.
 
@@ -31,8 +31,8 @@ Extract the archive. You should see:
 
 The engine needs game data (maps, textures, sounds). You must provide a compatible game base, for example:
 
-- **Quake III Arena** — copy or symlink the `baseq3` folder from your Q3A installation into the engine directory
-- **Open Arena** or other Q3-based games — same idea: the engine expects a `baseq3` (or `base`) folder with `.pk3` files
+- **Quake III Arena** - copy or symlink the `baseq3` folder from your Q3A installation into the engine directory
+- **Open Arena** or other Q3-based games - same idea: the engine expects a `baseq3` (or `base`) folder with `.pk3` files
 
 Typical layout:
 ```
@@ -63,7 +63,7 @@ idtech3/
 
 If you **build the engine from this repository**, you can use the **`idtech3_demo`** config mod without editing C code:
 
-1. `./examples/demo_game/build_demo_pack.sh` — builds `idtech3_demo.pk3`
+1. `./examples/demo_game/build_demo_pack.sh` - builds `idtech3_demo.pk3`
 2. Put your licensed game `.pk3` files under **`examples/demo_skeleton/base/`**
 3. Copy the `.pk3` to **`examples/demo_skeleton/idtech3_demo/idtech3_demo.pk3`**, or run **`./examples/demo_skeleton/setup_demo_layout.sh`**
 4. From the repo root: **`./scripts/run_demo.sh`**
@@ -97,8 +97,8 @@ See [ARM_RASPBERRY_PI.md](ARM_RASPBERRY_PI.md) for details.
 
 ## Troubleshooting
 
-- **"No game data"** — Ensure `baseq3/` (or `base/`) exists with at least one `.pk3` file.
-- **Black screen / no render** — Try OpenGL: `+set cl_renderer opengl`
-- **Solid color / dark brown / dark green / no UI** — Ensure FBO is enabled: `+set r_fbo 1` and run `vid_restart`. If still broken, try `r_exposure_auto 0`, `r_volumetricFog 0`, then `vid_restart`. As last resort, `r_fbo 0` disables HDR/post-processing.
-- **Missing libraries** — On Linux, install SDL2, OpenAL, and Vulkan drivers for your GPU. On Windows, if you copied only `idtech3.exe` out of a MinGW build folder, restore the accompanying `.dll` files from the same archive or re-run `./scripts/stage_mingw_runtime_dlls.sh bin` from an MSYS2 **MINGW64** shell after copying binaries into `bin/`.
-- **Native game DLLs not found** — The engine looks under `baseq3`/`base` in `modules/` and `vm/` (and the gamedir root as a legacy fallback). It tries several basename patterns per slot (`ui.so` / `ui.x86_64.dll` / `uix86_64.dll`, etc.) and alternate logical names for some VMs. If load still fails, run with `+set com_nativeLibraryDebug 1` to print the full path and the OS loader error for each attempt. Details: [ARCHITECTURE.md#native-game-modules-vm](ARCHITECTURE.md#native-game-modules-vm).
+- **"No game data"** - Ensure `baseq3/` (or `base/`) exists with at least one `.pk3` file.
+- **Black screen / no render** - Try OpenGL: `+set cl_renderer opengl`
+- **Solid color / dark brown / dark green / no UI** - Ensure FBO is enabled: `+set r_fbo 1` and run `vid_restart`. If still broken, try `r_exposure_auto 0`, `r_volumetricFog 0`, then `vid_restart`. As last resort, `r_fbo 0` disables HDR/post-processing.
+- **Missing libraries** - On Linux, install SDL2, OpenAL, and Vulkan drivers for your GPU. On Windows, if you copied only `idtech3.exe` out of a MinGW build folder, restore the accompanying `.dll` files from the same archive or re-run `./scripts/stage_mingw_runtime_dlls.sh bin` from an MSYS2 **MINGW64** shell after copying binaries into `bin/`.
+- **Native game DLLs not found** - The engine looks under `baseq3`/`base` in `modules/` and `vm/` (and the gamedir root as a legacy fallback). It tries several basename patterns per slot (`ui.so` / `ui.x86_64.dll` / `uix86_64.dll`, etc.) and alternate logical names for some VMs. If load still fails, run with `+set com_nativeLibraryDebug 1` to print the full path and the OS loader error for each attempt. Details: [ARCHITECTURE.md#native-game-modules-vm](ARCHITECTURE.md#native-game-modules-vm).

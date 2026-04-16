@@ -113,7 +113,7 @@ target_include_directories(cflux2
 # Link libraries
 target_link_libraries(cflux2 PRIVATE ${FLUX_LINK_LIBRARIES})
 
-# CLI executable (external generator) — not built on Android (JNI shared lib target only)
+# CLI executable (external generator) - not built on Android (JNI shared lib target only)
 if(NOT ANDROID)
 set(FLUX_CLI_SOURCES
     main.c

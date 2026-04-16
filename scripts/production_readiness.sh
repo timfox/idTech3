@@ -45,7 +45,7 @@ echo "Project: $PROJECT_ROOT"
 if [ -n "${GAME_BASE:-}" ]; then
   echo "GAME_BASE: $GAME_BASE (map load sanity will run)"
 else
-  echo "GAME_BASE: (unset — map load sanity skipped)"
+  echo "GAME_BASE: (unset - map load sanity skipped)"
 fi
 echo ""
 

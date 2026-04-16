@@ -1,4 +1,4 @@
-# Renderer examples — regression and confidence
+# Renderer examples - regression and confidence
 
 Requires a **real game base** (VMs, assets, and optionally the regression pack). Paths below are placeholders.
 

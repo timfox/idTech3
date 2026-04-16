@@ -27,11 +27,11 @@ if git rev-parse --short HEAD >/dev/null 2>&1; then
 fi
 echo ""
 
-echo "Tier A — Automated (CI + local orchestrator)"
+echo "Tier A - Automated (CI + local orchestrator)"
 if [[ -d "$ROOT/build-vk-Release" ]]; then
 	pass "build-vk-Release exists (run ctest / production_readiness.sh here)"
 else
-	warn "build-vk-Release missing — ./scripts/compile_engine.sh vulkan"
+	warn "build-vk-Release missing - ./scripts/compile_engine.sh vulkan"
 fi
 if [[ -x "$ROOT/scripts/production_readiness.sh" ]]; then
 	info "Run: ./scripts/production_readiness.sh  (full local gate; optional GAME_BASE)"
@@ -44,11 +44,11 @@ if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
 		info "GitHub CLI: check Actions UI for latest main matrix (this script does not poll CI)"
 	fi
 else
-	skip "gh not logged in — open GitHub Actions for matrix status"
+	skip "gh not logged in - open GitHub Actions for matrix status"
 fi
 echo ""
 
-echo "Tier B — Content-backed (GAME_BASE regression)"
+echo "Tier B - Content-backed (GAME_BASE regression)"
 if [[ -n "${GAME_BASE:-}" ]]; then
 	if [[ -d "$GAME_BASE" ]]; then
 		pass "GAME_BASE is a directory: $GAME_BASE"
@@ -60,18 +60,18 @@ if [[ -n "${GAME_BASE:-}" ]]; then
 		warn "GAME_BASE set but not a directory: $GAME_BASE"
 	fi
 else
-	skip "GAME_BASE unset — export GAME_BASE=/abs/path/to/base for map-load scripts"
+	skip "GAME_BASE unset - export GAME_BASE=/abs/path/to/base for map-load scripts"
 fi
 info "GitHub Tier B: set repo variable or secret IDTECH3_GAME_BASE_PATH + self-hosted runner label idtech3-tierb (docs/renderer_validation/SELF_HOSTED_TIER_B.md)"
 echo ""
 
-echo "Tier C — Manual GPU / validation layers"
+echo "Tier C - Manual GPU / validation layers"
 if [[ -f "$ROOT/docs/renderer_validation/TEMPLATE_TIER_C.md" ]]; then
 	info "Copy docs/renderer_validation/TEMPLATE_TIER_C.md per session; append row to FINDINGS.md"
 fi
 if [[ -f "$ROOT/docs/renderer_validation/FINDINGS.md" ]]; then
 	if grep -q 'Add a row when you complete a real GPU pass' "$ROOT/docs/renderer_validation/FINDINGS.md" 2>/dev/null; then
-		warn "FINDINGS.md Tier C section still describes an empty log — add a real GPU pass row"
+		warn "FINDINGS.md Tier C section still describes an empty log - add a real GPU pass row"
 	else
 		info "FINDINGS.md: review Tier C table for dated sessions"
 	fi
@@ -79,7 +79,7 @@ fi
 info "Follow renderer proof loop: docs/RENDERER_CONFIDENCE.md"
 echo ""
 
-echo "Tier D — Release hygiene"
+echo "Tier D - Release hygiene"
 if [[ -f "$ROOT/docs/RELEASE_CHECKLIST.md" ]]; then
 	info "Before tag: docs/RELEASE_CHECKLIST.md"
 fi

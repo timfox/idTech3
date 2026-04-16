@@ -4,8 +4,8 @@
 
 This repository is built and validated through **CMake**. The two supported entry points are:
 
-1. **`./scripts/compile_engine.sh`** — canonical developer workflow; handles the common Vulkan/OpenGL configurations, stages artifacts into `release/`, and mirrors CI closely.
-2. **`cmake` / `cmake --preset`** — direct CMake workflow for IDEs, local iteration, and CI-style configure/build/test steps.
+1. **`./scripts/compile_engine.sh`** - canonical developer workflow; handles the common Vulkan/OpenGL configurations, stages artifacts into `release/`, and mirrors CI closely.
+2. **`cmake` / `cmake --preset`** - direct CMake workflow for IDEs, local iteration, and CI-style configure/build/test steps.
 
 Legacy `make`-first instructions are no longer the primary build path for this fork.
 

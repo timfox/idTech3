@@ -1,4 +1,4 @@
-# Scene 05 — PostFX toggles
+# Scene 05 - PostFX toggles
 
 ## Goal
 

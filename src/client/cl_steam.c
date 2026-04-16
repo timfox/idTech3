@@ -46,7 +46,7 @@ void Steam_Init( void ) {
 	steamDeckDetected = SteamUtils()->IsSteamRunningOnSteamDeck();
 	if ( steamDeckDetected ) {
 		Cvar_Set( "in_steamDeck", "1" );
-		Com_Printf( "Steam Deck detected — loading steamdeck.cfg\n" );
+		Com_Printf( "Steam Deck detected - loading steamdeck.cfg\n" );
 		Cbuf_AddText( "exec steamdeck.cfg\n" );
 	}
 
@@ -111,7 +111,7 @@ void Steam_Init( void ) {
 		if ( ( deckEnv && deckEnv[0] == '1' ) || gamescope ) {
 			steamDeckDetected = qtrue;
 			Cvar_Set( "in_steamDeck", "1" );
-			Com_Printf( "Steam Deck detected (environment) — loading steamdeck.cfg\n" );
+			Com_Printf( "Steam Deck detected (environment) - loading steamdeck.cfg\n" );
 			Cbuf_AddText( "exec steamdeck.cfg\n" );
 		}
 	}

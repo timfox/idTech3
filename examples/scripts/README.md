@@ -10,4 +10,4 @@ These live under **`docs/samples/`** so they stay next to related documentation.
 
 Launcher helper (repo root):
 
-- `scripts/run_vulkan.sh` — see `tests/scripts/test_run_vulkan.sh` for expected behavior.
+- `scripts/run_vulkan.sh` - see `tests/scripts/test_run_vulkan.sh` for expected behavior.

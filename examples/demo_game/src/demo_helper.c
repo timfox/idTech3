@@ -9,7 +9,7 @@ int main(int argc, char **argv) {
 	(void)argc;
 	(void)argv;
 
-	printf("idtech3_demo_helper — example mod launcher hints\n\n");
+	printf("idtech3_demo_helper - example mod launcher hints\n\n");
 	printf("1. Build the pack: cmake --build <build-dir> --target demo_game_pk3\n");
 	printf("   Output: <build-dir>/idtech3_demo.pk3\n\n");
 	printf("2. Install: copy idtech3_demo.pk3 into <install>/idtech3_demo/\n");

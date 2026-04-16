@@ -15,7 +15,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 
 ### Compute shaders, mesh shaders (NV), and upscaling (DLSS)
 - **Compute:** already central to Vulkan (volumetric fog stages, vegetation wind, fluid sim, terrain CBT, etc.).
-- **Mesh shaders (NVIDIA):** optional device extension **`VK_NV_mesh_shader`** when **`r_vk_meshShaderNV 1`** (default **0**, **latched**, `vid_restart`). Enables `meshShader` in `VkPhysicalDeviceMeshShaderFeaturesNV` for future pipelines; **no mesh-shader draw path** is wired yet — safe on `main`.
+- **Mesh shaders (NVIDIA):** optional device extension **`VK_NV_mesh_shader`** when **`r_vk_meshShaderNV 1`** (default **0**, **latched**, `vid_restart`). Enables `meshShader` in `VkPhysicalDeviceMeshShaderFeaturesNV` for future pipelines; **no mesh-shader draw path** is wired yet - safe on `main`.
 - **DLSS / NGX:** **not** linked in this repository (proprietary NVIDIA SDK). Use **`r_renderScale`** / internal resolution, **TAA** (`r_taa`), **SMAA/MSAA**, or **driver-level** scaling (e.g. NVIDIA NIS/DLSS in control panel) where applicable. Startup logs state that DLSS is not in-engine.
 
 ### Physically Based Rendering (PBR)
@@ -75,7 +75,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - Surfaces with `surfaceparm vegetation` in shaders feed the VegetationVertex buffer
 - Flexibility from vertex normal Y; phase from position hash
 - Cvars: `r_vegWind` (PostFX panel), wind direction/strength, primary/detail frequency and amplitude
-- Compute **dispatches after each vegetation tess batch** uploads staging (so the GPU sees the correct `vertexCount`). **Vertex shaders still draw from the original tess buffer** — binding the modified SSBO for final positions remains a future enhancement.
+- Compute **dispatches after each vegetation tess batch** uploads staging (so the GPU sees the correct `vertexCount`). **Vertex shaders still draw from the original tess buffer** - binding the modified SSBO for final positions remains a future enhancement.
 
 ### RB_ColorMask (Vulkan)
 - `RB_ColorMask` is wired through `vk_set_color_write_mask()`, but the `VK_EXT_extended_dynamic_state3` path is currently disabled due to validation/driver issues.
@@ -105,7 +105,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 
 ### Screen-Space Ambient Occlusion (SSAO / HBAO)
 - **SSAO** (`r_ssaoMethod 0`): Hemisphere sampling with Halton(2,3) low-discrepancy sequence for better distribution and less noise
-- **HBAO** (`r_ssaoMethod 1`): Horizon-Based Ambient Occlusion — raymarches depth in multiple directions, tracks horizon angles; higher quality with fewer samples
+- **HBAO** (`r_ssaoMethod 1`): Horizon-Based Ambient Occlusion - raymarches depth in multiple directions, tracks horizon angles; higher quality with fewer samples
 - Configurable radius, bias, intensity, power; SSAO sample count or HBAO directions/steps
 - Separable blur pass
 - Combine pass with debug visualization modes
@@ -219,15 +219,15 @@ The OpenGL renderer provides compatibility for systems without Vulkan support. I
 | Feature | Vulkan | OpenGL |
 |---------|--------|--------|
 | Model formats **glTF/GLB**, **OBJ**, **MD5** (registration + draw) | ✓ (full; GPU glTF options on Vulkan) | ✓ (CPU tess; no `r_gltfGpu`) |
-| PBR (metalness/roughness, IBL) | ✓ | — |
-| Volumetric fog | ✓ | — |
-| SSAO / HBAO | ✓ | — |
-| SMAA | ✓ | — |
-| Bloom, HDR tonemapping | ✓ | — |
-| OIT (order-independent transparency) | ✓ | — |
-| IQM morph targets | ✓ | — |
-| Fluid simulation (fog) | ✓ | — |
-| Vegetation wind (GPU compute) | ✓ | — |
+| PBR (metalness/roughness, IBL) | ✓ | - |
+| Volumetric fog | ✓ | - |
+| SSAO / HBAO | ✓ | - |
+| SMAA | ✓ | - |
+| Bloom, HDR tonemapping | ✓ | - |
+| OIT (order-independent transparency) | ✓ | - |
+| IQM morph targets | ✓ | - |
+| Fluid simulation (fog) | ✓ | - |
+| Vegetation wind (GPU compute) | ✓ | - |
 | SDF text | ✓ | ✓ |
 | Dynamic lighting | ✓ | ✓ |
 | Stencil shadows | ✓ | ✓ |

@@ -1,11 +1,11 @@
-# Codebase Quality Audit — Phase 2
+# Codebase Quality Audit - Phase 2
 
 **Date**: 2026-02-28  
 **Scope**: String safety, unbounded functions, memory, and remaining project code (excluding `external/`)
 
 ---
 
-## 1. String Safety — Remaining `strcpy` / `strcat`
+## 1. String Safety - Remaining `strcpy` / `strcat`
 
 ### High priority (user/network-controlled input)
 
@@ -61,13 +61,13 @@
 
 | Location | Issue |
 |----------|-------|
-| `tr_arb.c` (many) | `strcat(program, ...)` — program buffer size unclear |
-| `tr_vbo.c` (many) | `strcat(buf, ...)` — same concern |
-| `unix_main.c:1137–1138` | `strcat(cmdline, " ")` / `strcat(cmdline, argv[i])` — `len` precomputed; safe |
-| `common.c:3272` | `strcat(&cl_cdkey[16], buffer)` — CD key handling; verify bounds |
-| `common.c:3468–3580` | `strcat(vendor, ...)` — CPU vendor string; fixed suffixes |
-| `cl_cgame.c:305,314–315` | `strcat(bigConfigString, ...)` — length checked before; safe |
-| `win_syscon.c:650` | `strcat(s_wcd.consoleText, "\n")` — verify buffer size |
+| `tr_arb.c` (many) | `strcat(program, ...)` - program buffer size unclear |
+| `tr_vbo.c` (many) | `strcat(buf, ...)` - same concern |
+| `unix_main.c:1137–1138` | `strcat(cmdline, " ")` / `strcat(cmdline, argv[i])` - `len` precomputed; safe |
+| `common.c:3272` | `strcat(&cl_cdkey[16], buffer)` - CD key handling; verify bounds |
+| `common.c:3468–3580` | `strcat(vendor, ...)` - CPU vendor string; fixed suffixes |
+| `cl_cgame.c:305,314–315` | `strcat(bigConfigString, ...)` - length checked before; safe |
+| `win_syscon.c:650` | `strcat(s_wcd.consoleText, "\n")` - verify buffer size |
 
 ---
 
@@ -103,19 +103,19 @@ No critical leaks identified in project code; external libs not audited in depth
 
 ## 7. Suggested Priorities
 
-### P0 — Security / robustness ✅ DONE
+### P0 - Security / robustness ✅ DONE
 
-1. **cl_curl.c:898** — `strcpy(dl->Name, name)` → `Q_strncpyz(dl->Name, name, sizeof(dl->Name))` (Content-Disposition is untrusted).
-2. **snd_dma.c:283** — `strcpy(sfx->soundName, name)` → `Q_strncpyz(sfx->soundName, name, sizeof(sfx->soundName))` (defense in depth).
+1. **cl_curl.c:898** - `strcpy(dl->Name, name)` → `Q_strncpyz(dl->Name, name, sizeof(dl->Name))` (Content-Disposition is untrusted).
+2. **snd_dma.c:283** - `strcpy(sfx->soundName, name)` → `Q_strncpyz(sfx->soundName, name, sizeof(sfx->soundName))` (defense in depth).
 
-### P1 — Consistency and safety ✅ DONE
+### P1 - Consistency and safety ✅ DONE
 
-3. **sv_client.c:403,405** — `sprintf` → `Com_sprintf` with buffer size.
-4. **Legacy `vk.c`** — `sprintf` → `Com_sprintf` (addressed when Vulkan was split; no `vk.c` today).
-5. **tr_bsp.c:2361** (Vulkan + OpenGL) — `strcpy` → `Com_Memcpy` + explicit null (BSP lump may lack terminator).
-6. **cl_curl.c:764,766** — `sprintf(dl->progress, ...)` → `Com_sprintf`.
+3. **sv_client.c:403,405** - `sprintf` → `Com_sprintf` with buffer size.
+4. **Legacy `vk.c`** - `sprintf` → `Com_sprintf` (addressed when Vulkan was split; no `vk.c` today).
+5. **tr_bsp.c:2361** (Vulkan + OpenGL) - `strcpy` → `Com_Memcpy` + explicit null (BSP lump may lack terminator).
+6. **cl_curl.c:764,766** - `sprintf(dl->progress, ...)` → `Com_sprintf`.
 
-### P2 — Cleanup
+### P2 - Cleanup
 
 6. Replace remaining `sprintf` in project code with `Com_sprintf`.
 7. Replace `strcat` in `tr_arb.c` / `tr_vbo.c` with `Q_strcat` or equivalent bounded append.

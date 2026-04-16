@@ -10,15 +10,15 @@ Templates are processed to generate responses with variable substitution.
 
 Supported AIML tags:
   <category>, <pattern>, <template>, <that>
-  <random> + <li>   — random response selection
-  <srai>            — redirect to another pattern (up to 8 deep)
-  <star/>, <star index="N"/>  — wildcard match references
-  <bot name="X"/>   — bot property lookup
-  <get name="X"/>   — user variable lookup
-  <set name="X">V</set>  — user variable assignment
-  <think>...</think>     — silent processing (no output)
-  <condition>       — conditional branching
-  <uppercase/>, <lowercase/>  — text transformation
+  <random> + <li>   - random response selection
+  <srai>            - redirect to another pattern (up to 8 deep)
+  <star/>, <star index="N"/>  - wildcard match references
+  <bot name="X"/>   - bot property lookup
+  <get name="X"/>   - user variable lookup
+  <set name="X">V</set>  - user variable assignment
+  <think>...</think>     - silent processing (no output)
+  <condition>       - conditional branching
+  <uppercase/>, <lowercase/>  - text transformation
 ===========================================================================
 */
 
@@ -316,7 +316,7 @@ static void AIML_ProcessTemplate( aimlBot_t *bot, const char *userId, const char
 				}
 			}
 
-			/* <think>...</think> — silent processing */
+			/* <think>...</think> - silent processing */
 			if ( !Q_strncmp( p, "<think>", 7 ) ) {
 				const char *cs, *ce;
 				if ( AIML_FindTag( p, "think", &cs, &ce ) ) {
@@ -365,7 +365,7 @@ static void AIML_ProcessTemplate( aimlBot_t *bot, const char *userId, const char
 				}
 			}
 
-			/* <srai>pattern</srai> — recursive lookup */
+			/* <srai>pattern</srai> - recursive lookup */
 			if ( !Q_strncmp( p, "<srai>", 6 ) ) {
 				const char *cs, *ce;
 				if ( AIML_FindTag( p, "srai", &cs, &ce ) && sraiDepth < AIML_MAX_SRAI_DEPTH ) {

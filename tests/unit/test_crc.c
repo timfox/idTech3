@@ -1,5 +1,5 @@
 /*
- * Unit tests: crc32_buffer (q_shared.c) — deterministic CRC.
+ * Unit tests: crc32_buffer (q_shared.c) - deterministic CRC.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,7 +23,7 @@
 
 int main(void)
 {
-	/* zlib polynomial 0xEDB88320 — standard test vector */
+	/* zlib polynomial 0xEDB88320 - standard test vector */
 	const unsigned int crc123456789 = 0xCBF43926U;
 
 	ASSERT_EQ_U(crc32_buffer(NULL, 0), 0U, "crc32 empty NULL");

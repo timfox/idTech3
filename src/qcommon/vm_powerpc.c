@@ -241,7 +241,7 @@ static void VM_FreeBuffers( void )
 	  (((unsigned)(aa)&1)<<1) | ((unsigned)(lk)&1) )
 
 // ---- B-form ----
-// bc, bcl (B-form encoding — use PPC_BC convenience macro instead)
+// bc, bcl (B-form encoding - use PPC_BC convenience macro instead)
 #define PPC_B_RAW(op, bo, bi, bd, aa, lk) \
 	( (((unsigned)(op)&0x3F)<<26) | (((unsigned)(bo)&0x1F)<<21) | \
 	  (((unsigned)(bi)&0x1F)<<16) | (((unsigned)(bd)&0x3FFF)<<2) | \
@@ -721,7 +721,7 @@ static void emit_MOVi64( int rt, uint64_t imm )
 		if ( w2 )
 			emit( PPC_ORI( rt, rt, w2 ) );
 	} else if ( w2 & 0x8000 ) {
-		// w2 has high bit set — can't use PPC_LI (would sign-extend)
+		// w2 has high bit set - can't use PPC_LI (would sign-extend)
 		// Use: li rt, 0; ori rt, rt, w2
 		emit( PPC_LI( rt, 0 ) );
 		emit( PPC_ORI( rt, rt, w2 ) );
@@ -1548,7 +1548,7 @@ __recompile:
 			case OP_BLOCK_COPY:
 				// R3 = src (second), R4 = dst (top), R5 = count (immediate)
 				// Actually: *(second) <- *(top), count = ci->value
-				// Wait — let me check the semantics:
+				// Wait - let me check the semantics:
 				// OP_BLOCK_COPY: src = stack[top], dst = stack[top-1], count = ci->value
 				// Actually from vm_interpreted2.c: src = opStack[opStackOfs], dst = opStack[opStackOfs-1]
 				// i.e., top = src addr, second = dst addr

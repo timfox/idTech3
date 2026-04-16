@@ -8,7 +8,7 @@
 
 ## 1. OIT descriptor binding (historical bug, fixed)
 
-**Location**: `vk_draw_state.c` — `vk_bind_descriptor_sets()`, `backEnd.oitAccumPass` / OIT accum branch (post-`vk.c` split).
+**Location**: `vk_draw_state.c` - `vk_bind_descriptor_sets()`, `backEnd.oitAccumPass` / OIT accum branch (post-`vk.c` split).
 
 **What went wrong (March 2025)**: The OIT accum pipeline expects **set 0 = `tex0`**. The main layout uses **set 0 = uniform** and **`VK_DESC_TEXTURE0` for the diffuse map**, so binding `current[0]` in the accum pass fed the **uniform buffer** to a texture sampler → garbage or solid colors on transparent surfaces.
 
@@ -46,7 +46,7 @@ If FBO is broken even with **r_oit 0**, consider:
 | **vk_bind_pipeline** | When `oitAccumPass` is false, we use `vk_gen_pipeline(pipeline)`. No change to normal path. |
 | **vk_update_mvp** | When `oitAccumPass` is false, we push to `vk.pipeline_layout`. No change. |
 | **RB_DrawSurfs** | When `r_oit` is 0, we take the `else` branch and call `RB_RenderDrawSurfList` for all surfaces. Same as pre-OIT. |
-| **Descriptor updates** | `vk_update_post_fog_descriptors`, `post_fog_color_source` — unchanged by OIT. |
+| **Descriptor updates** | `vk_update_post_fog_descriptors`, `post_fog_color_source` - unchanged by OIT. |
 | **Config** | `r_oit` may be 1 in config from prior testing. Try `r_oit 0` and `vid_restart`. |
 
 ---

@@ -5,7 +5,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 WebSocket client implementation using raw TCP sockets + RFC 6455 framing.
 
 Supports:
-  - ws:// connections (no TLS — use a reverse proxy for wss://)
+  - ws:// connections (no TLS - use a reverse proxy for wss://)
   - Text and binary frames
   - Ping/pong keepalive
   - Masked client-to-server frames (per RFC 6455 §5.3)

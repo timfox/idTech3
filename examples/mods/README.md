@@ -1,4 +1,4 @@
-# Mod examples — `fs_game` and layout
+# Mod examples - `fs_game` and layout
 
 Mods usually ship as a **folder** or **`.pk3`** archives alongside the base game. The engine searches game directories according to `fs_game`, `fs_basegame`, and the launch cwd.
 
@@ -7,7 +7,7 @@ Mods usually ship as a **folder** or **`.pk3`** archives alongside the base game
 ```
 YourInstall/
 ├── idtech3
-├── base/                    # or baseq3 — stock game pk3s
+├── base/                    # or baseq3 - stock game pk3s
 │   └── pak0.pk3 ...
 └── mymod/                   # mod as a sibling directory
     ├── pak_mymod.pk3        # your assets

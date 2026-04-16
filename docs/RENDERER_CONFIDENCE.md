@@ -25,18 +25,18 @@ Run these after any renderer, shader, or mikktspace change.
 | OpenGL matrix | `./scripts/compile_engine.sh opengl` then `ctest` in `build-gl-Release` | Fallback renderer still links and tests pass. |
 | Standalone GLSL | `./scripts/smoke_test.sh` (or the smoke step inside `validate_ci_build.sh`) | Every `.vert`, `.frag`, `.geom`, and `.comp` under `src/renderers/vulkan/shaders/glsl/` validates with `glslangValidator` (recursive, including `volumetric/`, `terrain/`, `postfx/`). |
 
-Optional: `SKIP_IDPAK_CHECK=ON` is normal for engine-only trees; the dedicated server may exit with “no game data” after init — that is still a useful crash-free signal.
+Optional: `SKIP_IDPAK_CHECK=ON` is normal for engine-only trees; the dedicated server may exit with “no game data” after init - that is still a useful crash-free signal.
 
 ## Manual (GPU + content)
 
 These do not run in headless CI; use the **[visual regression pack](samples/renderer_regression/README.md)** (scene docs + optional BSP list) so the same six concerns are hit every time.
 
-1. **Tangent / normal maps** — Load meshes that rely on MikkTSpace tangents; inspect lighting seams at UV splits and mirrored UVs. Regress after changes to `mikktspace` or normal-map sampling.
-2. **PBR materials** — Scenes with metalness/roughness, clearcoat, and normal maps; toggle `r_pbr_debug` modes where applicable. See [PBR_TEXTURES.md](PBR_TEXTURES.md).
-3. **Vulkan vs OpenGL** — Same map, same cvars: confirm no silent fallback-only bugs (water, fog, postFX).
-4. **Validation** — Debug build or `r_vulkan_validation` (see project cvars/docs): clean validation for a representative play session.
-5. **MSAA / SMAA / SSAO** — Spot-check toggles; watch for black screens, NaN tint, or resolution mismatches.
-6. **Emissive** and **volumetric fog** — See scene docs under `samples/renderer_regression/scenes/`.
+1. **Tangent / normal maps** - Load meshes that rely on MikkTSpace tangents; inspect lighting seams at UV splits and mirrored UVs. Regress after changes to `mikktspace` or normal-map sampling.
+2. **PBR materials** - Scenes with metalness/roughness, clearcoat, and normal maps; toggle `r_pbr_debug` modes where applicable. See [PBR_TEXTURES.md](PBR_TEXTURES.md).
+3. **Vulkan vs OpenGL** - Same map, same cvars: confirm no silent fallback-only bugs (water, fog, postFX).
+4. **Validation** - Debug build or `r_vulkan_validation` (see project cvars/docs): clean validation for a representative play session.
+5. **MSAA / SMAA / SSAO** - Spot-check toggles; watch for black screens, NaN tint, or resolution mismatches.
+6. **Emissive** and **volumetric fog** - See scene docs under `samples/renderer_regression/scenes/`.
 
 ## Renderer proof loop
 
@@ -118,7 +118,7 @@ For the **first** full renderer proof run against regression content, treat the 
 * `renderer_regression_maps.sh` is green for all six maps
 * `rtest_parity` has either acceptable Vulkan/OpenGL agreement or a **clearly written drift note** in findings
 * `rtest_volumetric` has either acceptable fog behavior or a **clearly written limitation/bug** in findings
-* every finding is recorded as **confirmed OK**, **bug to fix**, **known limitation**, or **needs more evidence** — not vague impressions
+* every finding is recorded as **confirmed OK**, **bug to fix**, **known limitation**, or **needs more evidence** - not vague impressions
 
 ### Next automation step
 
@@ -133,6 +133,6 @@ That sequence closes the gap between engine-side confidence and renderer evidenc
 
 ## See also
 
-- [RENDERERS.md](RENDERERS.md) — feature inventory and cvars
-- [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) — pre-release steps
-- `./scripts/validate_ci_build.sh` — local mirror of Ubuntu CI expectations
+- [RENDERERS.md](RENDERERS.md) - feature inventory and cvars
+- [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) - pre-release steps
+- `./scripts/validate_ci_build.sh` - local mirror of Ubuntu CI expectations
