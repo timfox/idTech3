@@ -11,6 +11,15 @@
 #include "vk_temporal.h"
 #include "vk_volumetric_pass.h"
 
+static void vk_end_frame_refresh_postfx_params_for_target( uint32_t width, uint32_t height )
+{
+	vk.renderWidth = width > 0 ? width : 1u;
+	vk.renderHeight = height > 0 ? height : 1u;
+	vk.renderScaleX = 1.0f;
+	vk.renderScaleY = 1.0f;
+	vk_update_postfx_params( vk.cmd_index );
+}
+
 void vk_end_frame_record_capture_if_needed( void )
 {
 	if ( !backEnd.screenshotMask || !vk.capture.image ) {
@@ -37,11 +46,7 @@ void vk_end_frame_record_capture_if_needed( void )
 				(unsigned long long)(uintptr_t)capture_src );
 		}
 
-		vk.renderWidth = cap_w;
-		vk.renderHeight = cap_h;
-		vk.renderScaleX = 1.0f;
-		vk.renderScaleY = 1.0f;
-		vk_update_postfx_params( vk.cmd_index );
+		vk_end_frame_refresh_postfx_params_for_target( cap_w, cap_h );
 
 		vk_begin_render_pass_tracked( vk.render_pass.capture, vk.framebuffers.capture, qfalse, cap_w, cap_h );
 		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.capture_pipeline );
@@ -138,10 +143,7 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 	}
 	vk_update_color_descriptor_image( taa_src );
 	vk_get_active_render_extent( &taaWidth, &taaHeight );
-	vk.renderWidth = taaWidth;
-	vk.renderHeight = taaHeight;
-	vk.renderScaleX = vk.renderScaleY = 1.0f;
-	vk_update_postfx_params( vk.cmd_index );
+	vk_end_frame_refresh_postfx_params_for_target( taaWidth, taaHeight );
 
 	vk_begin_render_pass_tracked( vk.render_pass.taa, vk.framebuffers.taa[writeIndex], qfalse,
 		taaWidth, taaHeight );
@@ -358,7 +360,7 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 	 */
 	vk_temporal_update_auto_exposure();
 	vk_end_frame_update_gamma_target();
-	vk_update_postfx_params( vk.cmd_index );
+	vk_end_frame_refresh_postfx_params_for_target( vk.renderWidth, vk.renderHeight );
 
 	if ( r_fboDebug && r_fboDebug->integer >= 2 && vk_post_fog_fbo_debug_throttle() ) {
 		const float sx = ( glConfig.vidWidth > 0 ) ? (float)vk.renderWidth / (float)glConfig.vidWidth : 1.0f;
