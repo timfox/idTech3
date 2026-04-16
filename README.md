@@ -8,11 +8,11 @@ Modern id Tech 3: **Vulkan-first renderer with PBR**, optional OpenGL fallback, 
 
 ### Engine pillars
 
-1. **Renderer** — Vulkan 1.x path with PBR, froxel volumetrics, SSAO, MSAA/SMAA, spherical harmonics lighting, SDF HUD text; OpenGL renderer remains for compatibility.
-2. **Tooling** — GPU detection, validation layers, performance HUD, safe mode, CI matrix builds, smoke tests and shader validation in the build.
-3. **Platform** — Linux, Windows, macOS, Android; IPv4/IPv6 networking, modern codecs and asset loaders.
+1. **Renderer** - Vulkan 1.x path with PBR, froxel volumetrics, SSAO, MSAA/SMAA, spherical harmonics lighting, SDF HUD text; OpenGL renderer remains for compatibility.
+2. **Tooling** - GPU detection, validation layers, performance HUD, safe mode, CI matrix builds, smoke tests and shader validation in the build.
+3. **Platform** - Linux, Windows, macOS, Android; IPv4/IPv6 networking, modern codecs and asset loaders.
 
-Ray tracing (Vulkan RT) is **scaffolded / in progress** — see `docs/RENDERERS_FUTURE.md` and `CLAUDE.md` for status, not a headline guarantee.
+Ray tracing (Vulkan RT) is **scaffolded / in progress** - see `docs/RENDERERS_FUTURE.md` and `CLAUDE.md` for status, not a headline guarantee.
 
 ### Features (by area)
 
@@ -36,9 +36,9 @@ Ray tracing (Vulkan RT) is **scaffolded / in progress** — see `docs/RENDERERS_
 * Video codec support: RoQ, WebM (VP8/VP9), Ogg Theora, MP4 (H.264)
 
 **Models**:
-* **Vulkan (primary):** MD3, MDR, IQM, **OBJ**, **glTF / GLB**, MD5, STL, DAE, FBX, USD / USDA, Maya Ascii (MA) — glTF details: [docs/GLTF.md](docs/GLTF.md)
-* **OpenGL (fallback):** MD3, MDR, IQM, **OBJ**, **glTF / GLB**, **MD5**, STL, DAE, FBX, USD / USDA, MA — loaders live next to Vulkan under `src/renderers/vulkan/` and are linked into both renderer plugins; OpenGL uses the **CPU tessellation** path for glTF (no Vulkan-style device VBO upload or **`r_gltfGpu`** pipeline). glTF on OpenGL: **`tess.qtangent`** follows skin+morph (including morph **TANGENT** deltas when present) with tangent **Gram–Schmidt** vs the deformed normal; **`r_gltfCpuQtangent`** (default `1`) then replaces it with a MikkTSpace-style recompute when stage textures look like a normal map (`norm` / `bump` / `nmap` / `_n.`); **`r_morph`** / **`r_gltfAnim`** as in `docs/GLTF.md`.
-* Blend shapes: **IQM** on both renderers where enabled; **glTF** morph + skeletal clips work on **both** renderers (CPU path on OpenGL; **`RE_SetEntityMorphWeight`** + `r_gltfAnim`; **`r_morph`** gates morph on OpenGL). **GPU** skin/morph + PBR extras remain **Vulkan** — [docs/GLTF.md](docs/GLTF.md)
+* **Vulkan (primary):** MD3, MDR, IQM, **OBJ**, **glTF / GLB**, MD5, STL, DAE, FBX, USD / USDA, Maya Ascii (MA) - glTF details: [docs/GLTF.md](docs/GLTF.md)
+* **OpenGL (fallback):** MD3, MDR, IQM, **OBJ**, **glTF / GLB**, **MD5**, STL, DAE, FBX, USD / USDA, MA - loaders live next to Vulkan under `src/renderers/vulkan/` and are linked into both renderer plugins; OpenGL uses the **CPU tessellation** path for glTF (no Vulkan-style device VBO upload or **`r_gltfGpu`** pipeline). glTF on OpenGL: **`tess.qtangent`** follows skin+morph (including morph **TANGENT** deltas when present) with tangent **Gram-Schmidt** vs the deformed normal; **`r_gltfCpuQtangent`** (default `1`) then replaces it with a MikkTSpace-style recompute when stage textures look like a normal map (`norm` / `bump` / `nmap` / `_n.`); **`r_morph`** / **`r_gltfAnim`** as in `docs/GLTF.md`.
+* Blend shapes: **IQM** on both renderers where enabled; **glTF** morph + skeletal clips work on **both** renderers (CPU path on OpenGL; **`RE_SetEntityMorphWeight`** + `r_gltfAnim`; **`r_morph`** gates morph on OpenGL). **GPU** skin/morph + PBR extras remain **Vulkan** - [docs/GLTF.md](docs/GLTF.md)
 
 **Renderer truth (models):** OBJ, glTF/GLB, and MD5 share the same registration and `MOD_*` types in **both** backends. **glTF GPU skin/morph** (`r_gltfGpu`, SSBOs, tangent fix) is **Vulkan PBR only**; OpenGL tessellates on the CPU. **`RE_SetEntityMorphWeight`** and clip-driven weights use the same **top-8** selection on Vulkan’s GPU path (see [docs/GLTF.md](docs/GLTF.md)). See also the OpenGL column in [docs/RENDERERS.md](docs/RENDERERS.md).
 
@@ -114,7 +114,7 @@ ctest --preset test-vulkan-release
 
 Artifacts land under `release/` and `build-vk-Release/` (or `build-gl-Release/`). The helper script is the canonical developer path because it stages `release/` automatically; presets are the preferred direct-CMake / IDE path.
 
-**Examples** (copy-paste workflows): [examples/README.md](examples/README.md) — local validation, `GAME_BASE` templates, mod launch lines, pointers to `docs/samples/`. **Demo mod pack** (optional CMake): `-DBUILD_EXAMPLE_DEMO_GAME=ON` then build target `demo_game_pk3` → `idtech3_demo.pk3` ([examples/demo_game/README.md](examples/demo_game/README.md)). **Run demo** from a source tree: `./scripts/run_demo.sh` — see [examples/demo_skeleton/README.md](examples/demo_skeleton/README.md).
+**Examples** (copy-paste workflows): [examples/README.md](examples/README.md) - local validation, `GAME_BASE` templates, mod launch lines, pointers to `docs/samples/`. **Demo mod pack** (optional CMake): `-DBUILD_EXAMPLE_DEMO_GAME=ON` then build target `demo_game_pk3` -> `idtech3_demo.pk3` ([examples/demo_game/README.md](examples/demo_game/README.md)). **Run demo** from a source tree: `./scripts/run_demo.sh` - see [examples/demo_skeleton/README.md](examples/demo_skeleton/README.md).
 
 Renderer discipline: [docs/RENDERER_CONFIDENCE.md](docs/RENDERER_CONFIDENCE.md), headless `./scripts/renderer_regression_check.sh`, visual pack specs under [docs/samples/renderer_regression/](docs/samples/renderer_regression/).
 

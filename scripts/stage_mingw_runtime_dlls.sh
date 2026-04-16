@@ -30,7 +30,7 @@ while IFS= read -r _pef; do
 done < <(find "$BIN_DIR" -maxdepth 1 \( -name '*.exe' -o -name '*.dll' \) -type f 2>/dev/null | sort -u)
 
 if [[ ${#PE_FILES[@]} -eq 0 ]]; then
-  echo "No .exe/.dll under $BIN_DIR — nothing to stage"
+  echo "No .exe/.dll under $BIN_DIR - nothing to stage"
   exit 0
 fi
 

@@ -1,4 +1,4 @@
-# idtech3_demo — example “game” mod (config + pack)
+# idtech3_demo - example “game” mod (config + pack)
 
 This is **not** a standalone game: it is a **tiny mod** (`.pk3` of configs) you layer on top of a **full** compatible `base` / `baseq3` (Q3A-class assets, VMs, maps). It exists to **demo renderer and engine cvars** without maintaining a fork of `qagame`.
 
@@ -11,13 +11,13 @@ This is **not** a standalone game: it is a **tiny mod** (`.pk3` of configs) you 
 
 ### “Playable” without custom qagame
 
-**Menus:** the pack includes a tiny **native `ui` shared library** (same API as `ui.qvm`) so the client can start with an **empty `base/`** — you get a window and on-screen hint text only.
+**Menus:** the pack includes a tiny **native `ui` shared library** (same API as `ui.qvm`) so the client can start with an **empty `base/`** - you get a window and on-screen hint text only.
 
 **In-game:** you still need **stock** `qagame` / maps from your `base/` to join a map or use full UI. This mod adds:
 
-1. **Renderer demo** — `demo_features.cfg` turns on PBR, volumetric fog, SSR, atmosphere, veg wind (Vulkan).
-2. **Lightweight game code** — `demo_hooks.js` registers `idtech3.on('map_load')` and `idtech3.on('frame')` and draws an occasional HUD line (proves the `idtech3` Duktape API in `src/qcommon/js_debug.c`).
-3. **Subsystem hooks** — the engine already runs Director, Horde bridge, particles, nav crowd, behavior trees, etc. in `CL_GameFrame` when `cl_physicsEnabled` / `cl_navEnabled` / … are on — see `demo_gameplay.cfg` and `buildnavmesh`.
+1. **Renderer demo** - `demo_features.cfg` turns on PBR, volumetric fog, SSR, atmosphere, veg wind (Vulkan).
+2. **Lightweight game code** - `demo_hooks.js` registers `idtech3.on('map_load')` and `idtech3.on('frame')` and draws an occasional HUD line (proves the `idtech3` Duktape API in `src/qcommon/js_debug.c`).
+3. **Subsystem hooks** - the engine already runs Director, Horde bridge, particles, nav crowd, behavior trees, etc. in `CL_GameFrame` when `cl_physicsEnabled` / `cl_navEnabled` / … are on - see `demo_gameplay.cfg` and `buildnavmesh`.
 
 ## Build the demo pack
 
@@ -47,12 +47,12 @@ Quick path: use the **[demo skeleton](../demo_skeleton/README.md)** (`run_demo_c
    ```
    YourInstall/
    ├── idtech3
-   ├── base/              # or baseq3 — full game pk3s
+   ├── base/              # or baseq3 - full game pk3s
    └── idtech3_demo/
        └── idtech3_demo.pk3
    ```
 
-2. Launch (Linux example — adjust paths and `fs_basegame` if you use `baseq3`):
+2. Launch (Linux example - adjust paths and `fs_basegame` if you use `baseq3`):
 
    ```bash
    ./idtech3 +set fs_basepath /path/to/YourInstall \

@@ -1,17 +1,17 @@
 # Vulkan FBO Rendering System Audit Report
 
 **Date**: March 4, 2025  
-**Context**: User reports `r_fbo 1` is "very broken" — solid colors, wrong rendering.  
+**Context**: User reports `r_fbo 1` is "very broken" - solid colors, wrong rendering.  
 **Scope**: Full pipeline trace from `vk.fboActive` through main pass, post-process, and swapchain.
 
 **Historical note (2026)**: This audit predates the removal of monolithic `vk.c`. **Line numbers and some call sites below are historical**; use `docs/ARCHITECTURE.md` and `rg` to find symbols today (`vk_init_device.c` for `vk.fboActive` from `r_fbo`, `vk_attachments.c` for `vk_alloc_attachments`, `vk_framebuffers.c`, `vk_presentation.c`, `vk_descriptor_sets.c`, `vk_post_fog.c`, `vk_frame_end.c`, `vk_volumetric_pass_compute.c`, etc.).
 
 ---
 
-## 1. vk.fboActive — Where Set and What Triggers Recreation
+## 1. vk.fboActive - Where Set and What Triggers Recreation
 
 ### Where Set
-- **Location**: `vk_init_device.c` — `vk.fboActive` / `vk.msaaActive` from `r_fbo` and `r_ext_multisample` during device init (formerly cited as monolithic `vk.c` ~6345–6353).
+- **Location**: `vk_init_device.c` - `vk.fboActive` / `vk.msaaActive` from `r_fbo` and `r_ext_multisample` during device init (formerly cited as monolithic `vk.c` ~6345–6353).
 - **Source**: `r_fbo->integer` cvar (CVAR_ARCHIVE | CVAR_LATCH)
 - **Logic**:
   ```c
@@ -31,11 +31,11 @@
 - **Render passes**: `vk_create_render_passes()` in `vk_render_pass.c`; main pass layout depends on `fboActive`.
 
 ### Critical Dependency
-`r_fbo` is **CVAR_LATCH** — changes require `vid_restart` to take effect. No hot-swap of FBO on/off.
+`r_fbo` is **CVAR_LATCH** - changes require `vid_restart` to take effect. No hot-swap of FBO on/off.
 
 ---
 
-## 2. Main Render Pass — Attachments, Formats, Layouts
+## 2. Main Render Pass - Attachments, Formats, Layouts
 
 ### r_fbo 0 (fboActive = false)
 | Attachment | Format | Samples | Layout |
@@ -84,17 +84,17 @@
 - **Binding 1**: `vk.luminance_image_view` (1×1 storage)
 - **Updated**:
   - From `vk_volumetric_fog_pass()` in `vk_volumetric_pass_compute.c` (and related modules): post-volumetric color source → luminance binding 0 (`smaa_output` or `color_image_view`)
-  - When volumetrics are skipped: `vk_update_luminance_descriptor_image()` in `vk_post_fog.c` / `vk_frame_end.c` — `color_image_view` only, aligned with gamma for that frame
+  - When volumetrics are skipped: `vk_update_luminance_descriptor_image()` in `vk_post_fog.c` / `vk_frame_end.c` - `color_image_view` only, aligned with gamma for that frame
 
 ### When Volumetrics Are Skipped
 - **luminance_descriptor binding 0** → `vk.color_image_view`
 - **color_descriptor** → `vk.color_image_view`
-- **Bug**: SMAA is never run when volumetrics are skipped. If SMAA was active in a previous frame, `color_descriptor` may have pointed to `smaa_output`; the skipped path always forces `color_image_view`, which is correct for the current frame (no SMAA ran). However, the **luminance** path does not account for SMAA when skipped — it always uses `color_image_view`, which is consistent.
+- **Bug**: SMAA is never run when volumetrics are skipped. If SMAA was active in a previous frame, `color_descriptor` may have pointed to `smaa_output`; the skipped path always forces `color_image_view`, which is correct for the current frame (no SMAA ran). However, the **luminance** path does not account for SMAA when skipped - it always uses `color_image_view`, which is consistent.
 
 ### Other Descriptors
 - **screenMap.color_descriptor** → `vk.screenMap.color_image_view`
 - **cubeMap.color_descriptor** → `vk.cubeMap.color_image_view[0]`
-- **smaa_edge_descriptor**, **smaa_blend_descriptor**, **smaa_compose_descriptor** — SMAA pipeline stages
+- **smaa_edge_descriptor**, **smaa_blend_descriptor**, **smaa_compose_descriptor** - SMAA pipeline stages
 
 ---
 
@@ -146,13 +146,13 @@ r_fbo 1:
 1. **Descriptor points to wrong image**: If `color_descriptor` samples from an uninitialized, cleared, or wrong-layout image.
 2. **Layout mismatch**: Gamma pass expects `SHADER_READ_ONLY_OPTIMAL`; wrong layout can cause undefined behavior.
 3. **Volumetrics skipped + stale descriptor**: When volumetrics are skipped, the fallback updates descriptors. If that path is not taken (e.g. different control flow), descriptors can remain stale.
-4. **r_exposure_auto + luminance**: Luminance pass writes to 1×1 image; if gamma shader accidentally sampled luminance, result would be solid color. Audit shows gamma uses `color_descriptor`, not luminance — so this is unlikely unless there is a shader bug.
+4. **r_exposure_auto + luminance**: Luminance pass writes to 1×1 image; if gamma shader accidentally sampled luminance, result would be solid color. Audit shows gamma uses `color_descriptor`, not luminance - so this is unlikely unless there is a shader bug.
 5. **First-frame / init**: `vk.color_image` created with `SHADER_READ_ONLY_OPTIMAL`; main pass transitions to `COLOR_ATTACHMENT`. First-frame layout handling appears correct.
 6. **gls.windowWidth vs glConfig.vidWidth**: Gamma framebuffer uses `gls.windowWidth/Height`; main pass uses `glConfig.vidWidth/Height`. Mismatch can cause scaling/black bars but not necessarily solid color.
 
 ---
 
-## 5. r_fbo 0 vs r_fbo 1 — Render Path Difference
+## 5. r_fbo 0 vs r_fbo 1 - Render Path Difference
 
 | Aspect | r_fbo 0 | r_fbo 1 |
 |--------|---------|---------|
@@ -175,8 +175,8 @@ r_fbo 1:
 When the volumetric fog pass does not run, `color_descriptor` / `luminance_descriptor` must still target the HDR color the gamma pass will sample (see `vk_update_color_descriptor_image` / `vk_update_luminance_descriptor_image` in `vk_post_fog.c` and call sites in `vk_frame_end.c`, `vk_2d_transition.c`).
 
 ### QUICKSTART.md Workaround (line 57)
-- `r_exposure_auto 0` — disables eye adaptation
-- `r_volumetricFog 0` — disables volumetrics
+- `r_exposure_auto 0` - disables eye adaptation
+- `r_volumetricFog 0` - disables volumetrics
 - `vid_restart`
 - If still broken: `r_fbo 0` as workaround
 
@@ -199,7 +199,7 @@ OIT re-enabled after wiring the OIT accum pipeline. When `r_oit 1` + `r_fbo 1`: 
 ## 7. Deferred vs Forward Architecture
 
 ### Current Architecture: **Forward Rendering**
-- **Main pass**: Forward rendering — geometry, lighting, fog drawn in a single pass.
+- **Main pass**: Forward rendering - geometry, lighting, fog drawn in a single pass.
 - **No G-Buffer**: No deferred pass; no separate albedo/normal/position buffers.
 - **Post-process**: Screen-space only (SSAO, SMAA, bloom, volumetrics, gamma).
 
@@ -215,7 +215,7 @@ OIT re-enabled after wiring the OIT accum pipeline. When `r_oit 1` + `r_fbo 1`: 
 9. Luminance (eye adaptation)
 10. Gamma → swapchain
 
-**No deferred or Forward+ path** — purely forward with screen-space post-processing.
+**No deferred or Forward+ path** - purely forward with screen-space post-processing.
 
 ---
 
@@ -274,12 +274,12 @@ The FBO pipeline is complex, with multiple conditional paths (volumetrics on/off
 - **Success path** and **vk_end_frame fallback** both use the same helper.
 - This ensures gamma and luminance passes always sample the correct image, eliminating the solid-color bug when volumetrics are skipped.
 
-### Additional Fixes (March 2025 — r_fbo 1 solid rapidly-changing color)
+### Additional Fixes (March 2025 - r_fbo 1 solid rapidly-changing color)
 
 - **Main pass color clear**: FBO color attachment now uses `VK_ATTACHMENT_LOAD_OP_CLEAR` instead of `DONT_CARE` to avoid uninitialized or stale content that could produce solid/wrong colors.
 - **Belt-and-suspenders descriptor update**: `vk.post_fog_color_source` tracks the last source (color_image or smaa_output) used for gamma. Right before the gamma pass, `vk_update_post_fog_descriptors()` is called again with that source (or `color_image_view` if unset) to ensure the descriptor is never stale.
 
-### SSAO Combine Fix (March 2025 — FBO color/post-process broken)
+### SSAO Combine Fix (March 2025 - FBO color/post-process broken)
 
 - **SSAO combine overwrote scene**: The ssao_combine shader previously output only the AO map (`vec4(ao,ao,ao,1)`), replacing the full scene with a grayscale AO image. Fixed to multiply scene × AO: `out_color = vec4(scene * ao, 1.0)`.
 - **Pipeline and descriptors**: ssao_combine now uses `pipeline_layout_ssao_combine` (2 sets: scene + AO), `vk.color_format` for output, and binds `ssao_scene_descriptor` + `ssao_blur_descriptor`.

@@ -185,7 +185,7 @@ void Android_AssetBootstrapUnpack( void *assetManager, const char *writableRoot 
 	probe = AAssetManager_openDir( am, ASSET_ROOT );
 	if ( !probe ) {
 		__android_log_print( ANDROID_LOG_INFO, ASSET_TAG,
-			"No assets/%s in APK — skipping bundled game data install", ASSET_ROOT );
+			"No assets/%s in APK - skipping bundled game data install", ASSET_ROOT );
 		return;
 	}
 	AAssetDir_close( probe );

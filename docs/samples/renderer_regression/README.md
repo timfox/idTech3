@@ -30,25 +30,25 @@ BSP path: `maps/<name>.bsp` inside the pk3.
 
 ## Content bring-up and enforcement
 
-Until **`z_renderer_regression.pk3`** (with the six BSPs and minimal assets) lives in a real **`base/`** next to normal game data, the engine repo can only prove scripts, manifests, and GLSL syntax—not regression content or load paths.
+Until **`z_renderer_regression.pk3`** (with the six BSPs and minimal assets) lives in a real **`base/`** next to normal game data, the engine repo can only prove scripts, manifests, and GLSL syntax-not regression content or load paths.
 
-**1. Ship the pack** — Build the six maps, pack **`z_renderer_regression.pk3`**, install into **`base/`**. Keep the pk3 minimal and version it in your **game/content** repo.
+**1. Ship the pack** - Build the six maps, pack **`z_renderer_regression.pk3`**, install into **`base/`**. Keep the pk3 minimal and version it in your **game/content** repo.
 
-**2. File contract** — Uncomment the `maps/rtest_*.bsp` lines in [`OPTIONAL_GAME_ASSETS.txt`](OPTIONAL_GAME_ASSETS.txt), then:
+**2. File contract** - Uncomment the `maps/rtest_*.bsp` lines in [`OPTIONAL_GAME_ASSETS.txt`](OPTIONAL_GAME_ASSETS.txt), then:
 
 ```bash
 GAME_BASE=/abs/path/to/base ./scripts/renderer_regression_check.sh
 ```
 
-**3. Runtime contract** — After the file contract passes:
+**3. Runtime contract** - After the file contract passes:
 
 ```bash
 GAME_BASE=/abs/path/to/base ./scripts/renderer_regression_maps.sh
 ```
 
-**4. Manual truth** — With both green, run the first full pass from [RENDERER_CONFIDENCE.md](../../RENDERER_CONFIDENCE.md): parity on `rtest_parity`, tangents on `rtest_tangent`, PBR on `rtest_pbr`, emissive on `rtest_emissive`, fog on `rtest_volumetric`, postFX on `rtest_postfx`. Goal: surface incompatibilities and fix or document them—not day-one perfection.
+**4. Manual truth** - With both green, run the first full pass from [RENDERER_CONFIDENCE.md](../../RENDERER_CONFIDENCE.md): parity on `rtest_parity`, tangents on `rtest_tangent`, PBR on `rtest_pbr`, emissive on `rtest_emissive`, fog on `rtest_volumetric`, postFX on `rtest_postfx`. Goal: surface incompatibilities and fix or document them-not day-one perfection.
 
-**5. Merge law (renderer-adjacent changes)** — After content is online:
+**5. Merge law (renderer-adjacent changes)** - After content is online:
 
 ```bash
 ./scripts/compile_engine.sh vulkan
@@ -61,7 +61,7 @@ GAME_BASE=/abs/path/to/base ./scripts/renderer_regression_maps.sh
 
 Add the manual checklist when the change is visually meaningful.
 
-**6. Stronger visual automation** — Screenshot or framebuffer capture (e.g. anchor on `rtest_parity` and `rtest_pbr`) only after the pack, both scripts, and the manual pass are stable.
+**6. Stronger visual automation** - Screenshot or framebuffer capture (e.g. anchor on `rtest_parity` and `rtest_pbr`) only after the pack, both scripts, and the manual pass are stable.
 
 ## Workflow (authoring)
 
@@ -71,6 +71,6 @@ Add the manual checklist when the change is visually meaningful.
 
 ## Related
 
-- [RENDERER_CONFIDENCE.md](../../RENDERER_CONFIDENCE.md) — automated vs manual gate
-- [PBR_TEXTURES.md](../../PBR_TEXTURES.md) — texture conventions
-- [samples/flowmap/](../flowmap/README.md) — optional water/flow regression add-on
+- [RENDERER_CONFIDENCE.md](../../RENDERER_CONFIDENCE.md) - automated vs manual gate
+- [PBR_TEXTURES.md](../../PBR_TEXTURES.md) - texture conventions
+- [samples/flowmap/](../flowmap/README.md) - optional water/flow regression add-on

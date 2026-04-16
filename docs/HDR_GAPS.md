@@ -40,7 +40,7 @@ This document tracks known gaps, risks, and mitigations in the Vulkan HDR render
 
 **Current**: Luminance from frame N used for frame N+1 (one-frame delay). Expected.
 
-**Mitigation**: Camera cut detection—when view origin jumps >128 units, eye adaptation uses 4× faster blend (0.5) to snap within ~2 frames. Prevents slow adaptation after teleports or level loads.
+**Mitigation**: Camera cut detection-when view origin jumps >128 units, eye adaptation uses 4× faster blend (0.5) to snap within ~2 frames. Prevents slow adaptation after teleports or level loads.
 
 **Death blowout**: On camera cut (e.g. death camera jump), target exposure is capped by `r_exposure_auto_cap_on_cut` (default 0.75) to avoid blowing out when the view suddenly faces a bright sky. Set to 0 to disable the cap.
 
@@ -76,7 +76,7 @@ Both feed into linear HDR; no conflict.
 
 **Current**: `VectorScale(dl->color, 2 * powf(r_intensity->value, r_gamma->value), ...)`. `r_gamma` affects light intensity; intentional for legacy look. Consider separating display gamma from light intensity if needed.
 
-**Desirable**: On dark monitors or legacy maps authored for CRT gamma, raising `r_gamma` brightens both display and lights—often what users expect. **Problematic**: When using HDR + tonemap, `r_gamma` changes light intensity without changing display gamma (handled by gamma pass), so lights can look too bright or too dim relative to the tonemapped scene. Prefer `r_exposure` or `r_exposure_auto` for HDR brightness control.
+**Desirable**: On dark monitors or legacy maps authored for CRT gamma, raising `r_gamma` brightens both display and lights-often what users expect. **Problematic**: When using HDR + tonemap, `r_gamma` changes light intensity without changing display gamma (handled by gamma pass), so lights can look too bright or too dim relative to the tonemapped scene. Prefer `r_exposure` or `r_exposure_auto` for HDR brightness control.
 
 ---
 
@@ -100,7 +100,7 @@ Both feed into linear HDR; no conflict.
 
 ## 8. HDR UI
 
-**Current**: When `RDF_NOWORLDMODEL` or no world (menus, player config, videos), the gamma pass sets `paniniPad1 = 1.0`, which disables the HDR film pipeline (`noWorldLdr`). UI is **composited after tonemap**—menus and 2D overlays are authored as LDR and rendered on top of the (possibly tonemapped) framebuffer. Brightness and exposure are forced to 1.0 for these frames to avoid darkening or blowing out UI. No HDR-specific scaling or correction for UI; it is drawn in the same LDR output space as the gamma pass.
+**Current**: When `RDF_NOWORLDMODEL` or no world (menus, player config, videos), the gamma pass sets `paniniPad1 = 1.0`, which disables the HDR film pipeline (`noWorldLdr`). UI is **composited after tonemap**-menus and 2D overlays are authored as LDR and rendered on top of the (possibly tonemapped) framebuffer. Brightness and exposure are forced to 1.0 for these frames to avoid darkening or blowing out UI. No HDR-specific scaling or correction for UI; it is drawn in the same LDR output space as the gamma pass.
 
 ---
 

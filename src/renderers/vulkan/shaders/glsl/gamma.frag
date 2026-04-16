@@ -155,7 +155,7 @@ vec3 Tonemap_Filmic( vec3 x ) {
 	return mix( mapped, vec3( dot( mapped, sRGB ) ), desat );
 }
 
-/* AgX-inspired tonemap — punchy, saturated, modern look.
+/* AgX-inspired tonemap - punchy, saturated, modern look.
    Attempt to preserve chrominance through the curve. */
 vec3 Tonemap_AgX( vec3 x ) {
 	/* Per-channel curve with luminance-guided saturation recovery */

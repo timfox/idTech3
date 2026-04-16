@@ -42,16 +42,16 @@ ctest --output-on-failure -V
 ```
 
 Tests include:
-- `smoke_test` — Binary checks, server startup, shader validation
-- `check_artifacts` — Artifact format verification
-- `unit_macros` — PAD, PADLEN, MAX_QPATH, MAX_STRING_CHARS
+- `smoke_test` - Binary checks, server startup, shader validation
+- `check_artifacts` - Artifact format verification
+- `unit_macros` - PAD, PADLEN, MAX_QPATH, MAX_STRING_CHARS
 
 ### Before Submitting
 
 1. **Build** with `./scripts/compile_engine.sh vulkan`
-2. **Run smoke test** — `./scripts/smoke_test.sh release`
-3. **Run CTest** — `cd build-vk-Release && ctest -V`
-4. **Check CI** — Push to a branch; CI runs on `main`, `next-gen*`, and related branches
+2. **Run smoke test** - `./scripts/smoke_test.sh release`
+3. **Run CTest** - `cd build-vk-Release && ctest -V`
+4. **Check CI** - Push to a branch; CI runs on `main`, `next-gen*`, and related branches
 
 ## Code Quality
 

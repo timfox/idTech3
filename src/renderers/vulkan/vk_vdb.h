@@ -7,8 +7,8 @@ Loads .vdb and .nvdb files for use as fog density volumes,
 cloud shapes, explosion sequences, and other volumetric effects.
 
 Supports:
-  - NanoVDB (.nvdb) — lightweight header-only, GPU-friendly
-  - OpenVDB (.vdb) — full library, optional compile-time dependency
+  - NanoVDB (.nvdb) - lightweight header-only, GPU-friendly
+  - OpenVDB (.vdb) - full library, optional compile-time dependency
   - Integration with the volumetric fog system
   - Lua API for loading and querying grids
 ===========================================================================

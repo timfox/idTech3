@@ -21,7 +21,7 @@ public class TouchHudView extends View {
     private static final float MOVE_CY = 0.82f;
     private static final float LOOK_CX = 0.82f;
     private static final float LOOK_CY = 0.82f;
-    /** Stick zone as fraction of min(w,h) — touch must start inside to capture */
+    /** Stick zone as fraction of min(w,h) - touch must start inside to capture */
     private static final float STICK_ZONE_FRAC = 0.22f;
 
     private final Paint ringPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -149,7 +149,7 @@ public class TouchHudView extends View {
             return true;
         }
         y0 += bh + gap;
-        /* Next weapon — default Q3 bind is ] (weapnext) */
+        /* Next weapon - default Q3 bind is ] (weapnext) */
         if (y >= y0 && y < y0 + bh) {
             if (down) {
                 TouchOverlayBridge.nativeKey(']', true);

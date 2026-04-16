@@ -146,7 +146,7 @@ public class GameActivity extends NativeActivity {
             @Override
             public void run() {
                 String msg = "No game data. Copy .pk3 files to:\n" + path + "/base\n"
-                    + "(or add assets/apkassets/ in the APK — see apkassets/README.txt)";
+                    + "(or add assets/apkassets/ in the APK - see apkassets/README.txt)";
                 Toast.makeText(GameActivity.this, msg, Toast.LENGTH_LONG).show();
             }
         });

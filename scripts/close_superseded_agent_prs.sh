@@ -14,7 +14,7 @@ for n in "${PRS[@]}"; do
   if gh pr close "$n" -R "$REPO" -c "$COMMENT" 2>/dev/null; then
     echo "  OK #${n}"
   else
-    echo "  SKIP/FAIL #${n} (already closed or no permission — run: gh auth login)"
+    echo "  SKIP/FAIL #${n} (already closed or no permission - run: gh auth login)"
   fi
 done
 

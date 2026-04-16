@@ -67,7 +67,7 @@ This document summarizes compatibility considerations, known issues, and mitigat
 
 ## Related Documents
 
-- [ARM_RASPBERRY_PI.md](ARM_RASPBERRY_PI.md) — Raspberry Pi setup and Vulkan
-- [QUICKSTART.md](QUICKSTART.md) — End-user quick start
-- [DEVELOPMENT_SETUP.md](DEVELOPMENT_SETUP.md) — Build environment
-- [RENDERERS.md](RENDERERS.md) — Renderer features and architecture
+- [ARM_RASPBERRY_PI.md](ARM_RASPBERRY_PI.md) - Raspberry Pi setup and Vulkan
+- [QUICKSTART.md](QUICKSTART.md) - End-user quick start
+- [DEVELOPMENT_SETUP.md](DEVELOPMENT_SETUP.md) - Build environment
+- [RENDERERS.md](RENDERERS.md) - Renderer features and architecture

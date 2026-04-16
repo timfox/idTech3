@@ -93,7 +93,7 @@ gltf_k="$(sed -n 's/^#define GLTF_MAX_MORPH_TARGETS[[:space:]]*\([0-9][0-9]*\).*
 if [[ -z "$gltf_k" || -z "$k_c" ]]; then
   fail "could not parse GLTF_MAX_MORPH_TARGETS from tr_model_gltf.h or IQM_MORPH_TOP_K from tr_local.h"
 elif [[ "$gltf_k" != "$k_c" ]]; then
-  fail "GLTF_MAX_MORPH_TARGETS ($gltf_k) != IQM_MORPH_TOP_K ($k_c) — GPU morph SSBO layout will disagree with glTF loader"
+  fail "GLTF_MAX_MORPH_TARGETS ($gltf_k) != IQM_MORPH_TOP_K ($k_c) - GPU morph SSBO layout will disagree with glTF loader"
 else
   pass "GLTF_MAX_MORPH_TARGETS=$gltf_k matches IQM_MORPH_TOP_K"
 fi
@@ -106,7 +106,7 @@ gltf_j="$(sed -n 's/^#define GLTF_MAX_JOINTS[[:space:]]*\([0-9][0-9]*\).*$/\1/p'
 if [[ -z "$gltf_j" || -z "$iqm_j" ]]; then
   fail "could not parse GLTF_MAX_JOINTS from tr_model_gltf.h or IQM_MAX_JOINTS from iqm.h"
 elif [[ "$gltf_j" != "$iqm_j" ]]; then
-  fail "GLTF_MAX_JOINTS ($gltf_j) != IQM_MAX_JOINTS ($iqm_j) — skinning matrix buffers disagree between glTF and IQM paths"
+  fail "GLTF_MAX_JOINTS ($gltf_j) != IQM_MAX_JOINTS ($iqm_j) - skinning matrix buffers disagree between glTF and IQM paths"
 else
   pass "GLTF_MAX_JOINTS=$gltf_j matches IQM_MAX_JOINTS"
 fi
@@ -151,10 +151,10 @@ if [ -n "${GAME_BASE:-}" ]; then
     fi
   done < "$ASSETS_LIST"
   if [ "$req" -eq 0 ]; then
-    echo "  (no uncommented paths in OPTIONAL_GAME_ASSETS.txt — add BSP paths to enforce)"
+    echo "  (no uncommented paths in OPTIONAL_GAME_ASSETS.txt - add BSP paths to enforce)"
   fi
 else
-  echo "GAME_BASE unset — skipping optional BSP checks (uncomment paths in OPTIONAL_GAME_ASSETS.txt to enforce in CI)."
+  echo "GAME_BASE unset - skipping optional BSP checks (uncomment paths in OPTIONAL_GAME_ASSETS.txt to enforce in CI)."
 fi
 
 echo ""

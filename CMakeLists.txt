@@ -418,14 +418,14 @@ endif()
 set(LUA_ANDROID_BUILT FALSE)
 if(ANDROID AND USE_LUA AND NOT LUA_FOUND)
   include(ExternalProject)
-  # Lua upstream ships a GNU Makefile; CMAKE_MAKE_PROGRAM is often Ninja on Android — use make.
+  # Lua upstream ships a GNU Makefile; CMAKE_MAKE_PROGRAM is often Ninja on Android - use make.
   find_program(LUA_ANDROID_MAKE_EXE NAMES make gmake)
   if(NOT LUA_ANDROID_MAKE_EXE)
     message(FATAL_ERROR "GNU make (make) is required to build Lua for Android but was not found in PATH.")
   endif()
   set(_LUA_ANDROID_VER "5.4.7")
   set(_LUA_ANDROID_SHA "9fbf5e28ef86c69858f6d3d34eccc32e911c1a28b4120ff3e84aaa70cfbf1e30")
-  # One prefix per ABI — Gradle builds arm64 and armeabi-v7a in the same CMake binary dir; a shared
+  # One prefix per ABI - Gradle builds arm64 and armeabi-v7a in the same CMake binary dir; a shared
   # "lua-android/" would leave the wrong-arch liblua.a from whichever ABI configured first.
   set(_LUA_ANDROID_PREFIX "${CMAKE_BINARY_DIR}/lua-android-${ANDROID_ABI}")
   set(_LUA_EP_EXTRA "")
@@ -434,7 +434,7 @@ if(ANDROID AND USE_LUA AND NOT LUA_FOUND)
     file(MAKE_DIRECTORY "${_LUA_DL_DIR}")
     list(APPEND _LUA_EP_EXTRA DOWNLOAD_DIR "${_LUA_DL_DIR}")
   endif()
-  # Lua src/Makefile sets "AR= ar rcu" and invokes $(AR) target objs — AR must be "llvm-ar rcu", not bare llvm-ar.
+  # Lua src/Makefile sets "AR= ar rcu" and invokes $(AR) target objs - AR must be "llvm-ar rcu", not bare llvm-ar.
   # ANDROID may set CMAKE_C_COMPILER to bare NDK clang (no --target); without it, objects are host x86_64.
   if(DEFINED ANDROID_PLATFORM_LEVEL AND NOT ANDROID_PLATFORM_LEVEL STREQUAL "")
     set(_LUA_API "${ANDROID_PLATFORM_LEVEL}")
@@ -1798,7 +1798,7 @@ IF(USE_RENDERER_DLOPEN)
 	set(RENDERER_OUT_Vulkan "idtech3_vulkan")
 	set_target_properties(${RENDERER_PREFIX}_opengl${RENDEXT} PROPERTIES OUTPUT_NAME ${RENDERER_OUT_OPengl} PREFIX "")
 	set_target_properties(${RENDERER_PREFIX}_vulkan${RENDEXT} PROPERTIES OUTPUT_NAME ${RENDERER_OUT_Vulkan} PREFIX "")
-	# MinGW/PE: without this, renderer DLLs can link but export no symbols (GetRefAPI missing) — breaks dlopen on Windows.
+	# MinGW/PE: without this, renderer DLLs can link but export no symbols (GetRefAPI missing) - breaks dlopen on Windows.
 	if(WIN32)
 		set_target_properties(${RENDERER_PREFIX}_opengl${RENDEXT} ${RENDERER_PREFIX}_vulkan${RENDEXT}
 			PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
@@ -2548,7 +2548,7 @@ if(BUILD_UNIT_TESTS)
 	set_tests_properties(unit_vm_native_module PROPERTIES LABELS "unit;validation")
 endif()
 
-# Example mod pack (config-only .pk3); optional — see examples/demo_game/README.md
+# Example mod pack (config-only .pk3); optional - see examples/demo_game/README.md
 if(BUILD_EXAMPLE_DEMO_GAME AND NOT ANDROID)
 	include("${CMAKE_SOURCE_DIR}/examples/demo_game/CMakeLists.txt")
 endif()

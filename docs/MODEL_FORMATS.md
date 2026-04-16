@@ -27,10 +27,10 @@ When a model is requested without extension, the engine tries formats in this or
 
 **Materials and animation (summary)**:
 - Base color, metallic/roughness, normal, emissive, occlusion maps
-- Extensions: clearcoat, sheen, transmission, IOR, emissive strength (loader reads many KHR fields; shader coverage varies — see GLTF.md)
+- Extensions: clearcoat, sheen, transmission, IOR, emissive strength (loader reads many KHR fields; shader coverage varies - see GLTF.md)
 - Skeletal animation with joint hierarchy and inverse bind matrices; runtime clip playback and GPU skin on Vulkan PBR when enabled
 - Keyframe animations (translation, rotation, scale) and morph targets (see GLTF.md for caps and `r_gltf*` cvars)
-- GLB binary container support (embedded bufferView images remain a known loader gap — prefer external images or see GLTF.md)
+- GLB binary container support (embedded bufferView images remain a known loader gap - prefer external images or see GLTF.md)
 
 ## MD5 Details
 

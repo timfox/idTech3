@@ -37,7 +37,7 @@ if [[ -n "$SAVED_DEMO_ROOT" && -d "$SAVED_DEMO_ROOT" ]]; then
 	IDTECH3_DEMO_ROOT="$SAVED_DEMO_ROOT"
 fi
 if [[ -n "${IDTECH3_DEMO_ROOT:-}" && ! -d "$IDTECH3_DEMO_ROOT" ]]; then
-	echo "Warning: IDTECH3_DEMO_ROOT is not a directory ($IDTECH3_DEMO_ROOT) — fix or remove it in local.env" >&2
+	echo "Warning: IDTECH3_DEMO_ROOT is not a directory ($IDTECH3_DEMO_ROOT) - fix or remove it in local.env" >&2
 	unset IDTECH3_DEMO_ROOT
 fi
 
@@ -82,7 +82,7 @@ if [[ ! -f "$PK3" && -f "$BASE_ROOT/idtech3_demo.pk3" ]]; then
 	ln -sf "../idtech3_demo.pk3" "$PK3" 2>/dev/null || true
 fi
 if [[ ! -f "$PK3" ]]; then
-	echo "Missing $PK3 — build ./examples/demo_game/build_demo_pack.sh and copy pk3 into idtech3_demo/ (or place idtech3_demo.pk3 in playfield root)." >&2
+	echo "Missing $PK3 - build ./examples/demo_game/build_demo_pack.sh and copy pk3 into idtech3_demo/ (or place idtech3_demo.pk3 in playfield root)." >&2
 	exit 2
 fi
 
@@ -100,7 +100,7 @@ shopt -s nullglob
 _base_pk3s=( "$BASE_ROOT/$BASE_DIR_NAME"/*.pk3 )
 shopt -u nullglob
 if [[ ${#_base_pk3s[@]} -eq 0 ]]; then
-	echo "Note: no .pk3 in $BASE_ROOT/$BASE_DIR_NAME — +map will need qagame/maps from a full base." >&2
+	echo "Note: no .pk3 in $BASE_ROOT/$BASE_DIR_NAME - +map will need qagame/maps from a full base." >&2
 fi
 
 SERVER="${IDTECH3_SERVER:-}"

@@ -40,7 +40,7 @@ android/local.properties
 /game_base.env
 /examples/demo_skeleton/local.env
 
-# demo_skeleton/base/ is otherwise matched by `base/` above — keep only the placeholder tracked
+# demo_skeleton/base/ is otherwise matched by `base/` above - keep only the placeholder tracked
 !/examples/demo_skeleton/base/
 /examples/demo_skeleton/base/*
 !/examples/demo_skeleton/base/README.txt

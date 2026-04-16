@@ -14,7 +14,7 @@ extern int gSTUB_SV_UTF8;
 
 /* Huffman streams: MSG_WriteBits sets cursize = (bit>>3)+1, so a full bit
  * stream needs headroom beyond the logical message length. Production pairs
- * byte[MAX_MSGLEN_BUF] with MSG_Init(..., MAX_MSGLEN) — not sizeof(buf). */
+ * byte[MAX_MSGLEN_BUF] with MSG_Init(..., MAX_MSGLEN) - not sizeof(buf). */
 
 #define ASSERT(cond, msg) do { \
 	if (!(cond)) { \

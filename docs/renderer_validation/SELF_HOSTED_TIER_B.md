@@ -13,7 +13,7 @@ Follow [GitHub Docs: Adding self-hosted runners](https://docs.github.com/en/acti
 
 On the runner machine:
 
-- Install build prerequisites from [docs/DEVELOPMENT_SETUP.md](../DEVELOPMENT_SETUP.md) (CMake, Ninja, compilers, `glslang-tools`, SDL2, etc.—mirror Ubuntu CI).
+- Install build prerequisites from [docs/DEVELOPMENT_SETUP.md](../DEVELOPMENT_SETUP.md) (CMake, Ninja, compilers, `glslang-tools`, SDL2, etc.-mirror Ubuntu CI).
 - Ensure the runner user can **read** `GAME_BASE` and execute the built `idtech3_server`.
 
 ## 3. Label the runner
@@ -21,7 +21,7 @@ On the runner machine:
 Add these labels to the runner (repository or organization settings):
 
 - `self-hosted` (often added by default)
-- `idtech3-tierb` (**required** — workflow `.github/workflows/renderer-tier-b.yml` selects this label)
+- `idtech3-tierb` (**required** - workflow `.github/workflows/renderer-tier-b.yml` selects this label)
 
 Example CLI when configuring the runner: `--labels self-hosted,Linux,X64,idtech3-tierb`
 
@@ -32,7 +32,7 @@ The workflow enables when **either** a repository **variable** or **secret** nam
 | Kind | Name | Value |
 |------|------|--------|
 | **Actions variable** (recommended) | `IDTECH3_GAME_BASE_PATH` | Absolute path on the runner host, e.g. `/data/idtech3-regression/base` |
-| **Actions secret** (optional) | `IDTECH3_GAME_BASE_PATH` | Same path; use if you do not want the string visible under **Variables** (values are still visible in job logs as `env` unless you mask — see below) |
+| **Actions secret** (optional) | `IDTECH3_GAME_BASE_PATH` | Same path; use if you do not want the string visible under **Variables** (values are still visible in job logs as `env` unless you mask - see below) |
 
 **Repository → Settings → Secrets and variables → Actions**
 

@@ -1,4 +1,4 @@
-# Scene 01 — Tangent space / normal maps
+# Scene 01 - Tangent space / normal maps
 
 ## Goal
 

@@ -15,12 +15,12 @@
 - If `vk.smaaActive && tr.world && !RDF_NOWORLDMODEL`: run SMAA, update `color_descriptor` to smaa_output
 - Else: update `color_descriptor` to color_image_view
 
-**vk_volumetric_fog_pass** (when skipped — tier/off/no-world):
+**vk_volumetric_fog_pass** (when skipped - tier/off/no-world):
 - `vk_reset_volumetric_history()`, `backEnd.doneFog = qtrue`, **return**
 - **BUG**: No descriptor update. `color_descriptor` stays at previous frame's value.
 
-**vk_volumetric_fog_pass** (when skipped — resources missing / MSAA incomplete):
-- **BUG**: Same — early return, no descriptor update.
+**vk_volumetric_fog_pass** (when skipped - resources missing / MSAA incomplete):
+- **BUG**: Same - early return, no descriptor update.
 
 **vk_prepare_2d** (no-world / menu):
 - `vk_end_render_pass()`, `vk_begin_post_bloom_render_pass()`, return

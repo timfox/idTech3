@@ -32,5 +32,5 @@ Create custom flowmaps in an image editor by painting R/G values. The included `
 
 ## Shader parameters
 
-- `flowmapTex <path>` — Path to the flowmap texture
-- `flowSpeed <value>` — Flow intensity (e.g. 0.05 for subtle, 0.15 for strong)
+- `flowmapTex <path>` - Path to the flowmap texture
+- `flowSpeed <value>` - Flow intensity (e.g. 0.05 for subtle, 0.15 for strong)

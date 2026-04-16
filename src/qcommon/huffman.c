@@ -265,7 +265,7 @@ static void Huff_addRef(huff_t* huff, byte ch) {
 	}
 }
 
-/* Get a symbol — maxoffset prevents out-of-bounds reads (CVE-2017-11721) */
+/* Get a symbol - maxoffset prevents out-of-bounds reads (CVE-2017-11721) */
 static int Huff_Receive(node_t *node, int *ch, byte *fin, int maxoffset) {
 	while (node && node->symbol == INTERNAL_NODE) {
 		if ( bloc > maxoffset ) {

@@ -16,7 +16,7 @@ fi
 
 if [[ ! -f "$TARGET/local.env" ]]; then
 	cp "$SCRIPT_DIR/demo_skeleton.env.example" "$TARGET/local.env"
-	echo "Created $TARGET/local.env (optional — defaults work if you use this folder as-is)"
+	echo "Created $TARGET/local.env (optional - defaults work if you use this folder as-is)"
 fi
 
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"

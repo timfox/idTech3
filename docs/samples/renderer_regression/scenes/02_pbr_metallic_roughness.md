@@ -1,4 +1,4 @@
-# Scene 02 — Metallic vs roughness
+# Scene 02 - Metallic vs roughness
 
 ## Goal
 

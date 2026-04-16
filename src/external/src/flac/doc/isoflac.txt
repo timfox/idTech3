@@ -32,12 +32,12 @@ Table of Contents
 
     [1] ISO/IEC 14496-12:2012 Corrected version
 
-        Information technology — Coding of audio-visual objects — Part
+        Information technology - Coding of audio-visual objects - Part
         12: ISO base media file format
 
     [2] ISO/IEC 14496-12:2012/Amd.1:2013
 
-        Information technology — Coding of audio-visual objects — Part
+        Information technology - Coding of audio-visual objects - Part
         12: ISO base media file format AMENDMENT 1: Various
         enhancements including support for large metadata
 

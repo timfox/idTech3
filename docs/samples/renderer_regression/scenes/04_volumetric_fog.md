@@ -1,4 +1,4 @@
-# Scene 04 — Volumetric fog
+# Scene 04 - Volumetric fog
 
 Package as **`maps/rtest_volumetric.bsp`** (see pack README).
 

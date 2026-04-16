@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Same as scripts/run_demo.sh — lives here so a minimal copy of demo_skeleton still has a launcher.
+# Same as scripts/run_demo.sh - lives here so a minimal copy of demo_skeleton still has a launcher.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 REL_ENV="$ROOT/release/local.env"

@@ -70,7 +70,7 @@ src/
 │   │   ├── vk_postfx.c/h         PostFX (SSR, atmosphere, wind)
 │   │   ├── vk_flashlight.c/h     Projected texture system
 │   │   ├── vk_skybox_hdr.c/h     HDR EXR skybox + IBL
-│   │   ├── tr_model_gltf.c/h     glTF 2.0 loader (shared; Vulkan GPU path + OpenGL CPU tess — see docs/GLTF.md)
+│   │   ├── tr_model_gltf.c/h     glTF 2.0 loader (shared; Vulkan GPU path + OpenGL CPU tess - see docs/GLTF.md)
 │   │   ├── tr_model_obj.c        OBJ loader
 │   │   ├── tr_model_md5.c        MD5 loader
 │   │   ├── inspector/             ImGui inspector overlay
@@ -148,7 +148,7 @@ When `fs_restrict` is **0** (default), `VM_Create` always tries a **native** sha
 **Filename probes** (`VM_TryLoadNativeModule` + `VM_BuildNativeModuleCandidates` in `src/qcommon/vm_native_module.c`), in order:
 
 1. `<module>.so` (Linux/macOS-style name; still the first probe on Windows builds too)
-2. `<module>.<ARCH_STRING><DLL_EXT>` (e.g. `client.x86_64.so`, `uix86_64.dll` — `ARCH_STRING` / `DLL_EXT` from `q_platform.h`)
+2. `<module>.<ARCH_STRING><DLL_EXT>` (e.g. `client.x86_64.so`, `uix86_64.dll` - `ARCH_STRING` / `DLL_EXT` from `q_platform.h`)
 3. `<module><ARCH_STRING><DLL_EXT>` (packed form, e.g. `clientx86_64.so`)
 
 **Alternate logical names** for the same VM slot: if those candidates fail, `loadNative` tries additional base names before the final platform-specific `name + ARCH_STRING + DLL_EXT` path. Examples: `qagame` tries `game` then `server`; `cgame` tries `client`; `ui` tries `frontend`; `server` tries `game`; `client` tries `cgame`; `frontend` tries `ui`.
@@ -159,7 +159,7 @@ When `fs_restrict` is **0** (default), `VM_Create` always tries a **native** sha
 
 ## JavaScript / UI Debug (Duktape)
 
-When `USE_DUKTAPE` is enabled, the engine provides a JavaScript runtime (`idtech3` namespace) with event callbacks and HUD bindings. **Game events** (emitted from snapshot parsing): `entity_spawn`, `entity_death`, `weapon_fire` — payloads include `entityNum`, `eType`, `attacker`, `weapon`. See [JS_HUD_DRAWING.md](JS_HUD_DRAWING.md#game-events). Other events: `frame`, `menu_changed`, `ui_open`, `ui_close`, `map_load`, `input_key`, `mouse_move`, etc. For debugging UI and script issues:
+When `USE_DUKTAPE` is enabled, the engine provides a JavaScript runtime (`idtech3` namespace) with event callbacks and HUD bindings. **Game events** (emitted from snapshot parsing): `entity_spawn`, `entity_death`, `weapon_fire` - payloads include `entityNum`, `eType`, `attacker`, `weapon`. See [JS_HUD_DRAWING.md](JS_HUD_DRAWING.md#game-events). Other events: `frame`, `menu_changed`, `ui_open`, `ui_close`, `map_load`, `input_key`, `mouse_move`, etc. For debugging UI and script issues:
 
 - **`js_verbose`** (0/1): Toggle verbose info when at a menu.
 - **`js_verboseMenu`** (main|ingame|all|none|off): Which menu to show verbose for. Default `main`.

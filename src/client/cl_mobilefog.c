@@ -8,7 +8,7 @@ Exponential height fog:
   Applied as a post-vertex color modulation. The fog factor is
   computed as: fogFactor = exp(-density * distance * heightFalloff)
   where heightFalloff increases fog below a reference height.
-  This is essentially free — no extra draw calls, just a color blend.
+  This is essentially free - no extra draw calls, just a color blend.
 
 Sprite-based volumetric fog:
   Spawns billboard particles around the camera that rotate slowly,

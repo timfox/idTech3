@@ -21,13 +21,13 @@
 
 ## Project TODOs (Actionable)
 
-### net_sdr.c — Steam Networking Sockets (SDR)
+### net_sdr.c - Steam Networking Sockets (SDR)
 
 **Resolution**: Full implementation complete. Uses Steamworks SDK (ISteamNetworkingSockets) for P2P SDR. Enable with `USE_STEAM_NETWORKING=ON` and set `STEAMWORKS_SDK` to SDK path. Cvar `net_sdr 1` enables SDR transport. Connect via `connect steam:STEAMID`. See `docs/ROADMAP.md` and `docs/DEVELOPMENT_SETUP.md`.
 
 ---
 
-### be_aas_reach.c — Jump pad velocity
+### be_aas_reach.c - Jump pad velocity
 
 | Line | Item | Priority | Notes |
 |------|------|----------|-------|
@@ -61,7 +61,7 @@ TODOs/FIXMEs in `src/external/` are from third-party code (duktape, zstd, cjson,
 | RB_ColorMask (Vulkan) | tr_backend.c | Partial: `vk_set_color_write_mask()` exists, but the VK_EXT_extended_dynamic_state3 path is currently disabled due to validation/driver issues; Vulkan falls back to full color writes. |
 | r_renderMode 1/2 | tr_init.c | Deferred/Forward+ placeholders; need G-buffers, light culling. Documented in cvar description. |
 | r_hdr 3 64-bit output | `vk_post_process_pipeline.c`, HDR format helpers | Infrastructure in place (vk_hdr64_active, _hdr64 modules, pipeline selection). glslangValidator rejects dvec4/f64vec4 fragment shader outputs. Falls back to RGBA32F. When glslang adds support, compile HDR64 variants and return RGBA64F from get_hdr_format. |
-| Vegetation wind draw | `vk_vegetation_wind.c` + draw path | Compute **dispatch** now runs **after** each `SURF_VEGETATION` tess batch (staging was previously uploaded *after* the misplaced `vk_begin_frame` dispatch, so GPU saw 0 verts). **Vertex shader still does not read** `vegwind_vertex_buffer` — deformed positions are not yet applied on draw. |
+| Vegetation wind draw | `vk_vegetation_wind.c` + draw path | Compute **dispatch** now runs **after** each `SURF_VEGETATION` tess batch (staging was previously uploaded *after* the misplaced `vk_begin_frame` dispatch, so GPU saw 0 verts). **Vertex shader still does not read** `vegwind_vertex_buffer` - deformed positions are not yet applied on draw. |
 | Vulkan RTX | CMake `USE_VULKAN_RTX`, renderer init | Extensions can be requested when `USE_VULKAN_RTX=ON` and GPU supports them. Pipeline (BLAS/TLAS, shaders) not yet implemented. See `docs/RENDERERS_FUTURE.md`. |
 
 ## Subsystem audit log (rolling)
@@ -71,8 +71,8 @@ TODOs/FIXMEs in `src/external/` are from third-party code (duktape, zstd, cjson,
 | 2026-04-11 | Network / downloads | `cl_curl.c`: `dl->Name` from `Content-Disposition` uses **`Q_strncpyz`** (Phase 2 P0 item remains fixed). |
 | 2026-04-11 | Botlib / preprocessor | **`src/botlib/l_precomp.c`** already bounded; duplicate **`src/platform/botlib/l_precomp.c`** and **`src/platform/win32/botlib/l_precomp.c`** aligned: `sprintf` → **`Com_sprintf(..., MAX_TOKEN, ...)`** (5 sites each). |
 | 2026-04-11 | Botlib / chat (Windows tree) | **`src/platform/win32/botlib/be_ai_chat.c`** `BotLoadChatMessage`: `sprintf`/`strcpy` → **`Com_sprintf` / `Q_strncpyz`** to match **`src/botlib/be_ai_chat.c`**; **`src/platform/botlib/be_ai_chat.c`** fixed-string append → **`Q_strncpyz`**. |
-| 2026-04-11 | Client / server / qcommon | `rg '\\b(TODO|FIXME)\\b' src/{client,server,qcommon}` — **no matches** (same triage expectation as 2026-04-10). |
-| 2026-04-11 | Renderer validation | `renderer_regression_check.sh` + manifest caps (`GLTF_MAX_*`, `IQM_*`) — CI-style parity checks on `main`. |
+| 2026-04-11 | Client / server / qcommon | `rg '\\b(TODO|FIXME)\\b' src/{client,server,qcommon}` - **no matches** (same triage expectation as 2026-04-10). |
+| 2026-04-11 | Renderer validation | `renderer_regression_check.sh` + manifest caps (`GLTF_MAX_*`, `IQM_*`) - CI-style parity checks on `main`. |
 | 2026-04-11 | Build / link | Optional **`ENABLE_LTO`** (`./scripts/compile_engine.sh … lto`): CMake `CheckIPOSupported` + `CMAKE_INTERPROCEDURAL_OPTIMIZATION` for GCC/Clang Release/RelWithDebInfo; off by default. |
 | 2026-04-11 | Vulkan / future GPU | **`r_vk_meshShaderNV`** (default 0): optional **`VK_NV_mesh_shader`** + `VkPhysicalDeviceMeshShaderFeaturesNV.meshShader` for NVIDIA; no mesh pipelines yet. **DLSS:** not in-repo; startup log documents use `r_renderScale` / driver scaling. |
 

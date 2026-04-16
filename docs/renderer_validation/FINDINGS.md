@@ -1,14 +1,14 @@
-# Renderer validation — findings (rolling log)
+# Renderer validation - findings (rolling log)
 
 Append new sessions here or add dated files alongside this README. Use [TEMPLATE_TIER_C.md](TEMPLATE_TIER_C.md) for **Tier C** (manual GPU) rows.
 
-## Tier C — manual GPU / validation layers
+## Tier C - manual GPU / validation layers
 
 | Date | Commit | Vulkan | OpenGL | Validation layers | Notes |
 |------|--------|--------|--------|-------------------|-------|
-| — | — | — | — | — | *Add a row when you complete a real GPU pass (see template). Not a substitute for Tier B (`GAME_BASE` regression on a runner).* |
+| - | - | - | - | - | *Add a row when you complete a real GPU pass (see template). Not a substitute for Tier B (`GAME_BASE` regression on a runner).* |
 
-## Tier A — automated baseline (reference only)
+## Tier A - automated baseline (reference only)
 
 Machine-verified checks that run without a full `GAME_BASE` or display server. **These rows are not Tier C evidence.**
 
