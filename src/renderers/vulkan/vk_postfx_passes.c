@@ -46,6 +46,41 @@ static void vk_begin_fullres_postfx_render_pass( VkRenderPass renderPass, VkFram
 	vk_begin_postfx_render_pass( renderPass, frameBuffer, width, height, clear );
 }
 
+static void vk_copy_color_to_fog_scene( uint32_t width, uint32_t height )
+{
+	VkImageCopy copy_region;
+
+	if ( vk.fog_scene_image == VK_NULL_HANDLE || vk.color_image == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	Com_Memset( &copy_region, 0, sizeof( copy_region ) );
+	copy_region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	copy_region.srcSubresource.layerCount = 1;
+	copy_region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	copy_region.dstSubresource.layerCount = 1;
+	copy_region.extent.width = width;
+	copy_region.extent.height = height;
+	copy_region.extent.depth = 1;
+
+	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
+	record_image_layout_transition( vk.cmd->command_buffer, vk.fog_scene_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
+	qvkCmdCopyImage( vk.cmd->command_buffer,
+		vk.color_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		vk.fog_scene_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		1, &copy_region );
+	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
+	record_image_layout_transition( vk.cmd->command_buffer, vk.fog_scene_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
+}
+
 void vk_begin_bloom_extract_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.bloom_extract;
@@ -93,7 +128,6 @@ void vk_begin_ssao_combine_render_pass( void )
 
 void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 {
-	VkImageCopy copy_region;
 	uint32_t fullWidth = 0;
 	uint32_t fullHeight = 0;
 
@@ -111,30 +145,7 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 	vk_get_active_render_extent( &fullWidth, &fullHeight );
 
 	/* Copy opaque scene to fog_scene for resolve */
-	Com_Memset( &copy_region, 0, sizeof( copy_region ) );
-	copy_region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	copy_region.srcSubresource.layerCount = 1;
-	copy_region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	copy_region.dstSubresource.layerCount = 1;
-	copy_region.extent.width = fullWidth;
-	copy_region.extent.height = fullHeight;
-	copy_region.extent.depth = 1;
-	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
-	record_image_layout_transition( vk.cmd->command_buffer, vk.fog_scene_image, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
-	qvkCmdCopyImage( vk.cmd->command_buffer,
-		vk.color_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-		vk.fog_scene_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		1, &copy_region );
-	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
-	record_image_layout_transition( vk.cmd->command_buffer, vk.fog_scene_image, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
+	vk_copy_color_to_fog_scene( fullWidth, fullHeight );
 
 	if ( vk.msaaActive ) {
 		VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
@@ -383,35 +394,8 @@ qboolean vk_ssao_pass( void )
 		qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 		vk_end_render_pass();
 
-		if ( vk.fog_scene_image != VK_NULL_HANDLE && vk.color_image != VK_NULL_HANDLE ) {
-			VkImageCopy copy_region;
-			uint32_t copy_w = vk.renderWidth > 0 ? (uint32_t)vk.renderWidth : 1u;
-			uint32_t copy_h = vk.renderHeight > 0 ? (uint32_t)vk.renderHeight : 1u;
-			Com_Memset( &copy_region, 0, sizeof( copy_region ) );
-			copy_region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			copy_region.srcSubresource.layerCount = 1;
-			copy_region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			copy_region.dstSubresource.layerCount = 1;
-			copy_region.extent.width = copy_w;
-			copy_region.extent.height = copy_h;
-			copy_region.extent.depth = 1;
-			record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
-				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
-			record_image_layout_transition( vk.cmd->command_buffer, vk.fog_scene_image, VK_IMAGE_ASPECT_COLOR_BIT,
-				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
-			qvkCmdCopyImage( vk.cmd->command_buffer,
-				vk.color_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-				vk.fog_scene_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-				1, &copy_region );
-			record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
-				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
-			record_image_layout_transition( vk.cmd->command_buffer, vk.fog_scene_image, VK_IMAGE_ASPECT_COLOR_BIT,
-				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
-		}
+		vk_copy_color_to_fog_scene( vk.renderWidth > 0 ? (uint32_t)vk.renderWidth : 1u,
+			vk.renderHeight > 0 ? (uint32_t)vk.renderHeight : 1u );
 		if ( vk.fog_scene_image_view != VK_NULL_HANDLE && vk.ssao_scene_descriptor != VK_NULL_HANDLE && vk.ssao_blur_descriptor != VK_NULL_HANDLE ) {
 			vk_begin_ssao_combine_render_pass();
 			if ( r_ssaoDebugView && r_ssaoDebugView->integer == 2 ) {
