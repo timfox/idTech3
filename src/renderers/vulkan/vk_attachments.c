@@ -10,6 +10,7 @@ atlases, froxel/fluid volumes, and teardown (split from vk.c).
 #include "vk_postfx.h"
 #include "vk_cmd.h"
 #include "vk_image_layout.h"
+#include "vk_scene_pass.h"
 #include "vk_volumetric_params.h"
 #include "vk_temporal.h"
 #include "vk_util.h"
@@ -384,9 +385,12 @@ void vk_create_depth_only_image_view( VkImage image, VkFormat format, VkImageVie
 void vk_create_attachments( void )
 {
 	uint32_t i;
+	uint32_t fullWidth = 0;
+	uint32_t fullHeight = 0;
 
 	vk_clear_attachment_pool();
 	vk_create_volumetric_params_buffer();
+	vk_get_active_render_extent( &fullWidth, &fullHeight );
 
 	// It looks like resulting performance depends from order you're creating/allocating
 	// memory for attachments in vulkan i.e. similar images grouped together will provide best results
@@ -424,23 +428,23 @@ void vk_create_attachments( void )
 
 		// ssao
 		if ( r_ssao && r_ssao->integer ) {
-			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.ssao_format,
+			create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, vk.ssao_format,
 				sampledColorUsage, &vk.ssao_image, &vk.ssao_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
-			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.ssao_format,
+			create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, vk.ssao_format,
 				sampledColorUsage, &vk.ssao_blur_image, &vk.ssao_blur_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 		}
 		if ( r_oit && r_oit->integer ) {
-			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R16G16B16A16_SFLOAT,
+			create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R16G16B16A16_SFLOAT,
 				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 				&vk.oit_accum_image, &vk.oit_accum_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
-			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R16_SFLOAT,
+			create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R16_SFLOAT,
 				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 				&vk.oit_reveal_image, &vk.oit_reveal_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 		}
 
 		// ssr (same format as color)
 		if ( PostFX_SSR_IsEnabled() ) {
-			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
+			create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
 				copyableColorUsage, &vk.ssr_image, &vk.ssr_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 		}
 
@@ -458,23 +462,23 @@ void vk_create_attachments( void )
         }
 
 		// post-processing/msaa-resolve
-			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
+			create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
 				copyableColorUsage, &vk.color_image, &vk.color_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
-			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
+			create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
 				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 				&vk.ui_overlay_image, &vk.ui_overlay_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 			// scene copy sampled by volumetric composite (avoids read/write feedback on vk.color_image)
-				create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
+				create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
 					VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 					&vk.fog_scene_image, &vk.fog_scene_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
-				create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R32_SFLOAT,
+				create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R32_SFLOAT,
 					VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 					&vk.volumetric_depth_image, &vk.volumetric_depth_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
-				create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R16G16_SFLOAT,
+				create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R16G16_SFLOAT,
 					VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
 					&vk.motion_vector_image, &vk.motion_vector_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 				if ( vk.msaaActive ) {
-					create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, vk_get_main_rasterization_samples(), VK_FORMAT_R16G16_SFLOAT,
+					create_color_attachment( fullWidth, fullHeight, vk_get_main_rasterization_samples(), VK_FORMAT_R16G16_SFLOAT,
 						VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
 						&vk.motion_vector_msaa_image, &vk.motion_vector_msaa_view, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, qtrue, 0 );
 				}
@@ -497,9 +501,9 @@ void vk_create_attachments( void )
 		create_depth_attachment( vk.screenMapWidth, vk.screenMapHeight, vk.screenMapSamples, &vk.screenMap.depth_image, &vk.screenMap.depth_image_view, qtrue );
 
 		if ( vk.msaaActive ) {
-			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, vk_get_main_rasterization_samples(), vk.color_format,
+			create_color_attachment( fullWidth, fullHeight, vk_get_main_rasterization_samples(), vk.color_format,
 				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &vk.msaa_image, &vk.msaa_image_view, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, qtrue, 0 );
-			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, vk_get_main_rasterization_samples(), vk.color_format,
+			create_color_attachment( fullWidth, fullHeight, vk_get_main_rasterization_samples(), vk.color_format,
 				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &vk.ui_overlay_msaa_image, &vk.ui_overlay_msaa_image_view, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, qtrue, 0 );
 		}
 
@@ -512,18 +516,18 @@ void vk_create_attachments( void )
 
 		if ( vk.smaaActive ) {
 			VkImageUsageFlags smaaUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
+			create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
 				smaaUsage, &vk.smaa_edge_image, &vk.smaa_edge_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
-			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
+			create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
 				smaaUsage, &vk.smaa_blend_image, &vk.smaa_blend_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
-			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
+			create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
 				smaaUsage, &vk.smaa_output_image, &vk.smaa_output_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 		}
 		{
 			VkImageUsageFlags taaUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
+			create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
 				taaUsage, &vk.taa_history_image[0], &vk.taa_history_image_view[0], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
-			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
+			create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
 				taaUsage, &vk.taa_history_image[1], &vk.taa_history_image_view[1], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 		}
 
@@ -573,7 +577,7 @@ void vk_create_attachments( void )
 
 	//vk_alloc_attachments();
 
-	create_depth_attachment( glConfig.vidWidth, glConfig.vidHeight, vk_get_main_rasterization_samples(), &vk.depth_image, &vk.depth_image_view,
+	create_depth_attachment( fullWidth, fullHeight, vk_get_main_rasterization_samples(), &vk.depth_image, &vk.depth_image_view,
 		(vk.fboActive && r_bloom->integer) || (r_ssao && r_ssao->integer) || (PostFX_SSR_IsEnabled()) ? qfalse : qtrue );
 	vk.depth_image_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
