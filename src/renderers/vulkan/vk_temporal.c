@@ -55,6 +55,7 @@ static void vk_temporal_clear_frame_state( void )
 	vk.temporal.appliedResetReasons = 0u;
 	vk.temporal.sharedCameraCut = qfalse;
 	vk.temporal.unreliableMotionThisFrame = qfalse;
+	vk.temporal.firstPersonProjectionThisFrame = qfalse;
 }
 
 static void vk_temporal_request_reset( uint32_t reasons )
@@ -70,6 +71,12 @@ void vk_temporal_request_sticky_reset( uint32_t reasons )
 qboolean vk_temporal_has_reason( uint32_t reasonMask )
 {
 	return ( vk.temporal.appliedResetReasons & reasonMask ) != 0u ? qtrue : qfalse;
+}
+
+void vk_temporal_note_first_person_projection( void )
+{
+	vk.temporal.firstPersonProjectionThisFrame = qtrue;
+	vk.temporal.unreliableMotionThisFrame = qtrue;
 }
 
 static void vk_temporal_log_reset( uint32_t reasons, qboolean hardReset )
@@ -290,10 +297,15 @@ void vk_temporal_commit_frame_state( void )
 	const qboolean worldValid = ( tr.world != NULL ) ? qtrue : qfalse;
 	const qboolean noWorldModel = ( backEnd.refdef.rdflags & RDF_NOWORLDMODEL ) ? qtrue : qfalse;
 
+	if ( vk.temporal.firstPersonProjectionThisFrame != vk.temporal.firstPersonProjectionLastFrame ) {
+		vk_temporal_request_sticky_reset( VK_TEMPORAL_RESET_CAMERA_CUT );
+	}
+
 	vk.prevClientState = clientState;
 	vk.temporal.worldWasValid = worldValid;
 	vk.temporal.noWorldModel = noWorldModel;
 	vk.temporal.stableGameplayState = ( clientState == CA_ACTIVE ) ? qtrue : qfalse;
+	vk.temporal.firstPersonProjectionLastFrame = vk.temporal.firstPersonProjectionThisFrame;
 	vk.temporal.lastRenderWidth = (uint32_t)glConfig.vidWidth;
 	vk.temporal.lastRenderHeight = (uint32_t)glConfig.vidHeight;
 	vk.temporal.lastSwapchainWidth = vk.swapchain_extent_valid ? vk.swapchain_extent.width : 0u;

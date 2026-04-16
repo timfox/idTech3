@@ -891,6 +891,8 @@ typedef struct {
 		qboolean hasValidLuminance;
 		qboolean sharedCameraCut;
 		qboolean unreliableMotionThisFrame;
+		qboolean firstPersonProjectionThisFrame;
+		qboolean firstPersonProjectionLastFrame;
 		qboolean worldWasValid;
 		qboolean noWorldModel;
 		qboolean stableGameplayState;

@@ -51,6 +51,7 @@ void vk_temporal_begin_frame( void );
 void vk_temporal_commit_frame_state( void );
 void vk_temporal_update_auto_exposure( void );
 void vk_temporal_request_sticky_reset( uint32_t reasons );
+void vk_temporal_note_first_person_projection( void );
 qboolean vk_temporal_has_reason( uint32_t reasonMask );
 
 void vk_reset_motion_history( void );
