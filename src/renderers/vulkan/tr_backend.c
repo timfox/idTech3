@@ -20,6 +20,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 #include "tr_local.h"
+#ifdef USE_VULKAN
+#include "vk_temporal.h"
+#endif
 
 backEndData_t	*backEndData;
 backEndState_t	backEnd;
@@ -754,6 +757,7 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 				if ( r_firstPersonFovEnabled->integer && r_firstPersonFov->value > 0.0f ) {
 					R_SetupFirstPersonProjection( &backEnd.viewParms, backEnd.firstPersonProjectionMatrix );
 					backEnd.useFirstPersonProjection = qtrue;
+					vk_temporal_note_first_person_projection();
 				}
 				if ( r_firstPersonScaleEnabled->integer && r_firstPersonScale->value > 0.0f && r_firstPersonScale->value != 1.0f ) {
 					float s = r_firstPersonScale->value;
@@ -1000,6 +1004,7 @@ static void RB_RenderLitSurfList( dlight_t* dl ) {
 				if ( r_firstPersonFovEnabled->integer && r_firstPersonFov->value > 0.0f ) {
 					R_SetupFirstPersonProjection( &backEnd.viewParms, backEnd.firstPersonProjectionMatrix );
 					backEnd.useFirstPersonProjection = qtrue;
+					vk_temporal_note_first_person_projection();
 				}
 				if ( r_firstPersonScaleEnabled->integer && r_firstPersonScale->value > 0.0f && r_firstPersonScale->value != 1.0f ) {
 					float s = r_firstPersonScale->value;
