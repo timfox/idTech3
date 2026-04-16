@@ -66,15 +66,31 @@ void vk_atmosphere_build_push_constants( vkAtmospherePushConstants_t *pc )
 	pc->viewParams[3] = 0.0f;
 }
 
+void vk_atmosphere_get_dimensions( uint32_t *width, uint32_t *height )
+{
+	if ( width ) {
+		*width = ( vk.renderWidth > 0 ) ? (uint32_t)vk.renderWidth :
+			( glConfig.vidWidth > 0 ? (uint32_t)glConfig.vidWidth : 1u );
+	}
+	if ( height ) {
+		*height = ( vk.renderHeight > 0 ) ? (uint32_t)vk.renderHeight :
+			( glConfig.vidHeight > 0 ? (uint32_t)glConfig.vidHeight : 1u );
+	}
+}
+
 void vk_atmosphere_pass( void )
 {
 	VkImageAspectFlags depth_aspect;
 	vkAtmospherePushConstants_t pc;
+	uint32_t passWidth;
+	uint32_t passHeight;
 
 	if ( !PostFX_Atmosphere_IsEnabled() || vk.atmosphere_pipeline == VK_NULL_HANDLE ||
 		vk.render_pass.atmosphere == VK_NULL_HANDLE || vk.framebuffers.atmosphere[0] == VK_NULL_HANDLE ) {
 		return;
 	}
+
+	vk_atmosphere_get_dimensions( &passWidth, &passHeight );
 
 	depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
 	if ( glConfig.stencilBits > 0 ) {
@@ -91,14 +107,14 @@ void vk_atmosphere_pass( void )
 
 	vk_begin_render_pass_tracked( vk.render_pass.atmosphere,
 		vk.framebuffers.atmosphere[ vk.cmd->swapchain_image_index ],
-		qtrue, glConfig.vidWidth, glConfig.vidHeight );
+		qtrue, passWidth, passHeight );
 
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.atmosphere_pipeline );
 	vk_atmosphere_build_push_constants( &pc );
 	qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_atmosphere,
 		VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( pc ), &pc );
 
-	vk_set_fullscreen_viewport_scissor( glConfig.vidWidth, glConfig.vidHeight );
+	vk_set_fullscreen_viewport_scissor( passWidth, passHeight );
 	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 
 	vk_end_render_pass();
