@@ -7,6 +7,7 @@
 #include "vk_postfx.h"
 #include "vk_postfx_params.h"
 #include "vk_render_pass.h"
+#include "vk_scene_pass.h"
 #include "vk_temporal.h"
 #include "vk_volumetric_pass.h"
 
@@ -87,6 +88,8 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 {
 	VkImageView taa_src;
 	VkImageView resolved_view;
+	uint32_t taaWidth;
+	uint32_t taaHeight;
 	uint32_t readIndex;
 	uint32_t writeIndex;
 	qboolean allow_taa;
@@ -128,10 +131,10 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 		vk_barrier_post_fog_source_for_sampling( vk.taa_history_image_view[readIndex], "vk_end_frame pre-taa (history)" );
 	}
 	vk_update_color_descriptor_image( taa_src );
+	vk_get_active_render_extent( &taaWidth, &taaHeight );
 
 	vk_begin_render_pass_tracked( vk.render_pass.taa, vk.framebuffers.taa[writeIndex], qfalse,
-		( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u,
-		( glConfig.vidHeight > 0 ) ? (uint32_t)glConfig.vidHeight : 1u );
+		taaWidth, taaHeight );
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.taa_pipeline );
 	{
 		VkDescriptorSet taa_sets[4] = {
@@ -143,9 +146,7 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 			vk.pipeline_layout_post_process, 0, 4, taa_sets, 0, NULL );
 	}
-	vk_set_fullscreen_viewport_scissor(
-		( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u,
-		( glConfig.vidHeight > 0 ) ? (uint32_t)glConfig.vidHeight : 1u );
+	vk_set_fullscreen_viewport_scissor( taaWidth, taaHeight );
 	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 	vk_end_render_pass();
 
@@ -431,9 +432,10 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 
 	{
 		VkPostProcessPushConstants push;
-		uint32_t srcTexW = ( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u;
-		uint32_t srcTexH = ( glConfig.vidHeight > 0 ) ? (uint32_t)glConfig.vidHeight : 1u;
+		uint32_t srcTexW;
+		uint32_t srcTexH;
 
+		vk_get_active_render_extent( &srcTexW, &srcTexH );
 		vk_end_frame_fill_gamma_push_constants( &push, srcTexW, srcTexH );
 		qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_post_process, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
 	}
