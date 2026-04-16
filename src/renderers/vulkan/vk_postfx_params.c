@@ -132,7 +132,7 @@ void vk_update_postfx_params( uint32_t cmd_index )
 	params.taaParams[2] = Com_Clamp( 0.0f, 0.99f, r_taa_feedbackMotion ? r_taa_feedbackMotion->value : 0.72f );
 	params.taaParams[3] = Com_Clamp( 0.0f, 1.0f, r_taa_sharpen ? r_taa_sharpen->value : 0.12f );
 
-	if ( backEnd.projection2D || !tr.world || backEnd.viewParms.portalView != PV_NONE ) {
+	if ( backEnd.projection2D || !tr.world || backEnd.viewParms.portalView != PV_NONE || backEnd.useFirstPersonProjection ) {
 		Com_Memcpy( vk.postfx_params_ptr[cmd_index], &params, sizeof( params ) );
 		return;
 	}
