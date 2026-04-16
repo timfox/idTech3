@@ -18,18 +18,21 @@ SSAO/HBAO pass, and vk_bloom. Split from vk.c.
 #include "vk_util.h"
 #include "vk_device.h"
 
+static void vk_postfx_set_render_extent( uint32_t width, uint32_t height )
+{
+	vk.renderWidth = width;
+	vk.renderHeight = height;
+	vk.renderScaleX = 1.0f;
+	vk.renderScaleY = 1.0f;
+}
+
 void vk_begin_bloom_extract_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.bloom_extract;
 
 	//vk.renderPassIndex = RENDER_PASS_BLOOM_EXTRACT; // doesn't matter, we will use dedicated pipelines
 
-	vk.renderWidth = gls.captureWidth;
-	vk.renderHeight = gls.captureHeight;
-
-	//vk.renderScaleX = (float)vk.renderWidth / (float)glConfig.vidWidth;
-	//vk.renderScaleY = (float)vk.renderHeight / (float)glConfig.vidHeight;
-	vk.renderScaleX = vk.renderScaleY = 1.0f;
+	vk_postfx_set_render_extent( gls.captureWidth, gls.captureHeight );
 
 	vk_begin_render_pass_tracked( vk.render_pass.bloom_extract, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
 }
@@ -41,12 +44,8 @@ void vk_begin_blur_render_pass( uint32_t index )
 
 	//vk.renderPassIndex = RENDER_PASS_BLOOM_EXTRACT; // doesn't matter, we will use dedicated pipelines
 
-	vk.renderWidth = gls.captureWidth / ( 2 << ( index / 2 ) );
-	vk.renderHeight = gls.captureHeight / ( 2 << ( index / 2 ) );
-
-	//vk.renderScaleX = (float)vk.renderWidth / (float)glConfig.vidWidth;
-	//vk.renderScaleY = (float)vk.renderHeight / (float)glConfig.vidHeight;
-	vk.renderScaleX = vk.renderScaleY = 1.0f;
+	vk_postfx_set_render_extent( gls.captureWidth / ( 2 << ( index / 2 ) ),
+		gls.captureHeight / ( 2 << ( index / 2 ) ) );
 
 	vk_begin_render_pass_tracked( vk.render_pass.blur[ index ], frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
 }
@@ -59,9 +58,7 @@ void vk_begin_ssao_render_pass( void )
 	uint32_t height = 0;
 
 	vk_get_active_render_extent( &width, &height );
-	vk.renderWidth = width;
-	vk.renderHeight = height;
-	vk.renderScaleX = vk.renderScaleY = 1.0f;
+	vk_postfx_set_render_extent( width, height );
 
 	vk_begin_render_pass_tracked( vk.render_pass.ssao, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
 }
@@ -74,9 +71,7 @@ void vk_begin_ssao_blur_render_pass( void )
 	uint32_t height = 0;
 
 	vk_get_active_render_extent( &width, &height );
-	vk.renderWidth = width;
-	vk.renderHeight = height;
-	vk.renderScaleX = vk.renderScaleY = 1.0f;
+	vk_postfx_set_render_extent( width, height );
 
 	vk_begin_render_pass_tracked( vk.render_pass.ssao_blur, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
 }
@@ -89,9 +84,7 @@ void vk_begin_ssao_combine_render_pass( void )
 	uint32_t height = 0;
 
 	vk_get_active_render_extent( &width, &height );
-	vk.renderWidth = width;
-	vk.renderHeight = height;
-	vk.renderScaleX = vk.renderScaleY = 1.0f;
+	vk_postfx_set_render_extent( width, height );
 
 	vk_begin_render_pass_tracked( vk.render_pass.ssao_combine, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
 }
@@ -169,9 +162,7 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT );
-	vk.renderWidth = fullWidth;
-	vk.renderHeight = fullHeight;
-	vk.renderScaleX = vk.renderScaleY = 1.0f;
+	vk_postfx_set_render_extent( fullWidth, fullHeight );
 	vk_begin_render_pass_tracked( vk.render_pass.oit_resolve, vk.framebuffers.oit_resolve, qfalse, fullWidth, fullHeight );
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.oit_resolve_pipeline );
 	{
@@ -207,9 +198,7 @@ void vk_begin_ssr_render_pass( void )
 	uint32_t height = 0;
 
 	vk_get_active_render_extent( &width, &height );
-	vk.renderWidth = width;
-	vk.renderHeight = height;
-	vk.renderScaleX = vk.renderScaleY = 1.0f;
+	vk_postfx_set_render_extent( width, height );
 
 	vk_begin_render_pass_tracked( vk.render_pass.ssr, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
 }
