@@ -320,6 +320,36 @@ static void create_depth_attachment( uint32_t width, uint32_t height, VkSampleCo
 #endif
 }
 
+static void vk_create_fullres_color_attachment(
+	VkFormat format,
+	VkImageUsageFlags usage,
+	VkImage *image,
+	VkImageView *image_view,
+	VkImageLayout image_layout,
+	qboolean allowTransient )
+{
+	uint32_t width = 0;
+	uint32_t height = 0;
+
+	vk_get_active_render_extent( &width, &height );
+	create_color_attachment( width, height, VK_SAMPLE_COUNT_1_BIT, format, usage, image, image_view, image_layout, allowTransient, 0 );
+}
+
+static void vk_create_fullres_msaa_color_attachment(
+	VkSampleCountFlagBits samples,
+	VkFormat format,
+	VkImageUsageFlags usage,
+	VkImage *image,
+	VkImageView *image_view,
+	qboolean allowTransient )
+{
+	uint32_t width = 0;
+	uint32_t height = 0;
+
+	vk_get_active_render_extent( &width, &height );
+	create_color_attachment( width, height, samples, format, usage, image, image_view, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, allowTransient, 0 );
+}
+
 static void vk_create_depth_sample_view( void )
 {
 	VkImageViewCreateInfo view_desc;
@@ -428,24 +458,24 @@ void vk_create_attachments( void )
 
 		// ssao
 		if ( r_ssao && r_ssao->integer ) {
-			create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, vk.ssao_format,
-				sampledColorUsage, &vk.ssao_image, &vk.ssao_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
-			create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, vk.ssao_format,
-				sampledColorUsage, &vk.ssao_blur_image, &vk.ssao_blur_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
+			vk_create_fullres_color_attachment( vk.ssao_format,
+				sampledColorUsage, &vk.ssao_image, &vk.ssao_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+			vk_create_fullres_color_attachment( vk.ssao_format,
+				sampledColorUsage, &vk.ssao_blur_image, &vk.ssao_blur_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
 		}
 		if ( r_oit && r_oit->integer ) {
-			create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R16G16B16A16_SFLOAT,
+			vk_create_fullres_color_attachment( VK_FORMAT_R16G16B16A16_SFLOAT,
 				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-				&vk.oit_accum_image, &vk.oit_accum_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
-			create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R16_SFLOAT,
+				&vk.oit_accum_image, &vk.oit_accum_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+			vk_create_fullres_color_attachment( VK_FORMAT_R16_SFLOAT,
 				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-				&vk.oit_reveal_image, &vk.oit_reveal_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
+				&vk.oit_reveal_image, &vk.oit_reveal_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
 		}
 
 		// ssr (same format as color)
 		if ( PostFX_SSR_IsEnabled() ) {
-			create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
-				copyableColorUsage, &vk.ssr_image, &vk.ssr_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
+			vk_create_fullres_color_attachment( vk.color_format,
+				copyableColorUsage, &vk.ssr_image, &vk.ssr_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
 		}
 
         // cubemap
@@ -462,25 +492,25 @@ void vk_create_attachments( void )
         }
 
 		// post-processing/msaa-resolve
-			create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
-				copyableColorUsage, &vk.color_image, &vk.color_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
-			create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
+			vk_create_fullres_color_attachment( vk.color_format,
+				copyableColorUsage, &vk.color_image, &vk.color_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+			vk_create_fullres_color_attachment( vk.color_format,
 				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-				&vk.ui_overlay_image, &vk.ui_overlay_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
+				&vk.ui_overlay_image, &vk.ui_overlay_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
 			// scene copy sampled by volumetric composite (avoids read/write feedback on vk.color_image)
-				create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
+				vk_create_fullres_color_attachment( vk.color_format,
 					VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-					&vk.fog_scene_image, &vk.fog_scene_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
-				create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R32_SFLOAT,
+					&vk.fog_scene_image, &vk.fog_scene_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+				vk_create_fullres_color_attachment( VK_FORMAT_R32_SFLOAT,
 					VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-					&vk.volumetric_depth_image, &vk.volumetric_depth_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
-				create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R16G16_SFLOAT,
+					&vk.volumetric_depth_image, &vk.volumetric_depth_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+				vk_create_fullres_color_attachment( VK_FORMAT_R16G16_SFLOAT,
 					VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-					&vk.motion_vector_image, &vk.motion_vector_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
+					&vk.motion_vector_image, &vk.motion_vector_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
 				if ( vk.msaaActive ) {
-					create_color_attachment( fullWidth, fullHeight, vk_get_main_rasterization_samples(), VK_FORMAT_R16G16_SFLOAT,
+					vk_create_fullres_msaa_color_attachment( vk_get_main_rasterization_samples(), VK_FORMAT_R16G16_SFLOAT,
 						VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-						&vk.motion_vector_msaa_image, &vk.motion_vector_msaa_view, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, qtrue, 0 );
+						&vk.motion_vector_msaa_image, &vk.motion_vector_msaa_view, qtrue );
 				}
 
 		// screenmap-msaa
@@ -501,10 +531,10 @@ void vk_create_attachments( void )
 		create_depth_attachment( vk.screenMapWidth, vk.screenMapHeight, vk.screenMapSamples, &vk.screenMap.depth_image, &vk.screenMap.depth_image_view, qtrue );
 
 		if ( vk.msaaActive ) {
-			create_color_attachment( fullWidth, fullHeight, vk_get_main_rasterization_samples(), vk.color_format,
-				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &vk.msaa_image, &vk.msaa_image_view, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, qtrue, 0 );
-			create_color_attachment( fullWidth, fullHeight, vk_get_main_rasterization_samples(), vk.color_format,
-				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &vk.ui_overlay_msaa_image, &vk.ui_overlay_msaa_image_view, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, qtrue, 0 );
+			vk_create_fullres_msaa_color_attachment( vk_get_main_rasterization_samples(), vk.color_format,
+				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &vk.msaa_image, &vk.msaa_image_view, qtrue );
+			vk_create_fullres_msaa_color_attachment( vk_get_main_rasterization_samples(), vk.color_format,
+				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &vk.ui_overlay_msaa_image, &vk.ui_overlay_msaa_image_view, qtrue );
 		}
 
 		if ( r_ext_supersample->integer ) {
@@ -516,19 +546,19 @@ void vk_create_attachments( void )
 
 		if ( vk.smaaActive ) {
 			VkImageUsageFlags smaaUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-			create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
-				smaaUsage, &vk.smaa_edge_image, &vk.smaa_edge_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
-			create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
-				smaaUsage, &vk.smaa_blend_image, &vk.smaa_blend_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
-			create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
-				smaaUsage, &vk.smaa_output_image, &vk.smaa_output_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
+			vk_create_fullres_color_attachment( vk.color_format,
+				smaaUsage, &vk.smaa_edge_image, &vk.smaa_edge_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+			vk_create_fullres_color_attachment( vk.color_format,
+				smaaUsage, &vk.smaa_blend_image, &vk.smaa_blend_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+			vk_create_fullres_color_attachment( vk.color_format,
+				smaaUsage, &vk.smaa_output_image, &vk.smaa_output_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
 		}
 		{
 			VkImageUsageFlags taaUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-			create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
-				taaUsage, &vk.taa_history_image[0], &vk.taa_history_image_view[0], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
-			create_color_attachment( fullWidth, fullHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
-				taaUsage, &vk.taa_history_image[1], &vk.taa_history_image_view[1], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
+			vk_create_fullres_color_attachment( vk.color_format,
+				taaUsage, &vk.taa_history_image[0], &vk.taa_history_image_view[0], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+			vk_create_fullres_color_attachment( vk.color_format,
+				taaUsage, &vk.taa_history_image[1], &vk.taa_history_image_view[1], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
 		}
 
 		/* Luminance 1x1 for eye adaptation (r_exposure_auto) */
