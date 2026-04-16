@@ -26,14 +26,24 @@ static void vk_postfx_set_render_extent( uint32_t width, uint32_t height )
 	vk.renderScaleY = 1.0f;
 }
 
+static void vk_begin_postfx_render_pass(
+	VkRenderPass renderPass,
+	VkFramebuffer frameBuffer,
+	uint32_t width,
+	uint32_t height,
+	qboolean clear )
+{
+	vk_postfx_set_render_extent( width, height );
+	vk_begin_render_pass_tracked( renderPass, frameBuffer, clear, vk.renderWidth, vk.renderHeight );
+}
+
 static void vk_begin_fullres_postfx_render_pass( VkRenderPass renderPass, VkFramebuffer frameBuffer, qboolean clear )
 {
 	uint32_t width = 0;
 	uint32_t height = 0;
 
 	vk_get_active_render_extent( &width, &height );
-	vk_postfx_set_render_extent( width, height );
-	vk_begin_render_pass_tracked( renderPass, frameBuffer, clear, vk.renderWidth, vk.renderHeight );
+	vk_begin_postfx_render_pass( renderPass, frameBuffer, width, height, clear );
 }
 
 void vk_begin_bloom_extract_render_pass( void )
@@ -42,9 +52,8 @@ void vk_begin_bloom_extract_render_pass( void )
 
 	//vk.renderPassIndex = RENDER_PASS_BLOOM_EXTRACT; // doesn't matter, we will use dedicated pipelines
 
-	vk_postfx_set_render_extent( gls.captureWidth, gls.captureHeight );
-
-	vk_begin_render_pass_tracked( vk.render_pass.bloom_extract, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+	vk_begin_postfx_render_pass( vk.render_pass.bloom_extract, frameBuffer,
+		gls.captureWidth, gls.captureHeight, qfalse );
 }
 
 
@@ -54,10 +63,10 @@ void vk_begin_blur_render_pass( uint32_t index )
 
 	//vk.renderPassIndex = RENDER_PASS_BLOOM_EXTRACT; // doesn't matter, we will use dedicated pipelines
 
-	vk_postfx_set_render_extent( gls.captureWidth / ( 2 << ( index / 2 ) ),
-		gls.captureHeight / ( 2 << ( index / 2 ) ) );
-
-	vk_begin_render_pass_tracked( vk.render_pass.blur[ index ], frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+	vk_begin_postfx_render_pass( vk.render_pass.blur[ index ], frameBuffer,
+		gls.captureWidth / ( 2 << ( index / 2 ) ),
+		gls.captureHeight / ( 2 << ( index / 2 ) ),
+		qfalse );
 }
 
 
