@@ -26,6 +26,16 @@ static void vk_postfx_set_render_extent( uint32_t width, uint32_t height )
 	vk.renderScaleY = 1.0f;
 }
 
+static void vk_begin_fullres_postfx_render_pass( VkRenderPass renderPass, VkFramebuffer frameBuffer, qboolean clear )
+{
+	uint32_t width = 0;
+	uint32_t height = 0;
+
+	vk_get_active_render_extent( &width, &height );
+	vk_postfx_set_render_extent( width, height );
+	vk_begin_render_pass_tracked( renderPass, frameBuffer, clear, vk.renderWidth, vk.renderHeight );
+}
+
 void vk_begin_bloom_extract_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.bloom_extract;
@@ -54,39 +64,21 @@ void vk_begin_blur_render_pass( uint32_t index )
 void vk_begin_ssao_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.ssao;
-	uint32_t width = 0;
-	uint32_t height = 0;
-
-	vk_get_active_render_extent( &width, &height );
-	vk_postfx_set_render_extent( width, height );
-
-	vk_begin_render_pass_tracked( vk.render_pass.ssao, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+	vk_begin_fullres_postfx_render_pass( vk.render_pass.ssao, frameBuffer, qfalse );
 }
 
 
 void vk_begin_ssao_blur_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.ssao_blur;
-	uint32_t width = 0;
-	uint32_t height = 0;
-
-	vk_get_active_render_extent( &width, &height );
-	vk_postfx_set_render_extent( width, height );
-
-	vk_begin_render_pass_tracked( vk.render_pass.ssao_blur, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+	vk_begin_fullres_postfx_render_pass( vk.render_pass.ssao_blur, frameBuffer, qfalse );
 }
 
 
 void vk_begin_ssao_combine_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.ssao_combine;
-	uint32_t width = 0;
-	uint32_t height = 0;
-
-	vk_get_active_render_extent( &width, &height );
-	vk_postfx_set_render_extent( width, height );
-
-	vk_begin_render_pass_tracked( vk.render_pass.ssao_combine, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+	vk_begin_fullres_postfx_render_pass( vk.render_pass.ssao_combine, frameBuffer, qfalse );
 }
 
 
@@ -194,13 +186,7 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 void vk_begin_ssr_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.ssr;
-	uint32_t width = 0;
-	uint32_t height = 0;
-
-	vk_get_active_render_extent( &width, &height );
-	vk_postfx_set_render_extent( width, height );
-
-	vk_begin_render_pass_tracked( vk.render_pass.ssr, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+	vk_begin_fullres_postfx_render_pass( vk.render_pass.ssr, frameBuffer, qfalse );
 }
 
 
