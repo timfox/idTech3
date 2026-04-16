@@ -64,6 +64,16 @@ void vk_reset_scene_src_rect_tracking( void )
 	vk_scene_src_rect_valid = qfalse;
 }
 
+qboolean vk_get_scene_src_rect( VkRect2D *out_rect )
+{
+	if ( !out_rect || !vk_scene_src_rect_valid ) {
+		return qfalse;
+	}
+
+	*out_rect = vk_scene_src_rect;
+	return qtrue;
+}
+
 static void vk_get_viewport_rect( VkRect2D *r )
 {
 	if ( backEnd.projection2D ) {
