@@ -37,6 +37,12 @@ void vk_end_frame_record_capture_if_needed( void )
 				(unsigned long long)(uintptr_t)capture_src );
 		}
 
+		vk.renderWidth = cap_w;
+		vk.renderHeight = cap_h;
+		vk.renderScaleX = 1.0f;
+		vk.renderScaleY = 1.0f;
+		vk_update_postfx_params( vk.cmd_index );
+
 		vk_begin_render_pass_tracked( vk.render_pass.capture, vk.framebuffers.capture, qfalse, cap_w, cap_h );
 		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.capture_pipeline );
 		{
