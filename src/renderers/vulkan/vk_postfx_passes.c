@@ -169,7 +169,7 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT );
-	vk.begin_render_pass_tracked?
+	vk_begin_render_pass_tracked( vk.render_pass.oit_resolve, vk.framebuffers.oit_resolve, qfalse, fullWidth, fullHeight );
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.oit_resolve_pipeline );
 	{
 		VkDescriptorSet sets[3] = { vk.oit_opaque_descriptor, vk.oit_accum_descriptor, vk.oit_reveal_descriptor };
