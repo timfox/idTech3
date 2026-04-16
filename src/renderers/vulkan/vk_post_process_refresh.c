@@ -12,13 +12,14 @@ Extracted from vk.c for incremental modularization.
 #include "vk_atmosphere.h"
 #include "vk_pipeline_helpers.h"
 #include "vk_postfx.h"
+#include "vk_scene_pass.h"
 
 void vk_update_post_process_pipelines( void )
 {
-	uint32_t postWidth = ( vk.renderWidth > 0 ) ? (uint32_t)vk.renderWidth :
-		( glConfig.vidWidth > 0 ? (uint32_t)glConfig.vidWidth : 1u );
-	uint32_t postHeight = ( vk.renderHeight > 0 ) ? (uint32_t)vk.renderHeight :
-		( glConfig.vidHeight > 0 ? (uint32_t)glConfig.vidHeight : 1u );
+	uint32_t postWidth = 0;
+	uint32_t postHeight = 0;
+
+	vk_get_active_render_extent( &postWidth, &postHeight );
 
 	if ( vk.fboActive ) {
 		vk_create_post_process_pipeline( 0, 0, 0 );

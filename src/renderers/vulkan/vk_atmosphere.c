@@ -4,6 +4,7 @@
 #include "vk_image_layout.h"
 #include "vk_postfx.h"
 #include "vk_render_pass.h"
+#include "vk_scene_pass.h"
 #include <math.h>
 
 void vk_atmosphere_build_push_constants( vkAtmospherePushConstants_t *pc )
@@ -66,18 +67,6 @@ void vk_atmosphere_build_push_constants( vkAtmospherePushConstants_t *pc )
 	pc->viewParams[3] = 0.0f;
 }
 
-void vk_atmosphere_get_dimensions( uint32_t *width, uint32_t *height )
-{
-	if ( width ) {
-		*width = ( vk.renderWidth > 0 ) ? (uint32_t)vk.renderWidth :
-			( glConfig.vidWidth > 0 ? (uint32_t)glConfig.vidWidth : 1u );
-	}
-	if ( height ) {
-		*height = ( vk.renderHeight > 0 ) ? (uint32_t)vk.renderHeight :
-			( glConfig.vidHeight > 0 ? (uint32_t)glConfig.vidHeight : 1u );
-	}
-}
-
 void vk_atmosphere_pass( void )
 {
 	VkImageAspectFlags depth_aspect;
@@ -90,7 +79,7 @@ void vk_atmosphere_pass( void )
 		return;
 	}
 
-	vk_atmosphere_get_dimensions( &passWidth, &passHeight );
+	vk_get_active_render_extent( &passWidth, &passHeight );
 
 	depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
 	if ( glConfig.stencilBits > 0 ) {

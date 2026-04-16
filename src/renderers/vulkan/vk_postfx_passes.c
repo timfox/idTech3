@@ -10,24 +10,13 @@ SSAO/HBAO pass, and vk_bloom. Split from vk.c.
 #include "tr_local.h"
 #include "vk_image_layout.h"
 #include "vk_render_pass.h"
+#include "vk_scene_pass.h"
 #include "vk_postfx.h"
 #include "vk_post_fog.h"
 #include "vk_volumetric_pass.h"
 #include "vk_volumetric_internal.h"
 #include "vk_util.h"
 #include "vk_device.h"
-
-static void vk_postfx_get_fullres_extent( uint32_t *width, uint32_t *height )
-{
-	if ( width ) {
-		*width = ( vk.renderWidth > 0 ) ? (uint32_t)vk.renderWidth :
-			( glConfig.vidWidth > 0 ? (uint32_t)glConfig.vidWidth : 1u );
-	}
-	if ( height ) {
-		*height = ( vk.renderHeight > 0 ) ? (uint32_t)vk.renderHeight :
-			( glConfig.vidHeight > 0 ? (uint32_t)glConfig.vidHeight : 1u );
-	}
-}
 
 void vk_begin_bloom_extract_render_pass( void )
 {
@@ -69,7 +58,7 @@ void vk_begin_ssao_render_pass( void )
 	uint32_t width = 0;
 	uint32_t height = 0;
 
-	vk_postfx_get_fullres_extent( &width, &height );
+	vk_get_active_render_extent( &width, &height );
 	vk.renderWidth = width;
 	vk.renderHeight = height;
 	vk.renderScaleX = vk.renderScaleY = 1.0f;
@@ -84,7 +73,7 @@ void vk_begin_ssao_blur_render_pass( void )
 	uint32_t width = 0;
 	uint32_t height = 0;
 
-	vk_postfx_get_fullres_extent( &width, &height );
+	vk_get_active_render_extent( &width, &height );
 	vk.renderWidth = width;
 	vk.renderHeight = height;
 	vk.renderScaleX = vk.renderScaleY = 1.0f;
@@ -99,7 +88,7 @@ void vk_begin_ssao_combine_render_pass( void )
 	uint32_t width = 0;
 	uint32_t height = 0;
 
-	vk_postfx_get_fullres_extent( &width, &height );
+	vk_get_active_render_extent( &width, &height );
 	vk.renderWidth = width;
 	vk.renderHeight = height;
 	vk.renderScaleX = vk.renderScaleY = 1.0f;
@@ -125,7 +114,7 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 		return;
 
 	vk_end_render_pass();
-	vk_postfx_get_fullres_extent( &fullWidth, &fullHeight );
+	vk_get_active_render_extent( &fullWidth, &fullHeight );
 
 	/* Copy opaque scene to fog_scene for resolve */
 	Com_Memset( &copy_region, 0, sizeof( copy_region ) );
