@@ -132,6 +132,10 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 	}
 	vk_update_color_descriptor_image( taa_src );
 	vk_get_active_render_extent( &taaWidth, &taaHeight );
+	vk.renderWidth = taaWidth;
+	vk.renderHeight = taaHeight;
+	vk.renderScaleX = vk.renderScaleY = 1.0f;
+	vk_update_postfx_params( vk.cmd_index );
 
 	vk_begin_render_pass_tracked( vk.render_pass.taa, vk.framebuffers.taa[writeIndex], qfalse,
 		taaWidth, taaHeight );
@@ -348,6 +352,7 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 	 */
 	vk_temporal_update_auto_exposure();
 	vk_end_frame_update_gamma_target();
+	vk_update_postfx_params( vk.cmd_index );
 
 	if ( r_fboDebug && r_fboDebug->integer >= 2 && vk_post_fog_fbo_debug_throttle() ) {
 		const float sx = ( glConfig.vidWidth > 0 ) ? (float)vk.renderWidth / (float)glConfig.vidWidth : 1.0f;
