@@ -98,7 +98,8 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 	taa_src = ( *post_fog_src != VK_NULL_HANDLE ) ? *post_fog_src : vk.color_image_view;
 	allow_taa = ( tr.world != NULL ) &&
 		( ( backEnd.refdef.rdflags & RDF_NOWORLDMODEL ) == 0 ) &&
-		( backEnd.viewParms.portalView == PV_NONE );
+		( backEnd.viewParms.portalView == PV_NONE ) &&
+		( vk.temporal.firstPersonProjectionThisFrame == vk.temporal.firstPersonProjectionLastFrame );
 
 	if ( !allow_taa ||
 		!( r_taa && r_taa->integer ) ||
