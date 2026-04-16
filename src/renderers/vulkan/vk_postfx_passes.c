@@ -17,6 +17,18 @@ SSAO/HBAO pass, and vk_bloom. Split from vk.c.
 #include "vk_util.h"
 #include "vk_device.h"
 
+static void vk_postfx_get_fullres_extent( uint32_t *width, uint32_t *height )
+{
+	if ( width ) {
+		*width = ( vk.renderWidth > 0 ) ? (uint32_t)vk.renderWidth :
+			( glConfig.vidWidth > 0 ? (uint32_t)glConfig.vidWidth : 1u );
+	}
+	if ( height ) {
+		*height = ( vk.renderHeight > 0 ) ? (uint32_t)vk.renderHeight :
+			( glConfig.vidHeight > 0 ? (uint32_t)glConfig.vidHeight : 1u );
+	}
+}
+
 void vk_begin_bloom_extract_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.bloom_extract;
@@ -54,9 +66,12 @@ void vk_begin_blur_render_pass( uint32_t index )
 void vk_begin_ssao_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.ssao;
+	uint32_t width = 0;
+	uint32_t height = 0;
 
-	vk.renderWidth = glConfig.vidWidth;
-	vk.renderHeight = glConfig.vidHeight;
+	vk_postfx_get_fullres_extent( &width, &height );
+	vk.renderWidth = width;
+	vk.renderHeight = height;
 	vk.renderScaleX = vk.renderScaleY = 1.0f;
 
 	vk_begin_render_pass_tracked( vk.render_pass.ssao, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
@@ -66,9 +81,12 @@ void vk_begin_ssao_render_pass( void )
 void vk_begin_ssao_blur_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.ssao_blur;
+	uint32_t width = 0;
+	uint32_t height = 0;
 
-	vk.renderWidth = glConfig.vidWidth;
-	vk.renderHeight = glConfig.vidHeight;
+	vk_postfx_get_fullres_extent( &width, &height );
+	vk.renderWidth = width;
+	vk.renderHeight = height;
 	vk.renderScaleX = vk.renderScaleY = 1.0f;
 
 	vk_begin_render_pass_tracked( vk.render_pass.ssao_blur, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
@@ -78,9 +96,12 @@ void vk_begin_ssao_blur_render_pass( void )
 void vk_begin_ssao_combine_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.ssao_combine;
+	uint32_t width = 0;
+	uint32_t height = 0;
 
-	vk.renderWidth = glConfig.vidWidth;
-	vk.renderHeight = glConfig.vidHeight;
+	vk_postfx_get_fullres_extent( &width, &height );
+	vk.renderWidth = width;
+	vk.renderHeight = height;
 	vk.renderScaleX = vk.renderScaleY = 1.0f;
 
 	vk_begin_render_pass_tracked( vk.render_pass.ssao_combine, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
@@ -90,6 +111,8 @@ void vk_begin_ssao_combine_render_pass( void )
 void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 {
 	VkImageCopy copy_region;
+	uint32_t fullWidth = 0;
+	uint32_t fullHeight = 0;
 
 	if ( !r_oit || !r_oit->integer || !r_fbo || !r_fbo->integer || !vk.fboActive ||
 		vk.render_pass.oit_accum == VK_NULL_HANDLE || vk.render_pass.oit_resolve == VK_NULL_HANDLE ||
@@ -102,6 +125,7 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 		return;
 
 	vk_end_render_pass();
+	vk_postfx_get_fullres_extent( &fullWidth, &fullHeight );
 
 	/* Copy opaque scene to fog_scene for resolve */
 	Com_Memset( &copy_region, 0, sizeof( copy_region ) );
@@ -109,8 +133,8 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 	copy_region.srcSubresource.layerCount = 1;
 	copy_region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	copy_region.dstSubresource.layerCount = 1;
-	copy_region.extent.width = glConfig.vidWidth;
-	copy_region.extent.height = glConfig.vidHeight;
+	copy_region.extent.width = fullWidth;
+	copy_region.extent.height = fullHeight;
 	copy_region.extent.depth = 1;
 	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
@@ -142,7 +166,7 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 	}
 
 	/* OIT accum pass: draw transparent surfaces (when oit_accum_pipeline ready) */
-	vk_begin_render_pass_tracked( vk.render_pass.oit_accum, vk.framebuffers.oit_accum, qtrue, glConfig.vidWidth, glConfig.vidHeight );
+	vk_begin_render_pass_tracked( vk.render_pass.oit_accum, vk.framebuffers.oit_accum, qtrue, fullWidth, fullHeight );
 	if ( vk.oit_accum_pipeline ) {
 		backEnd.oitAccumPass = qtrue;
 		backEnd.drawSurfFilter = 2;
@@ -156,7 +180,7 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT );
-	vk_begin_render_pass_tracked( vk.render_pass.oit_resolve, vk.framebuffers.oit_resolve, qfalse, glConfig.vidWidth, glConfig.vidHeight );
+	vk.begin_render_pass_tracked?
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.oit_resolve_pipeline );
 	{
 		VkDescriptorSet sets[3] = { vk.oit_opaque_descriptor, vk.oit_accum_descriptor, vk.oit_reveal_descriptor };
