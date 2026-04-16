@@ -16,5 +16,6 @@ typedef struct {
 
 void vk_atmosphere_build_push_constants( vkAtmospherePushConstants_t *pc );
 void vk_atmosphere_pass( void );
+void vk_atmosphere_get_dimensions( uint32_t *width, uint32_t *height );
 
 #endif

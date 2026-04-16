@@ -15,20 +15,25 @@ Extracted from vk.c for incremental modularization.
 
 void vk_update_post_process_pipelines( void )
 {
+	uint32_t postWidth = ( vk.renderWidth > 0 ) ? (uint32_t)vk.renderWidth :
+		( glConfig.vidWidth > 0 ? (uint32_t)glConfig.vidWidth : 1u );
+	uint32_t postHeight = ( vk.renderHeight > 0 ) ? (uint32_t)vk.renderHeight :
+		( glConfig.vidHeight > 0 ? (uint32_t)glConfig.vidHeight : 1u );
+
 	if ( vk.fboActive ) {
 		vk_create_post_process_pipeline( 0, 0, 0 );
 		if ( vk.ui_overlay_image != VK_NULL_HANDLE ) {
-			vk_create_post_process_pipeline( 22, glConfig.vidWidth, glConfig.vidHeight );
+			vk_create_post_process_pipeline( 22, postWidth, postHeight );
 		}
 		if ( vk.capture.image ) {
 			vk_create_post_process_pipeline( 3, gls.captureWidth, gls.captureHeight );
 		}
 		if ( vk.smaaActive ) {
-			vk_create_post_process_pipeline( 10, glConfig.vidWidth, glConfig.vidHeight );
-			vk_create_post_process_pipeline( 11, glConfig.vidWidth, glConfig.vidHeight );
-			vk_create_post_process_pipeline( 12, glConfig.vidWidth, glConfig.vidHeight );
+			vk_create_post_process_pipeline( 10, postWidth, postHeight );
+			vk_create_post_process_pipeline( 11, postWidth, postHeight );
+			vk_create_post_process_pipeline( 12, postWidth, postHeight );
 		}
-		vk_create_post_process_pipeline( 23, glConfig.vidWidth, glConfig.vidHeight );
+		vk_create_post_process_pipeline( 23, postWidth, postHeight );
 		if ( r_bloom->integer ) {
 			uint32_t width = gls.captureWidth;
 			uint32_t height = gls.captureHeight;
@@ -43,23 +48,23 @@ void vk_update_post_process_pipelines( void )
 				vk_create_blur_pipeline( i + 1, width, height, qfalse );
 			}
 
-			vk_create_post_process_pipeline( 2, glConfig.vidWidth, glConfig.vidHeight );
+			vk_create_post_process_pipeline( 2, postWidth, postHeight );
 		}
 
 		if ( r_ssao && r_ssao->integer ) {
-			vk_create_post_process_pipeline( 5, glConfig.vidWidth, glConfig.vidHeight );
-			vk_create_post_process_pipeline( 21, glConfig.vidWidth, glConfig.vidHeight );
-			vk_create_post_process_pipeline( 6, glConfig.vidWidth, glConfig.vidHeight );
-			vk_create_post_process_pipeline( 7, glConfig.vidWidth, glConfig.vidHeight );
-			vk_create_post_process_pipeline( 8, glConfig.vidWidth, glConfig.vidHeight );
-			vk_create_post_process_pipeline( 9, glConfig.vidWidth, glConfig.vidHeight );
+			vk_create_post_process_pipeline( 5, postWidth, postHeight );
+			vk_create_post_process_pipeline( 21, postWidth, postHeight );
+			vk_create_post_process_pipeline( 6, postWidth, postHeight );
+			vk_create_post_process_pipeline( 7, postWidth, postHeight );
+			vk_create_post_process_pipeline( 8, postWidth, postHeight );
+			vk_create_post_process_pipeline( 9, postWidth, postHeight );
 		}
 		if ( r_oit && r_oit->integer ) {
-			vk_create_post_process_pipeline( 20, glConfig.vidWidth, glConfig.vidHeight );
+			vk_create_post_process_pipeline( 20, postWidth, postHeight );
 			vk_create_oit_accum_pipeline();
 		}
 		if ( PostFX_SSR_IsEnabled() ) {
-			vk_create_post_process_pipeline( 13, glConfig.vidWidth, glConfig.vidHeight );
+			vk_create_post_process_pipeline( 13, postWidth, postHeight );
 		}
 		vk_create_atmosphere_pipeline();
 	}
