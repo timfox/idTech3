@@ -94,6 +94,7 @@ Priorities that keep **CI green** and **README/build truth** aligned:
 ### Renderer 2026 Architecture Pass
 - [ ] Lighting scalability: move Vulkan from legacy dynamic-light selection toward clustered Forward+; decouple Vulkan light scale from `MAX_DLIGHTS` and surface-bit assumptions. See `docs/RENDERER_2026_ARCHITECTURE_PASS.md`.
 - [ ] Temporal robustness: introduce shared history invalidation and stronger motion-vector coverage before adding TAA/upscaling or RT reuse systems. See `docs/RENDERER_2026_ARCHITECTURE_PASS.md`.
+  - Incremental progress on `main`: shared temporal reset policy is already in place; recent hardening passes now gate or bypass unstable first-person TAA history and improve post/gamma source-region tracking for internal-resolution presentation. More post-pass dimension cleanup is still needed before calling the temporal path "done."
 - [ ] Platform strategy: keep Vulkan primary, freeze OpenGL as compatibility-only, prioritize Metal ahead of DXR, and treat RTX as a Vulkan feature tier. See `docs/RENDERER_2026_ARCHITECTURE_PASS.md`.
 
 ### Short-Term (completed)

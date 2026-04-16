@@ -85,6 +85,16 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 ### Anti-Aliasing
 - **SMAA** (Sub-pixel Morphological Anti-Aliasing): edge detection, blend weight, and compose passes. Cvars: `r_ext_smaa` (enable), `r_smaa_preset` (0=Custom, 1=Low, 2=Medium, 3=High, 4=Ultra), `r_smaa_threshold` (0.01–0.5), `r_smaa_local_contrast` (1–4), `r_smaa_max_search_steps` (8–32), `r_smaa_corner_rounding` (0–1). Preset overrides manual params when non-zero. Edge detection uses max(left,right) and max(top,bottom) deltas (reference SMAA), HDR-safe luma, configurable corner rounding, and explicit LOD 0 sampling. Requires `r_fbo 1`.
 - **MSAA**: Multi-sample anti-aliasing for geometry edges. Cvar `r_ext_multisample` (0|2|4|8|16). Requires `r_fbo 1`. `r_msaa_sample_shading` enables per-sample shading for better alpha/specular quality (~2x fragment cost). `r_ext_alpha_to_coverage` improves alpha-tested surfaces (foliage, grates) when MSAA is on. MSAA and SMAA can be used together: MSAA handles geometry edges, SMAA handles alpha/transparency edges.
+- **TAA**: Optional temporal resolve for the Vulkan HDR/post path. Cvars: `r_taa`, `r_taa_feedbackStationary`, `r_taa_feedbackMotion`, `r_taa_sharpen`. Best used with world rendering plus internal-resolution rendering (`r_renderScale`) when you want a softer, more temporally stable presentation than pure SMAA/MSAA. TAA is intentionally conservative: portal views, non-world/menu/cinematic paths, missing history, and first-person projection transitions invalidate or bypass history rather than trying to blend through unstable motion.
+
+### Internal Resolution / Present Scaling
+- **Internal resolution controls**: `r_renderScale`, `r_renderWidth`, and `r_renderHeight` let the renderer shade at one resolution and present at another. This is the in-engine alternative to vendor upscalers.
+- `r_renderScale 0` disables custom internal resolution.
+- `r_renderScale 1/2` use nearest filtering; `3/4` use linear filtering. Modes `2/4` preserve aspect ratio with black bars; `1/3` stretch to the window.
+- Recommended combinations:
+  - sharp/default path: `r_taa 0`, `r_ext_smaa 1`, optional MSAA
+  - softer temporal path: `r_taa 1`, `r_renderScale 3` or `4`, custom `r_renderWidth` / `r_renderHeight`
+- Current renderer truth: internal-resolution presentation is supported, but some post paths are still being hardened around source-region tracking and active render-target sizing. Prefer modest scale reductions first.
 
 ### Order-Independent Transparency (OIT)
 - Weighted Blended OIT (WBOIT) for correct blending of overlapping transparent surfaces
@@ -162,6 +172,13 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 | `r_exposure_auto` | 0 | Eye adaptation (0=manual, 1=temporal blend toward target) |
 | `r_exposure_auto_target` | 0.5 | Target exposure for eye adaptation |
 | `r_exposure_auto_speed` | 2.0 | Adaptation speed (higher = faster) |
+| `r_taa` | 0 | Optional temporal resolve for Vulkan HDR/post-processing. Best for world rendering; history is conservatively invalidated on unstable paths. |
+| `r_taa_feedbackStationary` | 0.92 | TAA history feedback for stable pixels. Higher = smoother, lower = more responsive. |
+| `r_taa_feedbackMotion` | 0.72 | TAA history feedback for moving pixels. Lower helps reduce ghosting. |
+| `r_taa_sharpen` | 0.12 | Post-resolve sharpening applied inside the TAA pass. |
+| `r_renderScale` | 0 | Custom internal-resolution presentation mode: 0=off, 1/2=nearest, 3/4=linear; 2/4 preserve aspect ratio. |
+| `r_renderWidth` | 800 | Internal render width used when `r_renderScale > 0`. |
+| `r_renderHeight` | 600 | Internal render height used when `r_renderScale > 0`. |
 | `r_post_contrast` | 1.0 | Post-tonemap contrast (1=neutral, >1=punchier, <1=flatter) |
 | `r_post_saturation` | 1.0 | Post-tonemap saturation (1=neutral, >1=vivid, <1=desaturated) |
 | `r_atmosphere` | 1 | Procedural atmospheric sky (Rayleigh+Mie). Replaces grey sky when no HDR skybox. |
