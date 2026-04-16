@@ -3,6 +3,18 @@
 #include "vk_render_pass.h"
 #include "vk_scene_pass.h"
 
+void vk_get_active_render_extent( uint32_t *width, uint32_t *height )
+{
+	if ( width ) {
+		*width = ( vk.renderWidth > 0 ) ? (uint32_t)vk.renderWidth :
+			( glConfig.vidWidth > 0 ? (uint32_t)glConfig.vidWidth : 1u );
+	}
+	if ( height ) {
+		*height = ( vk.renderHeight > 0 ) ? (uint32_t)vk.renderHeight :
+			( glConfig.vidHeight > 0 ? (uint32_t)glConfig.vidHeight : 1u );
+	}
+}
+
 static void vk_configure_scene_pass_dimensions( void )
 {
 	uint32_t logicalWidth = ( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u;
