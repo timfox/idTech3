@@ -89,7 +89,7 @@ void main() {
 	vec3 current = sampleCurrent( uv );
 	float depthNdc = textureLod( depthTex, uv, 0.0 ).r;
 
-	if ( postfx.taaParams.x < 0.5 || depthNdc <= 0.0 || depthNdc >= 1.0 ) {
+	if ( postfx.taaParams.x < 0.5 || postfx.frameInfo.w < 0.5 || depthNdc <= 0.0 || depthNdc >= 1.0 ) {
 		out_color = vec4( current, 1.0 );
 		return;
 	}
