@@ -350,6 +350,19 @@ static void vk_create_fullres_msaa_color_attachment(
 	create_color_attachment( width, height, samples, format, usage, image, image_view, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, allowTransient, 0 );
 }
 
+static void vk_create_fullres_depth_attachment(
+	VkSampleCountFlagBits samples,
+	VkImage *image,
+	VkImageView *image_view,
+	qboolean allowTransient )
+{
+	uint32_t width = 0;
+	uint32_t height = 0;
+
+	vk_get_active_render_extent( &width, &height );
+	create_depth_attachment( width, height, samples, image, image_view, allowTransient );
+}
+
 static void vk_create_depth_sample_view( void )
 {
 	VkImageViewCreateInfo view_desc;
@@ -607,7 +620,7 @@ void vk_create_attachments( void )
 
 	//vk_alloc_attachments();
 
-	create_depth_attachment( fullWidth, fullHeight, vk_get_main_rasterization_samples(), &vk.depth_image, &vk.depth_image_view,
+	vk_create_fullres_depth_attachment( vk_get_main_rasterization_samples(), &vk.depth_image, &vk.depth_image_view,
 		(vk.fboActive && r_bloom->integer) || (r_ssao && r_ssao->integer) || (PostFX_SSR_IsEnabled()) ? qfalse : qtrue );
 	vk.depth_image_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
