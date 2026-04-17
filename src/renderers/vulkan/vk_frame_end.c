@@ -20,6 +20,14 @@ static void vk_end_frame_refresh_postfx_params_for_target( uint32_t width, uint3
 	vk_update_postfx_params( vk.cmd_index );
 }
 
+static void vk_end_frame_bind_post_process_sets( VkDescriptorSet set0, VkDescriptorSet set1, VkDescriptorSet set2, VkDescriptorSet set3 )
+{
+	VkDescriptorSet sets[4] = { set0, set1, set2, set3 };
+
+	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+		vk.pipeline_layout_post_process, 0, 4, sets, 0, NULL );
+}
+
 void vk_end_frame_record_capture_if_needed( void )
 {
 	if ( !backEnd.screenshotMask || !vk.capture.image ) {
@@ -50,15 +58,11 @@ void vk_end_frame_record_capture_if_needed( void )
 
 		vk_begin_render_pass_tracked( vk.render_pass.capture, vk.framebuffers.capture, qfalse, cap_w, cap_h );
 		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.capture_pipeline );
-		{
-			VkDescriptorSet capture_sets[4] = {
-				vk.color_descriptor[vk.cmd_index],
-				vk.depth_descriptor[vk.cmd_index],
-				vk.postfx_params_descriptor[vk.cmd_index],
-				PostFX_GetLUTImage()->descriptor
-			};
-			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 4, capture_sets, 0, NULL );
-		}
+		vk_end_frame_bind_post_process_sets(
+			vk.color_descriptor[vk.cmd_index],
+			vk.depth_descriptor[vk.cmd_index],
+			vk.postfx_params_descriptor[vk.cmd_index],
+			PostFX_GetLUTImage()->descriptor );
 		vk_set_fullscreen_viewport_scissor( cap_w, cap_h );
 		qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 	}
@@ -148,16 +152,11 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 	vk_begin_render_pass_tracked( vk.render_pass.taa, vk.framebuffers.taa[writeIndex], qfalse,
 		taaWidth, taaHeight );
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.taa_pipeline );
-	{
-		VkDescriptorSet taa_sets[4] = {
-			vk.post_color_descriptor[vk.cmd_index],
-			vk.depth_descriptor[vk.cmd_index],
-			vk.postfx_params_descriptor[vk.cmd_index],
-			vk.taa_history_descriptor[readIndex]
-		};
-		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-			vk.pipeline_layout_post_process, 0, 4, taa_sets, 0, NULL );
-	}
+	vk_end_frame_bind_post_process_sets(
+		vk.post_color_descriptor[vk.cmd_index],
+		vk.depth_descriptor[vk.cmd_index],
+		vk.postfx_params_descriptor[vk.cmd_index],
+		vk.taa_history_descriptor[readIndex] );
 	vk_set_fullscreen_viewport_scissor( taaWidth, taaHeight );
 	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 	vk_end_render_pass();
@@ -427,21 +426,11 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 
 	vk_begin_render_pass_tracked( vk.render_pass.gamma, vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ], qfalse, vk.renderWidth, vk.renderHeight );
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.gamma_pipeline );
-	{
-		VkDescriptorSet gamma_sets[3] = {
-			vk.post_color_descriptor[vk.cmd_index],
-			vk.depth_descriptor[vk.cmd_index],
-			vk.postfx_params_descriptor[vk.cmd_index]
-		};
-		VkDescriptorSet gamma_lut_set = PostFX_GetLUTImage()->descriptor;
-		VkDescriptorSet gamma_bind_sets[4] = {
-			gamma_sets[0],
-			gamma_sets[1],
-			gamma_sets[2],
-			gamma_lut_set
-		};
-		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 4, gamma_bind_sets, 0, NULL );
-	}
+	vk_end_frame_bind_post_process_sets(
+		vk.post_color_descriptor[vk.cmd_index],
+		vk.depth_descriptor[vk.cmd_index],
+		vk.postfx_params_descriptor[vk.cmd_index],
+		PostFX_GetLUTImage()->descriptor );
 
 	{
 		VkPostProcessPushConstants push;
