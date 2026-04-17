@@ -52,6 +52,16 @@ static void vk_postfx_draw_fullscreen_quad( void )
 	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 }
 
+static void vk_postfx_run_blur_pass( uint32_t passIndex, VkDescriptorSet sourceDescriptor )
+{
+	vk_begin_blur_render_pass( passIndex );
+	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.blur_pipeline[passIndex] );
+	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+		vk.pipeline_layout_post_process, 0, 1, &sourceDescriptor, 0, NULL );
+	vk_postfx_draw_fullscreen_quad();
+	vk_end_render_pass();
+}
+
 static void vk_copy_color_to_fog_scene( uint32_t width, uint32_t height )
 {
 	VkImageCopy copy_region;
@@ -507,33 +517,16 @@ qboolean vk_bloom( void )
 				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
 
 			// horizontal blur: downsampled source -> ping image
-			vk_begin_blur_render_pass( i + 0 );
-			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.blur_pipeline[i+0] );
-			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.bloom_image_descriptor[dstIndex], 0, NULL );
-			vk_postfx_draw_fullscreen_quad();
-			vk_end_render_pass();
+			vk_postfx_run_blur_pass( i + 0, vk.bloom_image_descriptor[dstIndex] );
 
 			// vertical blur: ping image -> final image for this level
-			vk_begin_blur_render_pass( i + 1 );
-			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.blur_pipeline[i+1] );
-			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.bloom_image_descriptor[i+1], 0, NULL );
-			vk_postfx_draw_fullscreen_quad();
-			vk_end_render_pass();
+			vk_postfx_run_blur_pass( i + 1, vk.bloom_image_descriptor[i+1] );
 		}
 	} else {
 		// Fallback to legacy downsample+blur in one pass if blit features are unavailable.
 		for ( i = 0; i < VK_NUM_BLOOM_PASSES * 2; i += 2 ) {
-			vk_begin_blur_render_pass( i + 0 );
-			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.blur_pipeline[i+0] );
-			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.bloom_image_descriptor[i+0], 0, NULL );
-			vk_postfx_draw_fullscreen_quad();
-			vk_end_render_pass();
-
-			vk_begin_blur_render_pass( i + 1 );
-			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.blur_pipeline[i+1] );
-			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.bloom_image_descriptor[i+1], 0, NULL );
-			vk_postfx_draw_fullscreen_quad();
-			vk_end_render_pass();
+			vk_postfx_run_blur_pass( i + 0, vk.bloom_image_descriptor[i+0] );
+			vk_postfx_run_blur_pass( i + 1, vk.bloom_image_descriptor[i+1] );
 		}
 	}
 
