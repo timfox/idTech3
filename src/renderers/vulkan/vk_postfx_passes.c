@@ -46,6 +46,12 @@ static void vk_begin_fullres_postfx_render_pass( VkRenderPass renderPass, VkFram
 	vk_begin_postfx_render_pass( renderPass, frameBuffer, width, height, clear );
 }
 
+static void vk_postfx_draw_fullscreen_quad( void )
+{
+	vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
+	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+}
+
 static void vk_copy_color_to_fog_scene( uint32_t width, uint32_t height )
 {
 	VkImageCopy copy_region;
@@ -181,8 +187,7 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 		VkDescriptorSet sets[3] = { vk.oit_opaque_descriptor, vk.oit_accum_descriptor, vk.oit_reveal_descriptor };
 		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_oit_resolve, 0, 3, sets, 0, NULL );
 	}
-	vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
-	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+	vk_postfx_draw_fullscreen_quad();
 	vk_end_render_pass();
 	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -267,8 +272,7 @@ void vk_ssr_pass( void )
 	push.params2[3] = PostFX_SSR_GetFresnelExponent();
 
 	qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_ssr, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
-	vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
-	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+	vk_postfx_draw_fullscreen_quad();
 	vk_end_render_pass();
 
 	/* Copy ssr_image back to color */
@@ -379,8 +383,7 @@ qboolean vk_ssao_pass( void )
 		}
 
 		qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_ssao, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
-		vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
-		qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+		vk_postfx_draw_fullscreen_quad();
 		vk_end_render_pass();
 
 		vk_begin_ssao_blur_render_pass();
@@ -390,8 +393,7 @@ qboolean vk_ssao_pass( void )
 		push.params[0] = ( r_ssaoBlurRadius && r_ssaoBlurRadius->integer >= 0 ) ? (float)r_ssaoBlurRadius->integer : 2.0f;
 		push.params[1] = push.params[2] = push.params[3] = 0.0f;
 		qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_ssao, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
-		vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
-		qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+		vk_postfx_draw_fullscreen_quad();
 		vk_end_render_pass();
 
 		vk_copy_color_to_fog_scene( vk.renderWidth > 0 ? (uint32_t)vk.renderWidth : 1u,
@@ -411,8 +413,7 @@ qboolean vk_ssao_pass( void )
 					qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_ssao_combine, 0, 2, ssao_combine_sets, 0, NULL );
 				}
 			}
-			vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
-			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+			vk_postfx_draw_fullscreen_quad();
 			vk_end_render_pass();
 		}
 		record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
@@ -464,8 +465,7 @@ qboolean vk_bloom( void )
 		};
 		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 3, bloom_sets, 0, NULL );
 	}
-	vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
-	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+	vk_postfx_draw_fullscreen_quad();
 	vk_end_render_pass();
 
 	if ( canBlitDownsample ) {
@@ -510,14 +510,14 @@ qboolean vk_bloom( void )
 			vk_begin_blur_render_pass( i + 0 );
 			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.blur_pipeline[i+0] );
 			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.bloom_image_descriptor[dstIndex], 0, NULL );
-			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+			vk_postfx_draw_fullscreen_quad();
 			vk_end_render_pass();
 
 			// vertical blur: ping image -> final image for this level
 			vk_begin_blur_render_pass( i + 1 );
 			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.blur_pipeline[i+1] );
 			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.bloom_image_descriptor[i+1], 0, NULL );
-			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+			vk_postfx_draw_fullscreen_quad();
 			vk_end_render_pass();
 		}
 	} else {
@@ -526,13 +526,13 @@ qboolean vk_bloom( void )
 			vk_begin_blur_render_pass( i + 0 );
 			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.blur_pipeline[i+0] );
 			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.bloom_image_descriptor[i+0], 0, NULL );
-			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+			vk_postfx_draw_fullscreen_quad();
 			vk_end_render_pass();
 
 			vk_begin_blur_render_pass( i + 1 );
 			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.blur_pipeline[i+1] );
 			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.bloom_image_descriptor[i+1], 0, NULL );
-			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+			vk_postfx_draw_fullscreen_quad();
 			vk_end_render_pass();
 		}
 	}
@@ -549,8 +549,7 @@ qboolean vk_bloom( void )
 		// blend downscaled buffers to main fbo
 		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.bloom_blend_pipeline );
 		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_blend, 0, ARRAY_LEN(dset), dset, 0, NULL );
-		vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
-		qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+		vk_postfx_draw_fullscreen_quad();
 	}
 
 	// invalidate pipeline state cache
