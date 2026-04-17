@@ -28,6 +28,12 @@ static void vk_end_frame_bind_post_process_sets( VkDescriptorSet set0, VkDescrip
 		vk.pipeline_layout_post_process, 0, 4, sets, 0, NULL );
 }
 
+static void vk_end_frame_draw_fullscreen_quad( uint32_t width, uint32_t height )
+{
+	vk_set_fullscreen_viewport_scissor( width, height );
+	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+}
+
 void vk_end_frame_record_capture_if_needed( void )
 {
 	if ( !backEnd.screenshotMask || !vk.capture.image ) {
@@ -63,8 +69,7 @@ void vk_end_frame_record_capture_if_needed( void )
 			vk.depth_descriptor[vk.cmd_index],
 			vk.postfx_params_descriptor[vk.cmd_index],
 			PostFX_GetLUTImage()->descriptor );
-		vk_set_fullscreen_viewport_scissor( cap_w, cap_h );
-		qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+		vk_end_frame_draw_fullscreen_quad( cap_w, cap_h );
 	}
 }
 
@@ -157,8 +162,7 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 		vk.depth_descriptor[vk.cmd_index],
 		vk.postfx_params_descriptor[vk.cmd_index],
 		vk.taa_history_descriptor[readIndex] );
-	vk_set_fullscreen_viewport_scissor( taaWidth, taaHeight );
-	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+	vk_end_frame_draw_fullscreen_quad( taaWidth, taaHeight );
 	vk_end_render_pass();
 
 	resolved_view = vk.taa_history_image_view[writeIndex];
@@ -442,8 +446,7 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 		qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_post_process, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
 	}
 
-	vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
-	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+	vk_end_frame_draw_fullscreen_quad( vk.renderWidth, vk.renderHeight );
 	vk_end_render_pass();
 
 	if ( vk.uiOverlayActive &&
@@ -458,8 +461,7 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.overlay_compose_pipeline );
 		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 			vk.pipeline_layout_post_process, 0, 1, &vk.post_color_descriptor[vk.cmd_index], 0, NULL );
-		vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
-		qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+		vk_end_frame_draw_fullscreen_quad( vk.renderWidth, vk.renderHeight );
 		vk_end_render_pass();
 		vk_update_color_descriptor_image( gamma_src );
 	}
