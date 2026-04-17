@@ -347,12 +347,6 @@ void MSG_WriteBigString( msg_t *sb, const char *s ) {
 	MSG_WriteChar( sb, '\0' );
 }
 
-#if 0
-static void MSG_WriteAngle( msg_t *sb, float f ) {
-	MSG_WriteByte (sb, (int)(f*256/360) & 255);
-}
-#endif
-
 void MSG_WriteAngle16( msg_t *sb, float f ) {
 	MSG_WriteShort (sb, ANGLE2SHORT(f));
 }
