@@ -10,6 +10,11 @@ and R_AddGLTFSurfaces live in tr_model_gltf.c; Vulkan adds GPU/VBO paths there.
 #include "tr_local.h"
 #include <math.h>
 
+/* Fail compile if glTF caps drift from IQM / entity morph limits (Vulkan SSBO + shared headers). */
+STATIC_ASSERT( GLTF_MAX_JOINTS == IQM_MAX_JOINTS, "GLTF_MAX_JOINTS must match IQM_MAX_JOINTS (skin matrix stack arrays)" );
+STATIC_ASSERT( GLTF_MAX_MORPH_TARGETS == IQM_MORPH_TOP_K, "GLTF_MAX_MORPH_TARGETS must match IQM_MORPH_TOP_K (morph weight arrays / GPU top-K)" );
+STATIC_ASSERT( IQM_MORPH_MAX_CHANNELS == IQM_MORPH_TOP_K, "IQM_MORPH_MAX_CHANNELS must match IQM_MORPH_TOP_K (pending morph slots vs active top-K)" );
+
 static qboolean RB_GLTF_ImagePathLooksLikeNormalMap( const char *path ) {
 	if ( !path || !path[0] ) {
 		return qfalse;
