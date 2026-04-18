@@ -112,6 +112,18 @@ else
 fi
 
 echo ""
+echo "IQM_MAX_JOINTS: OpenGL vs Vulkan iqm.h (duplicate header drift guard):"
+IQM_H_GL="$PROJECT_ROOT/src/renderers/opengl/iqm.h"
+iqm_j_gl="$(sed -n 's/^#define[[:space:]]*IQM_MAX_JOINTS[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$IQM_H_GL" | head -1)"
+if [[ -z "$iqm_j_gl" || -z "$iqm_j" ]]; then
+  fail "could not parse IQM_MAX_JOINTS from opengl/iqm.h or vulkan/iqm.h"
+elif [[ "$iqm_j_gl" != "$iqm_j" ]]; then
+  fail "IQM_MAX_JOINTS mismatch: opengl/iqm.h=$iqm_j_gl vulkan/iqm.h=$iqm_j"
+else
+  pass "IQM_MAX_JOINTS=$iqm_j (both iqm.h copies)"
+fi
+
+echo ""
 echo "IQM_MORPH_TOP_K: OpenGL vs Vulkan tr_local.h (entity morph channel arrays):"
 TR_LOCAL_GL="$PROJECT_ROOT/src/renderers/opengl/tr_local.h"
 k_gl="$(sed -n 's/^#define IQM_MORPH_TOP_K[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$TR_LOCAL_GL" | head -1)"
