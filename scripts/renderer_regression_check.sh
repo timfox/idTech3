@@ -148,6 +148,17 @@ else
 fi
 
 echo ""
+echo "IQM morph pending slots vs GPU top-K (Vulkan tr_local.h):"
+mc_top="$(sed -n 's/^#define IQM_MORPH_MAX_CHANNELS[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$TR_LOCAL" | head -1)"
+if [[ -z "$mc_top" || -z "$k_c" ]]; then
+  fail "could not parse IQM_MORPH_MAX_CHANNELS or IQM_MORPH_TOP_K from vulkan/tr_local.h"
+elif [[ "$mc_top" != "$k_c" ]]; then
+  fail "IQM_MORPH_MAX_CHANNELS ($mc_top) != IQM_MORPH_TOP_K ($k_c) in vulkan/tr_local.h - pending morph slots must match GPU morph top-K packing"
+else
+  pass "IQM_MORPH_MAX_CHANNELS=$mc_top matches IQM_MORPH_TOP_K (vulkan tr_local.h)"
+fi
+
+echo ""
 if [ -n "${GAME_BASE:-}" ]; then
   echo "Optional game base: $GAME_BASE"
   ASSETS_LIST="${GAME_ASSETS_LIST:-$PROJECT_ROOT/docs/samples/renderer_regression/OPTIONAL_GAME_ASSETS.txt}"
