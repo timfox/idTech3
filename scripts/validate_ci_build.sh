@@ -34,11 +34,19 @@ echo "3. Running smoke test..."
 ./scripts/smoke_test.sh release
 echo ""
 
-echo "4. Renderer regression check (repo + GLSL)..."
+echo "4. CTest (mirrors ubuntu-x86_64 job: smoke + renderer + scripts + units)..."
+if [ -d build-vk-Release ]; then
+  ( cd build-vk-Release && ctest -C Release --output-on-failure )
+else
+  echo "Warning: build-vk-Release missing; skip ctest (run compile_engine.sh vulkan first)" >&2
+fi
+echo ""
+
+echo "5. Renderer regression check (repo + GLSL)..."
 ./scripts/renderer_regression_check.sh
 echo ""
 
-echo "5. Demo mod pack layout (idtech3_demo.pk3)..."
+echo "6. Demo mod pack layout (idtech3_demo.pk3)..."
 chmod +x ./tests/scripts/test_demo_game_pk3.sh
 ./tests/scripts/test_demo_game_pk3.sh
 echo ""
