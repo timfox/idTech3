@@ -1344,6 +1344,28 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		vk.cmd->camera_ubo_offset = vk_append_uniform( &uniform_camera, sizeof(uniform_camera), vk.uniform_camera_item_size );
 
 		pushUniform = qtrue;
+
+		uniform.pbrForwardPlus[0] = -1.0f;
+		uniform.pbrForwardPlus[1] = 0.0f;
+		uniform.pbrForwardPlus[2] = 0.0f;
+		uniform.pbrForwardPlus[3] = 0.0f;
+		if ( r_forwardPlus && r_forwardPlus->integer ) {
+			const unsigned int bits = (unsigned int)tess.dlightBits;
+			if ( bits != 0u && ( bits & ( bits - 1u ) ) == 0u ) {
+				int idx = 0;
+				unsigned int b = bits;
+				while ( ( b & 1u ) == 0u ) {
+					b >>= 1u;
+					idx++;
+				}
+				uniform.pbrForwardPlus[0] = (float)idx;
+			}
+		}
+	} else {
+		uniform.pbrForwardPlus[0] = -1.0f;
+		uniform.pbrForwardPlus[1] = 0.0f;
+		uniform.pbrForwardPlus[2] = 0.0f;
+		uniform.pbrForwardPlus[3] = 0.0f;
 	}
 #endif
 #endif // USE_VULKAN
