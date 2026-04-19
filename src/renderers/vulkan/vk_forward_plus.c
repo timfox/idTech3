@@ -18,10 +18,10 @@ docs/RENDERER_2026_ARCHITECTURE_PASS.md.
 #define VK_FP_HEADER_BYTES (sizeof(float) * 8) /* 2 x vec4: count/meta + tile grid / viewport */
 #define VK_FP_TILE_DIM 16u
 #define VK_FP_MAX_TILES (256u * 256u)
-#define VK_FP_MAX_PER_TILE 4u
+#define VK_FP_MAX_PER_TILE 8u
 #define VK_FP_PARAM_BYTES 256u
 #define VK_FP_DUMMY_LIGHT_FLOATS 32u
-#define VK_FP_DUMMY_TILE_UINTS 16u
+#define VK_FP_DUMMY_TILE_UINTS 32u
 
 static void vk_fp_compute_tile_grid( uint32_t *tiles_x, uint32_t *tiles_y, uint32_t *total_tiles, VkDeviceSize *tile_bytes )
 {
