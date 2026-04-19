@@ -544,7 +544,7 @@ void vk_initialize( void )
 	// Descriptor pool.
 	//
 		{
-			VkDescriptorPoolSize pool_size[5];
+			VkDescriptorPoolSize pool_size[6];
 		VkDescriptorPoolCreateInfo desc;
 		uint32_t j, maxSets;
 
@@ -569,6 +569,9 @@ void vk_initialize( void )
 
 		pool_size[4].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		pool_size[4].descriptorCount = 8 + NUM_COMMAND_BUFFERS;
+
+		pool_size[5].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		pool_size[5].descriptorCount = 4; /* forward+ tile cull set uses 3 SSBO bindings */
 
 		for ( j = 0, maxSets = 0; j < ARRAY_LEN( pool_size ); j++ ) {
 			maxSets += pool_size[j].descriptorCount;
@@ -1123,9 +1126,9 @@ void vk_initialize( void )
 
 	vk_create_storage_buffer( MAX_FLARES * vk.storage_alignment );
 
-	vk_forward_plus_init();
-
 	vk_create_shader_modules();
+
+	vk_forward_plus_init();
 
 	{
 		VkPipelineCacheCreateInfo ci;

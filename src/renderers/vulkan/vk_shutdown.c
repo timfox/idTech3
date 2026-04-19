@@ -92,6 +92,8 @@ void vk_shutdown( refShutdownCode_t code )
 		vk.descriptor_pool = VK_NULL_HANDLE;
 	}
 
+	vk_forward_plus_destroy_descriptor_layout();
+
 	qvkDestroyDescriptorSetLayout(vk.device, vk.set_layout_sampler, NULL);
 	qvkDestroyDescriptorSetLayout(vk.device, vk.set_layout_uniform, NULL);
 	qvkDestroyDescriptorSetLayout(vk.device, vk.set_layout_storage, NULL);
