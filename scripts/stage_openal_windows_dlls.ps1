@@ -9,6 +9,7 @@
     - bin/<WinNN>/soft_oal.dll     (actual OpenAL Soft implementation)
 
   Override the release with env OPENAL_SOFT_BIN_VERSION (e.g. 1.24.3). Set SKIP_OPENAL_DLL_BUNDLE=1 to no-op.
+  Downloads retry on failure (OPENAL_SOFT_DOWNLOAD_ATTEMPTS, default 5).
 
   Note: upstream bin zips currently ship Win32/Win64 only; ARM64 native Windows is skipped with a message.
 
@@ -62,32 +63,82 @@ $cacheRoot = Join-Path $workspace ".ci-openal-soft-cache"
 $zipPath = Join-Path $cacheRoot $zipName
 $extractRoot = Join-Path $cacheRoot "extract-$version"
 
+$maxAttempts = 5
+if ($env:OPENAL_SOFT_DOWNLOAD_ATTEMPTS -match '^\d+$') {
+    $maxAttempts = [int]$env:OPENAL_SOFT_DOWNLOAD_ATTEMPTS
+    if ($maxAttempts -lt 1) { $maxAttempts = 1 }
+}
+
+function Invoke-DownloadWithRetry {
+    param([string]$Uri, [string]$OutPath)
+    $lastErr = $null
+    for ($a = 1; $a -le $maxAttempts; $a++) {
+        try {
+            Write-Host "Downloading (attempt $a/$maxAttempts): $Uri"
+            Invoke-WebRequest -Uri $Uri -OutFile $OutPath -UseBasicParsing
+            $len = (Get-Item -LiteralPath $OutPath).Length
+            if ($len -lt 200000) {
+                throw "Downloaded file too small ($len bytes); likely HTML error page or truncated file"
+            }
+            return
+        } catch {
+            $lastErr = $_
+            Write-Warning "Download failed: $($_.Exception.Message)"
+            if (Test-Path -LiteralPath $OutPath) {
+                Remove-Item -LiteralPath $OutPath -Force -ErrorAction SilentlyContinue
+            }
+            if ($a -lt $maxAttempts) {
+                $delay = [Math]::Min(60, 4 * $a)
+                Start-Sleep -Seconds $delay
+            }
+        }
+    }
+    throw "OpenAL Soft download failed after $maxAttempts attempts: $lastErr"
+}
+
 New-Item -ItemType Directory -Force -Path $cacheRoot | Out-Null
 New-Item -ItemType Directory -Force -Path $dest | Out-Null
-
-if (-not (Test-Path -LiteralPath $zipPath -PathType Leaf)) {
-    Write-Host "Downloading OpenAL Soft $version Windows binaries..."
-    Invoke-WebRequest -Uri $url -OutFile $zipPath -UseBasicParsing
-}
 
 $inner = Join-Path $extractRoot "openal-soft-$version-bin"
 $routerDll = Join-Path $inner "router\$winSubdir\OpenAL32.dll"
 $softDll = Join-Path $inner "bin\$winSubdir\soft_oal.dll"
 
+$needDownload = $true
+if (Test-Path -LiteralPath $zipPath -PathType Leaf) {
+    try {
+        $zlen = (Get-Item -LiteralPath $zipPath).Length
+        if ($zlen -ge 200000) { $needDownload = $false }
+    } catch { }
+}
+
+if ($needDownload) {
+    Invoke-DownloadWithRetry -Uri $url -OutPath $zipPath
+}
+
+# Extract (or re-extract if cache is stale / corrupt)
 if (-not (Test-Path -LiteralPath $routerDll) -or -not (Test-Path -LiteralPath $softDll)) {
     if (Test-Path -LiteralPath $extractRoot) {
         Remove-Item -LiteralPath $extractRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
     New-Item -ItemType Directory -Force -Path $extractRoot | Out-Null
     Write-Host "Extracting $zipName ..."
-    Expand-Archive -LiteralPath $zipPath -DestinationPath $extractRoot -Force
+    try {
+        Expand-Archive -LiteralPath $zipPath -DestinationPath $extractRoot -Force
+    } catch {
+        Write-Warning "Expand-Archive failed, removing zip and re-downloading once: $($_.Exception.Message)"
+        Remove-Item -LiteralPath $zipPath -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $extractRoot -Recurse -Force -ErrorAction SilentlyContinue
+        New-Item -ItemType Directory -Force -Path $extractRoot | Out-Null
+        Invoke-DownloadWithRetry -Uri $url -OutPath $zipPath
+        Expand-Archive -LiteralPath $zipPath -DestinationPath $extractRoot -Force
+    }
 }
 
 if (-not (Test-Path -LiteralPath $routerDll)) {
-    throw "Expected router DLL missing after extract: $routerDll"
+    throw "Expected router DLL missing after extract: $routerDll (wrong OPENAL_SOFT_BIN_VERSION or corrupt zip?)"
 }
 if (-not (Test-Path -LiteralPath $softDll)) {
-    throw "Expected soft_oal.dll missing after extract: $softDll"
+    throw "Expected soft_oal.dll missing after extract: $softDll (wrong OPENAL_SOFT_BIN_VERSION or corrupt zip?)"
 }
 
 $copying = Join-Path $inner "COPYING"

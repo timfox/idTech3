@@ -34,6 +34,7 @@ android/.gradle/
 android/app/.cxx/
 android/local.properties
 .ci-android-deps/
+.ci-openal-soft-cache/
 
 # Local copies of examples/*/*.env.example (optional secrets / machine paths)
 /local_validation.env
