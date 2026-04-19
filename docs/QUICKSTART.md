@@ -24,8 +24,8 @@ Extract the archive. You should see:
 - `idtech3` (or `idtech3.exe` on Windows) - game client
 - `idtech3_server` (or `idtech3_server.exe`) - dedicated server
 - **Linux**: `idtech3_vulkan.so` / `idtech3_opengl.so` - renderer plugins (when built with `USE_RENDERER_DLOPEN`)
-- **Windows (MSYS2/MinGW zip from CI)**: same `.exe` names plus several `.dll` files (SDL2, OpenAL, MinGW runtime). Keep them in the same folder as the executables.
-- **Windows (MSVC zip)**: renderers are usually linked into the client; you may only see the `.exe` files plus Visual C++ runtime requirements from your system.
+- **Windows (MSYS2/MinGW zip from CI)**: same `.exe` names plus several `.dll` files (SDL2, OpenAL Soft via `OpenAL32.dll` + `soft_oal.dll`, MinGW runtime). Keep them in the same folder as the executables. **OpenAL** does not require a separate Creative/OpenAL installer for these builds.
+- **Windows (MSVC zip, x64)**: same as above for **OpenAL** (`OpenAL32.dll`, `soft_oal.dll`, and `OpenAL-Soft-COPYING.txt` from OpenAL Soft). Renderers are usually linked into the client; you may only see the `.exe` files plus Visual C++ runtime requirements from your system. **Windows MSVC ARM64** zips do not include OpenAL DLLs yet (upstream OpenAL Soft bin package has no WinARM64); use the default WASAPI audio path or install OpenAL separately if you enable OpenAL there.
 
 ## 2. Game Data
 

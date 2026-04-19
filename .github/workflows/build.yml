@@ -135,6 +135,11 @@ jobs:
           cp -f build-gl-${{ matrix.btype }}/idtech3* bin/ || true
           bash ./scripts/stage_mingw_runtime_dlls.sh bin
 
+      - name: Bundle OpenAL Soft DLLs (Win64; no separate OpenAL install)
+        if: ${{ matrix.arch == 'x86_64' && (github.event_name != 'release' || matrix.btype != 'Debug') }}
+        shell: pwsh
+        run: ./scripts/stage_openal_windows_dlls.ps1 -BinDir bin -Arch x64
+
       - name: Verify PE architecture (native compat)
         if: matrix.cc == 'gcc' && matrix.btype == 'Release'
         shell: pwsh
@@ -328,6 +333,11 @@ jobs:
             /t:Clean
 
           dir /b bin
+
+      - name: Bundle OpenAL Soft DLLs (x64 zip; ARM64 has no official bin zip — skipped in script)
+        if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
+        shell: pwsh
+        run: ./scripts/stage_openal_windows_dlls.ps1 -BinDir bin -Arch ${{ matrix.arch }}
 
       - name: Verify MSVC staging (Release artifact prep)
         if: ${{ matrix.btype == 'Release' }}
