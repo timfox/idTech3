@@ -12,6 +12,7 @@ docs/RENDERER_2026_ARCHITECTURE_PASS.md.
 #include "vk.h"
 #include "vk_forward_plus.h"
 #include "vk_util.h"
+#include "vk_view_state.h"
 
 #define VK_FP_RECORD_STRIDE (sizeof(float) * 16) /* 4 x vec4 per light */
 #define VK_FP_HEADER_BYTES (sizeof(float) * 8) /* 2 x vec4: count/meta + tile grid / viewport */
@@ -554,6 +555,9 @@ void vk_forward_plus_dispatch_tile_cull( void )
 	float *param_f;
 	uint32_t *param_u;
 	float clip_from_world[16];
+	float proj_vk[16];
+	const float *view;
+	const float *proj_gl;
 
 	if ( !r_forwardPlus || !r_forwardPlus->integer ) {
 		return;
@@ -568,7 +572,11 @@ void vk_forward_plus_dispatch_tile_cull( void )
 		return;
 	}
 
-	myGlMultMatrix( backEnd.viewParms.projectionMatrix, backEnd.viewParms.world.modelViewMatrix, clip_from_world );
+	/* Match vk_postfx_params / vertex MVP: view * projection_vk (column-major). */
+	view = backEnd.viewParms.world.modelViewMatrix;
+	proj_gl = backEnd.useFirstPersonProjection ? backEnd.firstPersonProjectionMatrix : backEnd.viewParms.projectionMatrix;
+	vk_get_projection_matrix_vk( proj_gl, proj_vk );
+	myGlMultMatrix( view, proj_vk, clip_from_world );
 
 	param_f = (float *)vk.forward_plus.param_mapped;
 	param_u = (uint32_t *)vk.forward_plus.param_mapped;
