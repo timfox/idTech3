@@ -1749,6 +1749,7 @@ static const void *RB_DrawSurfs( const void *data ) {
 
 #ifdef USE_VULKAN
 	vk_prepare_frame_temporal_state();
+	vk_forward_plus_ensure_render_resolution();
 	vk_forward_plus_update_for_refdef();
 	RB_RenderSunShadowMap( cmd );
 #endif

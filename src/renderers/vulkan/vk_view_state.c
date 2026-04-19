@@ -21,7 +21,7 @@ static int vk_curr_entity_types[MAX_REFENTITIES];
 static qboolean vk_prev_entity_model_valid[MAX_REFENTITIES];
 static qboolean vk_curr_entity_model_valid[MAX_REFENTITIES];
 
-static uint32_t vk_get_render_target_width( void )
+uint32_t vk_get_render_target_width( void )
 {
 	if ( vk.renderWidth > 0 ) {
 		return vk.renderWidth;
@@ -32,7 +32,7 @@ static uint32_t vk_get_render_target_width( void )
 	return 1u;
 }
 
-static uint32_t vk_get_render_target_height( void )
+uint32_t vk_get_render_target_height( void )
 {
 	if ( vk.renderHeight > 0 ) {
 		return vk.renderHeight;
