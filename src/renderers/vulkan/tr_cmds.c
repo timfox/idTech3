@@ -381,21 +381,6 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 #endif
 	}
 
-#ifndef USE_BUFFER_CLEAR
-#ifdef USE_VULKAN
-	if ( r_fastsky->integer && vk.clearAttachment ) {
-#else
-	if ( r_fastsky->integer ) {
-#endif
-		if ( stereoFrame != STEREO_RIGHT ) {
-			clearColorCommand_t *clrcmd; 
-			if ( ( clrcmd = R_GetCommandBuffer( sizeof( *clrcmd ) ) ) == NULL )
-				return;
-			clrcmd->commandId = RC_CLEARCOLOR;
-		}
-	}
-#endif // USE_BUFFER_CLEAR
-
 	tr.refdef.stereoFrame = stereoFrame;
 }
 
