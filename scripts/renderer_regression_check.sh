@@ -159,6 +159,33 @@ else
 fi
 
 echo ""
+echo "Forward+ tile cull: MAX_LIGHTS vs MAX_DLIGHTS (packed light index range):"
+TR_TYPES="$PROJECT_ROOT/src/renderers/common/tr_types.h"
+FP_COMP="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/forward_plus_tile_cull.comp"
+max_dl="$(sed -n 's/^#define[[:space:]]*MAX_DLIGHTS[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$TR_TYPES" | head -1)"
+max_sh="$(sed -n 's/^#define MAX_LIGHTS[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$FP_COMP" | head -1)"
+if [[ -z "$max_dl" || -z "$max_sh" ]]; then
+  fail "could not parse MAX_DLIGHTS from tr_types.h or MAX_LIGHTS from forward_plus_tile_cull.comp"
+elif [[ "$max_sh" != "$max_dl" ]]; then
+  fail "forward_plus_tile_cull MAX_LIGHTS ($max_sh) != MAX_DLIGHTS ($max_dl) - tile cull and dlight index cap disagree"
+else
+  pass "forward_plus_tile_cull MAX_LIGHTS=$max_sh matches MAX_DLIGHTS"
+fi
+
+echo ""
+echo "Forward+ tile cull: MAX_PER_TILE vs VK_FP_MAX_PER_TILE (tile SSBO stride):"
+FP_C="$PROJECT_ROOT/src/renderers/vulkan/vk_forward_plus.c"
+max_tile_sh="$(sed -n 's/^#define MAX_PER_TILE[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$FP_COMP" | head -1)"
+max_tile_c="$(sed -n 's/^#define VK_FP_MAX_PER_TILE[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$FP_C" | head -1)"
+if [[ -z "$max_tile_sh" || -z "$max_tile_c" ]]; then
+  fail "could not parse MAX_PER_TILE from forward_plus_tile_cull.comp or VK_FP_MAX_PER_TILE from vk_forward_plus.c"
+elif [[ "$max_tile_sh" != "$max_tile_c" ]]; then
+  fail "MAX_PER_TILE ($max_tile_sh) != VK_FP_MAX_PER_TILE ($max_tile_c) - compute vs host tile layout disagree"
+else
+  pass "MAX_PER_TILE=$max_tile_sh matches VK_FP_MAX_PER_TILE"
+fi
+
+echo ""
 if [ -n "${GAME_BASE:-}" ]; then
   echo "Optional game base: $GAME_BASE"
   ASSETS_LIST="${GAME_ASSETS_LIST:-$PROJECT_ROOT/docs/samples/renderer_regression/OPTIONAL_GAME_ASSETS.txt}"
