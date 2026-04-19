@@ -18,6 +18,8 @@ docs/RENDERER_2026_ARCHITECTURE_PASS.md.
 #define VK_FP_HEADER_BYTES (sizeof(float) * 8) /* 2 x vec4: count/meta + tile grid / viewport */
 #define VK_FP_TILE_DIM 16u
 #define VK_FP_MAX_TILES (256u * 256u)
+/* Tile SSBO stores VK_FP_MAX_PER_TILE uint32 indices per tile; r_forwardPlusMaxPerTile clamps active count to [MIN, MAX]. */
+#define VK_FP_MIN_PER_TILE 4u
 #define VK_FP_MAX_PER_TILE 8u
 #define VK_FP_PARAM_BYTES 256u
 #define VK_FP_DUMMY_LIGHT_FLOATS 32u
@@ -428,19 +430,31 @@ void vk_forward_plus_shutdown( void )
 	vk_fp_destroy_dummy_buffers();
 }
 
+uint32_t vk_forward_plus_get_min_per_tile_cap( void )
+{
+	return VK_FP_MIN_PER_TILE;
+}
+
+uint32_t vk_forward_plus_get_max_per_tile_cap( void )
+{
+	return VK_FP_MAX_PER_TILE;
+}
+
 static uint32_t vk_fp_effective_max_per_tile( void )
 {
 	int v;
+	const int min_t = (int)VK_FP_MIN_PER_TILE;
+	const int max_t = (int)VK_FP_MAX_PER_TILE;
 
 	if ( !r_forwardPlusMaxPerTile ) {
 		return VK_FP_MAX_PER_TILE;
 	}
 	v = r_forwardPlusMaxPerTile->integer;
-	if ( v < 4 ) {
-		v = 4;
+	if ( v < min_t ) {
+		v = min_t;
 	}
-	if ( v > (int)VK_FP_MAX_PER_TILE ) {
-		v = (int)VK_FP_MAX_PER_TILE;
+	if ( v > max_t ) {
+		v = max_t;
 	}
 	return (uint32_t)v;
 }
