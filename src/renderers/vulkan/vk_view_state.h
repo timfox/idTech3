@@ -5,6 +5,10 @@
 /* OpenGL-style column-major projection -> Vulkan clip (Y flip on m22/m23 stack row). */
 void vk_get_projection_matrix_vk( const float *projection_matrix, float *projection_vk );
 
+/* Effective color pass resolution (r_renderScale / FBO); falls back to glConfig. */
+uint32_t vk_get_render_target_width( void );
+uint32_t vk_get_render_target_height( void );
+
 void vk_reset_scene_src_rect_tracking( void );
 qboolean vk_get_scene_src_rect( VkRect2D *out_rect );
 void vk_begin_motion_frame( void );

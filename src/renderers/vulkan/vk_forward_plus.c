@@ -23,6 +23,128 @@ docs/RENDERER_2026_ARCHITECTURE_PASS.md.
 #define VK_FP_DUMMY_LIGHT_FLOATS 32u
 #define VK_FP_DUMMY_TILE_UINTS 16u
 
+static void vk_fp_compute_tile_grid( uint32_t *tiles_x, uint32_t *tiles_y, uint32_t *total_tiles, VkDeviceSize *tile_bytes )
+{
+	uint32_t vw = vk_get_render_target_width();
+	uint32_t vh = vk_get_render_target_height();
+
+	if ( vw < 16u ) {
+		vw = 1280u;
+	}
+	if ( vh < 16u ) {
+		vh = 720u;
+	}
+	*tiles_x = ( vw + VK_FP_TILE_DIM - 1u ) / VK_FP_TILE_DIM;
+	*tiles_y = ( vh + VK_FP_TILE_DIM - 1u ) / VK_FP_TILE_DIM;
+	*total_tiles = *tiles_x * *tiles_y;
+	if ( *total_tiles > VK_FP_MAX_TILES ) {
+		*total_tiles = VK_FP_MAX_TILES;
+		*tiles_y = *total_tiles / *tiles_x;
+	}
+	*tile_bytes = (VkDeviceSize)*total_tiles * (VkDeviceSize)VK_FP_MAX_PER_TILE * sizeof( uint32_t );
+}
+
+static void vk_fp_destroy_tile_buffer_only( void )
+{
+	if ( vk.forward_plus.tile_buffer != VK_NULL_HANDLE ) {
+		qvkDestroyBuffer( vk.device, vk.forward_plus.tile_buffer, NULL );
+		vk.forward_plus.tile_buffer = VK_NULL_HANDLE;
+	}
+	if ( vk.forward_plus.tile_memory != VK_NULL_HANDLE ) {
+		qvkFreeMemory( vk.device, vk.forward_plus.tile_memory, NULL );
+		vk.forward_plus.tile_memory = VK_NULL_HANDLE;
+	}
+	vk.forward_plus.tile_capacity_tiles = 0u;
+}
+
+static void vk_fp_update_compute_descriptor_tile_binding( void )
+{
+	VkDescriptorBufferInfo info;
+	VkWriteDescriptorSet write;
+
+	if ( vk.forward_plus.descriptor == VK_NULL_HANDLE || vk.forward_plus.tile_buffer == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	info.buffer = vk.forward_plus.tile_buffer;
+	info.offset = 0;
+	info.range = VK_WHOLE_SIZE;
+
+	Com_Memset( &write, 0, sizeof( write ) );
+	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.dstSet = vk.forward_plus.descriptor;
+	write.dstBinding = 1;
+	write.dstArrayElement = 0;
+	write.descriptorCount = 1;
+	write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	write.pBufferInfo = &info;
+
+	qvkUpdateDescriptorSets( vk.device, 1, &write, 0, NULL );
+}
+
+/* Recreate tile SSBO when render resolution changes (r_renderScale / FBO) without vid_restart. */
+static void vk_fp_ensure_tile_for_render_resolution( void )
+{
+	VkBufferCreateInfo bci;
+	VkMemoryRequirements mr;
+	VkMemoryAllocateInfo mai;
+	uint32_t mem_type;
+	uint32_t tiles_x, tiles_y, total_tiles;
+	VkDeviceSize tile_bytes;
+	qboolean changed;
+
+	if ( !r_forwardPlus || !r_forwardPlus->integer ) {
+		return;
+	}
+	if ( vk.forward_plus.tile_pipeline == VK_NULL_HANDLE || vk.forward_plus.buffer == VK_NULL_HANDLE ) {
+		return;
+	}
+	if ( !vk.device || vk.device_lost ) {
+		return;
+	}
+
+	vk_fp_compute_tile_grid( &tiles_x, &tiles_y, &total_tiles, &tile_bytes );
+
+	changed = ( tiles_x != vk.forward_plus.tiles_x || tiles_y != vk.forward_plus.tiles_y ||
+		vk.forward_plus.tile_buffer == VK_NULL_HANDLE );
+
+	if ( !changed ) {
+		return;
+	}
+
+	vk_fp_destroy_tile_buffer_only();
+
+	bci.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bci.pNext = NULL;
+	bci.flags = 0;
+	bci.size = tile_bytes;
+	bci.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+	bci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	bci.queueFamilyIndexCount = 0;
+	bci.pQueueFamilyIndices = NULL;
+	VK_CHECK( qvkCreateBuffer( vk.device, &bci, NULL, &vk.forward_plus.tile_buffer ) );
+	qvkGetBufferMemoryRequirements( vk.device, vk.forward_plus.tile_buffer, &mr );
+	mem_type = vk_find_memory_type( vk.physical_device, mr.memoryTypeBits,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+	mai.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	mai.pNext = NULL;
+	mai.allocationSize = mr.size;
+	mai.memoryTypeIndex = mem_type;
+	VK_CHECK( qvkAllocateMemory( vk.device, &mai, NULL, &vk.forward_plus.tile_memory ) );
+	VK_CHECK( qvkBindBufferMemory( vk.device, vk.forward_plus.tile_buffer, vk.forward_plus.tile_memory, 0 ) );
+	SET_OBJECT_NAME( vk.forward_plus.tile_buffer, "forward+ tile indices", VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT );
+
+	vk.forward_plus.tiles_x = tiles_x;
+	vk.forward_plus.tiles_y = tiles_y;
+	vk.forward_plus.tile_capacity_tiles = total_tiles;
+
+	vk_fp_update_compute_descriptor_tile_binding();
+	vk_forward_plus_init_graphics_descriptors();
+
+	ri.Printf( PRINT_DEVELOPER, "[VK][Forward+] tile grid resized to %ux%u (%u tiles)\n",
+		(unsigned)tiles_x, (unsigned)tiles_y, (unsigned)total_tiles );
+}
+
 typedef struct {
 	uint32_t tile_grid[2];
 	uint32_t total_tiles;
@@ -286,27 +408,12 @@ static void vk_fp_create_buffers_and_compute( void )
 	VkMemoryRequirements mr;
 	VkMemoryAllocateInfo mai;
 	uint32_t mem_type;
-	uint32_t vw, vh, tiles_x, tiles_y, total_tiles;
+	uint32_t tiles_x, tiles_y, total_tiles;
 	VkDeviceSize tile_bytes;
 	const uint32_t max_lights = (uint32_t)MAX_REAL_DLIGHTS;
 	const VkDeviceSize light_buf_size = (VkDeviceSize)VK_FP_HEADER_BYTES + (VkDeviceSize)max_lights * (VkDeviceSize)VK_FP_RECORD_STRIDE;
 
-	vw = (uint32_t)glConfig.vidWidth;
-	vh = (uint32_t)glConfig.vidHeight;
-	if ( vw < 16u ) {
-		vw = 1280u;
-	}
-	if ( vh < 16u ) {
-		vh = 720u;
-	}
-	tiles_x = ( vw + VK_FP_TILE_DIM - 1u ) / VK_FP_TILE_DIM;
-	tiles_y = ( vh + VK_FP_TILE_DIM - 1u ) / VK_FP_TILE_DIM;
-	total_tiles = tiles_x * tiles_y;
-	if ( total_tiles > VK_FP_MAX_TILES ) {
-		total_tiles = VK_FP_MAX_TILES;
-		tiles_y = total_tiles / tiles_x;
-	}
-	tile_bytes = (VkDeviceSize)total_tiles * (VkDeviceSize)VK_FP_MAX_PER_TILE * sizeof( uint32_t );
+	vk_fp_compute_tile_grid( &tiles_x, &tiles_y, &total_tiles, &tile_bytes );
 
 	vk.forward_plus.tiles_x = tiles_x;
 	vk.forward_plus.tiles_y = tiles_y;
@@ -447,6 +554,11 @@ void vk_forward_plus_init( void )
 		(unsigned)vk.forward_plus.capacity_bytes );
 }
 
+void vk_forward_plus_ensure_render_resolution( void )
+{
+	vk_fp_ensure_tile_for_render_resolution();
+}
+
 void vk_forward_plus_update_for_refdef( void )
 {
 	float *base;
@@ -482,11 +594,11 @@ void vk_forward_plus_update_for_refdef( void )
 	base[2] = 0.0f;
 	base[3] = dbg;
 
-	/* Tile grid + viewport (for fragment overlay; compute still uses push + param SSBO) */
+	/* Tile grid + render target size (FBO / r_renderScale; matches NDC->pixel in tile cull) */
 	base[4] = (float)vk.forward_plus.tiles_x;
 	base[5] = (float)vk.forward_plus.tiles_y;
-	base[6] = (float)glConfig.vidWidth;
-	base[7] = (float)glConfig.vidHeight;
+	base[6] = (float)vk_get_render_target_width();
+	base[7] = (float)vk_get_render_target_height();
 
 	dl = backEnd.refdef.dlights;
 	if ( !dl ) {
@@ -583,8 +695,8 @@ void vk_forward_plus_dispatch_tile_cull( void )
 	Com_Memcpy( param_f, clip_from_world, sizeof( clip_from_world ) );
 	param_u[16] = vk.forward_plus.tiles_x;
 	param_u[17] = vk.forward_plus.tiles_y;
-	param_u[18] = (uint32_t)glConfig.vidWidth;
-	param_u[19] = (uint32_t)glConfig.vidHeight;
+	param_u[18] = vk_get_render_target_width();
+	param_u[19] = vk_get_render_target_height();
 
 	Com_Memset( barriers, 0, sizeof( barriers ) );
 	barriers[0].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
