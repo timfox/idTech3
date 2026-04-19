@@ -162,6 +162,12 @@ def with_forward_plus_frag(defines):
         return defines + " -DUSE_FORWARD_PLUS_FRAG"
     return defines
 
+def with_forward_plus_vert(defines):
+    """PBR gen_vert outputs world position for Forward+ tile shading when set."""
+    if defines and "-DUSE_VK_PBR" in defines:
+        return defines + " -DUSE_FORWARD_PLUS_WORLD_POS"
+    return defines
+
 def compile_individual_shaders():
     print("Compiling standalone GLSL stages...")
     # Shaders that need Vulkan reversed-depth define (matches vk.h USE_REVERSED_DEPTH)
@@ -211,7 +217,7 @@ def compile_template_shaders():
             for m in range(len(mode_flags)):
                 for k in range(len(env_flags)):
                     for l in range(len(fog_flags)):
-                        defines = join_flags(pbr_flags[i], tx_flags[j], mode_flags[m], env_flags[k], fog_flags[l])
+                        defines = with_forward_plus_vert(join_flags(pbr_flags[i], tx_flags[j], mode_flags[m], env_flags[k], fog_flags[l]))
                         name = f"vert_{pbr_ids[i]}{tx_ids[j]}_{mode_ids[m]}{env_ids[k]}{fog_ids[l]}"
                         binding = join_indexes(f"vk.modules.vert.{mode_ids[m]}", [i, j, k, l])
                         compile_shader("vert", "gen_vert.tmpl", name, binding_expr=binding, defines=defines)
@@ -230,12 +236,12 @@ def compile_template_shaders():
         for j in range(len(tx_flags)):
             for k in range(len(env_flags)):
                 for l in range(len(fog_flags)):
-                    defines = join_flags(pbr_flags[i], tx_flags[j], env_flags[k], fog_flags[l])
+                    defines = with_forward_plus_vert(join_flags(pbr_flags[i], tx_flags[j], env_flags[k], fog_flags[l]))
                     name = f"vert_{pbr_ids[i]}{tx_ids[j]}{env_ids[k]}{fog_ids[l]}"
                     binding = join_indexes("vk.modules.vert.gen", [i, j, 0, k, l])
                     compile_shader("vert", "gen_vert.tmpl", name, binding_expr=binding, defines=defines)
                     if j != 0:
-                        defines_cl = join_flags(pbr_flags[i], tx_flags[j], cl_flags[j], env_flags[k], fog_flags[l])
+                        defines_cl = with_forward_plus_vert(join_flags(pbr_flags[i], tx_flags[j], cl_flags[j], env_flags[k], fog_flags[l]))
                         name_cl = f"vert_{pbr_ids[i]}{tx_ids[j]}_{cl_ids[j]}{env_ids[k]}{fog_ids[l]}"
                         binding_cl = join_indexes("vk.modules.vert.gen", [i, j, 1, k, l])
                         compile_shader("vert", "gen_vert.tmpl", name_cl, binding_expr=binding_cl, defines=defines_cl)
@@ -251,12 +257,12 @@ def compile_template_shaders():
                     for tan_fix in (0, 1):
                         tan_def = "-DGLTF_GPU_TANGENT_FIX" if tan_fix else ""
                         tan_suffix = "_tfix" if tan_fix else ""
-                        defines = join_flags(pbr_flags[i], "-DUSE_GLTF_GPU_SKIN", tan_def, tx_flags[j], env_flags[k], fog_flags[l])
+                        defines = with_forward_plus_vert(join_flags(pbr_flags[i], "-DUSE_GLTF_GPU_SKIN", tan_def, tx_flags[j], env_flags[k], fog_flags[l]))
                         name = f"vert_gltfgpu_{pbr_ids[i]}{tx_ids[j]}{env_ids[k]}{fog_ids[l]}{tan_suffix}"
                         binding = join_indexes("vk.modules.vert.gen_gltf_gpu", [i, j, 0, k, l, tan_fix])
                         compile_shader("vert", "gen_vert.tmpl", name, binding_expr=binding, defines=defines)
                         if j != 0:
-                            defines_cl = join_flags(pbr_flags[i], "-DUSE_GLTF_GPU_SKIN", tan_def, tx_flags[j], cl_flags[j], env_flags[k], fog_flags[l])
+                            defines_cl = with_forward_plus_vert(join_flags(pbr_flags[i], "-DUSE_GLTF_GPU_SKIN", tan_def, tx_flags[j], cl_flags[j], env_flags[k], fog_flags[l]))
                             name_cl = f"vert_gltfgpu_{pbr_ids[i]}{tx_ids[j]}_{cl_ids[j]}{env_ids[k]}{fog_ids[l]}{tan_suffix}"
                             binding_cl = join_indexes("vk.modules.vert.gen_gltf_gpu", [i, j, 1, k, l, tan_fix])
                             compile_shader("vert", "gen_vert.tmpl", name_cl, binding_expr=binding_cl, defines=defines_cl)

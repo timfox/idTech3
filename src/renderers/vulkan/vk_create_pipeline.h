@@ -54,6 +54,7 @@ struct Vk_Pipeline_FragSpecData {
 	int32_t pom_enabled;
 	int32_t pom_max_steps;
 	float   parallax_bias_shader;
+	float   forward_plus_shade_strength;
 #endif
 };
 
