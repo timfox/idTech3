@@ -442,7 +442,8 @@ static void vk_fp_create_buffers_and_compute( void )
 	uint32_t mem_type;
 	uint32_t tiles_x, tiles_y, total_tiles;
 	VkDeviceSize tile_bytes;
-	const uint32_t max_lights = (uint32_t)MAX_REAL_DLIGHTS;
+	/* Packed indices must match tess.dlightBits (MAX_DLIGHTS); do not pack extra "real" slots. */
+	const uint32_t max_lights = (uint32_t)MAX_DLIGHTS;
 	const VkDeviceSize light_buf_size = (VkDeviceSize)VK_FP_HEADER_BYTES + (VkDeviceSize)max_lights * (VkDeviceSize)VK_FP_RECORD_STRIDE;
 
 	vk_fp_compute_tile_grid( &tiles_x, &tiles_y, &total_tiles, &tile_bytes );
@@ -696,8 +697,8 @@ void vk_forward_plus_update_for_refdef( void )
 
 	base = (float *)vk.forward_plus.mapped;
 	n = backEnd.refdef.num_dlights;
-	if ( n > (uint32_t)MAX_REAL_DLIGHTS ) {
-		n = (uint32_t)MAX_REAL_DLIGHTS;
+	if ( n > (uint32_t)MAX_DLIGHTS ) {
+		n = (uint32_t)MAX_DLIGHTS;
 	}
 
 	max_pack = ( vk.forward_plus.capacity_bytes - (uint32_t)VK_FP_HEADER_BYTES ) / (uint32_t)VK_FP_RECORD_STRIDE;
