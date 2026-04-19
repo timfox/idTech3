@@ -683,10 +683,12 @@ void vk_forward_plus_update_for_refdef( void )
 {
 	float *base;
 	uint32_t n;
+	uint32_t src;
 	unsigned int i;
 	uint32_t max_pack;
 	const dlight_t *dl;
 	float dbg;
+	static uint32_t s_trunc_log_src;
 
 	if ( !r_forwardPlus || !r_forwardPlus->integer ) {
 		return;
@@ -696,7 +698,8 @@ void vk_forward_plus_update_for_refdef( void )
 	}
 
 	base = (float *)vk.forward_plus.mapped;
-	n = backEnd.refdef.num_dlights;
+	src = backEnd.refdef.num_dlights;
+	n = src;
 	if ( n > (uint32_t)MAX_DLIGHTS ) {
 		n = (uint32_t)MAX_DLIGHTS;
 	}
@@ -704,6 +707,16 @@ void vk_forward_plus_update_for_refdef( void )
 	max_pack = ( vk.forward_plus.capacity_bytes - (uint32_t)VK_FP_HEADER_BYTES ) / (uint32_t)VK_FP_RECORD_STRIDE;
 	if ( n > max_pack ) {
 		n = max_pack;
+	}
+
+	if ( src > n ) {
+		if ( src != s_trunc_log_src ) {
+			ri.Printf( PRINT_DEVELOPER, "[VK][Forward+] refdef has %u dlights; packing %u (Forward+ / dlightBits index cap)\n",
+				(unsigned)src, (unsigned)n );
+			s_trunc_log_src = src;
+		}
+	} else if ( src <= (uint32_t)MAX_DLIGHTS ) {
+		s_trunc_log_src = 0u;
 	}
 
 	dbg = ( r_forwardPlusDebug && r_forwardPlusDebug->value > 0.0f ) ? r_forwardPlusDebug->value : 0.0f;
