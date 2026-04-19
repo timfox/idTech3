@@ -1589,6 +1589,7 @@ extern cvar_t	*r_taa_feedbackStationary;
 extern cvar_t	*r_taa_feedbackMotion;
 extern cvar_t	*r_taa_sharpen;
 extern cvar_t	*r_rtx;
+extern cvar_t	*r_forwardPlus;
 extern cvar_t	*r_glint;
 extern cvar_t	*r_glintMode;
 extern cvar_t	*r_glintDensity;
