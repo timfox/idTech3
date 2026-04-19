@@ -201,6 +201,7 @@ cvar_t	*r_taa_feedbackMotion;
 cvar_t	*r_taa_sharpen;
 cvar_t	*r_rtx;
 cvar_t	*r_forwardPlus;
+cvar_t	*r_forwardPlusMaxPerTile;
 cvar_t	*r_forwardPlusDebug;
 cvar_t	*r_forwardPlusShade;
 
@@ -3468,8 +3469,12 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_rtx, "Ray tracing (0=off, 1=shadows, 2=reflections, 3=full). Requires USE_VULKAN_RTX build and RT-capable GPU. See docs/RENDERERS_FUTURE.md." );
 	r_forwardPlus = ri.Cvar_Get( "r_forwardPlus", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_forwardPlus, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_forwardPlus, "Forward+ scaffolding: GPU light SSBO + per-tile cull compute (16px tiles, max 8 lights/tile). Packs at most MAX_DLIGHTS (32) so indices match tess.dlightBits. PBR: \\r_forwardPlusDebug (overlay), \\r_forwardPlusShade (experimental additive lights); see docs/RENDERER_2026_ARCHITECTURE_PASS.md." );
+	ri.Cvar_SetDescription( r_forwardPlus, "Forward+ scaffolding: GPU light SSBO + per-tile cull compute (16px tiles; max per tile from \\r_forwardPlusMaxPerTile, default 8). Packs at most MAX_DLIGHTS (32) so indices match tess.dlightBits. PBR: \\r_forwardPlusDebug (overlay), \\r_forwardPlusShade (experimental additive lights); see docs/RENDERER_2026_ARCHITECTURE_PASS.md." );
 	ri.Cvar_SetGroup( r_forwardPlus, CVG_RENDERER );
+	r_forwardPlusMaxPerTile = ri.Cvar_Get( "r_forwardPlusMaxPerTile", "8", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_forwardPlusMaxPerTile, "4", "8", CV_INTEGER );
+	ri.Cvar_SetDescription( r_forwardPlusMaxPerTile, "Forward+ tile list length per 16px tile (4–8, latched). Lower values reduce GPU work when \\r_forwardPlus 1. Requires vid_restart after change." );
+	ri.Cvar_SetGroup( r_forwardPlusMaxPerTile, CVG_RENDERER );
 	r_forwardPlusDebug = ri.Cvar_Get( "r_forwardPlusDebug", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_forwardPlusDebug, "0", "1", CV_FLOAT );
 	ri.Cvar_SetDescription( r_forwardPlusDebug, "PBR Forward+ debug overlay strength (0=off, typ. 0.08–0.25): heatmap by lights per 16px tile + tile borders. Requires \\r_forwardPlus 1." );
