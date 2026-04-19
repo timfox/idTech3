@@ -4,6 +4,7 @@ docs/RENDERER_CONFIDENCE.md
 docs/RELEASE_CHECKLIST.md
 docs/RENDERERS.md
 docs/RENDERERS_FUTURE.md
+docs/RENDERER_2026_ARCHITECTURE_PASS.md
 docs/GLTF.md
 src/renderers/vulkan/tr_model_gltf.h
 src/renderers/opengl/tr_local.h

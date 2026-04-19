@@ -574,7 +574,7 @@ void vk_initialize( void )
 		pool_size[4].descriptorCount = 8 + NUM_COMMAND_BUFFERS;
 
 		pool_size[5].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		pool_size[5].descriptorCount = 8; /* forward+: compute set (3 SSBO) + PBR graphics set (2 SSBO) */
+		pool_size[5].descriptorCount = 10; /* forward+: compute (3 SSBO) + PBR graphics (3 SSBO) */
 
 		for ( j = 0, maxSets = 0; j < ARRAY_LEN( pool_size ); j++ ) {
 			maxSets += pool_size[j].descriptorCount;

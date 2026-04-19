@@ -20,6 +20,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_postfx.h"
 #include "vk_postfx_params.h"
 #include "vk_render_pass.h"
+#include "vk_resource_destroy.h"
 #include "vk_scene_pass.h"
 #include "vk_staging.h"
 #include "vk_swapchain.h"
@@ -92,6 +93,16 @@ void vk_begin_frame( void )
 		return;
 
 	vk.inRenderPass = qfalse;
+
+#ifdef USE_VK_PBR
+	if ( r_forwardPlusShade && r_forwardPlusShade->modified ) {
+		r_forwardPlusShade->modified = qfalse;
+		if ( vk.device && !vk.device_lost && vk.pipelines_count > 0u ) {
+			ri.Printf( PRINT_ALL, "[VK][Forward+] r_forwardPlusShade changed; invalidating graphics pipelines for new fragment specialization\n" );
+			vk_destroy_pipelines( qfalse );
+		}
+	}
+#endif
 
 	if ( PostFX_NeedsPipelineUpdate() ) {
 		vk_update_post_process_pipelines();

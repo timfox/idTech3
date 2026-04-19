@@ -174,7 +174,10 @@ typedef struct {
 static VkDescriptorSet vk_fp_graphics_descriptor = VK_NULL_HANDLE;
 static VkBuffer vk_fp_dummy_light_buf = VK_NULL_HANDLE;
 static VkBuffer vk_fp_dummy_tile_buf = VK_NULL_HANDLE;
-static VkDeviceMemory vk_fp_dummy_mem = VK_NULL_HANDLE;
+static VkBuffer vk_fp_dummy_param_buf = VK_NULL_HANDLE;
+static VkDeviceMemory vk_fp_dummy_light_mem = VK_NULL_HANDLE;
+static VkDeviceMemory vk_fp_dummy_tile_mem = VK_NULL_HANDLE;
+static VkDeviceMemory vk_fp_dummy_param_mem = VK_NULL_HANDLE;
 
 static void vk_fp_destroy_dummy_buffers( void )
 {
@@ -186,65 +189,74 @@ static void vk_fp_destroy_dummy_buffers( void )
 		qvkDestroyBuffer( vk.device, vk_fp_dummy_tile_buf, NULL );
 		vk_fp_dummy_tile_buf = VK_NULL_HANDLE;
 	}
-	if ( vk_fp_dummy_mem != VK_NULL_HANDLE ) {
-		qvkFreeMemory( vk.device, vk_fp_dummy_mem, NULL );
-		vk_fp_dummy_mem = VK_NULL_HANDLE;
+	if ( vk_fp_dummy_param_buf != VK_NULL_HANDLE ) {
+		qvkDestroyBuffer( vk.device, vk_fp_dummy_param_buf, NULL );
+		vk_fp_dummy_param_buf = VK_NULL_HANDLE;
+	}
+	if ( vk_fp_dummy_light_mem != VK_NULL_HANDLE ) {
+		qvkFreeMemory( vk.device, vk_fp_dummy_light_mem, NULL );
+		vk_fp_dummy_light_mem = VK_NULL_HANDLE;
+	}
+	if ( vk_fp_dummy_tile_mem != VK_NULL_HANDLE ) {
+		qvkFreeMemory( vk.device, vk_fp_dummy_tile_mem, NULL );
+		vk_fp_dummy_tile_mem = VK_NULL_HANDLE;
+	}
+	if ( vk_fp_dummy_param_mem != VK_NULL_HANDLE ) {
+		qvkFreeMemory( vk.device, vk_fp_dummy_param_mem, NULL );
+		vk_fp_dummy_param_mem = VK_NULL_HANDLE;
 	}
 }
 
-static void vk_fp_create_dummy_buffers( void )
+static void vk_fp_alloc_dummy_ssbo( VkBuffer *buf, VkDeviceMemory *mem, VkDeviceSize size )
 {
 	VkBufferCreateInfo bci;
-	VkMemoryRequirements mr_light, mr_tile;
+	VkMemoryRequirements mr;
 	VkMemoryAllocateInfo mai;
 	uint32_t mem_type;
-	VkDeviceSize light_bytes, tile_bytes, tile_off, total;
 	byte *ptr;
-
-	if ( vk_fp_dummy_light_buf != VK_NULL_HANDLE ) {
-		return;
-	}
-
-	light_bytes = (VkDeviceSize)VK_FP_DUMMY_LIGHT_FLOATS * sizeof( float );
-	tile_bytes = (VkDeviceSize)VK_FP_DUMMY_TILE_UINTS * sizeof( uint32_t );
 
 	bci.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	bci.pNext = NULL;
 	bci.flags = 0;
-	bci.size = light_bytes;
+	bci.size = size;
 	bci.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 	bci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	bci.queueFamilyIndexCount = 0;
 	bci.pQueueFamilyIndices = NULL;
-	VK_CHECK( qvkCreateBuffer( vk.device, &bci, NULL, &vk_fp_dummy_light_buf ) );
-	qvkGetBufferMemoryRequirements( vk.device, vk_fp_dummy_light_buf, &mr_light );
-
-	tile_off = PAD( light_bytes, mr_light.alignment );
-
-	bci.size = tile_bytes;
-	VK_CHECK( qvkCreateBuffer( vk.device, &bci, NULL, &vk_fp_dummy_tile_buf ) );
-	qvkGetBufferMemoryRequirements( vk.device, vk_fp_dummy_tile_buf, &mr_tile );
-
-	total = tile_off + mr_tile.size;
-	mem_type = vk_find_memory_type( vk.physical_device, mr_light.memoryTypeBits & mr_tile.memoryTypeBits,
+	VK_CHECK( qvkCreateBuffer( vk.device, &bci, NULL, buf ) );
+	qvkGetBufferMemoryRequirements( vk.device, *buf, &mr );
+	mem_type = vk_find_memory_type( vk.physical_device, mr.memoryTypeBits,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
 	mai.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	mai.pNext = NULL;
-	mai.allocationSize = total;
+	mai.allocationSize = mr.size;
 	mai.memoryTypeIndex = mem_type;
-	VK_CHECK( qvkAllocateMemory( vk.device, &mai, NULL, &vk_fp_dummy_mem ) );
-	VK_CHECK( qvkMapMemory( vk.device, vk_fp_dummy_mem, 0, VK_WHOLE_SIZE, 0, (void **)&ptr ) );
-	Com_Memset( ptr, 0, (size_t)total );
-	VK_CHECK( qvkBindBufferMemory( vk.device, vk_fp_dummy_light_buf, vk_fp_dummy_mem, 0 ) );
-	VK_CHECK( qvkBindBufferMemory( vk.device, vk_fp_dummy_tile_buf, vk_fp_dummy_mem, tile_off ) );
+	VK_CHECK( qvkAllocateMemory( vk.device, &mai, NULL, mem ) );
+	VK_CHECK( qvkMapMemory( vk.device, *mem, 0, VK_WHOLE_SIZE, 0, (void **)&ptr ) );
+	Com_Memset( ptr, 0, (size_t)mr.size );
+	VK_CHECK( qvkBindBufferMemory( vk.device, *buf, *mem, 0 ) );
 }
 
-static void vk_fp_write_graphics_descriptor( VkBuffer light_buf, VkBuffer tile_buf )
+static void vk_fp_create_dummy_buffers( void )
 {
-	VkDescriptorBufferInfo infos[2];
-	VkWriteDescriptorSet writes[2];
+	if ( vk_fp_dummy_light_buf != VK_NULL_HANDLE ) {
+		return;
+	}
 
-	if ( vk_fp_graphics_descriptor == VK_NULL_HANDLE || light_buf == VK_NULL_HANDLE || tile_buf == VK_NULL_HANDLE ) {
+	vk_fp_alloc_dummy_ssbo( &vk_fp_dummy_light_buf, &vk_fp_dummy_light_mem,
+		(VkDeviceSize)VK_FP_DUMMY_LIGHT_FLOATS * sizeof( float ) );
+	vk_fp_alloc_dummy_ssbo( &vk_fp_dummy_tile_buf, &vk_fp_dummy_tile_mem,
+		(VkDeviceSize)VK_FP_DUMMY_TILE_UINTS * sizeof( uint32_t ) );
+	vk_fp_alloc_dummy_ssbo( &vk_fp_dummy_param_buf, &vk_fp_dummy_param_mem, (VkDeviceSize)VK_FP_PARAM_BYTES );
+}
+
+static void vk_fp_write_graphics_descriptor( VkBuffer light_buf, VkBuffer tile_buf, VkBuffer param_buf )
+{
+	VkDescriptorBufferInfo infos[3];
+	VkWriteDescriptorSet writes[3];
+
+	if ( vk_fp_graphics_descriptor == VK_NULL_HANDLE || light_buf == VK_NULL_HANDLE ||
+		tile_buf == VK_NULL_HANDLE || param_buf == VK_NULL_HANDLE ) {
 		return;
 	}
 
@@ -254,22 +266,21 @@ static void vk_fp_write_graphics_descriptor( VkBuffer light_buf, VkBuffer tile_b
 	infos[1].buffer = tile_buf;
 	infos[1].offset = 0;
 	infos[1].range = VK_WHOLE_SIZE;
+	infos[2].buffer = param_buf;
+	infos[2].offset = 0;
+	infos[2].range = VK_WHOLE_SIZE;
 
 	Com_Memset( writes, 0, sizeof( writes ) );
-	writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	writes[0].dstSet = vk_fp_graphics_descriptor;
-	writes[0].dstBinding = 0;
-	writes[0].descriptorCount = 1;
-	writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-	writes[0].pBufferInfo = &infos[0];
-	writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	writes[1].dstSet = vk_fp_graphics_descriptor;
-	writes[1].dstBinding = 1;
-	writes[1].descriptorCount = 1;
-	writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-	writes[1].pBufferInfo = &infos[1];
+	for ( int i = 0; i < 3; i++ ) {
+		writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[i].dstSet = vk_fp_graphics_descriptor;
+		writes[i].dstBinding = (uint32_t)i;
+		writes[i].descriptorCount = 1;
+		writes[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		writes[i].pBufferInfo = &infos[i];
+	}
 
-	qvkUpdateDescriptorSets( vk.device, 2, writes, 0, NULL );
+	qvkUpdateDescriptorSets( vk.device, 3, writes, 0, NULL );
 }
 
 void vk_forward_plus_create_set_layout( void )
@@ -294,7 +305,7 @@ void vk_forward_plus_create_set_layout( void )
 	binds[2].binding = 2;
 	binds[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 	binds[2].descriptorCount = 1;
-	binds[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	binds[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
 	layout_ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	layout_ci.pNext = NULL;
@@ -336,10 +347,11 @@ void vk_forward_plus_init_graphics_descriptors( void )
 
 	vk_fp_create_dummy_buffers();
 
-	if ( r_forwardPlus && r_forwardPlus->integer && vk.forward_plus.buffer != VK_NULL_HANDLE && vk.forward_plus.tile_buffer != VK_NULL_HANDLE ) {
-		vk_fp_write_graphics_descriptor( vk.forward_plus.buffer, vk.forward_plus.tile_buffer );
+	if ( r_forwardPlus && r_forwardPlus->integer && vk.forward_plus.buffer != VK_NULL_HANDLE &&
+		vk.forward_plus.tile_buffer != VK_NULL_HANDLE && vk.forward_plus.param_buffer != VK_NULL_HANDLE ) {
+		vk_fp_write_graphics_descriptor( vk.forward_plus.buffer, vk.forward_plus.tile_buffer, vk.forward_plus.param_buffer );
 	} else {
-		vk_fp_write_graphics_descriptor( vk_fp_dummy_light_buf, vk_fp_dummy_tile_buf );
+		vk_fp_write_graphics_descriptor( vk_fp_dummy_light_buf, vk_fp_dummy_tile_buf, vk_fp_dummy_param_buf );
 	}
 #endif
 }

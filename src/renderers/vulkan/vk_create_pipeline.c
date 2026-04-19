@@ -66,7 +66,7 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
     struct Vk_Pipeline_FragSpecData frag_spec_data;
 
 #ifdef USE_VK_PBR
-    VkSpecializationMapEntry spec_entries[37];
+    VkSpecializationMapEntry spec_entries[38];
 #else
     VkSpecializationMapEntry spec_entries[12];
 #endif
@@ -686,7 +686,7 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 	ADD_FRAG_SPEC( 16, normalScale_y );
 	ADD_FRAG_SPEC( 17, normalScale_z );
 	ADD_FRAG_SPEC( 18, normalScale_w );
-	/* constant_id order must match gen_frag.tmpl (19..39) */
+	/* constant_id order must match gen_frag.tmpl (19..40) */
 	ADD_FRAG_SPEC( 19, normal_texture_set );
 	ADD_FRAG_SPEC( 20, physical_texture_set );
 	ADD_FRAG_SPEC( 21, env_texture_set );
@@ -708,6 +708,7 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 	ADD_FRAG_SPEC( 37, pom_enabled );
 	ADD_FRAG_SPEC( 38, pom_max_steps );
 	ADD_FRAG_SPEC( 39, parallax_bias_shader );
+	ADD_FRAG_SPEC( 40, forward_plus_shade_strength );
 
 	// only use w value, specgloss maps are not supported
 	frag_spec_data.specularScale_x = def->specularScale[0];
@@ -738,6 +739,8 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 	frag_spec_data.pom_enabled = 0;
 	frag_spec_data.pom_max_steps = 16;
 	frag_spec_data.parallax_bias_shader = def->parallaxBias;
+	frag_spec_data.forward_plus_shade_strength = ( r_forwardPlusShade && r_forwardPlusShade->value > 0.0f )
+		? Com_Clamp( 0.0f, 4.0f, r_forwardPlusShade->value ) : 0.0f;
 
 	if ( def->vk_pbr_flags & PBR_HAS_NORMALMAP )
 		frag_spec_data.normal_texture_set = 0;
