@@ -162,6 +162,15 @@ layout(set = 15, binding = 0) uniform sampler2D transmission_texture;
 layout(set = 16, binding = 0) uniform sampler2D subsurface_texture;
 layout(set = 17, binding = 0) uniform sampler2D detail_texture;
 
+#ifdef USE_FORWARD_PLUS_FRAG
+layout(set = 18, binding = 0) readonly buffer FpLightSSBO {
+	vec4 fp_light_data[];
+} fp_lights;
+layout(set = 18, binding = 1) readonly buffer FpTileSSBO {
+	uint fp_tile_cells[];
+} fp_tiles;
+#endif
+
 // prob use ubo for specularScale & normalScale ..
 layout (constant_id = 11) const float specularScale_x = 1.0;
 layout (constant_id = 12) const float specularScale_y = 1.0;
@@ -1299,6 +1308,31 @@ void main() {
 		diffuse.rgb *= ( 1.0 - transmitFactor );
 		out_color.rgb += lightColor * diffuse.rgb * ( attenuation * NL ) * transmitFactor;
 	}
+
+#ifdef USE_FORWARD_PLUS_FRAG
+	{
+		const float fp_dbg = fp_lights.fp_light_data[0].w;
+		if ( fp_dbg > 1e-6 ) {
+			uint tilesX = uint( fp_lights.fp_light_data[1].x + 0.5 );
+			uint tilesY = uint( fp_lights.fp_light_data[1].y + 0.5 );
+			if ( tilesX > 0u && tilesY > 0u ) {
+				vec2 px = gl_FragCoord.xy;
+				uint tx = min( uint( px.x / 16.0 ), tilesX - 1u );
+				uint ty = min( uint( px.y / 16.0 ), tilesY - 1u );
+				uint tileId = ty * tilesX + tx;
+				uint base = tileId * 4u;
+				vec4 heat = vec4( 0.0 );
+				for ( uint k = 0u; k < 4u; k++ ) {
+					uint idx = fp_tiles.fp_tile_cells[ base + k ];
+					if ( idx != 0xFFFFFFFFu ) {
+						heat[ k ] = 1.0;
+					}
+				}
+				out_color.rgb += heat.rgb * fp_dbg;
+			}
+		}
+	}
+#endif
 	
 	out_color.rgb += emissive;
 	

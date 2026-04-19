@@ -10,6 +10,10 @@ Split from vk.c.
 #include "tr_local.h"
 
 #ifdef USE_VK_PBR
+#include "vk_forward_plus.h"
+#endif
+
+#ifdef USE_VK_PBR
 static VkBuffer shade_bufs[10];
 #else
 static VkBuffer shade_bufs[8];
@@ -386,6 +390,15 @@ void vk_bind_descriptor_sets( void )
 	}
 
 	count = end - start + 1;
+
+#ifdef USE_VK_PBR
+	if ( vk.maxBoundDescriptorSets >= VK_DESC_COUNT ) {
+		VkDescriptorSet fp_set = vk_forward_plus_get_graphics_descriptor_set();
+		if ( fp_set != VK_NULL_HANDLE ) {
+			vk.cmd->descriptor_set.current[VK_DESC_FORWARD_PLUS] = fp_set;
+		}
+	}
+#endif
 
 	// fill NULL descriptor gaps
 	if ( tr.whiteImage ) {

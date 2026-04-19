@@ -92,7 +92,7 @@ void vk_shutdown( refShutdownCode_t code )
 		vk.descriptor_pool = VK_NULL_HANDLE;
 	}
 
-	vk_forward_plus_destroy_descriptor_layout();
+	vk_forward_plus_on_descriptor_pool_destroyed();
 
 	qvkDestroyDescriptorSetLayout(vk.device, vk.set_layout_sampler, NULL);
 	qvkDestroyDescriptorSetLayout(vk.device, vk.set_layout_uniform, NULL);
@@ -126,6 +126,7 @@ void vk_shutdown( refShutdownCode_t code )
 		qvkDestroyPipelineLayout( vk.device, vk.pipeline_layout, NULL );
 		vk.pipeline_layout = VK_NULL_HANDLE;
 	}
+	vk_forward_plus_destroy_graphics_layout();
 	if ( vk.pipeline_layout_storage != VK_NULL_HANDLE && qvkDestroyPipelineLayout != NULL ) {
 		qvkDestroyPipelineLayout( vk.device, vk.pipeline_layout_storage, NULL );
 		vk.pipeline_layout_storage = VK_NULL_HANDLE;

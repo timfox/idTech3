@@ -8,6 +8,7 @@ Extracted from vk.c for incremental modularization.
 */
 
 #include "tr_local.h"
+#include "vk_forward_plus.h"
 #include "vk.h"
 #include "vk_descriptors.h"
 #include "vk_draw_state.h"
@@ -196,6 +197,14 @@ _retry:
 
 	Com_Memset( &vk.cmd->descriptor_set, 0, sizeof( vk.cmd->descriptor_set ) );
 	vk.cmd->descriptor_set.start = ~0U;
+#ifdef USE_VK_PBR
+	if ( vk.maxBoundDescriptorSets >= VK_DESC_COUNT ) {
+		VkDescriptorSet fp_set = vk_forward_plus_get_graphics_descriptor_set();
+		if ( fp_set != VK_NULL_HANDLE ) {
+			vk.cmd->descriptor_set.current[VK_DESC_FORWARD_PLUS] = fp_set;
+		}
+	}
+#endif
 
 	Com_Memset( &vk.cmd->scissor_rect, 0, sizeof( vk.cmd->scissor_rect ) );
 
