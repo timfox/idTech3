@@ -777,6 +777,13 @@ void vk_forward_plus_update_for_refdef( void )
 		base[0] = 0.0f;
 	}
 
+	/* Drop stale records when the packed count shrinks (or dlights is null); SSBO is not fully rewritten each frame. */
+	if ( n < max_pack ) {
+		float *tail = base + (uint32_t)( VK_FP_HEADER_BYTES / sizeof( float ) ) +
+			(uint32_t)n * (uint32_t)( VK_FP_RECORD_STRIDE / sizeof( float ) );
+		Com_Memset( tail, 0, (size_t)( max_pack - n ) * (size_t)VK_FP_RECORD_STRIDE );
+	}
+
 	for ( i = 0; i < n; i++ ) {
 		const dlight_t *L = dl + i;
 		float *rec = base + (uint32_t)( VK_FP_HEADER_BYTES / sizeof( float ) ) + (uint32_t)i * (uint32_t)( VK_FP_RECORD_STRIDE / sizeof( float ) );
