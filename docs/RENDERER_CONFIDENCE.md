@@ -18,7 +18,7 @@ Run these after any renderer, shader, or mikktspace change.
 
 | Check | Command | What it proves |
 |--------|---------|----------------|
-| Renderer regression (repo) | `./scripts/renderer_regression_check.sh` | Regression docs present; `shader_data.c` / `shader_binding.c` exist; recursive GLSL `glslang` pass. Optional: set `GAME_BASE` and uncomment BSP paths in `OPTIONAL_GAME_ASSETS.txt` to require packaged maps. |
+| Renderer regression (repo) | `./scripts/renderer_regression_check.sh` | Regression docs present (including `docs/ARCHITECTURE.md`); `shader_data.c` / `shader_binding.c` exist; recursive GLSL `glslang` pass; IQM/glTF morph **#define** parity (see script output). Optional: set `GAME_BASE` and uncomment BSP paths in `OPTIONAL_GAME_ASSETS.txt` to require packaged maps. |
 | Map load sanity (content) | `GAME_BASE=/abs/path/to/base ./scripts/renderer_regression_maps.sh` | Dedicated server runs `+map` for each `rtest_*` map; log scanned for `ERROR:`, `couldn't load`, `CM_LoadMap`, crashes. Requires full game base (VM + assets), not the regression pk3 alone. `RELEASE_DIR` optional (default `<repo>/release`). |
 | Full local CI parity | `./scripts/validate_ci_build.sh` | SPIR-V generation, Vulkan Release build, smoke test, renderer regression check. |
 | CMake smoke + artifacts | `ctest --output-on-failure` (from `build-vk-Release` or `build-gl-Release`) | Smoke, **renderer_regression_check**, artifacts, unit hooks, **demo_game pk3 layout** (`test_demo_game_pk3`). |
@@ -26,6 +26,8 @@ Run these after any renderer, shader, or mikktspace change.
 | Standalone GLSL | `./scripts/smoke_test.sh` (or the smoke step inside `validate_ci_build.sh`) | Every `.vert`, `.frag`, `.geom`, and `.comp` under `src/renderers/vulkan/shaders/glsl/` validates with `glslangValidator` (recursive, including `volumetric/`, `terrain/`, `postfx/`). |
 
 Optional: `SKIP_IDPAK_CHECK=ON` is normal for engine-only trees; the dedicated server may exit with “no game data” after init - that is still a useful crash-free signal.
+
+**Vulkan Forward+ (optional, `r_forwardPlus 1`):** `r_forwardPlusMaxPerTile` (4–8, latched, default 8) trims per-tile light index work while keeping the same SSBO stride; requires `vid_restart` after changes. Does not affect mod game code or QVMs.
 
 ## Manual (GPU + content)
 
