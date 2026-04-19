@@ -16,6 +16,8 @@ Visual regression **specs** and suggested map names: [samples/renderer_regressio
 
 Run these after any renderer, shader, or mikktspace change.
 
+On **`main`**, GitHub Actions **`.github/workflows/build.yml`** runs **`renderer_regression_check.sh`** (Tier A: manifest + cap parity + full GLSL `glslang` when the job installs `glslang`) on **Windows MSYS2**, **Windows MSVC** (Vulkan SDK install for `glslangValidator`, Release matrix only), **macOS**, **Ubuntu ARM**, and **Android** (CMake matrix + Gradle APK job), in addition to Ubuntu x86_64 / ASAN paths that already ran smoke + ctest. MSVC **smoke_test** runs on **x64 Release** only (ARM64 PEs are not executed on the x64 GitHub runner). Forks without `glslang` in a job still skip only the GLSL subtree inside the script.
+
 | Check | Command | What it proves |
 |--------|---------|----------------|
 | Renderer regression (repo) | `./scripts/renderer_regression_check.sh` | Regression docs present (including `docs/ARCHITECTURE.md`); `shader_data.c` / `shader_binding.c` exist; recursive GLSL `glslang` pass; IQM/glTF morph **#define** parity; Forward+ **tile cull vs `tr_types.h` / `vk_forward_plus.c`** caps; **`r_forwardPlusMaxPerTile`** range wired to `vk_forward_plus_get_*_per_tile_cap` (see script output). Optional: set `GAME_BASE` and uncomment BSP paths in `OPTIONAL_GAME_ASSETS.txt` to require packaged maps. |
