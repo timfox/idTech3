@@ -320,7 +320,10 @@ static void vk_get_prev_mvp_transform( float *prev_mvp )
 			vk_curr_entity_model_valid[motion_index] = qtrue;
 		}
 
-		if ( !vk_entity_requires_no_motion( backEnd.currentEntity ) &&
+		/* GPU skin (IQM / glTF SSBO): deformation is not in the entity model matrix, so per-entity
+		 * previous model does not reconstruct prior clip positions — keep prev_model = current. */
+		if ( !( vk.cmd && vk.cmd->iqm_skin_offset != 0 ) &&
+			!vk_entity_requires_no_motion( backEnd.currentEntity ) &&
 			vk_prev_entity_model_valid[motion_index] &&
 			vk_prev_entity_model_handles[motion_index] == backEnd.currentEntity->e.hModel &&
 			vk_prev_entity_types[motion_index] == (int)backEnd.currentEntity->e.reType ) {

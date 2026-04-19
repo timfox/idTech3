@@ -515,6 +515,12 @@ void vk_draw_geometry( Vk_Depth_Range depth_range, qboolean indexed ) {
 	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE || !vk.inRenderPass )
 		return;
 
+	/* MVP push may have run before IQM/glTF GPU skin data was committed to the geometry buffer;
+	 * refresh so prev_mvp matches the SSBO binding for this indexed draw. */
+	if ( indexed && vk.cmd->iqm_skin_offset != 0 ) {
+		vk_update_mvp( NULL );
+	}
+
 	vk_bind_descriptor_sets();
 
 	// configure pipeline's dynamic state
