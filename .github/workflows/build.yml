@@ -155,6 +155,7 @@ jobs:
         run: |
           mkdir -p release
           cp -f bin/idtech3* release/ || true
+          cp -f bin/*.dll release/ 2>/dev/null || true
           chmod +x scripts/smoke_test.sh
           ./scripts/smoke_test.sh release
 
@@ -429,6 +430,7 @@ jobs:
           sfx='${{ matrix.suffix }}'
           cp -f "bin/idtech3_server${sfx}.exe" release/idtech3_server.exe
           cp -f "bin/idtech3${sfx}.exe" release/idtech3.exe
+          cp -f bin/*.dll release/ 2>/dev/null || true
           chmod +x scripts/smoke_test.sh
           ./scripts/smoke_test.sh release
 
