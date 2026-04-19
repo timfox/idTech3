@@ -121,6 +121,8 @@ cmake --build --preset build-vulkan-release
 
 If you stage Windows binaries into a `bin/` directory outside MSYS2, run `./scripts/stage_mingw_runtime_dlls.sh bin` from a MINGW64 shell so the required runtime `.dll` files sit next to the executables.
 
+To ship **OpenAL** without asking users to install Creative’s OpenAL (match CI release zips), from PowerShell run **`./scripts/stage_openal_windows_dlls.ps1 -BinDir bin -Arch x64`**. This downloads OpenAL Soft’s official `*-bin.zip` (cached under `.ci-openal-soft-cache/`, gitignored) and copies `OpenAL32.dll` + `soft_oal.dll` next to your `.exe` files. Optional env: `OPENAL_SOFT_BIN_VERSION`, `OPENAL_SOFT_DOWNLOAD_ATTEMPTS`, `SKIP_OPENAL_DLL_BUNDLE=1`.
+
 ### Windows (MSVC solution files)
 
 The Visual Studio solution under `src/platform/win32/msvc2017/quake3e.sln` is still maintained for native MSVC workflows, but it is no longer the primary build truth for the repository.
