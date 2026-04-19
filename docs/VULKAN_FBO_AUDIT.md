@@ -215,7 +215,7 @@ OIT re-enabled after wiring the OIT accum pipeline. When `r_oit 1` + `r_fbo 1`: 
 9. Luminance (eye adaptation)
 10. Gamma → swapchain
 
-**No deferred or Forward+ path** - purely forward with screen-space post-processing.
+**No deferred path** — main geometry stays forward with screen-space post-processing. **Optional Vulkan Forward+** (`r_forwardPlus 1`) adds GPU light records + tile cull compute on that forward path; it is not a separate frame mode (see `docs/RENDERERS.md`).
 
 ---
 
@@ -251,8 +251,8 @@ OIT re-enabled after wiring the OIT accum pipeline. When `r_oit 1` + `r_fbo 1`: 
 - **Defensive null checks**: Gamma pass skips and logs a warning if pipeline, descriptor, render pass, or framebuffer is null, avoiding crashes when resources are missing.
 
 ### Deferred / Forward+
-- Current design is forward-only. No change recommended unless deferred/Forward+ is a stated goal.
-- If adding deferred later, keep the FBO/descriptor design in mind to avoid similar descriptor/layout issues.
+- Shipping path remains **forward**; **`r_renderMode` 1/2** are still placeholders for a hypothetical deferred / alternate pipeline.
+- **Forward+ (Vulkan):** optional tile-culled dynamic lights (`r_forwardPlus`); keep FBO / internal-resolution behavior in mind when debugging tile SSBO lifetime (realloc on render-target resize). Full deferred would still need a separate design pass.
 
 ### Debugging
 - Enable Vulkan validation layers and check for:
