@@ -67,8 +67,12 @@ bool IQMDecodeMeta( float packedFloat, out int skinIndex, out int morphIndex ) {
 	return true;
 }
 
-vec3 IQMSkinPosition( int skinIndex, vec3 position ) {
-	int base = 1 + skinIndex * 12;
+int IQMSkinBlockStride( int skinCount ) {
+	return skinCount * 12 + skinCount * 9;
+}
+
+vec3 IQMSkinPositionFrom( int skinIndex, vec3 position, int blockOffset ) {
+	int base = 1 + blockOffset + skinIndex * 12;
 	return vec3(
 		iqmSkinData[base + 0] * position.x + iqmSkinData[base + 1] * position.y + iqmSkinData[base + 2] * position.z + iqmSkinData[base + 3],
 		iqmSkinData[base + 4] * position.x + iqmSkinData[base + 5] * position.y + iqmSkinData[base + 6] * position.z + iqmSkinData[base + 7],
@@ -76,13 +80,21 @@ vec3 IQMSkinPosition( int skinIndex, vec3 position ) {
 	);
 }
 
-vec3 IQMSkinNormal( int skinIndex, int skinCount, vec3 normal ) {
-	int base = 1 + skinCount * 12 + skinIndex * 9;
+vec3 IQMSkinNormalFrom( int skinIndex, int skinCount, vec3 normal, int blockOffset ) {
+	int base = 1 + blockOffset + skinCount * 12 + skinIndex * 9;
 	return vec3(
 		iqmSkinData[base + 0] * normal.x + iqmSkinData[base + 1] * normal.y + iqmSkinData[base + 2] * normal.z,
 		iqmSkinData[base + 3] * normal.x + iqmSkinData[base + 4] * normal.y + iqmSkinData[base + 5] * normal.z,
 		iqmSkinData[base + 6] * normal.x + iqmSkinData[base + 7] * normal.y + iqmSkinData[base + 8] * normal.z
 	);
+}
+
+vec3 IQMSkinPosition( int skinIndex, vec3 position ) {
+	return IQMSkinPositionFrom( skinIndex, position, 0 );
+}
+
+vec3 IQMSkinNormal( int skinIndex, int skinCount, vec3 normal ) {
+	return IQMSkinNormalFrom( skinIndex, skinCount, normal, 0 );
 }
 
 vec3 IQMMorphDeltaPos( int morphIndex, int morphStage ) {
@@ -97,10 +109,13 @@ vec3 IQMMorphDeltaNormal( int morphIndex, int morphStage ) {
 
 void main() {
 	vec3 position = in_position.xyz;
+	vec3 bindPosition = in_position.xyz;
 	vec3 normal = in_normal.xyz;
 	int skinIndex;
 	int morphIndex;
 	int skinCount = int( iqmSkinData[0] );
+	int skinBufStride = IQMSkinBlockStride( skinCount );
+	vec3 prevClipPos = bindPosition;
 
 	if ( IQMDecodeMeta( in_position.w, skinIndex, morphIndex ) && skinIndex >= 0 && skinIndex < skinCount ) {
 		int morphCount = int( iqmMorphData[0] );
@@ -121,11 +136,12 @@ void main() {
 		}
 
 		position = IQMSkinPosition( skinIndex, morphPosition );
+		prevClipPos = IQMSkinPositionFrom( skinIndex, morphPosition, skinBufStride );
 		normal = normalize( IQMSkinNormal( skinIndex, skinCount, morphNormal ) );
 	}
 
 	vec4 currClip = mvp * vec4(position, 1.0);
-	vec4 prevClip = prevMvp * vec4(position, 1.0);
+	vec4 prevClip = prevMvp * vec4(prevClipPos, 1.0);
 	gl_Position = currClip;
 	var_CurrentClip = currClip;
 	var_PrevClip = prevClip;

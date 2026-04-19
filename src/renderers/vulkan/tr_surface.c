@@ -1626,6 +1626,7 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 	qboolean useMorph;
 	const gltfModel_t *model;
 	float jointMatrix[GLTF_MAX_JOINTS * 12];
+	float jointMatrixPrev[GLTF_MAX_JOINTS * 12];
 	qboolean haveJoints;
 	int animCur, animOld;
 	float timeCur, timeOld, backlerp;
@@ -1717,11 +1718,14 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 		if ( animCur >= 0 && model->numAnimations > 0 ) {
 			if ( backlerp > 0.001f && animOld >= 0 && animOld != animCur ) {
 				R_ComputeGLTFJointMatricesBlend( model, animCur, timeCur, animOld, timeOld, backlerp, jointMatrix );
+				R_ComputeGLTFJointMatrices( model, animOld, timeOld, jointMatrixPrev );
 			} else {
 				R_ComputeGLTFJointMatrices( model, animCur, timeCur, jointMatrix );
+				Com_Memcpy( jointMatrixPrev, jointMatrix, sizeof( jointMatrixPrev ) );
 			}
 		} else {
 			R_ComputeGLTFJointMatrices( model, -1, 0.0f, jointMatrix );
+			Com_Memcpy( jointMatrixPrev, jointMatrix, sizeof( jointMatrixPrev ) );
 		}
 	}
 
@@ -1732,7 +1736,7 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 		surf->numVertices > 0 && surf->numVertices <= SHADER_MAX_VERTEXES ) {
 		qboolean gpuOk = qtrue;
 		int nj = ( model && model->skeleton.numJoints > 0 ) ? model->skeleton.numJoints : 0;
-		size_t skinFloats = 1u + (size_t)nj * 12u;
+		size_t skinFloats = 1u + 2u * ( (size_t)nj * 12u );
 		size_t skinBytes = skinFloats * sizeof( float );
 		uint32_t skinOff = 0;
 		float *skinPayload = (float *)vk_alloc_storage( skinBytes, &skinOff );
@@ -1754,6 +1758,7 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 			skinPayload[0] = (float)nj;
 			if ( nj > 0 ) {
 				Com_Memcpy( skinPayload + 1, jointMatrix, (size_t)nj * 12u * sizeof( float ) );
+				Com_Memcpy( skinPayload + 1 + (size_t)nj * 12u, jointMatrixPrev, (size_t)nj * 12u * sizeof( float ) );
 			}
 		}
 
