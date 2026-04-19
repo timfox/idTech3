@@ -44,7 +44,7 @@ layout(set = 0, binding = 0) uniform UBO {
 	vec4 pbrDebugMode; // x: debug mode selector
 	vec4 pbrShCoeffs[9];
 	vec4 pbrParallaxParams; // x=scale, y=shadow str, z=shadow steps (float), w=unused (reserved)
-	vec4 pbrForwardPlus; // x: skip light index (>=0) when single dlight on surface; else -1
+	vec4 pbrForwardPlus; // y: uint bits(floatBitsToUint) — skip Forward+ lights whose index is in tess.dlightBits
 #endif
 //#endif
 };
@@ -1246,7 +1246,7 @@ void main() {
 					uint tileId = ty * tilesX + tx;
 					uint tbase = tileId * 4u;
 					float nLights = fp_lights.fp_light_data[0].x;
-					int skipIdx = int( pbrForwardPlus.x + 0.5 );
+					uint skipMask = floatBitsToUint( pbrForwardPlus.y );
 					for ( uint k = 0u; k < 4u; k++ ) {
 						uint li = fp_tiles.fp_tile_cells[ tbase + k ];
 						if ( li == 0xFFFFFFFFu ) {
@@ -1255,7 +1255,7 @@ void main() {
 						if ( float( li ) + 0.5 >= nLights ) {
 							continue;
 						}
-						if ( skipIdx >= 0 && int( li ) == skipIdx ) {
+						if ( skipMask != 0u && li < 32u && ( skipMask & ( 1u << li ) ) != 0u ) {
 							continue;
 						}
 						uint b0 = 2u + li * 4u;

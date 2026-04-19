@@ -323,7 +323,7 @@ typedef struct vkUniform_s {
 	vec4_t pbrShCoeffs[9];
 	/* Parallax occlusion (POM): x=height scale, y=self-shadow strength, z=shadow ray steps (float bits as int), w=unused */
 	vec4_t pbrParallaxParams;
-	/* Forward+: x = skip packed light index when single dlight on surface (>=0), else -1 */
+	/* Forward+: x unused (-1); y bits = floatBitsToUint skip mask for tess.dlightBits (skip packed light indices) */
 	vec4_t pbrForwardPlus;
 #endif
 } vkUniform_t;
