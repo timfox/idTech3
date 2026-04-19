@@ -72,6 +72,15 @@ if [ ! -f "$RELEASE_DIR/idtech3_vulkan.so" ] && [ ! -f "$RELEASE_DIR/idtech3_vul
   warn "renderer libs not found (may be statically linked)"
 fi
 
+# Windows OpenAL Soft bundle (CI / release layout): router OpenAL32.dll + soft_oal.dll next to the client.
+if [ -f "$RELEASE_DIR/OpenAL32.dll" ] || [ -f "$RELEASE_DIR/soft_oal.dll" ]; then
+  if [ -f "$RELEASE_DIR/OpenAL32.dll" ] && [ -f "$RELEASE_DIR/soft_oal.dll" ]; then
+    pass "OpenAL Soft bundle present (OpenAL32.dll + soft_oal.dll)"
+  else
+    fail "Incomplete OpenAL bundle in $RELEASE_DIR (need both OpenAL32.dll and soft_oal.dll)"
+  fi
+fi
+
 echo ""
 
 # --- Binary format checks ---
