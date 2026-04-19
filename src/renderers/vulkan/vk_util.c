@@ -413,3 +413,13 @@ void vk_normalize_rgb_luma_safe( vec3_t io )
 		VectorScale( io, 1.0f / maxc, io );
 	}
 }
+
+void vk_linear_dlight_cone_cosines( float *out_cos_outer, float *out_cos_inner )
+{
+	if ( out_cos_outer != NULL ) {
+		*out_cos_outer = cosf( DEG2RAD( 35.0f ) );
+	}
+	if ( out_cos_inner != NULL ) {
+		*out_cos_inner = cosf( DEG2RAD( 20.0f ) );
+	}
+}
