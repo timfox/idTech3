@@ -1350,15 +1350,11 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		uniform.pbrForwardPlus[2] = 0.0f;
 		uniform.pbrForwardPlus[3] = 0.0f;
 		if ( r_forwardPlus && r_forwardPlus->integer ) {
-			const unsigned int bits = (unsigned int)tess.dlightBits;
-			if ( bits != 0u && ( bits & ( bits - 1u ) ) == 0u ) {
-				int idx = 0;
-				unsigned int b = bits;
-				while ( ( b & 1u ) == 0u ) {
-					b >>= 1u;
-					idx++;
-				}
-				uniform.pbrForwardPlus[0] = (float)idx;
+			const uint32_t bits = (uint32_t)tess.dlightBits;
+			if ( bits != 0u ) {
+				float maskF;
+				Com_Memcpy( &maskF, &bits, sizeof( maskF ) );
+				uniform.pbrForwardPlus[1] = maskF;
 			}
 		}
 	} else {
