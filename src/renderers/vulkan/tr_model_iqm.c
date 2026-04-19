@@ -1447,6 +1447,7 @@ typedef struct {
 	int			morphVertexCount;
 	int			activeCount;
 	float		weights[IQM_MORPH_TOP_K];
+	float		prevWeights[IQM_MORPH_TOP_K];
 	float		skinMatrices[SHADER_MAX_VERTEXES * 12];
 	float		normalMatrices[SHADER_MAX_VERTEXES * 9];
 	float		prevSkinMatrices[SHADER_MAX_VERTEXES * 12];
@@ -1478,6 +1479,7 @@ void R_IQMBeginSurfaceBatch( void )
 	s_iqmGpuBatch.activeCount = 0;
 	for ( i = 0; i < IQM_MORPH_TOP_K; i++ ) {
 		s_iqmGpuBatch.weights[i] = 0.0f;
+		s_iqmGpuBatch.prevWeights[i] = 0.0f;
 	}
 }
 
@@ -1517,7 +1519,7 @@ void R_IQMCommitSurfaceBatch( void )
 	Com_Memcpy( skinPayload + 1 + 2u * (size_t)s_iqmGpuBatch.skinCount * 12u + (size_t)s_iqmGpuBatch.skinCount * 9u,
 		s_iqmGpuBatch.prevNormalMatrices, (size_t)s_iqmGpuBatch.skinCount * 9u * sizeof( float ) );
 
-	morphFloats = (size_t)( 2 + IQM_MORPH_TOP_K ) + (size_t)s_iqmGpuBatch.morphVertexCount * IQM_MORPH_TOP_K * 6u;
+	morphFloats = (size_t)( 2 + 2u * (size_t)IQM_MORPH_TOP_K ) + (size_t)s_iqmGpuBatch.morphVertexCount * IQM_MORPH_TOP_K * 6u;
 	morphBytes = morphFloats * sizeof( float );
 	morphPayload = (float *)vk_alloc_storage( morphBytes, &morphOffset );
 	if ( !morphPayload ) {
@@ -1529,8 +1531,9 @@ void R_IQMCommitSurfaceBatch( void )
 	morphPayload[1] = (float)s_iqmGpuBatch.activeCount;
 	for ( i = 0; i < IQM_MORPH_TOP_K; i++ ) {
 		morphPayload[2 + i] = s_iqmGpuBatch.weights[i];
+		morphPayload[2 + IQM_MORPH_TOP_K + i] = s_iqmGpuBatch.prevWeights[i];
 	}
-	Com_Memcpy( morphPayload + 2 + IQM_MORPH_TOP_K, s_iqmGpuBatch.morphDeltas,
+	Com_Memcpy( morphPayload + 2 + 2u * (size_t)IQM_MORPH_TOP_K, s_iqmGpuBatch.morphDeltas,
 		(size_t)s_iqmGpuBatch.morphVertexCount * IQM_MORPH_TOP_K * 6u * sizeof( float ) );
 
 	vk_set_iqm_storage_offsets( skinOffset, morphOffset );
@@ -1831,6 +1834,14 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 				for ( weightIndex = 0; weightIndex < IQM_MORPH_TOP_K; weightIndex++ ) {
 					s_iqmGpuBatch.weights[weightIndex] =
 						( weightIndex < ent->morphActiveCount ) ? ent->morphActiveWeight[weightIndex] : 0.0f;
+				}
+			}
+			for ( weightIndex = 0; weightIndex < IQM_MORPH_TOP_K; weightIndex++ ) {
+				if ( s_iqmGpuBatch.activeCount == ent->morphActiveCount ) {
+					s_iqmGpuBatch.prevWeights[weightIndex] =
+						( weightIndex < ent->morphActiveCount ) ? ent->morphGpuWeightPrev[weightIndex] : 0.0f;
+				} else {
+					s_iqmGpuBatch.prevWeights[weightIndex] = s_iqmGpuBatch.weights[weightIndex];
 				}
 			}
 		}

@@ -180,12 +180,12 @@ vec3 IQMSkinNormal( int skinIndex, int skinCount, vec3 normal ) {
 }
 
 vec3 IQMMorphDeltaPos( int morphIndex, int morphStage ) {
-	int base = 2 + IQM_MORPH_TOP_K + morphIndex * (IQM_MORPH_TOP_K * 6) + morphStage * 6;
+	int base = 2 + 2 * IQM_MORPH_TOP_K + morphIndex * (IQM_MORPH_TOP_K * 6) + morphStage * 6;
 	return vec3( iqmMorphData[base + 0], iqmMorphData[base + 1], iqmMorphData[base + 2] );
 }
 
 vec3 IQMMorphDeltaNormal( int morphIndex, int morphStage ) {
-	int base = 2 + IQM_MORPH_TOP_K + morphIndex * (IQM_MORPH_TOP_K * 6) + morphStage * 6;
+	int base = 2 + 2 * IQM_MORPH_TOP_K + morphIndex * (IQM_MORPH_TOP_K * 6) + morphStage * 6;
 	return vec3( iqmMorphData[base + 3], iqmMorphData[base + 4], iqmMorphData[base + 5] );
 }
 
@@ -288,12 +288,13 @@ void main() {
 					break;
 				}
 				float wt = iqmMorphData[2 + mk];
+				float wtPrev = iqmMorphData[2 + IQM_MORPH_TOP_K + mk];
 				if ( wt <= 0.0 ) {
 					continue;
 				}
 				vec3 dP = IQMMorphDeltaPos( morphVtx, mk ) * wt;
 				position += dP;
-				prevClipPos += dP;
+				prevClipPos += IQMMorphDeltaPos( morphVtx, mk ) * wtPrev;
 				normal += IQMMorphDeltaNormal( morphVtx, mk ) * wt;
 			}
 			normal = normalize( normal );
@@ -311,8 +312,10 @@ void main() {
 		int morphCount = int( iqmMorphData[0] );
 		int activeCount = min( int( iqmMorphData[1] ), IQM_MORPH_TOP_K );
 		vec3 morphPosition = position;
+		vec3 morphPositionPrev = bindPosition;
 		#if defined(USE_ENV) || defined(USE_VK_PBR)
 			vec3 morphNormal = normal;
+			vec3 morphNormalPrev = bindNormal;
 		#endif
 
 		if ( morphIndex >= 0 && morphIndex < morphCount && activeCount > 0 ) {
@@ -321,18 +324,22 @@ void main() {
 					break;
 				}
 				float weight = iqmMorphData[2 + k];
+				float wPrev = iqmMorphData[2 + IQM_MORPH_TOP_K + k];
 				morphPosition += IQMMorphDeltaPos( morphIndex, k ) * weight;
+				morphPositionPrev += IQMMorphDeltaPos( morphIndex, k ) * wPrev;
 				#if defined(USE_ENV) || defined(USE_VK_PBR)
 					morphNormal += IQMMorphDeltaNormal( morphIndex, k ) * weight;
+					morphNormalPrev += IQMMorphDeltaNormal( morphIndex, k ) * wPrev;
 				#endif
 			}
 			#if defined(USE_ENV) || defined(USE_VK_PBR)
 				morphNormal = normalize( morphNormal );
+				morphNormalPrev = normalize( morphNormalPrev );
 			#endif
 		}
 
 		position = IQMSkinPosition( skinIndex, morphPosition );
-		prevClipPos = IQMSkinPositionFrom( skinIndex, morphPosition, skinBufStride );
+		prevClipPos = IQMSkinPositionFrom( skinIndex, morphPositionPrev, skinBufStride );
 		#if defined(USE_ENV) || defined(USE_VK_PBR)
 			normal = normalize( IQMSkinNormal( skinIndex, skinCount, morphNormal ) );
 		#endif

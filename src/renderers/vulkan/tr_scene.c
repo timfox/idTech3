@@ -21,6 +21,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "tr_local.h"
+#ifdef USE_VULKAN
+#include "vk.h"
+#endif
 
 static int			r_firstSceneDrawSurf;
 #ifdef USE_PMLIGHT
@@ -74,9 +77,13 @@ static void R_CopyPendingMorphStateToEntity( const refEntity_t *srcEnt, trRefEnt
 	dstEnt->morphChannelCount = 0;
 	dstEnt->morphActiveCount = 0;
 	dstEnt->morphDebugMaxAbsWeight = 0.0f;
+	for ( i = 0; i < IQM_MORPH_MAX_CHANNELS; i++ ) {
+		dstEnt->morphChannelWeightPrev[i] = 0.0f;
+	}
 	for ( i = 0; i < IQM_MORPH_TOP_K; i++ ) {
 		dstEnt->morphActiveTargetIndex[i] = -1;
 		dstEnt->morphActiveWeight[i] = 0.0f;
+		dstEnt->morphGpuWeightPrev[i] = 0.0f;
 	}
 
 	if ( !state ) {
@@ -555,6 +562,10 @@ void RE_BeginScene( const refdef_t *fd ) {
 }
 
 void RE_EndScene( void ) {
+#ifdef USE_VULKAN
+	/* After this view's entities are finalized, stash morph weights for next frame's GPU motion vectors. */
+	vk_snap_gpu_morph_weights_for_motion();
+#endif
 	// the next scene rendered in this frame will tack on after this one
 	r_firstSceneDrawSurf = tr.refdef.numDrawSurfs;
 #ifdef USE_PMLIGHT

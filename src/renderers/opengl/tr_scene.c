@@ -74,9 +74,13 @@ static void R_CopyPendingMorphStateToEntity( const refEntity_t *srcEnt, trRefEnt
 	dstEnt->morphChannelCount = 0;
 	dstEnt->morphActiveCount = 0;
 	dstEnt->morphDebugMaxAbsWeight = 0.0f;
+	for ( i = 0; i < IQM_MORPH_MAX_CHANNELS; i++ ) {
+		dstEnt->morphChannelWeightPrev[i] = 0.0f;
+	}
 	for ( i = 0; i < IQM_MORPH_TOP_K; i++ ) {
 		dstEnt->morphActiveTargetIndex[i] = -1;
 		dstEnt->morphActiveWeight[i] = 0.0f;
+		dstEnt->morphGpuWeightPrev[i] = 0.0f;
 	}
 
 	if ( !state ) {

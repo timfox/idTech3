@@ -12,5 +12,7 @@ uint32_t vk_get_render_target_height( void );
 void vk_reset_scene_src_rect_tracking( void );
 qboolean vk_get_scene_src_rect( VkRect2D *out_rect );
 void vk_begin_motion_frame( void );
+/* Copy morphActiveWeight -> morphGpuWeightPrev for all refdef entities (GPU morph motion vectors). */
+void vk_snap_gpu_morph_weights_for_motion( void );
 void vk_get_scissor_rect( VkRect2D *r );
 void vk_update_depth_range( Vk_Depth_Range depth_range );
