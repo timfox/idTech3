@@ -2419,6 +2419,12 @@ set_tests_properties(test_compile_engine_lto_script PROPERTIES
 	LABELS "unit;scripts;validation"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_compile_engine_lto.sh")
 
+add_test(NAME test_vk_vegetation_dispatch_order
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_vk_vegetation_dispatch_order.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_vk_vegetation_dispatch_order PROPERTIES
+	LABELS "unit;scripts;validation")
+
 # --- Unit tests ---
 option(BUILD_UNIT_TESTS "Build unit tests" ON)
 if(BUILD_UNIT_TESTS)
