@@ -442,7 +442,8 @@ static void vk_fp_create_buffers_and_compute( void )
 	uint32_t mem_type;
 	uint32_t tiles_x, tiles_y, total_tiles;
 	VkDeviceSize tile_bytes;
-	const uint32_t max_lights = (uint32_t)MAX_REAL_DLIGHTS;
+	/* Packed indices must match tess.dlightBits (MAX_DLIGHTS); do not pack extra "real" slots. */
+	const uint32_t max_lights = (uint32_t)MAX_DLIGHTS;
 	const VkDeviceSize light_buf_size = (VkDeviceSize)VK_FP_HEADER_BYTES + (VkDeviceSize)max_lights * (VkDeviceSize)VK_FP_RECORD_STRIDE;
 
 	vk_fp_compute_tile_grid( &tiles_x, &tiles_y, &total_tiles, &tile_bytes );
@@ -682,10 +683,12 @@ void vk_forward_plus_update_for_refdef( void )
 {
 	float *base;
 	uint32_t n;
+	uint32_t src;
 	unsigned int i;
 	uint32_t max_pack;
 	const dlight_t *dl;
 	float dbg;
+	static uint32_t s_trunc_log_src;
 
 	if ( !r_forwardPlus || !r_forwardPlus->integer ) {
 		return;
@@ -695,14 +698,25 @@ void vk_forward_plus_update_for_refdef( void )
 	}
 
 	base = (float *)vk.forward_plus.mapped;
-	n = backEnd.refdef.num_dlights;
-	if ( n > (uint32_t)MAX_REAL_DLIGHTS ) {
-		n = (uint32_t)MAX_REAL_DLIGHTS;
+	src = backEnd.refdef.num_dlights;
+	n = src;
+	if ( n > (uint32_t)MAX_DLIGHTS ) {
+		n = (uint32_t)MAX_DLIGHTS;
 	}
 
 	max_pack = ( vk.forward_plus.capacity_bytes - (uint32_t)VK_FP_HEADER_BYTES ) / (uint32_t)VK_FP_RECORD_STRIDE;
 	if ( n > max_pack ) {
 		n = max_pack;
+	}
+
+	if ( src > n ) {
+		if ( src != s_trunc_log_src ) {
+			ri.Printf( PRINT_DEVELOPER, "[VK][Forward+] refdef has %u dlights; packing %u (Forward+ / dlightBits index cap)\n",
+				(unsigned)src, (unsigned)n );
+			s_trunc_log_src = src;
+		}
+	} else if ( src <= (uint32_t)MAX_DLIGHTS ) {
+		s_trunc_log_src = 0u;
 	}
 
 	dbg = ( r_forwardPlusDebug && r_forwardPlusDebug->value > 0.0f ) ? r_forwardPlusDebug->value : 0.0f;
