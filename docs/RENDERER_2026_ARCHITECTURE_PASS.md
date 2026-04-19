@@ -150,7 +150,7 @@ Use **Vulkan as the primary renderer architecture**, freeze OpenGL as compatibil
 
 ## Phase 2: Lighting Scale
 
-- Add Vulkan light records plus cluster/tile culling. **Incremental (engine):** `r_forwardPlus 1` (default 0) allocates light + tile SSBOs, packs lights from `backEnd.refdef`, and runs a **compute tile cull** (`forward_plus_tile_cull.comp`, 16×16 tiles, max 4 light indices per tile) after `RB_BeginDrawingView` inside the main render pass. Tile grid and NDC→pixel use **`vk_get_render_target_width/height`** (FBO / `r_renderScale`); the tile SSBO is **reallocated when that resolution changes** (no `vid_restart` for resize alone). **PBR fragment:** descriptor set 18 binds the same light + tile SSBOs; `r_forwardPlusDebug` (0–1, default 0) adds a per-tile RGB tint from the first four slot occupancy (debug only, not production lighting).
+- Add Vulkan light records plus cluster/tile culling. **Incremental (engine):** `r_forwardPlus 1` (default 0) allocates light + tile SSBOs, packs lights from `backEnd.refdef`, and runs a **compute tile cull** (`forward_plus_tile_cull.comp`, 16×16 tiles, max 4 light indices per tile) after `RB_BeginDrawingView` inside the main render pass. Tile grid and NDC→pixel use **`vk_get_render_target_width/height`** (FBO / `r_renderScale`); the tile SSBO is **reallocated when that resolution changes** (no `vid_restart` for resize alone). **PBR fragment:** descriptor set 18 binds the same light + tile SSBOs; `r_forwardPlusDebug` (0–1, default 0) adds a **heatmap + tile borders** overlay from Forward+ occupancy (debug only, not production lighting).
 - Introduce Forward+ shading for local lights.
 - Keep shadow budgets conservative and explicit.
 
