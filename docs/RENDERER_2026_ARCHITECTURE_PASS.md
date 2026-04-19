@@ -97,6 +97,10 @@ Treat temporal stability as a first-class renderer subsystem instead of a set of
    - debug overlays for current vs history contribution
 5. Keep temporal AA optional until motion-vector coverage and history invalidation are reliable.
 
+### Incremental (engine)
+
+- **`VK_TEMPORAL_RESET_RENDER_SIZE_CHANGE`** in `vk_temporal.c` compares the **effective render target** size from **`vk_get_render_target_width()` / `vk_get_render_target_height()`** (FBO / `r_renderScale`), not `glConfig` alone, so internal resolution changes still clear motion, TAA, volumetric, exposure, and occlusion history consistently with the color pass.
+
 ### Explicit non-goals
 
 - Do not add TAA just to match a checklist if the motion-vector path is still partial.

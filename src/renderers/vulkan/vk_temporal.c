@@ -2,6 +2,7 @@
 #include "vk.h"
 #include "vk_temporal.h"
 #include "vk_util.h"
+#include "vk_view_state.h"
 #include <math.h>
 
 float vk_prev_view_matrix[16];
@@ -261,8 +262,8 @@ static qboolean vk_temporal_compute_shared_camera_cut( uint32_t *outReasons )
 void vk_temporal_begin_frame( void )
 {
 	uint32_t reasons = 0u;
-	uint32_t renderWidth = (uint32_t)glConfig.vidWidth;
-	uint32_t renderHeight = (uint32_t)glConfig.vidHeight;
+	uint32_t renderWidth = vk_get_render_target_width();
+	uint32_t renderHeight = vk_get_render_target_height();
 	uint32_t swapchainWidth = vk.swapchain_extent_valid ? vk.swapchain_extent.width : 0u;
 	uint32_t swapchainHeight = vk.swapchain_extent_valid ? vk.swapchain_extent.height : 0u;
 	qboolean hardReset;
@@ -306,8 +307,8 @@ void vk_temporal_commit_frame_state( void )
 	vk.temporal.noWorldModel = noWorldModel;
 	vk.temporal.stableGameplayState = ( clientState == CA_ACTIVE ) ? qtrue : qfalse;
 	vk.temporal.firstPersonProjectionLastFrame = vk.temporal.firstPersonProjectionThisFrame;
-	vk.temporal.lastRenderWidth = (uint32_t)glConfig.vidWidth;
-	vk.temporal.lastRenderHeight = (uint32_t)glConfig.vidHeight;
+	vk.temporal.lastRenderWidth = vk_get_render_target_width();
+	vk.temporal.lastRenderHeight = vk_get_render_target_height();
 	vk.temporal.lastSwapchainWidth = vk.swapchain_extent_valid ? vk.swapchain_extent.width : 0u;
 	vk.temporal.lastSwapchainHeight = vk.swapchain_extent_valid ? vk.swapchain_extent.height : 0u;
 	Q_strncpyz( vk.temporal.worldName, ( worldValid && tr.world->name[0] ) ? tr.world->name : "", sizeof( vk.temporal.worldName ) );
