@@ -143,6 +143,9 @@ void vk_initialize( void )
 	vk.prevClientState = CA_UNINITIALIZED;
 	Com_Memset( &vk.temporal, 0, sizeof( vk.temporal ) );
 	Com_Memset( &vk.forward_plus, 0, sizeof( vk.forward_plus ) );
+#ifdef USE_VK_PBR
+	vk.set_layout_forward_plus = VK_NULL_HANDLE;
+#endif
 	vk.uniform_alignment = props.limits.minUniformBufferOffsetAlignment;
 	vk.uniform_item_size = PAD( sizeof( vkUniform_t ), (size_t)vk.uniform_alignment );
 #ifdef USE_VK_PBR	
@@ -571,7 +574,7 @@ void vk_initialize( void )
 		pool_size[4].descriptorCount = 8 + NUM_COMMAND_BUFFERS;
 
 		pool_size[5].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		pool_size[5].descriptorCount = 4; /* forward+ tile cull set uses 3 SSBO bindings */
+		pool_size[5].descriptorCount = 8; /* forward+: compute set (3 SSBO) + PBR graphics set (2 SSBO) */
 
 		for ( j = 0, maxSets = 0; j < ARRAY_LEN( pool_size ); j++ ) {
 			maxSets += pool_size[j].descriptorCount;
@@ -595,6 +598,8 @@ void vk_initialize( void )
 	vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, &vk.set_layout_storage );
 	vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, &vk.set_layout_postfx_uniform );
 	//vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_SHADER_STAGE_FRAGMENT_BIT, &vk.set_layout_input );
+
+	vk_forward_plus_create_set_layout();
 
 		{
 			VkDescriptorSetLayoutBinding compute_bindings[17];
@@ -952,6 +957,7 @@ void vk_initialize( void )
 		set_layouts[15] = vk.set_layout_sampler; // transmission
 		set_layouts[16] = vk.set_layout_sampler; // subsurface
 		set_layouts[17] = vk.set_layout_sampler; // detail
+		set_layouts[18] = vk.set_layout_forward_plus;
 #endif
 		desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		desc.pNext = NULL;

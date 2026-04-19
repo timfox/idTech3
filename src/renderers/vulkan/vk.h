@@ -99,7 +99,8 @@ typedef enum {
 	#define VK_DESC_PBR_TRANSMISSION		15
 	#define VK_DESC_PBR_SUBSURFACE			16
 	#define VK_DESC_PBR_DETAIL				17
-	#define VK_DESC_COUNT	18
+	#define VK_DESC_FORWARD_PLUS			18 /* SSBO set: light + tile lists (PBR fragment) */
+	#define VK_DESC_COUNT	19
 #else
 	#define VK_DESC_COUNT   5
 #endif
@@ -642,6 +643,9 @@ typedef struct {
 	VkDescriptorSetLayout set_layout_uniform;	// dynamic uniform buffer
 	VkDescriptorSetLayout set_layout_storage;	// feedback buffer
 	VkDescriptorSetLayout set_layout_postfx_uniform;	// post-process params uniform buffer
+#ifdef USE_VK_PBR
+	VkDescriptorSetLayout set_layout_forward_plus;	/* light + tile SSBOs (compute cull + PBR fragment debug) */
+#endif
 
 	VkPipelineLayout pipeline_layout;			// default shaders
 	VkPipelineLayout pipeline_layout_storage;	// flare test shader layout
@@ -872,7 +876,6 @@ typedef struct {
 		void *param_mapped;
 		uint32_t param_buffer_size;
 		VkDescriptorSet descriptor;
-		VkDescriptorSetLayout compute_layout;
 		VkPipelineLayout pipeline_layout;
 		VkPipeline tile_pipeline;
 	} forward_plus;

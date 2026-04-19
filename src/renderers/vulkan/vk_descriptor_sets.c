@@ -9,6 +9,7 @@ Descriptor set allocation and image/buffer binding updates (split from vk.c).
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_descriptor_sets.h"
+#include "vk_forward_plus.h"
 #include "vk_postfx.h"
 #include "vk_postfx_params.h"
 #include "vk_post_fog.h"
@@ -912,5 +913,7 @@ void vk_init_descriptors( void )
 
 			vk_update_attachment_descriptors();
 			vk_update_volumetric_descriptors();
+
+			vk_forward_plus_init_graphics_descriptors();
 		}
 	}

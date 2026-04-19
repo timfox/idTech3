@@ -201,6 +201,7 @@ cvar_t	*r_taa_feedbackMotion;
 cvar_t	*r_taa_sharpen;
 cvar_t	*r_rtx;
 cvar_t	*r_forwardPlus;
+cvar_t	*r_forwardPlusDebug;
 
 #endif // USE_VULKAN
 
@@ -3466,8 +3467,12 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_rtx, "Ray tracing (0=off, 1=shadows, 2=reflections, 3=full). Requires USE_VULKAN_RTX build and RT-capable GPU. See docs/RENDERERS_FUTURE.md." );
 	r_forwardPlus = ri.Cvar_Get( "r_forwardPlus", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_forwardPlus, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_forwardPlus, "Forward+ scaffolding: GPU light SSBO + per-tile cull compute (16px tiles, max 4 lights/tile; first overlapping lights). No fragment consumption yet; see docs/RENDERER_2026_ARCHITECTURE_PASS.md." );
+	ri.Cvar_SetDescription( r_forwardPlus, "Forward+ scaffolding: GPU light SSBO + per-tile cull compute (16px tiles, max 4 lights/tile). PBR: set \\r_forwardPlusDebug > 0 to tint by tile occupancy; see docs/RENDERER_2026_ARCHITECTURE_PASS.md." );
 	ri.Cvar_SetGroup( r_forwardPlus, CVG_RENDERER );
+	r_forwardPlusDebug = ri.Cvar_Get( "r_forwardPlusDebug", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_forwardPlusDebug, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_forwardPlusDebug, "PBR overlay tint from Forward+ tile list (0=off). Requires \\r_forwardPlus 1 and vid_restart after toggling \\r_forwardPlus." );
+	ri.Cvar_SetGroup( r_forwardPlusDebug, CVG_RENDERER );
 	r_ext_alpha_to_coverage = ri.Cvar_Get( "r_ext_alpha_to_coverage", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_alpha_to_coverage, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ext_alpha_to_coverage, "Alpha-to-coverage for alpha-tested surfaces (foliage, grates) when MSAA is on. Enabled by default for Vulkan MSAA paths. Requires \\r_fbo 1 and \\r_ext_multisample 2+." );

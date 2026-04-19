@@ -2,7 +2,7 @@
 
 /*
  * Forward+ scaffolding: per-tile light index list (max 4 per 16x16 tile).
- * CPU-packed lights: binding 0 — vec4 header (x = count), then count * 4 vec4 records.
+ * CPU-packed lights: binding 0 — vec4 (x=count,...), vec4 (tiles_x, tiles_y, viewport_w, viewport_h), then count * 4 vec4 records.
  */
 
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
@@ -49,9 +49,6 @@ void main() {
 	uint tileX = tileId % tilesX;
 	uint tileY = tileId / tilesX;
 
-	float vw = float(params.tiles_xy_viewport.z);
-	float vh = float(params.tiles_xy_viewport.w);
-
 	uint base = tileId * MAX_PER_TILE;
 	for (uint k = 0u; k < MAX_PER_TILE; k++) {
 		tiles.cells[base + k] = 0xFFFFFFFFu;
@@ -60,9 +57,12 @@ void main() {
 	uint n = uint(max(lights.data[0].x + 0.5, 0.0));
 	n = min(n, min(pc.numLights, MAX_LIGHTS));
 
+	float vw = lights.data[1].z;
+	float vh = lights.data[1].w;
+
 	uint outCount = 0u;
 	for (uint li = 0u; li < n && outCount < MAX_PER_TILE; li++) {
-		uint b = 1u + li * REC_VEC4S;
+		uint b = 2u + li * REC_VEC4S;
 		vec3 worldPos = lights.data[b].xyz;
 		float radius = max(lights.data[b].w, 1e-4);
 

@@ -156,6 +156,12 @@ def join_flags(*flags):
 def join_indexes(base, indexes):
     return base + "".join(f"[{idx}]" for idx in indexes)
 
+def with_forward_plus_frag(defines):
+    """PBR gen_frag variants bind set=18 Forward+ SSBOs when USE_FORWARD_PLUS_FRAG is set."""
+    if defines and "-DUSE_VK_PBR" in defines:
+        return defines + " -DUSE_FORWARD_PLUS_FRAG"
+    return defines
+
 def compile_individual_shaders():
     print("Compiling standalone GLSL stages...")
     # Shaders that need Vulkan reversed-depth define (matches vk.h USE_REVERSED_DEPTH)
@@ -184,8 +190,8 @@ def compile_template_shaders():
 
     compile_shader("frag", "gen_frag.tmpl", "frag_tx0_ent", defines="-DUSE_ENT_COLOR -DUSE_ATEST")
     compile_shader("frag", "gen_frag.tmpl", "frag_tx0_ent_fog", defines="-DUSE_ENT_COLOR -DUSE_ATEST -DUSE_FOG")
-    compile_shader("frag", "gen_frag.tmpl", "frag_pbr_tx0_ent", defines="-DUSE_ENT_COLOR -DUSE_ATEST -DUSE_VK_PBR")
-    compile_shader("frag", "gen_frag.tmpl", "frag_pbr_tx0_ent_fog", defines="-DUSE_ENT_COLOR -DUSE_ATEST -DUSE_FOG -DUSE_VK_PBR")
+    compile_shader("frag", "gen_frag.tmpl", "frag_pbr_tx0_ent", defines=with_forward_plus_frag("-DUSE_ENT_COLOR -DUSE_ATEST -DUSE_VK_PBR"))
+    compile_shader("frag", "gen_frag.tmpl", "frag_pbr_tx0_ent_fog", defines=with_forward_plus_frag("-DUSE_ENT_COLOR -DUSE_ATEST -DUSE_FOG -DUSE_VK_PBR"))
 
     mode_flags = ["-DUSE_CLX_IDENT", "-DUSE_FIXED_COLOR"]
     mode_ids = ["ident1", "fixed"]
@@ -215,7 +221,7 @@ def compile_template_shaders():
             for m in range(len(mode_flags)):
                 for k in range(len(fog_flags)):
                     extra = "-DUSE_ATEST" if j == 0 else ""
-                    defines = join_flags(pbr_flags[i], tx_flags[j], mode_flags[m], fog_flags[k], extra)
+                    defines = with_forward_plus_frag(join_flags(pbr_flags[i], tx_flags[j], mode_flags[m], fog_flags[k], extra))
                     name = f"frag_{pbr_ids[i]}{tx_ids[j]}_{mode_ids[m]}{fog_ids[k]}"
                     binding = join_indexes(f"vk.modules.frag.{mode_ids[m]}", [i, j, k])
                     compile_shader("frag", "gen_frag.tmpl", name, binding_expr=binding, defines=defines)
@@ -259,12 +265,12 @@ def compile_template_shaders():
         for j in range(len(tx_flags)):
             for k in range(len(fog_flags)):
                 extra = "-DUSE_ATEST" if j == 0 else ""
-                defines = join_flags(pbr_flags[i], tx_flags[j], fog_flags[k], extra)
+                defines = with_forward_plus_frag(join_flags(pbr_flags[i], tx_flags[j], fog_flags[k], extra))
                 name = f"frag_{pbr_ids[i]}{tx_ids[j]}{fog_ids[k]}"
                 binding = join_indexes("vk.modules.frag.gen", [i, j, 0, k])
                 compile_shader("frag", "gen_frag.tmpl", name, binding_expr=binding, defines=defines)
                 if j != 0:
-                    defines_cl = join_flags(pbr_flags[i], tx_flags[j], cl_flags[j], fog_flags[k])
+                    defines_cl = with_forward_plus_frag(join_flags(pbr_flags[i], tx_flags[j], cl_flags[j], fog_flags[k]))
                     name_cl = f"frag_{pbr_ids[i]}{tx_ids[j]}_{cl_ids[j]}{fog_ids[k]}"
                     binding_cl = join_indexes("vk.modules.frag.gen", [i, j, 1, k])
                     compile_shader("frag", "gen_frag.tmpl", name_cl, binding_expr=binding_cl, defines=defines_cl)
