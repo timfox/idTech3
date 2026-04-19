@@ -1226,7 +1226,7 @@ void main() {
 	vec3 fpAdd = vec3( 0.0 );
 #ifdef USE_FORWARD_PLUS_FRAG
 #if defined(USE_FORWARD_PLUS_WORLD_POS)
-	if ( forward_plus_shade_strength > 1e-6 && deluxe_mapping < 0 ) {
+	if ( forward_plus_shade_strength > 1e-6 ) {
 		uint tilesX = uint( fp_lights.fp_light_data[1].x + 0.5 );
 		uint tilesY = uint( fp_lights.fp_light_data[1].y + 0.5 );
 		float vw = fp_lights.fp_light_data[1].z;
@@ -1257,19 +1257,46 @@ void main() {
 						vec3 lpos = fp_lights.fp_light_data[ b0 ].xyz;
 						float rad = max( fp_lights.fp_light_data[ b0 ].w, 1e-3 );
 						vec4 lc = fp_lights.fp_light_data[ b0 + 1u ];
-						if ( lc.w > 0.5 ) {
-							continue;
+						vec4 lpack = fp_lights.fp_light_data[ b0 + 2u ];
+						vec3 Ldir;
+						float att = 0.0;
+						float NLfp = 0.0;
+						if ( lc.w < 0.5 ) {
+							vec3 Lw = lpos - var_WorldPos;
+							float dist = length( Lw );
+							if ( dist > rad ) {
+								continue;
+							}
+							att = 1.0 - dist / rad;
+							att *= att;
+							Ldir = Lw / max( dist, 1e-4 );
+							NLfp = max( dot( N, Ldir ), 0.0 );
+						} else {
+							vec3 axis = normalize( vec3( lpack.x, lpack.y, lpack.z ) );
+							float cosOuter = lpack.w;
+							float cosInner = fp_lights.fp_light_data[ b0 + 3u ].x;
+							float segLen = max( fp_lights.fp_light_data[ b0 + 3u ].y, 1e-3 );
+							vec3 v = var_WorldPos - lpos;
+							float tAx = dot( v, axis );
+							float tCl = clamp( tAx, 0.0, segLen );
+							vec3 closest = lpos + axis * tCl;
+							float dPerp = length( var_WorldPos - closest );
+							if ( dPerp > rad ) {
+								continue;
+							}
+							vec3 wDir = v / max( length( v ), 1e-4 );
+							float cosAng = dot( wDir, axis );
+							float cone = smoothstep( cosOuter, cosInner, cosAng );
+							if ( cone <= 1e-4 ) {
+								continue;
+							}
+							float axAtt = 1.0 - smoothstep( segLen * 0.85, segLen, tCl );
+							float radAtt = 1.0 - clamp( dPerp / rad, 0.0, 1.0 );
+							att = cone * axAtt * radAtt * radAtt;
+							Ldir = -wDir;
+							NLfp = max( dot( N, Ldir ), 0.0 );
 						}
-						vec3 Lw = lpos - var_WorldPos;
-						float dist = length( Lw );
-						if ( dist > rad ) {
-							continue;
-						}
-						float att = 1.0 - dist / rad;
-						att *= att;
-						vec3 Ldir = Lw / max( dist, 1e-4 );
-						float NLfp = max( dot( N, Ldir ), 0.0 );
-						if ( NLfp <= 0.0 ) {
+						if ( att <= 0.0 || NLfp <= 0.0 ) {
 							continue;
 						}
 						fpAdd += lc.rgb * Fd * ( att * NLfp * forward_plus_shade_strength );
@@ -1281,7 +1308,14 @@ void main() {
 #endif
 #endif
 
-	vec3 directLighting = lightColor * reflectance * ( attenuation * NL ) * pomSelfShadow + fpAdd;
+	vec3 primaryDirect = lightColor * reflectance * ( attenuation * NL ) * pomSelfShadow;
+	float fpRenorm = 1.0;
+	if ( forward_plus_shade_strength > 1e-6 ) {
+		float pL = length( primaryDirect );
+		float fL = length( fpAdd );
+		fpRenorm = clamp( 1.0 - ( fL / ( pL + 1e-3 ) ) * 0.45, 0.35, 1.0 );
+	}
+	vec3 directLighting = primaryDirect * fpRenorm + fpAdd;
 	vec3 ambientContribution = ambientColor * diffuse.rgb * kD;
 	vec3 diffuseIrradiance = vec3( 0.0 );
 	if ( irradiance_texture_set >= 0 ) {
