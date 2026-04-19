@@ -3466,7 +3466,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_rtx, "Ray tracing (0=off, 1=shadows, 2=reflections, 3=full). Requires USE_VULKAN_RTX build and RT-capable GPU. See docs/RENDERERS_FUTURE.md." );
 	r_forwardPlus = ri.Cvar_Get( "r_forwardPlus", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_forwardPlus, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_forwardPlus, "Forward+ scaffolding: allocate and pack GPU-visible dynamic light records (0=off, 1=on). No tile lists or shading yet; see docs/RENDERER_2026_ARCHITECTURE_PASS.md." );
+	ri.Cvar_SetDescription( r_forwardPlus, "Forward+ scaffolding: GPU light SSBO + per-tile cull compute (16px tiles, max 4 lights/tile; first overlapping lights). No fragment consumption yet; see docs/RENDERER_2026_ARCHITECTURE_PASS.md." );
 	ri.Cvar_SetGroup( r_forwardPlus, CVG_RENDERER );
 	r_ext_alpha_to_coverage = ri.Cvar_Get( "r_ext_alpha_to_coverage", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_alpha_to_coverage, "0", "1", CV_INTEGER );

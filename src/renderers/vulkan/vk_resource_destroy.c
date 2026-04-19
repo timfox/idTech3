@@ -7,6 +7,7 @@ Teardown for VkRenderPass handles and long-lived VkPipelines (split from vk.c).
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_resource_destroy.h"
+#include "vk_forward_plus.h"
 
 void vk_destroy_render_passes( void )
 {
@@ -141,6 +142,8 @@ void vk_destroy_render_passes( void )
 void vk_destroy_pipelines( qboolean resetCounter )
 {
 	uint32_t i, j;
+
+	vk_forward_plus_destroy_compute_pipeline();
 
 	for ( i = 0; i < vk.pipelines_count; i++ ) {
 		for ( j = 0; j < RENDER_PASS_COUNT; j++ ) {

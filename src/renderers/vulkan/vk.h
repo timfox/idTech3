@@ -855,13 +855,26 @@ typedef struct {
 		VkDescriptorSet	descriptor;
 	} storage;
 
-	/* Forward+ scaffolding: host-visible SSBO of packed dynamic lights (see vk_forward_plus.c). */
+	/* Forward+ scaffolding: light SSBO + optional tile cull compute (see vk_forward_plus.c). */
 	struct {
 		VkBuffer buffer;
 		VkDeviceMemory memory;
 		void *mapped;
 		uint32_t capacity_bytes;
 		uint32_t last_packed_count;
+		VkBuffer tile_buffer;
+		VkDeviceMemory tile_memory;
+		uint32_t tile_capacity_tiles;
+		uint32_t tiles_x;
+		uint32_t tiles_y;
+		VkBuffer param_buffer;
+		VkDeviceMemory param_memory;
+		void *param_mapped;
+		uint32_t param_buffer_size;
+		VkDescriptorSet descriptor;
+		VkDescriptorSetLayout compute_layout;
+		VkPipelineLayout pipeline_layout;
+		VkPipeline tile_pipeline;
 	} forward_plus;
 
 	uint32_t uniform_item_size;
@@ -1017,6 +1030,7 @@ typedef struct {
 		VkShaderModule fluid_divergence_cs;
 		VkShaderModule fluid_pressure_cs;
 		VkShaderModule fluid_gradient_cs;
+		VkShaderModule forward_plus_tile_cull_cs;
 
 		VkShaderModule cbt_terrain_cs;
 		VkShaderModule terrain_vs;

@@ -325,6 +325,8 @@ void vk_bind_generated_shaders( void ){
     vk_set_shader_name( vk.modules.vegetation_wind_cs, "vegetation_wind_cs" );
     vk.modules.cbt_terrain_cs = SHADER_MODULE( cbt_terrain_cs );
     vk_set_shader_name( vk.modules.cbt_terrain_cs, "cbt_terrain_cs" );
+    vk.modules.forward_plus_tile_cull_cs = SHADER_MODULE( forward_plus_tile_cull_cs );
+    vk_set_shader_name( vk.modules.forward_plus_tile_cull_cs, "forward_plus_tile_cull_cs" );
     vk.modules.terrain_vs = SHADER_MODULE( terrain_vs );
     vk_set_shader_name( vk.modules.terrain_vs, "terrain_vs" );
     vk.modules.terrain_fs = SHADER_MODULE( terrain_fs );

@@ -1,0 +1,93 @@
+#version 450
+
+/*
+ * Forward+ scaffolding: per-tile light index list (max 4 per 16x16 tile).
+ * CPU-packed lights: binding 0 — vec4 header (x = count), then count * 4 vec4 records.
+ */
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+#define MAX_PER_TILE 4u
+#define MAX_LIGHTS 64u
+#define REC_VEC4S 4u
+
+layout(std430, set = 0, binding = 0) readonly buffer LightSSBO {
+	vec4 data[];
+} lights;
+
+layout(std430, set = 0, binding = 1) buffer TileSSBO {
+	uint cells[];
+} tiles;
+
+layout(std430, set = 0, binding = 2) readonly buffer ParamSSBO {
+	mat4 clipFromWorld;
+	uvec4 tiles_xy_viewport;
+} params;
+
+layout(push_constant) uniform Push {
+	uvec2 tileGrid;
+	uint totalTiles;
+	uint numLights;
+} pc;
+
+bool sphere_tile_overlap(vec2 centerPx, float radiusPx, uint tileX, uint tileY) {
+	float minX = float(tileX * 16u);
+	float minY = float(tileY * 16u);
+	float maxX = minX + 16.0;
+	float maxY = minY + 16.0;
+	vec2 closest = clamp(centerPx, vec2(minX, minY), vec2(maxX, maxY));
+	return distance(centerPx, closest) <= radiusPx + 1e-3;
+}
+
+void main() {
+	uint tileId = gl_GlobalInvocationID.x;
+	if (tileId >= pc.totalTiles) {
+		return;
+	}
+
+	uint tilesX = pc.tileGrid.x;
+	uint tileX = tileId % tilesX;
+	uint tileY = tileId / tilesX;
+
+	float vw = float(params.tiles_xy_viewport.z);
+	float vh = float(params.tiles_xy_viewport.w);
+
+	uint base = tileId * MAX_PER_TILE;
+	for (uint k = 0u; k < MAX_PER_TILE; k++) {
+		tiles.cells[base + k] = 0xFFFFFFFFu;
+	}
+
+	uint n = uint(max(lights.data[0].x + 0.5, 0.0));
+	n = min(n, min(pc.numLights, MAX_LIGHTS));
+
+	uint outCount = 0u;
+	for (uint li = 0u; li < n && outCount < MAX_PER_TILE; li++) {
+		uint b = 1u + li * REC_VEC4S;
+		vec3 worldPos = lights.data[b].xyz;
+		float radius = max(lights.data[b].w, 1e-4);
+
+		vec4 clip = params.clipFromWorld * vec4(worldPos, 1.0);
+		if (abs(clip.w) < 1e-5) {
+			continue;
+		}
+
+		vec3 ndc = clip.xyz / clip.w;
+		if (ndc.z < -1.0 || ndc.z > 1.0 || ndc.x < -1.2 || ndc.x > 1.2 || ndc.y < -1.2 || ndc.y > 1.2) {
+			continue;
+		}
+
+		vec2 centerPx;
+		centerPx.x = 0.5 * (1.0 + ndc.x) * vw;
+		centerPx.y = 0.5 * (1.0 + ndc.y) * vh;
+
+		float distW = max(abs(clip.w), 1e-3);
+		float radiusPx = clamp(radius * (0.5 * vw) / distW, 2.0, vw + vh);
+
+		if (!sphere_tile_overlap(centerPx, radiusPx, tileX, tileY)) {
+			continue;
+		}
+
+		tiles.cells[base + outCount] = li;
+		outCount++;
+	}
+}

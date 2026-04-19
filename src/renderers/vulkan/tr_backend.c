@@ -1757,6 +1757,10 @@ static const void *RB_DrawSurfs( const void *data ) {
 	RB_BeginDrawingView();
 
 #ifdef USE_VULKAN
+	vk_forward_plus_dispatch_tile_cull();
+#endif
+
+#ifdef USE_VULKAN
 	if ( r_occlusionCulling && r_occlusionCulling->integer && vk.occlusion_query_pool != VK_NULL_HANDLE ) {
 		backEnd.depthOnlyWorldPass = qtrue;
 		RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );

@@ -48,3 +48,4 @@ docs/renderer_validation/devdata/rtest_base/maps/rtest_postfx.bsp
 docs/renderer_validation/devdata/rtest_base/maps/rtest_parity.bsp
 src/renderers/vulkan/shaders/spirv/generated/shader_data.c
 src/renderers/vulkan/shaders/spirv/generated/shader_binding.c
+src/renderers/vulkan/shaders/glsl/forward_plus_tile_cull.comp

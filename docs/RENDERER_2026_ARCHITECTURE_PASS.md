@@ -150,7 +150,7 @@ Use **Vulkan as the primary renderer architecture**, freeze OpenGL as compatibil
 
 ## Phase 2: Lighting Scale
 
-- Add Vulkan light records plus cluster/tile culling. **Incremental (engine):** `r_forwardPlus 1` (default 0) allocates a host-visible SSBO and packs dynamic lights from `backEnd.refdef` each main view (`vk_forward_plus.c`); no tile/cluster lists or shader consumption yet.
+- Add Vulkan light records plus cluster/tile culling. **Incremental (engine):** `r_forwardPlus 1` (default 0) allocates light + tile SSBOs, packs lights from `backEnd.refdef`, and runs a **compute tile cull** (`forward_plus_tile_cull.comp`, 16×16 tiles, max 4 light indices per tile) after `RB_BeginDrawingView` inside the main render pass. **No** fragment path consumes the tile buffer yet.
 - Introduce Forward+ shading for local lights.
 - Keep shadow budgets conservative and explicit.
 
