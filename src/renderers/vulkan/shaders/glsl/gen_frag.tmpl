@@ -44,6 +44,7 @@ layout(set = 0, binding = 0) uniform UBO {
 	vec4 pbrDebugMode; // x: debug mode selector
 	vec4 pbrShCoeffs[9];
 	vec4 pbrParallaxParams; // x=scale, y=shadow str, z=shadow steps (float), w=unused (reserved)
+	vec4 pbrForwardPlus; // x: skip light index (>=0) when single dlight on surface; else -1
 #endif
 //#endif
 };
@@ -1245,12 +1246,16 @@ void main() {
 					uint tileId = ty * tilesX + tx;
 					uint tbase = tileId * 4u;
 					float nLights = fp_lights.fp_light_data[0].x;
+					int skipIdx = int( pbrForwardPlus.x + 0.5 );
 					for ( uint k = 0u; k < 4u; k++ ) {
 						uint li = fp_tiles.fp_tile_cells[ tbase + k ];
 						if ( li == 0xFFFFFFFFu ) {
 							continue;
 						}
 						if ( float( li ) + 0.5 >= nLights ) {
+							continue;
+						}
+						if ( skipIdx >= 0 && int( li ) == skipIdx ) {
 							continue;
 						}
 						uint b0 = 2u + li * 4u;
@@ -1299,7 +1304,15 @@ void main() {
 						if ( att <= 0.0 || NLfp <= 0.0 ) {
 							continue;
 						}
-						fpAdd += lc.rgb * Fd * ( att * NLfp * forward_plus_shade_strength );
+						vec3 Lfp = Ldir;
+						vec3 Hfp = normalize( Lfp + E );
+						float NHfp = clamp( dot( N, Hfp ), 0.0, 1.0 );
+						float LHfp = clamp( dot( Lfp, Hfp ), 0.0, 1.0 );
+						float VHfp = clamp( dot( E, Hfp ), 0.0, 1.0 );
+						float specMul = ( deluxe_mapping > 0 ) ? deluxe_specular_scale : 1.0;
+						vec3 Fsfp = CalcSpecular( specular.rgb, Hfp, NHfp, NLfp, NE, LHfp, VHfp, roughness, baseUV, shadingFrame, anisoAmount, Lfp, E ) * specMul;
+						fpAdd += lc.rgb * ( Fd * ( att * NLfp * forward_plus_shade_strength )
+							+ Fsfp * ( att * forward_plus_shade_strength * 0.65 ) );
 					}
 				}
 			}
