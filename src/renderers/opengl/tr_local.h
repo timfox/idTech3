@@ -107,9 +107,11 @@ typedef struct {
 	int			morphChannelCount;
 	uint32_t	morphChannelHashes[IQM_MORPH_MAX_CHANNELS];
 	float		morphChannelWeights[IQM_MORPH_MAX_CHANNELS];
+	float		morphChannelWeightPrev[IQM_MORPH_MAX_CHANNELS];
 	int			morphActiveCount;
 	int			morphActiveTargetIndex[IQM_MORPH_TOP_K];
 	float		morphActiveWeight[IQM_MORPH_TOP_K];
+	float		morphGpuWeightPrev[IQM_MORPH_TOP_K];
 	float		morphDebugMaxAbsWeight;
 } trRefEntity_t;
 

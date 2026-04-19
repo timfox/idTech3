@@ -1623,6 +1623,7 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 	int i, j;
 	int base;
 	float morphW[GLTF_MAX_MORPH_TARGETS];
+	float morphWPrev[GLTF_MAX_MORPH_TARGETS];
 	qboolean useMorph;
 	const gltfModel_t *model;
 	float jointMatrix[GLTF_MAX_JOINTS * 12];
@@ -1636,6 +1637,7 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 		? R_GetGLTFModelFromModelData( tr.currentModel->modelData ) : NULL;
 
 	Com_Memset( morphW, 0, sizeof( morphW ) );
+	Com_Memset( morphWPrev, 0, sizeof( morphWPrev ) );
 	useMorph = ( surf->numMorphTargets > 0 && surf->morphTargets != NULL && r_morph && r_morph->integer );
 
 	speed = ( r_gltfAnim && r_gltfAnim->value > 0.0f ) ? r_gltfAnim->value : 1.0f;
@@ -1692,6 +1694,9 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 			for ( i = 0; i < surf->numMorphTargets; i++ ) {
 				morphW[i] = morphW[i] * ( 1.0f - backlerp ) + wB[i] * backlerp;
 			}
+			Com_Memcpy( morphWPrev, wB, sizeof( float ) * (size_t)surf->numMorphTargets );
+		} else {
+			Com_Memcpy( morphWPrev, morphW, sizeof( float ) * (size_t)surf->numMorphTargets );
 		}
 	}
 	if ( useMorph && ent->morphChannelCount > 0 ) {
@@ -1699,6 +1704,9 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 			int ti = RB_GLTFMorphIndexByHash( surf->morphTargets, surf->numMorphTargets, ent->morphChannelHashes[i] );
 			if ( ti >= 0 ) {
 				morphW[ti] += ent->morphChannelWeights[i];
+				if ( i < IQM_MORPH_MAX_CHANNELS ) {
+					morphWPrev[ti] += ent->morphChannelWeightPrev[i];
+				}
 			}
 		}
 	}
@@ -1710,6 +1718,7 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 		}
 		for ( i = 0; i < nw; i++ ) {
 			morphW[i] += gm->defaultMorphWeights[i];
+			morphWPrev[i] += gm->defaultMorphWeights[i];
 		}
 	}
 
@@ -1742,8 +1751,10 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 		float *skinPayload = (float *)vk_alloc_storage( skinBytes, &skinOff );
 		int morphN = surf->numMorphTargets;
 		float mwCopy[GLTF_MAX_MORPH_TARGETS];
+		float mwPrevCopy[GLTF_MAX_MORPH_TARGETS];
 		int topMorphIdx[IQM_MORPH_TOP_K];
 		float topMorphW[IQM_MORPH_TOP_K];
+		float topMorphWPrev[IQM_MORPH_TOP_K];
 		int morphActive = 0;
 		int mk;
 		size_t morphFloats;
@@ -1766,6 +1777,7 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 			morphN = GLTF_MAX_MORPH_TARGETS;
 		}
 		Com_Memcpy( mwCopy, morphW, sizeof( mwCopy ) );
+		Com_Memcpy( mwPrevCopy, morphWPrev, sizeof( mwPrevCopy ) );
 		for ( mk = 0; mk < IQM_MORPH_TOP_K; mk++ ) {
 			int best = -1;
 			float bestW = 0.0f;
@@ -1780,11 +1792,13 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 			}
 			topMorphIdx[morphActive] = best;
 			topMorphW[morphActive] = bestW;
-			morphActive++;
+			topMorphWPrev[morphActive] = mwPrevCopy[best];
 			mwCopy[best] = 0.0f;
+			mwPrevCopy[best] = 0.0f;
+			morphActive++;
 		}
 
-		morphFloats = (size_t)( 2 + IQM_MORPH_TOP_K ) + (size_t)surf->numVertices * (size_t)IQM_MORPH_TOP_K * 6u;
+		morphFloats = (size_t)( 2 + 2u * (size_t)IQM_MORPH_TOP_K ) + (size_t)surf->numVertices * (size_t)IQM_MORPH_TOP_K * 6u;
 		morphBytes = morphFloats * sizeof( float );
 		morphPayload = gpuOk ? (float *)vk_alloc_storage( morphBytes, &morphOff ) : NULL;
 		if ( gpuOk && !morphPayload ) {
@@ -1795,9 +1809,10 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 			morphPayload[1] = (float)morphActive;
 			for ( mk = 0; mk < IQM_MORPH_TOP_K; mk++ ) {
 				morphPayload[2 + mk] = ( mk < morphActive ) ? topMorphW[mk] : 0.0f;
+				morphPayload[2 + IQM_MORPH_TOP_K + mk] = ( mk < morphActive ) ? topMorphWPrev[mk] : 0.0f;
 			}
 			for ( i = 0; i < surf->numVertices; i++ ) {
-				const size_t morphBase = (size_t)( 2 + IQM_MORPH_TOP_K );
+				const size_t morphBase = (size_t)( 2 + 2u * (size_t)IQM_MORPH_TOP_K );
 				for ( mk = 0; mk < morphActive; mk++ ) {
 					int tgt = topMorphIdx[mk];
 					size_t dst = (size_t)i * (size_t)IQM_MORPH_TOP_K * 6u + (size_t)mk * 6u;

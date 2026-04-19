@@ -223,6 +223,31 @@ static void vk_get_mvp_transform( float *mvp )
 	}
 }
 
+void vk_snap_gpu_morph_weights_for_motion( void )
+{
+	unsigned int i, k;
+	const unsigned int n = tr.refdef.num_entities;
+	trRefEntity_t *ents;
+
+	if ( n == 0 ) {
+		return;
+	}
+	ents = tr.refdef.entities;
+	if ( !ents ) {
+		return;
+	}
+	for ( i = 0; i < n; i++ ) {
+		trRefEntity_t *re = ents + i;
+		int ch;
+		for ( k = 0; k < (unsigned int)IQM_MORPH_TOP_K; k++ ) {
+			re->morphGpuWeightPrev[k] = re->morphActiveWeight[k];
+		}
+		for ( ch = 0; ch < re->morphChannelCount && ch < IQM_MORPH_MAX_CHANNELS; ch++ ) {
+			re->morphChannelWeightPrev[ch] = re->morphChannelWeights[ch];
+		}
+	}
+}
+
 void vk_begin_motion_frame( void )
 {
 	for ( int i = 0; i < MAX_REFENTITIES; i++ ) {
