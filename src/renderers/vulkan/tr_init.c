@@ -3476,7 +3476,7 @@ static void R_Register( void )
 	ri.Cvar_SetGroup( r_forwardPlusDebug, CVG_RENDERER );
 	r_forwardPlusShade = ri.Cvar_Get( "r_forwardPlusShade", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_forwardPlusShade, "0", "4", CV_FLOAT );
-	ri.Cvar_SetDescription( r_forwardPlusShade, "PBR Forward+ **additive** diffuse from tile-culled dynamic lights (0=off). Experimental: stacks on primary light; point lights only in shader; rebuilds pipelines when changed. Requires \\r_forwardPlus 1." );
+	ri.Cvar_SetDescription( r_forwardPlusShade, "PBR Forward+ diffuse from tile-culled dynamic lights (0=off). Point + linear/spot (cone from SSBO). Primary direct is softly scaled down when Forward+ contributes (reduces double-count). Works with deluxe/lightmap; rebuilds pipelines when changed. Requires \\r_forwardPlus 1." );
 	ri.Cvar_SetGroup( r_forwardPlusShade, CVG_RENDERER );
 	r_ext_alpha_to_coverage = ri.Cvar_Get( "r_ext_alpha_to_coverage", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_alpha_to_coverage, "0", "1", CV_INTEGER );
