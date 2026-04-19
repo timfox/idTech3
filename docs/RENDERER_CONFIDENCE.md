@@ -16,7 +16,7 @@ Visual regression **specs** and suggested map names: [samples/renderer_regressio
 
 Run these after any renderer, shader, or mikktspace change.
 
-On **`main`**, GitHub Actions **`.github/workflows/build.yml`** runs **`renderer_regression_check.sh`** (Tier A: manifest + cap parity + full GLSL `glslang` when the job installs `glslang`) on **Windows MSYS2**, **macOS**, **Ubuntu ARM**, and **Android** (CMake matrix + Gradle APK job), in addition to Ubuntu x86_64 / ASAN paths that already ran smoke + ctest. Forks without `glslang` in a job still skip only the GLSL subtree inside the script.
+On **`main`**, GitHub Actions **`.github/workflows/build.yml`** runs **`renderer_regression_check.sh`** (Tier A: manifest + cap parity + full GLSL `glslang` when the job installs `glslang`) on **Windows MSYS2**, **Windows MSVC** (Vulkan SDK install for `glslangValidator`, Release matrix only), **macOS**, **Ubuntu ARM**, and **Android** (CMake matrix + Gradle APK job), in addition to Ubuntu x86_64 / ASAN paths that already ran smoke + ctest. MSVC **smoke_test** runs on **x64 Release** only (ARM64 PEs are not executed on the x64 GitHub runner). Forks without `glslang` in a job still skip only the GLSL subtree inside the script.
 
 | Check | Command | What it proves |
 |--------|---------|----------------|

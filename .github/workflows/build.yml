@@ -393,6 +393,35 @@ jobs:
         shell: pwsh
         run: ./scripts/windows_pe_exports_check.ps1 -BinDir bin -SkipRendererDlls
 
+      - name: Install Vulkan SDK (glslangValidator for Tier A)
+        if: ${{ github.event_name != 'release' && matrix.btype == 'Release' }}
+        uses: humbletim/install-vulkan-sdk@v1.2
+        with:
+          version: 1.4.309.0
+          cache: true
+
+      - name: Renderer regression check (Tier A, MSVC Release)
+        if: ${{ github.event_name != 'release' && matrix.btype == 'Release' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          chmod +x scripts/renderer_regression_check.sh
+          ./scripts/renderer_regression_check.sh
+
+      - name: Smoke test (MSVC Release x64 only)
+        if: ${{ github.event_name != 'release' && matrix.btype == 'Release' && matrix.arch == 'x64' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          mkdir -p release
+          sfx='${{ matrix.suffix }}'
+          cp -f "bin/idtech3_server${sfx}.exe" release/idtech3_server.exe
+          cp -f "bin/idtech3${sfx}.exe" release/idtech3.exe
+          chmod +x scripts/smoke_test.sh
+          ./scripts/smoke_test.sh release
+
       - uses: actions/upload-artifact@v4
         if: ${{ matrix.btype == 'Release' }}
         with:
