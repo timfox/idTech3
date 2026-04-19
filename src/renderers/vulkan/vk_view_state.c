@@ -192,7 +192,7 @@ void vk_get_scissor_rect( VkRect2D *r )
 	}
 }
 
-static void vk_get_projection_matrix_vk( const float *projection_matrix, float *projection_vk )
+void vk_get_projection_matrix_vk( const float *projection_matrix, float *projection_vk )
 {
 	Com_Memcpy( projection_vk, projection_matrix, sizeof( float ) * 16 );
 	projection_vk[5] = -projection_matrix[5];
