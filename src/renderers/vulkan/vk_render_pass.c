@@ -151,11 +151,7 @@ void vk_create_render_passes( void )
 		attachments[0].flags = 0;
 		attachments[0].format = vk.present_format.format;
 		attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
-#ifdef USE_BUFFER_CLEAR
 		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-#else
-		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;	// Assuming this will be completely overwritten
-#endif
 		attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;		// needed for presentation
 		attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -242,11 +238,7 @@ void vk_create_render_passes( void )
 		attachments[3].flags = 0;
 		attachments[3].format = vk.color_format;
 		attachments[3].samples = vkSamples;
-#ifdef USE_BUFFER_CLEAR
 		attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-#else
-		attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-#endif
 		attachments[3].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 		attachments[3].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		attachments[3].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -257,11 +249,7 @@ void vk_create_render_passes( void )
 			attachments[4].flags = 0;
 			attachments[4].format = VK_FORMAT_R16G16_SFLOAT;
 			attachments[4].samples = vkSamples;
-#ifdef USE_BUFFER_CLEAR
 			attachments[4].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-#else
-			attachments[4].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-#endif
 			attachments[4].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 			attachments[4].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 			attachments[4].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -932,14 +920,10 @@ void vk_create_render_passes( void )
 	attachments[0].flags = 0;
 	attachments[0].format = vk.base_format.format;
 	attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
-#ifdef USE_BUFFER_CLEAR
 	if ( vk.screenMapSamples > VK_SAMPLE_COUNT_1_BIT )
 		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	else
 		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-#else
-	attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE; // Assuming this will be completely overwritten
-#endif
 	attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;   // needed for next render pass
 	attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -997,11 +981,7 @@ void vk_create_render_passes( void )
 		attachments[3].flags = 0;
 		attachments[3].format = vk.base_format.format;
 		attachments[3].samples = vk.screenMapSamples;
-#ifdef USE_BUFFER_CLEAR
 		attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-#else
-		attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-#endif
 		attachments[3].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		attachments[3].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		attachments[3].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -1011,11 +991,7 @@ void vk_create_render_passes( void )
 		attachments[4].flags = 0;
 		attachments[4].format = VK_FORMAT_R16G16_SFLOAT;
 		attachments[4].samples = vk.screenMapSamples;
-#ifdef USE_BUFFER_CLEAR
 		attachments[4].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-#else
-		attachments[4].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-#endif
 		attachments[4].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		attachments[4].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		attachments[4].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;

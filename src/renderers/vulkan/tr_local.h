@@ -46,8 +46,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define MAX_TEXTURE_SIZE	32768
 
-#define USE_BUFFER_CLEAR	/* clear attachments on render pass begin */
-
 #ifdef USE_VBO
 #define USE_VBO_GRID		/* put SF_GRID to VBO */
 #endif
