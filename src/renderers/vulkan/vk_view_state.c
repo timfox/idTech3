@@ -280,10 +280,16 @@ static qboolean vk_entity_requires_no_motion( const trRefEntity_t *ent )
 	if ( !markUnreliable && ent->e.customShader ) {
 		markUnreliable = qtrue;
 	}
+	/* View weapon / first-person geometry: model matrix is view-relative; per-entity
+	 * prev-model history does not represent prior screen motion. Use current MVP as prev. */
+	if ( !markUnreliable && ( ent->e.renderfx & RF_FIRST_PERSON ) ) {
+		markUnreliable = qtrue;
+	}
 	if ( markUnreliable ) {
 		if ( !vk.temporal.unreliableMotionThisFrame && r_temporalDebug && r_temporalDebug->integer >= 2 ) {
-			ri.Printf( PRINT_DEVELOPER, "[VK][temporal] unreliable motion for entity type=%d customShader=%d frame=%d oldframe=%d backlerp=%.3f\n",
-				ent->e.reType, ent->e.customShader, ent->e.frame, ent->e.oldframe, ent->e.backlerp );
+			ri.Printf( PRINT_DEVELOPER, "[VK][temporal] unreliable motion for entity type=%d customShader=%d frame=%d oldframe=%d backlerp=%.3f rf_fp=%d\n",
+				ent->e.reType, ent->e.customShader, ent->e.frame, ent->e.oldframe, ent->e.backlerp,
+				( ent->e.renderfx & RF_FIRST_PERSON ) ? 1 : 0 );
 		}
 		vk.temporal.unreliableMotionThisFrame = qtrue;
 		return qtrue;
