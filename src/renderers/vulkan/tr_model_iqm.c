@@ -1449,6 +1449,8 @@ typedef struct {
 	float		weights[IQM_MORPH_TOP_K];
 	float		skinMatrices[SHADER_MAX_VERTEXES * 12];
 	float		normalMatrices[SHADER_MAX_VERTEXES * 9];
+	float		prevSkinMatrices[SHADER_MAX_VERTEXES * 12];
+	float		prevNormalMatrices[SHADER_MAX_VERTEXES * 9];
 	float		morphDeltas[SHADER_MAX_VERTEXES * IQM_MORPH_TOP_K * 6];
 } iqmGpuBatchState_t;
 
@@ -1497,7 +1499,7 @@ void R_IQMCommitSurfaceBatch( void )
 		return;
 	}
 
-	skinFloats = 1u + (size_t)s_iqmGpuBatch.skinCount * 12u + (size_t)s_iqmGpuBatch.skinCount * 9u;
+	skinFloats = 1u + 2u * ( (size_t)s_iqmGpuBatch.skinCount * 12u + (size_t)s_iqmGpuBatch.skinCount * 9u );
 	skinBytes = skinFloats * sizeof( float );
 	skinPayload = (float *)vk_alloc_storage( skinBytes, &skinOffset );
 	if ( !skinPayload ) {
@@ -1510,6 +1512,10 @@ void R_IQMCommitSurfaceBatch( void )
 		(size_t)s_iqmGpuBatch.skinCount * 12u * sizeof( float ) );
 	Com_Memcpy( skinPayload + 1 + (size_t)s_iqmGpuBatch.skinCount * 12u,
 		s_iqmGpuBatch.normalMatrices, (size_t)s_iqmGpuBatch.skinCount * 9u * sizeof( float ) );
+	Com_Memcpy( skinPayload + 1 + (size_t)s_iqmGpuBatch.skinCount * 12u + (size_t)s_iqmGpuBatch.skinCount * 9u,
+		s_iqmGpuBatch.prevSkinMatrices, (size_t)s_iqmGpuBatch.skinCount * 12u * sizeof( float ) );
+	Com_Memcpy( skinPayload + 1 + 2u * (size_t)s_iqmGpuBatch.skinCount * 12u + (size_t)s_iqmGpuBatch.skinCount * 9u,
+		s_iqmGpuBatch.prevNormalMatrices, (size_t)s_iqmGpuBatch.skinCount * 9u * sizeof( float ) );
 
 	morphFloats = (size_t)( 2 + IQM_MORPH_TOP_K ) + (size_t)s_iqmGpuBatch.morphVertexCount * IQM_MORPH_TOP_K * 6u;
 	morphBytes = morphFloats * sizeof( float );
@@ -1744,6 +1750,7 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 	int gpuSkinBase = 0;
 	int gpuMorphBase = 0;
 	float		poseMats[IQM_MAX_JOINTS * 12];
+	float		poseMatsPrev[IQM_MAX_JOINTS * 12];
 	float		influenceVtxMat[SHADER_MAX_VERTEXES * 12];
 	float		influenceNrmMat[SHADER_MAX_VERTEXES * 9];
 	int		i;
@@ -1832,6 +1839,11 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 	if ( data->num_poses > 0 ) {
 		// compute interpolated joint matrices
 		ComputePoseMats( data, frame, oldframe, backlerp, poseMats );
+		if ( oldframe != frame ) {
+			ComputePoseMats( data, oldframe, oldframe, 0.0f, poseMatsPrev );
+		} else {
+			Com_Memcpy( poseMatsPrev, poseMats, sizeof( poseMatsPrev ) );
+		}
 
 		// compute vertex blend influence matricies
 		for( i = 0; i < surf->num_influences; i++ ) {
@@ -1916,8 +1928,61 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 			nrmMat[ 8] = vtxMat[ 0]*vtxMat[ 5] - vtxMat[ 1]*vtxMat[ 4];
 
 			if ( useGpuMorphPath ) {
+				float *vtxPrev;
+				float *nrmPrev;
+				float vtxMatPrev[12];
+				float nrmMatPrev[9];
+				int jp;
+
 				Com_Memcpy( &s_iqmGpuBatch.skinMatrices[( gpuSkinBase + i ) * 12], vtxMat, 12 * sizeof( float ) );
 				Com_Memcpy( &s_iqmGpuBatch.normalMatrices[( gpuSkinBase + i ) * 9], nrmMat, 9 * sizeof( float ) );
+
+				vtxPrev = vtxMatPrev;
+				if ( blendWeights[0] <= 0.0f ) {
+					Com_Memcpy( vtxPrev, identityMatrix, 12 * sizeof( float ) );
+				} else {
+					vtxPrev[0] = blendWeights[0] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + 0] + 0];
+					vtxPrev[1] = blendWeights[0] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + 0] + 1];
+					vtxPrev[2] = blendWeights[0] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + 0] + 2];
+					vtxPrev[3] = blendWeights[0] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + 0] + 3];
+					vtxPrev[4] = blendWeights[0] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + 0] + 4];
+					vtxPrev[5] = blendWeights[0] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + 0] + 5];
+					vtxPrev[6] = blendWeights[0] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + 0] + 6];
+					vtxPrev[7] = blendWeights[0] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + 0] + 7];
+					vtxPrev[8] = blendWeights[0] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + 0] + 8];
+					vtxPrev[9] = blendWeights[0] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + 0] + 9];
+					vtxPrev[10] = blendWeights[0] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + 0] + 10];
+					vtxPrev[11] = blendWeights[0] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + 0] + 11];
+					for ( jp = 1; jp < (int)ARRAY_LEN( blendWeights ); jp++ ) {
+						if ( blendWeights[jp] <= 0.0f ) {
+							break;
+						}
+						vtxPrev[0] += blendWeights[jp] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + jp] + 0];
+						vtxPrev[1] += blendWeights[jp] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + jp] + 1];
+						vtxPrev[2] += blendWeights[jp] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + jp] + 2];
+						vtxPrev[3] += blendWeights[jp] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + jp] + 3];
+						vtxPrev[4] += blendWeights[jp] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + jp] + 4];
+						vtxPrev[5] += blendWeights[jp] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + jp] + 5];
+						vtxPrev[6] += blendWeights[jp] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + jp] + 6];
+						vtxPrev[7] += blendWeights[jp] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + jp] + 7];
+						vtxPrev[8] += blendWeights[jp] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + jp] + 8];
+						vtxPrev[9] += blendWeights[jp] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + jp] + 9];
+						vtxPrev[10] += blendWeights[jp] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + jp] + 10];
+						vtxPrev[11] += blendWeights[jp] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + jp] + 11];
+					}
+				}
+				nrmPrev = nrmMatPrev;
+				nrmPrev[0] = vtxPrev[5]*vtxPrev[10] - vtxPrev[6]*vtxPrev[9];
+				nrmPrev[1] = vtxPrev[6]*vtxPrev[8] - vtxPrev[4]*vtxPrev[10];
+				nrmPrev[2] = vtxPrev[4]*vtxPrev[9] - vtxPrev[5]*vtxPrev[8];
+				nrmPrev[3] = vtxPrev[2]*vtxPrev[9] - vtxPrev[1]*vtxPrev[10];
+				nrmPrev[4] = vtxPrev[0]*vtxPrev[10] - vtxPrev[2]*vtxPrev[8];
+				nrmPrev[5] = vtxPrev[1]*vtxPrev[8] - vtxPrev[0]*vtxPrev[9];
+				nrmPrev[6] = vtxPrev[1]*vtxPrev[6] - vtxPrev[2]*vtxPrev[5];
+				nrmPrev[7] = vtxPrev[2]*vtxPrev[4] - vtxPrev[0]*vtxPrev[6];
+				nrmPrev[8] = vtxPrev[0]*vtxPrev[5] - vtxPrev[1]*vtxPrev[4];
+				Com_Memcpy( &s_iqmGpuBatch.prevSkinMatrices[( gpuSkinBase + i ) * 12], vtxMatPrev, 12 * sizeof( float ) );
+				Com_Memcpy( &s_iqmGpuBatch.prevNormalMatrices[( gpuSkinBase + i ) * 9], nrmMatPrev, 9 * sizeof( float ) );
 			}
 		}
 
