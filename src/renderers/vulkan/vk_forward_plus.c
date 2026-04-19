@@ -688,6 +688,7 @@ void vk_forward_plus_update_for_refdef( void )
 	uint32_t max_pack;
 	const dlight_t *dl;
 	float dbg;
+	float cos_outer, cos_inner;
 	static uint32_t s_trunc_log_src;
 
 	if ( !r_forwardPlus || !r_forwardPlus->integer ) {
@@ -718,6 +719,8 @@ void vk_forward_plus_update_for_refdef( void )
 	} else if ( src <= (uint32_t)MAX_DLIGHTS ) {
 		s_trunc_log_src = 0u;
 	}
+
+	vk_linear_dlight_cone_cosines( &cos_outer, &cos_inner );
 
 	dbg = ( r_forwardPlusDebug && r_forwardPlusDebug->value > 0.0f ) ? r_forwardPlusDebug->value : 0.0f;
 
@@ -764,8 +767,8 @@ void vk_forward_plus_update_for_refdef( void )
 			rec[8] = dir[0];
 			rec[9] = dir[1];
 			rec[10] = dir[2];
-			rec[11] = cosf( DEG2RAD( 35.0f ) );
-			rec[12] = cosf( DEG2RAD( 20.0f ) );
+			rec[11] = cos_outer;
+			rec[12] = cos_inner;
 			rec[13] = len;
 			rec[14] = L->additive ? 1.0f : 0.0f;
 			rec[15] = 0.0f;

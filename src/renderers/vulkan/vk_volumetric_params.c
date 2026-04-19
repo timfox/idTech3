@@ -80,6 +80,8 @@ void vk_update_volumetric_params( void )
 	int quality = r_volumetricFogQuality ? r_volumetricFogQuality->integer : 2;
 	int local_light_count = 0;
 	int local_volume_count = 0;
+	float linear_dlight_cos_outer;
+	float linear_dlight_cos_inner;
 	float temporal_weight = r_volumetricFogTemporalWeight ? r_volumetricFogTemporalWeight->value : 0.0f;
 	float jitter_amount = r_volumetricFogJitter ? r_volumetricFogJitter->value : 0.0f;
 	float sun_intensity = r_volumetricFogSunIntensity ? r_volumetricFogSunIntensity->value : 1.0f;
@@ -97,6 +99,8 @@ void vk_update_volumetric_params( void )
 	float max_distance = ( r_volumetricFogMaxDistance ) ? r_volumetricFogMaxDistance->value : 4096.0f;
 	float reprojection_threshold = ( r_volumetricFogHistoryVelocityThreshold ) ? r_volumetricFogHistoryVelocityThreshold->value :
 		( ( r_volumetricFogReprojectionThreshold ) ? r_volumetricFogReprojectionThreshold->value : 0.075f );
+
+	vk_linear_dlight_cone_cosines( &linear_dlight_cos_outer, &linear_dlight_cos_inner );
 	float firefly_clamp = ( r_volumetricFogFireflyClamp ) ? r_volumetricFogFireflyClamp->value : 8.0f;
 	float transmittance_cutoff = ( r_volumetricFogTransmittanceCutoff ) ? r_volumetricFogTransmittanceCutoff->value : 0.01f;
 	float wind_speed = ( r_volumetricFogWindSpeed ) ? r_volumetricFogWindSpeed->value : 1.0f;
@@ -646,8 +650,8 @@ void vk_update_volumetric_params( void )
 			params.lightDirAngle[local_light_count][0] = dir[0];
 			params.lightDirAngle[local_light_count][1] = dir[1];
 			params.lightDirAngle[local_light_count][2] = dir[2];
-			params.lightDirAngle[local_light_count][3] = cosf( DEG2RAD( 35.0f ) );
-			params.lightExtra[local_light_count][0] = cosf( DEG2RAD( 20.0f ) );
+			params.lightDirAngle[local_light_count][3] = linear_dlight_cos_outer;
+			params.lightExtra[local_light_count][0] = linear_dlight_cos_inner;
 			params.lightExtra[local_light_count][1] = len;
 			params.lightExtra[local_light_count][3] = -1.0f;
 		} else {

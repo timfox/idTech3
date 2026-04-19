@@ -55,6 +55,13 @@ void vk_normalize_rgb_luma_safe( vec3_t io );
 /* 3D noise hash for volumetric fog. */
 uint32_t vk_noise_hash3( uint32_t x, uint32_t y, uint32_t z );
 
+/*
+ * Linear/segment dlights use a cone falloff in several GPU paths (Forward+ SSBO,
+ * volumetric fog). Outer/inner half-angles are fixed until dlight_t carries angles;
+ * keep cosines in one place so Forward+ tile cull and shading stay aligned with fog.
+ */
+void vk_linear_dlight_cone_cosines( float *out_cos_outer, float *out_cos_inner );
+
 /* Returns qtrue if extension name is one we request for the instance. */
 qboolean vk_used_instance_extension( const char *ext );
 
