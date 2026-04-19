@@ -1246,8 +1246,10 @@ void main() {
 					uint tileId = ty * tilesX + tx;
 					uint tbase = tileId * 8u;
 					float nLights = fp_lights.fp_light_data[0].x;
+					uint maxPerTile = uint( max( fp_lights.fp_light_data[0].z + 0.5, 1.0 ) );
+					maxPerTile = min( maxPerTile, 8u );
 					uint skipMask = floatBitsToUint( pbrForwardPlus.y );
-					for ( uint k = 0u; k < 8u; k++ ) {
+					for ( uint k = 0u; k < maxPerTile; k++ ) {
 						uint li = fp_tiles.fp_tile_cells[ tbase + k ];
 						if ( li == 0xFFFFFFFFu ) {
 							continue;
@@ -1435,13 +1437,15 @@ void main() {
 				uint ty = min( uint( px.y / tilePx ), tilesY - 1u );
 				uint tileId = ty * tilesX + tx;
 				uint base = tileId * 8u;
+				uint maxPerTile = uint( max( fp_lights.fp_light_data[0].z + 0.5, 1.0 ) );
+				maxPerTile = min( maxPerTile, 8u );
 				float occ = 0.0;
-				for ( uint k = 0u; k < 8u; k++ ) {
+				for ( uint k = 0u; k < maxPerTile; k++ ) {
 					if ( fp_tiles.fp_tile_cells[ base + k ] != 0xFFFFFFFFu ) {
 						occ += 1.0;
 					}
 				}
-				occ *= 0.125;
+				occ = ( maxPerTile > 0u ) ? ( occ / float( maxPerTile ) ) : 0.0;
 				vec3 col;
 				if ( occ < 0.25 ) {
 					col = mix( vec3( 0.02, 0.04, 0.18 ), vec3( 0.0, 0.55, 1.0 ), occ * 4.0 );

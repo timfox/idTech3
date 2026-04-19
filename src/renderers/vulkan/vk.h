@@ -878,6 +878,7 @@ typedef struct {
 		VkDeviceMemory param_memory;
 		void *param_mapped;
 		uint32_t param_buffer_size;
+		uint32_t max_per_tile; /* 4..8 from r_forwardPlusMaxPerTile (latched); SSBO stride is always 8 slots */
 		VkDescriptorSet descriptor;
 		VkPipelineLayout pipeline_layout;
 		VkPipeline tile_pipeline;

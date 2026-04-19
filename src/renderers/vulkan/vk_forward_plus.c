@@ -169,6 +169,7 @@ typedef struct {
 	uint32_t tile_grid[2];
 	uint32_t total_tiles;
 	uint32_t num_lights;
+	uint32_t max_per_tile;
 } vk_fp_push_t;
 
 static VkDescriptorSet vk_fp_graphics_descriptor = VK_NULL_HANDLE;
@@ -427,6 +428,23 @@ void vk_forward_plus_shutdown( void )
 	vk_fp_destroy_dummy_buffers();
 }
 
+static uint32_t vk_fp_effective_max_per_tile( void )
+{
+	int v;
+
+	if ( !r_forwardPlusMaxPerTile ) {
+		return VK_FP_MAX_PER_TILE;
+	}
+	v = r_forwardPlusMaxPerTile->integer;
+	if ( v < 4 ) {
+		v = 4;
+	}
+	if ( v > (int)VK_FP_MAX_PER_TILE ) {
+		v = (int)VK_FP_MAX_PER_TILE;
+	}
+	return (uint32_t)v;
+}
+
 static void vk_fp_create_buffers_and_compute( void )
 {
 	VkPushConstantRange push_range;
@@ -445,6 +463,8 @@ static void vk_fp_create_buffers_and_compute( void )
 	/* Packed indices must match tess.dlightBits (MAX_DLIGHTS); do not pack extra "real" slots. */
 	const uint32_t max_lights = (uint32_t)MAX_DLIGHTS;
 	const VkDeviceSize light_buf_size = (VkDeviceSize)VK_FP_HEADER_BYTES + (VkDeviceSize)max_lights * (VkDeviceSize)VK_FP_RECORD_STRIDE;
+
+	vk.forward_plus.max_per_tile = vk_fp_effective_max_per_tile();
 
 	vk_fp_compute_tile_grid( &tiles_x, &tiles_y, &total_tiles, &tile_bytes );
 
@@ -652,8 +672,9 @@ static void vk_fp_create_buffers_and_compute( void )
 
 	vk_forward_plus_init_graphics_descriptors();
 
-	ri.Printf( PRINT_ALL, "[VK][Forward+] tile cull: %ux%u tiles (%u total), %u bytes/tile list\n",
-		(unsigned)tiles_x, (unsigned)tiles_y, (unsigned)total_tiles, (unsigned)tile_bytes );
+	ri.Printf( PRINT_ALL, "[VK][Forward+] tile cull: %ux%u tiles (%u total), %u bytes/tile list, max %u lights/tile\n",
+		(unsigned)tiles_x, (unsigned)tiles_y, (unsigned)total_tiles, (unsigned)tile_bytes,
+		(unsigned)vk.forward_plus.max_per_tile );
 }
 
 void vk_forward_plus_init( void )
@@ -724,10 +745,10 @@ void vk_forward_plus_update_for_refdef( void )
 
 	dbg = ( r_forwardPlusDebug && r_forwardPlusDebug->value > 0.0f ) ? r_forwardPlusDebug->value : 0.0f;
 
-	/* Header vec4: x=count, y=refdef time (ms), z=reserved, w=debug overlay scale */
+	/* Header vec4: x=count, y=refdef time (ms), z=max lights per tile (4..8), w=debug overlay scale */
 	base[0] = (float)n;
 	base[1] = (float)backEnd.refdef.time;
-	base[2] = 0.0f;
+	base[2] = (float)vk.forward_plus.max_per_tile;
 	base[3] = dbg;
 
 	/* Tile grid + render target size (FBO / r_renderScale; matches NDC->pixel in tile cull) */
@@ -875,6 +896,7 @@ void vk_forward_plus_dispatch_tile_cull( void )
 	push.tile_grid[1] = vk.forward_plus.tiles_y;
 	push.total_tiles = vk.forward_plus.tiles_x * vk.forward_plus.tiles_y;
 	push.num_lights = vk.forward_plus.last_packed_count;
+	push.max_per_tile = vk.forward_plus.max_per_tile;
 
 	qvkCmdPushConstants( vk.cmd->command_buffer, vk.forward_plus.pipeline_layout,
 		VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( push ), &push );

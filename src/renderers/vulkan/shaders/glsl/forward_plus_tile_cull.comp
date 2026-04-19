@@ -28,6 +28,7 @@ layout(push_constant) uniform Push {
 	uvec2 tileGrid;
 	uint totalTiles;
 	uint numLights;
+	uint maxPerTile;
 } pc;
 
 bool sphere_tile_overlap(vec2 centerPx, float radiusPx, uint tileX, uint tileY) {
@@ -57,11 +58,17 @@ void main() {
 	uint n = uint(max(lights.data[0].x + 0.5, 0.0));
 	n = min(n, min(pc.numLights, MAX_LIGHTS));
 
+	uint cap = pc.maxPerTile;
+	if (cap < 1u) {
+		cap = MAX_PER_TILE;
+	}
+	cap = min(cap, MAX_PER_TILE);
+
 	float vw = lights.data[1].z;
 	float vh = lights.data[1].w;
 
 	uint outCount = 0u;
-	for (uint li = 0u; li < n && outCount < MAX_PER_TILE; li++) {
+	for (uint li = 0u; li < n && outCount < cap; li++) {
 		uint b = 2u + li * REC_VEC4S;
 		vec3 worldPos = lights.data[b].xyz;
 		float radius = max(lights.data[b].w, 1e-4);
