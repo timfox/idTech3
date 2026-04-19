@@ -186,6 +186,25 @@ else
 fi
 
 echo ""
+echo "Forward+ tile cap: VK_FP_MIN_PER_TILE vs MAX_PER_TILE (shader slot layout):"
+min_tile_c="$(sed -n 's/^#define VK_FP_MIN_PER_TILE[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$FP_C" | head -1)"
+if [[ -z "$min_tile_c" || -z "$max_tile_sh" ]]; then
+  fail "could not parse VK_FP_MIN_PER_TILE from vk_forward_plus.c or MAX_PER_TILE from forward_plus_tile_cull.comp"
+elif [[ "$min_tile_c" -gt "$max_tile_sh" ]]; then
+  fail "VK_FP_MIN_PER_TILE ($min_tile_c) > MAX_PER_TILE ($max_tile_sh) - r_forwardPlusMaxPerTile range would be empty"
+else
+  pass "VK_FP_MIN_PER_TILE=$min_tile_c <= MAX_PER_TILE=$max_tile_sh"
+fi
+
+echo ""
+TR_INIT_VK="$PROJECT_ROOT/src/renderers/vulkan/tr_init.c"
+if ! grep -q 'vk_forward_plus_get_min_per_tile_cap' "$TR_INIT_VK" || ! grep -q 'vk_forward_plus_get_max_per_tile_cap' "$TR_INIT_VK"; then
+  fail "vulkan/tr_init.c should use vk_forward_plus_get_*_per_tile_cap for r_forwardPlusMaxPerTile CheckRange"
+else
+  pass "r_forwardPlusMaxPerTile CheckRange wired to vk_forward_plus tile caps"
+fi
+
+echo ""
 if [ -n "${GAME_BASE:-}" ]; then
   echo "Optional game base: $GAME_BASE"
   ASSETS_LIST="${GAME_ASSETS_LIST:-$PROJECT_ROOT/docs/samples/renderer_regression/OPTIONAL_GAME_ASSETS.txt}"

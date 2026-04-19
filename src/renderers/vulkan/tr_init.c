@@ -45,6 +45,7 @@ glstatic_t	gls;
 
 #ifdef USE_VULKAN
 #include "vk_device.h"
+#include "vk_forward_plus.h"
 static void VkInfo_f( void );
 static void VulkanInfo_f( void );
 static void VkVolumetricValidate_f( void );
@@ -3472,8 +3473,14 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_forwardPlus, "Forward+ scaffolding: GPU light SSBO + per-tile cull compute (16px tiles; max per tile from \\r_forwardPlusMaxPerTile, default 8). Packs at most MAX_DLIGHTS (32) so indices match tess.dlightBits. PBR: \\r_forwardPlusDebug (overlay), \\r_forwardPlusShade (experimental additive lights); see docs/RENDERER_2026_ARCHITECTURE_PASS.md." );
 	ri.Cvar_SetGroup( r_forwardPlus, CVG_RENDERER );
 	r_forwardPlusMaxPerTile = ri.Cvar_Get( "r_forwardPlusMaxPerTile", "8", CVAR_ARCHIVE_ND | CVAR_LATCH );
-	ri.Cvar_CheckRange( r_forwardPlusMaxPerTile, "4", "8", CV_INTEGER );
-	ri.Cvar_SetDescription( r_forwardPlusMaxPerTile, "Forward+ tile list length per 16px tile (4–8, latched). Lower values reduce GPU work when \\r_forwardPlus 1. Requires vid_restart after change." );
+	{
+		char fp_min[12];
+		char fp_max[12];
+		Com_sprintf( fp_min, sizeof( fp_min ), "%u", vk_forward_plus_get_min_per_tile_cap() );
+		Com_sprintf( fp_max, sizeof( fp_max ), "%u", vk_forward_plus_get_max_per_tile_cap() );
+		ri.Cvar_CheckRange( r_forwardPlusMaxPerTile, fp_min, fp_max, CV_INTEGER );
+	}
+	ri.Cvar_SetDescription( r_forwardPlusMaxPerTile, "Forward+ tile list length per 16px tile (min VK_FP_MIN_PER_TILE, max VK_FP_MAX_PER_TILE in vk_forward_plus.c; latched). Lower values reduce GPU work when \\r_forwardPlus 1. Requires vid_restart after change." );
 	ri.Cvar_SetGroup( r_forwardPlusMaxPerTile, CVG_RENDERER );
 	r_forwardPlusDebug = ri.Cvar_Get( "r_forwardPlusDebug", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_forwardPlusDebug, "0", "1", CV_FLOAT );
