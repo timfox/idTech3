@@ -3471,7 +3471,7 @@ static void R_Register( void )
 	ri.Cvar_SetGroup( r_forwardPlus, CVG_RENDERER );
 	r_forwardPlusDebug = ri.Cvar_Get( "r_forwardPlusDebug", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_forwardPlusDebug, "0", "1", CV_FLOAT );
-	ri.Cvar_SetDescription( r_forwardPlusDebug, "PBR overlay tint from Forward+ tile list (0=off). Requires \\r_forwardPlus 1 and vid_restart after toggling \\r_forwardPlus." );
+	ri.Cvar_SetDescription( r_forwardPlusDebug, "PBR Forward+ debug overlay strength (0=off, typ. 0.08–0.25): heatmap by lights per 16px tile + tile borders. Requires \\r_forwardPlus 1." );
 	ri.Cvar_SetGroup( r_forwardPlusDebug, CVG_RENDERER );
 	r_ext_alpha_to_coverage = ri.Cvar_Get( "r_ext_alpha_to_coverage", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_alpha_to_coverage, "0", "1", CV_INTEGER );

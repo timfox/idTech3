@@ -92,6 +92,9 @@ static void vk_fp_ensure_tile_for_render_resolution( void )
 	uint32_t tiles_x, tiles_y, total_tiles;
 	VkDeviceSize tile_bytes;
 	qboolean changed;
+	VkBuffer new_tile = VK_NULL_HANDLE;
+	VkDeviceMemory new_mem = VK_NULL_HANDLE;
+	VkResult res;
 
 	if ( !r_forwardPlus || !r_forwardPlus->integer ) {
 		return;
@@ -112,8 +115,6 @@ static void vk_fp_ensure_tile_for_render_resolution( void )
 		return;
 	}
 
-	vk_fp_destroy_tile_buffer_only();
-
 	bci.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	bci.pNext = NULL;
 	bci.flags = 0;
@@ -122,18 +123,37 @@ static void vk_fp_ensure_tile_for_render_resolution( void )
 	bci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	bci.queueFamilyIndexCount = 0;
 	bci.pQueueFamilyIndices = NULL;
-	VK_CHECK( qvkCreateBuffer( vk.device, &bci, NULL, &vk.forward_plus.tile_buffer ) );
-	qvkGetBufferMemoryRequirements( vk.device, vk.forward_plus.tile_buffer, &mr );
+	res = qvkCreateBuffer( vk.device, &bci, NULL, &new_tile );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "[VK][Forward+] tile buffer create failed (%d); keeping previous tile SSBO\n" S_COLOR_WHITE, (int)res );
+		return;
+	}
+	qvkGetBufferMemoryRequirements( vk.device, new_tile, &mr );
 	mem_type = vk_find_memory_type( vk.physical_device, mr.memoryTypeBits,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
 	mai.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	mai.pNext = NULL;
 	mai.allocationSize = mr.size;
 	mai.memoryTypeIndex = mem_type;
-	VK_CHECK( qvkAllocateMemory( vk.device, &mai, NULL, &vk.forward_plus.tile_memory ) );
-	VK_CHECK( qvkBindBufferMemory( vk.device, vk.forward_plus.tile_buffer, vk.forward_plus.tile_memory, 0 ) );
-	SET_OBJECT_NAME( vk.forward_plus.tile_buffer, "forward+ tile indices", VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT );
+	res = qvkAllocateMemory( vk.device, &mai, NULL, &new_mem );
+	if ( res != VK_SUCCESS ) {
+		qvkDestroyBuffer( vk.device, new_tile, NULL );
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "[VK][Forward+] tile buffer memory alloc failed (%d); keeping previous tile SSBO\n" S_COLOR_WHITE, (int)res );
+		return;
+	}
+	res = qvkBindBufferMemory( vk.device, new_tile, new_mem, 0 );
+	if ( res != VK_SUCCESS ) {
+		qvkFreeMemory( vk.device, new_mem, NULL );
+		qvkDestroyBuffer( vk.device, new_tile, NULL );
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "[VK][Forward+] tile buffer bind failed (%d); keeping previous tile SSBO\n" S_COLOR_WHITE, (int)res );
+		return;
+	}
+	SET_OBJECT_NAME( new_tile, "forward+ tile indices", VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT );
 
+	vk_fp_destroy_tile_buffer_only();
+
+	vk.forward_plus.tile_buffer = new_tile;
+	vk.forward_plus.tile_memory = new_mem;
 	vk.forward_plus.tiles_x = tiles_x;
 	vk.forward_plus.tiles_y = tiles_y;
 	vk.forward_plus.tile_capacity_tiles = total_tiles;
@@ -415,10 +435,6 @@ static void vk_fp_create_buffers_and_compute( void )
 
 	vk_fp_compute_tile_grid( &tiles_x, &tiles_y, &total_tiles, &tile_bytes );
 
-	vk.forward_plus.tiles_x = tiles_x;
-	vk.forward_plus.tiles_y = tiles_y;
-	vk.forward_plus.tile_capacity_tiles = total_tiles;
-
 	bci.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	bci.pNext = NULL;
 	bci.flags = 0;
@@ -444,32 +460,93 @@ static void vk_fp_create_buffers_and_compute( void )
 
 	if ( vk.modules.forward_plus_tile_cull_cs == VK_NULL_HANDLE ) {
 		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "[VK][Forward+] forward_plus_tile_cull compute shader missing; tile SSBO disabled\n" S_COLOR_WHITE );
+		vk_fp_destroy_light_buffer();
+		vk.forward_plus.tiles_x = 0u;
+		vk.forward_plus.tiles_y = 0u;
+		vk.forward_plus.tile_capacity_tiles = 0u;
 		return;
 	}
 
 	bci.size = tile_bytes;
 	bci.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-	VK_CHECK( qvkCreateBuffer( vk.device, &bci, NULL, &vk.forward_plus.tile_buffer ) );
+	if ( qvkCreateBuffer( vk.device, &bci, NULL, &vk.forward_plus.tile_buffer ) != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "[VK][Forward+] tile buffer create failed; Forward+ init aborted\n" S_COLOR_WHITE );
+		vk_fp_destroy_light_buffer();
+		vk.forward_plus.tiles_x = 0u;
+		vk.forward_plus.tiles_y = 0u;
+		vk.forward_plus.tile_capacity_tiles = 0u;
+		return;
+	}
 	qvkGetBufferMemoryRequirements( vk.device, vk.forward_plus.tile_buffer, &mr );
 	mem_type = vk_find_memory_type( vk.physical_device, mr.memoryTypeBits,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
 	mai.allocationSize = mr.size;
 	mai.memoryTypeIndex = mem_type;
-	VK_CHECK( qvkAllocateMemory( vk.device, &mai, NULL, &vk.forward_plus.tile_memory ) );
-	VK_CHECK( qvkBindBufferMemory( vk.device, vk.forward_plus.tile_buffer, vk.forward_plus.tile_memory, 0 ) );
+	if ( qvkAllocateMemory( vk.device, &mai, NULL, &vk.forward_plus.tile_memory ) != VK_SUCCESS ) {
+		qvkDestroyBuffer( vk.device, vk.forward_plus.tile_buffer, NULL );
+		vk.forward_plus.tile_buffer = VK_NULL_HANDLE;
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "[VK][Forward+] tile buffer memory alloc failed; Forward+ init aborted\n" S_COLOR_WHITE );
+		vk_fp_destroy_light_buffer();
+		vk.forward_plus.tiles_x = 0u;
+		vk.forward_plus.tiles_y = 0u;
+		vk.forward_plus.tile_capacity_tiles = 0u;
+		return;
+	}
+	if ( qvkBindBufferMemory( vk.device, vk.forward_plus.tile_buffer, vk.forward_plus.tile_memory, 0 ) != VK_SUCCESS ) {
+		qvkFreeMemory( vk.device, vk.forward_plus.tile_memory, NULL );
+		vk.forward_plus.tile_memory = VK_NULL_HANDLE;
+		qvkDestroyBuffer( vk.device, vk.forward_plus.tile_buffer, NULL );
+		vk.forward_plus.tile_buffer = VK_NULL_HANDLE;
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "[VK][Forward+] tile buffer bind failed; Forward+ init aborted\n" S_COLOR_WHITE );
+		vk_fp_destroy_light_buffer();
+		vk.forward_plus.tiles_x = 0u;
+		vk.forward_plus.tiles_y = 0u;
+		vk.forward_plus.tile_capacity_tiles = 0u;
+		return;
+	}
 	SET_OBJECT_NAME( vk.forward_plus.tile_buffer, "forward+ tile indices", VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT );
 
 	bci.size = VK_FP_PARAM_BYTES;
 	bci.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-	VK_CHECK( qvkCreateBuffer( vk.device, &bci, NULL, &vk.forward_plus.param_buffer ) );
+	if ( qvkCreateBuffer( vk.device, &bci, NULL, &vk.forward_plus.param_buffer ) != VK_SUCCESS ) {
+		vk_fp_destroy_buffers();
+		vk_fp_destroy_light_buffer();
+		vk.forward_plus.tiles_x = 0u;
+		vk.forward_plus.tiles_y = 0u;
+		vk.forward_plus.tile_capacity_tiles = 0u;
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "[VK][Forward+] param buffer create failed; Forward+ init aborted\n" S_COLOR_WHITE );
+		return;
+	}
 	qvkGetBufferMemoryRequirements( vk.device, vk.forward_plus.param_buffer, &mr );
 	mem_type = vk_find_memory_type( vk.physical_device, mr.memoryTypeBits,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
 	mai.allocationSize = mr.size;
 	mai.memoryTypeIndex = mem_type;
-	VK_CHECK( qvkAllocateMemory( vk.device, &mai, NULL, &vk.forward_plus.param_memory ) );
-	VK_CHECK( qvkMapMemory( vk.device, vk.forward_plus.param_memory, 0, VK_WHOLE_SIZE, 0, &vk.forward_plus.param_mapped ) );
-	VK_CHECK( qvkBindBufferMemory( vk.device, vk.forward_plus.param_buffer, vk.forward_plus.param_memory, 0 ) );
+	if ( qvkAllocateMemory( vk.device, &mai, NULL, &vk.forward_plus.param_memory ) != VK_SUCCESS ) {
+		qvkDestroyBuffer( vk.device, vk.forward_plus.param_buffer, NULL );
+		vk.forward_plus.param_buffer = VK_NULL_HANDLE;
+		vk_fp_destroy_buffers();
+		vk_fp_destroy_light_buffer();
+		vk.forward_plus.tiles_x = 0u;
+		vk.forward_plus.tiles_y = 0u;
+		vk.forward_plus.tile_capacity_tiles = 0u;
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "[VK][Forward+] param buffer memory alloc failed; Forward+ init aborted\n" S_COLOR_WHITE );
+		return;
+	}
+	if ( qvkMapMemory( vk.device, vk.forward_plus.param_memory, 0, VK_WHOLE_SIZE, 0, &vk.forward_plus.param_mapped ) != VK_SUCCESS ||
+		qvkBindBufferMemory( vk.device, vk.forward_plus.param_buffer, vk.forward_plus.param_memory, 0 ) != VK_SUCCESS ) {
+		qvkFreeMemory( vk.device, vk.forward_plus.param_memory, NULL );
+		vk.forward_plus.param_memory = VK_NULL_HANDLE;
+		qvkDestroyBuffer( vk.device, vk.forward_plus.param_buffer, NULL );
+		vk.forward_plus.param_buffer = VK_NULL_HANDLE;
+		vk_fp_destroy_buffers();
+		vk_fp_destroy_light_buffer();
+		vk.forward_plus.tiles_x = 0u;
+		vk.forward_plus.tiles_y = 0u;
+		vk.forward_plus.tile_capacity_tiles = 0u;
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "[VK][Forward+] param buffer map/bind failed; Forward+ init aborted\n" S_COLOR_WHITE );
+		return;
+	}
 	vk.forward_plus.param_buffer_size = (uint32_t)mr.size;
 	Com_Memset( vk.forward_plus.param_mapped, 0, (size_t)mr.size );
 	SET_OBJECT_NAME( vk.forward_plus.param_buffer, "forward+ tile cull params", VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT );
@@ -485,7 +562,15 @@ static void vk_fp_create_buffers_and_compute( void )
 	pl_ci.pSetLayouts = &vk.set_layout_forward_plus;
 	pl_ci.pushConstantRangeCount = 1;
 	pl_ci.pPushConstantRanges = &push_range;
-	VK_CHECK( qvkCreatePipelineLayout( vk.device, &pl_ci, NULL, &vk.forward_plus.pipeline_layout ) );
+	if ( qvkCreatePipelineLayout( vk.device, &pl_ci, NULL, &vk.forward_plus.pipeline_layout ) != VK_SUCCESS ) {
+		vk_fp_destroy_buffers();
+		vk_fp_destroy_light_buffer();
+		vk.forward_plus.tiles_x = 0u;
+		vk.forward_plus.tiles_y = 0u;
+		vk.forward_plus.tile_capacity_tiles = 0u;
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "[VK][Forward+] tile cull pipeline layout create failed; Forward+ init aborted\n" S_COLOR_WHITE );
+		return;
+	}
 
 	Com_Memset( &stage, 0, sizeof( stage ) );
 	stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -497,7 +582,16 @@ static void vk_fp_create_buffers_and_compute( void )
 	pipe_ci.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
 	pipe_ci.stage = stage;
 	pipe_ci.layout = vk.forward_plus.pipeline_layout;
-	VK_CHECK( qvkCreateComputePipelines( vk.device, VK_NULL_HANDLE, 1, &pipe_ci, NULL, &vk.forward_plus.tile_pipeline ) );
+	if ( qvkCreateComputePipelines( vk.device, VK_NULL_HANDLE, 1, &pipe_ci, NULL, &vk.forward_plus.tile_pipeline ) != VK_SUCCESS ) {
+		vk_fp_destroy_compute_pipeline();
+		vk_fp_destroy_buffers();
+		vk_fp_destroy_light_buffer();
+		vk.forward_plus.tiles_x = 0u;
+		vk.forward_plus.tiles_y = 0u;
+		vk.forward_plus.tile_capacity_tiles = 0u;
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "[VK][Forward+] tile cull compute pipeline create failed; Forward+ init aborted\n" S_COLOR_WHITE );
+		return;
+	}
 	SET_OBJECT_NAME( vk.forward_plus.tile_pipeline, "pipeline - forward+ tile cull", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
 
 	alloc_ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -505,7 +599,16 @@ static void vk_fp_create_buffers_and_compute( void )
 	alloc_ci.descriptorPool = vk.descriptor_pool;
 	alloc_ci.descriptorSetCount = 1;
 	alloc_ci.pSetLayouts = &vk.set_layout_forward_plus;
-	VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc_ci, &vk.forward_plus.descriptor ) );
+	if ( qvkAllocateDescriptorSets( vk.device, &alloc_ci, &vk.forward_plus.descriptor ) != VK_SUCCESS ) {
+		vk_fp_destroy_compute_pipeline();
+		vk_fp_destroy_buffers();
+		vk_fp_destroy_light_buffer();
+		vk.forward_plus.tiles_x = 0u;
+		vk.forward_plus.tiles_y = 0u;
+		vk.forward_plus.tile_capacity_tiles = 0u;
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "[VK][Forward+] descriptor set alloc failed (pool full?); Forward+ init aborted\n" S_COLOR_WHITE );
+		return;
+	}
 
 	Com_Memset( buf_infos, 0, sizeof( buf_infos ) );
 	buf_infos[0].buffer = vk.forward_plus.buffer;
@@ -529,6 +632,10 @@ static void vk_fp_create_buffers_and_compute( void )
 		writes[i].pBufferInfo = &buf_infos[i];
 	}
 	qvkUpdateDescriptorSets( vk.device, 3, writes, 0, NULL );
+
+	vk.forward_plus.tiles_x = tiles_x;
+	vk.forward_plus.tiles_y = tiles_y;
+	vk.forward_plus.tile_capacity_tiles = total_tiles;
 
 	vk_forward_plus_init_graphics_descriptors();
 
