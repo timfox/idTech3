@@ -74,7 +74,7 @@ jobs:
         shell: msys2 {0}
         run: |
           set -e
-          pkgs="${{ matrix.prefix }}-SDL2 ${{ matrix.prefix }}-openal ${{ matrix.prefix }}-freetype ${{ matrix.prefix }}-lua ${{ matrix.prefix }}-openssl ${{ matrix.prefix }}-curl ${{ matrix.prefix }}-bullet"
+          pkgs="${{ matrix.prefix }}-SDL2 ${{ matrix.prefix }}-openal ${{ matrix.prefix }}-freetype ${{ matrix.prefix }}-lua ${{ matrix.prefix }}-openssl ${{ matrix.prefix }}-curl ${{ matrix.prefix }}-bullet ${{ matrix.prefix }}-glslang"
           for attempt in 1 2 3 4 5; do
             # Refresh db + avoid spurious timeouts on congested mirrors (curl stack under pacman).
             pacman -Sy --noconfirm || true
@@ -152,6 +152,12 @@ jobs:
           cp -f bin/idtech3* release/ || true
           chmod +x scripts/smoke_test.sh
           ./scripts/smoke_test.sh release
+
+      - name: Renderer regression check (Tier A)
+        if: ${{ github.event_name != 'release' && matrix.btype != 'Debug' && matrix.cc == 'gcc' }}
+        run: |
+          chmod +x scripts/renderer_regression_check.sh
+          ./scripts/renderer_regression_check.sh
 
       - uses: actions/upload-artifact@v4
         if: matrix.cc == 'gcc' && matrix.btype == 'Release'
@@ -386,6 +392,35 @@ jobs:
         if: ${{ matrix.btype == 'Release' }}
         shell: pwsh
         run: ./scripts/windows_pe_exports_check.ps1 -BinDir bin -SkipRendererDlls
+
+      - name: Install Vulkan SDK (glslangValidator for Tier A)
+        if: ${{ github.event_name != 'release' && matrix.btype == 'Release' }}
+        uses: humbletim/install-vulkan-sdk@v1.2
+        with:
+          version: 1.4.309.0
+          cache: true
+
+      - name: Renderer regression check (Tier A, MSVC Release)
+        if: ${{ github.event_name != 'release' && matrix.btype == 'Release' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          chmod +x scripts/renderer_regression_check.sh
+          ./scripts/renderer_regression_check.sh
+
+      - name: Smoke test (MSVC Release x64 only)
+        if: ${{ github.event_name != 'release' && matrix.btype == 'Release' && matrix.arch == 'x64' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          mkdir -p release
+          sfx='${{ matrix.suffix }}'
+          cp -f "bin/idtech3_server${sfx}.exe" release/idtech3_server.exe
+          cp -f "bin/idtech3${sfx}.exe" release/idtech3.exe
+          chmod +x scripts/smoke_test.sh
+          ./scripts/smoke_test.sh release
 
       - uses: actions/upload-artifact@v4
         if: ${{ matrix.btype == 'Release' }}
@@ -733,6 +768,9 @@ jobs:
             chmod +x scripts/smoke_test.sh
             ./scripts/smoke_test.sh release
 
+            chmod +x scripts/renderer_regression_check.sh
+            ./scripts/renderer_regression_check.sh
+
       - uses: actions/upload-artifact@v4
         if: matrix.cc == 'gcc' && matrix.btype == 'Release'
         with:
@@ -757,7 +795,7 @@ jobs:
         run: |
           set -e
           for attempt in 1 2 3 4; do
-            if brew install coreutils sdl2 openal-soft cmake ninja freetype lua molten-vk bullet pkgconf; then
+            if brew install coreutils sdl2 openal-soft cmake ninja freetype lua molten-vk bullet pkgconf glslang; then
               exit 0
             fi
             echo "brew install attempt $attempt failed, retrying in $((attempt * 20))s..."
@@ -857,6 +895,12 @@ jobs:
           chmod +x scripts/smoke_test.sh
           ./scripts/smoke_test.sh release
 
+      - name: Renderer regression check (Tier A)
+        if: ${{ github.event_name != 'release' && matrix.btype != 'Debug' }}
+        run: |
+          chmod +x scripts/renderer_regression_check.sh
+          ./scripts/renderer_regression_check.sh
+
       - uses: actions/upload-artifact@v4
         if: matrix.cc == 'clang' && matrix.btype == 'Release'
         with:
@@ -903,7 +947,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/.ci-android-deps
-          key: android-deps-${{ matrix.abi }}-${{ hashFiles('CMakeLists.txt', 'cmake/**', 'android/**', '.github/workflows/build.yml') }}
+          key: android-deps-${{ matrix.abi }}-${{ hashFiles('CMakeLists.txt', 'cmake/**', 'android/**', '.github/workflows/build.yml', 'scripts/renderer_regression_check.sh', 'scripts/renderer_regression_maps.sh') }}
           restore-keys: |
             android-deps-${{ matrix.abi }}-
 
@@ -914,7 +958,7 @@ jobs:
           GIT_TERMINAL_PROMPT: 0
         run: |
           sudo apt-get -o Acquire::Retries=5 update -qq
-          sudo apt-get -o Acquire::Retries=5 install -y --no-install-recommends make git perl
+          sudo apt-get -o Acquire::Retries=5 install -y --no-install-recommends make git perl glslang-tools
           # Use direct CMake cross-compile instead of Gradle to avoid
           # wrapper/SDK bootstrapping complexity in CI.
           NDK_HOME="${ANDROID_NDK_HOME:-$ANDROID_SDK_ROOT/ndk/27.0.12077973}"
@@ -989,6 +1033,12 @@ jobs:
             -exec cp -f {} ../bin/ \;
           ls -la ../bin/
 
+      - name: Renderer regression check (Tier A)
+        if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
+        run: |
+          chmod +x scripts/renderer_regression_check.sh
+          ./scripts/renderer_regression_check.sh
+
       - uses: actions/upload-artifact@v4
         if: matrix.btype == 'Release'
         with:
@@ -1030,7 +1080,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/.ci-android-deps
-          key: android-apk-deps-${{ hashFiles('CMakeLists.txt', 'android/app/build.gradle') }}
+          key: android-apk-deps-${{ hashFiles('CMakeLists.txt', 'android/app/build.gradle', '.github/workflows/build.yml', 'scripts/renderer_regression_check.sh', 'scripts/renderer_regression_maps.sh') }}
           restore-keys: |
             android-apk-deps-
 
@@ -1042,7 +1092,7 @@ jobs:
           GIT_TERMINAL_PROMPT: 0
         run: |
           sudo apt-get -o Acquire::Retries=5 update -qq
-          sudo apt-get -o Acquire::Retries=5 install -y --no-install-recommends make git perl
+          sudo apt-get -o Acquire::Retries=5 install -y --no-install-recommends make git perl glslang-tools
           chmod +x ./gradlew
           SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME}}"
           echo "sdk.dir=${SDK_ROOT}" > local.properties
@@ -1058,6 +1108,12 @@ jobs:
             sleep $((attempt * 30))
           done
           ls -la app/build/outputs/apk/debug/
+
+      - name: Renderer regression check (Tier A)
+        if: ${{ github.event_name != 'release' }}
+        run: |
+          chmod +x scripts/renderer_regression_check.sh
+          ./scripts/renderer_regression_check.sh
 
       - uses: actions/upload-artifact@v4
         if: ${{ github.event_name != 'release' }}
