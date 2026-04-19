@@ -20,6 +20,27 @@ static void vk_end_frame_refresh_postfx_params_for_target( uint32_t width, uint3
 	vk_update_postfx_params( vk.cmd_index );
 }
 
+static void vk_end_frame_bind_post_process_sets( VkDescriptorSet set0, VkDescriptorSet set1, VkDescriptorSet set2, VkDescriptorSet set3 )
+{
+	VkDescriptorSet sets[4] = { set0, set1, set2, set3 };
+
+	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+		vk.pipeline_layout_post_process, 0, 4, sets, 0, NULL );
+}
+
+static void vk_end_frame_draw_fullscreen_quad( uint32_t width, uint32_t height )
+{
+	vk_set_fullscreen_viewport_scissor( width, height );
+	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+}
+
+static void vk_end_frame_begin_post_process_pass( VkRenderPass renderPass, VkFramebuffer framebuffer,
+	uint32_t width, uint32_t height, VkPipeline pipeline )
+{
+	vk_begin_render_pass_tracked( renderPass, framebuffer, qfalse, width, height );
+	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline );
+}
+
 void vk_end_frame_record_capture_if_needed( void )
 {
 	if ( !backEnd.screenshotMask || !vk.capture.image ) {
@@ -48,19 +69,14 @@ void vk_end_frame_record_capture_if_needed( void )
 
 		vk_end_frame_refresh_postfx_params_for_target( cap_w, cap_h );
 
-		vk_begin_render_pass_tracked( vk.render_pass.capture, vk.framebuffers.capture, qfalse, cap_w, cap_h );
-		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.capture_pipeline );
-		{
-			VkDescriptorSet capture_sets[4] = {
-				vk.color_descriptor[vk.cmd_index],
-				vk.depth_descriptor[vk.cmd_index],
-				vk.postfx_params_descriptor[vk.cmd_index],
-				PostFX_GetLUTImage()->descriptor
-			};
-			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 4, capture_sets, 0, NULL );
-		}
-		vk_set_fullscreen_viewport_scissor( cap_w, cap_h );
-		qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+		vk_end_frame_begin_post_process_pass( vk.render_pass.capture, vk.framebuffers.capture,
+			cap_w, cap_h, vk.capture_pipeline );
+		vk_end_frame_bind_post_process_sets(
+			vk.color_descriptor[vk.cmd_index],
+			vk.depth_descriptor[vk.cmd_index],
+			vk.postfx_params_descriptor[vk.cmd_index],
+			PostFX_GetLUTImage()->descriptor );
+		vk_end_frame_draw_fullscreen_quad( cap_w, cap_h );
 	}
 }
 
@@ -145,21 +161,14 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 	vk_get_active_render_extent( &taaWidth, &taaHeight );
 	vk_end_frame_refresh_postfx_params_for_target( taaWidth, taaHeight );
 
-	vk_begin_render_pass_tracked( vk.render_pass.taa, vk.framebuffers.taa[writeIndex], qfalse,
-		taaWidth, taaHeight );
-	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.taa_pipeline );
-	{
-		VkDescriptorSet taa_sets[4] = {
-			vk.post_color_descriptor[vk.cmd_index],
-			vk.depth_descriptor[vk.cmd_index],
-			vk.postfx_params_descriptor[vk.cmd_index],
-			vk.taa_history_descriptor[readIndex]
-		};
-		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-			vk.pipeline_layout_post_process, 0, 4, taa_sets, 0, NULL );
-	}
-	vk_set_fullscreen_viewport_scissor( taaWidth, taaHeight );
-	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+	vk_end_frame_begin_post_process_pass( vk.render_pass.taa, vk.framebuffers.taa[writeIndex],
+		taaWidth, taaHeight, vk.taa_pipeline );
+	vk_end_frame_bind_post_process_sets(
+		vk.post_color_descriptor[vk.cmd_index],
+		vk.depth_descriptor[vk.cmd_index],
+		vk.postfx_params_descriptor[vk.cmd_index],
+		vk.taa_history_descriptor[readIndex] );
+	vk_end_frame_draw_fullscreen_quad( taaWidth, taaHeight );
 	vk_end_render_pass();
 
 	resolved_view = vk.taa_history_image_view[writeIndex];
@@ -425,23 +434,14 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 			VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 0, 0 );
 	}
 
-	vk_begin_render_pass_tracked( vk.render_pass.gamma, vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ], qfalse, vk.renderWidth, vk.renderHeight );
-	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.gamma_pipeline );
-	{
-		VkDescriptorSet gamma_sets[3] = {
-			vk.post_color_descriptor[vk.cmd_index],
-			vk.depth_descriptor[vk.cmd_index],
-			vk.postfx_params_descriptor[vk.cmd_index]
-		};
-		VkDescriptorSet gamma_lut_set = PostFX_GetLUTImage()->descriptor;
-		VkDescriptorSet gamma_bind_sets[4] = {
-			gamma_sets[0],
-			gamma_sets[1],
-			gamma_sets[2],
-			gamma_lut_set
-		};
-		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 4, gamma_bind_sets, 0, NULL );
-	}
+	vk_end_frame_begin_post_process_pass( vk.render_pass.gamma,
+		vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ],
+		vk.renderWidth, vk.renderHeight, vk.gamma_pipeline );
+	vk_end_frame_bind_post_process_sets(
+		vk.post_color_descriptor[vk.cmd_index],
+		vk.depth_descriptor[vk.cmd_index],
+		vk.postfx_params_descriptor[vk.cmd_index],
+		PostFX_GetLUTImage()->descriptor );
 
 	{
 		VkPostProcessPushConstants push;
@@ -453,8 +453,7 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 		qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_post_process, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
 	}
 
-	vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
-	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+	vk_end_frame_draw_fullscreen_quad( vk.renderWidth, vk.renderHeight );
 	vk_end_render_pass();
 
 	if ( vk.uiOverlayActive &&
@@ -463,14 +462,12 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 		vk.render_pass.overlay_compose != VK_NULL_HANDLE &&
 		vk.framebuffers.overlay_compose[ vk.cmd->swapchain_image_index ] != VK_NULL_HANDLE ) {
 		vk_update_color_descriptor_image( vk.ui_overlay_image_view );
-		vk_begin_render_pass_tracked( vk.render_pass.overlay_compose,
+		vk_end_frame_begin_post_process_pass( vk.render_pass.overlay_compose,
 			vk.framebuffers.overlay_compose[ vk.cmd->swapchain_image_index ],
-			qfalse, vk.renderWidth, vk.renderHeight );
-		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.overlay_compose_pipeline );
+			vk.renderWidth, vk.renderHeight, vk.overlay_compose_pipeline );
 		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 			vk.pipeline_layout_post_process, 0, 1, &vk.post_color_descriptor[vk.cmd_index], 0, NULL );
-		vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
-		qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+		vk_end_frame_draw_fullscreen_quad( vk.renderWidth, vk.renderHeight );
 		vk_end_render_pass();
 		vk_update_color_descriptor_image( gamma_src );
 	}

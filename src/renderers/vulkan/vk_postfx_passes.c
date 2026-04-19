@@ -18,20 +18,93 @@ SSAO/HBAO pass, and vk_bloom. Split from vk.c.
 #include "vk_util.h"
 #include "vk_device.h"
 
+static void vk_postfx_set_render_extent( uint32_t width, uint32_t height )
+{
+	vk.renderWidth = width;
+	vk.renderHeight = height;
+	vk.renderScaleX = 1.0f;
+	vk.renderScaleY = 1.0f;
+}
+
+static void vk_begin_postfx_render_pass(
+	VkRenderPass renderPass,
+	VkFramebuffer frameBuffer,
+	uint32_t width,
+	uint32_t height,
+	qboolean clear )
+{
+	vk_postfx_set_render_extent( width, height );
+	vk_begin_render_pass_tracked( renderPass, frameBuffer, clear, vk.renderWidth, vk.renderHeight );
+}
+
+static void vk_begin_fullres_postfx_render_pass( VkRenderPass renderPass, VkFramebuffer frameBuffer, qboolean clear )
+{
+	uint32_t width = 0;
+	uint32_t height = 0;
+
+	vk_get_active_render_extent( &width, &height );
+	vk_begin_postfx_render_pass( renderPass, frameBuffer, width, height, clear );
+}
+
+static void vk_postfx_draw_fullscreen_quad( void )
+{
+	vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
+	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+}
+
+static void vk_postfx_run_blur_pass( uint32_t passIndex, VkDescriptorSet sourceDescriptor )
+{
+	vk_begin_blur_render_pass( passIndex );
+	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.blur_pipeline[passIndex] );
+	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+		vk.pipeline_layout_post_process, 0, 1, &sourceDescriptor, 0, NULL );
+	vk_postfx_draw_fullscreen_quad();
+	vk_end_render_pass();
+}
+
+static void vk_copy_color_to_fog_scene( uint32_t width, uint32_t height )
+{
+	VkImageCopy copy_region;
+
+	if ( vk.fog_scene_image == VK_NULL_HANDLE || vk.color_image == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	Com_Memset( &copy_region, 0, sizeof( copy_region ) );
+	copy_region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	copy_region.srcSubresource.layerCount = 1;
+	copy_region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	copy_region.dstSubresource.layerCount = 1;
+	copy_region.extent.width = width;
+	copy_region.extent.height = height;
+	copy_region.extent.depth = 1;
+
+	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
+	record_image_layout_transition( vk.cmd->command_buffer, vk.fog_scene_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
+	qvkCmdCopyImage( vk.cmd->command_buffer,
+		vk.color_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		vk.fog_scene_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		1, &copy_region );
+	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
+	record_image_layout_transition( vk.cmd->command_buffer, vk.fog_scene_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
+}
+
 void vk_begin_bloom_extract_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.bloom_extract;
 
 	//vk.renderPassIndex = RENDER_PASS_BLOOM_EXTRACT; // doesn't matter, we will use dedicated pipelines
 
-	vk.renderWidth = gls.captureWidth;
-	vk.renderHeight = gls.captureHeight;
-
-	//vk.renderScaleX = (float)vk.renderWidth / (float)glConfig.vidWidth;
-	//vk.renderScaleY = (float)vk.renderHeight / (float)glConfig.vidHeight;
-	vk.renderScaleX = vk.renderScaleY = 1.0f;
-
-	vk_begin_render_pass_tracked( vk.render_pass.bloom_extract, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+	vk_begin_postfx_render_pass( vk.render_pass.bloom_extract, frameBuffer,
+		gls.captureWidth, gls.captureHeight, qfalse );
 }
 
 
@@ -41,65 +114,36 @@ void vk_begin_blur_render_pass( uint32_t index )
 
 	//vk.renderPassIndex = RENDER_PASS_BLOOM_EXTRACT; // doesn't matter, we will use dedicated pipelines
 
-	vk.renderWidth = gls.captureWidth / ( 2 << ( index / 2 ) );
-	vk.renderHeight = gls.captureHeight / ( 2 << ( index / 2 ) );
-
-	//vk.renderScaleX = (float)vk.renderWidth / (float)glConfig.vidWidth;
-	//vk.renderScaleY = (float)vk.renderHeight / (float)glConfig.vidHeight;
-	vk.renderScaleX = vk.renderScaleY = 1.0f;
-
-	vk_begin_render_pass_tracked( vk.render_pass.blur[ index ], frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+	vk_begin_postfx_render_pass( vk.render_pass.blur[ index ], frameBuffer,
+		gls.captureWidth / ( 2 << ( index / 2 ) ),
+		gls.captureHeight / ( 2 << ( index / 2 ) ),
+		qfalse );
 }
 
 
 void vk_begin_ssao_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.ssao;
-	uint32_t width = 0;
-	uint32_t height = 0;
-
-	vk_get_active_render_extent( &width, &height );
-	vk.renderWidth = width;
-	vk.renderHeight = height;
-	vk.renderScaleX = vk.renderScaleY = 1.0f;
-
-	vk_begin_render_pass_tracked( vk.render_pass.ssao, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+	vk_begin_fullres_postfx_render_pass( vk.render_pass.ssao, frameBuffer, qfalse );
 }
 
 
 void vk_begin_ssao_blur_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.ssao_blur;
-	uint32_t width = 0;
-	uint32_t height = 0;
-
-	vk_get_active_render_extent( &width, &height );
-	vk.renderWidth = width;
-	vk.renderHeight = height;
-	vk.renderScaleX = vk.renderScaleY = 1.0f;
-
-	vk_begin_render_pass_tracked( vk.render_pass.ssao_blur, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+	vk_begin_fullres_postfx_render_pass( vk.render_pass.ssao_blur, frameBuffer, qfalse );
 }
 
 
 void vk_begin_ssao_combine_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.ssao_combine;
-	uint32_t width = 0;
-	uint32_t height = 0;
-
-	vk_get_active_render_extent( &width, &height );
-	vk.renderWidth = width;
-	vk.renderHeight = height;
-	vk.renderScaleX = vk.renderScaleY = 1.0f;
-
-	vk_begin_render_pass_tracked( vk.render_pass.ssao_combine, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+	vk_begin_fullres_postfx_render_pass( vk.render_pass.ssao_combine, frameBuffer, qfalse );
 }
 
 
 void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 {
-	VkImageCopy copy_region;
 	uint32_t fullWidth = 0;
 	uint32_t fullHeight = 0;
 
@@ -117,30 +161,7 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 	vk_get_active_render_extent( &fullWidth, &fullHeight );
 
 	/* Copy opaque scene to fog_scene for resolve */
-	Com_Memset( &copy_region, 0, sizeof( copy_region ) );
-	copy_region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	copy_region.srcSubresource.layerCount = 1;
-	copy_region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	copy_region.dstSubresource.layerCount = 1;
-	copy_region.extent.width = fullWidth;
-	copy_region.extent.height = fullHeight;
-	copy_region.extent.depth = 1;
-	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
-	record_image_layout_transition( vk.cmd->command_buffer, vk.fog_scene_image, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
-	qvkCmdCopyImage( vk.cmd->command_buffer,
-		vk.color_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-		vk.fog_scene_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		1, &copy_region );
-	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
-	record_image_layout_transition( vk.cmd->command_buffer, vk.fog_scene_image, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
+	vk_copy_color_to_fog_scene( fullWidth, fullHeight );
 
 	if ( vk.msaaActive ) {
 		VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
@@ -169,17 +190,14 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT );
-	vk.renderWidth = fullWidth;
-	vk.renderHeight = fullHeight;
-	vk.renderScaleX = vk.renderScaleY = 1.0f;
+	vk_postfx_set_render_extent( fullWidth, fullHeight );
 	vk_begin_render_pass_tracked( vk.render_pass.oit_resolve, vk.framebuffers.oit_resolve, qfalse, fullWidth, fullHeight );
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.oit_resolve_pipeline );
 	{
 		VkDescriptorSet sets[3] = { vk.oit_opaque_descriptor, vk.oit_accum_descriptor, vk.oit_reveal_descriptor };
 		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_oit_resolve, 0, 3, sets, 0, NULL );
 	}
-	vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
-	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+	vk_postfx_draw_fullscreen_quad();
 	vk_end_render_pass();
 	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -203,15 +221,7 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 void vk_begin_ssr_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.ssr;
-	uint32_t width = 0;
-	uint32_t height = 0;
-
-	vk_get_active_render_extent( &width, &height );
-	vk.renderWidth = width;
-	vk.renderHeight = height;
-	vk.renderScaleX = vk.renderScaleY = 1.0f;
-
-	vk_begin_render_pass_tracked( vk.render_pass.ssr, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+	vk_begin_fullres_postfx_render_pass( vk.render_pass.ssr, frameBuffer, qfalse );
 }
 
 
@@ -272,8 +282,7 @@ void vk_ssr_pass( void )
 	push.params2[3] = PostFX_SSR_GetFresnelExponent();
 
 	qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_ssr, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
-	vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
-	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+	vk_postfx_draw_fullscreen_quad();
 	vk_end_render_pass();
 
 	/* Copy ssr_image back to color */
@@ -384,8 +393,7 @@ qboolean vk_ssao_pass( void )
 		}
 
 		qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_ssao, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
-		vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
-		qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+		vk_postfx_draw_fullscreen_quad();
 		vk_end_render_pass();
 
 		vk_begin_ssao_blur_render_pass();
@@ -395,39 +403,11 @@ qboolean vk_ssao_pass( void )
 		push.params[0] = ( r_ssaoBlurRadius && r_ssaoBlurRadius->integer >= 0 ) ? (float)r_ssaoBlurRadius->integer : 2.0f;
 		push.params[1] = push.params[2] = push.params[3] = 0.0f;
 		qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_ssao, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
-		vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
-		qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+		vk_postfx_draw_fullscreen_quad();
 		vk_end_render_pass();
 
-		if ( vk.fog_scene_image != VK_NULL_HANDLE && vk.color_image != VK_NULL_HANDLE ) {
-			VkImageCopy copy_region;
-			uint32_t copy_w = vk.renderWidth > 0 ? (uint32_t)vk.renderWidth : 1u;
-			uint32_t copy_h = vk.renderHeight > 0 ? (uint32_t)vk.renderHeight : 1u;
-			Com_Memset( &copy_region, 0, sizeof( copy_region ) );
-			copy_region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			copy_region.srcSubresource.layerCount = 1;
-			copy_region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			copy_region.dstSubresource.layerCount = 1;
-			copy_region.extent.width = copy_w;
-			copy_region.extent.height = copy_h;
-			copy_region.extent.depth = 1;
-			record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
-				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
-			record_image_layout_transition( vk.cmd->command_buffer, vk.fog_scene_image, VK_IMAGE_ASPECT_COLOR_BIT,
-				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
-			qvkCmdCopyImage( vk.cmd->command_buffer,
-				vk.color_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-				vk.fog_scene_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-				1, &copy_region );
-			record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
-				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
-			record_image_layout_transition( vk.cmd->command_buffer, vk.fog_scene_image, VK_IMAGE_ASPECT_COLOR_BIT,
-				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
-		}
+		vk_copy_color_to_fog_scene( vk.renderWidth > 0 ? (uint32_t)vk.renderWidth : 1u,
+			vk.renderHeight > 0 ? (uint32_t)vk.renderHeight : 1u );
 		if ( vk.fog_scene_image_view != VK_NULL_HANDLE && vk.ssao_scene_descriptor != VK_NULL_HANDLE && vk.ssao_blur_descriptor != VK_NULL_HANDLE ) {
 			vk_begin_ssao_combine_render_pass();
 			if ( r_ssaoDebugView && r_ssaoDebugView->integer == 2 ) {
@@ -443,8 +423,7 @@ qboolean vk_ssao_pass( void )
 					qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_ssao_combine, 0, 2, ssao_combine_sets, 0, NULL );
 				}
 			}
-			vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
-			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+			vk_postfx_draw_fullscreen_quad();
 			vk_end_render_pass();
 		}
 		record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
@@ -496,8 +475,7 @@ qboolean vk_bloom( void )
 		};
 		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 3, bloom_sets, 0, NULL );
 	}
-	vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
-	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+	vk_postfx_draw_fullscreen_quad();
 	vk_end_render_pass();
 
 	if ( canBlitDownsample ) {
@@ -539,33 +517,16 @@ qboolean vk_bloom( void )
 				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
 
 			// horizontal blur: downsampled source -> ping image
-			vk_begin_blur_render_pass( i + 0 );
-			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.blur_pipeline[i+0] );
-			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.bloom_image_descriptor[dstIndex], 0, NULL );
-			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
-			vk_end_render_pass();
+			vk_postfx_run_blur_pass( i + 0, vk.bloom_image_descriptor[dstIndex] );
 
 			// vertical blur: ping image -> final image for this level
-			vk_begin_blur_render_pass( i + 1 );
-			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.blur_pipeline[i+1] );
-			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.bloom_image_descriptor[i+1], 0, NULL );
-			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
-			vk_end_render_pass();
+			vk_postfx_run_blur_pass( i + 1, vk.bloom_image_descriptor[i+1] );
 		}
 	} else {
 		// Fallback to legacy downsample+blur in one pass if blit features are unavailable.
 		for ( i = 0; i < VK_NUM_BLOOM_PASSES * 2; i += 2 ) {
-			vk_begin_blur_render_pass( i + 0 );
-			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.blur_pipeline[i+0] );
-			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.bloom_image_descriptor[i+0], 0, NULL );
-			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
-			vk_end_render_pass();
-
-			vk_begin_blur_render_pass( i + 1 );
-			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.blur_pipeline[i+1] );
-			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.bloom_image_descriptor[i+1], 0, NULL );
-			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
-			vk_end_render_pass();
+			vk_postfx_run_blur_pass( i + 0, vk.bloom_image_descriptor[i+0] );
+			vk_postfx_run_blur_pass( i + 1, vk.bloom_image_descriptor[i+1] );
 		}
 	}
 
@@ -581,8 +542,7 @@ qboolean vk_bloom( void )
 		// blend downscaled buffers to main fbo
 		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.bloom_blend_pipeline );
 		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_blend, 0, ARRAY_LEN(dset), dset, 0, NULL );
-		vk_set_fullscreen_viewport_scissor( vk.renderWidth, vk.renderHeight );
-		qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+		vk_postfx_draw_fullscreen_quad();
 	}
 
 	// invalidate pipeline state cache
