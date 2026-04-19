@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_local.h"
 #ifdef USE_VULKAN
 #include "vk_temporal.h"
+#include "vk_forward_plus.h"
 #endif
 
 backEndData_t	*backEndData;
@@ -1748,6 +1749,7 @@ static const void *RB_DrawSurfs( const void *data ) {
 
 #ifdef USE_VULKAN
 	vk_prepare_frame_temporal_state();
+	vk_forward_plus_update_for_refdef();
 	RB_RenderSunShadowMap( cmd );
 #endif
 

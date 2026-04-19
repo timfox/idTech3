@@ -200,6 +200,7 @@ cvar_t	*r_taa_feedbackStationary;
 cvar_t	*r_taa_feedbackMotion;
 cvar_t	*r_taa_sharpen;
 cvar_t	*r_rtx;
+cvar_t	*r_forwardPlus;
 
 #endif // USE_VULKAN
 
@@ -3463,6 +3464,10 @@ static void R_Register( void )
 	r_rtx = ri.Cvar_Get( "r_rtx", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_rtx, "0", "3", CV_INTEGER );
 	ri.Cvar_SetDescription( r_rtx, "Ray tracing (0=off, 1=shadows, 2=reflections, 3=full). Requires USE_VULKAN_RTX build and RT-capable GPU. See docs/RENDERERS_FUTURE.md." );
+	r_forwardPlus = ri.Cvar_Get( "r_forwardPlus", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_forwardPlus, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_forwardPlus, "Forward+ scaffolding: allocate and pack GPU-visible dynamic light records (0=off, 1=on). No tile lists or shading yet; see docs/RENDERER_2026_ARCHITECTURE_PASS.md." );
+	ri.Cvar_SetGroup( r_forwardPlus, CVG_RENDERER );
 	r_ext_alpha_to_coverage = ri.Cvar_Get( "r_ext_alpha_to_coverage", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_alpha_to_coverage, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ext_alpha_to_coverage, "Alpha-to-coverage for alpha-tested surfaces (foliage, grates) when MSAA is on. Enabled by default for Vulkan MSAA paths. Requires \\r_fbo 1 and \\r_ext_multisample 2+." );

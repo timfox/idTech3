@@ -21,6 +21,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_scene_pass.h"
 #include "vk_frame_end.h"
 #include "vk_temporal.h"
+#include "vk_forward_plus.h"
 #include "vk_view_state.h"
 #include "vk_volumetric_fog_color.h"
 #include "vk_volumetric_pass.h"
@@ -141,6 +142,7 @@ void vk_initialize( void )
 	VectorSet( vk.prevViewForward, 0.0f, 0.0f, -1.0f );  /* sentinel until first frame */
 	vk.prevClientState = CA_UNINITIALIZED;
 	Com_Memset( &vk.temporal, 0, sizeof( vk.temporal ) );
+	Com_Memset( &vk.forward_plus, 0, sizeof( vk.forward_plus ) );
 	vk.uniform_alignment = props.limits.minUniformBufferOffsetAlignment;
 	vk.uniform_item_size = PAD( sizeof( vkUniform_t ), (size_t)vk.uniform_alignment );
 #ifdef USE_VK_PBR	
@@ -1120,6 +1122,8 @@ void vk_initialize( void )
 	vk.geometry_buffer_size_new = 0;
 
 	vk_create_storage_buffer( MAX_FLARES * vk.storage_alignment );
+
+	vk_forward_plus_init();
 
 	vk_create_shader_modules();
 

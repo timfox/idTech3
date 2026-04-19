@@ -855,6 +855,15 @@ typedef struct {
 		VkDescriptorSet	descriptor;
 	} storage;
 
+	/* Forward+ scaffolding: host-visible SSBO of packed dynamic lights (see vk_forward_plus.c). */
+	struct {
+		VkBuffer buffer;
+		VkDeviceMemory memory;
+		void *mapped;
+		uint32_t capacity_bytes;
+		uint32_t last_packed_count;
+	} forward_plus;
+
 	uint32_t uniform_item_size;
 	uint32_t uniform_camera_item_size;
 	uint32_t uniform_alignment;

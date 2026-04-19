@@ -18,6 +18,7 @@ Split from vk.c.
 #include "vk_staging.h"
 #include "vk_sync.h"
 #include "vk_skybox_hdr.h"
+#include "vk_forward_plus.h"
 
 #ifdef USE_VBO
 void vk_release_vbo( void );
@@ -165,6 +166,8 @@ void vk_shutdown( refShutdownCode_t code )
 	vk_clean_staging_buffer();
 
 	vk_release_geometry_buffers();
+
+	vk_forward_plus_shutdown();
 
 	vk_destroy_samplers();
 
