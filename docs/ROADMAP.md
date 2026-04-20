@@ -4,6 +4,8 @@
 
 Priorities that keep **CI green** and **README/build truth** aligned:
 
+**Long-arc goal (id Tech 6–8 class, incrementally):** converge on **lighting scale** (Forward+ / clustered lists), **temporal robustness** (history + motion vectors before heavy TAA/upscale), **trustworthy GPU glTF**, and **locked-in validation** (Tier A everywhere, Tier B where `GAME_BASE` exists). Treat **Metal / RTX / full-cluster deferred** as later tiers once the forward path and CI are boringly stable—not parallel science projects on `main`.
+
 1. **Watch GitHub Actions on `main`** - especially **Android** (CMake + Gradle `assembleDebug`, OpenSSL/Lua/FetchContent caches) and **MSYS curl**.
 2. **Renderer validation** - Tier B (self-hosted `GAME_BASE`) and Tier C (manual GPU notes) when you have hardware/content; keep `renderer_regression_check` passing on default CI (manifest + GLSL + **IQM_MORPH_TOP_K** C/GLSL parity + **glTF vs IQM** joint/morph `#define` parity + **OpenGL vs Vulkan** `IQM_MORPH_*` in `tr_local.h`).
 3. **glTF on Vulkan** - **GPU skinning/morph** (PBR + `r_gltfGpu`) uses **top-8** morph weights per draw (aligned with `GLTF_MAX_MORPH_TARGETS`), including **`RE_SetEntityMorphWeight`** with clip-driven weights; **`r_gltfGpuTangentFix`** (default on) re-orthonormalizes tangents on the GPU path after skin+morph; next polish: full **MikkTSpace**-style qtangent on GPU (neighborhood-aware). **OpenGL** now registers glTF/OBJ/MD5 with a **CPU tess** path (no `r_gltfGpu`).
