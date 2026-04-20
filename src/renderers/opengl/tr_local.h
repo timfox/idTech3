@@ -112,6 +112,7 @@ typedef struct {
 	int			morphActiveTargetIndex[IQM_MORPH_TOP_K];
 	float		morphActiveWeight[IQM_MORPH_TOP_K];
 	float		morphGpuWeightPrev[IQM_MORPH_TOP_K];
+	qboolean	morphGpuWeightsPrimedSingleUse;
 	float		morphDebugMaxAbsWeight;
 } trRefEntity_t;
 
