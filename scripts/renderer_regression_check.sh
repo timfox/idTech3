@@ -205,6 +205,20 @@ else
 fi
 
 echo ""
+echo "PBR fragment spec: Forward+ shade constant_id vs vk_create_pipeline.c:"
+GEN_FRAG="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/gen_frag.tmpl"
+VK_PIPE="$PROJECT_ROOT/src/renderers/vulkan/vk_create_pipeline.c"
+fp_cid="$(grep -F 'forward_plus_shade_strength' "$GEN_FRAG" | grep 'constant_id' | sed -n 's/.*constant_id[[:space:]]*=[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -1)"
+fp_add="$(grep 'forward_plus_shade_strength' "$VK_PIPE" | grep 'ADD_FRAG_SPEC' | sed -n 's/.*ADD_FRAG_SPEC([[:space:]]*\([0-9][0-9]*\)[[:space:]]*,[[:space:]]*forward_plus_shade_strength.*/\1/p' | head -1)"
+if [[ -z "$fp_cid" || -z "$fp_add" ]]; then
+  fail "could not parse forward_plus_shade_strength constant_id from gen_frag.tmpl or ADD_FRAG_SPEC from vk_create_pipeline.c"
+elif [[ "$fp_cid" != "$fp_add" ]]; then
+  fail "Forward+ shade specialization mismatch: gen_frag.tmpl constant_id=$fp_cid vs vk_create_pipeline.c ADD_FRAG_SPEC=$fp_add"
+else
+  pass "forward_plus_shade_strength uses constant_id=$fp_cid (shader + pipeline agree)"
+fi
+
+echo ""
 if [ -n "${GAME_BASE:-}" ]; then
   echo "Optional game base: $GAME_BASE"
   ASSETS_LIST="${GAME_ASSETS_LIST:-$PROJECT_ROOT/docs/samples/renderer_regression/OPTIONAL_GAME_ASSETS.txt}"
