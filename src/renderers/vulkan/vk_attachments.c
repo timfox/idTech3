@@ -507,6 +507,8 @@ void vk_create_attachments( void )
 		// post-processing/msaa-resolve
 			vk_create_fullres_color_attachment( vk.color_format,
 				copyableColorUsage, &vk.color_image, &vk.color_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+			vk.mainColorWidth = fullWidth;
+			vk.mainColorHeight = fullHeight;
 			vk_create_fullres_color_attachment( vk.color_format,
 				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 				&vk.ui_overlay_image, &vk.ui_overlay_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
@@ -1866,6 +1868,8 @@ void vk_destroy_attachments( void )
 		vk.color_image_view = VK_NULL_HANDLE;
 		vk.post_fog_color_source = VK_NULL_HANDLE;
 		vk.scene_post_fog_color_source = VK_NULL_HANDLE;
+		vk.mainColorWidth = 0u;
+		vk.mainColorHeight = 0u;
 	}
 	if ( vk.ui_overlay_image ) {
 		qvkDestroyImage( vk.device, vk.ui_overlay_image, NULL );
