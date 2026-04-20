@@ -1,7 +1,7 @@
 #version 450
 
 /*
- * Forward+ scaffolding: per-tile light index list (max 8 per 16x16 tile).
+ * Forward+ scaffolding: per-tile light index list (max 8 per tile; tile pixel size = viewport / tileGrid).
  * CPU-packed lights: binding 0 — vec4 (x=count,...), vec4 (tiles_x, tiles_y, viewport_w, viewport_h), then count * 4 vec4 records.
  */
 
@@ -31,11 +31,11 @@ layout(push_constant) uniform Push {
 	uint maxPerTile;
 } pc;
 
-bool sphere_tile_overlap(vec2 centerPx, float radiusPx, uint tileX, uint tileY) {
-	float minX = float(tileX * 16u);
-	float minY = float(tileY * 16u);
-	float maxX = minX + 16.0;
-	float maxY = minY + 16.0;
+bool sphere_tile_overlap(vec2 centerPx, float radiusPx, uint tileX, uint tileY, float tilePxX, float tilePxY) {
+	float minX = float(tileX) * tilePxX;
+	float minY = float(tileY) * tilePxY;
+	float maxX = minX + tilePxX;
+	float maxY = minY + tilePxY;
 	vec2 closest = clamp(centerPx, vec2(minX, minY), vec2(maxX, maxY));
 	return distance(centerPx, closest) <= radiusPx + 1e-3;
 }
@@ -47,6 +47,7 @@ void main() {
 	}
 
 	uint tilesX = pc.tileGrid.x;
+	uint tilesY = pc.tileGrid.y;
 	uint tileX = tileId % tilesX;
 	uint tileY = tileId / tilesX;
 
@@ -66,6 +67,8 @@ void main() {
 
 	float vw = lights.data[1].z;
 	float vh = lights.data[1].w;
+	float tilePxX = vw / max(float(tilesX), 1.0);
+	float tilePxY = vh / max(float(tilesY), 1.0);
 
 	uint outCount = 0u;
 	for (uint li = 0u; li < n && outCount < cap; li++) {
@@ -90,7 +93,7 @@ void main() {
 		float distW = max(abs(clip.w), 1e-3);
 		float radiusPx = clamp(radius * (0.5 * vw) / distW, 2.0, vw + vh);
 
-		if (!sphere_tile_overlap(centerPx, radiusPx, tileX, tileY)) {
+		if (!sphere_tile_overlap(centerPx, radiusPx, tileX, tileY, tilePxX, tilePxY)) {
 			continue;
 		}
 
