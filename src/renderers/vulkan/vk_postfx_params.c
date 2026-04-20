@@ -4,6 +4,7 @@
 #include "vk_postfx_params.h"
 #include "vk_temporal.h"
 #include "vk_util.h"
+#include "vk_view_state.h"
 #include <math.h>
 
 void vk_update_postfx_params( uint32_t cmd_index )
@@ -51,9 +52,14 @@ void vk_update_postfx_params( uint32_t cmd_index )
 	params.depthOfField[1] = Com_Clamp( 0.0f, 8.0f, PostFX_DepthOfField_GetAperture() );
 	params.depthOfField[2] = fmaxf( PostFX_DepthOfField_GetFocusDistance(), 0.0f );
 	params.depthOfField[3] = fmaxf( PostFX_DepthOfField_GetFocusRange(), 1.0f );
-	params.frameInfo[0] = Com_Clamp( 0.0f, 64.0f, PostFX_DepthOfField_GetMaxBlur() );
-	params.frameInfo[1] = ( vk.renderWidth > 0 ) ? ( 1.0f / (float)vk.renderWidth ) : 0.0f;
-	params.frameInfo[2] = ( vk.renderHeight > 0 ) ? ( 1.0f / (float)vk.renderHeight ) : 0.0f;
+	{
+		const uint32_t rtw = vk_get_render_target_width();
+		const uint32_t rth = vk_get_render_target_height();
+		params.frameInfo[0] = Com_Clamp( 0.0f, 64.0f, PostFX_DepthOfField_GetMaxBlur() );
+		/* Texel size for post/TAA/motion in **render target** space (FBO / r_renderScale), not transient vk.renderWidth during shadow passes. */
+		params.frameInfo[1] = ( rtw > 0u ) ? ( 1.0f / (float)rtw ) : 0.0f;
+		params.frameInfo[2] = ( rth > 0u ) ? ( 1.0f / (float)rth ) : 0.0f;
+	}
 	params.toneMapParams0[0] = Com_Clamp( 0.0f, 1.0f, PostFX_GetGradeToe() );
 	params.toneMapParams0[1] = Com_Clamp( 0.0f, 1.0f, PostFX_GetGradeShoulder() );
 	params.toneMapParams0[2] = Com_Clamp( 0.5f, 32.0f, PostFX_GetGradeWhitePoint() );

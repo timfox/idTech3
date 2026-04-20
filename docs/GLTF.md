@@ -76,6 +76,12 @@ Larger assets are **silently clamped** during load.
 - **Skinned / morphed** primitives prefer the **GPU path** under Vulkan PBR when **`r_gltfGpu 1`** and constraints above are met; otherwise **`RB_GLTFSurface`** falls back to **CPU tess**.
 - **More than eight** non-zero morph weights per vertex: GPU path keeps only the **eight largest** weights per draw (same cap as IQM `IQM_MORPH_TOP_K`; tune `r_morphMaxActive` for IQM batching only).
 
+### 8. Roadmap: full GPU qtangent / MikkTSpace (not shipped yet)
+
+- **Today (Vulkan PBR GPU):** bind-pose tangents + **`r_gltfGpuTangentFix`** Gram–Schmidt **T** vs deformed **N** after skin+morph (`gen_vert.tmpl`). CPU tess still does **MikkTSpace-style qtangent** from deformed positions + **UV0** when PBR needs it.
+- **Next increment:** optional **compute** or **vertex-neighborhood** pass is required for true **MikkTSpace** on arbitrary meshes on the GPU (needs neighbor topology / shared-vertex groups, not just per-vertex attributes). Likely behind a **`r_gltfGpuQtangent`** (or similar) latched cvar with clear **startup** + **developer** logs when enabled or when falling back.
+- **Validation:** add Tier B scenes with known normal-map assets and compare against CPU tess / reference captures once a GPU path exists.
+
 ## Engine references
 
 - Loader / registration: `src/renderers/vulkan/tr_model_gltf.c`, `tr_model_gltf.h`
