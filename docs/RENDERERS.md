@@ -8,10 +8,27 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 
 ### Current Architecture
 - Forward renderer with a large HDR/post-processing stack
-- No shipping deferred or Forward+ path yet; `r_renderMode 1/2` remain placeholders
+- `r_renderMode 1/2` remain placeholders (no full deferred / mode-switched Forward+ path)
 - Vulkan is the primary feature backend; OpenGL is compatibility fallback
 - **Shared temporal reset policy** (`vk_temporal.c`): centralizes history invalidation for volumetrics, motion vectors, exposure. Resize, map load, camera cut, and missing prev-frame data trigger resets. Ready for future TAA/upscaler integration.
 - See [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_2026_ARCHITECTURE_PASS.md) for the focused 2026 renderer direction
+
+### Vulkan Forward+ scaffolding
+
+Optional **GPU light packing + per-tile cull** on the existing forward path (not `r_renderMode`):
+
+| Cvar | Role |
+|------|------|
+| `r_forwardPlus` | **0** (default) off; **1** on (**latched**; `vid_restart` to apply). Startup logs buffer size when enabled. |
+| `r_forwardPlusMaxPerTile` | **4–8** lights indexed per **16×16** tile (**latched**; `vid_restart`). Lowers GPU work vs default **8**; tile SSBO keeps **8** `uint32` slots either way. |
+| `r_forwardPlusDebug` | **0–1** float: PBR heatmap overlay (lights per tile + borders). |
+| `r_forwardPlusShade` | **0–4** float: experimental **additive** PBR from tile-culled dynamics; skips indices already in the Forward+ `tess.dlightBits` mask (first 32); changing it **invalidates graphics pipelines** (logged). |
+
+**Caps:** at most **`MAX_DLIGHTS` (32)** packed lights so GPU indices match `tess.dlightBits`. If the refdef supplies more, extras are dropped and a **developer** log can note it.
+
+**Resolution:** tile grid uses **`vk_get_render_target_width/height`** (FBO / internal scale). The tile SSBO **reallocates when that size changes**; toggling Forward+ itself still needs **`vid_restart`**.
+
+Code: `src/renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar registration `src/renderers/vulkan/tr_init.c`.
 
 ### Compute shaders, mesh shaders (NV), and upscaling (DLSS)
 - **Compute:** already central to Vulkan (volumetric fog stages, vegetation wind, fluid sim, terrain CBT, etc.).

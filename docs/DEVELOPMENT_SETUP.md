@@ -242,11 +242,11 @@ ffmpeg play <file>      # Play a video file
 # Smoke test (verify binaries in release/ work)
 ./scripts/smoke_test.sh release
 
-# Local CI validation (shader compile + Vulkan build + smoke test)
+# Local CI validation: shaders, Vulkan Release build, smoke test, then ctest (same ordering as Ubuntu CI), renderer regression script, demo pk3 layout check
 ./scripts/validate_ci_build.sh
 
-# CTest (requires build first; runs smoke test)
-cd build-vk-Release && ctest -V
+# CTest only (after `./scripts/compile_engine.sh vulkan` so `build-vk-Release/` exists)
+cd build-vk-Release && ctest -C Release --output-on-failure
 # or: make test
 
 # CTest through presets
