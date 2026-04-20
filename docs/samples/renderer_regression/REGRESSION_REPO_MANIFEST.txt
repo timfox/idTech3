@@ -13,6 +13,8 @@ docs/GLTF.md
 src/renderers/vulkan/tr_model_gltf.h
 src/renderers/opengl/tr_local.h
 src/renderers/vulkan/iqm.h
+src/renderers/vulkan/vk_temporal.h
+src/renderers/vulkan/vk_temporal.c
 docs/renderer_validation/SELF_HOSTED_TIER_B.md
 docs/samples/renderer_regression/README.md
 docs/samples/renderer_regression/OPTIONAL_GAME_ASSETS.txt
