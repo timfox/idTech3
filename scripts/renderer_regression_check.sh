@@ -219,14 +219,14 @@ else
 fi
 
 echo ""
-echo "Forward+ tile pixel size: VK_FP_TILE_DIM vs compute shader literals:"
-fp_dim="$(sed -n 's/^#define VK_FP_TILE_DIM[[:space:]]*\([0-9][0-9]*\)u*$/\1/p' "$FP_C" | head -1)"
-if [[ -z "$fp_dim" ]]; then
-  fail "could not parse VK_FP_TILE_DIM from vk_forward_plus.c"
-elif ! grep -q "tileX \* ${fp_dim}u" "$FP_COMP" 2>/dev/null; then
-  fail "forward_plus_tile_cull.comp sphere_tile_overlap must use VK_FP_TILE_DIM (${fp_dim}) in tile corner math"
+echo "Forward+ tile cull: sphere overlap uses viewport-derived tile pixels (not hard-coded 16px):"
+if grep -q 'tileX \* 16u\|tileY \* 16u' "$FP_COMP" 2>/dev/null; then
+  fail "forward_plus_tile_cull.comp must not hard-code 16px tiles; derive tilePx from viewport / tileGrid (see vk_forward_plus VK_FP_TILE_DIM)"
+elif ! grep -q 'tilePxX' "$FP_COMP" 2>/dev/null || ! grep -q 'sphere_tile_overlap' "$FP_COMP" 2>/dev/null; then
+  fail "forward_plus_tile_cull.comp expected tilePxX/tilePxY sphere_tile_overlap path"
 else
-  pass "VK_FP_TILE_DIM=$fp_dim matches forward_plus_tile_cull.comp tile grid math"
+  fp_dim="$(sed -n 's/^#define VK_FP_TILE_DIM[[:space:]]*\([0-9][0-9]*\)u*$/\1/p' "$FP_C" | head -1)"
+  pass "forward_plus_tile_cull uses dynamic tile pixels (VK_FP_TILE_DIM=$fp_dim on host grid)"
 fi
 
 echo ""
