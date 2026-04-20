@@ -219,6 +219,24 @@ else
 fi
 
 echo ""
+echo "Vulkan temporal: reset bitmask vs reason_string / log table:"
+VK_TEMP_H="$PROJECT_ROOT/src/renderers/vulkan/vk_temporal.h"
+VK_TEMP_C="$PROJECT_ROOT/src/renderers/vulkan/vk_temporal.c"
+# One line per 1u<<N reset flag in the public enum (excludes VK_TEMPORAL_RESET_NONE = 0).
+n_enum="$(grep -E '^[[:space:]]*VK_TEMPORAL_RESET_[A-Z0-9_]+[[:space:]]*=[[:space:]]*1u[[:space:]]*<<' "$VK_TEMP_H" 2>/dev/null | wc -l | tr -d ' ')"
+n_case="$(grep -E '^[[:space:]]*case VK_TEMPORAL_RESET_' "$VK_TEMP_C" 2>/dev/null | wc -l | tr -d ' ')"
+n_arr="$(awk '/knownReasons\[\][[:space:]]*=[[:space:]]*\{/,/\}[[:space:]]*;/' "$VK_TEMP_C" 2>/dev/null | grep -c 'VK_TEMPORAL_RESET_' | tr -d ' ')"
+if [[ -z "$n_enum" || "$n_enum" -eq 0 ]]; then
+  fail "could not count VK_TEMPORAL_RESET_* 1u<< lines in vk_temporal.h"
+elif [[ "$n_enum" != "$n_case" ]]; then
+  fail "vk_temporal reset count mismatch: enum 1u<< lines=$n_enum vs switch cases=$n_case in vk_temporal.c"
+elif [[ "$n_enum" != "$n_arr" ]]; then
+  fail "vk_temporal reset count mismatch: enum 1u<< lines=$n_enum vs knownReasons[] entries=$n_arr in vk_temporal.c"
+else
+  pass "vk_temporal: $n_enum reset flags, $n_case switch cases, $n_arr knownReasons entries"
+fi
+
+echo ""
 if [ -n "${GAME_BASE:-}" ]; then
   echo "Optional game base: $GAME_BASE"
   ASSETS_LIST="${GAME_ASSETS_LIST:-$PROJECT_ROOT/docs/samples/renderer_regression/OPTIONAL_GAME_ASSETS.txt}"
