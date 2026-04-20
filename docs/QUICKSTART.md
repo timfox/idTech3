@@ -31,6 +31,8 @@ Extract the archive. You should see:
 
 The engine needs game data (maps, textures, sounds). You must provide a compatible game base, for example:
 
+**Smallest valid tree (bootstrap / tech demo):** at least one **`.pk3`** under **`base/`** (or your `fs_basegame` folder) that contains **`default.cfg`** and loads as a non-empty archive—see [MINIMAL_GAME_SHELL.md](MINIMAL_GAME_SHELL.md).
+
 - **Quake III Arena** - copy or symlink the `baseq3` folder from your Q3A installation into the engine directory
 - **Open Arena** or other Q3-based games - same idea: the engine expects a `baseq3` (or `base`) folder with `.pk3` files
 
