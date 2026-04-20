@@ -11,7 +11,8 @@
   Override the release with env OPENAL_SOFT_BIN_VERSION (e.g. 1.24.3). Set SKIP_OPENAL_DLL_BUNDLE=1 to no-op.
   Downloads retry on failure (OPENAL_SOFT_DOWNLOAD_ATTEMPTS, default 5).
 
-  Note: upstream bin zips currently ship Win32/Win64 only; ARM64 native Windows is skipped with a message.
+  Note: upstream bin zips ship Win32/Win64 only (no WinARM64 soft_oal). ARM64 skips with a message.
+  The stock MSVC quake3e.vcxproj client does not link OpenAL; ARM64 audio is WASAPI/DirectSound (win_snd.c).
 
 .PARAMETER BinDir
   Directory containing (or to receive) the PE files, relative to the repo root or absolute.
