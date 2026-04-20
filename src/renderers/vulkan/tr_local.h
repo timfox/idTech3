@@ -165,6 +165,8 @@ typedef struct {
 	float		morphActiveWeight[IQM_MORPH_TOP_K];
 	/* GPU morph motion: weights from start of this frame (updated in vk_begin_frame). */
 	float		morphGpuWeightPrev[IQM_MORPH_TOP_K];
+	/* Cleared each Vulkan frame; first GPU-morph draw copies current weights into prev for motion. */
+	qboolean	morphGpuWeightsPrimedSingleUse;
 	float		morphDebugMaxAbsWeight;
 } trRefEntity_t;
 

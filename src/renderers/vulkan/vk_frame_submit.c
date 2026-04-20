@@ -109,6 +109,7 @@ void vk_begin_frame( void )
 	}
 
 	vk_begin_motion_frame();
+	vk_prime_gpu_morph_weights_current();
 	vk.sun_shadow_valid = qfalse;
 	vk.temporal.preparedThisFrame = qfalse;
 	vk.uiOverlayActive = qfalse;

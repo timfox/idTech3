@@ -82,6 +82,7 @@ static void R_CopyPendingMorphStateToEntity( const refEntity_t *srcEnt, trRefEnt
 		dstEnt->morphActiveWeight[i] = 0.0f;
 		dstEnt->morphGpuWeightPrev[i] = 0.0f;
 	}
+	dstEnt->morphGpuWeightsPrimedSingleUse = qfalse;
 
 	if ( !state ) {
 		return;

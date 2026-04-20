@@ -1747,6 +1747,9 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 	const srfIQModel_t	*surf = (const srfIQModel_t *)surface;
 	iqmData_t	*data = surf->data;
 	const trRefEntity_t *ent = backEnd.currentEntity;
+#ifdef USE_VULKAN
+	trRefEntity_t *entMutable = (trRefEntity_t *)backEnd.currentEntity;
+#endif
 	const iqmMorphSurface_t *morphSurface = NULL;
 	qboolean applyMorph = qfalse;
 	qboolean useGpuMorphPath = qfalse;
@@ -1836,12 +1839,23 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 						( weightIndex < ent->morphActiveCount ) ? ent->morphActiveWeight[weightIndex] : 0.0f;
 				}
 			}
-			for ( weightIndex = 0; weightIndex < IQM_MORPH_TOP_K; weightIndex++ ) {
-				if ( s_iqmGpuBatch.activeCount == ent->morphActiveCount ) {
+#ifdef USE_VULKAN
+			if ( entMutable && !entMutable->morphGpuWeightsPrimedSingleUse ) {
+				for ( weightIndex = 0; weightIndex < IQM_MORPH_TOP_K; weightIndex++ ) {
 					s_iqmGpuBatch.prevWeights[weightIndex] =
-						( weightIndex < ent->morphActiveCount ) ? ent->morphGpuWeightPrev[weightIndex] : 0.0f;
-				} else {
-					s_iqmGpuBatch.prevWeights[weightIndex] = s_iqmGpuBatch.weights[weightIndex];
+						( weightIndex < ent->morphActiveCount ) ? ent->morphActiveWeight[weightIndex] : 0.0f;
+				}
+				entMutable->morphGpuWeightsPrimedSingleUse = qtrue;
+			} else
+#endif
+			{
+				for ( weightIndex = 0; weightIndex < IQM_MORPH_TOP_K; weightIndex++ ) {
+					if ( s_iqmGpuBatch.activeCount == ent->morphActiveCount ) {
+						s_iqmGpuBatch.prevWeights[weightIndex] =
+							( weightIndex < ent->morphActiveCount ) ? ent->morphGpuWeightPrev[weightIndex] : 0.0f;
+					} else {
+						s_iqmGpuBatch.prevWeights[weightIndex] = s_iqmGpuBatch.weights[weightIndex];
+					}
 				}
 			}
 		}

@@ -229,6 +229,20 @@ static void vk_get_mvp_transform( float *mvp )
 	}
 }
 
+void vk_prime_gpu_morph_weights_current( void )
+{
+	unsigned int i;
+	trRefEntity_t *ents;
+
+	if ( !backEndData ) {
+		return;
+	}
+	ents = backEndData->entities;
+	for ( i = 0; i < (unsigned int)MAX_REFENTITIES; i++ ) {
+		ents[i].morphGpuWeightsPrimedSingleUse = qfalse;
+	}
+}
+
 void vk_snap_gpu_morph_weights_for_motion( void )
 {
 	unsigned int i, k;
