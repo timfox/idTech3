@@ -31,7 +31,7 @@ For a **stricter engine bar** (automated steps + optional content-backed maps), 
 ## Release Artifacts
 
 ### Binaries
-- [ ] Windows: `idtech3.exe`, `idtech3_server.exe`; **MSYS2/MinGW** artifacts also need bundled MinGW runtime `.dll` (CI runs `scripts/stage_mingw_runtime_dlls.sh`) plus **OpenAL Soft** (`scripts/stage_openal_windows_dlls.ps1` → `OpenAL32.dll` + `soft_oal.dll` next to the `.exe` files on x64). **MSVC** builds static-link renderers (no `idtech3_vulkan.dll` / `idtech3_opengl.dll`); x64 CI runs the same OpenAL bundle step.
+- [ ] Windows: `idtech3.exe`, `idtech3_server.exe`; **MSYS2/MinGW** artifacts also need bundled MinGW runtime `.dll` (CI runs `scripts/stage_mingw_runtime_dlls.sh`) plus **OpenAL Soft** (`scripts/stage_openal_windows_dlls.ps1` → `OpenAL32.dll` + `soft_oal.dll` next to the `.exe` files on x64). **MSVC** builds static-link renderers (no `idtech3_vulkan.dll` / `idtech3_opengl.dll`); **MSVC x64** CI still runs the OpenAL bundle for drop-in compatibility with OpenAL-linked binaries. **MSVC ARM64** skips that step (no official ARM64 OpenAL Soft bin zip; stock MSVC client uses **WASAPI/DirectSound**, not `snd_backend_openal.c`).
 - [ ] Linux: `idtech3`, `idtech3_server`, `idtech3_vulkan.so`, `idtech3_opengl.so`
 - [ ] macOS: `idtech3`, `idtech3_server`, renderer plugins
 

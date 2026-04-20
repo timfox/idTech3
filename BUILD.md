@@ -130,6 +130,8 @@ The Visual Studio solution under `src/platform/win32/msvc2017/quake3e.sln` is st
 - Open the solution in Visual Studio 2022 or newer.
 - Build the desired configuration/platform.
 - Outputs land under `src/platform/win32/msvc2017/output/`.
+- **Audio:** the MSVC client uses the **Windows DMA path** (`win_snd.c`: **WASAPI** when `UseWasapi=0` is passed from CI, else build defaults apply)—it does **not** compile `snd_backend_openal.c`. For **OpenAL** + EFX/acoustics you need a **CMake** build with `USE_OPENAL=ON` and OpenAL installed/found (Linux/macOS/MinGW), or a custom MSVC project that defines `USE_OPENAL` and links OpenAL.
+- **OpenAL Soft DLL zip (CI):** bundled for **MSVC x64** and **MinGW x64** artifacts only. **ARM64** MSVC zips skip it: upstream OpenAL Soft Windows bins ship **Win32/Win64** only; ARM64 Windows clients should rely on **WASAPI**.
 
 Prefer the CMake path for documentation, CI parity, and cross-platform consistency.
 

@@ -25,7 +25,7 @@ Extract the archive. You should see:
 - `idtech3_server` (or `idtech3_server.exe`) - dedicated server
 - **Linux**: `idtech3_vulkan.so` / `idtech3_opengl.so` - renderer plugins (when built with `USE_RENDERER_DLOPEN`)
 - **Windows (MSYS2/MinGW zip from CI)**: same `.exe` names plus several `.dll` files (SDL2, OpenAL Soft via `OpenAL32.dll` + `soft_oal.dll`, MinGW runtime). Keep them in the same folder as the executables. **OpenAL** does not require a separate Creative/OpenAL installer for these builds.
-- **Windows (MSVC zip, x64)**: same as above for **OpenAL** (`OpenAL32.dll`, `soft_oal.dll`, and `OpenAL-Soft-COPYING.txt` from OpenAL Soft). Renderers are usually linked into the client; you may only see the `.exe` files plus Visual C++ runtime requirements from your system. **Windows MSVC ARM64** zips do not include OpenAL DLLs yet (upstream OpenAL Soft bin package has no WinARM64); use the default WASAPI audio path or install OpenAL separately if you enable OpenAL there.
+- **Windows (MSVC zip, x64)**: CI may ship **OpenAL Soft** router DLLs next to the `.exe` (`OpenAL32.dll` + `soft_oal.dll` + `OpenAL-Soft-COPYING.txt`) for users who run a **CMake/MinGW-style** client build linked against OpenAL, or who drop in an OpenAL-linked `idtech3.exe`. The **stock MSVC `quake3e.vcxproj` client does not compile in `snd_backend_openal.c`**, so out of the box it uses **WASAPI / DirectSound** (`win_snd.c`, `s_driver` / `s_openal` has no effect there). **Windows MSVC ARM64** zips omit the OpenAL Soft bundle: upstream **openal-soft *-bin.zip** has no **WinARM64** `soft_oal.dll`, and the MSVC client is **not** an OpenAL build—use **WASAPI** (default on Win7+) or **DirectSound** for audio.
 
 ## 2. Game Data
 

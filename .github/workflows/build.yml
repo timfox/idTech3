@@ -335,10 +335,10 @@ jobs:
 
           dir /b bin
 
-      - name: Bundle OpenAL Soft DLLs (x64 zip; ARM64 has no official bin zip — skipped in script)
-        if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
+      - name: Bundle OpenAL Soft DLLs (MSVC x64 only; MinGW job bundles separately)
+        if: ${{ (github.event_name != 'release' || matrix.btype != 'Debug') && matrix.arch == 'x64' }}
         shell: pwsh
-        run: ./scripts/stage_openal_windows_dlls.ps1 -BinDir bin -Arch ${{ matrix.arch }}
+        run: ./scripts/stage_openal_windows_dlls.ps1 -BinDir bin -Arch x64
 
       - name: Verify MSVC staging (Release artifact prep)
         if: ${{ matrix.btype == 'Release' }}
