@@ -1271,6 +1271,9 @@ typedef struct {
 
 	uint32_t renderWidth;
 	uint32_t renderHeight;
+	/* Main scene color attachment (FBO) pixel size; stable while vk.renderWidth is temporarily overridden (shadow atlases, etc.). */
+	uint32_t mainColorWidth;
+	uint32_t mainColorHeight;
 
 	float renderScaleX;
 	float renderScaleY;

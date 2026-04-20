@@ -23,6 +23,9 @@ static qboolean vk_curr_entity_model_valid[MAX_REFENTITIES];
 
 uint32_t vk_get_render_target_width( void )
 {
+	if ( vk.fboActive && vk.mainColorWidth > 0u ) {
+		return vk.mainColorWidth;
+	}
 	if ( vk.renderWidth > 0 ) {
 		return vk.renderWidth;
 	}
@@ -34,6 +37,9 @@ uint32_t vk_get_render_target_width( void )
 
 uint32_t vk_get_render_target_height( void )
 {
+	if ( vk.fboActive && vk.mainColorHeight > 0u ) {
+		return vk.mainColorHeight;
+	}
 	if ( vk.renderHeight > 0 ) {
 		return vk.renderHeight;
 	}
