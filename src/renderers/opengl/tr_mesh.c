@@ -290,12 +290,10 @@ void R_AddMD3Surfaces( trRefEntity_t *ent ) {
 	int				lod;
 	int				fogNum;
 	qboolean		personalModel;
-#ifdef USE_PMLIGHT
 	dlight_t		*dl;
 	unsigned int	n;
 	dlight_t		*dlights[ ARRAY_LEN( backEndData->dlights ) ];
 	int				numDlights;
-#endif
 
 	// don't add third_person objects if not in a portal
 	personalModel = (ent->e.renderfx & RF_THIRD_PERSON) && (tr.viewParms.portalView == PV_NONE);
@@ -345,7 +343,6 @@ void R_AddMD3Surfaces( trRefEntity_t *ent ) {
 		R_SetupEntityLighting( &tr.refdef, ent );
 	}
 
-#ifdef USE_PMLIGHT
 	numDlights = 0;
 	if ( r_dlightMode->integer >= 2 && ( !personalModel || tr.viewParms.portalView != PV_NONE ) ) {
 		R_TransformDlights( tr.viewParms.num_dlights, tr.viewParms.dlights, &tr.or );
@@ -355,7 +352,6 @@ void R_AddMD3Surfaces( trRefEntity_t *ent ) {
 				dlights[ numDlights++ ] = dl;
 		}
 	}
-#endif
 
 	//
 	// see if we are in a fog volume
@@ -424,7 +420,6 @@ void R_AddMD3Surfaces( trRefEntity_t *ent ) {
 			R_AddDrawSurf( (void *)surface, shader, fogNum, 0 );
 		}
 
-#ifdef USE_PMLIGHT
 		if ( numDlights && shader->lightingStage >= 0 ) {
 			for ( n = 0; n < numDlights; n++ ) {
 				dl = dlights[ n ];
@@ -432,7 +427,6 @@ void R_AddMD3Surfaces( trRefEntity_t *ent ) {
 				R_AddLitSurf( (void *)surface, shader, fogNum );
 			}
 		}
-#endif
 
 		surface = (md3Surface_t *)( (byte *)surface + surface->ofsEnd );
 	}

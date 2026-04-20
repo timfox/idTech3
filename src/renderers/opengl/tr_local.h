@@ -23,7 +23,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef TR_LOCAL_H
 #define TR_LOCAL_H
 
-#define USE_PMLIGHT			// promode dynamic lights via \r_dlightMode 1|2
 #define MAX_REAL_DLIGHTS	(MAX_DLIGHTS*2)
 #define MAX_LITSURFS		(MAX_DRAWSURFS)
 
@@ -77,10 +76,8 @@ typedef struct dlight_s {
 	vec3_t	transformed2;		// origin2 in local coordinate system
 	int		additive;			// texture detail is lost tho when the lightmap is dark
 	qboolean linear;
-#ifdef USE_PMLIGHT
 	struct litSurf_s	*head;
 	struct litSurf_s	*tail;
-#endif
 } dlight_t;
 
 #define IQM_MORPH_MAX_CHANNELS 8
@@ -100,9 +97,7 @@ typedef struct {
 	vec3_t		directedLight;
 	vec3_t		shCoeffs[SH_COEFF_COUNT];
 	qboolean	shLightingValid;
-#ifdef USE_PMLIGHT
 	vec3_t		shadowLightDir;	// normalized direction towards light
-#endif
 	qboolean	intShaderTime;
 	int			morphChannelCount;
 	uint32_t	morphChannelHashes[IQM_MORPH_MAX_CHANNELS];
@@ -441,10 +436,8 @@ typedef struct shader_s {
 	int			numUnfoggedPasses;
 	shaderStage_t	*stages[MAX_SHADER_STAGES];
 
-#ifdef USE_PMLIGHT
 	int			lightingStage;
 	int			lightingBundle;
-#endif
 	qboolean	isStaticShader;
 	int			svarsSize;
 	int			iboOffset;
@@ -501,10 +494,8 @@ typedef struct {
 
 	int			numDrawSurfs;
 	struct drawSurf_s	*drawSurfs;
-#ifdef USE_PMLIGHT
 	int			numLitSurfs;
 	struct litSurf_s	*litSurfs;
-#endif
 } trRefdef_t;
 
 
@@ -593,11 +584,9 @@ typedef struct {
 	vec3_t		visBounds[2];
 	float		zFar;
 	stereoFrame_t	stereoFrame;
-#ifdef USE_PMLIGHT
 	// each view will have its own dlight set
 	unsigned int num_dlights;
 	struct dlight_s	*dlights;
-#endif
 } viewParms_t;
 
 /*
@@ -632,13 +621,11 @@ typedef struct drawSurf_s {
 	surfaceType_t		*surface;		// any of surface*_t
 } drawSurf_t;
 
-#ifdef USE_PMLIGHT
 typedef struct litSurf_s {
 	unsigned int		sort;			// bit combination for fast compares
 	surfaceType_t		*surface;		// any of surface*_t
 	struct litSurf_s	*next;
 } litSurf_t;
-#endif
 
 #define	MAX_FACE_POINTS		64
 
@@ -815,10 +802,8 @@ typedef struct msurface_s {
 	int					viewCount;		// if == tr.viewCount, already added
 	struct shader_s		*shader;
 	int					fogIndex;
-#ifdef USE_PMLIGHT
 	int					vcVisible;		// if == tr.viewCount, is actually VISIBLE in this frame, i.e. passed facecull and has been added to the drawsurf list
 	int					lightCount;		// if == tr.lightCount, already added to the litsurf list for the current light
-#endif // USE_PMLIGHT
 	surfaceType_t		*data;			// any of srf*_t
 } msurface_t;
 
@@ -1000,14 +985,12 @@ typedef struct {
 	int		c_leafs;
 	int		c_dlightSurfaces;
 	int		c_dlightSurfacesCulled;
-#ifdef USE_PMLIGHT
 	int		c_light_cull_out;
 	int		c_light_cull_in;
 	int		c_lit_leafs;
 	int		c_lit_surfs;
 	int		c_lit_culls;
 	int		c_lit_masks;
-#endif
 } frontEndCounters_t;
 
 #define	FOG_TABLE_SIZE		256
@@ -1049,14 +1032,12 @@ typedef struct {
 	int		c_flareRenders;
 
 	int		msec;			// total msec for backend run
-#ifdef USE_PMLIGHT
 	int		c_lit_batches;
 	int		c_lit_vertices;
 	int		c_lit_indices;
 	int		c_lit_indices_latecull_in;
 	int		c_lit_indices_latecull_out;
 	int		c_lit_vertices_lateculltest;
-#endif
 } backEndCounters_t;
 
 typedef struct videoFrameCommand_s {
@@ -1125,9 +1106,7 @@ typedef struct {
 	int						sceneCount;		// incremented every scene
 	int						viewCount;		// incremented every view (twice a scene if portaled)
 											// and every R_MarkFragments call
-#ifdef USE_PMLIGHT
 	int						lightCount;		// incremented for each dlight in the view
-#endif
 
 	int						frameSceneNum;	// zeroed at RE_BeginFrame
 
@@ -1178,9 +1157,7 @@ typedef struct {
 	trRefdef_t				refdef;
 
 	int						viewCluster;
-#ifdef USE_PMLIGHT
 	dlight_t				*light;				// current light during R_RecursiveLightNode
-#endif
 	vec3_t					sunLight;			// from the sky shader for this level
 	vec3_t					sunDirection;
 
@@ -1264,13 +1241,11 @@ extern cvar_t	*r_fastsky;				// controls whether sky should be cleared or drawn
 extern cvar_t	*r_neatsky;				// nomip and nopicmip for skyboxes, cnq3 like look
 extern cvar_t	*r_drawSun;				// controls drawing of sun quad
 extern cvar_t	*r_dynamiclight;		// dynamic lights enabled/disabled
-#ifdef USE_PMLIGHT
 extern cvar_t	*r_dlightMode;			// 0 - vq3, 1 - pmlight
 extern cvar_t	*r_dlightSpecPower;		// 1 - 32
 extern cvar_t	*r_dlightSpecColor;		// -1.0 - 1.0
 extern cvar_t	*r_dlightScale;			// 0.1 - 1.0
 extern cvar_t	*r_dlightIntensity;		// 0.1 - 1.0
-#endif
 extern cvar_t	*r_dlightSaturation;	// 0.0 - 1.0
 #ifdef USE_VBO
 extern cvar_t	*r_vbo;
@@ -1384,10 +1359,8 @@ void R_DecomposeSort( unsigned sort, int *entityNum, shader_t **shader,
 					 int *fogNum, int *dlightMap );
 
 void R_AddDrawSurf( surfaceType_t *surface, shader_t *shader, int fogIndex, int dlightMap );
-#ifdef USE_PMLIGHT
 void R_DecomposeLitSort( unsigned sort, int *entityNum, shader_t **shader, int *fogNum );
 void R_AddLitSurf( surfaceType_t *surface, shader_t *shader, int fogIndex );
-#endif
 
 #define	CULL_IN		0		// completely unclipped
 #define	CULL_CLIP	1		// clipped by one or more planes
@@ -1559,12 +1532,10 @@ typedef struct shaderCommands_s
 	int			numIndexes;
 	int			numVertexes;
 
-#ifdef USE_PMLIGHT
 	const dlight_t* light;
 	qboolean	dlightPass;
 	qboolean	dlightUpdateParams;
 	cullType_t	cullType;
-#endif
 
 	// info extracted from current shader
 #ifdef USE_TESS_NEEDS_NORMAL
@@ -1636,11 +1607,9 @@ void R_TransformDlights( int count, dlight_t *dl, orientationr_t *or );
 int R_LightForPoint( vec3_t point, vec3_t ambientLight, vec3_t directedLight, vec3_t lightDir );
 qboolean R_SampleLightGridSH( const world_t *world, const vec3_t position, vec3_t shCoeffs[SH_COEFF_COUNT] );
 
-#ifdef USE_PMLIGHT
 void ARB_SetupLightParams( void );
 void ARB_LightingPass( void );
 qboolean R_LightCullBounds( const dlight_t* dl, const vec3_t mins, const vec3_t maxs );
-#endif // USE_PMLIGHT
 
 void R_BindAnimatedImage( const textureBundle_t *bundle );
 void R_DrawElements( int numIndexes, const glIndex_t *indexes );
@@ -1928,12 +1897,8 @@ typedef enum {
 // contained in a backEndData_t
 typedef struct {
 	drawSurf_t	drawSurfs[MAX_DRAWSURFS];
-#ifdef USE_PMLIGHT
 	litSurf_t	litSurfs[MAX_LITSURFS];
 	dlight_t	dlights[MAX_REAL_DLIGHTS];
-#else
-	dlight_t	dlights[MAX_DLIGHTS];
-#endif
 
 	trRefEntity_t	entities[MAX_REFENTITIES];
 	srfPoly_t	*polys;//[MAX_POLYS];
@@ -2019,7 +1984,6 @@ typedef enum {
 
 	// locate all fog programs in predefined order (sequentially after non-fogged ones)
 	// so we can easy switch/adjust them without many if() statements
-#ifdef USE_PMLIGHT
 	DLIGHT_VERTEX,
 	DLIGHT_VERTEX_FOG_IN,
 	DLIGHT_VERTEX_FOG_OUT,
@@ -2035,7 +1999,6 @@ typedef enum {
 
 	DLIGHT_LINEAR_ABS_FRAGMENT,
 	DLIGHT_LINEAR_ABS_FRAGMENT_FOG,
-#endif
 	SPRITE_FRAGMENT,
 #ifdef USE_FBO
 	GAMMA_FRAGMENT,

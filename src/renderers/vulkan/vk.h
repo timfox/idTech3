@@ -1085,10 +1085,8 @@ typedef struct {
 	uint32_t dlight_pipelines[2][3][2];
 
 	// cullType[3], polygonOffset[2], fogStage[2], absLight[2]
-#ifdef USE_PMLIGHT
 	uint32_t dlight_pipelines_x[3][2][2][2];
 	uint32_t dlight1_pipelines_x[3][2][2][2];
-#endif
 
 	// debug visualization pipelines
 	uint32_t tris_debug_pipeline;
