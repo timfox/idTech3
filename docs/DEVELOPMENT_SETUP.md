@@ -200,6 +200,10 @@ Requires OpenSSL. When enabled, use `net_dtls 1` and `net_dtls_key <shared-secre
 | `release/idtech3_opengl.so` | OpenGL renderer plugin |
 | `release/flux_cli` | FLUX.2 image generation tool |
 
+### Minimal game data (engine-only trees)
+
+The repo does not ship full game `.pk3` sets. For a **smallest valid `base/`** (one `.pk3` + `default.cfg`) so the client/server pass filesystem init without **“No game data”**, see [MINIMAL_GAME_SHELL.md](MINIMAL_GAME_SHELL.md). For a **demo layout** with optional `idtech3_demo.pk3`, see [examples/demo_skeleton/README.md](../examples/demo_skeleton/README.md). For **headless dedicated** smoke with maps + `qagame.qvm`, build [renderer_validation/devdata](renderer_validation/devdata/README.md) and point **`GAME_BASE`** at `rtest_base/`.
+
 ## Shader Compilation
 
 Vulkan GLSL shaders are compiled to SPIR-V automatically during the CMake build:
