@@ -286,33 +286,38 @@ void vk_ssr_pass( void )
 	vk_postfx_draw_fullscreen_quad();
 	vk_end_render_pass();
 
-	/* Copy ssr_image back to color */
-	record_image_layout_transition( vk.cmd->command_buffer, vk.ssr_image, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 0, 0 );
-	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0 );
-
+	/* Copy ssr_image back to color (main FBO extent; not transient vk.renderWidth). */
 	{
-		VkImageCopy region;
-		Com_Memset( &region, 0, sizeof( region ) );
-		region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		region.srcSubresource.layerCount = 1;
-		region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		region.dstSubresource.layerCount = 1;
-		region.extent.width = vk.renderWidth;
-		region.extent.height = vk.renderHeight;
-		region.extent.depth = 1;
-		qvkCmdCopyImage( vk.cmd->command_buffer, vk.ssr_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-			vk.color_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region );
+		const uint32_t ssr_rw = vk_get_render_target_width();
+		const uint32_t ssr_rh = vk_get_render_target_height();
+
+		record_image_layout_transition( vk.cmd->command_buffer, vk.ssr_image, VK_IMAGE_ASPECT_COLOR_BIT,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 0, 0 );
+		record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0 );
+
+		{
+			VkImageCopy region;
+			Com_Memset( &region, 0, sizeof( region ) );
+			region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			region.srcSubresource.layerCount = 1;
+			region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			region.dstSubresource.layerCount = 1;
+			region.extent.width = ssr_rw > 0u ? ssr_rw : 1u;
+			region.extent.height = ssr_rh > 0u ? ssr_rh : 1u;
+			region.extent.depth = 1;
+			qvkCmdCopyImage( vk.cmd->command_buffer, vk.ssr_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				vk.color_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region );
+		}
+
+		record_image_layout_transition( vk.cmd->command_buffer, vk.ssr_image, VK_IMAGE_ASPECT_COLOR_BIT,
+			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
+		record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
+
+		record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
+			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 0, 0 );
 	}
-
-	record_image_layout_transition( vk.cmd->command_buffer, vk.ssr_image, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
-	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
-
-	record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
-		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 0, 0 );
 }
 qboolean vk_ssao_pass( void )
 {
