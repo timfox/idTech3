@@ -30,6 +30,8 @@ Optional **GPU light packing + per-tile cull** on the existing forward path (not
 
 Code: `src/renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar registration `src/renderers/vulkan/tr_init.c`.
 
+**Audit:** [FORWARD_PLUS_PIPELINE_AUDIT.md](FORWARD_PLUS_PIPELINE_AUDIT.md).
+
 ### Compute shaders, mesh shaders (NV), and upscaling (DLSS)
 - **Compute:** already central to Vulkan (volumetric fog stages, vegetation wind, fluid sim, terrain CBT, etc.).
 - **Mesh shaders (NVIDIA):** optional device extension **`VK_NV_mesh_shader`** when **`r_vk_meshShaderNV 1`** (default **0**, **latched**, `vid_restart`). Enables `meshShader` in `VkPhysicalDeviceMeshShaderFeaturesNV` for future pipelines; **no mesh-shader draw path** is wired yet - safe on `main`.

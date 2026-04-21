@@ -230,6 +230,19 @@ else
 fi
 
 echo ""
+echo "Forward+ PBR fragment: tile SSBO stride (tileId * N) matches MAX_PER_TILE:"
+fp_stride="$(grep -E 'tileId \* [0-9]+u' "$GEN_FRAG" 2>/dev/null | sed -n 's/.*tileId \* \([0-9][0-9]*\)u.*/\1/p' | head -1)"
+if [[ -z "$fp_stride" ]]; then
+  fail "gen_frag.tmpl: expected tileId * <N>u for Forward+ tile base (fp_tiles stride)"
+elif [[ -z "$max_tile_sh" ]]; then
+  fail "could not re-use MAX_PER_TILE from forward_plus_tile_cull.comp for gen_frag stride check"
+elif [[ "$fp_stride" != "$max_tile_sh" ]]; then
+  fail "gen_frag.tmpl tile stride uses * ${fp_stride}u but MAX_PER_TILE=$max_tile_sh - tile SSBO layout vs fragment disagree"
+else
+  pass "gen_frag.tmpl tile stride * ${fp_stride}u matches MAX_PER_TILE"
+fi
+
+echo ""
 echo "Vulkan temporal: reset bitmask vs reason_string / log table:"
 VK_TEMP_H="$PROJECT_ROOT/src/renderers/vulkan/vk_temporal.h"
 VK_TEMP_C="$PROJECT_ROOT/src/renderers/vulkan/vk_temporal.c"
