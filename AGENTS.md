@@ -40,3 +40,4 @@ Build artifacts go to `build-vk-Release/` or `build-gl-Release/` and are copied 
 ### Game data / base
 
 - **Standalone full conversion**: Do not assume Q3A, OpenArena, or other generic bases. The base is either Unwaking or a game explicitly defined by the user.
+- **Smallest valid data tree** (bootstrap `.pk3` + `default.cfg`): see `docs/MINIMAL_GAME_SHELL.md`.

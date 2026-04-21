@@ -103,6 +103,7 @@ Treat temporal stability as a first-class renderer subsystem instead of a set of
 - When **`vk.fboActive`**, those helpers prefer **`vk.mainColorWidth` / `vk.mainColorHeight`** (set when the main scene color attachment is created in `vk_attachments.c`) so **Forward+**, **post params**, and **temporal** paths do not read transient **`vk.renderWidth`** overrides from shadow or atlas passes.
 - **GPU IQM morph motion:** the first GPU-morph draw of each Vulkan frame seeds **`prevWeights`** from current active weights (per-entity **`morphGpuWeightsPrimedSingleUse`**, cleared in **`vk_prime_gpu_morph_weights_current`**) so the first visible frame after spawn or after a temporal reset does not imply a full morph delta from zero.
 - **SSAO / HBAO push texels** use **`vk_get_render_target_width/height`** (same cached main-color extent as post/temporal) so screen-space noise and **`vk_copy_color_to_fog_scene`** stay aligned with the SSAO attachment when **`vk.renderWidth`** is not the main scene size.
+- **SSR resolve → color copy** uses the same **`vk_get_render_target_*`** extent so the **`vkCmdCopyImage`** region matches **`vk.ssr_image`** / **`vk.color_image`** when auxiliary passes have overridden **`vk.renderWidth`**.
 
 ### Explicit non-goals
 
