@@ -39,6 +39,8 @@ Legacy `make`-first instructions are no longer the primary build path for this f
 
 Artifacts are copied to `release/` and the build trees live under `build-vk-Release/`, `build-vk-Debug/`, `build-gl-Release/`, and `build-gl-Debug/`.
 
+**Minimal game data next to binaries:** see [docs/MINIMAL_GAME_SHELL.md](docs/MINIMAL_GAME_SHELL.md) (bootstrap `base/*.pk3` with `default.cfg`).
+
 ### CMake presets
 
 `CMakePresets.json` exposes the same common configurations without having to remember the cache flags:
