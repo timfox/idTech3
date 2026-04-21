@@ -17,6 +17,7 @@ SSAO/HBAO pass, and vk_bloom. Split from vk.c.
 #include "vk_volumetric_internal.h"
 #include "vk_util.h"
 #include "vk_device.h"
+#include "vk_view_state.h"
 
 static void vk_postfx_set_render_extent( uint32_t width, uint32_t height )
 {
@@ -340,6 +341,8 @@ qboolean vk_ssao_pass( void )
 
 		vk_ssao_push_t push;
 		VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+		const uint32_t ssaoTexW = vk_get_render_target_width();
+		const uint32_t ssaoTexH = vk_get_render_target_height();
 #ifdef USE_REVERSED_DEPTH
 		const float depthIsReversed = 1.0f;
 #else
@@ -373,18 +376,18 @@ qboolean vk_ssao_pass( void )
 			push.params[3] = r_ssaoPower->value;
 			push.misc[0] = (float)( r_hbaoDirections ? r_hbaoDirections->integer : 8 );
 			push.misc[1] = (float)( r_hbaoSteps ? r_hbaoSteps->integer : 8 );
-			push.misc[2] = ( vk.renderWidth > 0 ) ? 1.0f / (float)vk.renderWidth : 1.0f;
+			push.misc[2] = ( ssaoTexW > 0u ) ? 1.0f / (float)ssaoTexW : 1.0f;
 			if ( depthIsReversed > 0.5f )
 				push.misc[2] = -push.misc[2];
-			push.misc[3] = ( vk.renderHeight > 0 ) ? 1.0f / (float)vk.renderHeight : 1.0f;
+			push.misc[3] = ( ssaoTexH > 0u ) ? 1.0f / (float)ssaoTexH : 1.0f;
 		} else {
 			push.params[0] = r_ssaoRadius->value;
 			push.params[1] = r_ssaoBias->value;
 			push.params[2] = r_ssaoIntensity->value;
 			push.params[3] = r_ssaoPower->value;
 			push.misc[0] = (float)r_ssaoSamples->integer;
-			push.misc[1] = ( vk.renderWidth > 0 ) ? 1.0f / (float)vk.renderWidth : 1.0f;
-			push.misc[2] = ( vk.renderHeight > 0 ) ? 1.0f / (float)vk.renderHeight : 1.0f;
+			push.misc[1] = ( ssaoTexW > 0u ) ? 1.0f / (float)ssaoTexW : 1.0f;
+			push.misc[2] = ( ssaoTexH > 0u ) ? 1.0f / (float)ssaoTexH : 1.0f;
 			push.misc[3] = depthIsReversed;
 			push.misc2[0] = (float)( r_ssaoMethod ? r_ssaoMethod->integer : 0 );
 			push.misc2[1] = (float)( r_hbaoDirections ? r_hbaoDirections->integer : 8 );
@@ -406,8 +409,8 @@ qboolean vk_ssao_pass( void )
 		vk_postfx_draw_fullscreen_quad();
 		vk_end_render_pass();
 
-		vk_copy_color_to_fog_scene( vk.renderWidth > 0 ? (uint32_t)vk.renderWidth : 1u,
-			vk.renderHeight > 0 ? (uint32_t)vk.renderHeight : 1u );
+		vk_copy_color_to_fog_scene( ssaoTexW > 0u ? ssaoTexW : 1u,
+			ssaoTexH > 0u ? ssaoTexH : 1u );
 		if ( vk.fog_scene_image_view != VK_NULL_HANDLE && vk.ssao_scene_descriptor != VK_NULL_HANDLE && vk.ssao_blur_descriptor != VK_NULL_HANDLE ) {
 			vk_begin_ssao_combine_render_pass();
 			if ( r_ssaoDebugView && r_ssaoDebugView->integer == 2 ) {

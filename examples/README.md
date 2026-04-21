@@ -15,5 +15,6 @@ Small, **copy-paste** workflows and templates for this engine repo. They do not 
 See also:
 
 - [docs/QUICKSTART.md](../docs/QUICKSTART.md) - install release binaries and game data.
+- [docs/MINIMAL_GAME_SHELL.md](../docs/MINIMAL_GAME_SHELL.md) - smallest valid `base/` + `.pk3` bootstrap.
 - [docs/PRODUCTION_CERTIFICATION.md](../docs/PRODUCTION_CERTIFICATION.md) - tiered production bar.
 - [docs/samples/renderer_regression/README.md](../docs/samples/renderer_regression/README.md) - visual regression pack.
