@@ -81,6 +81,8 @@ The default renderer is Vulkan. To use OpenGL instead:
 
 **PBR (Physically Based Rendering)** is on by default when using Vulkan with FBO. Ensure `r_fbo 1` (default) and `r_pbr 1` (default). If PBR is disabled at startup, the console will show why (e.g. "requires r_fbo 1"). Use `vid_restart` after changing these.
 
+**Optional Forward+ scaffolding (Vulkan, advanced):** `r_forwardPlus 1` (default **0**, **latched**; `vid_restart` to toggle) enables GPU light records + per-tile compute cull and optional PBR debug/shade cvars—see [RENDERERS.md](RENDERERS.md#vulkan-forward-scaffolding) and the pipeline audit [FORWARD_PLUS_PIPELINE_AUDIT.md](FORWARD_PLUS_PIPELINE_AUDIT.md).
+
 ## Steam Deck
 
 When running under Steam on Steam Deck, the engine auto-detects the device and loads `base/steamdeck.cfg` (gamepad enabled, Vulkan, 60 FPS cap). Ensure `steamdeck.cfg` exists in your base folder. Build with `-DUSE_STEAM=ON -DSTEAMWORKS_SDK=/path/to/sdk` for full Steam API support.
