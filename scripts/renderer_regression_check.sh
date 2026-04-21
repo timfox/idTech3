@@ -136,6 +136,44 @@ else
 fi
 
 echo ""
+echo "Vegetation wind dispatch ordering (staging must be populated before compute):"
+TR_SHADE="$PROJECT_ROOT/src/renderers/vulkan/tr_shade.c"
+VK_FRAME_SUBMIT="$PROJECT_ROOT/src/renderers/vulkan/vk_frame_submit.c"
+if awk '
+  /PostFX_VegWind_IsEnabled\(\) && tess\.shader && \( tess\.shader->surfaceFlags & SURF_VEGETATION \)/ { guard=1 }
+  /vk_vegetation_wind_dispatch\(\);/ { dispatch=1 }
+  /vk_vegetation_clear_staging\(\);/ { clear=1 }
+  END { exit !(guard && dispatch && clear) }
+' "$TR_SHADE"; then
+  pass "tr_shade.c dispatches + clears vegetation staging from SURF_VEGETATION batches"
+else
+  fail "tr_shade.c is missing SURF_VEGETATION-gated veg-wind dispatch/clear sequence"
+fi
+if grep -q 'vk_vegetation_wind_dispatch();' "$VK_FRAME_SUBMIT"; then
+  fail "vk_frame_submit.c should not dispatch vegetation wind at frame start"
+else
+  pass "vk_frame_submit.c has no direct veg-wind dispatch call"
+fi
+
+echo ""
+echo "Optional VK_NV_mesh_shader gating (must stay cvar/feature-chain guarded):"
+VK_INSTANCE="$PROJECT_ROOT/src/renderers/vulkan/vk_instance.c"
+TR_INIT="$PROJECT_ROOT/src/renderers/vulkan/tr_init.c"
+if grep -q 'strcmp( ext, VK_NV_MESH_SHADER_EXTENSION_NAME ) == 0' "$VK_INSTANCE" && \
+   grep -q 'if ( nvMeshShader && r_vk_meshShaderNV && r_vk_meshShaderNV->integer' "$VK_INSTANCE" && \
+   grep -q 'vk.meshShaderNV = qtrue;' "$VK_INSTANCE" && \
+   grep -q 'mesh_shader_features_nv.meshShader = VK_TRUE;' "$VK_INSTANCE"; then
+  pass "vk_instance.c keeps VK_NV_mesh_shader opt-in and meshShader feature-chain wiring"
+else
+  fail "vk_instance.c mesh-shader opt-in/feature chain regression detected"
+fi
+if grep -q 'r_vk_meshShaderNV = ri.Cvar_Get( "r_vk_meshShaderNV", "0"' "$TR_INIT"; then
+  pass "tr_init.c registers r_vk_meshShaderNV as default-off latch cvar"
+else
+  fail "tr_init.c missing r_vk_meshShaderNV default-off cvar registration"
+fi
+
+echo ""
 if [ -n "${GAME_BASE:-}" ]; then
   echo "Optional game base: $GAME_BASE"
   ASSETS_LIST="${GAME_ASSETS_LIST:-$PROJECT_ROOT/docs/samples/renderer_regression/OPTIONAL_GAME_ASSETS.txt}"
