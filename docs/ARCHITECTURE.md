@@ -141,6 +141,8 @@ The shipping Vulkan renderer is **forward-only** with a layered HDR/post-process
 
 For goals and longer notes, see [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_2026_ARCHITECTURE_PASS.md) and [RENDERERS.md](RENDERERS.md#vulkan-forward-scaffolding).
 
+**Bootstrap game data** (minimal `base/` layout that still satisfies the filesystem): [MINIMAL_GAME_SHELL.md](MINIMAL_GAME_SHELL.md).
+
 ## Native game modules (VM)
 
 When `fs_restrict` is **0** (default), `VM_Create` always tries a **native** shared library before falling back to a `.qvm` (`src/qcommon/vm.c`). Native load is disabled when `fs_restrict` is set (demo-style restriction).
