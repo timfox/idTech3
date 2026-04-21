@@ -451,10 +451,12 @@ All significant changes require architectural review:
 ### Key Documents
 - **[ARCHITECTURE.md](docs/ARCHITECTURE.md)**: High-level architectural overview
 - **[RENDERERS.md](docs/RENDERERS.md)**: Renderer architecture and features
+- **[FORWARD_PLUS_PIPELINE_AUDIT.md](docs/FORWARD_PLUS_PIPELINE_AUDIT.md)**: Vulkan Forward+ scaffolding (SSBOs, compute cull, PBR fragment path, Tier A hooks)
 - **[BRANCHES.md](docs/BRANCHES.md)**: Development philosophy
 - **[ROADMAP.md](docs/ROADMAP.md)**: Development priorities
 - **[DEVELOPMENT_SETUP.md](docs/DEVELOPMENT_SETUP.md)**: Development environment
 - **[QUICKSTART.md](docs/QUICKSTART.md)**: End-user quick start (download, game data, run)
+- **[MINIMAL_GAME_SHELL.md](docs/MINIMAL_GAME_SHELL.md)**: Smallest valid `base/` + `.pk3` bootstrap (engine-only / tech demo)
 - **[RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md)**: Pre-release validation and release steps
 
 ### Build Scripts
