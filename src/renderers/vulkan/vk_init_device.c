@@ -426,10 +426,14 @@ void vk_initialize( void )
 					features.multiViewport ? "yes" : "no" );
 				ri.Printf( PRINT_ALL, "[VK]   Sampler Anisotropy  : %s\n",
 					features.samplerAnisotropy ? "yes" : "no" );
-#ifdef VK_KHR_RAY_TRACING_PIPELINE
-				ri.Printf( PRINT_ALL, "[VK]   Ray Tracing         : available\n" );
+#ifdef USE_VULKAN_RTX
+				if ( vk.rtxExtensionsEnabled ) {
+					ri.Printf( PRINT_ALL, "[VK]   Ray Tracing         : enabled (KHR AS + RT pipeline + buffer device address)\n" );
+				} else {
+					ri.Printf( PRINT_ALL, "[VK]   Ray Tracing         : build on, GPU/extensions unavailable\n" );
+				}
 #else
-				ri.Printf( PRINT_ALL, "[VK]   Ray Tracing         : not available\n" );
+				ri.Printf( PRINT_ALL, "[VK]   Ray Tracing         : not built (enable USE_VULKAN_RTX)\n" );
 #endif
 				ri.Printf( PRINT_ALL, "[VK]   Compute Pipelines   : enabled\n" );
 				ri.Printf( PRINT_ALL, "[VK]   First Person Rendering : enabled (r_firstPersonFov, r_firstPersonScale, r_firstPersonZNear)\n" );

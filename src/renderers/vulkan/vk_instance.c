@@ -188,6 +188,12 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 	VkPhysicalDevice8BitStorageFeatures storage_8bit_features;
 #endif
 	VkPhysicalDeviceMeshShaderFeaturesNV mesh_shader_features_nv;
+#ifdef USE_VULKAN_RTX
+	VkPhysicalDeviceFeatures2 rtx_device_features2;
+	VkPhysicalDeviceBufferDeviceAddressFeaturesKHR rtx_bda_features;
+	VkPhysicalDeviceAccelerationStructureFeaturesKHR rtx_as_features;
+	VkPhysicalDeviceRayTracingPipelineFeaturesKHR rtx_rtp_features;
+#endif
 
 	ri.Printf( PRINT_ALL, "...selected physical device: %i\n", device_index );
 
@@ -502,13 +508,52 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			vk.colorWriteMaskDynamic = qfalse;
 		}
 #ifdef USE_VULKAN_RTX
-		if ( rtxAccelStruct && rtxPipeline && rtxDeferredHostOps && rtxBufferDeviceAddress && memoryRequirements2 ) {
-			device_extension_list[ device_extension_count++ ] = VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME;
-			device_extension_list[ device_extension_count++ ] = "VK_KHR_deferred_host_operations";
-			device_extension_list[ device_extension_count++ ] = VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME;
-			device_extension_list[ device_extension_count++ ] = VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME;
-			ri.Printf( PRINT_ALL, "[VK] Ray tracing extensions enabled (r_rtx available)\n" );
+		{
+			const qboolean rtxExtPresent = rtxAccelStruct && rtxPipeline && rtxDeferredHostOps && rtxBufferDeviceAddress && memoryRequirements2;
+			qboolean rtxGpuCapable = qfalse;
+
+			if ( rtxExtPresent && qvkGetPhysicalDeviceFeatures2 != NULL ) {
+				VkPhysicalDeviceFeatures2 qf2;
+				VkPhysicalDeviceBufferDeviceAddressFeaturesKHR qbda;
+				VkPhysicalDeviceAccelerationStructureFeaturesKHR qas;
+				VkPhysicalDeviceRayTracingPipelineFeaturesKHR qrtp;
+
+				Com_Memset( &qf2, 0, sizeof( qf2 ) );
+				Com_Memset( &qbda, 0, sizeof( qbda ) );
+				Com_Memset( &qas, 0, sizeof( qas ) );
+				Com_Memset( &qrtp, 0, sizeof( qrtp ) );
+				qf2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+				qf2.pNext = &qbda;
+				qbda.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES_KHR;
+				qbda.pNext = &qas;
+				qas.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+				qas.pNext = &qrtp;
+				qrtp.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
+				qrtp.pNext = NULL;
+				qvkGetPhysicalDeviceFeatures2( physical_device, &qf2 );
+				rtxGpuCapable = ( qbda.bufferDeviceAddress && qas.accelerationStructure && qrtp.rayTracingPipeline ) ? qtrue : qfalse;
+				if ( !rtxGpuCapable ) {
+					ri.Printf( PRINT_DEVELOPER, "[VK] Ray tracing extensions present but required GPU features are off "
+						"(bufferDeviceAddress=%u accelerationStructure=%u rayTracingPipeline=%u); RT disabled\n",
+						(unsigned)qbda.bufferDeviceAddress, (unsigned)qas.accelerationStructure, (unsigned)qrtp.rayTracingPipeline );
+				}
+			} else if ( rtxExtPresent && qvkGetPhysicalDeviceFeatures2 == NULL ) {
+				ri.Printf( PRINT_WARNING, "[VK] Ray tracing extensions present but vkGetPhysicalDeviceFeatures2 is unavailable; RT disabled\n" );
+			}
+
+			if ( rtxExtPresent && rtxGpuCapable ) {
+				device_extension_list[ device_extension_count++ ] = VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME;
+				device_extension_list[ device_extension_count++ ] = VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME;
+				device_extension_list[ device_extension_count++ ] = VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME;
+				device_extension_list[ device_extension_count++ ] = VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME;
+				vk.rtxExtensionsEnabled = qtrue;
+				ri.Printf( PRINT_ALL, "[VK] Ray tracing path: KHR extensions + GPU features enabled (buffer device address, acceleration structure, ray tracing pipeline)\n" );
+			} else {
+				vk.rtxExtensionsEnabled = qfalse;
+			}
 		}
+#else
+		vk.rtxExtensionsEnabled = qfalse;
 #endif
 		if ( nvMeshShader && r_vk_meshShaderNV && r_vk_meshShaderNV->integer &&
 			device_extension_count < ARRAY_LEN( device_extension_list ) ) {
@@ -606,7 +651,11 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			pNextPtr = (const void **)&memory_model.pNext;
 		}
 
-		if ( devAddrFeat ) {
+		if ( devAddrFeat
+#ifdef USE_VULKAN_RTX
+			&& !vk.rtxExtensionsEnabled
+#endif
+			) {
 			*pNextPtr = &devaddr_features;
 			devaddr_features.pNext = NULL;
 			devaddr_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
@@ -645,6 +694,39 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			mesh_shader_features_nv.meshShader = VK_TRUE;
 			device_desc.pNext = &mesh_shader_features_nv;
 		}
+
+#ifdef USE_VULKAN_RTX
+		if ( vk.rtxExtensionsEnabled ) {
+			Com_Memset( &rtx_device_features2, 0, sizeof( rtx_device_features2 ) );
+			Com_Memset( &rtx_bda_features, 0, sizeof( rtx_bda_features ) );
+			Com_Memset( &rtx_as_features, 0, sizeof( rtx_as_features ) );
+			Com_Memset( &rtx_rtp_features, 0, sizeof( rtx_rtp_features ) );
+			Com_Memcpy( &rtx_device_features2.features, &features, sizeof( features ) );
+			rtx_device_features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+			rtx_device_features2.pNext = &rtx_bda_features;
+			rtx_bda_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES_KHR;
+			rtx_bda_features.pNext = &rtx_as_features;
+			rtx_bda_features.bufferDeviceAddress = VK_TRUE;
+			rtx_bda_features.bufferDeviceAddressCaptureReplay = VK_FALSE;
+			rtx_bda_features.bufferDeviceAddressMultiDevice = VK_FALSE;
+			rtx_as_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+			rtx_as_features.pNext = &rtx_rtp_features;
+			rtx_as_features.accelerationStructure = VK_TRUE;
+			rtx_as_features.accelerationStructureCaptureReplay = VK_FALSE;
+			rtx_as_features.accelerationStructureIndirectBuild = VK_FALSE;
+			rtx_as_features.accelerationStructureHostCommands = VK_FALSE;
+			rtx_as_features.descriptorBindingAccelerationStructureUpdateAfterBind = VK_FALSE;
+			rtx_rtp_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
+			rtx_rtp_features.pNext = (void *)(uintptr_t)device_desc.pNext;
+			rtx_rtp_features.rayTracingPipeline = VK_TRUE;
+			rtx_rtp_features.rayTracingPipelineShaderGroupHandleCaptureReplay = VK_FALSE;
+			rtx_rtp_features.rayTracingPipelineShaderGroupHandleCaptureReplayMixed = VK_FALSE;
+			rtx_rtp_features.rayTracingPipelineTraceRaysIndirect = VK_FALSE;
+			rtx_rtp_features.rayTraversalPrimitiveCulling = VK_FALSE;
+			device_desc.pNext = &rtx_device_features2;
+			device_desc.pEnabledFeatures = NULL;
+		}
+#endif
 
 		res = qvkCreateDevice( physical_device, &device_desc, NULL, &vk.device );
 		if ( res < 0 ) {
@@ -709,6 +791,7 @@ void vk_init_vulkan_library( void )
 		INIT_INSTANCE_FUNCTION( vkEnumeratePhysicalDevices )
 		INIT_INSTANCE_FUNCTION( vkGetDeviceProcAddr )
 		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceFeatures )
+		INIT_INSTANCE_FUNCTION_EXT( vkGetPhysicalDeviceFeatures2 )
 		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceFormatProperties )
 		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceMemoryProperties )
 		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceProperties )
