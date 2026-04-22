@@ -20,6 +20,7 @@ PFN_vkEnumerateDeviceExtensionProperties			qvkEnumerateDeviceExtensionProperties
 PFN_vkEnumeratePhysicalDevices					qvkEnumeratePhysicalDevices;
 PFN_vkGetDeviceProcAddr							qvkGetDeviceProcAddr;
 PFN_vkGetPhysicalDeviceFeatures					qvkGetPhysicalDeviceFeatures;
+PFN_vkGetPhysicalDeviceFeatures2					qvkGetPhysicalDeviceFeatures2;
 PFN_vkGetPhysicalDeviceFormatProperties			qvkGetPhysicalDeviceFormatProperties;
 PFN_vkGetPhysicalDeviceMemoryProperties			qvkGetPhysicalDeviceMemoryProperties;
 PFN_vkGetPhysicalDeviceProperties				qvkGetPhysicalDeviceProperties;
