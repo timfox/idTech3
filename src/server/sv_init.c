@@ -514,9 +514,7 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	Cvar_Set( "cl_paused", "0" );
 #endif
 
-	// get latched value
-	sv_pure = Cvar_Get( "sv_pure", "1", CVAR_SYSTEMINFO | CVAR_LATCH );
-
+	// latched sv_pure is registered in SV_Init; refresh local copy for this map load
 	// VMs can change latched cvars instantly which could cause side-effects in SV_UserMove()
 	sv.pure = sv_pure->integer;
 
