@@ -36,6 +36,7 @@ if [ ! -f "$MANIFEST" ]; then
   fail "Missing manifest: $MANIFEST"
 else
   while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%$'\r'}"
     [[ -z "$line" || "$line" =~ ^# ]] && continue
     p="$PROJECT_ROOT/$line"
     if [ -f "$p" ]; then
@@ -266,6 +267,7 @@ if [ -n "${GAME_BASE:-}" ]; then
   ASSETS_LIST="${GAME_ASSETS_LIST:-$PROJECT_ROOT/docs/samples/renderer_regression/OPTIONAL_GAME_ASSETS.txt}"
   req=0
   while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%$'\r'}"
     [[ -z "$line" || "$line" =~ ^# ]] && continue
     req=$((req + 1))
     f="$GAME_BASE/$line"
