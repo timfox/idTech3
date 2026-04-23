@@ -67,8 +67,6 @@ typedef enum {
 	VK_VOLUMETRY_QUERY_USED = 13
 } vk_volumetry_query_index_t;
 
-#define USE_REVERSED_DEPTH
-
 #define VK_NUM_BLOOM_PASSES 4
 
 #ifndef _DEBUG

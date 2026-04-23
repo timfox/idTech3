@@ -5,11 +5,7 @@
  * MSAA path samples resolved opaque depth so transparent layers still reject
  * against opaque geometry before accumulation.
  */
-#ifdef USE_REVERSED_DEPTH
 #define DEPTH_TO_WEIGHT(z) (z)
-#else
-#define DEPTH_TO_WEIGHT(z) (1.0 - (z))
-#endif
 
 layout (constant_id = 0) const int manual_depth_test = 0;
 
@@ -31,11 +27,7 @@ void main() {
 		ivec2 depthSize = textureSize( opaqueDepthTex, 0 );
 		vec2 depthUv = gl_FragCoord.xy / vec2( depthSize );
 		float opaqueDepth = textureLod( opaqueDepthTex, depthUv, 0.0 ).r;
-#ifdef USE_REVERSED_DEPTH
 		if ( gl_FragCoord.z + 1e-5 < opaqueDepth ) discard;
-#else
-		if ( gl_FragCoord.z - 1e-5 > opaqueDepth ) discard;
-#endif
 	}
 
 	float d = DEPTH_TO_WEIGHT(gl_FragCoord.z);
