@@ -1670,19 +1670,17 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				vk_push_uniform_cached( &uniform );
 			}
 
-			#ifdef HDR_DELUXE_LIGHTMAP
-				// aparently lightmap is not always in bundle 1 ..
-				// should probably fix this in collapseMuklitexture
-				if ( def.vk_pbr_flags & PBR_HAS_DELUXEMAP0 )
-					vk_update_descriptor(  VK_DESC_PBR_DELUXE, pStage->bundle[0].deluxeMap->descriptor );
+			// aparently lightmap is not always in bundle 1 ..
+			// should probably fix this in collapseMuklitexture
+			if ( def.vk_pbr_flags & PBR_HAS_DELUXEMAP0 )
+				vk_update_descriptor(  VK_DESC_PBR_DELUXE, pStage->bundle[0].deluxeMap->descriptor );
 
-				if ( def.vk_pbr_flags & PBR_HAS_DELUXEMAP1 )
-					vk_update_descriptor(  VK_DESC_PBR_DELUXE, pStage->bundle[1].deluxeMap->descriptor );
+			if ( def.vk_pbr_flags & PBR_HAS_DELUXEMAP1 )
+				vk_update_descriptor(  VK_DESC_PBR_DELUXE, pStage->bundle[1].deluxeMap->descriptor );
 
-				else if ( !(def.vk_pbr_flags & PBR_HAS_DELUXEMAP0) && tr.whiteImage )
-					vk_update_descriptor(  VK_DESC_PBR_DELUXE, tr.whiteImage->descriptor );
-				}
-			#endif
+			else if ( !(def.vk_pbr_flags & PBR_HAS_DELUXEMAP0) && tr.whiteImage )
+				vk_update_descriptor(  VK_DESC_PBR_DELUXE, tr.whiteImage->descriptor );
+		}
 #endif
 
 #ifdef USE_VK_PBR

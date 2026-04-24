@@ -305,41 +305,32 @@ static float R_ProcessLightmap( byte *image, const byte *buf_p, float maxIntensi
 	return maxIntensity;
 }
 
-#ifdef HDR_DELUXE_LIGHTMAP
 static void R_ProcessDeluxemap( byte *image, const byte *buf_p )
 {
 	int x, y;
 
-	if ( tr.mergeLightmaps ) {
-		for ( y = 0 ; y < LIGHTMAP_SIZE; y++ ) {
-			for ( x = 0 ; x < LIGHTMAP_SIZE; x++ ) {
-				byte *dst = &image[((y + LIGHTMAP_BORDER) * LIGHTMAP_LEN + x + LIGHTMAP_BORDER) * 4];
+	for ( y = 0 ; y < LIGHTMAP_SIZE; y++ ) {
+		for ( x = 0 ; x < LIGHTMAP_SIZE; x++ ) {
+			byte *dst = &image[((y + LIGHTMAP_BORDER) * LIGHTMAP_LEN + x + LIGHTMAP_BORDER) * 4];
 
-				byte r = buf_p[0];
-				byte g = buf_p[1];
-				byte b = buf_p[2];
+			byte r = buf_p[0];
+			byte g = buf_p[1];
+			byte b = buf_p[2];
 
-				if ( r == 0 && g == 0 && b == 0 ) {
-					r = g = b = 127;
-				}
-
-				dst[0] = r;
-				dst[1] = g;
-				dst[2] = b;
-				dst[3] = 255;
-
-				buf_p += 3;
+			if ( r == 0 && g == 0 && b == 0 ) {
+				r = g = b = 127;
 			}
-		}
-		FillBorders( image );
 
-	} 
-	
-	else {
-		// legacy path is not implemented
+			dst[0] = r;
+			dst[1] = g;
+			dst[2] = b;
+			dst[3] = 255;
+
+			buf_p += 3;
+		}
 	}
+	FillBorders( image );
 }
-#endif // HDR_DELUXE_LIGHTMAP
 
 static int SetLightmapParams( int numLightmaps, int maxTextureSize )
 {
@@ -409,21 +400,17 @@ static void R_LoadMergedLightmaps( const lump_t *l, byte *image )
 
 	tr.lightmaps = ri.Hunk_Alloc( tr.numLightmaps * sizeof(image_t *), h_low );
 
-#ifdef HDR_DELUXE_LIGHTMAP
 	if ( tr.worldDeluxeMapping )
 		tr.deluxemaps = (image_t**)ri.Hunk_Alloc( tr.numLightmaps * sizeof(image_t*), h_low );
-#endif
 
 	for ( offs = 0, i = 0 ; i < tr.numLightmaps; i++ ) {
 
 		tr.lightmaps[ i ] = R_CreateImage( va( "*mergedLightmap%d", i ), NULL, NULL,
 			lightmapWidth, lightmapHeight, lightmapFlags | IMGFLAG_CLAMPTOBORDER, 0, 0 );
 
-#ifdef HDR_DELUXE_LIGHTMAP
 		if ( tr.worldDeluxeMapping )
 			tr.deluxemaps[ i ] = R_CreateImage( va( "*mergedDeluxemap%d", i ), NULL, NULL,
 				lightmapWidth, lightmapHeight, lightmapFlags | IMGFLAG_CLAMPTOBORDER, 0, 0 );
-#endif
 
 		for ( y = 0; y < lightmapCountY; y++ ) {
 			if ( offs >= l->filelen )
@@ -443,16 +430,14 @@ static void R_LoadMergedLightmaps( const lump_t *l, byte *image )
 
 				offs += LIGHTMAP_SIZE * LIGHTMAP_SIZE * 3;
 
-#ifdef HDR_DELUXE_LIGHTMAP
 				if ( tr.worldDeluxeMapping )
 				{
 					R_ProcessDeluxemap( image, buf + offs );
-				
+
 					vk_upload_image_data( tr.deluxemaps[ i ], x * LIGHTMAP_LEN, y * LIGHTMAP_LEN, LIGHTMAP_LEN, LIGHTMAP_LEN, 1, image, LIGHTMAP_LEN * LIGHTMAP_LEN * 4, qtrue );
-				
+
 					offs += LIGHTMAP_SIZE * LIGHTMAP_SIZE * 3;
 				}
-#endif
 			}
 		}
 #ifdef USE_VULKAN
@@ -489,9 +474,7 @@ static void R_LoadLightmaps( const lump_t *l, const lump_t *surfs ) {
 	lightmapHeight = LIGHTMAP_SIZE;
 	lightmapCountX = 1;
 	lightmapCountY = 1;
-#ifdef HDR_DELUXE_LIGHTMAP
 	tr.worldDeluxeMapping = qfalse;
-#endif
 
 	if ( l->filelen < LIGHTMAP_SIZE * LIGHTMAP_SIZE * 3 ) {
 		return;
@@ -504,7 +487,6 @@ static void R_LoadLightmaps( const lump_t *l, const lump_t *surfs ) {
 
 	numLightmaps = l->filelen / (LIGHTMAP_SIZE * LIGHTMAP_SIZE * 3);
 
-#ifdef HDR_DELUXE_LIGHTMAP
 	if ( numLightmaps > 1 )
 	{
 		tr.worldDeluxeMapping = qtrue;
@@ -523,7 +505,6 @@ static void R_LoadLightmaps( const lump_t *l, const lump_t *surfs ) {
 
 	if ( tr.worldDeluxeMapping )
 		numLightmaps >>= 1;
-#endif
 
 	// create all the lightmaps
 	tr.numLightmaps = numLightmaps;
@@ -537,11 +518,9 @@ static void R_LoadLightmaps( const lump_t *l, const lump_t *surfs ) {
 		}
 	}
 
-#ifdef HDR_DELUXE_LIGHTMAP
 	/* Non-merged path does not allocate deluxemaps; ensure no stale pointer */
 	tr.deluxemaps = NULL;
 	tr.worldDeluxeMapping = qfalse;
-#endif
 
 	buf = fileBase + l->fileofs;
 
