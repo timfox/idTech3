@@ -666,15 +666,12 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 					stage->bundle[0].image[0] = tr.whiteImage;
 				} else {
 					stage->bundle[0].image[0] = tr.lightmaps[shader.lightmapIndex];
-#ifdef HDR_DELUXE_LIGHTMAP
 					if ( r_deluxeMapping->integer && tr.worldDeluxeMapping && tr.deluxemaps != NULL &&
 						shader.lightmapIndex < tr.numLightmaps )
 						stage->bundle[0].deluxeMap = tr.deluxemaps[shader.lightmapIndex];
-#endif
 				}
 				continue;
 			}
-#ifdef HDR_DELUXE_LIGHTMAP
 			else if (!Q_stricmp(token, "$deluxemap"))
 			{
 				if ( !tr.worldDeluxeMapping )
@@ -694,7 +691,6 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 				}
 				continue;
 			}
-#endif
 			else if ( Q_stricmpn( token, "*lightmap", 9 ) == 0 && token[9] >= '0' && token[9] <= '9' )
 			{
 				const int lightmapIndex = atoi( token + 9 );
@@ -4471,7 +4467,6 @@ static shader_t *FinishShader( void ) {
 					def.lightmap_bundle = lightmapBundle;
 				}
 
-#ifdef HDR_DELUXE_LIGHTMAP
 				if ( def.vk_pbr_flags & PBR_HAS_LIGHTMAP )
 				{
 					// aparently lightmap is not always in bundle 1 ..
@@ -4483,7 +4478,6 @@ static shader_t *FinishShader( void ) {
 					else if ( pStage->bundle[1].deluxeMap )	
 						def.vk_pbr_flags |= PBR_HAS_DELUXEMAP1;
 				}
-#endif
 				// move this to ubo ..
 				Vector4Copy( pStage->specularScale, def.specularScale );
 				Vector4Copy( pStage->normalScale, def.normalScale );
@@ -4734,11 +4728,9 @@ static void R_CreateDefaultShading( image_t *image ) {
 			stages[0].bundle[0].image[0] = tr.lightmaps[shader.lightmapIndex];
 		}
 		stages[0].bundle[0].lightmap = LIGHTMAP_INDEX_SHADER;
-#ifdef HDR_DELUXE_LIGHTMAP
 		if ( r_deluxeMapping->integer && tr.worldDeluxeMapping && tr.deluxemaps != NULL &&
 			shader.lightmapIndex >= 0 && shader.lightmapIndex < tr.numLightmaps )
 			stages[0].bundle[0].deluxeMap = tr.deluxemaps[shader.lightmapIndex];
-#endif
 		stages[0].active = qtrue;
 		stages[0].bundle[0].tcGen = TCGEN_LIGHTMAP;
 		stages[0].bundle[0].rgbGen = CGEN_IDENTITY;	// lightmaps are scaled on creation
