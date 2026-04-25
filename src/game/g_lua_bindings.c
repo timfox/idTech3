@@ -41,9 +41,7 @@ Usage from Lua:
 #include "g_dismember.h"
 #include "g_choreography.h"
 #include "g_response.h"
-#ifdef USE_ECS
 #include "ecs.h"
-#endif
 #include "../physics/phys_bullet.h"
 #include "../physics/phys_procedural_anim.h"
 #include "../physics/phys_ik.h"
@@ -423,7 +421,6 @@ static int l_dialogue_count(lua_State *L ) {
 }
 
 /* ========== ECS bindings ========== */
-#ifdef USE_ECS
 
 static int l_ecs_create(lua_State *L) {
 	ecs_entity_t e = ECS_Create();
@@ -536,8 +533,6 @@ static int l_ecs_componentName(lua_State *L) {
 	lua_pushstring(L, ECS_ComponentName((ecs_component_id_t)luaL_checkinteger(L, 1)));
 	return 1;
 }
-
-#endif /* USE_ECS */
 
 /* ========== GOAP bindings ========== */
 
@@ -991,7 +986,6 @@ void LuaBindings_RegisterAll(void *luaState) {
 	};
 	registerTable(L, "BT", btFuncs);
 
-#ifdef USE_ECS
 	static const luaL_Reg ecsFuncs[] = {
 		{"create", l_ecs_create}, {"destroy", l_ecs_destroy},
 		{"valid", l_ecs_valid}, {"count", l_ecs_count},
@@ -1007,7 +1001,6 @@ void LuaBindings_RegisterAll(void *luaState) {
 		{NULL, NULL}
 	};
 	registerTable(L, "ECS", ecsFuncs);
-#endif
 
 	static const luaL_Reg aimlFuncs[] = {
 		{"createBot", l_aiml_createBot},
