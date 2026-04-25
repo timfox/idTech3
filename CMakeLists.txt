@@ -2181,29 +2181,21 @@ if(USE_RECAST_NAV)
 endif()
 
 # --- ECS (EnTT) module - alternative to gentity ---
-set(ECS_CPP "${CMAKE_SOURCE_DIR}/src/game/ecs.cpp")
-if(EXISTS "${ECS_CPP}")
-  enable_language(CXX)
-  ADD_LIBRARY(ecs_module STATIC ${ECS_CPP})
-  set_target_properties(ecs_module PROPERTIES
-    CXX_STANDARD 17
-    CXX_STANDARD_REQUIRED ON
-  )
-  target_include_directories(ecs_module PRIVATE
-    ${EXTERNAL_INCLUDE}/entt/single_include
-    ${CMAKE_SOURCE_DIR}/src/game
-    ${CMAKE_SOURCE_DIR}/src/qcommon
-  )
-  if(NOT MSVC)
-    target_compile_options(ecs_module PRIVATE -Wno-unused-parameter)
-  endif()
-  set(ECS_MODULE_AVAILABLE TRUE)
-  add_compile_definitions(USE_ECS)
-  message(STATUS "ECS (EnTT): enabled")
-else()
-  set(ECS_MODULE_AVAILABLE FALSE)
-  message(STATUS "ECS (EnTT): disabled (src/game/ecs.cpp not found)")
+enable_language(CXX)
+ADD_LIBRARY(ecs_module STATIC src/game/ecs.cpp)
+set_target_properties(ecs_module PROPERTIES
+  CXX_STANDARD 17
+  CXX_STANDARD_REQUIRED ON
+)
+target_include_directories(ecs_module PRIVATE
+  ${EXTERNAL_INCLUDE}/entt/single_include
+  ${CMAKE_SOURCE_DIR}/src/game
+  ${CMAKE_SOURCE_DIR}/src/qcommon
+)
+if(NOT MSVC)
+  target_compile_options(ecs_module PRIVATE -Wno-unused-parameter)
 endif()
+message(STATUS "ECS (EnTT): enabled")
 
 # --- Bullet Physics module ---
 option(USE_BULLET_PHYSICS "Enable Bullet Physics integration" ON)
@@ -2270,9 +2262,7 @@ endif()
 if(USE_RECAST_NAV AND TARGET recast_nav)
   TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE recast_nav)
 endif()
-if(TARGET ecs_module)
-  TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ecs_module)
-endif()
+TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ecs_module)
 if(USE_FLUX)
 	TARGET_COMPILE_DEFINITIONS(${CNAME}${BINEXT} PRIVATE USE_FLUX)
 	if(TARGET cflux2)
