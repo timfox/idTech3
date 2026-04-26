@@ -114,6 +114,7 @@ Code: `src/renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar regist
   - sharp/default path: `r_taa 0`, `r_ext_smaa 1`, optional MSAA
   - softer temporal path: `r_taa 1`, `r_renderScale 3` or `4`, custom `r_renderWidth` / `r_renderHeight`
 - Current renderer truth: internal-resolution presentation is supported, but some post paths are still being hardened around source-region tracking and active render-target sizing. Prefer modest scale reductions first.
+- **Effective scene render target (Vulkan):** **`vk_get_render_target_width()` / `vk_get_render_target_height()`** in `src/renderers/vulkan/vk_view_state.c` return **`vk.mainColorWidth` / `mainColorHeight`** when **`vk.fboActive`** and those extents are set (main HDR color attachment); otherwise **`vk.renderWidth` / `vk.renderHeight`** if nonzero; otherwise **`glConfig.vidWidth` / `vidHeight`**. Sun shadow and other passes can temporarily change **`vk.renderWidth`**; packing and screen-space work that must match the **main color** image (Forward+ SSBO viewport, tile cull, SSAO/HBAO texel pushes, SSR → color copy, temporal history invalidation on resize—see `vk_temporal.c`, `vk_forward_plus.c`, `vk_postfx_passes.c`) uses this helper so dimensions stay aligned with the attachment the player sees, not transient globals.
 
 ### Order-Independent Transparency (OIT)
 - Weighted Blended OIT (WBOIT) for correct blending of overlapping transparent surfaces
