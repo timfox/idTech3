@@ -1188,21 +1188,11 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 			cvar_t *sv_units = ri.Cvar_Get( "r_shadowVolumeOffsetUnits", "1", CVAR_ARCHIVE_ND );
 			float factor = sv_factor ? sv_factor->value : 1.0f;
 			float units = sv_units ? sv_units->value : 1.0f;
-#ifdef USE_REVERSED_DEPTH
 			rasterization_state.depthBiasConstantFactor = units;
 			rasterization_state.depthBiasSlopeFactor = factor;
-#else
-			rasterization_state.depthBiasConstantFactor = -units;
-			rasterization_state.depthBiasSlopeFactor = -factor;
-#endif
 		} else {
-#ifdef USE_REVERSED_DEPTH
 			rasterization_state.depthBiasConstantFactor = -r_offsetUnits->value;
 			rasterization_state.depthBiasSlopeFactor = -r_offsetFactor->value;
-#else
-			rasterization_state.depthBiasConstantFactor = r_offsetUnits->value;
-			rasterization_state.depthBiasSlopeFactor = r_offsetFactor->value;
-#endif
 		}
 	} else {
 		rasterization_state.depthBiasEnable = VK_FALSE;
@@ -1241,11 +1231,7 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 	depth_stencil_state.flags = 0;
 	depth_stencil_state.depthTestEnable = (state_bits & GLS_DEPTHTEST_DISABLE) ? VK_FALSE : VK_TRUE;
 	depth_stencil_state.depthWriteEnable = ( def->shader_type == TYPE_OCCLUSION_BBOX ) ? VK_FALSE : ( (state_bits & GLS_DEPTHMASK_TRUE) ? VK_TRUE : VK_FALSE );
-#ifdef USE_REVERSED_DEPTH
 	depth_stencil_state.depthCompareOp = (state_bits & GLS_DEPTHFUNC_EQUAL) ? VK_COMPARE_OP_EQUAL : VK_COMPARE_OP_GREATER_OR_EQUAL;
-#else
-	depth_stencil_state.depthCompareOp = (state_bits & GLS_DEPTHFUNC_EQUAL) ? VK_COMPARE_OP_EQUAL : VK_COMPARE_OP_LESS_OR_EQUAL;
-#endif
 	depth_stencil_state.depthBoundsTestEnable = VK_FALSE;
 	depth_stencil_state.stencilTestEnable = (def->shadow_phase != SHADOW_DISABLED) ? VK_TRUE : VK_FALSE;
 
