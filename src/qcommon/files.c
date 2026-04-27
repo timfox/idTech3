@@ -1570,7 +1570,7 @@ static int FS_OpenFileInPak( fileHandle_t *file, pack_t *pak, fileInPack_t *pakF
 		// open a new file on the pakfile
 		temp = unzReOpen( pak->pakFilename, pak->handle );
 		if ( temp == NULL ) {
-			Com_Printf( S_COLOR_RED "Couldn't reopen %s", pak->pakFilename );
+			Com_Printf( S_COLOR_RED "Couldn't reopen %s\n", pak->pakFilename );
 			*file = FS_INVALID_HANDLE;
 			return -1;
 		}

@@ -300,9 +300,14 @@ void R_AddMD3Surfaces( trRefEntity_t *ent ) {
 	// don't add third_person objects if not in a portal
 	personalModel = (ent->e.renderfx & RF_THIRD_PERSON) && (tr.viewParms.portalView == PV_NONE);
 
+	if ( !tr.currentModel->md3[0] || tr.currentModel->md3[0]->numFrames < 1 ) {
+		return;
+	}
+
 	if ( ent->e.renderfx & RF_WRAP_FRAMES ) {
-		ent->e.frame %= tr.currentModel->md3[0]->numFrames;
-		ent->e.oldframe %= tr.currentModel->md3[0]->numFrames;
+		const int nf = tr.currentModel->md3[0]->numFrames;
+		ent->e.frame %= nf;
+		ent->e.oldframe %= nf;
 	}
 
 	//
