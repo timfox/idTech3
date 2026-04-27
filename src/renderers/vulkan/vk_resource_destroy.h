@@ -3,8 +3,9 @@
 
 void vk_destroy_render_passes( void );
 void vk_destroy_pipelines( qboolean resetCounter );
-/* Destroy only shader-table pipelines at/after vk.pipelines_world_base (PBR world draw),
- * not post/gamma/smaa bloom etc. Use when a cvar only invalidates world graphics (e.g. r_forwardPlusShade). */
+/* Destroy VkPipeline handles for shader-table rows at/after vk.pipelines_world_base only.
+ * Preserves slot indices and Vk_Pipeline_Def entries so cached shader_t/vk_pipeline IDs stay valid;
+ * vk_gen_pipeline() lazily recreates handles. Do not shrink vk.pipelines_count (would desync indices). */
 void vk_destroy_world_graphics_pipelines( void );
 
 #endif
