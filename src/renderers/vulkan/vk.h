@@ -1144,6 +1144,9 @@ typedef struct {
 	qboolean debugMarkers;
 	qboolean colorWriteMaskDynamic;
 	qboolean meshShaderNV; /* VK_NV_mesh_shader enabled at device create (r_vk_meshShaderNV); no mesh pipelines yet */
+#ifdef USE_VULKAN_RTX
+	qboolean rtxAvailable; /* VK_KHR_ray_tracing_pipeline + AS + BDA enabled; trace/AS build not integrated */
+#endif
 
 	float maxAnisotropy;
 	float maxLod;

@@ -8,7 +8,7 @@ This document outlines the architecture and implementation plan for three render
 |---------|--------|-------|
 | **Vulkan** | ✅ Complete | Primary renderer, ~18k LOC |
 | **OpenGL** | ✅ Complete | Fallback renderer |
-| **Vulkan RTX** | 🔶 Stub only | Ray tracing extensions probed; no pipeline |
+| **Vulkan RTX** | 🔶 Stub only | With `USE_VULKAN_RTX=ON` and `r_rtx`>0 (latched): device enables KHR AS + ray-tracing pipeline + BDA and loads core entry points; no BLAS/TLAS or trace integration |
 | **Metal** | ❌ Not started | Native Apple Silicon / macOS |
 | **DXR** | ❌ Not started | DirectX 12 + DirectX Raytracing (Windows) |
 
