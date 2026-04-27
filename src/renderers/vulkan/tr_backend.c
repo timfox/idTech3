@@ -1758,6 +1758,7 @@ static const void *RB_DrawSurfs( const void *data ) {
 	RB_BeginDrawingView();
 
 #ifdef USE_VULKAN
+	vk_forward_plus_upload_refdef();
 	vk_forward_plus_dispatch_tile_cull();
 #endif
 
