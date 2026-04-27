@@ -1501,6 +1501,7 @@ list(APPEND CLIENT_SRCS
   src/game/g_horde.c
   src/game/g_goap.c
   src/game/g_aiml.c
+  src/game/g_eda.c
   src/game/g_engine_systems.c
   src/game/g_bt.c
   src/game/g_entity_bridge.c
