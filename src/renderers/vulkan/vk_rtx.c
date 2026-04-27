@@ -139,6 +139,82 @@ static void vk_rtx_submit_oneshot_build( VkCommandBuffer cmd )
 	VK_CHECK( qvkResetCommandBuffer( cmd, 0 ) );
 }
 
+static void vk_rtx_destroy_rt_output( void )
+{
+	if ( rtx.rt_image_view != VK_NULL_HANDLE ) {
+		qvkDestroyImageView( vk.device, rtx.rt_image_view, NULL );
+		rtx.rt_image_view = VK_NULL_HANDLE;
+	}
+	if ( rtx.rt_image != VK_NULL_HANDLE ) {
+		qvkDestroyImage( vk.device, rtx.rt_image, NULL );
+		rtx.rt_image = VK_NULL_HANDLE;
+	}
+	if ( rtx.rt_image_memory != VK_NULL_HANDLE ) {
+		qvkFreeMemory( vk.device, rtx.rt_image_memory, NULL );
+		rtx.rt_image_memory = VK_NULL_HANDLE;
+	}
+}
+
+static void vk_rtx_create_rt_output( uint32_t w, uint32_t h, VkDescriptorSet descriptor_set )
+{
+	VkImageCreateInfo ici;
+	VkMemoryRequirements imgReq;
+	VkMemoryAllocateInfo ai;
+	VkImageViewCreateInfo ivci;
+	VkDescriptorImageInfo imgInfo;
+	VkWriteDescriptorSet write;
+
+	vk_rtx_destroy_rt_output();
+
+	Com_Memset( &ici, 0, sizeof( ici ) );
+	ici.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	ici.imageType = VK_IMAGE_TYPE_2D;
+	ici.format = vk.color_format;
+	ici.extent.width = w;
+	ici.extent.height = h;
+	ici.extent.depth = 1;
+	ici.mipLevels = 1;
+	ici.arrayLayers = 1;
+	ici.samples = VK_SAMPLE_COUNT_1_BIT;
+	ici.tiling = VK_IMAGE_TILING_OPTIMAL;
+	ici.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+	ici.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	VK_CHECK( qvkCreateImage( vk.device, &ici, NULL, &rtx.rt_image ) );
+	qvkGetImageMemoryRequirements( vk.device, rtx.rt_image, &imgReq );
+	Com_Memset( &ai, 0, sizeof( ai ) );
+	ai.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	ai.allocationSize = imgReq.size;
+	ai.memoryTypeIndex = vk_find_memory_type( vk.physical_device, imgReq.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	VK_CHECK( qvkAllocateMemory( vk.device, &ai, NULL, &rtx.rt_image_memory ) );
+	VK_CHECK( qvkBindImageMemory( vk.device, rtx.rt_image, rtx.rt_image_memory, 0 ) );
+
+	Com_Memset( &ivci, 0, sizeof( ivci ) );
+	ivci.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	ivci.image = rtx.rt_image;
+	ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	ivci.format = vk.color_format;
+	ivci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	ivci.subresourceRange.levelCount = 1;
+	ivci.subresourceRange.layerCount = 1;
+	VK_CHECK( qvkCreateImageView( vk.device, &ivci, NULL, &rtx.rt_image_view ) );
+
+	Com_Memset( &imgInfo, 0, sizeof( imgInfo ) );
+	imgInfo.imageView = rtx.rt_image_view;
+	imgInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+	Com_Memset( &write, 0, sizeof( write ) );
+	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.dstSet = descriptor_set;
+	write.dstBinding = 1;
+	write.descriptorCount = 1;
+	write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	write.pImageInfo = &imgInfo;
+	qvkUpdateDescriptorSets( vk.device, 1, &write, 0, NULL );
+
+	rtx.width = w;
+	rtx.height = h;
+}
+
 void vk_rtx_shutdown( void )
 {
 	if ( !rtx.ready ) {
@@ -184,18 +260,7 @@ void vk_rtx_shutdown( void )
 	vk_rtx_destroy_buffer( &rtx.scratch_buffer, &rtx.scratch_memory );
 	vk_rtx_destroy_buffer( &rtx.sbt_buffer, &rtx.sbt_memory );
 
-	if ( rtx.rt_image_view != VK_NULL_HANDLE ) {
-		qvkDestroyImageView( vk.device, rtx.rt_image_view, NULL );
-		rtx.rt_image_view = VK_NULL_HANDLE;
-	}
-	if ( rtx.rt_image != VK_NULL_HANDLE ) {
-		qvkDestroyImage( vk.device, rtx.rt_image, NULL );
-		rtx.rt_image = VK_NULL_HANDLE;
-	}
-	if ( rtx.rt_image_memory != VK_NULL_HANDLE ) {
-		qvkFreeMemory( vk.device, rtx.rt_image_memory, NULL );
-		rtx.rt_image_memory = VK_NULL_HANDLE;
-	}
+	vk_rtx_destroy_rt_output();
 
 	Com_Memset( &rtx, 0, sizeof( rtx ) );
 }
@@ -211,7 +276,6 @@ void vk_rtx_init( void )
 	VkPipelineLayoutCreateInfo plci;
 	VkDescriptorSetAllocateInfo allocInfo;
 	VkWriteDescriptorSetAccelerationStructureKHR asWrite;
-	VkDescriptorImageInfo imgInfo;
 	VkAccelerationStructureCreateInfoKHR asci;
 	VkAccelerationStructureBuildGeometryInfoKHR buildInfoBLAS;
 	VkAccelerationStructureGeometryKHR geometryBLAS;
@@ -220,6 +284,7 @@ void vk_rtx_init( void )
 	const VkAccelerationStructureBuildRangeInfoKHR *pRangeBLAS;
 	VkAccelerationStructureBuildSizesInfoKHR sizeInfoBLAS;
 	VkDeviceAddress vbAddr, ibAddr, scratchAddr, blasDeviceAddress, instAddr;
+	VkDeviceSize scratchSize;
 	uint32_t maxPrimBLAS;
 	VkAccelerationStructureBuildGeometryInfoKHR buildInfoTLAS;
 	VkAccelerationStructureGeometryKHR geometryTLAS;
@@ -239,11 +304,7 @@ void vk_rtx_init( void )
 	VkPipelineShaderStageCreateInfo stages[3];
 	VkRayTracingShaderGroupCreateInfoKHR groups[3];
 	VkRayTracingPipelineCreateInfoKHR rtpci;
-	VkImageCreateInfo ici;
-	VkMemoryRequirements imgReq;
-	VkMemoryAllocateInfo ai;
-	VkImageViewCreateInfo ivci;
-	VkWriteDescriptorSet writes[2];
+	VkWriteDescriptorSet writes[1];
 	VkResult pipeRes;
 	VkCommandBuffer buildCmd;
 	VkCommandBufferBeginInfo beginInfo;
@@ -265,8 +326,6 @@ void vk_rtx_init( void )
 
 	w = ( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u;
 	h = ( glConfig.vidHeight > 0 ) ? (uint32_t)glConfig.vidHeight : 1u;
-	rtx.width = w;
-	rtx.height = h;
 
 	Com_Memset( &rtProps, 0, sizeof( rtProps ) );
 	rtProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
@@ -327,51 +386,7 @@ void vk_rtx_init( void )
 	allocInfo.pSetLayouts = &rtx.dsl;
 	VK_CHECK( qvkAllocateDescriptorSets( vk.device, &allocInfo, &rtx.descriptor_set ) );
 
-	Com_Memset( &ici, 0, sizeof( ici ) );
-	ici.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	ici.imageType = VK_IMAGE_TYPE_2D;
-	ici.format = vk.color_format;
-	ici.extent.width = w;
-	ici.extent.height = h;
-	ici.extent.depth = 1;
-	ici.mipLevels = 1;
-	ici.arrayLayers = 1;
-	ici.samples = VK_SAMPLE_COUNT_1_BIT;
-	ici.tiling = VK_IMAGE_TILING_OPTIMAL;
-	ici.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-	ici.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	VK_CHECK( qvkCreateImage( vk.device, &ici, NULL, &rtx.rt_image ) );
-	qvkGetImageMemoryRequirements( vk.device, rtx.rt_image, &imgReq );
-	Com_Memset( &ai, 0, sizeof( ai ) );
-	ai.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	ai.allocationSize = imgReq.size;
-	ai.memoryTypeIndex = vk_find_memory_type( vk.physical_device, imgReq.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
-	VK_CHECK( qvkAllocateMemory( vk.device, &ai, NULL, &rtx.rt_image_memory ) );
-	VK_CHECK( qvkBindImageMemory( vk.device, rtx.rt_image, rtx.rt_image_memory, 0 ) );
-
-	Com_Memset( &ivci, 0, sizeof( ivci ) );
-	ivci.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	ivci.image = rtx.rt_image;
-	ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
-	ivci.format = vk.color_format;
-	ivci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	ivci.subresourceRange.levelCount = 1;
-	ivci.subresourceRange.layerCount = 1;
-	VK_CHECK( qvkCreateImageView( vk.device, &ivci, NULL, &rtx.rt_image_view ) );
-
-	Com_Memset( &imgInfo, 0, sizeof( imgInfo ) );
-	imgInfo.imageView = rtx.rt_image_view;
-	imgInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-	Com_Memset( &writes[0], 0, sizeof( writes[0] ) );
-	Com_Memset( &writes[1], 0, sizeof( writes[1] ) );
-	writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	writes[1].dstSet = rtx.descriptor_set;
-	writes[1].dstBinding = 1;
-	writes[1].descriptorCount = 1;
-	writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-	writes[1].pImageInfo = &imgInfo;
-	qvkUpdateDescriptorSets( vk.device, 1, &writes[1], 0, NULL );
+	vk_rtx_create_rt_output( w, h, rtx.descriptor_set );
 
 	vertices[0] = -1.0f; vertices[1] = -1.0f; vertices[2] = 0.0f;
 	vertices[3] =  1.0f; vertices[4] = -1.0f; vertices[5] = 0.0f;
@@ -433,27 +448,6 @@ void vk_rtx_init( void )
 	asci.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
 	VK_CHECK( qvkCreateAccelerationStructureKHR( vk.device, &asci, NULL, &rtx.blas ) );
 
-	vk_rtx_alloc_buffer( sizeInfoBLAS.buildScratchSize,
-		VK_BUFFER_USAGE_STORAGE_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &rtx.scratch_buffer, &rtx.scratch_memory, &scratchAddr );
-
-	Com_Memset( &rangeBLAS, 0, sizeof( rangeBLAS ) );
-	rangeBLAS.primitiveCount = 1;
-	pRangeBLAS = &rangeBLAS;
-
-	buildInfoBLAS.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
-	buildInfoBLAS.dstAccelerationStructure = rtx.blas;
-	buildInfoBLAS.scratchData.deviceAddress = scratchAddr;
-
-	buildCmd = vk.tess[0].command_buffer;
-	Com_Memset( &beginInfo, 0, sizeof( beginInfo ) );
-	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-	VK_CHECK( qvkBeginCommandBuffer( buildCmd, &beginInfo ) );
-	qvkCmdBuildAccelerationStructuresKHR( buildCmd, 1, &buildInfoBLAS, &pRangeBLAS );
-	VK_CHECK( qvkEndCommandBuffer( buildCmd ) );
-	vk_rtx_submit_oneshot_build( buildCmd );
-
 	Com_Memset( &addrInfo, 0, sizeof( addrInfo ) );
 	addrInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
 	addrInfo.accelerationStructure = rtx.blas;
@@ -500,10 +494,29 @@ void vk_rtx_init( void )
 	qvkGetAccelerationStructureBuildSizesKHR( vk.device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
 		&buildInfoTLAS, &maxInstTLAS, &sizeInfoTLAS );
 
-	vk_rtx_destroy_buffer( &rtx.scratch_buffer, &rtx.scratch_memory );
-	vk_rtx_alloc_buffer( sizeInfoTLAS.buildScratchSize,
+	scratchSize = sizeInfoBLAS.buildScratchSize;
+	if ( sizeInfoTLAS.buildScratchSize > scratchSize ) {
+		scratchSize = sizeInfoTLAS.buildScratchSize;
+	}
+	vk_rtx_alloc_buffer( scratchSize,
 		VK_BUFFER_USAGE_STORAGE_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &rtx.scratch_buffer, &rtx.scratch_memory, &scratchAddr );
+
+	Com_Memset( &rangeBLAS, 0, sizeof( rangeBLAS ) );
+	rangeBLAS.primitiveCount = 1;
+	pRangeBLAS = &rangeBLAS;
+	buildInfoBLAS.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
+	buildInfoBLAS.dstAccelerationStructure = rtx.blas;
+	buildInfoBLAS.scratchData.deviceAddress = scratchAddr;
+
+	buildCmd = vk.tess[0].command_buffer;
+	Com_Memset( &beginInfo, 0, sizeof( beginInfo ) );
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+	VK_CHECK( qvkBeginCommandBuffer( buildCmd, &beginInfo ) );
+	qvkCmdBuildAccelerationStructuresKHR( buildCmd, 1, &buildInfoBLAS, &pRangeBLAS );
+	VK_CHECK( qvkEndCommandBuffer( buildCmd ) );
+	vk_rtx_submit_oneshot_build( buildCmd );
 
 	vk_rtx_alloc_buffer( sizeInfoTLAS.accelerationStructureSize,
 		VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
@@ -520,7 +533,6 @@ void vk_rtx_init( void )
 	Com_Memset( &rangeTLAS, 0, sizeof( rangeTLAS ) );
 	rangeTLAS.primitiveCount = 1;
 	pRangeTLAS = &rangeTLAS;
-
 	buildInfoTLAS.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
 	buildInfoTLAS.dstAccelerationStructure = rtx.tlas;
 	buildInfoTLAS.scratchData.deviceAddress = scratchAddr;
@@ -622,6 +634,24 @@ void vk_rtx_init( void )
 	ri.Printf( PRINT_ALL, "[VK][RTX] Demo pipeline ready (r_rtx=%d); triangle trace composites into scene color\n", r_rtx->integer );
 }
 
+void vk_rtx_frame_begin( void )
+{
+	uint32_t w, h;
+
+	if ( !rtx.ready || !r_rtxDemo || !r_rtxDemo->integer ) {
+		return;
+	}
+
+	w = ( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u;
+	h = ( glConfig.vidHeight > 0 ) ? (uint32_t)glConfig.vidHeight : 1u;
+	if ( w == rtx.width && h == rtx.height ) {
+		return;
+	}
+
+	vk_rtx_create_rt_output( w, h, rtx.descriptor_set );
+	ri.Printf( PRINT_ALL, "[VK][RTX] Resized RT output to %ux%u\n", w, h );
+}
+
 void vk_rtx_record_demo_pass( VkCommandBuffer cmd )
 {
 	VkBufferDeviceAddressInfo addr;
@@ -629,9 +659,21 @@ void vk_rtx_record_demo_pass( VkCommandBuffer cmd )
 	VkStridedDeviceAddressRegionKHR raygenRegion, missRegion, hitRegion, callableRegion;
 	VkImageMemoryBarrier barriers[2];
 	VkImageBlit blit;
+	VkImageLayout colorOldLayout;
+	VkImageLayout colorRestoreLayout;
 
 	if ( !rtx.ready || !cmd || !r_rtxDemo || !r_rtxDemo->integer ) {
 		return;
+	}
+
+	/* vk_end_render_pass_tracked runs *after* vkCmdEndRenderPass: FBO color is already in finalLayout
+	 * (SHADER_READ_ONLY_OPTIMAL), not COLOR_ATTACHMENT_OPTIMAL. */
+	colorOldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	if ( vk.renderPassIndex == RENDER_PASS_POST_BLOOM ) {
+		colorRestoreLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	} else {
+		/* Next pass (post_bloom) may expect COLOR_ATTACHMENT when RTX adjusted its load/initial layouts. */
+		colorRestoreLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 	}
 
 	Com_Memset( &addr, 0, sizeof( addr ) );
@@ -684,9 +726,9 @@ void vk_rtx_record_demo_pass( VkCommandBuffer cmd )
 	barriers[1].subresourceRange.layerCount = 1;
 	barriers[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	barriers[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barriers[1].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	barriers[1].oldLayout = colorOldLayout;
 	barriers[1].newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-	barriers[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	barriers[1].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
 	barriers[1].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 
 	qvkCmdPipelineBarrier( cmd, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, VK_PIPELINE_STAGE_TRANSFER_BIT,
@@ -717,11 +759,17 @@ void vk_rtx_record_demo_pass( VkCommandBuffer cmd )
 
 	barriers[1].image = vk.color_image;
 	barriers[1].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-	barriers[1].newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	barriers[1].newLayout = colorRestoreLayout;
 	barriers[1].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-	barriers[1].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	if ( colorRestoreLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL ) {
+		barriers[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	} else {
+		barriers[1].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	}
 
-	qvkCmdPipelineBarrier( cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+	qvkCmdPipelineBarrier( cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
+		( colorRestoreLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL )
+			? VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT : VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 		0, 0, NULL, 0, NULL, 2, barriers );
 }
 
@@ -729,6 +777,7 @@ void vk_rtx_record_demo_pass( VkCommandBuffer cmd )
 
 void vk_rtx_init( void ) {}
 void vk_rtx_shutdown( void ) {}
+void vk_rtx_frame_begin( void ) {}
 void vk_rtx_record_demo_pass( VkCommandBuffer cmd ) { (void)cmd; }
 
 #endif /* USE_VULKAN_RTX */
