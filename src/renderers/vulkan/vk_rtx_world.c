@@ -1,6 +1,6 @@
 /*
 ===========================================================================
-World BSP geometry extraction for Vulkan RTX BLAS (faces + triangle soups).
+World BSP geometry extraction for Vulkan RTX BLAS (all brush submodels: faces + triangle soups).
 ===========================================================================
 */
 
@@ -44,25 +44,35 @@ static uint32_t rtx_count_surface_primitives( const msurface_t *sf )
 
 uint32_t vk_rtx_world_count_primitives( const world_t *w, uint32_t maxPrimitives )
 {
-	uint32_t n, i, total;
+	uint32_t n, i, bi, total;
+	int bmCount;
 	const bmodel_t *bm;
 	const msurface_t *sf;
 
 	if ( !w || !w->bmodels || w->surfaces == NULL ) {
 		return 0u;
 	}
-	bm = &w->bmodels[0];
+	bmCount = w->numBModels;
+	if ( bmCount <= 0 ) {
+		bmCount = 1;
+	}
 	total = 0u;
-	for ( i = 0; i < (uint32_t)bm->numSurfaces; i++ ) {
-		sf = bm->firstSurface + i;
-		n = rtx_count_surface_primitives( sf );
-		if ( n == 0u ) {
+	for ( bi = 0u; bi < (uint32_t)bmCount; bi++ ) {
+		bm = &w->bmodels[bi];
+		if ( bm->numSurfaces <= 0 || bm->firstSurface == NULL ) {
 			continue;
 		}
-		if ( total + n > maxPrimitives ) {
-			return maxPrimitives;
+		for ( i = 0; i < (uint32_t)bm->numSurfaces; i++ ) {
+			sf = bm->firstSurface + i;
+			n = rtx_count_surface_primitives( sf );
+			if ( n == 0u ) {
+				continue;
+			}
+			if ( total + n > maxPrimitives ) {
+				return maxPrimitives;
+			}
+			total += n;
 		}
-		total += n;
 	}
 	return total;
 }
@@ -140,7 +150,8 @@ static void rtx_emit_triangles_tris( const srfTriangles_t *surf, float *position
 uint32_t vk_rtx_world_pack( const world_t *w, uint32_t maxPrimitives,
 	float *positions, uint32_t *indices )
 {
-	uint32_t i, primCount, vertPos, idxPos;
+	uint32_t i, bi, primCount, vertPos, idxPos;
+	int bmCount;
 	const bmodel_t *bm;
 	const msurface_t *sf;
 	const surfaceType_t *st;
@@ -148,24 +159,33 @@ uint32_t vk_rtx_world_pack( const world_t *w, uint32_t maxPrimitives,
 	if ( !w || !w->bmodels || w->surfaces == NULL || maxPrimitives == 0u ) {
 		return 0u;
 	}
-	bm = &w->bmodels[0];
+	bmCount = w->numBModels;
+	if ( bmCount <= 0 ) {
+		bmCount = 1;
+	}
 	primCount = 0u;
 	vertPos = 0u;
 	idxPos = 0u;
 
-	for ( i = 0; i < (uint32_t)bm->numSurfaces; i++ ) {
-		sf = bm->firstSurface + i;
-		if ( !sf->data ) {
+	for ( bi = 0u; bi < (uint32_t)bmCount; bi++ ) {
+		bm = &w->bmodels[bi];
+		if ( bm->numSurfaces <= 0 || bm->firstSurface == NULL ) {
 			continue;
 		}
-		st = sf->data;
-		if ( *st == SF_FACE ) {
-			rtx_emit_face_tris( (const srfSurfaceFace_t *)st, positions, indices, &vertPos, &idxPos, maxPrimitives, &primCount );
-		} else if ( *st == SF_TRIANGLES ) {
-			rtx_emit_triangles_tris( (const srfTriangles_t *)st, positions, indices, &vertPos, &idxPos, maxPrimitives, &primCount );
-		}
-		if ( primCount >= maxPrimitives ) {
-			break;
+		for ( i = 0; i < (uint32_t)bm->numSurfaces; i++ ) {
+			sf = bm->firstSurface + i;
+			if ( !sf->data ) {
+				continue;
+			}
+			st = sf->data;
+			if ( *st == SF_FACE ) {
+				rtx_emit_face_tris( (const srfSurfaceFace_t *)st, positions, indices, &vertPos, &idxPos, maxPrimitives, &primCount );
+			} else if ( *st == SF_TRIANGLES ) {
+				rtx_emit_triangles_tris( (const srfTriangles_t *)st, positions, indices, &vertPos, &idxPos, maxPrimitives, &primCount );
+			}
+			if ( primCount >= maxPrimitives ) {
+				return primCount;
+			}
 		}
 	}
 	return primCount;

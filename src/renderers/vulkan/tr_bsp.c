@@ -1908,6 +1908,7 @@ static void R_LoadSubmodels( const lump_t *l ) {
 	count = l->filelen / sizeof(*in);
 
 	s_worldData.bmodels = out = ri.Hunk_Alloc( count * sizeof(*out), h_low );
+	s_worldData.numBModels = count;
 
 	for ( i=0 ; i<count ; i++, in++, out++ ) {
 		model_t *model;

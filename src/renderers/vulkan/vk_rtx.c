@@ -1,6 +1,6 @@
 /*
 ===========================================================================
-Vulkan KHR ray tracing: world BLAS (BSP faces + trisoups) + primary rays.
+Vulkan KHR ray tracing: world BLAS (all brush submodels: BSP faces + trisoups) + primary rays.
 
 Build with USE_VULKAN_RTX, set r_rtx > 0 before vid_restart. r_rtxDemo 1 runs
 per-frame trace using scene depth + invViewProj (see rgen). r_rtxWorldPrimCap
@@ -497,8 +497,9 @@ static void vk_rtx_rebuild_world_blas( void )
 	rtx.world_blas_valid = qtrue;
 
 	if ( useWorld && wn[0] != '\0' ) {
-		ri.Printf( PRINT_DEVELOPER, "[VK][RTX] BLAS rebuilt: %u tris from %s (cap %u)\n",
-			maxPrimBLAS, wn, capPrim );
+		int subm = ( tr.world->numBModels > 0 ) ? tr.world->numBModels : 1;
+		ri.Printf( PRINT_DEVELOPER, "[VK][RTX] BLAS rebuilt: %u tris from %s (%d brush submodels, cap %u)\n",
+			maxPrimBLAS, wn, subm, capPrim );
 	} else if ( wn[0] != '\0' ) {
 		ri.Printf( PRINT_DEVELOPER, "[VK][RTX] BLAS fallback triangle (no packable world tris for %s)\n", wn );
 	} else {
