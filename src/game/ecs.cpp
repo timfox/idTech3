@@ -275,4 +275,16 @@ void ECS_Each( ecs_component_id_t *components, int count, ecs_iter_cb_t cb, void
 	}
 }
 
+void ECS_StepMotion( float deltaTime ) {
+	if ( !s_registry || deltaTime <= 0.f ) return;
+	auto view = s_registry->view<PositionComponent, VelocityComponent>();
+	for ( auto ent : view ) {
+		auto &p = s_registry->get<PositionComponent>( ent );
+		const auto &v = s_registry->get<VelocityComponent>( ent );
+		p.x += v.x * deltaTime;
+		p.y += v.y * deltaTime;
+		p.z += v.z * deltaTime;
+	}
+}
+
 } /* extern "C" */
