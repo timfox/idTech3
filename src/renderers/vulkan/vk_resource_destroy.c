@@ -139,6 +139,26 @@ void vk_destroy_render_passes( void )
 	}
 }
 
+void vk_destroy_world_graphics_pipelines( void )
+{
+	uint32_t i, j;
+
+	if ( vk.device == VK_NULL_HANDLE || vk.pipelines_count <= (uint32_t)vk.pipelines_world_base ) {
+		return;
+	}
+	for ( i = (uint32_t)vk.pipelines_world_base; i < vk.pipelines_count; i++ ) {
+		for ( j = 0; j < RENDER_PASS_COUNT; j++ ) {
+			if ( vk.pipelines[i].handle[j] != VK_NULL_HANDLE ) {
+				qvkDestroyPipeline( vk.device, vk.pipelines[i].handle[j], NULL );
+				vk.pipelines[i].handle[j] = VK_NULL_HANDLE;
+				vk.pipeline_create_count--;
+			}
+		}
+		Com_Memset( &vk.pipelines[i], 0, sizeof( vk.pipelines[0] ) );
+	}
+	vk.pipelines_count = (uint32_t)vk.pipelines_world_base;
+}
+
 void vk_destroy_pipelines( qboolean resetCounter )
 {
 	uint32_t i, j;
