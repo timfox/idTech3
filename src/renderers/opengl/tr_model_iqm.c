@@ -1253,7 +1253,7 @@ Compute vertices for this model surface
 =================
 */
 void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
-	srfIQModel_t	*surf = (srfIQModel_t *)surface;
+	const srfIQModel_t *surf = (const srfIQModel_t *)(const void *)surface;
 	iqmData_t	*data = surf->data;
 	float		poseMats[IQM_MAX_JOINTS * 12];
 	float		influenceVtxMat[SHADER_MAX_VERTEXES * 12];
@@ -1348,7 +1348,7 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 				vtxMat[10] = blendWeights[0] * poseMats[12 * data->influenceBlendIndexes[4*influence + 0] + 10];
 				vtxMat[11] = blendWeights[0] * poseMats[12 * data->influenceBlendIndexes[4*influence + 0] + 11];
 
-				for( j = 1; j < ARRAY_LEN( blendWeights ); j++ ) {
+				for ( j = 1; j < 4; j++ ) {
 					if ( blendWeights[j] <= 0.0f ) {
 						break;
 					}

@@ -1922,7 +1922,7 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 				vtxMat[10] = blendWeights[0] * poseMats[12 * data->influenceBlendIndexes[4*influence + 0] + 10];
 				vtxMat[11] = blendWeights[0] * poseMats[12 * data->influenceBlendIndexes[4*influence + 0] + 11];
 
-				for ( j = 1; j < (int)ARRAY_LEN( blendWeights ); j++ ) {
+				for ( j = 1; j < 4; j++ ) {
 					if ( blendWeights[j] <= 0.0f ) {
 						break;
 					}
@@ -1980,7 +1980,7 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 					vtxPrev[9] = blendWeights[0] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + 0] + 9];
 					vtxPrev[10] = blendWeights[0] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + 0] + 10];
 					vtxPrev[11] = blendWeights[0] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + 0] + 11];
-					for ( jp = 1; jp < (int)ARRAY_LEN( blendWeights ); jp++ ) {
+					for ( jp = 1; jp < 4; jp++ ) {
 						if ( blendWeights[jp] <= 0.0f ) {
 							break;
 						}
