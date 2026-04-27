@@ -37,7 +37,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #endif
 
 #define USE_VBO				// store static world geometry in VBO
-#define USE_FOG_ONLY
 #define USE_FOG_COLLAPSE	// not compatible with legacy dlights
 #define USE_PMLIGHT			// promode dynamic lights via \r_dlightMode 1|2
 #define MAX_REAL_DLIGHTS	(MAX_DLIGHTS*2)

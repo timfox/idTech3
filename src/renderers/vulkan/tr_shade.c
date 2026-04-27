@@ -723,7 +723,6 @@ Blends a fog texture on top of everything else
 #ifdef USE_VULKAN
 static void RB_FogPass( qboolean rebindIndex ) {
 	uint32_t pipeline = vk.fog_pipelines[tess.shader->fogPass - 1][tess.shader->cullType][tess.shader->polygonOffset];
-#ifdef USE_FOG_ONLY
 	int fog_stage;
 
 	// fog parameters
@@ -735,26 +734,6 @@ static void RB_FogPass( qboolean rebindIndex ) {
 	vk_push_uniform( &uniform );
 	vk_update_descriptor( VK_DESC_FOG_ONLY, tr.fogImage->descriptor );
 	vk_draw_geometry( DEPTH_RANGE_NORMAL, qtrue );
-#else
-	const fog_t	*fog = tr.world->fogs + tess.fogNum;
-	const color4ub_t fogColor = RB_TintedFogColor( fog );
-	int	i;
-
-	for ( i = 0; i < tess.numVertexes; i++ ) {
-		tess.svars.colors[0][i] = fogColor;
-	}
-
-	RB_CalcFogTexCoords( ( float * ) tess.svars.texcoords[0] );
-	tess.svars.texcoordPtr[ 0 ] = tess.svars.texcoords[ 0 ];
-	GL_Bind( tr.fogImage );
-
-	vk_bind_pipeline( pipeline );
-	if ( rebindIndex ) {
-		vk_bind_index();
-	}
-	vk_bind_geometry( TESS_ST0 | TESS_RGBA0 );
-	vk_draw_geometry( DEPTH_RANGE_NORMAL, qtrue );
-#endif
 #else
 static void RB_FogPass( void ) {
 	const fog_t	*fog;
