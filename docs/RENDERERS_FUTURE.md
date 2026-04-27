@@ -8,7 +8,7 @@ This document outlines the architecture and implementation plan for three render
 |---------|--------|-------|
 | **Vulkan** | ✅ Complete | Primary renderer, ~18k LOC |
 | **OpenGL** | ✅ Complete | Fallback renderer |
-| **Vulkan RTX** | 🔶 Demo path | With `USE_VULKAN_RTX=ON` and `r_rtx`>0 (latched): device enables KHR AS + ray-tracing pipeline + BDA. `r_rtxDemo` 1 (default): triangle BLAS/TLAS, minimal RTPSO, `vkCmdTraceRaysKHR` after main/post-bloom pass, blit into resolved color (layout barriers match FBO `SHADER_READ_ONLY` after `vkCmdEndRenderPass`). `r_rtxDemo` 0: extensions only. |
+| **Vulkan RTX** | 🔶 Demo path | With `USE_VULKAN_RTX=ON` and `r_rtx`>0 (latched): device enables KHR AS + ray-tracing pipeline + BDA. `r_rtxDemo` 1 (default): world BSP BLAS (SF_FACE + SF_TRIANGLES, capped by latched `r_rtxWorldPrimCap`) when a map is loaded, else a fallback triangle; raygen uses depth + `invViewProj` UBO; trace after main/post-bloom, blit into resolved color (depth briefly transitioned to read-only on main pass). `r_rtxDemo` 0: extensions only. |
 | **Metal** | ❌ Not started | Native Apple Silicon / macOS |
 | **DXR** | ❌ Not started | DirectX 12 + DirectX Raytracing (Windows) |
 
