@@ -41,6 +41,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_attachments.h"
 #include "vk_resource_destroy.h"
 #include "vk_descriptor_sets.h"
+#include "vk_rtx.h"
 #include "vk_pipeline_helpers.h"
 #include "vk_raster_samples.h"
 #include "vk_fluidsim.h"
@@ -1158,6 +1159,8 @@ void vk_initialize( void )
 
 	// framebuffers for each swapchain image
 	vk_create_framebuffers();
+
+	vk_rtx_init();
 
 #ifdef VK_CUBEMAP
 	vk_create_cubemap_prefilter();

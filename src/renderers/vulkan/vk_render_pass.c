@@ -3,6 +3,7 @@
 #include "vk_postfx.h"
 #include "vk_render_pass.h"
 #include "vk_validation.h"
+#include "vk_rtx.h"
 
 void vk_set_fullscreen_viewport_scissor( uint32_t width, uint32_t height )
 {
@@ -124,6 +125,13 @@ void vk_end_render_pass_tracked( void )
 
 	qvkCmdEndRenderPass( vk.cmd->command_buffer );
 	vk.inRenderPass = qfalse;
+
+#ifdef USE_VULKAN_RTX
+	if ( vk.rtxAvailable && vk.fboActive && r_rtx && r_rtx->integer > 0 &&
+		( vk.renderPassIndex == RENDER_PASS_MAIN || vk.renderPassIndex == RENDER_PASS_POST_BLOOM ) ) {
+		vk_rtx_record_demo_pass( vk.cmd->command_buffer );
+	}
+#endif
 }
 void vk_create_render_passes( void )
 {
