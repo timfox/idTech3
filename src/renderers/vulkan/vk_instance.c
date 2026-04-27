@@ -188,6 +188,8 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 	VkPhysicalDevice8BitStorageFeatures storage_8bit_features;
 #endif
 	VkPhysicalDeviceMeshShaderFeaturesNV mesh_shader_features_nv;
+	/* Must survive until qvkCreateDevice (do not declare inside a narrow if-block). */
+	VkPhysicalDeviceHostQueryResetFeatures host_query;
 
 	ri.Printf( PRINT_ALL, "...selected physical device: %i\n", device_index );
 
@@ -681,7 +683,6 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		}
 #endif
 		if ( hostQueryReset ) {
-			VkPhysicalDeviceHostQueryResetFeatures host_query;
 			const void *prev_next = device_desc.pNext;
 			Com_Memset( &host_query, 0, sizeof( host_query ) );
 			host_query.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES;

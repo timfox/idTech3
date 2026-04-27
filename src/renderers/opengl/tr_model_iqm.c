@@ -1073,7 +1073,7 @@ void R_AddIQMSurfaces( trRefEntity_t *ent ) {
 	// don't add third_person objects if not in a portal
 	personalModel = (ent->e.renderfx & RF_THIRD_PERSON) && (tr.viewParms.portalView == PV_NONE);
 
-	if ( ent->e.renderfx & RF_WRAP_FRAMES ) {
+	if ( ent->e.renderfx & RF_WRAP_FRAMES && data->num_frames > 0 ) {
 		ent->e.frame %= data->num_frames;
 		ent->e.oldframe %= data->num_frames;
 	}

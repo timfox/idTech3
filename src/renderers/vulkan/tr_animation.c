@@ -192,10 +192,15 @@ void R_MDRAddAnimSurfaces( trRefEntity_t *ent ) {
 
 	personalModel = (ent->e.renderfx & RF_THIRD_PERSON) && (tr.viewParms.portalView == PV_NONE);
 
+	if ( !header || header->numFrames < 1 ) {
+		return;
+	}
+
 	if ( ent->e.renderfx & RF_WRAP_FRAMES )
 	{
-		ent->e.frame %= header->numFrames;
-		ent->e.oldframe %= header->numFrames;
+		const int nf = (int)header->numFrames;
+		ent->e.frame %= nf;
+		ent->e.oldframe %= nf;
 	}
 
 	//
