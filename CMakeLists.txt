@@ -2421,6 +2421,12 @@ add_test(NAME test_compile_engine_lto
 set_tests_properties(test_compile_engine_lto PROPERTIES
 	LABELS "unit;scripts;validation")
 
+add_test(NAME test_botlib_bounded_strings
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_botlib_bounded_strings.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_botlib_bounded_strings PROPERTIES
+	LABELS "unit;scripts;validation")
+
 # --- Unit tests ---
 option(BUILD_UNIT_TESTS "Build unit tests" ON)
 if(BUILD_UNIT_TESTS)

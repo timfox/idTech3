@@ -1,4 +1,5 @@
 # Tests
 
 - **Unit** (`BUILD_UNIT_TESTS=ON`): `unit_macros`, `unit_qmath`, `unit_surfaceflags`, `unit_qhelpers`, `unit_crc`, `unit_pathutil`, `unit_msg`, `unit_info`, `unit_cm_bounds`, `unit_parse`, `unit_endian` (CRC, COM path, `Info_*`, `COM_Parse*`, and endian tests use the same minimal `stub_qcommon_min.c` + `q_shared.c` + `q_math.c` link as `unit_qhelpers`; `unit_msg` links `msg.c` + `huffman_static.c` with `stub_qcommon_min.c`, `stub_msg_cvar.c`, and `-DDEDICATED`; `unit_cm_bounds` links `cm_bounds.c` + `q_math.c` only) — run `ctest -R unit_` or `./unit_*` from the build directory.
+- **Script regression tests**: `test_run_vulkan_script`, `test_demo_game_pk3`, `test_compile_engine_lto`, `test_botlib_bounded_strings` cover launcher/build packaging behavior and source-level safety invariants. Run them with `ctest -R 'test_(run_vulkan_script|demo_game_pk3|compile_engine_lto|botlib_bounded_strings)'` from the build directory.
 - **Validation**: `smoke_test`, `renderer_regression_check`, `check_artifacts` — see `scripts/` and `docs/RENDERER_CONFIDENCE.md`.
