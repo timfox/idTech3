@@ -66,9 +66,10 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
     struct Vk_Pipeline_FragSpecData frag_spec_data;
 
 #ifdef USE_VK_PBR
-    VkSpecializationMapEntry spec_entries[38];
+	/* ADD_FRAG_SPEC: 11 base + 30 PBR (constant_id 11..40) + lightmap_scale/srgb = 41 entries; was 38 (stack smash / SIGABRT). */
+	VkSpecializationMapEntry spec_entries[48];
 #else
-    VkSpecializationMapEntry spec_entries[12];
+	VkSpecializationMapEntry spec_entries[12];
 #endif
 	
 	VkSpecializationInfo frag_spec_info;
@@ -816,6 +817,11 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 		r_hdr_lightmap_scale->value : 1.0f;
 
 	frag_spec_data.lightmap_srgb_decode = ( r_lightmap_srgb_decode && r_lightmap_srgb_decode->integer && r_hdr && r_hdr->integer > 0 ) ? 1 : 0;
+
+	if ( spec_entry_count > (int)( sizeof( spec_entries ) / sizeof( spec_entries[0] ) ) ) {
+		ri.Error( ERR_FATAL, "vk_create_pipeline: fragment specialization map overflow (%d > %u)",
+			spec_entry_count, (unsigned int)( sizeof( spec_entries ) / sizeof( spec_entries[0] ) ) );
+	}
 
 	frag_spec_info.mapEntryCount = spec_entry_count;
 	frag_spec_info.pMapEntries = spec_entries;
