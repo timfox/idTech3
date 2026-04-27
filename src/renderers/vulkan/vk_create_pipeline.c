@@ -66,10 +66,15 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
     struct Vk_Pipeline_FragSpecData frag_spec_data;
 
 #ifdef USE_VK_PBR
-	/* ADD_FRAG_SPEC: 11 base + 30 PBR (constant_id 11..40) + lightmap_scale/srgb = 41 entries; was 38 (stack smash / SIGABRT). */
+	/* ADD_FRAG_SPEC: 11 base (0..10) + 30 PBR (constant_id 11..40, includes lightmap_scale/srgb at 32..33) = 41 entries.
+	 * Was 38 → stack smash / SIGABRT in debug when vk_create_pipelines ran after VarInfo. */
 	VkSpecializationMapEntry spec_entries[48];
+	_Static_assert( sizeof( spec_entries ) / sizeof( spec_entries[0] ) >= 41u,
+		"vk_create_pipeline: spec_entries[] too small for PBR fragment specialization map" );
 #else
 	VkSpecializationMapEntry spec_entries[12];
+	_Static_assert( sizeof( spec_entries ) / sizeof( spec_entries[0] ) >= 11u,
+		"vk_create_pipeline: spec_entries[] too small for non-PBR fragment specialization map" );
 #endif
 	
 	VkSpecializationInfo frag_spec_info;
