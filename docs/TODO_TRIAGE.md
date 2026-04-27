@@ -68,6 +68,7 @@ TODOs/FIXMEs in `src/external/` are from third-party code (duktape, zstd, cjson,
 
 | Date | Scope | Notes |
 |------|--------|------|
+| 2026-04-27 | Vulkan / PBR | `vk_create_pipeline.c`: PBR `ADD_FRAG_SPEC` wrote 41 map entries into `spec_entries[38]` (stack smash / SIGABRT after `VarInfo`); enlarged buffer + overflow guard. |
 | 2026-04-27 | Vulkan / IQM | `tr_model_iqm.c`: avoid `-Wcast-qual` on `backEnd.currentEntity` (uintptr_t bridge). Vegetation wind: `vk_vegetation_wind.c` header + triage row clarify dispatch-after-draw vs binding `vegwind_vertex_buffer` (still TODO). |
 | 2026-04-11 | Network / downloads | `cl_curl.c`: `dl->Name` from `Content-Disposition` uses **`Q_strncpyz`** (Phase 2 P0 item remains fixed). |
 | 2026-04-11 | Botlib / preprocessor | **`src/botlib/l_precomp.c`** already bounded; duplicate **`src/platform/botlib/l_precomp.c`** and **`src/platform/win32/botlib/l_precomp.c`** aligned: `sprintf` → **`Com_sprintf(..., MAX_TOKEN, ...)`** (5 sites each). |
