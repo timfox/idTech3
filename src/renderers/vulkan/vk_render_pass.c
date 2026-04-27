@@ -350,6 +350,17 @@ void vk_create_render_passes( void )
 				attachments[4].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 			}
 		}
+#ifdef USE_VULKAN_RTX
+		/* RTX demo blit leaves resolved color in COLOR_ATTACHMENT_OPTIMAL; match layouts so post_bloom is valid. */
+		if ( fboActive && vk.rtxAvailable && r_rtx && r_rtx->integer > 0 ) {
+			attachments[0].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			attachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			if ( vk.msaaActive ) {
+				attachments[3].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+				attachments[3].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			}
+		}
+#endif
 		VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.post_bloom ) );
 		SET_OBJECT_NAME( vk.render_pass.post_bloom, "render pass - post_bloom", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
 	}

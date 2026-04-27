@@ -27,6 +27,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_temporal.h"
 #include "vk_util.h"
 #include "vk_volumetric_internal.h"
+#include "vk_rtx.h"
 
 #ifdef __ANDROID__
 #include "../../platform/android/android_surface_glue.h"
@@ -119,6 +120,10 @@ void vk_begin_frame( void )
 #endif
 
 	vk.cmd = &vk.tess[ vk.cmd_index ];
+
+#ifdef USE_VULKAN_RTX
+	vk_rtx_frame_begin();
+#endif
 
 	if ( vk.cmd->waitForFence ) {
 		vk.cmd->waitForFence = qfalse;
