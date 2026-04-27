@@ -1748,7 +1748,9 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 	iqmData_t	*data = surf->data;
 	const trRefEntity_t *ent = backEnd.currentEntity;
 #ifdef USE_VULKAN
-	trRefEntity_t *entMutable = (trRefEntity_t *)backEnd.currentEntity;
+	/* currentEntity points at tr.worldEntity or refdef.entities[] (mutable storage);
+	 * const is for front-end discipline; avoid direct const-drop cast (-Wcast-qual). */
+	trRefEntity_t *entMutable = (trRefEntity_t *)(void *)(uintptr_t)backEnd.currentEntity;
 #endif
 	const iqmMorphSurface_t *morphSurface = NULL;
 	qboolean applyMorph = qfalse;
