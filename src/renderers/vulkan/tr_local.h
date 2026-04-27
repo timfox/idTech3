@@ -1070,6 +1070,7 @@ typedef struct {
 	dshader_t	*shaders;
 
 	bmodel_t	*bmodels;
+	int			numBModels;		/* LUMP_MODELS count; *0..*(numBModels-1) */
 
 	int			numplanes;
 	cplane_t	*planes;
