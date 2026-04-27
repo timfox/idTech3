@@ -372,6 +372,37 @@ static int l_eda_clear( lua_State *L ) {
 	EDA_Clear();
 	return 0;
 }
+static int l_eda_drain( lua_State *L ) {
+	int i, n, cap;
+	edaEventRecord_t stackBuf[64];
+	edaEventRecord_t *buf = stackBuf;
+	cap = (int)luaL_optinteger( L, 1, 32 );
+	if ( cap < 1 ) {
+		cap = 1;
+	}
+	if ( cap > 256 ) {
+		cap = 256;
+	}
+	if ( cap > 64 ) {
+		buf = (edaEventRecord_t *)Z_TagMalloc( (int)( (size_t)cap * sizeof( *buf ) ), TAG_GENERAL );
+		Com_Memset( buf, 0, (size_t)cap * sizeof( *buf ) );
+	}
+	n = EDA_Drain( buf, cap );
+	lua_createtable( L, n, 0 );
+	for ( i = 0; i < n; i++ ) {
+		lua_createtable( L, 0, 2 );
+		lua_pushstring( L, buf[i].channel );
+		lua_setfield( L, -2, "channel" );
+		lua_pushstring( L, buf[i].payload );
+		lua_setfield( L, -2, "payload" );
+		lua_rawseti( L, -2, i + 1 );
+	}
+	if ( buf != stackBuf ) {
+		Z_Free( buf );
+	}
+	lua_pushinteger( L, (lua_Integer)n );
+	return 2;
+}
 
 /* ========== Telemetry / replay / save / quest / dialogue ========== */
 
@@ -465,6 +496,15 @@ static int l_ecs_valid(lua_State *L) {
 }
 static int l_ecs_count(lua_State *L) {
 	lua_pushinteger(L, (lua_Integer)ECS_Count());
+	return 1;
+}
+static int l_ecs_countWith( lua_State *L ) {
+	ecs_component_id_t c = ECS_ComponentFromName( luaL_checkstring( L, 1 ) );
+	if ( c >= ECS_COMP_COUNT ) {
+		lua_pushinteger( L, 0 );
+	} else {
+		lua_pushinteger( L, (lua_Integer)ECS_CountWith( c ) );
+	}
 	return 1;
 }
 static int l_ecs_has(lua_State *L) {
@@ -1023,7 +1063,7 @@ void LuaBindings_RegisterAll(void *luaState) {
 #ifdef USE_ECS
 	static const luaL_Reg ecsFuncs[] = {
 		{"create", l_ecs_create}, {"destroy", l_ecs_destroy},
-		{"valid", l_ecs_valid}, {"count", l_ecs_count},
+		{"valid", l_ecs_valid}, {"count", l_ecs_count}, {"countWith", l_ecs_countWith},
 		{"has", l_ecs_has}, {"add", l_ecs_add}, {"remove", l_ecs_remove},
 		{"setPosition", l_ecs_setPosition}, {"getPosition", l_ecs_getPosition},
 		{"setRotation", l_ecs_setRotation}, {"getRotation", l_ecs_getRotation},
@@ -1058,6 +1098,7 @@ void LuaBindings_RegisterAll(void *luaState) {
 		{"publish", l_eda_publish},
 		{"pop", l_eda_pop},
 		{"queueDepth", l_eda_queueDepth},
+		{"drain", l_eda_drain},
 		{"clear", l_eda_clear},
 		{NULL, NULL}
 	};

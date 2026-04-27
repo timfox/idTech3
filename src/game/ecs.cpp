@@ -102,6 +102,22 @@ uint32_t ECS_Count( void ) {
 	return static_cast<uint32_t>( s_registry->storage<entt::entity>().size() );
 }
 
+uint32_t ECS_CountWith( ecs_component_id_t comp ) {
+	if ( !s_registry || comp < 0 || comp >= ECS_COMP_COUNT ) {
+		return 0;
+	}
+	switch ( comp ) {
+		case ECS_COMP_POSITION:  return static_cast<uint32_t>( s_registry->view<PositionComponent>().size() );
+		case ECS_COMP_ROTATION:  return static_cast<uint32_t>( s_registry->view<RotationComponent>().size() );
+		case ECS_COMP_SCALE:     return static_cast<uint32_t>( s_registry->view<ScaleComponent>().size() );
+		case ECS_COMP_VELOCITY:  return static_cast<uint32_t>( s_registry->view<VelocityComponent>().size() );
+		case ECS_COMP_HEALTH:     return static_cast<uint32_t>( s_registry->view<HealthComponent>().size() );
+		case ECS_COMP_TAG:        return static_cast<uint32_t>( s_registry->view<TagComponent>().size() );
+		case ECS_COMP_GENTITY_LINK: return static_cast<uint32_t>( s_registry->view<GentityLinkComponent>().size() );
+		default: return 0;
+	}
+}
+
 static qboolean has_comp( ecs_entity_t e, ecs_component_id_t comp ) {
 	if ( !s_registry ) return qfalse;
 	entt::entity ent = to_entt( e );

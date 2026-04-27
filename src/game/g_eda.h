@@ -18,6 +18,11 @@ Lua is served by Engine.Events in g_lua_bindings.c.
 #define EDA_MAX_NAME       48
 #define EDA_MAX_PAYLOAD    256
 
+typedef struct {
+	char channel[EDA_MAX_NAME];
+	char payload[EDA_MAX_PAYLOAD];
+} edaEventRecord_t;
+
 void    EDA_Init( void );
 void    EDA_Shutdown( void );
 void    EDA_Frame( void );
@@ -33,5 +38,8 @@ qboolean EDA_Pop( char *channelOut, int channelLen, char *payloadOut, int payloa
 
 int     EDA_QueueDepth( void );
 void    EDA_Clear( void );
+
+/* Drain up to maxOut events into out[0..]; returns count written. */
+int     EDA_Drain( edaEventRecord_t *out, int maxOut );
 
 #endif /* G_EDA_H */

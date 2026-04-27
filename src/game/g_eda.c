@@ -147,6 +147,19 @@ void EDA_Clear( void ) {
 	Com_Memset( s_queue, 0, sizeof( s_queue ) );
 }
 
+int EDA_Drain( edaEventRecord_t *out, int maxOut ) {
+	int n;
+	if ( !out || maxOut <= 0 ) {
+		return 0;
+	}
+	for ( n = 0; n < maxOut; n++ ) {
+		if ( !EDA_Pop( out[n].channel, (int)sizeof( out[n].channel ), out[n].payload, (int)sizeof( out[n].payload ) ) ) {
+			break;
+		}
+	}
+	return n;
+}
+
 void EDA_Frame( void ) {
 	/* Reserved: hook for future coalescing or per-frame limits. */
 	(void)0;
