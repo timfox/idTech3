@@ -408,6 +408,18 @@ void vk_forward_plus_on_descriptor_pool_destroyed( void )
 
 static void vk_fp_destroy_light_buffer( void )
 {
+	if ( vk.forward_plus.staging != VK_NULL_HANDLE ) {
+		qvkDestroyBuffer( vk.device, vk.forward_plus.staging, NULL );
+		vk.forward_plus.staging = VK_NULL_HANDLE;
+	}
+	if ( vk.forward_plus.staging_memory != VK_NULL_HANDLE ) {
+		if ( vk.forward_plus.staging_ptr != NULL ) {
+			qvkUnmapMemory( vk.device, vk.forward_plus.staging_memory );
+			vk.forward_plus.staging_ptr = NULL;
+		}
+		qvkFreeMemory( vk.device, vk.forward_plus.staging_memory, NULL );
+		vk.forward_plus.staging_memory = VK_NULL_HANDLE;
+	}
 	if ( vk.forward_plus.buffer != VK_NULL_HANDLE ) {
 		qvkDestroyBuffer( vk.device, vk.forward_plus.buffer, NULL );
 		vk.forward_plus.buffer = VK_NULL_HANDLE;
@@ -416,7 +428,8 @@ static void vk_fp_destroy_light_buffer( void )
 		qvkFreeMemory( vk.device, vk.forward_plus.memory, NULL );
 		vk.forward_plus.memory = VK_NULL_HANDLE;
 	}
-	vk.forward_plus.mapped = NULL;
+	vk.forward_plus.staging_ptr = NULL;
+	vk.forward_plus.last_upload_bytes = 0u;
 	vk.forward_plus.capacity_bytes = 0u;
 }
 
@@ -492,18 +505,30 @@ static void vk_fp_create_buffers_and_compute( void )
 	bci.pQueueFamilyIndices = NULL;
 	VK_CHECK( qvkCreateBuffer( vk.device, &bci, NULL, &vk.forward_plus.buffer ) );
 	qvkGetBufferMemoryRequirements( vk.device, vk.forward_plus.buffer, &mr );
-	mem_type = vk_find_memory_type( vk.physical_device, mr.memoryTypeBits,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+	mem_type = vk_find_memory_type( vk.physical_device, mr.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 	mai.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	mai.pNext = NULL;
 	mai.allocationSize = mr.size;
 	mai.memoryTypeIndex = mem_type;
 	VK_CHECK( qvkAllocateMemory( vk.device, &mai, NULL, &vk.forward_plus.memory ) );
-	VK_CHECK( qvkMapMemory( vk.device, vk.forward_plus.memory, 0, VK_WHOLE_SIZE, 0, &vk.forward_plus.mapped ) );
 	VK_CHECK( qvkBindBufferMemory( vk.device, vk.forward_plus.buffer, vk.forward_plus.memory, 0 ) );
-	vk.forward_plus.capacity_bytes = (uint32_t)mr.size;
-	Com_Memset( vk.forward_plus.mapped, 0, (size_t)mr.size );
-	SET_OBJECT_NAME( vk.forward_plus.buffer, "forward+ light records", VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT );
+	vk.forward_plus.capacity_bytes = (uint32_t)light_buf_size;
+	SET_OBJECT_NAME( vk.forward_plus.buffer, "forward+ light records (device)", VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT );
+
+	/* Host staging: CPU pack each frame, copy to device before tile cull (VRAM path for compute + PBR). */
+	bci.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+	VK_CHECK( qvkCreateBuffer( vk.device, &bci, NULL, &vk.forward_plus.staging ) );
+	qvkGetBufferMemoryRequirements( vk.device, vk.forward_plus.staging, &mr );
+	mem_type = vk_find_memory_type( vk.physical_device, mr.memoryTypeBits,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+	mai.allocationSize = mr.size;
+	mai.memoryTypeIndex = mem_type;
+	VK_CHECK( qvkAllocateMemory( vk.device, &mai, NULL, &vk.forward_plus.staging_memory ) );
+	VK_CHECK( qvkMapMemory( vk.device, vk.forward_plus.staging_memory, 0, VK_WHOLE_SIZE, 0, &vk.forward_plus.staging_ptr ) );
+	VK_CHECK( qvkBindBufferMemory( vk.device, vk.forward_plus.staging, vk.forward_plus.staging_memory, 0 ) );
+	Com_Memset( vk.forward_plus.staging_ptr, 0, (size_t)light_buf_size );
+	SET_OBJECT_NAME( vk.forward_plus.staging, "forward+ light records (staging)", VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT );
+	vk.forward_plus.last_upload_bytes = 0u;
 
 	if ( vk.modules.forward_plus_tile_cull_cs == VK_NULL_HANDLE ) {
 		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "[VK][Forward+] forward_plus_tile_cull compute shader missing; tile SSBO disabled\n" S_COLOR_WHITE );
@@ -705,7 +730,7 @@ void vk_forward_plus_init( void )
 
 	vk_fp_create_buffers_and_compute();
 
-	ri.Printf( PRINT_ALL, "[VK][Forward+] r_forwardPlus=1 GPU light record buffer %u bytes\n",
+	ri.Printf( PRINT_ALL, "[VK][Forward+] r_forwardPlus=1 device-local light SSBO + staging %u bytes (tile cull + PBR read VRAM)\n",
 		(unsigned)vk.forward_plus.capacity_bytes );
 }
 
@@ -729,11 +754,11 @@ void vk_forward_plus_update_for_refdef( void )
 	if ( !r_forwardPlus || !r_forwardPlus->integer ) {
 		return;
 	}
-	if ( vk.forward_plus.buffer == VK_NULL_HANDLE || vk.forward_plus.mapped == NULL ) {
+	if ( vk.forward_plus.buffer == VK_NULL_HANDLE || vk.forward_plus.staging_ptr == NULL ) {
 		return;
 	}
 
-	base = (float *)vk.forward_plus.mapped;
+	base = (float *)vk.forward_plus.staging_ptr;
 	src = backEnd.refdef.num_dlights;
 	n = src;
 	if ( n > (uint32_t)MAX_DLIGHTS ) {
@@ -827,6 +852,62 @@ void vk_forward_plus_update_for_refdef( void )
 	}
 
 	vk.forward_plus.last_packed_count = n;
+	vk.forward_plus.last_upload_bytes = (uint32_t)VK_FP_HEADER_BYTES + n * (uint32_t)VK_FP_RECORD_STRIDE;
+}
+
+void vk_forward_plus_upload_refdef( void )
+{
+	VkBufferMemoryBarrier b[2];
+	VkBufferCopy region;
+
+	if ( !r_forwardPlus || !r_forwardPlus->integer ) {
+		return;
+	}
+	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
+		return;
+	}
+	if ( vk.forward_plus.buffer == VK_NULL_HANDLE || vk.forward_plus.staging == VK_NULL_HANDLE ||
+		vk.forward_plus.staging_ptr == NULL || vk.forward_plus.last_upload_bytes == 0u ) {
+		return;
+	}
+
+	Com_Memset( b, 0, sizeof( b ) );
+	b[0].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+	b[0].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	b[0].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	b[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	b[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	b[0].buffer = vk.forward_plus.buffer;
+	b[0].offset = 0;
+	b[0].size = VK_WHOLE_SIZE;
+	b[1].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+	b[1].srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+	b[1].dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+	b[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	b[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	b[1].buffer = vk.forward_plus.staging;
+	b[1].offset = 0;
+	b[1].size = VK_WHOLE_SIZE;
+	qvkCmdPipelineBarrier( vk.cmd->command_buffer,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_HOST_BIT,
+		VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 2, b, 0, NULL );
+
+	region.srcOffset = 0;
+	region.dstOffset = 0;
+	region.size = (VkDeviceSize)vk.forward_plus.last_upload_bytes;
+	qvkCmdCopyBuffer( vk.cmd->command_buffer, vk.forward_plus.staging, vk.forward_plus.buffer, 1, &region );
+
+	Com_Memset( b, 0, sizeof( b[0] ) );
+	b[0].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+	b[0].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	b[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	b[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	b[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	b[0].buffer = vk.forward_plus.buffer;
+	b[0].offset = 0;
+	b[0].size = VK_WHOLE_SIZE;
+	qvkCmdPipelineBarrier( vk.cmd->command_buffer,
+		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 1, b, 0, NULL );
 }
 
 VkDescriptorSet vk_forward_plus_get_graphics_descriptor_set( void )
@@ -878,7 +959,7 @@ void vk_forward_plus_dispatch_tile_cull( void )
 
 	Com_Memset( barriers, 0, sizeof( barriers ) );
 	barriers[0].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-	barriers[0].srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+	barriers[0].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
 	barriers[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 	barriers[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	barriers[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;

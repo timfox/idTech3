@@ -3476,9 +3476,9 @@ static void R_Register( void )
 	r_rtxWorldPrimCap = ri.Cvar_Get( "r_rtxWorldPrimCap", "262144", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_rtxWorldPrimCap, "4096", "1048576", CV_INTEGER );
 	ri.Cvar_SetDescription( r_rtxWorldPrimCap, "Max triangles packed into the RTX world BLAS (latched). Lower on huge maps if BLAS build fails." );
-	r_forwardPlus = ri.Cvar_Get( "r_forwardPlus", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	r_forwardPlus = ri.Cvar_Get( "r_forwardPlus", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_forwardPlus, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_forwardPlus, "Forward+ scaffolding: GPU light SSBO + per-tile cull compute (16px tiles; max per tile from \\r_forwardPlusMaxPerTile, default 8). Packs at most MAX_DLIGHTS (32) so indices match tess.dlightBits. PBR: \\r_forwardPlusDebug (overlay), \\r_forwardPlusShade (experimental additive lights); see docs/RENDERER_2026_ARCHITECTURE_PASS.md." );
+	ri.Cvar_SetDescription( r_forwardPlus, "Forward+ (default 1 on Vulkan): device-local light SSBO + per-tile cull compute (16px tiles; max from \\r_forwardPlusMaxPerTile, default 8). Packs at most MAX_DLIGHTS (32) for tess.dlightBits. PBR: \\r_forwardPlusDebug, \\r_forwardPlusShade. Set 0 to disable (vid_restart). See docs/RENDERER_2026_ARCHITECTURE_PASS.md." );
 	ri.Cvar_SetGroup( r_forwardPlus, CVG_RENDERER );
 	r_forwardPlusMaxPerTile = ri.Cvar_Get( "r_forwardPlusMaxPerTile", "8", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	{

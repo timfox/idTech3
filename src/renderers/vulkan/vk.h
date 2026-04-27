@@ -866,10 +866,13 @@ typedef struct {
 	/* Forward+ scaffolding: light SSBO + optional tile cull compute (see vk_forward_plus.c). */
 	struct {
 		VkBuffer buffer;
-		VkDeviceMemory memory;
-		void *mapped;
+		VkDeviceMemory memory; /* device-local: SSBO for compute + fragment */
+		VkBuffer staging; /* host-visible: CPU pack, vkCmdCopyBuffer to buffer before cull */
+		VkDeviceMemory staging_memory;
+		void *staging_ptr;
 		uint32_t capacity_bytes;
 		uint32_t last_packed_count;
+		uint32_t last_upload_bytes; /* bytes copied to device this frame (header + n records) */
 		VkBuffer tile_buffer;
 		VkDeviceMemory tile_memory;
 		uint32_t tile_capacity_tiles;
