@@ -128,6 +128,7 @@ void vk_end_render_pass_tracked( void )
 
 #ifdef USE_VULKAN_RTX
 	if ( vk.rtxAvailable && vk.fboActive && r_rtx && r_rtx->integer > 0 &&
+		r_rtxDemo && r_rtxDemo->integer &&
 		( vk.renderPassIndex == RENDER_PASS_MAIN || vk.renderPassIndex == RENDER_PASS_POST_BLOOM ) ) {
 		vk_rtx_record_demo_pass( vk.cmd->command_buffer );
 	}

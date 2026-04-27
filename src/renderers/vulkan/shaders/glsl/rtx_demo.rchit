@@ -5,5 +5,6 @@ layout(location = 0) rayPayloadInEXT vec3 hitValue;
 
 void main()
 {
-	hitValue = vec3( 0.15, 0.85, 0.25 );
+	/* Simple diffuse-style albedo for BSP hits (no texture fetch yet). */
+	hitValue = vec3( 0.72, 0.70, 0.66 );
 }

@@ -1,19 +1,30 @@
 /*
 ===========================================================================
-Vulkan KHR ray tracing: minimal demo (BLAS triangle + TLAS + trace + blit).
+Vulkan KHR ray tracing: world BLAS (BSP faces + trisoups) + primary rays.
 
-Build with USE_VULKAN_RTX, set r_rtx > 0 before vid_restart. Optional r_rtxDemo
-(default 1) gates the per-frame trace; set 0 to keep extensions without demo.
+Build with USE_VULKAN_RTX, set r_rtx > 0 before vid_restart. r_rtxDemo 1 runs
+per-frame trace using scene depth + invViewProj (see rgen). r_rtxWorldPrimCap
+caps BLAS triangles (default 262144). See docs/RENDERERS_FUTURE.md.
 ===========================================================================
 */
 
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_rtx.h"
+#include "vk_rtx_world.h"
+#include "vk_util.h"
+#include "vk_image_layout.h"
 
 #ifdef USE_VULKAN_RTX
 
 #include "vk_rtx_demo_spirv.inc"
+
+typedef struct {
+	float invViewProj[16];
+	float viewOrigin[4];
+	float zNearFar[4];
+	float outputSize[4];
+} VkRtxFrameUBO_t;
 
 static struct {
 	qboolean		ready;
@@ -48,6 +59,14 @@ static struct {
 	VkImage			rt_image;
 	VkDeviceMemory		rt_image_memory;
 	VkImageView		rt_image_view;
+	VkBuffer		rtx_ubo;
+	VkDeviceMemory		rtx_ubo_memory;
+	void			*rtx_ubo_ptr;
+	qboolean		world_blas_valid;
+	qboolean		blas_geo_is_world;
+	qboolean		rt_image_traced;
+	uint32_t		world_primitive_count;
+	char			world_name[MAX_QPATH];
 } rtx;
 
 static VkShaderModule vk_rtx_shader_module( const uint8_t *code, uint32_t codeSize, const char *name )
@@ -213,42 +232,57 @@ static void vk_rtx_create_rt_output( uint32_t w, uint32_t h, VkDescriptorSet des
 
 	rtx.width = w;
 	rtx.height = h;
+	rtx.rt_image_traced = qfalse;
 }
 
-void vk_rtx_shutdown( void )
+static void vk_rtx_rebuild_world_blas( void )
 {
-	if ( !rtx.ready ) {
+	VkAccelerationStructureCreateInfoKHR asci;
+	VkAccelerationStructureBuildGeometryInfoKHR buildInfoBLAS;
+	VkAccelerationStructureGeometryKHR geometryBLAS;
+	VkAccelerationStructureGeometryTrianglesDataKHR triangles;
+	VkAccelerationStructureBuildRangeInfoKHR rangeBLAS;
+	const VkAccelerationStructureBuildRangeInfoKHR *pRangeBLAS;
+	VkAccelerationStructureBuildSizesInfoKHR sizeInfoBLAS;
+	VkAccelerationStructureBuildGeometryInfoKHR buildInfoTLAS;
+	VkAccelerationStructureGeometryKHR geometryTLAS;
+	VkAccelerationStructureGeometryInstancesDataKHR instGeom;
+	VkAccelerationStructureBuildRangeInfoKHR rangeTLAS;
+	const VkAccelerationStructureBuildRangeInfoKHR *pRangeTLAS;
+	VkAccelerationStructureBuildSizesInfoKHR sizeInfoTLAS;
+	VkAccelerationStructureDeviceAddressInfoKHR addrInfo;
+	VkAccelerationStructureInstanceKHR instance;
+	VkDeviceAddress vbAddr, ibAddr, scratchAddr, blasDeviceAddress, instAddr;
+	VkDeviceSize scratchSize;
+	uint32_t maxInstTLAS;
+	uint32_t maxPrimBLAS;
+	uint32_t capPrim;
+	uint32_t worldPrim;
+	uint32_t packedPrim;
+	qboolean useWorld;
+	float triVerts[9];
+	uint16_t triIdx[3];
+	VkCommandBuffer buildCmd;
+	VkCommandBufferBeginInfo beginInfo;
+	uint8_t *vertMap;
+	uint8_t *idxMap;
+	uint8_t *instMap;
+	VkWriteDescriptorSetAccelerationStructureKHR asWrite;
+	VkWriteDescriptorSet writeAS;
+	const char *wn;
+
+	if ( !rtx.descriptor_set ) {
 		return;
 	}
 
-	if ( rtx.pipeline != VK_NULL_HANDLE ) {
-		qvkDestroyPipeline( vk.device, rtx.pipeline, NULL );
-		rtx.pipeline = VK_NULL_HANDLE;
+	wn = ( tr.world && tr.world->name[0] && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) ? tr.world->name : "";
+	if ( rtx.world_blas_valid && !strcmp( rtx.world_name, wn ) ) {
+		return;
 	}
-	if ( rtx.pl != VK_NULL_HANDLE ) {
-		qvkDestroyPipelineLayout( vk.device, rtx.pl, NULL );
-		rtx.pl = VK_NULL_HANDLE;
-	}
-	if ( rtx.dsl != VK_NULL_HANDLE ) {
-		qvkDestroyDescriptorSetLayout( vk.device, rtx.dsl, NULL );
-		rtx.dsl = VK_NULL_HANDLE;
-	}
-	if ( rtx.pool != VK_NULL_HANDLE ) {
-		qvkDestroyDescriptorPool( vk.device, rtx.pool, NULL );
-		rtx.pool = VK_NULL_HANDLE;
-	}
-	if ( rtx.rgen != VK_NULL_HANDLE ) {
-		qvkDestroyShaderModule( vk.device, rtx.rgen, NULL );
-		rtx.rgen = VK_NULL_HANDLE;
-	}
-	if ( rtx.rmiss != VK_NULL_HANDLE ) {
-		qvkDestroyShaderModule( vk.device, rtx.rmiss, NULL );
-		rtx.rmiss = VK_NULL_HANDLE;
-	}
-	if ( rtx.rchit != VK_NULL_HANDLE ) {
-		qvkDestroyShaderModule( vk.device, rtx.rchit, NULL );
-		rtx.rchit = VK_NULL_HANDLE;
-	}
+
+	capPrim = ( r_rtxWorldPrimCap && r_rtxWorldPrimCap->integer > 0 ) ? (uint32_t)r_rtxWorldPrimCap->integer : 262144u;
+	worldPrim = ( wn[0] != '\0' ) ? vk_rtx_world_count_primitives( tr.world, capPrim ) : 0u;
+	useWorld = ( worldPrim > 0u ) ? qtrue : qfalse;
 
 	vk_rtx_destroy_as( &rtx.tlas );
 	vk_rtx_destroy_as( &rtx.blas );
@@ -258,164 +292,67 @@ void vk_rtx_shutdown( void )
 	vk_rtx_destroy_buffer( &rtx.vertex_buffer, &rtx.vertex_memory );
 	vk_rtx_destroy_buffer( &rtx.index_buffer, &rtx.index_memory );
 	vk_rtx_destroy_buffer( &rtx.scratch_buffer, &rtx.scratch_memory );
-	vk_rtx_destroy_buffer( &rtx.sbt_buffer, &rtx.sbt_memory );
 
-	vk_rtx_destroy_rt_output();
+	maxPrimBLAS = 1u;
+	if ( useWorld ) {
+		VkDeviceSize vbSize = (VkDeviceSize)worldPrim * 9u * sizeof( float );
+		VkDeviceSize ibSize = (VkDeviceSize)worldPrim * 3u * sizeof( uint32_t );
+		float *posHost;
+		uint32_t *idxHost;
 
-	Com_Memset( &rtx, 0, sizeof( rtx ) );
-}
-
-void vk_rtx_init( void )
-{
-	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rtProps;
-	VkPhysicalDeviceProperties2 props2;
-	VkDescriptorSetLayoutBinding bindings[2];
-	VkDescriptorSetLayoutCreateInfo dslci;
-	VkDescriptorPoolSize poolSizes[2];
-	VkDescriptorPoolCreateInfo pci;
-	VkPipelineLayoutCreateInfo plci;
-	VkDescriptorSetAllocateInfo allocInfo;
-	VkWriteDescriptorSetAccelerationStructureKHR asWrite;
-	VkAccelerationStructureCreateInfoKHR asci;
-	VkAccelerationStructureBuildGeometryInfoKHR buildInfoBLAS;
-	VkAccelerationStructureGeometryKHR geometryBLAS;
-	VkAccelerationStructureGeometryTrianglesDataKHR triangles;
-	VkAccelerationStructureBuildRangeInfoKHR rangeBLAS;
-	const VkAccelerationStructureBuildRangeInfoKHR *pRangeBLAS;
-	VkAccelerationStructureBuildSizesInfoKHR sizeInfoBLAS;
-	VkDeviceAddress vbAddr, ibAddr, scratchAddr, blasDeviceAddress, instAddr;
-	VkDeviceSize scratchSize;
-	uint32_t maxPrimBLAS;
-	VkAccelerationStructureBuildGeometryInfoKHR buildInfoTLAS;
-	VkAccelerationStructureGeometryKHR geometryTLAS;
-	VkAccelerationStructureGeometryInstancesDataKHR instGeom;
-	VkAccelerationStructureBuildRangeInfoKHR rangeTLAS;
-	const VkAccelerationStructureBuildRangeInfoKHR *pRangeTLAS;
-	VkAccelerationStructureBuildSizesInfoKHR sizeInfoTLAS;
-	uint32_t maxInstTLAS;
-	VkAccelerationStructureDeviceAddressInfoKHR addrInfo;
-	VkAccelerationStructureInstanceKHR instance;
-	VkDeviceSize sbtSize;
-	uint32_t w, h;
-	uint8_t *sbtHost;
-	uint8_t *vertMap;
-	uint8_t *idxMap;
-	uint8_t *instMap;
-	VkPipelineShaderStageCreateInfo stages[3];
-	VkRayTracingShaderGroupCreateInfoKHR groups[3];
-	VkRayTracingPipelineCreateInfoKHR rtpci;
-	VkWriteDescriptorSet writes[1];
-	VkResult pipeRes;
-	VkCommandBuffer buildCmd;
-	VkCommandBufferBeginInfo beginInfo;
-	float vertices[9];
-	uint16_t indices[3];
-	size_t hbufSize;
-	int gi;
-
-	vk_rtx_shutdown();
-
-	if ( !vk.rtxAvailable || !r_rtx || r_rtx->integer <= 0 ) {
-		return;
+		vk_rtx_alloc_buffer( vbSize,
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			&rtx.vertex_buffer, &rtx.vertex_memory, &vbAddr );
+		vk_rtx_alloc_buffer( ibSize,
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			&rtx.index_buffer, &rtx.index_memory, &ibAddr );
+		VK_CHECK( qvkMapMemory( vk.device, rtx.vertex_memory, 0, vbSize, 0, (void **)&posHost ) );
+		VK_CHECK( qvkMapMemory( vk.device, rtx.index_memory, 0, ibSize, 0, (void **)&idxHost ) );
+		packedPrim = vk_rtx_world_pack( tr.world, worldPrim, posHost, idxHost );
+		qvkUnmapMemory( vk.device, rtx.vertex_memory );
+		qvkUnmapMemory( vk.device, rtx.index_memory );
+		if ( packedPrim == 0u ) {
+			useWorld = qfalse;
+			vk_rtx_destroy_buffer( &rtx.vertex_buffer, &rtx.vertex_memory );
+			vk_rtx_destroy_buffer( &rtx.index_buffer, &rtx.index_memory );
+		} else {
+			maxPrimBLAS = packedPrim;
+			rtx.world_primitive_count = packedPrim;
+		}
 	}
 
-	if ( !r_rtxDemo || !r_rtxDemo->integer ) {
-		ri.Printf( PRINT_DEVELOPER, "[VK][RTX] r_rtxDemo 0: skipping demo pipeline init\n" );
-		return;
+	if ( !useWorld ) {
+		triVerts[0] = -1.0f; triVerts[1] = -1.0f; triVerts[2] = 0.0f;
+		triVerts[3] =  1.0f; triVerts[4] = -1.0f; triVerts[5] = 0.0f;
+		triVerts[6] =  0.0f; triVerts[7] =  1.0f; triVerts[8] = 0.0f;
+		triIdx[0] = 0; triIdx[1] = 1; triIdx[2] = 2;
+		vk_rtx_alloc_buffer( sizeof( triVerts ),
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			&rtx.vertex_buffer, &rtx.vertex_memory, &vbAddr );
+		VK_CHECK( qvkMapMemory( vk.device, rtx.vertex_memory, 0, sizeof( triVerts ), 0, (void **)&vertMap ) );
+		Com_Memcpy( vertMap, triVerts, sizeof( triVerts ) );
+		qvkUnmapMemory( vk.device, rtx.vertex_memory );
+		vk_rtx_alloc_buffer( sizeof( triIdx ),
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			&rtx.index_buffer, &rtx.index_memory, &ibAddr );
+		VK_CHECK( qvkMapMemory( vk.device, rtx.index_memory, 0, sizeof( triIdx ), 0, (void **)&idxMap ) );
+		Com_Memcpy( idxMap, triIdx, sizeof( triIdx ) );
+		qvkUnmapMemory( vk.device, rtx.index_memory );
+		maxPrimBLAS = 1u;
+		rtx.world_primitive_count = 0u;
 	}
-
-	w = ( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u;
-	h = ( glConfig.vidHeight > 0 ) ? (uint32_t)glConfig.vidHeight : 1u;
-
-	Com_Memset( &rtProps, 0, sizeof( rtProps ) );
-	rtProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
-	Com_Memset( &props2, 0, sizeof( props2 ) );
-	props2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-	props2.pNext = &rtProps;
-	if ( qvkGetPhysicalDeviceProperties2 ) {
-		qvkGetPhysicalDeviceProperties2( vk.physical_device, &props2 );
-	} else {
-		rtProps.shaderGroupHandleSize = 32;
-		rtProps.shaderGroupHandleAlignment = 32;
-		rtProps.shaderGroupBaseAlignment = 64;
-	}
-	rtx.handle_size = rtProps.shaderGroupHandleSize;
-	rtx.shader_group_base_alignment = rtProps.shaderGroupBaseAlignment;
-
-	rtx.rgen = vk_rtx_shader_module( vk_rtx_demo_rgen_spv, VK_RTX_DEMO_RGEN_SPV_SIZE, "rtx_demo.rgen" );
-	rtx.rmiss = vk_rtx_shader_module( vk_rtx_demo_rmiss_spv, VK_RTX_DEMO_RMISS_SPV_SIZE, "rtx_demo.rmiss" );
-	rtx.rchit = vk_rtx_shader_module( vk_rtx_demo_rchit_spv, VK_RTX_DEMO_RCHIT_SPV_SIZE, "rtx_demo.rchit" );
-
-	Com_Memset( bindings, 0, sizeof( bindings ) );
-	bindings[0].binding = 0;
-	bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
-	bindings[0].descriptorCount = 1;
-	bindings[0].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-	bindings[1].binding = 1;
-	bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-	bindings[1].descriptorCount = 1;
-	bindings[1].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-
-	Com_Memset( &dslci, 0, sizeof( dslci ) );
-	dslci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	dslci.bindingCount = 2;
-	dslci.pBindings = bindings;
-	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &dslci, NULL, &rtx.dsl ) );
-
-	poolSizes[0].type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
-	poolSizes[0].descriptorCount = 1;
-	poolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-	poolSizes[1].descriptorCount = 1;
-	Com_Memset( &pci, 0, sizeof( pci ) );
-	pci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	pci.maxSets = 1;
-	pci.poolSizeCount = 2;
-	pci.pPoolSizes = poolSizes;
-	VK_CHECK( qvkCreateDescriptorPool( vk.device, &pci, NULL, &rtx.pool ) );
-
-	Com_Memset( &plci, 0, sizeof( plci ) );
-	plci.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	plci.setLayoutCount = 1;
-	plci.pSetLayouts = &rtx.dsl;
-	VK_CHECK( qvkCreatePipelineLayout( vk.device, &plci, NULL, &rtx.pl ) );
-
-	Com_Memset( &allocInfo, 0, sizeof( allocInfo ) );
-	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	allocInfo.descriptorPool = rtx.pool;
-	allocInfo.descriptorSetCount = 1;
-	allocInfo.pSetLayouts = &rtx.dsl;
-	VK_CHECK( qvkAllocateDescriptorSets( vk.device, &allocInfo, &rtx.descriptor_set ) );
-
-	vk_rtx_create_rt_output( w, h, rtx.descriptor_set );
-
-	vertices[0] = -1.0f; vertices[1] = -1.0f; vertices[2] = 0.0f;
-	vertices[3] =  1.0f; vertices[4] = -1.0f; vertices[5] = 0.0f;
-	vertices[6] =  0.0f; vertices[7] =  1.0f; vertices[8] = 0.0f;
-	indices[0] = 0; indices[1] = 1; indices[2] = 2;
-
-	vk_rtx_alloc_buffer( sizeof( vertices ),
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		&rtx.vertex_buffer, &rtx.vertex_memory, &vbAddr );
-	VK_CHECK( qvkMapMemory( vk.device, rtx.vertex_memory, 0, sizeof( vertices ), 0, (void **)&vertMap ) );
-	Com_Memcpy( vertMap, vertices, sizeof( vertices ) );
-	qvkUnmapMemory( vk.device, rtx.vertex_memory );
-
-	vk_rtx_alloc_buffer( sizeof( indices ),
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		&rtx.index_buffer, &rtx.index_memory, &ibAddr );
-	VK_CHECK( qvkMapMemory( vk.device, rtx.index_memory, 0, sizeof( indices ), 0, (void **)&idxMap ) );
-	Com_Memcpy( idxMap, indices, sizeof( indices ) );
-	qvkUnmapMemory( vk.device, rtx.index_memory );
 
 	Com_Memset( &triangles, 0, sizeof( triangles ) );
 	triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
 	triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
 	triangles.vertexData.deviceAddress = vbAddr;
-	triangles.vertexStride = sizeof( float ) * 3;
-	triangles.maxVertex = 2;
-	triangles.indexType = VK_INDEX_TYPE_UINT16;
+	triangles.vertexStride = sizeof( float ) * 3u;
+	triangles.maxVertex = ( maxPrimBLAS > 0u ) ? ( maxPrimBLAS * 3u - 1u ) : 0u;
+	triangles.indexType = useWorld ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16;
 	triangles.indexData.deviceAddress = ibAddr;
 
 	Com_Memset( &geometryBLAS, 0, sizeof( geometryBLAS ) );
@@ -430,7 +367,6 @@ void vk_rtx_init( void )
 	buildInfoBLAS.geometryCount = 1;
 	buildInfoBLAS.pGeometries = &geometryBLAS;
 
-	maxPrimBLAS = 1;
 	Com_Memset( &sizeInfoBLAS, 0, sizeof( sizeInfoBLAS ) );
 	sizeInfoBLAS.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
 	qvkGetAccelerationStructureBuildSizesKHR( vk.device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
@@ -488,7 +424,7 @@ void vk_rtx_init( void )
 	buildInfoTLAS.geometryCount = 1;
 	buildInfoTLAS.pGeometries = &geometryTLAS;
 
-	maxInstTLAS = 1;
+	maxInstTLAS = 1u;
 	Com_Memset( &sizeInfoTLAS, 0, sizeof( sizeInfoTLAS ) );
 	sizeInfoTLAS.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
 	qvkGetAccelerationStructureBuildSizesKHR( vk.device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
@@ -499,11 +435,11 @@ void vk_rtx_init( void )
 		scratchSize = sizeInfoTLAS.buildScratchSize;
 	}
 	vk_rtx_alloc_buffer( scratchSize,
-		VK_BUFFER_USAGE_STORAGE_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &rtx.scratch_buffer, &rtx.scratch_memory, &scratchAddr );
 
 	Com_Memset( &rangeBLAS, 0, sizeof( rangeBLAS ) );
-	rangeBLAS.primitiveCount = 1;
+	rangeBLAS.primitiveCount = maxPrimBLAS;
 	pRangeBLAS = &rangeBLAS;
 	buildInfoBLAS.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
 	buildInfoBLAS.dstAccelerationStructure = rtx.blas;
@@ -531,7 +467,7 @@ void vk_rtx_init( void )
 	VK_CHECK( qvkCreateAccelerationStructureKHR( vk.device, &asci, NULL, &rtx.tlas ) );
 
 	Com_Memset( &rangeTLAS, 0, sizeof( rangeTLAS ) );
-	rangeTLAS.primitiveCount = 1;
+	rangeTLAS.primitiveCount = 1u;
 	pRangeTLAS = &rangeTLAS;
 	buildInfoTLAS.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
 	buildInfoTLAS.dstAccelerationStructure = rtx.tlas;
@@ -547,14 +483,255 @@ void vk_rtx_init( void )
 	asWrite.accelerationStructureCount = 1;
 	asWrite.pAccelerationStructures = &rtx.tlas;
 
-	Com_Memset( &writes[0], 0, sizeof( writes[0] ) );
+	Com_Memset( &writeAS, 0, sizeof( writeAS ) );
+	writeAS.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writeAS.dstSet = rtx.descriptor_set;
+	writeAS.dstBinding = 0;
+	writeAS.descriptorCount = 1;
+	writeAS.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+	writeAS.pNext = &asWrite;
+	qvkUpdateDescriptorSets( vk.device, 1, &writeAS, 0, NULL );
+
+	Q_strncpyz( rtx.world_name, wn, sizeof( rtx.world_name ) );
+	rtx.blas_geo_is_world = ( wn[0] != '\0' && useWorld ) ? qtrue : qfalse;
+	rtx.world_blas_valid = qtrue;
+
+	if ( useWorld && wn[0] != '\0' ) {
+		ri.Printf( PRINT_DEVELOPER, "[VK][RTX] BLAS rebuilt: %u tris from %s (cap %u)\n",
+			maxPrimBLAS, wn, capPrim );
+	} else if ( wn[0] != '\0' ) {
+		ri.Printf( PRINT_DEVELOPER, "[VK][RTX] BLAS fallback triangle (no packable world tris for %s)\n", wn );
+	} else {
+		ri.Printf( PRINT_DEVELOPER, "[VK][RTX] BLAS fallback triangle (no world)\n" );
+	}
+}
+
+void vk_rtx_shutdown( void )
+{
+	if ( !rtx.ready ) {
+		return;
+	}
+
+	if ( rtx.pipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, rtx.pipeline, NULL );
+		rtx.pipeline = VK_NULL_HANDLE;
+	}
+	if ( rtx.pl != VK_NULL_HANDLE ) {
+		qvkDestroyPipelineLayout( vk.device, rtx.pl, NULL );
+		rtx.pl = VK_NULL_HANDLE;
+	}
+	if ( rtx.dsl != VK_NULL_HANDLE ) {
+		qvkDestroyDescriptorSetLayout( vk.device, rtx.dsl, NULL );
+		rtx.dsl = VK_NULL_HANDLE;
+	}
+	if ( rtx.pool != VK_NULL_HANDLE ) {
+		qvkDestroyDescriptorPool( vk.device, rtx.pool, NULL );
+		rtx.pool = VK_NULL_HANDLE;
+	}
+	if ( rtx.rgen != VK_NULL_HANDLE ) {
+		qvkDestroyShaderModule( vk.device, rtx.rgen, NULL );
+		rtx.rgen = VK_NULL_HANDLE;
+	}
+	if ( rtx.rmiss != VK_NULL_HANDLE ) {
+		qvkDestroyShaderModule( vk.device, rtx.rmiss, NULL );
+		rtx.rmiss = VK_NULL_HANDLE;
+	}
+	if ( rtx.rchit != VK_NULL_HANDLE ) {
+		qvkDestroyShaderModule( vk.device, rtx.rchit, NULL );
+		rtx.rchit = VK_NULL_HANDLE;
+	}
+
+	if ( rtx.rtx_ubo != VK_NULL_HANDLE ) {
+		qvkDestroyBuffer( vk.device, rtx.rtx_ubo, NULL );
+		rtx.rtx_ubo = VK_NULL_HANDLE;
+	}
+	if ( rtx.rtx_ubo_memory != VK_NULL_HANDLE ) {
+		qvkFreeMemory( vk.device, rtx.rtx_ubo_memory, NULL );
+		rtx.rtx_ubo_memory = VK_NULL_HANDLE;
+	}
+	rtx.rtx_ubo_ptr = NULL;
+
+	vk_rtx_destroy_as( &rtx.tlas );
+	vk_rtx_destroy_as( &rtx.blas );
+	vk_rtx_destroy_buffer( &rtx.tlas_buffer, &rtx.tlas_memory );
+	vk_rtx_destroy_buffer( &rtx.instance_buffer, &rtx.instance_memory );
+	vk_rtx_destroy_buffer( &rtx.blas_buffer, &rtx.blas_memory );
+	vk_rtx_destroy_buffer( &rtx.vertex_buffer, &rtx.vertex_memory );
+	vk_rtx_destroy_buffer( &rtx.index_buffer, &rtx.index_memory );
+	vk_rtx_destroy_buffer( &rtx.scratch_buffer, &rtx.scratch_memory );
+	vk_rtx_destroy_buffer( &rtx.sbt_buffer, &rtx.sbt_memory );
+
+	vk_rtx_destroy_rt_output();
+
+	Com_Memset( &rtx, 0, sizeof( rtx ) );
+	rtx.world_name[0] = '\0';
+}
+
+void vk_rtx_init( void )
+{
+	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rtProps;
+	VkPhysicalDeviceProperties2 props2;
+	VkDescriptorSetLayoutBinding bindings[4];
+	VkDescriptorSetLayoutCreateInfo dslci;
+	VkDescriptorPoolSize poolSizes[4];
+	VkDescriptorPoolCreateInfo pci;
+	VkPipelineLayoutCreateInfo plci;
+	VkDescriptorSetAllocateInfo allocInfo;
+	VkPipelineShaderStageCreateInfo stages[3];
+	VkRayTracingShaderGroupCreateInfoKHR groups[3];
+	VkRayTracingPipelineCreateInfoKHR rtpci;
+	VkWriteDescriptorSet writes[5];
+	VkDescriptorBufferInfo uboInfo;
+	VkDescriptorImageInfo depthInfo;
+	VkMemoryRequirements uboReq;
+	VkMemoryAllocateInfo uboAi;
+	VkBufferCreateInfo uboBi;
+	Vk_Sampler_Def sd;
+	uint32_t uboMemType;
+	VkDeviceSize uboAllocSize;
+	VkDeviceSize sbtSize;
+	uint32_t w, h;
+	uint8_t *sbtHost;
+	size_t hbufSize;
+	int gi;
+	VkResult pipeRes;
+
+	vk_rtx_shutdown();
+
+	if ( !vk.rtxAvailable || !r_rtx || r_rtx->integer <= 0 ) {
+		return;
+	}
+
+	if ( !r_rtxDemo || !r_rtxDemo->integer ) {
+		ri.Printf( PRINT_DEVELOPER, "[VK][RTX] r_rtxDemo 0: skipping demo pipeline init\n" );
+		return;
+	}
+
+	w = ( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u;
+	h = ( glConfig.vidHeight > 0 ) ? (uint32_t)glConfig.vidHeight : 1u;
+
+	Com_Memset( &rtProps, 0, sizeof( rtProps ) );
+	rtProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
+	Com_Memset( &props2, 0, sizeof( props2 ) );
+	props2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+	props2.pNext = &rtProps;
+	if ( qvkGetPhysicalDeviceProperties2 ) {
+		qvkGetPhysicalDeviceProperties2( vk.physical_device, &props2 );
+	} else {
+		rtProps.shaderGroupHandleSize = 32;
+		rtProps.shaderGroupHandleAlignment = 32;
+		rtProps.shaderGroupBaseAlignment = 64;
+	}
+	rtx.handle_size = rtProps.shaderGroupHandleSize;
+	rtx.shader_group_base_alignment = rtProps.shaderGroupBaseAlignment;
+
+	rtx.rgen = vk_rtx_shader_module( vk_rtx_demo_rgen_spv, VK_RTX_DEMO_RGEN_SPV_SIZE, "rtx_demo.rgen" );
+	rtx.rmiss = vk_rtx_shader_module( vk_rtx_demo_rmiss_spv, VK_RTX_DEMO_RMISS_SPV_SIZE, "rtx_demo.rmiss" );
+	rtx.rchit = vk_rtx_shader_module( vk_rtx_demo_rchit_spv, VK_RTX_DEMO_RCHIT_SPV_SIZE, "rtx_demo.rchit" );
+
+	Com_Memset( bindings, 0, sizeof( bindings ) );
+	bindings[0].binding = 0;
+	bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+	bindings[0].descriptorCount = 1;
+	bindings[0].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+	bindings[1].binding = 1;
+	bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	bindings[1].descriptorCount = 1;
+	bindings[1].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+	bindings[2].binding = 2;
+	bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	bindings[2].descriptorCount = 1;
+	bindings[2].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+	bindings[3].binding = 3;
+	bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	bindings[3].descriptorCount = 1;
+	bindings[3].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+
+	Com_Memset( &dslci, 0, sizeof( dslci ) );
+	dslci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	dslci.bindingCount = 4;
+	dslci.pBindings = bindings;
+	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &dslci, NULL, &rtx.dsl ) );
+
+	poolSizes[0].type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+	poolSizes[0].descriptorCount = 1;
+	poolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	poolSizes[1].descriptorCount = 1;
+	poolSizes[2].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	poolSizes[2].descriptorCount = 1;
+	poolSizes[3].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	poolSizes[3].descriptorCount = 1;
+	Com_Memset( &pci, 0, sizeof( pci ) );
+	pci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	pci.maxSets = 1;
+	pci.poolSizeCount = 4;
+	pci.pPoolSizes = poolSizes;
+	VK_CHECK( qvkCreateDescriptorPool( vk.device, &pci, NULL, &rtx.pool ) );
+
+	Com_Memset( &plci, 0, sizeof( plci ) );
+	plci.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	plci.setLayoutCount = 1;
+	plci.pSetLayouts = &rtx.dsl;
+	VK_CHECK( qvkCreatePipelineLayout( vk.device, &plci, NULL, &rtx.pl ) );
+
+	Com_Memset( &allocInfo, 0, sizeof( allocInfo ) );
+	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.descriptorPool = rtx.pool;
+	allocInfo.descriptorSetCount = 1;
+	allocInfo.pSetLayouts = &rtx.dsl;
+	VK_CHECK( qvkAllocateDescriptorSets( vk.device, &allocInfo, &rtx.descriptor_set ) );
+
+	vk_rtx_create_rt_output( w, h, rtx.descriptor_set );
+
+	uboAllocSize = (VkDeviceSize)PAD( (uint32_t)sizeof( VkRtxFrameUBO_t ), (uint32_t)vk.uniform_alignment );
+	Com_Memset( &uboBi, 0, sizeof( uboBi ) );
+	uboBi.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	uboBi.size = uboAllocSize;
+	uboBi.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+	uboBi.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	VK_CHECK( qvkCreateBuffer( vk.device, &uboBi, NULL, &rtx.rtx_ubo ) );
+	qvkGetBufferMemoryRequirements( vk.device, rtx.rtx_ubo, &uboReq );
+	uboMemType = vk_find_memory_type( vk.physical_device, uboReq.memoryTypeBits,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+	Com_Memset( &uboAi, 0, sizeof( uboAi ) );
+	uboAi.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	uboAi.allocationSize = uboReq.size;
+	uboAi.memoryTypeIndex = uboMemType;
+	VK_CHECK( qvkAllocateMemory( vk.device, &uboAi, NULL, &rtx.rtx_ubo_memory ) );
+	VK_CHECK( qvkBindBufferMemory( vk.device, rtx.rtx_ubo, rtx.rtx_ubo_memory, 0 ) );
+	VK_CHECK( qvkMapMemory( vk.device, rtx.rtx_ubo_memory, 0, uboAllocSize, 0, &rtx.rtx_ubo_ptr ) );
+	Com_Memset( rtx.rtx_ubo_ptr, 0, (size_t)uboAllocSize );
+
+	Com_Memset( &uboInfo, 0, sizeof( uboInfo ) );
+	uboInfo.buffer = rtx.rtx_ubo;
+	uboInfo.offset = 0;
+	uboInfo.range = uboAllocSize;
+
+	Com_Memset( &sd, 0, sizeof( sd ) );
+	sd.gl_mag_filter = sd.gl_min_filter = GL_NEAREST;
+	sd.max_lod_1_0 = qtrue;
+	sd.noAnisotropy = qtrue;
+	Com_Memset( &depthInfo, 0, sizeof( depthInfo ) );
+	depthInfo.sampler = vk_find_sampler( &sd );
+	depthInfo.imageView = vk.depth_image_view_sample ? vk.depth_image_view_sample : vk.depth_image_view;
+	depthInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+
+	Com_Memset( writes, 0, sizeof( writes ) );
 	writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	writes[0].dstSet = rtx.descriptor_set;
-	writes[0].dstBinding = 0;
+	writes[0].dstBinding = 2;
 	writes[0].descriptorCount = 1;
-	writes[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
-	writes[0].pNext = &asWrite;
-	qvkUpdateDescriptorSets( vk.device, 1, &writes[0], 0, NULL );
+	writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	writes[0].pBufferInfo = &uboInfo;
+	writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writes[1].dstSet = rtx.descriptor_set;
+	writes[1].dstBinding = 3;
+	writes[1].descriptorCount = 1;
+	writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	writes[1].pImageInfo = &depthInfo;
+	qvkUpdateDescriptorSets( vk.device, 2, writes, 0, NULL );
+
+	vk_rtx_rebuild_world_blas();
 
 	Com_Memset( stages, 0, sizeof( stages ) );
 	stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -631,7 +808,7 @@ void vk_rtx_init( void )
 	qvkUnmapMemory( vk.device, rtx.sbt_memory );
 
 	rtx.ready = qtrue;
-	ri.Printf( PRINT_ALL, "[VK][RTX] Demo pipeline ready (r_rtx=%d); triangle trace composites into scene color\n", r_rtx->integer );
+	ri.Printf( PRINT_ALL, "[VK][RTX] RTX demo ready (r_rtx=%d): world BLAS when map loaded, else fallback triangle; composites after main/post bloom\n", r_rtx->integer );
 }
 
 void vk_rtx_frame_begin( void )
@@ -661,9 +838,52 @@ void vk_rtx_record_demo_pass( VkCommandBuffer cmd )
 	VkImageBlit blit;
 	VkImageLayout colorOldLayout;
 	VkImageLayout colorRestoreLayout;
+	VkRtxFrameUBO_t frameUbo;
+	float viewProj[16];
+	float zNear, zFar;
+	VkImageAspectFlags depthAspect;
 
 	if ( !rtx.ready || !cmd || !r_rtxDemo || !r_rtxDemo->integer ) {
 		return;
+	}
+
+	vk_rtx_rebuild_world_blas();
+
+	if ( rtx.rtx_ubo_ptr ) {
+		const float *view = backEnd.viewParms.world.modelViewMatrix;
+		const float *projection = backEnd.viewParms.projectionMatrix;
+
+		myGlMultMatrix( view, projection, viewProj );
+		if ( !vk_mat4_inverse( viewProj, frameUbo.invViewProj ) ) {
+			Com_Memcpy( frameUbo.invViewProj, viewProj, sizeof( frameUbo.invViewProj ) );
+		}
+		frameUbo.viewOrigin[0] = backEnd.viewParms.or.origin[0];
+		frameUbo.viewOrigin[1] = backEnd.viewParms.or.origin[1];
+		frameUbo.viewOrigin[2] = backEnd.viewParms.or.origin[2];
+		frameUbo.viewOrigin[3] = 0.0f;
+		zNear = ( r_znear && r_znear->value > 0.0f ) ? r_znear->value : 8.0f;
+		zFar = backEnd.viewParms.zFar;
+		if ( zFar <= zNear ) {
+			zFar = zNear + 100.0f;
+		}
+		frameUbo.zNearFar[0] = zNear;
+		frameUbo.zNearFar[1] = zFar;
+		frameUbo.zNearFar[2] = 0.0f;
+		frameUbo.zNearFar[3] = 0.0f;
+		frameUbo.outputSize[0] = (float)rtx.width;
+		frameUbo.outputSize[1] = (float)rtx.height;
+		frameUbo.outputSize[2] = 0.0f;
+		frameUbo.outputSize[3] = 0.0f;
+		Com_Memcpy( rtx.rtx_ubo_ptr, &frameUbo, sizeof( frameUbo ) );
+	}
+
+	depthAspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+	if ( glConfig.stencilBits > 0 ) {
+		depthAspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
+	}
+	if ( vk.depth_image != VK_NULL_HANDLE && vk.renderPassIndex == RENDER_PASS_MAIN ) {
+		record_depth_image_layout_transition( cmd, depthAspect,
+			VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 0, 0 );
 	}
 
 	/* vk_end_render_pass_tracked runs *after* vkCmdEndRenderPass: FBO color is already in finalLayout
@@ -696,7 +916,7 @@ void vk_rtx_record_demo_pass( VkCommandBuffer cmd )
 
 	Com_Memset( barriers, 0, sizeof( barriers ) );
 	barriers[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-	barriers[0].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	barriers[0].oldLayout = rtx.rt_image_traced ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_UNDEFINED;
 	barriers[0].newLayout = VK_IMAGE_LAYOUT_GENERAL;
 	barriers[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	barriers[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -704,10 +924,12 @@ void vk_rtx_record_demo_pass( VkCommandBuffer cmd )
 	barriers[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	barriers[0].subresourceRange.levelCount = 1;
 	barriers[0].subresourceRange.layerCount = 1;
-	barriers[0].srcAccessMask = 0;
+	barriers[0].srcAccessMask = rtx.rt_image_traced ? VK_ACCESS_SHADER_WRITE_BIT : 0;
 	barriers[0].dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 
-	qvkCmdPipelineBarrier( cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
+	qvkCmdPipelineBarrier( cmd,
+		rtx.rt_image_traced ? VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+		VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
 		0, 0, NULL, 0, NULL, 1, barriers );
 
 	qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, rtx.pipeline );
@@ -771,6 +993,13 @@ void vk_rtx_record_demo_pass( VkCommandBuffer cmd )
 		( colorRestoreLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL )
 			? VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT : VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 		0, 0, NULL, 0, NULL, 2, barriers );
+
+	rtx.rt_image_traced = qtrue;
+
+	if ( vk.depth_image != VK_NULL_HANDLE && vk.renderPassIndex == RENDER_PASS_MAIN ) {
+		record_depth_image_layout_transition( cmd, depthAspect,
+			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 0, 0 );
+	}
 }
 
 #else /* !USE_VULKAN_RTX */

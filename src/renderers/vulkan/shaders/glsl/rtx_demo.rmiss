@@ -5,5 +5,6 @@ layout(location = 0) rayPayloadInEXT vec3 hitValue;
 
 void main()
 {
-	hitValue = vec3( 0.95, 0.15, 0.15 );
+	/* Sky tint */
+	hitValue = vec3( 0.35, 0.52, 0.85 );
 }

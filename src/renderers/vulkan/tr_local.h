@@ -1593,6 +1593,7 @@ extern cvar_t	*r_taa_feedbackMotion;
 extern cvar_t	*r_taa_sharpen;
 extern cvar_t	*r_rtx;
 extern cvar_t	*r_rtxDemo;
+extern cvar_t	*r_rtxWorldPrimCap;
 extern cvar_t	*r_forwardPlus;
 extern cvar_t	*r_forwardPlusMaxPerTile;
 extern cvar_t	*r_forwardPlusDebug;
