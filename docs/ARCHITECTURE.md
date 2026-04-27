@@ -11,6 +11,7 @@ src/
 │   ├── cl_cin_modern.c/h         Modern video codec dispatcher
 │   ├── cl_cin_ffmpeg/dav1d/vpx/theora.c  Codec backends
 │   ├── cl_particles.c/h          Particle system (8192 pool)
+│   ├── cl_demo.c/h               Demo record/playback (record, demo, stoprecord)
 │   ├── cl_map_background.c/h     Background maps for menus
 │   └── cl_window_title.c/h       Dynamic window title
 ├── game/                Gameplay systems
