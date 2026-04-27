@@ -725,12 +725,14 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			INIT_DEVICE_FUNCTION_EXT( vkCreateAccelerationStructureKHR );
 			INIT_DEVICE_FUNCTION_EXT( vkDestroyAccelerationStructureKHR );
 			INIT_DEVICE_FUNCTION_EXT( vkGetAccelerationStructureBuildSizesKHR );
+			INIT_DEVICE_FUNCTION_EXT( vkGetAccelerationStructureDeviceAddressKHR );
 			INIT_DEVICE_FUNCTION_EXT( vkCmdBuildAccelerationStructuresKHR );
 			INIT_DEVICE_FUNCTION_EXT( vkCreateRayTracingPipelinesKHR );
 			INIT_DEVICE_FUNCTION_EXT( vkGetRayTracingShaderGroupHandlesKHR );
 			INIT_DEVICE_FUNCTION_EXT( vkCmdTraceRaysKHR );
 			if ( !qvkGetBufferDeviceAddress || !qvkCreateAccelerationStructureKHR || !qvkDestroyAccelerationStructureKHR
-				|| !qvkGetAccelerationStructureBuildSizesKHR || !qvkCmdBuildAccelerationStructuresKHR
+				|| !qvkGetAccelerationStructureBuildSizesKHR || !qvkGetAccelerationStructureDeviceAddressKHR
+				|| !qvkCmdBuildAccelerationStructuresKHR
 				|| !qvkCreateRayTracingPipelinesKHR || !qvkGetRayTracingShaderGroupHandlesKHR || !qvkCmdTraceRaysKHR ) {
 				ri.Printf( PRINT_WARNING, "[VK] Ray tracing: failed to resolve one or more KHR entry points; abandoning this device\n" );
 				qvkDestroyDevice( vk.device, NULL );
@@ -803,6 +805,7 @@ void vk_init_vulkan_library( void )
 		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceFormatProperties )
 		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceMemoryProperties )
 		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceProperties )
+		INIT_INSTANCE_FUNCTION_EXT( vkGetPhysicalDeviceProperties2 )
 		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceQueueFamilyProperties )
 		INIT_INSTANCE_FUNCTION( vkDestroySurfaceKHR )
 		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceSurfaceCapabilitiesKHR )
@@ -1013,6 +1016,7 @@ void vk_deinit_instance_functions( void )
 	qvkGetPhysicalDeviceFormatProperties = NULL;
 	qvkGetPhysicalDeviceMemoryProperties = NULL;
 	qvkGetPhysicalDeviceProperties = NULL;
+	qvkGetPhysicalDeviceProperties2 = NULL;
 	qvkGetPhysicalDeviceQueueFamilyProperties = NULL;
 	qvkDestroySurfaceKHR = NULL;
 	qvkGetPhysicalDeviceSurfaceCapabilitiesKHR = NULL;
@@ -1133,6 +1137,7 @@ void vk_deinit_device_functions( void )
 	qvkCreateAccelerationStructureKHR = NULL;
 	qvkDestroyAccelerationStructureKHR = NULL;
 	qvkGetAccelerationStructureBuildSizesKHR = NULL;
+	qvkGetAccelerationStructureDeviceAddressKHR = NULL;
 	qvkCmdBuildAccelerationStructuresKHR = NULL;
 	qvkCreateRayTracingPipelinesKHR = NULL;
 	qvkGetRayTracingShaderGroupHandlesKHR = NULL;

@@ -19,6 +19,7 @@ Split from vk.c.
 #include "vk_sync.h"
 #include "vk_skybox_hdr.h"
 #include "vk_forward_plus.h"
+#include "vk_rtx.h"
 
 #ifdef USE_VBO
 void vk_release_vbo( void );
@@ -38,6 +39,7 @@ void vk_shutdown( refShutdownCode_t code )
 	/* VUID-05137: ensure GPU finished before destroying resources */
 	if ( !vk.device_lost && qvkDeviceWaitIdle )
 		qvkDeviceWaitIdle( vk.device );
+	vk_rtx_shutdown();
 	/* Always run full destroy sequence for VUID-05137 compliance.
 	 * When device_lost, destroy calls may return VK_ERROR_DEVICE_LOST but we still attempt them. */
 	vk_destroy_framebuffers();
