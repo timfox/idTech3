@@ -47,6 +47,8 @@ ecs_entity_t ECS_Create( void );
 void         ECS_Destroy( ecs_entity_t e );
 qboolean     ECS_Valid( ecs_entity_t e );
 uint32_t     ECS_Count( void );
+/* Entities that have the given component (0 if unknown id). */
+uint32_t     ECS_CountWith( ecs_component_id_t comp );
 
 /* ---- Components (by ID) ---- */
 qboolean ECS_Has( ecs_entity_t e, ecs_component_id_t comp );

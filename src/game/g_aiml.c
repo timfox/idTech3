@@ -77,6 +77,8 @@ static aimlBot_t		bots[AIML_MAX_BOTS];
 static int			numBots;
 static cvar_t		*g_aiml3;
 static cvar_t		*g_aimlJson;
+static cvar_t		*g_aimlDebug;
+static cvar_t		*g_eda;
 
 /* Match-time captures: input and <that> patterns */
 static char		in_stars[AIML_MAX_STAR][256];
@@ -655,6 +657,14 @@ static void AIML_InnerGetResponse( int h, const char *userId, const char *rawIn,
 	}
 	if ( bi < 0 ) {
 		out[0] = '\0';
+		if ( sraiD == 0 && g_aimlDebug && g_aimlDebug->integer > 0 ) {
+			Com_Printf( "AIML: no match (bot %d user %.48s in=%.64s)\n", h, userId, norm );
+		}
+		if ( sraiD == 0 && g_eda && g_eda->integer ) {
+			char ev[EDA_MAX_PAYLOAD];
+			Com_sprintf( ev, sizeof( ev ), "bot=%d no_match user=%.32s in=%.120s", h, userId, norm );
+			(void)EDA_Publish( "aiml.nomatch", ev );
+		}
 		return;
 	}
 	{
@@ -674,6 +684,9 @@ static void AIML_InnerGetResponse( int h, const char *userId, const char *rawIn,
 		in_nStars = 0;
 		AIML_MatchExpr( c->nPat, c->patKind, c->patTok, nU, ut, in_stars, &in_nStars );
 		AIML_ProcTmpl( B, h, userId, c->templateText, out, olen, sraiD );
+		if ( sraiD == 0 && g_aimlDebug && g_aimlDebug->integer > 0 ) {
+			Com_Printf( "AIML: match cat %d (bot %d) pat=%.80s score=%d out=%.120s\n", bi, h, c->pattern, bsc, out );
+		}
 	}
 	if ( sraiD == 0 && U && out[0] ) {
 		Q_strncpyz( U->lastResponse, out, sizeof( U->lastResponse ) );
@@ -848,8 +861,14 @@ void AIML_Init( void ) {
 	numBots = 0;
 	g_aiml3 = Cvar_Get( "g_aiml3", "1", CVAR_ARCHIVE );
 	g_aimlJson = Cvar_Get( "g_aimlJson", "0", CVAR_ARCHIVE );
+	g_aimlDebug = Cvar_Get( "g_aimlDebug", "0", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( g_aimlDebug, "AIML: log top match / no-match to console; 0=off, 1=on." );
+	g_eda = Cvar_Get( "g_eda", "1", CVAR_ARCHIVE_ND );
 	if ( g_aiml3->integer ) {
-		Com_Printf( "AIML: AIML 3.0 Core path (token * / _ , <that>, <topic>, JSON with g_aimlJson 1; cvars g_aiml3, g_aimlJson)\n" );
+		Com_Printf( "AIML: AIML 3.0 Core path (token * / _ , <that>, <topic>, JSON with g_aimlJson 1; cvars g_aiml3, g_aimlJson, g_aimlDebug)\n" );
+	}
+	if ( g_aimlDebug && g_aimlDebug->integer ) {
+		Com_Printf( "AIML: g_aimlDebug=1 (verbose matching enabled)\n" );
 	}
 }
 
@@ -950,7 +969,7 @@ const char *AIML_GetResponse( aimlBotHandle_t h, const char *userId, const char 
 		return s_aimlResponse;
 	}
 	AIML_InnerGetResponse( h, userId, input, s_aimlResponse, sizeof( s_aimlResponse ), 0 );
-	if ( s_aimlResponse[0] ) {
+	if ( s_aimlResponse[0] && g_eda && g_eda->integer ) {
 		char ev[EDA_MAX_PAYLOAD];
 		Com_sprintf( ev, sizeof( ev ), "bot=%d user=%.48s r=%.150s", h, userId, s_aimlResponse );
 		(void)EDA_Publish( "aiml.response", ev );
