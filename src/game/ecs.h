@@ -87,6 +87,9 @@ typedef void (*ecs_iter_cb_t)( ecs_entity_t e, void *userdata );
 /* Iterate entities that have all of the given components */
 void ECS_Each( ecs_component_id_t *components, int count, ecs_iter_cb_t cb, void *userdata );
 
+/* Integrate velocity into position (dt seconds). No-op if position/velocity missing. */
+void ECS_StepMotion( float deltaTime );
+
 /* ---- Component name lookup (for Lua) ---- */
 ecs_component_id_t ECS_ComponentFromName( const char *name );
 const char        *ECS_ComponentName( ecs_component_id_t id );
