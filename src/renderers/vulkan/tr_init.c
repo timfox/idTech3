@@ -3467,7 +3467,7 @@ static void R_Register( void )
 
 	r_rtx = ri.Cvar_Get( "r_rtx", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_rtx, "0", "3", CV_INTEGER );
-	ri.Cvar_SetDescription( r_rtx, "Ray tracing (0=off, 1=shadows, 2=reflections, 3=full). Requires USE_VULKAN_RTX build and RT-capable GPU. See docs/RENDERERS_FUTURE.md." );
+	ri.Cvar_SetDescription( r_rtx, "Ray tracing (0=off, 1=shadows, 2=reflections, 3=full). When built with USE_VULKAN_RTX and set >0 before vid_restart, enables KHR ray tracing device extensions and core entry points; BLAS/TLAS and dispatch are not integrated yet. See docs/RENDERERS_FUTURE.md." );
 	r_forwardPlus = ri.Cvar_Get( "r_forwardPlus", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_forwardPlus, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_forwardPlus, "Forward+ scaffolding: GPU light SSBO + per-tile cull compute (16px tiles; max per tile from \\r_forwardPlusMaxPerTile, default 8). Packs at most MAX_DLIGHTS (32) so indices match tess.dlightBits. PBR: \\r_forwardPlusDebug (overlay), \\r_forwardPlusShade (experimental additive lights); see docs/RENDERER_2026_ARCHITECTURE_PASS.md." );
