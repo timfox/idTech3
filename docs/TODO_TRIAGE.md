@@ -69,6 +69,7 @@ TODOs/FIXMEs in `src/external/` are from third-party code (duktape, zstd, cjson,
 | Date | Scope | Notes |
 |------|--------|------|
 | 2026-04-27 | Vulkan / post | `vk_post_process_pipeline.c`: named `Vk_PostProcess_FragSpecData`, `#define` map count (29), `_Static_assert` array ≥ count; avoids silent spec/map drift. |
+| 2026-04-27 | OpenGL / IQM | `R_LoadIQM` / mesh validation: cast `header->num_*` / `mesh->num_vertexes` to `int` in loop bounds; fix `ARRAY_LEN` / joint name compares for `-Wsign-compare` (Clang). |
 | 2026-04-27 | OpenGL / IQM | `tr_model_iqm.c`: const-correct `RB_IQMSurfaceAnim` surface pointer; blend loop bound `j < 4` (fixes `-Wcast-qual` / `-Wsign-compare` on `ARRAY_LEN(float[4])`). |
 | 2026-04-27 | Vulkan / PBR | `vk_create_pipeline.c`: PBR `ADD_FRAG_SPEC` wrote 41 map entries into `spec_entries[38]` (stack smash / SIGABRT after `VarInfo`); enlarged buffer + runtime guard + `_Static_assert` so array size cannot drift below entry count. |
 | 2026-04-27 | Vulkan / IQM | `tr_model_iqm.c`: avoid `-Wcast-qual` on `backEnd.currentEntity` (uintptr_t bridge). Vegetation wind: `vk_vegetation_wind.c` header + triage row clarify dispatch-after-draw vs binding `vegwind_vertex_buffer` (still TODO). |
