@@ -10,6 +10,7 @@ drain in EDA_Frame (or EDA_Pop) for decoupled systems (AIML, ECS, Lua).
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
 #include "g_eda.h"
+#include "g_engine_systems.h"
 #include <string.h>
 
 typedef struct {
@@ -29,6 +30,11 @@ static int s_qHead; /* read */
 static int s_qTail; /* next write */
 static int s_qCount;
 static cvar_t *g_eda;
+static cvar_t *g_edaLog;
+
+qboolean EDA_IsEnabled( void ) {
+	return ( g_eda && g_eda->integer ) ? qtrue : qfalse;
+}
 
 void EDA_Init( void ) {
 	Com_Memset( s_channels, 0, sizeof( s_channels ) );
@@ -39,7 +45,10 @@ void EDA_Init( void ) {
 	s_qCount = 0;
 	g_eda = Cvar_Get( "g_eda", "1", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( g_eda, "Enable in-process event bus (EDA: Engine.Events, EDA_Publish/Pop)." );
-	Com_Printf( "EDA: event bus ready (cvar g_eda=%d, max queue %d)\n", g_eda ? g_eda->integer : 1, EDA_MAX_QUEUE );
+	g_edaLog = Cvar_Get( "g_edaLog", "0", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( g_edaLog, "EDA: log every publish to console (0=off, 1=on)." );
+	Com_Printf( "EDA: event bus ready (cvar g_eda=%d, g_edaLog=%d, max queue %d)\n",
+		g_eda ? g_eda->integer : 1, g_edaLog ? g_edaLog->integer : 0, EDA_MAX_QUEUE );
 }
 
 void EDA_Shutdown( void ) {
@@ -103,6 +112,9 @@ qboolean EDA_Publish( const char *channel, const char *payload ) {
 		Com_DPrintf( "EDA: queue full, drop %s\n", channel );
 		return qfalse;
 	}
+	if ( g_edaLog && g_edaLog->integer ) {
+		Com_Printf( "EDA: publish %s = %.200s\n", channel, payload && payload[0] ? payload : "" );
+	}
 	s_queue[s_qTail].ch = idx;
 	if ( payload && payload[0] ) {
 		Q_strncpyz( s_queue[s_qTail].payload, payload, sizeof( s_queue[0].payload ) );
@@ -136,6 +148,24 @@ qboolean EDA_Pop( char *channelOut, int channelLen, char *payloadOut, int payloa
 	return qtrue;
 }
 
+qboolean EDA_Peek( char *channelOut, int channelLen, char *payloadOut, int payloadLen ) {
+	edaEvent_t *ev;
+	if ( s_qCount <= 0 || s_qHead == s_qTail ) {
+		return qfalse;
+	}
+	ev = &s_queue[s_qHead];
+	if ( ev->ch < 0 || ev->ch >= s_numChannels || !s_channels[ev->ch].used ) {
+		return qfalse;
+	}
+	if ( channelOut && channelLen > 0 ) {
+		Q_strncpyz( channelOut, s_channels[ev->ch].name, channelLen );
+	}
+	if ( payloadOut && payloadLen > 0 ) {
+		Q_strncpyz( payloadOut, ev->payload, payloadLen );
+	}
+	return qtrue;
+}
+
 int EDA_QueueDepth( void ) {
 	return s_qCount;
 }
@@ -161,6 +191,7 @@ int EDA_Drain( edaEventRecord_t *out, int maxOut ) {
 }
 
 void EDA_Frame( void ) {
-	/* Reserved: hook for future coalescing or per-frame limits. */
-	(void)0;
+	if ( g_eda && g_eda->integer && s_qCount > 0 ) {
+		EngineTelemetry_Record( "eda_queue_depth", (double)s_qCount );
+	}
 }
