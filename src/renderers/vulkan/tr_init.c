@@ -3344,6 +3344,7 @@ static void R_Register( void )
 	r_fbo = ri.Cvar_Get( "r_fbo", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_fbo, "Framebuffer objects for offscreen rendering. Required for PBR, HDR, bloom, MSAA, SMAA, SSAO, gamma correction.\n"
 		"Use vid_restart after changing. Default 1 recommended." );
+	ri.Cvar_SetGroup( r_fbo, CVG_RENDERER );
 	r_renderMode = ri.Cvar_Get( "r_renderMode", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_renderMode, "0", "2", CV_INTEGER );
 	ri.Cvar_SetDescription( r_renderMode, "Rendering path. Requires vid_restart.\n 0: Forward (default)\n 1: Deferred (placeholder)\n 2: Forward+ (placeholder)\nDeferred and forward+ would need G-buffers, light culling, and separate passes; they are not implemented yet." );
@@ -3354,10 +3355,12 @@ static void R_Register( void )
 	r_bloom = ri.Cvar_Get( "r_bloom", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_bloom, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription(r_bloom, "Enables bloom post-processing effect. Requires \\r_fbo 1.");
+	ri.Cvar_SetGroup( r_bloom, CVG_RENDERER );
 
 	r_ssao = ri.Cvar_Get( "r_ssao", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ssao, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ssao, "Enables screen-space ambient occlusion (SSAO). Requires \\r_fbo 1." );
+	ri.Cvar_SetGroup( r_ssao, CVG_RENDERER );
 
 	r_ssaoMethod = ri.Cvar_Get( "r_ssaoMethod", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ssaoMethod, "0", "1", CV_INTEGER );
@@ -3402,6 +3405,7 @@ static void R_Register( void )
 	r_oit = ri.Cvar_Get( "r_oit", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_oit, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_oit, "Order-independent transparency (WBOIT). Correct blending of overlapping transparent surfaces. Requires \\r_fbo 1." );
+	ri.Cvar_SetGroup( r_oit, CVG_RENDERER );
 	r_ssaoDebugView = ri.Cvar_Get( "r_ssaoDebugView", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_ssaoDebugView, "0", "2", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ssaoDebugView, "SSAO debug view:\n 0: off\n 1: show AO only\n 2: show depth" );
@@ -3412,6 +3416,7 @@ static void R_Register( void )
 	r_ext_multisample = ri.Cvar_Get( "r_ext_multisample", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_multisample, "0", "16", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ext_multisample, "MSAA sample count for geometry edges: 0=off, 2|4|8|16. Requires \\r_fbo 1. Use with SMAA for alpha edges." );
+	ri.Cvar_SetGroup( r_ext_multisample, CVG_RENDERER );
 
 	r_msaa_sample_shading = ri.Cvar_Get( "r_msaa_sample_shading", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_msaa_sample_shading, "0", "1", CV_INTEGER );
@@ -3431,6 +3436,7 @@ static void R_Register( void )
 	r_ext_smaa = ri.Cvar_Get( "r_ext_smaa", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_smaa, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ext_smaa, "Enables SMAA post-processing, requires \\r_fbo 1." );
+	ri.Cvar_SetGroup( r_ext_smaa, CVG_RENDERER );
 
 	r_smaa_preset = ri.Cvar_Get( "r_smaa_preset", "3", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_smaa_preset, "0", "4", CV_INTEGER );
