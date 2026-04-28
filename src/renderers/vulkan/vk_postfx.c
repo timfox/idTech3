@@ -13,6 +13,7 @@ and color grading lens effects.
 */
 
 #include "tr_local.h"
+#include "vk.h"
 #include "vk_postfx.h"
 #include "vk_util.h"
 
@@ -260,6 +261,50 @@ void PostFX_RegisterCvars(void) {
 	ri.Cvar_SetDescription( r_grade_splitStrength, "Split-tone blend strength." );
 	ri.Cvar_SetDescription( r_grade_lut, "Path to a 32x32x32 LUT packed as a 2D strip texture." );
 	ri.Cvar_SetDescription( r_grade_lutIntensity, "Blend strength for the active LUT." );
+	ri.Cvar_SetGroup( r_ssr, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_ssr_maxDistance, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_ssr_stepSize, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_ssr_thickness, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_ssr_fadeEdge, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_ssr_roughnessThreshold, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_ssr_fresnelExponent, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_ssr_intensity, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_ssr_maxDepthGradient, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_atmosphere, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_atmosphere_sunDirX, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_atmosphere_sunDirY, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_atmosphere_sunDirZ, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_atmosphere_sunIntensity, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_atmosphere_scale, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_atmosphere_rayleighHeight, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_atmosphere_mieHeight, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_atmosphere_mieG, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_vegWind, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_vegWind_primaryFreq, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_vegWind_primaryAmp, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_vegWind_detailFreq, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_vegWind_detailAmp, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_vegWind_gustFreq, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_vegWind_gustAmp, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_vegWind_dirX, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_vegWind_dirY, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_vegWind_dirZ, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_vegWind_strength, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_vignette, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_vignette_radius, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_chromaticAberration, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_filmGrain, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_filmLook, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_motionBlur, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_motionBlurStrength, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_motionBlurMaxRadius, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_motionBlurSamples, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_depthOfField, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_dofFocusDistance, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_dofFocusRange, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_dofAperture, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_dofMaxBlur, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_sharpen, CVG_RENDERER );
 	ri.Cvar_SetGroup( r_grade_toe, CVG_RENDERER );
 	ri.Cvar_SetGroup( r_grade_shoulder, CVG_RENDERER );
 	ri.Cvar_SetGroup( r_grade_whitePoint, CVG_RENDERER );
@@ -329,6 +374,8 @@ static int lastSSAOState = -1;
 static int lastSMAAState = -1;
 static int lastSSRState = -1;
 static int lastOITState = -1;
+/* vk_create_post_process_pipeline and atmosphere pick HDR32 vs HDR64 from vk.color_format. */
+static uint32_t s_lastPostPipelineVkFboColorFmt = 0u;
 
 qboolean PostFX_NeedsPipelineUpdate(void) {
 	/* Same heuristics as PostFX_PostPipelinesNeedUpdate (tr_cmds.c end-of-frame); used from
@@ -344,6 +391,7 @@ qboolean PostFX_PostPipelinesNeedUpdate(void) {
 	int oitState = ( r_oit && r_oit->integer ) ? 1 : 0;
 	cvar_t *r_bloom_scatter = ri.Cvar_Get( "r_bloom_scatter", "0.72", 0 );
 	cvar_t *r_bloom_energy = ri.Cvar_Get( "r_bloom_energyPreserve", "1", 0 );
+	const uint32_t fboColorFmt = (uint32_t)vk.color_format;
 
 	/* r_ssr on/off: toggles whether vk_update_post_process_pipelines builds the SSR subpass. */
 	if ( ( r_bloom && r_bloom->modified ) ||
@@ -359,6 +407,7 @@ qboolean PostFX_PostPipelinesNeedUpdate(void) {
 		( r_oit && r_oit->modified ) ||
 		( r_ssr && r_ssr->modified ) )
 	{
+		s_lastPostPipelineVkFboColorFmt = fboColorFmt;
 		lastBloomState = bloomState;
 		lastSSAOState = ssaoState;
 		lastSMAAState = smaaState;
@@ -368,7 +417,8 @@ qboolean PostFX_PostPipelinesNeedUpdate(void) {
 	}
 
 	if ( bloomState != lastBloomState || ssaoState != lastSSAOState || smaaState != lastSMAAState ||
-		ssrState != lastSSRState || oitState != lastOITState ) {
+		ssrState != lastSSRState || oitState != lastOITState || fboColorFmt != s_lastPostPipelineVkFboColorFmt ) {
+		s_lastPostPipelineVkFboColorFmt = fboColorFmt;
 		lastBloomState = bloomState;
 		lastSSAOState = ssaoState;
 		lastSMAAState = smaaState;
@@ -398,6 +448,7 @@ void PostFX_NotifyPostPipelinesRebuilt( void ) {
 	lastSMAAState = smaaState;
 	lastSSRState = ssrState;
 	lastOITState = oitState;
+	s_lastPostPipelineVkFboColorFmt = (uint32_t)vk.color_format;
 
 	if ( r_bloom ) {
 		r_bloom->modified = qfalse;
