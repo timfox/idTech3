@@ -331,7 +331,9 @@ static int lastSSRState = -1;
 static int lastOITState = -1;
 
 qboolean PostFX_NeedsPipelineUpdate(void) {
-	return qfalse;
+	/* Same heuristics as PostFX_PostPipelinesNeedUpdate (tr_cmds.c end-of-frame); used from
+	 * vk_begin_frame so post/gamma pipelines refresh at frame start when cvars change. */
+	return PostFX_PostPipelinesNeedUpdate();
 }
 
 qboolean PostFX_PostPipelinesNeedUpdate(void) {

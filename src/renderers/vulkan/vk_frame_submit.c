@@ -101,9 +101,8 @@ void vk_begin_frame( void )
 		if ( vk.device && !vk.device_lost && vk.pipelines_count > 0u ) {
 			ri.Printf( PRINT_ALL, "[VK][Forward+] r_forwardPlusShade changed; invalidating graphics pipelines for new fragment specialization\n" );
 			vk_destroy_pipelines( qfalse );
-			/* vk_destroy_pipelines destroys gamma/post FX pipelines too; PostFX_NeedsPipelineUpdate()
-			 * is not wired for Forward+ shade, so rebuild here or the swapchain gamma blit stays
-			 * skipped and the window can show black until vid_restart. */
+			/* vk_destroy_pipelines destroys gamma/post FX pipelines too; ensure
+			 * vk_update_post_process_pipelines runs (also covered when PostFX_NeedsPipelineUpdate). */
 			if ( vk.fboActive ) {
 				vk_update_post_process_pipelines();
 			}
