@@ -345,6 +345,7 @@ qboolean PostFX_PostPipelinesNeedUpdate(void) {
 	cvar_t *r_bloom_scatter = ri.Cvar_Get( "r_bloom_scatter", "0.72", 0 );
 	cvar_t *r_bloom_energy = ri.Cvar_Get( "r_bloom_energyPreserve", "1", 0 );
 
+	/* r_ssr on/off: toggles whether vk_update_post_process_pipelines builds the SSR subpass. */
 	if ( ( r_bloom && r_bloom->modified ) ||
 		( r_bloom_intensity && r_bloom_intensity->modified ) ||
 		( r_bloom_threshold && r_bloom_threshold->modified ) ||
@@ -355,7 +356,8 @@ qboolean PostFX_PostPipelinesNeedUpdate(void) {
 		( r_bloom_energy && r_bloom_energy->modified ) ||
 		( r_ssao && r_ssao->modified ) ||
 		( r_ext_smaa && r_ext_smaa->modified ) ||
-		( r_oit && r_oit->modified ) )
+		( r_oit && r_oit->modified ) ||
+		( r_ssr && r_ssr->modified ) )
 	{
 		lastBloomState = bloomState;
 		lastSSAOState = ssaoState;
@@ -426,6 +428,9 @@ void PostFX_NotifyPostPipelinesRebuilt( void ) {
 	}
 	if ( r_ext_smaa ) {
 		r_ext_smaa->modified = qfalse;
+	}
+	if ( r_ssr ) {
+		r_ssr->modified = qfalse;
 	}
 	if ( r_oit ) {
 		r_oit->modified = qfalse;
