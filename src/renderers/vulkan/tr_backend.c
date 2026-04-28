@@ -563,15 +563,6 @@ static void RB_BeginDrawingView( void ) {
 	{
 		clearBits |= GL_STENCIL_BUFFER_BIT;
 	}
-	if ( 0 && r_fastsky->integer && !( backEnd.refdef.rdflags & RDF_NOWORLDMODEL ) )
-	{
-		clearBits |= GL_COLOR_BUFFER_BIT;	/* Could clear only if sky shaders used */
-#ifdef _DEBUG
-		qglClearColor( 0.8f, 0.7f, 0.4f, 1.0f );	/* Debug: could sample sky color */
-#else
-		qglClearColor( 0.0f, 0.0f, 0.0f, 1.0f );	/* Could sample sky color */
-#endif
-	}
 	qglClear( clearBits );
 #endif
 
@@ -1794,10 +1785,6 @@ static const void *RB_DrawSurfs( const void *data ) {
 #ifdef USE_VBO
 	VBO_UnBind();
 #endif
-
-	if ( 0 && r_drawSun->integer ) { /* sun drawing disabled */
-		RB_DrawSun( 0.1f, tr.sunShader );
-	}
 
 	// darken down any stencil shadows
 	RB_ShadowFinish();
