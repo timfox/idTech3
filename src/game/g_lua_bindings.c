@@ -362,6 +362,20 @@ static int l_eda_pop( lua_State *L ) {
 	}
 	return 0;
 }
+static int l_eda_peek( lua_State *L ) {
+	char ch[EDA_MAX_NAME], pay[EDA_MAX_PAYLOAD];
+	if ( EDA_Peek( ch, sizeof( ch ), pay, sizeof( pay ) ) ) {
+		lua_pushstring( L, ch );
+		lua_pushstring( L, pay );
+		return 2;
+	}
+	return 0;
+}
+static int l_eda_isEnabled( lua_State *L ) {
+	(void)L;
+	lua_pushboolean( L, EDA_IsEnabled() );
+	return 1;
+}
 static int l_eda_queueDepth( lua_State *L ) {
 	(void)L;
 	lua_pushinteger( L, (lua_Integer)EDA_QueueDepth() );
@@ -1097,6 +1111,8 @@ void LuaBindings_RegisterAll(void *luaState) {
 	static const luaL_Reg eventFuncs[] = {
 		{"publish", l_eda_publish},
 		{"pop", l_eda_pop},
+		{"peek", l_eda_peek},
+		{"isEnabled", l_eda_isEnabled},
 		{"queueDepth", l_eda_queueDepth},
 		{"drain", l_eda_drain},
 		{"clear", l_eda_clear},

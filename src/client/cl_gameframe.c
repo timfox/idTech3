@@ -160,8 +160,8 @@ void CL_InitGameSystems(void) {
 	Horde_Init();
 	Dismember_Init();
 	GOAP_Init();
-	AIML_Init();
 	EDA_Init();
+	AIML_Init();
 	EngineTelemetry_Init();
 	EngineReplay_Init();
 	EngineSave_Init();

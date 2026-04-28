@@ -27,6 +27,8 @@ void    EDA_Init( void );
 void    EDA_Shutdown( void );
 void    EDA_Frame( void );
 
+qboolean EDA_IsEnabled( void );
+
 /* Returns qfalse if channel table is full. */
 qboolean EDA_RegisterChannel( const char *name );
 
@@ -35,6 +37,9 @@ qboolean EDA_Publish( const char *channel, const char *payload );
 
 /* Pop one event: returns qtrue and writes channel name + payload. */
 qboolean EDA_Pop( char *channelOut, int channelLen, char *payloadOut, int payloadLen );
+
+/* Inspect head of queue without consuming (for Lua/debug). */
+qboolean EDA_Peek( char *channelOut, int channelLen, char *payloadOut, int payloadLen );
 
 int     EDA_QueueDepth( void );
 void    EDA_Clear( void );
