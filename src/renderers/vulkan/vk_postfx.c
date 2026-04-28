@@ -378,6 +378,60 @@ qboolean PostFX_PostPipelinesNeedUpdate(void) {
 	return qfalse;
 }
 
+/*
+ * Call after vk_update_post_process_pipelines() so PostFX_PostPipelinesNeedUpdate does not
+ * stay true for extra frames, and tr_cmds does not rebuild again the same frame.
+ */
+void PostFX_NotifyPostPipelinesRebuilt( void ) {
+	int bloomState = ( r_bloom && r_bloom->integer ) ? 1 : 0;
+	int ssaoState = ( r_ssao && r_ssao->integer ) ? 1 : 0;
+	int smaaState = ( r_ext_smaa && r_ext_smaa->integer ) ? 1 : 0;
+	int ssrState = ( r_ssr && r_ssr->integer ) ? 1 : 0;
+	int oitState = ( r_oit && r_oit->integer ) ? 1 : 0;
+	cvar_t *r_bloom_scatter = ri.Cvar_Get( "r_bloom_scatter", "0.72", 0 );
+	cvar_t *r_bloom_energy = ri.Cvar_Get( "r_bloom_energyPreserve", "1", 0 );
+
+	lastBloomState = bloomState;
+	lastSSAOState = ssaoState;
+	lastSMAAState = smaaState;
+	lastSSRState = ssrState;
+	lastOITState = oitState;
+
+	if ( r_bloom ) {
+		r_bloom->modified = qfalse;
+	}
+	if ( r_bloom_intensity ) {
+		r_bloom_intensity->modified = qfalse;
+	}
+	if ( r_bloom_threshold ) {
+		r_bloom_threshold->modified = qfalse;
+	}
+	if ( r_bloom_threshold_mode ) {
+		r_bloom_threshold_mode->modified = qfalse;
+	}
+	if ( r_bloom_modulate ) {
+		r_bloom_modulate->modified = qfalse;
+	}
+	if ( r_bloomKnee ) {
+		r_bloomKnee->modified = qfalse;
+	}
+	if ( r_bloom_scatter ) {
+		r_bloom_scatter->modified = qfalse;
+	}
+	if ( r_bloom_energy ) {
+		r_bloom_energy->modified = qfalse;
+	}
+	if ( r_ssao ) {
+		r_ssao->modified = qfalse;
+	}
+	if ( r_ext_smaa ) {
+		r_ext_smaa->modified = qfalse;
+	}
+	if ( r_oit ) {
+		r_oit->modified = qfalse;
+	}
+}
+
 float PostFX_GetVignetteIntensity(void) { return r_vignette ? r_vignette->value : 0.0f; }
 float PostFX_GetVignetteRadius(void) { return r_vignette_radius ? r_vignette_radius->value : 0.75f; }
 float PostFX_GetChromaticAberration(void) { return r_chromaticAberration ? r_chromaticAberration->value : 0.0f; }
