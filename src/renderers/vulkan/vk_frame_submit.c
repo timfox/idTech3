@@ -86,6 +86,7 @@ void vk_begin_frame( void )
 {
 	VkCommandBufferBeginInfo begin_info;
 	VkResult res;
+	qboolean needPost = qfalse;
 
 	if ( vk.device_lost ) {
 		return;
@@ -101,16 +102,18 @@ void vk_begin_frame( void )
 		if ( vk.device && !vk.device_lost && vk.pipelines_count > 0u ) {
 			ri.Printf( PRINT_ALL, "[VK][Forward+] r_forwardPlusShade changed; invalidating graphics pipelines for new fragment specialization\n" );
 			vk_destroy_pipelines( qfalse );
-			/* vk_destroy_pipelines destroys gamma/post FX pipelines too; ensure
-			 * vk_update_post_process_pipelines runs (also covered when PostFX_NeedsPipelineUpdate). */
+			/* vk_destroy_pipelines destroys gamma/post FX pipelines too. */
 			if ( vk.fboActive ) {
-				vk_update_post_process_pipelines();
+				needPost = qtrue;
 			}
 		}
 	}
 #endif
 
 	if ( PostFX_NeedsPipelineUpdate() ) {
+		needPost = qtrue;
+	}
+	if ( needPost && vk.fboActive ) {
 		vk_update_post_process_pipelines();
 	}
 
