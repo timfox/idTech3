@@ -68,6 +68,6 @@ void vk_update_post_process_pipelines( void )
 			vk_create_post_process_pipeline( 13, postWidth, postHeight );
 		}
 		vk_create_atmosphere_pipeline();
+		PostFX_NotifyPostPipelinesRebuilt();
 	}
-	PostFX_NotifyPostPipelinesRebuilt();
 }
