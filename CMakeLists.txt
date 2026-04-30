@@ -2421,6 +2421,13 @@ add_test(NAME test_compile_engine_lto
 set_tests_properties(test_compile_engine_lto PROPERTIES
 	LABELS "unit;scripts;validation")
 
+add_test(NAME test_vulkan_mesh_shader_opt_in
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_vulkan_mesh_shader_opt_in.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_vulkan_mesh_shader_opt_in PROPERTIES
+	LABELS "unit;scripts;validation;renderer"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_vulkan_mesh_shader_opt_in.sh")
+
 # --- Unit tests ---
 option(BUILD_UNIT_TESTS "Build unit tests" ON)
 if(BUILD_UNIT_TESTS)
