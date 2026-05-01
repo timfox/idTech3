@@ -3881,8 +3881,6 @@ static void CreateExternalShaders( void ) {
 			tr.flareShader->stages[index]->stateBits |= GLS_DEPTHTEST_DISABLE;
 		}
 	}
-
-	tr.sunShader = R_FindShader( "sun", LIGHTMAP_NONE, qtrue );
 }
 
 

@@ -90,7 +90,6 @@ cvar_t  *r_teleporterFlash;
 
 cvar_t	*r_fastsky;
 cvar_t	*r_neatsky;
-cvar_t	*r_drawSun;
 cvar_t	*r_dynamiclight;
 #ifdef USE_PMLIGHT
 cvar_t	*r_dlightMode;
@@ -2448,8 +2447,6 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_teleporterFlash, "Show a white screen instead of a black screen when being teleported in hyperspace." );
 	r_fastsky = ri.Cvar_Get( "r_fastsky", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_fastsky, "Draw flat colored skies." );
-	r_drawSun = ri.Cvar_Get( "r_drawSun", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_SetDescription( r_drawSun, "Draw sun shader in skies." );
 	r_dynamiclight = ri.Cvar_Get( "r_dynamiclight", "1", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_dynamiclight, "Enables dynamic lighting." );
 #ifdef USE_PMLIGHT
