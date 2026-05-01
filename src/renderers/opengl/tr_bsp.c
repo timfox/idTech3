@@ -40,57 +40,6 @@ static int	c_gridVerts;
 
 //===============================================================================
 
-static void HSVtoRGB( float h, float s, float v, float rgb[3] )
-{
-	int i;
-	float f;
-	float p, q, t;
-
-	h *= 5;
-
-	i = floor( h );
-	f = h - i;
-
-	p = v * ( 1 - s );
-	q = v * ( 1 - s * f );
-	t = v * ( 1 - s * ( 1 - f ) );
-
-	switch ( i )
-	{
-	case 0:
-		rgb[0] = v;
-		rgb[1] = t;
-		rgb[2] = p;
-		break;
-	case 1:
-		rgb[0] = q;
-		rgb[1] = v;
-		rgb[2] = p;
-		break;
-	case 2:
-		rgb[0] = p;
-		rgb[1] = v;
-		rgb[2] = t;
-		break;
-	case 3:
-		rgb[0] = p;
-		rgb[1] = q;
-		rgb[2] = v;
-		break;
-	case 4:
-		rgb[0] = t;
-		rgb[1] = p;
-		rgb[2] = v;
-		break;
-	case 5:
-		rgb[0] = v;
-		rgb[1] = p;
-		rgb[2] = q;
-		break;
-	}
-}
-
-
 /*
 ===============
 R_ClampDenorm
@@ -241,54 +190,24 @@ static float R_ProcessLightmap( byte *image, const byte *buf_p, float maxIntensi
 {
 	int x, y;
 
-	if ( 0 && r_lightmap->integer == 2 ) {
-		int j;
-		// color code by intensity as development tool (r/g/b from buf_p, clamp output)
-		for ( j = 0; j < LIGHTMAP_SIZE * LIGHTMAP_SIZE; j++ )
-		{
-			float r = buf_p[j*3+0];
-			float g = buf_p[j*3+1];
-			float b = buf_p[j*3+2];
-			float intensity;
-			float out[3] = {0.0, 0.0, 0.0};
-
-			intensity = 0.33f * r + 0.685f * g + 0.063f * b;
-
-			if ( intensity > 255 )
-				intensity = 1.0f;
-			else
-				intensity /= 255.0f;
-
-			if ( intensity > maxIntensity )
-				maxIntensity = intensity;
-
-			HSVtoRGB( intensity, 1.00, 0.50, out );
-
-			image[j*4+0] = (byte)Com_Clamp( 0.0f, 255.0f, out[0] * 255.0f );
-			image[j*4+1] = (byte)Com_Clamp( 0.0f, 255.0f, out[1] * 255.0f );
-			image[j*4+2] = (byte)Com_Clamp( 0.0f, 255.0f, out[2] * 255.0f );
-			image[j*4+3] = 255;
-		}
-	} else {
-		if ( tr.mergeLightmaps ) {
-			for ( y = 0 ; y < LIGHTMAP_SIZE; y++ ) {
-				for ( x = 0 ; x < LIGHTMAP_SIZE; x++ ) {
-					byte *dst = &image[((y + LIGHTMAP_BORDER) * LIGHTMAP_LEN + x + LIGHTMAP_BORDER) * 4];
-					R_ColorShiftLightingBytes( buf_p, dst, qfalse );
-					dst[3] = 255;
-					buf_p += 3;
-				}
+	if ( tr.mergeLightmaps ) {
+		for ( y = 0 ; y < LIGHTMAP_SIZE; y++ ) {
+			for ( x = 0 ; x < LIGHTMAP_SIZE; x++ ) {
+				byte *dst = &image[((y + LIGHTMAP_BORDER) * LIGHTMAP_LEN + x + LIGHTMAP_BORDER) * 4];
+				R_ColorShiftLightingBytes( buf_p, dst, qfalse );
+				dst[3] = 255;
+				buf_p += 3;
 			}
-			FillBorders( image );
-		} else {
-			// legacy path
-			for ( y = 0 ; y < LIGHTMAP_SIZE; y++ ) {
-				for ( x = 0 ; x < LIGHTMAP_SIZE; x++ ) {
-					byte *dst = &image[(y * LIGHTMAP_SIZE + x) * 4];
-					R_ColorShiftLightingBytes( buf_p, dst, qfalse );
-					dst[3] = 255;
-					buf_p += 3;
-				}
+		}
+		FillBorders( image );
+	} else {
+		// legacy path
+		for ( y = 0 ; y < LIGHTMAP_SIZE; y++ ) {
+			for ( x = 0 ; x < LIGHTMAP_SIZE; x++ ) {
+				byte *dst = &image[(y * LIGHTMAP_SIZE + x) * 4];
+				R_ColorShiftLightingBytes( buf_p, dst, qfalse );
+				dst[3] = 255;
+				buf_p += 3;
 			}
 		}
 	}

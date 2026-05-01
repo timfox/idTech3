@@ -1153,7 +1153,6 @@ typedef struct {
 	shader_t				*projectionShadowShader;
 
 	shader_t				*flareShader;
-	shader_t				*sunShader;
 
 	int						numLightmaps;
 	image_t					**lightmaps;
@@ -1264,7 +1263,6 @@ extern cvar_t	*r_teleporterFlash;		// teleport hyperspace visual
 
 extern cvar_t	*r_fastsky;				// controls whether sky should be cleared or drawn
 extern cvar_t	*r_neatsky;				// nomip and nopicmip for skyboxes, cnq3 like look
-extern cvar_t	*r_drawSun;				// controls drawing of sun quad
 extern cvar_t	*r_dynamiclight;		// dynamic lights enabled/disabled
 #ifdef USE_PMLIGHT
 extern cvar_t	*r_dlightMode;			// 0 - vq3, 1 - pmlight
@@ -1695,7 +1693,6 @@ SKIES
 
 void R_InitSkyTexCoords( float cloudLayerHeight );
 void R_DrawSkyBox( const shaderCommands_t *shader );
-void RB_DrawSun( float scale, shader_t *shader );
 
 /*
 ============================================================

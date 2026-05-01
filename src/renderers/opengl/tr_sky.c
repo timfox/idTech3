@@ -758,46 +758,6 @@ void R_InitSkyTexCoords( float heightCloud )
 //======================================================================================
 
 /*
-** RB_DrawSun
-*/
-void RB_DrawSun( float scale, shader_t *shader ) {
-	float		size;
-	float		dist;
-	vec3_t		origin, vec1, vec2;
-	color4ub_t	sunColor;
-
-	if ( !backEnd.skyRenderedThisView )
-		return;
-
-	sunColor.u32 = ~0U;
-
-	qglLoadMatrixf( backEnd.viewParms.world.modelMatrix );
-
-	dist = backEnd.viewParms.zFar / 1.75;		// div sqrt(3)
-	size = dist * scale;
-
-	VectorMA( backEnd.viewParms.or.origin, dist, tr.sunDirection, origin );
-	PerpendicularVector( vec1, tr.sunDirection );
-	CrossProduct( tr.sunDirection, vec1, vec2 );
-
-	VectorScale( vec1, size, vec1 );
-	VectorScale( vec2, size, vec2 );
-
-	// farthest depth range
-	qglDepthRange( sky_min_depth, 1.0 );
-
-	RB_BeginSurface( shader, 0 );
-
-	RB_AddQuadStamp( origin, vec1, vec2, sunColor );
-
-	RB_EndSurface();
-
-	// back to normal depth range
-	qglDepthRange( 0.0, 1.0 );
-}
-
-
-/*
 ================
 RB_StageIteratorSky
 
