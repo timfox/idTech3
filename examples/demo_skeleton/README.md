@@ -56,7 +56,7 @@ The scripts look for **`base/`** and **`idtech3_demo/`** next to themselves, so 
 |--------|------------|
 | “Missing … idtech3_demo.pk3” | Run Step 1 and copy the `.pk3` into `idtech3_demo/`. |
 | “No engine binary” | Build the engine (`./scripts/compile_engine.sh vulkan`) or set **`IDTECH3_ENGINE`** in `local.env` to your `idtech3` path. |
-| **`VM_Create on UI failed`** / **`ui.qvm not found`** | Rebuild **`idtech3_demo.pk3`** (`./examples/demo_game/build_demo_pack.sh`) so **`vm/ui*.so`** (or **`.dll`**) is inside the zip. Older packs were config-only. |
+| **`VM_Create on UI failed`** / **`ui.qvm not found`** | Use an **up-to-date engine** (extracts `vm/*.so` from pk3 to `vm/native_cache/`) and rebuild **`idtech3_demo.pk3`** so **`vm/ui*.so`** / **`vm/ui.*.so`** are inside the zip. Copy the `.pk3` into **`idtech3_demo/`** next to `base/`, not only `release/`. |
 | “No game data” / missing maps | Add `.pk3` files under **`base/`** (or set **`DEMO_BASE_DIR`** - see below). |
 | Wrong renderer | Set **`DEMO_RENDERER=opengl`** in `local.env`, or run with `+set cl_renderer opengl`. |
 | Windows | Use **`run_demo_client.bat`** from the same folder layout; put **`idtech3.exe`** next to it or on `PATH`. |

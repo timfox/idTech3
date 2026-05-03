@@ -6,7 +6,7 @@ This is **not** a standalone game: it is a **tiny mod** (`.pk3` of configs) you 
 
 | Artifact | Description |
 |----------|-------------|
-| `idtech3_demo.pk3` | Config mod + **minimal native UI** (`vm/ui<arch>.so` or `.dll` inside the zip): enough to open a window and draw placeholder text **without** retail `ui.qvm`. Also **Duktape** hooks and gameplay hints. |
+| `idtech3_demo.pk3` | Config mod + **minimal native UI** (inside the zip as **`vm/ui<arch>.so`** and **`vm/ui.<arch>.so`**, same binary): enough to open a window without retail `ui.qvm`. The engine extracts packed natives to **`vm/native_cache/`** on load. Also **Duktape** (`demo_js.cfg`), optional **Lua** (`demo_lua.cfg` / `scripts/lua/` when built with `USE_LUA`), and gameplay hints. |
 | `idtech3_demo_helper` | Optional tiny host binary that prints launch hints (built when `BUILD_EXAMPLE_DEMO_GAME=ON`). |
 
 ### “Playable” without custom qagame
@@ -17,7 +17,8 @@ This is **not** a standalone game: it is a **tiny mod** (`.pk3` of configs) you 
 
 1. **Renderer demo** - `demo_features.cfg` turns on PBR, volumetric fog, SSR, atmosphere, veg wind (Vulkan).
 2. **Lightweight game code** - `demo_hooks.js` registers `idtech3.on('map_load')` and `idtech3.on('frame')` and draws an occasional HUD line (proves the `idtech3` Duktape API in `src/qcommon/js_debug.c`).
-3. **Subsystem hooks** - the engine already runs Director, Horde bridge, particles, nav crowd, behavior trees, etc. in `CL_GameFrame` when `cl_physicsEnabled` / `cl_navEnabled` / … are on - see `demo_gameplay.cfg` and `buildnavmesh`.
+3. **Lua (optional)** - `demo_lua.cfg` runs `script_reload scripts/lua/demo_hooks.lua`. Requires a Lua-enabled engine build; otherwise the console reports Lua disabled.
+4. **Subsystem hooks** - the engine already runs Director, Horde bridge, particles, nav crowd, behavior trees, etc. in `CL_GameFrame` when `cl_physicsEnabled` / `cl_navEnabled` / … are on - see `demo_gameplay.cfg` and `buildnavmesh`.
 
 ## Build the demo pack
 
@@ -60,9 +61,11 @@ Quick path: use the **[demo skeleton](../demo_skeleton/README.md)** (`run_demo_c
              +set cl_renderer vulkan
    ```
 
-3. On load, `autoexec.cfg` runs `demo_features.cfg`, `demo_js.cfg` ( **`js_reload scripts/js/demo_hooks.js`** ), and `demo_gameplay.cfg`. Edit files under `mod/` and rebuild `demo_game_pk3`.
+3. On load, `autoexec.cfg` runs `demo_features.cfg`, `demo_js.cfg`, `demo_lua.cfg`, and `demo_gameplay.cfg`. Edit files under `mod/` and rebuild `demo_game_pk3`.
 
 **JavaScript:** requires **USE_DUKTAPE** in the engine build. If `js_reload` fails, check the console; ensure `js_allowEvents` is `1` (default).
+
+**Lua:** requires **USE_LUA** and a found Lua library at CMake configure time. If `script_reload` reports Lua disabled, reconfigure the engine with Lua dev packages installed.
 
 ## Maps
 
