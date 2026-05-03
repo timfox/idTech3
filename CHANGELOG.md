@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- docs/CURL_NETWORKING.md: tutorial for client libcurl usage (build, `cl_dlURL` / `sv_dlURL`, `download`/`dlmap`, `DLF_*` flags, security, extending for MOTD/API/music).
 - `examples/demo_game`: `idtech3_demo.pk3` embeds a minimal native UI module (`vm/ui<arch>.so` or `.dll`) so the demo skeleton can open a window without retail `ui.qvm` (`examples/demo_game/native/ui_skeleton_stub.c`, CMake target `demo_ui_skeleton`).
 - `examples/demo_skeleton/`: user-friendly demo playfield (`./scripts/run_demo.sh`, auto-detect layout, `baseq3` hint, help text); `scripts/run_demo.sh` entry point; `base/` + `idtech3_demo/` README stubs.
 - CTest `test_demo_game_pk3`: verifies `examples/demo_game` zip layout (configs + optional **`cc`**-built **`vm/ui*.so`**) matches CMake staging.
