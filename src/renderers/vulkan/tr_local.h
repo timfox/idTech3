@@ -1595,6 +1595,7 @@ extern cvar_t	*r_taa_sharpen;
 extern cvar_t	*r_rtx;
 extern cvar_t	*r_rtxDemo;
 extern cvar_t	*r_rtxWorldPrimCap;
+extern cvar_t	*r_rtxComposite;
 extern cvar_t	*r_forwardPlus;
 extern cvar_t	*r_forwardPlusMaxPerTile;
 extern cvar_t	*r_forwardPlusDebug;
@@ -1806,6 +1807,9 @@ extern	cvar_t	*r_debugSurface;
 extern	cvar_t	*r_simpleMipMaps;
 
 extern	cvar_t	*r_showImages;
+#ifdef USE_IMGUI
+extern	cvar_t	*r_imgui;
+#endif
 extern	cvar_t	*r_defaultImage;
 extern	cvar_t	*r_debugSort;
 
