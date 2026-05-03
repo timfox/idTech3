@@ -314,6 +314,7 @@ static  const char  *basegame = ""; /* last value in array */
 static	char		fs_gamedir[MAX_OSPATH];	// this will be a single file name with no separators
 static	cvar_t		*fs_debug;
 static	cvar_t		*com_nativeLibraryDebug;
+static	cvar_t		*com_nativeLibraryExtractPk3;
 static	cvar_t		*fs_homepath;
 
 #ifdef __APPLE__
@@ -4845,6 +4846,12 @@ static void FS_Startup( void ) {
 	if ( com_nativeLibraryDebug->integer ) {
 		Com_Printf( S_COLOR_CYAN "com_nativeLibraryDebug: logging failed native library load paths + loader errors.\n" );
 	}
+	com_nativeLibraryExtractPk3 = Cvar_Get( "com_nativeLibraryExtractPk3", "1", CVAR_ARCHIVE );
+	Cvar_SetDescription( com_nativeLibraryExtractPk3,
+		"When 1, native .so/.dll modules referenced only from .pk3 are extracted to vm/native_cache/ under fs_homepath/fs_game before dlopen/LoadLibrary. Disable for debugging or locked-down environments." );
+	if ( com_nativeLibraryExtractPk3->integer ) {
+		Com_Printf( "com_nativeLibraryExtractPk3: extracting embedded native libs from pk3 is enabled.\n" );
+	}
 	fs_copyfiles = Cvar_Get( "fs_copyfiles", "0", CVAR_INIT );
 	Cvar_SetDescription( fs_copyfiles, "Whether or not to copy files when loading them into the game. Every file found in the cdpath will be copied over." );
 	fs_basepath = Cvar_Get( "fs_basepath", Sys_DefaultBasePath(), CVAR_INIT | CVAR_PROTECTED | CVAR_PRIVATE );
@@ -6051,6 +6058,10 @@ static void *FS_TryLoadLibraryFromPk3Cache( const char *name ) {
 	const char		*slash;
 	FILE			*fp;
 	long			readLen;
+
+	if ( !com_nativeLibraryExtractPk3 || !com_nativeLibraryExtractPk3->integer ) {
+		return NULL;
+	}
 
 	if ( !name || !name[0] ) {
 		return NULL;
