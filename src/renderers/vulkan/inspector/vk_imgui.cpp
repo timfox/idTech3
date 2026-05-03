@@ -29,6 +29,15 @@ extern glconfig_t glConfig;
 extern cvar_t *r_imgui;
 }
 
+#if defined( USE_SDL ) && !defined( ANDROID )
+#	if defined( USE_LOCAL_HEADERS )
+#		include "SDL.h"
+#	else
+#		include <SDL2/SDL.h>
+#	endif
+extern "C" struct SDL_Window *SDL_window;
+#endif
+
 #ifdef USE_VULKAN
 #define USE_VK_PBR
 #include "../vk.h"
@@ -93,7 +102,22 @@ static void VkImgui_PrepareIO( void )
 
 	io.DisplaySize = ImVec2( (float)( windowWidth >= 0 ? windowWidth : 0 ),
 		(float)( windowHeight >= 0 ? windowHeight : 0 ) );
-	io.DisplayFramebufferScale = ImVec2( 1.0f, 1.0f );
+	{
+		float sx = 1.0f;
+		float sy = 1.0f;
+#if defined( USE_SDL ) && !defined( ANDROID )
+		if ( SDL_window != nullptr ) {
+			int winW = 0;
+			int winH = 0;
+			SDL_GetWindowSize( SDL_window, &winW, &winH );
+			if ( winW > 0 && winH > 0 && glConfig.vidWidth > 0 && glConfig.vidHeight > 0 ) {
+				sx = (float)glConfig.vidWidth / (float)winW;
+				sy = (float)glConfig.vidHeight / (float)winH;
+			}
+		}
+#endif
+		io.DisplayFramebufferScale = ImVec2( sx, sy );
+	}
 	io.DeltaTime = deltaSeconds;
 
 	{

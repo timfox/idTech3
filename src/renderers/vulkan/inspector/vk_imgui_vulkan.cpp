@@ -31,6 +31,11 @@ extern "C" {
 extern "C" struct SDL_Window *SDL_window;
 #endif
 
+extern "C" {
+#include "../../renderers/common/tr_types.h"
+extern glconfig_t glConfig;
+}
+
 #include "vk_imgui.h"
 
 static qboolean g_vkImguiBackendReady = qfalse;
@@ -148,7 +153,19 @@ extern "C" void VkImgui_UpdateMouseFromSDL( ImGuiIO *io, qboolean inspectorWants
 		int mx = 0;
 		int my = 0;
 		const Uint32 buttons = SDL_GetMouseState( &mx, &my );
-		io->MousePos = ImVec2( (float)mx, (float)my );
+		float ix = (float)mx;
+		float iy = (float)my;
+		{
+			int winW = 0;
+			int winH = 0;
+			SDL_GetWindowSize( SDL_window, &winW, &winH );
+			if ( winW > 0 && winH > 0 && glConfig.vidWidth > 0 && glConfig.vidHeight > 0 &&
+				( winW != glConfig.vidWidth || winH != glConfig.vidHeight ) ) {
+				ix *= (float)glConfig.vidWidth / (float)winW;
+				iy *= (float)glConfig.vidHeight / (float)winH;
+			}
+		}
+		io->MousePos = ImVec2( ix, iy );
 		io->MouseDown[0] = ( buttons & SDL_BUTTON( SDL_BUTTON_LEFT ) ) != 0;
 		io->MouseDown[1] = ( buttons & SDL_BUTTON( SDL_BUTTON_RIGHT ) ) != 0;
 		io->MouseDown[2] = ( buttons & SDL_BUTTON( SDL_BUTTON_MIDDLE ) ) != 0;
