@@ -6,7 +6,7 @@ This is **not** a standalone game: it is a **tiny mod** (`.pk3` of configs) you 
 
 | Artifact | Description |
 |----------|-------------|
-| `idtech3_demo.pk3` | Config mod + **minimal native UI** (inside the zip as **`vm/ui<arch>.so`** and **`vm/ui.<arch>.so`**, same binary): enough to open a window without retail `ui.qvm`. The engine extracts packed natives to **`vm/native_cache/`** on load. Also **Duktape** (`demo_js.cfg`), optional **Lua** (`demo_lua.cfg` / `scripts/lua/` when built with `USE_LUA`), and gameplay hints. |
+| `idtech3_demo.pk3` | Config mod + **minimal native UI** (inside the zip as **`vm/ui<arch>.so`** and **`vm/ui.<arch>.so`**, same binary): enough to open a window without retail `ui.qvm`. The engine packs native shared libraries only inside zips; it **extracts** them to **`vm/native_cache/`** under your game home path (toggle **`com_nativeLibraryExtractPk3`**, default **1**) then loads that file, because `dlopen` cannot read zip entries directly. Also **Duktape** (`demo_js.cfg`), optional **Lua** (`demo_lua.cfg` / `scripts/lua/` when built with `USE_LUA`), and gameplay hints. |
 | `idtech3_demo_helper` | Optional tiny host binary that prints launch hints (built when `BUILD_EXAMPLE_DEMO_GAME=ON`). |
 
 ### “Playable” without custom qagame
