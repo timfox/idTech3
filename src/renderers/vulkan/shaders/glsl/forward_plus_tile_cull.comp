@@ -29,6 +29,7 @@ layout(push_constant) uniform Push {
 	uint totalTiles;
 	uint numLights;
 	uint maxPerTile;
+	uint luminanceSort;
 } pc;
 
 bool sphere_tile_overlap(vec2 centerPx, float radiusPx, uint tileX, uint tileY, float tilePxX, float tilePxY) {
@@ -70,8 +71,11 @@ void main() {
 	float tilePxX = vw / max(float(tilesX), 1.0);
 	float tilePxY = vh / max(float(tilesY), 1.0);
 
-	uint outCount = 0u;
-	for (uint li = 0u; li < n && outCount < cap; li++) {
+	uint candLi[MAX_LIGHTS];
+	float candLum[MAX_LIGHTS];
+	uint candCount = 0u;
+
+	for (uint li = 0u; li < n; li++) {
 		uint b = 2u + li * REC_VEC4S;
 		vec3 worldPos = lights.data[b].xyz;
 		float radius = max(lights.data[b].w, 1e-4);
@@ -97,7 +101,38 @@ void main() {
 			continue;
 		}
 
-		tiles.cells[base + outCount] = li;
-		outCount++;
+		vec4 lc = lights.data[b + 1u];
+		float lum = lc.x + lc.y + lc.z;
+
+		candLi[candCount] = li;
+		candLum[candCount] = lum;
+		candCount++;
+	}
+
+	uint useCount = min(candCount, cap);
+
+	if (pc.luminanceSort != 0u && candCount > cap) {
+		for (uint k = 0u; k < cap; k++) {
+			uint bestJ = k;
+			float bestVal = candLum[k];
+			for (uint j = k + 1u; j < candCount; j++) {
+				if (candLum[j] > bestVal) {
+					bestVal = candLum[j];
+					bestJ = j;
+				}
+			}
+			if (bestJ != k) {
+				uint tmpI = candLi[bestJ];
+				float tmpL = candLum[bestJ];
+				candLi[bestJ] = candLi[k];
+				candLum[bestJ] = candLum[k];
+				candLi[k] = tmpI;
+				candLum[k] = tmpL;
+			}
+		}
+	}
+
+	for (uint k = 0u; k < useCount; k++) {
+		tiles.cells[base + k] = candLi[k];
 	}
 }

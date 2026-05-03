@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Vulkan Forward+: **`r_forwardPlusLuminanceSort`** (0/1, archived, default **1**); push constant + **`forward_plus_tile_cull.comp`** partial selection by RGB sum when a tile exceeds **`r_forwardPlusMaxPerTile`**; **`compile_shaders.sh --apply`** updates SPIR-V blobs.
 - `examples/demo_game`: `idtech3_demo.pk3` embeds a minimal native UI module (`vm/ui<arch>.so` or `.dll`) so the demo skeleton can open a window without retail `ui.qvm` (`examples/demo_game/native/ui_skeleton_stub.c`, CMake target `demo_ui_skeleton`).
 - `examples/demo_skeleton/`: user-friendly demo playfield (`./scripts/run_demo.sh`, auto-detect layout, `baseq3` hint, help text); `scripts/run_demo.sh` entry point; `base/` + `idtech3_demo/` README stubs.
 - CTest `test_demo_game_pk3`: verifies `examples/demo_game` zip layout (configs + optional **`cc`**-built **`vm/ui*.so`**) matches CMake staging.
@@ -27,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI: Clang in Ubuntu build matrix, ASAN job, FORTIFY_SOURCE enabled on Linux
 
 ### Changed
+- Vulkan Forward+: `vk_forward_plus_dispatch_tile_cull` passes **`luminanceSort`** in push constants; init logs when sort is on.
 - FORTIFY_SOURCE now enabled by default in Release builds (compile_engine.sh)
 - Vulkan cinematic path: r_fboCinematic cvar, vk_in_render_pass reset, luminance skip workaround
 - Vulkan PBR: direct specular uses **anisotropic GGX** when an anisotropy map is bound (`r_pbr_anisotropicSpecular` default 1); replaces the old roughness-only blend. Re-run `scripts/compile_shaders.sh` after changing `gen_frag.tmpl`.
