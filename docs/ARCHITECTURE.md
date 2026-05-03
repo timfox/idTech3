@@ -67,7 +67,8 @@ src/
 │   │   ├── vk_clear_attachments.c In-pass color/depth clear + dynamic color write mask (split from vk.c)
 │   │   ├── vk_cubemap_prefilter.c IBL cubemap prefilter, SH extraction, vk_generate_cubemaps, vk_begin_cubemap_render_pass, vk_create_brfdlut (split from legacy vk.c)
 │   │   ├── vk_fluidsim.c/h       Fluid simulation module
-│   │   ├── vk_postfx.c/h         PostFX (SSR, atmosphere, wind)
+│   │   ├── vk_postfx.c/h         PostFX cvars + `PostFX_PostPipelinesNeedUpdate` (SSR/bloom/SSAO/SMAA/OIT/FBO fmt)
+│   │   ├── vk_post_process_refresh.c  `vk_update_post_process_pipelines` — rebuild post VkPipelines when needed
 │   │   ├── vk_flashlight.c/h     Projected texture system
 │   │   ├── vk_skybox_hdr.c/h     HDR EXR skybox + IBL
 │   │   ├── tr_model_gltf.c/h     glTF 2.0 loader (shared; Vulkan GPU path + OpenGL CPU tess - see docs/GLTF.md)
@@ -126,7 +127,7 @@ The shipping Vulkan renderer is **forward-only** with a layered HDR/post-process
 1. Shadow passes (sun CSM, spot atlas, point cubemaps)
 2. Main forward scene pass
 3. Optional OIT resolve for transparent surfaces
-4. SSR
+4. SSR (SSR pass pipelines are created only when `r_ssr` is on; toggling it triggers a frame-start post-pipeline rebuild)
 5. Bloom
 6. SSAO/HBAO
 7. Atmosphere + volumetric fog
