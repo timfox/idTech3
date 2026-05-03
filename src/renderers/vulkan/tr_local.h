@@ -1599,6 +1599,7 @@ extern cvar_t	*r_forwardPlus;
 extern cvar_t	*r_forwardPlusMaxPerTile;
 extern cvar_t	*r_forwardPlusDebug;
 extern cvar_t	*r_forwardPlusShade;
+extern cvar_t	*r_forwardPlusLuminanceSort;
 extern cvar_t	*r_glint;
 extern cvar_t	*r_glintMode;
 extern cvar_t	*r_glintDensity;
