@@ -49,9 +49,8 @@ static void push_attr( uint32_t location, uint32_t binding, VkFormat format )
 static VkShaderModule *vk_select_pbr_gen_vert( const Vk_Pipeline_Def *def, int use_pbr, int tx, int cl, int env )
 {
 	const int fog = def->fog_stage ? 1 : 0;
-	const int gltfTan = ( def->gltf_gpu_tangent_fixup && def->pbr_vert_mode ) ? 1 : 0;
 	if ( def->pbr_vert_mode && use_pbr ) {
-		return &vk.modules.vert.gen_gltf_gpu[use_pbr][tx][cl][env][fog][gltfTan];
+		return &vk.modules.vert.gen_gltf_gpu[use_pbr][tx][cl][env][fog];
 	}
 	return &vk.modules.vert.gen[use_pbr][tx][cl][env][fog];
 }
