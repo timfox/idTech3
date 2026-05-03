@@ -159,6 +159,8 @@ When `fs_restrict` is **0** (default), `VM_Create` always tries a **native** sha
 
 **Filesystem resolution** (`FS_LoadLibrary` in `src/qcommon/files.c`): for each static game directory on the search path, the engine tries `modules/<file>` then `vm/<file>`, then the file **directly in the gamedir** (legacy). If the requested name already looks like a dotted native (`ui.x86_64.dll`, `cgame.x86_64.so`, etc.), it also tries the dotted form under `modules/` and `vm/` for `ui`, `cgame`, and `qagame` prefixes.
 
+**Native modules stored only inside `.pk3`:** `dlopen` / `LoadLibrary` cannot load directly from zip-backed file handles. When **`com_nativeLibraryExtractPk3`** is **1** (default, archived), `FS_LoadLibrary` first looks up the requested basename via `FS_ReadFile` (virtual paths such as `vm/uix86_64.so`). If the bytes exist only in a pack, it writes them under **`<fs_homepath>/<fs_game>/vm/native_cache/<basename>`** (CRC32 match skips rewrite when the cache file already matches), then loads that OS path. Set **`com_nativeLibraryExtractPk3`** to **0** to disable extraction (fall back to loose files only). Startup prints one line when extraction is enabled.
+
 **Debugging failed loads:** `+set com_nativeLibraryDebug 1` logs each failed path and the OS loader message. See [DEVELOPMENT_SETUP.md](DEVELOPMENT_SETUP.md#prerequisites) (native DLL troubleshooting). Unit coverage: `ctest -R unit_vm_native_module` exercises candidate ordering.
 
 ## JavaScript / UI Debug (Duktape)
