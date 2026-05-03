@@ -22,7 +22,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef TR_COMMON_H
 #define TR_COMMON_H
 
+#ifndef USE_VULKAN
 #define USE_VULKAN
+#endif
 
 #include "../../qcommon/q_shared.h"
 #include "../common/tr_public.h"
