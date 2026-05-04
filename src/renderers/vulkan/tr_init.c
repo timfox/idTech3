@@ -75,6 +75,9 @@ cvar_t	*r_firstPersonScaleEnabled;
 cvar_t	*r_firstPersonZNear;
 
 cvar_t	*r_skipBackEnd;
+#ifdef USE_IMGUI
+cvar_t	*r_imgui;
+#endif
 
 //cvar_t	*r_anaglyphMode;
 
@@ -2657,6 +2660,15 @@ static void R_Register( void )
 
 	r_skipBackEnd = ri.Cvar_Get ("r_skipBackEnd", "0", CVAR_CHEAT);
 	ri.Cvar_SetDescription( r_skipBackEnd, "Skips loading rendering backend." );
+
+#ifdef USE_IMGUI
+	r_imgui = ri.Cvar_Get( "r_imgui", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_imgui,
+		"Vulkan ImGui debug inspector overlay (0=off, 1=on). Toggle at runtime with F11 when enabled." );
+	ri.Cvar_CheckRange( r_imgui, "0", "1", CV_INTEGER );
+	ri.Printf( PRINT_ALL, "[VK][imgui] debug inspector r_imgui=%d (F11 toggles when enabled)\n",
+		r_imgui->integer );
+#endif
 
 	r_lodscale = ri.Cvar_Get( "r_lodscale", "5", CVAR_CHEAT );
 	ri.Cvar_SetDescription( r_lodscale, "Set scale for level of detail adjustment." );
