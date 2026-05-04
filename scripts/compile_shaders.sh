@@ -88,6 +88,7 @@ echo "Using glslangValidator at $GLSLANG_VALIDATOR"
   export BIN2HEX
   export BINDSHADER
   export GENERATED_DIR
+  export PROJECT_ROOT
 
   "$PYTHON" - <<'PY'
 import os
@@ -114,6 +115,7 @@ glslang = Path(os.environ["GLSLANG_VALIDATOR"])
 
 bindings = []
 task_counter = 0
+rtx_spv_bytes = {}
 
 def append_shader_data(spv_path, array_name):
     data = spv_path.read_bytes()
@@ -128,7 +130,7 @@ def append_shader_data(spv_path, array_name):
             f.write("\n")
         f.write("};\n")
 
-def compile_shader(stage, source, array_name, binding_expr=None, defines=""):
+def compile_shader(stage, source, array_name, binding_expr=None, defines="", rtx_collect=False):
     global task_counter
     input_path = glsl_dir / source
     if not input_path.is_file():
@@ -141,6 +143,8 @@ def compile_shader(stage, source, array_name, binding_expr=None, defines=""):
     cmd = [str(glslang), "-S", stage, "-V", "--target-env", "vulkan1.2", "-o", str(tmp_spv), str(input_path)] + defines_list
     print(f"  compiling {array_name}")
     subprocess.run(cmd, check=True)
+    if rtx_collect:
+        rtx_spv_bytes[array_name] = tmp_spv.read_bytes()
     append_shader_data(tmp_spv, array_name)
     if binding_expr:
         bindings.append((binding_expr, array_name))
@@ -246,26 +250,23 @@ def compile_template_shaders():
                         binding_cl = join_indexes("vk.modules.vert.gen", [i, j, 1, k, l])
                         compile_shader("vert", "gen_vert.tmpl", name_cl, binding_expr=binding_cl, defines=defines_cl)
 
-    # PBR glTF GPU skinning/morph: same vertex layout as gen[i][j][*][k][l] + USE_GLTF_GPU_SKIN
-    # Sixth index: 0=bind-pose tangent, 1=GLTF_GPU_TANGENT_FIX (Gram–Schmidt T after skin+morph)
+    # PBR glTF GPU skinning/morph: same vertex layout as gen[i][j][*][k][l] + USE_GLTF_GPU_SKIN + GLTF_GPU_TANGENT_FIX
     for i in range(len(pbr_flags)):
         if pbr_flags[i] != "-DUSE_VK_PBR":
             continue
         for j in range(len(tx_flags)):
             for k in range(len(env_flags)):
                 for l in range(len(fog_flags)):
-                    for tan_fix in (0, 1):
-                        tan_def = "-DGLTF_GPU_TANGENT_FIX" if tan_fix else ""
-                        tan_suffix = "_tfix" if tan_fix else ""
-                        defines = with_forward_plus_vert(join_flags(pbr_flags[i], "-DUSE_GLTF_GPU_SKIN", tan_def, tx_flags[j], env_flags[k], fog_flags[l]))
-                        name = f"vert_gltfgpu_{pbr_ids[i]}{tx_ids[j]}{env_ids[k]}{fog_ids[l]}{tan_suffix}"
-                        binding = join_indexes("vk.modules.vert.gen_gltf_gpu", [i, j, 0, k, l, tan_fix])
-                        compile_shader("vert", "gen_vert.tmpl", name, binding_expr=binding, defines=defines)
-                        if j != 0:
-                            defines_cl = with_forward_plus_vert(join_flags(pbr_flags[i], "-DUSE_GLTF_GPU_SKIN", tan_def, tx_flags[j], cl_flags[j], env_flags[k], fog_flags[l]))
-                            name_cl = f"vert_gltfgpu_{pbr_ids[i]}{tx_ids[j]}_{cl_ids[j]}{env_ids[k]}{fog_ids[l]}{tan_suffix}"
-                            binding_cl = join_indexes("vk.modules.vert.gen_gltf_gpu", [i, j, 1, k, l, tan_fix])
-                            compile_shader("vert", "gen_vert.tmpl", name_cl, binding_expr=binding_cl, defines=defines_cl)
+                    tan_def = "-DGLTF_GPU_TANGENT_FIX"
+                    defines = with_forward_plus_vert(join_flags(pbr_flags[i], "-DUSE_GLTF_GPU_SKIN", tan_def, tx_flags[j], env_flags[k], fog_flags[l]))
+                    name = f"vert_gltfgpu_{pbr_ids[i]}{tx_ids[j]}{env_ids[k]}{fog_ids[l]}"
+                    binding = join_indexes("vk.modules.vert.gen_gltf_gpu", [i, j, 0, k, l])
+                    compile_shader("vert", "gen_vert.tmpl", name, binding_expr=binding, defines=defines)
+                    if j != 0:
+                        defines_cl = with_forward_plus_vert(join_flags(pbr_flags[i], "-DUSE_GLTF_GPU_SKIN", tan_def, tx_flags[j], cl_flags[j], env_flags[k], fog_flags[l]))
+                        name_cl = f"vert_gltfgpu_{pbr_ids[i]}{tx_ids[j]}_{cl_ids[j]}{env_ids[k]}{fog_ids[l]}"
+                        binding_cl = join_indexes("vk.modules.vert.gen_gltf_gpu", [i, j, 1, k, l])
+                        compile_shader("vert", "gen_vert.tmpl", name_cl, binding_expr=binding_cl, defines=defines_cl)
 
     for i in range(len(pbr_flags)):
         for j in range(len(tx_flags)):
@@ -305,9 +306,42 @@ compile_shader("vert", "terrain/terrain.vert", "terrain_vs", binding_expr="vk.mo
 compile_shader("frag", "terrain/terrain.frag", "terrain_fs", binding_expr="vk.modules.terrain_fs")
 
 # KHR ray tracing demo shaders (SPIR-V also embedded in vk_rtx_demo_spirv.inc; recompile to refresh blobs)
-compile_shader("rgen", "rtx_demo.rgen", "rtx_demo_rgen_spv")
-compile_shader("rmiss", "rtx_demo.rmiss", "rtx_demo_rmiss_spv")
-compile_shader("rchit", "rtx_demo.rchit", "rtx_demo_rchit_spv")
+compile_shader("rgen", "rtx_demo.rgen", "rtx_demo_rgen_spv", rtx_collect=True)
+compile_shader("rmiss", "rtx_demo.rmiss", "rtx_demo_rmiss_spv", rtx_collect=True)
+compile_shader("rchit", "rtx_demo.rchit", "rtx_demo_rchit_spv", rtx_collect=True)
+
+def write_vk_rtx_demo_spirv_inc():
+    """Emit src/renderers/vulkan/vk_rtx_demo_spirv.inc for USE_VULKAN_RTX embedded SPIR-V."""
+    root = Path(os.environ.get("PROJECT_ROOT", "")).resolve()
+    if not root or not root.is_dir():
+        sys.exit("PROJECT_ROOT must be set for rtx demo SPIR-V embed")
+    out_path = root / "src/renderers/vulkan/vk_rtx_demo_spirv.inc"
+    mapping = [
+        ("rtx_demo_rgen_spv", "vk_rtx_demo_rgen_spv", "VK_RTX_DEMO_RGEN_SPV_SIZE"),
+        ("rtx_demo_rmiss_spv", "vk_rtx_demo_rmiss_spv", "VK_RTX_DEMO_RMISS_SPV_SIZE"),
+        ("rtx_demo_rchit_spv", "vk_rtx_demo_rchit_spv", "VK_RTX_DEMO_RCHIT_SPV_SIZE"),
+    ]
+    lines = []
+    lines.append("/* Auto-generated by scripts/compile_shaders.sh — do not edit by hand */")
+    lines.append("")
+    for src_name, c_array, size_macro in mapping:
+        if src_name not in rtx_spv_bytes:
+            sys.exit(f"Missing RTX SPIR-V blob for {src_name}")
+        data = rtx_spv_bytes[src_name]
+        lines.append(f"/* {src_name}.spv {len(data)} bytes */")
+        lines.append(f"static const uint8_t {c_array}[] = {{")
+        for offset in range(0, len(data), 16):
+            chunk = data[offset:offset + 16]
+            bytes_text = ", ".join(f"0x{b:02X}" for b in chunk)
+            suffix = "," if offset + 16 < len(data) else ""
+            lines.append(f"\t{bytes_text}{suffix}")
+        lines.append("};")
+        lines.append(f"#define {size_macro} ({len(data)}u)")
+        lines.append("")
+    out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"Wrote {out_path}")
+
+write_vk_rtx_demo_spirv_inc()
 
 with binding_file.open("w") as f:
     f.write("// this file is autogenerated during shader compilation\n")

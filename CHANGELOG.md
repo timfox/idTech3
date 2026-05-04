@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Vulkan RTX (USE_VULKAN_RTX): **`compile_shaders.sh` auto-writes `src/renderers/vulkan/vk_rtx_demo_spirv.inc`**; per-frame UBO passes **`r_rtx` 1–3** into **`rtx_demo.rchit`** for distinct hit tints (shadow / reflections / full visualization).
+- Vulkan ImGui: **File** (screenshot JPEG silent, toggle console, quit), **Help** (shortcuts popup + About inspector with GPU strings), **Developer** (`r_imgui`, `r_speeds` 0–6, `r_showtris` wireframe) menu items.
+- Filesystem: `FS_LoadLibrary` extracts native `.so`/`.dll` modules from `.pk3` into `vm/native_cache/` under the game home path (CRC-checked) before `dlopen`, when **`com_nativeLibraryExtractPk3`** is **1** (default; startup log line).
+- Lua: `script_reload` falls back to `FS_ReadFile` + `luaL_loadbuffer` when a script lives only inside a pack (virtual paths).
+- `examples/demo_game`: `demo_lua.cfg`, `scripts/lua/demo_hooks.lua`, and `exec demo_lua.cfg` from `autoexec.cfg` (Lua demo when `USE_LUA=ON`); pk3 packs **both** `vm/ui<arch>.so` and `vm/ui.<arch>.so` aliases for native UI probe order.
+- Vulkan Forward+: **`r_forwardPlusLuminanceSort`** (0/1, archived, default **1**); push constant + **`forward_plus_tile_cull.comp`** partial selection by RGB sum when a tile exceeds **`r_forwardPlusMaxPerTile`**; **`compile_shaders.sh --apply`** updates SPIR-V blobs.
+- docs/CURL_NETWORKING.md: tutorial for client libcurl usage (build, `cl_dlURL` / `sv_dlURL`, `download`/`dlmap`, `DLF_*` flags, security, extending for MOTD/API/music).
+- Vulkan ImGui: `r_imgui` cvar (default 1) skips inspector CPU work when 0; startup log line in renderer init; client `toggle_imgui` command and **F11** hardcoded toggle when `USE_IMGUI` + Vulkan client build.
 - `examples/demo_game`: `idtech3_demo.pk3` embeds a minimal native UI module (`vm/ui<arch>.so` or `.dll`) so the demo skeleton can open a window without retail `ui.qvm` (`examples/demo_game/native/ui_skeleton_stub.c`, CMake target `demo_ui_skeleton`).
 - `examples/demo_skeleton/`: user-friendly demo playfield (`./scripts/run_demo.sh`, auto-detect layout, `baseq3` hint, help text); `scripts/run_demo.sh` entry point; `base/` + `idtech3_demo/` README stubs.
 - CTest `test_demo_game_pk3`: verifies `examples/demo_game` zip layout (configs + optional **`cc`**-built **`vm/ui*.so`**) matches CMake staging.
@@ -27,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI: Clang in Ubuntu build matrix, ASAN job, FORTIFY_SOURCE enabled on Linux
 
 ### Changed
+- Vulkan ImGui: **File → Quit** runs `quit` (clean exit) instead of a no-op.
+
+- Client: clearer message when UI VM fails to load (idtech3_demo ships native UI in `vm/`, not configs-only).
+- Vulkan Forward+: `vk_forward_plus_dispatch_tile_cull` passes **`luminanceSort`** in push constants; init logs when sort is on.
 - FORTIFY_SOURCE now enabled by default in Release builds (compile_engine.sh)
 - Vulkan cinematic path: r_fboCinematic cvar, vk_in_render_pass reset, luminance skip workaround
 - Vulkan PBR: direct specular uses **anisotropic GGX** when an anisotropy map is bound (`r_pbr_anisotropicSpecular` default 1); replaces the old roughness-only blend. Re-run `scripts/compile_shaders.sh` after changing `gen_frag.tmpl`.

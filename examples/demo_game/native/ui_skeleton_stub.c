@@ -34,15 +34,17 @@ static int float_bits( float f ) {
 	return u.i;
 }
 
-static void draw_placeholder( int realtime ) {
+	static void draw_placeholder( int realtime ) {
 	float white[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
 	int h = 480;
 	const char *title = "idtech3_demo - minimal native UI";
 	const char *hint = "Add full base/ pk3s for menus & maps; this stub proves client + renderer only.";
+	const char *luaHint = "Lua (USE_LUA=ON): script_reload scripts/lua/demo_hooks.lua";
 
 	if ( trap ) {
 		trap( UI_R_DRAWSTRING, 24, 32, float_bits( 0.35f ), (intptr_t)title, (intptr_t)white );
 		trap( UI_R_DRAWSTRING, 24, 64, float_bits( 0.28f ), (intptr_t)hint, (intptr_t)white );
+		trap( UI_R_DRAWSTRING, 24, 96, float_bits( 0.24f ), (intptr_t)luaHint, (intptr_t)white );
 		trap( UI_R_DRAWSTRING, 24, h - 48, float_bits( 0.22f ), (intptr_t)"~ key: console", (intptr_t)white );
 		(void)realtime;
 	}
