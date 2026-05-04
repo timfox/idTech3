@@ -10,7 +10,7 @@ layout(set = 0, binding = 2, std140) uniform RtxFrame {
 	mat4 invViewProj;
 	vec4 viewOrigin;
 	vec4 zNearFar;     /* x=zNear, y=zFar */
-	vec4 outputSize;   /* xy = width,height in pixels; zw unused */
+	vec4 outputSize;   /* xy = width,height; z = r_rtx mode 0-3 (hit shader demo tint); w unused in rgen */
 } rtx;
 
 layout(set = 0, binding = 3) uniform sampler2D depthTex;
