@@ -156,21 +156,38 @@ else
 fi
 
 echo ""
-echo "Optional VK_NV_mesh_shader gating (must stay cvar/feature-chain guarded):"
+echo "Vulkan mesh-shader extension gating (startup safety):"
+TR_INIT_VK="$PROJECT_ROOT/src/renderers/vulkan/tr_init.c"
 VK_INSTANCE="$PROJECT_ROOT/src/renderers/vulkan/vk_instance.c"
-TR_INIT="$PROJECT_ROOT/src/renderers/vulkan/tr_init.c"
-if grep -q 'strcmp( ext, VK_NV_MESH_SHADER_EXTENSION_NAME ) == 0' "$VK_INSTANCE" && \
-   grep -q 'if ( nvMeshShader && r_vk_meshShaderNV && r_vk_meshShaderNV->integer' "$VK_INSTANCE" && \
-   grep -q 'vk.meshShaderNV = qtrue;' "$VK_INSTANCE" && \
-   grep -q 'mesh_shader_features_nv.meshShader = VK_TRUE;' "$VK_INSTANCE"; then
-  pass "vk_instance.c keeps VK_NV_mesh_shader opt-in and meshShader feature-chain wiring"
+if grep -Fq 'r_vk_meshShaderNV = ri.Cvar_Get( "r_vk_meshShaderNV", "0"' "$TR_INIT_VK"; then
+  pass "r_vk_meshShaderNV cvar registered with default 0"
 else
-  fail "vk_instance.c mesh-shader opt-in/feature chain regression detected"
+  fail "missing r_vk_meshShaderNV cvar registration with default 0 in tr_init.c"
 fi
-if grep -q 'r_vk_meshShaderNV = ri.Cvar_Get( "r_vk_meshShaderNV", "0"' "$TR_INIT"; then
-  pass "tr_init.c registers r_vk_meshShaderNV as default-off latch cvar"
+
+if grep -Fq 'vk.meshShaderNV = qfalse;' "$VK_INSTANCE"; then
+  pass "vk.meshShaderNV reset each device creation"
 else
-  fail "tr_init.c missing r_vk_meshShaderNV default-off cvar registration"
+  fail "vk.meshShaderNV is not reset before extension selection"
+fi
+
+if grep -Fq 'if ( nvMeshShader && r_vk_meshShaderNV && r_vk_meshShaderNV->integer &&' "$VK_INSTANCE"; then
+  pass "VK_NV_mesh_shader enable path gated by support + cvar"
+else
+  fail "VK_NV_mesh_shader enable path is missing support/cvar gating"
+fi
+
+if grep -Fq 'device_extension_count < ARRAY_LEN( device_extension_list ) ) {' "$VK_INSTANCE"; then
+  pass "VK_NV_mesh_shader enable path guards extension-list capacity"
+else
+  fail "VK_NV_mesh_shader enable path missing extension-list capacity guard"
+fi
+
+if grep -Fq 'mesh_shader_features_nv.meshShader = VK_TRUE;' "$VK_INSTANCE" && \
+   grep -Fq 'mesh_shader_features_nv.pNext = (void *)(uintptr_t)device_desc.pNext;' "$VK_INSTANCE"; then
+  pass "mesh-shader feature struct is chained to current device_desc.pNext head"
+else
+  fail "mesh-shader feature chain setup is missing required pNext/meshShader assignments"
 fi
 
 echo ""
