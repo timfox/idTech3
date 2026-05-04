@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Vulkan RTX (USE_VULKAN_RTX): **`compile_shaders.sh` auto-writes `src/renderers/vulkan/vk_rtx_demo_spirv.inc`**; per-frame UBO passes **`r_rtx` 1–3** into **`rtx_demo.rchit`** for distinct hit tints (shadow / reflections / full visualization).
-- Vulkan ImGui: **File** menu — screenshot (JPEG, silent), toggle console, quit; **Help → About inspector** modal (engine name, ImGui version, GPU strings, `r_imgui` / F11 hint).
+- Vulkan ImGui: **File** (screenshot JPEG silent, toggle console, quit), **Help** (shortcuts popup + About inspector with GPU strings), **Developer** (`r_imgui`, `r_speeds` 0–6, `r_showtris` wireframe) menu items.
 - Filesystem: `FS_LoadLibrary` extracts native `.so`/`.dll` modules from `.pk3` into `vm/native_cache/` under the game home path (CRC-checked) before `dlopen`, when **`com_nativeLibraryExtractPk3`** is **1** (default; startup log line).
 - Lua: `script_reload` falls back to `FS_ReadFile` + `luaL_loadbuffer` when a script lives only inside a pack (virtual paths).
 - `examples/demo_game`: `demo_lua.cfg`, `scripts/lua/demo_hooks.lua`, and `exec demo_lua.cfg` from `autoexec.cfg` (Lua demo when `USE_LUA=ON`); pk3 packs **both** `vm/ui<arch>.so` and `vm/ui.<arch>.so` aliases for native UI probe order.
