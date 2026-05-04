@@ -20,6 +20,9 @@ Extracted from vk.c for incremental modularization.
 #include "vk_sync.h"
 #include "vk_temporal.h"
 #include "vk_util.h"
+#ifdef USE_IMGUI
+#include "inspector/vk_imgui.h"
+#endif
 
 void vk_teardown_presentation_targets( void )
 {
@@ -79,6 +82,10 @@ void vk_restore_presentation_targets( void )
 	vk_update_volumetric_descriptors();
 
 	vk_update_post_process_pipelines();
+
+#ifdef USE_IMGUI
+	VkImgui_SwapchainRestarted();
+#endif
 
 #ifdef VK_PBR_BRDFLUT
 	vk_create_brfdlut();
