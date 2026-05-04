@@ -2872,8 +2872,8 @@ static qboolean FS_LoadPakFromFile( FILE *f )
 	pack->pakBasename = (char*)( pack->pakFilename + pk.pakNameLen );
 	pack->headerLongs = (int*)( pack->pakBasename + pakBaseLen );
 
-	strcpy( pack->pakFilename, pakName );
-	strcpy( pack->pakBasename, pakBase );
+	Com_Memcpy( pack->pakFilename, pakName, (size_t)pk.pakNameLen );
+	Com_Memcpy( pack->pakBasename, pakBase, (size_t)strlen( pakBase ) + 1 );
 
 	if ( fread( namePtr, pk.namesLen, 1, f ) != 1 )
 	{
@@ -3364,7 +3364,7 @@ DIRECTORY SCANNING FUNCTIONS
 =================================================================================
 */
 
-static int FS_ReturnPath( const char *zname, char *zpath, int *depth ) {
+static int FS_ReturnPath( const char *zname, char *zpath, int zpathSize, int *depth ) {
 	int len, at, newdep;
 
 	newdep = 0;
@@ -3380,8 +3380,17 @@ static int FS_ReturnPath( const char *zname, char *zpath, int *depth ) {
 		}
 		at++;
 	}
-	strcpy(zpath, zname);
-	zpath[len] = '\0';
+	/* Prefix of zname up to last path separator (len); len==0 => empty (no strcpy of full string). */
+	if ( len > 0 ) {
+		int n = len;
+		if ( zpathSize > 0 && n >= zpathSize ) {
+			n = zpathSize - 1;
+		}
+		Com_Memcpy( zpath, zname, (size_t)n );
+		zpath[n] = '\0';
+	} else {
+		zpath[0] = '\0';
+	}
 	*depth = newdep;
 
 	return len;
@@ -3391,8 +3400,11 @@ static int FS_ReturnPath( const char *zname, char *zpath, int *depth ) {
 char *FS_CopyString( const char *in ) {
 	char *out;
 	//out = S_Malloc( strlen( in ) + 1 );
-	out = Z_Malloc( strlen( in ) + 1 );
-	strcpy( out, in );
+	{
+		const size_t n = strlen( in ) + 1;
+		out = Z_Malloc( n );
+		Com_Memcpy( out, in, n );
+	}
 	return out;
 }
 
@@ -3505,7 +3517,7 @@ static char **FS_ListFilteredFiles( const char *path, const char *extension, con
 	}
 
 	nfiles = 0;
-	FS_ReturnPath( path, zpath, &pathDepth );
+	FS_ReturnPath( path, zpath, sizeof( zpath ), &pathDepth );
 
 	//
 	// search through the path, one element at a time, adding to list
@@ -3539,7 +3551,7 @@ static char **FS_ListFilteredFiles( const char *path, const char *extension, con
 				}
 				else {
 
-					zpathLen = FS_ReturnPath(name, zpath, &depth);
+					zpathLen = FS_ReturnPath( name, zpath, sizeof( zpath ), &depth );
 
 					if ( (depth-pathDepth)>2 || pathLength > zpathLen || Q_stricmpn( name, path, pathLength ) ) {
 						continue;
@@ -3675,7 +3687,7 @@ int	FS_GetFileList( const char *path, const char *extension, char *listbuf, int 
 	for (i =0; i < nFiles; i++) {
 		nLen = strlen(pFiles[i]) + 1;
 		if (nTotal + nLen + 1 < bufsize) {
-			strcpy(listbuf, pFiles[i]);
+			Com_Memcpy( listbuf, pFiles[i], (size_t)nLen );
 			listbuf += nLen;
 			nTotal += nLen;
 		}
@@ -3987,9 +3999,9 @@ static int FS_GetModList( char *listbuf, int bufsize ) {
 			nDescLen = strlen( description ) + 1;
 
 			if ( nTotal + nLen + 1 + nDescLen + 1 < bufsize ) {
-				strcpy( listbuf, name );
+				Com_Memcpy( listbuf, name, (size_t)nLen );
 				listbuf += nLen;
-				strcpy( listbuf, description );
+				Com_Memcpy( listbuf, description, (size_t)nDescLen );
 				listbuf += nDescLen;
 				nTotal += nLen + nDescLen;
 				nMods++;
@@ -4295,8 +4307,8 @@ static void FS_AddGameDirectory( const char *path, const char *dir ) {
 	search->dir->path = (char*)( search->dir + 1 );
 	search->dir->gamedir = (char*)( search->dir->path + path_len );
 
-	strcpy( search->dir->path, path );
-	strcpy( search->dir->gamedir, dir );
+	Com_Memcpy( search->dir->path, path, (size_t)strlen( path ) + 1 );
+	Com_Memcpy( search->dir->gamedir, dir, (size_t)strlen( dir ) + 1 );
 	gamedir = search->dir->gamedir;
 
 	search->next = fs_searchpaths;
@@ -4402,8 +4414,8 @@ static void FS_AddGameDirectory( const char *path, const char *dir ) {
 			search->dir->gamedir = (char*)( search->dir->path + path_len );
 			search->policy = DIR_ALLOW;
 
-			strcpy( search->dir->path, curpath );				// c:\quake3\baseq3
-			strcpy( search->dir->gamedir, pakdirs[ pakdirsi ] );// mypak.pk3dir
+			Com_Memcpy( search->dir->path, curpath, (size_t)strlen( curpath ) + 1 );				// c:\quake3\baseq3
+			Com_Memcpy( search->dir->gamedir, pakdirs[ pakdirsi ], (size_t)len + 1 );// mypak.pk3dir
 
 			search->next = fs_searchpaths;
 			fs_searchpaths = search;
