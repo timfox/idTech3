@@ -725,7 +725,7 @@ static bot_synonymlist_t *BotLoadSynonyms( const char *filename )
 							ptr += sizeof(bot_synonym_t);
 							synonym->string = ptr;
 							ptr += len;
-							strcpy(synonym->string, token.string);
+							Com_Memcpy( synonym->string, token.string, strlen( token.string ) + 1 );
 							//
 							if (lastsynonym) lastsynonym->next = synonym;
 							else syn->firstsynonym = synonym;
@@ -1067,7 +1067,7 @@ static bot_randomlist_t *BotLoadRandomStrings( const char *filename )
 				ptr += sizeof(bot_randomlist_t);
 				random->string = ptr;
 				ptr += len;
-				strcpy(random->string, token.string);
+				Com_Memcpy( random->string, token.string, strlen( token.string ) + 1 );
 				random->firstrandomstring = NULL;
 				random->numstrings = 0;
 				//
@@ -1097,7 +1097,7 @@ static bot_randomlist_t *BotLoadRandomStrings( const char *filename )
 					ptr += sizeof(bot_randomstring_t);
 					randomstring->string = ptr;
 					ptr += len;
-					strcpy(randomstring->string, chatmessagestring);
+					Com_Memcpy( randomstring->string, chatmessagestring, strlen( chatmessagestring ) + 1 );
 					//
 					random->numstrings++;
 					randomstring->next = random->firstrandomstring;
@@ -1286,7 +1286,7 @@ static bot_matchpiece_t *BotLoadMatchPieces(source_t *source, char *endtoken)
 				StripDoubleQuotes(token.string);
 				matchstring = (bot_matchstring_t *) GetClearedHunkMemory(sizeof(bot_matchstring_t) + strlen(token.string) + 1);
 				matchstring->string = (char *) matchstring + sizeof(bot_matchstring_t);
-				strcpy(matchstring->string, token.string);
+				Com_Memcpy( matchstring->string, token.string, strlen( token.string ) + 1 );
 				if (!strlen(token.string)) emptystring = qtrue;
 				matchstring->next = NULL;
 				if (lastmatchstring) lastmatchstring->next = matchstring;
@@ -1635,7 +1635,7 @@ static bot_stringlist_t *BotCheckChatMessageIntegrety(char *message, bot_stringl
 							Log_Write("%s = {\"%s\"} //MISSING RANDOM\r\n", temp, temp);
 							s = GetClearedMemory(sizeof(bot_stringlist_t) + strlen(temp) + 1);
 							s->string = (char *) s + sizeof(bot_stringlist_t);
-							strcpy(s->string, temp);
+							Com_Memcpy( s->string, temp, strlen( temp ) + 1 );
 							s->next = stringlist;
 							stringlist = s;
 						} //end if
@@ -1973,7 +1973,7 @@ static bot_replychat_t *BotLoadReplyChat( const char *filename )
 			else if (PC_CheckTokenString(source, "<")) //bot names
 			{
 				key->flags |= RCKFL_BOTNAMES;
-				strcpy(namebuffer, "");
+				namebuffer[0] = '\0';
 				do
 				{
 					if (!PC_ExpectTokenType(source, TT_STRING, 0, &token))
@@ -1983,8 +1983,10 @@ static bot_replychat_t *BotLoadReplyChat( const char *filename )
 						return NULL;
 					} //end if
 					StripDoubleQuotes(token.string);
-					if (strlen(namebuffer)) strcat(namebuffer, "\\");
-					strcat(namebuffer, token.string);
+					if ( namebuffer[0] ) {
+						Q_strcat( namebuffer, sizeof( namebuffer ), "\\" );
+					}
+					Q_strcat( namebuffer, sizeof( namebuffer ), token.string );
 				} while(PC_CheckTokenString(source, ","));
 				if (!PC_ExpectTokenString(source, ">"))
 				{
@@ -1993,7 +1995,7 @@ static bot_replychat_t *BotLoadReplyChat( const char *filename )
 					return NULL;
 				} //end if
 				key->string = (char *) GetClearedHunkMemory(strlen(namebuffer) + 1);
-				strcpy(key->string, namebuffer);
+				Com_Memcpy( key->string, namebuffer, strlen( namebuffer ) + 1 );
 			} //end else if
 			else //normal string key
 			{
@@ -2006,7 +2008,7 @@ static bot_replychat_t *BotLoadReplyChat( const char *filename )
 				} //end if
 				StripDoubleQuotes(token.string);
 				key->string = (char *) GetClearedHunkMemory(strlen(token.string) + 1);
-				strcpy(key->string, token.string);
+				Com_Memcpy( key->string, token.string, strlen( token.string ) + 1 );
 			} //end else
 			//
 			PC_CheckTokenString(source, ",");
@@ -2041,7 +2043,7 @@ static bot_replychat_t *BotLoadReplyChat( const char *filename )
 			} //end if
 			chatmessage = (bot_chatmessage_t *) GetClearedHunkMemory(sizeof(bot_chatmessage_t) + strlen(chatmessagestring) + 1);
 			chatmessage->chatmessage = (char *) chatmessage + sizeof(bot_chatmessage_t);
-			strcpy(chatmessage->chatmessage, chatmessagestring);
+			Com_Memcpy( chatmessage->chatmessage, chatmessagestring, strlen( chatmessagestring ) + 1 );
 			chatmessage->time = -2*CHATMESSAGE_RECENTTIME;
 			chatmessage->next = replychat->firstchatmessage;
 			//add the chat message to the reply chat
@@ -2210,7 +2212,7 @@ static bot_chat_t *BotLoadInitialChat(const char *chatfile, const char *chatname
 								//store the chat message
 								ptr += sizeof(bot_chatmessage_t);
 								chatmessage->chatmessage = ptr;
-								strcpy(chatmessage->chatmessage, chatmessagestring);
+								Com_Memcpy( chatmessage->chatmessage, chatmessagestring, strlen( chatmessagestring ) + 1 );
 								ptr += len;
 								//the number of chat messages increased
 								chattype->numchatmessages++;
@@ -2406,8 +2408,8 @@ static int BotExpandChatMessage(char *outmessage, int size, const char *message,
 							botimport.Print( PRT_ERROR, "%s(): message \"%s\" too long\n", __func__, message );
 							return qfalse;
 						}
-						strcpy(&outputbuf[len], temp);
-						len += strlen(temp);
+						Com_Memcpy( &outputbuf[len], temp, strlen( temp ) + 1 );
+						len += (int)strlen( temp );
 					} //end if
 					break;
 				}
@@ -2437,8 +2439,8 @@ static int BotExpandChatMessage(char *outmessage, int size, const char *message,
 						botimport.Print( PRT_ERROR, "%s(): message \"%s\" too long\n", __func__, message );
 						return qfalse;
 					}
-					strcpy(&outputbuf[len], ptr);
-					len += strlen(ptr);
+					Com_Memcpy( &outputbuf[len], ptr, strlen( ptr ) + 1 );
+					len += (int)strlen( ptr );
 					expansion = qtrue;
 					break;
 				}
@@ -2487,7 +2489,7 @@ static void BotConstructChatMessage(bot_chatstate_t *chatstate, const char *mess
 		{
 			break;
 		}
-		strcpy( srcmessage, chatstate->chatmessage );
+		Q_strncpyz( srcmessage, chatstate->chatmessage, sizeof( srcmessage ) );
 	}
 
 	if ( i >= 10 )
@@ -2617,8 +2619,9 @@ void BotInitialChat(int chatstate, const char *type, int mcontext, const char *v
 		match.variables[0].offset = index;
 		if ( (size_t) len + index < sizeof( match.string ) ) {
 			match.variables[0].length = len;
-			strcat( match.string, var0 );
-			index += strlen( var0 );
+			Com_Memcpy( match.string + index, var0, (size_t)len );
+			index += len;
+			match.string[index] = '\0';
 		}
 	}
 	if ( var1 ) {
@@ -2626,8 +2629,9 @@ void BotInitialChat(int chatstate, const char *type, int mcontext, const char *v
 		match.variables[1].offset = index;
 		if ( (size_t) len + index < sizeof( match.string ) ) {
 			match.variables[1].length = len;
-			strcat( match.string, var1 );
+			Com_Memcpy( match.string + index, var1, (size_t)len );
 			index += len;
+			match.string[index] = '\0';
 		}
 	}
 	if ( var2 ) {
@@ -2635,8 +2639,9 @@ void BotInitialChat(int chatstate, const char *type, int mcontext, const char *v
 		match.variables[2].offset = index;
 		if ( (size_t) len + index < sizeof( match.string ) ) {
 			match.variables[2].length = len;
-			strcat( match.string, var2 );
+			Com_Memcpy( match.string + index, var2, (size_t)len );
 			index += len;
+			match.string[index] = '\0';
 		}
 	}
 	if ( var3 ) {
@@ -2644,8 +2649,9 @@ void BotInitialChat(int chatstate, const char *type, int mcontext, const char *v
 		match.variables[3].offset = index;
 		if ( (size_t) len + index < sizeof( match.string ) ) {
 			match.variables[3].length = len;
-			strcat( match.string, var3 );
+			Com_Memcpy( match.string + index, var3, (size_t)len );
 			index += len;
+			match.string[index] = '\0';
 		}
 	}
 	if ( var4 ) {
@@ -2653,8 +2659,9 @@ void BotInitialChat(int chatstate, const char *type, int mcontext, const char *v
 		match.variables[4].offset = index;
 		if ( (size_t) len + index < sizeof( match.string ) ) {
 			match.variables[4].length = len;
-			strcat( match.string, var4 );
+			Com_Memcpy( match.string + index, var4, (size_t)len );
 			index += len;
+			match.string[index] = '\0';
 		}
 	}
 	if ( var5 ) {
@@ -2662,8 +2669,9 @@ void BotInitialChat(int chatstate, const char *type, int mcontext, const char *v
 		match.variables[5].offset = index;
 		if ( (size_t) len + index < sizeof( match.string ) ) {
 			match.variables[5].length = len;
-			strcat( match.string, var5 );
+			Com_Memcpy( match.string + index, var5, (size_t)len );
 			index += len;
+			match.string[index] = '\0';
 		}
 	}
 	if ( var6 ) {
@@ -2671,17 +2679,19 @@ void BotInitialChat(int chatstate, const char *type, int mcontext, const char *v
 		match.variables[6].offset = index;
 		if ( (size_t) len + index < sizeof( match.string ) ) {
 			match.variables[6].length = len;
-			strcat( match.string, var6 );
+			Com_Memcpy( match.string + index, var6, (size_t)len );
 			index += len;
+			match.string[index] = '\0';
 		}
 	}
 	if ( var7 ) {
 		len = (int) strlen( var7 );
 		match.variables[7].offset = index;
 		if ( (size_t) len + index < sizeof( match.string ) ) {
-			match.variables[7].length = strlen(var7);
-			strcat( match.string, var7 );
-			//index += len;
+			match.variables[7].length = len;
+			Com_Memcpy( match.string + index, var7, (size_t)len );
+			index += len;
+			match.string[index] = '\0';
 		}
 	}
 
@@ -2827,8 +2837,9 @@ int BotReplyChat(int chatstate, const char *message, int mcontext, int vcontext,
 			bestmatch.variables[0].offset = index;
 			if ( (size_t) len + index < sizeof( bestmatch.string ) ) {
 				bestmatch.variables[0].length = len;
-				strcat( bestmatch.string, var0 );
+				Com_Memcpy( bestmatch.string + index, var0, (size_t)len );
 				index += len;
+				bestmatch.string[index] = '\0';
 			}
 		}
 		if ( var1 ) {
@@ -2836,8 +2847,9 @@ int BotReplyChat(int chatstate, const char *message, int mcontext, int vcontext,
 			bestmatch.variables[1].offset = index;
 			if ( (size_t) len + index < sizeof( bestmatch.string ) ) {
 				bestmatch.variables[1].length = len;
-				strcat( bestmatch.string, var1 );
+				Com_Memcpy( bestmatch.string + index, var1, (size_t)len );
 				index += len;
+				bestmatch.string[index] = '\0';
 			}
 		}
 		if ( var2 ) {
@@ -2845,8 +2857,9 @@ int BotReplyChat(int chatstate, const char *message, int mcontext, int vcontext,
 			bestmatch.variables[2].offset = index;
 			if ( (size_t) len + index < sizeof( bestmatch.string ) ) {
 				bestmatch.variables[2].length = len;
-				strcat( bestmatch.string, var2 );
+				Com_Memcpy( bestmatch.string + index, var2, (size_t)len );
 				index += len;
+				bestmatch.string[index] = '\0';
 			}
 		}
 		if ( var3 ) {
@@ -2854,8 +2867,9 @@ int BotReplyChat(int chatstate, const char *message, int mcontext, int vcontext,
 			bestmatch.variables[3].offset = index;
 			if ( (size_t) len + index < sizeof( bestmatch.string ) ) {
 				bestmatch.variables[3].length = len;
-				strcat( bestmatch.string, var3 );
+				Com_Memcpy( bestmatch.string + index, var3, (size_t)len );
 				index += len;
+				bestmatch.string[index] = '\0';
 			}
 		}
 		if ( var4 ) {
@@ -2863,8 +2877,9 @@ int BotReplyChat(int chatstate, const char *message, int mcontext, int vcontext,
 			bestmatch.variables[4].offset = index;
 			if ( (size_t) len + index < sizeof( bestmatch.string ) ) {
 				bestmatch.variables[4].length = len;
-				strcat( bestmatch.string, var4 );
+				Com_Memcpy( bestmatch.string + index, var4, (size_t)len );
 				index += len;
+				bestmatch.string[index] = '\0';
 			}
 		}
 		if ( var5 ) {
@@ -2872,8 +2887,9 @@ int BotReplyChat(int chatstate, const char *message, int mcontext, int vcontext,
 			bestmatch.variables[5].offset = index;
 			if ( (size_t) len + index < sizeof( bestmatch.string ) ) {
 				bestmatch.variables[5].length = len;
-				strcat( bestmatch.string, var5 );
+				Com_Memcpy( bestmatch.string + index, var5, (size_t)len );
 				index += len;
+				bestmatch.string[index] = '\0';
 			}
 		}
 		if ( var6 ) {
@@ -2881,8 +2897,9 @@ int BotReplyChat(int chatstate, const char *message, int mcontext, int vcontext,
 			bestmatch.variables[6].offset = index;
 			if ( (size_t) len + index < sizeof( bestmatch.string ) ) {
 				bestmatch.variables[6].length = len;
-				strcat( bestmatch.string, var6 );
+				Com_Memcpy( bestmatch.string + index, var6, (size_t)len );
 				index += len;
+				bestmatch.string[index] = '\0';
 			}
 		}
 		if ( var7 ) {
@@ -2890,8 +2907,9 @@ int BotReplyChat(int chatstate, const char *message, int mcontext, int vcontext,
 			bestmatch.variables[7].offset = index;
 			if ( (size_t) len + index < sizeof( bestmatch.string ) ) {
 				bestmatch.variables[7].length = len;
-				strcat( bestmatch.string, var7 );
-				//index += len;
+				Com_Memcpy( bestmatch.string + index, var7, (size_t)len );
+				index += len;
+				bestmatch.string[index] = '\0';
 			}
 		}
 		if (LibVarGetValue("bot_testrchat"))
@@ -2959,7 +2977,7 @@ void BotEnterChat(int chatstate, int clientto, int sendto)
 			}
 		}
 		//clear the chat message from the state
-		strcpy(cs->chatmessage, "");
+		cs->chatmessage[0] = '\0';
 	} //end if
 } //end of the function BotEnterChat
 //===========================================================================

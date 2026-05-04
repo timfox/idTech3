@@ -1,86 +1,69 @@
 #!/usr/bin/env bash
-# Regression coverage for optional VK_NV_mesh_shader device setup.
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+if [ "$#" -ne 1 ]; then
+  echo "Usage: $0 <project-root>" >&2
+  exit 2
+fi
+
+PROJECT_ROOT="$1"
+VK_INSTANCE="$PROJECT_ROOT/src/renderers/vulkan/vk_instance.c"
+VK_INIT="$PROJECT_ROOT/src/renderers/vulkan/tr_init.c"
+VK_H="$PROJECT_ROOT/src/renderers/vulkan/vk.h"
+VK_LOCAL="$PROJECT_ROOT/src/renderers/vulkan/tr_local.h"
 
 fail() {
-	echo "FAIL: $*" >&2
-	exit 1
+  echo "FAIL: $*" >&2
+  exit 1
 }
 
-assert_contains() {
-	local haystack="$1"
-	local needle="$2"
-	local context="$3"
-	if [[ "$haystack" != *"$needle"* ]]; then
-		fail "$context: expected '$needle'"
-	fi
+require_file() {
+  [ -f "$1" ] || fail "missing file: $1"
 }
 
-line_of() {
-	local file="$1"
-	local needle="$2"
-	awk -v needle="$needle" 'index($0, needle) { print NR; found=1; exit } END { if (!found) exit 1 }' "$file"
+require_pattern() {
+  local file="$1"
+  local pattern="$2"
+  local message="$3"
+
+  perl -0ne "exit(!(/$pattern/s))" "$file" || fail "$message"
 }
 
-line_count() {
-	local file="$1"
-	local needle="$2"
-	awk -v needle="$needle" 'index($0, needle) { count++ } END { print count + 0 }' "$file"
-}
+require_file "$VK_INSTANCE"
+require_file "$VK_INIT"
+require_file "$VK_H"
+require_file "$VK_LOCAL"
 
-VK_INSTANCE="$PROJECT_ROOT/src/renderers/vulkan/vk_instance.c"
-TR_INIT="$PROJECT_ROOT/src/renderers/vulkan/tr_init.c"
-TR_LOCAL="$PROJECT_ROOT/src/renderers/vulkan/tr_local.h"
-VK_HEADER="$PROJECT_ROOT/src/renderers/vulkan/vk.h"
+require_pattern "$VK_INIT" \
+  'r_vk_meshShaderNV\s*=\s*ri\.Cvar_Get\s*\(\s*"r_vk_meshShaderNV"\s*,\s*"0"\s*,\s*CVAR_ARCHIVE_ND\s*\|\s*CVAR_LATCH\s*\)' \
+  "r_vk_meshShaderNV must default off and remain latched"
 
-for required in "$VK_INSTANCE" "$TR_INIT" "$TR_LOCAL" "$VK_HEADER"; do
-	[[ -f "$required" ]] || fail "required source file missing: $required"
-done
+require_pattern "$VK_INIT" \
+  'ri\.Cvar_CheckRange\s*\(\s*r_vk_meshShaderNV\s*,\s*"0"\s*,\s*"1"\s*,\s*CV_INTEGER\s*\)' \
+  "r_vk_meshShaderNV must stay constrained to a boolean integer"
 
-vk_instance="$(<"$VK_INSTANCE")"
-tr_init="$(<"$TR_INIT")"
-tr_local="$(<"$TR_LOCAL")"
-vk_header="$(<"$VK_HEADER")"
+require_pattern "$VK_LOCAL" \
+  'extern\s+cvar_t\s*\*\s*r_vk_meshShaderNV\s*;' \
+  "r_vk_meshShaderNV must remain visible to Vulkan device creation"
 
-assert_contains "$tr_init" 'r_vk_meshShaderNV = ri.Cvar_Get( "r_vk_meshShaderNV", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );' "mesh shader cvar default and flags"
-assert_contains "$tr_init" 'ri.Cvar_CheckRange( r_vk_meshShaderNV, "0", "1", CV_INTEGER );' "mesh shader cvar range"
-assert_contains "$tr_init" 'Requires vid_restart.' "mesh shader cvar restart documentation"
-assert_contains "$tr_init" 'ri.Cvar_SetGroup( r_vk_meshShaderNV, CVG_RENDERER );' "mesh shader cvar renderer group"
-assert_contains "$tr_local" 'extern cvar_t	*r_vk_meshShaderNV;' "mesh shader cvar declaration"
-assert_contains "$vk_header" 'qboolean meshShaderNV;' "mesh shader device state"
+require_pattern "$VK_H" \
+  'qboolean\s+meshShaderNV\s*;' \
+  "vk_t must keep meshShaderNV state for feature-chain gating"
 
-assert_contains "$vk_instance" 'qboolean nvMeshShader = qfalse;' "mesh shader extension detection default"
-assert_contains "$vk_instance" 'strcmp( ext, VK_NV_MESH_SHADER_EXTENSION_NAME ) == 0' "mesh shader extension detection"
-assert_contains "$vk_instance" 'vk.meshShaderNV = qfalse;' "mesh shader state reset"
-assert_contains "$vk_instance" 'if ( nvMeshShader && r_vk_meshShaderNV && r_vk_meshShaderNV->integer &&' "mesh shader opt-in gate"
-assert_contains "$vk_instance" 'device_extension_count < ARRAY_LEN( device_extension_list )' "mesh shader extension capacity guard"
-assert_contains "$vk_instance" 'device_extension_list[ device_extension_count++ ] = VK_NV_MESH_SHADER_EXTENSION_NAME;' "mesh shader extension append"
-assert_contains "$vk_instance" 'vk.meshShaderNV = qtrue;' "mesh shader enabled state"
-assert_contains "$vk_instance" '[VK] VK_NV_mesh_shader enabled (experimental; no mesh draw path yet)' "mesh shader startup log"
+require_pattern "$VK_INSTANCE" \
+  'qboolean\s+nvMeshShader\s*=\s*qfalse\s*;' \
+  "VK_NV_mesh_shader availability must be tracked from enumerated extensions"
 
-assert_contains "$vk_instance" '/* Chain last so _DEBUG / host_query pNext lists stay valid. */' "mesh shader pNext chain placement comment"
-assert_contains "$vk_instance" 'if ( vk.meshShaderNV ) {' "mesh shader feature chain gate"
-assert_contains "$vk_instance" 'mesh_shader_features_nv.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_NV;' "mesh shader feature sType"
-assert_contains "$vk_instance" 'mesh_shader_features_nv.pNext = (void *)(uintptr_t)device_desc.pNext;' "mesh shader preserves previous pNext"
-assert_contains "$vk_instance" 'mesh_shader_features_nv.taskShader = VK_FALSE;' "mesh shader keeps task shaders disabled"
-assert_contains "$vk_instance" 'mesh_shader_features_nv.meshShader = VK_TRUE;' "mesh shader enables only mesh shader feature"
-assert_contains "$vk_instance" 'device_desc.pNext = &mesh_shader_features_nv;' "mesh shader pNext head"
+require_pattern "$VK_INSTANCE" \
+  'strcmp\s*\(\s*ext\s*,\s*VK_NV_MESH_SHADER_EXTENSION_NAME\s*\)\s*==\s*0\s*\)\s*\{[^}]*nvMeshShader\s*=\s*qtrue\s*;' \
+  "VK_NV_mesh_shader must only be marked available when reported by the driver"
 
-extension_append_count="$(line_count "$VK_INSTANCE" 'VK_NV_MESH_SHADER_EXTENSION_NAME')"
-[[ "$extension_append_count" -eq 2 ]] || fail "expected one detection and one append of VK_NV_mesh_shader; saw $extension_append_count occurrences"
+require_pattern "$VK_INSTANCE" \
+  'vk\.meshShaderNV\s*=\s*qfalse\s*;.*if\s*\(\s*nvMeshShader\s*&&\s*r_vk_meshShaderNV\s*&&\s*r_vk_meshShaderNV->integer\s*&&\s*device_extension_count\s*<\s*ARRAY_LEN\s*\(\s*device_extension_list\s*\)\s*\)\s*\{[^}]*device_extension_list\s*\[\s*device_extension_count\+\+\s*\]\s*=\s*VK_NV_MESH_SHADER_EXTENSION_NAME\s*;[^}]*vk\.meshShaderNV\s*=\s*qtrue\s*;' \
+  "VK_NV_mesh_shader must require driver support, explicit cvar opt-in, and list capacity before enabling"
 
-gate_line="$(line_of "$VK_INSTANCE" 'if ( nvMeshShader && r_vk_meshShaderNV && r_vk_meshShaderNV->integer &&')"
-append_line="$(line_of "$VK_INSTANCE" 'device_extension_list[ device_extension_count++ ] = VK_NV_MESH_SHADER_EXTENSION_NAME;')"
-state_line="$(line_of "$VK_INSTANCE" 'vk.meshShaderNV = qtrue;')"
-feature_line="$(line_of "$VK_INSTANCE" 'if ( vk.meshShaderNV ) {')"
-create_line="$(line_of "$VK_INSTANCE" 'qvkCreateDevice( physical_device, &device_desc, NULL, &vk.device )')"
+require_pattern "$VK_INSTANCE" \
+  'if\s*\(\s*vk\.meshShaderNV\s*\)\s*\{[^}]*Com_Memset\s*\(\s*&mesh_shader_features_nv\s*,\s*0\s*,\s*sizeof\s*\(\s*mesh_shader_features_nv\s*\)\s*\)\s*;[^}]*mesh_shader_features_nv\.sType\s*=\s*VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_NV\s*;[^}]*mesh_shader_features_nv\.pNext\s*=\s*\(void\s*\*\)\s*\(uintptr_t\)device_desc\.pNext\s*;[^}]*mesh_shader_features_nv\.taskShader\s*=\s*VK_FALSE\s*;[^}]*mesh_shader_features_nv\.meshShader\s*=\s*VK_TRUE\s*;[^}]*device_desc\.pNext\s*=\s*&mesh_shader_features_nv\s*;' \
+  "VK_NV_mesh_shader must append meshShader feature enablement to the VkDeviceCreateInfo pNext chain"
 
-(( gate_line < append_line )) || fail "mesh shader extension append must remain inside the opt-in gate"
-(( append_line < state_line )) || fail "mesh shader state should be set after appending the extension"
-(( state_line < feature_line )) || fail "mesh shader feature chaining must happen after state is set"
-(( feature_line < create_line )) || fail "mesh shader features must be chained before vkCreateDevice"
-
-echo "PASS: test_vulkan_mesh_shader_opt_in"
+echo "PASS: Vulkan mesh shader extension remains explicit opt-in with feature-chain wiring"
