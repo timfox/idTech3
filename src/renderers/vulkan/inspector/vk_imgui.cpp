@@ -361,6 +361,33 @@ extern "C" void VkImgui_BeginFrame(void) {
 	ImGui::NewFrame();
 }
 
+static void VkImgui_DrawAboutInspectorPopup( void )
+{
+	if ( ImGui::BeginPopupModal( "AboutInspector", nullptr, ImGuiWindowFlags_AlwaysAutoResize ) ) {
+		ImGui::TextUnformatted( Q3_VERSION );
+		ImGui::Separator();
+		ImGui::Text( "ImGui %s", IMGUI_VERSION );
+#ifdef USE_VULKAN
+		ImGui::Text( "Renderer API: Vulkan" );
+#else
+		ImGui::Text( "Renderer API: OpenGL" );
+#endif
+		ImGui::Spacing();
+		ImGui::TextWrapped( "Vendor: %s", glConfig.vendor_string );
+		ImGui::TextWrapped( "Device: %s", glConfig.renderer_string );
+		ImGui::TextWrapped( "Version: %s", glConfig.version_string );
+		ImGui::Spacing();
+		ImGui::TextWrapped(
+			"Toggle overlay input with F11 or \\toggle_imgui; set \\r_imgui 0 to hide CPU/UI work. "
+			"PostFX and related panels drive renderer cvars." );
+		ImGui::Spacing();
+		if ( ImGui::Button( "OK", ImVec2( 120.0f, 0.0f ) ) ) {
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
+}
+
 static void VkImgui_DrawMenuBar(void) {
 	ImGuiIO &io = ImGui::GetIO();
 	const float fps = io.Framerate > 0.0f ? io.Framerate : 0.0f;
@@ -368,7 +395,23 @@ static void VkImgui_DrawMenuBar(void) {
 
 	if (ImGui::BeginMainMenuBar()) {
 		if (ImGui::BeginMenu("File")) {
-			ImGui::MenuItem("Quit");
+			if ( ImGui::MenuItem( "Screenshot (JPEG)" ) ) {
+				ri.Cmd_ExecuteText( EXEC_APPEND, "screenshotJPEG silent\n" );
+			}
+			if ( ImGui::MenuItem( "Toggle console" ) ) {
+				ri.Cmd_ExecuteText( EXEC_APPEND, "toggleconsole\n" );
+			}
+			ImGui::Separator();
+			if ( ImGui::MenuItem( "Quit" ) ) {
+				ri.Cmd_ExecuteText( EXEC_APPEND, "quit\n" );
+			}
+			ImGui::EndMenu();
+		}
+
+		if (ImGui::BeginMenu("Help")) {
+			if ( ImGui::MenuItem( "About inspector" ) ) {
+				ImGui::OpenPopup( "AboutInspector" );
+			}
 			ImGui::EndMenu();
 		}
 
@@ -974,6 +1017,7 @@ extern "C" void VkImgui_Draw(void) {
 	ImGui::DockSpace(dockId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
 
 	VkImgui_DrawMenuBar();
+	VkImgui_DrawAboutInspectorPopup();
 	VkImgui_DrawViewport();
 	VkImgui_DrawShaderEditor();
 	VkImgui_DrawObjects();
