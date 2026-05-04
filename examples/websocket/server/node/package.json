@@ -1,0 +1,14 @@
+{
+  "name": "idtech3-websocket-example",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Echo and JSON ping/pong templates for the idTech3 WebSocket client",
+  "license": "GPL-2.0",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

@@ -49,9 +49,8 @@ static void push_attr( uint32_t location, uint32_t binding, VkFormat format )
 static VkShaderModule *vk_select_pbr_gen_vert( const Vk_Pipeline_Def *def, int use_pbr, int tx, int cl, int env )
 {
 	const int fog = def->fog_stage ? 1 : 0;
-	const int gltfTan = ( def->gltf_gpu_tangent_fixup && def->pbr_vert_mode ) ? 1 : 0;
 	if ( def->pbr_vert_mode && use_pbr ) {
-		return &vk.modules.vert.gen_gltf_gpu[use_pbr][tx][cl][env][fog][gltfTan];
+		return &vk.modules.vert.gen_gltf_gpu[use_pbr][tx][cl][env][fog];
 	}
 	return &vk.modules.vert.gen[use_pbr][tx][cl][env][fog];
 }
@@ -66,9 +65,15 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
     struct Vk_Pipeline_FragSpecData frag_spec_data;
 
 #ifdef USE_VK_PBR
-    VkSpecializationMapEntry spec_entries[38];
+	/* ADD_FRAG_SPEC: 11 base (0..10) + 30 PBR (constant_id 11..40, includes lightmap_scale/srgb at 32..33) = 41 entries.
+	 * Was 38 → stack smash / SIGABRT in debug when vk_create_pipelines ran after VarInfo. */
+	VkSpecializationMapEntry spec_entries[48];
+	_Static_assert( sizeof( spec_entries ) / sizeof( spec_entries[0] ) >= 41u,
+		"vk_create_pipeline: spec_entries[] too small for PBR fragment specialization map" );
 #else
-    VkSpecializationMapEntry spec_entries[12];
+	VkSpecializationMapEntry spec_entries[12];
+	_Static_assert( sizeof( spec_entries ) / sizeof( spec_entries[0] ) >= 11u,
+		"vk_create_pipeline: spec_entries[] too small for non-PBR fragment specialization map" );
 #endif
 	
 	VkSpecializationInfo frag_spec_info;
@@ -791,7 +796,6 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 
 	if ( def->vk_pbr_flags & PBR_HAS_DETAILMAP )
 		frag_spec_data.detail_texture_set = 0;
-#ifdef HDR_DELUXE_LIGHTMAP
 	if ( r_deluxeMapping->integer )
 	{
 		// deluxe_texture_set = 0: use approx + scale
@@ -803,7 +807,6 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 			frag_spec_data.deluxe_mapping = 1;
 	}
 	else
-#endif // HDR_DELUXE_LIGHTMAP
 	{
 		// use approx + default scale
 		// perhaps when r_specularMapping = 0 set scale to 0 to disable it?
@@ -816,6 +819,11 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 		r_hdr_lightmap_scale->value : 1.0f;
 
 	frag_spec_data.lightmap_srgb_decode = ( r_lightmap_srgb_decode && r_lightmap_srgb_decode->integer && r_hdr && r_hdr->integer > 0 ) ? 1 : 0;
+
+	if ( spec_entry_count > (int)( sizeof( spec_entries ) / sizeof( spec_entries[0] ) ) ) {
+		ri.Error( ERR_FATAL, "vk_create_pipeline: fragment specialization map overflow (%d > %u)",
+			spec_entry_count, (unsigned int)( sizeof( spec_entries ) / sizeof( spec_entries[0] ) ) );
+	}
 
 	frag_spec_info.mapEntryCount = spec_entry_count;
 	frag_spec_info.pMapEntries = spec_entries;

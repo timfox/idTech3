@@ -170,6 +170,14 @@ void VkImgui_DrawVolumetricsPanel(void);
 
 void VkImgui_BindGameColorImage(void);
 
+/* Record ImGui into the swapchain (overlay_compose pass). Called from vk_frame_end after gamma. */
+void VkImgui_RecordOverlayPass( void );
+
+qboolean VkImgui_IsVulkanBackendReady( void );
+void VkImgui_SetVulkanBackendReady( qboolean ready );
+
+void VkImgui_NotifySwapchainRestart( void );
+
 #ifdef __cplusplus
 }
 #endif
