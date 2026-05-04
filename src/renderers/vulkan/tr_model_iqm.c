@@ -1562,7 +1562,7 @@ void R_AddIQMSurfaces( trRefEntity_t *ent ) {
 	// don't add third_person objects if not in a portal
 	personalModel = (ent->e.renderfx & RF_THIRD_PERSON) && (tr.viewParms.portalView == PV_NONE);
 
-	if ( ent->e.renderfx & RF_WRAP_FRAMES ) {
+	if ( ent->e.renderfx & RF_WRAP_FRAMES && data->num_frames > 0 ) {
 		ent->e.frame %= data->num_frames;
 		ent->e.oldframe %= data->num_frames;
 	}
@@ -1748,7 +1748,9 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 	iqmData_t	*data = surf->data;
 	const trRefEntity_t *ent = backEnd.currentEntity;
 #ifdef USE_VULKAN
-	trRefEntity_t *entMutable = (trRefEntity_t *)backEnd.currentEntity;
+	/* currentEntity points at tr.worldEntity or refdef.entities[] (mutable storage);
+	 * const is for front-end discipline; avoid direct const-drop cast (-Wcast-qual). */
+	trRefEntity_t *entMutable = (trRefEntity_t *)(void *)(uintptr_t)backEnd.currentEntity;
 #endif
 	const iqmMorphSurface_t *morphSurface = NULL;
 	qboolean applyMorph = qfalse;
@@ -1920,7 +1922,7 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 				vtxMat[10] = blendWeights[0] * poseMats[12 * data->influenceBlendIndexes[4*influence + 0] + 10];
 				vtxMat[11] = blendWeights[0] * poseMats[12 * data->influenceBlendIndexes[4*influence + 0] + 11];
 
-				for ( j = 1; j < (int)ARRAY_LEN( blendWeights ); j++ ) {
+				for ( j = 1; j < 4; j++ ) {
 					if ( blendWeights[j] <= 0.0f ) {
 						break;
 					}
@@ -1978,7 +1980,7 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 					vtxPrev[9] = blendWeights[0] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + 0] + 9];
 					vtxPrev[10] = blendWeights[0] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + 0] + 10];
 					vtxPrev[11] = blendWeights[0] * poseMatsPrev[12 * data->influenceBlendIndexes[4*influence + 0] + 11];
-					for ( jp = 1; jp < (int)ARRAY_LEN( blendWeights ); jp++ ) {
+					for ( jp = 1; jp < 4; jp++ ) {
 						if ( blendWeights[jp] <= 0.0f ) {
 							break;
 						}

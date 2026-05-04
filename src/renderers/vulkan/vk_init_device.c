@@ -41,6 +41,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_attachments.h"
 #include "vk_resource_destroy.h"
 #include "vk_descriptor_sets.h"
+#include "vk_rtx.h"
 #include "vk_pipeline_helpers.h"
 #include "vk_raster_samples.h"
 #include "vk_fluidsim.h"
@@ -426,10 +427,14 @@ void vk_initialize( void )
 					features.multiViewport ? "yes" : "no" );
 				ri.Printf( PRINT_ALL, "[VK]   Sampler Anisotropy  : %s\n",
 					features.samplerAnisotropy ? "yes" : "no" );
-#ifdef VK_KHR_RAY_TRACING_PIPELINE
-				ri.Printf( PRINT_ALL, "[VK]   Ray Tracing         : available\n" );
+#ifdef USE_VULKAN_RTX
+				if ( vk.rtxExtensionsEnabled ) {
+					ri.Printf( PRINT_ALL, "[VK]   Ray Tracing         : enabled (KHR AS + RT pipeline + buffer device address)\n" );
+				} else {
+					ri.Printf( PRINT_ALL, "[VK]   Ray Tracing         : build on, GPU/extensions unavailable\n" );
+				}
 #else
-				ri.Printf( PRINT_ALL, "[VK]   Ray Tracing         : not available\n" );
+				ri.Printf( PRINT_ALL, "[VK]   Ray Tracing         : not built (enable USE_VULKAN_RTX)\n" );
 #endif
 				ri.Printf( PRINT_ALL, "[VK]   Compute Pipelines   : enabled\n" );
 				ri.Printf( PRINT_ALL, "[VK]   First Person Rendering : enabled (r_firstPersonFov, r_firstPersonScale, r_firstPersonZNear)\n" );
@@ -464,20 +469,6 @@ void vk_initialize( void )
 
 		SET_OBJECT_NAME( vk.command_pool, "command pool", VK_DEBUG_REPORT_OBJECT_TYPE_COMMAND_POOL_EXT );
 	}
-
-#ifdef USE_UPLOAD_QUEUE
-	{
-		VkCommandBufferAllocateInfo alloc_info;
-
-		alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		alloc_info.pNext = NULL;
-		alloc_info.commandPool = vk.command_pool;
-		alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		alloc_info.commandBufferCount = 1;
-
-		VK_CHECK( qvkAllocateCommandBuffers( vk.device, &alloc_info, &vk.staging_command_buffer ) );
-	}
-#endif
 
 	//
 	// Command buffers and color attachments.
@@ -1158,6 +1149,8 @@ void vk_initialize( void )
 
 	// framebuffers for each swapchain image
 	vk_create_framebuffers();
+
+	vk_rtx_init();
 
 #ifdef VK_CUBEMAP
 	vk_create_cubemap_prefilter();

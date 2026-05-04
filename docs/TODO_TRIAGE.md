@@ -61,13 +61,18 @@ TODOs/FIXMEs in `src/external/` are from third-party code (duktape, zstd, cjson,
 | RB_ColorMask (Vulkan) | tr_backend.c | Partial: `vk_set_color_write_mask()` exists, but the VK_EXT_extended_dynamic_state3 path is currently disabled due to validation/driver issues; Vulkan falls back to full color writes. |
 | r_renderMode 1/2 | tr_init.c | Deferred / alternate-pipeline placeholders (`r_renderMode`); not wired to Vulkan **optional** Forward+ (`r_forwardPlus`). Real deferred still needs G-buffers, etc. Documented in cvar description. |
 | r_hdr 3 64-bit output | `vk_post_process_pipeline.c`, HDR format helpers | Infrastructure in place (vk_hdr64_active, _hdr64 modules, pipeline selection). glslangValidator rejects dvec4/f64vec4 fragment shader outputs. Falls back to RGBA32F. When glslang adds support, compile HDR64 variants and return RGBA64F from get_hdr_format. |
-| Vegetation wind draw | `vk_vegetation_wind.c` + draw path | Compute **dispatch** now runs **after** each `SURF_VEGETATION` tess batch (staging was previously uploaded *after* the misplaced `vk_begin_frame` dispatch, so GPU saw 0 verts). **Vertex shader still does not read** `vegwind_vertex_buffer` - deformed positions are not yet applied on draw. |
-| Vulkan RTX | CMake `USE_VULKAN_RTX`, renderer init | Extensions can be requested when `USE_VULKAN_RTX=ON` and GPU supports them. Pipeline (BLAS/TLAS, shaders) not yet implemented. See `docs/RENDERERS_FUTURE.md`. |
+| Vegetation wind draw | `vk_vegetation_wind.c` + draw path | Compute dispatch runs **after** each vegetation batch draw (`RB_EndSurface`); buffer holds deformed verts for the **next** frame unless the raster path binds `vegwind_vertex_buffer` as stream 0 (still TODO). |
+| Vulkan RTX | CMake `USE_VULKAN_RTX`, `vk_rtx.c` / `vk_rtx_world.c`, `r_rtx` / `r_rtxDemo` / `r_rtxWorldPrimCap` | Demo: world BSP BLAS over all map brush submodels (capped) + trace + blit when `r_rtxDemo` 1; entity TLAS and real lighting still TODO. See `docs/RENDERERS_FUTURE.md`. |
 
 ## Subsystem audit log (rolling)
 
 | Date | Scope | Notes |
 |------|--------|------|
+| 2026-04-27 | Vulkan / post | `vk_post_process_pipeline.c`: named `Vk_PostProcess_FragSpecData`, `#define` map count (29), `_Static_assert` array ≥ count; avoids silent spec/map drift. |
+| 2026-04-27 | OpenGL / IQM | `R_LoadIQM` / mesh validation: cast `header->num_*` / `mesh->num_vertexes` to `int` in loop bounds; fix `ARRAY_LEN` / joint name compares for `-Wsign-compare` (Clang). |
+| 2026-04-27 | OpenGL / IQM | `tr_model_iqm.c`: const-correct `RB_IQMSurfaceAnim` surface pointer; blend loop bound `j < 4` (fixes `-Wcast-qual` / `-Wsign-compare` on `ARRAY_LEN(float[4])`). |
+| 2026-04-27 | Vulkan / PBR | `vk_create_pipeline.c`: PBR `ADD_FRAG_SPEC` wrote 41 map entries into `spec_entries[38]` (stack smash / SIGABRT after `VarInfo`); enlarged buffer + runtime guard + `_Static_assert` so array size cannot drift below entry count. |
+| 2026-04-27 | Vulkan / IQM | `tr_model_iqm.c`: avoid `-Wcast-qual` on `backEnd.currentEntity` (uintptr_t bridge). Vegetation wind: `vk_vegetation_wind.c` header + triage row clarify dispatch-after-draw vs binding `vegwind_vertex_buffer` (still TODO). |
 | 2026-04-11 | Network / downloads | `cl_curl.c`: `dl->Name` from `Content-Disposition` uses **`Q_strncpyz`** (Phase 2 P0 item remains fixed). |
 | 2026-04-11 | Botlib / preprocessor | **`src/botlib/l_precomp.c`** already bounded; duplicate **`src/platform/botlib/l_precomp.c`** and **`src/platform/win32/botlib/l_precomp.c`** aligned: `sprintf` → **`Com_sprintf(..., MAX_TOKEN, ...)`** (5 sites each). |
 | 2026-04-11 | Botlib / chat (Windows tree) | **`src/platform/win32/botlib/be_ai_chat.c`** `BotLoadChatMessage`: `sprintf`/`strcpy` → **`Com_sprintf` / `Q_strncpyz`** to match **`src/botlib/be_ai_chat.c`**; **`src/platform/botlib/be_ai_chat.c`** fixed-string append → **`Q_strncpyz`**. |

@@ -860,6 +860,9 @@ SET(RENDERER_DEFAULT vulkan) # valid options: opengl, vulkan
 add_compile_definitions(RENDERER_PREFIX="${RENDERER_PREFIX}" RENDERER_DEFAULT="${RENDERER_DEFAULT}")
 
 OPTION(USE_SDL "" ON)
+# When no system SDL2 is detected, download and build SDL2 from the official release tarball
+# (headers under src/external/src/sdl are not sufficient to link the client).
+option(USE_BUNDLED_SDL2 "Build SDL2 from source if system SDL2 is not found (requires network on first configure)" ON)
 OPTION(USE_OPENAL "Enable OpenAL audio backend" ON)
 OPTION(USE_CURL "" ON)
 OPTION(USE_LOCAL_HEADERS "" ON)
@@ -935,6 +938,53 @@ if(USE_SDL)
 else()
   add_compile_definitions(USE_SDL=0)
 endif()
+
+# Set when FetchContent-built SDL2 is used (avoid mixing vendored snapshot headers with built lib).
+set(IDTECH3_USING_FETCHED_SDL2 OFF)
+if(USE_SDL AND NOT SDL2_FOUND AND USE_BUNDLED_SDL2 AND NOT ANDROID AND NOT MSVC)
+  set(_IDTECH3_SDL2_VER "2.30.11")
+  set(_IDTECH3_SDL2_SHA256 "8b8d4aef2038533da814965220f88f77d60dfa0f32685f80ead65e501337da7f")
+  include(FetchContent)
+  FetchContent_Declare(
+    idtech3_sdl2
+    URL "https://github.com/libsdl-org/SDL/releases/download/release-${_IDTECH3_SDL2_VER}/SDL2-${_IDTECH3_SDL2_VER}.tar.gz"
+    URL_HASH SHA256=${_IDTECH3_SDL2_SHA256}
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+  set(SDL2_DISABLE_INSTALL ON CACHE BOOL "" FORCE)
+  set(SDL_TESTS OFF CACHE BOOL "" FORCE)
+  set(SDL_TEST OFF CACHE BOOL "" FORCE)
+  set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+  set(SDL_STATIC ON CACHE BOOL "" FORCE)
+  if(CMAKE_POSITION_INDEPENDENT_CODE)
+    set(SDL_STATIC_PIC ON CACHE BOOL "" FORCE)
+  endif()
+  message(STATUS "SDL2: system library not found; building SDL ${_IDTECH3_SDL2_VER} via FetchContent (one-time download)")
+  FetchContent_MakeAvailable(idtech3_sdl2)
+  if(NOT TARGET SDL2::SDL2)
+    message(FATAL_ERROR "SDL2 FetchContent: expected target SDL2::SDL2 after building bundled SDL2.")
+  endif()
+  if(NOT TARGET SDL2::Core)
+    add_library(SDL2::Core INTERFACE IMPORTED)
+    set_property(TARGET SDL2::Core PROPERTY INTERFACE_LINK_LIBRARIES SDL2::SDL2)
+  endif()
+  if(NOT TARGET SDL2::Main)
+    add_library(SDL2::Main INTERFACE IMPORTED)
+    if(TARGET SDL2::SDL2main)
+      set_property(TARGET SDL2::Main PROPERTY INTERFACE_LINK_LIBRARIES SDL2::SDL2main SDL2::SDL2)
+    else()
+      set_property(TARGET SDL2::Main PROPERTY INTERFACE_LINK_LIBRARIES SDL2::SDL2)
+    endif()
+  endif()
+  FetchContent_GetProperties(idtech3_sdl2 SOURCE_DIR _idtech3_sdl2_src)
+  if(_idtech3_sdl2_src)
+    set(SDL2_INCLUDE_DIR "${_idtech3_sdl2_src}/include")
+    set(SDL2_INCLUDE_DIRS "${SDL2_INCLUDE_DIR}")
+  endif()
+  set(SDL2_FOUND TRUE)
+  set(IDTECH3_USING_FETCHED_SDL2 ON)
+  message(STATUS "SDL2: bundled build enabled (includes + libs from ${_idtech3_sdl2_src})")
+endif()
+
 OPTION(SKIP_IDPAK_CHECK "Skip checking for original Quake III pak files (pak0.pk3)" ON)
 OPTION(BUILD_FREETYPE "Enable FreeType-powered font rendering / font generation" ON)
 if(BUILD_FREETYPE)
@@ -1451,6 +1501,7 @@ list(APPEND CLIENT_SRCS
   src/game/g_horde.c
   src/game/g_goap.c
   src/game/g_aiml.c
+  src/game/g_eda.c
   src/game/g_engine_systems.c
   src/game/g_bt.c
   src/game/g_entity_bridge.c
@@ -1911,11 +1962,15 @@ if(USE_IMGUI AND NOT APPLE)
   enable_language(CXX)
   set(IMGUI_SRCS
     src/renderers/vulkan/inspector/vk_imgui.cpp
+    src/renderers/vulkan/inspector/vk_imgui_vulkan.cpp
     ${EXTERNAL_SRC}/cimgui/imgui/imgui.cpp
     ${EXTERNAL_SRC}/cimgui/imgui/imgui_draw.cpp
     ${EXTERNAL_SRC}/cimgui/imgui/imgui_tables.cpp
     ${EXTERNAL_SRC}/cimgui/imgui/imgui_widgets.cpp
+    ${EXTERNAL_SRC}/cimgui/imgui/backends/imgui_impl_vulkan.cpp
   )
+  set_source_files_properties(${EXTERNAL_SRC}/cimgui/imgui/backends/imgui_impl_vulkan.cpp PROPERTIES
+    COMPILE_DEFINITIONS "VK_NO_PROTOTYPES")
   set(IMGUI_INCLUDE_DIRS
     ${EXTERNAL_SRC}/cimgui/imgui
     ${EXTERNAL_SRC}/cimgui/imgui/backends
@@ -1925,12 +1980,18 @@ if(USE_IMGUI AND NOT APPLE)
   if(USE_RENDERER_DLOPEN)
     target_sources(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${IMGUI_SRCS})
     target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${IMGUI_INCLUDE_DIRS})
-    target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_IMGUI)
+    target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_IMGUI USE_VULKAN)
+    if(USE_SDL AND TARGET SDL2::Core)
+      target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE SDL2::Core)
+    endif()
   else()
     if(USE_VULKAN)
       target_sources(${RENDERER_PREFIX}_vulkan PRIVATE ${IMGUI_SRCS})
       target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${IMGUI_INCLUDE_DIRS})
-      target_compile_definitions(${RENDERER_PREFIX}_vulkan PRIVATE USE_IMGUI)
+      target_compile_definitions(${RENDERER_PREFIX}_vulkan PRIVATE USE_IMGUI USE_VULKAN)
+      if(USE_SDL AND TARGET SDL2::Core)
+        target_link_libraries(${RENDERER_PREFIX}_vulkan PRIVATE SDL2::Core)
+      endif()
     endif()
   endif()
   message(STATUS "ImGui Inspector: enabled")
@@ -2023,7 +2084,7 @@ IF(Q3_UI_SRCS)
 ADD_LIBRARY(q3ui OBJECT ${Q3_UI_SRCS})
 ENDIF()
 
-if(USE_LOCAL_HEADERS)
+if(USE_LOCAL_HEADERS AND NOT IDTECH3_USING_FETCHED_SDL2)
 	if(TARGET q3ui)
 		target_include_directories(q3ui PRIVATE ${EXTERNAL_SDL_INCLUDE_DIR})
 	endif()
@@ -2043,7 +2104,7 @@ endif()
 IF(NOT MSVC)
 	IF(USE_SDL)
 		if(NOT SDL2_FOUND)
-		  message(FATAL_ERROR "SDL2 could not be found. Please install or set SDL2_DIR/SDL2_PATH.")
+		  message(FATAL_ERROR "SDL2 could not be found. Install SDL2 dev packages, set SDL2_DIR/SDL2_PATH, or enable USE_BUNDLED_SDL2=ON (default) for an automatic source build.")
 		endif()
 		if(TARGET q3ui)
 			TARGET_LINK_LIBRARIES(q3ui SDL2::Main)
@@ -2115,6 +2176,12 @@ IF(USE_VULKAN)
 	endif()
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_VULKAN_API)
 ENDIF()
+
+if(USE_IMGUI AND NOT APPLE)
+	if(TARGET client)
+		target_compile_definitions(client PRIVATE USE_IMGUI)
+	endif()
+endif()
 
 IF(USE_MP3)
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_MP3)
@@ -2424,6 +2491,12 @@ add_test(NAME test_vk_vegetation_dispatch_order
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_vk_vegetation_dispatch_order PROPERTIES
 	LABELS "unit;scripts;validation")
+
+add_test(NAME test_vulkan_mesh_shader_opt_in
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_vulkan_mesh_shader_opt_in.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_vulkan_mesh_shader_opt_in PROPERTIES
+	LABELS "unit;scripts;validation;renderer")
 
 # --- Unit tests ---
 option(BUILD_UNIT_TESTS "Build unit tests" ON)

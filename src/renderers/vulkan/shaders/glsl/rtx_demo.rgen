@@ -1,0 +1,42 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+
+layout(location = 0) rayPayloadEXT vec3 hitValue;
+
+layout(set = 0, binding = 0) uniform accelerationStructureEXT topLevelAS;
+layout(set = 0, binding = 1, rgba16f) uniform writeonly image2D outImage;
+
+layout(set = 0, binding = 2, std140) uniform RtxFrame {
+	mat4 invViewProj;
+	vec4 viewOrigin;
+	vec4 zNearFar;     /* x=zNear, y=zFar */
+	vec4 outputSize;   /* xy = width,height; z = r_rtx mode 0-3 (hit shader demo tint); w unused in rgen */
+} rtx;
+
+layout(set = 0, binding = 3) uniform sampler2D depthTex;
+
+void main()
+{
+	vec2 pix = vec2( gl_LaunchIDEXT.xy ) + vec2( 0.5 );
+	vec2 uv = pix / max( rtx.outputSize.xy, vec2( 1.0 ) );
+	float d = textureLod( depthTex, uv, 0.0 ).r;
+
+	vec3 ro = rtx.viewOrigin.xyz;
+	vec3 rd;
+
+	if ( d <= 0.0 || d >= 1.0 ) {
+		/* Sky / void: shoot along forward from clip center ray */
+		vec4 farClip = vec4( uv * 2.0 - 1.0, 0.0, 1.0 );
+		vec4 farW = rtx.invViewProj * farClip;
+		farW /= max( abs( farW.w ), 1e-6 );
+		rd = normalize( farW.xyz - ro );
+	} else {
+		vec4 clip = vec4( uv * 2.0 - 1.0, d, 1.0 );
+		vec4 worldPos = rtx.invViewProj * clip;
+		worldPos /= max( abs( worldPos.w ), 1e-6 );
+		rd = normalize( worldPos.xyz - ro );
+	}
+
+	traceRayEXT( topLevelAS, gl_RayFlagsOpaqueEXT, 0xFFu, 0u, 0u, 0u, ro, 0.01, rd, 1.0e5, 0 );
+	imageStore( outImage, ivec2( gl_LaunchIDEXT.xy ), vec4( hitValue, 1.0 ) );
+}

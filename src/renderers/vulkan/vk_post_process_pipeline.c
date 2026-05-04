@@ -20,6 +20,41 @@ static inline qboolean vk_post_process_hdr64_active( void )
 	return vk.color_format == VK_FORMAT_R64G64B64A64_SFLOAT;
 }
 
+/* Fragment specialization constants 0..28 (29 entries); keep in sync with assignments in vk_create_post_process_pipeline. */
+#define VK_POST_PROCESS_FRAG_SPEC_MAP_COUNT 29
+
+typedef struct {
+	float gamma;
+	float preExposureScale;
+	float greyscale;
+	float bloom_threshold;
+	float bloom_intensity;
+	int bloom_threshold_mode;
+	int bloom_modulate;
+	int dither;
+	int depth_r;
+	int depth_g;
+	int depth_b;
+	float exposure;
+	float bloom_knee;
+	int tonemap_mode;
+	int apply_srgb_gamma;
+	int post_debug;
+	float vignette_intensity;
+	float vignette_radius;
+	float chromatic_aberration;
+	float film_grain;
+	int postprocess_enabled;
+	float outline_strength;
+	float outline_threshold;
+	int film_look;
+	float post_contrast;
+	float post_saturation;
+	float sharpen;
+	float bloom_scatter;
+	int bloom_energy_preserve;
+} Vk_PostProcess_FragSpecData;
+
 static void vk_post_process_set_shader_stage_desc( VkPipelineShaderStageCreateInfo *desc, VkShaderStageFlagBits stage, VkShaderModule shader_module, const char *entry )
 {
 	desc->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -90,7 +125,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	VkGraphicsPipelineCreateInfo create_info;
 	VkViewport viewport;
 	VkRect2D scissor;
-	VkSpecializationMapEntry spec_entries[29];
+	VkSpecializationMapEntry spec_entries[VK_POST_PROCESS_FRAG_SPEC_MAP_COUNT];
 	VkSpecializationInfo frag_spec_info;
 	VkPipeline *pipeline;
 	VkShaderModule fsmodule;
@@ -102,37 +137,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	qboolean blend;
 	qboolean alpha_composite = qfalse;
 
-	struct PostProcess_FragSpecData {
-		float gamma;
-		float preExposureScale;
-		float greyscale;
-		float bloom_threshold;
-		float bloom_intensity;
-		int bloom_threshold_mode;
-		int bloom_modulate;
-		int dither;
-		int depth_r;
-		int depth_g;
-		int depth_b;
-		float exposure;
-		float bloom_knee;
-		int tonemap_mode;
-		int apply_srgb_gamma;
-		int post_debug;
-		float vignette_intensity;
-		float vignette_radius;
-		float chromatic_aberration;
-		float film_grain;
-		int postprocess_enabled;
-		float outline_strength;
-		float outline_threshold;
-		int film_look;
-		float post_contrast;
-		float post_saturation;
-		float sharpen;
-		float bloom_scatter;
-		int bloom_energy_preserve;
-	} frag_spec_data;
+	Vk_PostProcess_FragSpecData frag_spec_data;
 
 	switch ( program_index ) {
 		case 1:
@@ -385,94 +390,96 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	}
 
 	spec_entries[0].constantID = 0;
-	spec_entries[0].offset = offsetof( struct PostProcess_FragSpecData, gamma );
+	spec_entries[0].offset = offsetof( Vk_PostProcess_FragSpecData, gamma );
 	spec_entries[0].size = sizeof( frag_spec_data.gamma );
 	spec_entries[1].constantID = 1;
-	spec_entries[1].offset = offsetof( struct PostProcess_FragSpecData, preExposureScale );
+	spec_entries[1].offset = offsetof( Vk_PostProcess_FragSpecData, preExposureScale );
 	spec_entries[1].size = sizeof( frag_spec_data.preExposureScale );
 	spec_entries[2].constantID = 2;
-	spec_entries[2].offset = offsetof( struct PostProcess_FragSpecData, greyscale );
+	spec_entries[2].offset = offsetof( Vk_PostProcess_FragSpecData, greyscale );
 	spec_entries[2].size = sizeof( frag_spec_data.greyscale );
 	spec_entries[3].constantID = 3;
-	spec_entries[3].offset = offsetof( struct PostProcess_FragSpecData, bloom_threshold );
+	spec_entries[3].offset = offsetof( Vk_PostProcess_FragSpecData, bloom_threshold );
 	spec_entries[3].size = sizeof( frag_spec_data.bloom_threshold );
 	spec_entries[4].constantID = 4;
-	spec_entries[4].offset = offsetof( struct PostProcess_FragSpecData, bloom_intensity );
+	spec_entries[4].offset = offsetof( Vk_PostProcess_FragSpecData, bloom_intensity );
 	spec_entries[4].size = sizeof( frag_spec_data.bloom_intensity );
 	spec_entries[5].constantID = 5;
-	spec_entries[5].offset = offsetof( struct PostProcess_FragSpecData, bloom_threshold_mode );
+	spec_entries[5].offset = offsetof( Vk_PostProcess_FragSpecData, bloom_threshold_mode );
 	spec_entries[5].size = sizeof( frag_spec_data.bloom_threshold_mode );
 	spec_entries[6].constantID = 6;
-	spec_entries[6].offset = offsetof( struct PostProcess_FragSpecData, bloom_modulate );
+	spec_entries[6].offset = offsetof( Vk_PostProcess_FragSpecData, bloom_modulate );
 	spec_entries[6].size = sizeof( frag_spec_data.bloom_modulate );
 	spec_entries[7].constantID = 7;
-	spec_entries[7].offset = offsetof( struct PostProcess_FragSpecData, dither );
+	spec_entries[7].offset = offsetof( Vk_PostProcess_FragSpecData, dither );
 	spec_entries[7].size = sizeof( frag_spec_data.dither );
 	spec_entries[8].constantID = 8;
-	spec_entries[8].offset = offsetof( struct PostProcess_FragSpecData, depth_r );
+	spec_entries[8].offset = offsetof( Vk_PostProcess_FragSpecData, depth_r );
 	spec_entries[8].size = sizeof( frag_spec_data.depth_r );
 	spec_entries[9].constantID = 9;
-	spec_entries[9].offset = offsetof( struct PostProcess_FragSpecData, depth_g );
+	spec_entries[9].offset = offsetof( Vk_PostProcess_FragSpecData, depth_g );
 	spec_entries[9].size = sizeof( frag_spec_data.depth_g );
 	spec_entries[10].constantID = 10;
-	spec_entries[10].offset = offsetof( struct PostProcess_FragSpecData, depth_b );
+	spec_entries[10].offset = offsetof( Vk_PostProcess_FragSpecData, depth_b );
 	spec_entries[10].size = sizeof( frag_spec_data.depth_b );
 	spec_entries[11].constantID = 11;
-	spec_entries[11].offset = offsetof( struct PostProcess_FragSpecData, exposure );
+	spec_entries[11].offset = offsetof( Vk_PostProcess_FragSpecData, exposure );
 	spec_entries[11].size = sizeof( frag_spec_data.exposure );
 	spec_entries[12].constantID = 12;
-	spec_entries[12].offset = offsetof( struct PostProcess_FragSpecData, bloom_knee );
+	spec_entries[12].offset = offsetof( Vk_PostProcess_FragSpecData, bloom_knee );
 	spec_entries[12].size = sizeof( frag_spec_data.bloom_knee );
 	spec_entries[13].constantID = 13;
-	spec_entries[13].offset = offsetof( struct PostProcess_FragSpecData, tonemap_mode );
+	spec_entries[13].offset = offsetof( Vk_PostProcess_FragSpecData, tonemap_mode );
 	spec_entries[13].size = sizeof( frag_spec_data.tonemap_mode );
 	spec_entries[14].constantID = 14;
-	spec_entries[14].offset = offsetof( struct PostProcess_FragSpecData, apply_srgb_gamma );
+	spec_entries[14].offset = offsetof( Vk_PostProcess_FragSpecData, apply_srgb_gamma );
 	spec_entries[14].size = sizeof( frag_spec_data.apply_srgb_gamma );
 	spec_entries[15].constantID = 15;
-	spec_entries[15].offset = offsetof( struct PostProcess_FragSpecData, post_debug );
+	spec_entries[15].offset = offsetof( Vk_PostProcess_FragSpecData, post_debug );
 	spec_entries[15].size = sizeof( frag_spec_data.post_debug );
 	spec_entries[16].constantID = 16;
-	spec_entries[16].offset = offsetof( struct PostProcess_FragSpecData, vignette_intensity );
+	spec_entries[16].offset = offsetof( Vk_PostProcess_FragSpecData, vignette_intensity );
 	spec_entries[16].size = sizeof( frag_spec_data.vignette_intensity );
 	spec_entries[17].constantID = 17;
-	spec_entries[17].offset = offsetof( struct PostProcess_FragSpecData, vignette_radius );
+	spec_entries[17].offset = offsetof( Vk_PostProcess_FragSpecData, vignette_radius );
 	spec_entries[17].size = sizeof( frag_spec_data.vignette_radius );
 	spec_entries[18].constantID = 18;
-	spec_entries[18].offset = offsetof( struct PostProcess_FragSpecData, chromatic_aberration );
+	spec_entries[18].offset = offsetof( Vk_PostProcess_FragSpecData, chromatic_aberration );
 	spec_entries[18].size = sizeof( frag_spec_data.chromatic_aberration );
 	spec_entries[19].constantID = 19;
-	spec_entries[19].offset = offsetof( struct PostProcess_FragSpecData, film_grain );
+	spec_entries[19].offset = offsetof( Vk_PostProcess_FragSpecData, film_grain );
 	spec_entries[19].size = sizeof( frag_spec_data.film_grain );
 	spec_entries[20].constantID = 20;
-	spec_entries[20].offset = offsetof( struct PostProcess_FragSpecData, postprocess_enabled );
+	spec_entries[20].offset = offsetof( Vk_PostProcess_FragSpecData, postprocess_enabled );
 	spec_entries[20].size = sizeof( frag_spec_data.postprocess_enabled );
 	spec_entries[21].constantID = 21;
-	spec_entries[21].offset = offsetof( struct PostProcess_FragSpecData, outline_strength );
+	spec_entries[21].offset = offsetof( Vk_PostProcess_FragSpecData, outline_strength );
 	spec_entries[21].size = sizeof( frag_spec_data.outline_strength );
 	spec_entries[22].constantID = 22;
-	spec_entries[22].offset = offsetof( struct PostProcess_FragSpecData, outline_threshold );
+	spec_entries[22].offset = offsetof( Vk_PostProcess_FragSpecData, outline_threshold );
 	spec_entries[22].size = sizeof( frag_spec_data.outline_threshold );
 	spec_entries[23].constantID = 23;
-	spec_entries[23].offset = offsetof( struct PostProcess_FragSpecData, film_look );
+	spec_entries[23].offset = offsetof( Vk_PostProcess_FragSpecData, film_look );
 	spec_entries[23].size = sizeof( frag_spec_data.film_look );
 	spec_entries[24].constantID = 24;
-	spec_entries[24].offset = offsetof( struct PostProcess_FragSpecData, post_contrast );
+	spec_entries[24].offset = offsetof( Vk_PostProcess_FragSpecData, post_contrast );
 	spec_entries[24].size = sizeof( frag_spec_data.post_contrast );
 	spec_entries[25].constantID = 25;
-	spec_entries[25].offset = offsetof( struct PostProcess_FragSpecData, post_saturation );
+	spec_entries[25].offset = offsetof( Vk_PostProcess_FragSpecData, post_saturation );
 	spec_entries[25].size = sizeof( frag_spec_data.post_saturation );
 	spec_entries[26].constantID = 26;
-	spec_entries[26].offset = offsetof( struct PostProcess_FragSpecData, sharpen );
+	spec_entries[26].offset = offsetof( Vk_PostProcess_FragSpecData, sharpen );
 	spec_entries[26].size = sizeof( frag_spec_data.sharpen );
 	spec_entries[27].constantID = 27;
-	spec_entries[27].offset = offsetof( struct PostProcess_FragSpecData, bloom_scatter );
+	spec_entries[27].offset = offsetof( Vk_PostProcess_FragSpecData, bloom_scatter );
 	spec_entries[27].size = sizeof( frag_spec_data.bloom_scatter );
 	spec_entries[28].constantID = 28;
-	spec_entries[28].offset = offsetof( struct PostProcess_FragSpecData, bloom_energy_preserve );
+	spec_entries[28].offset = offsetof( Vk_PostProcess_FragSpecData, bloom_energy_preserve );
 	spec_entries[28].size = sizeof( frag_spec_data.bloom_energy_preserve );
 
-	frag_spec_info.mapEntryCount = 29;
+	_Static_assert( sizeof( spec_entries ) / sizeof( spec_entries[0] ) >= (size_t)VK_POST_PROCESS_FRAG_SPEC_MAP_COUNT,
+		"vk_create_post_process_pipeline: spec_entries[] smaller than VK_POST_PROCESS_FRAG_SPEC_MAP_COUNT" );
+	frag_spec_info.mapEntryCount = VK_POST_PROCESS_FRAG_SPEC_MAP_COUNT;
 	frag_spec_info.pMapEntries = spec_entries;
 	frag_spec_info.dataSize = sizeof( frag_spec_data );
 	frag_spec_info.pData = &frag_spec_data;

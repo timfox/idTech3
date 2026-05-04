@@ -49,57 +49,6 @@ static int	c_gridVerts;
 
 //===============================================================================
 
-static void HSVtoRGB( float h, float s, float v, float rgb[3] )
-{
-	int i;
-	float f;
-	float p, q, t;
-
-	h *= 5;
-
-	i = floor( h );
-	f = h - i;
-
-	p = v * ( 1 - s );
-	q = v * ( 1 - s * f );
-	t = v * ( 1 - s * ( 1 - f ) );
-
-	switch ( i )
-	{
-	case 0:
-		rgb[0] = v;
-		rgb[1] = t;
-		rgb[2] = p;
-		break;
-	case 1:
-		rgb[0] = q;
-		rgb[1] = v;
-		rgb[2] = p;
-		break;
-	case 2:
-		rgb[0] = p;
-		rgb[1] = v;
-		rgb[2] = t;
-		break;
-	case 3:
-		rgb[0] = p;
-		rgb[1] = q;
-		rgb[2] = v;
-		break;
-	case 4:
-		rgb[0] = t;
-		rgb[1] = p;
-		rgb[2] = v;
-		break;
-	case 5:
-		rgb[0] = v;
-		rgb[1] = p;
-		rgb[2] = q;
-		break;
-	}
-}
-
-
 /*
 ===============
 R_ClampDenorm
@@ -250,54 +199,24 @@ static float R_ProcessLightmap( byte *image, const byte *buf_p, float maxIntensi
 {
 	int x, y;
 
-	if ( 0 && r_lightmap->integer == 2 ) {
-		int j;
-		// color code by intensity as development tool (r/g/b from buf_p, clamp output)
-		for ( j = 0; j < LIGHTMAP_SIZE * LIGHTMAP_SIZE; j++ )
-		{
-			float r = buf_p[j*3+0];
-			float g = buf_p[j*3+1];
-			float b = buf_p[j*3+2];
-			float intensity;
-			float out[3] = {0.0, 0.0, 0.0};
-
-			intensity = 0.33f * r + 0.685f * g + 0.063f * b;
-
-			if ( intensity > 255 )
-				intensity = 1.0f;
-			else
-				intensity /= 255.0f;
-
-			if ( intensity > maxIntensity )
-				maxIntensity = intensity;
-
-			HSVtoRGB( intensity, 1.00, 0.50, out );
-
-			image[j*4+0] = (byte)Com_Clamp( 0.0f, 255.0f, out[0] * 255.0f );
-			image[j*4+1] = (byte)Com_Clamp( 0.0f, 255.0f, out[1] * 255.0f );
-			image[j*4+2] = (byte)Com_Clamp( 0.0f, 255.0f, out[2] * 255.0f );
-			image[j*4+3] = 255;
-		}
-	} else {
-		if ( tr.mergeLightmaps ) {
-			for ( y = 0 ; y < LIGHTMAP_SIZE; y++ ) {
-				for ( x = 0 ; x < LIGHTMAP_SIZE; x++ ) {
-					byte *dst = &image[((y + LIGHTMAP_BORDER) * LIGHTMAP_LEN + x + LIGHTMAP_BORDER) * 4];
-					R_ColorShiftLightingBytes( buf_p, dst, qfalse );
-					dst[3] = 255;
-					buf_p += 3;
-				}
+	if ( tr.mergeLightmaps ) {
+		for ( y = 0 ; y < LIGHTMAP_SIZE; y++ ) {
+			for ( x = 0 ; x < LIGHTMAP_SIZE; x++ ) {
+				byte *dst = &image[((y + LIGHTMAP_BORDER) * LIGHTMAP_LEN + x + LIGHTMAP_BORDER) * 4];
+				R_ColorShiftLightingBytes( buf_p, dst, qfalse );
+				dst[3] = 255;
+				buf_p += 3;
 			}
-			FillBorders( image );
-		} else {
-			// legacy path
-			for ( y = 0 ; y < LIGHTMAP_SIZE; y++ ) {
-				for ( x = 0 ; x < LIGHTMAP_SIZE; x++ ) {
-					byte *dst = &image[(y * LIGHTMAP_SIZE + x) * 4];
-					R_ColorShiftLightingBytes( buf_p, dst, qfalse );
-					dst[3] = 255;
-					buf_p += 3;
-				}
+		}
+		FillBorders( image );
+	} else {
+		// legacy path
+		for ( y = 0 ; y < LIGHTMAP_SIZE; y++ ) {
+			for ( x = 0 ; x < LIGHTMAP_SIZE; x++ ) {
+				byte *dst = &image[(y * LIGHTMAP_SIZE + x) * 4];
+				R_ColorShiftLightingBytes( buf_p, dst, qfalse );
+				dst[3] = 255;
+				buf_p += 3;
 			}
 		}
 	}
@@ -305,41 +224,32 @@ static float R_ProcessLightmap( byte *image, const byte *buf_p, float maxIntensi
 	return maxIntensity;
 }
 
-#ifdef HDR_DELUXE_LIGHTMAP
 static void R_ProcessDeluxemap( byte *image, const byte *buf_p )
 {
 	int x, y;
 
-	if ( tr.mergeLightmaps ) {
-		for ( y = 0 ; y < LIGHTMAP_SIZE; y++ ) {
-			for ( x = 0 ; x < LIGHTMAP_SIZE; x++ ) {
-				byte *dst = &image[((y + LIGHTMAP_BORDER) * LIGHTMAP_LEN + x + LIGHTMAP_BORDER) * 4];
+	for ( y = 0 ; y < LIGHTMAP_SIZE; y++ ) {
+		for ( x = 0 ; x < LIGHTMAP_SIZE; x++ ) {
+			byte *dst = &image[((y + LIGHTMAP_BORDER) * LIGHTMAP_LEN + x + LIGHTMAP_BORDER) * 4];
 
-				byte r = buf_p[0];
-				byte g = buf_p[1];
-				byte b = buf_p[2];
+			byte r = buf_p[0];
+			byte g = buf_p[1];
+			byte b = buf_p[2];
 
-				if ( r == 0 && g == 0 && b == 0 ) {
-					r = g = b = 127;
-				}
-
-				dst[0] = r;
-				dst[1] = g;
-				dst[2] = b;
-				dst[3] = 255;
-
-				buf_p += 3;
+			if ( r == 0 && g == 0 && b == 0 ) {
+				r = g = b = 127;
 			}
-		}
-		FillBorders( image );
 
-	} 
-	
-	else {
-		// legacy path is not implemented
+			dst[0] = r;
+			dst[1] = g;
+			dst[2] = b;
+			dst[3] = 255;
+
+			buf_p += 3;
+		}
 	}
+	FillBorders( image );
 }
-#endif // HDR_DELUXE_LIGHTMAP
 
 static int SetLightmapParams( int numLightmaps, int maxTextureSize )
 {
@@ -409,21 +319,17 @@ static void R_LoadMergedLightmaps( const lump_t *l, byte *image )
 
 	tr.lightmaps = ri.Hunk_Alloc( tr.numLightmaps * sizeof(image_t *), h_low );
 
-#ifdef HDR_DELUXE_LIGHTMAP
 	if ( tr.worldDeluxeMapping )
 		tr.deluxemaps = (image_t**)ri.Hunk_Alloc( tr.numLightmaps * sizeof(image_t*), h_low );
-#endif
 
 	for ( offs = 0, i = 0 ; i < tr.numLightmaps; i++ ) {
 
 		tr.lightmaps[ i ] = R_CreateImage( va( "*mergedLightmap%d", i ), NULL, NULL,
 			lightmapWidth, lightmapHeight, lightmapFlags | IMGFLAG_CLAMPTOBORDER, 0, 0 );
 
-#ifdef HDR_DELUXE_LIGHTMAP
 		if ( tr.worldDeluxeMapping )
 			tr.deluxemaps[ i ] = R_CreateImage( va( "*mergedDeluxemap%d", i ), NULL, NULL,
 				lightmapWidth, lightmapHeight, lightmapFlags | IMGFLAG_CLAMPTOBORDER, 0, 0 );
-#endif
 
 		for ( y = 0; y < lightmapCountY; y++ ) {
 			if ( offs >= l->filelen )
@@ -443,16 +349,14 @@ static void R_LoadMergedLightmaps( const lump_t *l, byte *image )
 
 				offs += LIGHTMAP_SIZE * LIGHTMAP_SIZE * 3;
 
-#ifdef HDR_DELUXE_LIGHTMAP
 				if ( tr.worldDeluxeMapping )
 				{
 					R_ProcessDeluxemap( image, buf + offs );
-				
+
 					vk_upload_image_data( tr.deluxemaps[ i ], x * LIGHTMAP_LEN, y * LIGHTMAP_LEN, LIGHTMAP_LEN, LIGHTMAP_LEN, 1, image, LIGHTMAP_LEN * LIGHTMAP_LEN * 4, qtrue );
-				
+
 					offs += LIGHTMAP_SIZE * LIGHTMAP_SIZE * 3;
 				}
-#endif
 			}
 		}
 #ifdef USE_VULKAN
@@ -489,9 +393,7 @@ static void R_LoadLightmaps( const lump_t *l, const lump_t *surfs ) {
 	lightmapHeight = LIGHTMAP_SIZE;
 	lightmapCountX = 1;
 	lightmapCountY = 1;
-#ifdef HDR_DELUXE_LIGHTMAP
 	tr.worldDeluxeMapping = qfalse;
-#endif
 
 	if ( l->filelen < LIGHTMAP_SIZE * LIGHTMAP_SIZE * 3 ) {
 		return;
@@ -504,7 +406,6 @@ static void R_LoadLightmaps( const lump_t *l, const lump_t *surfs ) {
 
 	numLightmaps = l->filelen / (LIGHTMAP_SIZE * LIGHTMAP_SIZE * 3);
 
-#ifdef HDR_DELUXE_LIGHTMAP
 	if ( numLightmaps > 1 )
 	{
 		tr.worldDeluxeMapping = qtrue;
@@ -523,7 +424,6 @@ static void R_LoadLightmaps( const lump_t *l, const lump_t *surfs ) {
 
 	if ( tr.worldDeluxeMapping )
 		numLightmaps >>= 1;
-#endif
 
 	// create all the lightmaps
 	tr.numLightmaps = numLightmaps;
@@ -537,11 +437,9 @@ static void R_LoadLightmaps( const lump_t *l, const lump_t *surfs ) {
 		}
 	}
 
-#ifdef HDR_DELUXE_LIGHTMAP
 	/* Non-merged path does not allocate deluxemaps; ensure no stale pointer */
 	tr.deluxemaps = NULL;
 	tr.worldDeluxeMapping = qfalse;
-#endif
 
 	buf = fileBase + l->fileofs;
 
@@ -704,7 +602,6 @@ static void vk_generate_light_directions( void )
 }
 #endif
 
-#ifdef USE_PMLIGHT
 static void GenerateNormals( srfSurfaceFace_t *face )
 {
 	vec3_t ba, ca, cross;
@@ -744,7 +641,6 @@ static void GenerateNormals( srfSurfaceFace_t *face )
 		}
 	}
 }
-#endif // USE_PMLIGHT
 
 
 /*
@@ -886,7 +782,6 @@ static void ParseFace( const dsurface_t *ds, const drawVert_t *verts, msurface_t
 		cv->plane.normal[i] = LittleFloat( ds->lightmapVecs[2][i] );
 	}
 
-#ifdef USE_PMLIGHT
 	if ( surf->shader->numUnfoggedPasses && surf->shader->lightingStage >= 0 ) {
 		if ( fabsf( cv->plane.normal[0] ) < 0.01f && fabsf( cv->plane.normal[1] ) < 0.01f && fabsf( cv->plane.normal[2] ) < 0.01f ) {
 			// Zero-normals case:
@@ -901,7 +796,6 @@ static void ParseFace( const dsurface_t *ds, const drawVert_t *verts, msurface_t
 			GenerateNormals( cv );
 		}
 	}
-#endif
 
 	for ( i = 0; i < 3; i++ ) {
 		cv->plane.normal[i] = R_ClampDenorm( cv->plane.normal[i] );
@@ -1908,6 +1802,7 @@ static void R_LoadSubmodels( const lump_t *l ) {
 	count = l->filelen / sizeof(*in);
 
 	s_worldData.bmodels = out = ri.Hunk_Alloc( count * sizeof(*out), h_low );
+	s_worldData.numBModels = count;
 
 	for ( i=0 ; i<count ; i++, in++, out++ ) {
 		model_t *model;
