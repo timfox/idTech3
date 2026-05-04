@@ -203,6 +203,7 @@ cvar_t	*r_taa_sharpen;
 cvar_t	*r_rtx;
 cvar_t	*r_rtxDemo;
 cvar_t	*r_rtxWorldPrimCap;
+cvar_t	*r_rtxComposite;
 cvar_t	*r_forwardPlus;
 cvar_t	*r_forwardPlusMaxPerTile;
 cvar_t	*r_forwardPlusDebug;
@@ -394,6 +395,9 @@ cvar_t	*r_debugSurface;
 cvar_t	*r_simpleMipMaps;
 
 cvar_t	*r_showImages;
+#ifdef USE_IMGUI
+cvar_t	*r_imgui;
+#endif
 cvar_t	*r_defaultImage;
 
 cvar_t	*r_ambientScale;
@@ -2590,6 +2594,16 @@ static void R_Register( void )
 	//
 	r_showImages = ri.Cvar_Get( "r_showImages", "0", CVAR_TEMP );
 	ri.Cvar_SetDescription( r_showImages, "Draw all images currently loaded into memory:\n 0: Disabled\n 1: Show images set to uniform size\n 2: Show images with scaled relative to largest image" );
+#ifdef USE_IMGUI
+	r_imgui = ri.Cvar_Get( "r_imgui", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_imgui, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_imgui,
+		"Draw Dear ImGui debug inspector overlay (Vulkan): dockspace, PostFX/physics/volumetrics panels. "
+		"Requires USE_IMGUI build. Set 0 during gameplay if mouse capture conflicts with look." );
+	if ( r_imgui && r_imgui->integer ) {
+		ri.Printf( PRINT_ALL, "ImGui inspector overlay: r_imgui 1 (toggle with r_imgui 0)\n" );
+	}
+#endif
 
 	r_debugLight = ri.Cvar_Get( "r_debuglight", "0", CVAR_TEMP );
 	ri.Cvar_SetDescription( r_debugLight, "Debugging tool to print ambient and directed lighting information." );
@@ -3484,6 +3498,12 @@ static void R_Register( void )
 	r_rtxWorldPrimCap = ri.Cvar_Get( "r_rtxWorldPrimCap", "262144", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_rtxWorldPrimCap, "4096", "1048576", CV_INTEGER );
 	ri.Cvar_SetDescription( r_rtxWorldPrimCap, "Max triangles packed into the RTX world BLAS (latched). Lower on huge maps if BLAS build fails." );
+	r_rtxComposite = ri.Cvar_Get( "r_rtxComposite", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_rtxComposite, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_rtxComposite,
+		"When USE_VULKAN_RTX and \\r_rtxDemo 1: blend resolved **raster** HDR color into the RT demo output per pixel: "
+		"out = mix(rtHit, rasterColor, factor). **0** = RT colors only (legacy demo). **0.2–0.5** approximates hybrid paths (e.g. Quake II RTX-style grounding). Requires RT demo composite." );
+	ri.Cvar_SetGroup( r_rtxComposite, CVG_RENDERER );
 	r_forwardPlus = ri.Cvar_Get( "r_forwardPlus", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_forwardPlus, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_forwardPlus, "Forward+ scaffolding: GPU light SSBO + per-tile cull compute (16px tiles; max per tile from \\r_forwardPlusMaxPerTile, default 8). Packs at most MAX_DLIGHTS (32) so indices match tess.dlightBits. PBR: \\r_forwardPlusDebug (overlay), \\r_forwardPlusShade (experimental additive lights); see docs/RENDERER_2026_ARCHITECTURE_PASS.md." );

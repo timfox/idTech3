@@ -1962,11 +1962,15 @@ if(USE_IMGUI AND NOT APPLE)
   enable_language(CXX)
   set(IMGUI_SRCS
     src/renderers/vulkan/inspector/vk_imgui.cpp
+    src/renderers/vulkan/inspector/vk_imgui_vulkan.cpp
     ${EXTERNAL_SRC}/cimgui/imgui/imgui.cpp
     ${EXTERNAL_SRC}/cimgui/imgui/imgui_draw.cpp
     ${EXTERNAL_SRC}/cimgui/imgui/imgui_tables.cpp
     ${EXTERNAL_SRC}/cimgui/imgui/imgui_widgets.cpp
+    ${EXTERNAL_SRC}/cimgui/imgui/backends/imgui_impl_vulkan.cpp
   )
+  set_source_files_properties(${EXTERNAL_SRC}/cimgui/imgui/backends/imgui_impl_vulkan.cpp PROPERTIES
+    COMPILE_DEFINITIONS "VK_NO_PROTOTYPES")
   set(IMGUI_INCLUDE_DIRS
     ${EXTERNAL_SRC}/cimgui/imgui
     ${EXTERNAL_SRC}/cimgui/imgui/backends
@@ -1976,12 +1980,18 @@ if(USE_IMGUI AND NOT APPLE)
   if(USE_RENDERER_DLOPEN)
     target_sources(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${IMGUI_SRCS})
     target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${IMGUI_INCLUDE_DIRS})
-    target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_IMGUI)
+    target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_IMGUI USE_VULKAN)
+    if(USE_SDL AND TARGET SDL2::Core)
+      target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE SDL2::Core)
+    endif()
   else()
     if(USE_VULKAN)
       target_sources(${RENDERER_PREFIX}_vulkan PRIVATE ${IMGUI_SRCS})
       target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${IMGUI_INCLUDE_DIRS})
-      target_compile_definitions(${RENDERER_PREFIX}_vulkan PRIVATE USE_IMGUI)
+      target_compile_definitions(${RENDERER_PREFIX}_vulkan PRIVATE USE_IMGUI USE_VULKAN)
+      if(USE_SDL AND TARGET SDL2::Core)
+        target_link_libraries(${RENDERER_PREFIX}_vulkan PRIVATE SDL2::Core)
+      endif()
     endif()
   endif()
   message(STATUS "ImGui Inspector: enabled")
