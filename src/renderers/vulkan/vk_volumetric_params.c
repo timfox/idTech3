@@ -665,7 +665,12 @@ void vk_update_volumetric_params( void )
 	params.volumeCounts[0] = (float)local_volume_count;
 	params.volumeCounts[1] = (float)local_light_count;
 	params.volumeCounts[2] = vk.sun_shadow_valid ? 1.0f : 0.0f;
-	params.volumeCounts[3] = 0.0f;
+	{
+		int compMode = r_volumetricFogCompositeMode ? r_volumetricFogCompositeMode->integer : 0;
+		if ( compMode < 0 ) compMode = 0;
+		if ( compMode > 2 ) compMode = 2;
+		params.volumeCounts[3] = (float)compMode;
+	}
 	params.passParams[0] = 0.0f;
 	params.passParams[1] = (float)( ( vk.froxel_width + 1 ) / 2 );
 	params.passParams[2] = (float)( ( vk.froxel_height + 1 ) / 2 );
