@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `examples/demo_game`: `demo_lua.cfg`, `scripts/lua/demo_hooks.lua`, and `exec demo_lua.cfg` from `autoexec.cfg` (Lua demo when `USE_LUA=ON`); pk3 packs **both** `vm/ui<arch>.so` and `vm/ui.<arch>.so` aliases for native UI probe order.
 - Vulkan Forward+: **`r_forwardPlusLuminanceSort`** (0/1, archived, default **1**); push constant + **`forward_plus_tile_cull.comp`** partial selection by RGB sum when a tile exceeds **`r_forwardPlusMaxPerTile`**; **`compile_shaders.sh --apply`** updates SPIR-V blobs.
 - docs/CURL_NETWORKING.md: tutorial for client libcurl usage (build, `cl_dlURL` / `sv_dlURL`, `download`/`dlmap`, `DLF_*` flags, security, extending for MOTD/API/music).
+- Vulkan ImGui: `r_imgui` cvar (default 1) skips inspector CPU work when 0; startup log line in renderer init; client `toggle_imgui` command and **F11** hardcoded toggle when `USE_IMGUI` + Vulkan client build.
 - `examples/demo_game`: `idtech3_demo.pk3` embeds a minimal native UI module (`vm/ui<arch>.so` or `.dll`) so the demo skeleton can open a window without retail `ui.qvm` (`examples/demo_game/native/ui_skeleton_stub.c`, CMake target `demo_ui_skeleton`).
 - `examples/demo_skeleton/`: user-friendly demo playfield (`./scripts/run_demo.sh`, auto-detect layout, `baseq3` hint, help text); `scripts/run_demo.sh` entry point; `base/` + `idtech3_demo/` README stubs.
 - CTest `test_demo_game_pk3`: verifies `examples/demo_game` zip layout (configs + optional **`cc`**-built **`vm/ui*.so`**) matches CMake staging.
