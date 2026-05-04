@@ -1271,7 +1271,6 @@ static qboolean R_MirrorViewBySurface( const drawSurf_t *drawSurf, int entityNum
 		return qfalse;		// bad portal, no portalentity
 	}
 
-#ifdef USE_PMLIGHT
 	// create dedicated set for each view
 	if ( r_numdlights + oldParms.num_dlights <= ARRAY_LEN( backEndData->dlights ) ) {
 		int i;
@@ -1281,7 +1280,6 @@ static qboolean R_MirrorViewBySurface( const drawSurf_t *drawSurf, int entityNum
 		for ( i = 0; i < (int)oldParms.num_dlights; i++ )
 			newParms.dlights[i] = oldParms.dlights[i];
 	}
-#endif
 
 	if ( tess.numVertexes > 2 && r_fastsky->integer ) {
 		int mins[2], maxs[2];
@@ -1410,7 +1408,6 @@ static void R_RadixSort( drawSurf_t *source, int size )
 }
 
 
-#ifdef USE_PMLIGHT
 
 typedef struct litSurf_tape_s {
 	struct litSurf_s *first;
@@ -1552,7 +1549,6 @@ void R_DecomposeLitSort( unsigned sort, int *entityNum, shader_t **shader, int *
 	*entityNum = ( sort >> QSORT_REFENTITYNUM_SHIFT ) & REFENTITYNUM_MASK;
 }
 
-#endif // USE_PMLIGHT
 
 
 //==========================================================================================
@@ -1640,9 +1636,7 @@ static void R_SortDrawSurfs( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 		}
 	}
 
-#ifdef USE_PMLIGHT
 	if ( r_dlightMode->integer ) 
-#endif
 	{
 		dlight_t *dl;
 		// all the lit surfaces are in a single queue

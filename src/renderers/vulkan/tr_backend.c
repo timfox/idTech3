@@ -563,15 +563,6 @@ static void RB_BeginDrawingView( void ) {
 	{
 		clearBits |= GL_STENCIL_BUFFER_BIT;
 	}
-	if ( 0 && r_fastsky->integer && !( backEnd.refdef.rdflags & RDF_NOWORLDMODEL ) )
-	{
-		clearBits |= GL_COLOR_BUFFER_BIT;	/* Could clear only if sky shaders used */
-#ifdef _DEBUG
-		qglClearColor( 0.8f, 0.7f, 0.4f, 1.0f );	/* Debug: could sample sky color */
-#else
-		qglClearColor( 0.0f, 0.0f, 0.0f, 1.0f );	/* Could sample sky color */
-#endif
-	}
 	qglClear( clearBits );
 #endif
 
@@ -589,9 +580,7 @@ static void RB_BeginDrawingView( void ) {
 	backEnd.skyRenderedThisView = qfalse;
 }
 
-#ifdef USE_PMLIGHT
 static void RB_LightingPass( void );
-#endif
 
 /*
 ==================
@@ -610,9 +599,7 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 	int				i;
 	drawSurf_t		*drawSurf;
 	unsigned int	oldSort;
-#ifdef USE_PMLIGHT
 	float			oldShaderSort;
-#endif
 	double			originalTime; // -EC-
 
 	// save original time for entity shader offsets
@@ -627,9 +614,7 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 	wasCrosshair = qfalse;
 #endif
 	oldSort = MAX_UINT;
-#ifdef USE_PMLIGHT
 	oldShaderSort = -1;
-#endif
 	depthRange = qfalse;
 
 	backEnd.pc.c_surfaces += numDrawSurfs;
@@ -684,7 +669,6 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 			//if ( oldShader != NULL ) {
 				RB_EndSurface();
 			//}
-#ifdef USE_PMLIGHT
 			#define INSERT_POINT SS_FOG
 			if ( backEnd.refdef.numLitSurfs && oldShaderSort < INSERT_POINT && shader->sort >= INSERT_POINT ) {
 				//RB_BeginDrawingLitSurfs(); // no need, already setup in RB_BeginDrawingView()
@@ -702,7 +686,6 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 				oldEntityNum = -1; // force matrix setup
 			}
 			oldShaderSort = shader->sort;
-#endif
 			RB_BeginSurface( shader, fogNum );
 			oldShader = shader;
 		}
@@ -725,9 +708,7 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 				// set up the transformation matrix
 				R_RotateForEntity( backEnd.currentEntity, &backEnd.viewParms, &backEnd.or );
 				// set up the dynamic lighting if needed
-#ifdef USE_PMLIGHT
 				if ( !r_dlightMode->integer )
-#endif
 				if ( backEnd.currentEntity->needDlights ) {
 					R_TransformDlights( backEnd.refdef.num_dlights, backEnd.refdef.dlights, &backEnd.or );
 				}
@@ -742,9 +723,7 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 				backEnd.currentEntity = &tr.worldEntity;
 				backEnd.refdef.floatTime = originalTime;
 				backEnd.or = backEnd.viewParms.world;
-#ifdef USE_PMLIGHT
 				if ( !r_dlightMode->integer )
-#endif
 				R_TransformDlights( backEnd.refdef.num_dlights, backEnd.refdef.dlights, &backEnd.or );
 			}
 
@@ -869,7 +848,6 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 }
 
 
-#ifdef USE_PMLIGHT
 /*
 =================
 RB_BeginDrawingLitView
@@ -1106,7 +1084,6 @@ static void RB_RenderLitSurfList( dlight_t* dl ) {
 	}
 #endif // !USE_VULKAN
 }
-#endif // USE_PMLIGHT
 
 
 /*
@@ -1301,7 +1278,6 @@ static const void *RB_StretchPic( const void *data ) {
 }
 
 
-#ifdef USE_PMLIGHT
 static void RB_LightingPass( void )
 {
 	dlight_t	*dl;
@@ -1328,7 +1304,6 @@ static void RB_LightingPass( void )
 
 	backEnd.viewParms.num_dlights = 0;
 }
-#endif
 
 
 static void transform_to_eye_space( const vec3_t v, vec3_t v_eye )
@@ -1758,6 +1733,7 @@ static const void *RB_DrawSurfs( const void *data ) {
 	RB_BeginDrawingView();
 
 #ifdef USE_VULKAN
+	vk_forward_plus_upload_refdef();
 	vk_forward_plus_dispatch_tile_cull();
 #endif
 
@@ -1795,22 +1771,16 @@ static const void *RB_DrawSurfs( const void *data ) {
 	VBO_UnBind();
 #endif
 
-	if ( 0 && r_drawSun->integer ) { /* sun drawing disabled */
-		RB_DrawSun( 0.1f, tr.sunShader );
-	}
-
 	// darken down any stencil shadows
 	RB_ShadowFinish();
 
 	// add light flares on lights that aren't obscured
 	RB_RenderFlares();
 
-#ifdef USE_PMLIGHT
 	if ( backEnd.refdef.numLitSurfs ) {
 		RB_BeginDrawingLitSurfs();
 		RB_LightingPass();
 	}
-#endif
 
 	// draw main system development information (surface outlines, etc)
 	RB_DebugGraphics();

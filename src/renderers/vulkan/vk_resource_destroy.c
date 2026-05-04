@@ -139,6 +139,27 @@ void vk_destroy_render_passes( void )
 	}
 }
 
+void vk_destroy_world_graphics_pipelines( void )
+{
+	uint32_t i, j;
+
+	if ( vk.device == VK_NULL_HANDLE || vk.pipelines_count <= (uint32_t)vk.pipelines_world_base ) {
+		return;
+	}
+	/* Only destroy GPU objects. Keep vk.pipelines[i].def and do not shrink pipelines_count:
+	 * shaders cache uint32_t pipeline indices in shader_t::vk_pipeline; shrinking the table
+	 * would make those indices point at wrong or empty rows (black/corrupt draws or ERR_FATAL). */
+	for ( i = (uint32_t)vk.pipelines_world_base; i < vk.pipelines_count; i++ ) {
+		for ( j = 0; j < RENDER_PASS_COUNT; j++ ) {
+			if ( vk.pipelines[i].handle[j] != VK_NULL_HANDLE ) {
+				qvkDestroyPipeline( vk.device, vk.pipelines[i].handle[j], NULL );
+				vk.pipelines[i].handle[j] = VK_NULL_HANDLE;
+				vk.pipeline_create_count--;
+			}
+		}
+	}
+}
+
 void vk_destroy_pipelines( qboolean resetCounter )
 {
 	uint32_t i, j;

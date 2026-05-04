@@ -75,6 +75,9 @@ cvar_t	*r_firstPersonScaleEnabled;
 cvar_t	*r_firstPersonZNear;
 
 cvar_t	*r_skipBackEnd;
+#ifdef USE_IMGUI
+cvar_t	*r_imgui;
+#endif
 
 //cvar_t	*r_anaglyphMode;
 
@@ -90,13 +93,10 @@ cvar_t  *r_teleporterFlash;
 
 cvar_t	*r_fastsky;
 cvar_t	*r_neatsky;
-cvar_t	*r_drawSun;
 cvar_t	*r_dynamiclight;
-#ifdef USE_PMLIGHT
 cvar_t	*r_dlightMode;
 cvar_t	*r_dlightScale;
 cvar_t	*r_dlightIntensity;
-#endif
 cvar_t	*r_dlightSaturation;
 #ifdef USE_VULKAN
 cvar_t	*r_device;
@@ -143,10 +143,8 @@ cvar_t  *r_baseSpecular;
 #ifdef VK_CUBEMAP
 cvar_t	*r_cubeMapping;
 #endif
-#ifdef HDR_DELUXE_LIGHTMAP
 cvar_t	*r_deluxeMapping;
 cvar_t	*r_deluxeSpecular;
-#endif
 #endif
 cvar_t   *r_vk_pipeline_debug;
 cvar_t	*r_vk_colorWriteMaskDynamic;
@@ -161,7 +159,6 @@ cvar_t	*r_morphBreathAmp;
 cvar_t	*r_morphBreathFreq;
 cvar_t	*r_gltfAnim;
 cvar_t	*r_gltfGpu;
-cvar_t	*r_gltfGpuTangentFix;
 cvar_t	*r_fbo;
 cvar_t	*r_renderMode;
 cvar_t	*r_hdr;
@@ -203,10 +200,12 @@ cvar_t	*r_taa_sharpen;
 cvar_t	*r_rtx;
 cvar_t	*r_rtxDemo;
 cvar_t	*r_rtxWorldPrimCap;
+cvar_t	*r_rtxComposite;
 cvar_t	*r_forwardPlus;
 cvar_t	*r_forwardPlusMaxPerTile;
 cvar_t	*r_forwardPlusDebug;
 cvar_t	*r_forwardPlusShade;
+cvar_t	*r_forwardPlusLuminanceSort;
 
 #endif // USE_VULKAN
 
@@ -393,6 +392,9 @@ cvar_t	*r_debugSurface;
 cvar_t	*r_simpleMipMaps;
 
 cvar_t	*r_showImages;
+#ifdef USE_IMGUI
+cvar_t	*r_imgui;
+#endif
 cvar_t	*r_defaultImage;
 
 cvar_t	*r_ambientScale;
@@ -2325,12 +2327,10 @@ static void R_Register( void )
 
 	r_cubeMapping = ri.Cvar_Get( "r_cubeMapping", "0", CVAR_ARCHIVE | CVAR_LATCH );
 #endif
-	#ifdef HDR_DELUXE_LIGHTMAP
 	r_deluxeMapping		= ri.Cvar_Get("r_deluxeMapping",	"1", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_deluxeMapping, "Reading deluxemaps when compiled with q3map2:\n 0: off (approximated from lightgrid)\n 1: on (compiled deluxemaps)" );
 	r_deluxeSpecular	= ri.Cvar_Get("r_deluxeSpecular",	"1", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_deluxeSpecular, "Scale the specular response from deluxemaps" );
-#endif
 #endif
 	r_mapGreyScale = ri.Cvar_Get( "r_mapGreyScale", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_mapGreyScale, "-1", "1", CV_FLOAT );
@@ -2407,12 +2407,6 @@ static void R_Register( void )
 		"Vulkan PBR: GPU vertex skinning and morph for glTF (joint matrix SSBO + morph deltas; top-8 morph weights per draw, incl. RE_SetEntityMorphWeight). Falls back to CPU tess when off or constraints fail." );
 	ri.Cvar_SetGroup( r_gltfGpu, CVG_RENDERER );
 
-	r_gltfGpuTangentFix = ri.Cvar_Get( "r_gltfGpuTangentFix", "1", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_gltfGpuTangentFix, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_gltfGpuTangentFix,
-		"Vulkan PBR glTF GPU path: re-orthonormalize tangent (Gram–Schmidt) after joint skin + morph so T matches deformed N (0=bind-pose qtangent only, legacy)." );
-	ri.Cvar_SetGroup( r_gltfGpuTangentFix, CVG_RENDERER );
-
 	r_flares = ri.Cvar_Get ("r_flares", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_flares, "Enables corona effects on light sources." );
 	r_znear = ri.Cvar_Get( "r_znear", "8", CVAR_CHEAT );
@@ -2448,11 +2442,8 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_teleporterFlash, "Show a white screen instead of a black screen when being teleported in hyperspace." );
 	r_fastsky = ri.Cvar_Get( "r_fastsky", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_fastsky, "Draw flat colored skies." );
-	r_drawSun = ri.Cvar_Get( "r_drawSun", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_SetDescription( r_drawSun, "Draw sun shader in skies." );
 	r_dynamiclight = ri.Cvar_Get( "r_dynamiclight", "1", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_dynamiclight, "Enables dynamic lighting." );
-#ifdef USE_PMLIGHT
 #if arm32 || arm64 // RPi4 Vulkan driver have very poor GLSL shaders performance...
 	r_dlightMode = ri.Cvar_Get( "r_dlightMode", "0", CVAR_ARCHIVE );
 #else
@@ -2466,7 +2457,6 @@ static void R_Register( void )
 	r_dlightIntensity = ri.Cvar_Get( "r_dlightIntensity", "1.0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_dlightIntensity, "0.1", "1", CV_FLOAT );
 	ri.Cvar_SetDescription( r_dlightIntensity, "Adjusts dynamic light intensity but not radius." );
-#endif // USE_PMLIGHT
 
 	r_dlightSaturation = ri.Cvar_Get( "r_dlightSaturation", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_dlightSaturation, "0", "1", CV_FLOAT );
@@ -2589,6 +2579,16 @@ static void R_Register( void )
 	//
 	r_showImages = ri.Cvar_Get( "r_showImages", "0", CVAR_TEMP );
 	ri.Cvar_SetDescription( r_showImages, "Draw all images currently loaded into memory:\n 0: Disabled\n 1: Show images set to uniform size\n 2: Show images with scaled relative to largest image" );
+#ifdef USE_IMGUI
+	r_imgui = ri.Cvar_Get( "r_imgui", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_imgui, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_imgui,
+		"Draw Dear ImGui debug inspector overlay (Vulkan): dockspace, PostFX/physics/volumetrics panels. "
+		"Requires USE_IMGUI build. Set 0 during gameplay if mouse capture conflicts with look." );
+	if ( r_imgui && r_imgui->integer ) {
+		ri.Printf( PRINT_ALL, "ImGui inspector overlay: r_imgui 1 (toggle with r_imgui 0)\n" );
+	}
+#endif
 
 	r_debugLight = ri.Cvar_Get( "r_debuglight", "0", CVAR_TEMP );
 	ri.Cvar_SetDescription( r_debugLight, "Debugging tool to print ambient and directed lighting information." );
@@ -2642,6 +2642,15 @@ static void R_Register( void )
 
 	r_skipBackEnd = ri.Cvar_Get ("r_skipBackEnd", "0", CVAR_CHEAT);
 	ri.Cvar_SetDescription( r_skipBackEnd, "Skips loading rendering backend." );
+
+#ifdef USE_IMGUI
+	r_imgui = ri.Cvar_Get( "r_imgui", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_imgui,
+		"Vulkan ImGui debug inspector overlay (0=off, 1=on). Toggle at runtime with F11 when enabled." );
+	ri.Cvar_CheckRange( r_imgui, "0", "1", CV_INTEGER );
+	ri.Printf( PRINT_ALL, "[VK][imgui] debug inspector r_imgui=%d (F11 toggles when enabled)\n",
+		r_imgui->integer );
+#endif
 
 	r_lodscale = ri.Cvar_Get( "r_lodscale", "5", CVAR_CHEAT );
 	ri.Cvar_SetDescription( r_lodscale, "Set scale for level of detail adjustment." );
@@ -3483,9 +3492,15 @@ static void R_Register( void )
 	r_rtxWorldPrimCap = ri.Cvar_Get( "r_rtxWorldPrimCap", "262144", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_rtxWorldPrimCap, "4096", "1048576", CV_INTEGER );
 	ri.Cvar_SetDescription( r_rtxWorldPrimCap, "Max triangles packed into the RTX world BLAS (latched). Lower on huge maps if BLAS build fails." );
-	r_forwardPlus = ri.Cvar_Get( "r_forwardPlus", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	r_rtxComposite = ri.Cvar_Get( "r_rtxComposite", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_rtxComposite, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_rtxComposite,
+		"When USE_VULKAN_RTX and \\r_rtxDemo 1: blend resolved **raster** HDR color into the RT demo output per pixel: "
+		"out = mix(rtHit, rasterColor, factor). **0** = RT colors only (legacy demo). **0.2–0.5** approximates hybrid paths (e.g. Quake II RTX-style grounding). Requires RT demo composite." );
+	ri.Cvar_SetGroup( r_rtxComposite, CVG_RENDERER );
+	r_forwardPlus = ri.Cvar_Get( "r_forwardPlus", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_forwardPlus, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_forwardPlus, "Forward+ scaffolding: GPU light SSBO + per-tile cull compute (16px tiles; max per tile from \\r_forwardPlusMaxPerTile, default 8). Packs at most MAX_DLIGHTS (32) so indices match tess.dlightBits. PBR: \\r_forwardPlusDebug (overlay), \\r_forwardPlusShade (experimental additive lights); see docs/RENDERER_2026_ARCHITECTURE_PASS.md." );
+	ri.Cvar_SetDescription( r_forwardPlus, "Forward+ (default 1 on Vulkan): device-local light SSBO + per-tile cull compute (16px tiles; max from \\r_forwardPlusMaxPerTile, default 8). Packs at most MAX_DLIGHTS (32) for tess.dlightBits. PBR: \\r_forwardPlusDebug, \\r_forwardPlusShade. Set 0 to disable (vid_restart). See docs/RENDERER_2026_ARCHITECTURE_PASS.md." );
 	ri.Cvar_SetGroup( r_forwardPlus, CVG_RENDERER );
 	r_forwardPlusMaxPerTile = ri.Cvar_Get( "r_forwardPlusMaxPerTile", "8", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	{
@@ -3505,6 +3520,11 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_forwardPlusShade, "0", "4", CV_FLOAT );
 	ri.Cvar_SetDescription( r_forwardPlusShade, "PBR Forward+ diffuse+spec from tile-culled dynamic lights (0=off). Skips packed indices in \\r_forwardPlus tess.dlightBits mask (first 32). Primary direct is softly scaled vs Forward+ energy. Works with deluxe/lightmap; rebuilds pipelines when changed. Requires \\r_forwardPlus 1." );
 	ri.Cvar_SetGroup( r_forwardPlusShade, CVG_RENDERER );
+	r_forwardPlusLuminanceSort = ri.Cvar_Get( "r_forwardPlusLuminanceSort", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_forwardPlusLuminanceSort, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_forwardPlusLuminanceSort,
+		"When 1 and a tile has more overlapping lights than \\r_forwardPlusMaxPerTile, the compute pass keeps the brightest by RGB sum (approximate importance). When 0, first light index order wins (legacy). Requires \\r_forwardPlus 1 (no vid_restart)." );
+	ri.Cvar_SetGroup( r_forwardPlusLuminanceSort, CVG_RENDERER );
 	r_ext_alpha_to_coverage = ri.Cvar_Get( "r_ext_alpha_to_coverage", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_alpha_to_coverage, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ext_alpha_to_coverage, "Alpha-to-coverage for alpha-tested surfaces (foliage, grates) when MSAA is on. Enabled by default for Vulkan MSAA paths. Requires \\r_fbo 1 and \\r_ext_multisample 2+." );
@@ -3610,8 +3630,6 @@ void R_Init( void ) {
 		r_gltfAnim ? r_gltfAnim->value : 1.0f );
 	ri.Printf( PRINT_ALL, "[VK][gltf] GPU skin/morph path: %s (r_gltfGpu)\n",
 		( r_gltfGpu && r_gltfGpu->integer ) ? "on" : "off" );
-	ri.Printf( PRINT_ALL, "[VK][gltf] GPU tangent Gram–Schmidt after skin+morph: %s (r_gltfGpuTangentFix)\n",
-		( r_gltfGpuTangentFix && r_gltfGpuTangentFix->integer ) ? "on" : "off" );
 
 
 	max_polys = r_maxpolys ? r_maxpolys->integer : MAX_POLYS;
