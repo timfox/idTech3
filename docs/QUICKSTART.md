@@ -81,7 +81,7 @@ The default renderer is Vulkan. To use OpenGL instead:
 
 **PBR (Physically Based Rendering)** is on by default when using Vulkan with FBO. Ensure `r_fbo 1` (default) and `r_pbr 1` (default). If PBR is disabled at startup, the console will show why (e.g. "requires r_fbo 1"). Use `vid_restart` after changing these.
 
-**Optional Forward+ scaffolding (Vulkan, advanced):** `r_forwardPlus 1` (default **0**, **latched**; `vid_restart` to toggle) enables GPU light records + per-tile compute cull and optional PBR debug/shade cvars—see [RENDERERS.md](RENDERERS.md#vulkan-forward-scaffolding) and the pipeline audit [FORWARD_PLUS_PIPELINE_AUDIT.md](FORWARD_PLUS_PIPELINE_AUDIT.md).
+**Optional Forward+ scaffolding (Vulkan, advanced):** `r_forwardPlus 1` (default **0**, **latched**; `vid_restart` to toggle) enables GPU light records + per-tile compute cull and optional PBR debug/shade cvars—see [RENDERERS.md](RENDERERS.md#vulkan-forward-scaffolding) and the pipeline audit [FORWARD_PLUS_PIPELINE_AUDIT.md](FORWARD_PLUS_PIPELINE_AUDIT.md). When many lights overlap a tile, **`r_forwardPlusLuminanceSort`** (**default 1**) keeps the brightest by RGB sum up to **`r_forwardPlusMaxPerTile`**.
 
 ## Steam Deck
 
