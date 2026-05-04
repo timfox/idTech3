@@ -2419,7 +2419,28 @@ add_test(NAME test_compile_engine_lto
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_compile_engine_lto.sh ${CMAKE_SOURCE_DIR}/scripts/compile_engine.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_compile_engine_lto PROPERTIES
+	LABELS "unit;scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_compile_engine_lto.sh")
+
+add_test(NAME test_vk_vegetation_dispatch_order
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_vk_vegetation_dispatch_order.sh
+		${CMAKE_SOURCE_DIR}/src/renderers/vulkan/tr_shade.c
+		${CMAKE_SOURCE_DIR}/src/renderers/vulkan/vk_frame_submit.c
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_vk_vegetation_dispatch_order PROPERTIES
 	LABELS "unit;scripts;validation")
+
+add_test(NAME test_vulkan_mesh_shader_opt_in
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_vulkan_mesh_shader_opt_in.sh ${CMAKE_SOURCE_DIR}
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_vulkan_mesh_shader_opt_in PROPERTIES
+	LABELS "unit;scripts;validation")
+
+add_test(NAME test_vulkan_runtime_regressions
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_vulkan_runtime_regressions.sh ${CMAKE_SOURCE_DIR}
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_vulkan_runtime_regressions PROPERTIES
+	LABELS "unit;scripts;validation;renderer")
 
 add_test(NAME test_botlib_chat_message_bounds
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_botlib_chat_message_bounds.sh
@@ -2428,7 +2449,6 @@ add_test(NAME test_botlib_chat_message_bounds
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_botlib_chat_message_bounds PROPERTIES
 	LABELS "unit;scripts;validation")
-
 # --- Unit tests ---
 option(BUILD_UNIT_TESTS "Build unit tests" ON)
 if(BUILD_UNIT_TESTS)
