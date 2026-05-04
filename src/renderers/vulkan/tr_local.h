@@ -23,8 +23,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef TR_LOCAL_H
 #define TR_LOCAL_H
 
-#define HDR_DELUXE_LIGHTMAP
-
 #define USE_VK_PBR
 #ifdef USE_VK_PBR
 	#define VK_PBR_BRDFLUT		// for inspecting codebase, does not toggle brdflut. 
@@ -1380,10 +1378,8 @@ typedef struct {
 	int						numLightmaps;
 	image_t					**lightmaps;
 
-#ifdef HDR_DELUXE_LIGHTMAP
 	image_t					**deluxemaps;
 	qboolean				worldDeluxeMapping;
-#endif
 
 	qboolean				mergeLightmaps;
 	float					lightmapOffset[2];	// current shader lightmap offset
@@ -1545,10 +1541,8 @@ extern cvar_t	*r_baseSpecular;
 #ifdef VK_CUBEMAP
 extern cvar_t	*r_cubeMapping;
 #endif
-#ifdef HDR_DELUXE_LIGHTMAP
 extern cvar_t	*r_deluxeMapping;
 extern cvar_t	*r_deluxeSpecular;
-#endif
 #endif
 extern cvar_t	*r_ssao;
 extern cvar_t	*r_ssaoMethod;
