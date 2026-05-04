@@ -12,6 +12,8 @@ sudo apt-get install cmake ninja-build pkg-config \
   libstdc++-14-dev
 ```
 
+**HTTP downloads (libcurl):** the client uses libcurl for HTTPS/FTP map and pak mirrors when enabled at build time. See **[CURL_NETWORKING.md](CURL_NETWORKING.md)** for `cl_dlURL`, `sv_dlURL`, `download` / `dlmap`, and security notes.
+
 ### Compiler Requirements
 - **Clang 18+** (recommended) or **GCC 15+**
 - C23 support required (falls back to C17 if unavailable)

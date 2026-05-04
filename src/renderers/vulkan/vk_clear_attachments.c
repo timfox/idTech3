@@ -63,11 +63,7 @@ void vk_clear_depth( qboolean clear_stencil )
 		return;
 
 	attachment.colorAttachment = 0;
-#ifdef USE_REVERSED_DEPTH
 	attachment.clearValue.depthStencil.depth = 0.0f;
-#else
-	attachment.clearValue.depthStencil.depth = 1.0f;
-#endif
 	attachment.clearValue.depthStencil.stencil = 0;
 	if ( clear_stencil && glConfig.stencilBits > 0 ) {
 		attachment.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;

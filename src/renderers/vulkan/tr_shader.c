@@ -666,15 +666,12 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 					stage->bundle[0].image[0] = tr.whiteImage;
 				} else {
 					stage->bundle[0].image[0] = tr.lightmaps[shader.lightmapIndex];
-#ifdef HDR_DELUXE_LIGHTMAP
 					if ( r_deluxeMapping->integer && tr.worldDeluxeMapping && tr.deluxemaps != NULL &&
 						shader.lightmapIndex < tr.numLightmaps )
 						stage->bundle[0].deluxeMap = tr.deluxemaps[shader.lightmapIndex];
-#endif
 				}
 				continue;
 			}
-#ifdef HDR_DELUXE_LIGHTMAP
 			else if (!Q_stricmp(token, "$deluxemap"))
 			{
 				if ( !tr.worldDeluxeMapping )
@@ -694,7 +691,6 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 				}
 				continue;
 			}
-#endif
 			else if ( Q_stricmpn( token, "*lightmap", 9 ) == 0 && token[9] >= '0' && token[9] <= '9' )
 			{
 				const int lightmapIndex = atoi( token + 9 );
@@ -3213,7 +3209,6 @@ static int CollapseMultitexture( unsigned int st0bits, shaderStage_t *st0, shade
 }
 
 
-#ifdef USE_PMLIGHT
 
 static int tcmodWeight2( const shaderStage_t* st )
 {
@@ -3388,7 +3383,6 @@ static void FindLightingBundle( void )
 		}
 	}
 }
-#endif // USE_PMLIGHT
 
 
 /*
@@ -3877,10 +3871,8 @@ static void InitShader( const char *name, int lightmapIndex ) {
 		stages[i].bundle[0].texMods = texMods[i];
 	}
 
-#ifdef USE_PMLIGHT
 	shader.lightingBundle = 0;
 	shader.lightingStage = -1;
-#endif
 }
 
 
@@ -4119,9 +4111,7 @@ static shader_t *FinishShader( void ) {
 	if ( stage > 1 && stages[0].bundle[0].image[0] == tr.whiteImage && stages[0].bundle[0].numImageAnimations <= 1 && stages[0].bundle[0].rgbGen == CGEN_IDENTITY && stages[0].bundle[0].alphaGen == AGEN_SKIP ) {
 		if ( stages[1].stateBits == ( GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ZERO ) ) {
 			stages[1].stateBits = stages[0].stateBits & ( GLS_DEPTHMASK_TRUE | GLS_DEPTHTEST_DISABLE | GLS_DEPTHFUNC_EQUAL );
-#ifdef USE_PMLIGHT
 			stages[1].bundle[0].dlight |= stages[0].bundle[0].dlight;
-#endif
 			memmove( &stages[0], &stages[1], sizeof( stages[0] ) * ( stage - 1 ) );
 			stages[stage - 1].active = qfalse;
 			stage--;
@@ -4157,9 +4147,7 @@ static shader_t *FinishShader( void ) {
 		stages[ i ].numTexBundles = 1;
 	}
 
-#ifdef USE_PMLIGHT
 	FindLightingStage( stage );
-#endif
 
 	//
 	// look for multitexture potential
@@ -4471,7 +4459,6 @@ static shader_t *FinishShader( void ) {
 					def.lightmap_bundle = lightmapBundle;
 				}
 
-#ifdef HDR_DELUXE_LIGHTMAP
 				if ( def.vk_pbr_flags & PBR_HAS_LIGHTMAP )
 				{
 					// aparently lightmap is not always in bundle 1 ..
@@ -4483,7 +4470,6 @@ static shader_t *FinishShader( void ) {
 					else if ( pStage->bundle[1].deluxeMap )	
 						def.vk_pbr_flags |= PBR_HAS_DELUXEMAP1;
 				}
-#endif
 				// move this to ubo ..
 				Vector4Copy( pStage->specularScale, def.specularScale );
 				Vector4Copy( pStage->normalScale, def.normalScale );
@@ -4500,7 +4486,6 @@ static shader_t *FinishShader( void ) {
 			if ( pStage->vk_pbr_flags ) {
 				Vk_Pipeline_Def gltfDef = def;
 				gltfDef.pbr_vert_mode = 1;
-				gltfDef.gltf_gpu_tangent_fixup = ( r_gltfGpuTangentFix && r_gltfGpuTangentFix->integer ) ? 1 : 0;
 				gltfDef.mirror = qfalse;
 				pStage->vk_pipeline_gltf_gpu[0] = vk_find_pipeline_ext( 0, &gltfDef, qtrue );
 				gltfDef.mirror = qtrue;
@@ -4543,8 +4528,6 @@ static shader_t *FinishShader( void ) {
 				if ( pStage->vk_pbr_flags ) {
 					fog_def.pbr_vert_mode = 1;
 					fog_def_mirror.pbr_vert_mode = 1;
-					fog_def.gltf_gpu_tangent_fixup = ( r_gltfGpuTangentFix && r_gltfGpuTangentFix->integer ) ? 1 : 0;
-					fog_def_mirror.gltf_gpu_tangent_fixup = fog_def.gltf_gpu_tangent_fixup;
 					pStage->vk_pipeline_gltf_gpu[1] = vk_find_pipeline_ext( 0, &fog_def, qfalse );
 					pStage->vk_mirror_pipeline_gltf_gpu[1] = vk_find_pipeline_ext( 0, &fog_def_mirror, qfalse );
 				} else {
@@ -4562,9 +4545,7 @@ static shader_t *FinishShader( void ) {
 	}
 #endif // USE_VULKAN
 
-#ifdef USE_PMLIGHT
 	FindLightingBundle();
-#endif
 
 #if 1
 	// try to avoid redundant per-stage computations
@@ -4734,11 +4715,9 @@ static void R_CreateDefaultShading( image_t *image ) {
 			stages[0].bundle[0].image[0] = tr.lightmaps[shader.lightmapIndex];
 		}
 		stages[0].bundle[0].lightmap = LIGHTMAP_INDEX_SHADER;
-#ifdef HDR_DELUXE_LIGHTMAP
 		if ( r_deluxeMapping->integer && tr.worldDeluxeMapping && tr.deluxemaps != NULL &&
 			shader.lightmapIndex >= 0 && shader.lightmapIndex < tr.numLightmaps )
 			stages[0].bundle[0].deluxeMap = tr.deluxemaps[shader.lightmapIndex];
-#endif
 		stages[0].active = qtrue;
 		stages[0].bundle[0].tcGen = TCGEN_LIGHTMAP;
 		stages[0].bundle[0].rgbGen = CGEN_IDENTITY;	// lightmaps are scaled on creation
@@ -5267,13 +5246,7 @@ static void ScanAndLoadShaderFiles( void )
 	// scan for legacy shader files
 	shaderFiles = ri.FS_ListFiles( "scripts", ".shader", &numShaderFiles );
 
-	if ( 1 ) {
-		// if ARB shaders available - scan for extended shader files
-		shaderxFiles = ri.FS_ListFiles( "scripts", ".shaderx", &numShaderxFiles );
-	} else {
-		shaderxFiles = NULL;
-		numShaderxFiles = 0;
-	}
+	shaderxFiles = ri.FS_ListFiles( "scripts", ".shaderx", &numShaderxFiles );
 
 	if ( (!shaderFiles || !numShaderFiles) && (!shaderxFiles || !numShaderxFiles) ) {
 		ri.Printf( PRINT_WARNING, "WARNING: no shader files found\n" );
@@ -5433,8 +5406,6 @@ static void CreateExternalShaders( void ) {
 			tr.flareShader->stages[index]->stateBits |= GLS_DEPTHTEST_DISABLE;
 		}
 	}
-
-	tr.sunShader = R_FindShader( "sun", LIGHTMAP_NONE, qtrue );
 }
 
 

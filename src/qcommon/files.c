@@ -314,6 +314,7 @@ static  const char  *basegame = ""; /* last value in array */
 static	char		fs_gamedir[MAX_OSPATH];	// this will be a single file name with no separators
 static	cvar_t		*fs_debug;
 static	cvar_t		*com_nativeLibraryDebug;
+static	cvar_t		*com_nativeLibraryExtractPk3;
 static	cvar_t		*fs_homepath;
 
 #ifdef __APPLE__
@@ -4845,6 +4846,12 @@ static void FS_Startup( void ) {
 	if ( com_nativeLibraryDebug->integer ) {
 		Com_Printf( S_COLOR_CYAN "com_nativeLibraryDebug: logging failed native library load paths + loader errors.\n" );
 	}
+	com_nativeLibraryExtractPk3 = Cvar_Get( "com_nativeLibraryExtractPk3", "1", CVAR_ARCHIVE );
+	Cvar_SetDescription( com_nativeLibraryExtractPk3,
+		"When 1, native .so/.dll modules referenced only from .pk3 are extracted to vm/native_cache/ under fs_homepath/fs_game before dlopen/LoadLibrary. Disable for debugging or locked-down environments." );
+	if ( com_nativeLibraryExtractPk3->integer ) {
+		Com_Printf( "com_nativeLibraryExtractPk3: extracting embedded native libs from pk3 is enabled.\n" );
+	}
 	fs_copyfiles = Cvar_Get( "fs_copyfiles", "0", CVAR_INIT );
 	Cvar_SetDescription( fs_copyfiles, "Whether or not to copy files when loading them into the game. Every file found in the cdpath will be copied over." );
 	fs_basepath = Cvar_Get( "fs_basepath", Sys_DefaultBasePath(), CVAR_INIT | CVAR_PROTECTED | CVAR_PRIVATE );
@@ -6027,6 +6034,142 @@ static void *FS_TryLoadLibraryPath( const char *path )
 
 /*
 =================
+FS_TryLoadLibraryFromPk3Cache
+
+Operating systems cannot dlopen/LoadLibrary directly from a zip-backed fd; native modules
+inside .pk3 must be extracted to the homepath games dir first. Cache path:
+  <fs_homepath>/<fs_gamedir>/vm/native_cache/<basename>
+
+Returns handle or NULL.
+=================
+*/
+#define FS_NATIVE_LIB_CACHE_PREFIX "vm/native_cache/"
+
+static void *FS_TryLoadLibraryFromPk3Cache( const char *name ) {
+	char			cacheQpath[MAX_OSPATH];
+	char			osCachePath[MAX_OSPATH];
+	void			*fileBuf = NULL;
+	void			*diskBuf = NULL;
+	int				len;
+	unsigned int	crcDisk;
+	unsigned int	crcPak;
+	void			*h;
+	const char		*base;
+	const char		*slash;
+	FILE			*fp;
+	long			readLen;
+
+	if ( !com_nativeLibraryExtractPk3 || !com_nativeLibraryExtractPk3->integer ) {
+		return NULL;
+	}
+
+	if ( !name || !name[0] ) {
+		return NULL;
+	}
+
+	base = name;
+	slash = strrchr( name, '/' );
+	if ( slash ) {
+		base = slash + 1;
+	}
+
+#if defined( _WIN32 )
+	if ( !strstr( base, ".dll" ) ) {
+		return NULL;
+	}
+#else
+	if ( strlen( base ) < 4 || Q_stricmp( base + strlen( base ) - 3, ".so" ) != 0 ) {
+		return NULL;
+	}
+#endif
+
+	Com_sprintf( cacheQpath, sizeof( cacheQpath ), "%s%s", FS_NATIVE_LIB_CACHE_PREFIX, base );
+
+	len = FS_ReadFile( name, &fileBuf );
+	if ( len <= 0 || !fileBuf ) {
+		char alt[MAX_QPATH];
+
+		if ( slash ) {
+			return NULL;
+		}
+		Com_sprintf( alt, sizeof( alt ), "vm/%s", name );
+		len = FS_ReadFile( alt, &fileBuf );
+		if ( len <= 0 || !fileBuf ) {
+			Com_sprintf( alt, sizeof( alt ), "modules/%s", name );
+			len = FS_ReadFile( alt, &fileBuf );
+			if ( len <= 0 || !fileBuf ) {
+				return NULL;
+			}
+		}
+	}
+
+	crcPak = crc32_buffer( (const byte *)fileBuf, (unsigned int)len );
+
+	Q_strncpyz( osCachePath, FS_BuildOSPath( fs_homepath->string, fs_gamedir, cacheQpath ), sizeof( osCachePath ) );
+
+	fp = Sys_FOpen( osCachePath, "rb" );
+	if ( fp ) {
+		if ( fseek( fp, 0, SEEK_END ) == 0 ) {
+			readLen = ftell( fp );
+			if ( readLen > 0 && readLen == len ) {
+				rewind( fp );
+				diskBuf = Z_Malloc( (int)readLen );
+				if ( diskBuf && fread( diskBuf, 1, (size_t)readLen, fp ) == (size_t)readLen ) {
+					crcDisk = crc32_buffer( (const byte *)diskBuf, (unsigned int)readLen );
+				} else {
+					crcDisk = 0;
+				}
+				if ( diskBuf ) {
+					Z_Free( diskBuf );
+				}
+			} else {
+				crcDisk = 0;
+			}
+		} else {
+			crcDisk = 0;
+		}
+		fclose( fp );
+		if ( crcDisk == crcPak ) {
+			FS_FreeFile( fileBuf );
+			h = FS_TryLoadLibraryPath( osCachePath );
+			if ( h ) {
+				if ( Com_LogVerbosity() >= 1 ) {
+					Com_Printf( "FS_LoadLibrary: using pk3 native cache %s\n", cacheQpath );
+				}
+				return h;
+			}
+			return NULL;
+		}
+	}
+
+	/* FS_FOpenFileWrite rejects .so paths; write cache file directly (see FS_CheckFilenameIsNotAllowed). */
+	if ( FS_CreatePath( osCachePath ) ) {
+		FS_FreeFile( fileBuf );
+		return NULL;
+	} else {
+		FILE *out = Sys_FOpen( osCachePath, "wb" );
+		if ( !out || fwrite( fileBuf, 1, (size_t)len, out ) != (size_t)len ) {
+			if ( out ) {
+				fclose( out );
+			}
+			FS_FreeFile( fileBuf );
+			Com_Printf( S_COLOR_YELLOW "FS_LoadLibrary: failed to write pk3 native cache %s\n", osCachePath );
+			return NULL;
+		}
+		fclose( out );
+	}
+	FS_FreeFile( fileBuf );
+
+	h = FS_TryLoadLibraryPath( osCachePath );
+	if ( h && Com_LogVerbosity() >= 1 ) {
+		Com_Printf( "FS_LoadLibrary: extracted pk3 native lib to %s\n", cacheQpath );
+	}
+	return h;
+}
+
+
+/*
+=================
 FS_LoadLibrary
 
 Tries to load libraries within known searchpaths
@@ -6040,6 +6183,11 @@ void *FS_LoadLibrary( const char *name )
 	char dottedName[MAX_QPATH];
 	int nameLen = strlen(name);
 	qboolean dottedNative = qfalse;
+
+	libHandle = FS_TryLoadLibraryFromPk3Cache( name );
+	if ( libHandle ) {
+		return libHandle;
+	}
 
 #ifdef _WIN32
 	if ( nameLen > 8 && nameLen < MAX_QPATH - 1 &&
