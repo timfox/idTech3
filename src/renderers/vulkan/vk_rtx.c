@@ -23,6 +23,7 @@ typedef struct {
 	float invViewProj[16];
 	float viewOrigin[4];
 	float zNearFar[4];
+	/* xy = RT output resolution (pixels); z = latched r_rtx mode 0-3 for demo hit tint; w unused */
 	float outputSize[4];
 } VkRtxFrameUBO_t;
 
@@ -642,7 +643,7 @@ void vk_rtx_init( void )
 	bindings[2].binding = 2;
 	bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	bindings[2].descriptorCount = 1;
-	bindings[2].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+	bindings[2].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 	bindings[3].binding = 3;
 	bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	bindings[3].descriptorCount = 1;
@@ -809,7 +810,7 @@ void vk_rtx_init( void )
 	qvkUnmapMemory( vk.device, rtx.sbt_memory );
 
 	rtx.ready = qtrue;
-	ri.Printf( PRINT_ALL, "[VK][RTX] RTX demo ready (r_rtx=%d): world BLAS when map loaded, else fallback triangle; composites after main/post bloom\n", r_rtx->integer );
+	ri.Printf( PRINT_ALL, "[VK][RTX] RTX demo ready (r_rtx=%d): world BLAS when map loaded, else fallback triangle; hit tint by r_rtx 1=shadows 2=reflections 3=full; composites after main/post bloom\n", r_rtx->integer );
 }
 
 void vk_rtx_frame_begin( void )
@@ -873,7 +874,16 @@ void vk_rtx_record_demo_pass( VkCommandBuffer cmd )
 		frameUbo.zNearFar[3] = 0.0f;
 		frameUbo.outputSize[0] = (float)rtx.width;
 		frameUbo.outputSize[1] = (float)rtx.height;
-		frameUbo.outputSize[2] = 0.0f;
+		{
+			int rtxMode = ( r_rtx && r_rtx->integer > 0 ) ? r_rtx->integer : 0;
+			if ( rtxMode < 0 ) {
+				rtxMode = 0;
+			}
+			if ( rtxMode > 3 ) {
+				rtxMode = 3;
+			}
+			frameUbo.outputSize[2] = (float)rtxMode;
+		}
 		frameUbo.outputSize[3] = 0.0f;
 		Com_Memcpy( rtx.rtx_ubo_ptr, &frameUbo, sizeof( frameUbo ) );
 	}

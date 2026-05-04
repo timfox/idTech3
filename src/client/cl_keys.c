@@ -619,6 +619,15 @@ static void CL_KeyDownEvent( int key, unsigned time )
 		return;
 	}
 
+#if defined(USE_IMGUI) && defined(USE_VULKAN_API)
+	/* Toggle Vulkan ImGui inspector (bind F11 in autoexec if desired). */
+	if ( key == K_F11 && keys[key].repeats == 1 &&
+		( !com_dedicated || !com_dedicated->integer ) ) {
+		Cbuf_ExecuteText( EXEC_APPEND, "toggle_imgui\n" );
+		return;
+	}
+#endif
+
 	// hardcoded screenshot key
 	if ( key == K_PRINT ) {
 		if ( keys[K_SHIFT].down ) {

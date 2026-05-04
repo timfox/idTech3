@@ -3479,6 +3479,27 @@ static void CL_ModeList_f( void )
 }
 
 
+#if defined(USE_IMGUI) && defined(USE_VULKAN_API)
+/*
+Toggle Vulkan ImGui debug inspector (\\r_imgui).
+*/
+static void CL_ToggleImgui_f( void )
+{
+	cvar_t *cv;
+	int on;
+
+	if ( com_dedicated && com_dedicated->integer ) {
+		return;
+	}
+
+	cv = Cvar_Get( "r_imgui", "1", CVAR_ARCHIVE_ND );
+	on = cv->integer ? 0 : 1;
+	Cvar_SetValue( "r_imgui", (float)on );
+	Com_Printf( "ImGui inspector %s (r_imgui=%d)\n", on ? "enabled" : "disabled", on );
+}
+#endif
+
+
 #if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
 static qboolean isValidRenderer( const char *s ) {
 	while ( *s ) {
@@ -3823,6 +3844,9 @@ void CL_Init( void ) {
 	Cmd_AddCommand( "dlmap", CL_Download_f );
 #endif
 	Cmd_AddCommand( "modelist", CL_ModeList_f );
+#if defined(USE_IMGUI) && defined(USE_VULKAN_API)
+	Cmd_AddCommand( "toggle_imgui", CL_ToggleImgui_f );
+#endif
 
 	Cvar_Set( "cl_running", "1" );
 #ifdef USE_MD5
