@@ -541,33 +541,11 @@ static void FillCloudBox( void )
 		int s, t;
 		float MIN_T;
 
-		if ( 1 ) /* shader->sky.fullClouds when supported */
-		{
-			MIN_T = -HALF_SKY_SUBDIVISIONS;
+		MIN_T = -HALF_SKY_SUBDIVISIONS;
 
-			// still don't want to draw the bottom, even if fullClouds
-			if ( i == 5 )
-				continue;
-		}
-		else
-		{
-			switch( i )
-			{
-			case 0:
-			case 1:
-			case 2:
-			case 3:
-				MIN_T = -1;
-				break;
-			case 5:
-				// don't draw clouds beneath you
-				continue;
-			case 4:		// top
-			default:
-				MIN_T = -HALF_SKY_SUBDIVISIONS;
-				break;
-			}
-		}
+		// still don't want to draw the bottom, even if fullClouds
+		if ( i == 5 )
+			continue;
 
 		sky_mins[0][i] = floor( sky_mins[0][i] * HALF_SKY_SUBDIVISIONS ) / HALF_SKY_SUBDIVISIONS;
 		sky_mins[1][i] = floor( sky_mins[1][i] * HALF_SKY_SUBDIVISIONS ) / HALF_SKY_SUBDIVISIONS;
@@ -758,46 +736,6 @@ void R_InitSkyTexCoords( float heightCloud )
 //======================================================================================
 
 /*
-** RB_DrawSun
-*/
-void RB_DrawSun( float scale, shader_t *shader ) {
-	float		size;
-	float		dist;
-	vec3_t		origin, vec1, vec2;
-	color4ub_t	sunColor;
-
-	if ( !backEnd.skyRenderedThisView )
-		return;
-
-	sunColor.u32 = ~0U;
-
-	qglLoadMatrixf( backEnd.viewParms.world.modelMatrix );
-
-	dist = backEnd.viewParms.zFar / 1.75;		// div sqrt(3)
-	size = dist * scale;
-
-	VectorMA( backEnd.viewParms.or.origin, dist, tr.sunDirection, origin );
-	PerpendicularVector( vec1, tr.sunDirection );
-	CrossProduct( tr.sunDirection, vec1, vec2 );
-
-	VectorScale( vec1, size, vec1 );
-	VectorScale( vec2, size, vec2 );
-
-	// farthest depth range
-	qglDepthRange( sky_min_depth, 1.0 );
-
-	RB_BeginSurface( shader, 0 );
-
-	RB_AddQuadStamp( origin, vec1, vec2, sunColor );
-
-	RB_EndSurface();
-
-	// back to normal depth range
-	qglDepthRange( 0.0, 1.0 );
-}
-
-
-/*
 ================
 RB_StageIteratorSky
 
@@ -808,11 +746,9 @@ Other things could be stuck in here, like birds in the sky, etc
 */
 void RB_StageIteratorSky( void ) {
 
-#ifdef USE_PMLIGHT
 	if ( r_dlightMode->integer ) {
 		GL_ProgramDisable();
 	}
-#endif
 
 	if ( r_fastsky->integer ) {
 		return;

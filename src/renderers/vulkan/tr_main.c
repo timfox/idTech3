@@ -695,17 +695,10 @@ void R_SetupFirstPersonProjection( viewParms_t *dest, float *outProjection )
 		const float depth = zFar - zNearClamped;
 		if ( depth > 0.1f ) {
 #ifdef USE_VULKAN
-#ifdef USE_REVERSED_DEPTH
 			outProjection[2]  = 0.0f;
 			outProjection[6]  = 0.0f;
 			outProjection[10] = zNearClamped / depth;
 			outProjection[14] = zFar * zNearClamped / depth;
-#else
-			outProjection[2]  = 0.0f;
-			outProjection[6]  = 0.0f;
-			outProjection[10] = -zFar / depth;
-			outProjection[14] = -zFar * zNearClamped / depth;
-#endif
 #else
 			outProjection[2]  = 0.0f;
 			outProjection[6]  = 0.0f;
@@ -733,13 +726,8 @@ static void R_SetupProjectionZ( viewParms_t *dest )
 	dest->projectionMatrix[2] = 0;
 	dest->projectionMatrix[6] = 0;
 #ifdef USE_VULKAN
-#ifdef USE_REVERSED_DEPTH
 	dest->projectionMatrix[10] = zNear / depth;
 	dest->projectionMatrix[14] = zFar * zNear / depth;
-#else
-	dest->projectionMatrix[10] = - zFar / depth;
-	dest->projectionMatrix[14] = - zFar * zNear / depth;
-#endif
 #else
 	dest->projectionMatrix[10] = -( zFar + zNear ) / depth;
 	dest->projectionMatrix[14] = -2 * zFar * zNear / depth;
@@ -752,10 +740,8 @@ static void R_SetupProjectionZ( viewParms_t *dest )
 		vec4_t q, c;
 
 #ifdef USE_VULKAN
-#ifdef USE_REVERSED_DEPTH
 		dest->projectionMatrix[10] = - zFar / depth;
 		dest->projectionMatrix[14] = - zFar * zNear / depth;
-#endif
 #endif
 		// transform portal plane into camera space
 		plane[0] = dest->portalPlane.normal[0];
@@ -789,7 +775,7 @@ static void R_SetupProjectionZ( viewParms_t *dest )
 #endif
 		dest->projectionMatrix[14] = c[3];
 
-#ifdef USE_REVERSED_DEPTH
+#ifdef USE_VULKAN
 		dest->projectionMatrix[2] = -dest->projectionMatrix[2];
 		dest->projectionMatrix[6] = -dest->projectionMatrix[6];
 		dest->projectionMatrix[10] = -(dest->projectionMatrix[10] + 1.0);
@@ -1287,7 +1273,6 @@ static qboolean R_MirrorViewBySurface( const drawSurf_t *drawSurf, int entityNum
 		return qfalse;		// bad portal, no portalentity
 	}
 
-#ifdef USE_PMLIGHT
 	// create dedicated set for each view
 	if ( r_numdlights + oldParms.num_dlights <= ARRAY_LEN( backEndData->dlights ) ) {
 		int i;
@@ -1297,7 +1282,6 @@ static qboolean R_MirrorViewBySurface( const drawSurf_t *drawSurf, int entityNum
 		for ( i = 0; i < (int)oldParms.num_dlights; i++ )
 			newParms.dlights[i] = oldParms.dlights[i];
 	}
-#endif
 
 	if ( tess.numVertexes > 2 && r_fastsky->integer ) {
 		int mins[2], maxs[2];
@@ -1426,7 +1410,6 @@ static void R_RadixSort( drawSurf_t *source, int size )
 }
 
 
-#ifdef USE_PMLIGHT
 
 typedef struct litSurf_tape_s {
 	struct litSurf_s *first;
@@ -1568,7 +1551,6 @@ void R_DecomposeLitSort( unsigned sort, int *entityNum, shader_t **shader, int *
 	*entityNum = ( sort >> QSORT_REFENTITYNUM_SHIFT ) & REFENTITYNUM_MASK;
 }
 
-#endif // USE_PMLIGHT
 
 
 //==========================================================================================
@@ -1656,9 +1638,7 @@ static void R_SortDrawSurfs( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 		}
 	}
 
-#ifdef USE_PMLIGHT
 	if ( r_dlightMode->integer ) 
-#endif
 	{
 		dlight_t *dl;
 		// all the lit surfaces are in a single queue
