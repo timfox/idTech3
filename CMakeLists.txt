@@ -2468,6 +2468,12 @@ add_test(NAME test_gltf_opengl_regressions
 set_tests_properties(test_gltf_opengl_regressions PROPERTIES
 	LABELS "unit;scripts;validation;renderer"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_gltf_opengl_regressions.sh")
+
+add_test(NAME test_botlib_bounded_strings
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_botlib_bounded_strings.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_botlib_bounded_strings PROPERTIES
+	LABELS "unit;scripts;validation")
 # --- Unit tests ---
 option(BUILD_UNIT_TESTS "Build unit tests" ON)
 if(BUILD_UNIT_TESTS)
