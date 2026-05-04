@@ -48,7 +48,7 @@ This document serves as the **constitutional contract** for the idTech3 engine f
 - ✅ **Documentation**: Complete architectural documentation
 
 ### Success Metrics
-- **Compatibility**: 100% backward compatibility with Quake III Arena
+- **Compatibility**: 100% backward compatibility with Quake III Arena; **QVM** remains for classic mods (including **OpenArena**-style `.pk3` stacks). **Full conversions** may ship **native** game modules instead—see [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md#vm--game-module-loading).
 - **Performance**: Measurable improvements in target use cases
 - **Stability**: Zero crashes in CI-validated scenarios
 - **Maintainability**: Code remains understandable and extensible

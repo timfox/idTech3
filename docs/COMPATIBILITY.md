@@ -55,6 +55,16 @@ This document summarizes compatibility considerations, known issues, and mitigat
 - **QVM fallback**: If native not found, tries `module.qvm`.
 - **Diagnostics**: Missing `ui.qvm` or native UI prints clear messages.
 
+### Legacy Quake 3 and OpenArena-style mods (QVM)
+
+Retail **Quake III Arena**, **OpenArena**, and most classic **`.pk3` mods** expect **bytecode QVMs** (`qagame.qvm`, `cgame.qvm`, `ui.qvm`) and the original filesystem / protocol surface. This fork **keeps the QVM path** (`Q3_VM` / `vm.c`) and native-vs-QVM selection so those games and mods remain loadable without forcing a native-only toolchain. Engine and renderer enhancements must **not** remove or silently break QVM execution for this class of content unless a deliberate, documented compatibility decision is made (see project constitution).
+
+### Full conversions (native game code)
+
+**Standalone** or **full-conversion** games may ship **only native** game/UI modules (e.g. `vm/qagame*.so`, `ui*.dll`) and omit `.qvm` files. `VM_Create` tries **native** shared libraries first when allowed (`fs_restrict` off); if a valid native module is present, QVM is not required. This is the supported path for modern total conversions that own their entire `base`/gamedir and build native game logic.
+
+Details: [ARCHITECTURE.md](ARCHITECTURE.md#native-game-modules-vm) (`vm.c`, `vm_native_module.c`, `FS_LoadLibrary`).
+
 ## Troubleshooting Quick Reference
 
 | Symptom | Likely cause | Fix |
