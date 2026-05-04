@@ -3,6 +3,7 @@
 #include "vk_postfx.h"
 #include "vk_render_pass.h"
 #include "vk_validation.h"
+#include "vk_rtx.h"
 
 void vk_set_fullscreen_viewport_scissor( uint32_t width, uint32_t height )
 {
@@ -57,9 +58,6 @@ void vk_begin_render_pass_tracked( VkRenderPass renderPass, VkFramebuffer frameB
 		if ( vk.renderPassIndex == RENDER_PASS_UI_OVERLAY ) {
 			clear_values[0].color.float32[3] = 0.0f;
 		}
-#ifndef USE_REVERSED_DEPTH
-		clear_values[1].depthStencil.depth = 1.0;
-#endif
 		if ( vk.renderPassIndex == RENDER_PASS_MAIN || vk.renderPassIndex == RENDER_PASS_POST_BLOOM ||
 			vk.renderPassIndex == RENDER_PASS_UI_OVERLAY ) {
 			if ( vk.fboActive ) {
@@ -91,9 +89,6 @@ void vk_begin_render_pass_tracked( VkRenderPass renderPass, VkFramebuffer frameB
 			clear_values[1].color.float32[1] = 1.0f;
 			clear_values[1].color.float32[2] = 1.0f;
 			clear_values[1].color.float32[3] = 1.0f;
-#ifndef USE_REVERSED_DEPTH
-			clear_values[2].depthStencil.depth = 1.0f;
-#endif
 			clear_count = vk.msaaActive ? 2 : 3;
 		}
 		render_pass_begin_info.clearValueCount = clear_count;
@@ -124,6 +119,14 @@ void vk_end_render_pass_tracked( void )
 
 	qvkCmdEndRenderPass( vk.cmd->command_buffer );
 	vk.inRenderPass = qfalse;
+
+#ifdef USE_VULKAN_RTX
+	if ( vk.rtxAvailable && vk.fboActive && r_rtx && r_rtx->integer > 0 &&
+		r_rtxDemo && r_rtxDemo->integer &&
+		( vk.renderPassIndex == RENDER_PASS_MAIN || vk.renderPassIndex == RENDER_PASS_POST_BLOOM ) ) {
+		vk_rtx_record_demo_pass( vk.cmd->command_buffer );
+	}
+#endif
 }
 void vk_create_render_passes( void )
 {
@@ -342,6 +345,17 @@ void vk_create_render_passes( void )
 				attachments[4].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 			}
 		}
+#ifdef USE_VULKAN_RTX
+		/* RTX demo blit leaves resolved color in COLOR_ATTACHMENT_OPTIMAL; match layouts so post_bloom is valid. */
+		if ( fboActive && vk.rtxAvailable && r_rtx && r_rtx->integer > 0 ) {
+			attachments[0].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			attachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			if ( vk.msaaActive ) {
+				attachments[3].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+				attachments[3].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			}
+		}
+#endif
 		VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.post_bloom ) );
 		SET_OBJECT_NAME( vk.render_pass.post_bloom, "render pass - post_bloom", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
 	}

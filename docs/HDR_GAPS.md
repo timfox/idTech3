@@ -86,7 +86,7 @@ Both feed into linear HDR; no conflict.
 2. **OIT** (if `r_oit`): opaque copy to `fog_scene`, OIT accum for transparents, resolve to `color_image`. Runs during draw; output stays in HDR.
 3. **Copy scene** → `vk.fog_scene_image` (for volumetric composite)
 4. **Atmosphere pass** → additive sky where depth == far (only when `tr.world` and not `RDF_NOWORLDMODEL`; skipped for menus, videos)
-5. **SSR** (if `r_ssr`): screen-space reflections; reads color + depth, writes back to `color_image`. Before bloom.
+5. **SSR** (if `r_ssr`): screen-space reflections; reads color + depth, writes back to `color_image`. Before bloom. The Vulkan SSR subpass is created only when SSR is enabled (`vk_update_post_process_pipelines`); toggling **`r_ssr`** (or bloom/SSAO/SMAA/OIT, HDR color format, or certain bloom cvars) schedules a **post-pipeline rebuild** at the next frame start (`PostFX_PostPipelinesNeedUpdate` in `vk_postfx.c`, refresh in `vk_post_process_refresh.c`). Quality tuning cvars do not require that rebuild.
 6. **Bloom extraction** → from `color_image` to bloom chain (threshold + knee). **Bloom blend** → additive blend of blurred bloom back to `color_image`. Both before SSAO and luminance.
 7. **SSAO** (if `r_ssao`): copy `color_image` to `fog_scene`, samples depth, blur, combine with scene into `fog_scene`. When SSAO is on, `fog_scene` becomes the post-fog source.
 8. **Volumetric compute + composite** → fog over scene (when enabled). Reads and writes `fog_scene`.

@@ -19,6 +19,7 @@ Split from vk.c.
 #include "vk_sync.h"
 #include "vk_skybox_hdr.h"
 #include "vk_forward_plus.h"
+#include "vk_rtx.h"
 
 #ifdef USE_VBO
 void vk_release_vbo( void );
@@ -38,6 +39,7 @@ void vk_shutdown( refShutdownCode_t code )
 	/* VUID-05137: ensure GPU finished before destroying resources */
 	if ( !vk.device_lost && qvkDeviceWaitIdle )
 		qvkDeviceWaitIdle( vk.device );
+	vk_rtx_shutdown();
 	/* Always run full destroy sequence for VUID-05137 compliance.
 	 * When device_lost, destroy calls may return VK_ERROR_DEVICE_LOST but we still attempt them. */
 	vk_destroy_framebuffers();
@@ -189,11 +191,9 @@ for (i = 0; i < 2; i++) {
                             qvkDestroyShaderModule(vk.device, vk.modules.vert.gen[i][j][k][l][m], NULL);
                             vk.modules.vert.gen[i][j][k][l][m] = VK_NULL_HANDLE;
                         }
-                        for ( int n = 0; n < 2; n++ ) {
-                            if (vk.modules.vert.gen_gltf_gpu[i][j][k][l][m][n] != VK_NULL_HANDLE) {
-                                qvkDestroyShaderModule(vk.device, vk.modules.vert.gen_gltf_gpu[i][j][k][l][m][n], NULL);
-                                vk.modules.vert.gen_gltf_gpu[i][j][k][l][m][n] = VK_NULL_HANDLE;
-                            }
+                        if (vk.modules.vert.gen_gltf_gpu[i][j][k][l][m] != VK_NULL_HANDLE) {
+                            qvkDestroyShaderModule(vk.device, vk.modules.vert.gen_gltf_gpu[i][j][k][l][m], NULL);
+                            vk.modules.vert.gen_gltf_gpu[i][j][k][l][m] = VK_NULL_HANDLE;
                         }
                     }
                 }

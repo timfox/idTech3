@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>WebSocket demo (template) — idTech3 echo server</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; }
+    body { max-width: 40rem; margin: 2rem auto; }
+    pre { background: #1e1e1e; color: #d4d4d4; padding: 1rem; min-height: 6rem; overflow: auto; }
+    button { margin-right: 0.5rem; }
+    label { display: block; margin: 0.5rem 0; }
+  </style>
+</head>
+<body>
+  <h1>WebSocket client (browser template)</h1>
+  <p>
+    Set the <strong>Server URL</strong> field to your echo server
+    (Node template default: <code>ws://127.0.0.1:8765/</code>).
+  </p>
+
+  <label>Server URL: <input id="url" size="40" value="ws://127.0.0.1:8765/" /></label>
+  <p>
+    <button type="button" id="connect">Connect</button>
+    <button type="button" id="disconnect" disabled>Disconnect</button>
+    <button type="button" id="ping">Send JSON ping</button>
+  </p>
+  <p>
+    <label>Outgoing text: <input id="out" size="50" value="Hello from browser" /></label>
+    <button type="button" id="send" disabled>Send</button>
+  </p>
+  <h2>Log</h2>
+  <pre id="log"></pre>
+
+  <script>
+    /** @type {WebSocket | null} */
+    let sock = null;
+    const logEl = document.getElementById("log");
+    function log(line) {
+      logEl.textContent += line + "\n";
+    }
+
+    document.getElementById("connect").onclick = () => {
+      const u = document.getElementById("url").value.trim() || "ws://127.0.0.1:8765/";
+      if (sock) sock.close();
+      sock = new WebSocket(u);
+      sock.addEventListener("open", () => {
+        log("[open] " + u);
+        document.getElementById("send").disabled = false;
+        document.getElementById("disconnect").disabled = false;
+      });
+      sock.addEventListener("message", (ev) => {
+        log("[in] " + (typeof ev.data === "string" ? ev.data : "<binary>"));
+      });
+      sock.addEventListener("close", (ev) => {
+        log("[close] code=" + ev.code);
+        document.getElementById("send").disabled = true;
+        document.getElementById("disconnect").disabled = true;
+        sock = null;
+      });
+      sock.addEventListener("error", () => {
+        log("[error]");
+      });
+    };
+
+    document.getElementById("disconnect").onclick = () => {
+      if (sock) sock.close(1000, "user");
+    };
+    document.getElementById("send").onclick = () => {
+      if (sock && sock.readyState === WebSocket.OPEN) {
+        const t = document.getElementById("out").value;
+        sock.send(t);
+        log("[out] " + t);
+      }
+    };
+    document.getElementById("ping").onclick = () => {
+      if (sock && sock.readyState === WebSocket.OPEN) {
+        const p = JSON.stringify({ type: "ping" });
+        sock.send(p);
+        log("[out] " + p);
+      } else {
+        log("(not connected; connect first)");
+      }
+    };
+  </script>
+</body>
+</html>
