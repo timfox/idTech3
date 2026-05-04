@@ -1675,6 +1675,7 @@ extern cvar_t	*r_volumetricFogZExponent;
 extern cvar_t	*r_volumetricFogSliceMode;
 extern cvar_t	*r_volumetricFogMaxDistance;
 extern cvar_t	*r_volumetricFogJitter;
+extern cvar_t	*r_volumetricFogCompositeMode;
 extern cvar_t	*r_volumetricFogTemporalWeight;
 extern cvar_t	*r_volumetricFogReprojectionThreshold;
 extern cvar_t	*r_volumetricFogHistoryVelocityThreshold;
