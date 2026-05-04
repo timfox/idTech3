@@ -85,12 +85,8 @@ void vk_create_atmosphere_pipeline( void )
 	depth_stencil_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 	depth_stencil_state.depthTestEnable = VK_TRUE;
 	depth_stencil_state.depthWriteEnable = VK_FALSE;
-#ifdef USE_REVERSED_DEPTH
 	/* Reversed depth: far=0.0. Pass only where stored==0.0 (sky). Shader outputs gl_FragDepth=0.0. */
 	depth_stencil_state.depthCompareOp = VK_COMPARE_OP_EQUAL;
-#else
-	depth_stencil_state.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
-#endif
 
 	Com_Memset( &attachment_blend, 0, sizeof( attachment_blend ) );
 	attachment_blend.blendEnable = VK_TRUE;
