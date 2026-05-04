@@ -159,7 +159,6 @@ static qboolean	R_CullSurface( const surfaceType_t *surface, shader_t *shader ) 
 }
 
 
-#ifdef USE_PMLIGHT
 qboolean R_LightCullBounds( const dlight_t* dl, const vec3_t mins, const vec3_t maxs )
 {
 	if ( dl->linear ) {
@@ -238,7 +237,6 @@ static qboolean R_LightCullSurface( const surfaceType_t* surface, const dlight_t
 		return qfalse;
 	};
 }
-#endif // USE_PMLIGHT
 
 
 static int R_DlightFace( srfSurfaceFace_t *face, int dlightBits ) {
@@ -371,13 +369,11 @@ static void R_AddWorldSurface( msurface_t *surf, int dlightBits ) {
 		return;
 	}
 
-#ifdef USE_PMLIGHT
 	if ( r_dlightMode->integer ) {
 		surf->vcVisible = tr.viewCount;
 		R_AddDrawSurf( surf->data, surf->shader, surf->fogIndex, 0 );
 		return;
 	}
-#endif // USE_PMLIGHT
 
 	// check for dlighting
 	if ( dlightBits ) {
@@ -394,7 +390,6 @@ static void R_AddWorldSurface( msurface_t *surf, int dlightBits ) {
 	PM LIGHTING
 =============================================================
 */
-#ifdef USE_PMLIGHT
 static void R_AddLitSurface( msurface_t *surf, const dlight_t *light )
 {
 	// since we're not worried about offscreen lights casting into the frustum (ATM !!!)
@@ -491,7 +486,6 @@ static void R_RecursiveLightNode( const mnode_t* node )
 		mark++;
 	}
 }
-#endif // USE_PMLIGHT
 
 
 /*
@@ -522,7 +516,6 @@ void R_AddBrushModelSurfaces ( trRefEntity_t *ent ) {
 		return;
 	}
 
-#ifdef USE_PMLIGHT
 	if ( r_dlightMode->integer ) {
 		dlight_t *dl;
 		int s;
@@ -547,7 +540,6 @@ void R_AddBrushModelSurfaces ( trRefEntity_t *ent ) {
 		}
 		return;
 	}
-#endif // USE_PMLIGHT
 
 	R_SetupEntityLighting( &tr.refdef, ent );
 	R_DlightBmodel( bmodel );
@@ -640,9 +632,7 @@ static void R_RecursiveWorldNode( mnode_t *node, unsigned int planeBits, unsigne
 		// determine which dlights are needed
 		newDlights[0] = 0;
 		newDlights[1] = 0;
-#ifdef USE_PMLIGHT
 		if ( !r_dlightMode->integer )
-#endif
 		if ( dlightBits ) {
 			int	i;
 
@@ -864,10 +854,8 @@ R_AddWorldSurfaces
 =============
 */
 void R_AddWorldSurfaces( void ) {
-#ifdef USE_PMLIGHT
 	dlight_t* dl;
 	int i;
-#endif
 
 	if ( !r_drawworld->integer ) {
 		return;
@@ -893,7 +881,6 @@ void R_AddWorldSurfaces( void ) {
 
 	R_RecursiveWorldNode( tr.world->nodes, 15, ( 1ULL << tr.refdef.num_dlights ) - 1 );
 
-#ifdef USE_PMLIGHT
 	if ( !r_dlightMode->integer )
 		return;
 
@@ -915,5 +902,4 @@ void R_AddWorldSurfaces( void ) {
 		tr.light = dl;
 		R_RecursiveLightNode( tr.world->nodes );
 	}
-#endif // USE_PMLIGHT
 }

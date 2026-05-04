@@ -35,6 +35,7 @@ Ticks all gameplay subsystems each client frame:
 #include "../game/g_dismember.h"
 #include "../game/g_goap.h"
 #include "../game/g_aiml.h"
+#include "../game/g_eda.h"
 #include "../game/g_bt.h"
 #include "../game/g_engine_systems.h"
 #include "../game/g_lua_bindings.h"
@@ -49,6 +50,7 @@ static cvar_t *cl_physicsEnabled;
 static cvar_t *cl_navEnabled;
 static cvar_t *cl_particlesEnabled;
 static cvar_t *cl_btEnabled;
+static cvar_t *g_ecsMotion;
 
 extern void Nav_BSP_ClearGeometry(void);
 extern int  Nav_BSP_AddVertex(float x, float y, float z);
@@ -154,6 +156,7 @@ void CL_InitGameSystems(void) {
 	Horde_Init();
 	Dismember_Init();
 	GOAP_Init();
+	EDA_Init();
 	AIML_Init();
 	EngineTelemetry_Init();
 	EngineReplay_Init();
@@ -162,6 +165,8 @@ void CL_InitGameSystems(void) {
 	EngineDialogue_Init();
 	BT_Init();
 	ECS_Init();
+	g_ecsMotion = Cvar_Get( "g_ecsMotion", "1", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( g_ecsMotion, "When 1, integrate ECS velocity into position each client frame." );
 	MobileFog_Init();
 	BgMap_Init();
 	WinTitle_Init();
@@ -191,6 +196,8 @@ void CL_ShutdownGameSystems(void) {
 	EngineSave_Shutdown();
 	EngineReplay_Shutdown();
 	EngineTelemetry_Shutdown();
+	AIML_Shutdown();
+	EDA_Shutdown();
 	BT_Shutdown();
 	ECS_Shutdown();
 	BgMap_Shutdown();
@@ -210,6 +217,10 @@ void CL_GameFrame(float frametime) {
 
 	if (cl_physicsEnabled && cl_physicsEnabled->integer) {
 		Phys_StepSimulation(frametime);
+	}
+
+	if ( g_ecsMotion && g_ecsMotion->integer ) {
+		ECS_StepMotion( frametime );
 	}
 
 	if (cl_navEnabled && cl_navEnabled->integer && activeNavMesh >= 0) {
@@ -270,6 +281,8 @@ void CL_GameFrame(float frametime) {
 
 	BgMap_Frame(frametime);
 	WinTitle_Update(frametime);
+
+	EDA_Frame();
 
 	{
 		vec3_t fwd = {1,0,0}, right = {0,1,0}, up = {0,0,1}, origin = {0,0,0};

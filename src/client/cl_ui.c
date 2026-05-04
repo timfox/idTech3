@@ -1283,13 +1283,13 @@ void CL_InitUI( void ) {
 			if ( !uivm ) {
 				Com_Printf( S_COLOR_RED "UI VM failed: could not load ui (native module or ui.qvm).\n" );
 				Com_Printf( S_COLOR_YELLOW "Install full game data under fs_basepath (e.g. base/pak0.pk3 and sibling packs, or baseq3 with fs_basegame).\n" );
-				Com_Printf( S_COLOR_YELLOW "Example mods (e.g. idtech3_demo) add configs only; they do not ship ui.qvm.\n" );
+				Com_Printf( S_COLOR_YELLOW "Example mod idtech3_demo ships a minimal native ui in vm/ inside its .pk3 (no retail ui.qvm).\n" );
 				Com_Error( ERR_DROP, "VM_Create on UI failed (missing ui - install base game .pk3 files)" );
 			}
 		} else {
 			Com_Printf( S_COLOR_RED "UI VM failed: could not load ui (native module or ui.qvm).\n" );
 			Com_Printf( S_COLOR_YELLOW "Install full game data under fs_basepath (e.g. base/pak0.pk3 and sibling packs, or baseq3 with fs_basegame).\n" );
-			Com_Printf( S_COLOR_YELLOW "Example mods (e.g. idtech3_demo) add configs only; they do not ship ui.qvm.\n" );
+			Com_Printf( S_COLOR_YELLOW "Example mod idtech3_demo ships a minimal native ui in vm/ inside its .pk3 (no retail ui.qvm).\n" );
 			Com_Error( ERR_DROP, "VM_Create on UI failed (missing ui - install base game .pk3 files)" );
 		}
 	}

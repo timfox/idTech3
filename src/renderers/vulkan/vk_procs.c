@@ -20,9 +20,11 @@ PFN_vkEnumerateDeviceExtensionProperties			qvkEnumerateDeviceExtensionProperties
 PFN_vkEnumeratePhysicalDevices					qvkEnumeratePhysicalDevices;
 PFN_vkGetDeviceProcAddr							qvkGetDeviceProcAddr;
 PFN_vkGetPhysicalDeviceFeatures					qvkGetPhysicalDeviceFeatures;
+PFN_vkGetPhysicalDeviceFeatures2					qvkGetPhysicalDeviceFeatures2;
 PFN_vkGetPhysicalDeviceFormatProperties			qvkGetPhysicalDeviceFormatProperties;
 PFN_vkGetPhysicalDeviceMemoryProperties			qvkGetPhysicalDeviceMemoryProperties;
 PFN_vkGetPhysicalDeviceProperties				qvkGetPhysicalDeviceProperties;
+PFN_vkGetPhysicalDeviceProperties2				qvkGetPhysicalDeviceProperties2;
 PFN_vkGetPhysicalDeviceQueueFamilyProperties		qvkGetPhysicalDeviceQueueFamilyProperties;
 PFN_vkDestroySurfaceKHR							qvkDestroySurfaceKHR;
 PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR	qvkGetPhysicalDeviceSurfaceCapabilitiesKHR;
@@ -133,3 +135,15 @@ PFN_vkGetImageMemoryRequirements2KHR				qvkGetImageMemoryRequirements2KHR;
 PFN_vkDebugMarkerSetObjectNameEXT				qvkDebugMarkerSetObjectNameEXT;
 
 PFN_vkCmdClearColorImage								qvkCmdClearColorImage;
+
+#ifdef USE_VULKAN_RTX
+PFN_vkGetBufferDeviceAddress							qvkGetBufferDeviceAddress;
+PFN_vkCreateAccelerationStructureKHR					qvkCreateAccelerationStructureKHR;
+PFN_vkDestroyAccelerationStructureKHR					qvkDestroyAccelerationStructureKHR;
+PFN_vkGetAccelerationStructureBuildSizesKHR			qvkGetAccelerationStructureBuildSizesKHR;
+PFN_vkGetAccelerationStructureDeviceAddressKHR		qvkGetAccelerationStructureDeviceAddressKHR;
+PFN_vkCmdBuildAccelerationStructuresKHR				qvkCmdBuildAccelerationStructuresKHR;
+PFN_vkCreateRayTracingPipelinesKHR					qvkCreateRayTracingPipelinesKHR;
+PFN_vkGetRayTracingShaderGroupHandlesKHR				qvkGetRayTracingShaderGroupHandlesKHR;
+PFN_vkCmdTraceRaysKHR								qvkCmdTraceRaysKHR;
+#endif

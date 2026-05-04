@@ -2,7 +2,7 @@
 
 This document is a **technical audit** of the current **Forward+ scaffolding** in this fork: what runs, what data flows where, synchronization, known limitations, and **risk items** for future work. It complements the narrative in [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_2026_ARCHITECTURE_PASS.md).
 
-**Scope:** `r_forwardPlus` (default **0**, **latched**), PBR-only descriptor integration, **dynamic lights** from `backEnd.refdef` (`dlight_t`), **no** replacement of the primary forward lighting path.
+**Scope:** `r_forwardPlus` (default **1** on Vulkan, **latched**), PBR-only descriptor integration, **dynamic lights** from `backEnd.refdef` (`dlight_t`), **no** replacement of the primary forward lighting path.
 
 ---
 
@@ -10,12 +10,12 @@ This document is a **technical audit** of the current **Forward+ scaffolding** i
 
 | Layer | Responsibility |
 |--------|----------------|
-| **C / `vk_forward_plus.c`** | Host-visible **light SSBO** packing, **tile SSBO** allocation, **param SSBO** (`clipFromWorld` + aux uvec4), compute **pipeline + dispatch**, graphics **descriptor set** (set **18**), tile grid from **`VK_FP_TILE_DIM`** (16 px) and **`vk_get_render_target_width/height`**. |
+| **C / `vk_forward_plus.c`** | CPU packs **staging** (host) light records; **device-local** light SSBO via `vkCmdCopyBuffer` each frame; **tile SSBO** allocation, **param SSBO** (`clipFromWorld` + aux uvec4), compute **pipeline + dispatch**, graphics **descriptor set** (set **18**), tile grid from **`VK_FP_TILE_DIM`** (16 px) and **`vk_get_render_target_width/height`**. |
 | **Compute / `forward_plus_tile_cull.comp`** | Per-tile **light index lists** ( **`MAX_PER_TILE` = 8** ), sphere-in-screen projection cull, **`MAX_LIGHTS` = 32** aligned with **`MAX_DLIGHTS`**. |
 | **Fragment / `gen_frag.tmpl`** (PBR) | Optional **debug heatmap** (`r_forwardPlusDebug`), optional **additive experimental shade** (`r_forwardPlusShade` → specialization **`forward_plus_shade_strength`**). Uses **`fp_params.fp_clip_from_world`** and SSBO light + tile data. |
 | **Uniform bridge / `tr_shade.c`** | When Forward+ is on, **`pbrForwardPlus.y`** carries **`floatBitsToUint(tess.dlightBits)`** so the fragment path can **skip** culled lights that the surface already received via the classic packed path (first **32** indices). |
 
-**Cvars** (see `tr_init.c`): `r_forwardPlus`, `r_forwardPlusMaxPerTile` (latched **4–8**), `r_forwardPlusDebug`, `r_forwardPlusShade` (pipeline invalidation on change in `vk_frame_submit.c`).
+**Cvars** (see `tr_init.c`): `r_forwardPlus`, `r_forwardPlusMaxPerTile` (latched **4–8**), `r_forwardPlusDebug`, `r_forwardPlusShade` (pipeline invalidation on change in `vk_frame_submit.c`), `r_forwardPlusLuminanceSort` (**0/1**, default **1** — tile overload picks brightest lights by RGB sum).
 
 ---
 
@@ -25,10 +25,11 @@ Within **`RB_DrawSurfs`** (`tr_backend.c`), order is:
 
 1. **`vk_prepare_frame_temporal_state()`**
 2. **`vk_forward_plus_ensure_render_resolution()`** — may resize **tile SSBO** if render target dimensions changed (matches FBO / `r_renderScale` via **`vk_get_render_target_*`**).
-3. **`vk_forward_plus_update_for_refdef()`** — CPU writes **light SSBO** header + records from **`backEnd.refdef.dlights`**. Clears **tail** of the buffer when light count drops (avoids stale records).
-4. **`RB_RenderSunShadowMap`** — can alter **`vk.renderWidth`**; light/tile packing already uses **`vk_get_render_target_*`**, not transient globals.
+3. **`vk_forward_plus_update_for_refdef()`** — CPU writes the **staging** buffer with light header + records; clears **tail** when count drops.
+4. **`RB_RenderSunShadowMap`**
 5. **`RB_BeginDrawingView()`** — begins the **main** render pass.
-6. **`vk_forward_plus_dispatch_tile_cull()`** — **compute** inside the active render pass (see §5).
+6. **`vk_forward_plus_upload_refdef()`** — `vkCmdCopyBuffer` staging → **device-local** light SSBO (transfer + shader barriers).
+7. **`vk_forward_plus_dispatch_tile_cull()`** — **compute** inside the active render pass (see §5).
 
 Then the world/entity draws run; PBR draws bind **descriptor set 18** when Forward+ resources are live (`vk_draw_state.c`).
 
@@ -62,23 +63,25 @@ Linear array: **`total_tiles × MAX_PER_TILE`** **`uint32`** indices. Unused slo
 ## 4. Compute shader behavior (`forward_plus_tile_cull.comp`)
 
 - **Workgroup:** 64 threads; dispatch **`ceil(totalTiles / 64)`**.
-- **Per thread:** one **tileId**; clears **MAX_PER_TILE** slots, then iterates lights **0 … min(n, numLights, MAX_LIGHTS)-1**.
+- **Per thread:** one **tileId**; clears **MAX_PER_TILE** slots, gathers all overlapping lights into a thread-local list (**≤ MAX_LIGHTS**), then writes up to **`maxPerTile`** indices.
 - **Projection:** `clip = clipFromWorld * vec4(worldPos,1)`; NDC bounds check (with margin on XY); center in **pixels** via **`0.5*(1+ndc)*viewport`**; **screen-radius** heuristic from world radius and **`clip.w`**; **AABB tile overlap** via **`sphere_tile_overlap`** with **`tilePxX/Y = viewport / tileGrid`** (aligned with fragment mapping).
 
-**Ordering bias:** lights are appended in **increasing index** order when a tile is under capacity—no distance or importance sort.
+**Ordering / overload:** when a tile has **fewer** overlapping lights than **`maxPerTile`**, output order matches **increasing light index** (build order). When **more** lights overlap than **`maxPerTile`**, and **`r_forwardPlusLuminanceSort`** is **1** (default), the shader runs a **partial selection** on the candidate list to keep the top **`maxPerTile`** by **RGB sum** (from the packed color **vec4**). If **`r_forwardPlusLuminanceSort`** is **0**, the first **`maxPerTile`** candidates in index order are kept (legacy overload behavior).
 
 ---
 
 ## 5. Synchronization and pass placement
 
+**Barriers in `vk_forward_plus_upload_refdef`:** **device-local** light SSBO: prior **SHADER_READ** (fragment/last frame) → **TRANSFER_WRITE**; **staging** **HOST_WRITE** → **TRANSFER_READ**; after copy, **TRANSFER_WRITE** → **SHADER_READ** for compute/fragment.
+
 **Barriers in `vk_forward_plus_dispatch_tile_cull`:**
 
-1. **Before compute:** HOST_WRITE → SHADER_READ on **light** + **param** buffers; tile buffer **dst** SHADER_WRITE (from prior fragment/compute read—first frame **`srcAccessMask = 0`**).
-2. **After compute:** SHADER_WRITE → SHADER_READ on **tile** buffer for subsequent **VS/FS** (and compute if chained).
+1. **Before compute:** **light** buffer: **SHADER_READ** → **SHADER_READ** (hazard with prior frame; safe layout). **param** buffer: **HOST_WRITE** → **SHADER_READ**; tile buffer **dst** **SHADER_WRITE** (from prior fragment/compute read—first frame **`srcAccessMask = 0`**).
+2. **After compute:** **SHADER_WRITE** → **SHADER_READ** on **tile** buffer for subsequent **VS/FS** (and compute if chained).
 
 **Compute inside render pass:** The dispatch is issued while **`vk.inRenderPass`** is true (main pass). This is **legal in Vulkan 1.x** when the pass does not use **subpasses** that forbid side effects; the engine uses **load/store** attachments and does not declare **subpass dependencies** that would make this invalid. **Risk:** some layers or future **render-pass graph** refactors could want compute **between** passes instead—worth revisiting if subpasses or **fragment density** are introduced.
 
-**Host coherence:** Light and param buffers are **host-visible**; barriers use **`VK_PIPELINE_STAGE_HOST_BIT`** for writes before compute. Typical pattern is correct for **CPU write → GPU read** in the same frame.
+**Host coherence:** **Staging** (light pack) and **param** buffers are **host-visible**; upload uses **transfer** for lights. **Param** still uses **`VK_PIPELINE_STAGE_HOST_BIT`** before compute.
 
 ---
 
@@ -125,7 +128,7 @@ Linear array: **`total_tiles × MAX_PER_TILE`** **`uint32`** indices. Unused slo
 
 | Item | Severity | Note |
 |------|-----------|------|
-| **No light sort** in tile lists | Medium (quality) | First-N lights win per tile; can miss visually dominant lights under overload. |
+| **No light sort** in tile lists | Medium (quality) | First-N lights win per tile **unless** `r_forwardPlusLuminanceSort` is **1** (default): then overloaded tiles keep top **`maxPerTile`** by RGB sum. |
 | **Sphere screen approximation** | Low–Medium | Conservative enough for prototyping; not a tight spotlight frustum test. |
 | **`dlightBits` 32-bit** | Low | Matches **`MAX_DLIGHTS`** today; document if caps change. |
 | **Compute inside render pass** | Low (portability) | Valid now; revisit with subpass graphs or render graph. |
@@ -134,7 +137,7 @@ Linear array: **`total_tiles × MAX_PER_TILE`** **`uint32`** indices. Unused slo
 ### Suggested next steps (roadmap)
 
 1. **Depth-aware culling** (optional Hi-Z or linear depth rejection) before accepting a light for a tile.
-2. **Sort or priority** (distance / luminance) when filling **`maxPerTile`** slots.
+2. **Sort or priority** (distance / luminance) when filling **`maxPerTile`** slots — **partially done:** **`r_forwardPlusLuminanceSort`** (default **1**) uses **RGB sum** when overloaded; distance-based priority is still open.
 3. **Decouple** Forward+ light ceiling from **`MAX_DLIGHTS`** only if the **game protocol** and **`tess.dlightBits`** story are redesigned together.
 4. **Tier B** map with mixed point + spot lights to validate heatmap vs ground truth.
 

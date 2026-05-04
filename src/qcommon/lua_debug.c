@@ -63,8 +63,22 @@ static qboolean LuaDebug_LoadScript( const char *scriptPath ) {
 	}
 
 	if ( luaL_loadfile( s_luaState, scriptPath ) != LUA_OK ) {
-		LuaDebug_PrintLuaError( scriptPath );
-		return qfalse;
+		void *buf = NULL;
+		int blen;
+
+		lua_pop( s_luaState, 1 );
+		blen = FS_ReadFile( scriptPath, &buf );
+		if ( blen <= 0 || !buf ) {
+			LuaDebug_PrintLuaError( scriptPath );
+			return qfalse;
+		}
+
+		if ( luaL_loadbuffer( s_luaState, (const char *)buf, (size_t)blen, scriptPath ) != LUA_OK ) {
+			LuaDebug_PrintLuaError( scriptPath );
+			FS_FreeFile( buf );
+			return qfalse;
+		}
+		FS_FreeFile( buf );
 	}
 
 	if ( lua_pcall( s_luaState, 0, LUA_MULTRET, 0 ) != LUA_OK ) {
