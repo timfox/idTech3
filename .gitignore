@@ -29,6 +29,7 @@ enable_vulkan_patch1_tiny.flag
 .cursor/
 test-build/
 build_log.txt
+artifacts/
 src/renderers/vulkan/shaders/spirv/generated/backups/
 android/.gradle/
 android/app/.cxx/
@@ -45,3 +46,8 @@ android/local.properties
 !/examples/demo_skeleton/base/
 /examples/demo_skeleton/base/*
 !/examples/demo_skeleton/base/README.txt
+!/examples/demo_skeleton/base/z_minimal_bootstrap.pk3
+
+# demo mod pk3 is created by build_demo_pack.sh; keep only README in git
+/examples/demo_skeleton/idtech3_demo/*
+!/examples/demo_skeleton/idtech3_demo/README.txt

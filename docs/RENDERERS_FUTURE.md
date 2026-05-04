@@ -8,7 +8,7 @@ This document outlines the architecture and implementation plan for three render
 |---------|--------|-------|
 | **Vulkan** | ✅ Complete | Primary renderer, ~18k LOC |
 | **OpenGL** | ✅ Complete | Fallback renderer |
-| **Vulkan RTX** | 🔶 Device path | With `USE_VULKAN_RTX=ON`, extensions plus **buffer device address**, **acceleration structure**, and **ray tracing pipeline** features are enabled when the GPU supports them (`vkGetPhysicalDeviceFeatures2` gate). BLAS/TLAS, SBT, and hybrid frame integration remain to be wired. |
+| **Vulkan RTX** | 🔶 Demo path | With `USE_VULKAN_RTX=ON` and `r_rtx`>0 (latched): device enables KHR AS + ray-tracing pipeline + BDA. `r_rtxDemo` 1 (default): world BSP BLAS (all brush submodels `*0..*N-1`: SF_FACE + SF_TRIANGLES, capped by latched `r_rtxWorldPrimCap`) when a map is loaded, else a fallback triangle; raygen uses depth + `invViewProj` UBO; **closest-hit tints by `r_rtx` (1=darken “shadows”, 2=cool “reflections”, 3=warm “full”) for visualization**; trace after main/post-bloom, blit into resolved color (depth briefly transitioned to read-only on main pass). `r_rtxDemo` 0: extensions only. **`scripts/compile_shaders.sh --apply` regenerates `vk_rtx_demo_spirv.inc` from `glsl/rtx_demo.*`.** |
 | **Metal** | ❌ Not started | Native Apple Silicon / macOS |
 | **DXR** | ❌ Not started | DirectX 12 + DirectX Raytracing (Windows) |
 
@@ -26,10 +26,10 @@ This document outlines the architecture and implementation plan for three render
 
 ### Implementation Phases
 
-1. **Extension + feature enablement** (`vk_instance.c` device creation)
-   - Add ray tracing extensions to `device_extension_list` when available **and** `vkGetPhysicalDeviceFeatures2` reports `bufferDeviceAddress`, `accelerationStructure`, and `rayTracingPipeline`
-   - Chain `VkPhysicalDeviceFeatures2` + `VkPhysicalDeviceBufferDeviceAddressFeaturesKHR` + `VkPhysicalDeviceAccelerationStructureFeaturesKHR` + `VkPhysicalDeviceRayTracingPipelineFeaturesKHR` into `VkDeviceCreateInfo` (required for valid device creation with these extensions)
-   - Next: query `VkPhysicalDeviceRayTracingPipelinePropertiesKHR`, load `vkCreateRayTracingPipelinesKHR`, `vkCmdTraceRaysKHR`, etc.
+1. **Extension enablement** (`vk_instance.c` / `vk_device.c` device creation)
+   - Add ray tracing extensions to `device_extension_list` when available
+   - Query `VkPhysicalDeviceRayTracingPipelinePropertiesKHR`
+   - Load `vkCreateRayTracingPipelinesKHR`, `vkCmdTraceRaysKHR`, etc.
 
 2. **Acceleration structures**
    - **BLAS**: Build from BSP world geometry + entity models (vertex/index buffers)
