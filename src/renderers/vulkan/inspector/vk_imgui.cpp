@@ -368,7 +368,9 @@ static void VkImgui_DrawMenuBar(void) {
 
 	if (ImGui::BeginMainMenuBar()) {
 		if (ImGui::BeginMenu("File")) {
-			ImGui::MenuItem("Quit");
+			if ( ImGui::MenuItem( "Quit" ) ) {
+				ri.Cmd_ExecuteText( EXEC_APPEND, "quit\n" );
+			}
 			ImGui::EndMenu();
 		}
 
