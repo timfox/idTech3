@@ -87,11 +87,7 @@ void vk_alloc_persistent_pipelines( void )
 
 				for ( k = 0; k < 2; k++ ) {
 					def.polygon_offset = polygon_offset[k];
-#ifdef USE_FOG_ONLY
 					def.shader_type = TYPE_FOG_ONLY;
-#else
-					def.shader_type = TYPE_SIGNLE_TEXTURE;
-#endif
 					def.state_bits = fog_state;
 					vk.fog_pipelines[i][j][k] = vk_find_pipeline_ext( 0, &def, qtrue );
 
