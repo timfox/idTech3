@@ -2419,7 +2419,8 @@ add_test(NAME test_compile_engine_lto
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_compile_engine_lto.sh ${CMAKE_SOURCE_DIR}/scripts/compile_engine.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_compile_engine_lto PROPERTIES
-	LABELS "unit;scripts;validation")
+	LABELS "unit;scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_compile_engine_lto.sh")
 
 add_test(NAME test_vk_vegetation_dispatch_order
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_vk_vegetation_dispatch_order.sh

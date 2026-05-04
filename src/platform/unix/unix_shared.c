@@ -569,7 +569,7 @@ void *Sys_LoadFunction( void *handle, const char *name )
 		if ( nlen >= sizeof( buf ) )
 			return NULL;
 		buf[0] = '_';
-		strcpy( buf+1, name );
+		Com_Memcpy( buf + 1, name, nlen );
 		dlerror(); /* clear old error state */
 		symbol = dlsym( handle, buf );
 	}
