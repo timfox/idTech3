@@ -695,17 +695,10 @@ void R_SetupFirstPersonProjection( viewParms_t *dest, float *outProjection )
 		const float depth = zFar - zNearClamped;
 		if ( depth > 0.1f ) {
 #ifdef USE_VULKAN
-#ifdef USE_REVERSED_DEPTH
 			outProjection[2]  = 0.0f;
 			outProjection[6]  = 0.0f;
 			outProjection[10] = zNearClamped / depth;
 			outProjection[14] = zFar * zNearClamped / depth;
-#else
-			outProjection[2]  = 0.0f;
-			outProjection[6]  = 0.0f;
-			outProjection[10] = -zFar / depth;
-			outProjection[14] = -zFar * zNearClamped / depth;
-#endif
 #else
 			outProjection[2]  = 0.0f;
 			outProjection[6]  = 0.0f;
@@ -733,13 +726,8 @@ static void R_SetupProjectionZ( viewParms_t *dest )
 	dest->projectionMatrix[2] = 0;
 	dest->projectionMatrix[6] = 0;
 #ifdef USE_VULKAN
-#ifdef USE_REVERSED_DEPTH
 	dest->projectionMatrix[10] = zNear / depth;
 	dest->projectionMatrix[14] = zFar * zNear / depth;
-#else
-	dest->projectionMatrix[10] = - zFar / depth;
-	dest->projectionMatrix[14] = - zFar * zNear / depth;
-#endif
 #else
 	dest->projectionMatrix[10] = -( zFar + zNear ) / depth;
 	dest->projectionMatrix[14] = -2 * zFar * zNear / depth;
@@ -752,10 +740,8 @@ static void R_SetupProjectionZ( viewParms_t *dest )
 		vec4_t q, c;
 
 #ifdef USE_VULKAN
-#ifdef USE_REVERSED_DEPTH
 		dest->projectionMatrix[10] = - zFar / depth;
 		dest->projectionMatrix[14] = - zFar * zNear / depth;
-#endif
 #endif
 		// transform portal plane into camera space
 		plane[0] = dest->portalPlane.normal[0];
@@ -789,7 +775,7 @@ static void R_SetupProjectionZ( viewParms_t *dest )
 #endif
 		dest->projectionMatrix[14] = c[3];
 
-#ifdef USE_REVERSED_DEPTH
+#ifdef USE_VULKAN
 		dest->projectionMatrix[2] = -dest->projectionMatrix[2];
 		dest->projectionMatrix[6] = -dest->projectionMatrix[6];
 		dest->projectionMatrix[10] = -(dest->projectionMatrix[10] + 1.0);
