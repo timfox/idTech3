@@ -1962,11 +1962,15 @@ if(USE_IMGUI AND NOT APPLE)
   enable_language(CXX)
   set(IMGUI_SRCS
     src/renderers/vulkan/inspector/vk_imgui.cpp
+    src/renderers/vulkan/inspector/vk_imgui_vulkan.cpp
     ${EXTERNAL_SRC}/cimgui/imgui/imgui.cpp
     ${EXTERNAL_SRC}/cimgui/imgui/imgui_draw.cpp
     ${EXTERNAL_SRC}/cimgui/imgui/imgui_tables.cpp
     ${EXTERNAL_SRC}/cimgui/imgui/imgui_widgets.cpp
+    ${EXTERNAL_SRC}/cimgui/imgui/backends/imgui_impl_vulkan.cpp
   )
+  set_source_files_properties(${EXTERNAL_SRC}/cimgui/imgui/backends/imgui_impl_vulkan.cpp PROPERTIES
+    COMPILE_DEFINITIONS "VK_NO_PROTOTYPES")
   set(IMGUI_INCLUDE_DIRS
     ${EXTERNAL_SRC}/cimgui/imgui
     ${EXTERNAL_SRC}/cimgui/imgui/backends
@@ -1976,12 +1980,18 @@ if(USE_IMGUI AND NOT APPLE)
   if(USE_RENDERER_DLOPEN)
     target_sources(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${IMGUI_SRCS})
     target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${IMGUI_INCLUDE_DIRS})
-    target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_IMGUI)
+    target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_IMGUI USE_VULKAN)
+    if(USE_SDL AND TARGET SDL2::Core)
+      target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE SDL2::Core)
+    endif()
   else()
     if(USE_VULKAN)
       target_sources(${RENDERER_PREFIX}_vulkan PRIVATE ${IMGUI_SRCS})
       target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${IMGUI_INCLUDE_DIRS})
-      target_compile_definitions(${RENDERER_PREFIX}_vulkan PRIVATE USE_IMGUI)
+      target_compile_definitions(${RENDERER_PREFIX}_vulkan PRIVATE USE_IMGUI USE_VULKAN)
+      if(USE_SDL AND TARGET SDL2::Core)
+        target_link_libraries(${RENDERER_PREFIX}_vulkan PRIVATE SDL2::Core)
+      endif()
     endif()
   endif()
   message(STATUS "ImGui Inspector: enabled")
@@ -2167,6 +2177,12 @@ IF(USE_VULKAN)
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_VULKAN_API)
 ENDIF()
 
+if(USE_IMGUI AND NOT APPLE)
+	if(TARGET client)
+		target_compile_definitions(client PRIVATE USE_IMGUI)
+	endif()
+endif()
+
 IF(USE_MP3)
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_MP3)
 ENDIF()
@@ -2232,29 +2248,21 @@ if(USE_RECAST_NAV)
 endif()
 
 # --- ECS (EnTT) module - alternative to gentity ---
-set(ECS_CPP "${CMAKE_SOURCE_DIR}/src/game/ecs.cpp")
-if(EXISTS "${ECS_CPP}")
-  enable_language(CXX)
-  ADD_LIBRARY(ecs_module STATIC ${ECS_CPP})
-  set_target_properties(ecs_module PROPERTIES
-    CXX_STANDARD 17
-    CXX_STANDARD_REQUIRED ON
-  )
-  target_include_directories(ecs_module PRIVATE
-    ${EXTERNAL_INCLUDE}/entt/single_include
-    ${CMAKE_SOURCE_DIR}/src/game
-    ${CMAKE_SOURCE_DIR}/src/qcommon
-  )
-  if(NOT MSVC)
-    target_compile_options(ecs_module PRIVATE -Wno-unused-parameter)
-  endif()
-  set(ECS_MODULE_AVAILABLE TRUE)
-  add_compile_definitions(USE_ECS)
-  message(STATUS "ECS (EnTT): enabled")
-else()
-  set(ECS_MODULE_AVAILABLE FALSE)
-  message(STATUS "ECS (EnTT): disabled (src/game/ecs.cpp not found)")
+enable_language(CXX)
+ADD_LIBRARY(ecs_module STATIC src/game/ecs.cpp)
+set_target_properties(ecs_module PROPERTIES
+  CXX_STANDARD 17
+  CXX_STANDARD_REQUIRED ON
+)
+target_include_directories(ecs_module PRIVATE
+  ${EXTERNAL_INCLUDE}/entt/single_include
+  ${CMAKE_SOURCE_DIR}/src/game
+  ${CMAKE_SOURCE_DIR}/src/qcommon
+)
+if(NOT MSVC)
+  target_compile_options(ecs_module PRIVATE -Wno-unused-parameter)
 endif()
+message(STATUS "ECS (EnTT): enabled")
 
 # --- Bullet Physics module ---
 option(USE_BULLET_PHYSICS "Enable Bullet Physics integration" ON)
@@ -2321,9 +2329,7 @@ endif()
 if(USE_RECAST_NAV AND TARGET recast_nav)
   TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE recast_nav)
 endif()
-if(TARGET ecs_module)
-  TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ecs_module)
-endif()
+TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ecs_module)
 if(USE_FLUX)
 	TARGET_COMPILE_DEFINITIONS(${CNAME}${BINEXT} PRIVATE USE_FLUX)
 	if(TARGET cflux2)
@@ -2475,6 +2481,12 @@ add_test(NAME test_vk_vegetation_dispatch_order
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_vk_vegetation_dispatch_order PROPERTIES
 	LABELS "unit;scripts;validation")
+
+add_test(NAME test_vulkan_mesh_shader_opt_in
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_vulkan_mesh_shader_opt_in.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_vulkan_mesh_shader_opt_in PROPERTIES
+	LABELS "unit;scripts;validation;renderer")
 
 # --- Unit tests ---
 option(BUILD_UNIT_TESTS "Build unit tests" ON)

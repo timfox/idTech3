@@ -207,18 +207,14 @@ static void DrawTris( const shaderCommands_t *input ) {
 
 	GL_ProgramDisable();
 
-#ifdef USE_PMLIGHT
 	tess.dlightUpdateParams = qtrue;
-#endif
 
 	GL_ClientState( 0, CLS_NONE );
 	qglDisable( GL_TEXTURE_2D );
 
-#ifdef USE_PMLIGHT
 	if ( tess.dlightPass )
 		qglColor4f( 1.0f, 0.33f, 0.2f, 1.0f );
 	else
-#endif
 	qglColor4f( 1, 1, 1, 1 );
 
 	GL_State( GLS_POLYMODE_LINE | GLS_DEPTHMASK_TRUE );
@@ -298,11 +294,7 @@ void RB_BeginSurface( shader_t *shader, int fogNum ) {
 
 	shader_t *state;
 
-#ifdef USE_PMLIGHT
 	if ( !tess.dlightPass && shader->isStaticShader && !shader->remappedShader )
-#else
-	if ( shader->isStaticShader )
-#endif
 		tess.allowVBO = qtrue;
 	else
 		tess.allowVBO = qfalse;
@@ -319,24 +311,15 @@ void RB_BeginSurface( shader_t *shader, int fogNum ) {
 		state = shader;
 	}
 
-#ifdef USE_PMLIGHT
 	if ( tess.fogNum != fogNum || tess.cullType != state->cullType ) {
 		tess.dlightUpdateParams = qtrue;
 	}
-#endif
 
 #ifdef USE_TESS_NEEDS_NORMAL
-#ifdef USE_PMLIGHT
 	tess.needsNormal = state->needsNormal || tess.dlightPass || r_shownormals->integer ||
 		( backEnd.currentEntity == &tr.worldEntity &&
 		( ( r_shDebugView && r_shDebugView->integer ) ||
 		( r_shWorldLighting && r_shWorldLighting->integer && r_shLighting && r_shLighting->integer ) ) );
-#else
-	tess.needsNormal = state->needsNormal || r_shownormals->integer ||
-		( backEnd.currentEntity == &tr.worldEntity &&
-		( ( r_shDebugView && r_shDebugView->integer ) ||
-		( r_shWorldLighting && r_shWorldLighting->integer && r_shLighting && r_shLighting->integer ) ) );
-#endif
 #endif
 
 #ifdef USE_TESS_NEEDS_ST2
@@ -1039,7 +1022,6 @@ void RB_StageIteratorGeneric( void )
 	shader_t		*shader;
 	qboolean		worldShOverride;
 
-#ifdef USE_PMLIGHT
 	if ( tess.dlightPass )
 	{
 		ARB_LightingPass();
@@ -1047,7 +1029,6 @@ void RB_StageIteratorGeneric( void )
 	}
 
 	GL_ProgramDisable();
-#endif // USE_PMLIGHT
 
 #ifdef USE_VBO
 	if ( tess.vboIndex )
@@ -1138,9 +1119,7 @@ void RB_StageIteratorGeneric( void )
 	//
 	// now do any dynamic lighting needed
 	//
-#ifdef USE_PMLIGHT
 	if ( !r_dlightMode->integer )
-#endif
 	if ( !worldShOverride && tess.dlightBits && tess.shader->sort <= SS_OPAQUE && !(tess.shader->surfaceFlags & (SURF_NODLIGHT | SURF_SKY) ) )
 	{
 		ProjectDlightTexture();
@@ -1213,13 +1192,11 @@ void RB_EndSurface( void ) {
 	//
 	// update performance counters
 	//
-#ifdef USE_PMLIGHT
 	if ( tess.dlightPass ) {
 		backEnd.pc.c_lit_batches++;
 		backEnd.pc.c_lit_vertices += tess.numVertexes;
 		backEnd.pc.c_lit_indices += tess.numIndexes;
 	} else
-#endif
 	{
 		backEnd.pc.c_shaders++;
 		backEnd.pc.c_vertexes += tess.numVertexes;

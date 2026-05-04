@@ -11,6 +11,7 @@ src/
 │   ├── cl_cin_modern.c/h         Modern video codec dispatcher
 │   ├── cl_cin_ffmpeg/dav1d/vpx/theora.c  Codec backends
 │   ├── cl_particles.c/h          Particle system (8192 pool)
+│   ├── cl_demo.c/h               Demo record/playback (record, demo, stoprecord)
 │   ├── cl_map_background.c/h     Background maps for menus
 │   └── cl_window_title.c/h       Dynamic window title
 ├── game/                Gameplay systems
@@ -67,7 +68,8 @@ src/
 │   │   ├── vk_clear_attachments.c In-pass color/depth clear + dynamic color write mask (split from vk.c)
 │   │   ├── vk_cubemap_prefilter.c IBL cubemap prefilter, SH extraction, vk_generate_cubemaps, vk_begin_cubemap_render_pass, vk_create_brfdlut (split from legacy vk.c)
 │   │   ├── vk_fluidsim.c/h       Fluid simulation module
-│   │   ├── vk_postfx.c/h         PostFX (SSR, atmosphere, wind)
+│   │   ├── vk_postfx.c/h         PostFX cvars + `PostFX_PostPipelinesNeedUpdate` (SSR/bloom/SSAO/SMAA/OIT/FBO fmt)
+│   │   ├── vk_post_process_refresh.c  `vk_update_post_process_pipelines` — rebuild post VkPipelines when needed
 │   │   ├── vk_flashlight.c/h     Projected texture system
 │   │   ├── vk_skybox_hdr.c/h     HDR EXR skybox + IBL
 │   │   ├── tr_model_gltf.c/h     glTF 2.0 loader (shared; Vulkan GPU path + OpenGL CPU tess - see docs/GLTF.md)
@@ -126,7 +128,7 @@ The shipping Vulkan renderer is **forward-only** with a layered HDR/post-process
 1. Shadow passes (sun CSM, spot atlas, point cubemaps)
 2. Main forward scene pass
 3. Optional OIT resolve for transparent surfaces
-4. SSR
+4. SSR (SSR pass pipelines are created only when `r_ssr` is on; toggling it triggers a frame-start post-pipeline rebuild)
 5. Bloom
 6. SSAO/HBAO
 7. Atmosphere + volumetric fog
@@ -137,7 +139,7 @@ The shipping Vulkan renderer is **forward-only** with a layered HDR/post-process
 
 `r_renderMode 1/2` remain **deferred / classic Forward+ placeholders** (no alternate full-frame path through those modes).
 
-**Vulkan optional Forward+ scaffolding** (`r_forwardPlus 1`, default **0**, **latched**): GPU light record SSBO, **16×16 px** tile cull compute, and optional PBR tile debug / additive local-light shading. Packed lights are capped at **`MAX_DLIGHTS` (32)** so indices stay aligned with `tess.dlightBits`. Per-tile index count is **`r_forwardPlusMaxPerTile`** (**4–8**, latched, default **8**; SSBO stride is fixed at 8 slots). Tile buffers follow **`vk_get_render_target_width/height`** (internal resolution / `r_renderScale`) and **reallocate on resize** without `vid_restart`; toggling `r_forwardPlus` or `r_forwardPlusMaxPerTile` still needs **`vid_restart`**. Implementation: `src/renderers/vulkan/vk_forward_plus.c`, cvars in `src/renderers/vulkan/tr_init.c`. Full audit: [FORWARD_PLUS_PIPELINE_AUDIT.md](FORWARD_PLUS_PIPELINE_AUDIT.md).
+**Vulkan optional Forward+ scaffolding** (`r_forwardPlus 1`, default **0**, **latched**): GPU light record SSBO, **16×16 px** tile cull compute, and optional PBR tile debug / additive local-light shading. Packed lights are capped at **`MAX_DLIGHTS` (32)** so indices stay aligned with `tess.dlightBits`. Per-tile index count is **`r_forwardPlusMaxPerTile`** (**4–8**, latched, default **8**; SSBO stride is fixed at 8 slots). Tile buffers follow **`vk_get_render_target_width/height`** (main FBO color extent when active, else `vk.render*` / window—`vk_view_state.c`) and **reallocate on resize** without `vid_restart`; toggling `r_forwardPlus` or `r_forwardPlusMaxPerTile` still needs **`vid_restart`**. Implementation: `src/renderers/vulkan/vk_forward_plus.c`, cvars in `src/renderers/vulkan/tr_init.c`. Full audit: [FORWARD_PLUS_PIPELINE_AUDIT.md](FORWARD_PLUS_PIPELINE_AUDIT.md).
 
 For goals and longer notes, see [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_2026_ARCHITECTURE_PASS.md) and [RENDERERS.md](RENDERERS.md#vulkan-forward-scaffolding).
 
@@ -159,7 +161,13 @@ When `fs_restrict` is **0** (default), `VM_Create` always tries a **native** sha
 
 **Filesystem resolution** (`FS_LoadLibrary` in `src/qcommon/files.c`): for each static game directory on the search path, the engine tries `modules/<file>` then `vm/<file>`, then the file **directly in the gamedir** (legacy). If the requested name already looks like a dotted native (`ui.x86_64.dll`, `cgame.x86_64.so`, etc.), it also tries the dotted form under `modules/` and `vm/` for `ui`, `cgame`, and `qagame` prefixes.
 
+**Native modules stored only inside `.pk3`:** `dlopen` / `LoadLibrary` cannot load directly from zip-backed file handles. When **`com_nativeLibraryExtractPk3`** is **1** (default, archived), `FS_LoadLibrary` first looks up the requested basename via `FS_ReadFile` (virtual paths such as `vm/uix86_64.so`). If the bytes exist only in a pack, it writes them under **`<fs_homepath>/<fs_game>/vm/native_cache/<basename>`** (CRC32 match skips rewrite when the cache file already matches), then loads that OS path. Set **`com_nativeLibraryExtractPk3`** to **0** to disable extraction (fall back to loose files only). Startup prints one line when extraction is enabled.
+
 **Debugging failed loads:** `+set com_nativeLibraryDebug 1` logs each failed path and the OS loader message. See [DEVELOPMENT_SETUP.md](DEVELOPMENT_SETUP.md#prerequisites) (native DLL troubleshooting). Unit coverage: `ctest -R unit_vm_native_module` exercises candidate ordering.
+
+## Client HTTP downloads (libcurl)
+
+The **client** links **libcurl** when `USE_CURL` is enabled at build time. It powers **HTTPS/FTP** fetches of **`.pk3`** archives: server redirect downloads (`sv_dlURL` + `CL_cURL_*`) and manual or auto map downloads (`cl_dlURL` + `Com_DL_*`, commands `download` / `dlmap`). Protocols are restricted to **http, https, ftp, ftps**; there is no generic HTTP API exposed to game VMs without additional code. Full tutorial: [CURL_NETWORKING.md](CURL_NETWORKING.md).
 
 ## JavaScript / UI Debug (Duktape)
 

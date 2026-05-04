@@ -13,11 +13,11 @@ Architecture inspired by EternalJK's pbr-rtx-inspector (Sunny JK).
 
 #ifdef USE_IMGUI
 
-#define VK_NO_PROTOTYPES
 #define IMGUI_DEFINE_MATH_OPERATORS
 
 #include <float.h>
 #include <imgui.h>
+#include <imgui_impl_vulkan.h>
 #include <imgui_internal.h>
 
 extern "C" {
@@ -26,9 +26,34 @@ extern "C" {
 #include "../../renderers/common/tr_public.h"
 
 extern glconfig_t glConfig;
+extern cvar_t *r_imgui;
 }
 
+#if defined( USE_SDL ) && !defined( ANDROID )
+#	if defined( USE_LOCAL_HEADERS )
+#		include "SDL.h"
+#	else
+#		include <SDL2/SDL.h>
+#	endif
+extern "C" struct SDL_Window *SDL_window;
+#endif
+
+#ifdef USE_VULKAN
+#define USE_VK_PBR
+#include "../vk.h"
+#endif
+
 #include "vk_imgui.h"
+
+extern "C" bool VkImgui_InitVulkanBackend( ImGui_ImplVulkan_InitInfo *outInfo, char *errBuf, size_t errBufSize );
+extern "C" void VkImgui_ShutdownVulkanBackend( void );
+extern "C" void VkImgui_NewFrameVulkan( void );
+extern "C" void VkImgui_RenderDrawDataVulkan( ImDrawData *drawData, VkCommandBuffer cmd );
+extern "C" void VkImgui_UpdateMouseFromSDL( ImGuiIO *io, qboolean inspectorWantsInput );
+extern "C" void VkImgui_NotifySwapchainRestart( void );
+extern "C" void VkImgui_SetVulkanBackendReady( qboolean ready );
+
+static qboolean vkImgBackendReady = qfalse;
 
 /* Helper to read float cvar (refimport has no Cvar_VariableValue) */
 static float VkImgui_CvarFloat( const char *name )
@@ -77,9 +102,33 @@ static void VkImgui_PrepareIO( void )
 
 	io.DisplaySize = ImVec2( (float)( windowWidth >= 0 ? windowWidth : 0 ),
 		(float)( windowHeight >= 0 ? windowHeight : 0 ) );
-	io.DisplayFramebufferScale = ImVec2( 1.0f, 1.0f );
+	{
+		float sx = 1.0f;
+		float sy = 1.0f;
+#if defined( USE_SDL ) && !defined( ANDROID )
+		if ( SDL_window != nullptr ) {
+			int winW = 0;
+			int winH = 0;
+			SDL_GetWindowSize( SDL_window, &winW, &winH );
+			if ( winW > 0 && winH > 0 && glConfig.vidWidth > 0 && glConfig.vidHeight > 0 ) {
+				sx = (float)glConfig.vidWidth / (float)winW;
+				sy = (float)glConfig.vidHeight / (float)winH;
+			}
+		}
+#endif
+		io.DisplayFramebufferScale = ImVec2( sx, sy );
+	}
 	io.DeltaTime = deltaSeconds;
-	io.MousePos = ImVec2( -FLT_MAX, -FLT_MAX );
+
+	{
+		const qboolean wantInput = ( r_imgui && r_imgui->integer ) ? qtrue : qfalse;
+		vkImguiState.inputState = wantInput;
+		if ( wantInput ) {
+			VkImgui_UpdateMouseFromSDL( &io, wantInput );
+		} else {
+			io.MousePos = ImVec2( -FLT_MAX, -FLT_MAX );
+		}
+	}
 
 	imguiLastFrameTimeMs = nowMs;
 }
@@ -249,12 +298,6 @@ extern "C" void VkImgui_Initialize(void) {
 	VkImgui_SetCurrentContext();
 	ImGuiIO &io = ImGui::GetIO();
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-	/* Build font atlas so ImGui can render text. Required when backend does not set
-	 * ImGuiBackendFlags_RendererHasTextures. Avoids "font atlas is not built" assert. */
-	unsigned char *fontPixels = nullptr;
-	int fontW = 0, fontH = 0;
-	io.Fonts->GetTexDataAsRGBA32(&fontPixels, &fontW, &fontH);
-	(void)fontPixels; (void)fontW; (void)fontH; /* backend would upload to GPU and call SetTexID */
 	VkImgui_DarkTheme();
 
 	memset(&vkInspector, 0, sizeof(vkInspector));
@@ -266,6 +309,24 @@ extern "C" void VkImgui_Initialize(void) {
 	vkImguiState.active = qtrue;
 	vkImguiState.inputState = qfalse;
 	imguiLastFrameTimeMs = 0;
+
+#ifdef USE_VULKAN
+	{
+		char errBuf[256];
+
+		vkImgBackendReady = qfalse;
+		VkImgui_SetVulkanBackendReady( qfalse );
+		if ( vk.device != VK_NULL_HANDLE && vk.render_pass.overlay_compose != VK_NULL_HANDLE ) {
+			if ( VkImgui_InitVulkanBackend( nullptr, errBuf, sizeof( errBuf ) ) ) {
+				vkImgBackendReady = qtrue;
+				VkImgui_SetVulkanBackendReady( qtrue );
+				ri.Printf( PRINT_ALL, "ImGui: Vulkan renderer backend initialized (overlay pass)\n" );
+			} else {
+				ri.Printf( PRINT_WARNING, "ImGui: Vulkan renderer backend failed (%s)\n", errBuf );
+			}
+		}
+	}
+#endif
 }
 
 extern "C" void VkImgui_Shutdown(void) {
@@ -273,6 +334,13 @@ extern "C" void VkImgui_Shutdown(void) {
 
 	if (imguiContext) {
 		VkImgui_SetCurrentContext();
+#ifdef USE_VULKAN
+		if ( vkImgBackendReady ) {
+			VkImgui_ShutdownVulkanBackend();
+			vkImgBackendReady = qfalse;
+			VkImgui_SetVulkanBackendReady( qfalse );
+		}
+#endif
 		ImGui::DestroyContext(imguiContext);
 		imguiContext = nullptr;
 	}
@@ -285,7 +353,59 @@ extern "C" void VkImgui_BeginFrame(void) {
 	if (!vkImguiState.active) return;
 	VkImgui_SetCurrentContext();
 	VkImgui_PrepareIO();
+#ifdef USE_VULKAN
+	if ( vkImgBackendReady ) {
+		VkImgui_NewFrameVulkan();
+	}
+#endif
 	ImGui::NewFrame();
+}
+
+static void VkImgui_DrawAboutInspectorPopup( void )
+{
+	if ( ImGui::BeginPopupModal( "AboutInspector", nullptr, ImGuiWindowFlags_AlwaysAutoResize ) ) {
+		ImGui::TextUnformatted( Q3_VERSION );
+		ImGui::Separator();
+		ImGui::Text( "ImGui %s", IMGUI_VERSION );
+#ifdef USE_VULKAN
+		ImGui::Text( "Renderer API: Vulkan" );
+#else
+		ImGui::Text( "Renderer API: OpenGL" );
+#endif
+		ImGui::Spacing();
+		ImGui::TextWrapped( "Vendor: %s", glConfig.vendor_string );
+		ImGui::TextWrapped( "Device: %s", glConfig.renderer_string );
+		ImGui::TextWrapped( "Version: %s", glConfig.version_string );
+		ImGui::Spacing();
+		ImGui::TextWrapped(
+			"Toggle overlay input with F11 or \\toggle_imgui; set \\r_imgui 0 to hide CPU/UI work. "
+			"PostFX and related panels drive renderer cvars." );
+		ImGui::Spacing();
+		if ( ImGui::Button( "OK", ImVec2( 120.0f, 0.0f ) ) ) {
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
+}
+
+static void VkImgui_DrawShortcutsPopup( void )
+{
+	if ( ImGui::BeginPopupModal( "InspectorShortcuts", nullptr, ImGuiWindowFlags_AlwaysAutoResize ) ) {
+		ImGui::TextWrapped(
+			"F11 or \\toggle_imgui toggles the inspector when the client is built with ImGui. "
+			"\\r_imgui 0 skips inspector CPU work; use Developer menu for a quick toggle." );
+		ImGui::Spacing();
+		ImGui::Separator();
+		ImGui::BulletText( "File: JPEG screenshot (silent), console, quit" );
+		ImGui::BulletText( "Window: show/hide docked panels" );
+		ImGui::BulletText( "Render Mode: \\r_pbr_debug modes (0-8 active)" );
+		ImGui::BulletText( "Developer: \\r_speeds, \\r_showtris, \\r_imgui" );
+		ImGui::Spacing();
+		if ( ImGui::Button( "Close", ImVec2( 120.0f, 0.0f ) ) ) {
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
 }
 
 static void VkImgui_DrawMenuBar(void) {
@@ -295,7 +415,66 @@ static void VkImgui_DrawMenuBar(void) {
 
 	if (ImGui::BeginMainMenuBar()) {
 		if (ImGui::BeginMenu("File")) {
-			ImGui::MenuItem("Quit");
+			if ( ImGui::MenuItem( "Screenshot (JPEG)" ) ) {
+				ri.Cmd_ExecuteText( EXEC_APPEND, "screenshotJPEG silent\n" );
+			}
+			if ( ImGui::MenuItem( "Toggle console" ) ) {
+				ri.Cmd_ExecuteText( EXEC_APPEND, "toggleconsole\n" );
+			}
+			ImGui::Separator();
+			if ( ImGui::MenuItem( "Quit" ) ) {
+				ri.Cmd_ExecuteText( EXEC_APPEND, "quit\n" );
+			}
+			ImGui::EndMenu();
+		}
+
+		if ( ImGui::BeginMenu("Help")) {
+			if ( ImGui::MenuItem( "Inspector shortcuts" ) ) {
+				ImGui::OpenPopup( "InspectorShortcuts" );
+			}
+			if ( ImGui::MenuItem( "About inspector" ) ) {
+				ImGui::OpenPopup( "AboutInspector" );
+			}
+			ImGui::EndMenu();
+		}
+
+		if ( ImGui::BeginMenu( "Developer" ) ) {
+			if ( r_imgui ) {
+				bool riOn = r_imgui->integer != 0;
+				if ( ImGui::Checkbox( "Inspector overlay (r_imgui)", &riOn ) ) {
+					ri.Cvar_SetValue( "r_imgui", riOn ? 1.0f : 0.0f );
+				}
+				if ( ImGui::IsItemHovered() ) {
+					ImGui::SetTooltip( "When off, skips ImGui BeginFrame/Draw CPU work. F11 still toggles from the client." );
+				}
+			}
+			{
+				int sp = ri.Cvar_VariableIntegerValue( "r_speeds" );
+				if ( sp < 0 ) {
+					sp = 0;
+				}
+				if ( sp > 6 ) {
+					sp = 6;
+				}
+				const int spPrev = sp;
+				ImGui::SliderInt( "r_speeds (debug HUD)", &sp, 0, 6 );
+				if ( sp != spPrev ) {
+					ri.Cvar_Set( "r_speeds", va( "%d", sp ) );
+				}
+				if ( ImGui::IsItemHovered() ) {
+					ImGui::SetTooltip( "Console stats overlay (cheat cvar). 0=off, 1=BSP, 2=patch cull, 3=cluster, 4=dlights, 5=zFar, 6=flares." );
+				}
+			}
+			{
+				int st = ri.Cvar_VariableIntegerValue( "r_showtris" );
+				bool showTris = ( st != 0 );
+				if ( ImGui::Checkbox( "Wireframe world (r_showtris)", &showTris ) ) {
+					ri.Cvar_Set( "r_showtris", showTris ? "1" : "0" );
+				}
+				if ( ImGui::IsItemHovered() ) {
+					ImGui::SetTooltip( "World triangle overlay (cheat). May reduce performance." );
+				}
+			}
 			ImGui::EndMenu();
 		}
 
@@ -901,6 +1080,8 @@ extern "C" void VkImgui_Draw(void) {
 	ImGui::DockSpace(dockId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
 
 	VkImgui_DrawMenuBar();
+	VkImgui_DrawAboutInspectorPopup();
+	VkImgui_DrawShortcutsPopup();
 	VkImgui_DrawViewport();
 	VkImgui_DrawShaderEditor();
 	VkImgui_DrawObjects();
@@ -914,7 +1095,12 @@ extern "C" void VkImgui_Draw(void) {
 	ImGui::Render();
 }
 
-extern "C" void VkImgui_SwapchainRestarted(void) { }
+extern "C" void VkImgui_SwapchainRestarted(void) {
+#ifdef USE_VULKAN
+	VkImgui_NotifySwapchainRestart();
+#endif
+}
+
 extern "C" void VkImgui_BindGameColorImage(void) { }
 
 #endif /* USE_IMGUI */

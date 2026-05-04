@@ -49,9 +49,8 @@ static void push_attr( uint32_t location, uint32_t binding, VkFormat format )
 static VkShaderModule *vk_select_pbr_gen_vert( const Vk_Pipeline_Def *def, int use_pbr, int tx, int cl, int env )
 {
 	const int fog = def->fog_stage ? 1 : 0;
-	const int gltfTan = ( def->gltf_gpu_tangent_fixup && def->pbr_vert_mode ) ? 1 : 0;
 	if ( def->pbr_vert_mode && use_pbr ) {
-		return &vk.modules.vert.gen_gltf_gpu[use_pbr][tx][cl][env][fog][gltfTan];
+		return &vk.modules.vert.gen_gltf_gpu[use_pbr][tx][cl][env][fog];
 	}
 	return &vk.modules.vert.gen[use_pbr][tx][cl][env][fog];
 }
@@ -797,7 +796,6 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 
 	if ( def->vk_pbr_flags & PBR_HAS_DETAILMAP )
 		frag_spec_data.detail_texture_set = 0;
-#ifdef HDR_DELUXE_LIGHTMAP
 	if ( r_deluxeMapping->integer )
 	{
 		// deluxe_texture_set = 0: use approx + scale
@@ -809,7 +807,6 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 			frag_spec_data.deluxe_mapping = 1;
 	}
 	else
-#endif // HDR_DELUXE_LIGHTMAP
 	{
 		// use approx + default scale
 		// perhaps when r_specularMapping = 0 set scale to 0 to disable it?

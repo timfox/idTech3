@@ -69,8 +69,8 @@ float opticalDepth(vec3 origin, vec3 dir, float rayLength, float scaleHeight) {
 }
 
 void main() {
-	/* Depth test: only sky pixels pass (no geometry).
-	 * Reversed depth: far=0.0, use EQUAL frag=0.0 so we pass only where stored==0.0. */
+	/* Depth test: only sky pixels pass (no geometry). Reversed depth: far=0.0;
+	 * use EQUAL in pipeline so we pass only where stored==0.0. */
 	gl_FragDepth = 0.0;
 	vec2 uv = frag_tex_coord * 2.0 - 1.0;
 	vec3 forward = normalize(atm.viewForward.xyz);
