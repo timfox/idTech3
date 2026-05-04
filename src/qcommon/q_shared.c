@@ -2161,7 +2161,7 @@ qboolean Info_SetValueForKey_s( char *s, int slen, const char *key, const char *
 		return qfalse;
 	}
 
-	strcpy( s + len1, newi );
+	Q_strncpyz( s + len1, newi, slen - len1 );
 	return qtrue;
 }
 

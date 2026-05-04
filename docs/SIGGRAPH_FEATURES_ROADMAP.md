@@ -14,7 +14,7 @@ This document tracks implementation of 10 features from recent Siggraph papers, 
 | # | Feature | Status | Priority | Est. Effort |
 |---|---------|--------|----------|-------------|
 | 1 | OIT (WBOIT) | Implemented (resolve; accum pipeline pending) | High | 1–2 days |
-| 2 | Volumetric fog improvements | Planned | High | 2–3 days |
+| 2 | Volumetric fog improvements | In progress (jitter + composite mode) | High | 2–3 days |
 | 3 | MegaLights | Planned | High | 3–5 days |
 | 4 | ReSTIR GI | Planned | High | 2–4 weeks |
 | 5 | Neural Light Grid | Planned | Medium | 4–8 weeks |
@@ -57,10 +57,11 @@ This document tracks implementation of 10 features from recent Siggraph papers, 
 ## 2. Volumetric Fog Improvements (TLOU2-style)
 
 **Source**: The Last of Us Part II, Advances  
-**Cvars**: Existing `r_volumetricFog*` + new `r_volumetricFogJitter`, `r_volumetricFogCompositeMode`
+**Cvars**: Existing `r_volumetricFog*` + `r_volumetricFogJitter`, **`r_volumetricFogCompositeMode`**
 
 ### Improvements
 - **Jittered sampling**: Per-frame offset to reduce banding (already have temporal)
+- **Composite modes** (`r_volumetricFogCompositeMode`): **0** = standard `scene * T + L`; **1** = depth-weighted in-scatter `scene * T + L * T` (reduces near-camera fog glow); **2** = optional per-channel clamp using `r_volumetricFogFireflyClamp` after composite
 - **Transparent compositing**: Proper depth-aware blend with alpha-tested geometry
 - **Froxel culling**: Aggressive frustum/occlusion culling for empty cells
 - **Indirect dispatch**: Sort froxels by workload for better GPU utilization
@@ -71,7 +72,7 @@ This document tracks implementation of 10 features from recent Siggraph papers, 
 - Compute stages: density, volume, sun, local lights, clamp, temporal
 
 ### Files
-- `vk_volumetric_params.c`, `vk_volumetric_pass_compute.c`, `volumetric_fog.comp`: Parameters, dispatch, jitter, culling
+- `vk_volumetric_params.c`, `vk_volumetric_pass_compute.c`, `volumetric_fog.comp` / **`volumetric_fog.frag`**: Parameters, dispatch, jitter, composite resolve
 
 ---
 
@@ -237,6 +238,8 @@ This document tracks implementation of 10 features from recent Siggraph papers, 
 
 ## References
 
+- Prioritized reading list (SSR, volumetric fog, spec AA, MSM, WBOIT, stochastic culling, water): **`docs/REALTIME_RENDERING_READING_LIST.md`**
+- Ocean / water rendering bibliography corrections (MIG vs SIGGRAPH, poster titles, “Real-Time Ocean Rendering” as a label): **`docs/OCEAN_RENDERING_REFERENCES.md`**
 - [Advances in Real-Time Rendering 2025](https://advances.realtimerendering.com/s2025)
 - [Advances in Real-Time Rendering 2024](https://advances.realtimerendering.com/s2024)
 - [Neural Light Grid (Activision)](https://research.activision.com/publications/2024/08/Neural_Light_Grid)
