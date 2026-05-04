@@ -9,10 +9,12 @@ set(DEMO_MOD_FILES
 	"${DEMO_MOD_DIR}/autoexec.cfg"
 	"${DEMO_MOD_DIR}/demo_features.cfg"
 	"${DEMO_MOD_DIR}/demo_js.cfg"
+	"${DEMO_MOD_DIR}/demo_lua.cfg"
 	"${DEMO_MOD_DIR}/demo_gameplay.cfg"
 	"${DEMO_MOD_DIR}/readme_demo.txt"
 	"${DEMO_MOD_DIR}/scripts/js/demo_hooks.js"
 	"${DEMO_MOD_DIR}/scripts/js/README.txt"
+	"${DEMO_MOD_DIR}/scripts/lua/demo_hooks.lua"
 )
 
 # Minimal native UI for skeleton playfields (loads from pk3 vm/ before ui.qvm).
@@ -38,7 +40,10 @@ if(NOT ANDROID)
 	if(NOT MSVC)
 		target_compile_options(demo_ui_skeleton PRIVATE -Wall -Wextra -pedantic)
 	endif()
+	# Primary probe name from VM_BuildNativeModuleCandidates (ui.so first is skipped if missing).
+	# Also ship dotted form so FS_LoadLibrary finds the same bytes under vm/ui.<arch>.so (matches docs/tests).
 	set(DEMO_UI_IN_ZIP "vm/ui${DEMO_UI_ARCH}${CMAKE_SHARED_LIBRARY_SUFFIX}")
+	set(DEMO_UI_DOT_ZIP "vm/ui.${DEMO_UI_ARCH}${CMAKE_SHARED_LIBRARY_SUFFIX}")
 endif()
 
 # Staging tree + zip so vm/ui*.so ships inside idtech3_demo.pk3 (pk3 is a zip).
@@ -46,6 +51,7 @@ add_custom_command(
 	OUTPUT "${DEMO_PK3}"
 	COMMAND ${CMAKE_COMMAND} -E rm -rf "${DEMO_PACK_STAGING}"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/scripts/js"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/scripts/lua"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/vm"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/autoexec.cfg" "${DEMO_PACK_STAGING}/autoexec.cfg"
@@ -53,6 +59,8 @@ add_custom_command(
 		"${DEMO_MOD_DIR}/demo_features.cfg" "${DEMO_PACK_STAGING}/demo_features.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/demo_js.cfg" "${DEMO_PACK_STAGING}/demo_js.cfg"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/demo_lua.cfg" "${DEMO_PACK_STAGING}/demo_lua.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/demo_gameplay.cfg" "${DEMO_PACK_STAGING}/demo_gameplay.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -62,12 +70,18 @@ add_custom_command(
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/scripts/js/README.txt" "${DEMO_PACK_STAGING}/scripts/js/README.txt"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/scripts/lua/demo_hooks.lua" "${DEMO_PACK_STAGING}/scripts/lua/demo_hooks.lua"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"$<TARGET_FILE:demo_ui_skeleton>" "${DEMO_PACK_STAGING}/${DEMO_UI_IN_ZIP}"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"$<TARGET_FILE:demo_ui_skeleton>" "${DEMO_PACK_STAGING}/${DEMO_UI_DOT_ZIP}"
 	COMMAND ${CMAKE_COMMAND} -E chdir "${DEMO_PACK_STAGING}"
 		${CMAKE_COMMAND} -E tar cf "${DEMO_PK3}" --format=zip
-		autoexec.cfg demo_features.cfg demo_js.cfg demo_gameplay.cfg readme_demo.txt
+		autoexec.cfg demo_features.cfg demo_js.cfg demo_lua.cfg demo_gameplay.cfg readme_demo.txt
 		scripts/js/demo_hooks.js scripts/js/README.txt
+		scripts/lua/demo_hooks.lua
 		"${DEMO_UI_IN_ZIP}"
+		"${DEMO_UI_DOT_ZIP}"
 	DEPENDS ${DEMO_MOD_FILES} demo_ui_skeleton
 	COMMENT "Packaging idtech3_demo.pk3 (configs + native UI stub)"
 	VERBATIM

@@ -263,7 +263,6 @@ typedef struct {
 	uint32_t				vk_pbr_flags;
 	int32_t					lightmap_bundle;
 	uint8_t					pbr_vert_mode; /* 0=default gen_vert, 1=glTF GPU skin+morph variant */
-	uint8_t					gltf_gpu_tangent_fixup; /* 1=vertex shader re-orthonormalizes T vs deformed N (r_gltfGpuTangentFix) */
 	uint8_t					pom_height_source; /* 0=ORM R (physical map), 1=normal map alpha (normalHeightMap) */
 	vec4_t					specularScale;
 	vec4_t					normalScale;
@@ -948,8 +947,8 @@ typedef struct {
 		struct {
 #ifdef USE_VK_PBR
 			VkShaderModule gen[2][3][2][2][2]; // pbr[0,1], tx[0,1,2], cl[0,1] env0[0,1] fog[0,1]
-			/* +USE_GLTF_GPU_SKIN; last dim: 0=bind pose tangent, 1=r_gltfGpuTangentFix (skin+morph orthonormalize) */
-			VkShaderModule gen_gltf_gpu[2][3][2][2][2][2];
+			/* +USE_GLTF_GPU_SKIN + GLTF_GPU_TANGENT_FIX (Gram–Schmidt T after skin+morph) */
+			VkShaderModule gen_gltf_gpu[2][3][2][2][2];
 			VkShaderModule ident1[2][2][2][2]; // pbr[0,1], tx[0,1], env0[0,1] fog[0,1]
 			VkShaderModule fixed[2][2][2][2];  // pbr[0,1], tx[0,1], env0[0,1] fog[0,1]
 #else
@@ -1089,10 +1088,8 @@ typedef struct {
 	uint32_t dlight_pipelines[2][3][2];
 
 	// cullType[3], polygonOffset[2], fogStage[2], absLight[2]
-#ifdef USE_PMLIGHT
 	uint32_t dlight_pipelines_x[3][2][2][2];
 	uint32_t dlight1_pipelines_x[3][2][2][2];
-#endif
 
 	// debug visualization pipelines
 	uint32_t tris_debug_pipeline;

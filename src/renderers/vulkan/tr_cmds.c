@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_postfx.h"
 #include "vk_skybox_hdr.h"
 #ifdef USE_IMGUI
+extern cvar_t *r_imgui;
 void VkImgui_Initialize( void );
 void VkImgui_BeginFrame( void );
 void VkImgui_Draw( void );
@@ -330,7 +331,7 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 #endif
 
 #ifdef USE_IMGUI
-	if ( stereoFrame == STEREO_CENTER ) {
+	if ( stereoFrame == STEREO_CENTER && r_imgui && r_imgui->integer ) {
 		VkImgui_Initialize();
 		VkImgui_BeginFrame();
 	}
@@ -401,7 +402,9 @@ void RE_EndFrame( int *frontEndMsec, int *backEndMsec ) {
 	}
 
 #ifdef USE_IMGUI
-	VkImgui_Draw();
+	if ( r_imgui && r_imgui->integer ) {
+		VkImgui_Draw();
+	}
 #endif
 
 	cmd = R_GetCommandBufferReserved( sizeof( *cmd ), 0 );
