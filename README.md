@@ -12,8 +12,6 @@ Modern id Tech 3: **Vulkan-first renderer with PBR**, optional OpenGL fallback, 
 2. **Tooling** - GPU detection, validation layers, performance HUD, safe mode, CI matrix builds, smoke tests and shader validation in the build.
 3. **Platform** - Linux, Windows, macOS, Android; IPv4/IPv6 networking, modern codecs and asset loaders.
 
-Ray tracing (Vulkan RT) is **scaffolded / in progress** - see `docs/RENDERERS_FUTURE.md` and `CLAUDE.md` for status, not a headline guarantee.
-
 ### Features (by area)
 
 **Rendering**:

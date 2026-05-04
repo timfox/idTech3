@@ -20,6 +20,9 @@ Extracted from vk.c for incremental modularization.
 #include "vk_sync.h"
 #include "vk_temporal.h"
 #include "vk_util.h"
+#ifdef USE_IMGUI
+#include "inspector/vk_imgui.h"
+#endif
 
 void vk_teardown_presentation_targets( void )
 {
@@ -36,12 +39,6 @@ void vk_teardown_presentation_targets( void )
 			qvkResetCommandBuffer( vk.tess[i].command_buffer, 0 );
 		}
 	}
-
-#ifdef USE_UPLOAD_QUEUE
-	if ( vk.staging_command_buffer != VK_NULL_HANDLE ) {
-		qvkResetCommandBuffer( vk.staging_command_buffer, 0 );
-	}
-#endif
 
 	vk_destroy_pipelines( qfalse );
 	vk_destroy_framebuffers();
@@ -79,6 +76,10 @@ void vk_restore_presentation_targets( void )
 	vk_update_volumetric_descriptors();
 
 	vk_update_post_process_pipelines();
+
+#ifdef USE_IMGUI
+	VkImgui_SwapchainRestarted();
+#endif
 
 #ifdef VK_PBR_BRDFLUT
 	vk_create_brfdlut();

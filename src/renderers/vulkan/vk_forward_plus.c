@@ -172,6 +172,7 @@ typedef struct {
 	uint32_t total_tiles;
 	uint32_t num_lights;
 	uint32_t max_per_tile;
+	uint32_t luminance_sort;
 } vk_fp_push_t;
 
 static VkDescriptorSet vk_fp_graphics_descriptor = VK_NULL_HANDLE;
@@ -732,6 +733,9 @@ void vk_forward_plus_init( void )
 
 	ri.Printf( PRINT_ALL, "[VK][Forward+] r_forwardPlus=1 device-local light SSBO + staging %u bytes (tile cull + PBR read VRAM)\n",
 		(unsigned)vk.forward_plus.capacity_bytes );
+	if ( r_forwardPlusLuminanceSort && r_forwardPlusLuminanceSort->integer ) {
+		ri.Printf( PRINT_ALL, "[VK][Forward+] r_forwardPlusLuminanceSort=1 (tile overload picks brightest RGB sum)\n" );
+	}
 }
 
 void vk_forward_plus_ensure_render_resolution( void )
@@ -999,6 +1003,7 @@ void vk_forward_plus_dispatch_tile_cull( void )
 	push.total_tiles = vk.forward_plus.tiles_x * vk.forward_plus.tiles_y;
 	push.num_lights = vk.forward_plus.last_packed_count;
 	push.max_per_tile = vk.forward_plus.max_per_tile;
+	push.luminance_sort = ( r_forwardPlusLuminanceSort && r_forwardPlusLuminanceSort->integer ) ? 1u : 0u;
 
 	qvkCmdPushConstants( vk.cmd->command_buffer, vk.forward_plus.pipeline_layout,
 		VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( push ), &push );

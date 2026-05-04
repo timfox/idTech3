@@ -138,7 +138,6 @@ void GL_ProgramEnable( void )
 }
 
 
-#ifdef USE_PMLIGHT
 static void ARB_Lighting( const shaderStage_t* pStage )
 {
 	const dlight_t* dl;
@@ -366,7 +365,6 @@ void ARB_LightingPass( void )
 		qglDisable( GL_POLYGON_OFFSET_FILL );
 	}
 }
-#endif // USE_PMLIGHT
 
 
 const char *fogOutVPCode = {
@@ -428,7 +426,6 @@ const char *fogInVPCode = {
 };
 
 
-#ifdef USE_PMLIGHT
 static const char dlightVPPrefix[] = {
 	"!!ARBvp1.0 \n"
 	"OPTION ARB_position_invariant; \n"
@@ -607,7 +604,6 @@ static const char *ARB_BuildDlightFP( char *program, int programSize, int progra
 	return program;
 }
 
-#endif // USE_PMLIGHT
 
 
 static const char *dummyVP = {
@@ -1009,14 +1005,10 @@ qboolean ARB_CompileProgram( programType ptype, const char *text, GLuint program
 
 qboolean ARB_UpdatePrograms( void )
 {
-#ifdef USE_PMLIGHT
 	const char *program;
 	int i;
-#endif
-#if defined (USE_FBO) || defined (USE_PMLIGHT)
 	char buf[4096];
 	char programText[4096];
-#endif
 
 	if ( !qglGenProgramsARB )
 		return qfalse;
@@ -1029,7 +1021,6 @@ qboolean ARB_UpdatePrograms( void )
 
 	qglGenProgramsARB( ARRAY_LEN( programs ) - PROGRAM_BASE, programs + PROGRAM_BASE );
 
-#ifdef USE_PMLIGHT
 	Com_sprintf( buf, sizeof( buf ), "%s%s%s", dlightVPPrefix, "", dlightVPSuffix );
 	if ( !ARB_CompileProgram( Vertex, buf, programs[ DLIGHT_VERTEX ] ) )
 		return qfalse;
@@ -1046,7 +1037,6 @@ qboolean ARB_UpdatePrograms( void )
 			return qfalse;
 		}
 	}
-#endif // USE_PMLIGHT
 
 	if ( !ARB_CompileProgram( Vertex, dummyVP, programs[ DUMMY_VERTEX ] ) )
 		return qfalse;

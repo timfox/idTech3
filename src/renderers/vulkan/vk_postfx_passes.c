@@ -348,11 +348,7 @@ qboolean vk_ssao_pass( void )
 		VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
 		const uint32_t ssaoTexW = vk_get_render_target_width();
 		const uint32_t ssaoTexH = vk_get_render_target_height();
-#ifdef USE_REVERSED_DEPTH
 		const float depthIsReversed = 1.0f;
-#else
-		const float depthIsReversed = 0.0f;
-#endif
 		if ( glConfig.stencilBits > 0 )
 			depth_aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
 

@@ -53,6 +53,7 @@ float    PostFX_VegWind_GetWindStrength(void);
 
 qboolean PostFX_NeedsPipelineUpdate(void);
 qboolean PostFX_PostPipelinesNeedUpdate(void);
+void     PostFX_NotifyPostPipelinesRebuilt( void );
 float    PostFX_GetVignetteIntensity(void);
 float    PostFX_GetVignetteRadius(void);
 float    PostFX_GetChromaticAberration(void);
