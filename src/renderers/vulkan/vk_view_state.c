@@ -108,7 +108,6 @@ static void vk_get_viewport( VkViewport *viewport, Vk_Depth_Range depth_range )
 
 	switch ( depth_range ) {
 		default:
-#ifdef USE_REVERSED_DEPTH
 			viewport->minDepth = 0.0f;
 			viewport->maxDepth = 1.0f;
 			break;
@@ -124,23 +123,6 @@ static void vk_get_viewport( VkViewport *viewport, Vk_Depth_Range depth_range )
 			viewport->minDepth = 0.6f;
 			viewport->maxDepth = 1.0f;
 			break;
-#else
-			viewport->minDepth = 0.0f;
-			viewport->maxDepth = 1.0f;
-			break;
-		case DEPTH_RANGE_ZERO:
-			viewport->minDepth = 0.0f;
-			viewport->maxDepth = 0.0f;
-			break;
-		case DEPTH_RANGE_ONE:
-			viewport->minDepth = 1.0f;
-			viewport->maxDepth = 1.0f;
-			break;
-		case DEPTH_RANGE_WEAPON:
-			viewport->minDepth = 0.0f;
-			viewport->maxDepth = 0.3f;
-			break;
-#endif
 	}
 }
 
@@ -212,13 +194,8 @@ static void vk_get_mvp_transform( float *mvp )
 
 		mvp[0]  =  mvp0; mvp[1]  =  0.0f; mvp[2]  = 0.0f; mvp[3]  = 0.0f;
 		mvp[4]  =  0.0f; mvp[5]  =  mvp5; mvp[6]  = 0.0f; mvp[7]  = 0.0f;
-#ifdef USE_REVERSED_DEPTH
 		mvp[8]  =  0.0f; mvp[9]  =  0.0f; mvp[10] = 0.0f; mvp[11] = 0.0f;
 		mvp[12] = -1.0f; mvp[13] = -1.0f; mvp[14] = 1.0f; mvp[15] = 1.0f;
-#else
-		mvp[8]  =  0.0f; mvp[9]  =  0.0f; mvp[10] = 1.0f; mvp[11] = 0.0f;
-		mvp[12] = -1.0f; mvp[13] = -1.0f; mvp[14] = 0.0f; mvp[15] = 1.0f;
-#endif
 	} else {
 		float proj[16];
 		const float *projection = backEnd.useFirstPersonProjection

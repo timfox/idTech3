@@ -6142,7 +6142,22 @@ static void *FS_TryLoadLibraryFromPk3Cache( const char *name ) {
 		}
 	}
 
-	FS_WriteFile( cacheQpath, fileBuf, len );
+	/* FS_FOpenFileWrite rejects .so paths; write cache file directly (see FS_CheckFilenameIsNotAllowed). */
+	if ( FS_CreatePath( osCachePath ) ) {
+		FS_FreeFile( fileBuf );
+		return NULL;
+	} else {
+		FILE *out = Sys_FOpen( osCachePath, "wb" );
+		if ( !out || fwrite( fileBuf, 1, (size_t)len, out ) != (size_t)len ) {
+			if ( out ) {
+				fclose( out );
+			}
+			FS_FreeFile( fileBuf );
+			Com_Printf( S_COLOR_YELLOW "FS_LoadLibrary: failed to write pk3 native cache %s\n", osCachePath );
+			return NULL;
+		}
+		fclose( out );
+	}
 	FS_FreeFile( fileBuf );
 
 	h = FS_TryLoadLibraryPath( osCachePath );

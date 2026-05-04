@@ -70,9 +70,7 @@ void vk_alloc_persistent_pipelines( void )
 		};
 		qboolean polygon_offset[2] = { qfalse, qtrue };
 		int i, j, k;
-#ifdef USE_PMLIGHT
 		int l;
-#endif
 
 		Com_Memset( &def, 0, sizeof( def ) );
 		def.shader_type = TYPE_SIGNLE_TEXTURE;
@@ -87,26 +85,17 @@ void vk_alloc_persistent_pipelines( void )
 
 				for ( k = 0; k < 2; k++ ) {
 					def.polygon_offset = polygon_offset[k];
-#ifdef USE_FOG_ONLY
 					def.shader_type = TYPE_FOG_ONLY;
-#else
-					def.shader_type = TYPE_SIGNLE_TEXTURE;
-#endif
 					def.state_bits = fog_state;
 					vk.fog_pipelines[i][j][k] = vk_find_pipeline_ext( 0, &def, qtrue );
 
 					def.shader_type = TYPE_SIGNLE_TEXTURE;
 					def.state_bits = dlight_state;
-#ifdef USE_PMLIGHT
 					vk.dlight_pipelines[i][j][k] = vk_find_pipeline_ext( 0, &def, r_dlightMode->integer == 0 ? qtrue : qfalse );
-#else
-					vk.dlight_pipelines[i][j][k] = vk_find_pipeline_ext( 0, &def, qtrue );
-#endif
 				}
 			}
 		}
 
-#ifdef USE_PMLIGHT
 		def.state_bits = GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE | GLS_DEPTHFUNC_EQUAL;
 		for ( i = 0; i < 3; i++ ) { // cullType
 			def.face_culling = i;
@@ -124,7 +113,6 @@ void vk_alloc_persistent_pipelines( void )
 				}
 			}
 		}
-#endif
 	}
 
 	// RT_BEAM surface
