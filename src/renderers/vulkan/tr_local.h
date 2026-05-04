@@ -1372,7 +1372,6 @@ typedef struct {
 	shader_t				*projectionShadowShader;
 
 	shader_t				*flareShader;
-	shader_t				*sunShader;
 
 	int						numLightmaps;
 	image_t					**lightmaps;
