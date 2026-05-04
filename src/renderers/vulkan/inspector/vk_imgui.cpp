@@ -361,6 +361,53 @@ extern "C" void VkImgui_BeginFrame(void) {
 	ImGui::NewFrame();
 }
 
+static void VkImgui_DrawAboutInspectorPopup( void )
+{
+	if ( ImGui::BeginPopupModal( "AboutInspector", nullptr, ImGuiWindowFlags_AlwaysAutoResize ) ) {
+		ImGui::TextUnformatted( Q3_VERSION );
+		ImGui::Separator();
+		ImGui::Text( "ImGui %s", IMGUI_VERSION );
+#ifdef USE_VULKAN
+		ImGui::Text( "Renderer API: Vulkan" );
+#else
+		ImGui::Text( "Renderer API: OpenGL" );
+#endif
+		ImGui::Spacing();
+		ImGui::TextWrapped( "Vendor: %s", glConfig.vendor_string );
+		ImGui::TextWrapped( "Device: %s", glConfig.renderer_string );
+		ImGui::TextWrapped( "Version: %s", glConfig.version_string );
+		ImGui::Spacing();
+		ImGui::TextWrapped(
+			"Toggle overlay input with F11 or \\toggle_imgui; set \\r_imgui 0 to hide CPU/UI work. "
+			"PostFX and related panels drive renderer cvars." );
+		ImGui::Spacing();
+		if ( ImGui::Button( "OK", ImVec2( 120.0f, 0.0f ) ) ) {
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
+}
+
+static void VkImgui_DrawShortcutsPopup( void )
+{
+	if ( ImGui::BeginPopupModal( "InspectorShortcuts", nullptr, ImGuiWindowFlags_AlwaysAutoResize ) ) {
+		ImGui::TextWrapped(
+			"F11 or \\toggle_imgui toggles the inspector when the client is built with ImGui. "
+			"\\r_imgui 0 skips inspector CPU work; use Developer menu for a quick toggle." );
+		ImGui::Spacing();
+		ImGui::Separator();
+		ImGui::BulletText( "File: JPEG screenshot (silent), console, quit" );
+		ImGui::BulletText( "Window: show/hide docked panels" );
+		ImGui::BulletText( "Render Mode: \\r_pbr_debug modes (0-8 active)" );
+		ImGui::BulletText( "Developer: \\r_speeds, \\r_showtris, \\r_imgui" );
+		ImGui::Spacing();
+		if ( ImGui::Button( "Close", ImVec2( 120.0f, 0.0f ) ) ) {
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
+}
+
 static void VkImgui_DrawMenuBar(void) {
 	ImGuiIO &io = ImGui::GetIO();
 	const float fps = io.Framerate > 0.0f ? io.Framerate : 0.0f;
@@ -368,7 +415,66 @@ static void VkImgui_DrawMenuBar(void) {
 
 	if (ImGui::BeginMainMenuBar()) {
 		if (ImGui::BeginMenu("File")) {
-			ImGui::MenuItem("Quit");
+			if ( ImGui::MenuItem( "Screenshot (JPEG)" ) ) {
+				ri.Cmd_ExecuteText( EXEC_APPEND, "screenshotJPEG silent\n" );
+			}
+			if ( ImGui::MenuItem( "Toggle console" ) ) {
+				ri.Cmd_ExecuteText( EXEC_APPEND, "toggleconsole\n" );
+			}
+			ImGui::Separator();
+			if ( ImGui::MenuItem( "Quit" ) ) {
+				ri.Cmd_ExecuteText( EXEC_APPEND, "quit\n" );
+			}
+			ImGui::EndMenu();
+		}
+
+		if ( ImGui::BeginMenu("Help")) {
+			if ( ImGui::MenuItem( "Inspector shortcuts" ) ) {
+				ImGui::OpenPopup( "InspectorShortcuts" );
+			}
+			if ( ImGui::MenuItem( "About inspector" ) ) {
+				ImGui::OpenPopup( "AboutInspector" );
+			}
+			ImGui::EndMenu();
+		}
+
+		if ( ImGui::BeginMenu( "Developer" ) ) {
+			if ( r_imgui ) {
+				bool riOn = r_imgui->integer != 0;
+				if ( ImGui::Checkbox( "Inspector overlay (r_imgui)", &riOn ) ) {
+					ri.Cvar_SetValue( "r_imgui", riOn ? 1.0f : 0.0f );
+				}
+				if ( ImGui::IsItemHovered() ) {
+					ImGui::SetTooltip( "When off, skips ImGui BeginFrame/Draw CPU work. F11 still toggles from the client." );
+				}
+			}
+			{
+				int sp = ri.Cvar_VariableIntegerValue( "r_speeds" );
+				if ( sp < 0 ) {
+					sp = 0;
+				}
+				if ( sp > 6 ) {
+					sp = 6;
+				}
+				const int spPrev = sp;
+				ImGui::SliderInt( "r_speeds (debug HUD)", &sp, 0, 6 );
+				if ( sp != spPrev ) {
+					ri.Cvar_Set( "r_speeds", va( "%d", sp ) );
+				}
+				if ( ImGui::IsItemHovered() ) {
+					ImGui::SetTooltip( "Console stats overlay (cheat cvar). 0=off, 1=BSP, 2=patch cull, 3=cluster, 4=dlights, 5=zFar, 6=flares." );
+				}
+			}
+			{
+				int st = ri.Cvar_VariableIntegerValue( "r_showtris" );
+				bool showTris = ( st != 0 );
+				if ( ImGui::Checkbox( "Wireframe world (r_showtris)", &showTris ) ) {
+					ri.Cvar_Set( "r_showtris", showTris ? "1" : "0" );
+				}
+				if ( ImGui::IsItemHovered() ) {
+					ImGui::SetTooltip( "World triangle overlay (cheat). May reduce performance." );
+				}
+			}
 			ImGui::EndMenu();
 		}
 
@@ -974,6 +1080,8 @@ extern "C" void VkImgui_Draw(void) {
 	ImGui::DockSpace(dockId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
 
 	VkImgui_DrawMenuBar();
+	VkImgui_DrawAboutInspectorPopup();
+	VkImgui_DrawShortcutsPopup();
 	VkImgui_DrawViewport();
 	VkImgui_DrawShaderEditor();
 	VkImgui_DrawObjects();
