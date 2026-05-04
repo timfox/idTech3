@@ -2,7 +2,10 @@
 ===========================================================================
 Copyright (C) 2026 Gopex LLC. All rights reserved.
 
-Vegetation wind compute: staging tess vertices and dispatch.
+Vegetation wind compute: uploads tess vertices to a storage buffer and dispatches
+the deform kernel. Dispatch runs from RB_EndSurface after the draw for that
+batch (see tr_shade.c); the GPU therefore applies wind to the *next* frame's
+vertices unless the draw path binds this buffer as positions (not wired yet).
 Extracted from vk.c for incremental modularization.
 ===========================================================================
 */

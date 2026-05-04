@@ -377,7 +377,7 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 			VectorCopy( stan, tan );
 		}
 
-		/* Re-orthonormalize tangent vs final normal (matches Vulkan r_gltfGpuTangentFix idea). */
+		/* Re-orthonormalize tangent vs final normal (matches Vulkan PBR glTF GPU Gram–Schmidt path). */
 		ndt = DotProduct( tan, nrm );
 		tan[0] -= ndt * nrm[0];
 		tan[1] -= ndt * nrm[1];
