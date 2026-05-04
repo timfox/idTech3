@@ -1815,8 +1815,11 @@ char *CopyString( const char *in ) {
 		return (char *)(uintptr_t)((const char *)&numberstring[in[0]-'0'] + sizeof(memblock_t));
 	}
 #endif
-	out = S_Malloc( strlen( in ) + 1 );
-	strcpy( out, in );
+	{
+		const size_t n = strlen( in ) + 1;
+		out = S_Malloc( n );
+		Com_Memcpy( out, in, n );
+	}
 	return out;
 }
 
@@ -2740,9 +2743,9 @@ static sysEvent_t Com_GetSystemEvent( void )
 		char  *b;
 		int   len;
 
-		len = strlen( s ) + 1;
+		len = (int)strlen( s ) + 1;
 		b = Z_Malloc( len );
-		strcpy( b, s );
+		Com_Memcpy( b, s, (size_t)len );
 		Sys_QueEvent( evTime, SE_CONSOLE, 0, 0, len, b );
 	}
 
