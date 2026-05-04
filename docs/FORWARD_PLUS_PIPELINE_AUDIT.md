@@ -15,7 +15,7 @@ This document is a **technical audit** of the current **Forward+ scaffolding** i
 | **Fragment / `gen_frag.tmpl`** (PBR) | Optional **debug heatmap** (`r_forwardPlusDebug`), optional **additive experimental shade** (`r_forwardPlusShade` → specialization **`forward_plus_shade_strength`**). Uses **`fp_params.fp_clip_from_world`** and SSBO light + tile data. |
 | **Uniform bridge / `tr_shade.c`** | When Forward+ is on, **`pbrForwardPlus.y`** carries **`floatBitsToUint(tess.dlightBits)`** so the fragment path can **skip** culled lights that the surface already received via the classic packed path (first **32** indices). |
 
-**Cvars** (see `tr_init.c`): `r_forwardPlus`, `r_forwardPlusMaxPerTile` (latched **4–8**), `r_forwardPlusDebug`, `r_forwardPlusShade` (pipeline invalidation on change in `vk_frame_submit.c`).
+**Cvars** (see `tr_init.c`): `r_forwardPlus`, `r_forwardPlusMaxPerTile` (latched **4–8**), `r_forwardPlusDebug`, `r_forwardPlusShade` (pipeline invalidation on change in `vk_frame_submit.c`), `r_forwardPlusLuminanceSort` (**0/1**, default **1** — tile overload picks brightest lights by RGB sum).
 
 ---
 
@@ -63,10 +63,10 @@ Linear array: **`total_tiles × MAX_PER_TILE`** **`uint32`** indices. Unused slo
 ## 4. Compute shader behavior (`forward_plus_tile_cull.comp`)
 
 - **Workgroup:** 64 threads; dispatch **`ceil(totalTiles / 64)`**.
-- **Per thread:** one **tileId**; clears **MAX_PER_TILE** slots, then iterates lights **0 … min(n, numLights, MAX_LIGHTS)-1**.
+- **Per thread:** one **tileId**; clears **MAX_PER_TILE** slots, gathers all overlapping lights into a thread-local list (**≤ MAX_LIGHTS**), then writes up to **`maxPerTile`** indices.
 - **Projection:** `clip = clipFromWorld * vec4(worldPos,1)`; NDC bounds check (with margin on XY); center in **pixels** via **`0.5*(1+ndc)*viewport`**; **screen-radius** heuristic from world radius and **`clip.w`**; **AABB tile overlap** via **`sphere_tile_overlap`** with **`tilePxX/Y = viewport / tileGrid`** (aligned with fragment mapping).
 
-**Ordering bias:** lights are appended in **increasing index** order when a tile is under capacity—no distance or importance sort.
+**Ordering / overload:** when a tile has **fewer** overlapping lights than **`maxPerTile`**, output order matches **increasing light index** (build order). When **more** lights overlap than **`maxPerTile`**, and **`r_forwardPlusLuminanceSort`** is **1** (default), the shader runs a **partial selection** on the candidate list to keep the top **`maxPerTile`** by **RGB sum** (from the packed color **vec4**). If **`r_forwardPlusLuminanceSort`** is **0**, the first **`maxPerTile`** candidates in index order are kept (legacy overload behavior).
 
 ---
 
@@ -128,7 +128,7 @@ Linear array: **`total_tiles × MAX_PER_TILE`** **`uint32`** indices. Unused slo
 
 | Item | Severity | Note |
 |------|-----------|------|
-| **No light sort** in tile lists | Medium (quality) | First-N lights win per tile; can miss visually dominant lights under overload. |
+| **No light sort** in tile lists | Medium (quality) | First-N lights win per tile **unless** `r_forwardPlusLuminanceSort` is **1** (default): then overloaded tiles keep top **`maxPerTile`** by RGB sum. |
 | **Sphere screen approximation** | Low–Medium | Conservative enough for prototyping; not a tight spotlight frustum test. |
 | **`dlightBits` 32-bit** | Low | Matches **`MAX_DLIGHTS`** today; document if caps change. |
 | **Compute inside render pass** | Low (portability) | Valid now; revisit with subpass graphs or render graph. |
@@ -137,7 +137,7 @@ Linear array: **`total_tiles × MAX_PER_TILE`** **`uint32`** indices. Unused slo
 ### Suggested next steps (roadmap)
 
 1. **Depth-aware culling** (optional Hi-Z or linear depth rejection) before accepting a light for a tile.
-2. **Sort or priority** (distance / luminance) when filling **`maxPerTile`** slots.
+2. **Sort or priority** (distance / luminance) when filling **`maxPerTile`** slots — **partially done:** **`r_forwardPlusLuminanceSort`** (default **1**) uses **RGB sum** when overloaded; distance-based priority is still open.
 3. **Decouple** Forward+ light ceiling from **`MAX_DLIGHTS`** only if the **game protocol** and **`tess.dlightBits`** story are redesigned together.
 4. **Tier B** map with mixed point + spot lights to validate heatmap vs ground truth.
 

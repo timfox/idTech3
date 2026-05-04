@@ -10,6 +10,9 @@
 #include "vk_scene_pass.h"
 #include "vk_temporal.h"
 #include "vk_volumetric_pass.h"
+#ifdef USE_IMGUI
+#include "inspector/vk_imgui.h"
+#endif
 
 static void vk_end_frame_refresh_postfx_params_for_target( uint32_t width, uint32_t height )
 {
@@ -455,6 +458,10 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 
 	vk_end_frame_draw_fullscreen_quad( vk.renderWidth, vk.renderHeight );
 	vk_end_render_pass();
+
+#ifdef USE_IMGUI
+	VkImgui_RecordOverlayPass();
+#endif
 
 	if ( vk.uiOverlayActive &&
 		vk.ui_overlay_image_view != VK_NULL_HANDLE &&
