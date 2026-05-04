@@ -2,7 +2,7 @@
 
 This document is a **technical audit** of the current **Forward+ scaffolding** in this fork: what runs, what data flows where, synchronization, known limitations, and **risk items** for future work. It complements the narrative in [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_2026_ARCHITECTURE_PASS.md).
 
-**Scope:** `r_forwardPlus` (default **0**, **latched**), PBR-only descriptor integration, **dynamic lights** from `backEnd.refdef` (`dlight_t`), **no** replacement of the primary forward lighting path.
+**Scope:** `r_forwardPlus` (default **1** on Vulkan, **latched**), PBR-only descriptor integration, **dynamic lights** from `backEnd.refdef` (`dlight_t`), **no** replacement of the primary forward lighting path.
 
 ---
 
@@ -10,7 +10,7 @@ This document is a **technical audit** of the current **Forward+ scaffolding** i
 
 | Layer | Responsibility |
 |--------|----------------|
-| **C / `vk_forward_plus.c`** | Host-visible **light SSBO** packing, **tile SSBO** allocation, **param SSBO** (`clipFromWorld` + aux uvec4), compute **pipeline + dispatch**, graphics **descriptor set** (set **18**), tile grid from **`VK_FP_TILE_DIM`** (16 px) and **`vk_get_render_target_width/height`**. |
+| **C / `vk_forward_plus.c`** | CPU packs **staging** (host) light records; **device-local** light SSBO via `vkCmdCopyBuffer` each frame; **tile SSBO** allocation, **param SSBO** (`clipFromWorld` + aux uvec4), compute **pipeline + dispatch**, graphics **descriptor set** (set **18**), tile grid from **`VK_FP_TILE_DIM`** (16 px) and **`vk_get_render_target_width/height`**. |
 | **Compute / `forward_plus_tile_cull.comp`** | Per-tile **light index lists** ( **`MAX_PER_TILE` = 8** ), sphere-in-screen projection cull, **`MAX_LIGHTS` = 32** aligned with **`MAX_DLIGHTS`**. |
 | **Fragment / `gen_frag.tmpl`** (PBR) | Optional **debug heatmap** (`r_forwardPlusDebug`), optional **additive experimental shade** (`r_forwardPlusShade` → specialization **`forward_plus_shade_strength`**). Uses **`fp_params.fp_clip_from_world`** and SSBO light + tile data. |
 | **Uniform bridge / `tr_shade.c`** | When Forward+ is on, **`pbrForwardPlus.y`** carries **`floatBitsToUint(tess.dlightBits)`** so the fragment path can **skip** culled lights that the surface already received via the classic packed path (first **32** indices). |
@@ -25,10 +25,11 @@ Within **`RB_DrawSurfs`** (`tr_backend.c`), order is:
 
 1. **`vk_prepare_frame_temporal_state()`**
 2. **`vk_forward_plus_ensure_render_resolution()`** — may resize **tile SSBO** if render target dimensions changed (matches FBO / `r_renderScale` via **`vk_get_render_target_*`**).
-3. **`vk_forward_plus_update_for_refdef()`** — CPU writes **light SSBO** header + records from **`backEnd.refdef.dlights`**. Clears **tail** of the buffer when light count drops (avoids stale records).
-4. **`RB_RenderSunShadowMap`** — can alter **`vk.renderWidth`**; light/tile packing already uses **`vk_get_render_target_*`**, not transient globals.
+3. **`vk_forward_plus_update_for_refdef()`** — CPU writes the **staging** buffer with light header + records; clears **tail** when count drops.
+4. **`RB_RenderSunShadowMap`**
 5. **`RB_BeginDrawingView()`** — begins the **main** render pass.
-6. **`vk_forward_plus_dispatch_tile_cull()`** — **compute** inside the active render pass (see §5).
+6. **`vk_forward_plus_upload_refdef()`** — `vkCmdCopyBuffer` staging → **device-local** light SSBO (transfer + shader barriers).
+7. **`vk_forward_plus_dispatch_tile_cull()`** — **compute** inside the active render pass (see §5).
 
 Then the world/entity draws run; PBR draws bind **descriptor set 18** when Forward+ resources are live (`vk_draw_state.c`).
 
@@ -71,14 +72,16 @@ Linear array: **`total_tiles × MAX_PER_TILE`** **`uint32`** indices. Unused slo
 
 ## 5. Synchronization and pass placement
 
+**Barriers in `vk_forward_plus_upload_refdef`:** **device-local** light SSBO: prior **SHADER_READ** (fragment/last frame) → **TRANSFER_WRITE**; **staging** **HOST_WRITE** → **TRANSFER_READ**; after copy, **TRANSFER_WRITE** → **SHADER_READ** for compute/fragment.
+
 **Barriers in `vk_forward_plus_dispatch_tile_cull`:**
 
-1. **Before compute:** HOST_WRITE → SHADER_READ on **light** + **param** buffers; tile buffer **dst** SHADER_WRITE (from prior fragment/compute read—first frame **`srcAccessMask = 0`**).
-2. **After compute:** SHADER_WRITE → SHADER_READ on **tile** buffer for subsequent **VS/FS** (and compute if chained).
+1. **Before compute:** **light** buffer: **SHADER_READ** → **SHADER_READ** (hazard with prior frame; safe layout). **param** buffer: **HOST_WRITE** → **SHADER_READ**; tile buffer **dst** **SHADER_WRITE** (from prior fragment/compute read—first frame **`srcAccessMask = 0`**).
+2. **After compute:** **SHADER_WRITE** → **SHADER_READ** on **tile** buffer for subsequent **VS/FS** (and compute if chained).
 
 **Compute inside render pass:** The dispatch is issued while **`vk.inRenderPass`** is true (main pass). This is **legal in Vulkan 1.x** when the pass does not use **subpasses** that forbid side effects; the engine uses **load/store** attachments and does not declare **subpass dependencies** that would make this invalid. **Risk:** some layers or future **render-pass graph** refactors could want compute **between** passes instead—worth revisiting if subpasses or **fragment density** are introduced.
 
-**Host coherence:** Light and param buffers are **host-visible**; barriers use **`VK_PIPELINE_STAGE_HOST_BIT`** for writes before compute. Typical pattern is correct for **CPU write → GPU read** in the same frame.
+**Host coherence:** **Staging** (light pack) and **param** buffers are **host-visible**; upload uses **transfer** for lights. **Param** still uses **`VK_PIPELINE_STAGE_HOST_BIT`** before compute.
 
 ---
 

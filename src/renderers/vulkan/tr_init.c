@@ -3498,9 +3498,9 @@ static void R_Register( void )
 		"When USE_VULKAN_RTX and \\r_rtxDemo 1: blend resolved **raster** HDR color into the RT demo output per pixel: "
 		"out = mix(rtHit, rasterColor, factor). **0** = RT colors only (legacy demo). **0.2–0.5** approximates hybrid paths (e.g. Quake II RTX-style grounding). Requires RT demo composite." );
 	ri.Cvar_SetGroup( r_rtxComposite, CVG_RENDERER );
-	r_forwardPlus = ri.Cvar_Get( "r_forwardPlus", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	r_forwardPlus = ri.Cvar_Get( "r_forwardPlus", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_forwardPlus, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_forwardPlus, "Forward+ scaffolding: GPU light SSBO + per-tile cull compute (16px tiles; max per tile from \\r_forwardPlusMaxPerTile, default 8). Packs at most MAX_DLIGHTS (32) so indices match tess.dlightBits. PBR: \\r_forwardPlusDebug (overlay), \\r_forwardPlusShade (experimental additive lights); see docs/RENDERER_2026_ARCHITECTURE_PASS.md." );
+	ri.Cvar_SetDescription( r_forwardPlus, "Forward+ (default 1 on Vulkan): device-local light SSBO + per-tile cull compute (16px tiles; max from \\r_forwardPlusMaxPerTile, default 8). Packs at most MAX_DLIGHTS (32) for tess.dlightBits. PBR: \\r_forwardPlusDebug, \\r_forwardPlusShade. Set 0 to disable (vid_restart). See docs/RENDERER_2026_ARCHITECTURE_PASS.md." );
 	ri.Cvar_SetGroup( r_forwardPlus, CVG_RENDERER );
 	r_forwardPlusMaxPerTile = ri.Cvar_Get( "r_forwardPlusMaxPerTile", "8", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	{
