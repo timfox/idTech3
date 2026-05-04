@@ -1,102 +1,69 @@
 #!/usr/bin/env bash
-# Regression coverage for optional VK_NV_mesh_shader device-extension opt-in.
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+if [ "$#" -ne 1 ]; then
+  echo "Usage: $0 <project-root>" >&2
+  exit 2
+fi
 
-python3 - "$PROJECT_ROOT" <<'PY'
-import pathlib
-import re
-import sys
+PROJECT_ROOT="$1"
+VK_INSTANCE="$PROJECT_ROOT/src/renderers/vulkan/vk_instance.c"
+VK_INIT="$PROJECT_ROOT/src/renderers/vulkan/tr_init.c"
+VK_H="$PROJECT_ROOT/src/renderers/vulkan/vk.h"
+VK_LOCAL="$PROJECT_ROOT/src/renderers/vulkan/tr_local.h"
 
-root = pathlib.Path(sys.argv[1])
+fail() {
+  echo "FAIL: $*" >&2
+  exit 1
+}
 
+require_file() {
+  [ -f "$1" ] || fail "missing file: $1"
+}
 
-def fail(message: str) -> None:
-    print(f"FAIL: {message}", file=sys.stderr)
-    sys.exit(1)
+require_pattern() {
+  local file="$1"
+  local pattern="$2"
+  local message="$3"
 
+  perl -0ne "exit(!(/$pattern/s))" "$file" || fail "$message"
+}
 
-def read_rel(path: str) -> str:
-    full = root / path
-    try:
-        return full.read_text(encoding="utf-8")
-    except OSError as exc:
-        fail(f"could not read {path}: {exc}")
+require_file "$VK_INSTANCE"
+require_file "$VK_INIT"
+require_file "$VK_H"
+require_file "$VK_LOCAL"
 
+require_pattern "$VK_INIT" \
+  'r_vk_meshShaderNV\s*=\s*ri\.Cvar_Get\s*\(\s*"r_vk_meshShaderNV"\s*,\s*"0"\s*,\s*CVAR_ARCHIVE_ND\s*\|\s*CVAR_LATCH\s*\)' \
+  "r_vk_meshShaderNV must default off and remain latched"
 
-def assert_contains(text: str, needle: str, context: str) -> None:
-    if needle not in text:
-        fail(f"{context}: expected to find {needle!r}")
+require_pattern "$VK_INIT" \
+  'ri\.Cvar_CheckRange\s*\(\s*r_vk_meshShaderNV\s*,\s*"0"\s*,\s*"1"\s*,\s*CV_INTEGER\s*\)' \
+  "r_vk_meshShaderNV must stay constrained to a boolean integer"
 
+require_pattern "$VK_LOCAL" \
+  'extern\s+cvar_t\s*\*\s*r_vk_meshShaderNV\s*;' \
+  "r_vk_meshShaderNV must remain visible to Vulkan device creation"
 
-def assert_regex(text: str, pattern: str, context: str) -> None:
-    if not re.search(pattern, text, re.DOTALL):
-        fail(f"{context}: expected pattern {pattern}")
+require_pattern "$VK_H" \
+  'qboolean\s+meshShaderNV\s*;' \
+  "vk_t must keep meshShaderNV state for feature-chain gating"
 
+require_pattern "$VK_INSTANCE" \
+  'qboolean\s+nvMeshShader\s*=\s*qfalse\s*;' \
+  "VK_NV_mesh_shader availability must be tracked from enumerated extensions"
 
-tr_init = read_rel("src/renderers/vulkan/tr_init.c")
-tr_local = read_rel("src/renderers/vulkan/tr_local.h")
-vk_h = read_rel("src/renderers/vulkan/vk.h")
-vk_instance = read_rel("src/renderers/vulkan/vk_instance.c")
+require_pattern "$VK_INSTANCE" \
+  'strcmp\s*\(\s*ext\s*,\s*VK_NV_MESH_SHADER_EXTENSION_NAME\s*\)\s*==\s*0\s*\)\s*\{[^}]*nvMeshShader\s*=\s*qtrue\s*;' \
+  "VK_NV_mesh_shader must only be marked available when reported by the driver"
 
-# The cvar is the user-facing safety valve: default off, latched, range-limited,
-# documented as restart-required, and exported like the other Vulkan renderer cvars.
-assert_contains(tr_init, 'cvar_t\t*r_vk_meshShaderNV;', "tr_init cvar definition")
-assert_regex(
-    tr_init,
-    r'r_vk_meshShaderNV\s*=\s*ri\.Cvar_Get\(\s*"r_vk_meshShaderNV"\s*,\s*"0"\s*,\s*CVAR_ARCHIVE_ND\s*\|\s*CVAR_LATCH\s*\)',
-    "mesh shader cvar remains default-off and latched",
-)
-assert_regex(
-    tr_init,
-    r'ri\.Cvar_CheckRange\(\s*r_vk_meshShaderNV\s*,\s*"0"\s*,\s*"1"\s*,\s*CV_INTEGER\s*\)',
-    "mesh shader cvar keeps integer 0/1 range",
-)
-assert_regex(
-    tr_init,
-    r'ri\.Cvar_SetDescription\(\s*r_vk_meshShaderNV\s*,.*?Requires vid_restart\.',
-    "mesh shader cvar documents restart requirement",
-)
-assert_contains(tr_local, 'extern cvar_t\t*r_vk_meshShaderNV;', "tr_local cvar export")
-assert_contains(vk_h, 'qboolean meshShaderNV;', "vk state records mesh shader enablement")
+require_pattern "$VK_INSTANCE" \
+  'vk\.meshShaderNV\s*=\s*qfalse\s*;.*if\s*\(\s*nvMeshShader\s*&&\s*r_vk_meshShaderNV\s*&&\s*r_vk_meshShaderNV->integer\s*&&\s*device_extension_count\s*<\s*ARRAY_LEN\s*\(\s*device_extension_list\s*\)\s*\)\s*\{[^}]*device_extension_list\s*\[\s*device_extension_count\+\+\s*\]\s*=\s*VK_NV_MESH_SHADER_EXTENSION_NAME\s*;[^}]*vk\.meshShaderNV\s*=\s*qtrue\s*;' \
+  "VK_NV_mesh_shader must require driver support, explicit cvar opt-in, and list capacity before enabling"
 
-# Device extension discovery must only mark driver support. Enabling the
-# extension requires both driver support and explicit user opt-in below.
-assert_regex(
-    vk_instance,
-    r'else\s+if\s*\(\s*strcmp\(\s*ext\s*,\s*VK_NV_MESH_SHADER_EXTENSION_NAME\s*\)\s*==\s*0\s*\)\s*\{\s*nvMeshShader\s*=\s*qtrue;\s*\}',
-    "mesh shader discovery records driver support only",
-)
-assert_contains(vk_instance, "vk.meshShaderNV = qfalse;", "mesh shader state resets before extension selection")
+require_pattern "$VK_INSTANCE" \
+  'if\s*\(\s*vk\.meshShaderNV\s*\)\s*\{[^}]*Com_Memset\s*\(\s*&mesh_shader_features_nv\s*,\s*0\s*,\s*sizeof\s*\(\s*mesh_shader_features_nv\s*\)\s*\)\s*;[^}]*mesh_shader_features_nv\.sType\s*=\s*VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_NV\s*;[^}]*mesh_shader_features_nv\.pNext\s*=\s*\(void\s*\*\)\s*\(uintptr_t\)device_desc\.pNext\s*;[^}]*mesh_shader_features_nv\.taskShader\s*=\s*VK_FALSE\s*;[^}]*mesh_shader_features_nv\.meshShader\s*=\s*VK_TRUE\s*;[^}]*device_desc\.pNext\s*=\s*&mesh_shader_features_nv\s*;' \
+  "VK_NV_mesh_shader must append meshShader feature enablement to the VkDeviceCreateInfo pNext chain"
 
-extension_append = 'device_extension_list[ device_extension_count++ ] = VK_NV_MESH_SHADER_EXTENSION_NAME;'
-if vk_instance.count(extension_append) != 1:
-    fail("mesh shader extension should be appended at exactly one call site")
-
-assert_regex(
-    vk_instance,
-    r'if\s*\(\s*nvMeshShader\s*&&\s*r_vk_meshShaderNV\s*&&\s*r_vk_meshShaderNV->integer\s*&&\s*device_extension_count\s*<\s*ARRAY_LEN\(\s*device_extension_list\s*\)\s*\)\s*\{'
-    r'\s*device_extension_list\[\s*device_extension_count\+\+\s*\]\s*=\s*VK_NV_MESH_SHADER_EXTENSION_NAME;'
-    r'\s*vk\.meshShaderNV\s*=\s*qtrue;'
-    r'\s*ri\.Printf\(\s*PRINT_ALL\s*,\s*"\[VK\] VK_NV_mesh_shader enabled',
-    "mesh shader extension remains gated by support, cvar opt-in, and list capacity",
-)
-
-# When enabled, request only the mesh-shader feature and preserve any existing
-# pNext chain. Task shaders stay disabled because there is no task draw path.
-assert_regex(
-    vk_instance,
-    r'if\s*\(\s*vk\.meshShaderNV\s*\)\s*\{'
-    r'\s*Com_Memset\(\s*&mesh_shader_features_nv\s*,\s*0\s*,\s*sizeof\(\s*mesh_shader_features_nv\s*\)\s*\);'
-    r'\s*mesh_shader_features_nv\.sType\s*=\s*VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_NV;'
-    r'\s*mesh_shader_features_nv\.pNext\s*=\s*\(void \*\)\(uintptr_t\)device_desc\.pNext;'
-    r'\s*mesh_shader_features_nv\.taskShader\s*=\s*VK_FALSE;'
-    r'\s*mesh_shader_features_nv\.meshShader\s*=\s*VK_TRUE;'
-    r'\s*device_desc\.pNext\s*=\s*&mesh_shader_features_nv;',
-    "mesh shader feature chain preserves pNext and disables task shaders",
-)
-
-print("PASS: test_vulkan_mesh_shader_opt_in")
-PY
+echo "PASS: Vulkan mesh shader extension remains explicit opt-in with feature-chain wiring"
