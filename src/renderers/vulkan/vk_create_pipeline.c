@@ -796,7 +796,6 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 
 	if ( def->vk_pbr_flags & PBR_HAS_DETAILMAP )
 		frag_spec_data.detail_texture_set = 0;
-#ifdef HDR_DELUXE_LIGHTMAP
 	if ( r_deluxeMapping->integer )
 	{
 		// deluxe_texture_set = 0: use approx + scale
@@ -808,7 +807,6 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 			frag_spec_data.deluxe_mapping = 1;
 	}
 	else
-#endif // HDR_DELUXE_LIGHTMAP
 	{
 		// use approx + default scale
 		// perhaps when r_specularMapping = 0 set scale to 0 to disable it?
