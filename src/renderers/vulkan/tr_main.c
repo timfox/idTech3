@@ -775,12 +775,10 @@ static void R_SetupProjectionZ( viewParms_t *dest )
 #endif
 		dest->projectionMatrix[14] = c[3];
 
-#ifdef USE_VULKAN
 		dest->projectionMatrix[2] = -dest->projectionMatrix[2];
 		dest->projectionMatrix[6] = -dest->projectionMatrix[6];
 		dest->projectionMatrix[10] = -(dest->projectionMatrix[10] + 1.0);
 		dest->projectionMatrix[14] = -dest->projectionMatrix[14];
-#endif
 	}
 }
 
