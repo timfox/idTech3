@@ -1,81 +1,116 @@
 #!/usr/bin/env bash
 # Regression test for Vulkan vegetation wind dispatch ordering.
-# Ensures dispatch happens after SURF_VEGETATION batches in RB_EndSurface,
-# and is not dispatched early from vk_begin_frame.
+# Ensures dispatch happens after vegetation tess staging upload and is not run
+# from frame start where vertexCount would be zero.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-TR_SHADE="$PROJECT_ROOT/src/renderers/vulkan/tr_shade.c"
-VK_FRAME_SUBMIT="$PROJECT_ROOT/src/renderers/vulkan/vk_frame_submit.c"
+TR_SHADE_FILE="${1:-$PROJECT_ROOT/src/renderers/vulkan/tr_shade.c}"
+FRAME_SUBMIT_FILE="${2:-$PROJECT_ROOT/src/renderers/vulkan/vk_frame_submit.c}"
 
 fail() {
 	echo "FAIL: $*" >&2
 	exit 1
 }
 
-[ -f "$TR_SHADE" ] || fail "missing source file: $TR_SHADE"
-[ -f "$VK_FRAME_SUBMIT" ] || fail "missing source file: $VK_FRAME_SUBMIT"
-command -v python3 >/dev/null 2>&1 || fail "python3 not found in PATH"
+require_file() {
+	local path="$1"
+	if [ ! -f "$path" ]; then
+		fail "missing file: $path"
+	fi
+}
 
-python3 - "$TR_SHADE" "$VK_FRAME_SUBMIT" <<'PY'
-import sys
+extract_function_body() {
+	local file="$1"
+	local function_name="$2"
+	local out_file="$3"
 
+	awk -v function_name="$function_name" '
+	BEGIN {
+		in_signature = 0;
+		in_body = 0;
+		depth = 0;
+		found = 0;
+	}
+	!in_signature && $0 ~ "^[[:space:]]*void[[:space:]]+" function_name "[[:space:]]*\\(" {
+		in_signature = 1;
+	}
+	in_signature && !in_body {
+		line = $0;
+		open_count = gsub(/\{/, "{", line);
+		if (open_count > 0) {
+			in_body = 1;
+			found = 1;
+			close_count = gsub(/\}/, "}", line);
+			depth += open_count - close_count;
+			if (depth == 0) {
+				exit;
+			}
+		}
+		next;
+	}
+	in_body {
+		print $0;
+		line = $0;
+		open_count = gsub(/\{/, "{", line);
+		close_count = gsub(/\}/, "}", line);
+		depth += open_count - close_count;
+		if (depth == 0) {
+			exit;
+		}
+	}
+	END {
+		if (!found) {
+			exit 2;
+		}
+		if (depth != 0) {
+			exit 3;
+		}
+	}
+	' "$file" > "$out_file" || return 1
+}
 
-def fail(msg: str) -> None:
-    print(f"FAIL: {msg}", file=sys.stderr)
-    raise SystemExit(1)
+line_of() {
+	local file="$1"
+	local needle="$2"
+	awk -v needle="$needle" 'index($0, needle) { print NR; exit }' "$file"
+}
 
+require_file "$TR_SHADE_FILE"
+require_file "$FRAME_SUBMIT_FILE"
 
-def extract_function_body(text: str, function_name: str) -> str:
-    signature_idx = text.find(function_name)
-    if signature_idx == -1:
-        fail(f"function signature not found: {function_name}")
+tmp_body="$(mktemp)"
+trap 'rm -f "$tmp_body"' EXIT
 
-    brace_open = text.find("{", signature_idx)
-    if brace_open == -1:
-        fail(f"opening brace not found for function: {function_name}")
+if ! extract_function_body "$TR_SHADE_FILE" "RB_EndSurface" "$tmp_body"; then
+	fail "could not extract RB_EndSurface body from $TR_SHADE_FILE"
+fi
 
-    depth = 0
-    for idx in range(brace_open, len(text)):
-        ch = text[idx]
-        if ch == "{":
-            depth += 1
-        elif ch == "}":
-            depth -= 1
-            if depth == 0:
-                return text[brace_open + 1 : idx]
+iterator_line="$(line_of "$tmp_body" "tess.shader->optimalStageIteratorFunc();")"
+guard_line="$(line_of "$tmp_body" "PostFX_VegWind_IsEnabled() && tess.shader && ( tess.shader->surfaceFlags & SURF_VEGETATION )")"
+dispatch_line="$(line_of "$tmp_body" "vk_vegetation_wind_dispatch();")"
+clear_line="$(line_of "$tmp_body" "vk_vegetation_clear_staging();")"
 
-    fail(f"unterminated function body for: {function_name}")
-    return ""
+if [ -z "$iterator_line" ]; then
+	fail "RB_EndSurface missing tess.shader->optimalStageIteratorFunc()"
+fi
+if [ -z "$guard_line" ]; then
+	fail "RB_EndSurface missing vegetation guard with PostFX_VegWind_IsEnabled + SURF_VEGETATION"
+fi
+if [ -z "$dispatch_line" ]; then
+	fail "RB_EndSurface missing vk_vegetation_wind_dispatch() call"
+fi
+if [ -z "$clear_line" ]; then
+	fail "RB_EndSurface missing vk_vegetation_clear_staging() call"
+fi
 
+if ! [ "$iterator_line" -lt "$guard_line" ] || ! [ "$guard_line" -lt "$dispatch_line" ] || ! [ "$dispatch_line" -lt "$clear_line" ]; then
+	fail "RB_EndSurface ordering regression: expected stage iterator -> guard -> dispatch -> clear staging"
+fi
 
-tr_shade_path = sys.argv[1]
-vk_frame_submit_path = sys.argv[2]
+if awk 'index($0, "vk_vegetation_wind_dispatch();") { exit 0 } END { exit 1 }' "$FRAME_SUBMIT_FILE"; then
+	fail "vk_frame_submit.c still dispatches vegetation wind from frame-start path"
+fi
 
-with open(tr_shade_path, "r", encoding="utf-8") as f:
-    tr_shade_text = f.read()
-with open(vk_frame_submit_path, "r", encoding="utf-8") as f:
-    vk_frame_text = f.read()
-
-rb_end_surface_body = extract_function_body(tr_shade_text, "void RB_EndSurface( void )")
-vk_begin_frame_body = extract_function_body(vk_frame_text, "void vk_begin_frame( void )")
-
-required_fragments = [
-    "PostFX_VegWind_IsEnabled()",
-    "tess.shader->surfaceFlags & SURF_VEGETATION",
-    "vk_vegetation_wind_dispatch();",
-    "vk_vegetation_clear_staging();",
-]
-for fragment in required_fragments:
-    if fragment not in rb_end_surface_body:
-        fail(
-            "RB_EndSurface missing required vegetation dispatch fragment: "
-            f"{fragment}"
-        )
-
-if "vk_vegetation_wind_dispatch();" in vk_begin_frame_body:
-    fail("vk_begin_frame still dispatches vegetation wind too early")
-
-print("PASS: test_vk_vegetation_dispatch_order")
-PY
+echo "PASS: test_vk_vegetation_dispatch_order"
