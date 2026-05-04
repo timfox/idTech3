@@ -5246,13 +5246,7 @@ static void ScanAndLoadShaderFiles( void )
 	// scan for legacy shader files
 	shaderFiles = ri.FS_ListFiles( "scripts", ".shader", &numShaderFiles );
 
-	if ( 1 ) {
-		// if ARB shaders available - scan for extended shader files
-		shaderxFiles = ri.FS_ListFiles( "scripts", ".shaderx", &numShaderxFiles );
-	} else {
-		shaderxFiles = NULL;
-		numShaderxFiles = 0;
-	}
+	shaderxFiles = ri.FS_ListFiles( "scripts", ".shaderx", &numShaderxFiles );
 
 	if ( (!shaderFiles || !numShaderFiles) && (!shaderxFiles || !numShaderxFiles) ) {
 		ri.Printf( PRINT_WARNING, "WARNING: no shader files found\n" );
