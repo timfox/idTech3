@@ -1788,6 +1788,9 @@ extern	cvar_t	*r_portalOnly;
 extern	cvar_t	*r_subdivisions;
 extern	cvar_t	*r_lodCurveError;
 extern	cvar_t	*r_skipBackEnd;
+#ifdef USE_IMGUI
+extern	cvar_t	*r_imgui;
+#endif
 
 extern	cvar_t	*r_greyscale;
 extern	cvar_t	*r_dither;
