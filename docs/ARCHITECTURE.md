@@ -163,6 +163,10 @@ When `fs_restrict` is **0** (default), `VM_Create` always tries a **native** sha
 
 **Debugging failed loads:** `+set com_nativeLibraryDebug 1` logs each failed path and the OS loader message. See [DEVELOPMENT_SETUP.md](DEVELOPMENT_SETUP.md#prerequisites) (native DLL troubleshooting). Unit coverage: `ctest -R unit_vm_native_module` exercises candidate ordering.
 
+## Client HTTP downloads (libcurl)
+
+The **client** links **libcurl** when `USE_CURL` is enabled at build time. It powers **HTTPS/FTP** fetches of **`.pk3`** archives: server redirect downloads (`sv_dlURL` + `CL_cURL_*`) and manual or auto map downloads (`cl_dlURL` + `Com_DL_*`, commands `download` / `dlmap`). Protocols are restricted to **http, https, ftp, ftps**; there is no generic HTTP API exposed to game VMs without additional code. Full tutorial: [CURL_NETWORKING.md](CURL_NETWORKING.md).
+
 ## JavaScript / UI Debug (Duktape)
 
 When `USE_DUKTAPE` is enabled, the engine provides a JavaScript runtime (`idtech3` namespace) with event callbacks and HUD bindings. **Game events** (emitted from snapshot parsing): `entity_spawn`, `entity_death`, `weapon_fire` - payloads include `entityNum`, `eType`, `attacker`, `weapon`. See [JS_HUD_DRAWING.md](JS_HUD_DRAWING.md#game-events). Other events: `frame`, `menu_changed`, `ui_open`, `ui_close`, `map_load`, `input_key`, `mouse_move`, etc. For debugging UI and script issues:
