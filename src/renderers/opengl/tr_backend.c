@@ -548,9 +548,7 @@ static void RB_BeginDrawingView( void ) {
 	backEnd.skyRenderedThisView = qfalse;
 }
 
-#ifdef USE_PMLIGHT
 static void RB_LightingPass( void );
-#endif
 
 /*
 ==================
@@ -566,9 +564,7 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 	int				i;
 	drawSurf_t		*drawSurf;
 	unsigned int	oldSort;
-#ifdef USE_PMLIGHT
 	float			oldShaderSort;
-#endif
 	double			originalTime; // -EC-
 
 	// save original time for entity shader offsets
@@ -581,9 +577,7 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 	oldDepthRange = qfalse;
 	wasCrosshair = qfalse;
 	oldSort = MAX_UINT;
-#ifdef USE_PMLIGHT
 	oldShaderSort = -1;
-#endif
 	depthRange = qfalse;
 
 	backEnd.pc.c_surfaces += numDrawSurfs;
@@ -605,7 +599,6 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 			if ( oldShader != NULL ) {
 				RB_EndSurface();
 			}
-#ifdef USE_PMLIGHT
 			#define INSERT_POINT SS_FOG
 			if ( backEnd.refdef.numLitSurfs && oldShaderSort < INSERT_POINT && shader->sort >= INSERT_POINT ) {
 				//RB_BeginDrawingLitSurfs(); // no need, already setup in RB_BeginDrawingView()
@@ -619,7 +612,6 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 				oldEntityNum = -1; // force matrix setup
 			}
 			oldShaderSort = shader->sort;
-#endif
 			RB_BeginSurface( shader, fogNum );
 			oldShader = shader;
 		}
@@ -642,9 +634,7 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 				// set up the transformation matrix
 				R_RotateForEntity( backEnd.currentEntity, &backEnd.viewParms, &backEnd.or );
 				// set up the dynamic lighting if needed
-#ifdef USE_PMLIGHT
 				if ( !r_dlightMode->integer )
-#endif
 				if ( backEnd.currentEntity->needDlights ) {
 					R_TransformDlights( backEnd.refdef.num_dlights, backEnd.refdef.dlights, &backEnd.or );
 				}
@@ -659,9 +649,7 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 				backEnd.currentEntity = &tr.worldEntity;
 				backEnd.refdef.floatTime = originalTime;
 				backEnd.or = backEnd.viewParms.world;
-#ifdef USE_PMLIGHT
 				if ( !r_dlightMode->integer )
-#endif
 				R_TransformDlights( backEnd.refdef.num_dlights, backEnd.refdef.dlights, &backEnd.or );
 			}
 
@@ -751,7 +739,6 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 }
 
 
-#ifdef USE_PMLIGHT
 /*
 =================
 RB_BeginDrawingLitView
@@ -951,7 +938,6 @@ static void RB_RenderLitSurfList( dlight_t* dl ) {
 		qglDepthRange (0, 1);
 	}
 }
-#endif // USE_PMLIGHT
 
 
 /*
@@ -1116,7 +1102,6 @@ static const void *RB_StretchPic( const void *data ) {
 }
 
 
-#ifdef USE_PMLIGHT
 static void RB_LightingPass( void )
 {
 	dlight_t	*dl;
@@ -1145,7 +1130,6 @@ static void RB_LightingPass( void )
 	backEnd.viewParms.num_dlights = 0;
 	GL_ProgramDisable();
 }
-#endif
 
 
 static void transform_to_eye_space( const vec3_t v, vec3_t v_eye )
@@ -1267,12 +1251,10 @@ static const void *RB_DrawSurfs( const void *data ) {
 	// add light flares on lights that aren't obscured
 	RB_RenderFlares();
 
-#ifdef USE_PMLIGHT
 	if ( backEnd.refdef.numLitSurfs ) {
 		RB_BeginDrawingLitSurfs();
 		RB_LightingPass();
 	}
-#endif
 
 #ifdef USE_FBO
 	if ( !backEnd.doneSurfaces && tr.needScreenMap ) {

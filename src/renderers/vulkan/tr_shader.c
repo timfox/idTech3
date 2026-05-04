@@ -3209,7 +3209,6 @@ static int CollapseMultitexture( unsigned int st0bits, shaderStage_t *st0, shade
 }
 
 
-#ifdef USE_PMLIGHT
 
 static int tcmodWeight2( const shaderStage_t* st )
 {
@@ -3384,7 +3383,6 @@ static void FindLightingBundle( void )
 		}
 	}
 }
-#endif // USE_PMLIGHT
 
 
 /*
@@ -3873,10 +3871,8 @@ static void InitShader( const char *name, int lightmapIndex ) {
 		stages[i].bundle[0].texMods = texMods[i];
 	}
 
-#ifdef USE_PMLIGHT
 	shader.lightingBundle = 0;
 	shader.lightingStage = -1;
-#endif
 }
 
 
@@ -4115,9 +4111,7 @@ static shader_t *FinishShader( void ) {
 	if ( stage > 1 && stages[0].bundle[0].image[0] == tr.whiteImage && stages[0].bundle[0].numImageAnimations <= 1 && stages[0].bundle[0].rgbGen == CGEN_IDENTITY && stages[0].bundle[0].alphaGen == AGEN_SKIP ) {
 		if ( stages[1].stateBits == ( GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ZERO ) ) {
 			stages[1].stateBits = stages[0].stateBits & ( GLS_DEPTHMASK_TRUE | GLS_DEPTHTEST_DISABLE | GLS_DEPTHFUNC_EQUAL );
-#ifdef USE_PMLIGHT
 			stages[1].bundle[0].dlight |= stages[0].bundle[0].dlight;
-#endif
 			memmove( &stages[0], &stages[1], sizeof( stages[0] ) * ( stage - 1 ) );
 			stages[stage - 1].active = qfalse;
 			stage--;
@@ -4153,9 +4147,7 @@ static shader_t *FinishShader( void ) {
 		stages[ i ].numTexBundles = 1;
 	}
 
-#ifdef USE_PMLIGHT
 	FindLightingStage( stage );
-#endif
 
 	//
 	// look for multitexture potential
@@ -4553,9 +4545,7 @@ static shader_t *FinishShader( void ) {
 	}
 #endif // USE_VULKAN
 
-#ifdef USE_PMLIGHT
 	FindLightingBundle();
-#endif
 
 #if 1
 	// try to avoid redundant per-stage computations

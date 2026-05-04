@@ -470,7 +470,6 @@ static shader_t *ShaderForShaderNum( const int shaderNum, int lightmapNum ) {
 }
 
 
-#ifdef USE_PMLIGHT
 static void GenerateNormals( srfSurfaceFace_t *face )
 {
 	vec3_t ba, ca, cross;
@@ -510,7 +509,6 @@ static void GenerateNormals( srfSurfaceFace_t *face )
 		}
 	}
 }
-#endif // USE_PMLIGHT
 
 
 /*
@@ -588,7 +586,6 @@ static void ParseFace( const dsurface_t *ds, const drawVert_t *verts, msurface_t
 		cv->plane.normal[i] = LittleFloat( ds->lightmapVecs[2][i] );
 	}
 
-#ifdef USE_PMLIGHT
 	if ( surf->shader->numUnfoggedPasses && surf->shader->lightingStage >= 0 ) {
 		if ( fabsf( cv->plane.normal[0] ) < 0.01f && fabsf( cv->plane.normal[1] ) < 0.01f && fabsf( cv->plane.normal[2] ) < 0.01f ) {
 			// Zero-normals case:
@@ -603,7 +600,6 @@ static void ParseFace( const dsurface_t *ds, const drawVert_t *verts, msurface_t
 			GenerateNormals( cv );
 		}
 	}
-#endif
 
 	for ( i = 0; i < 3; i++ ) {
 		cv->plane.normal[i] = R_ClampDenorm( cv->plane.normal[i] );
