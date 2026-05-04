@@ -147,10 +147,14 @@ Code: `src/renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar regist
 - Pre-exposure scaling (`r_pre_exposure_scale`)
 
 ### Post-Processing
+- **Module**: `vk_postfx.c` / `vk_postfx.h` register and own most HDR-adjacent post cvars (SSR, procedural atmosphere, vegetation wind, vignette, chromatic aberration, film grain / look, motion blur, depth of field, sharpen, color grading + LUT). They are grouped for UI as **`CVG_RENDERER`** (renderer options).
+- **Vulkan pipeline refresh**: At the start of each rendered frame, `PostFX_PostPipelinesNeedUpdate()` decides whether `vk_update_post_process_pipelines()` must run (`vk_post_process_refresh.c`). A rebuild happens when **bloom / SSAO / SMAA / SSR / OIT** are toggled, when **HDR FBO color format** changes (e.g. `r_hdr` path), when related **bloom** cvars change (`r_bloom`, `r_bloom_intensity`, `r_bloom_threshold`, `r_bloom_threshold_mode`, `r_bloom_modulate`, `r_bloomKnee`, `r_bloom_scatter`, `r_bloom_energyPreserve`), or after **Forward+ shade** invalidates pipelines (`r_forwardPlusShade`). Other PostFX tuning (SSR quality, atmosphere, grading, etc.) updates **uniforms** each frame and does **not** require a full post-pipeline rebuild.
 - Panini projection with configurable parameters
 - Ordered dithering (8x8 Bayer matrix)
 - Greyscale mode
 - sRGB gamma correction
+- **Screen-space reflections (SSR)**: `r_ssr` (default **1**, requires **`r_fbo 1`**). Tuners: `r_ssr_maxDistance`, `r_ssr_stepSize`, `r_ssr_thickness`, `r_ssr_fadeEdge`, `r_ssr_intensity`, `r_ssr_maxDepthGradient` (depth-edge rejection for silhouette artifacts), `r_ssr_roughnessThreshold` / `r_ssr_fresnelExponent` (view-dependent weighting without a roughness buffer). Turning SSR on/off triggers the post-pipeline refresh above. Render order vs bloom/SSAO: [HDR_GAPS.md](HDR_GAPS.md) section 7.
+- **Procedural atmosphere**: `r_atmosphere` (default **0**; when **1**, Rayleigh+Mie sky; requires **`r_fbo 1`**). Sun direction and scattering cvars are registered alongside SSR in `vk_postfx.c`.
 - **Camera motion blur**: Per-pixel velocity from depth + prev/curr view-proj; samples along motion vector. Cvars: `r_motionBlur`, `r_motionBlurStrength`, `r_motionBlurMaxRadius`, `r_motionBlurSamples`.
 - **Depth of field**: Circle-of-confusion from linear depth; radial blur for out-of-focus areas. Cvars: `r_depthOfField`, `r_dofFocusDistance`, `r_dofFocusRange`, `r_dofAperture`, `r_dofMaxBlur`.
 - Debug views (pre-tonemap HDR, luminance heatmap)
@@ -200,7 +204,7 @@ Code: `src/renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar regist
 | `r_renderHeight` | 600 | Internal render height used when `r_renderScale > 0`. |
 | `r_post_contrast` | 1.0 | Post-tonemap contrast (1=neutral, >1=punchier, <1=flatter) |
 | `r_post_saturation` | 1.0 | Post-tonemap saturation (1=neutral, >1=vivid, <1=desaturated) |
-| `r_atmosphere` | 1 | Procedural atmospheric sky (Rayleigh+Mie). Replaces grey sky when no HDR skybox. |
+| `r_atmosphere` | 0 | Procedural atmospheric sky (Rayleigh+Mie). **1** replaces grey sky when no HDR skybox; requires `r_fbo 1`. |
 | `r_atmosphere_scale` | 4.0 | HDR scale multiplier for sky brightness. Works with auto exposure; increase if sky appears dark. |
 | `r_skyboxHDR` | "" | Path to HDR skybox panorama: EXR or Radiance .hdr (empty = use atmosphere or map skybox). |
 | `r_ssao` | 0 | SSAO/HBAO enable |
