@@ -306,6 +306,7 @@ cvar_t	*r_volumetricFogZExponent;
 cvar_t	*r_volumetricFogSliceMode;
 cvar_t	*r_volumetricFogMaxDistance;
 cvar_t	*r_volumetricFogJitter;
+cvar_t	*r_volumetricFogCompositeMode;
 cvar_t	*r_volumetricFogTemporalWeight;
 cvar_t	*r_volumetricFogReprojectionThreshold;
 cvar_t	*r_volumetricFogHistoryVelocityThreshold;
@@ -828,6 +829,10 @@ static void InitOpenGL( void )
 	}
 	ri.Printf( PRINT_ALL, "[VK] GPU compute: enabled (volumetric fog, vegetation wind, etc.)\n" );
 	ri.Printf( PRINT_ALL, "[VK] NVIDIA DLSS / NGX: not integrated in-engine; use \\r_renderScale and HDR post paths, or GPU-driver upscaling\n" );
+	if ( r_volumetricFog && r_volumetricFog->integer ) {
+		ri.Printf( PRINT_ALL, "[VK][fog] r_volumetricFogCompositeMode=%d (0=standard, 1=depth-weighted in-scatter, 2=HDR clamp)\n",
+			r_volumetricFogCompositeMode ? r_volumetricFogCompositeMode->integer : 0 );
+	}
 #endif
 
 	// set default state
@@ -2976,6 +2981,14 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_volumetricFogFireflyClamp, "0", "128", CV_FLOAT );
 	ri.Cvar_SetDescription( r_volumetricFogFireflyClamp, "Optional luminance clamp used to suppress temporal fireflies (0 disables)." );
 	ri.Cvar_SetGroup( r_volumetricFogFireflyClamp, CVG_RENDERER );
+
+	r_volumetricFogCompositeMode = ri.Cvar_Get( "r_volumetricFogCompositeMode", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogCompositeMode, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_volumetricFogCompositeMode,
+		"Volumetric fog composite (full-screen resolve): 0=standard (scene*T + in-scatter), "
+		"1=depth-weighted in-scatter (reduce near-camera fog glow; TLOU2-style transparency hint), "
+		"2=HDR clamp (clamp final RGB to \\r_volumetricFogFireflyClamp per channel after composite)." );
+	ri.Cvar_SetGroup( r_volumetricFogCompositeMode, CVG_RENDERER );
 
 	r_volumetricFogColorMode = ri.Cvar_Get( "r_volumetricFogColorMode", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogColorMode, "0", "2", CV_INTEGER );
