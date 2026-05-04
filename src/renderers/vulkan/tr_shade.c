@@ -229,20 +229,16 @@ static void DrawTris( const shaderCommands_t *input ) {
 
 #ifdef USE_VBO
 	if ( tess.vboIndex ) {
-#ifdef USE_PMLIGHT
 		if ( tess.dlightPass )
 			pipeline = backEnd.viewParms.portalView == PV_MIRROR ? vk.tris_mirror_debug_red_pipeline : vk.tris_debug_red_pipeline;
 		else
-#endif
 			pipeline = backEnd.viewParms.portalView == PV_MIRROR ? vk.tris_mirror_debug_green_pipeline : vk.tris_debug_green_pipeline;
 	} else
 #endif
 	{
-#ifdef USE_PMLIGHT
 		if ( tess.dlightPass )
 			pipeline = backEnd.viewParms.portalView == PV_MIRROR ? vk.tris_mirror_debug_red_pipeline : vk.tris_debug_red_pipeline;
 		else
-#endif
 			pipeline = backEnd.viewParms.portalView == PV_MIRROR ? vk.tris_mirror_debug_pipeline : vk.tris_debug_pipeline;
 	}
 
@@ -381,24 +377,15 @@ void RB_BeginSurface( shader_t *shader, int fogNum ) {
 		state = shader;
 	}
 
-#ifdef USE_PMLIGHT
 	if ( tess.fogNum != fogNum ) {
 		tess.dlightUpdateParams = qtrue;
 	}
-#endif
 
 #ifdef USE_TESS_NEEDS_NORMAL
-#ifdef USE_PMLIGHT
 	tess.needsNormal = state->needsNormal || tess.dlightPass || r_shownormals->integer ||
 		( backEnd.currentEntity == &tr.worldEntity &&
 		( ( r_shDebugView && r_shDebugView->integer ) ||
 		( r_shWorldLighting && r_shWorldLighting->integer && r_shLighting && r_shLighting->integer ) ) );
-#else
-	tess.needsNormal = state->needsNormal || r_shownormals->integer ||
-		( backEnd.currentEntity == &tr.worldEntity &&
-		( ( r_shDebugView && r_shDebugView->integer ) ||
-		( r_shWorldLighting && r_shWorldLighting->integer && r_shLighting && r_shLighting->integer ) ) );
-#endif
 #endif
 
 #ifdef USE_TESS_NEEDS_ST2
@@ -1774,7 +1761,6 @@ void VK_SetFogParams( vkUniform_t *ubo, int *fogStage )
 }
 
 
-#ifdef USE_PMLIGHT
 static void VK_SetLightParams( vkUniform_t *ubo, const dlight_t *dl ) {
 	float radius;
 
@@ -1806,7 +1792,6 @@ static void VK_SetLightParams( vkUniform_t *ubo, const dlight_t *dl ) {
 		Vector4Copy( ab, ubo->light.vector );
 	}
 }
-#endif
 
 uint32_t vk_append_uniform( const void *uniform_data, size_t size, uint32_t min_offset ) {
 	const uint32_t offset = PAD(vk.cmd->vertex_buffer_offset, (VkDeviceSize)vk.uniform_alignment);
@@ -1871,7 +1856,6 @@ uint32_t vk_push_uniform( const vkUniform_t *ubo ) {
 	return offset;
 }
 
-#ifdef USE_PMLIGHT
 void VK_LightingPass( void )
 {
 	static uint32_t uniform_offset;
@@ -1936,7 +1920,6 @@ void VK_LightingPass( void )
 	vk_bind_lighting( tess.shader->lightingStage, tess.shader->lightingBundle );
 	vk_draw_geometry( tess.depthRange, qtrue );
 }
-#endif // USE_PMLIGHT
 
 void RB_StageIteratorGeneric( void )
 {
@@ -1954,12 +1937,10 @@ void RB_StageIteratorGeneric( void )
 #endif
 	RB_DeformTessGeometry();
 
-#ifdef USE_PMLIGHT
 	if ( tess.dlightPass ) {
 		VK_LightingPass();
 		return;
 	}
-#endif
 
 #ifdef USE_FOG_COLLAPSE
 	fogCollapse = tess.fogNum && tess.shader->fogPass && tess.shader->fogCollapse;
@@ -1970,9 +1951,7 @@ void RB_StageIteratorGeneric( void )
 	RB_IterateStagesGeneric( &tess, fogCollapse );
 
 	// now do any dynamic lighting needed
-#ifdef USE_PMLIGHT
 	if ( r_dlightMode->integer == 0 )
-#endif
 	if ( !worldShOverride && tess.dlightBits && tess.shader->sort <= SS_OPAQUE && !(tess.shader->surfaceFlags & (SURF_NODLIGHT | SURF_SKY) ) ) {
 		if ( !fogCollapse ) {
 #ifdef USE_VULKAN
@@ -2152,13 +2131,11 @@ void RB_EndSurface( void ) {
 	//
 	// update performance counters
 	//
-#ifdef USE_PMLIGHT
 	if ( tess.dlightPass ) {
 		backEnd.pc.c_lit_batches++;
 		backEnd.pc.c_lit_vertices += tess.numVertexes;
 		backEnd.pc.c_lit_indices += tess.numIndexes;
 	} else
-#endif
 	{
 		backEnd.pc.c_shaders++;
 		backEnd.pc.c_vertexes += tess.numVertexes;
