@@ -1501,6 +1501,7 @@ list(APPEND CLIENT_SRCS
   src/game/g_horde.c
   src/game/g_goap.c
   src/game/g_aiml.c
+  src/game/g_eda.c
   src/game/g_engine_systems.c
   src/game/g_bt.c
   src/game/g_entity_bridge.c
@@ -1961,11 +1962,15 @@ if(USE_IMGUI AND NOT APPLE)
   enable_language(CXX)
   set(IMGUI_SRCS
     src/renderers/vulkan/inspector/vk_imgui.cpp
+    src/renderers/vulkan/inspector/vk_imgui_vulkan.cpp
     ${EXTERNAL_SRC}/cimgui/imgui/imgui.cpp
     ${EXTERNAL_SRC}/cimgui/imgui/imgui_draw.cpp
     ${EXTERNAL_SRC}/cimgui/imgui/imgui_tables.cpp
     ${EXTERNAL_SRC}/cimgui/imgui/imgui_widgets.cpp
+    ${EXTERNAL_SRC}/cimgui/imgui/backends/imgui_impl_vulkan.cpp
   )
+  set_source_files_properties(${EXTERNAL_SRC}/cimgui/imgui/backends/imgui_impl_vulkan.cpp PROPERTIES
+    COMPILE_DEFINITIONS "VK_NO_PROTOTYPES")
   set(IMGUI_INCLUDE_DIRS
     ${EXTERNAL_SRC}/cimgui/imgui
     ${EXTERNAL_SRC}/cimgui/imgui/backends
@@ -1975,12 +1980,18 @@ if(USE_IMGUI AND NOT APPLE)
   if(USE_RENDERER_DLOPEN)
     target_sources(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${IMGUI_SRCS})
     target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${IMGUI_INCLUDE_DIRS})
-    target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_IMGUI)
+    target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_IMGUI USE_VULKAN)
+    if(USE_SDL AND TARGET SDL2::Core)
+      target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE SDL2::Core)
+    endif()
   else()
     if(USE_VULKAN)
       target_sources(${RENDERER_PREFIX}_vulkan PRIVATE ${IMGUI_SRCS})
       target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${IMGUI_INCLUDE_DIRS})
-      target_compile_definitions(${RENDERER_PREFIX}_vulkan PRIVATE USE_IMGUI)
+      target_compile_definitions(${RENDERER_PREFIX}_vulkan PRIVATE USE_IMGUI USE_VULKAN)
+      if(USE_SDL AND TARGET SDL2::Core)
+        target_link_libraries(${RENDERER_PREFIX}_vulkan PRIVATE SDL2::Core)
+      endif()
     endif()
   endif()
   message(STATUS "ImGui Inspector: enabled")
@@ -2165,6 +2176,12 @@ IF(USE_VULKAN)
 	endif()
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_VULKAN_API)
 ENDIF()
+
+if(USE_IMGUI AND NOT APPLE)
+	if(TARGET client)
+		target_compile_definitions(client PRIVATE USE_IMGUI)
+	endif()
+endif()
 
 IF(USE_MP3)
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_MP3)
@@ -2474,6 +2491,12 @@ add_test(NAME test_vk_vegetation_dispatch_order
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_vk_vegetation_dispatch_order PROPERTIES
 	LABELS "unit;scripts;validation")
+
+add_test(NAME test_vulkan_mesh_shader_opt_in
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_vulkan_mesh_shader_opt_in.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_vulkan_mesh_shader_opt_in PROPERTIES
+	LABELS "unit;scripts;validation;renderer")
 
 # --- Unit tests ---
 option(BUILD_UNIT_TESTS "Build unit tests" ON)
