@@ -46,9 +46,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define USE_VBO_GRID		/* put SF_GRID to VBO */
 #endif
 
-//#define USE_TESS_NEEDS_NORMAL
-//#define USE_TESS_NEEDS_ST2
-
 #define SH_COEFF_COUNT 9
 
 #include "../../qcommon/q_shared.h"
@@ -2019,12 +2016,6 @@ typedef struct shaderCommands_s
 #endif
 
 	// info extracted from current shader
-#ifdef USE_TESS_NEEDS_NORMAL
-	int			needsNormal;
-#endif
-#ifdef USE_TESS_NEEDS_ST2
-	int			needsST2;
-#endif
 
 	int			numPasses;
 	shaderStage_t **xstages;
