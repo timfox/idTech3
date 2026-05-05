@@ -20,6 +20,7 @@ Split from vk.c.
 #include "vk_skybox_hdr.h"
 #include "vk_forward_plus.h"
 #include "vk_rtx.h"
+#include "vk_pipeline_cache_disk.h"
 
 #ifdef USE_VBO
 void vk_release_vbo( void );
@@ -72,6 +73,7 @@ void vk_shutdown( refShutdownCode_t code )
 	SkyboxHDR_Shutdown();
 
 	if ( vk.pipelineCache != VK_NULL_HANDLE ) {
+		vk_pipeline_cache_save();
 		qvkDestroyPipelineCache( vk.device, vk.pipelineCache, NULL );
 		vk.pipelineCache = VK_NULL_HANDLE;
 	}

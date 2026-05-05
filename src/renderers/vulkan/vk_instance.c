@@ -958,6 +958,7 @@ void vk_init_vulkan_library( void )
 	INIT_DEVICE_FUNCTION(vkGetDeviceQueue)
 	INIT_DEVICE_FUNCTION(vkGetImageMemoryRequirements)
 	INIT_DEVICE_FUNCTION(vkGetImageSubresourceLayout)
+	INIT_DEVICE_FUNCTION(vkGetPipelineCacheData)
 	INIT_DEVICE_FUNCTION(vkInvalidateMappedMemoryRanges)
 	INIT_DEVICE_FUNCTION(vkMapMemory)
 	INIT_DEVICE_FUNCTION(vkQueueSubmit)
@@ -1109,6 +1110,7 @@ void vk_deinit_device_functions( void )
 	qvkGetDeviceQueue = NULL;
 	qvkGetImageMemoryRequirements = NULL;
 	qvkGetImageSubresourceLayout = NULL;
+	qvkGetPipelineCacheData = NULL;
 	qvkInvalidateMappedMemoryRanges = NULL;
 	qvkMapMemory = NULL;
 	qvkQueueSubmit = NULL;

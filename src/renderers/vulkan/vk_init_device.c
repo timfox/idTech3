@@ -42,6 +42,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_resource_destroy.h"
 #include "vk_descriptor_sets.h"
 #include "vk_rtx.h"
+#include "vk_pipeline_cache_disk.h"
 #include "vk_pipeline_helpers.h"
 #include "vk_raster_samples.h"
 #include "vk_fluidsim.h"
@@ -1127,12 +1128,7 @@ void vk_initialize( void )
 
 	vk_forward_plus_init();
 
-	{
-		VkPipelineCacheCreateInfo ci;
-		Com_Memset( &ci, 0, sizeof( ci ) );
-		ci.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
-		VK_CHECK( qvkCreatePipelineCache( vk.device, &ci, NULL, &vk.pipelineCache ) );
-	}
+	vk_pipeline_cache_create( &props );
 
 	vk.renderPassIndex = RENDER_PASS_MAIN; // default render pass
 

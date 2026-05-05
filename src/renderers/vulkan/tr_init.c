@@ -148,6 +148,7 @@ cvar_t	*r_deluxeMapping;
 cvar_t	*r_deluxeSpecular;
 #endif
 cvar_t   *r_vk_pipeline_debug;
+cvar_t	*r_vk_pipelineCacheDisk;
 cvar_t	*r_vk_colorWriteMaskDynamic;
 cvar_t	*r_vk_meshShaderNV;
 cvar_t	*r_morph;
@@ -3324,6 +3325,12 @@ static void R_Register( void )
 	r_vk_pipeline_debug = ri.Cvar_Get( "r_vk_pipeline_debug", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_vk_pipeline_debug, "Print Vulkan pipeline creation info (discard mode, shader type, fog, etc)." );
 	ri.Cvar_SetGroup( r_vk_pipeline_debug, CVG_RENDERER );
+
+	r_vk_pipelineCacheDisk = ri.Cvar_Get( "r_vk_pipelineCacheDisk", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_vk_pipelineCacheDisk, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_vk_pipelineCacheDisk,
+		"When 1 (latched): load/save VkPipelineCache under fs_homepath as vk/pcache_<pipelineCacheUUID>.bin to reduce pipeline compile time after cold start. Saves on shutdown or vid_restart. Requires driver-compatible blob; stale files are replaced." );
+	ri.Cvar_SetGroup( r_vk_pipelineCacheDisk, CVG_RENDERER );
 
 	r_vk_colorWriteMaskDynamic = ri.Cvar_Get( "r_vk_colorWriteMaskDynamic", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_vk_colorWriteMaskDynamic, "Enable VK_EXT_extended_dynamic_state3 for RB_ColorMask. Requires vid_restart. Disabled by default (OIT crash on some drivers)." );
