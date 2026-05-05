@@ -1,7 +1,7 @@
 Put your licensed game data here
 ================================
 
-**Bare window (skeleton):** rebuild **idtech3_demo.pk3** from this repo; it ships a **native UI stub** in **vm/** so the client can open without **ui.qvm**.
+**Bare window (skeleton):** this folder includes **z_minimal_bootstrap.pk3** (tiny GPL zip: **default.cfg** + **gameinfo.txt**) so the engine’s filesystem gate passes with no retail files. Rebuild **idtech3_demo.pk3** from this repo; it ships **native UI** in **vm/** plus **fonts**, **HUD gfx**, and **scripts/demo_bootstrap.shader** so the renderer initializes cleanly.
 
 **Play maps / full menus:** add the **full** game .pk3 set from a compatible title (maps, **qagame**, retail UI if you want stock menus).
 

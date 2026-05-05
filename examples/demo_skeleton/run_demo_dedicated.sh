@@ -15,6 +15,9 @@ Usage:
   run_demo_dedicated.sh [PLAYFIELD_DIR] [args...]
 
 Default PLAYFIELD_DIR is this folder when it contains idtech3_demo/.
+
+Maps: set DEMO_MAP in local.env (e.g. q3dm1) or pass +map name. With only
+z_minimal_bootstrap.pk3 in base/, omit DEMO_MAP unless you have BSP/qagame.
 EOF
 	exit 0
 fi
@@ -41,7 +44,7 @@ if [[ -n "${IDTECH3_DEMO_ROOT:-}" && ! -d "$IDTECH3_DEMO_ROOT" ]]; then
 	unset IDTECH3_DEMO_ROOT
 fi
 
-if [[ -n "${1:-}" && "$1" != -* ]]; then
+if [[ -n "${1:-}" && "$1" != -* && "$1" != +* ]]; then
 	IDTECH3_DEMO_ROOT="$1"
 	shift
 fi
@@ -100,7 +103,7 @@ shopt -s nullglob
 _base_pk3s=( "$BASE_ROOT/$BASE_DIR_NAME"/*.pk3 )
 shopt -u nullglob
 if [[ ${#_base_pk3s[@]} -eq 0 ]]; then
-	echo "Note: no .pk3 in $BASE_ROOT/$BASE_DIR_NAME - +map will need qagame/maps from a full base." >&2
+	echo "Note: no .pk3 in $BASE_ROOT/$BASE_DIR_NAME - copy examples/demo_skeleton/base/z_minimal_bootstrap.pk3 or add retail pk3s; +map needs maps/qagame." >&2
 fi
 
 SERVER="${IDTECH3_SERVER:-}"
@@ -115,11 +118,14 @@ if [[ -z "$SERVER" ]]; then
 	fi
 fi
 
-MAP="${DEMO_MAP:-q3dm1}"
 EXTRA=( "$@" )
+MAP_ARGS=()
+if [[ -n "${DEMO_MAP:-}" ]]; then
+	MAP_ARGS=( +map "$DEMO_MAP" )
+fi
 BASEGAME_ARGS=()
 if [[ -n "${DEMO_BASE_DIR:-}" ]]; then
 	BASEGAME_ARGS=( +set fs_basegame "$DEMO_BASE_DIR" )
 fi
 
-exec "$SERVER" +set dedicated 1 +set fs_basepath "$BASE_ROOT" +set fs_game idtech3_demo "${BASEGAME_ARGS[@]}" +map "$MAP" "${EXTRA[@]}"
+exec "$SERVER" +set dedicated 1 +set fs_basepath "$BASE_ROOT" +set fs_game idtech3_demo "${BASEGAME_ARGS[@]}" "${MAP_ARGS[@]}" "${EXTRA[@]}"

@@ -12,8 +12,13 @@ SDF fonts are generated offline from TTF/OTF files using tools like:
   - fontbm (BMFont with SDF support)
 
 The atlas texture stores the signed distance to the glyph edge in
-the alpha channel. The fragment shader uses smoothstep to reconstruct
-crisp edges at any resolution.
+the alpha channel (0.5 = glyph edge). The default 2D path uses linear
+filtering on that field; dedicated `sdf_text.frag` exists for a future
+GPU smoothstep path.
+
+`SDF_DrawStringExt` takes a coordinate space: **virtual 640×480** for
+big HUD strings (`SCR_DrawStringExt`) and **native screen pixels** for
+the console (`SCR_DrawSmallString*`).
 ===========================================================================
 */
 
@@ -63,8 +68,14 @@ void            SDF_DrawText( sdfFontHandle_t font, float x, float y, float scal
 float           SDF_TextWidth( sdfFontHandle_t font, float scale, const char *text );
 float           SDF_TextHeight( sdfFontHandle_t font, float scale );
 
+typedef enum {
+	SDF_COORDS_VIRTUAL_640 = 0,
+	SDF_COORDS_SCREEN = 1
+} sdfCoordSpace_t;
+
 qboolean        SDF_IsEnabled( void );
 qboolean        SDF_DrawStringExt( int x, int y, float size, const char *string,
-                                   const float *setColor, qboolean forceColor, qboolean noColorEscape );
+                                   const float *setColor, qboolean forceColor, qboolean noColorEscape,
+                                   sdfCoordSpace_t coordSpace );
 
 #endif /* CL_SDF_FONT_H */

@@ -351,6 +351,13 @@ typedef struct {
 	float		biasX;
 	float		biasY;
 
+	/* FreeType-backed TrueType fonts for HUD/console (see CL_RegisterBuiltInTrueTypeFonts). */
+	fontInfo_t	builtInHudFont;
+	fontInfo_t	builtInConsoleFont;
+	int		builtInHudRefLinePx;
+	int		builtInConsoleRefLinePx;
+	qboolean	builtInTtfActive;
+
 } clientStatic_t;
 
 extern int bigchar_width;
@@ -471,6 +478,7 @@ qboolean CL_GetModeInfo( int *width, int *height, float *windowAspect, int mode,
 // cl_input
 //
 void CL_InitInput( void );
+void CL_RegisterBuiltInTrueTypeFonts( void );
 void CL_ClearInput( void );
 void CL_SendCmd( void );
 void CL_WritePacket( int repeat );
