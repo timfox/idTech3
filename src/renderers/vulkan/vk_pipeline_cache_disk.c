@@ -5,6 +5,9 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 Optional disk-backed VkPipelineCache (r_vk_pipelineCacheDisk): speeds up
 cold starts by reusing driver-serialized pipeline entries keyed by
 VkPhysicalDeviceProperties::pipelineCacheUUID.
+
+Bump VK_PIPELINE_CACHE_DISK_SCHEMA when pipeline layout / shader-keying
+changes incompatibly so stale blobs are not reused (new filename).
 ===========================================================================
 */
 
@@ -13,26 +16,61 @@ VkPhysicalDeviceProperties::pipelineCacheUUID.
 #include "vk_pipeline_cache_disk.h"
 #include <limits.h>
 #include <stdlib.h>
-#include <string.h>
 
 #define VK_PCACHE_MAX_SERIALIZE ( 64 * 1024 * 1024 )
+/* Increment when on-disk cache must be invalidated across engine builds. */
+#define VK_PIPELINE_CACHE_DISK_SCHEMA 1u
 
-static void vk_pipeline_cache_disk_qpath( char *out, size_t outsz, const uint8_t *uuid )
+static void vk_pipeline_cache_disk_uuid_hex( char *uuidhex, size_t uuidhexsz, const uint8_t *uuid )
 {
 	static const char hexd[] = "0123456789abcdef";
-	int i;
+	size_t i;
 
-	if ( outsz < 11u + (size_t)VK_UUID_SIZE * 2u + 1u )
+	if ( uuidhexsz < (size_t)VK_UUID_SIZE * 2u + 1u )
 		return;
-	Q_strncpyz( out, "vk/pcache_", outsz );
-	for ( i = 0; i < VK_UUID_SIZE; i++ ) {
-		size_t pos = strlen( out );
-		if ( pos + 3 >= outsz )
-			break;
-		out[pos] = hexd[ ( uuid[i] >> 4 ) & 0x0f ];
-		out[pos + 1] = hexd[ uuid[i] & 0x0f ];
-		out[pos + 2] = '\0';
+	for ( i = 0; i < (size_t)VK_UUID_SIZE; i++ ) {
+		uuidhex[i * 2] = hexd[ ( uuid[i] >> 4 ) & 0x0f ];
+		uuidhex[i * 2 + 1] = hexd[ uuid[i] & 0x0f ];
 	}
+	uuidhex[VK_UUID_SIZE * 2] = '\0';
+}
+
+/* Current: vk/pcache_<uuidhex>_<schema>.bin ; legacy: vk/pcache_<uuidhex> */
+static void vk_pipeline_cache_disk_qpath_versioned( char *out, size_t outsz, const uint8_t *uuid )
+{
+	char uuidhex[VK_UUID_SIZE * 2 + 1];
+
+	vk_pipeline_cache_disk_uuid_hex( uuidhex, sizeof( uuidhex ), uuid );
+	Com_sprintf( out, (int)outsz, "vk/pcache_%s_%08x.bin", uuidhex, (unsigned)VK_PIPELINE_CACHE_DISK_SCHEMA );
+}
+
+static void vk_pipeline_cache_disk_qpath_legacy( char *out, size_t outsz, const uint8_t *uuid )
+{
+	char uuidhex[VK_UUID_SIZE * 2 + 1];
+
+	vk_pipeline_cache_disk_uuid_hex( uuidhex, sizeof( uuidhex ), uuid );
+	Com_sprintf( out, (int)outsz, "vk/pcache_%s", uuidhex );
+}
+
+static int vk_pipeline_cache_disk_try_read( const uint8_t *uuid, void **outBuf )
+{
+	char path[MAX_QPATH];
+	int n;
+
+	*outBuf = NULL;
+	vk_pipeline_cache_disk_qpath_versioned( path, sizeof( path ), uuid );
+	n = ri.FS_ReadFile( path, outBuf );
+	if ( n > 0 && *outBuf )
+		return n;
+	if ( *outBuf ) {
+		ri.FS_FreeFile( *outBuf );
+		*outBuf = NULL;
+	}
+	vk_pipeline_cache_disk_qpath_legacy( path, sizeof( path ), uuid );
+	n = ri.FS_ReadFile( path, outBuf );
+	if ( n > 0 && *outBuf )
+		ri.Printf( PRINT_DEVELOPER, "[VK] Pipeline cache disk: loaded legacy path %s (migrate on next save)\n", path );
+	return n;
 }
 
 void vk_pipeline_cache_create( const VkPhysicalDeviceProperties *props )
@@ -50,8 +88,7 @@ void vk_pipeline_cache_create( const VkPhysicalDeviceProperties *props )
 	path[0] = '\0';
 
 	if ( r_vk_pipelineCacheDisk && r_vk_pipelineCacheDisk->integer ) {
-		vk_pipeline_cache_disk_qpath( path, sizeof( path ), props->pipelineCacheUUID );
-		initial_len = ri.FS_ReadFile( path, &initial );
+		initial_len = vk_pipeline_cache_disk_try_read( props->pipelineCacheUUID, &initial );
 		if ( initial_len > 0 && initial ) {
 			ci.initialDataSize = (size_t)initial_len;
 			ci.pInitialData = initial;
@@ -70,15 +107,17 @@ void vk_pipeline_cache_create( const VkPhysicalDeviceProperties *props )
 		ci.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
 		VK_CHECK( qvkCreatePipelineCache( vk.device, &ci, NULL, &vk.pipelineCache ) );
 		if ( r_vk_pipelineCacheDisk && r_vk_pipelineCacheDisk->integer ) {
-			vk_pipeline_cache_disk_qpath( path, sizeof( path ), props->pipelineCacheUUID );
+			vk_pipeline_cache_disk_qpath_versioned( path, sizeof( path ), props->pipelineCacheUUID );
 			ri.Printf( PRINT_ALL, "[VK] Pipeline cache disk: using empty cache (see %s after exit)\n", path );
 		}
 	} else if ( r_vk_pipelineCacheDisk && r_vk_pipelineCacheDisk->integer ) {
-		vk_pipeline_cache_disk_qpath( path, sizeof( path ), props->pipelineCacheUUID );
+		vk_pipeline_cache_disk_qpath_versioned( path, sizeof( path ), props->pipelineCacheUUID );
 		if ( initial_len > 0 )
-			ri.Printf( PRINT_ALL, "[VK] Pipeline cache disk: warm start from %s (%d bytes)\n", path, initial_len );
+			ri.Printf( PRINT_ALL, "[VK] Pipeline cache disk: warm start schema=%u from %s (%d bytes)\n",
+				(unsigned)VK_PIPELINE_CACHE_DISK_SCHEMA, path, initial_len );
 		else
-			ri.Printf( PRINT_ALL, "[VK] Pipeline cache disk: cold start (writes %s on shutdown or vid_restart)\n", path );
+			ri.Printf( PRINT_ALL, "[VK] Pipeline cache disk: cold start schema=%u (writes %s on shutdown or vid_restart)\n",
+				(unsigned)VK_PIPELINE_CACHE_DISK_SCHEMA, path );
 	}
 }
 
@@ -96,7 +135,7 @@ void vk_pipeline_cache_save( void )
 		return;
 
 	qvkGetPhysicalDeviceProperties( vk.physical_device, &props );
-	vk_pipeline_cache_disk_qpath( path, sizeof( path ), props.pipelineCacheUUID );
+	vk_pipeline_cache_disk_qpath_versioned( path, sizeof( path ), props.pipelineCacheUUID );
 
 	r = qvkGetPipelineCacheData( vk.device, vk.pipelineCache, &sz, NULL );
 	if ( r != VK_SUCCESS ) {

@@ -6,9 +6,11 @@ AIML 3.0 Core-oriented interpreter (draft-spec aligned, in progress).
 
 Implements: tokenized normalization (loose default), * / _ pattern tokens,
 <that> conditioning, <topic> blocks, <intent> alias, JSON category packs,
+JSON/XML string maps (SPEC §10.3 / §8.7), <map name="m">…</map>,
 <condition>, <srai> with stack save/restore, <star/> and <thatstar/>,
 <think>, <get>/<set> (set emits empty in Core 3.0), <random>,
-g_aiml3 and g_aimlJson cvars.
+<id/> (§8.12), ASCII <uppercase>/<lowercase> (§8.9),
+g_aiml3, g_aimlJson, g_aimlMaps, g_aimlDebug cvars.
 ===========================================================================
 */
 
@@ -63,6 +65,12 @@ typedef struct {
 } aimlUser_t;
 
 typedef struct {
+	char mapName[32];
+	char key[64];
+	char value[256];
+} aimlMapEntry_t;
+
+typedef struct {
 	char name[64];
 	qboolean active;
 	aimlCategory_t categories[AIML_MAX_CATEGORIES];
@@ -71,12 +79,15 @@ typedef struct {
 	int numProperties;
 	aimlUser_t users[16];
 	int numUsers;
+	aimlMapEntry_t mapEntries[AIML_MAX_MAP_ENTRIES];
+	int numMapEntries;
 } aimlBot_t;
 
 static aimlBot_t		bots[AIML_MAX_BOTS];
 static int			numBots;
 static cvar_t		*g_aiml3;
 static cvar_t		*g_aimlJson;
+static cvar_t		*g_aimlMaps;
 static cvar_t		*g_aimlDebug;
 
 /* Match-time captures: input and <that> patterns */
@@ -98,6 +109,13 @@ static int		*g_starCount;
 static void AIML_AsciiUpper( char *s ) {
 	while ( *s ) {
 		*s = (char)toupper( (unsigned char)*s );
+		s++;
+	}
+}
+
+static void AIML_AsciiLower( char *s ) {
+	while ( *s ) {
+		*s = (char)tolower( (unsigned char)*s );
 		s++;
 	}
 }
@@ -391,6 +409,71 @@ static int AIML_JsonOneString( const char *obj, const char *key, char *out, int 
 	return 1;
 }
 
+static void AIML_AddMapEntry( int h, const char *mapName, const char *key, const char *val ) {
+	aimlBot_t *B;
+	char nk[64];
+	int i;
+
+	if ( !VALID_BOT( h ) || !mapName || !mapName[0] || !key || !val ) {
+		return;
+	}
+	B = &bots[h];
+	AIML_CoreNormalizeLine( key, nk, sizeof( nk ) );
+	for ( i = 0; i < B->numMapEntries; i++ ) {
+		if ( !Q_stricmp( B->mapEntries[i].mapName, mapName ) && !Q_stricmp( B->mapEntries[i].key, nk ) ) {
+			Q_strncpyz( B->mapEntries[i].value, val, sizeof( B->mapEntries[i].value ) );
+			return;
+		}
+	}
+	if ( B->numMapEntries >= AIML_MAX_MAP_ENTRIES ) {
+		Com_Printf( S_COLOR_YELLOW "AIML: map entry limit %d\n", AIML_MAX_MAP_ENTRIES );
+		return;
+	}
+	Q_strncpyz( B->mapEntries[B->numMapEntries].mapName, mapName, sizeof( B->mapEntries[0].mapName ) );
+	Q_strncpyz( B->mapEntries[B->numMapEntries].key, nk, sizeof( B->mapEntries[0].key ) );
+	Q_strncpyz( B->mapEntries[B->numMapEntries].value, val, sizeof( B->mapEntries[0].value ) );
+	B->numMapEntries++;
+}
+
+static const char *AIML_MapLookup( const aimlBot_t *B, const char *mapName, const char *rawKey ) {
+	char nk[256];
+	int i, bestIdx, bestLen, kl;
+
+	if ( !B || !mapName || !mapName[0] || !rawKey ) {
+		return "";
+	}
+	AIML_CoreNormalizeLine( rawKey, nk, sizeof( nk ) );
+	for ( i = 0; i < B->numMapEntries; i++ ) {
+		if ( Q_stricmp( B->mapEntries[i].mapName, mapName ) ) {
+			continue;
+		}
+		if ( !Q_stricmp( B->mapEntries[i].key, nk ) ) {
+			return B->mapEntries[i].value;
+		}
+	}
+	bestIdx = -1;
+	bestLen = -1;
+	for ( i = 0; i < B->numMapEntries; i++ ) {
+		if ( Q_stricmp( B->mapEntries[i].mapName, mapName ) ) {
+			continue;
+		}
+		kl = (int)strlen( B->mapEntries[i].key );
+		if ( kl <= 0 ) {
+			continue;
+		}
+		if ( (int)strlen( nk ) >= kl && !Q_strncmp( nk, B->mapEntries[i].key, kl ) ) {
+			char boundary = nk[kl];
+			if ( boundary == '\0' || boundary == ' ' ) {
+				if ( kl > bestLen ) {
+					bestLen = kl;
+					bestIdx = i;
+				}
+			}
+		}
+	}
+	return ( bestIdx >= 0 ) ? B->mapEntries[bestIdx].value : "";
+}
+
 /* ---- User / bot state ---- */
 
 static aimlUser_t *AIML_FindUser( aimlBot_t *bot, const char *userId, qboolean create ) {
@@ -453,6 +536,61 @@ static void AIML_AddOneCategory( int h, const char *pat, const char *th, const c
 		AIML_CompilePat( cat->topic, &cat->nTopic, cat->topicKind, cat->topicTok );
 	} else { cat->nTopic = 0; }
 	bots[h].numCategories++;
+}
+
+/* Optional <maps><map name="m"><entry key="k" value="v"/>…</map></maps> (SPEC §10.3) */
+static void AIML_LoadXml_maps( int h, const char *t ) {
+	const char *ms, *me, *p, *mopen, *gt, *inner, *mc, *en;
+	char mapn[32], ky[64], vl[256];
+
+	if ( !g_aimlMaps || !g_aimlMaps->integer ) {
+		return;
+	}
+	ms = strstr( t, "<maps>" );
+	if ( !ms ) {
+		return;
+	}
+	me = strstr( ms, "</maps>" );
+	if ( !me || me <= ms ) {
+		return;
+	}
+	p = ms + 6;
+	for ( ; ; ) {
+		mopen = strstr( p, "<map " );
+		if ( !mopen || mopen >= me ) {
+			break;
+		}
+		mapn[0] = '\0';
+		if ( !AIML_GetAttr( mopen, "name", mapn, sizeof( mapn ) ) || !mapn[0] ) {
+			p = mopen + 5;
+			continue;
+		}
+		gt = strchr( mopen, '>' );
+		if ( !gt || gt >= me ) {
+			break;
+		}
+		inner = gt + 1;
+		mc = strstr( inner, "</map>" );
+		if ( !mc || mc > me ) {
+			break;
+		}
+		for ( en = inner; en < mc; ) {
+			en = strstr( en, "<entry" );
+			if ( !en || en >= mc ) {
+				break;
+			}
+			ky[0] = vl[0] = '\0';
+			if ( AIML_GetAttr( en, "key", ky, sizeof( ky ) ) && AIML_GetAttr( en, "value", vl, sizeof( vl ) ) ) {
+				AIML_AddMapEntry( h, mapn, ky, vl );
+			}
+			en = strchr( en, '>' );
+			if ( !en ) {
+				break;
+			}
+			en++;
+		}
+		p = mc + 6;
+	}
 }
 
 /* Scan for <category>...</category> in [p0, end) */
@@ -533,6 +671,7 @@ static void AIML_LoadCategoryBlock( int h, const char *p0, const char *end, cons
 static void AIML_LoadXml( int h, const char *t ) {
 	const char *e = t + strlen( t ), *p, *topen, *tclose, *in0, *na;
 	char tnm[64], *gt;
+
 	p = t;
 	for ( ; ; ) {
 		topen = strstr( p, "<topic" );
@@ -590,6 +729,116 @@ static void AIML_LoadJson( int h, const char *j ) {
 		AIML_AddOneCategory( h, pb, th, tp, to, tbuf );
 		}
 		c1 = d;
+	}
+}
+
+/* "maps": { "mapName": { "key": "value", ... }, ... } */
+static void AIML_LoadJson_maps( int h, const char *j ) {
+	const char *anchor, *colon, *body, *c;
+	char mapName[32], keybuf[64], valbuf[256];
+
+	if ( !g_aimlMaps || !g_aimlMaps->integer ) {
+		return;
+	}
+	anchor = strstr( j, "\"maps\"" );
+	if ( !anchor ) {
+		return;
+	}
+	colon = strchr( anchor, ':' );
+	if ( !colon ) {
+		return;
+	}
+	body = colon + 1;
+	while ( *body && strchr( " \t\n\r", *body ) ) {
+		body++;
+	}
+	if ( *body != '{' ) {
+		return;
+	}
+	body++;
+	for ( ; ; ) {
+		while ( *body && strchr( " \t\n\r,", *body ) ) {
+			body++;
+		}
+		if ( *body == '}' ) {
+			break;
+		}
+		if ( *body != '"' ) {
+			break;
+		}
+		body++;
+		c = strchr( body, '"' );
+		if ( !c ) {
+			break;
+		}
+		if ( c - body >= (int)sizeof( mapName ) ) {
+			break;
+		}
+		Com_Memcpy( mapName, body, c - body );
+		mapName[c - body] = '\0';
+		body = c + 1;
+		while ( *body && strchr( " \t\n\r:", *body ) && *body != ':' ) {
+			body++;
+		}
+		if ( *body != ':' ) {
+			break;
+		}
+		body++;
+		while ( *body && strchr( " \t\n\r", *body ) ) {
+			body++;
+		}
+		if ( *body != '{' ) {
+			break;
+		}
+		body++;
+		for ( ; ; ) {
+			while ( *body && strchr( " \t\n\r,", *body ) ) {
+				body++;
+			}
+			if ( *body == '}' ) {
+				body++;
+				break;
+			}
+			if ( *body != '"' ) {
+				return;
+			}
+			body++;
+			c = strchr( body, '"' );
+			if ( !c ) {
+				return;
+			}
+			if ( c - body >= (int)sizeof( keybuf ) ) {
+				return;
+			}
+			Com_Memcpy( keybuf, body, c - body );
+			keybuf[c - body] = '\0';
+			body = c + 1;
+			while ( *body && strchr( " \t\n\r:", *body ) && *body != ':' ) {
+				body++;
+			}
+			if ( *body != ':' ) {
+				return;
+			}
+			body++;
+			while ( *body && strchr( " \t\n\r", *body ) ) {
+				body++;
+			}
+			if ( *body != '"' ) {
+				return;
+			}
+			body++;
+			c = strchr( body, '"' );
+			if ( !c ) {
+				return;
+			}
+			if ( c - body >= (int)sizeof( valbuf ) ) {
+				return;
+			}
+			Com_Memcpy( valbuf, body, c - body );
+			valbuf[c - body] = '\0';
+			body = c + 1;
+			AIML_AddMapEntry( h, mapName, keybuf, valbuf );
+		}
 	}
 }
 
@@ -702,7 +951,6 @@ static void AIML_ProcTmpl( aimlBot_t *bot, int h, const char *userId, const char
 	int pick, j, k, L2, cnt;
 	char it[AIML_MAX_RANDOM_ITEMS][256];
 
-	(void)bot;
 	if ( !tmpl || olen < 2 || sraiD > AIML_MAX_SRAI_DEPTH ) { if ( out ) { out[0] = '\0'; } return; }
 	p = tmpl; w = 0; out[0] = '\0';
 	while ( *p && w < olen - 1 ) {
@@ -738,6 +986,60 @@ static void AIML_ProcTmpl( aimlBot_t *bot, int h, const char *userId, const char
 				if ( idx < topic_nStars && topic_stars[idx][0] ) { AIML_Append( out, &w, olen, topic_stars[idx] ); }
 				p = a + 1;
 			} else { p++; }
+			continue;
+		}
+		/* <id/> session id (SPEC §8.12) */
+		if ( !Q_strncmp( p, "<id/>", 5 ) ) {
+			AIML_Append( out, &w, olen, userId ? userId : "" );
+			p += 5;
+			continue;
+		}
+		if ( !Q_strncmp( p, "<id />", 6 ) ) {
+			AIML_Append( out, &w, olen, userId ? userId : "" );
+			p += 6;
+			continue;
+		}
+		/* <map name="m">key template</map> (SPEC §8.7) */
+		if ( g_aimlMaps && g_aimlMaps->integer && !Q_strncmp( p, "<map ", 5 ) && AIML_GetAttr( p, "name", nbuf, sizeof( nbuf ) ) ) {
+			const char *gt = strchr( p, '>' );
+			if ( gt ) {
+				const char *inner = gt + 1;
+				const char *cl = strstr( inner, "</map>" );
+				if ( cl ) {
+					k = (int)( cl - inner );
+					if ( k >= (int)sizeof( vbuf ) - 1 ) { k = (int)sizeof( vbuf ) - 1; }
+					Com_Memcpy( vbuf, inner, k );
+					vbuf[k] = '\0';
+					AIML_ProcTmpl( bot, h, userId, vbuf, sub, sizeof( sub ), sraiD );
+					AIML_Append( out, &w, olen, AIML_MapLookup( bot, nbuf, sub ) );
+					p = cl + 6;
+					continue;
+				}
+			}
+		}
+		/* ASCII <uppercase> / <lowercase> (SPEC §8.9 optional) */
+		if ( !Q_strncmp( p, "<uppercase>", 11 ) && AIML_FindTag( p, "uppercase", &a, &b ) ) {
+			k = (int)( b - a );
+			if ( k >= (int)sizeof( vbuf ) - 1 ) { k = (int)sizeof( vbuf ) - 1; }
+			Com_Memcpy( vbuf, a, k );
+			vbuf[k] = '\0';
+			AIML_ProcTmpl( bot, h, userId, vbuf, sub, sizeof( sub ), sraiD );
+			AIML_AsciiUpper( sub );
+			AIML_Append( out, &w, olen, sub );
+			p = b;
+			if ( !Q_strncmp( p, "</uppercase>", 12 ) ) { p += 12; }
+			continue;
+		}
+		if ( !Q_strncmp( p, "<lowercase>", 11 ) && AIML_FindTag( p, "lowercase", &a, &b ) ) {
+			k = (int)( b - a );
+			if ( k >= (int)sizeof( vbuf ) - 1 ) { k = (int)sizeof( vbuf ) - 1; }
+			Com_Memcpy( vbuf, a, k );
+			vbuf[k] = '\0';
+			AIML_ProcTmpl( bot, h, userId, vbuf, sub, sizeof( sub ), sraiD );
+			AIML_AsciiLower( sub );
+			AIML_Append( out, &w, olen, sub );
+			p = b;
+			if ( !Q_strncmp( p, "</lowercase>", 12 ) ) { p += 12; }
 			continue;
 		}
 		/* <bot */
@@ -860,10 +1162,12 @@ void AIML_Init( void ) {
 	numBots = 0;
 	g_aiml3 = Cvar_Get( "g_aiml3", "1", CVAR_ARCHIVE );
 	g_aimlJson = Cvar_Get( "g_aimlJson", "0", CVAR_ARCHIVE );
+	g_aimlMaps = Cvar_Get( "g_aimlMaps", "1", CVAR_ARCHIVE );
+	Cvar_SetDescription( g_aimlMaps, "AIML 3.0: load string maps from JSON/XML (SPEC §10.3) and expand <map name=…>…</map> in templates; 0=disable." );
 	g_aimlDebug = Cvar_Get( "g_aimlDebug", "0", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( g_aimlDebug, "AIML: log top match / no-match to console; 0=off, 1=on." );
 	if ( g_aiml3->integer ) {
-		Com_Printf( "AIML: AIML 3.0 Core path (token * / _ , <that>, <topic>, JSON with g_aimlJson 1; cvars g_aiml3, g_aimlJson, g_aimlDebug)\n" );
+		Com_Printf( "AIML: AIML 3.0 Core path (token * / _ , <that>, <topic>, JSON with g_aimlJson 1, maps with g_aimlMaps 1; cvars g_aiml3, g_aimlJson, g_aimlMaps, g_aimlDebug)\n" );
 	}
 	if ( g_aimlDebug && g_aimlDebug->integer ) {
 		Com_Printf( "AIML: g_aimlDebug=1 (verbose matching enabled)\n" );
@@ -941,6 +1245,9 @@ qboolean AIML_LoadFile( aimlBotHandle_t h, const char *filename ) {
 	if ( !g_aimlJson ) {
 		g_aimlJson = Cvar_Get( "g_aimlJson", "0", CVAR_ARCHIVE );
 	}
+	if ( !g_aimlMaps ) {
+		g_aimlMaps = Cvar_Get( "g_aimlMaps", "1", CVAR_ARCHIVE );
+	}
 	len = FS_ReadFile( filename, &buf );
 	if ( len <= 0 || !buf ) {
 		Com_Printf( S_COLOR_YELLOW "AIML: could not load %s\n", filename );
@@ -948,12 +1255,19 @@ qboolean AIML_LoadFile( aimlBotHandle_t h, const char *filename ) {
 	}
 	ext = COM_GetExtension( filename );
 	if ( ( ext && !Q_stricmp( ext, "json" ) ) || ( g_aimlJson->integer > 0 && strstr( (const char *)buf, "\"categories\"" ) != NULL ) ) {
+		if ( strstr( (const char *)buf, "\"maps\"" ) ) {
+			AIML_LoadJson_maps( h, (const char *)buf );
+		}
 		AIML_LoadJson( h, (const char *)buf );
 	} else {
+		if ( strstr( (const char *)buf, "<maps>" ) ) {
+			AIML_LoadXml_maps( h, (const char *)buf );
+		}
 		AIML_LoadXml( h, (const char *)buf );
 	}
 	FS_FreeFile( buf );
-	Com_Printf( "AIML: %s -> %d categories (bot %s)\n", filename, bots[h].numCategories, bots[h].name );
+	Com_Printf( "AIML: %s -> %d categories, %d map entries (bot %s)\n", filename, bots[h].numCategories,
+		bots[h].numMapEntries, bots[h].name );
 	return qtrue;
 }
 

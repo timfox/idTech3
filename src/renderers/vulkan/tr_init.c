@@ -3329,7 +3329,7 @@ static void R_Register( void )
 	r_vk_pipelineCacheDisk = ri.Cvar_Get( "r_vk_pipelineCacheDisk", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_vk_pipelineCacheDisk, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_vk_pipelineCacheDisk,
-		"When 1 (latched): load/save VkPipelineCache under fs_homepath as vk/pcache_<pipelineCacheUUID>.bin to reduce pipeline compile time after cold start. Saves on shutdown or vid_restart. Requires driver-compatible blob; stale files are replaced." );
+		"When 1 (latched): load/save VkPipelineCache under fs_homepath as vk/pcache_<UUIDhex>_<schema>.bin (legacy vk/pcache_<UUIDhex> still loads once). Schema bumps invalidate incompatible caches. Saves on shutdown or vid_restart." );
 	ri.Cvar_SetGroup( r_vk_pipelineCacheDisk, CVG_RENDERER );
 
 	r_vk_colorWriteMaskDynamic = ri.Cvar_Get( "r_vk_colorWriteMaskDynamic", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
