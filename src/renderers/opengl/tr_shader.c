@@ -1087,7 +1087,8 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			stage->depthFragment = qtrue;
 			continue;
 		}
-		else if ( !Q_stricmp( token, "uiSdfText" ) && s_extendedShader )
+		/* See Vulkan tr_shader.c: uiSdfText must parse in legacy .shader, not only .shaderx. */
+		else if ( !Q_stricmp( token, "uiSdfText" ) )
 		{
 			stage->uiSdfText = 1u;
 			continue;

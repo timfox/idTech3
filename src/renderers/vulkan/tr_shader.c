@@ -1710,7 +1710,9 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			stage->depthFragment = qtrue;
 			continue;
 		}
-		else if ( !Q_stricmp( token, "uiSdfText" ) && s_extendedShader )
+		/* Not gated on s_extendedShader: tokens after s_extensionOffset only apply to .shaderx;
+		 * demo/mod SDF console stages live in ordinary .shader (e.g. demo_bootstrap.shader). */
+		else if ( !Q_stricmp( token, "uiSdfText" ) )
 		{
 			stage->uiSdfText = 1u;
 			continue;
