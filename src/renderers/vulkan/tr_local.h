@@ -1562,6 +1562,7 @@ extern cvar_t	*r_rtx;
 extern cvar_t	*r_rtxDemo;
 extern cvar_t	*r_rtxWorldPrimCap;
 extern cvar_t	*r_rtxComposite;
+extern cvar_t	*r_rtxSamples;
 extern cvar_t	*r_forwardPlus;
 extern cvar_t	*r_forwardPlusMaxPerTile;
 extern cvar_t	*r_forwardPlusDebug;

@@ -8,6 +8,7 @@ layout(set = 0, binding = 2, std140) uniform RtxFrame {
 	vec4 viewOrigin;
 	vec4 zNearFar;
 	vec4 outputSize; /* xy = resolution; z = r_rtx mode (1-3); w = r_rtxComposite blend */
+	vec4 traceParams;
 } rtx;
 
 void main()
