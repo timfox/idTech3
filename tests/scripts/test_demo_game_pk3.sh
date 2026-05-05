@@ -6,6 +6,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 MOD="$PROJECT_ROOT/examples/demo_game/mod"
+BOOT="$PROJECT_ROOT/examples/demo_game/bootstrap_media"
 STUB="$PROJECT_ROOT/examples/demo_game/native/ui_skeleton_stub.c"
 
 fail() {
@@ -25,8 +26,20 @@ for f in \
 	readme_demo.txt \
 	scripts/js/demo_hooks.js \
 	scripts/js/README.txt \
-	scripts/lua/demo_hooks.lua; do
+	scripts/lua/demo_hooks.lua \
+	scripts/demo_bootstrap.shader; do
 	[ -f "$MOD/$f" ] || fail "missing mod file: $MOD/$f"
+done
+
+for f in \
+	gfx/2d/bigchars.png \
+	gfx/demo/bootstrap_white.png \
+	gfx/demo/bootstrap_console.png \
+	gfx/demo/bootstrap_flare.png \
+	gfx/demo/bootstrap_shadow.png \
+	fonts/Inter-Regular.ttf \
+	fonts/LICENSE.txt; do
+	[ -f "$BOOT/$f" ] || fail "missing bootstrap media: $BOOT/$f"
 done
 
 [ -f "$STUB" ] || fail "missing UI stub: $STUB"
@@ -65,16 +78,30 @@ if command -v cc >/dev/null 2>&1; then
 fi
 
 mkdir -p "$STAGE/scripts/js"
+mkdir -p "$STAGE/gfx/2d" "$STAGE/gfx/demo" "$STAGE/fonts"
 cp "$MOD/autoexec.cfg" "$MOD/demo_features.cfg" "$MOD/demo_js.cfg" "$MOD/demo_lua.cfg" \
 	"$MOD/demo_gameplay.cfg" "$MOD/readme_demo.txt" "$STAGE/"
 cp "$MOD/scripts/js/demo_hooks.js" "$MOD/scripts/js/README.txt" "$STAGE/scripts/js/"
 mkdir -p "$STAGE/scripts/lua"
 cp "$MOD/scripts/lua/demo_hooks.lua" "$STAGE/scripts/lua/"
+cp "$MOD/scripts/demo_bootstrap.shader" "$STAGE/scripts/demo_bootstrap.shader"
+cp "$BOOT/gfx/2d/bigchars.png" "$STAGE/gfx/2d/bigchars.png"
+cp "$BOOT/gfx/demo/bootstrap_white.png" "$BOOT/gfx/demo/bootstrap_console.png" \
+	"$BOOT/gfx/demo/bootstrap_flare.png" "$BOOT/gfx/demo/bootstrap_shadow.png" "$STAGE/gfx/demo/"
+cp "$BOOT/fonts/Inter-Regular.ttf" "$BOOT/fonts/LICENSE.txt" "$STAGE/fonts/"
 
 TAR_ARGS=(
 	autoexec.cfg demo_features.cfg demo_js.cfg demo_lua.cfg demo_gameplay.cfg readme_demo.txt
 	scripts/js/demo_hooks.js scripts/js/README.txt
 	scripts/lua/demo_hooks.lua
+	scripts/demo_bootstrap.shader
+	gfx/2d/bigchars.png
+	gfx/demo/bootstrap_white.png
+	gfx/demo/bootstrap_console.png
+	gfx/demo/bootstrap_flare.png
+	gfx/demo/bootstrap_shadow.png
+	fonts/Inter-Regular.ttf
+	fonts/LICENSE.txt
 )
 if [[ -n "$UI_ZIP_PATH" ]]; then
 	TAR_ARGS+=( "$UI_ZIP_PATH" "$UI_DOT_ZIP_PATH" )
@@ -94,7 +121,15 @@ for needle in \
 	readme_demo.txt \
 	scripts/js/demo_hooks.js \
 	scripts/js/README.txt \
-	scripts/lua/demo_hooks.lua; do
+	scripts/lua/demo_hooks.lua \
+	scripts/demo_bootstrap.shader \
+	gfx/2d/bigchars.png \
+	gfx/demo/bootstrap_white.png \
+	gfx/demo/bootstrap_console.png \
+	gfx/demo/bootstrap_flare.png \
+	gfx/demo/bootstrap_shadow.png \
+	fonts/Inter-Regular.ttf \
+	fonts/LICENSE.txt; do
 	if [[ "$listing" != *"$needle"* ]]; then
 		fail "pk3 listing missing: $needle"
 	fi
