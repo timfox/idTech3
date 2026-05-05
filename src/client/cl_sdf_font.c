@@ -262,7 +262,7 @@ void SDF_Init( void ) {
 	Cvar_SetDescription( r_sdfFontAtlas, "Optional explicit atlas image path for SDF font." );
 
 	r_sdfSmoothing = Cvar_Get( "r_sdfSmoothing", "0.1", CVAR_ARCHIVE );
-	Cvar_SetDescription( r_sdfSmoothing, "SDF edge half-width for Vulkan uiSdfText smoothstep (smaller = sharper; 0.05-0.25 typical)." );
+	Cvar_SetDescription( r_sdfSmoothing, "SDF edge half-width for Vulkan uiSdfText smoothstep (smaller = sharper; 0.05-0.25 typical). Combined with fwidth(distance) when r_sdfScreenAa > 0." );
 
 	r_sdfAuto = Cvar_Get( "r_sdfAuto", "0", CVAR_ARCHIVE );
 	Cvar_SetDescription( r_sdfAuto, "When 1, set r_sdfFont to fonts/demo_console_sdf if its .fnt exists on the path and r_sdfFont is empty (does not enable r_sdfEnable; console/HUD prefer r_font + cl_builtInTtf)." );

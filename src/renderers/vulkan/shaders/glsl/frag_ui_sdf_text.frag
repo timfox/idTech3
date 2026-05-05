@@ -1,7 +1,8 @@
 #version 450
 /*
  * Single-texture UI SDF: matches vert_tx0 + gen_frag (vertex color) I/O.
- * Edge width comes from push_constant reserved[0] (see vkMvpPushConstants_t / vk_update_mvp).
+ * reserved[0] = sdfEdgeSmooth (user / r_sdfSmoothing).
+ * reserved[1] = r_sdfScreenAa: scale fwidth(dist) for resolution-independent AA (0 = off).
  * No specialization constants — vk_create_pipeline omits pSpecializationInfo for this type.
  */
 layout(location = 0) centroid in vec4 frag_color0;
@@ -18,6 +19,7 @@ layout(push_constant) uniform Transform {
 	mat4 mvp;
 	mat4 prevMvp;
 	float sdfEdgeSmooth;
+	float sdfScreenAa;
 	float _pad[7];
 } pc;
 
@@ -32,8 +34,11 @@ void main() {
 	vec4 samp = texture(texture0, frag_tex_coord0);
 	float dist = max(samp.a, samp.r);
 	float sm = max(pc.sdfEdgeSmooth, 1e-4);
-	float edgeMin = 0.5 - sm;
-	float edgeMax = 0.5 + sm;
+	/* Screen-space band: fwidth(dist) widens AA when the field is magnified (Valve SDF / Alvin 2020). */
+	float screenW = fwidth(dist) * max(pc.sdfScreenAa, 0.0);
+	float halfBand = (pc.sdfScreenAa > 1e-6) ? max(sm, screenW) : sm;
+	float edgeMin = 0.5 - halfBand;
+	float edgeMax = 0.5 + halfBand;
 	float cov = smoothstep(edgeMin, edgeMax, dist);
 	out_color = vec4(frag_color0.rgb * cov, frag_color0.a * cov);
 }

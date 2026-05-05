@@ -17,10 +17,11 @@ This directory and `base/fonts/` hold TrueType fonts used by the renderer when `
 - **r_fontSize**: Point size for custom fonts (default 16).
 - **r_fontDpi**: FreeType device DPI for rasterization (default 72; try **96** for sharper glyphs when text is magnified on HiDPI displays). Clamped 72–144; restart after change.
 - **r_fontHint**: **0** = legacy `FT_LOAD_DEFAULT`, **1** (default) = `FT_LOAD_TARGET_LIGHT`, **2** = `FT_LOAD_TARGET_NORMAL`. Restart after change.
+- **r_fontMipmap**: **1** (default) builds mipmaps on each 256×256 TrueType atlas page for cleaner minification; **0** = single mip (legacy). Restart after change.
 
 Place `.ttf` files in `base/fonts/` so the game can find them. The compile script copies `base/fonts/*.ttf` to the release directory.
 
-Engine **console** and **small HUD** text use the same FreeType registration when **`cl_builtInTtf`** is **1** (default) and **`r_font`** resolves: that path is preferred over pre-baked SDF when both are enabled.
+Engine **console** and **small HUD** text use the same FreeType registration when **`cl_builtInTtf`** is **1** (default) and **`r_font`** resolves: that path is preferred over pre-baked SDF when both are enabled. **`r_fontConsoleAlign`** (**1** default) vertically aligns glyphs to a row baseline inside each cell (pixel and 640×480 virtual); set **0** for legacy top alignment. **`r_fontShadow`** (**0–8**, default **2**) controls the TrueType drop shadow (**0** = off); **`r_fontSubpixel`** **1** applies a small fractional nudge after projection (try on fuzzy LCDs).
 
 ## SDF fonts (HUD)
 

@@ -1766,6 +1766,7 @@ extern	cvar_t	*r_dither;
 extern	cvar_t	*r_presentBits;
 extern	cvar_t	*r_outline;
 extern	cvar_t	*r_outlineThreshold;
+extern	cvar_t	*r_sdfScreenAa;
 
 extern	cvar_t	*r_ignoreGLErrors;
 

@@ -1737,6 +1737,18 @@ static void R_Register( void )
 		ri.Cvar_SetDescription( fh,
 			"FreeType load hinting: 0 = FT_LOAD_DEFAULT, 1 = FT_LOAD_TARGET_LIGHT (default), 2 = FT_LOAD_TARGET_NORMAL. Restart client after change." );
 	}
+	{
+		cvar_t *fm = ri.Cvar_Get( "r_fontMipmap", "1", CVAR_ARCHIVE );
+		ri.Cvar_CheckRange( fm, "0", "1", CV_INTEGER );
+		ri.Cvar_SetDescription( fm,
+			"Build mipmaps for FreeType TrueType atlas pages (256x256). Helps minified UI text; 0 = single mip (legacy). Restart client after change." );
+	}
+	{
+		cvar_t *saa = ri.Cvar_Get( "r_sdfScreenAa", "2", CVAR_ARCHIVE );
+		ri.Cvar_CheckRange( saa, "0", "8", CV_FLOAT );
+		ri.Cvar_SetDescription( saa,
+			"Vulkan uiSdfText only: scales fwidth(distance) for SDF edge AA when using the OpenGL renderer this cvar is ignored." );
+	}
 	ri.Cvar_Get( "r_svgRasterScale", "1.0", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( ri.Cvar_Get( "r_svgRasterScale", "1.0", CVAR_ARCHIVE ),
 		"SVG rasterization scale factor (vector assets only). 1.0 = intrinsic size." );

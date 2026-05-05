@@ -37,6 +37,9 @@ static cvar_t		*cl_graphheight;
 static cvar_t		*cl_graphscale;
 static cvar_t		*cl_graphshift;
 static cvar_t		*ui_scale;
+static cvar_t		*r_fontConsoleAlign;
+static cvar_t		*r_fontShadow;
+static cvar_t		*r_fontSubpixel;
 
 /*
 ================
@@ -211,6 +214,50 @@ void CL_RegisterBuiltInTrueTypeFonts( void ) {
 
 	cls.builtInTtfActive = qtrue;
 	Com_Printf( "Client: built-in HUD TrueType font \"%s\" @ %dpt (FreeType glyph atlas)\n", hudPath, pt );
+	if ( r_fontConsoleAlign ) {
+		Com_Printf( "Client: r_fontConsoleAlign %i (TrueType pixel console/HUD: 0=top of cell, 1=baseline in cell)\n",
+			r_fontConsoleAlign->integer );
+	}
+}
+
+
+static float SCR_TtfScaledTop( const glyphInfo_t *g, float cellH ) {
+	if ( !g || g->imageHeight <= 0 || cellH <= 0.0f ) {
+		return 0.0f;
+	}
+	return (float)g->top * cellH / (float)g->imageHeight;
+}
+
+/*
+SCR_TtfCellAy
+Vertical origin for a TrueType glyph stretched into a square cell (virtual 640x480 or screen pixels).
+When baseline alignment is on, a row baseline sits above a descender gutter so cap height and descenders fit more naturally than pinning the atlas rect to y.
+*/
+static float SCR_TtfCellAy( float y, const glyphInfo_t *g, float cellH, int refLinePx, qboolean baselineAlign ) {
+	if ( !baselineAlign || refLinePx <= 0 || cellH <= 0.0f || !g || g->imageHeight <= 0 ) {
+		return y;
+	}
+	const float desc = Com_Clamp( 2.0f, 12.0f, cellH * 0.22f );
+	const float baselineInCell = cellH - desc;
+	return y + baselineInCell - SCR_TtfScaledTop( g, cellH );
+}
+
+static float SCR_TtfShadowOffset( void ) {
+	int sh = 2;
+	if ( r_fontShadow ) {
+		sh = r_fontShadow->integer;
+	}
+	if ( sh < 0 ) {
+		sh = 0;
+	}
+	if ( sh > 8 ) {
+		sh = 8;
+	}
+	return (float)sh;
+}
+
+static float SCR_TtfSubpixelBias( void ) {
+	return ( r_fontSubpixel && r_fontSubpixel->integer ) ? 0.375f : 0.0f;
 }
 
 
@@ -220,7 +267,10 @@ static qboolean SCR_DrawBuiltInTtfStringExtVirtual( int x, int y, float size, co
 	const char *s;
 	float xx;
 	const float cell = size;
-	const float shadow = 2.0f;
+	const float shOff = SCR_TtfShadowOffset();
+	const float sp = SCR_TtfSubpixelBias();
+	const qboolean baselineAlign = ( r_fontConsoleAlign && r_fontConsoleAlign->integer ) ? qtrue : qfalse;
+	const int refPx = cls.builtInHudRefLinePx;
 
 	if ( !string || !string[0] || !setColor || !font ) {
 		return qfalse;
@@ -228,44 +278,48 @@ static qboolean SCR_DrawBuiltInTtfStringExtVirtual( int x, int y, float size, co
 
 	/* Match SCR_DrawChar: cell is `size` x `size` in 640x480 virtual units; do not scale quad by
 	 * atlas pixel dimensions * useScale or huge clampedSize values blow up SCR_AdjustFrom640. */
-	color[0] = color[1] = color[2] = 0.0f;
-	color[3] = setColor[3];
-	re.SetColor( color );
-	s = string;
-	xx = (float)x;
-	while ( *s ) {
-		int ch;
-		const glyphInfo_t *g;
-		float ax, ay, aw, ah;
+	if ( shOff > 0.0f ) {
+		color[0] = color[1] = color[2] = 0.0f;
+		color[3] = setColor[3];
+		re.SetColor( color );
+		s = string;
+		xx = (float)x;
+		while ( *s ) {
+			int ch;
+			const glyphInfo_t *g;
+			float ax, ay, aw, ah;
 
-		if ( !noColorEscape && Q_IsColorString( s ) ) {
-			s += 2;
-			continue;
-		}
-		if ( (unsigned char)*s >= 0x80 ) {
-			uint32_t cp = Q_UTF8_Decode( &s );
-			if ( CL_Emoji_IsEnabled() && Q_UTF8_IsEmoji( cp ) ) {
+			if ( !noColorEscape && Q_IsColorString( s ) ) {
+				s += 2;
+				continue;
+			}
+			if ( (unsigned char)*s >= 0x80 ) {
+				uint32_t cp = Q_UTF8_Decode( &s );
+				if ( CL_Emoji_IsEnabled() && Q_UTF8_IsEmoji( cp ) ) {
+					xx += cell;
+					continue;
+				}
+				ch = ( cp < 256 ) ? (int)( cp & 0xFF ) : '?';
+			} else {
+				ch = (unsigned char)*s;
+				s++;
+			}
+			ch &= 255;
+			g = &font->glyphs[ch];
+			if ( !g->glyph || g->imageHeight <= 0 || g->imageWidth <= 0 ) {
 				xx += cell;
 				continue;
 			}
-			ch = ( cp < 256 ) ? (int)( cp & 0xFF ) : '?';
-		} else {
-			ch = (unsigned char)*s;
-			s++;
-		}
-		ch &= 255;
-		g = &font->glyphs[ch];
-		if ( !g->glyph || g->imageHeight <= 0 || g->imageWidth <= 0 ) {
+			aw = cell;
+			ah = cell;
+			ax = xx + shOff;
+			ay = SCR_TtfCellAy( (float)y, g, cell, refPx, baselineAlign ) + shOff;
+			SCR_AdjustFrom640( &ax, &ay, &aw, &ah );
+			ax += sp;
+			ay += sp;
+			re.DrawStretchPic( ax, ay, aw, ah, g->s, g->t, g->s2, g->t2, g->glyph );
 			xx += cell;
-			continue;
 		}
-		aw = cell;
-		ah = cell;
-		ax = xx + shadow;
-		ay = (float)y + shadow;
-		SCR_AdjustFrom640( &ax, &ay, &aw, &ah );
-		re.DrawStretchPic( ax, ay, aw, ah, g->s, g->t, g->s2, g->t2, g->glyph );
-		xx += cell;
 	}
 
 	s = string;
@@ -309,8 +363,10 @@ static qboolean SCR_DrawBuiltInTtfStringExtVirtual( int x, int y, float size, co
 		aw = cell;
 		ah = cell;
 		ax = xx;
-		ay = (float)y;
+		ay = SCR_TtfCellAy( (float)y, g, cell, refPx, baselineAlign );
 		SCR_AdjustFrom640( &ax, &ay, &aw, &ah );
+		ax += sp;
+		ay += sp;
 		re.DrawStretchPic( ax, ay, aw, ah, g->s, g->t, g->s2, g->t2, g->glyph );
 		xx += cell;
 	}
@@ -325,51 +381,55 @@ static qboolean SCR_DrawBuiltInTtfStringExtPixels( int x, int y, const char *str
 	vec4_t color;
 	const char *s;
 	float xx;
-	const float shadow = 2.0f;
-	(void)refLinePx;
+	const float shOff = SCR_TtfShadowOffset();
+	const float sp = SCR_TtfSubpixelBias();
+	const qboolean baselineAlign = ( r_fontConsoleAlign && r_fontConsoleAlign->integer ) ? qtrue : qfalse;
+	const float cellH = (float)smallchar_height;
 
 	if ( !string || !string[0] || !setColor || !font ) {
 		return qfalse;
 	}
 
 	/* Match SCR_DrawSmallChar: fixed smallchar_width x smallchar_height in screen pixels. */
-	color[0] = color[1] = color[2] = 0.0f;
-	color[3] = setColor[3];
-	re.SetColor( color );
-	s = string;
-	xx = (float)x;
-	while ( *s ) {
-		int ch;
-		const glyphInfo_t *g;
-		float ax, ay, aw, ah;
+	if ( shOff > 0.0f ) {
+		color[0] = color[1] = color[2] = 0.0f;
+		color[3] = setColor[3];
+		re.SetColor( color );
+		s = string;
+		xx = (float)x;
+		while ( *s ) {
+			int ch;
+			const glyphInfo_t *g;
+			float ax, ay, aw, ah;
 
-		if ( !noColorEscape && Q_IsColorString( s ) ) {
-			s += 2;
-			continue;
-		}
-		if ( (unsigned char)*s >= 0x80 ) {
-			uint32_t cp = Q_UTF8_Decode( &s );
-			if ( CL_Emoji_IsEnabled() && Q_UTF8_IsEmoji( cp ) ) {
+			if ( !noColorEscape && Q_IsColorString( s ) ) {
+				s += 2;
+				continue;
+			}
+			if ( (unsigned char)*s >= 0x80 ) {
+				uint32_t cp = Q_UTF8_Decode( &s );
+				if ( CL_Emoji_IsEnabled() && Q_UTF8_IsEmoji( cp ) ) {
+					xx += (float)smallchar_width;
+					continue;
+				}
+				ch = ( cp < 256 ) ? (int)( cp & 0xFF ) : '?';
+			} else {
+				ch = (unsigned char)*s;
+				s++;
+			}
+			ch &= 255;
+			g = &font->glyphs[ch];
+			if ( !g->glyph || g->imageHeight <= 0 || g->imageWidth <= 0 ) {
 				xx += (float)smallchar_width;
 				continue;
 			}
-			ch = ( cp < 256 ) ? (int)( cp & 0xFF ) : '?';
-		} else {
-			ch = (unsigned char)*s;
-			s++;
-		}
-		ch &= 255;
-		g = &font->glyphs[ch];
-		if ( !g->glyph || g->imageHeight <= 0 || g->imageWidth <= 0 ) {
+			aw = (float)smallchar_width;
+			ah = cellH;
+			ax = xx + shOff + sp;
+			ay = SCR_TtfCellAy( (float)y, g, cellH, refLinePx, baselineAlign ) + shOff + sp;
+			re.DrawStretchPic( ax, ay, aw, ah, g->s, g->t, g->s2, g->t2, g->glyph );
 			xx += (float)smallchar_width;
-			continue;
 		}
-		aw = (float)smallchar_width;
-		ah = (float)smallchar_height;
-		ax = xx + shadow;
-		ay = (float)y + shadow;
-		re.DrawStretchPic( ax, ay, aw, ah, g->s, g->t, g->s2, g->t2, g->glyph );
-		xx += (float)smallchar_width;
 	}
 
 	s = string;
@@ -411,9 +471,9 @@ static qboolean SCR_DrawBuiltInTtfStringExtPixels( int x, int y, const char *str
 			continue;
 		}
 		aw = (float)smallchar_width;
-		ah = (float)smallchar_height;
-		ax = xx;
-		ay = (float)y;
+		ah = cellH;
+		ax = xx + sp;
+		ay = SCR_TtfCellAy( (float)y, g, cellH, refLinePx, baselineAlign ) + sp;
 		re.DrawStretchPic( ax, ay, aw, ah, g->s, g->t, g->s2, g->t2, g->glyph );
 		xx += (float)smallchar_width;
 	}
@@ -895,6 +955,21 @@ void SCR_Init( void ) {
 			"drawn before pre-baked SDF when both are available. Set 0 to prefer SDF (r_sdfEnable) or legacy bigchars if r_font fails. "
 			"Requires BUILD_FREETYPE and valid font files (e.g. base/fonts/Inter-Regular.ttf)." );
 	}
+
+	r_fontConsoleAlign = Cvar_Get( "r_fontConsoleAlign", "1", CVAR_ARCHIVE );
+	Cvar_CheckRange( r_fontConsoleAlign, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( r_fontConsoleAlign,
+		"TrueType console / pixel HUD strings: 1 = baseline-aligned inside each fixed cell (default); 0 = legacy top-aligned to cell top." );
+
+	r_fontShadow = Cvar_Get( "r_fontShadow", "2", CVAR_ARCHIVE );
+	Cvar_CheckRange( r_fontShadow, "0", "8", CV_INTEGER );
+	Cvar_SetDescription( r_fontShadow,
+		"Drop-shadow offset in pixels (console/notify) or virtual units (640x480 HUD bigchars). 0 disables the shadow pass for TrueType." );
+
+	r_fontSubpixel = Cvar_Get( "r_fontSubpixel", "0", CVAR_ARCHIVE );
+	Cvar_CheckRange( r_fontSubpixel, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( r_fontSubpixel,
+		"When 1, nudge TrueType draw positions by 0.375px after projection; can sharpen linear-filtered edges on some displays." );
 
 	{
 		cvar_t *ui_open_tab = Cvar_Get( "ui_open_tab", "", CVAR_ARCHIVE_ND );

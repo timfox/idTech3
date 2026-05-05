@@ -118,7 +118,7 @@ static int R_FontDeviceDpi( void ) {
 
 static FT_Int32 R_FontLoadFlags( void ) {
 	int mode = ri.Cvar_VariableIntegerValue( "r_fontHint" );
-	FT_Int32 flags = FT_LOAD_DEFAULT;
+	FT_Int32 flags = FT_LOAD_DEFAULT | FT_LOAD_NO_BITMAP;
 	if ( mode == 0 ) {
 		return flags;
 	}
@@ -128,6 +128,14 @@ static FT_Int32 R_FontLoadFlags( void ) {
 		flags |= (FT_Int32)FT_LOAD_TARGET_LIGHT;
 	}
 	return flags;
+}
+
+static imgFlags_t R_FontAtlasFlags( void ) {
+	imgFlags_t f = IMGFLAG_CLAMPTOEDGE;
+	if ( ri.Cvar_VariableIntegerValue( "r_fontMipmap" ) > 0 ) {
+		f |= IMGFLAG_MIPMAP;
+	}
+	return f;
 }
 
 static void R_GetGlyphInfo(FT_GlyphSlot glyph, int *left, int *right, int *width, int *top, int *bottom, int *height, int *pitch) {
@@ -583,9 +591,9 @@ try_freetype:
 			}
 
 	#if defined(RENDERER_VULKAN)
-		image = R_CreateImage(name, NULL, imageBuff, 256, 256, IMGFLAG_CLAMPTOEDGE, 0, 0);
+		image = R_CreateImage(name, NULL, imageBuff, 256, 256, R_FontAtlasFlags(), 0, 0);
 	#else
-		image = R_CreateImage(name, NULL, imageBuff, 256, 256, IMGFLAG_CLAMPTOEDGE);
+		image = R_CreateImage(name, NULL, imageBuff, 256, 256, R_FontAtlasFlags());
 	#endif
 			h = RE_RegisterShaderFromImage(name, LIGHTMAP_2D, image, qfalse);
 			for (j = lastStart; j < i; j++) {
@@ -644,8 +652,9 @@ void R_InitFreeType(void) {
 	if ( FT_Init_FreeType( &ftLibrary ) ) {
 		ri.Printf( PRINT_WARNING, "R_InitFreeType: Unable to initialize FreeType.\n" );
 	} else {
-		ri.Printf( PRINT_ALL, "FreeType: TrueType raster dpi=%i (r_fontDpi), hint=%i (r_fontHint 0=default 1=light 2=normal; restart after change)\n",
-			R_FontDeviceDpi(), ri.Cvar_VariableIntegerValue( "r_fontHint" ) );
+		ri.Printf( PRINT_ALL, "FreeType: TrueType raster dpi=%i (r_fontDpi), hint=%i (r_fontHint 0=default 1=light 2=normal), atlas mipmaps=%s (r_fontMipmap; restart after change)\n",
+			R_FontDeviceDpi(), ri.Cvar_VariableIntegerValue( "r_fontHint" ),
+			ri.Cvar_VariableIntegerValue( "r_fontMipmap" ) > 0 ? "on" : "off" );
 	}
 	registeredFontCount = 0;
 }
