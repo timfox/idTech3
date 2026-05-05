@@ -23,8 +23,10 @@ typedef struct {
 	float invViewProj[16];
 	float viewOrigin[4];
 	float zNearFar[4];
-	/* xy = RT output resolution (pixels); z = latched r_rtx mode 0-3 for demo hit tint; w unused */
+	/* xy = RT output resolution; z = r_rtx mode; w = r_rtxComposite blend */
 	float outputSize[4];
+	/* x = r_rtxSamples; yzw reserved */
+	float traceParams[4];
 } VkRtxFrameUBO_t;
 
 static struct {
@@ -234,6 +236,37 @@ static void vk_rtx_create_rt_output( uint32_t w, uint32_t h, VkDescriptorSet des
 	rtx.width = w;
 	rtx.height = h;
 	rtx.rt_image_traced = qfalse;
+}
+
+static void vk_rtx_update_color_descriptor( void )
+{
+	VkDescriptorImageInfo colorInfo;
+	VkWriteDescriptorSet write;
+	Vk_Sampler_Def sd;
+
+	if ( rtx.descriptor_set == VK_NULL_HANDLE || vk.color_image_view == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	Com_Memset( &sd, 0, sizeof( sd ) );
+	sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+	sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	sd.max_lod_1_0 = qtrue;
+	sd.noAnisotropy = qtrue;
+
+	Com_Memset( &colorInfo, 0, sizeof( colorInfo ) );
+	colorInfo.sampler = vk_find_sampler( &sd );
+	colorInfo.imageView = vk.color_image_view;
+	colorInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	Com_Memset( &write, 0, sizeof( write ) );
+	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.dstSet = rtx.descriptor_set;
+	write.dstBinding = 4;
+	write.descriptorCount = 1;
+	write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	write.pImageInfo = &colorInfo;
+	qvkUpdateDescriptorSets( vk.device, 1, &write, 0, NULL );
 }
 
 static void vk_rtx_rebuild_world_blas( void )
@@ -573,7 +606,7 @@ void vk_rtx_init( void )
 {
 	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rtProps;
 	VkPhysicalDeviceProperties2 props2;
-	VkDescriptorSetLayoutBinding bindings[4];
+	VkDescriptorSetLayoutBinding bindings[5];
 	VkDescriptorSetLayoutCreateInfo dslci;
 	VkDescriptorPoolSize poolSizes[4];
 	VkDescriptorPoolCreateInfo pci;
@@ -596,6 +629,7 @@ void vk_rtx_init( void )
 	uint8_t *sbtHost;
 	size_t hbufSize;
 	int gi;
+	int sampleCount;
 	VkResult pipeRes;
 
 	vk_rtx_shutdown();
@@ -648,10 +682,14 @@ void vk_rtx_init( void )
 	bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	bindings[3].descriptorCount = 1;
 	bindings[3].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+	bindings[4].binding = 4;
+	bindings[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	bindings[4].descriptorCount = 1;
+	bindings[4].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 
 	Com_Memset( &dslci, 0, sizeof( dslci ) );
 	dslci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	dslci.bindingCount = 4;
+	dslci.bindingCount = 5;
 	dslci.pBindings = bindings;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &dslci, NULL, &rtx.dsl ) );
 
@@ -662,7 +700,7 @@ void vk_rtx_init( void )
 	poolSizes[2].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	poolSizes[2].descriptorCount = 1;
 	poolSizes[3].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[3].descriptorCount = 1;
+	poolSizes[3].descriptorCount = 2;
 	Com_Memset( &pci, 0, sizeof( pci ) );
 	pci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	pci.maxSets = 1;
@@ -732,6 +770,7 @@ void vk_rtx_init( void )
 	writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	writes[1].pImageInfo = &depthInfo;
 	qvkUpdateDescriptorSets( vk.device, 2, writes, 0, NULL );
+	vk_rtx_update_color_descriptor();
 
 	vk_rtx_rebuild_world_blas();
 
@@ -810,7 +849,12 @@ void vk_rtx_init( void )
 	qvkUnmapMemory( vk.device, rtx.sbt_memory );
 
 	rtx.ready = qtrue;
-	ri.Printf( PRINT_ALL, "[VK][RTX] RTX demo ready (r_rtx=%d): world BLAS when map loaded, else fallback triangle; hit tint by r_rtx 1=shadows 2=reflections 3=full; composites after main/post bloom\n", r_rtx->integer );
+	sampleCount = ( r_rtxSamples && r_rtxSamples->integer > 0 ) ? r_rtxSamples->integer : 1;
+	if ( sampleCount > 8 ) {
+		sampleCount = 8;
+	}
+	ri.Printf( PRINT_ALL, "[VK][RTX] Ray pass ready (r_rtx=%d, samples=%d, blend=%.2f): world BLAS when map loaded, else fallback triangle\n",
+		r_rtx->integer, sampleCount, r_rtxComposite ? r_rtxComposite->value : 0.0f );
 }
 
 void vk_rtx_frame_begin( void )
@@ -828,6 +872,7 @@ void vk_rtx_frame_begin( void )
 	}
 
 	vk_rtx_create_rt_output( w, h, rtx.descriptor_set );
+	vk_rtx_update_color_descriptor();
 	ri.Printf( PRINT_ALL, "[VK][RTX] Resized RT output to %ux%u\n", w, h );
 }
 
@@ -844,6 +889,7 @@ void vk_rtx_record_demo_pass( VkCommandBuffer cmd )
 	float viewProj[16];
 	float zNear, zFar;
 	VkImageAspectFlags depthAspect;
+	uint32_t preBarrierCount;
 
 	if ( !rtx.ready || !cmd || !r_rtxDemo || !r_rtxDemo->integer ) {
 		return;
@@ -884,7 +930,20 @@ void vk_rtx_record_demo_pass( VkCommandBuffer cmd )
 			}
 			frameUbo.outputSize[2] = (float)rtxMode;
 		}
-		frameUbo.outputSize[3] = 0.0f;
+		frameUbo.outputSize[3] = r_rtxComposite ? r_rtxComposite->value : 0.0f;
+		if ( frameUbo.outputSize[3] < 0.0f ) {
+			frameUbo.outputSize[3] = 0.0f;
+		}
+		if ( frameUbo.outputSize[3] > 1.0f ) {
+			frameUbo.outputSize[3] = 1.0f;
+		}
+		frameUbo.traceParams[0] = ( r_rtxSamples && r_rtxSamples->integer > 0 ) ? (float)r_rtxSamples->integer : 1.0f;
+		if ( frameUbo.traceParams[0] > 8.0f ) {
+			frameUbo.traceParams[0] = 8.0f;
+		}
+		frameUbo.traceParams[1] = 0.0f;
+		frameUbo.traceParams[2] = 0.0f;
+		frameUbo.traceParams[3] = 0.0f;
 		Com_Memcpy( rtx.rtx_ubo_ptr, &frameUbo, sizeof( frameUbo ) );
 	}
 
@@ -938,10 +997,27 @@ void vk_rtx_record_demo_pass( VkCommandBuffer cmd )
 	barriers[0].srcAccessMask = rtx.rt_image_traced ? VK_ACCESS_SHADER_WRITE_BIT : 0;
 	barriers[0].dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 
+	preBarrierCount = 1;
+	if ( vk.color_image != VK_NULL_HANDLE ) {
+		barriers[1].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		barriers[1].oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		barriers[1].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		barriers[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barriers[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barriers[1].image = vk.color_image;
+		barriers[1].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		barriers[1].subresourceRange.levelCount = 1;
+		barriers[1].subresourceRange.layerCount = 1;
+		barriers[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		barriers[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		preBarrierCount = 2;
+	}
+
 	qvkCmdPipelineBarrier( cmd,
-		rtx.rt_image_traced ? VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+		( rtx.rt_image_traced ? VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT ) |
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 		VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
-		0, 0, NULL, 0, NULL, 1, barriers );
+		0, 0, NULL, 0, NULL, preBarrierCount, barriers );
 
 	qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, rtx.pipeline );
 	qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, rtx.pl, 0, 1, &rtx.descriptor_set, 0, NULL );

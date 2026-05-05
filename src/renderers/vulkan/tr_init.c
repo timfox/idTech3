@@ -201,6 +201,7 @@ cvar_t	*r_rtx;
 cvar_t	*r_rtxDemo;
 cvar_t	*r_rtxWorldPrimCap;
 cvar_t	*r_rtxComposite;
+cvar_t	*r_rtxSamples;
 cvar_t	*r_forwardPlus;
 cvar_t	*r_forwardPlusMaxPerTile;
 cvar_t	*r_forwardPlusDebug;
@@ -3495,9 +3496,13 @@ static void R_Register( void )
 	r_rtxComposite = ri.Cvar_Get( "r_rtxComposite", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_rtxComposite, "0", "1", CV_FLOAT );
 	ri.Cvar_SetDescription( r_rtxComposite,
-		"When USE_VULKAN_RTX and \\r_rtxDemo 1: blend resolved **raster** HDR color into the RT demo output per pixel: "
-		"out = mix(rtHit, rasterColor, factor). **0** = RT colors only (legacy demo). **0.2–0.5** approximates hybrid paths (e.g. Quake II RTX-style grounding). Requires RT demo composite." );
+		"When USE_VULKAN_RTX and \\r_rtxDemo 1: blend resolved raster HDR color into the RT output per pixel. "
+		"0 = traced color only; 1 = resolved scene color only; 0.2 to 0.5 keeps traced grounding with scene detail." );
 	ri.Cvar_SetGroup( r_rtxComposite, CVG_RENDERER );
+	r_rtxSamples = ri.Cvar_Get( "r_rtxSamples", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_rtxSamples, "1", "8", CV_INTEGER );
+	ri.Cvar_SetDescription( r_rtxSamples, "Primary ray samples per pixel for the Vulkan RT output. Higher values smooth edge shimmer at extra GPU cost." );
+	ri.Cvar_SetGroup( r_rtxSamples, CVG_RENDERER );
 	r_forwardPlus = ri.Cvar_Get( "r_forwardPlus", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_forwardPlus, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_forwardPlus, "Forward+ (default 1 on Vulkan): device-local light SSBO + per-tile cull compute (16px tiles; max from \\r_forwardPlusMaxPerTile, default 8). Packs at most MAX_DLIGHTS (32) for tess.dlightBits. PBR: \\r_forwardPlusDebug, \\r_forwardPlusShade. Set 0 to disable (vid_restart). See docs/RENDERER_2026_ARCHITECTURE_PASS.md." );
