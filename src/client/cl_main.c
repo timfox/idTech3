@@ -223,6 +223,11 @@ cvar_t	*cl_flux_width;
 cvar_t	*cl_flux_height;
 cvar_t	*cl_flux_steps;
 cvar_t	*cl_flux_seed;
+/* FonTS (ICCV 2025): external Python DiT pipeline; see docs/FONTS.md */
+cvar_t	*cl_fonts_enable;
+cvar_t	*cl_fonts_repo;
+cvar_t	*cl_fonts_python;
+cvar_t	*cl_fonts_cmd;
 
 // FLUX job system for background generation
 typedef enum {
@@ -348,6 +353,74 @@ static qboolean CL_FluxGenerateExternal(const char *model_path, const char *prom
 	return qtrue;
 }
 
+static qboolean CL_FontsAppendEscapedToCmd( char *out, size_t *len, size_t maxlen, const char *raw ) {
+	char esc[4096];
+	size_t add;
+
+	if ( !raw ) {
+		raw = "";
+	}
+	if ( !CL_FluxEscapeShellArg( raw, esc, sizeof( esc ) ) ) {
+		return qfalse;
+	}
+	add = strlen( esc );
+	if ( *len + add >= maxlen ) {
+		return qfalse;
+	}
+	memcpy( out + *len, esc, add + 1 );
+	*len += add;
+	return qtrue;
+}
+
+static qboolean CL_FontsExpandPipelineTemplate( char *out, size_t maxlen, const char *tmpl,
+		const char *repo, const char *base, const char *py, const char *args ) {
+	size_t o = 0;
+	const char *p;
+
+	if ( !tmpl || !*tmpl || maxlen < 8 ) {
+		return qfalse;
+	}
+	out[0] = '\0';
+	for ( p = tmpl; *p && o + 1 < maxlen; ) {
+		if ( p[0] == '%' && p[1] == '%' ) {
+			out[o++] = '%';
+			p += 2;
+			continue;
+		}
+		if ( p[0] == '%' && p[1] == 'R' ) {
+			if ( !CL_FontsAppendEscapedToCmd( out, &o, maxlen, repo ) ) {
+				return qfalse;
+			}
+			p += 2;
+			continue;
+		}
+		if ( p[0] == '%' && p[1] == 'B' ) {
+			if ( !CL_FontsAppendEscapedToCmd( out, &o, maxlen, base ) ) {
+				return qfalse;
+			}
+			p += 2;
+			continue;
+		}
+		if ( p[0] == '%' && p[1] == 'P' ) {
+			if ( !CL_FontsAppendEscapedToCmd( out, &o, maxlen, py ) ) {
+				return qfalse;
+			}
+			p += 2;
+			continue;
+		}
+		if ( p[0] == '%' && p[1] == 'A' ) {
+			if ( !CL_FontsAppendEscapedToCmd( out, &o, maxlen, args ) ) {
+				return qfalse;
+			}
+			p += 2;
+			continue;
+		}
+		out[o++] = *p++;
+	}
+	out[o] = '\0';
+	return qtrue;
+}
+
 // Get model directory path based on selected model variant
 static const char *CL_FluxGetModelPath(const char *model_variant) {
 	// Model variants can have their own directories for better organization
@@ -461,6 +534,7 @@ static void CL_FluxDevices_f( void );
 static void CL_FluxReload_f( void );
 static void CL_FluxShow_f( void );
 static void CL_FluxView_f( void );
+static void CL_FontsPipeline_f( void );
 #endif
 static void CL_ServerStatusResponse( const netadr_t *from, msg_t *msg );
 static void CL_ServerInfoPacket( const netadr_t *from, msg_t *msg );
@@ -3826,6 +3900,18 @@ void CL_Init( void ) {
 	cl_flux_seed = Cvar_Get( "cl_flux_seed", "-1", CVAR_ARCHIVE );
 	Cvar_CheckRange( cl_flux_seed, "-1", "2147483647", CV_INTEGER );
 	Cvar_SetDescription( cl_flux_seed, "Random seed for reproducible image generation. -1 for random seed." );
+
+	cl_fonts_enable = Cvar_Get( "cl_fonts_enable", "0", CVAR_ARCHIVE );
+	Cvar_CheckRange( cl_fonts_enable, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( cl_fonts_enable,
+		"Enable FonTS (ICCV 2025) external Python pipeline hook. Requires separate FonTS repo + GPU env; see docs/FONTS.md." );
+	cl_fonts_repo = Cvar_Get( "cl_fonts_repo", "", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_fonts_repo, "Absolute path to a checkout of github.com/ArtmeScienceLab/FonTS (used as %R in cl_fonts_cmd)." );
+	cl_fonts_python = Cvar_Get( "cl_fonts_python", "python3", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_fonts_python, "Python interpreter for fonts_pipeline (substituted as %P in cl_fonts_cmd)." );
+	cl_fonts_cmd = Cvar_Get( "cl_fonts_cmd", "", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_fonts_cmd,
+		"Shell template for fonts_pipeline: use %R FonTS repo, %B engine base path, %P python, %A args from console; %% for literal %. Blocking system() call." );
 #endif
 
 	//
@@ -3870,6 +3956,7 @@ void CL_Init( void ) {
 	Cmd_AddCommand ("flux_reload", CL_FluxReload_f );
 	Cmd_AddCommand ("flux_show", CL_FluxShow_f );
 	Cmd_AddCommand ("flux_view", CL_FluxView_f );
+	Cmd_AddCommand ("fonts_pipeline", CL_FontsPipeline_f );
 #endif
 
 #ifdef USE_CURL
@@ -3898,6 +3985,12 @@ void CL_Init( void ) {
 		Com_Printf( "FLUX external generation: %s\n", cl_flux_external && cl_flux_external->integer ? "enabled" : "disabled" );
 	} else {
 		Com_Printf( "FLUX image generation: disabled (set cl_flux_enable 1 to enable)\n" );
+	}
+	if ( cl_fonts_enable && cl_fonts_enable->integer ) {
+		Com_Printf( "FonTS pipeline: enabled (cl_fonts_repo %s)\n",
+			( cl_fonts_repo && cl_fonts_repo->string[0] ) ? cl_fonts_repo->string : "unset — set cl_fonts_repo + cl_fonts_cmd" );
+	} else {
+		Com_Printf( "FonTS pipeline: disabled (cl_fonts_enable 0; docs/FONTS.md)\n" );
 	}
 #else
 	Com_Printf( "FLUX.2 image generation: not available (compiled without USE_FLUX)\n" );
@@ -3978,6 +4071,9 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 	Cmd_RemoveCommand ("snd_restart");
 	Cmd_RemoveCommand ("vid_restart");
 	Cmd_RemoveCommand ("reloadTtf");
+#ifdef USE_FLUX
+	Cmd_RemoveCommand ("fonts_pipeline");
+#endif
 	Cmd_RemoveCommand ("disconnect");
 	CL_Demo_ShutdownCommands();
 	Cmd_RemoveCommand ("cinematic");
@@ -5594,6 +5690,55 @@ static void CL_FluxView_f( void ) {
 		flux_job.status = FLUX_JOB_IDLE;
 		Com_Printf(S_COLOR_GREEN "FLUX: Job completed and cleaned up\n");
 	}
+}
+
+/*
+==================
+CL_FontsPipeline_f
+
+Run a user-configured shell command for the FonTS (ICCV 2025) typography pipeline.
+Upstream FonTS is Python + PyTorch + diffusers; the engine only orchestrates via system().
+==================
+*/
+static void CL_FontsPipeline_f( void ) {
+	char cmd[8192];
+	const char *repo;
+	const char *base;
+	const char *py;
+	const char *args;
+	const char *tmpl;
+
+	if ( !cl_fonts_enable || !cl_fonts_enable->integer ) {
+		Com_Printf( S_COLOR_YELLOW "fonts_pipeline: set cl_fonts_enable 1 (see docs/FONTS.md)\n" );
+		return;
+	}
+	repo = cl_fonts_repo ? cl_fonts_repo->string : "";
+	if ( !repo || !repo[0] ) {
+		Com_Printf( S_COLOR_YELLOW "fonts_pipeline: set cl_fonts_repo to your FonTS checkout path\n" );
+		return;
+	}
+	base = Sys_DefaultBasePath();
+	if ( !base ) {
+		Com_Printf( S_COLOR_RED "fonts_pipeline: no engine base path\n" );
+		return;
+	}
+	py = ( cl_fonts_python && cl_fonts_python->string[0] ) ? cl_fonts_python->string : "python3";
+	tmpl = cl_fonts_cmd ? cl_fonts_cmd->string : "";
+	if ( !tmpl || !tmpl[0] ) {
+		Com_Printf( S_COLOR_YELLOW "fonts_pipeline: set cl_fonts_cmd (template with %%R %%B %%P %%A — see docs/FONTS.md)\n" );
+		return;
+	}
+	args = ( Cmd_Argc() >= 2 ) ? Cmd_ArgsFrom( 1 ) : "";
+	if ( !CL_FontsExpandPipelineTemplate( cmd, sizeof( cmd ), tmpl, repo, base, py, args ) ) {
+		Com_Printf( S_COLOR_RED "fonts_pipeline: expanded command too long or bad path characters\n" );
+		return;
+	}
+	Com_Printf( "FonTS: executing (blocking): %s\n", cmd );
+	if ( system( cmd ) != 0 ) {
+		Com_Printf( S_COLOR_RED "fonts_pipeline: shell returned non-zero\n" );
+		return;
+	}
+	Com_Printf( S_COLOR_GREEN "fonts_pipeline: finished\n" );
 }
 #endif
 
