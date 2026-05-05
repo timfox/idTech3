@@ -6,12 +6,10 @@ This file is original work by Gopex LLC and is not derived from
 existing id Tech 3 / ioquake3 code.
 The engine framework is based on id Tech 3 (GPLv2).
 
-AIML (Artificial Intelligence Markup Language) engine.
-Parses standard AIML 1.0/2.0 files and provides pattern-matching
-chatbot responses for NPC dialogue. Supports wildcards, random
-responses, SRAI recursion, bot properties, and user variables.
-
-Compatible with AIML files from ALICE, Pandorabots, and libAIML.
+AIML 3.0 draft–spec–oriented interpreter (see github.com/timfox/aiml-3.0-spec):
+Core tier matching, JSON/XML category packs, maps (§8.7), predicates,
+<that>/<topic>, <srai>, <random>, <condition>, <id/> (§8.12), ASCII
+<uppercase>/<lowercase> (§8.9 optional).
 ===========================================================================
 */
 
@@ -33,6 +31,7 @@ extern "C" {
 #define AIML_MAX_RANDOM_ITEMS   16
 #define AIML_MAX_SRAI_DEPTH     8
 #define AIML_MAX_STAR           9
+#define AIML_MAX_MAP_ENTRIES    256
 
 typedef int aimlBotHandle_t;
 

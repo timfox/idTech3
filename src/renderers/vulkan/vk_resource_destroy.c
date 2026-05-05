@@ -9,6 +9,15 @@ Teardown for VkRenderPass handles and long-lived VkPipelines (split from vk.c).
 #include "vk_resource_destroy.h"
 #include "vk_forward_plus.h"
 
+static void vk_clear_tess_last_pipelines( void )
+{
+	int i;
+
+	for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ ) {
+		vk.tess[i].last_pipeline = VK_NULL_HANDLE;
+	}
+}
+
 void vk_destroy_render_passes( void )
 {
 	uint32_t i;
@@ -158,6 +167,7 @@ void vk_destroy_world_graphics_pipelines( void )
 			}
 		}
 	}
+	vk_clear_tess_last_pipelines();
 }
 
 void vk_destroy_pipelines( qboolean resetCounter )
@@ -360,4 +370,5 @@ void vk_destroy_pipelines( qboolean resetCounter )
 		qvkDestroyDescriptorSetLayout( vk.device, vk.vegwind_layout, NULL );
 		vk.vegwind_layout = VK_NULL_HANDLE;
 	}
+	vk_clear_tess_last_pipelines();
 }
