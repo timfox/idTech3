@@ -7,6 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 MOD="$PROJECT_ROOT/examples/demo_game/mod"
 BOOT="$PROJECT_ROOT/examples/demo_game/bootstrap_media"
+INTER="$PROJECT_ROOT/fonts/Inter_28pt-Regular.ttf"
 STUB="$PROJECT_ROOT/examples/demo_game/native/ui_skeleton_stub.c"
 
 fail() {
@@ -38,13 +39,13 @@ for f in \
 	gfx/demo/bootstrap_console.png \
 	gfx/demo/bootstrap_flare.png \
 	gfx/demo/bootstrap_shadow.png \
-	fonts/Inter-Regular.ttf \
 	fonts/LICENSE.txt \
 	fonts/demo_console_sdf.png \
 	fonts/demo_console_sdf.fnt; do
 	[ -f "$BOOT/$f" ] || fail "missing bootstrap media: $BOOT/$f"
 done
 
+[ -f "$INTER" ] || fail "missing repo font: $INTER"
 [ -f "$STUB" ] || fail "missing UI stub: $STUB"
 
 OUT="$(mktemp)"
@@ -91,7 +92,8 @@ cp "$MOD/scripts/demo_bootstrap.shader" "$STAGE/scripts/demo_bootstrap.shader"
 cp "$BOOT/gfx/2d/bigchars.png" "$STAGE/gfx/2d/bigchars.png"
 cp "$BOOT/gfx/demo/bootstrap_white.png" "$BOOT/gfx/demo/bootstrap_console.png" \
 	"$BOOT/gfx/demo/bootstrap_flare.png" "$BOOT/gfx/demo/bootstrap_shadow.png" "$STAGE/gfx/demo/"
-cp "$BOOT/fonts/Inter-Regular.ttf" "$BOOT/fonts/LICENSE.txt" "$BOOT/fonts/demo_console_sdf.png" \
+cp "$INTER" "$STAGE/fonts/Inter_28pt-Regular.ttf"
+cp "$BOOT/fonts/LICENSE.txt" "$BOOT/fonts/demo_console_sdf.png" \
 	"$BOOT/fonts/demo_console_sdf.fnt" "$STAGE/fonts/"
 
 TAR_ARGS=(
@@ -104,7 +106,7 @@ TAR_ARGS=(
 	gfx/demo/bootstrap_console.png
 	gfx/demo/bootstrap_flare.png
 	gfx/demo/bootstrap_shadow.png
-	fonts/Inter-Regular.ttf
+	fonts/Inter_28pt-Regular.ttf
 	fonts/LICENSE.txt
 	fonts/demo_console_sdf.png
 	fonts/demo_console_sdf.fnt
@@ -135,7 +137,7 @@ for needle in \
 	gfx/demo/bootstrap_console.png \
 	gfx/demo/bootstrap_flare.png \
 	gfx/demo/bootstrap_shadow.png \
-	fonts/Inter-Regular.ttf \
+	fonts/Inter_28pt-Regular.ttf \
 	fonts/LICENSE.txt \
 	fonts/demo_console_sdf.png \
 	fonts/demo_console_sdf.fnt; do

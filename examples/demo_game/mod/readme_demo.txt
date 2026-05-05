@@ -5,7 +5,7 @@ This pk3 contains configuration + scripts/js + bootstrap renderer assets (no map
 
 Contents:
   - gameinfo.txt - window title "idTech3 Demo"
-  - scripts/demo_bootstrap.shader + gfx/* + fonts/Inter-Regular.ttf - HUD / init without retail pak0
+  - scripts/demo_bootstrap.shader + gfx/* + fonts/Inter_28pt-Regular.ttf (repo fonts/) - HUD / init without retail pak0
   - demo_features.cfg - renderer cvar toggles (PBR, volumetric fog, etc.)
   - scripts/js/demo_hooks.js - Duktape hooks (map_load, frame, HUD text)
   - demo_gameplay.cfg - hints for buildnavmesh / cl_* subsystem cvars

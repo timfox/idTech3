@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: ./compile_engine.sh [game_name] [Debug|Release] [clean] [quiet] [coverage] [asan] [lto] [vulkan] [opengl] [aarch64] [freetype] [lua] [duktape|no-duktape] [system-duktape] [skipshaders] [--out DIR] [mac-app <target> [arch]] [mac-ub2 [notarize]]
+# Usage: ./compile_engine.sh [game_name] [Debug|Release] [clean] [quiet] [coverage] [asan] [lto] [vulkan] [opengl] [aarch64] [freetype] [lua] [duktape|no-duktape] [system-duktape] [skipshaders] [demo] [--out DIR] [mac-app <target> [arch]] [mac-ub2 [notarize]]
 # Notes:
 # - build type defaults to Release
 # - vulkan and opengl are mutually exclusive
 # - if neither is specified: defaults to Vulkan
+# - demo: BUILD_EXAMPLE_DEMO_GAME=ON, builds demo_game_pk3 (idtech3_demo.pk3), copies to release/demo_game/ when present
 # - aarch64: cross-compile for Linux aarch64 (requires gcc-aarch64-linux-gnu); may fail without ARM sysroot
 # - mac-app wraps the legacy bundle script (requires release|debug target, optional architecture)
 # - mac-ub2 compiles universal-2 binaries (release only) and can optionally notarize
@@ -20,6 +21,7 @@ DUKTAPE=1
 SYSTEM_DUKTAPE=0
 CROSS_AARCH64=0
 CODECS_FOR_CROSS=0
+BUILD_DEMO_PK3=0
 
 GAME_NAME="idtech3"
 BUILD_TYPE="Release"
@@ -87,6 +89,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     skipshaders|skip-shaders|skip_shaders)
       SKIP_SHADERS=1
+      shift
+      ;;
+    demo|demo-game|demo-pk3|with-demo)
+      BUILD_DEMO_PK3=1
       shift
       ;;
     vulkan)
@@ -324,6 +330,11 @@ if command -v ccache &>/dev/null; then
   echo "CMake: ccache enabled (faster incremental builds)"
 fi
 
+if [ "$BUILD_DEMO_PK3" -eq 1 ]; then
+  CMAKE_FLAGS+=("-DBUILD_EXAMPLE_DEMO_GAME=ON")
+  echo "CMake: BUILD_EXAMPLE_DEMO_GAME=ON (idtech3_demo.pk3 via demo_game_pk3)"
+fi
+
 if [ "$LTO" -eq 1 ]; then
   echo "CMake: ENABLE_LTO=ON (IPO/LTO for Release/RelWithDebInfo on GCC/Clang; expect longer links)"
 fi
@@ -336,6 +347,16 @@ if [ "$QUIET" -eq 1 ]; then
   cmake --build "$BUILD_DIR" -- -j"${CORES}" -s
 else
   cmake --build "$BUILD_DIR" -- -j"${CORES}"
+fi
+
+if [ "$BUILD_DEMO_PK3" -eq 1 ]; then
+  echo ""
+  echo "Building example demo pack (demo_game_pk3)..."
+  if [ "$QUIET" -eq 1 ]; then
+    cmake --build "$BUILD_DIR" --target demo_game_pk3 -- -j"${CORES}" -s
+  else
+    cmake --build "$BUILD_DIR" --target demo_game_pk3 -- -j"${CORES}"
+  fi
 fi
 
 echo ""
@@ -353,6 +374,16 @@ copy_to_release() {
   if [ -d "$PROJECT_ROOT/base/fonts" ]; then
     mkdir -p "$dest/base/fonts"
     cp -f "$PROJECT_ROOT/base/fonts/"*.ttf "$dest/base/fonts/" 2>/dev/null || true
+  fi
+  # SDF console: explicit uiSdfText must be in scanned shader text (not only inside a mod pk3).
+  if [ -d "$PROJECT_ROOT/base/scripts" ]; then
+    mkdir -p "$dest/base/scripts"
+    shopt -s nullglob
+    for f in "$PROJECT_ROOT/base/scripts/"*.shader "$PROJECT_ROOT/base/scripts/"*.shaderx; do
+      [ -f "$f" ] || continue
+      cp -f "$f" "$dest/base/scripts/"
+    done
+    shopt -u nullglob
   fi
   if [ -f "$PROJECT_ROOT/config/steamdeck.cfg" ]; then
     cp -f "$PROJECT_ROOT/config/steamdeck.cfg" "$dest/base/steamdeck.cfg"
@@ -426,10 +457,27 @@ echo ""
 echo "Copying engine binaries and renderer .so files to $RELEASE_DIR..."
 copy_to_release "$RELEASE_DIR"
 
+demo_pk3_copy() {
+  local dest_root="$1"
+  if [ "$BUILD_DEMO_PK3" -ne 1 ]; then
+    return 0
+  fi
+  if [ ! -f "$BUILD_DIR/idtech3_demo.pk3" ]; then
+    echo "Note: idtech3_demo.pk3 not found under $BUILD_DIR (demo_game_pk3 may have been skipped by CMake)." >&2
+    return 0
+  fi
+  mkdir -p "$dest_root/demo_game"
+  cp -f "$BUILD_DIR/idtech3_demo.pk3" "$dest_root/demo_game/idtech3_demo.pk3"
+  echo "Copied idtech3_demo.pk3 -> $dest_root/demo_game/"
+}
+
+demo_pk3_copy "$RELEASE_DIR"
+
 if [[ -n "$EXTRA_OUT_DIR" ]]; then
   echo ""
   echo "Copying engine binaries to extra output dir: $EXTRA_OUT_DIR"
   copy_to_release "$EXTRA_OUT_DIR"
+  demo_pk3_copy "$EXTRA_OUT_DIR"
   echo "✓ Extra artifacts ready in $EXTRA_OUT_DIR"
 fi
 
