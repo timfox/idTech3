@@ -86,6 +86,7 @@ cvar_t	*r_dither;
 cvar_t	*r_presentBits;
 cvar_t	*r_outline;
 cvar_t	*r_outlineThreshold;
+cvar_t	*r_sdfScreenAa;
 
 static cvar_t *r_ignorehwgamma;
 
@@ -2617,6 +2618,17 @@ static void R_Register( void )
 		ri.Cvar_SetDescription( fh,
 			"FreeType load hinting: 0 = FT_LOAD_DEFAULT, 1 = FT_LOAD_TARGET_LIGHT (default), 2 = FT_LOAD_TARGET_NORMAL. Restart client after change." );
 	}
+	{
+		cvar_t *fm = ri.Cvar_Get( "r_fontMipmap", "1", CVAR_ARCHIVE );
+		ri.Cvar_CheckRange( fm, "0", "1", CV_INTEGER );
+		ri.Cvar_SetDescription( fm,
+			"Build mipmaps for FreeType TrueType atlas pages (256x256). Helps minified UI text; 0 = single mip (legacy). Restart client after change." );
+	}
+	r_sdfScreenAa = ri.Cvar_Get( "r_sdfScreenAa", "2", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_sdfScreenAa, "0", "8", CV_FLOAT );
+	ri.Cvar_SetDescription( r_sdfScreenAa,
+		"Vulkan uiSdfText: scales fwidth(distance) for screen-space edge AA (resolution-independent; Green/Alvin-style). 0 = use push r_sdfSmoothing band only." );
+	ri.Printf( PRINT_ALL, "SDF UI text: r_sdfScreenAa=%.2f (fwidth edge AA; 0 disables)\n", r_sdfScreenAa->value );
 	ri.Cvar_Get( "r_svgRasterScale", "1.0", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( ri.Cvar_Get( "r_svgRasterScale", "1.0", CVAR_ARCHIVE ),
 		"SVG rasterization scale factor (vector assets only). 1.0 = intrinsic size." );
