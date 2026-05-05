@@ -185,6 +185,11 @@ void RE_RegisterFont( const char *fontName, int pointSize, fontInfo_t *font ) {
 	ri.Printf( PRINT_DEVELOPER, "RE_RegisterFont: no cached font data for '%s' at %dpt\n", fontName, pointSize );
 }
 
+void RE_ClearTrueTypeFontCache( void ) {
+	registeredFontCount = 0;
+	Com_Memset( registeredFont, 0, sizeof( registeredFont ) );
+}
+
 void R_InitFreeType( void ) {
 	registeredFontCount = 0;
 	ri.Printf( PRINT_DEVELOPER, "Font system: using cached font data (FreeType not available)\n" );

@@ -1341,6 +1341,30 @@ static void CL_ResetPureClientAtServer( void ) {
 
 /*
 =================
+CL_ReloadTtf_f
+
+Rebuild FreeType HUD/console atlases after r_fontDpi / r_fontHint / r_fontMipmap
+(or r_font / r_fontSize) changes without a full client restart. Safer than relying
+on renderer registration cache alone; use vid_restart if anything looks stale.
+=================
+*/
+static void CL_ReloadTtf_f( void ) {
+	if ( !re.RegisterFont ) {
+		Com_Printf( S_COLOR_YELLOW "reloadTtf: renderer not loaded.\n" );
+		return;
+	}
+	if ( re.ClearTrueTypeFontCache ) {
+		re.ClearTrueTypeFontCache();
+	} else {
+		Com_Printf( S_COLOR_YELLOW "reloadTtf: renderer API too old (missing ClearTrueTypeFontCache); try vid_restart keep_window\n" );
+	}
+	CL_RegisterBuiltInTrueTypeFonts();
+	Com_Printf( "reloadTtf: re-registered built-in TrueType fonts\n" );
+}
+
+
+/*
+=================
 CL_Vid_Restart
 
 Restart the video subsystem
@@ -3812,6 +3836,7 @@ void CL_Init( void ) {
 	Cmd_AddCommand ("clientinfo", CL_Clientinfo_f);
 	Cmd_AddCommand ("snd_restart", CL_Snd_Restart_f);
 	Cmd_AddCommand ("vid_restart", CL_Vid_Restart_f);
+	Cmd_AddCommand ("reloadTtf", CL_ReloadTtf_f );
 	Cmd_AddCommand ("disconnect", CL_Disconnect_f);
 	CL_Demo_InitCommands();
 	Cmd_AddCommand ("cinematic", CL_PlayCinematic_f);
@@ -3952,6 +3977,7 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 	Cmd_RemoveCommand ("clientinfo");
 	Cmd_RemoveCommand ("snd_restart");
 	Cmd_RemoveCommand ("vid_restart");
+	Cmd_RemoveCommand ("reloadTtf");
 	Cmd_RemoveCommand ("disconnect");
 	CL_Demo_ShutdownCommands();
 	Cmd_RemoveCommand ("cinematic");
