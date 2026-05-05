@@ -105,6 +105,31 @@ FT_Library ftLibrary = NULL;
 static int registeredFontCount = 0;
 static fontInfo_t registeredFont[MAX_FONTS];
 
+static int R_FontDeviceDpi( void ) {
+	int d = ri.Cvar_VariableIntegerValue( "r_fontDpi" );
+	if ( d < 72 ) {
+		d = 72;
+	}
+	if ( d > 144 ) {
+		d = 144;
+	}
+	return d;
+}
+
+static FT_Int32 R_FontLoadFlags( void ) {
+	int mode = ri.Cvar_VariableIntegerValue( "r_fontHint" );
+	FT_Int32 flags = FT_LOAD_DEFAULT;
+	if ( mode == 0 ) {
+		return flags;
+	}
+	if ( mode >= 2 ) {
+		flags |= (FT_Int32)FT_LOAD_TARGET_NORMAL;
+	} else {
+		flags |= (FT_Int32)FT_LOAD_TARGET_LIGHT;
+	}
+	return flags;
+}
+
 static void R_GetGlyphInfo(FT_GlyphSlot glyph, int *left, int *right, int *width, int *top, int *bottom, int *height, int *pitch) {
 	*left  = _FLOOR( glyph->metrics.horiBearingX );
 	*right = _CEIL( glyph->metrics.horiBearingX + glyph->metrics.width );
@@ -212,7 +237,7 @@ static glyphInfo_t *RE_ConstructGlyphInfo(unsigned char *imageOut, int *xOut, in
 	Com_Memset(&glyph, 0, sizeof(glyphInfo_t));
 	// make sure everything is here
 	if (face != NULL) {
-		FT_Load_Glyph(face, FT_Get_Char_Index( face, c), FT_LOAD_DEFAULT );
+		FT_Load_Glyph( face, FT_Get_Char_Index( face, c ), R_FontLoadFlags() );
 		bitmap = R_RenderGlyph(face->glyph, &glyph);
 		if (bitmap) {
 			glyph.xSkip = (face->glyph->metrics.horiAdvance >> 6) + 1;
@@ -372,7 +397,7 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 	image_t *image;
 	qhandle_t h;
 	float max;
-	float dpi = 72;
+	int dpi = R_FontDeviceDpi();
 	float glyphScale;
 	void *faceData;
 	int i, len;
@@ -499,7 +524,7 @@ try_freetype:
 		return;
 	}
 
-	if (FT_Set_Char_Size(face, pointSize << 6, pointSize << 6, dpi, dpi)) {
+	if ( FT_Set_Char_Size( face, pointSize << 6, pointSize << 6, (FT_UInt)dpi, (FT_UInt)dpi ) ) {
 		ri.Printf(PRINT_WARNING, "RE_RegisterFont: FreeType, unable to set face char size.\n");
 		return;
 	}
@@ -581,8 +606,8 @@ try_freetype:
 		}
 	}
 
-	glyphScale = 72.0f / dpi;
-	glyphScale *= 48.0f / pointSize;
+	glyphScale = 72.0f / (float)dpi;
+	glyphScale *= 48.0f / (float)pointSize;
 
 	registeredFont[registeredFontCount].glyphScale = glyphScale;
 	font->glyphScale = glyphScale;
@@ -616,8 +641,11 @@ try_freetype:
 	ri.FS_FreeFile(faceData);
 }
 void R_InitFreeType(void) {
-	if (FT_Init_FreeType( &ftLibrary )) {
-		ri.Printf(PRINT_WARNING, "R_InitFreeType: Unable to initialize FreeType.\n");
+	if ( FT_Init_FreeType( &ftLibrary ) ) {
+		ri.Printf( PRINT_WARNING, "R_InitFreeType: Unable to initialize FreeType.\n" );
+	} else {
+		ri.Printf( PRINT_ALL, "FreeType: TrueType raster dpi=%i (r_fontDpi), hint=%i (r_fontHint 0=default 1=light 2=normal; restart after change)\n",
+			R_FontDeviceDpi(), ri.Cvar_VariableIntegerValue( "r_fontHint" ) );
 	}
 	registeredFontCount = 0;
 }

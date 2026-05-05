@@ -1725,6 +1725,18 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( ri.Cvar_Get( "r_consoleFont", "", CVAR_ARCHIVE ), "Custom TrueType font for the console (e.g. fonts/consolefont.ttf). Empty = default." );
 	ri.Cvar_Get( "r_fontSize", "16", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( ri.Cvar_Get( "r_fontSize", "16", CVAR_ARCHIVE ), "Point size for custom fonts loaded via r_font / r_consoleFont." );
+	{
+		cvar_t *fd = ri.Cvar_Get( "r_fontDpi", "72", CVAR_ARCHIVE );
+		ri.Cvar_CheckRange( fd, "72", "144", CV_INTEGER );
+		ri.Cvar_SetDescription( fd,
+			"FreeType device DPI for TrueType glyph rasterization (72 = legacy sizing, 96+ = denser atlas / sharper upscaled console). Restart client after change." );
+	}
+	{
+		cvar_t *fh = ri.Cvar_Get( "r_fontHint", "1", CVAR_ARCHIVE );
+		ri.Cvar_CheckRange( fh, "0", "2", CV_INTEGER );
+		ri.Cvar_SetDescription( fh,
+			"FreeType load hinting: 0 = FT_LOAD_DEFAULT, 1 = FT_LOAD_TARGET_LIGHT (default), 2 = FT_LOAD_TARGET_NORMAL. Restart client after change." );
+	}
 	ri.Cvar_Get( "r_svgRasterScale", "1.0", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( ri.Cvar_Get( "r_svgRasterScale", "1.0", CVAR_ARCHIVE ),
 		"SVG rasterization scale factor (vector assets only). 1.0 = intrinsic size." );
