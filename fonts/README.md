@@ -17,7 +17,7 @@ This directory and `base/fonts/` hold TrueType fonts used by the renderer when `
 - **r_fontSize**: Point size for custom fonts (default 16).
 - **r_fontDpi**: FreeType device DPI for rasterization (default 72; try **96** for sharper glyphs when text is magnified on HiDPI displays). Clamped 72–144; restart after change.
 - **r_fontHint**: **0** = legacy `FT_LOAD_DEFAULT`, **1** (default) = `FT_LOAD_TARGET_LIGHT`, **2** = `FT_LOAD_TARGET_NORMAL`. Restart after change.
-- **r_fontMipmap**: **1** (default) builds mipmaps on each 256×256 TrueType atlas page for cleaner minification; **0** = single mip (legacy). Restart after change.
+- **r_fontMipmap**: **1** (default) builds mipmaps on each 256×256 TrueType atlas page for cleaner minification; **0** = single mip (legacy). After changing raster cvars, run **`reloadTtf`** in the client console or **`vid_restart`** (optional **`keep_window`**).
 
 Place `.ttf` files in `base/fonts/` so the game can find them. The compile script copies `base/fonts/*.ttf` to the release directory.
 

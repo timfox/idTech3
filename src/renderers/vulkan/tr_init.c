@@ -2610,19 +2610,19 @@ static void R_Register( void )
 		cvar_t *fd = ri.Cvar_Get( "r_fontDpi", "72", CVAR_ARCHIVE );
 		ri.Cvar_CheckRange( fd, "72", "144", CV_INTEGER );
 		ri.Cvar_SetDescription( fd,
-			"FreeType device DPI for TrueType glyph rasterization (72 = legacy sizing, 96+ = denser atlas / sharper upscaled console). Restart client after change." );
+			"FreeType device DPI for TrueType glyph rasterization (72 = legacy sizing, 96+ = denser atlas / sharper upscaled console). Apply with reloadTtf or vid_restart." );
 	}
 	{
 		cvar_t *fh = ri.Cvar_Get( "r_fontHint", "1", CVAR_ARCHIVE );
 		ri.Cvar_CheckRange( fh, "0", "2", CV_INTEGER );
 		ri.Cvar_SetDescription( fh,
-			"FreeType load hinting: 0 = FT_LOAD_DEFAULT, 1 = FT_LOAD_TARGET_LIGHT (default), 2 = FT_LOAD_TARGET_NORMAL. Restart client after change." );
+			"FreeType load hinting: 0 = FT_LOAD_DEFAULT, 1 = FT_LOAD_TARGET_LIGHT (default), 2 = FT_LOAD_TARGET_NORMAL. Apply with reloadTtf or vid_restart." );
 	}
 	{
 		cvar_t *fm = ri.Cvar_Get( "r_fontMipmap", "1", CVAR_ARCHIVE );
 		ri.Cvar_CheckRange( fm, "0", "1", CV_INTEGER );
 		ri.Cvar_SetDescription( fm,
-			"Build mipmaps for FreeType TrueType atlas pages (256x256). Helps minified UI text; 0 = single mip (legacy). Restart client after change." );
+			"Build mipmaps for FreeType TrueType atlas pages (256x256). Helps minified UI text; 0 = single mip (legacy). Apply with reloadTtf or vid_restart." );
 	}
 	r_sdfScreenAa = ri.Cvar_Get( "r_sdfScreenAa", "2", CVAR_ARCHIVE );
 	ri.Cvar_CheckRange( r_sdfScreenAa, "0", "8", CV_FLOAT );
@@ -3873,6 +3873,7 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 	re.UploadCinematic = RE_UploadCinematic;
 
 	re.RegisterFont = RE_RegisterFont;
+	re.ClearTrueTypeFontCache = RE_ClearTrueTypeFontCache;
 	re.RemapShader = RE_RemapShader;
 	re.GetEntityToken = RE_GetEntityToken;
 	re.inPVS = R_inPVS;

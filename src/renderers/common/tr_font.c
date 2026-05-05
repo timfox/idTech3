@@ -138,6 +138,34 @@ static imgFlags_t R_FontAtlasFlags( void ) {
 	return f;
 }
 
+static void R_FontRuntimeRegKey( char *dst, int dstSize, const char *ttfPath, int pointSize ) {
+	unsigned long h = Com_GenerateHashValue( ttfPath, 256 );
+	int dpi = R_FontDeviceDpi();
+	int hint = ri.Cvar_VariableIntegerValue( "r_fontHint" );
+	int mip = ri.Cvar_VariableIntegerValue( "r_fontMipmap" ) > 0 ? 1 : 0;
+	if ( hint < 0 ) {
+		hint = 0;
+	}
+	if ( hint > 2 ) {
+		hint = 2;
+	}
+	Com_sprintf( dst, dstSize, "fonts/_ftr_%lu_%i_d%i_h%i_m%i", h, pointSize, dpi, hint, mip );
+}
+
+static void R_FontAtlasImageName( char *dst, int dstSize, const char *ttfPath, int pageIndex, int pointSize ) {
+	unsigned long h = Com_GenerateHashValue( ttfPath, 256 );
+	int dpi = R_FontDeviceDpi();
+	int hint = ri.Cvar_VariableIntegerValue( "r_fontHint" );
+	int mip = ri.Cvar_VariableIntegerValue( "r_fontMipmap" ) > 0 ? 1 : 0;
+	if ( hint < 0 ) {
+		hint = 0;
+	}
+	if ( hint > 2 ) {
+		hint = 2;
+	}
+	Com_sprintf( dst, dstSize, "fonts/_ftg_%lu_%i_%i_d%i_h%i_m%i.tga", h, pointSize, pageIndex, dpi, hint, mip );
+}
+
 static void R_GetGlyphInfo(FT_GlyphSlot glyph, int *left, int *right, int *width, int *top, int *bottom, int *height, int *pitch) {
 	*left  = _FLOOR( glyph->metrics.horiBearingX );
 	*right = _CEIL( glyph->metrics.horiBearingX + glyph->metrics.width );
@@ -396,6 +424,12 @@ static float readFloat( void ) {
 	return me.ffred;
 }
 
+void RE_ClearTrueTypeFontCache( void ) {
+	registeredFontCount = 0;
+	Com_Memset( registeredFont, 0, sizeof( registeredFont ) );
+	ri.Printf( PRINT_DEVELOPER, "RE_ClearTrueTypeFontCache: TrueType registration cache cleared\n" );
+}
+
 void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 	FT_Face face;
 	int j, k, xOut, yOut, lastStart, imageNumber;
@@ -515,6 +549,16 @@ load_cached_dat:
 	return;
 
 try_freetype:
+{
+	char runtimeRegKey[MAX_QPATH];
+
+	R_FontRuntimeRegKey( runtimeRegKey, sizeof( runtimeRegKey ), resolvedFontName, pointSize );
+	for ( i = 0; i < registeredFontCount; i++ ) {
+		if ( !Q_stricmp( runtimeRegKey, registeredFont[i].name ) ) {
+			Com_Memcpy( font, &registeredFont[i], sizeof( fontInfo_t ) );
+			return;
+		}
+	}
 
 	if (ftLibrary == NULL) {
 		ri.Printf(PRINT_WARNING, "RE_RegisterFont: FreeType not initialized.\n");
@@ -585,7 +629,8 @@ try_freetype:
 				imageBuff[left++] = ((float)out[k] * max);
 			}
 
-			Com_sprintf(name, sizeof(name), "fonts/fontImage_%i_%i.tga", imageNumber++, pointSize);
+			R_FontAtlasImageName( name, sizeof( name ), resolvedFontName, imageNumber, pointSize );
+			imageNumber++;
 			if (r_saveFontData->integer) {
 				WriteTGA(name, imageBuff, 256, 256);
 			}
@@ -620,6 +665,7 @@ try_freetype:
 	registeredFont[registeredFontCount].glyphScale = glyphScale;
 	font->glyphScale = glyphScale;
 	RE_ApplyUtf8GlyphFix( font );
+	Q_strncpyz( font->name, runtimeRegKey, sizeof( font->name ) );
 	Com_Memcpy(&registeredFont[registeredFontCount++], font, sizeof(fontInfo_t));
 
 	if (r_saveFontData->integer) {
@@ -648,11 +694,12 @@ try_freetype:
 	ri.Free(out);
 	ri.FS_FreeFile(faceData);
 }
+}
 void R_InitFreeType(void) {
 	if ( FT_Init_FreeType( &ftLibrary ) ) {
 		ri.Printf( PRINT_WARNING, "R_InitFreeType: Unable to initialize FreeType.\n" );
 	} else {
-		ri.Printf( PRINT_ALL, "FreeType: TrueType raster dpi=%i (r_fontDpi), hint=%i (r_fontHint 0=default 1=light 2=normal), atlas mipmaps=%s (r_fontMipmap; restart after change)\n",
+		ri.Printf( PRINT_ALL, "FreeType: TrueType raster dpi=%i (r_fontDpi), hint=%i (r_fontHint 0=default 1=light 2=normal), atlas mipmaps=%s (r_fontMipmap; apply with reloadTtf or vid_restart)\n",
 			R_FontDeviceDpi(), ri.Cvar_VariableIntegerValue( "r_fontHint" ),
 			ri.Cvar_VariableIntegerValue( "r_fontMipmap" ) > 0 ? "on" : "off" );
 	}

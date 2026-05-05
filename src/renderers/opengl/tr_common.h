@@ -112,6 +112,7 @@ void R_InitFreeType( void );
 void R_DoneFreeType( void );
 void R_WorldToLocal( const vec3_t world, vec3_t local );
 void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font);
+void RE_ClearTrueTypeFontCache( void );
 
 /*
 =============================================================
