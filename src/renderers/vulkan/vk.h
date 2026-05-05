@@ -128,6 +128,7 @@ typedef enum {
 	TYPE_SIGNLE_TEXTURE_LIGHTING_LINEAR,
 
 	TYPE_SIGNLE_TEXTURE_DF,
+	TYPE_SIGNLE_TEXTURE_UI_SDF,
 
 	TYPE_GENERIC_BEGIN, // start of non-env/env shader pairs
 	TYPE_SIGNLE_TEXTURE = TYPE_GENERIC_BEGIN,
@@ -958,6 +959,7 @@ typedef struct {
 		} vert;
 		struct {
 			VkShaderModule gen0_df;
+			VkShaderModule ui_sdf_text;
 			VkShaderModule flowmap[2];      // fog[0,1] - water flowmap
 #ifdef USE_VK_PBR
 			VkShaderModule gen[2][3][2][2]; // pbr[0,1], tx[0,1,2] cl[0,1] fog[0,1]

@@ -5,14 +5,8 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 SDF font implementation.
 
 Loads BMFont-format .fnt metric files and SDF atlas textures.
-Renders text using the standard engine DrawStretchPic with the
-SDF alpha channel providing resolution-independent edge detection.
-
-For full SDF shader effects (outline, shadow, glow), use the
-dedicated sdf_text.frag shader via a custom render path.
-For basic sharp text, the standard alpha-tested rendering with
-a high-resolution SDF atlas already provides a major improvement
-over the 256x256 bitmap font.
+Renders text via DrawStretchPicEx so Vulkan can apply uiSdfText
+per-pixel reconstruction (r_sdfSmoothing); OpenGL falls back to DrawStretchPic.
 ===========================================================================
 */
 
@@ -109,6 +103,16 @@ static void SDF_TryAutopickPackagedConsoleFont( void ) {
 }
 
 #define VALID_FONT(h) ((h) >= 0 && (h) < numFonts && fonts[(h)].active)
+
+static void SDF_AtlasStretchPic( float ax, float ay, float aw, float ah,
+	float s0, float t0, float s1, float t1, qhandle_t shader ) {
+	const float sm = r_sdfSmoothing ? Com_Clamp( 0.001f, 0.45f, r_sdfSmoothing->value ) : 0.1f;
+	if ( re.DrawStretchPicEx ) {
+		re.DrawStretchPicEx( ax, ay, aw, ah, s0, t0, s1, t1, shader, sm );
+	} else {
+		re.DrawStretchPic( ax, ay, aw, ah, s0, t0, s1, t1, shader );
+	}
+}
 
 static int SDF_FindFreeSlot( void ) {
 	int i;
@@ -265,7 +269,7 @@ void SDF_Init( void ) {
 	Cvar_SetDescription( r_sdfFontAtlas, "Optional explicit atlas image path for SDF font." );
 
 	r_sdfSmoothing = Cvar_Get( "r_sdfSmoothing", "0.1", CVAR_ARCHIVE );
-	Cvar_SetDescription( r_sdfSmoothing, "SDF edge smoothing width (smaller = sharper, 0.05-0.25 typical)." );
+	Cvar_SetDescription( r_sdfSmoothing, "SDF edge half-width for Vulkan uiSdfText smoothstep (smaller = sharper; 0.05-0.25 typical)." );
 
 	r_sdfAuto = Cvar_Get( "r_sdfAuto", "1", CVAR_ARCHIVE );
 	Cvar_SetDescription( r_sdfAuto, "When 1, pick fonts/demo_console_sdf if its .fnt exists on the path and r_sdfFont is empty; may auto-enable r_sdfEnable if not user-overridden." );
@@ -512,7 +516,7 @@ void SDF_DrawText( sdfFontHandle_t font, float x, float y, float scale,
 
 			SCR_AdjustFrom640( &ax, &ay, &aw, &ah );
 
-			re.DrawStretchPic( ax, ay, aw, ah,
+			SDF_AtlasStretchPic( ax, ay, aw, ah,
 				g->s0, g->t0, g->s1, g->t1, f->atlasShader );
 		}
 
@@ -606,7 +610,7 @@ qboolean SDF_DrawStringExt( int x, int y, float size, const char *string,
 				float ay = drawY;
 				float aw = cellW;
 				float ah = cellH;
-				re.DrawStretchPic( ax, ay, aw, ah, g->s0, g->t0, g->s1, g->t1, f->atlasShader );
+				SDF_AtlasStretchPic( ax, ay, aw, ah, g->s0, g->t0, g->s1, g->t1, f->atlasShader );
 			}
 
 			xx += cellW;
@@ -671,7 +675,7 @@ qboolean SDF_DrawStringExt( int x, int y, float size, const char *string,
 				float ay = drawY;
 				float aw = cellW;
 				float ah = cellH;
-				re.DrawStretchPic( ax, ay, aw, ah, g->s0, g->t0, g->s1, g->t1, f->atlasShader );
+				SDF_AtlasStretchPic( ax, ay, aw, ah, g->s0, g->t0, g->s1, g->t1, f->atlasShader );
 			}
 
 			xx += cellW;
@@ -736,7 +740,7 @@ qboolean SDF_DrawStringExt( int x, int y, float size, const char *string,
 			if ( coordSpace == SDF_COORDS_VIRTUAL_640 ) {
 				SCR_AdjustFrom640( &ax, &ay, &aw, &ah );
 			}
-			re.DrawStretchPic( ax, ay, aw, ah, g->s0, g->t0, g->s1, g->t1, f->atlasShader );
+			SDF_AtlasStretchPic( ax, ay, aw, ah, g->s0, g->t0, g->s1, g->t1, f->atlasShader );
 		}
 
 		xx += ( g->xadvance + SDF_FindKerning( f, prevCp, cp ) ) * scale;
@@ -806,7 +810,7 @@ qboolean SDF_DrawStringExt( int x, int y, float size, const char *string,
 			if ( coordSpace == SDF_COORDS_VIRTUAL_640 ) {
 				SCR_AdjustFrom640( &ax, &ay, &aw, &ah );
 			}
-			re.DrawStretchPic( ax, ay, aw, ah, g->s0, g->t0, g->s1, g->t1, f->atlasShader );
+			SDF_AtlasStretchPic( ax, ay, aw, ah, g->s0, g->t0, g->s1, g->t1, f->atlasShader );
 		}
 
 		xx += ( g->xadvance + SDF_FindKerning( f, prevCp, cp ) ) * scale;
