@@ -139,8 +139,7 @@ shopt -s nullglob
 _base_pk3s=( "$BASE_ROOT/$BASE_DIR_NAME"/*.pk3 )
 shopt -u nullglob
 if [[ ${#_base_pk3s[@]} -eq 0 ]]; then
-	echo "Note: no .pk3 in $BASE_ROOT/$BASE_DIR_NAME - menus/maps need retail/base packs." >&2
-	echo "Rebuild idtech3_demo.pk3 (./examples/demo_game/build_demo_pack.sh) for the bundled native UI stub in vm/." >&2
+	echo "Note: no .pk3 in $BASE_ROOT/$BASE_DIR_NAME - add retail/base pk3s for maps/menus (or copy z_minimal_bootstrap.pk3 from repo demo_skeleton/base for FS-only smoke)." >&2
 fi
 
 ENGINE="${IDTECH3_ENGINE:-}"

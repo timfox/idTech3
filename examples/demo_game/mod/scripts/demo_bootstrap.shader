@@ -56,3 +56,15 @@ flareShader
 		blendFunc add
 	}
 }
+
+fonts/demo_console_sdf
+{
+	nomipmaps
+	nopicmip
+	{
+		map fonts/demo_console_sdf.png
+		blendFunc blend
+		rgbGen vertex
+		alphaGen vertex
+	}
+}

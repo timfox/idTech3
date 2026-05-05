@@ -2779,6 +2779,12 @@ static void CL_ShutdownRef( refShutdownCode_t code ) {
 
 	SCR_Done();
 
+	cls.builtInTtfActive = qfalse;
+	Com_Memset( &cls.builtInHudFont, 0, sizeof( cls.builtInHudFont ) );
+	Com_Memset( &cls.builtInConsoleFont, 0, sizeof( cls.builtInConsoleFont ) );
+	cls.builtInHudRefLinePx = 0;
+	cls.builtInConsoleRefLinePx = 0;
+
 	if ( re.Shutdown ) {
 		re.Shutdown( code );
 	}
@@ -2835,6 +2841,8 @@ static void CL_InitRenderer( void ) {
 	}
 
 	SCR_Init();
+
+	CL_RegisterBuiltInTrueTypeFonts();
 }
 
 

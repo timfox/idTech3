@@ -16,16 +16,19 @@ set(DEMO_BOOTSTRAP_GFX_DEMO
 set(DEMO_BOOTSTRAP_FONTS
 	"${DEMO_BOOTSTRAP_DIR}/fonts/Inter-Regular.ttf"
 	"${DEMO_BOOTSTRAP_DIR}/fonts/LICENSE.txt"
+	"${DEMO_BOOTSTRAP_DIR}/fonts/demo_console_sdf.png"
+	"${DEMO_BOOTSTRAP_DIR}/fonts/demo_console_sdf.fnt"
 )
 
 foreach(_demo_boot_chk IN LISTS DEMO_BOOTSTRAP_GFX2D DEMO_BOOTSTRAP_GFX_DEMO DEMO_BOOTSTRAP_FONTS)
 	if(NOT EXISTS "${_demo_boot_chk}")
-		message(FATAL_ERROR "Missing demo bootstrap file: ${_demo_boot_chk}\n  Regenerate PNGs: python3 examples/demo_game/tools/gen_demo_bootstrap_media.py examples/demo_game/bootstrap_media\n  Install Inter OFL fonts under examples/demo_game/bootstrap_media/fonts/ (see tools script header / cmake/DownloadInterFonts.cmake).")
+		message(FATAL_ERROR "Missing demo bootstrap file: ${_demo_boot_chk}\n  Regenerate PNGs: python3 examples/demo_game/tools/gen_demo_bootstrap_media.py examples/demo_game/bootstrap_media\n  SDF console font: python3 examples/demo_game/tools/gen_demo_console_sdf.py examples/demo_game/bootstrap_media/fonts/Inter-Regular.ttf examples/demo_game/bootstrap_media/fonts\n  Install Inter OFL fonts under examples/demo_game/bootstrap_media/fonts/ if missing.")
 	endif()
 endforeach()
 
 set(DEMO_MOD_FILES
 	"${DEMO_MOD_DIR}/autoexec.cfg"
+	"${DEMO_MOD_DIR}/gameinfo.txt"
 	"${DEMO_MOD_DIR}/demo_features.cfg"
 	"${DEMO_MOD_DIR}/demo_js.cfg"
 	"${DEMO_MOD_DIR}/demo_lua.cfg"
@@ -79,6 +82,8 @@ add_custom_command(
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/autoexec.cfg" "${DEMO_PACK_STAGING}/autoexec.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/gameinfo.txt" "${DEMO_PACK_STAGING}/gameinfo.txt"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/demo_features.cfg" "${DEMO_PACK_STAGING}/demo_features.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/demo_js.cfg" "${DEMO_PACK_STAGING}/demo_js.cfg"
@@ -111,12 +116,16 @@ add_custom_command(
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_BOOTSTRAP_DIR}/fonts/LICENSE.txt" "${DEMO_PACK_STAGING}/fonts/LICENSE.txt"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_BOOTSTRAP_DIR}/fonts/demo_console_sdf.png" "${DEMO_PACK_STAGING}/fonts/demo_console_sdf.png"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_BOOTSTRAP_DIR}/fonts/demo_console_sdf.fnt" "${DEMO_PACK_STAGING}/fonts/demo_console_sdf.fnt"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"$<TARGET_FILE:demo_ui_skeleton>" "${DEMO_PACK_STAGING}/${DEMO_UI_IN_ZIP}"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"$<TARGET_FILE:demo_ui_skeleton>" "${DEMO_PACK_STAGING}/${DEMO_UI_DOT_ZIP}"
 	COMMAND ${CMAKE_COMMAND} -E chdir "${DEMO_PACK_STAGING}"
 		${CMAKE_COMMAND} -E tar cf "${DEMO_PK3}" --format=zip
-		autoexec.cfg demo_features.cfg demo_js.cfg demo_lua.cfg demo_gameplay.cfg readme_demo.txt
+		autoexec.cfg gameinfo.txt demo_features.cfg demo_js.cfg demo_lua.cfg demo_gameplay.cfg readme_demo.txt
 		scripts/js/demo_hooks.js scripts/js/README.txt
 		scripts/lua/demo_hooks.lua
 		scripts/demo_bootstrap.shader
@@ -127,6 +136,8 @@ add_custom_command(
 		gfx/demo/bootstrap_shadow.png
 		fonts/Inter-Regular.ttf
 		fonts/LICENSE.txt
+		fonts/demo_console_sdf.png
+		fonts/demo_console_sdf.fnt
 		"${DEMO_UI_IN_ZIP}"
 		"${DEMO_UI_DOT_ZIP}"
 	DEPENDS ${DEMO_MOD_FILES} demo_ui_skeleton

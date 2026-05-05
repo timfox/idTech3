@@ -10,6 +10,10 @@ mkdir -p "$TARGET/base" "$TARGET/idtech3_demo"
 if [[ ! -f "$TARGET/base/README.txt" && -f "$SCRIPT_DIR/base/README.txt" ]]; then
 	cp "$SCRIPT_DIR/base/README.txt" "$TARGET/base/README.txt"
 fi
+if [[ -f "$SCRIPT_DIR/base/z_minimal_bootstrap.pk3" && ! -f "$TARGET/base/z_minimal_bootstrap.pk3" ]]; then
+	cp "$SCRIPT_DIR/base/z_minimal_bootstrap.pk3" "$TARGET/base/z_minimal_bootstrap.pk3"
+	echo "Copied base/z_minimal_bootstrap.pk3 (default.cfg + gameinfo for empty-base installs)"
+fi
 if [[ ! -f "$TARGET/idtech3_demo/README.txt" && -f "$SCRIPT_DIR/idtech3_demo/README.txt" ]]; then
 	cp "$SCRIPT_DIR/idtech3_demo/README.txt" "$TARGET/idtech3_demo/README.txt"
 fi
@@ -44,7 +48,7 @@ TMP_ENV="$(mktemp)"
 
 echo ""
 echo "Playfield ready: $ABS"
-echo "  1. (Optional) Add game .pk3 files → $ABS/base/ for maps/menus; bare window works with empty base + rebuilt idtech3_demo.pk3"
+echo "  1. (Optional) Add game .pk3 files → $ABS/base/ for maps/menus; bare client uses z_minimal_bootstrap.pk3 + idtech3_demo.pk3"
 echo "  2. Launch (repo root): ./scripts/run_demo.sh"
 echo "     or:                ./examples/demo_skeleton/run_demo.sh"
 echo ""

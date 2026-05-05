@@ -19,6 +19,7 @@ command -v unzip >/dev/null 2>&1 || fail "unzip not in PATH"
 
 for f in \
 	autoexec.cfg \
+	gameinfo.txt \
 	demo_features.cfg \
 	demo_js.cfg \
 	demo_lua.cfg \
@@ -38,7 +39,9 @@ for f in \
 	gfx/demo/bootstrap_flare.png \
 	gfx/demo/bootstrap_shadow.png \
 	fonts/Inter-Regular.ttf \
-	fonts/LICENSE.txt; do
+	fonts/LICENSE.txt \
+	fonts/demo_console_sdf.png \
+	fonts/demo_console_sdf.fnt; do
 	[ -f "$BOOT/$f" ] || fail "missing bootstrap media: $BOOT/$f"
 done
 
@@ -79,7 +82,7 @@ fi
 
 mkdir -p "$STAGE/scripts/js"
 mkdir -p "$STAGE/gfx/2d" "$STAGE/gfx/demo" "$STAGE/fonts"
-cp "$MOD/autoexec.cfg" "$MOD/demo_features.cfg" "$MOD/demo_js.cfg" "$MOD/demo_lua.cfg" \
+cp "$MOD/autoexec.cfg" "$MOD/gameinfo.txt" "$MOD/demo_features.cfg" "$MOD/demo_js.cfg" "$MOD/demo_lua.cfg" \
 	"$MOD/demo_gameplay.cfg" "$MOD/readme_demo.txt" "$STAGE/"
 cp "$MOD/scripts/js/demo_hooks.js" "$MOD/scripts/js/README.txt" "$STAGE/scripts/js/"
 mkdir -p "$STAGE/scripts/lua"
@@ -88,10 +91,11 @@ cp "$MOD/scripts/demo_bootstrap.shader" "$STAGE/scripts/demo_bootstrap.shader"
 cp "$BOOT/gfx/2d/bigchars.png" "$STAGE/gfx/2d/bigchars.png"
 cp "$BOOT/gfx/demo/bootstrap_white.png" "$BOOT/gfx/demo/bootstrap_console.png" \
 	"$BOOT/gfx/demo/bootstrap_flare.png" "$BOOT/gfx/demo/bootstrap_shadow.png" "$STAGE/gfx/demo/"
-cp "$BOOT/fonts/Inter-Regular.ttf" "$BOOT/fonts/LICENSE.txt" "$STAGE/fonts/"
+cp "$BOOT/fonts/Inter-Regular.ttf" "$BOOT/fonts/LICENSE.txt" "$BOOT/fonts/demo_console_sdf.png" \
+	"$BOOT/fonts/demo_console_sdf.fnt" "$STAGE/fonts/"
 
 TAR_ARGS=(
-	autoexec.cfg demo_features.cfg demo_js.cfg demo_lua.cfg demo_gameplay.cfg readme_demo.txt
+	autoexec.cfg gameinfo.txt demo_features.cfg demo_js.cfg demo_lua.cfg demo_gameplay.cfg readme_demo.txt
 	scripts/js/demo_hooks.js scripts/js/README.txt
 	scripts/lua/demo_hooks.lua
 	scripts/demo_bootstrap.shader
@@ -102,6 +106,8 @@ TAR_ARGS=(
 	gfx/demo/bootstrap_shadow.png
 	fonts/Inter-Regular.ttf
 	fonts/LICENSE.txt
+	fonts/demo_console_sdf.png
+	fonts/demo_console_sdf.fnt
 )
 if [[ -n "$UI_ZIP_PATH" ]]; then
 	TAR_ARGS+=( "$UI_ZIP_PATH" "$UI_DOT_ZIP_PATH" )
@@ -114,6 +120,7 @@ cmake -E chdir "$STAGE" cmake -E tar cf "$OUT" --format=zip "${TAR_ARGS[@]}"
 listing="$(unzip -l "$OUT")"
 for needle in \
 	autoexec.cfg \
+	gameinfo.txt \
 	demo_features.cfg \
 	demo_js.cfg \
 	demo_lua.cfg \
@@ -129,7 +136,9 @@ for needle in \
 	gfx/demo/bootstrap_flare.png \
 	gfx/demo/bootstrap_shadow.png \
 	fonts/Inter-Regular.ttf \
-	fonts/LICENSE.txt; do
+	fonts/LICENSE.txt \
+	fonts/demo_console_sdf.png \
+	fonts/demo_console_sdf.fnt; do
 	if [[ "$listing" != *"$needle"* ]]; then
 		fail "pk3 listing missing: $needle"
 	fi

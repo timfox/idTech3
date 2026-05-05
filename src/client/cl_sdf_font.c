@@ -49,6 +49,64 @@ static cvar_t *r_sdfFont;
 static cvar_t *r_sdfFontMetrics;
 static cvar_t *r_sdfFontAtlas;
 static cvar_t *r_sdfSmoothing;
+static cvar_t *r_sdfAuto;
+
+#define SDF_PACKAGED_CONSOLE_METRICS "fonts/demo_console_sdf.fnt"
+#define SDF_PACKAGED_CONSOLE_BASE    "fonts/demo_console_sdf"
+
+static qboolean sdf_autopick_done;
+static qboolean sdf_load_failed;
+static char     sdf_fail_font_base[MAX_QPATH];
+
+static void SDF_ClearFailedLoad( void ) {
+	sdf_load_failed = qfalse;
+	sdf_fail_font_base[0] = '\0';
+}
+
+/*
+===============
+SDF_TryAutopickPackagedConsoleFont
+
+If the demo/mod ships fonts/demo_console_sdf.fnt on the search path and
+r_sdfFont is empty, set r_sdfFont to fonts/demo_console_sdf so SDF can load
+without relying on autoexec/demo_features.cfg.
+
+When r_sdfAuto is 1 (default), also turn on r_sdfEnable if the user has
+never overridden r_sdfEnable (modified == qfalse), so first-run demo pk3
+gets crisp console text.
+===============
+*/
+static void SDF_TryAutopickPackagedConsoleFont( void ) {
+	void *buf;
+	int len;
+
+	if ( sdf_autopick_done || !r_sdfAuto || !r_sdfAuto->integer ) {
+		return;
+	}
+	if ( r_sdfFont && r_sdfFont->string[0] ) {
+		sdf_autopick_done = qtrue;
+		return;
+	}
+
+	len = FS_ReadFile( SDF_PACKAGED_CONSOLE_METRICS, &buf );
+	if ( len <= 0 || !buf ) {
+		sdf_autopick_done = qtrue;
+		return;
+	}
+	FS_FreeFile( buf );
+
+	sdf_autopick_done = qtrue;
+	SDF_ClearFailedLoad();
+	Cvar_Set( "r_sdfFont", SDF_PACKAGED_CONSOLE_BASE );
+	if ( r_sdfEnable && !r_sdfEnable->integer && !r_sdfEnable->modified ) {
+		Cvar_Set( "r_sdfEnable", "1" );
+		Com_Printf( "[SDF] Auto-configured packaged console font (%s + r_sdfEnable 1; set r_sdfAuto 0 to opt out).\n",
+			SDF_PACKAGED_CONSOLE_BASE );
+	} else {
+		Com_Printf( "[SDF] Auto-selected packaged console font %s (set r_sdfAuto 0 to opt out).\n",
+			SDF_PACKAGED_CONSOLE_BASE );
+	}
+}
 
 #define VALID_FONT(h) ((h) >= 0 && (h) < numFonts && fonts[(h)].active)
 
@@ -193,9 +251,11 @@ void SDF_Init( void ) {
 	loadedFontBase[0] = '\0';
 	loadedMetricsPath[0] = '\0';
 	loadedAtlasPath[0] = '\0';
+	sdf_autopick_done = qfalse;
+	SDF_ClearFailedLoad();
 
 	r_sdfEnable = Cvar_Get( "r_sdfEnable", "0", CVAR_ARCHIVE );
-	Cvar_SetDescription( r_sdfEnable, "Enable SDF HUD text rendering for supported paths (0 = off, 1 = on)." );
+	Cvar_SetDescription( r_sdfEnable, "Enable signed-distance-field text (r_sdfFont .fnt + atlas). Console uses screen pixels; big HUD strings use 640x480 virtual coords (0 = off, 1 = on)." );
 
 	r_sdfFont = Cvar_Get( "r_sdfFont", "", CVAR_ARCHIVE );
 	Cvar_SetDescription( r_sdfFont, "SDF font base name (e.g. fonts/myfont). Expects myfont.fnt + image atlas." );
@@ -207,6 +267,9 @@ void SDF_Init( void ) {
 	r_sdfSmoothing = Cvar_Get( "r_sdfSmoothing", "0.1", CVAR_ARCHIVE );
 	Cvar_SetDescription( r_sdfSmoothing, "SDF edge smoothing width (smaller = sharper, 0.05-0.25 typical)." );
 
+	r_sdfAuto = Cvar_Get( "r_sdfAuto", "1", CVAR_ARCHIVE );
+	Cvar_SetDescription( r_sdfAuto, "When 1, pick fonts/demo_console_sdf if its .fnt exists on the path and r_sdfFont is empty; may auto-enable r_sdfEnable if not user-overridden." );
+
 	Com_Printf( "SDF fonts: initialized\n" );
 }
 
@@ -216,6 +279,8 @@ void SDF_Shutdown( void ) {
 	loadedMetricsPath[0] = '\0';
 	loadedAtlasPath[0] = '\0';
 	numFonts = 0;
+	sdf_autopick_done = qfalse;
+	SDF_ClearFailedLoad();
 }
 
 /* Parse a BMFont .fnt text format file */
@@ -334,6 +399,8 @@ static qboolean SDF_EnsureDefaultFont( void ) {
 	char atlasPath[MAX_QPATH];
 	const char *fontBase;
 
+	SDF_TryAutopickPackagedConsoleFont();
+
 	if ( !r_sdfEnable || !r_sdfEnable->integer ) {
 		return qfalse;
 	}
@@ -342,6 +409,12 @@ static qboolean SDF_EnsureDefaultFont( void ) {
 	}
 
 	fontBase = r_sdfFont->string;
+	if ( sdf_load_failed && sdf_fail_font_base[0] && !Q_stricmp( sdf_fail_font_base, fontBase ) ) {
+		return qfalse;
+	}
+	if ( sdf_load_failed && sdf_fail_font_base[0] && Q_stricmp( sdf_fail_font_base, fontBase ) ) {
+		SDF_ClearFailedLoad();
+	}
 	if ( !SDF_ResolveDefaultPaths( metricsPath, sizeof( metricsPath ), atlasPath, sizeof( atlasPath ) ) ) {
 		return qfalse;
 	}
@@ -361,9 +434,12 @@ static qboolean SDF_EnsureDefaultFont( void ) {
 
 	defaultFontHandle = SDF_LoadFont( fontBase, atlasPath, metricsPath );
 	if ( defaultFontHandle == SDF_INVALID_HANDLE ) {
+		sdf_load_failed = qtrue;
+		Q_strncpyz( sdf_fail_font_base, fontBase, sizeof( sdf_fail_font_base ) );
 		return qfalse;
 	}
 
+	SDF_ClearFailedLoad();
 	Q_strncpyz( loadedFontBase, fontBase, sizeof( loadedFontBase ) );
 	Q_strncpyz( loadedMetricsPath, metricsPath, sizeof( loadedMetricsPath ) );
 	Q_strncpyz( loadedAtlasPath, atlasPath, sizeof( loadedAtlasPath ) );
@@ -448,7 +524,8 @@ void SDF_DrawText( sdfFontHandle_t font, float x, float y, float scale,
 }
 
 qboolean SDF_DrawStringExt( int x, int y, float size, const char *string,
-	const float *setColor, qboolean forceColor, qboolean noColorEscape ) {
+	const float *setColor, qboolean forceColor, qboolean noColorEscape,
+	sdfCoordSpace_t coordSpace ) {
 	const char *s;
 	sdfFont_t *f;
 	float xx;
@@ -472,6 +549,138 @@ qboolean SDF_DrawStringExt( int x, int y, float size, const char *string,
 
 	scale = SDF_LineScale( f, clampedSize );
 	fallbackGlyph = SDF_FindGlyph( f, (uint32_t)'?' );
+
+	/* Console: fixed cell (smallchar_width x smallchar_height), monospace advance — matches bitmap path. */
+	if ( coordSpace == SDF_COORDS_SCREEN && smallchar_width > 0 && smallchar_height > 0 ) {
+		const float cellW = (float)smallchar_width;
+		const float cellH = (float)smallchar_height;
+		const float lineStep = cellH;
+
+		/* drop shadow pass */
+		color[0] = color[1] = color[2] = 0.0f;
+		color[3] = setColor[3];
+		re.SetColor( color );
+		s = string;
+		xx = (float)x;
+		yy = (float)y;
+		prevCp = 0;
+		while ( *s ) {
+			const char *prevPtr = s;
+			uint32_t cp;
+			const sdfGlyph_t *g;
+
+			if ( !noColorEscape && Q_IsColorString( s ) ) {
+				s += 2;
+				continue;
+			}
+
+			cp = Q_UTF8_Decode( &s );
+			if ( cp == '\n' ) {
+				xx = (float)x;
+				yy += lineStep;
+				prevCp = 0;
+				continue;
+			}
+
+			if ( CL_Emoji_IsEnabled() && ( (unsigned char)prevPtr[0] >= 0x80 ) && Q_UTF8_IsEmoji( cp ) ) {
+				xx += cellW;
+				prevCp = cp;
+				continue;
+			}
+
+			g = SDF_FindGlyph( f, cp );
+			if ( !g ) {
+				g = fallbackGlyph;
+			}
+			if ( !g ) {
+				xx += cellW;
+				prevCp = cp;
+				continue;
+			}
+
+			if ( g->w > 0.0f && g->h > 0.0f ) {
+				const float sh = ( cellH > 4.0f ) ? 1.0f : 0.0f;
+				float drawX = xx + sh + g->xoffset * scale;
+				float drawY = yy + sh + g->yoffset * scale;
+				float ax = drawX;
+				float ay = drawY;
+				float aw = cellW;
+				float ah = cellH;
+				re.DrawStretchPic( ax, ay, aw, ah, g->s0, g->t0, g->s1, g->t1, f->atlasShader );
+			}
+
+			xx += cellW;
+			prevCp = cp;
+		}
+
+		/* color pass */
+		s = string;
+		xx = (float)x;
+		yy = (float)y;
+		Com_Memcpy( color, setColor, sizeof( color ) );
+		re.SetColor( setColor );
+		prevCp = 0;
+		while ( *s ) {
+			const char *prevPtr = s;
+			uint32_t cp;
+			const sdfGlyph_t *g;
+
+			if ( Q_IsColorString( s ) ) {
+				if ( !forceColor ) {
+					Com_Memcpy( color, g_color_table[ColorIndexFromChar( *(s + 1) )], sizeof( color ) );
+					color[3] = setColor[3];
+					re.SetColor( color );
+				}
+				if ( !noColorEscape ) {
+					s += 2;
+					continue;
+				}
+			}
+
+			cp = Q_UTF8_Decode( &s );
+			if ( cp == '\n' ) {
+				xx = (float)x;
+				yy += lineStep;
+				prevCp = 0;
+				continue;
+			}
+
+			if ( CL_Emoji_IsEnabled() && ( (unsigned char)prevPtr[0] >= 0x80 ) && Q_UTF8_IsEmoji( cp ) ) {
+				if ( CL_Emoji_DrawChar( (int)xx, (int)yy, (int)cellW, (int)cellH, cp ) ) {
+					re.SetColor( forceColor ? setColor : color );
+					xx += cellW;
+					prevCp = cp;
+					continue;
+				}
+			}
+
+			g = SDF_FindGlyph( f, cp );
+			if ( !g ) {
+				g = fallbackGlyph;
+			}
+			if ( !g ) {
+				xx += cellW;
+				prevCp = cp;
+				continue;
+			}
+
+			if ( g->w > 0.0f && g->h > 0.0f ) {
+				float drawX = xx + g->xoffset * scale;
+				float drawY = yy + g->yoffset * scale;
+				float ax = drawX;
+				float ay = drawY;
+				float aw = cellW;
+				float ah = cellH;
+				re.DrawStretchPic( ax, ay, aw, ah, g->s0, g->t0, g->s1, g->t1, f->atlasShader );
+			}
+
+			xx += cellW;
+			prevCp = cp;
+		}
+
+		re.SetColor( NULL );
+		return qtrue;
+	}
 
 	/* drop shadow pass */
 	color[0] = color[1] = color[2] = 0.0f;
@@ -524,7 +733,9 @@ qboolean SDF_DrawStringExt( int x, int y, float size, const char *string,
 			float ay = drawY;
 			float aw = drawW;
 			float ah = drawH;
-			SCR_AdjustFrom640( &ax, &ay, &aw, &ah );
+			if ( coordSpace == SDF_COORDS_VIRTUAL_640 ) {
+				SCR_AdjustFrom640( &ax, &ay, &aw, &ah );
+			}
 			re.DrawStretchPic( ax, ay, aw, ah, g->s0, g->t0, g->s1, g->t1, f->atlasShader );
 		}
 
@@ -592,7 +803,9 @@ qboolean SDF_DrawStringExt( int x, int y, float size, const char *string,
 			float ay = drawY;
 			float aw = drawW;
 			float ah = drawH;
-			SCR_AdjustFrom640( &ax, &ay, &aw, &ah );
+			if ( coordSpace == SDF_COORDS_VIRTUAL_640 ) {
+				SCR_AdjustFrom640( &ax, &ay, &aw, &ah );
+			}
 			re.DrawStretchPic( ax, ay, aw, ah, g->s0, g->t0, g->s1, g->t1, f->atlasShader );
 		}
 
