@@ -14,6 +14,7 @@ See `CLAUDE.md` for canonical build commands. The primary build script is `./scr
 ./scripts/compile_engine.sh vulkan          # Vulkan renderer, Release
 ./scripts/compile_engine.sh opengl          # OpenGL renderer, Release
 ./scripts/compile_engine.sh vulkan debug    # Vulkan renderer, Debug
+./scripts/compile_engine.sh vulkan demo     # Also builds idtech3_demo.pk3 → release/demo_game/
 ./scripts/compile_engine.sh clean vulkan    # Clean build
 ```
 

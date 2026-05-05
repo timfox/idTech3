@@ -3,6 +3,7 @@
 
 set(DEMO_MOD_DIR "${CMAKE_SOURCE_DIR}/examples/demo_game/mod")
 set(DEMO_BOOTSTRAP_DIR "${CMAKE_SOURCE_DIR}/examples/demo_game/bootstrap_media")
+set(DEMO_INTER_PACK_FONT "${CMAKE_SOURCE_DIR}/fonts/Inter_28pt-Regular.ttf")
 set(DEMO_PK3 "${CMAKE_BINARY_DIR}/idtech3_demo.pk3")
 set(DEMO_PACK_STAGING "${CMAKE_BINARY_DIR}/idtech3_demo_pack_staging")
 
@@ -14,15 +15,18 @@ set(DEMO_BOOTSTRAP_GFX_DEMO
 	"${DEMO_BOOTSTRAP_DIR}/gfx/demo/bootstrap_shadow.png"
 )
 set(DEMO_BOOTSTRAP_FONTS
-	"${DEMO_BOOTSTRAP_DIR}/fonts/Inter-Regular.ttf"
 	"${DEMO_BOOTSTRAP_DIR}/fonts/LICENSE.txt"
 	"${DEMO_BOOTSTRAP_DIR}/fonts/demo_console_sdf.png"
 	"${DEMO_BOOTSTRAP_DIR}/fonts/demo_console_sdf.fnt"
 )
 
+if(NOT EXISTS "${DEMO_INTER_PACK_FONT}")
+	message(FATAL_ERROR "Missing demo UI TTF: ${DEMO_INTER_PACK_FONT}\n  The idtech3_demo pack ships this file as fonts/Inter_28pt-Regular.ttf.\n  SDF console atlas: python3 examples/demo_game/tools/gen_demo_console_sdf.py \"${DEMO_INTER_PACK_FONT}\" examples/demo_game/bootstrap_media/fonts")
+endif()
+
 foreach(_demo_boot_chk IN LISTS DEMO_BOOTSTRAP_GFX2D DEMO_BOOTSTRAP_GFX_DEMO DEMO_BOOTSTRAP_FONTS)
 	if(NOT EXISTS "${_demo_boot_chk}")
-		message(FATAL_ERROR "Missing demo bootstrap file: ${_demo_boot_chk}\n  Regenerate PNGs: python3 examples/demo_game/tools/gen_demo_bootstrap_media.py examples/demo_game/bootstrap_media\n  SDF console font: python3 examples/demo_game/tools/gen_demo_console_sdf.py examples/demo_game/bootstrap_media/fonts/Inter-Regular.ttf examples/demo_game/bootstrap_media/fonts\n  Install Inter OFL fonts under examples/demo_game/bootstrap_media/fonts/ if missing.")
+		message(FATAL_ERROR "Missing demo bootstrap file: ${_demo_boot_chk}\n  Regenerate PNGs: python3 examples/demo_game/tools/gen_demo_bootstrap_media.py examples/demo_game/bootstrap_media\n  SDF console font: python3 examples/demo_game/tools/gen_demo_console_sdf.py \"${DEMO_INTER_PACK_FONT}\" examples/demo_game/bootstrap_media/fonts")
 	endif()
 endforeach()
 
@@ -112,7 +116,7 @@ add_custom_command(
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_BOOTSTRAP_DIR}/gfx/demo/bootstrap_shadow.png" "${DEMO_PACK_STAGING}/gfx/demo/bootstrap_shadow.png"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
-		"${DEMO_BOOTSTRAP_DIR}/fonts/Inter-Regular.ttf" "${DEMO_PACK_STAGING}/fonts/Inter-Regular.ttf"
+		"${DEMO_INTER_PACK_FONT}" "${DEMO_PACK_STAGING}/fonts/Inter_28pt-Regular.ttf"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_BOOTSTRAP_DIR}/fonts/LICENSE.txt" "${DEMO_PACK_STAGING}/fonts/LICENSE.txt"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -134,7 +138,7 @@ add_custom_command(
 		gfx/demo/bootstrap_console.png
 		gfx/demo/bootstrap_flare.png
 		gfx/demo/bootstrap_shadow.png
-		fonts/Inter-Regular.ttf
+		fonts/Inter_28pt-Regular.ttf
 		fonts/LICENSE.txt
 		fonts/demo_console_sdf.png
 		fonts/demo_console_sdf.fnt

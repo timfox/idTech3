@@ -5,9 +5,9 @@ Build a BMFont-style metrics file + RGBA atlas for cl_sdf_font.c (alpha = normal
 Glyphs: ASCII 32-126 in a fixed grid. Requires Pillow, numpy, scipy.
 
 Usage:
-  python3 gen_demo_console_sdf.py <Inter-Regular.ttf> <output_dir>
+  python3 gen_demo_console_sdf.py <font.ttf> <output_dir>
   python3 gen_demo_console_sdf.py \\
-    examples/demo_game/bootstrap_media/fonts/Inter-Regular.ttf \\
+    fonts/Inter_28pt-Regular.ttf \\
     examples/demo_game/bootstrap_media/fonts
 """
 from __future__ import annotations

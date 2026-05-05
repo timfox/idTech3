@@ -268,6 +268,10 @@ sudo apt-get install cmake clang-18 gcc-15 ninja-build
 # Vulkan build (recommended)
 ./scripts/compile_engine.sh vulkan
 
+# Same, plus example demo mod: BUILD_EXAMPLE_DEMO_GAME=ON, target demo_game_pk3,
+# copies idtech3_demo.pk3 to release/demo_game/ when the pack builds successfully
+./scripts/compile_engine.sh vulkan demo
+
 # OpenGL build (fallback)
 ./scripts/compile_engine.sh opengl
 
