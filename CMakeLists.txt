@@ -2528,6 +2528,13 @@ add_test(NAME test_botlib_bounded_strings
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_botlib_bounded_strings PROPERTIES
 	LABELS "unit;scripts;validation")
+
+add_test(NAME test_pk3_native_library_cache
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_pk3_native_library_cache.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_pk3_native_library_cache PROPERTIES
+	LABELS "unit;scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_pk3_native_library_cache.sh")
 # --- Unit tests ---
 option(BUILD_UNIT_TESTS "Build unit tests" ON)
 if(BUILD_UNIT_TESTS)
