@@ -63,7 +63,7 @@ Quick path: use the **[demo skeleton](../demo_skeleton/README.md)** (`run_demo_c
 
 3. On load, `autoexec.cfg` runs `demo_features.cfg`, `demo_js.cfg`, `demo_lua.cfg`, and `demo_gameplay.cfg`. Edit files under `mod/` and rebuild `demo_game_pk3`.
 
-**SDF console text:** `demo_features.cfg` enables `r_sdfEnable` / `r_sdfFont` using the packed **BMFont + distance atlas** (`fonts/demo_console_sdf.png` + `.fnt`). Regenerate with `python3 examples/demo_game/tools/gen_demo_console_sdf.py fonts/Inter_28pt-Regular.ttf examples/demo_game/bootstrap_media/fonts` (needs Pillow, numpy, scipy). If `autoexec.cfg` does not run from your install path, run `exec demo_features` once or add the same `r_font` / `r_sdf*` lines to your `default.cfg`.
+**Console / HUD text:** `demo_features.cfg` sets **`r_font`** so **`cl_builtInTtf`** (default **1**) rasterizes glyphs at runtime via FreeType—no offline atlas. Optional **SDF** (sharper at extreme scales): set **`r_sdfEnable 1`** and **`r_sdfFont "fonts/demo_console_sdf"`**; regenerate that atlas with `python3 examples/demo_game/tools/gen_demo_console_sdf.py fonts/Inter_28pt-Regular.ttf examples/demo_game/bootstrap_media/fonts` (Pillow, numpy, scipy). If `autoexec.cfg` does not run, `exec demo_features` once or mirror the `r_font` line in `default.cfg`.
 
 **JavaScript:** requires **USE_DUKTAPE** in the engine build. If `js_reload` fails, check the console; ensure `js_allowEvents` is `1` (default).
 

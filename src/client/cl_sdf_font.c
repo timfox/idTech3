@@ -65,9 +65,8 @@ If the demo/mod ships fonts/demo_console_sdf.fnt on the search path and
 r_sdfFont is empty, set r_sdfFont to fonts/demo_console_sdf so SDF can load
 without relying on autoexec/demo_features.cfg.
 
-When r_sdfAuto is 1 (default), also turn on r_sdfEnable if the user has
-never overridden r_sdfEnable (modified == qfalse), so first-run demo pk3
-gets crisp console text.
+When r_sdfAuto is 1, set r_sdfFont so enabling r_sdfEnable later works
+without autoexec; does not turn on r_sdfEnable (use FreeType + r_font by default).
 ===============
 */
 static void SDF_TryAutopickPackagedConsoleFont( void ) {
@@ -92,14 +91,8 @@ static void SDF_TryAutopickPackagedConsoleFont( void ) {
 	sdf_autopick_done = qtrue;
 	SDF_ClearFailedLoad();
 	Cvar_Set( "r_sdfFont", SDF_PACKAGED_CONSOLE_BASE );
-	if ( r_sdfEnable && !r_sdfEnable->integer && !r_sdfEnable->modified ) {
-		Cvar_Set( "r_sdfEnable", "1" );
-		Com_Printf( "[SDF] Auto-configured packaged console font (%s + r_sdfEnable 1; set r_sdfAuto 0 to opt out).\n",
-			SDF_PACKAGED_CONSOLE_BASE );
-	} else {
-		Com_Printf( "[SDF] Auto-selected packaged console font %s (set r_sdfAuto 0 to opt out).\n",
-			SDF_PACKAGED_CONSOLE_BASE );
-	}
+	Com_Printf( "[SDF] Auto-selected packaged SDF metrics base %s (set r_sdfEnable 1 to use; r_sdfAuto 0 to opt out).\n",
+		SDF_PACKAGED_CONSOLE_BASE );
 }
 
 #define VALID_FONT(h) ((h) >= 0 && (h) < numFonts && fonts[(h)].active)
@@ -259,7 +252,7 @@ void SDF_Init( void ) {
 	SDF_ClearFailedLoad();
 
 	r_sdfEnable = Cvar_Get( "r_sdfEnable", "0", CVAR_ARCHIVE );
-	Cvar_SetDescription( r_sdfEnable, "Enable signed-distance-field text (r_sdfFont .fnt + atlas). Console uses screen pixels; big HUD strings use 640x480 virtual coords (0 = off, 1 = on)." );
+	Cvar_SetDescription( r_sdfEnable, "Enable signed-distance-field text (r_sdfFont .fnt + atlas). When cl_builtInTtf loads r_font, FreeType draws first; set cl_builtInTtf 0 to prefer SDF. Console: screen pixels; big HUD: 640x480 virtual." );
 
 	r_sdfFont = Cvar_Get( "r_sdfFont", "", CVAR_ARCHIVE );
 	Cvar_SetDescription( r_sdfFont, "SDF font base name (e.g. fonts/myfont). Expects myfont.fnt + image atlas." );
@@ -271,8 +264,8 @@ void SDF_Init( void ) {
 	r_sdfSmoothing = Cvar_Get( "r_sdfSmoothing", "0.1", CVAR_ARCHIVE );
 	Cvar_SetDescription( r_sdfSmoothing, "SDF edge half-width for Vulkan uiSdfText smoothstep (smaller = sharper; 0.05-0.25 typical)." );
 
-	r_sdfAuto = Cvar_Get( "r_sdfAuto", "1", CVAR_ARCHIVE );
-	Cvar_SetDescription( r_sdfAuto, "When 1, pick fonts/demo_console_sdf if its .fnt exists on the path and r_sdfFont is empty; may auto-enable r_sdfEnable if not user-overridden." );
+	r_sdfAuto = Cvar_Get( "r_sdfAuto", "0", CVAR_ARCHIVE );
+	Cvar_SetDescription( r_sdfAuto, "When 1, set r_sdfFont to fonts/demo_console_sdf if its .fnt exists on the path and r_sdfFont is empty (does not enable r_sdfEnable; console/HUD prefer r_font + cl_builtInTtf)." );
 
 	Com_Printf( "SDF fonts: initialized\n" );
 }
