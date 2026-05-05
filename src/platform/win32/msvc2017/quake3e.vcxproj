@@ -303,6 +303,7 @@
     <ClCompile Include="..\..\client\cl_cin_modern.c" />
     <ClCompile Include="..\..\client\cl_console.c" />
     <ClCompile Include="..\..\client\cl_curl.c" />
+    <ClCompile Include="..\..\client\cl_demo.c" />
     <ClCompile Include="..\..\client\cl_input.c" />
     <ClCompile Include="..\..\client\cl_jpeg.c">
       <AdditionalIncludeDirectories>$(LibJpegInclude);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -335,6 +336,7 @@
     <ClCompile Include="..\..\game\g_horde.c" />
     <ClCompile Include="..\..\game\g_goap.c" />
     <ClCompile Include="..\..\game\g_aiml.c" />
+    <ClCompile Include="..\..\game\g_eda.c" />
     <ClCompile Include="..\..\game\g_engine_systems.c" />
     <ClCompile Include="..\..\game\g_bt.c" />
     <ClCompile Include="..\..\game\g_entity_bridge.c" />
