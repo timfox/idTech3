@@ -105,6 +105,7 @@ extern PFN_vkGetBufferMemoryRequirements				qvkGetBufferMemoryRequirements;
 extern PFN_vkGetDeviceQueue								qvkGetDeviceQueue;
 extern PFN_vkGetImageMemoryRequirements					qvkGetImageMemoryRequirements;
 extern PFN_vkGetImageSubresourceLayout					qvkGetImageSubresourceLayout;
+extern PFN_vkGetPipelineCacheData						qvkGetPipelineCacheData;
 extern PFN_vkInvalidateMappedMemoryRanges				qvkInvalidateMappedMemoryRanges;
 extern PFN_vkMapMemory									qvkMapMemory;
 extern PFN_vkQueueSubmit								qvkQueueSubmit;

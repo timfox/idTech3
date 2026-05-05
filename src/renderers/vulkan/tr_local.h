@@ -1711,6 +1711,7 @@ extern cvar_t	*r_fboDebug;
 extern cvar_t	*r_froxelDebug;
 extern cvar_t	*r_vk_swapchain_srgb;
 extern cvar_t	*r_vk_pipeline_debug;
+extern cvar_t	*r_vk_pipelineCacheDisk;
 extern cvar_t	*r_vk_colorWriteMaskDynamic;
 extern cvar_t	*r_vk_meshShaderNV;
 extern cvar_t	*r_morph;

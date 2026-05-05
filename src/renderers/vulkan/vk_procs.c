@@ -111,6 +111,7 @@ PFN_vkGetBufferMemoryRequirements				qvkGetBufferMemoryRequirements;
 PFN_vkGetDeviceQueue								qvkGetDeviceQueue;
 PFN_vkGetImageMemoryRequirements					qvkGetImageMemoryRequirements;
 PFN_vkGetImageSubresourceLayout					qvkGetImageSubresourceLayout;
+PFN_vkGetPipelineCacheData						qvkGetPipelineCacheData;
 PFN_vkInvalidateMappedMemoryRanges				qvkInvalidateMappedMemoryRanges;
 PFN_vkMapMemory									qvkMapMemory;
 PFN_vkQueueSubmit								qvkQueueSubmit;
