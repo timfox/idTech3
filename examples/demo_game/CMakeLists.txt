@@ -2,8 +2,27 @@
 # Included from top-level CMakeLists.txt when BUILD_EXAMPLE_DEMO_GAME=ON.
 
 set(DEMO_MOD_DIR "${CMAKE_SOURCE_DIR}/examples/demo_game/mod")
+set(DEMO_BOOTSTRAP_DIR "${CMAKE_SOURCE_DIR}/examples/demo_game/bootstrap_media")
 set(DEMO_PK3 "${CMAKE_BINARY_DIR}/idtech3_demo.pk3")
 set(DEMO_PACK_STAGING "${CMAKE_BINARY_DIR}/idtech3_demo_pack_staging")
+
+set(DEMO_BOOTSTRAP_GFX2D "${DEMO_BOOTSTRAP_DIR}/gfx/2d/bigchars.png")
+set(DEMO_BOOTSTRAP_GFX_DEMO
+	"${DEMO_BOOTSTRAP_DIR}/gfx/demo/bootstrap_white.png"
+	"${DEMO_BOOTSTRAP_DIR}/gfx/demo/bootstrap_console.png"
+	"${DEMO_BOOTSTRAP_DIR}/gfx/demo/bootstrap_flare.png"
+	"${DEMO_BOOTSTRAP_DIR}/gfx/demo/bootstrap_shadow.png"
+)
+set(DEMO_BOOTSTRAP_FONTS
+	"${DEMO_BOOTSTRAP_DIR}/fonts/Inter-Regular.ttf"
+	"${DEMO_BOOTSTRAP_DIR}/fonts/LICENSE.txt"
+)
+
+foreach(_demo_boot_chk IN LISTS DEMO_BOOTSTRAP_GFX2D DEMO_BOOTSTRAP_GFX_DEMO DEMO_BOOTSTRAP_FONTS)
+	if(NOT EXISTS "${_demo_boot_chk}")
+		message(FATAL_ERROR "Missing demo bootstrap file: ${_demo_boot_chk}\n  Regenerate PNGs: python3 examples/demo_game/tools/gen_demo_bootstrap_media.py examples/demo_game/bootstrap_media\n  Install Inter OFL fonts under examples/demo_game/bootstrap_media/fonts/ (see tools script header / cmake/DownloadInterFonts.cmake).")
+	endif()
+endforeach()
 
 set(DEMO_MOD_FILES
 	"${DEMO_MOD_DIR}/autoexec.cfg"
@@ -15,6 +34,7 @@ set(DEMO_MOD_FILES
 	"${DEMO_MOD_DIR}/scripts/js/demo_hooks.js"
 	"${DEMO_MOD_DIR}/scripts/js/README.txt"
 	"${DEMO_MOD_DIR}/scripts/lua/demo_hooks.lua"
+	"${DEMO_MOD_DIR}/scripts/demo_bootstrap.shader"
 )
 
 # Minimal native UI for skeleton playfields (loads from pk3 vm/ before ui.qvm).
@@ -53,6 +73,9 @@ add_custom_command(
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/scripts/js"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/scripts/lua"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/vm"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/gfx/2d"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/gfx/demo"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/fonts"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/autoexec.cfg" "${DEMO_PACK_STAGING}/autoexec.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -72,6 +95,22 @@ add_custom_command(
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/scripts/lua/demo_hooks.lua" "${DEMO_PACK_STAGING}/scripts/lua/demo_hooks.lua"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/scripts/demo_bootstrap.shader" "${DEMO_PACK_STAGING}/scripts/demo_bootstrap.shader"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_BOOTSTRAP_GFX2D}" "${DEMO_PACK_STAGING}/gfx/2d/bigchars.png"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_BOOTSTRAP_DIR}/gfx/demo/bootstrap_white.png" "${DEMO_PACK_STAGING}/gfx/demo/bootstrap_white.png"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_BOOTSTRAP_DIR}/gfx/demo/bootstrap_console.png" "${DEMO_PACK_STAGING}/gfx/demo/bootstrap_console.png"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_BOOTSTRAP_DIR}/gfx/demo/bootstrap_flare.png" "${DEMO_PACK_STAGING}/gfx/demo/bootstrap_flare.png"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_BOOTSTRAP_DIR}/gfx/demo/bootstrap_shadow.png" "${DEMO_PACK_STAGING}/gfx/demo/bootstrap_shadow.png"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_BOOTSTRAP_DIR}/fonts/Inter-Regular.ttf" "${DEMO_PACK_STAGING}/fonts/Inter-Regular.ttf"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_BOOTSTRAP_DIR}/fonts/LICENSE.txt" "${DEMO_PACK_STAGING}/fonts/LICENSE.txt"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"$<TARGET_FILE:demo_ui_skeleton>" "${DEMO_PACK_STAGING}/${DEMO_UI_IN_ZIP}"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"$<TARGET_FILE:demo_ui_skeleton>" "${DEMO_PACK_STAGING}/${DEMO_UI_DOT_ZIP}"
@@ -80,6 +119,14 @@ add_custom_command(
 		autoexec.cfg demo_features.cfg demo_js.cfg demo_lua.cfg demo_gameplay.cfg readme_demo.txt
 		scripts/js/demo_hooks.js scripts/js/README.txt
 		scripts/lua/demo_hooks.lua
+		scripts/demo_bootstrap.shader
+		gfx/2d/bigchars.png
+		gfx/demo/bootstrap_white.png
+		gfx/demo/bootstrap_console.png
+		gfx/demo/bootstrap_flare.png
+		gfx/demo/bootstrap_shadow.png
+		fonts/Inter-Regular.ttf
+		fonts/LICENSE.txt
 		"${DEMO_UI_IN_ZIP}"
 		"${DEMO_UI_DOT_ZIP}"
 	DEPENDS ${DEMO_MOD_FILES} demo_ui_skeleton

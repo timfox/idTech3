@@ -48,6 +48,7 @@ android/local.properties
 !/examples/demo_skeleton/base/README.txt
 !/examples/demo_skeleton/base/z_minimal_bootstrap.pk3
 
-# demo mod pk3 is created by build_demo_pack.sh; keep only README in git
+# demo mod pk3: default build output is ignored; ship a tracked bootstrap pack for turnkey skeleton (rebuild: demo_game_pk3)
 /examples/demo_skeleton/idtech3_demo/*
 !/examples/demo_skeleton/idtech3_demo/README.txt
+!/examples/demo_skeleton/idtech3_demo/idtech3_demo.pk3

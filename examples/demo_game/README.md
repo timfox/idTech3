@@ -6,7 +6,7 @@ This is **not** a standalone game: it is a **tiny mod** (`.pk3` of configs) you 
 
 | Artifact | Description |
 |----------|-------------|
-| `idtech3_demo.pk3` | Config mod + **minimal native UI** (inside the zip as **`vm/ui<arch>.so`** and **`vm/ui.<arch>.so`**, same binary): enough to open a window without retail `ui.qvm`. The engine packs native shared libraries only inside zips; it **extracts** them to **`vm/native_cache/`** under your game home path (toggle **`com_nativeLibraryExtractPk3`**, default **1**) then loads that file, because `dlopen` cannot read zip entries directly. Also **Duktape** (`demo_js.cfg`), optional **Lua** (`demo_lua.cfg` / `scripts/lua/` when built with `USE_LUA`), and gameplay hints. |
+| `idtech3_demo.pk3` | Config mod + **minimal native UI** (inside the zip as **`vm/ui<arch>.so`** and **`vm/ui.<arch>.so`**, same binary): enough to open a window without retail `ui.qvm`. The engine packs native shared libraries only inside zips; it **extracts** them to **`vm/native_cache/`** under your game home path (toggle **`com_nativeLibraryExtractPk3`**, default **1**) then loads that file, because `dlopen` cannot read zip entries directly. Also **Duktape** (`demo_js.cfg`), optional **Lua** (`demo_lua.cfg` / `scripts/lua/` when built with `USE_LUA`), and gameplay hints. **Bootstrap renderer assets** ship in the same zip (`scripts/demo_bootstrap.shader`, `gfx/2d/bigchars.png`, small `gfx/demo/*.png`, **Inter** `fonts/Inter-Regular.ttf` + `fonts/LICENSE.txt`) so an **empty `base/`** still clears shader init and default `r_font` without retail `pak0`. Regenerate PNGs with `python3 examples/demo_game/tools/gen_demo_bootstrap_media.py examples/demo_game/bootstrap_media`. |
 | `idtech3_demo_helper` | Optional tiny host binary that prints launch hints (built when `BUILD_EXAMPLE_DEMO_GAME=ON`). |
 
 ### “Playable” without custom qagame
@@ -79,4 +79,4 @@ For renderer regression maps, use the official regression pack and docs under `d
 
 ## Legal
 
-Do not redistribute commercial game `.pk3` files. This example only ships **text configs** you build yourself.
+Do not redistribute commercial game `.pk3` files. This example ships **configs you edit in-tree**, **GPL engine-authored PNG placeholders**, the **demo UI native stub** you compile, and **Inter** (SIL Open Font License 1.1 — see `examples/demo_game/bootstrap_media/fonts/LICENSE.txt` in the source tree and `fonts/LICENSE.txt` inside the zip).

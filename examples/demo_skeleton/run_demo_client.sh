@@ -55,8 +55,8 @@ if [[ -n "${IDTECH3_DEMO_ROOT:-}" && ! -d "$IDTECH3_DEMO_ROOT" ]]; then
 	unset IDTECH3_DEMO_ROOT
 fi
 
-# First argument: explicit playfield root
-if [[ -n "${1:-}" && "$1" != -* ]]; then
+# First argument: explicit playfield root (reject engine tokens like +set / +map)
+if [[ -n "${1:-}" && "$1" != -* && "$1" != +* ]]; then
 	IDTECH3_DEMO_ROOT="$1"
 	shift
 fi
