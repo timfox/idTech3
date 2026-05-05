@@ -221,12 +221,11 @@ Code: `src/renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar regist
 
 See [HDR_GAPS.md](HDR_GAPS.md) for HDR pipeline gaps, risks, and render order.
 
-### SDF Text Rendering
-- Signed Distance Field (SDF) fonts for resolution-independent sharp text
-- Applied to HUD, menu, console, key bindings, and all UI text paths
-- BMFont-format metrics (`.fnt`) + SDF atlas textures
-- Cvars: `r_sdfEnable`, `r_sdfFont`, `r_sdfFontAtlas`, `r_sdfSmoothing`
-- Fallback to bitmap charset when SDF font unavailable
+### Engine HUD / console text (FreeType vs SDF)
+- **Default path:** `r_font` (TrueType) + `cl_builtInTtf` **1** (default) — FreeType rasterizes glyphs into a runtime atlas (no offline bake). Used for engine console, small HUD strings, and bigchars-style paths when the font loads.
+- **Optional SDF:** BMFont `.fnt` + distance atlas (`r_sdfEnable`, `r_sdfFont`, optional `r_sdfFontAtlas`, `r_sdfSmoothing`). When both FreeType and SDF are configured, the engine **draws FreeType first**; set `cl_builtInTtf` **0** to prefer SDF for those paths.
+- **Autopick:** `r_sdfAuto` (default **0**) may preset `r_sdfFont` to the packaged demo metrics when enabled; it does **not** turn on `r_sdfEnable`.
+- **Fallback:** legacy 16×16 bitmap charset when neither path applies.
 
 ### SVG Graphics
 - Vector SVG assets load as textures (icons, logos, UI graphics)

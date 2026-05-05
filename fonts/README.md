@@ -18,6 +18,8 @@ This directory and `base/fonts/` hold TrueType fonts used by the renderer when `
 
 Place `.ttf` files in `base/fonts/` so the game can find them. The compile script copies `base/fonts/*.ttf` to the release directory.
 
+Engine **console** and **small HUD** text use the same FreeType registration when **`cl_builtInTtf`** is **1** (default) and **`r_font`** resolves: that path is preferred over pre-baked SDF when both are enabled.
+
 ## SDF fonts (HUD)
 
-For resolution-independent SDF text (`r_sdfEnable 1`), use `r_sdfFont` with a BMFont `.fnt` metrics file and matching atlas texture. Generate these from Inter (or any TTF) using tools like msdfgen, Hiero, or fontbm.
+Optional resolution-independent SDF text (`r_sdfEnable 1`): use `r_sdfFont` with a BMFont `.fnt` metrics file and matching atlas texture. Generate these from Inter (or any TTF) using tools like msdfgen, Hiero, or fontbm. To draw SDF instead of FreeType for those engine paths, set **`cl_builtInTtf`** to **0**.

@@ -511,17 +511,7 @@ void SCR_DrawSmallString( int x, int y, const char *s, int len ) {
 		return;
 	}
 
-	if ( SDF_IsEnabled() && len > 0 && len < 1024 ) {
-		char buf[1024];
-		int n = len;
-		if ( n >= (int)sizeof( buf ) ) n = (int)sizeof( buf ) - 1;
-		Com_Memcpy( buf, s, (size_t)n );
-		buf[n] = '\0';
-		if ( SDF_DrawStringExt( x, y, (float)smallchar_height, buf, white, qtrue, qtrue, SDF_COORDS_SCREEN ) ) {
-			return;
-		}
-	}
-
+	/* Prefer FreeType (r_font) over pre-baked SDF when both are available. */
 	if ( cls.builtInTtfActive && len > 0 && len < 1024 ) {
 		char buf[1024];
 		int n = len;
@@ -529,6 +519,17 @@ void SCR_DrawSmallString( int x, int y, const char *s, int len ) {
 		Com_Memcpy( buf, s, (size_t)n );
 		buf[n] = '\0';
 		if ( SCR_DrawBuiltInTtfStringExtPixels( x, y, buf, &cls.builtInConsoleFont, cls.builtInConsoleRefLinePx, white, qtrue, qtrue ) ) {
+			return;
+		}
+	}
+
+	if ( SDF_IsEnabled() && len > 0 && len < 1024 ) {
+		char buf[1024];
+		int n = len;
+		if ( n >= (int)sizeof( buf ) ) n = (int)sizeof( buf ) - 1;
+		Com_Memcpy( buf, s, (size_t)n );
+		buf[n] = '\0';
+		if ( SDF_DrawStringExt( x, y, (float)smallchar_height, buf, white, qtrue, qtrue, SDF_COORDS_SCREEN ) ) {
 			return;
 		}
 	}
@@ -576,11 +577,11 @@ void SCR_DrawStringExt( int x, int y, float size, const char *string, const floa
 	int			xx;
 	const float	clampedSize = Com_Clamp( 1.0f, 256.0f, size );
 
-	if ( SDF_DrawStringExt( x, y, clampedSize, string, setColor, forceColor, noColorEscape, SDF_COORDS_VIRTUAL_640 ) ) {
+	if ( cls.builtInTtfActive && SCR_DrawBuiltInTtfStringExtVirtual( x, y, clampedSize, string, &cls.builtInHudFont, setColor, forceColor, noColorEscape ) ) {
 		return;
 	}
 
-	if ( cls.builtInTtfActive && SCR_DrawBuiltInTtfStringExtVirtual( x, y, clampedSize, string, &cls.builtInHudFont, setColor, forceColor, noColorEscape ) ) {
+	if ( SDF_DrawStringExt( x, y, clampedSize, string, setColor, forceColor, noColorEscape, SDF_COORDS_VIRTUAL_640 ) ) {
 		return;
 	}
 
@@ -679,11 +680,11 @@ void SCR_DrawSmallStringExt( int x, int y, const char *string, const float *setC
 	int			ch;
 	const float	sdfSize = (float)smallchar_height;
 
-	if ( SDF_IsEnabled() && SDF_DrawStringExt( x, y, sdfSize, string, setColor, forceColor, noColorEscape, SDF_COORDS_SCREEN ) ) {
+	if ( cls.builtInTtfActive && SCR_DrawBuiltInTtfStringExtPixels( x, y, string, &cls.builtInConsoleFont, cls.builtInConsoleRefLinePx, setColor, forceColor, noColorEscape ) ) {
 		return;
 	}
 
-	if ( cls.builtInTtfActive && SCR_DrawBuiltInTtfStringExtPixels( x, y, string, &cls.builtInConsoleFont, cls.builtInConsoleRefLinePx, setColor, forceColor, noColorEscape ) ) {
+	if ( SDF_IsEnabled() && SDF_DrawStringExt( x, y, sdfSize, string, setColor, forceColor, noColorEscape, SDF_COORDS_SCREEN ) ) {
 		return;
 	}
 
@@ -890,8 +891,9 @@ void SCR_Init( void ) {
 	{
 		cvar_t *cl_builtInTtf = Cvar_Get( "cl_builtInTtf", "1", CVAR_ARCHIVE_ND );
 		Cvar_SetDescription( cl_builtInTtf,
-			"When 1 (default), load r_font (FreeType) for engine HUD and console text instead of only the bitmap charset. "
-			"Requires BUILD_FREETYPE and valid font files (e.g. base/fonts/Inter-Regular.ttf). Set 0 to force legacy bigchars." );
+			"When 1 (default), load r_font (FreeType) for engine HUD and console text instead of only the bitmap charset; "
+			"drawn before pre-baked SDF when both are available. Set 0 to prefer SDF (r_sdfEnable) or legacy bigchars if r_font fails. "
+			"Requires BUILD_FREETYPE and valid font files (e.g. base/fonts/Inter-Regular.ttf)." );
 	}
 
 	{
