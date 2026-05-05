@@ -969,7 +969,7 @@ void SCR_Init( void ) {
 	r_fontSubpixel = Cvar_Get( "r_fontSubpixel", "0", CVAR_ARCHIVE );
 	Cvar_CheckRange( r_fontSubpixel, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( r_fontSubpixel,
-		"When 1, nudge TrueType draw positions by 0.375px after projection; can sharpen linear-filtered edges on some displays." );
+		"When 1, nudge TrueType draw positions by 0.375px after projection; can sharpen linear-filtered edges on some displays. Subpixel-style tweaks are individually variable (Bias et al. 2009, DOI 10.1002/asi.21273; see docs/research/bias2009-subpixel-preference.md)." );
 
 	{
 		cvar_t *ui_open_tab = Cvar_Get( "ui_open_tab", "", CVAR_ARCHIVE_ND );
