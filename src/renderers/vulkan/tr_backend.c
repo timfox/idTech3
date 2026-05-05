@@ -1273,6 +1273,7 @@ static const void *RB_StretchPic( const void *data ) {
 #endif
 
 	RB_AddQuadStamp2( cmd->x, cmd->y, cmd->w, cmd->h, cmd->s1, cmd->t1, cmd->s2, cmd->t2, backEnd.color2D );
+	tess.sdfUiEdge = cmd->sdfSmoothing;
 
 	return (const void *)(cmd + 1);
 }

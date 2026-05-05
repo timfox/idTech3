@@ -360,6 +360,8 @@ void vk_update_mvp( const float *m )
 {
 	vkMvpPushConstants_t push_constants;
 	VkPipelineLayout layout;
+	VkShaderStageFlags stage_flags;
+	uint32_t push_bytes;
 
 	Com_Memset( &push_constants, 0, sizeof( push_constants ) );
 
@@ -369,12 +371,24 @@ void vk_update_mvp( const float *m )
 		vk_get_mvp_transform( push_constants.mvp );
 	}
 	vk_get_prev_mvp_transform( push_constants.prev_mvp );
+	push_constants.reserved[0] = ( tess.sdfUiEdge >= 0.0f ) ? tess.sdfUiEdge : 0.0f;
 
 	layout = ( backEnd.oitAccumPass && vk.pipeline_layout_oit_accum != VK_NULL_HANDLE ) ?
 		vk.pipeline_layout_oit_accum : vk.pipeline_layout;
-	qvkCmdPushConstants( vk.cmd->command_buffer, layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof( push_constants ), &push_constants );
+	/*
+	 * Pipeline layouts declare this push range for VERTEX|FRAGMENT (vk_init_device.c).
+	 * Stages omitted from vkCmdPushConstants do not receive the update (Vulkan spec);
+	 * frag_ui_sdf_text.frag reads sdfEdgeSmooth from bytes after the two mat4s.
+	 */
+	stage_flags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+	push_bytes = (uint32_t)sizeof( push_constants );
+	if ( layout == vk.pipeline_layout_oit_accum && vk.pipeline_layout_oit_accum != VK_NULL_HANDLE ) {
+		/* OIT accum layout only reserves two mat4 (128 B); no reserved[] tail. */
+		push_bytes = (uint32_t)( sizeof( float ) * 32 );
+	}
+	qvkCmdPushConstants( vk.cmd->command_buffer, layout, stage_flags, 0, push_bytes, &push_constants );
 
-	vk.stats.push_size += sizeof( push_constants );
+	vk.stats.push_size += push_bytes;
 }
 
 void vk_update_depth_range( Vk_Depth_Range depth_range )

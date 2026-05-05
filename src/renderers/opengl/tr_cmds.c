@@ -208,11 +208,11 @@ void RE_SetColor( const float *rgba ) {
 
 /*
 =============
-RE_StretchPic
+RE_StretchPicEx
 =============
 */
-void RE_StretchPic( float x, float y, float w, float h,
-					float s1, float t1, float s2, float t2, qhandle_t hShader ) {
+void RE_StretchPicEx( float x, float y, float w, float h,
+					float s1, float t1, float s2, float t2, qhandle_t hShader, float sdfEdgeSoftening ) {
 	stretchPicCommand_t	*cmd;
 
 	if ( !tr.registered ) {
@@ -232,6 +232,17 @@ void RE_StretchPic( float x, float y, float w, float h,
 	cmd->t1 = t1;
 	cmd->s2 = s2;
 	cmd->t2 = t2;
+	cmd->sdfSmoothing = sdfEdgeSoftening;
+}
+
+/*
+=============
+RE_StretchPic
+=============
+*/
+void RE_StretchPic( float x, float y, float w, float h,
+					float s1, float t1, float s2, float t2, qhandle_t hShader ) {
+	RE_StretchPicEx( x, y, w, h, s1, t1, s2, t2, hShader, -1.0f );
 }
 
 #define MODE_RED_CYAN	1

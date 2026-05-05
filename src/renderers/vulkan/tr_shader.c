@@ -1710,6 +1710,11 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			stage->depthFragment = qtrue;
 			continue;
 		}
+		else if ( !Q_stricmp( token, "uiSdfText" ) && s_extendedShader )
+		{
+			stage->uiSdfText = 1u;
+			continue;
+		}
 		else if ( !Q_stricmp( token, "dlight" ) && s_extendedShader )
 		{
 			stage->bundle[0].dlight = 1;
@@ -4476,6 +4481,11 @@ static shader_t *FinishShader( void ) {
 				def.parallaxBias = pStage->parallaxBias;
 				def.pom_height_source = ( pStage->normalMapType == PHYS_NORMALHEIGHT ) ? 1 : 0;
 			#endif
+			}
+
+			if ( pStage->uiSdfText && def.shader_type == TYPE_SIGNLE_TEXTURE && pStage->numTexBundles == 1U
+				&& !pStage->depthFragment && !def.hasFlowmap ) {
+				def.shader_type = TYPE_SIGNLE_TEXTURE_UI_SDF;
 			}
 
 			def.mirror = qfalse;

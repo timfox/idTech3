@@ -44,6 +44,9 @@ void vk_create_shader_modules( void )
 	vk.modules.frag.gen0_df = SHADER_MODULE( frag_tx0_df );
 	SET_OBJECT_NAME( vk.modules.frag.gen0_df, "single-texture df fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 
+	vk.modules.frag.ui_sdf_text = SHADER_MODULE( frag_ui_sdf_text_frag_spv );
+	SET_OBJECT_NAME( vk.modules.frag.ui_sdf_text, "ui sdf text fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+
 	vk.modules.frag.ent[0][0][0] = SHADER_MODULE( frag_tx0_ent );
 	vk.modules.frag.ent[0][0][1] = SHADER_MODULE( frag_tx0_ent_fog );
 	vk.modules.frag.ent[1][0][0] = SHADER_MODULE( frag_pbr_tx0_ent );

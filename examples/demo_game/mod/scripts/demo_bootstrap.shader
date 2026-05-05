@@ -63,6 +63,7 @@ fonts/demo_console_sdf
 	nopicmip
 	{
 		map fonts/demo_console_sdf.png
+		uiSdfText
 		blendFunc blend
 		rgbGen vertex
 		alphaGen vertex

@@ -125,6 +125,10 @@ typedef struct {
 	// FLUX texture reload functionality
 	qboolean (*ReloadTexture)( const char *name );
 
+	/* Appended: sdfEdgeSoftening < 0 = legacy. >= 0 = Vulkan UI SDF when shader stage has uiSdfText. */
+	void	(*DrawStretchPicEx) ( float x, float y, float w, float h,
+		float s1, float t1, float s2, float t2, qhandle_t hShader, float sdfEdgeSoftening );
+
 } refexport_t;
 
 //

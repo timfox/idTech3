@@ -1087,6 +1087,11 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			stage->depthFragment = qtrue;
 			continue;
 		}
+		else if ( !Q_stricmp( token, "uiSdfText" ) && s_extendedShader )
+		{
+			stage->uiSdfText = 1u;
+			continue;
+		}
 		else if ( !Q_stricmp( token, "dlight" ) && s_extendedShader )
 		{
 			stage->bundle[0].dlight = 1;

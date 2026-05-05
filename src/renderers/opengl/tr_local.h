@@ -354,6 +354,7 @@ typedef struct {
 
 	qboolean		isDetail;
 	qboolean		depthFragment;
+	unsigned int	uiSdfText : 1;
 
 	short			vboVPindex[3];		// normal, eye-in, eye-out
 	short			vboFPindex[2];		// normal, fog-blend
@@ -1548,6 +1549,8 @@ typedef struct shaderCommands_s
 	int			numPasses;
 	shaderStage_t **xstages;
 
+	float		sdfUiEdge;
+
 } shaderCommands_t;
 
 extern	shaderCommands_t	tess;
@@ -1840,6 +1843,7 @@ typedef struct {
 	float	w, h;
 	float	s1, t1;
 	float	s2, t2;
+	float	sdfSmoothing;
 } stretchPicCommand_t;
 
 typedef struct {
@@ -1922,6 +1926,8 @@ void R_AddDrawSurfCmd( drawSurf_t *drawSurfs, int numDrawSurfs );
 void RE_SetColor( const float *rgba );
 void RE_StretchPic ( float x, float y, float w, float h, 
 					  float s1, float t1, float s2, float t2, qhandle_t hShader );
+void RE_StretchPicEx( float x, float y, float w, float h,
+					  float s1, float t1, float s2, float t2, qhandle_t hShader, float sdfEdgeSoftening );
 void RE_BeginFrame( stereoFrame_t stereoFrame );
 void RE_EndFrame( int *frontEndMsec, int *backEndMsec );
 void RE_TakeVideoFrame( int width, int height,

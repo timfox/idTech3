@@ -328,6 +328,7 @@ void RB_BeginSurface( shader_t *shader, int fogNum ) {
 
 	tess.numIndexes = 0;
 	tess.numVertexes = 0;
+	tess.sdfUiEdge = -1.0f;
 	tess.shader = state;
 	tess.fogNum = fogNum;
 

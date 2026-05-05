@@ -11,10 +11,9 @@ SDF fonts are generated offline from TTF/OTF files using tools like:
   - Hiero (libGDX font tool)
   - fontbm (BMFont with SDF support)
 
-The atlas texture stores the signed distance to the glyph edge in
-the alpha channel (0.5 = glyph edge). The default 2D path uses linear
-filtering on that field; dedicated `sdf_text.frag` exists for a future
-GPU smoothstep path.
+The atlas stores normalized distance (0.5 = edge) in alpha (and RGB).
+On Vulkan, shaders with `uiSdfText` use per-pixel smoothstep; `r_sdfSmoothing`
+maps to the GPU edge width via `DrawStretchPicEx`.
 
 `SDF_DrawStringExt` takes a coordinate space: **virtual 640×480** for
 big HUD strings (`SCR_DrawStringExt`) and **native screen pixels** for

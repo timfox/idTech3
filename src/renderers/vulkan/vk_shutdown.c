@@ -317,6 +317,7 @@ for (i = 0; i < 2; i++) {
 #endif
 
 	qvkDestroyShaderModule( vk.device, vk.modules.frag.gen0_df, NULL );
+	qvkDestroyShaderModule( vk.device, vk.modules.frag.ui_sdf_text, NULL );
 
 	for ( i = 0; i < 2; i++ ) {
 		if ( vk.modules.frag.flowmap[i] != VK_NULL_HANDLE ) {
