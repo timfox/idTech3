@@ -115,6 +115,15 @@ typedef struct {
 	struct {
 		qboolean    open;
 	} inspector;
+
+	/* id Studio-inspired in-engine tools (gated by r_studio_tools) */
+	struct {
+		qboolean    open;
+	} studioMap;
+
+	struct {
+		qboolean    open;
+	} studioConsole;
 } vkImguiWindows_t;
 
 typedef struct {
@@ -167,6 +176,8 @@ void VkImgui_DrawShaderEditor(void);
 void VkImgui_DrawPostFXPanel(void);
 void VkImgui_DrawPhysicsPanel(void);
 void VkImgui_DrawVolumetricsPanel(void);
+void VkImgui_DrawStudioMapPanel(void);
+void VkImgui_DrawStudioConsolePanel(void);
 
 void VkImgui_BindGameColorImage(void);
 

@@ -397,6 +397,7 @@ cvar_t	*r_simpleMipMaps;
 cvar_t	*r_showImages;
 #ifdef USE_IMGUI
 cvar_t	*r_imgui;
+cvar_t	*r_studio_tools;
 #endif
 cvar_t	*r_defaultImage;
 
@@ -2677,6 +2678,12 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_imgui, "0", "1", CV_INTEGER );
 	ri.Printf( PRINT_ALL, "[VK][imgui] debug inspector r_imgui=%d (F11 toggles when enabled)\n",
 		r_imgui->integer );
+	r_studio_tools = ri.Cvar_Get( "r_studio_tools", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_studio_tools, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_studio_tools,
+		"When 1 (with r_imgui 1): id Studio-style in-engine panels: session/map strip and Studio console (command history + exec)." );
+	ri.Printf( PRINT_ALL, "[VK][studio] r_studio_tools=%d (0=inspector only, 1=add Studio map + console panels)\n",
+		r_studio_tools->integer );
 #endif
 
 	r_lodscale = ri.Cvar_Get( "r_lodscale", "5", CVAR_CHEAT );
