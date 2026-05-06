@@ -331,6 +331,29 @@ else
 fi
 
 echo ""
+echo "glTF topo: GLTF_GPU_TOPO_WORDS_PER_VERT macro (tr_gltf_topo.h vs gen_vert.tmpl formula):"
+TOPO_H="$PROJECT_ROOT/src/renderers/vulkan/tr_gltf_topo.h"
+if ! grep 'GLTF_GPU_TOPO_WORDS_PER_VERT' "$TOPO_H" | grep -q '1.*+.*GLTF_GPU_ADJ_TRIS_MAX'; then
+  fail "tr_gltf_topo.h: GLTF_GPU_TOPO_WORDS_PER_VERT must expand to (1 + GLTF_GPU_ADJ_TRIS_MAX)"
+elif ! grep -q 'const uint GLTF_GPU_TOPO_WORDS_PER_VERT = 1u + GLTF_GPU_ADJ_TRIS_MAX' "$GEN_VERT"; then
+  fail "gen_vert.tmpl: GLTF_GPU_TOPO_WORDS_PER_VERT must be 1u + GLTF_GPU_ADJ_TRIS_MAX (match tr_gltf_topo.h)"
+else
+  pass "GLTF_GPU_TOPO_WORDS_PER_VERT = 1 + ADJ (C header + GLSL)"
+fi
+
+echo ""
+echo "glTF topo: GLTF_GPU_PULL_UINTS_PER_VERT (tr_gltf_topo.h vs gen_vert.tmpl):"
+pull_c="$(sed -n 's/^#define GLTF_GPU_PULL_UINTS_PER_VERT[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$TOPO_H" | head -1)"
+pull_glsl="$(grep -E 'const uint GLTF_GPU_PULL_UINTS_PER_VERT' "$GEN_VERT" | head -1 | sed -n 's/.*GLTF_GPU_PULL_UINTS_PER_VERT = \([0-9][0-9]*\)u.*/\1/p')"
+if [[ -z "$pull_c" || -z "$pull_glsl" ]]; then
+  fail "could not parse GLTF_GPU_PULL_UINTS_PER_VERT from tr_gltf_topo.h or gen_vert.tmpl"
+elif [[ "$pull_c" != "$pull_glsl" ]]; then
+  fail "GLTF_GPU_PULL_UINTS_PER_VERT mismatch: C=$pull_c GLSL=$pull_glsl"
+else
+  pass "GLTF_GPU_PULL_UINTS_PER_VERT=$pull_c (C + GLSL)"
+fi
+
+echo ""
 if [ -n "${GAME_BASE:-}" ]; then
   echo "Optional game base: $GAME_BASE"
   ASSETS_LIST="${GAME_ASSETS_LIST:-$PROJECT_ROOT/docs/samples/renderer_regression/OPTIONAL_GAME_ASSETS.txt}"

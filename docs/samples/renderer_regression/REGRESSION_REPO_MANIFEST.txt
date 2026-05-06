@@ -12,6 +12,7 @@ docs/RENDERER_2026_ARCHITECTURE_PASS.md
 docs/FORWARD_PLUS_PIPELINE_AUDIT.md
 docs/GLTF.md
 src/renderers/vulkan/tr_model_gltf.h
+src/renderers/vulkan/tr_model_gltf.c
 src/renderers/vulkan/tr_gltf_topo.h
 src/renderers/opengl/tr_local.h
 src/renderers/vulkan/iqm.h
