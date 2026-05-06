@@ -45,6 +45,10 @@ layout(set = 0, binding = 3) readonly buffer IQMMorphBuffer {
 	float iqmMorphData[];
 };
 
+layout(set = 0, binding = 4) readonly buffer GltfTopoAux {
+	uint gltfTopoAux[];
+};
+
 layout(location = 0) in vec4 in_position;
 
 #ifndef USE_ENV
@@ -133,6 +137,14 @@ const int IQM_MORPH_TOP_K = 8;
 const uint GLTF_GPU_META_TAG = 0xAC000000u;
 const uint GLTF_GPU_MORPH_VTX_MASK = 0x00000FFFu;
 const uint GLTF_GPU_NO_MORPH_VTX = 0x00000FFFu;
+#ifndef GLTF_GPU_TANGENT_MODE
+#define GLTF_GPU_TANGENT_MODE 0
+#endif
+#ifdef GLTF_GPU_TANGENT_TOPO
+const uint GLTF_GPU_ADJ_TRIS_MAX = 8u;
+const uint GLTF_GPU_TOPO_WORDS_PER_VERT = 1u + GLTF_GPU_ADJ_TRIS_MAX;
+const uint GLTF_GPU_PULL_UINTS_PER_VERT = 16u;
+#endif
 #endif
 
 bool IQMDecodeMeta( float packedFloat, out int skinIndex, out int morphIndex ) {
@@ -232,6 +244,83 @@ vec3 GltfSkinVector( int skinCount, uvec4 joints, vec4 wIn, vec3 v ) {
 #endif
 #endif
 
+#ifdef GLTF_GPU_TANGENT_TOPO
+vec3 GltfTopoReadPullPos( uint b ) {
+	return vec3(
+		uintBitsToFloat( gltfTopoAux[b + 0u] ), uintBitsToFloat( gltfTopoAux[b + 1u] ), uintBitsToFloat( gltfTopoAux[b + 2u] ) );
+}
+vec3 GltfTopoReadPullNrm( uint b ) {
+	return vec3(
+		uintBitsToFloat( gltfTopoAux[b + 3u] ), uintBitsToFloat( gltfTopoAux[b + 4u] ), uintBitsToFloat( gltfTopoAux[b + 5u] ) );
+}
+vec2 GltfTopoReadPullUv( uint b ) {
+	return vec2( uintBitsToFloat( gltfTopoAux[b + 6u] ), uintBitsToFloat( gltfTopoAux[b + 7u] ) );
+}
+void GltfTopoDeformVertex( uint vid, int skinCount, out vec3 outPos, out vec3 outNrm, out vec2 outUv ) {
+	uint pullBase = gltfTopoAux[3];
+	uint base = pullBase + vid * GLTF_GPU_PULL_UINTS_PER_VERT;
+	vec3 position = GltfTopoReadPullPos( base );
+	vec3 normal = GltfTopoReadPullNrm( base );
+	outUv = GltfTopoReadPullUv( base );
+	ivec4 ji = ivec4( int( gltfTopoAux[base + 8u] ), int( gltfTopoAux[base + 9u] ), int( gltfTopoAux[base + 10u] ), int( gltfTopoAux[base + 11u] ) );
+	vec4 w = vec4(
+		uintBitsToFloat( gltfTopoAux[base + 12u] ), uintBitsToFloat( gltfTopoAux[base + 13u] ),
+		uintBitsToFloat( gltfTopoAux[base + 14u] ), uintBitsToFloat( gltfTopoAux[base + 15u] ) );
+	if ( skinCount > 0 ) {
+		float wsum = w.x + w.y + w.z + w.w;
+		if ( wsum > 1e-6 ) {
+			w /= wsum;
+		}
+		vec3 sp = vec3( 0.0 );
+		vec3 sn = vec3( 0.0 );
+		for ( int k = 0; k < 4; k++ ) {
+			if ( w[k] <= 0.0 ) {
+				continue;
+			}
+			int j = ji[k];
+			if ( j < 0 || j >= skinCount ) {
+				continue;
+			}
+			sp += w[k] * IQMSkinPosition( j, position );
+			sn += w[k] * GltfJointTransformNormal( j, normal );
+		}
+		position = sp;
+		normal = normalize( sn );
+	}
+	int morphVtx = int( vid & GLTF_GPU_MORPH_VTX_MASK );
+	int mvCount = int( iqmMorphData[0] );
+	int activeMorph = min( int( iqmMorphData[1] ), IQM_MORPH_TOP_K );
+	if ( morphVtx < mvCount && morphVtx != int( GLTF_GPU_NO_MORPH_VTX ) && activeMorph > 0 ) {
+		for ( int mk = 0; mk < IQM_MORPH_TOP_K; mk++ ) {
+			if ( mk >= activeMorph ) {
+				break;
+			}
+			float wt = iqmMorphData[2 + mk];
+			if ( wt <= 0.0 ) {
+				continue;
+			}
+			position += IQMMorphDeltaPos( morphVtx, mk ) * wt;
+			normal += IQMMorphDeltaNormal( morphVtx, mk ) * wt;
+		}
+		normal = normalize( normal );
+	}
+	outPos = position;
+	outNrm = normal;
+}
+vec3 GltfTopoTriTangent( vec3 p0, vec3 p1, vec3 p2, vec2 uv0, vec2 uv1, vec2 uv2 ) {
+	vec3 e1 = p1 - p0;
+	vec3 e2 = p2 - p0;
+	vec2 du1 = uv1 - uv0;
+	vec2 du2 = uv2 - uv0;
+	float denom = du1.x * du2.y - du1.y * du2.x;
+	if ( abs( denom ) < 1e-8 ) {
+		return vec3( 0.0 );
+	}
+	float r = 1.0 / denom;
+	return ( e1 * du2.y - e2 * du1.y ) * r;
+}
+#endif
+
 void main() {
 	vec3 position = in_position.xyz;
 	vec3 bindPosition = in_position.xyz;
@@ -299,7 +388,50 @@ void main() {
 			}
 			normal = normalize( normal );
 		}
-#if defined(GLTF_GPU_TANGENT_FIX) && defined(USE_VK_PBR)
+#if defined(GLTF_GPU_TANGENT_TOPO) && defined(USE_VK_PBR)
+		{
+			uint Ni = gltfTopoAux[0];
+			uint Nv = gltfTopoAux[1];
+			uint topoBase = gltfTopoAux[2];
+			uint vid = uint( gl_VertexIndex );
+			if ( Ni > 0u && Nv > 0u && vid < Nv ) {
+				uint row = topoBase + vid * GLTF_GPU_TOPO_WORDS_PER_VERT;
+				uint nTri = gltfTopoAux[row];
+				vec3 acc = vec3( 0.0 );
+				float wacc = 0.0;
+				for ( uint ti = 0u; ti < nTri && ti < GLTF_GPU_ADJ_TRIS_MAX; ti++ ) {
+					uint triFirst = gltfTopoAux[row + 1u + ti];
+					if ( triFirst + 2u >= Ni ) {
+						continue;
+					}
+					uint ia = gltfTopoAux[4u + triFirst + 0u];
+					uint ib = gltfTopoAux[4u + triFirst + 1u];
+					uint ic = gltfTopoAux[4u + triFirst + 2u];
+					vec3 pa, na, pb, nb, pc, nc;
+					vec2 uva, uvb, uvc;
+					GltfTopoDeformVertex( ia, skinCount, pa, na, uva );
+					GltfTopoDeformVertex( ib, skinCount, pb, nb, uvb );
+					GltfTopoDeformVertex( ic, skinCount, pc, nc, uvc );
+					vec3 tTri = GltfTopoTriTangent( pa, pb, pc, uva, uvb, uvc );
+					float wl = length( cross( pb - pa, pc - pa ) );
+					if ( wl > 1e-12 ) {
+						acc += normalize( tTri ) * wl;
+						wacc += wl;
+					}
+				}
+				if ( wacc > 1e-8 ) {
+					tangent = acc / wacc;
+					tangent = normalize( tangent - normal * dot( normal, tangent ) );
+				} else if ( skinCount > 0 ) {
+					vec3 st = GltfSkinVector( skinCount, in_gltf_joints, in_gltf_weights, tangent );
+					tangent = normalize( st - normal * dot( normal, st ) );
+				}
+			} else if ( skinCount > 0 ) {
+				vec3 st = GltfSkinVector( skinCount, in_gltf_joints, in_gltf_weights, tangent );
+				tangent = normalize( st - normal * dot( normal, st ) );
+			}
+		}
+#elif defined(GLTF_GPU_TANGENT_FIX) && defined(USE_VK_PBR)
 		/* GPU path used bind-pose qtangent; after skin + morph, Gram–Schmidt T against final N. */
 		if ( skinCount > 0 ) {
 			vec3 st = GltfSkinVector( skinCount, in_gltf_joints, in_gltf_weights, tangent );

@@ -908,6 +908,8 @@ typedef struct srfGLTFPrimitive_s {
 	int		materialIndex;
 	qboolean	hasSkinning;
 	qboolean	hasMorphTargets;
+	uint32_t	*gltfTopoData;
+	int		gltfTopoNumUints;
 } srfGLTFPrimitive_t;
 
 typedef struct model_s {

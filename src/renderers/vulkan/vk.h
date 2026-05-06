@@ -114,7 +114,8 @@ typedef enum {
 #define VK_DESC_UNIFORM_CAMERA_BINDING		1
 #define VK_DESC_UNIFORM_IQM_SKIN_BINDING	2
 #define VK_DESC_UNIFORM_IQM_MORPH_BINDING	3
-#define VK_DESC_UNIFORM_COUNT				4
+#define VK_DESC_UNIFORM_GLTF_TOPO_BINDING	4
+#define VK_DESC_UNIFORM_COUNT				5
 
 typedef enum {
 	TYPE_COLOR_BLACK,
@@ -262,6 +263,7 @@ typedef struct {
 	uint32_t				vk_pbr_flags;
 	int32_t					lightmap_bundle;
 	uint8_t					pbr_vert_mode; /* 0=default gen_vert, 1=glTF GPU skin+morph variant */
+	uint8_t					gltf_gpu_tangent_mode; /* 0=bind T, 1=Gram–Schmidt, 2=topology-weighted (r_gltfGpuTangentFix 0–2, latched) */
 	uint8_t					pom_height_source; /* 0=ORM R (physical map), 1=normal map alpha (normalHeightMap) */
 	vec4_t					specularScale;
 	vec4_t					normalScale;
@@ -555,6 +557,7 @@ typedef struct vk_tess_s {
 	uint32_t		uniform_read_offset;
 	uint32_t		iqm_skin_offset;
 	uint32_t		iqm_morph_offset;
+	uint32_t		gltf_topo_offset;
 #ifdef USE_VK_PBR
 	uint32_t			camera_ubo_offset;
 	VkDeviceSize		buf_offset[10];
@@ -946,8 +949,8 @@ typedef struct {
 		struct {
 #ifdef USE_VK_PBR
 			VkShaderModule gen[2][3][2][2][2]; // pbr[0,1], tx[0,1,2], cl[0,1] env0[0,1] fog[0,1]
-			/* +USE_GLTF_GPU_SKIN + GLTF_GPU_TANGENT_FIX (Gram–Schmidt T after skin+morph) */
-			VkShaderModule gen_gltf_gpu[2][3][2][2][2];
+			/* +USE_GLTF_GPU_SKIN; last dim: 0=bind T, 1=Gram–Schmidt, 2=topology+MikkT-inspired average */
+			VkShaderModule gen_gltf_gpu[2][3][2][2][2][3];
 			VkShaderModule ident1[2][2][2][2]; // pbr[0,1], tx[0,1], env0[0,1] fog[0,1]
 			VkShaderModule fixed[2][2][2][2];  // pbr[0,1], tx[0,1], env0[0,1] fog[0,1]
 #else

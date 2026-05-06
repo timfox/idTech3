@@ -1719,6 +1719,7 @@ set(RENDERER_COMMON_SRCS
 	src/renderers/common/tr_image_svg.c
 	src/renderers/common/tr_model_mesh_import.c
 	src/renderers/vulkan/tr_model_gltf.c
+	src/renderers/vulkan/tr_gltf_topo.c
 	src/renderers/vulkan/tr_model_obj.c
 	src/renderers/vulkan/tr_model_md5.c
 	src/renderers/common/tr_image_ktx2.c

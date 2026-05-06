@@ -4498,6 +4498,16 @@ static shader_t *FinishShader( void ) {
 			if ( pStage->vk_pbr_flags ) {
 				Vk_Pipeline_Def gltfDef = def;
 				gltfDef.pbr_vert_mode = 1;
+				{
+					int tm = r_gltfGpuTangentFix ? r_gltfGpuTangentFix->integer : 1;
+					if ( tm < 0 ) {
+						tm = 0;
+					}
+					if ( tm > 2 ) {
+						tm = 2;
+					}
+					gltfDef.gltf_gpu_tangent_mode = (uint8_t)tm;
+				}
 				gltfDef.mirror = qfalse;
 				pStage->vk_pipeline_gltf_gpu[0] = vk_find_pipeline_ext( 0, &gltfDef, qtrue );
 				gltfDef.mirror = qtrue;
@@ -4540,6 +4550,17 @@ static shader_t *FinishShader( void ) {
 				if ( pStage->vk_pbr_flags ) {
 					fog_def.pbr_vert_mode = 1;
 					fog_def_mirror.pbr_vert_mode = 1;
+					{
+						int tm = r_gltfGpuTangentFix ? r_gltfGpuTangentFix->integer : 1;
+						if ( tm < 0 ) {
+							tm = 0;
+						}
+						if ( tm > 2 ) {
+							tm = 2;
+						}
+						fog_def.gltf_gpu_tangent_mode = (uint8_t)tm;
+						fog_def_mirror.gltf_gpu_tangent_mode = fog_def.gltf_gpu_tangent_mode;
+					}
 					pStage->vk_pipeline_gltf_gpu[1] = vk_find_pipeline_ext( 0, &fog_def, qfalse );
 					pStage->vk_mirror_pipeline_gltf_gpu[1] = vk_find_pipeline_ext( 0, &fog_def_mirror, qfalse );
 				} else {

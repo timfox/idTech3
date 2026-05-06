@@ -1536,7 +1536,7 @@ void R_IQMCommitSurfaceBatch( void )
 	Com_Memcpy( morphPayload + 2 + 2u * (size_t)IQM_MORPH_TOP_K, s_iqmGpuBatch.morphDeltas,
 		(size_t)s_iqmGpuBatch.morphVertexCount * IQM_MORPH_TOP_K * 6u * sizeof( float ) );
 
-	vk_set_iqm_storage_offsets( skinOffset, morphOffset );
+	vk_set_iqm_storage_offsets( skinOffset, morphOffset, 0 );
 }
 
 /*

@@ -67,7 +67,7 @@ void *vk_alloc_storage( size_t size, uint32_t *offset )
 	return vk.cmd->vertex_buffer_ptr + aligned;
 }
 
-void vk_set_iqm_storage_offsets( uint32_t skin_offset, uint32_t morph_offset )
+void vk_set_iqm_storage_offsets( uint32_t skin_offset, uint32_t morph_offset, uint32_t topo_offset )
 {
 	if ( !vk.cmd ) {
 		return;
@@ -75,11 +75,12 @@ void vk_set_iqm_storage_offsets( uint32_t skin_offset, uint32_t morph_offset )
 
 	vk.cmd->iqm_skin_offset = skin_offset;
 	vk.cmd->iqm_morph_offset = morph_offset;
+	vk.cmd->gltf_topo_offset = topo_offset;
 }
 
 void vk_reset_iqm_storage_offsets( void )
 {
-	vk_set_iqm_storage_offsets( 0, 0 );
+	vk_set_iqm_storage_offsets( 0, 0, 0 );
 }
 
 
