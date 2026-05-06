@@ -247,23 +247,42 @@ def compile_template_shaders():
                         binding_cl = join_indexes("vk.modules.vert.gen", [i, j, 1, k, l])
                         compile_shader("vert", "gen_vert.tmpl", name_cl, binding_expr=binding_cl, defines=defines_cl)
 
-    # PBR glTF GPU skinning/morph: same vertex layout as gen[i][j][*][k][l] + USE_GLTF_GPU_SKIN + GLTF_GPU_TANGENT_FIX
+    # PBR glTF GPU skinning/morph: same vertex layout as gen[i][j][*][k][l] + USE_GLTF_GPU_SKIN
+    # Sixth index: 0=bind-pose tangent, 1=Gram–Schmidt (GLTF_GPU_TANGENT_FIX), 2=topology+MikkT-inspired (TOPO)
     for i in range(len(pbr_flags)):
         if pbr_flags[i] != "-DUSE_VK_PBR":
             continue
         for j in range(len(tx_flags)):
             for k in range(len(env_flags)):
                 for l in range(len(fog_flags)):
-                    tan_def = "-DGLTF_GPU_TANGENT_FIX"
-                    defines = with_forward_plus_vert(join_flags(pbr_flags[i], "-DUSE_GLTF_GPU_SKIN", tan_def, tx_flags[j], env_flags[k], fog_flags[l]))
-                    name = f"vert_gltfgpu_{pbr_ids[i]}{tx_ids[j]}{env_ids[k]}{fog_ids[l]}"
-                    binding = join_indexes("vk.modules.vert.gen_gltf_gpu", [i, j, 0, k, l])
-                    compile_shader("vert", "gen_vert.tmpl", name, binding_expr=binding, defines=defines)
-                    if j != 0:
-                        defines_cl = with_forward_plus_vert(join_flags(pbr_flags[i], "-DUSE_GLTF_GPU_SKIN", tan_def, tx_flags[j], cl_flags[j], env_flags[k], fog_flags[l]))
-                        name_cl = f"vert_gltfgpu_{pbr_ids[i]}{tx_ids[j]}_{cl_ids[j]}{env_ids[k]}{fog_ids[l]}"
-                        binding_cl = join_indexes("vk.modules.vert.gen_gltf_gpu", [i, j, 1, k, l])
-                        compile_shader("vert", "gen_vert.tmpl", name_cl, binding_expr=binding_cl, defines=defines_cl)
+                    for tan_mode in (0, 1, 2):
+                        tan_mode_def = f"-DGLTF_GPU_TANGENT_MODE={tan_mode}"
+                        if tan_mode == 0:
+                            tan_extra = ""
+                            tan_suffix = ""
+                        elif tan_mode == 1:
+                            tan_extra = "-DGLTF_GPU_TANGENT_FIX"
+                            tan_suffix = "_tfix"
+                        else:
+                            tan_extra = "-DGLTF_GPU_TANGENT_FIX -DGLTF_GPU_TANGENT_TOPO"
+                            tan_suffix = "_ttopo"
+                        defines = with_forward_plus_vert(
+                            join_flags(
+                                pbr_flags[i], "-DUSE_GLTF_GPU_SKIN", tan_mode_def, tan_extra, tx_flags[j], env_flags[k], fog_flags[l]
+                            )
+                        )
+                        name = f"vert_gltfgpu_{pbr_ids[i]}{tx_ids[j]}{env_ids[k]}{fog_ids[l]}{tan_suffix}"
+                        binding = join_indexes("vk.modules.vert.gen_gltf_gpu", [i, j, 0, k, l, tan_mode])
+                        compile_shader("vert", "gen_vert.tmpl", name, binding_expr=binding, defines=defines)
+                        if j != 0:
+                            defines_cl = with_forward_plus_vert(
+                                join_flags(
+                                    pbr_flags[i], "-DUSE_GLTF_GPU_SKIN", tan_mode_def, tan_extra, tx_flags[j], cl_flags[j], env_flags[k], fog_flags[l]
+                                )
+                            )
+                            name_cl = f"vert_gltfgpu_{pbr_ids[i]}{tx_ids[j]}_{cl_ids[j]}{env_ids[k]}{fog_ids[l]}{tan_suffix}"
+                            binding_cl = join_indexes("vk.modules.vert.gen_gltf_gpu", [i, j, 1, k, l, tan_mode])
+                            compile_shader("vert", "gen_vert.tmpl", name_cl, binding_expr=binding_cl, defines=defines_cl)
 
     for i in range(len(pbr_flags)):
         for j in range(len(tx_flags)):

@@ -12,6 +12,8 @@ docs/RENDERER_2026_ARCHITECTURE_PASS.md
 docs/FORWARD_PLUS_PIPELINE_AUDIT.md
 docs/GLTF.md
 src/renderers/vulkan/tr_model_gltf.h
+src/renderers/vulkan/tr_model_gltf.c
+src/renderers/vulkan/tr_gltf_topo.h
 src/renderers/opengl/tr_local.h
 src/renderers/vulkan/iqm.h
 src/renderers/vulkan/vk_temporal.h
@@ -25,6 +27,7 @@ docs/samples/renderer_regression/scenes/03_emissive.md
 docs/samples/renderer_regression/scenes/04_volumetric_fog.md
 docs/samples/renderer_regression/scenes/05_postfx.md
 docs/samples/renderer_regression/scenes/06_vulkan_opengl_parity.md
+docs/samples/renderer_regression/scenes/07_gltf_gpu_tangent_topo.md
 scripts/smoke_test.sh
 scripts/stage_mingw_runtime_dlls.sh
 scripts/stage_openal_windows_dlls.ps1

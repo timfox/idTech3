@@ -12,6 +12,7 @@ Small, **purpose-built** scenes for catching renderer regressions (tangents, PBR
 | 04 | [scenes/04_volumetric_fog.md](scenes/04_volumetric_fog.md) | Froxel fog density, light shafts / sun |
 | 05 | [scenes/05_postfx.md](scenes/05_postfx.md) | MSAA, SMAA, SSAO, bloom toggles |
 | 06 | [scenes/06_vulkan_opengl_parity.md](scenes/06_vulkan_opengl_parity.md) | Same cvars, both renderers |
+| 07 | [scenes/07_gltf_gpu_tangent_topo.md](scenes/07_gltf_gpu_tangent_topo.md) | glTF GPU tangent mode 2 (topology) vs mode 1 |
 
 ## Suggested packaged names
 

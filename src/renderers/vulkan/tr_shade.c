@@ -1853,6 +1853,7 @@ uint32_t vk_push_uniform( const vkUniform_t *ubo ) {
 	vk_update_descriptor_offset( VK_DESC_UNIFORM_CAMERA_BINDING, vk.cmd->camera_ubo_offset );
 	vk_update_descriptor_offset( VK_DESC_UNIFORM_IQM_SKIN_BINDING, vk.cmd->iqm_skin_offset );
 	vk_update_descriptor_offset( VK_DESC_UNIFORM_IQM_MORPH_BINDING, vk.cmd->iqm_morph_offset );
+	vk_update_descriptor_offset( VK_DESC_UNIFORM_GLTF_TOPO_BINDING, vk.cmd->gltf_topo_offset );
 
 	return offset;
 }

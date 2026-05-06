@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_surf.c
 #include "tr_local.h"
 #include "tr_model_gltf.h"
+#include "tr_gltf_topo.h"
 #include "vk_draw_state.h"
 #include <math.h>
 
@@ -1758,6 +1759,7 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 		uint32_t morphOff = 0;
 		float *morphPayload;
 		uint32_t idxOff;
+		uint32_t topoOff = 0;
 
 		if ( !skinPayload ) {
 			gpuOk = qfalse;
@@ -1834,10 +1836,25 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 			gpuOk = qfalse;
 		}
 
+		if ( gpuOk && r_gltfGpuTangentFix && r_gltfGpuTangentFix->integer >= 2 &&
+			surf->gltfTopoData && surf->gltfTopoNumUints > 0 ) {
+			const int blobInts = R_GLTFTopoDrawBlobUints( surf->numIndices, surf->numVertices );
+			uint32_t *blob = (uint32_t *)vk_alloc_storage( (size_t)blobInts * sizeof( uint32_t ), &topoOff );
+			int topoBaseIgnored;
+
+			if ( !blob ) {
+				gpuOk = qfalse;
+			} else {
+				R_GLTFTopoPackDrawBlob( surf->indices, surf->numIndices, surf->numVertices,
+					surf->gltfTopoData, surf->vertices, blob, &topoBaseIgnored );
+				(void)topoBaseIgnored;
+			}
+		}
+
 		if ( !gpuOk ) {
 			vk_reset_iqm_storage_offsets();
 		} else {
-			vk_set_iqm_storage_offsets( skinOff, morphOff );
+			vk_set_iqm_storage_offsets( skinOff, morphOff, topoOff );
 			tess.gltfGpuMorphActive = ( morphActive > 0 ) ? qtrue : qfalse;
 			tess.gltfGpuMorphCount = morphActive;
 			for ( mk = 0; mk < IQM_MORPH_TOP_K; mk++ ) {
