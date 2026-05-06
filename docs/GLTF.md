@@ -26,7 +26,7 @@ Use Vulkan for **PBR GPU** glTF and maximum parity with advanced materials; Open
 - **Time**: clip time is `refEntity.shaderTime` (seconds) when set, else `refdef.time * 0.001f`, scaled by cvar **`r_gltfAnim`** (default `1`). Time **loops** by each clip’s stored duration.
 - **Cross-clip blend**: `oldframe` selects the second clip; **`backlerp`** blends joint TRS (and morph weights from weight tracks) between **current** and **old** clip at the **same** clock time.
 - **Skeletal sampling**: translation/rotation/scale channels on skin joints update local pose, then **`world * inverseBindMatrix`** joint matrices are computed each draw.
-- **GPU skin + morph (Vulkan PBR)**: when **`r_gltfGpu`** is `1`, **`vk.pbrActive`**, and the surface shader is PBR, `RB_GLTFSurface` uploads joint matrices to the same **SSBO slot** as IQM skin data, packs **top-8** morph targets by **combined** weight (glTF animation + **`RE_SetEntityMorphWeight`** / `morphChannelCount` + mesh defaults) into the shared IQM-style morph SSBO (`IQM_MORPH_TOP_K`), and draws with **`USE_GLTF_GPU_SKIN`** vertex shaders (`gen_vert.tmpl`). Vertex count must be ≤ **`SHADER_MAX_VERTEXES`**. **Tangent / qtangent**: bind-pose tangents from the asset feed the shader; when **`r_gltfGpuTangentFix`** is `1` (default), after joint skin + morph the vertex shader **Gram–Schmidt**-orthonormalizes **T** against the deformed **N** (closer to CPU tess qtangent behavior than raw bind-pose **T**). Set **`r_gltfGpuTangentFix 0`** for the legacy bind-pose-only tangent path.
+- **GPU skin + morph (Vulkan PBR)**: when **`r_gltfGpu`** is `1`, **`vk.pbrActive`**, and the surface shader is PBR, `RB_GLTFSurface` uploads joint matrices to the same **SSBO slot** as IQM skin data, packs **top-8** morph targets by **combined** weight (glTF animation + **`RE_SetEntityMorphWeight`** / `morphChannelCount` + mesh defaults) into the shared IQM-style morph SSBO (`IQM_MORPH_TOP_K`), and draws with **`USE_GLTF_GPU_SKIN`** vertex shaders (`gen_vert.tmpl`). Vertex count must be ≤ **`SHADER_MAX_VERTEXES`**. **Tangent / qtangent**: bind-pose tangents from the asset feed the shader; **`r_gltfGpuTangentFix`** (latched, **`vid_restart`** to rebuild pipelines) selects **`0`** = bind-pose **T** only, **`1`** (default) = **Gram–Schmidt** vs deformed **N** after skin+morph, **`2`** = **topology-weighted** tangent from incident triangles (MikkTSpace-inspired average of per-triangle UV/position tangents on the **deformed** mesh, then Gram–Schmidt vs **N**). Mode **`2`** requires a per-primitive **incident-triangle list** built at registration (`tr_gltf_topo.c`) plus a per-draw packed SSBO (indices + topo + bind-pose pull buffer); see §8.
 - **CPU tess fallback**: used when GPU path is disabled, storage/index upload fails, or for non-PBR shaders. After CPU morph + skinning, **qtangent** is recomputed from deformed positions and **TEXCOORD_0** when PBR is active.
 - **Morph weights**: primitives load **mesh `target_names`** when present; `RE_SetEntityMorphWeight(ent, name, w)` matches those names (same hash path as IQM). **glTF weight animation** channels on the mesh node add to the same weight array. **`mesh.weights`** default blend shape weights from the file are added as a baseline.
 
@@ -76,15 +76,23 @@ Larger assets are **silently clamped** during load.
 - **Skinned / morphed** primitives prefer the **GPU path** under Vulkan PBR when **`r_gltfGpu 1`** and constraints above are met; otherwise **`RB_GLTFSurface`** falls back to **CPU tess**.
 - **More than eight** non-zero morph weights per vertex: GPU path keeps only the **eight largest** weights per draw (same cap as IQM `IQM_MORPH_TOP_K`; tune `r_morphMaxActive` for IQM batching only).
 
-### 8. Roadmap: full GPU qtangent / MikkTSpace (not shipped yet)
+### 8. GPU tangent modes (`r_gltfGpuTangentFix`)
 
-- **Today (Vulkan PBR GPU):** bind-pose tangents + **`r_gltfGpuTangentFix`** Gram–Schmidt **T** vs deformed **N** after skin+morph (`gen_vert.tmpl`). CPU tess still does **MikkTSpace-style qtangent** from deformed positions + **UV0** when PBR needs it.
-- **Next increment:** optional **compute** or **vertex-neighborhood** pass is required for true **MikkTSpace** on arbitrary meshes on the GPU (needs neighbor topology / shared-vertex groups, not just per-vertex attributes). Likely behind a **`r_gltfGpuQtangent`** (or similar) latched cvar with clear **startup** + **developer** logs when enabled or when falling back.
-- **Validation:** add Tier B scenes with known normal-map assets and compare against CPU tess / reference captures once a GPU path exists.
+- **`0`**: bind-pose **T** only. **`1`** (default): Gram–Schmidt **T** vs deformed **N** after skin+morph. **`2`**: **topology-weighted** tangents (see below).
+- **Mode `2` (topology / MikkT-inspired):** **Not** a full MikkTSpace port on the GPU (no welded-corner equivalence classes or `genTangSpace` iteration). It averages **per-triangle** tangents from **deformed** positions and **TEXCOORD_0** over up to **`GLTF_GPU_ADJ_TRIS_MAX` (8)** incident triangles per vertex, weighted by triangle area, then orthonormalizes **T** vs the deformed normal.
+- **Build**: `R_BuildGLTFPrimitiveTopo` in `tr_gltf_topo.c` runs when a Vulkan device VBO is created for the primitive. **Draw**: `RB_GLTFSurface` packs indices + topo + per-vertex bind-pose pull data into the dynamic SSBO at **descriptor set 0, binding 4** (`gen_vert.tmpl`).
+- **Tier B**: compare mode `1` vs `2` on the same skinned glTF with a visible normal map; see `docs/samples/renderer_regression/scenes/07_gltf_gpu_tangent_topo.md`.
+
+### 9. Roadmap: full GPU qtangent / MikkTSpace equivalence (beyond mode `2`)
+
+- **CPU tess** still does **MikkTSpace-style qtangent** from deformed positions + **UV0** when PBR needs it.
+- **Further GPU work** toward true **MikkTSpace** parity may add welded-corner grouping, optional **compute** passes, or richer neighbor data than the current incident-triangle cap—likely behind additional latched cvars with **startup** / **developer** logs when enabled or when falling back.
+- **Validation:** extend Tier B scenes with known normal-map assets and reference captures as GPU paths mature.
 
 ## Engine references
 
 - Loader / registration: `src/renderers/vulkan/tr_model_gltf.c`, `tr_model_gltf.h`
+- GPU tangent topology: `src/renderers/vulkan/tr_gltf_topo.c`, `tr_gltf_topo.h`
 - Draw: `RB_GLTFSurface` in `src/renderers/vulkan/tr_surface.c`
 - GPU buffer helper: `src/renderers/vulkan/vk_gltf.c`
 

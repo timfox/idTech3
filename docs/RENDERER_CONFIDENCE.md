@@ -46,7 +46,7 @@ These do not run in headless CI; use the **[visual regression pack](samples/rend
 
 Use this loop to move renderer work from “builds and scripts pass” to “actual rendered behavior is proven.”
 
-Record outcomes under [docs/renderer_validation/](renderer_validation/) (Tier C template and optional [FINDINGS.md](renderer_validation/FINDINGS.md)). For automated Tier B on `main`, see [docs/renderer_validation/SELF_HOSTED_TIER_B.md](renderer_validation/SELF_HOSTED_TIER_B.md) (repository **variable** or **secret** `IDTECH3_GAME_BASE_PATH`, self-hosted runner label `idtech3-tierb`).
+Record outcomes under [docs/renderer_validation/](renderer_validation/) (Tier C template and optional [FINDINGS.md](renderer_validation/FINDINGS.md)). For automated Tier B on `main`, see [docs/renderer_validation/SELF_HOSTED_TIER_B.md](renderer_validation/SELF_HOSTED_TIER_B.md) (repository **variable** or **secret** `IDTECH3_GAME_BASE_PATH`, self-hosted runner label `idtech3-tierb`). For **Vulkan glTF GPU tangent mode 2** (`r_gltfGpuTangentFix 2`), use the Tier B checklist in [docs/samples/renderer_regression/scenes/07_gltf_gpu_tangent_topo.md](samples/renderer_regression/scenes/07_gltf_gpu_tangent_topo.md).
 
 ### 1. Install the regression pack
 

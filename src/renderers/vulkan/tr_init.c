@@ -161,6 +161,7 @@ cvar_t	*r_morphBreathAmp;
 cvar_t	*r_morphBreathFreq;
 cvar_t	*r_gltfAnim;
 cvar_t	*r_gltfGpu;
+cvar_t	*r_gltfGpuTangentFix;
 cvar_t	*r_fbo;
 cvar_t	*r_renderMode;
 cvar_t	*r_hdr;
@@ -2411,6 +2412,12 @@ static void R_Register( void )
 		"Vulkan PBR: GPU vertex skinning and morph for glTF (joint matrix SSBO + morph deltas; top-8 morph weights per draw, incl. RE_SetEntityMorphWeight). Falls back to CPU tess when off or constraints fail." );
 	ri.Cvar_SetGroup( r_gltfGpu, CVG_RENDERER );
 
+	r_gltfGpuTangentFix = ri.Cvar_Get( "r_gltfGpuTangentFix", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_gltfGpuTangentFix, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_gltfGpuTangentFix,
+		"Vulkan PBR glTF GPU tangent: 0=bind-pose T only, 1=Gram–Schmidt vs deformed N after skin+morph (default), 2=topology-weighted MikkTSpace-inspired average from incident triangles (needs per-primitive topo; see docs/GLTF.md). Latched: vid_restart to rebuild pipelines." );
+	ri.Cvar_SetGroup( r_gltfGpuTangentFix, CVG_RENDERER );
+
 	r_flares = ri.Cvar_Get ("r_flares", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_flares, "Enables corona effects on light sources." );
 	r_znear = ri.Cvar_Get( "r_znear", "8", CVAR_CHEAT );
@@ -3674,6 +3681,8 @@ void R_Init( void ) {
 		r_gltfAnim ? r_gltfAnim->value : 1.0f );
 	ri.Printf( PRINT_ALL, "[VK][gltf] GPU skin/morph path: %s (r_gltfGpu)\n",
 		( r_gltfGpu && r_gltfGpu->integer ) ? "on" : "off" );
+	ri.Printf( PRINT_ALL, "[VK][gltf] GPU tangent mode: %d (r_gltfGpuTangentFix 0=bind 1=Gram–Schmidt 2=topology)\n",
+		r_gltfGpuTangentFix ? r_gltfGpuTangentFix->integer : 1 );
 
 
 	max_polys = r_maxpolys ? r_maxpolys->integer : MAX_POLYS;

@@ -59,6 +59,11 @@ void vk_create_uniform_layout( VkDescriptorSetLayout *layout )
 	bindings[VK_DESC_UNIFORM_IQM_MORPH_BINDING].descriptorCount = 1;
 	bindings[VK_DESC_UNIFORM_IQM_MORPH_BINDING].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
+	bindings[VK_DESC_UNIFORM_GLTF_TOPO_BINDING].binding = VK_DESC_UNIFORM_GLTF_TOPO_BINDING;
+	bindings[VK_DESC_UNIFORM_GLTF_TOPO_BINDING].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+	bindings[VK_DESC_UNIFORM_GLTF_TOPO_BINDING].descriptorCount = 1;
+	bindings[VK_DESC_UNIFORM_GLTF_TOPO_BINDING].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
 	desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	desc.pNext = NULL;
 	desc.flags = 0;
@@ -99,6 +104,8 @@ void vk_update_uniform_descriptor( VkDescriptorSet descriptor, VkBuffer buffer )
 	vk_write_buffer_descriptor( desc, info, buffer, descriptor, VK_DESC_UNIFORM_IQM_SKIN_BINDING,
 		VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC );
 	vk_write_buffer_descriptor( desc, info, buffer, descriptor, VK_DESC_UNIFORM_IQM_MORPH_BINDING,
+		VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC );
+	vk_write_buffer_descriptor( desc, info, buffer, descriptor, VK_DESC_UNIFORM_GLTF_TOPO_BINDING,
 		VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC );
 
 	qvkUpdateDescriptorSets(vk.device, VK_DESC_UNIFORM_COUNT, desc, 0, NULL);

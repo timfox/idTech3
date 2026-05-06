@@ -113,6 +113,20 @@ else
 fi
 
 echo ""
+echo "glTF GPU tangent topo: GLTF_GPU_ADJ_TRIS_MAX (C vs gen_vert.tmpl):"
+TOPO_H="$PROJECT_ROOT/src/renderers/vulkan/tr_gltf_topo.h"
+GEN_VERT="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/gen_vert.tmpl"
+adj_c="$(sed -n 's/^#define GLTF_GPU_ADJ_TRIS_MAX[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$TOPO_H" | head -1)"
+adj_glsl="$(grep -E 'const uint GLTF_GPU_ADJ_TRIS_MAX' "$GEN_VERT" | head -1 | sed -n 's/.*GLTF_GPU_ADJ_TRIS_MAX = \([0-9][0-9]*\)u.*/\1/p')"
+if [[ -z "$adj_c" || -z "$adj_glsl" ]]; then
+  fail "could not parse GLTF_GPU_ADJ_TRIS_MAX from tr_gltf_topo.h or gen_vert.tmpl"
+elif [[ "$adj_c" != "$adj_glsl" ]]; then
+  fail "GLTF_GPU_ADJ_TRIS_MAX mismatch: C=$adj_c GLSL=$adj_glsl"
+else
+  pass "GLTF_GPU_ADJ_TRIS_MAX=$adj_c (C + GLSL)"
+fi
+
+echo ""
 echo "IQM_MAX_JOINTS: OpenGL vs Vulkan iqm.h (duplicate header drift guard):"
 IQM_H_GL="$PROJECT_ROOT/src/renderers/opengl/iqm.h"
 iqm_j_gl="$(sed -n 's/^#define[[:space:]]*IQM_MAX_JOINTS[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$IQM_H_GL" | head -1)"
@@ -314,6 +328,29 @@ if grep -Fq 'mesh_shader_features_nv.meshShader = VK_TRUE;' "$VK_INSTANCE" && \
   pass "mesh-shader feature struct is chained to current device_desc.pNext head"
 else
   fail "mesh-shader feature chain setup is missing required pNext/meshShader assignments"
+fi
+
+echo ""
+echo "glTF topo: GLTF_GPU_TOPO_WORDS_PER_VERT macro (tr_gltf_topo.h vs gen_vert.tmpl formula):"
+TOPO_H="$PROJECT_ROOT/src/renderers/vulkan/tr_gltf_topo.h"
+if ! grep 'GLTF_GPU_TOPO_WORDS_PER_VERT' "$TOPO_H" | grep -q '1.*+.*GLTF_GPU_ADJ_TRIS_MAX'; then
+  fail "tr_gltf_topo.h: GLTF_GPU_TOPO_WORDS_PER_VERT must expand to (1 + GLTF_GPU_ADJ_TRIS_MAX)"
+elif ! grep -q 'const uint GLTF_GPU_TOPO_WORDS_PER_VERT = 1u + GLTF_GPU_ADJ_TRIS_MAX' "$GEN_VERT"; then
+  fail "gen_vert.tmpl: GLTF_GPU_TOPO_WORDS_PER_VERT must be 1u + GLTF_GPU_ADJ_TRIS_MAX (match tr_gltf_topo.h)"
+else
+  pass "GLTF_GPU_TOPO_WORDS_PER_VERT = 1 + ADJ (C header + GLSL)"
+fi
+
+echo ""
+echo "glTF topo: GLTF_GPU_PULL_UINTS_PER_VERT (tr_gltf_topo.h vs gen_vert.tmpl):"
+pull_c="$(sed -n 's/^#define GLTF_GPU_PULL_UINTS_PER_VERT[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$TOPO_H" | head -1)"
+pull_glsl="$(grep -E 'const uint GLTF_GPU_PULL_UINTS_PER_VERT' "$GEN_VERT" | head -1 | sed -n 's/.*GLTF_GPU_PULL_UINTS_PER_VERT = \([0-9][0-9]*\)u.*/\1/p')"
+if [[ -z "$pull_c" || -z "$pull_glsl" ]]; then
+  fail "could not parse GLTF_GPU_PULL_UINTS_PER_VERT from tr_gltf_topo.h or gen_vert.tmpl"
+elif [[ "$pull_c" != "$pull_glsl" ]]; then
+  fail "GLTF_GPU_PULL_UINTS_PER_VERT mismatch: C=$pull_c GLSL=$pull_glsl"
+else
+  pass "GLTF_GPU_PULL_UINTS_PER_VERT=$pull_c (C + GLSL)"
 fi
 
 echo ""
