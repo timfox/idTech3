@@ -1,6 +1,14 @@
 # In-engine tools (id Studio–inspired)
 
-The Vulkan + **Dear ImGui** overlay (`r_imgui`, toggle **F11** / `toggle_imgui`) already provides a docked **inspector**: PostFX, volumetrics, physics, profiler, placeholder Objects/Inspector/Shader/Viewport panels.
+The Vulkan + **Dear ImGui** overlay (`r_imgui`, toggle **F11** / `toggle_imgui`) provides a docked **inspector**: PostFX, volumetrics, physics, profiler, plus **scene-aware** panels backed by the last assembled `tr.refdef` batch:
+
+- **Viewport** — refdef rect, FOV, view origin/axis, entity/dlight/surf counts  
+- **Objects** — world BSP row, filtered ref-entity list (model path, reType), dynamic lights, first 96 registered `tr.models` slots  
+- **Inspector** — details for selected world row, entity, dlight, or shader row (including morph channel snapshot and map shader counts)  
+- **Shaders** — filterable clipper list of `tr.sortedShaders`, plus **`r_reloadShaders`** shortcut  
+- **Profiler** — adds the same scene batch counts  
+
+Scene snapshots are gathered through **`vk_imgui_scene.c`** (C only) because `tr_local.h` uses identifiers that are invalid in C++ (`or`, linkage clashes with ImGui TU).
 
 This document describes the optional **Studio** layer: lightweight, in-game workflow helpers reminiscent of classic **id Studio** (session strip + command strip), not a full map editor.
 

@@ -76,7 +76,17 @@ typedef struct {
 		qboolean    active;
 		void       *surf;
 	} surface;
+
+	/* Scene / inspector selection (indexes into current tr.refdef; kind disambiguates) */
+	int			inspectorSelectionKind; /* 0=none, 1=world BSP, 2=ref entity, 3=dynamic light */
+	int			inspectorEntityIndex;
+	int			inspectorDlightIndex;
 } vkImguiInspector_t;
+
+#define VK_INSP_KIND_NONE	0
+#define VK_INSP_KIND_WORLD	1
+#define VK_INSP_KIND_ENTITY	2
+#define VK_INSP_KIND_DLIGHT	3
 
 typedef struct {
 	struct {
@@ -135,33 +145,6 @@ extern vkImguiInspector_t   vkInspector;
 extern vkImguiWindows_t     vkWindows;
 extern vkImguiGlobal_t      vkImguiState;
 
-static const char *vkRenderModes[] = {
-	"Final Image",
-	"Direct Lighting",
-	"IBL Specular",
-	"Diffuse Irradiance",
-	"Env/Irradiance Samples",
-	"Glint D (log)",
-	"Glint Lambda (LOD)",
-	"Glint Compensation",
-	"Glint Weight",
-	"View Direction",
-	"Tangents",
-	"Light Color",
-	"Emissive",
-	"Reflectance",
-	"NdotL",
-	"NdotH",
-	"NdotV",
-	"IBL Contribution",
-	"Volumetric Fog Density",
-	"Depth Buffer",
-	"Motion Vectors",
-	"Fluid Density"
-};
-
-#define NUM_RENDER_MODES (sizeof(vkRenderModes) / sizeof(vkRenderModes[0]))
-
 void VkImgui_Initialize(void);
 void VkImgui_Shutdown(void);
 void VkImgui_BeginFrame(void);
@@ -190,7 +173,14 @@ void VkImgui_SetVulkanBackendReady( qboolean ready );
 void VkImgui_NotifySwapchainRestart( void );
 
 #ifdef __cplusplus
+void VkImgui_ApplyInspectorStyle( void );
+#endif
+
+#ifdef __cplusplus
 }
+/* C++-only inspector chrome (ImGui DockBuilder, style). */
+void VkImgui_DrawInspectorChrome( void );
+void VkImgui_ResetInspectorWorkspaceLayout( void );
 #endif
 
 #endif /* USE_IMGUI */

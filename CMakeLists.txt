@@ -1960,6 +1960,14 @@ if(USE_IMGUI AND NOT APPLE)
   enable_language(CXX)
   set(IMGUI_SRCS
     src/renderers/vulkan/inspector/vk_imgui.cpp
+    src/renderers/vulkan/inspector/vk_imgui_chrome_panels.cpp
+    src/renderers/vulkan/inspector/vk_imgui_helpers.cpp
+    src/renderers/vulkan/inspector/vk_imgui_studio_panels.cpp
+    src/renderers/vulkan/inspector/vk_imgui_postfx_panels.cpp
+    src/renderers/vulkan/inspector/vk_imgui_physics_panels.cpp
+    src/renderers/vulkan/inspector/vk_imgui_volumetrics_panels.cpp
+    src/renderers/vulkan/inspector/vk_imgui_scene_panels.cpp
+    src/renderers/vulkan/inspector/vk_imgui_scene.c
     src/renderers/vulkan/inspector/vk_imgui_vulkan.cpp
     ${EXTERNAL_SRC}/cimgui/imgui/imgui.cpp
     ${EXTERNAL_SRC}/cimgui/imgui/imgui_draw.cpp
