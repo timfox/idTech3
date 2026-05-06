@@ -4191,7 +4191,6 @@ static shader_t *FinishShader( void ) {
 
 #ifdef USE_VULKAN
 
-#ifdef USE_FOG_COLLAPSE
 	if ( vk.maxBoundDescriptorSets >= 6 && !(shader.contentFlags & CONTENTS_FOG) && shader.fogPass != FP_NONE ) {
 		fogCollapse = qtrue;
 		if ( stage == 1 ) {
@@ -4243,7 +4242,6 @@ static shader_t *FinishShader( void ) {
 		// if there is no fogs - assume that we can apply all color optimizations without any restrictions
 		fogCollapse = qtrue;
 	}
-#endif
 
 	shader.tessFlags = TESS_XYZ;
 
@@ -4521,7 +4519,6 @@ static shader_t *FinishShader( void ) {
 			}
 
 
-#ifdef USE_FOG_COLLAPSE
 			if ( fogCollapse && tr.numFogs > 0 ) {
 				Vk_Pipeline_Def fog_def;
 				Vk_Pipeline_Def fog_def_mirror;
@@ -4552,7 +4549,6 @@ static shader_t *FinishShader( void ) {
 
 				shader.fogCollapse = qtrue;
 			}
-#endif
 		}
 	}
 #endif // USE_VULKAN

@@ -1275,14 +1275,12 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 
 	is_pbr_surface = qfalse;
 
-#ifdef USE_FOG_COLLAPSE
 	if ( fogCollapse ) {
 		VK_SetFogParams( &uniform, &fog_stage );
 		VectorCopy( backEnd.or.viewOrigin, uniform.eyePos );
 		vk_update_descriptor( VK_DESC_FOG_COLLAPSE, tr.fogImage->descriptor );
 		pushUniform = qtrue;
 	} else
-#endif
 	{
 		fog_stage = 0;
 		if ( tess_flags & TESS_VPOS ) {
@@ -1943,9 +1941,7 @@ void RB_StageIteratorGeneric( void )
 		return;
 	}
 
-#ifdef USE_FOG_COLLAPSE
 	fogCollapse = tess.fogNum && tess.shader->fogPass && tess.shader->fogCollapse;
-#endif
 	worldShOverride = ( r_shDebugView && r_shDebugView->integer == 3 );
 
 	// call shader function
