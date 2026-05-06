@@ -47,6 +47,8 @@ Packed as **`float`** array in **`vk_forward_plus_update_for_refdef`**:
 | `data[1]` | **x,y** = **`tiles_x`, `tiles_y`**, **z,w** = viewport **width/height** (render target pixels) |
 | `data[2 + i*4 …]` | Four **`vec4`** per light **i** (origin+radius, color+linear flag, axis/cone pack, etc.) — mirrors **`dlight_t`** fields |
 
+**PBR shade parity (incremental):** experimental Forward+ shade in **`gen_frag.tmpl`** uses the same **radial** falloff as the classic projected dlight path for **point** lights (`1 - (dist/radius)^2`, matching **`light_frag.tmpl`** / **`VK_SetLightParams`**). **Linear** lights use **`vk_linear_dlight_cone_cosines`** for outer/inner cone cosines (shared with volumetrics). Perpendicular tube falloff uses a **squared** rim term for closer behavior to the point sphere. **`dlight_t.additive`** is packed in the fourth record **`vec4` `.z`** and applies a small brightness boost (legacy **ADD** blend is not identical in PBR, but this reduces “flat” additive props). **`pbrForwardPlus.y`** still carries **`tess.dlightBits`** so indices already handled by the multi-pass projector are **skipped** in Forward+ shade.
+
 **Caps:** at most **`MAX_DLIGHTS` (32)** lights for index compatibility with **`tess.dlightBits`**. Packing may be further limited by **buffer capacity**; overflow is clamped with a **developer** log (rate-limited by last source count).
 
 ### 3.2 Tile buffer (`binding = 1`)
@@ -132,7 +134,7 @@ Linear array: **`total_tiles × MAX_PER_TILE`** **`uint32`** indices. Unused slo
 | **Sphere screen approximation** | Low–Medium | Conservative enough for prototyping; not a tight spotlight frustum test. |
 | **`dlightBits` 32-bit** | Low | Matches **`MAX_DLIGHTS`** today; document if caps change. |
 | **Compute inside render pass** | Low (portability) | Valid now; revisit with subpass graphs or render graph. |
-| **Primary + Forward+ energy** | Medium (art) | Renormalization is heuristic; tune per title if shade is enabled. |
+| **Primary + Forward+ energy** | Medium (art) | Renormalization is heuristic; tune per title if shade is enabled. Point radial falloff matches classic dlight projection; specular scalar `0.65` remains an art knob vs `light_frag.tmpl`. |
 
 ### Suggested next steps (roadmap)
 
