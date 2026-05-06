@@ -11,6 +11,10 @@ set -euo pipefail
 # Usage:
 #   GAME_BASE=/abs/path/to/base RELEASE_DIR=/abs/path/to/release ./scripts/renderer_regression_maps.sh
 #
+# Optional extra BSP names (space-separated), e.g. custom Tier B maps with mixed dlights:
+#   MAPS_EXTRA="rtest_mixed_dlights" GAME_BASE=... ./scripts/renderer_regression_maps.sh
+# CI: set repository variable IDTECH3_MAPS_EXTRA (see docs/renderer_validation/SELF_HOSTED_TIER_B.md).
+#
 # RELEASE_DIR defaults to <repo>/release if unset.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -61,7 +65,8 @@ echo "  Server:  $SERVER"
 echo "  fs_basepath -> $INSTALL_ROOT (game dir: $BASE_NAME)"
 echo ""
 
-for map in "${MAPS[@]}"; do
+run_map_check() {
+  local map="$1"
   # shellcheck disable=SC2086
   out="$(timeout 45 "$SERVER" \
     +set dedicated 1 \
@@ -76,16 +81,30 @@ for map in "${MAPS[@]}"; do
   if echo "$out" | grep -Eiq "$FAIL_PATTERN"; then
     echo "$out" | grep -Ei "$FAIL_PATTERN" | head -20 >&2
     fail "map $map: error in server log"
-    continue
+    return
   fi
 
   if ! echo "$out" | grep -q "Server: $map"; then
     fail "map $map: missing \"Server: $map\" in log (map may not have started)"
-    continue
+    return
   fi
 
   pass "map $map loaded (no error pattern in log)"
+}
+
+for map in "${MAPS[@]}"; do
+  run_map_check "$map"
 done
+
+if [ -n "${MAPS_EXTRA:-}" ]; then
+  echo ""
+  echo "MAPS_EXTRA (optional additional BSP names): ${MAPS_EXTRA}"
+  # shellcheck disable=SC2086
+  for map in ${MAPS_EXTRA}; do
+    [ -z "$map" ] && continue
+    run_map_check "$map"
+  done
+fi
 
 echo ""
 echo "=== Summary === Passed: $PASS  Failed: $FAIL"

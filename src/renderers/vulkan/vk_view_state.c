@@ -299,7 +299,8 @@ static qboolean vk_entity_requires_no_motion( const trRefEntity_t *ent )
 	if ( !markUnreliable && ent->e.backlerp > 0.001f ) {
 		markUnreliable = qtrue;
 	}
-	if ( !markUnreliable && ent->e.customShader ) {
+	if ( !markUnreliable && ent->e.customShader &&
+		( !r_temporalCustomShaderMotion || !r_temporalCustomShaderMotion->integer ) ) {
 		markUnreliable = qtrue;
 	}
 	/* View weapon / first-person geometry: model matrix is view-relative; per-entity

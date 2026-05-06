@@ -28,6 +28,7 @@ docs/samples/renderer_regression/scenes/04_volumetric_fog.md
 docs/samples/renderer_regression/scenes/05_postfx.md
 docs/samples/renderer_regression/scenes/06_vulkan_opengl_parity.md
 docs/samples/renderer_regression/scenes/07_gltf_gpu_tangent_topo.md
+docs/samples/renderer_regression/scenes/08_tier_b_mixed_dlights.md
 scripts/smoke_test.sh
 scripts/stage_mingw_runtime_dlls.sh
 scripts/stage_openal_windows_dlls.ps1

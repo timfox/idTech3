@@ -79,6 +79,8 @@ jobs:
           GAME_BASE="$GAME_BASE" ./scripts/renderer_regression_check.sh
 
       - name: Renderer regression map load (dedicated)
+        env:
+          MAPS_EXTRA: ${{ vars.IDTECH3_MAPS_EXTRA }}
         run: |
           set -euo pipefail
           GAME_BASE="$GAME_BASE" ./scripts/renderer_regression_maps.sh
