@@ -258,6 +258,34 @@ else
 fi
 
 echo ""
+echo "Forward+ SSBO: light header + record vec4 counts (vk_forward_plus.c vs tile_cull.comp vs gen_frag.tmpl):"
+rec_stride_f="$(sed -n 's/^#define VK_FP_RECORD_STRIDE *(sizeof(float) *\*[[:space:]]*\([0-9][0-9]*\)).*$/\1/p' "$FP_C" | head -1)"
+hdr_f="$(sed -n 's/^#define VK_FP_HEADER_BYTES *(sizeof(float) *\*[[:space:]]*\([0-9][0-9]*\)).*$/\1/p' "$FP_C" | head -1)"
+rec_vec4s="$(sed -n 's/^#define REC_VEC4S[[:space:]]*\([0-9][0-9]*\)u*$/\1/p' "$FP_COMP" | head -1)"
+if [[ -z "$rec_stride_f" || -z "$hdr_f" || -z "$rec_vec4s" ]]; then
+  fail "could not parse VK_FP_RECORD_STRIDE / VK_FP_HEADER_BYTES from vk_forward_plus.c or REC_VEC4S from forward_plus_tile_cull.comp"
+else
+  exp_stride=$(( rec_vec4s * 4 ))
+  if [[ "$rec_stride_f" != "$exp_stride" ]]; then
+    fail "VK_FP_RECORD_STRIDE packs $rec_stride_f floats but REC_VEC4S=$rec_vec4s implies ${exp_stride} (4 floats per vec4)"
+  elif [[ "$hdr_f" != "8" ]]; then
+    fail "VK_FP_HEADER_BYTES uses sizeof(float)*$hdr_f; expected 8 (two header vec4s: lights.data[0..1])"
+  else
+    pass "Forward+ light SSBO: header ${hdr_f}f, record ${rec_stride_f}f (=REC_VEC4S $rec_vec4s * 4)"
+  fi
+fi
+fp_frag_uniq="$(grep -E '2u \+ li \* [0-9]+u' "$GEN_FRAG" 2>/dev/null | sed -n 's/.*\* \([0-9][0-9]*\)u.*/\1/p' | sort -u | tr '\n' ' ' | xargs)"
+if [[ -z "$fp_frag_uniq" ]]; then
+  fail "gen_frag.tmpl: missing Forward+ light base index pattern '2u + li * <N>u'"
+elif [[ "$(grep -E '2u \+ li \* [0-9]+u' "$GEN_FRAG" 2>/dev/null | sed -n 's/.*\* \([0-9][0-9]*\)u.*/\1/p' | sort -u | wc -l | tr -d ' ')" != "1" ]]; then
+  fail "gen_frag.tmpl: multiple distinct '2u + li * Nu' multipliers ($fp_frag_uniq) — Forward+ record layout drift"
+elif [[ "$fp_frag_uniq" != "$rec_vec4s" ]]; then
+  fail "gen_frag.tmpl light record stride multiplier ($fp_frag_uniq) != REC_VEC4S ($rec_vec4s)"
+else
+  pass "gen_frag.tmpl Forward+ light base uses li * ${fp_frag_uniq}u (matches REC_VEC4S)"
+fi
+
+echo ""
 echo "Vulkan temporal: reset bitmask vs reason_string / log table:"
 VK_TEMP_H="$PROJECT_ROOT/src/renderers/vulkan/vk_temporal.h"
 VK_TEMP_C="$PROJECT_ROOT/src/renderers/vulkan/vk_temporal.c"
