@@ -27,11 +27,17 @@ def fail(message: str) -> None:
 
 
 def find_function_body(text: str, name: str) -> str:
-    match = re.search(r"\b" + re.escape(name) + r"\s*\(", text)
+    match = re.search(
+        r"(?m)^[\t A-Za-z_][A-Za-z0-9_\t *]*\b"
+        + re.escape(name)
+        + r"\s*\([^;{}]*\)\s*\{",
+        text,
+        flags=re.S,
+    )
     if not match:
-        fail(f"{name}: function not found")
+        fail(f"{name}: function definition not found")
 
-    start = text.find("{", match.end())
+    start = text.rfind("{", match.start(), match.end())
     if start < 0:
         fail(f"{name}: opening brace not found")
 
