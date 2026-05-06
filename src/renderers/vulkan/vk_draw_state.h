@@ -25,7 +25,7 @@ void vk_draw_dot( uint32_t storage_offset );
 
 uint32_t vk_tess_index( uint32_t numIndexes, const void *src );
 void *vk_alloc_storage( size_t size, uint32_t *offset );
-void vk_set_iqm_storage_offsets( uint32_t skin_offset, uint32_t morph_offset );
+void vk_set_iqm_storage_offsets( uint32_t skin_offset, uint32_t morph_offset, uint32_t topo_offset );
 void vk_reset_iqm_storage_offsets( void );
 void vk_bind_index_buffer( VkBuffer buffer, uint32_t offset );
 #ifdef USE_VBO

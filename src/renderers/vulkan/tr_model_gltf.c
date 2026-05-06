@@ -16,6 +16,7 @@ skeleton, and animations into engine-native structures.
 #include "../../external/include/cgltf/cgltf.h"
 
 #include "tr_local.h"
+#include "tr_gltf_topo.h"
 #include "tr_model_gltf.h"
 
 /* glTF GPU path reuses IQM skin + morph SSBO layouts; keep caps aligned at compile time. */
@@ -1108,6 +1109,8 @@ qboolean R_RegisterGLTF(const char *name, model_t *mod) {
 			surf->materialIndex = prim->materialIndex;
 			surf->hasSkinning = (gltfModel.skeleton.numJoints > 0) ? qtrue : qfalse;
 			surf->hasMorphTargets = (prim->numMorphTargets > 0) ? qtrue : qfalse;
+			surf->gltfTopoData = NULL;
+			surf->gltfTopoNumUints = 0;
 			surf->vbo_vertex = TR_GLTF_VBO_HANDLE_INVALID;
 			surf->vbo_index = TR_GLTF_VBO_HANDLE_INVALID;
 			Com_Memset(surf->vbo_vertex_offsets, 0, sizeof(surf->vbo_vertex_offsets));
@@ -1170,6 +1173,12 @@ qboolean R_RegisterGLTF(const char *name, model_t *mod) {
 					surf->vbo_vertex_offsets[5] = (uint64_t)offNorm;
 					surf->vbo_vertex_offsets[6] = (uint64_t)offJoint;
 					surf->vbo_vertex_offsets[7] = (uint64_t)offWeight;
+					if ( prim->indices && prim->numIndices >= 3 && ( prim->numIndices % 3 ) == 0 && prim->numVertices > 0 ) {
+						surf->gltfTopoNumUints = prim->numVertices * GLTF_GPU_TOPO_WORDS_PER_VERT;
+						surf->gltfTopoData = (uint32_t *)ri.Hunk_Alloc(
+							(size_t)surf->gltfTopoNumUints * sizeof( uint32_t ), h_low );
+						R_BuildGLTFPrimitiveTopo( prim->indices, prim->numIndices, prim->numVertices, surf->gltfTopoData );
+					}
 				}
 				ri.Hunk_FreeTempMemory(vboPack);
 			}

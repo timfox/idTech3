@@ -557,7 +557,7 @@ void vk_initialize( void )
 		//pool_size[2].descriptorCount = NUM_COMMAND_BUFFERS;
 
 		pool_size[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
-		pool_size[2].descriptorCount = 1 + NUM_COMMAND_BUFFERS * 2; // flare storage + IQM skin/morph
+		pool_size[2].descriptorCount = 1 + NUM_COMMAND_BUFFERS * 3; // flare storage + IQM skin/morph + glTF topo SSBO
 
 		pool_size[3].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 			pool_size[3].descriptorCount = 22 + NUM_COMMAND_BUFFERS;	/* luminance[N] binding 1 */

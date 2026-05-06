@@ -113,6 +113,20 @@ else
 fi
 
 echo ""
+echo "glTF GPU tangent topo: GLTF_GPU_ADJ_TRIS_MAX (C vs gen_vert.tmpl):"
+TOPO_H="$PROJECT_ROOT/src/renderers/vulkan/tr_gltf_topo.h"
+GEN_VERT="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/gen_vert.tmpl"
+adj_c="$(sed -n 's/^#define GLTF_GPU_ADJ_TRIS_MAX[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$TOPO_H" | head -1)"
+adj_glsl="$(grep -E 'const uint GLTF_GPU_ADJ_TRIS_MAX' "$GEN_VERT" | head -1 | sed -n 's/.*GLTF_GPU_ADJ_TRIS_MAX = \([0-9][0-9]*\)u.*/\1/p')"
+if [[ -z "$adj_c" || -z "$adj_glsl" ]]; then
+  fail "could not parse GLTF_GPU_ADJ_TRIS_MAX from tr_gltf_topo.h or gen_vert.tmpl"
+elif [[ "$adj_c" != "$adj_glsl" ]]; then
+  fail "GLTF_GPU_ADJ_TRIS_MAX mismatch: C=$adj_c GLSL=$adj_glsl"
+else
+  pass "GLTF_GPU_ADJ_TRIS_MAX=$adj_c (C + GLSL)"
+fi
+
+echo ""
 echo "IQM_MAX_JOINTS: OpenGL vs Vulkan iqm.h (duplicate header drift guard):"
 IQM_H_GL="$PROJECT_ROOT/src/renderers/opengl/iqm.h"
 iqm_j_gl="$(sed -n 's/^#define[[:space:]]*IQM_MAX_JOINTS[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$IQM_H_GL" | head -1)"

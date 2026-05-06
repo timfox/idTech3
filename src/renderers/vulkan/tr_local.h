@@ -986,6 +986,8 @@ typedef struct srfGLTFPrimitive_s {
 	int		materialIndex;
 	qboolean	hasSkinning;
 	qboolean	hasMorphTargets;
+	uint32_t	*gltfTopoData; /* per-vertex incident triangle list (Vulkan GPU tangent mode 2); NULL if not built */
+	int		gltfTopoNumUints;
 } srfGLTFPrimitive_t;
 
 
@@ -1724,6 +1726,7 @@ extern cvar_t	*r_morphBreathAmp;
 extern cvar_t	*r_morphBreathFreq;
 extern cvar_t	*r_gltfAnim;
 extern cvar_t	*r_gltfGpu;
+extern cvar_t	*r_gltfGpuTangentFix;
 
 extern	cvar_t	*r_nobind;						// turns off binding to appropriate textures
 extern	cvar_t	*r_singleShader;				// make most world faces use default shader
