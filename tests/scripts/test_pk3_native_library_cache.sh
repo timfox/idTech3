@@ -26,14 +26,8 @@ def fail(message: str) -> None:
     sys.exit(1)
 
 
-def find_function_body(text: str, name: str) -> str:
-    match = re.search(
-        r"(?m)^[\t A-Za-z_][A-Za-z0-9_\t *]*\b"
-        + re.escape(name)
-        + r"\s*\([^;{}]*\)\s*\{",
-        text,
-        flags=re.S,
-    )
+def find_function_body(text: str, pattern: str, name: str) -> str:
+    match = re.search(pattern, text, flags=re.M | re.S)
     if not match:
         fail(f"{name}: function definition not found")
 
@@ -119,9 +113,13 @@ if not files_c.is_file():
     fail(f"missing source file: {files_c}")
 
 text = files_c.read_text()
-startup = find_function_body(text, "FS_Startup")
-cache = find_function_body(text, "FS_TryLoadLibraryFromPk3Cache")
-load_library = find_function_body(text, "FS_LoadLibrary")
+startup = find_function_body(text, r"^static void FS_Startup\( void \) \{", "FS_Startup")
+cache = find_function_body(
+    text,
+    r"^static void \*FS_TryLoadLibraryFromPk3Cache\( const char \*name \) \{",
+    "FS_TryLoadLibraryFromPk3Cache",
+)
+load_library = find_function_body(text, r"^void \*FS_LoadLibrary\( const char \*name \)\s*\{", "FS_LoadLibrary")
 
 assert_contains(text, 'static\tcvar_t\t\t*com_nativeLibraryExtractPk3;', "files.c")
 assert_contains(text, '#define FS_NATIVE_LIB_CACHE_PREFIX "vm/native_cache/"', "files.c")
