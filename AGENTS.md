@@ -4,7 +4,7 @@
 
 ### Overview
 
-This is an **idTech3 engine fork** - a C/C++ game engine based on Quake III Arena with Vulkan 1.4 + RTX rendering, PBR, audio codecs (Opus/FLAC/WebM/MP3), Lua/Duktape scripting, and ImGui debug UI. It produces a client (`idtech3`), dedicated server (`idtech3_server`), and renderer plugins (`idtech3_opengl.so`, `idtech3_vulkan.so`).
+This is an **idTech3 engine fork** - a C/C++ game engine based on Quake III Arena with Vulkan 1.4 + RTX rendering, PBR, audio codecs (Opus/FLAC/WebM/MP3), Lua/Duktape scripting, and ImGui debug UI (optional **Studio** session + command strips via `r_studio_tools`; see `docs/IN_ENGINE_STUDIO_TOOLS.md`). It produces a client (`idtech3`), dedicated server (`idtech3_server`), and renderer plugins (`idtech3_opengl.so`, `idtech3_vulkan.so`).
 
 ### Building
 

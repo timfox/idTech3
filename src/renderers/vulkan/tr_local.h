@@ -1782,6 +1782,7 @@ extern	cvar_t	*r_simpleMipMaps;
 extern	cvar_t	*r_showImages;
 #ifdef USE_IMGUI
 extern	cvar_t	*r_imgui;
+extern	cvar_t	*r_studio_tools;
 #endif
 extern	cvar_t	*r_defaultImage;
 extern	cvar_t	*r_debugSort;

@@ -27,6 +27,7 @@ extern "C" {
 
 extern glconfig_t glConfig;
 extern cvar_t *r_imgui;
+extern cvar_t *r_studio_tools;
 }
 
 #if defined( USE_SDL ) && !defined( ANDROID )
@@ -305,6 +306,10 @@ extern "C" void VkImgui_Initialize(void) {
 	vkWindows.viewport.open = qtrue;
 	vkWindows.postfx.open = qtrue;
 	vkWindows.volumetrics.open = qtrue;
+	if ( r_studio_tools && r_studio_tools->integer ) {
+		vkWindows.studioMap.open = qtrue;
+		vkWindows.studioConsole.open = qtrue;
+	}
 
 	vkImguiState.active = qtrue;
 	vkImguiState.inputState = qfalse;
@@ -379,7 +384,8 @@ static void VkImgui_DrawAboutInspectorPopup( void )
 		ImGui::Spacing();
 		ImGui::TextWrapped(
 			"Toggle overlay input with F11 or \\toggle_imgui; set \\r_imgui 0 to hide CPU/UI work. "
-			"PostFX and related panels drive renderer cvars." );
+			"PostFX and related panels drive renderer cvars. "
+			"Set \\r_studio_tools 1 for id Studio-style session + command strip (see docs/IN_ENGINE_STUDIO_TOOLS.md)." );
 		ImGui::Spacing();
 		if ( ImGui::Button( "OK", ImVec2( 120.0f, 0.0f ) ) ) {
 			ImGui::CloseCurrentPopup();
@@ -399,13 +405,161 @@ static void VkImgui_DrawShortcutsPopup( void )
 		ImGui::BulletText( "File: JPEG screenshot (silent), console, quit" );
 		ImGui::BulletText( "Window: show/hide docked panels" );
 		ImGui::BulletText( "Render Mode: \\r_pbr_debug modes (0-8 active)" );
-		ImGui::BulletText( "Developer: \\r_speeds, \\r_showtris, \\r_imgui" );
+		ImGui::BulletText( "Developer: \\r_speeds, \\r_showtris, \\r_imgui, \\r_studio_tools" );
 		ImGui::Spacing();
 		if ( ImGui::Button( "Close", ImVec2( 120.0f, 0.0f ) ) ) {
 			ImGui::CloseCurrentPopup();
 		}
 		ImGui::EndPopup();
 	}
+}
+
+#define VK_STUDIO_CMD_HIST 48
+#define VK_STUDIO_CMD_LEN 256
+
+static char vkStudioCmdInput[VK_STUDIO_CMD_LEN];
+static char vkStudioHistory[VK_STUDIO_CMD_HIST][VK_STUDIO_CMD_LEN];
+static int vkStudioHistoryCount;
+
+static void VkImgui_StudioPushHistoryLine( const char *line )
+{
+	if ( vkStudioHistoryCount < VK_STUDIO_CMD_HIST ) {
+		Q_strncpyz( vkStudioHistory[vkStudioHistoryCount], line, VK_STUDIO_CMD_LEN );
+		vkStudioHistoryCount++;
+	} else {
+		int i;
+		for ( i = 1; i < VK_STUDIO_CMD_HIST; i++ ) {
+			Q_strncpyz( vkStudioHistory[i - 1], vkStudioHistory[i], VK_STUDIO_CMD_LEN );
+		}
+		Q_strncpyz( vkStudioHistory[VK_STUDIO_CMD_HIST - 1], line, VK_STUDIO_CMD_LEN );
+		vkStudioHistoryCount = VK_STUDIO_CMD_HIST;
+	}
+}
+
+static void VkImgui_StudioExecTrimmedLine( char *start )
+{
+	char *end;
+	if ( !start || !start[0] ) {
+		return;
+	}
+	while ( *start == ' ' || *start == '\t' ) {
+		start++;
+	}
+	if ( *start == '\0' ) {
+		return;
+	}
+	end = start + strlen( start );
+	while ( end > start && ( end[-1] == ' ' || end[-1] == '\t' || end[-1] == '\r' || end[-1] == '\n' ) ) {
+		*--end = '\0';
+	}
+	if ( *start == '\0' ) {
+		return;
+	}
+	VkImgui_StudioPushHistoryLine( start );
+	{
+		char exec[VK_STUDIO_CMD_LEN + 8];
+		Com_sprintf( exec, sizeof( exec ), "%s\n", start );
+		ri.Printf( PRINT_DEVELOPER, "[VK][studio] exec: %s", exec );
+		ri.Cmd_ExecuteText( EXEC_APPEND, exec );
+	}
+}
+
+extern "C" void VkImgui_DrawStudioMapPanel( void )
+{
+	const char *mapn;
+	const char *fsGame;
+	const char *fsBase;
+	const char *svHost;
+
+	if ( !r_studio_tools || !r_studio_tools->integer ) {
+		return;
+	}
+	if ( !vkWindows.studioMap.open ) {
+		return;
+	}
+
+	ImGui::Begin( "Studio / Session", (bool *)&vkWindows.studioMap.open );
+	ImGui::TextDisabled( "(?)" );
+	if ( ImGui::IsItemHovered() ) {
+		ImGui::SetTooltip(
+			"Live session readout (engine cvars). For entity keys shared with idTech3Radiant, see docs/EDITOR_BRIDGE.md in the repo." );
+	}
+	ImGui::Separator();
+	mapn = ri.Cvar_VariableString( "mapname" );
+	fsGame = ri.Cvar_VariableString( "fs_game" );
+	fsBase = ri.Cvar_VariableString( "fs_basegame" );
+	svHost = ri.Cvar_VariableString( "sv_hostname" );
+	ImGui::Text( "mapname: %s", mapn[0] ? mapn : "(unset)" );
+	ImGui::Text( "fs_game: %s", fsGame[0] ? fsGame : "(default)" );
+	ImGui::Text( "fs_basegame: %s", fsBase[0] ? fsBase : "(default)" );
+	ImGui::Text( "sv_hostname: %s", svHost[0] ? svHost : "(unset)" );
+	ImGui::SeparatorText( "Quick commands" );
+	if ( ImGui::Button( "map_restart" ) ) {
+		ri.Cmd_ExecuteText( EXEC_APPEND, "map_restart\n" );
+	}
+	ImGui::SameLine();
+	if ( ImGui::Button( "disconnect" ) ) {
+		ri.Cmd_ExecuteText( EXEC_APPEND, "disconnect\n" );
+	}
+	ImGui::SameLine();
+	if ( ImGui::Button( "vid_restart" ) ) {
+		ri.Cmd_ExecuteText( EXEC_APPEND, "vid_restart\n" );
+	}
+	ImGui::SeparatorText( "Dev (cheat-class)" );
+	if ( ImGui::Button( "noclip" ) ) {
+		ri.Cmd_ExecuteText( EXEC_APPEND, "noclip\n" );
+	}
+	ImGui::SameLine();
+	if ( ImGui::Button( "god" ) ) {
+		ri.Cmd_ExecuteText( EXEC_APPEND, "god\n" );
+	}
+	ImGui::SameLine();
+	if ( ImGui::Button( "notarget" ) ) {
+		ri.Cmd_ExecuteText( EXEC_APPEND, "notarget\n" );
+	}
+	ImGui::End();
+}
+
+extern "C" void VkImgui_DrawStudioConsolePanel( void )
+{
+	if ( !r_studio_tools || !r_studio_tools->integer ) {
+		return;
+	}
+	if ( !vkWindows.studioConsole.open ) {
+		return;
+	}
+
+	ImGui::Begin( "Studio / Console", (bool *)&vkWindows.studioConsole.open );
+	ImGui::TextDisabled( "(?)" );
+	if ( ImGui::IsItemHovered() ) {
+		ImGui::SetTooltip(
+			"Runs text through the main command buffer (same as the drop-down console). "
+			"History is local to this panel." );
+	}
+	ImGui::Separator();
+	ImGui::BeginChild( "StudioCmdHistory", ImVec2( 0.0f, -ImGui::GetFrameHeightWithSpacing() ), qfalse,
+		ImGuiWindowFlags_HorizontalScrollbar );
+	{
+		int i;
+		for ( i = 0; i < vkStudioHistoryCount; i++ ) {
+			ImGui::TextUnformatted( vkStudioHistory[i] );
+		}
+		if ( vkStudioHistoryCount > 0 ) {
+			ImGui::SetScrollHereY( 1.0f );
+		}
+	}
+	ImGui::EndChild();
+	if ( ImGui::InputText( "##studio_cmd", vkStudioCmdInput, sizeof( vkStudioCmdInput ),
+			ImGuiInputTextFlags_EnterReturnsTrue ) ) {
+		VkImgui_StudioExecTrimmedLine( vkStudioCmdInput );
+		vkStudioCmdInput[0] = '\0';
+	}
+	ImGui::SameLine();
+	if ( ImGui::Button( "Run" ) ) {
+		VkImgui_StudioExecTrimmedLine( vkStudioCmdInput );
+		vkStudioCmdInput[0] = '\0';
+	}
+	ImGui::End();
 }
 
 static void VkImgui_DrawMenuBar(void) {
@@ -438,6 +592,16 @@ static void VkImgui_DrawMenuBar(void) {
 			ImGui::EndMenu();
 		}
 
+		if ( r_studio_tools && r_studio_tools->integer ) {
+			if ( ImGui::BeginMenu( "Studio" ) ) {
+				ImGui::MenuItem( "Session / map strip", nullptr, (bool *)&vkWindows.studioMap.open );
+				ImGui::MenuItem( "Command strip", nullptr, (bool *)&vkWindows.studioConsole.open );
+				ImGui::Separator();
+				ImGui::TextDisabled( "Entity key reference: docs/EDITOR_BRIDGE.md" );
+				ImGui::EndMenu();
+			}
+		}
+
 		if ( ImGui::BeginMenu( "Developer" ) ) {
 			if ( r_imgui ) {
 				bool riOn = r_imgui->integer != 0;
@@ -446,6 +610,21 @@ static void VkImgui_DrawMenuBar(void) {
 				}
 				if ( ImGui::IsItemHovered() ) {
 					ImGui::SetTooltip( "When off, skips ImGui BeginFrame/Draw CPU work. F11 still toggles from the client." );
+				}
+			}
+			if ( r_studio_tools ) {
+				bool stOn = r_studio_tools->integer != 0;
+				if ( ImGui::Checkbox( "Studio tools (r_studio_tools)", &stOn ) ) {
+					ri.Cvar_SetValue( "r_studio_tools", stOn ? 1.0f : 0.0f );
+					if ( stOn ) {
+						vkWindows.studioMap.open = qtrue;
+						vkWindows.studioConsole.open = qtrue;
+					}
+				}
+				if ( ImGui::IsItemHovered() ) {
+					ImGui::SetTooltip(
+						"Adds id Studio-style Session + Console docked panels and a Studio menu. "
+						"Requires r_imgui 1. See docs/IN_ENGINE_STUDIO_TOOLS.md." );
 				}
 			}
 			{
@@ -487,6 +666,11 @@ static void VkImgui_DrawMenuBar(void) {
 			ImGui::MenuItem("Volumetrics", nullptr, (bool *)&vkWindows.volumetrics.open);
 			ImGui::MenuItem("Objects", nullptr, (bool *)&vkWindows.objects.open);
 			ImGui::MenuItem("Inspector", nullptr, (bool *)&vkWindows.inspector.open);
+			if ( r_studio_tools && r_studio_tools->integer ) {
+				ImGui::Separator();
+				ImGui::MenuItem( "Studio / Session", nullptr, (bool *)&vkWindows.studioMap.open );
+				ImGui::MenuItem( "Studio / Console", nullptr, (bool *)&vkWindows.studioConsole.open );
+			}
 			ImGui::EndMenu();
 		}
 
@@ -1090,6 +1274,8 @@ extern "C" void VkImgui_Draw(void) {
 	VkImgui_DrawPhysicsPanel();
 	VkImgui_DrawVolumetricsPanel();
 	VkImgui_DrawProfiler();
+	VkImgui_DrawStudioMapPanel();
+	VkImgui_DrawStudioConsolePanel();
 
 	ImGui::End();
 	ImGui::Render();

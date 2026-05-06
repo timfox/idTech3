@@ -3,6 +3,8 @@
 Entity definitions and key/value conventions shared between the
 id Tech 3 engine and idTech3Radiant editor for feature parity.
 
+For optional in-engine **Studio** panels (session strip + command strip) that surface this document at runtime, see **[IN_ENGINE_STUDIO_TOOLS.md](IN_ENGINE_STUDIO_TOOLS.md)** (`r_studio_tools`).
+
 ## Entity Key/Value Reference
 
 ### Volumetric Fog (`worldspawn` keys)
