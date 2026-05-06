@@ -188,6 +188,7 @@ cvar_t	*r_renderWidth;
 cvar_t	*r_renderHeight;
 cvar_t	*r_renderScale;
 cvar_t	*r_temporalDebug;
+cvar_t	*r_temporalCustomShaderMotion;
 cvar_t	*r_screenMapScale;
 cvar_t	*r_ext_supersample;
 cvar_t	*r_ext_smaa;
@@ -3598,6 +3599,15 @@ static void R_Register( void )
 	r_temporalDebug = ri.Cvar_Get( "r_temporalDebug", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_temporalDebug, "0", "2", CV_INTEGER );
 	ri.Cvar_SetDescription( r_temporalDebug, "Temporal diagnostics:\n 0 - off\n 1 - log temporal reset reasons\n 2 - log reset reasons plus shared camera-cut and invalidated consumers." );
+	r_temporalCustomShaderMotion = ri.Cvar_Get( "r_temporalCustomShaderMotion", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_temporalCustomShaderMotion, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_temporalCustomShaderMotion,
+		"Temporal motion vectors: 0 (default) treats customShader entities as motion-unreliable (prev MVP = current; TAA-safe).\n"
+		"1 allows prev-model matrices for customShader RT_MODEL draws — only enable for materials that do not animate vertices per frame." );
+	ri.Cvar_SetGroup( r_temporalCustomShaderMotion, CVG_RENDERER );
+	if ( r_temporalCustomShaderMotion && r_temporalCustomShaderMotion->integer ) {
+		ri.Printf( PRINT_ALL, "[VK][temporal] r_temporalCustomShaderMotion=1 (customShader entities use prev-model motion; may ghost if stages deform)\n" );
+	}
 	#endif // USE_VULKAN
 
 	// Register modular subsystem cvars

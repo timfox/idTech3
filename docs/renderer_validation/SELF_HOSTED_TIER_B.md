@@ -33,6 +33,7 @@ The workflow enables when **either** a repository **variable** or **secret** nam
 |------|------|--------|
 | **Actions variable** (recommended) | `IDTECH3_GAME_BASE_PATH` | Absolute path on the runner host, e.g. `/data/idtech3-regression/base` |
 | **Actions secret** (optional) | `IDTECH3_GAME_BASE_PATH` | Same path; use if you do not want the string visible under **Variables** (values are still visible in job logs as `env` unless you mask - see below) |
+| **Actions variable** (optional) | `IDTECH3_MAPS_EXTRA` | Space-separated BSP names appended to `renderer_regression_maps.sh` after the stock `rtest_*` list (e.g. a map with mixed point + linear dlights). Leave unset if you only use the built-in regression maps. |
 
 **Repository → Settings → Secrets and variables → Actions**
 
@@ -46,6 +47,7 @@ If neither variable nor secret is set, the Tier B workflow **does not run** (job
 
 - Push to `main` or run **Actions → renderer-tier-b → Run workflow**.
 - First run may take longer (full Vulkan build on the runner).
+- Optional: set repository variable **`IDTECH3_MAPS_EXTRA`** to a space-separated list of extra BSP names; the workflow passes it as **`MAPS_EXTRA`** to `renderer_regression_maps.sh` (after the stock `rtest_*` maps). See `docs/samples/renderer_regression/scenes/08_tier_b_mixed_dlights.md`.
 
 ## Troubleshooting
 
