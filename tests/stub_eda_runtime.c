@@ -8,6 +8,14 @@
 
 #include "qcommon/q_shared.h"
 #include "qcommon/qcommon.h"
+#include "game/g_engine_systems.h"
+
+void StubEDA_SetEnabled( int enabled );
+void StubEDA_SetLog( int enabled );
+void StubEDA_ResetTelemetry( void );
+int StubEDA_TelemetryCount( void );
+const char *StubEDA_LastTelemetryName( void );
+double StubEDA_LastTelemetryValue( void );
 
 static cvar_t g_eda_stub;
 static cvar_t g_edaLog_stub;
@@ -74,9 +82,8 @@ cvar_t *Cvar_Get( const char *var_name, const char *value, int flags ) {
 }
 
 void Cvar_SetDescription( cvar_t *var, const char *var_description ) {
-	if ( var ) {
-		var->description = (char *)var_description;
-	}
+	(void)var;
+	(void)var_description;
 }
 
 void QDECL Com_DPrintf( const char *fmt, ... ) {
