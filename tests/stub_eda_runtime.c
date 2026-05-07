@@ -19,6 +19,8 @@ double StubEDA_LastTelemetryValue( void );
 
 static cvar_t g_eda_stub;
 static cvar_t g_edaLog_stub;
+static char g_eda_name[] = "g_eda";
+static char g_edaLog_name[] = "g_edaLog";
 static char g_eda_string[4] = "1";
 static char g_edaLog_string[4] = "0";
 static int g_eda_enabled = 1;
@@ -28,11 +30,11 @@ static int g_telemetry_count;
 static char g_telemetry_name[64];
 static double g_telemetry_value;
 
-static void StubEDA_UpdateCvar( cvar_t *var, const char *name, char *string, int value, int flags ) {
+static void StubEDA_UpdateCvar( cvar_t *var, char *name, char *string, int value, int flags ) {
 	memset( var, 0, sizeof( *var ) );
 	string[0] = (char)( value ? '1' : '0' );
 	string[1] = '\0';
-	var->name = (char *)name;
+	var->name = name;
 	var->string = string;
 	var->resetString = string;
 	var->flags = flags;
@@ -42,12 +44,12 @@ static void StubEDA_UpdateCvar( cvar_t *var, const char *name, char *string, int
 
 void StubEDA_SetEnabled( int enabled ) {
 	g_eda_enabled = enabled ? 1 : 0;
-	StubEDA_UpdateCvar( &g_eda_stub, "g_eda", g_eda_string, g_eda_enabled, CVAR_ARCHIVE_ND );
+	StubEDA_UpdateCvar( &g_eda_stub, g_eda_name, g_eda_string, g_eda_enabled, CVAR_ARCHIVE_ND );
 }
 
 void StubEDA_SetLog( int enabled ) {
 	g_eda_log_enabled = enabled ? 1 : 0;
-	StubEDA_UpdateCvar( &g_edaLog_stub, "g_edaLog", g_edaLog_string, g_eda_log_enabled, CVAR_ARCHIVE_ND );
+	StubEDA_UpdateCvar( &g_edaLog_stub, g_edaLog_name, g_edaLog_string, g_eda_log_enabled, CVAR_ARCHIVE_ND );
 }
 
 void StubEDA_ResetTelemetry( void ) {
@@ -71,11 +73,11 @@ double StubEDA_LastTelemetryValue( void ) {
 cvar_t *Cvar_Get( const char *var_name, const char *value, int flags ) {
 	(void)value;
 	if ( var_name && strcmp( var_name, "g_eda" ) == 0 ) {
-		StubEDA_UpdateCvar( &g_eda_stub, "g_eda", g_eda_string, g_eda_enabled, flags );
+		StubEDA_UpdateCvar( &g_eda_stub, g_eda_name, g_eda_string, g_eda_enabled, flags );
 		return &g_eda_stub;
 	}
 	if ( var_name && strcmp( var_name, "g_edaLog" ) == 0 ) {
-		StubEDA_UpdateCvar( &g_edaLog_stub, "g_edaLog", g_edaLog_string, g_eda_log_enabled, flags );
+		StubEDA_UpdateCvar( &g_edaLog_stub, g_edaLog_name, g_edaLog_string, g_eda_log_enabled, flags );
 		return &g_edaLog_stub;
 	}
 	return NULL;
