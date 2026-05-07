@@ -2646,6 +2646,20 @@ if(BUILD_UNIT_TESTS)
 	add_test(NAME unit_endian COMMAND unit_endian)
 	set_tests_properties(unit_endian PROPERTIES LABELS "unit;validation")
 
+	add_executable(unit_eda
+		tests/unit/test_eda.c
+		tests/stub_qcommon_min.c
+		tests/stub_eda_runtime.c
+		src/game/g_eda.c
+		src/qcommon/q_shared.c
+		src/qcommon/q_math.c)
+	target_include_directories(unit_eda PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_eda PRIVATE m)
+	endif()
+	add_test(NAME unit_eda COMMAND unit_eda)
+	set_tests_properties(unit_eda PROPERTIES LABELS "unit;validation;game")
+
 	add_executable(unit_vm_native_module
 		tests/unit/test_vm_native_module.c
 		src/qcommon/vm_native_module.c)
