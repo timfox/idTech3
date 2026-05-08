@@ -2652,6 +2652,21 @@ if(BUILD_UNIT_TESTS)
 	target_include_directories(unit_vm_native_module PRIVATE ${CMAKE_SOURCE_DIR}/src)
 	add_test(NAME unit_vm_native_module COMMAND unit_vm_native_module)
 	set_tests_properties(unit_vm_native_module PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_ecs
+		tests/unit/test_ecs.cpp
+		src/game/ecs.cpp)
+	set_target_properties(unit_ecs PROPERTIES
+		CXX_STANDARD 17
+		CXX_STANDARD_REQUIRED ON)
+	target_include_directories(unit_ecs PRIVATE
+		${CMAKE_SOURCE_DIR}/src
+		${EXTERNAL_INCLUDE}/entt/single_include)
+	if(NOT MSVC)
+		target_compile_options(unit_ecs PRIVATE -Wno-unused-parameter)
+	endif()
+	add_test(NAME unit_ecs COMMAND unit_ecs)
+	set_tests_properties(unit_ecs PROPERTIES LABELS "unit;validation;game")
 endif()
 
 # Example mod pack (config-only .pk3); optional - see examples/demo_game/README.md
