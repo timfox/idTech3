@@ -99,7 +99,7 @@ qboolean ECS_Valid( ecs_entity_t e ) {
 
 uint32_t ECS_Count( void ) {
 	if ( !s_registry ) return 0;
-	return static_cast<uint32_t>( s_registry->alive() );
+	return static_cast<uint32_t>( s_registry->storage<entt::entity>().free_list() );
 }
 
 uint32_t ECS_CountWith( ecs_component_id_t comp ) {
