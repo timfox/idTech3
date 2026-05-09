@@ -268,7 +268,7 @@ static void Huff_addRef(huff_t* huff, byte ch) {
 /* Get a symbol - maxoffset prevents out-of-bounds reads (CVE-2017-11721) */
 static int Huff_Receive(node_t *node, int *ch, byte *fin, int maxoffset) {
 	while (node && node->symbol == INTERNAL_NODE) {
-		if ( bloc > maxoffset ) {
+		if ( bloc >= maxoffset ) {
 			return 0;
 		}
 		if (get_bit(fin)) {
@@ -281,7 +281,8 @@ static int Huff_Receive(node_t *node, int *ch, byte *fin, int maxoffset) {
 		return 0;
 //		Com_Error(ERR_DROP, "Illegal tree!");
 	}
-	return (*ch = node->symbol);
+	*ch = node->symbol;
+	return 1;
 }
 
 /* Send the prefix code for this node */
@@ -317,6 +318,7 @@ void Huff_Decompress(msg_t *mbuf, int offset) {
 	byte		seq[65536];
 	byte*		buffer;
 	huff_t		huff;
+	qboolean	truncated;
 
 	size = mbuf->cursize - offset;
 	buffer = mbuf->data + offset;
@@ -342,18 +344,26 @@ void Huff_Decompress(msg_t *mbuf, int offset) {
 
 	for ( j = 0; j < cch; j++ ) {
 		ch = 0;
+		truncated = qfalse;
 		// don't overflow reading from the messages (CVE-2017-11721)
-		if ( (bloc >> 3) > size ) {
-			seq[j] = 0;
-			break;
+		if ( (bloc >> 3) >= size ) {
+			truncated = qtrue;
+		} else if ( !Huff_Receive(huff.tree, &ch, buffer, size << 3) ) {	/* Get a character, with bounds check */
+			truncated = qtrue;
 		}
-		Huff_Receive(huff.tree, &ch, buffer, size << 3);	/* Get a character, with bounds check */
 		if ( ch == NYT ) {								/* We got a NYT, get the symbol associated with it */
 			ch = 0;
 			for ( i = 0; i < 8; i++ ) {
-				if ( bloc > (size << 3) ) { break; }
+				if ( bloc >= (size << 3) ) {
+					truncated = qtrue;
+					break;
+				}
 				ch = (ch<<1) + get_bit(buffer);
 			}
+		}
+		if ( truncated ) {
+			Com_Memset( seq + j, 0, cch - j );
+			break;
 		}
     
 		seq[j] = ch;									/* Write symbol */

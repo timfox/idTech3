@@ -2599,6 +2599,13 @@ if(BUILD_UNIT_TESTS)
 	add_test(NAME unit_msg COMMAND unit_msg)
 	set_tests_properties(unit_msg PROPERTIES LABELS "unit;validation")
 
+	add_executable(unit_huffman_adaptive
+		tests/unit/test_huffman_adaptive.c
+		src/qcommon/huffman.c)
+	target_include_directories(unit_huffman_adaptive PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	add_test(NAME unit_huffman_adaptive COMMAND unit_huffman_adaptive)
+	set_tests_properties(unit_huffman_adaptive PROPERTIES LABELS "unit;validation;network")
+
 	add_executable(unit_info
 		tests/unit/test_info.c
 		tests/stub_qcommon_min.c
