@@ -88,9 +88,6 @@ jobs:
 
       - name: Build Vulkan
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
-        env:
-          CFLAGS: "-DSKIP_IDPAK_CHECK=1"
-          CXXFLAGS: "-DSKIP_IDPAK_CHECK=1"
         run: |
           mkdir -p build-vk-${{ matrix.btype }}
           cmake -S . -B build-vk-${{ matrix.btype }} -G Ninja \
@@ -103,7 +100,6 @@ jobs:
             -DBUILD_SERVER=ON \
             -DUSE_VULKAN=ON \
             -DRENDERER_DEFAULT=vulkan \
-            -DSKIP_IDPAK_CHECK=ON \
             -DSKIP_SHADER_REGEN=ON \
             -Wno-dev
           cmake --build build-vk-${{ matrix.btype }} -j$(nproc)
@@ -113,9 +109,6 @@ jobs:
 
       - name: Build OpenGL
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
-        env:
-          CFLAGS: "-DSKIP_IDPAK_CHECK=1"
-          CXXFLAGS: "-DSKIP_IDPAK_CHECK=1"
         run: |
           mkdir -p build-gl-${{ matrix.btype }}
           cmake -S . -B build-gl-${{ matrix.btype }} -G Ninja \
@@ -128,7 +121,6 @@ jobs:
             -DBUILD_SERVER=ON \
             -DUSE_VULKAN=ON \
             -DRENDERER_DEFAULT=opengl \
-            -DSKIP_IDPAK_CHECK=ON \
             -DSKIP_SHADER_REGEN=ON \
             -Wno-dev
           cmake --build build-gl-${{ matrix.btype }} -j$(nproc)
@@ -481,9 +473,6 @@ jobs:
 
       - name: Build Vulkan
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
-        env:
-          CFLAGS: "-DSKIP_IDPAK_CHECK=1"
-          CXXFLAGS: "-DSKIP_IDPAK_CHECK=1"
         run: |
           CMAKE_EXTRA=""
           if [ "${{ matrix.cc }}" = "clang" ]; then
@@ -502,7 +491,6 @@ jobs:
             -DBUILD_SERVER=ON \
             -DUSE_VULKAN=ON \
             -DRENDERER_DEFAULT=vulkan \
-            -DSKIP_IDPAK_CHECK=ON \
             -DSKIP_SHADER_REGEN=ON \
             -Wno-dev
           cmake --build build-vk-${{ matrix.btype }} -j$(nproc)
@@ -511,9 +499,6 @@ jobs:
 
       - name: Build OpenGL
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
-        env:
-          CFLAGS: "-DSKIP_IDPAK_CHECK=1"
-          CXXFLAGS: "-DSKIP_IDPAK_CHECK=1"
         run: |
           CMAKE_EXTRA=""
           if [ "${{ matrix.cc }}" = "clang" ]; then
@@ -532,7 +517,6 @@ jobs:
             -DBUILD_SERVER=ON \
             -DUSE_VULKAN=ON \
             -DRENDERER_DEFAULT=opengl \
-            -DSKIP_IDPAK_CHECK=ON \
             -DSKIP_SHADER_REGEN=ON \
             -Wno-dev
           cmake --build build-gl-${{ matrix.btype }} -j$(nproc)
@@ -571,9 +555,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build Vulkan (ASAN)
-        env:
-          CFLAGS: "-DSKIP_IDPAK_CHECK=1"
-          CXXFLAGS: "-DSKIP_IDPAK_CHECK=1"
         run: |
           mkdir -p build-vk-asan
           cmake -S . -B build-vk-asan \
@@ -586,7 +567,6 @@ jobs:
             -DBUILD_SERVER=ON \
             -DUSE_VULKAN=ON \
             -DRENDERER_DEFAULT=vulkan \
-            -DSKIP_IDPAK_CHECK=ON \
             -DSKIP_SHADER_REGEN=ON \
             -Wno-dev
           cmake --build build-vk-asan -j$(nproc)
@@ -610,9 +590,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build with ASAN
-        env:
-          CFLAGS: "-DSKIP_IDPAK_CHECK=1"
-          CXXFLAGS: "-DSKIP_IDPAK_CHECK=1"
         run: |
           ./scripts/compile_shaders.sh
           mkdir -p build-asan
@@ -626,7 +603,6 @@ jobs:
             -DBUILD_SERVER=ON \
             -DUSE_VULKAN=ON \
             -DRENDERER_DEFAULT=vulkan \
-            -DSKIP_IDPAK_CHECK=ON \
             -DSKIP_SHADER_REGEN=ON \
             -Wno-dev
           cmake --build build-asan -j$(nproc)
@@ -660,9 +636,6 @@ jobs:
             ccache-static-
 
       - name: Build (compile_commands.json)
-        env:
-          CFLAGS: "-DSKIP_IDPAK_CHECK=1"
-          CXXFLAGS: "-DSKIP_IDPAK_CHECK=1"
         run: |
           mkdir -p build-static
           cmake -S . -B build-static -G Ninja \
@@ -676,7 +649,6 @@ jobs:
             -DBUILD_SERVER=ON \
             -DUSE_VULKAN=ON \
             -DRENDERER_DEFAULT=vulkan \
-            -DSKIP_IDPAK_CHECK=ON \
             -DSKIP_SHADER_REGEN=ON \
             -Wno-dev
           cmake --build build-static -j$(nproc)
@@ -747,7 +719,6 @@ jobs:
               -DBUILD_SERVER=ON \
               -DUSE_VULKAN=ON \
               -DRENDERER_DEFAULT=vulkan \
-              -DSKIP_IDPAK_CHECK=ON \
               -DSKIP_SHADER_REGEN=ON \
               -Wno-dev
             cmake --build build-vk-${{ matrix.btype }} -j"$(nproc)"
@@ -765,7 +736,6 @@ jobs:
               -DBUILD_SERVER=ON \
               -DUSE_VULKAN=ON \
               -DRENDERER_DEFAULT=opengl \
-              -DSKIP_IDPAK_CHECK=ON \
               -DSKIP_SHADER_REGEN=ON \
               -Wno-dev
             cmake --build build-gl-${{ matrix.btype }} -j"$(nproc)"
@@ -820,8 +790,6 @@ jobs:
       - name: Build Vulkan
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
         env:
-          CFLAGS: "-DSKIP_IDPAK_CHECK=1"
-          CXXFLAGS: "-DSKIP_IDPAK_CHECK=1"
           LIBRARY_PATH: "/opt/homebrew/lib"
           CMAKE_PREFIX_PATH: "/opt/homebrew"
         run: |
@@ -844,7 +812,6 @@ jobs:
             -DBUILD_SERVER=ON \
             -DUSE_VULKAN=ON \
             -DRENDERER_DEFAULT=vulkan \
-            -DSKIP_IDPAK_CHECK=ON \
             -DSKIP_SHADER_REGEN=ON \
             -DCMAKE_INCLUDE_PATH="${OPENAL_PREFIX}/include" \
             -DCMAKE_LIBRARY_PATH="${OPENAL_PREFIX}/lib" \
@@ -862,8 +829,6 @@ jobs:
       - name: Build OpenGL
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
         env:
-          CFLAGS: "-DSKIP_IDPAK_CHECK=1"
-          CXXFLAGS: "-DSKIP_IDPAK_CHECK=1"
           LIBRARY_PATH: "/opt/homebrew/lib"
           CMAKE_PREFIX_PATH: "/opt/homebrew"
         run: |
@@ -886,7 +851,6 @@ jobs:
             -DBUILD_SERVER=ON \
             -DUSE_VULKAN=ON \
             -DRENDERER_DEFAULT=opengl \
-            -DSKIP_IDPAK_CHECK=ON \
             -DSKIP_SHADER_REGEN=ON \
             -DCMAKE_INCLUDE_PATH="${OPENAL_PREFIX}/include" \
             -DCMAKE_LIBRARY_PATH="${OPENAL_PREFIX}/lib" \
@@ -996,7 +960,6 @@ jobs:
               -DUSE_VULKAN=ON \
               -DUSE_RENDERER_DLOPEN=OFF \
               -DRENDERER_DEFAULT=vulkan \
-              -DSKIP_IDPAK_CHECK=ON \
               -DSKIP_SHADER_REGEN=ON \
               -DUSE_SDL=OFF \
               -DUSE_OPENAL=OFF \

@@ -14,7 +14,7 @@ Legacy `make`-first instructions are no longer the primary build path for this f
 - CMake targets **C23** when supported by the active compiler/toolchain and falls back to **C17** otherwise.
 - Set `C_STANDARD_STRICT=OFF` to disable the stricter warning set locally. CI keeps strict warnings enabled.
 - The Vulkan path is the primary renderer configuration; OpenGL remains the compatibility fallback.
-- `SKIP_IDPAK_CHECK=ON` is the default expectation for source-tree builds in this repository.
+- Source-tree builds do not ship Quake III Arena `.pk3` files; use your own `base/` or see [docs/MINIMAL_GAME_SHELL.md](docs/MINIMAL_GAME_SHELL.md).
 
 ## Quick start
 
@@ -67,7 +67,6 @@ Use the script when you want staged artifacts in `release/` and the standard hel
 cmake -S . -B build-vk-Release -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DRENDERER_DEFAULT=vulkan \
-  -DSKIP_IDPAK_CHECK=ON \
   -DUSE_VULKAN=ON \
   -Wno-dev
 cmake --build build-vk-Release -j"$(nproc)"
@@ -209,7 +208,6 @@ For a more CI-like local pass:
 These are the CMake switches most developers touch during local builds:
 
 - `RENDERER_DEFAULT=vulkan|opengl`
-- `SKIP_IDPAK_CHECK=ON|OFF`
 - `ENABLE_LTO=ON|OFF`
 - `ENABLE_ASAN=ON|OFF` (Debug builds)
 - `BUILD_FREETYPE=ON|OFF`

@@ -983,7 +983,6 @@ if(USE_SDL AND NOT SDL2_FOUND AND USE_BUNDLED_SDL2 AND NOT ANDROID AND NOT MSVC)
   message(STATUS "SDL2: bundled build enabled (includes + libs from ${_idtech3_sdl2_src})")
 endif()
 
-OPTION(SKIP_IDPAK_CHECK "Skip checking for original Quake III pak files (pak0.pk3)" ON)
 OPTION(BUILD_FREETYPE "Enable FreeType-powered font rendering / font generation" ON)
 if(BUILD_FREETYPE)
 	include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/DownloadInterFonts.cmake)
@@ -1435,12 +1434,6 @@ elseif(USE_STEAM AND STEAMWORKS_FOUND)
   target_compile_definitions(client PRIVATE USE_STEAM=1)
   target_include_directories(client PRIVATE ${STEAMWORKS_INCLUDE_DIR})
   message(STATUS "Steam: API enabled (achievements, overlay, rich presence, Deck)")
-endif()
-
-# Apply SKIP_IDPAK_CHECK to qcommon targets that compile files.c
-if(SKIP_IDPAK_CHECK)
-  TARGET_COMPILE_DEFINITIONS(qcommon PRIVATE SKIP_IDPAK_CHECK=1)
-  TARGET_COMPILE_DEFINITIONS(qcommon_ded PRIVATE SKIP_IDPAK_CHECK=1)
 endif()
 
 if(NO_VM_COMPILED)

@@ -14,7 +14,6 @@ set -euo pipefail
 
 VULKAN=0
 OPENGL=0
-SKIP_IDPAK=0
 FREETYPE=0
 LUA=0
 DUKTAPE=1
@@ -97,10 +96,6 @@ while [[ $# -gt 0 ]]; do
       ;;
     vulkan)
       VULKAN=1
-      shift
-      ;;
-    skip-idpak-check|skip_idpak_check|skip-pak|skip-paks)
-      SKIP_IDPAK=1
       shift
       ;;
     opengl)
@@ -318,11 +313,6 @@ if [ "$VULKAN" -eq 1 ]; then
   CMAKE_FLAGS+=("-DRENDERER_DEFAULT=vulkan")
 else
   CMAKE_FLAGS+=("-DRENDERER_DEFAULT=opengl")
-fi
-
-if [ "$SKIP_IDPAK" -eq 1 ]; then
-  CMAKE_FLAGS+=("-DSKIP_IDPAK_CHECK=ON")
-  echo "CMake: SKIP_IDPAK_CHECK=ON"
 fi
 
 if command -v ccache &>/dev/null; then
