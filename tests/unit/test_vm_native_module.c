@@ -64,6 +64,62 @@ static int test_candidate_limit(void) {
 	return 0;
 }
 
+static int assert_load_order(const char *moduleName, const char *const *expected, int expectedCount) {
+	char out[3][MAX_QPATH];
+	int count;
+	int i;
+
+	count = VM_BuildNativeModuleLoadOrder(moduleName, out, 3);
+	ASSERT(count == expectedCount, "load order count");
+
+	for (i = 0; i < expectedCount; i++) {
+		ASSERT(strcmp(out[i], expected[i]) == 0, "load order entry");
+	}
+
+	return 0;
+}
+
+static int test_load_order_aliases(void) {
+	static const char *const qagameOrder[] = { "qagame", "game", "server" };
+	static const char *const gameOrder[] = { "game", "server" };
+	static const char *const cgameOrder[] = { "cgame", "client" };
+	static const char *const uiOrder[] = { "ui", "frontend" };
+	static const char *const serverOrder[] = { "server", "game" };
+	static const char *const clientOrder[] = { "client", "cgame" };
+	static const char *const frontendOrder[] = { "frontend", "ui" };
+	static const char *const upperQagameOrder[] = { "QAGAME", "game", "server" };
+	char out[3][MAX_QPATH];
+
+	ASSERT(assert_load_order("qagame", qagameOrder, 3) == 0, "qagame aliases");
+	ASSERT(assert_load_order("game", gameOrder, 2) == 0, "game aliases");
+	ASSERT(assert_load_order("cgame", cgameOrder, 2) == 0, "cgame aliases");
+	ASSERT(assert_load_order("ui", uiOrder, 2) == 0, "ui aliases");
+	ASSERT(assert_load_order("server", serverOrder, 2) == 0, "server aliases");
+	ASSERT(assert_load_order("client", clientOrder, 2) == 0, "client aliases");
+	ASSERT(assert_load_order("frontend", frontendOrder, 2) == 0, "frontend aliases");
+	ASSERT(assert_load_order("QAGAME", upperQagameOrder, 3) == 0, "case-insensitive alias recognition");
+
+	ASSERT(VM_BuildNativeModuleLoadOrder("renderer", out, 3) == 0, "non-generic module should not use aliases");
+	ASSERT(VM_BuildNativeModuleLoadOrder("", out, 3) == 0, "empty module load order");
+	ASSERT(VM_BuildNativeModuleLoadOrder(NULL, out, 3) == 0, "NULL module load order");
+	ASSERT(VM_BuildNativeModuleLoadOrder("qagame", NULL, 3) == 0, "NULL load-order output");
+	ASSERT(VM_BuildNativeModuleLoadOrder("qagame", out, 0) == 0, "zero load-order capacity");
+
+	return 0;
+}
+
+static int test_load_order_limit(void) {
+	char out[3][MAX_QPATH];
+	int count;
+
+	count = VM_BuildNativeModuleLoadOrder("qagame", out, 2);
+	ASSERT(count == 2, "limited load-order count");
+	ASSERT(strcmp(out[0], "qagame") == 0, "limited load-order primary");
+	ASSERT(strcmp(out[1], "game") == 0, "limited load-order first alias");
+
+	return 0;
+}
+
 int main(void) {
 	if (test_empty_inputs() != 0) {
 		return 1;
@@ -72,6 +128,12 @@ int main(void) {
 		return 1;
 	}
 	if (test_candidate_limit() != 0) {
+		return 1;
+	}
+	if (test_load_order_aliases() != 0) {
+		return 1;
+	}
+	if (test_load_order_limit() != 0) {
 		return 1;
 	}
 

@@ -11,4 +11,11 @@
  */
 int VM_BuildNativeModuleCandidates( const char *moduleName, char out[][MAX_QPATH], int maxCandidates );
 
+/*
+ * Builds generic native VM logical module names in load priority order.
+ * Returns 0 for names that should use only the legacy platform-specific
+ * fallback path in loadNative.
+ */
+int VM_BuildNativeModuleLoadOrder( const char *moduleName, char out[][MAX_QPATH], int maxModules );
+
 #endif
