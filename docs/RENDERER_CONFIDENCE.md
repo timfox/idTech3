@@ -27,8 +27,6 @@ On **`main`**, GitHub Actions **`.github/workflows/build.yml`** runs **`renderer
 | OpenGL matrix | `./scripts/compile_engine.sh opengl` then `ctest` in `build-gl-Release` | Fallback renderer still links and tests pass. |
 | Standalone GLSL | `./scripts/smoke_test.sh` (or the smoke step inside `validate_ci_build.sh`) | Every `.vert`, `.frag`, `.geom`, and `.comp` under `src/renderers/vulkan/shaders/glsl/` validates with `glslangValidator` (recursive, including `volumetric/`, `terrain/`, `postfx/`). |
 
-Optional: `SKIP_IDPAK_CHECK=ON` is normal for engine-only trees; the dedicated server may exit with “no game data” after init - that is still a useful crash-free signal.
-
 **Vulkan Forward+ (optional, `r_forwardPlus 1`):** `r_forwardPlusMaxPerTile` (4–8, latched, default 8) trims per-tile light index work while keeping the same SSBO stride; requires `vid_restart` after changes. Does not affect mod game code or QVMs.
 
 ## Manual (GPU + content)

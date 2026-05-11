@@ -5019,13 +5019,6 @@ static void FS_Startup( void ) {
 	// Parse gameinfo.txt to get game title for window
 	FS_ParseGameInfo();
 
-	// check original q3a files (can be disabled via SKIP_IDPAK_CHECK)
-#ifndef SKIP_IDPAK_CHECK
-	if ( FS_IsBaseGame( BASEGAME ) || FS_IsBaseGame( BASEDEMO ) ) {
-		// FS_CheckIdPaks(); // Disabled - function removed
-	}
-#endif
-
 #ifdef FS_MISSING
 	if (missingFiles == NULL) {
 		missingFiles = Sys_FOpen( "\\missing.txt", "ab" );

@@ -66,9 +66,6 @@ jobs:
           echo "Using GAME_BASE=$GAME_BASE"
 
       - name: Build Vulkan (Release)
-        env:
-          CFLAGS: "-DSKIP_IDPAK_CHECK=1"
-          CXXFLAGS: "-DSKIP_IDPAK_CHECK=1"
         run: |
           set -euo pipefail
           ./scripts/compile_engine.sh vulkan

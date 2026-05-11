@@ -31,7 +31,6 @@ android {
                     "-DUSE_VULKAN=ON",
                     "-DUSE_RENDERER_DLOPEN=OFF",
                     "-DRENDERER_DEFAULT=vulkan",
-                    "-DSKIP_IDPAK_CHECK=ON",
                     "-DSKIP_SHADER_REGEN=ON",
                     "-DUSE_SDL=OFF",
                     "-DUSE_OPENAL=OFF",

@@ -162,7 +162,7 @@ sudo apt-get install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
 # Or use CMake directly with the toolchain
 cmake -S . -B build-aarch64 \
   -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/linux-aarch64.cmake \
-  -DCMAKE_BUILD_TYPE=Release -DUSE_VULKAN=ON -DSKIP_IDPAK_CHECK=ON -Wno-dev
+  -DCMAKE_BUILD_TYPE=Release -DUSE_VULKAN=ON -Wno-dev
 cmake --build build-aarch64 -j$(nproc)
 ```
 
