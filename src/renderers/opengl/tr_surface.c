@@ -357,9 +357,6 @@ static void RB_SurfaceTriangles( const srfTriangles_t *srf ) {
 		texCoords0[0] = dv->st[0];
 		texCoords0[1] = dv->st[1];
 
-#ifdef USE_TESS_NEEDS_ST2
-		if ( tess.needsST2 )
-#endif
 		{
 			texCoords1[0] = dv->lightmap[0];
 			texCoords1[1] = dv->lightmap[1];
@@ -903,9 +900,6 @@ static void RB_SurfaceFace( const srfSurfaceFace_t *surf ) {
 		VectorCopy( v, tess.xyz[ndx]);
 		tess.texCoords[0][ndx][0] = v[3];
 		tess.texCoords[0][ndx][1] = v[4];
-#ifdef USE_TESS_NEEDS_ST2
-		if ( tess.needsST2 )
-#endif
 		{
 			tess.texCoords[1][ndx][0] = v[5];
 			tess.texCoords[1][ndx][1] = v[6];
@@ -1155,9 +1149,6 @@ static void RB_SurfaceGrid( srfGridMesh_t *cv ) {
 				xyz[2] = dv->xyz[2];
 				texCoords0[0] = dv->st[0];
 				texCoords0[1] = dv->st[1];
-#ifdef USE_TESS_NEEDS_ST2
-				if ( tess.needsST2 )
-#endif
 				{
 					texCoords1[0] = dv->lightmap[0];
 					texCoords1[1] = dv->lightmap[1];
