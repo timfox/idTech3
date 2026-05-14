@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "game/g_eda.h"
+#include "game/g_engine_systems.h"
 #include "qcommon/qcommon.h"
 
 #define ASSERT(cond, msg) do { \
@@ -18,6 +19,8 @@
 
 static cvar_t g_eda_stub;
 static cvar_t g_eda_log_stub;
+static char g_eda_name[] = "g_eda";
+static char g_eda_log_name[] = "g_edaLog";
 static char g_eda_string[4] = "1";
 static char g_eda_log_string[4] = "0";
 static int stub_g_eda = 1;
@@ -26,7 +29,7 @@ static int telemetry_count;
 static char telemetry_name[64];
 static double telemetry_value;
 
-static void configure_cvar( cvar_t *cv, const char *name, char *string, int value ) {
+static void configure_cvar( cvar_t *cv, char *name, char *string, int value ) {
 	memset( cv, 0, sizeof( *cv ) );
 	cv->name = (char *)name;
 	snprintf( string, 4, "%d", value );
@@ -49,11 +52,11 @@ cvar_t *Cvar_Get( const char *var_name, const char *value, int flags ) {
 	(void)value;
 	(void)flags;
 	if ( var_name && strcmp( var_name, "g_eda" ) == 0 ) {
-		configure_cvar( &g_eda_stub, "g_eda", g_eda_string, stub_g_eda );
+		configure_cvar( &g_eda_stub, g_eda_name, g_eda_string, stub_g_eda );
 		return &g_eda_stub;
 	}
 	if ( var_name && strcmp( var_name, "g_edaLog" ) == 0 ) {
-		configure_cvar( &g_eda_log_stub, "g_edaLog", g_eda_log_string, stub_g_eda_log );
+		configure_cvar( &g_eda_log_stub, g_eda_log_name, g_eda_log_string, stub_g_eda_log );
 		return &g_eda_log_stub;
 	}
 	return NULL;
