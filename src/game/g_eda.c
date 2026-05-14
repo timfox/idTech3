@@ -128,7 +128,7 @@ qboolean EDA_Publish( const char *channel, const char *payload ) {
 
 qboolean EDA_Pop( char *channelOut, int channelLen, char *payloadOut, int payloadLen ) {
 	edaEvent_t *ev;
-	if ( s_qCount <= 0 || s_qHead == s_qTail ) {
+	if ( s_qCount <= 0 ) {
 		return qfalse;
 	}
 	ev = &s_queue[s_qHead];
@@ -150,7 +150,7 @@ qboolean EDA_Pop( char *channelOut, int channelLen, char *payloadOut, int payloa
 
 qboolean EDA_Peek( char *channelOut, int channelLen, char *payloadOut, int payloadLen ) {
 	edaEvent_t *ev;
-	if ( s_qCount <= 0 || s_qHead == s_qTail ) {
+	if ( s_qCount <= 0 ) {
 		return qfalse;
 	}
 	ev = &s_queue[s_qHead];
