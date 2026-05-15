@@ -298,6 +298,7 @@ def main() -> int:
 
     begin_frame_body = extract_function(vk_frame_submit, "vk_begin_frame")
     begin_frame_code = strip_c_comments(begin_frame_body)
+    draw_surfs_body = extract_function(tr_backend, "RB_DrawSurfs")
     assert_contains(
         begin_frame_body,
         "if ( r_forwardPlusShade && r_forwardPlusShade->modified )",
@@ -315,25 +316,25 @@ def main() -> int:
     )
 
     assert_order(
-        tr_backend,
+        draw_surfs_body,
         "vk_forward_plus_ensure_render_resolution();",
         "vk_forward_plus_update_for_refdef();",
         "draw-surfs flow must resize tile SSBO before packing refdef data",
     )
     assert_order(
-        tr_backend,
+        draw_surfs_body,
         "vk_forward_plus_update_for_refdef();",
         "RB_BeginDrawingView();",
         "draw-surfs flow must pack Forward+ lights before the render pass begins",
     )
     assert_order(
-        tr_backend,
+        draw_surfs_body,
         "RB_BeginDrawingView();",
         "vk_forward_plus_upload_refdef();",
         "draw-surfs flow must upload Forward+ lights after the command buffer/render pass starts",
     )
     assert_order(
-        tr_backend,
+        draw_surfs_body,
         "vk_forward_plus_upload_refdef();",
         "vk_forward_plus_dispatch_tile_cull();",
         "draw-surfs flow must dispatch tile cull after light SSBO upload",
