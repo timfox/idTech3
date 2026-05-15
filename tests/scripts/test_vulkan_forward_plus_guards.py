@@ -59,6 +59,12 @@ def assert_not_contains(haystack: str, needle: str, context: str) -> None:
         fail(f"{context}: unexpected {needle!r}")
 
 
+def strip_c_comments(source: str) -> str:
+    source = re.sub(r"/\*.*?\*/", "", source, flags=re.DOTALL)
+    source = re.sub(r"//.*", "", source)
+    return source
+
+
 def assert_regex(haystack: str, pattern: str, context: str) -> None:
     if re.search(pattern, haystack, re.DOTALL) is None:
         fail(f"{context}: expected pattern {pattern!r}")
@@ -291,6 +297,7 @@ def main() -> int:
     )
 
     begin_frame_body = extract_function(vk_frame_submit, "vk_begin_frame")
+    begin_frame_code = strip_c_comments(begin_frame_body)
     assert_contains(
         begin_frame_body,
         "if ( r_forwardPlusShade && r_forwardPlusShade->modified )",
@@ -302,7 +309,7 @@ def main() -> int:
         "Forward+ shade cvar changes must invalidate world graphics pipelines",
     )
     assert_not_contains(
-        begin_frame_body,
+        begin_frame_code,
         "vk_destroy_pipelines(",
         "Forward+ shade cvar changes must not tear down unrelated post-process pipelines",
     )
