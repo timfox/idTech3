@@ -35,7 +35,7 @@ def find_function_body(text: str, name: str) -> str:
     pattern = re.compile(
         r"^[A-Za-z_][A-Za-z0-9_\t \*]*\b"
         + re.escape(name)
-        + r"\s*\([^;{]*\)\s*\{",
+        + r"\s*\([^\n;{]*\)\s*\{",
         re.M,
     )
     match = pattern.search(text)
