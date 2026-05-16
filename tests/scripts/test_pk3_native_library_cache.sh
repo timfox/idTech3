@@ -33,7 +33,7 @@ def strip_comments(text: str) -> str:
 
 def find_function_body(text: str, name: str) -> str:
     pattern = re.compile(
-        r"^[A-Za-z_][A-Za-z0-9_\s\*]*\b" + re.escape(name) + r"\s*\(",
+        r"^[A-Za-z_][A-Za-z0-9_\t \*]*\b" + re.escape(name) + r"\s*\(",
         re.M,
     )
     match = pattern.search(text)
