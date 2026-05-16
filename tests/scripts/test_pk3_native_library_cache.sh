@@ -42,7 +42,7 @@ def find_function_body(text: str, name: str) -> str:
     if not match:
         fail(f"{name}: function definition not found")
 
-    start = text.find("{", match.end())
+    start = text.rfind("{", match.start(), match.end())
     if start < 0:
         fail(f"{name}: opening brace not found")
 
