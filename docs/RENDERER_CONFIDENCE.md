@@ -25,11 +25,12 @@ On **`main`**, GitHub Actions **`.github/workflows/build.yml`** runs **`renderer
 | Full local CI parity | `./scripts/validate_ci_build.sh` | SPIR-V generation, Vulkan Release build, smoke test, renderer regression check. |
 | CMake smoke + artifacts | `ctest --output-on-failure` (from `build-vk-Release` or `build-gl-Release`) | Smoke, **renderer_regression_check**, artifacts, unit hooks, **demo_game pk3 layout** (`test_demo_game_pk3`). |
 | OpenGL matrix | `./scripts/compile_engine.sh opengl` then `ctest` in `build-gl-Release` | Fallback renderer still links and tests pass. |
+| Q3 / OpenArena compat (static) | `./scripts/q3_openarena_compat_check.sh [release_dir]` (also run from `smoke_test.sh` and `validate_ci_build.sh`) | No retail data: asserts `VM_LoadQVM` + native-module path, **docs/COMPATIBILITY.md** mentions QVM/OpenArena, safe defaults (`cl_trellis_enable`, `r_vegWind`, `r_forwardPlusDistanceSort`, `r_forwardPlusDepthCull`, `r_rtxEntities`, `r_vdbFog`), and release **client/server** binaries expose QVM / `fs_basegame` strings. |
 | Standalone GLSL | `./scripts/smoke_test.sh` (or the smoke step inside `validate_ci_build.sh`) | Every `.vert`, `.frag`, `.geom`, and `.comp` under `src/renderers/vulkan/shaders/glsl/` validates with `glslangValidator` (recursive, including `volumetric/`, `terrain/`, `postfx/`). |
 
 Optional: `SKIP_IDPAK_CHECK=ON` is normal for engine-only trees; the dedicated server may exit with “no game data” after init - that is still a useful crash-free signal.
 
-**Vulkan Forward+ (optional, `r_forwardPlus 1`):** `r_forwardPlusMaxPerTile` (4–8, latched, default 8) trims per-tile light index work while keeping the same SSBO stride; requires `vid_restart` after changes. Does not affect mod game code or QVMs.
+**Vulkan Forward+ (`r_forwardPlus`, default 1 on Vulkan):** `r_forwardPlusMaxPerTile` (4–8, latched, default 8) trims per-tile light index work while keeping the same SSBO stride; requires `vid_restart` after changes. Does not affect mod game code or QVMs.
 
 ## Manual (GPU + content)
 

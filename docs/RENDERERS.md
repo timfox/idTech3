@@ -19,7 +19,7 @@ Optional **GPU light packing + per-tile cull** on the existing forward path (not
 
 | Cvar | Role |
 |------|------|
-| `r_forwardPlus` | **0** (default) off; **1** on (**latched**; `vid_restart` to apply). Startup logs buffer size when enabled. |
+| `r_forwardPlus` | **1** (default on Vulkan) enables device-local light SSBO + tile cull; **0** off (**latched**; `vid_restart` to apply). Startup logs buffer size when enabled. |
 | `r_forwardPlusMaxPerTile` | **4–8** lights indexed per **16×16** tile (**latched**; `vid_restart`). Lowers GPU work vs default **8**; tile SSBO keeps **8** `uint32` slots either way. |
 | `r_forwardPlusDebug` | **0–1** float: PBR heatmap overlay (lights per tile + borders). |
 | `r_forwardPlusShade` | **0–4** float: experimental **additive** PBR from tile-culled dynamics; skips indices already in the Forward+ `tess.dlightBits` mask (first 32); changing it **invalidates graphics pipelines** (logged). |
