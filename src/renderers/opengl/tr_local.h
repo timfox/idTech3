@@ -29,6 +29,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define MAX_TEXTURE_SIZE	32768	// max index texture size (was 2048)
 
 #define USE_VBO
+#define USE_VBO_GRID		/* put SF_GRID to VBO */
 #define USE_TESS_NEEDS_NORMAL
 //#define USE_TESS_NEEDS_ST2
 #define USE_FBO
@@ -39,9 +40,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../../qcommon/qfiles.h"
 #include "../../qcommon/qcommon.h"
 #include "../common/tr_public.h"
-#ifdef USE_VBO
-#define USE_VBO_GRID		/* put SF_GRID to VBO */
-#endif
 #include "tr_common.h"
 #include "../vulkan/tr_model_gltf.h"
 #include "iqm.h"
