@@ -309,18 +309,17 @@ TR_SHADE="$PROJECT_ROOT/src/renderers/vulkan/tr_shade.c"
 VK_FRAME_SUBMIT="$PROJECT_ROOT/src/renderers/vulkan/vk_frame_submit.c"
 if awk '
   /PostFX_VegWind_IsEnabled\(\) && tess\.shader && \( tess\.shader->surfaceFlags & SURF_VEGETATION \)/ { guard=1 }
-  /vk_vegetation_wind_dispatch\(\);/ { dispatch=1 }
-  /vk_vegetation_clear_staging\(\);/ { clear=1 }
-  END { exit !(guard && dispatch && clear) }
+  /vk_vegetation_wind_prepare_draw\(\);/ { prepare=1 }
+  END { exit !(guard && prepare) }
 ' "$TR_SHADE"; then
-  pass "tr_shade.c dispatches + clears vegetation staging from SURF_VEGETATION batches"
+  pass "tr_shade.c prepares vegetation wind from SURF_VEGETATION batches before draw"
 else
-  fail "tr_shade.c is missing SURF_VEGETATION-gated veg-wind dispatch/clear sequence"
+  fail "tr_shade.c is missing SURF_VEGETATION-gated vk_vegetation_wind_prepare_draw()"
 fi
-if grep -q 'vk_vegetation_wind_dispatch();' "$VK_FRAME_SUBMIT"; then
-  fail "vk_frame_submit.c should not dispatch vegetation wind at frame start"
+if grep -q 'vk_vegetation_wind_prepare_draw();' "$VK_FRAME_SUBMIT"; then
+  fail "vk_frame_submit.c should not prepare vegetation wind at frame start"
 else
-  pass "vk_frame_submit.c has no direct veg-wind dispatch call"
+  pass "vk_frame_submit.c has no direct veg-wind prepare call"
 fi
 
 echo ""

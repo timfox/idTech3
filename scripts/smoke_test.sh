@@ -158,6 +158,20 @@ fi
 
 echo ""
 
+# --- Q3 / OpenArena QVM compatibility (static; no game data required) ---
+echo "Q3 / OpenArena compatibility:"
+if [ -x "$PROJECT_ROOT/scripts/q3_openarena_compat_check.sh" ]; then
+  if "$PROJECT_ROOT/scripts/q3_openarena_compat_check.sh" "$RELEASE_DIR"; then
+    pass "q3_openarena_compat_check.sh"
+  else
+    fail "q3_openarena_compat_check.sh"
+  fi
+else
+  warn "q3_openarena_compat_check.sh not executable"
+fi
+
+echo ""
+
 # --- Shader validation ---
 echo "Shader checks:"
 if command -v glslangValidator &>/dev/null; then

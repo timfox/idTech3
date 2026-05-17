@@ -46,30 +46,25 @@ for f in "$TR_SHADE" "$VK_FRAME" "$VK_INSTANCE" "$TR_INIT" "$TR_LOCAL" "$VK_H"; 
 	assert_file_exists "$f"
 done
 
-# Vegetation wind dispatch ordering guard:
-# It must be dispatched only after vegetation staging upload in RB_EndSurface.
-assert_not_contains "$VK_FRAME" "\\bvk_vegetation_wind_dispatch[[:space:]]*\\(" "vk_begin_frame dispatch removal"
+# Vegetation wind prepare ordering guard: compute before draw in RB_EndSurface.
+assert_not_contains "$VK_FRAME" "\\bvk_vegetation_wind_prepare_draw[[:space:]]*\\(" "vk_begin_frame prepare removal"
 assert_contains "$TR_SHADE" "PostFX_VegWind_IsEnabled\\(\\) && tess\\.shader && \\( tess\\.shader->surfaceFlags & SURF_VEGETATION \\)" "RB_EndSurface vegetation gate"
-assert_contains "$TR_SHADE" "\\bvk_vegetation_wind_dispatch[[:space:]]*\\(\\);" "RB_EndSurface dispatch call"
-assert_contains "$TR_SHADE" "\\bvk_vegetation_clear_staging[[:space:]]*\\(\\);" "RB_EndSurface staging clear call"
+assert_contains "$TR_SHADE" "\\bvk_vegetation_wind_prepare_draw[[:space:]]*\\(\\);" "RB_EndSurface prepare call"
 
-dispatch_line="$(awk '/vk_vegetation_wind_dispatch[[:space:]]*\(/ {print NR; exit}' "$TR_SHADE")"
-clear_line="$(awk '/vk_vegetation_clear_staging[[:space:]]*\(/ {print NR; exit}' "$TR_SHADE")"
+prepare_line="$(awk '/vk_vegetation_wind_prepare_draw[[:space:]]*\(/ {print NR; exit}' "$TR_SHADE")"
+iterator_line="$(awk '/optimalStageIteratorFunc[[:space:]]*\(/ {print NR; exit}' "$TR_SHADE")"
 guard_line="$(awk '/PostFX_VegWind_IsEnabled\(\).*SURF_VEGETATION/ {print NR; exit}' "$TR_SHADE")"
 
-if [ -z "$dispatch_line" ] || [ -z "$clear_line" ] || [ -z "$guard_line" ]; then
-	fail "could not locate vegetation wind guard/dispatch/clear lines"
+if [ -z "$prepare_line" ] || [ -z "$iterator_line" ] || [ -z "$guard_line" ]; then
+	fail "could not locate vegetation wind guard/prepare/iterator lines"
 fi
-if [ "$dispatch_line" -le "$guard_line" ] || [ $((dispatch_line - guard_line)) -gt 4 ]; then
-	fail "vegetation dispatch is no longer directly guarded by SURF_VEGETATION branch"
-fi
-if [ "$clear_line" -le "$dispatch_line" ] || [ $((clear_line - dispatch_line)) -gt 4 ]; then
-	fail "staging clear is no longer immediately after vegetation dispatch"
+if [ "$prepare_line" -le "$guard_line" ] || [ "$prepare_line" -ge "$iterator_line" ]; then
+	fail "vegetation prepare must run after SURF_VEGETATION guard and before stage iterator"
 fi
 
-dispatch_count="$(grep -Eho '\bvk_vegetation_wind_dispatch[[:space:]]*\(' "$TR_SHADE" "$VK_FRAME" | wc -l | tr -d '[:space:]')"
-if [ "$dispatch_count" -ne 1 ]; then
-	fail "expected exactly one vegetation dispatch call across tr_shade/vk_frame_submit, got $dispatch_count"
+prepare_count="$(grep -Eho '\bvk_vegetation_wind_prepare_draw[[:space:]]*\(' "$TR_SHADE" "$VK_FRAME" | wc -l | tr -d '[:space:]')"
+if [ "$prepare_count" -ne 1 ]; then
+	fail "expected exactly one vegetation prepare call across tr_shade/vk_frame_submit, got $prepare_count"
 fi
 
 # VK_NV_mesh_shader gating guard:

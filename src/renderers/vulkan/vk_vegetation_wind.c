@@ -2,11 +2,9 @@
 ===========================================================================
 Copyright (C) 2026 Gopex LLC. All rights reserved.
 
-Vegetation wind compute: uploads tess vertices to a storage buffer and dispatches
-the deform kernel. Dispatch runs from RB_EndSurface after the draw for that
-batch (see tr_shade.c); the GPU therefore applies wind to the *next* frame's
-vertices unless the draw path binds this buffer as positions (not wired yet).
-Extracted from vk.c for incremental modularization.
+Vegetation wind compute: uploads tess vertices to a storage buffer, dispatches
+the deform kernel, then copies deformed positions into tess.xyz before draw.
+Called from RB_EndSurface before the stage iterator (see tr_shade.c).
 ===========================================================================
 */
 
@@ -60,7 +58,57 @@ void vk_vegetation_add_from_tess( int oldVertexCount, int newVertexCount )
 	vegwind_staging_count += n;
 }
 
-void vk_vegetation_wind_dispatch( void )
+static void vk_vegetation_wind_barrier_after_compute( void )
+{
+	VkBufferMemoryBarrier barrier;
+
+	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE || vk.vegwind_vertex_buffer == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	Com_Memset( &barrier, 0, sizeof( barrier ) );
+	barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+	barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+	barrier.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
+	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.buffer = vk.vegwind_vertex_buffer;
+	barrier.offset = 0;
+	barrier.size = VK_WHOLE_SIZE;
+
+	qvkCmdPipelineBarrier( vk.cmd->command_buffer,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		VK_PIPELINE_STAGE_HOST_BIT,
+		0, 0, NULL, 1, &barrier, 0, NULL );
+}
+
+static void vk_vegetation_apply_deformed_positions( int vertexCount )
+{
+	void *ptr;
+	int i;
+	const vegwind_vertex_t *deformed;
+
+	if ( vertexCount <= 0 || vertexCount > tess.numVertexes || vk.vegwind_vertex_memory == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	if ( qvkMapMemory( vk.device, vk.vegwind_vertex_memory, 0,
+			(VkDeviceSize)vertexCount * VEGWIND_VERTEX_STRIDE, 0, &ptr ) != VK_SUCCESS ) {
+		return;
+	}
+
+	deformed = (const vegwind_vertex_t *)ptr;
+	for ( i = 0; i < vertexCount; i++ ) {
+		tess.xyz[i][0] = deformed[i].positionFlex[0];
+		tess.xyz[i][1] = deformed[i].positionFlex[1];
+		tess.xyz[i][2] = deformed[i].positionFlex[2];
+		tess.xyz[i][3] = 1.0f;
+	}
+
+	qvkUnmapMemory( vk.device, vk.vegwind_vertex_memory );
+}
+
+void vk_vegetation_wind_prepare_draw( void )
 {
 	typedef struct {
 		float windDirection[4];
@@ -76,16 +124,20 @@ void vk_vegetation_wind_dispatch( void )
 	vegwind_push_t push;
 	uint32_t groupCount;
 	const uint32_t localSize = 64;
+	qboolean wasInRenderPass;
 
 	if ( !PostFX_VegWind_IsEnabled() || vk.vegwind_pipeline == VK_NULL_HANDLE ||
-		vk.vegwind_descriptor == VK_NULL_HANDLE )
+		vk.vegwind_descriptor == VK_NULL_HANDLE || vegwind_staging_count <= 0 )
 	{
 		return;
 	}
 	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE )
 		return;
 
-	vk_end_render_pass();
+	wasInRenderPass = vk.inRenderPass;
+	if ( wasInRenderPass ) {
+		vk_end_render_pass();
+	}
 
 	PostFX_VegWind_GetWindDir( &push.windDirection[0], &push.windDirection[1], &push.windDirection[2] );
 	push.windDirection[3] = PostFX_VegWind_GetWindStrength();
@@ -101,10 +153,10 @@ void vk_vegetation_wind_dispatch( void )
 	push.timeParams[1] = 0.0f;
 	push.timeParams[2] = 0.0f;
 	push.timeParams[3] = 0.0f;
-	push.vertexCount = vegwind_staging_count;
+	push.vertexCount = (uint32_t)vegwind_staging_count;
 	push.pad0 = push.pad1 = push.pad2 = 0;
 
-	if ( push.vertexCount > 0 && vk.vegwind_vertex_buffer != VK_NULL_HANDLE ) {
+	if ( vk.vegwind_vertex_buffer != VK_NULL_HANDLE ) {
 		void *ptr;
 		VkDeviceSize uploadSize = (VkDeviceSize)push.vertexCount * VEGWIND_VERTEX_STRIDE;
 		if ( qvkMapMemory( vk.device, vk.vegwind_vertex_memory, 0, uploadSize, 0, &ptr ) == VK_SUCCESS ) {
@@ -113,10 +165,19 @@ void vk_vegetation_wind_dispatch( void )
 		}
 	}
 
-	groupCount = ( push.vertexCount > 0 ) ? ( ( push.vertexCount + localSize - 1 ) / localSize ) : 1;
+	groupCount = ( push.vertexCount + localSize - 1 ) / localSize;
 
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.vegwind_pipeline );
 	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.pipeline_layout_vegwind, 0, 1, &vk.vegwind_descriptor, 0, NULL );
 	qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_vegwind, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( push ), &push );
 	qvkCmdDispatch( vk.cmd->command_buffer, groupCount, 1, 1 );
+
+	vk_vegetation_wind_barrier_after_compute();
+	vk_vegetation_apply_deformed_positions( (int)push.vertexCount );
+
+	if ( wasInRenderPass ) {
+		vk_resume_current_render_pass();
+	}
+
+	vk_vegetation_clear_staging();
 }

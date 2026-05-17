@@ -32,6 +32,7 @@ echo ""
 
 echo "3. Running smoke test..."
 ./scripts/smoke_test.sh release
+./scripts/q3_openarena_compat_check.sh release
 echo ""
 
 echo "4. CTest (mirrors ubuntu-x86_64 job: smoke + renderer + scripts + units)..."

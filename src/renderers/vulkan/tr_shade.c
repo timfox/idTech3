@@ -2156,16 +2156,14 @@ void RB_EndSurface( void ) {
 		vk_update_mvp( NULL );
 	}
 #endif
-	R_IQMCommitSurfaceBatch();
-	tess.shader->optimalStageIteratorFunc();
-
 #ifdef USE_VULKAN
-	/* Run veg-wind compute after this vegetation batch uploaded staging (vk_begin_frame is too early). */
+	/* Deform vegetation verts on GPU before draw (staging filled during RB_DrawSurfs). */
 	if ( PostFX_VegWind_IsEnabled() && tess.shader && ( tess.shader->surfaceFlags & SURF_VEGETATION ) ) {
-		vk_vegetation_wind_dispatch();
-		vk_vegetation_clear_staging();
+		vk_vegetation_wind_prepare_draw();
 	}
 #endif
+	R_IQMCommitSurfaceBatch();
+	tess.shader->optimalStageIteratorFunc();
 
 	//
 	// draw debugging stuff

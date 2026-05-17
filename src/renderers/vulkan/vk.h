@@ -488,6 +488,7 @@ void vk_update_depth_range( Vk_Depth_Range depth_range );
 
 void vk_end_render_pass( void );
 void vk_begin_main_render_pass( void );
+void vk_resume_current_render_pass( void );
 void vk_begin_post_bloom_render_pass( void );
 void vk_begin_ui_overlay_render_pass( void );
 void vk_begin_bloom_extract_render_pass( void );
@@ -499,7 +500,7 @@ struct drawSurfsCommand_s;
 void vk_oit_pass( const struct drawSurfsCommand_s *cmd );
 void vk_begin_ssr_render_pass( void );
 void vk_ssr_pass( void );
-void vk_vegetation_wind_dispatch( void );
+void vk_vegetation_wind_prepare_draw( void );
 void vk_vegetation_add_from_tess( int oldVertexCount, int newVertexCount );
 void vk_vegetation_clear_staging( void );
 qboolean vk_begin_sun_shadow_render_pass( void );

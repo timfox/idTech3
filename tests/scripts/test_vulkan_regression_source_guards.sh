@@ -55,13 +55,11 @@ assert_contains_literal "$VK_INSTANCE" "mesh_shader_features_nv.taskShader = VK_
 assert_contains_literal "$VK_INSTANCE" "mesh_shader_features_nv.meshShader = VK_TRUE;" "mesh shader stage explicitly enabled"
 assert_contains_literal "$VK_INSTANCE" "device_desc.pNext = &mesh_shader_features_nv;" "mesh shader features added to pNext chain"
 
-# Vegetation wind compute must happen after SURF_VEGETATION batching in RB_EndSurface.
-assert_contains_literal "$TR_SHADE" "if ( PostFX_VegWind_IsEnabled() && tess.shader && ( tess.shader->surfaceFlags & SURF_VEGETATION ) ) {" "vegetation dispatch gate in RB_EndSurface"
-assert_contains_literal "$TR_SHADE" "vk_vegetation_wind_dispatch();" "vegetation dispatch call in RB_EndSurface"
-assert_contains_literal "$TR_SHADE" "vk_vegetation_clear_staging();" "vegetation staging clear after dispatch"
+# Vegetation wind compute must run before draw for SURF_VEGETATION batches in RB_EndSurface.
+assert_contains_literal "$TR_SHADE" "if ( PostFX_VegWind_IsEnabled() && tess.shader && ( tess.shader->surfaceFlags & SURF_VEGETATION ) ) {" "vegetation prepare gate in RB_EndSurface"
+assert_contains_literal "$TR_SHADE" "vk_vegetation_wind_prepare_draw();" "vegetation prepare call in RB_EndSurface"
 
-# Frame begin path must not dispatch vegetation compute directly (would run before tess upload).
-assert_not_matches_regex "$VK_FRAME_SUBMIT" "^[[:space:]]*vk_vegetation_wind_dispatch[[:space:]]*\\(" "no early vegetation dispatch in vk_begin_frame"
-assert_contains_literal "$VK_FRAME_SUBMIT" "before tessellation and see vertexCount==0." "frame-submit comment documents ordering risk"
+# Frame begin path must not prepare vegetation compute directly (would run before tess upload).
+assert_not_matches_regex "$VK_FRAME_SUBMIT" "^[[:space:]]*vk_vegetation_wind_prepare_draw[[:space:]]*\\(" "no early vegetation prepare in vk_begin_frame"
 
 echo "PASS: test_vulkan_regression_source_guards"
