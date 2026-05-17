@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Vulkan Forward+: **`r_forwardPlusDepthCull`** (0/1, default **0**); when **1**, tile cull runs after opaque geometry and rejects lights behind the depth buffer at each light’s screen center (reversed-Z).
+- Vulkan RTX (USE_VULKAN_RTX): **`r_rtxEntities`** / **`r_rtxEntityCap`** (default **0** / **128**); when **1** with **`r_rtxDemo`**, refEntity model bounds are packed as proxy AABB boxes in a second BLAS and included in the TLAS each frame.
+- Vulkan VDB: **`r_vdbFog`** / **`r_vdbFogBlend`** (default **0** / **0.5**); blends bound GPU-uploaded VDB fog density into the volumetric fog compute pass (binding 17).
 - Vulkan RTX (USE_VULKAN_RTX): **`compile_shaders.sh` auto-writes `src/renderers/vulkan/vk_rtx_demo_spirv.inc`**; per-frame UBO passes **`r_rtx` 1–3** into **`rtx_demo.rchit`** for distinct hit tints (shadow / reflections / full visualization).
 - Vulkan ImGui: **File** (screenshot JPEG silent, toggle console, quit), **Help** (shortcuts popup + About inspector with GPU strings), **Developer** (`r_imgui`, `r_speeds` 0–6, `r_showtris` wireframe) menu items.
 - Filesystem: `FS_LoadLibrary` extracts native `.so`/`.dll` modules from `.pk3` into `vm/native_cache/` under the game home path (CRC-checked) before `dlopen`, when **`com_nativeLibraryExtractPk3`** is **1** (default; startup log line).
