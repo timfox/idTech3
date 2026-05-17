@@ -80,11 +80,9 @@ assert_contains "$TR_SHADE" '#include "vk_postfx.h"' \
 	"vegetation dispatch include"
 assert_contains "$TR_SHADE" 'if ( PostFX_VegWind_IsEnabled() && tess.shader && ( tess.shader->surfaceFlags & SURF_VEGETATION ) ) {' \
 	"vegetation dispatch guard"
-assert_contains "$TR_SHADE" 'vk_vegetation_wind_dispatch();' \
-	"vegetation dispatch call"
-assert_contains "$TR_SHADE" 'vk_vegetation_clear_staging();' \
-	"vegetation staging clear"
-assert_not_contains "$VK_FRAME_SUBMIT" 'vk_vegetation_wind_dispatch();' \
-	"frame-start dispatch regression"
+assert_contains "$TR_SHADE" 'vk_vegetation_wind_prepare_draw();' \
+	"vegetation prepare-before-draw call"
+assert_not_contains "$VK_FRAME_SUBMIT" 'vk_vegetation_wind_prepare_draw();' \
+	"frame-start prepare regression"
 
 echo "PASS: test_vulkan_runtime_regressions"
