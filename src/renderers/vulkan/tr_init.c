@@ -854,6 +854,9 @@ static void InitOpenGL( void )
 		ri.Printf( PRINT_ALL, "[VK][fog] r_volumetricFogCompositeMode=%d (0=standard, 1=depth-weighted in-scatter, 2=HDR clamp)\n",
 			r_volumetricFogCompositeMode ? r_volumetricFogCompositeMode->integer : 0 );
 	}
+	if ( r_vdbFog && r_vdbFog->integer ) {
+		ri.Printf( PRINT_ALL, "[VK][fog] r_vdbFog=1 (blend bound VDB density in volumetric compute when GPU-uploaded)\n" );
+	}
 #endif
 
 	// set default state

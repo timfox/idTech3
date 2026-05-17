@@ -286,6 +286,37 @@ else
 fi
 
 echo ""
+echo "Forward+ tile cull: push constants (depthCull) host vs compute shader:"
+if ! grep -q 'depth_cull' "$FP_C" 2>/dev/null || ! grep -q 'depthCull' "$FP_COMP" 2>/dev/null; then
+  fail "vk_forward_plus.c vk_fp_push_t and forward_plus_tile_cull.comp Push must both declare depth_cull / depthCull"
+elif ! grep -q 'push\.depth_cull = use_depth_cull' "$FP_C" 2>/dev/null; then
+  fail "vk_forward_plus_dispatch_tile_cull_internal must assign push.depth_cull from use_depth_cull"
+elif ! grep -q 'binding = 3' "$FP_COMP" 2>/dev/null || ! grep -q 'depthTexture' "$FP_COMP" 2>/dev/null; then
+  fail "forward_plus_tile_cull.comp must declare depthTexture on binding 3 for r_forwardPlusDepthCull"
+elif ! grep -q 'binds\[3\].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER' "$FP_C" 2>/dev/null; then
+  fail "vk_forward_plus_create_set_layout must include binding 3 depth sampler for compute"
+else
+  pass "Forward+ depth cull: push depthCull + binding 3 depth sampler wired"
+fi
+
+echo ""
+echo "Volumetric fog compute: VDB binding 17 + params (host vs volumetric_fog.comp):"
+VF_COMP="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/volumetric/volumetric_fog.comp"
+VK_INIT="$PROJECT_ROOT/src/renderers/vulkan/vk_init_device.c"
+VK_VOL_P="$PROJECT_ROOT/src/renderers/vulkan/vk_volumetric_params.h"
+if [[ ! -f "$VF_COMP" ]]; then
+  fail "missing volumetric_fog.comp"
+elif ! grep -q 'binding = 17' "$VF_COMP" 2>/dev/null || ! grep -q 'vdbFogDensity' "$VF_COMP" 2>/dev/null; then
+  fail "volumetric_fog.comp must declare sampler3D vdbFogDensity on binding 17"
+elif ! grep -q 'compute_bindings\[18\]' "$VK_INIT" 2>/dev/null || ! grep -q 'compute_bindings\[17\].binding = 17' "$VK_INIT" 2>/dev/null; then
+  fail "vk_init_device.c volumetric compute layout must include binding 17 (18 bindings total)"
+elif ! grep -q 'vdbParams\[4\]' "$VK_VOL_P" 2>/dev/null || ! grep -q 'vdbWorldMin\[4\]' "$VK_VOL_P" 2>/dev/null; then
+  fail "volumetric_params_t must include vdbParams / vdbWorldMin / vdbWorldMax for r_vdbFog"
+else
+  pass "VDB volumetric fog: binding 17 + UBO vdb fields present"
+fi
+
+echo ""
 echo "Vulkan temporal: reset bitmask vs reason_string / log table:"
 VK_TEMP_H="$PROJECT_ROOT/src/renderers/vulkan/vk_temporal.h"
 VK_TEMP_C="$PROJECT_ROOT/src/renderers/vulkan/vk_temporal.c"
