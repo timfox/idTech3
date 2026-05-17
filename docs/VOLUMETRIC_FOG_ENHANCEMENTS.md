@@ -110,10 +110,10 @@ The engine already has:
 
 ### 7. Authored Volume Integration (VDB)
 
-**Current**: VDB_Load, VDB_SampleFloat, VDB_BindAsFogDensity; integration path exists but may be partial.
+**Current**: `VDB_Load` / `VDB_UploadToGPU` (R32 3D texture), `VDB_BindAsFogDensity`, **`r_vdbFog`** / **`r_vdbFogBlend`** blend bound density in **`volumetric_fog.comp`** global density stage (binding **17**). CPU `VDB_SampleFloat` remains for tooling.
 
 **Enhancement**:
-- **Full VDB density in compute**: Sample VDB 3D texture in density stage; blend with procedural density
+- **Animated VDB sequences** and richer blending (still open below)
 - **VDB + procedural**: Combine authored clouds/smoke with height fog and noise
 - **Animated VDB sequences**: Support frame-indexed VDB for explosions, smoke plumes
 - **VDB world-space mapping**: Proper transform from VDB voxel space to world
@@ -203,7 +203,7 @@ The engine already has:
 | Fog color/lighting | Height-based color (GetFogColorAtHeight), cooler at altitude |
 | Shadow quality | Stochastic PCF jitter (frame-based offset) in ComputeShadow |
 | Temporal stability | Variance-guided blend in ReprojectHistory |
-| VDB API | VDB_GetBoundFogDensityHandle() for future GPU integration |
+| VDB fog | `r_vdbFog` + GPU 3D sample in `ComputeBaseDensity` when bound grid is uploaded |
 
 ## Priority Matrix
 
@@ -215,7 +215,7 @@ The engine already has:
 | Multi-scatter approx | Medium | Low | Done |
 | Shadow quality | Medium | Medium | Done |
 | Slice distribution | Medium | Low | None |
-| VDB integration | High | Medium | OpenVDB, 3D texture upload |
+| VDB integration | High | Medium | Animated sequences, art workflow; base GPU path done |
 | Fog color/lighting | Medium | Low | Done |
 | Temporal/denoise | High | Medium | Done |
 | Performance tiers | High | Medium | None |
