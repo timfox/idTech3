@@ -66,6 +66,13 @@ else
 	fail "r_vegWind default not 0 in Vulkan postfx"
 fi
 
+if grep -qE 'r_forwardPlusDistanceSort[[:space:]]*=[[:space:]]*ri\.Cvar_Get\([[:space:]]*"r_forwardPlusDistanceSort"[[:space:]]*,[[:space:]]*"0"' \
+	"$PROJECT_ROOT/src/renderers/vulkan/tr_init.c"; then
+	pass "r_forwardPlusDistanceSort defaults to 0 (classic Forward+ overload order preserved)"
+else
+	fail "r_forwardPlusDistanceSort default not 0"
+fi
+
 SERVER="$(bin_path idtech3_server)"
 CLIENT="$(bin_path idtech3)"
 if [ -n "$SERVER" ]; then
