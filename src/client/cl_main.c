@@ -212,6 +212,229 @@ static void CL_Open_f( void ) {
 	Com_Printf( "open: unhandled target '%s'\n", target );
 }
 
+#if defined( USE_FLUX ) || defined( USE_TRELLIS )
+static qboolean CL_ShellEscapeArg( const char *in, char *out, size_t out_size ) {
+	size_t pos = 0;
+	if ( !in || !out || out_size == 0 ) {
+		return qfalse;
+	}
+
+	for ( const char *p = in; *p; ++p ) {
+		char c = *p;
+		if ( c == '\n' || c == '\r' || c == '\t' ) {
+			c = ' ';
+		}
+		if ( c == '"' || c == '\\' || c == '$' || c == '`' ) {
+			if ( pos + 2 >= out_size ) {
+				return qfalse;
+			}
+			out[pos++] = '\\';
+			out[pos++] = c;
+		} else {
+			if ( pos + 1 >= out_size ) {
+				return qfalse;
+			}
+			out[pos++] = c;
+		}
+	}
+	out[pos] = '\0';
+	return qtrue;
+}
+
+static qboolean CL_PipelineAppendEscaped( char *out, size_t *len, size_t maxlen, const char *raw ) {
+	char esc[4096];
+	size_t add;
+
+	if ( !raw ) {
+		raw = "";
+	}
+	if ( !CL_ShellEscapeArg( raw, esc, sizeof( esc ) ) ) {
+		return qfalse;
+	}
+	add = strlen( esc );
+	if ( *len + add >= maxlen ) {
+		return qfalse;
+	}
+	memcpy( out + *len, esc, add + 1 );
+	*len += add;
+	return qtrue;
+}
+
+typedef struct {
+	const char *repo;
+	const char *base;
+	const char *engine;
+	const char *py;
+	const char *conda;
+	const char *image;
+	const char *output;
+	const char *model;
+	const char *decimation;
+	const char *texture_size;
+	const char *args;
+} cl_pipeline_expand_t;
+
+static qboolean CL_PipelineExpandTemplate( char *out, size_t maxlen, const char *tmpl,
+		const cl_pipeline_expand_t *ex ) {
+	size_t o = 0;
+	const char *p;
+
+	if ( !tmpl || !*tmpl || maxlen < 8 || !ex ) {
+		return qfalse;
+	}
+	out[0] = '\0';
+	for ( p = tmpl; *p && o + 1 < maxlen; ) {
+		if ( p[0] == '%' && p[1] == '%' ) {
+			out[o++] = '%';
+			p += 2;
+			continue;
+		}
+		if ( p[0] == '%' && p[1] == 'R' ) {
+			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->repo ) ) {
+				return qfalse;
+			}
+			p += 2;
+			continue;
+		}
+		if ( p[0] == '%' && p[1] == 'B' ) {
+			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->base ) ) {
+				return qfalse;
+			}
+			p += 2;
+			continue;
+		}
+		if ( p[0] == '%' && p[1] == 'E' ) {
+			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->engine ) ) {
+				return qfalse;
+			}
+			p += 2;
+			continue;
+		}
+		if ( p[0] == '%' && p[1] == 'P' ) {
+			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->py ) ) {
+				return qfalse;
+			}
+			p += 2;
+			continue;
+		}
+		if ( p[0] == '%' && p[1] == 'N' ) {
+			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->conda ) ) {
+				return qfalse;
+			}
+			p += 2;
+			continue;
+		}
+		if ( p[0] == '%' && p[1] == 'I' ) {
+			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->image ) ) {
+				return qfalse;
+			}
+			p += 2;
+			continue;
+		}
+		if ( p[0] == '%' && p[1] == 'O' ) {
+			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->output ) ) {
+				return qfalse;
+			}
+			p += 2;
+			continue;
+		}
+		if ( p[0] == '%' && p[1] == 'M' ) {
+			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->model ) ) {
+				return qfalse;
+			}
+			p += 2;
+			continue;
+		}
+		if ( p[0] == '%' && p[1] == 'D' ) {
+			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->decimation ) ) {
+				return qfalse;
+			}
+			p += 2;
+			continue;
+		}
+		if ( p[0] == '%' && p[1] == 'T' ) {
+			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->texture_size ) ) {
+				return qfalse;
+			}
+			p += 2;
+			continue;
+		}
+		if ( p[0] == '%' && p[1] == 'A' ) {
+			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->args ) ) {
+				return qfalse;
+			}
+			p += 2;
+			continue;
+		}
+		out[o++] = *p++;
+	}
+	out[o] = '\0';
+	return qtrue;
+}
+#endif
+
+#ifdef USE_TRELLIS
+cvar_t	*cl_trellis_enable;
+cvar_t	*cl_trellis_repo;
+cvar_t	*cl_trellis_python;
+cvar_t	*cl_trellis_conda;
+cvar_t	*cl_trellis_cmd;
+cvar_t	*cl_trellis_hf_model;
+cvar_t	*cl_trellis_decimation;
+cvar_t	*cl_trellis_texture_size;
+
+static const char *CL_TrellisDefaultCmd( void ) {
+	return "conda run -n %N --no-capture-output %P \"%E/trellis_image_to_glb.py\" --repo \"%R\" --image \"%I\" --output \"%O\" --model \"%M\" --decimation %D --texture-size %T %A";
+}
+
+static qboolean CL_TrellisFileExists( const char *path ) {
+	FILE *f;
+
+	if ( !path || !path[0] ) {
+		return qfalse;
+	}
+	f = fopen( path, "rb" );
+	if ( f ) {
+		fclose( f );
+		return qtrue;
+	}
+	return qfalse;
+}
+
+static void CL_TrellisResolvePath( const char *base, const char *in, char *out, size_t out_size ) {
+	if ( !in || !in[0] || !out || out_size == 0 ) {
+		if ( out && out_size > 0 ) {
+			out[0] = '\0';
+		}
+		return;
+	}
+	if ( in[0] == '/' || ( in[0] && in[1] == ':' ) ) {
+		Q_strncpyz( out, in, out_size );
+		return;
+	}
+	if ( base && base[0] ) {
+		Com_sprintf( out, out_size, "%s/%s", base, in );
+	} else {
+		Q_strncpyz( out, in, out_size );
+	}
+}
+
+static qboolean CL_TrellisRunExpanded( const char *tmpl, const cl_pipeline_expand_t *ex ) {
+	char cmd[8192];
+
+	if ( !CL_PipelineExpandTemplate( cmd, sizeof( cmd ), tmpl, ex ) ) {
+		Com_Printf( S_COLOR_RED "TRELLIS: expanded command too long or bad path characters\n" );
+		return qfalse;
+	}
+	Com_Printf( "TRELLIS: executing (blocking): %s\n", cmd );
+	if ( system( cmd ) != 0 ) {
+		Com_Printf( S_COLOR_RED "TRELLIS: shell returned non-zero\n" );
+		return qfalse;
+	}
+	return qtrue;
+}
+#endif
+
 #ifdef USE_FLUX
 // FLUX image generation cvars
 cvar_t	*cl_flux_enable;
@@ -245,34 +468,6 @@ static qboolean CL_FluxFileExists(const char *path) {
 		return qtrue;
 	}
 	return qfalse;
-}
-
-static qboolean CL_FluxEscapeShellArg(const char *in, char *out, size_t out_size) {
-	size_t pos = 0;
-	if (!in || !out || out_size == 0) {
-		return qfalse;
-	}
-
-	for (const char *p = in; *p; ++p) {
-		char c = *p;
-		if (c == '\n' || c == '\r' || c == '\t') {
-			c = ' ';
-		}
-		if (c == '"' || c == '\\' || c == '$' || c == '`') {
-			if (pos + 2 >= out_size) {
-				return qfalse;
-			}
-			out[pos++] = '\\';
-			out[pos++] = c;
-		} else {
-			if (pos + 1 >= out_size) {
-				return qfalse;
-			}
-			out[pos++] = c;
-		}
-	}
-	out[pos] = '\0';
-	return qtrue;
 }
 
 static qboolean CL_FluxFindCliPath(char *out, size_t out_size) {
@@ -320,7 +515,7 @@ static qboolean CL_FluxGenerateExternal(const char *model_path, const char *prom
 		return qfalse;
 	}
 
-	if (!CL_FluxEscapeShellArg(prompt, prompt_escaped, sizeof(prompt_escaped))) {
+	if (!CL_ShellEscapeArg(prompt, prompt_escaped, sizeof(prompt_escaped))) {
 		if (error_msg && error_msg_size > 0) {
 			Q_strncpyz(error_msg, "Failed to escape prompt for shell", error_msg_size);
 		}
@@ -350,74 +545,6 @@ static qboolean CL_FluxGenerateExternal(const char *model_path, const char *prom
 		return qfalse;
 	}
 
-	return qtrue;
-}
-
-static qboolean CL_FontsAppendEscapedToCmd( char *out, size_t *len, size_t maxlen, const char *raw ) {
-	char esc[4096];
-	size_t add;
-
-	if ( !raw ) {
-		raw = "";
-	}
-	if ( !CL_FluxEscapeShellArg( raw, esc, sizeof( esc ) ) ) {
-		return qfalse;
-	}
-	add = strlen( esc );
-	if ( *len + add >= maxlen ) {
-		return qfalse;
-	}
-	memcpy( out + *len, esc, add + 1 );
-	*len += add;
-	return qtrue;
-}
-
-static qboolean CL_FontsExpandPipelineTemplate( char *out, size_t maxlen, const char *tmpl,
-		const char *repo, const char *base, const char *py, const char *args ) {
-	size_t o = 0;
-	const char *p;
-
-	if ( !tmpl || !*tmpl || maxlen < 8 ) {
-		return qfalse;
-	}
-	out[0] = '\0';
-	for ( p = tmpl; *p && o + 1 < maxlen; ) {
-		if ( p[0] == '%' && p[1] == '%' ) {
-			out[o++] = '%';
-			p += 2;
-			continue;
-		}
-		if ( p[0] == '%' && p[1] == 'R' ) {
-			if ( !CL_FontsAppendEscapedToCmd( out, &o, maxlen, repo ) ) {
-				return qfalse;
-			}
-			p += 2;
-			continue;
-		}
-		if ( p[0] == '%' && p[1] == 'B' ) {
-			if ( !CL_FontsAppendEscapedToCmd( out, &o, maxlen, base ) ) {
-				return qfalse;
-			}
-			p += 2;
-			continue;
-		}
-		if ( p[0] == '%' && p[1] == 'P' ) {
-			if ( !CL_FontsAppendEscapedToCmd( out, &o, maxlen, py ) ) {
-				return qfalse;
-			}
-			p += 2;
-			continue;
-		}
-		if ( p[0] == '%' && p[1] == 'A' ) {
-			if ( !CL_FontsAppendEscapedToCmd( out, &o, maxlen, args ) ) {
-				return qfalse;
-			}
-			p += 2;
-			continue;
-		}
-		out[o++] = *p++;
-	}
-	out[o] = '\0';
 	return qtrue;
 }
 
@@ -535,6 +662,11 @@ static void CL_FluxReload_f( void );
 static void CL_FluxShow_f( void );
 static void CL_FluxView_f( void );
 static void CL_FontsPipeline_f( void );
+#endif
+#ifdef USE_TRELLIS
+static void CL_TrellisGenerate_f( void );
+static void CL_TrellisPipeline_f( void );
+static void CL_TrellisImport_f( void );
 #endif
 static void CL_ServerStatusResponse( const netadr_t *from, msg_t *msg );
 static void CL_ServerInfoPacket( const netadr_t *from, msg_t *msg );
@@ -3914,6 +4046,31 @@ void CL_Init( void ) {
 		"Shell template for fonts_pipeline: use %R FonTS repo, %B engine base path, %P python, %A args from console; %% for literal %. Blocking system() call." );
 #endif
 
+#ifdef USE_TRELLIS
+	cl_trellis_enable = Cvar_Get( "cl_trellis_enable", "0", CVAR_ARCHIVE );
+	Cvar_CheckRange( cl_trellis_enable, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( cl_trellis_enable,
+		"Enable Microsoft TRELLIS.2 external image-to-3D pipeline (Python/CUDA). See docs/TRELLIS.md." );
+	cl_trellis_repo = Cvar_Get( "cl_trellis_repo", "", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_trellis_repo,
+		"Absolute path to a TRELLIS.2 git checkout (%%R in cl_trellis_cmd / trellis_generate)." );
+	cl_trellis_python = Cvar_Get( "cl_trellis_python", "python3", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_trellis_python, "Python interpreter (%%P) when not using conda run." );
+	cl_trellis_conda = Cvar_Get( "cl_trellis_conda", "trellis2", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_trellis_conda, "Conda environment name (%%N) for default trellis_generate command." );
+	cl_trellis_cmd = Cvar_Get( "cl_trellis_cmd", "", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_trellis_cmd,
+		"Optional shell template for trellis_pipeline / trellis_generate. Tokens: %%R repo, %%B base, %%E release dir, %%P python, %%N conda, %%I image, %%O output glb, %%M HF model, %%D decimation, %%T texture size, %%A extra args." );
+	cl_trellis_hf_model = Cvar_Get( "cl_trellis_hf_model", "microsoft/TRELLIS.2-4B", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_trellis_hf_model, "Hugging Face model id passed to the TRELLIS.2 wrapper (%%M)." );
+	cl_trellis_decimation = Cvar_Get( "cl_trellis_decimation", "500000", CVAR_ARCHIVE );
+	Cvar_CheckRange( cl_trellis_decimation, "1000", "10000000", CV_INTEGER );
+	Cvar_SetDescription( cl_trellis_decimation, "GLB decimation target for o_voxel export (%%D)." );
+	cl_trellis_texture_size = Cvar_Get( "cl_trellis_texture_size", "2048", CVAR_ARCHIVE );
+	Cvar_CheckRange( cl_trellis_texture_size, "256", "8192", CV_INTEGER );
+	Cvar_SetDescription( cl_trellis_texture_size, "GLB texture atlas size for export (%%T)." );
+#endif
+
 	//
 	// register client commands
 	//
@@ -3958,6 +4115,11 @@ void CL_Init( void ) {
 	Cmd_AddCommand ("flux_view", CL_FluxView_f );
 	Cmd_AddCommand ("fonts_pipeline", CL_FontsPipeline_f );
 #endif
+#ifdef USE_TRELLIS
+	Cmd_AddCommand( "trellis_generate", CL_TrellisGenerate_f );
+	Cmd_AddCommand( "trellis_pipeline", CL_TrellisPipeline_f );
+	Cmd_AddCommand( "trellis_import", CL_TrellisImport_f );
+#endif
 
 #ifdef USE_CURL
 	Cmd_AddCommand( "download", CL_Download_f );
@@ -3994,6 +4156,17 @@ void CL_Init( void ) {
 	}
 #else
 	Com_Printf( "FLUX.2 image generation: not available (compiled without USE_FLUX)\n" );
+#endif
+#ifdef USE_TRELLIS
+	if ( cl_trellis_enable && cl_trellis_enable->integer ) {
+		Com_Printf( "TRELLIS.2 image-to-3D: enabled (repo: %s, model: %s)\n",
+			( cl_trellis_repo && cl_trellis_repo->string[0] ) ? cl_trellis_repo->string : "unset",
+			cl_trellis_hf_model ? cl_trellis_hf_model->string : "microsoft/TRELLIS.2-4B" );
+	} else {
+		Com_Printf( "TRELLIS.2 image-to-3D: disabled (cl_trellis_enable 0; docs/TRELLIS.md)\n" );
+	}
+#else
+	Com_Printf( "TRELLIS.2 image-to-3D: not available (compiled without USE_TRELLIS)\n" );
 #endif
 
 	CL_InitGameSystems();
@@ -4073,6 +4246,11 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 	Cmd_RemoveCommand ("reloadTtf");
 #ifdef USE_FLUX
 	Cmd_RemoveCommand ("fonts_pipeline");
+#endif
+#ifdef USE_TRELLIS
+	Cmd_RemoveCommand( "trellis_generate" );
+	Cmd_RemoveCommand( "trellis_pipeline" );
+	Cmd_RemoveCommand( "trellis_import" );
 #endif
 	Cmd_RemoveCommand ("disconnect");
 	CL_Demo_ShutdownCommands();
@@ -5729,9 +5907,17 @@ static void CL_FontsPipeline_f( void ) {
 		return;
 	}
 	args = ( Cmd_Argc() >= 2 ) ? Cmd_ArgsFrom( 1 ) : "";
-	if ( !CL_FontsExpandPipelineTemplate( cmd, sizeof( cmd ), tmpl, repo, base, py, args ) ) {
-		Com_Printf( S_COLOR_RED "fonts_pipeline: expanded command too long or bad path characters\n" );
-		return;
+	{
+		cl_pipeline_expand_t ex;
+		Com_Memset( &ex, 0, sizeof( ex ) );
+		ex.repo = repo;
+		ex.base = base;
+		ex.py = py;
+		ex.args = args;
+		if ( !CL_PipelineExpandTemplate( cmd, sizeof( cmd ), tmpl, &ex ) ) {
+			Com_Printf( S_COLOR_RED "fonts_pipeline: expanded command too long or bad path characters\n" );
+			return;
+		}
 	}
 	Com_Printf( "FonTS: executing (blocking): %s\n", cmd );
 	if ( system( cmd ) != 0 ) {
@@ -5739,6 +5925,191 @@ static void CL_FontsPipeline_f( void ) {
 		return;
 	}
 	Com_Printf( S_COLOR_GREEN "fonts_pipeline: finished\n" );
+}
+#endif
+
+#ifdef USE_TRELLIS
+/*
+==================
+CL_TrellisPipeline_f
+
+Run a user-configured shell command for the TRELLIS.2 Python/CUDA stack.
+==================
+*/
+static void CL_TrellisPipeline_f( void ) {
+	const char *repo;
+	const char *base;
+	const char *engine;
+	const char *py;
+	const char *conda;
+	const char *tmpl;
+	const char *args;
+	cl_pipeline_expand_t ex;
+
+	if ( !cl_trellis_enable || !cl_trellis_enable->integer ) {
+		Com_Printf( S_COLOR_YELLOW "trellis_pipeline: set cl_trellis_enable 1 (see docs/TRELLIS.md)\n" );
+		return;
+	}
+	repo = cl_trellis_repo ? cl_trellis_repo->string : "";
+	if ( !repo || !repo[0] ) {
+		Com_Printf( S_COLOR_YELLOW "trellis_pipeline: set cl_trellis_repo to your TRELLIS.2 checkout\n" );
+		return;
+	}
+	base = Sys_DefaultBasePath();
+	engine = base;
+	if ( !base ) {
+		Com_Printf( S_COLOR_RED "trellis_pipeline: no engine base path\n" );
+		return;
+	}
+	py = ( cl_trellis_python && cl_trellis_python->string[0] ) ? cl_trellis_python->string : "python3";
+	conda = ( cl_trellis_conda && cl_trellis_conda->string[0] ) ? cl_trellis_conda->string : "trellis2";
+	tmpl = ( cl_trellis_cmd && cl_trellis_cmd->string[0] ) ? cl_trellis_cmd->string : CL_TrellisDefaultCmd();
+	args = ( Cmd_Argc() >= 2 ) ? Cmd_ArgsFrom( 1 ) : "";
+	Com_Memset( &ex, 0, sizeof( ex ) );
+	ex.repo = repo;
+	ex.base = base;
+	ex.engine = engine;
+	ex.py = py;
+	ex.conda = conda;
+	ex.args = args;
+	if ( !CL_TrellisRunExpanded( tmpl, &ex ) ) {
+		return;
+	}
+	Com_Printf( S_COLOR_GREEN "trellis_pipeline: finished\n" );
+}
+
+/*
+==================
+CL_TrellisGenerate_f
+
+Image-to-GLB via TRELLIS.2 wrapper (blocking). Output defaults to models/trellis/*.glb under base.
+==================
+*/
+static void CL_TrellisGenerate_f( void ) {
+	char image_rel[MAX_OSPATH];
+	char image_full[MAX_OSPATH];
+	char output_rel[MAX_OSPATH];
+	char output_full[MAX_OSPATH];
+	char output_vfs[MAX_QPATH];
+	char dec_str[32];
+	char tex_str[32];
+	char mkdir_cmd[1024];
+	const char *repo;
+	const char *base;
+	const char *engine;
+	const char *py;
+	const char *conda;
+	const char *tmpl;
+	const char *hf_model;
+	cl_pipeline_expand_t ex;
+
+	if ( !cl_trellis_enable || !cl_trellis_enable->integer ) {
+		Com_Printf( S_COLOR_YELLOW "trellis_generate: set cl_trellis_enable 1 (see docs/TRELLIS.md)\n" );
+		return;
+	}
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( S_COLOR_YELLOW "Usage: trellis_generate <image_path> [output.glb]\n" );
+		Com_Printf( "  Example: trellis_generate screenshots/shot0000.tga\n" );
+		return;
+	}
+	repo = cl_trellis_repo ? cl_trellis_repo->string : "";
+	if ( !repo || !repo[0] ) {
+		Com_Printf( S_COLOR_YELLOW "trellis_generate: set cl_trellis_repo to your TRELLIS.2 checkout\n" );
+		return;
+	}
+	base = Sys_DefaultBasePath();
+	engine = base;
+	if ( !base ) {
+		Com_Printf( S_COLOR_RED "trellis_generate: no engine base path\n" );
+		return;
+	}
+	Q_strncpyz( image_rel, Cmd_Argv( 1 ), sizeof( image_rel ) );
+	CL_TrellisResolvePath( base, image_rel, image_full, sizeof( image_full ) );
+	if ( !CL_TrellisFileExists( image_full ) ) {
+		Com_Printf( S_COLOR_RED "trellis_generate: input image not found: %s\n", image_full );
+		return;
+	}
+	if ( Cmd_Argc() >= 3 ) {
+		Q_strncpyz( output_rel, Cmd_Argv( 2 ), sizeof( output_rel ) );
+	} else {
+		Com_sprintf( output_rel, sizeof( output_rel ), "models/trellis/trellis_%d.glb", Com_Milliseconds() );
+	}
+	CL_TrellisResolvePath( base, output_rel, output_full, sizeof( output_full ) );
+	Q_strncpyz( output_vfs, output_rel, sizeof( output_vfs ) );
+	if ( !strstr( output_vfs, ".glb" ) && !strstr( output_vfs, ".gltf" ) ) {
+		Q_strcat( output_vfs, sizeof( output_vfs ), ".glb" );
+		Q_strcat( output_full, sizeof( output_full ), ".glb" );
+	}
+	{
+		char *slash = strrchr( output_full, '/' );
+		if ( slash ) {
+			char dir[MAX_OSPATH];
+			size_t dlen = (size_t)( slash - output_full );
+			if ( dlen < sizeof( dir ) ) {
+				memcpy( dir, output_full, dlen );
+				dir[dlen] = '\0';
+				Com_sprintf( mkdir_cmd, sizeof( mkdir_cmd ), "mkdir -p \"%s\"", dir );
+				system( mkdir_cmd );
+			}
+		}
+	}
+	py = ( cl_trellis_python && cl_trellis_python->string[0] ) ? cl_trellis_python->string : "python3";
+	conda = ( cl_trellis_conda && cl_trellis_conda->string[0] ) ? cl_trellis_conda->string : "trellis2";
+	hf_model = ( cl_trellis_hf_model && cl_trellis_hf_model->string[0] ) ?
+		cl_trellis_hf_model->string : "microsoft/TRELLIS.2-4B";
+	Com_sprintf( dec_str, sizeof( dec_str ), "%d", cl_trellis_decimation ? cl_trellis_decimation->integer : 500000 );
+	Com_sprintf( tex_str, sizeof( tex_str ), "%d", cl_trellis_texture_size ? cl_trellis_texture_size->integer : 2048 );
+	tmpl = ( cl_trellis_cmd && cl_trellis_cmd->string[0] ) ? cl_trellis_cmd->string : CL_TrellisDefaultCmd();
+	Com_Memset( &ex, 0, sizeof( ex ) );
+	ex.repo = repo;
+	ex.base = base;
+	ex.engine = engine;
+	ex.py = py;
+	ex.conda = conda;
+	ex.image = image_full;
+	ex.output = output_full;
+	ex.model = hf_model;
+	ex.decimation = dec_str;
+	ex.texture_size = tex_str;
+	ex.args = "";
+	if ( !CL_TrellisRunExpanded( tmpl, &ex ) ) {
+		return;
+	}
+	if ( !CL_TrellisFileExists( output_full ) ) {
+		Com_Printf( S_COLOR_RED "trellis_generate: expected output missing: %s\n", output_full );
+		return;
+	}
+	Com_Printf( S_COLOR_GREEN "trellis_generate: wrote %s\n", output_full );
+	Com_Printf( "  VFS path: %s — use trellis_import %s\n", output_vfs, output_vfs );
+}
+
+/*
+==================
+CL_TrellisImport_f
+
+Register a generated GLB/GLTF with the renderer (Vulkan/OpenGL glTF loader).
+==================
+*/
+static void CL_TrellisImport_f( void ) {
+	const char *name;
+	qhandle_t h;
+
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( S_COLOR_YELLOW "Usage: trellis_import <models/.../asset.glb>\n" );
+		return;
+	}
+	name = Cmd_Argv( 1 );
+	if ( !re.RegisterModel ) {
+		Com_Printf( S_COLOR_RED "trellis_import: renderer not initialized\n" );
+		return;
+	}
+	h = re.RegisterModel( name );
+	if ( !h ) {
+		Com_Printf( S_COLOR_RED "trellis_import: failed to register '%s'\n", name );
+		return;
+	}
+	Com_Printf( S_COLOR_GREEN "trellis_import: registered '%s' (handle %d)\n", name, h );
+	Com_Printf( "  Spawn in maps with misc_model or your game's model entity using this path.\n" );
 }
 #endif
 

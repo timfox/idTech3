@@ -451,6 +451,12 @@ copy_to_release() {
     chmod +x "$dest/run_vulkan.sh"
     echo "Copied run_vulkan.sh -> $dest/run_vulkan.sh"
   fi
+
+  if [ -f "$PROJECT_ROOT/scripts/trellis_image_to_glb.py" ]; then
+    cp -f "$PROJECT_ROOT/scripts/trellis_image_to_glb.py" "$dest/trellis_image_to_glb.py"
+    chmod +x "$dest/trellis_image_to_glb.py"
+    echo "Copied trellis_image_to_glb.py -> $dest/trellis_image_to_glb.py"
+  fi
 }
 
 echo ""
