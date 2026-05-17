@@ -23,6 +23,9 @@ Optional **GPU light packing + per-tile cull** on the existing forward path (not
 | `r_forwardPlusMaxPerTile` | **4–8** lights indexed per **16×16** tile (**latched**; `vid_restart`). Lowers GPU work vs default **8**; tile SSBO keeps **8** `uint32` slots either way. |
 | `r_forwardPlusDebug` | **0–1** float: PBR heatmap overlay (lights per tile + borders). |
 | `r_forwardPlusShade` | **0–4** float: experimental **additive** PBR from tile-culled dynamics; skips indices already in the Forward+ `tess.dlightBits` mask (first 32); changing it **invalidates graphics pipelines** (logged). |
+| `r_forwardPlusLuminanceSort` | **0/1** (default **1**): when a tile is overloaded, keep brightest lights by RGB sum. |
+| `r_forwardPlusDistanceSort` | **0/1** (default **0**): when overloaded, prefer nearest lights to the camera (`vieworg`). |
+| `r_forwardPlusDepthCull` | **0/1** (default **0**): **0** = tile cull before draws; **1** = cull after opaque, reject lights behind depth at each light’s screen center (reversed-Z). |
 
 **Caps:** at most **`MAX_DLIGHTS` (32)** packed lights so GPU indices match `tess.dlightBits`. If the refdef supplies more, extras are dropped and a **developer** log can note it.
 
@@ -182,6 +185,8 @@ Code: `src/renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar regist
 | `r_pbr` | 1 | Physically Based Rendering (metalness/roughness, IBL). Requires r_fbo 1. |
 | `r_renderMode` | 0 | Rendering path: 0=forward, 1=deferred (placeholder), 2=forward+ (placeholder). Deferred and forward+ would need G-buffers, light culling, and separate passes; they are not implemented yet. |
 | `r_volumetricFog` | 0 | Volumetric fog enable (0=off, 1=on) |
+| `r_vdbFog` | 0 | Blend GPU-uploaded bound VDB density (`vdb_bind_fog`) into global volumetric density (requires `r_volumetricFog` 1 and `VDB_UploadToGPU`) |
+| `r_vdbFogBlend` | 0.5 | VDB density blend weight when `r_vdbFog` 1 |
 | `r_volumetricFogDensity` | 0.35 | Volumetric density multiplier |
 | `r_volumetricFogQuality` | 2 | Quality tier (0=low, 1=medium, 2=high, 3=ultra; latched) |
 | `r_fogFluid` | 0 | Fluid-driven volumetric fog (0=off, 1=on). Vorticity/buoyancy: `r_fogFluidVorticity`, `r_fogFluidBuoyancy`. |
@@ -266,7 +271,7 @@ OpenGL is the compatibility fallback; Vulkan is the primary feature backend. Use
 
 See [RENDERERS_FUTURE.md](RENDERERS_FUTURE.md) for architecture and implementation plans:
 
-- **Vulkan RTX**: `VK_KHR_ray_tracing_pipeline` integration. Build with `-DUSE_VULKAN_RTX=ON`. Cvar `r_rtx` (0–3) reserved.
+- **Vulkan RTX**: demo path with `USE_VULKAN_RTX=ON`, `r_rtx` / `r_rtxDemo`, world BLAS; optional **`r_rtxEntities`** proxy entity boxes in TLAS. See [RENDERERS_FUTURE.md](RENDERERS_FUTURE.md).
 - **Metal**: Native Metal renderer for macOS/iOS (Apple Silicon). Option `USE_METAL_RENDERER` reserved.
 - **DXR**: DirectX 12 + DirectX Raytracing for Windows. Option `USE_DXR_RENDERER` reserved.
 
