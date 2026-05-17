@@ -62,7 +62,7 @@ TODOs/FIXMEs in `src/external/` are from third-party code (duktape, zstd, cjson,
 | r_renderMode 1/2 | tr_init.c | Deferred / alternate-pipeline placeholders (`r_renderMode`); not wired to Vulkan **optional** Forward+ (`r_forwardPlus`). Real deferred still needs G-buffers, etc. Documented in cvar description. |
 | r_hdr 3 64-bit output | `vk_post_process_pipeline.c`, HDR format helpers | Infrastructure in place (vk_hdr64_active, _hdr64 modules, pipeline selection). glslangValidator rejects dvec4/f64vec4 fragment shader outputs. Falls back to RGBA32F. When glslang adds support, compile HDR64 variants and return RGBA64F from get_hdr_format. |
 | Vegetation wind draw | `vk_vegetation_wind.c` + draw path | Compute dispatch runs **after** each vegetation batch draw (`RB_EndSurface`); buffer holds deformed verts for the **next** frame unless the raster path binds `vegwind_vertex_buffer` as stream 0 (still TODO). |
-| Vulkan RTX | CMake `USE_VULKAN_RTX`, `vk_rtx.c` / `vk_rtx_world.c`, `r_rtx` / `r_rtxDemo` / `r_rtxWorldPrimCap` | Demo: world BSP BLAS over all map brush submodels (capped) + trace + blit when `r_rtxDemo` 1; entity TLAS and real lighting still TODO. See `docs/RENDERERS_FUTURE.md`. |
+| Vulkan RTX | CMake `USE_VULKAN_RTX`, `vk_rtx.c` / `vk_rtx_world.c` / `vk_rtx_entities.c`, `r_rtx` / `r_rtxDemo` / `r_rtxWorldPrimCap` / `r_rtxEntities` | Demo: world BSP BLAS (capped) + trace + blit when `r_rtxDemo` 1; **`r_rtxEntities` 1** adds proxy AABB entity BLAS in TLAS (not full mesh AS). Real lighting still TODO. See `docs/RENDERERS_FUTURE.md`. |
 
 ## Subsystem audit log (rolling)
 
