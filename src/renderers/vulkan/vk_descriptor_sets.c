@@ -16,6 +16,7 @@ Descriptor set allocation and image/buffer binding updates (split from vk.c).
 #include "vk_descriptors.h"
 #include "vk_attachments.h"
 #include "vk_volumetric_params.h"
+#include "vk_vdb.h"
 
 void vk_update_attachment_descriptors( void ) {
 	uint32_t i;
@@ -302,7 +303,8 @@ void vk_update_volumetric_descriptors( void )
 		VkDescriptorImageInfo local_point_shadow_info;
 		VkDescriptorImageInfo motion_info;
 		VkDescriptorImageInfo fluid_info[4];
-		VkWriteDescriptorSet writes[17];
+		VkWriteDescriptorSet writes[18];
+		VkDescriptorImageInfo vdb_info;
 		Vk_Sampler_Def depth_sd;
 		Vk_Sampler_Def noise_sd;
 		Vk_Sampler_Def shadow_sd;
@@ -492,6 +494,22 @@ void vk_update_volumetric_descriptors( void )
 		writes[16].descriptorCount = 1;
 		writes[16].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 		writes[16].pImageInfo = &telemetry_info;
+
+		Com_Memset( &vdb_info, 0, sizeof( vdb_info ) );
+		vdb_info.sampler = vk.fog_noise_sampler;
+		vdb_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		{
+			const vdbHandle_t vdb_h = VDB_GetBoundFogDensityHandle();
+			VkImageView vdb_view = ( vdb_h >= 0 ) ? VDB_GetGpuImageView( vdb_h ) : VK_NULL_HANDLE;
+			vdb_info.imageView = ( vdb_view != VK_NULL_HANDLE ) ? vdb_view : vk.fog_noise_view;
+		}
+
+		writes[17].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[17].dstSet = vk.volumetric_compute_descriptor;
+		writes[17].dstBinding = 17;
+		writes[17].descriptorCount = 1;
+		writes[17].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		writes[17].pImageInfo = &vdb_info;
 
 		qvkUpdateDescriptorSets( vk.device, ARRAY_LEN( writes ), writes, 0, NULL );
 	}

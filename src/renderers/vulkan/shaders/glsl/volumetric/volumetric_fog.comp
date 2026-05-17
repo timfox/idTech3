@@ -18,6 +18,7 @@ layout(binding = 13) uniform sampler2D fluidVelocityB;
 layout(binding = 14) uniform sampler2D fluidDensityA;
 layout(binding = 15) uniform sampler2D fluidDensityB;
 layout(binding = 16, r32ui) uniform uimage2D telemetryCounters;
+layout(binding = 17) uniform sampler3D vdbFogDensity;
 
 const int MAX_VOLUMES = 24;
 const int MAX_LIGHTS = 32;
@@ -89,6 +90,9 @@ layout(std140, binding = 3) uniform VolumetricParams {
     vec4 fluidEmitterCount;
     vec4 telemetryParams0;
     vec4 telemetryParams1;
+    vec4 vdbParams;
+    vec4 vdbWorldMin;
+    vec4 vdbWorldMax;
 } params;
 
 const int TELEMETRY_NAN_INF = 0;
@@ -342,6 +346,15 @@ float ComputeBaseDensity(vec3 worldPos) {
         float noiseValue = texture(fogNoiseTexture, fract(noiseUV)).r;
         float noiseMask = clamp((noiseValue - noiseThreshold) / max(1.0 - noiseThreshold, 1e-4), 0.0, 1.0);
         density *= mix(1.0, noiseMask, noiseStrength);
+    }
+
+    if (params.vdbParams.y > 0.5) {
+        vec3 vdbExtent = max(params.vdbWorldMax.xyz - params.vdbWorldMin.xyz, vec3(1e-4));
+        vec3 vdbUvw = (worldPos - params.vdbWorldMin.xyz) / vdbExtent;
+        if (all(greaterThanEqual(vdbUvw, vec3(0.0))) && all(lessThanEqual(vdbUvw, vec3(1.0)))) {
+            float vdbDensity = texture(vdbFogDensity, vdbUvw).r;
+            density = mix(density, density + vdbDensity, params.vdbParams.x);
+        }
     }
 
     return max(density, 0.0);
