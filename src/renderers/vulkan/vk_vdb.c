@@ -27,6 +27,10 @@ Sampling:
 
 #include "tr_local.h"
 #include "vk_vdb.h"
+#include "vk.h"
+#include "vk_cmd.h"
+#include "vk_staging.h"
+#include "vk_image_layout.h"
 #include <math.h>
 
 typedef struct {
@@ -36,6 +40,9 @@ typedef struct {
 	float       *data;
 	int         dataSize;
 	qboolean    onGPU;
+	VkImage     gpuImage;
+	VkDeviceMemory gpuMemory;
+	VkImageView gpuView;
 } vdbGrid_t;
 
 static vdbGrid_t grids[VDB_MAX_GRIDS];
@@ -44,6 +51,26 @@ static vdbHandle_t boundFogDensityHandle = VDB_INVALID_HANDLE;
 static cvar_t *r_vdb;
 
 #define VALID_GRID(h) ((h) >= 0 && (h) < numGrids && grids[(h)].active)
+
+static void VDB_DestroyGpuResources( vdbGrid_t *grid )
+{
+	if ( !grid ) {
+		return;
+	}
+	if ( grid->gpuView != VK_NULL_HANDLE ) {
+		qvkDestroyImageView( vk.device, grid->gpuView, NULL );
+		grid->gpuView = VK_NULL_HANDLE;
+	}
+	if ( grid->gpuImage != VK_NULL_HANDLE ) {
+		qvkDestroyImage( vk.device, grid->gpuImage, NULL );
+		grid->gpuImage = VK_NULL_HANDLE;
+	}
+	if ( grid->gpuMemory != VK_NULL_HANDLE ) {
+		qvkFreeMemory( vk.device, grid->gpuMemory, NULL );
+		grid->gpuMemory = VK_NULL_HANDLE;
+	}
+	grid->onGPU = qfalse;
+}
 
 void VDB_Init( void ) {
 	Com_Memset( grids, 0, sizeof( grids ) );
@@ -61,6 +88,7 @@ void VDB_Init( void ) {
 void VDB_Shutdown( void ) {
 	int i;
 	for ( i = 0; i < numGrids; i++ ) {
+		VDB_DestroyGpuResources( &grids[i] );
 		if ( grids[i].data ) {
 			ri.Free( grids[i].data );
 			grids[i].data = NULL;
@@ -207,6 +235,7 @@ vdbHandle_t VDB_Load( const char *filename, const char *gridName ) {
 
 void VDB_Free( vdbHandle_t h ) {
 	if ( !VALID_GRID( h ) ) return;
+	VDB_DestroyGpuResources( &grids[h] );
 	if ( grids[h].data ) {
 		ri.Free( grids[h].data );
 		grids[h].data = NULL;
@@ -251,10 +280,139 @@ void VDB_SampleVec3( vdbHandle_t h, float x, float y, float z, float *outX, floa
 }
 
 qboolean VDB_UploadToGPU( vdbHandle_t h ) {
-	if ( !VALID_GRID( h ) || !grids[h].data ) return qfalse;
-	grids[h].onGPU = qtrue;
-	ri.Printf( PRINT_DEVELOPER, "VDB: grid %d uploaded to GPU (placeholder)\n", h );
+	vdbGrid_t *grid;
+	VkCommandBuffer cmd;
+	VkDeviceSize uploadBytes;
+	uint32_t width, height, depth;
+	VkImageCreateInfo image_desc;
+	VkImageViewCreateInfo view_desc;
+	VkMemoryRequirements mem_req;
+	VkMemoryAllocateInfo alloc_info;
+	VkBufferImageCopy region;
+
+	if ( !VALID_GRID( h ) || !grids[h].data ) {
+		return qfalse;
+	}
+	if ( !vk.device || vk.device_lost ) {
+		ri.Printf( PRINT_WARNING, "VDB: GPU upload skipped (Vulkan device not ready)\n" );
+		return qfalse;
+	}
+	if ( grids[h].info.type != VDB_GRID_FLOAT ) {
+		ri.Printf( PRINT_WARNING, "VDB: GPU upload supports float grids only (handle %d)\n", h );
+		return qfalse;
+	}
+
+	grid = &grids[h];
+	width = (uint32_t)grid->info.dimX;
+	height = (uint32_t)grid->info.dimY;
+	depth = (uint32_t)grid->info.dimZ;
+	if ( width < 1u ) width = 1u;
+	if ( height < 1u ) height = 1u;
+	if ( depth < 1u ) depth = 1u;
+
+	uploadBytes = (VkDeviceSize)grid->dataSize * sizeof( float );
+	if ( uploadBytes == 0 ) {
+		return qfalse;
+	}
+
+	VDB_DestroyGpuResources( grid );
+
+	Com_Memset( &image_desc, 0, sizeof( image_desc ) );
+	image_desc.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	image_desc.imageType = VK_IMAGE_TYPE_3D;
+	image_desc.format = VK_FORMAT_R32_SFLOAT;
+	image_desc.extent.width = width;
+	image_desc.extent.height = height;
+	image_desc.extent.depth = depth;
+	image_desc.mipLevels = 1;
+	image_desc.arrayLayers = 1;
+	image_desc.samples = VK_SAMPLE_COUNT_1_BIT;
+	image_desc.tiling = VK_IMAGE_TILING_OPTIMAL;
+	image_desc.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	image_desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	image_desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+	if ( qvkCreateImage( vk.device, &image_desc, NULL, &grid->gpuImage ) != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, "VDB: failed to create 3D image for grid %d\n", h );
+		return qfalse;
+	}
+
+	qvkGetImageMemoryRequirements( vk.device, grid->gpuImage, &mem_req );
+	Com_Memset( &alloc_info, 0, sizeof( alloc_info ) );
+	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	alloc_info.allocationSize = mem_req.size;
+	alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, mem_req.memoryTypeBits,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	if ( qvkAllocateMemory( vk.device, &alloc_info, NULL, &grid->gpuMemory ) != VK_SUCCESS ||
+		qvkBindImageMemory( vk.device, grid->gpuImage, grid->gpuMemory, 0 ) != VK_SUCCESS ) {
+		VDB_DestroyGpuResources( grid );
+		ri.Printf( PRINT_WARNING, "VDB: failed to allocate GPU memory for grid %d\n", h );
+		return qfalse;
+	}
+
+	Com_Memset( &view_desc, 0, sizeof( view_desc ) );
+	view_desc.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	view_desc.image = grid->gpuImage;
+	view_desc.viewType = VK_IMAGE_VIEW_TYPE_3D;
+	view_desc.format = VK_FORMAT_R32_SFLOAT;
+	view_desc.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	view_desc.subresourceRange.levelCount = 1;
+	view_desc.subresourceRange.layerCount = 1;
+	if ( qvkCreateImageView( vk.device, &view_desc, NULL, &grid->gpuView ) != VK_SUCCESS ) {
+		VDB_DestroyGpuResources( grid );
+		ri.Printf( PRINT_WARNING, "VDB: failed to create 3D image view for grid %d\n", h );
+		return qfalse;
+	}
+
+	if ( vk.staging_buffer.size < uploadBytes ) {
+		vk_alloc_staging_buffer( uploadBytes );
+	}
+	if ( !vk.staging_buffer.ptr || vk.staging_buffer.size < uploadBytes ) {
+		VDB_DestroyGpuResources( grid );
+		ri.Printf( PRINT_WARNING, "VDB: staging buffer too small for grid %d upload\n", h );
+		return qfalse;
+	}
+
+	Com_Memcpy( vk.staging_buffer.ptr, grid->data, (size_t)uploadBytes );
+
+	cmd = vk_begin_command_buffer();
+	record_image_layout_transition( cmd, grid->gpuImage, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
+
+	Com_Memset( &region, 0, sizeof( region ) );
+	region.bufferOffset = 0;
+	region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	region.imageSubresource.mipLevel = 0;
+	region.imageSubresource.baseArrayLayer = 0;
+	region.imageSubresource.layerCount = 1;
+	region.imageOffset.x = 0;
+	region.imageOffset.y = 0;
+	region.imageOffset.z = 0;
+	region.imageExtent.width = width;
+	region.imageExtent.height = height;
+	region.imageExtent.depth = depth;
+
+	qvkCmdCopyBufferToImage( cmd, vk.staging_buffer.handle, grid->gpuImage,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region );
+
+	record_image_layout_transition( cmd, grid->gpuImage, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
+
+	vk_end_command_buffer( cmd, "VDB_UploadToGPU" );
+
+	grid->onGPU = qtrue;
+	ri.Printf( PRINT_ALL, "VDB: grid %d '%s' uploaded to GPU (%ux%ux%u R32_SFLOAT)\n",
+		h, grid->info.name, (unsigned)width, (unsigned)height, (unsigned)depth );
 	return qtrue;
+}
+
+qboolean VDB_IsOnGPU( vdbHandle_t h ) {
+	if ( !VALID_GRID( h ) ) {
+		return qfalse;
+	}
+	return grids[h].onGPU && grids[h].gpuView != VK_NULL_HANDLE;
 }
 
 qboolean VDB_BindAsFogDensity( vdbHandle_t h ) {

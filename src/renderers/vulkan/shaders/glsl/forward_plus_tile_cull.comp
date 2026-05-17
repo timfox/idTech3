@@ -22,6 +22,7 @@ layout(std430, set = 0, binding = 1) buffer TileSSBO {
 layout(std430, set = 0, binding = 2) readonly buffer ParamSSBO {
 	mat4 clipFromWorld;
 	uvec4 tiles_xy_viewport;
+	vec4 viewOrg;
 } params;
 
 layout(push_constant) uniform Push {
@@ -30,6 +31,7 @@ layout(push_constant) uniform Push {
 	uint numLights;
 	uint maxPerTile;
 	uint luminanceSort;
+	uint distanceSort;
 } pc;
 
 bool sphere_tile_overlap(vec2 centerPx, float radiusPx, uint tileX, uint tileY, float tilePxX, float tilePxY) {
@@ -73,7 +75,9 @@ void main() {
 
 	uint candLi[MAX_LIGHTS];
 	float candLum[MAX_LIGHTS];
+	float candDistSq[MAX_LIGHTS];
 	uint candCount = 0u;
+	vec3 viewOrg = params.viewOrg.xyz;
 
 	for (uint li = 0u; li < n; li++) {
 		uint b = 2u + li * REC_VEC4S;
@@ -106,12 +110,36 @@ void main() {
 
 		candLi[candCount] = li;
 		candLum[candCount] = lum;
+		vec3 delta = worldPos - viewOrg;
+		candDistSq[candCount] = dot(delta, delta);
 		candCount++;
 	}
 
 	uint useCount = min(candCount, cap);
 
-	if (pc.luminanceSort != 0u && candCount > cap) {
+	if (pc.distanceSort != 0u && candCount > cap) {
+		for (uint k = 0u; k < cap; k++) {
+			uint bestJ = k;
+			float bestVal = candDistSq[k];
+			for (uint j = k + 1u; j < candCount; j++) {
+				if (candDistSq[j] < bestVal) {
+					bestVal = candDistSq[j];
+					bestJ = j;
+				}
+			}
+			if (bestJ != k) {
+				uint tmpI = candLi[bestJ];
+				float tmpL = candLum[bestJ];
+				float tmpD = candDistSq[bestJ];
+				candLi[bestJ] = candLi[k];
+				candLum[bestJ] = candLum[k];
+				candDistSq[bestJ] = candDistSq[k];
+				candLi[k] = tmpI;
+				candLum[k] = tmpL;
+				candDistSq[k] = tmpD;
+			}
+		}
+	} else if (pc.luminanceSort != 0u && candCount > cap) {
 		for (uint k = 0u; k < cap; k++) {
 			uint bestJ = k;
 			float bestVal = candLum[k];
@@ -124,10 +152,13 @@ void main() {
 			if (bestJ != k) {
 				uint tmpI = candLi[bestJ];
 				float tmpL = candLum[bestJ];
+				float tmpD = candDistSq[bestJ];
 				candLi[bestJ] = candLi[k];
 				candLum[bestJ] = candLum[k];
+				candDistSq[bestJ] = candDistSq[k];
 				candLi[k] = tmpI;
 				candLum[k] = tmpL;
+				candDistSq[k] = tmpD;
 			}
 		}
 	}

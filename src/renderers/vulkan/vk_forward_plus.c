@@ -173,6 +173,7 @@ typedef struct {
 	uint32_t num_lights;
 	uint32_t max_per_tile;
 	uint32_t luminance_sort;
+	uint32_t distance_sort;
 } vk_fp_push_t;
 
 static VkDescriptorSet vk_fp_graphics_descriptor = VK_NULL_HANDLE;
@@ -960,6 +961,10 @@ void vk_forward_plus_dispatch_tile_cull( void )
 	param_u[17] = vk.forward_plus.tiles_y;
 	param_u[18] = vk_get_render_target_width();
 	param_u[19] = vk_get_render_target_height();
+	param_f[20] = backEnd.refdef.vieworg[0];
+	param_f[21] = backEnd.refdef.vieworg[1];
+	param_f[22] = backEnd.refdef.vieworg[2];
+	param_f[23] = 0.0f;
 
 	Com_Memset( barriers, 0, sizeof( barriers ) );
 	barriers[0].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
@@ -1004,6 +1009,14 @@ void vk_forward_plus_dispatch_tile_cull( void )
 	push.num_lights = vk.forward_plus.last_packed_count;
 	push.max_per_tile = vk.forward_plus.max_per_tile;
 	push.luminance_sort = ( r_forwardPlusLuminanceSort && r_forwardPlusLuminanceSort->integer ) ? 1u : 0u;
+	push.distance_sort = ( r_forwardPlusDistanceSort && r_forwardPlusDistanceSort->integer ) ? 1u : 0u;
+	if ( push.distance_sort ) {
+		static qboolean distance_sort_logged;
+		if ( !distance_sort_logged ) {
+			ri.Printf( PRINT_ALL, "[VK][Forward+] r_forwardPlusDistanceSort=1 (overloaded tiles prefer nearest lights)\n" );
+			distance_sort_logged = qtrue;
+		}
+	}
 
 	qvkCmdPushConstants( vk.cmd->command_buffer, vk.forward_plus.pipeline_layout,
 		VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( push ), &push );

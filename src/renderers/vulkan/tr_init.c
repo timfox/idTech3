@@ -211,6 +211,7 @@ cvar_t	*r_forwardPlusMaxPerTile;
 cvar_t	*r_forwardPlusDebug;
 cvar_t	*r_forwardPlusShade;
 cvar_t	*r_forwardPlusLuminanceSort;
+cvar_t	*r_forwardPlusDistanceSort;
 
 #endif // USE_VULKAN
 
@@ -3577,6 +3578,11 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_forwardPlusLuminanceSort,
 		"When 1 and a tile has more overlapping lights than \\r_forwardPlusMaxPerTile, the compute pass keeps the brightest by RGB sum (approximate importance). When 0, first light index order wins (legacy). Requires \\r_forwardPlus 1 (no vid_restart)." );
 	ri.Cvar_SetGroup( r_forwardPlusLuminanceSort, CVG_RENDERER );
+	r_forwardPlusDistanceSort = ri.Cvar_Get( "r_forwardPlusDistanceSort", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_forwardPlusDistanceSort, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_forwardPlusDistanceSort,
+		"When 1 and a tile is overloaded, the compute pass prefers lights nearest the camera (vieworg). When 0, overload order follows \\r_forwardPlusLuminanceSort / index order. Requires \\r_forwardPlus 1 (no vid_restart)." );
+	ri.Cvar_SetGroup( r_forwardPlusDistanceSort, CVG_RENDERER );
 	r_ext_alpha_to_coverage = ri.Cvar_Get( "r_ext_alpha_to_coverage", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_alpha_to_coverage, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ext_alpha_to_coverage, "Alpha-to-coverage for alpha-tested surfaces (foliage, grates) when MSAA is on. Enabled by default for Vulkan MSAA paths. Requires \\r_fbo 1 and \\r_ext_multisample 2+." );
