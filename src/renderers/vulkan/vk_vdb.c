@@ -415,6 +415,13 @@ qboolean VDB_IsOnGPU( vdbHandle_t h ) {
 	return grids[h].onGPU && grids[h].gpuView != VK_NULL_HANDLE;
 }
 
+VkImageView VDB_GetGpuImageView( vdbHandle_t h ) {
+	if ( !VALID_GRID( h ) || !grids[h].onGPU ) {
+		return VK_NULL_HANDLE;
+	}
+	return grids[h].gpuView;
+}
+
 qboolean VDB_BindAsFogDensity( vdbHandle_t h ) {
 	if ( !VALID_GRID( h ) ) return qfalse;
 	boundFogDensityHandle = h;

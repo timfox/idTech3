@@ -11,6 +11,7 @@ docs/RENDERER_2026_ARCHITECTURE_PASS.md.
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_forward_plus.h"
+#include "vk_image_layout.h"
 #include "vk_util.h"
 #include "vk_view_state.h"
 
@@ -174,6 +175,7 @@ typedef struct {
 	uint32_t max_per_tile;
 	uint32_t luminance_sort;
 	uint32_t distance_sort;
+	uint32_t depth_cull;
 } vk_fp_push_t;
 
 static VkDescriptorSet vk_fp_graphics_descriptor = VK_NULL_HANDLE;
@@ -290,7 +292,7 @@ static void vk_fp_write_graphics_descriptor( VkBuffer light_buf, VkBuffer tile_b
 
 void vk_forward_plus_create_set_layout( void )
 {
-	VkDescriptorSetLayoutBinding binds[3];
+	VkDescriptorSetLayoutBinding binds[4];
 	VkDescriptorSetLayoutCreateInfo layout_ci;
 
 #ifdef USE_VK_PBR
@@ -311,11 +313,15 @@ void vk_forward_plus_create_set_layout( void )
 	binds[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 	binds[2].descriptorCount = 1;
 	binds[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+	binds[3].binding = 3;
+	binds[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	binds[3].descriptorCount = 1;
+	binds[3].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
 	layout_ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	layout_ci.pNext = NULL;
 	layout_ci.flags = 0;
-	layout_ci.bindingCount = 3;
+	layout_ci.bindingCount = 4;
 	layout_ci.pBindings = binds;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &layout_ci, NULL, &vk.set_layout_forward_plus ) );
 	SET_OBJECT_NAME( vk.set_layout_forward_plus, "descriptor set layout - forward+", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT_EXT );
@@ -482,7 +488,9 @@ static void vk_fp_create_buffers_and_compute( void )
 	VkPipelineShaderStageCreateInfo stage;
 	VkDescriptorSetAllocateInfo alloc_ci;
 	VkDescriptorBufferInfo buf_infos[3];
-	VkWriteDescriptorSet writes[3];
+	VkDescriptorImageInfo depth_info;
+	VkWriteDescriptorSet writes[4];
+	Vk_Sampler_Def depth_sd;
 	VkBufferCreateInfo bci;
 	VkMemoryRequirements mr;
 	VkMemoryAllocateInfo mai;
@@ -695,6 +703,15 @@ static void vk_fp_create_buffers_and_compute( void )
 	buf_infos[2].offset = 0;
 	buf_infos[2].range = VK_WHOLE_SIZE;
 
+	Com_Memset( &depth_sd, 0, sizeof( depth_sd ) );
+	depth_sd.gl_mag_filter = depth_sd.gl_min_filter = GL_NEAREST;
+	depth_sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	depth_sd.noAnisotropy = qtrue;
+	Com_Memset( &depth_info, 0, sizeof( depth_info ) );
+	depth_info.sampler = vk_find_sampler( &depth_sd );
+	depth_info.imageView = vk.depth_image_view_sample ? vk.depth_image_view_sample : vk.depth_image_view;
+	depth_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+
 	Com_Memset( writes, 0, sizeof( writes ) );
 	for ( int i = 0; i < 3; i++ ) {
 		writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -705,7 +722,13 @@ static void vk_fp_create_buffers_and_compute( void )
 		writes[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 		writes[i].pBufferInfo = &buf_infos[i];
 	}
-	qvkUpdateDescriptorSets( vk.device, 3, writes, 0, NULL );
+	writes[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writes[3].dstSet = vk.forward_plus.descriptor;
+	writes[3].dstBinding = 3;
+	writes[3].descriptorCount = 1;
+	writes[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	writes[3].pImageInfo = &depth_info;
+	qvkUpdateDescriptorSets( vk.device, 4, writes, 0, NULL );
 
 	vk.forward_plus.tiles_x = tiles_x;
 	vk.forward_plus.tiles_y = tiles_y;
@@ -924,7 +947,7 @@ VkDescriptorSet vk_forward_plus_get_graphics_descriptor_set( void )
 #endif
 }
 
-void vk_forward_plus_dispatch_tile_cull( void )
+static void vk_forward_plus_dispatch_tile_cull_internal( qboolean use_depth_cull )
 {
 	VkBufferMemoryBarrier barriers[3];
 	vk_fp_push_t push;
@@ -934,6 +957,7 @@ void vk_forward_plus_dispatch_tile_cull( void )
 	float proj_vk[16];
 	const float *view;
 	const float *proj_gl;
+	VkImageAspectFlags depth_aspect;
 
 	if ( !r_forwardPlus || !r_forwardPlus->integer ) {
 		return;
@@ -948,7 +972,17 @@ void vk_forward_plus_dispatch_tile_cull( void )
 		return;
 	}
 
-	/* Match vk_postfx_params / vertex MVP: view * projection_vk (column-major). */
+	if ( use_depth_cull && vk.depth_image != VK_NULL_HANDLE ) {
+		depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+		if ( glConfig.stencilBits > 0 ) {
+			depth_aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
+		}
+		record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
+			VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+			VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
+	}
+
 	view = backEnd.viewParms.world.modelViewMatrix;
 	proj_gl = backEnd.useFirstPersonProjection ? backEnd.firstPersonProjectionMatrix : backEnd.viewParms.projectionMatrix;
 	vk_get_projection_matrix_vk( proj_gl, proj_vk );
@@ -970,8 +1004,6 @@ void vk_forward_plus_dispatch_tile_cull( void )
 	barriers[0].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
 	barriers[0].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
 	barriers[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-	barriers[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barriers[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	barriers[0].buffer = vk.forward_plus.buffer;
 	barriers[0].offset = 0;
 	barriers[0].size = VK_WHOLE_SIZE;
@@ -979,8 +1011,6 @@ void vk_forward_plus_dispatch_tile_cull( void )
 	barriers[1].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
 	barriers[1].srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
 	barriers[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-	barriers[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barriers[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	barriers[1].buffer = vk.forward_plus.param_buffer;
 	barriers[1].offset = 0;
 	barriers[1].size = VK_WHOLE_SIZE;
@@ -988,8 +1018,6 @@ void vk_forward_plus_dispatch_tile_cull( void )
 	barriers[2].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
 	barriers[2].srcAccessMask = 0;
 	barriers[2].dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-	barriers[2].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barriers[2].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	barriers[2].buffer = vk.forward_plus.tile_buffer;
 	barriers[2].offset = 0;
 	barriers[2].size = VK_WHOLE_SIZE;
@@ -1010,11 +1038,20 @@ void vk_forward_plus_dispatch_tile_cull( void )
 	push.max_per_tile = vk.forward_plus.max_per_tile;
 	push.luminance_sort = ( r_forwardPlusLuminanceSort && r_forwardPlusLuminanceSort->integer ) ? 1u : 0u;
 	push.distance_sort = ( r_forwardPlusDistanceSort && r_forwardPlusDistanceSort->integer ) ? 1u : 0u;
+	push.depth_cull = use_depth_cull ? 1u : 0u;
+
 	if ( push.distance_sort ) {
 		static qboolean distance_sort_logged;
 		if ( !distance_sort_logged ) {
 			ri.Printf( PRINT_ALL, "[VK][Forward+] r_forwardPlusDistanceSort=1 (overloaded tiles prefer nearest lights)\n" );
 			distance_sort_logged = qtrue;
+		}
+	}
+	if ( push.depth_cull ) {
+		static qboolean depth_cull_logged;
+		if ( !depth_cull_logged ) {
+			ri.Printf( PRINT_ALL, "[VK][Forward+] r_forwardPlusDepthCull=1 (tile cull after opaque, depth rejection at light center)\n" );
+			depth_cull_logged = qtrue;
 		}
 	}
 
@@ -1023,17 +1060,28 @@ void vk_forward_plus_dispatch_tile_cull( void )
 
 	qvkCmdDispatch( vk.cmd->command_buffer, ( push.total_tiles + 63u ) / 64u, 1, 1 );
 
-	barriers[0].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
 	barriers[0].srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 	barriers[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-	barriers[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barriers[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	barriers[0].buffer = vk.forward_plus.tile_buffer;
-	barriers[0].offset = 0;
-	barriers[0].size = VK_WHOLE_SIZE;
-
 	qvkCmdPipelineBarrier( vk.cmd->command_buffer,
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 		VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 		0, 0, NULL, 1, barriers, 0, NULL );
+
+	if ( use_depth_cull && vk.depth_image != VK_NULL_HANDLE ) {
+		record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
+			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT );
+	}
+}
+
+void vk_forward_plus_dispatch_tile_cull( void )
+{
+	vk_forward_plus_dispatch_tile_cull_internal( qfalse );
+}
+
+void vk_forward_plus_dispatch_tile_cull_after_opaque( void )
+{
+	vk_forward_plus_dispatch_tile_cull_internal( qtrue );
 }

@@ -63,6 +63,9 @@ typedef struct {
 	float fluidEmitterCount[4];
 	float telemetryParams0[4];
 	float telemetryParams1[4];
+	float vdbParams[4];
+	float vdbWorldMin[4];
+	float vdbWorldMax[4];
 } volumetric_params_t;
 
 void vk_update_volumetric_params( void );
@@ -118,6 +121,9 @@ VK_VOLUMETRIC_ASSERT_ALIGNED16( fluidEmitterData );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( fluidEmitterCount );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( telemetryParams0 );
 VK_VOLUMETRIC_ASSERT_ALIGNED16( telemetryParams1 );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( vdbParams );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( vdbWorldMin );
+VK_VOLUMETRIC_ASSERT_ALIGNED16( vdbWorldMax );
 #undef VK_VOLUMETRIC_ASSERT_ALIGNED16
 
 #endif

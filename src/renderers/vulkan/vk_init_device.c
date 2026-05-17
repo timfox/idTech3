@@ -594,7 +594,7 @@ void vk_initialize( void )
 	vk_forward_plus_create_set_layout();
 
 		{
-			VkDescriptorSetLayoutBinding compute_bindings[17];
+			VkDescriptorSetLayoutBinding compute_bindings[18];
 		VkDescriptorSetLayoutCreateInfo compute_layout_desc;
 
 		compute_bindings[0].binding = 0;
@@ -698,6 +698,12 @@ void vk_initialize( void )
 			compute_bindings[16].descriptorCount = 1;
 			compute_bindings[16].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 			compute_bindings[16].pImmutableSamplers = NULL;
+
+			compute_bindings[17].binding = 17;
+			compute_bindings[17].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			compute_bindings[17].descriptorCount = 1;
+			compute_bindings[17].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+			compute_bindings[17].pImmutableSamplers = NULL;
 
 		compute_layout_desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 		compute_layout_desc.pNext = NULL;

@@ -206,12 +206,17 @@ cvar_t	*r_rtxDemo;
 cvar_t	*r_rtxWorldPrimCap;
 cvar_t	*r_rtxComposite;
 cvar_t	*r_rtxSamples;
+cvar_t	*r_rtxEntities;
+cvar_t	*r_rtxEntityCap;
+cvar_t	*r_vdbFog;
+cvar_t	*r_vdbFogBlend;
 cvar_t	*r_forwardPlus;
 cvar_t	*r_forwardPlusMaxPerTile;
 cvar_t	*r_forwardPlusDebug;
 cvar_t	*r_forwardPlusShade;
 cvar_t	*r_forwardPlusLuminanceSort;
 cvar_t	*r_forwardPlusDistanceSort;
+cvar_t	*r_forwardPlusDepthCull;
 
 #endif // USE_VULKAN
 
@@ -3551,6 +3556,23 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_rtxSamples, "1", "8", CV_INTEGER );
 	ri.Cvar_SetDescription( r_rtxSamples, "Primary ray samples per pixel for the Vulkan RT output. Higher values smooth edge shimmer at extra GPU cost." );
 	ri.Cvar_SetGroup( r_rtxSamples, CVG_RENDERER );
+	r_rtxEntities = ri.Cvar_Get( "r_rtxEntities", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_rtxEntities, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_rtxEntities,
+		"When USE_VULKAN_RTX and \\r_rtxDemo 1: add refEntity model bounds as a second BLAS in the TLAS (proxy boxes). Default 0." );
+	ri.Cvar_SetGroup( r_rtxEntities, CVG_RENDERER );
+	r_rtxEntityCap = ri.Cvar_Get( "r_rtxEntityCap", "128", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_rtxEntityCap, "0", "1024", CV_INTEGER );
+	ri.Cvar_SetDescription( r_rtxEntityCap, "Max RT_MODEL entities packed into the entity BLAS when \\r_rtxEntities 1 (latched)." );
+	ri.Cvar_SetGroup( r_rtxEntityCap, CVG_RENDERER );
+	r_vdbFog = ri.Cvar_Get( "r_vdbFog", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_vdbFog, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_vdbFog, "Blend bound VDB fog density (\\vdb_bind_fog) into volumetric global density when uploaded to GPU. Requires \\r_volumetricFog 1." );
+	ri.Cvar_SetGroup( r_vdbFog, CVG_RENDERER );
+	r_vdbFogBlend = ri.Cvar_Get( "r_vdbFogBlend", "0.5", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_vdbFogBlend, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_vdbFogBlend, "VDB density blend weight when \\r_vdbFog 1." );
+	ri.Cvar_SetGroup( r_vdbFogBlend, CVG_RENDERER );
 	r_forwardPlus = ri.Cvar_Get( "r_forwardPlus", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_forwardPlus, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_forwardPlus, "Forward+ (default 1 on Vulkan): device-local light SSBO + per-tile cull compute (16px tiles; max from \\r_forwardPlusMaxPerTile, default 8). Packs at most MAX_DLIGHTS (32) for tess.dlightBits. PBR: \\r_forwardPlusDebug, \\r_forwardPlusShade. Set 0 to disable (vid_restart). See docs/RENDERER_2026_ARCHITECTURE_PASS.md." );
@@ -3583,6 +3605,11 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_forwardPlusDistanceSort,
 		"When 1 and a tile is overloaded, the compute pass prefers lights nearest the camera (vieworg). When 0, overload order follows \\r_forwardPlusLuminanceSort / index order. Requires \\r_forwardPlus 1 (no vid_restart)." );
 	ri.Cvar_SetGroup( r_forwardPlusDistanceSort, CVG_RENDERER );
+	r_forwardPlusDepthCull = ri.Cvar_Get( "r_forwardPlusDepthCull", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_forwardPlusDepthCull, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_forwardPlusDepthCull,
+		"When 1, tile cull runs after the opaque pass and rejects lights behind the depth buffer at each light's screen center. When 0, cull runs at view start (legacy). Requires \\r_forwardPlus 1 (no vid_restart)." );
+	ri.Cvar_SetGroup( r_forwardPlusDepthCull, CVG_RENDERER );
 	r_ext_alpha_to_coverage = ri.Cvar_Get( "r_ext_alpha_to_coverage", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_alpha_to_coverage, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ext_alpha_to_coverage, "Alpha-to-coverage for alpha-tested surfaces (foliage, grates) when MSAA is on. Enabled by default for Vulkan MSAA paths. Requires \\r_fbo 1 and \\r_ext_multisample 2+." );

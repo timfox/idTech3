@@ -11,6 +11,7 @@ caps BLAS triangles (default 262144). See docs/RENDERERS_FUTURE.md.
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_rtx.h"
+#include "vk_rtx_entities.h"
 #include "vk_rtx_world.h"
 #include "vk_util.h"
 #include "vk_image_layout.h"
@@ -69,8 +70,19 @@ static struct {
 	qboolean		blas_geo_is_world;
 	qboolean		rt_image_traced;
 	uint32_t		world_primitive_count;
+	uint32_t		entity_primitive_count;
+	uint32_t		entity_packed_count;
+	VkBuffer		entity_vertex_buffer;
+	VkDeviceMemory	entity_vertex_memory;
+	VkBuffer		entity_index_buffer;
+	VkDeviceMemory	entity_index_memory;
+	VkAccelerationStructureKHR entity_blas;
+	VkBuffer		entity_blas_buffer;
+	VkDeviceMemory	entity_blas_memory;
 	char			world_name[MAX_QPATH];
 } rtx;
+
+static void vk_rtx_destroy_entity_blas( void );
 
 static VkShaderModule vk_rtx_shader_module( const uint8_t *code, uint32_t codeSize, const char *name )
 {
@@ -310,7 +322,8 @@ static void vk_rtx_rebuild_world_blas( void )
 	}
 
 	wn = ( tr.world && tr.world->name[0] && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) ? tr.world->name : "";
-	if ( rtx.world_blas_valid && !strcmp( rtx.world_name, wn ) ) {
+	if ( rtx.world_blas_valid && !strcmp( rtx.world_name, wn ) &&
+		!( r_rtxEntities && r_rtxEntities->integer ) ) {
 		return;
 	}
 
@@ -320,12 +333,18 @@ static void vk_rtx_rebuild_world_blas( void )
 
 	vk_rtx_destroy_as( &rtx.tlas );
 	vk_rtx_destroy_as( &rtx.blas );
+	vk_rtx_destroy_as( &rtx.entity_blas );
 	vk_rtx_destroy_buffer( &rtx.tlas_buffer, &rtx.tlas_memory );
 	vk_rtx_destroy_buffer( &rtx.instance_buffer, &rtx.instance_memory );
 	vk_rtx_destroy_buffer( &rtx.blas_buffer, &rtx.blas_memory );
+	vk_rtx_destroy_buffer( &rtx.entity_blas_buffer, &rtx.entity_blas_memory );
 	vk_rtx_destroy_buffer( &rtx.vertex_buffer, &rtx.vertex_memory );
 	vk_rtx_destroy_buffer( &rtx.index_buffer, &rtx.index_memory );
+	vk_rtx_destroy_buffer( &rtx.entity_vertex_buffer, &rtx.entity_vertex_memory );
+	vk_rtx_destroy_buffer( &rtx.entity_index_buffer, &rtx.entity_index_memory );
 	vk_rtx_destroy_buffer( &rtx.scratch_buffer, &rtx.scratch_memory );
+	rtx.entity_primitive_count = 0u;
+	rtx.entity_packed_count = 0u;
 
 	maxPrimBLAS = 1u;
 	if ( useWorld ) {
@@ -541,6 +560,271 @@ static void vk_rtx_rebuild_world_blas( void )
 	}
 }
 
+static void vk_rtx_destroy_entity_blas( void )
+{
+	vk_rtx_destroy_as( &rtx.entity_blas );
+	vk_rtx_destroy_buffer( &rtx.entity_blas_buffer, &rtx.entity_blas_memory );
+	vk_rtx_destroy_buffer( &rtx.entity_vertex_buffer, &rtx.entity_vertex_memory );
+	vk_rtx_destroy_buffer( &rtx.entity_index_buffer, &rtx.entity_index_memory );
+	rtx.entity_primitive_count = 0u;
+	rtx.entity_packed_count = 0u;
+}
+
+static void vk_rtx_rebuild_entity_tlas( void )
+{
+	VkAccelerationStructureInstanceKHR instances[2];
+	VkAccelerationStructureDeviceAddressInfoKHR addrInfo;
+	VkDeviceAddress worldBlasAddr = 0;
+	VkDeviceAddress entityBlasAddr = 0;
+	VkDeviceAddress instAddr = 0;
+	VkDeviceAddress scratchAddr = 0;
+	VkAccelerationStructureBuildGeometryInfoKHR buildInfoTLAS;
+	VkAccelerationStructureGeometryKHR geometryTLAS;
+	VkAccelerationStructureGeometryInstancesDataKHR instGeom;
+	VkAccelerationStructureBuildRangeInfoKHR rangeTLAS;
+	const VkAccelerationStructureBuildRangeInfoKHR *pRangeTLAS;
+	VkAccelerationStructureBuildSizesInfoKHR sizeInfoTLAS;
+	VkAccelerationStructureCreateInfoKHR asci;
+	VkAccelerationStructureBuildGeometryInfoKHR buildInfoBLAS;
+	VkAccelerationStructureGeometryKHR geometryBLAS;
+	VkAccelerationStructureGeometryTrianglesDataKHR triangles;
+	VkAccelerationStructureBuildRangeInfoKHR rangeBLAS;
+	const VkAccelerationStructureBuildRangeInfoKHR *pRangeBLAS;
+	VkAccelerationStructureBuildSizesInfoKHR sizeInfoBLAS;
+	VkCommandBuffer buildCmd;
+	VkCommandBufferBeginInfo beginInfo;
+	VkWriteDescriptorSetAccelerationStructureKHR asWrite;
+	VkWriteDescriptorSet writeAS;
+	uint32_t maxInstTLAS;
+	uint32_t maxPrimEntity;
+	uint32_t capEnt;
+	uint32_t packedEnt;
+	uint8_t *instMap;
+	VkDeviceSize scratchSize = 0;
+	VkDeviceAddress vbAddr = 0;
+	VkDeviceAddress ibAddr = 0;
+
+	if ( !rtx.ready || !rtx.descriptor_set || !rtx.blas || !rtx.world_blas_valid ) {
+		return;
+	}
+
+	if ( !r_rtxEntities || !r_rtxEntities->integer ) {
+		return;
+	}
+
+	Com_Memset( &addrInfo, 0, sizeof( addrInfo ) );
+	addrInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
+	addrInfo.accelerationStructure = rtx.blas;
+	worldBlasAddr = qvkGetAccelerationStructureDeviceAddressKHR( vk.device, &addrInfo );
+
+	vk_rtx_destroy_as( &rtx.tlas );
+	vk_rtx_destroy_buffer( &rtx.tlas_buffer, &rtx.tlas_memory );
+	vk_rtx_destroy_buffer( &rtx.instance_buffer, &rtx.instance_memory );
+	vk_rtx_destroy_entity_blas();
+
+	capEnt = ( r_rtxEntityCap && r_rtxEntityCap->integer > 0 ) ? (uint32_t)r_rtxEntityCap->integer : 128u;
+	if ( capEnt > 1024u ) {
+		capEnt = 1024u;
+	}
+
+	maxPrimEntity = 0u;
+	packedEnt = 0u;
+	if ( backEnd.refdef.num_entities > 0 ) {
+		VkDeviceSize vbSize = (VkDeviceSize)capEnt * 8u * 3u * sizeof( float );
+		VkDeviceSize ibSize = (VkDeviceSize)capEnt * 36u * sizeof( uint32_t );
+		float *posHost;
+		uint32_t *idxHost;
+
+		vk_rtx_alloc_buffer( vbSize,
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			&rtx.entity_vertex_buffer, &rtx.entity_vertex_memory, &vbAddr );
+		vk_rtx_alloc_buffer( ibSize,
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			&rtx.entity_index_buffer, &rtx.entity_index_memory, &ibAddr );
+		VK_CHECK( qvkMapMemory( vk.device, rtx.entity_vertex_memory, 0, vbSize, 0, (void **)&posHost ) );
+		VK_CHECK( qvkMapMemory( vk.device, rtx.entity_index_memory, 0, ibSize, 0, (void **)&idxHost ) );
+		packedEnt = vk_rtx_entities_pack( &backEnd.refdef, &backEnd.viewParms, capEnt, posHost, idxHost );
+		qvkUnmapMemory( vk.device, rtx.entity_vertex_memory );
+		qvkUnmapMemory( vk.device, rtx.entity_index_memory );
+		if ( packedEnt == 0u ) {
+			vk_rtx_destroy_entity_blas();
+		} else {
+			maxPrimEntity = packedEnt * 12u;
+			rtx.entity_packed_count = packedEnt;
+			rtx.entity_primitive_count = maxPrimEntity;
+
+			Com_Memset( &triangles, 0, sizeof( triangles ) );
+			triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
+			triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
+			triangles.vertexData.deviceAddress = vbAddr;
+			triangles.vertexStride = sizeof( float ) * 3u;
+			triangles.maxVertex = packedEnt * 8u - 1u;
+			triangles.indexType = VK_INDEX_TYPE_UINT32;
+			triangles.indexData.deviceAddress = ibAddr;
+			triangles.transformData.deviceAddress = 0;
+
+			Com_Memset( &geometryBLAS, 0, sizeof( geometryBLAS ) );
+			geometryBLAS.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
+			geometryBLAS.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
+			geometryBLAS.geometry.triangles = triangles;
+
+			Com_Memset( &buildInfoBLAS, 0, sizeof( buildInfoBLAS ) );
+			buildInfoBLAS.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
+			buildInfoBLAS.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
+			buildInfoBLAS.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
+			buildInfoBLAS.geometryCount = 1;
+			buildInfoBLAS.pGeometries = &geometryBLAS;
+
+			Com_Memset( &sizeInfoBLAS, 0, sizeof( sizeInfoBLAS ) );
+			sizeInfoBLAS.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
+			qvkGetAccelerationStructureBuildSizesKHR( vk.device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
+				&buildInfoBLAS, &maxPrimEntity, &sizeInfoBLAS );
+
+			vk_rtx_alloc_buffer( sizeInfoBLAS.accelerationStructureSize,
+				VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &rtx.entity_blas_buffer, &rtx.entity_blas_memory, NULL );
+
+			Com_Memset( &asci, 0, sizeof( asci ) );
+			asci.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
+			asci.buffer = rtx.entity_blas_buffer;
+			asci.size = sizeInfoBLAS.accelerationStructureSize;
+			asci.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
+			VK_CHECK( qvkCreateAccelerationStructureKHR( vk.device, &asci, NULL, &rtx.entity_blas ) );
+
+			addrInfo.accelerationStructure = rtx.entity_blas;
+			entityBlasAddr = qvkGetAccelerationStructureDeviceAddressKHR( vk.device, &addrInfo );
+
+			scratchSize = sizeInfoBLAS.buildScratchSize;
+			vk_rtx_destroy_buffer( &rtx.scratch_buffer, &rtx.scratch_memory );
+			vk_rtx_alloc_buffer( scratchSize,
+				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &rtx.scratch_buffer, &rtx.scratch_memory, &scratchAddr );
+
+			Com_Memset( &rangeBLAS, 0, sizeof( rangeBLAS ) );
+			rangeBLAS.primitiveCount = maxPrimEntity;
+			pRangeBLAS = &rangeBLAS;
+			buildInfoBLAS.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
+			buildInfoBLAS.dstAccelerationStructure = rtx.entity_blas;
+			buildInfoBLAS.scratchData.deviceAddress = scratchAddr;
+
+			buildCmd = vk.tess[0].command_buffer;
+			Com_Memset( &beginInfo, 0, sizeof( beginInfo ) );
+			beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+			beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+			VK_CHECK( qvkBeginCommandBuffer( buildCmd, &beginInfo ) );
+			qvkCmdBuildAccelerationStructuresKHR( buildCmd, 1, &buildInfoBLAS, &pRangeBLAS );
+			VK_CHECK( qvkEndCommandBuffer( buildCmd ) );
+			vk_rtx_submit_oneshot_build( buildCmd );
+		}
+	}
+
+	maxInstTLAS = ( packedEnt > 0u && rtx.entity_blas != VK_NULL_HANDLE ) ? 2u : 1u;
+
+	Com_Memset( instances, 0, sizeof( instances ) );
+	instances[0].transform.matrix[0][0] = 1.0f;
+	instances[0].transform.matrix[1][1] = 1.0f;
+	instances[0].transform.matrix[2][2] = 1.0f;
+	instances[0].instanceCustomIndex = 0;
+	instances[0].mask = 0xFF;
+	instances[0].instanceShaderBindingTableRecordOffset = 0;
+	instances[0].flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+	instances[0].accelerationStructureReference = worldBlasAddr;
+
+	if ( maxInstTLAS > 1u ) {
+		instances[1] = instances[0];
+		instances[1].instanceCustomIndex = 1;
+		instances[1].accelerationStructureReference = entityBlasAddr;
+	}
+
+	vk_rtx_alloc_buffer( sizeof( instances[0] ) * maxInstTLAS,
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		&rtx.instance_buffer, &rtx.instance_memory, &instAddr );
+	VK_CHECK( qvkMapMemory( vk.device, rtx.instance_memory, 0, sizeof( instances[0] ) * maxInstTLAS, 0, (void **)&instMap ) );
+	Com_Memcpy( instMap, instances, sizeof( instances[0] ) * maxInstTLAS );
+	qvkUnmapMemory( vk.device, rtx.instance_memory );
+
+	Com_Memset( &instGeom, 0, sizeof( instGeom ) );
+	instGeom.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR;
+	instGeom.arrayOfPointers = VK_FALSE;
+	instGeom.data.deviceAddress = instAddr;
+
+	Com_Memset( &geometryTLAS, 0, sizeof( geometryTLAS ) );
+	geometryTLAS.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
+	geometryTLAS.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
+	geometryTLAS.geometry.instances = instGeom;
+
+	Com_Memset( &buildInfoTLAS, 0, sizeof( buildInfoTLAS ) );
+	buildInfoTLAS.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
+	buildInfoTLAS.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
+	buildInfoTLAS.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
+	buildInfoTLAS.geometryCount = 1;
+	buildInfoTLAS.pGeometries = &geometryTLAS;
+
+	Com_Memset( &sizeInfoTLAS, 0, sizeof( sizeInfoTLAS ) );
+	sizeInfoTLAS.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
+	qvkGetAccelerationStructureBuildSizesKHR( vk.device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
+		&buildInfoTLAS, &maxInstTLAS, &sizeInfoTLAS );
+
+	if ( sizeInfoTLAS.buildScratchSize > scratchSize ) {
+		scratchSize = sizeInfoTLAS.buildScratchSize;
+	}
+	if ( scratchSize > 0u ) {
+		vk_rtx_destroy_buffer( &rtx.scratch_buffer, &rtx.scratch_memory );
+		vk_rtx_alloc_buffer( scratchSize,
+			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &rtx.scratch_buffer, &rtx.scratch_memory, &scratchAddr );
+	}
+
+	vk_rtx_alloc_buffer( sizeInfoTLAS.accelerationStructureSize,
+		VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &rtx.tlas_buffer, &rtx.tlas_memory, NULL );
+
+	Com_Memset( &asci, 0, sizeof( asci ) );
+	asci.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
+	asci.buffer = rtx.tlas_buffer;
+	asci.size = sizeInfoTLAS.accelerationStructureSize;
+	asci.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
+	VK_CHECK( qvkCreateAccelerationStructureKHR( vk.device, &asci, NULL, &rtx.tlas ) );
+
+	Com_Memset( &rangeTLAS, 0, sizeof( rangeTLAS ) );
+	rangeTLAS.primitiveCount = maxInstTLAS;
+	pRangeTLAS = &rangeTLAS;
+	buildInfoTLAS.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
+	buildInfoTLAS.dstAccelerationStructure = rtx.tlas;
+	buildInfoTLAS.scratchData.deviceAddress = scratchAddr;
+
+	buildCmd = vk.tess[0].command_buffer;
+	VK_CHECK( qvkBeginCommandBuffer( buildCmd, &beginInfo ) );
+	qvkCmdBuildAccelerationStructuresKHR( buildCmd, 1, &buildInfoTLAS, &pRangeTLAS );
+	VK_CHECK( qvkEndCommandBuffer( buildCmd ) );
+	vk_rtx_submit_oneshot_build( buildCmd );
+
+	Com_Memset( &asWrite, 0, sizeof( asWrite ) );
+	asWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
+	asWrite.accelerationStructureCount = 1;
+	asWrite.pAccelerationStructures = &rtx.tlas;
+
+	Com_Memset( &writeAS, 0, sizeof( writeAS ) );
+	writeAS.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writeAS.dstSet = rtx.descriptor_set;
+	writeAS.dstBinding = 0;
+	writeAS.descriptorCount = 1;
+	writeAS.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+	writeAS.pNext = &asWrite;
+	qvkUpdateDescriptorSets( vk.device, 1, &writeAS, 0, NULL );
+
+	if ( packedEnt > 0u ) {
+		static qboolean entity_tlas_logged;
+		if ( !entity_tlas_logged ) {
+			ri.Printf( PRINT_ALL, "[VK][RTX] r_rtxEntities=1: entity proxy BLAS + TLAS (cap %u entities)\n", capEnt );
+			entity_tlas_logged = qtrue;
+		}
+	}
+}
+
 void vk_rtx_shutdown( void )
 {
 	if ( !rtx.ready ) {
@@ -588,6 +872,7 @@ void vk_rtx_shutdown( void )
 
 	vk_rtx_destroy_as( &rtx.tlas );
 	vk_rtx_destroy_as( &rtx.blas );
+	vk_rtx_destroy_entity_blas();
 	vk_rtx_destroy_buffer( &rtx.tlas_buffer, &rtx.tlas_memory );
 	vk_rtx_destroy_buffer( &rtx.instance_buffer, &rtx.instance_memory );
 	vk_rtx_destroy_buffer( &rtx.blas_buffer, &rtx.blas_memory );
@@ -896,6 +1181,7 @@ void vk_rtx_record_demo_pass( VkCommandBuffer cmd )
 	}
 
 	vk_rtx_rebuild_world_blas();
+	vk_rtx_rebuild_entity_tlas();
 
 	if ( rtx.rtx_ubo_ptr ) {
 		const float *view = backEnd.viewParms.world.modelViewMatrix;

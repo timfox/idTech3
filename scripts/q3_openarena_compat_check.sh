@@ -73,6 +73,27 @@ else
 	fail "r_forwardPlusDistanceSort default not 0"
 fi
 
+if grep -qE 'r_forwardPlusDepthCull[[:space:]]*=[[:space:]]*ri\.Cvar_Get\([[:space:]]*"r_forwardPlusDepthCull"[[:space:]]*,[[:space:]]*"0"' \
+	"$PROJECT_ROOT/src/renderers/vulkan/tr_init.c"; then
+	pass "r_forwardPlusDepthCull defaults to 0 (classic Forward+ tile cull timing preserved)"
+else
+	fail "r_forwardPlusDepthCull default not 0"
+fi
+
+if grep -qE 'r_rtxEntities[[:space:]]*=[[:space:]]*ri\.Cvar_Get\([[:space:]]*"r_rtxEntities"[[:space:]]*,[[:space:]]*"0"' \
+	"$PROJECT_ROOT/src/renderers/vulkan/tr_init.c"; then
+	pass "r_rtxEntities defaults to 0 (RTX demo unchanged unless enabled)"
+else
+	fail "r_rtxEntities default not 0"
+fi
+
+if grep -qE 'r_vdbFog[[:space:]]*=[[:space:]]*ri\.Cvar_Get\([[:space:]]*"r_vdbFog"[[:space:]]*,[[:space:]]*"0"' \
+	"$PROJECT_ROOT/src/renderers/vulkan/tr_init.c"; then
+	pass "r_vdbFog defaults to 0 (VDB volumetric blend off unless enabled)"
+else
+	fail "r_vdbFog default not 0"
+fi
+
 SERVER="$(bin_path idtech3_server)"
 CLIENT="$(bin_path idtech3)"
 if [ -n "$SERVER" ]; then

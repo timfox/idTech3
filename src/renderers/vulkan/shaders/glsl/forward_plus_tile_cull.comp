@@ -25,6 +25,8 @@ layout(std430, set = 0, binding = 2) readonly buffer ParamSSBO {
 	vec4 viewOrg;
 } params;
 
+layout(set = 0, binding = 3) uniform sampler2D depthTexture;
+
 layout(push_constant) uniform Push {
 	uvec2 tileGrid;
 	uint totalTiles;
@@ -32,6 +34,7 @@ layout(push_constant) uniform Push {
 	uint maxPerTile;
 	uint luminanceSort;
 	uint distanceSort;
+	uint depthCull;
 } pc;
 
 bool sphere_tile_overlap(vec2 centerPx, float radiusPx, uint tileX, uint tileY, float tilePxX, float tilePxY) {
@@ -103,6 +106,16 @@ void main() {
 
 		if (!sphere_tile_overlap(centerPx, radiusPx, tileX, tileY, tilePxX, tilePxY)) {
 			continue;
+		}
+
+		if (pc.depthCull != 0u) {
+			vec2 depthUv = vec2(centerPx.x / max(vw, 1.0), centerPx.y / max(vh, 1.0));
+			float sceneZ = texture(depthTexture, depthUv).r;
+			float lightZ = ndc.z * 0.5 + 0.5;
+			/* Reversed-Z: nearer surfaces have larger depth; reject lights behind the surface. */
+			if (lightZ < sceneZ - 1e-4) {
+				continue;
+			}
 		}
 
 		vec4 lc = lights.data[b + 1u];

@@ -5,6 +5,7 @@
 #include "vk_util.h"
 #include "vk_volumetric_fog_color.h"
 #include "vk_volumetric_params.h"
+#include "vk_vdb.h"
 #include <math.h>
 
 static void vk_tint_local_fog_volume_color( vec3_t io ) {
@@ -711,6 +712,34 @@ void vk_update_volumetric_params( void )
 	params.telemetryParams1[1] = vk.volumetric_fluid_ms;
 	params.telemetryParams1[2] = fluid_enabled ? fluid_effective_scale : 0.0f;
 	params.telemetryParams1[3] = fluid_enabled ? (float)fluid_pressure_iterations : 0.0f;
+
+	params.vdbParams[0] = 0.0f;
+	params.vdbParams[1] = 0.0f;
+	params.vdbParams[2] = 0.0f;
+	params.vdbParams[3] = 0.0f;
+	params.vdbWorldMin[0] = 0.0f;
+	params.vdbWorldMin[1] = 0.0f;
+	params.vdbWorldMin[2] = 0.0f;
+	params.vdbWorldMin[3] = 0.0f;
+	params.vdbWorldMax[0] = 1.0f;
+	params.vdbWorldMax[1] = 1.0f;
+	params.vdbWorldMax[2] = 1.0f;
+	params.vdbWorldMax[3] = 0.0f;
+	if ( r_vdbFog && r_vdbFog->integer ) {
+		const vdbHandle_t vdb_h = VDB_GetBoundFogDensityHandle();
+		vdbGridInfo_t vdb_info;
+
+		if ( vdb_h >= 0 && VDB_IsOnGPU( vdb_h ) && VDB_GetInfo( vdb_h, &vdb_info ) ) {
+			params.vdbParams[0] = r_vdbFogBlend ? Com_Clamp( 0.0f, 1.0f, r_vdbFogBlend->value ) : 0.5f;
+			params.vdbParams[1] = 1.0f;
+			params.vdbWorldMin[0] = vdb_info.worldMin[0];
+			params.vdbWorldMin[1] = vdb_info.worldMin[1];
+			params.vdbWorldMin[2] = vdb_info.worldMin[2];
+			params.vdbWorldMax[0] = vdb_info.worldMax[0];
+			params.vdbWorldMax[1] = vdb_info.worldMax[1];
+			params.vdbWorldMax[2] = vdb_info.worldMax[2];
+		}
+	}
 
 	if ( r_fogDebug && r_fogDebug->integer > 0 && ( vk.volumetric_frame % 120u ) == 0u ) {
 		ri.Printf( PRINT_ALL,

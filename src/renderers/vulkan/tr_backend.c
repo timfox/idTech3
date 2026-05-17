@@ -1735,7 +1735,9 @@ static const void *RB_DrawSurfs( const void *data ) {
 
 #ifdef USE_VULKAN
 	vk_forward_plus_upload_refdef();
-	vk_forward_plus_dispatch_tile_cull();
+	if ( !r_forwardPlusDepthCull || !r_forwardPlusDepthCull->integer ) {
+		vk_forward_plus_dispatch_tile_cull();
+	}
 #endif
 
 #ifdef USE_VULKAN
@@ -1767,6 +1769,12 @@ static const void *RB_DrawSurfs( const void *data ) {
 	} else
 #endif
 	RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
+
+#ifdef USE_VULKAN
+	if ( r_forwardPlusDepthCull && r_forwardPlusDepthCull->integer ) {
+		vk_forward_plus_dispatch_tile_cull_after_opaque();
+	}
+#endif
 
 #ifdef USE_VBO
 	VBO_UnBind();
