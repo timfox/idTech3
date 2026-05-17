@@ -2528,6 +2528,13 @@ add_test(NAME test_botlib_bounded_strings
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_botlib_bounded_strings PROPERTIES
 	LABELS "unit;scripts;validation")
+
+add_test(NAME test_native_module_regressions
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_native_module_regressions.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_native_module_regressions PROPERTIES
+	LABELS "unit;scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_native_module_regressions.sh")
 # --- Unit tests ---
 option(BUILD_UNIT_TESTS "Build unit tests" ON)
 if(BUILD_UNIT_TESTS)
