@@ -130,6 +130,34 @@ fi
 
 echo ""
 
+# --- Runtime generative hooks (FLUX / TRELLIS) ---
+echo "Generative runtime checks:"
+CLIENT_PATH="$(bin_path "idtech3")"
+if [ -n "$CLIENT_PATH" ]; then
+  if grep -q trellis_generate < <(strings "$CLIENT_PATH" 2>/dev/null); then
+    pass "client exports trellis_generate (USE_TRELLIS)"
+  else
+    warn "trellis_generate not in client (USE_TRELLIS=OFF or stripped build)"
+  fi
+  if grep -q flux_generate < <(strings "$CLIENT_PATH" 2>/dev/null); then
+    pass "client exports flux_generate (USE_FLUX)"
+  else
+    warn "flux_generate not in client (USE_FLUX=OFF or stripped build)"
+  fi
+else
+  warn "idtech3 not found, skipping generative symbol checks"
+fi
+if [ -f "$RELEASE_DIR/trellis_image_to_glb.py" ]; then
+  pass "trellis_image_to_glb.py present in release"
+  if [ -x "$RELEASE_DIR/trellis_image_to_glb.py" ] || head -1 "$RELEASE_DIR/trellis_image_to_glb.py" | grep -q python; then
+    pass "trellis_image_to_glb.py looks executable"
+  fi
+else
+  warn "trellis_image_to_glb.py missing (non-TRELLIS build or old release copy)"
+fi
+
+echo ""
+
 # --- Shader validation ---
 echo "Shader checks:"
 if command -v glslangValidator &>/dev/null; then
