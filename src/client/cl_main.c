@@ -525,25 +525,46 @@ static qhandle_t CL_TrellisImportVfs( const char *vfs_path ) {
 	return re.RegisterModel( vfs_path );
 }
 
-static void CL_TrellisFinishJob( qboolean success ) {
+static void CL_TrellisSetJobResult( qboolean success ) {
 	if ( success ) {
 		trellis_job.status = TRELLIS_JOB_COMPLETED;
-		if ( cl_trellis_auto_import && cl_trellis_auto_import->integer ) {
-			trellis_job.model_handle = CL_TrellisImportVfs( trellis_job.output_vfs );
-			if ( trellis_job.model_handle ) {
-				Com_Printf( S_COLOR_GREEN "TRELLIS: auto-imported '%s' (handle %d)\n",
-					trellis_job.output_vfs, trellis_job.model_handle );
-			} else {
-				Com_Printf( S_COLOR_YELLOW "TRELLIS: GLB written but auto-import failed; try trellis_view %s\n",
-					trellis_job.output_vfs );
-			}
-		} else {
-			Com_Printf( S_COLOR_GREEN "TRELLIS: wrote %s — trellis_view %s\n",
-				trellis_job.output_vfs, trellis_job.output_vfs );
-		}
 	} else {
 		trellis_job.status = TRELLIS_JOB_FAILED;
 	}
+}
+
+/*
+CL_TrellisFinalizeOnMain
+Must run on the main thread (RegisterModel / renderer).
+*/
+static void CL_TrellisFinalizeOnMain( void ) {
+	if ( trellis_job.status != TRELLIS_JOB_COMPLETED ) {
+		return;
+	}
+	if ( cl_trellis_auto_import && cl_trellis_auto_import->integer ) {
+		trellis_job.model_handle = CL_TrellisImportVfs( trellis_job.output_vfs );
+		if ( trellis_job.model_handle ) {
+			Com_Printf( S_COLOR_GREEN "TRELLIS: auto-imported '%s' (handle %d)\n",
+				trellis_job.output_vfs, trellis_job.model_handle );
+		} else {
+			Com_Printf( S_COLOR_YELLOW "TRELLIS: GLB written but auto-import failed; try trellis_view %s\n",
+				trellis_job.output_vfs );
+		}
+	} else {
+		Com_Printf( S_COLOR_GREEN "TRELLIS: wrote %s — trellis_view %s\n",
+			trellis_job.output_vfs, trellis_job.output_vfs );
+	}
+}
+
+static void CL_TrellisJoinThread( void ) {
+#if USE_SDL
+	if ( trellis_job.thread ) {
+		int rc = 0;
+		SDL_WaitThread( trellis_job.thread, &rc );
+		trellis_job.thread = NULL;
+		(void)rc;
+	}
+#endif
 }
 
 #if USE_SDL
@@ -571,7 +592,7 @@ static int CL_TrellisGenerationThread( void *data ) {
 		job->status = TRELLIS_JOB_FAILED;
 		return -1;
 	}
-	CL_TrellisFinishJob( qtrue );
+	CL_TrellisSetJobResult( qtrue );
 	return 0;
 }
 #endif
@@ -657,7 +678,9 @@ static qboolean CL_TrellisStartJob( const char *image_rel, const char *output_re
 		Com_Printf( S_COLOR_RED "TRELLIS: generation failed\n" );
 		return qfalse;
 	}
-	CL_TrellisFinishJob( qtrue );
+	CL_TrellisSetJobResult( qtrue );
+	CL_TrellisFinalizeOnMain();
+	trellis_job.notified = qtrue;
 	return qtrue;
 }
 
@@ -669,13 +692,19 @@ static void CL_TrellisFrame( void ) {
 				trellis_job.timeout_seconds );
 			trellis_job.timeout_seconds = 0;
 		}
+		return;
 	}
-	if ( trellis_job.status == TRELLIS_JOB_COMPLETED && !trellis_job.notified ) {
-		trellis_job.notified = qtrue;
-		Com_Printf( S_COLOR_GREEN "TRELLIS: generation complete: %s\n", trellis_job.output_vfs );
+	if ( trellis_job.status != TRELLIS_JOB_COMPLETED && trellis_job.status != TRELLIS_JOB_FAILED ) {
+		return;
 	}
-	if ( trellis_job.status == TRELLIS_JOB_FAILED && !trellis_job.notified ) {
-		trellis_job.notified = qtrue;
+	if ( trellis_job.notified ) {
+		return;
+	}
+	CL_TrellisJoinThread();
+	trellis_job.notified = qtrue;
+	if ( trellis_job.status == TRELLIS_JOB_COMPLETED ) {
+		CL_TrellisFinalizeOnMain();
+	} else {
 		Com_Printf( S_COLOR_RED "TRELLIS: generation failed: %s\n", trellis_job.error_msg );
 	}
 }
@@ -6342,14 +6371,8 @@ static void CL_TrellisCancel_f( void ) {
 	}
 	trellis_job.status = TRELLIS_JOB_FAILED;
 	Q_strncpyz( trellis_job.error_msg, "Cancelled by user", sizeof( trellis_job.error_msg ) );
-#if USE_SDL
-	if ( trellis_job.thread ) {
-		int rc = 0;
-		SDL_WaitThread( trellis_job.thread, &rc );
-		trellis_job.thread = NULL;
-		Com_Printf( "TRELLIS: background thread stopped (exit %d)\n", rc );
-	}
-#endif
+	CL_TrellisJoinThread();
+	Com_Printf( "TRELLIS: background job stopped (subprocess may still run until exit)\n" );
 	if ( trellis_job.output_full[0] ) {
 		remove( trellis_job.output_full );
 	}
@@ -6405,14 +6428,10 @@ static void CL_TrellisView_f( void ) {
 	}
 	trellis_job.model_handle = h;
 	Com_Printf( S_COLOR_GREEN "TRELLIS: registered '%s' (handle %d)\n", name, h );
-#if USE_SDL
-	if ( trellis_job.thread ) {
-		SDL_WaitThread( trellis_job.thread, NULL );
-		trellis_job.thread = NULL;
-	}
-#endif
-	if ( trellis_job.status == TRELLIS_JOB_COMPLETED ) {
+	CL_TrellisJoinThread();
+	if ( trellis_job.status == TRELLIS_JOB_COMPLETED || trellis_job.status == TRELLIS_JOB_FAILED ) {
 		trellis_job.status = TRELLIS_JOB_IDLE;
+		trellis_job.notified = qfalse;
 	}
 }
 
@@ -6453,7 +6472,9 @@ static void CL_TrellisFromPrompt_f( void ) {
 	}
 	Cvar_Set( "cl_trellis_chain", "1" );
 	trellis_chain_armed = qtrue;
-	Cbuf_AddText( va( "flux_generate %s\n", prompt ) );
+	Cbuf_AddText( "flux_generate \"" );
+	Cbuf_AddText( prompt );
+	Cbuf_AddText( "\"\n" );
 	Com_Printf( "TRELLIS: FLUX started; will chain TRELLIS when image completes (cl_trellis_chain 1)\n" );
 	if ( !flux_was_async ) {
 		Com_Printf( "TRELLIS: enabled cl_flux_async 1 for this workflow\n" );

@@ -87,4 +87,9 @@ Wrapper script: `release/trellis_image_to_glb.py` (copied on build).
 
 `USE_TRELLIS` (default ON). Disable with `-DUSE_TRELLIS=OFF`.
 
-Optional check (no GPU): `./scripts/trellis_check.sh /path/to/TRELLIS.2`
+Optional checks (no GPU):
+
+- `./scripts/trellis_runtime_check.sh release` — client symbols + wrapper script
+- `./scripts/trellis_check.sh /path/to/TRELLIS.2` — upstream repo layout
+
+Background jobs finalize on the **main thread** (`RegisterModel` after the worker thread exits); do not call `trellis_view` from the subprocess.
