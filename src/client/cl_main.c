@@ -40,11 +40,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <limits.h>
 #ifdef USE_FLUX
 #include "flux.h"
-#if USE_SDL
-#include <SDL2/SDL_thread.h>
-#else
-typedef struct SDL_Thread SDL_Thread;
 #endif
+#if ( defined( USE_FLUX ) || defined( USE_TRELLIS ) ) && USE_SDL
+#include <SDL2/SDL_thread.h>
+#elif defined( USE_FLUX ) || defined( USE_TRELLIS )
+typedef struct SDL_Thread SDL_Thread;
 #endif
 
 cvar_t	*cl_noprint;
@@ -375,6 +375,9 @@ static qboolean CL_PipelineExpandTemplate( char *out, size_t maxlen, const char 
 
 #ifdef USE_TRELLIS
 cvar_t	*cl_trellis_enable;
+cvar_t	*cl_trellis_async;
+cvar_t	*cl_trellis_auto_import;
+cvar_t	*cl_trellis_chain;
 cvar_t	*cl_trellis_repo;
 cvar_t	*cl_trellis_python;
 cvar_t	*cl_trellis_conda;
@@ -382,6 +385,37 @@ cvar_t	*cl_trellis_cmd;
 cvar_t	*cl_trellis_hf_model;
 cvar_t	*cl_trellis_decimation;
 cvar_t	*cl_trellis_texture_size;
+cvar_t	*cl_trellis_timeout;
+
+typedef enum {
+	TRELLIS_JOB_IDLE,
+	TRELLIS_JOB_RUNNING,
+	TRELLIS_JOB_COMPLETED,
+	TRELLIS_JOB_FAILED
+} trellis_job_status_t;
+
+typedef struct {
+	trellis_job_status_t status;
+	qboolean notified;
+	int start_time;
+	int timeout_seconds;
+	char repo[MAX_OSPATH];
+	char image_full[MAX_OSPATH];
+	char image_vfs[MAX_QPATH];
+	char output_full[MAX_OSPATH];
+	char output_vfs[MAX_QPATH];
+	char hf_model[256];
+	char dec_str[32];
+	char tex_str[32];
+	char error_msg[1024];
+	qhandle_t model_handle;
+	SDL_Thread *thread;
+} trellis_job_t;
+
+static trellis_job_t trellis_job;
+#if defined( USE_FLUX )
+static qboolean trellis_chain_armed;
+#endif
 
 static const char *CL_TrellisDefaultCmd( void ) {
 	return "conda run -n %N --no-capture-output %P \"%E/trellis_image_to_glb.py\" --repo \"%R\" --image \"%I\" --output \"%O\" --model \"%M\" --decimation %D --texture-size %T %A";
@@ -419,20 +453,233 @@ static void CL_TrellisResolvePath( const char *base, const char *in, char *out, 
 	}
 }
 
-static qboolean CL_TrellisRunExpanded( const char *tmpl, const cl_pipeline_expand_t *ex ) {
+static void CL_TrellisEnsureOutputDir( const char *output_full ) {
+	char *slash;
+	char dir[MAX_OSPATH];
+	char mkdir_cmd[1024];
+
+	slash = strrchr( output_full, '/' );
+	if ( !slash ) {
+		return;
+	}
+	if ( (size_t)( slash - output_full ) >= sizeof( dir ) ) {
+		return;
+	}
+	memcpy( dir, output_full, (size_t)( slash - output_full ) );
+	dir[slash - output_full] = '\0';
+	Com_sprintf( mkdir_cmd, sizeof( mkdir_cmd ), "mkdir -p \"%s\"", dir );
+	system( mkdir_cmd );
+}
+
+static qboolean CL_TrellisRunExpanded( const char *tmpl, const cl_pipeline_expand_t *ex, qboolean quiet ) {
 	char cmd[8192];
 
 	if ( !CL_PipelineExpandTemplate( cmd, sizeof( cmd ), tmpl, ex ) ) {
-		Com_Printf( S_COLOR_RED "TRELLIS: expanded command too long or bad path characters\n" );
+		if ( !quiet ) {
+			Com_Printf( S_COLOR_RED "TRELLIS: expanded command too long or bad path characters\n" );
+		}
 		return qfalse;
 	}
-	Com_Printf( "TRELLIS: executing (blocking): %s\n", cmd );
+	if ( !quiet ) {
+		Com_Printf( "TRELLIS: executing: %s\n", cmd );
+	}
 	if ( system( cmd ) != 0 ) {
-		Com_Printf( S_COLOR_RED "TRELLIS: shell returned non-zero\n" );
+		if ( !quiet ) {
+			Com_Printf( S_COLOR_RED "TRELLIS: shell returned non-zero\n" );
+		}
 		return qfalse;
 	}
 	return qtrue;
 }
+
+static qboolean CL_TrellisBuildExpandFromJob( cl_pipeline_expand_t *ex ) {
+	const char *base;
+	const char *py;
+	const char *conda;
+
+	if ( !ex ) {
+		return qfalse;
+	}
+	base = Sys_DefaultBasePath();
+	py = ( cl_trellis_python && cl_trellis_python->string[0] ) ? cl_trellis_python->string : "python3";
+	conda = ( cl_trellis_conda && cl_trellis_conda->string[0] ) ? cl_trellis_conda->string : "trellis2";
+	Com_Memset( ex, 0, sizeof( *ex ) );
+	ex->repo = trellis_job.repo;
+	ex->base = base;
+	ex->engine = base;
+	ex->py = py;
+	ex->conda = conda;
+	ex->image = trellis_job.image_full;
+	ex->output = trellis_job.output_full;
+	ex->model = trellis_job.hf_model;
+	ex->decimation = trellis_job.dec_str;
+	ex->texture_size = trellis_job.tex_str;
+	ex->args = "";
+	return qtrue;
+}
+
+static qhandle_t CL_TrellisImportVfs( const char *vfs_path ) {
+	if ( !vfs_path || !vfs_path[0] || !re.RegisterModel ) {
+		return 0;
+	}
+	return re.RegisterModel( vfs_path );
+}
+
+static void CL_TrellisFinishJob( qboolean success ) {
+	if ( success ) {
+		trellis_job.status = TRELLIS_JOB_COMPLETED;
+		if ( cl_trellis_auto_import && cl_trellis_auto_import->integer ) {
+			trellis_job.model_handle = CL_TrellisImportVfs( trellis_job.output_vfs );
+			if ( trellis_job.model_handle ) {
+				Com_Printf( S_COLOR_GREEN "TRELLIS: auto-imported '%s' (handle %d)\n",
+					trellis_job.output_vfs, trellis_job.model_handle );
+			} else {
+				Com_Printf( S_COLOR_YELLOW "TRELLIS: GLB written but auto-import failed; try trellis_view %s\n",
+					trellis_job.output_vfs );
+			}
+		} else {
+			Com_Printf( S_COLOR_GREEN "TRELLIS: wrote %s — trellis_view %s\n",
+				trellis_job.output_vfs, trellis_job.output_vfs );
+		}
+	} else {
+		trellis_job.status = TRELLIS_JOB_FAILED;
+	}
+}
+
+#if USE_SDL
+static int CL_TrellisGenerationThread( void *data ) {
+	trellis_job_t *job = (trellis_job_t *)data;
+	cl_pipeline_expand_t ex;
+	const char *tmpl;
+
+	if ( !job ) {
+		return -1;
+	}
+	if ( !CL_TrellisBuildExpandFromJob( &ex ) ) {
+		Q_strncpyz( job->error_msg, "Failed to build TRELLIS command", sizeof( job->error_msg ) );
+		job->status = TRELLIS_JOB_FAILED;
+		return -1;
+	}
+	tmpl = ( cl_trellis_cmd && cl_trellis_cmd->string[0] ) ? cl_trellis_cmd->string : CL_TrellisDefaultCmd();
+	if ( !CL_TrellisRunExpanded( tmpl, &ex, qtrue ) ) {
+		Q_strncpyz( job->error_msg, "TRELLIS generation subprocess failed", sizeof( job->error_msg ) );
+		job->status = TRELLIS_JOB_FAILED;
+		return -1;
+	}
+	if ( !CL_TrellisFileExists( job->output_full ) ) {
+		Q_strncpyz( job->error_msg, "TRELLIS output GLB missing after subprocess", sizeof( job->error_msg ) );
+		job->status = TRELLIS_JOB_FAILED;
+		return -1;
+	}
+	CL_TrellisFinishJob( qtrue );
+	return 0;
+}
+#endif
+
+static qboolean CL_TrellisStartJob( const char *image_rel, const char *output_rel_optional ) {
+	cl_pipeline_expand_t ex;
+	const char *tmpl;
+	const char *base;
+	const char *repo;
+	const char *hf_model;
+
+	if ( trellis_job.status == TRELLIS_JOB_RUNNING ) {
+		Com_Printf( S_COLOR_YELLOW "TRELLIS: generation already in progress (trellis_status / trellis_cancel)\n" );
+		return qfalse;
+	}
+	repo = cl_trellis_repo ? cl_trellis_repo->string : "";
+	if ( !repo || !repo[0] ) {
+		Com_Printf( S_COLOR_YELLOW "TRELLIS: set cl_trellis_repo to your TRELLIS.2 checkout\n" );
+		return qfalse;
+	}
+	base = Sys_DefaultBasePath();
+	if ( !base ) {
+		Com_Printf( S_COLOR_RED "TRELLIS: no engine base path\n" );
+		return qfalse;
+	}
+	Com_Memset( &trellis_job, 0, sizeof( trellis_job ) );
+	trellis_job.start_time = Com_Milliseconds();
+	trellis_job.timeout_seconds = cl_trellis_timeout ? cl_trellis_timeout->integer : 3600;
+	Q_strncpyz( trellis_job.repo, repo, sizeof( trellis_job.repo ) );
+	Q_strncpyz( trellis_job.image_vfs, image_rel, sizeof( trellis_job.image_vfs ) );
+	CL_TrellisResolvePath( base, image_rel, trellis_job.image_full, sizeof( trellis_job.image_full ) );
+	if ( !CL_TrellisFileExists( trellis_job.image_full ) ) {
+		Com_Printf( S_COLOR_RED "TRELLIS: input image not found: %s\n", trellis_job.image_full );
+		return qfalse;
+	}
+	if ( output_rel_optional && output_rel_optional[0] ) {
+		Q_strncpyz( trellis_job.output_vfs, output_rel_optional, sizeof( trellis_job.output_vfs ) );
+	} else {
+		Com_sprintf( trellis_job.output_vfs, sizeof( trellis_job.output_vfs ),
+			"models/trellis/trellis_%d.glb", Com_Milliseconds() );
+	}
+	if ( !strstr( trellis_job.output_vfs, ".glb" ) && !strstr( trellis_job.output_vfs, ".gltf" ) ) {
+		Q_strcat( trellis_job.output_vfs, sizeof( trellis_job.output_vfs ), ".glb" );
+	}
+	CL_TrellisResolvePath( base, trellis_job.output_vfs, trellis_job.output_full, sizeof( trellis_job.output_full ) );
+	CL_TrellisEnsureOutputDir( trellis_job.output_full );
+	hf_model = ( cl_trellis_hf_model && cl_trellis_hf_model->string[0] ) ?
+		cl_trellis_hf_model->string : "microsoft/TRELLIS.2-4B";
+	Q_strncpyz( trellis_job.hf_model, hf_model, sizeof( trellis_job.hf_model ) );
+	Com_sprintf( trellis_job.dec_str, sizeof( trellis_job.dec_str ), "%d",
+		cl_trellis_decimation ? cl_trellis_decimation->integer : 500000 );
+	Com_sprintf( trellis_job.tex_str, sizeof( trellis_job.tex_str ), "%d",
+		cl_trellis_texture_size ? cl_trellis_texture_size->integer : 2048 );
+
+	if ( cl_trellis_async && cl_trellis_async->integer ) {
+#if USE_SDL
+		trellis_job.status = TRELLIS_JOB_RUNNING;
+		trellis_job.thread = SDL_CreateThread( CL_TrellisGenerationThread, "TRELLIS_Generation", &trellis_job );
+		if ( !trellis_job.thread ) {
+			trellis_job.status = TRELLIS_JOB_IDLE;
+			Com_Printf( S_COLOR_RED "TRELLIS: failed to create background thread\n" );
+			return qfalse;
+		}
+		Com_Printf( "TRELLIS: started background generation from %s -> %s\n",
+			trellis_job.image_vfs, trellis_job.output_vfs );
+		Com_Printf( "TRELLIS: Use trellis_status / trellis_cancel; model auto-imports when cl_trellis_auto_import 1\n" );
+		return qtrue;
+#else
+		Com_Printf( S_COLOR_YELLOW "TRELLIS: async requires SDL threads; running synchronously\n" );
+#endif
+	}
+
+	trellis_job.status = TRELLIS_JOB_RUNNING;
+	if ( !CL_TrellisBuildExpandFromJob( &ex ) ) {
+		trellis_job.status = TRELLIS_JOB_IDLE;
+		return qfalse;
+	}
+	tmpl = ( cl_trellis_cmd && cl_trellis_cmd->string[0] ) ? cl_trellis_cmd->string : CL_TrellisDefaultCmd();
+	if ( !CL_TrellisRunExpanded( tmpl, &ex, qfalse ) ||
+		!CL_TrellisFileExists( trellis_job.output_full ) ) {
+		Q_strncpyz( trellis_job.error_msg, "TRELLIS generation failed", sizeof( trellis_job.error_msg ) );
+		trellis_job.status = TRELLIS_JOB_FAILED;
+		Com_Printf( S_COLOR_RED "TRELLIS: generation failed\n" );
+		return qfalse;
+	}
+	CL_TrellisFinishJob( qtrue );
+	return qtrue;
+}
+
+static void CL_TrellisFrame( void ) {
+	if ( trellis_job.status == TRELLIS_JOB_RUNNING && trellis_job.timeout_seconds > 0 ) {
+		int runtime = ( Com_Milliseconds() - trellis_job.start_time ) / 1000;
+		if ( runtime > trellis_job.timeout_seconds ) {
+			Com_Printf( S_COLOR_YELLOW "TRELLIS: generation exceeded %d s (still running); trellis_cancel to stop\n",
+				trellis_job.timeout_seconds );
+			trellis_job.timeout_seconds = 0;
+		}
+	}
+	if ( trellis_job.status == TRELLIS_JOB_COMPLETED && !trellis_job.notified ) {
+		trellis_job.notified = qtrue;
+		Com_Printf( S_COLOR_GREEN "TRELLIS: generation complete: %s\n", trellis_job.output_vfs );
+	}
+	if ( trellis_job.status == TRELLIS_JOB_FAILED && !trellis_job.notified ) {
+		trellis_job.notified = qtrue;
+		Com_Printf( S_COLOR_RED "TRELLIS: generation failed: %s\n", trellis_job.error_msg );
+	}
+}
+
 #endif
 
 #ifdef USE_FLUX
@@ -667,6 +914,13 @@ static void CL_FontsPipeline_f( void );
 static void CL_TrellisGenerate_f( void );
 static void CL_TrellisPipeline_f( void );
 static void CL_TrellisImport_f( void );
+static void CL_TrellisStatus_f( void );
+static void CL_TrellisCancel_f( void );
+static void CL_TrellisShow_f( void );
+static void CL_TrellisView_f( void );
+#if defined( USE_FLUX )
+static void CL_TrellisFromPrompt_f( void );
+#endif
 #endif
 static void CL_ServerStatusResponse( const netadr_t *from, msg_t *msg );
 static void CL_ServerInfoPacket( const netadr_t *from, msg_t *msg );
@@ -2803,6 +3057,10 @@ static void CL_Steam_UpdateRichPresence( void ) {
 	}
 }
 
+#ifdef USE_TRELLIS
+void CL_GenerativeFrame( void );
+#endif
+
 /*
 ==================
 CL_Frame
@@ -2819,6 +3077,10 @@ void CL_Frame( int msec, int realMsec ) {
 	if ( !com_cl_running->integer ) {
 		return;
 	}
+
+#ifdef USE_TRELLIS
+	CL_GenerativeFrame();
+#endif
 
 	// save the msec before checking pause
 	cls.realFrametime = realMsec;
@@ -4050,7 +4312,24 @@ void CL_Init( void ) {
 	cl_trellis_enable = Cvar_Get( "cl_trellis_enable", "0", CVAR_ARCHIVE );
 	Cvar_CheckRange( cl_trellis_enable, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( cl_trellis_enable,
-		"Enable Microsoft TRELLIS.2 external image-to-3D pipeline (Python/CUDA). See docs/TRELLIS.md." );
+		"Enable Microsoft TRELLIS.2 image-to-3D runtime generation (mirrors FLUX workflow). See docs/TRELLIS.md." );
+	cl_trellis_async = Cvar_Get( "cl_trellis_async", "1", CVAR_ARCHIVE );
+	Cvar_CheckRange( cl_trellis_async, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( cl_trellis_async,
+		"TRELLIS mode: 0=blocking console, 1=background thread (recommended for runtime use)." );
+	cl_trellis_auto_import = Cvar_Get( "cl_trellis_auto_import", "1", CVAR_ARCHIVE );
+	Cvar_CheckRange( cl_trellis_auto_import, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( cl_trellis_auto_import,
+		"When 1, register the output .glb via RegisterModel when generation completes." );
+#if defined( USE_FLUX )
+	cl_trellis_chain = Cvar_Get( "cl_trellis_chain", "0", CVAR_ARCHIVE );
+	Cvar_CheckRange( cl_trellis_chain, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( cl_trellis_chain,
+		"When 1, trellis_from_prompt (or manual FLUX then chain) runs TRELLIS on FLUX output automatically." );
+#endif
+	cl_trellis_timeout = Cvar_Get( "cl_trellis_timeout", "3600", CVAR_ARCHIVE );
+	Cvar_CheckRange( cl_trellis_timeout, "60", "86400", CV_INTEGER );
+	Cvar_SetDescription( cl_trellis_timeout, "Warn after this many seconds if a background TRELLIS job is still running." );
 	cl_trellis_repo = Cvar_Get( "cl_trellis_repo", "", CVAR_ARCHIVE );
 	Cvar_SetDescription( cl_trellis_repo,
 		"Absolute path to a TRELLIS.2 git checkout (%%R in cl_trellis_cmd / trellis_generate)." );
@@ -4119,6 +4398,17 @@ void CL_Init( void ) {
 	Cmd_AddCommand( "trellis_generate", CL_TrellisGenerate_f );
 	Cmd_AddCommand( "trellis_pipeline", CL_TrellisPipeline_f );
 	Cmd_AddCommand( "trellis_import", CL_TrellisImport_f );
+	Cmd_AddCommand( "trellis_status", CL_TrellisStatus_f );
+	Cmd_AddCommand( "trellis_cancel", CL_TrellisCancel_f );
+	Cmd_AddCommand( "trellis_show", CL_TrellisShow_f );
+	Cmd_AddCommand( "trellis_view", CL_TrellisView_f );
+#if defined( USE_FLUX )
+	Cmd_AddCommand( "trellis_from_prompt", CL_TrellisFromPrompt_f );
+#endif
+	Com_Memset( &trellis_job, 0, sizeof( trellis_job ) );
+#if defined( USE_FLUX )
+	trellis_chain_armed = qfalse;
+#endif
 #endif
 
 #ifdef USE_CURL
@@ -4159,9 +4449,11 @@ void CL_Init( void ) {
 #endif
 #ifdef USE_TRELLIS
 	if ( cl_trellis_enable && cl_trellis_enable->integer ) {
-		Com_Printf( "TRELLIS.2 image-to-3D: enabled (repo: %s, model: %s)\n",
+		Com_Printf( "TRELLIS.2 image-to-3D: enabled (repo: %s, model: %s, async: %s, auto_import: %s)\n",
 			( cl_trellis_repo && cl_trellis_repo->string[0] ) ? cl_trellis_repo->string : "unset",
-			cl_trellis_hf_model ? cl_trellis_hf_model->string : "microsoft/TRELLIS.2-4B" );
+			cl_trellis_hf_model ? cl_trellis_hf_model->string : "microsoft/TRELLIS.2-4B",
+			( cl_trellis_async && cl_trellis_async->integer ) ? "on" : "off",
+			( cl_trellis_auto_import && cl_trellis_auto_import->integer ) ? "on" : "off" );
 	} else {
 		Com_Printf( "TRELLIS.2 image-to-3D: disabled (cl_trellis_enable 0; docs/TRELLIS.md)\n" );
 	}
@@ -4237,6 +4529,16 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 	flux_job.status = FLUX_JOB_IDLE;
 #endif
 
+#ifdef USE_TRELLIS
+#if USE_SDL
+	if ( trellis_job.thread ) {
+		SDL_WaitThread( trellis_job.thread, NULL );
+		trellis_job.thread = NULL;
+	}
+#endif
+	trellis_job.status = TRELLIS_JOB_IDLE;
+#endif
+
 	Cmd_RemoveCommand ("cmd");
 	Cmd_RemoveCommand ("configstrings");
 	Cmd_RemoveCommand ("userinfo");
@@ -4251,6 +4553,13 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 	Cmd_RemoveCommand( "trellis_generate" );
 	Cmd_RemoveCommand( "trellis_pipeline" );
 	Cmd_RemoveCommand( "trellis_import" );
+	Cmd_RemoveCommand( "trellis_status" );
+	Cmd_RemoveCommand( "trellis_cancel" );
+	Cmd_RemoveCommand( "trellis_show" );
+	Cmd_RemoveCommand( "trellis_view" );
+#if defined( USE_FLUX )
+	Cmd_RemoveCommand( "trellis_from_prompt" );
+#endif
 #endif
 	Cmd_RemoveCommand ("disconnect");
 	CL_Demo_ShutdownCommands();
@@ -5972,7 +6281,7 @@ static void CL_TrellisPipeline_f( void ) {
 	ex.py = py;
 	ex.conda = conda;
 	ex.args = args;
-	if ( !CL_TrellisRunExpanded( tmpl, &ex ) ) {
+	if ( !CL_TrellisRunExpanded( tmpl, &ex, qfalse ) ) {
 		return;
 	}
 	Com_Printf( S_COLOR_GREEN "trellis_pipeline: finished\n" );
@@ -5981,27 +6290,10 @@ static void CL_TrellisPipeline_f( void ) {
 /*
 ==================
 CL_TrellisGenerate_f
-
-Image-to-GLB via TRELLIS.2 wrapper (blocking). Output defaults to models/trellis/*.glb under base.
 ==================
 */
 static void CL_TrellisGenerate_f( void ) {
-	char image_rel[MAX_OSPATH];
-	char image_full[MAX_OSPATH];
-	char output_rel[MAX_OSPATH];
-	char output_full[MAX_OSPATH];
-	char output_vfs[MAX_QPATH];
-	char dec_str[32];
-	char tex_str[32];
-	char mkdir_cmd[1024];
-	const char *repo;
-	const char *base;
-	const char *engine;
-	const char *py;
-	const char *conda;
-	const char *tmpl;
-	const char *hf_model;
-	cl_pipeline_expand_t ex;
+	const char *output_opt;
 
 	if ( !cl_trellis_enable || !cl_trellis_enable->integer ) {
 		Com_Printf( S_COLOR_YELLOW "trellis_generate: set cl_trellis_enable 1 (see docs/TRELLIS.md)\n" );
@@ -6012,104 +6304,201 @@ static void CL_TrellisGenerate_f( void ) {
 		Com_Printf( "  Example: trellis_generate screenshots/shot0000.tga\n" );
 		return;
 	}
-	repo = cl_trellis_repo ? cl_trellis_repo->string : "";
-	if ( !repo || !repo[0] ) {
-		Com_Printf( S_COLOR_YELLOW "trellis_generate: set cl_trellis_repo to your TRELLIS.2 checkout\n" );
-		return;
-	}
-	base = Sys_DefaultBasePath();
-	engine = base;
-	if ( !base ) {
-		Com_Printf( S_COLOR_RED "trellis_generate: no engine base path\n" );
-		return;
-	}
-	Q_strncpyz( image_rel, Cmd_Argv( 1 ), sizeof( image_rel ) );
-	CL_TrellisResolvePath( base, image_rel, image_full, sizeof( image_full ) );
-	if ( !CL_TrellisFileExists( image_full ) ) {
-		Com_Printf( S_COLOR_RED "trellis_generate: input image not found: %s\n", image_full );
-		return;
-	}
-	if ( Cmd_Argc() >= 3 ) {
-		Q_strncpyz( output_rel, Cmd_Argv( 2 ), sizeof( output_rel ) );
-	} else {
-		Com_sprintf( output_rel, sizeof( output_rel ), "models/trellis/trellis_%d.glb", Com_Milliseconds() );
-	}
-	CL_TrellisResolvePath( base, output_rel, output_full, sizeof( output_full ) );
-	Q_strncpyz( output_vfs, output_rel, sizeof( output_vfs ) );
-	if ( !strstr( output_vfs, ".glb" ) && !strstr( output_vfs, ".gltf" ) ) {
-		Q_strcat( output_vfs, sizeof( output_vfs ), ".glb" );
-		Q_strcat( output_full, sizeof( output_full ), ".glb" );
-	}
-	{
-		char *slash = strrchr( output_full, '/' );
-		if ( slash ) {
-			char dir[MAX_OSPATH];
-			size_t dlen = (size_t)( slash - output_full );
-			if ( dlen < sizeof( dir ) ) {
-				memcpy( dir, output_full, dlen );
-				dir[dlen] = '\0';
-				Com_sprintf( mkdir_cmd, sizeof( mkdir_cmd ), "mkdir -p \"%s\"", dir );
-				system( mkdir_cmd );
-			}
-		}
-	}
-	py = ( cl_trellis_python && cl_trellis_python->string[0] ) ? cl_trellis_python->string : "python3";
-	conda = ( cl_trellis_conda && cl_trellis_conda->string[0] ) ? cl_trellis_conda->string : "trellis2";
-	hf_model = ( cl_trellis_hf_model && cl_trellis_hf_model->string[0] ) ?
-		cl_trellis_hf_model->string : "microsoft/TRELLIS.2-4B";
-	Com_sprintf( dec_str, sizeof( dec_str ), "%d", cl_trellis_decimation ? cl_trellis_decimation->integer : 500000 );
-	Com_sprintf( tex_str, sizeof( tex_str ), "%d", cl_trellis_texture_size ? cl_trellis_texture_size->integer : 2048 );
-	tmpl = ( cl_trellis_cmd && cl_trellis_cmd->string[0] ) ? cl_trellis_cmd->string : CL_TrellisDefaultCmd();
-	Com_Memset( &ex, 0, sizeof( ex ) );
-	ex.repo = repo;
-	ex.base = base;
-	ex.engine = engine;
-	ex.py = py;
-	ex.conda = conda;
-	ex.image = image_full;
-	ex.output = output_full;
-	ex.model = hf_model;
-	ex.decimation = dec_str;
-	ex.texture_size = tex_str;
-	ex.args = "";
-	if ( !CL_TrellisRunExpanded( tmpl, &ex ) ) {
-		return;
-	}
-	if ( !CL_TrellisFileExists( output_full ) ) {
-		Com_Printf( S_COLOR_RED "trellis_generate: expected output missing: %s\n", output_full );
-		return;
-	}
-	Com_Printf( S_COLOR_GREEN "trellis_generate: wrote %s\n", output_full );
-	Com_Printf( "  VFS path: %s — use trellis_import %s\n", output_vfs, output_vfs );
+	output_opt = ( Cmd_Argc() >= 3 ) ? Cmd_Argv( 2 ) : NULL;
+	CL_TrellisStartJob( Cmd_Argv( 1 ), output_opt );
 }
 
 /*
 ==================
-CL_TrellisImport_f
-
-Register a generated GLB/GLTF with the renderer (Vulkan/OpenGL glTF loader).
+CL_TrellisStatus_f / CL_TrellisCancel_f
 ==================
 */
-static void CL_TrellisImport_f( void ) {
+static void CL_TrellisStatus_f( void ) {
+	switch ( trellis_job.status ) {
+	case TRELLIS_JOB_IDLE:
+		Com_Printf( "TRELLIS: no generation in progress\n" );
+		break;
+	case TRELLIS_JOB_RUNNING: {
+		int runtime = ( Com_Milliseconds() - trellis_job.start_time ) / 1000;
+		Com_Printf( "TRELLIS: generation in progress (%d s)\n", runtime );
+		Com_Printf( "TRELLIS: image: %s -> %s\n", trellis_job.image_vfs, trellis_job.output_vfs );
+		break;
+	}
+	case TRELLIS_JOB_COMPLETED:
+		Com_Printf( S_COLOR_GREEN "TRELLIS: complete: %s (handle %d)\n",
+			trellis_job.output_vfs, trellis_job.model_handle );
+		Com_Printf( "TRELLIS: trellis_view to re-register; trellis_show for spawn hint\n" );
+		break;
+	case TRELLIS_JOB_FAILED:
+		Com_Printf( S_COLOR_RED "TRELLIS: failed: %s\n", trellis_job.error_msg );
+		break;
+	}
+}
+
+static void CL_TrellisCancel_f( void ) {
+	if ( trellis_job.status != TRELLIS_JOB_RUNNING ) {
+		Com_Printf( "TRELLIS: no active generation to cancel\n" );
+		return;
+	}
+	trellis_job.status = TRELLIS_JOB_FAILED;
+	Q_strncpyz( trellis_job.error_msg, "Cancelled by user", sizeof( trellis_job.error_msg ) );
+#if USE_SDL
+	if ( trellis_job.thread ) {
+		int rc = 0;
+		SDL_WaitThread( trellis_job.thread, &rc );
+		trellis_job.thread = NULL;
+		Com_Printf( "TRELLIS: background thread stopped (exit %d)\n", rc );
+	}
+#endif
+	if ( trellis_job.output_full[0] ) {
+		remove( trellis_job.output_full );
+	}
+	trellis_job.status = TRELLIS_JOB_IDLE;
+	Com_Printf( "TRELLIS: generation cancelled\n" );
+}
+
+/*
+==================
+CL_TrellisShow_f / CL_TrellisView_f — mirror flux_show / flux_view for models
+==================
+*/
+static void CL_TrellisShow_f( void ) {
+	const char *name;
+
+	if ( Cmd_Argc() < 2 ) {
+		if ( trellis_job.status == TRELLIS_JOB_COMPLETED && trellis_job.output_vfs[0] ) {
+			name = trellis_job.output_vfs;
+		} else {
+			Com_Printf( S_COLOR_YELLOW "Usage: trellis_show <models/.../asset.glb>\n" );
+			return;
+		}
+	} else {
+		name = Cmd_Argv( 1 );
+	}
+	if ( CL_TrellisImportVfs( name ) ) {
+		Com_Printf( S_COLOR_GREEN "TRELLIS: model ready at '%s'\n", name );
+		Com_Printf( "  Use in maps: misc_model \"%s\" (or your game's model entity)\n", name );
+	} else {
+		Com_Printf( S_COLOR_RED "TRELLIS: failed to register '%s'\n", name );
+	}
+}
+
+static void CL_TrellisView_f( void ) {
 	const char *name;
 	qhandle_t h;
 
 	if ( Cmd_Argc() < 2 ) {
-		Com_Printf( S_COLOR_YELLOW "Usage: trellis_import <models/.../asset.glb>\n" );
-		return;
+		if ( trellis_job.status == TRELLIS_JOB_COMPLETED && trellis_job.output_vfs[0] ) {
+			name = trellis_job.output_vfs;
+			Com_Printf( "TRELLIS: using last job output: %s\n", name );
+		} else {
+			Com_Printf( S_COLOR_YELLOW "Usage: trellis_view <models/.../asset.glb>\n" );
+			return;
+		}
+	} else {
+		name = Cmd_Argv( 1 );
 	}
-	name = Cmd_Argv( 1 );
-	if ( !re.RegisterModel ) {
-		Com_Printf( S_COLOR_RED "trellis_import: renderer not initialized\n" );
-		return;
-	}
-	h = re.RegisterModel( name );
+	h = CL_TrellisImportVfs( name );
 	if ( !h ) {
-		Com_Printf( S_COLOR_RED "trellis_import: failed to register '%s'\n", name );
+		Com_Printf( S_COLOR_RED "TRELLIS: failed to register '%s'\n", name );
 		return;
 	}
-	Com_Printf( S_COLOR_GREEN "trellis_import: registered '%s' (handle %d)\n", name, h );
-	Com_Printf( "  Spawn in maps with misc_model or your game's model entity using this path.\n" );
+	trellis_job.model_handle = h;
+	Com_Printf( S_COLOR_GREEN "TRELLIS: registered '%s' (handle %d)\n", name, h );
+#if USE_SDL
+	if ( trellis_job.thread ) {
+		SDL_WaitThread( trellis_job.thread, NULL );
+		trellis_job.thread = NULL;
+	}
+#endif
+	if ( trellis_job.status == TRELLIS_JOB_COMPLETED ) {
+		trellis_job.status = TRELLIS_JOB_IDLE;
+	}
+}
+
+static void CL_TrellisImport_f( void ) {
+	CL_TrellisShow_f();
+}
+
+#if defined( USE_FLUX )
+/*
+==================
+CL_TrellisFromPrompt_f — FLUX image then TRELLIS mesh (runtime text-to-3D)
+==================
+*/
+static void CL_TrellisFromPrompt_f( void ) {
+	const char *prompt;
+	qboolean flux_was_async;
+
+	if ( !cl_trellis_enable || !cl_trellis_enable->integer ) {
+		Com_Printf( S_COLOR_YELLOW "trellis_from_prompt: set cl_trellis_enable 1\n" );
+		return;
+	}
+	if ( !cl_flux_enable || !cl_flux_enable->integer ) {
+		Com_Printf( S_COLOR_YELLOW "trellis_from_prompt: set cl_flux_enable 1\n" );
+		return;
+	}
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( S_COLOR_YELLOW "Usage: trellis_from_prompt <text prompt>\n" );
+		return;
+	}
+	if ( flux_job.status == FLUX_JOB_RUNNING || trellis_job.status == TRELLIS_JOB_RUNNING ) {
+		Com_Printf( S_COLOR_YELLOW "trellis_from_prompt: wait for current FLUX/TRELLIS job or cancel\n" );
+		return;
+	}
+	prompt = Cmd_ArgsFrom( 1 );
+	flux_was_async = cl_flux_async && cl_flux_async->integer;
+	if ( !flux_was_async ) {
+		Cvar_Set( "cl_flux_async", "1" );
+	}
+	Cvar_Set( "cl_trellis_chain", "1" );
+	trellis_chain_armed = qtrue;
+	Cbuf_AddText( va( "flux_generate %s\n", prompt ) );
+	Com_Printf( "TRELLIS: FLUX started; will chain TRELLIS when image completes (cl_trellis_chain 1)\n" );
+	if ( !flux_was_async ) {
+		Com_Printf( "TRELLIS: enabled cl_flux_async 1 for this workflow\n" );
+	}
+}
+#endif
+
+#if defined( USE_FLUX ) && defined( USE_TRELLIS )
+static void CL_TrellisMaybeChainFromFlux( void ) {
+	if ( !cl_trellis_enable || !cl_trellis_enable->integer ) {
+		trellis_chain_armed = qfalse;
+		return;
+	}
+	if ( !cl_trellis_chain || !cl_trellis_chain->integer ) {
+		trellis_chain_armed = qfalse;
+		return;
+	}
+	if ( !trellis_chain_armed ) {
+		return;
+	}
+	if ( flux_job.status == FLUX_JOB_RUNNING ) {
+		return;
+	}
+	trellis_chain_armed = qfalse;
+	if ( flux_job.status != FLUX_JOB_COMPLETED || !flux_job.output_path[0] ) {
+		Com_Printf( S_COLOR_YELLOW "TRELLIS: FLUX chain aborted (FLUX did not complete successfully)\n" );
+		return;
+	}
+	Com_Printf( "TRELLIS: chaining from FLUX output %s\n", flux_job.output_path );
+	CL_TrellisStartJob( flux_job.output_path, NULL );
+}
+#endif
+
+/*
+==================
+CL_GenerativeFrame — per-frame FLUX/TRELLIS job notifications and chaining
+==================
+*/
+void CL_GenerativeFrame( void ) {
+#ifdef USE_TRELLIS
+	CL_TrellisFrame();
+#endif
+#if defined( USE_FLUX ) && defined( USE_TRELLIS )
+	CL_TrellisMaybeChainFromFlux();
+#endif
 }
 #endif
 
