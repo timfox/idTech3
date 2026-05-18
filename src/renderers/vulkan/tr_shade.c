@@ -388,10 +388,6 @@ void RB_BeginSurface( shader_t *shader, int fogNum ) {
 		( r_shWorldLighting && r_shWorldLighting->integer && r_shLighting && r_shLighting->integer ) ) );
 #endif
 
-#ifdef USE_TESS_NEEDS_ST2
-	tess.needsST2 = state->needsST2;
-#endif
-
 	tess.numIndexes = 0;
 	tess.numVertexes = 0;
 	tess.sdfUiEdge = -1.0f;

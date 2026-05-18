@@ -2781,10 +2781,6 @@ static void DetectNeeds( void )
 		t1 = stages[i].bundle[0].tcGen;
 		t2 = stages[i].bundle[1].tcGen;
 
-		if ( t1 == TCGEN_LIGHTMAP || t2 == TCGEN_LIGHTMAP )
-		{
-			shader.needsST2 = qtrue;
-		}
 		if ( t1 == TCGEN_ENVIRONMENT_MAPPED || t1 == TCGEN_ENVIRONMENT_MAPPED_FP )
 		{
 			shader.needsNormal = qtrue;
@@ -3288,7 +3284,6 @@ shader_t *R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImag
 
 	/* needsNormal etc. could be set based on stage requirements. */
 	//shader.needsST1 = qtrue;
-	//shader.needsST2 = qtrue;
 	//shader.needsColor = qtrue;
 
 	//
@@ -3377,7 +3372,6 @@ qhandle_t RE_RegisterShaderFromImage(const char *name, int lightmapIndex, image_
 
 	/* needsNormal etc. could be set based on stage requirements. */
 	//shader.needsST1 = qtrue;
-	//shader.needsST2 = qtrue;
 	//shader.needsColor = qtrue;
 
 	//

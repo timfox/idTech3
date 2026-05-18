@@ -47,7 +47,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #endif
 
 //#define USE_TESS_NEEDS_NORMAL
-//#define USE_TESS_NEEDS_ST2
 
 #define SH_COEFF_COUNT 9
 
@@ -532,7 +531,6 @@ typedef struct shader_s {
 
 	qboolean	needsNormal;			// not all shaders will need all data to be gathered
 	//qboolean	needsST1;
-	qboolean	needsST2;
 	//qboolean	needsColor;
 
 	int			numDeforms;
@@ -2033,9 +2031,6 @@ typedef struct shaderCommands_s
 	// info extracted from current shader
 #ifdef USE_TESS_NEEDS_NORMAL
 	int			needsNormal;
-#endif
-#ifdef USE_TESS_NEEDS_ST2
-	int			needsST2;
 #endif
 
 	int			numPasses;
