@@ -29,6 +29,7 @@ Sampling:
 #include "vk_vdb.h"
 #include "vk.h"
 #include "vk_cmd.h"
+#include "vk_descriptor_sets.h"
 #include "vk_staging.h"
 #include "vk_image_layout.h"
 #include <math.h>
@@ -49,8 +50,135 @@ static vdbGrid_t grids[VDB_MAX_GRIDS];
 static int numGrids = 0;
 static vdbHandle_t boundFogDensityHandle = VDB_INVALID_HANDLE;
 static cvar_t *r_vdb;
+static qboolean vdb_console_cmds_registered = qfalse;
 
 #define VALID_GRID(h) ((h) >= 0 && (h) < numGrids && grids[(h)].active)
+
+static vdbHandle_t VDB_ParseHandleArg( const char *s )
+{
+	char *end;
+	long v;
+
+	if ( !s || !s[0] ) {
+		return VDB_INVALID_HANDLE;
+	}
+	v = strtol( s, &end, 10 );
+	if ( end == s || *end != '\0' || v < 0 || v >= VDB_MAX_GRIDS ) {
+		return VDB_INVALID_HANDLE;
+	}
+	return (vdbHandle_t)v;
+}
+
+static void VDB_Cmd_Load_f( void )
+{
+	const char *filename;
+	const char *gridName;
+	vdbHandle_t h;
+
+	if ( ri.Cmd_Argc() < 2 ) {
+		ri.Printf( PRINT_ALL, "Usage: vdb_load <filename> [gridName]\n" );
+		return;
+	}
+	filename = ri.Cmd_Argv( 1 );
+	gridName = ( ri.Cmd_Argc() >= 3 ) ? ri.Cmd_Argv( 2 ) : "density";
+	h = VDB_Load( filename, gridName );
+	if ( h < 0 ) {
+		ri.Printf( PRINT_WARNING, "VDB: vdb_load failed for '%s'\n", filename );
+		return;
+	}
+	ri.Printf( PRINT_ALL, "VDB: loaded handle %d '%s' from %s\n", h, grids[h].info.name, filename );
+}
+
+static void VDB_Cmd_Upload_f( void )
+{
+	vdbHandle_t h;
+
+	if ( ri.Cmd_Argc() < 2 ) {
+		ri.Printf( PRINT_ALL, "Usage: vdb_upload <handle>\n" );
+		return;
+	}
+	h = VDB_ParseHandleArg( ri.Cmd_Argv( 1 ) );
+	if ( !VALID_GRID( h ) ) {
+		ri.Printf( PRINT_WARNING, "VDB: invalid handle\n" );
+		return;
+	}
+	if ( !VDB_UploadToGPU( h ) ) {
+		ri.Printf( PRINT_WARNING, "VDB: GPU upload failed for handle %d\n", h );
+		return;
+	}
+	vk_update_volumetric_descriptors();
+	ri.Printf( PRINT_ALL, "VDB: handle %d on GPU; volumetric descriptors refreshed\n", h );
+}
+
+static void VDB_Cmd_BindFog_f( void )
+{
+	vdbHandle_t h;
+
+	if ( ri.Cmd_Argc() < 2 ) {
+		ri.Printf( PRINT_ALL, "Usage: vdb_bind_fog <handle>\n" );
+		return;
+	}
+	h = VDB_ParseHandleArg( ri.Cmd_Argv( 1 ) );
+	if ( !VALID_GRID( h ) ) {
+		ri.Printf( PRINT_WARNING, "VDB: invalid handle\n" );
+		return;
+	}
+	if ( !VDB_BindAsFogDensity( h ) ) {
+		ri.Printf( PRINT_WARNING, "VDB: bind failed for handle %d\n", h );
+		return;
+	}
+	if ( !VDB_IsOnGPU( h ) ) {
+		ri.Printf( PRINT_ALL, "VDB: handle %d bound; run vdb_upload %d before r_vdbFog will sample it\n", h, h );
+	} else {
+		vk_update_volumetric_descriptors();
+		ri.Printf( PRINT_ALL, "VDB: handle %d bound for fog; enable r_volumetricFog 1 and r_vdbFog 1\n", h );
+	}
+}
+
+static void VDB_Cmd_List_f( void )
+{
+	int i;
+
+	if ( numGrids <= 0 ) {
+		ri.Printf( PRINT_ALL, "VDB: no grids loaded\n" );
+		return;
+	}
+	for ( i = 0; i < numGrids; i++ ) {
+		if ( !grids[i].active ) {
+			continue;
+		}
+		ri.Printf( PRINT_ALL, "  [%d] %s %dx%dx%d gpu=%s bound_fog=%s\n",
+			i, grids[i].info.name,
+			grids[i].info.dimX, grids[i].info.dimY, grids[i].info.dimZ,
+			grids[i].onGPU ? "yes" : "no",
+			( boundFogDensityHandle == i ) ? "yes" : "no" );
+	}
+}
+
+static void VDB_RegisterConsoleCommands( void )
+{
+	if ( vdb_console_cmds_registered ) {
+		return;
+	}
+	ri.Cmd_AddCommand( "vdb_load", VDB_Cmd_Load_f );
+	ri.Cmd_AddCommand( "vdb_upload", VDB_Cmd_Upload_f );
+	ri.Cmd_AddCommand( "vdb_bind_fog", VDB_Cmd_BindFog_f );
+	ri.Cmd_AddCommand( "vdb_list", VDB_Cmd_List_f );
+	vdb_console_cmds_registered = qtrue;
+	ri.Printf( PRINT_DEVELOPER, "VDB: console commands vdb_load, vdb_upload, vdb_bind_fog, vdb_list\n" );
+}
+
+static void VDB_UnregisterConsoleCommands( void )
+{
+	if ( !vdb_console_cmds_registered ) {
+		return;
+	}
+	ri.Cmd_RemoveCommand( "vdb_load" );
+	ri.Cmd_RemoveCommand( "vdb_upload" );
+	ri.Cmd_RemoveCommand( "vdb_bind_fog" );
+	ri.Cmd_RemoveCommand( "vdb_list" );
+	vdb_console_cmds_registered = qfalse;
+}
 
 static void VDB_DestroyGpuResources( vdbGrid_t *grid )
 {
@@ -83,10 +211,14 @@ void VDB_Init( void ) {
 #else
 	ri.Printf( PRINT_ALL, "VDB: initialized (NanoVDB only, compile with USE_OPENVDB for full support)\n" );
 #endif
+	VDB_RegisterConsoleCommands();
 }
 
 void VDB_Shutdown( void ) {
 	int i;
+
+	VDB_UnregisterConsoleCommands();
+	boundFogDensityHandle = VDB_INVALID_HANDLE;
 	for ( i = 0; i < numGrids; i++ ) {
 		VDB_DestroyGpuResources( &grids[i] );
 		if ( grids[i].data ) {
