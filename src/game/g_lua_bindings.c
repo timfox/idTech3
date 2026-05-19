@@ -291,6 +291,10 @@ static int l_vdb_getInfo(lua_State *L) {
 	lua_pushnil(L);
 	return 1;
 }
+static int l_vdb_upload(lua_State *L) {
+	lua_pushboolean(L, VDB_UploadToGPU((int)luaL_checkinteger(L, 1)));
+	return 1;
+}
 static int l_vdb_bindAsFog(lua_State *L) {
 	lua_pushboolean(L, VDB_BindAsFogDensity((int)luaL_checkinteger(L, 1)));
 	return 1;
@@ -1158,6 +1162,7 @@ void LuaBindings_RegisterAll(void *luaState) {
 		{"free", l_vdb_free},
 		{"sample", l_vdb_sample},
 		{"getInfo", l_vdb_getInfo},
+		{"upload", l_vdb_upload},
 		{"bindAsFog", l_vdb_bindAsFog},
 		{"getGridCount", l_vdb_getGridCount},
 		{NULL, NULL}
