@@ -106,8 +106,7 @@ static void VDB_Cmd_Upload_f( void )
 		ri.Printf( PRINT_WARNING, "VDB: GPU upload failed for handle %d\n", h );
 		return;
 	}
-	vk_update_volumetric_descriptors();
-	ri.Printf( PRINT_ALL, "VDB: handle %d on GPU; volumetric descriptors refreshed\n", h );
+	ri.Printf( PRINT_ALL, "VDB: handle %d on GPU\n", h );
 }
 
 static void VDB_Cmd_BindFog_f( void )
@@ -130,7 +129,6 @@ static void VDB_Cmd_BindFog_f( void )
 	if ( !VDB_IsOnGPU( h ) ) {
 		ri.Printf( PRINT_ALL, "VDB: handle %d bound; run vdb_upload %d before r_vdbFog will sample it\n", h, h );
 	} else {
-		vk_update_volumetric_descriptors();
 		ri.Printf( PRINT_ALL, "VDB: handle %d bound for fog; enable r_volumetricFog 1 and r_vdbFog 1\n", h );
 	}
 }
@@ -537,6 +535,9 @@ qboolean VDB_UploadToGPU( vdbHandle_t h ) {
 	grid->onGPU = qtrue;
 	ri.Printf( PRINT_ALL, "VDB: grid %d '%s' uploaded to GPU (%ux%ux%u R32_SFLOAT)\n",
 		h, grid->info.name, (unsigned)width, (unsigned)height, (unsigned)depth );
+	if ( vk.device && !vk.device_lost ) {
+		vk_update_volumetric_descriptors();
+	}
 	return qtrue;
 }
 
@@ -555,9 +556,14 @@ VkImageView VDB_GetGpuImageView( vdbHandle_t h ) {
 }
 
 qboolean VDB_BindAsFogDensity( vdbHandle_t h ) {
-	if ( !VALID_GRID( h ) ) return qfalse;
+	if ( !VALID_GRID( h ) ) {
+		return qfalse;
+	}
 	boundFogDensityHandle = h;
 	ri.Printf( PRINT_ALL, "VDB: grid %d bound as fog density source\n", h );
+	if ( grids[h].onGPU && vk.device && !vk.device_lost ) {
+		vk_update_volumetric_descriptors();
+	}
 	return qtrue;
 }
 
