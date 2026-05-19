@@ -20,6 +20,7 @@ Split from vk.c.
 #include "vk_skybox_hdr.h"
 #include "vk_forward_plus.h"
 #include "vk_rtx.h"
+#include "vk_vdb.h"
 #include "vk_pipeline_cache_disk.h"
 
 #ifdef USE_VBO
@@ -174,6 +175,7 @@ void vk_shutdown( refShutdownCode_t code )
 
 	vk_release_geometry_buffers();
 
+	VDB_Shutdown();
 	vk_forward_plus_shutdown();
 
 	vk_destroy_samplers();

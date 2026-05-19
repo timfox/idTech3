@@ -317,6 +317,19 @@ else
 fi
 
 echo ""
+echo "VDB console workflow (vdb_load / upload / bind_fog):"
+VK_VDB_C="$PROJECT_ROOT/src/renderers/vulkan/vk_vdb.c"
+if [[ ! -f "$VK_VDB_C" ]]; then
+  fail "missing vk_vdb.c"
+elif ! grep -q 'ri\.Cmd_AddCommand( "vdb_load"' "$VK_VDB_C" || \
+     ! grep -q 'ri\.Cmd_AddCommand( "vdb_bind_fog"' "$VK_VDB_C" || \
+     ! grep -q 'vk_update_volumetric_descriptors' "$VK_VDB_C"; then
+  fail "vk_vdb.c must register vdb_load/vdb_bind_fog and refresh volumetric descriptors on upload"
+else
+  pass "VDB console commands registered in vk_vdb.c"
+fi
+
+echo ""
 echo "Vulkan temporal: reset bitmask vs reason_string / log table:"
 VK_TEMP_H="$PROJECT_ROOT/src/renderers/vulkan/vk_temporal.h"
 VK_TEMP_C="$PROJECT_ROOT/src/renderers/vulkan/vk_temporal.c"
