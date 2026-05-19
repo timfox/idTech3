@@ -330,6 +330,31 @@ else
 fi
 
 echo ""
+echo "Optional Tiled Map Editor submodule (GPL-2.0, not linked into engine):"
+GITMODULES="$PROJECT_ROOT/.gitmodules"
+if [[ ! -f "$GITMODULES" ]]; then
+  fail "missing .gitmodules"
+elif ! grep -qE '^\[submodule "tools/tiled"\]' "$GITMODULES" || \
+     ! grep -qE '^\s*path = tools/tiled' "$GITMODULES" || \
+     ! grep -q 'github.com/mapeditor/tiled' "$GITMODULES"; then
+  fail ".gitmodules must register tools/tiled -> mapeditor/tiled"
+else
+  pass ".gitmodules registers tools/tiled (mapeditor/tiled)"
+fi
+if ! git -C "$PROJECT_ROOT" rev-parse --git-dir &>/dev/null; then
+  fail "not a git checkout (cannot verify tools/tiled gitlink)"
+elif ! git -C "$PROJECT_ROOT" ls-tree HEAD tools/tiled 2>/dev/null | grep -q '160000'; then
+  fail "tools/tiled must be a submodule gitlink (mode 160000) at HEAD"
+else
+  pass "tools/tiled submodule gitlink present at HEAD"
+fi
+if [[ ! -f "$PROJECT_ROOT/docs/TILED.md" ]]; then
+  fail "missing docs/TILED.md"
+else
+  pass "docs/TILED.md present"
+fi
+
+echo ""
 echo "Vulkan temporal: reset bitmask vs reason_string / log table:"
 VK_TEMP_H="$PROJECT_ROOT/src/renderers/vulkan/vk_temporal.h"
 VK_TEMP_C="$PROJECT_ROOT/src/renderers/vulkan/vk_temporal.c"
