@@ -41,6 +41,15 @@ Artifacts are copied to `release/` and the build trees live under `build-vk-Rele
 
 **Minimal game data next to binaries:** see [docs/MINIMAL_GAME_SHELL.md](docs/MINIMAL_GAME_SHELL.md) (bootstrap `base/*.pk3` with `default.cfg`).
 
+**Optional Git submodules** (not required to compile the engine):
+
+```bash
+git submodule update --init tools/tiled              # Tiled Map Editor (GPL-2.0)
+git submodule update --init src/external/src/SparseVoxelOctree
+```
+
+See [docs/TILED.md](docs/TILED.md) and [tools/README.md](tools/README.md).
+
 ### CMake presets
 
 `CMakePresets.json` exposes the same common configurations without having to remember the cache flags:
