@@ -17,6 +17,8 @@ Tiled is **GPL-2.0** (see `tools/tiled/COPYING` and `tools/tiled/LICENSE.GPL`). 
 Initialize after clone:
 
 ```bash
+./scripts/init_optional_submodules.sh --tiled
+# equivalent:
 git submodule update --init tools/tiled
 ```
 

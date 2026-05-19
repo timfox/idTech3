@@ -50,4 +50,4 @@ Build artifacts go to `build-vk-Release/` or `build-gl-Release/` and are copied 
 
 ### Optional submodules
 
-- **Tiled Map Editor** (`tools/tiled`, GPL-2.0): `git submodule update --init tools/tiled` — not built by `compile_engine.sh`; see `docs/TILED.md`.
+- **Tiled Map Editor** (`tools/tiled`, GPL-2.0): `./scripts/init_optional_submodules.sh --tiled` — not built by `compile_engine.sh`; see `docs/TILED.md`.

@@ -44,8 +44,9 @@ Artifacts are copied to `release/` and the build trees live under `build-vk-Rele
 **Optional Git submodules** (not required to compile the engine):
 
 ```bash
-git submodule update --init tools/tiled              # Tiled Map Editor (GPL-2.0)
-git submodule update --init src/external/src/SparseVoxelOctree
+./scripts/init_optional_submodules.sh --tiled   # Tiled Map Editor (GPL-2.0)
+./scripts/init_optional_submodules.sh --svo     # SparseVoxelOctree reference
+./scripts/init_optional_submodules.sh --all
 ```
 
 See [docs/TILED.md](docs/TILED.md) and [tools/README.md](tools/README.md).

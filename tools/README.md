@@ -11,7 +11,7 @@ These directories are **not** linked into the idTech3 engine build. They exist f
 ```bash
 git clone --recurse-submodules <repo-url>
 # or after a plain clone:
-git submodule update --init tools/tiled
+./scripts/init_optional_submodules.sh --tiled
 ```
 
 See [docs/TILED.md](../docs/TILED.md) for version pin and build pointers.
