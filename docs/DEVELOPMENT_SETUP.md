@@ -40,6 +40,20 @@ sudo apt-get install libtheora-dev
 
 See [COMPATIBILITY.md](COMPATIBILITY.md) for platform-specific notes.
 
+### Git submodules (optional)
+
+The engine build does **not** require submodules. Initialize only what you need:
+
+```bash
+# Tiled Map Editor (GPL-2.0, level design — not linked into idtech3)
+git submodule update --init tools/tiled
+
+# Sparse voxel octree reference (optional, src/external)
+git submodule update --init src/external/src/SparseVoxelOctree
+```
+
+See [TILED.md](TILED.md) and [tools/README.md](../tools/README.md).
+
 ### macOS
 ```bash
 brew install coreutils sdl2 openal-soft cmake ninja freetype lua

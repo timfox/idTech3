@@ -1,3 +1,6 @@
 [submodule "src/external/src/SparseVoxelOctree"]
 	path = src/external/src/SparseVoxelOctree
 	url = https://github.com/AdamYuan/SparseVoxelOctree
+[submodule "tools/tiled"]
+	path = tools/tiled
+	url = https://github.com/mapeditor/tiled.git
