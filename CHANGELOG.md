@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Optional Git submodule **`tools/tiled`**: [Tiled Map Editor](https://www.mapeditor.org/) (GPL-2.0, upstream `mapeditor/tiled`, pinned tag **v1.9.91**); not linked into the engine — see **`docs/TILED.md`**.
 - Vulkan VDB: console commands **`vdb_load`**, **`vdb_upload`**, **`vdb_bind_fog`**, **`vdb_list`** for NanoVDB → volumetric fog workflow (refreshes volumetric descriptors after upload).
 - Vulkan Forward+: **`r_forwardPlusDepthCull`** (0/1, default **0**); when **1**, tile cull runs after opaque geometry and rejects lights behind the depth buffer at each light’s screen center (reversed-Z).
 - Vulkan RTX (USE_VULKAN_RTX): **`r_rtxEntities`** / **`r_rtxEntityCap`** (default **0** / **128**); when **1** with **`r_rtxDemo`**, refEntity model bounds are packed as proxy AABB boxes in a second BLAS and included in the TLAS each frame.
