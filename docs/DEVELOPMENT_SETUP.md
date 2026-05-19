@@ -46,10 +46,13 @@ The engine build does **not** require submodules. Initialize only what you need:
 
 ```bash
 # Tiled Map Editor (GPL-2.0, level design — not linked into idtech3)
-git submodule update --init tools/tiled
+./scripts/init_optional_submodules.sh --tiled
 
 # Sparse voxel octree reference (optional, src/external)
-git submodule update --init src/external/src/SparseVoxelOctree
+./scripts/init_optional_submodules.sh --svo
+
+# Both
+./scripts/init_optional_submodules.sh --all
 ```
 
 See [TILED.md](TILED.md) and [tools/README.md](../tools/README.md).

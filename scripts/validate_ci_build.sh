@@ -43,11 +43,15 @@ else
 fi
 echo ""
 
-echo "5. Renderer regression check (repo + GLSL)..."
+echo "5. Optional submodule init script (dry-run)..."
+./scripts/init_optional_submodules.sh --all --dry-run
+echo ""
+
+echo "6. Renderer regression check (repo + GLSL)..."
 ./scripts/renderer_regression_check.sh
 echo ""
 
-echo "6. Demo mod pack layout (idtech3_demo.pk3)..."
+echo "7. Demo mod pack layout (idtech3_demo.pk3)..."
 chmod +x ./tests/scripts/test_demo_game_pk3.sh
 ./tests/scripts/test_demo_game_pk3.sh
 echo ""
