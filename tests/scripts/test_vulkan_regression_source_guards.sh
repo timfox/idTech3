@@ -37,10 +37,12 @@ assert_not_matches_regex() {
 VK_INSTANCE="$PROJECT_ROOT/src/renderers/vulkan/vk_instance.c"
 TR_SHADE="$PROJECT_ROOT/src/renderers/vulkan/tr_shade.c"
 VK_FRAME_SUBMIT="$PROJECT_ROOT/src/renderers/vulkan/vk_frame_submit.c"
+VK_RESOURCE_DESTROY="$PROJECT_ROOT/src/renderers/vulkan/vk_resource_destroy.c"
 
 assert_file_exists "$VK_INSTANCE"
 assert_file_exists "$TR_SHADE"
 assert_file_exists "$VK_FRAME_SUBMIT"
+assert_file_exists "$VK_RESOURCE_DESTROY"
 
 # Mesh shader extension must stay explicitly gated (support + cvar + extension list capacity).
 assert_contains_literal "$VK_INSTANCE" "const char *device_extension_list[40];" "mesh shader extension-list headroom"
@@ -63,5 +65,116 @@ assert_contains_literal "$TR_SHADE" "vk_vegetation_clear_staging();" "vegetation
 # Frame begin path must not dispatch vegetation compute directly (would run before tess upload).
 assert_not_matches_regex "$VK_FRAME_SUBMIT" "^[[:space:]]*vk_vegetation_wind_dispatch[[:space:]]*\\(" "no early vegetation dispatch in vk_begin_frame"
 assert_contains_literal "$VK_FRAME_SUBMIT" "before tessellation and see vertexCount==0." "frame-submit comment documents ordering risk"
+
+python3 - "$VK_RESOURCE_DESTROY" "$VK_FRAME_SUBMIT" <<'PY'
+import re
+import sys
+
+
+def fail(message):
+    print(f"FAIL: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
+def strip_comments(source):
+    return re.sub(r"/\*.*?\*/|//[^\n]*", "", source, flags=re.S)
+
+
+def extract_function(source, name):
+    pattern = re.compile(r"(^|\n)\s*(?:static\s+)?[A-Za-z_][\w\s\*]*\b" + re.escape(name) + r"\s*\([^;]*\)\s*\{")
+    match = pattern.search(source)
+    if not match:
+        fail(f"missing function {name}")
+
+    brace = source.find("{", match.start())
+    depth = 0
+    for index in range(brace, len(source)):
+        char = source[index]
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return source[match.start():index + 1]
+
+    fail(f"unterminated function {name}")
+
+
+def require_contains(text, needle, context):
+    if needle not in text:
+        fail(f"{context}: expected {needle!r}")
+
+
+def require_regex(text, pattern, context):
+    if not re.search(pattern, text, flags=re.S):
+        fail(f"{context}: expected pattern {pattern!r}")
+
+
+def forbid_regex(text, pattern, context):
+    if re.search(pattern, text, flags=re.S):
+        fail(f"{context}: unexpected pattern {pattern!r}")
+
+
+resource_destroy_path, frame_submit_path = sys.argv[1:3]
+with open(resource_destroy_path, "r", encoding="utf-8") as handle:
+    resource_destroy = handle.read()
+with open(frame_submit_path, "r", encoding="utf-8") as handle:
+    frame_submit = handle.read()
+
+world_destroy = extract_function(resource_destroy, "vk_destroy_world_graphics_pipelines")
+world_destroy_code = strip_comments(world_destroy)
+require_contains(
+    world_destroy,
+    "Keep vk.pipelines[i].def and do not shrink pipelines_count",
+    "world pipeline invalidation documents cached pipeline-index invariant",
+)
+require_contains(
+    world_destroy,
+    "shader_t::vk_pipeline",
+    "world pipeline invalidation documents shader cache risk",
+)
+require_regex(
+    world_destroy_code,
+    r"for\s*\([^;]*vk\.pipelines_world_base[^;]*;\s*i\s*<\s*vk\.pipelines_count\s*;",
+    "world pipeline invalidation iterates existing world pipeline rows",
+)
+require_contains(
+    world_destroy_code,
+    "qvkDestroyPipeline( vk.device, vk.pipelines[i].handle[j], NULL );",
+    "world pipeline invalidation destroys GPU handles",
+)
+require_contains(
+    world_destroy_code,
+    "vk.pipelines[i].handle[j] = VK_NULL_HANDLE;",
+    "world pipeline invalidation clears destroyed handles",
+)
+forbid_regex(
+    world_destroy_code,
+    r"vk\.pipelines_count\s*=",
+    "world pipeline invalidation must preserve cached shader pipeline indices",
+)
+forbid_regex(
+    world_destroy_code,
+    r"Com_Memset\s*\(\s*&?vk\.pipelines\b",
+    "world pipeline invalidation must preserve pipeline definitions",
+)
+
+begin_frame_code = strip_comments(extract_function(frame_submit, "vk_begin_frame"))
+require_contains(
+    begin_frame_code,
+    "r_forwardPlusShade && r_forwardPlusShade->modified",
+    "Forward+ shade cvar modification is handled during frame begin",
+)
+require_contains(
+    begin_frame_code,
+    "vk_destroy_world_graphics_pipelines();",
+    "Forward+ shade changes invalidate only world graphics pipelines",
+)
+forbid_regex(
+    begin_frame_code,
+    r"vk_destroy_pipelines\s*\(",
+    "Forward+ shade changes must not destroy unrelated post-process pipelines",
+)
+PY
 
 echo "PASS: test_vulkan_regression_source_guards"
