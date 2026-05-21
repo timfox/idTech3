@@ -29,6 +29,7 @@ static char s_csTrackedScripts[MAX_CS_TRACKED_SCRIPTS][MAX_OSPATH];
 
 static cvar_t *cs_autoInit;
 static cvar_t *cs_allowEvents;
+static cvar_t *cs_allowExec;
 static cvar_t *cs_frameCallbackBudgetMs;
 static cvar_t *cs_compiler;
 static cvar_t *cs_compatTarget;
@@ -47,6 +48,10 @@ static void CsDebug_InitPolicyCvars( void ) {
 	if ( !cs_allowEvents ) {
 		cs_allowEvents = Cvar_Get( "cs_allowEvents", "1", CVAR_ARCHIVE_ND );
 		Cvar_SetDescription( cs_allowEvents, "Allow C# event handlers via IdTech3.Engine.On (0=off, 1=on)." );
+	}
+	if ( !cs_allowExec ) {
+		cs_allowExec = Cvar_Get( "cs_allowExec", "1", CVAR_ARCHIVE_ND );
+		Cvar_SetDescription( cs_allowExec, "Allow IdTech3.Engine.Exec to append console commands (0=off, 1=on)." );
 	}
 	if ( !cs_frameCallbackBudgetMs ) {
 		cs_frameCallbackBudgetMs = Cvar_Get( "cs_frameCallbackBudgetMs", "2", CVAR_ARCHIVE_ND );
@@ -147,13 +152,35 @@ static MonoString *id3_cs_get_engine_info( void ) {
 	return mono_string_new( mono_domain_get(), info );
 }
 
+static void id3_cs_exec( MonoString *command ) {
+	char *utf8;
+
+	if ( !cs_allowExec || !cs_allowExec->integer ) {
+		return;
+	}
+	if ( !command ) {
+		return;
+	}
+	utf8 = mono_string_to_utf8( command );
+	if ( utf8 && utf8[0] ) {
+		Cbuf_AddText( utf8 );
+		Cbuf_AddText( "\n" );
+	}
+	if ( utf8 ) {
+		mono_free( utf8 );
+	}
+}
+
 static void CsDebug_RegisterInternalCalls( void ) {
 	mono_add_internal_call( "IdTech3.Engine::Print", id3_cs_print );
 	mono_add_internal_call( "IdTech3.Engine::CvarGet", id3_cs_cvar_get );
 	mono_add_internal_call( "IdTech3.Engine::CvarSet", id3_cs_cvar_set );
 	mono_add_internal_call( "IdTech3.Engine::GetMilliseconds", id3_cs_get_milliseconds );
 	mono_add_internal_call( "IdTech3.Engine::GetEngineInfo", id3_cs_get_engine_info );
+	mono_add_internal_call( "IdTech3.Engine::Exec", id3_cs_exec );
 }
+
+static qboolean CsDebug_StageVfsFileToHome( const char *vfsPath, char *diskPath, int diskPathSize );
 
 static qboolean CsDebug_EnsureMono( void ) {
 	if ( s_csMonoReady ) {
@@ -171,11 +198,15 @@ static qboolean CsDebug_EnsureMono( void ) {
 	return qtrue;
 }
 
-static qboolean CsDebug_ResolveApiPath( char *out, int outSize ) {
+static qboolean CsDebug_ResolveApiDiskPath( char *out, int outSize ) {
 	const char *fromDefine;
 
 	if ( !out || outSize <= 0 ) {
 		return qfalse;
+	}
+
+	if ( FS_FileExists( "scripts/csharp/IdTech3.Engine.cs" ) ) {
+		return CsDebug_StageVfsFileToHome( "scripts/csharp/IdTech3.Engine.cs", out, outSize );
 	}
 
 #ifdef IDTECH3_CSHARP_API_PATH
@@ -185,11 +216,6 @@ static qboolean CsDebug_ResolveApiPath( char *out, int outSize ) {
 		return qtrue;
 	}
 #endif
-
-	if ( FS_FileExists( "scripts/csharp/IdTech3.Engine.cs" ) ) {
-		Q_strncpyz( out, "scripts/csharp/IdTech3.Engine.cs", outSize );
-		return qtrue;
-	}
 
 	return qfalse;
 }
@@ -211,13 +237,13 @@ static qboolean CsDebug_StageVfsFileToHome( const char *vfsPath, char *diskPath,
 }
 
 static qboolean CsDebug_CompileScript( const char *scriptPath, char *dllPath, int dllPathSize ) {
-	char apiPath[MAX_OSPATH];
+	char apiDisk[MAX_OSPATH];
 	char scriptDisk[MAX_OSPATH];
 	char cmd[2048];
 	const char *compiler;
 	int result;
 
-	if ( !CsDebug_ResolveApiPath( apiPath, sizeof( apiPath ) ) ) {
+	if ( !CsDebug_ResolveApiDiskPath( apiDisk, sizeof( apiDisk ) ) ) {
 		Com_Printf( S_COLOR_RED "C#: IdTech3.Engine.cs not found (scripts/csharp/ or build tree)\n" );
 		return qfalse;
 	}
@@ -230,7 +256,7 @@ static qboolean CsDebug_CompileScript( const char *scriptPath, char *dllPath, in
 	compiler = ( cs_compiler && cs_compiler->string[0] ) ? cs_compiler->string : "mcs";
 	Com_sprintf( cmd, sizeof( cmd ),
 		"%s -nologo -warn:0 -target:library -out:\"%s\" -reference:System \"%s\" \"%s\"",
-		compiler, dllPath, apiPath, scriptDisk );
+		compiler, dllPath, apiDisk, scriptDisk );
 
 	Com_Printf( "C#: compiling %s\n", scriptPath );
 	result = system( cmd );
@@ -460,8 +486,9 @@ void Cmd_CsList_f( void ) {
 
 	CsDebug_InitPolicyCvars();
 	Com_Printf( "C#: compat %s\n", cs_compatTarget ? cs_compatTarget->string : "mono-4.7-api" );
-	Com_Printf( "C#: policy cs_allowEvents=%d cs_frameCallbackBudgetMs=%d cs_autoInit=%d compiler=%s\n",
+	Com_Printf( "C#: policy cs_allowEvents=%d cs_allowExec=%d cs_frameCallbackBudgetMs=%d cs_autoInit=%d compiler=%s\n",
 		cs_allowEvents ? cs_allowEvents->integer : 0,
+		cs_allowExec ? cs_allowExec->integer : 0,
 		cs_frameCallbackBudgetMs ? cs_frameCallbackBudgetMs->integer : 0,
 		cs_autoInit ? cs_autoInit->integer : 0,
 		cs_compiler ? cs_compiler->string : "mcs" );

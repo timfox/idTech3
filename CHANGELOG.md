@@ -8,7 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **C# scripting (Mono):** optional `USE_CSHARP=ON` embeds Mono for runtime `.cs` scripts (`cs_reload`, `cs_list`, `cs_dump`); shared events with JavaScript via `Com_ScriptEmitEvent`; API in `src/qcommon/csharp/IdTech3.Engine.cs`; see **`docs/CSHARP.md`**.
+- **C# scripting (Mono):** optional `USE_CSHARP=ON` embeds Mono for runtime `.cs` scripts (`cs_reload`, `cs_list`, `cs_dump`); shared events with JavaScript via `Com_ScriptEmitEvent`; API in `src/qcommon/csharp/IdTech3.Engine.cs`; `IdTech3.Engine.Exec`; demo mod `demo_csharp.cfg`; see **`docs/CSHARP.md`**.
+- **Lua `Engine.*` on client:** `LuaBindings_RegisterAll` runs when the Lua VM opens (`LuaDebug_SetEngineRegisterCallback` from `CL_Init`).
 - Optional Git submodule **`tools/tiled`**: [Tiled Map Editor](https://www.mapeditor.org/) (GPL-2.0, upstream `mapeditor/tiled`, pinned tag **v1.9.91**); not linked into the engine — see **`docs/TILED.md`**. Init via **`scripts/init_optional_submodules.sh`** (`--tiled`, `--svo`, `--all`, `--dry-run`). Designer sample: **`examples/tiled/minimal_demo.tmx`**; CTest **`test_init_optional_submodules`**.
 - Vulkan VDB: console commands **`vdb_load`**, **`vdb_upload`**, **`vdb_bind_fog`**, **`vdb_list`** for NanoVDB → volumetric fog workflow (refreshes volumetric descriptors after upload).
 - Vulkan Forward+: **`r_forwardPlusDepthCull`** (0/1, default **0**); when **1**, tile cull runs after opaque geometry and rejects lights behind the depth buffer at each light’s screen center (reversed-Z).

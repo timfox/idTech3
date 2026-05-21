@@ -16,6 +16,8 @@ grep -q 'csharp_debug.c' "$PROJECT_ROOT/src/qcommon/csharp_debug.c" 2>/dev/null 
 grep -q 'Cmd_CsReload_f' "$PROJECT_ROOT/src/qcommon/cmd.c" || fail "cs_reload not registered in cmd.c"
 grep -q 'Com_ScriptEmitEvent' "$PROJECT_ROOT/src/qcommon/script_emit.c" || fail "script_emit bridge missing"
 grep -q 'CsDebug_Frame' "$PROJECT_ROOT/src/qcommon/common.c" || fail "CsDebug_Frame not called from Com_Frame"
+grep -q 'cs_allowExec' "$PROJECT_ROOT/src/qcommon/csharp_debug.c" || fail "cs_allowExec cvar missing"
+grep -q 'LuaDebug_SetEngineRegisterCallback' "$PROJECT_ROOT/src/client/cl_main.c" || fail "client must register Lua Engine.* callback"
 [ -f "$PROJECT_ROOT/src/qcommon/csharp/IdTech3.Engine.cs" ] || fail "IdTech3.Engine.cs missing"
 [ -f "$PROJECT_ROOT/docs/CSHARP.md" ] || fail "docs/CSHARP.md missing"
 

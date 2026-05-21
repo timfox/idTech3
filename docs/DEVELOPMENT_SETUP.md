@@ -57,6 +57,15 @@ The engine build does **not** require submodules. Initialize only what you need:
 
 See [TILED.md](TILED.md) and [tools/README.md](../tools/README.md).
 
+### C# scripting (optional, Mono)
+
+```bash
+sudo apt-get install libmono-2.0-dev mono-devel
+./scripts/compile_engine.sh vulkan csharp
+```
+
+See [CSHARP.md](CSHARP.md). Lua `Engine.*` bindings register on the **client** when `USE_LUA=ON` (`LuaDebug_SetEngineRegisterCallback` in `CL_Init`).
+
 ### macOS
 ```bash
 brew install coreutils sdl2 openal-soft cmake ninja freetype lua
