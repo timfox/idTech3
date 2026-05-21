@@ -11,6 +11,8 @@ docs/RENDERERS_FUTURE.md
 docs/RENDERER_2026_ARCHITECTURE_PASS.md
 docs/FORWARD_PLUS_PIPELINE_AUDIT.md
 docs/TILED.md
+examples/tiled/README.md
+examples/tiled/minimal_demo.tmx
 docs/GLTF.md
 tools/README.md
 src/renderers/vulkan/tr_model_gltf.h
