@@ -34,9 +34,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cl_menuvideo.h"
 #include "cl_sdf_font.h"
 #include "cl_demo.h"
-#ifdef USE_DUKTAPE
-#include "../qcommon/js_debug.h"
-#endif
+#include "../qcommon/script_emit.h"
 #include <limits.h>
 #ifdef USE_FLUX
 #include "flux.h"
@@ -98,7 +96,6 @@ cvar_t	*cl_dlDirectory;
 cvar_t	*cl_reconnectArgs;
 
 void CL_JsNotifyMenuChanged( int menu ) {
-#ifdef USE_DUKTAPE
 	const char *menuName = "unknown";
 
 	switch ( menu ) {
@@ -127,11 +124,8 @@ void CL_JsNotifyMenuChanged( int menu ) {
 			break;
 	}
 
-	JsDebug_EmitEvent( "menu_changed", menuName, NULL, menu, 0 );
-	JsDebug_SetCurrentMenu( menu );
-#else
-	(void)menu;
-#endif
+	Com_ScriptEmitEvent( "menu_changed", menuName, NULL, menu, 0 );
+	Com_ScriptSetCurrentMenu( menu );
 }
 
 static qboolean CL_SetActiveMenuByName( const char *name ) {
@@ -195,10 +189,8 @@ static void CL_Open_f( void ) {
 		return;
 	}
 
-	/* Keep legacy JS "open <tab>" flows alive by advertising a menu_changed event. */
-#ifdef USE_DUKTAPE
-	JsDebug_EmitEvent( "menu_changed", target, NULL, -1, 0 );
-#endif
+	/* Keep legacy JS/C# "open <tab>" flows alive by advertising a menu_changed event. */
+	Com_ScriptEmitEvent( "menu_changed", target, NULL, -1, 0 );
 
 	/* Common tabs live under main menu in most UI scripts. Set ui_open_tab
 	 * so the UI can switch to the requested tab when main menu opens. */

@@ -225,6 +225,7 @@ These are the CMake switches most developers touch during local builds:
 - `BUILD_FREETYPE=ON|OFF`
 - `USE_LUA=ON|OFF`
 - `USE_DUKTAPE=ON|OFF`
+- `USE_CSHARP=ON|OFF` (Mono; default **OFF**)
 
 Platform-specific and feature-specific switches are documented below.
 
@@ -452,10 +453,25 @@ JavaScript policy cvars:
 - `js_autoInit` (`0/1`) - initialize JS runtime automatically at startup
 - `js_compatTarget` (read-only) - compatibility target string (default `es5.1-duktape`)
 
+### C# scripting support (Mono)
+
+**Off by default.** Requires Mono development packages (e.g. `libmono-2.0-dev`, `mono-devel` on Debian/Ubuntu).
+
+```bash
+./scripts/compile_engine.sh vulkan csharp
+# or
+cmake -S . -B build -DUSE_CSHARP=ON
+```
+
+Commands: `cs_reload [file.cs ...]`, `cs_list`, `cs_dump`. Scripts compile with `mcs` (see `cs_compiler` cvar) and load `Game.Script.Init` / `Frame`. Events use `IdTech3.Engine.On` (see `docs/CSHARP.md`).
+
+Script paths: `scripts/csharp/`, `gameplay/`, `client/`, `ui/`.
+
 Script boundary policy:
 
 - JavaScript (`js_reload`, `idtech3.include`) only accepts paths under: `ui/`, `client/`, `frontend/`, `scripts/js/`
 - Lua (`script_reload`) only accepts paths under: `gameplay/`, `server/`, `vm/game/`, `scripts/lua/`
+- C# (`cs_reload`) only accepts `.cs` under: `scripts/csharp/`, `gameplay/`, `client/`, `ui/`
 
 JavaScript module policy:
 

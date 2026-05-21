@@ -23,9 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "client.h"
 #include "../physics/phys_bullet.h"
-#ifdef USE_DUKTAPE
-#include "../qcommon/js_debug.h"
-#endif
+#include "../qcommon/script_emit.h"
 
 #include "../botlib/botlib.h"
 
@@ -899,11 +897,9 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 	case CG_PHYS_LOADBSPCOLLISION:
 		return Phys_LoadBSPCollision();
 
-#ifdef USE_DUKTAPE
 	case CG_EMIT_JSEVENT:
-		JsDebug_EmitEvent( (const char *)VMA(1), (const char *)VMA(2), (const char *)VMA(3), args[4], args[5] );
+		Com_ScriptEmitEvent( (const char *)VMA(1), (const char *)VMA(2), (const char *)VMA(3), args[4], args[5] );
 		return 0;
-#endif
 
 	default:
 		Com_Error( ERR_DROP, "Bad cgame system trap: %ld", (long int) args[0] );
@@ -960,9 +956,7 @@ void CL_InitCGame( void ) {
 	info = cl.gameState.stringData + cl.gameState.stringOffsets[ CS_SERVERINFO ];
 	mapname = Info_ValueForKey( info, "mapname" );
 	Com_sprintf( cl.mapname, sizeof( cl.mapname ), "maps/%s.bsp", mapname );
-#ifdef USE_DUKTAPE
-	JsDebug_EmitEvent( "map_load", mapname, NULL, 0, 0 );
-#endif
+	Com_ScriptEmitEvent( "map_load", mapname, NULL, 0, 0 );
 
 	// allow vertex lighting for in-game elements
 	re.VertexLighting( qtrue );

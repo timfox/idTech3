@@ -19,6 +19,7 @@ FREETYPE=0
 LUA=0
 DUKTAPE=1
 SYSTEM_DUKTAPE=0
+CSHARP=0
 CROSS_AARCH64=0
 CODECS_FOR_CROSS=0
 BUILD_DEMO_PK3=0
@@ -146,6 +147,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     vendored-duktape|vendored_duktape|no-system-duktape|nosystemduktape)
       SYSTEM_DUKTAPE=0
+      shift
+      ;;
+    csharp|cs|mono)
+      CSHARP=1
+      shift
+      ;;
+    no-csharp|nocs|nomono)
+      CSHARP=0
       shift
       ;;
     --out|--output|--dir)
@@ -312,6 +321,14 @@ if [ "$DUKTAPE" -eq 1 ]; then
 else
   CMAKE_FLAGS+=("-DUSE_DUKTAPE=OFF")
   echo "CMake: USE_DUKTAPE=OFF"
+fi
+
+if [ "$CSHARP" -eq 1 ]; then
+  CMAKE_FLAGS+=("-DUSE_CSHARP=ON")
+  echo "CMake: USE_CSHARP=ON"
+else
+  CMAKE_FLAGS+=("-DUSE_CSHARP=OFF")
+  echo "CMake: USE_CSHARP=OFF"
 fi
 
 if [ "$VULKAN" -eq 1 ]; then

@@ -20,9 +20,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 #include "client.h"
-#ifdef USE_DUKTAPE
-#include "../qcommon/js_debug.h"
-#endif
+#include "../qcommon/script_emit.h"
 
 /*
 
@@ -784,8 +782,8 @@ Called by the system for both key up and key down events
 */
 void CL_KeyEvent( int key, qboolean down, unsigned time )
 {
-#ifdef USE_DUKTAPE
-	JsDebug_EmitEvent( "input_key", Key_KeynumToString( key ), NULL, key, down ? 1 : 0 );
+#if defined(USE_DUKTAPE) || defined(USE_CSHARP)
+	Com_ScriptEmitEvent( "input_key", Key_KeynumToString( key ), NULL, key, down ? 1 : 0 );
 #endif
 
 	if ( down )
@@ -887,15 +885,15 @@ void Key_SetCatcher( int catcher )
 		}
 	}
 
-#ifdef USE_DUKTAPE
+#if defined(USE_DUKTAPE) || defined(USE_CSHARP)
 	if ( !( oldCatchers & KEYCATCH_UI ) && ( catcher & KEYCATCH_UI ) ) {
-		JsDebug_EmitEvent( "ui_open", NULL, NULL, catcher, 0 );
+		Com_ScriptEmitEvent( "ui_open", NULL, NULL, catcher, 0 );
 	}
 	if ( ( oldCatchers & KEYCATCH_UI ) && !( catcher & KEYCATCH_UI ) ) {
-		JsDebug_EmitEvent( "ui_close", NULL, NULL, catcher, 0 );
+		Com_ScriptEmitEvent( "ui_close", NULL, NULL, catcher, 0 );
 	}
 	if ( !( oldCatchers & KEYCATCH_CONSOLE ) && ( catcher & KEYCATCH_CONSOLE ) ) {
-		JsDebug_EmitEvent( "console_open", NULL, NULL, catcher, 0 );
+		Com_ScriptEmitEvent( "console_open", NULL, NULL, catcher, 0 );
 	}
 #endif
 }

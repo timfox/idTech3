@@ -27,6 +27,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "defer.h"
 #ifdef USE_DUKTAPE
 #include "js_debug.h"
+#include "csharp_debug.h"
 #endif
 #include <setjmp.h>
 #ifndef _WIN32
@@ -4521,6 +4522,9 @@ void Com_Frame( qboolean noDelay ) {
 
 #ifdef USE_DUKTAPE
 	JsDebug_Frame( msec, realMsec );
+#endif
+#ifdef USE_CSHARP
+	CsDebug_Frame( msec, realMsec );
 #endif
 
 	//

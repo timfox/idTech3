@@ -23,8 +23,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "client.h"
 #include "cl_voip.h"
-#ifdef USE_DUKTAPE
-#include "js_debug.h"
+#include "script_emit.h"
+#if defined(USE_DUKTAPE) || defined(USE_CSHARP)
 #include "../game/bg_public.h"
 #endif
 
@@ -194,7 +194,7 @@ static void CL_ParsePacketEntities( msg_t *msg, const clSnapshot_t *oldframe, cl
 }
 
 
-#ifdef USE_DUKTAPE
+#if defined(USE_DUKTAPE) || defined(USE_CSHARP)
 /*
 ================
 CL_EmitJSEventsFromSnapshot
@@ -227,14 +227,14 @@ static void CL_EmitJSEventsFromSnapshot( const clSnapshot_t *oldSnap, const clSn
 		}
 
 		if ( !inOld[es->number] ) {
-			JsDebug_EmitEvent( "entity_spawn", NULL, NULL, es->number, es->eType );
+			Com_ScriptEmitEvent( "entity_spawn", NULL, NULL, es->number, es->eType );
 		}
 
 		if ( es->event == EV_DEATH1 || es->event == EV_DEATH2 || es->event == EV_DEATH3 ) {
-			JsDebug_EmitEvent( "entity_death", NULL, NULL, es->number, es->otherEntityNum );
+			Com_ScriptEmitEvent( "entity_death", NULL, NULL, es->number, es->otherEntityNum );
 		}
 		if ( es->event == EV_FIRE_WEAPON ) {
-			JsDebug_EmitEvent( "weapon_fire", NULL, NULL, es->number, es->weapon );
+			Com_ScriptEmitEvent( "weapon_fire", NULL, NULL, es->number, es->weapon );
 		}
 	}
 }
@@ -351,7 +351,7 @@ static void CL_ParseSnapshot( msg_t *msg ) {
 		cl.snapshots[ ( oldMessageNum + i ) & PACKET_MASK ].valid = qfalse;
 	}
 
-#ifdef USE_DUKTAPE
+#if defined(USE_DUKTAPE) || defined(USE_CSHARP)
 	CL_EmitJSEventsFromSnapshot( cl.snap.valid ? &cl.snap : NULL, &newSnap );
 #endif
 
