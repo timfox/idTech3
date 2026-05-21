@@ -171,6 +171,60 @@ static void id3_cs_exec( MonoString *command ) {
 	}
 }
 
+static qboolean CsDebug_IsSafeReadPath( const char *path ) {
+	int i;
+
+	if ( !path || !path[0] ) {
+		return qfalse;
+	}
+	if ( path[0] == '/' || path[0] == '\\' ) {
+		return qfalse;
+	}
+	if ( strstr( path, ".." ) ) {
+		return qfalse;
+	}
+	if ( strchr( path, ':' ) ) {
+		return qfalse;
+	}
+	for ( i = 0; path[i]; i++ ) {
+		if ( path[i] == '\\' ) {
+			return qfalse;
+		}
+	}
+	return qtrue;
+}
+
+static MonoString *id3_cs_read_file( MonoString *pathMono ) {
+	char *pathUtf8;
+	void *buf;
+	int len;
+	MonoString *result;
+
+	if ( !pathMono ) {
+		return mono_string_new( mono_domain_get(), "" );
+	}
+	pathUtf8 = mono_string_to_utf8( pathMono );
+	if ( !pathUtf8 ) {
+		return mono_string_new( mono_domain_get(), "" );
+	}
+	if ( !CsDebug_IsSafeReadPath( pathUtf8 ) ) {
+		Com_Printf( S_COLOR_YELLOW "C#: ReadFile denied unsafe path '%s'\n", pathUtf8 );
+		mono_free( pathUtf8 );
+		return mono_string_new( mono_domain_get(), "" );
+	}
+
+	len = FS_ReadFile( pathUtf8, &buf );
+	mono_free( pathUtf8 );
+
+	if ( len < 0 || !buf ) {
+		return mono_string_new( mono_domain_get(), "" );
+	}
+
+	result = mono_string_new( mono_domain_get(), (const char *)buf );
+	FS_FreeFile( buf );
+	return result;
+}
+
 static void CsDebug_RegisterInternalCalls( void ) {
 	mono_add_internal_call( "IdTech3.Engine::Print", id3_cs_print );
 	mono_add_internal_call( "IdTech3.Engine::CvarGet", id3_cs_cvar_get );
@@ -178,6 +232,7 @@ static void CsDebug_RegisterInternalCalls( void ) {
 	mono_add_internal_call( "IdTech3.Engine::GetMilliseconds", id3_cs_get_milliseconds );
 	mono_add_internal_call( "IdTech3.Engine::GetEngineInfo", id3_cs_get_engine_info );
 	mono_add_internal_call( "IdTech3.Engine::Exec", id3_cs_exec );
+	mono_add_internal_call( "IdTech3.Engine::ReadFile", id3_cs_read_file );
 }
 
 static qboolean CsDebug_StageVfsFileToHome( const char *vfsPath, char *diskPath, int diskPathSize );
@@ -308,11 +363,77 @@ static qboolean CsDebug_LoadAssembly( const char *dllPath ) {
 	return qtrue;
 }
 
-static qboolean CsDebug_LoadScript( const char *scriptPath ) {
-	char dllPath[MAX_OSPATH];
+static qboolean CsDebug_DllPathForScript( const char *scriptPath, char *dllPath, int dllPathSize ) {
 	char cacheDir[MAX_OSPATH];
+	char baseName[MAX_QPATH];
 	const char *base;
 	int len;
+
+	if ( !scriptPath || !dllPath || dllPathSize <= 0 ) {
+		return qfalse;
+	}
+
+	len = (int)strlen( scriptPath );
+	if ( len < 4 || Q_stricmp( scriptPath + len - 3, ".cs" ) ) {
+		return qfalse;
+	}
+
+	Com_sprintf( cacheDir, sizeof( cacheDir ), "%s/vm/csharp_cache", FS_GetHomePath() );
+	Sys_Mkdir( cacheDir );
+
+	Q_strncpyz( baseName, scriptPath, sizeof( baseName ) );
+	base = COM_SkipPath( baseName );
+	COM_StripExtension( base, dllPath, dllPathSize );
+	Com_sprintf( dllPath, dllPathSize, "%s/%s.dll", cacheDir, dllPath );
+	return qtrue;
+}
+
+static qboolean CsDebug_CompileToDll( const char *scriptPath, char *dllPath, int dllPathSize ) {
+	if ( !CsDebug_DllPathForScript( scriptPath, dllPath, dllPathSize ) ) {
+		Com_Printf( S_COLOR_RED "C#: only .cs sources supported (got '%s')\n", scriptPath );
+		return qfalse;
+	}
+	return CsDebug_CompileScript( scriptPath, dllPath, dllPathSize );
+}
+
+static qboolean CsDebug_RunInitFromDll( const char *dllPath ) {
+	MonoAssembly *assembly;
+	MonoImage *image;
+	MonoClass *gameScriptClass;
+	MonoMethod *initMethod;
+	MonoObject *exc;
+	MonoImageOpenStatus status;
+
+	assembly = mono_assembly_open( dllPath, &status );
+	if ( !assembly || status != MONO_IMAGE_OK ) {
+		Com_Printf( S_COLOR_RED "C#: cs_exec failed to open '%s' (status %d)\n", dllPath, (int)status );
+		return qfalse;
+	}
+
+	image = mono_assembly_get_image( assembly );
+	gameScriptClass = mono_class_from_name( image, "Game", "Script" );
+	if ( !gameScriptClass ) {
+		Com_Printf( S_COLOR_RED "C#: cs_exec missing Game.Script in %s\n", dllPath );
+		return qfalse;
+	}
+
+	initMethod = mono_class_get_method_from_name( gameScriptClass, "Init", 0 );
+	if ( !initMethod ) {
+		Com_Printf( S_COLOR_RED "C#: cs_exec missing Game.Script.Init in %s\n", dllPath );
+		return qfalse;
+	}
+
+	mono_runtime_invoke( initMethod, NULL, NULL, &exc );
+	if ( exc ) {
+		Com_Printf( S_COLOR_RED "C#: cs_exec Game.Script.Init threw an exception\n" );
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+static qboolean CsDebug_LoadScript( const char *scriptPath ) {
+	char dllPath[MAX_OSPATH];
 
 	if ( !CsDebug_EnsureMono() ) {
 		return qfalse;
@@ -322,25 +443,7 @@ static qboolean CsDebug_LoadScript( const char *scriptPath ) {
 		return qfalse;
 	}
 
-	len = (int)strlen( scriptPath );
-	if ( len < 4 || Q_stricmp( scriptPath + len - 3, ".cs" ) ) {
-		Com_Printf( S_COLOR_RED "C#: only .cs sources supported (got '%s')\n", scriptPath );
-		return qfalse;
-	}
-
-	Com_sprintf( cacheDir, sizeof( cacheDir ), "%s/vm/csharp_cache", FS_GetHomePath() );
-	Sys_Mkdir( cacheDir );
-
-	{
-		char baseName[MAX_QPATH];
-
-		Q_strncpyz( baseName, scriptPath, sizeof( baseName ) );
-		base = COM_SkipPath( baseName );
-		COM_StripExtension( base, dllPath, sizeof( dllPath ) );
-		Com_sprintf( dllPath, sizeof( dllPath ), "%s/%s.dll", cacheDir, dllPath );
-	}
-
-	if ( !CsDebug_CompileScript( scriptPath, dllPath, sizeof( dllPath ) ) ) {
+	if ( !CsDebug_CompileToDll( scriptPath, dllPath, sizeof( dllPath ) ) ) {
 		return qfalse;
 	}
 
@@ -375,11 +478,18 @@ void CsDebug_Frame( int msec, int realMsec ) {
 	void *evArgs[5];
 	int i0;
 	int i1;
+	int startMs;
+	int budgetMs;
+	int elapsedMs;
 	MonoObject *exc;
 
 	if ( !s_csMonoReady || !s_csAssembly ) {
 		return;
 	}
+
+	CsDebug_InitPolicyCvars();
+	startMs = Sys_Milliseconds();
+	budgetMs = cs_frameCallbackBudgetMs ? cs_frameCallbackBudgetMs->integer : 0;
 
 	if ( s_csFrameMethod ) {
 		args[0] = &msec;
@@ -388,6 +498,11 @@ void CsDebug_Frame( int msec, int realMsec ) {
 		if ( exc ) {
 			Com_Printf( S_COLOR_RED "C#: Game.Script.Frame exception\n" );
 		}
+	}
+
+	elapsedMs = Sys_Milliseconds() - startMs;
+	if ( budgetMs > 0 && elapsedMs >= budgetMs ) {
+		return;
 	}
 
 	if ( cs_allowEvents && cs_allowEvents->integer && s_csDispatchEventMethod ) {
@@ -508,6 +623,64 @@ void Cmd_CsDump_f( void ) {
 	Cmd_CsList_f();
 }
 
+#define CS_EXEC_SCRATCH_PATH "scripts/csharp/cs_exec_scratch.cs"
+#define CS_EXEC_MAX_SOURCE 8192
+
+void Cmd_CsExec_f( void ) {
+	const char *source;
+	char wrapped[CS_EXEC_MAX_SOURCE + 512];
+	char dllPath[MAX_OSPATH];
+	int wrappedLen;
+
+	CsDebug_InitPolicyCvars();
+
+	if ( Cmd_Argc() <= 1 ) {
+		Com_Printf( "Usage: cs_exec <csharp-statements>\n" );
+		Com_Printf( "  Wraps statements in Game.Script.Init (one-shot; does not replace cs_reload assembly).\n" );
+		return;
+	}
+
+	if ( !CsDebug_EnsureMono() ) {
+		return;
+	}
+
+	source = Cmd_ArgsFrom( 1 );
+	if ( !source || !source[0] ) {
+		Com_Printf( "C#: empty source\n" );
+		return;
+	}
+
+	if ( (int)strlen( source ) > CS_EXEC_MAX_SOURCE ) {
+		Com_Printf( S_COLOR_RED "C#: cs_exec source exceeds %d bytes\n", CS_EXEC_MAX_SOURCE );
+		return;
+	}
+
+	wrappedLen = Com_sprintf( wrapped, sizeof( wrapped ),
+		"namespace Game {\n"
+		"public static class Script {\n"
+		"public static void Init() {\n"
+		"%s\n"
+		"}\n"
+		"public static void Frame(int msec,int realMsec) {}\n"
+		"}\n"
+		"}\n",
+		source );
+	if ( wrappedLen < 0 || wrappedLen >= (int)sizeof( wrapped ) ) {
+		Com_Printf( S_COLOR_RED "C#: cs_exec wrapped source too large\n" );
+		return;
+	}
+
+	FS_WriteFile( CS_EXEC_SCRATCH_PATH, wrapped, wrappedLen );
+
+	if ( !CsDebug_CompileToDll( CS_EXEC_SCRATCH_PATH, dllPath, sizeof( dllPath ) ) ) {
+		return;
+	}
+
+	if ( CsDebug_RunInitFromDll( dllPath ) ) {
+		Com_Printf( "C#: cs_exec completed\n" );
+	}
+}
+
 #else /* !USE_CSHARP */
 
 void CsDebug_InitCvars( void ) {
@@ -522,6 +695,10 @@ void Cmd_CsList_f( void ) {
 }
 
 void Cmd_CsDump_f( void ) {
+	Cmd_CsReload_f();
+}
+
+void Cmd_CsExec_f( void ) {
 	Cmd_CsReload_f();
 }
 

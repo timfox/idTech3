@@ -25,6 +25,9 @@ namespace IdTech3
 		[MethodImpl( MethodImplOptions.InternalCall )]
 		public static extern void Exec( string command );
 
+		[MethodImpl( MethodImplOptions.InternalCall )]
+		public static extern string ReadFile( string path );
+
 		static readonly Dictionary<string, List<Action<string, string, int, int>>> s_handlers =
 			new Dictionary<string, List<Action<string, string, int, int>>>( StringComparer.OrdinalIgnoreCase );
 

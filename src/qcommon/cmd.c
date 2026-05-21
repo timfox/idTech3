@@ -1203,9 +1203,11 @@ void Cmd_Init( void ) {
 	extern void Cmd_CsReload_f(void);
 	extern void Cmd_CsList_f(void);
 	extern void Cmd_CsDump_f(void);
+	extern void Cmd_CsExec_f(void);
 	extern void CsDebug_InitCvars(void);
 	Cmd_AddCommand("cs_reload", Cmd_CsReload_f);
 	Cmd_AddCommand("cs_list", Cmd_CsList_f);
 	Cmd_AddCommand("cs_dump", Cmd_CsDump_f);
+	Cmd_AddCommand("cs_exec", Cmd_CsExec_f);
 	CsDebug_InitCvars();
 }

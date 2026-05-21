@@ -169,6 +169,18 @@ When `fs_restrict` is **0** (default), `VM_Create` always tries a **native** sha
 
 The **client** links **libcurl** when `USE_CURL` is enabled at build time. It powers **HTTPS/FTP** fetches of **`.pk3`** archives: server redirect downloads (`sv_dlURL` + `CL_cURL_*`) and manual or auto map downloads (`cl_dlURL` + `Com_DL_*`, commands `download` / `dlmap`). Protocols are restricted to **http, https, ftp, ftps**; there is no generic HTTP API exposed to game VMs without additional code. Full tutorial: [CURL_NETWORKING.md](CURL_NETWORKING.md).
 
+## Scripting (Lua / JavaScript / C#)
+
+Three optional runtimes share the same **event bridge** (`Com_ScriptEmitEvent` in `src/qcommon/script_emit.c`):
+
+| Runtime | Build flag | Entry / API | Console |
+|---------|------------|-------------|---------|
+| **Lua** | `USE_LUA` (default on client) | `g_lua_bindings.c` — `Engine.*` on client via `LuaBindings_RegisterAll` | `lua_reload`, `lua_exec`, … |
+| **JavaScript** | `USE_DUKTAPE` | Duktape HUD + `js_*` bindings | `js_reload`, `js_exec`, `js_list`, … |
+| **C#** | `USE_CSHARP` (default OFF) | Mono + `IdTech3.Engine.cs` + `Game.Script` | `cs_reload`, `cs_exec`, `cs_list`, … |
+
+**Lua** is the richest gameplay API (Director, nav, physics hooks). **JavaScript** targets UI/HUD scripting. **C#** is a lighter Mono host for mods that prefer C# syntax; see [CSHARP.md](CSHARP.md). All three can receive the same engine events (`frame`, `map_load`, `entity_spawn`, …) when their policy cvars allow it.
+
 ## JavaScript / UI Debug (Duktape)
 
 When `USE_DUKTAPE` is enabled, the engine provides a JavaScript runtime (`idtech3` namespace) with event callbacks and HUD bindings. **Game events** (emitted from snapshot parsing): `entity_spawn`, `entity_death`, `weapon_fire` - payloads include `entityNum`, `eType`, `attacker`, `weapon`. See [JS_HUD_DRAWING.md](JS_HUD_DRAWING.md#game-events). Other events: `frame`, `menu_changed`, `ui_open`, `ui_close`, `map_load`, `input_key`, `mouse_move`, etc. For debugging UI and script issues:

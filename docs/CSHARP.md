@@ -22,6 +22,7 @@ Startup log when enabled: `C# scripting: USE_CSHARP enabled (cs_reload, scripts/
 | Command | Description |
 |---------|-------------|
 | `cs_reload [path.cs ...]` | Compile `.cs` with `mcs` and load assembly (see `cs_compiler` cvar) |
+| `cs_exec <statements>` | One-shot: compile statements inside `Game.Script.Init` (does not replace tracked assembly) |
 | `cs_list` | Runtime status and tracked scripts |
 | `cs_dump` | Same as `cs_list` |
 
@@ -31,6 +32,7 @@ Startup log when enabled: `C# scripting: USE_CSHARP enabled (cs_reload, scripts/
 - Entry: `namespace Game { public static class Script { public static void Init(); public static void Frame(int msec, int realMsec); } }`
 - Events: `IdTech3.Engine.On("event", (s0,s1,i0,i1) => { ... });`
 - Console: `IdTech3.Engine.Exec("set r_fullscreen 0");` (when `cs_allowExec` 1)
+- VFS read: `IdTech3.Engine.ReadFile("scripts/csharp/foo.txt")` (relative paths only; no `..`)
 - Allowed paths: `scripts/csharp/`, `gameplay/`, `client/`, `ui/`
 
 Compiled DLL cache: `<fs_home>/vm/csharp_cache/`
@@ -41,7 +43,7 @@ Compiled DLL cache: `<fs_home>/vm/csharp_cache/`
 |------|---------|---------|
 | `cs_autoInit` | `0` | Open Mono at startup (no scripts until `cs_reload`) |
 | `cs_allowEvents` | `1` | `Engine.On` / `DispatchEvent` |
-| `cs_frameCallbackBudgetMs` | `2` | Reserved for future budget enforcement |
+| `cs_frameCallbackBudgetMs` | `2` | Soft cap for `Game.Script.Frame` + `frame` event per tick (`0` = unlimited) |
 | `cs_compiler` | `mcs` | Compiler executable |
 | `cs_allowExec` | `1` | `IdTech3.Engine.Exec` appends to the command buffer |
 | `cs_compatTarget` | `mono-4.7-api` | Read-only API profile label |
