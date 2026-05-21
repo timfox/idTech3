@@ -22,9 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cl.input.c  -- builds an intended movement command to send to the server
 
 #include "client.h"
-#ifdef USE_DUKTAPE
-#include "../qcommon/js_debug.h"
-#endif
+#include "../qcommon/script_emit.h"
 
 static unsigned frame_msec;
 static int old_com_frameTime;
@@ -371,8 +369,8 @@ CL_MouseEvent
 =================
 */
 void CL_MouseEvent( int dx, int dy /*, int time*/ ) {
-#ifdef USE_DUKTAPE
-	JsDebug_EmitEvent( "mouse_move", NULL, NULL, dx, dy );
+#if defined(USE_DUKTAPE) || defined(USE_CSHARP)
+	Com_ScriptEmitEvent( "mouse_move", NULL, NULL, dx, dy );
 #endif
 	if ( Key_GetCatcher() & KEYCATCH_UI ) {
 		VM_Call( uivm, 2, UI_MOUSE_EVENT, dx, dy );

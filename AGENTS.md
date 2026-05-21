@@ -48,6 +48,12 @@ Build artifacts go to `build-vk-Release/` or `build-gl-Release/` and are copied 
 - **Standalone full conversion**: Do not assume Q3A, OpenArena, or other generic bases. The base is either Unwaking or a game explicitly defined by the user.
 - **Smallest valid data tree** (bootstrap `.pk3` + `default.cfg`): see `docs/MINIMAL_GAME_SHELL.md`.
 
+### Scripting
+
+- **Lua:** `script_reload` (default build `USE_LUA=ON`).
+- **JavaScript (Duktape):** `js_reload` (default `USE_DUKTAPE=ON`).
+- **C# (Mono):** `cs_reload` when built with `./scripts/compile_engine.sh vulkan csharp` or `-DUSE_CSHARP=ON` + `libmono-2.0-dev` / `mono-devel`; see `docs/CSHARP.md`.
+
 ### Optional submodules
 
 - **Tiled Map Editor** (`tools/tiled`, GPL-2.0): `./scripts/init_optional_submodules.sh --tiled` — not built by `compile_engine.sh`; see `docs/TILED.md`.

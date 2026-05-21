@@ -245,6 +245,9 @@ endif()
 if(NOT DEFINED USE_SYSTEM_DUKTAPE)
   option(USE_SYSTEM_DUKTAPE "Use system-installed Duktape instead of vendored internal copy" OFF)
 endif()
+if(NOT DEFINED USE_CSHARP)
+  option(USE_CSHARP "Enable Mono C# scripting support" OFF)
+endif()
 
 set(LUA_FOUND FALSE)
 set(LUA_LINK_LIBRARIES "")
@@ -254,6 +257,9 @@ set(LUA_EXTRA_LIBRARIES "")
 set(DUKTAPE_FOUND FALSE)
 set(DUKTAPE_LINK_LIBRARIES "")
 set(DUKTAPE_EXTRA_LIBRARIES "")
+set(CSHARP_FOUND FALSE)
+set(CSHARP_LINK_LIBRARIES "")
+set(CSHARP_INCLUDE_DIRS "")
 
 if(USE_LUA)
 if(NOT ANDROID)
@@ -576,6 +582,37 @@ if(USE_DUKTAPE)
         list(APPEND DUKTAPE_LINK_LIBRARIES ${DUKTAPE_EXTRA_LIBRARIES})
       endif()
     endif()
+  endif()
+endif()
+
+if(USE_CSHARP AND NOT ANDROID)
+  find_path(MONO_INCLUDE_DIR
+    NAMES mono/jit/jit.h
+    PATH_SUFFIXES include include/mono-2.0
+    PATHS
+      $ENV{MONO_PREFIX}
+      /usr
+      /usr/local
+      /opt/homebrew
+      /opt/local
+  )
+  find_library(MONO_LIBRARY
+    NAMES mono-2.0-sgen mono-2.0
+    PATH_SUFFIXES lib64 lib
+    PATHS
+      $ENV{MONO_PREFIX}
+      /usr
+      /usr/local
+      /opt/homebrew
+      /opt/local
+  )
+  if(MONO_INCLUDE_DIR AND MONO_LIBRARY)
+    set(CSHARP_FOUND TRUE)
+    set(CSHARP_INCLUDE_DIRS "${MONO_INCLUDE_DIR}")
+    list(APPEND CSHARP_LINK_LIBRARIES "${MONO_LIBRARY}")
+    message(STATUS "C# scripting enabled: Mono ${MONO_LIBRARY}")
+  else()
+    message(WARNING "USE_CSHARP=ON but Mono not found (install libmono-2.0-dev mono-devel); C# scripting disabled.")
   endif()
 endif()
 
@@ -1373,6 +1410,10 @@ if(USE_DUKTAPE AND DUKTAPE_FOUND)
   target_compile_definitions(qcommon PRIVATE USE_DUKTAPE)
   target_include_directories(qcommon PRIVATE ${DUKTAPE_INCLUDE_DIR})
 endif()
+if(USE_CSHARP AND CSHARP_FOUND)
+  target_compile_definitions(qcommon PRIVATE USE_CSHARP IDTECH3_CSHARP_API_PATH="${CMAKE_SOURCE_DIR}/src/qcommon/csharp/IdTech3.Engine.cs")
+  target_include_directories(qcommon PRIVATE ${CSHARP_INCLUDE_DIRS})
+endif()
 if(USE_DTLS_FOUND)
   target_compile_definitions(qcommon PRIVATE USE_DTLS=1)
   target_include_directories(qcommon PRIVATE ${OPENSSL_INCLUDE_DIR})
@@ -1414,6 +1455,10 @@ endif()
 if(USE_DUKTAPE AND DUKTAPE_FOUND)
   target_compile_definitions(qcommon_ded PRIVATE USE_DUKTAPE)
   target_include_directories(qcommon_ded PRIVATE ${DUKTAPE_INCLUDE_DIR})
+endif()
+if(USE_CSHARP AND CSHARP_FOUND)
+  target_compile_definitions(qcommon_ded PRIVATE USE_CSHARP IDTECH3_CSHARP_API_PATH="${CMAKE_SOURCE_DIR}/src/qcommon/csharp/IdTech3.Engine.cs")
+  target_include_directories(qcommon_ded PRIVATE ${CSHARP_INCLUDE_DIRS})
 endif()
 if(USE_DTLS_FOUND)
   target_compile_definitions(qcommon_ded PRIVATE USE_DTLS=1)
@@ -2400,6 +2445,12 @@ if(USE_DUKTAPE AND DUKTAPE_FOUND)
     TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE ${DUKTAPE_LINK_LIBRARIES})
   endif()
 endif()
+if(USE_CSHARP AND CSHARP_FOUND)
+  TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ${CSHARP_LINK_LIBRARIES})
+  if(NOT ANDROID)
+    TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE ${CSHARP_LINK_LIBRARIES})
+  endif()
+endif()
 if((USE_STEAM OR USE_STEAM_NETWORKING) AND STEAMWORKS_FOUND)
   TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ${STEAMWORKS_LIBRARY})
 endif()
@@ -2487,6 +2538,13 @@ add_test(NAME test_init_optional_submodules
 set_tests_properties(test_init_optional_submodules PROPERTIES
 	LABELS "scripts;validation"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_init_optional_submodules.sh;${CMAKE_SOURCE_DIR}/scripts/init_optional_submodules.sh")
+
+add_test(NAME test_csharp_scripting
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_csharp_scripting.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_csharp_scripting PROPERTIES
+	LABELS "scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_csharp_scripting.sh")
 
 add_test(NAME test_compile_engine_lto
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_compile_engine_lto.sh ${CMAKE_SOURCE_DIR}/scripts/compile_engine.sh
