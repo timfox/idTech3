@@ -29,6 +29,9 @@ for f in \
 	scripts/js/demo_hooks.js \
 	scripts/js/README.txt \
 	scripts/lua/demo_hooks.lua \
+	scripts/csharp/IdTech3.Engine.cs \
+	scripts/csharp/demo_hooks.cs \
+	demo_csharp.cfg \
 	scripts/demo_bootstrap.shader; do
 	[ -f "$MOD/$f" ] || fail "missing mod file: $MOD/$f"
 done

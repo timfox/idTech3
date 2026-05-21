@@ -35,6 +35,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cl_sdf_font.h"
 #include "cl_demo.h"
 #include "../qcommon/script_emit.h"
+#ifdef USE_LUA
+#include "../qcommon/lua_debug.h"
+#include "g_lua_bindings.h"
+#endif
 #include <limits.h>
 #ifdef USE_FLUX
 #include "flux.h"
@@ -4493,6 +4497,10 @@ void CL_Init( void ) {
 	Steam_Init();
 	MenuVideo_Init();
 	SDF_Init();
+
+#ifdef USE_LUA
+	LuaDebug_SetEngineRegisterCallback( LuaBindings_RegisterAll );
+#endif
 
 	Com_Printf( "----- Client Initialization Complete -----\n" );
 }

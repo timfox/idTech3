@@ -36,11 +36,14 @@ set(DEMO_MOD_FILES
 	"${DEMO_MOD_DIR}/demo_features.cfg"
 	"${DEMO_MOD_DIR}/demo_js.cfg"
 	"${DEMO_MOD_DIR}/demo_lua.cfg"
+	"${DEMO_MOD_DIR}/demo_csharp.cfg"
 	"${DEMO_MOD_DIR}/demo_gameplay.cfg"
 	"${DEMO_MOD_DIR}/readme_demo.txt"
 	"${DEMO_MOD_DIR}/scripts/js/demo_hooks.js"
 	"${DEMO_MOD_DIR}/scripts/js/README.txt"
 	"${DEMO_MOD_DIR}/scripts/lua/demo_hooks.lua"
+	"${DEMO_MOD_DIR}/scripts/csharp/IdTech3.Engine.cs"
+	"${DEMO_MOD_DIR}/scripts/csharp/demo_hooks.cs"
 	"${DEMO_MOD_DIR}/scripts/demo_bootstrap.shader"
 )
 
@@ -79,6 +82,7 @@ add_custom_command(
 	COMMAND ${CMAKE_COMMAND} -E rm -rf "${DEMO_PACK_STAGING}"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/scripts/js"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/scripts/lua"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/scripts/csharp"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/vm"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/gfx/2d"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/gfx/demo"
@@ -94,6 +98,8 @@ add_custom_command(
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/demo_lua.cfg" "${DEMO_PACK_STAGING}/demo_lua.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/demo_csharp.cfg" "${DEMO_PACK_STAGING}/demo_csharp.cfg"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/demo_gameplay.cfg" "${DEMO_PACK_STAGING}/demo_gameplay.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/readme_demo.txt" "${DEMO_PACK_STAGING}/readme_demo.txt"
@@ -103,6 +109,10 @@ add_custom_command(
 		"${DEMO_MOD_DIR}/scripts/js/README.txt" "${DEMO_PACK_STAGING}/scripts/js/README.txt"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/scripts/lua/demo_hooks.lua" "${DEMO_PACK_STAGING}/scripts/lua/demo_hooks.lua"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/scripts/csharp/IdTech3.Engine.cs" "${DEMO_PACK_STAGING}/scripts/csharp/IdTech3.Engine.cs"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/scripts/csharp/demo_hooks.cs" "${DEMO_PACK_STAGING}/scripts/csharp/demo_hooks.cs"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/scripts/demo_bootstrap.shader" "${DEMO_PACK_STAGING}/scripts/demo_bootstrap.shader"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -129,9 +139,10 @@ add_custom_command(
 		"$<TARGET_FILE:demo_ui_skeleton>" "${DEMO_PACK_STAGING}/${DEMO_UI_DOT_ZIP}"
 	COMMAND ${CMAKE_COMMAND} -E chdir "${DEMO_PACK_STAGING}"
 		${CMAKE_COMMAND} -E tar cf "${DEMO_PK3}" --format=zip
-		autoexec.cfg gameinfo.txt demo_features.cfg demo_js.cfg demo_lua.cfg demo_gameplay.cfg readme_demo.txt
+		autoexec.cfg gameinfo.txt demo_features.cfg demo_js.cfg demo_lua.cfg demo_csharp.cfg demo_gameplay.cfg readme_demo.txt
 		scripts/js/demo_hooks.js scripts/js/README.txt
 		scripts/lua/demo_hooks.lua
+		scripts/csharp/IdTech3.Engine.cs scripts/csharp/demo_hooks.cs
 		scripts/demo_bootstrap.shader
 		gfx/2d/bigchars.png
 		gfx/demo/bootstrap_white.png

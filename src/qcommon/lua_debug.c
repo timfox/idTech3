@@ -10,6 +10,11 @@
 static lua_State *s_luaState;
 static int s_luaTrackedCount;
 static char s_luaTrackedScripts[MAX_LUA_TRACKED_SCRIPTS][MAX_OSPATH];
+static LuaDebug_EngineRegisterFn s_luaEngineRegisterFn;
+
+void LuaDebug_SetEngineRegisterCallback( LuaDebug_EngineRegisterFn fn ) {
+	s_luaEngineRegisterFn = fn;
+}
 
 static qboolean LuaDebug_IsAllowedPath( const char *scriptPath ) {
 	if ( !scriptPath || !scriptPath[0] ) {
@@ -44,6 +49,10 @@ static qboolean LuaDebug_OpenState( void ) {
 	}
 
 	luaL_openlibs( s_luaState );
+	if ( s_luaEngineRegisterFn ) {
+		s_luaEngineRegisterFn( s_luaState );
+		Com_Printf( "Lua: Engine.* API registered\n" );
+	}
 	return qtrue;
 }
 

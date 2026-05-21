@@ -30,6 +30,7 @@ Startup log when enabled: `C# scripting: USE_CSHARP enabled (cs_reload, scripts/
 - API: `src/qcommon/csharp/IdTech3.Engine.cs` (compiled with your script)
 - Entry: `namespace Game { public static class Script { public static void Init(); public static void Frame(int msec, int realMsec); } }`
 - Events: `IdTech3.Engine.On("event", (s0,s1,i0,i1) => { ... });`
+- Console: `IdTech3.Engine.Exec("set r_fullscreen 0");` (when `cs_allowExec` 1)
 - Allowed paths: `scripts/csharp/`, `gameplay/`, `client/`, `ui/`
 
 Compiled DLL cache: `<fs_home>/vm/csharp_cache/`
@@ -42,6 +43,7 @@ Compiled DLL cache: `<fs_home>/vm/csharp_cache/`
 | `cs_allowEvents` | `1` | `Engine.On` / `DispatchEvent` |
 | `cs_frameCallbackBudgetMs` | `2` | Reserved for future budget enforcement |
 | `cs_compiler` | `mcs` | Compiler executable |
+| `cs_allowExec` | `1` | `IdTech3.Engine.Exec` appends to the command buffer |
 | `cs_compatTarget` | `mono-4.7-api` | Read-only API profile label |
 
 ## Events (shared with JavaScript)

@@ -94,6 +94,13 @@ else
 	fail "r_vdbFog default not 0"
 fi
 
+if grep -qE 'cs_autoInit[[:space:]]*=[[:space:]]*ri\.Cvar_Get\([[:space:]]*"cs_autoInit"[[:space:]]*,[[:space:]]*"0"' \
+	"$PROJECT_ROOT/src/qcommon/csharp_debug.c"; then
+	pass "cs_autoInit defaults to 0 (C# runtime manual until cs_reload)"
+else
+	fail "cs_autoInit default not 0 in csharp_debug.c"
+fi
+
 if grep -q 'ri\.Cmd_AddCommand( "vdb_load"' "$PROJECT_ROOT/src/renderers/vulkan/vk_vdb.c" && \
    grep -q 'ri\.Cmd_AddCommand( "vdb_bind_fog"' "$PROJECT_ROOT/src/renderers/vulkan/vk_vdb.c"; then
 	pass "VDB console commands vdb_load / vdb_bind_fog registered"
