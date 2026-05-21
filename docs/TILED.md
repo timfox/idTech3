@@ -45,3 +45,4 @@ Typical Linux deps (Qt 5 or 6 per upstream branch): `qtbase5-dev` / `qt6-base-de
 
 - Quake III–style maps remain **`.map` / BSP** in the vanilla pipeline.
 - Tiled **`.tmx` / `.json`** exports are a **content-authoring** path; any runtime loader would be a separate game/mod feature, not this submodule.
+- Sample map and designer notes: [examples/tiled/README.md](../examples/tiled/README.md) (`minimal_demo.tmx`).
