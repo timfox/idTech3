@@ -94,7 +94,7 @@ else
 	fail "r_vdbFog default not 0"
 fi
 
-if grep -qE 'cs_autoInit[[:space:]]*=[[:space:]]*ri\.Cvar_Get\([[:space:]]*"cs_autoInit"[[:space:]]*,[[:space:]]*"0"' \
+if grep -qE 'cs_autoInit[[:space:]]*=[[:space:]]*(ri\.)?Cvar_Get\([[:space:]]*"cs_autoInit"[[:space:]]*,[[:space:]]*"0"' \
 	"$PROJECT_ROOT/src/qcommon/csharp_debug.c"; then
 	pass "cs_autoInit defaults to 0 (C# runtime manual until cs_reload)"
 else
