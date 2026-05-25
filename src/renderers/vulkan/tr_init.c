@@ -75,9 +75,6 @@ cvar_t	*r_firstPersonScaleEnabled;
 cvar_t	*r_firstPersonZNear;
 
 cvar_t	*r_skipBackEnd;
-#ifdef USE_IMGUI
-cvar_t	*r_imgui;
-#endif
 
 //cvar_t	*r_anaglyphMode;
 
@@ -2600,16 +2597,6 @@ static void R_Register( void )
 	//
 	r_showImages = ri.Cvar_Get( "r_showImages", "0", CVAR_TEMP );
 	ri.Cvar_SetDescription( r_showImages, "Draw all images currently loaded into memory:\n 0: Disabled\n 1: Show images set to uniform size\n 2: Show images with scaled relative to largest image" );
-#ifdef USE_IMGUI
-	r_imgui = ri.Cvar_Get( "r_imgui", "1", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_imgui, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_imgui,
-		"Draw Dear ImGui debug inspector overlay (Vulkan): dockspace, PostFX/physics/volumetrics panels. "
-		"Requires USE_IMGUI build. Set 0 during gameplay if mouse capture conflicts with look." );
-	if ( r_imgui && r_imgui->integer ) {
-		ri.Printf( PRINT_ALL, "ImGui inspector overlay: r_imgui 1 (toggle with r_imgui 0)\n" );
-	}
-#endif
 
 	r_debugLight = ri.Cvar_Get( "r_debuglight", "0", CVAR_TEMP );
 	ri.Cvar_SetDescription( r_debugLight, "Debugging tool to print ambient and directed lighting information." );
@@ -2690,9 +2677,10 @@ static void R_Register( void )
 
 #ifdef USE_IMGUI
 	r_imgui = ri.Cvar_Get( "r_imgui", "1", CVAR_ARCHIVE_ND );
-	ri.Cvar_SetDescription( r_imgui,
-		"Vulkan ImGui debug inspector overlay (0=off, 1=on). Toggle at runtime with F11 when enabled." );
 	ri.Cvar_CheckRange( r_imgui, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_imgui,
+		"Dear ImGui debug inspector (Vulkan, USE_IMGUI): dockspace with PostFX/physics/volumetrics panels. "
+		"Set 0 during gameplay if mouse capture conflicts with look. F11 toggles when enabled." );
 	ri.Printf( PRINT_ALL, "[VK][imgui] debug inspector r_imgui=%d (F11 toggles when enabled)\n",
 		r_imgui->integer );
 	r_studio_tools = ri.Cvar_Get( "r_studio_tools", "0", CVAR_ARCHIVE_ND );
