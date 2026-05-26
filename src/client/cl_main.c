@@ -3964,6 +3964,9 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 	Cmd_RemoveCommand ("serverinfo");
 	Cmd_RemoveCommand ("systeminfo");
 	Cmd_RemoveCommand ("modelist");
+#if defined(USE_IMGUI) && defined(USE_VULKAN_API)
+	Cmd_RemoveCommand( "toggle_imgui" );
+#endif
 	Cmd_RemoveCommand ("open");
 
 #ifdef USE_CURL

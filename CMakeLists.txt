@@ -2523,6 +2523,12 @@ set_tests_properties(test_gltf_opengl_regressions PROPERTIES
 	LABELS "unit;scripts;validation;renderer"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_gltf_opengl_regressions.sh")
 
+add_test(NAME test_imgui_toggle_guards
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_imgui_toggle_guards.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_imgui_toggle_guards PROPERTIES
+	LABELS "unit;scripts;validation;renderer")
+
 add_test(NAME test_botlib_bounded_strings
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_botlib_bounded_strings.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
