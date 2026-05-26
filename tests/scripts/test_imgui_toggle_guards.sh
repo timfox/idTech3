@@ -28,7 +28,10 @@ require_pattern() {
 	local pattern="$2"
 	local context="$3"
 
-	perl -0ne "exit(!(/$pattern/s))" "$file" || fail "$context"
+	PATTERN="$pattern" perl -0ne '
+		my $pattern = $ENV{"PATTERN"};
+		exit(!(/$pattern/s));
+	' "$file" || fail "$context"
 }
 
 require_literal_count() {
