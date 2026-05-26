@@ -24,17 +24,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define TR_LOCAL_H
 
 #define USE_VK_PBR
-#ifdef USE_VK_PBR
-	#define VK_PBR_BRDFLUT		// for inspecting codebase, does not toggle brdflut. 
-	#define VK_CUBEMAP	
-
-	#ifdef VK_CUBEMAP
-		#define REF_CUBEMAP_IRRADIANCE_SIZE		64
-		#define REF_CUBEMAP_SIZE				256
-	#endif
-#endif
+#define VK_PBR_BRDFLUT		// for inspecting codebase, does not toggle brdflut.
+#define VK_CUBEMAP
+#define REF_CUBEMAP_IRRADIANCE_SIZE		64
+#define REF_CUBEMAP_SIZE				256
 
 #define USE_VBO				// store static world geometry in VBO
+#define USE_VBO_GRID		/* put SF_GRID to VBO */
 #define USE_FOG_COLLAPSE	// not compatible with legacy dlights
 #define MAX_REAL_DLIGHTS	(MAX_DLIGHTS*2)
 #define MAX_LITSURFS		(MAX_DRAWSURFS)
