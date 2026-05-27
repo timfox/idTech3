@@ -190,14 +190,14 @@ load_body = find_function_body(files_text, "FS_LoadLibrary")
 assert_order(
     load_body,
     "libHandle = FS_TryLoadLibraryFromPk3Cache( name );",
-    "const searchpath_t *sp = fs_searchpaths;",
-    "FS_LoadLibrary must try pk3-backed native modules before loose filesystem search paths",
+    "while ( !libHandle && sp )",
+    "FS_LoadLibrary must keep pk3 cache first in the load order",
 )
 assert_order(
     load_body,
-    "libHandle = FS_TryLoadLibraryFromPk3Cache( name );",
-    "while ( !libHandle && sp )",
-    "FS_LoadLibrary must keep pk3 cache first in the load order",
+    "if ( libHandle ) {\n\t\treturn libHandle;\n\t}",
+    "#ifdef _WIN32",
+    "FS_LoadLibrary must return a pk3 cache hit before loose filesystem probing",
 )
 
 vmcall_body = find_function_body(vm_text, "VM_Call")
