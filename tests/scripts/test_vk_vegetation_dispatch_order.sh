@@ -15,8 +15,8 @@ fail() {
 [ -f "$TR_SHADE_FILE" ] || fail "missing $TR_SHADE_FILE"
 [ -f "$FRAME_SUBMIT_FILE" ] || fail "missing $FRAME_SUBMIT_FILE"
 
-prepare_line="$(rg -n 'vk_vegetation_wind_prepare_draw\s*\(' "$TR_SHADE_FILE" | cut -d: -f1)"
-iterator_line="$(rg -n 'optimalStageIteratorFunc\s*\(' "$TR_SHADE_FILE" | head -1 | cut -d: -f1)"
+prepare_line="$(grep -En 'vk_vegetation_wind_prepare_draw[[:space:]]*\(' "$TR_SHADE_FILE" | head -1 | cut -d: -f1)"
+iterator_line="$(grep -En 'optimalStageIteratorFunc[[:space:]]*\(' "$TR_SHADE_FILE" | head -1 | cut -d: -f1)"
 
 if [ -z "$prepare_line" ]; then
 	fail "tr_shade.c missing vk_vegetation_wind_prepare_draw()"
@@ -28,7 +28,7 @@ if [ "$prepare_line" -ge "$iterator_line" ]; then
 	fail "prepare must precede optimalStageIteratorFunc (prepare=$prepare_line iterator=$iterator_line)"
 fi
 
-if rg -n 'vk_vegetation_wind_prepare_draw\s*\(' "$FRAME_SUBMIT_FILE" >/dev/null; then
+if grep -Eq 'vk_vegetation_wind_prepare_draw[[:space:]]*\(' "$FRAME_SUBMIT_FILE"; then
 	fail "vk_frame_submit.c must not call vk_vegetation_wind_prepare_draw()"
 fi
 

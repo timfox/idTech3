@@ -8,7 +8,7 @@ This document tracks known gaps, risks, and mitigations in the Vulkan HDR render
 
 **Current**: Used as linear; `r_hdr_lightmap_scale` only scales intensity.
 
-**Mitigation**: Added `r_lightmap_srgb_decode` (0=linear assumed, 1=sRGB→linear). When `r_hdr` 1/2 and lightmaps are gamma-encoded (e.g. q3map2 `-gamma`), set to 1 to avoid darkening in bright areas.
+**Mitigation**: Added `r_lightmap_srgb_decode` (0=linear assumed, 1=sRGB→linear). When `r_hdr` 1/2 and lightmaps are gamma-encoded (e.g. q3map2 `-gamma`), set to 1 to avoid darkening in bright areas. Vulkan rebuilds world pipelines when this cvar changes (no `vid_restart` required).
 
 **How to tell if lightmaps are gamma-encoded**: Maps compiled with q3map2 `-gamma` (or `-gamma 2.2` etc.) produce gamma-encoded lightmaps. Many mod workflows use `-gamma` for a brighter look; if bright areas appear too dark or washed out with HDR on, try `r_lightmap_srgb_decode 1`. Linear lightmaps (no `-gamma`) are typical for vanilla Q3A and some modern maps.
 

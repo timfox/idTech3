@@ -2790,7 +2790,7 @@ static void R_Register( void )
 
 	r_lightmap_srgb_decode = ri.Cvar_Get( "r_lightmap_srgb_decode", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_lightmap_srgb_decode, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_lightmap_srgb_decode, "When r_hdr 1/2: 0=lightmaps assumed linear (default), 1=sRGB->linear decode for gamma-encoded BSP lightmaps (q3map2 -gamma)." );
+	ri.Cvar_SetDescription( r_lightmap_srgb_decode, "When r_hdr 1/2: 0=lightmaps assumed linear (default), 1=sRGB->linear decode for gamma-encoded BSP lightmaps (q3map2 -gamma). Rebuilds world pipelines when changed." );
 	ri.Cvar_SetGroup( r_lightmap_srgb_decode, CVG_RENDERER );
 
 	r_pre_exposure_scale = ri.Cvar_Get( "r_pre_exposure_scale", "1.0", CVAR_ARCHIVE_ND );

@@ -1258,6 +1258,7 @@ typedef struct {
 	VkImageLayout initSwapchainLayout;
 
 	qboolean clearAttachment;		// requires VK_IMAGE_USAGE_TRANSFER_DST_BIT for swapchains
+	qboolean swapchainTransferSrc;	// VK_IMAGE_USAGE_TRANSFER_SRC_BIT on swapchain (screenshots when r_fbo 0)
 	qboolean fboActive;
 	qboolean isV3DV;				/* Raspberry Pi Vulkan driver (V3DV); used for RPi5-friendly hints */
 	qboolean blitEnabled;

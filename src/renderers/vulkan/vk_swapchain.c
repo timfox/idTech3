@@ -39,6 +39,7 @@ void vk_create_swapchain( VkPhysicalDevice physical_device, VkDevice device, VkS
 	}
 
 	vk.clearAttachment = qtrue;
+	vk.swapchainTransferSrc = qtrue;
 
 	if ( !vk.fboActive ) {
 		if ( ( surface_caps.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_DST_BIT ) == 0 ) {
@@ -46,7 +47,10 @@ void vk_create_swapchain( VkPhysicalDevice physical_device, VkDevice device, VkS
 			ri.Printf( PRINT_WARNING, "VK_IMAGE_USAGE_TRANSFER_DST_BIT is not supported by the swapchain, \\r_clear might not work\n" );
 		}
 		if ( ( surface_caps.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT ) == 0 ) {
-			ri.Error( ERR_FATAL, "create_swapchain: VK_IMAGE_USAGE_TRANSFER_SRC_BIT is not supported by the swapchain" );
+			vk.swapchainTransferSrc = qfalse;
+			ri.Printf( PRINT_WARNING,
+				"VK_IMAGE_USAGE_TRANSFER_SRC_BIT is not supported by the swapchain; "
+				"screenshots with r_fbo 0 are disabled. Use r_fbo 1 (default) or cl_renderer opengl.\n" );
 		}
 	}
 
@@ -126,7 +130,12 @@ void vk_create_swapchain( VkPhysicalDevice physical_device, VkDevice device, VkS
 	desc.imageArrayLayers = 1;
 	desc.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 	if ( !vk.fboActive ) {
-		desc.imageUsage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+		if ( vk.clearAttachment ) {
+			desc.imageUsage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+		}
+		if ( vk.swapchainTransferSrc ) {
+			desc.imageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+		}
 	}
 	desc.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	desc.queueFamilyIndexCount = 0;
