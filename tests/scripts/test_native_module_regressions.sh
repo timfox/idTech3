@@ -70,7 +70,10 @@ extract_function() {
 	local name="$2"
 
 	awk -v name="$name" '
-		index($0, name "(") > 0 && in_fn == 0 {
+		BEGIN {
+			def = "^[[:space:]]*(static[[:space:]]+)?[A-Za-z_][A-Za-z0-9_[:space:]\\*]*" name "[[:space:]]*\\(";
+		}
+		$0 ~ def && in_fn == 0 {
 			in_fn = 1;
 		}
 		in_fn {
