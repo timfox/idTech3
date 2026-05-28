@@ -2512,6 +2512,14 @@ set_tests_properties(renderer_regression_check PROPERTIES
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/renderer_regression_check.sh"
 	RESOURCE_LOCK "idtech3_headless_validation")
 
+add_test(NAME q3_openarena_compat_check
+	COMMAND ${CMAKE_SOURCE_DIR}/scripts/q3_openarena_compat_check.sh ${CMAKE_SOURCE_DIR}/release
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(q3_openarena_compat_check PROPERTIES
+	LABELS "validation;smoke"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/q3_openarena_compat_check.sh;${CMAKE_SOURCE_DIR}/release/idtech3"
+	RESOURCE_LOCK "idtech3_headless_validation")
+
 add_test(NAME check_artifacts
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/check_artifacts.sh ${CMAKE_SOURCE_DIR}/release
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

@@ -76,7 +76,7 @@ Classic `.pk3` content runs on the Vulkan renderer (`cl_renderer vulkan`, defaul
 | Vulkan init fails (SDL / driver) | System SDL without Vulkan | `./release/run_vulkan.sh` or install Vulkan-capable SDL; fallback: `+set cl_renderer opengl` |
 | Compare against reference | Debugging only | `+set cl_renderer opengl` on the same install |
 
-After engine changes, run `./scripts/q3_openarena_compat_check.sh release` (no game data required) and smoke-test with your retail/OA `.pk3` tree.
+After engine changes, run `./scripts/q3_openarena_compat_check.sh release` (no game data required) and smoke-test with your retail/OA `.pk3` tree. Optional starter cvars: copy [examples/q3_vulkan_compat.cfg](../examples/q3_vulkan_compat.cfg) into your gamedir and `+exec q3_vulkan_compat`.
 
 ## Troubleshooting Quick Reference
 

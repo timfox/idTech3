@@ -11,6 +11,7 @@ Small, **copy-paste** workflows and templates for this engine repo. They do not 
 | [title-repo/](title-repo/) | Templates for a **game** repo: platform cert, telemetry, soak, submissions. |
 | [demo_game/](demo_game/) | **Buildable** config mod `idtech3_demo.pk3` (+ optional helper) to toggle renderer cvars over a real `base/`. |
 | [demo_skeleton/](demo_skeleton/) | **Easiest demo run**: `./scripts/run_demo.sh` after adding game data to `demo_skeleton/base/` (see README). |
+| [q3_vulkan_compat.cfg](q3_vulkan_compat.cfg) | Optional cvars for **Quake III / OpenArena** on Vulkan (HDR/FBO/lightmap hints); copy into `baseq3/` and `+exec q3_vulkan_compat`. |
 | [tiled/](tiled/) | Optional **Tiled Map Editor** workflow (`.tmx` sample); init submodule with `./scripts/init_optional_submodules.sh --tiled`. |
 
 See also:
