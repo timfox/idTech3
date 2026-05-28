@@ -13,6 +13,18 @@ FAIL=0
 pass() { PASS=$((PASS + 1)); echo "  ✓ $1"; }
 fail() { FAIL=$((FAIL + 1)); echo "  ✗ $1" >&2; }
 
+# Match ri.Cvar_Get or qcommon Cvar_Get with default "0" (classic-mod safety cvars).
+assert_cvar_default_off() {
+	local file="$1"
+	local cvar="$2"
+	local desc="$3"
+	if grep -qE "(ri\.)?Cvar_Get\([[:space:]]*\"${cvar}\"[[:space:]]*,[[:space:]]*\"0\"" "$file"; then
+		pass "$desc"
+	else
+		fail "$desc"
+	fi
+}
+
 bin_path() {
 	local bin="$1"
 	local base="$RELEASE_DIR/$bin"
@@ -94,12 +106,8 @@ else
 	fail "r_vdbFog default not 0"
 fi
 
-if grep -qE 'cs_autoInit[[:space:]]*=[[:space:]]*ri\.Cvar_Get\([[:space:]]*"cs_autoInit"[[:space:]]*,[[:space:]]*"0"' \
-	"$PROJECT_ROOT/src/qcommon/csharp_debug.c"; then
-	pass "cs_autoInit defaults to 0 (C# runtime manual until cs_reload)"
-else
-	fail "cs_autoInit default not 0 in csharp_debug.c"
-fi
+assert_cvar_default_off "$PROJECT_ROOT/src/qcommon/csharp_debug.c" "cs_autoInit" \
+	"cs_autoInit defaults to 0 (C# runtime manual until cs_reload)"
 
 if grep -q 'ri\.Cmd_AddCommand( "vdb_load"' "$PROJECT_ROOT/src/renderers/vulkan/vk_vdb.c" && \
    grep -q 'ri\.Cmd_AddCommand( "vdb_bind_fog"' "$PROJECT_ROOT/src/renderers/vulkan/vk_vdb.c"; then

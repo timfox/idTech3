@@ -65,6 +65,19 @@ Retail **Quake III Arena**, **OpenArena**, and most classic **`.pk3` mods** expe
 
 Details: [ARCHITECTURE.md](ARCHITECTURE.md#native-game-modules-vm) (`vm.c`, `vm_native_module.c`, `FS_LoadLibrary`).
 
+### Vulkan with Quake III Arena / OpenArena
+
+Classic `.pk3` content runs on the Vulkan renderer (`cl_renderer vulkan`, default in most builds). Optional features stay **off by default** so stock maps match vanilla unless you enable them (Forward+, RTX, VDB fog, vegetation wind, etc.).
+
+| Symptom | Likely cause | Fix |
+|---------|--------------|-----|
+| Bright areas too dark / HDR looks wrong | Gamma-encoded BSP lightmaps (common in mod maps) | `r_lightmap_srgb_decode 1` then `vid_restart` (vanilla Q3A maps usually keep default **0**) |
+| Black screen, solid color, or broken UI | FBO / HDR post path | `r_fbo 1` + `vid_restart`; if still broken: `r_exposure_auto 0`, `r_volumetricFog 0`, then `vid_restart`; last resort `r_fbo 0` |
+| Vulkan init fails (SDL / driver) | System SDL without Vulkan | `./release/run_vulkan.sh` or install Vulkan-capable SDL; fallback: `+set cl_renderer opengl` |
+| Compare against reference | Debugging only | `+set cl_renderer opengl` on the same install |
+
+After engine changes, run `./scripts/q3_openarena_compat_check.sh release` (no game data required) and smoke-test with your retail/OA `.pk3` tree.
+
 ## Troubleshooting Quick Reference
 
 | Symptom | Likely cause | Fix |
