@@ -37,9 +37,6 @@ static VkShaderModule vk_shader_module_from_spirv( const uint8_t *bytes, int cou
 void vk_create_shader_modules( void )
 {
 	int i, j, k;
-#ifndef USE_VK_PBR
-	int l;
-#endif
 
 	vk.modules.frag.gen0_df = SHADER_MODULE( frag_tx0_df );
 	SET_OBJECT_NAME( vk.modules.frag.gen0_df, "single-texture df fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
@@ -65,126 +62,7 @@ void vk_create_shader_modules( void )
 		}
 	}
 
-#ifdef USE_VK_PBR
 	vk_bind_generated_shaders();
-#else
-	vk.modules.vert.gen[0][0][0][0] = SHADER_MODULE( vert_tx0 );
-	vk.modules.vert.gen[0][0][0][1] = SHADER_MODULE( vert_tx0_fog );
-	vk.modules.vert.gen[0][0][1][0] = SHADER_MODULE( vert_tx0_env );
-	vk.modules.vert.gen[0][0][1][1] = SHADER_MODULE( vert_tx0_env_fog );
-
-	vk.modules.vert.gen[1][0][0][0] = SHADER_MODULE( vert_tx1 );
-	vk.modules.vert.gen[1][0][0][1] = SHADER_MODULE( vert_tx1_fog );
-	vk.modules.vert.gen[1][0][1][0] = SHADER_MODULE( vert_tx1_env );
-	vk.modules.vert.gen[1][0][1][1] = SHADER_MODULE( vert_tx1_env_fog );
-
-	vk.modules.vert.gen[1][1][0][0] = SHADER_MODULE( vert_tx1_cl );
-	vk.modules.vert.gen[1][1][0][1] = SHADER_MODULE( vert_tx1_cl_fog );
-	vk.modules.vert.gen[1][1][1][0] = SHADER_MODULE( vert_tx1_cl_env );
-	vk.modules.vert.gen[1][1][1][1] = SHADER_MODULE( vert_tx1_cl_env_fog );
-
-	vk.modules.vert.gen[2][0][0][0] = SHADER_MODULE( vert_tx2 );
-	vk.modules.vert.gen[2][0][0][1] = SHADER_MODULE( vert_tx2_fog );
-	vk.modules.vert.gen[2][0][1][0] = SHADER_MODULE( vert_tx2_env );
-	vk.modules.vert.gen[2][0][1][1] = SHADER_MODULE( vert_tx2_env_fog );
-
-	vk.modules.vert.gen[2][1][0][0] = SHADER_MODULE( vert_tx2_cl );
-	vk.modules.vert.gen[2][1][0][1] = SHADER_MODULE( vert_tx2_cl_fog );
-	vk.modules.vert.gen[2][1][1][0] = SHADER_MODULE( vert_tx2_cl_env );
-	vk.modules.vert.gen[2][1][1][1] = SHADER_MODULE( vert_tx2_cl_env_fog );
-
-	for ( i = 0; i < 3; i++ ) {
-		const char *tx[] = { "single", "double", "triple" };
-		const char *cl[] = { "", "+cl" };
-		const char *env[] = { "", "+env" };
-		const char *fog[] = { "", "+fog" };
-		for ( j = 0; j < 2; j++ ) {
-			for ( k = 0; k < 2; k++ ) {
-				for ( l = 0; l < 2; l++ ) {
-					const char *s = va( "%s-texture%s%s%s vertex module", tx[i], cl[j], env[k], fog[l] );
-					SET_OBJECT_NAME( vk.modules.vert.gen[i][j][k][l], s, VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
-				}
-			}
-		}
-	}
-
-	vk.modules.vert.ident1[0][0][0] = SHADER_MODULE( vert_tx0_ident1 );
-	vk.modules.vert.ident1[0][0][1] = SHADER_MODULE( vert_tx0_ident1_fog );
-	vk.modules.vert.ident1[0][1][0] = SHADER_MODULE( vert_tx0_ident1_env );
-	vk.modules.vert.ident1[0][1][1] = SHADER_MODULE( vert_tx0_ident1_env_fog );
-	vk.modules.vert.ident1[1][0][0] = SHADER_MODULE( vert_tx1_ident1 );
-	vk.modules.vert.ident1[1][0][1] = SHADER_MODULE( vert_tx1_ident1_fog );
-	vk.modules.vert.ident1[1][1][0] = SHADER_MODULE( vert_tx1_ident1_env );
-	vk.modules.vert.ident1[1][1][1] = SHADER_MODULE( vert_tx1_ident1_env_fog );
-	for ( i = 0; i < 2; i++ ) {
-		const char *tx[] = { "single", "double" };
-		const char *env[] = { "", "+env" };
-		const char *fog[] = { "", "+fog" };
-		for ( j = 0; j < 2; j++ ) {
-			for ( k = 0; k < 2; k++ ) {
-				const char *s = va( "%s-texture identity%s%s vertex module", tx[i], env[j], fog[k] );
-				SET_OBJECT_NAME( vk.modules.vert.ident1[i][j][k], s, VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
-			}
-		}
-	}
-
-	vk.modules.frag.ident1[0][0] = SHADER_MODULE( frag_tx0_ident1 );
-	vk.modules.frag.ident1[0][1] = SHADER_MODULE( frag_tx0_ident1_fog );
-	vk.modules.frag.ident1[1][0] = SHADER_MODULE( frag_tx1_ident1 );
-	vk.modules.frag.ident1[1][1] = SHADER_MODULE( frag_tx1_ident1_fog );
-	for ( i = 0; i < 2; i++ ) {
-		const char *tx[] = { "single", "double" };
-		const char *fog[] = { "", "+fog" };
-		for ( j = 0; j < 2; j++ ) {
-			const char *s = va( "%s-texture identity%s fragment module", tx[i], fog[j] );
-			SET_OBJECT_NAME( vk.modules.frag.ident1[i][j], s, VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
-		}
-	}
-
-	vk.modules.vert.fixed[0][0][0] = SHADER_MODULE( vert_tx0_fixed );
-	vk.modules.vert.fixed[0][0][1] = SHADER_MODULE( vert_tx0_fixed_fog );
-	vk.modules.vert.fixed[0][1][0] = SHADER_MODULE( vert_tx0_fixed_env );
-	vk.modules.vert.fixed[0][1][1] = SHADER_MODULE( vert_tx0_fixed_env_fog );
-	vk.modules.vert.fixed[1][0][0] = SHADER_MODULE( vert_tx1_fixed );
-	vk.modules.vert.fixed[1][0][1] = SHADER_MODULE( vert_tx1_fixed_fog );
-	vk.modules.vert.fixed[1][1][0] = SHADER_MODULE( vert_tx1_fixed_env );
-	vk.modules.vert.fixed[1][1][1] = SHADER_MODULE( vert_tx1_fixed_env_fog );
-	for ( i = 0; i < 2; i++ ) {
-		const char *tx[] = { "single", "double" };
-		const char *env[] = { "", "+env" };
-		const char *fog[] = { "", "+fog" };
-		for ( j = 0; j < 2; j++ ) {
-			for ( k = 0; k < 2; k++ ) {
-				const char *s = va( "%s-texture fixed-color%s%s vertex module", tx[i], env[j], fog[k] );
-				SET_OBJECT_NAME( vk.modules.vert.fixed[i][j][k], s, VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
-			}
-		}
-	}
-
-	vk.modules.frag.fixed[0][0] = SHADER_MODULE( frag_tx0_fixed );
-	vk.modules.frag.fixed[0][1] = SHADER_MODULE( frag_tx0_fixed_fog );
-	vk.modules.frag.fixed[1][0] = SHADER_MODULE( frag_tx1_fixed );
-	vk.modules.frag.fixed[1][1] = SHADER_MODULE( frag_tx1_fixed_fog );
-	for ( i = 0; i < 2; i++ ) {
-		const char *tx[] = { "single", "double" };
-		const char *fog[] = { "", "+fog" };
-		for ( j = 0; j < 2; j++ ) {
-			const char *s = va( "%s-texture fixed-color%s fragment module", tx[i], fog[j] );
-			SET_OBJECT_NAME( vk.modules.frag.fixed[i][j], s, VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
-		}
-	}
-
-	vk.modules.frag.ent[0][0] = SHADER_MODULE( frag_tx0_ent );
-	vk.modules.frag.ent[0][1] = SHADER_MODULE( frag_tx0_ent_fog );
-	for ( i = 0; i < 1; i++ ) {
-		const char *tx[] = { "single" /*, "double" */};
-		const char *fog[] = { "", "+fog" };
-		for ( j = 0; j < 2; j++ ) {
-			const char *s = va( "%s-texture entity-color%s fragment module", tx[i], fog[j] );
-			SET_OBJECT_NAME( vk.modules.frag.ent[i][j], s, VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
-		}
-	}
-#endif
 
 	vk.modules.vert.light[0] = SHADER_MODULE( vert_light );
 	vk.modules.vert.light[1] = SHADER_MODULE( vert_light_fog );
