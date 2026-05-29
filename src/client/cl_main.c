@@ -3527,15 +3527,16 @@ static void CL_InitRef( void ) {
 		}
 	}
 
-#if defined(USE_VULKAN_API) && (defined(__arm__) || defined(__aarch64__))
-	/* SDL may lack Vulkan support on ARM (e.g. RPi system SDL); fall back to OpenGL unless forced */
+#if defined(USE_VULKAN_API)
+	/* Probe SDL window creation (VK_KHR_surface). RPi/headless SDL often lacks Vulkan;
+	 * fall back to OpenGL so Q3/OA and demo shells still start unless cl_renderer_force 1. */
 	if ( Q_stricmp( rendererName, "vulkan" ) == 0 && !GLimp_VulkanAvailable() )
 	{
 		if ( cl_renderer_force && cl_renderer_force->integer )
 			Com_Printf( "[VK] cl_renderer_force 1: attempting Vulkan despite probe failure\n" );
 		else
 		{
-			Com_Printf( "[VK] Vulkan not available in SDL, falling back to OpenGL\n" );
+			Com_Printf( "[VK] Vulkan not available in SDL (no VK window), falling back to OpenGL\n" );
 			Cvar_Set( "cl_renderer", "opengl" );
 			Cvar_Set( "renderer", "opengl" );
 			rendererName = "opengl";

@@ -136,6 +136,14 @@ else
 	fail "VK_SetLightParams missing HDR/r_gamma decouple for classic mods"
 fi
 
+if grep -q 'defined(USE_VULKAN_API)' "$PROJECT_ROOT/src/client/cl_main.c" && \
+   grep -q 'GLimp_VulkanAvailable' "$PROJECT_ROOT/src/client/cl_main.c" && \
+   ! grep -q 'USE_VULKAN_API) && (defined(__arm__)' "$PROJECT_ROOT/src/client/cl_main.c"; then
+	pass "Vulkan SDL probe + OpenGL fallback enabled on all platforms (cl_main)"
+else
+	fail "cl_main missing all-platform GLimp_VulkanAvailable fallback"
+fi
+
 SERVER="$(bin_path idtech3_server)"
 CLIENT="$(bin_path idtech3)"
 if [ -n "$SERVER" ]; then

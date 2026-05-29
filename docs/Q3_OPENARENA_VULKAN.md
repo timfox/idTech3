@@ -35,7 +35,7 @@ Copy [examples/q3_vulkan_compat.cfg](../examples/q3_vulkan_compat.cfg) into your
 | Mod maps too dark/bright (HDR) | `r_lightmap_srgb_decode 1` |
 | Black screen / broken UI | `r_fbo 1`, then `r_exposure_auto 0`, `r_volumetricFog 0`; last resort `r_fbo 0` |
 | Fog on alpha foliage (OA) | `r_volumetricFog 0` |
-| Vulkan won’t start | `./release/run_vulkan.sh` or `+set cl_renderer opengl` |
+| Vulkan won’t start | Auto-fallback to OpenGL when SDL has no Vulkan window (log: `falling back to OpenGL`). Or `./release/run_vulkan.sh`, install a Vulkan ICD, or `+set cl_renderer opengl` |
 
 ## What automation does *not* prove
 

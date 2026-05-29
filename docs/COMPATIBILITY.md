@@ -75,7 +75,7 @@ Classic `.pk3` content runs on the Vulkan renderer (`cl_renderer vulkan`, defaul
 |---------|--------------|-----|
 | Bright areas too dark / HDR looks wrong | Gamma-encoded BSP lightmaps (common in mod maps) | `r_lightmap_srgb_decode 1` then `vid_restart` (vanilla Q3A maps usually keep default **0**) |
 | Black screen, solid color, or broken UI | FBO / HDR post path | `r_fbo 1` + `vid_restart`; if still broken: `r_exposure_auto 0`, `r_volumetricFog 0`, then `vid_restart`; last resort `r_fbo 0` |
-| Vulkan init fails (SDL / driver) | System SDL without Vulkan | `./release/run_vulkan.sh` or install Vulkan-capable SDL; fallback: `+set cl_renderer opengl` |
+| Vulkan init fails (SDL / driver) | System SDL without Vulkan / no `VK_KHR_surface` | Client probes at startup and falls back to OpenGL unless `cl_renderer_force 1`; or `./release/run_vulkan.sh`; or `+set cl_renderer opengl` |
 | Fog wrong on foliage / alpha grates | Volumetric fog vs alpha-tested geometry | `r_volumetricFog 0` (or `r_volumetricFogSkipStatic 1`, default) on foliage-heavy OA maps |
 | Compare against reference | Debugging only | `+set cl_renderer opengl` on the same install |
 

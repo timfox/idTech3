@@ -827,9 +827,9 @@ void *GL_GetProcAddress( const char *symbol )
 ===============
 GLimp_VulkanAvailable
 
-Probes whether SDL has Vulkan support for the current video driver.
-Used on ARM to avoid loading the Vulkan renderer when SDL was built
-without Vulkan or the platform has no Vulkan ICD.
+Probes whether SDL can create a Vulkan window (VK_KHR_surface) for the current video driver.
+Used before loading the Vulkan renderer when SDL was built without Vulkan, the ICD
+is missing surface support, or the display stack is unavailable (headless CI, etc.).
 ===============
 */
 qboolean GLimp_VulkanAvailable( void )

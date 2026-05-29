@@ -47,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Vulkan swapchain: missing `VK_IMAGE_USAGE_TRANSFER_SRC_BIT` warns instead of `ERR_FATAL` when `r_fbo 0` (screenshot readback skipped); only requests supported swapchain usage flags.
 - Vulkan: `r_lightmap_srgb_decode` rebuilds world graphics pipelines when toggled (gamma-encoded BSP lightmaps on HDR paths).
 - Vulkan / OpenGL: dynamic light color no longer scales with `pow(r_intensity, r_gamma)` when HDR/FBO is active (`r_hdr` 1/2 or `vk.fboActive`).
+- Client: `GLimp_VulkanAvailable()` probe before loading the Vulkan renderer on all platforms (not ARM-only); falls back to OpenGL when SDL cannot create a `VK_KHR_surface` window.
 - Vulkan ImGui: **File → Quit** runs `quit` (clean exit) instead of a no-op.
 
 - Client: clearer message when UI VM fails to load (idtech3_demo ships native UI in `vm/`, not configs-only).
