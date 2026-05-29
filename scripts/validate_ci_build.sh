@@ -50,6 +50,18 @@ echo "6. Renderer regression check (repo + GLSL)..."
 ./scripts/renderer_regression_check.sh
 echo ""
 
+DEVDATA_BASE="$PROJECT_ROOT/docs/renderer_validation/devdata/rtest_base"
+if [ -f "$DEVDATA_BASE/vm/qagame.qvm" ]; then
+  echo "6b. Tier B devdata map load (dedicated, no retail pk3)..."
+  chmod +x ./scripts/run_renderer_tier_b_devdata.sh
+  ./scripts/run_renderer_tier_b_devdata.sh
+  echo ""
+else
+  echo "6b. Tier B devdata skipped (run ./scripts/build_renderer_devdata.sh to enable)"
+  echo ""
+fi
+echo ""
+
 echo "7. Demo mod pack layout (idtech3_demo.pk3)..."
 chmod +x ./tests/scripts/test_demo_game_pk3.sh
 ./tests/scripts/test_demo_game_pk3.sh

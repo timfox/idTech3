@@ -6,6 +6,7 @@ Small, **copy-paste** workflows and templates for this engine repo. They do not 
 |------|---------|
 | [engine/](engine/) | Local build and automated validation (smoke, `ctest`, production readiness). |
 | [renderer/](renderer/) | Renderer regression and `GAME_BASE` environment template. |
+| (script) | `./scripts/run_renderer_tier_b_devdata.sh` — Tier B map load without retail pk3 (`rtest_base`). |
 | [mods/](mods/) | Typical mod / `fs_game` layout and launch examples. |
 | [scripts/](scripts/) | Pointers to in-repo script and UI samples under `docs/samples/`. |
 | [title-repo/](title-repo/) | Templates for a **game** repo: platform cert, telemetry, soak, submissions. |

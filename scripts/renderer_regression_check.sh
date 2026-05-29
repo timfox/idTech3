@@ -452,6 +452,10 @@ fi
 echo ""
 if [ -n "${GAME_BASE:-}" ]; then
   echo "Optional game base: $GAME_BASE"
+  if [ -z "${GAME_ASSETS_LIST:-}" ] && [ -f "$PROJECT_ROOT/docs/renderer_validation/devdata/OPTIONAL_GAME_ASSETS.txt" ] && \
+     [ "$(cd "$GAME_BASE" 2>/dev/null && pwd)" = "$(cd "$PROJECT_ROOT/docs/renderer_validation/devdata/rtest_base" 2>/dev/null && pwd)" ]; then
+    GAME_ASSETS_LIST="$PROJECT_ROOT/docs/renderer_validation/devdata/OPTIONAL_GAME_ASSETS.txt"
+  fi
   ASSETS_LIST="${GAME_ASSETS_LIST:-$PROJECT_ROOT/docs/samples/renderer_regression/OPTIONAL_GAME_ASSETS.txt}"
   req=0
   while IFS= read -r line || [ -n "$line" ]; do

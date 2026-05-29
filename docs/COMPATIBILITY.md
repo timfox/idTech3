@@ -79,6 +79,8 @@ Classic `.pk3` content runs on the Vulkan renderer (`cl_renderer vulkan`, defaul
 
 After engine changes, run `./scripts/q3_openarena_compat_check.sh release` (no game data required) and smoke-test with your retail/OA `.pk3` tree. Optional starter cvars: copy [examples/q3_vulkan_compat.cfg](../examples/q3_vulkan_compat.cfg) into your gamedir and `+exec q3_vulkan_compat`.
 
+**Automated map load (no retail pk3):** `./scripts/run_renderer_tier_b_devdata.sh` uses `docs/renderer_validation/devdata/rtest_base` (dedicated server + stub BSPs). Full retail/OA trees: set `GAME_BASE` and run `./scripts/renderer_regression_maps.sh`.
+
 ## Troubleshooting Quick Reference
 
 | Symptom | Likely cause | Fix |
