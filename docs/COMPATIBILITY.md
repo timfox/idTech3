@@ -55,6 +55,8 @@ This document summarizes compatibility considerations, known issues, and mitigat
 - **QVM fallback**: If native not found, tries `module.qvm`.
 - **Diagnostics**: Missing `ui.qvm` or native UI prints clear messages.
 
+See also [Q3_OPENARENA_VULKAN.md](Q3_OPENARENA_VULKAN.md) for a short play + validation checklist.
+
 ### Legacy Quake 3 and OpenArena-style mods (QVM)
 
 Retail **Quake III Arena**, **OpenArena**, and most classic **`.pk3` mods** expect **bytecode QVMs** (`qagame.qvm`, `cgame.qvm`, `ui.qvm`) and the original filesystem / protocol surface. This fork **keeps the QVM path** (`Q3_VM` / `vm.c`) and native-vs-QVM selection so those games and mods remain loadable without forcing a native-only toolchain. Engine and renderer enhancements must **not** remove or silently break QVM execution for this class of content unless a deliberate, documented compatibility decision is made (see project constitution).
