@@ -36,6 +36,7 @@ assert_not_matches_regex() {
 
 VK_INSTANCE="$PROJECT_ROOT/src/renderers/vulkan/vk_instance.c"
 TR_SHADE="$PROJECT_ROOT/src/renderers/vulkan/tr_shade.c"
+TR_ARB="$PROJECT_ROOT/src/renderers/opengl/tr_arb.c"
 VK_FRAME_SUBMIT="$PROJECT_ROOT/src/renderers/vulkan/vk_frame_submit.c"
 VK_SWAPCHAIN="$PROJECT_ROOT/src/renderers/vulkan/vk_swapchain.c"
 
@@ -70,5 +71,11 @@ assert_not_matches_regex "$VK_SWAPCHAIN" "TRANSFER_SRC_BIT.*ERR_FATAL" "no fatal
 
 # Classic-mod lightmap decode must rebuild world pipelines when toggled at runtime.
 assert_contains_literal "$VK_FRAME_SUBMIT" "r_lightmap_srgb_decode && r_lightmap_srgb_decode->modified" "lightmap srgb decode pipeline invalidation"
+
+assert_contains_literal "$TR_SHADE" "useLegacyLightScale" "VK dlight legacy scale flag"
+assert_contains_literal "$TR_SHADE" "r_hdr && r_hdr->integer > 0" "VK dlight HDR decouple"
+if [ -f "$TR_ARB" ]; then
+	assert_contains_literal "$TR_ARB" "!( r_hdr && r_hdr->integer > 0 )" "OpenGL dlight HDR decouple"
+fi
 
 echo "PASS: test_vulkan_regression_source_guards"

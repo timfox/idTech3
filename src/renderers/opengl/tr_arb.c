@@ -255,10 +255,12 @@ void ARB_SetupLightParams( void )
 
 	dl = tess.light;
 
-	if ( !glConfig.deviceSupportsGamma && !fboEnabled )
+	if ( !glConfig.deviceSupportsGamma && !fboEnabled &&
+		!( r_hdr && r_hdr->integer > 0 ) ) {
 		VectorScale( dl->color, 2 * powf( r_intensity->value, r_gamma->value ), lightRGB );
-	else
+	} else {
 		VectorCopy( dl->color, lightRGB );
+	}
 
 	radius = dl->radius;
 

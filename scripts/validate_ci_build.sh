@@ -30,9 +30,8 @@ echo "2. Building Vulkan (Release)..."
 ./scripts/compile_engine.sh vulkan
 echo ""
 
-echo "3. Running smoke test..."
+echo "3. Running smoke test (includes Q3/OA compat check)..."
 ./scripts/smoke_test.sh release
-./scripts/q3_openarena_compat_check.sh release
 echo ""
 
 echo "4. CTest (mirrors ubuntu-x86_64 job: smoke + renderer + scripts + units)..."

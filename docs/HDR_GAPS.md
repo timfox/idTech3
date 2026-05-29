@@ -74,9 +74,9 @@ Both feed into linear HDR; no conflict.
 
 ## 6.7 Dynamic Light Intensity
 
-**Current**: `VectorScale(dl->color, 2 * powf(r_intensity->value, r_gamma->value), ...)`. `r_gamma` affects light intensity; intentional for legacy look. Consider separating display gamma from light intensity if needed.
+**Current**: Legacy path (no FBO / no HDR) scales lights with `2 * pow(r_intensity, r_gamma)` when the device has no hardware gamma. **Vulkan/OpenGL HDR** (`r_fbo 1` or `r_hdr` 1/2): `VK_SetLightParams` / dlight ARB path copies `dl->color` unchanged so display gamma stays in the gamma pass.
 
-**Desirable**: On dark monitors or legacy maps authored for CRT gamma, raising `r_gamma` brightens both display and lights-often what users expect. **Problematic**: When using HDR + tonemap, `r_gamma` changes light intensity without changing display gamma (handled by gamma pass), so lights can look too bright or too dim relative to the tonemapped scene. Prefer `r_exposure` or `r_exposure_auto` for HDR brightness control.
+**Desirable**: On dark monitors or legacy maps authored for CRT gamma, raising `r_gamma` brightens both display and lights—often what users expect on the non-HDR path. **HDR**: Prefer `r_exposure` or `r_exposure_auto` for scene brightness; do not use `r_gamma` to tune dynamic lights when `r_hdr` is on.
 
 ---
 

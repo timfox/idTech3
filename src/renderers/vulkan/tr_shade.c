@@ -1764,15 +1764,24 @@ void VK_SetFogParams( vkUniform_t *ubo, int *fogStage )
 
 static void VK_SetLightParams( vkUniform_t *ubo, const dlight_t *dl ) {
 	float radius;
+	qboolean useLegacyLightScale = qfalse;
 
 #ifdef USE_VULKAN
-	if ( !glConfig.deviceSupportsGamma && !vk.fboActive )
+	/* HDR/FBO: display gamma is in the gamma pass; only scale lights on the legacy non-HDR path. */
+	if ( !vk.fboActive && !( r_hdr && r_hdr->integer > 0 ) && !glConfig.deviceSupportsGamma ) {
+		useLegacyLightScale = qtrue;
+	}
 #else
-	if ( !glConfig.deviceSupportsGamma )
+	if ( !glConfig.deviceSupportsGamma ) {
+		useLegacyLightScale = qtrue;
+	}
 #endif
-		VectorScale( dl->color, 2 * powf( r_intensity->value, r_gamma->value ), ubo->light.color);
-	else
+
+	if ( useLegacyLightScale ) {
+		VectorScale( dl->color, 2 * powf( r_intensity->value, r_gamma->value ), ubo->light.color );
+	} else {
 		VectorCopy( dl->color, ubo->light.color );
+	}
 
 	radius = dl->radius;
 	if ( radius < 0.001f )

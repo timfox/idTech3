@@ -116,6 +116,26 @@ else
 	fail "VDB console commands missing from vk_vdb.c"
 fi
 
+if grep -q 'vk.swapchainTransferSrc = qfalse;' "$PROJECT_ROOT/src/renderers/vulkan/vk_swapchain.c" && \
+   ! grep -q 'ERR_FATAL.*TRANSFER_SRC' "$PROJECT_ROOT/src/renderers/vulkan/vk_swapchain.c"; then
+	pass "swapchain missing TRANSFER_SRC warns instead of ERR_FATAL"
+else
+	fail "swapchain TRANSFER_SRC must not fatal (classic Vulkan startup)"
+fi
+
+if grep -q 'r_lightmap_srgb_decode && r_lightmap_srgb_decode->modified' "$PROJECT_ROOT/src/renderers/vulkan/vk_frame_submit.c"; then
+	pass "r_lightmap_srgb_decode invalidates world pipelines at runtime"
+else
+	fail "r_lightmap_srgb_decode pipeline refresh missing from vk_frame_submit.c"
+fi
+
+if grep -q 'useLegacyLightScale' "$PROJECT_ROOT/src/renderers/vulkan/tr_shade.c" && \
+   grep -q 'r_hdr && r_hdr->integer > 0' "$PROJECT_ROOT/src/renderers/vulkan/tr_shade.c"; then
+	pass "HDR dynamic lights decoupled from r_gamma (VK_SetLightParams)"
+else
+	fail "VK_SetLightParams missing HDR/r_gamma decouple for classic mods"
+fi
+
 SERVER="$(bin_path idtech3_server)"
 CLIENT="$(bin_path idtech3)"
 if [ -n "$SERVER" ]; then
