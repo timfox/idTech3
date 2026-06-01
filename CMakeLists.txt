@@ -2517,6 +2517,22 @@ set_tests_properties(spec_energy_runtime_check PROPERTIES
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/release/idtech3"
 	RESOURCE_LOCK "idtech3_headless_validation")
 
+add_test(NAME vk_shader_determinism_check
+	COMMAND ${CMAKE_SOURCE_DIR}/scripts/vk_shader_determinism_check.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(vk_shader_determinism_check PROPERTIES
+	LABELS "validation;renderer;scripts"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/compile_shaders.sh;${CMAKE_SOURCE_DIR}/src/renderers/vulkan/shaders/spirv/generated/shader_data.c"
+	RESOURCE_LOCK "idtech3_headless_validation")
+
+add_test(NAME vulkan_state_of_art_check
+	COMMAND ${CMAKE_SOURCE_DIR}/scripts/vulkan_state_of_art_check.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(vulkan_state_of_art_check PROPERTIES
+	LABELS "validation;renderer;scripts"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/src/renderers/vulkan/vk_instance.c;${CMAKE_SOURCE_DIR}/src/renderers/vulkan/vk_init_device.c"
+	RESOURCE_LOCK "idtech3_headless_validation")
+
 add_test(NAME renderer_regression_check
 	COMMAND ${CMAKE_SOURCE_DIR}/scripts/renderer_regression_check.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
