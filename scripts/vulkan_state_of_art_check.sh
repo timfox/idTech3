@@ -43,4 +43,19 @@ if ! rg -n "device_extension_count < ARRAY_LEN\( device_extension_list \)" src/r
 fi
 ok "Extension-list capacity guard present"
 
+# 5) RTX extension-list capacity guard must remain
+if ! rg -n "device_extension_count \\+ 4 > ARRAY_LEN\\( device_extension_list \\)" src/renderers/vulkan/vk_instance.c >/dev/null; then
+  fail "Missing extension-list capacity guard for RTX extensions (+4)"
+fi
+ok "RTX extension-list capacity guard present"
+
+# 6) RTX should only advertise enabled when both build + features allow it
+if ! rg -n "vk\\.rtxAvailable = qtrue" src/renderers/vulkan/vk_instance.c >/dev/null; then
+  fail "vk_instance.c missing vk.rtxAvailable assignment"
+fi
+if ! rg -n "Ray tracing: KHR extensions and device features enabled" src/renderers/vulkan/vk_instance.c >/dev/null; then
+  fail "vk_instance.c missing RT enable log line"
+fi
+ok "RTX enable log + vk.rtxAvailable assignment present"
+
 echo "vulkan_state_of_art_check: all checks passed"
