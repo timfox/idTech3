@@ -170,10 +170,16 @@ else
 fi
 
 if [ -x "$SCRIPT_DIR/spec_energy_runtime_check.sh" ]; then
-  if "$SCRIPT_DIR/spec_energy_runtime_check.sh" "$RELEASE_DIR"; then
-    pass "spec_energy_runtime_check.sh"
+  # Some CI jobs (eg ASAN) build via raw CMake and only copy binaries into release/,
+  # so the Python wrapper may be intentionally absent. Treat that as a warning.
+  if [ -f "$RELEASE_DIR/spec_energy_flux_generate.py" ]; then
+    if "$SCRIPT_DIR/spec_energy_runtime_check.sh" "$RELEASE_DIR"; then
+      pass "spec_energy_runtime_check.sh"
+    else
+      fail "spec_energy_runtime_check.sh"
+    fi
   else
-    fail "spec_energy_runtime_check.sh"
+    warn "spec_energy_runtime_check skipped (release/spec_energy_flux_generate.py missing)"
   fi
 fi
 
