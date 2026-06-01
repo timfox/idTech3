@@ -2520,6 +2520,13 @@ set_tests_properties(q3_openarena_compat_check PROPERTIES
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/q3_openarena_compat_check.sh;${CMAKE_SOURCE_DIR}/release/idtech3"
 	RESOURCE_LOCK "idtech3_headless_validation")
 
+add_test(NAME test_msvc_qcommon_parity
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_msvc_qcommon_parity.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_msvc_qcommon_parity PROPERTIES
+	LABELS "scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_msvc_qcommon_parity.sh;${CMAKE_SOURCE_DIR}/src/platform/win32/msvc2017/quake3e-ded.vcxproj;${CMAKE_SOURCE_DIR}/src/platform/win32/msvc2017/quake3e.vcxproj")
+
 add_test(NAME renderer_regression_maps_devdata
 	COMMAND ${CMAKE_SOURCE_DIR}/scripts/run_renderer_tier_b_devdata.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

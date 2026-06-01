@@ -26,7 +26,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "lua_debug.h"
 #endif
 #include "js_debug.h"
+#ifdef USE_CSHARP
 #include "csharp_debug.h"
+#endif
 
 #define MAX_CMD_BUFFER  65536
 
@@ -1200,6 +1202,7 @@ void Cmd_Init( void ) {
 	Cmd_AddCommand("js_clearErrors", Cmd_JsClearErrors_f);
 	JsDebug_InitCvars();
 
+#ifdef USE_CSHARP
 	extern void Cmd_CsReload_f(void);
 	extern void Cmd_CsList_f(void);
 	extern void Cmd_CsDump_f(void);
@@ -1208,4 +1211,5 @@ void Cmd_Init( void ) {
 	Cmd_AddCommand("cs_list", Cmd_CsList_f);
 	Cmd_AddCommand("cs_dump", Cmd_CsDump_f);
 	CsDebug_InitCvars();
+#endif
 }

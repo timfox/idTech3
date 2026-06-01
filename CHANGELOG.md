@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **MSVC / scripting:** `USE_CSHARP` gates for `cs_*` commands in `cmd.c`; CTest `test_msvc_qcommon_parity` keeps Windows vcxproj qcommon sources aligned with CMake.
 - **Quake III / OpenArena (Vulkan):** `scripts/q3_openarena_compat_check.sh` (QVM path, default-off feature cvars, swapchain/HDR guards); CTest `q3_openarena_compat_check`; `examples/q3_vulkan_compat.cfg`; Vulkan troubleshooting section in `docs/COMPATIBILITY.md`.
 - **Renderer Tier B devdata (no retail pk3):** `scripts/run_renderer_tier_b_devdata.sh`, CTest `renderer_regression_maps_devdata`, `scripts/bootstrap_ioq3_qvm.sh`; `validate_ci_build.sh` step 6b; shipped `docs/renderer_validation/devdata/rtest_base` map-load regression.
 - **C# scripting (Mono):** optional `USE_CSHARP=ON` embeds Mono for runtime `.cs` scripts (`cs_reload`, `cs_list`, `cs_dump`); shared events with JavaScript via `Com_ScriptEmitEvent`; API in `src/qcommon/csharp/IdTech3.Engine.cs`; `IdTech3.Engine.Exec`; demo mod `demo_csharp.cfg`; see **`docs/CSHARP.md`**.
