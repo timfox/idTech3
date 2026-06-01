@@ -169,6 +169,14 @@ else
   warn "spec_energy_flux_generate.py missing (non-spec-energy build or old release copy)"
 fi
 
+if [ -x "$SCRIPT_DIR/spec_energy_runtime_check.sh" ]; then
+  if "$SCRIPT_DIR/spec_energy_runtime_check.sh" "$RELEASE_DIR"; then
+    pass "spec_energy_runtime_check.sh"
+  else
+    fail "spec_energy_runtime_check.sh"
+  fi
+fi
+
 echo ""
 
 # --- Q3 / OpenArena QVM compatibility (static; no game data required) ---

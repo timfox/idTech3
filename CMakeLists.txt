@@ -2509,6 +2509,14 @@ set_tests_properties(smoke_test PROPERTIES
 	# Avoid parallel runs with renderer_regression_check (both hammer glslang; server startup is CPU-sensitive).
 	RESOURCE_LOCK "idtech3_headless_validation")
 
+add_test(NAME spec_energy_runtime_check
+	COMMAND ${CMAKE_SOURCE_DIR}/scripts/spec_energy_runtime_check.sh ${CMAKE_SOURCE_DIR}/release
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(spec_energy_runtime_check PROPERTIES
+	LABELS "validation;scripts"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/release/idtech3"
+	RESOURCE_LOCK "idtech3_headless_validation")
+
 add_test(NAME renderer_regression_check
 	COMMAND ${CMAKE_SOURCE_DIR}/scripts/renderer_regression_check.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
