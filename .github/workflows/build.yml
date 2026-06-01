@@ -153,8 +153,7 @@ jobs:
       - name: Smoke test
         if: ${{ github.event_name != 'release' && matrix.btype != 'Debug' }}
         run: |
-          chmod +x scripts/stage_ci_release.sh scripts/smoke_test.sh scripts/lib/release_bin.sh \
-            scripts/q3_openarena_compat_check.sh scripts/spec_energy_runtime_check.sh
+          chmod +x scripts/stage_ci_release.sh scripts/smoke_test.sh scripts/q3_openarena_compat_check.sh
           cp -f bin/*.dll release/ 2>/dev/null || true
           ./scripts/stage_ci_release.sh release bin
           ./scripts/smoke_test.sh release
@@ -431,8 +430,7 @@ jobs:
           cp -f "bin/idtech3_server${sfx}.exe" bin/idtech3_server.exe
           cp -f "bin/idtech3${sfx}.exe" bin/idtech3.exe
           cp -f bin/*.dll release/ 2>/dev/null || true
-          chmod +x scripts/stage_ci_release.sh scripts/smoke_test.sh scripts/lib/release_bin.sh \
-            scripts/q3_openarena_compat_check.sh scripts/spec_energy_runtime_check.sh
+          chmod +x scripts/stage_ci_release.sh scripts/smoke_test.sh scripts/q3_openarena_compat_check.sh
           ./scripts/stage_ci_release.sh release bin
           ./scripts/smoke_test.sh release
 
@@ -543,8 +541,7 @@ jobs:
       - name: Smoke test
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
         run: |
-          chmod +x scripts/stage_ci_release.sh scripts/smoke_test.sh scripts/lib/release_bin.sh \
-            scripts/q3_openarena_compat_check.sh scripts/spec_energy_runtime_check.sh
+          chmod +x scripts/stage_ci_release.sh scripts/smoke_test.sh scripts/q3_openarena_compat_check.sh
           ./scripts/stage_ci_release.sh release bin
           ./scripts/smoke_test.sh release
 
