@@ -9,7 +9,8 @@ This fork targets a **modern Vulkan renderer** while keeping **Quake III Arena**
 
 ```bash
 export OA_BASE=/path/to/openarena/base
-./scripts/run_openarena.sh
+./scripts/run_openarena.sh              # Vulkan + optional q3_vulkan_compat (copied into OA_BASE)
+CLASSIC_MOD=1 ./scripts/run_openarena.sh # same, with classic preset cvars at launch
 ```
 
 Or manually:
@@ -34,7 +35,8 @@ Or persist: `seta r_classicMod 1` then `vid_restart`.
 | `r_classicMod 1` | Disables heavy Vulkan features at init (Forward+, volumetrics, RTX demo, VDB, veg wind, etc.) |
 | `classic_mod` | Sets `r_classicMod 1`, turns off FLUX/TRELLIS/spec_energy client hooks, prompts `vid_restart` |
 | `r_rpi_profile 1` | Raspberry Pi (V3DV) performance preset (see [ARM_RASPBERRY_PI.md](ARM_RASPBERRY_PI.md)) |
-| `examples/q3_vulkan_compat.cfg` | Optional HDR/FBO tuning; copy into your gamedir |
+| `examples/q3_vulkan_compat.cfg` | Optional HDR/FBO tuning; copied into `OA_BASE` by `run_openarena.sh` when set |
+| `examples/q3_classic_mod.cfg` | Full classic preset file; or use `CLASSIC_MOD=1` / `classic_mod` |
 
 `r_classicMod` defaults to **0** so new projects keep modern features until you opt in.
 

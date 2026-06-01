@@ -167,6 +167,18 @@ else
 	fail "OpenArena playbook or launcher script missing"
 fi
 
+if [ -f "$PROJECT_ROOT/examples/q3_classic_mod.cfg" ] && grep -q 'r_classicMod' "$PROJECT_ROOT/examples/q3_classic_mod.cfg"; then
+	pass "examples/q3_classic_mod.cfg documents classic preset"
+else
+	fail "examples/q3_classic_mod.cfg missing or incomplete"
+fi
+
+if bash -n "$PROJECT_ROOT/scripts/run_openarena.sh" 2>/dev/null; then
+	pass "run_openarena.sh passes bash -n syntax check"
+else
+	fail "run_openarena.sh has bash syntax errors"
+fi
+
 SERVER="$(bin_path idtech3_server)"
 CLIENT="$(bin_path idtech3)"
 if [ -n "$SERVER" ]; then

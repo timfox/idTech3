@@ -1767,6 +1767,21 @@ Apply Quake III / OpenArena-friendly renderer and client toggles (no gameplay ch
 */
 static void CL_ClassicMod_f( void ) {
 	Cvar_Set( "r_classicMod", "1" );
+	Cvar_Set( "r_volumetricFog", "0" );
+	Cvar_Set( "r_ssao", "0" );
+	Cvar_Set( "r_bloom", "0" );
+	Cvar_Set( "r_ext_smaa", "0" );
+	Cvar_Set( "r_ssr", "0" );
+	Cvar_Set( "r_sharpen", "0.0" );
+	Cvar_Set( "r_exposure_auto", "0" );
+	Cvar_Set( "r_fogFluid", "0" );
+	Cvar_Set( "r_forwardPlus", "0" );
+	Cvar_Set( "r_rtx", "0" );
+	Cvar_Set( "r_rtxDemo", "0" );
+	Cvar_Set( "r_rtxEntities", "0" );
+	Cvar_Set( "r_vdbFog", "0" );
+	Cvar_Set( "r_vdb", "0" );
+	Cvar_Set( "r_vegWind", "0" );
 #ifdef USE_FLUX
 	if ( cl_flux_enable ) {
 		Cvar_Set( "cl_flux_enable", "0" );
@@ -1785,7 +1800,7 @@ static void CL_ClassicMod_f( void ) {
 		}
 	}
 #endif
-	Com_Printf( "Classic mod preset: r_classicMod 1; generative hooks off. Run vid_restart to apply Vulkan latch cvars.\n" );
+	Com_Printf( "Classic mod preset applied (Q3/OA-safe Vulkan). Run vid_restart for latched renderer state.\n" );
 }
 
 static void CL_Vid_Restart_f( void ) {
