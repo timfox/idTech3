@@ -78,6 +78,13 @@ else
 	fail "cl_spec_energy_enable default not 0"
 fi
 
+if grep -q 'cl_flux_enable' "$PROJECT_ROOT/src/client/cl_main.c" && \
+   grep -q '"cl_flux_enable", "0"' "$PROJECT_ROOT/src/client/cl_main.c"; then
+	pass "cl_flux_enable defaults to 0"
+else
+	fail "cl_flux_enable default not 0"
+fi
+
 if grep -qE 'r_vegWind[[:space:]]*=[[:space:]]*ri\.Cvar_Get\([[:space:]]*"r_vegWind"[[:space:]]*,[[:space:]]*"0"' \
 	"$PROJECT_ROOT/src/renderers/vulkan/vk_postfx.c"; then
 	pass "r_vegWind defaults to 0 (classic maps unchanged unless enabled)"
@@ -179,6 +186,12 @@ else
 	fail "run_openarena.sh has bash syntax errors"
 fi
 
+if [ -x "$PROJECT_ROOT/scripts/run_openarena_server.sh" ] && bash -n "$PROJECT_ROOT/scripts/run_openarena_server.sh" 2>/dev/null; then
+	pass "run_openarena_server.sh present and valid"
+else
+	fail "run_openarena_server.sh missing or invalid"
+fi
+
 SERVER="$(bin_path idtech3_server)"
 CLIENT="$(bin_path idtech3)"
 if [ -n "$SERVER" ]; then
@@ -196,6 +209,11 @@ if [ -n "$CLIENT" ]; then
 		pass "client supports fs_basegame (e.g. baseq3 for Q3A)"
 	else
 		fail "client missing fs_basegame support strings"
+	fi
+	if grep -q 'classic_mod' < <(strings "$CLIENT" 2>/dev/null); then
+		pass "client exports classic_mod command"
+	else
+		fail "client missing classic_mod string"
 	fi
 else
 	fail "idtech3 client not found under $RELEASE_DIR"

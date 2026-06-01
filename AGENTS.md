@@ -47,7 +47,7 @@ Build artifacts go to `build-vk-Release/` or `build-gl-Release/` and are copied 
 ### Game data / base
 
 - **Standalone full conversion**: Do not assume Q3A, OpenArena, or other generic bases. The base is either Unwaking or a game explicitly defined by the user.
-- **OpenArena / Q3A QVM**: `./scripts/run_openarena.sh` with `OA_BASE` set; `classic_mod` + `vid_restart` or `r_classicMod 1` for a conservative Vulkan preset. See `docs/OPENARENA.md`.
+- **OpenArena / Q3A QVM**: `./scripts/run_openarena.sh` with `OA_BASE` set; `./scripts/run_openarena_server.sh` for dedicated; `classic_mod` + `vid_restart` or `r_classicMod 1` for a conservative Vulkan preset. See `docs/OPENARENA.md`.
 - **Smallest valid data tree** (bootstrap `.pk3` + `default.cfg`): see `docs/MINIMAL_GAME_SHELL.md`.
 
 ### Scripting

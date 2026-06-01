@@ -101,6 +101,7 @@ else
 fi
 
 echo "=== Production readiness: automated steps complete ==="
+echo "OpenArena / Q3 QVM: docs/OPENARENA.md  ./scripts/run_openarena.sh  ./scripts/q3_openarena_compat_check.sh release"
 echo "Evidence gaps: ./scripts/evidence_status.sh"
 echo "Manual: Tier C in docs/PRODUCTION_CERTIFICATION.md (GPU proof, validation layers)."
 echo "Release: docs/RELEASE_CHECKLIST.md before tagging."

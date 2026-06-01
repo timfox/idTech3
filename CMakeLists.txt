@@ -2570,6 +2570,13 @@ add_test(NAME test_run_vulkan_script
 set_tests_properties(test_run_vulkan_script PROPERTIES
 	LABELS "unit;scripts;validation")
 
+add_test(NAME test_run_openarena_script
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_run_openarena.sh ${CMAKE_SOURCE_DIR}/scripts/run_openarena.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_run_openarena_script PROPERTIES
+	LABELS "unit;scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/run_openarena.sh;${CMAKE_SOURCE_DIR}/examples/q3_vulkan_compat.cfg")
+
 add_test(NAME test_demo_game_pk3
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_demo_game_pk3.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

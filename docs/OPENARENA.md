@@ -40,6 +40,14 @@ Or persist: `seta r_classicMod 1` then `vid_restart`.
 
 `r_classicMod` defaults to **0** so new projects keep modern features until you opt in.
 
+## Dedicated server
+
+```bash
+export OA_BASE=/path/to/openarena/base
+./scripts/run_openarena_server.sh
+# or: ./release/idtech3_server +set dedicated 1 +set fs_game "$OA_BASE"
+```
+
 ## Validation (no retail pk3)
 
 ```bash
@@ -71,3 +79,5 @@ See [Q3_OPENARENA_VULKAN.md](Q3_OPENARENA_VULKAN.md) and [COMPATIBILITY.md](COMP
 - [COMPATIBILITY.md](COMPATIBILITY.md) — QVM vs native modules
 - [SPEC_ENERGY.md](SPEC_ENERGY.md) — optional generative pipeline (off by default)
 - [QUICKSTART.md](QUICKSTART.md) — engine install
+- `scripts/run_openarena_server.sh` — dedicated server helper
+- `scripts/bootstrap_ioq3_qvm.sh` — optional QVM build for renderer devdata (no retail pk3)
