@@ -16,13 +16,41 @@ fail() { FAIL=$((FAIL + 1)); echo "  ✗ $1" >&2; }
 bin_path() {
 	local bin="$1"
 	local base="$RELEASE_DIR/$bin"
-	for candidate in "$base" "$base.x64" "$base.x86_64" "$base.aarch64"; do
+	# Match smoke_test.sh: Windows .exe, arch suffixes, macOS bundles.
+	for candidate in \
+		"$base" "$base.exe" \
+		"$base.x64" "$base.x64.exe" "$base.x86_64" "$base.x86_64.exe" \
+		"$base.aarch64" "$base.arm" "$base.armv7l" \
+		"$base.aarch64.app/Contents/MacOS/$bin.aarch64" \
+		"$base.aarch64.app/Contents/MacOS/$bin" \
+		"$base.arm.app/Contents/MacOS/$bin.arm" \
+		"$base.arm.app/Contents/MacOS/$bin" \
+		"$base.app/Contents/MacOS/$bin"; do
 		if [ -f "$candidate" ]; then
 			echo "$candidate"
 			return
 		fi
 	done
 	echo ""
+}
+
+# Scan release binaries for ASCII / UTF-16LE literals (PE-safe; strings(1) alone can miss on Windows).
+bin_has_text() {
+	local bin="$1"
+	local pattern="$2"
+
+	[ -f "$bin" ] || return 1
+
+	if grep -a -q -E "$pattern" "$bin" 2>/dev/null; then
+		return 0
+	fi
+	if grep -q -E "$pattern" < <(strings -a "$bin" 2>/dev/null); then
+		return 0
+	fi
+	if grep -q -E "$pattern" < <(strings -el "$bin" 2>/dev/null); then
+		return 0
+	fi
+	return 1
 }
 
 echo "=== Q3 / OpenArena compatibility checks ==="
@@ -118,7 +146,7 @@ fi
 SERVER="$(bin_path idtech3_server)"
 CLIENT="$(bin_path idtech3)"
 if [ -n "$SERVER" ]; then
-	if strings "$SERVER" 2>/dev/null | grep -E 'qvm|VM_LoadQVM' | head -1 | grep -q .; then
+	if bin_has_text "$SERVER" 'qvm|VM_LoadQVM|\.qvm|qagame'; then
 		pass "dedicated server binary references QVM modules"
 	else
 		fail "server binary missing QVM string references"
@@ -128,7 +156,7 @@ else
 fi
 
 if [ -n "$CLIENT" ]; then
-	if strings "$CLIENT" 2>/dev/null | grep -E 'fs_basegame|FS_GetBaseGameDir' | head -1 | grep -q .; then
+	if bin_has_text "$CLIENT" 'fs_basegame|FS_GetBaseGameDir|baseq3'; then
 		pass "client supports fs_basegame (e.g. baseq3 for Q3A)"
 	else
 		fail "client missing fs_basegame support strings"
