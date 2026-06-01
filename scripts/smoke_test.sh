@@ -18,6 +18,8 @@ else
 fi
 
 RELEASE_DIR="${1:-$PROJECT_ROOT/release}"
+# shellcheck source=lib/release_bin.sh
+source "$SCRIPT_DIR/lib/release_bin.sh"
 PASS=0
 FAIL=0
 WARN=0
@@ -31,27 +33,7 @@ echo "Release dir: $RELEASE_DIR"
 echo ""
 
 # --- Binary existence checks ---
-# Resolve binary path (handle Windows .exe and arch suffixes: .x64, .x86_64, .aarch64)
-bin_path() {
-  local bin="$1"
-  local base="$RELEASE_DIR/$bin"
-  # Try: plain name, .exe, arch suffixes (Windows/Linux), macOS .app bundle executable
-  for candidate in \
-    "$base" "$base.exe" \
-    "$base.x64" "$base.x64.exe" "$base.x86_64" "$base.x86_64.exe" \
-    "$base.aarch64" "$base.arm" "$base.armv7l" \
-    "$base.aarch64.app/Contents/MacOS/$bin.aarch64" \
-    "$base.aarch64.app/Contents/MacOS/$bin" \
-    "$base.arm.app/Contents/MacOS/$bin.arm" \
-    "$base.arm.app/Contents/MacOS/$bin" \
-    "$base.app/Contents/MacOS/$bin"; do
-    if [ -f "$candidate" ]; then
-      echo "$candidate"
-      return
-    fi
-  done
-  echo ""
-}
+bin_path() { release_bin_path "$RELEASE_DIR" "$1"; }
 
 echo "Binary checks:"
 for bin in idtech3 idtech3_server; do
@@ -134,20 +116,25 @@ echo ""
 echo "Generative runtime checks:"
 CLIENT_PATH="$(bin_path "idtech3")"
 if [ -n "$CLIENT_PATH" ]; then
-  if grep -q trellis_generate < <(strings "$CLIENT_PATH" 2>/dev/null); then
+  if release_bin_has_text "$CLIENT_PATH" 'trellis_generate'; then
     pass "client exports trellis_generate (USE_TRELLIS)"
   else
     warn "trellis_generate not in client (USE_TRELLIS=OFF or stripped build)"
   fi
-  if grep -q flux_generate < <(strings "$CLIENT_PATH" 2>/dev/null); then
+  if release_bin_has_text "$CLIENT_PATH" 'flux_generate'; then
     pass "client exports flux_generate (USE_FLUX)"
   else
     warn "flux_generate not in client (USE_FLUX=OFF or stripped build)"
   fi
-  if grep -q spec_energy_generate < <(strings "$CLIENT_PATH" 2>/dev/null); then
+  if release_bin_has_text "$CLIENT_PATH" 'spec_energy_generate'; then
     pass "client exports spec_energy_generate (USE_SPEC_ENERGY)"
   else
     warn "spec_energy_generate not in client (USE_SPEC_ENERGY=OFF or stripped build)"
+  fi
+  if release_bin_has_text "$CLIENT_PATH" 'beta_record|beta_test'; then
+    pass "client exports beta trace commands"
+  else
+    warn "beta_record not in client (stripped build)"
   fi
 else
   warn "idtech3 not found, skipping generative symbol checks"

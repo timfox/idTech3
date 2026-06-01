@@ -6,6 +6,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 RELEASE_DIR="${1:-$PROJECT_ROOT/release}"
+# shellcheck source=lib/release_bin.sh
+source "$SCRIPT_DIR/lib/release_bin.sh"
 
 PASS=0
 FAIL=0
@@ -25,45 +27,8 @@ assert_cvar_default_off() {
 	fi
 }
 
-bin_path() {
-	local bin="$1"
-	local base="$RELEASE_DIR/$bin"
-	# Match smoke_test.sh: Windows .exe, arch suffixes, macOS bundles.
-	for candidate in \
-		"$base" "$base.exe" \
-		"$base.x64" "$base.x64.exe" "$base.x86_64" "$base.x86_64.exe" \
-		"$base.aarch64" "$base.arm" "$base.armv7l" \
-		"$base.aarch64.app/Contents/MacOS/$bin.aarch64" \
-		"$base.aarch64.app/Contents/MacOS/$bin" \
-		"$base.arm.app/Contents/MacOS/$bin.arm" \
-		"$base.arm.app/Contents/MacOS/$bin" \
-		"$base.app/Contents/MacOS/$bin"; do
-		if [ -f "$candidate" ]; then
-			echo "$candidate"
-			return
-		fi
-	done
-	echo ""
-}
-
-# Scan release binaries for ASCII / UTF-16LE literals (PE-safe; strings(1) alone can miss on Windows).
-bin_has_text() {
-	local bin="$1"
-	local pattern="$2"
-
-	[ -f "$bin" ] || return 1
-
-	if grep -a -q -E "$pattern" "$bin" 2>/dev/null; then
-		return 0
-	fi
-	if grep -q -E "$pattern" < <(strings -a "$bin" 2>/dev/null); then
-		return 0
-	fi
-	if grep -q -E "$pattern" < <(strings -el "$bin" 2>/dev/null); then
-		return 0
-	fi
-	return 1
-}
+bin_path() { release_bin_path "$RELEASE_DIR" "$1"; }
+bin_has_text() { release_bin_has_text "$1" "$2"; }
 
 echo "=== Q3 / OpenArena compatibility checks ==="
 echo "Release dir: $RELEASE_DIR"
@@ -226,6 +191,21 @@ else
 	fail "openarena_validate.sh missing or invalid"
 fi
 
+if [ -f "$PROJECT_ROOT/src/client/cl_beta_trace.c" ] && \
+   grep -q 'Cvar_Get( "cl_betaTrace", "1"' "$PROJECT_ROOT/src/client/cl_beta_trace.c" && \
+   grep -q 'Cmd_AddCommand( "beta_record"' "$PROJECT_ROOT/src/client/cl_beta_trace.c"; then
+	pass "beta trace framework (beta_record / cl_betaTrace) present"
+else
+	fail "beta trace framework missing from client"
+fi
+
+if [ -f "$PROJECT_ROOT/docs/BETA_AUTOMATED_TESTING.md" ] && \
+   [ -f "$PROJECT_ROOT/examples/demo_game/beta_traces/sample_level.betacmd" ]; then
+	pass "beta trace docs and example assets present"
+else
+	fail "beta trace documentation or examples missing"
+fi
+
 SERVER="$(bin_path idtech3_server)"
 CLIENT="$(bin_path idtech3)"
 if [ -n "$SERVER" ]; then
@@ -244,10 +224,15 @@ if [ -n "$CLIENT" ]; then
 	else
 		fail "client missing fs_basegame support strings"
 	fi
-	if grep -q 'classic_mod' < <(strings "$CLIENT" 2>/dev/null); then
-		pass "client exports classic_mod command"
+	if bin_has_text "$CLIENT" 'classic_mod|r_classicMod'; then
+		pass "client exports classic_mod / r_classicMod"
 	else
-		fail "client missing classic_mod string"
+		fail "client missing classic_mod string references"
+	fi
+	if bin_has_text "$CLIENT" 'beta_record|beta_test|cl_betaTrace'; then
+		pass "client binary includes beta trace commands"
+	else
+		fail "client missing beta trace string references"
 	fi
 else
 	fail "idtech3 client not found under $RELEASE_DIR"

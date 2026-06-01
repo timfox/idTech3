@@ -42,6 +42,10 @@ Build artifacts go to `build-vk-Release/` or `build-gl-Release/` and are copied 
 
 Recording/replay of `usercmd_t` streams and high-level JSONL events for regression testing (paper-inspired). See **`docs/BETA_AUTOMATED_TESTING.md`**. Console: `beta_record`, `beta_play`, `beta_test`, `beta_event`. Example files: `examples/demo_game/beta_traces/`.
 
+### Level-up validation
+
+After building: `./scripts/level_up_validate.sh release` (OpenArena + beta traces + smoke + spec_energy static checks). See **`docs/LEVEL_UP.md`**.
+
 ### Running
 
 - **Dedicated server**: `./release/idtech3_server +set dedicated 1 +set com_hunkMegs 64`

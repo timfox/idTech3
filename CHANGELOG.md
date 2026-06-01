@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Level-up integration:** `docs/LEVEL_UP.md`, `scripts/level_up_validate.sh`, shared `scripts/lib/release_bin.sh` (PE-safe binary string scans for smoke/compat); automated **beta trace** record/replay (`beta_record`, `beta_play`, `beta_test`); see `docs/BETA_AUTOMATED_TESTING.md`.
 - **OpenArena playbook:** `docs/OPENARENA.md`, `scripts/openarena_validate.sh`, `run_openarena.sh` / `run_openarena_server.sh`, CTest `test_run_openarena_script`, `examples/q3_classic_mod.cfg`, release `examples/*.cfg` copy on build; `r_classicMod` / `classic_mod` preset for QVM-safe Vulkan.
 - **Quake III / OpenArena (Vulkan):** `scripts/q3_openarena_compat_check.sh` (QVM path, default-off feature cvars, swapchain/HDR guards); CTest `q3_openarena_compat_check`; `examples/q3_vulkan_compat.cfg`; Vulkan troubleshooting section in `docs/COMPATIBILITY.md`.
 - **Renderer Tier B devdata (no retail pk3):** `scripts/run_renderer_tier_b_devdata.sh`, CTest `renderer_regression_maps_devdata`, `scripts/bootstrap_ioq3_qvm.sh`; `validate_ci_build.sh` step 6b; shipped `docs/renderer_validation/devdata/rtest_base` map-load regression.

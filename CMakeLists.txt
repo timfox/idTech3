@@ -2591,6 +2591,13 @@ set_tests_properties(test_beta_trace_format PROPERTIES
 	LABELS "scripts;validation;client"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_beta_trace_format.sh;${CMAKE_SOURCE_DIR}/docs/BETA_AUTOMATED_TESTING.md")
 
+add_test(NAME test_level_up_scripts
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_level_up_scripts.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_level_up_scripts PROPERTIES
+	LABELS "scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_level_up_scripts.sh;${CMAKE_SOURCE_DIR}/scripts/level_up_validate.sh")
+
 add_test(NAME test_init_optional_submodules
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_init_optional_submodules.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

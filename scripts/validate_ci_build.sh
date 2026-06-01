@@ -75,4 +75,9 @@ chmod +x ./tests/scripts/test_demo_game_pk3.sh
 ./tests/scripts/test_demo_game_pk3.sh
 echo ""
 
+echo "8. Level-up integration (beta traces + OpenArena gates)..."
+chmod +x ./scripts/level_up_validate.sh ./scripts/lib/release_bin.sh
+./scripts/level_up_validate.sh release
+echo ""
+
 echo "=== CI validation passed ==="
