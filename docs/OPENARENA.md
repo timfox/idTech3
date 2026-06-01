@@ -50,6 +50,14 @@ export OA_BASE=/path/to/openarena/base
 
 ## Validation (no retail pk3)
 
+One-shot orchestrator:
+
+```bash
+./scripts/openarena_validate.sh release
+```
+
+Or step by step:
+
 ```bash
 ./scripts/q3_openarena_compat_check.sh release
 ./scripts/smoke_test.sh release
@@ -73,6 +81,10 @@ See [Q3_OPENARENA_VULKAN.md](Q3_OPENARENA_VULKAN.md) and [COMPATIBILITY.md](COMP
 | Wrong brightness on mod BSPs | `r_lightmap_srgb_decode 1`; `vid_restart` |
 | Heavy fog on foliage | `r_volumetricFog 0` or `classic_mod` + `vid_restart` |
 | Compare to stock | `+set cl_renderer opengl` on the same install |
+
+## Merge / PR
+
+Consolidated development lands via **[PR #233](https://github.com/timfox/idTech3/pull/233)** (`cursor/evolve-openarena-optimized-d22f`), which supersedes separate compat-only and spec_energy-only PRs.
 
 ## Related
 

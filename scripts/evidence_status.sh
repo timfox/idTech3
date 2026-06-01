@@ -39,6 +39,12 @@ fi
 if [[ -x "$ROOT/scripts/validate_ci_build.sh" ]]; then
 	info "Run: ./scripts/validate_ci_build.sh  (CI-parity smoke)"
 fi
+if [[ -x "$ROOT/scripts/openarena_validate.sh" ]]; then
+	info "Run: ./scripts/openarena_validate.sh release  (QVM compat + launcher + optional Tier B)"
+fi
+if [[ -f "$ROOT/docs/OPENARENA.md" ]]; then
+	info "OpenArena playbook: docs/OPENARENA.md"
+fi
 if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
 	if gh api "repos/$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)/actions/workflows/build.yml" >/dev/null 2>&1; then
 		info "GitHub CLI: check Actions UI for latest main matrix (this script does not poll CI)"

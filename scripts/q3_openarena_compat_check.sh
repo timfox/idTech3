@@ -192,6 +192,12 @@ else
 	fail "run_openarena_server.sh missing or invalid"
 fi
 
+if [ -x "$PROJECT_ROOT/scripts/openarena_validate.sh" ] && bash -n "$PROJECT_ROOT/scripts/openarena_validate.sh" 2>/dev/null; then
+	pass "openarena_validate.sh orchestrator present and valid"
+else
+	fail "openarena_validate.sh missing or invalid"
+fi
+
 SERVER="$(bin_path idtech3_server)"
 CLIENT="$(bin_path idtech3)"
 if [ -n "$SERVER" ]; then
