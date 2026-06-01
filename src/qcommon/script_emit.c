@@ -2,7 +2,9 @@
 #include "qcommon.h"
 #include "script_emit.h"
 #include "js_debug.h"
+#ifdef USE_CSHARP
 #include "csharp_debug.h"
+#endif
 
 void Com_ScriptEmitEvent( const char *eventName, const char *s0, const char *s1, int i0, int i1 ) {
 #ifdef USE_DUKTAPE

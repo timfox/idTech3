@@ -30,3 +30,6 @@ qboolean CL_BetaTrace_IsReplaying( void );
 
 /* True during beta_play / beta_test (before each cmd is applied). */
 qboolean CL_BetaTrace_ShouldSuppressInput( void );
+
+/* Last automated test outcome: 0 none/idle, 1 pass, -1 fail (for beta_status / scripts). */
+int CL_BetaTrace_LastTestResult( void );

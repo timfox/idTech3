@@ -19,6 +19,7 @@ done
 
 bash -n "$ROOT/scripts/level_up_validate.sh" || fail "level_up_validate.sh syntax"
 bash -n "$ROOT/scripts/lib/release_bin.sh" || fail "release_bin.sh syntax"
+bash -n "$ROOT/tests/scripts/test_msvc_qcommon_parity.sh" || fail "test_msvc_qcommon_parity.sh syntax"
 
 grep -q 'test_beta_trace_format' "$ROOT/scripts/level_up_validate.sh" || \
 	fail "level_up_validate must include beta trace step"

@@ -2591,6 +2591,13 @@ set_tests_properties(test_beta_trace_format PROPERTIES
 	LABELS "scripts;validation;client"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_beta_trace_format.sh;${CMAKE_SOURCE_DIR}/docs/BETA_AUTOMATED_TESTING.md")
 
+add_test(NAME test_msvc_qcommon_parity
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_msvc_qcommon_parity.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_msvc_qcommon_parity PROPERTIES
+	LABELS "scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_msvc_qcommon_parity.sh;${CMAKE_SOURCE_DIR}/src/platform/win32/msvc2017/quake3e-ded.vcxproj;${CMAKE_SOURCE_DIR}/src/platform/win32/msvc2017/quake3e.vcxproj")
+
 add_test(NAME test_level_up_scripts
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_level_up_scripts.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

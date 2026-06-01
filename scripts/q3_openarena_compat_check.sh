@@ -220,8 +220,9 @@ fi
 
 if [ -f "$PROJECT_ROOT/src/client/cl_beta_trace.c" ] && \
    grep -q 'Cvar_Get( "cl_betaTrace", "1"' "$PROJECT_ROOT/src/client/cl_beta_trace.c" && \
-   grep -q 'Cmd_AddCommand( "beta_record"' "$PROJECT_ROOT/src/client/cl_beta_trace.c"; then
-	pass "beta trace framework (beta_record / cl_betaTrace) present"
+   grep -q 'Cmd_AddCommand( "beta_record"' "$PROJECT_ROOT/src/client/cl_beta_trace.c" && \
+   grep -q 'Cmd_AddCommand( "beta_status"' "$PROJECT_ROOT/src/client/cl_beta_trace.c"; then
+	pass "beta trace framework (beta_record / beta_status / cl_betaTrace) present"
 else
 	fail "beta trace framework missing from client"
 fi
@@ -256,7 +257,7 @@ if [ -n "$CLIENT" ]; then
 	else
 		fail "client missing classic_mod string references"
 	fi
-	if bin_has_text "$CLIENT" 'beta_record|beta_test|cl_betaTrace'; then
+	if bin_has_text "$CLIENT" 'beta_record|beta_test|beta_status|cl_betaTrace'; then
 		pass "client binary includes beta trace commands"
 	else
 		fail "client missing beta trace string references"

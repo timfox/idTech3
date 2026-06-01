@@ -9,8 +9,8 @@ This document describes the **combined capability stack** on the `cursor/level-u
 | Renderer | Vulkan Q3/OA compat (HDR lightmap, swapchain, `classic_mod`) | [Q3_OPENARENA_VULKAN.md](Q3_OPENARENA_VULKAN.md) |
 | Classic mods | `r_classicMod`, `classic_mod`, OpenArena launcher | [OPENARENA.md](OPENARENA.md) |
 | Generative | Spectral-Energy FLUX (`spec_energy_generate`) | [SPEC_ENERGY.md](SPEC_ENERGY.md) |
-| QA | Automated beta trace record/replay | [BETA_AUTOMATED_TESTING.md](BETA_AUTOMATED_TESTING.md) |
-| CI | Windows-safe binary string scans, shader determinism | `scripts/q3_openarena_compat_check.sh`, `scripts/vk_shader_determinism_check.sh` |
+| QA | Automated beta trace record/replay (`beta_status`, `test_result=`) | [BETA_AUTOMATED_TESTING.md](BETA_AUTOMATED_TESTING.md) |
+| CI | Windows-safe binary scans, MSVC qcommon parity, shader determinism | `scripts/q3_openarena_compat_check.sh`, `tests/scripts/test_msvc_qcommon_parity.sh` |
 
 ## One-command validation
 

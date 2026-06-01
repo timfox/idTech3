@@ -27,6 +27,9 @@ The engine is not fully component-based like the paper’s Unity testbed, but th
 | `beta_event <type> [source] [target]` | Log a high-level event (mods, scripts, debug) |
 | `beta_mark_success <pattern>` | While recording, add success pattern to manifest |
 | `beta_mark_fail <pattern>` | While recording, add fail pattern to manifest |
+| `beta_status` | Print mode, basename, map, replay frame, and `test_result` (pass/fail/pending) |
+
+After `beta_test` completes, the console prints `Beta trace: test_result=pass` or `=fail` for script parsing.
 
 Files are written under the game home path, e.g. `~/.idtech3/beta_traces/` (same search path as demos).
 
@@ -96,7 +99,7 @@ See `examples/demo_game/beta_traces/README.md` and sample files `sample_level.*`
 
 ## Dedicated / CI
 
-Headless VMs cannot run the client; CI validates trace **file formats** via `tests/scripts/test_beta_trace_format.sh`. Full replay requires a display and game data.
+Headless VMs cannot run the client; CI validates trace **file formats** via `tests/scripts/test_beta_trace_format.sh` and MSVC **qcommon source parity** via `tests/scripts/test_msvc_qcommon_parity.sh` (prevents Windows link drift). Full replay requires a display and game data.
 
 ## References
 

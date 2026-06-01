@@ -403,10 +403,59 @@ static void CL_BetaTrace_Stop_f( void ) {
 	if ( beta_mode == BETA_MODE_RECORD ) {
 		CL_BetaTrace_WriteManifest();
 	}
+	if ( beta_testFinished ) {
+		if ( beta_testResult > 0 ) {
+			Com_Printf( S_COLOR_GREEN "Beta trace: test_result=pass\n" );
+		} else if ( beta_testResult < 0 ) {
+			Com_Printf( S_COLOR_RED "Beta trace: test_result=fail\n" );
+		}
+	}
 	CL_BetaTrace_CloseFiles();
 	beta_mode = BETA_MODE_IDLE;
 	beta_cmdReplayActive = qfalse;
+	beta_testFinished = qfalse;
 	Com_Printf( "Beta trace: stopped.\n" );
+}
+
+static void CL_BetaTrace_Status_f( void ) {
+	const char *modeName = "idle";
+
+	switch ( beta_mode ) {
+	case BETA_MODE_RECORD:
+		modeName = "record";
+		break;
+	case BETA_MODE_REPLAY:
+		modeName = "replay";
+		break;
+	case BETA_MODE_TEST:
+		modeName = "test";
+		break;
+	default:
+		break;
+	}
+
+	Com_Printf( "Beta trace status:\n" );
+	Com_Printf( "  mode=%s cl_betaTrace=%d\n", modeName,
+		cl_betaTrace ? cl_betaTrace->integer : 0 );
+	if ( beta_baseName[0] ) {
+		Com_Printf( "  basename=%s\n", beta_baseName );
+	}
+	if ( beta_mapName[0] ) {
+		Com_Printf( "  map=%s\n", beta_mapName );
+	}
+	if ( beta_mode == BETA_MODE_REPLAY || beta_mode == BETA_MODE_TEST ) {
+		Com_Printf( "  replay_frame=%d replay_active=%d\n",
+			beta_replayFrameIndex, beta_cmdReplayActive );
+	}
+	if ( beta_mode == BETA_MODE_TEST ) {
+		const char *resultName = "pending";
+
+		if ( beta_testFinished ) {
+			resultName = ( beta_testResult > 0 ) ? "pass" : "fail";
+		}
+		Com_Printf( "  test_finished=%d test_result=%s max_time_ms=%d\n",
+			beta_testFinished, resultName, beta_testMaxTimeMs );
+	}
 }
 
 static void CL_BetaTrace_Record_f( void ) {
@@ -541,6 +590,13 @@ qboolean CL_BetaTrace_ShouldSuppressInput( void ) {
 	return beta_mode == BETA_MODE_REPLAY || beta_mode == BETA_MODE_TEST;
 }
 
+int CL_BetaTrace_LastTestResult( void ) {
+	if ( !beta_testFinished ) {
+		return 0;
+	}
+	return beta_testResult;
+}
+
 void CL_BetaTrace_Frame( void ) {
 	if ( beta_mode != BETA_MODE_TEST || beta_testFinished ) {
 		return;
@@ -566,6 +622,7 @@ void CL_BetaTrace_Init( void ) {
 	Cmd_AddCommand( "beta_event", CL_BetaTrace_Event_f );
 	Cmd_AddCommand( "beta_mark_success", CL_BetaTrace_MarkSuccess_f );
 	Cmd_AddCommand( "beta_mark_fail", CL_BetaTrace_MarkFail_f );
+	Cmd_AddCommand( "beta_status", CL_BetaTrace_Status_f );
 
 	CL_BetaTrace_LogStartup();
 }
@@ -579,4 +636,5 @@ void CL_BetaTrace_Shutdown( void ) {
 	Cmd_RemoveCommand( "beta_event" );
 	Cmd_RemoveCommand( "beta_mark_success" );
 	Cmd_RemoveCommand( "beta_mark_fail" );
+	Cmd_RemoveCommand( "beta_status" );
 }
