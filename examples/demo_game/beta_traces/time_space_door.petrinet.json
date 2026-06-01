@@ -1,6 +1,7 @@
 {
   "version": 1,
   "description": "Switch-held door (Time and Space style, paper Fig. 10)",
+  "initial": ["S1"],
   "places": [
     { "id": "S1", "label": "door_closed" },
     { "id": "S2", "label": "switch_pressed" },

@@ -29,3 +29,9 @@ for cfg in "$PROJECT_ROOT"/examples/q3_*.cfg "$PROJECT_ROOT"/examples/q3_fbo_saf
 		cp -f "$cfg" "$RELEASE_DIR/examples/"
 	fi
 done
+
+if [ -d "$PROJECT_ROOT/examples/demo_game/beta_traces" ]; then
+	mkdir -p "$RELEASE_DIR/beta_traces"
+	cp -f "$PROJECT_ROOT/examples/demo_game/beta_traces/"*.petrinet.json \
+		"$RELEASE_DIR/beta_traces/" 2>/dev/null || true
+fi

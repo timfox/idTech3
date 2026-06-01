@@ -298,6 +298,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\client\cl_avi.c" />
+    <ClCompile Include="..\..\client\cl_beta_petri.c" />
+    <ClCompile Include="..\..\client\cl_beta_trace.c" />
     <ClCompile Include="..\..\client\cl_cgame.c" />
     <ClCompile Include="..\..\client\cl_cin.c" />
     <ClCompile Include="..\..\client\cl_cin_modern.c" />

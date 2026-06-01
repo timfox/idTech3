@@ -4,3 +4,5 @@ recorded_ms=2000
 success=level_complete
 fail=player_death
 max_time_ms=60000
+petrinet=time_space_door
+petri_goal=S3

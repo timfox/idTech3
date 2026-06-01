@@ -27,4 +27,16 @@ beta_stop
 ```
 beta_play sample_level
 beta_test sample_level
+beta_status
 ```
+
+## Petri net (high-level test)
+
+```
+beta_petri_validate time_space_door
+beta_petri_load time_space_door
+beta_petri_status
+beta_event OPEN Button1 Door1
+```
+
+Manifest keys in `.betatest`: `petrinet=time_space_door`, `petri_goal=S3`.

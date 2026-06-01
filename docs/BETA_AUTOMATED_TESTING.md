@@ -7,7 +7,7 @@ The engine is not fully component-based like the paper’s Unity testbed, but th
 1. **Record** per-frame `usercmd_t` streams plus optional **high-level events** (JSON Lines).
 2. **Replay** raw commands for regression / compatibility after code changes.
 3. **Test** with success / fail patterns and `max_time_ms` (immediate failure conditions from the paper).
-4. **Petri net models** (data files) describe level logic for future high-level adaptive replay; see `examples/demo_game/beta_traces/`.
+4. **Petri net models** (JSON) describe level logic for high-level adaptive replay; a lightweight executor fires transitions on matching events during `beta_test`. See `examples/demo_game/beta_traces/`.
 
 ## Toggle and logging
 
@@ -28,8 +28,22 @@ The engine is not fully component-based like the paper’s Unity testbed, but th
 | `beta_mark_success <pattern>` | While recording, add success pattern to manifest |
 | `beta_mark_fail <pattern>` | While recording, add fail pattern to manifest |
 | `beta_status` | Print mode, basename, map, replay frame, and `test_result` (pass/fail/pending) |
+| `beta_petri_load <basename>` | Load `beta_traces/<basename>.petrinet.json` |
+| `beta_petri_status` | Print place markings and fireable transitions |
+| `beta_petri_validate <basename>` | Load and validate a Petri model (no replay) |
 
 After `beta_test` completes, the console prints `Beta trace: test_result=pass` or `=fail` for script parsing.
+
+### Petri net manifest keys
+
+```ini
+petrinet=time_space_door
+petri_goal=S3
+```
+
+During `beta_test`, gameplay events (`beta_event` or engine hooks) are matched to transition `message.type` values; when all input places are marked, the transition fires. If `petri_goal` is set and that place becomes marked, the test passes immediately.
+
+Optional JSON field `"initial": ["S1"]` sets the starting marking (defaults to the first place when omitted).
 
 Files are written under the game home path, e.g. `~/.idtech3/beta_traces/` (same search path as demos).
 
@@ -71,7 +85,7 @@ Semicolon-separated alternatives are supported on `success=` lines.
 
 ### `*.petrinet.json` (model, optional)
 
-Describes places, transitions, and message bindings for **high-level** replay when maps change (paper §7). The runtime executor is not fully implemented yet; traces and Petri files are validated in CI and documented for mod authors.
+Describes places, transitions, and message bindings for **high-level** replay when maps change (paper §7). The engine loads models at `beta_test` time and fires transitions when event types match (navigation AI fallback is still future work).
 
 ## Workflow
 

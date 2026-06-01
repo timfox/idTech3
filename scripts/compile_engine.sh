@@ -490,6 +490,12 @@ copy_to_release() {
     done
     echo "Copied Q3/OA example cfgs -> $dest/examples/"
   fi
+
+  if [ -d "$PROJECT_ROOT/examples/demo_game/beta_traces" ]; then
+    mkdir -p "$dest/beta_traces"
+    cp -f "$PROJECT_ROOT/examples/demo_game/beta_traces/"*.petrinet.json "$dest/beta_traces/" 2>/dev/null || true
+    echo "Copied beta Petri examples -> $dest/beta_traces/"
+  fi
 }
 
 echo ""

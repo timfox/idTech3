@@ -5,6 +5,7 @@
 # Environment:
 #   OA_BASE       - path to OpenArena (or Q3) pk3 folder (+set fs_game)
 #   CLASSIC_MOD=1 - enable r_classicMod + conservative Vulkan cvars at launch
+#   AUTO_CLASSIC=1 - when OA_BASE path looks like OpenArena/baseoa, set CLASSIC_MOD=1
 #   RELEASE_DIR   - default: repo release/
 set -euo pipefail
 
@@ -26,6 +27,16 @@ if [ ! -x "$CLIENT" ]; then
 fi
 
 OA_BASE="${OA_BASE:-}"
+
+if [ -z "${CLASSIC_MOD:-}" ] && [ "${AUTO_CLASSIC:-1}" = "1" ] && [ -n "$OA_BASE" ]; then
+	case "$OA_BASE" in
+		*[Oo]pen[Aa]rena*|*openarena*|*baseoa*|*BaseOA*)
+			CLASSIC_MOD=1
+			echo "run_openarena: AUTO_CLASSIC enabled conservative Vulkan (CLASSIC_MOD=1)"
+			;;
+	esac
+fi
+
 FS_GAME_ARGS=()
 if [ -n "$OA_BASE" ]; then
 	if [ ! -d "$OA_BASE" ]; then
@@ -67,7 +78,7 @@ fi
 
 # Optional: copy example cfgs into OA_BASE when present (so +exec works in-game).
 if [ -n "$OA_BASE" ] && [ -d "$PROJECT_ROOT/examples" ]; then
-	for cfg in q3_vulkan_compat.cfg q3_classic_mod.cfg; do
+	for cfg in q3_vulkan_compat.cfg q3_classic_mod.cfg q3_fbo_safe.cfg; do
 		if [ -f "$PROJECT_ROOT/examples/$cfg" ] && [ ! -f "$OA_BASE/$cfg" ]; then
 			cp -n "$PROJECT_ROOT/examples/$cfg" "$OA_BASE/$cfg" 2>/dev/null || cp "$PROJECT_ROOT/examples/$cfg" "$OA_BASE/$cfg"
 		fi

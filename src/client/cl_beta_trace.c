@@ -9,6 +9,7 @@ See docs/BETA_AUTOMATED_TESTING.md.
 
 #include "client.h"
 #include "cl_beta_trace.h"
+#include "cl_beta_petri.h"
 
 #define BETA_TRACE_VERSION          1
 #define BETA_TRACE_CMD_MAGIC        "# idtech3 betacmd v1"
@@ -145,6 +146,10 @@ static void CL_BetaTrace_ParseManifestLine( const char *line ) {
 				sizeof( beta_failPatterns[0] ) );
 			beta_failCount++;
 		}
+	} else if ( !Q_stricmp( key, "petrinet" ) ) {
+		CL_BetaPetri_Load( value );
+	} else if ( !Q_stricmp( key, "petri_goal" ) ) {
+		CL_BetaPetri_SetGoalPlace( value );
 	}
 }
 
@@ -284,8 +289,17 @@ void CL_BetaTrace_LogEvent( const char *type, const char *source, const char *ta
 		FS_Write( line, (int)strlen( line ), beta_evtHandle );
 	}
 
+	CL_BetaPetri_OnGameplayEvent( type, src, tgt );
+
 	if ( beta_mode == BETA_MODE_TEST && !beta_testFinished ) {
 		int i;
+
+		if ( CL_BetaPetri_GoalReached() ) {
+			beta_testFinished = qtrue;
+			beta_testResult = 1;
+			Com_Printf( S_COLOR_GREEN "Beta test PASS (Petri goal reached)\n" );
+			return;
+		}
 
 		for ( i = 0; i < beta_failCount; i++ ) {
 			if ( Q_stristr( type, beta_failPatterns[i] ) ||
@@ -612,6 +626,8 @@ void CL_BetaTrace_Frame( void ) {
 }
 
 void CL_BetaTrace_Init( void ) {
+	CL_BetaPetri_Init();
+
 	cl_betaTrace = Cvar_Get( "cl_betaTrace", "1", CVAR_ARCHIVE );
 	cl_betaTraceLog = Cvar_Get( "cl_betaTraceLog", "1", CVAR_ARCHIVE );
 
@@ -629,6 +645,7 @@ void CL_BetaTrace_Init( void ) {
 
 void CL_BetaTrace_Shutdown( void ) {
 	CL_BetaTrace_Stop_f();
+	CL_BetaPetri_Shutdown();
 	Cmd_RemoveCommand( "beta_record" );
 	Cmd_RemoveCommand( "beta_stop" );
 	Cmd_RemoveCommand( "beta_play" );

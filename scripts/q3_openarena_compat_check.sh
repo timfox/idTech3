@@ -221,8 +221,9 @@ fi
 if [ -f "$PROJECT_ROOT/src/client/cl_beta_trace.c" ] && \
    grep -q 'Cvar_Get( "cl_betaTrace", "1"' "$PROJECT_ROOT/src/client/cl_beta_trace.c" && \
    grep -q 'Cmd_AddCommand( "beta_record"' "$PROJECT_ROOT/src/client/cl_beta_trace.c" && \
-   grep -q 'Cmd_AddCommand( "beta_status"' "$PROJECT_ROOT/src/client/cl_beta_trace.c"; then
-	pass "beta trace framework (beta_record / beta_status / cl_betaTrace) present"
+   grep -q 'Cmd_AddCommand( "beta_status"' "$PROJECT_ROOT/src/client/cl_beta_trace.c" && \
+   grep -q 'Cmd_AddCommand( "beta_petri_load"' "$PROJECT_ROOT/src/client/cl_beta_petri.c"; then
+	pass "beta trace + Petri executor (beta_record / beta_petri_load) present"
 else
 	fail "beta trace framework missing from client"
 fi

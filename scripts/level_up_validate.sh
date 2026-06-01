@@ -19,6 +19,7 @@ echo ""
 
 echo "--- 2/7 beta trace example format ---"
 ./tests/scripts/test_beta_trace_format.sh
+./tests/scripts/test_beta_petri_validate.sh
 echo ""
 
 echo "--- 3/7 Q3 / OpenArena compat ---"
@@ -52,7 +53,7 @@ fi
 if [ -d "$PROJECT_ROOT/build-vk-Release" ]; then
 	echo "--- 7/7 CTest (subset: scripts + units) ---"
 	( cd build-vk-Release && ctest -C Release --output-on-failure -j1 \
-		-R 'test_beta_trace|test_msvc_qcommon|test_level_up|test_run_openarena|unit_' )
+		-R 'test_beta_trace|test_beta_petri|test_msvc_qcommon|test_level_up|test_run_openarena|unit_' )
 	echo ""
 else
 	echo "--- 7/7 CTest SKIPPED (build-vk-Release missing) ---"

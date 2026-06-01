@@ -71,4 +71,9 @@ out_oa="$(OA_BASE="$TMP_ROOT/oa_base" bash "$LAUNCHER" 2>&1)"
 assert_contains "$out_oa" "ARG:+exec" "OA_BASE exec"
 assert_contains "$out_oa" "ARG:q3_vulkan_compat" "OA_BASE exec cfg"
 
+mkdir -p "$TMP_ROOT/oa_openarena/OpenArena"
+out_auto="$(OA_BASE="$TMP_ROOT/oa_openarena/OpenArena" AUTO_CLASSIC=1 bash "$LAUNCHER" 2>&1)"
+assert_contains "$out_auto" "AUTO_CLASSIC" "auto classic log"
+assert_contains "$out_auto" "ARG:r_classicMod" "auto classic cvar"
+
 echo "PASS: test_run_openarena"
