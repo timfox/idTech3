@@ -6,11 +6,14 @@ Small, **copy-paste** workflows and templates for this engine repo. They do not 
 |------|---------|
 | [engine/](engine/) | Local build and automated validation (smoke, `ctest`, production readiness). |
 | [renderer/](renderer/) | Renderer regression and `GAME_BASE` environment template. |
+| (script) | `./scripts/run_renderer_tier_b_devdata.sh` — Tier B map load without retail pk3 (`rtest_base`). |
 | [mods/](mods/) | Typical mod / `fs_game` layout and launch examples. |
 | [scripts/](scripts/) | Pointers to in-repo script and UI samples under `docs/samples/`. |
 | [title-repo/](title-repo/) | Templates for a **game** repo: platform cert, telemetry, soak, submissions. |
 | [demo_game/](demo_game/) | **Buildable** config mod `idtech3_demo.pk3` (+ optional helper) to toggle renderer cvars over a real `base/`. |
 | [demo_skeleton/](demo_skeleton/) | **Easiest demo run**: `./scripts/run_demo.sh` after adding game data to `demo_skeleton/base/` (see README). |
+| [q3_vulkan_compat.cfg](q3_vulkan_compat.cfg) | Optional cvars for **Quake III / OpenArena** on Vulkan (HDR/FBO/lightmap hints); copy into `baseq3/` and `+exec q3_vulkan_compat`. |
+| [q3_classic_mod.cfg](q3_classic_mod.cfg) | Full **classic mod** preset (`r_classicMod`, disables Forward+/volumetrics/RTX/generative hooks); `+exec q3_classic_mod` then `vid_restart`. |
 | [tiled/](tiled/) | Optional **Tiled Map Editor** workflow (`.tmx` sample); init submodule with `./scripts/init_optional_submodules.sh --tiled`. |
 
 See also:

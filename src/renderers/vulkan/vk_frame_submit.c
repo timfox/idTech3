@@ -112,6 +112,16 @@ void vk_begin_frame( void )
 	}
 #endif
 
+	/* r_lightmap_srgb_decode changes world fragment specialization (gamma-encoded BSP lightmaps). */
+	if ( r_lightmap_srgb_decode && r_lightmap_srgb_decode->modified ) {
+		r_lightmap_srgb_decode->modified = qfalse;
+		if ( vk.device && !vk.device_lost && vk.pipelines_count > (uint32_t)vk.pipelines_world_base ) {
+			ri.Printf( PRINT_ALL, "[VK] r_lightmap_srgb_decode changed; invalidating world graphics pipelines\n" );
+			vk_wait_idle();
+			vk_destroy_world_graphics_pipelines();
+		}
+	}
+
 	if ( PostFX_NeedsPipelineUpdate() ) {
 		needPost = qtrue;
 	}

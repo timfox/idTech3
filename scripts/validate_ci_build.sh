@@ -38,10 +38,8 @@ echo "2. Building Vulkan (Release)..."
 ./scripts/compile_engine.sh vulkan
 echo ""
 
-echo "3. Running smoke test..."
+echo "3. Running smoke test (includes Q3/OA compat + spec_energy gates)..."
 ./scripts/smoke_test.sh release
-./scripts/q3_openarena_compat_check.sh release
-./scripts/spec_energy_runtime_check.sh release
 echo ""
 
 echo "4. CTest (mirrors ubuntu-x86_64 job: smoke + renderer + scripts + units)..."
@@ -58,6 +56,18 @@ echo ""
 
 echo "6. Renderer regression check (repo + GLSL)..."
 ./scripts/renderer_regression_check.sh
+echo ""
+
+DEVDATA_BASE="$PROJECT_ROOT/docs/renderer_validation/devdata/rtest_base"
+if [ -f "$DEVDATA_BASE/vm/qagame.qvm" ]; then
+  echo "6b. Tier B devdata map load (dedicated, no retail pk3)..."
+  chmod +x ./scripts/run_renderer_tier_b_devdata.sh
+  ./scripts/run_renderer_tier_b_devdata.sh
+  echo ""
+else
+  echo "6b. Tier B devdata skipped (run ./scripts/build_renderer_devdata.sh to enable)"
+  echo ""
+fi
 echo ""
 
 echo "7. Demo mod pack layout (idtech3_demo.pk3)..."

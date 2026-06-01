@@ -39,6 +39,12 @@ fi
 if [[ -x "$ROOT/scripts/validate_ci_build.sh" ]]; then
 	info "Run: ./scripts/validate_ci_build.sh  (CI-parity smoke)"
 fi
+if [[ -x "$ROOT/scripts/openarena_validate.sh" ]]; then
+	info "Run: ./scripts/openarena_validate.sh release  (QVM compat + launcher + optional Tier B)"
+fi
+if [[ -f "$ROOT/docs/OPENARENA.md" ]]; then
+	info "OpenArena playbook: docs/OPENARENA.md"
+fi
 if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
 	if gh api "repos/$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)/actions/workflows/build.yml" >/dev/null 2>&1; then
 		info "GitHub CLI: check Actions UI for latest main matrix (this script does not poll CI)"
@@ -49,6 +55,7 @@ fi
 echo ""
 
 echo "Tier B - Content-backed (GAME_BASE regression)"
+DEVDATA_BASE="$ROOT/docs/renderer_validation/devdata/rtest_base"
 if [[ -n "${GAME_BASE:-}" ]]; then
 	if [[ -d "$GAME_BASE" ]]; then
 		pass "GAME_BASE is a directory: $GAME_BASE"
@@ -59,10 +66,16 @@ if [[ -n "${GAME_BASE:-}" ]]; then
 	else
 		warn "GAME_BASE set but not a directory: $GAME_BASE"
 	fi
+elif [[ -f "$DEVDATA_BASE/vm/qagame.qvm" ]]; then
+	pass "shipped devdata: $DEVDATA_BASE"
+	info "Run: ./scripts/run_renderer_tier_b_devdata.sh  (no retail pk3)"
+	info "Or:  export GAME_BASE=\"$DEVDATA_BASE\" && ./scripts/renderer_regression_maps.sh"
 else
-	skip "GAME_BASE unset - export GAME_BASE=/abs/path/to/base for map-load scripts"
+	skip "GAME_BASE unset and devdata missing qagame.qvm"
+	info "Build devdata: ./scripts/build_renderer_devdata.sh (needs ioquake3 qagame.qvm)"
 fi
-info "GitHub Tier B: set repo variable or secret IDTECH3_GAME_BASE_PATH + self-hosted runner label idtech3-tierb (docs/renderer_validation/SELF_HOSTED_TIER_B.md)"
+info "GitHub Tier B (full game tree): IDTECH3_GAME_BASE_PATH + runner idtech3-tierb (docs/renderer_validation/SELF_HOSTED_TIER_B.md)"
+info "GitHub Tier B (devdata only): ubuntu-x86_64 ctest includes renderer_regression_maps_devdata when qvm is in repo"
 echo ""
 
 echo "Tier C - Manual GPU / validation layers"

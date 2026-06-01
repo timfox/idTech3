@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **OpenArena playbook:** `docs/OPENARENA.md`, `scripts/openarena_validate.sh`, `run_openarena.sh` / `run_openarena_server.sh`, CTest `test_run_openarena_script`, `examples/q3_classic_mod.cfg`, release `examples/*.cfg` copy on build; `r_classicMod` / `classic_mod` preset for QVM-safe Vulkan.
+- **Quake III / OpenArena (Vulkan):** `scripts/q3_openarena_compat_check.sh` (QVM path, default-off feature cvars, swapchain/HDR guards); CTest `q3_openarena_compat_check`; `examples/q3_vulkan_compat.cfg`; Vulkan troubleshooting section in `docs/COMPATIBILITY.md`.
+- **Renderer Tier B devdata (no retail pk3):** `scripts/run_renderer_tier_b_devdata.sh`, CTest `renderer_regression_maps_devdata`, `scripts/bootstrap_ioq3_qvm.sh`; `validate_ci_build.sh` step 6b; shipped `docs/renderer_validation/devdata/rtest_base` map-load regression.
 - **C# scripting (Mono):** optional `USE_CSHARP=ON` embeds Mono for runtime `.cs` scripts (`cs_reload`, `cs_list`, `cs_dump`); shared events with JavaScript via `Com_ScriptEmitEvent`; API in `src/qcommon/csharp/IdTech3.Engine.cs`; `IdTech3.Engine.Exec`; demo mod `demo_csharp.cfg`; see **`docs/CSHARP.md`**.
 - **Lua `Engine.*` on client:** `LuaBindings_RegisterAll` runs when the Lua VM opens (`LuaDebug_SetEngineRegisterCallback` from `CL_Init`).
 - Optional Git submodule **`tools/tiled`**: [Tiled Map Editor](https://www.mapeditor.org/) (GPL-2.0, upstream `mapeditor/tiled`, pinned tag **v1.9.91**); not linked into the engine — see **`docs/TILED.md`**. Init via **`scripts/init_optional_submodules.sh`** (`--tiled`, `--svo`, `--all`, `--dry-run`). Designer sample: **`examples/tiled/minimal_demo.tmx`**; CTest **`test_init_optional_submodules`**.
@@ -42,6 +45,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI: Clang in Ubuntu build matrix, ASAN job, FORTIFY_SOURCE enabled on Linux
 
 ### Changed
+- Vulkan swapchain: missing `VK_IMAGE_USAGE_TRANSFER_SRC_BIT` warns instead of `ERR_FATAL` when `r_fbo 0` (screenshot readback skipped); only requests supported swapchain usage flags.
+- Vulkan: `r_lightmap_srgb_decode` rebuilds world graphics pipelines when toggled (gamma-encoded BSP lightmaps on HDR paths).
+- Vulkan / OpenGL: dynamic light color no longer scales with `pow(r_intensity, r_gamma)` when HDR/FBO is active (`r_hdr` 1/2 or `vk.fboActive`).
+- Client: `GLimp_VulkanAvailable()` probe before loading the Vulkan renderer on all platforms (not ARM-only); falls back to OpenGL when SDL cannot create a `VK_KHR_surface` window.
 - Vulkan ImGui: **File → Quit** runs `quit` (clean exit) instead of a no-op.
 
 - Client: clearer message when UI VM fails to load (idtech3_demo ships native UI in `vm/`, not configs-only).

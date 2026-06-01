@@ -60,6 +60,11 @@ void vk_read_pixels( byte *buffer, uint32_t width, uint32_t height )
 			srcImage = vk.color_image;
 		}
 	} else {
+		if ( !vk.swapchainTransferSrc ) {
+			ri.Printf( PRINT_WARNING,
+				"Screenshot readback skipped: swapchain lacks TRANSFER_SRC (enable r_fbo 1 and vid_restart).\n" );
+			return;
+		}
 		srcImageLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 		srcImage = vk.swapchain_images[ vk.cmd->swapchain_image_index ];
 	}

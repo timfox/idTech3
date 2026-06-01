@@ -91,12 +91,17 @@ if [ -n "${GAME_BASE:-}" ]; then
   echo "--- 4/4 Map load sanity (GAME_BASE) ---"
   GAME_BASE="$GAME_BASE" ./scripts/renderer_regression_maps.sh
   echo ""
+elif [ -f "$PROJECT_ROOT/docs/renderer_validation/devdata/rtest_base/vm/qagame.qvm" ]; then
+  echo "--- 4/4 Tier B devdata map load (rtest_base) ---"
+  ./scripts/run_renderer_tier_b_devdata.sh
+  echo ""
 else
-  echo "--- 4/4 Map load sanity SKIPPED (set GAME_BASE to enable) ---"
+  echo "--- 4/4 Map load sanity SKIPPED (set GAME_BASE or build devdata) ---"
   echo ""
 fi
 
 echo "=== Production readiness: automated steps complete ==="
+echo "OpenArena / Q3 QVM: docs/OPENARENA.md  ./scripts/run_openarena.sh  ./scripts/q3_openarena_compat_check.sh release"
 echo "Evidence gaps: ./scripts/evidence_status.sh"
 echo "Manual: Tier C in docs/PRODUCTION_CERTIFICATION.md (GPU proof, validation layers)."
 echo "Release: docs/RELEASE_CHECKLIST.md before tagging."

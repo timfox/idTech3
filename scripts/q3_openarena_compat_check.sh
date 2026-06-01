@@ -13,6 +13,18 @@ FAIL=0
 pass() { PASS=$((PASS + 1)); echo "  ✓ $1"; }
 fail() { FAIL=$((FAIL + 1)); echo "  ✗ $1" >&2; }
 
+# Match ri.Cvar_Get or qcommon Cvar_Get with default "0" (classic-mod safety cvars).
+assert_cvar_default_off() {
+	local file="$1"
+	local cvar="$2"
+	local desc="$3"
+	if grep -qE "(ri\.)?Cvar_Get\([[:space:]]*\"${cvar}\"[[:space:]]*,[[:space:]]*\"0\"" "$file"; then
+		pass "$desc"
+	else
+		fail "$desc"
+	fi
+}
+
 bin_path() {
 	local bin="$1"
 	local base="$RELEASE_DIR/$bin"
@@ -94,6 +106,13 @@ else
 	fail "cl_spec_energy_enable default not 0"
 fi
 
+if grep -q 'cl_flux_enable' "$PROJECT_ROOT/src/client/cl_main.c" && \
+   grep -q '"cl_flux_enable", "0"' "$PROJECT_ROOT/src/client/cl_main.c"; then
+	pass "cl_flux_enable defaults to 0"
+else
+	fail "cl_flux_enable default not 0"
+fi
+
 if grep -qE 'r_vegWind[[:space:]]*=[[:space:]]*ri\.Cvar_Get\([[:space:]]*"r_vegWind"[[:space:]]*,[[:space:]]*"0"' \
 	"$PROJECT_ROOT/src/renderers/vulkan/vk_postfx.c"; then
 	pass "r_vegWind defaults to 0 (classic maps unchanged unless enabled)"
@@ -129,18 +148,82 @@ else
 	fail "r_vdbFog default not 0"
 fi
 
-if grep -qE 'cs_autoInit[[:space:]]*=[[:space:]]*(ri\.)?Cvar_Get\([[:space:]]*"cs_autoInit"[[:space:]]*,[[:space:]]*"0"' \
-	"$PROJECT_ROOT/src/qcommon/csharp_debug.c"; then
-	pass "cs_autoInit defaults to 0 (C# runtime manual until cs_reload)"
-else
-	fail "cs_autoInit default not 0 in csharp_debug.c"
-fi
+assert_cvar_default_off "$PROJECT_ROOT/src/renderers/vulkan/tr_init.c" "r_classicMod" \
+	"r_classicMod defaults to 0 (classic QVM preset off until enabled)"
+
+assert_cvar_default_off "$PROJECT_ROOT/src/qcommon/csharp_debug.c" "cs_autoInit" \
+	"cs_autoInit defaults to 0 (C# runtime manual until cs_reload)"
 
 if grep -q 'ri\.Cmd_AddCommand( "vdb_load"' "$PROJECT_ROOT/src/renderers/vulkan/vk_vdb.c" && \
    grep -q 'ri\.Cmd_AddCommand( "vdb_bind_fog"' "$PROJECT_ROOT/src/renderers/vulkan/vk_vdb.c"; then
 	pass "VDB console commands vdb_load / vdb_bind_fog registered"
 else
 	fail "VDB console commands missing from vk_vdb.c"
+fi
+
+if grep -q 'vk.swapchainTransferSrc = qfalse;' "$PROJECT_ROOT/src/renderers/vulkan/vk_swapchain.c" && \
+   ! grep -q 'ERR_FATAL.*TRANSFER_SRC' "$PROJECT_ROOT/src/renderers/vulkan/vk_swapchain.c"; then
+	pass "swapchain missing TRANSFER_SRC warns instead of ERR_FATAL"
+else
+	fail "swapchain TRANSFER_SRC must not fatal (classic Vulkan startup)"
+fi
+
+if grep -q 'r_lightmap_srgb_decode && r_lightmap_srgb_decode->modified' "$PROJECT_ROOT/src/renderers/vulkan/vk_frame_submit.c"; then
+	pass "r_lightmap_srgb_decode invalidates world pipelines at runtime"
+else
+	fail "r_lightmap_srgb_decode pipeline refresh missing from vk_frame_submit.c"
+fi
+
+if grep -q 'useLegacyLightScale' "$PROJECT_ROOT/src/renderers/vulkan/tr_shade.c" && \
+   grep -q 'r_hdr && r_hdr->integer > 0' "$PROJECT_ROOT/src/renderers/vulkan/tr_shade.c"; then
+	pass "HDR dynamic lights decoupled from r_gamma (VK_SetLightParams)"
+else
+	fail "VK_SetLightParams missing HDR/r_gamma decouple for classic mods"
+fi
+
+if grep -q 'defined(USE_VULKAN_API)' "$PROJECT_ROOT/src/client/cl_main.c" && \
+   grep -q 'GLimp_VulkanAvailable' "$PROJECT_ROOT/src/client/cl_main.c" && \
+   ! grep -q 'USE_VULKAN_API) && (defined(__arm__)' "$PROJECT_ROOT/src/client/cl_main.c"; then
+	pass "Vulkan SDL probe + OpenGL fallback enabled on all platforms (cl_main)"
+else
+	fail "cl_main missing all-platform GLimp_VulkanAvailable fallback"
+fi
+
+if grep -q 'Cmd_AddCommand.*"classic_mod"' "$PROJECT_ROOT/src/client/cl_main.c" && \
+   grep -q 'vk_apply_classic_mod_preset' "$PROJECT_ROOT/src/renderers/vulkan/vk_init_device.c"; then
+	pass "classic_mod command + Vulkan classic preset present"
+else
+	fail "classic_mod / r_classicMod preset missing"
+fi
+
+if [ -f "$PROJECT_ROOT/docs/OPENARENA.md" ] && [ -x "$PROJECT_ROOT/scripts/run_openarena.sh" ]; then
+	pass "OPENARENA.md and run_openarena.sh present"
+else
+	fail "OpenArena playbook or launcher script missing"
+fi
+
+if [ -f "$PROJECT_ROOT/examples/q3_classic_mod.cfg" ] && grep -q 'r_classicMod' "$PROJECT_ROOT/examples/q3_classic_mod.cfg"; then
+	pass "examples/q3_classic_mod.cfg documents classic preset"
+else
+	fail "examples/q3_classic_mod.cfg missing or incomplete"
+fi
+
+if bash -n "$PROJECT_ROOT/scripts/run_openarena.sh" 2>/dev/null; then
+	pass "run_openarena.sh passes bash -n syntax check"
+else
+	fail "run_openarena.sh has bash syntax errors"
+fi
+
+if [ -x "$PROJECT_ROOT/scripts/run_openarena_server.sh" ] && bash -n "$PROJECT_ROOT/scripts/run_openarena_server.sh" 2>/dev/null; then
+	pass "run_openarena_server.sh present and valid"
+else
+	fail "run_openarena_server.sh missing or invalid"
+fi
+
+if [ -x "$PROJECT_ROOT/scripts/openarena_validate.sh" ] && bash -n "$PROJECT_ROOT/scripts/openarena_validate.sh" 2>/dev/null; then
+	pass "openarena_validate.sh orchestrator present and valid"
+else
+	fail "openarena_validate.sh missing or invalid"
 fi
 
 SERVER="$(bin_path idtech3_server)"
@@ -160,6 +243,11 @@ if [ -n "$CLIENT" ]; then
 		pass "client supports fs_basegame (e.g. baseq3 for Q3A)"
 	else
 		fail "client missing fs_basegame support strings"
+	fi
+	if grep -q 'classic_mod' < <(strings "$CLIENT" 2>/dev/null); then
+		pass "client exports classic_mod command"
+	else
+		fail "client missing classic_mod string"
 	fi
 else
 	fail "idtech3 client not found under $RELEASE_DIR"

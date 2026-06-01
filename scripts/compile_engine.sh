@@ -480,6 +480,16 @@ copy_to_release() {
     chmod +x "$dest/spec_energy_flux_generate.py"
     echo "Copied spec_energy_flux_generate.py -> $dest/spec_energy_flux_generate.py"
   fi
+
+  if [ -d "$PROJECT_ROOT/examples" ]; then
+    mkdir -p "$dest/examples"
+    for cfg in q3_vulkan_compat.cfg q3_classic_mod.cfg; do
+      if [ -f "$PROJECT_ROOT/examples/$cfg" ]; then
+        cp -f "$PROJECT_ROOT/examples/$cfg" "$dest/examples/$cfg"
+      fi
+    done
+    echo "Copied Q3/OA example cfgs -> $dest/examples/"
+  fi
 }
 
 echo ""

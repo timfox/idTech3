@@ -24,7 +24,7 @@ Build artifacts go to `build-vk-Release/` or `build-gl-Release/` and are copied 
 
 - **C++ linker dependency**: The build requires `libstdc++-14-dev` because Clang 18 (the default `c++` on Ubuntu 24.04) selects the GCC 14 installation but only GCC 13 dev files are installed by default. The update script installs this.
 - **No game data**: The engine repo does not include Quake III Arena game data (`.pk3` files). The dedicated server will print "No game data" and exit cleanly - this is expected. `SKIP_IDPAK_CHECK=ON` is set by default in `compile_engine.sh`.
-- **Test suite**: Run `make test` or `ctest` from the build directory to execute the smoke test (binary checks, server startup, shader validation). Full validation is via build matrix (`.github/workflows/build.yml`) and manual testing.
+- **Test suite**: Run `make test` or `ctest` from the build directory (smoke, Q3/OA compat, Tier B devdata map load, unit tests). `./scripts/run_renderer_tier_b_devdata.sh` exercises `docs/renderer_validation/devdata/rtest_base` without retail pk3. Full validation: `.github/workflows/build.yml` and `./scripts/validate_ci_build.sh`.
 - **Headless environment**: The client executable (`idtech3`) requires a display server (X11/SDL2) and GPU. In headless Cloud Agent VMs, only the dedicated server (`idtech3_server`) can run. The client binary can still be verified via `file` and `ldd` checks.
 - **Shader compilation**: Vulkan GLSL shaders are compiled to SPIR-V during the CMake build via `scripts/compile_shaders.sh`. This requires `glslangValidator` (from `glslang-tools`) and Python 3.
 - **SDF UI (Vulkan):** `r_sdfScreenAa` scales `fwidth`-based edge AA for `uiSdfText`; re-run `compile_shaders.sh` after editing `frag_ui_sdf_text.frag` / `sdf_text.frag`.
@@ -47,6 +47,7 @@ Build artifacts go to `build-vk-Release/` or `build-gl-Release/` and are copied 
 ### Game data / base
 
 - **Standalone full conversion**: Do not assume Q3A, OpenArena, or other generic bases. The base is either Unwaking or a game explicitly defined by the user.
+- **OpenArena / Q3A QVM**: `./scripts/run_openarena.sh` with `OA_BASE` set; `./scripts/run_openarena_server.sh` for dedicated; `./scripts/openarena_validate.sh release` for automated gates; `classic_mod` + `vid_restart` or `r_classicMod 1` for a conservative Vulkan preset. See `docs/OPENARENA.md`.
 - **Smallest valid data tree** (bootstrap `.pk3` + `default.cfg`): see `docs/MINIMAL_GAME_SHELL.md`.
 
 ### Scripting

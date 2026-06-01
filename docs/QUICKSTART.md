@@ -36,6 +36,8 @@ The engine needs game data (maps, textures, sounds). You must provide a compatib
 - **Quake III Arena** - copy or symlink the `baseq3` folder from your Q3A installation into the engine directory
 - **Open Arena** or other Q3-based games - same idea: the engine expects a `baseq3` (or `base`) folder with `.pk3` files
 
+Vulkan + OpenArena: [OPENARENA.md](OPENARENA.md) and [Q3_OPENARENA_VULKAN.md](Q3_OPENARENA_VULKAN.md). Launcher: `./scripts/run_openarena.sh` with `OA_BASE` set.
+
 Typical layout:
 ```
 idtech3/

@@ -24,6 +24,15 @@ for f in idtech3 idtech3_server; do
   fi
 done
 
+if [ -d "$RELEASE_DIR/examples" ]; then
+  for cfg in q3_vulkan_compat.cfg q3_classic_mod.cfg; do
+    if [ ! -f "$RELEASE_DIR/examples/$cfg" ]; then
+      echo "Missing: $RELEASE_DIR/examples/$cfg"
+      missing=1
+    fi
+  done
+fi
+
 if [ "$missing" -ne 0 ]; then
   exit 1
 fi

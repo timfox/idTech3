@@ -16,6 +16,7 @@ For a **stricter engine bar** (automated steps + optional content-backed maps), 
 
 ### Smoke Test
 - [ ] **Smoke test passes**: `./scripts/smoke_test.sh release` (run after build; requires `idtech3` and `idtech3_server` in `release/`)
+- [ ] **Q3 / OpenArena compat** (no retail pk3): `./scripts/q3_openarena_compat_check.sh release` and `./scripts/openarena_validate.sh release` (see [OPENARENA.md](OPENARENA.md))
 
 ### Renderer regression (headless)
 - [ ] **Renderer regression check**: `./scripts/renderer_regression_check.sh` (docs + generated shader blobs + recursive GLSL; optional `GAME_BASE=...` with uncommented paths in `docs/samples/renderer_regression/OPTIONAL_GAME_ASSETS.txt` to require BSPs)

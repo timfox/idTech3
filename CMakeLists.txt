@@ -2541,6 +2541,22 @@ set_tests_properties(renderer_regression_check PROPERTIES
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/renderer_regression_check.sh"
 	RESOURCE_LOCK "idtech3_headless_validation")
 
+add_test(NAME q3_openarena_compat_check
+	COMMAND ${CMAKE_SOURCE_DIR}/scripts/q3_openarena_compat_check.sh ${CMAKE_SOURCE_DIR}/release
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(q3_openarena_compat_check PROPERTIES
+	LABELS "validation;smoke"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/q3_openarena_compat_check.sh;${CMAKE_SOURCE_DIR}/release/idtech3"
+	RESOURCE_LOCK "idtech3_headless_validation")
+
+add_test(NAME renderer_regression_maps_devdata
+	COMMAND ${CMAKE_SOURCE_DIR}/scripts/run_renderer_tier_b_devdata.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(renderer_regression_maps_devdata PROPERTIES
+	LABELS "validation;renderer"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/run_renderer_tier_b_devdata.sh;${CMAKE_SOURCE_DIR}/release/idtech3_server;${CMAKE_SOURCE_DIR}/docs/renderer_validation/devdata/rtest_base/vm/qagame.qvm"
+	RESOURCE_LOCK "idtech3_headless_validation")
+
 add_test(NAME check_artifacts
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/check_artifacts.sh ${CMAKE_SOURCE_DIR}/release
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -2553,6 +2569,13 @@ add_test(NAME test_run_vulkan_script
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_run_vulkan_script PROPERTIES
 	LABELS "unit;scripts;validation")
+
+add_test(NAME test_run_openarena_script
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_run_openarena.sh ${CMAKE_SOURCE_DIR}/scripts/run_openarena.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_run_openarena_script PROPERTIES
+	LABELS "unit;scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/run_openarena.sh;${CMAKE_SOURCE_DIR}/examples/q3_vulkan_compat.cfg")
 
 add_test(NAME test_demo_game_pk3
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_demo_game_pk3.sh

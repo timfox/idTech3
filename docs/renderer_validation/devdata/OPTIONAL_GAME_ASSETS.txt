@@ -1,5 +1,5 @@
-# Use with GAME_BASE=<repo>/docs/renderer_validation/devdata/base
-# (paths relative to base/)
+# Use with GAME_BASE=<repo>/docs/renderer_validation/devdata/rtest_base
+# (paths relative to that folder, same layout as a normal base/)
 
 maps/rtest_tangent.bsp
 maps/rtest_pbr.bsp

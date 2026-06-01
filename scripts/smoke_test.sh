@@ -185,6 +185,13 @@ fi
 
 echo ""
 
+# --- Q3 / OpenArena example cfgs in release ---
+if [ -f "$RELEASE_DIR/examples/q3_vulkan_compat.cfg" ] && [ -f "$RELEASE_DIR/examples/q3_classic_mod.cfg" ]; then
+  pass "release/examples Q3/OA cfgs present"
+else
+  warn "release/examples Q3/OA cfgs missing (re-run compile_engine.sh vulkan)"
+fi
+
 # --- Q3 / OpenArena QVM compatibility (static; no game data required) ---
 echo "Q3 / OpenArena compatibility:"
 if [ -x "$PROJECT_ROOT/scripts/q3_openarena_compat_check.sh" ]; then

@@ -1758,6 +1758,51 @@ CL_Vid_Restart_f
 Wrapper for CL_Vid_Restart
 =================
 */
+/*
+=================
+CL_ClassicMod_f
+
+Apply Quake III / OpenArena-friendly renderer and client toggles (no gameplay change).
+=================
+*/
+static void CL_ClassicMod_f( void ) {
+	Cvar_Set( "r_classicMod", "1" );
+	Cvar_Set( "r_volumetricFog", "0" );
+	Cvar_Set( "r_ssao", "0" );
+	Cvar_Set( "r_bloom", "0" );
+	Cvar_Set( "r_ext_smaa", "0" );
+	Cvar_Set( "r_ssr", "0" );
+	Cvar_Set( "r_sharpen", "0.0" );
+	Cvar_Set( "r_exposure_auto", "0" );
+	Cvar_Set( "r_fogFluid", "0" );
+	Cvar_Set( "r_forwardPlus", "0" );
+	Cvar_Set( "r_rtx", "0" );
+	Cvar_Set( "r_rtxDemo", "0" );
+	Cvar_Set( "r_rtxEntities", "0" );
+	Cvar_Set( "r_vdbFog", "0" );
+	Cvar_Set( "r_vdb", "0" );
+	Cvar_Set( "r_vegWind", "0" );
+#ifdef USE_FLUX
+	if ( cl_flux_enable ) {
+		Cvar_Set( "cl_flux_enable", "0" );
+	}
+#endif
+#ifdef USE_TRELLIS
+	if ( cl_trellis_enable ) {
+		Cvar_Set( "cl_trellis_enable", "0" );
+	}
+#endif
+#ifdef USE_SPEC_ENERGY
+	{
+		cvar_t *enable = Cvar_Get( "cl_spec_energy_enable", "0", CVAR_ARCHIVE );
+		if ( enable ) {
+			Cvar_Set( "cl_spec_energy_enable", "0" );
+		}
+	}
+#endif
+	Com_Printf( "Classic mod preset applied (Q3/OA-safe Vulkan). Run vid_restart for latched renderer state.\n" );
+}
+
 static void CL_Vid_Restart_f( void ) {
 
 	if ( Q_stricmp( Cmd_Argv( 1 ), "keep_window" ) == 0 || Q_stricmp( Cmd_Argv( 1 ), "fast" ) == 0 ) {
@@ -3370,15 +3415,16 @@ static void CL_InitRef( void ) {
 		}
 	}
 
-#if defined(USE_VULKAN_API) && (defined(__arm__) || defined(__aarch64__))
-	/* SDL may lack Vulkan support on ARM (e.g. RPi system SDL); fall back to OpenGL unless forced */
+#if defined(USE_VULKAN_API)
+	/* Probe SDL window creation (VK_KHR_surface). RPi/headless SDL often lacks Vulkan;
+	 * fall back to OpenGL so Q3/OA and demo shells still start unless cl_renderer_force 1. */
 	if ( Q_stricmp( rendererName, "vulkan" ) == 0 && !GLimp_VulkanAvailable() )
 	{
 		if ( cl_renderer_force && cl_renderer_force->integer )
 			Com_Printf( "[VK] cl_renderer_force 1: attempting Vulkan despite probe failure\n" );
 		else
 		{
-			Com_Printf( "[VK] Vulkan not available in SDL, falling back to OpenGL\n" );
+			Com_Printf( "[VK] Vulkan not available in SDL (no VK window), falling back to OpenGL\n" );
 			Cvar_Set( "cl_renderer", "opengl" );
 			Cvar_Set( "renderer", "opengl" );
 			rendererName = "opengl";
@@ -4226,6 +4272,7 @@ void CL_Init( void ) {
 	Cmd_AddCommand ("clientinfo", CL_Clientinfo_f);
 	Cmd_AddCommand ("snd_restart", CL_Snd_Restart_f);
 	Cmd_AddCommand ("vid_restart", CL_Vid_Restart_f);
+	Cmd_AddCommand ("classic_mod", CL_ClassicMod_f );
 	Cmd_AddCommand ("reloadTtf", CL_ReloadTtf_f );
 	Cmd_AddCommand ("disconnect", CL_Disconnect_f);
 	CL_Demo_InitCommands();

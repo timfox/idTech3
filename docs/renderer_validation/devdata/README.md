@@ -19,6 +19,13 @@ From the repo root:
 
 Set `QAGAME_QVM` or `IOQ3_BUILD` if `qagame.qvm` is not at `/tmp/ioq3-check/build/Release/baseq3/vm/qagame.qvm`.
 
+To rebuild `qagame.qvm` from ioquake3:
+
+```bash
+./scripts/bootstrap_ioq3_qvm.sh
+IOQ3_BUILD=/tmp/ioq3-check/build ./scripts/build_renderer_devdata.sh
+```
+
 ## Validate
 
 ```bash
