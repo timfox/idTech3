@@ -34,6 +34,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cl_menuvideo.h"
 #include "cl_sdf_font.h"
 #include "cl_demo.h"
+#include "cl_beta_trace.h"
 #include "../qcommon/script_emit.h"
 #ifdef USE_LUA
 #include "../qcommon/lua_debug.h"
@@ -3105,6 +3106,8 @@ void CL_Frame( int msec, int realMsec ) {
 		CL_CheckTimeout();
 	}
 
+	CL_BetaTrace_Frame();
+
 	// send intentions now
 	CL_SendCmd();
 
@@ -4276,6 +4279,7 @@ void CL_Init( void ) {
 	Cmd_AddCommand ("reloadTtf", CL_ReloadTtf_f );
 	Cmd_AddCommand ("disconnect", CL_Disconnect_f);
 	CL_Demo_InitCommands();
+	CL_BetaTrace_Init();
 	Cmd_AddCommand ("cinematic", CL_PlayCinematic_f);
 	Cmd_AddCommand ("connect", CL_Connect_f);
 	Cmd_AddCommand ("reconnect", CL_Reconnect_f);
@@ -4490,6 +4494,7 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 #endif
 	Cmd_RemoveCommand ("disconnect");
 	CL_Demo_ShutdownCommands();
+	CL_BetaTrace_Shutdown();
 	Cmd_RemoveCommand ("cinematic");
 	Cmd_RemoveCommand ("connect");
 	Cmd_RemoveCommand ("reconnect");
