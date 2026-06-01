@@ -1,6 +1,6 @@
 /*
 ===========================================================================
-Shared shell-template expansion for external generative pipelines (FLUX/TRELLIS/SEGA).
+Shared shell-template expansion for external generative pipelines (FLUX/TRELLIS/spec_energy).
 ===========================================================================
 */
 
@@ -9,7 +9,7 @@ Shared shell-template expansion for external generative pipelines (FLUX/TRELLIS/
 
 #include "../qcommon/q_shared.h"
 
-#if defined( USE_FLUX ) || defined( USE_TRELLIS ) || defined( USE_SEGA )
+#if defined( USE_FLUX ) || defined( USE_TRELLIS ) || defined( USE_SPEC_ENERGY )
 
 typedef struct {
 	const char *repo;

@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """
-idTech3 wrapper for SEGA high-resolution FLUX generation (rajabi2001/sega).
+idTech3 wrapper for Spectral-Energy Guided Attention hi-res FLUX generation.
 
-Requires a local SEGA checkout (--repo) with flux_sega/ and PyTorch/diffusers deps.
-Invoked by sega_generate / cl_sega_cmd from the engine client.
+Upstream: https://github.com/rajabi2001/sega (flux_sega/ package layout).
+
+Requires a local checkout (--repo) with flux_sega/ and PyTorch/diffusers deps.
+Invoked by spec_energy_generate / cl_spec_energy_cmd from the engine client.
 """
 
 from __future__ import annotations
@@ -15,7 +17,7 @@ import types
 
 
 def _fail(msg: str) -> None:
-    print(f"SEGA wrapper: {msg}", file=sys.stderr)
+    print(f"spec_energy wrapper: {msg}", file=sys.stderr)
     sys.exit(1)
 
 
@@ -34,8 +36,8 @@ def _move_to_device(v, device):
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="SEGA FLUX image generation for idTech3")
-    ap.add_argument("--repo", required=True, help="Path to SEGA git checkout (contains flux_sega/)")
+    ap = argparse.ArgumentParser(description="Spectral-Energy FLUX image generation for idTech3")
+    ap.add_argument("--repo", required=True, help="Path to upstream git checkout (contains flux_sega/)")
     ap.add_argument("--prompt", required=True, help="Text prompt")
     ap.add_argument("--output", required=True, help="Output PNG path")
     ap.add_argument("--height", type=int, default=4096)
@@ -54,7 +56,7 @@ def main() -> None:
     repo = os.path.abspath(args.repo)
     flux_dir = os.path.join(repo, "flux_sega")
     if not os.path.isdir(flux_dir):
-        _fail(f"flux_sega/ not found under {repo} (clone https://github.com/rajabi2001/sega)")
+        _fail(f"flux_sega/ not found under {repo} (clone upstream repo from github.com/rajabi2001/sega)")
 
     sys.path.insert(0, flux_dir)
 
@@ -66,7 +68,7 @@ def main() -> None:
         _fail(f"import failed ({exc}). pip install -r {repo}/requirements.txt")
 
     if not torch.cuda.is_available():
-        _fail("CUDA is not available — SEGA FLUX requires an NVIDIA GPU")
+        _fail("CUDA is not available — hi-res FLUX requires an NVIDIA GPU")
 
     shorthand = {"dev", "Krea-dev"}
     model_id = (
@@ -75,7 +77,7 @@ def main() -> None:
         else args.checkpoint
     )
 
-    print(f"SEGA wrapper: loading {model_id} ...")
+    print(f"spec_energy wrapper: loading {model_id} ...")
     num_gpus = torch.cuda.device_count()
     enable_multi_gpu = args.multi_gpu and num_gpus >= 2
 
@@ -93,7 +95,7 @@ def main() -> None:
     pipe.vae.enable_tiling()
 
     if enable_multi_gpu:
-        print(f"SEGA wrapper: multi-GPU across {num_gpus} devices")
+        print(f"spec_energy wrapper: multi-GPU across {num_gpus} devices")
         transformer = pipe.transformer
         for module in (
             transformer.x_embedder,
@@ -153,7 +155,7 @@ def main() -> None:
     else:
         gpu_mem_gb = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
         if gpu_mem_gb < 60:
-            print(f"SEGA wrapper: CPU offload (GPU {gpu_mem_gb:.1f} GB < 60 GB)")
+            print(f"spec_energy wrapper: CPU offload (GPU {gpu_mem_gb:.1f} GB < 60 GB)")
             pipe.enable_model_cpu_offload()
         else:
             pipe.to("cuda")
@@ -164,7 +166,7 @@ def main() -> None:
 
     gen_device = "cuda"
     generator = torch.Generator(gen_device).manual_seed(args.seed)
-    print(f"SEGA wrapper: generating {args.width}x{args.height} ({args.steps} steps, seed {args.seed}) ...")
+    print(f"spec_energy wrapper: generating {args.width}x{args.height} ({args.steps} steps, seed {args.seed}) ...")
 
     image = pipe(
         prompt=args.prompt,
@@ -176,7 +178,7 @@ def main() -> None:
     ).images[0]
 
     image.save(args.output)
-    print(f"SEGA wrapper: saved {args.output}")
+    print(f"spec_energy wrapper: saved {args.output}")
 
 
 if __name__ == "__main__":

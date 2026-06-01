@@ -144,10 +144,10 @@ if [ -n "$CLIENT_PATH" ]; then
   else
     warn "flux_generate not in client (USE_FLUX=OFF or stripped build)"
   fi
-  if grep -q sega_generate < <(strings "$CLIENT_PATH" 2>/dev/null); then
-    pass "client exports sega_generate (USE_SEGA)"
+  if grep -q spec_energy_generate < <(strings "$CLIENT_PATH" 2>/dev/null); then
+    pass "client exports spec_energy_generate (USE_SPEC_ENERGY)"
   else
-    warn "sega_generate not in client (USE_SEGA=OFF or stripped build)"
+    warn "spec_energy_generate not in client (USE_SPEC_ENERGY=OFF or stripped build)"
   fi
 else
   warn "idtech3 not found, skipping generative symbol checks"
@@ -160,13 +160,13 @@ if [ -f "$RELEASE_DIR/trellis_image_to_glb.py" ]; then
 else
   warn "trellis_image_to_glb.py missing (non-TRELLIS build or old release copy)"
 fi
-if [ -f "$RELEASE_DIR/sega_flux_generate.py" ]; then
-  pass "sega_flux_generate.py present in release"
-  if head -1 "$RELEASE_DIR/sega_flux_generate.py" | grep -q python; then
-    pass "sega_flux_generate.py looks like Python wrapper"
+if [ -f "$RELEASE_DIR/spec_energy_flux_generate.py" ]; then
+  pass "spec_energy_flux_generate.py present in release"
+  if head -1 "$RELEASE_DIR/spec_energy_flux_generate.py" | grep -q python; then
+    pass "spec_energy_flux_generate.py looks like Python wrapper"
   fi
 else
-  warn "sega_flux_generate.py missing (non-SEGA build or old release copy)"
+  warn "spec_energy_flux_generate.py missing (non-spec-energy build or old release copy)"
 fi
 
 echo ""

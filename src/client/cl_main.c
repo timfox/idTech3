@@ -44,12 +44,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "flux.h"
 #endif
 #include "cl_pipeline.h"
-#ifdef USE_SEGA
-#include "cl_sega.h"
+#ifdef USE_SPEC_ENERGY
+#include "cl_spec_energy.h"
 #endif
-#if ( defined( USE_FLUX ) || defined( USE_TRELLIS ) || defined( USE_SEGA ) ) && USE_SDL
+#if ( defined( USE_FLUX ) || defined( USE_TRELLIS ) || defined( USE_SPEC_ENERGY ) ) && USE_SDL
 #include <SDL2/SDL_thread.h>
-#elif defined( USE_FLUX ) || defined( USE_TRELLIS ) || defined( USE_SEGA )
+#elif defined( USE_FLUX ) || defined( USE_TRELLIS ) || defined( USE_SPEC_ENERGY )
 typedef struct SDL_Thread SDL_Thread;
 #endif
 
@@ -2925,7 +2925,7 @@ static void CL_Steam_UpdateRichPresence( void ) {
 	}
 }
 
-#if defined( USE_TRELLIS ) || defined( USE_SEGA )
+#if defined( USE_TRELLIS ) || defined( USE_SPEC_ENERGY )
 void CL_GenerativeFrame( void );
 #endif
 
@@ -2946,7 +2946,7 @@ void CL_Frame( int msec, int realMsec ) {
 		return;
 	}
 
-#if defined( USE_TRELLIS ) || defined( USE_SEGA )
+#if defined( USE_TRELLIS ) || defined( USE_SPEC_ENERGY )
 	CL_GenerativeFrame();
 #endif
 
@@ -4328,10 +4328,10 @@ void CL_Init( void ) {
 #else
 	Com_Printf( "TRELLIS.2 image-to-3D: not available (compiled without USE_TRELLIS)\n" );
 #endif
-#ifdef USE_SEGA
-	CL_SegaInit();
+#ifdef USE_SPEC_ENERGY
+	CL_SpecEnergyInit();
 #else
-	Com_Printf( "SEGA hi-res FLUX: not available (compiled without USE_SEGA)\n" );
+	Com_Printf( "Spec-energy hi-res FLUX: not available (compiled without USE_SPEC_ENERGY)\n" );
 #endif
 
 	CL_InitGameSystems();
@@ -4415,8 +4415,8 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 #endif
 	trellis_job.status = TRELLIS_JOB_IDLE;
 #endif
-#ifdef USE_SEGA
-	CL_SegaShutdown();
+#ifdef USE_SPEC_ENERGY
+	CL_SpecEnergyShutdown();
 #endif
 
 	Cmd_RemoveCommand ("cmd");
@@ -6361,7 +6361,7 @@ static void CL_TrellisMaybeChainFromFlux( void ) {
 
 #endif /* USE_TRELLIS */
 
-#if defined( USE_TRELLIS ) || defined( USE_SEGA )
+#if defined( USE_TRELLIS ) || defined( USE_SPEC_ENERGY )
 /*
 ==================
 CL_GenerativeFrame — per-frame generative job notifications and chaining
@@ -6371,14 +6371,14 @@ void CL_GenerativeFrame( void ) {
 #ifdef USE_TRELLIS
 	CL_TrellisFrame();
 #endif
-#ifdef USE_SEGA
-	CL_SegaFrame();
+#ifdef USE_SPEC_ENERGY
+	CL_SpecEnergyFrame();
 #endif
 #if defined( USE_FLUX ) && defined( USE_TRELLIS )
 	CL_TrellisMaybeChainFromFlux();
 #endif
 }
-#endif /* USE_TRELLIS || USE_SEGA */
+#endif /* USE_TRELLIS || USE_SPEC_ENERGY */
 
 
 #ifdef USE_CURL

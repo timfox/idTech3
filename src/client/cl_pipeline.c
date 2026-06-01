@@ -7,7 +7,7 @@ Shared shell-template expansion for external generative pipelines.
 #include "client.h"
 #include "cl_pipeline.h"
 
-#if defined( USE_FLUX ) || defined( USE_TRELLIS ) || defined( USE_SEGA )
+#if defined( USE_FLUX ) || defined( USE_TRELLIS ) || defined( USE_SPEC_ENERGY )
 
 qboolean CL_ShellEscapeArg( const char *in, char *out, size_t out_size ) {
 	size_t pos = 0;
