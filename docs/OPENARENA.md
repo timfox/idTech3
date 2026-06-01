@@ -11,6 +11,7 @@ This fork targets a **modern Vulkan renderer** while keeping **Quake III Arena**
 export OA_BASE=/path/to/openarena/base
 ./scripts/run_openarena.sh              # Vulkan + optional q3_vulkan_compat (copied into OA_BASE)
 CLASSIC_MOD=1 ./scripts/run_openarena.sh # same, with classic preset cvars at launch
+# AUTO_CLASSIC=1 (default): paths containing openarena/baseoa auto-enable CLASSIC_MOD
 ```
 
 Or manually:
