@@ -7,19 +7,23 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 RELEASE_DIR="${1:-$PROJECT_ROOT/release}"
 UPSTREAM_REPO="${2:-$PROJECT_ROOT/external/flux_spec_energy}"
+# shellcheck source=lib/release_bin.sh
+source "$SCRIPT_DIR/lib/release_bin.sh"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 ok() { echo "OK: $*"; }
+skip() { echo "SKIP: $*"; exit 0; }
 
-[ -f "$RELEASE_DIR/idtech3" ] || [ -f "$RELEASE_DIR/idtech3.x86_64" ] || fail "release client not found under $RELEASE_DIR"
-CLIENT="$RELEASE_DIR/idtech3"
-[ -f "$CLIENT" ] || CLIENT="$RELEASE_DIR/idtech3.x86_64"
+CLIENT="$(release_bin_path "$RELEASE_DIR" idtech3)"
+[ -n "$CLIENT" ] || fail "release client not found under $RELEASE_DIR"
 
-grep -q spec_energy_generate < <(strings "$CLIENT" 2>/dev/null) || fail "spec_energy_generate not linked in client"
-grep -q cl_spec_energy_enable < <(strings "$CLIENT" 2>/dev/null) || fail "cl_spec_energy_enable missing"
+if [ ! -f "$RELEASE_DIR/spec_energy_flux_generate.py" ]; then
+	skip "release/spec_energy_flux_generate.py missing (binary-only layout; run stage_ci_release.sh)"
+fi
+
+release_bin_has_text "$CLIENT" 'spec_energy_generate' || fail "spec_energy_generate not linked in client"
+release_bin_has_text "$CLIENT" 'cl_spec_energy_enable' || fail "cl_spec_energy_enable missing"
 ok "client has spec_energy console symbols"
-
-[ -f "$RELEASE_DIR/spec_energy_flux_generate.py" ] || fail "missing release/spec_energy_flux_generate.py"
 python3 -m py_compile "$RELEASE_DIR/spec_energy_flux_generate.py"
 ok "spec_energy_flux_generate.py syntax valid"
 

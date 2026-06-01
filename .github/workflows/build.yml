@@ -153,10 +153,10 @@ jobs:
       - name: Smoke test
         if: ${{ github.event_name != 'release' && matrix.btype != 'Debug' }}
         run: |
-          mkdir -p release
-          cp -f bin/idtech3* release/ || true
+          chmod +x scripts/stage_ci_release.sh scripts/smoke_test.sh scripts/lib/release_bin.sh \
+            scripts/q3_openarena_compat_check.sh scripts/spec_energy_runtime_check.sh
           cp -f bin/*.dll release/ 2>/dev/null || true
-          chmod +x scripts/smoke_test.sh
+          ./scripts/stage_ci_release.sh release bin
           ./scripts/smoke_test.sh release
 
       - name: Renderer regression check (Tier A)
@@ -426,12 +426,14 @@ jobs:
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE"
-          mkdir -p release
+          mkdir -p release bin
           sfx='${{ matrix.suffix }}'
-          cp -f "bin/idtech3_server${sfx}.exe" release/idtech3_server.exe
-          cp -f "bin/idtech3${sfx}.exe" release/idtech3.exe
+          cp -f "bin/idtech3_server${sfx}.exe" bin/idtech3_server.exe
+          cp -f "bin/idtech3${sfx}.exe" bin/idtech3.exe
           cp -f bin/*.dll release/ 2>/dev/null || true
-          chmod +x scripts/smoke_test.sh
+          chmod +x scripts/stage_ci_release.sh scripts/smoke_test.sh scripts/lib/release_bin.sh \
+            scripts/q3_openarena_compat_check.sh scripts/spec_energy_runtime_check.sh
+          ./scripts/stage_ci_release.sh release bin
           ./scripts/smoke_test.sh release
 
       - uses: actions/upload-artifact@v4
@@ -541,15 +543,15 @@ jobs:
       - name: Smoke test
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
         run: |
-          mkdir -p release
-          cp -f bin/idtech3* release/ || true
-          chmod +x scripts/smoke_test.sh
+          chmod +x scripts/stage_ci_release.sh scripts/smoke_test.sh scripts/lib/release_bin.sh \
+            scripts/q3_openarena_compat_check.sh scripts/spec_energy_runtime_check.sh
+          ./scripts/stage_ci_release.sh release bin
           ./scripts/smoke_test.sh release
 
       - name: CTest (make test)
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
         run: |
-          cd build-vk-${{ matrix.btype }} && ctest -C ${{ matrix.btype }} --output-on-failure -V
+          cd build-vk-${{ matrix.btype }} && ctest -C ${{ matrix.btype }} --output-on-failure -V -j1
 
       - uses: actions/upload-artifact@v4
         if: matrix.cc == 'gcc' && matrix.btype == 'Release'

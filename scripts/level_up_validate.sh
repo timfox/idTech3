@@ -47,8 +47,8 @@ fi
 
 if [ -d "$PROJECT_ROOT/build-vk-Release" ]; then
 	echo "--- 6/6 CTest (subset: scripts + units) ---"
-	( cd build-vk-Release && ctest -C Release -L "scripts;unit" --output-on-failure ) || \
-		( cd build-vk-Release && ctest -C Release --output-on-failure -R 'test_beta_trace|test_run_openarena|unit_' )
+	( cd build-vk-Release && ctest -C Release --output-on-failure -j1 \
+		-R 'test_beta_trace|test_level_up|test_run_openarena|unit_' )
 	echo ""
 else
 	echo "--- 6/6 CTest SKIPPED (build-vk-Release missing) ---"
