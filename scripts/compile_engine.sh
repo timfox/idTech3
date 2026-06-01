@@ -474,6 +474,12 @@ copy_to_release() {
     chmod +x "$dest/trellis_image_to_glb.py"
     echo "Copied trellis_image_to_glb.py -> $dest/trellis_image_to_glb.py"
   fi
+
+  if [ -f "$PROJECT_ROOT/scripts/spec_energy_flux_generate.py" ]; then
+    cp -f "$PROJECT_ROOT/scripts/spec_energy_flux_generate.py" "$dest/spec_energy_flux_generate.py"
+    chmod +x "$dest/spec_energy_flux_generate.py"
+    echo "Copied spec_energy_flux_generate.py -> $dest/spec_energy_flux_generate.py"
+  fi
 }
 
 echo ""

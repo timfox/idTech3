@@ -227,6 +227,8 @@ Requires OpenSSL. When enabled, use `net_dtls 1` and `net_dtls_key <shared-secre
 | `release/idtech3_vulkan.so` | Vulkan renderer plugin |
 | `release/idtech3_opengl.so` | OpenGL renderer plugin |
 | `release/flux_cli` | FLUX.2 image generation tool |
+| `release/trellis_image_to_glb.py` | TRELLIS.2 image-to-3D wrapper (when `USE_TRELLIS=ON`) |
+| `release/spec_energy_flux_generate.py` | Spectral-Energy hi-res FLUX wrapper (when `USE_SPEC_ENERGY=ON`) |
 
 ### Minimal game data (engine-only trees)
 

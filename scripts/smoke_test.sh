@@ -144,6 +144,11 @@ if [ -n "$CLIENT_PATH" ]; then
   else
     warn "flux_generate not in client (USE_FLUX=OFF or stripped build)"
   fi
+  if grep -q spec_energy_generate < <(strings "$CLIENT_PATH" 2>/dev/null); then
+    pass "client exports spec_energy_generate (USE_SPEC_ENERGY)"
+  else
+    warn "spec_energy_generate not in client (USE_SPEC_ENERGY=OFF or stripped build)"
+  fi
 else
   warn "idtech3 not found, skipping generative symbol checks"
 fi
@@ -154,6 +159,28 @@ if [ -f "$RELEASE_DIR/trellis_image_to_glb.py" ]; then
   fi
 else
   warn "trellis_image_to_glb.py missing (non-TRELLIS build or old release copy)"
+fi
+if [ -f "$RELEASE_DIR/spec_energy_flux_generate.py" ]; then
+  pass "spec_energy_flux_generate.py present in release"
+  if head -1 "$RELEASE_DIR/spec_energy_flux_generate.py" | grep -q python; then
+    pass "spec_energy_flux_generate.py looks like Python wrapper"
+  fi
+else
+  warn "spec_energy_flux_generate.py missing (non-spec-energy build or old release copy)"
+fi
+
+if [ -x "$SCRIPT_DIR/spec_energy_runtime_check.sh" ]; then
+  # Some CI jobs (eg ASAN) build via raw CMake and only copy binaries into release/,
+  # so the Python wrapper may be intentionally absent. Treat that as a warning.
+  if [ -f "$RELEASE_DIR/spec_energy_flux_generate.py" ]; then
+    if "$SCRIPT_DIR/spec_energy_runtime_check.sh" "$RELEASE_DIR"; then
+      pass "spec_energy_runtime_check.sh"
+    else
+      fail "spec_energy_runtime_check.sh"
+    fi
+  else
+    warn "spec_energy_runtime_check skipped (release/spec_energy_flux_generate.py missing)"
+  fi
 fi
 
 echo ""

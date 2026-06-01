@@ -26,11 +26,19 @@ echo "1. Verifying shader compilation..."
 ./scripts/compile_shaders.sh
 echo ""
 
+echo "1b. Checking Vulkan generated shader determinism..."
+./scripts/vk_shader_determinism_check.sh
+echo ""
+
+echo "1c. Checking Vulkan feature gates (static)..."
+./scripts/vulkan_state_of_art_check.sh
+echo ""
+
 echo "2. Building Vulkan (Release)..."
 ./scripts/compile_engine.sh vulkan
 echo ""
 
-echo "3. Running smoke test (includes Q3/OA compat check)..."
+echo "3. Running smoke test (includes Q3/OA compat + spec_energy gates)..."
 ./scripts/smoke_test.sh release
 echo ""
 

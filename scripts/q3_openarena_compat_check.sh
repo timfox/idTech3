@@ -71,6 +71,13 @@ else
 	fail "cl_trellis_enable default not 0"
 fi
 
+if grep -q 'cl_spec_energy_enable' "$PROJECT_ROOT/src/client/cl_spec_energy.c" && \
+   grep -q '"cl_spec_energy_enable", "0"' "$PROJECT_ROOT/src/client/cl_spec_energy.c"; then
+	pass "cl_spec_energy_enable defaults to 0"
+else
+	fail "cl_spec_energy_enable default not 0"
+fi
+
 if grep -qE 'r_vegWind[[:space:]]*=[[:space:]]*ri\.Cvar_Get\([[:space:]]*"r_vegWind"[[:space:]]*,[[:space:]]*"0"' \
 	"$PROJECT_ROOT/src/renderers/vulkan/vk_postfx.c"; then
 	pass "r_vegWind defaults to 0 (classic maps unchanged unless enabled)"
@@ -105,6 +112,9 @@ if grep -qE 'r_vdbFog[[:space:]]*=[[:space:]]*ri\.Cvar_Get\([[:space:]]*"r_vdbFo
 else
 	fail "r_vdbFog default not 0"
 fi
+
+assert_cvar_default_off "$PROJECT_ROOT/src/renderers/vulkan/tr_init.c" "r_classicMod" \
+	"r_classicMod defaults to 0 (classic QVM preset off until enabled)"
 
 assert_cvar_default_off "$PROJECT_ROOT/src/qcommon/csharp_debug.c" "cs_autoInit" \
 	"cs_autoInit defaults to 0 (C# runtime manual until cs_reload)"
@@ -142,6 +152,19 @@ if grep -q 'defined(USE_VULKAN_API)' "$PROJECT_ROOT/src/client/cl_main.c" && \
 	pass "Vulkan SDL probe + OpenGL fallback enabled on all platforms (cl_main)"
 else
 	fail "cl_main missing all-platform GLimp_VulkanAvailable fallback"
+fi
+
+if grep -q 'Cmd_AddCommand.*"classic_mod"' "$PROJECT_ROOT/src/client/cl_main.c" && \
+   grep -q 'vk_apply_classic_mod_preset' "$PROJECT_ROOT/src/renderers/vulkan/vk_init_device.c"; then
+	pass "classic_mod command + Vulkan classic preset present"
+else
+	fail "classic_mod / r_classicMod preset missing"
+fi
+
+if [ -f "$PROJECT_ROOT/docs/OPENARENA.md" ] && [ -x "$PROJECT_ROOT/scripts/run_openarena.sh" ]; then
+	pass "OPENARENA.md and run_openarena.sh present"
+else
+	fail "OpenArena playbook or launcher script missing"
 fi
 
 SERVER="$(bin_path idtech3_server)"

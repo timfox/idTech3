@@ -48,6 +48,7 @@ This document summarizes compatibility considerations, known issues, and mitigat
 | `r_vid_driver` | SDL video driver (x11, wayland, kmsdrm) | Auto-retry wayland if x11 fails on ARM |
 | `r_fbo` | Enable HDR/post-processing | 0 disables if issues |
 | `r_rpi_profile` | RPi performance preset | Disables SSAO, volumetrics, etc. |
+| `r_classicMod` | Q3/OA classic preset | Disables Forward+, volumetrics, RTX, VDB, etc. at Vulkan init |
 
 ## VM / Game Module Loading
 
@@ -71,6 +72,8 @@ Details: [ARCHITECTURE.md](ARCHITECTURE.md#native-game-modules-vm) (`vm.c`, `vm_
 
 Classic `.pk3` content runs on the Vulkan renderer (`cl_renderer vulkan`, default in most builds). Optional features stay **off by default** so stock maps match vanilla unless you enable them (Forward+, RTX, VDB fog, vegetation wind, etc.).
 
+Use **`r_classicMod 1`** (or console **`classic_mod`**) before **`vid_restart`** to apply a renderer preset that disables heavy Vulkan features (SSAO, volumetrics, Forward+, RTX demo, VDB fog blend, generative hooks). Default is **0**. See [OPENARENA.md](OPENARENA.md).
+
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
 | Bright areas too dark / HDR looks wrong | Gamma-encoded BSP lightmaps (common in mod maps) | `r_lightmap_srgb_decode 1` then `vid_restart` (vanilla Q3A maps usually keep default **0**) |
@@ -82,6 +85,10 @@ Classic `.pk3` content runs on the Vulkan renderer (`cl_renderer vulkan`, defaul
 After engine changes, run `./scripts/q3_openarena_compat_check.sh release` (no game data required) and smoke-test with your retail/OA `.pk3` tree. Optional starter cvars: copy [examples/q3_vulkan_compat.cfg](../examples/q3_vulkan_compat.cfg) into your gamedir and `+exec q3_vulkan_compat`.
 
 **Automated map load (no retail pk3):** `./scripts/run_renderer_tier_b_devdata.sh` uses `docs/renderer_validation/devdata/rtest_base` (dedicated server + stub BSPs). Full retail/OA trees: set `GAME_BASE` and run `./scripts/renderer_regression_maps.sh`.
+
+### Optional generative runtime hooks (FLUX / TRELLIS / spec_energy)
+
+Client-side **FLUX**, **TRELLIS**, and **Spectral-Energy** pipelines are **off by default** (`cl_flux_enable`, `cl_trellis_enable`, and `cl_spec_energy_enable` default to **0**). They run external Python/CUDA tools out-of-process and do not affect classic QVM mod loading when disabled. See [TRELLIS.md](TRELLIS.md) and [SPEC_ENERGY.md](SPEC_ENERGY.md).
 
 ## Troubleshooting Quick Reference
 

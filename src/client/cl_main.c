@@ -43,9 +43,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifdef USE_FLUX
 #include "flux.h"
 #endif
-#if ( defined( USE_FLUX ) || defined( USE_TRELLIS ) ) && USE_SDL
+#include "cl_pipeline.h"
+#ifdef USE_SPEC_ENERGY
+#include "cl_spec_energy.h"
+#endif
+#if ( defined( USE_FLUX ) || defined( USE_TRELLIS ) || defined( USE_SPEC_ENERGY ) ) && USE_SDL
 #include <SDL2/SDL_thread.h>
-#elif defined( USE_FLUX ) || defined( USE_TRELLIS )
+#elif defined( USE_FLUX ) || defined( USE_TRELLIS ) || defined( USE_SPEC_ENERGY )
 typedef struct SDL_Thread SDL_Thread;
 #endif
 
@@ -207,167 +211,6 @@ static void CL_Open_f( void ) {
 	Cvar_Set( "ui_open_tab", "" );
 	Com_Printf( "open: unhandled target '%s'\n", target );
 }
-
-#if defined( USE_FLUX ) || defined( USE_TRELLIS )
-static qboolean CL_ShellEscapeArg( const char *in, char *out, size_t out_size ) {
-	size_t pos = 0;
-	if ( !in || !out || out_size == 0 ) {
-		return qfalse;
-	}
-
-	for ( const char *p = in; *p; ++p ) {
-		char c = *p;
-		if ( c == '\n' || c == '\r' || c == '\t' ) {
-			c = ' ';
-		}
-		if ( c == '"' || c == '\\' || c == '$' || c == '`' ) {
-			if ( pos + 2 >= out_size ) {
-				return qfalse;
-			}
-			out[pos++] = '\\';
-			out[pos++] = c;
-		} else {
-			if ( pos + 1 >= out_size ) {
-				return qfalse;
-			}
-			out[pos++] = c;
-		}
-	}
-	out[pos] = '\0';
-	return qtrue;
-}
-
-static qboolean CL_PipelineAppendEscaped( char *out, size_t *len, size_t maxlen, const char *raw ) {
-	char esc[4096];
-	size_t add;
-
-	if ( !raw ) {
-		raw = "";
-	}
-	if ( !CL_ShellEscapeArg( raw, esc, sizeof( esc ) ) ) {
-		return qfalse;
-	}
-	add = strlen( esc );
-	if ( *len + add >= maxlen ) {
-		return qfalse;
-	}
-	memcpy( out + *len, esc, add + 1 );
-	*len += add;
-	return qtrue;
-}
-
-typedef struct {
-	const char *repo;
-	const char *base;
-	const char *engine;
-	const char *py;
-	const char *conda;
-	const char *image;
-	const char *output;
-	const char *model;
-	const char *decimation;
-	const char *texture_size;
-	const char *args;
-} cl_pipeline_expand_t;
-
-static qboolean CL_PipelineExpandTemplate( char *out, size_t maxlen, const char *tmpl,
-		const cl_pipeline_expand_t *ex ) {
-	size_t o = 0;
-	const char *p;
-
-	if ( !tmpl || !*tmpl || maxlen < 8 || !ex ) {
-		return qfalse;
-	}
-	out[0] = '\0';
-	for ( p = tmpl; *p && o + 1 < maxlen; ) {
-		if ( p[0] == '%' && p[1] == '%' ) {
-			out[o++] = '%';
-			p += 2;
-			continue;
-		}
-		if ( p[0] == '%' && p[1] == 'R' ) {
-			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->repo ) ) {
-				return qfalse;
-			}
-			p += 2;
-			continue;
-		}
-		if ( p[0] == '%' && p[1] == 'B' ) {
-			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->base ) ) {
-				return qfalse;
-			}
-			p += 2;
-			continue;
-		}
-		if ( p[0] == '%' && p[1] == 'E' ) {
-			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->engine ) ) {
-				return qfalse;
-			}
-			p += 2;
-			continue;
-		}
-		if ( p[0] == '%' && p[1] == 'P' ) {
-			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->py ) ) {
-				return qfalse;
-			}
-			p += 2;
-			continue;
-		}
-		if ( p[0] == '%' && p[1] == 'N' ) {
-			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->conda ) ) {
-				return qfalse;
-			}
-			p += 2;
-			continue;
-		}
-		if ( p[0] == '%' && p[1] == 'I' ) {
-			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->image ) ) {
-				return qfalse;
-			}
-			p += 2;
-			continue;
-		}
-		if ( p[0] == '%' && p[1] == 'O' ) {
-			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->output ) ) {
-				return qfalse;
-			}
-			p += 2;
-			continue;
-		}
-		if ( p[0] == '%' && p[1] == 'M' ) {
-			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->model ) ) {
-				return qfalse;
-			}
-			p += 2;
-			continue;
-		}
-		if ( p[0] == '%' && p[1] == 'D' ) {
-			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->decimation ) ) {
-				return qfalse;
-			}
-			p += 2;
-			continue;
-		}
-		if ( p[0] == '%' && p[1] == 'T' ) {
-			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->texture_size ) ) {
-				return qfalse;
-			}
-			p += 2;
-			continue;
-		}
-		if ( p[0] == '%' && p[1] == 'A' ) {
-			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->args ) ) {
-				return qfalse;
-			}
-			p += 2;
-			continue;
-		}
-		out[o++] = *p++;
-	}
-	out[o] = '\0';
-	return qtrue;
-}
-#endif
 
 #ifdef USE_TRELLIS
 cvar_t	*cl_trellis_enable;
@@ -1915,6 +1758,36 @@ CL_Vid_Restart_f
 Wrapper for CL_Vid_Restart
 =================
 */
+/*
+=================
+CL_ClassicMod_f
+
+Apply Quake III / OpenArena-friendly renderer and client toggles (no gameplay change).
+=================
+*/
+static void CL_ClassicMod_f( void ) {
+	Cvar_Set( "r_classicMod", "1" );
+#ifdef USE_FLUX
+	if ( cl_flux_enable ) {
+		Cvar_Set( "cl_flux_enable", "0" );
+	}
+#endif
+#ifdef USE_TRELLIS
+	if ( cl_trellis_enable ) {
+		Cvar_Set( "cl_trellis_enable", "0" );
+	}
+#endif
+#ifdef USE_SPEC_ENERGY
+	{
+		cvar_t *enable = Cvar_Get( "cl_spec_energy_enable", "0", CVAR_ARCHIVE );
+		if ( enable ) {
+			Cvar_Set( "cl_spec_energy_enable", "0" );
+		}
+	}
+#endif
+	Com_Printf( "Classic mod preset: r_classicMod 1; generative hooks off. Run vid_restart to apply Vulkan latch cvars.\n" );
+}
+
 static void CL_Vid_Restart_f( void ) {
 
 	if ( Q_stricmp( Cmd_Argv( 1 ), "keep_window" ) == 0 || Q_stricmp( Cmd_Argv( 1 ), "fast" ) == 0 ) {
@@ -3082,7 +2955,7 @@ static void CL_Steam_UpdateRichPresence( void ) {
 	}
 }
 
-#ifdef USE_TRELLIS
+#if defined( USE_TRELLIS ) || defined( USE_SPEC_ENERGY )
 void CL_GenerativeFrame( void );
 #endif
 
@@ -3103,7 +2976,7 @@ void CL_Frame( int msec, int realMsec ) {
 		return;
 	}
 
-#ifdef USE_TRELLIS
+#if defined( USE_TRELLIS ) || defined( USE_SPEC_ENERGY )
 	CL_GenerativeFrame();
 #endif
 
@@ -4384,6 +4257,7 @@ void CL_Init( void ) {
 	Cmd_AddCommand ("clientinfo", CL_Clientinfo_f);
 	Cmd_AddCommand ("snd_restart", CL_Snd_Restart_f);
 	Cmd_AddCommand ("vid_restart", CL_Vid_Restart_f);
+	Cmd_AddCommand ("classic_mod", CL_ClassicMod_f );
 	Cmd_AddCommand ("reloadTtf", CL_ReloadTtf_f );
 	Cmd_AddCommand ("disconnect", CL_Disconnect_f);
 	CL_Demo_InitCommands();
@@ -4486,6 +4360,11 @@ void CL_Init( void ) {
 #else
 	Com_Printf( "TRELLIS.2 image-to-3D: not available (compiled without USE_TRELLIS)\n" );
 #endif
+#ifdef USE_SPEC_ENERGY
+	CL_SpecEnergyInit();
+#else
+	Com_Printf( "Spec-energy hi-res FLUX: not available (compiled without USE_SPEC_ENERGY)\n" );
+#endif
 
 	CL_InitGameSystems();
 
@@ -4567,6 +4446,9 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 	}
 #endif
 	trellis_job.status = TRELLIS_JOB_IDLE;
+#endif
+#ifdef USE_SPEC_ENERGY
+	CL_SpecEnergyShutdown();
 #endif
 
 	Cmd_RemoveCommand ("cmd");
@@ -6509,20 +6391,26 @@ static void CL_TrellisMaybeChainFromFlux( void ) {
 }
 #endif
 
+#endif /* USE_TRELLIS */
+
+#if defined( USE_TRELLIS ) || defined( USE_SPEC_ENERGY )
 /*
 ==================
-CL_GenerativeFrame — per-frame FLUX/TRELLIS job notifications and chaining
+CL_GenerativeFrame — per-frame generative job notifications and chaining
 ==================
 */
 void CL_GenerativeFrame( void ) {
 #ifdef USE_TRELLIS
 	CL_TrellisFrame();
 #endif
+#ifdef USE_SPEC_ENERGY
+	CL_SpecEnergyFrame();
+#endif
 #if defined( USE_FLUX ) && defined( USE_TRELLIS )
 	CL_TrellisMaybeChainFromFlux();
 #endif
 }
-#endif
+#endif /* USE_TRELLIS || USE_SPEC_ENERGY */
 
 
 #ifdef USE_CURL

@@ -34,6 +34,7 @@ option(C_STANDARD_STRICT "Enable the stricter warning set for engine builds" ON)
 option(CI_BUILD "Enable CI-specific behaviors such as warnings-as-errors" OFF)
 option(USE_FLUX "Enable FLUX.2 image generation support" ON)
 option(USE_TRELLIS "Enable Microsoft TRELLIS.2 external 3D generation hook" ON)
+option(USE_SPEC_ENERGY "Enable Spectral-Energy hi-res FLUX external generation hook" ON)
 option(ENABLE_FORTIFY_SOURCE "Enable _FORTIFY_SOURCE=2 buffer overflow protection (GCC/Clang)" ON)
 option(ENABLE_ASAN "Enable AddressSanitizer for memory error detection (Debug builds)" OFF)
 option(ENABLE_LTO "Enable IPO/LTO for Release and RelWithDebInfo (GCC/Clang; longer links, smaller/faster binaries)" OFF)
@@ -1755,6 +1756,10 @@ if(USE_TRELLIS)
 	target_compile_definitions(client PRIVATE USE_TRELLIS)
 endif()
 
+if(USE_SPEC_ENERGY)
+	target_compile_definitions(client PRIVATE USE_SPEC_ENERGY)
+endif()
+
 # renderers
 set(RENDERER_COMMON_SRCS
 	src/renderers/common/tr_font_stub.c  # placeholder, will be replaced below
@@ -2502,6 +2507,30 @@ set_tests_properties(smoke_test PROPERTIES
 	LABELS "validation;smoke"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/release/idtech3_server"
 	# Avoid parallel runs with renderer_regression_check (both hammer glslang; server startup is CPU-sensitive).
+	RESOURCE_LOCK "idtech3_headless_validation")
+
+add_test(NAME spec_energy_runtime_check
+	COMMAND ${CMAKE_SOURCE_DIR}/scripts/spec_energy_runtime_check.sh ${CMAKE_SOURCE_DIR}/release
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(spec_energy_runtime_check PROPERTIES
+	LABELS "validation;scripts"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/release/idtech3"
+	RESOURCE_LOCK "idtech3_headless_validation")
+
+add_test(NAME vk_shader_determinism_check
+	COMMAND ${CMAKE_SOURCE_DIR}/scripts/vk_shader_determinism_check.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(vk_shader_determinism_check PROPERTIES
+	LABELS "validation;renderer;scripts"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/compile_shaders.sh;${CMAKE_SOURCE_DIR}/src/renderers/vulkan/shaders/spirv/generated/shader_data.c"
+	RESOURCE_LOCK "idtech3_headless_validation")
+
+add_test(NAME vulkan_state_of_art_check
+	COMMAND ${CMAKE_SOURCE_DIR}/scripts/vulkan_state_of_art_check.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(vulkan_state_of_art_check PROPERTIES
+	LABELS "validation;renderer;scripts"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/src/renderers/vulkan/vk_instance.c;${CMAKE_SOURCE_DIR}/src/renderers/vulkan/vk_init_device.c"
 	RESOURCE_LOCK "idtech3_headless_validation")
 
 add_test(NAME renderer_regression_check

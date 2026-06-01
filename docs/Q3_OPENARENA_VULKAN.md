@@ -30,6 +30,8 @@ export GAME_BASE=/path/to/baseq3   # or your OA base folder
 
 Copy [examples/q3_vulkan_compat.cfg](../examples/q3_vulkan_compat.cfg) into your gamedir and run `+exec q3_vulkan_compat`.
 
+For a one-shot classic-mod preset: `classic_mod` then `vid_restart`, or `seta r_classicMod 1` before restart. See [OPENARENA.md](OPENARENA.md).
+
 | Issue | Try |
 |-------|-----|
 | Mod maps too dark/bright (HDR) | `r_lightmap_srgb_decode 1` |

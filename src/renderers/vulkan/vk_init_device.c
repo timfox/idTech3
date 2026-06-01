@@ -102,6 +102,25 @@ static void vk_set_render_scale( void )
 	}
 }
 
+static void vk_apply_classic_mod_preset( void )
+{
+	ri.Cvar_Set( "r_volumetricFog", "0" );
+	ri.Cvar_Set( "r_ssao", "0" );
+	ri.Cvar_Set( "r_bloom", "0" );
+	ri.Cvar_Set( "r_ext_smaa", "0" );
+	ri.Cvar_Set( "r_ssr", "0" );
+	ri.Cvar_Set( "r_sharpen", "0.0" );
+	ri.Cvar_Set( "r_exposure_auto", "0" );
+	ri.Cvar_Set( "r_fogFluid", "0" );
+	ri.Cvar_Set( "r_forwardPlus", "0" );
+	ri.Cvar_Set( "r_rtx", "0" );
+	ri.Cvar_Set( "r_rtxDemo", "0" );
+	ri.Cvar_Set( "r_rtxEntities", "0" );
+	ri.Cvar_Set( "r_vdbFog", "0" );
+	ri.Cvar_Set( "r_vdb", "0" );
+	ri.Cvar_Set( "r_vegWind", "0" );
+}
+
 void vk_initialize( void )
 {
 	char buf[64], driver_version[64];
@@ -134,6 +153,14 @@ void vk_initialize( void )
 			ri.Printf( PRINT_ALL, "[VK] Raspberry Pi (V3DV) detected: applied r_rpi_profile preset\n" );
 		} else {
 			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "[VK] Raspberry Pi (V3DV) detected. For performance: set r_rpi_profile 1; vid_restart\n" S_COLOR_WHITE );
+		}
+	}
+
+	{
+		cvar_t *r_classicMod = ri.Cvar_Get( "r_classicMod", "0", CVAR_ARCHIVE );
+		if ( r_classicMod->integer ) {
+			vk_apply_classic_mod_preset();
+			ri.Printf( PRINT_ALL, "[VK] r_classicMod=1: applied classic QVM mod preset (Q3/OA-safe Vulkan)\n" );
 		}
 	}
 

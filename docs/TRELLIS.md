@@ -2,6 +2,8 @@
 
 This engine does **not** embed the [TRELLIS.2](https://github.com/microsoft/TRELLIS.2) PyTorch/CUDA stack. Like **FLUX** (`flux_generate`), TRELLIS runs as a **runtime asset pipeline**: background jobs, status/cancel, and automatic registration of the produced asset in the renderer.
 
+For **hi-res 2D** FLUX generation (Spectral-Energy Guided Attention), see [SPEC_ENERGY.md](SPEC_ENERGY.md) (`spec_energy_generate`).
+
 ## Parity with FLUX
 
 | FLUX (2D textures) | TRELLIS (3D models) |
