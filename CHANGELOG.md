@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Caspar (SymForce experimental):** optional submodule `external/symforce` (tag **v0.10.1**), `docs/CASPAR.md`, `scripts/build_symforce_caspar.sh`, `caspar_check.sh`, BAL/kernel runners; CTest `test_caspar_integration`. Not linked into `idtech3` — GPU symbolic optimization for robotics tooling (arXiv:2605.30583).
 - **C# scripting (Mono):** optional `USE_CSHARP=ON` embeds Mono for runtime `.cs` scripts (`cs_reload`, `cs_list`, `cs_dump`); shared events with JavaScript via `Com_ScriptEmitEvent`; API in `src/qcommon/csharp/IdTech3.Engine.cs`; `IdTech3.Engine.Exec`; demo mod `demo_csharp.cfg`; see **`docs/CSHARP.md`**.
 - **Lua `Engine.*` on client:** `LuaBindings_RegisterAll` runs when the Lua VM opens (`LuaDebug_SetEngineRegisterCallback` from `CL_Init`).
 - Optional Git submodule **`tools/tiled`**: [Tiled Map Editor](https://www.mapeditor.org/) (GPL-2.0, upstream `mapeditor/tiled`, pinned tag **v1.9.91**); not linked into the engine — see **`docs/TILED.md`**. Init via **`scripts/init_optional_submodules.sh`** (`--tiled`, `--svo`, `--all`, `--dry-run`). Designer sample: **`examples/tiled/minimal_demo.tmx`**; CTest **`test_init_optional_submodules`**.

@@ -2539,6 +2539,13 @@ set_tests_properties(test_init_optional_submodules PROPERTIES
 	LABELS "scripts;validation"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_init_optional_submodules.sh;${CMAKE_SOURCE_DIR}/scripts/init_optional_submodules.sh")
 
+add_test(NAME test_caspar_integration
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_caspar_integration.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_caspar_integration PROPERTIES
+	LABELS "scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_caspar_integration.sh;${CMAKE_SOURCE_DIR}/docs/CASPAR.md")
+
 add_test(NAME test_csharp_scripting
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_csharp_scripting.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

@@ -16,7 +16,7 @@ fail() {
 "$INIT" --help >/dev/null || fail "--help must exit 0"
 
 if "$INIT" 2>/dev/null; then
-	fail "must require --tiled, --svo, or --all"
+	fail "must require --tiled, --svo, --symforce, or --all"
 fi
 
 out="$("$INIT" --tiled --dry-run 2>&1)" || fail "--tiled --dry-run failed"
@@ -25,6 +25,13 @@ echo "$out" | grep -q 'tools/tiled' || fail "dry-run must mention tools/tiled"
 
 if ! grep -qF 'path = tools/tiled' "$PROJECT_ROOT/.gitmodules"; then
 	fail ".gitmodules missing tools/tiled"
+fi
+
+out_sf="$("$INIT" --symforce --dry-run 2>&1)" || fail "--symforce --dry-run failed"
+echo "$out_sf" | grep -q 'external/symforce' || fail "dry-run must mention external/symforce"
+
+if ! grep -qF 'path = external/symforce' "$PROJECT_ROOT/.gitmodules"; then
+	fail ".gitmodules missing external/symforce"
 fi
 
 echo "PASS: init_optional_submodules.sh"

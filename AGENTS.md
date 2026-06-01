@@ -57,3 +57,4 @@ Build artifacts go to `build-vk-Release/` or `build-gl-Release/` and are copied 
 ### Optional submodules
 
 - **Tiled Map Editor** (`tools/tiled`, GPL-2.0): `./scripts/init_optional_submodules.sh --tiled` — not built by `compile_engine.sh`; see `docs/TILED.md`.
+- **SymForce / Caspar** (`external/symforce`, Apache-2.0): `./scripts/init_optional_submodules.sh --symforce` then `./scripts/build_symforce_caspar.sh` — experimental CUDA symbolic kernels + GPU solver; not linked into the engine; see `docs/CASPAR.md`.

@@ -4,3 +4,6 @@
 [submodule "tools/tiled"]
 	path = tools/tiled
 	url = https://github.com/mapeditor/tiled.git
+[submodule "external/symforce"]
+	path = external/symforce
+	url = https://github.com/symforce-org/symforce.git
