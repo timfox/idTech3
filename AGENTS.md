@@ -37,6 +37,10 @@ Build artifacts go to `build-vk-Release/` or `build-gl-Release/` and are copied 
 
 `scripts/run_clang_tidy.sh` and `scripts/run_cppcheck.sh` are available for optional local static analysis. CI primarily enforces quality through compiler warnings (`-Wall -Wextra -Wpedantic` and more), with `CI_BUILD=OFF` in the current workflow so warnings are not treated as errors by default.
 
+### Automated beta traces (client)
+
+Recording/replay of `usercmd_t` streams and high-level JSONL events for regression testing (paper-inspired). See **`docs/BETA_AUTOMATED_TESTING.md`**. Console: `beta_record`, `beta_play`, `beta_test`, `beta_event`. Example files: `examples/demo_game/beta_traces/`.
+
 ### Running
 
 - **Dedicated server**: `./release/idtech3_server +set dedicated 1 +set com_hunkMegs 64`

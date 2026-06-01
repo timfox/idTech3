@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cl.input.c  -- builds an intended movement command to send to the server
 
 #include "client.h"
+#include "cl_beta_trace.h"
 #include "../qcommon/script_emit.h"
 
 static unsigned frame_msec;
@@ -596,6 +597,12 @@ static usercmd_t CL_CreateCmd( void ) {
 	usercmd_t	cmd;
 	vec3_t		oldAngles;
 
+	if ( CL_BetaTrace_ShouldSuppressInput() ) {
+		Com_Memset( &cmd, 0, sizeof( cmd ) );
+		CL_FinishMove( &cmd );
+		return cmd;
+	}
+
 	VectorCopy( cl.viewangles, oldAngles );
 
 	// keyboard angle adjustment
@@ -672,6 +679,7 @@ static void CL_CreateNewCommands( void ) {
 	cl.cmdNumber++;
 	cmdNum = cl.cmdNumber & CMD_MASK;
 	cl.cmds[cmdNum] = CL_CreateCmd();
+	CL_BetaTrace_OnUserCmd( &cl.cmds[cmdNum] );
 }
 
 

@@ -2532,6 +2532,13 @@ set_tests_properties(test_demo_game_pk3 PROPERTIES
 	LABELS "scripts;validation;examples"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_demo_game_pk3.sh")
 
+add_test(NAME test_beta_trace_format
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_beta_trace_format.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_beta_trace_format PROPERTIES
+	LABELS "scripts;validation;client"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_beta_trace_format.sh;${CMAKE_SOURCE_DIR}/docs/BETA_AUTOMATED_TESTING.md")
+
 add_test(NAME test_init_optional_submodules
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_init_optional_submodules.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
