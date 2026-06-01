@@ -68,6 +68,7 @@ Wrapper script: `release/spec_energy_flux_generate.py` (copied on build).
 Optional checks (no GPU):
 
 - `./scripts/spec_energy_runtime_check.sh release` — client symbols + wrapper script
+- `./scripts/spec_energy_check.sh /path/to/upstream` — upstream repo layout
 - `python3 -m py_compile release/spec_energy_flux_generate.py`
 
 Background jobs finalize on the **main thread**; use `spec_energy_view` after completion for hot-reload.

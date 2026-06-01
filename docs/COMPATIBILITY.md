@@ -65,6 +65,10 @@ Retail **Quake III Arena**, **OpenArena**, and most classic **`.pk3` mods** expe
 
 Details: [ARCHITECTURE.md](ARCHITECTURE.md#native-game-modules-vm) (`vm.c`, `vm_native_module.c`, `FS_LoadLibrary`).
 
+### Optional generative runtime hooks (FLUX / TRELLIS / spec_energy)
+
+Client-side **FLUX**, **TRELLIS**, and **Spectral-Energy** pipelines are **off by default** (`cl_flux_enable`, `cl_trellis_enable`, and `cl_spec_energy_enable` default to **0**). They run external Python/CUDA tools out-of-process and do not affect classic QVM mod loading when disabled. See [TRELLIS.md](TRELLIS.md) and [SPEC_ENERGY.md](SPEC_ENERGY.md).
+
 ## Troubleshooting Quick Reference
 
 | Symptom | Likely cause | Fix |

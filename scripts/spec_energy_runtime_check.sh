@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # CI/local check: Spectral-Energy runtime hook artifacts (no GPU inference).
-# Usage: ./scripts/spec_energy_runtime_check.sh [release_dir]
+# Usage: ./scripts/spec_energy_runtime_check.sh [release_dir] [upstream_repo]
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 RELEASE_DIR="${1:-$PROJECT_ROOT/release}"
+UPSTREAM_REPO="${2:-$PROJECT_ROOT/external/flux_spec_energy}"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 ok() { echo "OK: $*"; }
@@ -24,5 +25,10 @@ ok "spec_energy_flux_generate.py syntax valid"
 
 [ -d "$PROJECT_ROOT/external/flux_spec_energy/flux_sega" ] || fail "vendored external/flux_spec_energy/flux_sega missing"
 ok "vendored upstream flux_sega present"
+
+if [ -n "$UPSTREAM_REPO" ]; then
+	"$SCRIPT_DIR/spec_energy_check.sh" "$UPSTREAM_REPO"
+	ok "upstream Spectral-Energy repo layout"
+fi
 
 echo "spec_energy_runtime_check: all checks passed"
