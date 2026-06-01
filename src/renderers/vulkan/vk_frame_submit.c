@@ -145,13 +145,10 @@ void vk_begin_frame( void )
 		vk.cmd->waitForFence = qfalse;
 		res = qvkWaitForFences( vk.device, 1, &vk.cmd->rendering_finished_fence, VK_FALSE, 1e10 );
 		if ( res != VK_SUCCESS ) {
-			if ( res == VK_ERROR_DEVICE_LOST ) {
-				vk.device_lost = qtrue;
-				ri.Error( ERR_FATAL, "Vulkan: %s returned %s (GPU lost)", "vkWaitForFences", vk_result_string( res ) );
+			if ( vk_handle_device_lost( res, "vkWaitForFences" ) ) {
+				return;
 			}
-			else {
-				ri.Error( ERR_FATAL, "Vulkan: %s returned %s", "vkWaitForFences", vk_result_string( res ) );
-			}
+			ri.Error( ERR_FATAL, "Vulkan: %s returned %s", "vkWaitForFences", vk_result_string( res ) );
 		}
 		VK_CHECK( qvkResetFences( vk.device, 1, &vk.cmd->rendering_finished_fence ) );
 		if ( vk.volumetric_query_pool != VK_NULL_HANDLE &&
@@ -376,8 +373,8 @@ void vk_end_frame( void )
 	{
 		VkResult sub_res = qvkQueueSubmit( vk.queue, 1, &submit_info, vk.cmd->rendering_finished_fence );
 		if ( sub_res != VK_SUCCESS ) {
-			if ( sub_res == VK_ERROR_DEVICE_LOST ) {
-				vk.device_lost = qtrue;
+			if ( vk_handle_device_lost( sub_res, "vkQueueSubmit" ) ) {
+				return;
 			}
 			ri.Error( ERR_FATAL, "Vulkan: qvkQueueSubmit returned %s", vk_result_string( sub_res ) );
 		}
@@ -448,7 +445,7 @@ void vk_present_frame( void )
 			vk_restart_swapchain( __func__, res );
 			return;
 		case VK_ERROR_DEVICE_LOST:
-			ri.Printf( PRINT_DEVELOPER, "vkQueuePresentKHR: device lost\n" );
+			(void)vk_handle_device_lost( res, "vkQueuePresentKHR" );
 			break;
 		default:
 			ri.Error( ERR_FATAL, "vkQueuePresentKHR returned %s", vk_result_string( res ) );

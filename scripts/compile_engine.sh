@@ -483,7 +483,7 @@ copy_to_release() {
 
   if [ -d "$PROJECT_ROOT/examples" ]; then
     mkdir -p "$dest/examples"
-    for cfg in q3_vulkan_compat.cfg q3_classic_mod.cfg; do
+    for cfg in q3_vulkan_compat.cfg q3_classic_mod.cfg q3_fbo_safe.cfg; do
       if [ -f "$PROJECT_ROOT/examples/$cfg" ]; then
         cp -f "$PROJECT_ROOT/examples/$cfg" "$dest/examples/$cfg"
       fi

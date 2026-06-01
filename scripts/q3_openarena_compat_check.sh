@@ -126,6 +126,33 @@ else
 	fail "VDB console commands missing from vk_vdb.c"
 fi
 
+if grep -q 'vk_handle_device_lost' "$PROJECT_ROOT/src/renderers/vulkan/vk_util.c" && \
+   grep -q 'vk_handle_device_lost' "$PROJECT_ROOT/src/renderers/vulkan/vk_frame_submit.c"; then
+	pass "Vulkan device-lost recovery (non-fatal vk_handle_device_lost)"
+else
+	fail "Vulkan device-lost recovery helper missing"
+fi
+
+if grep -q 'cl_autoClassicMod' "$PROJECT_ROOT/src/client/cl_main.c" && \
+   grep -q 'CL_MaybeAutoClassicMod' "$PROJECT_ROOT/src/client/cl_main.c"; then
+	pass "cl_autoClassicMod classic QVM base detection present"
+else
+	fail "cl_autoClassicMod auto preset missing"
+fi
+
+if [ -f "$PROJECT_ROOT/examples/q3_fbo_safe.cfg" ]; then
+	pass "examples/q3_fbo_safe.cfg FBO troubleshooting preset present"
+else
+	fail "examples/q3_fbo_safe.cfg missing"
+fi
+
+if grep -q 'PRT_ERROR, "travel type' "$PROJECT_ROOT/src/botlib/be_ai_move.c" && \
+   ! grep -q 'PRT_FATAL, "travel type' "$PROJECT_ROOT/src/botlib/be_ai_move.c"; then
+	pass "bot unimplemented travel types log PRT_ERROR (not PRT_FATAL)"
+else
+	fail "bot travel type handling still uses PRT_FATAL or missing PRT_ERROR"
+fi
+
 if grep -q 'vk.swapchainTransferSrc = qfalse;' "$PROJECT_ROOT/src/renderers/vulkan/vk_swapchain.c" && \
    ! grep -q 'ERR_FATAL.*TRANSFER_SRC' "$PROJECT_ROOT/src/renderers/vulkan/vk_swapchain.c"; then
 	pass "swapchain missing TRANSFER_SRC warns instead of ERR_FATAL"

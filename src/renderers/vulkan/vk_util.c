@@ -423,3 +423,18 @@ void vk_linear_dlight_cone_cosines( float *out_cos_outer, float *out_cos_inner )
 		*out_cos_inner = cosf( DEG2RAD( 20.0f ) );
 	}
 }
+
+qboolean vk_handle_device_lost( VkResult res, const char *apiName )
+{
+	if ( res != VK_ERROR_DEVICE_LOST ) {
+		return qfalse;
+	}
+
+	vk.device_lost = qtrue;
+	ri.Printf( PRINT_ALL, S_COLOR_YELLOW "Warning: Vulkan GPU device lost during %s.\n",
+		apiName ? apiName : "unknown" );
+	ri.Printf( PRINT_ALL, "  Try: classic_mod then vid_restart\n" );
+	ri.Printf( PRINT_ALL, "  Or:  seta cl_renderer opengl; vid_restart\n" );
+	ri.Printf( PRINT_ALL, "  FBO troubleshooting: +exec examples/q3_fbo_safe (then vid_restart)\n" );
+	return qtrue;
+}

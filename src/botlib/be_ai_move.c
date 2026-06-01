@@ -3332,7 +3332,8 @@ void BotMoveToGoal(bot_moveresult_t *result, int movestate, bot_goal_t *goal, in
 				case TRAVEL_FUNCBOB: *result = BotTravel_FuncBobbing(ms, &reach); break;
 				default:
 				{
-					botimport.Print(PRT_FATAL, "travel type %d not implemented yet\n", (reach.traveltype & TRAVELTYPE_MASK));
+					botimport.Print( PRT_ERROR, "travel type %d not implemented yet\n", (reach.traveltype & TRAVELTYPE_MASK) );
+					result->failure = qtrue;
 					break;
 				} //end case
 			} //end switch
@@ -3440,7 +3441,8 @@ void BotMoveToGoal(bot_moveresult_t *result, int movestate, bot_goal_t *goal, in
 				case TRAVEL_FUNCBOB: *result = BotFinishTravel_FuncBobbing(ms, &reach); break;
 				default:
 				{
-					botimport.Print(PRT_FATAL, "(last) travel type %d not implemented yet\n", (reach.traveltype & TRAVELTYPE_MASK));
+					botimport.Print( PRT_ERROR, "(last) travel type %d not implemented yet\n", (reach.traveltype & TRAVELTYPE_MASK) );
+					result->failure = qtrue;
 					break;
 				} //end case
 			} //end switch

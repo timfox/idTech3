@@ -4,15 +4,24 @@
 #
 # Usage:
 #   ./scripts/evidence_status.sh
+#   ./scripts/evidence_status.sh --strict   # exit 1 if release/Tier C gaps remain
 #   GAME_BASE=/path/to/base ./scripts/evidence_status.sh
 #
 # See: docs/PRODUCTION_CERTIFICATION.md, docs/renderer_validation/README.md
 
 set -euo pipefail
 
+STRICT=0
+for _arg in "$@"; do
+	case "$_arg" in
+		--strict) STRICT=1 ;;
+	esac
+done
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT"
+STRICT_ISSUES=0
 
 pass() { printf '  [ok]   %s\n' "$*"; }
 warn() { printf '  [warn] %s\n' "$*"; }
@@ -102,3 +111,18 @@ echo "Title / AAA (out of engine repo)"
 info "Game cert, telemetry, soak, platform submission: examples/title-repo/CERTIFICATION_CHECKLIST.md"
 echo ""
 echo "=== End evidence status ==="
+
+if [[ "$STRICT" -eq 1 ]]; then
+	if [[ ! -d "$ROOT/build-vk-Release" ]]; then
+		printf 'strict: build-vk-Release missing\n' >&2
+		STRICT_ISSUES=$((STRICT_ISSUES + 1))
+	fi
+	if [[ -f "$ROOT/docs/renderer_validation/FINDINGS.md" ]] && \
+		grep -q 'Add a row when you complete a real GPU pass' "$ROOT/docs/renderer_validation/FINDINGS.md" 2>/dev/null; then
+		printf 'strict: Tier C FINDINGS.md has no completed GPU session row\n' >&2
+		STRICT_ISSUES=$((STRICT_ISSUES + 1))
+	fi
+	if [[ "$STRICT_ISSUES" -gt 0 ]]; then
+		exit 1
+	fi
+fi

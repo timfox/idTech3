@@ -65,6 +65,12 @@ void vk_linear_dlight_cone_cosines( float *out_cos_outer, float *out_cos_inner )
 /* Returns qtrue if extension name is one we request for the instance. */
 qboolean vk_used_instance_extension( const char *ext );
 
+/*
+ * On VK_ERROR_DEVICE_LOST: set vk.device_lost, log recovery steps, return qtrue.
+ * Caller should skip further Vulkan work this frame (no ERR_FATAL).
+ */
+qboolean vk_handle_device_lost( VkResult res, const char *apiName );
+
 #ifdef __cplusplus
 }
 #endif

@@ -1759,6 +1759,25 @@ CL_Vid_Restart_f
 Wrapper for CL_Vid_Restart
 =================
 */
+static cvar_t *cl_autoClassicMod;
+static qboolean cl_autoClassicModApplied;
+
+static qboolean CL_BaseLooksLikeClassicQvm( const char *path ) {
+	if ( !path || !path[0] ) {
+		return qfalse;
+	}
+	if ( Q_stristr( path, "baseq3" ) ) {
+		return qtrue;
+	}
+	if ( Q_stristr( path, "openarena" ) ) {
+		return qtrue;
+	}
+	if ( Q_stristr( path, "baseoa" ) ) {
+		return qtrue;
+	}
+	return qfalse;
+}
+
 /*
 =================
 CL_ClassicMod_f
@@ -1802,6 +1821,39 @@ static void CL_ClassicMod_f( void ) {
 	}
 #endif
 	Com_Printf( "Classic mod preset applied (Q3/OA-safe Vulkan). Run vid_restart for latched renderer state.\n" );
+}
+
+/*
+=================
+CL_MaybeAutoClassicMod
+
+When fs_basegame/fs_game looks like Q3A or OpenArena, apply classic_mod once at startup.
+=================
+*/
+static void CL_MaybeAutoClassicMod( void ) {
+	cvar_t *classic;
+
+	if ( cl_autoClassicModApplied ) {
+		return;
+	}
+	cl_autoClassicModApplied = qtrue;
+
+	if ( !cl_autoClassicMod || !cl_autoClassicMod->integer ) {
+		return;
+	}
+
+	classic = Cvar_Get( "r_classicMod", "0", CVAR_ARCHIVE );
+	if ( classic && classic->integer ) {
+		return;
+	}
+
+	if ( !CL_BaseLooksLikeClassicQvm( Cvar_VariableString( "fs_basegame" ) ) &&
+		!CL_BaseLooksLikeClassicQvm( Cvar_VariableString( "fs_game" ) ) ) {
+		return;
+	}
+
+	Com_Printf( "cl_autoClassicMod: Q3/OA-style base detected — applying classic mod preset.\n" );
+	CL_ClassicMod_f();
 }
 
 static void CL_Vid_Restart_f( void ) {
@@ -4070,6 +4122,9 @@ void CL_Init( void ) {
 	cl_activeAction = Cvar_Get( "activeAction", "", CVAR_TEMP );
 	Cvar_SetDescription( cl_activeAction, "Contents of this variable will be executed upon first frame of play.\nNote: It is cleared every time it is executed." );
 
+	cl_autoClassicMod = Cvar_Get( "cl_autoClassicMod", "1", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_autoClassicMod, "When 1, apply classic_mod preset once at startup if fs_basegame/fs_game looks like baseq3 or OpenArena." );
+
 	cl_autoRecordDemo = Cvar_Get ("cl_autoRecordDemo", "0", CVAR_ARCHIVE);
 	Cvar_SetDescription( cl_autoRecordDemo, "Auto-record demos when starting or joining a game." );
 	cl_drawRecording = Cvar_Get("cl_drawRecording", "1", CVAR_ARCHIVE);
@@ -4400,6 +4455,8 @@ void CL_Init( void ) {
 #ifdef USE_LUA
 	LuaDebug_SetEngineRegisterCallback( LuaBindings_RegisterAll );
 #endif
+
+	CL_MaybeAutoClassicMod();
 
 	Com_Printf( "----- Client Initialization Complete -----\n" );
 }

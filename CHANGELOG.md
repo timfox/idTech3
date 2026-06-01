@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Renderer safety (Q3/OA):** `vk_handle_device_lost()` — GPU device loss logs recovery steps instead of immediate `ERR_FATAL`; `cl_autoClassicMod` (default 1) applies `classic_mod` when `fs_basegame`/`fs_game` looks like baseq3 or OpenArena; `examples/q3_fbo_safe.cfg` conservative post preset; bot unimplemented travel types use `PRT_ERROR` + movement failure instead of `PRT_FATAL` spam.
 - **Level-up integration:** `docs/LEVEL_UP.md`, `scripts/level_up_validate.sh`, shared `scripts/lib/release_bin.sh` (PE-safe binary string scans for smoke/compat); automated **beta trace** record/replay (`beta_record`, `beta_play`, `beta_test`); see `docs/BETA_AUTOMATED_TESTING.md`.
 - **OpenArena playbook:** `docs/OPENARENA.md`, `scripts/openarena_validate.sh`, `run_openarena.sh` / `run_openarena_server.sh`, CTest `test_run_openarena_script`, `examples/q3_classic_mod.cfg`, release `examples/*.cfg` copy on build; `r_classicMod` / `classic_mod` preset for QVM-safe Vulkan.
 - **Quake III / OpenArena (Vulkan):** `scripts/q3_openarena_compat_check.sh` (QVM path, default-off feature cvars, swapchain/HDR guards); CTest `q3_openarena_compat_check`; `examples/q3_vulkan_compat.cfg`; Vulkan troubleshooting section in `docs/COMPATIBILITY.md`.
