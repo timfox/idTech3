@@ -34,6 +34,7 @@ option(C_STANDARD_STRICT "Enable the stricter warning set for engine builds" ON)
 option(CI_BUILD "Enable CI-specific behaviors such as warnings-as-errors" OFF)
 option(USE_FLUX "Enable FLUX.2 image generation support" ON)
 option(USE_TRELLIS "Enable Microsoft TRELLIS.2 external 3D generation hook" ON)
+option(USE_SEGA "Enable SEGA hi-res FLUX external generation hook" ON)
 option(ENABLE_FORTIFY_SOURCE "Enable _FORTIFY_SOURCE=2 buffer overflow protection (GCC/Clang)" ON)
 option(ENABLE_ASAN "Enable AddressSanitizer for memory error detection (Debug builds)" OFF)
 option(ENABLE_LTO "Enable IPO/LTO for Release and RelWithDebInfo (GCC/Clang; longer links, smaller/faster binaries)" OFF)
@@ -1753,6 +1754,10 @@ endif()
 
 if(USE_TRELLIS)
 	target_compile_definitions(client PRIVATE USE_TRELLIS)
+endif()
+
+if(USE_SEGA)
+	target_compile_definitions(client PRIVATE USE_SEGA)
 endif()
 
 # renderers

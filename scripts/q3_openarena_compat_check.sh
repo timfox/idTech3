@@ -59,6 +59,13 @@ else
 	fail "cl_trellis_enable default not 0"
 fi
 
+if grep -q 'cl_sega_enable' "$PROJECT_ROOT/src/client/cl_sega.c" && \
+   grep -q '"cl_sega_enable", "0"' "$PROJECT_ROOT/src/client/cl_sega.c"; then
+	pass "cl_sega_enable defaults to 0"
+else
+	fail "cl_sega_enable default not 0"
+fi
+
 if grep -qE 'r_vegWind[[:space:]]*=[[:space:]]*ri\.Cvar_Get\([[:space:]]*"r_vegWind"[[:space:]]*,[[:space:]]*"0"' \
 	"$PROJECT_ROOT/src/renderers/vulkan/vk_postfx.c"; then
 	pass "r_vegWind defaults to 0 (classic maps unchanged unless enabled)"
