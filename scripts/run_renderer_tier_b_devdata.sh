@@ -26,6 +26,8 @@ echo ""
 "$PROJECT_ROOT/scripts/renderer_regression_check.sh"
 echo ""
 "$PROJECT_ROOT/scripts/renderer_regression_maps.sh"
+echo ""
+"$PROJECT_ROOT/scripts/tier_b_devdata_log_gate.sh"
 
 echo ""
 echo "TIER B DEVDATA PASSED"

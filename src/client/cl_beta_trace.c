@@ -28,6 +28,8 @@ typedef enum {
 
 static cvar_t *cl_betaTrace;
 static cvar_t *cl_betaTraceLog;
+static cvar_t *cl_betaTraceStudioMode;
+static cvar_t *cl_betaTraceStudioBase;
 
 static betaTraceMode_t beta_mode = BETA_MODE_IDLE;
 static fileHandle_t beta_cmdHandle = FS_INVALID_HANDLE;
@@ -51,6 +53,16 @@ static void CL_BetaTrace_LogStartup( void ) {
 	if ( cl_betaTraceLog && cl_betaTraceLog->integer ) {
 		Com_Printf( "Beta trace: cl_betaTrace=%d (beta_record / beta_play / beta_test)\n",
 			cl_betaTrace ? cl_betaTrace->integer : 0 );
+	}
+}
+
+static void CL_BetaTrace_PublishStudioCvars( void ) {
+	if ( !cl_betaTraceStudioMode ) {
+		return;
+	}
+	Cvar_Set( "cl_betaTraceStudioMode", va( "%d", (int)beta_mode ) );
+	if ( cl_betaTraceStudioBase ) {
+		Cvar_Set( "cl_betaTraceStudioBase", beta_baseName[0] ? beta_baseName : "" );
 	}
 }
 
@@ -375,6 +387,7 @@ static void CL_BetaTrace_BeginRecord( const char *base ) {
 	}
 
 	Com_Printf( "Beta trace: recording to beta_traces/%s.*\n", base );
+	CL_BetaTrace_PublishStudioCvars();
 }
 
 static qboolean CL_BetaTrace_BeginPlayback( const char *base, qboolean testMode ) {
@@ -410,6 +423,7 @@ static qboolean CL_BetaTrace_BeginPlayback( const char *base, qboolean testMode 
 
 	Com_Printf( "Beta trace: %s from beta_traces/%s.betacmd (%d bytes)\n",
 		testMode ? "testing" : "replaying", base, len );
+	CL_BetaTrace_PublishStudioCvars();
 	return qtrue;
 }
 
@@ -428,6 +442,7 @@ static void CL_BetaTrace_Stop_f( void ) {
 	beta_mode = BETA_MODE_IDLE;
 	beta_cmdReplayActive = qfalse;
 	beta_testFinished = qfalse;
+	CL_BetaTrace_PublishStudioCvars();
 	Com_Printf( "Beta trace: stopped.\n" );
 }
 
@@ -612,6 +627,8 @@ int CL_BetaTrace_LastTestResult( void ) {
 }
 
 void CL_BetaTrace_Frame( void ) {
+	CL_BetaTrace_PublishStudioCvars();
+
 	if ( beta_mode != BETA_MODE_TEST || beta_testFinished ) {
 		return;
 	}
@@ -630,6 +647,12 @@ void CL_BetaTrace_Init( void ) {
 
 	cl_betaTrace = Cvar_Get( "cl_betaTrace", "1", CVAR_ARCHIVE );
 	cl_betaTraceLog = Cvar_Get( "cl_betaTraceLog", "1", CVAR_ARCHIVE );
+	cl_betaTraceStudioMode = Cvar_Get( "cl_betaTraceStudioMode", "0", CVAR_ROM );
+	cl_betaTraceStudioBase = Cvar_Get( "cl_betaTraceStudioBase", "", CVAR_ROM );
+	Cvar_SetDescription( cl_betaTraceStudioMode,
+		"Read-only: beta trace mode for ImGui Studio (0=idle 1=record 2=replay 3=test)." );
+	Cvar_SetDescription( cl_betaTraceStudioBase,
+		"Read-only: active beta trace basename (Studio / Author panel)." );
 
 	Cmd_AddCommand( "beta_record", CL_BetaTrace_Record_f );
 	Cmd_AddCommand( "beta_stop", CL_BetaTrace_Stop_f );

@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Vulkan Studio / Author:** `r_studio_tools` adds **Studio / Author** (renderer presets, Forward+ debug, beta QA); read-only `cl_betaTraceStudioMode` / `cl_betaTraceStudioBase` for ImGui; docked via **Window** / **Studio** menus and default workspace reset.
+- **Tier B log golden gate:** `scripts/tier_b_devdata_log_gate.sh` + `docs/renderer_validation/devdata/golden_server_logs.tsv` (SHA-256 of stable dedicated-server log lines per devdata map); runs from `run_renderer_tier_b_devdata.sh`.
 - **Modernization:** Petri-net beta executor (`beta_petri_load`, `beta_petri_status`, manifest `petrinet`/`petri_goal`); `beta_status` + `test_result=pass|fail`; CTest `test_msvc_qcommon_parity` + `test_beta_petri_validate`; `run_openarena.sh` `AUTO_CLASSIC` for OA paths; C# commands gated on `USE_CSHARP`.
 - **Renderer safety (Q3/OA):** `vk_handle_device_lost()` — GPU device loss logs recovery steps instead of immediate `ERR_FATAL`; `cl_autoClassicMod` (default 1) applies `classic_mod` when `fs_basegame`/`fs_game` looks like baseq3 or OpenArena; `examples/q3_fbo_safe.cfg` conservative post preset; bot unimplemented travel types use `PRT_ERROR` + movement failure instead of `PRT_FATAL` spam.
 - **Level-up integration:** `docs/LEVEL_UP.md`, `scripts/level_up_validate.sh`, shared `scripts/lib/release_bin.sh` (PE-safe binary string scans for smoke/compat); automated **beta trace** record/replay (`beta_record`, `beta_play`, `beta_test`); see `docs/BETA_AUTOMATED_TESTING.md`.

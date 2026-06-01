@@ -2554,7 +2554,7 @@ add_test(NAME renderer_regression_maps_devdata
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(renderer_regression_maps_devdata PROPERTIES
 	LABELS "validation;renderer"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/run_renderer_tier_b_devdata.sh;${CMAKE_SOURCE_DIR}/release/idtech3_server;${CMAKE_SOURCE_DIR}/docs/renderer_validation/devdata/rtest_base/vm/qagame.qvm"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/run_renderer_tier_b_devdata.sh;${CMAKE_SOURCE_DIR}/scripts/tier_b_devdata_log_gate.sh;${CMAKE_SOURCE_DIR}/docs/renderer_validation/devdata/golden_server_logs.tsv;${CMAKE_SOURCE_DIR}/release/idtech3_server;${CMAKE_SOURCE_DIR}/docs/renderer_validation/devdata/rtest_base/vm/qagame.qvm"
 	RESOURCE_LOCK "idtech3_headless_validation")
 
 add_test(NAME check_artifacts

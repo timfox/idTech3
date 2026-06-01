@@ -76,7 +76,7 @@ run_map_check() {
     +set bot_enable 0 \
     +set com_hunkMegs 128 \
     +map "$map" \
-    +quit 2>&1 || true)"
+    +quit 2>&1 < /dev/null || true)"
 
   if echo "$out" | grep -Eiq "$FAIL_PATTERN"; then
     echo "$out" | grep -Ei "$FAIL_PATTERN" | head -20 >&2

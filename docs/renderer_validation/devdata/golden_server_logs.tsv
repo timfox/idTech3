@@ -1,0 +1,9 @@
+# Tier B devdata: SHA-256 of filtered dedicated-server log lines per map.
+# Regenerate: UPDATE_GOLDEN=1 ./scripts/tier_b_devdata_log_gate.sh
+# Filter: scripts/tier_b_devdata_log_gate.sh (LOG_FILTER_RE)
+rtest_tangent	63ea5363b50800301f724ef959a7c0755488c5ba7cdbf11cf42b866e80deff5e
+rtest_pbr	0cfdfb676d7f50b9a3d5914c14106ad70dba6c185744bc9053ccc04ccf03c7fa
+rtest_emissive	3d9be9e5c1f0a1093b7a53ae06568c22ac9014dfa3c9361869c522f2a38a4b6c
+rtest_volumetric	c67bea023a25ecf0d99b93f557d7aec203232b4cef293a42e9ae8a7a5e94f72a
+rtest_postfx	65b547384c2c035124a90e4448cd10b639ac83b4550b13a3eb87689b2417e5eb
+rtest_parity	0820eb7afd86708ea79bf3bb601cfaa57231913ed9484c3a2ba306fb26b4dfea

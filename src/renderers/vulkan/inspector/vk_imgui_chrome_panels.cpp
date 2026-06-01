@@ -177,6 +177,7 @@ void VkImgui_ResetInspectorWorkspaceLayout( void )
 	if ( r_studio_tools && r_studio_tools->integer ) {
 		vkWindows.studioMap.open = qtrue;
 		vkWindows.studioConsole.open = qtrue;
+		vkWindows.studioAuthor.open = qtrue;
 	}
 
 	ImGui::DockBuilderDockWindow( "Viewport", id_main );
@@ -189,6 +190,7 @@ void VkImgui_ResetInspectorWorkspaceLayout( void )
 	ImGui::DockBuilderDockWindow( "Volumetrics", id_bottom );
 	ImGui::DockBuilderDockWindow( "Studio / Session", id_bottom );
 	ImGui::DockBuilderDockWindow( "Studio / Console", id_bottom );
+	ImGui::DockBuilderDockWindow( "Studio / Author", id_right );
 
 	ImGui::DockBuilderFinish( dockspace_id );
 	ri.Printf( PRINT_DEVELOPER, "[VK][imgui] workspace layout reset (editor default dock)\n" );
@@ -229,6 +231,7 @@ static void VkImgui_DrawMenuBar( void )
 			if ( ImGui::BeginMenu( "Studio" ) ) {
 				ImGui::MenuItem( "Session / map strip", nullptr, (bool *)&vkWindows.studioMap.open );
 				ImGui::MenuItem( "Command strip", nullptr, (bool *)&vkWindows.studioConsole.open );
+				ImGui::MenuItem( "Author (presets / QA)", nullptr, (bool *)&vkWindows.studioAuthor.open );
 				ImGui::Separator();
 				ImGui::TextDisabled( "Entity key reference: docs/EDITOR_BRIDGE.md" );
 				ImGui::EndMenu();
@@ -252,11 +255,12 @@ static void VkImgui_DrawMenuBar( void )
 					if ( stOn ) {
 						vkWindows.studioMap.open = qtrue;
 						vkWindows.studioConsole.open = qtrue;
+						vkWindows.studioAuthor.open = qtrue;
 					}
 				}
 				if ( ImGui::IsItemHovered() ) {
 					ImGui::SetTooltip(
-						"Adds id Studio-style Session + Console docked panels and a Studio menu. "
+						"Adds id Studio-style Session, Console, and Author docked panels and a Studio menu. "
 						"Requires r_imgui 1. See docs/IN_ENGINE_STUDIO_TOOLS.md." );
 				}
 			}
@@ -303,6 +307,7 @@ static void VkImgui_DrawMenuBar( void )
 				ImGui::Separator();
 				ImGui::MenuItem( "Studio / Session", nullptr, (bool *)&vkWindows.studioMap.open );
 				ImGui::MenuItem( "Studio / Console", nullptr, (bool *)&vkWindows.studioConsole.open );
+				ImGui::MenuItem( "Studio / Author", nullptr, (bool *)&vkWindows.studioAuthor.open );
 			}
 			ImGui::Separator();
 			if ( ImGui::MenuItem( "Reset workspace layout" ) ) {

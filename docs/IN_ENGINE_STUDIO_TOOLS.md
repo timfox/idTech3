@@ -17,9 +17,9 @@ This document describes the optional **Studio** layer: lightweight, in-game work
 | Cvar | Default | Meaning |
 |------|---------|---------|
 | `r_imgui` | `1` | Master switch for the ImGui overlay (inspector CPU work). |
-| `r_studio_tools` | `0` | When `1`, enables **Studio** menu, **Studio / Session**, and **Studio / Console** panels. |
+| `r_studio_tools` | `0` | When `1`, enables **Studio** menu, **Studio / Session**, **Studio / Console**, and **Studio / Author** panels. |
 
-On startup with `r_studio_tools 1`, the Session and Console panels open automatically (with `r_imgui 1`). Enabling **Studio tools** from the inspector **Developer** menu at runtime also opens both panels.
+On startup with `r_studio_tools 1`, the Session, Console, and Author panels open automatically (with `r_imgui 1`). Enabling **Studio tools** from the inspector **Developer** menu at runtime also opens all three panels.
 
 Startup logs:
 
@@ -33,6 +33,16 @@ Read-only view of common session cvars (`mapname`, `fs_game`, `fs_basegame`, `sv
 ## Studio / Console
 
 Single-line command entry (Enter or **Run**) that appends to the main **command buffer**—same as the drop-down console. A **local history** (last 48 lines) is shown above the input; it is **not** a mirror of the full engine log.
+
+## Studio / Author
+
+Author workflow panel (Vulkan + ImGui only):
+
+- **Renderer presets** — **Classic (Q3/OA)** (`classic_mod` + `vid_restart`), **Modern (Vulkan)** (`r_classicMod 0`, Forward+, SSAO/bloom/volumetrics), and one-click `exec` for `q3_fbo_safe`, `q3_classic_mod`, `q3_vulkan_compat`.
+- **Forward+** — toggles `r_forwardPlus`, sliders for `r_forwardPlusDebug` / `r_forwardPlusShade`, readout for `r_forwardPlusMaxPerTile`.
+- **Beta trace / QA** — read-only `cl_betaTraceStudioMode` (0 idle, 1 record, 2 replay, 3 test) and `cl_betaTraceStudioBase`; buttons for `beta_status`, `beta_petri_status`, `beta_stop`, and silent JPEG screenshot.
+
+See **`docs/BETA_AUTOMATED_TESTING.md`** for trace record/replay commands.
 
 ## Editor parity
 
