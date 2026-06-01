@@ -279,6 +279,7 @@
     <ClCompile Include="..\..\qcommon\cm_test.c" />
     <ClCompile Include="..\..\qcommon\cm_trace.c" />
     <ClCompile Include="..\..\qcommon\common.c" />
+    <ClCompile Include="..\..\qcommon\csharp_debug.c" />
     <ClCompile Include="..\..\qcommon\defer.c" />
     <ClCompile Include="..\..\qcommon\jobs.c" />
     <ClCompile Include="..\..\qcommon\q_utf8.c" />
@@ -289,6 +290,7 @@
     <ClCompile Include="..\..\qcommon\huffman_static.c" />
     <ClCompile Include="..\..\qcommon\js_debug.c" />
     <ClCompile Include="..\..\qcommon\keys.c" />
+    <ClCompile Include="..\..\qcommon\q3_compat.c" />
     <ClCompile Include="..\..\qcommon\md4.c" />
     <ClCompile Include="..\..\qcommon\md5.c" />
     <ClCompile Include="..\..\qcommon\msg.c" />
@@ -300,6 +302,7 @@
     </ClCompile>
     <ClCompile Include="..\..\qcommon\q_math.c" />
     <ClCompile Include="..\..\qcommon\q_shared.c" />
+    <ClCompile Include="..\..\qcommon\script_emit.c" />
     <ClCompile Include="..\..\qcommon\unzip.c" />
     <ClCompile Include="..\..\qcommon\vm.c" />
     <ClCompile Include="..\..\qcommon\vm_native_module.c" />
@@ -340,10 +343,13 @@
     <ClInclude Include="..\..\qcommon\cm_patch.h" />
     <ClInclude Include="..\..\qcommon\cm_polylib.h" />
     <ClInclude Include="..\..\qcommon\cm_public.h" />
+    <ClInclude Include="..\..\qcommon\csharp_debug.h" />
+    <ClInclude Include="..\..\qcommon\q3_compat.h" />
     <ClInclude Include="..\..\qcommon\qcommon.h" />
     <ClInclude Include="..\..\qcommon\qfiles.h" />
     <ClInclude Include="..\..\qcommon\q_platform.h" />
     <ClInclude Include="..\..\qcommon\q_shared.h" />
+    <ClInclude Include="..\..\qcommon\script_emit.h" />
     <ClInclude Include="..\..\qcommon\surfaceflags.h" />
     <ClInclude Include="..\..\qcommon\unzip.h" />
     <ClInclude Include="..\..\qcommon\vm_local.h" />

@@ -64,6 +64,9 @@
     <ClCompile Include="..\..\qcommon\common.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\qcommon\csharp_debug.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\qcommon\cvar.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -100,10 +103,16 @@
     <ClCompile Include="..\..\qcommon\puff.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\qcommon\q3_compat.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\qcommon\q_math.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\qcommon\q_shared.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\qcommon\script_emit.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\audio\mix\snd_adpcm.c">
