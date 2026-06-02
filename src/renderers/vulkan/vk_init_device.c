@@ -298,8 +298,10 @@ void vk_initialize( void )
 	}
 
 #ifdef VK_CUBEMAP
-	if ( vk.pbrActive && r_cubeMapping->integer )
-		vk.cubemapActive = qtrue;
+	if ( vk.pbrActive && r_cubeMapping->integer ) {
+		ri.Printf( PRINT_WARNING,
+			"PBR IBL: runtime cubemap convolution is disabled on Vulkan; using fallback IBL.\n" );
+	}
 #endif
 #endif
 
@@ -579,6 +581,7 @@ void vk_initialize( void )
 		desc.poolSizeCount = ARRAY_LEN( pool_size );
 		desc.pPoolSizes = pool_size;
 
+		vk_forward_plus_on_descriptor_pool_destroyed();
 		VK_CHECK( qvkCreateDescriptorPool( vk.device, &desc, NULL, &vk.descriptor_pool ) );
 	}
 

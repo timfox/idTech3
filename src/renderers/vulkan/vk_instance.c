@@ -445,9 +445,10 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		if ( portabilitySubset ) {
 			device_extension_list[ device_extension_count++ ] = "VK_KHR_portability_subset";
 		}
-		if ( swapchainMaintenance1 ) {
+		if ( swapchainMaintenance1 && surfaceMaintenance1 ) {
+			device_extension_list[ device_extension_count++ ] = "VK_KHR_surface_maintenance1";
 			device_extension_list[ device_extension_count++ ] = "VK_KHR_swapchain_maintenance1";
-			ri.Printf( PRINT_DEVELOPER, "  VK_KHR_swapchain_maintenance1: enabled\n" );
+			ri.Printf( PRINT_DEVELOPER, "  VK_KHR_surface_maintenance1 + VK_KHR_swapchain_maintenance1: enabled\n" );
 		}
 		if ( provokingVertex ) {
 			device_extension_list[ device_extension_count++ ] = "VK_EXT_provoking_vertex";

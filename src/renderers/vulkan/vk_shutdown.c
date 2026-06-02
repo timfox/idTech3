@@ -457,6 +457,7 @@ void vk_release_resources( void ) {
 	vk.pipelines_count = vk.pipelines_world_base;
 
 	VK_CHECK( qvkResetDescriptorPool( vk.device, vk.descriptor_pool, 0 ) );
+	vk_forward_plus_on_descriptor_pool_destroyed();
 
 	Com_Memset( &vk_world, 0, sizeof( vk_world ) );
 

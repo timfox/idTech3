@@ -459,6 +459,15 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 	vk_end_frame_draw_fullscreen_quad( vk.renderWidth, vk.renderHeight );
 	vk_end_render_pass();
 
+	if ( vk.depth_image != VK_NULL_HANDLE ) {
+		VkImageAspectFlags da = VK_IMAGE_ASPECT_DEPTH_BIT;
+		if ( glConfig.stencilBits > 0 ) {
+			da |= VK_IMAGE_ASPECT_STENCIL_BIT;
+		}
+		record_depth_image_layout_transition( vk.cmd->command_buffer, da,
+			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 0, 0 );
+	}
+
 #ifdef USE_IMGUI
 	VkImgui_RecordOverlayPass();
 #endif
@@ -467,15 +476,14 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 		vk.ui_overlay_image_view != VK_NULL_HANDLE &&
 		vk.overlay_compose_pipeline != VK_NULL_HANDLE &&
 		vk.render_pass.overlay_compose != VK_NULL_HANDLE &&
+		vk.overlay_color_descriptor[vk.cmd_index] != VK_NULL_HANDLE &&
 		vk.framebuffers.overlay_compose[ vk.cmd->swapchain_image_index ] != VK_NULL_HANDLE ) {
-		vk_update_color_descriptor_image( vk.ui_overlay_image_view );
 		vk_end_frame_begin_post_process_pass( vk.render_pass.overlay_compose,
 			vk.framebuffers.overlay_compose[ vk.cmd->swapchain_image_index ],
 			vk.renderWidth, vk.renderHeight, vk.overlay_compose_pipeline );
 		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-			vk.pipeline_layout_post_process, 0, 1, &vk.post_color_descriptor[vk.cmd_index], 0, NULL );
+			vk.pipeline_layout_post_process, 0, 1, &vk.overlay_color_descriptor[vk.cmd_index], 0, NULL );
 		vk_end_frame_draw_fullscreen_quad( vk.renderWidth, vk.renderHeight );
 		vk_end_render_pass();
-		vk_update_color_descriptor_image( gamma_src );
 	}
 }

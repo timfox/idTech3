@@ -27,6 +27,7 @@ typedef struct {
 	float paniniPad1;
 	float paniniPad2;
 	float exposure;
+	float srcUVAlignPad[3];
 	float srcUVScaleBias[4];
 } VkPostProcessPushConstants;
 

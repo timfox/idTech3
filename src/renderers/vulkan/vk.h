@@ -713,6 +713,7 @@ typedef struct {
 
 	VkDescriptorSet color_descriptor[NUM_COMMAND_BUFFERS];	/* per-frame base scene color (VUID-03047) */
 	VkDescriptorSet post_color_descriptor[NUM_COMMAND_BUFFERS];	/* per-frame mutable post-fog/gamma source */
+	VkDescriptorSet overlay_color_descriptor[NUM_COMMAND_BUFFERS];	/* immutable UI overlay source */
 	VkImageView post_fog_color_source;	/* last source for gamma (color_image or smaa_output) */
 	VkImageView scene_post_fog_color_source;	/* scene-only source for luminance/exposure before HUD/console */
 	VkDescriptorSet depth_descriptor[NUM_COMMAND_BUFFERS];	/* per-frame (VUID-03047) */

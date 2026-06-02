@@ -21,6 +21,8 @@ Descriptor set allocation and image/buffer binding updates (split from vk.c).
 void vk_update_attachment_descriptors( void ) {
 	uint32_t i;
 
+	vk_forward_plus_update_depth_descriptor();
+
 	if ( vk.color_image_view )
 	{
 		VkDescriptorImageInfo info;
@@ -77,6 +79,12 @@ void vk_update_attachment_descriptors( void ) {
 
 				qvkUpdateDescriptorSets( vk.device, 1, &post_desc, 0, NULL );
 			}
+			if ( vk.overlay_color_descriptor[i] != VK_NULL_HANDLE && vk.ui_overlay_image_view != VK_NULL_HANDLE ) {
+				desc.dstSet = vk.overlay_color_descriptor[i];
+				info.imageView = vk.ui_overlay_image_view;
+				qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+				info.imageView = vk.color_image_view;
+			}
 		}
 		/* Ensure post-fog and luminance descriptors are initialized for gamma/eye-adaptation. */
 		vk_update_post_fog_descriptors( vk.color_image_view );
@@ -92,25 +100,42 @@ void vk_update_attachment_descriptors( void ) {
 
 		info.sampler = vk_find_sampler( &sd );
 
-		info.imageView = vk.screenMap.color_image_view;
-		desc.dstSet = vk.screenMap.color_descriptor;
+		if ( vk.screenMap.color_image_view ) {
+			info.imageView = vk.screenMap.color_image_view;
+			desc.dstSet = vk.screenMap.color_descriptor;
+			qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+		}
 
-		qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+		// shared depth sampling for post-process passes
+		{
+			VkDescriptorImageInfo depth_info;
+			VkWriteDescriptorSet depth_desc;
+
+			Com_Memset( &depth_info, 0, sizeof( depth_info ) );
+			depth_info.imageView = vk.depth_image_view_sample ? vk.depth_image_view_sample : vk.depth_image_view;
+			if ( depth_info.imageView ) {
+				sd.gl_mag_filter = sd.gl_min_filter = GL_NEAREST;
+				sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+				sd.max_lod_1_0 = qtrue;
+				sd.noAnisotropy = qtrue;
+				depth_info.sampler = vk_find_sampler( &sd );
+				depth_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+
+				Com_Memset( &depth_desc, 0, sizeof( depth_desc ) );
+				depth_desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				depth_desc.dstBinding = 0;
+				depth_desc.descriptorCount = 1;
+				depth_desc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+				depth_desc.pImageInfo = &depth_info;
+				for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ ) {
+					depth_desc.dstSet = vk.depth_descriptor[i];
+					qvkUpdateDescriptorSets( vk.device, 1, &depth_desc, 0, NULL );
+				}
+			}
+		}
 
 		if ( r_ssao && r_ssao->integer )
 		{
-			// depth sampling for SSAO (use depth-only view when available for VUID-01976)
-			sd.gl_mag_filter = sd.gl_min_filter = GL_NEAREST;
-			sd.max_lod_1_0 = qtrue;
-			sd.noAnisotropy = qtrue;
-			info.sampler = vk_find_sampler( &sd );
-			info.imageView = vk.depth_image_view_sample ? vk.depth_image_view_sample : vk.depth_image_view;
-			info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-			for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ ) {
-				desc.dstSet = vk.depth_descriptor[i];
-				qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
-			}
-
 			// ssao output
 			sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
 			sd.max_lod_1_0 = qtrue;
@@ -256,9 +281,11 @@ void vk_update_attachment_descriptors( void ) {
 			qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );	
 		
 			// cubemap
-			info.imageView = vk.cubeMap.color_image_view[0];
-			desc.dstSet = vk.cubeMap.color_descriptor;
-			qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );	
+			if ( vk.cubeMap.color_image_view[0] ) {
+				info.imageView = vk.cubeMap.color_image_view[0];
+				desc.dstSet = vk.cubeMap.color_descriptor;
+				qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+			}
 		}
 #endif
 	}
@@ -836,6 +863,7 @@ void vk_init_descriptors( void )
 			for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ ) {
 				VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.color_descriptor[i] ) );
 				VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.post_color_descriptor[i] ) );
+				VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.overlay_color_descriptor[i] ) );
 			}
 		for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ )
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.depth_descriptor[i] ) );

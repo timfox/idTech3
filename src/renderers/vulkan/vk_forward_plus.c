@@ -179,6 +179,7 @@ typedef struct {
 } vk_fp_push_t;
 
 static VkDescriptorSet vk_fp_graphics_descriptor = VK_NULL_HANDLE;
+static VkDescriptorPool vk_fp_graphics_descriptor_pool = VK_NULL_HANDLE;
 static VkBuffer vk_fp_dummy_light_buf = VK_NULL_HANDLE;
 static VkBuffer vk_fp_dummy_tile_buf = VK_NULL_HANDLE;
 static VkBuffer vk_fp_dummy_param_buf = VK_NULL_HANDLE;
@@ -347,6 +348,11 @@ void vk_forward_plus_init_graphics_descriptors( void )
 		return;
 	}
 
+	if ( vk_fp_graphics_descriptor_pool != vk.descriptor_pool ) {
+		vk_fp_graphics_descriptor = VK_NULL_HANDLE;
+		vk_fp_graphics_descriptor_pool = vk.descriptor_pool;
+	}
+
 	if ( vk_fp_graphics_descriptor == VK_NULL_HANDLE ) {
 		alloc_ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 		alloc_ci.pNext = NULL;
@@ -411,6 +417,7 @@ void vk_forward_plus_destroy_compute_pipeline( void )
 void vk_forward_plus_on_descriptor_pool_destroyed( void )
 {
 	vk_fp_graphics_descriptor = VK_NULL_HANDLE;
+	vk_fp_graphics_descriptor_pool = VK_NULL_HANDLE;
 	vk.forward_plus.descriptor = VK_NULL_HANDLE;
 }
 
@@ -443,6 +450,7 @@ static void vk_fp_destroy_light_buffer( void )
 
 void vk_forward_plus_shutdown( void )
 {
+	vk_forward_plus_on_descriptor_pool_destroyed();
 	vk_fp_destroy_buffers();
 	vk_fp_destroy_light_buffer();
 	vk.forward_plus.last_packed_count = 0u;
@@ -488,9 +496,7 @@ static void vk_fp_create_buffers_and_compute( void )
 	VkPipelineShaderStageCreateInfo stage;
 	VkDescriptorSetAllocateInfo alloc_ci;
 	VkDescriptorBufferInfo buf_infos[3];
-	VkDescriptorImageInfo depth_info;
-	VkWriteDescriptorSet writes[4];
-	Vk_Sampler_Def depth_sd;
+	VkWriteDescriptorSet writes[3];
 	VkBufferCreateInfo bci;
 	VkMemoryRequirements mr;
 	VkMemoryAllocateInfo mai;
@@ -703,15 +709,6 @@ static void vk_fp_create_buffers_and_compute( void )
 	buf_infos[2].offset = 0;
 	buf_infos[2].range = VK_WHOLE_SIZE;
 
-	Com_Memset( &depth_sd, 0, sizeof( depth_sd ) );
-	depth_sd.gl_mag_filter = depth_sd.gl_min_filter = GL_NEAREST;
-	depth_sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	depth_sd.noAnisotropy = qtrue;
-	Com_Memset( &depth_info, 0, sizeof( depth_info ) );
-	depth_info.sampler = vk_find_sampler( &depth_sd );
-	depth_info.imageView = vk.depth_image_view_sample ? vk.depth_image_view_sample : vk.depth_image_view;
-	depth_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-
 	Com_Memset( writes, 0, sizeof( writes ) );
 	for ( int i = 0; i < 3; i++ ) {
 		writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -722,13 +719,8 @@ static void vk_fp_create_buffers_and_compute( void )
 		writes[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 		writes[i].pBufferInfo = &buf_infos[i];
 	}
-	writes[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	writes[3].dstSet = vk.forward_plus.descriptor;
-	writes[3].dstBinding = 3;
-	writes[3].descriptorCount = 1;
-	writes[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	writes[3].pImageInfo = &depth_info;
-	qvkUpdateDescriptorSets( vk.device, 4, writes, 0, NULL );
+	qvkUpdateDescriptorSets( vk.device, 3, writes, 0, NULL );
+	vk_forward_plus_update_depth_descriptor();
 
 	vk.forward_plus.tiles_x = tiles_x;
 	vk.forward_plus.tiles_y = tiles_y;
@@ -739,6 +731,38 @@ static void vk_fp_create_buffers_and_compute( void )
 	ri.Printf( PRINT_ALL, "[VK][Forward+] tile cull: %ux%u tiles (%u total), %u bytes/tile list, max %u lights/tile\n",
 		(unsigned)tiles_x, (unsigned)tiles_y, (unsigned)total_tiles, (unsigned)tile_bytes,
 		(unsigned)vk.forward_plus.max_per_tile );
+}
+
+void vk_forward_plus_update_depth_descriptor( void )
+{
+	VkDescriptorImageInfo depth_info;
+	VkWriteDescriptorSet write;
+	Vk_Sampler_Def depth_sd;
+	VkImageView depth_view;
+
+	depth_view = vk.depth_image_view_sample ? vk.depth_image_view_sample : vk.depth_image_view;
+	if ( vk.forward_plus.descriptor == VK_NULL_HANDLE || depth_view == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	Com_Memset( &depth_sd, 0, sizeof( depth_sd ) );
+	depth_sd.gl_mag_filter = depth_sd.gl_min_filter = GL_NEAREST;
+	depth_sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	depth_sd.noAnisotropy = qtrue;
+
+	Com_Memset( &depth_info, 0, sizeof( depth_info ) );
+	depth_info.sampler = vk_find_sampler( &depth_sd );
+	depth_info.imageView = depth_view;
+	depth_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+
+	Com_Memset( &write, 0, sizeof( write ) );
+	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.dstSet = vk.forward_plus.descriptor;
+	write.dstBinding = 3;
+	write.descriptorCount = 1;
+	write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	write.pImageInfo = &depth_info;
+	qvkUpdateDescriptorSets( vk.device, 1, &write, 0, NULL );
 }
 
 void vk_forward_plus_init( void )
@@ -957,7 +981,7 @@ static void vk_forward_plus_dispatch_tile_cull_internal( qboolean use_depth_cull
 	float proj_vk[16];
 	const float *view;
 	const float *proj_gl;
-	VkImageAspectFlags depth_aspect;
+	VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
 
 	if ( !r_forwardPlus || !r_forwardPlus->integer ) {
 		return;

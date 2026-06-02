@@ -532,6 +532,9 @@ void vk_create_render_passes( void )
 
 	if ( vk.fboActive )
 	{
+		colorRef0.attachment = 0;
+		colorRef0.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
 		Com_Memset( &subpass, 0, sizeof( subpass ) );
 		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 		subpass.colorAttachmentCount = 1;
@@ -666,8 +669,8 @@ void vk_create_render_passes( void )
 		ui_attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		ui_attachments[2].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		ui_attachments[2].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		ui_attachments[2].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		ui_attachments[2].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		ui_attachments[2].initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		ui_attachments[2].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 		ui_color_refs[0].attachment = 0;
 		ui_color_refs[0].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -968,6 +971,7 @@ void vk_create_render_passes( void )
 
 	colorRef0.attachment = 0;
 	colorRef0.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	colorRefs[0] = colorRef0;
 	colorRefs[1].attachment = 2;
 	colorRefs[1].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
