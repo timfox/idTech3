@@ -3812,12 +3812,12 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 		R_DeleteTextures();
 	//}
 
-#ifdef USE_VULKAN
-	vk_release_resources();
-#endif
-
 #ifdef USE_IMGUI
 	VkImgui_Shutdown();
+#endif
+
+#ifdef USE_VULKAN
+	vk_release_resources();
 #endif
 
 	R_DoneFreeType();

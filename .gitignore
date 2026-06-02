@@ -54,3 +54,6 @@ android/local.properties
 !/examples/demo_skeleton/idtech3_demo/idtech3_demo.pk3
 src/renderers/vulkan/shaders/spirv/generated/shader_build_meta.txt
 src/renderers/vulkan/shaders/spirv/generated/shader_build_meta.txt
+
+# Unwaking mod runtime assets (local game data; too large for GitHub — keep under release/unwaking/)
+unwaking/

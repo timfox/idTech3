@@ -1,6 +1,7 @@
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_validation.h"
+#include <stdio.h>
 
 void vk_set_object_name( uint64_t obj, const char *objName, VkDebugReportObjectTypeEXT objType )
 {
@@ -39,7 +40,7 @@ static void vk_validation_record( VkDebugReportFlagsEXT flags, const char *messa
 	const char *severity = vk_debug_report_severity( flags );
 	const char *msg = message ? message : "<no message>";
 
-	Com_sprintf( vk_validation_error_message, sizeof( vk_validation_error_message ), "%s: %s", severity, msg );
+	snprintf( vk_validation_error_message, sizeof( vk_validation_error_message ), "%s: %s", severity, msg );
 	vk_validation_error_pending = qtrue;
 }
 

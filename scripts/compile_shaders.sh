@@ -375,7 +375,7 @@ PY
 )
 
 METADATA_FILE="$GENERATED_DIR/shader_build_meta.txt"
-VALIDATOR_VERSION="$("$GLSLANG_VALIDATOR" --version 2>&1 | head -n1 | tr '\n' ' ')"
+VALIDATOR_VERSION="$("$GLSLANG_VALIDATOR" --version 2>&1 | head -n1)"
 TIMESTAMP="$(date -u +%FT%TZ)"
 shader_data_generated="$GENERATED_DIR/shader_data.c"
 shader_binding_generated="$GENERATED_DIR/shader_binding.c"
@@ -419,15 +419,15 @@ apply_shaders() {
       return 1
     fi
 
+    if [[ -f "$dst" ]] && cmp -s "$src" "$dst"; then
+      echo "Skipped $file (no changes)"
+      continue
+    fi
+
     if [[ -f "$dst" ]]; then
       mkdir -p "$backup_base"
       cp "$dst" "$backup_base/$file.bak"
       created_backup=1
-    fi
-
-    if [[ -f "$dst" ]] && cmp -s "$src" "$dst"; then
-      echo "Skipped $file (no changes)"
-      continue
     fi
 
     cp "$src" "$dst"
