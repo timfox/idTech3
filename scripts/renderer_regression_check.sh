@@ -242,6 +242,8 @@ elif ! grep -q 'R_ApplyRenderModeLatch();' "$TR_INIT_VK" 2>/dev/null; then
   fail "tr_init.c should call R_ApplyRenderModeLatch() after R_Register"
 elif ! grep -q 'R_ApplyRenderModeLatch();' "$PROJECT_ROOT/src/renderers/vulkan/vk_forward_plus.c" 2>/dev/null; then
   fail "vk_forward_plus.c should call R_ApplyRenderModeLatch() during Forward+ init"
+elif ! grep -q 'r_deferredLighting' "$RENDER_MODE_C" 2>/dev/null; then
+  fail "tr_render_mode_vk.c should latch deferred lighting (r_forwardPlusShade 0)"
 else
   pass "R_ApplyRenderModeLatch wired (tr_render_mode_vk.c, R_Init, vk_forward_plus)"
 fi
@@ -261,8 +263,48 @@ else
 fi
 
 echo ""
-echo "Deferred G-buffer scaffold (r_renderMode 1 + r_deferredGBuffer):"
+echo "Deferred G-buffer fill (r_deferredGBufferFill + compute capture):"
+DGB_C="$PROJECT_ROOT/src/renderers/vulkan/vk_deferred_gbuffer.c"
+DGB_COMP="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/deferred_gbuffer_fill.comp"
 VK_ATTACH="$PROJECT_ROOT/src/renderers/vulkan/vk_attachments.c"
+if [[ ! -f "$DGB_C" ]]; then
+  fail "missing vk_deferred_gbuffer.c"
+elif ! grep -q 'r_deferredGBufferFill = ri.Cvar_Get' "$TR_INIT_VK" 2>/dev/null; then
+  fail "tr_init.c missing r_deferredGBufferFill cvar"
+elif ! grep -q 'vk_deferred_gbuffer_capture_after_geometry' "$PROJECT_ROOT/src/renderers/vulkan/tr_backend.c" 2>/dev/null; then
+  fail "tr_backend.c should call vk_deferred_gbuffer_capture_after_geometry after geometry"
+elif ! grep -q 'deferred_gbuffer_fill_cs' "$PROJECT_ROOT/scripts/compile_shaders.sh" 2>/dev/null; then
+  fail "compile_shaders.sh missing deferred_gbuffer_fill_cs"
+elif [[ ! -f "$DGB_COMP" ]]; then
+  fail "missing deferred_gbuffer_fill.comp"
+elif ! grep -q 'vk_deferred_gbuffer_draw_debug' "$DGB_C" 2>/dev/null; then
+  fail "vk_deferred_gbuffer.c missing vk_deferred_gbuffer_draw_debug"
+elif ! grep -q 'r_deferredGBufferDebug = ri.Cvar_Get' "$TR_INIT_VK" 2>/dev/null; then
+  fail "tr_init.c missing r_deferredGBufferDebug cvar"
+elif ! grep -q 'deferred_gbuffer_debug_fs' "$PROJECT_ROOT/scripts/compile_shaders.sh" 2>/dev/null; then
+  fail "compile_shaders.sh missing deferred_gbuffer_debug_fs"
+else
+  pass "deferred G-buffer fill path wired (cvar, backend hook, compute shader)"
+fi
+
+echo ""
+echo "Deferred lighting (r_deferredLighting + Forward+ tile diffuse):"
+if ! grep -q 'r_deferredLighting = ri.Cvar_Get' "$TR_INIT_VK" 2>/dev/null; then
+  fail "tr_init.c missing r_deferredLighting cvar"
+elif ! grep -q 'vk_deferred_lighting_apply_after_geometry' "$PROJECT_ROOT/src/renderers/vulkan/tr_backend.c" 2>/dev/null; then
+  fail "tr_backend.c should call vk_deferred_lighting_apply_after_geometry after G-buffer capture"
+elif ! grep -q 'deferred_lighting_cs' "$PROJECT_ROOT/scripts/compile_shaders.sh" 2>/dev/null; then
+  fail "compile_shaders.sh missing deferred_lighting_cs"
+elif [[ ! -f "$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/deferred_lighting.comp" ]]; then
+  fail "missing deferred_lighting.comp"
+elif ! grep -q 'deferred_lighting_image' "$VK_ATTACH" 2>/dev/null; then
+  fail "vk_attachments.c missing deferred_lighting_image alloc"
+else
+  pass "deferred lighting compute + composite wired"
+fi
+
+echo ""
+echo "Deferred G-buffer scaffold (r_renderMode 1 + r_deferredGBuffer):"
 if ! grep -q 'r_deferredGBuffer = ri.Cvar_Get' "$TR_INIT_VK" 2>/dev/null; then
   fail "tr_init.c missing r_deferredGBuffer cvar"
 elif ! grep -q 'vk_create_deferred_gbuffer_scaffold' "$VK_ATTACH" 2>/dev/null; then

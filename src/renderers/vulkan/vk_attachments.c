@@ -354,25 +354,32 @@ static void vk_create_deferred_gbuffer_scaffold( void )
 	vk.deferred_gbuffer_normal_view = VK_NULL_HANDLE;
 	vk.deferred_gbuffer_material = VK_NULL_HANDLE;
 	vk.deferred_gbuffer_material_view = VK_NULL_HANDLE;
+	vk.deferred_lighting_image = VK_NULL_HANDLE;
+	vk.deferred_lighting_view = VK_NULL_HANDLE;
 
 	if ( !vk.fboActive || !r_renderMode || r_renderMode->integer != 1 ||
 		!r_deferredGBuffer || !r_deferredGBuffer->integer ) {
 		return;
 	}
 
-	vk_create_fullres_color_attachment( vk.color_format, gbufUsage,
+	vk_create_fullres_color_attachment( vk.color_format, gbufUsage | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 		&vk.deferred_gbuffer_albedo, &vk.deferred_gbuffer_albedo_view,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
-	vk_create_fullres_color_attachment( VK_FORMAT_R16G16_SFLOAT, gbufUsage,
+	vk_create_fullres_color_attachment( VK_FORMAT_R16G16B16A16_SFLOAT,
+		gbufUsage | VK_IMAGE_USAGE_STORAGE_BIT,
 		&vk.deferred_gbuffer_normal, &vk.deferred_gbuffer_normal_view,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
-	vk_create_fullres_color_attachment( VK_FORMAT_R16G16_SFLOAT, gbufUsage,
+	vk_create_fullres_color_attachment( VK_FORMAT_R16G16_SFLOAT,
+		gbufUsage | VK_IMAGE_USAGE_STORAGE_BIT,
 		&vk.deferred_gbuffer_material, &vk.deferred_gbuffer_material_view,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+	vk_create_fullres_color_attachment( VK_FORMAT_R16G16B16A16_SFLOAT,
+		gbufUsage | VK_IMAGE_USAGE_STORAGE_BIT,
+		&vk.deferred_lighting_image, &vk.deferred_lighting_view,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
 	vk.deferredGbufferAllocated = qtrue;
 	ri.Printf( PRINT_ALL,
-		"[VK][deferred] G-buffer scaffold: albedo (scene color format) + normal/material R16G16 "
-		"(no deferred lighting pass; forward unchanged)\n" );
+		"[VK][deferred] G-buffer scaffold: albedo (scene color format) + normal RGBA16F + material R16G16 + lighting RGBA16F\n" );
 }
 
 static void vk_create_fullres_msaa_color_attachment(
@@ -768,6 +775,10 @@ void vk_create_attachments( void )
 	if ( vk.deferred_gbuffer_material ) {
 		SET_OBJECT_NAME( vk.deferred_gbuffer_material, "deferred gbuffer material", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
 		SET_OBJECT_NAME( vk.deferred_gbuffer_material_view, "deferred gbuffer material view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+	}
+	if ( vk.deferred_lighting_image ) {
+		SET_OBJECT_NAME( vk.deferred_lighting_image, "deferred lighting", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+		SET_OBJECT_NAME( vk.deferred_lighting_view, "deferred lighting view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 	}
 
 	for ( i = 0; i < ARRAY_LEN( vk.bloom_image ); i++ )
@@ -2006,6 +2017,12 @@ void vk_destroy_attachments( void )
 		qvkDestroyImageView( vk.device, vk.deferred_gbuffer_material_view, NULL );
 		vk.deferred_gbuffer_material = VK_NULL_HANDLE;
 		vk.deferred_gbuffer_material_view = VK_NULL_HANDLE;
+	}
+	if ( vk.deferred_lighting_image ) {
+		qvkDestroyImage( vk.device, vk.deferred_lighting_image, NULL );
+		qvkDestroyImageView( vk.device, vk.deferred_lighting_view, NULL );
+		vk.deferred_lighting_image = VK_NULL_HANDLE;
+		vk.deferred_lighting_view = VK_NULL_HANDLE;
 	}
 	vk.deferredGbufferAllocated = qfalse;
 

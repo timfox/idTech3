@@ -19,6 +19,7 @@ SSAO/HBAO pass, and vk_bloom. Split from vk.c.
 #include "vk_util.h"
 #include "vk_device.h"
 #include "vk_view_state.h"
+#include "vk_deferred_gbuffer.h"
 
 static void vk_postfx_set_render_extent( uint32_t width, uint32_t height )
 {
@@ -462,6 +463,7 @@ qboolean vk_bloom( void )
 	}
 
 	vk_end_render_pass(); // end main/post-bloom continuation
+	vk_deferred_gbuffer_draw_debug();
 	if ( !backEnd.doneFog ) {
 		vk_volumetric_fog_pass();
 	}

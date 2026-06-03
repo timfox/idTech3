@@ -19,6 +19,7 @@ Split from vk.c.
 #include "vk_sync.h"
 #include "vk_skybox_hdr.h"
 #include "vk_forward_plus.h"
+#include "vk_deferred_gbuffer.h"
 #include "vk_rtx.h"
 #include "vk_vdb.h"
 #include "vk_pipeline_cache_disk.h"
@@ -184,6 +185,7 @@ void vk_shutdown( refShutdownCode_t code )
 
 	VDB_Shutdown();
 	vk_forward_plus_shutdown();
+	vk_deferred_gbuffer_shutdown();
 
 	vk_destroy_samplers();
 
@@ -394,6 +396,10 @@ for (i = 0; i < 2; i++) {
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.fluid_divergence_cs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.fluid_pressure_cs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.fluid_gradient_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.deferred_gbuffer_fill_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.deferred_gbuffer_debug_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.deferred_lighting_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.deferred_lighting_composite_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.cbt_terrain_cs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.terrain_vs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.terrain_fs );

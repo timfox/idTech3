@@ -1,0 +1,156 @@
+#version 450
+
+/*
+ * Experimental deferred diffuse (point + spot via Forward+ tile lists).
+ * Input: G-buffer albedo/normal/material + depth; Forward+ light/tile SSBOs.
+ * Output: RGBA16F lit color (composite replaces scene color when r_deferredLighting 1).
+ */
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+#define MAX_PER_TILE 8u
+#define REC_VEC4S 4u
+
+layout(std430, set = 0, binding = 0) readonly buffer LightSSBO {
+	vec4 data[];
+} lights;
+
+layout(std430, set = 0, binding = 1) readonly buffer TileSSBO {
+	uint cells[];
+} tiles;
+
+layout(set = 0, binding = 2) uniform sampler2D depthTex;
+layout(set = 0, binding = 3) uniform sampler2D albedoTex;
+layout(set = 0, binding = 4) uniform sampler2D normalTex;
+layout(set = 0, binding = 5) uniform sampler2D materialTex;
+layout(rgba16f, set = 0, binding = 6) uniform writeonly image2D outLit;
+
+layout(push_constant) uniform Push {
+	mat4 viewMatrix;
+	vec4 projInfo;
+	uvec2 extent;
+	uvec2 tileGrid;
+	float strength;
+	uint maxPerTile;
+	uint numLights;
+} pc;
+
+float viewZFromDepth( float depth ) {
+	return -pc.projInfo.w / max( depth + pc.projInfo.z, 1e-6 );
+}
+
+vec3 reconstructViewPos( vec2 uv, float depth ) {
+	float viewZ = viewZFromDepth( depth );
+	float negZ = -viewZ;
+	vec2 ndc = uv * 2.0 - 1.0;
+	return vec3( ndc.x * negZ * pc.projInfo.x, ndc.y * negZ * pc.projInfo.y, viewZ );
+}
+
+vec3 toViewDir( vec3 worldDir ) {
+	return normalize( ( pc.viewMatrix * vec4( worldDir, 0.0 ) ).xyz );
+}
+
+float evalPointLight( vec3 lView, vec3 viewPos, vec3 N, vec3 lightRgb, float rad ) {
+	vec3 toLight = lView - viewPos;
+	float dist = length( toLight );
+	if ( dist > rad ) {
+		return 0.0;
+	}
+	vec3 L = toLight / max( dist, 1e-4 );
+	float dr = dist / rad;
+	float att = clamp( 1.0 - dr * dr, 0.0, 1.0 );
+	float nl = max( dot( N, L ), 0.0 );
+	return att * nl;
+}
+
+float evalSpotLight( vec3 lView, vec3 viewPos, vec3 N, vec3 lightRgb, float rad,
+	vec3 axisView, float cosOuter, float cosInner, float segLen ) {
+	vec3 v = viewPos - lView;
+	float tAx = dot( v, axisView );
+	float tCl = clamp( tAx, 0.0, segLen );
+	vec3 closest = lView + axisView * tCl;
+	float dPerp = length( viewPos - closest );
+	if ( dPerp > rad ) {
+		return 0.0;
+	}
+	vec3 wDir = v / max( length( v ), 1e-4 );
+	float cosAng = dot( wDir, axisView );
+	float cone = smoothstep( cosOuter, cosInner, cosAng );
+	if ( cone <= 1e-4 ) {
+		return 0.0;
+	}
+	float axAtt = 1.0 - smoothstep( segLen * 0.85, segLen, tCl );
+	float rp = dPerp / max( rad, 1e-4 );
+	float radAtt = clamp( 1.0 - rp * rp, 0.0, 1.0 );
+	float att = cone * axAtt * radAtt;
+	vec3 Ldir = -wDir;
+	float nl = max( dot( N, Ldir ), 0.0 );
+	return att * nl;
+}
+
+void main() {
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if ( pix.x >= pc.extent.x || pix.y >= pc.extent.y ) {
+		return;
+	}
+
+	vec2 uv = ( vec2( pix ) + 0.5 ) / vec2( pc.extent );
+	float depth = texture( depthTex, uv ).r;
+
+	if ( depth <= 0.0 || depth >= 1.0 ) {
+		imageStore( outLit, ivec2( pix ), vec4( 0.0 ) );
+		return;
+	}
+
+	vec3 viewPos = reconstructViewPos( uv, depth );
+	vec3 N = normalize( texture( normalTex, uv ).xyz );
+	vec3 albedo = texture( albedoTex, uv ).rgb;
+	float roughness = texture( materialTex, uv ).g;
+
+	uint tilesX = max( pc.tileGrid.x, 1u );
+	uint tilesY = max( pc.tileGrid.y, 1u );
+	float tilePxX = float( pc.extent.x ) / float( tilesX );
+	float tilePxY = float( pc.extent.y ) / float( tilesY );
+	uint tx = min( uint( float( pix.x ) / tilePxX ), tilesX - 1u );
+	uint ty = min( uint( float( pix.y ) / tilePxY ), tilesY - 1u );
+	uint tileId = ty * tilesX + tx;
+	uint tbase = tileId * MAX_PER_TILE;
+
+	uint nPack = uint( max( lights.data[0].x + 0.5, 0.0 ) );
+	uint nLights = min( pc.numLights, nPack );
+	uint maxPer = min( pc.maxPerTile, MAX_PER_TILE );
+
+	vec3 irradiance = vec3( 0.04 );
+	for ( uint k = 0u; k < maxPer; k++ ) {
+		uint li = tiles.cells[ tbase + k ];
+		if ( li == 0xFFFFFFFFu ) {
+			break;
+		}
+		if ( li >= nLights ) {
+			continue;
+		}
+		uint b0 = 2u + li * REC_VEC4S;
+		vec3 lWorld = lights.data[ b0 ].xyz;
+		float rad = max( lights.data[ b0 ].w, 1e-3 );
+		vec4 lc = lights.data[ b0 + 1u ];
+		vec4 lpack = lights.data[ b0 + 2u ];
+		vec4 ltail = lights.data[ b0 + 3u ];
+		vec3 lView = ( pc.viewMatrix * vec4( lWorld, 1.0 ) ).xyz;
+		float nlAtt;
+		float addBoost = mix( 1.0, 1.25, step( 0.5, ltail.z ) );
+
+		if ( lc.w < 0.5 ) {
+			nlAtt = evalPointLight( lView, viewPos, N, lc.rgb, rad );
+		} else {
+			vec3 axisView = toViewDir( lpack.xyz );
+			nlAtt = evalSpotLight( lView, viewPos, N, lc.rgb, rad, axisView, lpack.w, ltail.x, ltail.y );
+		}
+		if ( nlAtt <= 0.0 ) {
+			continue;
+		}
+		irradiance += lc.rgb * addBoost * nlAtt;
+	}
+
+	vec3 lit = albedo * irradiance * mix( 1.0, 0.85, roughness ) * pc.strength;
+	imageStore( outLit, ivec2( pix ), vec4( lit, 1.0 ) );
+}

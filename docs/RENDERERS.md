@@ -8,7 +8,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 
 ### Current Architecture
 - Forward renderer with a large HDR/post-processing stack
-- `r_renderMode`: **0** forward (classic projector; `r_forwardPlus` may still be 1), **1** deferred (lighting not implemented; **`r_deferredGBuffer 1`** allocates scaffold RTs), **2** Forward+ primary (`r_forwardPlus` 1, `r_forwardPlusShade` 1, latched via `vid_restart`)
+- `r_renderMode`: **0** forward (classic projector; `r_forwardPlus` may still be 1), **1** deferred (scaffold + optional `r_deferredLighting`; **`r_deferredGBuffer 1`** allocates RTs), **2** Forward+ primary (`r_forwardPlus` 1, `r_forwardPlusShade` 1, latched via `vid_restart`)
 - Vulkan is the supported rendering backend
 - **Shared temporal reset policy** (`vk_temporal.c`): centralizes history invalidation for volumetrics, motion vectors, exposure. Resize, map load, camera cut, and missing prev-frame data trigger resets. Ready for future TAA/upscaler integration.
 - See [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_2026_ARCHITECTURE_PASS.md) for the focused 2026 renderer direction
@@ -185,8 +185,11 @@ Code: `src/renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar regist
 |------|---------|-------------|
 | `r_fbo` | 1 | Framebuffer objects (required for PBR, HDR, bloom, MSAA, SMAA, SSAO). Use vid_restart after changing. |
 | `r_pbr` | 1 | Physically Based Rendering (metalness/roughness, IBL). Requires r_fbo 1. |
-| `r_renderMode` | 0 | **0** forward, **1** deferred (forward fallback; scaffold RTs with `r_deferredGBuffer` 1), **2** Forward+ primary. Latched; `vid_restart`. |
-| `r_deferredGBuffer` | 0 | With `r_renderMode` 1: allocate albedo/normal/material G-buffer images (no deferred lighting pass yet). Latched; `r_fbo` 1. |
+| `r_renderMode` | 0 | **0** forward, **1** deferred (scaffold RTs with `r_deferredGBuffer`; optional `r_deferredLighting`), **2** Forward+ primary. Latched; `vid_restart`. |
+| `r_deferredGBuffer` | 0 | With `r_renderMode` 1: allocate albedo/normal/material/lighting G-buffer images. Latched; `r_fbo` 1. |
+| `r_deferredGBufferFill` | 0 | With scaffold RTs: copy scene albedo + depth-derived normal/material after geometry. |
+| `r_deferredGBufferDebug` | 0 | Before bloom: show G-buffer on scene color (1=albedo, 2=normal, 3=material, 4=lighting). |
+| `r_deferredLighting` | 0 | Experimental deferred diffuse (Forward+ tiles, point+spot). Replaces scene color after geometry. Latches `r_forwardPlusShade` 0 with `vid_restart`. |
 | `r_volumetricFog` | 0 | Volumetric fog enable (0=off, 1=on) |
 | `r_vdbFog` | 0 | Blend GPU-uploaded bound VDB density (`vdb_bind_fog`) into global volumetric density (requires `r_volumetricFog` 1 and `VDB_UploadToGPU`) |
 | `r_vdbFogBlend` | 0.5 | VDB density blend weight when `r_vdbFog` 1 |
