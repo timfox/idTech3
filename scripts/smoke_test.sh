@@ -130,6 +130,29 @@ fi
 
 echo ""
 
+# --- FreeUSD (default USE_FREEUSD=ON) ---
+echo "FreeUSD checks:"
+VK_SO=""
+for candidate in \
+  "$RELEASE_DIR/idtech3_vulkan.so" \
+  "$RELEASE_DIR/idtech3_vulkan_x86_64.so"; do
+  if [ -f "$candidate" ]; then
+    VK_SO="$candidate"
+    break
+  fi
+done
+if [ -n "$VK_SO" ]; then
+  if grep -Fq 'R_RegisterFreeusdMesh' < <(nm -D "$VK_SO" 2>/dev/null); then
+    pass "Vulkan renderer exports FreeUSD mesh loader"
+  else
+    warn "Vulkan renderer missing R_RegisterFreeusdMesh (built with USE_FREEUSD=OFF?)"
+  fi
+else
+  warn "idtech3_vulkan.so not found for FreeUSD check"
+fi
+
+echo ""
+
 # --- Runtime generative hooks (FLUX / TRELLIS) ---
 echo "Generative runtime checks:"
 CLIENT_PATH="$(bin_path "idtech3")"

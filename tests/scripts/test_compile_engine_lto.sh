@@ -97,14 +97,21 @@ trap 'rm -rf "$TMP_ROOT"' EXIT
 mkdir -p "$TMP_ROOT/home"
 
 # Case 1: no lto arg should pass ENABLE_LTO=OFF and avoid LTO status log.
-mapfile -t case1_files < <(run_case "case-no-lto" "opengl")
+# Use vulkan (OpenGL renderer removed from this fork).
+mapfile -t case1_files < <(run_case "case-no-lto" "vulkan")
+if [[ "${#case1_files[@]}" -lt 2 ]]; then
+	fail "case-no-lto: run_case did not return log and output paths"
+fi
 case1_cfg="$(extract_configure_call "${case1_files[0]}")"
 case1_output="$(<"${case1_files[1]}")"
 assert_contains "$case1_cfg" "-DENABLE_LTO=OFF" "case-no-lto configure flag"
 assert_not_contains "$case1_output" "CMake: ENABLE_LTO=ON" "case-no-lto output"
 
 # Case 2: lto arg should pass ENABLE_LTO=ON and print explicit startup log.
-mapfile -t case2_files < <(run_case "case-with-lto" "opengl lto")
+mapfile -t case2_files < <(run_case "case-with-lto" "vulkan lto")
+if [[ "${#case2_files[@]}" -lt 2 ]]; then
+	fail "case-with-lto: run_case did not return log and output paths"
+fi
 case2_cfg="$(extract_configure_call "${case2_files[0]}")"
 case2_output="$(<"${case2_files[1]}")"
 assert_contains "$case2_cfg" "-DENABLE_LTO=ON" "case-with-lto configure flag"

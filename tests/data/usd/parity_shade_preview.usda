@@ -1,0 +1,34 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+)
+
+# Preview-surface material bound to a mesh (parity_shade_preview.usda):
+# Material.outputs:surface -> PreviewSurface shader
+# material:binding on mesh -> Material
+
+def Xform "World"
+{
+    def Mesh "Cube"
+    {
+        float3[] extent = [(-1, -1, -1), (1, 1, 1)]
+        rel material:binding = </World/Looks/Material>
+    }
+
+    def Scope "Looks"
+    {
+        def Material "Material"
+        {
+            token outputs:surface.connect = </World/Looks/Material/PreviewSurface.outputs:surface>
+
+            def Shader "PreviewSurface"
+            {
+                token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.8, 0.2, 0.1)
+                float inputs:metallic = 0.5
+                float inputs:roughness = 0.3
+                float inputs:opacity = 1.0
+            }
+        }
+    }
+}

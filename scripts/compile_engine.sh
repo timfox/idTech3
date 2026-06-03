@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: ./compile_engine.sh [game_name] [Debug|Release] [clean] [quiet] [coverage] [asan] [lto] [vulkan] [aarch64] [freetype] [lua] [duktape|no-duktape] [system-duktape] [skipshaders] [demo] [--out DIR] [mac-app <target> [arch]] [mac-ub2 [notarize]]
+# Usage: ./compile_engine.sh [game_name] [Debug|Release] [clean] [quiet] [coverage] [asan] [lto] [vulkan] [aarch64] [freetype] [lua] [duktape|no-duktape] [system-duktape] [nofreeusd] [skipshaders] [demo] [--out DIR] [mac-app <target> [arch]] [mac-ub2 [notarize]]
 # Notes:
 # - build type defaults to Release
 # - Vulkan is the only renderer backend
@@ -18,6 +18,7 @@ LUA=0
 DUKTAPE=1
 SYSTEM_DUKTAPE=0
 CSHARP=0
+FREEUSD=1
 CROSS_AARCH64=0
 CODECS_FOR_CROSS=0
 BUILD_DEMO_PK3=0
@@ -134,6 +135,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     duktape|js)
       DUKTAPE=1
+      shift
+      ;;
+    nofreeusd|no-freeusd|nofree-usd)
+      FREEUSD=0
       shift
       ;;
     no-duktape|noduktape|nojs)
@@ -316,6 +321,14 @@ if [ "$CSHARP" -eq 1 ]; then
 else
   CMAKE_FLAGS+=("-DUSE_CSHARP=OFF")
   echo "CMake: USE_CSHARP=OFF"
+fi
+
+if [ "$FREEUSD" -eq 1 ]; then
+  CMAKE_FLAGS+=("-DUSE_FREEUSD=ON")
+  echo "CMake: USE_FREEUSD=ON (USDA mesh import + usd_* console tools)"
+else
+  CMAKE_FLAGS+=("-DUSE_FREEUSD=OFF")
+  echo "CMake: USE_FREEUSD=OFF"
 fi
 
 CMAKE_FLAGS+=("-DRENDERER_DEFAULT=vulkan")

@@ -210,6 +210,8 @@ typedef struct {
 	void	(*FS_FreeFileList)( char **filelist );
 	void	(*FS_WriteFile)( const char *qpath, const void *buffer, int size );
 	qboolean (*FS_FileExists)( const char *file );
+	/// Quake VFS path to host OS path (return value is engine-owned; do not free).
+	char *(*FS_BuildOSPath)( const char *base, const char *game, const char *qpath );
 
 	// cinematic stuff
 	void	(*CIN_UploadCinematic)( int handle );

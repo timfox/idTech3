@@ -34,6 +34,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cl_menuvideo.h"
 #include "cl_sdf_font.h"
 #include "cl_vector_font.h"
+#include "cl_usd.h"
 #include "cl_demo.h"
 #include "../qcommon/script_emit.h"
 #ifdef USE_LUA
@@ -3625,6 +3626,7 @@ static void CL_InitRef( void ) {
 	rimp.FS_ListFiles = FS_ListFiles;
 	//rimp.FS_FileIsInPAK = FS_FileIsInPAK;
 	rimp.FS_FileExists = FS_FileExists;
+	rimp.FS_BuildOSPath = FS_BuildOSPath;
 
 	rimp.Cvar_Get = Cvar_Get;
 	rimp.Cvar_Set = Cvar_Set;
@@ -4437,6 +4439,7 @@ void CL_Init( void ) {
 	MenuVideo_Init();
 	SDF_Init();
 	VectorFont_Init();
+	CL_USD_Init();
 
 #ifdef USE_LUA
 	LuaDebug_SetEngineRegisterCallback( LuaBindings_RegisterAll );

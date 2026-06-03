@@ -38,6 +38,7 @@ option(ENABLE_FORTIFY_SOURCE "Enable _FORTIFY_SOURCE=2 buffer overflow protectio
 option(ENABLE_ASAN "Enable AddressSanitizer for memory error detection (Debug builds)" OFF)
 option(ENABLE_LTO "Enable IPO/LTO for Release and RelWithDebInfo (GCC/Clang; longer links, smaller/faster binaries)" OFF)
 option(BUILD_EXAMPLE_DEMO_GAME "Build examples/demo_game (idtech3_demo.pk3 + helper)" OFF)
+option(USE_FREEUSD "Link FreeUSD for USDA mesh import and USD scene tools (GPL-2.0-or-later)" ON)
 
 if(C_STANDARD_STRICT)
   if(MSVC)
@@ -1761,6 +1762,8 @@ if(USE_TRELLIS)
 	target_compile_definitions(client PRIVATE USE_TRELLIS)
 endif()
 
+list(APPEND CLIENT_SRCS src/client/cl_usd.cpp)
+
 # renderers
 set(RENDERER_COMMON_SRCS
 	src/renderers/common/tr_font_stub.c  # placeholder, will be replaced below
@@ -1774,6 +1777,7 @@ set(RENDERER_COMMON_SRCS
 	src/renderers/common/tr_image_dds.c
 	src/renderers/common/tr_image_svg.c
 	src/renderers/common/tr_model_mesh_import.c
+	src/renderers/common/tr_model_freeusd_register.c
 	src/renderers/vulkan/tr_model_gltf.c
 	src/renderers/vulkan/tr_gltf_topo.c
 	src/renderers/vulkan/tr_model_obj.c
@@ -1788,6 +1792,17 @@ IF(BUILD_FREETYPE)
 ELSE()
 	# Keep tr_font_stub.c
 ENDIF()
+
+if(USE_FREEUSD)
+	include(${CMAKE_SOURCE_DIR}/cmake/FreeUSD.cmake)
+	list(APPEND RENDERER_COMMON_SRCS src/renderers/common/tr_model_freeusd.cpp)
+	target_compile_definitions(client PRIVATE USE_FREEUSD=1)
+	target_link_libraries(client PRIVATE idtech3_freeusd freeusd::c)
+	message(STATUS "FreeUSD: client tools (usd_info, usd_assess, usd_entities, usd_shaders, usd_load)")
+else()
+	message(STATUS "FreeUSD: disabled (cmake -DUSE_FREEUSD=OFF); usd_* commands unavailable")
+endif()
+
 AUX_SOURCE_DIRECTORY(src/renderers/vulkan RENDERER_VK_SRCS)
 # Exclude generated shader blobs to avoid duplicate symbols with committed spirv/ copies
 list(FILTER RENDERER_VK_SRCS EXCLUDE REGEX ".*/shaders/spirv/generated/shader_data\\.c$")
@@ -1871,6 +1886,10 @@ IF(USE_RENDERER_DLOPEN)
 	IF(BUILD_FREETYPE)
 		target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE idtech3_freetype)
 	ENDIF()
+	if(USE_FREEUSD)
+		target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE idtech3_freeusd freeusd::c)
+		set_property(SOURCE src/renderers/common/tr_model_freeusd.cpp PROPERTY CXX_STANDARD 17)
+	endif()
 	if(WIN32)
 		target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE qcommon m ${CMAKE_DL_LIBS})
 	else()
@@ -1903,6 +1922,10 @@ ELSE()
 	IF(BUILD_FREETYPE)
 		target_link_libraries(${RENDERER_PREFIX}_vulkan PRIVATE idtech3_freetype)
 	ENDIF()
+	if(USE_FREEUSD)
+		target_link_libraries(${RENDERER_PREFIX}_vulkan PRIVATE idtech3_freeusd freeusd::c)
+		set_property(SOURCE src/renderers/common/tr_model_freeusd.cpp PROPERTY CXX_STANDARD 17)
+	endif()
 ENDIF()
 
 # libpng/zlib for renderer PNG loader
@@ -2455,6 +2478,15 @@ enable_testing()
 add_test(NAME smoke_test
 	COMMAND ${CMAKE_SOURCE_DIR}/scripts/smoke_test.sh ${CMAKE_SOURCE_DIR}/release
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+if(USE_FREEUSD)
+	add_test(NAME test_freeusd_smoke
+		COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_freeusd_smoke.sh ${CMAKE_SOURCE_DIR}/release
+		WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+	set_tests_properties(test_freeusd_smoke PROPERTIES
+		LABELS "validation;freeusd"
+		REQUIRED_FILES "${CMAKE_SOURCE_DIR}/release/idtech3_vulkan.so")
+endif()
 set_tests_properties(smoke_test PROPERTIES
 	LABELS "validation;smoke"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/release/idtech3_server"

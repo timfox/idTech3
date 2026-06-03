@@ -32,7 +32,10 @@ for f in \
 	scripts/csharp/IdTech3.Engine.cs \
 	scripts/csharp/demo_hooks.cs \
 	demo_csharp.cfg \
-	scripts/demo_bootstrap.shader; do
+	demo_usd.cfg \
+	scripts/demo_bootstrap.shader \
+	models/parity_geom_mesh.usda \
+	models/parity_shade_preview.usda; do
 	[ -f "$MOD/$f" ] || fail "missing mod file: $MOD/$f"
 done
 

@@ -33,7 +33,7 @@ Modern id Tech 3: **Vulkan renderer with PBR**, validation and smoke-tested buil
 * Video codec support: RoQ, WebM (VP8/VP9), Ogg Theora, MP4 (H.264)
 
 **Models**:
-* MD3, MDR, IQM, **OBJ**, **glTF / GLB**, MD5, STL, DAE, FBX, USD / USDA, Maya Ascii (MA) — loaders under `src/renderers/vulkan/`; glTF details: [docs/GLTF.md](docs/GLTF.md)
+* MD3, MDR, IQM, **OBJ**, **glTF / GLB**, MD5, STL, DAE, FBX, **USD / USDA** ([FreeUSD](docs/FREEUSD.md), default ON), Maya Ascii (MA) — loaders under `src/renderers/vulkan/`; glTF details: [docs/GLTF.md](docs/GLTF.md)
 * Blend shapes: **IQM** and **glTF** morph + skeletal clips (**`RE_SetEntityMorphWeight`**, **`r_gltfAnim`**, **`r_morph`**, GPU skin/morph via **`r_gltfGpu`**) — [docs/GLTF.md](docs/GLTF.md)
 
 **Renderer (models):** OBJ, glTF/GLB, and MD5 share registration and `MOD_*` types on the Vulkan path. **glTF GPU skin/morph** (`r_gltfGpu`, SSBOs, tangent fix) is Vulkan PBR. See [docs/RENDERERS.md](docs/RENDERERS.md).
