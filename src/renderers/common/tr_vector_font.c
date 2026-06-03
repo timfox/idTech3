@@ -31,6 +31,23 @@ extern FT_Library ftLibrary;
 
 static vectorFont_t vectorFont;
 static qhandle_t vectorFontShaderHandle = 0;
+static cvar_t *r_vectorFontMode;
+
+#define VECTOR_FONT_MODE_LENGYEL      0
+#define VECTOR_FONT_MODE_LOOP_BLINN   2
+
+static int R_VectorFont_EffectiveMode( void ) {
+	int mode;
+
+	if ( !r_vectorFontMode ) {
+		return VECTOR_FONT_MODE_LENGYEL;
+	}
+	mode = r_vectorFontMode->integer;
+	if ( mode == VECTOR_FONT_MODE_LOOP_BLINN ) {
+		return VECTOR_FONT_MODE_LOOP_BLINN;
+	}
+	return VECTOR_FONT_MODE_LENGYEL;
+}
 
 void RE_SetColor( const float *rgba );
 void RE_DrawVectorGlyph( float x, float y, float w, float h,
@@ -320,8 +337,12 @@ static qboolean R_VectorFont_BuildFromFace( FT_Face face, const char *ttfPath ) 
 	vectorFont.totalCurves = texelCount / VECTOR_TEXELS_PER_CURVE;
 	vectorFont.loaded = qtrue;
 
-	ri.Printf( PRINT_ALL, "Vector font: loaded %s (%d curves, %dx%d curve texture)\n",
-		ttfPath, vectorFont.totalCurves, width, height );
+	ri.Printf( PRINT_ALL, "Vector font: loaded %s (%d curves, %dx%d curve texture, mode %d Lengyel)\n",
+		ttfPath, vectorFont.totalCurves, width, height, VECTOR_FONT_MODE_LENGYEL );
+	if ( R_VectorFont_EffectiveMode() == VECTOR_FONT_MODE_LOOP_BLINN ) {
+		ri.Printf( PRINT_WARNING,
+			"Vector font: r_vectorFontMode 2 (Loop&Blinn mesh) not implemented; using Lengyel — see docs/VECTOR_FONT.md\n" );
+	}
 
 	ri.Free( texels );
 	return qtrue;
@@ -330,7 +351,15 @@ static qboolean R_VectorFont_BuildFromFace( FT_Face face, const char *ttfPath ) 
 #endif /* BUILD_FREETYPE */
 
 void R_VectorFont_Init( void ) {
+	r_vectorFontMode = ri.Cvar_Get( "r_vectorFontMode", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_vectorFontMode,
+		"Vector font algorithm when r_vectorFont 1: 0 = Lengyel JCGT 2017 (curve texture + winding), "
+		"2 = Loop & Blinn + mesh glyphlets (AMD GPUOpen; not implemented, falls back to 0)." );
 	R_VectorFont_Clear();
+}
+
+int R_VectorFont_Mode( void ) {
+	return R_VectorFont_EffectiveMode();
 }
 
 void R_VectorFont_Shutdown( void ) {

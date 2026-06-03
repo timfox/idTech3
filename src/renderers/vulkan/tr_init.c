@@ -3593,7 +3593,8 @@ static void R_Register( void )
 	r_vk_meshShaderNV = ri.Cvar_Get( "r_vk_meshShaderNV", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_vk_meshShaderNV, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_vk_meshShaderNV,
-		"Request VK_NV_mesh_shader at device creation (NVIDIA). Default off: extension is enabled for future mesh pipelines only; no draw path uses mesh shaders yet. Requires vid_restart." );
+		"Request VK_NV_mesh_shader at device creation (NVIDIA). Default off: extension is enabled for future mesh pipelines only; no draw path uses mesh shaders yet. "
+		"Planned use: Loop&Blinn glyphlet string dispatch (r_vectorFontMode 2, AMD GPUOpen). Requires vid_restart." );
 	ri.Cvar_SetGroup( r_vk_meshShaderNV, CVG_RENDERER );
 
 	if ( glConfig.vidWidth )
