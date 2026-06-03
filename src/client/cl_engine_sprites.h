@@ -18,6 +18,7 @@ extern "C" {
 void CL_EngineSprites_Init( void );
 void CL_EngineSprites_AddFromSnapshot( void );
 void CL_EngineSprite_AddLocal( const engineSpriteDesc_t *desc );
+void CL_EngineSprite_AddLocalAtTime( const engineSpriteDesc_t *desc, int timeMs );
 void CL_SpriteSpawn_f( void );
 
 #ifdef __cplusplus

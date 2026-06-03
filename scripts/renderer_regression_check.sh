@@ -373,6 +373,10 @@ elif ! grep -q 'SV_EngineSprite_SpawnFromDef' "$PROJECT_ROOT/src/server/sv_engin
   fail "sv_engine_sprites.c missing runtime spawn helper"
 elif ! grep -q 'registerTable(L, "Sprites"' "$PROJECT_ROOT/src/game/g_lua_bindings.c" 2>/dev/null; then
   fail "g_lua_bindings.c missing Engine.Sprites Lua table"
+elif ! grep -q 'CG_ENGINE_SPRITE_ADD_LOCAL' "$PROJECT_ROOT/src/cgame/cg_public.h" 2>/dev/null; then
+  fail "cg_public.h missing CG_ENGINE_SPRITE_ADD_LOCAL cgame trap"
+elif ! grep -q 'CL_EngineSprite_AddLocalAtTime' "$PROJECT_ROOT/src/client/cl_engine_sprites.c" 2>/dev/null; then
+  fail "cl_engine_sprites.c missing AddLocalAtTime helper for cgame trap"
 else
   pass "engine-native sprite props (map entities + RE_AddEngineSpriteToScene)"
 fi
