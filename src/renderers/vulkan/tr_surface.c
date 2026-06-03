@@ -224,10 +224,28 @@ RB_SurfaceSprite
 static void RB_SurfaceSprite( void ) {
 	vec3_t		left, up;
 	float		radius;
+	float		s1, t1, s2, t2;
+	qboolean	flipbookUV;
+
+	flipbookUV = ( backEnd.currentEntity->e.renderfx & RF_SPRITE_FLIPBOOK ) ? qtrue : qfalse;
 
 	// calculate the xyz locations for the four corners
 	radius = backEnd.currentEntity->e.radius;
-	if ( backEnd.currentEntity->e.rotation == 0.0 ) {
+	if ( backEnd.currentEntity->e.renderfx & RF_SPRITE_YAWLOCK ) {
+		vec3_t dir;
+		static const vec3_t worldUp = { 0.0f, 0.0f, 1.0f };
+
+		VectorSubtract( backEnd.viewParms.or.origin, backEnd.currentEntity->e.origin, dir );
+		dir[2] = 0.0f;
+		if ( VectorNormalize2( dir, dir ) > 0.0f ) {
+			CrossProduct( dir, worldUp, left );
+			VectorScale( left, radius, left );
+			VectorScale( worldUp, radius, up );
+		} else {
+			VectorScale( backEnd.viewParms.or.axis[1], radius, left );
+			VectorScale( backEnd.viewParms.or.axis[2], radius, up );
+		}
+	} else if ( backEnd.currentEntity->e.rotation == 0.0 ) {
 		VectorScale( backEnd.viewParms.or.axis[1], radius, left );
 		VectorScale( backEnd.viewParms.or.axis[2], radius, up );
 	} else {
@@ -249,7 +267,29 @@ static void RB_SurfaceSprite( void ) {
 		VectorSubtract( vec3_origin, left, left );
 	}
 
-	RB_AddQuadStamp( backEnd.currentEntity->e.origin, left, up, backEnd.currentEntity->e.shader );
+	if ( flipbookUV ) {
+		int cols = backEnd.currentEntity->e.oldframe;
+		int rows = backEnd.currentEntity->e.skinNum;
+		int frame = backEnd.currentEntity->e.frame;
+		int col, row;
+
+		if ( cols < 1 ) {
+			cols = 1;
+		}
+		if ( rows < 1 ) {
+			rows = 1;
+		}
+		col = frame % cols;
+		row = ( frame / cols ) % rows;
+		s1 = (float)col / (float)cols;
+		t1 = (float)row / (float)rows;
+		s2 = (float)( col + 1 ) / (float)cols;
+		t2 = (float)( row + 1 ) / (float)rows;
+		RB_AddQuadStampExt( backEnd.currentEntity->e.origin, left, up,
+			backEnd.currentEntity->e.shader, s1, t1, s2, t2 );
+	} else {
+		RB_AddQuadStamp( backEnd.currentEntity->e.origin, left, up, backEnd.currentEntity->e.shader );
+	}
 }
 
 

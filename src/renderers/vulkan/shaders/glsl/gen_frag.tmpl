@@ -213,6 +213,7 @@ layout (constant_id = 37) const int pom_enabled = 0;
 layout (constant_id = 38) const int pom_max_steps = 16;
 layout (constant_id = 39) const float parallax_bias_shader = 0.0;
 layout (constant_id = 40) const float forward_plus_shade_strength = 0.0;
+layout (constant_id = 41) const float deferred_unlit_base_strength = 0.0;
 
 vec3 lightmapDecode( vec3 c ) {
 	/* sRGB to linear: use when BSP lightmaps are gamma-encoded (q3map2 -gamma, etc.) */
@@ -1331,6 +1332,9 @@ void main() {
 #endif
 
 	vec3 primaryDirect = lightColor * reflectance * ( attenuation * NL ) * pomSelfShadow;
+	if ( deferred_unlit_base_strength > 1e-6 && lightmap_texture_set < 0 ) {
+		primaryDirect = vec3( 0.0 );
+	}
 	float fpRenorm = 1.0;
 	if ( forward_plus_shade_strength > 1e-6 ) {
 		float pL = length( primaryDirect );
@@ -1393,7 +1397,7 @@ void main() {
 	}
 
 	// Clearcoat: second specular lobe on top; scale by (1 - max F0 of base) for approximate energy balance.
-	if ( clearcoat_texture_set >= 0 ) {
+	if ( clearcoat_texture_set >= 0 && deferred_unlit_base_strength <= 1e-6 ) {
 		vec4 cc = texture( clearcoat_texture, frag_tex_coord0 );
 		float ccStrength = clamp( cc.r * pbrClearcoatScale.x, 0.0, 1.0 );
 		float ccRoughness = clamp( cc.g * pbrClearcoatScale.y, 0.02, 1.0 );
@@ -1405,7 +1409,7 @@ void main() {
 	}
 
 	// Sheen: Charlie NDF + same Smith visibility form as base specular (no separate Fresnel here).
-	if ( sheen_texture_set >= 0 ) {
+	if ( sheen_texture_set >= 0 && deferred_unlit_base_strength <= 1e-6 ) {
 		vec3 sheenColor = texture( sheen_texture, frag_tex_coord0 ).rgb * pbrSheenScale.rgb;
 		float sheenRough = clamp( pbrSheenScale.w, 0.07, 1.0 );
 		float sheenWeight = clamp( max( max( sheenColor.r, sheenColor.g ), sheenColor.b ), 0.0, 1.0 );
@@ -1419,12 +1423,12 @@ void main() {
 	}
 
 	// subsurface term (Burley-style wrap approximation)
-	if ( subsurfaceStrength > 0.0 ) {
+	if ( subsurfaceStrength > 0.0 && deferred_unlit_base_strength <= 1e-6 ) {
 		out_color.rgb += lightColor * CalcBurleySubsurface( N, L, subsurfaceColor, subsurfaceStrength, subsurfaceWrap ) * attenuation;
 	}
 
 	// transmission term
-	if ( transmission_texture_set >= 0 ) {
+	if ( transmission_texture_set >= 0 && deferred_unlit_base_strength <= 1e-6 ) {
 		float transmission = texture( transmission_texture, frag_tex_coord0 ).r * pbrTransmissionScale.x;
 		float transmitFactor = transmission * ( 1.0 - roughness );
 		diffuse.rgb *= ( 1.0 - transmitFactor );

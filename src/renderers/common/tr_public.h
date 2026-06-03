@@ -141,6 +141,10 @@ typedef struct {
 		float emS1, float emT1, float emS2, float emT2,
 		int curveStart, int curveCount );
 
+	/* Engine-native RT_SPRITE helpers (billboard / flipbook / imposter). */
+	void	(*AddEngineSpriteToScene)( const engineSpriteDesc_t *desc );
+	void	(*AddEngineSpriteToSceneAtTime)( const engineSpriteDesc_t *desc, int refdefTimeMs );
+
 } refexport_t;
 
 //

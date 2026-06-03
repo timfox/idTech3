@@ -100,6 +100,33 @@ def radial_shadow(w: int, h: int) -> list[bytes]:
     return rows
 
 
+def flipbook_atlas(cols: int, rows: int, cell: int) -> list[bytes]:
+    """Simple colored cells for flipbook demo (cols x rows)."""
+    w, h = cols * cell, rows * cell
+    palette = [
+        (220, 60, 60, 255),
+        (60, 180, 80, 255),
+        (60, 120, 220, 255),
+        (220, 180, 40, 255),
+        (180, 80, 200, 255),
+        (80, 200, 200, 255),
+        (240, 120, 60, 255),
+        (160, 160, 160, 255),
+    ]
+    rows_out: list[bytes] = []
+    for y in range(h):
+        row = bytearray(w * 4)
+        cy = y // cell
+        for x in range(w):
+            cx = x // cell
+            idx = (cy * cols + cx) % len(palette)
+            r, g, b, a = palette[idx]
+            i = x * 4
+            row[i : i + 4] = bytes([r, g, b, a])
+        rows_out.append(bytes(row))
+    return rows_out
+
+
 def main() -> int:
     if len(sys.argv) != 2:
         print("usage: gen_demo_bootstrap_media.py <output_root>", file=sys.stderr)
@@ -117,6 +144,9 @@ def main() -> int:
     )
     write_png_rgba(demo / "bootstrap_flare.png", 64, 64, radial_flare(64, 64))
     write_png_rgba(demo / "bootstrap_shadow.png", 64, 64, radial_shadow(64, 64))
+    write_png_rgba(demo / "demo_sprite_billboard.png", 64, 64, radial_flare(64, 64))
+    write_png_rgba(demo / "demo_sprite_imposter.png", 64, 128, solid_rgba(64, 128, 40, 120, 50, 255))
+    write_png_rgba(demo / "demo_sprite_flipbook.png", 64, 64, flipbook_atlas(2, 2, 32))
     print("Wrote:", root / "gfx/2d/bigchars.png", root / "gfx/demo/*.png", sep="\n  ")
     return 0
 

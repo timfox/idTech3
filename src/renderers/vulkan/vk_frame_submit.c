@@ -88,6 +88,9 @@ void vk_begin_frame( void )
 	VkCommandBufferBeginInfo begin_info;
 	VkResult res;
 	qboolean needPost = qfalse;
+#ifdef USE_VK_PBR
+	qboolean needWorldPipeRebuild = qfalse;
+#endif
 
 	if ( vk.device_lost ) {
 		return;
@@ -98,15 +101,26 @@ void vk_begin_frame( void )
 	vk.inRenderPass = qfalse;
 
 #ifdef USE_VK_PBR
-	/* r_forwardPlusShade only changes PBR fragment specialization on world draw pipelines.
-	 * Do not use vk_destroy_pipelines() here: it also tears down gamma/bloom/smaa and other
-	 * post paths unrelated to Forward+ (black screen if not rebuilt the same frame).
-	 * World VkPipelines are shared across both command-buffer slots: wait for the whole
-	 * queue before destroy so the other slot cannot still be executing draws (GPU hazard). */
+	/* r_forwardPlusShade / r_deferredUnlitBase / r_deferredLighting change PBR fragment specialization
+	 * on world draw pipelines. Do not use vk_destroy_pipelines() here: it also tears down gamma/bloom/smaa
+	 * and other post paths unrelated to Forward+ (black screen if not rebuilt the same frame).
+	 * World VkPipelines are shared across both command-buffer slots: wait for the whole queue before
+	 * destroy so the other slot cannot still be executing draws (GPU hazard). */
 	if ( r_forwardPlusShade && r_forwardPlusShade->modified ) {
 		r_forwardPlusShade->modified = qfalse;
+		needWorldPipeRebuild = qtrue;
+	}
+	if ( r_deferredUnlitBase && r_deferredUnlitBase->modified ) {
+		r_deferredUnlitBase->modified = qfalse;
+		needWorldPipeRebuild = qtrue;
+	}
+	if ( r_deferredLighting && r_deferredLighting->modified ) {
+		r_deferredLighting->modified = qfalse;
+		needWorldPipeRebuild = qtrue;
+	}
+	if ( needWorldPipeRebuild ) {
 		if ( vk.device && !vk.device_lost && vk.pipelines_count > (uint32_t)vk.pipelines_world_base ) {
-			ri.Printf( PRINT_ALL, "[VK][Forward+] r_forwardPlusShade changed; invalidating world graphics pipelines for new fragment specialization\n" );
+			ri.Printf( PRINT_ALL, "[VK][PBR] Fragment specialization changed; invalidating world graphics pipelines\n" );
 			vk_wait_idle();
 			vk_destroy_world_graphics_pipelines();
 		}

@@ -13,6 +13,9 @@ set(DEMO_BOOTSTRAP_GFX_DEMO
 	"${DEMO_BOOTSTRAP_DIR}/gfx/demo/bootstrap_console.png"
 	"${DEMO_BOOTSTRAP_DIR}/gfx/demo/bootstrap_flare.png"
 	"${DEMO_BOOTSTRAP_DIR}/gfx/demo/bootstrap_shadow.png"
+	"${DEMO_BOOTSTRAP_DIR}/gfx/demo/demo_sprite_billboard.png"
+	"${DEMO_BOOTSTRAP_DIR}/gfx/demo/demo_sprite_flipbook.png"
+	"${DEMO_BOOTSTRAP_DIR}/gfx/demo/demo_sprite_imposter.png"
 )
 set(DEMO_BOOTSTRAP_FONTS
 	"${DEMO_BOOTSTRAP_DIR}/fonts/LICENSE.txt"
@@ -39,6 +42,7 @@ set(DEMO_MOD_FILES
 	"${DEMO_MOD_DIR}/demo_csharp.cfg"
 	"${DEMO_MOD_DIR}/demo_gameplay.cfg"
 	"${DEMO_MOD_DIR}/demo_usd.cfg"
+	"${DEMO_MOD_DIR}/demo_sprites.cfg"
 	"${DEMO_MOD_DIR}/models/parity_geom_mesh.usda"
 	"${DEMO_MOD_DIR}/models/parity_shade_preview.usda"
 	"${DEMO_MOD_DIR}/readme_demo.txt"
@@ -48,6 +52,7 @@ set(DEMO_MOD_FILES
 	"${DEMO_MOD_DIR}/scripts/csharp/IdTech3.Engine.cs"
 	"${DEMO_MOD_DIR}/scripts/csharp/demo_hooks.cs"
 	"${DEMO_MOD_DIR}/scripts/demo_bootstrap.shader"
+	"${DEMO_MOD_DIR}/scripts/demo_sprites.shader"
 )
 
 # Minimal native UI for skeleton playfields (loads from pk3 vm/ before ui.qvm).
@@ -108,6 +113,8 @@ add_custom_command(
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/demo_usd.cfg" "${DEMO_PACK_STAGING}/demo_usd.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/demo_sprites.cfg" "${DEMO_PACK_STAGING}/demo_sprites.cfg"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/readme_demo.txt" "${DEMO_PACK_STAGING}/readme_demo.txt"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/scripts/js/demo_hooks.js" "${DEMO_PACK_STAGING}/scripts/js/demo_hooks.js"
@@ -121,6 +128,8 @@ add_custom_command(
 		"${DEMO_MOD_DIR}/scripts/csharp/demo_hooks.cs" "${DEMO_PACK_STAGING}/scripts/csharp/demo_hooks.cs"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/scripts/demo_bootstrap.shader" "${DEMO_PACK_STAGING}/scripts/demo_bootstrap.shader"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/scripts/demo_sprites.shader" "${DEMO_PACK_STAGING}/scripts/demo_sprites.shader"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/models/parity_geom_mesh.usda" "${DEMO_PACK_STAGING}/models/parity_geom_mesh.usda"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -136,6 +145,12 @@ add_custom_command(
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_BOOTSTRAP_DIR}/gfx/demo/bootstrap_shadow.png" "${DEMO_PACK_STAGING}/gfx/demo/bootstrap_shadow.png"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_BOOTSTRAP_DIR}/gfx/demo/demo_sprite_billboard.png" "${DEMO_PACK_STAGING}/gfx/demo/demo_sprite_billboard.png"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_BOOTSTRAP_DIR}/gfx/demo/demo_sprite_flipbook.png" "${DEMO_PACK_STAGING}/gfx/demo/demo_sprite_flipbook.png"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_BOOTSTRAP_DIR}/gfx/demo/demo_sprite_imposter.png" "${DEMO_PACK_STAGING}/gfx/demo/demo_sprite_imposter.png"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_INTER_PACK_FONT}" "${DEMO_PACK_STAGING}/fonts/Inter_28pt-Regular.ttf"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_BOOTSTRAP_DIR}/fonts/LICENSE.txt" "${DEMO_PACK_STAGING}/fonts/LICENSE.txt"
@@ -149,16 +164,19 @@ add_custom_command(
 		"$<TARGET_FILE:demo_ui_skeleton>" "${DEMO_PACK_STAGING}/${DEMO_UI_DOT_ZIP}"
 	COMMAND ${CMAKE_COMMAND} -E chdir "${DEMO_PACK_STAGING}"
 		${CMAKE_COMMAND} -E tar cf "${DEMO_PK3}" --format=zip
-		autoexec.cfg gameinfo.txt demo_features.cfg demo_js.cfg demo_lua.cfg demo_csharp.cfg demo_gameplay.cfg readme_demo.txt
+		autoexec.cfg gameinfo.txt demo_features.cfg demo_js.cfg demo_lua.cfg demo_csharp.cfg demo_gameplay.cfg demo_usd.cfg demo_sprites.cfg readme_demo.txt
 		scripts/js/demo_hooks.js scripts/js/README.txt
 		scripts/lua/demo_hooks.lua
 		scripts/csharp/IdTech3.Engine.cs scripts/csharp/demo_hooks.cs
-		scripts/demo_bootstrap.shader
+		scripts/demo_bootstrap.shader scripts/demo_sprites.shader
 		gfx/2d/bigchars.png
 		gfx/demo/bootstrap_white.png
 		gfx/demo/bootstrap_console.png
 		gfx/demo/bootstrap_flare.png
 		gfx/demo/bootstrap_shadow.png
+		gfx/demo/demo_sprite_billboard.png
+		gfx/demo/demo_sprite_flipbook.png
+		gfx/demo/demo_sprite_imposter.png
 		fonts/Inter_28pt-Regular.ttf
 		fonts/LICENSE.txt
 		fonts/demo_console_sdf.png

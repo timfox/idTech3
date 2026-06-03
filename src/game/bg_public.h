@@ -91,7 +91,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define CS_LOCATIONS			(CS_PLAYERS+MAX_CLIENTS)
 #define CS_PARTICLES			(CS_LOCATIONS+MAX_LOCATIONS)
 
-#define CS_MAX					(CS_PARTICLES+MAX_LOCATIONS)
+#define CS_ENGINE_SPRITE_SHADERS	(CS_PARTICLES+MAX_LOCATIONS)
+#define MAX_ENGINE_SPRITE_SHADERS	512
+#define CS_ENGINE_SPRITE_META		(CS_ENGINE_SPRITE_SHADERS+MAX_ENGINE_SPRITE_SHADERS)
+
+#define CS_MAX					(CS_ENGINE_SPRITE_META+1)
 
 #if (CS_MAX) > MAX_CONFIGSTRINGS
 #error overflow: (CS_MAX) > MAX_CONFIGSTRINGS
@@ -265,6 +269,7 @@ typedef enum {
 #define	EF_AWARD_ASSIST		0x00020000		// draw a assist sprite
 #define EF_AWARD_DENIED		0x00040000		// denied
 #define EF_TEAMVOTED		0x00080000		// already cast a team vote
+/* EF_BILLBOARD / EF_FLIPBOOK / EF_IMPOSTER: engine-native sprites in q_shared.h */
 
 // NOTE: may not have more than 16
 typedef enum {

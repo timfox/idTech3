@@ -52,6 +52,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define	RF_WRAP_FRAMES		0x0200		// mod the model frames by the maxframes to allow continuous
 										// animation without needing to know the frame count
 
+#define RF_SPRITE_YAWLOCK	0x0400		// RT_SPRITE: cylindrical billboard (yaw locked, world up)
+#define RF_SPRITE_FLIPBOOK	0x0800		// RT_SPRITE: atlas UV from frame + oldframe(cols) + skinNum(rows)
+
 // refdef flags
 #define RDF_NOWORLDMODEL	0x0001		// used for player configuration screen
 #define RDF_HYPERSPACE		0x0004		// teleportation effect
@@ -71,7 +74,7 @@ typedef struct poly_s {
 typedef enum {
 	RT_MODEL,
 	RT_POLY,
-	RT_SPRITE,
+	RT_SPRITE,		// camera-facing quad (RB_SurfaceSprite); engine map props + EF_BILLBOARD
 	RT_BEAM,
 	RT_RAIL_CORE,
 	RT_RAIL_RINGS,
@@ -80,6 +83,21 @@ typedef enum {
 
 	RT_MAX_REF_ENTITY_TYPE
 } refEntityType_t;
+
+#include "../../qcommon/engine_sprite_map.h"
+
+typedef struct engineSpriteDesc_s {
+	engineSpriteType_t	type;
+	vec3_t				origin;
+	float				radius;
+	float				rotation;
+	qhandle_t			shader;
+	int					cols;
+	int					rows;
+	float				fps;
+	float				swayAmount;
+	float				swaySpeed;
+} engineSpriteDesc_t;
 
 typedef struct {
 	refEntityType_t	reType;

@@ -47,7 +47,11 @@ Usage from Lua:
 #include "../physics/phys_ik.h"
 #include "../navigation/nav_recast.h"
 #include "../client/cl_particles.h"
+#include "../client/cl_engine_sprites.h"
+#include "../renderers/common/tr_public.h"
 #include "../audio/snd_music_adaptive.h"
+
+extern refexport_t re;
 
 /* ========== Director bindings ========== */
 
@@ -302,6 +306,72 @@ static int l_vdb_bindAsFog(lua_State *L) {
 static int l_vdb_getGridCount(lua_State *L) {
 	lua_pushinteger(L, VDB_GetGridCount());
 	return 1;
+}
+
+/* ========== Engine sprite bindings (client-local + listen-server spawn) ========== */
+
+static engineSpriteType_t l_spriteTypeFromString( const char *typeArg ) {
+	if ( typeArg && !Q_stricmp( typeArg, "flipbook" ) ) {
+		return ENGINE_SPRITE_FLIPBOOK;
+	}
+	if ( typeArg && !Q_stricmp( typeArg, "imposter" ) ) {
+		return ENGINE_SPRITE_IMPOSTER;
+	}
+	return ENGINE_SPRITE_BILLBOARD;
+}
+
+static int l_sprite_spawnLocal(lua_State *L) {
+	engineSpriteDesc_t desc;
+	const char *typeArg;
+	const char *shaderArg;
+
+	typeArg = luaL_optstring( L, 1, "billboard" );
+	shaderArg = luaL_checkstring( L, 2 );
+
+	Com_Memset( &desc, 0, sizeof( desc ) );
+	desc.type = l_spriteTypeFromString( typeArg );
+	desc.cols = (int)luaL_optinteger( L, 3, 2 );
+	desc.rows = (int)luaL_optinteger( L, 4, 2 );
+	desc.fps = (float)luaL_optnumber( L, 5, 8.0 );
+	desc.origin[0] = (float)luaL_optnumber( L, 6, 0.0 );
+	desc.origin[1] = (float)luaL_optnumber( L, 7, 0.0 );
+	desc.origin[2] = (float)luaL_optnumber( L, 8, 64.0 );
+	desc.radius = (float)luaL_optnumber( L, 9, 48.0 );
+	desc.rotation = (float)luaL_optnumber( L, 10, 0.0 );
+
+	if ( !re.RegisterShader ) {
+		return luaL_error( L, "renderer not ready" );
+	}
+	desc.shader = re.RegisterShader( shaderArg );
+	if ( !desc.shader ) {
+		return luaL_error( L, "shader not found: %s", shaderArg );
+	}
+
+	CL_EngineSprite_AddLocal( &desc );
+	return 0;
+}
+
+static int l_sprite_spawnServer(lua_State *L) {
+	const char *typeArg;
+	const char *shaderArg;
+	char cmd[MAX_STRING_CHARS];
+
+	typeArg = luaL_optstring( L, 1, "billboard" );
+	shaderArg = luaL_checkstring( L, 2 );
+
+	Com_sprintf( cmd, sizeof( cmd ),
+		"sv_sprite_spawn %s %s %d %d %.0f %.0f %.0f %.0f %.0f %.0f\n",
+		typeArg, shaderArg,
+		(int)luaL_optinteger( L, 3, 2 ),
+		(int)luaL_optinteger( L, 4, 2 ),
+		luaL_optnumber( L, 5, 8.0 ),
+		luaL_optnumber( L, 6, 0.0 ),
+		luaL_optnumber( L, 7, 0.0 ),
+		luaL_optnumber( L, 8, 64.0 ),
+		luaL_optnumber( L, 9, 48.0 ),
+		luaL_optnumber( L, 10, 0.0 ) );
+	Cbuf_AddText( cmd );
+	return 0;
 }
 
 /* ========== AIML bindings ========== */
@@ -1169,8 +1239,15 @@ void LuaBindings_RegisterAll(void *luaState) {
 	};
 	registerTable(L, "VDB", vdbFuncs);
 
+	static const luaL_Reg spriteFuncs[] = {
+		{"spawnLocal", l_sprite_spawnLocal},
+		{"spawnServer", l_sprite_spawnServer},
+		{NULL, NULL}
+	};
+	registerTable(L, "Sprites", spriteFuncs);
+
 	lua_setglobal(L, "Engine");
-	Com_Printf("Lua bindings registered: Engine.{Director,Nav,Physics,Particles,Music,Face,Horde,Dismember,Choreo,Response,GOAP,AIML,Events,Telemetry,Replay,Save,Quest,Dialogue,ECS}\n");
+	Com_Printf("Lua bindings registered: Engine.{Director,Nav,Physics,Particles,Music,Face,Horde,Dismember,Choreo,Response,GOAP,AIML,Events,Telemetry,Replay,Save,Quest,Dialogue,ECS,VDB,Sprites}\n");
 }
 
 #else /* !USE_LUA */

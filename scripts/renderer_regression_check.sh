@@ -305,6 +305,14 @@ elif ! grep -q 'vk_deferred_unlit_base_wanted' "$DGB_C" 2>/dev/null; then
   fail "vk_deferred_gbuffer.c missing vk_deferred_unlit_base_wanted"
 elif ! grep -q 'pc.additive' "$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/deferred_lighting.comp" 2>/dev/null; then
   fail "deferred_lighting.comp missing additive composite path"
+elif ! grep -q 'r_deferredLightingStrength = ri.Cvar_Get' "$TR_INIT_VK" 2>/dev/null; then
+  fail "tr_init.c missing r_deferredLightingStrength cvar"
+elif ! grep -q 'vk_deferred_unlit_base_wanted' "$PROJECT_ROOT/src/renderers/vulkan/tr_shade.c" 2>/dev/null; then
+  fail "tr_shade.c should skip ProjectDlightTexture when deferred unlit base active"
+elif ! grep -q 'deferred_unlit_base_strength' "$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/gen_frag.tmpl" 2>/dev/null; then
+  fail "gen_frag.tmpl missing deferred_unlit_base_strength fragment spec constant"
+elif ! grep -q 'deferred_unlit_base_strength' "$PROJECT_ROOT/src/renderers/vulkan/vk_create_pipeline.c" 2>/dev/null; then
+  fail "vk_create_pipeline.c missing deferred_unlit_base_strength specialization"
 else
   pass "deferred lighting compute + composite wired"
 fi
@@ -319,6 +327,73 @@ elif ! grep -q 'deferred_gbuffer_albedo' "$VK_ATTACH" 2>/dev/null; then
   fail "vk_attachments.c missing deferred_gbuffer_albedo destroy path"
 else
   pass "r_deferredGBuffer cvar + deferred G-buffer scaffold alloc/teardown"
+fi
+
+echo ""
+echo "Engine-native sprite props (misc_billboard / misc_flipbook / misc_imposter):"
+SP_C="$PROJECT_ROOT/src/renderers/vulkan/tr_sprite_props.c"
+TR_TYPES="$PROJECT_ROOT/src/renderers/common/tr_types.h"
+if ! grep -q 'misc_billboard' "$SP_C" 2>/dev/null; then
+  fail "tr_sprite_props.c missing misc_billboard parse"
+elif ! grep -q 'misc_flipbook' "$SP_C" 2>/dev/null; then
+  fail "tr_sprite_props.c missing misc_flipbook parse"
+elif ! grep -q 'misc_imposter' "$SP_C" 2>/dev/null; then
+  fail "tr_sprite_props.c missing misc_imposter parse"
+elif ! grep -q 'R_SpriteProps_ParseFromEntityString' "$PROJECT_ROOT/src/renderers/vulkan/tr_bsp.c" 2>/dev/null; then
+  fail "tr_bsp.c should parse sprite props on RE_LoadWorldMap"
+elif ! grep -q 'RF_SPRITE_YAWLOCK' "$TR_TYPES" 2>/dev/null; then
+  fail "tr_types.h missing RF_SPRITE_YAWLOCK"
+elif ! grep -q 'RF_SPRITE_FLIPBOOK' "$TR_TYPES" 2>/dev/null; then
+  fail "tr_types.h missing RF_SPRITE_FLIPBOOK"
+elif ! grep -q 'EF_BILLBOARD' "$PROJECT_ROOT/src/qcommon/q_shared.h" 2>/dev/null; then
+  fail "q_shared.h missing EF_BILLBOARD engine flag"
+elif ! grep -q 'AddEngineSpriteToScene' "$PROJECT_ROOT/src/renderers/common/tr_public.h" 2>/dev/null; then
+  fail "tr_public.h missing AddEngineSpriteToScene export"
+elif ! grep -q 'R_SpriteProps_Init' "$TR_INIT_VK" 2>/dev/null; then
+  fail "tr_init.c should call R_SpriteProps_Init"
+elif ! grep -q 'r_spriteProps = ri.Cvar_Get' "$SP_C" 2>/dev/null; then
+  fail "tr_sprite_props.c missing r_spriteProps cvar"
+elif ! grep -q 'CL_EngineSprites_AddFromSnapshot' "$PROJECT_ROOT/src/client/cl_cgame.c" 2>/dev/null; then
+  fail "cl_cgame.c should call CL_EngineSprites_AddFromSnapshot before RenderScene"
+elif ! grep -q 'cl_engineSprites = Cvar_Get' "$PROJECT_ROOT/src/client/cl_engine_sprites.c" 2>/dev/null; then
+  fail "cl_engine_sprites.c missing cl_engineSprites cvar"
+elif ! grep -q 'CS_ENGINE_SPRITE_SHADERS' "$PROJECT_ROOT/src/game/bg_public.h" 2>/dev/null; then
+  fail "bg_public.h missing CS_ENGINE_SPRITE_SHADERS"
+elif ! grep -q 'EngineSpriteMap_Parse' "$PROJECT_ROOT/src/qcommon/engine_sprite_map.c" 2>/dev/null; then
+  fail "engine_sprite_map.c missing shared map parser"
+elif ! grep -q 'SV_EngineSprites_LoadMap' "$PROJECT_ROOT/src/server/sv_init.c" 2>/dev/null; then
+  fail "sv_init.c should load map sprite shaders on CM_LoadMap"
+elif ! grep -q 'SV_EngineSprites_SpawnMapEntities' "$PROJECT_ROOT/src/server/sv_init.c" 2>/dev/null; then
+  fail "sv_init.c should spawn map sprite snapshot ents after game init"
+elif ! grep -q 'CS_ENGINE_SPRITE_META' "$PROJECT_ROOT/src/game/bg_public.h" 2>/dev/null; then
+  fail "bg_public.h missing CS_ENGINE_SPRITE_META"
+elif ! grep -q 'G_ENGINE_SPRITE_SPAWN' "$PROJECT_ROOT/src/game/g_public.h" 2>/dev/null; then
+  fail "g_public.h missing G_ENGINE_SPRITE_SPAWN game trap"
+elif ! grep -q 'SV_EngineSprite_SpawnFromDef' "$PROJECT_ROOT/src/server/sv_engine_sprites.c" 2>/dev/null; then
+  fail "sv_engine_sprites.c missing runtime spawn helper"
+elif ! grep -q 'registerTable(L, "Sprites"' "$PROJECT_ROOT/src/game/g_lua_bindings.c" 2>/dev/null; then
+  fail "g_lua_bindings.c missing Engine.Sprites Lua table"
+else
+  pass "engine-native sprite props (map entities + RE_AddEngineSpriteToScene)"
+fi
+
+echo ""
+echo "Billboard sprites (EF_BILLBOARD + RT_SPRITE renderer path):"
+Q_SHARED="$PROJECT_ROOT/src/qcommon/q_shared.h"
+TR_TYPES="$PROJECT_ROOT/src/renderers/common/tr_types.h"
+TR_SURF="$PROJECT_ROOT/src/renderers/vulkan/tr_surface.c"
+if ! grep -q 'EF_BILLBOARD' "$Q_SHARED" 2>/dev/null; then
+  fail "q_shared.h missing EF_BILLBOARD"
+elif ! grep -q 'RT_SPRITE' "$TR_TYPES" 2>/dev/null; then
+  fail "tr_types.h missing RT_SPRITE"
+elif ! grep -q 'RB_SurfaceSprite' "$TR_SURF" 2>/dev/null; then
+  fail "tr_surface.c missing RB_SurfaceSprite"
+elif ! grep -q 'RF_SPRITE_FLIPBOOK' "$TR_SURF" 2>/dev/null; then
+  fail "tr_surface.c missing flipbook UV path in RB_SurfaceSprite"
+elif ! grep -q 'case RT_SPRITE:' "$PROJECT_ROOT/src/renderers/vulkan/tr_main.c" 2>/dev/null; then
+  fail "tr_main.c missing RT_SPRITE draw surf path"
+else
+  pass "EF_BILLBOARD + RT_SPRITE backend (engine map props + RB_SurfaceSprite)"
 fi
 
 echo ""

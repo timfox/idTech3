@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "tr_local.h"
 #include "../common/tr_vector_font.h"
+#include "tr_sprite_props.h"
 #include "vk_fluidsim.h"
 #include "vk_terrain.h"
 #include "vk_vdb.h"
@@ -4107,6 +4108,7 @@ void R_Init( void ) {
 	R_NoiseInit();
 
 	R_Register();
+	R_SpriteProps_Init();
 	R_ApplyRenderModeLatch();
 	ri.Printf( PRINT_ALL, "[VK] SH lighting: %s\n", r_shLighting && r_shLighting->integer ? "enabled" : "disabled" );
 	ri.Printf( PRINT_ALL, "[VK] SH world: %s\n", r_shWorldLighting && r_shWorldLighting->integer ? "enabled" : "disabled" );
@@ -4321,6 +4323,8 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 	re.ClearScene = RE_ClearScene;
 	re.SetEntityMorphWeight = RE_SetEntityMorphWeight;
 	re.AddRefEntityToScene = RE_AddRefEntityToScene;
+	re.AddEngineSpriteToScene = RE_AddEngineSpriteToScene;
+	re.AddEngineSpriteToSceneAtTime = RE_AddEngineSpriteToSceneAtTime;
 	re.AddPolyToScene = RE_AddPolyToScene;
 	re.LightForPoint = R_LightForPoint;
 	re.AddLightToScene = RE_AddLightToScene;
