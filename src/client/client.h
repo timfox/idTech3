@@ -428,9 +428,11 @@ extern	cvar_t	*vid_xpos;
 extern	cvar_t	*vid_ypos;
 extern	cvar_t	*r_noborder;
 
-extern	cvar_t	*r_allowSoftwareGL;
 extern	cvar_t	*r_swapInterval;
+#ifdef USE_OPENGL_API
+extern	cvar_t	*r_allowSoftwareGL;
 extern	cvar_t	*r_glDriver;
+#endif
 
 extern	cvar_t	*r_displayRefresh;
 extern	cvar_t	*r_fullscreen;
@@ -624,7 +626,7 @@ void	GLimp_Minimize( void );
 void	GLimp_LogComment( const char *comment );
 void	GLW_RestoreGamma( void );
 
-// OpenGL (needed for static OpenGL build, or Vulkan build with dlopen so OpenGL renderer can load)
+// Window / swapchain (SDL GLimp for OpenGL; VKimp for Vulkan)
 #if defined(USE_OPENGL_API) || defined(USE_VULKAN_API)
 void	GLimp_Init( glconfig_t *config );
 void	GLimp_Shutdown( qboolean unloadDLL );
