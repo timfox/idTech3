@@ -159,6 +159,8 @@ qhandle_t R_RegisterFreeusdMesh( const char *name, model_t *mod ) {
 	}
 
 	if ( !numLoaded ) {
+		mod->numLods = 0;
+		Com_Memset( mod->md3, 0, sizeof( mod->md3 ) );
 		return 0;
 	}
 

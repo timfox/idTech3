@@ -374,6 +374,45 @@ static qboolean R_Freeusd_LoadMeshPrim( std::shared_ptr<freeusd::usd::Stage> sta
 	}
 	numVerts = numTris * 3;
 
+	/* Fan triangulation may skip bad corners; shrink over-allocated buffers. */
+	if ( numVerts < maxTris * 3 ) {
+		float *tightVerts = (float *)ri.Malloc( (size_t)numVerts * 3 * sizeof( *tightVerts ) );
+		int *tightInds = (int *)ri.Malloc( (size_t)numVerts * sizeof( *tightInds ) );
+		float *tightSt = nullptr;
+		if ( !tightVerts || !tightInds ) {
+			if ( tightVerts ) {
+				ri.Free( tightVerts );
+			}
+			if ( tightInds ) {
+				ri.Free( tightInds );
+			}
+			ri.Free( verts );
+			ri.Free( inds );
+			if ( vertSt ) {
+				ri.Free( vertSt );
+			}
+			return qfalse;
+		}
+		Com_Memcpy( tightVerts, verts, (size_t)numVerts * 3 * sizeof( *tightVerts ) );
+		Com_Memcpy( tightInds, inds, (size_t)numVerts * sizeof( *tightInds ) );
+		ri.Free( verts );
+		ri.Free( inds );
+		verts = tightVerts;
+		inds = tightInds;
+		if ( vertSt ) {
+			tightSt = (float *)ri.Malloc( (size_t)numVerts * 2 * sizeof( *tightSt ) );
+			if ( !tightSt ) {
+				ri.Free( verts );
+				ri.Free( inds );
+				ri.Free( vertSt );
+				return qfalse;
+			}
+			Com_Memcpy( tightSt, vertSt, (size_t)numVerts * 2 * sizeof( *tightSt ) );
+			ri.Free( vertSt );
+			vertSt = tightSt;
+		}
+	}
+
 	ri.Printf( PRINT_DEVELOPER, "FreeUSD: tessellated mesh %s (%d tris%s)\n",
 		meshPath.GetString().c_str(), numTris, haveSt ? ", ST" : "" );
 

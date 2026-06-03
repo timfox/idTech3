@@ -147,8 +147,19 @@ if [ -n "$VK_SO" ]; then
   else
     warn "Vulkan renderer missing R_RegisterFreeusdMesh (built with USE_FREEUSD=OFF?)"
   fi
+  if grep -Fq 'R_Freeusd_Init' < <(nm -D "$VK_SO" 2>/dev/null); then
+    pass "Vulkan renderer exports R_Freeusd_Init"
+  else
+    warn "Vulkan renderer missing R_Freeusd_Init"
+  fi
 else
   warn "idtech3_vulkan.so not found for FreeUSD check"
+fi
+CLIENT_FREEUSD="$(bin_path "idtech3")"
+if [ -n "$CLIENT_FREEUSD" ] && grep -Fq 'usd_meshes' < <(strings "$CLIENT_FREEUSD" 2>/dev/null); then
+  pass "client exports usd_meshes (USE_FREEUSD tools)"
+elif [ -n "$CLIENT_FREEUSD" ]; then
+  warn "client missing usd_meshes (USE_FREEUSD=OFF?)"
 fi
 
 echo ""

@@ -57,9 +57,15 @@ Startup logs FreeUSD version in the client (`com_freeusd`) and renderer (`r_free
 
 Disable mesh import at runtime with `r_freeusd 0` (falls back to ASCII vertex soup). Disable tools with `com_freeusd 0`.
 
-## Test asset
+## Test assets
 
-`tests/data/usd/parity_geom_mesh.usda` — single triangle mesh (from FreeUSD parity fixtures).
+| File | Purpose |
+|------|---------|
+| `tests/data/usd/parity_geom_mesh.usda` | Single-triangle `UsdGeom.Mesh` (geometry parity) |
+| `tests/data/usd/parity_shade_preview.usda` | `UsdPreviewSurface` + `material:binding` (shader-map parity) |
+| `examples/demo_game/mod/models/*.usda` | Shipped in `idtech3_demo.pk3`; `demo_usd.cfg` prints console hints |
+
+`ctest -R test_freeusd_smoke` checks renderer/client symbols and that these USDA files exist.
 
 ## License note
 
