@@ -40,7 +40,7 @@ void R_ApplyRenderModeLatch( void )
 			if ( mode != s_last_logged_mode ) {
 				ri.Printf( PRINT_ALL,
 					"[VK] r_renderMode 1 + r_deferredLighting 1: deferred diffuse (r_forwardPlus=1, "
-					"r_forwardPlusShade=0; G-buffer fill required)\n" );
+					"r_forwardPlusShade=0, r_deferredUnlitBase additive; G-buffer fill required)\n" );
 				s_last_logged_mode = mode;
 			}
 		} else if ( mode != s_last_logged_mode ) {

@@ -1816,7 +1816,7 @@ static const void *RB_DrawSurfs( const void *data ) {
 	// add light flares on lights that aren't obscured
 	RB_RenderFlares();
 
-	if ( backEnd.refdef.numLitSurfs ) {
+	if ( backEnd.refdef.numLitSurfs && !vk_deferred_unlit_base_wanted() ) {
 		RB_BeginDrawingLitSurfs();
 		RB_LightingPass();
 	}

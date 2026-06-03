@@ -33,6 +33,7 @@ typedef struct {
 	float strength;
 	uint32_t maxPerTile;
 	uint32_t numLights;
+	uint32_t additive;
 } vk_deferred_light_push_t;
 
 static void vk_dgb_destroy_composite_gfx_pipeline( void )
@@ -118,6 +119,17 @@ static qboolean vk_deferred_lighting_wanted( void )
 {
 	return ( vk_deferred_gbuffer_fill_wanted() && r_deferredLighting && r_deferredLighting->integer &&
 		r_forwardPlus && r_forwardPlus->integer ) ? qtrue : qfalse;
+}
+
+qboolean vk_deferred_unlit_base_wanted( void )
+{
+	if ( !vk_deferred_lighting_wanted() ) {
+		return qfalse;
+	}
+	if ( !r_deferredUnlitBase || !r_deferredUnlitBase->integer ) {
+		return qfalse;
+	}
+	return qtrue;
 }
 
 static void vk_dgb_destroy_pipeline( void )
@@ -646,9 +658,11 @@ static void vk_dgb_fill_light_push( vk_deferred_light_push_t *push, uint32_t wid
 	push->extent[1] = height;
 	push->tileGrid[0] = vk.forward_plus.tiles_x;
 	push->tileGrid[1] = vk.forward_plus.tiles_y;
-	push->strength = 1.0f;
+	push->strength = ( r_deferredLightingStrength && r_deferredLightingStrength->value > 0.0f ) ?
+		Com_Clamp( 0.0f, 4.0f, r_deferredLightingStrength->value ) : 1.0f;
 	push->maxPerTile = vk.forward_plus.max_per_tile;
 	push->numLights = vk.forward_plus.last_packed_count;
+	push->additive = vk_deferred_unlit_base_wanted() ? 1u : 0u;
 }
 
 static void vk_dgb_dispatch_lighting_compute( uint32_t width, uint32_t height )
@@ -674,7 +688,11 @@ static void vk_dgb_dispatch_lighting_compute( uint32_t width, uint32_t height )
 	}
 
 	if ( !vk.deferred_gbuffer.lighting_logged ) {
-		ri.Printf( PRINT_ALL, "[VK][deferred] r_deferredLighting=1 (Forward+ tile diffuse; point+spot lights; replaces scene color)\n" );
+		ri.Printf( PRINT_ALL,
+			"[VK][deferred] r_deferredLighting=1 (%s dynamic; point+spot; strength=%.2f)\n",
+			vk_deferred_unlit_base_wanted() ? "additive" : "multiply",
+			( r_deferredLightingStrength && r_deferredLightingStrength->value > 0.0f ) ?
+				r_deferredLightingStrength->value : 1.0f );
 		vk.deferred_gbuffer.lighting_logged = qtrue;
 	}
 

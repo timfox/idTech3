@@ -173,6 +173,8 @@ cvar_t	*r_deferredGBuffer;
 cvar_t	*r_deferredGBufferFill;
 cvar_t	*r_deferredGBufferDebug;
 cvar_t	*r_deferredLighting;
+cvar_t	*r_deferredUnlitBase;
+cvar_t	*r_deferredLightingStrength;
 cvar_t	*r_hdr;
 cvar_t	*r_bloom;
 cvar_t	*r_bloom_threshold;
@@ -3683,6 +3685,20 @@ static void R_Register( void )
 	if ( r_deferredLighting && r_deferredLighting->integer ) {
 		ri.Printf( PRINT_ALL, "[VK][deferred] r_deferredLighting=1 (G-buffer diffuse + Forward+ tiles; point+spot)\n" );
 	}
+	r_deferredUnlitBase = ri.Cvar_Get( "r_deferredUnlitBase", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_deferredUnlitBase, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_deferredUnlitBase,
+		"With r_deferredLighting 1: additive dynamic lights on static-lit base (scene copy + deferred diffuse). "
+		"Skips classic lit-surf projector pass. Set 0 for legacy multiply composite." );
+	ri.Cvar_SetGroup( r_deferredUnlitBase, CVG_RENDERER );
+	if ( r_deferredUnlitBase && r_deferredUnlitBase->integer && r_deferredLighting && r_deferredLighting->integer ) {
+		ri.Printf( PRINT_ALL, "[VK][deferred] r_deferredUnlitBase=1 (additive dynamic on static base; skip lit-surf pass)\n" );
+	}
+	r_deferredLightingStrength = ri.Cvar_Get( "r_deferredLightingStrength", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_deferredLightingStrength, "0", "4", CV_FLOAT );
+	ri.Cvar_SetDescription( r_deferredLightingStrength,
+		"Scale for deferred dynamic diffuse contribution (0=off, 1=default)." );
+	ri.Cvar_SetGroup( r_deferredLightingStrength, CVG_RENDERER );
 	r_hdr = ri.Cvar_Get( "r_hdr", "2", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_hdr, "-1", "3", CV_INTEGER );
 	ri.Cvar_SetDescription(r_hdr, "HDR frame buffer format. Requires \\r_fbo 1.\n -1: 4-bit (B4G4R4A4), testing only\n  0: 8-bit, moderate banding\n  1: 16-bit float (RGBA16F)\n  2: 32-bit float (RGBA32F), default, fallback to 16F if unsupported\n  3: 64-bit float (RGBA64F), optional; falls back to 32F (glslang lacks dvec4 fragment output support)\n" );

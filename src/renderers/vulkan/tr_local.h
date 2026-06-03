@@ -1561,6 +1561,8 @@ extern cvar_t	*r_deferredGBuffer;
 extern cvar_t	*r_deferredGBufferFill;
 extern cvar_t	*r_deferredGBufferDebug;
 extern cvar_t	*r_deferredLighting;
+extern cvar_t	*r_deferredUnlitBase;
+extern cvar_t	*r_deferredLightingStrength;
 void R_ApplyRenderModeLatch( void );
 extern cvar_t	*r_hdr;
 extern cvar_t	*r_bloom;

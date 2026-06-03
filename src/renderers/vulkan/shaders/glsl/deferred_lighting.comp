@@ -33,6 +33,7 @@ layout(push_constant) uniform Push {
 	float strength;
 	uint maxPerTile;
 	uint numLights;
+	uint additive;
 } pc;
 
 float viewZFromDepth( float depth ) {
@@ -120,7 +121,7 @@ void main() {
 	uint nLights = min( pc.numLights, nPack );
 	uint maxPer = min( pc.maxPerTile, MAX_PER_TILE );
 
-	vec3 irradiance = vec3( 0.04 );
+	vec3 irradiance = vec3( 0.0 );
 	for ( uint k = 0u; k < maxPer; k++ ) {
 		uint li = tiles.cells[ tbase + k ];
 		if ( li == 0xFFFFFFFFu ) {
@@ -151,6 +152,13 @@ void main() {
 		irradiance += lc.rgb * addBoost * nlAtt;
 	}
 
-	vec3 lit = albedo * irradiance * mix( 1.0, 0.85, roughness ) * pc.strength;
+	float roughMod = mix( 1.0, 0.85, roughness );
+	vec3 lit;
+	if ( pc.additive != 0u ) {
+		vec3 base = albedo;
+		lit = base + base * irradiance * roughMod * pc.strength;
+	} else {
+		lit = albedo * ( vec3( 0.04 ) + irradiance ) * roughMod * pc.strength;
+	}
 	imageStore( outLit, ivec2( pix ), vec4( lit, 1.0 ) );
 }
