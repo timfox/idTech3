@@ -58,6 +58,27 @@ def find_function_body(text: str, name: str) -> str:
         nxt = text[i + 1] if i + 1 < len(text) else ""
 
         if state == "code":
+            line_start = i == 0 or text[i - 1] == "\n"
+            if line_start and (text.startswith("#else", i) or text.startswith("#elif", i)):
+                nested = 0
+                line_end = text.find("\n", i)
+                pos = len(text) if line_end < 0 else line_end + 1
+                while pos < len(text):
+                    next_end = text.find("\n", pos)
+                    if next_end < 0:
+                        next_end = len(text)
+                    directive = text[pos:next_end].strip()
+                    if directive.startswith(("#if ", "#ifdef ", "#ifndef ")):
+                        nested += 1
+                    elif directive.startswith("#endif"):
+                        if nested == 0:
+                            i = next_end + 1
+                            break
+                        nested -= 1
+                    pos = next_end + 1
+                else:
+                    i = len(text)
+                continue
             if ch == "/" and nxt == "/":
                 state = "line_comment"
                 i += 2
