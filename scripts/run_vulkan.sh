@@ -4,7 +4,7 @@
 # SDL lacks Vulkan support.
 #
 # Usage: ./run_vulkan.sh [engine args...]
-# Example: ./run_vulkan.sh +set fs_game unwaking +set cl_renderer vulkan
+# Example: ./run_vulkan.sh +set fs_game /path/to/your-mod +set cl_renderer vulkan
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Engine lives in release/ (sibling of scripts/ when run from repo, or same dir when copied to release/)
