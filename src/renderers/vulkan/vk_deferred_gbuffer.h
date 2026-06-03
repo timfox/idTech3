@@ -4,6 +4,7 @@
 
 qboolean vk_deferred_gbuffer_active( void );
 qboolean vk_deferred_gbuffer_fill_wanted( void );
+qboolean vk_deferred_unlit_base_wanted( void );
 void vk_deferred_gbuffer_init( void );
 void vk_deferred_gbuffer_shutdown( void );
 void vk_deferred_gbuffer_capture_after_geometry( void );

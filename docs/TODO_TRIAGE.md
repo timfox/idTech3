@@ -59,7 +59,7 @@ TODOs/FIXMEs in `src/external/` are from third-party code (duktape, zstd, cjson,
 | Item | Location | Status |
 |------|----------|--------|
 | RB_ColorMask (Vulkan) | tr_backend.c | Partial: `vk_set_color_write_mask()` exists, but the VK_EXT_extended_dynamic_state3 path is currently disabled due to validation/driver issues; Vulkan falls back to full color writes. |
-| r_renderMode 1 | tr_init.c, tr_render_mode_vk.c | **`r_deferredLighting 1`**: G-buffer fill + Forward+ tile diffuse (point+spot); latches `r_forwardPlusShade` 0. **`r_deferredGBufferFill 1`** required. |
+| r_renderMode 1 | tr_init.c, tr_render_mode_vk.c | **`r_deferredLighting 1`**: G-buffer fill + Forward+ tile diffuse (point+spot); **`r_deferredUnlitBase 1`** additive dynamic on static base; latches `r_forwardPlusShade` 0. |
 | r_renderMode 2 | tr_render_mode_vk.c | Latched Forward+ primary: sets `r_forwardPlus` / `r_forwardPlusShade` (GPU cap 64; classic `dlightBits` still 32). |
 | r_hdr 3 64-bit output | `vk_post_process_pipeline.c`, HDR format helpers | Infrastructure in place (vk_hdr64_active, _hdr64 modules, pipeline selection). glslangValidator rejects dvec4/f64vec4 fragment shader outputs. Falls back to RGBA32F. When glslang adds support, compile HDR64 variants and return RGBA64F from get_hdr_format. |
 | Vegetation wind draw | `vk_vegetation_wind.c` + `tr_shade.c` | **Same-frame deform:** `vk_vegetation_wind_prepare_draw()` runs before the stage iterator on `SURF_VEGETATION` batches; compute writes deformed positions back into `tess.xyz`. Staging is filled during `RB_DrawSurfs`. Optional future: bind `vegwind_vertex_buffer` as stream 0 to skip CPU readback. |

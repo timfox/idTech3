@@ -190,6 +190,8 @@ Code: `src/renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar regist
 | `r_deferredGBufferFill` | 0 | With scaffold RTs: copy scene albedo + depth-derived normal/material after geometry. |
 | `r_deferredGBufferDebug` | 0 | Before bloom: show G-buffer on scene color (1=albedo, 2=normal, 3=material, 4=lighting). |
 | `r_deferredLighting` | 0 | Experimental deferred diffuse (Forward+ tiles, point+spot). Replaces scene color after geometry. Latches `r_forwardPlusShade` 0 with `vid_restart`. |
+| `r_deferredUnlitBase` | 1 | Additive dynamic on static-lit scene copy; skips classic lit-surf pass. **0** = legacy multiply composite. |
+| `r_deferredLightingStrength` | 1 | Scale deferred dynamic diffuse (0–4). |
 | `r_volumetricFog` | 0 | Volumetric fog enable (0=off, 1=on) |
 | `r_vdbFog` | 0 | Blend GPU-uploaded bound VDB density (`vdb_bind_fog`) into global volumetric density (requires `r_volumetricFog` 1 and `VDB_UploadToGPU`) |
 | `r_vdbFogBlend` | 0.5 | VDB density blend weight when `r_vdbFog` 1 |

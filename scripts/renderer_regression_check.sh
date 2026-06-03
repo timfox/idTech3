@@ -299,6 +299,12 @@ elif [[ ! -f "$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/deferred_lighting.
   fail "missing deferred_lighting.comp"
 elif ! grep -q 'deferred_lighting_image' "$VK_ATTACH" 2>/dev/null; then
   fail "vk_attachments.c missing deferred_lighting_image alloc"
+elif ! grep -q 'r_deferredUnlitBase = ri.Cvar_Get' "$TR_INIT_VK" 2>/dev/null; then
+  fail "tr_init.c missing r_deferredUnlitBase cvar"
+elif ! grep -q 'vk_deferred_unlit_base_wanted' "$DGB_C" 2>/dev/null; then
+  fail "vk_deferred_gbuffer.c missing vk_deferred_unlit_base_wanted"
+elif ! grep -q 'pc.additive' "$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/deferred_lighting.comp" 2>/dev/null; then
+  fail "deferred_lighting.comp missing additive composite path"
 else
   pass "deferred lighting compute + composite wired"
 fi
