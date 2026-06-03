@@ -26,6 +26,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../qcommon/script_emit.h"
 
 #include "../botlib/botlib.h"
+#include "../game/g_entity_bridge.h"
+#include "cl_engine_sprites.h"
 
 extern	botlib_export_t	*botlib_export;
 
@@ -404,6 +406,7 @@ static void CL_CM_LoadMap( const char *mapname ) {
 	int		checksum;
 
 	CM_LoadMap( mapname, qtrue, &checksum );
+	EntityBridge_ParseEntities( CM_EntityString() );
 }
 
 
@@ -689,6 +692,7 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 		re.AddAdditiveLightToScene( VMA(1), VMF(2), VMF(3), VMF(4), VMF(5) );
 		return 0;
 	case CG_R_RENDERSCENE:
+		CL_EngineSprites_AddFromSnapshot();
 		re.RenderScene( VMA(1) );
 		return 0;
 	case CG_R_SETCOLOR:

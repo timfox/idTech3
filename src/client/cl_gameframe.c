@@ -23,6 +23,7 @@ Ticks all gameplay subsystems each client frame:
 #include "cl_map_background.h"
 #include "cl_window_title.h"
 #include "cl_mobilefog.h"
+#include "cl_engine_sprites.h"
 #include "../physics/phys_bullet.h"
 #include "../physics/phys_procedural_anim.h"
 #include "../physics/phys_cloth.h"
@@ -148,6 +149,7 @@ void CL_InitGameSystems(void) {
 	}
 	Nav_Init();
 	Particles_Init();
+	CL_EngineSprites_Init();
 	Cloth_Init();
 	Director_Init();
 	Music_Init();

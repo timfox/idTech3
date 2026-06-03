@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // sv_game.c -- interface to the game dll
 
 #include "server.h"
+#include "sv_engine_sprites.h"
 
 #include "../botlib/botlib.h"
 
@@ -1035,6 +1036,29 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 	case G_TRAP_GETVALUE:
 		VM_CHECKBOUNDS( gvm, args[1], args[2] );
 		return SV_GetValue( VMA(1), args[2], VMA(3) );
+
+	case G_ENGINE_SPRITE_SHADER_INDEX:
+		return SV_EngineSpriteShaderIndex( (const char *)VMA( 1 ) );
+
+	case G_ENGINE_SPRITE_SPAWN: {
+		engineSpriteMapDef_t def;
+
+		Com_Memset( &def, 0, sizeof( def ) );
+		def.type = (engineSpriteType_t)args[1];
+		Q_strncpyz( def.shader, (const char *)VMA( 2 ), sizeof( def.shader ) );
+		def.origin[0] = VMF( 3 );
+		def.origin[1] = VMF( 4 );
+		def.origin[2] = VMF( 5 );
+		def.radius = VMF( 6 );
+		def.rotation = VMF( 7 );
+		def.cols = args[8] > 0 ? (int)args[8] : 1;
+		def.rows = args[9] > 0 ? (int)args[9] : 1;
+		def.fps = VMF( 10 );
+		if ( def.fps <= 0.0f ) {
+			def.fps = 8.0f;
+		}
+		return SV_EngineSprite_SpawnFromDef( &def );
+	}
 
 	default:
 		Com_Error( ERR_DROP, "Bad game system trap: %ld", (long int) args[0] );

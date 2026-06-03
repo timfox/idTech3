@@ -1435,6 +1435,14 @@ typedef struct entityState_s {
 	int		generic1;
 } entityState_t;
 
+/* Engine-native sprite entity flags (entityState_t.eFlags).
+ * Map props use misc_billboard / misc_flipbook / misc_imposter (no cgame required).
+ * Dynamic entities: set eFlags; shader path via modelindex -> CS_ENGINE_SPRITE_SHADERS
+ * (server sv_engineSprites) or legacy generic1 qhandle (local dev only). */
+#define EF_BILLBOARD		0x00100000	// camera-facing RT_SPRITE
+#define EF_FLIPBOOK			0x00200000	// animated sprite sheet (cols/rows/fps in refEntity or map keys)
+#define EF_IMPOSTER			0x00400000	// yaw-locked imposter billboard (RF_SPRITE_YAWLOCK)
+
 typedef enum {
 	CA_UNINITIALIZED,
 	CA_DISCONNECTED, 	// not talking to a server

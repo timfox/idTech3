@@ -23,6 +23,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "tr_local.h"
 #include "vk_util.h"
+#ifdef USE_VULKAN
+#include "vk_deferred_gbuffer.h"
+#endif
 #include "../common/tr_vector_font.h"
 #ifdef USE_VULKAN
 #include "vk_postfx.h"
@@ -1968,6 +1971,9 @@ void RB_StageIteratorGeneric( void )
 
 	// now do any dynamic lighting needed
 	if ( r_dlightMode->integer == 0 )
+#ifdef USE_VULKAN
+	if ( !vk_deferred_unlit_base_wanted() )
+#endif
 	if ( !worldShOverride && tess.dlightBits && tess.shader->sort <= SS_OPAQUE && !(tess.shader->surfaceFlags & (SURF_NODLIGHT | SURF_SKY) ) ) {
 		if ( !fogCollapse ) {
 #ifdef USE_VULKAN

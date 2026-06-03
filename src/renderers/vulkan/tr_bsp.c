@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_local.h"
 #ifdef USE_VULKAN
 #include "vk.h"
+#include "tr_sprite_props.h"
 
 #ifdef VK_CUBEMAP
 #define JSON_IMPLEMENTATION
@@ -2672,6 +2673,8 @@ void RE_LoadWorldMap( const char *name ) {
 		ri.Error( ERR_DROP, "ERROR: attempted to redundantly load world map" );
 	}
 
+	R_SpriteProps_Clear();
+
 	// set default sun direction to be used if it isn't
 	// overridden by a shader
 	tr.sunDirection[0] = 0.45f;
@@ -2774,6 +2777,8 @@ void RE_LoadWorldMap( const char *name ) {
 	tr.world = &s_worldData;
 
 	ri.FS_FreeFile( buffer.v );
+
+	R_SpriteProps_ParseFromEntityString( s_worldData.entityString );
 
 #ifdef VK_CUBEMAP
 	// Render all cubemaps

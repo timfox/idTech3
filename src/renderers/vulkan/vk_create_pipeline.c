@@ -66,10 +66,9 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
     struct Vk_Pipeline_FragSpecData frag_spec_data;
 
 #ifdef USE_VK_PBR
-	/* ADD_FRAG_SPEC: 11 base (0..10) + 30 PBR (constant_id 11..40, includes lightmap_scale/srgb at 32..33) = 41 entries.
-	 * Was 38 → stack smash / SIGABRT in debug when vk_create_pipelines ran after VarInfo. */
+	/* ADD_FRAG_SPEC: 11 base (0..10) + 31 PBR (constant_id 11..41) = 42 entries. */
 	VkSpecializationMapEntry spec_entries[48];
-	_Static_assert( sizeof( spec_entries ) / sizeof( spec_entries[0] ) >= 41u,
+	_Static_assert( sizeof( spec_entries ) / sizeof( spec_entries[0] ) >= 42u,
 		"vk_create_pipeline: spec_entries[] too small for PBR fragment specialization map" );
 #else
 	VkSpecializationMapEntry spec_entries[12];
@@ -743,6 +742,7 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 	ADD_FRAG_SPEC( 38, pom_max_steps );
 	ADD_FRAG_SPEC( 39, parallax_bias_shader );
 	ADD_FRAG_SPEC( 40, forward_plus_shade_strength );
+	ADD_FRAG_SPEC( 41, deferred_unlit_base_strength );
 
 	// only use w value, specgloss maps are not supported
 	frag_spec_data.specularScale_x = def->specularScale[0];
@@ -775,6 +775,9 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 	frag_spec_data.parallax_bias_shader = def->parallaxBias;
 	frag_spec_data.forward_plus_shade_strength = ( r_forwardPlusShade && r_forwardPlusShade->value > 0.0f )
 		? Com_Clamp( 0.0f, 4.0f, r_forwardPlusShade->value ) : 0.0f;
+	frag_spec_data.deferred_unlit_base_strength = ( r_renderMode && r_renderMode->integer == 1 &&
+		r_deferredLighting && r_deferredLighting->integer &&
+		r_deferredUnlitBase && r_deferredUnlitBase->integer ) ? 1.0f : 0.0f;
 
 	if ( def->vk_pbr_flags & PBR_HAS_NORMALMAP )
 		frag_spec_data.normal_texture_set = 0;

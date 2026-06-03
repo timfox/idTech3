@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "server.h"
 #include "sv_enhanced.h"
+#include "sv_engine_sprites.h"
 
 
 /*
@@ -526,6 +527,8 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	Sys_SetStatus( "Loading map %s", mapname );
 	CM_LoadMap( va( "maps/%s.bsp", mapname ), qfalse, &checksum );
 
+	SV_EngineSprites_LoadMap( CM_EntityString() );
+
 	// set serverinfo visible name
 	Cvar_Set( "mapname", mapname );
 
@@ -549,6 +552,8 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 
 	// load and spawn all other entities
 	SV_InitGameProgs();
+
+	SV_EngineSprites_SpawnMapEntities();
 
 	// don't allow a map_restart if game is modified
 	sv_gametype->modified = qfalse;
@@ -703,6 +708,8 @@ Only called at main exe startup, not for each game
 void SV_Init( void )
 {
 	int index;
+
+	SV_EngineSprites_Init();
 
 	SV_AddOperatorCommands();
 
