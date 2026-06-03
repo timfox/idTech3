@@ -744,13 +744,44 @@ typedef struct {
 		VkImage taa_history_image[2];
 		VkImageView taa_history_image_view[2];
 
-	/* Deferred G-buffer scaffold (r_renderMode 1 + r_deferredGBuffer 1); no lighting pass yet */
+	/* Deferred G-buffer scaffold (r_renderMode 1 + r_deferredGBuffer 1); fill via vk_deferred_gbuffer.c */
+	struct {
+		VkDescriptorSetLayout layout;
+		VkPipelineLayout pipeline_layout;
+		VkPipeline pipeline;
+		VkDescriptorPool pool;
+		VkDescriptorSet descriptor;
+		qboolean pipeline_ready;
+		qboolean fill_logged;
+		VkDescriptorSetLayout debug_gfx_layout;
+		VkPipelineLayout debug_gfx_pipeline_layout;
+		VkPipeline debug_gfx_pipeline;
+		VkDescriptorPool debug_gfx_pool;
+		VkDescriptorSet debug_gfx_descriptor;
+		qboolean debug_gfx_ready;
+		VkDescriptorSetLayout lighting_layout;
+		VkPipelineLayout lighting_pipeline_layout;
+		VkPipeline lighting_pipeline;
+		VkDescriptorPool lighting_pool;
+		VkDescriptorSet lighting_descriptor;
+		qboolean lighting_pipeline_ready;
+		qboolean lighting_logged;
+		VkDescriptorSetLayout composite_gfx_layout;
+		VkPipelineLayout composite_gfx_pipeline_layout;
+		VkPipeline composite_gfx_pipeline;
+		VkDescriptorPool composite_gfx_pool;
+		VkDescriptorSet composite_gfx_descriptor;
+		qboolean composite_gfx_ready;
+		qboolean composite_logged;
+	} deferred_gbuffer;
 	VkImage deferred_gbuffer_albedo;
 	VkImageView deferred_gbuffer_albedo_view;
 	VkImage deferred_gbuffer_normal;
 	VkImageView deferred_gbuffer_normal_view;
 	VkImage deferred_gbuffer_material;
 	VkImageView deferred_gbuffer_material_view;
+	VkImage deferred_lighting_image;
+	VkImageView deferred_lighting_view;
 	qboolean deferredGbufferAllocated;
 
 	VkImage bloom_image[1+VK_NUM_BLOOM_PASSES*2];
@@ -1071,6 +1102,10 @@ typedef struct {
 		VkShaderModule fluid_pressure_cs;
 		VkShaderModule fluid_gradient_cs;
 		VkShaderModule forward_plus_tile_cull_cs;
+		VkShaderModule deferred_gbuffer_fill_cs;
+		VkShaderModule deferred_gbuffer_debug_fs;
+		VkShaderModule deferred_lighting_cs;
+		VkShaderModule deferred_lighting_composite_fs;
 
 		VkShaderModule cbt_terrain_cs;
 		VkShaderModule terrain_vs;

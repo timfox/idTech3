@@ -318,6 +318,10 @@ compile_shader("comp", "postfx/luminance.comp", "luminance_cs", binding_expr="vk
 compile_shader("comp", "vegetation_wind.comp", "vegetation_wind_cs", binding_expr="vk.modules.vegetation_wind_cs")
 compile_shader("comp", "terrain/cbt_terrain.comp", "cbt_terrain_cs", binding_expr="vk.modules.cbt_terrain_cs")
 compile_shader("comp", "forward_plus_tile_cull.comp", "forward_plus_tile_cull_cs", binding_expr="vk.modules.forward_plus_tile_cull_cs")
+compile_shader("comp", "deferred_gbuffer_fill.comp", "deferred_gbuffer_fill_cs", binding_expr="vk.modules.deferred_gbuffer_fill_cs")
+compile_shader("frag", "deferred_gbuffer_debug.frag", "deferred_gbuffer_debug_fs", binding_expr="vk.modules.deferred_gbuffer_debug_fs")
+compile_shader("comp", "deferred_lighting.comp", "deferred_lighting_cs", binding_expr="vk.modules.deferred_lighting_cs")
+compile_shader("frag", "deferred_lighting_composite.frag", "deferred_lighting_composite_fs", binding_expr="vk.modules.deferred_lighting_composite_fs")
 compile_shader("vert", "terrain/terrain.vert", "terrain_vs", binding_expr="vk.modules.terrain_vs")
 compile_shader("frag", "terrain/terrain.frag", "terrain_fs", binding_expr="vk.modules.terrain_fs")
 

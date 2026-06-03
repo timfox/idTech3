@@ -29,6 +29,12 @@ src/renderers/vulkan/iqm.h
 src/renderers/vulkan/vk_temporal.h
 src/renderers/vulkan/vk_temporal.c
 src/renderers/vulkan/tr_render_mode_vk.c
+src/renderers/vulkan/vk_deferred_gbuffer.c
+src/renderers/vulkan/vk_deferred_gbuffer.h
+src/renderers/vulkan/shaders/glsl/deferred_gbuffer_fill.comp
+src/renderers/vulkan/shaders/glsl/deferred_gbuffer_debug.frag
+src/renderers/vulkan/shaders/glsl/deferred_lighting.comp
+src/renderers/vulkan/shaders/glsl/deferred_lighting_composite.frag
 docs/renderer_validation/SELF_HOSTED_TIER_B.md
 docs/samples/renderer_regression/README.md
 docs/samples/renderer_regression/OPTIONAL_GAME_ASSETS.txt

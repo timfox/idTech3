@@ -2,8 +2,7 @@
 ===========================================================================
 Copyright (C) 2026 Gopex LLC. All rights reserved.
 
-Apply latched r_renderMode to Vulkan lighting path (forward / Forward+).
-Deferred (mode 1) remains unimplemented; mode 2 enables clustered Forward+.
+Apply latched r_renderMode to Vulkan lighting path (forward / deferred / Forward+).
 ===========================================================================
 */
 
@@ -26,11 +25,29 @@ void R_ApplyRenderModeLatch( void )
 
 	switch ( mode ) {
 	case 1:
-		if ( mode != s_last_logged_mode ) {
+		if ( r_deferredGBuffer && r_deferredGBuffer->integer &&
+			r_deferredLighting && r_deferredLighting->integer ) {
+			if ( r_forwardPlus && !r_forwardPlus->integer ) {
+				ri.Cvar_Set( "r_forwardPlus", "1" );
+				r_forwardPlus->integer = 1;
+				r_forwardPlus->modified = qtrue;
+			}
+			if ( r_forwardPlusShade && r_forwardPlusShade->value > 0.0f ) {
+				ri.Cvar_Set( "r_forwardPlusShade", "0" );
+				r_forwardPlusShade->value = 0.0f;
+				r_forwardPlusShade->modified = qtrue;
+			}
+			if ( mode != s_last_logged_mode ) {
+				ri.Printf( PRINT_ALL,
+					"[VK] r_renderMode 1 + r_deferredLighting 1: deferred diffuse (r_forwardPlus=1, "
+					"r_forwardPlusShade=0; G-buffer fill required)\n" );
+				s_last_logged_mode = mode;
+			}
+		} else if ( mode != s_last_logged_mode ) {
 			ri.Printf( PRINT_ALL,
-				"[VK] r_renderMode 1 (deferred G-buffer): lighting pass not implemented; using forward. "
-				"r_deferredGBuffer 1 allocates scaffold RTs (vid_restart). "
-				"Set r_renderMode 2 for clustered Forward+.\n" );
+				"[VK] r_renderMode 1 (deferred G-buffer scaffold). "
+				"r_deferredGBuffer 1 + r_deferredGBufferFill 1 capture RTs; "
+				"r_deferredLighting 1 enables experimental diffuse. vid_restart after latch.\n" );
 			s_last_logged_mode = mode;
 		}
 		break;

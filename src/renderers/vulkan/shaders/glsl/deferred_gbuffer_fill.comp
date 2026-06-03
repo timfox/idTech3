@@ -1,0 +1,62 @@
+#version 450
+
+/*
+ * Deferred G-buffer scaffold: view-space normal + default material from depth.
+ * Albedo is copied separately (scene color -> deferred_gbuffer_albedo).
+ */
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D depthTex;
+layout(rgba16f, set = 0, binding = 1) uniform writeonly image2D normalOut;
+layout(rg16f, set = 0, binding = 2) uniform writeonly image2D materialOut;
+
+layout(push_constant) uniform Push {
+	vec4 projInfo; /* invProj00, invProj11, proj10, proj14 (SSAO-compatible) */
+	uvec2 extent;
+} pc;
+
+float viewZFromDepth( float depth ) {
+	return -pc.projInfo.w / max( depth + pc.projInfo.z, 1e-6 );
+}
+
+vec3 reconstructViewPos( vec2 uv, float depth ) {
+	float viewZ = viewZFromDepth( depth );
+	float negZ = -viewZ;
+	vec2 ndc = uv * 2.0 - 1.0;
+	return vec3( ndc.x * negZ * pc.projInfo.x, ndc.y * negZ * pc.projInfo.y, viewZ );
+}
+
+void main() {
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if ( pix.x >= pc.extent.x || pix.y >= pc.extent.y ) {
+		return;
+	}
+
+	vec2 uv = ( vec2( pix ) + 0.5 ) / vec2( pc.extent );
+	float depth = texture( depthTex, uv ).r;
+
+	if ( depth <= 0.0 || depth >= 1.0 ) {
+		imageStore( normalOut, ivec2( pix ), vec4( 0.0, 0.0, 1.0, 1.0 ) );
+		imageStore( materialOut, ivec2( pix ), vec4( 0.0, 0.5, 0.0, 1.0 ) );
+		return;
+	}
+
+	vec2 texel = 1.0 / vec2( pc.extent );
+	float dl = texture( depthTex, uv + vec2( -texel.x, 0.0 ) ).r;
+	float dr = texture( depthTex, uv + vec2( texel.x, 0.0 ) ).r;
+	float du = texture( depthTex, uv + vec2( 0.0, -texel.y ) ).r;
+	float dd = texture( depthTex, uv + vec2( 0.0, texel.y ) ).r;
+
+	vec3 pos = reconstructViewPos( uv, depth );
+	vec3 posL = reconstructViewPos( uv + vec2( -texel.x, 0.0 ), dl );
+	vec3 posR = reconstructViewPos( uv + vec2( texel.x, 0.0 ), dr );
+	vec3 posU = reconstructViewPos( uv + vec2( 0.0, -texel.y ), du );
+	vec3 posD = reconstructViewPos( uv + vec2( 0.0, texel.y ), dd );
+	vec3 dx = posR - posL;
+	vec3 dy = posD - posU;
+	vec3 n = normalize( cross( dx, dy ) );
+
+	imageStore( normalOut, ivec2( pix ), vec4( n, 1.0 ) );
+	imageStore( materialOut, ivec2( pix ), vec4( 0.0, 0.5, 0.0, 1.0 ) );
+}
