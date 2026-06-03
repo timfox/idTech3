@@ -45,9 +45,9 @@ def write_png_rgba(path: Path, rgba: np.ndarray) -> None:
 def sdf_alpha_from_mask(mask: np.ndarray, spread: float) -> np.ndarray:
     """mask: float HxW 0..1, inside glyph ~1. Returns uint8 HxW alpha 0-255 (0.5 = edge)."""
     b = mask > 0.5
-    inside = distance_transform_edt(~b)
-    outside = distance_transform_edt(b)
-    sdf = inside.astype(np.float32) - outside.astype(np.float32)
+    distance_outside = distance_transform_edt(~b)
+    distance_inside = distance_transform_edt(b)
+    sdf = distance_inside.astype(np.float32) - distance_outside.astype(np.float32)
     # map sdf in [-spread, spread] to [0,1] with edge at 0.5
     t = 0.5 + 0.5 * np.clip(sdf / spread, -1.0, 1.0)
     return (np.clip(t, 0.0, 1.0) * 255.0 + 0.5).astype(np.uint8)
@@ -76,7 +76,8 @@ def main() -> int:
 
     font_px = 56 * scale
     font = ImageFont.truetype(str(ttf), size=font_px)
-    spread = 32.0 * float(scale)
+    # Keep enough range for scaled edges without washing out narrow strokes.
+    spread = 8.0 * float(scale)
     line_height = float(cell - 16)  # breathing room vs cell (output coords)
     base = line_height * 0.75
 

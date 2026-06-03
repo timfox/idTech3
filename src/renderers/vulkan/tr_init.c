@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_init.c -- functions that are not called every frame
 
 #include "tr_local.h"
+#include "../common/tr_vector_font.h"
 #include "vk_fluidsim.h"
 #include "vk_terrain.h"
 #include "vk_vdb.h"
@@ -87,6 +88,9 @@ cvar_t	*r_presentBits;
 cvar_t	*r_outline;
 cvar_t	*r_outlineThreshold;
 cvar_t	*r_sdfScreenAa;
+cvar_t	*r_sdfOutline;
+cvar_t	*r_sdfOutlineWidth;
+cvar_t	*r_fontGamma;
 
 static cvar_t *r_ignorehwgamma;
 
@@ -2643,10 +2647,40 @@ static void R_Register( void )
 		ri.Cvar_SetDescription( fm,
 			"Build mipmaps for FreeType TrueType atlas pages (256x256). Helps minified UI text; 0 = single mip (legacy). Apply with reloadTtf or vid_restart." );
 	}
+	{
+		cvar_t *fv = ri.Cvar_Get( "r_fontVerticalHint", "0", CVAR_ARCHIVE );
+		ri.Cvar_CheckRange( fv, "0", "1", CV_INTEGER );
+		ri.Cvar_SetDescription( fv,
+			"Rougier HAL-00821839 vertical-only FreeType hinting (horizontal DPI x100 trick). 1 = crisp vertical stems with accurate horizontal advance. Apply with reloadTtf." );
+	}
+	{
+		cvar_t *fl = ri.Cvar_Get( "r_fontLcd", "0", CVAR_ARCHIVE );
+		ri.Cvar_CheckRange( fl, "0", "1", CV_INTEGER );
+		ri.Cvar_SetDescription( fl,
+			"Rougier HAL-00821839 LCD/subpixel FreeType atlas (FT_RENDER_MODE_LCD). Best with r_fontSubpixelPos 1. Apply with reloadTtf." );
+	}
+	{
+		cvar_t *fp = ri.Cvar_Get( "r_fontSubpixelPos", "0", CVAR_ARCHIVE );
+		ri.Cvar_CheckRange( fp, "0", "1", CV_INTEGER );
+		ri.Cvar_SetDescription( fp,
+			"Rougier HAL-00821839 subpixel glyph positioning (Vulkan uiSubpixelText shader). 1 = fractional horizontal placement. Disable r_fontSubpixel when using this." );
+	}
 	r_sdfScreenAa = ri.Cvar_Get( "r_sdfScreenAa", "2", CVAR_ARCHIVE );
 	ri.Cvar_CheckRange( r_sdfScreenAa, "0", "8", CV_FLOAT );
 	ri.Cvar_SetDescription( r_sdfScreenAa,
 		"Vulkan uiSdfText: scales fwidth(distance) for screen-space edge AA (resolution-independent; Green/Alvin-style). 0 = use push r_sdfSmoothing band only." );
+	r_sdfOutline = ri.Cvar_Get( "r_sdfOutline", "0", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_sdfOutline, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_sdfOutline,
+		"Vulkan uiSdfText: Green (2007) outline ring around SDF glyphs (single-channel distance field)." );
+	r_sdfOutlineWidth = ri.Cvar_Get( "r_sdfOutlineWidth", "0.06", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_sdfOutlineWidth, "0.01", "0.25", CV_FLOAT );
+	ri.Cvar_SetDescription( r_sdfOutlineWidth,
+		"Vulkan uiSdfText: outline width in SDF distance units when r_sdfOutline is 1." );
+	r_fontGamma = ri.Cvar_Get( "r_fontGamma", "1.0", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_fontGamma, "0.5", "3.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_fontGamma,
+		"Linearize coverage before display gamma (Rougier HAL-05430837: apply AA before gamma). 1.0 = off; uiSdfText and uiSubpixelText." );
 	ri.Printf( PRINT_ALL, "SDF UI text: r_sdfScreenAa=%.2f (fwidth edge AA; 0 disables)\n", r_sdfScreenAa->value );
 	ri.Cvar_Get( "r_svgRasterScale", "1.0", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( ri.Cvar_Get( "r_svgRasterScale", "1.0", CVAR_ARCHIVE ),
@@ -3759,6 +3793,7 @@ void R_Init( void ) {
 #endif
 
 	R_InitShaders();
+	R_VectorFont_Init();
 
 	R_InitSkins();
 
@@ -3943,6 +3978,7 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 
 	re.RegisterFont = RE_RegisterFont;
 	re.ClearTrueTypeFontCache = RE_ClearTrueTypeFontCache;
+	re.GetFontKerning = RE_GetFontKerning;
 	re.RemapShader = RE_RemapShader;
 	re.GetEntityToken = RE_GetEntityToken;
 	re.inPVS = R_inPVS;
@@ -3958,6 +3994,11 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 	re.SyncRender = RE_SyncRender;
 	re.ReloadTexture = R_ReloadTexture;
 	re.DrawStretchPicEx = RE_StretchPicEx;
+	re.DrawStretchPicSubpixel = RE_StretchPicSubpixel;
+	re.LoadVectorFont = RE_LoadVectorFont;
+	re.VectorFontActive = RE_VectorFontActive;
+	re.DrawVectorString = RE_DrawVectorString;
+	re.DrawVectorGlyph = RE_DrawVectorGlyph;
 
 	return &re;
 }

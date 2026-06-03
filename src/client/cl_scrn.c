@@ -27,6 +27,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cl_menuvideo.h"
 #include "cl_superhud.h"
 #include "cl_sdf_font.h"
+#include "cl_vector_font.h"
 #include "../qcommon/q_utf8.h"
 
 static qboolean	scr_initialized;		// ready to draw
@@ -40,6 +41,22 @@ static cvar_t		*ui_scale;
 static cvar_t		*r_fontConsoleAlign;
 static cvar_t		*r_fontShadow;
 static cvar_t		*r_fontSubpixel;
+static cvar_t		*r_fontSubpixelPos;
+static cvar_t		*r_fontKerning;
+static cvar_t		*r_textMode;
+
+static void SCR_DrawStretchPicTtf( float ax, float ay, float aw, float ah,
+		float s1, float t1, float s2, float t2, qhandle_t shader ) {
+	if ( r_fontSubpixelPos && r_fontSubpixelPos->integer && re.DrawStretchPicSubpixel ) {
+		float shift = ax - floorf( ax );
+		if ( shift < 0.0f ) {
+			shift += 1.0f;
+		}
+		re.DrawStretchPicSubpixel( ax, ay, aw, ah, s1, t1, s2, t2, shader, shift );
+	} else {
+		re.DrawStretchPic( ax, ay, aw, ah, s1, t1, s2, t2, shader );
+	}
+}
 
 /*
 ================
@@ -214,6 +231,10 @@ void CL_RegisterBuiltInTrueTypeFonts( void ) {
 
 	cls.builtInTtfActive = qtrue;
 	Com_Printf( "Client: built-in HUD TrueType font \"%s\" @ %dpt (FreeType glyph atlas)\n", hudPath, pt );
+	if ( r_fontKerning ) {
+		Com_Printf( "Client: r_fontKerning %i (proportional xSkip + FreeType kern; Rougier HAL-05430837)\n",
+			r_fontKerning->integer );
+	}
 	if ( r_fontConsoleAlign ) {
 		Com_Printf( "Client: r_fontConsoleAlign %i (TrueType pixel console/HUD: 0=top of cell, 1=baseline in cell)\n",
 			r_fontConsoleAlign->integer );
@@ -257,7 +278,42 @@ static float SCR_TtfShadowOffset( void ) {
 }
 
 static float SCR_TtfSubpixelBias( void ) {
+	if ( r_fontSubpixelPos && r_fontSubpixelPos->integer ) {
+		return 0.0f;
+	}
 	return ( r_fontSubpixel && r_fontSubpixel->integer ) ? 0.375f : 0.0f;
+}
+
+static int SCR_TextRenderMode( void ) {
+	int mode = 0;
+
+	if ( r_textMode ) {
+		mode = r_textMode->integer;
+	}
+	if ( mode < 0 ) {
+		mode = 0;
+	}
+	if ( mode > 4 ) {
+		mode = 4;
+	}
+	return mode;
+}
+
+static float SCR_TtfGlyphAdvance( const fontInfo_t *font, int refLinePx, float cellH,
+		const glyphInfo_t *g, int prevCh, int ch ) {
+	float adv;
+
+	if ( !g || refLinePx <= 0 || cellH <= 0.0f ) {
+		return cellH;
+	}
+	adv = (float)g->xSkip * cellH / (float)refLinePx;
+	if ( r_fontKerning && r_fontKerning->integer && prevCh >= 0 && re.GetFontKerning ) {
+		adv += re.GetFontKerning( font, prevCh, ch ) * cellH / (float)refLinePx;
+	}
+	if ( adv < 1.0f ) {
+		adv = 1.0f;
+	}
+	return adv;
 }
 
 
@@ -271,6 +327,7 @@ static qboolean SCR_DrawBuiltInTtfStringExtVirtual( int x, int y, float size, co
 	const float sp = SCR_TtfSubpixelBias();
 	const qboolean baselineAlign = ( r_fontConsoleAlign && r_fontConsoleAlign->integer ) ? qtrue : qfalse;
 	const int refPx = cls.builtInHudRefLinePx;
+	int prevCh;
 
 	if ( !string || !string[0] || !setColor || !font ) {
 		return qfalse;
@@ -284,6 +341,7 @@ static qboolean SCR_DrawBuiltInTtfStringExtVirtual( int x, int y, float size, co
 		re.SetColor( color );
 		s = string;
 		xx = (float)x;
+		prevCh = -1;
 		while ( *s ) {
 			int ch;
 			const glyphInfo_t *g;
@@ -317,13 +375,15 @@ static qboolean SCR_DrawBuiltInTtfStringExtVirtual( int x, int y, float size, co
 			SCR_AdjustFrom640( &ax, &ay, &aw, &ah );
 			ax += sp;
 			ay += sp;
-			re.DrawStretchPic( ax, ay, aw, ah, g->s, g->t, g->s2, g->t2, g->glyph );
-			xx += cell;
+			SCR_DrawStretchPicTtf( ax, ay, aw, ah, g->s, g->t, g->s2, g->t2, g->glyph );
+			xx += SCR_TtfGlyphAdvance( font, refPx, cell, g, prevCh, ch );
+			prevCh = ch;
 		}
 	}
 
 	s = string;
 	xx = (float)x;
+	prevCh = -1;
 	Com_Memcpy( color, setColor, sizeof( color ) );
 	re.SetColor( setColor );
 	while ( *s ) {
@@ -367,8 +427,9 @@ static qboolean SCR_DrawBuiltInTtfStringExtVirtual( int x, int y, float size, co
 		SCR_AdjustFrom640( &ax, &ay, &aw, &ah );
 		ax += sp;
 		ay += sp;
-		re.DrawStretchPic( ax, ay, aw, ah, g->s, g->t, g->s2, g->t2, g->glyph );
-		xx += cell;
+		SCR_DrawStretchPicTtf( ax, ay, aw, ah, g->s, g->t, g->s2, g->t2, g->glyph );
+		xx += SCR_TtfGlyphAdvance( font, refPx, cell, g, prevCh, ch );
+		prevCh = ch;
 	}
 
 	re.SetColor( NULL );
@@ -385,6 +446,7 @@ static qboolean SCR_DrawBuiltInTtfStringExtPixels( int x, int y, const char *str
 	const float sp = SCR_TtfSubpixelBias();
 	const qboolean baselineAlign = ( r_fontConsoleAlign && r_fontConsoleAlign->integer ) ? qtrue : qfalse;
 	const float cellH = (float)smallchar_height;
+	int prevCh;
 
 	if ( !string || !string[0] || !setColor || !font ) {
 		return qfalse;
@@ -397,6 +459,7 @@ static qboolean SCR_DrawBuiltInTtfStringExtPixels( int x, int y, const char *str
 		re.SetColor( color );
 		s = string;
 		xx = (float)x;
+		prevCh = -1;
 		while ( *s ) {
 			int ch;
 			const glyphInfo_t *g;
@@ -427,13 +490,15 @@ static qboolean SCR_DrawBuiltInTtfStringExtPixels( int x, int y, const char *str
 			ah = cellH;
 			ax = xx + shOff + sp;
 			ay = SCR_TtfCellAy( (float)y, g, cellH, refLinePx, baselineAlign ) + shOff + sp;
-			re.DrawStretchPic( ax, ay, aw, ah, g->s, g->t, g->s2, g->t2, g->glyph );
-			xx += (float)smallchar_width;
+			SCR_DrawStretchPicTtf( ax, ay, aw, ah, g->s, g->t, g->s2, g->t2, g->glyph );
+			xx += SCR_TtfGlyphAdvance( font, refLinePx, cellH, g, prevCh, ch );
+			prevCh = ch;
 		}
 	}
 
 	s = string;
 	xx = (float)x;
+	prevCh = -1;
 	Com_Memcpy( color, setColor, sizeof( color ) );
 	re.SetColor( setColor );
 	while ( *s ) {
@@ -457,6 +522,7 @@ static qboolean SCR_DrawBuiltInTtfStringExtPixels( int x, int y, const char *str
 			if ( CL_Emoji_IsEnabled() && Q_UTF8_IsEmoji( cp ) && CL_Emoji_DrawChar( (int)xx, (int)y, smallchar_width, smallchar_height, cp ) ) {
 				re.SetColor( forceColor ? setColor : color );
 				xx += (float)smallchar_width;
+				prevCh = -1;
 				continue;
 			}
 			ch = ( cp < 256 ) ? (int)( cp & 0xFF ) : '?';
@@ -468,14 +534,16 @@ static qboolean SCR_DrawBuiltInTtfStringExtPixels( int x, int y, const char *str
 		g = &font->glyphs[ch];
 		if ( !g->glyph || g->imageHeight <= 0 || g->imageWidth <= 0 ) {
 			xx += (float)smallchar_width;
+			prevCh = -1;
 			continue;
 		}
 		aw = (float)smallchar_width;
 		ah = cellH;
 		ax = xx + sp;
 		ay = SCR_TtfCellAy( (float)y, g, cellH, refLinePx, baselineAlign ) + sp;
-		re.DrawStretchPic( ax, ay, aw, ah, g->s, g->t, g->s2, g->t2, g->glyph );
-		xx += (float)smallchar_width;
+		SCR_DrawStretchPicTtf( ax, ay, aw, ah, g->s, g->t, g->s2, g->t2, g->glyph );
+		xx += SCR_TtfGlyphAdvance( font, refLinePx, cellH, g, prevCh, ch );
+		prevCh = ch;
 	}
 
 	re.SetColor( NULL );
@@ -571,6 +639,18 @@ void SCR_DrawSmallString( int x, int y, const char *s, int len ) {
 		return;
 	}
 
+	/* GPU vector outlines (Lengyel 2017) when r_vectorFont 1. */
+	if ( len > 0 && len < 1024 ) {
+		char buf[1024];
+		int n = len;
+		if ( n >= (int)sizeof( buf ) ) n = (int)sizeof( buf ) - 1;
+		Com_Memcpy( buf, s, (size_t)n );
+		buf[n] = '\0';
+		if ( VectorFont_DrawStringExt( x, y, (float)smallchar_height, buf, white, qtrue, qtrue, qfalse ) ) {
+			return;
+		}
+	}
+
 	/* Prefer FreeType (r_font) over pre-baked SDF when both are available. */
 	if ( cls.builtInTtfActive && len > 0 && len < 1024 ) {
 		char buf[1024];
@@ -636,15 +716,33 @@ void SCR_DrawStringExt( int x, int y, float size, const char *string, const floa
 	const char	*s;
 	int			xx;
 	const float	clampedSize = Com_Clamp( 1.0f, 256.0f, size );
+	const int textMode = SCR_TextRenderMode();
 
-	if ( cls.builtInTtfActive && SCR_DrawBuiltInTtfStringExtVirtual( x, y, clampedSize, string, &cls.builtInHudFont, setColor, forceColor, noColorEscape ) ) {
+	if ( textMode == 0 || textMode == 3 ) {
+		if ( VectorFont_DrawStringExt( x, y, clampedSize, string, setColor, forceColor, noColorEscape, qtrue ) ) {
+			return;
+		}
+	}
+
+	if ( textMode == 4 ) {
+		goto bitmap_fallback;
+	}
+
+	if ( ( textMode == 0 || textMode == 1 ) && cls.builtInTtfActive &&
+			SCR_DrawBuiltInTtfStringExtVirtual( x, y, clampedSize, string, &cls.builtInHudFont, setColor, forceColor, noColorEscape ) ) {
 		return;
 	}
 
-	if ( SDF_DrawStringExt( x, y, clampedSize, string, setColor, forceColor, noColorEscape, SDF_COORDS_VIRTUAL_640 ) ) {
+	if ( ( textMode == 0 || textMode == 2 ) &&
+			SDF_DrawStringExt( x, y, clampedSize, string, setColor, forceColor, noColorEscape, SDF_COORDS_VIRTUAL_640 ) ) {
 		return;
 	}
 
+	if ( textMode == 2 || textMode == 3 ) {
+		return;
+	}
+
+bitmap_fallback:
 	// draw the drop shadow
 	color[0] = color[1] = color[2] = 0.0;
 	color[3] = setColor[3];
@@ -739,15 +837,27 @@ void SCR_DrawSmallStringExt( int x, int y, const char *string, const float *setC
 	int			xx;
 	int			ch;
 	const float	sdfSize = (float)smallchar_height;
+	const int textMode = SCR_TextRenderMode();
 
-	if ( cls.builtInTtfActive && SCR_DrawBuiltInTtfStringExtPixels( x, y, string, &cls.builtInConsoleFont, cls.builtInConsoleRefLinePx, setColor, forceColor, noColorEscape ) ) {
+	if ( textMode == 4 ) {
+		goto bitmap_fallback;
+	}
+
+	if ( ( textMode == 0 || textMode == 1 ) && cls.builtInTtfActive &&
+			SCR_DrawBuiltInTtfStringExtPixels( x, y, string, &cls.builtInConsoleFont, cls.builtInConsoleRefLinePx, setColor, forceColor, noColorEscape ) ) {
 		return;
 	}
 
-	if ( SDF_IsEnabled() && SDF_DrawStringExt( x, y, sdfSize, string, setColor, forceColor, noColorEscape, SDF_COORDS_SCREEN ) ) {
+	if ( ( textMode == 0 || textMode == 2 ) && SDF_IsEnabled() &&
+			SDF_DrawStringExt( x, y, sdfSize, string, setColor, forceColor, noColorEscape, SDF_COORDS_SCREEN ) ) {
 		return;
 	}
 
+	if ( textMode == 2 || textMode == 3 ) {
+		return;
+	}
+
+bitmap_fallback:
 	// draw the colored text (bitmap fallback)
 	s = string;
 	xx = x;
@@ -969,7 +1079,22 @@ void SCR_Init( void ) {
 	r_fontSubpixel = Cvar_Get( "r_fontSubpixel", "0", CVAR_ARCHIVE );
 	Cvar_CheckRange( r_fontSubpixel, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( r_fontSubpixel,
-		"When 1, nudge TrueType draw positions by 0.375px after projection; can sharpen linear-filtered edges on some displays. Subpixel-style tweaks are individually variable (Bias et al. 2009, DOI 10.1002/asi.21273; see docs/research/bias2009-subpixel-preference.md)." );
+		"When 1, nudge TrueType draw positions by 0.375px after projection; can sharpen linear-filtered edges on some displays. Ignored when r_fontSubpixelPos is 1." );
+
+	r_fontSubpixelPos = Cvar_Get( "r_fontSubpixelPos", "0", CVAR_ARCHIVE );
+	Cvar_CheckRange( r_fontSubpixelPos, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( r_fontSubpixelPos,
+		"Rougier HAL-00821839 subpixel glyph positioning (Vulkan). 1 = fractional horizontal placement via uiSubpixelText shader. Best with r_fontLcd 1; apply reloadTtf after atlas changes." );
+
+	r_fontKerning = Cvar_Get( "r_fontKerning", "1", CVAR_ARCHIVE );
+	Cvar_CheckRange( r_fontKerning, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( r_fontKerning,
+		"Rougier HAL-05430839: apply FreeType GPOS/kern pairs when advancing TrueType HUD/console text (with proportional xSkip)." );
+
+	r_textMode = Cvar_Get( "r_textMode", "0", CVAR_ARCHIVE );
+	Cvar_CheckRange( r_textMode, "0", "4", CV_INTEGER );
+	Cvar_SetDescription( r_textMode,
+		"Engine text renderer: 0=auto (vector→FreeType→SDF→bitmap), 1=texture/FreeType, 2=SDF, 3=vector, 4=bitmap only." );
 
 	{
 		cvar_t *ui_open_tab = Cvar_Get( "ui_open_tab", "", CVAR_ARCHIVE_ND );

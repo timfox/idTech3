@@ -20,6 +20,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 #include "tr_local.h"
+#include "../common/tr_vector_font.h"
 #ifdef USE_VULKAN
 #include "vk_temporal.h"
 #include "vk_forward_plus.h"
@@ -1273,7 +1274,24 @@ static const void *RB_StretchPic( const void *data ) {
 #endif
 
 	RB_AddQuadStamp2( cmd->x, cmd->y, cmd->w, cmd->h, cmd->s1, cmd->t1, cmd->s2, cmd->t2, backEnd.color2D );
-	tess.sdfUiEdge = cmd->sdfSmoothing;
+	if ( cmd->vectorCurveCount > 0 ) {
+		tess.vectorCurveStart = cmd->vectorCurveStart;
+		tess.vectorCurveCount = cmd->vectorCurveCount;
+		tess.vectorCurveTexWidth = R_VectorFont_CurveTexWidth();
+		tess.sdfUiEdge = -1.0f;
+		tess.subpixelShift = -1.0f;
+	} else if ( cmd->subpixelShift >= 0.0f ) {
+		tess.vectorCurveStart = 0;
+		tess.vectorCurveCount = 0;
+		tess.sdfUiEdge = -1.0f;
+		tess.subpixelShift = cmd->subpixelShift;
+		tess.subpixelInvTexWidth = cmd->subpixelInvTexWidth;
+	} else {
+		tess.vectorCurveStart = 0;
+		tess.vectorCurveCount = 0;
+		tess.sdfUiEdge = cmd->sdfSmoothing;
+		tess.subpixelShift = -1.0f;
+	}
 
 	return (const void *)(cmd + 1);
 }

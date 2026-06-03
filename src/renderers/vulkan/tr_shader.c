@@ -1717,6 +1717,11 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			stage->uiSdfText = 1u;
 			continue;
 		}
+		else if ( !Q_stricmp( token, "uiVectorText" ) )
+		{
+			stage->uiVectorText = 1u;
+			continue;
+		}
 		else if ( !Q_stricmp( token, "dlight" ) && s_extendedShader )
 		{
 			stage->bundle[0].dlight = 1;
@@ -4490,6 +4495,11 @@ static shader_t *FinishShader( void ) {
 				def.shader_type = TYPE_SIGNLE_TEXTURE_UI_SDF;
 			}
 
+			if ( pStage->uiVectorText && def.shader_type == TYPE_SIGNLE_TEXTURE && pStage->numTexBundles == 1U
+				&& !pStage->depthFragment && !def.hasFlowmap ) {
+				def.shader_type = TYPE_SIGNLE_TEXTURE_UI_VECTOR;
+			}
+
 			def.mirror = qfalse;
 			pStage->vk_pipeline[0] = vk_find_pipeline_ext( 0, &def, qtrue );
 			def.mirror = qtrue;
@@ -5413,8 +5423,17 @@ static void CreateInternalShaders( void ) {
 	stages[0].bundle[0].tcGen = TCGEN_TEXTURE;
 	stages[0].active = qtrue;
 	stages[0].bundle[0].rgbGen = CGEN_IDENTITY_LIGHTING;
-	stages[0].stateBits = GLS_DEPTHTEST_DISABLE;
+	stages[0].stateBits = GLS_DEPTHTEST_DISABLE | GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA;
 	tr.cinematicShader = FinishShader();
+
+	InitShader( "<vectorfont>", LIGHTMAP_NONE );
+	stages[0].bundle[0].image[0] = tr.whiteImage;
+	stages[0].bundle[0].tcGen = TCGEN_TEXTURE;
+	stages[0].active = qtrue;
+	stages[0].bundle[0].rgbGen = CGEN_VERTEX;
+	stages[0].uiVectorText = 1u;
+	stages[0].stateBits = GLS_DEPTHTEST_DISABLE | GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA;
+	tr.vectorFontShader = FinishShader();
 }
 
 

@@ -414,6 +414,7 @@ typedef struct {
 	qboolean		isDetail;
 	qboolean		depthFragment;
 	unsigned int	uiSdfText : 1;
+	unsigned int	uiVectorText : 1;
 
 #ifdef USE_VULKAN
 	uint32_t		tessFlags;
@@ -1349,6 +1350,7 @@ typedef struct {
 
 	shader_t				*defaultShader;
 	shader_t				*whiteShader;
+	shader_t				*vectorFontShader;
 	shader_t				*cinematicShader;
 	shader_t				*shadowShader;
 	shader_t				*projectionShadowShader;
@@ -1778,6 +1780,9 @@ extern	cvar_t	*r_presentBits;
 extern	cvar_t	*r_outline;
 extern	cvar_t	*r_outlineThreshold;
 extern	cvar_t	*r_sdfScreenAa;
+extern	cvar_t	*r_sdfOutline;
+extern	cvar_t	*r_sdfOutlineWidth;
+extern	cvar_t	*r_fontGamma;
 
 extern	cvar_t	*r_ignoreGLErrors;
 
@@ -2042,6 +2047,13 @@ typedef struct shaderCommands_s
 	shaderStage_t **xstages;
 
 	float		sdfUiEdge;
+
+	float		subpixelShift;
+	float		subpixelInvTexWidth;
+
+	int			vectorCurveStart;
+	int			vectorCurveCount;
+	int			vectorCurveTexWidth;
 
 } shaderCommands_t;
 
@@ -2320,6 +2332,10 @@ typedef struct {
 	float	s1, t1;
 	float	s2, t2;
 	float	sdfSmoothing;
+	float	subpixelShift;
+	float	subpixelInvTexWidth;
+	int		vectorCurveStart;
+	int		vectorCurveCount;
 } stretchPicCommand_t;
 
 typedef struct drawSurfsCommand_s {
@@ -2398,6 +2414,8 @@ void RE_StretchPic ( float x, float y, float w, float h,
 					  float s1, float t1, float s2, float t2, qhandle_t hShader );
 void RE_StretchPicEx( float x, float y, float w, float h,
 					  float s1, float t1, float s2, float t2, qhandle_t hShader, float sdfEdgeSoftening );
+void RE_StretchPicSubpixel( float x, float y, float w, float h,
+					  float s1, float t1, float s2, float t2, qhandle_t hShader, float subpixelShift );
 void RE_BeginFrame( stereoFrame_t stereoFrame );
 void RE_EndFrame( int *frontEndMsec, int *backEndMsec );
 void RE_TakeVideoFrame( int width, int height,

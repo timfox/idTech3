@@ -478,6 +478,48 @@ int SV_BotLibSetup( void ) {
 	return botlib_export->BotLibSetup();
 }
 
+
+/*
+==================
+SV_BotLoadMap
+
+Load bot navigation for the current map. Custom maps often ship without
+maps/<name>.aas; continuing bot setup in that case can crash native game code.
+==================
+*/
+int SV_BotLoadMap( const char *mapname ) {
+	int errnum;
+	char aasPath[MAX_QPATH];
+
+	if ( !bot_enable || !botlib_export ) {
+		return BLERR_NOERROR;
+	}
+
+	if ( !mapname || !mapname[0] ) {
+		return BLERR_NOERROR;
+	}
+
+	Com_sprintf( aasPath, sizeof( aasPath ), "maps/%s.aas", mapname );
+	if ( !FS_FileExists( aasPath ) ) {
+		Com_Printf( S_COLOR_YELLOW "WARNING: %s not found; disabling bots for this map\n", aasPath );
+		bot_enable = 0;
+		Cvar_Set( "bot_enable", "0" );
+		return BLERR_NOERROR;
+	}
+
+	errnum = botlib_export->BotLibLoadMap( mapname );
+	if ( errnum == BLERR_NOAASFILE || errnum == BLERR_CANNOTOPENAASFILE
+		|| errnum == BLERR_WRONGAASFILEID || errnum == BLERR_WRONGAASFILEVERSION ) {
+		Com_Printf( S_COLOR_YELLOW "WARNING: bot navigation failed for '%s' (error %d); disabling bots\n",
+			mapname, errnum );
+		bot_enable = 0;
+		Cvar_Set( "bot_enable", "0" );
+		return BLERR_NOERROR;
+	}
+
+	return errnum;
+}
+
 /*
 ===============
 SV_ShutdownBotLib

@@ -190,6 +190,13 @@ void RE_ClearTrueTypeFontCache( void ) {
 	Com_Memset( registeredFont, 0, sizeof( registeredFont ) );
 }
 
+float RE_GetFontKerning( const fontInfo_t *font, int prevIndex, int nextIndex ) {
+	(void)font;
+	(void)prevIndex;
+	(void)nextIndex;
+	return 0.0f;
+}
+
 void R_InitFreeType( void ) {
 	registeredFontCount = 0;
 	ri.Printf( PRINT_DEVELOPER, "Font system: using cached font data (FreeType not available)\n" );

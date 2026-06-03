@@ -105,6 +105,7 @@ typedef struct {
 #endif
 	void	(*RegisterFont)(const char *fontName, int pointSize, fontInfo_t *font);
 	void	(*ClearTrueTypeFontCache)( void );
+	float	(*GetFontKerning)( const fontInfo_t *font, int prevIndex, int nextIndex );
 	void	(*RemapShader)(const char *oldShader, const char *newShader, const char *offsetTime);
 	qboolean (*GetEntityToken)( char *buffer, int size );
 	qboolean (*inPVS)( const vec3_t p1, const vec3_t p2 );
@@ -129,6 +130,16 @@ typedef struct {
 	/* Appended: sdfEdgeSoftening < 0 = legacy. >= 0 = Vulkan UI SDF when shader stage has uiSdfText. */
 	void	(*DrawStretchPicEx) ( float x, float y, float w, float h,
 		float s1, float t1, float s2, float t2, qhandle_t hShader, float sdfEdgeSoftening );
+	void	(*DrawStretchPicSubpixel) ( float x, float y, float w, float h,
+		float s1, float t1, float s2, float t2, qhandle_t hShader, float subpixelShift );
+
+	qboolean (*LoadVectorFont)( const char *path );
+	qboolean (*VectorFontActive)( void );
+	qboolean (*DrawVectorString)( float x, float y, float scale, const char *text,
+		const float *color, float shadowOff );
+	void	(*DrawVectorGlyph)( float x, float y, float w, float h,
+		float emS1, float emT1, float emS2, float emT2,
+		int curveStart, int curveCount );
 
 } refexport_t;
 
@@ -223,12 +234,6 @@ typedef struct {
 	// platform-dependent functions
 	void(*GLimp_InitGamma)(glconfig_t *config);
 	void(*GLimp_SetGamma)(unsigned char red[256], unsigned char green[256], unsigned char blue[256]);
-
-	// OpenGL
-	void	(*GLimp_Init)( glconfig_t *config );
-	void	(*GLimp_Shutdown)( qboolean unloadDLL );
-	void	(*GLimp_EndFrame)( void );
-	void*	(*GL_GetProcAddress)( const char *name );
 
 	// Vulkan
 	void	(*VKimp_Init)( glconfig_t *config );

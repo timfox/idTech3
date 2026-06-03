@@ -46,6 +46,10 @@ void vk_create_shader_modules( void )
 
 	vk.modules.frag.ui_sdf_text = SHADER_MODULE( frag_ui_sdf_text_frag_spv );
 	SET_OBJECT_NAME( vk.modules.frag.ui_sdf_text, "ui sdf text fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	vk.modules.frag.ui_vector_text = SHADER_MODULE( frag_ui_vector_text_frag_spv );
+	SET_OBJECT_NAME( vk.modules.frag.ui_vector_text, "ui vector text fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	vk.modules.frag.ui_subpixel_text = SHADER_MODULE( frag_ui_subpixel_text_frag_spv );
+	SET_OBJECT_NAME( vk.modules.frag.ui_subpixel_text, "ui subpixel text fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 
 	vk.modules.frag.ent[0][0][0] = SHADER_MODULE( frag_tx0_ent );
 	vk.modules.frag.ent[0][0][1] = SHADER_MODULE( frag_tx0_ent_fog );

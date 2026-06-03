@@ -262,6 +262,78 @@ void RE_StretchPicEx( float x, float y, float w, float h,
 	cmd->s2 = s2;
 	cmd->t2 = t2;
 	cmd->sdfSmoothing = sdfEdgeSoftening;
+	cmd->subpixelShift = -1.0f;
+	cmd->subpixelInvTexWidth = 1.0f / 256.0f;
+	cmd->vectorCurveStart = 0;
+	cmd->vectorCurveCount = 0;
+}
+
+/*
+=============
+RE_StretchPicSubpixel
+Rougier HAL-00821839 subpixel glyph positioning (Vulkan uiSubpixelText pipeline).
+=============
+*/
+void RE_StretchPicSubpixel( float x, float y, float w, float h,
+					float s1, float t1, float s2, float t2, qhandle_t hShader, float subpixelShift ) {
+	stretchPicCommand_t	*cmd;
+
+	if ( !tr.registered ) {
+		return;
+	}
+	cmd = R_GetCommandBuffer( sizeof( *cmd ) );
+	if ( !cmd ) {
+		return;
+	}
+	cmd->commandId = RC_STRETCH_PIC;
+	cmd->shader = R_GetShaderByHandle( hShader );
+	cmd->x = x;
+	cmd->y = y;
+	cmd->w = w;
+	cmd->h = h;
+	cmd->s1 = s1;
+	cmd->t1 = t1;
+	cmd->s2 = s2;
+	cmd->t2 = t2;
+	cmd->sdfSmoothing = -1.0f;
+	cmd->subpixelShift = subpixelShift;
+	cmd->subpixelInvTexWidth = 1.0f / 256.0f;
+	cmd->vectorCurveStart = 0;
+	cmd->vectorCurveCount = 0;
+}
+
+/*
+=============
+RE_DrawVectorGlyph
+=============
+*/
+void RE_DrawVectorGlyph( float x, float y, float w, float h,
+	float emS1, float emT1, float emS2, float emT2,
+	int curveStart, int curveCount ) {
+	stretchPicCommand_t *cmd;
+
+	if ( !tr.registered || !tr.vectorFontShader || curveCount <= 0 ) {
+		return;
+	}
+	cmd = R_GetCommandBuffer( sizeof( *cmd ) );
+	if ( !cmd ) {
+		return;
+	}
+	cmd->commandId = RC_STRETCH_PIC;
+	cmd->shader = tr.vectorFontShader;
+	cmd->x = x;
+	cmd->y = y;
+	cmd->w = w;
+	cmd->h = h;
+	cmd->s1 = emS1;
+	cmd->t1 = emT1;
+	cmd->s2 = emS2;
+	cmd->t2 = emT2;
+	cmd->sdfSmoothing = -1.0f;
+	cmd->subpixelShift = -1.0f;
+	cmd->subpixelInvTexWidth = 1.0f / 256.0f;
+	cmd->vectorCurveStart = curveStart;
+	cmd->vectorCurveCount = curveCount;
 }
 
 /*

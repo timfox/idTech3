@@ -1589,6 +1589,60 @@ static void SV_Disconnect_f( client_t *cl ) {
 
 /*
 =================
+SV_VerifyNativePureChecksums
+
+Native full-conversion mods (no vm/cgame.qvm or vm/ui.qvm in pk3) send:
+  cp <serverId> @ <refPureChecksum> ... <encoded>
+instead of the classic QVM cgame/ui prefix. Validate referenced pk3 pure sums only.
+=================
+*/
+static qboolean SV_VerifyNativePureChecksums( int argc, int startArg ) {
+	int nClientChkSum[512];
+	int i, j, nClientPaks, nCurArg, encoded;
+	const char *pArg;
+
+	nCurArg = startArg;
+	pArg = Cmd_Argv( nCurArg++ );
+	if ( !pArg || *pArg != '@' ) {
+		return qfalse;
+	}
+
+	i = 0;
+	while ( nCurArg < argc && i < (int)ARRAY_LEN( nClientChkSum ) ) {
+		nClientChkSum[i++] = atoi( Cmd_Argv( nCurArg++ ) );
+	}
+	if ( i < 2 ) {
+		return qfalse;
+	}
+
+	nClientPaks = i - 1;
+	encoded = nClientChkSum[nClientPaks];
+
+	for ( i = 0; i < nClientPaks; i++ ) {
+		for ( j = i + 1; j < nClientPaks; j++ ) {
+			if ( nClientChkSum[i] == nClientChkSum[j] ) {
+				return qfalse;
+			}
+		}
+	}
+
+	for ( i = 0; i < nClientPaks; i++ ) {
+		if ( !FS_IsPureChecksum( nClientChkSum[i] ) ) {
+			return qfalse;
+		}
+	}
+
+	i = sv.checksumFeed;
+	for ( j = 0; j < nClientPaks; j++ ) {
+		i ^= nClientChkSum[j];
+	}
+	i ^= nClientPaks;
+	return ( i == encoded ) ? qtrue : qfalse;
+}
+
+
+/*
+=================
 SV_VerifyPaks_f
 
 If we are pure, disconnect the client if they do no meet the following conditions:
@@ -1605,6 +1659,9 @@ static void SV_VerifyPaks_f( client_t *cl ) {
 	int nClientChkSum[512];
 	const char *pArg;
 	qboolean bGood = qtrue;
+	qboolean hasCgameQvm;
+	qboolean hasUiQvm;
+	qboolean nativeOnlyMod;
 
 	// if we are pure, we "expect" the client to load certain things from
 	// certain pk3 files, namely we want the client to have loaded the
@@ -1613,10 +1670,9 @@ static void SV_VerifyPaks_f( client_t *cl ) {
 	if ( sv.pure != 0 ) {
 
 		nChkSum1 = nChkSum2 = 0;
-
-		// we run the game, so determine which cgame and ui the client "should" be running
-		bGood = FS_FileIsInPAK( "vm/cgame.qvm", &nChkSum1, NULL );
-		bGood &= FS_FileIsInPAK( "vm/ui.qvm", &nChkSum2, NULL );
+		hasCgameQvm = FS_FileIsInPAK( "vm/cgame.qvm", &nChkSum1, NULL );
+		hasUiQvm = FS_FileIsInPAK( "vm/ui.qvm", &nChkSum2, NULL );
+		nativeOnlyMod = ( !hasCgameQvm && !hasUiQvm ) ? qtrue : qfalse;
 
 		nClientPaks = Cmd_Argc();
 
@@ -1639,8 +1695,13 @@ static void SV_VerifyPaks_f( client_t *cl ) {
 			}
 		}
 
-		// we basically use this while loop to avoid using 'goto' :)
-		while (bGood) {
+		if ( nativeOnlyMod ) {
+			bGood = SV_VerifyNativePureChecksums( nClientPaks, nCurArg );
+		} else {
+			bGood = hasCgameQvm && hasUiQvm;
+
+			// we basically use this while loop to avoid using 'goto' :)
+			while (bGood) {
 
 			// must be at least 6: "cl_paks cgame ui @ firstref ... numChecksums"
 			// numChecksums is encoded
@@ -1715,6 +1776,7 @@ static void SV_VerifyPaks_f( client_t *cl ) {
 
 			// break out
 			break;
+		}
 		}
 
 		cl->gotCP = qtrue;

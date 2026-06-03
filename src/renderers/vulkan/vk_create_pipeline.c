@@ -127,6 +127,16 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 			fs_module = &vk.modules.frag.ui_sdf_text;
 			break;
 
+		case TYPE_SIGNLE_TEXTURE_UI_VECTOR:
+			vs_module = vk_select_pbr_gen_vert( def, use_pbr, 0, 0, 0 );
+			fs_module = &vk.modules.frag.ui_vector_text;
+			break;
+
+		case TYPE_SIGNLE_TEXTURE_UI_SUBPIXEL:
+			vs_module = vk_select_pbr_gen_vert( def, use_pbr, 0, 0, 0 );
+			fs_module = &vk.modules.frag.ui_subpixel_text;
+			break;
+
 		case TYPE_SIGNLE_TEXTURE_FIXED_COLOR:
 			vs_module = &vk.modules.vert.fixed[use_pbr][0][0][0];
 			fs_module = vk_hdr64_active() ? &vk.modules.frag.fixed_hdr64[use_pbr][0][0] : &vk.modules.frag.fixed[use_pbr][0][0];
@@ -320,6 +330,11 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 			fs_module = &vk.modules.frag.ui_sdf_text;
 			break;
 
+		case TYPE_SIGNLE_TEXTURE_UI_VECTOR:
+			vs_module = &vk.modules.vert.gen[0][0][0][0];
+			fs_module = &vk.modules.frag.ui_vector_text;
+			break;
+
 		case TYPE_SIGNLE_TEXTURE_FIXED_COLOR:
 			vs_module = &vk.modules.vert.fixed[0][0][0];
 			fs_module = &vk.modules.frag.fixed[0][0];
@@ -498,6 +513,8 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 			case TYPE_DOT:
 			case TYPE_SIGNLE_TEXTURE_DF:
 			case TYPE_SIGNLE_TEXTURE_UI_SDF:
+			case TYPE_SIGNLE_TEXTURE_UI_VECTOR:
+			case TYPE_SIGNLE_TEXTURE_UI_SUBPIXEL:
 			case TYPE_OCCLUSION_BBOX:
 			case TYPE_COLOR_BLACK:
 			case TYPE_COLOR_WHITE:
@@ -837,7 +854,8 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 			spec_entry_count, (unsigned int)( sizeof( spec_entries ) / sizeof( spec_entries[0] ) ) );
 	}
 
-	if ( def->shader_type == TYPE_SIGNLE_TEXTURE_UI_SDF ) {
+	if ( def->shader_type == TYPE_SIGNLE_TEXTURE_UI_SDF || def->shader_type == TYPE_SIGNLE_TEXTURE_UI_VECTOR
+		|| def->shader_type == TYPE_SIGNLE_TEXTURE_UI_SUBPIXEL ) {
 		shader_stages[1].pSpecializationInfo = NULL;
 	} else {
 		frag_spec_info.mapEntryCount = spec_entry_count;
@@ -884,6 +902,8 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 
 		case TYPE_SIGNLE_TEXTURE:
 		case TYPE_SIGNLE_TEXTURE_UI_SDF:
+		case TYPE_SIGNLE_TEXTURE_UI_VECTOR:
+		case TYPE_SIGNLE_TEXTURE_UI_SUBPIXEL:
 			push_bind( 0, sizeof( vec4_t ) );					// xyz array
 			push_bind( 1, sizeof( color4ub_t ) );				// color array
 			push_bind( 2, sizeof( vec2_t ) );					// st0 array
@@ -1394,6 +1414,8 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 		def->shader_type != TYPE_DOT &&
 		def->shader_type != TYPE_SIGNLE_TEXTURE_DF &&
 		def->shader_type != TYPE_SIGNLE_TEXTURE_UI_SDF &&
+		def->shader_type != TYPE_SIGNLE_TEXTURE_UI_VECTOR &&
+		def->shader_type != TYPE_SIGNLE_TEXTURE_UI_SUBPIXEL &&
 		def->shadow_phase == SHADOW_DISABLED &&
 		depth_stencil_state.depthTestEnable == VK_TRUE &&
 		depth_stencil_state.depthWriteEnable == VK_TRUE )

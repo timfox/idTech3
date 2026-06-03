@@ -98,6 +98,7 @@ void  R_NoiseInit( void );
 
 image_t *R_FindImageFile( const char *name, imgFlags_t flags, uint32_t type );
 image_t *R_CreateImage( const char *name, const char *name2, byte *pic, int width, int height, imgFlags_t flags, int format, uint32_t type );
+image_t *R_CreateImageRGBA32F( const char *name, const float *rgba, int width, int height, imgFlags_t flags );
 void R_UploadSubImage( byte *data, int x, int y, int width, int height, image_t *image );
 
 qhandle_t RE_RegisterShaderLightMap( const char *name, int lightmapIndex );
@@ -111,6 +112,16 @@ void R_DoneFreeType( void );
 void R_WorldToLocal( const vec3_t world, vec3_t local );
 void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font);
 void RE_ClearTrueTypeFontCache( void );
+float RE_GetFontKerning( const fontInfo_t *font, int prevIndex, int nextIndex );
+void R_VectorFont_Init( void );
+void R_VectorFont_Shutdown( void );
+qboolean RE_LoadVectorFont( const char *path );
+qboolean RE_VectorFontActive( void );
+qboolean RE_DrawVectorString( float x, float y, float scale, const char *text,
+	const float *color, float shadowOff );
+void RE_DrawVectorGlyph( float x, float y, float w, float h,
+	float emS1, float emT1, float emS2, float emT2,
+	int curveStart, int curveCount );
 
 /*
 =============================================================

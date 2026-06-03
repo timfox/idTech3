@@ -238,6 +238,43 @@ void vk_upload_image_data( image_t *image, int x, int y, int width, int height, 
 	}
 }
 
+void vk_upload_image_rgba32f( image_t *image, int width, int height, const float *rgba, int floatCount ) {
+	VkCommandBuffer command_buffer;
+	VkBufferImageCopy region;
+	int byteSize;
+
+	if ( !image || !rgba || width <= 0 || height <= 0 || floatCount < width * height * 4 ) {
+		return;
+	}
+
+	byteSize = width * height * 4 * (int)sizeof( float );
+
+	if ( vk.staging_buffer.size < (VkDeviceSize)byteSize ) {
+		vk_alloc_staging_buffer( byteSize );
+	}
+
+	Com_Memcpy( vk.staging_buffer.ptr, rgba, byteSize );
+
+	Com_Memset( &region, 0, sizeof( region ) );
+	region.bufferOffset = 0;
+	region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	region.imageSubresource.mipLevel = 0;
+	region.imageSubresource.baseArrayLayer = 0;
+	region.imageSubresource.layerCount = 1;
+	region.imageExtent.width = (uint32_t)width;
+	region.imageExtent.height = (uint32_t)height;
+	region.imageExtent.depth = 1;
+
+	command_buffer = vk_begin_command_buffer();
+	record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_HOST_BIT, 0 );
+	qvkCmdCopyBufferToImage( command_buffer, vk.staging_buffer.handle, image->handle,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region );
+	record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
+	vk_end_command_buffer( command_buffer, __func__ );
+}
+
 void vk_upload_cubemap_mip_data( image_t *image, int face_size, int miplevels, const byte *pixels, int size, int bytes_per_pixel, qboolean update ) {
 	VkCommandBuffer command_buffer;
 	VkBufferImageCopy regions[64];

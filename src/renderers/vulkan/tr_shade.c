@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "tr_local.h"
 #include "vk_util.h"
+#include "../common/tr_vector_font.h"
 #ifdef USE_VULKAN
 #include "vk_postfx.h"
 #endif
@@ -185,7 +186,12 @@ static void R_BindAnimatedImage( const textureBundle_t *bundle ) {
 	}
 
 	if ( bundle->numImageAnimations <= 1 ) {
-		GL_Bind( bundle->image[0] );
+		if ( tess.vectorCurveCount > 0 ) {
+			image_t *curve = R_VectorFont_GetCurveImage();
+			GL_Bind( curve ? curve : bundle->image[0] );
+		} else {
+			GL_Bind( bundle->image[0] );
+		}
 		return;
 	}
 
@@ -395,6 +401,11 @@ void RB_BeginSurface( shader_t *shader, int fogNum ) {
 	tess.numIndexes = 0;
 	tess.numVertexes = 0;
 	tess.sdfUiEdge = -1.0f;
+	tess.subpixelShift = -1.0f;
+	tess.subpixelInvTexWidth = 0.0f;
+	tess.vectorCurveStart = 0;
+	tess.vectorCurveCount = 0;
+	tess.vectorCurveTexWidth = 0;
 	tess.shader = state;
 	tess.fogNum = fogNum;
 #ifdef USE_VULKAN
@@ -1402,6 +1413,9 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			uiDef.state_bits |= GLS_DEPTHTEST_DISABLE;
 			uiDef.state_bits &= ~GLS_DEPTHMASK_TRUE;
 			uiDef.face_culling = CT_TWO_SIDED;
+			if ( tess.subpixelShift >= 0.0f ) {
+				uiDef.shader_type = TYPE_SIGNLE_TEXTURE_UI_SUBPIXEL;
+			}
 			pipeline = vk_find_pipeline_ext( 0, &uiDef, qfalse );
 		}
 
