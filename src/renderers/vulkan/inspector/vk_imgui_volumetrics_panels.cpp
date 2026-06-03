@@ -101,6 +101,23 @@ extern "C" void VkImgui_DrawVolumetricsPanel(void) {
 		}
 		ImGui::SameLine();
 		ImGui::SetTooltip( "Depth-slice allocation: Exponential=more near camera, Linear=equal spacing, Logarithmic=more in distance." );
+		int integration = ri.Cvar_VariableIntegerValue( "r_volumetricFogIntegration" );
+		if ( integration < 0 || integration > 3 ) {
+			integration = 0;
+		}
+		const char *integrationModes[] = {
+			"Froxel (3D grid)",
+			"Screen approximate",
+			"Screen ray march + sun shadow",
+			"OpenVDB Woodcock (majorant)"
+		};
+		if ( ImGui::Combo( "Integration", &integration, integrationModes, 4 ) ) {
+			ri.Cvar_Set( "r_volumetricFogIntegration", va( "%d", integration ) );
+		}
+		ImGui::SameLine();
+		ImGui::SetTooltip(
+			"0=froxel compute+march. 1=analytical screen fog. 2=ray march + sun shadows. "
+			"3=OpenVDB delta tracking (arXiv:2211.09997); needs vdb_load/upload/bind + r_vdbFog 1." );
 	}
 
 	if (ImGui::CollapsingHeader("Sphere Volumes (Debug)")) {

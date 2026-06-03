@@ -23,10 +23,13 @@ Extracted from vk.c for incremental modularization.
 #include "vk_temporal.h"
 #include "vk_forward_plus.h"
 #include "vk_view_state.h"
+#include "vk_sim_render_profile.h"
+#include "vk_fp64_points.h"
 #include "vk_volumetric_fog_color.h"
 #include "vk_volumetric_pass.h"
 #include "vk_volumetric_internal.h"
 #include "vk_util.h"
+#include "vk_lens_flare_push.h"
 #include "vk_validation.h"
 #include "vk_staging.h"
 #include "vk_descriptors.h"
@@ -137,6 +140,11 @@ void vk_initialize( void )
 		}
 	}
 
+	if ( r_simRenderProfileAutoApply && r_simRenderProfileAutoApply->integer &&
+		r_simRenderProfile && r_simRenderProfile->integer > 0 ) {
+		VK_ApplySimRenderProfile( r_simRenderProfile->integer );
+	}
+
 	vk.cmd = vk.tess + 0;
 	vk_reset_motion_history();
 	vk.adaptedExposure = 1.0f;
@@ -162,6 +170,8 @@ void vk_initialize( void )
 	vk.windowAdjusted = qfalse;
 	vk.blitX0 = vk.blitY0 = 0;
 	vk.smaaActive = qfalse;
+	vk.fxaaActive = qfalse;
+	vk.lensFlareActive = qfalse;
 	vk.msaaActive = qfalse;
 
 	vk_set_render_scale();
@@ -178,7 +188,12 @@ void vk_initialize( void )
 	} else {
 		vk.fboActive = qfalse;
 	}
-	vk.smaaActive = (vk.fboActive && r_ext_smaa->integer) ? qtrue : qfalse;
+	vk.smaaActive = (vk.fboActive && r_ext_smaa->integer && !r_ext_fxaa->integer) ? qtrue : qfalse;
+	vk.fxaaActive = (vk.fboActive && r_ext_fxaa->integer && !r_ext_smaa->integer) ? qtrue : qfalse;
+	if ( r_ext_fxaa->integer && r_ext_smaa->integer ) {
+		ri.Printf( PRINT_WARNING, "Warning: r_ext_fxaa and r_ext_smaa both enabled; using SMAA only.\n" );
+		vk.fxaaActive = qfalse;
+	}
 
 	// multisampling
 	vk_raster_samples_configure( &props, vk.msaaActive );
@@ -189,8 +204,21 @@ void vk_initialize( void )
 			int search = p ? ( p == 1 ? 8 : p == 2 ? 16 : p == 3 ? 24 : 32 ) : ( r_smaa_max_search_steps && r_smaa_max_search_steps->integer ? r_smaa_max_search_steps->integer : 16 );
 			ri.Printf( PRINT_ALL, "...SMAA enabled (preset=%s, threshold %.2f, search %d)\n", preset_name, thresh, search );
 	}
+	if ( vk.fxaaActive ) {
+		ri.Printf( PRINT_ALL, "...FXAA enabled (subpix %.2f, edgeThreshold %.3f)\n",
+			r_fxaa_subpix ? r_fxaa_subpix->value : 0.75f,
+			r_fxaa_edgeThreshold ? r_fxaa_edgeThreshold->value : 0.166f );
+	}
+	vk.lensFlareActive = ( vk.fboActive && r_lensFlare && r_lensFlare->integer ) ? qtrue : qfalse;
+	if ( vk.lensFlareActive ) {
+		ri.Printf( PRINT_ALL, "...Lens flare enabled (strength %.2f)\n",
+			r_lensFlareStrength ? r_lensFlareStrength->value : 1.0f );
+	}
 	if ( vk.msaaActive && vk.smaaActive ) {
 		ri.Printf( PRINT_ALL, "...MSAA (geometry) + SMAA (alpha/transparency) for best edge quality\n" );
+	}
+	if ( vk.msaaActive && vk.fxaaActive ) {
+		ri.Printf( PRINT_ALL, "...MSAA (geometry) + FXAA (post-process) for simulation-style edge quality\n" );
 	}
 
 	vk.screenMapSamples = MIN( vk_get_main_rasterization_max_samples(), VK_SAMPLE_COUNT_4_BIT );
@@ -597,7 +625,7 @@ void vk_initialize( void )
 	vk_forward_plus_create_set_layout();
 
 		{
-			VkDescriptorSetLayoutBinding compute_bindings[18];
+			VkDescriptorSetLayoutBinding compute_bindings[19];
 		VkDescriptorSetLayoutCreateInfo compute_layout_desc;
 
 		compute_bindings[0].binding = 0;
@@ -708,6 +736,12 @@ void vk_initialize( void )
 			compute_bindings[17].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 			compute_bindings[17].pImmutableSamplers = NULL;
 
+			compute_bindings[18].binding = 18;
+			compute_bindings[18].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			compute_bindings[18].descriptorCount = 1;
+			compute_bindings[18].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+			compute_bindings[18].pImmutableSamplers = NULL;
+
 		compute_layout_desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 		compute_layout_desc.pNext = NULL;
 		compute_layout_desc.flags = 0;
@@ -804,7 +838,7 @@ void vk_initialize( void )
 	}
 
 			{
-				VkDescriptorSetLayoutBinding composite_bindings[9];
+				VkDescriptorSetLayoutBinding composite_bindings[12];
 			VkDescriptorSetLayoutCreateInfo composite_layout_desc;
 
 		composite_bindings[0].binding = 0;
@@ -860,6 +894,24 @@ void vk_initialize( void )
 			composite_bindings[8].descriptorCount = 1;
 			composite_bindings[8].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 			composite_bindings[8].pImmutableSamplers = NULL;
+
+			composite_bindings[9].binding = 9;
+			composite_bindings[9].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			composite_bindings[9].descriptorCount = 1;
+			composite_bindings[9].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+			composite_bindings[9].pImmutableSamplers = NULL;
+
+			composite_bindings[10].binding = 10;
+			composite_bindings[10].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			composite_bindings[10].descriptorCount = 1;
+			composite_bindings[10].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+			composite_bindings[10].pImmutableSamplers = NULL;
+
+			composite_bindings[11].binding = 11;
+			composite_bindings[11].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			composite_bindings[11].descriptorCount = 1;
+			composite_bindings[11].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+			composite_bindings[11].pImmutableSamplers = NULL;
 
 			composite_layout_desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 			composite_layout_desc.pNext = NULL;
@@ -1009,8 +1061,11 @@ void vk_initialize( void )
 		set_layouts[2] = vk.set_layout_sampler;
 		set_layouts[3] = vk.set_layout_sampler;
 		desc.setLayoutCount = VK_NUM_BLOOM_PASSES;
-		desc.pushConstantRangeCount = 0;
-		desc.pPushConstantRanges = NULL;
+		push_range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		push_range.offset = 0;
+		push_range.size = sizeof( VkLensFlarePushConstants );
+		desc.pushConstantRangeCount = 1;
+		desc.pPushConstantRanges = &push_range;
 
 		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_blend ) );
 
@@ -1151,6 +1206,9 @@ void vk_initialize( void )
 
 	// renderpasses
 	vk_create_render_passes();
+
+	VK_FP64_PointsInit();
+	VK_FP64_PointsCreatePipelines();
 
 	// framebuffers for each swapchain image
 	vk_create_framebuffers();

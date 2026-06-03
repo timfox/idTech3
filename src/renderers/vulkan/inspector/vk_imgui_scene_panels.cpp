@@ -134,6 +134,50 @@ static void VkImgui_ClearInspectorSelectionScene( void )
 extern "C" void VkImgui_DrawViewport(void) {
 	if ( !vkWindows.viewport.open ) return;
 	ImGui::Begin( "Viewport", (bool *)&vkWindows.viewport.open );
+
+	static int viewTab = 0;
+	static int viewTabPrev = -1;
+	if ( ImGui::BeginTabBar( "ViewportTabs", ImGuiTabBarFlags_None ) ) {
+		if ( ImGui::BeginTabItem( "Main" ) ) {
+			viewTab = 0;
+			ImGui::EndTabItem();
+		}
+		if ( ImGui::BeginTabItem( "HDR" ) ) {
+			viewTab = 1;
+			ImGui::EndTabItem();
+		}
+		if ( ImGui::BeginTabItem( "Volumetrics" ) ) {
+			viewTab = 2;
+			ImGui::EndTabItem();
+		}
+		if ( ImGui::BeginTabItem( "Shadow" ) ) {
+			viewTab = 3;
+			ImGui::EndTabItem();
+		}
+		ImGui::EndTabBar();
+	}
+
+	if ( viewTab != viewTabPrev ) {
+		viewTabPrev = viewTab;
+		if ( viewTab == 1 ) {
+			ri.Cvar_Set( "r_pbr_debug", "0" );
+			ri.Cvar_Set( "r_post_debug", "1" );
+			ri.Cvar_Set( "r_fogDebug", "0" );
+		} else if ( viewTab == 2 ) {
+			ri.Cvar_Set( "r_pbr_debug", "0" );
+			ri.Cvar_Set( "r_post_debug", "0" );
+			ri.Cvar_Set( "r_fogDebug", "3" );
+		} else if ( viewTab == 3 ) {
+			ri.Cvar_Set( "r_pbr_debug", "0" );
+			ri.Cvar_Set( "r_post_debug", "0" );
+			ri.Cvar_Set( "r_fogDebug", "8" );
+		} else {
+			ri.Cvar_Set( "r_pbr_debug", "0" );
+			ri.Cvar_Set( "r_post_debug", "0" );
+			ri.Cvar_Set( "r_fogDebug", "0" );
+		}
+	}
+
 	ImGui::TextDisabled( "(?)" );
 	if ( ImGui::IsItemHovered() ) {
 		ImGui::SetTooltip( "Reads tr.refdef from the last assembled scene (same frame as Objects)." );

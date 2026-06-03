@@ -6,8 +6,7 @@ This document outlines the architecture and implementation plan for three render
 
 | Backend | Status | Scope |
 |---------|--------|-------|
-| **Vulkan** | ✅ Complete | Primary renderer, ~18k LOC |
-| **OpenGL** | ✅ Complete | Fallback renderer |
+| **Vulkan** | ✅ Complete | Primary (and supported) renderer, ~18k LOC |
 | **Vulkan RTX** | 🔶 Demo path | With `USE_VULKAN_RTX=ON` and `r_rtx`>0 (latched): device enables KHR AS + ray-tracing pipeline + BDA. `r_rtxDemo` 1 (default): world BSP BLAS (all brush submodels `*0..*N-1`: SF_FACE + SF_TRIANGLES, capped by latched `r_rtxWorldPrimCap`) when a map is loaded, else a fallback triangle; raygen uses depth + `invViewProj` UBO; **closest-hit tints by `r_rtx` (1=darken “shadows”, 2=cool “reflections”, 3=warm “full”) for visualization**; trace after main/post-bloom, blit into resolved color (depth briefly transitioned to read-only on main pass). **`r_rtxEntities` 1** (default **0**): optional second BLAS of **RT_MODEL** AABB proxy boxes + two-instance TLAS (`r_rtxEntityCap`). `r_rtxDemo` 0: extensions only. Real lighting / full mesh BLAS still TODO. **`scripts/compile_shaders.sh --apply` regenerates `vk_rtx_demo_spirv.inc` from `glsl/rtx_demo.*`.** |
 | **Metal** | ❌ Not started | Native Apple Silicon / macOS |
 | **DXR** | ❌ Not started | DirectX 12 + DirectX Raytracing (Windows) |
@@ -59,7 +58,7 @@ This document outlines the architecture and implementation plan for three render
 
 ### Architecture
 - New renderer module: `src/renderers/metal/`
-- Implements `refexport_t` (same interface as Vulkan/OpenGL)
+- Implements `refexport_t` (same interface as Vulkan)
 - Uses Metal 3 API (MTLDevice, MTLCommandQueue, MTLRenderPipelineState)
 - Shaders: Metal Shading Language (MSL), compiled at runtime or offline
 

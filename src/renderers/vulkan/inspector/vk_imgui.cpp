@@ -16,6 +16,11 @@ Architecture inspired by EternalJK's pbr-rtx-inspector (Sunny JK).
 #include "vk_imgui_common.hpp"
 
 static qboolean vkImgBackendReady = qfalse;
+static int vkImgLastTheme = -1;
+
+extern cvar_t *r_imguiTheme;
+
+extern "C" void VkImgui_LoadFonts( void );
 
 vkImguiInspector_t   vkInspector;
 vkImguiWindows_t     vkWindows;
@@ -85,8 +90,16 @@ extern "C" void VkImgui_Initialize(void) {
 	imguiContext = ImGui::CreateContext();
 	VkImgui_SetCurrentContext();
 	ImGuiIO &io = ImGui::GetIO();
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+	VkImgui_LoadFonts();
 	VkImgui_ApplyInspectorStyle();
+	vkImgLastTheme = ( r_imguiTheme && r_imguiTheme->integer == 1 ) ? 1 : 0;
+	ri.Printf( PRINT_ALL,
+		"[VK][imgui] editor UI: Pablo/VEditor-style dock, theme %s (r_imguiTheme %d)\n",
+		vkImgLastTheme ? "Spectrum light" : "Pablo dark",
+		vkImgLastTheme );
 
 	memset(&vkInspector, 0, sizeof(vkInspector));
 	memset(&vkWindows, 0, sizeof(vkWindows));
@@ -145,6 +158,13 @@ extern "C" void VkImgui_BeginFrame(void) {
 	if (!vkImguiState.active) return;
 	VkImgui_SetCurrentContext();
 	VkImgui_PrepareIO();
+	if ( r_imguiTheme ) {
+		const int theme = r_imguiTheme->integer == 1 ? 1 : 0;
+		if ( theme != vkImgLastTheme ) {
+			vkImgLastTheme = theme;
+			VkImgui_ApplyInspectorStyle();
+		}
+	}
 #ifdef USE_VULKAN
 	if ( vkImgBackendReady ) {
 		VkImgui_NewFrameVulkan();
@@ -185,6 +205,7 @@ extern "C" void VkImgui_Draw(void) {
 	VkImgui_DrawPhysicsPanel();
 	VkImgui_DrawVolumetricsPanel();
 	VkImgui_DrawProfiler();
+	VkImgui_DrawSimRenderDebugHud();
 	VkImgui_DrawStudioMapPanel();
 	VkImgui_DrawStudioConsolePanel();
 

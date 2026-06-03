@@ -11,7 +11,11 @@ layout(binding = 5) uniform sampler2D motionTexture;
 layout(binding = 6) uniform sampler2D localSpotShadowMap;
 layout(binding = 7) uniform sampler2DArray localPointShadowMap;
 layout(binding = 8) uniform usampler2D telemetryTexture;
+layout(binding = 9) uniform sampler2D sunShadowMap;
+layout(binding = 10) uniform sampler3D vdbFogDensity;
+layout(binding = 11) uniform sampler3D vdbFogMajorant;
 
+const float PI = 3.14159265359;
 const int MAX_VOLUMES = 24;
 const int MAX_LIGHTS = 32;
 
@@ -65,6 +69,9 @@ layout(std140, binding = 4) uniform VolumetricParams {
     vec4 fluidEmitterCount;
     vec4 telemetryParams0;
     vec4 telemetryParams1;
+    vec4 vdbParams;
+    vec4 vdbWorldMin;
+    vec4 vdbWorldMax;
 } params;
 
 float hash12(vec2 p) {
@@ -133,6 +140,19 @@ float depthFromSliceNorm(float sliceNorm, float nearPlane, float farPlane) {
     float invExp = 1.0 / max(getSliceExponent(), 1.0);
     float expNorm = pow(s, invExp);
     return nearPlane * pow(farPlane / nearPlane, expNorm);
+}
+
+float sliceNormFromDepth(float depth, float nearPlane, float farPlane) {
+    float mode = floor(params.qualityParams.y + 0.5);
+    if (mode <= 0.5) {
+        float r = log(max(depth / nearPlane, 1e-4)) / max(log(farPlane / nearPlane), 1e-5);
+        return pow(saturate(r), 1.0 / getSliceExponent());
+    }
+    if (mode <= 1.5) {
+        return saturate((depth - nearPlane) / max(farPlane - nearPlane, 1e-5));
+    }
+    float r = log(max(depth / nearPlane, 1e-4)) / max(log(farPlane / nearPlane), 1e-5);
+    return pow(saturate(r), getSliceExponent());
 }
 
 vec3 reconstructViewRay(vec2 uv) {
@@ -289,6 +309,240 @@ int findFirstShadowedLightIndex(bool wantSpot) {
     return -1;
 }
 
+float phaseHG(float cosTheta, float g) {
+    float gg = g * g;
+    float denom = max(1.0 + gg - 2.0 * g * cosTheta, 1e-5);
+    return (1.0 - gg) / (4.0 * PI * pow(denom, 1.5));
+}
+
+float evaluateHeightDensity(vec3 worldPos) {
+    float heightFalloff = max(params.densityParams.y, 0.0);
+    float heightDelta = worldPos.z - params.viewOrigin.w;
+    return exp(-heightFalloff * max(0.0, heightDelta));
+}
+
+float proceduralFogNoise(vec3 worldPos) {
+    float noiseScale = max(params.noiseParams.x, 0.0);
+    float noiseThreshold = saturate(params.noiseParams.y);
+    float noiseStrength = saturate(params.noiseParams.z);
+
+    if (noiseScale <= 0.0 || noiseStrength <= 0.0) {
+        return 1.0;
+    }
+
+    vec3 wind = params.noiseScroll.xyz * max(params.windParams.z, 0.0);
+    vec3 noiseUV = worldPos * noiseScale + wind * params.windParams.x;
+    float n0 = hash12(noiseUV.xy + noiseUV.z * 17.31);
+    float n1 = hash12(noiseUV.yz + noiseUV.x * 13.71);
+    float noiseValue = mix(n0, n1, 0.5);
+    float noiseMask = clamp((noiseValue - noiseThreshold) / max(1.0 - noiseThreshold, 1e-4), 0.0, 1.0);
+    return mix(1.0, noiseMask, noiseStrength);
+}
+
+float evaluateSigmaTAt(vec3 worldPos) {
+    float base = max(params.densityParams.x, 0.0) * max(params.scatterParams.y, 0.05);
+    return base * evaluateHeightDensity(worldPos) * proceduralFogNoise(worldPos);
+}
+
+bool vdbWorldUvw(vec3 worldPos, out vec3 uvw) {
+    if (params.vdbParams.y < 0.5) {
+        return false;
+    }
+    vec3 extent = max(params.vdbWorldMax.xyz - params.vdbWorldMin.xyz, vec3(1e-4));
+    uvw = (worldPos - params.vdbWorldMin.xyz) / extent;
+    return all(greaterThanEqual(uvw, vec3(0.0))) && all(lessThanEqual(uvw, vec3(1.0)));
+}
+
+float sampleVdbSigmaT(vec3 worldPos) {
+    vec3 uvw;
+    if (!vdbWorldUvw(worldPos, uvw)) {
+        return 0.0;
+    }
+    float blend = params.vdbParams.x;
+    float scale = max(params.scatterParams.y, 0.05);
+    return texture(vdbFogDensity, uvw).r * blend * scale;
+}
+
+float sampleVdbMajorant(vec3 worldPos) {
+    vec3 uvw;
+    if (!vdbWorldUvw(worldPos, uvw)) {
+        return 0.0;
+    }
+    float blend = params.vdbParams.x;
+    float scale = max(params.scatterParams.y, 0.05);
+    if (params.vdbParams.z > 0.5) {
+        return max(texture(vdbFogMajorant, uvw).r * blend * scale, 1e-5);
+    }
+    return max(sampleVdbSigmaT(worldPos), 1e-5);
+}
+
+float sampleSunShadowVisibility(vec3 worldPos);
+
+/* Woodcock / delta tracking with OpenVDB majorant macrocells (arXiv:2211.09997 Algorithm 1). */
+vec3 integrateVdbWoodcockFog(vec3 scene, vec3 viewDir, float rayLength, vec3 camPos, float blueNoise) {
+    vec3 V = normalize(viewDir);
+    vec3 sunDir = normalize(params.sunDirection.xyz);
+    vec3 I = params.fogColor.rgb * max(params.phaseParams.y, 0.0);
+    float g = clamp(params.phaseParams.x, -0.999, 0.999);
+    float sigmaS = clamp(params.scatterParams.x, 0.0, 1.0);
+    vec3 fogAmbient = params.fogColor.rgb * max(params.phaseParams.z, 0.0);
+    int maxSteps = int(clamp(floor(params.miscParams.x + 0.5), 8.0, 96.0));
+    float t = blueNoise * (rayLength / float(maxSteps));
+    float T = 1.0;
+    vec3 inScatter = vec3(0.0);
+    float transCutoff = max(params.qualityParams.w, 0.0001);
+    int iter = 0;
+
+    while (t < rayLength && T > transCutoff && iter < maxSteps) {
+        vec3 samplePos = camPos + V * t;
+        float muBar = sampleVdbMajorant(samplePos);
+
+        if (muBar < 1e-5) {
+            t += rayLength / float(maxSteps);
+            iter++;
+            continue;
+        }
+
+        float xi = fract(hash12(samplePos.xy + samplePos.z * 17.0) + float(iter) * 0.618 + blueNoise);
+        float dt = -log(max(1e-4, 1.0 - xi)) / muBar;
+        float tHit = t + dt;
+        if (tHit >= rayLength) {
+            T *= exp(-muBar * (rayLength - t));
+            break;
+        }
+
+        vec3 hitPos = camPos + V * tHit;
+        float mu = sampleVdbSigmaT(hitPos) + evaluateSigmaTAt(hitPos) * 0.15;
+        float reject = fract(hash12(hitPos.yz + float(iter) * 0.37));
+        if (reject * muBar < mu) {
+            float heightAtt = evaluateHeightDensity(hitPos);
+            float noiseAtt = proceduralFogNoise(hitPos);
+            if (params.volumeCounts.z > 0.5) {
+                float sunVis = sampleSunShadowVisibility(hitPos);
+                float cosTheta = dot(normalize(hitPos - camPos), sunDir);
+                float p = phaseHG(cosTheta, g);
+                inScatter += T * p * mu * sigmaS * sunVis * I * dt;
+            } else {
+                inScatter += T * mu * sigmaS * fogAmbient * dt * heightAtt * noiseAtt;
+            }
+        }
+
+        T *= exp(-muBar * dt);
+        t = tHit;
+        iter++;
+    }
+
+    return scene * T + inScatter + (1.0 - T) * fogAmbient;
+}
+
+float sampleSunShadowVisibility(vec3 worldPos) {
+    if (params.volumeCounts.z <= 0.5) {
+        return 1.0;
+    }
+    if (params.shadowMapSize0.z <= 0.0 || params.shadowMapSize0.w <= 0.0) {
+        return 1.0;
+    }
+
+    vec4 lightClip = params.sunShadowMatrix0 * vec4(worldPos, 1.0);
+    if (abs(lightClip.w) <= 1e-6) {
+        return 1.0;
+    }
+
+    vec3 ndc = lightClip.xyz / lightClip.w;
+    vec2 uv = ndc.xy * 0.5 + 0.5;
+    float depth = ndc.z * 0.5 + 0.5;
+
+    if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0))) || depth <= 0.0 || depth >= 1.0) {
+        return 1.0;
+    }
+
+    float compareDepth = depth - max(params.shadowParams0.x, 0.0);
+    vec2 texelStep = params.shadowMapSize0.zw * max(params.shadowParams0.y, 0.0);
+
+    if (texelStep.x <= 0.0 || texelStep.y <= 0.0) {
+        float sampleDepth = texture(sunShadowMap, uv).r;
+        return (compareDepth <= sampleDepth) ? 1.0 : 0.0;
+    }
+
+    float lit = 0.0;
+    for (int y = -1; y <= 1; ++y) {
+        for (int x = -1; x <= 1; ++x) {
+            vec2 pcfUV = uv + vec2(x, y) * texelStep;
+            float sampleDepth = texture(sunShadowMap, pcfUV).r;
+            lit += (compareDepth <= sampleDepth) ? 1.0 : 0.0;
+        }
+    }
+    return lit * (1.0 / 9.0);
+}
+
+/* Hoffman/Preetham-style single-sample approximate (reference: ApproximateFog). */
+vec3 integrateApproximateFog(vec3 scene, vec3 viewDir, float rayLength, vec3 worldPos) {
+    float g = clamp(params.phaseParams.x, -0.999, 0.999);
+    vec3 sunDir = normalize(params.sunDirection.xyz);
+    vec3 V = normalize(viewDir);
+    float cosTheta = dot(V, sunDir);
+    float p = phaseHG(cosTheta, g);
+
+    float heightAtt = evaluateHeightDensity(worldPos);
+    float sigmaT = evaluateSigmaTAt(worldPos);
+    float sigmaS = sigmaT * clamp(params.scatterParams.x, 0.0, 1.0);
+    float betaS = max(sigmaS, 1e-5);
+
+    vec3 E_sun = params.fogColor.rgb * max(params.phaseParams.y, 0.0);
+    float sunVis = sampleSunShadowVisibility(worldPos);
+
+    vec3 inScatter = (E_sun * p) / betaS * (1.0 - exp(-betaS * rayLength)) * heightAtt * sunVis;
+    float T = exp(-betaS * heightAtt * rayLength);
+    vec3 fogAmbient = params.fogColor.rgb * max(params.phaseParams.z, 0.0);
+
+    return scene * T + inScatter + (1.0 - T) * fogAmbient;
+}
+
+/* Screen-space ray march with height density + sun shadow (reference: RayMarchFog; no TLAS). */
+vec3 integrateRayMarchFog(vec3 scene, vec3 viewDir, float rayLength, vec3 camPos, float blueNoiseJitter) {
+    int numSteps = int(clamp(floor(params.miscParams.x + 0.5), 1.0, 256.0));
+    float stepSize = rayLength / float(numSteps);
+
+    vec3 sunDir = normalize(params.sunDirection.xyz);
+    vec3 I = params.fogColor.rgb * max(params.phaseParams.y, 0.0);
+    float g = clamp(params.phaseParams.x, -0.999, 0.999);
+    float densityScale = max(params.densityParams.x, 0.0) * max(params.scatterParams.y, 0.05);
+    float sigmaS = densityScale * clamp(params.scatterParams.x, 0.0, 1.0);
+    vec3 fogAmbient = params.fogColor.rgb * max(params.phaseParams.z, 0.0);
+
+    vec3 inScatter = vec3(0.0);
+    float T = 1.0;
+
+    for (int i = 0; i < numSteps; ++i) {
+        float rayT = stepSize * (float(i) + blueNoiseJitter);
+        if (rayT > rayLength) {
+            break;
+        }
+        vec3 samplePos = camPos + normalize(viewDir) * rayT;
+        float heightAtt = evaluateHeightDensity(samplePos);
+        float noiseAtt = proceduralFogNoise(samplePos);
+        float sigmaT = densityScale * heightAtt * noiseAtt;
+        float perStepAttenuation = exp(-stepSize * sigmaT);
+
+        if (params.volumeCounts.z > 0.5) {
+            float sunVis = sampleSunShadowVisibility(samplePos);
+            vec3 V = normalize(samplePos - camPos);
+            float cosTheta = dot(V, sunDir);
+            float p = phaseHG(cosTheta, g);
+            inScatter += T * p * sigmaS * sunVis * I * stepSize;
+        } else {
+            inScatter += T * sigmaS * fogAmbient * stepSize * heightAtt * noiseAtt;
+        }
+
+        T *= perStepAttenuation;
+        if (T <= max(params.qualityParams.w, 0.0001)) {
+            break;
+        }
+    }
+
+    return scene * T + inScatter + (1.0 - T) * fogAmbient;
+}
+
 void main() {
     float depthSample = textureLod(depthTexture, v_UV, 0.0).r;
     int depthMode = int(clamp(floor(params.miscParams.y + 0.5), 0.0, 2.0));
@@ -336,6 +590,42 @@ void main() {
         return;
     }
 
+    int integrationMode = int(clamp(floor(params.passParams.x + 0.5), 0.0, 3.0));
+    if (integrationMode > 0) {
+        vec3 worldPos = reconstructWorldPos(viewDir, sceneDepth);
+        vec3 camPos = params.viewOrigin.xyz;
+        float rayLength = length(worldPos - camPos);
+        rayLength = min(rayLength, maxDistance - nearPlane);
+        rayLength = max(rayLength, nearPlane);
+
+        float blueNoise = halton2(haltonIdx % 256);
+        vec3 outRgb;
+        if (integrationMode == 1) {
+            outRgb = integrateApproximateFog(scene, viewDir, rayLength, worldPos);
+        } else if (integrationMode == 2) {
+            outRgb = integrateRayMarchFog(scene, viewDir, rayLength, camPos, blueNoise);
+        } else if (params.vdbParams.y > 0.5) {
+            outRgb = integrateVdbWoodcockFog(scene, viewDir, rayLength, camPos, blueNoise);
+        } else {
+            outRgb = integrateRayMarchFog(scene, viewDir, rayLength, camPos, blueNoise);
+        }
+
+        if (compositeMode == 2) {
+            float cap = max(params.temporalParams.z, 0.0);
+            if (cap > 0.0) {
+                outRgb = min(outRgb, vec3(cap));
+            }
+        }
+        if (fogDebug == 13) {
+            vec3 fogDelta = outRgb - scene;
+            float fogAmount = clamp(dot(abs(fogDelta), vec3(0.3333)) * 6.0, 0.0, 1.0);
+            fragColor = vec4(vec3(fogAmount), 1.0);
+            return;
+        }
+        fragColor = vec4(outRgb, 1.0);
+        return;
+    }
+
     float transmittance = 1.0;
     vec3 fogRadiance = vec3(0.0);
     float transCutoff = max(params.qualityParams.w, 0.0001);
@@ -355,14 +645,25 @@ void main() {
         float t0 = max(z0, nearPlane);
         float t1 = min(z1, sceneDepth);
         if (t1 > t0) {
-            float sCenter = (float(step) + 0.5 * float(advance) + jitter) / float(marchCount);
-            vec3 uvw = vec3(v_UV, clamp(sCenter, 0.0, 1.0));
-            float sigmaT = textureLod(froxelExtinction, uvw, 0.0).r;
+            float sliceA = sliceNormFromDepth(t0, nearPlane, farPlane);
+            float sliceB = sliceNormFromDepth(t1, nearPlane, farPlane);
+            float zBlend = (t1 > t0 + 1e-5) ? saturate((0.5 * (t0 + t1) - t0) / (t1 - t0)) : 0.5;
+            sliceA = clamp(sliceA + jitter / float(marchCount), 0.0, 1.0);
+            sliceB = clamp(sliceB + jitter / float(marchCount), 0.0, 1.0);
+
+            vec3 uvwA = vec3(v_UV, sliceA);
+            vec3 uvwB = vec3(v_UV, sliceB);
+            float sigmaA = textureLod(froxelExtinction, uvwA, 0.0).r;
+            float sigmaB = textureLod(froxelExtinction, uvwB, 0.0).r;
+            vec3 scatterA = max(textureLod(froxelScattering, uvwA, 0.0).rgb, vec3(0.0));
+            vec3 scatterB = max(textureLod(froxelScattering, uvwB, 0.0).rgb, vec3(0.0));
+            float sigmaT = mix(sigmaA, sigmaB, zBlend);
+            vec3 scatterSource = mix(scatterA, scatterB, zBlend);
+
             if (!isFinite1(sigmaT)) {
                 sigmaT = 0.0;
             }
             sigmaT = clamp(sigmaT, 0.0, 6.0);
-            vec3 scatterSource = max(textureLod(froxelScattering, uvw, 0.0).rgb, vec3(0.0));
 
             float dt = t1 - t0;
             float prevT = transmittance;
@@ -445,10 +746,11 @@ void main() {
 
     vec3 outRgb;
     if (compositeMode == 1) {
-        /* Reduce near-camera in-scatter halo (TLOU2-style): weight by absorbed fraction, not transmittance. */
+        /* Artistic near-camera halo reduction (not strictly physical). Mode 0 is the accurate path. */
         float inScatterWeight = clamp(1.0 - transmittance, 0.0, 1.0);
         outRgb = scene * transmittance + fogRadiance * inScatterWeight;
     } else {
+        /* Physical single-scatter composite: C = C_scene * T + L_in-scatter */
         outRgb = scene * transmittance + fogRadiance;
     }
     if (compositeMode == 2) {

@@ -300,20 +300,28 @@ else
 fi
 
 echo ""
-echo "Volumetric fog compute: VDB binding 17 + params (host vs volumetric_fog.comp):"
+echo "Volumetric fog compute: VDB bindings 17-18 + params (host vs volumetric_fog.comp):"
 VF_COMP="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/volumetric/volumetric_fog.comp"
+VF_FRAG="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/volumetric/volumetric_fog.frag"
 VK_INIT="$PROJECT_ROOT/src/renderers/vulkan/vk_init_device.c"
 VK_VOL_P="$PROJECT_ROOT/src/renderers/vulkan/vk_volumetric_params.h"
 if [[ ! -f "$VF_COMP" ]]; then
   fail "missing volumetric_fog.comp"
 elif ! grep -q 'binding = 17' "$VF_COMP" 2>/dev/null || ! grep -q 'vdbFogDensity' "$VF_COMP" 2>/dev/null; then
   fail "volumetric_fog.comp must declare sampler3D vdbFogDensity on binding 17"
+elif ! grep -q 'binding = 18' "$VF_COMP" 2>/dev/null || ! grep -q 'vdbFogMajorant' "$VF_COMP" 2>/dev/null; then
+  fail "volumetric_fog.comp must declare sampler3D vdbFogMajorant on binding 18"
 elif ! grep -q 'compute_bindings\[18\]' "$VK_INIT" 2>/dev/null || ! grep -q 'compute_bindings\[17\].binding = 17' "$VK_INIT" 2>/dev/null; then
-  fail "vk_init_device.c volumetric compute layout must include binding 17 (18 bindings total)"
+  fail "vk_init_device.c volumetric compute layout must include bindings 17-18 (19 bindings total)"
 elif ! grep -q 'vdbParams\[4\]' "$VK_VOL_P" 2>/dev/null || ! grep -q 'vdbWorldMin\[4\]' "$VK_VOL_P" 2>/dev/null; then
   fail "volumetric_params_t must include vdbParams / vdbWorldMin / vdbWorldMax for r_vdbFog"
+elif [[ ! -f "$VF_FRAG" ]] || ! grep -q 'integrateVdbWoodcockFog' "$VF_FRAG" 2>/dev/null; then
+  fail "volumetric_fog.frag must implement integrateVdbWoodcockFog for integration mode 3"
+elif [[ ! -f "$PROJECT_ROOT/src/renderers/vulkan/vk_nanovdb_decode.c" ]] || \
+     ! grep -q 'VDB_NanoVDB_DecodeToDense' "$PROJECT_ROOT/src/renderers/vulkan/vk_nanovdb_decode.c" 2>/dev/null; then
+  fail "vk_nanovdb_decode.c must implement VDB_NanoVDB_DecodeToDense for .nvdb voxel fill"
 else
-  pass "VDB volumetric fog: binding 17 + UBO vdb fields present"
+  pass "VDB volumetric fog: bindings 17-18 + Woodcock + NanoVDB decode present"
 fi
 
 echo ""
@@ -323,8 +331,10 @@ if [[ ! -f "$VK_VDB_C" ]]; then
   fail "missing vk_vdb.c"
 elif ! grep -q 'ri\.Cmd_AddCommand( "vdb_load"' "$VK_VDB_C" || \
      ! grep -q 'ri\.Cmd_AddCommand( "vdb_bind_fog"' "$VK_VDB_C" || \
+     ! grep -q 'ri\.Cmd_AddCommand( "vdb_rebuild_majorant"' "$VK_VDB_C" || \
+     ! grep -q 'VDB_FrameUpdate' "$VK_VDB_C" || \
      ! grep -q 'vk_update_volumetric_descriptors' "$VK_VDB_C"; then
-  fail "vk_vdb.c must register vdb_load/vdb_bind_fog and refresh volumetric descriptors on upload"
+  fail "vk_vdb.c must register vdb commands, VDB_FrameUpdate, and refresh volumetric descriptors on upload"
 else
   pass "VDB console commands registered in vk_vdb.c"
 fi

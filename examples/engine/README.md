@@ -10,9 +10,8 @@ Run all commands from the **repository root** unless noted.
 ## Build
 
 ```bash
-# Vulkan + OpenGL Release (artifacts under release/)
+# Vulkan Release (artifacts under release/)
 ./scripts/compile_engine.sh vulkan
-./scripts/compile_engine.sh opengl
 
 # Debug Vulkan
 ./scripts/compile_engine.sh vulkan debug
@@ -31,7 +30,7 @@ cd build-vk-Release && ctest --output-on-failure
 ## Full local CI parity + production orchestrator
 
 ```bash
-# Same stack as validate_ci_build + optional OpenGL + full ctest (+ maps if GAME_BASE set)
+# Same stack as validate_ci_build + full ctest (+ maps if GAME_BASE set)
 ./scripts/production_readiness.sh
 ```
 

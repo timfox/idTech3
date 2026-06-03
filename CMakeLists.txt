@@ -1974,10 +1974,12 @@ if(USE_IMGUI AND NOT APPLE)
     src/renderers/vulkan/inspector/vk_imgui.cpp
     src/renderers/vulkan/inspector/vk_imgui_chrome_panels.cpp
     src/renderers/vulkan/inspector/vk_imgui_helpers.cpp
+    src/renderers/vulkan/inspector/vk_imgui_fonts.cpp
     src/renderers/vulkan/inspector/vk_imgui_studio_panels.cpp
     src/renderers/vulkan/inspector/vk_imgui_postfx_panels.cpp
     src/renderers/vulkan/inspector/vk_imgui_physics_panels.cpp
     src/renderers/vulkan/inspector/vk_imgui_volumetrics_panels.cpp
+    src/renderers/vulkan/inspector/vk_imgui_sim_render_panels.cpp
     src/renderers/vulkan/inspector/vk_imgui_scene_panels.cpp
     src/renderers/vulkan/inspector/vk_imgui_scene.c
     src/renderers/vulkan/inspector/vk_imgui_vulkan.cpp
@@ -2677,6 +2679,23 @@ if(BUILD_UNIT_TESTS)
 	target_include_directories(unit_vm_native_module PRIVATE ${CMAKE_SOURCE_DIR}/src)
 	add_test(NAME unit_vm_native_module COMMAND unit_vm_native_module)
 	set_tests_properties(unit_vm_native_module PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_nanovdb_decode
+		tests/unit/test_nanovdb_decode.c
+		tests/stub_qcommon_min.c
+		src/renderers/vulkan/vk_nanovdb_decode.c
+		src/qcommon/q_shared.c
+		src/qcommon/q_math.c)
+	target_include_directories(unit_nanovdb_decode PRIVATE
+		${CMAKE_SOURCE_DIR}/src
+		${CMAKE_SOURCE_DIR}/src/renderers/vulkan)
+	target_compile_definitions(unit_nanovdb_decode PRIVATE
+		TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data")
+	if(NOT MSVC)
+		target_link_libraries(unit_nanovdb_decode PRIVATE m)
+	endif()
+	add_test(NAME unit_nanovdb_decode COMMAND unit_nanovdb_decode)
+	set_tests_properties(unit_nanovdb_decode PROPERTIES LABELS "unit;validation")
 endif()
 
 # Example mod pack (config-only .pk3); optional - see examples/demo_game/README.md

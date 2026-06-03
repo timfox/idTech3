@@ -221,33 +221,39 @@ void vk_create_framebuffers( void )
 		SET_OBJECT_NAME( vk.framebuffers.capture, "framebuffer - capture", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
 	}
 
-	if ( vk.smaaActive )
+	if ( vk.smaaActive || vk.fxaaActive )
 	{
-		desc.renderPass = vk.render_pass.smaa_edge;
-		desc.attachmentCount = 1;
 		desc.width = glConfig.vidWidth;
 		desc.height = glConfig.vidHeight;
-		framebuffer_attachments[0] = vk.smaa_edge_image_view;
-		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.smaa_edge ) );
-		SET_OBJECT_NAME( vk.framebuffers.smaa_edge, "framebuffer - smaa edge", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+		desc.attachmentCount = 1;
 
-		desc.renderPass = vk.render_pass.smaa_blend;
-		framebuffer_attachments[0] = vk.smaa_blend_image_view;
-		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.smaa_blend ) );
-		SET_OBJECT_NAME( vk.framebuffers.smaa_blend, "framebuffer - smaa blend", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+		if ( vk.smaaActive ) {
+			desc.renderPass = vk.render_pass.smaa_edge;
+			framebuffer_attachments[0] = vk.smaa_edge_image_view;
+			VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.smaa_edge ) );
+			SET_OBJECT_NAME( vk.framebuffers.smaa_edge, "framebuffer - smaa edge", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+
+			desc.renderPass = vk.render_pass.smaa_blend;
+			framebuffer_attachments[0] = vk.smaa_blend_image_view;
+			VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.smaa_blend ) );
+			SET_OBJECT_NAME( vk.framebuffers.smaa_blend, "framebuffer - smaa blend", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+		}
 
 		desc.renderPass = vk.render_pass.smaa_compose;
 		framebuffer_attachments[0] = vk.smaa_output_image_view;
 		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.smaa_compose ) );
-		SET_OBJECT_NAME( vk.framebuffers.smaa_compose, "framebuffer - smaa compose", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+		SET_OBJECT_NAME( vk.framebuffers.smaa_compose, vk.smaaActive ? "framebuffer - smaa compose" : "framebuffer - fxaa",
+			VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
 
-		desc.renderPass = vk.render_pass.taa;
-		framebuffer_attachments[0] = vk.taa_history_image_view[0];
-		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.taa[0] ) );
-		SET_OBJECT_NAME( vk.framebuffers.taa[0], "framebuffer - taa history 0", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
-		framebuffer_attachments[0] = vk.taa_history_image_view[1];
-		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.taa[1] ) );
-		SET_OBJECT_NAME( vk.framebuffers.taa[1], "framebuffer - taa history 1", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+		if ( vk.smaaActive ) {
+			desc.renderPass = vk.render_pass.taa;
+			framebuffer_attachments[0] = vk.taa_history_image_view[0];
+			VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.taa[0] ) );
+			SET_OBJECT_NAME( vk.framebuffers.taa[0], "framebuffer - taa history 0", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+			framebuffer_attachments[0] = vk.taa_history_image_view[1];
+			VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.taa[1] ) );
+			SET_OBJECT_NAME( vk.framebuffers.taa[1], "framebuffer - taa history 1", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+		}
 	}
 
 	if ( r_bloom->integer )

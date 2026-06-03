@@ -510,6 +510,7 @@ void vk_end_sun_shadow_render_pass( void );
 
 void vk_read_pixels( byte* buffer, uint32_t width, uint32_t height ); // screenshots
 qboolean vk_bloom( void );
+qboolean vk_lens_flare( void );
 qboolean vk_ssao_pass( void );
 
 #ifdef USE_VBO
@@ -666,6 +667,7 @@ typedef struct {
 	VkPipelineLayout pipeline_layout_oit_accum;	// oit accum (sampler + depth + push constants)
 	VkPipelineLayout pipeline_layout_ssr;		// ssr (color + depth + push constants)
 	VkPipelineLayout pipeline_layout_atmosphere;	// atmosphere (push constants only)
+	VkPipelineLayout pipeline_layout_fp64_points;	// fp64 point cloud (push constants)
 #ifdef VK_PBR_BRDFLUT
 	VkPipelineLayout pipeline_layout_brdflut;
 #endif
@@ -1023,6 +1025,14 @@ typedef struct {
 		VkShaderModule smaa_edge_fs;
 		VkShaderModule smaa_blend_fs;
 		VkShaderModule smaa_compose_fs;
+		VkShaderModule fxaa_fs;
+		VkShaderModule lens_flare_fs;
+		VkShaderModule fp64_points_native_vs;
+		VkShaderModule fp64_points_native_fs;
+		VkShaderModule fp64_points_emulated_vs;
+		VkShaderModule fp64_points_emulated_fs;
+		VkShaderModule fp64_points_single_vs;
+		VkShaderModule fp64_points_single_fs;
 		VkShaderModule taa_fs;
 		VkShaderModule ssr_fs;
 
@@ -1128,6 +1138,8 @@ typedef struct {
 	VkPipeline smaa_edge_pipeline;
 	VkPipeline smaa_blend_pipeline;
 	VkPipeline smaa_compose_pipeline;
+	VkPipeline fxaa_pipeline;
+	VkPipeline lens_flare_pipeline;
 	VkPipeline taa_pipeline;
 	VkPipeline ssao_pipeline;
 	VkPipeline hbao_pipeline;
@@ -1147,6 +1159,7 @@ typedef struct {
 	qboolean active;
 	qboolean uiOverlayActive;
 	qboolean wideLines;
+	qboolean shaderFloat64;
 	qboolean samplerAnisotropy;
 	qboolean fragmentStores;
 	qboolean dedicatedAllocation;
@@ -1269,6 +1282,8 @@ typedef struct {
 	qboolean msaaActive;
 	qboolean msaaSampleShading;	/* per-sample shading when MSAA on (better alpha/specular, higher cost) */
 	qboolean smaaActive;
+	qboolean fxaaActive;
+	qboolean lensFlareActive;
 #ifdef USE_VK_PBR
 	qboolean pbrActive;
 #endif

@@ -72,12 +72,12 @@ src/
 │   │   ├── vk_post_process_refresh.c  `vk_update_post_process_pipelines` — rebuild post VkPipelines when needed
 │   │   ├── vk_flashlight.c/h     Projected texture system
 │   │   ├── vk_skybox_hdr.c/h     HDR EXR skybox + IBL
-│   │   ├── tr_model_gltf.c/h     glTF 2.0 loader (shared; Vulkan GPU path + OpenGL CPU tess - see docs/GLTF.md)
+│   │   ├── tr_model_gltf.c/h     glTF 2.0 loader (Vulkan GPU path; CPU tess fallback - see docs/GLTF.md)
 │   │   ├── tr_model_obj.c        OBJ loader
 │   │   ├── tr_model_md5.c        MD5 loader
 │   │   ├── inspector/             ImGui inspector overlay
 │   │   └── shaders/glsl/          GLSL shaders
-│   ├── opengl/            OpenGL fallback renderer
+│   ├── opengl/            Legacy OpenGL renderer (not shipped as supported path; tree may remain for reference)
 │   └── common/              Shared (images, fonts, types)
 │       └── tr_image_exr.cpp       OpenEXR loader
 ├── platform/

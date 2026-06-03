@@ -1,6 +1,6 @@
 # Renderer confidence checklist
 
-This document lists **automated** checks you can run today and **manual** passes that still require a GPU, game data, or artist judgment. Use it to tighten the Vulkan core and OpenGL fallback without turning every idea into a CI job.
+This document lists **automated** checks you can run today and **manual** passes that still require a GPU, game data, or artist judgment. Use it to tighten the Vulkan renderer without turning every idea into a CI job.
 
 ## Release gate (renderer changes)
 
@@ -23,8 +23,7 @@ On **`main`**, GitHub Actions **`.github/workflows/build.yml`** runs **`renderer
 | Renderer regression (repo) | `./scripts/renderer_regression_check.sh` | Regression docs present (manifest includes `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, `BUILD.md`, `docs/FORWARD_PLUS_PIPELINE_AUDIT.md`, `src/renderers/vulkan/vk_temporal.h`, …); `shader_data.c` / `shader_binding.c` exist; recursive GLSL `glslang` pass; IQM/glTF morph **#define** parity; Forward+ **tile cull vs `tr_types.h` / `vk_forward_plus.c`** caps; **`gen_frag.tmpl`** tile stride `tileId * Nu` matches **`MAX_PER_TILE`**; **`r_forwardPlusMaxPerTile`** range wired to `vk_forward_plus_get_*_per_tile_cap`; PBR **`forward_plus_shade_strength`** `constant_id` matches `vk_create_pipeline.c`; Forward+ **`depthCull`** push + depth binding **3**; volumetric VDB binding **17** + **`vdbParams`** UBO fields; **`vk_temporal`** reset bitmask count matches switch + `knownReasons[]` table. Manifest lines strip **CRLF** so Windows checkouts do not false-fail path existence. Optional: set `GAME_BASE` and uncomment BSP paths in `OPTIONAL_GAME_ASSETS.txt` to require packaged maps. |
 | Map load sanity (content) | `GAME_BASE=/abs/path/to/base ./scripts/renderer_regression_maps.sh` | Dedicated server runs `+map` for each `rtest_*` map; log scanned for `ERROR:`, `couldn't load`, `CM_LoadMap`, crashes. Requires full game base (VM + assets), not the regression pk3 alone. `RELEASE_DIR` optional (default `<repo>/release`). Optional `MAPS_EXTRA="name1 name2"` (or repo var `IDTECH3_MAPS_EXTRA` on Tier B self-hosted) appends more BSPs. Mixed dlights checklist: `docs/samples/renderer_regression/scenes/08_tier_b_mixed_dlights.md`. |
 | Full local CI parity | `./scripts/validate_ci_build.sh` | SPIR-V generation, Vulkan Release build, smoke test, renderer regression check. |
-| CMake smoke + artifacts | `ctest --output-on-failure` (from `build-vk-Release` or `build-gl-Release`) | Smoke, **renderer_regression_check**, artifacts, unit hooks, **demo_game pk3 layout** (`test_demo_game_pk3`). |
-| OpenGL matrix | `./scripts/compile_engine.sh opengl` then `ctest` in `build-gl-Release` | Fallback renderer still links and tests pass. |
+| CMake smoke + artifacts | `ctest --output-on-failure` (from `build-vk-Release`) | Smoke, **renderer_regression_check**, artifacts, unit hooks, **demo_game pk3 layout** (`test_demo_game_pk3`). |
 | Standalone GLSL | `./scripts/smoke_test.sh` (or the smoke step inside `validate_ci_build.sh`) | Every `.vert`, `.frag`, `.geom`, and `.comp` under `src/renderers/vulkan/shaders/glsl/` validates with `glslangValidator` (recursive, including `volumetric/`, `terrain/`, `postfx/`). |
 
 Optional: `SKIP_IDPAK_CHECK=ON` is normal for engine-only trees; the dedicated server may exit with “no game data” after init - that is still a useful crash-free signal.
@@ -37,7 +36,7 @@ These do not run in headless CI; use the **[visual regression pack](samples/rend
 
 1. **Tangent / normal maps** - Load meshes that rely on MikkTSpace tangents; inspect lighting seams at UV splits and mirrored UVs. Regress after changes to `mikktspace` or normal-map sampling.
 2. **PBR materials** - Scenes with metalness/roughness, clearcoat, and normal maps; toggle `r_pbr_debug` modes where applicable. See [PBR_TEXTURES.md](PBR_TEXTURES.md).
-3. **Vulkan vs OpenGL** - Same map, same cvars: confirm no silent fallback-only bugs (water, fog, postFX).
+3. **Vulkan stability** - Same map, same cvars across sessions: confirm no silent init or postFX regressions (water, fog, volumetrics).
 4. **Validation** - Debug build or `r_vulkan_validation` (see project cvars/docs): clean validation for a representative play session.
 5. **MSAA / SMAA / SSAO** - Spot-check toggles; watch for black screens, NaN tint, or resolution mismatches.
 6. **Emissive** and **volumetric fog** - See scene docs under `samples/renderer_regression/scenes/`.
@@ -74,7 +73,7 @@ This proves each regression map can be loaded by `idtech3_server` without matchi
 
 ### 4. Run the manual GPU pass
 
-Run the client manually in both Vulkan and OpenGL and inspect the regression scenes using the guidance in this document and the scene specs under `docs/samples/renderer_regression/`.
+Run the client manually with Vulkan and inspect the regression scenes using the guidance in this document and the scene specs under `docs/samples/renderer_regression/`.
 
 Priority order:
 
@@ -87,7 +86,7 @@ Priority order:
 
 Focus on:
 
-* Vulkan vs OpenGL agreement
+* Stable frame output across restarts and resolution changes
 * tangent and normal-map seam behavior
 * roughness/metallic response
 * emissive and exposure/bloom interaction
@@ -111,7 +110,7 @@ A renderer change is not fully proven until:
 
 * the file contract is green
 * the runtime contract is green
-* the manual Vulkan/OpenGL pass is complete
+* the manual Vulkan GPU pass is complete
 * findings are written down with concrete outcomes
 
 ### First manual pass (strict)
@@ -120,7 +119,7 @@ For the **first** full renderer proof run against regression content, treat the 
 
 * `renderer_regression_check.sh` is green with the real `GAME_BASE`
 * `renderer_regression_maps.sh` is green for all six maps
-* `rtest_parity` has either acceptable Vulkan/OpenGL agreement or a **clearly written drift note** in findings
+* `rtest_parity` has either acceptable Vulkan baseline stability or a **clearly written drift note** in findings
 * `rtest_volumetric` has either acceptable fog behavior or a **clearly written limitation/bug** in findings
 * every finding is recorded as **confirmed OK**, **bug to fix**, **known limitation**, or **needs more evidence** - not vague impressions
 

@@ -23,6 +23,7 @@ extern "C" {
 
 extern glconfig_t glConfig;
 extern cvar_t *r_imgui;
+extern cvar_t *r_imguiTheme;
 extern cvar_t *r_studio_tools;
 }
 

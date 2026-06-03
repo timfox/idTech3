@@ -70,6 +70,8 @@ void vk_update_volumetric_params( void )
 		return;
 	}
 
+	VDB_FrameUpdate();
+
 	volumetric_params_t params;
 	Com_Memset( &params, 0, sizeof( params ) );
 
@@ -676,7 +678,12 @@ void vk_update_volumetric_params( void )
 		if ( compMode > 2 ) compMode = 2;
 		params.volumeCounts[3] = (float)compMode;
 	}
-	params.passParams[0] = 0.0f;
+	params.passParams[0] = (float)( r_volumetricFogIntegration ? r_volumetricFogIntegration->integer : 0 );
+	if ( params.passParams[0] < 0.0f ) {
+		params.passParams[0] = 0.0f;
+	} else if ( params.passParams[0] > 3.0f ) {
+		params.passParams[0] = 3.0f;
+	}
 	params.passParams[1] = (float)( ( vk.froxel_width + 1 ) / 2 );
 	params.passParams[2] = (float)( ( vk.froxel_height + 1 ) / 2 );
 	params.passParams[3] = (float)vk.froxel_slices;
@@ -732,6 +739,8 @@ void vk_update_volumetric_params( void )
 		if ( vdb_h >= 0 && VDB_IsOnGPU( vdb_h ) && VDB_GetInfo( vdb_h, &vdb_info ) ) {
 			params.vdbParams[0] = r_vdbFogBlend ? Com_Clamp( 0.0f, 1.0f, r_vdbFogBlend->value ) : 0.5f;
 			params.vdbParams[1] = 1.0f;
+			params.vdbParams[2] = VDB_HasMajorantOnGPU( vdb_h ) ? 1.0f : 0.0f;
+			params.vdbParams[3] = (float)( r_volumetricFogIntegration && r_volumetricFogIntegration->integer == 3 ? 1 : 0 );
 			params.vdbWorldMin[0] = vdb_info.worldMin[0];
 			params.vdbWorldMin[1] = vdb_info.worldMin[1];
 			params.vdbWorldMin[2] = vdb_info.worldMin[2];

@@ -4,18 +4,18 @@ This document summarizes compatibility considerations, known issues, and mitigat
 
 ## Platform Support Matrix
 
-| Platform | Vulkan | OpenGL | Video Codecs | Notes |
-|----------|--------|--------|--------------|-------|
-| Linux x86_64 | ✅ | ✅ | FFmpeg, dav1d, vpx, Theora (if deps installed) | Primary development target |
-| Linux aarch64 (RPi 4/5) | ✅ (SDL with Vulkan) | ✅ | If deps installed; cross-compile disables by default | See [ARM_RASPBERRY_PI.md](ARM_RASPBERRY_PI.md) |
-| Linux armv7 | OpenGL | ✅ | Same as aarch64 | |
-| Windows x64 | ✅ | ✅ | Same | |
-| macOS Apple Silicon | ✅ | ✅ | Same | |
-| Android | ✅ | ✅ | Varies by build | Separate init path |
+| Platform | Vulkan | Video Codecs | Notes |
+|----------|--------|--------------|-------|
+| Linux x86_64 | ✅ | FFmpeg, dav1d, vpx, Theora (if deps installed) | Primary development target |
+| Linux aarch64 (RPi 4/5) | ✅ (SDL with Vulkan) | If deps installed; cross-compile disables by default | See [ARM_RASPBERRY_PI.md](ARM_RASPBERRY_PI.md) |
+| Linux armv7 | Varies | Same as aarch64 | Limited Vulkan; see platform notes |
+| Windows x64 | ✅ | Same | |
+| macOS Apple Silicon | ✅ | Same | |
+| Android | ✅ | Varies by build | Separate init path |
 
 ## Compatibility Principles
 
-1. **Fallback chains**: Vulkan → OpenGL; high-quality features → low-quality or disabled
+1. **Graceful degradation**: High-quality features → lower quality or disabled when hardware or deps are missing
 2. **Graceful degradation**: Missing optional deps (codecs, etc.) disable features without crashing
 3. **Backward compatibility**: Existing mods, configs, and game data continue to work
 4. **Clear diagnostics**: Startup logs and error messages point to fixes
@@ -43,7 +43,7 @@ This document summarizes compatibility considerations, known issues, and mitigat
 
 | Cvar | Purpose | Fallback |
 |------|---------|----------|
-| `cl_renderer` | Renderer selection (vulkan/opengl) | Auto-fallback to OpenGL on ARM if Vulkan unavailable |
+| `cl_renderer` | Renderer selection (`vulkan`) | Requires working Vulkan + SDL Vulkan support |
 | `renderer` | Alias for `cl_renderer` | Synced to `cl_renderer` |
 | `r_vid_driver` | SDL video driver (x11, wayland, kmsdrm) | Auto-retry wayland if x11 fails on ARM |
 | `r_fbo` | Enable HDR/post-processing | 0 disables if issues |
@@ -71,7 +71,7 @@ Details: [ARCHITECTURE.md](ARCHITECTURE.md#native-game-modules-vm) (`vm.c`, `vm_
 |---------|--------------|-----|
 | "No decoder available for codec FFmpeg" | Codec libs not installed | `./scripts/install_video_codecs.sh` + rebuild |
 | "Couldn't get a visual" / Vulkan fails | SDL without Vulkan | `./scripts/build_sdl_vulkan_rpi.sh`; use `run_vulkan.sh` |
-| OpenGL loads instead of Vulkan | System SDL used | `LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH` or `run_vulkan.sh` |
+| Vulkan init fails on Pi | System SDL without Vulkan | `./scripts/build_sdl_vulkan_rpi.sh`; `run_vulkan.sh` or `LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH` |
 | "VM_Create on UI failed" | Missing ui.qvm / native UI | Ensure game provides `ui.qvm` or `ui.aarch64.so` in base/ |
 | Black screen / wrong colors | FBO/HDR issue | `r_fbo 0` or `r_exposure_auto 0` `r_volumetricFog 0`; `vid_restart` |
 

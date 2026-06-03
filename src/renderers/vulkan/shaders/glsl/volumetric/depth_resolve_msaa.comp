@@ -5,6 +5,11 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 layout(binding = 0) uniform sampler2DMS depthMsaaTexture;
 layout(binding = 1, r32f) uniform writeonly image2D resolvedDepthTexture;
 
+layout(push_constant) uniform DepthResolveParams {
+    int depthMode; /* 0=standard, 1=reversed-Z (default Vulkan path) */
+    int sampleCount;
+} pc;
+
 void main() {
     ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
     ivec2 size = imageSize(resolvedDepthTexture);
@@ -12,7 +17,21 @@ void main() {
         return;
     }
 
-    // SAMPLE_ZERO resolve keeps depth semantics stable across normal/reversed depth paths.
+    int samples = pc.sampleCount > 0 ? pc.sampleCount : textureSamples(depthMsaaTexture);
+    if (samples < 1) {
+        samples = 1;
+    }
+
     float depthSample = texelFetch(depthMsaaTexture, pixel, 0).r;
+    for (int s = 1; s < samples; ++s) {
+        float d = texelFetch(depthMsaaTexture, pixel, s).r;
+        /* Nearest surface: min for reversed-Z, max for legacy depth. */
+        if (pc.depthMode == 1) {
+            depthSample = min(depthSample, d);
+        } else {
+            depthSample = max(depthSample, d);
+        }
+    }
+
     imageStore(resolvedDepthTexture, pixel, vec4(depthSample, 0.0, 0.0, 1.0));
 }

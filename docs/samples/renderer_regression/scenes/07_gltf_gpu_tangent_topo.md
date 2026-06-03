@@ -21,4 +21,4 @@
 
 ## Notes
 
-- Mode `2` is **MikkT-inspired**, not bit-exact MikkTSpace; CPU **`r_gltfCpuQtangent`** on OpenGL remains the reference for full MikkT on tessellated geometry.
+- Mode `2` is **MikkT-inspired**, not bit-exact MikkTSpace; CPU tess + **`r_gltfCpuQtangent`** (when GPU path is off) remains the reference for full MikkT on deformed geometry.

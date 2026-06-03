@@ -34,7 +34,6 @@ your_install/
 ├── idtech3                    # client (or idtech3.exe)
 ├── idtech3_server             # optional
 ├── idtech3_vulkan.so          # when using dlopen renderers (Linux)
-├── idtech3_opengl.so
 └── base/                      # or baseq3/ + fs_basegame (see above)
     └── z_your_bootstrap.pk3   # at least one .pk3; see contents below
 ```
@@ -102,7 +101,7 @@ If your data lives in **`baseq3/`** instead:
 From the repository root (see [BUILD.md](../BUILD.md) and [CLAUDE.md](../CLAUDE.md) for full detail):
 
 ```bash
-./scripts/compile_engine.sh vulkan    # or: opengl, vulkan debug, etc.
+./scripts/compile_engine.sh vulkan    # or: vulkan debug, etc.
 ```
 
 Artifacts are copied under **`release/`** (and the CMake build tree under **`build-vk-Release/`** or similar). Your **`base/`** folder should sit **alongside** those binaries, **or** you pass an absolute **`+set fs_basepath /path/to/parent`**.

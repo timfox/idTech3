@@ -330,8 +330,9 @@ void vk_update_volumetric_descriptors( void )
 		VkDescriptorImageInfo local_point_shadow_info;
 		VkDescriptorImageInfo motion_info;
 		VkDescriptorImageInfo fluid_info[4];
-		VkWriteDescriptorSet writes[18];
+		VkWriteDescriptorSet writes[19];
 		VkDescriptorImageInfo vdb_info;
+		VkDescriptorImageInfo vdb_majorant_info;
 		Vk_Sampler_Def depth_sd;
 		Vk_Sampler_Def noise_sd;
 		Vk_Sampler_Def shadow_sd;
@@ -538,6 +539,22 @@ void vk_update_volumetric_descriptors( void )
 		writes[17].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		writes[17].pImageInfo = &vdb_info;
 
+		Com_Memset( &vdb_majorant_info, 0, sizeof( vdb_majorant_info ) );
+		vdb_majorant_info.sampler = vk.fog_noise_sampler;
+		vdb_majorant_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		{
+			const vdbHandle_t vdb_h = VDB_GetBoundFogDensityHandle();
+			VkImageView majorant_view = ( vdb_h >= 0 ) ? VDB_GetGpuMajorantView( vdb_h ) : VK_NULL_HANDLE;
+			vdb_majorant_info.imageView = ( majorant_view != VK_NULL_HANDLE ) ? majorant_view : vdb_info.imageView;
+		}
+
+		writes[18].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[18].dstSet = vk.volumetric_compute_descriptor;
+		writes[18].dstBinding = 18;
+		writes[18].descriptorCount = 1;
+		writes[18].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		writes[18].pImageInfo = &vdb_majorant_info;
+
 		qvkUpdateDescriptorSets( vk.device, ARRAY_LEN( writes ), writes, 0, NULL );
 	}
 
@@ -546,8 +563,10 @@ void vk_update_volumetric_descriptors( void )
 		vk.motion_vector_view && vk.local_spot_shadow_atlas_sample_view && vk.local_point_shadow_array_sample_view &&
 		vk.volumetric_telemetry_view )
 	{
-		VkDescriptorImageInfo composite_info[8];
-		VkWriteDescriptorSet writes[9];
+		VkDescriptorImageInfo composite_info[11];
+		VkWriteDescriptorSet writes[12];
+		VkDescriptorImageInfo vdb_density_info;
+		VkDescriptorImageInfo vdb_majorant_info;
 		Vk_Sampler_Def color_sd;
 		Vk_Sampler_Def volume_sd;
 		Vk_Sampler_Def motion_sd;
@@ -622,6 +641,12 @@ void vk_update_volumetric_descriptors( void )
 		composite_info[7].imageView = vk.volumetric_telemetry_view;
 		composite_info[7].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
+		// sunShadowMap (binding 9) — screen-space fog integration
+		composite_info[8].sampler = ( vk.sun_shadow_sampler != VK_NULL_HANDLE ) ? vk.sun_shadow_sampler : vk_find_sampler( &shadow_sd );
+		composite_info[8].imageView = ( vk.sun_shadow_sample_view != VK_NULL_HANDLE ) ? vk.sun_shadow_sample_view : volumetric_depth_view;
+		composite_info[8].imageLayout = ( vk.sun_shadow_sample_view != VK_NULL_HANDLE ) ?
+			VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL : volumetric_depth_layout;
+
 		Com_Memset( writes, 0, sizeof( writes ) );
 		for ( int i = 0; i < 4; i++ ) {
 			writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -654,6 +679,43 @@ void vk_update_volumetric_descriptors( void )
 		writes[8].descriptorCount = 1;
 		writes[8].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		writes[8].pImageInfo = &composite_info[7];
+
+		writes[9].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[9].dstSet = vk.volumetric_composite_descriptor;
+		writes[9].dstBinding = 9;
+		writes[9].descriptorCount = 1;
+		writes[9].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		writes[9].pImageInfo = &composite_info[8];
+
+		Com_Memset( &vdb_density_info, 0, sizeof( vdb_density_info ) );
+		vdb_density_info.sampler = vk.froxel_sampler;
+		vdb_density_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		Com_Memset( &vdb_majorant_info, 0, sizeof( vdb_majorant_info ) );
+		vdb_majorant_info.sampler = vk.froxel_sampler;
+		vdb_majorant_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		{
+			const vdbHandle_t vdb_h = VDB_GetBoundFogDensityHandle();
+			VkImageView density_view = ( vdb_h >= 0 ) ? VDB_GetGpuImageView( vdb_h ) : VK_NULL_HANDLE;
+			VkImageView majorant_view = ( vdb_h >= 0 ) ? VDB_GetGpuMajorantView( vdb_h ) : VK_NULL_HANDLE;
+			vdb_density_info.imageView = ( density_view != VK_NULL_HANDLE ) ? density_view : vk.fog_noise_view;
+			vdb_majorant_info.imageView = ( majorant_view != VK_NULL_HANDLE ) ? majorant_view : vdb_density_info.imageView;
+		}
+		composite_info[9] = vdb_density_info;
+		composite_info[10] = vdb_majorant_info;
+
+		writes[10].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[10].dstSet = vk.volumetric_composite_descriptor;
+		writes[10].dstBinding = 10;
+		writes[10].descriptorCount = 1;
+		writes[10].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		writes[10].pImageInfo = &composite_info[9];
+
+		writes[11].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[11].dstSet = vk.volumetric_composite_descriptor;
+		writes[11].dstBinding = 11;
+		writes[11].descriptorCount = 1;
+		writes[11].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		writes[11].pImageInfo = &composite_info[10];
 
 		qvkUpdateDescriptorSets( vk.device, ARRAY_LEN( writes ), writes, 0, NULL );
 	}

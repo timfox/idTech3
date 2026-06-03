@@ -260,11 +260,27 @@ void vk_create_shader_modules( void )
 	vk.modules.smaa_edge_fs = SHADER_MODULE( smaa_edge_frag_spv );
 	vk.modules.smaa_blend_fs = SHADER_MODULE( smaa_blend_frag_spv );
 	vk.modules.smaa_compose_fs = SHADER_MODULE( smaa_compose_frag_spv );
+	vk.modules.fxaa_fs = SHADER_MODULE( fxaa_frag_spv );
+	vk.modules.lens_flare_fs = SHADER_MODULE( lens_flare_frag_spv );
+	vk.modules.fp64_points_native_vs = SHADER_MODULE( fp64_points_native_vert_spv );
+	vk.modules.fp64_points_native_fs = SHADER_MODULE( fp64_points_native_frag_spv );
+	vk.modules.fp64_points_emulated_vs = SHADER_MODULE( fp64_points_emulated_vert_spv );
+	vk.modules.fp64_points_emulated_fs = SHADER_MODULE( fp64_points_emulated_frag_spv );
+	vk.modules.fp64_points_single_vs = SHADER_MODULE( fp64_points_single_vert_spv );
+	vk.modules.fp64_points_single_fs = SHADER_MODULE( fp64_points_single_frag_spv );
 	vk.modules.taa_fs = SHADER_MODULE( taa_frag_spv );
 
 	SET_OBJECT_NAME( vk.modules.smaa_edge_fs, "smaa edge fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.smaa_blend_fs, "smaa blend fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.smaa_compose_fs, "smaa compose fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	SET_OBJECT_NAME( vk.modules.fxaa_fs, "fxaa fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	SET_OBJECT_NAME( vk.modules.lens_flare_fs, "lens flare fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	SET_OBJECT_NAME( vk.modules.fp64_points_native_vs, "fp64 points native vertex module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	SET_OBJECT_NAME( vk.modules.fp64_points_native_fs, "fp64 points native fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	SET_OBJECT_NAME( vk.modules.fp64_points_emulated_vs, "fp64 points emulated vertex module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	SET_OBJECT_NAME( vk.modules.fp64_points_emulated_fs, "fp64 points emulated fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	SET_OBJECT_NAME( vk.modules.fp64_points_single_vs, "fp64 points single vertex module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	SET_OBJECT_NAME( vk.modules.fp64_points_single_fs, "fp64 points single fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.taa_fs, "taa fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 
 #ifdef VK_PBR_BRDFLUT

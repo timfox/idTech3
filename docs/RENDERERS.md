@@ -9,7 +9,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 ### Current Architecture
 - Forward renderer with a large HDR/post-processing stack
 - `r_renderMode 1/2` remain placeholders (no full deferred / mode-switched Forward+ path)
-- Vulkan is the primary feature backend; OpenGL is compatibility fallback
+- Vulkan is the supported rendering backend
 - **Shared temporal reset policy** (`vk_temporal.c`): centralizes history invalidation for volumetrics, motion vectors, exposure. Resize, map load, camera cut, and missing prev-frame data trigger resets. Ready for future TAA/upscaler integration.
 - See [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_2026_ARCHITECTURE_PASS.md) for the focused 2026 renderer direction
 
@@ -38,7 +38,8 @@ Code: `src/renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar regist
 ### Compute shaders, mesh shaders (NV), and upscaling (DLSS)
 - **Compute:** already central to Vulkan (volumetric fog stages, vegetation wind, fluid sim, terrain CBT, etc.).
 - **Mesh shaders (NVIDIA):** optional device extension **`VK_NV_mesh_shader`** when **`r_vk_meshShaderNV 1`** (default **0**, **latched**, `vid_restart`). Enables `meshShader` in `VkPhysicalDeviceMeshShaderFeaturesNV` for future pipelines; **no mesh-shader draw path** is wired yet - safe on `main`.
-- **DLSS / NGX:** **not** linked in this repository (proprietary NVIDIA SDK). Use **`r_renderScale`** / internal resolution, **TAA** (`r_taa`), **SMAA/MSAA**, or **driver-level** scaling (e.g. NVIDIA NIS/DLSS in control panel) where applicable. Startup logs state that DLSS is not in-engine.
+- **DLSS / NGX:** **not** linked in this repository (proprietary NVIDIA SDK). Use **`r_renderScale`** / internal resolution, **TAA** (`r_taa`), **SMAA/FXAA/MSAA**, or **driver-level** scaling (e.g. NVIDIA NIS/DLSS in control panel) where applicable. Startup logs state that DLSS is not in-engine.
+- **Simulation profile (AMBF-Vulkan):** `sim_render_profile 1` then `vid_restart` — MSAA + FXAA, Reinhard tonemap, lightweight post. See [SIM_RENDER_PROFILE.md](SIM_RENDER_PROFILE.md).
 
 ### Physically Based Rendering (PBR)
 - Metalness/roughness workflow with Cook-Torrance BRDF
@@ -60,7 +61,8 @@ Code: `src/renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar regist
 - Temporal reprojection for stable results
 - Integration with Navier-Stokes fluid simulation for dynamic fog
 - Shadowed volumetrics via sun CSM and local shadow maps
-- Cvars: `r_volumetricFog`, `r_volumetricFogDensity`, `r_volumetricFogHeightFalloff`, `r_volumetricFogNoiseScale`, `r_volumetricFogGridDim`, `r_volumetricFogQuality`, etc.
+- **Composite accuracy**: froxel Z aligned to view-depth march (Z-interpolation between slice bounds); MSAA depth resolve uses nearest surface per pixel
+- Cvars: `r_volumetricFog`, `r_volumetricFogDensity`, `r_volumetricFogHeightFalloff`, `r_volumetricFogNoiseScale`, `r_volumetricFogGridDim`, `r_volumetricFogQuality`, `r_volumetricFogCompositeMode` (0=physical), `r_volumetricFogSteps`, etc. See [SIM_RENDER_PROFILE.md](SIM_RENDER_PROFILE.md) for simulation presets.
 
 ### Water Flowmap
 - Flowmap textures drive per-pixel UV offset for water surfaces (rivers, pools, wakes)
@@ -240,32 +242,6 @@ See [HDR_GAPS.md](HDR_GAPS.md) for HDR pipeline gaps, risks, and render order.
 - Uses librsvg when available; NanoSVG fallback on all platforms
 - Cvars: `r_svgRasterScale`, `r_svgMaxRasterSize`, `r_svgMaxFileBytes`
 - Use `.svg` files in textures/ or gfx/ for scalable UI elements
-
-## OpenGL Renderer (Fallback)
-
-The OpenGL renderer provides compatibility for systems without Vulkan support. It implements the same `refexport_t` interface with classic OpenGL fixed-function and shader-based rendering.
-
-### OpenGL vs Vulkan Feature Parity
-
-| Feature | Vulkan | OpenGL |
-|---------|--------|--------|
-| Model formats **glTF/GLB**, **OBJ**, **MD5** (registration + draw) | ✓ (full; GPU glTF options on Vulkan) | ✓ (CPU tess; no `r_gltfGpu`) |
-| PBR (metalness/roughness, IBL) | ✓ | - |
-| Volumetric fog | ✓ | - |
-| SSAO / HBAO | ✓ | - |
-| SMAA | ✓ | - |
-| Bloom, HDR tonemapping | ✓ | - |
-| OIT (order-independent transparency) | ✓ | - |
-| IQM morph targets | ✓ | - |
-| Fluid simulation (fog) | ✓ | - |
-| Vegetation wind (GPU compute) | ✓ | - |
-| SDF text | ✓ | ✓ |
-| Dynamic lighting | ✓ | ✓ |
-| Stencil shadows | ✓ | ✓ |
-| Fog volumes | ✓ | ✓ |
-| Multi-texture, vertex/fragment programs | ✓ | ✓ |
-
-OpenGL is the compatibility fallback; Vulkan is the primary feature backend. Use Vulkan when available for PBR, HDR, and advanced effects.
 
 ## Future Renderers (Planned)
 

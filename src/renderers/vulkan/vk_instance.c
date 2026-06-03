@@ -594,8 +594,12 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			features.shaderInt64 = VK_TRUE;
 		}
 #endif
-		if ( r_hdr && r_hdr->integer == 3 && device_features.shaderFloat64 ) {
-			features.shaderFloat64 = VK_TRUE;
+		vk.shaderFloat64 = device_features.shaderFloat64 ? qtrue : qfalse;
+		if ( device_features.shaderFloat64 ) {
+			if ( ( r_hdr && r_hdr->integer == 3 ) || ( r_fp64Points && r_fp64Points->integer ) ) {
+				features.shaderFloat64 = VK_TRUE;
+				ri.Printf( PRINT_ALL, "[VK][fp64] shaderFloat64 enabled (r_hdr 3 and/or r_fp64Points 1)\n" );
+			}
 		}
 		if ( device_features.wideLines ) {
 			features.wideLines = VK_TRUE;

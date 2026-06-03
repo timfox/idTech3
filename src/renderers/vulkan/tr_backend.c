@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifdef USE_VULKAN
 #include "vk_temporal.h"
 #include "vk_forward_plus.h"
+#include "vk_fp64_points.h"
 #endif
 
 backEndData_t	*backEndData;
@@ -1818,6 +1819,10 @@ static const void *RB_DrawSurfs( const void *data ) {
 	RB_DebugGraphics();
 
 #ifdef USE_VULKAN
+	VK_FP64_PointsDraw();
+#endif
+
+#ifdef USE_VULKAN
 	if ( cmd->refdef.switchRenderPass ) {
 		vk_end_render_pass();
 		vk_begin_main_render_pass();
@@ -2099,6 +2104,9 @@ static const void *RB_FinishBloom( const void *data )
 	if ( r_bloom->integer ) {
 		vk_bloom();
 	}
+	if ( vk.lensFlareActive ) {
+		vk_lens_flare();
+	}
 #endif
 
 	// texture swapping test
@@ -2185,6 +2193,7 @@ static const void *RB_SwapBuffers( const void *data ) {
 #ifdef USE_VULKAN
 	backEnd.doneBloom = qfalse;
 	backEnd.doneSSAO = qfalse;
+	backEnd.doneLensFlare = qfalse;
 #endif
 
 	return (const void *)(cmd + 1);

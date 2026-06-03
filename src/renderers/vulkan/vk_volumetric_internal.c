@@ -8,9 +8,39 @@ Split from vk.c.
 */
 
 #include "tr_local.h"
+#include "vk_sim_render_debug.h"
 #include "vk_image_layout.h"
 #include "vk_volumetric_internal.h"
 #include "vk_volumetric_params.h"
+
+qboolean vk_volumetric_screen_integration_active( void )
+{
+	if ( r_volumetricFogIntegration && r_volumetricFogIntegration->integer > 0 ) {
+		return qtrue;
+	}
+	return qfalse;
+}
+
+void vk_volumetric_restore_pass_params_for_composite( void )
+{
+	volumetric_params_t *params;
+
+	if ( !vk.volumetric_params_ptr ) {
+		return;
+	}
+
+	/* passParams[0] is reused as compute/fluid stage opcode during the fog pass; restore integration mode before composite. */
+	params = (volumetric_params_t *)vk.volumetric_params_ptr;
+	params->passParams[0] = (float)( r_volumetricFogIntegration ? r_volumetricFogIntegration->integer : 0 );
+	if ( params->passParams[0] < 0.0f ) {
+		params->passParams[0] = 0.0f;
+	} else if ( params->passParams[0] > 3.0f ) {
+		params->passParams[0] = 3.0f;
+	}
+	params->passParams[1] = (float)( ( vk.froxel_width + 1 ) / 2 );
+	params->passParams[2] = (float)( ( vk.froxel_height + 1 ) / 2 );
+	params->passParams[3] = (float)vk.froxel_slices;
+}
 
 void vk_resolve_volumetric_depth_msaa( void )
 {
@@ -28,6 +58,14 @@ void vk_resolve_volumetric_depth_msaa( void )
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.volumetric_depth_resolve_pipeline );
 	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
 		vk.volumetric_depth_resolve_pipeline_layout, 0, 1, &vk.volumetric_depth_resolve_descriptor, 0, NULL );
+	{
+		int resolve_pc[2];
+		int depth_mode = r_volumetricFogDepthMode ? r_volumetricFogDepthMode->integer : 1;
+		resolve_pc[0] = depth_mode;
+		resolve_pc[1] = 0; /* 0 = use textureSamples() in shader */
+		qvkCmdPushConstants( vk.cmd->command_buffer, vk.volumetric_depth_resolve_pipeline_layout,
+			VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( resolve_pc ), resolve_pc );
+	}
 	qvkCmdDispatch( vk.cmd->command_buffer, ( glConfig.vidWidth + 7 ) / 8, ( glConfig.vidHeight + 7 ) / 8, 1 );
 
 	record_image_layout_transition( vk.cmd->command_buffer, vk.volumetric_depth_image, VK_IMAGE_ASPECT_COLOR_BIT,
@@ -53,7 +91,7 @@ void vk_write_volumetric_timestamp( uint32_t query_index, VkPipelineStageFlagBit
 	if ( vk.volumetric_query_pool == VK_NULL_HANDLE || !qvkCmdWriteTimestamp ) {
 		return;
 	}
-	if ( !r_volumetricFogPerfTimers || !r_volumetricFogPerfTimers->integer ) {
+	if ( !vk_volumetric_perf_wanted() ) {
 		return;
 	}
 	if ( query_index >= VK_VOLUMETRY_QUERY_USED ) {

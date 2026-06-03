@@ -153,6 +153,135 @@ void SCR_DrawPic( float x, float y, float width, float height, qhandle_t hShader
 
 /*
 ================
+SCR_TtfPointSizeForPixelHeight
+
+Pick a FreeType point size so cap height is at least targetPx at r_fontDpi.
+================
+*/
+static int SCR_TtfPointSizeForPixelHeight( int targetPx ) {
+	int dpi;
+	int pt;
+
+	if ( targetPx < 8 ) {
+		targetPx = 8;
+	}
+	if ( targetPx > 96 ) {
+		targetPx = 96;
+	}
+
+	dpi = Cvar_VariableIntegerValue( "r_fontDpi" );
+	if ( dpi < 72 ) {
+		dpi = 72;
+	}
+	if ( dpi > 144 ) {
+		dpi = 144;
+	}
+
+	pt = ( targetPx * 72 + dpi - 1 ) / dpi;
+	if ( pt < 8 ) {
+		pt = 8;
+	}
+	if ( pt > 72 ) {
+		pt = 72;
+	}
+	return pt;
+}
+
+static float SCR_UiPixelScale( void ) {
+	float pixelScale;
+
+	if ( cls.glconfig.vidHeight > 0 && cls.glconfig.vidWidth > 0 ) {
+		pixelScale = (float)cls.glconfig.vidHeight / 480.0f;
+		{
+			const float sx = (float)cls.glconfig.vidWidth / 640.0f;
+			if ( sx < pixelScale ) {
+				pixelScale = sx;
+			}
+		}
+	} else {
+		pixelScale = 1.0f;
+	}
+
+	if ( ui_scale ) {
+		pixelScale *= Com_Clamp( 0.5f, 4.0f, ui_scale->value );
+	}
+
+	return pixelScale;
+}
+
+static int SCR_ComputeHudTtfPointSize( void ) {
+	int basePt;
+	int targetPx;
+	float pixelScale;
+
+	basePt = Cvar_VariableIntegerValue( "r_fontSize" );
+	if ( basePt <= 0 ) {
+		basePt = 16;
+	}
+
+	pixelScale = SCR_UiPixelScale();
+	targetPx = (int)( (float)BIGCHAR_HEIGHT * pixelScale + 0.5f );
+	if ( targetPx < basePt ) {
+		targetPx = basePt;
+	}
+
+	return SCR_TtfPointSizeForPixelHeight( targetPx );
+}
+
+static int SCR_ComputeConsoleTtfPointSize( void ) {
+	int targetPx;
+	float scale;
+
+	scale = 1.0f;
+	if ( con_scale ) {
+		scale = con_scale->value;
+		if ( scale < 0.5f ) {
+			scale = 0.5f;
+		}
+		if ( scale > 8.0f ) {
+			scale = 8.0f;
+		}
+	}
+
+	targetPx = (int)( (float)SMALLCHAR_HEIGHT * scale * cls.con_factor + 0.5f );
+	if ( targetPx < 8 ) {
+		targetPx = 8;
+	}
+
+	return SCR_TtfPointSizeForPixelHeight( targetPx );
+}
+
+/*
+================
+CL_RefreshBuiltInTrueTypeFonts
+
+Re-rasterize when console cell size or resolution changes (avoids blurry upscale).
+================
+*/
+void CL_RefreshBuiltInTrueTypeFonts( void ) {
+	int wantHud;
+	int wantCon;
+
+	if ( !Cvar_VariableIntegerValue( "cl_builtInTtf" ) || !re.RegisterFont ) {
+		return;
+	}
+
+	wantHud = SCR_ComputeHudTtfPointSize();
+	wantCon = SCR_ComputeConsoleTtfPointSize();
+
+	if ( cls.builtInTtfActive && wantHud == cls.builtInHudPointSize && wantCon == cls.builtInConsolePointSize ) {
+		return;
+	}
+
+	if ( re.ClearTrueTypeFontCache ) {
+		re.ClearTrueTypeFontCache();
+	}
+
+	CL_RegisterBuiltInTrueTypeFonts();
+}
+
+/*
+================
 CL_RegisterBuiltInTrueTypeFonts
 
 Loads r_font (and optional r_consoleFont) via the renderer FreeType path so
@@ -163,7 +292,8 @@ legacy 16x16 bitmap charset (when r_font is set and BUILD_FREETYPE is on).
 void CL_RegisterBuiltInTrueTypeFonts( void ) {
 	const char *hudPath;
 	const char *conPath;
-	int pt;
+	int hudPt;
+	int conPt;
 	glyphInfo_t *g;
 
 	if ( !Cvar_VariableIntegerValue( "cl_builtInTtf" ) ) {
@@ -175,6 +305,8 @@ void CL_RegisterBuiltInTrueTypeFonts( void ) {
 	Com_Memset( &cls.builtInConsoleFont, 0, sizeof( cls.builtInConsoleFont ) );
 	cls.builtInHudRefLinePx = 0;
 	cls.builtInConsoleRefLinePx = 0;
+	cls.builtInHudPointSize = 0;
+	cls.builtInConsolePointSize = 0;
 
 	if ( !re.RegisterFont ) {
 		return;
@@ -185,12 +317,10 @@ void CL_RegisterBuiltInTrueTypeFonts( void ) {
 		return;
 	}
 
-	pt = Cvar_VariableIntegerValue( "r_fontSize" );
-	if ( pt <= 0 ) {
-		pt = 16;
-	}
+	hudPt = SCR_ComputeHudTtfPointSize();
+	conPt = SCR_ComputeConsoleTtfPointSize();
 
-	re.RegisterFont( hudPath, pt, &cls.builtInHudFont );
+	re.RegisterFont( hudPath, hudPt, &cls.builtInHudFont );
 	g = &cls.builtInHudFont.glyphs[ (int)'M' & 255 ];
 	if ( !g->glyph || g->imageHeight <= 0 ) {
 		g = &cls.builtInHudFont.glyphs[ (int)'0' & 255 ];
@@ -208,7 +338,7 @@ void CL_RegisterBuiltInTrueTypeFonts( void ) {
 
 	conPath = Cvar_VariableString( "r_consoleFont" );
 	if ( conPath && conPath[0] && Q_stricmp( conPath, hudPath ) != 0 ) {
-		re.RegisterFont( conPath, pt, &cls.builtInConsoleFont );
+		re.RegisterFont( conPath, conPt, &cls.builtInConsoleFont );
 		g = &cls.builtInConsoleFont.glyphs[ (int)'M' & 255 ];
 		if ( !g->glyph || g->imageHeight <= 0 ) {
 			g = &cls.builtInConsoleFont.glyphs[ (int)'0' & 255 ];
@@ -222,7 +352,7 @@ void CL_RegisterBuiltInTrueTypeFonts( void ) {
 			if ( cls.builtInConsoleRefLinePx <= 0 ) {
 				cls.builtInConsoleRefLinePx = g->imageHeight;
 			}
-			Com_Printf( "Client: console TrueType font \"%s\" @ %dpt\n", conPath, pt );
+			Com_Printf( "Client: console TrueType font \"%s\" @ %dpt (cell %dpx)\n", conPath, conPt, smallchar_height );
 		}
 	} else {
 		Com_Memcpy( &cls.builtInConsoleFont, &cls.builtInHudFont, sizeof( cls.builtInConsoleFont ) );
@@ -230,7 +360,11 @@ void CL_RegisterBuiltInTrueTypeFonts( void ) {
 	}
 
 	cls.builtInTtfActive = qtrue;
-	Com_Printf( "Client: built-in HUD TrueType font \"%s\" @ %dpt (FreeType glyph atlas)\n", hudPath, pt );
+	cls.builtInHudPointSize = hudPt;
+	cls.builtInConsolePointSize = conPt;
+	Com_Printf( "Client: built-in HUD TrueType font \"%s\" @ %dpt (target ~%dpx, dpi %d)\n",
+		hudPath, hudPt, (int)( (float)BIGCHAR_HEIGHT * SCR_UiPixelScale() + 0.5f ), Cvar_VariableIntegerValue( "r_fontDpi" ) );
+	Com_Printf( "Client: console TrueType @ %dpt (cell %dpx)\n", conPt, smallchar_height );
 	if ( r_fontKerning ) {
 		Com_Printf( "Client: r_fontKerning %i (proportional xSkip + FreeType kern; Rougier HAL-05430837)\n",
 			r_fontKerning->integer );

@@ -7,8 +7,8 @@ Priorities that keep **CI green** and **README/build truth** aligned:
 **Long-arc goal (id Tech 6–8 class, incrementally):** converge on **lighting scale** (Forward+ / clustered lists), **temporal robustness** (history + motion vectors before heavy TAA/upscale), **trustworthy GPU glTF**, and **locked-in validation** (Tier A everywhere, Tier B where `GAME_BASE` exists). Treat **Metal / RTX / full-cluster deferred** as later tiers once the forward path and CI are boringly stable—not parallel science projects on `main`.
 
 1. **Watch GitHub Actions on `main`** - especially **Android** (CMake + Gradle `assembleDebug`, OpenSSL/Lua/FetchContent caches) and **MSYS curl**.
-2. **Renderer validation** - Tier B (self-hosted `GAME_BASE`) and Tier C (manual GPU notes) when you have hardware/content; keep `renderer_regression_check` passing on default CI (manifest + GLSL + **IQM_MORPH_TOP_K** C/GLSL parity + **glTF vs IQM** joint/morph `#define` parity + **OpenGL vs Vulkan** `IQM_MORPH_*` in `tr_local.h` + Forward+ **`gen_frag.tmpl` tile stride** vs **`MAX_PER_TILE`**; repo manifest includes **`docs/FORWARD_PLUS_PIPELINE_AUDIT.md`**).
-3. **glTF on Vulkan** - **GPU skinning/morph** (PBR + `r_gltfGpu`) uses **top-8** morph weights per draw (aligned with `GLTF_MAX_MORPH_TARGETS`), including **`RE_SetEntityMorphWeight`** with clip-driven weights; **`r_gltfGpuTangentFix`** (default on) re-orthonormalizes tangents on the GPU path after skin+morph; next polish: full **MikkTSpace**-style qtangent on GPU (neighborhood-aware). **OpenGL** now registers glTF/OBJ/MD5 with a **CPU tess** path (no `r_gltfGpu`).
+2. **Renderer validation** - Tier B (self-hosted `GAME_BASE`) and Tier C (manual GPU notes) when you have hardware/content; keep `renderer_regression_check` passing on default CI (manifest + GLSL + **IQM_MORPH_TOP_K** C/GLSL parity + **glTF vs IQM** joint/morph `#define` parity + morph cap consistency in `tr_local.h` + Forward+ **`gen_frag.tmpl` tile stride** vs **`MAX_PER_TILE`**; repo manifest includes **`docs/FORWARD_PLUS_PIPELINE_AUDIT.md`**).
+3. **glTF on Vulkan** - **GPU skinning/morph** (PBR + `r_gltfGpu`) uses **top-8** morph weights per draw (aligned with `GLTF_MAX_MORPH_TARGETS`), including **`RE_SetEntityMorphWeight`** with clip-driven weights; **`r_gltfGpuTangentFix`** (default on) re-orthonormalizes tangents on the GPU path after skin+morph; next polish: full **MikkTSpace**-style qtangent on GPU (neighborhood-aware). CPU tess fallback when GPU path is off.
 4. **Android product** - missing `base/` / no pk3: logcat path + **Toast** with `.../base` and apkassets hint before exit; optional APK smoke.
 
 ## Current Status (`main`)
@@ -62,7 +62,7 @@ Priorities that keep **CI green** and **README/build truth** aligned:
 - [x] OpenEXR HDR image loading
 
 ### Assets -- Complete
-- [x] Multiple model formats (glTF primary on Vulkan for GPU path; OpenGL loads glTF/OBJ/MD5 with CPU tess - see `docs/GLTF.md`)
+- [x] Multiple model formats (glTF primary on Vulkan for GPU path; CPU tess fallback - see `docs/GLTF.md`)
 - [x] 6 image formats (EXR, PNG, TGA, JPG, PCX, BMP)
 
 ### Integration -- Complete
@@ -87,8 +87,8 @@ Priorities that keep **CI green** and **README/build truth** aligned:
 |----------|------|--------|
 | P0 | **CI stability** | Fix any red matrix on `main`; Android OpenSSL/Lua first-build time - tune cache keys if needed |
 | P1 | **glTF GPU path (polish)** | Entity morph + top-8 GPU morph (done); GPU tangent Gram–Schmidt after skin+morph via **`r_gltfGpuTangentFix`** (done); optional full MikkTSpace qtangent on GPU; validate on real assets |
-| P1 | **Renderer validation** | Tier B/C as optional gates; `renderer_regression_check`: manifest (**`BUILD.md`**, **`docs/ROADMAP.md`**, **`docs/FORWARD_PLUS_PIPELINE_AUDIT.md`**, **`src/renderers/vulkan/vk_temporal.h`**, **`docs/GLTF.md`**, …), GLSL validate, **IQM_MORPH_TOP_K** + **IQM_MORPH_MAX_CHANNELS** (OpenGL vs Vulkan `tr_local.h`), **GLTF_MAX_* vs IQM_*** header parity; **`tr_model_gltf.c`** `STATIC_ASSERT` for joint/morph caps + `IQM_MORPH_MAX_CHANNELS == IQM_MORPH_TOP_K`; PBR **`forward_plus_shade_strength`** `constant_id` vs **`vk_create_pipeline.c`**; Forward+ **`gen_frag.tmpl`** `tileId * N` vs **`MAX_PER_TILE`**; **`vk_temporal`** reset enum vs reason-string / log-table drift guard |
-| P2 | **OpenGL glTF polish** | CPU tess + **`r_gltfCpuQtangent`** qtangent recompute when stage textures look like a normal map (`norm` / `bump` / `nmap` / `_n.`); **`_norm`** shader try from `normalTexture`; optional: wire qtangents into fixed-function tangents if a normal-mapped ARB path appears |
+| P1 | **Renderer validation** | Tier B/C as optional gates; `renderer_regression_check`: manifest (**`BUILD.md`**, **`docs/ROADMAP.md`**, **`docs/FORWARD_PLUS_PIPELINE_AUDIT.md`**, **`src/renderers/vulkan/vk_temporal.h`**, **`docs/GLTF.md`**, …), GLSL validate, **IQM_MORPH_TOP_K** + **IQM_MORPH_MAX_CHANNELS** in `tr_local.h`, **GLTF_MAX_* vs IQM_*** header parity; **`tr_model_gltf.c`** `STATIC_ASSERT` for joint/morph caps + `IQM_MORPH_MAX_CHANNELS == IQM_MORPH_TOP_K`; PBR **`forward_plus_shade_strength`** `constant_id` vs **`vk_create_pipeline.c`**; Forward+ **`gen_frag.tmpl`** `tileId * N` vs **`MAX_PER_TILE`**; **`vk_temporal`** reset enum vs reason-string / log-table drift guard |
+| P2 | **glTF CPU tess polish** | **`r_gltfCpuQtangent`** qtangent recompute when stage textures look like a normal map (`norm` / `bump` / `nmap` / `_n.`); **`_norm`** shader try from `normalTexture` on CPU tess path |
 | P2 | **Engine systems hardening** | Telemetry / replay / save / quest / dialogue - define stable APIs + minimal tests |
 | P3 | **GOAP content** | Data-driven actions; perf limits; debug draw |
 | P3 | **Vulkan architecture pass** | Clustered Forward+, motion history - see below |
@@ -97,7 +97,7 @@ Priorities that keep **CI green** and **README/build truth** aligned:
 - [ ] Lighting scalability: move Vulkan from legacy dynamic-light selection toward clustered Forward+; decouple Vulkan light scale from `MAX_DLIGHTS` and surface-bit assumptions. See `docs/RENDERER_2026_ARCHITECTURE_PASS.md`.
 - [ ] Temporal robustness: introduce shared history invalidation and stronger motion-vector coverage before adding TAA/upscaling or RT reuse systems. See `docs/RENDERER_2026_ARCHITECTURE_PASS.md`.
   - Incremental progress on `main`: shared temporal reset policy is already in place; recent hardening passes now gate or bypass unstable first-person TAA history and improve post/gamma source-region tracking for internal-resolution presentation. More post-pass dimension cleanup is still needed before calling the temporal path "done."
-- [ ] Platform strategy: keep Vulkan primary, freeze OpenGL as compatibility-only, prioritize Metal ahead of DXR, and treat RTX as a Vulkan feature tier. See `docs/RENDERER_2026_ARCHITECTURE_PASS.md`.
+- [ ] Platform strategy: Vulkan as the supported renderer; prioritize Metal ahead of DXR; treat RTX as a Vulkan feature tier. See `docs/RENDERER_2026_ARCHITECTURE_PASS.md`.
 
 ### Short-Term (completed)
 - [x] Connect BSP geometry extraction to map loading for automatic navmesh

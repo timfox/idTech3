@@ -23,7 +23,7 @@ When a model is requested without extension, the engine tries formats in this or
 
 ## glTF 2.0 Details
 
-**Renderer**: glTF loading and the full material/animation path are **Vulkan-only** (see [GLTF.md](GLTF.md)); OpenGL does not register `.gltf`/`.glb`.
+**Renderer**: glTF loading and the full material/animation path are **Vulkan-only** (see [GLTF.md](GLTF.md)).
 
 **Materials and animation (summary)**:
 - Base color, metallic/roughness, normal, emissive, occlusion maps

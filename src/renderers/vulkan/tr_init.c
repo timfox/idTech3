@@ -28,6 +28,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_vdb.h"
 #include "vk_postfx.h"
 #include "vk_flashlight.h"
+#include "vk_sim_render_profile.h"
+#include "vk_sim_render_debug.h"
 #include "vk_skybox_hdr.h"
 #ifdef USE_IMGUI
 void VkImgui_Shutdown( void );
@@ -78,9 +80,8 @@ cvar_t	*r_firstPersonZNear;
 cvar_t	*r_skipBackEnd;
 #ifdef USE_IMGUI
 cvar_t	*r_imgui;
+cvar_t	*r_imguiTheme;
 #endif
-
-//cvar_t	*r_anaglyphMode;
 
 cvar_t	*r_greyscale;
 cvar_t	*r_dither;
@@ -175,6 +176,18 @@ cvar_t	*r_bloom_intensity;
 cvar_t	*r_bloom_threshold_mode;
 cvar_t	*r_bloom_modulate;
 cvar_t	*r_bloomKnee;
+cvar_t	*r_lensFlare;
+cvar_t	*r_lensFlareStrength;
+cvar_t	*r_lensFlareF1;
+cvar_t	*r_lensFlareF2;
+cvar_t	*r_lensFlareF3;
+cvar_t	*r_lensFlareTintR;
+cvar_t	*r_lensFlareTintG;
+cvar_t	*r_lensFlareTintB;
+cvar_t	*r_fp64Points;
+cvar_t	*r_fp64PointsMode;
+cvar_t	*r_fp64PointsSize;
+cvar_t	*r_fp64PointsMaxVerts;
 cvar_t	*r_ssao;
 cvar_t	*r_ssaoMethod;
 cvar_t	*r_ssaoRadius;
@@ -196,6 +209,14 @@ cvar_t	*r_temporalCustomShaderMotion;
 cvar_t	*r_screenMapScale;
 cvar_t	*r_ext_supersample;
 cvar_t	*r_ext_smaa;
+cvar_t	*r_ext_fxaa;
+cvar_t	*r_fxaa_subpix;
+cvar_t	*r_fxaa_edgeThreshold;
+cvar_t	*r_simRenderProfile;
+cvar_t	*r_simRenderProfileAutoApply;
+cvar_t	*r_simRenderDebug;
+cvar_t	*r_volumetricFogAccurate;
+cvar_t	*r_postAaAfterBloom;
 cvar_t	*r_smaa_preset;
 cvar_t	*r_smaa_threshold;
 cvar_t	*r_smaa_local_contrast;
@@ -328,6 +349,7 @@ cvar_t	*r_volumetricFogSliceMode;
 cvar_t	*r_volumetricFogMaxDistance;
 cvar_t	*r_volumetricFogJitter;
 cvar_t	*r_volumetricFogCompositeMode;
+cvar_t	*r_volumetricFogIntegration;
 cvar_t	*r_volumetricFogTemporalWeight;
 cvar_t	*r_volumetricFogReprojectionThreshold;
 cvar_t	*r_volumetricFogHistoryVelocityThreshold;
@@ -409,6 +431,7 @@ cvar_t	*r_simpleMipMaps;
 cvar_t	*r_showImages;
 #ifdef USE_IMGUI
 cvar_t	*r_imgui;
+cvar_t	*r_imguiTheme;
 cvar_t	*r_studio_tools;
 #endif
 cvar_t	*r_defaultImage;
@@ -1786,6 +1809,154 @@ static void VulkanInfo_f( void )
 
 /*
 ===============
+R_VolumetricAccurate_f
+===============
+Apply accurate volumetric fog integration defaults (physical composite, depth march).
+*/
+static void R_VolumetricAccurate_f( void )
+{
+	VK_ApplyVolumetricAccurateSettings();
+}
+
+/*
+===============
+R_VolumetricIntegration_f
+===============
+Set screen-space or froxel volumetric integration (see r_volumetricFogIntegration).
+*/
+static void R_VolumetricIntegration_f( void )
+{
+	const int argc = ri.Cmd_Argc();
+	const char *arg = ( argc > 1 ) ? ri.Cmd_Argv( 1 ) : "";
+	int mode = ( arg[0] >= '0' && arg[0] <= '9' ) ? ( arg[0] - '0' ) : -1;
+
+	if ( mode < 0 ) {
+		ri.Printf( PRINT_ALL,
+			"usage: volumetric_integration <0|1|2|3>\n"
+			"  0 = froxel grid march (default, accurate sim profile 2)\n"
+			"  1 = screen analytical approximate (fast, Hoffman/Preetham style)\n"
+			"  2 = screen ray march with sun shadow map per step\n"
+			"  3 = OpenVDB Woodcock/delta tracking (majorant grid; needs vdb_bind_fog + upload)\n" );
+		return;
+	}
+
+	if ( mode > 3 ) {
+		mode = 3;
+	}
+	ri.Cvar_Set( "r_volumetricFogIntegration", va( "%d", mode ) );
+	ri.Printf( PRINT_ALL, "Volumetric integration mode %d active.\n", mode );
+}
+
+/*
+===============
+R_SimRenderProfile_f
+===============
+Apply simulation/robotics render presets (AMBF-Vulkan alignment). Run vid_restart after.
+*/
+static void R_SimRenderProfile_f( void )
+{
+	const int argc = ri.Cmd_Argc();
+	const char *arg = ( argc > 1 ) ? ri.Cmd_Argv( 1 ) : "";
+	int profile = ( arg[0] >= '0' && arg[0] <= '9' ) ? ( arg[0] - '0' ) : -1;
+
+	if ( profile < 0 ) {
+		ri.Printf( PRINT_ALL,
+			"usage: sim_render_profile <1|2>\n"
+			"  1 = AMBF-Vulkan (arXiv:2410.05095): MSAA+FXAA, Reinhard, PBR, no volumetrics\n"
+			"  2 = Simulation volumetrics: profile 1 + accurate froxel fog (64 steps, shadows, temporal)\n"
+			"Run vid_restart after changing for full effect.\n" );
+		return;
+	}
+
+	VK_ApplySimRenderProfile( profile );
+	if ( r_simRenderProfile ) {
+		ri.Cvar_Set( "r_simRenderProfile", va( "%d", profile ) );
+	}
+	ri.Printf( PRINT_ALL, "Run vid_restart to apply sim render profile %d.\n", profile );
+}
+
+/*
+===============
+R_SimRenderDebug_f
+===============
+Toggle simulation render debug overlay (console or ImGui HUD).
+*/
+static void R_SimRenderDebug_f( void )
+{
+	const int argc = ri.Cmd_Argc();
+	const char *arg = ( argc > 1 ) ? ri.Cmd_Argv( 1 ) : "";
+	int mode = ( arg[0] >= '0' && arg[0] <= '9' ) ? ( arg[0] - '0' ) : -1;
+
+	if ( mode < 0 ) {
+		ri.Printf( PRINT_ALL,
+			"usage: sim_render_debug <0|1|2>\n"
+			"  0 = off\n"
+			"  1 = throttled console stats (post chain + volumetric GPU ms)\n"
+			"  2 = ImGui HUD (requires r_imgui 1; falls back to console if ImGui off)\n" );
+		return;
+	}
+
+	if ( r_simRenderDebug ) {
+		ri.Cvar_Set( "r_simRenderDebug", va( "%d", mode ) );
+	}
+	VK_SimRenderDebugStartupLog();
+}
+
+#ifdef USE_VULKAN
+#include "vk_fp64_points.h"
+
+/*
+===============
+R_FP64_PointsGen_f
+===============
+*/
+static void R_FP64_PointsGen_f( void )
+{
+	const int argc = ri.Cmd_Argc();
+	int count = ( argc > 1 ) ? atoi( ri.Cmd_Argv( 1 ) ) : 10000;
+	int dims = ( argc > 2 ) ? atoi( ri.Cmd_Argv( 2 ) ) : 2;
+
+	if ( !VK_FP64_PointsGenerate( count, dims ) ) {
+		ri.Printf( PRINT_WARNING, "fp64_points_gen failed (set r_fp64Points 1 and vid_restart for native fp64)\n" );
+	}
+}
+
+/*
+===============
+R_FP64_PointsLoad_f
+===============
+*/
+static void R_FP64_PointsLoad_f( void )
+{
+	const int argc = ri.Cmd_Argc();
+	int dims = ( argc > 2 ) ? atoi( ri.Cmd_Argv( 2 ) ) : 2;
+
+	if ( argc < 2 ) {
+		ri.Printf( PRINT_ALL, "usage: fp64_points_load <csv.qpath> [2|3]\n" );
+		return;
+	}
+	if ( !VK_FP64_PointsLoadCsv( ri.Cmd_Argv( 1 ), dims ) ) {
+		ri.Printf( PRINT_WARNING, "fp64_points_load failed\n" );
+	}
+}
+
+static void R_FP64_PointsClear_f( void )
+{
+	VK_FP64_PointsClear();
+	ri.Printf( PRINT_ALL, "fp64_points_clear: dataset released\n" );
+}
+
+static void R_FP64_PointsBenchmark_f( void )
+{
+	const int argc = ri.Cmd_Argc();
+	int frames = ( argc > 1 ) ? atoi( ri.Cmd_Argv( 1 ) ) : 60;
+
+	VK_FP64_PointsBenchmark( frames );
+}
+#endif
+
+/*
+===============
 R_Quality_f
 ===============
 Apply AAA-style quality presets: 0=Low, 1=Medium, 2=High, 3=Ultra.
@@ -2141,7 +2312,15 @@ static void R_Register( void )
 	ri.Cmd_AddCommand( "vulkaninfo", VulkanInfo_f );
 	ri.Cmd_AddCommand( "vkVolumetricValidate", VkVolumetricValidate_f );
 	ri.Cmd_AddCommand( "r_quality", R_Quality_f );
+	ri.Cmd_AddCommand( "sim_render_profile", R_SimRenderProfile_f );
+	ri.Cmd_AddCommand( "sim_render_debug", R_SimRenderDebug_f );
+	ri.Cmd_AddCommand( "volumetric_accurate", R_VolumetricAccurate_f );
+	ri.Cmd_AddCommand( "volumetric_integration", R_VolumetricIntegration_f );
 	ri.Cmd_AddCommand( "r_aaQuality", R_AAQuality_f );
+	ri.Cmd_AddCommand( "fp64_points_gen", R_FP64_PointsGen_f );
+	ri.Cmd_AddCommand( "fp64_points_load", R_FP64_PointsLoad_f );
+	ri.Cmd_AddCommand( "fp64_points_clear", R_FP64_PointsClear_f );
+	ri.Cmd_AddCommand( "fp64_points_benchmark", R_FP64_PointsBenchmark_f );
 #endif
 
 	//
@@ -2613,6 +2792,11 @@ static void R_Register( void )
 	if ( r_imgui && r_imgui->integer ) {
 		ri.Printf( PRINT_ALL, "ImGui inspector overlay: r_imgui 1 (toggle with r_imgui 0)\n" );
 	}
+	r_imguiTheme = ri.Cvar_Get( "r_imguiTheme", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_imguiTheme, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_imguiTheme,
+		"ImGui editor theme: 0=Pablo dark (VEditor-style), 1=Spectrum light." );
+	ri.Cvar_SetGroup( r_imguiTheme, CVG_RENDERER );
 #endif
 
 	r_debugLight = ri.Cvar_Get( "r_debuglight", "0", CVAR_TEMP );
@@ -2630,7 +2814,7 @@ static void R_Register( void )
 	ri.Cvar_Get( "r_fontSize", "16", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( ri.Cvar_Get( "r_fontSize", "16", CVAR_ARCHIVE ), "Point size for custom fonts loaded via r_font / r_consoleFont." );
 	{
-		cvar_t *fd = ri.Cvar_Get( "r_fontDpi", "72", CVAR_ARCHIVE );
+		cvar_t *fd = ri.Cvar_Get( "r_fontDpi", "96", CVAR_ARCHIVE );
 		ri.Cvar_CheckRange( fd, "72", "144", CV_INTEGER );
 		ri.Cvar_SetDescription( fd,
 			"FreeType device DPI for TrueType glyph rasterization (72 = legacy sizing, 96+ = denser atlas / sharper upscaled console). Apply with reloadTtf or vid_restart." );
@@ -2665,7 +2849,7 @@ static void R_Register( void )
 		ri.Cvar_SetDescription( fp,
 			"Rougier HAL-00821839 subpixel glyph positioning (Vulkan uiSubpixelText shader). 1 = fractional horizontal placement. Disable r_fontSubpixel when using this." );
 	}
-	r_sdfScreenAa = ri.Cvar_Get( "r_sdfScreenAa", "2", CVAR_ARCHIVE );
+	r_sdfScreenAa = ri.Cvar_Get( "r_sdfScreenAa", "1", CVAR_ARCHIVE );
 	ri.Cvar_CheckRange( r_sdfScreenAa, "0", "8", CV_FLOAT );
 	ri.Cvar_SetDescription( r_sdfScreenAa,
 		"Vulkan uiSdfText: scales fwidth(distance) for screen-space edge AA (resolution-independent; Green/Alvin-style). 0 = use push r_sdfSmoothing band only." );
@@ -2752,7 +2936,7 @@ static void R_Register( void )
 	r_showcluster = ri.Cvar_Get ("r_showcluster", "0", CVAR_CHEAT);
 	ri.Cvar_SetDescription( r_showcluster, "Shows current cluster index." );
 	r_speeds = ri.Cvar_Get ("r_speeds", "0", CVAR_CHEAT);
-	ri.Cvar_SetDescription( r_speeds, "Prints out various debugging stats from PVS:\n 0: Disabled\n 1: Backend BSP\n 2: Frontend grid culling\n 3: Current view cluster index\n 4: Dynamic lighting\n 5: zFar clipping\n 6: Flares" );
+	ri.Cvar_SetDescription( r_speeds, "Prints out various debugging stats from PVS:\n 0: Disabled\n 1: Backend BSP\n 2: Frontend grid culling\n 3: Current view cluster index\n 4: Dynamic lighting\n 5: zFar clipping\n 6: Flares\n 7: Sim render profile + volumetric GPU ms" );
 	r_debugSurface = ri.Cvar_Get ("r_debugSurface", "0", CVAR_CHEAT);
 	ri.Cvar_SetDescription( r_debugSurface, "Backend visual debugging tool for bezier mesh surfaces." );
 	r_nobind = ri.Cvar_Get ("r_nobind", "0", CVAR_CHEAT);
@@ -3039,9 +3223,9 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_volumetricFogAniso, "Henyey-Greenstein anisotropy factor (positive = forward scattering, negative = backward)." );
 	ri.Cvar_SetGroup( r_volumetricFogAniso, CVG_RENDERER );
 
-	r_volumetricFogSteps = ri.Cvar_Get( "r_volumetricFogSteps", "32", CVAR_ARCHIVE_ND );
+	r_volumetricFogSteps = ri.Cvar_Get( "r_volumetricFogSteps", "48", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogSteps, "1", "256", CV_INTEGER );
-	ri.Cvar_SetDescription( r_volumetricFogSteps, "Raymarch steps per pixel when compositing volumetric fog." );
+	ri.Cvar_SetDescription( r_volumetricFogSteps, "Raymarch steps per pixel when compositing volumetric fog (higher = more accurate froxel integration)." );
 	ri.Cvar_SetGroup( r_volumetricFogSteps, CVG_RENDERER );
 
 	r_volumetricFogZExponent = ri.Cvar_Get( "r_volumetricFogZExponent", "1.5", CVAR_ARCHIVE_ND );
@@ -3086,10 +3270,22 @@ static void R_Register( void )
 	r_volumetricFogCompositeMode = ri.Cvar_Get( "r_volumetricFogCompositeMode", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogCompositeMode, "0", "2", CV_INTEGER );
 	ri.Cvar_SetDescription( r_volumetricFogCompositeMode,
-		"Volumetric fog composite (full-screen resolve): 0=standard (scene*T + in-scatter), "
-		"1=depth-weighted in-scatter (reduce near-camera fog glow via (1-T) weight; TLOU2-style transparency hint), "
-		"2=HDR clamp (clamp final RGB to \\r_volumetricFogFireflyClamp per channel after composite)." );
+		"Volumetric fog composite: 0=physical (scene*T + in-scatter integral, default), "
+		"1=artistic depth-weighted in-scatter (reduces near-camera glow), "
+		"2=HDR clamp (clamp final RGB to \\r_volumetricFogFireflyClamp after composite)." );
 	ri.Cvar_SetGroup( r_volumetricFogCompositeMode, CVG_RENDERER );
+
+	r_volumetricFogIntegration = ri.Cvar_Get( "r_volumetricFogIntegration", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogIntegration, "0", "3", CV_INTEGER );
+	ri.Cvar_SetDescription( r_volumetricFogIntegration,
+		"Volumetric composite integration: 0=froxel grid march (default), 1=screen analytical approx, "
+		"2=screen ray march + sun shadow map, 3=OpenVDB Woodcock/delta tracking (majorant grid; skips froxel compute)." );
+	ri.Cvar_SetGroup( r_volumetricFogIntegration, CVG_RENDERER );
+	if ( r_volumetricFogIntegration && r_volumetricFogIntegration->integer > 0 ) {
+		ri.Printf( PRINT_ALL,
+			"...volumetric fog integration mode %d (screen-space; froxel compute skipped when > 0)\n",
+			r_volumetricFogIntegration->integer );
+	}
 
 	r_volumetricFogColorMode = ri.Cvar_Get( "r_volumetricFogColorMode", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogColorMode, "0", "2", CV_INTEGER );
@@ -3115,7 +3311,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_volumetricFogResolutionScale, "Scales volumetric froxel XY resolution before quality tiering (0.25-1.0). Requires vid_restart." );
 	ri.Cvar_SetGroup( r_volumetricFogResolutionScale, CVG_RENDERER );
 
-	r_volumetricFogTransmittanceCutoff = ri.Cvar_Get( "r_volumetricFogTransmittanceCutoff", "0.01", CVAR_ARCHIVE_ND );
+	r_volumetricFogTransmittanceCutoff = ri.Cvar_Get( "r_volumetricFogTransmittanceCutoff", "0.002", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogTransmittanceCutoff, "0.0001", "1.0", CV_FLOAT );
 	ri.Cvar_SetDescription( r_volumetricFogTransmittanceCutoff, "Early-out threshold for volumetric integration (smaller values = higher quality)." );
 	ri.Cvar_SetGroup( r_volumetricFogTransmittanceCutoff, CVG_RENDERER );
@@ -3457,6 +3653,67 @@ static void R_Register( void )
 	ri.Cvar_SetDescription(r_bloom, "Enables bloom post-processing effect. Requires \\r_fbo 1.");
 	ri.Cvar_SetGroup( r_bloom, CVG_RENDERER );
 
+	r_lensFlare = ri.Cvar_Get( "r_lensFlare", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_lensFlare, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_lensFlare, "Screen-space lens flare post-pass (directional sun ghosts). Requires \\r_fbo 1." );
+	ri.Cvar_SetGroup( r_lensFlare, CVG_RENDERER );
+
+	r_lensFlareStrength = ri.Cvar_Get( "r_lensFlareStrength", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_lensFlareStrength, "0.0", "4.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_lensFlareStrength, "Overall lens flare intensity multiplier." );
+	ri.Cvar_SetGroup( r_lensFlareStrength, CVG_RENDERER );
+
+	r_lensFlareF1 = ri.Cvar_Get( "r_lensFlareF1", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_lensFlareF1, "0.0", "4.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_lensFlareF1, "Primary ghost ring strength (f1 term)." );
+	ri.Cvar_SetGroup( r_lensFlareF1, CVG_RENDERER );
+
+	r_lensFlareF2 = ri.Cvar_Get( "r_lensFlareF2", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_lensFlareF2, "0.0", "4.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_lensFlareF2, "Secondary chromatic ghost strength (f2/f4 terms)." );
+	ri.Cvar_SetGroup( r_lensFlareF2, CVG_RENDERER );
+
+	r_lensFlareF3 = ri.Cvar_Get( "r_lensFlareF3", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_lensFlareF3, "0.0", "4.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_lensFlareF3, "Tight halo ghost strength (f5 terms)." );
+	ri.Cvar_SetGroup( r_lensFlareF3, CVG_RENDERER );
+
+	r_lensFlareTintR = ri.Cvar_Get( "r_lensFlareTintR", "1.4", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_lensFlareTintR, "0.0", "4.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_lensFlareTintR, "Lens flare warm tint (red channel)." );
+	ri.Cvar_SetGroup( r_lensFlareTintR, CVG_RENDERER );
+
+	r_lensFlareTintG = ri.Cvar_Get( "r_lensFlareTintG", "1.2", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_lensFlareTintG, "0.0", "4.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_lensFlareTintG, "Lens flare warm tint (green channel)." );
+	ri.Cvar_SetGroup( r_lensFlareTintG, CVG_RENDERER );
+
+	r_lensFlareTintB = ri.Cvar_Get( "r_lensFlareTintB", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_lensFlareTintB, "0.0", "4.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_lensFlareTintB, "Lens flare warm tint (blue channel)." );
+	ri.Cvar_SetGroup( r_lensFlareTintB, CVG_RENDERER );
+
+	r_fp64Points = ri.Cvar_Get( "r_fp64Points", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_fp64Points, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fp64Points,
+		"Draw double-precision point datasets (arXiv:2408.09699). Requires vid_restart; needs GPU shaderFloat64 for native mode." );
+	ri.Cvar_SetGroup( r_fp64Points, CVG_RENDERER );
+
+	r_fp64PointsMode = ri.Cvar_Get( "r_fp64PointsMode", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_fp64PointsMode, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fp64PointsMode, "0=native fp64, 1=emulated high/low vec3, 2=single-precision baseline." );
+	ri.Cvar_SetGroup( r_fp64PointsMode, CVG_RENDERER );
+
+	r_fp64PointsSize = ri.Cvar_Get( "r_fp64PointsSize", "2", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_fp64PointsSize, "1", "32", CV_FLOAT );
+	ri.Cvar_SetDescription( r_fp64PointsSize, "Point sprite size for fp64 point visualization." );
+	ri.Cvar_SetGroup( r_fp64PointsSize, CVG_RENDERER );
+
+	r_fp64PointsMaxVerts = ri.Cvar_Get( "r_fp64PointsMaxVerts", "1000000", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_fp64PointsMaxVerts, "1000", "10000000", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fp64PointsMaxVerts, "Maximum vertices for fp64_points_gen / fp64_points_load." );
+	ri.Cvar_SetGroup( r_fp64PointsMaxVerts, CVG_RENDERER );
+
 	r_ssao = ri.Cvar_Get( "r_ssao", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ssao, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ssao, "Enables screen-space ambient occlusion (SSAO). Requires \\r_fbo 1." );
@@ -3535,8 +3792,49 @@ static void R_Register( void )
 
 	r_ext_smaa = ri.Cvar_Get( "r_ext_smaa", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_smaa, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_ext_smaa, "Enables SMAA post-processing, requires \\r_fbo 1." );
+	ri.Cvar_SetDescription( r_ext_smaa, "Enables SMAA post-processing, requires \\r_fbo 1. Mutually exclusive with \\r_ext_fxaa." );
 	ri.Cvar_SetGroup( r_ext_smaa, CVG_RENDERER );
+
+	r_ext_fxaa = ri.Cvar_Get( "r_ext_fxaa", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_ext_fxaa, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_ext_fxaa, "Enables FXAA post-processing (lightweight edge AA after main pass). Requires \\r_fbo 1. Mutually exclusive with \\r_ext_smaa." );
+	ri.Cvar_SetGroup( r_ext_fxaa, CVG_RENDERER );
+
+	r_fxaa_subpix = ri.Cvar_Get( "r_fxaa_subpix", "0.75", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_fxaa_subpix, "0.0", "1.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_fxaa_subpix, "FXAA sub-pixel quality (higher = softer edges, more blur)." );
+
+	r_fxaa_edgeThreshold = ri.Cvar_Get( "r_fxaa_edgeThreshold", "0.166", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_fxaa_edgeThreshold, "0.031", "0.5", CV_FLOAT );
+	ri.Cvar_SetDescription( r_fxaa_edgeThreshold, "FXAA edge detection threshold (lower = more edges filtered)." );
+
+	r_simRenderProfile = ri.Cvar_Get( "r_simRenderProfile", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_simRenderProfile, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_simRenderProfile, "Active simulation render profile: 0=off, 1=AMBF lightweight, 2=volumetric accurate. Use sim_render_profile then vid_restart." );
+	ri.Cvar_SetGroup( r_simRenderProfile, CVG_RENDERER );
+
+	r_simRenderProfileAutoApply = ri.Cvar_Get( "r_simRenderProfileAutoApply", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_simRenderProfileAutoApply, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_simRenderProfileAutoApply, "When 1, re-applies r_simRenderProfile cvars at each vid_restart (simulation lock-in)." );
+	ri.Cvar_SetGroup( r_simRenderProfileAutoApply, CVG_RENDERER );
+
+	r_simRenderDebug = ri.Cvar_Get( "r_simRenderDebug", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_simRenderDebug, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_simRenderDebug,
+		"Simulation render debug: 0=off, 1=console stats (~1 Hz), 2=ImGui HUD (needs r_imgui 1). "
+		"Enables volumetric GPU timestamps while active." );
+	ri.Cvar_SetGroup( r_simRenderDebug, CVG_RENDERER );
+	VK_SimRenderDebugStartupLog();
+
+	r_volumetricFogAccurate = ri.Cvar_Get( "r_volumetricFogAccurate", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_volumetricFogAccurate, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_volumetricFogAccurate, "Informational flag: set to 1 by volumetric_accurate / sim profile 2. Use volumetric_accurate command to apply settings." );
+	ri.Cvar_SetGroup( r_volumetricFogAccurate, CVG_RENDERER );
+
+	r_postAaAfterBloom = ri.Cvar_Get( "r_postAaAfterBloom", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_postAaAfterBloom, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_postAaAfterBloom, "Re-run FXAA/SMAA after bloom so tonemap samples the final HDR image (default 1)." );
+	ri.Cvar_SetGroup( r_postAaAfterBloom, CVG_RENDERER );
 
 	r_smaa_preset = ri.Cvar_Get( "r_smaa_preset", "3", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_smaa_preset, "0", "4", CV_INTEGER );

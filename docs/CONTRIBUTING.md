@@ -11,11 +11,8 @@ Thank you for your interest in contributing. This document outlines how to get s
 ## Building
 
 ```bash
-# Vulkan renderer (recommended)
+# Vulkan renderer
 ./scripts/compile_engine.sh vulkan
-
-# OpenGL renderer
-./scripts/compile_engine.sh opengl
 
 # Debug build
 ./scripts/compile_engine.sh vulkan debug
