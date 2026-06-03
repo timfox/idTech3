@@ -46,9 +46,18 @@ if [ -n "$CLIENT" ]; then
   fi
 fi
 
-if [ ! -f "$PROJECT_ROOT/tests/data/usd/parity_geom_mesh.usda" ]; then
-  echo "fail: missing tests/data/usd/parity_geom_mesh.usda"
+for usda in \
+  "$PROJECT_ROOT/tests/data/usd/parity_geom_mesh.usda" \
+  "$PROJECT_ROOT/tests/data/usd/parity_shade_preview.usda"; do
+  if [ ! -f "$usda" ]; then
+    echo "fail: missing $usda"
+    exit 1
+  fi
+done
+
+if ! grep -Fq 'R_Freeusd_BuildMeshBuffers' < <(nm -D "$VK_SO" 2>/dev/null); then
+  echo "fail: $VK_SO missing R_Freeusd_BuildMeshBuffers"
   exit 1
 fi
 
-echo "ok: FreeUSD smoke (renderer + client symbols, test USDA present)"
+echo "ok: FreeUSD smoke (renderer + client symbols, parity USDA fixtures)"

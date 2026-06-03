@@ -14,7 +14,12 @@ docs/TILED.md
 examples/tiled/README.md
 examples/tiled/minimal_demo.tmx
 docs/GLTF.md
+docs/FREEUSD.md
 tools/README.md
+tests/data/usd/parity_geom_mesh.usda
+tests/data/usd/parity_shade_preview.usda
+src/renderers/common/tr_model_freeusd.h
+src/renderers/common/tr_model_freeusd_register.c
 src/renderers/vulkan/tr_model_gltf.h
 src/renderers/vulkan/tr_model_gltf.c
 src/renderers/vulkan/tr_gltf_topo.h
