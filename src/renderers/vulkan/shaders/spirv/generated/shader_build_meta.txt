@@ -1,5 +1,5 @@
 glslang_validator_path=/usr/bin/glslangValidator
 glslang_validator_version=Glslang Version: 11:16.2.0
-generated_at=2026-06-03T00:48:37Z
-shader_data_sha256=5440cf83fec0df1b68de0d777e6268ecf415557ff70653c38fafab98c32d002e
+generated_at=2026-06-03T00:51:53Z
+shader_data_sha256=ecc244abbcfb4222c2a1d32dcc42a186065f2f87e9952cc86614e29718bfe8fd
 shader_binding_sha256=b5b9eea3699f249a8bcc862fef2304af888d895599abf4e825827b40ebfcc584

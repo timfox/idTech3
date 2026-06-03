@@ -445,8 +445,8 @@ void main() {
 
     vec3 outRgb;
     if (compositeMode == 1) {
-        /* Depth-aware in-scatter weight: attenuate fogRadiance when transmittance is high (near camera / clear air). */
-        float inScatterWeight = clamp(transmittance, 0.0, 1.0);
+        /* Reduce near-camera in-scatter halo (TLOU2-style): weight by absorbed fraction, not transmittance. */
+        float inScatterWeight = clamp(1.0 - transmittance, 0.0, 1.0);
         outRgb = scene * transmittance + fogRadiance * inScatterWeight;
     } else {
         outRgb = scene * transmittance + fogRadiance;

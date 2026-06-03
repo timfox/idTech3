@@ -1062,6 +1062,9 @@ static void vk_forward_plus_dispatch_tile_cull_internal( qboolean use_depth_cull
 	push.max_per_tile = vk.forward_plus.max_per_tile;
 	push.luminance_sort = ( r_forwardPlusLuminanceSort && r_forwardPlusLuminanceSort->integer ) ? 1u : 0u;
 	push.distance_sort = ( r_forwardPlusDistanceSort && r_forwardPlusDistanceSort->integer ) ? 1u : 0u;
+	if ( push.distance_sort && push.luminance_sort ) {
+		push.luminance_sort = 0u;
+	}
 	push.depth_cull = use_depth_cull ? 1u : 0u;
 
 	if ( push.distance_sort ) {
@@ -1074,7 +1077,7 @@ static void vk_forward_plus_dispatch_tile_cull_internal( qboolean use_depth_cull
 	if ( push.depth_cull ) {
 		static qboolean depth_cull_logged;
 		if ( !depth_cull_logged ) {
-			ri.Printf( PRINT_ALL, "[VK][Forward+] r_forwardPlusDepthCull=1 (tile cull after opaque, depth rejection at light center)\n" );
+			ri.Printf( PRINT_ALL, "[VK][Forward+] r_forwardPlusDepthCull=1 (depth prepass + tile cull before opaque color; depth rejection at light center)\n" );
 			depth_cull_logged = qtrue;
 		}
 	}
