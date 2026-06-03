@@ -2,6 +2,9 @@
 
 #ifdef USE_VULKAN
 
+/* GPU Forward+ light records (decoupled from surface dlightBits, which stays MAX_DLIGHTS). */
+#define VK_FP_MAX_GPU_LIGHTS 64
+
 /* Tile list capacity (SSBO stride = max cap uint32s per tile); must match forward_plus_tile_cull.comp MAX_PER_TILE. */
 uint32_t vk_forward_plus_get_min_per_tile_cap( void );
 uint32_t vk_forward_plus_get_max_per_tile_cap( void );

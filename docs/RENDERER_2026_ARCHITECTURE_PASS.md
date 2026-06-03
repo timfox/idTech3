@@ -23,8 +23,8 @@ The objective is not "add every modern rendering acronym." The objective is to m
 
 ### What still limits the architecture
 
-- The Vulkan renderer is still **forward-only**. `r_renderMode 1/2` are placeholders, not real deferred or Forward+ paths.
-- Dynamic lighting still inherits legacy constraints such as `MAX_DLIGHTS == 32` and surface-bit assumptions in the classic renderer path.
+- The Vulkan renderer is still **forward-only**. `r_renderMode 1` is a deferred placeholder; **`r_renderMode 2`** enables clustered **Forward+** (`r_forwardPlus`, `r_forwardPlusShade`, up to **64** GPU lights via `VK_FP_MAX_GPU_LIGHTS`).
+- Dynamic lighting on the **classic** path still uses **`MAX_DLIGHTS == 32`** surface **`dlightBits`**; Forward+ packs **`refdef.dlights`** separately (see [FORWARD_PLUS_PIPELINE_AUDIT.md](FORWARD_PLUS_PIPELINE_AUDIT.md)).
 - Temporal behavior is fragmented. Volumetric fog, exposure, motion vectors, occlusion visibility, and post effects each track history differently.
 - Platform strategy is incomplete. Vulkan is primary, OpenGL is fallback, Vulkan RTX is only extension scaffolding, and Metal/DXR are not started.
 
@@ -158,7 +158,7 @@ Use **Vulkan as the primary renderer architecture**, freeze OpenGL as compatibil
 
 ## Phase 2: Lighting Scale
 
-- Add Vulkan light records plus cluster/tile culling. **Incremental (engine):** `r_forwardPlus 1` (default 0) allocates light + tile SSBOs, packs **at most `MAX_DLIGHTS` (32)** lights from `backEnd.refdef` (indices align with `tess.dlightBits`; excess lights are omitted and a **developer** log notes when the source count exceeds the cap), and runs a **compute tile cull** (`forward_plus_tile_cull.comp`, **`VK_FP_TILE_DIM` (16)** px tiles via `ceil(viewport / dim)`, up to **8** index slots per tile; active count **4–8** via latched **`r_forwardPlusMaxPerTile`**, default **8**) after `RB_BeginDrawingView` inside the main render pass. **Compute + PBR fragment** derive **tile pixel size** from the packed **viewport ÷ tile grid** so cull, debug overlay, and experimental shade stay aligned if tile policy changes. Tile grid and NDC→pixel use **`vk_get_render_target_width/height`** (FBO / `r_renderScale`); the tile SSBO is **reallocated when that resolution changes** (no `vid_restart` for resize alone). **PBR fragment:** descriptor set 18 binds light + tile + **param** SSBOs (clip matrix for shading). `r_forwardPlusDebug` (0–1) = debug overlay; **`r_forwardPlusShade`** (0–4, default 0) adds **experimental diffuse + microfacet spec** (per-light `CalcSpecular`, scaled) from tile-culled **point and linear/spot** lights. When `r_forwardPlus` is on, **`pbrForwardPlus.y`** carries **`floatBitsToUint(tess.dlightBits)`** so the shader **skips** any packed light index whose bit is set in `tess.dlightBits` (first **32** indices only; matches typical `MAX_DLIGHTS` range). Primary direct is still **softly renormalized** vs Forward+ energy. Works with deluxe/lightmap; toggling shade **invalidates cached pipelines** next frame. **Formal audit:** [FORWARD_PLUS_PIPELINE_AUDIT.md](FORWARD_PLUS_PIPELINE_AUDIT.md).
+- Add Vulkan light records plus cluster/tile culling. **Incremental (engine):** `r_forwardPlus 1` (default **1**) allocates light + tile SSBOs, packs up to **`VK_FP_MAX_GPU_LIGHTS` (64)** from `refdef.dlights` (classic **`tess.dlightBits`** skip still applies to indices **0–31** only), and runs **compute tile cull** (`forward_plus_tile_cull.comp`, **16 px** tiles, up to **8** slots per tile via latched **`r_forwardPlusMaxPerTile`**). **`r_renderMode 2`** latches Forward+ shade on via `tr_render_mode_vk.c`. Tile grid uses **`vk_get_render_target_width/height`**; SSBOs reallocate on resize. **PBR:** `r_forwardPlusDebug`, **`r_forwardPlusShade`** (pipeline invalidation on change). **Formal audit:** [FORWARD_PLUS_PIPELINE_AUDIT.md](FORWARD_PLUS_PIPELINE_AUDIT.md).
 - Introduce Forward+ shading for local lights.
 - Keep shadow budgets conservative and explicit.
 

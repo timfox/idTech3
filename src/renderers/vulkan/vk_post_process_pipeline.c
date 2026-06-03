@@ -318,7 +318,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			pipeline = &vk.taa_pipeline;
 			fsmodule = vk.modules.taa_fs;
 			renderpass = vk.render_pass.taa;
-			layout = vk.pipeline_layout_post_process;
+			layout = vk.pipeline_layout_taa;
 			samples = VK_SAMPLE_COUNT_1_BIT;
 			pipeline_name = "taa resolve pipeline";
 			target_format = vk.color_format;

@@ -7,11 +7,17 @@ This is **not** a full OpenUSD / Hydra / USD Imaging stack. Scope matches FreeUS
 ## Build
 
 ```bash
-./scripts/compile_engine.sh vulkan          # USE_FREEUSD=ON by default
-cmake -DUSE_FREEUSD=OFF ...                 # disable (smaller link; no usd_* tools)
+git submodule update --init src/external/FreeUSD   # preferred library source
+./scripts/compile_engine.sh vulkan               # USE_FREEUSD=ON by default; auto-inits submodule
+cmake -DUSE_FREEUSD=OFF ...                        # disable (smaller link; no usd_* tools)
 ```
 
-First configure **fetches** `gopexllc/FreeUSD` via CMake `FetchContent` (`cmake/FreeUSD.cmake`).
+**Library source** (`cmake/FreeUSD.cmake`):
+
+1. **Git submodule** at `src/external/FreeUSD` → [gopexllc/FreeUSD](https://github.com/gopexllc/FreeUSD) (pinned commit in parent repo).
+2. **FetchContent** fallback if the submodule is not initialized (network on first configure).
+
+`./scripts/init_optional_submodules.sh --freeusd` (or `--all`) initializes the submodule without building.
 
 ## Mesh models (renderer)
 

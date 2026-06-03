@@ -244,7 +244,7 @@ static int R_DlightFace( srfSurfaceFace_t *face, int dlightBits ) {
 	int			i;
 	const dlight_t	*dl;
 
-	for ( i = 0; i < (int)tr.refdef.num_dlights; i++ ) {
+	for ( i = 0; i < (int)R_NumSurfaceDlights( tr.refdef.num_dlights ); i++ ) {
 		if ( ! ( dlightBits & ( 1 << i ) ) ) {
 			continue;
 		}
@@ -269,7 +269,7 @@ static int R_DlightGrid( srfGridMesh_t *grid, int dlightBits ) {
 	int			i;
 	const dlight_t	*dl;
 
-	for ( i = 0 ; i < (int)tr.refdef.num_dlights ; i++ ) {
+	for ( i = 0 ; i < (int)R_NumSurfaceDlights( tr.refdef.num_dlights ); i++ ) {
 		if ( ! ( dlightBits & ( 1 << i ) ) ) {
 			continue;
 		}
@@ -298,7 +298,7 @@ static int R_DlightTrisurf( srfTriangles_t *surf, int dlightBits ) {
 	int				i;
 	const dlight_t	*dl;
 
-	for ( i = 0 ; i < (int)tr.refdef.num_dlights ; i++ ) {
+	for ( i = 0 ; i < (int)R_NumSurfaceDlights( tr.refdef.num_dlights ); i++ ) {
 		if ( ! ( dlightBits & ( 1 << i ) ) ) {
 			continue;
 		}
@@ -636,7 +636,7 @@ static void R_RecursiveWorldNode( mnode_t *node, unsigned int planeBits, unsigne
 		if ( dlightBits ) {
 			int	i;
 
-			for ( i = 0 ; i < (int)tr.refdef.num_dlights ; i++ ) {
+			for ( i = 0 ; i < (int)R_NumSurfaceDlights( tr.refdef.num_dlights ); i++ ) {
 				const dlight_t	*dl;
 				float		dist;
 
@@ -875,11 +875,8 @@ void R_AddWorldSurfaces( void ) {
 	ClearBounds( tr.viewParms.visBounds[0], tr.viewParms.visBounds[1] );
 
 	// perform frustum culling and add all the potentially visible surfaces
-	if ( tr.refdef.num_dlights > MAX_DLIGHTS ) {
-		tr.refdef.num_dlights = MAX_DLIGHTS;
-	}
-
-	R_RecursiveWorldNode( tr.world->nodes, 15, ( 1ULL << tr.refdef.num_dlights ) - 1 );
+	/* Do not clamp tr.refdef.num_dlights: Forward+ packs up to VK_FP_MAX_GPU_LIGHTS. */
+	R_RecursiveWorldNode( tr.world->nodes, 15, R_SurfaceDlightBitsMask( tr.refdef.num_dlights ) );
 
 	if ( !r_dlightMode->integer )
 		return;

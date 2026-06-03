@@ -134,6 +134,31 @@ void vk_update_attachment_descriptors( void ) {
 			}
 		}
 
+		if ( vk.motion_vector_view ) {
+			VkDescriptorImageInfo motion_info;
+			VkWriteDescriptorSet motion_desc;
+
+			Com_Memset( &motion_info, 0, sizeof( motion_info ) );
+			motion_info.imageView = vk.motion_vector_view;
+			motion_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			sd.gl_mag_filter = sd.gl_min_filter = GL_NEAREST;
+			sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			sd.max_lod_1_0 = qtrue;
+			sd.noAnisotropy = qtrue;
+			motion_info.sampler = vk_find_sampler( &sd );
+
+			Com_Memset( &motion_desc, 0, sizeof( motion_desc ) );
+			motion_desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			motion_desc.dstBinding = 0;
+			motion_desc.descriptorCount = 1;
+			motion_desc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			motion_desc.pImageInfo = &motion_info;
+			for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ ) {
+				motion_desc.dstSet = vk.taa_motion_descriptor[i];
+				qvkUpdateDescriptorSets( vk.device, 1, &motion_desc, 0, NULL );
+			}
+		}
+
 		if ( r_ssao && r_ssao->integer )
 		{
 			// ssao output
@@ -927,8 +952,10 @@ void vk_init_descriptors( void )
 				VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.post_color_descriptor[i] ) );
 				VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.overlay_color_descriptor[i] ) );
 			}
-		for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ )
+		for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ ) {
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.depth_descriptor[i] ) );
+			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.taa_motion_descriptor[i] ) );
+		}
 
 		if ( r_ssao && r_ssao->integer ) {
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.ssao_descriptor ) );

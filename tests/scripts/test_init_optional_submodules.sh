@@ -16,15 +16,22 @@ fail() {
 "$INIT" --help >/dev/null || fail "--help must exit 0"
 
 if "$INIT" 2>/dev/null; then
-	fail "must require --tiled, --svo, or --all"
+	fail "must require --tiled, --svo, --freeusd, --backend, or --all"
 fi
 
-out="$("$INIT" --tiled --dry-run 2>&1)" || fail "--tiled --dry-run failed"
+if ! grep -qF 'path = src/external/FreeUSD' "$PROJECT_ROOT/.gitmodules"; then
+	fail ".gitmodules missing src/external/FreeUSD"
+fi
+
+if ! grep -qF 'path = src/external/idtech3backend' "$PROJECT_ROOT/.gitmodules"; then
+	fail ".gitmodules missing src/external/idtech3backend"
+fi
+
+out="$("$INIT" --svo --dry-run 2>&1)" || fail "--svo --dry-run failed"
 echo "$out" | grep -q 'dry-run: git' || fail "dry-run must print git submodule command"
-echo "$out" | grep -q 'tools/tiled' || fail "dry-run must mention tools/tiled"
+echo "$out" | grep -q 'SparseVoxelOctree' || fail "dry-run must mention SparseVoxelOctree"
 
-if ! grep -qF 'path = tools/tiled' "$PROJECT_ROOT/.gitmodules"; then
-	fail ".gitmodules missing tools/tiled"
-fi
+out="$("$INIT" --freeusd 2>&1)" || fail "--freeusd failed"
+echo "$out" | grep -qE 'ok: FreeUSD|init: FreeUSD' || fail "--freeusd must init or report already initialized"
 
 echo "PASS: init_optional_submodules.sh"

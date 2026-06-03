@@ -251,7 +251,7 @@ OIT re-enabled after wiring the OIT accum pipeline. When `r_oit 1` + `r_fbo 1`: 
 - **Defensive null checks**: Gamma pass skips and logs a warning if pipeline, descriptor, render pass, or framebuffer is null, avoiding crashes when resources are missing.
 
 ### Deferred / Forward+
-- Shipping path remains **forward**; **`r_renderMode` 1/2** are still placeholders for a hypothetical deferred / alternate pipeline.
+- Shipping path remains **forward**; **`r_renderMode 1`** is deferred (not implemented); **`r_renderMode 2`** latches clustered Forward+ (`tr_render_mode_vk.c`).
 - **Forward+ (Vulkan):** optional tile-culled dynamic lights (`r_forwardPlus`); keep FBO / internal-resolution behavior in mind when debugging tile SSBO lifetime (realloc on render-target resize). Full deferred would still need a separate design pass.
 
 ### Debugging

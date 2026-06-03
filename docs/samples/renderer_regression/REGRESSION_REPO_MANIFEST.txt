@@ -15,6 +15,8 @@ examples/tiled/README.md
 examples/tiled/minimal_demo.tmx
 docs/GLTF.md
 docs/FREEUSD.md
+docs/IDTECH3_BACKEND.md
+src/external/FreeUSD/CMakeLists.txt
 tools/README.md
 tests/data/usd/parity_geom_mesh.usda
 tests/data/usd/parity_shade_preview.usda
@@ -26,6 +28,7 @@ src/renderers/vulkan/tr_gltf_topo.h
 src/renderers/vulkan/iqm.h
 src/renderers/vulkan/vk_temporal.h
 src/renderers/vulkan/vk_temporal.c
+src/renderers/vulkan/tr_render_mode_vk.c
 docs/renderer_validation/SELF_HOSTED_TIER_B.md
 docs/samples/renderer_regression/README.md
 docs/samples/renderer_regression/OPTIONAL_GAME_ASSETS.txt

@@ -8,18 +8,18 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 
 ### Current Architecture
 - Forward renderer with a large HDR/post-processing stack
-- `r_renderMode 1/2` remain placeholders (no full deferred / mode-switched Forward+ path)
+- `r_renderMode`: **0** forward (classic projector; `r_forwardPlus` may still be 1), **1** deferred (lighting not implemented; **`r_deferredGBuffer 1`** allocates scaffold RTs), **2** Forward+ primary (`r_forwardPlus` 1, `r_forwardPlusShade` 1, latched via `vid_restart`)
 - Vulkan is the supported rendering backend
 - **Shared temporal reset policy** (`vk_temporal.c`): centralizes history invalidation for volumetrics, motion vectors, exposure. Resize, map load, camera cut, and missing prev-frame data trigger resets. Ready for future TAA/upscaler integration.
 - See [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_2026_ARCHITECTURE_PASS.md) for the focused 2026 renderer direction
 
 ### Vulkan Forward+ scaffolding
 
-Optional **GPU light packing + per-tile cull** on the existing forward path (not `r_renderMode`):
+**GPU light packing + per-tile cull** on the forward path (`r_forwardPlus` default **1**; `r_renderMode 2` forces it on):
 
 | Cvar | Role |
 |------|------|
-| `r_forwardPlus` | **0** (default) off; **1** on (**latched**; `vid_restart` to apply). Startup logs buffer size when enabled. |
+| `r_forwardPlus` | **1** (default) on; **0** off (**latched**; `vid_restart`). Packs up to **64** refdef dlights on GPU. |
 | `r_forwardPlusMaxPerTile` | **4–8** lights indexed per **16×16** tile (**latched**; `vid_restart`). Lowers GPU work vs default **8**; tile SSBO keeps **8** `uint32` slots either way. |
 | `r_forwardPlusDebug` | **0–1** float: PBR heatmap overlay (lights per tile + borders). |
 | `r_forwardPlusShade` | **0–4** float: experimental **additive** PBR from tile-culled dynamics; skips indices already in the Forward+ `tess.dlightBits` mask (first 32); changing it **invalidates graphics pipelines** (logged). |
@@ -27,7 +27,7 @@ Optional **GPU light packing + per-tile cull** on the existing forward path (not
 | `r_forwardPlusDistanceSort` | **0/1** (default **0**): when overloaded, prefer nearest lights to the camera (`vieworg`). |
 | `r_forwardPlusDepthCull` | **0/1** (default **0**): **0** = tile cull before draws; **1** = cull after opaque, reject lights behind depth at each light’s screen center (reversed-Z). |
 
-**Caps:** at most **`MAX_DLIGHTS` (32)** packed lights so GPU indices match `tess.dlightBits`. If the refdef supplies more, extras are dropped and a **developer** log can note it.
+**Caps:** up to **`VK_FP_MAX_GPU_LIGHTS` (64)** on GPU; **`tess.dlightBits`** skip still applies to indices **0–31** only (classic projector remains **32** lights).
 
 **Resolution:** tile grid uses **`vk_get_render_target_width/height`** (FBO / internal scale). The tile SSBO **reallocates when that size changes**; toggling Forward+ itself still needs **`vid_restart`**.
 
@@ -185,7 +185,8 @@ Code: `src/renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar regist
 |------|---------|-------------|
 | `r_fbo` | 1 | Framebuffer objects (required for PBR, HDR, bloom, MSAA, SMAA, SSAO). Use vid_restart after changing. |
 | `r_pbr` | 1 | Physically Based Rendering (metalness/roughness, IBL). Requires r_fbo 1. |
-| `r_renderMode` | 0 | Rendering path: 0=forward, 1=deferred (placeholder), 2=forward+ (placeholder). Deferred and forward+ would need G-buffers, light culling, and separate passes; they are not implemented yet. |
+| `r_renderMode` | 0 | **0** forward, **1** deferred (forward fallback; scaffold RTs with `r_deferredGBuffer` 1), **2** Forward+ primary. Latched; `vid_restart`. |
+| `r_deferredGBuffer` | 0 | With `r_renderMode` 1: allocate albedo/normal/material G-buffer images (no deferred lighting pass yet). Latched; `r_fbo` 1. |
 | `r_volumetricFog` | 0 | Volumetric fog enable (0=off, 1=on) |
 | `r_vdbFog` | 0 | Blend GPU-uploaded bound VDB density (`vdb_bind_fog`) into global volumetric density (requires `r_volumetricFog` 1 and `VDB_UploadToGPU`) |
 | `r_vdbFogBlend` | 0.5 | VDB density blend weight when `r_vdbFog` 1 |
@@ -203,7 +204,8 @@ Code: `src/renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar regist
 | `r_exposure_auto` | 0 | Eye adaptation (0=manual, 1=temporal blend toward target) |
 | `r_exposure_auto_target` | 0.5 | Target exposure for eye adaptation |
 | `r_exposure_auto_speed` | 2.0 | Adaptation speed (higher = faster) |
-| `r_taa` | 0 | Optional temporal resolve for Vulkan HDR/post-processing. Best for world rendering; history is conservatively invalidated on unstable paths. |
+| `r_taa` | 0 | Temporal resolve after post-fog, before luminance/gamma. Uses `vk_temporal` resets; skips portals, menus, unreliable motion. See [HDR_GAPS.md](HDR_GAPS.md) §6.8. |
+| `r_taaMotionVectors` | 1 | TAA history UV from main-pass motion attachment (1) or depth reprojection (0). |
 | `r_taa_feedbackStationary` | 0.92 | TAA history feedback for stable pixels. Higher = smoother, lower = more responsive. |
 | `r_taa_feedbackMotion` | 0.72 | TAA history feedback for moving pixels. Lower helps reduce ghosting. |
 | `r_taa_sharpen` | 0.12 | Post-resolve sharpening applied inside the TAA pass. |

@@ -14,6 +14,7 @@ See `CLAUDE.md` for canonical build commands. The primary build script is `./scr
 ./scripts/compile_engine.sh vulkan          # Vulkan renderer, Release
 ./scripts/compile_engine.sh vulkan debug    # Vulkan renderer, Debug
 ./scripts/compile_engine.sh vulkan demo     # Also builds idtech3_demo.pk3 → release/demo_game/
+./scripts/compile_engine.sh vulkan rtx      # Same + USE_VULKAN_RTX=ON (RTX demo path)
 ./scripts/compile_engine.sh clean vulkan    # Clean build
 ```
 
@@ -31,7 +32,8 @@ Build artifacts go to `build-vk-Release/` and are copied to `release/`.
 - **FonTS (ICCV 2025) + FLUX**: In-engine image generation uses **`flux_generate`** (cflux2). The separate [FonTS](https://github.com/ArtmeScienceLab/FonTS) typography pipeline is optional: set **`cl_fonts_enable` 1**, **`cl_fonts_repo`**, and **`cl_fonts_cmd`**, then run **`fonts_pipeline`** (see **`docs/FONTS.md`**).
 - **TRELLIS.2 (image-to-3D)**: Runtime pipeline mirroring FLUX: **`trellis_generate`** (async default), **`trellis_status`** / **`trellis_cancel`**, **`trellis_view`**, **`trellis_from_prompt`** (FLUX→TRELLIS chain). Set **`cl_trellis_enable` 1** and **`cl_trellis_repo`** (see **`docs/TRELLIS.md`**). Requires Linux + NVIDIA GPU (24GB+); Python/CUDA runs out-of-process like external FLUX.
 - **VDB volumetric fog (Vulkan)**: **`r_vdb` 1** (default) loads `.nvdb` (NanoVDB leaf/blind CPU decode → GPU 3D texture); console **`vdb_load`**, **`vdb_upload`**, **`vdb_bind_fog`**, **`vdb_list`**, **`vdb_rebuild_majorant`**. Typical path: `vdb_load path/to/grid.nvdb` → `vdb_upload 0` → `vdb_bind_fog 0` → `r_volumetricFog 1` + **`r_vdbFog 1`**. **`r_volumetricFogIntegration 3`** + **`r_vdbMajorantBrick`** enable OpenVDB majorant grid + Woodcock/delta tracking (arXiv:2211.09997-style, real-time). See **`docs/VDB_WOODCOCK_VOLUMETRICS.md`**. Unit test: **`unit_nanovdb_decode`**. Lua: `VDB.load` / `bindAsFog` in game module when enabled.
-- **FreeUSD (default ON)**: **`USE_FREEUSD=ON`** in CMake and **`./scripts/compile_engine.sh`** (pass **`nofreeusd`** to disable). Renderer **`r_freeusd` 1** + **`r_freeusdShaderMap` 1** load `.usda`/`.usd` (UsdGeom.Mesh, PreviewSurface → Q3 shader, `primvars:st`); client **`usd_*`** tools including **`usd_shader_map`** / **`usd_load`**. Demo pk3 ships `models/*.usda` + `demo_usd.cfg`. See **`docs/FREEUSD.md`**.
+- **Vulkan Forward+ / TAA**: **`r_forwardPlus` 1** (default), up to **64** GPU dlights; **`r_renderMode 2`** latches Forward+ shade. **`r_taa 1`** optional temporal resolve; **`r_taaMotionVectors 1`** uses main-pass motion (`gen_frag` `out_motion`). See **`docs/FORWARD_PLUS_PIPELINE_AUDIT.md`**, **`docs/HDR_GAPS.md`** §6.8.
+- **FreeUSD (default ON)**: Git submodule **`src/external/FreeUSD`** ([gopexllc/FreeUSD](https://github.com/gopexllc/FreeUSD)); **`USE_FREEUSD=ON`** in CMake and **`./scripts/compile_engine.sh`** (auto `git submodule update --init`; pass **`nofreeusd`** to disable). Targets link **`freeusd::runtime`** + **`freeusd::c`** via **`idtech3_freeusd`**. Renderer **`r_freeusd` 1**; client **`usd_*`** tools. Init: **`./scripts/init_optional_submodules.sh --freeusd`**. See **`docs/FREEUSD.md`**.
 
 ### Linting / Static Analysis
 
@@ -56,4 +58,6 @@ Build artifacts go to `build-vk-Release/` and are copied to `release/`.
 
 ### Optional submodules
 
+- **FreeUSD** (`src/external/FreeUSD`): default build; see `docs/FREEUSD.md`.
+- **idTech3 Backend** (`src/external/idtech3backend`, [timfox/idtech3backend](https://github.com/timfox/idtech3backend)): `./scripts/init_optional_submodules.sh --backend` — optional game/backend tree; not linked into engine CMake by default; see `docs/IDTECH3_BACKEND.md`.
 - **Tiled Map Editor** (`tools/tiled`, GPL-2.0): `./scripts/init_optional_submodules.sh --tiled` — not built by `compile_engine.sh`; see `docs/TILED.md`.
