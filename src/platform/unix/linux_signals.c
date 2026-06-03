@@ -84,7 +84,7 @@ static void signal_handler( int sig )
 		fprintf( stderr, "\n" );
 		fprintf( stderr, " Try these workarounds:\n" );
 		fprintf( stderr, "   1. Clear shader cache:  rm -rf ~/.nv/GLCache/\n" );
-		fprintf( stderr, "   2. Use OpenGL renderer: +set cl_renderer opengl\n" );
+		fprintf( stderr, "   2. Ensure Vulkan/SDL are built correctly (see docs/DEVELOPMENT_SETUP.md)\n" );
 		fprintf( stderr, "   3. Disable post-process: +set r_bloom 0 +set r_ssao 0\n" );
 		fprintf( stderr, "   4. Update GPU driver to the latest version\n" );
 		fprintf( stderr, "   5. Set r_volumetricFog 0 to disable volumetric fog\n" );

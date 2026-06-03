@@ -412,9 +412,10 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 		else
 			perChannelColorBits = 4;
 
-#ifdef USE_VULKAN_API
+#if defined(USE_OPENGL_API)
+# ifdef USE_VULKAN_API
 		if ( !vulkan )
-#endif
+# endif
 		{
 	
 #ifdef __sgi /* Fix for SGIs grabbing too many bits of color */
@@ -450,6 +451,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 			if ( !r_allowSoftwareGL->integer )
 				SDL_GL_SetAttribute( SDL_GL_ACCELERATED_VISUAL, 1 );
 		}
+#endif /* USE_OPENGL_API */
 
 		if ( ( SDL_window = SDL_CreateWindow( cl_title, x, y, config->vidWidth, config->vidHeight, flags ) ) == NULL )
 		{
@@ -559,7 +561,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 		Com_Printf( "[VK] Couldn't get a visual: %s\n", ( sdl_err && sdl_err[0] ) ? sdl_err : "(no SDL error string)" );
 		Com_Printf( "[VK] SDL video driver: %s\n", SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "(none)" );
 #if defined(__arm__) || defined(__aarch64__)
-		Com_Printf( S_COLOR_YELLOW "[VK] On ARM, Vulkan may be unavailable. Try: ./idtech3.aarch64 +set cl_renderer opengl\n" );
+		Com_Printf( S_COLOR_YELLOW "[VK] On ARM, Vulkan may be unavailable. Ensure SDL was built with Vulkan support (see docs/ARM_RASPBERRY_PI.md).\n" );
 #endif
 		/* SDL built without Vulkan: no point retrying modes/drivers */
 		if ( vulkan && sdl_err && strstr( sdl_err, "Vulkan support" ) != NULL )
@@ -692,7 +694,9 @@ void GLimp_Init( glconfig_t *config )
 	in_nograb = Cvar_Get( "in_nograb", "0", 0 );
 	Cvar_SetDescription( in_nograb, "Do not capture mouse in game, may be useful during online streaming." );
 
+#ifdef USE_OPENGL_API
 	r_allowSoftwareGL = Cvar_Get( "r_allowSoftwareGL", "0", CVAR_LATCH );
+#endif
 
 	r_swapInterval = Cvar_Get( "r_swapInterval", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	r_stereoEnabled = Cvar_Get( "r_stereoEnabled", "0", CVAR_ARCHIVE | CVAR_LATCH );
@@ -976,7 +980,7 @@ void VKimp_Init( glconfig_t *config )
 #if defined(__arm__) || defined(__aarch64__)
 			Com_Printf( S_COLOR_YELLOW "Vulkan failed on ARM. SDL needs Vulkan support.\n" );
 			Com_Printf( "  Build SDL with Vulkan: ./scripts/build_sdl_vulkan_rpi.sh\n" );
-			Com_Printf( "  Or use OpenGL: +set cl_renderer opengl\n" );
+			Com_Printf( "  Vulkan is required; rebuild SDL with Vulkan enabled.\n" );
 #endif
 			Com_Error( ERR_FATAL, "VKimp_Init() - could not load Vulkan subsystem: %s", SDL_GetError() );
 			return;
@@ -986,7 +990,7 @@ void VKimp_Init( glconfig_t *config )
 #if defined(__arm__) || defined(__aarch64__)
 			Com_Printf( S_COLOR_YELLOW "Vulkan failed on ARM. SDL may lack Vulkan support.\n" );
 			Com_Printf( "  Build SDL with Vulkan: ./scripts/build_sdl_vulkan_rpi.sh\n" );
-			Com_Printf( "  Or use OpenGL: +set cl_renderer opengl\n" );
+			Com_Printf( "  Vulkan is required; rebuild SDL with Vulkan enabled.\n" );
 #endif
 			Com_Error( ERR_FATAL, "VKimp_Init() - could not load Vulkan subsystem: %s", SDL_GetError() );
 			return;
