@@ -42,20 +42,26 @@ See [COMPATIBILITY.md](COMPATIBILITY.md) for platform-specific notes.
 
 ### Git submodules (optional)
 
-The engine build does **not** require submodules. Initialize only what you need:
+The default engine build only **auto-inits** the **FreeUSD** submodule (`compile_engine.sh` with `USE_FREEUSD=ON`). Other submodules are optional:
 
 ```bash
+# FreeUSD (also auto-inited on compile when USE_FREEUSD=ON)
+./scripts/init_optional_submodules.sh --freeusd
+
+# Game/backend tree (timfox/idtech3backend — not linked into CMake by default)
+./scripts/init_optional_submodules.sh --backend
+
 # Tiled Map Editor (GPL-2.0, level design — not linked into idtech3)
 ./scripts/init_optional_submodules.sh --tiled
 
 # Sparse voxel octree reference (optional, src/external)
 ./scripts/init_optional_submodules.sh --svo
 
-# Both
+# All optional submodules above
 ./scripts/init_optional_submodules.sh --all
 ```
 
-See [TILED.md](TILED.md) and [tools/README.md](../tools/README.md).
+See [FREEUSD.md](FREEUSD.md), [IDTECH3_BACKEND.md](IDTECH3_BACKEND.md), [TILED.md](TILED.md), and [tools/README.md](../tools/README.md).
 
 ### C# scripting (optional, Mono)
 
@@ -68,7 +74,7 @@ See [CSHARP.md](CSHARP.md). Lua `Engine.*` bindings register on the **client** w
 
 ### FreeUSD (default ON)
 
-`USE_FREEUSD=ON` is the CMake default. The first configure **fetches** [gopexllc/FreeUSD](https://github.com/gopexllc/FreeUSD) via `cmake/FreeUSD.cmake` (network required). Disable with `./scripts/compile_engine.sh vulkan nofreeusd` or `-DUSE_FREEUSD=OFF`.
+`USE_FREEUSD=ON` is the CMake default. The library lives in the **Git submodule** `src/external/FreeUSD` ([gopexllc/FreeUSD](https://github.com/gopexllc/FreeUSD)); `./scripts/compile_engine.sh` runs `git submodule update --init` when needed. If the submodule is missing, CMake **FetchContent** can fetch the same pin (network). Init manually with `./scripts/init_optional_submodules.sh --freeusd`. Disable with `./scripts/compile_engine.sh vulkan nofreeusd` or `-DUSE_FREEUSD=OFF`.
 
 See [FREEUSD.md](FREEUSD.md) for mesh import cvars (`r_freeusd`, `r_freeusdPickLargest`, …) and console tools (`usd_info`, `usd_meshes`, `usd_load`, …). Test USDA files: `tests/data/usd/`.
 
@@ -98,6 +104,9 @@ The primary build entry point is `scripts/compile_engine.sh`. The repository als
 ```bash
 # Vulkan renderer
 ./scripts/compile_engine.sh vulkan
+
+# Vulkan + KHR ray-tracing demo (r_rtx 1, r_rtxDemo 1; requires RT-capable GPU)
+./scripts/compile_engine.sh vulkan rtx
 
 # Debug build
 ./scripts/compile_engine.sh vulkan debug

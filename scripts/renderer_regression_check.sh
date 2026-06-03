@@ -194,17 +194,108 @@ else
 fi
 
 echo ""
-echo "Forward+ tile cull: MAX_LIGHTS vs MAX_DLIGHTS (packed light index range):"
-TR_TYPES="$PROJECT_ROOT/src/renderers/common/tr_types.h"
+echo "Forward+ tile cull: MAX_LIGHTS vs VK_FP_MAX_GPU_LIGHTS (GPU light record cap):"
+FP_H="$PROJECT_ROOT/src/renderers/vulkan/vk_forward_plus.h"
 FP_COMP="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/forward_plus_tile_cull.comp"
-max_dl="$(sed -n 's/^#define[[:space:]]*MAX_DLIGHTS[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$TR_TYPES" | head -1)"
+max_gpu="$(sed -n 's/^#define VK_FP_MAX_GPU_LIGHTS[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$FP_H" | head -1)"
 max_sh="$(sed -n 's/^#define MAX_LIGHTS[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$FP_COMP" | head -1)"
-if [[ -z "$max_dl" || -z "$max_sh" ]]; then
-  fail "could not parse MAX_DLIGHTS from tr_types.h or MAX_LIGHTS from forward_plus_tile_cull.comp"
-elif [[ "$max_sh" != "$max_dl" ]]; then
-  fail "forward_plus_tile_cull MAX_LIGHTS ($max_sh) != MAX_DLIGHTS ($max_dl) - tile cull and dlight index cap disagree"
+if [[ -z "$max_gpu" || -z "$max_sh" ]]; then
+  fail "could not parse VK_FP_MAX_GPU_LIGHTS from vk_forward_plus.h or MAX_LIGHTS from forward_plus_tile_cull.comp"
+elif [[ "$max_sh" != "$max_gpu" ]]; then
+  fail "forward_plus_tile_cull MAX_LIGHTS ($max_sh) != VK_FP_MAX_GPU_LIGHTS ($max_gpu)"
 else
-  pass "forward_plus_tile_cull MAX_LIGHTS=$max_sh matches MAX_DLIGHTS"
+  pass "forward_plus_tile_cull MAX_LIGHTS=$max_sh matches VK_FP_MAX_GPU_LIGHTS (surface dlightBits still MAX_DLIGHTS)"
+fi
+
+echo ""
+echo "Forward+ refdef: tr_world must not clamp tr.refdef.num_dlights (GPU pack uses full count):"
+TR_WORLD="$PROJECT_ROOT/src/renderers/vulkan/tr_world.c"
+TR_LOCAL="$PROJECT_ROOT/src/renderers/vulkan/tr_local.h"
+if grep -q 'tr\.refdef\.num_dlights = MAX_DLIGHTS' "$TR_WORLD" 2>/dev/null; then
+  fail "tr_world.c clamps tr.refdef.num_dlights to MAX_DLIGHTS (breaks Forward+ lights 33-64)"
+elif ! grep -q 'R_SurfaceDlightBitsMask' "$TR_WORLD" 2>/dev/null; then
+  fail "tr_world.c missing R_SurfaceDlightBitsMask for classic dlightBits culling"
+elif ! grep -q 'R_SurfaceDlightBitsMask' "$TR_LOCAL" 2>/dev/null; then
+  fail "tr_local.h missing R_SurfaceDlightBitsMask helper"
+else
+  pass "tr_world preserves refdef.num_dlights; surface mask via R_SurfaceDlightBitsMask"
+fi
+
+echo ""
+echo "TAA shader: neighborhoodMinMax must run before history clamp:"
+TAA_FRAG="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/taa.frag"
+if ! grep -q 'neighborhoodMinMax( uv, mn, mx, avg )' "$TAA_FRAG" 2>/dev/null; then
+  fail "taa.frag missing neighborhoodMinMax() call (history AABB clamp would be undefined)"
+else
+  pass "taa.frag calls neighborhoodMinMax before history clamp"
+fi
+
+echo ""
+echo "r_renderMode latch (tr_render_mode_vk.c):"
+TR_INIT_VK="$PROJECT_ROOT/src/renderers/vulkan/tr_init.c"
+RENDER_MODE_C="$PROJECT_ROOT/src/renderers/vulkan/tr_render_mode_vk.c"
+if [[ ! -f "$RENDER_MODE_C" ]]; then
+  fail "missing tr_render_mode_vk.c (R_ApplyRenderModeLatch)"
+elif ! grep -q 'void R_ApplyRenderModeLatch' "$RENDER_MODE_C" 2>/dev/null; then
+  fail "tr_render_mode_vk.c missing R_ApplyRenderModeLatch"
+elif ! grep -q 'R_ApplyRenderModeLatch();' "$TR_INIT_VK" 2>/dev/null; then
+  fail "tr_init.c should call R_ApplyRenderModeLatch() after R_Register"
+elif ! grep -q 'R_ApplyRenderModeLatch();' "$PROJECT_ROOT/src/renderers/vulkan/vk_forward_plus.c" 2>/dev/null; then
+  fail "vk_forward_plus.c should call R_ApplyRenderModeLatch() during Forward+ init"
+else
+  pass "R_ApplyRenderModeLatch wired (tr_render_mode_vk.c, R_Init, vk_forward_plus)"
+fi
+
+echo ""
+echo "TAA frame gating (unreliable motion, motion barrier):"
+VK_FRAME_END="$PROJECT_ROOT/src/renderers/vulkan/vk_frame_end.c"
+if ! grep -q '!vk.temporal.unreliableMotionThisFrame' "$VK_FRAME_END" 2>/dev/null; then
+  fail "vk_frame_end.c must skip TAA when unreliableMotionThisFrame"
+elif ! grep -q 'vk_barrier_motion_vector_for_sampling' "$VK_FRAME_END" 2>/dev/null; then
+  fail "vk_frame_end.c missing motion-vector barrier before TAA"
+elif ! grep -q 'vk_reset_taa_history' "$PROJECT_ROOT/src/renderers/vulkan/vk_temporal.c" 2>/dev/null || \
+     ! awk '/vk_temporal_commit_frame_state/,/^}/' "$PROJECT_ROOT/src/renderers/vulkan/vk_temporal.c" | grep -q 'unreliableMotionThisFrame'; then
+  fail "vk_temporal_commit_frame_state should reset TAA history on unreliable motion"
+else
+  pass "TAA gated on unreliable motion; motion barrier + history reset present"
+fi
+
+echo ""
+echo "Deferred G-buffer scaffold (r_renderMode 1 + r_deferredGBuffer):"
+VK_ATTACH="$PROJECT_ROOT/src/renderers/vulkan/vk_attachments.c"
+if ! grep -q 'r_deferredGBuffer = ri.Cvar_Get' "$TR_INIT_VK" 2>/dev/null; then
+  fail "tr_init.c missing r_deferredGBuffer cvar"
+elif ! grep -q 'vk_create_deferred_gbuffer_scaffold' "$VK_ATTACH" 2>/dev/null; then
+  fail "vk_attachments.c missing vk_create_deferred_gbuffer_scaffold"
+elif ! grep -q 'deferred_gbuffer_albedo' "$VK_ATTACH" 2>/dev/null; then
+  fail "vk_attachments.c missing deferred_gbuffer_albedo destroy path"
+else
+  pass "r_deferredGBuffer cvar + deferred G-buffer scaffold alloc/teardown"
+fi
+
+echo ""
+echo "TAA: motion-vector path (set 4) and depthParams.z gate:"
+if ! grep -q 'layout(set = 4, binding = 0) uniform sampler2D motionTex' "$TAA_FRAG" 2>/dev/null; then
+  fail "taa.frag missing motionTex binding (set 4)"
+elif ! grep -q 'postfx.depthParams.z' "$TAA_FRAG" 2>/dev/null; then
+  fail "taa.frag missing postfx.depthParams.z motion-vector gate"
+elif ! grep -q 'pipeline_layout_taa' "$PROJECT_ROOT/src/renderers/vulkan/vk_init_device.c" 2>/dev/null; then
+  fail "vk_init_device.c missing pipeline_layout_taa"
+else
+  pass "TAA motion-vector shader + pipeline_layout_taa present"
+fi
+
+echo ""
+echo "RTX demo: invViewProj uses Vulkan projection + render-target extent:"
+RTX_C="$PROJECT_ROOT/src/renderers/vulkan/vk_rtx.c"
+if [[ ! -f "$RTX_C" ]]; then
+  fail "vk_rtx.c missing"
+elif ! grep -q 'vk_get_projection_matrix_vk' "$RTX_C" 2>/dev/null; then
+  fail "vk_rtx.c missing vk_get_projection_matrix_vk (depth reprojection must match main pass)"
+elif ! grep -q 'vk_get_render_target_width' "$RTX_C" 2>/dev/null; then
+  fail "vk_rtx.c missing vk_get_render_target_width (RT dispatch must match FBO depth size)"
+else
+  pass "vk_rtx.c uses Vulkan projection flip and render-target extent"
 fi
 
 echo ""

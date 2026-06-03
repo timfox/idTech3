@@ -258,6 +258,10 @@ void vk_prepare_frame_temporal_state( void )
 		r_taa_sharpen->modified = qfalse;
 		reset_taa = qtrue;
 	}
+	if ( r_taaMotionVectors && r_taaMotionVectors->modified ) {
+		r_taaMotionVectors->modified = qfalse;
+		reset_taa = qtrue;
+	}
 	if ( reset_taa ) {
 		vk_reset_taa_history();
 	}

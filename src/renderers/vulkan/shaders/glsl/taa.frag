@@ -28,6 +28,7 @@ layout(set = 2, binding = 0) uniform PostFXParams {
 	vec4 taaParams;
 } postfx;
 layout(set = 3, binding = 0) uniform sampler2D historyColor;
+layout(set = 4, binding = 0) uniform sampler2D motionTex;
 
 layout(location = 0) in vec2 frag_tex_coord;
 layout(location = 0) out vec4 out_color;
@@ -94,7 +95,13 @@ void main() {
 		return;
 	}
 
-	vec2 historyUV = reprojectHistoryUV( uv, depthNdc );
+	vec2 historyUV;
+	if ( postfx.depthParams.z > 0.5 ) {
+		vec2 motion = textureLod( motionTex, uv, 0.0 ).rg;
+		historyUV = uv - motion;
+	} else {
+		historyUV = reprojectHistoryUV( uv, depthNdc );
+	}
 	if ( any( lessThan( historyUV, vec2( 0.0 ) ) ) || any( greaterThan( historyUV, vec2( 1.0 ) ) ) ) {
 		out_color = vec4( current, 1.0 );
 		return;
@@ -102,6 +109,7 @@ void main() {
 
 	vec3 history = textureLod( historyColor, historyUV, 0.0 ).rgb;
 	vec3 mn, mx, avg;
+	neighborhoodMinMax( uv, mn, mx, avg );
 	vec2 texSize = vec2( textureSize( currentColor, 0 ) );
 	vec2 velocity = ( uv - historyUV ) * texSize;
 	float motion = length( velocity );

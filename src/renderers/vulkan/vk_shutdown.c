@@ -141,6 +141,10 @@ void vk_shutdown( refShutdownCode_t code )
 		qvkDestroyPipelineLayout( vk.device, vk.pipeline_layout_post_process, NULL );
 		vk.pipeline_layout_post_process = VK_NULL_HANDLE;
 	}
+	if ( vk.pipeline_layout_taa != VK_NULL_HANDLE && qvkDestroyPipelineLayout != NULL ) {
+		qvkDestroyPipelineLayout( vk.device, vk.pipeline_layout_taa, NULL );
+		vk.pipeline_layout_taa = VK_NULL_HANDLE;
+	}
 	if ( vk.pipeline_layout_blend != VK_NULL_HANDLE && qvkDestroyPipelineLayout != NULL ) {
 		qvkDestroyPipelineLayout( vk.device, vk.pipeline_layout_blend, NULL );
 		vk.pipeline_layout_blend = VK_NULL_HANDLE;

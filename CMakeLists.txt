@@ -39,6 +39,9 @@ option(ENABLE_ASAN "Enable AddressSanitizer for memory error detection (Debug bu
 option(ENABLE_LTO "Enable IPO/LTO for Release and RelWithDebInfo (GCC/Clang; longer links, smaller/faster binaries)" OFF)
 option(BUILD_EXAMPLE_DEMO_GAME "Build examples/demo_game (idtech3_demo.pk3 + helper)" OFF)
 option(USE_FREEUSD "Link FreeUSD for USDA mesh import and USD scene tools (GPL-2.0-or-later)" ON)
+option(USE_IDTECH3_BACKEND "Require idtech3backend submodule (timfox/idtech3backend); wiring TBD" OFF)
+
+include(${CMAKE_SOURCE_DIR}/cmake/IdTech3Backend.cmake)
 
 if(C_STANDARD_STRICT)
   if(MSVC)

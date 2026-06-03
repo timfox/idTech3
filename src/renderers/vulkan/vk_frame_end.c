@@ -31,6 +31,15 @@ static void vk_end_frame_bind_post_process_sets( VkDescriptorSet set0, VkDescrip
 		vk.pipeline_layout_post_process, 0, 4, sets, 0, NULL );
 }
 
+static void vk_end_frame_bind_taa_sets( VkDescriptorSet set0, VkDescriptorSet set1, VkDescriptorSet set2,
+	VkDescriptorSet set3, VkDescriptorSet set4 )
+{
+	VkDescriptorSet sets[5] = { set0, set1, set2, set3, set4 };
+
+	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+		vk.pipeline_layout_taa, 0, 5, sets, 0, NULL );
+}
+
 static void vk_end_frame_draw_fullscreen_quad( uint32_t width, uint32_t height )
 {
 	vk_set_fullscreen_viewport_scissor( width, height );
@@ -132,13 +141,19 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 	allow_taa = ( tr.world != NULL ) &&
 		( ( backEnd.refdef.rdflags & RDF_NOWORLDMODEL ) == 0 ) &&
 		( backEnd.viewParms.portalView == PV_NONE ) &&
-		( vk.temporal.firstPersonProjectionThisFrame == vk.temporal.firstPersonProjectionLastFrame );
+		( vk.temporal.firstPersonProjectionThisFrame == vk.temporal.firstPersonProjectionLastFrame ) &&
+		!vk.temporal.unreliableMotionThisFrame &&
+		!vk_temporal_has_reason( VK_TEMPORAL_RESET_CAMERA_CUT | VK_TEMPORAL_RESET_MISSING_PREV_DATA |
+			VK_TEMPORAL_RESET_RENDERER_INIT | VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE |
+			VK_TEMPORAL_RESET_RENDER_SIZE_CHANGE | VK_TEMPORAL_RESET_WORLD_CHANGE |
+			VK_TEMPORAL_RESET_CLIENT_STATE_CHANGE );
 
 	if ( !allow_taa ||
 		!( r_taa && r_taa->integer ) ||
 		vk.cmd == NULL || vk.cmd->command_buffer == VK_NULL_HANDLE ||
 		taa_src == VK_NULL_HANDLE ||
 		vk.taa_pipeline == VK_NULL_HANDLE ||
+		vk.pipeline_layout_taa == VK_NULL_HANDLE ||
 		vk.render_pass.taa == VK_NULL_HANDLE ||
 		vk.post_color_descriptor[vk.cmd_index] == VK_NULL_HANDLE ||
 		vk.depth_descriptor[vk.cmd_index] == VK_NULL_HANDLE ||
@@ -157,6 +172,9 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 	writeIndex = 1u - readIndex;
 
 	vk_barrier_post_fog_source_for_sampling( taa_src, "vk_end_frame pre-taa (current)" );
+	if ( r_taaMotionVectors && r_taaMotionVectors->integer && vk.motion_vector_image != VK_NULL_HANDLE ) {
+		vk_barrier_motion_vector_for_sampling( "vk_end_frame pre-taa (motion)" );
+	}
 	if ( vk.temporal.hasValidTAAHistory ) {
 		vk_barrier_post_fog_source_for_sampling( vk.taa_history_image_view[readIndex], "vk_end_frame pre-taa (history)" );
 	}
@@ -166,11 +184,12 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 
 	vk_end_frame_begin_post_process_pass( vk.render_pass.taa, vk.framebuffers.taa[writeIndex],
 		taaWidth, taaHeight, vk.taa_pipeline );
-	vk_end_frame_bind_post_process_sets(
+	vk_end_frame_bind_taa_sets(
 		vk.post_color_descriptor[vk.cmd_index],
 		vk.depth_descriptor[vk.cmd_index],
 		vk.postfx_params_descriptor[vk.cmd_index],
-		vk.taa_history_descriptor[readIndex] );
+		vk.taa_history_descriptor[readIndex],
+		vk.taa_motion_descriptor[vk.cmd_index] );
 	vk_end_frame_draw_fullscreen_quad( taaWidth, taaHeight );
 	vk_end_render_pass();
 

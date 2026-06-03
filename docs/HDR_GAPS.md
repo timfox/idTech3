@@ -78,6 +78,16 @@ Both feed into linear HDR; no conflict.
 
 **Desirable**: On dark monitors or legacy maps authored for CRT gamma, raising `r_gamma` brightens both display and lights-often what users expect. **Problematic**: When using HDR + tonemap, `r_gamma` changes light intensity without changing display gamma (handled by gamma pass), so lights can look too bright or too dim relative to the tonemapped scene. Prefer `r_exposure` or `r_exposure_auto` for HDR brightness control.
 
+## 6.8 TAA (`r_taa`)
+
+**Current**: Optional temporal resolve after the post-fog source (SMAA / volumetrics), before luminance and gamma. Uses `vk_temporal` reset policy (resize, map load, camera cut, missing prev matrices) and skips the pass on portals, `RDF_NOWORLDMODEL`, first-person projection toggles, and **unreliable motion** (e.g. `customShader` vertex deformation).
+
+**History clamp**: `taa.frag` uses a 3×3 neighborhood min/max on the **current** color before blending reprojected history (prevents fireflies when history is valid).
+
+**Motion**: `r_taaMotionVectors` **1** (default) samples the main-pass motion attachment (`gen_frag` `out_motion`, same as volumetric fog). **0** uses depth + `prevViewProj` reprojection only.
+
+**Tuning**: `r_taa_feedbackStationary` / `r_taa_feedbackMotion` / `r_taa_sharpen`. Use `r_temporalDebug 1` to log reset reasons. Default **off**; enable when SMAA alone is not enough.
+
 ---
 
 ## 7. Render Order
@@ -91,8 +101,9 @@ Both feed into linear HDR; no conflict.
 7. **SSAO** (if `r_ssao`): copy `color_image` to `fog_scene`, samples depth, blur, combine with scene into `fog_scene`. When SSAO is on, `fog_scene` becomes the post-fog source.
 8. **Volumetric compute + composite** → fog over scene (when enabled). Reads and writes `fog_scene`.
 9. **SMAA** (if enabled): edge detection, blend, resolve. Runs after volumetrics (or after 2D overlays if volumetrics skipped). Output is the post-fog source.
-10. **Luminance pass** (if `r_exposure_auto`): compute pass on post-fog source; result used next frame for eye adaptation.
-11. **Gamma pass** → tonemap, exposure, gamma → swapchain.
+10. **TAA** (if `r_taa` 1): temporal resolve on post-fog source; history ping-pong in `taa_history` images. Skipped when temporal policy marks the frame unstable.
+11. **Luminance pass** (if `r_exposure_auto`): compute pass on post-fog source (after TAA when enabled); result used next frame for eye adaptation.
+12. **Gamma pass** → tonemap, exposure, gamma → swapchain.
 
 **OIT / SSAO / SSR and HDR**: All operate in HDR space. OIT resolve outputs to `color_image`; SSAO combine writes to `fog_scene`; SSR modifies `color_image`. Luminance and gamma consume the final post-fog source (SMAA output or `fog_scene`/`color_image` when SMAA off).
 

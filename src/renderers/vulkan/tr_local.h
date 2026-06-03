@@ -59,6 +59,21 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_model_gltf.h"
 #include "iqm.h"
 
+/* Classic surface/tess paths use 32-bit dlightBits; Forward+ packs refdef.dlights separately. */
+static inline unsigned int R_NumSurfaceDlights( unsigned int numDlights )
+{
+	return numDlights > (unsigned int)MAX_DLIGHTS ? (unsigned int)MAX_DLIGHTS : numDlights;
+}
+
+static inline unsigned int R_SurfaceDlightBitsMask( unsigned int numDlights )
+{
+	unsigned int n = R_NumSurfaceDlights( numDlights );
+
+	if ( n >= 32u ) {
+		return 0xFFFFFFFFu;
+	}
+	return ( 1u << n ) - 1u;
+}
 
 #ifdef USE_VULKAN
 #include "vk.h"
@@ -1542,6 +1557,8 @@ extern cvar_t	*r_oit;
 extern cvar_t	*r_fbo;
 extern cvar_t	*r_fboCinematic;
 extern cvar_t	*r_renderMode;
+extern cvar_t	*r_deferredGBuffer;
+void R_ApplyRenderModeLatch( void );
 extern cvar_t	*r_hdr;
 extern cvar_t	*r_bloom;
 extern cvar_t	*r_bloom_threshold;
@@ -1585,6 +1602,7 @@ extern cvar_t	*r_taa;
 extern cvar_t	*r_taa_feedbackStationary;
 extern cvar_t	*r_taa_feedbackMotion;
 extern cvar_t	*r_taa_sharpen;
+extern cvar_t	*r_taaMotionVectors;
 extern cvar_t	*r_rtx;
 extern cvar_t	*r_rtxDemo;
 extern cvar_t	*r_rtxWorldPrimCap;

@@ -9,7 +9,7 @@ Modern id Tech 3: **Vulkan renderer with PBR**, validation and smoke-tested buil
 ### Engine pillars
 
 1. **Renderer** - Vulkan 1.x path with PBR, froxel volumetrics, SSAO, MSAA/SMAA, spherical harmonics lighting, SDF HUD text.
-2. **Tooling** - GPU detection, validation layers, performance HUD, safe mode, CI matrix builds, smoke tests and shader validation in the build. Optional **[Tiled Map Editor](docs/TILED.md)** submodule (`tools/tiled`, GPL-2.0) for tile-based level design—not linked into the engine build.
+2. **Tooling** - GPU detection, validation layers, performance HUD, safe mode, CI matrix builds, smoke tests and shader validation in the build. **[FreeUSD](docs/FREEUSD.md)** Git submodule (`src/external/FreeUSD`, default ON) for USDA import and `usd_*` tools. Optional **[Tiled Map Editor](docs/TILED.md)** submodule (`tools/tiled`, GPL-2.0) for tile-based level design—not linked into the engine build.
 3. **Platform** - Linux, Windows, macOS, Android; IPv4/IPv6 networking, modern codecs and asset loaders.
 
 ### Features (by area)

@@ -503,8 +503,8 @@ static void vk_fp_create_buffers_and_compute( void )
 	uint32_t mem_type;
 	uint32_t tiles_x, tiles_y, total_tiles;
 	VkDeviceSize tile_bytes;
-	/* Packed indices must match tess.dlightBits (MAX_DLIGHTS); do not pack extra "real" slots. */
-	const uint32_t max_lights = (uint32_t)MAX_DLIGHTS;
+	/* Up to VK_FP_MAX_GPU_LIGHTS (MAX_REAL_DLIGHTS); indices 0..31 still participate in tess.dlightBits skip. */
+	const uint32_t max_lights = (uint32_t)VK_FP_MAX_GPU_LIGHTS;
 	const VkDeviceSize light_buf_size = (VkDeviceSize)VK_FP_HEADER_BYTES + (VkDeviceSize)max_lights * (VkDeviceSize)VK_FP_RECORD_STRIDE;
 
 	vk.forward_plus.max_per_tile = vk_fp_effective_max_per_tile();
@@ -767,6 +767,8 @@ void vk_forward_plus_update_depth_descriptor( void )
 
 void vk_forward_plus_init( void )
 {
+	R_ApplyRenderModeLatch();
+
 	vk_fp_destroy_compute_pipeline();
 	vk_fp_destroy_buffers();
 	vk_fp_destroy_light_buffer();
@@ -813,8 +815,8 @@ void vk_forward_plus_update_for_refdef( void )
 	base = (float *)vk.forward_plus.staging_ptr;
 	src = backEnd.refdef.num_dlights;
 	n = src;
-	if ( n > (uint32_t)MAX_DLIGHTS ) {
-		n = (uint32_t)MAX_DLIGHTS;
+	if ( n > (uint32_t)VK_FP_MAX_GPU_LIGHTS ) {
+		n = (uint32_t)VK_FP_MAX_GPU_LIGHTS;
 	}
 
 	max_pack = ( vk.forward_plus.capacity_bytes - (uint32_t)VK_FP_HEADER_BYTES ) / (uint32_t)VK_FP_RECORD_STRIDE;
@@ -824,11 +826,12 @@ void vk_forward_plus_update_for_refdef( void )
 
 	if ( src > n ) {
 		if ( src != s_trunc_log_src ) {
-			ri.Printf( PRINT_DEVELOPER, "[VK][Forward+] refdef has %u dlights; packing %u (Forward+ / dlightBits index cap)\n",
-				(unsigned)src, (unsigned)n );
+			ri.Printf( PRINT_DEVELOPER,
+				"[VK][Forward+] refdef has %u dlights; packing %u (Forward+ cap %u; surface dlightBits still %d)\n",
+				(unsigned)src, (unsigned)n, (unsigned)VK_FP_MAX_GPU_LIGHTS, MAX_DLIGHTS );
 			s_trunc_log_src = src;
 		}
-	} else if ( src <= (uint32_t)MAX_DLIGHTS ) {
+	} else if ( src <= (uint32_t)VK_FP_MAX_GPU_LIGHTS ) {
 		s_trunc_log_src = 0u;
 	}
 

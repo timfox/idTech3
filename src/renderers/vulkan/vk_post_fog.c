@@ -156,6 +156,44 @@ VkImage vk_post_fog_source_image( VkImageView color_source )
 	return VK_NULL_HANDLE;
 }
 
+void vk_barrier_motion_vector_for_sampling( const char *reason )
+{
+	VkImageMemoryBarrier barrier;
+
+	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE || vk.motion_vector_image == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	Com_Memset( &barrier, 0, sizeof( barrier ) );
+	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.image = vk.motion_vector_image;
+	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	barrier.subresourceRange.baseMipLevel = 0;
+	barrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
+	barrier.subresourceRange.baseArrayLayer = 0;
+	barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+	barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+	qvkCmdPipelineBarrier(
+		vk.cmd->command_buffer,
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+		0, 0, NULL, 0, NULL, 1, &barrier );
+
+	if ( r_fboDebug && r_fboDebug->integer >= 2 && vk_post_fog_fbo_debug_throttle() ) {
+		ri.Printf( PRINT_DEVELOPER,
+			"[VK][fbo] motion-vector barrier (%s): image=0x%llx view=0x%llx\n",
+			reason ? reason : "unspecified",
+			(unsigned long long)(uintptr_t)vk.motion_vector_image,
+			(unsigned long long)(uintptr_t)vk.motion_vector_view );
+	}
+}
+
 void vk_barrier_post_fog_source_for_sampling( VkImageView color_source, const char *reason )
 {
 	VkImage image;

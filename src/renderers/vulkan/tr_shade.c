@@ -532,7 +532,7 @@ static void ProjectDlightTexture( void ) {
 #endif
 	}
 
-	for ( l = 0 ; l < (int)backEnd.refdef.num_dlights ; l++ ) {
+	for ( l = 0 ; l < (int)R_NumSurfaceDlights( backEnd.refdef.num_dlights ); l++ ) {
 
 		if ( !( tess.dlightBits & ( 1 << l ) ) ) {
 			continue;	// this surface definitely doesn't have any of this light

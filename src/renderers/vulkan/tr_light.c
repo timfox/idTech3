@@ -212,7 +212,7 @@ void R_DlightBmodel( bmodel_t *bmodel ) {
 	R_TransformDlights( tr.refdef.num_dlights, tr.refdef.dlights, &tr.or );
 
 	mask = 0;
-	for ( i = 0; i < (int)tr.refdef.num_dlights; i++ ) {
+	for ( i = 0; i < (int)R_NumSurfaceDlights( tr.refdef.num_dlights ); i++ ) {
 		dl = &tr.refdef.dlights[i];
 
 		// see if the point is close enough to the bounds to matter

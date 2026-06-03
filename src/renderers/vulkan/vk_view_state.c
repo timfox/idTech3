@@ -286,18 +286,27 @@ static int vk_get_current_entity_motion_index( void )
 	return (int)( ent - base );
 }
 
-static qboolean vk_entity_requires_no_motion( const trRefEntity_t *ent )
+static qboolean vk_entity_requires_no_motion( const trRefEntity_t *ent, int motion_index )
 {
 	qboolean markUnreliable = qfalse;
+	qboolean rigidPrevModel = qfalse;
 
 	if ( !ent ) {
 		return qfalse;
 	}
-	if ( ent->e.frame != ent->e.oldframe ) {
-		markUnreliable = qtrue;
+	if ( ent->e.reType == RT_MODEL && motion_index >= 0 &&
+		vk_prev_entity_model_valid[motion_index] &&
+		vk_prev_entity_model_handles[motion_index] == ent->e.hModel &&
+		vk_prev_entity_types[motion_index] == (int)ent->e.reType ) {
+		rigidPrevModel = qtrue;
 	}
-	if ( !markUnreliable && ent->e.backlerp > 0.001f ) {
-		markUnreliable = qtrue;
+	if ( !rigidPrevModel ) {
+		if ( ent->e.frame != ent->e.oldframe ) {
+			markUnreliable = qtrue;
+		}
+		if ( !markUnreliable && ent->e.backlerp > 0.001f ) {
+			markUnreliable = qtrue;
+		}
 	}
 	if ( !markUnreliable && ent->e.customShader &&
 		( !r_temporalCustomShaderMotion || !r_temporalCustomShaderMotion->integer ) ) {
@@ -344,7 +353,7 @@ static void vk_get_prev_mvp_transform( float *prev_mvp )
 		}
 
 		/* Rigid entity motion: previous model matrix. GPU skin deformation uses prev pose in the skin SSBO. */
-		if ( !vk_entity_requires_no_motion( backEnd.currentEntity ) &&
+		if ( !vk_entity_requires_no_motion( backEnd.currentEntity, motion_index ) &&
 			vk_prev_entity_model_valid[motion_index] &&
 			vk_prev_entity_model_handles[motion_index] == backEnd.currentEntity->e.hModel &&
 			vk_prev_entity_types[motion_index] == (int)backEnd.currentEntity->e.reType ) {

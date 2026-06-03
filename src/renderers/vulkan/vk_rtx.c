@@ -14,6 +14,7 @@ caps BLAS triangles (default 262144). See docs/RENDERERS_FUTURE.md.
 #include "vk_rtx_entities.h"
 #include "vk_rtx_world.h"
 #include "vk_util.h"
+#include "vk_view_state.h"
 #include "vk_image_layout.h"
 
 #ifdef USE_VULKAN_RTX
@@ -29,6 +30,18 @@ typedef struct {
 	/* x = r_rtxSamples; yzw reserved */
 	float traceParams[4];
 } VkRtxFrameUBO_t;
+
+static void vk_rtx_get_trace_extent( uint32_t *w, uint32_t *h )
+{
+	*w = vk_get_render_target_width();
+	*h = vk_get_render_target_height();
+	if ( *w == 0u ) {
+		*w = 1u;
+	}
+	if ( *h == 0u ) {
+		*h = 1u;
+	}
+}
 
 static struct {
 	qboolean		ready;
@@ -928,8 +941,7 @@ void vk_rtx_init( void )
 		return;
 	}
 
-	w = ( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u;
-	h = ( glConfig.vidHeight > 0 ) ? (uint32_t)glConfig.vidHeight : 1u;
+	vk_rtx_get_trace_extent( &w, &h );
 
 	Com_Memset( &rtProps, 0, sizeof( rtProps ) );
 	rtProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
@@ -1150,8 +1162,7 @@ void vk_rtx_frame_begin( void )
 		return;
 	}
 
-	w = ( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u;
-	h = ( glConfig.vidHeight > 0 ) ? (uint32_t)glConfig.vidHeight : 1u;
+	vk_rtx_get_trace_extent( &w, &h );
 	if ( w == rtx.width && h == rtx.height ) {
 		return;
 	}
@@ -1185,9 +1196,13 @@ void vk_rtx_record_demo_pass( VkCommandBuffer cmd )
 
 	if ( rtx.rtx_ubo_ptr ) {
 		const float *view = backEnd.viewParms.world.modelViewMatrix;
-		const float *projection = backEnd.viewParms.projectionMatrix;
+		const float *projection = backEnd.useFirstPersonProjection
+			? backEnd.firstPersonProjectionMatrix
+			: backEnd.viewParms.projectionMatrix;
+		float proj_vk[16];
 
-		myGlMultMatrix( view, projection, viewProj );
+		vk_get_projection_matrix_vk( projection, proj_vk );
+		myGlMultMatrix( view, proj_vk, viewProj );
 		if ( !vk_mat4_inverse( viewProj, frameUbo.invViewProj ) ) {
 			Com_Memcpy( frameUbo.invViewProj, viewProj, sizeof( frameUbo.invViewProj ) );
 		}

@@ -11,7 +11,7 @@ This document is a **technical audit** of the current **Forward+ scaffolding** i
 | Layer | Responsibility |
 |--------|----------------|
 | **C / `vk_forward_plus.c`** | CPU packs **staging** (host) light records; **device-local** light SSBO via `vkCmdCopyBuffer` each frame; **tile SSBO** allocation, **param SSBO** (`clipFromWorld` + aux uvec4), compute **pipeline + dispatch**, graphics **descriptor set** (set **18**), tile grid from **`VK_FP_TILE_DIM`** (16 px) and **`vk_get_render_target_width/height`**. |
-| **Compute / `forward_plus_tile_cull.comp`** | Per-tile **light index lists** ( **`MAX_PER_TILE` = 8** ), sphere-in-screen projection cull, **`MAX_LIGHTS` = 32** aligned with **`MAX_DLIGHTS`**. |
+| **Compute / `forward_plus_tile_cull.comp`** | Per-tile **light index lists** ( **`MAX_PER_TILE` = 8** ), sphere-in-screen projection cull, **`MAX_LIGHTS` = 64** aligned with **`VK_FP_MAX_GPU_LIGHTS`** (classic **`dlightBits`** still **`MAX_DLIGHTS` = 32**). |
 | **Fragment / `gen_frag.tmpl`** (PBR) | Optional **debug heatmap** (`r_forwardPlusDebug`), optional **additive experimental shade** (`r_forwardPlusShade` → specialization **`forward_plus_shade_strength`**). Uses **`fp_params.fp_clip_from_world`** and SSBO light + tile data. |
 | **Uniform bridge / `tr_shade.c`** | When Forward+ is on, **`pbrForwardPlus.y`** carries **`floatBitsToUint(tess.dlightBits)`** so the fragment path can **skip** culled lights that the surface already received via the classic packed path (first **32** indices). |
 
@@ -58,7 +58,7 @@ Packed as **`float`** array in **`vk_forward_plus_update_for_refdef`**:
 
 **PBR shade parity (incremental):** experimental Forward+ shade in **`gen_frag.tmpl`** uses the same **radial** falloff as the classic projected dlight path for **point** lights (`1 - (dist/radius)^2`, matching **`light_frag.tmpl`** / **`VK_SetLightParams`**). **Linear** lights use **`vk_linear_dlight_cone_cosines`** for outer/inner cone cosines (shared with volumetrics). Perpendicular tube falloff uses a **squared** rim term for closer behavior to the point sphere. **`dlight_t.additive`** is packed in the fourth record **`vec4` `.z`** and applies a small brightness boost (legacy **ADD** blend is not identical in PBR, but this reduces “flat” additive props). **`pbrForwardPlus.y`** still carries **`tess.dlightBits`** so indices already handled by the multi-pass projector are **skipped** in Forward+ shade.
 
-**Caps:** at most **`MAX_DLIGHTS` (32)** lights for index compatibility with **`tess.dlightBits`**. Packing may be further limited by **buffer capacity**; overflow is clamped with a **developer** log (rate-limited by last source count).
+**Caps:** up to **`VK_FP_MAX_GPU_LIGHTS` (64)** lights packed from **`backEnd.refdef.dlights`** (matches **`MAX_REAL_DLIGHTS`**). Surface **`tess.dlightBits`** still covers only the first **`MAX_DLIGHTS` (32)** indices for skip/double-count avoidance. Overflow beyond 64 is clamped with a **developer** log.
 
 ### 3.2 Tile buffer (`binding = 1`)
 
@@ -122,7 +122,8 @@ Linear array: **`total_tiles × MAX_PER_TILE`** **`uint32`** indices. Unused slo
 
 `scripts/renderer_regression_check.sh` asserts:
 
-- **`MAX_LIGHTS` == `MAX_DLIGHTS`**
+- **`MAX_LIGHTS` == `VK_FP_MAX_GPU_LIGHTS`** (compute); **`MAX_DLIGHTS`** remains the surface **`dlightBits`** ceiling
+- **`tr_world.c`** does **not** clamp **`tr.refdef.num_dlights`** (Forward+ pack uses full refdef count up to 64)
 - **`MAX_PER_TILE` == `VK_FP_MAX_PER_TILE`**
 - **`VK_FP_MIN_PER_TILE` ≤ `MAX_PER_TILE`**
 - **`r_forwardPlusMaxPerTile`** CheckRange uses **`vk_forward_plus_get_*_per_tile_cap`**

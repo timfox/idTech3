@@ -91,12 +91,12 @@ Priorities that keep **CI green** and **README/build truth** aligned:
 | P2 | **glTF CPU tess polish** | **`r_gltfCpuQtangent`** qtangent recompute when stage textures look like a normal map (`norm` / `bump` / `nmap` / `_n.`); **`_norm`** shader try from `normalTexture` on CPU tess path |
 | P2 | **Engine systems hardening** | Telemetry / replay / save / quest / dialogue - define stable APIs + minimal tests |
 | P3 | **GOAP content** | Data-driven actions; perf limits; debug draw |
-| P3 | **Vulkan architecture pass** | Clustered Forward+, motion history - see below |
+| P3 | **Vulkan architecture pass** | Forward+ **64** GPU lights + `r_renderMode 2` latch done; TAA optional with motion vectors — polish motion on skinned/customShader |
 
 ### Renderer 2026 Architecture Pass
-- [ ] Lighting scalability: move Vulkan from legacy dynamic-light selection toward clustered Forward+; decouple Vulkan light scale from `MAX_DLIGHTS` and surface-bit assumptions. See `docs/RENDERER_2026_ARCHITECTURE_PASS.md`.
-- [ ] Temporal robustness: introduce shared history invalidation and stronger motion-vector coverage before adding TAA/upscaling or RT reuse systems. See `docs/RENDERER_2026_ARCHITECTURE_PASS.md`.
-  - Incremental progress on `main`: shared temporal reset policy is already in place; recent hardening passes now gate or bypass unstable first-person TAA history and improve post/gamma source-region tracking for internal-resolution presentation. More post-pass dimension cleanup is still needed before calling the temporal path "done."
+- [x] Lighting scalability (incremental): clustered Forward+ packs **64** GPU lights; classic projector/`dlightBits` remain **32**; `r_renderMode 2` latches Forward+ shade. See `docs/RENDERER_2026_ARCHITECTURE_PASS.md`.
+- [ ] Temporal robustness (incremental in progress): shared reset policy + optional **`r_taa`** with motion-vector path; per-entity unreliable motion and full skinned motion coverage still open. See `docs/RENDERER_2026_ARCHITECTURE_PASS.md`.
+  - On `main`: TAA skips portals/camera cuts/`unreliableMotionThisFrame`; `taa.frag` neighborhood clamp; RTX demo uses Vulkan projection + render-target extent.
 - [ ] Platform strategy: Vulkan as the supported renderer; prioritize Metal ahead of DXR; treat RTX as a Vulkan feature tier. See `docs/RENDERER_2026_ARCHITECTURE_PASS.md`.
 
 ### Short-Term (completed)

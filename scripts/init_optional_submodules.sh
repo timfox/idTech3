@@ -8,6 +8,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DO_TILED=0
 DO_SVO=0
 DO_FREEUSD=0
+DO_BACKEND=0
 DRY_RUN=0
 
 usage() {
@@ -20,6 +21,7 @@ Options:
   --tiled     tools/tiled (Tiled Map Editor, GPL-2.0) — see docs/TILED.md
   --svo       src/external/src/SparseVoxelOctree
   --freeusd   src/external/FreeUSD (USDA library; default USE_FREEUSD=ON) — see docs/FREEUSD.md
+  --backend   src/external/idtech3backend (timfox/idtech3backend) — see docs/IDTECH3_BACKEND.md
   --all       Initialize every optional submodule listed above
   --dry-run   Print commands without running git submodule
   --help      Show this help
@@ -29,7 +31,7 @@ Examples:
   ./scripts/init_optional_submodules.sh --all
   ./scripts/init_optional_submodules.sh --tiled --dry-run
 
-Error: pass at least one of --tiled, --svo, --freeusd, or --all.
+Error: pass at least one of --tiled, --svo, --freeusd, --backend, or --all.
 EOF
 }
 
@@ -38,7 +40,8 @@ while [ $# -gt 0 ]; do
 		--tiled) DO_TILED=1 ;;
 		--svo) DO_SVO=1 ;;
 		--freeusd) DO_FREEUSD=1 ;;
-		--all) DO_TILED=1; DO_SVO=1; DO_FREEUSD=1 ;;
+		--backend|--idtech3backend) DO_BACKEND=1 ;;
+		--all) DO_TILED=1; DO_SVO=1; DO_FREEUSD=1; DO_BACKEND=1 ;;
 		--dry-run) DRY_RUN=1 ;;
 		-h|--help)
 			usage
@@ -53,8 +56,8 @@ while [ $# -gt 0 ]; do
 	shift
 done
 
-if [ "$DO_TILED" -eq 0 ] && [ "$DO_SVO" -eq 0 ] && [ "$DO_FREEUSD" -eq 0 ]; then
-	echo "Error: pass at least one of --tiled, --svo, --freeusd, or --all." >&2
+if [ "$DO_TILED" -eq 0 ] && [ "$DO_SVO" -eq 0 ] && [ "$DO_FREEUSD" -eq 0 ] && [ "$DO_BACKEND" -eq 0 ]; then
+	echo "Error: pass at least one of --tiled, --svo, --freeusd, --backend, or --all." >&2
 	usage >&2
 	exit 2
 fi
@@ -99,6 +102,9 @@ if [ "$DO_SVO" -eq 1 ]; then
 fi
 if [ "$DO_FREEUSD" -eq 1 ]; then
 	init_one "src/external/FreeUSD" "FreeUSD (gopexllc/FreeUSD)"
+fi
+if [ "$DO_BACKEND" -eq 1 ]; then
+	init_one "src/external/idtech3backend" "idTech3 Backend (timfox/idtech3backend)"
 fi
 
 echo "optional submodules: finished"

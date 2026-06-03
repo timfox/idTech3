@@ -169,6 +169,7 @@ cvar_t	*r_gltfGpu;
 cvar_t	*r_gltfGpuTangentFix;
 cvar_t	*r_fbo;
 cvar_t	*r_renderMode;
+cvar_t	*r_deferredGBuffer;
 cvar_t	*r_hdr;
 cvar_t	*r_bloom;
 cvar_t	*r_bloom_threshold;
@@ -226,6 +227,7 @@ cvar_t	*r_taa;
 cvar_t	*r_taa_feedbackStationary;
 cvar_t	*r_taa_feedbackMotion;
 cvar_t	*r_taa_sharpen;
+cvar_t	*r_taaMotionVectors;
 cvar_t	*r_rtx;
 cvar_t	*r_rtxDemo;
 cvar_t	*r_rtxWorldPrimCap;
@@ -2605,7 +2607,7 @@ static void R_Register( void )
 		"Vulkan PBR: GPU vertex skinning and morph for glTF (joint matrix SSBO + morph deltas; top-8 morph weights per draw, incl. RE_SetEntityMorphWeight). Falls back to CPU tess when off or constraints fail." );
 	ri.Cvar_SetGroup( r_gltfGpu, CVG_RENDERER );
 
-	r_gltfGpuTangentFix = ri.Cvar_Get( "r_gltfGpuTangentFix", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	r_gltfGpuTangentFix = ri.Cvar_Get( "r_gltfGpuTangentFix", "2", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_gltfGpuTangentFix, "0", "2", CV_INTEGER );
 	ri.Cvar_SetDescription( r_gltfGpuTangentFix,
 		"Vulkan PBR glTF GPU tangent: 0=bind-pose T only, 1=Gram–Schmidt vs deformed N after skin+morph (default), 2=topology-weighted MikkTSpace-inspired average from incident triangles (needs per-primitive topo; see docs/GLTF.md). Latched: vid_restart to rebuild pipelines." );
@@ -3644,7 +3646,16 @@ static void R_Register( void )
 	ri.Cvar_SetGroup( r_fbo, CVG_RENDERER );
 	r_renderMode = ri.Cvar_Get( "r_renderMode", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_renderMode, "0", "2", CV_INTEGER );
-	ri.Cvar_SetDescription( r_renderMode, "Rendering path. Requires vid_restart.\n 0: Forward (default)\n 1: Deferred (placeholder)\n 2: Forward+ (placeholder)\nDeferred and forward+ would need G-buffers, light culling, and separate passes; they are not implemented yet." );
+	ri.Cvar_SetDescription( r_renderMode, "Vulkan lighting path (latched, vid_restart).\n 0: Forward (classic projector; r_forwardPlus may still be 1)\n 1: Deferred G-buffer (forward fallback; set r_deferredGBuffer 1 to alloc scaffold RTs)\n 2: Forward+ primary (sets r_forwardPlus 1 and r_forwardPlusShade 1; GPU cap VK_FP_MAX_GPU_LIGHTS)" );
+	r_deferredGBuffer = ri.Cvar_Get( "r_deferredGBuffer", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_deferredGBuffer, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_deferredGBuffer,
+		"With r_renderMode 1: allocate full-res G-buffer images (albedo=color format, normal/material R16G16). "
+		"No deferred lighting pass yet; forward path unchanged. Requires r_fbo 1 and vid_restart." );
+	ri.Cvar_SetGroup( r_deferredGBuffer, CVG_RENDERER );
+	if ( r_deferredGBuffer && r_deferredGBuffer->integer ) {
+		ri.Printf( PRINT_ALL, "[VK][deferred] r_deferredGBuffer=1 (G-buffer RTs when r_renderMode 1; lighting pass not wired)\n" );
+	}
 	r_hdr = ri.Cvar_Get( "r_hdr", "2", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_hdr, "-1", "3", CV_INTEGER );
 	ri.Cvar_SetDescription(r_hdr, "HDR frame buffer format. Requires \\r_fbo 1.\n -1: 4-bit (B4G4R4A4), testing only\n  0: 8-bit, moderate banding\n  1: 16-bit float (RGBA16F)\n  2: 32-bit float (RGBA32F), default, fallback to 16F if unsupported\n  3: 64-bit float (RGBA64F), optional; falls back to 32F (glslang lacks dvec4 fragment output support)\n" );
@@ -3858,7 +3869,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_smaa_corner_rounding, "SMAA corner rounding strength (0=off, 1=full). Attenuates edges at L-corners for smoother silhouettes." );
 	r_taa = ri.Cvar_Get( "r_taa", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_taa, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_taa, "Optional temporal resolve for Vulkan HDR post-processing. Disabled by default in favor of SMAA/MSAA paths." );
+	ri.Cvar_SetDescription( r_taa, "Temporal resolve for Vulkan HDR post (after post-fog). Uses vk_temporal reset policy (resize, map load, camera cut). r_taaMotionVectors 1 uses main-pass per-pixel motion when available. Disabled by default; prefer SMAA when unstable." );
 	ri.Cvar_SetGroup( r_taa, CVG_RENDERER );
 	r_taa_feedbackStationary = ri.Cvar_Get( "r_taa_feedbackStationary", "0.92", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_taa_feedbackStationary, "0.0", "0.99", CV_FLOAT );
@@ -3872,6 +3883,10 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_taa_sharpen, "0.0", "1.0", CV_FLOAT );
 	ri.Cvar_SetDescription( r_taa_sharpen, "Post-resolve sharpening amount applied inside the TAA pass." );
 	ri.Cvar_SetGroup( r_taa_sharpen, CVG_RENDERER );
+	r_taaMotionVectors = ri.Cvar_Get( "r_taaMotionVectors", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_taaMotionVectors, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_taaMotionVectors, "TAA history UV: 1=main-pass motion vectors (gen_frag out_motion), 0=depth reprojection only." );
+	ri.Cvar_SetGroup( r_taaMotionVectors, CVG_RENDERER );
 
 	r_rtx = ri.Cvar_Get( "r_rtx", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_rtx, "0", "3", CV_INTEGER );
@@ -3911,7 +3926,7 @@ static void R_Register( void )
 	ri.Cvar_SetGroup( r_vdbFogBlend, CVG_RENDERER );
 	r_forwardPlus = ri.Cvar_Get( "r_forwardPlus", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_forwardPlus, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_forwardPlus, "Forward+ (default 1 on Vulkan): device-local light SSBO + per-tile cull compute (16px tiles; max from \\r_forwardPlusMaxPerTile, default 8). Packs at most MAX_DLIGHTS (32) for tess.dlightBits. PBR: \\r_forwardPlusDebug, \\r_forwardPlusShade. Set 0 to disable (vid_restart). See docs/RENDERER_2026_ARCHITECTURE_PASS.md." );
+	ri.Cvar_SetDescription( r_forwardPlus, "Forward+ (default 1 on Vulkan): device-local light SSBO + per-tile cull (16px tiles; \\r_forwardPlusMaxPerTile 4-8). Packs up to 64 refdef dlights on GPU; tess.dlightBits skip applies to indices 0-31 only. PBR: \\r_forwardPlusDebug, \\r_forwardPlusShade. r_renderMode 2 forces this on. See docs/FORWARD_PLUS_PIPELINE_AUDIT.md." );
 	ri.Cvar_SetGroup( r_forwardPlus, CVG_RENDERER );
 	r_forwardPlusMaxPerTile = ri.Cvar_Get( "r_forwardPlusMaxPerTile", "8", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	{
@@ -4049,6 +4064,7 @@ void R_Init( void ) {
 	R_NoiseInit();
 
 	R_Register();
+	R_ApplyRenderModeLatch();
 	ri.Printf( PRINT_ALL, "[VK] SH lighting: %s\n", r_shLighting && r_shLighting->integer ? "enabled" : "disabled" );
 	ri.Printf( PRINT_ALL, "[VK] SH world: %s\n", r_shWorldLighting && r_shWorldLighting->integer ? "enabled" : "disabled" );
 	ri.Printf( PRINT_ALL, "[VK] SH debug view: %d\n", r_shDebugView ? r_shDebugView->integer : 0 );

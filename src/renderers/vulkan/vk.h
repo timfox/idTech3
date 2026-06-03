@@ -659,6 +659,7 @@ typedef struct {
 	VkPipelineLayout pipeline_layout;			// default shaders
 	VkPipelineLayout pipeline_layout_storage;	// flare test shader layout
 	VkPipelineLayout pipeline_layout_post_process;	// post-processing
+	VkPipelineLayout pipeline_layout_taa;	/* post-processing + motion vectors (set 4) */
 	VkPipelineLayout pipeline_layout_blend;		// post-processing
 	VkPipelineLayout pipeline_layout_smaa;
 	VkPipelineLayout pipeline_layout_ssao;		// ssao (depth + push constants)
@@ -721,6 +722,7 @@ typedef struct {
 	VkImageView post_fog_color_source;	/* last source for gamma (color_image or smaa_output) */
 	VkImageView scene_post_fog_color_source;	/* scene-only source for luminance/exposure before HUD/console */
 	VkDescriptorSet depth_descriptor[NUM_COMMAND_BUFFERS];	/* per-frame (VUID-03047) */
+	VkDescriptorSet taa_motion_descriptor[NUM_COMMAND_BUFFERS];
 		VkDescriptorSet postfx_params_descriptor[NUM_COMMAND_BUFFERS];
 		VkDescriptorSet smaa_edge_descriptor;
 		VkDescriptorSet smaa_blend_descriptor;
@@ -741,6 +743,15 @@ typedef struct {
 		VkImageView smaa_output_image_view;
 		VkImage taa_history_image[2];
 		VkImageView taa_history_image_view[2];
+
+	/* Deferred G-buffer scaffold (r_renderMode 1 + r_deferredGBuffer 1); no lighting pass yet */
+	VkImage deferred_gbuffer_albedo;
+	VkImageView deferred_gbuffer_albedo_view;
+	VkImage deferred_gbuffer_normal;
+	VkImageView deferred_gbuffer_normal_view;
+	VkImage deferred_gbuffer_material;
+	VkImageView deferred_gbuffer_material_view;
+	qboolean deferredGbufferAllocated;
 
 	VkImage bloom_image[1+VK_NUM_BLOOM_PASSES*2];
 	VkImageView bloom_image_view[1+VK_NUM_BLOOM_PASSES*2];
@@ -1167,7 +1178,7 @@ typedef struct {
 	qboolean colorWriteMaskDynamic;
 	qboolean meshShaderNV; /* VK_NV_mesh_shader enabled at device create (r_vk_meshShaderNV); no mesh pipelines yet */
 #ifdef USE_VULKAN_RTX
-	qboolean rtxAvailable; /* VK_KHR_ray_tracing_pipeline + AS + BDA enabled; trace/AS build not integrated */
+	qboolean rtxAvailable; /* KHR RT pipeline + AS + BDA; demo trace (r_rtxDemo) when r_rtx>0 — not production hybrid lighting */
 #endif
 
 	float maxAnisotropy;

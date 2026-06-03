@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: ./compile_engine.sh [game_name] [Debug|Release] [clean] [quiet] [coverage] [asan] [lto] [vulkan] [aarch64] [freetype] [lua] [duktape|no-duktape] [system-duktape] [nofreeusd] [skipshaders] [demo] [--out DIR] [mac-app <target> [arch]] [mac-ub2 [notarize]]
+# Usage: ./compile_engine.sh [game_name] [Debug|Release] [clean] [quiet] [coverage] [asan] [lto] [vulkan] [rtx] [aarch64] [freetype] [lua] [duktape|no-duktape] [system-duktape] [nofreeusd] [skipshaders] [demo] [--out DIR] [mac-app <target> [arch]] [mac-ub2 [notarize]]
 # Notes:
 # - build type defaults to Release
 # - Vulkan is the only renderer backend
@@ -19,6 +19,7 @@ DUKTAPE=1
 SYSTEM_DUKTAPE=0
 CSHARP=0
 FREEUSD=1
+VULKAN_RTX=0
 CROSS_AARCH64=0
 CODECS_FOR_CROSS=0
 BUILD_DEMO_PK3=0
@@ -135,6 +136,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     duktape|js)
       DUKTAPE=1
+      shift
+      ;;
+    rtx|vulkan-rtx|vulkan_rtx)
+      VULKAN_RTX=1
       shift
       ;;
     nofreeusd|no-freeusd|nofree-usd)
@@ -331,6 +336,13 @@ else
   echo "CMake: USE_FREEUSD=OFF"
 fi
 
+if [ "$VULKAN_RTX" -eq 1 ]; then
+  CMAKE_FLAGS+=("-DUSE_VULKAN_RTX=ON")
+  echo "CMake: USE_VULKAN_RTX=ON (KHR ray tracing demo; set r_rtx 1 + vid_restart)"
+else
+  CMAKE_FLAGS+=("-DUSE_VULKAN_RTX=OFF")
+fi
+
 CMAKE_FLAGS+=("-DRENDERER_DEFAULT=vulkan")
 
 if [ "$SKIP_IDPAK" -eq 1 ]; then
@@ -350,6 +362,15 @@ fi
 
 if [ "$LTO" -eq 1 ]; then
   echo "CMake: ENABLE_LTO=ON (IPO/LTO for Release/RelWithDebInfo on GCC/Clang; expect longer links)"
+fi
+
+if [ "$FREEUSD" -eq 1 ] && [ -f "$PROJECT_ROOT/.gitmodules" ]; then
+  if [ ! -f "$PROJECT_ROOT/src/external/FreeUSD/CMakeLists.txt" ]; then
+    echo "Initializing FreeUSD submodule (src/external/FreeUSD)..."
+    if ! git -C "$PROJECT_ROOT" submodule update --init src/external/FreeUSD; then
+      echo "Warning: FreeUSD submodule init failed; CMake may use FetchContent fallback." >&2
+    fi
+  fi
 fi
 
 echo "Running CMake configuration..."
