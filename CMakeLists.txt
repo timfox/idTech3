@@ -2696,6 +2696,19 @@ if(BUILD_UNIT_TESTS)
 	add_test(NAME unit_parse COMMAND unit_parse)
 	set_tests_properties(unit_parse PROPERTIES LABELS "unit;validation")
 
+	add_executable(unit_engine_sprite_map
+		tests/unit/test_engine_sprite_map.c
+		tests/stub_qcommon_min.c
+		src/qcommon/q_shared.c
+		src/qcommon/q_math.c
+		src/qcommon/engine_sprite_map.c)
+	target_include_directories(unit_engine_sprite_map PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_engine_sprite_map PRIVATE m)
+	endif()
+	add_test(NAME unit_engine_sprite_map COMMAND unit_engine_sprite_map)
+	set_tests_properties(unit_engine_sprite_map PROPERTIES LABELS "unit;validation")
+
 	add_executable(unit_endian
 		tests/unit/test_endian.c
 		tests/stub_qcommon_min.c

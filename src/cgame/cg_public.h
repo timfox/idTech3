@@ -198,6 +198,10 @@ typedef enum {
 
 	CG_EMIT_JSEVENT,  /* void trap_EmitJSEvent( const char *eventName, const char *s0, const char *s1, int i0, int i1 ) */
 
+	CG_ENGINE_SPRITE_ADD_LOCAL,	/* void trap_EngineSpriteAddLocal( int type, qhandle_t shader,
+									   float x, float y, float z, float radius, float rotation,
+									   int cols, int rows, float fps, int timeMs ) timeMs 0 = now */
+
 	CG_TRAP_GETVALUE = COM_TRAP_GETVALUE,
 
 } cgameImport_t;

@@ -215,11 +215,15 @@ void CL_EngineSprites_AddFromSnapshot( void ) {
 }
 
 void CL_EngineSprite_AddLocal( const engineSpriteDesc_t *desc ) {
+	CL_EngineSprite_AddLocalAtTime( desc, cls.realtime );
+}
+
+void CL_EngineSprite_AddLocalAtTime( const engineSpriteDesc_t *desc, int timeMs ) {
 	if ( !desc || !desc->shader ) {
 		return;
 	}
 	if ( re.AddEngineSpriteToSceneAtTime ) {
-		re.AddEngineSpriteToSceneAtTime( desc, cls.realtime );
+		re.AddEngineSpriteToSceneAtTime( desc, timeMs );
 	} else if ( re.AddEngineSpriteToScene ) {
 		re.AddEngineSpriteToScene( desc );
 	}

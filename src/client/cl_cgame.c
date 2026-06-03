@@ -499,6 +499,10 @@ static qboolean CL_GetValue( char* value, int valueSize, const char* key ) {
 		Com_sprintf( value, valueSize, "%i", CG_EMIT_JSEVENT );
 		return qtrue;
 	}
+	if ( !Q_stricmp( key, "trap_EngineSpriteAddLocal" ) ) {
+		Com_sprintf( value, valueSize, "%i", CG_ENGINE_SPRITE_ADD_LOCAL );
+		return qtrue;
+	}
 
 	if ( !Q_stricmp( key, "trap_Cvar_SetDescription_Q3E" ) ) {
 		Com_sprintf( value, valueSize, "%i", CG_CVAR_SETDESCRIPTION );
@@ -904,6 +908,32 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 	case CG_EMIT_JSEVENT:
 		Com_ScriptEmitEvent( (const char *)VMA(1), (const char *)VMA(2), (const char *)VMA(3), args[4], args[5] );
 		return 0;
+
+	case CG_ENGINE_SPRITE_ADD_LOCAL: {
+		engineSpriteDesc_t desc;
+		int timeMs;
+
+		Com_Memset( &desc, 0, sizeof( desc ) );
+		desc.type = (engineSpriteType_t)args[1];
+		desc.shader = (qhandle_t)args[2];
+		desc.origin[0] = VMF( 3 );
+		desc.origin[1] = VMF( 4 );
+		desc.origin[2] = VMF( 5 );
+		desc.radius = VMF( 6 );
+		desc.rotation = VMF( 7 );
+		desc.cols = args[8] > 0 ? (int)args[8] : 1;
+		desc.rows = args[9] > 0 ? (int)args[9] : 1;
+		desc.fps = VMF( 10 );
+		if ( desc.fps <= 0.0f ) {
+			desc.fps = 8.0f;
+		}
+		timeMs = (int)args[11];
+		if ( timeMs <= 0 ) {
+			timeMs = cls.realtime;
+		}
+		CL_EngineSprite_AddLocalAtTime( &desc, timeMs );
+		return 0;
+	}
 
 	default:
 		Com_Error( ERR_DROP, "Bad cgame system trap: %ld", (long int) args[0] );
