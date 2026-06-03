@@ -353,7 +353,7 @@ int AAS_LoadAASFile(char *filename)
 	botimport.FS_FOpenFile( filename, &fp, FS_READ );
 	if (!fp)
 	{
-		AAS_Error("can't open %s\n", filename);
+		botimport.Print( PRT_WARNING, "missing %s (bot navigation unavailable)\n", filename );
 		return BLERR_CANNOTOPENAASFILE;
 	} //end if
 	//read the header

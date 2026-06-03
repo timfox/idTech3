@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: ./compile_engine.sh [game_name] [Debug|Release] [clean] [quiet] [coverage] [asan] [lto] [vulkan] [opengl] [aarch64] [freetype] [lua] [duktape|no-duktape] [system-duktape] [skipshaders] [demo] [--out DIR] [mac-app <target> [arch]] [mac-ub2 [notarize]]
+# Usage: ./compile_engine.sh [game_name] [Debug|Release] [clean] [quiet] [coverage] [asan] [lto] [vulkan] [aarch64] [freetype] [lua] [duktape|no-duktape] [system-duktape] [skipshaders] [demo] [--out DIR] [mac-app <target> [arch]] [mac-ub2 [notarize]]
 # Notes:
 # - build type defaults to Release
-# - vulkan and opengl are mutually exclusive
-# - if neither is specified: defaults to Vulkan
+# - Vulkan is the only renderer backend
 # - demo: BUILD_EXAMPLE_DEMO_GAME=ON, builds demo_game_pk3 (idtech3_demo.pk3), copies to release/demo_game/ when present
 # - aarch64: cross-compile for Linux aarch64 (requires gcc-aarch64-linux-gnu); may fail without ARM sysroot
 # - mac-app wraps the legacy bundle script (requires release|debug target, optional architecture)
@@ -13,7 +12,6 @@ set -euo pipefail
 # - first unrecognized arg becomes game_name
 
 VULKAN=0
-OPENGL=0
 SKIP_IDPAK=0
 FREETYPE=0
 LUA=0
@@ -105,7 +103,8 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     opengl)
-      OPENGL=1
+      echo "Error: OpenGL has been removed; use the Vulkan renderer." >&2
+      exit 1
       shift
       ;;
     aarch64|cross-aarch64)
@@ -206,22 +205,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [ "$VULKAN" -eq 1 ] && [ "$OPENGL" -eq 1 ]; then
-  echo "Error: vulkan and opengl are mutually exclusive"
-  exit 1
-fi
-
 # Default to Vulkan if neither specified
-if [ "$VULKAN" -eq 0 ] && [ "$OPENGL" -eq 0 ]; then
+if [ "$VULKAN" -eq 0 ]; then
   VULKAN=1
 fi
 
-# Renderer-specific build directory (prevents cache collisions)
-if [ "$VULKAN" -eq 1 ]; then
-  BUILD_DIR="$PROJECT_ROOT/build-vk-${BUILD_TYPE}"
-else
-  BUILD_DIR="$PROJECT_ROOT/build-gl-${BUILD_TYPE}"
-fi
+BUILD_DIR="$PROJECT_ROOT/build-vk-${BUILD_TYPE}"
 if [ "$CROSS_AARCH64" -eq 1 ]; then
   BUILD_DIR="${BUILD_DIR}-aarch64"
   if ! command -v aarch64-linux-gnu-gcc &>/dev/null; then
@@ -263,7 +252,7 @@ fi
 
 if [[ "$SKIP_SHADERS" -eq 1 ]]; then
   echo "Skipping Vulkan shader compilation/apply (skipshaders requested)."
-elif [[ "$VULKAN" -eq 1 ]]; then
+else
   SHADER_SCRIPT="$PROJECT_ROOT/scripts/compile_shaders.sh"
   if [[ -x "$SHADER_SCRIPT" ]]; then
     echo "Compiling and applying Vulkan shaders..."
@@ -271,8 +260,6 @@ elif [[ "$VULKAN" -eq 1 ]]; then
   else
     echo "Warning: shader compile script not found or not executable: $SHADER_SCRIPT" >&2
   fi
-else
-  echo "Skipping Vulkan shader compilation/apply for OpenGL build."
 fi
 
 # CMake flags
@@ -331,11 +318,7 @@ else
   echo "CMake: USE_CSHARP=OFF"
 fi
 
-if [ "$VULKAN" -eq 1 ]; then
-  CMAKE_FLAGS+=("-DRENDERER_DEFAULT=vulkan")
-else
-  CMAKE_FLAGS+=("-DRENDERER_DEFAULT=opengl")
-fi
+CMAKE_FLAGS+=("-DRENDERER_DEFAULT=vulkan")
 
 if [ "$SKIP_IDPAK" -eq 1 ]; then
   CMAKE_FLAGS+=("-DSKIP_IDPAK_CHECK=ON")

@@ -623,7 +623,7 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 	case BOTLIB_START_FRAME:
 		return botlib_export->BotLibStartFrame( VMF(1) );
 	case BOTLIB_LOAD_MAP:
-		return botlib_export->BotLibLoadMap( VMA(1) );
+		return SV_BotLoadMap( VMA(1) );
 	case BOTLIB_UPDATENTITY:
 		return botlib_export->BotLibUpdateEntity( args[1], VMA(2) );
 	case BOTLIB_TEST:

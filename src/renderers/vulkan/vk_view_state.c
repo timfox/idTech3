@@ -378,6 +378,33 @@ void vk_update_mvp( const float *m )
 	} else {
 		push_constants.reserved[1] = 2.0f;
 	}
+	if ( tess.vectorCurveCount > 0 ) {
+		push_constants.reserved[0] = (float)tess.vectorCurveStart;
+		push_constants.reserved[1] = (float)tess.vectorCurveCount;
+		push_constants.reserved[2] = (float)tess.vectorCurveTexWidth;
+		push_constants.reserved[3] = 0.0f;
+	} else if ( tess.subpixelShift >= 0.0f ) {
+		push_constants.reserved[0] = tess.subpixelShift;
+		push_constants.reserved[1] = tess.subpixelInvTexWidth;
+		if ( r_fontGamma ) {
+			push_constants.reserved[2] = Com_Clamp( 0.5f, 3.0f, r_fontGamma->value );
+		} else {
+			push_constants.reserved[2] = 1.0f;
+		}
+		push_constants.reserved[3] = 0.0f;
+	} else if ( tess.sdfUiEdge >= 0.0f ) {
+		if ( r_sdfOutline ) {
+			push_constants.reserved[2] = (float)r_sdfOutline->integer;
+		}
+		if ( r_sdfOutlineWidth ) {
+			push_constants.reserved[3] = Com_Clamp( 0.01f, 0.25f, r_sdfOutlineWidth->value );
+		}
+		if ( r_fontGamma ) {
+			push_constants.reserved[4] = Com_Clamp( 0.5f, 3.0f, r_fontGamma->value );
+		} else {
+			push_constants.reserved[4] = 1.0f;
+		}
+	}
 
 	layout = ( backEnd.oitAccumPass && vk.pipeline_layout_oit_accum != VK_NULL_HANDLE ) ?
 		vk.pipeline_layout_oit_accum : vk.pipeline_layout;

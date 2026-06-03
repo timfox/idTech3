@@ -638,6 +638,10 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 		qboolean overflowed = qfalse;
 		qboolean infoTruncated = qfalse;
 
+		if ( !FS_FileIsInPAK( "vm/cgame.qvm", NULL, NULL ) && !FS_FileIsInPAK( "vm/ui.qvm", NULL, NULL ) ) {
+			Com_Printf( "sv_pure: native-only mod (no vm/cgame.qvm or vm/ui.qvm in pk3); validating pk3 checksums only\n" );
+		}
+
 		p = FS_LoadedPakChecksums( &overflowed );
 
 		pakslen = strlen( p ) + 9; // + strlen( "\\sv_paks\\" )

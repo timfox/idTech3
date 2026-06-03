@@ -13,10 +13,8 @@ and line-based vertex soup for ASCII interchange (.fbx/.usd/.usda/.ma).
 #include <stdint.h>
 #if defined( RENDERER_VULKAN )
 #include "../vulkan/tr_local.h"
-#elif defined( RENDERER_OPENGL )
-#include "../opengl/tr_local.h"
 #else
-#error tr_model_mesh_import.c must be compiled with RENDERER_VULKAN or RENDERER_OPENGL
+#error tr_model_mesh_import.c must be compiled with RENDERER_VULKAN
 #endif
 
 #define MIMP_MAX_VERTS   SHADER_MAX_VERTEXES

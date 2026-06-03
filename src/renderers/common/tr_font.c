@@ -76,10 +76,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #if defined(RENDERER_VULKAN)
 #include "../vulkan/tr_common.h"
-#elif defined(RENDERER_OPENGL)
-#include "../opengl/tr_common.h"
 #else
-#error "tr_font.c must be compiled with either RENDERER_VULKAN or RENDERER_OPENGL defined"
+#error "tr_font.c must be compiled with RENDERER_VULKAN defined"
 #endif
 
 extern void R_IssuePendingRenderCommands( void );
@@ -92,6 +90,9 @@ extern qhandle_t RE_RegisterShaderNoMip( const char *name );
 #include FT_SYSTEM_H
 #include FT_IMAGE_H
 #include FT_OUTLINE_H
+#ifdef FT_LCD_FILTER_H
+#include FT_LCD_FILTER_H
+#endif
 
 #define _FLOOR(x)  ((x) & -64)
 #define _CEIL(x)   (((x)+63) & -64)
@@ -104,6 +105,132 @@ FT_Library ftLibrary = NULL;
 #define MAX_FONTS 16
 static int registeredFontCount = 0;
 static fontInfo_t registeredFont[MAX_FONTS];
+static char registeredTtfPath[MAX_FONTS][MAX_QPATH];
+static int registeredPointSize[MAX_FONTS];
+static FT_Face registeredFace[MAX_FONTS];
+static void *registeredFaceData[MAX_FONTS];
+
+static void R_FontSetupFaceSize( FT_Face face, int pointSize );
+
+static void R_FontReleaseSlotFace( int slot ) {
+	if ( slot < 0 || slot >= MAX_FONTS ) {
+		return;
+	}
+	if ( registeredFace[slot] ) {
+		FT_Done_Face( registeredFace[slot] );
+		registeredFace[slot] = NULL;
+	}
+	if ( registeredFaceData[slot] ) {
+		ri.FS_FreeFile( registeredFaceData[slot] );
+		registeredFaceData[slot] = NULL;
+	}
+	registeredTtfPath[slot][0] = '\0';
+	registeredPointSize[slot] = 0;
+}
+
+static void R_FontReleaseAllFaces( void ) {
+	int i;
+
+	for ( i = 0; i < MAX_FONTS; i++ ) {
+		R_FontReleaseSlotFace( i );
+	}
+}
+
+static void R_FontBindSource( int slot, const char *ttfPath, int pointSize ) {
+	if ( slot < 0 || slot >= MAX_FONTS || !ttfPath ) {
+		return;
+	}
+	Q_strncpyz( registeredTtfPath[slot], ttfPath, MAX_QPATH );
+	registeredPointSize[slot] = pointSize;
+}
+
+static void R_FontBindSourceFromDat( int slot, const char *datName ) {
+	const char *base;
+	const char *slash;
+	const char *underscore;
+	const char *dot;
+	char prefix[MAX_QPATH];
+	char cleanName[64];
+	int nameLen;
+
+	if ( slot < 0 || slot >= MAX_FONTS || !datName || !datName[0] ) {
+		return;
+	}
+
+	slash = strrchr( datName, '/' );
+	base = slash ? slash + 1 : datName;
+	if ( !Q_strncmp( base, "fontImage_", 10 ) ) {
+		return;
+	}
+
+	underscore = strrchr( base, '_' );
+	dot = strrchr( base, '.' );
+	if ( !underscore || !dot || underscore >= dot ) {
+		return;
+	}
+
+	if ( slash ) {
+		nameLen = (int)( slash - datName + 1 );
+		if ( nameLen >= (int)sizeof( prefix ) ) {
+			nameLen = (int)sizeof( prefix ) - 1;
+		}
+		Com_Memcpy( prefix, datName, nameLen );
+		prefix[nameLen] = '\0';
+	} else {
+		prefix[0] = '\0';
+	}
+
+	nameLen = (int)( underscore - base );
+	if ( nameLen >= (int)sizeof( cleanName ) ) {
+		nameLen = (int)sizeof( cleanName ) - 1;
+	}
+	Com_Memcpy( cleanName, base, nameLen );
+	cleanName[nameLen] = '\0';
+
+	Com_sprintf( registeredTtfPath[slot], MAX_QPATH, "%s%s.ttf", prefix, cleanName );
+	registeredPointSize[slot] = atoi( underscore + 1 );
+}
+
+static int R_FontFindSlot( const fontInfo_t *font ) {
+	int i;
+
+	if ( !font ) {
+		return -1;
+	}
+	for ( i = 0; i < registeredFontCount; i++ ) {
+		if ( font->name[0] && !Q_stricmp( font->name, registeredFont[i].name ) ) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+static qboolean R_FontEnsureFace( int slot ) {
+	void *faceData;
+	int len;
+
+	if ( slot < 0 || slot >= registeredFontCount ) {
+		return qfalse;
+	}
+	if ( registeredFace[slot] ) {
+		return qtrue;
+	}
+	if ( !registeredTtfPath[slot][0] || !ftLibrary ) {
+		return qfalse;
+	}
+
+	len = ri.FS_ReadFile( registeredTtfPath[slot], &faceData );
+	if ( len <= 0 ) {
+		return qfalse;
+	}
+	if ( FT_New_Memory_Face( ftLibrary, faceData, len, 0, &registeredFace[slot] ) ) {
+		ri.FS_FreeFile( faceData );
+		return qfalse;
+	}
+	registeredFaceData[slot] = faceData;
+	R_FontSetupFaceSize( registeredFace[slot], registeredPointSize[slot] );
+	return qtrue;
+}
 
 static int R_FontDeviceDpi( void ) {
 	int d = ri.Cvar_VariableIntegerValue( "r_fontDpi" );
@@ -114,6 +241,40 @@ static int R_FontDeviceDpi( void ) {
 		d = 144;
 	}
 	return d;
+}
+
+static qboolean R_FontVerticalHintEnabled( void ) {
+	return ri.Cvar_VariableIntegerValue( "r_fontVerticalHint" ) > 0 ? qtrue : qfalse;
+}
+
+static qboolean R_FontLcdEnabled( void ) {
+	return ri.Cvar_VariableIntegerValue( "r_fontLcd" ) > 0 ? qtrue : qfalse;
+}
+
+static void R_FontSetupFaceSize( FT_Face face, int pointSize ) {
+	int dpi = R_FontDeviceDpi();
+
+	if ( R_FontVerticalHintEnabled() ) {
+		const float scale = 100.0f;
+		FT_Matrix matrix;
+
+		matrix.xx = (FT_Fixed)( ( 1.0 / scale ) * 0x10000L );
+		matrix.xy = 0;
+		matrix.yx = 0;
+		matrix.yy = (FT_Fixed)( 1.0 * 0x10000L );
+		FT_Set_Transform( face, &matrix, NULL );
+		FT_Set_Char_Size( face, ( pointSize << 6 ), 0, (FT_UInt)( dpi * scale ), (FT_UInt)dpi );
+	} else {
+		FT_Set_Transform( face, NULL, NULL );
+		FT_Set_Char_Size( face, pointSize << 6, pointSize << 6, (FT_UInt)dpi, (FT_UInt)dpi );
+	}
+}
+
+static int R_FontUnhintedAdvance( FT_Face face, FT_UInt gindex ) {
+	if ( FT_Load_Glyph( face, gindex, FT_LOAD_DEFAULT | FT_LOAD_NO_BITMAP | FT_LOAD_NO_HINTING ) ) {
+		return 0;
+	}
+	return face->glyph->metrics.horiAdvance >> 6;
 }
 
 static FT_Int32 R_FontLoadFlags( void ) {
@@ -143,13 +304,15 @@ static void R_FontRuntimeRegKey( char *dst, int dstSize, const char *ttfPath, in
 	int dpi = R_FontDeviceDpi();
 	int hint = ri.Cvar_VariableIntegerValue( "r_fontHint" );
 	int mip = ri.Cvar_VariableIntegerValue( "r_fontMipmap" ) > 0 ? 1 : 0;
+	int vhint = R_FontVerticalHintEnabled() ? 1 : 0;
+	int lcd = R_FontLcdEnabled() ? 1 : 0;
 	if ( hint < 0 ) {
 		hint = 0;
 	}
 	if ( hint > 2 ) {
 		hint = 2;
 	}
-	Com_sprintf( dst, dstSize, "fonts/_ftr_%lu_%i_d%i_h%i_m%i", h, pointSize, dpi, hint, mip );
+	Com_sprintf( dst, dstSize, "fonts/_ftr_%lu_%i_d%i_h%i_m%i_v%i_l%i", h, pointSize, dpi, hint, mip, vhint, lcd );
 }
 
 static void R_FontAtlasImageName( char *dst, int dstSize, const char *ttfPath, int pageIndex, int pointSize ) {
@@ -157,13 +320,15 @@ static void R_FontAtlasImageName( char *dst, int dstSize, const char *ttfPath, i
 	int dpi = R_FontDeviceDpi();
 	int hint = ri.Cvar_VariableIntegerValue( "r_fontHint" );
 	int mip = ri.Cvar_VariableIntegerValue( "r_fontMipmap" ) > 0 ? 1 : 0;
+	int vhint = R_FontVerticalHintEnabled() ? 1 : 0;
+	int lcd = R_FontLcdEnabled() ? 1 : 0;
 	if ( hint < 0 ) {
 		hint = 0;
 	}
 	if ( hint > 2 ) {
 		hint = 2;
 	}
-	Com_sprintf( dst, dstSize, "fonts/_ftg_%lu_%i_%i_d%i_h%i_m%i.tga", h, pointSize, pageIndex, dpi, hint, mip );
+	Com_sprintf( dst, dstSize, "fonts/_ftg_%lu_%i_%i_d%i_h%i_m%i_v%i_l%i.tga", h, pointSize, pageIndex, dpi, hint, mip, vhint, lcd );
 }
 
 static void R_GetGlyphInfo(FT_GlyphSlot glyph, int *left, int *right, int *width, int *top, int *bottom, int *height, int *pitch) {
@@ -178,23 +343,36 @@ static void R_GetGlyphInfo(FT_GlyphSlot glyph, int *left, int *right, int *width
 }
 
 
-static FT_Bitmap *R_RenderGlyph(FT_GlyphSlot glyph, glyphInfo_t* glyphOut) {
-	FT_Bitmap  *bit2;
+static FT_Bitmap *R_RenderGlyph( FT_GlyphSlot glyph, glyphInfo_t *glyphOut, qboolean *ownedBitmap ) {
+	FT_Bitmap *bit2;
 	int left, right, width, top, bottom, height, pitch, size;
 
-	R_GetGlyphInfo(glyph, &left, &right, &width, &top, &bottom, &height, &pitch);
+	*ownedBitmap = qfalse;
+
+	if ( R_FontLcdEnabled() ) {
+		if ( FT_Render_Glyph( glyph, FT_RENDER_MODE_LCD ) ) {
+			return NULL;
+		}
+		bit2 = &glyph->bitmap;
+		glyphOut->height = bit2->rows;
+		glyphOut->pitch = bit2->width;
+		glyphOut->top = ( glyph->metrics.horiBearingY >> 6 ) + 1;
+		glyphOut->bottom = _TRUNC( _FLOOR( glyph->metrics.horiBearingY - glyph->metrics.height ) );
+		return bit2;
+	}
+
+	R_GetGlyphInfo( glyph, &left, &right, &width, &top, &bottom, &height, &pitch );
 
 	if ( glyph->format == ft_glyph_format_outline ) {
-		size   = pitch*height; 
+		size   = pitch * height;
 
-		bit2 = ri.Malloc(sizeof(FT_Bitmap));
+		bit2 = ri.Malloc( sizeof( FT_Bitmap ) );
 
 		bit2->width      = width;
 		bit2->rows       = height;
 		bit2->pitch      = pitch;
 		bit2->pixel_mode = ft_pixel_mode_grays;
-		//bit2->pixel_mode = ft_pixel_mode_mono;
-		bit2->buffer     = ri.Malloc(pitch*height);
+		bit2->buffer     = ri.Malloc( pitch * height );
 		bit2->num_grays = 256;
 
 		Com_Memset( bit2->buffer, 0, size );
@@ -205,12 +383,13 @@ static FT_Bitmap *R_RenderGlyph(FT_GlyphSlot glyph, glyphInfo_t* glyphOut) {
 
 		glyphOut->height = height;
 		glyphOut->pitch = pitch;
-		glyphOut->top = (glyph->metrics.horiBearingY >> 6) + 1;
+		glyphOut->top = ( glyph->metrics.horiBearingY >> 6 ) + 1;
 		glyphOut->bottom = bottom;
+		*ownedBitmap = qtrue;
 
 		return bit2;
 	} else {
-		ri.Printf(PRINT_ALL, "Non-outline fonts are not supported\n");
+		ri.Printf( PRINT_ALL, "Non-outline fonts are not supported\n" );
 	}
 	return NULL;
 }
@@ -263,20 +442,30 @@ static void WriteTGA (const char *filename, byte *data, int width, int height) {
 	ri.Free (buffer);
 }
 
-static glyphInfo_t *RE_ConstructGlyphInfo(unsigned char *imageOut, int *xOut, int *yOut, int *maxHeight, FT_Face face, const unsigned char c, qboolean calcHeight) {
-	int i;
+static glyphInfo_t *RE_ConstructGlyphInfo( unsigned char *imageOut, int *xOut, int *yOut, int *maxHeight, FT_Face face, const unsigned char c, qboolean calcHeight, qboolean lcdAtlas ) {
+	int i, j;
 	static glyphInfo_t glyph;
 	unsigned char *src, *dst;
 	float scaled_width, scaled_height;
 	FT_Bitmap *bitmap = NULL;
+	qboolean ownedBitmap = qfalse;
+	FT_UInt gindex;
+	int unhintedAdvance = 0;
 
-	Com_Memset(&glyph, 0, sizeof(glyphInfo_t));
-	// make sure everything is here
-	if (face != NULL) {
-		FT_Load_Glyph( face, FT_Get_Char_Index( face, c ), R_FontLoadFlags() );
-		bitmap = R_RenderGlyph(face->glyph, &glyph);
-		if (bitmap) {
-			glyph.xSkip = (face->glyph->metrics.horiAdvance >> 6) + 1;
+	Com_Memset( &glyph, 0, sizeof( glyphInfo_t ) );
+	if ( face != NULL ) {
+		gindex = FT_Get_Char_Index( face, c );
+		if ( R_FontVerticalHintEnabled() ) {
+			unhintedAdvance = R_FontUnhintedAdvance( face, gindex );
+		}
+		FT_Load_Glyph( face, gindex, R_FontLoadFlags() );
+		bitmap = R_RenderGlyph( face->glyph, &glyph, &ownedBitmap );
+		if ( bitmap ) {
+			if ( unhintedAdvance > 0 ) {
+				glyph.xSkip = unhintedAdvance + 1;
+			} else {
+				glyph.xSkip = ( face->glyph->metrics.horiAdvance >> 6 ) + 1;
+			}
 		} else {
 			return &glyph;
 		}
@@ -286,8 +475,10 @@ static glyphInfo_t *RE_ConstructGlyphInfo(unsigned char *imageOut, int *xOut, in
 		}
 
 		if (calcHeight) {
-			ri.Free(bitmap->buffer);
-			ri.Free(bitmap);
+			if ( ownedBitmap ) {
+				ri.Free( bitmap->buffer );
+				ri.Free( bitmap );
+			}
 			return &glyph;
 		}
 
@@ -318,39 +509,74 @@ static glyphInfo_t *RE_ConstructGlyphInfo(unsigned char *imageOut, int *xOut, in
 		}
 
 
+		if (*yOut + *maxHeight + 1 >= 255) {
+			*yOut = -1;
+			*xOut = -1;
+			if ( ownedBitmap ) {
+				ri.Free( bitmap->buffer );
+				ri.Free( bitmap );
+			}
+			return &glyph;
+		}
+
+
 		src = bitmap->buffer;
-		dst = imageOut + (*yOut * 256) + *xOut;
-
-		if (bitmap->pixel_mode == ft_pixel_mode_mono) {
-			for (i = 0; i < glyph.height; i++) {
-				int j;
-				unsigned char *_src = src;
-				unsigned char *_dst = dst;
-				unsigned char mask = 0x80;
-				unsigned char val = *_src;
-				for (j = 0; j < glyph.pitch; j++) {
-					if (mask == 0x80) {
-						val = *_src++;
+		if ( lcdAtlas && bitmap->pixel_mode == FT_PIXEL_MODE_LCD ) {
+			dst = imageOut + ( ( *yOut * 256 ) + *xOut ) * 4;
+			for ( i = 0; i < glyph.height; i++ ) {
+				unsigned char *rowSrc = src + i * bitmap->pitch;
+				unsigned char *rowDst = dst + i * ( 256 * 4 );
+				for ( j = 0; j < glyph.pitch; j++ ) {
+					unsigned char r = rowSrc[j * 3 + 0];
+					unsigned char g = rowSrc[j * 3 + 1];
+					unsigned char b = rowSrc[j * 3 + 2];
+					unsigned char a = r;
+					if ( g > a ) {
+						a = g;
 					}
-					if (val & mask) {
-						*_dst = 0xff;
+					if ( b > a ) {
+						a = b;
 					}
-					mask >>= 1;
-
-					if ( mask == 0 ) {
-						mask = 0x80;
-					}
-					_dst++;
+					rowDst[j * 4 + 0] = r;
+					rowDst[j * 4 + 1] = g;
+					rowDst[j * 4 + 2] = b;
+					rowDst[j * 4 + 3] = a;
 				}
-
-				src += glyph.pitch;
-				dst += 256;
 			}
 		} else {
-			for (i = 0; i < glyph.height; i++) {
-				Com_Memcpy(dst, src, glyph.pitch);
-				src += glyph.pitch;
-				dst += 256;
+			dst = imageOut + ( *yOut * 256 ) + *xOut;
+
+			if (bitmap->pixel_mode == ft_pixel_mode_mono) {
+				for (i = 0; i < glyph.height; i++) {
+					int j;
+					unsigned char *_src = src;
+					unsigned char *_dst = dst;
+					unsigned char mask = 0x80;
+					unsigned char val = *_src;
+					for (j = 0; j < glyph.pitch; j++) {
+						if (mask == 0x80) {
+							val = *_src++;
+						}
+						if (val & mask) {
+							*_dst = 0xff;
+						}
+						mask >>= 1;
+
+						if ( mask == 0 ) {
+							mask = 0x80;
+						}
+						_dst++;
+					}
+
+					src += glyph.pitch;
+					dst += 256;
+				}
+			} else {
+				for (i = 0; i < glyph.height; i++) {
+					Com_Memcpy(dst, src, glyph.pitch);
+					src += glyph.pitch;
+					dst += 256;
+				}
 			}
 		}
 
@@ -366,8 +592,10 @@ static glyphInfo_t *RE_ConstructGlyphInfo(unsigned char *imageOut, int *xOut, in
 
 		*xOut += scaled_width + 1;
 
-		ri.Free(bitmap->buffer);
-		ri.Free(bitmap);
+		if ( ownedBitmap ) {
+			ri.Free( bitmap->buffer );
+			ri.Free( bitmap );
+		}
 	}
 
 	return &glyph;
@@ -425,9 +653,38 @@ static float readFloat( void ) {
 }
 
 void RE_ClearTrueTypeFontCache( void ) {
+	R_FontReleaseAllFaces();
 	registeredFontCount = 0;
 	Com_Memset( registeredFont, 0, sizeof( registeredFont ) );
 	ri.Printf( PRINT_DEVELOPER, "RE_ClearTrueTypeFontCache: TrueType registration cache cleared\n" );
+}
+
+float RE_GetFontKerning( const fontInfo_t *font, int prevIndex, int nextIndex ) {
+	FT_UInt prevGindex;
+	FT_UInt nextGindex;
+	FT_Vector delta;
+	int slot;
+
+	if ( !font || prevIndex < 0 || nextIndex < 0 ) {
+		return 0.0f;
+	}
+	prevIndex &= 255;
+	nextIndex &= 255;
+
+	slot = R_FontFindSlot( font );
+	if ( slot < 0 || !R_FontEnsureFace( slot ) ) {
+		return 0.0f;
+	}
+
+	prevGindex = FT_Get_Char_Index( registeredFace[slot], (unsigned char)prevIndex );
+	nextGindex = FT_Get_Char_Index( registeredFace[slot], (unsigned char)nextIndex );
+	if ( !prevGindex || !nextGindex ) {
+		return 0.0f;
+	}
+	if ( FT_Get_Kerning( registeredFace[slot], prevGindex, nextGindex, FT_KERNING_DEFAULT, &delta ) ) {
+		return 0.0f;
+	}
+	return (float)( delta.x >> 6 );
 }
 
 void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
@@ -544,13 +801,16 @@ load_cached_dat:
 		font->glyphs[i].glyph = RE_RegisterShaderNoMip(font->glyphs[i].shaderName);
 	}
 	RE_ApplyUtf8GlyphFix( font );
-	Com_Memcpy(&registeredFont[registeredFontCount++], font, sizeof(fontInfo_t));
-	ri.FS_FreeFile(faceData);
+	Com_Memcpy( &registeredFont[registeredFontCount], font, sizeof( fontInfo_t ) );
+	R_FontBindSourceFromDat( registeredFontCount, name );
+	registeredFontCount++;
+	ri.FS_FreeFile( faceData );
 	return;
 
 try_freetype:
 {
 	char runtimeRegKey[MAX_QPATH];
+	const int regSlot = registeredFontCount;
 
 	R_FontRuntimeRegKey( runtimeRegKey, sizeof( runtimeRegKey ), resolvedFontName, pointSize );
 	for ( i = 0; i < registeredFontCount; i++ ) {
@@ -571,26 +831,32 @@ try_freetype:
 		return;
 	}
 
-	if (FT_New_Memory_Face(ftLibrary, faceData, len, 0, &face)) {
-		ri.Printf(PRINT_WARNING, "RE_RegisterFont: FreeType, unable to allocate new face.\n");
+	if ( FT_New_Memory_Face( ftLibrary, faceData, len, 0, &face ) ) {
+		ri.Printf( PRINT_WARNING, "RE_RegisterFont: FreeType, unable to allocate new face.\n" );
+		ri.FS_FreeFile( faceData );
 		return;
 	}
 
-	if ( FT_Set_Char_Size( face, pointSize << 6, pointSize << 6, (FT_UInt)dpi, (FT_UInt)dpi ) ) {
-		ri.Printf(PRINT_WARNING, "RE_RegisterFont: FreeType, unable to set face char size.\n");
-		return;
-	}
+	R_FontSetupFaceSize( face, pointSize );
+	R_FontBindSource( regSlot, resolvedFontName, pointSize );
+	registeredFace[regSlot] = face;
+	registeredFaceData[regSlot] = faceData;
 
-	out = ri.Malloc(256 * 256);
-	if (out == NULL) {
-		ri.Printf(PRINT_WARNING, "RE_RegisterFont: ri.Malloc failure during output image creation.\n");
-		return;
-	}
-	Com_Memset(out, 0, 256 * 256);
+	{
+		const qboolean lcdAtlas = R_FontLcdEnabled();
+		const int atlasBytes = lcdAtlas ? ( 256 * 256 * 4 ) : ( 256 * 256 );
+
+		out = ri.Malloc( atlasBytes );
+		if ( out == NULL ) {
+			ri.Printf( PRINT_WARNING, "RE_RegisterFont: ri.Malloc failure during output image creation.\n" );
+			R_FontReleaseSlotFace( regSlot );
+			return;
+		}
+		Com_Memset(out, 0, atlasBytes);
 
 	maxHeight = 0;
 	for (i = GLYPH_START; i <= GLYPH_END; i++) {
-		RE_ConstructGlyphInfo(out, &xOut, &yOut, &maxHeight, face, (unsigned char)i, qtrue);
+		RE_ConstructGlyphInfo(out, &xOut, &yOut, &maxHeight, face, (unsigned char)i, qtrue, lcdAtlas);
 	}
 
 	xOut = 0;
@@ -603,30 +869,34 @@ try_freetype:
 		if (i == GLYPH_END + 1) {
 			xOut = yOut = -1;
 		} else {
-			glyph = RE_ConstructGlyphInfo(out, &xOut, &yOut, &maxHeight, face, (unsigned char)i, qfalse);
+			glyph = RE_ConstructGlyphInfo(out, &xOut, &yOut, &maxHeight, face, (unsigned char)i, qfalse, lcdAtlas);
 		}
 
 		if (xOut == -1 || yOut == -1) {
 			scaledSize = 256 * 256;
 			newSize = scaledSize * 4;
 			imageBuff = ri.Malloc(newSize);
-			left = 0;
-			max = 0;
-			for (k = 0; k < scaledSize; k++) {
-				if (max < out[k]) {
-					max = out[k];
+			if ( lcdAtlas ) {
+				Com_Memcpy( imageBuff, out, newSize );
+			} else {
+				left = 0;
+				max = 0;
+				for (k = 0; k < scaledSize; k++) {
+					if (max < out[k]) {
+						max = out[k];
+					}
 				}
-			}
 
-			if (max > 0) {
-				max = 255 / max;
-			}
+				if (max > 0) {
+					max = 255 / max;
+				}
 
-			for (k = 0; k < scaledSize; k++) {
-				imageBuff[left++] = 255;
-				imageBuff[left++] = 255;
-				imageBuff[left++] = 255;
-				imageBuff[left++] = ((float)out[k] * max);
+				for (k = 0; k < scaledSize; k++) {
+					imageBuff[left++] = 255;
+					imageBuff[left++] = 255;
+					imageBuff[left++] = 255;
+					imageBuff[left++] = ((float)out[k] * max);
+				}
 			}
 
 			R_FontAtlasImageName( name, sizeof( name ), resolvedFontName, imageNumber, pointSize );
@@ -646,7 +916,7 @@ try_freetype:
 				Q_strncpyz(font->glyphs[j].shaderName, name, sizeof(font->glyphs[j].shaderName));
 			}
 			lastStart = i;
-			Com_Memset(out, 0, 256 * 256);
+			Com_Memset(out, 0, atlasBytes);
 			xOut = 0;
 			yOut = 0;
 			ri.Free(imageBuff);
@@ -691,24 +961,31 @@ try_freetype:
 		}
 	}
 
-	ri.Free(out);
-	ri.FS_FreeFile(faceData);
+	ri.Free( out );
+	}
 }
 }
 void R_InitFreeType(void) {
 	if ( FT_Init_FreeType( &ftLibrary ) ) {
 		ri.Printf( PRINT_WARNING, "R_InitFreeType: Unable to initialize FreeType.\n" );
 	} else {
-		ri.Printf( PRINT_ALL, "FreeType: TrueType raster dpi=%i (r_fontDpi), hint=%i (r_fontHint 0=default 1=light 2=normal), atlas mipmaps=%s (r_fontMipmap; apply with reloadTtf or vid_restart)\n",
+#ifdef FT_LCD_FILTER_H
+		FT_Library_SetLcdFilter( ftLibrary, FT_LCD_FILTER_DEFAULT );
+#endif
+		ri.Printf( PRINT_ALL, "FreeType: TrueType raster dpi=%i (r_fontDpi), hint=%i (r_fontHint), atlas mipmaps=%s (r_fontMipmap), verticalHint=%i (r_fontVerticalHint), lcd=%i (r_fontLcd); Rougier HAL-00821839 / HAL-05430837 (kerning); apply with reloadTtf or vid_restart\n",
 			R_FontDeviceDpi(), ri.Cvar_VariableIntegerValue( "r_fontHint" ),
-			ri.Cvar_VariableIntegerValue( "r_fontMipmap" ) > 0 ? "on" : "off" );
+			ri.Cvar_VariableIntegerValue( "r_fontMipmap" ) > 0 ? "on" : "off",
+			ri.Cvar_VariableIntegerValue( "r_fontVerticalHint" ),
+			ri.Cvar_VariableIntegerValue( "r_fontLcd" ) );
 	}
+	R_FontReleaseAllFaces();
 	registeredFontCount = 0;
 }
 
 
 void R_DoneFreeType(void) {
-	if (ftLibrary) {
+	R_FontReleaseAllFaces();
+	if ( ftLibrary ) {
 		FT_Done_FreeType( ftLibrary );
 		ftLibrary = NULL;
 	}
@@ -716,4 +993,3 @@ void R_DoneFreeType(void) {
 }
 
 #endif
-

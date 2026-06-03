@@ -1308,6 +1308,61 @@ image_t *R_CreateImage( const char *name, const char *name2, byte *pic, int widt
 	return image;
 }
 
+/*
+================
+R_CreateImageRGBA32F
+
+Upload a single-mip RGBA32F texture (used for vector font curve control points).
+================
+*/
+image_t *R_CreateImageRGBA32F( const char *name, const float *rgba, int width, int height, imgFlags_t flags ) {
+	image_t *image;
+	long hash;
+	int namelen;
+
+	if ( !name || !rgba || width <= 0 || height <= 0 ) {
+		return NULL;
+	}
+
+	namelen = (int)strlen( name ) + 1;
+	if ( namelen > MAX_QPATH ) {
+		ri.Error( ERR_DROP, "R_CreateImageRGBA32F: \"%s\" is too long", name );
+	}
+
+	if ( tr.numImages == MAX_DRAWIMAGES ) {
+		ri.Error( ERR_DROP, "R_CreateImageRGBA32F: MAX_DRAWIMAGES hit" );
+	}
+
+	image = ri.Hunk_Alloc( sizeof( *image ) + namelen, h_low );
+	image->imgName = (char *)( image + 1 );
+	Q_strncpyz( image->imgName, name, namelen );
+	image->imgName2 = image->imgName;
+
+	hash = generateHashValue( name );
+	image->next = hashTable[hash];
+	hashTable[hash] = image;
+	tr.images[tr.numImages++] = image;
+
+	image->flags = flags;
+	image->width = width;
+	image->height = height;
+	image->wrapClampMode = ( flags & IMGFLAG_CLAMPTOBORDER ) ? VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER :
+		( ( flags & IMGFLAG_CLAMPTOEDGE ) ? VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE : VK_SAMPLER_ADDRESS_MODE_REPEAT );
+	image->handle = VK_NULL_HANDLE;
+	image->view = VK_NULL_HANDLE;
+	image->descriptor = VK_NULL_HANDLE;
+	image->internalFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
+	image->uploadWidth = width;
+	image->uploadHeight = height;
+	image->layers = 1;
+	image->type = vk_find_texture_type( 0 );
+
+	vk_create_image( image, width, height, 1 );
+	vk_upload_image_rgba32f( image, width, height, rgba, width * height * 4 );
+	vk_update_descriptor_set( image, qfalse );
+	return image;
+}
+
 //===================================================================
 
 typedef struct
