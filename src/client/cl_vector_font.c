@@ -15,8 +15,9 @@ static qboolean vectorLoadAttempted;
 void VectorFont_Init( void ) {
 	r_vectorFont = Cvar_Get( "r_vectorFont", "0", CVAR_ARCHIVE );
 	Cvar_SetDescription( r_vectorFont,
-		"Draw console/HUD text from TrueType outlines on the GPU (Lengyel 2017). "
-		"Requires Vulkan and r_font .ttf. 1 = vector outlines; 0 = FreeType atlas (default)." );
+		"Draw console/HUD text from TrueType outlines on the GPU. "
+		"Requires Vulkan, r_font .ttf, and BUILD_FREETYPE. "
+		"1 = enabled (see r_vectorFontMode); 0 = FreeType atlas (default)." );
 	vectorLoadAttempted = qfalse;
 }
 

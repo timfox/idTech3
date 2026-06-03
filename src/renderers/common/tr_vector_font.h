@@ -2,9 +2,14 @@
 ===========================================================================
 Copyright (C) 2026 Gopex LLC. All rights reserved.
 
-GPU vector font rendering from TrueType glyph outlines (Lengyel, JCGT 2017).
-Quadratic Bezier curves are uploaded to a float curve texture; the Vulkan
-uiVectorText shader evaluates robust winding-number coverage per pixel.
+GPU vector font rendering from TrueType glyph outlines.
+
+Mode 0 (default, r_vectorFontMode): Lengyel, JCGT 2017 — curve texture +
+winding-number coverage (frag_ui_vector_text).
+
+Mode 2 (planned): Loop & Blinn 2005 + mesh-shader glyphlets per AMD GPUOpen
+https://gpuopen.com/learn/mesh_shaders/mesh_shaders-font-rendering/
+See docs/VECTOR_FONT.md and docs/research/amd-gpuopen-loop-blinn-mesh-fonts.md
 ===========================================================================
 */
 
@@ -16,6 +21,20 @@ uiVectorText shader evaluates robust winding-number coverage per pixel.
 #define VECTOR_CURVE_TEX_WIDTH 4096
 #define VECTOR_TEXELS_PER_CURVE 2
 
+/* Loop & Blinn / AMD glyphlet (mesh-shader path, not built yet). */
+#define VECTOR_GLYPHLET_TRI_SOLID   0u
+#define VECTOR_GLYPHLET_TRI_CONVEX  1u
+#define VECTOR_GLYPHLET_TRI_CONCAVE 2u
+#define VECTOR_MAX_GLYPHLET_TRIS    128
+#define VECTOR_MAX_GLYPHLET_VERTS   64
+
+typedef struct {
+	unsigned int vertexBaseIndex;
+	unsigned int triangleBaseIndex;
+	unsigned int vertexCount;
+	unsigned int primitiveCount;
+} vectorGlyphletInfo_t;
+
 typedef struct {
 	int     curveStart;
 	int     curveCount;
@@ -25,6 +44,7 @@ typedef struct {
 	float   emTop;
 	float   xAdvance;
 	qboolean valid;
+	vectorGlyphletInfo_t glyphlet;
 } vectorFontGlyph_t;
 
 typedef struct {
@@ -40,6 +60,7 @@ typedef struct {
 void            R_VectorFont_Init( void );
 void            R_VectorFont_Shutdown( void );
 qboolean        R_VectorFont_IsEnabled( void );
+int             R_VectorFont_Mode( void );
 qboolean        R_VectorFont_Load( const char *ttfPath );
 void            R_VectorFont_Clear( void );
 const vectorFontGlyph_t *R_VectorFont_GetGlyph( int ch );
