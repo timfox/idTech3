@@ -27,8 +27,10 @@ Sampling:
 
 #include "tr_local.h"
 #include "vk_vdb.h"
+#include "vk_nanovdb_decode.h"
 #include "vk.h"
 #include "vk_cmd.h"
+#include <string.h>
 #include "vk_descriptor_sets.h"
 #include "vk_staging.h"
 #include "vk_image_layout.h"
@@ -44,15 +46,28 @@ typedef struct {
 	VkImage     gpuImage;
 	VkDeviceMemory gpuMemory;
 	VkImageView gpuView;
+	float       *majorantData;
+	int         majorantDimX;
+	int         majorantDimY;
+	int         majorantDimZ;
+	qboolean    majorantOnGPU;
+	VkImage     gpuMajorantImage;
+	VkDeviceMemory gpuMajorantMemory;
+	VkImageView gpuMajorantView;
 } vdbGrid_t;
 
 static vdbGrid_t grids[VDB_MAX_GRIDS];
 static int numGrids = 0;
 static vdbHandle_t boundFogDensityHandle = VDB_INVALID_HANDLE;
 static cvar_t *r_vdb;
+static cvar_t *r_vdbMajorantBrick;
 static qboolean vdb_console_cmds_registered = qfalse;
 
 #define VALID_GRID(h) ((h) >= 0 && (h) < numGrids && grids[(h)].active)
+
+static void VDB_Cmd_RebuildMajorant_f( void );
+
+static qboolean VDB_RebuildMajorantForGrid( vdbGrid_t *grid, qboolean logResult );
 
 static vdbHandle_t VDB_ParseHandleArg( const char *s )
 {
@@ -162,8 +177,9 @@ static void VDB_RegisterConsoleCommands( void )
 	ri.Cmd_AddCommand( "vdb_upload", VDB_Cmd_Upload_f );
 	ri.Cmd_AddCommand( "vdb_bind_fog", VDB_Cmd_BindFog_f );
 	ri.Cmd_AddCommand( "vdb_list", VDB_Cmd_List_f );
+	ri.Cmd_AddCommand( "vdb_rebuild_majorant", VDB_Cmd_RebuildMajorant_f );
 	vdb_console_cmds_registered = qtrue;
-	ri.Printf( PRINT_DEVELOPER, "VDB: console commands vdb_load, vdb_upload, vdb_bind_fog, vdb_list\n" );
+	ri.Printf( PRINT_DEVELOPER, "VDB: console commands vdb_load, vdb_upload, vdb_bind_fog, vdb_list, vdb_rebuild_majorant\n" );
 }
 
 static void VDB_UnregisterConsoleCommands( void )
@@ -175,6 +191,7 @@ static void VDB_UnregisterConsoleCommands( void )
 	ri.Cmd_RemoveCommand( "vdb_upload" );
 	ri.Cmd_RemoveCommand( "vdb_bind_fog" );
 	ri.Cmd_RemoveCommand( "vdb_list" );
+	ri.Cmd_RemoveCommand( "vdb_rebuild_majorant" );
 	vdb_console_cmds_registered = qfalse;
 }
 
@@ -196,6 +213,220 @@ static void VDB_DestroyGpuResources( vdbGrid_t *grid )
 		grid->gpuMemory = VK_NULL_HANDLE;
 	}
 	grid->onGPU = qfalse;
+
+	if ( grid->gpuMajorantView != VK_NULL_HANDLE ) {
+		qvkDestroyImageView( vk.device, grid->gpuMajorantView, NULL );
+		grid->gpuMajorantView = VK_NULL_HANDLE;
+	}
+	if ( grid->gpuMajorantImage != VK_NULL_HANDLE ) {
+		qvkDestroyImage( vk.device, grid->gpuMajorantImage, NULL );
+		grid->gpuMajorantImage = VK_NULL_HANDLE;
+	}
+	if ( grid->gpuMajorantMemory != VK_NULL_HANDLE ) {
+		qvkFreeMemory( vk.device, grid->gpuMajorantMemory, NULL );
+		grid->gpuMajorantMemory = VK_NULL_HANDLE;
+	}
+	grid->majorantOnGPU = qfalse;
+}
+
+static void VDB_FreeMajorantCpu( vdbGrid_t *grid )
+{
+	if ( !grid ) {
+		return;
+	}
+	if ( grid->majorantData ) {
+		ri.Free( grid->majorantData );
+		grid->majorantData = NULL;
+	}
+	grid->majorantDimX = 0;
+	grid->majorantDimY = 0;
+	grid->majorantDimZ = 0;
+}
+
+/*
+===============
+VDB_BuildMajorantGrid
+OpenVDB-style macrocell majorants (arXiv:2211.09997 §5.1.3): per-brick max density
+for Woodcock/delta-tracking segment bounds.
+===============
+*/
+static qboolean VDB_BuildMajorantGrid( vdbGrid_t *grid )
+{
+	int brick;
+	int mx, my, mz;
+	int bx, by, bz;
+	int ix, iy, iz;
+	float maxVal;
+
+	if ( !grid || !grid->data ) {
+		return qfalse;
+	}
+
+	brick = r_vdbMajorantBrick ? (int)r_vdbMajorantBrick->value : 8;
+	if ( brick < 2 ) {
+		brick = 2;
+	}
+	if ( brick > 32 ) {
+		brick = 32;
+	}
+
+	mx = ( grid->info.dimX + brick - 1 ) / brick;
+	my = ( grid->info.dimY + brick - 1 ) / brick;
+	mz = ( grid->info.dimZ + brick - 1 ) / brick;
+	if ( mx < 1 ) {
+		mx = 1;
+	}
+	if ( my < 1 ) {
+		my = 1;
+	}
+	if ( mz < 1 ) {
+		mz = 1;
+	}
+	if ( mx > 64 ) {
+		mx = 64;
+	}
+	if ( my > 64 ) {
+		my = 64;
+	}
+	if ( mz > 64 ) {
+		mz = 64;
+	}
+
+	VDB_FreeMajorantCpu( grid );
+	grid->majorantData = (float *)ri.Malloc( mx * my * mz * sizeof( float ) );
+	if ( !grid->majorantData ) {
+		return qfalse;
+	}
+	Com_Memset( grid->majorantData, 0, mx * my * mz * sizeof( float ) );
+	grid->majorantDimX = mx;
+	grid->majorantDimY = my;
+	grid->majorantDimZ = mz;
+
+	for ( bz = 0; bz < mz; bz++ ) {
+		for ( by = 0; by < my; by++ ) {
+			for ( bx = 0; bx < mx; bx++ ) {
+				maxVal = 0.0f;
+				for ( iz = bz * brick; iz < ( bz + 1 ) * brick && iz < grid->info.dimZ; iz++ ) {
+					for ( iy = by * brick; iy < ( by + 1 ) * brick && iy < grid->info.dimY; iy++ ) {
+						for ( ix = bx * brick; ix < ( bx + 1 ) * brick && ix < grid->info.dimX; ix++ ) {
+							const float v = grid->data[iz * grid->info.dimX * grid->info.dimY + iy * grid->info.dimX + ix];
+							if ( v > maxVal ) {
+								maxVal = v;
+							}
+						}
+					}
+				}
+				grid->majorantData[bz * mx * my + by * mx + bx] = maxVal;
+			}
+		}
+	}
+
+	ri.Printf( PRINT_ALL, "VDB: majorant grid %dx%dx%d (brick %d) for '%s'\n",
+		mx, my, mz, brick, grid->info.name );
+	return qtrue;
+}
+
+static qboolean VDB_Upload3DTexture( const float *src, int dimX, int dimY, int dimZ,
+	VkImage *outImage, VkDeviceMemory *outMemory, VkImageView *outView, const char *debugName )
+{
+	VkCommandBuffer cmd;
+	VkDeviceSize uploadBytes;
+	uint32_t width, height, depth;
+	VkImageCreateInfo image_desc;
+	VkImageViewCreateInfo view_desc;
+	VkMemoryRequirements mem_req;
+	VkMemoryAllocateInfo alloc_info;
+	VkBufferImageCopy region;
+
+	if ( !src || dimX < 1 || dimY < 1 || dimZ < 1 || !vk.device || vk.device_lost ) {
+		return qfalse;
+	}
+
+	width = (uint32_t)dimX;
+	height = (uint32_t)dimY;
+	depth = (uint32_t)dimZ;
+	uploadBytes = (VkDeviceSize)( dimX * dimY * dimZ ) * sizeof( float );
+
+	Com_Memset( &image_desc, 0, sizeof( image_desc ) );
+	image_desc.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	image_desc.imageType = VK_IMAGE_TYPE_3D;
+	image_desc.format = VK_FORMAT_R32_SFLOAT;
+	image_desc.extent.width = width;
+	image_desc.extent.height = height;
+	image_desc.extent.depth = depth;
+	image_desc.mipLevels = 1;
+	image_desc.arrayLayers = 1;
+	image_desc.samples = VK_SAMPLE_COUNT_1_BIT;
+	image_desc.tiling = VK_IMAGE_TILING_OPTIMAL;
+	image_desc.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	image_desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	image_desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+	if ( qvkCreateImage( vk.device, &image_desc, NULL, outImage ) != VK_SUCCESS ) {
+		return qfalse;
+	}
+
+	qvkGetImageMemoryRequirements( vk.device, *outImage, &mem_req );
+	Com_Memset( &alloc_info, 0, sizeof( alloc_info ) );
+	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	alloc_info.allocationSize = mem_req.size;
+	alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, mem_req.memoryTypeBits,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	if ( qvkAllocateMemory( vk.device, &alloc_info, NULL, outMemory ) != VK_SUCCESS ||
+		qvkBindImageMemory( vk.device, *outImage, *outMemory, 0 ) != VK_SUCCESS ) {
+		qvkDestroyImage( vk.device, *outImage, NULL );
+		*outImage = VK_NULL_HANDLE;
+		return qfalse;
+	}
+
+	Com_Memset( &view_desc, 0, sizeof( view_desc ) );
+	view_desc.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	view_desc.image = *outImage;
+	view_desc.viewType = VK_IMAGE_VIEW_TYPE_3D;
+	view_desc.format = VK_FORMAT_R32_SFLOAT;
+	view_desc.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	view_desc.subresourceRange.levelCount = 1;
+	view_desc.subresourceRange.layerCount = 1;
+	if ( qvkCreateImageView( vk.device, &view_desc, NULL, outView ) != VK_SUCCESS ) {
+		qvkDestroyImage( vk.device, *outImage, NULL );
+		qvkFreeMemory( vk.device, *outMemory, NULL );
+		*outImage = VK_NULL_HANDLE;
+		*outMemory = VK_NULL_HANDLE;
+		return qfalse;
+	}
+
+	if ( vk.staging_buffer.size < uploadBytes ) {
+		vk_alloc_staging_buffer( uploadBytes );
+	}
+	if ( !vk.staging_buffer.ptr || vk.staging_buffer.size < uploadBytes ) {
+		return qfalse;
+	}
+
+	Com_Memcpy( vk.staging_buffer.ptr, src, (size_t)uploadBytes );
+	cmd = vk_begin_command_buffer();
+	record_image_layout_transition( cmd, *outImage, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
+
+	Com_Memset( &region, 0, sizeof( region ) );
+	region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	region.imageSubresource.mipLevel = 0;
+	region.imageSubresource.baseArrayLayer = 0;
+	region.imageSubresource.layerCount = 1;
+	region.imageExtent.width = width;
+	region.imageExtent.height = height;
+	region.imageExtent.depth = depth;
+
+	qvkCmdCopyBufferToImage( cmd, vk.staging_buffer.handle, *outImage,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region );
+
+	record_image_layout_transition( cmd, *outImage, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_SHADER_STAGE_COMPUTE_BIT );
+
+	vk_end_command_buffer( cmd, debugName );
+	SET_OBJECT_NAME( *outImage, debugName, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+	return qtrue;
 }
 
 void VDB_Init( void ) {
@@ -203,6 +434,10 @@ void VDB_Init( void ) {
 	numGrids = 0;
 	r_vdb = ri.Cvar_Get( "r_vdb", "1", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_vdb, "Enable OpenVDB/NanoVDB volumetric data loading (0 = off, 1 = on)." );
+	r_vdbMajorantBrick = ri.Cvar_Get( "r_vdbMajorantBrick", "8", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_vdbMajorantBrick, "2", "32", CV_INTEGER );
+	ri.Cvar_SetDescription( r_vdbMajorantBrick,
+		"Brick size for OpenVDB majorant macrocells (delta-tracking segment bounds; arXiv:2211.09997)." );
 
 #ifdef USE_OPENVDB
 	ri.Printf( PRINT_ALL, "VDB: initialized (OpenVDB + NanoVDB)\n" );
@@ -223,104 +458,128 @@ void VDB_Shutdown( void ) {
 			ri.Free( grids[i].data );
 			grids[i].data = NULL;
 		}
+		VDB_FreeMajorantCpu( &grids[i] );
 		grids[i].active = qfalse;
 	}
 	numGrids = 0;
 }
 
-/* ---- NanoVDB header parsing ---- */
+/* ---- NanoVDB header + dense decode ---- */
 
-#define NANOVDB_MAGIC 0x304244566f6e614eULL /* "NanoVDB0" */
+#define NVDB_OFF_GRID_NAME   40
+#define NVDB_OFF_WORLD_BBOX  560
+#define NVDB_OFF_VOXEL_SIZE  608
+#define NVDB_OFF_GRID_TYPE   636
+#define NVDB_TREE_VOXEL_CNT  56
 
-typedef struct {
-	uint64_t magic;
-	uint64_t checksum;
-	uint32_t version;
-	uint32_t flags;
-	uint32_t gridCount;
-	char     gridName[256];
-} nanovdbFileHeader_t;
+static uint32_t nvdb_read_u32( const byte *p ) {
+	uint32_t v;
+	memcpy( &v, p, sizeof( v ) );
+	return v;
+}
 
-typedef struct {
-	uint64_t gridSize;
-	uint64_t gridOffset;
-	float    worldBBox[6];
-	float    voxelSize[3];
-	uint32_t gridClass;
+static double nvdb_read_f64( const byte *p ) {
+	double v;
+	memcpy( &v, p, sizeof( v ) );
+	return v;
+}
+
+static qboolean VDB_ReadGridInfo( const byte *grid, vdbGrid_t *out ) {
+	const byte *tree;
 	uint32_t gridType;
-	uint64_t activeVoxelCount;
-} nanovdbGridMeta_t;
+	double vx, vy, vz;
 
-static qboolean VDB_ParseNanoVDB( const byte *buf, int bufLen, vdbGrid_t *grid ) {
-	const nanovdbFileHeader_t *hdr;
-	const nanovdbGridMeta_t *meta;
-
-	if ( bufLen < (int)sizeof( nanovdbFileHeader_t ) + (int)sizeof( nanovdbGridMeta_t ) ) {
+	if ( !grid || !out ) {
 		return qfalse;
 	}
 
-	hdr = (const nanovdbFileHeader_t *)buf;
-	if ( hdr->magic != NANOVDB_MAGIC ) {
-		return qfalse;
+	tree = grid + NANOVDB_GRIDDATA_BYTES;
+	Q_strncpyz( out->info.name, (const char *)( grid + NVDB_OFF_GRID_NAME ), sizeof( out->info.name ) );
+
+	out->info.worldMin[0] = (float)nvdb_read_f64( grid + NVDB_OFF_WORLD_BBOX + 0 );
+	out->info.worldMin[1] = (float)nvdb_read_f64( grid + NVDB_OFF_WORLD_BBOX + 8 );
+	out->info.worldMin[2] = (float)nvdb_read_f64( grid + NVDB_OFF_WORLD_BBOX + 16 );
+	out->info.worldMax[0] = (float)nvdb_read_f64( grid + NVDB_OFF_WORLD_BBOX + 24 );
+	out->info.worldMax[1] = (float)nvdb_read_f64( grid + NVDB_OFF_WORLD_BBOX + 32 );
+	out->info.worldMax[2] = (float)nvdb_read_f64( grid + NVDB_OFF_WORLD_BBOX + 40 );
+
+	vx = nvdb_read_f64( grid + NVDB_OFF_VOXEL_SIZE + 0 );
+	vy = nvdb_read_f64( grid + NVDB_OFF_VOXEL_SIZE + 8 );
+	vz = nvdb_read_f64( grid + NVDB_OFF_VOXEL_SIZE + 16 );
+	out->info.voxelSize = (float)vx;
+	(void)vy;
+	(void)vz;
+
+	{
+		uint64_t vox;
+		memcpy( &vox, tree + NVDB_TREE_VOXEL_CNT, sizeof( vox ) );
+		out->info.activeVoxels = (int)vox;
 	}
 
-	meta = (const nanovdbGridMeta_t *)( buf + sizeof( nanovdbFileHeader_t ) );
-
-	grid->info.worldMin[0] = meta->worldBBox[0];
-	grid->info.worldMin[1] = meta->worldBBox[1];
-	grid->info.worldMin[2] = meta->worldBBox[2];
-	grid->info.worldMax[0] = meta->worldBBox[3];
-	grid->info.worldMax[1] = meta->worldBBox[4];
-	grid->info.worldMax[2] = meta->worldBBox[5];
-	grid->info.voxelSize = meta->voxelSize[0];
-	grid->info.activeVoxels = (int)meta->activeVoxelCount;
-
-	if ( grid->info.voxelSize > 0.0f ) {
-		grid->info.dimX = (int)ceilf( ( grid->info.worldMax[0] - grid->info.worldMin[0] ) / grid->info.voxelSize );
-		grid->info.dimY = (int)ceilf( ( grid->info.worldMax[1] - grid->info.worldMin[1] ) / grid->info.voxelSize );
-		grid->info.dimZ = (int)ceilf( ( grid->info.worldMax[2] - grid->info.worldMin[2] ) / grid->info.voxelSize );
+	gridType = nvdb_read_u32( grid + NVDB_OFF_GRID_TYPE );
+	switch ( gridType ) {
+	case 1:
+	case 2:
+	case 9:
+		out->info.type = VDB_GRID_FLOAT;
+		break;
+	case 6:
+		out->info.type = VDB_GRID_VEC3;
+		break;
+	case 4:
+		out->info.type = VDB_GRID_INT32;
+		break;
+	default:
+		out->info.type = VDB_GRID_UNKNOWN;
+		break;
 	}
-
-	Q_strncpyz( grid->info.name, hdr->gridName, sizeof( grid->info.name ) );
-
-	switch ( meta->gridType ) {
-		case 0: grid->info.type = VDB_GRID_FLOAT; break;
-		case 3: grid->info.type = VDB_GRID_VEC3; break;
-		case 5: grid->info.type = VDB_GRID_INT32; break;
-		default: grid->info.type = VDB_GRID_UNKNOWN; break;
-	}
-
-	ri.Printf( PRINT_ALL, "VDB: parsed NanoVDB grid '%s' (%dx%dx%d, %d active voxels, voxel %.3f)\n",
-		grid->info.name, grid->info.dimX, grid->info.dimY, grid->info.dimZ,
-		grid->info.activeVoxels, grid->info.voxelSize );
 
 	return qtrue;
 }
 
-/* ---- Dense grid generation for CPU sampling ---- */
-
-static void VDB_GenerateDenseGrid( vdbGrid_t *grid ) {
+static qboolean VDB_AllocAndDecodeNanoVDB( const byte *buf, int bufLen, const char *gridName, vdbGrid_t *grid ) {
+	vdbNanoIndexBBox_t idx;
 	int total;
-	int cx, cy, cz;
+	float maxVal;
+	int i;
 
-	cx = grid->info.dimX > 0 ? grid->info.dimX : 1;
-	cy = grid->info.dimY > 0 ? grid->info.dimY : 1;
-	cz = grid->info.dimZ > 0 ? grid->info.dimZ : 1;
+	if ( !VDB_NanoVDB_GetIndexDims( buf, bufLen, gridName, &idx ) ) {
+		return qfalse;
+	}
 
-	if ( cx > 256 ) cx = 256;
-	if ( cy > 256 ) cy = 256;
-	if ( cz > 256 ) cz = 256;
+	total = idx.dimX * idx.dimY * idx.dimZ;
+	if ( total <= 0 || total > 256 * 256 * 256 ) {
+		return qfalse;
+	}
 
-	total = cx * cy * cz;
 	grid->data = (float *)ri.Malloc( total * sizeof( float ) );
-	if ( !grid->data ) return;
-
+	if ( !grid->data ) {
+		return qfalse;
+	}
 	grid->dataSize = total;
-	grid->info.dimX = cx;
-	grid->info.dimY = cy;
-	grid->info.dimZ = cz;
+	grid->info.dimX = idx.dimX;
+	grid->info.dimY = idx.dimY;
+	grid->info.dimZ = idx.dimZ;
+	Com_Memset( grid->data, 0, (size_t)total * sizeof( float ) );
 
-	Com_Memset( grid->data, 0, total * sizeof( float ) );
+	if ( !VDB_NanoVDB_DecodeToDense( buf, bufLen, gridName, grid->data, total, &idx ) ) {
+		ri.Free( grid->data );
+		grid->data = NULL;
+		grid->dataSize = 0;
+		return qfalse;
+	}
+
+	maxVal = 0.0f;
+	for ( i = 0; i < total; i++ ) {
+		if ( grid->data[i] > maxVal ) {
+			maxVal = grid->data[i];
+		}
+	}
+
+	ri.Printf( PRINT_ALL, "VDB: decoded NanoVDB '%s' %dx%dx%d (%d voxels, peak %.4f)\n",
+		grid->info.name, grid->info.dimX, grid->info.dimY, grid->info.dimZ,
+		grid->info.activeVoxels, maxVal );
+	return qtrue;
 }
 
 /* ---- Public API ---- */
@@ -343,20 +602,38 @@ vdbHandle_t VDB_Load( const char *filename, const char *gridName ) {
 	grids[slot].active = qtrue;
 	Q_strncpyz( grids[slot].filename, filename, sizeof( grids[slot].filename ) );
 
-	if ( !VDB_ParseNanoVDB( (const byte *)buf, len, &grids[slot] ) ) {
-		ri.Printf( PRINT_WARNING, "VDB: %s is not a valid NanoVDB file\n", filename );
+	{
+		const byte *fileBuf = (const byte *)buf;
+		const byte *gridPtr = NULL;
+
+		if ( !VDB_NanoVDB_ResolveGrid( fileBuf, len, gridName, &gridPtr ) ) {
+			ri.Printf( PRINT_WARNING, "VDB: %s is not a valid NanoVDB file (or unsupported grid type)\n", filename );
 #ifdef USE_OPENVDB
-		ri.Printf( PRINT_ALL, "VDB: attempting OpenVDB load...\n" );
+			ri.Printf( PRINT_ALL, "VDB: attempting OpenVDB load...\n" );
 #endif
-		grids[slot].active = qfalse;
-		numGrids--;
-		ri.FS_FreeFile( buf );
-		return VDB_INVALID_HANDLE;
+			grids[slot].active = qfalse;
+			numGrids--;
+			ri.FS_FreeFile( buf );
+			return VDB_INVALID_HANDLE;
+		}
+
+		if ( !VDB_ReadGridInfo( gridPtr, &grids[slot] ) ) {
+			ri.Printf( PRINT_WARNING, "VDB: failed to read grid metadata from %s\n", filename );
+			grids[slot].active = qfalse;
+			numGrids--;
+			ri.FS_FreeFile( buf );
+			return VDB_INVALID_HANDLE;
+		}
+
+		if ( !VDB_AllocAndDecodeNanoVDB( fileBuf, len, gridName, &grids[slot] ) ) {
+			ri.Printf( PRINT_WARNING, "VDB: failed to decode voxel data from %s\n", filename );
+			grids[slot].active = qfalse;
+			numGrids--;
+			ri.FS_FreeFile( buf );
+			return VDB_INVALID_HANDLE;
+		}
 	}
 
-	VDB_GenerateDenseGrid( &grids[slot] );
-
-	(void)gridName;
 	ri.FS_FreeFile( buf );
 
 	ri.Printf( PRINT_ALL, "VDB: loaded %s (handle %d)\n", filename, slot );
@@ -370,6 +647,7 @@ void VDB_Free( vdbHandle_t h ) {
 		ri.Free( grids[h].data );
 		grids[h].data = NULL;
 	}
+	VDB_FreeMajorantCpu( &grids[h] );
 	grids[h].active = qfalse;
 }
 
@@ -409,16 +687,83 @@ void VDB_SampleVec3( vdbHandle_t h, float x, float y, float z, float *outX, floa
 	if ( outZ ) *outZ = 0.0f;
 }
 
+static qboolean VDB_RebuildMajorantForGrid( vdbGrid_t *grid, qboolean logResult )
+{
+	if ( !grid || !grid->data ) {
+		return qfalse;
+	}
+
+	if ( grid->gpuMajorantView != VK_NULL_HANDLE ) {
+		qvkDestroyImageView( vk.device, grid->gpuMajorantView, NULL );
+		grid->gpuMajorantView = VK_NULL_HANDLE;
+	}
+	if ( grid->gpuMajorantImage != VK_NULL_HANDLE ) {
+		qvkDestroyImage( vk.device, grid->gpuMajorantImage, NULL );
+		grid->gpuMajorantImage = VK_NULL_HANDLE;
+	}
+	if ( grid->gpuMajorantMemory != VK_NULL_HANDLE ) {
+		qvkFreeMemory( vk.device, grid->gpuMajorantMemory, NULL );
+		grid->gpuMajorantMemory = VK_NULL_HANDLE;
+	}
+	grid->majorantOnGPU = qfalse;
+
+	if ( !VDB_BuildMajorantGrid( grid ) ) {
+		if ( logResult ) {
+			ri.Printf( PRINT_WARNING, "VDB: majorant rebuild failed for '%s'\n", grid->info.name );
+		}
+		return qfalse;
+	}
+
+	if ( grid->onGPU && vk.device && !vk.device_lost && grid->majorantData ) {
+		if ( VDB_Upload3DTexture( grid->majorantData, grid->majorantDimX, grid->majorantDimY, grid->majorantDimZ,
+			&grid->gpuMajorantImage, &grid->gpuMajorantMemory, &grid->gpuMajorantView, "VDB majorant 3D" ) ) {
+			grid->majorantOnGPU = qtrue;
+		} else {
+			if ( logResult ) {
+				ri.Printf( PRINT_WARNING, "VDB: majorant GPU re-upload failed for '%s'\n", grid->info.name );
+			}
+			return qfalse;
+		}
+	}
+
+	if ( logResult ) {
+		ri.Printf( PRINT_ALL, "VDB: majorant rebuilt for '%s' (%dx%dx%d bricks)\n",
+			grid->info.name, grid->majorantDimX, grid->majorantDimY, grid->majorantDimZ );
+	}
+	return qtrue;
+}
+
+void VDB_FrameUpdate( void )
+{
+	int i;
+	qboolean anyOnGpu = qfalse;
+	qboolean refreshed = qfalse;
+
+	if ( !r_vdbMajorantBrick || !r_vdbMajorantBrick->modified ) {
+		return;
+	}
+	r_vdbMajorantBrick->modified = qfalse;
+
+	for ( i = 0; i < numGrids; i++ ) {
+		if ( !grids[i].active || !grids[i].data ) {
+			continue;
+		}
+		if ( grids[i].onGPU ) {
+			anyOnGpu = qtrue;
+		}
+		if ( VDB_RebuildMajorantForGrid( &grids[i], qfalse ) ) {
+			refreshed = qtrue;
+		}
+	}
+
+	if ( refreshed && anyOnGpu && vk.device && !vk.device_lost ) {
+		vk_update_volumetric_descriptors();
+	}
+	ri.Printf( PRINT_DEVELOPER, "VDB: r_vdbMajorantBrick changed; majorant bricks refreshed for loaded grids\n" );
+}
+
 qboolean VDB_UploadToGPU( vdbHandle_t h ) {
 	vdbGrid_t *grid;
-	VkCommandBuffer cmd;
-	VkDeviceSize uploadBytes;
-	uint32_t width, height, depth;
-	VkImageCreateInfo image_desc;
-	VkImageViewCreateInfo view_desc;
-	VkMemoryRequirements mem_req;
-	VkMemoryAllocateInfo alloc_info;
-	VkBufferImageCopy region;
 
 	if ( !VALID_GRID( h ) || !grids[h].data ) {
 		return qfalse;
@@ -433,112 +778,56 @@ qboolean VDB_UploadToGPU( vdbHandle_t h ) {
 	}
 
 	grid = &grids[h];
-	width = (uint32_t)grid->info.dimX;
-	height = (uint32_t)grid->info.dimY;
-	depth = (uint32_t)grid->info.dimZ;
-	if ( width < 1u ) width = 1u;
-	if ( height < 1u ) height = 1u;
-	if ( depth < 1u ) depth = 1u;
-
-	uploadBytes = (VkDeviceSize)grid->dataSize * sizeof( float );
-	if ( uploadBytes == 0 ) {
+	if ( grid->dataSize <= 0 ) {
 		return qfalse;
 	}
 
 	VDB_DestroyGpuResources( grid );
+	(void)VDB_BuildMajorantGrid( grid );
 
-	Com_Memset( &image_desc, 0, sizeof( image_desc ) );
-	image_desc.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	image_desc.imageType = VK_IMAGE_TYPE_3D;
-	image_desc.format = VK_FORMAT_R32_SFLOAT;
-	image_desc.extent.width = width;
-	image_desc.extent.height = height;
-	image_desc.extent.depth = depth;
-	image_desc.mipLevels = 1;
-	image_desc.arrayLayers = 1;
-	image_desc.samples = VK_SAMPLE_COUNT_1_BIT;
-	image_desc.tiling = VK_IMAGE_TILING_OPTIMAL;
-	image_desc.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-	image_desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	image_desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-
-	if ( qvkCreateImage( vk.device, &image_desc, NULL, &grid->gpuImage ) != VK_SUCCESS ) {
-		ri.Printf( PRINT_WARNING, "VDB: failed to create 3D image for grid %d\n", h );
-		return qfalse;
-	}
-
-	qvkGetImageMemoryRequirements( vk.device, grid->gpuImage, &mem_req );
-	Com_Memset( &alloc_info, 0, sizeof( alloc_info ) );
-	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	alloc_info.allocationSize = mem_req.size;
-	alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, mem_req.memoryTypeBits,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
-	if ( qvkAllocateMemory( vk.device, &alloc_info, NULL, &grid->gpuMemory ) != VK_SUCCESS ||
-		qvkBindImageMemory( vk.device, grid->gpuImage, grid->gpuMemory, 0 ) != VK_SUCCESS ) {
+	if ( !VDB_Upload3DTexture( grid->data, grid->info.dimX, grid->info.dimY, grid->info.dimZ,
+		&grid->gpuImage, &grid->gpuMemory, &grid->gpuView, "VDB density 3D" ) ) {
 		VDB_DestroyGpuResources( grid );
-		ri.Printf( PRINT_WARNING, "VDB: failed to allocate GPU memory for grid %d\n", h );
+		ri.Printf( PRINT_WARNING, "VDB: density GPU upload failed for grid %d\n", h );
 		return qfalse;
 	}
-
-	Com_Memset( &view_desc, 0, sizeof( view_desc ) );
-	view_desc.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	view_desc.image = grid->gpuImage;
-	view_desc.viewType = VK_IMAGE_VIEW_TYPE_3D;
-	view_desc.format = VK_FORMAT_R32_SFLOAT;
-	view_desc.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	view_desc.subresourceRange.levelCount = 1;
-	view_desc.subresourceRange.layerCount = 1;
-	if ( qvkCreateImageView( vk.device, &view_desc, NULL, &grid->gpuView ) != VK_SUCCESS ) {
-		VDB_DestroyGpuResources( grid );
-		ri.Printf( PRINT_WARNING, "VDB: failed to create 3D image view for grid %d\n", h );
-		return qfalse;
-	}
-
-	if ( vk.staging_buffer.size < uploadBytes ) {
-		vk_alloc_staging_buffer( uploadBytes );
-	}
-	if ( !vk.staging_buffer.ptr || vk.staging_buffer.size < uploadBytes ) {
-		VDB_DestroyGpuResources( grid );
-		ri.Printf( PRINT_WARNING, "VDB: staging buffer too small for grid %d upload\n", h );
-		return qfalse;
-	}
-
-	Com_Memcpy( vk.staging_buffer.ptr, grid->data, (size_t)uploadBytes );
-
-	cmd = vk_begin_command_buffer();
-	record_image_layout_transition( cmd, grid->gpuImage, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
-
-	Com_Memset( &region, 0, sizeof( region ) );
-	region.bufferOffset = 0;
-	region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	region.imageSubresource.mipLevel = 0;
-	region.imageSubresource.baseArrayLayer = 0;
-	region.imageSubresource.layerCount = 1;
-	region.imageOffset.x = 0;
-	region.imageOffset.y = 0;
-	region.imageOffset.z = 0;
-	region.imageExtent.width = width;
-	region.imageExtent.height = height;
-	region.imageExtent.depth = depth;
-
-	qvkCmdCopyBufferToImage( cmd, vk.staging_buffer.handle, grid->gpuImage,
-		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region );
-
-	record_image_layout_transition( cmd, grid->gpuImage, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
-
-	vk_end_command_buffer( cmd, "VDB_UploadToGPU" );
-
 	grid->onGPU = qtrue;
-	ri.Printf( PRINT_ALL, "VDB: grid %d '%s' uploaded to GPU (%ux%ux%u R32_SFLOAT)\n",
-		h, grid->info.name, (unsigned)width, (unsigned)height, (unsigned)depth );
+
+	if ( grid->majorantData ) {
+		if ( VDB_Upload3DTexture( grid->majorantData, grid->majorantDimX, grid->majorantDimY, grid->majorantDimZ,
+			&grid->gpuMajorantImage, &grid->gpuMajorantMemory, &grid->gpuMajorantView, "VDB majorant 3D" ) ) {
+			grid->majorantOnGPU = qtrue;
+		} else {
+			ri.Printf( PRINT_WARNING, "VDB: majorant GPU upload failed for grid %d (density-only path)\n", h );
+		}
+	}
+
+	ri.Printf( PRINT_ALL, "VDB: grid %d '%s' uploaded to GPU (%dx%dx%d density, majorant %s)\n",
+		h, grid->info.name, grid->info.dimX, grid->info.dimY, grid->info.dimZ,
+		grid->majorantOnGPU ? "yes" : "no" );
 	if ( vk.device && !vk.device_lost ) {
 		vk_update_volumetric_descriptors();
 	}
 	return qtrue;
+}
+
+static void VDB_Cmd_RebuildMajorant_f( void )
+{
+	vdbHandle_t h;
+
+	if ( ri.Cmd_Argc() < 2 ) {
+		ri.Printf( PRINT_ALL, "Usage: vdb_rebuild_majorant <handle>\n" );
+		return;
+	}
+	h = VDB_ParseHandleArg( ri.Cmd_Argv( 1 ) );
+	if ( !VALID_GRID( h ) || !grids[h].data ) {
+		ri.Printf( PRINT_WARNING, "VDB: invalid handle or no CPU density\n" );
+		return;
+	}
+
+	if ( VDB_RebuildMajorantForGrid( &grids[h], qtrue ) && grids[h].onGPU && vk.device && !vk.device_lost ) {
+		vk_update_volumetric_descriptors();
+	}
 }
 
 qboolean VDB_IsOnGPU( vdbHandle_t h ) {
@@ -553,6 +842,20 @@ VkImageView VDB_GetGpuImageView( vdbHandle_t h ) {
 		return VK_NULL_HANDLE;
 	}
 	return grids[h].gpuView;
+}
+
+qboolean VDB_HasMajorantOnGPU( vdbHandle_t h ) {
+	if ( !VALID_GRID( h ) ) {
+		return qfalse;
+	}
+	return grids[h].majorantOnGPU && grids[h].gpuMajorantView != VK_NULL_HANDLE;
+}
+
+VkImageView VDB_GetGpuMajorantView( vdbHandle_t h ) {
+	if ( !VDB_HasMajorantOnGPU( h ) ) {
+		return VK_NULL_HANDLE;
+	}
+	return grids[h].gpuMajorantView;
 }
 
 qboolean VDB_BindAsFogDensity( vdbHandle_t h ) {

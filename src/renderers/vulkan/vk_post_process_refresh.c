@@ -34,6 +34,9 @@ void vk_update_post_process_pipelines( void )
 			vk_create_post_process_pipeline( 11, postWidth, postHeight );
 			vk_create_post_process_pipeline( 12, postWidth, postHeight );
 		}
+		if ( vk.fxaaActive ) {
+			vk_create_post_process_pipeline( 24, postWidth, postHeight );
+		}
 		vk_create_post_process_pipeline( 23, postWidth, postHeight );
 		if ( r_bloom->integer ) {
 			uint32_t width = gls.captureWidth;
@@ -50,6 +53,9 @@ void vk_update_post_process_pipelines( void )
 			}
 
 			vk_create_post_process_pipeline( 2, postWidth, postHeight );
+		}
+		if ( vk.lensFlareActive ) {
+			vk_create_post_process_pipeline( 25, postWidth, postHeight );
 		}
 
 		if ( r_ssao && r_ssao->integer ) {

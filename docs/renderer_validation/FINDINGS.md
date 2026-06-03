@@ -4,9 +4,9 @@ Append new sessions here or add dated files alongside this README. Use [TEMPLATE
 
 ## Tier C - manual GPU / validation layers
 
-| Date | Commit | Vulkan | OpenGL | Validation layers | Notes |
-|------|--------|--------|--------|-------------------|-------|
-| - | - | - | - | - | *Add a row when you complete a real GPU pass (see template). Not a substitute for Tier B (`GAME_BASE` regression on a runner).* |
+| Date | Commit | Vulkan pass | Validation layers | Notes |
+|------|--------|-------------|-------------------|-------|
+| - | - | - | - | *Add a row when you complete a real GPU pass (see template). Not a substitute for Tier B (`GAME_BASE` regression on a runner).* |
 
 ## Tier A - automated baseline (reference only)
 

@@ -22,6 +22,7 @@ Split from vk.c.
 #include "vk_rtx.h"
 #include "vk_vdb.h"
 #include "vk_pipeline_cache_disk.h"
+#include "vk_fp64_points.h"
 
 #ifdef USE_VBO
 void vk_release_vbo( void );
@@ -159,6 +160,8 @@ void vk_shutdown( refShutdownCode_t code )
 		vk.pipeline_layout_oit_accum = VK_NULL_HANDLE;
 	}
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_ssr, NULL);
+	VK_FP64_PointsShutdown();
+
 	if ( vk.pipeline_layout_atmosphere != VK_NULL_HANDLE ) {
 		qvkDestroyPipelineLayout( vk.device, vk.pipeline_layout_atmosphere, NULL );
 		vk.pipeline_layout_atmosphere = VK_NULL_HANDLE;
@@ -368,6 +371,14 @@ for (i = 0; i < 2; i++) {
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.smaa_edge_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.smaa_blend_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.smaa_compose_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.fxaa_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.lens_flare_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.fp64_points_native_vs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.fp64_points_native_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.fp64_points_emulated_vs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.fp64_points_emulated_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.fp64_points_single_vs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.fp64_points_single_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.taa_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.volumetric_fog_vs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.volumetric_fog_fs );

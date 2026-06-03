@@ -18,7 +18,7 @@ The engine already has:
 - **Phase function**: Henyey-Greenstein anisotropy
 - **Noise**: 3D FBM-style turbulence, wind scroll
 - **Shadows**: Sun PCF, local spot/point shadow maps
-- **VDB integration**: OpenVDB/NanoVDB for authored density volumes
+- **VDB integration**: OpenVDB/NanoVDB for authored density volumes; optional **Woodcock/delta tracking** composite (`r_volumetricFogIntegration 3`) with GPU majorant brick grid (`r_vdbMajorantBrick`) — see [VDB_WOODCOCK_VOLUMETRICS.md](VDB_WOODCOCK_VOLUMETRICS.md)
 - **Fluid simulation**: Navier-Stokes advection for dynamic fog motion
 
 ---
@@ -110,7 +110,7 @@ The engine already has:
 
 ### 7. Authored Volume Integration (VDB)
 
-**Current**: `VDB_Load` / `VDB_UploadToGPU` (R32 3D texture), `VDB_BindAsFogDensity`, **`r_vdbFog`** / **`r_vdbFogBlend`** blend bound density in **`volumetric_fog.comp`** global density stage (binding **17**). CPU `VDB_SampleFloat` remains for tooling.
+**Current**: `VDB_Load` decodes NanoVDB leaves (float/half/double) or FogVolume blind data into a dense CPU grid, then `VDB_UploadToGPU` (R32 3D texture + majorant bricks). `VDB_BindAsFogDensity`, **`r_vdbFog`** / **`r_vdbFogBlend`** blend bound density in **`volumetric_fog.comp`** (binding **17–18**). Woodcock composite: **`r_volumetricFogIntegration 3`**. CPU `VDB_SampleFloat` remains for tooling.
 
 **Enhancement**:
 - **Animated VDB sequences** and richer blending (still open below)

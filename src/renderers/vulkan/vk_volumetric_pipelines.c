@@ -42,8 +42,19 @@ static void vk_create_volumetric_pipeline_layouts( void )
 	desc.pSetLayouts = &vk.volumetric_composite_layout;
 	VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.volumetric_composite_pipeline_layout ) );
 
-	desc.pSetLayouts = &vk.volumetric_depth_resolve_layout;
-	VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.volumetric_depth_resolve_pipeline_layout ) );
+	{
+		VkPushConstantRange resolve_push_range;
+
+		resolve_push_range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		resolve_push_range.offset = 0;
+		resolve_push_range.size = sizeof( int ) * 2;
+		desc.pSetLayouts = &vk.volumetric_depth_resolve_layout;
+		desc.pushConstantRangeCount = 1;
+		desc.pPushConstantRanges = &resolve_push_range;
+		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.volumetric_depth_resolve_pipeline_layout ) );
+		desc.pushConstantRangeCount = 0;
+		desc.pPushConstantRanges = NULL;
+	}
 
 	if ( vk.luminance_layout != VK_NULL_HANDLE ) {
 		VkPushConstantRange luminance_push_range;

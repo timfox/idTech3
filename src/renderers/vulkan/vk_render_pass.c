@@ -798,23 +798,25 @@ void vk_create_render_passes( void )
 		SET_OBJECT_NAME( vk.render_pass.atmosphere, "render pass - atmosphere", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
 	}
 
-	if ( vk.smaaActive )
+	if ( vk.smaaActive || vk.fxaaActive )
 	{
 		VkAttachmentDescription smaaAttachment;
 		VkAttachmentReference smaaColorRef;
 		VkSubpassDescription smaaSubpass;
 		VkSubpassDependency smaaDeps[2];
 		VkRenderPassCreateInfo smaaDesc;
+		uint32_t passCount;
 		VkRenderPass *smaaPasses[3];
 		const char *smaaNames[3];
 
+		passCount = vk.smaaActive ? 3u : 1u;
 		smaaPasses[0] = &vk.render_pass.smaa_edge;
 		smaaPasses[1] = &vk.render_pass.smaa_blend;
 		smaaPasses[2] = &vk.render_pass.smaa_compose;
 
 		smaaNames[0] = "render pass - smaa edge";
 		smaaNames[1] = "render pass - smaa blend";
-		smaaNames[2] = "render pass - smaa compose";
+		smaaNames[2] = vk.smaaActive ? "render pass - smaa compose" : "render pass - fxaa";
 
 		Com_Memset( &smaaAttachment, 0, sizeof( smaaAttachment ) );
 		smaaAttachment.flags = 0;
@@ -863,10 +865,10 @@ void vk_create_render_passes( void )
 		smaaDesc.pDependencies = smaaDeps;
 		smaaDesc.dependencyCount = 2;
 
-		for ( i = 0; i < ARRAY_LEN( smaaPasses ); i++ )
+		for ( i = 0; i < passCount; i++ )
 		{
-			VK_CHECK( qvkCreateRenderPass( device, &smaaDesc, NULL, smaaPasses[i] ) );
-			SET_OBJECT_NAME( *smaaPasses[i], smaaNames[i], VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
+			VK_CHECK( qvkCreateRenderPass( device, &smaaDesc, NULL, smaaPasses[vk.smaaActive ? i : 2] ) );
+			SET_OBJECT_NAME( *smaaPasses[vk.smaaActive ? i : 2], smaaNames[vk.smaaActive ? i : 2], VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
 		}
 	}
 

@@ -14,7 +14,7 @@
 ## Relation to this engine (idTech3)
 
 - **HUD / console TrueType:** Glyphs are rasterized with **FreeType on the CPU** into atlases (or cached `.dat`), then drawn as **textured quads**—the same *separation of concerns* as the paper: topology/outline work on CPU, **parallel sampling** on GPU.
-- We do **not** implement their **span-based** glyph submission or print **OpenPL** pipeline; Vulkan/OpenGL paths use standard texture + fragment shading (plus optional SDF).
+- We do **not** implement their **span-based** glyph submission or print **OpenPL** pipeline; the Vulkan UI/text paths use standard texture + fragment shading (plus optional SDF).
 - If a future path needed **massive** dynamic text without atlases, their **horizontal run** representation is a documented precedent for GPU-friendly monochrome fills—at the cost of a very different display-list design.
 
 ## Obtaining the report

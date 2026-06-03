@@ -15,8 +15,7 @@ This document serves as the **constitutional contract** for the idTech3 engine f
 
 #### Vulkan Renderer (PRIMARY GOAL)
 - ✅ **Hardware Acceleration**: Full Vulkan 1.4 + RTX support
-- ✅ **Fallback Compatibility**: Automatic OpenGL fallback for all systems
-- ✅ **Performance**: 2x+ FPS improvement over OpenGL baseline
+- ✅ **Performance**: Modern GPU path tuned for Vulkan (Forward+, PBR, volumetrics)
 - ✅ **Stability**: Zero crashes in production use
 - ✅ **Validation**: Clean validation layers, no warnings
 - ✅ **CI Coverage**: Automated testing across GCC/Clang, Debug/Release
@@ -156,7 +155,7 @@ src/
 ├── server/           # Server-side systems
 ├── renderers/        # Renderer implementations
 │   ├── vulkan/       # Vulkan renderer
-│   └── opengl/       # OpenGL renderer
+│   └── opengl/       # Legacy renderer tree (not the supported shipping path)
 ├── common/           # Shared utilities
 └── game/             # Game logic
 ```
@@ -271,9 +270,6 @@ sudo apt-get install cmake clang-18 gcc-15 ninja-build
 # Same, plus example demo mod: BUILD_EXAMPLE_DEMO_GAME=ON, target demo_game_pk3,
 # copies idtech3_demo.pk3 to release/demo_game/ when the pack builds successfully
 ./scripts/compile_engine.sh vulkan demo
-
-# OpenGL build (fallback)
-./scripts/compile_engine.sh opengl
 
 # Debug build
 ./scripts/compile_engine.sh vulkan debug

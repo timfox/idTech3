@@ -154,6 +154,7 @@ void VkImgui_SwapchainRestarted(void);
 void VkImgui_DrawObjects(void);
 void VkImgui_DrawInspector(void);
 void VkImgui_DrawProfiler(void);
+void VkImgui_DrawSimRenderDebugHud(void);
 void VkImgui_DrawViewport(void);
 void VkImgui_DrawShaderEditor(void);
 void VkImgui_DrawPostFXPanel(void);
@@ -174,6 +175,7 @@ void VkImgui_NotifySwapchainRestart( void );
 
 #ifdef __cplusplus
 void VkImgui_ApplyInspectorStyle( void );
+void VkImgui_LoadFonts( void );
 #endif
 
 #ifdef __cplusplus

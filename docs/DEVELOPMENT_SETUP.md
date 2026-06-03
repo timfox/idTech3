@@ -82,7 +82,7 @@ MinGW links SDL2/OpenAL/etc. dynamically. If you copy `idtech3.exe` outside MSYS
 
 **PE architecture sanity:** from PowerShell, `pwsh ./scripts/windows_native_compat_check.ps1 -BinDir path\to\bin` fails if any `.exe`/`.dll` in the folder is not the same machine type as the reference executable (catches x86/x64/ARM64 mixups).
 
-**PE export sanity:** `pwsh ./scripts/windows_pe_exports_check.ps1 -BinDir path\to\bin` - use **`-SkipRendererDlls`** for Windows CMake/MSVC/MinGW artifacts (`USE_RENDERER_DLOPEN` is forced **off** on `WIN32`, so renderer plugins are not shipped as separate DLLs). Use **`-ExpectRendererDlls`** only for trees that actually ship `idtech3_vulkan.dll` / `idtech3_opengl.dll` (e.g. Linux dlopen builds). Any `qagame`/`cgame`/`ui`/... native `.dll` present in the folder must export **`vmMain`** and **`dllEntry`**.
+**PE export sanity:** `pwsh ./scripts/windows_pe_exports_check.ps1 -BinDir path\to\bin` - use **`-SkipRendererDlls`** for Windows CMake/MSVC/MinGW artifacts (`USE_RENDERER_DLOPEN` is forced **off** on `WIN32`, so renderer plugins are not shipped as separate DLLs). Use **`-ExpectRendererDlls`** only for trees that ship `idtech3_vulkan.dll` (e.g. Linux dlopen builds). Any `qagame`/`cgame`/`ui`/... native `.dll` present in the folder must export **`vmMain`** and **`dllEntry`**.
 
 ## Building
 
@@ -90,11 +90,8 @@ The primary build entry point is `scripts/compile_engine.sh`. The repository als
 
 ### Quick Start
 ```bash
-# Vulkan renderer (recommended)
+# Vulkan renderer
 ./scripts/compile_engine.sh vulkan
-
-# OpenGL renderer
-./scripts/compile_engine.sh opengl
 
 # Debug build
 ./scripts/compile_engine.sh vulkan debug
@@ -117,11 +114,9 @@ ctest --preset test-vulkan-release
 
 # Alternate configurations
 cmake --preset vulkan-debug
-cmake --preset opengl-release
-cmake --preset opengl-debug
 ```
 
-Presets use dedicated `build/presets/<name>/` trees so they do not overwrite the helper script's `build-vk-*` / `build-gl-*` directories.
+Presets use dedicated `build/presets/<name>/` trees so they do not overwrite the helper script's `build-vk-*` directories.
 
 Use the helper script when you want staged artifacts in `release/` and the same workflow documented throughout the repo. Use presets when you want direct CMake control or IDE integration.
 
@@ -225,7 +220,6 @@ Requires OpenSSL. When enabled, use `net_dtls 1` and `net_dtls_key <shared-secre
 | `release/idtech3` | Client executable |
 | `release/idtech3_server` | Dedicated server |
 | `release/idtech3_vulkan.so` | Vulkan renderer plugin |
-| `release/idtech3_opengl.so` | OpenGL renderer plugin |
 | `release/flux_cli` | FLUX.2 image generation tool |
 
 ### Minimal game data (engine-only trees)

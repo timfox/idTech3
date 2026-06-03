@@ -273,6 +273,26 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			target_format = vk.color_format;
 			blend = qfalse;
 			break;
+		case 24:
+			pipeline = &vk.fxaa_pipeline;
+			fsmodule = vk.modules.fxaa_fs;
+			renderpass = vk.render_pass.smaa_compose;
+			layout = vk.pipeline_layout_post_process;
+			samples = VK_SAMPLE_COUNT_1_BIT;
+			pipeline_name = "fxaa pipeline";
+			target_format = vk.color_format;
+			blend = qfalse;
+			break;
+		case 25:
+			pipeline = &vk.lens_flare_pipeline;
+			fsmodule = vk.modules.lens_flare_fs;
+			renderpass = vk.render_pass.post_bloom;
+			layout = vk.pipeline_layout_blend;
+			samples = vk_get_main_rasterization_samples();
+			pipeline_name = "lens flare pipeline";
+			target_format = vk.color_format;
+			blend = qtrue;
+			break;
 		case 13:
 			pipeline = &vk.ssr_pipeline;
 			fsmodule = vk_post_process_hdr64_active() ? vk.modules.ssr_fs_hdr64 : vk.modules.ssr_fs;

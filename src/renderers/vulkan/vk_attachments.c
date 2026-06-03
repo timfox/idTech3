@@ -559,12 +559,14 @@ void vk_create_attachments( void )
 				&vk.capture.image, &vk.capture.image_view, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, qfalse, 0 );
 		}
 
-		if ( vk.smaaActive ) {
+		if ( vk.smaaActive || vk.fxaaActive ) {
 			VkImageUsageFlags smaaUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-			vk_create_fullres_color_attachment( vk.color_format,
-				smaaUsage, &vk.smaa_edge_image, &vk.smaa_edge_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
-			vk_create_fullres_color_attachment( vk.color_format,
-				smaaUsage, &vk.smaa_blend_image, &vk.smaa_blend_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+			if ( vk.smaaActive ) {
+				vk_create_fullres_color_attachment( vk.color_format,
+					smaaUsage, &vk.smaa_edge_image, &vk.smaa_edge_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+				vk_create_fullres_color_attachment( vk.color_format,
+					smaaUsage, &vk.smaa_blend_image, &vk.smaa_blend_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+			}
 			vk_create_fullres_color_attachment( vk.color_format,
 				smaaUsage, &vk.smaa_output_image, &vk.smaa_output_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
 		}

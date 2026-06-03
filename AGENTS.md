@@ -4,7 +4,7 @@
 
 ### Overview
 
-This is an **idTech3 engine fork** - a C/C++ game engine based on Quake III Arena with Vulkan 1.4 + RTX rendering, PBR, audio codecs (Opus/FLAC/WebM/MP3), Lua/Duktape scripting, and ImGui debug UI (optional **Studio** session + command strips via `r_studio_tools`; see `docs/IN_ENGINE_STUDIO_TOOLS.md`). It produces a client (`idtech3`), dedicated server (`idtech3_server`), and renderer plugins (`idtech3_opengl.so`, `idtech3_vulkan.so`).
+This is an **idTech3 engine fork** - a C/C++ game engine based on Quake III Arena with Vulkan 1.4 + RTX rendering, PBR, audio codecs (Opus/FLAC/WebM/MP3), Lua/Duktape scripting, and ImGui debug UI (optional **Studio** session + command strips via `r_studio_tools`; see `docs/IN_ENGINE_STUDIO_TOOLS.md`). It produces a client (`idtech3`), dedicated server (`idtech3_server`), and the Vulkan renderer plugin (`idtech3_vulkan.so`).
 
 ### Building
 
@@ -12,13 +12,12 @@ See `CLAUDE.md` for canonical build commands. The primary build script is `./scr
 
 ```
 ./scripts/compile_engine.sh vulkan          # Vulkan renderer, Release
-./scripts/compile_engine.sh opengl          # OpenGL renderer, Release
 ./scripts/compile_engine.sh vulkan debug    # Vulkan renderer, Debug
 ./scripts/compile_engine.sh vulkan demo     # Also builds idtech3_demo.pk3 → release/demo_game/
 ./scripts/compile_engine.sh clean vulkan    # Clean build
 ```
 
-Build artifacts go to `build-vk-Release/` or `build-gl-Release/` and are copied to `release/`.
+Build artifacts go to `build-vk-Release/` and are copied to `release/`.
 
 ### Gotchas
 
@@ -31,7 +30,7 @@ Build artifacts go to `build-vk-Release/` or `build-gl-Release/` and are copied 
 - **Console / HUD fonts**: With **`cl_builtInTtf` 1** (default) and a valid **`r_font`** `.ttf`, FreeType draws engine console and small HUD text before optional pre-baked SDF (`r_sdfEnable`). Use **`cl_builtInTtf 0`** to prefer SDF when both are configured. Tune rasterization with **`r_fontDpi`** (e.g. **96**), **`r_fontHint`** (default **1**), and **`r_fontMipmap`** (default **1**, atlas mip chain for minified text); apply with **`reloadTtf`** or **`vid_restart`**. Client cvars: **`r_fontConsoleAlign`** (baseline in cell), **`r_fontShadow`** (0–8, 0=no shadow), **`r_fontSubpixel`** (optional 0.375px nudge).
 - **FonTS (ICCV 2025) + FLUX**: In-engine image generation uses **`flux_generate`** (cflux2). The separate [FonTS](https://github.com/ArtmeScienceLab/FonTS) typography pipeline is optional: set **`cl_fonts_enable` 1**, **`cl_fonts_repo`**, and **`cl_fonts_cmd`**, then run **`fonts_pipeline`** (see **`docs/FONTS.md`**).
 - **TRELLIS.2 (image-to-3D)**: Runtime pipeline mirroring FLUX: **`trellis_generate`** (async default), **`trellis_status`** / **`trellis_cancel`**, **`trellis_view`**, **`trellis_from_prompt`** (FLUX→TRELLIS chain). Set **`cl_trellis_enable` 1** and **`cl_trellis_repo`** (see **`docs/TRELLIS.md`**). Requires Linux + NVIDIA GPU (24GB+); Python/CUDA runs out-of-process like external FLUX.
-- **VDB volumetric fog (Vulkan)**: **`r_vdb` 1** (default) loads `.nvdb`; console **`vdb_load`**, **`vdb_upload`**, **`vdb_bind_fog`**, **`vdb_list`**. Typical path: `vdb_load path/to/grid.nvdb` → `vdb_upload 0` → `vdb_bind_fog 0` → `r_volumetricFog 1` + **`r_vdbFog 1`**. Lua: `VDB.load` / `bindAsFog` in game module when enabled.
+- **VDB volumetric fog (Vulkan)**: **`r_vdb` 1** (default) loads `.nvdb` (NanoVDB leaf/blind CPU decode → GPU 3D texture); console **`vdb_load`**, **`vdb_upload`**, **`vdb_bind_fog`**, **`vdb_list`**, **`vdb_rebuild_majorant`**. Typical path: `vdb_load path/to/grid.nvdb` → `vdb_upload 0` → `vdb_bind_fog 0` → `r_volumetricFog 1` + **`r_vdbFog 1`**. **`r_volumetricFogIntegration 3`** + **`r_vdbMajorantBrick`** enable OpenVDB majorant grid + Woodcock/delta tracking (arXiv:2211.09997-style, real-time). See **`docs/VDB_WOODCOCK_VOLUMETRICS.md`**. Unit test: **`unit_nanovdb_decode`**. Lua: `VDB.load` / `bindAsFog` in game module when enabled.
 
 ### Linting / Static Analysis
 

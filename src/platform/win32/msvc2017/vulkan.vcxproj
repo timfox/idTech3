@@ -319,6 +319,7 @@
     <ClCompile Include="..\..\..\renderers\vulkan\vk_validation.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_vbo.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_vdb.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_nanovdb_decode.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_view_state.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_volumetric_fog_color.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_volumetric_params.c" />

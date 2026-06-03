@@ -4,15 +4,21 @@
 #include "vk_post_fog.h"
 #include "vk_temporal.h"
 #include "vk_volumetric_pass.h"
+#include "vk_post_aa.h"
 
 void vk_volumetric_skip_cleanup( const char *reason, uint32_t restoreDepthSrcStages )
 {
 	VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
 
 	vk_reset_volumetric_history();
-	vk_set_scene_post_fog_source( vk.color_image_view );
-	vk_log_post_fog_rebind( reason, vk.color_image_view );
-	vk_update_post_fog_descriptors( vk.color_image_view );
+	if ( tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) && vk_post_aa_output_active() ) {
+		vk_post_scene_aa_apply();
+		vk_log_post_fog_rebind( reason, vk_get_post_fog_source() );
+	} else {
+		vk_set_scene_post_fog_source( vk.color_image_view );
+		vk_log_post_fog_rebind( reason, vk.color_image_view );
+		vk_update_post_fog_descriptors( vk.color_image_view );
+	}
 
 	if ( tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
 		if ( glConfig.stencilBits > 0 ) {

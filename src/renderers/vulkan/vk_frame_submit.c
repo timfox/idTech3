@@ -27,6 +27,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_temporal.h"
 #include "vk_util.h"
 #include "vk_volumetric_internal.h"
+#include "vk_sim_render_debug.h"
 #include "vk_rtx.h"
 
 #ifdef __ANDROID__
@@ -145,9 +146,10 @@ void vk_begin_frame( void )
 		}
 		VK_CHECK( qvkResetFences( vk.device, 1, &vk.cmd->rendering_finished_fence ) );
 		if ( vk.volumetric_query_pool != VK_NULL_HANDLE &&
-			r_volumetricFogPerfTimers && r_volumetricFogPerfTimers->integer ) {
+			vk_volumetric_perf_wanted() ) {
 			vk_update_volumetric_perf_queries();
 		}
+		VK_SimRenderDebugFrameEnd();
 		if ( r_occlusionCulling && r_occlusionCulling->integer ) {
 			vk_occlusion_readback();
 		}
@@ -318,6 +320,11 @@ void vk_end_frame( void )
 		if ( r_bloom->integer )
 		{
 			vk_bloom();
+		}
+
+		if ( vk.lensFlareActive )
+		{
+			vk_lens_flare();
 		}
 
 		if ( r_ssao && r_ssao->integer && !backEnd.doneSSAO )

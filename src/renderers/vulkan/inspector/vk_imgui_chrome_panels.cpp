@@ -10,62 +10,14 @@ Inspector chrome: theme, main menu bar, popups, and workspace dock presets
 #ifdef USE_IMGUI
 
 #include "vk_imgui_common.hpp"
+#include "vk_imgui_theme.hpp"
+
+extern cvar_t *r_imguiTheme;
 
 extern "C" void VkImgui_ApplyInspectorStyle( void )
 {
-	ImVec4 *colors = ImGui::GetStyle().Colors;
-	/* Neutral dark editor (closer to id Tech 4 tool feel than flat black). */
-	colors[ImGuiCol_Text] = ImVec4( 0.96f, 0.96f, 0.96f, 1.00f );
-	colors[ImGuiCol_TextDisabled] = ImVec4( 0.45f, 0.45f, 0.46f, 1.00f );
-	colors[ImGuiCol_WindowBg] = ImVec4( 0.11f, 0.11f, 0.12f, 1.00f );
-	colors[ImGuiCol_ChildBg] = ImVec4( 0.09f, 0.09f, 0.10f, 1.00f );
-	colors[ImGuiCol_PopupBg] = ImVec4( 0.14f, 0.14f, 0.15f, 0.98f );
-	colors[ImGuiCol_Border] = ImVec4( 0.22f, 0.22f, 0.24f, 1.00f );
-	colors[ImGuiCol_FrameBg] = ImVec4( 0.16f, 0.16f, 0.18f, 1.00f );
-	colors[ImGuiCol_FrameBgHovered] = ImVec4( 0.22f, 0.22f, 0.25f, 1.00f );
-	colors[ImGuiCol_FrameBgActive] = ImVec4( 0.26f, 0.26f, 0.29f, 1.00f );
-	colors[ImGuiCol_MenuBarBg] = ImVec4( 0.08f, 0.08f, 0.09f, 1.00f );
-	colors[ImGuiCol_TitleBg] = ImVec4( 0.08f, 0.08f, 0.09f, 1.00f );
-	colors[ImGuiCol_TitleBgActive] = ImVec4( 0.10f, 0.10f, 0.11f, 1.00f );
-	colors[ImGuiCol_CheckMark] = ImVec4( 0.45f, 0.72f, 0.95f, 1.00f );
-	colors[ImGuiCol_SliderGrab] = ImVec4( 0.36f, 0.58f, 0.82f, 1.00f );
-	colors[ImGuiCol_SliderGrabActive] = ImVec4( 0.50f, 0.72f, 0.95f, 1.00f );
-	colors[ImGuiCol_Button] = ImVec4( 0.18f, 0.18f, 0.20f, 1.00f );
-	colors[ImGuiCol_ButtonHovered] = ImVec4( 0.26f, 0.26f, 0.30f, 1.00f );
-	colors[ImGuiCol_ButtonActive] = ImVec4( 0.30f, 0.30f, 0.35f, 1.00f );
-	colors[ImGuiCol_Header] = ImVec4( 0.20f, 0.20f, 0.23f, 0.85f );
-	colors[ImGuiCol_HeaderHovered] = ImVec4( 0.26f, 0.26f, 0.30f, 0.90f );
-	colors[ImGuiCol_HeaderActive] = ImVec4( 0.30f, 0.30f, 0.35f, 1.00f );
-	colors[ImGuiCol_Separator] = ImVec4( 0.25f, 0.25f, 0.28f, 1.00f );
-	colors[ImGuiCol_Tab] = ImVec4( 0.14f, 0.14f, 0.16f, 1.00f );
-	colors[ImGuiCol_TabHovered] = ImVec4( 0.22f, 0.22f, 0.25f, 1.00f );
-	colors[ImGuiCol_TabSelected] = ImVec4( 0.24f, 0.22f, 0.20f, 1.00f );
-	colors[ImGuiCol_TabDimmed] = ImVec4( 0.12f, 0.12f, 0.13f, 1.00f );
-	colors[ImGuiCol_TabDimmedSelected] = ImVec4( 0.20f, 0.18f, 0.16f, 1.00f );
-	colors[ImGuiCol_DockingPreview] = ImVec4( 0.33f, 0.67f, 0.86f, 0.55f );
-	colors[ImGuiCol_DockingEmptyBg] = ImVec4( 0.06f, 0.06f, 0.07f, 1.00f );
-
-	ImGuiStyle &style = ImGui::GetStyle();
-	style.IndentSpacing = 22.0f;
-	style.ScrollbarSize = 14.0f;
-	style.GrabMinSize = 10.0f;
-	style.WindowBorderSize = 1.0f;
-	style.ChildBorderSize = 1.0f;
-	style.PopupBorderSize = 1.0f;
-	style.FrameBorderSize = 0.0f;
-	style.WindowRounding = 6.0f;
-	style.ChildRounding = 4.0f;
-	style.FrameRounding = 3.0f;
-	style.PopupRounding = 5.0f;
-	style.ScrollbarRounding = 6.0f;
-	style.GrabRounding = 3.0f;
-	style.TabRounding = 4.0f;
-	style.WindowPadding = ImVec2( 10.0f, 8.0f );
-	style.FramePadding = ImVec2( 8.0f, 4.0f );
-	style.ItemSpacing = ImVec2( 8.0f, 6.0f );
-
-	ri.Printf( PRINT_ALL,
-		"[VK][imgui] inspector editor style applied (Window reset layout for id Tech 4–style dock)\n" );
+	const int theme = ( r_imguiTheme && r_imguiTheme->integer == 1 ) ? 1 : 0;
+	VkImguiTheme::Apply( theme );
 }
 
 static void VkImgui_DrawAboutInspectorPopup( void )
@@ -194,6 +146,79 @@ void VkImgui_ResetInspectorWorkspaceLayout( void )
 	ri.Printf( PRINT_DEVELOPER, "[VK][imgui] workspace layout reset (editor default dock)\n" );
 }
 
+static void VkImgui_SetViewportDebugMode( int pbrDebug, int postDebug, int fogDebug )
+{
+	ri.Cvar_Set( "r_pbr_debug", va( "%d", pbrDebug ) );
+	ri.Cvar_Set( "r_post_debug", va( "%d", postDebug ) );
+	ri.Cvar_Set( "r_fogDebug", va( "%d", fogDebug ) );
+}
+
+static void VkImgui_DrawViewMenu( void )
+{
+	if ( !ImGui::BeginMenu( "View" ) ) {
+		return;
+	}
+
+	if ( ImGui::MenuItem( "Main (final)" ) ) {
+		VkImgui_SetViewportDebugMode( 0, 0, 0 );
+	}
+	if ( ImGui::MenuItem( "Pre-tonemap HDR" ) ) {
+		VkImgui_SetViewportDebugMode( 0, 1, 0 );
+	}
+	if ( ImGui::MenuItem( "Luminance heatmap" ) ) {
+		VkImgui_SetViewportDebugMode( 0, 2, 0 );
+	}
+	ImGui::Separator();
+	if ( ImGui::BeginMenu( "Volumetrics" ) ) {
+		if ( ImGui::MenuItem( "Extinction" ) ) {
+			VkImgui_SetViewportDebugMode( 0, 0, 2 );
+		}
+		if ( ImGui::MenuItem( "Scattering" ) ) {
+			VkImgui_SetViewportDebugMode( 0, 0, 3 );
+		}
+		if ( ImGui::MenuItem( "Spot shadow map" ) ) {
+			VkImgui_SetViewportDebugMode( 0, 0, 8 );
+		}
+		if ( ImGui::MenuItem( "Point shadow map" ) ) {
+			VkImgui_SetViewportDebugMode( 0, 0, 9 );
+		}
+		ImGui::EndMenu();
+	}
+	if ( ImGui::BeginMenu( "PBR buffers" ) ) {
+		if ( ImGui::MenuItem( "Direct lighting" ) ) {
+			VkImgui_SetViewportDebugMode( 1, 0, 0 );
+		}
+		if ( ImGui::MenuItem( "IBL specular" ) ) {
+			VkImgui_SetViewportDebugMode( 2, 0, 0 );
+		}
+		if ( ImGui::MenuItem( "Depth (PBR debug 19)" ) ) {
+			VkImgui_SetViewportDebugMode( 19, 0, 0 );
+		}
+		ImGui::EndMenu();
+	}
+	ImGui::Separator();
+	if ( r_imguiTheme ) {
+		const int theme = r_imguiTheme->integer;
+		if ( ImGui::MenuItem( "Theme: Pablo dark", nullptr, theme == 0 ) ) {
+			ri.Cvar_Set( "r_imguiTheme", "0" );
+			VkImgui_ApplyInspectorStyle();
+			ri.Printf( PRINT_ALL, "[VK][imgui] theme: Pablo dark\n" );
+		}
+		if ( ImGui::MenuItem( "Theme: Spectrum light", nullptr, theme == 1 ) ) {
+			ri.Cvar_Set( "r_imguiTheme", "1" );
+			VkImgui_ApplyInspectorStyle();
+			ri.Printf( PRINT_ALL, "[VK][imgui] theme: Spectrum light\n" );
+		}
+	}
+	{
+		int simDbg = ri.Cvar_VariableIntegerValue( "r_simRenderDebug" );
+		if ( ImGui::MenuItem( "Sim render debug HUD", nullptr, simDbg >= 2 ) ) {
+			ri.Cvar_Set( "r_simRenderDebug", simDbg >= 2 ? "0" : "2" );
+		}
+	}
+	ImGui::EndMenu();
+}
+
 static void VkImgui_DrawMenuBar( void )
 {
 	ImGuiIO &io = ImGui::GetIO();
@@ -224,6 +249,8 @@ static void VkImgui_DrawMenuBar( void )
 			}
 			ImGui::EndMenu();
 		}
+
+		VkImgui_DrawViewMenu();
 
 		if ( r_studio_tools && r_studio_tools->integer ) {
 			if ( ImGui::BeginMenu( "Studio" ) ) {
@@ -265,16 +292,16 @@ static void VkImgui_DrawMenuBar( void )
 				if ( sp < 0 ) {
 					sp = 0;
 				}
-				if ( sp > 6 ) {
-					sp = 6;
+				if ( sp > 7 ) {
+					sp = 7;
 				}
 				const int spPrev = sp;
-				ImGui::SliderInt( "r_speeds (debug HUD)", &sp, 0, 6 );
+				ImGui::SliderInt( "r_speeds (debug HUD)", &sp, 0, 7 );
 				if ( sp != spPrev ) {
 					ri.Cvar_Set( "r_speeds", va( "%d", sp ) );
 				}
 				if ( ImGui::IsItemHovered() ) {
-					ImGui::SetTooltip( "Console stats overlay (cheat cvar). 0=off, 1=BSP, 2=patch cull, 3=cluster, 4=dlights, 5=zFar, 6=flares." );
+					ImGui::SetTooltip( "Console stats overlay (cheat cvar). 0=off, 1=BSP, 2=patch cull, 3=cluster, 4=dlights, 5=zFar, 6=flares, 7=sim render." );
 				}
 			}
 			{

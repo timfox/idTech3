@@ -13,7 +13,9 @@ composite fullscreen draw, SMAA subpasses. Split from vk.c.
 #include "vk_atmosphere.h"
 #include "vk_volumetric_params.h"
 #include "vk_volumetric_pass.h"
+#include "vk_post_aa.h"
 #include "vk_volumetric_internal.h"
+#include "vk_sim_render_debug.h"
 #include "vk_post_fog.h"
 #include "vk_temporal.h"
 
@@ -659,92 +661,6 @@ static void vk_volumetric_composite_pass( void )
 	vk_end_render_pass();
 }
 
-typedef struct {
-	float threshold;
-	float localContrast;
-	int maxSearchSteps;
-	float corner_rounding;
-} SMAAPushConstants_t;
-
-static void vk_run_smaa_pass( VkPipeline pipeline, VkRenderPass pass, VkFramebuffer framebuffer, VkDescriptorSet color_descriptor, VkDescriptorSet aux_descriptor, uint32_t width, uint32_t height )
-{
-	if ( !pipeline || pass == VK_NULL_HANDLE || framebuffer == VK_NULL_HANDLE || vk.pipeline_layout_smaa == VK_NULL_HANDLE || color_descriptor == VK_NULL_HANDLE ) {
-		return;
-	}
-
-	vk_begin_render_pass_tracked( pass, framebuffer, qfalse, width, height );
-
-	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline );
-
-	{
-		SMAAPushConstants_t pc;
-		int preset = ( r_smaa_preset && r_smaa_preset->integer >= 1 && r_smaa_preset->integer <= 4 ) ? r_smaa_preset->integer : 0;
-		if ( preset ) {
-			/* Quality presets: threshold, localContrast, maxSearchSteps */
-			static const float preset_threshold[5]  = { 0.0f, 0.15f, 0.1f, 0.08f, 0.05f };
-			static const float preset_contrast[5]   = { 0.0f, 2.0f, 2.0f, 2.2f, 2.5f };
-			static const int   preset_search[5]     = { 0, 8, 16, 24, 32 };
-			pc.threshold = preset_threshold[preset];
-			pc.localContrast = preset_contrast[preset];
-			pc.maxSearchSteps = preset_search[preset];
-		} else {
-			pc.threshold = r_smaa_threshold ? r_smaa_threshold->value : 0.1f;
-			pc.localContrast = r_smaa_local_contrast ? r_smaa_local_contrast->value : 2.0f;
-			pc.maxSearchSteps = ( r_smaa_max_search_steps && r_smaa_max_search_steps->integer >= 8 && r_smaa_max_search_steps->integer <= 32 )
-				? r_smaa_max_search_steps->integer : 16;
-		}
-		pc.corner_rounding = ( r_smaa_corner_rounding && r_smaa_corner_rounding->value >= 0.0f ) ?
-			( r_smaa_corner_rounding->value <= 1.0f ? r_smaa_corner_rounding->value : 1.0f ) : 0.2f;
-		qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_smaa, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( pc ), &pc );
-	}
-
-	VkDescriptorSet descriptor_sets[2];
-	descriptor_sets[0] = color_descriptor;
-	descriptor_sets[1] = ( aux_descriptor != VK_NULL_HANDLE ) ? aux_descriptor : color_descriptor;
-
-	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_smaa, 0, 2, descriptor_sets, 0, NULL );
-
-	VkViewport viewport;
-	viewport.x = 0.0f;
-	viewport.y = 0.0f;
-	viewport.width = (float)width;
-	viewport.height = (float)height;
-	viewport.minDepth = 0.0f;
-	viewport.maxDepth = 1.0f;
-
-	VkRect2D scissor;
-	scissor.offset.x = 0;
-	scissor.offset.y = 0;
-	scissor.extent.width = width;
-	scissor.extent.height = height;
-
-	qvkCmdSetViewport( vk.cmd->command_buffer, 0, 1, &viewport );
-	qvkCmdSetScissor( vk.cmd->command_buffer, 0, 1, &scissor );
-
-	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
-
-	vk_end_render_pass();
-}
-
-static void vk_smaa_passes( void )
-{
-	uint32_t w, h;
-
-	if ( !vk.smaaActive ) {
-		return;
-	}
-	if ( vk.color_image_view == VK_NULL_HANDLE || vk.smaa_output_image_view == VK_NULL_HANDLE ) {
-		return;
-	}
-	w = ( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u;
-	h = ( glConfig.vidHeight > 0 ) ? (uint32_t)glConfig.vidHeight : 1u;
-
-	/* Edge: set0=scene(color_image). Blend: set0=scene(texelSize), set1=edges. Compose: set0=scene, set1=blend. */
-	vk_run_smaa_pass( vk.smaa_edge_pipeline, vk.render_pass.smaa_edge, vk.framebuffers.smaa_edge, vk.smaa_edge_descriptor, vk.smaa_edge_descriptor, w, h );
-	vk_run_smaa_pass( vk.smaa_blend_pipeline, vk.render_pass.smaa_blend, vk.framebuffers.smaa_blend, vk.smaa_edge_descriptor, vk.smaa_blend_descriptor, w, h );
-	vk_run_smaa_pass( vk.smaa_compose_pipeline, vk.render_pass.smaa_compose, vk.framebuffers.smaa_compose, vk.smaa_edge_descriptor, vk.smaa_compose_descriptor, w, h );
-}
-
 void vk_reset_volumetric_history( void )
 {
 	vk.has_prev_volumetric = qfalse;
@@ -843,7 +759,7 @@ void vk_volumetric_fog_pass( void )
 	vk_volumetric_validation_state.telemetry_temporal_rejects = 0;
 
 	if ( vk.volumetric_query_pool != VK_NULL_HANDLE &&
-		r_volumetricFogPerfTimers && r_volumetricFogPerfTimers->integer &&
+		vk_volumetric_perf_wanted() &&
 		qvkCmdResetQueryPool )
 	{
 		const uint32_t query_base = vk.cmd_index * VK_VOLUMETRIC_QUERY_SLOTS;
@@ -899,12 +815,8 @@ void vk_volumetric_fog_pass( void )
 	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT );
-	if ( r_fogDebug && r_fogDebug->integer >= 1 && ( vk.volumetric_frame % 120u ) == 0u ) {
-		ri.Printf( PRINT_ALL, "[VK][fog] copied scene color src=0x%llx dst=0x%llx for explicit composite\n",
-			(unsigned long long)(uintptr_t)vk.color_image,
-			(unsigned long long)(uintptr_t)vk.fog_scene_image );
-	}
 
+	if ( !vk_volumetric_screen_integration_active() ) {
 	record_image_layout_transition( vk.cmd->command_buffer, vk.froxel_volume_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
 		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
@@ -922,21 +834,20 @@ void vk_volumetric_fog_pass( void )
 	} else {
 		vk.has_prev_volumetric = qfalse;
 	}
+	} else {
+		if ( r_fogDebug && r_fogDebug->integer >= 1 && ( vk.volumetric_frame % 120u ) == 0u ) {
+			ri.Printf( PRINT_DEVELOPER, "[VK][fog] screen integration mode %d: skipping froxel compute\n",
+				r_volumetricFogIntegration ? r_volumetricFogIntegration->integer : 0 );
+		}
+	}
 
+	vk_volumetric_restore_pass_params_for_composite();
 	vk_volumetric_composite_pass();
 	vk_write_volumetric_timestamp( VK_VOLUMETRY_QUERY_AFTER_COMPOSITE, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT );
 
 	/* Render pass finalLayout=SHADER_READ_ONLY transitions color_image automatically on end. */
 
-	if ( vk.smaaActive && tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
-		vk_barrier_post_fog_source_for_sampling( vk.color_image_view, "volumetric pre-SMAA" );
-		vk_smaa_passes();
-		vk_set_scene_post_fog_source( vk.smaa_output_image_view ? vk.smaa_output_image_view : vk.color_image_view );
-		vk_update_post_fog_descriptors( vk.smaa_output_image_view ? vk.smaa_output_image_view : vk.color_image_view );
-	} else {
-		vk_set_scene_post_fog_source( vk.color_image_view );
-		vk_update_post_fog_descriptors( vk.color_image_view );
-	}
+	vk_post_scene_aa_apply();
 
 	// Restore depth layout for the next frame's main render pass clears/attachments.
 	record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,

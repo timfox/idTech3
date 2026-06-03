@@ -19,6 +19,7 @@ layout(binding = 14) uniform sampler2D fluidDensityA;
 layout(binding = 15) uniform sampler2D fluidDensityB;
 layout(binding = 16, r32ui) uniform uimage2D telemetryCounters;
 layout(binding = 17) uniform sampler3D vdbFogDensity;
+layout(binding = 18) uniform sampler3D vdbFogMajorant;
 
 const int MAX_VOLUMES = 24;
 const int MAX_LIGHTS = 32;
@@ -352,6 +353,12 @@ float ComputeBaseDensity(vec3 worldPos) {
         vec3 vdbExtent = max(params.vdbWorldMax.xyz - params.vdbWorldMin.xyz, vec3(1e-4));
         vec3 vdbUvw = (worldPos - params.vdbWorldMin.xyz) / vdbExtent;
         if (all(greaterThanEqual(vdbUvw, vec3(0.0))) && all(lessThanEqual(vdbUvw, vec3(1.0)))) {
+            if (params.vdbParams.z > 0.5) {
+                float vdbMajorant = texture(vdbFogMajorant, vdbUvw).r * params.vdbParams.x;
+                if (vdbMajorant < 1e-5) {
+                    return max(density, 0.0);
+                }
+            }
             float vdbDensity = texture(vdbFogDensity, vdbUvw).r;
             density = mix(density, density + vdbDensity, params.vdbParams.x);
         }

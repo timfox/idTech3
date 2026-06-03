@@ -22,7 +22,7 @@ The engine uses [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 ### Renderer Changes
 
 - **r_fbo / r_hdr**: If upgrading from an older build, run `vid_restart` after changing these cvars. Some combinations require a full restart.
-- **Vulkan vs OpenGL**: Switching renderers may require `vid_restart`. Save configs before switching.
+- **Renderer / video**: After driver or `r_vid_driver` changes, use `vid_restart`. Save configs before major renderer updates.
 
 ### Cvar Changes
 

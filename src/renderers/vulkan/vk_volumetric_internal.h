@@ -20,4 +20,7 @@ void vk_update_volumetric_perf_queries( void );
 void vk_set_volumetric_pass_params( float stage, float x, float y, float z );
 void vk_volumetric_stage_barrier( VkImage image );
 
+qboolean vk_volumetric_screen_integration_active( void );
+void vk_volumetric_restore_pass_params_for_composite( void );
+
 #endif

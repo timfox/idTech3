@@ -360,6 +360,8 @@ void Con_CheckResize( void )
 	bigchar_width = BIGCHAR_WIDTH * scale * cls.con_factor;
 	bigchar_height = BIGCHAR_HEIGHT * scale * cls.con_factor;
 
+	CL_RefreshBuiltInTrueTypeFonts();
+
 	if ( cls.glconfig.vidWidth == 0 ) // video hasn't been initialized yet
 	{
 		g_console_field_width = DEFAULT_CONSOLE_WIDTH;

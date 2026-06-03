@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 #include "tr_local.h"
 #include "vk_postfx.h"
+#include "vk_sim_render_debug.h"
 #include "vk_skybox_hdr.h"
 #ifdef USE_IMGUI
 extern cvar_t *r_imgui;
@@ -70,6 +71,20 @@ static void R_PerformanceCounters( void ) {
 	{
 		ri.Printf( PRINT_ALL, "flare adds:%i tests:%i renders:%i\n", 
 			backEnd.pc.c_flareAdds, backEnd.pc.c_flareTests, backEnd.pc.c_flareRenders );
+	}
+	else if ( r_speeds->integer == 7 )
+	{
+		vk_sim_render_debug_stats_t stats;
+		VK_SimRenderDebugFillStats( &stats );
+		ri.Printf( PRINT_ALL,
+			"sim profile=%d MSAA=%dx AA=%s tonemap=%d fog=%s total=%.2fms composite=%.2fms\n",
+			stats.profile,
+			stats.msaaSamples,
+			stats.fxaaActive ? "FXAA" : ( stats.smaaActive ? "SMAA" : "none" ),
+			stats.tonemapMode,
+			stats.fogActive ? "on" : "off",
+			stats.fogTotalMs,
+			stats.fogCompositeMs );
 	}
 
 	Com_Memset( &tr.pc, 0, sizeof( tr.pc ) );
@@ -426,6 +441,7 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 	backEnd.doneBloom = qfalse;
 	backEnd.doneFog = qfalse;
 	backEnd.doneSSAO = qfalse;
+	backEnd.doneLensFlare = qfalse;
 #endif
 
 	backEnd.color2D.u32 = ~0U;

@@ -10,7 +10,6 @@ For a **stricter engine bar** (automated steps + optional content-backed maps), 
 - [ ] **Local CI validation** (optional): `./scripts/validate_ci_build.sh` runs shader compile, Vulkan build, and smoke test
 - [ ] **Production readiness orchestrator** (optional): `./scripts/production_readiness.sh` - extends validation with full `ctest` and, if `GAME_BASE` is set, `renderer_regression_maps.sh`
 - [ ] **Vulkan build**: `./scripts/compile_engine.sh vulkan` succeeds
-- [ ] **OpenGL build**: `./scripts/compile_engine.sh opengl` succeeds
 - [ ] **Debug build**: `./scripts/compile_engine.sh vulkan debug` succeeds
 - [ ] **Shader regeneration**: If shader sources (`.tmpl`, `.vert`, `.frag`, etc.) changed, run `./scripts/compile_shaders.sh --apply` and commit the updated `shader_data.c` and `shader_binding.c`
 
@@ -31,8 +30,8 @@ For a **stricter engine bar** (automated steps + optional content-backed maps), 
 ## Release Artifacts
 
 ### Binaries
-- [ ] Windows: `idtech3.exe`, `idtech3_server.exe`; **MSYS2/MinGW** artifacts also need bundled MinGW runtime `.dll` (CI runs `scripts/stage_mingw_runtime_dlls.sh`) plus **OpenAL Soft** (`scripts/stage_openal_windows_dlls.ps1` → `OpenAL32.dll` + `soft_oal.dll` next to the `.exe` files on x64). **MSVC** builds static-link renderers (no `idtech3_vulkan.dll` / `idtech3_opengl.dll`); **MSVC x64** CI still runs the OpenAL bundle for drop-in compatibility with OpenAL-linked binaries. **MSVC ARM64** skips that step (no official ARM64 OpenAL Soft bin zip; stock MSVC client uses **WASAPI/DirectSound**, not `snd_backend_openal.c`).
-- [ ] Linux: `idtech3`, `idtech3_server`, `idtech3_vulkan.so`, `idtech3_opengl.so`
+- [ ] Windows: `idtech3.exe`, `idtech3_server.exe`; **MSYS2/MinGW** artifacts also need bundled MinGW runtime `.dll` (CI runs `scripts/stage_mingw_runtime_dlls.sh`) plus **OpenAL Soft** (`scripts/stage_openal_windows_dlls.ps1` → `OpenAL32.dll` + `soft_oal.dll` next to the `.exe` files on x64). **MSVC** builds static-link the Vulkan renderer (no separate `idtech3_vulkan.dll`); **MSVC x64** CI still runs the OpenAL bundle for drop-in compatibility with OpenAL-linked binaries. **MSVC ARM64** skips that step (no official ARM64 OpenAL Soft bin zip; stock MSVC client uses **WASAPI/DirectSound**, not `snd_backend_openal.c`).
+- [ ] Linux: `idtech3`, `idtech3_server`, `idtech3_vulkan.so`
 - [ ] macOS: `idtech3`, `idtech3_server`, renderer plugins
 
 ### Documentation

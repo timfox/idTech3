@@ -23,7 +23,7 @@ Binaries are built by CI when a release is published; allow 15–30 minutes afte
 Extract the archive. You should see:
 - `idtech3` (or `idtech3.exe` on Windows) - game client
 - `idtech3_server` (or `idtech3_server.exe`) - dedicated server
-- **Linux**: `idtech3_vulkan.so` / `idtech3_opengl.so` - renderer plugins (when built with `USE_RENDERER_DLOPEN`)
+- **Linux**: `idtech3_vulkan.so` - Vulkan renderer plugin (when built with `USE_RENDERER_DLOPEN`)
 - **Windows (MSYS2/MinGW zip from CI)**: same `.exe` names plus several `.dll` files (SDL2, OpenAL Soft via `OpenAL32.dll` + `soft_oal.dll`, MinGW runtime). Keep them in the same folder as the executables. **OpenAL** does not require a separate Creative/OpenAL installer for these builds.
 - **Windows (MSVC zip, x64)**: CI may ship **OpenAL Soft** router DLLs next to the `.exe` (`OpenAL32.dll` + `soft_oal.dll` + `OpenAL-Soft-COPYING.txt`) for users who run a **CMake/MinGW-style** client build linked against OpenAL, or who drop in an OpenAL-linked `idtech3.exe`. The **stock MSVC `quake3e.vcxproj` client does not compile in `snd_backend_openal.c`**, so out of the box it uses **WASAPI / DirectSound** (`win_snd.c`, `s_driver` / `s_openal` has no effect there). **Windows MSVC ARM64** zips omit the OpenAL Soft bundle: upstream **openal-soft *-bin.zip** has no **WinARM64** `soft_oal.dll`, and the MSVC client is **not** an OpenAL build—use **WASAPI** (default on Win7+) or **DirectSound** for audio.
 
@@ -42,7 +42,6 @@ idtech3/
 ├── idtech3
 ├── idtech3_server
 ├── idtech3_vulkan.so
-├── idtech3_opengl.so
 └── baseq3/          ← your game data
     ├── pak0.pk3
     ├── pak1.pk3
@@ -74,12 +73,9 @@ Full walkthrough, **`baseq3`** layouts, and troubleshooting: [examples/demo_skel
 
 ## 4. Renderer
 
-The default renderer is Vulkan. To use OpenGL instead:
-```bash
-./idtech3 +set cl_renderer opengl
-```
+The engine uses the **Vulkan** renderer. Ensure a working Vulkan driver and loader (Mesa/NVIDIA/AMD) on Linux.
 
-**PBR (Physically Based Rendering)** is on by default when using Vulkan with FBO. Ensure `r_fbo 1` (default) and `r_pbr 1` (default). If PBR is disabled at startup, the console will show why (e.g. "requires r_fbo 1"). Use `vid_restart` after changing these.
+**PBR (Physically Based Rendering)** is on by default with FBO. Ensure `r_fbo 1` (default) and `r_pbr 1` (default). If PBR is disabled at startup, the console will show why (e.g. "requires r_fbo 1"). Use `vid_restart` after changing these.
 
 **Optional Forward+ scaffolding (Vulkan, advanced):** `r_forwardPlus 1` (default **0**, **latched**; `vid_restart` to toggle) enables GPU light records + per-tile compute cull and optional PBR debug/shade cvars—see [RENDERERS.md](RENDERERS.md#vulkan-forward-scaffolding) and the pipeline audit [FORWARD_PLUS_PIPELINE_AUDIT.md](FORWARD_PLUS_PIPELINE_AUDIT.md). When many lights overlap a tile, **`r_forwardPlusLuminanceSort`** (**default 1**) keeps the brightest by RGB sum up to **`r_forwardPlusMaxPerTile`**.
 
@@ -102,7 +98,7 @@ See [ARM_RASPBERRY_PI.md](ARM_RASPBERRY_PI.md) for details.
 ## Troubleshooting
 
 - **"No game data"** - Ensure `baseq3/` (or `base/`) exists with at least one `.pk3` file.
-- **Black screen / no render** - Try OpenGL: `+set cl_renderer opengl`
+- **Black screen / no render** - Confirm Vulkan works (`vulkaninfo` or your distro’s GPU tools), install current GPU drivers, then `vid_restart`. Check the console for renderer init errors.
 - **Solid color / dark brown / dark green / no UI** - Ensure FBO is enabled: `+set r_fbo 1` and run `vid_restart`. If still broken, try `r_exposure_auto 0`, `r_volumetricFog 0`, then `vid_restart`. As last resort, `r_fbo 0` disables HDR/post-processing.
 - **Missing libraries** - On Linux, install SDL2, OpenAL, and Vulkan drivers for your GPU. On Windows, if you copied only `idtech3.exe` out of a MinGW build folder, restore the accompanying `.dll` files from the same archive or re-run `./scripts/stage_mingw_runtime_dlls.sh bin` from an MSYS2 **MINGW64** shell after copying binaries into `bin/`.
 - **Native game DLLs not found** - The engine looks under `baseq3`/`base` in `modules/` and `vm/` (and the gamedir root as a legacy fallback). It tries several basename patterns per slot (`ui.so` / `ui.x86_64.dll` / `uix86_64.dll`, etc.) and alternate logical names for some VMs. If a module exists **only inside a `.pk3`**, enable **`com_nativeLibraryExtractPk3`** (**1** by default): the engine copies it to **`vm/native_cache/`** under your game home path, then loads it. If load still fails, run with `+set com_nativeLibraryDebug 1` to print the full path and the OS loader error for each attempt. Details: [ARCHITECTURE.md#native-game-modules-vm](ARCHITECTURE.md#native-game-modules-vm).

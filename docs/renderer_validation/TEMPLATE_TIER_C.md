@@ -20,14 +20,14 @@ Copy this file to a dated entry (e.g. `tier_c_2026-04-06.md`) or append a sectio
 | **GAME_BASE** | Absolute path to `base` (do not commit secrets; use “internal lab path”) |
 | **Regression maps run** | List: `rtest_parity`, `rtest_volumetric`, … |
 
-## Renderer paths
+## Vulkan pass
 
-| Path | Result (pass / fail / N/A) | Notes |
-|------|----------------------------|--------|
-| **Vulkan** | | |
-| **OpenGL** | | |
+| Check | Result (pass / fail / N/A) | Notes |
+|-------|----------------------------|--------|
+| **Regression scenes** | | `rtest_parity`, `rtest_volumetric`, … |
+| **Validation layers** | | See below |
 
-Brief notes (black screen, wrong fog, parity diff, etc.):
+Brief notes (black screen, wrong fog, postFX, etc.):
 
 ## Validation layers (Vulkan)
 

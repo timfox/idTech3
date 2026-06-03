@@ -51,6 +51,7 @@ typedef struct {
 
 void        VDB_Init( void );
 void        VDB_Shutdown( void );
+void        VDB_FrameUpdate( void );
 
 vdbHandle_t VDB_Load( const char *filename, const char *gridName );
 void        VDB_Free( vdbHandle_t handle );
@@ -61,8 +62,10 @@ void        VDB_SampleVec3( vdbHandle_t handle, float x, float y, float z, float
 
 qboolean    VDB_UploadToGPU( vdbHandle_t handle );
 qboolean    VDB_IsOnGPU( vdbHandle_t handle );
+qboolean    VDB_HasMajorantOnGPU( vdbHandle_t handle );
 #ifdef USE_VULKAN
 VkImageView VDB_GetGpuImageView( vdbHandle_t handle );
+VkImageView VDB_GetGpuMajorantView( vdbHandle_t handle );
 #endif
 qboolean    VDB_BindAsFogDensity( vdbHandle_t handle );
 vdbHandle_t VDB_GetBoundFogDensityHandle( void );

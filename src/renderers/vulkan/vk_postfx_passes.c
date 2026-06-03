@@ -15,6 +15,7 @@ SSAO/HBAO pass, and vk_bloom. Split from vk.c.
 #include "vk_post_fog.h"
 #include "vk_volumetric_pass.h"
 #include "vk_volumetric_internal.h"
+#include "vk_post_aa.h"
 #include "vk_util.h"
 #include "vk_device.h"
 #include "vk_view_state.h"
@@ -581,6 +582,16 @@ qboolean vk_bloom( void )
 				else
 					qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout, i, 1, &vk.cmd->descriptor_set.current[i], 0, NULL );
 			}
+		}
+	}
+
+	/* Bloom writes back to color_image; refresh post chain source and re-AA when enabled. */
+	if ( r_bloom && r_bloom->integer && vk.color_image_view != VK_NULL_HANDLE ) {
+		vk_barrier_post_fog_source_for_sampling( vk.color_image_view, "post-bloom refresh post-fog source" );
+		vk_set_scene_post_fog_source( vk.color_image_view );
+		vk_update_post_fog_descriptors( vk.color_image_view );
+		if ( r_postAaAfterBloom && r_postAaAfterBloom->integer && vk_post_aa_output_active() ) {
+			vk_post_scene_aa_apply();
 		}
 	}
 
