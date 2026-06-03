@@ -1286,6 +1286,7 @@ typedef struct {
 	qboolean doneFog;
 	qboolean doneSSAO;
 	qboolean depthOnlyWorldPass;	/* for occlusion culling: render world depth only, skip entities */
+	qboolean forwardPlusDepthPrepass; /* depth-only pass (world + entities) before Forward+ depth tile cull */
 
 	/* OIT: 0=draw all, 1=opaque only, 2=transparent only */
 	int drawSurfFilter;

@@ -3087,7 +3087,7 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_volumetricFogCompositeMode, "0", "2", CV_INTEGER );
 	ri.Cvar_SetDescription( r_volumetricFogCompositeMode,
 		"Volumetric fog composite (full-screen resolve): 0=standard (scene*T + in-scatter), "
-		"1=depth-weighted in-scatter (reduce near-camera fog glow; TLOU2-style transparency hint), "
+		"1=depth-weighted in-scatter (reduce near-camera fog glow via (1-T) weight; TLOU2-style transparency hint), "
 		"2=HDR clamp (clamp final RGB to \\r_volumetricFogFireflyClamp per channel after composite)." );
 	ri.Cvar_SetGroup( r_volumetricFogCompositeMode, CVG_RENDERER );
 
@@ -3645,7 +3645,7 @@ static void R_Register( void )
 	r_forwardPlusDepthCull = ri.Cvar_Get( "r_forwardPlusDepthCull", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_forwardPlusDepthCull, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_forwardPlusDepthCull,
-		"When 1, tile cull runs after the opaque pass and rejects lights behind the depth buffer at each light's screen center. When 0, cull runs at view start (legacy). Requires \\r_forwardPlus 1 (no vid_restart)." );
+		"When 1, a depth prepass fills the depth buffer, then tile cull rejects lights behind surfaces at each light's screen center, then opaque color draws. When 0, cull runs at view start without depth (legacy). Requires \\r_forwardPlus 1 (no vid_restart)." );
 	ri.Cvar_SetGroup( r_forwardPlusDepthCull, CVG_RENDERER );
 	r_ext_alpha_to_coverage = ri.Cvar_Get( "r_ext_alpha_to_coverage", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_alpha_to_coverage, "0", "1", CV_INTEGER );

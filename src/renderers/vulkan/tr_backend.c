@@ -1767,6 +1767,17 @@ static const void *RB_DrawSurfs( const void *data ) {
 	}
 #endif
 
+#ifdef USE_VULKAN
+	/* Depth-aware tile lists must be ready before opaque PBR reads the tile SSBO (not after opaque). */
+	if ( r_forwardPlus && r_forwardPlus->integer &&
+		r_forwardPlusDepthCull && r_forwardPlusDepthCull->integer ) {
+		backEnd.forwardPlusDepthPrepass = qtrue;
+		RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
+		backEnd.forwardPlusDepthPrepass = qfalse;
+		vk_forward_plus_dispatch_tile_cull_after_opaque();
+	}
+#endif
+
 #ifdef VK_CUBEMAP
 	if ( backEnd.viewParms.targetCube != NULL ) 
 	{
@@ -1787,12 +1798,6 @@ static const void *RB_DrawSurfs( const void *data ) {
 	} else
 #endif
 	RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
-
-#ifdef USE_VULKAN
-	if ( r_forwardPlusDepthCull && r_forwardPlusDepthCull->integer ) {
-		vk_forward_plus_dispatch_tile_cull_after_opaque();
-	}
-#endif
 
 #ifdef USE_VBO
 	VBO_UnBind();
