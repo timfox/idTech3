@@ -55,5 +55,12 @@ android/local.properties
 src/renderers/vulkan/shaders/spirv/generated/shader_build_meta.txt
 src/renderers/vulkan/shaders/spirv/generated/shader_build_meta.txt
 
-# Unwaking mod runtime assets (local game data; too large for GitHub — keep under release/unwaking/)
+# Full-conversion / mod game data (never commit — keep outside the engine repo)
 unwaking/
+swamp/
+mods/unwaking/
+mods/swamp/
+*_content.pk3
+**/maps/swamp_*.pk3
+**/maps/swamp_*.bsp
+**/maps/swamp_*.aas
