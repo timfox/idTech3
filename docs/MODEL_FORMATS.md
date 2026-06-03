@@ -1,9 +1,10 @@
 # Model Format Support
 
-## Supported Formats (7 total)
+## Supported Formats
 
 | Format | Extension | Features | Library |
 |--------|-----------|----------|---------|
+| USDA / USD | `.usda`, `.usd` | First `UsdGeom.Mesh` → static MD3 mesh; scene tools on client | [FreeUSD](FREEUSD.md) (GPL, **default ON**) |
 | glTF 2.0 | `.gltf`, `.glb` | PBR materials, skeletal animation, morph targets | cgltf (MIT) |
 | Wavefront OBJ | `.obj` | Vertices, normals, texcoords, materials | tinyobjloader-c (MIT) |
 | MD5 Mesh | `.md5mesh` | Skeletal mesh with weighted vertices | Built-in parser |
@@ -15,11 +16,12 @@
 
 When a model is requested without extension, the engine tries formats in this order:
 1. glTF (`.gltf`, `.glb`)
-2. OBJ (`.obj`)
-3. MD5 (`.md5mesh`)
-4. IQM (`.iqm`)
-5. MDR (`.mdr`)
-6. MD3 (`.md3`)
+2. USDA / USD (`.usda`, `.usd`) when `r_freeusd` 1 and `USE_FREEUSD` build
+3. OBJ (`.obj`)
+4. MD5 (`.md5mesh`)
+5. IQM (`.iqm`)
+6. MDR (`.mdr`)
+7. MD3 (`.md3`)
 
 ## glTF 2.0 Details
 

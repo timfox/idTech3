@@ -66,6 +66,12 @@ sudo apt-get install libmono-2.0-dev mono-devel
 
 See [CSHARP.md](CSHARP.md). Lua `Engine.*` bindings register on the **client** when `USE_LUA=ON` (`LuaDebug_SetEngineRegisterCallback` in `CL_Init`).
 
+### FreeUSD (default ON)
+
+`USE_FREEUSD=ON` is the CMake default. The first configure **fetches** [gopexllc/FreeUSD](https://github.com/gopexllc/FreeUSD) via `cmake/FreeUSD.cmake` (network required). Disable with `./scripts/compile_engine.sh vulkan nofreeusd` or `-DUSE_FREEUSD=OFF`.
+
+See [FREEUSD.md](FREEUSD.md) for mesh import cvars (`r_freeusd`, `r_freeusdPickLargest`, …) and console tools (`usd_info`, `usd_meshes`, `usd_load`, …). Test USDA files: `tests/data/usd/`.
+
 ### macOS
 ```bash
 brew install coreutils sdl2 openal-soft cmake ninja freetype lua

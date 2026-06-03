@@ -18,7 +18,6 @@ tools/README.md
 src/renderers/vulkan/tr_model_gltf.h
 src/renderers/vulkan/tr_model_gltf.c
 src/renderers/vulkan/tr_gltf_topo.h
-src/renderers/opengl/tr_local.h
 src/renderers/vulkan/iqm.h
 src/renderers/vulkan/vk_temporal.h
 src/renderers/vulkan/vk_temporal.c

@@ -38,6 +38,9 @@ set(DEMO_MOD_FILES
 	"${DEMO_MOD_DIR}/demo_lua.cfg"
 	"${DEMO_MOD_DIR}/demo_csharp.cfg"
 	"${DEMO_MOD_DIR}/demo_gameplay.cfg"
+	"${DEMO_MOD_DIR}/demo_usd.cfg"
+	"${DEMO_MOD_DIR}/models/parity_geom_mesh.usda"
+	"${DEMO_MOD_DIR}/models/parity_shade_preview.usda"
 	"${DEMO_MOD_DIR}/readme_demo.txt"
 	"${DEMO_MOD_DIR}/scripts/js/demo_hooks.js"
 	"${DEMO_MOD_DIR}/scripts/js/README.txt"
@@ -87,6 +90,7 @@ add_custom_command(
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/gfx/2d"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/gfx/demo"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/fonts"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/models"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/autoexec.cfg" "${DEMO_PACK_STAGING}/autoexec.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -102,6 +106,8 @@ add_custom_command(
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/demo_gameplay.cfg" "${DEMO_PACK_STAGING}/demo_gameplay.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/demo_usd.cfg" "${DEMO_PACK_STAGING}/demo_usd.cfg"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/readme_demo.txt" "${DEMO_PACK_STAGING}/readme_demo.txt"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/scripts/js/demo_hooks.js" "${DEMO_PACK_STAGING}/scripts/js/demo_hooks.js"
@@ -115,6 +121,10 @@ add_custom_command(
 		"${DEMO_MOD_DIR}/scripts/csharp/demo_hooks.cs" "${DEMO_PACK_STAGING}/scripts/csharp/demo_hooks.cs"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/scripts/demo_bootstrap.shader" "${DEMO_PACK_STAGING}/scripts/demo_bootstrap.shader"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/models/parity_geom_mesh.usda" "${DEMO_PACK_STAGING}/models/parity_geom_mesh.usda"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/models/parity_shade_preview.usda" "${DEMO_PACK_STAGING}/models/parity_shade_preview.usda"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_BOOTSTRAP_GFX2D}" "${DEMO_PACK_STAGING}/gfx/2d/bigchars.png"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different

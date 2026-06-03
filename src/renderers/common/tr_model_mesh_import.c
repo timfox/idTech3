@@ -11,6 +11,7 @@ and line-based vertex soup for ASCII interchange (.fbx/.usd/.usda/.ma).
 #include <ctype.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include "tr_model_mesh_import.h"
 #if defined( RENDERER_VULKAN )
 #include "../vulkan/tr_local.h"
 #else
@@ -51,8 +52,15 @@ static short R_Mimp_LatLong( const vec3_t n ) {
 	}
 }
 
-static qboolean R_Mimp_FinalizeMD3( model_t *mod, int lod, const char *name,
+qboolean R_MeshImport_FinalizeMD3( model_t *mod, int lod, const char *name,
 	float *verts, int numVerts, int *inds, int numIdx ) {
+	return R_MeshImport_FinalizeMD3Ex( mod, lod, name, verts, numVerts, inds, numIdx, NULL, NULL );
+}
+
+qboolean R_MeshImport_FinalizeMD3Ex( model_t *mod, int lod, const char *name,
+	float *verts, int numVerts, int *inds, int numIdx,
+	const char *shaderName, const float *vertSt ) {
+	const char *surfShader = shaderName && shaderName[0] ? shaderName : "textures/common/white";
 	int numTris = numIdx / 3;
 	int i, s, v, t;
 	vec3_t mins, maxs, localOrigin;
@@ -166,7 +174,7 @@ static qboolean R_Mimp_FinalizeMD3( model_t *mod, int lod, const char *name,
 		}
 
 		md3Shader = (md3Shader_t *)( (byte *)surf + surf->ofsShaders );
-		Q_strncpyz( md3Shader->name, "textures/common/white", sizeof( md3Shader->name ) );
+		Q_strncpyz( md3Shader->name, surfShader, sizeof( md3Shader->name ) );
 		{
 			shader_t *sh = R_FindShader( md3Shader->name, LIGHTMAP_NONE, qtrue );
 			md3Shader->shaderIndex = sh->defaultShader ? 0 : sh->index;
@@ -179,8 +187,13 @@ static qboolean R_Mimp_FinalizeMD3( model_t *mod, int lod, const char *name,
 		for ( v = 0; v < surfVerts; v++ ) {
 			int gi = vertOffset + v;
 			float *p = verts + gi * 3;
-			st[v].st[0] = 0.0f;
-			st[v].st[1] = 0.0f;
+			if ( vertSt ) {
+				st[v].st[0] = vertSt[gi * 2 + 0];
+				st[v].st[1] = vertSt[gi * 2 + 1];
+			} else {
+				st[v].st[0] = 0.0f;
+				st[v].st[1] = 0.0f;
+			}
 			xyz[v].xyz[0] = (short)( p[0] * 64.0f );
 			xyz[v].xyz[1] = (short)( p[1] * 64.0f );
 			xyz[v].xyz[2] = (short)( p[2] * 64.0f );
@@ -218,7 +231,8 @@ static qboolean R_Mimp_FinalizeMD3( model_t *mod, int lod, const char *name,
 	mod->type = MOD_MESH;
 	mod->dataSize = 0;
 	mod->md3[lod] = md3;
-	ri.Printf( PRINT_DEVELOPER, "MeshImport: %s (%d verts, %d tris)\n", name, numVerts, numTris );
+	ri.Printf( PRINT_DEVELOPER, "MeshImport: %s (%d verts, %d tris) shader '%s'\n",
+		name, numVerts, numTris, surfShader );
 	return qtrue;
 }
 
@@ -305,7 +319,7 @@ static qboolean R_LoadSTL( model_t *mod, int lod, const char *name, const byte *
 	if ( nv < 3 || ni < 3 ) {
 		return qfalse;
 	}
-	return R_Mimp_FinalizeMD3( mod, lod, name, verts, nv, inds, ni );
+	return R_MeshImport_FinalizeMD3( mod, lod, name, verts, nv, inds, ni );
 }
 
 static qboolean R_LoadDAE_FloatSoup( model_t *mod, int lod, const char *name, char *text ) {
@@ -363,7 +377,7 @@ static qboolean R_LoadDAE_FloatSoup( model_t *mod, int lod, const char *name, ch
 			inds[i] = i;
 		}
 		{
-			qboolean ok = R_Mimp_FinalizeMD3( mod, lod, name, pos, nv, inds, nv );
+			qboolean ok = R_MeshImport_FinalizeMD3( mod, lod, name, pos, nv, inds, nv );
 			ri.Free( inds );
 			return ok;
 		}
@@ -412,7 +426,7 @@ static qboolean R_LoadVertexLines( model_t *mod, int lod, const char *name, cons
 		for ( i = 0; i < nv; i++ ) {
 			inds[i] = i;
 		}
-		return R_Mimp_FinalizeMD3( mod, lod, name, verts, nv, inds, nv );
+		return R_MeshImport_FinalizeMD3( mod, lod, name, verts, nv, inds, nv );
 	}
 }
 

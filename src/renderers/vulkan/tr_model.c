@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_models.c -- model loading and caching
 
 #include "tr_local.h"
+#include "../common/tr_model_freeusd.h"
 
 #define	LL(x) x=LittleLong(x)
 
@@ -211,16 +212,29 @@ static qhandle_t R_RegisterGLTF_Wrapper(const char *name, model_t *mod) {
 	return R_RegisterGLTF(name, mod) ? mod->index : 0;
 }
 
+static qhandle_t R_RegisterUSD_Model( const char *name, model_t *mod ) {
+	if ( R_Freeusd_MeshImportEnabled() ) {
+		qhandle_t h = R_RegisterFreeusdMesh( name, mod );
+		if ( h ) {
+			return h;
+		}
+		/* FreeUSD failed: clear partial state before vertex-soup fallback. */
+		mod->numLods = 0;
+		Com_Memset( mod->md3, 0, sizeof( mod->md3 ) );
+	}
+	return R_RegisterMeshImport( name, mod );
+}
+
 static modelExtToLoaderMap_t modelLoaders[ ] =
 {
 	{ "gltf", R_RegisterGLTF_Wrapper },
 	{ "glb",  R_RegisterGLTF_Wrapper },
+	{ "usda", R_RegisterUSD_Model },
+	{ "usd",  R_RegisterUSD_Model },
 	{ "obj",  R_RegisterOBJ },
 	{ "stl",  R_RegisterMeshImport },
 	{ "dae",  R_RegisterMeshImport },
 	{ "fbx",  R_RegisterMeshImport },
-	{ "usd",  R_RegisterMeshImport },
-	{ "usda", R_RegisterMeshImport },
 	{ "ma",   R_RegisterMeshImport },
 	{ "md5mesh", R_RegisterMD5 },
 	{ "iqm",  R_RegisterIQM },
@@ -991,6 +1005,8 @@ R_ModelInit
 */
 void R_ModelInit( void ) {
 	model_t		*mod;
+
+	R_Freeusd_Init();
 
 	// leave a space for NULL model
 	tr.numModels = 0;
