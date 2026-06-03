@@ -168,7 +168,6 @@ cvar_t	*r_gltfAnim;
 cvar_t	*r_gltfGpu;
 cvar_t	*r_gltfGpuTangentFix;
 cvar_t	*r_fbo;
-cvar_t	*r_renderMode;
 cvar_t	*r_hdr;
 cvar_t	*r_bloom;
 cvar_t	*r_bloom_threshold;
@@ -3642,9 +3641,6 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_fbo, "Framebuffer objects for offscreen rendering. Required for PBR, HDR, bloom, MSAA, SMAA, SSAO, gamma correction.\n"
 		"Use vid_restart after changing. Default 1 recommended." );
 	ri.Cvar_SetGroup( r_fbo, CVG_RENDERER );
-	r_renderMode = ri.Cvar_Get( "r_renderMode", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
-	ri.Cvar_CheckRange( r_renderMode, "0", "2", CV_INTEGER );
-	ri.Cvar_SetDescription( r_renderMode, "Rendering path. Requires vid_restart.\n 0: Forward (default)\n 1: Deferred (placeholder)\n 2: Forward+ (placeholder)\nDeferred and forward+ would need G-buffers, light culling, and separate passes; they are not implemented yet." );
 	r_hdr = ri.Cvar_Get( "r_hdr", "2", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_hdr, "-1", "3", CV_INTEGER );
 	ri.Cvar_SetDescription(r_hdr, "HDR frame buffer format. Requires \\r_fbo 1.\n -1: 4-bit (B4G4R4A4), testing only\n  0: 8-bit, moderate banding\n  1: 16-bit float (RGBA16F)\n  2: 32-bit float (RGBA32F), default, fallback to 16F if unsupported\n  3: 64-bit float (RGBA64F), optional; falls back to 32F (glslang lacks dvec4 fragment output support)\n" );

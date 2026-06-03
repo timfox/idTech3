@@ -77,7 +77,7 @@ The engine uses the **Vulkan** renderer. Ensure a working Vulkan driver and load
 
 **PBR (Physically Based Rendering)** is on by default with FBO. Ensure `r_fbo 1` (default) and `r_pbr 1` (default). If PBR is disabled at startup, the console will show why (e.g. "requires r_fbo 1"). Use `vid_restart` after changing these.
 
-**Optional Forward+ scaffolding (Vulkan, advanced):** `r_forwardPlus 1` (default **0**, **latched**; `vid_restart` to toggle) enables GPU light records + per-tile compute cull and optional PBR debug/shade cvars—see [RENDERERS.md](RENDERERS.md#vulkan-forward-scaffolding) and the pipeline audit [FORWARD_PLUS_PIPELINE_AUDIT.md](FORWARD_PLUS_PIPELINE_AUDIT.md). When many lights overlap a tile, **`r_forwardPlusLuminanceSort`** (**default 1**) keeps the brightest by RGB sum up to **`r_forwardPlusMaxPerTile`**.
+**Vulkan Forward+ (default on):** `r_forwardPlus` defaults to **1** (**latched**; set **0** + `vid_restart` to disable). GPU light records + per-tile compute cull and optional PBR debug/shade cvars—see [RENDERERS.md](RENDERERS.md#vulkan-forward-scaffolding) and [FORWARD_PLUS_PIPELINE_AUDIT.md](FORWARD_PLUS_PIPELINE_AUDIT.md). When many lights overlap a tile, **`r_forwardPlusLuminanceSort`** (**default 1**) keeps the brightest by RGB sum up to **`r_forwardPlusMaxPerTile`**.
 
 ## Steam Deck
 

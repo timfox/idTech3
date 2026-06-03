@@ -66,6 +66,20 @@ else
 	fail "r_vegWind default not 0 in Vulkan postfx"
 fi
 
+if ! grep -qE 'r_renderMode[[:space:]]*=[[:space:]]*ri\.Cvar_Get' \
+	"$PROJECT_ROOT/src/renderers/vulkan/tr_init.c"; then
+	pass "r_renderMode placeholder cvar removed (Forward+ uses r_forwardPlus)"
+else
+	fail "r_renderMode still registered in tr_init.c"
+fi
+
+if grep -qE 'r_forwardPlus[[:space:]]*=[[:space:]]*ri\.Cvar_Get\([[:space:]]*"r_forwardPlus"[[:space:]]*,[[:space:]]*"1"' \
+	"$PROJECT_ROOT/src/renderers/vulkan/tr_init.c"; then
+	pass "r_forwardPlus defaults to 1 (Forward+ enabled on Vulkan)"
+else
+	fail "r_forwardPlus default not 1"
+fi
+
 if grep -qE 'r_forwardPlusDistanceSort[[:space:]]*=[[:space:]]*ri\.Cvar_Get\([[:space:]]*"r_forwardPlusDistanceSort"[[:space:]]*,[[:space:]]*"0"' \
 	"$PROJECT_ROOT/src/renderers/vulkan/tr_init.c"; then
 	pass "r_forwardPlusDistanceSort defaults to 0 (classic Forward+ overload order preserved)"
