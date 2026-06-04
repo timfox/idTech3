@@ -302,7 +302,7 @@ PROTOCOL
 
 #define	OLD_PROTOCOL_VERSION	68
 // new protocol with UDP spoofing protection:
-#define	NEW_PROTOCOL_VERSION	71
+#define	NEW_PROTOCOL_VERSION	72
 // 1.31 - 67
 
 #define DEFAULT_PROTOCOL_VERSION	OLD_PROTOCOL_VERSION

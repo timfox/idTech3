@@ -28,6 +28,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../botlib/botlib.h"
 #include "../game/g_entity_bridge.h"
 #include "cl_engine_sprites.h"
+#include "cl_engine_decals.h"
 
 extern	botlib_export_t	*botlib_export;
 
@@ -697,6 +698,7 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 		return 0;
 	case CG_R_RENDERSCENE:
 		CL_EngineSprites_AddFromSnapshot();
+		CL_EngineDecals_AddFromSnapshot();
 		re.RenderScene( VMA(1) );
 		return 0;
 	case CG_R_SETCOLOR:
@@ -932,6 +934,21 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 			timeMs = cls.realtime;
 		}
 		CL_EngineSprite_AddLocalAtTime( &desc, timeMs );
+		return 0;
+	}
+
+	case CG_ENGINE_DECAL_ADD_LOCAL: {
+		engineDecalDesc_t desc;
+
+		Com_Memset( &desc, 0, sizeof( desc ) );
+		desc.shader = (qhandle_t)args[1];
+		desc.origin[0] = VMF( 2 );
+		desc.origin[1] = VMF( 3 );
+		desc.origin[2] = VMF( 4 );
+		desc.radius = VMF( 5 );
+		desc.pitch = VMF( 6 );
+		desc.yaw = VMF( 7 );
+		CL_EngineDecal_AddLocal( &desc );
 		return 0;
 	}
 

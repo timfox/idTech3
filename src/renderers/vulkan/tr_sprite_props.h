@@ -16,6 +16,7 @@ extern "C" {
 
 void R_SpriteProps_Clear( void );
 void R_SpriteProps_ParseFromEntityString( const char *entityString );
+const char *R_MapProps_EntityString( void );
 void R_SpriteProps_AddRefEntitiesToScene( int refdefTimeMs );
 void R_SpriteProps_Init( void );
 void RE_AddEngineSpriteToScene( const engineSpriteDesc_t *desc );

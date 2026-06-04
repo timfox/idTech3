@@ -402,6 +402,11 @@ typedef enum {
 	G_ENGINE_SPRITE_SPAWN,			/* int trap_EngineSpriteSpawn( int type, const char *shader,
 									   float x, float y, float z, float radius, float rotation,
 									   int cols, int rows, float fps ) -> entityNum or -1 */
+	G_ENGINE_DECAL_SHADER_INDEX,
+	G_ENGINE_DECAL_SPAWN,
+	G_PHYS_CHARACTER_CREATE,
+	G_PHYS_CHARACTER_MOVE,
+	G_LOC_LOOKUP,
 	G_TRAP_GETVALUE = COM_TRAP_GETVALUE
 
 } gameImport_t;

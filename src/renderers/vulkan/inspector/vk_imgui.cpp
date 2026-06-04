@@ -109,6 +109,7 @@ extern "C" void VkImgui_Initialize(void) {
 	if ( r_studio_tools && r_studio_tools->integer ) {
 		vkWindows.studioMap.open = qtrue;
 		vkWindows.studioConsole.open = qtrue;
+		vkWindows.studioEntities.open = qtrue;
 	}
 
 	vkImguiState.active = qtrue;
@@ -208,6 +209,8 @@ extern "C" void VkImgui_Draw(void) {
 	VkImgui_DrawSimRenderDebugHud();
 	VkImgui_DrawStudioMapPanel();
 	VkImgui_DrawStudioConsolePanel();
+	VkImgui_DrawStudioEntitiesPanel();
+	VkImgui_DrawStudioAnimationPanel();
 
 	ImGui::End();
 	ImGui::Render();

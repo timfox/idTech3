@@ -202,6 +202,8 @@ typedef enum {
 									   float x, float y, float z, float radius, float rotation,
 									   int cols, int rows, float fps, int timeMs ) timeMs 0 = now */
 
+	CG_ENGINE_DECAL_ADD_LOCAL,
+
 	CG_TRAP_GETVALUE = COM_TRAP_GETVALUE,
 
 } cgameImport_t;

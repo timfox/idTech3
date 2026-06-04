@@ -212,6 +212,13 @@ void R_SpriteProps_AddRefEntitiesToScene( int refdefTimeMs ) {
 	}
 }
 
+const char *R_MapProps_EntityString( void ) {
+	if ( tr.world && tr.world->entityString ) {
+		return tr.world->entityString;
+	}
+	return NULL;
+}
+
 void R_SpriteProps_Init( void ) {
 	r_spriteProps = ri.Cvar_Get( "r_spriteProps", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_spriteProps,

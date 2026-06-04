@@ -48,6 +48,9 @@ Usage from Lua:
 #include "../navigation/nav_recast.h"
 #include "../client/cl_particles.h"
 #include "../client/cl_engine_sprites.h"
+#include "../client/cl_engine_decals.h"
+#include "../physics/phys_character.h"
+#include "g_animgraph.h"
 #include "../renderers/common/tr_public.h"
 #include "../audio/snd_music_adaptive.h"
 
@@ -349,6 +352,86 @@ static int l_sprite_spawnLocal(lua_State *L) {
 
 	CL_EngineSprite_AddLocal( &desc );
 	return 0;
+}
+
+static int l_decal_spawnLocal(lua_State *L) {
+	engineDecalDesc_t desc;
+	const char *shaderArg;
+
+	shaderArg = luaL_checkstring( L, 1 );
+	if ( !re.RegisterShader ) {
+		return luaL_error( L, "renderer not ready" );
+	}
+	Com_Memset( &desc, 0, sizeof( desc ) );
+	desc.shader = re.RegisterShader( shaderArg );
+	if ( !desc.shader ) {
+		return luaL_error( L, "shader not found: %s", shaderArg );
+	}
+	desc.origin[0] = (float)luaL_optnumber( L, 2, 0.0 );
+	desc.origin[1] = (float)luaL_optnumber( L, 3, 0.0 );
+	desc.origin[2] = (float)luaL_optnumber( L, 4, 64.0 );
+	desc.radius = (float)luaL_optnumber( L, 5, 32.0 );
+	desc.pitch = (float)luaL_optnumber( L, 6, 0.0 );
+	desc.yaw = (float)luaL_optnumber( L, 7, 0.0 );
+	CL_EngineDecal_AddLocal( &desc );
+	return 0;
+}
+
+static int l_decal_spawnServer(lua_State *L) {
+	char cmd[MAX_STRING_CHARS];
+	const char *shaderArg = luaL_checkstring( L, 1 );
+
+	Com_sprintf( cmd, sizeof( cmd ),
+		"sv_decal_spawn %s %.0f %.0f %.0f %.0f %.0f %.0f %.0f\n",
+		shaderArg,
+		luaL_optnumber( L, 2, 0.0 ),
+		luaL_optnumber( L, 3, 0.0 ),
+		luaL_optnumber( L, 4, 64.0 ),
+		luaL_optnumber( L, 5, 32.0 ),
+		luaL_optnumber( L, 6, 0.0 ),
+		luaL_optnumber( L, 7, 0.0 ),
+		luaL_optnumber( L, 8, 0.0 ) );
+	Cbuf_AddText( cmd );
+	return 0;
+}
+
+static int l_char_create(lua_State *L) {
+	int h = Phys_CharacterCreate(
+		(float)luaL_optnumber( L, 1, 16.0 ),
+		(float)luaL_optnumber( L, 2, 56.0 ),
+		(float)luaL_optnumber( L, 3, 18.0 ) );
+	lua_pushinteger( L, h );
+	return 1;
+}
+
+static int l_char_move(lua_State *L) {
+	int handle = (int)luaL_checkinteger( L, 1 );
+	float dir[3];
+	dir[0] = (float)luaL_optnumber( L, 2, 0.0 );
+	dir[1] = (float)luaL_optnumber( L, 3, 0.0 );
+	dir[2] = (float)luaL_optnumber( L, 4, 0.0 );
+	Phys_CharacterMove( handle, dir, (float)luaL_optnumber( L, 5, 320.0 ),
+		lua_toboolean( L, 6 ) );
+	return 0;
+}
+
+static int l_animgraph_load(lua_State *L) {
+	lua_pushboolean( L, G_AnimGraph_Load( luaL_checkstring( L, 1 ) ) );
+	return 1;
+}
+
+static int l_animgraph_setState(lua_State *L) {
+	G_AnimGraph_SetState( luaL_checkstring( L, 1 ) );
+	return 0;
+}
+
+static int l_animgraph_update(lua_State *L) {
+	int frame = 0, old = 0;
+	float blend = 0.0f;
+	G_AnimGraph_Update( (int)luaL_optinteger( L, 1, 16 ), &frame, &old, &blend );
+	lua_pushinteger( L, frame );
+	lua_pushnumber( L, blend );
+	return 2;
 }
 
 static int l_sprite_spawnServer(lua_State *L) {
@@ -1246,8 +1329,30 @@ void LuaBindings_RegisterAll(void *luaState) {
 	};
 	registerTable(L, "Sprites", spriteFuncs);
 
+	static const luaL_Reg decalFuncs[] = {
+		{"spawnLocal", l_decal_spawnLocal},
+		{"spawnServer", l_decal_spawnServer},
+		{NULL, NULL}
+	};
+	registerTable(L, "Decals", decalFuncs);
+
+	static const luaL_Reg charFuncs[] = {
+		{"create", l_char_create},
+		{"move", l_char_move},
+		{NULL, NULL}
+	};
+	registerTable(L, "Character", charFuncs);
+
+	static const luaL_Reg animFuncs[] = {
+		{"load", l_animgraph_load},
+		{"setState", l_animgraph_setState},
+		{"update", l_animgraph_update},
+		{NULL, NULL}
+	};
+	registerTable(L, "AnimGraph", animFuncs);
+
 	lua_setglobal(L, "Engine");
-	Com_Printf("Lua bindings registered: Engine.{Director,Nav,Physics,Particles,Music,Face,Horde,Dismember,Choreo,Response,GOAP,AIML,Events,Telemetry,Replay,Save,Quest,Dialogue,ECS,VDB,Sprites}\n");
+	Com_Printf("Lua bindings registered: Engine.{...,Sprites,Decals,Character,AnimGraph}\n");
 }
 
 #else /* !USE_LUA */

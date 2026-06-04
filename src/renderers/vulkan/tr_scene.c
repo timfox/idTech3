@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifdef USE_VULKAN
 #include "vk.h"
 #include "tr_sprite_props.h"
+#include "tr_decal_props.h"
 #endif
 
 static int			r_firstSceneDrawSurf;
@@ -601,6 +602,7 @@ void RE_RenderScene( const refdef_t *fd ) {
 
 	if ( !( fd->rdflags & RDF_NOWORLDMODEL ) ) {
 		R_SpriteProps_AddRefEntitiesToScene( fd->time );
+		R_DecalProps_AddRefEntitiesToScene( fd->time );
 	}
 
 	RE_BeginScene( fd );

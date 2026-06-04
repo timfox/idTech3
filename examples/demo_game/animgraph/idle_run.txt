@@ -1,0 +1,2 @@
+state idle 0 0.25
+state run 1 0.15

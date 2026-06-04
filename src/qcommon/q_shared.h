@@ -1442,6 +1442,7 @@ typedef struct entityState_s {
 #define EF_BILLBOARD		0x00100000	// camera-facing RT_SPRITE
 #define EF_FLIPBOOK			0x00200000	// animated sprite sheet (cols/rows/fps in refEntity or map keys)
 #define EF_IMPOSTER			0x00400000	// yaw-locked imposter billboard (RF_SPRITE_YAWLOCK)
+#define EF_DECAL			0x00800000	// engine-native projected decal (misc_decal / CS_ENGINE_DECAL_SHADERS)
 
 typedef enum {
 	CA_UNINITIALIZED,

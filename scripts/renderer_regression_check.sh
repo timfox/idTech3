@@ -382,6 +382,31 @@ else
 fi
 
 echo ""
+echo "Engine-native decals (misc_decal):"
+DC_C="$PROJECT_ROOT/src/renderers/vulkan/tr_decal_props.c"
+if ! grep -q 'misc_decal' "$PROJECT_ROOT/src/qcommon/engine_decal_map.c" 2>/dev/null; then
+  fail "engine_decal_map.c missing misc_decal parse"
+elif ! grep -q 'EF_DECAL' "$PROJECT_ROOT/src/qcommon/q_shared.h" 2>/dev/null; then
+  fail "q_shared.h missing EF_DECAL"
+elif ! grep -q 'CS_ENGINE_DECAL_SHADERS' "$PROJECT_ROOT/src/game/bg_public.h" 2>/dev/null; then
+  fail "bg_public.h missing CS_ENGINE_DECAL_SHADERS"
+elif ! grep -q 'AddEngineDecalToScene' "$PROJECT_ROOT/src/renderers/common/tr_public.h" 2>/dev/null; then
+  fail "tr_public.h missing AddEngineDecalToScene"
+elif ! grep -q 'registerTable(L, "Decals"' "$PROJECT_ROOT/src/game/g_lua_bindings.c" 2>/dev/null; then
+  fail "g_lua_bindings.c missing Engine.Decals Lua table"
+else
+  pass "engine-native decals (CS + EF_DECAL + renderer bridge)"
+fi
+
+echo ""
+echo "Network eFlags wire width (engine flags bits 20-23):"
+if ! grep -q '{ NETF(eFlags), 24 }' "$PROJECT_ROOT/src/qcommon/msg.c" 2>/dev/null; then
+  fail "msg.c eFlags must be 24 bits for EF_BILLBOARD..EF_DECAL"
+else
+  pass "msg.c NETF(eFlags) 24-bit (protocol 72+)"
+fi
+
+echo ""
 echo "Billboard sprites (EF_BILLBOARD + RT_SPRITE renderer path):"
 Q_SHARED="$PROJECT_ROOT/src/qcommon/q_shared.h"
 TR_TYPES="$PROJECT_ROOT/src/renderers/common/tr_types.h"

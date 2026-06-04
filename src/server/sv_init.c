@@ -23,6 +23,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "server.h"
 #include "sv_enhanced.h"
 #include "sv_engine_sprites.h"
+#include "sv_engine_decals.h"
+#include "sv_auth.h"
 
 
 /*
@@ -523,11 +525,18 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	srand( Com_Milliseconds() );
 	Com_RandomBytes( (byte*)&sv.checksumFeed, sizeof( sv.checksumFeed ) );
 	FS_Restart( sv.checksumFeed );
+	if ( sv_pureSigned && sv_pureSigned->integer ) {
+		Cvar_Set( "com_pk3Signed", "1" );
+		Com_Printf( "[server] sv_pureSigned=1 (pk3.sig verification enabled)\n" );
+	} else {
+		Cvar_Set( "com_pk3Signed", "0" );
+	}
 
 	Sys_SetStatus( "Loading map %s", mapname );
 	CM_LoadMap( va( "maps/%s.bsp", mapname ), qfalse, &checksum );
 
 	SV_EngineSprites_LoadMap( CM_EntityString() );
+	SV_EngineDecals_LoadMap( CM_EntityString() );
 
 	// set serverinfo visible name
 	Cvar_Set( "mapname", mapname );
@@ -554,6 +563,7 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	SV_InitGameProgs();
 
 	SV_EngineSprites_SpawnMapEntities();
+	SV_EngineDecals_SpawnMapEntities();
 
 	// don't allow a map_restart if game is modified
 	sv_gametype->modified = qfalse;
@@ -710,6 +720,8 @@ void SV_Init( void )
 	int index;
 
 	SV_EngineSprites_Init();
+	SV_EngineDecals_Init();
+	SV_Auth_Init();
 
 	SV_AddOperatorCommands();
 
@@ -758,6 +770,17 @@ void SV_Init( void )
 	sv_serverid = Cvar_Get( "sv_serverid", "0", CVAR_SYSTEMINFO | CVAR_ROM );
 	sv_pure = Cvar_Get( "sv_pure", "1", CVAR_SYSTEMINFO | CVAR_LATCH );
 	Cvar_SetDescription( sv_pure, "Requires clients to only get data from pk3 files the server is using." );
+	sv_pureSigned = Cvar_Get( "sv_pureSigned", "0", CVAR_ARCHIVE );
+	Cvar_SetDescription( sv_pureSigned,
+		"Require valid pk3.sig sidecars for loaded archives (sets com_pk3Signed on map load)." );
+	sv_interestMaxDist = Cvar_Get( "sv_interestMaxDist", "0", CVAR_ARCHIVE );
+	Cvar_SetDescription( sv_interestMaxDist,
+		"After PVS, drop ents farther than this distance (0=off). Engine props exempt." );
+	sv_interestPriority = Cvar_Get( "sv_interestPriority", "0", CVAR_ARCHIVE );
+	Cvar_SetDescription( sv_interestPriority,
+		"Entities with generic1 >= this value skip interest distance cull." );
+	sv_sectorURL = Cvar_Get( "sv_sectorURL", "", CVAR_ARCHIVE );
+	Cvar_SetDescription( sv_sectorURL, "Base URL for sector pk3 autodownload (Phase I streaming)." );
 	Cvar_Get( "sv_paks", "", CVAR_SYSTEMINFO | CVAR_ROM );
 	Cvar_Get( "sv_pakNames", "", CVAR_SYSTEMINFO | CVAR_ROM );
 	Cvar_Get( "sv_referencedPaks", "", CVAR_SYSTEMINFO | CVAR_ROM );

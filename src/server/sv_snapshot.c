@@ -418,6 +418,23 @@ static void SV_AddEntitiesVisibleFromPoint( const vec3_t origin, clientSnapshot_
 			}
 		}
 
+		if ( sv_interestMaxDist && sv_interestMaxDist->value > 0.0f ) {
+			const float maxDist = sv_interestMaxDist->value;
+			const int minPri = sv_interestPriority ? sv_interestPriority->integer : 0;
+			const int engineFlags = EF_BILLBOARD | EF_FLIPBOOK | EF_IMPOSTER | EF_DECAL;
+
+			if ( !( es->eFlags & engineFlags ) && es->generic1 < minPri ) {
+				vec3_t delta;
+				float distSq;
+
+				VectorSubtract( ent->r.currentOrigin, origin, delta );
+				distSq = VectorLengthSquared( delta );
+				if ( distSq > maxDist * maxDist ) {
+					continue;
+				}
+			}
+		}
+
 		// add it
 		SV_AddIndexToSnapshot( svEnt, e, eNums );
 

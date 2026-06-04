@@ -25,6 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifdef USE_VULKAN
 #include "vk.h"
 #include "tr_sprite_props.h"
+#include "tr_decal_props.h"
 
 #ifdef VK_CUBEMAP
 #define JSON_IMPLEMENTATION
@@ -2779,6 +2780,7 @@ void RE_LoadWorldMap( const char *name ) {
 	ri.FS_FreeFile( buffer.v );
 
 	R_SpriteProps_ParseFromEntityString( s_worldData.entityString );
+	R_DecalProps_ParseFromEntityString( s_worldData.entityString );
 
 #ifdef VK_CUBEMAP
 	// Render all cubemaps
