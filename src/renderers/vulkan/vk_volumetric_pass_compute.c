@@ -18,6 +18,7 @@ composite fullscreen draw, SMAA subpasses. Split from vk.c.
 #include "vk_sim_render_debug.h"
 #include "vk_post_fog.h"
 #include "vk_temporal.h"
+#include "vk_nslm.h"
 
 static const float vk_local_shadow_flip_matrix[16] = {
 	0, 0, -1, 0,
@@ -567,6 +568,9 @@ static void vk_volumetric_compute_pass( void )
 
 	vk_set_volumetric_pass_params( (float)VK_VOLUMETRIC_STAGE_TEMPORAL, 0.0f, 0.0f, 0.0f );
 	qvkCmdDispatch( vk.cmd->command_buffer, groups_x, groups_y, groups_z );
+	vk_volumetric_stage_barrier( vk.froxel_volume_image );
+	vk_nslm_apply_to_froxels( groups_x, groups_y, groups_z );
+	vk_volumetric_stage_barrier( vk.froxel_volume_image );
 	vk_write_volumetric_timestamp( VK_VOLUMETRY_QUERY_AFTER_TEMPORAL, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
 
 	record_image_layout_transition( vk.cmd->command_buffer, vk.froxel_volume_image, VK_IMAGE_ASPECT_COLOR_BIT,

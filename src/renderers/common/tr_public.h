@@ -25,6 +25,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_types.h"
 #include "vulkan/vulkan.h"
 
+#if defined( USE_VUDA )
+#include "../../vuda/vuda_types.h"
+#endif
+
 #define	REF_API_VERSION		10
 
 //
@@ -145,6 +149,15 @@ typedef struct {
 	void	(*AddEngineSpriteToScene)( const engineSpriteDesc_t *desc );
 	void	(*AddEngineSpriteToSceneAtTime)( const engineSpriteDesc_t *desc, int refdefTimeMs );
 	void	(*AddEngineDecalToScene)( const engineDecalDesc_t *desc );
+
+#if defined( USE_VUDA )
+	/* VUDA: CUDA-Vulkan spatial multiplexing (NULL when renderer built without USE_VUDA). */
+	qboolean (*VudaActive)( void );
+	qboolean (*VudaInteropReady)( void );
+	qboolean (*VudaGetExportBundle)( vudaExportBundle_t *out );
+	qboolean (*VudaConsumeComputeWindow)( void );
+	void (*VudaNotifyCudaComplete)( uint64_t timelineValue );
+#endif
 
 } refexport_t;
 

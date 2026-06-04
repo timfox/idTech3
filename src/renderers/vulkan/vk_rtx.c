@@ -16,6 +16,7 @@ caps BLAS triangles (default 262144). See docs/RENDERERS_FUTURE.md.
 #include "vk_util.h"
 #include "vk_view_state.h"
 #include "vk_image_layout.h"
+#include "vk_fsa.h"
 
 #ifdef USE_VULKAN_RTX
 
@@ -904,7 +905,7 @@ void vk_rtx_init( void )
 {
 	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rtProps;
 	VkPhysicalDeviceProperties2 props2;
-	VkDescriptorSetLayoutBinding bindings[5];
+	VkDescriptorSetLayoutBinding bindings[6];
 	VkDescriptorSetLayoutCreateInfo dslci;
 	VkDescriptorPoolSize poolSizes[4];
 	VkDescriptorPoolCreateInfo pci;
@@ -983,10 +984,14 @@ void vk_rtx_init( void )
 	bindings[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	bindings[4].descriptorCount = 1;
 	bindings[4].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+	bindings[5].binding = 5;
+	bindings[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	bindings[5].descriptorCount = 1;
+	bindings[5].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 
 	Com_Memset( &dslci, 0, sizeof( dslci ) );
 	dslci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	dslci.bindingCount = 5;
+	dslci.bindingCount = 6;
 	dslci.pBindings = bindings;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &dslci, NULL, &rtx.dsl ) );
 
@@ -997,7 +1002,7 @@ void vk_rtx_init( void )
 	poolSizes[2].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	poolSizes[2].descriptorCount = 1;
 	poolSizes[3].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[3].descriptorCount = 2;
+	poolSizes[3].descriptorCount = 3;
 	Com_Memset( &pci, 0, sizeof( pci ) );
 	pci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	pci.maxSets = 1;
@@ -1068,6 +1073,7 @@ void vk_rtx_init( void )
 	writes[1].pImageInfo = &depthInfo;
 	qvkUpdateDescriptorSets( vk.device, 2, writes, 0, NULL );
 	vk_rtx_update_color_descriptor();
+	vk_fsa_write_rtx_importance_descriptor( rtx.descriptor_set );
 
 	vk_rtx_rebuild_world_blas();
 
@@ -1242,11 +1248,11 @@ void vk_rtx_record_demo_pass( VkCommandBuffer cmd )
 		if ( frameUbo.traceParams[0] > 8.0f ) {
 			frameUbo.traceParams[0] = 8.0f;
 		}
-		frameUbo.traceParams[1] = 0.0f;
-		frameUbo.traceParams[2] = 0.0f;
-		frameUbo.traceParams[3] = 0.0f;
+		vk_fsa_patch_rtx_trace_params( frameUbo.traceParams, (uint32_t)tr.frameCount );
 		Com_Memcpy( rtx.rtx_ubo_ptr, &frameUbo, sizeof( frameUbo ) );
 	}
+
+	vk_fsa_write_rtx_importance_descriptor( rtx.descriptor_set );
 
 	depthAspect = VK_IMAGE_ASPECT_DEPTH_BIT;
 	if ( glConfig.stencilBits > 0 ) {
@@ -1390,11 +1396,63 @@ void vk_rtx_record_demo_pass( VkCommandBuffer cmd )
 	}
 }
 
+static void vk_rtx_write_tlas_descriptor( VkDescriptorSet set )
+{
+	VkWriteDescriptorSetAccelerationStructureKHR asWrite;
+	VkWriteDescriptorSet writeAS;
+
+	if ( set == VK_NULL_HANDLE || rtx.tlas == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	Com_Memset( &asWrite, 0, sizeof( asWrite ) );
+	asWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
+	asWrite.accelerationStructureCount = 1;
+	asWrite.pAccelerationStructures = &rtx.tlas;
+
+	Com_Memset( &writeAS, 0, sizeof( writeAS ) );
+	writeAS.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writeAS.dstSet = set;
+	writeAS.dstBinding = 0;
+	writeAS.descriptorCount = 1;
+	writeAS.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+	writeAS.pNext = &asWrite;
+	qvkUpdateDescriptorSets( vk.device, 1, &writeAS, 0, NULL );
+}
+
+qboolean vk_rtx_scene_ready( void )
+{
+	return rtx.ready && rtx.tlas != VK_NULL_HANDLE;
+}
+
+void vk_rtx_scene_prepare( void )
+{
+	if ( !rtx.ready ) {
+		return;
+	}
+	vk_rtx_rebuild_world_blas();
+	vk_rtx_rebuild_entity_tlas();
+}
+
+void vk_rtx_scene_extent( uint32_t *w, uint32_t *h )
+{
+	vk_rtx_get_trace_extent( w, h );
+}
+
+void vk_rtx_bind_tlas_descriptor( VkDescriptorSet set )
+{
+	vk_rtx_write_tlas_descriptor( set );
+}
+
 #else /* !USE_VULKAN_RTX */
 
 void vk_rtx_init( void ) {}
 void vk_rtx_shutdown( void ) {}
 void vk_rtx_frame_begin( void ) {}
 void vk_rtx_record_demo_pass( VkCommandBuffer cmd ) { (void)cmd; }
+qboolean vk_rtx_scene_ready( void ) { return qfalse; }
+void vk_rtx_scene_prepare( void ) {}
+void vk_rtx_scene_extent( uint32_t *w, uint32_t *h ) { if ( w ) { *w = 1u; } if ( h ) { *h = 1u; } }
+void vk_rtx_bind_tlas_descriptor( VkDescriptorSet set ) { (void)set; }
 
 #endif /* USE_VULKAN_RTX */

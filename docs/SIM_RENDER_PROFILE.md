@@ -90,7 +90,12 @@ Inspired by screen-space volumetric shaders (Henyey–Greenstein phase, height f
 
 Tune with `r_volumetricFogDensity`, `r_volumetricFogHeightFalloff`, `r_volumetricFogAniso`, `r_volumetricFogSteps` (mode 2).
 
+## RTX path trace profiling (Nsight)
+
+For **megakernel vs wavefront** GPU path tracing (`r_pathtrace`), use the checklist in [PATHTRACE_ARCH_BENCHMARK.md](PATHTRACE_ARCH_BENCHMARK.md): fixed camera, `r_pathtrace_bounces 4`, compare `r_pathtrace_arch` with Nsight Graphics GPU Trace (divergence, `vkCmdTraceRaysKHR` count, memory).
+
 ## References
 
 - Paper: [arXiv:2410.05095](https://arxiv.org/abs/2410.05095)
 - Upstream AMBF-Vulkan: https://github.com/AMBF-Vulkan-repositories/AMBF-Vulkan
+- Path trace benchmark: [PATHTRACE_ARCH_BENCHMARK.md](PATHTRACE_ARCH_BENCHMARK.md)

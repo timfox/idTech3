@@ -1,3 +1,9 @@
-# Demo i18n table (com_loc_language en)
+# Demo i18n (com_loc_language en) — trap G_LOC_LOOKUP / Engine.Loc
 welcome=Welcome to idTech3 demo
 pause=Paused
+hud_demo=Engine demo active
+menu_play=Play
+menu_quit=Quit
+slice_title=SP vertical slice
+slice_audio=Try: snd_playevent ui_click
+slice_save=Save slots: Engine.Save.write

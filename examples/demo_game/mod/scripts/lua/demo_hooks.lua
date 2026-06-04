@@ -14,4 +14,18 @@ function demo_run_sprites()
   print("[idtech3_demo] spawnLocal billboard at (0,0,96) — see demo_sprites.cfg for server/Lua options")
 end
 
+local function demo_sp_slice()
+  if Engine and Engine.AnimGraph then
+    if Engine.AnimGraph.load("animgraph/idle_run.txt") then
+      Engine.AnimGraph.setState("idle")
+      print("[idtech3_demo] animgraph idle_run loaded")
+    end
+  end
+  if Engine and Engine.Save then
+    Engine.Save.write(0, "demo_sp_autosave")
+    print("[idtech3_demo] save slot 0 written (see save/engine_slot_0.json)")
+  end
+end
+
+-- Console: lua_run demo_sp_slice()
 demo_banner()

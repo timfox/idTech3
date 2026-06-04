@@ -784,6 +784,311 @@ typedef struct {
 	VkImageView deferred_lighting_view;
 	qboolean deferredGbufferAllocated;
 
+	/* Neural Irradiance Volume (r_niv); see vk_niv.c */
+	struct {
+		VkDescriptorSetLayout shade_layout;
+		VkPipelineLayout shade_pipeline_layout;
+		VkPipeline shade_pipeline;
+		VkDescriptorPool shade_pool;
+		VkDescriptorSet shade_descriptor;
+		qboolean shade_ready;
+		VkDescriptorSetLayout composite_layout;
+		VkPipelineLayout composite_pipeline_layout;
+		VkPipeline composite_pipeline;
+		VkDescriptorPool composite_pool;
+		VkDescriptorSet composite_descriptor;
+		qboolean composite_ready;
+		VkImage feature_volume;
+		VkImageView feature_volume_view;
+		VkDeviceMemory feature_volume_memory;
+		VkImage irradiance_image;
+		VkImageView irradiance_view;
+		VkDeviceMemory irradiance_memory;
+		VkBuffer weights_buffer;
+		VkDeviceMemory weights_memory;
+		VkDeviceSize weights_size;
+		qboolean volume_ready;
+	} niv;
+	qboolean nivAllocated;
+
+	/* Neural Six-way Lightmaps (r_nslm); see vk_nslm.c */
+	struct {
+		VkDescriptorSetLayout froxel_layout;
+		VkPipelineLayout froxel_pipeline_layout;
+		VkPipeline froxel_pipeline;
+		VkDescriptorPool froxel_pool;
+		VkDescriptorSet froxel_descriptor;
+		qboolean froxel_ready;
+		VkImage feature_volume;
+		VkImageView feature_volume_view;
+		VkDeviceMemory feature_volume_memory;
+		VkBuffer weights_buffer;
+		VkDeviceMemory weights_memory;
+		VkDeviceSize weights_size;
+		qboolean volume_ready;
+	} nslm;
+	qboolean nslmAllocated;
+
+	/* Neural Image Space Tessellation (r_nist); see vk_nist.c */
+	struct {
+		VkDescriptorSetLayout refine_layout;
+		VkPipelineLayout refine_pipeline_layout;
+		VkPipeline refine_pipeline;
+		VkDescriptorPool refine_pool;
+		VkDescriptorSet refine_descriptor;
+		qboolean refine_ready;
+		VkDescriptorSetLayout composite_layout;
+		VkPipelineLayout composite_pipeline_layout;
+		VkPipeline composite_pipeline;
+		VkDescriptorPool composite_pool;
+		VkDescriptorSet composite_descriptor;
+		qboolean composite_ready;
+		VkImage refined_image;
+		VkImageView refined_view;
+		VkDeviceMemory refined_memory;
+		VkBuffer weights_buffer;
+		VkDeviceMemory weights_memory;
+		VkDeviceSize weights_size;
+		qboolean weights_ready;
+	} nist;
+	qboolean nistAllocated;
+
+	/* Neural Visibility Cache (r_nvc); see vk_nvc.c */
+	struct {
+		VkDescriptorSetLayout cache_layout;
+		VkPipelineLayout cache_pipeline_layout;
+		VkPipeline cache_pipeline;
+		VkDescriptorPool cache_pool;
+		VkDescriptorSet cache_descriptor;
+		qboolean cache_ready;
+		VkDescriptorSetLayout restir_layout;
+		VkPipelineLayout restir_pipeline_layout;
+		VkPipeline restir_pipeline;
+		VkDescriptorPool restir_pool;
+		VkDescriptorSet restir_descriptor;
+		qboolean restir_ready;
+		VkDescriptorSetLayout composite_layout;
+		VkPipelineLayout composite_pipeline_layout;
+		VkPipeline composite_pipeline;
+		VkDescriptorPool composite_pool;
+		VkDescriptorSet composite_descriptor;
+		qboolean composite_ready;
+		VkImage cache_image;
+		VkImageView cache_view;
+		VkDeviceMemory cache_memory;
+		VkImage direct_image;
+		VkImageView direct_view;
+		VkDeviceMemory direct_memory;
+		VkBuffer weights_buffer;
+		VkDeviceMemory weights_memory;
+		VkDeviceSize weights_size;
+		qboolean weights_ready;
+	} nvc;
+	qboolean nvcAllocated;
+
+	/* Forget Superresolution / Sample Adaptively (r_fsa); see vk_fsa.c */
+	struct {
+		VkDescriptorSetLayout importance_layout;
+		VkPipelineLayout importance_pipeline_layout;
+		VkPipeline importance_pipeline;
+		VkDescriptorPool importance_pool;
+		VkDescriptorSet importance_descriptor;
+		qboolean importance_ready;
+		VkDescriptorSetLayout denoise_layout;
+		VkPipelineLayout denoise_pipeline_layout;
+		VkPipeline denoise_pipeline;
+		VkDescriptorPool denoise_pool;
+		VkDescriptorSet denoise_descriptor;
+		qboolean denoise_ready;
+		VkImage importance_image;
+		VkImageView importance_view;
+		VkDeviceMemory importance_memory;
+		VkImage fallback_importance_image;
+		VkImageView fallback_importance_view;
+		VkDeviceMemory fallback_importance_memory;
+		VkCommandPool fallback_cmd_pool;
+		VkBuffer dummy_ssbo;
+		VkDeviceMemory dummy_ssbo_memory;
+		qboolean importance_built;
+	} fsa;
+	qboolean fsaAllocated;
+
+	/* Vertex Features Neural GI (r_vfgi); see vk_vfgi.c */
+	struct {
+		VkDescriptorSetLayout decode_layout;
+		VkPipelineLayout decode_pipeline_layout;
+		VkPipeline decode_pipeline;
+		VkDescriptorPool decode_pool;
+		VkDescriptorSet decode_descriptor;
+		qboolean decode_ready;
+		VkDescriptorSetLayout composite_layout;
+		VkPipelineLayout composite_pipeline_layout;
+		VkPipeline composite_pipeline;
+		VkDescriptorPool composite_pool;
+		VkDescriptorSet composite_descriptor;
+		qboolean composite_ready;
+		VkBuffer vertex_buffer;
+		VkDeviceMemory vertex_memory;
+		uint32_t vertex_count;
+		VkBuffer grid_buffer;
+		VkDeviceMemory grid_memory;
+		VkBuffer weights_buffer;
+		VkDeviceMemory weights_memory;
+		VkDeviceSize weights_size;
+		qboolean buffers_ready;
+		VkImage irradiance_image;
+		VkImageView irradiance_view;
+		VkDeviceMemory irradiance_memory;
+	} vfgi;
+	qboolean vfgiAllocated;
+
+	/* RenderFormer neural mesh preview (r_renderformer); see vk_renderformer.c */
+	struct {
+		VkDescriptorSetLayout transport_layout;
+		VkPipelineLayout transport_pipeline_layout;
+		VkPipeline transport_pipeline;
+		qboolean transport_ready;
+		VkDescriptorSetLayout decode_layout;
+		VkPipelineLayout decode_pipeline_layout;
+		VkPipeline decode_pipeline;
+		qboolean decode_ready;
+		VkDescriptorSetLayout composite_layout;
+		VkPipelineLayout composite_pipeline_layout;
+		VkPipeline composite_pipeline;
+		qboolean composite_ready;
+		VkBuffer token_buffer;
+		VkDeviceMemory token_memory;
+		uint32_t triangle_count;
+		VkBuffer grid_buffer;
+		VkDeviceMemory grid_memory;
+		VkBuffer latent_buffer;
+		VkDeviceMemory latent_memory;
+		qboolean buffers_ready;
+		VkImage preview_image;
+		VkImageView preview_view;
+		VkDeviceMemory preview_memory;
+	} renderformer;
+	qboolean renderformerAllocated;
+
+	/* Wavefront path experiment (r_wpt); see vk_wpt.c */
+	struct {
+		VkDescriptorSetLayout enqueue_layout;
+		VkPipelineLayout enqueue_pipeline_layout;
+		VkPipeline enqueue_pipeline;
+		qboolean enqueue_ready;
+		VkDescriptorSetLayout wave_layout;
+		VkPipelineLayout wave_pipeline_layout;
+		VkPipeline wave_pipeline;
+		qboolean wave_ready;
+		VkDescriptorSetLayout composite_layout;
+		VkPipelineLayout composite_pipeline_layout;
+		VkPipeline composite_pipeline;
+		qboolean composite_ready;
+		VkBuffer ray_buffer;
+		VkDeviceMemory ray_memory;
+		qboolean buffers_ready;
+	} wpt;
+	qboolean wptAllocated;
+
+#ifdef USE_VUDA
+	/* VUDA CUDA-Vulkan interop; see vk_vuda.c */
+	struct {
+		VkBuffer        slot_buffer[3];
+		VkDeviceMemory  slot_memory[3];
+		uint64_t        slot_size[3];
+		qboolean        slot_valid[3];
+		VkSemaphore     cuda_wait_sem;
+		VkSemaphore     cuda_signal_sem;
+		uint64_t        renderTimeline;
+		uint64_t        cudaTimeline;
+		qboolean        interopReady;
+		qboolean        computeWindowOpen;
+	} vuda;
+	qboolean vudaInteropCapable;
+	qboolean vudaAllocated;
+#endif
+
+	/* Mobile-GS (r_mgs); see vk_mgs.c */
+	struct {
+		VkDescriptorSetLayout prepare_layout;
+		VkPipelineLayout prepare_pipeline_layout;
+		VkPipeline prepare_pipeline;
+		VkDescriptorPool prepare_pool;
+		VkDescriptorSet prepare_descriptor;
+		qboolean prepare_ready;
+		VkDescriptorSetLayout splat_layout;
+		VkPipelineLayout splat_pipeline_layout;
+		VkPipeline splat_pipeline;
+		VkDescriptorPool splat_pool;
+		VkDescriptorSet splat_descriptor;
+		qboolean splat_ready;
+		VkDescriptorSetLayout composite_layout;
+		VkPipelineLayout composite_pipeline_layout;
+		VkPipeline composite_pipeline;
+		VkDescriptorPool composite_pool;
+		VkDescriptorSet composite_descriptor;
+		qboolean composite_ready;
+		VkBuffer gaussian_buffer;
+		VkDeviceMemory gaussian_memory;
+		VkBuffer splat_buffer;
+		VkDeviceMemory splat_memory;
+		VkImage accum_image;
+		VkImageView accum_view;
+		VkDeviceMemory accum_memory;
+		uint32_t gaussian_count;
+	} mgs;
+	qboolean mgsAllocated;
+
+	/* WebSplatter (r_wsp); see vk_wsp.c — WebGPU-portable tile splat path */
+	struct {
+		VkDescriptorSetLayout clear_layout;
+		VkPipelineLayout clear_pipeline_layout;
+		VkPipeline clear_pipeline;
+		VkDescriptorPool clear_pool;
+		VkDescriptorSet clear_descriptor;
+		qboolean clear_ready;
+		VkDescriptorSetLayout prepare_layout;
+		VkPipelineLayout prepare_pipeline_layout;
+		VkPipeline prepare_pipeline;
+		VkDescriptorPool prepare_pool;
+		VkDescriptorSet prepare_descriptor;
+		qboolean prepare_ready;
+		VkDescriptorSetLayout bin_layout;
+		VkPipelineLayout bin_pipeline_layout;
+		VkPipeline bin_pipeline;
+		VkDescriptorPool bin_pool;
+		VkDescriptorSet bin_descriptor;
+		qboolean bin_ready;
+		VkDescriptorSetLayout draw_layout;
+		VkPipelineLayout draw_pipeline_layout;
+		VkPipeline draw_pipeline;
+		VkDescriptorPool draw_pool;
+		VkDescriptorSet draw_descriptor;
+		qboolean draw_ready;
+		VkDescriptorSetLayout composite_layout;
+		VkPipelineLayout composite_pipeline_layout;
+		VkPipeline composite_pipeline;
+		VkDescriptorPool composite_pool;
+		VkDescriptorSet composite_descriptor;
+		qboolean composite_ready;
+		VkBuffer gaussian_buffer;
+		VkDeviceMemory gaussian_memory;
+		VkBuffer splat_buffer;
+		VkDeviceMemory splat_memory;
+		VkBuffer tile_count_buffer;
+		VkDeviceMemory tile_count_memory;
+		VkBuffer tile_index_buffer;
+		VkDeviceMemory tile_index_memory;
+		VkImage accum_image;
+		VkImageView accum_view;
+		VkDeviceMemory accum_memory;
+		uint32_t gaussian_count;
+		uint32_t tile_cols;
+		uint32_t tile_rows;
+		uint32_t tile_count;
+	} wsp;
+	qboolean wspAllocated;
+
 	VkImage bloom_image[1+VK_NUM_BLOOM_PASSES*2];
 	VkImageView bloom_image_view[1+VK_NUM_BLOOM_PASSES*2];
 
@@ -1106,6 +1411,33 @@ typedef struct {
 		VkShaderModule deferred_gbuffer_debug_fs;
 		VkShaderModule deferred_lighting_cs;
 		VkShaderModule deferred_lighting_composite_fs;
+		VkShaderModule ndgi_decompress_cs;
+		VkShaderModule niv_shade_cs;
+		VkShaderModule niv_composite_cs;
+		VkShaderModule nslm_froxel_cs;
+		VkShaderModule nist_refine_cs;
+		VkShaderModule nist_composite_cs;
+		VkShaderModule nvc_cache_cs;
+		VkShaderModule nvc_restir_cs;
+		VkShaderModule nvc_composite_cs;
+		VkShaderModule fsa_importance_cs;
+		VkShaderModule fsa_denoise_cs;
+		VkShaderModule vfgi_decode_cs;
+		VkShaderModule vfgi_composite_cs;
+		VkShaderModule rf_transport_cs;
+		VkShaderModule rf_decode_cs;
+		VkShaderModule rf_composite_cs;
+		VkShaderModule wpt_enqueue_cs;
+		VkShaderModule wpt_wave_cs;
+		VkShaderModule wpt_composite_cs;
+		VkShaderModule mgs_prepare_cs;
+		VkShaderModule mgs_splat_cs;
+		VkShaderModule mgs_composite_cs;
+		VkShaderModule wsp_clear_tiles_cs;
+		VkShaderModule wsp_prepare_cs;
+		VkShaderModule wsp_tile_bin_cs;
+		VkShaderModule wsp_tile_draw_cs;
+		VkShaderModule wsp_composite_cs;
 
 		VkShaderModule cbt_terrain_cs;
 		VkShaderModule terrain_vs;

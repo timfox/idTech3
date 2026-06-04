@@ -1622,6 +1622,13 @@ extern cvar_t	*r_forwardPlusDistanceSort;
 extern cvar_t	*r_forwardPlusDepthCull;
 extern cvar_t	*r_rtxEntities;
 extern cvar_t	*r_rtxEntityCap;
+extern cvar_t	*r_pathtrace;
+extern cvar_t	*r_pathtrace_arch;
+extern cvar_t	*r_pathtrace_bounces;
+extern cvar_t	*r_pathtrace_samples;
+extern cvar_t	*r_pathtrace_denoise;
+extern cvar_t	*r_pathtrace_debug;
+extern cvar_t	*r_pathtrace_composite;
 extern cvar_t	*r_vdbFog;
 extern cvar_t	*r_vdbFogBlend;
 extern cvar_t	*r_glint;
@@ -2506,5 +2513,6 @@ extern void VBO_Flush( void );
 #endif
 
 int R_GetLightmapCoords( int lightmapIndex, float *x, float *y );
+int R_GetLightmapPixelOffset( int lightmapIndex, int *pixelX, int *pixelY );
 
 #endif //TR_LOCAL_H

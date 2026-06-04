@@ -1,0 +1,4 @@
+# GRTX demo manifest (v1: procedural Gaussians; asset path reserved)
+version 1
+maxGaussians 256
+sigmaScale 3.0

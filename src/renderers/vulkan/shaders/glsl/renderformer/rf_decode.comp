@@ -1,0 +1,106 @@
+#version 450
+/*
+ * RenderFormer scaffold — view-dependent decode from transport latent + depth.
+ */
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(std430, set = 0, binding = 0) readonly buffer Latent {
+	vec4 latent[];
+} latentBuf;
+
+layout(set = 0, binding = 1) uniform sampler2D depthTex;
+layout(set = 0, binding = 2) uniform sampler2D normalTex;
+layout(rgba16f, set = 0, binding = 3) uniform writeonly image2D previewOut;
+
+layout(push_constant) uniform RfDecodePush {
+	mat4 invViewProj;
+	vec4 worldMin;
+	vec4 worldMax;
+	uvec3 gridDim;
+	uint useGBufferNormal;
+	uint hasGBuffer;
+	uvec2 extent;
+	vec4 cameraPos;
+	float strength;
+} pc;
+
+vec3 worldPosFromDepth(vec2 uv, float depth) {
+	vec4 clip = vec4(uv * 2.0 - 1.0, depth, 1.0);
+	vec4 world = pc.invViewProj * clip;
+	return world.xyz / max(world.w, 1e-6);
+}
+
+vec3 decodeNormal(vec2 uv) {
+	if (pc.hasGBuffer != 0u && pc.useGBufferNormal != 0u) {
+		vec3 n = texture(normalTex, uv).xyz * 2.0 - 1.0;
+		float len = length(n);
+		if (len > 0.01) {
+			return n / len;
+		}
+	}
+	return vec3(0.0, 0.0, 1.0);
+}
+
+vec4 sampleLatent(vec3 worldPos) {
+	vec3 span = pc.worldMax.xyz - pc.worldMin.xyz;
+	vec3 rel = (worldPos - pc.worldMin.xyz) / max(span, vec3(1e-3));
+	uvec3 g = pc.gridDim;
+	float wSum = 0.0;
+	vec4 feat = vec4(0.0);
+	int dx;
+	int dy;
+	int dz;
+	for (dz = -1; dz <= 1; dz++) {
+		for (dy = -1; dy <= 1; dy++) {
+			for (dx = -1; dx <= 1; dx++) {
+				int nx = int(rel.x * float(g.x)) + dx;
+				int ny = int(rel.y * float(g.y)) + dy;
+				int nz = int(rel.z * float(g.z)) + dz;
+				if (nx < 0 || ny < 0 || nz < 0 ||
+					nx >= int(g.x) || ny >= int(g.y) || nz >= int(g.z)) {
+					continue;
+				}
+				uint cid = uint(nx) + uint(ny) * g.x + uint(nz) * g.x * g.y;
+				vec3 cp = pc.worldMin.xyz + vec3(
+					(float(nx) + 0.5) * span.x / float(g.x),
+					(float(ny) + 0.5) * span.y / float(g.y),
+					(float(nz) + 0.5) * span.z / float(g.z) );
+				float w = 1.0 / (length(worldPos - cp) + 0.15);
+				feat += latentBuf.latent[cid] * w;
+				wSum += w;
+			}
+		}
+	}
+	if (wSum > 1e-6) {
+		feat /= wSum;
+	}
+	return feat;
+}
+
+void main() {
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if (pix.x >= pc.extent.x || pix.y >= pc.extent.y) {
+		return;
+	}
+
+	vec2 uv = (vec2(pix) + 0.5) / vec2(pc.extent);
+	float depth = texture(depthTex, uv).r;
+	if (depth <= 0.0 || depth >= 1.0) {
+		imageStore(previewOut, ivec2(pix), vec4(0.0));
+		return;
+	}
+
+	vec3 worldPos = worldPosFromDepth(uv, depth);
+	if (any(lessThan(worldPos, pc.worldMin.xyz)) || any(greaterThan(worldPos, pc.worldMax.xyz))) {
+		imageStore(previewOut, ivec2(pix), vec4(0.0));
+		return;
+	}
+
+	vec3 N = decodeNormal(uv);
+	vec3 V = normalize(pc.cameraPos.xyz - worldPos);
+	float ndv = max(dot(N, V), 0.0);
+	vec4 latent = sampleLatent(worldPos);
+	float spec = latent.a * pow(ndv, 4.0 + latent.a * 8.0);
+	vec3 rgb = latent.rgb * (0.65 + 0.35 * ndv) + vec3(spec * 0.25);
+	imageStore(previewOut, ivec2(pix), vec4(rgb * pc.strength, 1.0));
+}

@@ -26,6 +26,17 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk.h"
 #include "tr_sprite_props.h"
 #include "tr_decal_props.h"
+#include "vk_ndgi.h"
+#include "vk_niv.h"
+#include "vk_nslm.h"
+#include "vk_nist.h"
+#include "vk_nvc.h"
+#include "vk_fsa.h"
+#include "vk_vfgi.h"
+#include "vk_renderformer.h"
+#include "vk_grtx.h"
+#include "vk_mgs.h"
+#include "vk_wsp.h"
 
 #ifdef VK_CUBEMAP
 #define JSON_IMPLEMENTATION
@@ -294,6 +305,41 @@ int R_GetLightmapCoords( int lightmapIndex, float *x, float *y )
 
 	*x = (float)( LIGHTMAP_BORDER + cX * LIGHTMAP_LEN ) / (float) lightmapWidth;
 	*y = (float)( LIGHTMAP_BORDER + cY * LIGHTMAP_LEN ) / (float) lightmapHeight;
+
+	return lightmapNum;
+}
+
+
+/*
+===============
+R_GetLightmapPixelOffset
+
+Returns merged-atlas index and top-left pixel offset for a logical lightmap index.
+Used by Neural Dynamic GI virtual-texture page uploads.
+===============
+*/
+int R_GetLightmapPixelOffset( int lightmapIndex, int *pixelX, int *pixelY )
+{
+	int lightmapNum;
+	int cN;
+	int cX;
+	int cY;
+
+	if ( tr.worldDeluxeMapping ) {
+		lightmapIndex >>= 1;
+	}
+
+	lightmapNum = lightmapIndex / tr.lightmapMod;
+	cN = lightmapIndex % tr.lightmapMod;
+	cX = cN % lightmapCountX;
+	cY = cN / lightmapCountX;
+
+	if ( pixelX ) {
+		*pixelX = cX * LIGHTMAP_LEN;
+	}
+	if ( pixelY ) {
+		*pixelY = cY * LIGHTMAP_LEN;
+	}
 
 	return lightmapNum;
 }
@@ -2781,6 +2827,18 @@ void RE_LoadWorldMap( const char *name ) {
 
 	R_SpriteProps_ParseFromEntityString( s_worldData.entityString );
 	R_DecalProps_ParseFromEntityString( s_worldData.entityString );
+
+	R_NDGI_OnMapLoad( s_worldData.baseName );
+	R_NIV_OnMapLoad( s_worldData.baseName );
+	R_NSLM_OnMapLoad( s_worldData.baseName );
+	R_NIST_OnMapLoad( s_worldData.baseName );
+	R_NVC_OnMapLoad( s_worldData.baseName );
+	R_FSA_OnMapLoad( s_worldData.baseName );
+	R_VFGI_OnMapLoad( s_worldData.baseName );
+	R_RenderFormer_OnMapLoad( s_worldData.baseName );
+	vk_grtx_on_map_load( s_worldData.baseName );
+	R_MGS_OnMapLoad( s_worldData.baseName );
+	R_WSP_OnMapLoad( s_worldData.baseName );
 
 #ifdef VK_CUBEMAP
 	// Render all cubemaps

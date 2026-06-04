@@ -131,6 +131,14 @@ extern PFN_vkDebugMarkerSetObjectNameEXT				qvkDebugMarkerSetObjectNameEXT;
 
 extern PFN_vkCmdClearColorImage								qvkCmdClearColorImage;
 
+#ifdef USE_VUDA
+extern PFN_vkGetMemoryFdKHR									qvkGetMemoryFdKHR;
+extern PFN_vkGetMemoryFdPropertiesKHR						qvkGetMemoryFdPropertiesKHR;
+extern PFN_vkGetSemaphoreFdKHR								qvkGetSemaphoreFdKHR;
+extern PFN_vkWaitSemaphoresKHR								qvkWaitSemaphoresKHR;
+extern PFN_vkSignalSemaphoreKHR							qvkSignalSemaphoreKHR;
+#endif
+
 #ifdef USE_VULKAN_RTX
 extern PFN_vkGetBufferDeviceAddress							qvkGetBufferDeviceAddress;
 extern PFN_vkCreateAccelerationStructureKHR					qvkCreateAccelerationStructureKHR;

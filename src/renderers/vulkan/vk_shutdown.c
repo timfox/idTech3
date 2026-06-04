@@ -21,6 +21,8 @@ Split from vk.c.
 #include "vk_forward_plus.h"
 #include "vk_deferred_gbuffer.h"
 #include "vk_rtx.h"
+#include "vk_grtx.h"
+#include "vk_pathtrace.h"
 #include "vk_vdb.h"
 #include "vk_pipeline_cache_disk.h"
 #include "vk_fp64_points.h"
@@ -44,6 +46,8 @@ void vk_shutdown( refShutdownCode_t code )
 	if ( !vk.device_lost && qvkDeviceWaitIdle )
 		qvkDeviceWaitIdle( vk.device );
 	vk_rtx_shutdown();
+	vk_grtx_shutdown();
+	vk_pathtrace_shutdown();
 	/* Always run full destroy sequence for VUID-05137 compliance.
 	 * When device_lost, destroy calls may return VK_ERROR_DEVICE_LOST but we still attempt them. */
 	vk_destroy_framebuffers();
@@ -400,6 +404,33 @@ for (i = 0; i < 2; i++) {
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.deferred_gbuffer_debug_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.deferred_lighting_cs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.deferred_lighting_composite_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.ndgi_decompress_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.niv_shade_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.niv_composite_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.nslm_froxel_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.nist_refine_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.nist_composite_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.nvc_cache_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.nvc_restir_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.nvc_composite_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.fsa_importance_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.fsa_denoise_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.vfgi_decode_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.vfgi_composite_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.rf_transport_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.rf_decode_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.rf_composite_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.wpt_enqueue_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.wpt_wave_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.wpt_composite_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.mgs_prepare_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.mgs_splat_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.mgs_composite_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.wsp_clear_tiles_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.wsp_prepare_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.wsp_tile_bin_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.wsp_tile_draw_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.wsp_composite_cs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.cbt_terrain_cs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.terrain_vs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.terrain_fs );

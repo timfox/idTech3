@@ -129,3 +129,25 @@ Already supported in the editor via navmesh overlay.
 |-----|------|-------------|
 | `concept` | string | Response concept to trigger |
 | `zone` | string | Zone name for context |
+
+### Engine-native sprites (`misc_billboard`, `misc_flipbook`, `misc_imposter`)
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `shader` | string | Material qpath (registered into CS_ENGINE_SPRITE_SHADERS) |
+| `radius` | float | Sprite size (world units) |
+| `angles` | vec3 | Yaw on Z for billboard; flipbook uses cols/rows/fps keys per class |
+| `cols` / `rows` / `fps` | int | Flipbook only |
+
+Parser: [engine_sprite_map.c](../src/qcommon/engine_sprite_map.c). Network: [MOD_SDK.md](MOD_SDK.md).
+
+### Engine-native decals (`misc_decal`)
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `shader` | string | Decal material qpath |
+| `radius` | float | Decal radius |
+| `pitch` / `yaw` | float | Orientation (degrees) |
+| `fade` | int | Optional fade duration (ticks) |
+
+Parser: [engine_decal_map.c](../src/qcommon/engine_decal_map.c).

@@ -1,0 +1,72 @@
+#version 450
+/* Per-Gaussian screen footprint splat (tile-friendly bbox; capped radius for mobile). */
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+struct ScreenSplat {
+	vec4 centerDepth;
+	vec4 colorOpacity;
+	vec4 axes;
+};
+
+layout(std430, set = 0, binding = 0) readonly buffer SplatBuffer {
+	ScreenSplat s[];
+} splats;
+
+layout(rgba16f, set = 0, binding = 1) uniform image2D accumOut;
+
+layout(push_constant) uniform MgsSplatPush {
+	vec4 viewport;
+	int splatCount;
+	int maxFootprint;
+	float strength;
+	float pad0;
+} pc;
+
+void main() {
+	uint i = gl_GlobalInvocationID.x;
+	if ( int(i) >= pc.splatCount ) {
+		return;
+	}
+
+	ScreenSplat sp = splats.s[i];
+	vec2 center = sp.centerDepth.xy;
+	float depth = sp.centerDepth.z;
+	float radius = sp.centerDepth.w;
+	if ( radius < 1.0 ) {
+		return;
+	}
+
+	radius = min(radius, float(pc.maxFootprint));
+	vec3 rgb = sp.colorOpacity.rgb;
+	float alpha = sp.colorOpacity.a * pc.strength;
+	int r = int(ceil(radius));
+	int x0 = max(0, int(center.x) - r);
+	int y0 = max(0, int(center.y) - r);
+	int x1 = min(int(pc.viewport.x) - 1, int(center.x) + r);
+	int y1 = min(int(pc.viewport.y) - 1, int(center.y) + r);
+	int x;
+	int y;
+
+	for ( y = y0; y <= y1; y++ ) {
+		for ( x = x0; x <= x1; x++ ) {
+			vec2 d = vec2(float(x), float(y)) - center;
+			float r2 = dot(d, d) / (radius * radius);
+			if ( r2 > 1.0 ) {
+				continue;
+			}
+			float w = exp(-4.0 * r2) * alpha;
+			if ( w < 1e-4 ) {
+				continue;
+			}
+			vec4 prev = imageLoad(accumOut, ivec2(x, y));
+			float a = clamp(prev.a + w, 0.0, 1.0);
+			vec3 rgbOut = mix(prev.rgb, rgb, w / max(a, 1e-4));
+			float zStore = (prev.a < 1e-4) ? depth : min(prev.b, depth);
+			vec4 outCol;
+			outCol.rgb = rgbOut;
+			outCol.b = zStore;
+			outCol.a = a;
+			imageStore(accumOut, ivec2(x, y), outCol);
+		}
+	}
+}

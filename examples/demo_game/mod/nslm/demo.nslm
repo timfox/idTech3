@@ -1,0 +1,6 @@
+version 1
+gridX 32
+gridY 16
+gridZ 32
+featureDim 4
+hiddenDim 16

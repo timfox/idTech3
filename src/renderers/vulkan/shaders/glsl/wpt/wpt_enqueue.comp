@@ -1,0 +1,52 @@
+#version 450
+/* Wavefront path experiment — wave 0: primary rays from depth. */
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+struct RayRec {
+	vec4 origin;
+	vec4 dir;
+	vec4 radiance;
+};
+
+layout(std430, set = 0, binding = 0) buffer RayQueue {
+	RayRec rays[];
+} queue;
+
+layout(set = 0, binding = 1) uniform sampler2D depthTex;
+
+layout(push_constant) uniform WptEnqueuePush {
+	mat4 invViewProj;
+	vec4 viewOrigin;
+	uvec2 extent;
+	uint maxRays;
+	float strength;
+} pc;
+
+void main() {
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	uint idx = pix.y * pc.extent.x + pix.x;
+	if (pix.x >= pc.extent.x || pix.y >= pc.extent.y || idx >= pc.maxRays) {
+		return;
+	}
+
+	vec2 uv = (vec2(pix) + 0.5) / vec2(pc.extent);
+	float depth = texture(depthTex, uv).r;
+	vec3 ro = pc.viewOrigin.xyz;
+	vec3 rd;
+
+	if (depth <= 0.0 || depth >= 1.0) {
+		queue.rays[idx].origin = vec4(ro, 0.0);
+		queue.rays[idx].dir = vec4(0.0, 0.0, 1.0, 0.0);
+		queue.rays[idx].radiance = vec4(0.0);
+		return;
+	}
+
+	vec4 clip = vec4(uv * 2.0 - 1.0, depth, 1.0);
+	vec4 world = pc.invViewProj * clip;
+	vec3 wp = world.xyz / max(abs(world.w), 1e-6);
+	rd = normalize(wp - ro);
+
+	queue.rays[idx].origin = vec4(ro, 1.0);
+	queue.rays[idx].dir = vec4(rd, 1.0);
+	queue.rays[idx].radiance = vec4(0.12, 0.14, 0.18, 0.0);
+}

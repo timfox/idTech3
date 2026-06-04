@@ -451,6 +451,20 @@ else
 fi
 
 echo ""
+echo "Path trace experiment (Phase C6): vk_pathtrace + shaders:"
+PT_C="$PROJECT_ROOT/src/renderers/vulkan/vk_pathtrace.c"
+PT_RGEN="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/pt_mega.rgen"
+if [[ ! -f "$PT_C" ]]; then
+  fail "vk_pathtrace.c missing"
+elif ! grep -q 'r_pathtrace_arch' "$PT_C" 2>/dev/null; then
+  fail "vk_pathtrace.c missing r_pathtrace_arch handling"
+elif [[ ! -f "$PT_RGEN" ]]; then
+  fail "pt_mega.rgen missing"
+else
+  pass "vk_pathtrace.c + pt_mega.rgen present (USE_VULKAN_RTX compile guard)"
+fi
+
+echo ""
 echo "Forward+ tile cull: MAX_PER_TILE vs VK_FP_MAX_PER_TILE (tile SSBO stride):"
 FP_C="$PROJECT_ROOT/src/renderers/vulkan/vk_forward_plus.c"
 max_tile_sh="$(sed -n 's/^#define MAX_PER_TILE[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$FP_COMP" | head -1)"

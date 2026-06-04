@@ -26,6 +26,19 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_sprite_props.h"
 #include "tr_decal_props.h"
 #include "vk_upscale.h"
+#include "vk_ndgi.h"
+#include "vk_niv.h"
+#include "vk_nslm.h"
+#include "vk_nist.h"
+#include "vk_nvc.h"
+#include "vk_fsa.h"
+#include "vk_vfgi.h"
+#include "vk_renderformer.h"
+#include "vk_wpt.h"
+#include "vk_vuda.h"
+#include "vk_grtx.h"
+#include "vk_mgs.h"
+#include "vk_wsp.h"
 #include "vk_fluidsim.h"
 #include "vk_terrain.h"
 #include "vk_vdb.h"
@@ -243,6 +256,13 @@ cvar_t	*r_rtxComposite;
 cvar_t	*r_rtxSamples;
 cvar_t	*r_rtxEntities;
 cvar_t	*r_rtxEntityCap;
+cvar_t	*r_pathtrace;
+cvar_t	*r_pathtrace_arch;
+cvar_t	*r_pathtrace_bounces;
+cvar_t	*r_pathtrace_samples;
+cvar_t	*r_pathtrace_denoise;
+cvar_t	*r_pathtrace_debug;
+cvar_t	*r_pathtrace_composite;
 cvar_t	*r_vdbFog;
 cvar_t	*r_vdbFogBlend;
 cvar_t	*r_forwardPlus;
@@ -3968,6 +3988,36 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_rtxEntityCap, "0", "1024", CV_INTEGER );
 	ri.Cvar_SetDescription( r_rtxEntityCap, "Max RT_MODEL entities packed into the entity BLAS when \\r_rtxEntities 1 (latched)." );
 	ri.Cvar_SetGroup( r_rtxEntityCap, CVG_RENDERER );
+	r_pathtrace = ri.Cvar_Get( "r_pathtrace", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_pathtrace, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pathtrace,
+		"Experimental multi-bounce path trace over RTX world TLAS (USE_VULKAN_RTX). Requires r_rtx 1, r_rtxDemo 1, vid_restart. See docs/PATHTRACE_ARCH_BENCHMARK.md." );
+	ri.Cvar_SetGroup( r_pathtrace, CVG_RENDERER );
+	r_pathtrace_arch = ri.Cvar_Get( "r_pathtrace_arch", "megakernel", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_pathtrace_arch,
+		"Path trace scheduler: megakernel (single dispatch, in-shader bounce loop) or wavefront (per-bounce TraceRays + compact). Latched; vid_restart." );
+	ri.Cvar_SetGroup( r_pathtrace_arch, CVG_RENDERER );
+	r_pathtrace_bounces = ri.Cvar_Get( "r_pathtrace_bounces", "4", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pathtrace_bounces, "1", "8", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pathtrace_bounces, "Max path depth for r_pathtrace (1-8)." );
+	ri.Cvar_SetGroup( r_pathtrace_bounces, CVG_RENDERER );
+	r_pathtrace_samples = ri.Cvar_Get( "r_pathtrace_samples", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pathtrace_samples, "1", "64", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pathtrace_samples, "Per-pixel samples (megakernel averages; wavefront uses primary only)." );
+	ri.Cvar_SetGroup( r_pathtrace_samples, CVG_RENDERER );
+	r_pathtrace_denoise = ri.Cvar_Get( "r_pathtrace_denoise", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pathtrace_denoise, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pathtrace_denoise, "Denoise stub toggle (cost measurement placeholder; no OIDN yet)." );
+	ri.Cvar_SetGroup( r_pathtrace_denoise, CVG_RENDERER );
+	r_pathtrace_debug = ri.Cvar_Get( "r_pathtrace_debug", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pathtrace_debug, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pathtrace_debug,
+		"Debug view: 0=off, 1=bounce heatmap (megakernel), 2=wavefront alive count per bounce (developer)." );
+	ri.Cvar_SetGroup( r_pathtrace_debug, CVG_RENDERER );
+	r_pathtrace_composite = ri.Cvar_Get( "r_pathtrace_composite", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pathtrace_composite, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_pathtrace_composite, "Blend path trace output into HDR color (1=full replace via blit)." );
+	ri.Cvar_SetGroup( r_pathtrace_composite, CVG_RENDERER );
 	r_vdbFog = ri.Cvar_Get( "r_vdbFog", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_vdbFog, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_vdbFog, "Blend bound VDB fog density (\\vdb_bind_fog) into volumetric global density when uploaded to GPU. Requires \\r_volumetricFog 1." );
@@ -4119,6 +4169,21 @@ void R_Init( void ) {
 	R_SpriteProps_Init();
 	R_DecalProps_Init();
 	R_Upscale_Init();
+#ifdef USE_VULKAN
+	R_NDGI_Init();
+	R_NIV_Init();
+	R_NSLM_Init();
+	R_NIST_Init();
+	R_NVC_Init();
+	R_FSA_Init();
+	R_VFGI_Init();
+	R_RenderFormer_Init();
+	R_WPT_Init();
+	R_VUDA_Init();
+	R_GRTX_Init();
+	R_MGS_Init();
+	R_WSP_Init();
+#endif
 	R_ApplyRenderModeLatch();
 	ri.Printf( PRINT_ALL, "[VK] SH lighting: %s\n", r_shLighting && r_shLighting->integer ? "enabled" : "disabled" );
 	ri.Printf( PRINT_ALL, "[VK] SH world: %s\n", r_shWorldLighting && r_shWorldLighting->integer ? "enabled" : "disabled" );
@@ -4222,6 +4287,19 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 #endif
 
 #ifdef USE_VULKAN
+	R_NDGI_Shutdown();
+	R_NIV_Shutdown();
+	R_NSLM_Shutdown();
+	R_NIST_Shutdown();
+	R_NVC_Shutdown();
+	R_FSA_Shutdown();
+	R_VFGI_Shutdown();
+	R_RenderFormer_Shutdown();
+	R_WPT_Shutdown();
+	R_VUDA_Shutdown();
+	R_GRTX_Shutdown();
+	R_MGS_Shutdown();
+	R_WSP_Shutdown();
 	vk_release_resources();
 #endif
 
@@ -4372,6 +4450,14 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 	re.VectorFontActive = RE_VectorFontActive;
 	re.DrawVectorString = RE_DrawVectorString;
 	re.DrawVectorGlyph = RE_DrawVectorGlyph;
+
+#ifdef USE_VUDA
+	re.VudaActive = R_VUDA_Active;
+	re.VudaInteropReady = R_VUDA_InteropReady;
+	re.VudaGetExportBundle = R_VUDA_GetExportBundle;
+	re.VudaConsumeComputeWindow = vk_vuda_consume_compute_window;
+	re.VudaNotifyCudaComplete = vk_vuda_notify_cuda_complete;
+#endif
 
 	return &re;
 }

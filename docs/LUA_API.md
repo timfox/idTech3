@@ -152,3 +152,15 @@ CHOREO_EVT_ANIMATE = 1
 CHOREO_EVT_CAMERA_CUT = 4
 CHOREO_EVT_SOUND = 7
 ```
+
+## Engine.Save (disk v1)
+
+Persists under `save/engine_slot_<N>.json` with `protocolVersion`, `modVersion`, `label`, and `checksum`.
+
+```lua
+Engine.Save.write(slot, "checkpoint_name")   -- returns boolean
+local label = Engine.Save.read(slot)         -- returns string or nil
+local last = Engine.Save.lastSlot()          -- returns integer
+```
+
+Protocol version: `1` (see [g_engine_systems.h](../src/game/g_engine_systems.h)). Legacy `save/engine_slot_*.txt` still reads.

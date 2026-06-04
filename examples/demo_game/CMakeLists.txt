@@ -43,6 +43,23 @@ set(DEMO_MOD_FILES
 	"${DEMO_MOD_DIR}/demo_gameplay.cfg"
 	"${DEMO_MOD_DIR}/demo_usd.cfg"
 	"${DEMO_MOD_DIR}/demo_sprites.cfg"
+	"${DEMO_MOD_DIR}/demo_audio.cfg"
+	"${DEMO_MOD_DIR}/demo_sp_slice.cfg"
+	"${DEMO_MOD_DIR}/sound/soundevents.txt"
+	"${DEMO_MOD_DIR}/animgraph/idle_run.txt"
+	"${DEMO_MOD_DIR}/ndgi/demo.ndgi"
+	"${DEMO_MOD_DIR}/niv/demo.niv"
+	"${DEMO_MOD_DIR}/nslm/demo.nslm"
+	"${DEMO_MOD_DIR}/nist/demo.nist"
+	"${DEMO_MOD_DIR}/nvc/demo.nvc"
+	"${DEMO_MOD_DIR}/fsa/demo.fsa"
+	"${DEMO_MOD_DIR}/vfgi/demo.vfgi"
+	"${DEMO_MOD_DIR}/renderformer/demo.rfm"
+	"${DEMO_MOD_DIR}/vuda/demo.vuda"
+	"${DEMO_MOD_DIR}/grtx/demo.grtx"
+	"${DEMO_MOD_DIR}/mgs/demo.mgs"
+	"${DEMO_MOD_DIR}/wsp/demo.wsp"
+	"${CMAKE_SOURCE_DIR}/examples/demo_game/loc/en.loc"
 	"${DEMO_MOD_DIR}/models/parity_geom_mesh.usda"
 	"${DEMO_MOD_DIR}/models/parity_shade_preview.usda"
 	"${DEMO_MOD_DIR}/readme_demo.txt"
@@ -96,6 +113,21 @@ add_custom_command(
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/gfx/demo"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/fonts"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/models"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/sound"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/animgraph"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/loc"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/ndgi"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/niv"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/nslm"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/nist"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/nvc"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/fsa"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/vfgi"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/renderformer"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/vuda"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/grtx"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/mgs"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/wsp"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/autoexec.cfg" "${DEMO_PACK_STAGING}/autoexec.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -114,6 +146,38 @@ add_custom_command(
 		"${DEMO_MOD_DIR}/demo_usd.cfg" "${DEMO_PACK_STAGING}/demo_usd.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/demo_sprites.cfg" "${DEMO_PACK_STAGING}/demo_sprites.cfg"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/demo_audio.cfg" "${DEMO_PACK_STAGING}/demo_audio.cfg"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/demo_sp_slice.cfg" "${DEMO_PACK_STAGING}/demo_sp_slice.cfg"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/sound/soundevents.txt" "${DEMO_PACK_STAGING}/sound/soundevents.txt"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/animgraph/idle_run.txt" "${DEMO_PACK_STAGING}/animgraph/idle_run.txt"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/ndgi/demo.ndgi" "${DEMO_PACK_STAGING}/ndgi/demo.ndgi"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/niv/demo.niv" "${DEMO_PACK_STAGING}/niv/demo.niv"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/nslm/demo.nslm" "${DEMO_PACK_STAGING}/nslm/demo.nslm"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/nist/demo.nist" "${DEMO_PACK_STAGING}/nist/demo.nist"
+		"${DEMO_MOD_DIR}/nvc/demo.nvc" "${DEMO_PACK_STAGING}/nvc/demo.nvc"
+		"${DEMO_MOD_DIR}/fsa/demo.fsa" "${DEMO_PACK_STAGING}/fsa/demo.fsa"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/vfgi/demo.vfgi" "${DEMO_PACK_STAGING}/vfgi/demo.vfgi"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/renderformer/demo.rfm" "${DEMO_PACK_STAGING}/renderformer/demo.rfm"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/vuda/demo.vuda" "${DEMO_PACK_STAGING}/vuda/demo.vuda"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/grtx/demo.grtx" "${DEMO_PACK_STAGING}/grtx/demo.grtx"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/mgs/demo.mgs" "${DEMO_PACK_STAGING}/mgs/demo.mgs"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/wsp/demo.wsp" "${DEMO_PACK_STAGING}/wsp/demo.wsp"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${CMAKE_SOURCE_DIR}/examples/demo_game/loc/en.loc" "${DEMO_PACK_STAGING}/loc/en.loc"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/readme_demo.txt" "${DEMO_PACK_STAGING}/readme_demo.txt"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -164,7 +228,8 @@ add_custom_command(
 		"$<TARGET_FILE:demo_ui_skeleton>" "${DEMO_PACK_STAGING}/${DEMO_UI_DOT_ZIP}"
 	COMMAND ${CMAKE_COMMAND} -E chdir "${DEMO_PACK_STAGING}"
 		${CMAKE_COMMAND} -E tar cf "${DEMO_PK3}" --format=zip
-		autoexec.cfg gameinfo.txt demo_features.cfg demo_js.cfg demo_lua.cfg demo_csharp.cfg demo_gameplay.cfg demo_usd.cfg demo_sprites.cfg readme_demo.txt
+		autoexec.cfg gameinfo.txt demo_features.cfg demo_js.cfg demo_lua.cfg demo_csharp.cfg demo_gameplay.cfg demo_usd.cfg demo_sprites.cfg demo_audio.cfg demo_sp_slice.cfg readme_demo.txt
+		sound/soundevents.txt animgraph/idle_run.txt ndgi/demo.ndgi niv/demo.niv nslm/demo.nslm nist/demo.nist nvc/demo.nvc fsa/demo.fsa vfgi/demo.vfgi renderformer/demo.rfm vuda/demo.vuda grtx/demo.grtx mgs/demo.mgs wsp/demo.wsp loc/en.loc
 		scripts/js/demo_hooks.js scripts/js/README.txt
 		scripts/lua/demo_hooks.lua
 		scripts/csharp/IdTech3.Engine.cs scripts/csharp/demo_hooks.cs

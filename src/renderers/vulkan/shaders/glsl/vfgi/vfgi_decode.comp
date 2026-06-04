@@ -1,0 +1,170 @@
+#version 450
+/*
+ * Vertex Features Neural GI — interpolate vertex features from spatial index, MLP decode.
+ */
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+struct VertexRec {
+	vec4 pos;
+	vec4 feat;
+};
+
+struct GridCell {
+	uint count;
+	uint i0;
+	uint i1;
+	uint i2;
+	uint i3;
+};
+
+layout(std430, set = 0, binding = 0) readonly buffer Vertices {
+	VertexRec v[];
+} verts;
+
+layout(std430, set = 0, binding = 1) readonly buffer Grid {
+	GridCell cells[];
+} grid;
+
+layout(std430, set = 0, binding = 2) readonly buffer VfgiWeights {
+	float data[];
+} weights;
+
+layout(set = 0, binding = 3) uniform sampler2D depthTex;
+layout(set = 0, binding = 4) uniform sampler2D normalTex;
+layout(rgba16f, set = 0, binding = 5) uniform writeonly image2D irradianceOut;
+
+layout(push_constant) uniform VfgiDecodePush {
+	mat4 invViewProj;
+	vec4 worldMin;
+	vec4 worldMax;
+	uvec3 gridDim;
+	uint featureDim;
+	uint hiddenDim;
+	uint useGBufferNormal;
+	uint hasGBuffer;
+	uvec2 extent;
+	float strength;
+} pc;
+
+float relu(float x) { return max(x, 0.0); }
+float sigmoid(float x) { return 1.0 / (1.0 + exp(-x)); }
+
+vec3 worldPosFromDepth(vec2 uv, float depth) {
+	vec4 clip = vec4(uv * 2.0 - 1.0, depth, 1.0);
+	vec4 world = pc.invViewProj * clip;
+	return world.xyz / max(world.w, 1e-6);
+}
+
+vec3 decodeNormal(vec2 uv) {
+	if (pc.hasGBuffer != 0u && pc.useGBufferNormal != 0u) {
+		vec3 n = texture(normalTex, uv).xyz * 2.0 - 1.0;
+		float len = length(n);
+		if (len > 0.01) {
+			return n / len;
+		}
+	}
+	return vec3(0.0, 0.0, 1.0);
+}
+
+vec3 mlpDecode(vec4 feat) {
+	int h = int(pc.hiddenDim);
+	int f = int(pc.featureDim);
+	float hidden[32];
+	int wBase = 0;
+	int i;
+	int c;
+	float sum;
+
+	for (i = 0; i < 32; i++) {
+		hidden[i] = 0.0;
+	}
+	for (i = 0; i < h && i < 32; i++) {
+		sum = weights.data[wBase + h * f + i];
+		int j;
+		for (j = 0; j < f && j < 4; j++) {
+			sum += weights.data[wBase + i * f + j] * feat[j];
+		}
+		hidden[i] = relu(sum);
+	}
+	wBase += h * f + h;
+	vec3 rgb = vec3(0.0);
+	for (c = 0; c < 3; c++) {
+		sum = weights.data[wBase + 3 * h + c];
+		for (i = 0; i < h && i < 32; i++) {
+			sum += weights.data[wBase + c * h + i] * hidden[i];
+		}
+		rgb[c] = sigmoid(sum);
+	}
+	return rgb * pc.strength;
+}
+
+vec4 interpFeatures(vec3 worldPos) {
+	vec3 span = pc.worldMax.xyz - pc.worldMin.xyz;
+	vec3 rel = (worldPos - pc.worldMin.xyz) / max(span, vec3(1e-3));
+	uvec3 g = pc.gridDim;
+	uint cx = min(uint(rel.x * float(g.x)), g.x - 1u);
+	uint cy = min(uint(rel.y * float(g.y)), g.y - 1u);
+	uint cz = min(uint(rel.z * float(g.z)), g.z - 1u);
+
+	float wSum = 0.0;
+	vec4 feat = vec4(0.0);
+	int dx;
+	int dy;
+	int dz;
+	for (dz = -1; dz <= 1; dz++) {
+		for (dy = -1; dy <= 1; dy++) {
+			for (dx = -1; dx <= 1; dx++) {
+				int nx = int(cx) + dx;
+				int ny = int(cy) + dy;
+				int nz = int(cz) + dz;
+				if (nx < 0 || ny < 0 || nz < 0 ||
+					nx >= int(g.x) || ny >= int(g.y) || nz >= int(g.z)) {
+					continue;
+				}
+				uint cellId = uint(nx) + uint(ny) * g.x + uint(nz) * g.x * g.y;
+				GridCell cell = grid.cells[cellId];
+				uint k;
+				for (k = 0u; k < min(cell.count, 4u); k++) {
+					uint vi = (k == 0u) ? cell.i0 : (k == 1u) ? cell.i1 : (k == 2u) ? cell.i2 : cell.i3;
+					if (vi == 0xFFFFFFFFu) {
+						continue;
+					}
+					vec3 vp = verts.v[vi].pos.xyz;
+					float d = length(worldPos - vp);
+					float w = 1.0 / (d * d + 0.05);
+					feat += verts.v[vi].feat * w;
+					wSum += w;
+				}
+			}
+		}
+	}
+	if (wSum > 1e-6) {
+		feat /= wSum;
+	}
+	return feat;
+}
+
+void main() {
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if (pix.x >= pc.extent.x || pix.y >= pc.extent.y) {
+		return;
+	}
+
+	vec2 uv = (vec2(pix) + 0.5) / vec2(pc.extent);
+	float depth = texture(depthTex, uv).r;
+
+	if (depth <= 0.0 || depth >= 1.0) {
+		imageStore(irradianceOut, ivec2(pix), vec4(0.0));
+		return;
+	}
+
+	vec3 worldPos = worldPosFromDepth(uv, depth);
+	if (any(lessThan(worldPos, pc.worldMin.xyz)) || any(greaterThan(worldPos, pc.worldMax.xyz))) {
+		imageStore(irradianceOut, ivec2(pix), vec4(0.0));
+		return;
+	}
+
+	vec4 feat = interpFeatures(worldPos);
+	vec3 irr = mlpDecode(feat);
+	imageStore(irradianceOut, ivec2(pix), vec4(irr, 1.0));
+}

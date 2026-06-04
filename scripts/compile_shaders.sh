@@ -116,6 +116,8 @@ glslang = Path(os.environ["GLSLANG_VALIDATOR"])
 bindings = []
 task_counter = 0
 rtx_spv_bytes = {}
+grtx_spv_bytes = {}
+pathtrace_spv_bytes = {}
 
 def append_shader_data(spv_path, array_name):
     data = spv_path.read_bytes()
@@ -130,7 +132,7 @@ def append_shader_data(spv_path, array_name):
             f.write("\n")
         f.write("};\n")
 
-def compile_shader(stage, source, array_name, binding_expr=None, defines="", rtx_collect=False):
+def compile_shader(stage, source, array_name, binding_expr=None, defines="", rtx_collect=False, grtx_collect=False, pathtrace_collect=False):
     global task_counter
     input_path = glsl_dir / source
     if not input_path.is_file():
@@ -145,6 +147,10 @@ def compile_shader(stage, source, array_name, binding_expr=None, defines="", rtx
     subprocess.run(cmd, check=True)
     if rtx_collect:
         rtx_spv_bytes[array_name] = tmp_spv.read_bytes()
+    if grtx_collect:
+        grtx_spv_bytes[array_name] = tmp_spv.read_bytes()
+    if pathtrace_collect:
+        pathtrace_spv_bytes[array_name] = tmp_spv.read_bytes()
     append_shader_data(tmp_spv, array_name)
     if binding_expr:
         bindings.append((binding_expr, array_name))
@@ -321,6 +327,35 @@ compile_shader("comp", "forward_plus_tile_cull.comp", "forward_plus_tile_cull_cs
 compile_shader("comp", "deferred_gbuffer_fill.comp", "deferred_gbuffer_fill_cs", binding_expr="vk.modules.deferred_gbuffer_fill_cs")
 compile_shader("frag", "deferred_gbuffer_debug.frag", "deferred_gbuffer_debug_fs", binding_expr="vk.modules.deferred_gbuffer_debug_fs")
 compile_shader("comp", "deferred_lighting.comp", "deferred_lighting_cs", binding_expr="vk.modules.deferred_lighting_cs")
+compile_shader("comp", "ndgi/ndgi_decompress.comp", "ndgi_decompress_cs", binding_expr="vk.modules.ndgi_decompress_cs")
+compile_shader("comp", "niv/niv_shade.comp", "niv_shade_cs", binding_expr="vk.modules.niv_shade_cs")
+compile_shader("comp", "niv/niv_composite.comp", "niv_composite_cs", binding_expr="vk.modules.niv_composite_cs")
+compile_shader("comp", "nslm/nslm_froxel.comp", "nslm_froxel_cs", binding_expr="vk.modules.nslm_froxel_cs")
+compile_shader("comp", "nist/nist_refine.comp", "nist_refine_cs", binding_expr="vk.modules.nist_refine_cs")
+compile_shader("comp", "nist/nist_composite.comp", "nist_composite_cs", binding_expr="vk.modules.nist_composite_cs")
+
+compile_shader("comp", "nvc/nvc_cache.comp", "nvc_cache_cs", binding_expr="vk.modules.nvc_cache_cs")
+compile_shader("comp", "nvc/nvc_restir.comp", "nvc_restir_cs", binding_expr="vk.modules.nvc_restir_cs")
+compile_shader("comp", "nvc/nvc_composite.comp", "nvc_composite_cs", binding_expr="vk.modules.nvc_composite_cs")
+
+compile_shader("comp", "fsa/fsa_importance.comp", "fsa_importance_cs", binding_expr="vk.modules.fsa_importance_cs")
+compile_shader("comp", "fsa/fsa_denoise.comp", "fsa_denoise_cs", binding_expr="vk.modules.fsa_denoise_cs")
+compile_shader("comp", "vfgi/vfgi_decode.comp", "vfgi_decode_cs", binding_expr="vk.modules.vfgi_decode_cs")
+compile_shader("comp", "vfgi/vfgi_composite.comp", "vfgi_composite_cs", binding_expr="vk.modules.vfgi_composite_cs")
+compile_shader("comp", "renderformer/rf_transport.comp", "rf_transport_cs", binding_expr="vk.modules.rf_transport_cs")
+compile_shader("comp", "renderformer/rf_decode.comp", "rf_decode_cs", binding_expr="vk.modules.rf_decode_cs")
+compile_shader("comp", "renderformer/rf_composite.comp", "rf_composite_cs", binding_expr="vk.modules.rf_composite_cs")
+compile_shader("comp", "wpt/wpt_enqueue.comp", "wpt_enqueue_cs", binding_expr="vk.modules.wpt_enqueue_cs")
+compile_shader("comp", "wpt/wpt_wave.comp", "wpt_wave_cs", binding_expr="vk.modules.wpt_wave_cs")
+compile_shader("comp", "wpt/wpt_composite.comp", "wpt_composite_cs", binding_expr="vk.modules.wpt_composite_cs")
+compile_shader("comp", "mgs/mgs_prepare.comp", "mgs_prepare_cs", binding_expr="vk.modules.mgs_prepare_cs")
+compile_shader("comp", "mgs/mgs_splat.comp", "mgs_splat_cs", binding_expr="vk.modules.mgs_splat_cs")
+compile_shader("comp", "mgs/mgs_composite.comp", "mgs_composite_cs", binding_expr="vk.modules.mgs_composite_cs")
+compile_shader("comp", "wsp/wsp_clear_tiles.comp", "wsp_clear_tiles_cs", binding_expr="vk.modules.wsp_clear_tiles_cs")
+compile_shader("comp", "wsp/wsp_prepare.comp", "wsp_prepare_cs", binding_expr="vk.modules.wsp_prepare_cs")
+compile_shader("comp", "wsp/wsp_tile_bin.comp", "wsp_tile_bin_cs", binding_expr="vk.modules.wsp_tile_bin_cs")
+compile_shader("comp", "wsp/wsp_tile_draw.comp", "wsp_tile_draw_cs", binding_expr="vk.modules.wsp_tile_draw_cs")
+compile_shader("comp", "wsp/wsp_composite.comp", "wsp_composite_cs", binding_expr="vk.modules.wsp_composite_cs")
 compile_shader("frag", "deferred_lighting_composite.frag", "deferred_lighting_composite_fs", binding_expr="vk.modules.deferred_lighting_composite_fs")
 compile_shader("vert", "terrain/terrain.vert", "terrain_vs", binding_expr="vk.modules.terrain_vs")
 compile_shader("frag", "terrain/terrain.frag", "terrain_fs", binding_expr="vk.modules.terrain_fs")
@@ -329,6 +364,16 @@ compile_shader("frag", "terrain/terrain.frag", "terrain_fs", binding_expr="vk.mo
 compile_shader("rgen", "rtx_demo.rgen", "rtx_demo_rgen_spv", rtx_collect=True)
 compile_shader("rmiss", "rtx_demo.rmiss", "rtx_demo_rmiss_spv", rtx_collect=True)
 compile_shader("rchit", "rtx_demo.rchit", "rtx_demo_rchit_spv", rtx_collect=True)
+
+compile_shader("rgen", "grtx/grtx_trace.rgen", "grtx_trace_rgen_spv", grtx_collect=True)
+compile_shader("rmiss", "grtx/grtx_miss.rmiss", "grtx_miss_rmiss_spv", grtx_collect=True)
+compile_shader("rchit", "grtx/grtx_gaussian.rchit", "grtx_gaussian_rchit_spv", grtx_collect=True)
+
+compile_shader("rgen", "pt_mega.rgen", "pt_mega_rgen_spv", pathtrace_collect=True)
+compile_shader("rgen", "pt_wave.rgen", "pt_wave_rgen_spv", pathtrace_collect=True)
+compile_shader("rmiss", "pt_miss.rmiss", "pt_miss_rmiss_spv", pathtrace_collect=True)
+compile_shader("rchit", "pt_hit.rchit", "pt_hit_rchit_spv", pathtrace_collect=True)
+compile_shader("comp", "pt_wave_compact.comp", "pt_wave_compact_cs", pathtrace_collect=True)
 
 def write_vk_rtx_demo_spirv_inc():
     """Emit src/renderers/vulkan/vk_rtx_demo_spirv.inc for USE_VULKAN_RTX embedded SPIR-V."""
@@ -362,6 +407,74 @@ def write_vk_rtx_demo_spirv_inc():
     print(f"Wrote {out_path}")
 
 write_vk_rtx_demo_spirv_inc()
+
+def write_vk_grtx_spirv_inc():
+    """Emit src/renderers/vulkan/vk_grtx_spirv.inc for USE_VULKAN_RTX GRTX embedded SPIR-V."""
+    root = Path(os.environ.get("PROJECT_ROOT", "")).resolve()
+    if not root or not root.is_dir():
+        sys.exit("PROJECT_ROOT must be set for GRTX SPIR-V embed")
+    out_path = root / "src/renderers/vulkan/vk_grtx_spirv.inc"
+    mapping = [
+        ("grtx_trace_rgen_spv", "vk_grtx_trace_rgen_spv", "VK_GRTX_TRACE_RGEN_SPV_SIZE"),
+        ("grtx_miss_rmiss_spv", "vk_grtx_miss_rmiss_spv", "VK_GRTX_MISS_RMISS_SPV_SIZE"),
+        ("grtx_gaussian_rchit_spv", "vk_grtx_gaussian_rchit_spv", "VK_GRTX_GAUSSIAN_RCHIT_SPV_SIZE"),
+    ]
+    lines = []
+    lines.append("/* Auto-generated by scripts/compile_shaders.sh — do not edit by hand */")
+    lines.append("")
+    for src_name, c_array, size_macro in mapping:
+        if src_name not in grtx_spv_bytes:
+            sys.exit(f"Missing GRTX SPIR-V blob for {src_name}")
+        data = grtx_spv_bytes[src_name]
+        lines.append(f"/* {src_name}.spv {len(data)} bytes */")
+        lines.append(f"static const uint8_t {c_array}[] = {{")
+        for offset in range(0, len(data), 16):
+            chunk = data[offset:offset + 16]
+            bytes_text = ", ".join(f"0x{b:02X}" for b in chunk)
+            suffix = "," if offset + 16 < len(data) else ""
+            lines.append(f"\t{bytes_text}{suffix}")
+        lines.append("};")
+        lines.append(f"#define {size_macro} ({len(data)}u)")
+        lines.append("")
+    out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"Wrote {out_path}")
+
+write_vk_grtx_spirv_inc()
+
+def write_vk_pathtrace_spirv_inc():
+    """Emit src/renderers/vulkan/vk_pathtrace_spirv.inc for USE_VULKAN_RTX path trace experiment."""
+    root = Path(os.environ.get("PROJECT_ROOT", "")).resolve()
+    if not root or not root.is_dir():
+        sys.exit("PROJECT_ROOT must be set for pathtrace SPIR-V embed")
+    out_path = root / "src/renderers/vulkan/vk_pathtrace_spirv.inc"
+    mapping = [
+        ("pt_mega_rgen_spv", "vk_pt_mega_rgen_spv", "VK_PT_MEGA_RGEN_SPV_SIZE"),
+        ("pt_wave_rgen_spv", "vk_pt_wave_rgen_spv", "VK_PT_WAVE_RGEN_SPV_SIZE"),
+        ("pt_miss_rmiss_spv", "vk_pt_miss_rmiss_spv", "VK_PT_MISS_RMISS_SPV_SIZE"),
+        ("pt_hit_rchit_spv", "vk_pt_hit_rchit_spv", "VK_PT_HIT_RCHIT_SPV_SIZE"),
+        ("pt_wave_compact_cs", "vk_pt_wave_compact_cs_spv", "VK_PT_WAVE_COMPACT_CS_SPV_SIZE"),
+    ]
+    lines = []
+    lines.append("/* Auto-generated by scripts/compile_shaders.sh — do not edit by hand */")
+    lines.append("")
+    for src_name, c_array, size_macro in mapping:
+        if src_name not in pathtrace_spv_bytes:
+            sys.exit(f"Missing PathTrace SPIR-V blob for {src_name}")
+        data = pathtrace_spv_bytes[src_name]
+        lines.append(f"/* {src_name}.spv {len(data)} bytes */")
+        lines.append(f"static const uint8_t {c_array}[] = {{")
+        for offset in range(0, len(data), 16):
+            chunk = data[offset:offset + 16]
+            bytes_text = ", ".join(f"0x{b:02X}" for b in chunk)
+            suffix = "," if offset + 16 < len(data) else ""
+            lines.append(f"\t{bytes_text}{suffix}")
+        lines.append("};")
+        lines.append(f"#define {size_macro} ({len(data)}u)")
+        lines.append("")
+    out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"Wrote {out_path}")
+
+write_vk_pathtrace_spirv_inc()
 
 with binding_file.open("w") as f:
     f.write("// this file is autogenerated during shader compilation\n")

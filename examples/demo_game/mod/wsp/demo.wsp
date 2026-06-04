@@ -1,0 +1,5 @@
+# WebSplatter demo manifest (v1: procedural splats; WGSL export reserved)
+version 1
+tier 1
+tileSize 16
+maxPerTile 16

@@ -1,0 +1,94 @@
+#version 450
+/*
+ * RenderFormer scaffold — view-independent triangle-token transport into per-cell latent.
+ */
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+struct TriTok {
+	vec4 center;
+	vec4 normal;
+	vec4 albedo;
+};
+
+struct GridCell {
+	uint count;
+	uint i0;
+	uint i1;
+	uint i2;
+	uint i3;
+};
+
+layout(std430, set = 0, binding = 0) readonly buffer Tokens {
+	TriTok tri[];
+} tokens;
+
+layout(std430, set = 0, binding = 1) readonly buffer Grid {
+	GridCell cells[];
+} grid;
+
+layout(std430, set = 0, binding = 2) buffer Latent {
+	vec4 latent[];
+} latentOut;
+
+layout(push_constant) uniform RfTransportPush {
+	vec4 worldMin;
+	vec4 worldMax;
+	uvec3 gridDim;
+	uint triCount;
+	uint hiddenDim;
+	float strength;
+} pc;
+
+float attnWeight(vec3 cellCenter, TriTok t) {
+	float d = length(cellCenter - t.center.xyz);
+	float area = max(t.center.w, 1e-4);
+	return area / (d * d + 0.25);
+}
+
+void main() {
+	uint cellCount = pc.gridDim.x * pc.gridDim.y * pc.gridDim.z;
+	uint cid = gl_GlobalInvocationID.x;
+	if (cid >= cellCount) {
+		return;
+	}
+
+	vec3 span = pc.worldMax.xyz - pc.worldMin.xyz;
+	uint gx = pc.gridDim.x;
+	uint gy = pc.gridDim.y;
+	uint gz = pc.gridDim.z;
+	uint cz = cid / (gx * gy);
+	uint rem = cid - cz * gx * gy;
+	uint cy = rem / gx;
+	uint cx = rem - cy * gx;
+
+	vec3 cellCenter = pc.worldMin.xyz + vec3(
+		(float(cx) + 0.5) * span.x / float(gx),
+		(float(cy) + 0.5) * span.y / float(gy),
+		(float(cz) + 0.5) * span.z / float(gz) );
+
+	GridCell cell = grid.cells[cid];
+	vec4 accum = vec4(0.0);
+	float wSum = 0.0;
+	uint k;
+
+	for (k = 0u; k < min(cell.count, 4u); k++) {
+		uint ti = (k == 0u) ? cell.i0 : (k == 1u) ? cell.i1 : (k == 2u) ? cell.i2 : cell.i3;
+		if (ti == 0xFFFFFFFFu || ti >= pc.triCount) {
+			continue;
+		}
+		TriTok t = tokens.tri[ti];
+		float w = attnWeight(cellCenter, t);
+		vec3 n = normalize(t.normal.xyz);
+		float bounce = 0.35 + 0.45 * max(n.z, 0.0);
+		accum.rgb += t.albedo.rgb * bounce * w;
+		accum.a += (t.normal.w * 0.5 + t.albedo.w * 0.5) * w;
+		wSum += w;
+	}
+
+	if (wSum > 1e-6) {
+		accum /= wSum;
+	} else {
+		accum = vec4(0.12, 0.14, 0.18, 0.5);
+	}
+	latentOut.latent[cid] = accum * pc.strength;
+}

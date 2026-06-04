@@ -1,0 +1,5 @@
+# idtech3_demo sound events (snd_mixer.c)
+# name bus volume samplePath
+ui_click ui 1.0 sound/misc/menu1.wav
+ui_back ui 0.9 sound/misc/menu3.wav
+ambient_ping amb 0.6 sound/misc/menu2.wav

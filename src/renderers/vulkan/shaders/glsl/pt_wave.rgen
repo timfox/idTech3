@@ -1,0 +1,120 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+
+layout( location = 0 ) rayPayloadEXT vec4 ptPayload;
+
+struct PtSlot {
+	vec4 origin;   /* xyz + alive */
+	vec4 direction; /* xyz + unused */
+	vec4 throughput;
+	vec4 radiance; /* rgb accumulated + pad */
+};
+
+layout( set = 0, binding = 0 ) uniform accelerationStructureEXT topLevelAS;
+layout( set = 0, binding = 1, rgba16f ) uniform writeonly image2D outImage;
+
+layout( set = 0, binding = 2, std140 ) uniform PtFrame {
+	mat4 invViewProj;
+	vec4 viewOrigin;
+	vec4 outputSize;
+	vec4 traceParams;
+} pt;
+
+layout( set = 0, binding = 3 ) uniform sampler2D depthTex;
+
+layout( set = 0, binding = 4, std430 ) buffer PtQueue {
+	PtSlot slots[];
+};
+
+const float PI = 3.14159265;
+
+float hash21( vec2 p )
+{
+	return fract( sin( dot( p, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
+}
+
+vec3 cosineSample( vec3 n, vec2 u )
+{
+	float phi = 2.0 * PI * u.x;
+	float cosTheta = sqrt( max( u.y, 0.0 ) );
+	float sinTheta = sqrt( max( 1.0 - cosTheta * cosTheta, 0.0 ) );
+	vec3 up = abs( n.z ) < 0.999 ? vec3( 0.0, 0.0, 1.0 ) : vec3( 0.0, 1.0, 0.0 );
+	vec3 t = normalize( cross( up, n ) );
+	vec3 b = cross( n, t );
+	return normalize( t * cos( phi ) * sinTheta + b * sin( phi ) * sinTheta + n * cosTheta );
+}
+
+vec3 tracePrimary( vec3 ro, vec3 rd, out float hitFlag )
+{
+	ptPayload = vec4( 0.0 );
+	traceRayEXT( topLevelAS, gl_RayFlagsOpaqueEXT, 0xFFu, 0u, 0u, 0u, ro, 0.01, rd, 1.0e5, 0 );
+	hitFlag = ptPayload.w;
+	return ptPayload.rgb;
+}
+
+void main()
+{
+	uvec2 lid = gl_LaunchIDEXT.xy;
+	uint idx = lid.x + lid.y * uint( max( pt.outputSize.x, 1.0 ) );
+	vec2 extent = max( pt.outputSize.xy, vec2( 1.0 ) );
+	vec2 uv = ( vec2( lid ) + vec2( 0.5 ) ) / extent;
+	int waveBounce = int( floor( pt.outputSize.w + 0.5 ) );
+	int maxBounces = clamp( int( floor( pt.traceParams.x + 0.5 ) ), 1, 8 );
+
+	if ( waveBounce == 0 ) {
+		float d = textureLod( depthTex, uv, 0.0 ).r;
+		vec3 ro = pt.viewOrigin.xyz;
+		vec3 rd;
+		if ( d <= 0.0 || d >= 1.0 ) {
+			vec4 farClip = vec4( uv * 2.0 - 1.0, 0.0, 1.0 );
+			vec4 farW = pt.invViewProj * farClip;
+			farW /= max( abs( farW.w ), 1e-6 );
+			rd = normalize( farW.xyz - ro );
+		} else {
+			vec4 clip = vec4( uv * 2.0 - 1.0, d, 1.0 );
+			vec4 worldPos = pt.invViewProj * clip;
+			worldPos /= max( abs( worldPos.w ), 1e-6 );
+			rd = normalize( worldPos.xyz - ro );
+		}
+		slots[idx].origin = vec4( ro, 1.0 );
+		slots[idx].direction = vec4( rd, 0.0 );
+		slots[idx].throughput = vec4( 1.0 );
+		slots[idx].radiance = vec4( 0.0 );
+		return;
+	}
+
+	if ( slots[idx].origin.w < 0.5 ) {
+		return;
+	}
+
+	vec3 ro = slots[idx].origin.xyz;
+	vec3 rd = slots[idx].direction.xyz;
+	vec3 tp = slots[idx].throughput.xyz;
+	vec3 rad = slots[idx].radiance.xyz;
+	float hitFlag;
+	vec3 hitRgb = tracePrimary( ro, rd, hitFlag );
+
+	if ( hitFlag < 0.5 ) {
+		rad += tp * hitRgb;
+		slots[idx].origin.w = 0.0;
+		slots[idx].radiance = vec4( rad, 1.0 );
+		imageStore( outImage, ivec2( lid ), vec4( rad, 1.0 ) );
+		return;
+	}
+
+	rad += tp * hitRgb * 0.12;
+	tp *= hitRgb;
+	vec2 ru = vec2( hash21( vec2( lid ) + pt.traceParams.zz ), hash21( vec2( lid.yx ) + pt.traceParams.z * 0.17 ) );
+	rd = cosineSample( vec3( 0.0, 1.0, 0.0 ), ru );
+	ro = ro + rd * 0.05;
+
+	slots[idx].origin = vec4( ro, 1.0 );
+	slots[idx].direction = vec4( rd, 0.0 );
+	slots[idx].throughput = vec4( tp, float( waveBounce ) );
+	slots[idx].radiance = vec4( rad, 0.0 );
+
+	if ( waveBounce >= maxBounces ) {
+		imageStore( outImage, ivec2( lid ), vec4( rad, 1.0 ) );
+		slots[idx].origin.w = 0.0;
+	}
+}

@@ -1040,6 +1040,13 @@ OPTION(USE_DTLS "Enable DTLS encryption for game network traffic (OpenSSL)" ON)
 OPTION(USE_STEAM "Enable Steam API (achievements, overlay, rich presence, Deck detection)" OFF)
 OPTION(USE_STEAM_NETWORKING "Enable Steam Datagram Relay (SDR) transport" OFF)
 OPTION(USE_VULKAN_RTX "Enable Vulkan ray tracing (VK_KHR_ray_tracing_*); requires RT-capable GPU" OFF)
+OPTION(USE_VUDA "CUDA-Vulkan spatial multiplexing interop (Linux + NVIDIA; KHR external memory fd)" OFF)
+if(USE_VUDA)
+  if(APPLE OR WIN32)
+    message(WARNING "USE_VUDA: primary target is Linux+NVIDIA; disabling on this platform.")
+    set(USE_VUDA OFF CACHE BOOL "" FORCE)
+  endif()
+endif()
 OPTION(USE_METAL_RENDERER "Build native Metal renderer (Apple only)" OFF)
 OPTION(USE_DXR_RENDERER "Build DirectX 12 + DXR renderer (Windows only)" OFF)
 
@@ -1711,6 +1718,13 @@ if(ANDROID)
 endif()
 # --- End modern video codec support ---
 
+if(USE_VUDA)
+  list(APPEND CLIENT_SRCS
+    src/client/cl_vuda.c
+    src/vuda/vuda_cuda.c
+  )
+endif()
+
 #ADD_LIBRARY(client OBJECT ${CLIENT_SRCS})
 
 # jpeg
@@ -1886,6 +1900,10 @@ IF(USE_RENDERER_DLOPEN)
 	  target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_VULKAN_RTX=1)
 	  message(STATUS "Vulkan RTX: ray tracing extensions will be requested when available")
 	endif()
+	if(USE_VUDA)
+	  target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_VUDA=1)
+	  message(STATUS "VUDA: CUDA-Vulkan interop enabled (r_vuda 1 + cl_vuda 1 + vid_restart)")
+	endif()
 	add_dependencies(${RENDERER_PREFIX}_vulkan${RENDEXT} vk_shaders_autogen)
 	IF(BUILD_FREETYPE)
 		target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE idtech3_freetype)
@@ -1921,6 +1939,9 @@ ELSE()
 	TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan PRIVATE RENDERER_VULKAN)
 	if(USE_VULKAN_RTX)
 	  target_compile_definitions(${RENDERER_PREFIX}_vulkan PRIVATE USE_VULKAN_RTX=1)
+	endif()
+	if(USE_VUDA)
+	  target_compile_definitions(${RENDERER_PREFIX}_vulkan PRIVATE USE_VUDA=1)
 	endif()
 	add_dependencies(${RENDERER_PREFIX}_vulkan vk_shaders_autogen)
 	IF(BUILD_FREETYPE)
@@ -2221,6 +2242,14 @@ if(TARGET q3ui)
 	TARGET_COMPILE_DEFINITIONS(q3ui PRIVATE USE_VULKAN_API)
 endif()
 TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_VULKAN_API)
+
+if(USE_VUDA)
+  target_compile_definitions(client PRIVATE USE_VUDA=1)
+  if(USE_RENDERER_DLOPEN)
+    target_link_libraries(client PRIVATE ${CMAKE_DL_LIBS})
+  endif()
+  message(STATUS "VUDA client: cl_vuda + vuda_cuda (dlopen libcudart)")
+endif()
 
 if(USE_IMGUI AND NOT APPLE)
 	if(TARGET client)
@@ -2532,6 +2561,27 @@ add_test(NAME test_demo_game_pk3
 set_tests_properties(test_demo_game_pk3 PROPERTIES
 	LABELS "scripts;validation;examples"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_demo_game_pk3.sh")
+
+add_test(NAME test_check_loc
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_check_loc.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_check_loc PROPERTIES
+	LABELS "scripts;validation;i18n"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_check_loc.sh;${CMAKE_SOURCE_DIR}/scripts/check_loc_keys.sh")
+
+add_test(NAME test_validate_assets
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_validate_assets.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_validate_assets PROPERTIES
+	LABELS "scripts;validation;assets"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_validate_assets.sh;${CMAKE_SOURCE_DIR}/scripts/validate_assets.sh")
+
+add_test(NAME test_crash_report
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_crash_report.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_crash_report PROPERTIES
+	LABELS "scripts;validation;crash"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_crash_report.sh")
 
 add_test(NAME test_init_optional_submodules
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_init_optional_submodules.sh

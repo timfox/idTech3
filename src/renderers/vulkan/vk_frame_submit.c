@@ -29,6 +29,9 @@ Extracted from vk.c for incremental modularization.
 #include "vk_volumetric_internal.h"
 #include "vk_sim_render_debug.h"
 #include "vk_rtx.h"
+#include "vk_pathtrace.h"
+#include "vk_grtx.h"
+#include "vk_vuda.h"
 
 #ifdef __ANDROID__
 #include "../../platform/android/android_surface_glue.h"
@@ -144,7 +147,10 @@ void vk_begin_frame( void )
 
 #ifdef USE_VULKAN_RTX
 	vk_rtx_frame_begin();
+	vk_grtx_frame_begin();
+	vk_pathtrace_frame_begin();
 #endif
+	vk_vuda_frame_begin();
 
 	if ( vk.cmd->waitForFence ) {
 		vk.cmd->waitForFence = qfalse;
@@ -399,6 +405,7 @@ void vk_end_frame( void )
 	}
 	vk.cmd->waitForFence = qtrue;
 	vk_temporal_commit_frame_state();
+	vk_vuda_after_queue_submit();
 
 	backEnd.pc.msec = ri.Milliseconds() - backEnd.pc.msec;
 

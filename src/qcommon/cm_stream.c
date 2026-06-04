@@ -15,6 +15,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 static qboolean s_sectorLoaded[CM_STREAM_SECTORS];
 static cvar_t *cm_stream;
 static cvar_t *sv_sectorURL;
+static cvar_t *cl_sectorPrefetch;
 
 void CM_Stream_Init( void ) {
 	cm_stream = Cvar_Get( "cm_stream", "0", CVAR_ARCHIVE );
@@ -23,6 +24,9 @@ void CM_Stream_Init( void ) {
 	sv_sectorURL = Cvar_Get( "sv_sectorURL", "", CVAR_ARCHIVE );
 	Cvar_SetDescription( sv_sectorURL,
 		"Base URL for sector pk3 autodownload (see docs/CURL_NETWORKING.md)." );
+	cl_sectorPrefetch = Cvar_Get( "cl_sectorPrefetch", "1", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_sectorPrefetch,
+		"Prefetch adjacent sector pk3 URLs when crossing boundaries (requires sv_sectorURL)." );
 	Com_Memset( s_sectorLoaded, 0, sizeof( s_sectorLoaded ) );
 	if ( cm_stream->integer ) {
 		Com_Printf( "[cm_stream] cm_stream=1 (sector BSP streaming v1)\n" );
@@ -70,6 +74,22 @@ qboolean CM_Stream_LoadSector( int cellX, int cellY ) {
 	CM_LoadMap( mapName, qtrue, &checksum );
 	s_sectorLoaded[idx] = qtrue;
 	Com_Printf( "[cm_stream] loaded sector %d,%d (%s)\n", cellX, cellY, mapName );
+
+	if ( cl_sectorPrefetch && cl_sectorPrefetch->integer ) {
+		static const int neighbors[8][2] = {
+			{ 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 },
+			{ 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 }
+		};
+		int n;
+
+		for ( n = 0; n < 8; ++n ) {
+			int nx = cellX + neighbors[n][0];
+			int ny = cellY + neighbors[n][1];
+			if ( !CM_Stream_IsSectorLoaded( nx, ny ) ) {
+				CM_Stream_PrefetchSectorPk3( nx, ny );
+			}
+		}
+	}
 	return qtrue;
 }
 
