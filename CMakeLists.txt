@@ -2528,6 +2528,15 @@ add_test(NAME test_botlib_bounded_strings
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_botlib_bounded_strings PROPERTIES
 	LABELS "unit;scripts;validation")
+
+if(Python3_Interpreter_FOUND)
+	add_test(NAME test_vulkan_forward_plus_pbr_guards
+		COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/scripts/test_vulkan_forward_plus_pbr_guards.py ${CMAKE_SOURCE_DIR}
+		WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+	set_tests_properties(test_vulkan_forward_plus_pbr_guards PROPERTIES
+		LABELS "unit;scripts;validation;renderer"
+		REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_vulkan_forward_plus_pbr_guards.py")
+endif()
 # --- Unit tests ---
 option(BUILD_UNIT_TESTS "Build unit tests" ON)
 if(BUILD_UNIT_TESTS)
