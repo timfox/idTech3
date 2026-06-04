@@ -1,0 +1,33 @@
+#version 460
+
+struct PtSlot {
+	vec4 origin;
+	vec4 direction;
+	vec4 throughput;
+	vec4 radiance;
+};
+
+layout( set = 0, binding = 4, std430 ) buffer PtQueue {
+	PtSlot slots[];
+};
+
+layout( set = 0, binding = 5, std430 ) buffer PtCounters {
+	uint aliveCount;
+};
+
+layout( local_size_x = 256, local_size_y = 1, local_size_z = 1 ) in;
+
+layout( push_constant ) uniform Push {
+	uint pixelCount;
+} pc;
+
+void main()
+{
+	uint gid = gl_GlobalInvocationID.x;
+	if ( gid >= pc.pixelCount ) {
+		return;
+	}
+	if ( slots[gid].origin.w > 0.5 ) {
+		atomicAdd( aliveCount, 1u );
+	}
+}

@@ -20,6 +20,7 @@ SYSTEM_DUKTAPE=0
 CSHARP=0
 FREEUSD=1
 VULKAN_RTX=0
+VUDA=0
 CROSS_AARCH64=0
 CODECS_FOR_CROSS=0
 BUILD_DEMO_PK3=0
@@ -140,6 +141,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     rtx|vulkan-rtx|vulkan_rtx)
       VULKAN_RTX=1
+      shift
+      ;;
+    vuda|cuda-vulkan)
+      VUDA=1
       shift
       ;;
     nofreeusd|no-freeusd|nofree-usd)
@@ -341,6 +346,13 @@ if [ "$VULKAN_RTX" -eq 1 ]; then
   echo "CMake: USE_VULKAN_RTX=ON (KHR ray tracing demo; set r_rtx 1 + vid_restart)"
 else
   CMAKE_FLAGS+=("-DUSE_VULKAN_RTX=OFF")
+fi
+
+if [ "$VUDA" -eq 1 ]; then
+  CMAKE_FLAGS+=("-DUSE_VUDA=ON")
+  echo "CMake: USE_VUDA=ON (CUDA-Vulkan interop; set r_vuda 1 + cl_vuda 1 + vid_restart)"
+else
+  CMAKE_FLAGS+=("-DUSE_VUDA=OFF")
 fi
 
 CMAKE_FLAGS+=("-DRENDERER_DEFAULT=vulkan")

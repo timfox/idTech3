@@ -22,6 +22,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cl_main.c  -- client main loop
 
 #include "client.h"
+#ifdef USE_VUDA
+#include "cl_vuda.h"
+#endif
 #include "cl_gameframe.h"
 #include "cl_emoji.h"
 #include "cl_osp.h"
@@ -3108,6 +3111,10 @@ void CL_Frame( int msec, int realMsec ) {
 	CL_GenerativeFrame();
 #endif
 
+#ifdef USE_VUDA
+	CL_VUDA_Frame();
+#endif
+
 	// save the msec before checking pause
 	cls.realFrametime = realMsec;
 
@@ -4440,6 +4447,9 @@ void CL_Init( void ) {
 	SDF_Init();
 	VectorFont_Init();
 	CL_USD_Init();
+#ifdef USE_VUDA
+	CL_VUDA_Init();
+#endif
 
 #ifdef USE_LUA
 	LuaDebug_SetEngineRegisterCallback( LuaBindings_RegisterAll );
@@ -4476,6 +4486,9 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 	SDF_Shutdown();
 	SHUD_Shutdown();
 	MenuVideo_Shutdown();
+#ifdef USE_VUDA
+	CL_VUDA_Shutdown();
+#endif
 
 	// clear and mute all sounds until next registration
 	S_DisableSounds();

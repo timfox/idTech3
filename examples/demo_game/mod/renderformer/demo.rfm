@@ -1,0 +1,6 @@
+version 1
+hiddenDim 4
+gridX 32
+gridY 32
+gridZ 32
+quantUnits 16

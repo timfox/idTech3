@@ -1,0 +1,7 @@
+version 1
+featureDim 4
+hiddenDim 16
+gridX 48
+gridY 48
+gridZ 48
+quantUnits 8

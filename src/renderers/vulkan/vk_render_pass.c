@@ -4,6 +4,9 @@
 #include "vk_render_pass.h"
 #include "vk_validation.h"
 #include "vk_rtx.h"
+#include "vk_fsa.h"
+#include "vk_grtx.h"
+#include "vk_pathtrace.h"
 
 void vk_set_fullscreen_viewport_scissor( uint32_t width, uint32_t height )
 {
@@ -125,6 +128,15 @@ void vk_end_render_pass_tracked( void )
 		r_rtxDemo && r_rtxDemo->integer &&
 		( vk.renderPassIndex == RENDER_PASS_MAIN || vk.renderPassIndex == RENDER_PASS_POST_BLOOM ) ) {
 		vk_rtx_record_demo_pass( vk.cmd->command_buffer );
+		vk_fsa_denoise_after_rtx( vk.cmd->command_buffer );
+	}
+	if ( vk_grtx_active() &&
+		( vk.renderPassIndex == RENDER_PASS_MAIN || vk.renderPassIndex == RENDER_PASS_POST_BLOOM ) ) {
+		vk_grtx_record_pass( vk.cmd->command_buffer );
+	}
+	if ( vk_pathtrace_active() &&
+		( vk.renderPassIndex == RENDER_PASS_MAIN || vk.renderPassIndex == RENDER_PASS_POST_BLOOM ) ) {
+		vk_pathtrace_record_pass( vk.cmd->command_buffer );
 	}
 #endif
 }

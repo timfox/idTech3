@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "tr_local.h"
+#include "vk_ndgi.h"
 #ifdef USE_VULKAN
 #include "vk.h"
 #include "tr_sprite_props.h"
@@ -603,6 +604,7 @@ void RE_RenderScene( const refdef_t *fd ) {
 	if ( !( fd->rdflags & RDF_NOWORLDMODEL ) ) {
 		R_SpriteProps_AddRefEntitiesToScene( fd->time );
 		R_DecalProps_AddRefEntitiesToScene( fd->time );
+		R_NDGI_FrameUpdate();
 	}
 
 	RE_BeginScene( fd );

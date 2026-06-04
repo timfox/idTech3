@@ -43,6 +43,10 @@ static void DP_FillRefEntity( const decalProp_t *prop, refEntity_t *ent ) {
 	VectorCopy( prop->origin, ent->origin );
 	ent->radius = prop->radius;
 	ent->rotation = prop->yaw;
+	/* Static decals: stable temporal history (TAA / motion vectors) */
+	ent->frame = 0;
+	ent->oldframe = 0;
+	ent->backlerp = 0.0f;
 	ent->shader.rgba[0] = 255;
 	ent->shader.rgba[1] = 255;
 	ent->shader.rgba[2] = 255;

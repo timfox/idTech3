@@ -1,0 +1,88 @@
+#version 450
+/* Bin screen splats into 16x16 tiles (WebGPU-friendly atomics + bounded list). */
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+struct ScreenSplat {
+	vec4 centerDepth;
+	vec4 colorOpacity;
+	vec4 axes;
+};
+
+layout(std430, set = 0, binding = 0) readonly buffer SplatBuffer {
+	ScreenSplat s[];
+} splats;
+
+layout(std430, set = 0, binding = 1) buffer TileCounts {
+	uint counts[];
+} tileCounts;
+
+layout(std430, set = 0, binding = 2) buffer TileIndices {
+	uint indices[];
+} tileIndices;
+
+layout(push_constant) uniform WspBinPush {
+	vec4 viewport;
+	int splatCount;
+	int tileCols;
+	int tileRows;
+	int maxPerTile;
+	int tileSize;
+	int maxTilesPerSplat;
+	float pad0;
+} pc;
+
+void assignTile( int tileX, int tileY, uint splatId ) {
+	if ( tileX < 0 || tileY < 0 || tileX >= pc.tileCols || tileY >= pc.tileRows ) {
+		return;
+	}
+	uint tileId = uint(tileY * pc.tileCols + tileX);
+	uint slot = atomicAdd( tileCounts.counts[tileId], 1u );
+	if ( int(slot) >= pc.maxPerTile ) {
+		return;
+	}
+	uint base = tileId * uint(pc.maxPerTile);
+	tileIndices.indices[base + slot] = splatId;
+}
+
+void main() {
+	uint i = gl_GlobalInvocationID.x;
+	int tx;
+	int ty;
+	int tx0;
+	int ty0;
+	int tx1;
+	int ty1;
+	int touched;
+	ScreenSplat sp;
+	vec2 center;
+	float radius;
+	int tileSize;
+
+	if ( int(i) >= pc.splatCount ) {
+		return;
+	}
+
+	sp = splats.s[i];
+	center = sp.centerDepth.xy;
+	radius = sp.centerDepth.w;
+	if ( radius < 1.0 ) {
+		return;
+	}
+
+	tileSize = pc.tileSize;
+	tx0 = int(center.x - radius) / tileSize;
+	ty0 = int(center.y - radius) / tileSize;
+	tx1 = int(center.x + radius) / tileSize;
+	ty1 = int(center.y + radius) / tileSize;
+	touched = 0;
+
+	for ( ty = ty0; ty <= ty1; ty++ ) {
+		for ( tx = tx0; tx <= tx1; tx++ ) {
+			assignTile( tx, ty, i );
+			touched++;
+			if ( touched >= pc.maxTilesPerSplat ) {
+				return;
+			}
+		}
+	}
+}

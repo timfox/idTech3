@@ -1,0 +1,87 @@
+#version 450
+/* Per-tile 16x16 workgroup splat raster (256 invocations — WebGPU limit). */
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+struct ScreenSplat {
+	vec4 centerDepth;
+	vec4 colorOpacity;
+	vec4 axes;
+};
+
+layout(std430, set = 0, binding = 0) readonly buffer SplatBuffer {
+	ScreenSplat s[];
+} splats;
+
+layout(std430, set = 0, binding = 1) readonly buffer TileCounts {
+	uint counts[];
+} tileCounts;
+
+layout(std430, set = 0, binding = 2) readonly buffer TileIndices {
+	uint indices[];
+} tileIndices;
+
+layout(rgba16f, set = 0, binding = 3) uniform image2D accumOut;
+
+layout(push_constant) uniform WspDrawPush {
+	vec4 viewport;
+	int tileCols;
+	int tileRows;
+	int maxPerTile;
+	int tileSize;
+	float strength;
+	float pad0;
+} pc;
+
+void main() {
+	uvec2 tileCoord = gl_WorkGroupID.xy;
+	uvec2 localPix = gl_LocalInvocationID.xy;
+	uvec2 pix = tileCoord * uint(pc.tileSize) + localPix;
+
+	if ( pix.x >= uint(pc.viewport.x) || pix.y >= uint(pc.viewport.y) ) {
+		return;
+	}
+
+	uint tileId = tileCoord.y * uint(pc.tileCols) + tileCoord.x;
+	uint count = min( tileCounts.counts[tileId], uint(pc.maxPerTile) );
+	vec2 fpix = vec2(pix) + vec2(0.5);
+	vec3 accumRgb = vec3(0.0);
+	float accumA = 0.0;
+	float zFront = 1.0;
+	uint si;
+	uint splatId;
+	ScreenSplat sp;
+	vec2 d;
+	float r2;
+	float w;
+
+	for ( si = 0u; si < count; si++ ) {
+		uint base = tileId * uint(pc.maxPerTile);
+		splatId = tileIndices.indices[base + si];
+		sp = splats.s[splatId];
+		if ( sp.centerDepth.w < 1.0 ) {
+			continue;
+		}
+		d = fpix - sp.centerDepth.xy;
+		r2 = dot(d, d) / (sp.centerDepth.w * sp.centerDepth.w);
+		if ( r2 > 1.0 ) {
+			continue;
+		}
+		w = exp(-4.0 * r2) * sp.colorOpacity.a * pc.strength;
+		if ( w < 1e-4 ) {
+			continue;
+		}
+		accumRgb = mix(accumRgb, sp.colorOpacity.rgb, w / max(accumA + w, 1e-4));
+		accumA = min(accumA + w, 1.0);
+		zFront = min(zFront, sp.centerDepth.z);
+	}
+
+	if ( accumA < 1e-4 ) {
+		return;
+	}
+
+	vec4 outCol;
+	outCol.rgb = accumRgb;
+	outCol.b = zFront;
+	outCol.a = accumA;
+	imageStore(accumOut, ivec2(pix), outCol);
+}

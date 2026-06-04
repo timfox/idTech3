@@ -1,0 +1,74 @@
+#version 450
+/* Wavefront path experiment — propagate one bounce via screen-space depth march. */
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+struct RayRec {
+	vec4 origin;
+	vec4 dir;
+	vec4 radiance;
+};
+
+layout(std430, set = 0, binding = 0) buffer RayQueue {
+	RayRec rays[];
+} queue;
+
+layout(set = 0, binding = 1) uniform sampler2D depthTex;
+layout(set = 0, binding = 2) uniform sampler2D normalTex;
+
+layout(push_constant) uniform WptWavePush {
+	mat4 viewProj;
+	uvec2 extent;
+	uint maxRays;
+	uint waveIndex;
+	float stepScale;
+	float strength;
+	uint useGBufferNormal;
+	uint hasGBuffer;
+} pc;
+
+void main() {
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	uint idx = pix.y * pc.extent.x + pix.x;
+	if (pix.x >= pc.extent.x || pix.y >= pc.extent.y || idx >= pc.maxRays) {
+		return;
+	}
+
+	RayRec r = queue.rays[idx];
+	if (r.origin.w < 0.5 || r.dir.w < 0.5) {
+		return;
+	}
+
+	vec3 ro = r.origin.xyz;
+	vec3 rd = normalize(r.dir.xyz);
+	float march = 48.0 * pc.stepScale * float(pc.waveIndex + 1u);
+	vec3 hit = ro + rd * march;
+
+	vec4 clip = pc.viewProj * vec4(hit, 1.0);
+	vec3 ndc = clip.xyz / max(abs(clip.w), 1e-6);
+	vec2 uv = ndc.xy * 0.5 + 0.5;
+	if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) {
+		r.dir.w = 0.0;
+		queue.rays[idx] = r;
+		return;
+	}
+
+	float sceneD = texture(depthTex, uv).r;
+	vec3 N = vec3(0.0, 0.0, 1.0);
+	if (pc.hasGBuffer != 0u && pc.useGBufferNormal != 0u) {
+		N = texture(normalTex, uv).xyz * 2.0 - 1.0;
+		float len = length(N);
+		if (len > 0.01) {
+			N /= len;
+		}
+	}
+
+	float ndl = max(dot(N, normalize(vec3(0.35, 0.55, 1.0))), 0.0);
+	vec3 bounce = vec3(0.25, 0.32, 0.42) * ndl * pc.strength;
+	r.radiance.rgb += bounce * (1.0 / float(pc.waveIndex + 1u));
+
+	vec3 newRd = normalize(reflect(rd, N));
+	r.origin.xyz = hit;
+	r.dir.xyz = newRd;
+	r.dir.w = (pc.waveIndex + 1u < 2u) ? 1.0 : 0.0;
+	queue.rays[idx] = r;
+}

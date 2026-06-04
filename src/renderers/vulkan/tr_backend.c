@@ -25,6 +25,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_temporal.h"
 #include "vk_forward_plus.h"
 #include "vk_deferred_gbuffer.h"
+#include "vk_niv.h"
+#include "vk_nist.h"
+#include "vk_nvc.h"
+#include "vk_fsa.h"
+#include "vk_vfgi.h"
+#include "vk_renderformer.h"
+#include "vk_wpt.h"
+#include "vk_mgs.h"
+#include "vk_wsp.h"
 #include "vk_fp64_points.h"
 #endif
 
@@ -1804,6 +1813,18 @@ static const void *RB_DrawSurfs( const void *data ) {
 #ifdef USE_VULKAN
 	vk_deferred_gbuffer_capture_after_geometry();
 	vk_deferred_lighting_apply_after_geometry();
+	vk_niv_apply_after_geometry();
+	vk_nist_apply_after_geometry();
+	vk_nvc_apply_after_geometry();
+	vk_vfgi_apply_after_geometry();
+	vk_renderformer_apply_after_geometry();
+	vk_wpt_apply_after_geometry();
+	vk_fsa_build_importance_after_geometry();
+	if ( R_WSP_Active() ) {
+		vk_wsp_apply_after_geometry();
+	} else {
+		vk_mgs_apply_after_geometry();
+	}
 #endif
 
 #ifdef USE_VBO

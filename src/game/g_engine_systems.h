@@ -16,11 +16,14 @@ void    EngineReplay_EndFrame( void );
 int     EngineReplay_GetFrameIndex( void );
 int     EngineReplay_GetBaseTime( void );
 
+#define ENGINE_SAVE_PROTOCOL_VERSION 1
+
 void    EngineSave_Init( void );
 void    EngineSave_Shutdown( void );
 qboolean EngineSave_WriteSlot( int slot, const char *label );
 qboolean EngineSave_ReadSlot( int slot, char *labelOut, int labelLen );
 int     EngineSave_LastSlot( void );
+int     EngineSave_ProtocolVersion( void );
 
 void    EngineQuest_Init( void );
 void    EngineQuest_Shutdown( void );

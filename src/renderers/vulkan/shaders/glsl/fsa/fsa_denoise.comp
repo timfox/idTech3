@@ -1,0 +1,81 @@
+#version 450
+/*
+ * FSA guided denoise — fill sub-1-SPP sparse traces; preserve high-importance detail.
+ */
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D depthTex;
+layout(set = 0, binding = 1) uniform sampler2D normalTex;
+layout(set = 0, binding = 2) uniform sampler2D importanceTex;
+layout(rgba16f, set = 0, binding = 3) uniform image2D colorOut;
+
+layout(push_constant) uniform FsaDenoisePush {
+	vec4 extent;
+	vec4 params;
+	uint useGBuffer;
+	uint hasGBuffer;
+	uint pad0;
+	uint pad1;
+} pc;
+
+vec3 decodeNormal(vec2 uv) {
+	if (pc.hasGBuffer != 0u && pc.useGBuffer != 0u) {
+		vec3 n = texture(normalTex, uv).xyz * 2.0 - 1.0;
+		float len = length(n);
+		if (len > 0.01) {
+			return n / len;
+		}
+	}
+	return vec3(0.0, 0.0, 1.0);
+}
+
+void main() {
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if (pix.x >= uint(pc.extent.x) || pix.y >= uint(pc.extent.y)) {
+		return;
+	}
+
+	vec2 uv = (vec2(pix) + 0.5) / pc.extent.xy;
+	float depth = texture(depthTex, uv).r;
+	if (pc.params.z > 0.5 && (depth <= 0.0 || depth >= 1.0)) {
+		return;
+	}
+
+	vec4 imp = texture(importanceTex, uv);
+	if (imp.r >= 0.98) {
+		return;
+	}
+
+	vec4 center = imageLoad(colorOut, ivec2(pix));
+	vec3 N = decodeNormal(uv);
+	vec2 texel = 1.0 / pc.extent.xy;
+	float blurW = (1.0 - imp.r) * pc.params.x * pc.params.y;
+
+	vec3 accum = center.rgb;
+	float wSum = 1.0;
+	int ox;
+	int oy;
+	for (oy = -1; oy <= 1; oy++) {
+		for (ox = -1; ox <= 1; ox++) {
+			if (ox == 0 && oy == 0) {
+				continue;
+			}
+			vec2 offUv = uv + vec2(float(ox), float(oy)) * texel;
+			float dN = texture(depthTex, offUv).r;
+			if (abs(dN - depth) > pc.params.w) {
+				continue;
+			}
+			vec3 nN = decodeNormal(offUv);
+			if (dot(N, nN) < 0.92) {
+				continue;
+			}
+			vec4 s = imageLoad(colorOut, ivec2(pix) + ivec2(ox, oy));
+			float w = blurW;
+			accum += s.rgb * w;
+			wSum += w;
+		}
+	}
+
+	vec3 outRgb = accum / wSum;
+	imageStore(colorOut, ivec2(pix), vec4(outRgb, center.a));
+}

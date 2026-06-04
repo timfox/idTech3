@@ -1,0 +1,159 @@
+#version 450
+/*
+ * Forget Superresolution, Sample Adaptively — importance map for sub-1-SPP path tracing.
+ * Highlights specular/glossy, silhouettes, contact regions, and dynamic light hotspots.
+ */
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+#define MAX_PER_TILE 8u
+#define REC_VEC4S 4u
+
+layout(set = 0, binding = 0) uniform sampler2D depthTex;
+layout(set = 0, binding = 1) uniform sampler2D normalTex;
+layout(set = 0, binding = 2) uniform sampler2D materialTex;
+layout(set = 0, binding = 3) uniform sampler2D colorTex;
+layout(std430, set = 0, binding = 4) readonly buffer LightSSBO {
+	vec4 data[];
+} lights;
+layout(std430, set = 0, binding = 5) readonly buffer TileSSBO {
+	uint cells[];
+} tiles;
+layout(std430, set = 0, binding = 6) readonly buffer ParamSSBO {
+	mat4 clipFromWorld;
+	uvec4 tiles_xy_viewport;
+	vec4 viewOrg;
+} params;
+layout(rgba16f, set = 0, binding = 7) uniform writeonly image2D importanceOut;
+
+layout(push_constant) uniform FsaImportancePush {
+	mat4 invViewProj;
+	vec4 extent;
+	vec4 weights;
+	vec4 forwardPlus;
+	uint useGBuffer;
+	uint hasGBuffer;
+	uint hasMaterial;
+	uint pad0;
+} pc;
+
+vec3 decodeNormal(vec2 uv) {
+	if (pc.hasGBuffer != 0u && pc.useGBuffer != 0u) {
+		vec3 n = texture(normalTex, uv).xyz * 2.0 - 1.0;
+		float len = length(n);
+		if (len > 0.01) {
+			return n / len;
+		}
+	}
+	vec2 texel = 1.0 / pc.extent.xy;
+	float dL = texture(depthTex, uv + vec2(-texel.x, 0.0)).r;
+	float dR = texture(depthTex, uv + vec2(texel.x, 0.0)).r;
+	float dD = texture(depthTex, uv + vec2(0.0, -texel.y)).r;
+	float dU = texture(depthTex, uv + vec2(0.0, texel.y)).r;
+	vec3 dpdx = vec3(texel.x * 2.0, 0.0, dR - dL);
+	vec3 dpdy = vec3(0.0, texel.y * 2.0, dU - dD);
+	return normalize(cross(dpdx, dpdy));
+}
+
+float depthEdge(vec2 uv) {
+	vec2 texel = 1.0 / pc.extent.xy;
+	float d = texture(depthTex, uv).r;
+	float e = 0.0;
+	e = max(e, abs(d - texture(depthTex, uv + vec2(texel.x, 0.0)).r));
+	e = max(e, abs(d - texture(depthTex, uv + vec2(-texel.x, 0.0)).r));
+	e = max(e, abs(d - texture(depthTex, uv + vec2(0.0, texel.y)).r));
+	e = max(e, abs(d - texture(depthTex, uv + vec2(0.0, -texel.y)).r));
+	return e;
+}
+
+float dynamicLightHotspot(vec3 worldPos) {
+	if (pc.forwardPlus.x < 0.5) {
+		return 0.0;
+	}
+	uint tilesX = uint(lights.data[1].x + 0.5);
+	uint tilesY = uint(lights.data[1].y + 0.5);
+	float vw = lights.data[1].z;
+	float vh = lights.data[1].w;
+	if (tilesX == 0u || tilesY == 0u) {
+		return 0.0;
+	}
+	vec4 wc = params.clipFromWorld * vec4(worldPos, 1.0);
+	if (abs(wc.w) < 1e-5) {
+		return 0.0;
+	}
+	vec3 ndc = wc.xyz / wc.w;
+	vec2 px;
+	px.x = 0.5 * (1.0 + ndc.x) * vw;
+	px.y = 0.5 * (1.0 + ndc.y) * vh;
+	float tilePxX = vw / max(float(tilesX), 1.0);
+	float tilePxY = vh / max(float(tilesY), 1.0);
+	uint tx = min(uint(px.x / tilePxX), tilesX - 1u);
+	uint ty = min(uint(px.y / tilePxY), tilesY - 1u);
+	uint tileId = ty * tilesX + tx;
+	uint tbase = tileId * MAX_PER_TILE;
+	float nLights = lights.data[0].x;
+	uint maxPerTile = uint(min(max(lights.data[0].z + 0.5, 1.0), float(MAX_PER_TILE)));
+	float lum = 0.0;
+	uint k;
+	for (k = 0u; k < maxPerTile; k++) {
+		uint li = tiles.cells[tbase + k];
+		if (li == 0xFFFFFFFFu || float(li) + 0.5 >= nLights) {
+			continue;
+		}
+		uint b0 = 2u + li * REC_VEC4S;
+		vec4 lc = lights.data[b0 + 1u];
+		lum = max(lum, dot(lc.rgb, vec3(0.2126, 0.7152, 0.0722)));
+	}
+	return clamp(lum * 0.35, 0.0, 1.0);
+}
+
+vec3 worldPosFromDepth(vec2 uv, float depth) {
+	vec4 clip = vec4(uv * 2.0 - 1.0, depth, 1.0);
+	vec4 world = pc.invViewProj * clip;
+	return world.xyz / max(world.w, 1e-6);
+}
+
+void main() {
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if (pix.x >= uint(pc.extent.x) || pix.y >= uint(pc.extent.y)) {
+		return;
+	}
+
+	vec2 uv = (vec2(pix) + 0.5) / pc.extent.xy;
+	float depth = texture(depthTex, uv).r;
+
+	if (depth <= 0.0 || depth >= 1.0) {
+		imageStore(importanceOut, ivec2(pix), vec4(0.0));
+		return;
+	}
+
+	vec3 worldPos = worldPosFromDepth(uv, depth);
+	vec3 N = decodeNormal(uv);
+	float dEdge = depthEdge(uv);
+	vec2 texel = 1.0 / pc.extent.xy;
+	vec3 nL = decodeNormal(uv + vec2(-texel.x, 0.0));
+	vec3 nR = decodeNormal(uv + vec2(texel.x, 0.0));
+	vec3 nD = decodeNormal(uv + vec2(0.0, -texel.y));
+	vec3 nU = decodeNormal(uv + vec2(0.0, texel.y));
+	float nEdge = max(max(length(N - nL), length(N - nR)), max(length(N - nD), length(N - nU)));
+
+	float roughness = 0.5;
+	if (pc.hasMaterial != 0u) {
+		vec4 mat = texture(materialTex, uv);
+		roughness = clamp(mat.g, 0.02, 1.0);
+	}
+	float glossy = (1.0 - roughness) * pc.weights.x;
+	float silhouette = clamp(dEdge * 48.0, 0.0, 1.0) * pc.weights.y;
+	float contact = clamp(nEdge * 6.0, 0.0, 1.0) * clamp(dEdge * 24.0, 0.0, 1.0) * pc.weights.z;
+
+	vec3 hdr = texture(colorTex, uv).rgb;
+	float luma = dot(hdr, vec3(0.2126, 0.7152, 0.0722));
+	float flash = clamp((luma - 0.85) * 4.0, 0.0, 1.0) * pc.weights.w;
+
+	float dynamic = dynamicLightHotspot(worldPos) * pc.forwardPlus.y;
+	float imp = clamp(glossy + silhouette + contact + flash + dynamic, 0.0, 1.0);
+	float tagSpecular = step(0.35, glossy);
+	float tagSilhouette = step(0.25, silhouette);
+	float tagContact = step(0.2, contact);
+
+	imageStore(importanceOut, ivec2(pix), vec4(imp, tagSpecular, tagSilhouette, tagContact));
+}

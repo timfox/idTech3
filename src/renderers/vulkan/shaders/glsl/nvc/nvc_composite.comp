@@ -1,0 +1,34 @@
+#version 450
+/* Additive neural ReSTIR direct correction into HDR scene color. */
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D depthTex;
+layout(set = 0, binding = 1) uniform sampler2D directTex;
+layout(rgba16f, set = 0, binding = 2) uniform image2D colorOut;
+
+layout(push_constant) uniform NvcCompositePush {
+	vec4 extent;
+	vec4 params;
+} pc;
+
+void main() {
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if (pix.x >= uint(pc.extent.x) || pix.y >= uint(pc.extent.y)) {
+		return;
+	}
+
+	vec2 uv = (vec2(pix) + 0.5) / pc.extent.xy;
+	float depth = texture(depthTex, uv).r;
+	if (pc.params.z > 0.5 && (depth <= 0.0 || depth >= 1.0)) {
+		return;
+	}
+
+	vec4 direct = texture(directTex, uv);
+	if (direct.a <= 1e-5) {
+		return;
+	}
+
+	vec4 cur = imageLoad(colorOut, ivec2(pix));
+	vec3 rgb = cur.rgb + direct.rgb * pc.params.x;
+	imageStore(colorOut, ivec2(pix), vec4(rgb, cur.a));
+}

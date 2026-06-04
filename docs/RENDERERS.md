@@ -39,6 +39,7 @@ Code: `src/renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar regist
 - **Compute:** already central to Vulkan (volumetric fog stages, vegetation wind, fluid sim, terrain CBT, etc.).
 - **Mesh shaders (NVIDIA):** optional device extension **`VK_NV_mesh_shader`** when **`r_vk_meshShaderNV 1`** (default **0**, **latched**, `vid_restart`). Enables `meshShader` in `VkPhysicalDeviceMeshShaderFeaturesNV` for future pipelines; **no mesh-shader draw path** is wired yet - safe on `main`.
 - **DLSS / NGX:** **not** linked in this repository (proprietary NVIDIA SDK). Use **`r_renderScale`** / internal resolution, **TAA** (`r_taa`), **SMAA/FXAA/MSAA**, or **driver-level** scaling (e.g. NVIDIA NIS/DLSS in control panel) where applicable. Startup logs state that DLSS is not in-engine.
+- **SP upscale preset:** `r_upscale 1` with `r_renderScale 0.75` (internal 75% res, spatial upscale). `r_upscale 2` is FSR2 experimental (falls back to spatial until SDK wired). See `demo_sp_slice.cfg` in idtech3_demo pk3.
 - **Simulation profile (AMBF-Vulkan):** `sim_render_profile 1` then `vid_restart` — MSAA + FXAA, Reinhard tonemap, lightweight post. See [SIM_RENDER_PROFILE.md](SIM_RENDER_PROFILE.md).
 
 ### Physically Based Rendering (PBR)
@@ -203,6 +204,42 @@ Code: `src/renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar regist
 | `r_hdr` | 2 | HDR format (0=8-bit, 1=RGBA16F, 2=RGBA32F default, 3=RGBA64F optional/gated, -1=4-bit test) |
 | `r_hdr_lightmap_scale` | 2.0 | HDR lightmap intensity (1=normal, 2+=brighter for 8-bit lightmaps) |
 | `r_lightmap_srgb_decode` | 0 | When r_hdr 1/2: 0=linear (default), 1=sRGB→linear for gamma-encoded lightmaps |
+| `r_ndgi` | 0 | **Neural Dynamic GI** (experimental): temporal baked lightmaps from neural feature atlas + VT page decode. See [NEURAL_DYNAMIC_GI.md](NEURAL_DYNAMIC_GI.md). Latched; needs BSP lightmaps. |
+| `r_ndgi_time` | 0 | NDGI blend time in `[0,1]` (day/night, weather keys). |
+| `r_ndgi_cycle` | 0 | Auto-cycle `r_ndgi_time` over `r_ndgi_cyclePeriod` seconds. |
+| `r_niv` | 0 | **Neural Irradiance Volume** (experimental): G-buffer indirect from compact 3D neural probe field. See [NEURAL_IRRADIANCE_VOLUME.md](NEURAL_IRRADIANCE_VOLUME.md). |
+| `r_niv_scale` | 1 | NIV decode resolution scale (0.25–1). |
+| `r_nslm` | 0 | **Neural Six-way Lightmaps** (experimental): froxel scatter modulation for fog/smoke/dust. Requires `r_volumetricFog 1`. See [NEURAL_SIXWAY_LIGHTMAPS.md](NEURAL_SIXWAY_LIGHTMAPS.md). |
+| `r_nslm_strength` | 1 | NSLM scattering scale in froxels. |
+| `r_nslm_sixWaySharpness` | 2 | Six-way axis lobe sharpness from view direction. |
+| `r_nist` | 0 | **Neural Image Space Tessellation** (experimental): screen-space silhouette smoothing. See [NEURAL_IMAGE_SPACE_TESSELLATION.md](NEURAL_IMAGE_SPACE_TESSELLATION.md). |
+| `r_nist_strength` | 1 | NIST silhouette blend strength. |
+| `r_nist_scale` | 1 | NIST refine resolution scale (0.25–1). |
+| `r_nvc` | 0 | **Neural Visibility Cache** (experimental): Forward+ ReSTIR-style direct refine with neural visibility. Requires `r_forwardPlus 1`. See [NEURAL_VISIBILITY_CACHE.md](NEURAL_VISIBILITY_CACHE.md). |
+| `r_nvc_strength` | 1 | NVC direct lighting refine scale. |
+| `r_nvc_scale` | 1 | NVC cache/ReSTIR resolution scale (0.25–1). |
+| `r_nvc_restirMode` | 1 | NVC `0`=cache only, `1`=ReSTIR refine + composite. |
+| `r_fsa` | 0 | **Forget Superresolution / Sample Adaptively** (experimental): importance-guided sub-1-SPP RTX + denoise. See [FORGET_SUPERRESOLUTION_FSA.md](FORGET_SUPERRESOLUTION_FSA.md). |
+| `r_fsa_budget` | `0.25` | FSA target samples per pixel (may be &lt;1). |
+| `r_fsa_rtxAdaptive` | 1 | Stochastic RTX traces from FSA importance map. |
+| `r_vfgi` | 0 | **Vertex Features Neural GI** (experimental): per-vertex features + spatial index decode. See [VERTEX_FEATURES_NEURAL_GI.md](VERTEX_FEATURES_NEURAL_GI.md). |
+| `r_vfgi_strength` | 1 | VFGI indirect irradiance scale. |
+| `r_vfgi_scale` | 1 | VFGI decode resolution scale (0.25–1). |
+| `r_vfgi_vertCap` | `524288` | Max unique world vertices for VFGI (latched). |
+| `r_renderformer` | 0 | **RenderFormer** neural triangle preview (experimental): transport + view decode. See [RENDERFORMER.md](RENDERFORMER.md). |
+| `r_renderformer_strength` | 1 | RenderFormer transport/decode/composite scale. |
+| `r_renderformer_scale` | 1 | RenderFormer decode resolution (0.25–1). |
+| `r_renderformer_triCap` | `32768` | Max world triangle tokens (latched). |
+| `r_wpt` | 0 | **Wavefront path experiment** (queued rays + bounce waves). See [WAVEFRONT_PATH_TRACING.md](WAVEFRONT_PATH_TRACING.md). |
+| `r_wpt_bounces` | `1` | WPT extension waves (0–2). |
+| `r_vuda` | 0 | **VUDA** CUDA-Vulkan spatial multiplexing scaffold (requires `USE_VUDA` build). See [VUDA.md](VUDA.md). |
+| `r_vuda_mux` | 1 | Open post-submit CUDA compute window. |
+| `r_vuda_slotMb` | 64 | Exported shared buffer per slot (MiB). |
+| `cl_vuda` | 0 | Client CUDA scheduler + import of Vulkan fds. |
+| `r_mgs` | 0 | **Mobile-GS** (experimental): tiered Gaussian splatting (`1`=mobile … `3`=high). See [MOBILE_GAUSSIAN_SPLATTING.md](MOBILE_GAUSSIAN_SPLATTING.md). |
+| `r_mgs_strength` | 0.85 | Mobile-GS splat / composite strength. |
+| `r_wsp` | 0 | **WebSplatter** (experimental): WebGPU-aligned tile splats (`1`=mobile … `3`=high). See [WEB_SPLATTER.md](WEB_SPLATTER.md). |
+| `r_wsp_strength` | 0.85 | WebSplatter composite strength. |
 | `r_pre_exposure_scale` | 1.0 | Pre-exposure scale for bloom/tonemap pipeline |
 | `r_tonemap` | 2 | Tonemapping (0=none, 1=Reinhard, 2=ACES) |
 | `r_exposure` | 1.0 | Exposure multiplier |
@@ -256,6 +293,10 @@ See [HDR_GAPS.md](HDR_GAPS.md) for HDR pipeline gaps, risks, and render order.
 See [RENDERERS_FUTURE.md](RENDERERS_FUTURE.md) for architecture and implementation plans:
 
 - **Vulkan RTX**: demo path with `USE_VULKAN_RTX=ON`, `r_rtx` / `r_rtxDemo`, world BLAS; optional **`r_rtxEntities`** proxy entity boxes in TLAS. See [RENDERERS_FUTURE.md](RENDERERS_FUTURE.md).
+- **GRTX (Gaussian RT)**: `r_grtx` / `r_grtxDemo` over procedural 3D Gaussian AABB proxies (separate from BSP `r_rtx` demo). See [GAUSSIAN_RAY_TRACING_GRTX.md](GAUSSIAN_RAY_TRACING_GRTX.md).
+- **Path trace experiment (C6)**: `r_pathtrace` + `r_pathtrace_arch` (`megakernel` / `wavefront`) over shared RTX world TLAS — requires `r_rtx 1`, `r_rtxDemo 1`, `USE_VULKAN_RTX`. Not SP ship lighting. See [PATHTRACE_ARCH_BENCHMARK.md](PATHTRACE_ARCH_BENCHMARK.md).
+- **Mobile-GS**: `r_mgs` tiered compute splatting (Android-friendly; no RTX). See [MOBILE_GAUSSIAN_SPLATTING.md](MOBILE_GAUSSIAN_SPLATTING.md).
+- **WebSplatter**: `r_wsp` tile-binned splats (WebGPU-portable compute layout). See [WEB_SPLATTER.md](WEB_SPLATTER.md).
 - **Metal**: Native Metal renderer for macOS/iOS (Apple Silicon). Option `USE_METAL_RENDERER` reserved.
 - **DXR**: DirectX 12 + DirectX Raytracing for Windows. Option `USE_DXR_RENDERER` reserved.
 

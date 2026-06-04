@@ -137,6 +137,14 @@ PFN_vkDebugMarkerSetObjectNameEXT				qvkDebugMarkerSetObjectNameEXT;
 
 PFN_vkCmdClearColorImage								qvkCmdClearColorImage;
 
+#ifdef USE_VUDA
+PFN_vkGetMemoryFdKHR									qvkGetMemoryFdKHR;
+PFN_vkGetMemoryFdPropertiesKHR						qvkGetMemoryFdPropertiesKHR;
+PFN_vkGetSemaphoreFdKHR								qvkGetSemaphoreFdKHR;
+PFN_vkWaitSemaphoresKHR								qvkWaitSemaphoresKHR;
+PFN_vkSignalSemaphoreKHR							qvkSignalSemaphoreKHR;
+#endif
+
 #ifdef USE_VULKAN_RTX
 PFN_vkGetBufferDeviceAddress							qvkGetBufferDeviceAddress;
 PFN_vkCreateAccelerationStructureKHR					qvkCreateAccelerationStructureKHR;

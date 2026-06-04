@@ -151,12 +151,26 @@ int EngineReplay_GetBaseTime( void ) {
 	return s_replayBaseTime;
 }
 
-/* ---- Save slots (client-local metadata in memory + optional file) ---- */
+/* ---- Save slots (client-local JSON v1 + legacy .txt) ---- */
+
+#define ENGINE_SAVE_MOD_VERSION "idtech3_engine"
+
+static unsigned EngineSave_ChecksumLabel( const char *label ) {
+	if ( !label ) {
+		return 0u;
+	}
+	return Com_BlockChecksum( label, (int)strlen( label ) );
+}
+
+int EngineSave_ProtocolVersion( void ) {
+	return ENGINE_SAVE_PROTOCOL_VERSION;
+}
 
 void EngineSave_Init( void ) {
 	Com_Memset( s_saves, 0, sizeof( s_saves ) );
 	s_lastSaveSlot = -1;
-	Com_Printf( "EngineSave: %d logical slots (Engine.Save.*)\n", SAVE_SLOTS );
+	Com_Printf( "EngineSave: %d slots, protocol v%d (save/engine_slot_*.json)\n",
+		SAVE_SLOTS, ENGINE_SAVE_PROTOCOL_VERSION );
 }
 
 void EngineSave_Shutdown( void ) {
@@ -166,8 +180,10 @@ void EngineSave_Shutdown( void ) {
 
 qboolean EngineSave_WriteSlot( int slot, const char *label ) {
 	char path[MAX_OSPATH];
+	char body[512];
 	fileHandle_t f;
-	int len;
+	unsigned checksum;
+	int bodyLen;
 
 	if ( slot < 0 || slot >= SAVE_SLOTS || !label ) {
 		return qfalse;
@@ -176,36 +192,128 @@ qboolean EngineSave_WriteSlot( int slot, const char *label ) {
 	s_saves[slot].used = qtrue;
 	s_lastSaveSlot = slot;
 
-	Com_sprintf( path, sizeof( path ), "save/engine_slot_%d.txt", slot );
-	len = (int)strlen( label );
+	checksum = EngineSave_ChecksumLabel( label );
+	Com_sprintf( body, sizeof( body ),
+		"{\n  \"protocolVersion\": %d,\n  \"modVersion\": \"%s\",\n  \"label\": \"%s\",\n  \"checksum\": %u\n}\n",
+		ENGINE_SAVE_PROTOCOL_VERSION, ENGINE_SAVE_MOD_VERSION, label, checksum );
+	bodyLen = (int)strlen( body );
+
+	Com_sprintf( path, sizeof( path ), "save/engine_slot_%d.json", slot );
 	f = FS_FOpenFileWrite( path );
 	if ( f ) {
-		FS_Write( label, len, f );
+		FS_Write( body, bodyLen, f );
 		FS_FCloseFile( f );
+		Com_Printf( "EngineSave: wrote %s\n", path );
+	}
+	return qtrue;
+}
+
+static qboolean EngineSave_ParseJsonSlot( const char *text, char *labelOut, int labelLen, int *protoOut ) {
+	const char *p;
+	char checksumStr[32];
+	unsigned storedCrc;
+	unsigned labelCrc;
+
+	if ( !text || !labelOut || labelLen < 1 ) {
+		return qfalse;
+	}
+	labelOut[0] = '\0';
+	if ( protoOut ) {
+		*protoOut = 0;
+	}
+
+	p = strstr( text, "\"protocolVersion\"" );
+	if ( p ) {
+		p = strchr( p, ':' );
+		if ( p && protoOut ) {
+			*protoOut = atoi( p + 1 );
+		}
+	}
+
+	p = strstr( text, "\"label\"" );
+	if ( !p ) {
+		return qfalse;
+	}
+	p = strchr( p, ':' );
+	if ( !p ) {
+		return qfalse;
+	}
+	p = strchr( p, '"' );
+	if ( !p ) {
+		return qfalse;
+	}
+	p++;
+	{
+		int i = 0;
+		while ( p[i] && p[i] != '"' && i < labelLen - 1 ) {
+			labelOut[i] = p[i];
+			i++;
+		}
+		labelOut[i] = '\0';
+	}
+
+	p = strstr( text, "\"checksum\"" );
+	if ( !p ) {
+		return labelOut[0] != '\0';
+	}
+	p = strchr( p, ':' );
+	if ( !p ) {
+		return qfalse;
+	}
+	Q_strncpyz( checksumStr, p + 1, sizeof( checksumStr ) );
+	storedCrc = (unsigned)strtoul( checksumStr, NULL, 10 );
+	labelCrc = EngineSave_ChecksumLabel( labelOut );
+	if ( storedCrc != labelCrc ) {
+		Com_Printf( S_COLOR_YELLOW "EngineSave: checksum mismatch slot data\n" );
+		return qfalse;
 	}
 	return qtrue;
 }
 
 qboolean EngineSave_ReadSlot( int slot, char *labelOut, int labelLen ) {
 	char path[MAX_OSPATH];
-	fileHandle_t f;
+	byte *buf;
 	int len;
+	int proto = 0;
 
 	if ( slot < 0 || slot >= SAVE_SLOTS || !labelOut || labelLen < 1 ) {
 		return qfalse;
 	}
 	labelOut[0] = '\0';
+
+	Com_sprintf( path, sizeof( path ), "save/engine_slot_%d.json", slot );
+	len = FS_ReadFile( path, (void **)&buf );
+	if ( len > 0 && buf ) {
+		qboolean ok;
+
+		buf[len] = '\0';
+		ok = EngineSave_ParseJsonSlot( (const char *)buf, labelOut, labelLen, &proto );
+		FS_FreeFile( buf );
+		if ( ok ) {
+			if ( proto != 0 && proto != ENGINE_SAVE_PROTOCOL_VERSION ) {
+				Com_Printf( S_COLOR_YELLOW "EngineSave: protocol %d != engine %d\n",
+					proto, ENGINE_SAVE_PROTOCOL_VERSION );
+			}
+			Q_strncpyz( s_saves[slot].label, labelOut, sizeof( s_saves[0].label ) );
+			s_saves[slot].used = qtrue;
+			return qtrue;
+		}
+	}
+
 	Com_sprintf( path, sizeof( path ), "save/engine_slot_%d.txt", slot );
-	len = FS_FOpenFileRead( path, &f, qfalse );
-	if ( len > 0 && f ) {
+	len = FS_ReadFile( path, (void **)&buf );
+	if ( len > 0 && buf ) {
 		if ( len >= labelLen ) {
 			len = labelLen - 1;
 		}
-		FS_Read( labelOut, len, f );
+		Com_Memcpy( labelOut, buf, len );
 		labelOut[len] = '\0';
-		FS_FCloseFile( f );
+		FS_FreeFile( buf );
+		Q_strncpyz( s_saves[slot].label, labelOut, sizeof( s_saves[0].label ) );
+		s_saves[slot].used = qtrue;
 		return qtrue;
 	}
+
 	if ( s_saves[slot].used ) {
 		Q_strncpyz( labelOut, s_saves[slot].label, labelLen );
 		return qtrue;

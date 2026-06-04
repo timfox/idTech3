@@ -1,0 +1,94 @@
+#version 450
+/*
+ * Neural Irradiance Volume — screen-space decode from compact 3D feature volume.
+ * Uses G-buffer normal when available; otherwise reconstructs from depth.
+ */
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D depthTex;
+layout(set = 0, binding = 1) uniform sampler2D normalTex;
+layout(set = 0, binding = 2) uniform sampler3D featureVolume;
+layout(std430, set = 0, binding = 3) readonly buffer NivWeights {
+	float data[];
+} weights;
+layout(rgba16f, set = 0, binding = 4) uniform writeonly image2D irradianceOut;
+
+layout(push_constant) uniform NivShadePush {
+	mat4 invViewProj;
+	vec4 worldMin;
+	vec4 worldMax;
+	uvec3 gridDim;
+	uint featureDim;
+	uint hiddenDim;
+	uint useGBufferNormal;
+	uint hasGBuffer;
+	uvec2 extent;
+	float strength;
+} pc;
+
+float relu(float x) { return max(x, 0.0); }
+float sigmoid(float x) { return 1.0 / (1.0 + exp(-x)); }
+
+vec3 mlpDecode(vec4 feat) {
+	int h = int(pc.hiddenDim);
+	int f = int(pc.featureDim);
+	float hidden[32];
+	vec3 rgb = vec3(0.0);
+	int wBase = 0;
+	int i;
+	int c;
+
+	for (i = 0; i < 32; i++) {
+		hidden[i] = 0.0;
+	}
+	for (i = 0; i < h && i < 32; i++) {
+		float sum = weights.data[wBase + h * f + i];
+		int j;
+		for (j = 0; j < f && j < 4; j++) {
+			sum += weights.data[wBase + i * f + j] * feat[j];
+		}
+		hidden[i] = relu(sum);
+	}
+	wBase += h * f + h;
+	for (c = 0; c < 3; c++) {
+		float sum = weights.data[wBase + 3 * h + c];
+		for (i = 0; i < h && i < 32; i++) {
+			sum += weights.data[wBase + c * h + i] * hidden[i];
+		}
+		rgb[c] = sigmoid(sum);
+	}
+	return rgb * pc.strength;
+}
+
+vec3 worldPosFromDepth(vec2 uv, float depth) {
+	vec4 clip = vec4(uv * 2.0 - 1.0, depth, 1.0);
+	vec4 world = pc.invViewProj * clip;
+	return world.xyz / max(world.w, 1e-6);
+}
+
+void main() {
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if (pix.x >= pc.extent.x || pix.y >= pc.extent.y) {
+		return;
+	}
+
+	vec2 uv = (vec2(pix) + 0.5) / vec2(pc.extent);
+	float depth = texture(depthTex, uv).r;
+
+	if (depth <= 0.0 || depth >= 1.0) {
+		imageStore(irradianceOut, ivec2(pix), vec4(0.0));
+		return;
+	}
+
+	vec3 worldPos = worldPosFromDepth(uv, depth);
+	vec3 span = pc.worldMax.xyz - pc.worldMin.xyz;
+	vec3 uvw = (worldPos - pc.worldMin.xyz) / max(span, vec3(1e-3));
+	if (any(lessThan(uvw, vec3(0.0))) || any(greaterThan(uvw, vec3(1.0)))) {
+		imageStore(irradianceOut, ivec2(pix), vec4(0.0));
+		return;
+	}
+
+	vec4 feat = texture(featureVolume, uvw);
+	vec3 irr = mlpDecode(feat);
+	imageStore(irradianceOut, ivec2(pix), vec4(irr, 1.0));
+}

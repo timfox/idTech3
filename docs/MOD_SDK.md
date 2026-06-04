@@ -133,7 +133,7 @@ Reload: `script_reload` (requires `USE_LUA=ON`).
 
 | Feature | Doc |
 |---------|-----|
-| Signed pk3 | `pk3.sig` Ed25519 sidecar; `sv_pureSigned` |
+| Signed pk3 | `pk3.sig` SHA-256 integrity sidecar (`sha256=<hex>`); `com_pk3Signed` / `sv_pureSigned` |
 | Pure server | Classic `sv_pure` + CRC |
 | Crash reports | `com_crashReportURL` — [CRASH_REPORTING.md](CRASH_REPORTING.md) |
 | Anti-cheat hooks | [ANTICHEAT_INTEGRATION.md](ANTICHEAT_INTEGRATION.md) |

@@ -1,0 +1,33 @@
+#version 450
+/* Add vertex-feature neural GI into HDR scene color. */
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D depthTex;
+layout(set = 0, binding = 1) uniform sampler2D albedoTex;
+layout(set = 0, binding = 2) uniform sampler2D irradianceTex;
+layout(rgba16f, set = 0, binding = 3) uniform image2D colorOut;
+
+layout(push_constant) uniform VfgiCompositePush {
+	uvec2 extent;
+	float strength;
+	uint skipSky;
+} pc;
+
+void main() {
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if (pix.x >= pc.extent.x || pix.y >= pc.extent.y) {
+		return;
+	}
+
+	vec2 uv = (vec2(pix) + 0.5) / vec2(pc.extent);
+	float depth = texture(depthTex, uv).r;
+	if (pc.skipSky != 0u && (depth <= 0.0 || depth >= 1.0)) {
+		return;
+	}
+
+	vec3 albedo = texture(albedoTex, uv).rgb;
+	vec3 irr = texture(irradianceTex, uv).rgb;
+	vec3 gi = irr * albedo * pc.strength;
+	vec4 cur = imageLoad(colorOut, ivec2(pix));
+	imageStore(colorOut, ivec2(pix), vec4(cur.rgb + gi, cur.a));
+}

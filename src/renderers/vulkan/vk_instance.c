@@ -13,6 +13,9 @@ Extracted from vk.c for incremental modularization.
 #include "vk_device.h"
 #include "vk_util.h"
 #include "vk_validation.h"
+#ifdef USE_VUDA
+#include "vk_vuda.h"
+#endif
 
 /* VK_EXT_extended_dynamic_state3: for vkCmdSetColorWriteMaskEXT (RB_ColorMask) */
 #ifndef VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT
@@ -278,6 +281,14 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		qboolean shaderSubgroupUniformCF = qfalse;
 		qboolean extendedDynamicState3 = qfalse;
 		qboolean nvMeshShader = qfalse;
+#ifdef USE_VUDA
+		qboolean vudaExtMemory = qfalse;
+		qboolean vudaExtMemoryFd = qfalse;
+		qboolean vudaExtSem = qfalse;
+		qboolean vudaExtSemFd = qfalse;
+		qboolean vudaTimelineSem = qfalse;
+		VkPhysicalDeviceTimelineSemaphoreFeatures vuda_timeline_features;
+#endif
 #ifdef USE_VULKAN_RTX
 		qboolean rtxAccelStruct = qfalse;
 		qboolean rtxPipeline = qfalse;
@@ -372,6 +383,19 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			} else if ( strcmp( ext, VK_NV_MESH_SHADER_EXTENSION_NAME ) == 0 ) {
 				nvMeshShader = qtrue;
 			}
+#ifdef USE_VUDA
+			else if ( strcmp( ext, VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME ) == 0 ) {
+				vudaExtMemory = qtrue;
+			} else if ( strcmp( ext, VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME ) == 0 ) {
+				vudaExtMemoryFd = qtrue;
+			} else if ( strcmp( ext, VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME ) == 0 ) {
+				vudaExtSem = qtrue;
+			} else if ( strcmp( ext, VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME ) == 0 ) {
+				vudaExtSemFd = qtrue;
+			} else if ( strcmp( ext, VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME ) == 0 ) {
+				vudaTimelineSem = qtrue;
+			}
+#endif
 #ifdef USE_VULKAN_RTX
 			else if ( strcmp( ext, VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME ) == 0 ) {
 				rtxAccelStruct = qtrue;
@@ -516,6 +540,19 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			vk.meshShaderNV = qtrue;
 			ri.Printf( PRINT_ALL, "[VK] VK_NV_mesh_shader enabled (experimental; no mesh draw path yet)\n" );
 		}
+#ifdef USE_VUDA
+		vk.vudaInteropCapable = qfalse;
+		if ( vudaExtMemory && vudaExtMemoryFd && vudaExtSem && vudaExtSemFd && vudaTimelineSem &&
+			device_extension_count + 5 <= ARRAY_LEN( device_extension_list ) ) {
+			device_extension_list[ device_extension_count++ ] = VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME;
+			device_extension_list[ device_extension_count++ ] = VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME;
+			device_extension_list[ device_extension_count++ ] = VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME;
+			device_extension_list[ device_extension_count++ ] = VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME;
+			device_extension_list[ device_extension_count++ ] = VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME;
+			vk.vudaInteropCapable = qtrue;
+			ri.Printf( PRINT_ALL, "[VUDA] KHR external memory/semaphore fd + timeline: enabled\n" );
+		}
+#endif
 		(void)globalPriority; (void)shaderFloatControls2; (void)shaderMaximalReconvergence;
 		(void)shaderRelaxedExtInstr; (void)shaderSubgroupUniformCF; (void)legacyDithering;
 		(void)surfaceMaintenance1;
@@ -696,6 +733,17 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			device_desc.pNext = &host_query;
 		}
 
+#ifdef USE_VUDA
+		if ( vk.vudaInteropCapable ) {
+			const void *prev_next = device_desc.pNext;
+			Com_Memset( &vuda_timeline_features, 0, sizeof( vuda_timeline_features ) );
+			vuda_timeline_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
+			vuda_timeline_features.timelineSemaphore = VK_TRUE;
+			vuda_timeline_features.pNext = prev_next ? (void *)(uintptr_t)prev_next : NULL;
+			device_desc.pNext = &vuda_timeline_features;
+		}
+#endif
+
 		/* Chain last so _DEBUG / host_query pNext lists stay valid. */
 		if ( vk.meshShaderNV ) {
 			Com_Memset( &mesh_shader_features_nv, 0, sizeof( mesh_shader_features_nv ) );
@@ -746,6 +794,22 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 				vk.rtxAvailable = qfalse;
 				vk.meshShaderNV = qfalse;
 				return qfalse;
+			}
+		}
+#endif
+
+#ifdef USE_VUDA
+		if ( vk.vudaInteropCapable ) {
+			INIT_DEVICE_FUNCTION_EXT( vkGetMemoryFdKHR );
+			INIT_DEVICE_FUNCTION_EXT( vkGetMemoryFdPropertiesKHR );
+			INIT_DEVICE_FUNCTION_EXT( vkGetSemaphoreFdKHR );
+			INIT_DEVICE_FUNCTION_EXT( vkWaitSemaphoresKHR );
+			INIT_DEVICE_FUNCTION_EXT( vkSignalSemaphoreKHR );
+			if ( !qvkGetMemoryFdKHR || !qvkGetSemaphoreFdKHR || !qvkWaitSemaphoresKHR || !qvkSignalSemaphoreKHR ) {
+				ri.Printf( PRINT_WARNING, "[VUDA] Failed to resolve interop entry points; disabling\n" );
+				vk.vudaInteropCapable = qfalse;
+			} else {
+				R_VUDA_TryBuildInterop();
 			}
 		}
 #endif
@@ -1001,6 +1065,16 @@ void vk_init_vulkan_library( void )
 	}
 
 	INIT_DEVICE_FUNCTION_EXT(vkCmdClearColorImage)
+
+#ifdef USE_VUDA
+	if ( vk.vudaInteropCapable ) {
+		INIT_DEVICE_FUNCTION_EXT( vkGetMemoryFdKHR );
+		INIT_DEVICE_FUNCTION_EXT( vkGetMemoryFdPropertiesKHR );
+		INIT_DEVICE_FUNCTION_EXT( vkGetSemaphoreFdKHR );
+		INIT_DEVICE_FUNCTION_EXT( vkWaitSemaphoresKHR );
+		INIT_DEVICE_FUNCTION_EXT( vkSignalSemaphoreKHR );
+	}
+#endif
 }
 
 #undef INIT_INSTANCE_FUNCTION

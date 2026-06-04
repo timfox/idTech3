@@ -1,0 +1,5 @@
+# Mobile-GS demo manifest (v1: procedural splats; asset path reserved)
+version 1
+tier 1
+maxSplats 64
+scale 0.25

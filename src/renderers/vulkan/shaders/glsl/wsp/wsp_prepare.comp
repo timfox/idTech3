@@ -1,0 +1,70 @@
+#version 450
+/* WebSplatter prepare — WebGPU-portable 64-wide 1D dispatch (wg size <= 256). */
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+struct GaussianPrim {
+	vec3 position;
+	float opacity;
+	vec3 scale;
+	float sigmaScale;
+	vec4 rotation;
+	vec3 color;
+	float pad;
+};
+
+struct ScreenSplat {
+	vec4 centerDepth;
+	vec4 colorOpacity;
+	vec4 axes;
+};
+
+layout(std430, set = 0, binding = 0) readonly buffer GaussianBuffer {
+	GaussianPrim g[];
+} gaussians;
+
+layout(std430, set = 0, binding = 1) buffer SplatBuffer {
+	ScreenSplat s[];
+} splats;
+
+layout(push_constant) uniform WspPreparePush {
+	mat4 viewProj;
+	vec4 viewOrigin;
+	vec4 viewport;
+	int gaussianCount;
+	int pad0;
+	int pad1;
+	int pad2;
+} pc;
+
+void main() {
+	uint i = gl_GlobalInvocationID.x;
+	if ( int(i) >= pc.gaussianCount ) {
+		return;
+	}
+
+	GaussianPrim gp = gaussians.g[i];
+	vec4 clip = pc.viewProj * vec4(gp.position, 1.0);
+	if ( abs(clip.w) < 1e-5 ) {
+		splats.s[i].centerDepth = vec4(0.0);
+		splats.s[i].colorOpacity = vec4(0.0);
+		splats.s[i].axes = vec4(0.0);
+		return;
+	}
+
+	vec3 ndc = clip.xyz / clip.w;
+	if ( ndc.x < -1.2 || ndc.x > 1.2 || ndc.y < -1.2 || ndc.y > 1.2 || ndc.z < 0.0 || ndc.z > 1.0 ) {
+		splats.s[i].centerDepth = vec4(0.0);
+		splats.s[i].colorOpacity = vec4(0.0);
+		splats.s[i].axes = vec4(0.0);
+		return;
+	}
+
+	vec2 pix = (ndc.xy * 0.5 + 0.5) * pc.viewport.xy;
+	float maxScale = max(gp.scale.x, max(gp.scale.y, gp.scale.z)) * gp.sigmaScale;
+	float dist = length(gp.position - pc.viewOrigin.xyz);
+	float radius = clamp(maxScale * pc.viewport.z / max(dist, 8.0), 2.0, pc.viewport.w);
+
+	splats.s[i].centerDepth = vec4(pix, ndc.z, radius);
+	splats.s[i].colorOpacity = vec4(gp.color, clamp(gp.opacity, 0.0, 1.0));
+	splats.s[i].axes = vec4(radius, radius, maxScale, dist);
+}

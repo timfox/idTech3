@@ -1,0 +1,252 @@
+#version 450
+/*
+ * Neural Visibility Cache — simplified ReSTIR DI over Forward+ tile lights.
+ * Neural visibility cache weights candidates; emphasis at disocclusions (depth edges).
+ */
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+#define MAX_PER_TILE 8u
+#define REC_VEC4S 4u
+
+layout(set = 0, binding = 0) uniform sampler2D depthTex;
+layout(set = 0, binding = 1) uniform sampler2D normalTex;
+layout(set = 0, binding = 2) uniform sampler2D cacheTex;
+layout(std430, set = 0, binding = 3) readonly buffer LightSSBO {
+	vec4 data[];
+} lights;
+layout(std430, set = 0, binding = 4) readonly buffer TileSSBO {
+	uint cells[];
+} tiles;
+layout(std430, set = 0, binding = 5) readonly buffer ParamSSBO {
+	mat4 clipFromWorld;
+	uvec4 tiles_xy_viewport;
+	vec4 viewOrg;
+} params;
+layout(std430, set = 0, binding = 6) readonly buffer NvcWeights {
+	float data[];
+} weights;
+layout(rgba16f, set = 0, binding = 7) uniform writeonly image2D directOut;
+
+layout(push_constant) uniform NvcRestirPush {
+	mat4 invViewProj;
+	vec4 extent;
+	vec4 params2;
+	vec4 featureHidden;
+	uint useGBufferNormal;
+	uint hasGBuffer;
+	uint restirMode;
+	uint pad0;
+} pc;
+
+float relu(float x) { return max(x, 0.0); }
+float sigmoid(float x) { return 1.0 / (1.0 + exp(-x)); }
+
+float mlpVis(vec4 feat) {
+	int h = int(pc.featureHidden.y);
+	int f = int(pc.featureHidden.x);
+	float hidden[16];
+	int wBase = 0;
+	int i;
+	float sum;
+
+	for (i = 0; i < 16; i++) {
+		hidden[i] = 0.0;
+	}
+	for (i = 0; i < h && i < 16; i++) {
+		sum = weights.data[wBase + h * f + i];
+		int j;
+		for (j = 0; j < f && j < 4; j++) {
+			sum += weights.data[wBase + i * f + j] * feat[j];
+		}
+		hidden[i] = relu(sum);
+	}
+	wBase += h * f + h;
+	sum = weights.data[wBase];
+	for (i = 0; i < h && i < 16; i++) {
+		sum += weights.data[wBase + 1 + i] * hidden[i];
+	}
+	return sigmoid(sum);
+}
+
+vec3 worldPosFromDepth(vec2 uv, float depth) {
+	vec4 clip = vec4(uv * 2.0 - 1.0, depth, 1.0);
+	vec4 world = pc.invViewProj * clip;
+	return world.xyz / max(world.w, 1e-6);
+}
+
+vec3 decodeNormal(vec2 uv) {
+	if (pc.hasGBuffer != 0u && pc.useGBufferNormal != 0u) {
+		vec3 n = texture(normalTex, uv).xyz * 2.0 - 1.0;
+		float len = length(n);
+		if (len > 0.01) {
+			return n / len;
+		}
+	}
+	vec2 texel = 1.0 / pc.extent.xy;
+	float dL = texture(depthTex, uv + vec2(-texel.x, 0.0)).r;
+	float dR = texture(depthTex, uv + vec2(texel.x, 0.0)).r;
+	float dD = texture(depthTex, uv + vec2(0.0, -texel.y)).r;
+	float dU = texture(depthTex, uv + vec2(0.0, texel.y)).r;
+	vec3 dpdx = vec3(texel.x * 2.0, 0.0, dR - dL);
+	vec3 dpdy = vec3(0.0, texel.y * 2.0, dU - dD);
+	return normalize(cross(dpdx, dpdy));
+}
+
+float hash21(vec2 p) {
+	return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
+void main() {
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if (pix.x >= uint(pc.extent.x) || pix.y >= uint(pc.extent.y)) {
+		return;
+	}
+
+	vec2 uv = (vec2(pix) + 0.5) / pc.extent.xy;
+	float depth = texture(depthTex, uv).r;
+
+	if (depth <= 0.0 || depth >= 1.0) {
+		imageStore(directOut, ivec2(pix), vec4(0.0));
+		return;
+	}
+
+	if (pc.restirMode == 0u) {
+		imageStore(directOut, ivec2(pix), vec4(0.0));
+		return;
+	}
+
+	vec4 cache = texture(cacheTex, uv);
+	float disocclusion = cache.b;
+	float visCache = cache.r;
+
+	uint tilesX = uint(lights.data[1].x + 0.5);
+	uint tilesY = uint(lights.data[1].y + 0.5);
+	float vw = lights.data[1].z;
+	float vh = lights.data[1].w;
+	if (tilesX == 0u || tilesY == 0u || vw < 1.0 || vh < 1.0) {
+		imageStore(directOut, ivec2(pix), vec4(0.0));
+		return;
+	}
+
+	vec3 worldPos = worldPosFromDepth(uv, depth);
+	vec3 N = decodeNormal(uv);
+	vec3 V = normalize(params.viewOrg.xyz - worldPos);
+
+	vec4 wc = params.clipFromWorld * vec4(worldPos, 1.0);
+	if (abs(wc.w) < 1e-5) {
+		imageStore(directOut, ivec2(pix), vec4(0.0));
+		return;
+	}
+	vec3 ndc = wc.xyz / wc.w;
+	if (ndc.z < -1.0 || ndc.z > 1.0) {
+		imageStore(directOut, ivec2(pix), vec4(0.0));
+		return;
+	}
+
+	vec2 px;
+	px.x = 0.5 * (1.0 + ndc.x) * vw;
+	px.y = 0.5 * (1.0 + ndc.y) * vh;
+	float tilePxX = vw / max(float(tilesX), 1.0);
+	float tilePxY = vh / max(float(tilesY), 1.0);
+	uint tx = min(uint(px.x / tilePxX), tilesX - 1u);
+	uint ty = min(uint(px.y / tilePxY), tilesY - 1u);
+	uint tileId = ty * tilesX + tx;
+	uint tbase = tileId * MAX_PER_TILE;
+
+	float nLights = lights.data[0].x;
+	uint maxPerTile = uint(max(lights.data[0].z + 0.5, 1.0));
+	maxPerTile = min(maxPerTile, MAX_PER_TILE);
+
+	float strength = pc.params2.x;
+	float disBoost = pc.params2.y;
+	float M = max(pc.params2.z, 1.0);
+
+	vec3 reservoirRgb = vec3(0.0);
+	float reservoirW = 0.0;
+	float wSum = 0.0;
+	float rnd = hash21(vec2(pix));
+
+	for (uint m = 0u; m < uint(M); m++) {
+		for (uint k = 0u; k < maxPerTile; k++) {
+			uint li = tiles.cells[tbase + k];
+			if (li == 0xFFFFFFFFu || float(li) + 0.5 >= nLights) {
+				continue;
+			}
+			uint b0 = 2u + li * REC_VEC4S;
+			vec3 lpos = lights.data[b0].xyz;
+			float rad = max(lights.data[b0].w, 1e-3);
+			vec4 lc = lights.data[b0 + 1u];
+			vec4 lpack = lights.data[b0 + 2u];
+			vec3 Ldir;
+			float att = 0.0;
+			float NL = 0.0;
+
+			if (lc.w < 0.5) {
+				vec3 Lw = lpos - worldPos;
+				float dist = length(Lw);
+				if (dist > rad) {
+					continue;
+				}
+				float dr = dist / max(rad, 1e-4);
+				att = clamp(1.0 - dr * dr, 0.0, 1.0);
+				Ldir = Lw / max(dist, 1e-4);
+				NL = max(dot(N, Ldir), 0.0);
+			} else {
+				vec3 axis = normalize(vec3(lpack.x, lpack.y, lpack.z));
+				float cosOuter = lpack.w;
+				float cosInner = lights.data[b0 + 3u].x;
+				float segLen = max(lights.data[b0 + 3u].y, 1e-3);
+				vec3 v = worldPos - lpos;
+				float tAx = dot(v, axis);
+				float tCl = clamp(tAx, 0.0, segLen);
+				vec3 closest = lpos + axis * tCl;
+				float dPerp = length(worldPos - closest);
+				if (dPerp > rad) {
+					continue;
+				}
+				vec3 wDir = v / max(length(v), 1e-4);
+				float cosAng = dot(wDir, axis);
+				float cone = smoothstep(cosOuter, cosInner, cosAng);
+				if (cone <= 1e-4) {
+					continue;
+				}
+				float axAtt = 1.0 - smoothstep(segLen * 0.85, segLen, tCl);
+				float rp = dPerp / max(rad, 1e-4);
+				float radAtt = clamp(1.0 - rp * rp, 0.0, 1.0);
+				att = cone * axAtt * radAtt;
+				Ldir = -wDir;
+				NL = max(dot(N, Ldir), 0.0);
+			}
+
+			if (att <= 0.0 || NL <= 0.0) {
+				continue;
+			}
+
+			float distNorm = 0.0;
+			if (lc.w < 0.5) {
+				distNorm = length(lpos - worldPos) / max(rad, 1e-3);
+			}
+			vec4 feat = vec4(distNorm, NL, att, disocclusion);
+			float visN = mlpVis(feat);
+			float vis = mix(visCache, visN, 0.35);
+			float lum = dot(lc.rgb, vec3(0.2126, 0.7152, 0.0722));
+			float w = lum * att * NL * vis;
+			w *= mix(1.0, 1.0 + disBoost * disocclusion, step(0.02, disocclusion));
+
+			wSum += w;
+			if (wSum > 1e-6 && rnd < w / wSum) {
+				reservoirW = w;
+				float fpAdditive = lights.data[b0 + 3u].z;
+				float addBoost = mix(1.0, 1.25, step(0.5, fpAdditive));
+				reservoirRgb = lc.rgb * addBoost * att * NL * strength;
+			}
+		}
+		rnd = fract(rnd * 1.37 + 0.11);
+	}
+
+	float edgeGate = mix(0.15, 1.0, clamp(disocclusion * (1.0 + disBoost), 0.0, 1.0));
+	vec3 outRgb = reservoirRgb * edgeGate;
+	float outW = clamp(reservoirW * edgeGate, 0.0, 1.0);
+
+	imageStore(directOut, ivec2(pix), vec4(outRgb, outW));
+}

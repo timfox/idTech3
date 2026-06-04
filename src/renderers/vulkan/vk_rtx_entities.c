@@ -21,7 +21,7 @@ static const uint16_t s_entity_cube_indices[36] = {
 	2, 6, 3, 3, 6, 7, 0, 4, 2, 2, 4, 6, 1, 3, 5, 3, 7, 5
 };
 
-uint32_t vk_rtx_entities_pack( const refdef_t *refdef, const viewParms_t *viewParms,
+uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *viewParms,
 	uint32_t maxEntities, float *positions, uint32_t *indices )
 {
 	int i, n, v, t;
@@ -83,7 +83,7 @@ uint32_t vk_rtx_entities_pack( const refdef_t *refdef, const viewParms_t *viewPa
 
 #else /* !USE_VULKAN_RTX */
 
-uint32_t vk_rtx_entities_pack( const refdef_t *refdef, const viewParms_t *viewParms,
+uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *viewParms,
 	uint32_t maxEntities, float *positions, uint32_t *indices )
 {
 	(void)refdef;

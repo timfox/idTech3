@@ -1,0 +1,35 @@
+#version 450
+/* Blend neural silhouette refinement into HDR scene color. */
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D depthTex;
+layout(set = 0, binding = 1) uniform sampler2D refinedTex;
+layout(rgba16f, set = 0, binding = 2) uniform image2D colorOut;
+
+layout(push_constant) uniform NistCompositePush {
+	vec4 extent;
+	vec4 params;
+} pc;
+
+void main() {
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if (pix.x >= uint(pc.extent.x) || pix.y >= uint(pc.extent.y)) {
+		return;
+	}
+
+	vec2 uv = (vec2(pix) + 0.5) / pc.extent.xy;
+	float depth = texture(depthTex, uv).r;
+	if (pc.params.z > 0.5 && (depth <= 0.0 || depth >= 1.0)) {
+		return;
+	}
+
+	vec4 refined = texture(refinedTex, uv);
+	if (refined.a <= 1e-4) {
+		return;
+	}
+
+	vec4 cur = imageLoad(colorOut, ivec2(pix));
+	float w = refined.a * pc.params.x;
+	vec3 rgb = mix(cur.rgb, refined.rgb, w);
+	imageStore(colorOut, ivec2(pix), vec4(rgb, cur.a));
+}

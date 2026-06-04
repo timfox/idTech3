@@ -1,0 +1,4 @@
+version 1
+coStreamMask 7
+slotMb 64
+mux 1

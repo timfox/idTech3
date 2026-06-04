@@ -1,0 +1,96 @@
+#version 450
+/*
+ * Neural Six-way Lightmaps — froxel modulation pass.
+ * Classic six axis weights from view direction + neural feature volume + MLP.
+ */
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;
+
+layout(set = 0, binding = 0) uniform sampler3D featureVolume;
+layout(std430, set = 0, binding = 1) readonly buffer NslmWeights {
+	float data[];
+} weights;
+layout(binding = 2, rgba16f) uniform image3D froxelScatter;
+
+layout(push_constant) uniform NslmFroxelPush {
+	vec4 worldMin;
+	vec4 worldMax;
+	vec4 froxelDim;
+	vec4 featureHidden;
+	vec4 viewOrigin;
+	vec4 sunDirection;
+	vec4 modParams;
+} pc;
+
+float relu(float x) { return max(x, 0.0); }
+float sigmoid(float x) { return 1.0 / (1.0 + exp(-x)); }
+
+vec3 sixWayBasis(vec3 viewDir) {
+	vec3 v = normalize(viewDir);
+	float sharp = max(pc.modParams.y, 0.5);
+	float px = pow(max( v.x, 0.0), sharp) + pow(max(-v.x, 0.0), sharp);
+	float py = pow(max( v.y, 0.0), sharp) + pow(max(-v.y, 0.0), sharp);
+	float pz = pow(max( v.z, 0.0), sharp) + pow(max(-v.z, 0.0), sharp);
+	return vec3(px, py, pz);
+}
+
+vec3 mlpDecode(vec4 feat, vec3 viewDir, vec3 sunDir, vec3 sixBasis) {
+	int h = int(pc.featureHidden.y);
+	int f = int(pc.featureHidden.x);
+	float hidden[32];
+	vec3 rgb = vec3(0.0);
+	int wBase = 0;
+	int i;
+	int c;
+
+	for (i = 0; i < 32; i++) {
+		hidden[i] = 0.0;
+	}
+	for (i = 0; i < h && i < 32; i++) {
+		float sum = weights.data[wBase + h * f + i];
+		int j;
+		for (j = 0; j < f && j < 4; j++) {
+			sum += weights.data[wBase + i * f + j] * feat[j];
+		}
+		sum += dot(viewDir, sunDir) * 0.1;
+		sum += sixBasis.x * 0.05;
+		hidden[i] = relu(sum);
+	}
+	wBase += h * f + h;
+	for (c = 0; c < 3; c++) {
+		float sum = weights.data[wBase + 3 * h + c];
+		for (i = 0; i < h && i < 32; i++) {
+			sum += weights.data[wBase + c * h + i] * hidden[i];
+		}
+		rgb[c] = sigmoid(sum);
+	}
+	return rgb;
+}
+
+void main() {
+	uvec3 gid = gl_GlobalInvocationID.xyz;
+	if ( gid.x >= uint(pc.froxelDim.x) || gid.y >= uint(pc.froxelDim.y) || gid.z >= uint(pc.froxelDim.z) ) {
+		return;
+	}
+
+	vec3 uvwFroxel = (vec3(gid) + 0.5) / pc.froxelDim.xyz;
+	vec3 span = pc.worldMax.xyz - pc.worldMin.xyz;
+	vec3 worldPos = pc.worldMin.xyz + uvwFroxel * span;
+
+	vec3 featSpan = pc.worldMax.xyz - pc.worldMin.xyz;
+	vec3 featUvw = (worldPos - pc.worldMin.xyz) / max(featSpan, vec3(1e-3));
+	if (any(lessThan(featUvw, vec3(0.0))) || any(greaterThan(featUvw, vec3(1.0)))) {
+		return;
+	}
+
+	vec4 feat = texture(featureVolume, featUvw);
+	vec3 viewDir = normalize(pc.viewOrigin.xyz - worldPos);
+	vec3 sunDir = normalize(pc.sunDirection.xyz);
+	vec3 sixBasis = sixWayBasis(viewDir);
+	vec3 irr = mlpDecode(feat, viewDir, sunDir, sixBasis);
+
+	float phase = 0.85 + 0.15 * sin(pc.modParams.z * 6.28318 + worldPos.z * 0.002);
+	irr *= phase * pc.modParams.x;
+
+	vec4 scatter = imageLoad(froxelScatter, ivec3(gid));
+	imageStore(froxelScatter, ivec3(gid), vec4(scatter.rgb + irr, scatter.a));
+}

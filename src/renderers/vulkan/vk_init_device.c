@@ -46,6 +46,8 @@ Extracted from vk.c for incremental modularization.
 #include "vk_resource_destroy.h"
 #include "vk_descriptor_sets.h"
 #include "vk_rtx.h"
+#include "vk_grtx.h"
+#include "vk_pathtrace.h"
 #include "vk_pipeline_cache_disk.h"
 #include "vk_pipeline_helpers.h"
 #include "vk_raster_samples.h"
@@ -460,7 +462,7 @@ void vk_initialize( void )
 				ri.Printf( PRINT_ALL, "[VK]   Sampler Anisotropy  : %s\n",
 					features.samplerAnisotropy ? "yes" : "no" );
 #ifdef USE_VULKAN_RTX
-				if ( vk.rtxExtensionsEnabled ) {
+				if ( vk.rtxAvailable ) {
 					ri.Printf( PRINT_ALL, "[VK]   Ray Tracing         : enabled (KHR AS + RT pipeline + buffer device address)\n" );
 				} else {
 					ri.Printf( PRINT_ALL, "[VK]   Ray Tracing         : build on, GPU/extensions unavailable\n" );
@@ -1226,6 +1228,8 @@ void vk_initialize( void )
 	vk_create_framebuffers();
 
 	vk_rtx_init();
+	vk_grtx_init();
+	vk_pathtrace_init();
 
 #ifdef VK_CUBEMAP
 	vk_create_cubemap_prefilter();
