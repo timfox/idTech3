@@ -228,6 +228,7 @@ extern cvar_t *s_acoustics_draw;
 extern cvar_t *s_acoustics_print_interval_ms;
 extern cvar_t *s_acoustics_hz;
 extern cvar_t *s_acoustics_rays;
+extern cvar_t *s_acoustics_reflection_effort;
 extern cvar_t *s_acoustics_maxdist;
 extern cvar_t *s_acoustics_near;
 extern cvar_t *s_acoustics_cone_deg;

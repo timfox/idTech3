@@ -33,6 +33,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <AL/alc.h>
 
 #include "../effects/snd_efx.h"
+#include "../mixer/snd_mixer.h"
 
 #ifndef ALC_HRTF_SOFT
 #define ALC_HRTF_SOFT 0x1992
@@ -320,6 +321,23 @@ static void S_AL_ApplyDirectFilter( ALuint source, qboolean occluded, float base
 		alSourcei( source, AL_DIRECT_FILTER, 0 );
 	}
 	alSourcef( source, AL_GAIN, baseGain );
+}
+
+static float S_AL_ComputeGain( float baseGain, int entchannel, const vec3_t srcPos ) {
+	snd_bus_t bus;
+
+	if ( srcPos && !S_Mixer_PropagationAllowed( srcPos ) ) {
+		return 0.0f;
+	}
+	bus = S_Mixer_ChannelToBus( entchannel );
+	return baseGain * S_Mixer_SourceGain( bus, entchannel );
+}
+
+static float S_AL_ComputeAmbGain( float baseGain, const vec3_t srcPos ) {
+	if ( srcPos && !S_Mixer_PropagationAllowed( srcPos ) ) {
+		return 0.0f;
+	}
+	return baseGain * S_Mixer_SourceGain( SND_BUS_AMB, CHAN_AUTO );
 }
 
 static void S_AL_UpdateOcclusion( ALuint source, const vec3_t sourcePos, float baseGain ) {
@@ -718,6 +736,7 @@ static void S_AL_UpdateLoopingSounds( void ) {
 			alChannels[channel].inUse = qtrue;
 			alChannels[channel].looping = qtrue;
 			alChannels[channel].entnum = ent;
+			alChannels[channel].entchannel = CHAN_AUTO;
 			alChannels[channel].sfx = loop->sfx;
 			alChannels[channel].startTime = Sys_Milliseconds();
 			alChannels[channel].fixed_origin = qtrue;
@@ -732,7 +751,8 @@ static void S_AL_UpdateLoopingSounds( void ) {
 
 		alSourcei( alChannels[channel].source, AL_BUFFER, buffer );
 		alSourcei( alChannels[channel].source, AL_LOOPING, AL_TRUE );
-		alSourcef( alChannels[channel].source, AL_GAIN, alChannels[channel].baseGain );
+		alSourcef( alChannels[channel].source, AL_GAIN,
+			S_AL_ComputeAmbGain( alChannels[channel].baseGain, loop->origin ) );
 		alSourcef( alChannels[channel].source, AL_REFERENCE_DISTANCE, 80.0f );
 		alSourcef( alChannels[channel].source, AL_ROLLOFF_FACTOR, s_openalRolloff ? s_openalRolloff->value : 1.0f );
 		alSourcef( alChannels[channel].source, AL_MAX_DISTANCE, s_openalMaxDistance ? s_openalMaxDistance->value : 2000.0f );
@@ -746,20 +766,24 @@ static void S_AL_UpdateLoopingSounds( void ) {
 		}
 
 		if ( ent == alListenerEntity ) {
+			float gain = S_AL_ComputeAmbGain( alChannels[channel].baseGain, alListenerOrigin );
+
 			VectorClear( pos );
 			S_AL_SetSourcePosition( alChannels[channel].source, qtrue, pos );
 			if ( s_acoustics_enable && s_acoustics_enable->integer ) {
-				S_Acoustics_ApplySource( alChannels[channel].source, alChannels[channel].baseGain, alListenerOrigin );
+				S_Acoustics_ApplySource( alChannels[channel].source, gain, alListenerOrigin );
 			} else {
-				S_AL_UpdateOcclusion( alChannels[channel].source, alListenerOrigin, alChannels[channel].baseGain );
+				S_AL_UpdateOcclusion( alChannels[channel].source, alListenerOrigin, gain );
 			}
 		} else {
+			float gain = S_AL_ComputeAmbGain( alChannels[channel].baseGain, loop->origin );
+
 			S_AL_SetSourcePosition( alChannels[channel].source, qfalse, loop->origin );
 			alSource3f( alChannels[channel].source, AL_VELOCITY, loop->velocity[0], loop->velocity[1], loop->velocity[2] );
 			if ( s_acoustics_enable && s_acoustics_enable->integer ) {
-				S_Acoustics_ApplySource( alChannels[channel].source, alChannels[channel].baseGain, loop->origin );
+				S_Acoustics_ApplySource( alChannels[channel].source, gain, loop->origin );
 			} else {
-				S_AL_UpdateOcclusion( alChannels[channel].source, loop->origin, alChannels[channel].baseGain );
+				S_AL_UpdateOcclusion( alChannels[channel].source, loop->origin, gain );
 			}
 		}
 
@@ -881,9 +905,12 @@ static void S_AL_VoipUnqueue( al_voip_channel_t *channel ) {
 }
 
 static void S_AL_UpdateMusic( void ) {
+	float musicMix = S_Mixer_MusicGain();
+
 	if ( alBackgroundStream && alMusicSource ) {
+		float gain = ( s_musicVolume ? s_musicVolume->value : 1.0f ) * musicMix;
 		S_AL_UpdateStreamSource( alMusicSource, alMusicBuffers, AL_MUSIC_BUFFER_COUNT, &alBackgroundStream,
-			alBackgroundLoop, s_musicVolume ? s_musicVolume->value : 1.0f );
+			alBackgroundLoop, gain );
 	}
 
 	if ( s_musicLayerEnabled && s_musicLayerEnabled->integer && alMusicLayerStream && alMusicLayerSource ) {
@@ -891,7 +918,7 @@ static void S_AL_UpdateMusic( void ) {
 		float base = s_musicVolume ? s_musicVolume->value : 1.0f;
 		float layerVolume = s_musicLayerVolume ? s_musicLayerVolume->value : 1.0f;
 		S_AL_UpdateStreamSource( alMusicLayerSource, alMusicLayerBuffers, AL_MUSIC_BUFFER_COUNT, &alMusicLayerStream,
-			alMusicLayerLoop, base * layerVolume * intensity );
+			alMusicLayerLoop, base * layerVolume * intensity * musicMix );
 	}
 }
 
@@ -952,10 +979,14 @@ static void S_AL_UpdateVoip( void ) {
 		}
 
 		S_AL_SetSourcePosition( channel->source, qfalse, channel->origin );
-		if ( s_acoustics_enable && s_acoustics_enable->integer ) {
-			S_Acoustics_ApplySource( channel->source, channel->baseGain, channel->origin );
-		} else {
-			S_AL_UpdateOcclusion( channel->source, channel->origin, channel->baseGain );
+		{
+			float gain = S_AL_ComputeGain( channel->baseGain, CHAN_VOICE, channel->origin );
+
+			if ( s_acoustics_enable && s_acoustics_enable->integer ) {
+				S_Acoustics_ApplySource( channel->source, gain, channel->origin );
+			} else {
+				S_AL_UpdateOcclusion( channel->source, channel->origin, gain );
+			}
 		}
 
 		alGetSourcei( channel->source, AL_SOURCE_STATE, &state );
@@ -1221,15 +1252,23 @@ static void S_AL_VoipSamples( int entityNum, const vec3_t origin, int samples, i
 	}
 
 	alSourceQueueBuffers( channel->source, 1, &buffer );
-	alSourcef( channel->source, AL_GAIN, channel->baseGain * volume );
+	S_Mixer_NotifyVoiceActive();
+	alSourcef( channel->source, AL_GAIN,
+		S_AL_ComputeGain( channel->baseGain * volume, CHAN_VOICE, channel->origin ) );
 	channel->bufferQueued[bufferIndex] = qtrue;
 	channel->nextBuffer = ( bufferIndex + 1 ) % AL_VOIP_BUFFER_COUNT;
 
 	S_AL_SetSourcePosition( channel->source, qfalse, channel->origin );
 	if ( s_acoustics_enable && s_acoustics_enable->integer ) {
-		S_Acoustics_ApplySource( channel->source, channel->baseGain * volume, channel->origin );
+		{
+			float gain = S_AL_ComputeGain( channel->baseGain * volume, CHAN_VOICE, channel->origin );
+
+			S_Acoustics_ApplySource( channel->source, gain, channel->origin );
+		}
 	} else {
-		S_AL_UpdateOcclusion( channel->source, channel->origin, channel->baseGain * volume );
+		float gain = S_AL_ComputeGain( channel->baseGain * volume, CHAN_VOICE, channel->origin );
+
+		S_AL_UpdateOcclusion( channel->source, channel->origin, gain );
 	}
 
 	{
@@ -1375,6 +1414,7 @@ static void S_AL_Respatialize( int entityNum, const vec3_t origin, vec3_t axis[3
 	VectorCopy( axis[0], alListenerAxis[0] );
 	VectorCopy( axis[1], alListenerAxis[1] );
 	VectorCopy( axis[2], alListenerAxis[2] );
+	S_Mixer_SetListenerOrigin( alListenerOrigin );
 	S_AL_UpdateListener();
 
 	S_Acoustics_Frame( alListenerOrigin, alListenerAxis[0], alListenerAxis[1], alListenerAxis[2] );
@@ -1385,21 +1425,28 @@ static void S_AL_Respatialize( int entityNum, const vec3_t origin, vec3_t axis[3
 		}
 
 		if ( alChannels[i].fixed_origin ) {
+			float gain = S_AL_ComputeGain( alChannels[i].baseGain, alChannels[i].entchannel, alChannels[i].origin );
+
 			S_AL_SetSourcePosition( alChannels[i].source, qfalse, alChannels[i].origin );
 			if ( s_acoustics_enable && s_acoustics_enable->integer ) {
-				S_Acoustics_ApplySource( alChannels[i].source, alChannels[i].baseGain, alChannels[i].origin );
+				S_Acoustics_ApplySource( alChannels[i].source, gain, alChannels[i].origin );
 			} else {
-				S_AL_UpdateOcclusion( alChannels[i].source, alChannels[i].origin, alChannels[i].baseGain );
+				S_AL_UpdateOcclusion( alChannels[i].source, alChannels[i].origin, gain );
 			}
 		} else if ( alChannels[i].entnum == alListenerEntity ) {
 			vec3_t zero = { 0.0f, 0.0f, 0.0f };
+			float gain = S_AL_ComputeGain( alChannels[i].baseGain, alChannels[i].entchannel, alListenerOrigin );
+
 			S_AL_SetSourcePosition( alChannels[i].source, qtrue, zero );
 			if ( s_acoustics_enable && s_acoustics_enable->integer ) {
-				S_Acoustics_ApplySource( alChannels[i].source, alChannels[i].baseGain, alListenerOrigin );
+				S_Acoustics_ApplySource( alChannels[i].source, gain, alListenerOrigin );
 			} else {
-				S_AL_UpdateOcclusion( alChannels[i].source, alListenerOrigin, alChannels[i].baseGain );
+				S_AL_UpdateOcclusion( alChannels[i].source, alListenerOrigin, gain );
 			}
 		} else if ( alChannels[i].entnum >= 0 && alChannels[i].entnum < MAX_GENTITIES && alEntityPosValid[alChannels[i].entnum] ) {
+			float gain = S_AL_ComputeGain( alChannels[i].baseGain, alChannels[i].entchannel,
+				alEntityPositions[alChannels[i].entnum] );
+
 			S_AL_SetSourcePosition( alChannels[i].source, qfalse, alEntityPositions[alChannels[i].entnum] );
 			// Update velocity for doppler
 			alSource3f( alChannels[i].source, AL_VELOCITY, 
@@ -1407,9 +1454,9 @@ static void S_AL_Respatialize( int entityNum, const vec3_t origin, vec3_t axis[3
 				alEntityVelocities[alChannels[i].entnum][1],
 				alEntityVelocities[alChannels[i].entnum][2] );
 			if ( s_acoustics_enable && s_acoustics_enable->integer ) {
-				S_Acoustics_ApplySource( alChannels[i].source, alChannels[i].baseGain, alEntityPositions[alChannels[i].entnum] );
+				S_Acoustics_ApplySource( alChannels[i].source, gain, alEntityPositions[alChannels[i].entnum] );
 			} else {
-				S_AL_UpdateOcclusion( alChannels[i].source, alEntityPositions[alChannels[i].entnum], alChannels[i].baseGain );
+				S_AL_UpdateOcclusion( alChannels[i].source, alEntityPositions[alChannels[i].entnum], gain );
 			}
 		}
 	}
@@ -1477,7 +1524,6 @@ static void S_AL_StartSound( const vec3_t origin, int entityNum, int entchannel,
 
 	alSourcei( ch->source, AL_BUFFER, buffer );
 	alSourcei( ch->source, AL_LOOPING, AL_FALSE );
-	alSourcef( ch->source, AL_GAIN, ch->baseGain );
 	alSourcef( ch->source, AL_REFERENCE_DISTANCE, 80.0f );
 	alSourcef( ch->source, AL_ROLLOFF_FACTOR, s_openalRolloff ? s_openalRolloff->value : 1.0f );
 	alSourcef( ch->source, AL_MAX_DISTANCE, s_openalMaxDistance ? s_openalMaxDistance->value : 2000.0f );
@@ -1494,35 +1540,59 @@ static void S_AL_StartSound( const vec3_t origin, int entityNum, int entchannel,
 		VectorCopy( origin, ch->origin );
 		ch->fixed_origin = qtrue;
 		S_AL_SetSourcePosition( ch->source, qfalse, ch->origin );
-		if ( s_acoustics_enable && s_acoustics_enable->integer ) {
-			S_Acoustics_ApplySource( ch->source, ch->baseGain, ch->origin );
-		} else {
-			S_AL_UpdateOcclusion( ch->source, ch->origin, ch->baseGain );
+		{
+			float gain = S_AL_ComputeGain( ch->baseGain, entchannel, ch->origin );
+
+			alSourcef( ch->source, AL_GAIN, gain );
+			if ( s_acoustics_enable && s_acoustics_enable->integer ) {
+				S_Acoustics_ApplySource( ch->source, gain, ch->origin );
+			} else {
+				S_AL_UpdateOcclusion( ch->source, ch->origin, gain );
+			}
+			S_Mixer_OnPlaySound( ch->sfx->soundName, entchannel, ch->origin );
 		}
 	} else {
 		ch->fixed_origin = qfalse;
 		if ( entityNum == alListenerEntity ) {
 			VectorClear( pos );
 			S_AL_SetSourcePosition( ch->source, qtrue, pos );
-			if ( s_acoustics_enable && s_acoustics_enable->integer ) {
-				S_Acoustics_ApplySource( ch->source, ch->baseGain, alListenerOrigin );
-			} else {
-				S_AL_UpdateOcclusion( ch->source, alListenerOrigin, ch->baseGain );
+			{
+				float gain = S_AL_ComputeGain( ch->baseGain, entchannel, alListenerOrigin );
+
+				alSourcef( ch->source, AL_GAIN, gain );
+				if ( s_acoustics_enable && s_acoustics_enable->integer ) {
+					S_Acoustics_ApplySource( ch->source, gain, alListenerOrigin );
+				} else {
+					S_AL_UpdateOcclusion( ch->source, alListenerOrigin, gain );
+				}
+				S_Mixer_OnPlaySound( ch->sfx->soundName, entchannel, alListenerOrigin );
 			}
 		} else if ( entityNum >= 0 && entityNum < MAX_GENTITIES && alEntityPosValid[entityNum] ) {
 			S_AL_SetSourcePosition( ch->source, qfalse, alEntityPositions[entityNum] );
-			if ( s_acoustics_enable && s_acoustics_enable->integer ) {
-				S_Acoustics_ApplySource( ch->source, ch->baseGain, alEntityPositions[entityNum] );
-			} else {
-				S_AL_UpdateOcclusion( ch->source, alEntityPositions[entityNum], ch->baseGain );
+			{
+				float gain = S_AL_ComputeGain( ch->baseGain, entchannel, alEntityPositions[entityNum] );
+
+				alSourcef( ch->source, AL_GAIN, gain );
+				if ( s_acoustics_enable && s_acoustics_enable->integer ) {
+					S_Acoustics_ApplySource( ch->source, gain, alEntityPositions[entityNum] );
+				} else {
+					S_AL_UpdateOcclusion( ch->source, alEntityPositions[entityNum], gain );
+				}
+				S_Mixer_OnPlaySound( ch->sfx->soundName, entchannel, alEntityPositions[entityNum] );
 			}
 		} else {
 			VectorClear( pos );
 			S_AL_SetSourcePosition( ch->source, qtrue, pos );
-			if ( s_acoustics_enable && s_acoustics_enable->integer ) {
-				S_Acoustics_ApplySource( ch->source, ch->baseGain, pos );
-			} else {
-				S_AL_UpdateOcclusion( ch->source, pos, ch->baseGain );
+			{
+				float gain = S_AL_ComputeGain( ch->baseGain, entchannel, pos );
+
+				alSourcef( ch->source, AL_GAIN, gain );
+				if ( s_acoustics_enable && s_acoustics_enable->integer ) {
+					S_Acoustics_ApplySource( ch->source, gain, pos );
+				} else {
+					S_AL_UpdateOcclusion( ch->source, pos, gain );
+				}
+				S_Mixer_OnPlaySound( ch->sfx->soundName, entchannel, NULL );
 			}
 		}
 	}
@@ -1551,7 +1621,8 @@ static void S_AL_Update( int msec ) {
 		return;
 	}
 
-	(void)msec;
+	S_Mixer_Frame( msec );
+	S_Mixer_SetListenerOrigin( alListenerOrigin );
 
 	s_soundtime = Sys_Milliseconds();
 

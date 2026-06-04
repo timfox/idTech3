@@ -19,6 +19,7 @@ How to test (console):
 #include "../snd_local.h"
 
 #include "snd_efx.h"
+#include "../mixer/snd_mixer.h"
 
 #ifdef USE_OPENAL
 
@@ -537,7 +538,14 @@ static void S_Acoustics_UpdatePreset( void ) {
 
 static int S_Acoustics_GetRayCount( void ) {
 	int cvarRays = s_acoustics_rays ? s_acoustics_rays->integer : 12;
+	int effort = s_acoustics_reflection_effort ? s_acoustics_reflection_effort->integer : 1;
 	int capped = S_Acoustics_ClampInt( cvarRays, 6, S_ACOUSTICS_MAX_RAYS );
+
+	if ( effort <= 0 ) {
+		capped = S_Acoustics_ClampInt( capped / 2, 6, S_ACOUSTICS_MAX_RAYS );
+	} else if ( effort >= 2 ) {
+		capped = S_Acoustics_ClampInt( capped + capped / 2, 6, S_ACOUSTICS_MAX_RAYS );
+	}
 
 	if ( s_acoustics.rayCountAdaptive <= 0 ) {
 		s_acoustics.rayCountAdaptive = capped;
@@ -885,6 +893,12 @@ void S_Acoustics_ApplySource( ALuint source, float baseGain, const vec3_t srcPos
 		return;
 	}
 	if ( !s_acoustics_enable || !s_acoustics_enable->integer ) {
+		return;
+	}
+	if ( srcPos && !S_Mixer_PropagationAllowed( srcPos ) ) {
+		alSourcef( source, AL_GAIN, 0.0f );
+		alSource3i( source, AL_AUXILIARY_SEND_FILTER, 0, 0, 0 );
+		alSourcei( source, AL_DIRECT_FILTER, 0 );
 		return;
 	}
 

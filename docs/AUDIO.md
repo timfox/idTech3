@@ -23,10 +23,11 @@
 
 - **HRTF:** `s_openalHrtf` cvar enables head-related transfer functions
 - **EFX Reverb:** `s_openalEfx` with presets (generic, room, hall, underwater, etc.)
-- **Geometry Acoustics:** `snd_acoustics_efx.c` -- ray-traced room estimation using `CM_BoxTrace`, auto-applies reverb and occlusion filters based on environment geometry
+- **Geometry Acoustics:** `snd_efx.c` — ray-traced room estimation using `CM_BoxTrace`, auto-applies reverb and occlusion filters based on environment geometry
 - **Doppler:** `s_openalDopplerFactor` for moving sound sources
+- **Wwise-style mixer:** `snd_mixer.c` — buses, RTPCs, state groups, auto-duck, sound events, replay ring. See [AUDIO_WWISE_PARITY.md](AUDIO_WWISE_PARITY.md).
 
-**Cvars:** `s_acoustics_enable`, `s_acoustics_debug`, `s_acoustics_rays`, `s_acoustics_occlusion_enable`
+**Cvars:** `s_acoustics_enable`, `s_acoustics_debug`, `s_acoustics_rays`, `s_acoustics_reflection_effort`, `s_acoustics_occlusion_enable`, `s_mixer_enable`, `s_bus_*`, `s_mixer_propagation_max`
 
 ## Adaptive Music (`snd_music_adaptive.h/c`)
 
