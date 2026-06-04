@@ -1546,6 +1546,7 @@ if(USE_SDL)
   list(APPEND CLIENT_SRCS src/audio/backends/snd_backend_sdl.c)
 endif()
 list(APPEND CLIENT_SRCS
+  src/audio/mixer/snd_mixer.c
   src/audio/snd_music_adaptive.c
   src/game/g_director.c
   src/game/g_response.c

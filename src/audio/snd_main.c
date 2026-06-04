@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../client/client.h"
 #include "snd_codec.h"
 #include "snd_local.h"
+#include "mixer/snd_mixer.h"
 #include "snd_public.h"
 
 #ifdef USE_OPENAL
@@ -60,6 +61,7 @@ cvar_t *s_acoustics_draw;
 cvar_t *s_acoustics_print_interval_ms;
 cvar_t *s_acoustics_hz;
 cvar_t *s_acoustics_rays;
+cvar_t *s_acoustics_reflection_effort;
 cvar_t *s_acoustics_maxdist;
 cvar_t *s_acoustics_near;
 cvar_t *s_acoustics_cone_deg;
@@ -607,6 +609,11 @@ Cvar_CheckRange( s_doppler, "0", "1", CV_INTEGER );
 	Cvar_CheckRange( s_acoustics_rays, "6", "32", CV_INTEGER );
 	Cvar_SetDescription( s_acoustics_rays, "Number of acoustics probe rays (clamped to 32)." );
 
+	s_acoustics_reflection_effort = Cvar_Get( "s_acoustics_reflection_effort", "1", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( s_acoustics_reflection_effort, "0", "2", CV_INTEGER );
+	Cvar_SetDescription( s_acoustics_reflection_effort,
+		"Reflection probe effort: 0=low (half rays), 1=normal, 2=high (1.5x rays, Wwise-style)." );
+
 	s_acoustics_maxdist = Cvar_Get( "s_acoustics_maxdist", "1536", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( s_acoustics_maxdist, "128", "4096", CV_FLOAT );
 	Cvar_SetDescription( s_acoustics_maxdist, "Max ray distance for room probing." );
@@ -738,6 +745,7 @@ Cvar_CheckRange( s_musicIntensity, "0", "1", CV_FLOAT );
 	} else {
 
 		S_CodecInit();
+		S_Mixer_Init();
 
 		Cmd_AddCommand( "play", S_Play_f );
 		Cmd_AddCommand( "music", S_Music_f );
@@ -842,6 +850,7 @@ void S_Shutdown( void )
 	Cmd_RemoveCommand( "s_acoustics_reset" );
 #endif
 
+	S_Mixer_Shutdown();
 	S_CodecShutdown();
 
 	cls.soundStarted = qfalse;
