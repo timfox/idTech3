@@ -24,6 +24,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_local.h"
 #include "../common/tr_vector_font.h"
 #include "tr_sprite_props.h"
+#include "tr_decal_props.h"
+#include "vk_upscale.h"
 #include "vk_fluidsim.h"
 #include "vk_terrain.h"
 #include "vk_vdb.h"
@@ -3930,6 +3932,12 @@ static void R_Register( void )
 	r_taaMotionVectors = ri.Cvar_Get( "r_taaMotionVectors", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_taaMotionVectors, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_taaMotionVectors, "TAA history UV: 1=main-pass motion vectors (gen_frag out_motion), 0=depth reprojection only." );
+	{
+		cvar_t *r_temporalCpuSkinPrev = ri.Cvar_Get( "r_temporalCpuSkinPrev", "1", CVAR_ARCHIVE_ND );
+		ri.Cvar_SetDescription( r_temporalCpuSkinPrev,
+			"Store previous-frame skin matrices for CPU tess / glTF fallback motion vectors." );
+	}
+	ri.Cvar_Get( "r_temporalScopeReduce", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetGroup( r_taaMotionVectors, CVG_RENDERER );
 
 	r_rtx = ri.Cvar_Get( "r_rtx", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
@@ -4109,6 +4117,8 @@ void R_Init( void ) {
 
 	R_Register();
 	R_SpriteProps_Init();
+	R_DecalProps_Init();
+	R_Upscale_Init();
 	R_ApplyRenderModeLatch();
 	ri.Printf( PRINT_ALL, "[VK] SH lighting: %s\n", r_shLighting && r_shLighting->integer ? "enabled" : "disabled" );
 	ri.Printf( PRINT_ALL, "[VK] SH world: %s\n", r_shWorldLighting && r_shWorldLighting->integer ? "enabled" : "disabled" );
@@ -4325,6 +4335,7 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 	re.AddRefEntityToScene = RE_AddRefEntityToScene;
 	re.AddEngineSpriteToScene = RE_AddEngineSpriteToScene;
 	re.AddEngineSpriteToSceneAtTime = RE_AddEngineSpriteToSceneAtTime;
+	re.AddEngineDecalToScene = RE_AddEngineDecalToScene;
 	re.AddPolyToScene = RE_AddPolyToScene;
 	re.LightForPoint = R_LightForPoint;
 	re.AddLightToScene = RE_AddLightToScene;

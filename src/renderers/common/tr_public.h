@@ -144,6 +144,7 @@ typedef struct {
 	/* Engine-native RT_SPRITE helpers (billboard / flipbook / imposter). */
 	void	(*AddEngineSpriteToScene)( const engineSpriteDesc_t *desc );
 	void	(*AddEngineSpriteToSceneAtTime)( const engineSpriteDesc_t *desc, int refdefTimeMs );
+	void	(*AddEngineDecalToScene)( const engineDecalDesc_t *desc );
 
 } refexport_t;
 

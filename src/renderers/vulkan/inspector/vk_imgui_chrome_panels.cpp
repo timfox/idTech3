@@ -256,6 +256,7 @@ static void VkImgui_DrawMenuBar( void )
 			if ( ImGui::BeginMenu( "Studio" ) ) {
 				ImGui::MenuItem( "Session / map strip", nullptr, (bool *)&vkWindows.studioMap.open );
 				ImGui::MenuItem( "Command strip", nullptr, (bool *)&vkWindows.studioConsole.open );
+				ImGui::MenuItem( "Entities (misc_*)", nullptr, (bool *)&vkWindows.studioEntities.open );
 				ImGui::Separator();
 				ImGui::TextDisabled( "Entity key reference: docs/EDITOR_BRIDGE.md" );
 				ImGui::EndMenu();

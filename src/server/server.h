@@ -301,6 +301,10 @@ extern	cvar_t	*sv_maxRate;
 extern	cvar_t	*sv_dlRate;
 extern	cvar_t	*sv_gametype;
 extern	cvar_t	*sv_pure;
+extern	cvar_t	*sv_pureSigned;
+extern	cvar_t	*sv_interestMaxDist;
+extern	cvar_t	*sv_interestPriority;
+extern	cvar_t	*sv_sectorURL;
 extern	cvar_t	*sv_floodProtect;
 extern	cvar_t	*sv_lanForceRate;
 

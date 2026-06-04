@@ -17,6 +17,7 @@ real implementation path -- no stubs.
 #include "../qcommon/qcommon.h"
 #include "../qcommon/cm_public.h"
 #include "phys_bullet.h"
+#include "phys_character.h"
 
 static qboolean physInitialized = qfalse;
 
@@ -88,6 +89,7 @@ void Phys_RegisterCvars(void) {
 	phys_dmm_enabled      = Cvar_Get("phys_dmm_enabled",      "1",     CVAR_ARCHIVE);
 	phys_dmm_resolution   = Cvar_Get("phys_dmm_resolution",   "8",     CVAR_ARCHIVE);
 	phys_dmm_fracture     = Cvar_Get("phys_dmm_fracture",     "1",     CVAR_ARCHIVE);
+	Phys_CharacterInit();
 }
 
 qboolean Phys_Init(void) {

@@ -2312,6 +2312,7 @@ message(STATUS "ECS (EnTT): enabled")
 option(USE_BULLET_PHYSICS "Enable Bullet Physics integration" ON)
 set(PHYSICS_SRCS
   src/physics/phys_bullet.c
+  src/physics/phys_character.c
   src/physics/phys_procedural_anim.c
   src/physics/phys_dmm.c
   src/physics/phys_ik.c
@@ -2405,7 +2406,7 @@ ADD_EXECUTABLE(${DNAME}${BINEXT} ${Q3_SRCS})
 ELSE()
 ADD_EXECUTABLE(${DNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
 ENDIF()
-TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE qcommon_ded botlib)
+TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE qcommon_ded botlib phys_module)
 if(TARGET Threads::Threads)
   TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE Threads::Threads)
 endif()
@@ -2503,6 +2504,13 @@ set_tests_properties(renderer_regression_check PROPERTIES
 	LABELS "validation;renderer"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/renderer_regression_check.sh"
 	RESOURCE_LOCK "idtech3_headless_validation")
+
+add_test(NAME gpu_golden_compare
+	COMMAND ${CMAKE_SOURCE_DIR}/scripts/gpu_golden_capture.sh --compare
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(gpu_golden_compare PROPERTIES
+	LABELS "validation;renderer;golden"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/gpu_golden_capture.sh")
 
 add_test(NAME check_artifacts
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/check_artifacts.sh ${CMAKE_SOURCE_DIR}/release
@@ -2708,6 +2716,19 @@ if(BUILD_UNIT_TESTS)
 	endif()
 	add_test(NAME unit_engine_sprite_map COMMAND unit_engine_sprite_map)
 	set_tests_properties(unit_engine_sprite_map PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_engine_decal_map
+		tests/unit/test_engine_decal_map.c
+		tests/stub_qcommon_min.c
+		src/qcommon/q_shared.c
+		src/qcommon/q_math.c
+		src/qcommon/engine_decal_map.c)
+	target_include_directories(unit_engine_decal_map PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(UNIX)
+		target_link_libraries(unit_engine_decal_map PRIVATE m)
+	endif()
+	add_test(NAME unit_engine_decal_map COMMAND unit_engine_decal_map)
+	set_tests_properties(unit_engine_decal_map PROPERTIES LABELS "unit;validation")
 
 	add_executable(unit_endian
 		tests/unit/test_endian.c

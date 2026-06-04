@@ -42,6 +42,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #endif
 
 #include "../client/keys.h"
+#include "com_crash.h"
+#include "com_loc.h"
+#include "cm_stream.h"
 
 #ifdef __ANDROID__
 #include "../platform/android/android_logcat.h"
@@ -458,6 +461,7 @@ void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error( errorParm_t code, const char 
 
 		Q_longjmp( abortframe, 1 );
 	} else {
+		Com_Crash_OnFatal( com_errorMessage );
 		VM_Forced_Unload_Start();
 #ifndef DEDICATED
 		CL_Shutdown( va( "Server fatal crashed: %s", com_errorMessage ), qtrue );
@@ -3874,6 +3878,7 @@ void Com_Init( char *commandLine ) {
 
 	Com_InitZoneMemory();
 	Cmd_Init();
+	Com_Crash_Init();
 
 	// get the developer cvar set as early as possible (com_developer is alias for developer)
 	Com_StartupVariable( "developer" );
@@ -3932,6 +3937,8 @@ void Com_Init( char *commandLine ) {
 	Com_InitKeyCommands();
 
 	FS_InitFilesystem();
+	Com_Loc_Init();
+	CM_Stream_Init();
 
 	com_logfile = Cvar_Get( "logfile", "0", CVAR_TEMP );
 	Cvar_CheckRange( com_logfile, "0", "4", CV_INTEGER );

@@ -99,6 +99,15 @@ typedef struct engineSpriteDesc_s {
 	float				swaySpeed;
 } engineSpriteDesc_t;
 
+typedef struct engineDecalDesc_s {
+	vec3_t		origin;
+	float		radius;
+	float		pitch;
+	float		yaw;
+	float		fadeSec;
+	qhandle_t	shader;
+} engineDecalDesc_t;
+
 typedef struct {
 	refEntityType_t	reType;
 	int			renderfx;

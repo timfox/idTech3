@@ -52,6 +52,10 @@ cvar_t	*sv_maxRate;
 cvar_t	*sv_dlRate;
 cvar_t	*sv_gametype;
 cvar_t	*sv_pure;
+cvar_t	*sv_pureSigned;
+cvar_t	*sv_interestMaxDist;
+cvar_t	*sv_interestPriority;
+cvar_t	*sv_sectorURL;
 cvar_t	*sv_floodProtect;
 cvar_t	*sv_lanForceRate; // dedicated 1 (LAN) server forces local client rates to 99999 (bug #491)
 

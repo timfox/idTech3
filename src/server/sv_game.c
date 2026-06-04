@@ -23,6 +23,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "server.h"
 #include "sv_engine_sprites.h"
+#include "sv_engine_decals.h"
+#include "../physics/phys_character.h"
+#include "../qcommon/com_loc.h"
 
 #include "../botlib/botlib.h"
 
@@ -1059,6 +1062,33 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 		}
 		return SV_EngineSprite_SpawnFromDef( &def );
 	}
+
+	case G_ENGINE_DECAL_SHADER_INDEX:
+		return SV_EngineDecalShaderIndex( (const char *)VMA( 1 ) );
+
+	case G_ENGINE_DECAL_SPAWN: {
+		engineDecalMapDef_t def;
+
+		Com_Memset( &def, 0, sizeof( def ) );
+		Q_strncpyz( def.shader, (const char *)VMA( 1 ), sizeof( def.shader ) );
+		def.origin[0] = VMF( 2 );
+		def.origin[1] = VMF( 3 );
+		def.origin[2] = VMF( 4 );
+		def.radius = VMF( 5 );
+		def.pitch = VMF( 6 );
+		def.yaw = VMF( 7 );
+		def.fadeSec = VMF( 8 );
+		return SV_EngineDecal_SpawnFromDef( &def );
+	}
+
+	case G_PHYS_CHARACTER_CREATE:
+		return Phys_CharacterCreate( VMF( 1 ), VMF( 2 ), VMF( 3 ) );
+
+	case G_PHYS_CHARACTER_MOVE:
+		return Phys_CharacterMove( (int)args[1], VMA( 2 ), VMF( 3 ), args[4] ? qtrue : qfalse );
+
+	case G_LOC_LOOKUP:
+		return Com_Loc_Lookup( (const char *)VMA( 1 ), VMA( 2 ), (int)args[3] );
 
 	default:
 		Com_Error( ERR_DROP, "Bad game system trap: %ld", (long int) args[0] );

@@ -15,6 +15,9 @@ id Studio-style session + command strip (C++: std::vector command history).
 #include <vector>
 
 #include "vk_imgui_common.hpp"
+#include "../../../qcommon/engine_sprite_map.h"
+#include "../../../qcommon/engine_decal_map.h"
+#include "../tr_sprite_props.h"
 
 namespace {
 
@@ -156,6 +159,130 @@ extern "C" void VkImgui_DrawStudioConsolePanel( void )
 	if ( ImGui::Button( "Run" ) ) {
 		ExecTrimmed( g_input.data() );
 		g_input[0] = '\0';
+	}
+	ImGui::End();
+}
+
+extern "C" void VkImgui_DrawStudioEntitiesPanel( void )
+{
+	static int exportIndex = -1;
+	engineSpriteMapList_t spriteList;
+	engineDecalMapList_t decalList;
+
+	if ( !r_studio_tools || !r_studio_tools->integer ) {
+		return;
+	}
+	if ( !vkWindows.studioEntities.open ) {
+		return;
+	}
+
+	ImGui::Begin( "Studio / Entities", (bool *)&vkWindows.studioEntities.open );
+	ImGui::TextDisabled( "(?)" );
+	if ( ImGui::IsItemHovered() ) {
+		ImGui::SetTooltip(
+			"Lists misc_billboard / flipbook / imposter / misc_decal from the loaded BSP entity lump. "
+			"Export writes Radiant-style snippets to studio_exportents.cfg." );
+	}
+
+	{
+		const char *entityString = R_MapProps_EntityString();
+		if ( !entityString || !entityString[0] ) {
+			ImGui::TextWrapped( "No world entity lump loaded." );
+			ImGui::End();
+			return;
+		}
+
+		EngineSpriteMap_Parse( entityString, &spriteList );
+		EngineDecalMap_Parse( entityString, &decalList );
+	}
+
+	ImGui::SeparatorText( "Sprites" );
+	for ( int i = 0; i < spriteList.count; i++ ) {
+		const engineSpriteMapDef_t *def = &spriteList.defs[i];
+		const char *typeLabel = "billboard";
+		char label[256];
+
+		if ( def->type == ENGINE_SPRITE_FLIPBOOK ) {
+			typeLabel = "flipbook";
+		} else if ( def->type == ENGINE_SPRITE_IMPOSTER ) {
+			typeLabel = "imposter";
+		}
+		Com_sprintf( label, sizeof( label ), "%s [%s] %.0f %.0f %.0f",
+			typeLabel, def->shader, def->origin[0], def->origin[1], def->origin[2] );
+		if ( ImGui::Selectable( label, exportIndex == i ) ) {
+			exportIndex = i;
+		}
+	}
+
+	ImGui::SeparatorText( "Decals" );
+	for ( int i = 0; i < decalList.count; i++ ) {
+		const engineDecalMapDef_t *def = &decalList.defs[i];
+		const int row = spriteList.count + i;
+		char label[256];
+
+		Com_sprintf( label, sizeof( label ), "decal [%s] %.0f %.0f %.0f",
+			def->shader, def->origin[0], def->origin[1], def->origin[2] );
+		if ( ImGui::Selectable( label, exportIndex == row ) ) {
+			exportIndex = row;
+		}
+	}
+
+	if ( ImGui::Button( "Export selection to studio_exportents.cfg" ) ) {
+		char cmd[512];
+		if ( exportIndex >= 0 && exportIndex < spriteList.count ) {
+			const engineSpriteMapDef_t *def = &spriteList.defs[exportIndex];
+			const char *cls = "misc_billboard";
+			if ( def->type == ENGINE_SPRITE_FLIPBOOK ) {
+				cls = "misc_flipbook";
+			} else if ( def->type == ENGINE_SPRITE_IMPOSTER ) {
+				cls = "misc_imposter";
+			}
+			Com_sprintf( cmd, sizeof( cmd ),
+				"echo \"{\\n\\\"classname\\\" \\\"%s\\\"\\n\\\"origin\\\" \\\"%.0f %.0f %.0f\\\"\\n"
+				"\\\"shader\\\" \\\"%s\\\"\\n\\\"scale\\\" \\\"%.0f\\\"\\n}\" > studio_exportents.cfg\n",
+				cls, def->origin[0], def->origin[1], def->origin[2], def->shader, def->radius );
+		} else if ( exportIndex >= spriteList.count &&
+			exportIndex < spriteList.count + decalList.count ) {
+			const engineDecalMapDef_t *def =
+				&decalList.defs[exportIndex - spriteList.count];
+			Com_sprintf( cmd, sizeof( cmd ),
+				"echo \"{\\n\\\"classname\\\" \\\"misc_decal\\\"\\n\\\"origin\\\" \\\"%.0f %.0f %.0f\\\"\\n"
+				"\\\"shader\\\" \\\"%s\\\"\\n\\\"scale\\\" \\\"%.0f\\\"\\n}\" > studio_exportents.cfg\n",
+				def->origin[0], def->origin[1], def->origin[2], def->shader, def->radius );
+		} else {
+			Q_strncpyz( cmd, "echo \"// select an entity first\" > studio_exportents.cfg\n", sizeof( cmd ) );
+		}
+		ri.Cmd_ExecuteText( EXEC_APPEND, cmd );
+		ri.Printf( PRINT_ALL, "[VK][studio] wrote studio_exportents.cfg\n" );
+	}
+	ImGui::SameLine();
+	if ( ImGui::Button( "r_spritePropsMapParse 1" ) ) {
+		ri.Cmd_ExecuteText( EXEC_APPEND, "r_spritePropsMapParse 1\n" );
+	}
+	ImGui::SameLine();
+	if ( ImGui::Button( "r_decalPropsMapParse 1" ) ) {
+		ri.Cmd_ExecuteText( EXEC_APPEND, "r_decalPropsMapParse 1\n" );
+	}
+	ImGui::End();
+}
+
+extern "C" void VkImgui_DrawStudioAnimationPanel( void )
+{
+	if ( !r_studio_tools || !r_studio_tools->integer ) {
+		return;
+	}
+
+	ImGui::Begin( "Studio / Animation", nullptr, ImGuiWindowFlags_AlwaysAutoResize );
+	ImGui::TextDisabled( "animgraph/*.json — see docs/ANIMGRAPH.md" );
+	if ( ImGui::Button( "g_animgraph 1" ) ) {
+		ri.Cmd_ExecuteText( EXEC_APPEND, "set g_animgraph 1\n" );
+	}
+	ImGui::SameLine();
+	if ( ImGui::InputText( "##ag_path", g_input.data(), g_input.size(),
+		    ImGuiInputTextFlags_EnterReturnsTrue ) ) {
+		char cmd[320];
+		Com_sprintf( cmd, sizeof( cmd ), "echo load animgraph: %s\n", g_input.data() );
+		ri.Cmd_ExecuteText( EXEC_APPEND, cmd );
 	}
 	ImGui::End();
 }

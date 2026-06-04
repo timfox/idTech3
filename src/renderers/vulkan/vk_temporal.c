@@ -185,8 +185,17 @@ static qboolean vk_temporal_compute_shared_camera_cut( uint32_t *outReasons )
 	qboolean noWorldTransition = ( noWorldModel != vk.temporal.noWorldModel ) ? qtrue : qfalse;
 	qboolean cameraCut = qfalse;
 
-	if ( !vk_prev_matrices_valid || !vk.temporal.worldWasValid ) {
-		reasons |= VK_TEMPORAL_RESET_MISSING_PREV_DATA;
+	{
+		static cvar_t *r_temporalScopeReduce;
+		r_temporalScopeReduce = ri.Cvar_Get( "r_temporalScopeReduce", "1", CVAR_ARCHIVE_ND );
+		if ( !r_temporalScopeReduce->integer ) {
+			if ( !vk_prev_matrices_valid || !vk.temporal.worldWasValid ) {
+				reasons |= VK_TEMPORAL_RESET_MISSING_PREV_DATA;
+			}
+		} else if ( !vk_prev_matrices_valid ) {
+			/* Camera matrices only — per-entity missing prev skin handled in glTF path */
+			reasons |= VK_TEMPORAL_RESET_MISSING_PREV_DATA;
+		}
 	}
 	if ( worldTransition || noWorldTransition ) {
 		reasons |= VK_TEMPORAL_RESET_WORLD_CHANGE;

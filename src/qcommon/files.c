@@ -37,6 +37,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "q_shared.h"
 #include "qcommon.h"
+#include "com_pk3sig.h"
 #include "unzip.h"
 
 #ifdef _WIN32
@@ -331,6 +332,7 @@ static	cvar_t		*fs_gamedirvar;
 static	cvar_t		*fs_locked;
 #endif
 static	cvar_t		*fs_excludeReference;
+static	cvar_t		*com_pk3Signed;
 
 static	searchpath_t	*fs_searchpaths;
 static	int			fs_readCount;			// total bytes read
@@ -4372,6 +4374,14 @@ static void FS_AddGameDirectory( const char *path, const char *dir ) {
 				continue;
 			}
 
+			if ( com_pk3Signed && com_pk3Signed->integer ) {
+				char sigPath[MAX_OSPATH];
+				Com_sprintf( sigPath, sizeof( sigPath ), "%s.sig", pakfile );
+				if ( !Com_Pk3Sig_VerifyFile( pakfile, sigPath ) ) {
+					Com_Printf( S_COLOR_YELLOW "WARNING: pk3.sig verify failed: %s\n", pakfile );
+				}
+			}
+
 			// store the game name for downloading
 			pak->pakGamename = gamedir;
 
@@ -5609,6 +5619,10 @@ void FS_InitFilesystem( void ) {
 #ifdef _WIN32
  	_setmaxstdio( 2048 );
 #endif
+
+	com_pk3Signed = Cvar_Get( "com_pk3Signed", "0", CVAR_ARCHIVE );
+	Cvar_SetDescription( com_pk3Signed,
+		"Verify pk3.sig sidecars when loading archives (pairs with sv_pureSigned on servers)." );
 
 	// try to start up normally
 	FS_Restart( 0 );
