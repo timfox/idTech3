@@ -1,0 +1,52 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    metersPerUnit = 0.0254
+    upAxis = "Z"
+    doc = "Gopex engine world manifest — districts + proxy mesh conventions (engine-original)."
+)
+
+def Xform "World" (
+    kind = "assembly"
+)
+{
+    def Xform "Districts" (
+        kind = "group"
+    )
+    {
+        def Xform "District_North" (
+            kind = "assembly"
+        )
+        {
+            double3 xformOp:translate = (4096, 4096, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+
+        def Xform "District_South" (
+            kind = "assembly"
+        )
+        {
+            double3 xformOp:translate = (0, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+    }
+
+    def Scope "ProxyLayer"
+    {
+        def Xform "District_North_Proxy" (
+            purpose = "proxy"
+        )
+        {
+            double3 xformOp:translate = (4096, 4096, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+
+        def Xform "District_South_Proxy" (
+            purpose = "proxy"
+        )
+        {
+            double3 xformOp:translate = (0, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+    }
+}

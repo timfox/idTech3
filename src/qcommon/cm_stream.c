@@ -8,6 +8,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #include "qcommon.h"
 #include "cm_public.h"
 #include "cm_stream.h"
+#include "cm_stream_merge.h"
 
 #define CM_STREAM_GRID 32
 #define CM_STREAM_SECTORS (CM_STREAM_GRID * CM_STREAM_GRID)
@@ -30,6 +31,7 @@ void CM_Stream_Init( void ) {
 		"Prefetch adjacent sector pk3 URLs when crossing boundaries (requires sv_sectorURL)." );
 	Com_Memset( s_sectorLoaded, 0, sizeof( s_sectorLoaded ) );
 	s_prefetchHandler = NULL;
+	CM_Stream_Merge_Init();
 	if ( cm_stream->integer ) {
 		Com_Printf( "[cm_stream] cm_stream=1 (sector BSP streaming v1)\n" );
 	}
@@ -44,6 +46,63 @@ static int CM_Stream_Index( int cellX, int cellY ) {
 		return -1;
 	}
 	return cellY * CM_STREAM_GRID + cellX;
+}
+
+void CM_Stream_WorldToCell( const vec3_t origin, float sectorSize, int *cellX, int *cellY ) {
+	float size;
+
+	if ( !origin || !cellX || !cellY ) {
+		return;
+	}
+	size = sectorSize;
+	if ( size < 256.0f ) {
+		size = 256.0f;
+	}
+	*cellX = (int)floor( origin[0] / size );
+	*cellY = (int)floor( origin[1] / size );
+}
+
+void CM_Stream_UpdateView( const vec3_t viewOrigin, float radius, float sectorSize, qboolean loadCollision ) {
+	int centerX, centerY;
+	int minX, maxX, minY, maxY;
+	int x, y;
+	int cellRadius;
+
+	if ( !cm_stream || !cm_stream->integer || !viewOrigin || radius <= 0.0f ) {
+		return;
+	}
+
+	CM_Stream_WorldToCell( viewOrigin, sectorSize, &centerX, &centerY );
+	cellRadius = (int)ceil( radius / sectorSize );
+	if ( cellRadius < 1 ) {
+		cellRadius = 1;
+	}
+
+	minX = centerX - cellRadius;
+	maxX = centerX + cellRadius;
+	minY = centerY - cellRadius;
+	maxY = centerY + cellRadius;
+
+	for ( y = minY; y <= maxY; y++ ) {
+		for ( x = minX; x <= maxX; x++ ) {
+			vec3_t center;
+			float dist;
+
+			center[0] = ( (float)x + 0.5f ) * sectorSize;
+			center[1] = ( (float)y + 0.5f ) * sectorSize;
+			center[2] = viewOrigin[2];
+			dist = Distance( viewOrigin, center );
+			if ( dist <= radius ) {
+				if ( loadCollision ) {
+					(void)CM_Stream_LoadSector( x, y );
+				} else {
+					(void)CM_Stream_PrefetchSectorPk3( x, y );
+				}
+			} else if ( CM_Stream_IsSectorLoaded( x, y ) ) {
+				CM_Stream_UnloadSector( x, y );
+			}
+		}
+	}
 }
 
 qboolean CM_Stream_IsSectorLoaded( int cellX, int cellY ) {
@@ -64,11 +123,14 @@ qboolean CM_Stream_LoadSector( int cellX, int cellY ) {
 	}
 
 	idx = CM_Stream_Index( cellX, cellY );
-	if ( idx < 0 || s_sectorLoaded[idx] ) {
-		return s_sectorLoaded[idx >= 0 ? idx : 0];
+	if ( idx < 0 ) {
+		return qfalse;
+	}
+	if ( s_sectorLoaded[idx] ) {
+		return qtrue;
 	}
 
-	Com_sprintf( mapName, sizeof( mapName ), "maps/sector_%d_%d", cellX, cellY );
+	Com_sprintf( mapName, sizeof( mapName ), "maps/sector_%d_%d.bsp", cellX, cellY );
 	if ( !FS_FileExists( mapName ) ) {
 		if ( sv_sectorURL && sv_sectorURL->string[0] ) {
 			Com_Printf( "[cm_stream] sector %d,%d missing — prefetch via sv_sectorURL (see cl_sectorPrefetch)\n",
@@ -77,9 +139,16 @@ qboolean CM_Stream_LoadSector( int cellX, int cellY ) {
 		return qfalse;
 	}
 
-	CM_LoadMap( mapName, qtrue, &checksum );
+	if ( Cvar_VariableIntegerValue( "cm_streamMerge" ) ) {
+		if ( !CM_Stream_MergeSector( cellX, cellY ) ) {
+			return qfalse;
+		}
+	} else {
+		CM_LoadMap( mapName, qtrue, &checksum );
+	}
 	s_sectorLoaded[idx] = qtrue;
-	Com_Printf( "[cm_stream] loaded sector %d,%d (%s)\n", cellX, cellY, mapName );
+	Com_Printf( "[cm_stream] loaded sector %d,%d (%s%s)\n", cellX, cellY, mapName,
+		Cvar_VariableIntegerValue( "cm_streamMerge" ) ? ", merge overlay" : "" );
 
 	if ( cl_sectorPrefetch && cl_sectorPrefetch->integer ) {
 		static const int neighbors[8][2] = {
@@ -104,6 +173,9 @@ void CM_Stream_UnloadSector( int cellX, int cellY ) {
 	if ( idx < 0 ) {
 		return;
 	}
+	if ( Cvar_VariableIntegerValue( "cm_streamMerge" ) ) {
+		CM_Stream_UnmergeSector( cellX, cellY );
+	}
 	s_sectorLoaded[idx] = qfalse;
 }
 
@@ -123,5 +195,32 @@ void CM_Stream_PrefetchSectorPk3( int cellX, int cellY ) {
 		s_prefetchHandler( localName, url );
 	} else {
 		Com_Printf( "[cm_stream] prefetch: %s (no client handler; set sv_sectorURL + client CURL)\n", url );
+	}
+}
+
+void CM_Stream_BuildLoadedList( char *buf, int bufSize ) {
+	int x, y;
+	int len = 0;
+	char token[32];
+
+	if ( !buf || bufSize < 1 ) {
+		return;
+	}
+	buf[0] = '\0';
+	if ( !cm_stream || !cm_stream->integer ) {
+		return;
+	}
+	for ( y = 0; y < CM_STREAM_GRID; y++ ) {
+		for ( x = 0; x < CM_STREAM_GRID; x++ ) {
+			if ( !CM_Stream_IsSectorLoaded( x, y ) ) {
+				continue;
+			}
+			Com_sprintf( token, sizeof( token ), "%s%d_%d", len ? "," : "", x, y );
+			if ( len + (int)strlen( token ) + 1 >= bufSize ) {
+				return;
+			}
+			Q_strcat( buf, bufSize, token );
+			len += (int)strlen( token );
+		}
 	}
 }

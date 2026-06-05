@@ -1,0 +1,6 @@
+{
+"classname" "misc_billboard"
+"origin" "2048 2048 96"
+"shader" "sprites/demo_billboard"
+"radius" "64"
+}

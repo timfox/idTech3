@@ -42,9 +42,18 @@ set(DEMO_MOD_FILES
 	"${DEMO_MOD_DIR}/demo_csharp.cfg"
 	"${DEMO_MOD_DIR}/demo_gameplay.cfg"
 	"${DEMO_MOD_DIR}/demo_usd.cfg"
+	"${DEMO_MOD_DIR}/demo_districts.cfg"
+	"${DEMO_MOD_DIR}/demo_openworld.cfg"
+	"${DEMO_MOD_DIR}/demo_physics.cfg"
+	"${DEMO_MOD_DIR}/sprites/sector_0_0.ents"
 	"${DEMO_MOD_DIR}/demo_sprites.cfg"
 	"${DEMO_MOD_DIR}/demo_audio.cfg"
 	"${DEMO_MOD_DIR}/demo_sp_slice.cfg"
+	"${DEMO_MOD_DIR}/world/playfield.usda"
+	"${DEMO_MOD_DIR}/world/proxies/north_proxy.usda"
+	"${DEMO_MOD_DIR}/world/proxies/south_proxy.usda"
+	"${DEMO_MOD_DIR}/world/districts/north.usda"
+	"${DEMO_MOD_DIR}/world/districts/south.usda"
 	"${DEMO_MOD_DIR}/gpu_golden_capture.cfg"
 	"${DEMO_MOD_DIR}/sound/soundevents.txt"
 	"${DEMO_MOD_DIR}/animgraph/idle_run.txt"
@@ -115,6 +124,9 @@ add_custom_command(
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/gfx/demo"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/fonts"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/models"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/world/proxies"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/world/districts"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/sprites"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/sound"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/animgraph"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/loc"
@@ -150,6 +162,14 @@ add_custom_command(
 		"${DEMO_MOD_DIR}/demo_gameplay.cfg" "${DEMO_PACK_STAGING}/demo_gameplay.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/demo_usd.cfg" "${DEMO_PACK_STAGING}/demo_usd.cfg"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/demo_districts.cfg" "${DEMO_PACK_STAGING}/demo_districts.cfg"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/demo_openworld.cfg" "${DEMO_PACK_STAGING}/demo_openworld.cfg"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/demo_physics.cfg" "${DEMO_PACK_STAGING}/demo_physics.cfg"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/sprites/sector_0_0.ents" "${DEMO_PACK_STAGING}/sprites/sector_0_0.ents"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/demo_sprites.cfg" "${DEMO_PACK_STAGING}/demo_sprites.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -212,6 +232,16 @@ add_custom_command(
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/models/parity_shade_preview.usda" "${DEMO_PACK_STAGING}/models/parity_shade_preview.usda"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/world/playfield.usda" "${DEMO_PACK_STAGING}/world/playfield.usda"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/world/proxies/north_proxy.usda" "${DEMO_PACK_STAGING}/world/proxies/north_proxy.usda"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/world/proxies/south_proxy.usda" "${DEMO_PACK_STAGING}/world/proxies/south_proxy.usda"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/world/districts/north.usda" "${DEMO_PACK_STAGING}/world/districts/north.usda"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/world/districts/south.usda" "${DEMO_PACK_STAGING}/world/districts/south.usda"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_BOOTSTRAP_GFX2D}" "${DEMO_PACK_STAGING}/gfx/2d/bigchars.png"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_BOOTSTRAP_DIR}/gfx/demo/bootstrap_white.png" "${DEMO_PACK_STAGING}/gfx/demo/bootstrap_white.png"
@@ -241,12 +271,16 @@ add_custom_command(
 		"$<TARGET_FILE:demo_ui_skeleton>" "${DEMO_PACK_STAGING}/${DEMO_UI_DOT_ZIP}"
 	COMMAND ${CMAKE_COMMAND} -E chdir "${DEMO_PACK_STAGING}"
 		${CMAKE_COMMAND} -E tar cf "${DEMO_PK3}" --format=zip
-		autoexec.cfg gameinfo.txt demo_features.cfg demo_js.cfg demo_lua.cfg demo_csharp.cfg demo_gameplay.cfg demo_usd.cfg demo_sprites.cfg demo_audio.cfg demo_sp_slice.cfg gpu_golden_capture.cfg readme_demo.txt
+		autoexec.cfg gameinfo.txt demo_features.cfg demo_js.cfg demo_lua.cfg demo_csharp.cfg demo_gameplay.cfg demo_usd.cfg demo_districts.cfg demo_openworld.cfg demo_physics.cfg demo_sprites.cfg demo_audio.cfg demo_sp_slice.cfg gpu_golden_capture.cfg readme_demo.txt
 		sound/soundevents.txt animgraph/idle_run.txt ndgi/demo.ndgi niv/demo.niv nslm/demo.nslm nist/demo.nist nvc/demo.nvc fsa/demo.fsa vfgi/demo.vfgi renderformer/demo.rfm vuda/demo.vuda grtx/demo.grtx mgs/demo.mgs wsp/demo.wsp sqz/demo.sqz loc/en.loc
 		scripts/js/demo_hooks.js scripts/js/README.txt
 		scripts/lua/demo_hooks.lua
 		scripts/csharp/IdTech3.Engine.cs scripts/csharp/demo_hooks.cs
 		scripts/demo_bootstrap.shader scripts/demo_sprites.shader
+		models/parity_geom_mesh.usda models/parity_shade_preview.usda
+		world/playfield.usda world/proxies/north_proxy.usda world/proxies/south_proxy.usda
+		world/districts/north.usda world/districts/south.usda
+		sprites/sector_0_0.ents
 		gfx/2d/bigchars.png
 		gfx/demo/bootstrap_white.png
 		gfx/demo/bootstrap_console.png

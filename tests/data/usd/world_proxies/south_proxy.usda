@@ -1,0 +1,16 @@
+#usda 1.0
+(
+    defaultPrim = "Proxy"
+)
+
+def Xform "Proxy"
+{
+    def Mesh "BoundsWedge"
+    {
+        purpose = "proxy"
+        point3f[] points = [(0, 0, 0), (192, 0, 0), (96, 192, 0), (96, 96, 96)]
+        int[] faceVertexCounts = [3, 3, 3, 3]
+        int[] faceVertexIndices = [0, 1, 2, 0, 2, 3, 0, 3, 1, 1, 3, 2]
+        color3f[] primvars:displayColor = [(0.3, 0.7, 0.4)]
+    }
+}

@@ -1,6 +1,6 @@
 # Production Gap Plan (SP-first)
 
-Living checklist for the **single-player conversion** track (Unwaking / full conversion). Master plan lives in Cursor; this doc is the repo hub.
+Living checklist for the **single-player full-conversion** track. Master plan lives in Cursor; this doc is the repo hub.
 
 ## Phase A — SP vertical slice
 
@@ -9,6 +9,7 @@ Living checklist for the **single-player conversion** track (Unwaking / full con
 | Demo pk3: sound events | Done | `snd_playevent ui_click` with `fs_game idtech3_demo` |
 | Demo pk3: i18n | Done | `com_loc_language en`; keys in `examples/demo_game/loc/en.loc` |
 | Demo SP cfg | Done | `demo_sp_slice.cfg` — TAA, animgraph, `phys_character` |
+| Demo physics cfg | Done | `demo_physics.cfg` — middleware + `phys_status` |
 | Editor contract | Done | [RADIANT.md](RADIANT.md#editor-contract-checklist) |
 | pk3.sig doc | Done | SHA-256 sidecar — [MOD_SDK.md](MOD_SDK.md#security--shipping) |
 | Hero TAA + decals | Done | `r_temporalCustomShaderMotion 1`; decal stable frames in `tr_decal_props.c` |
@@ -19,8 +20,8 @@ Living checklist for the **single-player conversion** track (Unwaking / full con
 ```
 YourInstall/
 ├── idtech3
-├── base/                 # retail or minimal bootstrap pk3
-├── unwaking/             # your conversion mod (fs_game)
+├── base/                 # licensed compatible pk3s or minimal bootstrap
+├── yourmod/              # your conversion mod (fs_game)
 │   ├── *.pk3
 │   ├── loc/en.loc
 │   ├── sound/soundevents.txt
@@ -29,7 +30,7 @@ YourInstall/
     └── idtech3_demo.pk3
 ```
 
-Launch: `./idtech3 +set fs_game unwaking +map yourmap` with `demo_sp_slice.cfg` equivalents in mod `autoexec.cfg`.
+Launch: `./idtech3 +set fs_game yourmod +map yourmap` with `demo_sp_slice.cfg` equivalents in mod `autoexec.cfg`.
 
 ## Phase B — Persistence + hygiene
 

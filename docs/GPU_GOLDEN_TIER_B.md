@@ -7,7 +7,7 @@ Tier A (`gpu_golden_compare` ctest) validates manifest + placeholders without a 
 Requirements:
 
 - Display + Vulkan RTX/GL capable GPU
-- Game data in `GAME_BASE` (Q3A-class or minimal bootstrap + demo pk3)
+- Game data in `GAME_BASE` (compatible retail install or minimal bootstrap + demo pk3)
 - Built client: `release/idtech3`
 
 ### Capture
@@ -21,7 +21,7 @@ Uses `+exec gpu_golden_capture.cfg` then compares PNGs under `tests/data/golden/
 
 ### SP slice preset (hero TAA)
 
-With `fs_game idtech3_demo` or Unwaking mod:
+With `fs_game idtech3_demo` or your conversion mod:
 
 ```
 set r_taa 1

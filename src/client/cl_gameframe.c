@@ -19,6 +19,9 @@ Ticks all gameplay subsystems each client frame:
 #include "../qcommon/qcommon.h"
 #include "../qcommon/cm_public.h"
 #include "cl_gameframe.h"
+#include "cl_district.h"
+#include "cl_openworld.h"
+#include "../world/world_open.h"
 #include "cl_particles.h"
 #include "cl_map_background.h"
 #include "cl_window_title.h"
@@ -269,12 +272,21 @@ void CL_GameFrame(float frametime) {
 		PhysMiddleware_Frame(frametime);
 	}
 
+	CL_District_Frame();
+	CL_OpenWorld_Frame();
+
 	if ( g_ecsMotion && g_ecsMotion->integer ) {
 		ECS_StepMotion( frametime );
 	}
 
-	if (cl_navEnabled && cl_navEnabled->integer && activeNavMesh >= 0) {
-		Nav_UpdateCrowd(activeNavMesh, frametime);
+	if ( cl_navEnabled && cl_navEnabled->integer ) {
+		int navMesh = activeNavMesh;
+		if ( navMesh < 0 && WorldOpen_IsEnabled() ) {
+			navMesh = Nav_GetOpenWorldMesh();
+		}
+		if ( navMesh >= 0 ) {
+			Nav_UpdateCrowd( navMesh, frametime );
+		}
 	}
 
 	if (cl_particlesEnabled && cl_particlesEnabled->integer) {

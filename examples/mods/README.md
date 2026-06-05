@@ -7,7 +7,7 @@ Mods usually ship as a **folder** or **`.pk3`** archives alongside the base game
 ```
 YourInstall/
 ├── idtech3
-├── base/                    # or baseq3 - stock game pk3s
+├── base/                    # licensed compatible game pk3s
 │   └── pak0.pk3 ...
 └── mymod/                   # mod as a sibling directory
     ├── pak_mymod.pk3        # your assets
@@ -19,7 +19,7 @@ YourInstall/
 Dedicated server with mod as game dir:
 
 ```bash
-./idtech3_server +set dedicated 1 +set fs_game mymod +set com_hunkMegs 64 +map q3dm1
+./idtech3_server +set dedicated 1 +set fs_game mymod +set com_hunkMegs 64 +map yourmap
 ```
 
 Client (Linux) with Vulkan and mod:
@@ -28,7 +28,7 @@ Client (Linux) with Vulkan and mod:
 ./idtech3 +set cl_renderer vulkan +set fs_game mymod
 ```
 
-Use `+set fs_basegame base` (or `baseq3`) if your stock assets live under a non-default name.
+Use `+set fs_basegame <folder>` if your stock assets live under a non-default name (see [COMPATIBILITY.md](../../docs/COMPATIBILITY.md)).
 
 ## Native modules
 

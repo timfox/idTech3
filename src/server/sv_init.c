@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "server.h"
+#include "sv_openworld.h"
 #include "sv_enhanced.h"
 #include "sv_engine_sprites.h"
 #include "sv_engine_decals.h"
@@ -866,6 +867,7 @@ void SV_Init( void )
 	SV_InitChallenger();
 
 	SV_Enhanced_Init();
+	SV_OpenWorld_Init();
 }
 
 

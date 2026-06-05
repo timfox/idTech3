@@ -1,2 +1,2 @@
-title "idTech3 Demo"
+title "Gopex Engine Demo"
 requires_engine >= 1.0

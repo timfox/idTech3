@@ -56,6 +56,12 @@ Build artifacts go to `build-vk-Release/` and are copied to `release/`.
 - **Vulkan Forward+ / TAA / deferred**: **`r_forwardPlus` 1** (default), up to **64** GPU dlights; **`r_renderMode 2`** latches Forward+ shade. **`r_renderMode 1`** + **`r_deferredLighting 1`**: G-buffer fill + additive dynamic (`r_deferredUnlitBase` 1); skips classic projector when active. **`r_taa 1`** optional temporal resolve. See **`docs/FORWARD_PLUS_PIPELINE_AUDIT.md`**, **`docs/RENDERERS.md`**, **`docs/HDR_GAPS.md`** §6.8.
 - **Billboard / flipbook / imposter (engine-native)**: Map entities **`misc_*`** parsed on **`LoadWorld`** (`r_spriteProps 1`, auto-disabled when **`CS_ENGINE_SPRITE_META`** set). Server: **`sv_engineSprites`**, **`sv_engineSpritesSpawn`**, console **`sv_sprite_spawn`**. Client: **`cl_engineSprites`**, **`sprite_spawn`**, cgame trap **`trap_EngineSpriteAddLocal`**. QVM game traps: **`G_ENGINE_SPRITE_SHADER_INDEX`**, **`G_ENGINE_SPRITE_SPAWN`**. Lua: **`Engine.Sprites.spawnLocal` / `spawnServer`**. Demo: **`demo_sprites.cfg`**, **`lua_run demo_run_sprites()`**.
 - **FreeUSD (default ON)**: Git submodule **`src/external/FreeUSD`** ([gopexllc/FreeUSD](https://github.com/gopexllc/FreeUSD)); **`USE_FREEUSD=ON`** in CMake and **`./scripts/compile_engine.sh`** (auto `git submodule update --init`; pass **`nofreeusd`** to disable). Targets link **`freeusd::runtime`** + **`freeusd::c`** via **`idtech3_freeusd`**. Renderer **`r_freeusd` 1**; client **`usd_*`** tools. Init: **`./scripts/init_optional_submodules.sh --freeusd`**. See **`docs/FREEUSD.md`**.
+- **World districts + proxy meshes**: **`r_district` 1** (default) — USD manifest via **`district_load world/playfield.usda`**, FreeUSD snapshot parse, proxy residency (`r_districtProxy`), optional **`cm_districtStream`** sector prefetch. Console: **`district_list`**, **`district_proxy`**, **`district_load_full`**. Demo: **`exec demo_districts.cfg`**. See **`docs/DISTRICTS.md`**.
+- **Infinite open worlds**: **`r_openWorld` 1** — view-driven sector residency: **`cm_stream`** + **`cm_streamMerge` 1** (overlay sector BSP collision), per-chunk **`nav/sector_X_Y.nav`**, **`sprites/sector_X_Y.ents`** billboard scatter. Console: **`openworld_start`**, **`openworld_sector`**, **`openworld_status`**. Demo: **`exec demo_openworld.cfg`**. See **`docs/OPEN_WORLD.md`**.
+- **Procedural patterns**: **`r_proc` 1** — deterministic Voronoi/grid/hex/radial/stripe/noise sector typing. Console: **`proc_pattern`**, **`proc_map`**, **`proc_sample`**. Scatter fallback: **`sprites/region_<id>.ents`** when **`r_procScatterRegion` 1**. Demo: **`exec demo_proc.cfg`**. See **`docs/PROC_PATTERNS.md`**.
+- **Sector BSP fixtures**: **`python3 scripts/tools/gen_sector_bsp.py maps/sector_0_0.bsp`** — minimal collision overlay for **`cm_streamMerge`**. **`ctest -R test_cm_stream_merge`**.
+- **Nav sector bake**: **`nav_bake_sector 0 0`** / **`nav_bake_view`** — Recast tile from sector BSP → **`nav/sector_X_Y.nav`**. Server collision residency: **`sv_openWorld 1`**. **`ctest -R test_nav_bake`**.
+- **MP sector sync**: **`sv_openWorldSync` 1** → **`CS_ENGINE_OPENWORLD_SECTORS`**; client **`cl_openWorldSync` 1**. Visual overlay: **`r_bspStream` 1**. **`ctest -R test_openworld_sync`**.
 
 ### Linting / Static Analysis
 
@@ -69,7 +75,8 @@ Build artifacts go to `build-vk-Release/` and are copied to `release/`.
 
 ### Game data / base
 
-- **Standalone full conversion**: Do not assume Q3A, OpenArena, or other generic bases. The base is either Unwaking or a game explicitly defined by the user.
+- **Standalone full conversion**: Ship your own `fs_game` mod with native or QVM modules; do not rely on third-party demo content in this repository.
+- **Legacy compatible installs**: Retail QVM mods remain supported — see [COMPATIBILITY.md](docs/COMPATIBILITY.md).
 - **Smallest valid data tree** (bootstrap `.pk3` + `default.cfg`): see `docs/MINIMAL_GAME_SHELL.md`.
 
 ### Scripting

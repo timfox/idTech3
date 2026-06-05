@@ -89,6 +89,11 @@ Full enum: [g_public.h](../src/game/g_public.h) (before `G_TRAP_GETVALUE` = 700)
 | `sv_pureSigned` | 0 | Require valid `pk3.sig` sidecars |
 | `sv_interestMaxDist` | 0 | 0=off; distance cull after PVS |
 | `sv_sectorURL` | "" | Base URL for sector pk3 autodownload |
+| `r_openWorld` | 0 | Open-world sector residency (nav/sprites/collision) |
+| `cm_stream` / `cm_streamMerge` | 0 | Sector BSP prefetch + overlay merge |
+| `sv_openWorldSync` / `cl_openWorldSync` | 1 | MP sector list via `CS_ENGINE_OPENWORLD_SECTORS` |
+| `r_bspStream` | 1 | Renderer overlay for streamed sector BSP |
+| `r_proc` | 0 | Procedural region/palette typing per sector |
 | `com_loc_language` | "en" | i18n table selection |
 
 Grouped lists: renderer [RENDERERS.md](RENDERERS.md), Lua [LUA_API.md](LUA_API.md), physics [PHYSICS.md](PHYSICS.md).
@@ -141,6 +146,38 @@ Reload: `script_reload` (requires `USE_LUA=ON`).
 | Pure server | Classic `sv_pure` + CRC |
 | Crash reports | `com_crashReportURL` — [CRASH_REPORTING.md](CRASH_REPORTING.md) |
 | Anti-cheat hooks | [ANTICHEAT_INTEGRATION.md](ANTICHEAT_INTEGRATION.md) |
+
+---
+
+## Open-world streaming
+
+View-driven **sector residency** for infinite maps. Full guide: [OPEN_WORLD.md](OPEN_WORLD.md).
+
+| Asset | Path |
+|-------|------|
+| Sector BSP | `maps/sector_<x>_<y>.bsp` |
+| Nav tile | `nav/sector_<x>_<y>.nav` |
+| Scatter | `sprites/sector_<x>_<y>.ents` (or `region_*` / `palette_*`) |
+
+**Bootstrap:**
+
+```text
+set r_openWorld 1
+set cm_stream 1
+openworld_start
+```
+
+**Fixture BSP** (collision + optional visual surfaces):
+
+```bash
+python3 scripts/tools/gen_sector_bsp.py maps/sector_0_0.bsp --cell-x 0 --cell-y 0 --visual
+```
+
+**MP sync:** server publishes `CS_ENGINE_OPENWORLD_SECTORS` (`0_0,1_0,...`); clients merge/unload collision from the authoritative list when `cl_openWorldSync 1`.
+
+**Procedural typing:** [PROC_PATTERNS.md](PROC_PATTERNS.md) (`proc_pattern`, `proc_map`, scatter fallbacks).
+
+Console: `openworld_start`, `openworld_sector`, `nav_bake_sector`, `proc_sample`.
 
 ---
 

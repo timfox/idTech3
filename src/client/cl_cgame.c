@@ -29,6 +29,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../game/g_entity_bridge.h"
 #include "cl_engine_sprites.h"
 #include "cl_engine_decals.h"
+#include "cl_openworld.h"
+#include "../game/bg_public.h"
 
 extern	botlib_export_t	*botlib_export;
 
@@ -268,6 +270,10 @@ static void CL_ConfigstringModified( void ) {
 	if ( index == CS_SYSTEMINFO ) {
 		// parse serverId and other cvars
 		CL_SystemInfoChanged( qfalse );
+	}
+
+	if ( index == CS_ENGINE_OPENWORLD_SECTORS ) {
+		CL_OpenWorld_OnConfigstring( s );
 	}
 }
 

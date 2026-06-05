@@ -3,7 +3,7 @@
 #
 # Usage:
 #   ./run_demo_client.sh                    # use examples/demo_skeleton/ as root (when run from repo)
-#   ./run_demo_client.sh /path/to/playfield # custom root (must contain base/ or baseq3/ and idtech3_demo/)
+#   ./run_demo_client.sh /path/to/playfield # custom root (must contain base/ and idtech3_demo/)
 #   ./run_demo_client.sh --help
 set -euo pipefail
 
@@ -125,13 +125,8 @@ fi
 
 BASE_DIR_NAME="${DEMO_BASE_DIR:-base}"
 if [[ ! -d "$BASE_ROOT/$BASE_DIR_NAME" ]]; then
-	if [[ "$BASE_DIR_NAME" == "base" && -d "$BASE_ROOT/baseq3" ]]; then
-		echo "Found baseq3/ but not base/. Set in local.env: DEMO_BASE_DIR=baseq3" >&2
-		echo "Or symlink: ln -s baseq3 \"$BASE_ROOT/base\"" >&2
-		exit 2
-	fi
 	echo "Missing game data folder: $BASE_ROOT/$BASE_DIR_NAME" >&2
-	echo "Add your licensed .pk3 files there. See base/README.txt" >&2
+	echo "Add your licensed .pk3 files there, or set DEMO_BASE_DIR in local.env (see docs/COMPATIBILITY.md)." >&2
 	exit 2
 fi
 

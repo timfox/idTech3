@@ -38,6 +38,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cl_sdf_font.h"
 #include "cl_vector_font.h"
 #include "cl_usd.h"
+#include "cl_district.h"
+#include "cl_openworld.h"
+#include "cl_proc.h"
 #include "cl_demo.h"
 #include "../qcommon/script_emit.h"
 #include "../qcommon/cm_stream.h"
@@ -4490,6 +4493,9 @@ void CL_Init( void ) {
 	SDF_Init();
 	VectorFont_Init();
 	CL_USD_Init();
+	CL_District_Init();
+	CL_OpenWorld_Init();
+	CL_Proc_Init();
 #ifdef USE_VUDA
 	CL_VUDA_Init();
 #endif

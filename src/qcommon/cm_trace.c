@@ -437,6 +437,8 @@ static void CM_PositionTest( traceWork_t *tw ) {
 			break;
 		}
 	}
+
+	CM_Stream_PointContentsMerged( tw->start, tw );
 }
 
 /*
@@ -474,7 +476,7 @@ static void CM_TraceThroughPatch( traceWork_t *tw, const cPatch_t *patch ) {
 CM_TraceThroughBrush
 ================
 */
-static void CM_TraceThroughBrush( traceWork_t *tw, const cbrush_t *brush ) {
+void CM_TraceThroughBrush( traceWork_t *tw, const cbrush_t *brush ) {
 	int			i;
 	cplane_t	*plane, *clipplane;
 	double		dist;
@@ -1333,6 +1335,7 @@ static void CM_Trace( trace_t *results, const vec3_t start, const vec3_t end, co
 			}
 		} else {
 			CM_TraceThroughTree( &tw, 0, 0, 1, tw.start, tw.end );
+			CM_Stream_TraceMerged( &tw );
 		}
 	}
 

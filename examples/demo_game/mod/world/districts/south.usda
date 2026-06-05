@@ -1,0 +1,16 @@
+#usda 1.0
+(
+    defaultPrim = "District"
+    doc = "Full district payload placeholder (meshes + future payloads)."
+)
+
+def Xform "District"
+{
+    def Mesh "Floor"
+    {
+        point3f[] points = [(0, 0, 0), (512, 0, 0), (512, 512, 0), (0, 512, 0)]
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        color3f[] primvars:displayColor = [(0.5, 0.5, 0.55)]
+    }
+}

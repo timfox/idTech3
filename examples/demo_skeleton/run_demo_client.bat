@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions
 rem Demo launcher (Windows). Put idtech3.exe next to this file or on PATH.
-rem Layout: same folder as this file must contain base\ (or baseq3\) and idtech3_demo\idtech3_demo.pk3
+rem Layout: same folder as this file must contain base\ and idtech3_demo\idtech3_demo.pk3
 
 if not defined IDTECH3_DEMO_ROOT set "IDTECH3_DEMO_ROOT=%~dp0"
 if "%IDTECH3_DEMO_ROOT:~-1%"=="\" set "IDTECH3_DEMO_ROOT=%IDTECH3_DEMO_ROOT:~0,-1%"
@@ -14,11 +14,8 @@ if not exist "%IDTECH3_DEMO_ROOT%\idtech3_demo\idtech3_demo.pk3" (
 
 if not defined DEMO_BASE_DIR set "DEMO_BASE_DIR=base"
 if not exist "%IDTECH3_DEMO_ROOT%\%DEMO_BASE_DIR%" (
-  if "%DEMO_BASE_DIR%"=="base" if exist "%IDTECH3_DEMO_ROOT%\baseq3" (
-    echo Found baseq3 but not base. Set DEMO_BASE_DIR=baseq3 in the environment or in this file.
-    exit /b 2
-  )
   echo Missing game data folder: %IDTECH3_DEMO_ROOT%\%DEMO_BASE_DIR%
+  echo Set DEMO_BASE_DIR if your install uses a different folder name.
   exit /b 2
 )
 
