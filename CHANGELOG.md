@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI: Clang in Ubuntu build matrix, ASAN job, FORTIFY_SOURCE enabled on Linux
 
 ### Changed
+- Vulkan renderer: removed stale compile-time gates (`USE_VBO_GRID`, `USE_TESS_NEEDS_*`), dead non-PBR shader init (`USE_VK_PBR` is always on), and unreachable `RENDERER_OPENGL` glTF paths; Vulkan-only clients no longer register legacy `r_allowSoftwareGL` / `r_glDriver` unless built with `USE_OPENGL_API`.
 - Vulkan ImGui: **File → Quit** runs `quit` (clean exit) instead of a no-op.
 
 - Client: clearer message when UI VM fails to load (idtech3_demo ships native UI in `vm/`, not configs-only).
