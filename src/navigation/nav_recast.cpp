@@ -22,8 +22,12 @@ Uses Recast for navmesh generation and Detour for pathfinding/crowd.
 
 extern "C" {
 #include "nav_recast.h"
+#include "nav_bsp_extract.h"
 #include "../qcommon/qcommon.h"
 }
+
+#include <cstdio>
+#include <cstdlib>
 
 #define MAX_NAV_MESHES 4
 
@@ -872,5 +876,86 @@ extern "C" qboolean Nav_BakeSectorTile( int cellX, int cellY, float sectorSize, 
 	dtFree( tileData );
 
 	Com_Printf( "Nav: baked sector tile %d,%d -> %s (%d bytes)\n", cellX, cellY, path, tileSize );
+	return qtrue;
+}
+
+extern "C" qboolean Nav_BakeSectorTileToPath( const char *bspPath, const char *navOutPath,
+	int cellX, int cellY, float sectorSize, const navMeshParams_t *params ) {
+	unsigned char *tileData;
+	int tileSize;
+	qboolean ok;
+	FILE *f;
+	byte *buf;
+	long length;
+	navMeshParams_t defaults;
+
+	if ( !bspPath || !bspPath[0] || !navOutPath || !navOutPath[0] ) {
+		return qfalse;
+	}
+	if ( !navInitialized ) {
+		Nav_Init();
+	}
+	if ( sectorSize < 256.0f ) {
+		sectorSize = 4096.0f;
+	}
+
+	f = fopen( bspPath, "rb" );
+	if ( !f ) {
+		return qfalse;
+	}
+	if ( fseek( f, 0, SEEK_END ) != 0 ) {
+		fclose( f );
+		return qfalse;
+	}
+	length = ftell( f );
+	if ( length <= (long)sizeof( dheader_t ) ) {
+		fclose( f );
+		return qfalse;
+	}
+	if ( fseek( f, 0, SEEK_SET ) != 0 ) {
+		fclose( f );
+		return qfalse;
+	}
+	buf = (byte *)malloc( (size_t)length );
+	if ( !buf ) {
+		fclose( f );
+		return qfalse;
+	}
+	if ( fread( buf, 1, (size_t)length, f ) != (size_t)length ) {
+		free( buf );
+		fclose( f );
+		return qfalse;
+	}
+	fclose( f );
+
+	if ( !Nav_BSP_ExtractFromSectorBuffer( buf, (int)length, cellX, cellY, sectorSize ) ) {
+		free( buf );
+		return qfalse;
+	}
+	free( buf );
+
+	if ( !params ) {
+		Nav_DefaultParams( &defaults );
+		params = &defaults;
+	}
+
+	ok = Nav_BuildTileBlob( cellX, cellY, sectorSize, sectorSize, params, &tileData, &tileSize );
+	if ( !ok || !tileData || tileSize <= 0 ) {
+		return qfalse;
+	}
+
+	f = fopen( navOutPath, "wb" );
+	if ( !f ) {
+		dtFree( tileData );
+		return qfalse;
+	}
+	if ( fwrite( tileData, 1, (size_t)tileSize, f ) != (size_t)tileSize ) {
+		fclose( f );
+		dtFree( tileData );
+		return qfalse;
+	}
+	fclose( f );
+	dtFree( tileData );
+	Com_Printf( "Nav: baked %s -> %s (%d bytes)\n", bspPath, navOutPath, tileSize );
 	return qtrue;
 }

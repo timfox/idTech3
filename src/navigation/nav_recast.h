@@ -102,6 +102,8 @@ navMeshHandle_t Nav_GetOpenWorldMesh( void );
 qboolean        Nav_LoadSectorTile( navMeshHandle_t mesh, int cellX, int cellY );
 void            Nav_UnloadSectorTile( navMeshHandle_t mesh, int cellX, int cellY );
 qboolean        Nav_BakeSectorTile( int cellX, int cellY, float sectorSize, const navMeshParams_t *params );
+qboolean        Nav_BakeSectorTileToPath( const char *bspPath, const char *navOutPath,
+	int cellX, int cellY, float sectorSize, const navMeshParams_t *params );
 
 #ifdef __cplusplus
 }

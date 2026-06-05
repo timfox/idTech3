@@ -127,6 +127,8 @@ add_custom_command(
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/world/proxies"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/world/districts"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/sprites"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/maps"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/nav"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/sound"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/animgraph"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/loc"
@@ -146,6 +148,14 @@ add_custom_command(
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/demo_sqz_pack/sqz"
 	COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/scripts/sqz_pack_demo.py"
 		"${CMAKE_BINARY_DIR}/demo_sqz_pack/sqz/demo.sqz"
+	COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/scripts/tools/gen_hub_bsp.py"
+		"${DEMO_PACK_STAGING}/maps/open_void.bsp"
+	COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/scripts/tools/gen_sector_bsp.py"
+		"${DEMO_PACK_STAGING}/maps/sector_0_0.bsp" --cell-x 0 --cell-y 0 --visual
+	COMMAND bash "${CMAKE_SOURCE_DIR}/scripts/bake_staged_openworld_nav.sh"
+		"${CMAKE_BINARY_DIR}"
+		"${DEMO_PACK_STAGING}/maps/sector_0_0.bsp"
+		"${DEMO_PACK_STAGING}/nav/sector_0_0.nav"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/autoexec.cfg" "${DEMO_PACK_STAGING}/autoexec.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -281,6 +291,8 @@ add_custom_command(
 		world/playfield.usda world/proxies/north_proxy.usda world/proxies/south_proxy.usda
 		world/districts/north.usda world/districts/south.usda
 		sprites/sector_0_0.ents
+		maps/open_void.bsp maps/sector_0_0.bsp
+		nav/sector_0_0.nav
 		gfx/2d/bigchars.png
 		gfx/demo/bootstrap_white.png
 		gfx/demo/bootstrap_console.png

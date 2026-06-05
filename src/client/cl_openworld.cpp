@@ -99,24 +99,31 @@ static void CL_OpenWorld_SyncUnloadRemoved( const clOpenWorldCell_t *newCells, i
 	int oldCount;
 	int i, n;
 	const worldOpenSector_t *sec;
-	int collisionMask = ( 1 << WO_LAYER_COLLISION );
+	int syncMask = 0;
+
+	if ( Cvar_VariableIntegerValue( "cm_openWorldCollision" ) ) {
+		syncMask |= ( 1 << WO_LAYER_COLLISION );
+	}
+	if ( Cvar_VariableIntegerValue( "r_openWorldNav" ) ) {
+		syncMask |= ( 1 << WO_LAYER_NAV );
+	}
 
 	oldCount = CL_OpenWorld_ParseSectorList( cl_openWorldLastSync, oldCells, CL_OPENWORLD_SYNC_MAX );
 	for ( i = 0; i < oldCount; i++ ) {
 		if ( !CL_OpenWorld_CellInList( oldCells[i].cellX, oldCells[i].cellY, newCells, newCount ) ) {
-			WorldOpen_UnloadSectorLayers( oldCells[i].cellX, oldCells[i].cellY, collisionMask );
+			WorldOpen_UnloadSectorLayers( oldCells[i].cellX, oldCells[i].cellY, syncMask );
 		}
 	}
 
 	n = WorldOpen_GetSectorCount();
 	for ( i = 0; i < n; i++ ) {
 		sec = WorldOpen_GetSector( i );
-		if ( !sec || !sec->active || !sec->collision ) {
+		if ( !sec || !sec->active ) {
 			continue;
 		}
 		if ( !CL_OpenWorld_CellInList( sec->cellX, sec->cellY, newCells, newCount ) &&
 			CL_OpenWorld_CellInList( sec->cellX, sec->cellY, oldCells, oldCount ) ) {
-			WorldOpen_UnloadSectorLayers( sec->cellX, sec->cellY, collisionMask );
+			WorldOpen_UnloadSectorLayers( sec->cellX, sec->cellY, syncMask );
 		}
 	}
 }
@@ -520,6 +527,9 @@ extern "C" void CL_OpenWorld_OnConfigstring( const char *sectorList ) {
 	if ( Cvar_VariableIntegerValue( "cm_openWorldCollision" ) ) {
 		layerMask |= ( 1 << WO_LAYER_COLLISION );
 	}
+	if ( Cvar_VariableIntegerValue( "r_openWorldNav" ) ) {
+		layerMask |= ( 1 << WO_LAYER_NAV );
+	}
 	CL_OpenWorld_LoadSectorCells( sectorList, layerMask );
 
 	Q_strncpyz( cl_openWorldLastSync, sectorList, sizeof( cl_openWorldLastSync ) );
@@ -529,7 +539,7 @@ extern "C" void CL_OpenWorld_OnConfigstring( const char *sectorList ) {
 extern "C" void CL_OpenWorld_Init( void ) {
 	cl_openWorldSync = Cvar_Get( "cl_openWorldSync", "1", CVAR_ARCHIVE );
 	Cvar_SetDescription( cl_openWorldSync,
-		"Apply CS_ENGINE_OPENWORLD_SECTORS from server for authoritative collision residency." );
+		"Apply CS_ENGINE_OPENWORLD_SECTORS from server (collision + nav when enabled)." );
 
 	WorldOpen_Init();
 	WorldOpen_SetSectorLoad( CL_OpenWorld_SectorLoad );

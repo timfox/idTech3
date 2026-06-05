@@ -1222,6 +1222,7 @@ list(APPEND QCOMMON_SRCS src/world/world_district.c)
 list(APPEND QCOMMON_SRCS src/world/world_open.c)
 list(APPEND QCOMMON_SRCS src/world/world_proc.c)
 list(APPEND QCOMMON_SRCS src/qcommon/cm_stream_merge.c)
+list(APPEND QCOMMON_SRCS src/qcommon/com_openworld_smoke.c)
 # exclude platform-dependent QVM JIT compilers; add the active backend below
 list(FILTER QCOMMON_SRCS EXCLUDE REGEX ".*vm_(aarch64|armv7l|powerpc|x86)\\.c")
 # exclude optional network modules; add when options enabled
@@ -2793,6 +2794,13 @@ set_tests_properties(test_openworld_sync PROPERTIES
 	LABELS "scripts;validation"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_openworld_sync.sh;${CMAKE_SOURCE_DIR}/src/renderers/vulkan/tr_bsp_stream.c;${CMAKE_SOURCE_DIR}/src/server/sv_openworld.c")
 
+add_test(NAME test_openworld_runtime
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_openworld_runtime.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_openworld_runtime PROPERTIES
+	LABELS "scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_openworld_runtime.sh;${CMAKE_SOURCE_DIR}/scripts/tools/gen_hub_bsp.py;${CMAKE_SOURCE_DIR}/scripts/tools/gen_sector_bsp.py;${CMAKE_SOURCE_DIR}/src/qcommon/com_openworld_smoke.c")
+
 add_test(NAME test_init_optional_submodules
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_init_optional_submodules.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -3121,6 +3129,25 @@ if(BUILD_UNIT_TESTS)
 	endif()
 	add_test(NAME unit_nanovdb_decode COMMAND unit_nanovdb_decode)
 	set_tests_properties(unit_nanovdb_decode PROPERTIES LABELS "unit;validation")
+
+	if(USE_RECAST_NAV AND TARGET recast_nav)
+		add_executable(unit_openworld_nav
+			tests/unit/test_openworld_nav.c
+			tests/stub_qcommon_min.c
+			tests/stub_openworld_nav.c
+			src/qcommon/q_shared.c
+			src/qcommon/q_math.c)
+		target_include_directories(unit_openworld_nav PRIVATE ${CMAKE_SOURCE_DIR}/src)
+		target_link_libraries(unit_openworld_nav PRIVATE recast_nav)
+		if(NOT MSVC)
+			target_link_libraries(unit_openworld_nav PRIVATE m)
+		endif()
+		add_test(NAME unit_openworld_nav
+			COMMAND unit_openworld_nav
+				${CMAKE_SOURCE_DIR}/tests/data/openworld/maps/sector_0_0.bsp
+				${CMAKE_BINARY_DIR}/sector_0_0_test.nav)
+		set_tests_properties(unit_openworld_nav PROPERTIES LABELS "unit;validation")
+	endif()
 endif()
 
 # Example mod pack (config-only .pk3); optional - see examples/demo_game/README.md
