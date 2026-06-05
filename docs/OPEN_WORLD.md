@@ -16,7 +16,7 @@ View position
 
 | Layer | Asset path | Default |
 |-------|------------|---------|
-| BSP collision | `maps/sector_X_Y.bsp` | Off (`cm_openWorldCollision 0`) — see limitations |
+| BSP collision | `maps/sector_X_Y.bsp` | Off (`cm_openWorldCollision 0`) — see [Limitations](#limitations) |
 | Nav tile | `nav/sector_X_Y.nav` | On (`r_openWorldNav 1`) |
 | Billboard scatter | `sprites/sector_X_Y.ents` | On (`r_openWorldSprites 1`) |
 
@@ -126,7 +126,7 @@ set cm_openWorldCollision 1
 
 ### Multiplayer sector sync
 
-When **`sv_openWorldSync 1`** (default), the server publishes loaded sector cells via **`CS_ENGINE_OPENWORLD_SECTORS`** (`0_0,1_0,...`). Clients with **`cl_openWorldSync 1`** merge authoritative collision for those cells and **unload** sectors dropped from the server list (bidirectional sync).
+When **`sv_openWorldSync 1`** (default), the server publishes loaded sector cells via **`CS_ENGINE_OPENWORLD_SECTORS`** (`0_0,1_0,...`). Clients with **`cl_openWorldSync 1`** merge authoritative **collision** for those cells, load **nav tiles** when **`r_openWorldNav 1`**, and **unload** layers dropped from the server list.
 
 ### Renderer visual overlay
 
@@ -146,13 +146,21 @@ Emits a minimal IBSP v46 with one solid platform brush in local sector space. **
 
 Requirements:
 
-1. Load a **base hub map** first (`maps/open_void.bsp` or your playfield) — provides world tree + default floor.
+1. Load a **base hub map** first (`maps/open_void.bsp` from `scripts/tools/gen_hub_bsp.py`, or your playfield) — provides world tree + default floor.
 2. Enable **`cm_openWorldCollision 1`** for view-driven sector merge residency.
 3. Author sector BSPs in **local sector space** (0..sectorSize); the engine offsets by `(cellX, cellY) * sectorSize`.
 
 Legacy replace mode: **`cm_streamMerge 0`** still calls `CM_LoadMap` per sector (single-sector collision only).
 
 Traces and `CM_PointContents` query merged sector brushes after the base BSP tree.
+
+## Limitations
+
+- **Hub map required**: Load `maps/open_void.bsp` (or your playfield) before sector merge; generator: `scripts/tools/gen_hub_bsp.py`.
+- **Collision default off on client**: Enable `cm_openWorldCollision 1` for view-driven merge (`openworld_start` / `demo_openworld.cfg` do this).
+- **MP sync scope**: `CS_ENGINE_OPENWORLD_SECTORS` is driven by **server collision residency**; clients also load **nav** when `r_openWorldNav 1` + `cl_openWorldSync 1`. Scatter/sprites remain view-driven unless loaded locally.
+- **Renderer overlay**: `r_bspStream` draws planar faces / brush-top quads; patches, lightmaps, and VBO residency for full Radiant sector art are not complete yet.
+- **Districts**: With `r_openWorld 1`, `district_load_full` streams through **WorldOpen** (collision + nav + scatter). With `r_openWorld 0`, districts use **cm_stream collision only** (legacy).
 
 ## Related
 

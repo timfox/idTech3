@@ -28,7 +28,7 @@ void SV_OpenWorld_Init( void ) {
 		"When sv_openWorld 1, merge sector BSP collision around connected players." );
 	sv_openWorldSync = Cvar_Get( "sv_openWorldSync", "1", CVAR_ARCHIVE );
 	Cvar_SetDescription( sv_openWorldSync,
-		"Publish loaded sector cells to clients via CS_ENGINE_OPENWORLD_SECTORS." );
+		"Publish loaded sector cells to clients via CS_ENGINE_OPENWORLD_SECTORS (collision authority; clients also load nav when r_openWorldNav 1)." );
 	sv_openWorldSectorList[0] = '\0';
 	SV_SetConfigstring( CS_ENGINE_OPENWORLD_SECTORS, "" );
 	Com_Printf( "[sv_openworld] sector collision streaming initialized (sv_openWorld 0)\n" );

@@ -8,6 +8,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #include "../qcommon/qcommon.h"
 #include "../qcommon/cm_stream.h"
 #include "world_district.h"
+#include "world_open.h"
 
 static worldDistrict_t districts[WORLD_DISTRICT_MAX];
 static int districtCount;
@@ -231,8 +232,30 @@ int WorldDistrict_FindAtPoint( const vec3_t point ) {
 
 static void WorldDistrict_StreamSectors( const worldDistrict_t *d ) {
 	int x, y;
+	int layerMask;
 
 	if ( !d || !cm_districtStream || !cm_districtStream->integer ) {
+		return;
+	}
+
+	if ( WorldOpen_IsEnabled() ) {
+		layerMask = 0;
+		if ( Cvar_VariableIntegerValue( "cm_openWorldCollision" ) ) {
+			layerMask |= ( 1 << WO_LAYER_COLLISION );
+		}
+		if ( Cvar_VariableIntegerValue( "r_openWorldNav" ) ) {
+			layerMask |= ( 1 << WO_LAYER_NAV );
+		}
+		if ( Cvar_VariableIntegerValue( "r_openWorldSprites" ) ) {
+			layerMask |= ( 1 << WO_LAYER_SPRITES );
+		}
+		for ( y = d->sectorY0; y <= d->sectorY1; y++ ) {
+			for ( x = d->sectorX0; x <= d->sectorX1; x++ ) {
+				(void)WorldOpen_LoadSector( x, y, layerMask );
+			}
+		}
+		Com_DPrintf( "[world_district] %s streamed via WorldOpen (%d,%d..%d,%d)\n",
+			d->name, d->sectorX0, d->sectorY0, d->sectorX1, d->sectorY1 );
 		return;
 	}
 

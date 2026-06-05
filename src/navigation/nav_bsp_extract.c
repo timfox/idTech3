@@ -129,10 +129,7 @@ static qboolean Nav_BSP_BoundsFromBrush( dplane_t *planes, int numPlanes,
 	return qtrue;
 }
 
-qboolean Nav_BSP_ExtractFromSectorMap( int cellX, int cellY, float sectorSize ) {
-	char mapName[MAX_QPATH];
-	void *buf;
-	int length;
+qboolean Nav_BSP_ExtractFromSectorBuffer( const byte *buf, int length, int cellX, int cellY, float sectorSize ) {
 	dheader_t header;
 	byte *base;
 	vec3_t worldOrigin;
@@ -143,29 +140,24 @@ qboolean Nav_BSP_ExtractFromSectorMap( int cellX, int cellY, float sectorSize ) 
 	dbrush_t *inBrushes;
 	int numPlanes, numSides, numBrushes;
 
+	if ( !buf || length <= 0 ) {
+		return qfalse;
+	}
 	if ( sectorSize < 256.0f ) {
 		sectorSize = 256.0f;
 	}
 
 	Nav_BSP_ClearGeometry();
 
-	Com_sprintf( mapName, sizeof( mapName ), "maps/sector_%d_%d.bsp", cellX, cellY );
-	length = FS_ReadFile( mapName, &buf );
-	if ( length <= 0 || !buf ) {
-		Com_DPrintf( "Nav: no sector BSP %s for extraction\n", mapName );
-		return qfalse;
-	}
 	if ( (size_t)length < sizeof( dheader_t ) ) {
-		FS_FreeFile( buf );
 		return qfalse;
 	}
 
-	header = *(dheader_t *)buf;
+	header = *(const dheader_t *)buf;
 	for ( i = 0; (size_t)i < sizeof( dheader_t ) / sizeof( int32_t ); i++ ) {
 		( (int32_t *)&header )[i] = LittleLong( ( (int32_t *)&header )[i] );
 	}
 	if ( header.version != BSP_VERSION ) {
-		FS_FreeFile( buf );
 		return qfalse;
 	}
 
@@ -205,8 +197,31 @@ qboolean Nav_BSP_ExtractFromSectorMap( int cellX, int cellY, float sectorSize ) 
 		Nav_BSP_AddBrushTopQuad( wmins, wmaxs );
 	}
 
+	return navTriCount > 0 ? qtrue : qfalse;
+}
+
+qboolean Nav_BSP_ExtractFromSectorMap( int cellX, int cellY, float sectorSize ) {
+	char mapName[MAX_QPATH];
+	void *buf;
+	int length;
+	qboolean ok;
+
+	if ( sectorSize < 256.0f ) {
+		sectorSize = 256.0f;
+	}
+
+	Com_sprintf( mapName, sizeof( mapName ), "maps/sector_%d_%d.bsp", cellX, cellY );
+	length = FS_ReadFile( mapName, &buf );
+	if ( length <= 0 || !buf ) {
+		Com_DPrintf( "Nav: no sector BSP %s for extraction\n", mapName );
+		return qfalse;
+	}
+
+	ok = Nav_BSP_ExtractFromSectorBuffer( (const byte *)buf, length, cellX, cellY, sectorSize );
 	FS_FreeFile( buf );
 
-	Com_Printf( "Nav: extracted %d tris from %s\n", navTriCount, mapName );
-	return navTriCount > 0 ? qtrue : qfalse;
+	if ( ok ) {
+		Com_Printf( "Nav: extracted %d tris from %s\n", navTriCount, mapName );
+	}
+	return ok;
 }

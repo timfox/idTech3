@@ -84,6 +84,10 @@ Shipped in `idtech3_demo.pk3` when built with `demo`: `exec demo_districts.cfg` 
 
 `ctest -R test_districts` validates sources, symbols, and fixture presence.
 
+## Open-world integration
+
+When **`r_openWorld 1`**, `district_load_full` calls **`WorldOpen_LoadSector`** for each cell in the district grid (collision + nav + scatter per cvars). When **`r_openWorld 0`**, full district load uses legacy **`CM_Stream_LoadSector`** (collision prefetch only). See [OPEN_WORLD.md](OPEN_WORLD.md#limitations).
+
 ## Related docs
 
 - [OPEN_WORLD.md](OPEN_WORLD.md) — view-driven sector streaming (BSP prefetch, per-chunk nav, billboard scatter)
