@@ -77,7 +77,6 @@ src/
 │   │   ├── tr_model_md5.c        MD5 loader
 │   │   ├── inspector/             ImGui inspector overlay
 │   │   └── shaders/glsl/          GLSL shaders
-│   ├── opengl/            Legacy OpenGL renderer (not shipped as supported path; tree may remain for reference)
 │   └── common/              Shared (images, fonts, types)
 │       └── tr_image_exr.cpp       OpenEXR loader
 ├── platform/

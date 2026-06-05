@@ -49,14 +49,21 @@ static struct {
 	VkShaderModule		rmiss;
 	VkShaderModule		rchit;
 	VkShaderModule		compact_cs;
+	VkShaderModule		denoise_cs;
+	VkShaderModule		composite_cs;
 	VkDescriptorPool	pool;
 	VkDescriptorSetLayout	dsl;
+	VkDescriptorSetLayout	dsl_post;
 	VkPipelineLayout	pl;
 	VkPipelineLayout	pl_compact;
+	VkPipelineLayout	pl_post;
 	VkPipeline		pipeline_mega;
 	VkPipeline		pipeline_wave;
 	VkPipeline		pipeline_compact;
+	VkPipeline		pipeline_denoise;
+	VkPipeline		pipeline_composite;
 	VkDescriptorSet		descriptor_set;
+	VkDescriptorSet		descriptor_post;
 	VkBuffer		sbt_buffer;
 	VkDeviceMemory		sbt_memory;
 	VkBuffer		queue_buffer;
@@ -288,6 +295,181 @@ static qboolean vk_pathtrace_is_wavefront( void )
 	return ( Q_stricmp( r_pathtrace_arch->string, "wavefront" ) == 0 ) ? qtrue : qfalse;
 }
 
+typedef struct {
+	float extent[4];
+	float strength;
+	float depthTol;
+} vk_pt_denoise_push_t;
+
+typedef struct {
+	float extent[4];
+	float blend;
+} vk_pt_composite_push_t;
+
+static void vk_pathtrace_update_post_descriptors( void )
+{
+	VkDescriptorImageInfo depthInfo;
+	VkDescriptorImageInfo traceInfo;
+	VkDescriptorImageInfo colorInfo;
+	VkWriteDescriptorSet writes[3];
+	Vk_Sampler_Def sd;
+
+	if ( pathtrace.descriptor_post == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	Com_Memset( &sd, 0, sizeof( sd ) );
+	sd.gl_mag_filter = sd.gl_min_filter = GL_NEAREST;
+	sd.max_lod_1_0 = qtrue;
+	sd.noAnisotropy = qtrue;
+
+	Com_Memset( &depthInfo, 0, sizeof( depthInfo ) );
+	depthInfo.sampler = vk_find_sampler( &sd );
+	depthInfo.imageView = vk.depth_image_view_sample ? vk.depth_image_view_sample : vk.depth_image_view;
+	depthInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+
+	Com_Memset( &traceInfo, 0, sizeof( traceInfo ) );
+	traceInfo.imageView = pathtrace.rt_image_view;
+	traceInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+	Com_Memset( &colorInfo, 0, sizeof( colorInfo ) );
+	colorInfo.imageView = vk.color_image_view;
+	colorInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+	Com_Memset( writes, 0, sizeof( writes ) );
+	writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writes[0].dstSet = pathtrace.descriptor_post;
+	writes[0].dstBinding = 0;
+	writes[0].descriptorCount = 1;
+	writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	writes[0].pImageInfo = &depthInfo;
+	writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writes[1].dstSet = pathtrace.descriptor_post;
+	writes[1].dstBinding = 1;
+	writes[1].descriptorCount = 1;
+	writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	writes[1].pImageInfo = &traceInfo;
+	writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writes[2].dstSet = pathtrace.descriptor_post;
+	writes[2].dstBinding = 2;
+	writes[2].descriptorCount = 1;
+	writes[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	writes[2].pImageInfo = &colorInfo;
+	qvkUpdateDescriptorSets( vk.device, 3, writes, 0, NULL );
+}
+
+static void vk_pathtrace_record_denoise( VkCommandBuffer cmd, VkImageLayout colorRestoreLayout )
+{
+	vk_pt_denoise_push_t push;
+	uint32_t gx, gy;
+
+	if ( !cmd || !r_pathtrace_denoise || !r_pathtrace_denoise->integer ) {
+		return;
+	}
+	if ( pathtrace.pipeline_denoise == VK_NULL_HANDLE || pathtrace.descriptor_post == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	{
+		VkImageMemoryBarrier barrier;
+		Com_Memset( &barrier, 0, sizeof( barrier ) );
+		barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		barrier.image = pathtrace.rt_image;
+		barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		barrier.subresourceRange.levelCount = 1;
+		barrier.subresourceRange.layerCount = 1;
+		barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+		barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+		barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+		barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+		qvkCmdPipelineBarrier( cmd, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier );
+	}
+
+	vk_pathtrace_update_post_descriptors();
+
+	push.extent[0] = (float)pathtrace.width;
+	push.extent[1] = (float)pathtrace.height;
+	push.extent[2] = 0.0f;
+	push.extent[3] = 0.0f;
+	push.strength = 0.65f;
+	push.depthTol = 0.02f;
+
+	gx = ( pathtrace.width + 7u ) / 8u;
+	gy = ( pathtrace.height + 7u ) / 8u;
+	qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pathtrace.pipeline_denoise );
+	qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pathtrace.pl_post, 0, 1,
+		&pathtrace.descriptor_post, 0, NULL );
+	qvkCmdPushConstants( cmd, pathtrace.pl_post, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( push ), &push );
+	qvkCmdDispatch( cmd, gx, gy, 1 );
+	(void)colorRestoreLayout;
+}
+
+static void vk_pathtrace_record_composite( VkCommandBuffer cmd, float blend, VkImageLayout colorRestoreLayout )
+{
+	VkImageMemoryBarrier barriers[2];
+	vk_pt_composite_push_t push;
+	uint32_t gx, gy;
+
+	if ( !cmd || blend <= 0.0f || vk.color_image == VK_NULL_HANDLE ) {
+		return;
+	}
+	if ( pathtrace.pipeline_composite == VK_NULL_HANDLE || pathtrace.descriptor_post == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	vk_pathtrace_update_post_descriptors();
+
+	Com_Memset( barriers, 0, sizeof( barriers ) );
+	barriers[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	barriers[0].image = pathtrace.rt_image;
+	barriers[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	barriers[0].subresourceRange.levelCount = 1;
+	barriers[0].subresourceRange.layerCount = 1;
+	barriers[0].oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+	barriers[0].newLayout = VK_IMAGE_LAYOUT_GENERAL;
+	barriers[0].srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+	barriers[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+	barriers[1].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	barriers[1].image = vk.color_image;
+	barriers[1].subresourceRange = barriers[0].subresourceRange;
+	barriers[1].oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	barriers[1].newLayout = VK_IMAGE_LAYOUT_GENERAL;
+	barriers[1].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	barriers[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+
+	qvkCmdPipelineBarrier( cmd, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 2, barriers );
+
+	push.extent[0] = (float)vk_get_render_target_width();
+	push.extent[1] = (float)vk_get_render_target_height();
+	push.extent[2] = 0.0f;
+	push.extent[3] = 0.0f;
+	push.blend = blend;
+
+	gx = ( push.extent[0] > 0.0f ) ? ( (uint32_t)push.extent[0] + 7u ) / 8u : 1u;
+	gy = ( push.extent[1] > 0.0f ) ? ( (uint32_t)push.extent[1] + 7u ) / 8u : 1u;
+	qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pathtrace.pipeline_composite );
+	qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pathtrace.pl_post, 0, 1,
+		&pathtrace.descriptor_post, 0, NULL );
+	qvkCmdPushConstants( cmd, pathtrace.pl_post, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( push ), &push );
+	qvkCmdDispatch( cmd, gx, gy, 1 );
+
+	barriers[1].oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+	barriers[1].newLayout = colorRestoreLayout;
+	barriers[1].srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+	if ( colorRestoreLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL ) {
+		barriers[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	} else {
+		barriers[1].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	}
+	qvkCmdPipelineBarrier( cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		( colorRestoreLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL )
+			? VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT : VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		0, 0, NULL, 0, NULL, 1, &barriers[1] );
+}
+
 void vk_pathtrace_shutdown( void )
 {
 	if ( pathtrace.pt_ubo_memory != VK_NULL_HANDLE && pathtrace.pt_ubo_ptr ) {
@@ -310,6 +492,18 @@ void vk_pathtrace_shutdown( void )
 		qvkDestroyPipeline( vk.device, pathtrace.pipeline_compact, NULL );
 		pathtrace.pipeline_compact = VK_NULL_HANDLE;
 	}
+	if ( pathtrace.pipeline_denoise != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, pathtrace.pipeline_denoise, NULL );
+		pathtrace.pipeline_denoise = VK_NULL_HANDLE;
+	}
+	if ( pathtrace.pipeline_composite != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, pathtrace.pipeline_composite, NULL );
+		pathtrace.pipeline_composite = VK_NULL_HANDLE;
+	}
+	if ( pathtrace.pl_post != VK_NULL_HANDLE ) {
+		qvkDestroyPipelineLayout( vk.device, pathtrace.pl_post, NULL );
+		pathtrace.pl_post = VK_NULL_HANDLE;
+	}
 	if ( pathtrace.pl != VK_NULL_HANDLE ) {
 		qvkDestroyPipelineLayout( vk.device, pathtrace.pl, NULL );
 		pathtrace.pl = VK_NULL_HANDLE;
@@ -317,6 +511,10 @@ void vk_pathtrace_shutdown( void )
 	if ( pathtrace.pl_compact != VK_NULL_HANDLE ) {
 		qvkDestroyPipelineLayout( vk.device, pathtrace.pl_compact, NULL );
 		pathtrace.pl_compact = VK_NULL_HANDLE;
+	}
+	if ( pathtrace.dsl_post != VK_NULL_HANDLE ) {
+		qvkDestroyDescriptorSetLayout( vk.device, pathtrace.dsl_post, NULL );
+		pathtrace.dsl_post = VK_NULL_HANDLE;
 	}
 	if ( pathtrace.dsl != VK_NULL_HANDLE ) {
 		qvkDestroyDescriptorSetLayout( vk.device, pathtrace.dsl, NULL );
@@ -346,6 +544,14 @@ void vk_pathtrace_shutdown( void )
 		qvkDestroyShaderModule( vk.device, pathtrace.compact_cs, NULL );
 		pathtrace.compact_cs = VK_NULL_HANDLE;
 	}
+	if ( pathtrace.denoise_cs != VK_NULL_HANDLE ) {
+		qvkDestroyShaderModule( vk.device, pathtrace.denoise_cs, NULL );
+		pathtrace.denoise_cs = VK_NULL_HANDLE;
+	}
+	if ( pathtrace.composite_cs != VK_NULL_HANDLE ) {
+		qvkDestroyShaderModule( vk.device, pathtrace.composite_cs, NULL );
+		pathtrace.composite_cs = VK_NULL_HANDLE;
+	}
 	vk_pathtrace_destroy_rt_output();
 	vk_pathtrace_destroy_buffer( &pathtrace.sbt_buffer, &pathtrace.sbt_memory );
 	vk_pathtrace_destroy_buffer( &pathtrace.queue_buffer, &pathtrace.queue_memory );
@@ -365,7 +571,7 @@ void vk_pathtrace_init( void )
 	VkPhysicalDeviceProperties2 props2;
 	VkDescriptorSetLayoutBinding bindings[6];
 	VkDescriptorSetLayoutCreateInfo dslci;
-	VkDescriptorPoolSize poolSizes[6];
+	VkDescriptorPoolSize poolSizes[7];
 	VkDescriptorPoolCreateInfo pci;
 	VkPipelineLayoutCreateInfo plci;
 	VkDescriptorSetAllocateInfo allocInfo;
@@ -423,6 +629,8 @@ void vk_pathtrace_init( void )
 	pathtrace.rmiss = vk_pathtrace_shader_module( vk_pt_miss_rmiss_spv, VK_PT_MISS_RMISS_SPV_SIZE, "pt_miss.rmiss" );
 	pathtrace.rchit = vk_pathtrace_shader_module( vk_pt_hit_rchit_spv, VK_PT_HIT_RCHIT_SPV_SIZE, "pt_hit.rchit" );
 	pathtrace.compact_cs = vk_pathtrace_shader_module( vk_pt_wave_compact_cs_spv, VK_PT_WAVE_COMPACT_CS_SPV_SIZE, "pt_wave_compact.comp" );
+	pathtrace.denoise_cs = vk_pathtrace_shader_module( vk_pt_denoise_cs_spv, VK_PT_DENOISE_CS_SPV_SIZE, "pt_denoise.comp" );
+	pathtrace.composite_cs = vk_pathtrace_shader_module( vk_pt_composite_cs_spv, VK_PT_COMPOSITE_CS_SPV_SIZE, "pt_composite.comp" );
 
 	Com_Memset( bindings, 0, sizeof( bindings ) );
 	bindings[0].binding = 0;
@@ -459,17 +667,43 @@ void vk_pathtrace_init( void )
 	poolSizes[0].type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
 	poolSizes[0].descriptorCount = 1;
 	poolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-	poolSizes[1].descriptorCount = 1;
+	poolSizes[1].descriptorCount = 2;
 	poolSizes[2].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	poolSizes[2].descriptorCount = 1;
 	poolSizes[3].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[3].descriptorCount = 1;
+	poolSizes[3].descriptorCount = 2;
 	poolSizes[4].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 	poolSizes[4].descriptorCount = 2;
+	poolSizes[5].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	poolSizes[5].descriptorCount = 1;
+	{
+		VkDescriptorSetLayoutBinding postBindings[3];
+		VkDescriptorSetLayoutCreateInfo postDslci;
+
+		Com_Memset( postBindings, 0, sizeof( postBindings ) );
+		postBindings[0].binding = 0;
+		postBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		postBindings[0].descriptorCount = 1;
+		postBindings[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		postBindings[1].binding = 1;
+		postBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		postBindings[1].descriptorCount = 1;
+		postBindings[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		postBindings[2].binding = 2;
+		postBindings[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		postBindings[2].descriptorCount = 1;
+		postBindings[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		Com_Memset( &postDslci, 0, sizeof( postDslci ) );
+		postDslci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		postDslci.bindingCount = 3;
+		postDslci.pBindings = postBindings;
+		VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &postDslci, NULL, &pathtrace.dsl_post ) );
+	}
+
 	Com_Memset( &pci, 0, sizeof( pci ) );
 	pci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	pci.maxSets = 1;
-	pci.poolSizeCount = 5;
+	pci.maxSets = 2;
+	pci.poolSizeCount = 7;
 	pci.pPoolSizes = poolSizes;
 	VK_CHECK( qvkCreateDescriptorPool( vk.device, &pci, NULL, &pathtrace.pool ) );
 
@@ -479,6 +713,8 @@ void vk_pathtrace_init( void )
 	plci.pSetLayouts = &pathtrace.dsl;
 	VK_CHECK( qvkCreatePipelineLayout( vk.device, &plci, NULL, &pathtrace.pl ) );
 	VK_CHECK( qvkCreatePipelineLayout( vk.device, &plci, NULL, &pathtrace.pl_compact ) );
+	plci.pSetLayouts = &pathtrace.dsl_post;
+	VK_CHECK( qvkCreatePipelineLayout( vk.device, &plci, NULL, &pathtrace.pl_post ) );
 
 	Com_Memset( &allocInfo, 0, sizeof( allocInfo ) );
 	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -486,6 +722,8 @@ void vk_pathtrace_init( void )
 	allocInfo.descriptorSetCount = 1;
 	allocInfo.pSetLayouts = &pathtrace.dsl;
 	VK_CHECK( qvkAllocateDescriptorSets( vk.device, &allocInfo, &pathtrace.descriptor_set ) );
+	allocInfo.pSetLayouts = &pathtrace.dsl_post;
+	VK_CHECK( qvkAllocateDescriptorSets( vk.device, &allocInfo, &pathtrace.descriptor_post ) );
 
 	vk_pathtrace_create_rt_output( w, h );
 	vk_rtx_bind_tlas_descriptor( pathtrace.descriptor_set );
@@ -583,17 +821,24 @@ void vk_pathtrace_init( void )
 	cpci.layout = pathtrace.pl_compact;
 	VK_CHECK( qvkCreateComputePipelines( vk.device, VK_NULL_HANDLE, 1, &cpci, NULL, &pathtrace.pipeline_compact ) );
 
+	cstage.module = pathtrace.denoise_cs;
+	cpci.layout = pathtrace.pl_post;
+	VK_CHECK( qvkCreateComputePipelines( vk.device, VK_NULL_HANDLE, 1, &cpci, NULL, &pathtrace.pipeline_denoise ) );
+
+	cstage.module = pathtrace.composite_cs;
+	VK_CHECK( qvkCreateComputePipelines( vk.device, VK_NULL_HANDLE, 1, &cpci, NULL, &pathtrace.pipeline_composite ) );
+
+	vk_pathtrace_update_post_descriptors();
+
 	pathtrace.ready = qtrue;
 	ri.Printf( PRINT_ALL,
-		"[VK][PathTrace] Ready arch=%s bounces=%d samples=%d denoise=%d debug=%d (experimental; shares RTX TLAS)\n",
+		"[VK][PathTrace] Ready arch=%s bounces=%d samples=%d denoise=%d composite blend=%.2f debug=%d (experimental; shares RTX TLAS)\n",
 		archName,
 		r_pathtrace_bounces ? r_pathtrace_bounces->integer : 4,
 		r_pathtrace_samples ? r_pathtrace_samples->integer : 1,
 		r_pathtrace_denoise ? r_pathtrace_denoise->integer : 0,
+		r_pathtrace_composite ? r_pathtrace_composite->value : 1.0f,
 		r_pathtrace_debug ? r_pathtrace_debug->integer : 0 );
-	if ( r_pathtrace_denoise && r_pathtrace_denoise->integer ) {
-		ri.Printf( PRINT_ALL, "[VK][PathTrace] r_pathtrace_denoise 1: spatial stub not wired — measure cost separately\n" );
-	}
 }
 
 void vk_pathtrace_frame_begin( void )
@@ -609,6 +854,7 @@ void vk_pathtrace_frame_begin( void )
 	}
 	vk_pathtrace_create_rt_output( w, h );
 	vk_rtx_bind_tlas_descriptor( pathtrace.descriptor_set );
+	vk_pathtrace_update_post_descriptors();
 	{
 		VkDescriptorBufferInfo queueInfo;
 		VkWriteDescriptorSet write;
@@ -809,37 +1055,54 @@ void vk_pathtrace_record_pass( VkCommandBuffer cmd )
 
 	pathtrace.rt_image_traced = qtrue;
 
-	barriers[0].oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-	barriers[0].newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-	barriers[0].srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-	barriers[0].dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-	barriers[1].oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	barriers[1].newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-	barriers[1].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-	barriers[1].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-	qvkCmdPipelineBarrier( cmd, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, VK_PIPELINE_STAGE_TRANSFER_BIT,
-		0, 0, NULL, 0, NULL, 2, barriers );
+	vk_pathtrace_record_denoise( cmd, colorRestoreLayout );
 
-	Com_Memset( &blit, 0, sizeof( blit ) );
-	blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	blit.srcSubresource.layerCount = 1;
-	blit.dstSubresource = blit.srcSubresource;
-	blit.srcOffsets[1].x = (int32_t)pathtrace.width;
-	blit.srcOffsets[1].y = (int32_t)pathtrace.height;
-	blit.srcOffsets[1].z = 1;
-	blit.dstOffsets[1].x = (int32_t)vk_get_render_target_width();
-	blit.dstOffsets[1].y = (int32_t)vk_get_render_target_height();
-	blit.dstOffsets[1].z = 1;
-	qvkCmdBlitImage( cmd, pathtrace.rt_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-		vk.color_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR );
+	{
+		float blend = r_pathtrace_composite ? r_pathtrace_composite->value : 1.0f;
 
-	barriers[0].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-	barriers[0].newLayout = VK_IMAGE_LAYOUT_GENERAL;
-	barriers[1].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-	barriers[1].newLayout = colorRestoreLayout;
-	qvkCmdPipelineBarrier( cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
-		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-		0, 0, NULL, 0, NULL, 2, barriers );
+		if ( blend < 0.0f ) {
+			blend = 0.0f;
+		}
+		if ( blend > 1.0f ) {
+			blend = 1.0f;
+		}
+
+		if ( blend >= 0.999f ) {
+			barriers[0].oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+			barriers[0].newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+			barriers[0].srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+			barriers[0].dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+			barriers[1].oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			barriers[1].newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+			barriers[1].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			barriers[1].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			qvkCmdPipelineBarrier( cmd, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, VK_PIPELINE_STAGE_TRANSFER_BIT,
+				0, 0, NULL, 0, NULL, 2, barriers );
+
+			Com_Memset( &blit, 0, sizeof( blit ) );
+			blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			blit.srcSubresource.layerCount = 1;
+			blit.dstSubresource = blit.srcSubresource;
+			blit.srcOffsets[1].x = (int32_t)pathtrace.width;
+			blit.srcOffsets[1].y = (int32_t)pathtrace.height;
+			blit.srcOffsets[1].z = 1;
+			blit.dstOffsets[1].x = (int32_t)vk_get_render_target_width();
+			blit.dstOffsets[1].y = (int32_t)vk_get_render_target_height();
+			blit.dstOffsets[1].z = 1;
+			qvkCmdBlitImage( cmd, pathtrace.rt_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				vk.color_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR );
+
+			barriers[0].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+			barriers[0].newLayout = VK_IMAGE_LAYOUT_GENERAL;
+			barriers[1].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+			barriers[1].newLayout = colorRestoreLayout;
+			qvkCmdPipelineBarrier( cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
+				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+				0, 0, NULL, 0, NULL, 2, barriers );
+		} else if ( blend > 0.001f ) {
+			vk_pathtrace_record_composite( cmd, blend, colorRestoreLayout );
+		}
+	}
 
 	if ( vk.depth_image != VK_NULL_HANDLE && vk.renderPassIndex == RENDER_PASS_MAIN ) {
 		record_depth_image_layout_transition( cmd, depthAspect,

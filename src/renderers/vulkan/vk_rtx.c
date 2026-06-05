@@ -933,12 +933,17 @@ void vk_rtx_init( void )
 
 	vk_rtx_shutdown();
 
-	if ( !vk.rtxAvailable || !r_rtx || r_rtx->integer <= 0 ) {
+	if ( !vk.rtxAvailable ) {
+		return;
+	}
+	if ( ( !r_rtx || r_rtx->integer <= 0 ) && ( !r_hybrid1 || r_hybrid1->integer <= 0 )
+		&& ( !r_raygun || r_raygun->integer <= 0 ) ) {
 		return;
 	}
 
-	if ( !r_rtxDemo || !r_rtxDemo->integer ) {
-		ri.Printf( PRINT_DEVELOPER, "[VK][RTX] r_rtxDemo 0: skipping demo pipeline init\n" );
+	if ( ( !r_rtxDemo || !r_rtxDemo->integer ) && ( !r_hybrid1 || r_hybrid1->integer <= 0 )
+		&& ( !r_raygun || r_raygun->integer <= 0 ) ) {
+		ri.Printf( PRINT_DEVELOPER, "[VK][RTX] r_rtxDemo 0: skipping RT AS/pipeline init\n" );
 		return;
 	}
 

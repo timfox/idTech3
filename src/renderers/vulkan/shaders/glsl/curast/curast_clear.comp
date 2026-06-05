@@ -1,0 +1,17 @@
+#version 450
+/* CuRast clear visibility buffer to far sentinel. */
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(r32ui, set = 0, binding = 0) uniform writeonly uimage2D visBuffer;
+
+layout(push_constant) uniform ClearPush {
+	ivec4 viewport;
+} pc;
+
+void main() {
+	ivec2 pix = ivec2(gl_GlobalInvocationID.xy);
+	if (pix.x >= pc.viewport.x || pix.y >= pc.viewport.y) {
+		return;
+	}
+	imageStore(visBuffer, pix, uvec4(0xFFFFFFFFu));
+}

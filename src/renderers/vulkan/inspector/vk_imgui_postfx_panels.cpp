@@ -285,6 +285,52 @@ extern "C" void VkImgui_DrawPostFXPanel(void) {
 		VkImgui_CvarSlider( "Detail scale (tiling)", "r_detail_scale", dtScale, 0.5f, 32.0f );
 	}
 
+#ifdef USE_VULKAN_RTX
+	if ( ImGui::CollapsingHeader( "Path trace (RTX experiment)" ) ) {
+		int ptOn = ri.Cvar_VariableIntegerValue( "r_pathtrace" );
+		bool ptEnabled = ( ptOn != 0 );
+		if ( ImGui::Checkbox( "r_pathtrace", &ptEnabled ) ) {
+			ri.Cvar_Set( "r_pathtrace", ptEnabled ? "1" : "0" );
+			ImGui::TextDisabled( "Requires vid_restart" );
+		}
+		if ( ptEnabled ) {
+			char archBuf[32];
+			Com_sprintf( archBuf, sizeof( archBuf ), "%s", ri.Cvar_VariableString( "r_pathtrace_arch" ) );
+			if ( ImGui::BeginCombo( "r_pathtrace_arch", archBuf[0] ? archBuf : "megakernel" ) ) {
+				if ( ImGui::Selectable( "megakernel", Q_stricmp( archBuf, "megakernel" ) == 0 ) ) {
+					ri.Cvar_Set( "r_pathtrace_arch", "megakernel" );
+				}
+				if ( ImGui::Selectable( "wavefront", Q_stricmp( archBuf, "wavefront" ) == 0 ) ) {
+					ri.Cvar_Set( "r_pathtrace_arch", "wavefront" );
+				}
+				ImGui::EndCombo();
+			}
+			int bounces = ri.Cvar_VariableIntegerValue( "r_pathtrace_bounces" );
+			int samples = ri.Cvar_VariableIntegerValue( "r_pathtrace_samples" );
+			int denoise = ri.Cvar_VariableIntegerValue( "r_pathtrace_denoise" );
+			int dbg = ri.Cvar_VariableIntegerValue( "r_pathtrace_debug" );
+			float composite = VkImgui_CvarFloat( "r_pathtrace_composite" );
+			if ( ImGui::SliderInt( "bounces", &bounces, 1, 8 ) ) {
+				ri.Cvar_SetValue( "r_pathtrace_bounces", (float)bounces );
+			}
+			if ( ImGui::SliderInt( "samples", &samples, 1, 64 ) ) {
+				ri.Cvar_SetValue( "r_pathtrace_samples", (float)samples );
+			}
+			{
+				bool denoiseOn = ( denoise != 0 );
+				if ( ImGui::Checkbox( "denoise", &denoiseOn ) ) {
+					ri.Cvar_Set( "r_pathtrace_denoise", denoiseOn ? "1" : "0" );
+				}
+			}
+			if ( ImGui::SliderInt( "debug", &dbg, 0, 2 ) ) {
+				ri.Cvar_SetValue( "r_pathtrace_debug", (float)dbg );
+			}
+			VkImgui_CvarSlider( "composite blend", "r_pathtrace_composite", composite, 0.0f, 1.0f );
+			ImGui::TextDisabled( "Also needs r_rtx 1, r_rtxDemo 1 + vid_restart" );
+		}
+	}
+#endif
+
 	if (ImGui::CollapsingHeader("SSR")) {
 		int ssrOn = ri.Cvar_VariableIntegerValue( "r_ssr" );
 		bool ssrEnabled = ( ssrOn != 0 );

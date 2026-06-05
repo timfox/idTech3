@@ -238,6 +238,9 @@ Code: `src/renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar regist
 | `cl_vuda` | 0 | Client CUDA scheduler + import of Vulkan fds. |
 | `r_mgs` | 0 | **Mobile-GS** (experimental): tiered Gaussian splatting (`1`=mobile … `3`=high). See [MOBILE_GAUSSIAN_SPLATTING.md](MOBILE_GAUSSIAN_SPLATTING.md). |
 | `r_mgs_strength` | 0.85 | Mobile-GS splat / composite strength. |
+| `r_squeezeme` | 0 | **SqueezeMe** (experimental): distilled animatable Gaussian avatars (linear+GCS, arXiv:2412.15171). See [SQUEEZEME.md](SQUEEZEME.md). |
+| `r_squeezeme_tier` | 2 | Mobile-GS splat tier when `r_mgs=0` and SqueezeMe is on. |
+| `r_squeezeme_avatars` | 1 | Concurrent SqueezeMe avatars (1–3). |
 | `r_wsp` | 0 | **WebSplatter** (experimental): WebGPU-aligned tile splats (`1`=mobile … `3`=high). See [WEB_SPLATTER.md](WEB_SPLATTER.md). |
 | `r_wsp_strength` | 0.85 | WebSplatter composite strength. |
 | `r_pre_exposure_scale` | 1.0 | Pre-exposure scale for bloom/tonemap pipeline |

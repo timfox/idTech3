@@ -1,0 +1,55 @@
+#version 450
+/* CuRast resolve: visibility buffer -> shaded RGBA (paper §4.4). */
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+struct Triangle {
+	vec4 v0;
+	vec4 v1;
+	vec4 v2;
+};
+
+layout(std430, set = 0, binding = 0) readonly buffer TriBuffer {
+	Triangle tris[];
+} mesh;
+
+layout(r32ui, set = 0, binding = 1) uniform uimage2D visBuffer;
+layout(rgba8, set = 0, binding = 2) uniform writeonly image2D colorOut;
+
+layout(push_constant) uniform ResolvePush {
+	ivec4 viewport;
+	int triBits;
+	int triCount;
+} pc;
+
+void main() {
+	ivec2 pix = ivec2(gl_GlobalInvocationID.xy);
+	if (pix.x >= pc.viewport.x || pix.y >= pc.viewport.y) {
+		return;
+	}
+
+	uint packed = imageLoad(visBuffer, pix).r;
+	if (packed == 0xFFFFFFFFu) {
+		imageStore(colorOut, pix, vec4(0.02, 0.03, 0.05, 1.0));
+		return;
+	}
+
+	uint triMask = (1u << pc.triBits) - 1u;
+	uint triId = packed & triMask;
+	uint depthBits = packed >> pc.triBits;
+
+	if (int(triId) >= pc.triCount) {
+		imageStore(colorOut, pix, vec4(1.0, 0.0, 1.0, 1.0));
+		return;
+	}
+
+	Triangle T = mesh.tris[triId];
+	vec3 c0 = T.v0.xyz;
+	vec3 c1 = T.v1.xyz;
+	vec3 c2 = T.v2.xyz;
+	float hue = float(triId % 997u) / 997.0;
+	vec3 base = 0.5 + 0.5 * cos(vec3(0.0, 2.0, 4.0) + hue * 6.283);
+	float shade = 0.35 + 0.65 * (float(depthBits) / 262143.0);
+	vec3 n = normalize(cross(c1 - c0, c2 - c0));
+	shade *= 0.5 + 0.5 * abs(n.z);
+	imageStore(colorOut, pix, vec4(base * shade, 1.0));
+}

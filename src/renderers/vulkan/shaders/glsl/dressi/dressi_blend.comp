@@ -1,0 +1,56 @@
+#version 450
+/*
+ * HardSoftRas blending (Dressi Eq. 4–6): weighted edge blend + hard-face mask.
+ */
+layout( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
+
+layout( set = 0, binding = 0 ) uniform sampler2DArray peelGBuffer; /* r=dist, gba=rgb */
+layout( rgba16f, set = 0, binding = 1 ) uniform writeonly image2D blendOut;
+
+layout( push_constant ) uniform DressiBlendPush {
+	vec4 extent;
+	vec4 params; /* x=K layers, y=sigma, z=delta edge mask width, w=background gray */
+} pc;
+
+float edgeMask( float dist0, float delta )
+{
+	float w = max( delta, 1e-4 );
+	return clamp( 1.0 - abs( dist0 ) / w, 0.0, 1.0 );
+}
+
+void main()
+{
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if ( pix.x >= uint( pc.extent.x ) || pix.y >= uint( pc.extent.y ) ) {
+		return;
+	}
+	vec2 uv = ( vec2( pix ) + 0.5 ) / pc.extent.xy;
+	int K = int( pc.params.x + 0.5 );
+	float sigma = max( pc.params.y, 1e-4 );
+	float delta = pc.params.z;
+	float bg = pc.params.w;
+
+	vec3 accumCol = vec3( bg );
+	float accumW = 0.0;
+	float silEdge = 0.0;
+
+	for ( int k = 0; k < K; k++ ) {
+		vec4 g = texture( peelGBuffer, vec3( uv, float( k ) ) );
+		float dist = g.r;
+		float prob = 1.0 / ( 1.0 + exp( -dist / sigma ) );
+		vec3 col = g.gba;
+		float w = prob;
+		accumCol += col * w;
+		accumW += w;
+		silEdge = 1.0 - ( 1.0 - silEdge ) * ( 1.0 - prob );
+	}
+
+	vec3 edgeCol = accumCol / max( accumW, 1e-4 );
+	float dist0 = texture( peelGBuffer, vec3( uv, 0.0 ) ).r;
+	float hardMask = ( dist0 >= 0.0 ) ? 1.0 : 0.0;
+	vec3 hardCol = texture( peelGBuffer, vec3( uv, 0.0 ) ).gba;
+	float em = edgeMask( dist0, delta );
+	vec3 outRgb = mix( hardCol, edgeCol, em );
+	float outSil = mix( hardMask, silEdge, em );
+	imageStore( blendOut, ivec2( pix ), vec4( outRgb, outSil ) );
+}

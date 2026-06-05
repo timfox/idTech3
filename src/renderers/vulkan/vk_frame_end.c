@@ -9,6 +9,7 @@
 #include "vk_render_pass.h"
 #include "vk_scene_pass.h"
 #include "vk_temporal.h"
+#include "vk_hybrid1.h"
 #include "vk_volumetric_pass.h"
 #ifdef USE_IMGUI
 #include "inspector/vk_imgui.h"
@@ -132,6 +133,7 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 	uint32_t readIndex;
 	uint32_t writeIndex;
 	qboolean allow_taa;
+	qboolean taa_wanted;
 
 	if ( post_fog_src == NULL || luminance_src == NULL ) {
 		return;
@@ -147,9 +149,13 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 			VK_TEMPORAL_RESET_RENDERER_INIT | VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE |
 			VK_TEMPORAL_RESET_RENDER_SIZE_CHANGE | VK_TEMPORAL_RESET_WORLD_CHANGE |
 			VK_TEMPORAL_RESET_CLIENT_STATE_CHANGE );
+	taa_wanted = ( r_taa && r_taa->integer ) ? qtrue : qfalse;
+	if ( !taa_wanted && r_hybrid1_taa && r_hybrid1_taa->integer && vk_hybrid1_active() ) {
+		taa_wanted = qtrue;
+	}
 
 	if ( !allow_taa ||
-		!( r_taa && r_taa->integer ) ||
+		!taa_wanted ||
 		vk.cmd == NULL || vk.cmd->command_buffer == VK_NULL_HANDLE ||
 		taa_src == VK_NULL_HANDLE ||
 		vk.taa_pipeline == VK_NULL_HANDLE ||
@@ -162,7 +168,7 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 		vk.framebuffers.taa[1] == VK_NULL_HANDLE ||
 		vk.taa_history_descriptor[0] == VK_NULL_HANDLE ||
 		vk.taa_history_descriptor[1] == VK_NULL_HANDLE ) {
-		if ( !allow_taa || !( r_taa && r_taa->integer ) ) {
+		if ( !allow_taa || !taa_wanted ) {
 			vk_reset_taa_history();
 		}
 		return;

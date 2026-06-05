@@ -118,6 +118,7 @@ Priorities that keep **CI green** and **README/build truth** aligned:
 - [x] clang-tidy / cppcheck static analysis (CI job, continue-on-error)
 
 ### Long-Term (future work, not in active development)
+- [x] **Hybrid Rendering 1** (Granja/Pereira 2021) — separate shadow/spec/diffuse RT, SVGF temporal + A-trous, IBL, composite. See `docs/HYBRID_RENDERING1.md`.
 - [ ] Vulkan RTX - VK_KHR_ray_tracing_pipeline integration (BLAS/TLAS, raygen/miss/closest-hit). See docs/RENDERERS_FUTURE.md.
 - [ ] Metal renderer - native Metal backend for macOS/iOS (Apple Silicon). See docs/RENDERERS_FUTURE.md.
 - [ ] DXR renderer - DirectX 12 + DirectX Raytracing for Windows. See docs/RENDERERS_FUTURE.md.

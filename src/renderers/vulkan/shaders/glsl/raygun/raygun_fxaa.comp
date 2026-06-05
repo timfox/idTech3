@@ -1,0 +1,46 @@
+#version 460
+
+layout( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
+
+layout( set = 0, binding = 0, rgba16f ) uniform readonly image2D srcImage;
+layout( set = 0, binding = 1, rgba16f ) uniform writeonly image2D dstImage;
+
+layout( set = 0, binding = 2, std140 ) uniform FxaaParams {
+	vec4 outputSize;
+} fxaa;
+
+float rgLuma( vec3 c )
+{
+	return dot( c, vec3( 0.299, 0.587, 0.114 ) );
+}
+
+void main()
+{
+	ivec2 pix = ivec2( gl_GlobalInvocationID.xy );
+	ivec2 size = imageSize( srcImage );
+	if ( pix.x >= size.x || pix.y >= size.y ) {
+		return;
+	}
+
+	vec2 uv = ( vec2( pix ) + vec2( 0.5 ) ) / vec2( size );
+	vec2 texel = 1.0 / vec2( size );
+
+	vec3 cM = imageLoad( srcImage, pix ).rgb;
+	vec3 cN = imageLoad( srcImage, clamp( pix + ivec2( 0, -1 ), ivec2( 0 ), size - 1 ) ).rgb;
+	vec3 cS = imageLoad( srcImage, clamp( pix + ivec2( 0, 1 ), ivec2( 0 ), size - 1 ) ).rgb;
+	vec3 cW = imageLoad( srcImage, clamp( pix + ivec2( -1, 0 ), ivec2( 0 ), size - 1 ) ).rgb;
+	vec3 cE = imageLoad( srcImage, clamp( pix + ivec2( 1, 0 ), ivec2( 0 ), size - 1 ) ).rgb;
+
+	float lM = rgLuma( cM );
+	float lMin = min( lM, min( min( rgLuma( cN ), rgLuma( cS ) ), min( rgLuma( cW ), rgLuma( cE ) ) ) );
+	float lMax = max( lM, max( max( rgLuma( cN ), rgLuma( cS ) ), max( rgLuma( cW ), rgLuma( cE ) ) ) );
+	float edge = lMax - lMin;
+
+	vec3 result = cM;
+	if ( edge > 0.125 ) {
+		vec3 blur = ( cN + cS + cW + cE ) * 0.25;
+		result = mix( cM, blur, clamp( edge * 2.0, 0.0, 1.0 ) );
+	}
+
+	imageStore( dstImage, pix, vec4( result, 1.0 ) );
+}

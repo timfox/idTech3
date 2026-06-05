@@ -56,6 +56,11 @@ static cvar_t *r_mgs_skipSky;
 static cvar_t *r_mgs_depthTest;
 static cvar_t *r_mgs_debug;
 
+static void MGS_CreatePreparePipeline( void );
+static void MGS_CreateSplatPipeline( void );
+static void MGS_CreateCompositePipeline( void );
+static qboolean MGS_UploadGaussians( uint32_t count, const mgsGaussian_t *src );
+
 typedef struct {
 	float viewProj[16];
 	float viewOrigin[4];
@@ -104,7 +109,7 @@ static mgsTierParams_t MGS_TierParams( void )
 	int tier;
 
 	Com_Memset( &p, 0, sizeof( p ) );
-	tier = r_mgs ? r_mgs->integer : 0;
+	tier = R_MGS_EffectiveTier();
 	if ( tier < 1 ) {
 		tier = 1;
 	}
@@ -263,6 +268,9 @@ static void MGS_FillProceduralGaussians( mgsGaussian_t *out, uint32_t count, flo
 	}
 }
 
+extern qboolean R_SQZ_Active( void );
+extern int R_SQZ_EffectiveMgsTier( void );
+
 static qboolean MGS_UploadGaussians( uint32_t count, const mgsGaussian_t *src )
 {
 	VkBufferCreateInfo bi;
@@ -315,6 +323,58 @@ static qboolean MGS_UploadGaussians( uint32_t count, const mgsGaussian_t *src )
 
 	vk.mgs.gaussian_count = count;
 	return qtrue;
+}
+
+int R_MGS_EffectiveTier( void )
+{
+	if ( R_SQZ_Active() ) {
+		return R_SQZ_EffectiveMgsTier();
+	}
+	if ( r_mgs && r_mgs->integer > 0 ) {
+		return r_mgs->integer;
+	}
+	return 0;
+}
+
+void R_MGS_MarkLoaded( const char *mapBaseName, uint32_t gaussianCount )
+{
+	if ( mapBaseName && mapBaseName[0] ) {
+		Q_strncpyz( mgs.mapName, mapBaseName, sizeof( mgs.mapName ) );
+	}
+	mgs.gaussianCount = gaussianCount;
+	mgs.loaded = qtrue;
+}
+
+qboolean R_MGS_UploadGaussians( uint32_t count, const void *src, size_t srcStride )
+{
+	size_t stride = srcStride ? srcStride : sizeof( mgsGaussian_t );
+
+	if ( !src || count == 0 || stride < sizeof( mgsGaussian_t ) ) {
+		return qfalse;
+	}
+	if ( stride == sizeof( mgsGaussian_t ) ) {
+		return MGS_UploadGaussians( count, (const mgsGaussian_t *)src );
+	}
+	{
+		mgsGaussian_t *tmp = (mgsGaussian_t *)ri.Malloc( (size_t)count * sizeof( mgsGaussian_t ) );
+		uint32_t i;
+		qboolean ok;
+
+		for ( i = 0; i < count; i++ ) {
+			Com_Memcpy( &tmp[i], (const byte *)src + i * stride, sizeof( mgsGaussian_t ) );
+		}
+		ok = MGS_UploadGaussians( count, tmp );
+		ri.Free( tmp );
+		return ok;
+	}
+}
+
+void R_MGS_EnsurePipelines( void )
+{
+	MGS_CreatePreparePipeline();
+	MGS_CreateSplatPipeline();
+	MGS_CreateCompositePipeline();
+	vk.mgsAllocated = qtrue;
 }
 
 static qboolean MGS_EnsureAccumTarget( uint32_t width, uint32_t height )
@@ -727,7 +787,7 @@ void R_MGS_OnMapLoad( const char *mapBaseName )
 
 qboolean R_MGS_Active( void )
 {
-	return ( r_mgs && r_mgs->integer > 0 && mgs.loaded && vk.mgs.gaussian_count > 0 &&
+	return ( R_MGS_EffectiveTier() > 0 && mgs.loaded && vk.mgs.gaussian_count > 0 &&
 		vk.fboActive && vk.color_image != VK_NULL_HANDLE &&
 		vk.mgs.prepare_ready && vk.mgs.splat_ready && vk.mgs.composite_ready ) ? qtrue : qfalse;
 }

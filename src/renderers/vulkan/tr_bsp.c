@@ -36,6 +36,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_renderformer.h"
 #include "vk_grtx.h"
 #include "vk_mgs.h"
+#include "vk_squeezeme.h"
 #include "vk_wsp.h"
 
 #ifdef VK_CUBEMAP
@@ -2837,7 +2838,10 @@ void RE_LoadWorldMap( const char *name ) {
 	R_VFGI_OnMapLoad( s_worldData.baseName );
 	R_RenderFormer_OnMapLoad( s_worldData.baseName );
 	vk_grtx_on_map_load( s_worldData.baseName );
-	R_MGS_OnMapLoad( s_worldData.baseName );
+	if ( !R_SQZ_Enabled() ) {
+		R_MGS_OnMapLoad( s_worldData.baseName );
+	}
+	R_SQZ_OnMapLoad( s_worldData.baseName );
 	R_WSP_OnMapLoad( s_worldData.baseName );
 
 #ifdef VK_CUBEMAP

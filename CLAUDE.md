@@ -154,8 +154,7 @@ src/
 ├── client/           # Client-side systems
 ├── server/           # Server-side systems
 ├── renderers/        # Renderer implementations
-│   ├── vulkan/       # Vulkan renderer
-│   └── opengl/       # Legacy renderer tree (not the supported shipping path)
+│   └── vulkan/       # Vulkan renderer (only supported backend)
 ├── common/           # Shared utilities
 └── game/             # Game logic
 ```

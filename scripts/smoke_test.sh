@@ -63,7 +63,7 @@ for bin in idtech3 idtech3_server; do
   fi
 done
 
-for lib in idtech3_vulkan.so idtech3_opengl.so idtech3_vulkan.dylib idtech3_opengl.dylib idtech3_vulkan.dll idtech3_opengl.dll; do
+for lib in idtech3_vulkan.so idtech3_vulkan.dylib idtech3_vulkan.dll; do
   if [ -f "$RELEASE_DIR/$lib" ]; then
     pass "$lib exists"
   fi

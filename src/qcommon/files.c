@@ -5052,6 +5052,55 @@ static void FS_Startup( void ) {
 
 /*
 =====================
+FS_ParseRequiresEngine
+
+Parses requires_engine >= M.N from gameinfo.txt and logs if the running
+engine API (IDTECH3_ENGINE_API_*) is older. Non-fatal — mods keep loading.
+=====================
+*/
+static void FS_ParseRequiresEngine( const char *buffer, int len )
+{
+	const char *p = buffer;
+	const char *end = buffer + len;
+	int reqMajor = 0;
+	int reqMinor = 0;
+
+	while ( p < end - 15 ) {
+		if ( Q_strncmp( p, "requires_engine", 15 ) == 0 ) {
+			p += 15;
+			while ( p < end && ( *p == ' ' || *p == '\t' ) ) {
+				p++;
+			}
+			if ( p + 1 < end && *p == '>' && p[1] == '=' ) {
+				p += 2;
+			}
+			while ( p < end && ( *p == ' ' || *p == '\t' ) ) {
+				p++;
+			}
+			reqMajor = atoi( p );
+			while ( p < end && *p != '.' && *p != '\n' && *p != '\r' && *p != ' ' ) {
+				p++;
+			}
+			if ( p < end && *p == '.' ) {
+				p++;
+				reqMinor = atoi( p );
+			}
+			if ( IDTECH3_ENGINE_API_MAJOR < reqMajor ||
+			     ( IDTECH3_ENGINE_API_MAJOR == reqMajor && IDTECH3_ENGINE_API_MINOR < reqMinor ) ) {
+				Com_Printf( S_COLOR_YELLOW "Warning: gameinfo requires_engine >= %d.%d but engine API is %d.%d\n",
+					reqMajor, reqMinor, IDTECH3_ENGINE_API_MAJOR, IDTECH3_ENGINE_API_MINOR );
+			} else if ( Com_LogVerbosity() >= 1 ) {
+				LOG_FS( "gameinfo requires_engine >= %d.%d OK (engine API %d.%d)\n",
+					reqMajor, reqMinor, IDTECH3_ENGINE_API_MAJOR, IDTECH3_ENGINE_API_MINOR );
+			}
+			return;
+		}
+		p++;
+	}
+}
+
+/*
+=====================
 FS_ParseGameInfo
 
 Parses gameinfo.txt (Source Engine style) from the game root directory
@@ -5160,6 +5209,8 @@ static void FS_ParseGameInfo( void )
 		}
 		p++;
 	}
+
+	FS_ParseRequiresEngine( buffer, len );
 
 	FS_FreeFile( buffer );
 }

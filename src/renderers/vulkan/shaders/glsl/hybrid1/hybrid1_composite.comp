@@ -1,0 +1,59 @@
+#version 450
+/*
+ * Composite denoised shadow + specular + optional diffuse with raster HDR.
+ */
+layout( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
+
+layout( set = 0, binding = 0 ) uniform sampler2D depthTex;
+layout( set = 0, binding = 1 ) uniform sampler2D shadowTex;
+layout( set = 0, binding = 2 ) uniform sampler2D specTex;
+layout( set = 0, binding = 3 ) uniform sampler2D diffuseTex;
+layout( set = 0, binding = 4 ) uniform sampler2D albedoTex;
+layout( rgba16f, set = 0, binding = 5 ) uniform image2D colorOut;
+
+layout( push_constant ) uniform Hybrid1CompositePush {
+	vec4 extent;
+	vec4 strengths; /* x=shadow, y=spec, z=debug mode, w=diffuse */
+} pc;
+
+void main()
+{
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if ( pix.x >= uint( pc.extent.x ) || pix.y >= uint( pc.extent.y ) ) {
+		return;
+	}
+
+	vec2 uv = ( vec2( pix ) + 0.5 ) / pc.extent.xy;
+	float depth = texture( depthTex, uv ).r;
+	vec4 scene = imageLoad( colorOut, ivec2( pix ) );
+
+	if ( depth <= 0.0 || depth >= 1.0 ) {
+		return;
+	}
+
+	float shadowVis = texture( shadowTex, uv ).r;
+	vec3 specRgb = texture( specTex, uv ).rgb;
+	vec3 diffuseRgb = texture( diffuseTex, uv ).rgb;
+	vec3 albedo = texture( albedoTex, uv ).rgb;
+	float shadowStr = pc.strengths.x;
+	float specStr = pc.strengths.y;
+	int debugMode = int( pc.strengths.z + 0.5 );
+	float diffuseStr = pc.strengths.w;
+
+	vec3 outRgb = scene.rgb;
+
+	if ( debugMode == 1 ) {
+		outRgb = vec3( shadowVis );
+	} else if ( debugMode == 2 ) {
+		outRgb = specRgb;
+	} else if ( debugMode == 3 ) {
+		outRgb = vec3( texture( shadowTex, uv ).g / 90.0 );
+	} else if ( debugMode == 4 ) {
+		outRgb = diffuseRgb * albedo;
+	} else {
+		float shadowFactor = mix( 1.0, shadowVis, clamp( shadowStr, 0.0, 1.0 ) );
+		outRgb = scene.rgb * shadowFactor + specRgb * specStr + diffuseRgb * albedo * diffuseStr;
+	}
+
+	imageStore( colorOut, ivec2( pix ), vec4( outRgb, scene.a ) );
+}

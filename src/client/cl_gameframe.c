@@ -27,6 +27,7 @@ Ticks all gameplay subsystems each client frame:
 #include "cl_engine_decals.h"
 #include "../physics/phys_bullet.h"
 #include "../physics/phys_procedural_anim.h"
+#include "../physics/phys_middleware.h"
 #include "../physics/phys_cloth.h"
 #include "../navigation/nav_recast.h"
 #include "../game/g_director.h"
@@ -57,6 +58,46 @@ static cvar_t *g_ecsMotion;
 extern void Nav_BSP_ClearGeometry(void);
 extern int  Nav_BSP_AddVertex(float x, float y, float z);
 extern void Nav_BSP_AddTriangle(int v0, int v1, int v2);
+
+static void CL_EngineSaveWrite_f( void ) {
+	int slot;
+	const char *label;
+
+	if ( Cmd_Argc() < 3 ) {
+		Com_Printf( "usage: engine_save_write <slot> <label>\n" );
+		return;
+	}
+	slot = atoi( Cmd_Argv( 1 ) );
+	label = Cmd_Argv( 2 );
+	if ( EngineSave_WriteSlot( slot, label ) ) {
+		Com_Printf( "engine_save_write: slot %d ok\n", slot );
+	} else {
+		Com_Printf( S_COLOR_YELLOW "engine_save_write: failed slot %d\n", slot );
+	}
+}
+
+static void CL_EngineSaveRead_f( void ) {
+	int slot;
+	char label[128];
+
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "usage: engine_save_read <slot>\n" );
+		return;
+	}
+	slot = atoi( Cmd_Argv( 1 ) );
+	if ( EngineSave_ReadSlot( slot, label, sizeof( label ) ) ) {
+		Com_Printf( "engine_save_read: slot %d label \"%s\"\n", slot, label );
+	} else {
+		Com_Printf( S_COLOR_YELLOW "engine_save_read: empty or invalid slot %d\n", slot );
+	}
+}
+
+static void CL_EngineSaveInfo_f( void ) {
+	Com_Printf( "EngineSave protocol v%d (com_engine_api %d.%d)\n",
+		EngineSave_ProtocolVersion(),
+		IDTECH3_ENGINE_API_MAJOR, IDTECH3_ENGINE_API_MINOR );
+	Com_Printf( "Paths: save/engine_slot_<N>.json (legacy .txt still reads)\n" );
+}
 
 /*
 ===============
@@ -176,6 +217,9 @@ void CL_InitGameSystems(void) {
 	WinTitle_Init();
 
 	Cmd_AddCommand("buildnavmesh", CL_BuildNavMesh_f);
+	Cmd_AddCommand( "engine_save_write", CL_EngineSaveWrite_f );
+	Cmd_AddCommand( "engine_save_read", CL_EngineSaveRead_f );
+	Cmd_AddCommand( "engine_save_info", CL_EngineSaveInfo_f );
 
 	gameSystemsInitialized = qtrue;
 	Com_Printf("Game systems initialized (physics, navigation, particles, AI, BT, audio)\n");
@@ -221,6 +265,8 @@ void CL_GameFrame(float frametime) {
 
 	if (cl_physicsEnabled && cl_physicsEnabled->integer) {
 		Phys_StepSimulation(frametime);
+		Phys_DebugDraw();
+		PhysMiddleware_Frame(frametime);
 	}
 
 	if ( g_ecsMotion && g_ecsMotion->integer ) {

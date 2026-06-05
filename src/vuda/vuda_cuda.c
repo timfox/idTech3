@@ -74,6 +74,9 @@ typedef struct {
 	cudaStream_t stream;
 } cudaExternalSemaphoreWaitParams_t;
 
+typedef cudaError_t (*pfn_cudaStreamCreate_t)( cudaStream_t *stream );
+typedef cudaError_t (*pfn_cudaStreamDestroy_t)( cudaStream_t stream );
+typedef cudaError_t (*pfn_cudaStreamSynchronize_t)( cudaStream_t stream );
 typedef cudaError_t (*pfn_cudaSetDevice_t)( int device );
 typedef cudaError_t (*pfn_cudaDeviceSynchronize_t)( void );
 typedef const char *(*pfn_cudaGetErrorString_t)( cudaError_t err );
@@ -97,6 +100,9 @@ typedef cudaError_t (*pfn_cudaMemcpy_t)( void *dst, const void *src, size_t coun
 
 typedef struct {
 	void                            *lib;
+	pfn_cudaStreamCreate_t           StreamCreate;
+	pfn_cudaStreamDestroy_t          StreamDestroy;
+	pfn_cudaStreamSynchronize_t      StreamSynchronize;
 	pfn_cudaSetDevice_t              SetDevice;
 	pfn_cudaDeviceSynchronize_t      DeviceSynchronize;
 	pfn_cudaGetErrorString_t         GetErrorString;
@@ -122,8 +128,12 @@ static vudaCudaApi_t cudaApi;
 static vudaCudaSlot_t cudaSlots[VUDA_MAX_SLOTS];
 static cudaExternalSemaphore_t cudaWaitSem;
 static cudaExternalSemaphore_t cudaSignalSem;
+static cudaStream_t cudaStreams[VUDA_MAX_STREAMS];
+static qboolean cudaStreamBound[VUDA_MAX_STREAMS];
 static qboolean importsReady;
 static int cudaDevice;
+static uint64_t cudaLastWaitTimeline;
+static uint64_t cudaLastSignalTimeline;
 
 static qboolean VudaCuda_LoadSym( void *sym, const char *name )
 {
@@ -146,7 +156,10 @@ qboolean VudaCuda_Init( void )
 		return qfalse;
 	}
 
-	if ( !VudaCuda_LoadSym( &cudaApi.SetDevice, "cudaSetDevice" ) ||
+	if ( !VudaCuda_LoadSym( &cudaApi.StreamCreate, "cudaStreamCreate" ) ||
+		!VudaCuda_LoadSym( &cudaApi.StreamDestroy, "cudaStreamDestroy" ) ||
+		!VudaCuda_LoadSym( &cudaApi.StreamSynchronize, "cudaStreamSynchronize" ) ||
+		!VudaCuda_LoadSym( &cudaApi.SetDevice, "cudaSetDevice" ) ||
 		!VudaCuda_LoadSym( &cudaApi.DeviceSynchronize, "cudaDeviceSynchronize" ) ||
 		!VudaCuda_LoadSym( &cudaApi.GetErrorString, "cudaGetErrorString" ) ||
 		!VudaCuda_LoadSym( &cudaApi.ImportExternalMemory, "cudaImportExternalMemory" ) ||
@@ -166,6 +179,7 @@ qboolean VudaCuda_Init( void )
 
 	cudaApi.loaded = qtrue;
 	cudaDevice = 0;
+	Com_Memset( cudaStreamBound, 0, sizeof( cudaStreamBound ) );
 	if ( cudaApi.SetDevice( cudaDevice ) != cudaSuccess ) {
 		Com_Printf( S_COLOR_YELLOW "[VUDA] cudaSetDevice(0) failed\n" );
 	}
@@ -175,7 +189,16 @@ qboolean VudaCuda_Init( void )
 
 void VudaCuda_Shutdown( void )
 {
+	int i;
+
 	VudaCuda_ReleaseImports();
+	for ( i = 0; i < VUDA_MAX_STREAMS; i++ ) {
+		if ( cudaStreams[i] && cudaApi.StreamDestroy ) {
+			cudaApi.StreamDestroy( cudaStreams[i] );
+		}
+		cudaStreams[i] = NULL;
+		cudaStreamBound[i] = qfalse;
+	}
 	if ( cudaApi.lib ) {
 		dlclose( cudaApi.lib );
 	}
@@ -313,35 +336,124 @@ qboolean VudaCuda_ImportExports( const vudaExportBundle_t *exp )
 	return qtrue;
 }
 
-qboolean VudaCuda_WaitRender( int timeoutMs )
+qboolean VudaCuda_BindStream( int streamSlot )
+{
+	cudaError_t err;
+
+	if ( streamSlot < 0 || streamSlot >= VUDA_MAX_STREAMS ) {
+		return qfalse;
+	}
+	if ( !cudaApi.loaded ) {
+		return qfalse;
+	}
+
+	if ( !cudaStreams[streamSlot] && cudaApi.StreamCreate ) {
+		err = cudaApi.StreamCreate( &cudaStreams[streamSlot] );
+		if ( err != cudaSuccess ) {
+			Com_Printf( S_COLOR_YELLOW "[VUDA] cudaStreamCreate slot %d: %s\n",
+				streamSlot, cudaApi.GetErrorString( err ) );
+			return qfalse;
+		}
+	}
+
+	cudaStreamBound[streamSlot] = qtrue;
+	Com_Printf( "[VUDA] CUstream_bind: slot %d co-scheduled with Vulkan (software redirect)\n",
+		streamSlot );
+	return qtrue;
+}
+
+qboolean VudaCuda_UnbindStream( int streamSlot )
+{
+	if ( streamSlot < 0 || streamSlot >= VUDA_MAX_STREAMS ) {
+		return qfalse;
+	}
+	cudaStreamBound[streamSlot] = qfalse;
+	Com_Printf( "[VUDA] CUstream_unbind: slot %d restored\n", streamSlot );
+	return qtrue;
+}
+
+qboolean VudaCuda_IsStreamBound( int streamSlot )
+{
+	if ( streamSlot < 0 || streamSlot >= VUDA_MAX_STREAMS ) {
+		return qfalse;
+	}
+	return cudaStreamBound[streamSlot] ? qtrue : qfalse;
+}
+
+int VudaCuda_BoundStreamCount( void )
+{
+	int i;
+	int n = 0;
+
+	for ( i = 0; i < VUDA_MAX_STREAMS; i++ ) {
+		if ( cudaStreamBound[i] ) {
+			n++;
+		}
+	}
+	return n;
+}
+
+static cudaStream_t VudaCuda_StreamForJob( const vudaCudaJob_t *job )
+{
+	int slot;
+
+	if ( !job ) {
+		return NULL;
+	}
+	if ( job->streamMask & 4 ) {
+		slot = VUDA_STREAM_INFERENCE;
+	} else if ( job->streamMask & 2 ) {
+		slot = VUDA_STREAM_NEURAL;
+	} else if ( job->streamMask & 1 ) {
+		slot = VUDA_STREAM_PHYSICS;
+	} else {
+		slot = VUDA_STREAM_NEURAL;
+	}
+
+	if ( slot >= 0 && slot < VUDA_MAX_STREAMS && cudaStreams[slot] ) {
+		return cudaStreams[slot];
+	}
+	return NULL;
+}
+
+qboolean VudaCuda_WaitRender( uint64_t waitTimeline, cudaStream_t stream )
 {
 	cudaExternalSemaphoreWaitParams_t params;
 	unsigned long long value;
 	cudaError_t err;
 
-	(void)timeoutMs;
-
 	if ( !importsReady || !cudaWaitSem ) {
 		return qtrue;
 	}
 
-	value = 0;
+	if ( waitTimeline <= cudaLastWaitTimeline ) {
+		return qtrue;
+	}
+
+	value = (unsigned long long)waitTimeline;
 	Com_Memset( &params, 0, sizeof( params ) );
 	params.extSem = &cudaWaitSem;
 	params.params = &value;
 	params.numParams = 1;
-	params.stream = NULL;
+	params.stream = stream;
 
-	err = cudaApi.WaitExternalSemaphoresAsync( &params, 1, NULL );
+	err = cudaApi.WaitExternalSemaphoresAsync( &params, 1, stream );
 	if ( err != cudaSuccess ) {
 		Com_Printf( S_COLOR_YELLOW "[VUDA] cudaWaitExternalSemaphoresAsync: %s\n",
 			cudaApi.GetErrorString( err ) );
 		return qfalse;
 	}
-	return cudaApi.DeviceSynchronize() == cudaSuccess;
+
+	if ( stream && cudaApi.StreamSynchronize ) {
+		err = cudaApi.StreamSynchronize( stream );
+	} else {
+		err = cudaApi.DeviceSynchronize();
+	}
+	cudaLastWaitTimeline = waitTimeline;
+	return err == cudaSuccess;
 }
 
-void VudaCuda_SignalComplete( void )
+void VudaCuda_SignalComplete( uint64_t signalTimeline, cudaStream_t stream )
 {
 	cudaExternalSemaphoreSignalParams_t params;
 	unsigned long long value;
@@ -351,27 +463,35 @@ void VudaCuda_SignalComplete( void )
 		return;
 	}
 
-	value = 1;
+	value = (unsigned long long)signalTimeline;
 	Com_Memset( &params, 0, sizeof( params ) );
 	params.extSem = &cudaSignalSem;
 	params.params = &value;
 	params.numParams = 1;
-	params.stream = NULL;
+	params.stream = stream;
 
-	err = cudaApi.SignalExternalSemaphoresAsync( &params, 1, NULL );
+	err = cudaApi.SignalExternalSemaphoresAsync( &params, 1, stream );
 	if ( err != cudaSuccess ) {
 		Com_Printf( S_COLOR_YELLOW "[VUDA] cudaSignalExternalSemaphoresAsync: %s\n",
 			cudaApi.GetErrorString( err ) );
+		return;
 	}
-	cudaApi.DeviceSynchronize();
+
+	if ( stream && cudaApi.StreamSynchronize ) {
+		cudaApi.StreamSynchronize( stream );
+	} else {
+		cudaApi.DeviceSynchronize();
+	}
+	cudaLastSignalTimeline = signalTimeline;
 }
 
-qboolean VudaCuda_RunJob( const vudaCudaJob_t *job, int maxMs )
+qboolean VudaCuda_RunJob( const vudaCudaJob_t *job, int maxMs, uint64_t waitTimeline, uint64_t *outSignalTimeline )
 {
 	void *ptr;
 	uint32_t touch;
 	cudaError_t err;
-	int start;
+	cudaStream_t stream;
+	uint64_t signalTimeline;
 
 	(void)maxMs;
 
@@ -379,9 +499,13 @@ qboolean VudaCuda_RunJob( const vudaCudaJob_t *job, int maxMs )
 		return qfalse;
 	}
 
-	start = Sys_Milliseconds();
+	stream = VudaCuda_StreamForJob( job );
+	if ( !stream && cudaApi.StreamCreate ) {
+		(void)VudaCuda_BindStream( VUDA_STREAM_NEURAL );
+		stream = cudaStreams[VUDA_STREAM_NEURAL];
+	}
 
-	if ( !VudaCuda_WaitRender( 8 ) ) {
+	if ( !VudaCuda_WaitRender( waitTimeline, stream ) ) {
 		return qfalse;
 	}
 
@@ -419,8 +543,15 @@ qboolean VudaCuda_RunJob( const vudaCudaJob_t *job, int maxMs )
 		break;
 	}
 
-	(void)start;
-	VudaCuda_SignalComplete();
+	signalTimeline = waitTimeline > 0 ? waitTimeline : ( cudaLastSignalTimeline + 1 );
+	if ( signalTimeline <= cudaLastSignalTimeline ) {
+		signalTimeline = cudaLastSignalTimeline + 1;
+	}
+	VudaCuda_SignalComplete( signalTimeline, stream );
+
+	if ( outSignalTimeline ) {
+		*outSignalTimeline = signalTimeline;
+	}
 	return qtrue;
 }
 
@@ -431,9 +562,13 @@ void VudaCuda_Shutdown( void ) {}
 qboolean VudaCuda_Available( void ) { return qfalse; }
 qboolean VudaCuda_ImportExports( const vudaExportBundle_t *exp ) { (void)exp; return qfalse; }
 void VudaCuda_ReleaseImports( void ) {}
-qboolean VudaCuda_RunJob( const vudaCudaJob_t *job, int maxMs ) { (void)job; (void)maxMs; return qfalse; }
-void VudaCuda_SignalComplete( void ) {}
-qboolean VudaCuda_WaitRender( int timeoutMs ) { (void)timeoutMs; return qfalse; }
+qboolean VudaCuda_RunJob( const vudaCudaJob_t *job, int maxMs, uint64_t waitTimeline, uint64_t *outSignalTimeline ) { (void)job; (void)maxMs; (void)waitTimeline; (void)outSignalTimeline; return qfalse; }
+void VudaCuda_SignalComplete( uint64_t signalTimeline, cudaStream_t stream ) { (void)signalTimeline; (void)stream; }
+qboolean VudaCuda_WaitRender( uint64_t waitTimeline, cudaStream_t stream ) { (void)waitTimeline; (void)stream; return qfalse; }
+qboolean VudaCuda_BindStream( int streamSlot ) { (void)streamSlot; return qfalse; }
+qboolean VudaCuda_UnbindStream( int streamSlot ) { (void)streamSlot; return qfalse; }
+qboolean VudaCuda_IsStreamBound( int streamSlot ) { (void)streamSlot; return qfalse; }
+int VudaCuda_BoundStreamCount( void ) { return 0; }
 const char *VudaCuda_BackendName( void ) { return "disabled"; }
 
 #endif

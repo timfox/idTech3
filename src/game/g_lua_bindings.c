@@ -1286,6 +1286,8 @@ void LuaBindings_RegisterAll(void *luaState) {
 	registerTable(L, "Replay", replayFuncs);
 
 	static const luaL_Reg saveFuncs[] = {
+		{"write", l_save_write},
+		{"read", l_save_read},
 		{"writeSlot", l_save_write},
 		{"readSlot", l_save_read},
 		{"lastSlot", l_save_lastSlot},

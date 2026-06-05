@@ -1,0 +1,27 @@
+#version 450
+/* Iris — alpha-blended scope overlay (PiP or fullscreen) onto the main color buffer. */
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(rgba8, set = 0, binding = 0) uniform readonly image2D scopeTex;
+layout(rgba8, set = 0, binding = 1) uniform image2D colorOut;
+
+layout(push_constant) uniform OverlayPush {
+	ivec4 dstRect;
+	ivec2 scopeSize;
+	float alpha;
+} pc;
+
+void main() {
+	ivec2 local = ivec2(gl_GlobalInvocationID.xy);
+	if (local.x >= pc.dstRect.z || local.y >= pc.dstRect.w) {
+		return;
+	}
+	ivec2 fbPix = pc.dstRect.xy + local;
+	vec2 uv = (vec2(local) + vec2(0.5)) / vec2(pc.dstRect.z, pc.dstRect.w);
+	ivec2 scopePix = ivec2(uv * vec2(pc.scopeSize));
+	scopePix = clamp(scopePix, ivec2(0), pc.scopeSize - ivec2(1));
+	vec4 scope = imageLoad(scopeTex, scopePix);
+	vec4 under = imageLoad(colorOut, fbPix);
+	vec4 outc = mix(under, scope, vec4(pc.alpha));
+	imageStore(colorOut, fbPix, outc);
+}

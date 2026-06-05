@@ -1,1 +1,2 @@
 title "idTech3 Demo"
+requires_engine >= 1.0

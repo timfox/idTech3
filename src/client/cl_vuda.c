@@ -25,12 +25,13 @@ static void CL_VUDA_Cmd_Status( void )
 	vudaExportBundle_t exp;
 	qboolean interop = re.VudaInteropReady && re.VudaInteropReady();
 
-	Com_Printf( "[VUDA] cl_vuda=%d ready=%d cuda=%s interop=%d active=%d\n",
+	Com_Printf( "[VUDA] cl_vuda=%d ready=%d cuda=%s interop=%d active=%d bound_streams=%d\n",
 		cl_vuda ? cl_vuda->integer : 0,
 		cl_vuda_ready ? 1 : 0,
 		VudaCuda_BackendName(),
 		interop ? 1 : 0,
-		( re.VudaActive && re.VudaActive() ) ? 1 : 0 );
+		( re.VudaActive && re.VudaActive() ) ? 1 : 0,
+		VudaCuda_BoundStreamCount() );
 
 	if ( re.VudaGetExportBundle && re.VudaGetExportBundle( &exp ) ) {
 		int i;
@@ -66,13 +67,20 @@ static void CL_VUDA_Cmd_Reload( void )
 static void CL_VUDA_Cmd_Run( void )
 {
 	vudaCudaJob_t job;
+	vudaExportBundle_t exp;
 	int maxMs;
+	uint64_t signalTimeline;
 
 	if ( !cl_vuda_ready ) {
 		CL_VUDA_Cmd_Reload();
 		if ( !cl_vuda_ready ) {
 			return;
 		}
+	}
+
+	if ( !re.VudaGetExportBundle || !re.VudaGetExportBundle( &exp ) ) {
+		Com_Printf( S_COLOR_YELLOW "[VUDA] Export bundle unavailable\n" );
+		return;
 	}
 
 	Com_Memset( &job, 0, sizeof( job ) );
@@ -84,11 +92,30 @@ static void CL_VUDA_Cmd_Run( void )
 		maxMs = 2;
 	}
 
-	if ( VudaCuda_RunJob( &job, maxMs ) ) {
-		Com_Printf( "[VUDA] Heartbeat job OK\n" );
+	if ( VudaCuda_RunJob( &job, maxMs, exp.renderTimeline, &signalTimeline ) ) {
+		Com_Printf( "[VUDA] Heartbeat job OK (timeline=%llu)\n",
+			(unsigned long long)signalTimeline );
 	} else {
 		Com_Printf( S_COLOR_YELLOW "[VUDA] Heartbeat job failed\n" );
 	}
+}
+
+static void CL_VUDA_Cmd_BindStream_f( void )
+{
+	int slot;
+
+	slot = ( Cmd_Argc() >= 2 ) ? atoi( Cmd_Argv( 1 ) ) : VUDA_STREAM_PHYSICS;
+	if ( !VudaCuda_BindStream( slot ) ) {
+		Com_Printf( S_COLOR_YELLOW "[VUDA] bind failed (slot 0=physics 1=neural 2=inference)\n" );
+	}
+}
+
+static void CL_VUDA_Cmd_UnbindStream_f( void )
+{
+	int slot;
+
+	slot = ( Cmd_Argc() >= 2 ) ? atoi( Cmd_Argv( 1 ) ) : VUDA_STREAM_PHYSICS;
+	(void)VudaCuda_UnbindStream( slot );
 }
 
 void CL_VUDA_Init( void )
@@ -106,6 +133,8 @@ void CL_VUDA_Init( void )
 	Cmd_AddCommand( "vuda_status", CL_VUDA_Cmd_Status );
 	Cmd_AddCommand( "vuda_reload", CL_VUDA_Cmd_Reload );
 	Cmd_AddCommand( "vuda_run", CL_VUDA_Cmd_Run );
+	Cmd_AddCommand( "vuda_bind_stream", CL_VUDA_Cmd_BindStream_f );
+	Cmd_AddCommand( "vuda_unbind_stream", CL_VUDA_Cmd_UnbindStream_f );
 
 	if ( !VudaCuda_Init() ) {
 		Com_Printf( S_COLOR_YELLOW "[VUDA] CUDA unavailable — install NVIDIA driver + libcudart\n" );
@@ -121,6 +150,8 @@ void CL_VUDA_Shutdown( void )
 	Cmd_RemoveCommand( "vuda_status" );
 	Cmd_RemoveCommand( "vuda_reload" );
 	Cmd_RemoveCommand( "vuda_run" );
+	Cmd_RemoveCommand( "vuda_bind_stream" );
+	Cmd_RemoveCommand( "vuda_unbind_stream" );
 	VudaCuda_Shutdown();
 	cl_vuda_ready = qfalse;
 }
@@ -130,6 +161,7 @@ void CL_VUDA_Frame( void )
 	vudaExportBundle_t exp;
 	vudaCudaJob_t job;
 	int maxMs;
+	uint64_t signalTimeline;
 
 	if ( !cl_vuda || !cl_vuda->integer ) {
 		return;
@@ -159,6 +191,10 @@ void CL_VUDA_Frame( void )
 		return;
 	}
 
+	if ( !re.VudaGetExportBundle || !re.VudaGetExportBundle( &exp ) ) {
+		return;
+	}
+
 	Com_Memset( &job, 0, sizeof( job ) );
 	job.kind = VUDA_JOB_NEURAL_STAGE;
 	job.streamMask = (uint32_t)Cvar_VariableIntegerValue( "r_vuda_coStreamMask" );
@@ -168,9 +204,9 @@ void CL_VUDA_Frame( void )
 		maxMs = 2;
 	}
 
-	if ( VudaCuda_RunJob( &job, maxMs ) && re.VudaGetExportBundle( &exp ) ) {
+	if ( VudaCuda_RunJob( &job, maxMs, exp.renderTimeline, &signalTimeline ) ) {
 		if ( re.VudaNotifyCudaComplete ) {
-			re.VudaNotifyCudaComplete( exp.cudaTimeline + 1 );
+			re.VudaNotifyCudaComplete( signalTimeline );
 		}
 	}
 }

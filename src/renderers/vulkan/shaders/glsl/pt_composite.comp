@@ -1,0 +1,25 @@
+#version 450
+/* Blend path-trace buffer into HDR color (replaces full blit when blend < 1). */
+layout( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
+
+layout( rgba16f, set = 0, binding = 1 ) uniform readonly image2D traceImg;
+layout( rgba16f, set = 0, binding = 2 ) uniform image2D colorOut;
+
+layout( push_constant ) uniform PtCompositePush {
+	vec4 extent;
+	float blend;
+} pc;
+
+void main()
+{
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if ( pix.x >= uint( pc.extent.x ) || pix.y >= uint( pc.extent.y ) ) {
+		return;
+	}
+
+	vec3 traced = imageLoad( traceImg, ivec2( pix ) ).rgb;
+	vec4 scene = imageLoad( colorOut, ivec2( pix ) );
+	float b = clamp( pc.blend, 0.0, 1.0 );
+	vec3 outRgb = mix( scene.rgb, traced, b );
+	imageStore( colorOut, ivec2( pix ), vec4( outRgb, scene.a ) );
+}

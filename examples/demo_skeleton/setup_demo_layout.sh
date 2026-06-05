@@ -25,7 +25,7 @@ fi
 
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 BUILD_PK3=""
-for d in "$REPO_ROOT/build-vk-Release" "$REPO_ROOT/build-gl-Release"; do
+for d in "$REPO_ROOT/build-vk-Release"; do
 	if [[ -f "$d/idtech3_demo.pk3" ]]; then
 		BUILD_PK3="$d/idtech3_demo.pk3"
 		break

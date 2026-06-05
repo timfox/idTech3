@@ -33,6 +33,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_renderformer.h"
 #include "vk_wpt.h"
 #include "vk_mgs.h"
+#include "vk_squeezeme.h"
 #include "vk_wsp.h"
 #include "vk_fp64_points.h"
 #endif
@@ -1820,7 +1821,9 @@ static const void *RB_DrawSurfs( const void *data ) {
 	vk_renderformer_apply_after_geometry();
 	vk_wpt_apply_after_geometry();
 	vk_fsa_build_importance_after_geometry();
-	if ( R_WSP_Active() ) {
+	if ( R_SQZ_Active() ) {
+		vk_sqz_apply_after_geometry();
+	} else if ( R_WSP_Active() ) {
 		vk_wsp_apply_after_geometry();
 	} else {
 		vk_mgs_apply_after_geometry();

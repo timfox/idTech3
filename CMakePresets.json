@@ -32,24 +32,6 @@
         "CMAKE_BUILD_TYPE": "Debug",
         "RENDERER_DEFAULT": "vulkan"
       }
-    },
-    {
-      "name": "opengl-release",
-      "inherits": "base",
-      "binaryDir": "${sourceDir}/build/presets/opengl-release",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "RENDERER_DEFAULT": "opengl"
-      }
-    },
-    {
-      "name": "opengl-debug",
-      "inherits": "base",
-      "binaryDir": "${sourceDir}/build/presets/opengl-debug",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "RENDERER_DEFAULT": "opengl"
-      }
     }
   ],
   "buildPresets": [
@@ -60,14 +42,6 @@
     {
       "name": "build-vulkan-debug",
       "configurePreset": "vulkan-debug"
-    },
-    {
-      "name": "build-opengl-release",
-      "configurePreset": "opengl-release"
-    },
-    {
-      "name": "build-opengl-debug",
-      "configurePreset": "opengl-debug"
     }
   ],
   "testPresets": [
@@ -81,20 +55,6 @@
     {
       "name": "test-vulkan-debug",
       "configurePreset": "vulkan-debug",
-      "output": {
-        "outputOnFailure": true
-      }
-    },
-    {
-      "name": "test-opengl-release",
-      "configurePreset": "opengl-release",
-      "output": {
-        "outputOnFailure": true
-      }
-    },
-    {
-      "name": "test-opengl-debug",
-      "configurePreset": "opengl-debug",
       "output": {
         "outputOnFailure": true
       }

@@ -36,9 +36,16 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_renderformer.h"
 #include "vk_wpt.h"
 #include "vk_vuda.h"
+#include "vk_vksplat.h"
+#include "vk_curast.h"
+#include "vk_mimir.h"
+#include "vk_iris.h"
 #include "vk_grtx.h"
 #include "vk_mgs.h"
+#include "vk_squeezeme.h"
 #include "vk_wsp.h"
+#include "vk_dressi.h"
+#include "vk_raygun.h"
 #include "vk_fluidsim.h"
 #include "vk_terrain.h"
 #include "vk_vdb.h"
@@ -263,6 +270,24 @@ cvar_t	*r_pathtrace_samples;
 cvar_t	*r_pathtrace_denoise;
 cvar_t	*r_pathtrace_debug;
 cvar_t	*r_pathtrace_composite;
+cvar_t	*r_hybrid1;
+cvar_t	*r_hybrid1_shadow;
+cvar_t	*r_hybrid1_spec;
+cvar_t	*r_hybrid1_historyClamp;
+cvar_t	*r_hybrid1_historyGamma;
+cvar_t	*r_hybrid1_temporalAlpha;
+cvar_t	*r_hybrid1_adaptiveBlur;
+cvar_t	*r_hybrid1_separableBlur;
+cvar_t	*r_hybrid1_reinhard;
+cvar_t	*r_hybrid1_atrousIters;
+cvar_t	*r_hybrid1_shadowStrength;
+cvar_t	*r_hybrid1_specStrength;
+cvar_t	*r_hybrid1_debug;
+cvar_t	*r_hybrid1_diffuse;
+cvar_t	*r_hybrid1_diffuseStrength;
+cvar_t	*r_hybrid1_ibl;
+cvar_t	*r_hybrid1_taa;
+cvar_t	*r_hybrid1_motion;
 cvar_t	*r_vdbFog;
 cvar_t	*r_vdbFogBlend;
 cvar_t	*r_forwardPlus;
@@ -4007,7 +4032,7 @@ static void R_Register( void )
 	ri.Cvar_SetGroup( r_pathtrace_samples, CVG_RENDERER );
 	r_pathtrace_denoise = ri.Cvar_Get( "r_pathtrace_denoise", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_pathtrace_denoise, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_pathtrace_denoise, "Denoise stub toggle (cost measurement placeholder; no OIDN yet)." );
+	ri.Cvar_SetDescription( r_pathtrace_denoise, "Depth-guided 3x3 spatial denoise on path-trace buffer before composite (cost measurement; not OIDN)." );
 	ri.Cvar_SetGroup( r_pathtrace_denoise, CVG_RENDERER );
 	r_pathtrace_debug = ri.Cvar_Get( "r_pathtrace_debug", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_pathtrace_debug, "0", "2", CV_INTEGER );
@@ -4018,6 +4043,83 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_pathtrace_composite, "0", "1", CV_FLOAT );
 	ri.Cvar_SetDescription( r_pathtrace_composite, "Blend path trace output into HDR color (1=full replace via blit)." );
 	ri.Cvar_SetGroup( r_pathtrace_composite, CVG_RENDERER );
+	r_hybrid1 = ri.Cvar_Get( "r_hybrid1", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_hybrid1, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_hybrid1,
+		"Granja/Pereira Hybrid Rendering 1 (USE_VULKAN_RTX): 1-SPP shadow/spec/diffuse RT, SVGF temporal, A-trous, IBL, composite. Requires r_hybrid1 or r_rtx latched, r_rtxDemo 1, r_fbo 1, vid_restart. See docs/HYBRID_RENDERING1.md." );
+	ri.Cvar_SetGroup( r_hybrid1, CVG_RENDERER );
+	r_hybrid1_shadow = ri.Cvar_Get( "r_hybrid1_shadow", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hybrid1_shadow, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_hybrid1_shadow, "Hybrid1: trace and denoise sun shadow visibility channel." );
+	ri.Cvar_SetGroup( r_hybrid1_shadow, CVG_RENDERER );
+	r_hybrid1_spec = ri.Cvar_Get( "r_hybrid1_spec", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hybrid1_spec, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_hybrid1_spec, "Hybrid1: trace and denoise indirect specular reflections channel." );
+	ri.Cvar_SetGroup( r_hybrid1_spec, CVG_RENDERER );
+	r_hybrid1_historyClamp = ri.Cvar_Get( "r_hybrid1_historyClamp", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hybrid1_historyClamp, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_hybrid1_historyClamp, "Hybrid1: variance color clamping (history rectification) on temporal reprojection." );
+	ri.Cvar_SetGroup( r_hybrid1_historyClamp, CVG_RENDERER );
+	r_hybrid1_historyGamma = ri.Cvar_Get( "r_hybrid1_historyGamma", "1.25", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hybrid1_historyGamma, "0.5", "4", CV_FLOAT );
+	ri.Cvar_SetDescription( r_hybrid1_historyGamma, "Hybrid1: variance neighborhood bounding box scale for history clamp." );
+	ri.Cvar_SetGroup( r_hybrid1_historyGamma, CVG_RENDERER );
+	r_hybrid1_temporalAlpha = ri.Cvar_Get( "r_hybrid1_temporalAlpha", "0.1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hybrid1_temporalAlpha, "0.02", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_hybrid1_temporalAlpha, "Hybrid1: temporal blend toward current noisy sample (lower = smoother)." );
+	ri.Cvar_SetGroup( r_hybrid1_temporalAlpha, CVG_RENDERER );
+	r_hybrid1_adaptiveBlur = ri.Cvar_Get( "r_hybrid1_adaptiveBlur", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hybrid1_adaptiveBlur, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_hybrid1_adaptiveBlur, "Hybrid1: start A-trous at coarser step when roughness>0.2 or shadow angle>6 deg." );
+	ri.Cvar_SetGroup( r_hybrid1_adaptiveBlur, CVG_RENDERER );
+	r_hybrid1_separableBlur = ri.Cvar_Get( "r_hybrid1_separableBlur", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hybrid1_separableBlur, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_hybrid1_separableBlur, "Hybrid1: separable 5-tap horizontal+vertical A-trous passes per iteration." );
+	ri.Cvar_SetGroup( r_hybrid1_separableBlur, CVG_RENDERER );
+	r_hybrid1_reinhard = ri.Cvar_Get( "r_hybrid1_reinhard", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hybrid1_reinhard, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_hybrid1_reinhard, "Hybrid1: Reinhard tone map specular before denoise; inverse after A-trous vertical pass." );
+	ri.Cvar_SetGroup( r_hybrid1_reinhard, CVG_RENDERER );
+	r_hybrid1_atrousIters = ri.Cvar_Get( "r_hybrid1_atrousIters", "4", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hybrid1_atrousIters, "0", "4", CV_INTEGER );
+	ri.Cvar_SetDescription( r_hybrid1_atrousIters, "Hybrid1: edge-avoiding A-trous iterations (0=temporal only)." );
+	ri.Cvar_SetGroup( r_hybrid1_atrousIters, CVG_RENDERER );
+	r_hybrid1_shadowStrength = ri.Cvar_Get( "r_hybrid1_shadowStrength", "0.85", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hybrid1_shadowStrength, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_hybrid1_shadowStrength, "Hybrid1 composite: shadow visibility blend (1=full RT shadow)." );
+	ri.Cvar_SetGroup( r_hybrid1_shadowStrength, CVG_RENDERER );
+	r_hybrid1_specStrength = ri.Cvar_Get( "r_hybrid1_specStrength", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hybrid1_specStrength, "0", "4", CV_FLOAT );
+	ri.Cvar_SetDescription( r_hybrid1_specStrength, "Hybrid1 composite: additive denoised specular weight." );
+	ri.Cvar_SetGroup( r_hybrid1_specStrength, CVG_RENDERER );
+	r_hybrid1_debug = ri.Cvar_Get( "r_hybrid1_debug", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hybrid1_debug, "0", "4", CV_INTEGER );
+	ri.Cvar_SetDescription( r_hybrid1_debug, "Hybrid1 debug view: 0=composite, 1=shadow vis, 2=spec RGB, 3=shadow angle, 4=diffuse." );
+	ri.Cvar_SetGroup( r_hybrid1_debug, CVG_RENDERER );
+	r_hybrid1_diffuse = ri.Cvar_Get( "r_hybrid1_diffuse", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hybrid1_diffuse, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_hybrid1_diffuse, "Hybrid1: trace and denoise indirect diffuse GI (A-trous only, no variance)." );
+	ri.Cvar_SetGroup( r_hybrid1_diffuse, CVG_RENDERER );
+	r_hybrid1_diffuseStrength = ri.Cvar_Get( "r_hybrid1_diffuseStrength", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hybrid1_diffuseStrength, "0", "4", CV_FLOAT );
+	ri.Cvar_SetDescription( r_hybrid1_diffuseStrength, "Hybrid1 composite: additive indirect diffuse weight (multiplied by G-buffer albedo)." );
+	ri.Cvar_SetGroup( r_hybrid1_diffuseStrength, CVG_RENDERER );
+	r_hybrid1_ibl = ri.Cvar_Get( "r_hybrid1_ibl", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hybrid1_ibl, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_hybrid1_ibl, "Hybrid1: sample prefiltered/irradiance cubemaps on RT miss and secondary hits." );
+	ri.Cvar_SetGroup( r_hybrid1_ibl, CVG_RENDERER );
+	r_hybrid1_taa = ri.Cvar_Get( "r_hybrid1_taa", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hybrid1_taa, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_hybrid1_taa, "Hybrid1: run post-process TAA after composite when r_hybrid1 is active (also set r_taa 1 to force always)." );
+	ri.Cvar_SetGroup( r_hybrid1_taa, CVG_RENDERER );
+	r_hybrid1_motion = ri.Cvar_Get( "r_hybrid1_motion", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hybrid1_motion, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_hybrid1_motion, "Hybrid1 temporal: use screen-space motion vectors for history reprojection when available." );
+	ri.Cvar_SetGroup( r_hybrid1_motion, CVG_RENDERER );
+	if ( r_hybrid1 && r_hybrid1->integer ) {
+		ri.Printf( PRINT_ALL,
+			"[VK][Hybrid1] r_hybrid1=1 (latched; build with USE_VULKAN_RTX, set r_rtxDemo 1 + r_fbo 1, vid_restart; exec demo_hybrid1.cfg)\n" );
+	}
 	r_vdbFog = ri.Cvar_Get( "r_vdbFog", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_vdbFog, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_vdbFog, "Blend bound VDB fog density (\\vdb_bind_fog) into volumetric global density when uploaded to GPU. Requires \\r_volumetricFog 1." );
@@ -4182,7 +4284,14 @@ void R_Init( void ) {
 	R_VUDA_Init();
 	R_GRTX_Init();
 	R_MGS_Init();
+	R_VKSplat_Init();
+	R_CuRast_Init();
+	R_Mimir_Init();
+	R_Iris_Init();
+	R_SQZ_Init();
 	R_WSP_Init();
+	R_Dressi_Init();
+	R_Raygun_Init();
 #endif
 	R_ApplyRenderModeLatch();
 	ri.Printf( PRINT_ALL, "[VK] SH lighting: %s\n", r_shLighting && r_shLighting->integer ? "enabled" : "disabled" );
@@ -4298,7 +4407,12 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	R_WPT_Shutdown();
 	R_VUDA_Shutdown();
 	R_GRTX_Shutdown();
+	R_SQZ_Shutdown();
 	R_MGS_Shutdown();
+	R_VKSplat_Shutdown();
+	R_CuRast_Shutdown();
+	R_Mimir_Shutdown();
+	R_Iris_Shutdown();
 	R_WSP_Shutdown();
 	vk_release_resources();
 #endif

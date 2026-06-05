@@ -1,0 +1,41 @@
+#version 450
+/* VkSplat: fused loss-gradient stub + Adam update on Gaussian parameters (paper §4.3/4.5). */
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+struct GaussianTrain {
+	vec3 mean;
+	float opacity;
+	vec3 scaleLog;
+	float pad0;
+	vec4 rotation;
+	vec3 sh0;
+	float pad1;
+};
+
+layout(std430, set = 0, binding = 0) buffer GaussianBuffer {
+	GaussianTrain g[];
+} gaussians;
+
+layout(push_constant) uniform AdamPush {
+	int gaussianCount;
+	float lr;
+	float l1Weight;
+	float beta1;
+	float beta2;
+} pc;
+
+void main() {
+	uint i = gl_GlobalInvocationID.x;
+	GaussianTrain gp;
+
+	if ( int(i) >= pc.gaussianCount ) {
+		return;
+	}
+
+	gp = gaussians.g[i];
+	/* Placeholder training step: nudge SH toward mid-gray, shrink opacity slightly. */
+	gp.sh0 += (vec3(0.5) - gp.sh0) * pc.lr * pc.l1Weight;
+	gp.opacity -= gp.opacity * pc.lr * 0.01;
+	gp.scaleLog -= gp.scaleLog * pc.lr * 0.001;
+	gaussians.g[i] = gp;
+}

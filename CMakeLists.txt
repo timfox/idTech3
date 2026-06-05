@@ -252,6 +252,9 @@ endif()
 if(NOT DEFINED USE_CSHARP)
   option(USE_CSHARP "Enable Mono C# scripting support" OFF)
 endif()
+if(NOT DEFINED USE_PYTHON)
+  option(USE_PYTHON "Enable embedded CPython scripting (Infernux-style batch bridge)" OFF)
+endif()
 
 set(LUA_FOUND FALSE)
 set(LUA_LINK_LIBRARIES "")
@@ -264,6 +267,9 @@ set(DUKTAPE_EXTRA_LIBRARIES "")
 set(CSHARP_FOUND FALSE)
 set(CSHARP_LINK_LIBRARIES "")
 set(CSHARP_INCLUDE_DIRS "")
+set(PYTHON_FOUND FALSE)
+set(PYTHON_LINK_LIBRARIES "")
+set(PYTHON_INCLUDE_DIRS "")
 
 if(USE_LUA)
 if(NOT ANDROID)
@@ -617,6 +623,18 @@ if(USE_CSHARP AND NOT ANDROID)
     message(STATUS "C# scripting enabled: Mono ${MONO_LIBRARY}")
   else()
     message(WARNING "USE_CSHARP=ON but Mono not found (install libmono-2.0-dev mono-devel); C# scripting disabled.")
+  endif()
+endif()
+
+if(USE_PYTHON AND NOT ANDROID)
+  find_package(Python3 COMPONENTS Development)
+  if(Python3_Development_FOUND)
+    set(PYTHON_FOUND TRUE)
+    set(PYTHON_INCLUDE_DIRS "${Python3_INCLUDE_DIRS}")
+    list(APPEND PYTHON_LINK_LIBRARIES Python3::Python)
+    message(STATUS "Python scripting enabled: ${Python3_VERSION} (${Python3_EXECUTABLE})")
+  else()
+    message(WARNING "USE_PYTHON=ON but Python3 Development not found (install python3-dev); Python scripting disabled.")
   endif()
 endif()
 
@@ -1041,10 +1059,17 @@ OPTION(USE_STEAM "Enable Steam API (achievements, overlay, rich presence, Deck d
 OPTION(USE_STEAM_NETWORKING "Enable Steam Datagram Relay (SDR) transport" OFF)
 OPTION(USE_VULKAN_RTX "Enable Vulkan ray tracing (VK_KHR_ray_tracing_*); requires RT-capable GPU" OFF)
 OPTION(USE_VUDA "CUDA-Vulkan spatial multiplexing interop (Linux + NVIDIA; KHR external memory fd)" OFF)
+OPTION(USE_MIMIR_CUDA "Mímir CUDA/Vulkan interop for r_mimir_cuda (Linux + NVIDIA)" OFF)
 if(USE_VUDA)
   if(APPLE OR WIN32)
     message(WARNING "USE_VUDA: primary target is Linux+NVIDIA; disabling on this platform.")
     set(USE_VUDA OFF CACHE BOOL "" FORCE)
+  endif()
+endif()
+if(USE_MIMIR_CUDA)
+  if(APPLE OR WIN32)
+    message(WARNING "USE_MIMIR_CUDA: primary target is Linux+NVIDIA; disabling on this platform.")
+    set(USE_MIMIR_CUDA OFF CACHE BOOL "" FORCE)
   endif()
 endif()
 OPTION(USE_METAL_RENDERER "Build native Metal renderer (Apple only)" OFF)
@@ -1186,6 +1211,13 @@ if(BUILD_FREETYPE)
 endif()
 
 AUX_SOURCE_DIRECTORY(src/qcommon QCOMMON_SRCS)
+list(APPEND QCOMMON_SRCS src/vuda/vuda_model.c src/vuda/vuda_console.c)
+list(APPEND QCOMMON_SRCS src/vksplat/vksplat_model.c src/vksplat/vksplat_console.c)
+list(APPEND QCOMMON_SRCS src/vksplat/vksplat_model.c src/vksplat/vksplat_console.c)
+list(APPEND QCOMMON_SRCS src/curast/curast_model.c src/curast/curast_console.c)
+list(APPEND QCOMMON_SRCS src/infernux/infernux_model.c src/infernux/infernux_console.c)
+list(APPEND QCOMMON_SRCS src/mimir/mimir_model.c src/mimir/mimir_console.c)
+list(APPEND QCOMMON_SRCS src/iris/iris_model.c src/iris/iris_console.c src/iris/iris_io.c)
 # exclude platform-dependent QVM JIT compilers; add the active backend below
 list(FILTER QCOMMON_SRCS EXCLUDE REGEX ".*vm_(aarch64|armv7l|powerpc|x86)\\.c")
 # exclude optional network modules; add when options enabled
@@ -1409,6 +1441,7 @@ if(USE_GLM)
   target_include_directories(qcommon PRIVATE ${EXTERNAL_GLM_INCLUDE})
 endif()
 target_include_directories(qcommon PRIVATE
+  ${CMAKE_SOURCE_DIR}/src
   ${CMAKE_SOURCE_DIR}/src/platform
   ${CMAKE_SOURCE_DIR}/src/platform/win32
   ${CMAKE_SOURCE_DIR}/src/platform/platform/win32
@@ -1430,6 +1463,10 @@ endif()
 if(USE_CSHARP AND CSHARP_FOUND)
   target_compile_definitions(qcommon PRIVATE USE_CSHARP IDTECH3_CSHARP_API_PATH="${CMAKE_SOURCE_DIR}/src/qcommon/csharp/IdTech3.Engine.cs")
   target_include_directories(qcommon PRIVATE ${CSHARP_INCLUDE_DIRS})
+endif()
+if(USE_PYTHON AND PYTHON_FOUND)
+  target_compile_definitions(qcommon PRIVATE USE_PYTHON)
+  target_include_directories(qcommon PRIVATE ${PYTHON_INCLUDE_DIRS})
 endif()
 if(USE_DTLS_FOUND)
   target_compile_definitions(qcommon PRIVATE USE_DTLS=1)
@@ -1455,6 +1492,7 @@ if(USE_GLM)
   target_include_directories(qcommon_ded PRIVATE ${EXTERNAL_GLM_INCLUDE})
 endif()
 target_include_directories(qcommon_ded PRIVATE
+  ${CMAKE_SOURCE_DIR}/src
   ${CMAKE_SOURCE_DIR}/src/platform
   ${CMAKE_SOURCE_DIR}/src/platform/win32
   ${CMAKE_SOURCE_DIR}/src/platform/platform/win32
@@ -1476,6 +1514,10 @@ endif()
 if(USE_CSHARP AND CSHARP_FOUND)
   target_compile_definitions(qcommon_ded PRIVATE USE_CSHARP IDTECH3_CSHARP_API_PATH="${CMAKE_SOURCE_DIR}/src/qcommon/csharp/IdTech3.Engine.cs")
   target_include_directories(qcommon_ded PRIVATE ${CSHARP_INCLUDE_DIRS})
+endif()
+if(USE_PYTHON AND PYTHON_FOUND)
+  target_compile_definitions(qcommon_ded PRIVATE USE_PYTHON)
+  target_include_directories(qcommon_ded PRIVATE ${PYTHON_INCLUDE_DIRS})
 endif()
 if(USE_DTLS_FOUND)
   target_compile_definitions(qcommon_ded PRIVATE USE_DTLS=1)
@@ -1828,6 +1870,9 @@ list(FILTER RENDERER_VK_SRCS EXCLUDE REGEX ".*/shaders/spirv/generated/shader_bi
 list(APPEND RENDERER_VK_SRCS
     src/renderers/vulkan/utils/mikktspace/mikktspace.c
 )
+if(USE_MIMIR_CUDA)
+  list(APPEND RENDERER_VK_SRCS src/mimir/mimir_cuda.c)
+endif()
 set(VK_SHADER_DIR "${CMAKE_SOURCE_DIR}/src/renderers/vulkan/shaders")
 set(VK_SPIRV_DIR "${VK_SHADER_DIR}/spirv")
 set(VK_GEN_DIR "${VK_SPIRV_DIR}/generated")
@@ -1904,10 +1949,15 @@ IF(USE_RENDERER_DLOPEN)
 	  target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_VUDA=1)
 	  message(STATUS "VUDA: CUDA-Vulkan interop enabled (r_vuda 1 + cl_vuda 1 + vid_restart)")
 	endif()
+	if(USE_MIMIR_CUDA)
+	  target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_MIMIR_CUDA=1)
+	  message(STATUS "Mímir: CUDA interop enabled (r_mimir 1 + r_mimir_cuda 1 + vid_restart)")
+	endif()
 	add_dependencies(${RENDERER_PREFIX}_vulkan${RENDEXT} vk_shaders_autogen)
 	IF(BUILD_FREETYPE)
 		target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE idtech3_freetype)
 	ENDIF()
+	target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${CMAKE_SOURCE_DIR}/src)
 	if(USE_FREEUSD)
 		target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE idtech3_freeusd freeusd::c)
 		set_property(SOURCE src/renderers/common/tr_model_freeusd.cpp PROPERTY CXX_STANDARD 17)
@@ -1943,10 +1993,14 @@ ELSE()
 	if(USE_VUDA)
 	  target_compile_definitions(${RENDERER_PREFIX}_vulkan PRIVATE USE_VUDA=1)
 	endif()
+	if(USE_MIMIR_CUDA)
+	  target_compile_definitions(${RENDERER_PREFIX}_vulkan PRIVATE USE_MIMIR_CUDA=1)
+	endif()
 	add_dependencies(${RENDERER_PREFIX}_vulkan vk_shaders_autogen)
 	IF(BUILD_FREETYPE)
 		target_link_libraries(${RENDERER_PREFIX}_vulkan PRIVATE idtech3_freetype)
 	ENDIF()
+	target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${CMAKE_SOURCE_DIR}/src)
 	if(USE_FREEUSD)
 		target_link_libraries(${RENDERER_PREFIX}_vulkan PRIVATE idtech3_freeusd freeusd::c)
 		set_property(SOURCE src/renderers/common/tr_model_freeusd.cpp PROPERTY CXX_STANDARD 17)
@@ -2089,7 +2143,6 @@ ELSEIF(UNIX)
 	ELSE()
 		SET(Q3_UI_SRCS
 			src/platform/unix/linux_glimp.c
-			src/platform/unix/linux_qgl.c
 			src/platform/unix/linux_snd.c
 			src/platform/unix/x11_dga.c
 			src/platform/unix/x11_randr.c
@@ -2137,7 +2190,6 @@ ELSEIF(WIN32)
 			src/platform/win32/win_glimp.c
 			src/platform/win32/win_input.c
 			src/platform/win32/win_minimize.c
-			src/platform/win32/win_qgl.c
 			src/platform/win32/win_wndproc.c
 			src/platform/win32/win_snd.c)
 	ENDIF()
@@ -2348,6 +2400,11 @@ set(PHYSICS_SRCS
   src/physics/phys_ik.c
   src/physics/phys_dmm_materials.c
   src/physics/phys_cloth.c
+  src/physics/phys_events.c
+  src/physics/phys_materials.c
+  src/physics/phys_motor.c
+  src/physics/phys_middleware.c
+  src/physics/phys_debugdraw.c
 )
 
 set(BULLET_FOUND FALSE)
@@ -2463,6 +2520,12 @@ if(USE_CSHARP AND CSHARP_FOUND)
   TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ${CSHARP_LINK_LIBRARIES})
   if(NOT ANDROID)
     TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE ${CSHARP_LINK_LIBRARIES})
+  endif()
+endif()
+if(USE_PYTHON AND PYTHON_FOUND)
+  TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ${PYTHON_LINK_LIBRARIES})
+  if(NOT ANDROID)
+    TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE ${PYTHON_LINK_LIBRARIES})
   endif()
 endif()
 if((USE_STEAM OR USE_STEAM_NETWORKING) AND STEAMWORKS_FOUND)
@@ -2582,6 +2645,104 @@ add_test(NAME test_crash_report
 set_tests_properties(test_crash_report PROPERTIES
 	LABELS "scripts;validation;crash"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_crash_report.sh")
+
+add_test(NAME test_engine_save
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_engine_save.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_engine_save PROPERTIES
+	LABELS "scripts;validation;engine"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_engine_save.sh;${CMAKE_SOURCE_DIR}/src/game/g_engine_systems.c")
+
+add_test(NAME test_squeezeme
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_squeezeme.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_squeezeme PROPERTIES
+	LABELS "scripts;validation;renderer"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_squeezeme.sh;${CMAKE_SOURCE_DIR}/src/renderers/vulkan/vk_squeezeme.c")
+
+add_test(NAME test_hybrid1
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_hybrid1.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_hybrid1 PROPERTIES
+	LABELS "scripts;validation;renderer;rtx"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_hybrid1.sh;${CMAKE_SOURCE_DIR}/src/renderers/vulkan/vk_hybrid1.c")
+
+add_test(NAME test_dressi
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_dressi.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_dressi PROPERTIES
+	LABELS "scripts;validation;renderer"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_dressi.sh;${CMAKE_SOURCE_DIR}/src/renderers/vulkan/vk_dressi.c")
+
+add_test(NAME test_raygun
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_raygun.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_raygun PROPERTIES
+	LABELS "scripts;validation;renderer"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_raygun.sh;${CMAKE_SOURCE_DIR}/src/renderers/vulkan/vk_raygun.c")
+
+add_test(NAME test_aiwc
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_aiwc.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_aiwc PROPERTIES
+	LABELS "scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_aiwc.sh;${CMAKE_SOURCE_DIR}/src/qcommon/aiwc_metrics.c")
+
+add_test(NAME test_ttp
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_ttp.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_ttp PROPERTIES
+	LABELS "scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_ttp.sh;${CMAKE_SOURCE_DIR}/src/qcommon/ttp_model.c")
+
+add_test(NAME test_vuda
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_vuda.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_vuda PROPERTIES
+	LABELS "scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_vuda.sh;${CMAKE_SOURCE_DIR}/src/vuda/vuda_model.c")
+
+add_test(NAME test_vksplat
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_vksplat.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_vksplat PROPERTIES
+	LABELS "scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_vksplat.sh;${CMAKE_SOURCE_DIR}/src/vksplat/vksplat_model.c")
+
+add_test(NAME test_curast
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_curast.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_curast PROPERTIES
+	LABELS "scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_curast.sh;${CMAKE_SOURCE_DIR}/src/curast/curast_model.c")
+
+add_test(NAME test_python
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_python.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_python PROPERTIES
+	LABELS "scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_python.sh;${CMAKE_SOURCE_DIR}/src/qcommon/python_debug.c")
+
+add_test(NAME test_mimir
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_mimir.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_mimir PROPERTIES
+	LABELS "scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_mimir.sh;${CMAKE_SOURCE_DIR}/src/mimir/mimir_model.c")
+
+add_test(NAME test_iris
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_iris.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_iris PROPERTIES
+	LABELS "scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_iris.sh;${CMAKE_SOURCE_DIR}/src/iris/iris_model.c")
+
+add_test(NAME test_physics
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_physics.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_physics PROPERTIES
+	LABELS "scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_physics.sh;${CMAKE_SOURCE_DIR}/src/physics/phys_middleware.c")
 
 add_test(NAME test_init_optional_submodules
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_init_optional_submodules.sh
@@ -2780,6 +2941,101 @@ if(BUILD_UNIT_TESTS)
 	endif()
 	add_test(NAME unit_engine_decal_map COMMAND unit_engine_decal_map)
 	set_tests_properties(unit_engine_decal_map PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_aiwc
+		tests/unit/test_aiwc_metrics.c
+		src/qcommon/aiwc_metrics.c
+		src/qcommon/aiwc_matmul.c)
+	target_include_directories(unit_aiwc PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_aiwc PRIVATE m)
+	endif()
+	add_test(NAME unit_aiwc COMMAND unit_aiwc)
+	set_tests_properties(unit_aiwc PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_ttp
+		tests/unit/test_ttp_model.c
+		src/qcommon/ttp_model.c
+		src/qcommon/ttp_sim.c)
+	target_include_directories(unit_ttp PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_ttp PRIVATE m)
+	endif()
+	add_test(NAME unit_ttp COMMAND unit_ttp)
+	set_tests_properties(unit_ttp PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_vuda_model
+		tests/unit/test_vuda_model.c
+		src/vuda/vuda_model.c)
+	target_include_directories(unit_vuda_model PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_vuda_model PRIVATE m)
+	endif()
+	add_test(NAME unit_vuda_model COMMAND unit_vuda_model)
+	set_tests_properties(unit_vuda_model PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_vksplat_model
+		tests/unit/test_vksplat_model.c
+		src/vksplat/vksplat_model.c)
+	target_include_directories(unit_vksplat_model PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_vksplat_model PRIVATE m)
+	endif()
+	add_test(NAME unit_vksplat_model COMMAND unit_vksplat_model)
+	set_tests_properties(unit_vksplat_model PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_curast_model
+		tests/unit/test_curast_model.c
+		src/curast/curast_model.c)
+	target_include_directories(unit_curast_model PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_curast_model PRIVATE m)
+	endif()
+	add_test(NAME unit_curast_model COMMAND unit_curast_model)
+	set_tests_properties(unit_curast_model PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_infernux_model
+		tests/unit/test_infernux_model.c
+		src/infernux/infernux_model.c)
+	target_include_directories(unit_infernux_model PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_infernux_model PRIVATE m)
+	endif()
+	add_test(NAME unit_infernux_model COMMAND unit_infernux_model)
+	set_tests_properties(unit_infernux_model PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_mimir_model
+		tests/unit/test_mimir_model.c
+		src/mimir/mimir_model.c)
+	target_include_directories(unit_mimir_model PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_mimir_model PRIVATE m)
+	endif()
+	add_test(NAME unit_mimir_model COMMAND unit_mimir_model)
+	set_tests_properties(unit_mimir_model PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_iris_model
+		tests/unit/test_iris_model.c
+		src/iris/iris_model.c)
+	target_include_directories(unit_iris_model PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_iris_model PRIVATE m)
+	endif()
+	add_test(NAME unit_iris_model COMMAND unit_iris_model)
+	set_tests_properties(unit_iris_model PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_iris_io
+		tests/unit/test_iris_io.c
+		src/iris/iris_io.c
+		tests/stub_qcommon_min.c
+		src/qcommon/q_shared.c
+		src/qcommon/q_math.c)
+	target_include_directories(unit_iris_io PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_iris_io PRIVATE m)
+	endif()
+	add_test(NAME unit_iris_io COMMAND unit_iris_io)
+	set_tests_properties(unit_iris_io PROPERTIES LABELS "unit;validation")
 
 	add_executable(unit_endian
 		tests/unit/test_endian.c

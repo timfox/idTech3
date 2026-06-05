@@ -455,3 +455,21 @@ void ProcAnim_Kill(procAnimHandle_t handle) {
 	if (!VALID_PROCANIM(handle)) return;
 	ProcAnim_TransitionState(&controllers[handle], PROCANIM_STATE_DEAD);
 }
+
+void ProcAnim_UpdateAll(float dt) {
+	int i;
+
+	for (i = 0; i < controllerCount; i++) {
+		if (controllers[i].active) {
+			ProcAnim_Update(i, dt);
+		}
+	}
+}
+
+int ProcAnim_GetActiveCount(void) {
+	int i, n = 0;
+	for (i = 0; i < controllerCount; i++) {
+		if (controllers[i].active) n++;
+	}
+	return n;
+}

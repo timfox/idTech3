@@ -30,6 +30,8 @@ Extracted from vk.c for incremental modularization.
 #include "vk_sim_render_debug.h"
 #include "vk_rtx.h"
 #include "vk_pathtrace.h"
+#include "vk_hybrid1.h"
+#include "vk_raygun.h"
 #include "vk_grtx.h"
 #include "vk_vuda.h"
 
@@ -149,6 +151,8 @@ void vk_begin_frame( void )
 	vk_rtx_frame_begin();
 	vk_grtx_frame_begin();
 	vk_pathtrace_frame_begin();
+	vk_hybrid1_frame_begin();
+	vk_raygun_frame_begin();
 #endif
 	vk_vuda_frame_begin();
 

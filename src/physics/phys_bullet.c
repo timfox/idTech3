@@ -18,6 +18,10 @@ real implementation path -- no stubs.
 #include "../qcommon/cm_public.h"
 #include "phys_bullet.h"
 #include "phys_character.h"
+#include "phys_middleware.h"
+#include "phys_events.h"
+#include "phys_materials.h"
+#include "phys_debugdraw.h"
 
 static qboolean physInitialized = qfalse;
 
@@ -69,9 +73,14 @@ extern qboolean         Dmm_IsFractured_Impl(dmmObjectHandle_t handle);
 extern int              Dmm_GetFragments_Impl(dmmObjectHandle_t handle, physBodyHandle_t *fragments, int maxFragments);
 extern void             Dmm_SetMaterialParams_Impl(dmmObjectHandle_t handle, float stiffness, float yield, float fracture);
 extern qboolean         Phys_RayCast_Impl(const vec3_t from, const vec3_t to, physRayResult_t *result);
+extern qboolean         Phys_ConvexSweep_Impl(const physBodyDef_t *shapeDef, const vec3_t from, const vec3_t to,
+	const vec3_t rotation, physRayResult_t *result);
 extern int              Phys_OverlapSphere_Impl(const vec3_t center, float radius, physBodyHandle_t *results, int maxResults);
 extern int              Phys_OverlapBox_Impl(const vec3_t center, const vec3_t halfExtents, physBodyHandle_t *results, int maxResults);
 extern void             Phys_DebugDraw_Impl(void);
+extern void             Phys_ProcessContactEvents_Impl(void);
+extern void             Phys_SetBodyMaterial_Impl(physBodyHandle_t handle, int materialId);
+extern int              Phys_GetBodyMaterial_Impl(physBodyHandle_t handle);
 extern int              Phys_GetBodyCount_Impl(void);
 extern int              Phys_GetConstraintCount_Impl(void);
 #endif
@@ -112,6 +121,7 @@ qboolean Phys_Init(void) {
 		VectorSet(g, 0, 0, phys_gravity->value);
 		Phys_SetGravity_Impl(g);
 	}
+	PhysMiddleware_Init();
 	Com_Printf("Bullet Physics: initialized with C++ backend\n");
 #else
 	Com_Printf(S_COLOR_YELLOW "Bullet Physics: no C++ backend (compile with USE_BULLET_PHYSICS_IMPL)\n");
@@ -124,6 +134,7 @@ qboolean Phys_Init(void) {
 
 void Phys_Shutdown(void) {
 	if (!physInitialized) return;
+	PhysMiddleware_Shutdown();
 #ifdef USE_BULLET_PHYSICS_IMPL
 	Phys_Shutdown_Impl();
 #endif
@@ -312,6 +323,7 @@ void Phys_StepSimulation(float dt) {
 	if (!physInitialized) return;
 #ifdef USE_BULLET_PHYSICS_IMPL
 	Phys_StepSimulation_Impl(dt);
+	Phys_ProcessContactEvents_Impl();
 #else
 	(void)dt;
 #endif
@@ -319,7 +331,16 @@ void Phys_StepSimulation(float dt) {
 
 physBodyHandle_t Phys_CreateBody(const physBodyDef_t *def) {
 #ifdef USE_BULLET_PHYSICS_IMPL
-	if (physInitialized) return Phys_CreateBody_Impl(def);
+	physBodyDef_t local;
+
+	if (physInitialized && def) {
+		if (def->materialId > 0) {
+			local = *def;
+			PhysMat_ApplyToBodyDef(&local, def->materialId);
+			return Phys_CreateBody_Impl(&local);
+		}
+		return Phys_CreateBody_Impl(def);
+	}
 #endif
 	(void)def;
 	return -1;
@@ -553,8 +574,37 @@ int Phys_OverlapBox(const vec3_t center, const vec3_t halfExtents, physBodyHandl
 
 void Phys_DebugDraw(void) {
 #ifdef USE_BULLET_PHYSICS_IMPL
-	if (physInitialized) Phys_DebugDraw_Impl();
+	if (physInitialized && phys_debugDraw && phys_debugDraw->integer) {
+		PhysDebug_Clear();
+		Phys_DebugDraw_Impl();
+	}
 #endif
+}
+
+qboolean Phys_ConvexSweep(const physBodyDef_t *shapeDef, const vec3_t from, const vec3_t to,
+	const vec3_t rotation, physRayResult_t *result) {
+#ifdef USE_BULLET_PHYSICS_IMPL
+	if (physInitialized) return Phys_ConvexSweep_Impl(shapeDef, from, to, rotation, result);
+#endif
+	(void)shapeDef; (void)from; (void)to; (void)rotation;
+	if (result) Com_Memset(result, 0, sizeof(*result));
+	return qfalse;
+}
+
+void Phys_SetBodyMaterial(physBodyHandle_t handle, int materialId) {
+#ifdef USE_BULLET_PHYSICS_IMPL
+	if (physInitialized) Phys_SetBodyMaterial_Impl(handle, materialId);
+#else
+	(void)handle; (void)materialId;
+#endif
+}
+
+int Phys_GetBodyMaterial(physBodyHandle_t handle) {
+#ifdef USE_BULLET_PHYSICS_IMPL
+	if (physInitialized) return Phys_GetBodyMaterial_Impl(handle);
+#endif
+	(void)handle;
+	return 0;
 }
 
 int Phys_GetBodyCount(void) {

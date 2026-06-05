@@ -127,59 +127,22 @@ else
 fi
 
 echo ""
-IQM_H_GL="$PROJECT_ROOT/src/renderers/opengl/iqm.h"
-TR_LOCAL_GL="$PROJECT_ROOT/src/renderers/opengl/tr_local.h"
-if [[ -f "$IQM_H_GL" && -f "$TR_LOCAL_GL" ]]; then
-  echo "IQM_MAX_JOINTS: OpenGL vs Vulkan iqm.h (duplicate header drift guard):"
-  iqm_j_gl="$(sed -n 's/^#define[[:space:]]*IQM_MAX_JOINTS[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$IQM_H_GL" | head -1)"
-  if [[ -z "$iqm_j_gl" || -z "$iqm_j" ]]; then
-    fail "could not parse IQM_MAX_JOINTS from opengl/iqm.h or vulkan/iqm.h"
-  elif [[ "$iqm_j_gl" != "$iqm_j" ]]; then
-    fail "IQM_MAX_JOINTS mismatch: opengl/iqm.h=$iqm_j_gl vulkan/iqm.h=$iqm_j"
-  else
-    pass "IQM_MAX_JOINTS=$iqm_j (both iqm.h copies)"
-  fi
-
-  echo ""
-  echo "IQM_MORPH_TOP_K: OpenGL vs Vulkan tr_local.h (entity morph channel arrays):"
-  k_gl="$(sed -n 's/^#define IQM_MORPH_TOP_K[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$TR_LOCAL_GL" | head -1)"
-  if [[ -z "$k_gl" || -z "$k_c" ]]; then
-    fail "could not parse IQM_MORPH_TOP_K from opengl/tr_local.h or vulkan/tr_local.h"
-  elif [[ "$k_gl" != "$k_c" ]]; then
-    fail "IQM_MORPH_TOP_K mismatch: opengl/tr_local.h=$k_gl vulkan/tr_local.h=$k_c"
-  else
-    pass "IQM_MORPH_TOP_K=$k_c (OpenGL + Vulkan tr_local.h)"
-  fi
-
-  echo ""
-  echo "IQM_MORPH_MAX_CHANNELS: OpenGL vs Vulkan tr_local.h (pending morph name slots):"
-  ch_gl="$(sed -n 's/^#define IQM_MORPH_MAX_CHANNELS[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$TR_LOCAL_GL" | head -1)"
-  ch_vk="$(sed -n 's/^#define IQM_MORPH_MAX_CHANNELS[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$TR_LOCAL" | head -1)"
-  if [[ -z "$ch_gl" || -z "$ch_vk" ]]; then
-    fail "could not parse IQM_MORPH_MAX_CHANNELS from opengl/tr_local.h or vulkan/tr_local.h"
-  elif [[ "$ch_gl" != "$ch_vk" ]]; then
-    fail "IQM_MORPH_MAX_CHANNELS mismatch: opengl/tr_local.h=$ch_gl vulkan/tr_local.h=$ch_vk"
-  else
-    pass "IQM_MORPH_MAX_CHANNELS=$ch_vk (OpenGL + Vulkan tr_local.h)"
-  fi
+echo "IQM / morph constants (Vulkan renderer):"
+if [[ -z "$iqm_j" ]]; then
+  fail "could not parse IQM_MAX_JOINTS from vulkan/iqm.h"
 else
-  echo "IQM / morph constants (Vulkan-only; OpenGL renderer removed):"
-  if [[ -z "$iqm_j" ]]; then
-    fail "could not parse IQM_MAX_JOINTS from vulkan/iqm.h"
-  else
-    pass "IQM_MAX_JOINTS=$iqm_j (vulkan/iqm.h)"
-  fi
-  ch_vk="$(sed -n 's/^#define IQM_MORPH_MAX_CHANNELS[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$TR_LOCAL" | head -1)"
-  if [[ -z "$k_c" ]]; then
-    fail "could not parse IQM_MORPH_TOP_K from vulkan/tr_local.h"
-  else
-    pass "IQM_MORPH_TOP_K=$k_c (vulkan/tr_local.h)"
-  fi
-  if [[ -z "$ch_vk" ]]; then
-    fail "could not parse IQM_MORPH_MAX_CHANNELS from vulkan/tr_local.h"
-  else
-    pass "IQM_MORPH_MAX_CHANNELS=$ch_vk (vulkan/tr_local.h)"
-  fi
+  pass "IQM_MAX_JOINTS=$iqm_j (vulkan/iqm.h)"
+fi
+ch_vk="$(sed -n 's/^#define IQM_MORPH_MAX_CHANNELS[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$TR_LOCAL" | head -1)"
+if [[ -z "$k_c" ]]; then
+  fail "could not parse IQM_MORPH_TOP_K from vulkan/tr_local.h"
+else
+  pass "IQM_MORPH_TOP_K=$k_c (vulkan/tr_local.h)"
+fi
+if [[ -z "$ch_vk" ]]; then
+  fail "could not parse IQM_MORPH_MAX_CHANNELS from vulkan/tr_local.h"
+else
+  pass "IQM_MORPH_MAX_CHANNELS=$ch_vk (vulkan/tr_local.h)"
 fi
 
 echo ""
@@ -454,14 +417,42 @@ echo ""
 echo "Path trace experiment (Phase C6): vk_pathtrace + shaders:"
 PT_C="$PROJECT_ROOT/src/renderers/vulkan/vk_pathtrace.c"
 PT_RGEN="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/pt_mega.rgen"
+PT_DENOISE="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/pt_denoise.comp"
+PT_COMP="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/pt_composite.comp"
 if [[ ! -f "$PT_C" ]]; then
   fail "vk_pathtrace.c missing"
-elif ! grep -q 'r_pathtrace_arch' "$PT_C" 2>/dev/null; then
-  fail "vk_pathtrace.c missing r_pathtrace_arch handling"
-elif [[ ! -f "$PT_RGEN" ]]; then
-  fail "pt_mega.rgen missing"
+elif ! grep -q 'pipeline_denoise' "$PT_C" 2>/dev/null; then
+  fail "vk_pathtrace.c missing wired denoise pipeline"
+elif ! grep -q 'r_pathtrace_composite' "$PT_C" 2>/dev/null; then
+  fail "vk_pathtrace.c missing r_pathtrace_composite blend"
+elif [[ ! -f "$PT_RGEN" || ! -f "$PT_DENOISE" || ! -f "$PT_COMP" ]]; then
+  fail "pathtrace shaders missing (pt_mega / pt_denoise / pt_composite)"
 else
-  pass "vk_pathtrace.c + pt_mega.rgen present (USE_VULKAN_RTX compile guard)"
+  pass "pathtrace megakernel/wavefront + denoise + composite wired"
+fi
+
+echo "Hybrid Rendering 1 (Granja/Pereira): vk_hybrid1 + shaders:"
+H1_C="$PROJECT_ROOT/src/renderers/vulkan/vk_hybrid1.c"
+H1_TEMP="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/hybrid1/hybrid1_temporal.comp"
+H1_ATR="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/hybrid1/hybrid1_atrous.comp"
+if [[ ! -f "$H1_C" ]]; then
+  fail "vk_hybrid1.c missing"
+elif ! grep -q 'r_hybrid1_historyClamp' "$H1_C" 2>/dev/null; then
+  fail "vk_hybrid1.c missing history clamp wiring"
+elif ! grep -q 'hybrid1_separableBlur' "$H1_C" 2>/dev/null; then
+  fail "vk_hybrid1.c missing separable blur path"
+elif ! grep -q 'r_hybrid1_diffuse' "$H1_C" 2>/dev/null; then
+  fail "vk_hybrid1.c missing diffuse channel"
+elif ! grep -q 'HYBRID1_RefreshRtDescriptors' "$H1_C" 2>/dev/null; then
+  fail "vk_hybrid1.c missing per-frame IBL/G-buffer descriptor refresh"
+elif ! grep -q 'r_hybrid1_motion' "$H1_C" 2>/dev/null; then
+  fail "vk_hybrid1.c missing motion-vector temporal path"
+elif [[ ! -f "$H1_TEMP" || ! -f "$H1_ATR" ]]; then
+  fail "hybrid1 temporal/atrous shaders missing"
+elif [[ ! -f "$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/hybrid1/hybrid1_diffuse.rgen" ]]; then
+  fail "hybrid1 diffuse RT shaders missing"
+else
+  pass "hybrid1 SVGF shadow/spec/diffuse + IBL + separable atrous wired"
 fi
 
 echo ""

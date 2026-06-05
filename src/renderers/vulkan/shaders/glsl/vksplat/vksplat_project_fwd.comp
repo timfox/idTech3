@@ -1,0 +1,95 @@
+#version 450
+/* VkSplat: projection forward + per-Gaussian tile intersection count (scan-line culling prep). */
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+struct GaussianTrain {
+	vec3 mean;
+	float opacity;
+	vec3 scaleLog;
+	float pad0;
+	vec4 rotation;
+	vec3 sh0;
+	float pad1;
+};
+
+struct ProjectedGaussian {
+	vec4 centerDepth;
+	vec4 conicOpacity;
+	vec2 axisRadii;
+	uint tileCount;
+	uint sortBase;
+};
+
+layout(std430, set = 0, binding = 0) buffer GaussianBuffer {
+	GaussianTrain g[];
+} gaussians;
+
+layout(std430, set = 0, binding = 1) buffer ProjectedBuffer {
+	ProjectedGaussian p[];
+} projected;
+
+layout(push_constant) uniform ProjectPush {
+	mat4 viewProj;
+	vec4 viewport;
+	int gaussianCount;
+	int tileSize;
+	float opacityThreshold;
+	float pad0;
+} pc;
+
+uint countTilesScanline( vec2 center, vec2 radii, int tileSize ) {
+	int tx0 = int(floor((center.x - radii.x) / float(tileSize)));
+	int ty0 = int(floor((center.y - radii.y) / float(tileSize)));
+	int tx1 = int(floor((center.x + radii.x) / float(tileSize)));
+	int ty1 = int(floor((center.y + radii.y) / float(tileSize)));
+	int tx;
+	int ty;
+	uint count = 0u;
+	tx0 = clamp(tx0, 0, int(pc.viewport.z) - 1);
+	ty0 = clamp(ty0, 0, int(pc.viewport.w) - 1);
+	tx1 = clamp(tx1, 0, int(pc.viewport.z) - 1);
+	ty1 = clamp(ty1, 0, int(pc.viewport.w) - 1);
+	for ( ty = ty0; ty <= ty1; ty++ ) {
+		for ( tx = tx0; tx <= tx1; tx++ ) {
+			count++;
+		}
+	}
+	return count;
+}
+
+void main() {
+	uint i = gl_GlobalInvocationID.x;
+	vec4 clip;
+	vec3 ndc;
+	vec2 pix;
+	float dist;
+	vec2 radii;
+
+	if ( int(i) >= pc.gaussianCount ) {
+		return;
+	}
+
+	GaussianTrain gp = gaussians.g[i];
+	clip = pc.viewProj * vec4(gp.mean, 1.0);
+	if ( abs(clip.w) < 1e-5 ) {
+		projected.p[i].tileCount = 0u;
+		return;
+	}
+
+	ndc = clip.xyz / clip.w;
+	if ( ndc.x < -1.2 || ndc.x > 1.2 || ndc.y < -1.2 || ndc.y > 1.2 || ndc.z < 0.0 || ndc.z > 1.0 ) {
+		projected.p[i].tileCount = 0u;
+		return;
+	}
+
+	pix = (ndc.xy * 0.5 + 0.5) * pc.viewport.xy;
+	dist = max(length(gp.mean), 8.0);
+	radii = vec2(exp(gp.scaleLog.x), exp(gp.scaleLog.y)) * (512.0 / dist);
+	radii = clamp(radii, vec2(2.0), vec2(128.0));
+
+	projected.p[i].centerDepth = vec4(pix, ndc.z, 1.0 / (1.0 + exp(-gp.opacity)));
+	projected.p[i].conicOpacity = vec4(radii, gp.sh0.r, gp.sh0.g);
+	projected.p[i].axisRadii = radii;
+	projected.p[i].tileCount = countTilesScanline(pix, radii, pc.tileSize);
+	projected.p[i].sortBase = 0u;
+}

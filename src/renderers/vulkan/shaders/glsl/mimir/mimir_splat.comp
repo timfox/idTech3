@@ -1,0 +1,49 @@
+#version 450
+/* Mímir — orthographic disc markers (ViewType::Markers, 3D domain). */
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) readonly buffer Positions {
+	vec3 pos[];
+};
+
+layout(rgba8, set = 0, binding = 1) uniform writeonly image2D colorOut;
+
+layout(push_constant) uniform SplatPush {
+	ivec4 viewport;
+	uint pointCount;
+	float pointRadius;
+	float markerColor[4];
+} pc;
+
+void splatDisc(ivec2 center, float radius) {
+	int r = int(ceil(radius));
+	for (int dy = -r; dy <= r; dy++) {
+		for (int dx = -r; dx <= r; dx++) {
+			ivec2 p = center + ivec2(dx, dy);
+			if (p.x < 0 || p.y < 0 || p.x >= pc.viewport.x || p.y >= pc.viewport.y) {
+				continue;
+			}
+			float d = length(vec2(dx, dy));
+			if (d > radius) {
+				continue;
+			}
+			float alpha = smoothstep(radius, radius * 0.6, d);
+			vec4 c = vec4(pc.markerColor[0], pc.markerColor[1], pc.markerColor[2], pc.markerColor[3]);
+			c.rgb *= alpha;
+			c.a = alpha;
+			imageStore(colorOut, p, c);
+		}
+	}
+}
+
+void main() {
+	uint i = gl_GlobalInvocationID.x;
+	if (i >= pc.pointCount) {
+		return;
+	}
+	vec3 p = pos[i];
+	float nx = p.x * 0.5 + 0.5;
+	float ny = p.y * 0.5 + 0.5;
+	ivec2 center = ivec2(nx * float(pc.viewport.x), (1.0 - ny) * float(pc.viewport.y));
+	splatDisc(center, pc.pointRadius);
+}

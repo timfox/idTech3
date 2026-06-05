@@ -629,6 +629,56 @@ void SkyboxHDR_UpdateRuntime(void) {
 	if ( r_skyboxHDR_intensity ) r_skyboxHDR_intensity->modified = qfalse;
 }
 
+qboolean SkyboxHDR_GetCubemapViews( VkImageView *prefilterOut, VkImageView *irradianceOut )
+{
+	if ( prefilterOut ) {
+		*prefilterOut = VK_NULL_HANDLE;
+	}
+	if ( irradianceOut ) {
+		*irradianceOut = VK_NULL_HANDLE;
+	}
+
+	if ( skybox.loaded && skyboxPrefilteredImage.view != VK_NULL_HANDLE ) {
+		if ( prefilterOut ) {
+			*prefilterOut = skyboxPrefilteredImage.view;
+		}
+		if ( irradianceOut && skyboxIrradianceImage.view != VK_NULL_HANDLE ) {
+			*irradianceOut = skyboxIrradianceImage.view;
+		}
+		return qtrue;
+	}
+
+	if ( tr.numCubemaps > 0 ) {
+		cubemap_t *cube = &tr.cubemaps[0];
+		if ( cube->prefiltered_image && cube->prefiltered_image->view != VK_NULL_HANDLE ) {
+			if ( prefilterOut ) {
+				*prefilterOut = cube->prefiltered_image->view;
+			}
+		}
+		if ( cube->irradiance_image && cube->irradiance_image->view != VK_NULL_HANDLE ) {
+			if ( irradianceOut ) {
+				*irradianceOut = cube->irradiance_image->view;
+			}
+		}
+		if ( ( prefilterOut && *prefilterOut != VK_NULL_HANDLE ) ||
+			( irradianceOut && *irradianceOut != VK_NULL_HANDLE ) ) {
+			return qtrue;
+		}
+	}
+
+	if ( tr.emptyCubemap && tr.emptyCubemap->view != VK_NULL_HANDLE ) {
+		if ( prefilterOut ) {
+			*prefilterOut = tr.emptyCubemap->view;
+		}
+		if ( irradianceOut ) {
+			*irradianceOut = tr.emptyCubemap->view;
+		}
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
 VkDescriptorSet SkyboxHDR_GetPrefilteredDescriptor(void) {
 	return ( skybox.loaded && skyboxPrefilteredImage.handle != VK_NULL_HANDLE && skyboxPrefilteredImage.descriptor != VK_NULL_HANDLE )
 		? skyboxPrefilteredImage.descriptor : VK_NULL_HANDLE;
