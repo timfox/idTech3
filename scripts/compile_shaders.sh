@@ -118,6 +118,8 @@ task_counter = 0
 rtx_spv_bytes = {}
 grtx_spv_bytes = {}
 pathtrace_spv_bytes = {}
+hybrid1_spv_bytes = {}
+raygun_spv_bytes = {}
 
 def append_shader_data(spv_path, array_name):
     data = spv_path.read_bytes()
@@ -132,7 +134,7 @@ def append_shader_data(spv_path, array_name):
             f.write("\n")
         f.write("};\n")
 
-def compile_shader(stage, source, array_name, binding_expr=None, defines="", rtx_collect=False, grtx_collect=False, pathtrace_collect=False):
+def compile_shader(stage, source, array_name, binding_expr=None, defines="", rtx_collect=False, grtx_collect=False, pathtrace_collect=False, hybrid1_collect=False, raygun_collect=False):
     global task_counter
     input_path = glsl_dir / source
     if not input_path.is_file():
@@ -151,6 +153,10 @@ def compile_shader(stage, source, array_name, binding_expr=None, defines="", rtx
         grtx_spv_bytes[array_name] = tmp_spv.read_bytes()
     if pathtrace_collect:
         pathtrace_spv_bytes[array_name] = tmp_spv.read_bytes()
+    if hybrid1_collect:
+        hybrid1_spv_bytes[array_name] = tmp_spv.read_bytes()
+    if raygun_collect:
+        raygun_spv_bytes[array_name] = tmp_spv.read_bytes()
     append_shader_data(tmp_spv, array_name)
     if binding_expr:
         bindings.append((binding_expr, array_name))
@@ -351,6 +357,20 @@ compile_shader("comp", "wpt/wpt_composite.comp", "wpt_composite_cs", binding_exp
 compile_shader("comp", "mgs/mgs_prepare.comp", "mgs_prepare_cs", binding_expr="vk.modules.mgs_prepare_cs")
 compile_shader("comp", "mgs/mgs_splat.comp", "mgs_splat_cs", binding_expr="vk.modules.mgs_splat_cs")
 compile_shader("comp", "mgs/mgs_composite.comp", "mgs_composite_cs", binding_expr="vk.modules.mgs_composite_cs")
+compile_shader("comp", "vksplat/vksplat_project_fwd.comp", "vksplat_project_fwd_cs", binding_expr="vk.modules.vksplat_project_fwd_cs")
+compile_shader("comp", "vksplat/vksplat_tile_cull.comp", "vksplat_tile_cull_cs", binding_expr="vk.modules.vksplat_tile_cull_cs")
+compile_shader("comp", "vksplat/vksplat_raster_fwd.comp", "vksplat_raster_fwd_cs", binding_expr="vk.modules.vksplat_raster_fwd_cs")
+compile_shader("comp", "vksplat/vksplat_adam.comp", "vksplat_adam_cs", binding_expr="vk.modules.vksplat_adam_cs")
+compile_shader("comp", "curast/curast_clear.comp", "curast_clear_cs", binding_expr="vk.modules.curast_clear_cs")
+compile_shader("comp", "curast/curast_stage1.comp", "curast_stage1_cs", binding_expr="vk.modules.curast_stage1_cs")
+compile_shader("comp", "curast/curast_resolve.comp", "curast_resolve_cs", binding_expr="vk.modules.curast_resolve_cs")
+compile_shader("comp", "mimir/mimir_clear.comp", "mimir_clear_cs", binding_expr="vk.modules.mimir_clear_cs")
+compile_shader("comp", "mimir/mimir_brownian.comp", "mimir_brownian_cs", binding_expr="vk.modules.mimir_brownian_cs")
+compile_shader("comp", "mimir/mimir_splat.comp", "mimir_splat_cs", binding_expr="vk.modules.mimir_splat_cs")
+compile_shader("comp", "iris/iris_clear.comp", "iris_clear_cs", binding_expr="vk.modules.iris_clear_cs")
+compile_shader("comp", "iris/iris_spd.comp", "iris_spd_cs", binding_expr="vk.modules.iris_spd_cs")
+compile_shader("comp", "iris/iris_compose.comp", "iris_compose_cs", binding_expr="vk.modules.iris_compose_cs")
+compile_shader("comp", "iris/iris_overlay.comp", "iris_overlay_cs", binding_expr="vk.modules.iris_overlay_cs")
 compile_shader("comp", "wsp/wsp_clear_tiles.comp", "wsp_clear_tiles_cs", binding_expr="vk.modules.wsp_clear_tiles_cs")
 compile_shader("comp", "wsp/wsp_prepare.comp", "wsp_prepare_cs", binding_expr="vk.modules.wsp_prepare_cs")
 compile_shader("comp", "wsp/wsp_tile_bin.comp", "wsp_tile_bin_cs", binding_expr="vk.modules.wsp_tile_bin_cs")
@@ -374,6 +394,33 @@ compile_shader("rgen", "pt_wave.rgen", "pt_wave_rgen_spv", pathtrace_collect=Tru
 compile_shader("rmiss", "pt_miss.rmiss", "pt_miss_rmiss_spv", pathtrace_collect=True)
 compile_shader("rchit", "pt_hit.rchit", "pt_hit_rchit_spv", pathtrace_collect=True)
 compile_shader("comp", "pt_wave_compact.comp", "pt_wave_compact_cs", pathtrace_collect=True)
+compile_shader("comp", "pt_denoise.comp", "pt_denoise_cs", pathtrace_collect=True)
+compile_shader("comp", "pt_composite.comp", "pt_composite_cs", pathtrace_collect=True)
+
+compile_shader("rgen", "hybrid1/hybrid1_shadow.rgen", "hybrid1_shadow_rgen_spv", hybrid1_collect=True)
+compile_shader("rmiss", "hybrid1/hybrid1_shadow.rmiss", "hybrid1_shadow_rmiss_spv", hybrid1_collect=True)
+compile_shader("rchit", "hybrid1/hybrid1_shadow.rchit", "hybrid1_shadow_rchit_spv", hybrid1_collect=True)
+compile_shader("rgen", "hybrid1/hybrid1_spec.rgen", "hybrid1_spec_rgen_spv", hybrid1_collect=True)
+compile_shader("rmiss", "hybrid1/hybrid1_spec.rmiss", "hybrid1_spec_rmiss_spv", hybrid1_collect=True)
+compile_shader("rchit", "hybrid1/hybrid1_spec.rchit", "hybrid1_spec_rchit_spv", hybrid1_collect=True)
+compile_shader("rgen", "hybrid1/hybrid1_diffuse.rgen", "hybrid1_diffuse_rgen_spv", hybrid1_collect=True)
+compile_shader("rmiss", "hybrid1/hybrid1_diffuse.rmiss", "hybrid1_diffuse_rmiss_spv", hybrid1_collect=True)
+compile_shader("rchit", "hybrid1/hybrid1_diffuse.rchit", "hybrid1_diffuse_rchit_spv", hybrid1_collect=True)
+compile_shader("comp", "hybrid1/hybrid1_temporal.comp", "hybrid1_temporal_cs", hybrid1_collect=True)
+compile_shader("comp", "hybrid1/hybrid1_atrous.comp", "hybrid1_atrous_cs", hybrid1_collect=True)
+compile_shader("comp", "hybrid1/hybrid1_composite.comp", "hybrid1_composite_cs", hybrid1_collect=True)
+
+compile_shader("rgen", "raygun/raygun.rgen", "raygun_rgen_spv", raygun_collect=True)
+compile_shader("rmiss", "raygun/raygun.rmiss", "raygun_rmiss_spv", raygun_collect=True)
+compile_shader("rchit", "raygun/raygun.rchit", "raygun_rchit_spv", raygun_collect=True)
+compile_shader("rchit", "raygun/raygun_shadow.rchit", "raygun_shadow_rchit_spv", raygun_collect=True)
+compile_shader("comp", "raygun/raygun_fxaa.comp", "raygun_fxaa_cs", raygun_collect=True)
+
+compile_shader("vert", "dressi/dressi_soft.vert", "dressi_soft_vs", binding_expr="vk.modules.dressi_soft_vs")
+compile_shader("frag", "dressi/dressi_soft.frag", "dressi_soft_fs", binding_expr="vk.modules.dressi_soft_fs")
+compile_shader("comp", "dressi/dressi_blend.comp", "dressi_blend_cs", binding_expr="vk.modules.dressi_blend_cs")
+compile_shader("comp", "dressi/dressi_composite.comp", "dressi_composite_cs", binding_expr="vk.modules.dressi_composite_cs")
+compile_shader("comp", "dressi/dressi_inverse_uv.comp", "dressi_inverse_uv_cs", binding_expr="vk.modules.dressi_inverse_uv_cs")
 
 def write_vk_rtx_demo_spirv_inc():
     """Emit src/renderers/vulkan/vk_rtx_demo_spirv.inc for USE_VULKAN_RTX embedded SPIR-V."""
@@ -453,6 +500,8 @@ def write_vk_pathtrace_spirv_inc():
         ("pt_miss_rmiss_spv", "vk_pt_miss_rmiss_spv", "VK_PT_MISS_RMISS_SPV_SIZE"),
         ("pt_hit_rchit_spv", "vk_pt_hit_rchit_spv", "VK_PT_HIT_RCHIT_SPV_SIZE"),
         ("pt_wave_compact_cs", "vk_pt_wave_compact_cs_spv", "VK_PT_WAVE_COMPACT_CS_SPV_SIZE"),
+        ("pt_denoise_cs", "vk_pt_denoise_cs_spv", "VK_PT_DENOISE_CS_SPV_SIZE"),
+        ("pt_composite_cs", "vk_pt_composite_cs_spv", "VK_PT_COMPOSITE_CS_SPV_SIZE"),
     ]
     lines = []
     lines.append("/* Auto-generated by scripts/compile_shaders.sh — do not edit by hand */")
@@ -475,6 +524,83 @@ def write_vk_pathtrace_spirv_inc():
     print(f"Wrote {out_path}")
 
 write_vk_pathtrace_spirv_inc()
+
+def write_vk_hybrid1_spirv_inc():
+    """Emit src/renderers/vulkan/vk_hybrid1_spirv.inc for USE_VULKAN_RTX Hybrid Rendering 1."""
+    root = Path(os.environ.get("PROJECT_ROOT", "")).resolve()
+    if not root or not root.is_dir():
+        sys.exit("PROJECT_ROOT must be set for hybrid1 SPIR-V embed")
+    out_path = root / "src/renderers/vulkan/vk_hybrid1_spirv.inc"
+    mapping = [
+        ("hybrid1_shadow_rgen_spv", "vk_hybrid1_shadow_rgen_spv", "VK_HYBRID1_SHADOW_RGEN_SPV_SIZE"),
+        ("hybrid1_shadow_rmiss_spv", "vk_hybrid1_shadow_rmiss_spv", "VK_HYBRID1_SHADOW_RMISS_SPV_SIZE"),
+        ("hybrid1_shadow_rchit_spv", "vk_hybrid1_shadow_rchit_spv", "VK_HYBRID1_SHADOW_RCHIT_SPV_SIZE"),
+        ("hybrid1_spec_rgen_spv", "vk_hybrid1_spec_rgen_spv", "VK_HYBRID1_SPEC_RGEN_SPV_SIZE"),
+        ("hybrid1_spec_rmiss_spv", "vk_hybrid1_spec_rmiss_spv", "VK_HYBRID1_SPEC_RMISS_SPV_SIZE"),
+        ("hybrid1_spec_rchit_spv", "vk_hybrid1_spec_rchit_spv", "VK_HYBRID1_SPEC_RCHIT_SPV_SIZE"),
+        ("hybrid1_diffuse_rgen_spv", "vk_hybrid1_diffuse_rgen_spv", "VK_HYBRID1_DIFFUSE_RGEN_SPV_SIZE"),
+        ("hybrid1_diffuse_rmiss_spv", "vk_hybrid1_diffuse_rmiss_spv", "VK_HYBRID1_DIFFUSE_RMISS_SPV_SIZE"),
+        ("hybrid1_diffuse_rchit_spv", "vk_hybrid1_diffuse_rchit_spv", "VK_HYBRID1_DIFFUSE_RCHIT_SPV_SIZE"),
+        ("hybrid1_temporal_cs", "vk_hybrid1_temporal_cs_spv", "VK_HYBRID1_TEMPORAL_CS_SPV_SIZE"),
+        ("hybrid1_atrous_cs", "vk_hybrid1_atrous_cs_spv", "VK_HYBRID1_ATROUS_CS_SPV_SIZE"),
+        ("hybrid1_composite_cs", "vk_hybrid1_composite_cs_spv", "VK_HYBRID1_COMPOSITE_CS_SPV_SIZE"),
+    ]
+    lines = []
+    lines.append("/* Auto-generated by scripts/compile_shaders.sh — do not edit by hand */")
+    lines.append("")
+    for src_name, c_array, size_macro in mapping:
+        if src_name not in hybrid1_spv_bytes:
+            sys.exit(f"Missing Hybrid1 SPIR-V blob for {src_name}")
+        data = hybrid1_spv_bytes[src_name]
+        lines.append(f"/* {src_name}.spv {len(data)} bytes */")
+        lines.append(f"static const uint8_t {c_array}[] = {{")
+        for offset in range(0, len(data), 16):
+            chunk = data[offset:offset + 16]
+            bytes_text = ", ".join(f"0x{b:02X}" for b in chunk)
+            suffix = "," if offset + 16 < len(data) else ""
+            lines.append(f"\t{bytes_text}{suffix}")
+        lines.append("};")
+        lines.append(f"#define {size_macro} ({len(data)}u)")
+        lines.append("")
+    out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"Wrote {out_path}")
+
+write_vk_hybrid1_spirv_inc()
+
+def write_vk_raygun_spirv_inc():
+    """Emit src/renderers/vulkan/vk_raygun_spirv.inc for Raygun RT demo (arXiv:2001.09792)."""
+    root = Path(os.environ.get("PROJECT_ROOT", "")).resolve()
+    if not root or not root.is_dir():
+        sys.exit("PROJECT_ROOT must be set for raygun SPIR-V embed")
+    out_path = root / "src/renderers/vulkan/vk_raygun_spirv.inc"
+    mapping = [
+        ("raygun_rgen_spv", "vk_raygun_rgen_spv", "VK_RAYGUN_RGEN_SPV_SIZE"),
+        ("raygun_rmiss_spv", "vk_raygun_rmiss_spv", "VK_RAYGUN_RMISS_SPV_SIZE"),
+        ("raygun_rchit_spv", "vk_raygun_rchit_spv", "VK_RAYGUN_RCHIT_SPV_SIZE"),
+        ("raygun_shadow_rchit_spv", "vk_raygun_shadow_rchit_spv", "VK_RAYGUN_SHADOW_RCHIT_SPV_SIZE"),
+        ("raygun_fxaa_cs", "vk_raygun_fxaa_cs_spv", "VK_RAYGUN_FXAA_CS_SPV_SIZE"),
+    ]
+    lines = []
+    lines.append("/* Auto-generated by scripts/compile_shaders.sh — do not edit by hand */")
+    lines.append("")
+    for src_name, c_array, size_macro in mapping:
+        if src_name not in raygun_spv_bytes:
+            sys.exit(f"Missing Raygun SPIR-V blob for {src_name}")
+        data = raygun_spv_bytes[src_name]
+        lines.append(f"/* {src_name}.spv {len(data)} bytes */")
+        lines.append(f"static const uint8_t {c_array}[] = {{")
+        for offset in range(0, len(data), 16):
+            chunk = data[offset:offset + 16]
+            bytes_text = ", ".join(f"0x{b:02X}" for b in chunk)
+            suffix = "," if offset + 16 < len(data) else ""
+            lines.append(f"\t{bytes_text}{suffix}")
+        lines.append("};")
+        lines.append(f"#define {size_macro} ({len(data)}u)")
+        lines.append("")
+    out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"Wrote {out_path}")
+
+write_vk_raygun_spirv_inc()
 
 with binding_file.open("w") as f:
     f.write("// this file is autogenerated during shader compilation\n")

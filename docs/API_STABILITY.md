@@ -16,7 +16,7 @@ This document formalizes the **layer cake** contract from [CLAUDE.md](../CLAUDE.
 - **MINOR**: New traps, new CS ranges, new `EF_*` flags (with wire room), new cvars (default off)
 - **PATCH**: Bug fixes, docs, regression tests; no ABI break
 
-Engine version is exposed via `com_version` / release tags. Mods should declare `requires_engine >= X.Y` in `gameinfo.txt` (convention; not enforced yet).
+Engine version is exposed via `com_version` / release tags. Layercake API semver is **`com_engine_api`** (`IDTECH3_ENGINE_API_MAJOR.MINOR` in [q_shared.h](../src/qcommon/q_shared.h)). Mods should declare `requires_engine >= X.Y` in `gameinfo.txt`; startup logs a **warning** if the running engine API is older (non-fatal).
 
 ## Trap numbering rules
 

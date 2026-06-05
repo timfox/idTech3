@@ -164,3 +164,41 @@ local last = Engine.Save.lastSlot()          -- returns integer
 ```
 
 Protocol version: `1` (see [g_engine_systems.h](../src/game/g_engine_systems.h)). Legacy `save/engine_slot_*.txt` still reads.
+
+Console (client, no Lua): `engine_save_write <slot> <label>`, `engine_save_read <slot>`, `engine_save_info`.
+
+## Engine.Telemetry
+
+```lua
+Engine.Telemetry.record("metric_name", 1.0)
+local v = Engine.Telemetry.get("metric_name")
+Engine.Telemetry.clear()
+```
+
+Cvar: `engine_telemetry` (default `1`).
+
+## Engine.Replay
+
+```lua
+local frame = Engine.Replay.frameIndex()
+local base = Engine.Replay.baseTime()
+```
+
+Cvar: `engine_replay` (default `1`). Frame index advances when client snapshots are valid.
+
+## Engine.Quest
+
+```lua
+Engine.Quest.add("quest_id", "Title", "active")
+Engine.Quest.setStage("quest_id", "complete")
+local stage = Engine.Quest.getStage("quest_id")
+local n = Engine.Quest.count()
+```
+
+## Engine.Dialogue
+
+```lua
+Engine.Dialogue.start("Speaker", "Line of dialogue")
+Engine.Dialogue.clear()
+local n = Engine.Dialogue.count()
+```

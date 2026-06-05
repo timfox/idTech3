@@ -1,0 +1,98 @@
+#version 450
+/* CuRast Stage 1: one thread per triangle, bbox raster + atomicMin visibility (paper §4.1). */
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+struct Triangle {
+	vec4 v0;
+	vec4 v1;
+	vec4 v2;
+};
+
+layout(std430, set = 0, binding = 0) readonly buffer TriBuffer {
+	Triangle tris[];
+} mesh;
+
+layout(r32ui, set = 0, binding = 1) uniform uimage2D visBuffer;
+
+layout(push_constant) uniform Stage1Push {
+	vec4 viewport;   /* width, height, invW, invH */
+	vec4 proj;       /* f/aspect, f, -1, pad */
+	int triCount;
+	int maxSmallPx;
+	int depthBits;
+	int triBits;
+} pc;
+
+bool insideTri(vec2 p, vec2 a, vec2 b, vec2 c, out vec3 bc) {
+	vec2 v0 = c - a;
+	vec2 v1 = b - a;
+	vec2 v2 = p - a;
+	float d00 = dot(v0, v0);
+	float d01 = dot(v0, v1);
+	float d11 = dot(v1, v1);
+	float d20 = dot(v2, v0);
+	float d21 = dot(v2, v1);
+	float denom = d00 * d11 - d01 * d01;
+	if (abs(denom) < 1e-12) {
+		return false;
+	}
+	float v = (d11 * d20 - d01 * d21) / denom;
+	float w = (d00 * d21 - d01 * d20) / denom;
+	float u = 1.0 - v - w;
+	bc = vec3(u, v, w);
+	return u >= 0.0 && v >= 0.0 && w >= 0.0;
+}
+
+uint packFragment(float depth, uint triId) {
+	uint d = uint(clamp(depth * 262143.0, 0.0, 262143.0));
+	uint t = triId & ((1u << pc.triBits) - 1u);
+	return (d << pc.triBits) | t;
+}
+
+void main() {
+	uint tid = gl_GlobalInvocationID.x;
+	if (int(tid) >= pc.triCount) {
+		return;
+	}
+
+	Triangle T = mesh.tris[tid];
+	vec3 p0 = T.v0.xyz;
+	vec3 p1 = T.v1.xyz;
+	vec3 p2 = T.v2.xyz;
+
+	vec2 ndc0 = p0.xy * pc.proj.xy / max(p0.z, 1e-4);
+	vec2 ndc1 = p1.xy * pc.proj.xy / max(p1.z, 1e-4);
+	vec2 ndc2 = p2.xy * pc.proj.xy / max(p2.z, 1e-4);
+
+	vec2 s0 = (ndc0 * 0.5 + 0.5) * pc.viewport.xy;
+	vec2 s1 = (ndc1 * 0.5 + 0.5) * pc.viewport.xy;
+	vec2 s2 = (ndc2 * 0.5 + 0.5) * pc.viewport.xy;
+
+	ivec2 bbMin = ivec2(floor(min(min(s0, s1), s2)));
+	ivec2 bbMax = ivec2(ceil(max(max(s0, s1), s2)));
+	bbMin = max(bbMin, ivec2(0));
+	bbMax = min(bbMax, ivec2(pc.viewport.xy) - 1);
+
+	int area = (bbMax.x - bbMin.x + 1) * (bbMax.y - bbMin.y + 1);
+	if (area <= 0 || area > pc.maxSmallPx) {
+		return;
+	}
+
+	float z0 = 1.0 / max(p0.z, 1e-4);
+	float z1 = 1.0 / max(p1.z, 1e-4);
+	float z2 = 1.0 / max(p2.z, 1e-4);
+
+	for (int y = bbMin.y; y <= bbMax.y; y++) {
+		for (int x = bbMin.x; x <= bbMax.x; x++) {
+			vec2 p = vec2(float(x) + 0.5, float(y) + 0.5);
+			vec3 bary;
+			if (!insideTri(p, s0, s1, s2, bary)) {
+				continue;
+			}
+			float invZ = bary.x * z0 + bary.y * z1 + bary.z * z2;
+			float depth = 1.0 / max(invZ, 1e-6);
+			uint frag = packFragment(depth, tid);
+			imageAtomicMin(visBuffer, ivec2(x, y), frag);
+		}
+	}
+}

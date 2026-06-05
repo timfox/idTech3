@@ -312,6 +312,8 @@ void R_VUDA_Init( void )
 
 	ri.Cvar_CheckRange( r_vuda, "0", "1", CV_INTEGER );
 	ri.Cvar_CheckRange( r_vuda_mode, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_vuda_mode,
+		"VUDA mode: 0=off, 1=interop (export/import fd), 2=spatial_mux (pipelined, no frame-begin CUDA wait)." );
 	ri.Cvar_CheckRange( r_vuda_slotMb, "4", "512", CV_INTEGER );
 	ri.Cvar_CheckRange( r_vuda_mux, "0", "1", CV_INTEGER );
 	ri.Cvar_CheckRange( r_vuda_computeMs, "0", "16", CV_INTEGER );
@@ -326,7 +328,8 @@ void R_VUDA_Init( void )
 
 	if ( r_vuda->integer && vk.vudaInteropCapable ) {
 		ri.Printf( PRINT_ALL,
-			"[VUDA] Enabled (experimental). See docs/VUDA.md — pair with cl_vuda 1 after vid_restart\n" );
+			"[VUDA] Enabled mode=%d (experimental). See docs/VUDA.md — pair with cl_vuda 1 after vid_restart\n",
+			r_vuda_mode ? r_vuda_mode->integer : 1 );
 	}
 }
 
@@ -390,6 +393,11 @@ void vk_vuda_frame_begin( void )
 	if ( r_vuda_syncCuda && r_vuda_syncCuda->integer && qvkWaitSemaphoresKHR && vk.vuda.cuda_signal_sem != VK_NULL_HANDLE ) {
 		VkSemaphoreWaitInfo wait_info;
 		uint64_t value;
+
+		/* Mode 2 (spatial_mux): pipelined overlap — skip blocking wait at frame begin. */
+		if ( r_vuda_mode && r_vuda_mode->integer >= 2 ) {
+			return;
+		}
 
 		value = vk.vuda.cudaTimeline;
 		Com_Memset( &wait_info, 0, sizeof( wait_info ) );

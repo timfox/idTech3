@@ -45,6 +45,7 @@ set(DEMO_MOD_FILES
 	"${DEMO_MOD_DIR}/demo_sprites.cfg"
 	"${DEMO_MOD_DIR}/demo_audio.cfg"
 	"${DEMO_MOD_DIR}/demo_sp_slice.cfg"
+	"${DEMO_MOD_DIR}/gpu_golden_capture.cfg"
 	"${DEMO_MOD_DIR}/sound/soundevents.txt"
 	"${DEMO_MOD_DIR}/animgraph/idle_run.txt"
 	"${DEMO_MOD_DIR}/ndgi/demo.ndgi"
@@ -59,6 +60,7 @@ set(DEMO_MOD_FILES
 	"${DEMO_MOD_DIR}/grtx/demo.grtx"
 	"${DEMO_MOD_DIR}/mgs/demo.mgs"
 	"${DEMO_MOD_DIR}/wsp/demo.wsp"
+	"${CMAKE_BINARY_DIR}/demo_sqz_pack/sqz/demo.sqz"
 	"${CMAKE_SOURCE_DIR}/examples/demo_game/loc/en.loc"
 	"${DEMO_MOD_DIR}/models/parity_geom_mesh.usda"
 	"${DEMO_MOD_DIR}/models/parity_shade_preview.usda"
@@ -128,6 +130,10 @@ add_custom_command(
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/grtx"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/mgs"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/wsp"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/sqz"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/demo_sqz_pack/sqz"
+	COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/scripts/sqz_pack_demo.py"
+		"${CMAKE_BINARY_DIR}/demo_sqz_pack/sqz/demo.sqz"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/autoexec.cfg" "${DEMO_PACK_STAGING}/autoexec.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -150,6 +156,7 @@ add_custom_command(
 		"${DEMO_MOD_DIR}/demo_audio.cfg" "${DEMO_PACK_STAGING}/demo_audio.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/demo_sp_slice.cfg" "${DEMO_PACK_STAGING}/demo_sp_slice.cfg"
+		"${DEMO_MOD_DIR}/gpu_golden_capture.cfg" "${DEMO_PACK_STAGING}/gpu_golden_capture.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/sound/soundevents.txt" "${DEMO_PACK_STAGING}/sound/soundevents.txt"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -176,6 +183,12 @@ add_custom_command(
 		"${DEMO_MOD_DIR}/mgs/demo.mgs" "${DEMO_PACK_STAGING}/mgs/demo.mgs"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/wsp/demo.wsp" "${DEMO_PACK_STAGING}/wsp/demo.wsp"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${CMAKE_BINARY_DIR}/demo_sqz_pack/sqz/demo.sqz" "${DEMO_PACK_STAGING}/sqz/demo.sqz"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/demo_squeezeme.cfg" "${DEMO_PACK_STAGING}/demo_squeezeme.cfg"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/demo_hybrid1.cfg" "${DEMO_PACK_STAGING}/demo_hybrid1.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${CMAKE_SOURCE_DIR}/examples/demo_game/loc/en.loc" "${DEMO_PACK_STAGING}/loc/en.loc"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -228,8 +241,8 @@ add_custom_command(
 		"$<TARGET_FILE:demo_ui_skeleton>" "${DEMO_PACK_STAGING}/${DEMO_UI_DOT_ZIP}"
 	COMMAND ${CMAKE_COMMAND} -E chdir "${DEMO_PACK_STAGING}"
 		${CMAKE_COMMAND} -E tar cf "${DEMO_PK3}" --format=zip
-		autoexec.cfg gameinfo.txt demo_features.cfg demo_js.cfg demo_lua.cfg demo_csharp.cfg demo_gameplay.cfg demo_usd.cfg demo_sprites.cfg demo_audio.cfg demo_sp_slice.cfg readme_demo.txt
-		sound/soundevents.txt animgraph/idle_run.txt ndgi/demo.ndgi niv/demo.niv nslm/demo.nslm nist/demo.nist nvc/demo.nvc fsa/demo.fsa vfgi/demo.vfgi renderformer/demo.rfm vuda/demo.vuda grtx/demo.grtx mgs/demo.mgs wsp/demo.wsp loc/en.loc
+		autoexec.cfg gameinfo.txt demo_features.cfg demo_js.cfg demo_lua.cfg demo_csharp.cfg demo_gameplay.cfg demo_usd.cfg demo_sprites.cfg demo_audio.cfg demo_sp_slice.cfg gpu_golden_capture.cfg readme_demo.txt
+		sound/soundevents.txt animgraph/idle_run.txt ndgi/demo.ndgi niv/demo.niv nslm/demo.nslm nist/demo.nist nvc/demo.nvc fsa/demo.fsa vfgi/demo.vfgi renderformer/demo.rfm vuda/demo.vuda grtx/demo.grtx mgs/demo.mgs wsp/demo.wsp sqz/demo.sqz loc/en.loc
 		scripts/js/demo_hooks.js scripts/js/README.txt
 		scripts/lua/demo_hooks.lua
 		scripts/csharp/IdTech3.Engine.cs scripts/csharp/demo_hooks.cs

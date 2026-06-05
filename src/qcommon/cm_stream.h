@@ -11,7 +11,10 @@ Sector BSP streaming v1 (broadphase chunks per grid cell).
 
 #include "q_shared.h"
 
+typedef void ( *cm_stream_prefetch_f )( const char *localName, const char *remoteURL );
+
 void CM_Stream_Init( void );
+void CM_Stream_SetPrefetchHandler( cm_stream_prefetch_f handler );
 qboolean CM_Stream_LoadSector( int cellX, int cellY );
 void CM_Stream_UnloadSector( int cellX, int cellY );
 qboolean CM_Stream_IsSectorLoaded( int cellX, int cellY );

@@ -1,0 +1,115 @@
+#version 450
+/*
+ * Hybrid1 temporal accumulation + variance estimation + history rectification (variance color clamping).
+ * channel: 0 = shadow (R), 1 = specular (RGB)
+ */
+#extension GL_GOOGLE_include_directive : enable
+#include "hybrid1_common.glsl"
+
+layout( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
+
+layout( set = 0, binding = 0 ) uniform sampler2D depthTex;
+layout( set = 0, binding = 1 ) uniform sampler2D normalTex;
+layout( set = 0, binding = 2 ) uniform sampler2D rawTex;
+layout( set = 0, binding = 3 ) uniform sampler2D historyTex;
+layout( rgba16f, set = 0, binding = 4 ) uniform writeonly image2D filteredOut;
+layout( rgba16f, set = 0, binding = 5 ) uniform writeonly image2D historyOut;
+layout( set = 0, binding = 6 ) uniform sampler2D varianceHistTex;
+layout( rgba16f, set = 0, binding = 7 ) uniform writeonly image2D varianceOut;
+layout( set = 0, binding = 8 ) uniform sampler2D motionTex;
+
+layout( push_constant ) uniform Hybrid1TemporalPush {
+	mat4 invViewProj;
+	mat4 prevViewProj;
+	vec4 extent;
+	vec4 params; /* x=gamma, y=alpha, z=historyClamp on, w=channel (0 shadow, 1 spec) */
+	uint hasGBuffer;
+	uint firstFrame;
+	uint useMotion;
+	uint pad1;
+} pc;
+
+void main()
+{
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if ( pix.x >= uint( pc.extent.x ) || pix.y >= uint( pc.extent.y ) ) {
+		return;
+	}
+
+	vec2 uv = ( vec2( pix ) + 0.5 ) / pc.extent.xy;
+	vec2 texel = 1.0 / pc.extent.xy;
+	float depth = texture( depthTex, uv ).r;
+
+	if ( depth <= 0.0 || depth >= 1.0 ) {
+		vec4 raw = texture( rawTex, uv );
+		imageStore( filteredOut, ivec2( pix ), raw );
+		imageStore( historyOut, ivec2( pix ), raw );
+		imageStore( varianceOut, ivec2( pix ), vec4( 0.0 ) );
+		return;
+	}
+
+	vec4 raw = texture( rawTex, uv );
+	vec3 filtered;
+	vec3 histWrite;
+	vec3 varWrite;
+
+	if ( pc.params.w < 0.5 ) {
+		float rawVis = raw.r;
+		float histVis = rawVis;
+		float variance = 0.0;
+
+		if ( pc.firstFrame == 0u ) {
+			vec2 histUv = hybrid1_historyUV( pc.invViewProj, pc.prevViewProj, uv, depth, motionTex, pc.useMotion );
+			if ( histUv.x >= 0.0 && histUv.x <= 1.0 && histUv.y >= 0.0 && histUv.y <= 1.0 ) {
+				histVis = texture( historyTex, histUv ).r;
+				variance = texture( varianceHistTex, histUv ).r;
+				if ( pc.params.z > 0.5 ) {
+					float mn;
+					float mx;
+					float mean;
+					float varN;
+					hybrid1_varianceColorClamp1( rawTex, uv, texel, pc.params.x, mn, mx, mean, varN );
+					histVis = hybrid1_clampFloat( histVis, mn, mx );
+				}
+			}
+		}
+
+		float alpha = pc.params.y;
+		filtered.r = mix( histVis, rawVis, alpha );
+		filtered.g = raw.g;
+		filtered.b = 0.0;
+		variance = mix( variance, ( rawVis - filtered.r ) * ( rawVis - filtered.r ), 0.2 );
+		histWrite = vec3( filtered.r, raw.g, 0.0 );
+		varWrite = vec3( variance, 0.0, 0.0 );
+	} else {
+		vec3 rawRgb = raw.rgb;
+		vec3 histRgb = rawRgb;
+		vec3 variance = vec3( 0.0 );
+
+		if ( pc.firstFrame == 0u ) {
+			vec2 histUv = hybrid1_historyUV( pc.invViewProj, pc.prevViewProj, uv, depth, motionTex, pc.useMotion );
+			if ( histUv.x >= 0.0 && histUv.x <= 1.0 && histUv.y >= 0.0 && histUv.y <= 1.0 ) {
+				histRgb = texture( historyTex, histUv ).rgb;
+				variance = texture( varianceHistTex, histUv ).rgb;
+				if ( pc.params.z > 0.5 ) {
+					vec3 mn;
+					vec3 mx;
+					vec3 mean;
+					vec3 varN;
+					hybrid1_varianceColorClamp3( rawTex, uv, texel, pc.params.x, mn, mx, mean, varN );
+					histRgb = hybrid1_clampVec3( histRgb, mn, mx );
+				}
+			}
+		}
+
+		float alpha = pc.params.y;
+		filtered = mix( histRgb, rawRgb, alpha );
+		variance = mix( variance, ( rawRgb - filtered ) * ( rawRgb - filtered ), vec3( 0.2 ) );
+		histWrite = filtered;
+		varWrite = variance;
+	}
+
+	imageStore( filteredOut, ivec2( pix ), vec4( filtered, raw.a ) );
+	imageStore( historyOut, ivec2( pix ), vec4( histWrite, raw.a ) );
+	imageStore( varianceOut, ivec2( pix ), vec4( varWrite, 1.0 ) );
+}

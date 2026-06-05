@@ -72,7 +72,7 @@ Modern id Tech 3: **Vulkan renderer with PBR**, validation and smoke-tested buil
 * Multithreaded scheduler/task system
 * Entity-Component System (ECS, ENTT)
 * Replay frame index tied to server snapshots (`engine_replay`; Lua `Engine.Replay`)
-* Save slot metadata + `save/engine_slot_*.txt` persistence (Lua `Engine.Save`)
+* Save slot metadata + `save/engine_slot_*.json` persistence (Lua `Engine.Save`; legacy `.txt` still reads)
 * Dynamic dialogue and quest stage tracking (Lua `Engine.Dialogue`, `Engine.Quest`)
 * Procedural/random systems
 * Statistics / player telemetry counters (Lua `Engine.Telemetry`, cvar `engine_telemetry`; distinct from renderer GPU counters)

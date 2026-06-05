@@ -27,6 +27,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // A user mod should never modify this file
 
 #define Q3_VERSION            "id Tech 3"
+
+/* Layercake API semver for gameinfo.txt requires_engine (see API_STABILITY.md). */
+#define IDTECH3_ENGINE_API_MAJOR 1
+#define IDTECH3_ENGINE_API_MINOR 0
 #ifndef SVN_VERSION
   #define SVN_VERSION Q3_VERSION
 #endif

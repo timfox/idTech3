@@ -116,6 +116,8 @@ void ProcAnim_SetAnimationBlend(procAnimHandle_t handle, float blend);
 void ProcAnim_ForceState(procAnimHandle_t handle, procAnimState_t state);
 void ProcAnim_SetPainLevel(procAnimHandle_t handle, float pain);
 void ProcAnim_Kill(procAnimHandle_t handle);
+void ProcAnim_UpdateAll(float dt);
+int  ProcAnim_GetActiveCount(void);
 
 void ProcAnim_DefaultConfig(procAnimConfig_t *config);
 

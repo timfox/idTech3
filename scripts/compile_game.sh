@@ -61,7 +61,7 @@ if [[ "$_mod_lc" == "vulkan" || "$_mod_lc" == "vk" || "$_mod_lc" == "opengl" || 
 	echo "Error: \"$MOD_NAME\" is a renderer/backend, not a game mod under mods/<name>/gamesrc."
 	echo ""
 	echo "Build the engine (client + renderers):"
-	echo "  $SCRIPT_DIR/compile_engine.sh vulkan   # or: opengl"
+	echo "  $SCRIPT_DIR/compile_engine.sh vulkan"
 	echo ""
 	echo "Package the example demo mod (.pk3 only, no native game DLL):"
 	echo "  $PROJECT_ROOT/examples/demo_game/build_demo_pack.sh"

@@ -10,6 +10,10 @@ lines for Lua/script integration (client-side game systems).
 #include "g_engine_systems.h"
 #include <string.h>
 
+#define JSON_IMPLEMENTATION
+#include "../qcommon/json.h"
+#undef JSON_IMPLEMENTATION
+
 #define TELEMETRY_MAX 64
 #define SAVE_SLOTS 8
 #define QUEST_MAX 64
@@ -162,6 +166,40 @@ static unsigned EngineSave_ChecksumLabel( const char *label ) {
 	return Com_BlockChecksum( label, (int)strlen( label ) );
 }
 
+/*
+===============
+EngineSave_JsonEscapeLabel
+===============
+Returns escaped length on success, -1 if label is invalid or out does not fit.
+*/
+static int EngineSave_JsonEscapeLabel( const char *in, char *out, int outSize ) {
+	int o = 0;
+	unsigned char c;
+
+	if ( !in || !out || outSize < 2 ) {
+		return -1;
+	}
+	while ( ( c = (unsigned char)*in++ ) != 0 ) {
+		if ( c < 0x20u ) {
+			return -1;
+		}
+		if ( c == '"' || c == '\\' ) {
+			if ( o + 2 >= outSize ) {
+				return -1;
+			}
+			out[o++] = '\\';
+			out[o++] = (char)c;
+		} else {
+			if ( o + 1 >= outSize ) {
+				return -1;
+			}
+			out[o++] = (char)c;
+		}
+	}
+	out[o] = '\0';
+	return o;
+}
+
 int EngineSave_ProtocolVersion( void ) {
 	return ENGINE_SAVE_PROTOCOL_VERSION;
 }
@@ -180,12 +218,17 @@ void EngineSave_Shutdown( void ) {
 
 qboolean EngineSave_WriteSlot( int slot, const char *label ) {
 	char path[MAX_OSPATH];
-	char body[512];
+	char body[640];
+	char escaped[256];
 	fileHandle_t f;
 	unsigned checksum;
 	int bodyLen;
 
-	if ( slot < 0 || slot >= SAVE_SLOTS || !label ) {
+	if ( slot < 0 || slot >= SAVE_SLOTS || !label || !label[0] ) {
+		return qfalse;
+	}
+	if ( EngineSave_JsonEscapeLabel( label, escaped, sizeof( escaped ) ) < 0 ) {
+		Com_Printf( S_COLOR_YELLOW "EngineSave: rejected label (invalid JSON characters)\n" );
 		return qfalse;
 	}
 	Q_strncpyz( s_saves[slot].label, label, sizeof( s_saves[0].label ) );
@@ -195,7 +238,7 @@ qboolean EngineSave_WriteSlot( int slot, const char *label ) {
 	checksum = EngineSave_ChecksumLabel( label );
 	Com_sprintf( body, sizeof( body ),
 		"{\n  \"protocolVersion\": %d,\n  \"modVersion\": \"%s\",\n  \"label\": \"%s\",\n  \"checksum\": %u\n}\n",
-		ENGINE_SAVE_PROTOCOL_VERSION, ENGINE_SAVE_MOD_VERSION, label, checksum );
+		ENGINE_SAVE_PROTOCOL_VERSION, ENGINE_SAVE_MOD_VERSION, escaped, checksum );
 	bodyLen = (int)strlen( body );
 
 	Com_sprintf( path, sizeof( path ), "save/engine_slot_%d.json", slot );
@@ -209,8 +252,8 @@ qboolean EngineSave_WriteSlot( int slot, const char *label ) {
 }
 
 static qboolean EngineSave_ParseJsonSlot( const char *text, char *labelOut, int labelLen, int *protoOut ) {
-	const char *p;
-	char checksumStr[32];
+	const char *jsonEnd;
+	const char *valueJson;
 	unsigned storedCrc;
 	unsigned labelCrc;
 
@@ -222,46 +265,22 @@ static qboolean EngineSave_ParseJsonSlot( const char *text, char *labelOut, int 
 		*protoOut = 0;
 	}
 
-	p = strstr( text, "\"protocolVersion\"" );
-	if ( p ) {
-		p = strchr( p, ':' );
-		if ( p && protoOut ) {
-			*protoOut = atoi( p + 1 );
-		}
+	jsonEnd = text + strlen( text );
+	valueJson = JSON_ObjectGetNamedValue( text, jsonEnd, "protocolVersion" );
+	if ( valueJson && protoOut ) {
+		*protoOut = JSON_ValueGetInt( valueJson, jsonEnd );
 	}
 
-	p = strstr( text, "\"label\"" );
-	if ( !p ) {
+	valueJson = JSON_ObjectGetNamedValue( text, jsonEnd, "label" );
+	if ( !valueJson || JSON_ValueGetString( valueJson, jsonEnd, labelOut, (unsigned)labelLen ) == 0 ) {
 		return qfalse;
-	}
-	p = strchr( p, ':' );
-	if ( !p ) {
-		return qfalse;
-	}
-	p = strchr( p, '"' );
-	if ( !p ) {
-		return qfalse;
-	}
-	p++;
-	{
-		int i = 0;
-		while ( p[i] && p[i] != '"' && i < labelLen - 1 ) {
-			labelOut[i] = p[i];
-			i++;
-		}
-		labelOut[i] = '\0';
 	}
 
-	p = strstr( text, "\"checksum\"" );
-	if ( !p ) {
-		return labelOut[0] != '\0';
+	valueJson = JSON_ObjectGetNamedValue( text, jsonEnd, "checksum" );
+	if ( !valueJson ) {
+		return qtrue;
 	}
-	p = strchr( p, ':' );
-	if ( !p ) {
-		return qfalse;
-	}
-	Q_strncpyz( checksumStr, p + 1, sizeof( checksumStr ) );
-	storedCrc = (unsigned)strtoul( checksumStr, NULL, 10 );
+	storedCrc = (unsigned)JSON_ValueGetInt( valueJson, jsonEnd );
 	labelCrc = EngineSave_ChecksumLabel( labelOut );
 	if ( storedCrc != labelCrc ) {
 		Com_Printf( S_COLOR_YELLOW "EngineSave: checksum mismatch slot data\n" );

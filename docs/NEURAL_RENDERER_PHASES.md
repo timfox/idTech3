@@ -49,6 +49,7 @@ Static textures: **BC7/KTX2** via `tr_image_ktx2.c` (not neural).
 
 | Feature | Status | Cvars | Docs |
 |---------|--------|-------|------|
+| **SqueezeMe avatars** | Demo | `r_squeezeme` 1 | [SQUEEZEME.md](SQUEEZEME.md) (arXiv:2412.15171) |
 | **Mobile-GS splatting** | Demo | `r_mgs` 1–3 | [MOBILE_GAUSSIAN_SPLATTING.md](MOBILE_GAUSSIAN_SPLATTING.md) |
 | **Gaussian ray tracing (GRTX)** | Demo (RTX) | `r_grtx`, `r_grtxDemo` | [GAUSSIAN_RAY_TRACING_GRTX.md](GAUSSIAN_RAY_TRACING_GRTX.md) |
 | **WebSplatter** | Demo | `r_wsp` (overrides MGS) | [WEB_SPLATTER.md](WEB_SPLATTER.md) |

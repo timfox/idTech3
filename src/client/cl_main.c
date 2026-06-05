@@ -40,6 +40,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cl_usd.h"
 #include "cl_demo.h"
 #include "../qcommon/script_emit.h"
+#include "../qcommon/cm_stream.h"
+#ifdef USE_CURL
+#include "cl_curl.h"
+#endif
 #ifdef USE_LUA
 #include "../qcommon/lua_debug.h"
 #include "g_lua_bindings.h"
@@ -3995,11 +3999,11 @@ static void CL_InitGLimp_Cvars( void )
 {
 	// shared with GLimp
 	r_allowSoftwareGL = Cvar_Get( "r_allowSoftwareGL", "0", CVAR_LATCH );
-	Cvar_SetDescription( r_allowSoftwareGL, "Toggle the use of the default software OpenGL driver supplied by the Operating System." );
+	Cvar_SetDescription( r_allowSoftwareGL, "Legacy cvar (ignored). OpenGL renderer removed; Vulkan only." );
 	r_swapInterval = Cvar_Get( "r_swapInterval", "0", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( r_swapInterval, "V-blanks to wait before swapping buffers.\n 0: No V-Sync\n 1: Synced to the monitor's refresh rate." );
 	r_glDriver = Cvar_Get( "r_glDriver", OPENGL_DRIVER_NAME, CVAR_ARCHIVE_ND | CVAR_LATCH );
-	Cvar_SetDescription( r_glDriver, "Specifies the OpenGL driver to use, will revert back to default if driver name set is invalid." );
+	Cvar_SetDescription( r_glDriver, "Legacy cvar (ignored). OpenGL renderer removed; Vulkan only." );
 
 	r_displayRefresh = Cvar_Get( "r_displayRefresh", "0", CVAR_LATCH );
 	Cvar_CheckRange( r_displayRefresh, "0", "500", CV_INTEGER );
@@ -4081,6 +4085,42 @@ static void CL_InitGLimp_Cvars( void )
 CL_Init
 ====================
 */
+#if !defined( DEDICATED ) && defined( USE_CURL )
+/*
+===============
+CL_CMStream_PrefetchHandler
+
+Sector pk3 HTTP prefetch when cm_stream requests adjacent cells (sv_sectorURL).
+===============
+*/
+void CL_CMStream_PrefetchHandler( const char *localName, const char *remoteURL )
+{
+	cvar_t *allow;
+
+	if ( !localName || !localName[0] || !remoteURL || !remoteURL[0] ) {
+		return;
+	}
+	if ( FS_FileExists( localName ) ) {
+		return;
+	}
+	allow = Cvar_Get( "cl_allowDownload", "1", CVAR_ARCHIVE );
+	if ( !allow || !( allow->integer & DLF_ENABLE ) || ( allow->integer & DLF_NO_REDIRECT ) ) {
+		Com_Printf( "[cm_stream] skip HTTP prefetch %s (cl_allowDownload)\n", localName );
+		return;
+	}
+	if ( !clc.cURLEnabled ) {
+		Com_Printf( "[cm_stream] skip HTTP prefetch %s (libcurl unavailable)\n", localName );
+		return;
+	}
+	if ( clc.downloadCURL ) {
+		Com_DPrintf( "[cm_stream] defer prefetch %s (download in progress)\n", localName );
+		return;
+	}
+	Com_Printf( "[cm_stream] HTTP prefetch %s\n", remoteURL );
+	CL_cURL_BeginDownload( localName, remoteURL );
+}
+#endif
+
 void CL_Init( void ) {
 	const char *s;
 	cvar_t *cv;
@@ -4394,6 +4434,9 @@ void CL_Init( void ) {
 #endif
 
 	Cvar_Set( "cl_running", "1" );
+#if !defined( DEDICATED ) && defined( USE_CURL )
+	CM_Stream_SetPrefetchHandler( CL_CMStream_PrefetchHandler );
+#endif
 #ifdef USE_MD5
 	CL_GenerateQKey();
 #endif

@@ -12,7 +12,7 @@ Living checklist for the **single-player conversion** track (Unwaking / full con
 | Editor contract | Done | [RADIANT.md](RADIANT.md#editor-contract-checklist) |
 | pk3.sig doc | Done | SHA-256 sidecar — [MOD_SDK.md](MOD_SDK.md#security--shipping) |
 | Hero TAA + decals | Done | `r_temporalCustomShaderMotion 1`; decal stable frames in `tr_decal_props.c` |
-| GPU golden Tier B | Doc | [tests/data/golden/placeholder/README.txt](../tests/data/golden/placeholder/README.txt) |
+| GPU golden Tier B | Capture cfg | `gpu_golden_capture.cfg` in demo pk3; [GPU_GOLDEN_TIER_B.md](GPU_GOLDEN_TIER_B.md) |
 
 ### Full SP map layout
 
@@ -65,7 +65,7 @@ See [PLATFORM_GATED.md](PLATFORM_GATED.md). No work until product SKU requires s
 
 ```bash
 ./scripts/compile_engine.sh vulkan demo
-cd build-vk-Release && ctest -R 'smoke|renderer_regression|gpu_golden|test_demo_game_pk3|test_validate_assets|test_check_loc|test_crash_report'
+cd build-vk-Release && ctest -R 'smoke|renderer_regression|gpu_golden|test_demo_game_pk3|test_validate_assets|test_check_loc|test_crash_report|test_engine_save'
 ./scripts/renderer_regression_check.sh
 ```
 
@@ -76,3 +76,25 @@ cd build-vk-Release && ctest -R 'smoke|renderer_regression|gpu_golden|test_demo_
 - [MINIMAL_GAME_SHELL.md](MINIMAL_GAME_SHELL.md) — bootstrap pk3
 - [ANIMGRAPH.md](ANIMGRAPH.md) — graph JSON
 - [AUDIO_WWISE_PARITY.md](AUDIO_WWISE_PARITY.md) — mixer buses
+
+---
+
+## Appendix — Platform backlog (gated)
+
+Tracked here for visibility; implementation waits on [PLATFORM_GATED.md](PLATFORM_GATED.md).
+
+### Mod platform P0
+
+| Item | Notes |
+|------|--------|
+| `requires_engine` in `gameinfo.txt` | Warn if `com_engine_api` &lt; required (see `FS_ParseRequiresEngine`) |
+| `pk3.sig` SHA-256 | [MOD_SDK.md](MOD_SDK.md#security--shipping) |
+| Engine.Save JSON v1 | `save/engine_slot_*.json`; `test_engine_save.sh` |
+| Sector prefetch | `cm_stream` + `sv_sectorURL` + client CURL handler |
+
+### Live MP P0 (deferred)
+
+| Item | Notes |
+|------|--------|
+| `sv_auth.c` | Documented stub until live SKU |
+| Signed pure + interest cull | `sv_pureSigned`, `sv_interestMaxDist` already exist |

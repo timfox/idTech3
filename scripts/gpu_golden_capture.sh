@@ -67,9 +67,15 @@ if [[ "$CAPTURE" -eq 1 ]]; then
 	elif [[ -z "${DISPLAY:-}" ]]; then
 		echo "WARN: capture skipped — no DISPLAY"
 	else
-		echo "Capture: screenshot after gpu_golden_capture.cfg (manual Tier B)"
-		# Non-blocking: user extends with real map + rtest scene
-		"$ENGINE" +set cl_renderer vulkan +exec gpu_golden_capture.cfg +quit 2>/dev/null || true
+		echo "Capture: gpu_golden_capture.cfg (Tier B — needs fs_game with cfg in pk3 or base/)"
+		GAME_ARGS=( +set cl_renderer vulkan )
+		if [[ -d "${ROOT}/release/demo_game" ]] || [[ -f "${ROOT}/release/idtech3_demo.pk3" ]]; then
+			GAME_ARGS+=( +set fs_game idtech3_demo )
+		fi
+		if [[ -n "${GAME_BASE:-}" ]]; then
+			GAME_ARGS+=( +set fs_basepath "${GAME_BASE}" )
+		fi
+		"$ENGINE" "${GAME_ARGS[@]}" +exec gpu_golden_capture.cfg 2>/dev/null || true
 	fi
 fi
 

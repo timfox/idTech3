@@ -103,7 +103,11 @@ Grouped lists: renderer [RENDERERS.md](RENDERERS.md), Lua [LUA_API.md](LUA_API.m
 | `Engine.Decals` | `spawnLocal`, `spawnServer` |
 | `Engine.Character` | `create`, `move`, `destroy` |
 | `Engine.AnimGraph` | `load`, `setState`, `update` |
-| `Engine.Telemetry` | `record`, `get` |
+| `Engine.Telemetry` | `record`, `get`, `clear` |
+| `Engine.Replay` | `frame`, `baseTime` |
+| `Engine.Save` | `write`, `read`, `lastSlot` |
+| `Engine.Quest` | `add`, `setStage`, `getStage`, `count` |
+| `Engine.Dialogue` | `start`, `clear`, `count` |
 | `Engine.VDB` | volumetric grids |
 
 Reload: `script_reload` (requires `USE_LUA=ON`).

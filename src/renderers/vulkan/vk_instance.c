@@ -281,9 +281,11 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		qboolean shaderSubgroupUniformCF = qfalse;
 		qboolean extendedDynamicState3 = qfalse;
 		qboolean nvMeshShader = qfalse;
-#ifdef USE_VUDA
+#if defined( USE_VUDA ) || defined( USE_MIMIR_CUDA )
 		qboolean vudaExtMemory = qfalse;
 		qboolean vudaExtMemoryFd = qfalse;
+#endif
+#ifdef USE_VUDA
 		qboolean vudaExtSem = qfalse;
 		qboolean vudaExtSemFd = qfalse;
 		qboolean vudaTimelineSem = qfalse;
@@ -383,12 +385,15 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			} else if ( strcmp( ext, VK_NV_MESH_SHADER_EXTENSION_NAME ) == 0 ) {
 				nvMeshShader = qtrue;
 			}
-#ifdef USE_VUDA
+#if defined( USE_VUDA ) || defined( USE_MIMIR_CUDA )
 			else if ( strcmp( ext, VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME ) == 0 ) {
 				vudaExtMemory = qtrue;
 			} else if ( strcmp( ext, VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME ) == 0 ) {
 				vudaExtMemoryFd = qtrue;
-			} else if ( strcmp( ext, VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME ) == 0 ) {
+			}
+#endif
+#ifdef USE_VUDA
+			else if ( strcmp( ext, VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME ) == 0 ) {
 				vudaExtSem = qtrue;
 			} else if ( strcmp( ext, VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME ) == 0 ) {
 				vudaExtSemFd = qtrue;
@@ -553,6 +558,23 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			ri.Printf( PRINT_ALL, "[VUDA] KHR external memory/semaphore fd + timeline: enabled\n" );
 		}
 #endif
+#ifdef USE_MIMIR_CUDA
+		vk.mimirInteropCapable = qfalse;
+		if ( vudaExtMemory && vudaExtMemoryFd ) {
+			qboolean mimir_need_ext = qtrue;
+#ifdef USE_VUDA
+			if ( vk.vudaInteropCapable ) {
+				mimir_need_ext = qfalse;
+			}
+#endif
+			if ( mimir_need_ext && device_extension_count + 2 <= ARRAY_LEN( device_extension_list ) ) {
+				device_extension_list[ device_extension_count++ ] = VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME;
+				device_extension_list[ device_extension_count++ ] = VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME;
+			}
+			vk.mimirInteropCapable = qtrue;
+			ri.Printf( PRINT_ALL, "[Mímir] KHR external memory fd: enabled (CUDA/Vulkan interop)\n" );
+		}
+#endif
 		(void)globalPriority; (void)shaderFloatControls2; (void)shaderMaximalReconvergence;
 		(void)shaderRelaxedExtInstr; (void)shaderSubgroupUniformCF; (void)legacyDithering;
 		(void)surfaceMaintenance1;
@@ -560,7 +582,10 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		vk.rtxAvailable = qfalse;
 		if ( rtxAccelStruct && rtxPipeline && rtxDeferredHostOps && rtxBufferDeviceAddress && memoryRequirements2 ) {
 			cvar_t *r_rtx_cvar = ri.Cvar_Get( "r_rtx", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
-			if ( r_rtx_cvar && r_rtx_cvar->integer > 0 ) {
+			cvar_t *r_hybrid1_cvar = ri.Cvar_Get( "r_hybrid1", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+			cvar_t *r_raygun_cvar = ri.Cvar_Get( "r_raygun", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+			if ( ( r_rtx_cvar && r_rtx_cvar->integer > 0 ) || ( r_hybrid1_cvar && r_hybrid1_cvar->integer > 0 )
+				|| ( r_raygun_cvar && r_raygun_cvar->integer > 0 ) ) {
 				if ( qvkGetPhysicalDeviceFeatures2 == NULL ) {
 					ri.Printf( PRINT_WARNING, "[VK] Ray tracing: vkGetPhysicalDeviceFeatures2 unavailable; cannot verify RT features\n" );
 				} else if ( device_extension_count + 4 > ARRAY_LEN( device_extension_list ) ) {
@@ -605,7 +630,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 					}
 				}
 			} else {
-				ri.Printf( PRINT_DEVELOPER, "[VK] Ray tracing: GPU supports KHR RT extensions; set r_rtx 1+ and vid_restart to enable (USE_VULKAN_RTX build)\n" );
+				ri.Printf( PRINT_DEVELOPER, "[VK] Ray tracing: GPU supports KHR RT extensions; set r_rtx 1 or r_hybrid1 1 and vid_restart to enable (USE_VULKAN_RTX build)\n" );
 			}
 		}
 #endif
@@ -810,6 +835,16 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 				vk.vudaInteropCapable = qfalse;
 			} else {
 				R_VUDA_TryBuildInterop();
+			}
+		}
+#endif
+#ifdef USE_MIMIR_CUDA
+		if ( vk.mimirInteropCapable && !qvkGetMemoryFdKHR ) {
+			INIT_DEVICE_FUNCTION_EXT( vkGetMemoryFdKHR );
+			INIT_DEVICE_FUNCTION_EXT( vkGetMemoryFdPropertiesKHR );
+			if ( !qvkGetMemoryFdKHR ) {
+				ri.Printf( PRINT_WARNING, "[Mímir] Failed to resolve GetMemoryFdKHR; CUDA interop disabled\n" );
+				vk.mimirInteropCapable = qfalse;
 			}
 		}
 #endif
@@ -1073,6 +1108,12 @@ void vk_init_vulkan_library( void )
 		INIT_DEVICE_FUNCTION_EXT( vkGetSemaphoreFdKHR );
 		INIT_DEVICE_FUNCTION_EXT( vkWaitSemaphoresKHR );
 		INIT_DEVICE_FUNCTION_EXT( vkSignalSemaphoreKHR );
+	}
+#endif
+#ifdef USE_MIMIR_CUDA
+	if ( vk.mimirInteropCapable && !qvkGetMemoryFdKHR ) {
+		INIT_DEVICE_FUNCTION_EXT( vkGetMemoryFdKHR );
+		INIT_DEVICE_FUNCTION_EXT( vkGetMemoryFdPropertiesKHR );
 	}
 #endif
 }

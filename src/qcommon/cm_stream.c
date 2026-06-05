@@ -13,6 +13,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #define CM_STREAM_SECTORS (CM_STREAM_GRID * CM_STREAM_GRID)
 
 static qboolean s_sectorLoaded[CM_STREAM_SECTORS];
+static cm_stream_prefetch_f s_prefetchHandler;
 static cvar_t *cm_stream;
 static cvar_t *sv_sectorURL;
 static cvar_t *cl_sectorPrefetch;
@@ -28,9 +29,14 @@ void CM_Stream_Init( void ) {
 	Cvar_SetDescription( cl_sectorPrefetch,
 		"Prefetch adjacent sector pk3 URLs when crossing boundaries (requires sv_sectorURL)." );
 	Com_Memset( s_sectorLoaded, 0, sizeof( s_sectorLoaded ) );
+	s_prefetchHandler = NULL;
 	if ( cm_stream->integer ) {
 		Com_Printf( "[cm_stream] cm_stream=1 (sector BSP streaming v1)\n" );
 	}
+}
+
+void CM_Stream_SetPrefetchHandler( cm_stream_prefetch_f handler ) {
+	s_prefetchHandler = handler;
 }
 
 static int CM_Stream_Index( int cellX, int cellY ) {
@@ -110,5 +116,12 @@ void CM_Stream_PrefetchSectorPk3( int cellX, int cellY ) {
 	}
 	Com_sprintf( localName, sizeof( localName ), "sector_%d_%d.pk3", cellX, cellY );
 	Com_sprintf( url, sizeof( url ), "%s/%s", sv_sectorURL->string, localName );
-	Com_Printf( "[cm_stream] prefetch queued: %s (wire cl_download + CURL for autodownload)\n", url );
+	if ( FS_FileExists( localName ) ) {
+		return;
+	}
+	if ( s_prefetchHandler ) {
+		s_prefetchHandler( localName, url );
+	} else {
+		Com_Printf( "[cm_stream] prefetch: %s (no client handler; set sv_sectorURL + client CURL)\n", url );
+	}
 }

@@ -20,7 +20,7 @@ After the filesystem starts (`FS_Restart` in `src/qcommon/files.c`), two gates m
 
 Optional but useful:
 
-- **`gameinfo.txt`** — if present, parsed for window title / bumper text (`FS_ParseGameInfo`). Not required to boot.
+- **`gameinfo.txt`** — if present, parsed for window title / bumper text (`FS_ParseGameInfo`). Optional `requires_engine >= M.N` is checked against `com_engine_api` (warning only). Not required to boot.
 - **`fs_basegame`** — stock idTech3 expects data under **`base/`** (`BASEGAME` is `"base"` in `q_shared.h`). Many Quake III installs use **`baseq3/`**; users can point the engine at that name with **`+set fs_basegame baseq3`** (see [QUICKSTART.md](QUICKSTART.md)).
 
 ---

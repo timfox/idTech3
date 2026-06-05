@@ -1,0 +1,26 @@
+#version 450
+/*
+ * Dressi-AD inverse UV: map screen positions to texture texels for hardware sampler backward (Algorithm 1).
+ */
+layout( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
+
+layout( set = 0, binding = 0 ) uniform sampler2D uvScreenTex;
+layout( rgba16f, set = 0, binding = 1 ) uniform writeonly image2D invUvOut;
+
+layout( push_constant ) uniform DressiInvUvPush {
+	vec4 screenSize; /* xy */
+	vec4 texSize;    /* xy */
+} pc;
+
+void main()
+{
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if ( pix.x >= uint( pc.screenSize.x ) || pix.y >= uint( pc.screenSize.y ) ) {
+		return;
+	}
+	vec2 uv = ( vec2( pix ) + 0.5 ) / pc.screenSize.xy;
+	vec2 texUv = texture( uvScreenTex, uv ).xy;
+	ivec2 texPix = ivec2( texUv * pc.texSize.xy );
+	texPix = clamp( texPix, ivec2( 0 ), ivec2( pc.texSize.xy - 1.0 ) );
+	imageStore( invUvOut, texPix, vec4( uv, 0.0, 1.0 ) );
+}

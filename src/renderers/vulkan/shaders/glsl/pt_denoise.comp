@@ -1,0 +1,52 @@
+#version 450
+/* Spatial depth-guided denoise on path-trace output (cost measurement; not OIDN). */
+layout( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
+
+layout( set = 0, binding = 0 ) uniform sampler2D depthTex;
+layout( rgba16f, set = 0, binding = 1 ) uniform image2D traceImg;
+
+layout( push_constant ) uniform PtDenoisePush {
+	vec4 extent;
+	float strength;
+	float depthTol;
+} pc;
+
+void main()
+{
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if ( pix.x >= uint( pc.extent.x ) || pix.y >= uint( pc.extent.y ) ) {
+		return;
+	}
+
+	vec2 uv = ( vec2( pix ) + 0.5 ) / pc.extent.xy;
+	float depth = texture( depthTex, uv ).r;
+	if ( depth <= 0.0 || depth >= 1.0 ) {
+		return;
+	}
+
+	vec4 center = imageLoad( traceImg, ivec2( pix ) );
+	vec2 texel = 1.0 / pc.extent.xy;
+	float blurW = pc.strength;
+	vec3 accum = center.rgb;
+	float wSum = 1.0;
+	int ox;
+	int oy;
+
+	for ( oy = -1; oy <= 1; oy++ ) {
+		for ( ox = -1; ox <= 1; ox++ ) {
+			if ( ox == 0 && oy == 0 ) {
+				continue;
+			}
+			vec2 offUv = uv + vec2( float( ox ), float( oy ) ) * texel;
+			float dN = texture( depthTex, offUv ).r;
+			if ( abs( dN - depth ) > pc.depthTol ) {
+				continue;
+			}
+			vec4 s = imageLoad( traceImg, ivec2( pix ) + ivec2( ox, oy ) );
+			accum += s.rgb * blurW;
+			wSum += blurW;
+		}
+	}
+
+	imageStore( traceImg, ivec2( pix ), vec4( accum / wSum, center.a ) );
+}

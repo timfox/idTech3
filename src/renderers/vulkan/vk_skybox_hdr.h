@@ -90,6 +90,7 @@ void SkyboxHDR_GeneratePrefiltered(void);
 const skyboxHDR_t *SkyboxHDR_Get(void);
 qboolean           SkyboxHDR_IsLoaded(void);
 void               SkyboxHDR_UpdateRuntime(void);
+qboolean           SkyboxHDR_GetCubemapViews(VkImageView *prefilterOut, VkImageView *irradianceOut);
 VkDescriptorSet    SkyboxHDR_GetPrefilteredDescriptor(void);
 VkDescriptorSet    SkyboxHDR_GetIrradianceDescriptor(void);
 qboolean           SkyboxHDR_CopySHCoeffs(vec4_t out[9]);

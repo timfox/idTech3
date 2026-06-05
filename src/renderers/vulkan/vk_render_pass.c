@@ -7,6 +7,10 @@
 #include "vk_fsa.h"
 #include "vk_grtx.h"
 #include "vk_pathtrace.h"
+#include "vk_hybrid1.h"
+#include "vk_raygun.h"
+#include "vk_dressi.h"
+#include "vk_iris.h"
 
 void vk_set_fullscreen_viewport_scissor( uint32_t width, uint32_t height )
 {
@@ -124,7 +128,13 @@ void vk_end_render_pass_tracked( void )
 	vk.inRenderPass = qfalse;
 
 #ifdef USE_VULKAN_RTX
-	if ( vk.rtxAvailable && vk.fboActive && r_rtx && r_rtx->integer > 0 &&
+	if ( vk_hybrid1_active() &&
+		( vk.renderPassIndex == RENDER_PASS_MAIN || vk.renderPassIndex == RENDER_PASS_POST_BLOOM ) ) {
+		vk_hybrid1_record_pass( vk.cmd->command_buffer );
+	} else if ( vk_raygun_active() &&
+		( vk.renderPassIndex == RENDER_PASS_MAIN || vk.renderPassIndex == RENDER_PASS_POST_BLOOM ) ) {
+		vk_raygun_record_pass( vk.cmd->command_buffer );
+	} else if ( vk.rtxAvailable && vk.fboActive && r_rtx && r_rtx->integer > 0 &&
 		r_rtxDemo && r_rtxDemo->integer &&
 		( vk.renderPassIndex == RENDER_PASS_MAIN || vk.renderPassIndex == RENDER_PASS_POST_BLOOM ) ) {
 		vk_rtx_record_demo_pass( vk.cmd->command_buffer );
@@ -139,6 +149,14 @@ void vk_end_render_pass_tracked( void )
 		vk_pathtrace_record_pass( vk.cmd->command_buffer );
 	}
 #endif
+	if ( vk_dressi_active() &&
+		( vk.renderPassIndex == RENDER_PASS_MAIN || vk.renderPassIndex == RENDER_PASS_POST_BLOOM ) ) {
+		vk_dressi_record_pass( vk.cmd->command_buffer );
+	}
+	if ( vk_iris_overlay_active() &&
+		( vk.renderPassIndex == RENDER_PASS_MAIN || vk.renderPassIndex == RENDER_PASS_POST_BLOOM ) ) {
+		vk_iris_record_overlay( vk.cmd->command_buffer );
+	}
 }
 void vk_create_render_passes( void )
 {

@@ -23,6 +23,9 @@ Split from vk.c.
 #include "vk_rtx.h"
 #include "vk_grtx.h"
 #include "vk_pathtrace.h"
+#include "vk_hybrid1.h"
+#include "vk_raygun.h"
+#include "vk_dressi.h"
 #include "vk_vdb.h"
 #include "vk_pipeline_cache_disk.h"
 #include "vk_fp64_points.h"
@@ -48,6 +51,9 @@ void vk_shutdown( refShutdownCode_t code )
 	vk_rtx_shutdown();
 	vk_grtx_shutdown();
 	vk_pathtrace_shutdown();
+	vk_hybrid1_shutdown();
+	vk_raygun_shutdown();
+	R_Dressi_Shutdown();
 	/* Always run full destroy sequence for VUID-05137 compliance.
 	 * When device_lost, destroy calls may return VK_ERROR_DEVICE_LOST but we still attempt them. */
 	vk_destroy_framebuffers();
@@ -426,6 +432,20 @@ for (i = 0; i < 2; i++) {
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.mgs_prepare_cs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.mgs_splat_cs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.mgs_composite_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.vksplat_project_fwd_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.vksplat_tile_cull_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.vksplat_raster_fwd_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.vksplat_adam_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.curast_clear_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.curast_stage1_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.curast_resolve_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.mimir_clear_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.mimir_brownian_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.mimir_splat_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.iris_clear_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.iris_spd_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.iris_compose_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.iris_overlay_cs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.wsp_clear_tiles_cs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.wsp_prepare_cs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.wsp_tile_bin_cs );

@@ -48,6 +48,8 @@ Extracted from vk.c for incremental modularization.
 #include "vk_rtx.h"
 #include "vk_grtx.h"
 #include "vk_pathtrace.h"
+#include "vk_hybrid1.h"
+#include "vk_raygun.h"
 #include "vk_pipeline_cache_disk.h"
 #include "vk_pipeline_helpers.h"
 #include "vk_raster_samples.h"
@@ -1230,6 +1232,8 @@ void vk_initialize( void )
 	vk_rtx_init();
 	vk_grtx_init();
 	vk_pathtrace_init();
+	vk_hybrid1_init();
+	vk_raygun_init();
 
 #ifdef VK_CUBEMAP
 	vk_create_cubemap_prefilter();

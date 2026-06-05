@@ -1039,6 +1039,63 @@ typedef struct {
 	} mgs;
 	qboolean mgsAllocated;
 
+	/* VkSplat (r_vksplat); see vk_vksplat.c — 3DGS training in Vulkan compute */
+	struct {
+		VkBuffer gaussian_buffer;
+		VkDeviceMemory gaussian_memory;
+		VkBuffer projected_buffer;
+		VkDeviceMemory projected_memory;
+		VkBuffer sortkey_buffer;
+		VkDeviceMemory sortkey_memory;
+		VkImage render_image;
+		VkImageView render_view;
+		VkDeviceMemory render_memory;
+	} vksplat;
+	qboolean vksplatAllocated;
+
+	/* CuRast (r_curast); see vk_curast.c — software rasterization scaffold */
+	struct {
+		VkBuffer tri_buffer;
+		VkDeviceMemory tri_memory;
+		VkImage vis_image;
+		VkImageView vis_view;
+		VkDeviceMemory vis_memory;
+		VkImage color_image;
+		VkImageView color_view;
+		VkDeviceMemory color_memory;
+	} curast;
+	qboolean curastAllocated;
+
+	/* Mímir (r_mimir); see vk_mimir.c — CUDA/Vulkan interop point cloud (arXiv:2504.20937) */
+	struct {
+		VkBuffer pos_buffer;
+		VkDeviceMemory pos_memory;
+		VkBuffer rng_buffer;
+		VkDeviceMemory rng_memory;
+		VkImage color_image;
+		VkImageView color_view;
+		VkDeviceMemory color_memory;
+	} mimir;
+	qboolean mimirAllocated;
+	qboolean mimirInteropCapable;
+
+	/* Iris (r_iris); see vk_iris.c — digital pathology WSI tiles (J Pathol Inform 2025) */
+	struct {
+		VkImage tile_atlas;
+		VkImageView tile_atlas_view;
+		VkDeviceMemory tile_atlas_memory;
+		VkImage tile_mip;
+		VkImageView tile_mip_view;
+		VkDeviceMemory tile_mip_memory;
+		VkImage tile_state;
+		VkImageView tile_state_view;
+		VkDeviceMemory tile_state_memory;
+		VkImage scope_image;
+		VkImageView scope_view;
+		VkDeviceMemory scope_memory;
+	} iris;
+	qboolean irisAllocated;
+
 	/* WebSplatter (r_wsp); see vk_wsp.c — WebGPU-portable tile splat path */
 	struct {
 		VkDescriptorSetLayout clear_layout;
@@ -1433,11 +1490,31 @@ typedef struct {
 		VkShaderModule mgs_prepare_cs;
 		VkShaderModule mgs_splat_cs;
 		VkShaderModule mgs_composite_cs;
+		VkShaderModule vksplat_project_fwd_cs;
+		VkShaderModule vksplat_tile_cull_cs;
+		VkShaderModule vksplat_raster_fwd_cs;
+		VkShaderModule vksplat_adam_cs;
+		VkShaderModule curast_clear_cs;
+		VkShaderModule curast_stage1_cs;
+		VkShaderModule curast_resolve_cs;
+		VkShaderModule mimir_clear_cs;
+		VkShaderModule mimir_brownian_cs;
+		VkShaderModule mimir_splat_cs;
+		VkShaderModule iris_clear_cs;
+		VkShaderModule iris_spd_cs;
+		VkShaderModule iris_compose_cs;
+		VkShaderModule iris_overlay_cs;
 		VkShaderModule wsp_clear_tiles_cs;
 		VkShaderModule wsp_prepare_cs;
 		VkShaderModule wsp_tile_bin_cs;
 		VkShaderModule wsp_tile_draw_cs;
 		VkShaderModule wsp_composite_cs;
+
+		VkShaderModule dressi_soft_vs;
+		VkShaderModule dressi_soft_fs;
+		VkShaderModule dressi_blend_cs;
+		VkShaderModule dressi_composite_cs;
+		VkShaderModule dressi_inverse_uv_cs;
 
 		VkShaderModule cbt_terrain_cs;
 		VkShaderModule terrain_vs;

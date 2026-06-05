@@ -1,0 +1,67 @@
+#version 450
+/* Iris — composite LR/HR tiles; LR pass uses SPD tileMip (optional bilinear upsample). */
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(rgba8, set = 0, binding = 0) uniform readonly image2D tileAtlas;
+layout(r32ui, set = 0, binding = 1) uniform readonly uimage2D tileState;
+layout(rgba8, set = 0, binding = 2) uniform image2D scopeOut;
+layout(rgba8, set = 0, binding = 3) uniform readonly image2D tileMip;
+
+layout(push_constant) uniform ComposePush {
+	ivec4 viewport;
+	ivec2 panTiles;
+	int atlasTilesX;
+	int atlasTilesY;
+	int layerHr;
+	int mipBilinear;
+} pc;
+
+vec4 irisSampleMipNearest(ivec2 atlasCoord) {
+	return imageLoad(tileMip, atlasCoord / 2);
+}
+
+vec4 irisSampleMipBilinear(ivec2 atlasCoord) {
+	ivec2 mipSize = imageSize(tileMip);
+	vec2 mc = (vec2(atlasCoord) + vec2(0.5)) * 0.5 - vec2(0.5);
+	ivec2 p0 = ivec2(floor(mc));
+	vec2 f = mc - vec2(p0);
+	p0 = clamp(p0, ivec2(0), mipSize - ivec2(2));
+	vec4 s00 = imageLoad(tileMip, p0);
+	vec4 s10 = imageLoad(tileMip, p0 + ivec2(1, 0));
+	vec4 s01 = imageLoad(tileMip, p0 + ivec2(0, 1));
+	vec4 s11 = imageLoad(tileMip, p0 + ivec2(1, 1));
+	return mix(mix(s00, s10, f.x), mix(s01, s11, f.x), f.y);
+}
+
+void main() {
+	ivec2 pix = ivec2(gl_GlobalInvocationID.xy);
+	if (pix.x >= pc.viewport.x || pix.y >= pc.viewport.y) {
+		return;
+	}
+	ivec2 tileIdx = pix / 256 + pc.panTiles;
+	if (tileIdx.x < 0 || tileIdx.y < 0 ||
+		tileIdx.x >= pc.atlasTilesX || tileIdx.y >= pc.atlasTilesY) {
+		return;
+	}
+	uint state = imageLoad(tileState, tileIdx).x;
+	if (state == 0u) {
+		return;
+	}
+	ivec2 atlasCoord = tileIdx * 256 + (pix % 256);
+	vec4 tex;
+	if (pc.layerHr == 0 && state >= 2u) {
+		tex = (pc.mipBilinear != 0)
+			? irisSampleMipBilinear(atlasCoord)
+			: irisSampleMipNearest(atlasCoord);
+	} else {
+		tex = imageLoad(tileAtlas, atlasCoord);
+	}
+	if (pc.layerHr != 0 && state < 2u) {
+		return;
+	}
+	if (pc.layerHr != 0) {
+		vec4 under = imageLoad(scopeOut, pix);
+		tex = mix(under, tex, vec4(tex.a > 0.01 ? 1.0 : 0.0));
+	}
+	imageStore(scopeOut, pix, tex);
+}

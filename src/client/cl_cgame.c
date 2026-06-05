@@ -1094,6 +1094,7 @@ void CL_CGameRendering( stereoFrame_t stereo ) {
 #ifdef DEBUG
 	VM_Debug( 0 );
 #endif
+	CL_PhysDebugDrawSubmit();
 }
 
 

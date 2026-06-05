@@ -28,7 +28,7 @@ vid_restart
 | `r_pathtrace_arch` | `megakernel` | `megakernel` or `wavefront` (latched) |
 | `r_pathtrace_bounces` | `4` | 1–8 path depth |
 | `r_pathtrace_samples` | `1` | 1–64 (megakernel averages; wavefront primary path) |
-| `r_pathtrace_denoise` | `0` | Stub — logs when on; no OIDN/ReSTIR yet |
+| `r_pathtrace_denoise` | `0` | Depth-guided 3×3 blur on trace buffer (`pt_denoise.comp`); not OIDN/ReSTIR |
 | `r_pathtrace_debug` | `0` | `1`=bounce heatmap, `2`=wave alive count (developer) |
 | `r_pathtrace_composite` | `1` | Blit trace target to HDR color |
 
@@ -39,7 +39,9 @@ Startup logs: `[VK][PathTrace] Ready arch=...` when init succeeds.
 - **Megakernel:** one `vkCmdTraceRaysKHR` per frame; bounce loop in `pt_mega.rgen`.
 - **Wavefront:** seed + one trace dispatch per bounce (`pt_wave.rgen`); optional `pt_wave_compact.comp` alive count when `r_pathtrace_debug 2`.
 - **Hit:** Lambert-style albedo stub in `pt_hit.rchit` (fair baseline, not production PBR).
-- **Host:** `vk_pathtrace.c` — composite blit like `r_rtxDemo`.
+- **Denoise:** `pt_denoise.comp` when `r_pathtrace_denoise 1` (depth-guided 3×3 on trace target).
+- **Composite:** `pt_composite.comp` when `r_pathtrace_composite` &lt; 1; full blit when `1`.
+- **Host:** `vk_pathtrace.c` — shares RTX TLAS with `r_rtxDemo`.
 
 ## Fixed capture recipe (manual)
 
@@ -62,7 +64,7 @@ Capture one frame per arch with **GPU Trace** or **Range Profiler**:
 | Bounce heatmap (`r_pathtrace_debug 1`) | optional | — | |
 | Alive rays (`r_pathtrace_debug 2`) | — | per-bounce log | |
 
-**Denoiser cost:** toggle `r_pathtrace_denoise 1` (stub only today) and compare frame time when a real denoise pass is added.
+**Denoiser cost:** compare frame time with `r_pathtrace_denoise 0` vs `1` (spatial pass wired).
 
 ## CI
 

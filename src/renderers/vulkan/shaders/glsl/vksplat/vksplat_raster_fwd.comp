@@ -1,0 +1,55 @@
+#version 450
+/* VkSplat: tile-based forward raster (16x16 tiles). */
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+struct ProjectedGaussian {
+	vec4 centerDepth;
+	vec4 conicOpacity;
+	vec2 axisRadii;
+	uint tileCount;
+	uint sortBase;
+};
+
+layout(std430, set = 0, binding = 0) readonly buffer ProjectedBuffer {
+	ProjectedGaussian p[];
+} projected;
+
+layout(rgba16f, set = 0, binding = 1) uniform writeonly image2D renderOut;
+
+layout(push_constant) uniform RasterPush {
+	vec4 viewport;
+	int gaussianCount;
+	int tileSize;
+	int tileCols;
+} pc;
+
+void main() {
+	ivec2 tileId = ivec2(gl_WorkGroupID.xy);
+	ivec2 pix = tileId * pc.tileSize + ivec2(gl_LocalInvocationID.xy);
+	vec2 pixF = vec2(pix) + vec2(0.5);
+	vec4 accum = vec4(0.0);
+	int i;
+
+	if ( pix.x >= int(pc.viewport.x) || pix.y >= int(pc.viewport.y) ) {
+		return;
+	}
+
+	for ( i = 0; i < pc.gaussianCount; i++ ) {
+		ProjectedGaussian pg = projected.p[i];
+		vec2 d = pixF - pg.centerDepth.xy;
+		vec2 r = max(pg.axisRadii, vec2(1.0));
+		float g = exp(-0.5 * dot(d / r, d / r));
+		float a = pg.centerDepth.w * g;
+		if ( a < 1e-4 ) {
+			continue;
+		}
+		vec3 rgb = vec3(pg.conicOpacity.z, pg.conicOpacity.w, 0.5);
+		accum.rgb += rgb * a * (1.0 - accum.a);
+		accum.a += a * (1.0 - accum.a);
+		if ( accum.a > 0.99 ) {
+			break;
+		}
+	}
+
+	imageStore(renderOut, pix, accum);
+}

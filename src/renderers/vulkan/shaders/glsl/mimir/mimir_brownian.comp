@@ -1,0 +1,45 @@
+#version 450
+/* Mímir — Brownian motion on interop-mapped float3 positions (paper §4.1 benchmark). */
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) buffer Positions {
+	vec3 pos[];
+};
+
+layout(set = 0, binding = 1) buffer RngState {
+	uint rng[];
+};
+
+layout(push_constant) uniform BrownianPush {
+	uint pointCount;
+	float dt;
+	float sigma;
+	uint frameSeed;
+} pc;
+
+uint xorshift32(inout uint state) {
+	state ^= state << 13u;
+	state ^= state >> 17u;
+	state ^= state << 5u;
+	return state;
+}
+
+float randUnit(inout uint state) {
+	return float(xorshift32(state)) / 4294967295.0;
+}
+
+void main() {
+	uint i = gl_GlobalInvocationID.x;
+	if (i >= pc.pointCount) {
+		return;
+	}
+	uint state = rng[i] ^ pc.frameSeed;
+	vec3 p = pos[i];
+	float sx = (randUnit(state) - 0.5) * pc.sigma * pc.dt;
+	float sy = (randUnit(state) - 0.5) * pc.sigma * pc.dt;
+	float sz = (randUnit(state) - 0.5) * pc.sigma * pc.dt;
+	p += vec3(sx, sy, sz);
+	p = clamp(p, vec3(-1.0), vec3(1.0));
+	pos[i] = p;
+	rng[i] = state;
+}

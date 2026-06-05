@@ -559,7 +559,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 		Com_Printf( "[VK] Couldn't get a visual: %s\n", ( sdl_err && sdl_err[0] ) ? sdl_err : "(no SDL error string)" );
 		Com_Printf( "[VK] SDL video driver: %s\n", SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "(none)" );
 #if defined(__arm__) || defined(__aarch64__)
-		Com_Printf( S_COLOR_YELLOW "[VK] On ARM, Vulkan may be unavailable. Try: ./idtech3.aarch64 +set cl_renderer opengl\n" );
+		Com_Printf( S_COLOR_YELLOW "[VK] On ARM, Vulkan may be unavailable. Ensure SDL was built with Vulkan support.\n" );
 #endif
 		/* SDL built without Vulkan: no point retrying modes/drivers */
 		if ( vulkan && sdl_err && strstr( sdl_err, "Vulkan support" ) != NULL )
@@ -976,7 +976,7 @@ void VKimp_Init( glconfig_t *config )
 #if defined(__arm__) || defined(__aarch64__)
 			Com_Printf( S_COLOR_YELLOW "Vulkan failed on ARM. SDL needs Vulkan support.\n" );
 			Com_Printf( "  Build SDL with Vulkan: ./scripts/build_sdl_vulkan_rpi.sh\n" );
-			Com_Printf( "  Or use OpenGL: +set cl_renderer opengl\n" );
+			Com_Printf( "  Try windowed mode: +set r_fullscreen 0\n" );
 #endif
 			Com_Error( ERR_FATAL, "VKimp_Init() - could not load Vulkan subsystem: %s", SDL_GetError() );
 			return;
@@ -986,7 +986,7 @@ void VKimp_Init( glconfig_t *config )
 #if defined(__arm__) || defined(__aarch64__)
 			Com_Printf( S_COLOR_YELLOW "Vulkan failed on ARM. SDL may lack Vulkan support.\n" );
 			Com_Printf( "  Build SDL with Vulkan: ./scripts/build_sdl_vulkan_rpi.sh\n" );
-			Com_Printf( "  Or use OpenGL: +set cl_renderer opengl\n" );
+			Com_Printf( "  Try windowed mode: +set r_fullscreen 0\n" );
 #endif
 			Com_Error( ERR_FATAL, "VKimp_Init() - could not load Vulkan subsystem: %s", SDL_GetError() );
 			return;

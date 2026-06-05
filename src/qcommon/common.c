@@ -23,11 +23,22 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "q_shared.h"
 #include "qcommon.h"
+#include "aiwc.h"
+#include "ttp.h"
+#include "vuda/vuda_console.h"
+#include "vksplat/vksplat_console.h"
+#include "curast/curast_console.h"
+#include "infernux/infernux_console.h"
+#include "mimir/mimir_console.h"
+#include "iris/iris_console.h"
 #include "jobs.h"
 #include "defer.h"
 #ifdef USE_DUKTAPE
 #include "js_debug.h"
 #include "csharp_debug.h"
+#ifdef USE_PYTHON
+#include "python_debug.h"
+#endif
 #endif
 #include <setjmp.h>
 #ifndef _WIN32
@@ -4076,6 +4087,12 @@ void Com_Init( char *commandLine ) {
 	com_version = Cvar_Get( "version", s, CVAR_PROTECTED | CVAR_ROM | CVAR_SERVERINFO );
 	Cvar_SetDescription( com_version, "Read-only CVAR to see the version of the game." );
 
+	Cvar_Get( "com_engine_api",
+		va( "%d.%d", IDTECH3_ENGINE_API_MAJOR, IDTECH3_ENGINE_API_MINOR ),
+		CVAR_PROTECTED | CVAR_ROM );
+	Com_Printf( "Engine API: %d.%d (gameinfo requires_engine)\n",
+		IDTECH3_ENGINE_API_MAJOR, IDTECH3_ENGINE_API_MINOR );
+
 	// Log verbosity: 0=errors only, 1=startup+warnings (default), 2=subsystem detail, 3=per-frame/spam
 	cvar_t *logVerbosity = Cvar_Get( "log_verbosity", "1", CVAR_ARCHIVE );
 	Cvar_SetDescription( logVerbosity, 
@@ -4194,6 +4211,14 @@ void Com_Init( char *commandLine ) {
 
 	Defer_Init();
 	Jobs_Init();
+	AIWC_Init();
+	TTP_Init();
+	Vuda_ConsoleInit();
+	Vksplat_ConsoleInit();
+	Curast_ConsoleInit();
+	Infernux_ConsoleInit();
+	Mimir_ConsoleInit();
+	Iris_ConsoleInit();
 
 	Com_Printf( "--- Common Initialization Complete ---\n" );
 
@@ -4532,6 +4557,9 @@ void Com_Frame( qboolean noDelay ) {
 #endif
 #ifdef USE_CSHARP
 	CsDebug_Frame( msec, realMsec );
+#endif
+#ifdef USE_PYTHON
+	PyDebug_Frame( msec, realMsec );
 #endif
 
 	//

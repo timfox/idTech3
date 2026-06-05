@@ -89,6 +89,7 @@ typedef struct physBodyDef_s {
 	float           angularDamping;
 	int             collisionGroup;
 	int             collisionMask;
+	int             materialId; /* phys_materials.h PHYS_MAT_* */
 } physBodyDef_t;
 
 typedef struct physConstraintDef_s {
@@ -210,8 +211,13 @@ typedef struct physRayResult_s {
 } physRayResult_t;
 
 qboolean Phys_RayCast(const vec3_t from, const vec3_t to, physRayResult_t *result);
+qboolean Phys_ConvexSweep(const physBodyDef_t *shapeDef, const vec3_t from, const vec3_t to,
+	const vec3_t rotation, physRayResult_t *result);
 int      Phys_OverlapSphere(const vec3_t center, float radius, physBodyHandle_t *results, int maxResults);
 int      Phys_OverlapBox(const vec3_t center, const vec3_t halfExtents, physBodyHandle_t *results, int maxResults);
+
+void     Phys_SetBodyMaterial(physBodyHandle_t handle, int materialId);
+int      Phys_GetBodyMaterial(physBodyHandle_t handle);
 
 /* debug */
 void Phys_DebugDraw(void);

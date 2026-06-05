@@ -1,0 +1,116 @@
+#version 450
+/*
+ * Separable edge-avoiding A-trous wavelet (5-tap) guided by depth, normals, luminance, variance.
+ * params.w: 0 = horizontal pass, 1 = vertical pass
+ * params.z: channel (0 shadow, 1 spec, 2 diffuse)
+ */
+#extension GL_GOOGLE_include_directive : enable
+#include "hybrid1_common.glsl"
+
+layout( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
+
+layout( set = 0, binding = 0 ) uniform sampler2D depthTex;
+layout( set = 0, binding = 1 ) uniform sampler2D normalTex;
+layout( set = 0, binding = 2 ) uniform sampler2D materialTex;
+layout( set = 0, binding = 3 ) uniform sampler2D rawGuideTex;
+layout( set = 0, binding = 4 ) uniform sampler2D varianceTex;
+layout( set = 0, binding = 5 ) uniform sampler2D inputTex;
+layout( rgba16f, set = 0, binding = 6 ) uniform writeonly image2D outputTex;
+
+layout( push_constant ) uniform Hybrid1AtrousPush {
+	vec4 extent;
+	vec4 params; /* x=iteration, y=phiColor, z=channel, w=axis (0 h, 1 v) */
+	uint hasGBuffer;
+	uint adaptiveBlur;
+	uint separableBlur;
+	uint reinhard;
+} pc;
+
+const float kKernel[5] = float[]( 1.0, 4.0, 6.0, 4.0, 1.0 );
+const float kKernelSum = 16.0;
+
+void main()
+{
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if ( pix.x >= uint( pc.extent.x ) || pix.y >= uint( pc.extent.y ) ) {
+		return;
+	}
+
+	vec2 uv = ( vec2( pix ) + 0.5 ) / pc.extent.xy;
+	vec2 texel = 1.0 / pc.extent.xy;
+	float depth = texture( depthTex, uv ).r;
+
+	if ( depth <= 0.0 || depth >= 1.0 ) {
+		vec4 c = texture( inputTex, uv );
+		imageStore( outputTex, ivec2( pix ), c );
+		return;
+	}
+
+	int iter = int( pc.params.x );
+	if ( pc.adaptiveBlur != 0u ) {
+		if ( pc.params.z < 0.5 ) {
+			float shadowAngle = texture( rawGuideTex, uv ).g;
+			if ( shadowAngle > 6.0 && iter == 0 ) {
+				iter = 1;
+			}
+		} else if ( pc.params.z < 1.5 ) {
+			float roughness = texture( rawGuideTex, uv ).a;
+			if ( roughness > 0.2 && iter == 0 ) {
+				iter = 1;
+			}
+		}
+	}
+
+	int step = 1 << iter;
+	vec3 N = hybrid1_decodeNormal( normalTex, uv, pc.hasGBuffer );
+	float centerVar = texture( varianceTex, uv ).r;
+	vec4 center = texture( inputTex, uv );
+	vec3 accum = center.rgb;
+	float wSum = 1.0;
+	int i;
+
+	for ( i = 0; i < 5; i++ ) {
+		if ( i == 2 ) {
+			continue;
+		}
+		ivec2 off = ivec2( 0 );
+		if ( pc.params.w < 0.5 ) {
+			off.x = ( i - 2 ) * step;
+		} else {
+			off.y = ( i - 2 ) * step;
+		}
+		vec2 offUv = uv + vec2( off ) * texel;
+		float dN = texture( depthTex, offUv ).r;
+		if ( abs( dN - depth ) > 0.002 ) {
+			continue;
+		}
+		vec3 nN = hybrid1_decodeNormal( normalTex, offUv, pc.hasGBuffer );
+		if ( dot( N, nN ) < 0.92 ) {
+			continue;
+		}
+		vec4 s = texture( inputTex, offUv );
+		float w = kKernel[i] / kKernelSum;
+		if ( pc.params.z < 0.5 ) {
+			float cw = hybrid1_atrousWeight( center.r, s.r, centerVar, pc.params.y );
+			w *= cw;
+		} else if ( pc.params.z < 1.5 ) {
+			float cw = hybrid1_atrousWeight( hybrid1_luma( center.rgb ), hybrid1_luma( s.rgb ),
+				max( centerVar, 1e-4 ), pc.params.y );
+			w *= cw;
+		} else {
+			float diff = abs( hybrid1_luma( center.rgb ) - hybrid1_luma( s.rgb ) );
+			w *= exp( -diff / max( pc.params.y, 1e-4 ) );
+		}
+		accum += s.rgb * w;
+		wSum += w;
+	}
+
+	vec3 outRgb = accum / max( wSum, 1e-4 );
+
+	if ( pc.params.z > 0.5 && pc.params.z < 1.5 && pc.params.w > 0.5 && pc.reinhard != 0u ) {
+		float l = hybrid1_luma( outRgb );
+		outRgb *= ( 1.0 + l );
+	}
+
+	imageStore( outputTex, ivec2( pix ), vec4( outRgb, center.a ) );
+}

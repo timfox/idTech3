@@ -1,0 +1,33 @@
+#version 450
+/*
+ * Composite Dressi HardSoftRas output over HDR color (demo overlay).
+ */
+layout( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
+
+layout( set = 0, binding = 0 ) uniform sampler2D sceneTex;
+layout( set = 0, binding = 1 ) uniform sampler2D dressiTex;
+layout( rgba16f, set = 0, binding = 2 ) uniform image2D colorOut;
+
+layout( push_constant ) uniform DressiCompositePush {
+	vec4 extent;
+	vec4 params; /* x=strength, y=debug (1=replace), z/w unused */
+} pc;
+
+void main()
+{
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if ( pix.x >= uint( pc.extent.x ) || pix.y >= uint( pc.extent.y ) ) {
+		return;
+	}
+	vec2 uv = ( vec2( pix ) + 0.5 ) / pc.extent.xy;
+	vec4 scene = texture( sceneTex, uv );
+	vec4 dr = texture( dressiTex, uv );
+	vec3 outRgb = scene.rgb;
+	if ( pc.params.y > 0.5 ) {
+		outRgb = dr.rgb;
+	} else {
+		float a = dr.a * pc.params.x;
+		outRgb = mix( scene.rgb, dr.rgb, a );
+	}
+	imageStore( colorOut, ivec2( pix ), vec4( outRgb, scene.a ) );
+}

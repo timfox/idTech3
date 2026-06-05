@@ -4,7 +4,7 @@
 
 This repository is built and validated through **CMake**. The two supported entry points are:
 
-1. **`./scripts/compile_engine.sh`** - canonical developer workflow; handles the common Vulkan/OpenGL configurations, stages artifacts into `release/`, and mirrors CI closely.
+1. **`./scripts/compile_engine.sh`** - canonical developer workflow; handles Vulkan Release/Debug configurations, stages artifacts into `release/`, and mirrors CI closely.
 2. **`cmake` / `cmake --preset`** - direct CMake workflow for IDEs, local iteration, and CI-style configure/build/test steps.
 
 Legacy `make`-first instructions are no longer the primary build path for this fork.
@@ -13,7 +13,7 @@ Legacy `make`-first instructions are no longer the primary build path for this f
 
 - CMake targets **C23** when supported by the active compiler/toolchain and falls back to **C17** otherwise.
 - Set `C_STANDARD_STRICT=OFF` to disable the stricter warning set locally. CI keeps strict warnings enabled.
-- The Vulkan path is the primary renderer configuration; OpenGL remains the compatibility fallback.
+- The Vulkan renderer is the only supported backend.
 - `SKIP_IDPAK_CHECK=ON` is the default expectation for source-tree builds in this repository.
 
 ## Quick start
@@ -23,9 +23,6 @@ Legacy `make`-first instructions are no longer the primary build path for this f
 ```bash
 # Vulkan + Release (recommended)
 ./scripts/compile_engine.sh vulkan
-
-# OpenGL + Release
-./scripts/compile_engine.sh opengl
 
 # Vulkan + Debug
 ./scripts/compile_engine.sh vulkan debug
@@ -37,7 +34,7 @@ Legacy `make`-first instructions are no longer the primary build path for this f
 ./scripts/compile_engine.sh vulkan lto
 ```
 
-Artifacts are copied to `release/` and the build trees live under `build-vk-Release/`, `build-vk-Debug/`, `build-gl-Release/`, and `build-gl-Debug/`.
+Artifacts are copied to `release/` and the build trees live under `build-vk-Release/` and `build-vk-Debug/`.
 
 **Minimal game data next to binaries:** see [docs/MINIMAL_GAME_SHELL.md](docs/MINIMAL_GAME_SHELL.md) (bootstrap `base/*.pk3` with `default.cfg`).
 
@@ -62,12 +59,9 @@ ctest --preset test-vulkan-release
 
 cmake --preset vulkan-debug
 cmake --build --preset build-vulkan-debug
-
-cmake --preset opengl-release
-cmake --build --preset build-opengl-release
 ```
 
-The presets intentionally use their own `build/presets/<name>/` trees so they do not collide with the helper script's `build-vk-*` / `build-gl-*` directories.
+The presets intentionally use their own `build/presets/<name>/` trees so they do not collide with the helper script's `build-vk-*` directories.
 
 Use the script when you want staged artifacts in `release/` and the standard helper behavior. Use presets when you want direct CMake/IDE workflows.
 

@@ -137,9 +137,11 @@ PFN_vkDebugMarkerSetObjectNameEXT				qvkDebugMarkerSetObjectNameEXT;
 
 PFN_vkCmdClearColorImage								qvkCmdClearColorImage;
 
-#ifdef USE_VUDA
+#if defined( USE_VUDA ) || defined( USE_MIMIR_CUDA )
 PFN_vkGetMemoryFdKHR									qvkGetMemoryFdKHR;
 PFN_vkGetMemoryFdPropertiesKHR						qvkGetMemoryFdPropertiesKHR;
+#endif
+#ifdef USE_VUDA
 PFN_vkGetSemaphoreFdKHR								qvkGetSemaphoreFdKHR;
 PFN_vkWaitSemaphoresKHR								qvkWaitSemaphoresKHR;
 PFN_vkSignalSemaphoreKHR							qvkSignalSemaphoreKHR;

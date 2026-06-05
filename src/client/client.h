@@ -577,6 +577,7 @@ void CL_InitCGame( void );
 void CL_ShutdownCGame( void );
 qboolean CL_GameCommand( void );
 void CL_CGameRendering( stereoFrame_t stereo );
+void CL_PhysDebugDrawSubmit( void );
 void CL_SetCGameTime( void );
 
 //
@@ -624,16 +625,8 @@ void	GLimp_Minimize( void );
 void	GLimp_LogComment( const char *comment );
 void	GLW_RestoreGamma( void );
 
-// OpenGL (needed for static OpenGL build, or Vulkan build with dlopen so OpenGL renderer can load)
-#if defined(USE_OPENGL_API) || defined(USE_VULKAN_API)
-void	GLimp_Init( glconfig_t *config );
-void	GLimp_Shutdown( qboolean unloadDLL );
-void	GLimp_EndFrame( void );
-void	*GL_GetProcAddress( const char *name );
-#endif
-
-// Vulkan
-#ifdef USE_VULKAN_API
+// Window/display (SDL or native platform; Vulkan is the only renderer backend)
+#if defined(USE_VULKAN_API)
 void	VKimp_Init( glconfig_t *config );
 void	VKimp_Shutdown( qboolean unloadDLL );
 void	*VK_GetInstanceProcAddr( VkInstance instance, const char *name );

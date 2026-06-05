@@ -1,0 +1,84 @@
+#version 450
+/* VkSplat: fill 32-bit tile-depth sort keys (paper §4.4). */
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+struct ProjectedGaussian {
+	vec4 centerDepth;
+	vec4 conicOpacity;
+	vec2 axisRadii;
+	uint tileCount;
+	uint sortBase;
+};
+
+layout(std430, set = 0, binding = 0) readonly buffer ProjectedBuffer {
+	ProjectedGaussian p[];
+} projected;
+
+layout(std430, set = 0, binding = 1) buffer SortKeys {
+	uint keys[];
+} sortKeys;
+
+layout(push_constant) uniform TileCullPush {
+	vec4 viewport;
+	int gaussianCount;
+	int tileSize;
+	int tileCols;
+	int tileRows;
+	int maxKeysPerGaussian;
+} pc;
+
+float depthToKeyBits( float z ) {
+	float mapped = (2.0 * z + 1.0) / (z + 1.0);
+	return mapped;
+}
+
+uint packKey( int tileId, float depth ) {
+	uint tileBits = uint(tileId) << 18;
+	uint depthBits = uint(floatBitsToUint(depthToKeyBits(depth))) & 0x3FFFFu;
+	return tileBits | depthBits;
+}
+
+void main() {
+	uint i = gl_GlobalInvocationID.x;
+	vec2 center;
+	vec2 radii;
+	int tx0;
+	int ty0;
+	int tx1;
+	int ty1;
+	int ty;
+	int tx;
+	uint base;
+	uint slot;
+
+	if ( int(i) >= pc.gaussianCount ) {
+		return;
+	}
+
+	ProjectedGaussian pg = projected.p[i];
+	if ( pg.tileCount == 0u ) {
+		return;
+	}
+
+	center = pg.centerDepth.xy;
+	radii = pg.axisRadii;
+	tx0 = int(floor((center.x - radii.x) / float(pc.tileSize)));
+	ty0 = int(floor((center.y - radii.y) / float(pc.tileSize)));
+	tx1 = int(floor((center.x + radii.x) / float(pc.tileSize)));
+	ty1 = int(floor((center.y + radii.y) / float(pc.tileSize)));
+	base = uint(i) * uint(pc.maxKeysPerGaussian);
+	slot = 0u;
+
+	for ( ty = ty0; ty <= ty1; ty++ ) {
+		for ( tx = tx0; tx <= tx1; tx++ ) {
+			if ( tx < 0 || ty < 0 || tx >= pc.tileCols || ty >= pc.tileRows ) {
+				continue;
+			}
+			if ( slot >= pg.tileCount ) {
+				return;
+			}
+			sortKeys.keys[base + slot] = packKey(ty * pc.tileCols + tx, pg.centerDepth.z);
+			slot++;
+		}
+	}
+}

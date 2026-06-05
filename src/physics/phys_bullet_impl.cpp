@@ -20,6 +20,8 @@ Every function in phys_bullet.h has a corresponding _Impl here.
 
 extern "C" {
 #include "phys_bullet.h"
+#include "phys_debugdraw.h"
+#include "phys_events.h"
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
 }
@@ -30,6 +32,7 @@ struct PhysBody {
 	btRigidBody      *rigidBody;
 	btCollisionShape *shape;
 	btMotionState    *motionState;
+	int               materialId;
 	qboolean          active;
 };
 
@@ -144,6 +147,33 @@ static void getDmmPreset(dmmMaterialType_t t, float &stiff, float &yield, float 
 #define VALID_RAG(h)  ((h) >= 0 && (h) < bs.ragdollCount && bs.ragdolls[(h)].active)
 #define VALID_DMM(h)  ((h) >= 0 && (h) < bs.dmmCount && bs.dmmObjects[(h)].active)
 
+class EngineBulletDebugDraw : public btIDebugDraw {
+public:
+	void drawLine( const btVector3 &from, const btVector3 &to, const btVector3 &color ) override {
+		vec3_t f, t, c;
+		f[0] = from.x(); f[1] = from.y(); f[2] = from.z();
+		t[0] = to.x(); t[1] = to.y(); t[2] = to.z();
+		c[0] = color.x(); c[1] = color.y(); c[2] = color.z();
+		PhysDebug_AddLine( f, t, c );
+	}
+	void drawContactPoint( const btVector3 &, const btVector3 &, btScalar, int, const btVector3 & ) override {}
+	void reportErrorWarning( const char * ) override {}
+	void draw3dText( const btVector3 &, const char * ) override {}
+	void setDebugMode( int ) override {}
+	int getDebugMode() const override { return DBG_DrawWireframe; }
+};
+
+static EngineBulletDebugDraw g_engineBulletDebugDraw;
+
+static int findBodyHandle( const btCollisionObject *obj ) {
+	for ( int i = 0; i < bs.bodyCount; i++ ) {
+		if ( bs.bodies[i].active && bs.bodies[i].rigidBody == obj ) {
+			return i;
+		}
+	}
+	return -1;
+}
+
 /* ========== core ========== */
 
 extern "C" qboolean Phys_Init_Impl(void) {
@@ -164,6 +194,7 @@ extern "C" qboolean Phys_Init_Impl(void) {
 	bs.softBodyWorldInfo.water_normal  = btVector3(0,0,0);
 
 	bs.bodyCount = bs.constraintCount = bs.ragdollCount = bs.dmmCount = 0;
+	bs.world->setDebugDrawer( &g_engineBulletDebugDraw );
 	bs.initialized = qtrue;
 	return qtrue;
 }
@@ -260,6 +291,7 @@ extern "C" physBodyHandle_t Phys_CreateBody_Impl(const physBodyDef_t *def) {
 	int group = def->collisionGroup ? def->collisionGroup : 1;
 	int mask  = def->collisionMask  ? def->collisionMask  : -1;
 	bs.world->addRigidBody(pb->rigidBody, group, mask);
+	pb->materialId = def->materialId;
 	pb->active = qtrue;
 	return idx;
 }
@@ -658,7 +690,117 @@ extern "C" int Phys_OverlapBox_Impl(const vec3_t c, const vec3_t he, physBodyHan
 	return count;
 }
 
-extern "C" void Phys_DebugDraw_Impl(void) { if (bs.initialized && bs.world) bs.world->debugDrawWorld(); }
+extern "C" void Phys_DebugDraw_Impl(void) {
+	if ( bs.initialized && bs.world ) {
+		bs.world->debugDrawWorld();
+	}
+}
+
+extern "C" void Phys_SetBodyMaterial_Impl( physBodyHandle_t h, int materialId ) {
+	if ( !VALID_BODY( h ) ) {
+		return;
+	}
+	bs.bodies[h].materialId = materialId;
+}
+
+extern "C" int Phys_GetBodyMaterial_Impl( physBodyHandle_t h ) {
+	if ( !VALID_BODY( h ) ) {
+		return 0;
+	}
+	return bs.bodies[h].materialId;
+}
+
+extern "C" qboolean Phys_ConvexSweep_Impl( const physBodyDef_t *shapeDef, const vec3_t from, const vec3_t to,
+	const vec3_t rotation, physRayResult_t *result ) {
+	if ( !bs.initialized || !shapeDef || !result ) {
+		return qfalse;
+	}
+
+	btCollisionShape *shape = createShape( shapeDef );
+	btConvexShape *convex = dynamic_cast<btConvexShape *>( shape );
+	btTransform fromXform;
+	btTransform toXform;
+	fromXform.setIdentity();
+	toXform.setIdentity();
+	fromXform.setOrigin( btVector3( from[0], from[1], from[2] ) );
+	toXform.setOrigin( btVector3( to[0], to[1], to[2] ) );
+	(void)rotation;
+
+	if ( !convex ) {
+		delete shape;
+		result->hit = qfalse;
+		return qfalse;
+	}
+
+	btCollisionWorld::ClosestConvexResultCallback cb( fromXform.getOrigin(), toXform.getOrigin() );
+	bs.world->convexSweepTest( convex, fromXform, toXform, cb );
+	delete shape;
+
+	if ( cb.hasHit() ) {
+		result->hit = qtrue;
+		result->hitPoint[0] = cb.m_hitPointWorld.x();
+		result->hitPoint[1] = cb.m_hitPointWorld.y();
+		result->hitPoint[2] = cb.m_hitPointWorld.z();
+		result->hitNormal[0] = cb.m_hitNormalWorld.x();
+		result->hitNormal[1] = cb.m_hitNormalWorld.y();
+		result->hitNormal[2] = cb.m_hitNormalWorld.z();
+		result->fraction = cb.m_closestHitFraction;
+		result->body = findBodyHandle( cb.m_hitCollisionObject );
+		return qtrue;
+	}
+
+	result->hit = qfalse;
+	return qfalse;
+}
+
+extern "C" void Phys_ProcessContactEvents_Impl( void ) {
+	if ( !bs.initialized || !bs.dispatcher ) {
+		return;
+	}
+
+	const int numManifolds = bs.dispatcher->getNumManifolds();
+	for ( int i = 0; i < numManifolds; i++ ) {
+		btPersistentManifold *manifold = bs.dispatcher->getManifoldByIndexInternal( i );
+		const btCollisionObject *obA = static_cast<const btCollisionObject *>( manifold->getBody0() );
+		const btCollisionObject *obB = static_cast<const btCollisionObject *>( manifold->getBody1() );
+		const int bodyA = findBodyHandle( obA );
+		const int bodyB = findBodyHandle( obB );
+		float totalImpulse = 0.0f;
+		vec3_t point = { 0.0f, 0.0f, 0.0f };
+		vec3_t normal = { 0.0f, 0.0f, 1.0f };
+		vec3_t impulse = { 0.0f, 0.0f, 0.0f };
+		const int numContacts = manifold->getNumContacts();
+
+		if ( bodyA < 0 && bodyB < 0 ) {
+			continue;
+		}
+
+		for ( int p = 0; p < numContacts; p++ ) {
+			const btManifoldPoint &pt = manifold->getContactPoint( p );
+			totalImpulse += pt.getAppliedImpulse();
+			point[0] = pt.getPositionWorldOnA().x();
+			point[1] = pt.getPositionWorldOnA().y();
+			point[2] = pt.getPositionWorldOnA().z();
+			normal[0] = pt.m_normalWorldOnB.x();
+			normal[1] = pt.m_normalWorldOnB.y();
+			normal[2] = pt.m_normalWorldOnB.z();
+		}
+
+		if ( totalImpulse < 25.0f ) {
+			continue;
+		}
+
+		impulse[0] = normal[0] * totalImpulse;
+		impulse[1] = normal[1] * totalImpulse;
+		impulse[2] = normal[2] * totalImpulse;
+
+		PhysEvent_PostImpact( -1, bodyA, bodyB,
+			bodyA >= 0 ? bs.bodies[bodyA].materialId : 0,
+			bodyB >= 0 ? bs.bodies[bodyB].materialId : 0,
+			point, normal, impulse, totalImpulse );
+	}
+}
+
 extern "C" int Phys_GetBodyCount_Impl(void) { return bs.bodyCount; }
 extern "C" int Phys_GetConstraintCount_Impl(void) { return bs.constraintCount; }
 

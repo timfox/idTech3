@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: ./compile_engine.sh [game_name] [Debug|Release] [clean] [quiet] [coverage] [asan] [lto] [vulkan] [rtx] [aarch64] [freetype] [lua] [duktape|no-duktape] [system-duktape] [nofreeusd] [skipshaders] [demo] [--out DIR] [mac-app <target> [arch]] [mac-ub2 [notarize]]
+# Usage: ./compile_engine.sh [game_name] [Debug|Release] [clean] ... [python|py] [csharp] ...
 # Notes:
 # - build type defaults to Release
 # - Vulkan is the only renderer backend
@@ -21,6 +21,8 @@ CSHARP=0
 FREEUSD=1
 VULKAN_RTX=0
 VUDA=0
+MIMIR=0
+PYTHON=0
 CROSS_AARCH64=0
 CODECS_FOR_CROSS=0
 BUILD_DEMO_PK3=0
@@ -147,6 +149,10 @@ while [[ $# -gt 0 ]]; do
       VUDA=1
       shift
       ;;
+    mimir|mimir-cuda)
+      MIMIR=1
+      shift
+      ;;
     nofreeusd|no-freeusd|nofree-usd)
       FREEUSD=0
       shift
@@ -169,6 +175,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     no-csharp|nocs|nomono)
       CSHARP=0
+      shift
+      ;;
+    python|py)
+      PYTHON=1
+      shift
+      ;;
+    no-python|nopy)
+      PYTHON=0
       shift
       ;;
     --out|--output|--dir)
@@ -333,6 +347,14 @@ else
   echo "CMake: USE_CSHARP=OFF"
 fi
 
+if [ "$PYTHON" -eq 1 ]; then
+  CMAKE_FLAGS+=("-DUSE_PYTHON=ON")
+  echo "CMake: USE_PYTHON=ON (embedded CPython; py_reload, Infernux batch bridge)"
+else
+  CMAKE_FLAGS+=("-DUSE_PYTHON=OFF")
+  echo "CMake: USE_PYTHON=OFF"
+fi
+
 if [ "$FREEUSD" -eq 1 ]; then
   CMAKE_FLAGS+=("-DUSE_FREEUSD=ON")
   echo "CMake: USE_FREEUSD=ON (USDA mesh import + usd_* console tools)"
@@ -353,6 +375,13 @@ if [ "$VUDA" -eq 1 ]; then
   echo "CMake: USE_VUDA=ON (CUDA-Vulkan interop; set r_vuda 1 + cl_vuda 1 + vid_restart)"
 else
   CMAKE_FLAGS+=("-DUSE_VUDA=OFF")
+fi
+
+if [ "$MIMIR" -eq 1 ]; then
+  CMAKE_FLAGS+=("-DUSE_MIMIR_CUDA=ON")
+  echo "CMake: USE_MIMIR_CUDA=ON (Mímir CUDA interop; r_mimir 1 + r_mimir_cuda 1 + vid_restart)"
+else
+  CMAKE_FLAGS+=("-DUSE_MIMIR_CUDA=OFF")
 fi
 
 CMAKE_FLAGS+=("-DRENDERER_DEFAULT=vulkan")
@@ -463,9 +492,9 @@ copy_to_release() {
     echo "Copied server -> $dest/${GAME_NAME}_server"
   fi
 
-  # Renderers
+  # Renderers (Vulkan only)
   shopt -s nullglob
-  for sofile in "$BUILD_DIR"/idtech3_*.so; do
+  for sofile in "$BUILD_DIR"/idtech3_vulkan*.so; do
     base="$(basename "$sofile")"
     cp -f "$sofile" "$dest/$base"
     echo "Copied renderer -> $dest/$base"

@@ -1208,4 +1208,15 @@ void Cmd_Init( void ) {
 	Cmd_AddCommand("cs_list", Cmd_CsList_f);
 	Cmd_AddCommand("cs_dump", Cmd_CsDump_f);
 	CsDebug_InitCvars();
+
+	extern void PyDebug_InitCvars(void);
+	extern void Cmd_PyReload_f(void);
+	extern void Cmd_PyList_f(void);
+	extern void Cmd_PyDump_f(void);
+	extern void Cmd_PyExec_f(void);
+	PyDebug_InitCvars();
+	Cmd_AddCommand("py_reload", Cmd_PyReload_f);
+	Cmd_AddCommand("py_list", Cmd_PyList_f);
+	Cmd_AddCommand("py_dump", Cmd_PyDump_f);
+	Cmd_AddCommand("py_exec", Cmd_PyExec_f);
 }

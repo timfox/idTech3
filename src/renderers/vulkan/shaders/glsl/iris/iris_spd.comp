@@ -1,0 +1,41 @@
+#version 450
+/* Iris SPD — 2× downsample + Laplacian sharpen on HR tile (Fig. 5). */
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(rgba8, set = 0, binding = 0) uniform readonly image2D tileIn;
+layout(rgba8, set = 0, binding = 1) uniform writeonly image2D mipOut;
+
+layout(push_constant) uniform SpdPush {
+	ivec4 tileOrigin;
+	int tileSize;
+	float sharpen;
+} pc;
+
+float irisLoadR(ivec2 c, ivec2 origin, int tileSize) {
+	ivec2 atlasSize = imageSize(tileIn);
+	ivec2 p = clamp(origin + c, ivec2(0), atlasSize - ivec2(1));
+	return imageLoad(tileIn, p).r;
+}
+
+void main() {
+	ivec2 local = ivec2(gl_GlobalInvocationID.xy);
+	int halfTile = pc.tileSize / 2;
+	if (local.x >= halfTile || local.y >= halfTile) {
+		return;
+	}
+	ivec2 block = local * 2;
+	vec4 a = vec4(irisLoadR(block + ivec2(0, 0), pc.tileOrigin.xy, pc.tileSize));
+	vec4 b = vec4(irisLoadR(block + ivec2(1, 0), pc.tileOrigin.xy, pc.tileSize));
+	vec4 c = vec4(irisLoadR(block + ivec2(0, 1), pc.tileOrigin.xy, pc.tileSize));
+	vec4 d = vec4(irisLoadR(block + ivec2(1, 1), pc.tileOrigin.xy, pc.tileSize));
+	vec4 avg = (a + b + c + d) * 0.25;
+	float center = avg.r;
+	float lap = center * 4.0
+		- irisLoadR(block + ivec2(-1, 0), pc.tileOrigin.xy, pc.tileSize)
+		- irisLoadR(block + ivec2(2, 0), pc.tileOrigin.xy, pc.tileSize)
+		- irisLoadR(block + ivec2(0, -1), pc.tileOrigin.xy, pc.tileSize)
+		- irisLoadR(block + ivec2(0, 2), pc.tileOrigin.xy, pc.tileSize);
+	float outv = clamp(center + pc.sharpen * lap, 0.0, 1.0);
+	ivec2 outPix = pc.tileOrigin.xy / 2 + local;
+	imageStore(mipOut, outPix, vec4(outv, outv, outv, 1.0));
+}
