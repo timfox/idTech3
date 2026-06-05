@@ -1,6 +1,8 @@
 # Demo playfield - run the engine with the `idtech3_demo` mod
 
-This is the **easiest path** to try renderer hooks and demo configs on top of **your** game data. The repo does not include maps or retail `.pk3` files - you add those once.
+This is the **easiest path** to try renderer hooks and demo configs on top of **your** licensed game data. The repo does not include maps or retail `.pk3` files - you add those once.
+
+All files in **`examples/demo_skeleton/`** and **`examples/demo_game/`** are **engine-original** sample content. See [../demo_game/DEMO_IDENTITY.md](../demo_game/DEMO_IDENTITY.md).
 
 ---
 
@@ -21,9 +23,9 @@ cp build-vk-Release/idtech3_demo.pk3 examples/demo_skeleton/idtech3_demo/
 
 **`base/`** includes **`z_minimal_bootstrap.pk3`** (GPL: **default.cfg** + **gameinfo.txt**) so the filesystem gate passes with **no retail files**. That is enough for a **client window** together with **`idtech3_demo.pk3`**.
 
-Add your compatible game `.pk3` files under **`base/`** when you want **maps, retail menus, and qagame**.
+Add your **compatible** game `.pk3` files under **`base/`** when you want **maps, retail menus, and qagame**.
 
-See **`base/README.txt`** if your game uses **`baseq3`** instead of **`base`**.
+See **`base/README.txt`** if your install uses a non-default base directory name.
 
 ### Step 3 - Run
 
@@ -53,7 +55,7 @@ The scripts look for **`base/`** and **`idtech3_demo/`** next to themselves, so 
 | “No engine binary” | Build the engine (`./scripts/compile_engine.sh vulkan`) or set **`IDTECH3_ENGINE`** in `local.env` to your `idtech3` path. |
 | **`VM_Create on UI failed`** / **`ui.qvm not found`** | Use an **up-to-date engine** (extracts `vm/*.so` from pk3 to `vm/native_cache/`) and rebuild **`idtech3_demo.pk3`** so **`vm/ui*.so`** / **`vm/ui.*.so`** are inside the zip. Copy the `.pk3` into **`idtech3_demo/`** next to `base/`, not only `release/`. |
 | “No game data” | Ensure **`base/*.pk3`** exists (ship **`z_minimal_bootstrap.pk3`** or run **`setup_demo_layout.sh`** from the repo copy). |
-| Dedicated exits / no map | **`run_demo_dedicated.sh`** no longer forces **`q3dm1`**. Set **`DEMO_MAP`** in **`local.env`** or pass **`+map …`** when you have BSP + **qagame**. |
+| Dedicated exits / no map | **`run_demo_dedicated.sh`** does not force a map. Set **`DEMO_MAP`** in **`local.env`** or pass **`+map …`** when you have BSP + **qagame**. |
 | Renderer init fails | Confirm Vulkan drivers and SDL Vulkan support; use **`DEMO_RENDERER=vulkan`** (default) and `vid_restart`. |
 | Windows | Use **`run_demo_client.bat`** from the same folder layout; put **`idtech3.exe`** next to it or on `PATH`. |
 
@@ -84,8 +86,8 @@ Copy **`demo_skeleton.env.example`** → **`local.env`** and adjust:
 |----------|--------|
 | `IDTECH3_DEMO_ROOT` | Folder containing `base/` and `idtech3_demo/` (only needed if not using `examples/demo_skeleton/`). |
 | `IDTECH3_ENGINE` | Full path to `idtech3` if not using `release/idtech3` from this repo. |
-| `DEMO_BASE_DIR` | If your data lives in **`baseq3`** instead of **`base`**, set to `baseq3` (passed as `+set fs_basegame`). |
-| `DEMO_MAP` | Map to load (e.g. `q3dm1`). Leave unset to open to the main menu. |
+| `DEMO_BASE_DIR` | Non-default `fs_basegame` folder name if your install does not use `base`. |
+| `DEMO_MAP` | Map to load (e.g. `playfield_01`). Leave unset to open to the main menu. |
 | `DEMO_RENDERER` | `vulkan` (default). |
 
 ---
@@ -115,5 +117,6 @@ Only share **engine binaries** and **configs you built** (e.g. `idtech3_demo.pk3
 ## See also
 
 - [demo_game README](../demo_game/README.md) - what the mod does (cvars, JS hooks, bootstrap media)
-- [QUICKSTART](../../docs/QUICKSTART.md) - releases and first run
+- [COMPATIBILITY.md](../../docs/COMPATIBILITY.md) - legacy retail mod support
+- [QUICKSTART.md](../../docs/QUICKSTART.md) - releases and first run
 - [mods README](../mods/README.md) - `fs_game` details

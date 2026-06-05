@@ -1,0 +1,12 @@
+{
+"classname" "misc_billboard"
+"origin" "512 512 64"
+"shader" "sprites/demo_billboard"
+"radius" "48"
+}
+{
+"classname" "misc_billboard"
+"origin" "768 512 64"
+"shader" "sprites/demo_billboard"
+"radius" "40"
+}

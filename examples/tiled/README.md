@@ -1,6 +1,6 @@
 # Tiled Map Editor (optional)
 
-Reference workflow for **2D tile maps** alongside Quake III–style **`.map` / BSP`** levels. The engine does not load `.tmx` files yet; use Tiled for planning, overlays, or exports your game mod converts.
+Reference workflow for **2D tile maps** alongside id Tech 3 **`.map` / BSP`** levels. The engine does not load `.tmx` files yet; use Tiled for planning, overlays, or exports your game mod converts.
 
 ## Setup
 
@@ -29,7 +29,7 @@ Build and run Tiled from `tools/tiled/` per [docs/TILED.md](../../docs/TILED.md)
 
 ## Engine maps (unchanged)
 
-- 3D levels: Quake `.map` → BSP → `.bsp` in your `base/` pk3.
+- 3D levels: `.map` → BSP → `.bsp` in your `base/` pk3.
 - Bootstrap data: [docs/MINIMAL_GAME_SHELL.md](../../docs/MINIMAL_GAME_SHELL.md).
 
 ## License

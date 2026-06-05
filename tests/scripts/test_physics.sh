@@ -26,4 +26,12 @@ rg -q 'Phys_ConvexSweep' src/physics/phys_bullet.h
 rg -q 'ProcAnim_UpdateAll' src/physics/phys_procedural_anim.c
 rg -q 'CL_PhysDebugDrawSubmit' src/client/cl_phys_debug.c
 
+echo "[test_physics] demo identity (no third-party game names in examples/)..."
+if rg -i 'unwaking|open.?arena|quake.?3|q3dm' examples/ 2>/dev/null; then
+	echo "examples/ contains third-party game references"
+	exit 1
+fi
+test -f examples/demo_game/DEMO_IDENTITY.md
+test -f examples/demo_game/mod/demo_physics.cfg
+
 echo "[test_physics] ok"

@@ -143,5 +143,5 @@ XPBD position-based dynamics beside Bullet (ropes, vines, cloth straps). 4096 pa
 1. **Phase 1 (done):** Bullet world, capsule character, props, ray/sweep, debug draw, materials, event bus
 2. **Phase 2 (partial):** Ragdoll + ProcAnim + motors + balance/recovery wired in game frame
 3. **Phase 3:** Prefractured meshes, stress accumulation, persistent damage
-4. **Phase 4:** Swamp buoyancy, mud drag, vine XPBD coupling
+4. **Phase 4:** Buoyancy volumes, mud drag, vine XPBD coupling
 5. **Phase 5:** Vulkan compute debris/particles, interaction zones

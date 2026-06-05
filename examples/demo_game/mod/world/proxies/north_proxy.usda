@@ -1,0 +1,27 @@
+#usda 1.0
+(
+    defaultPrim = "Proxy"
+    doc = "Low-poly district proxy — residency placeholder before full payload."
+)
+
+def Xform "Proxy"
+{
+    def Mesh "BoundsBox"
+    {
+        purpose = "proxy"
+        point3f[] points = [
+            (0, 0, 0), (256, 0, 0), (256, 256, 0), (0, 256, 0),
+            (0, 0, 128), (256, 0, 128), (256, 256, 128), (0, 256, 128)
+        ]
+        int[] faceVertexCounts = [4, 4, 4, 4, 4, 4]
+        int[] faceVertexIndices = [
+            0, 1, 2, 3,
+            4, 7, 6, 5,
+            0, 4, 5, 1,
+            1, 5, 6, 2,
+            2, 6, 7, 3,
+            3, 7, 4, 0
+        ]
+        color3f[] primvars:displayColor = [(0.2, 0.5, 0.9)]
+    }
+}

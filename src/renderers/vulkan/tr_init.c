@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_init.c -- functions that are not called every frame
 
 #include "tr_local.h"
+#include "tr_bsp_stream.h"
 #include "../common/tr_vector_font.h"
 #include "tr_sprite_props.h"
 #include "tr_decal_props.h"
@@ -4345,6 +4346,8 @@ void R_Init( void ) {
 
 	R_InitFreeType();
 
+	R_BspStream_Init();
+
 #ifndef USE_VULKAN
 	err = qglGetError();
 	if ( err != GL_NO_ERROR )
@@ -4512,6 +4515,8 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 	re.RegisterShader = RE_RegisterShader;
 	re.RegisterShaderNoMip = RE_RegisterShaderNoMip;
 	re.LoadWorld = RE_LoadWorldMap;
+	re.BspStreamMergeSector = RE_BspStream_MergeSector;
+	re.BspStreamUnmergeSector = RE_BspStream_UnmergeSector;
 	re.SetWorldVisData = RE_SetWorldVisData;
 	re.EndRegistration = RE_EndRegistration;
 

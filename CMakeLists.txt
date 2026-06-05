@@ -1218,6 +1218,10 @@ list(APPEND QCOMMON_SRCS src/curast/curast_model.c src/curast/curast_console.c)
 list(APPEND QCOMMON_SRCS src/infernux/infernux_model.c src/infernux/infernux_console.c)
 list(APPEND QCOMMON_SRCS src/mimir/mimir_model.c src/mimir/mimir_console.c)
 list(APPEND QCOMMON_SRCS src/iris/iris_model.c src/iris/iris_console.c src/iris/iris_io.c)
+list(APPEND QCOMMON_SRCS src/world/world_district.c)
+list(APPEND QCOMMON_SRCS src/world/world_open.c)
+list(APPEND QCOMMON_SRCS src/world/world_proc.c)
+list(APPEND QCOMMON_SRCS src/qcommon/cm_stream_merge.c)
 # exclude platform-dependent QVM JIT compilers; add the active backend below
 list(FILTER QCOMMON_SRCS EXCLUDE REGEX ".*vm_(aarch64|armv7l|powerpc|x86)\\.c")
 # exclude optional network modules; add when options enabled
@@ -1823,6 +1827,9 @@ if(USE_TRELLIS)
 endif()
 
 list(APPEND CLIENT_SRCS src/client/cl_usd.cpp)
+list(APPEND CLIENT_SRCS src/client/cl_district.cpp)
+list(APPEND CLIENT_SRCS src/client/cl_openworld.cpp)
+list(APPEND CLIENT_SRCS src/client/cl_proc.cpp)
 
 # renderers
 set(RENDERER_COMMON_SRCS
@@ -2743,6 +2750,48 @@ add_test(NAME test_physics
 set_tests_properties(test_physics PROPERTIES
 	LABELS "scripts;validation"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_physics.sh;${CMAKE_SOURCE_DIR}/src/physics/phys_middleware.c")
+
+add_test(NAME test_districts
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_districts.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_districts PROPERTIES
+	LABELS "scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_districts.sh;${CMAKE_SOURCE_DIR}/src/world/world_district.c;${CMAKE_SOURCE_DIR}/tests/data/usd/world_playfield.usda")
+
+add_test(NAME test_openworld
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_openworld.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_openworld PROPERTIES
+	LABELS "scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_openworld.sh;${CMAKE_SOURCE_DIR}/src/world/world_open.c;${CMAKE_SOURCE_DIR}/tests/data/openworld/sprites/sector_0_0.ents")
+
+add_test(NAME test_proc
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_proc.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_proc PROPERTIES
+	LABELS "scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_proc.sh;${CMAKE_SOURCE_DIR}/src/world/world_proc.c;${CMAKE_SOURCE_DIR}/src/client/cl_proc.cpp")
+
+add_test(NAME test_cm_stream_merge
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_cm_stream_merge.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_cm_stream_merge PROPERTIES
+	LABELS "scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_cm_stream_merge.sh;${CMAKE_SOURCE_DIR}/scripts/tools/gen_sector_bsp.py;${CMAKE_SOURCE_DIR}/src/qcommon/cm_stream_merge.c")
+
+add_test(NAME test_nav_bake
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_nav_bake.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_nav_bake PROPERTIES
+	LABELS "scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_nav_bake.sh;${CMAKE_SOURCE_DIR}/src/navigation/nav_recast.cpp;${CMAKE_SOURCE_DIR}/tests/data/openworld/maps/sector_0_0.bsp")
+
+add_test(NAME test_openworld_sync
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_openworld_sync.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_openworld_sync PROPERTIES
+	LABELS "scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_openworld_sync.sh;${CMAKE_SOURCE_DIR}/src/renderers/vulkan/tr_bsp_stream.c;${CMAKE_SOURCE_DIR}/src/server/sv_openworld.c")
 
 add_test(NAME test_init_optional_submodules
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_init_optional_submodules.sh

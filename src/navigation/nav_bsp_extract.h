@@ -18,6 +18,8 @@ int   *Nav_BSP_GetTris(void);
 int    Nav_BSP_GetVertCount(void);
 int    Nav_BSP_GetTriCount(void);
 
+qboolean Nav_BSP_ExtractFromSectorMap( int cellX, int cellY, float sectorSize );
+
 #ifdef __cplusplus
 }
 #endif

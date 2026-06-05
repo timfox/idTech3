@@ -16,7 +16,7 @@ Usage:
 
 Default PLAYFIELD_DIR is this folder when it contains idtech3_demo/.
 
-Maps: set DEMO_MAP in local.env (e.g. q3dm1) or pass +map name. With only
+Maps: set DEMO_MAP in local.env (e.g. playfield_01) or pass +map name. With only
 z_minimal_bootstrap.pk3 in base/, omit DEMO_MAP unless you have BSP/qagame.
 EOF
 	exit 0
@@ -91,11 +91,7 @@ fi
 
 BASE_DIR_NAME="${DEMO_BASE_DIR:-base}"
 if [[ ! -d "$BASE_ROOT/$BASE_DIR_NAME" ]]; then
-	if [[ "$BASE_DIR_NAME" == "base" && -d "$BASE_ROOT/baseq3" ]]; then
-		echo "Found baseq3/ but not base/. Set DEMO_BASE_DIR=baseq3 in local.env" >&2
-		exit 2
-	fi
-	echo "Missing $BASE_ROOT/$BASE_DIR_NAME" >&2
+	echo "Missing $BASE_ROOT/$BASE_DIR_NAME (set DEMO_BASE_DIR in local.env — see docs/COMPATIBILITY.md)" >&2
 	exit 2
 fi
 

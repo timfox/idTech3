@@ -269,6 +269,10 @@ int CM_PointContents( const vec3_t p, clipHandle_t model ) {
 		}
 	}
 
+	if ( !model ) {
+		contents |= CM_Stream_PointContentsAt( p );
+	}
+
 	return contents;
 }
 

@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "server.h"
 #include "sv_enhanced.h"
+#include "sv_openworld.h"
 
 serverStatic_t	svs;				// persistant server info
 server_t		sv;					// local server
@@ -1376,6 +1377,8 @@ void SV_Frame( int msec ) {
 
 	// send a heartbeat to the master if needed
 	SV_MasterHeartbeat(HEARTBEAT_FOR_MASTER);
+
+	SV_OpenWorld_Frame();
 }
 
 

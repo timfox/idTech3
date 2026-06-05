@@ -63,15 +63,21 @@ Startup logs FreeUSD version in the client (`com_freeusd`) and renderer (`r_free
 
 Disable mesh import at runtime with `r_freeusd 0` (falls back to ASCII vertex soup). Disable tools with `com_freeusd 0`.
 
+## World districts (proxy meshes)
+
+FreeUSD `BuildEngineSceneSnapshot` also feeds the **district manifest** parser (`district_load`). District assemblies and `purpose=proxy` prims drive proxy/full residency and optional `cm_stream` sector loads. See **[DISTRICTS.md](DISTRICTS.md)**.
+
 ## Test assets
 
 | File | Purpose |
 |------|---------|
 | `tests/data/usd/parity_geom_mesh.usda` | Single-triangle `UsdGeom.Mesh` (geometry parity) |
 | `tests/data/usd/parity_shade_preview.usda` | `UsdPreviewSurface` + `material:binding` (shader-map parity) |
+| `tests/data/usd/world_playfield.usda` | District manifest (North/South + proxy layer) |
 | `examples/demo_game/mod/models/*.usda` | Shipped in `idtech3_demo.pk3`; `demo_usd.cfg` prints console hints |
+| `examples/demo_game/mod/world/*.usda` | District demo tree; `demo_districts.cfg` |
 
-`ctest -R test_freeusd_smoke` checks renderer/client symbols and that these USDA files exist.
+`ctest -R test_freeusd_smoke` checks renderer/client symbols and that these USDA files exist. `ctest -R test_districts` validates the district layer wiring.
 
 ## License note
 

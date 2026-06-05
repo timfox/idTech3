@@ -39,6 +39,18 @@ struct NavMeshInstance {
 static NavMeshInstance navMeshes[MAX_NAV_MESHES];
 static int navMeshCount = 0;
 static qboolean navInitialized = qfalse;
+static navMeshHandle_t openWorldMeshHandle = -1;
+
+#define NAV_OPEN_WORLD_TILES 256
+
+typedef struct {
+	qboolean  active;
+	int       cellX;
+	int       cellY;
+	dtTileRef tileRef;
+} navOpenWorldTile_t;
+
+static navOpenWorldTile_t openWorldTiles[NAV_OPEN_WORLD_TILES];
 
 static cvar_t *nav_enabled;
 static cvar_t *nav_debugDraw;
@@ -99,6 +111,171 @@ extern "C" float *Nav_BSP_GetVerts(void);
 extern "C" int   *Nav_BSP_GetTris(void);
 extern "C" int    Nav_BSP_GetVertCount(void);
 extern "C" int    Nav_BSP_GetTriCount(void);
+extern "C" qboolean Nav_BSP_ExtractFromSectorMap( int cellX, int cellY, float sectorSize );
+
+static qboolean Nav_BuildTileBlob( int tileX, int tileY, float tileWorldWidth, float tileWorldHeight,
+	const navMeshParams_t *params, unsigned char **outData, int *outDataSize ) {
+	navMeshParams_t p;
+	int nverts, ntris;
+	float *verts;
+	int *tris;
+	float bmin[3], bmax[3];
+	rcContext ctx;
+	rcConfig cfg;
+	rcHeightfield *solid;
+	unsigned char *triAreas;
+	rcCompactHeightfield *chf;
+	rcContourSet *cset;
+	rcPolyMesh *pmesh;
+	rcPolyMeshDetail *dmesh;
+	dtNavMeshCreateParams dtParams;
+	unsigned char *navData = nullptr;
+	int navDataSize = 0;
+	int i;
+
+	if ( !outData || !outDataSize ) {
+		return qfalse;
+	}
+	*outData = nullptr;
+	*outDataSize = 0;
+
+	if ( params ) {
+		p = *params;
+	} else {
+		Nav_DefaultParams( &p );
+	}
+
+	nverts = Nav_BSP_GetVertCount();
+	ntris = Nav_BSP_GetTriCount();
+	verts = Nav_BSP_GetVerts();
+	tris = Nav_BSP_GetTris();
+	if ( nverts < 3 || ntris < 1 ) {
+		return qfalse;
+	}
+
+	bmin[0] = bmin[1] = bmin[2] = 1e10f;
+	bmax[0] = bmax[1] = bmax[2] = -1e10f;
+	for ( i = 0; i < nverts; i++ ) {
+		for ( int a = 0; a < 3; a++ ) {
+			if ( verts[i * 3 + a] < bmin[a] ) {
+				bmin[a] = verts[i * 3 + a];
+			}
+			if ( verts[i * 3 + a] > bmax[a] ) {
+				bmax[a] = verts[i * 3 + a];
+			}
+		}
+	}
+
+	memset( &cfg, 0, sizeof( cfg ) );
+	cfg.cs = p.cellSize;
+	cfg.ch = p.cellHeight;
+	cfg.walkableSlopeAngle = p.agentMaxSlope;
+	cfg.walkableHeight = (int)ceilf( p.agentHeight / cfg.ch );
+	cfg.walkableClimb = (int)floorf( p.agentMaxClimb / cfg.ch );
+	cfg.walkableRadius = (int)ceilf( p.agentRadius / cfg.cs );
+	cfg.maxEdgeLen = (int)( p.edgeMaxLen / cfg.cs );
+	cfg.maxSimplificationError = p.edgeMaxError;
+	cfg.minRegionArea = p.regionMinSize * p.regionMinSize;
+	cfg.mergeRegionArea = p.regionMergeSize * p.regionMergeSize;
+	cfg.maxVertsPerPoly = p.vertsPerPoly;
+	cfg.detailSampleDist = p.detailSampleDist < 0.9f ? 0 : cfg.cs * p.detailSampleDist;
+	cfg.detailSampleMaxError = cfg.ch * p.detailSampleMaxError;
+	rcVcopy( cfg.bmin, bmin );
+	rcVcopy( cfg.bmax, bmax );
+	rcCalcGridSize( cfg.bmin, cfg.bmax, cfg.cs, &cfg.width, &cfg.height );
+
+	solid = rcAllocHeightfield();
+	if ( !solid || !rcCreateHeightfield( &ctx, *solid, cfg.width, cfg.height, cfg.bmin, cfg.bmax, cfg.cs, cfg.ch ) ) {
+		rcFreeHeightField( solid );
+		return qfalse;
+	}
+
+	triAreas = new unsigned char[ntris];
+	memset( triAreas, 0, (size_t)ntris );
+	rcMarkWalkableTriangles( &ctx, cfg.walkableSlopeAngle, verts, nverts, tris, ntris, triAreas );
+	rcRasterizeTriangles( &ctx, verts, nverts, tris, triAreas, ntris, *solid, cfg.walkableClimb );
+	delete[] triAreas;
+
+	rcFilterLowHangingWalkableObstacles( &ctx, cfg.walkableClimb, *solid );
+	rcFilterLedgeSpans( &ctx, cfg.walkableHeight, cfg.walkableClimb, *solid );
+	rcFilterWalkableLowHeightSpans( &ctx, cfg.walkableHeight, *solid );
+
+	chf = rcAllocCompactHeightfield();
+	rcBuildCompactHeightfield( &ctx, cfg.walkableHeight, cfg.walkableClimb, *solid, *chf );
+	rcFreeHeightField( solid );
+
+	rcErodeWalkableArea( &ctx, cfg.walkableRadius, *chf );
+	rcBuildDistanceField( &ctx, *chf );
+	rcBuildRegions( &ctx, *chf, 0, cfg.minRegionArea, cfg.mergeRegionArea );
+
+	cset = rcAllocContourSet();
+	rcBuildContours( &ctx, *chf, cfg.maxSimplificationError, cfg.maxEdgeLen, *cset );
+
+	pmesh = rcAllocPolyMesh();
+	rcBuildPolyMesh( &ctx, *cset, cfg.maxVertsPerPoly, *pmesh );
+
+	dmesh = rcAllocPolyMeshDetail();
+	rcBuildPolyMeshDetail( &ctx, *pmesh, *chf, cfg.detailSampleDist, cfg.detailSampleMaxError, *dmesh );
+	rcFreeCompactHeightfield( chf );
+	rcFreeContourSet( cset );
+
+	if ( pmesh->nverts < 3 || pmesh->npolys < 1 ) {
+		rcFreePolyMesh( pmesh );
+		rcFreePolyMeshDetail( dmesh );
+		return qfalse;
+	}
+
+	for ( i = 0; i < pmesh->npolys; i++ ) {
+		if ( pmesh->areas[i] == RC_WALKABLE_AREA ) {
+			pmesh->areas[i] = 0;
+		}
+		if ( pmesh->areas[i] == 0 ) {
+			pmesh->flags[i] = 1;
+		}
+	}
+
+	memset( &dtParams, 0, sizeof( dtParams ) );
+	dtParams.verts = pmesh->verts;
+	dtParams.vertCount = pmesh->nverts;
+	dtParams.polys = pmesh->polys;
+	dtParams.polyAreas = pmesh->areas;
+	dtParams.polyFlags = pmesh->flags;
+	dtParams.polyCount = pmesh->npolys;
+	dtParams.nvp = pmesh->nvp;
+	dtParams.detailMeshes = dmesh->meshes;
+	dtParams.detailVerts = dmesh->verts;
+	dtParams.detailVertsCount = dmesh->nverts;
+	dtParams.detailTris = dmesh->tris;
+	dtParams.detailTriCount = dmesh->ntris;
+	dtParams.walkableHeight = p.agentHeight;
+	dtParams.walkableRadius = p.agentRadius;
+	dtParams.walkableClimb = p.agentMaxClimb;
+	rcVcopy( dtParams.bmin, pmesh->bmin );
+	rcVcopy( dtParams.bmax, pmesh->bmax );
+	dtParams.cs = cfg.cs;
+	dtParams.ch = cfg.ch;
+	dtParams.buildBvTree = true;
+	dtParams.tileX = tileX;
+	dtParams.tileY = tileY;
+	dtParams.tileLayer = 0;
+	dtParams.bmin[0] = (float)tileX * tileWorldWidth;
+	dtParams.bmax[0] = (float)( tileX + 1 ) * tileWorldWidth;
+	dtParams.bmin[2] = -(float)( tileY + 1 ) * tileWorldHeight;
+	dtParams.bmax[2] = -(float)tileY * tileWorldHeight;
+
+	if ( !dtCreateNavMeshData( &dtParams, &navData, &navDataSize ) || !navData || navDataSize <= 0 ) {
+		rcFreePolyMesh( pmesh );
+		rcFreePolyMeshDetail( dmesh );
+		return qfalse;
+	}
+
+	rcFreePolyMesh( pmesh );
+	rcFreePolyMeshDetail( dmesh );
+
+	*outData = navData;
+	*outDataSize = navDataSize;
+	return qtrue;
+}
 
 extern "C" navMeshHandle_t Nav_BuildFromBSP(const char *mapName, const navMeshParams_t *params) {
 	if (!navInitialized || navMeshCount >= MAX_NAV_MESHES) return -1;
@@ -509,4 +686,191 @@ extern "C" void Nav_DebugDraw(navMeshHandle_t mesh) {
 
 	Com_Printf("Nav debug: mesh %d, max tiles %d, %d agents\n",
 		mesh, inst->navMesh->getMaxTiles(), inst->agentCount);
+}
+
+static int Nav_FindOpenWorldTile( int cellX, int cellY ) {
+	for ( int i = 0; i < NAV_OPEN_WORLD_TILES; i++ ) {
+		if ( openWorldTiles[i].active && openWorldTiles[i].cellX == cellX &&
+			openWorldTiles[i].cellY == cellY ) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+static int Nav_AllocOpenWorldTile( int cellX, int cellY ) {
+	int idx = Nav_FindOpenWorldTile( cellX, cellY );
+	if ( idx >= 0 ) {
+		return idx;
+	}
+	for ( int i = 0; i < NAV_OPEN_WORLD_TILES; i++ ) {
+		if ( !openWorldTiles[i].active ) {
+			openWorldTiles[i].active = qtrue;
+			openWorldTiles[i].cellX = cellX;
+			openWorldTiles[i].cellY = cellY;
+			openWorldTiles[i].tileRef = 0;
+			return i;
+		}
+	}
+	return -1;
+}
+
+extern "C" navMeshHandle_t Nav_CreateOpenWorldMesh( void ) {
+	navMeshParams_t p;
+
+	if ( openWorldMeshHandle >= 0 && VALID_MESH( openWorldMeshHandle ) ) {
+		return openWorldMeshHandle;
+	}
+	if ( !navInitialized || navMeshCount >= MAX_NAV_MESHES ) {
+		return -1;
+	}
+
+	Nav_DefaultParams( &p );
+
+	int idx = navMeshCount++;
+	NavMeshInstance *inst = &navMeshes[idx];
+	memset( inst, 0, sizeof( *inst ) );
+
+	inst->navMesh = dtAllocNavMesh();
+	dtNavMeshParams meshParams;
+	float sectorTile;
+	memset( &meshParams, 0, sizeof( meshParams ) );
+	meshParams.orig[0] = 0.0f;
+	meshParams.orig[1] = 0.0f;
+	meshParams.orig[2] = 0.0f;
+	sectorTile = Cvar_VariableValue( "r_openWorldSectorSize" );
+	if ( sectorTile < 256.0f ) {
+		sectorTile = 4096.0f;
+	}
+	meshParams.tileWidth = sectorTile;
+	meshParams.tileHeight = sectorTile;
+	meshParams.maxTiles = 1024;
+	meshParams.maxPolys = 1024 * 64;
+	if ( dtStatusFailed( inst->navMesh->init( &meshParams ) ) ) {
+		dtFreeNavMesh( inst->navMesh );
+		memset( inst, 0, sizeof( *inst ) );
+		navMeshCount--;
+		return -1;
+	}
+
+	inst->navQuery = dtAllocNavMeshQuery();
+	inst->navQuery->init( inst->navMesh, 2048 );
+	inst->crowd = dtAllocCrowd();
+	inst->crowd->init( NAV_MAX_AGENTS, p.agentRadius * 4.0f, inst->navMesh );
+	inst->active = qtrue;
+	inst->agentCount = 0;
+
+	memset( openWorldTiles, 0, sizeof( openWorldTiles ) );
+	openWorldMeshHandle = idx;
+	Com_Printf( "Nav: open-world tiled mesh handle %d (tile %.1fx%.1f)\n",
+		idx, meshParams.tileWidth, meshParams.tileHeight );
+	return idx;
+}
+
+extern "C" navMeshHandle_t Nav_GetOpenWorldMesh( void ) {
+	return openWorldMeshHandle;
+}
+
+extern "C" qboolean Nav_LoadSectorTile( navMeshHandle_t mesh, int cellX, int cellY ) {
+	char path[MAX_QPATH];
+	void *fileData;
+	int fileSize;
+	dtTileRef tileRef;
+	dtStatus status;
+	int slot;
+
+	if ( !VALID_MESH( mesh ) ) {
+		return qfalse;
+	}
+	if ( Nav_FindOpenWorldTile( cellX, cellY ) >= 0 ) {
+		return qtrue;
+	}
+
+	Com_sprintf( path, sizeof( path ), "nav/sector_%d_%d.nav", cellX, cellY );
+	fileSize = FS_ReadFile( path, &fileData );
+	if ( fileSize <= 0 || !fileData ) {
+		Com_DPrintf( "Nav: no tile %s\n", path );
+		return qfalse;
+	}
+
+	slot = Nav_AllocOpenWorldTile( cellX, cellY );
+	if ( slot < 0 ) {
+		FS_FreeFile( fileData );
+		Com_Printf( S_COLOR_YELLOW "Nav: open-world tile table full (%d,%d)\n", cellX, cellY );
+		return qfalse;
+	}
+
+	status = navMeshes[mesh].navMesh->addTile(
+		(unsigned char *)fileData, fileSize, DT_TILE_FREE_DATA, 0, &tileRef );
+	if ( dtStatusFailed( status ) ) {
+		FS_FreeFile( fileData );
+		openWorldTiles[slot].active = qfalse;
+		Com_Printf( S_COLOR_YELLOW "Nav: addTile failed for %s (0x%x)\n", path, status );
+		return qfalse;
+	}
+
+	openWorldTiles[slot].tileRef = tileRef;
+	Com_Printf( "Nav: loaded sector tile %d,%d from %s\n", cellX, cellY, path );
+	return qtrue;
+}
+
+extern "C" void Nav_UnloadSectorTile( navMeshHandle_t mesh, int cellX, int cellY ) {
+	int slot;
+	unsigned char *data = NULL;
+	int dataSize = 0;
+
+	if ( !VALID_MESH( mesh ) ) {
+		return;
+	}
+	slot = Nav_FindOpenWorldTile( cellX, cellY );
+	if ( slot < 0 ) {
+		return;
+	}
+
+	if ( openWorldTiles[slot].tileRef ) {
+		navMeshes[mesh].navMesh->removeTile( openWorldTiles[slot].tileRef, &data, &dataSize );
+		if ( data ) {
+			dtFree( data );
+		}
+	}
+	openWorldTiles[slot].active = qfalse;
+	openWorldTiles[slot].tileRef = 0;
+	Com_DPrintf( "Nav: unloaded sector tile %d,%d\n", cellX, cellY );
+}
+
+extern "C" qboolean Nav_BakeSectorTile( int cellX, int cellY, float sectorSize, const navMeshParams_t *params ) {
+	char path[MAX_QPATH];
+	unsigned char *tileData;
+	int tileSize;
+	qboolean ok;
+
+	if ( !navInitialized ) {
+		return qfalse;
+	}
+	if ( sectorSize < 256.0f ) {
+		sectorSize = Cvar_VariableValue( "r_openWorldSectorSize" );
+	}
+	if ( sectorSize < 256.0f ) {
+		sectorSize = 4096.0f;
+	}
+
+	Nav_BSP_ClearGeometry();
+	if ( !Nav_BSP_ExtractFromSectorMap( cellX, cellY, sectorSize ) ) {
+		Com_Printf( S_COLOR_YELLOW "Nav: bake %d,%d failed — no geometry (load maps/sector_%d_%d.bsp)\n",
+			cellX, cellY, cellX, cellY );
+		return qfalse;
+	}
+
+	ok = Nav_BuildTileBlob( cellX, cellY, sectorSize, sectorSize, params, &tileData, &tileSize );
+	if ( !ok || !tileData || tileSize <= 0 ) {
+		Com_Printf( S_COLOR_YELLOW "Nav: bake %d,%d Recast build failed\n", cellX, cellY );
+		return qfalse;
+	}
+
+	Com_sprintf( path, sizeof( path ), "nav/sector_%d_%d.nav", cellX, cellY );
+	FS_WriteFile( path, tileData, tileSize );
+	dtFree( tileData );
+
+	Com_Printf( "Nav: baked sector tile %d,%d -> %s (%d bytes)\n", cellX, cellY, path, tileSize );
+	return qtrue;
 }

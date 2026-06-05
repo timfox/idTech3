@@ -24,7 +24,7 @@ state run 1 0.15
 
 Drives `refEntity_t.frame` / `oldframe` / `backlerp` on the native game module path.
 
-## Retarget / mocap (Unwaking pipeline)
+## Retarget / mocap (full-conversion pipeline)
 
 | Tool | Purpose |
 |------|---------|

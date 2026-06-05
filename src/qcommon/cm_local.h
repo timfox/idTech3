@@ -214,6 +214,11 @@ typedef struct {
 	sphere_t	sphere;		// sphere for oriendted capsule collision
 } traceWork_t;
 
+void CM_TraceThroughBrush( traceWork_t *tw, const cbrush_t *brush );
+void CM_Stream_TraceMerged( traceWork_t *tw );
+void CM_Stream_PointContentsMerged( const vec3_t p, traceWork_t *tw );
+int CM_Stream_PointContentsAt( const vec3_t p );
+
 typedef struct leafList_s {
 	int		count;
 	int		maxcount;
