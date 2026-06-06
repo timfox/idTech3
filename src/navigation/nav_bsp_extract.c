@@ -95,7 +95,7 @@ static qboolean Nav_BSP_BoundsFromBrush( dplane_t *planes, int numPlanes,
 	return qtrue;
 }
 
-qboolean Nav_BSP_ExtractFromSectorBuffer( const byte *buf, int length, int cellX, int cellY, float sectorSize ) {
+qboolean Nav_BSP_ExtractFromSectorBuffer( const byte *buf, size_t length, int cellX, int cellY, float sectorSize ) {
 	dheader_t header;
 	byte *base;
 	vec3_t worldOrigin;
@@ -106,7 +106,7 @@ qboolean Nav_BSP_ExtractFromSectorBuffer( const byte *buf, int length, int cellX
 	dbrush_t *inBrushes;
 	int numPlanes, numSides, numBrushes;
 
-	if ( !buf || length <= 0 ) {
+	if ( !buf || length == 0 ) {
 		return qfalse;
 	}
 	if ( sectorSize < 256.0f ) {
@@ -183,7 +183,7 @@ qboolean Nav_BSP_ExtractFromSectorMap( int cellX, int cellY, float sectorSize ) 
 		return qfalse;
 	}
 
-	ok = Nav_BSP_ExtractFromSectorBuffer( (const byte *)buf, length, cellX, cellY, sectorSize );
+	ok = Nav_BSP_ExtractFromSectorBuffer( (const byte *)buf, (size_t)length, cellX, cellY, sectorSize );
 	FS_FreeFile( buf );
 
 	if ( ok ) {

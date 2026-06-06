@@ -99,13 +99,13 @@ static void CL_OpenWorld_SyncUnloadRemoved( const clOpenWorldCell_t *newCells, i
 	int oldCount;
 	int i, n;
 	const worldOpenSector_t *sec;
-	int syncMask = 0;
+	worldOpenLayerMask_t syncMask = 0;
 
 	if ( Cvar_VariableIntegerValue( "cm_openWorldCollision" ) ) {
-		syncMask |= ( 1 << WO_LAYER_COLLISION );
+		syncMask |= WO_LAYER_MASK_COLLISION;
 	}
 	if ( Cvar_VariableIntegerValue( "r_openWorldNav" ) ) {
-		syncMask |= ( 1 << WO_LAYER_NAV );
+		syncMask |= WO_LAYER_MASK_NAV;
 	}
 
 	oldCount = CL_OpenWorld_ParseSectorList( cl_openWorldLastSync, oldCells, CL_OPENWORLD_SYNC_MAX );
@@ -230,7 +230,7 @@ static void CL_OpenWorld_UpdateBspStream( void ) {
 	}
 }
 
-static void CL_OpenWorld_LoadSectorCells( const char *sectorList, int layerMask ) {
+static void CL_OpenWorld_LoadSectorCells( const char *sectorList, worldOpenLayerMask_t layerMask ) {
 	clOpenWorldCell_t cells[CL_OPENWORLD_SYNC_MAX];
 	int count;
 	int i;
@@ -294,7 +294,7 @@ static void CL_OpenWorld_MapDefToDesc( const engineSpriteMapDef_t *def, engineSp
 static qboolean CL_OpenWorld_ReadScatterFile( const char *path, void **buf, int *len ) {
 	*buf = NULL;
 	*len = FS_ReadFile( path, buf );
-	return ( *len > 0 && *buf ) ? qtrue : qfalse;
+	return *len > 0 && *buf;
 }
 
 static qboolean CL_OpenWorld_LoadSprites( int cellX, int cellY ) {
@@ -351,7 +351,7 @@ static qboolean CL_OpenWorld_LoadSprites( int cellX, int cellY ) {
 
 	Com_Printf( "[world_open] scatter %d,%d: %d billboard(s) from %s\n",
 		cellX, cellY, spriteSectors[idx].spriteCount, path );
-	return spriteSectors[idx].spriteCount > 0 ? qtrue : qfalse;
+	return spriteSectors[idx].spriteCount > 0;
 }
 
 static void CL_OpenWorld_UnloadSprites( int cellX, int cellY ) {
@@ -484,7 +484,7 @@ static void CL_OpenWorld_BakeNavView_f( void ) {
 
 static void CL_OpenWorld_LoadSector_f( void ) {
 	int cellX, cellY;
-	int mask;
+	worldOpenLayerMask_t mask = WO_LAYER_MASK_NAV | WO_LAYER_MASK_SPRITES;
 
 	if ( Cmd_Argc() < 3 ) {
 		Com_Printf( "Usage: openworld_sector <cellX> <cellY>\n" );
@@ -495,9 +495,8 @@ static void CL_OpenWorld_LoadSector_f( void ) {
 	}
 	cellX = atoi( Cmd_Argv( 1 ) );
 	cellY = atoi( Cmd_Argv( 2 ) );
-	mask = ( 1 << WO_LAYER_NAV ) | ( 1 << WO_LAYER_SPRITES );
 	if ( Cvar_VariableIntegerValue( "cm_openWorldCollision" ) ) {
-		mask |= ( 1 << WO_LAYER_COLLISION );
+		mask |= WO_LAYER_MASK_COLLISION;
 	}
 	WorldOpen_LoadSector( cellX, cellY, mask );
 }
@@ -505,7 +504,7 @@ static void CL_OpenWorld_LoadSector_f( void ) {
 extern "C" void CL_OpenWorld_OnConfigstring( const char *sectorList ) {
 	clOpenWorldCell_t newCells[CL_OPENWORLD_SYNC_MAX];
 	int newCount;
-	int layerMask;
+	worldOpenLayerMask_t layerMask = 0;
 
 	if ( !cl_openWorldSync || !cl_openWorldSync->integer ) {
 		return;
@@ -523,12 +522,11 @@ extern "C" void CL_OpenWorld_OnConfigstring( const char *sectorList ) {
 	newCount = CL_OpenWorld_ParseSectorList( sectorList, newCells, CL_OPENWORLD_SYNC_MAX );
 	CL_OpenWorld_SyncUnloadRemoved( newCells, newCount );
 
-	layerMask = 0;
 	if ( Cvar_VariableIntegerValue( "cm_openWorldCollision" ) ) {
-		layerMask |= ( 1 << WO_LAYER_COLLISION );
+		layerMask |= WO_LAYER_MASK_COLLISION;
 	}
 	if ( Cvar_VariableIntegerValue( "r_openWorldNav" ) ) {
-		layerMask |= ( 1 << WO_LAYER_NAV );
+		layerMask |= WO_LAYER_MASK_NAV;
 	}
 	CL_OpenWorld_LoadSectorCells( sectorList, layerMask );
 

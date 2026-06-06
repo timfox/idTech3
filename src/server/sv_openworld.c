@@ -78,7 +78,7 @@ void SV_OpenWorld_Frame( void ) {
 	if ( radius <= 0.0f ) {
 		radius = 12288.0f;
 	}
-	mergeCollision = ( sv_openWorldCollision && sv_openWorldCollision->integer ) ? qtrue : qfalse;
+	mergeCollision = sv_openWorldCollision && sv_openWorldCollision->integer;
 
 	for ( i = 0; i < sv.maxclients; i++ ) {
 		client_t *cl = &svs.clients[i];

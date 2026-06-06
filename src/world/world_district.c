@@ -232,22 +232,21 @@ int WorldDistrict_FindAtPoint( const vec3_t point ) {
 
 static void WorldDistrict_StreamSectors( const worldDistrict_t *d ) {
 	int x, y;
-	int layerMask;
+	worldOpenLayerMask_t layerMask = 0;
 
 	if ( !d || !cm_districtStream || !cm_districtStream->integer ) {
 		return;
 	}
 
 	if ( WorldOpen_IsEnabled() ) {
-		layerMask = 0;
 		if ( Cvar_VariableIntegerValue( "cm_openWorldCollision" ) ) {
-			layerMask |= ( 1 << WO_LAYER_COLLISION );
+			layerMask |= WO_LAYER_MASK_COLLISION;
 		}
 		if ( Cvar_VariableIntegerValue( "r_openWorldNav" ) ) {
-			layerMask |= ( 1 << WO_LAYER_NAV );
+			layerMask |= WO_LAYER_MASK_NAV;
 		}
 		if ( Cvar_VariableIntegerValue( "r_openWorldSprites" ) ) {
-			layerMask |= ( 1 << WO_LAYER_SPRITES );
+			layerMask |= WO_LAYER_MASK_SPRITES;
 		}
 		for ( y = d->sectorY0; y <= d->sectorY1; y++ ) {
 			for ( x = d->sectorX0; x <= d->sectorX1; x++ ) {

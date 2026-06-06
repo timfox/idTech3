@@ -23,6 +23,13 @@ typedef enum {
 	WO_LAYER_SPRITES
 } worldOpenLayer_t;
 
+typedef uint32_t worldOpenLayerMask_t;
+
+#define WO_LAYER_MASK_COLLISION  ( 1u << WO_LAYER_COLLISION )
+#define WO_LAYER_MASK_NAV        ( 1u << WO_LAYER_NAV )
+#define WO_LAYER_MASK_SPRITES    ( 1u << WO_LAYER_SPRITES )
+#define WO_LAYER_MASK_ALL        ( WO_LAYER_MASK_COLLISION | WO_LAYER_MASK_NAV | WO_LAYER_MASK_SPRITES )
+
 typedef struct worldOpenSector_s {
 	qboolean active;
 	int      cellX;
@@ -44,9 +51,9 @@ void     WorldOpen_Enable( qboolean enable );
 qboolean WorldOpen_IsEnabled( void );
 
 void     WorldOpen_UpdateView( const vec3_t viewOrigin, float radius );
-qboolean WorldOpen_LoadSector( int cellX, int cellY, int layerMask );
+qboolean WorldOpen_LoadSector( int cellX, int cellY, worldOpenLayerMask_t layerMask );
 void     WorldOpen_UnloadSector( int cellX, int cellY );
-void     WorldOpen_UnloadSectorLayers( int cellX, int cellY, int layerMask );
+void     WorldOpen_UnloadSectorLayers( int cellX, int cellY, worldOpenLayerMask_t layerMask );
 
 int      WorldOpen_GetSectorCount( void );
 const worldOpenSector_t *WorldOpen_GetSector( int index );

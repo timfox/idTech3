@@ -108,7 +108,7 @@ qboolean Com_Pk3Sig_VerifyFile( const char *pakPath, const char *sigPath )
 	for ( i = 0; (unsigned)i < digestLen; i++ ) {
 		Com_sprintf( hex + i * 2, 3, "%02x", digest[i] );
 	}
-	return Com_Pk3Sig_HexEq( hex, expect ) ? qtrue : qfalse;
+	return Com_Pk3Sig_HexEq( hex, expect );
 #else
 	(void)pakPath;
 	(void)sigPath;

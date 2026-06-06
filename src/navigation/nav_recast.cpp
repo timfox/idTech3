@@ -946,7 +946,7 @@ extern "C" qboolean Nav_BakeSectorTileToPath( const char *bspPath, const char *n
 	}
 	fclose( f );
 
-	if ( !Nav_BSP_ExtractFromSectorBuffer( buf, (int)length, cellX, cellY, sectorSize ) ) {
+	if ( !Nav_BSP_ExtractFromSectorBuffer( buf, (size_t)length, cellX, cellY, sectorSize ) ) {
 		free( buf );
 		return qfalse;
 	}
