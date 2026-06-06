@@ -102,10 +102,6 @@ cvar_t	*r_firstPersonScaleEnabled;
 cvar_t	*r_firstPersonZNear;
 
 cvar_t	*r_skipBackEnd;
-#ifdef USE_IMGUI
-cvar_t	*r_imgui;
-cvar_t	*r_imguiTheme;
-#endif
 
 cvar_t	*r_greyscale;
 cvar_t	*r_dither;
