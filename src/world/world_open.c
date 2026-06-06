@@ -214,19 +214,19 @@ static void WorldOpen_UnloadLayer( int cellX, int cellY, worldOpenLayer_t layer 
 	}
 }
 
-qboolean WorldOpen_LoadSector( int cellX, int cellY, int layerMask ) {
+qboolean WorldOpen_LoadSector( int cellX, int cellY, worldOpenLayerMask_t layerMask ) {
 	qboolean ok = qtrue;
 
 	if ( !WorldOpen_IsEnabled() ) {
 		return qfalse;
 	}
-	if ( layerMask & ( 1 << WO_LAYER_COLLISION ) ) {
+	if ( layerMask & WO_LAYER_MASK_COLLISION ) {
 		ok = WorldOpen_LoadLayer( cellX, cellY, WO_LAYER_COLLISION ) && ok;
 	}
-	if ( layerMask & ( 1 << WO_LAYER_NAV ) ) {
+	if ( layerMask & WO_LAYER_MASK_NAV ) {
 		ok = WorldOpen_LoadLayer( cellX, cellY, WO_LAYER_NAV ) && ok;
 	}
-	if ( layerMask & ( 1 << WO_LAYER_SPRITES ) ) {
+	if ( layerMask & WO_LAYER_MASK_SPRITES ) {
 		ok = WorldOpen_LoadLayer( cellX, cellY, WO_LAYER_SPRITES ) && ok;
 	}
 	if ( ok ) {
@@ -242,18 +242,17 @@ qboolean WorldOpen_LoadSector( int cellX, int cellY, int layerMask ) {
 }
 
 void WorldOpen_UnloadSector( int cellX, int cellY ) {
-	WorldOpen_UnloadSectorLayers( cellX, cellY,
-		( 1 << WO_LAYER_SPRITES ) | ( 1 << WO_LAYER_NAV ) | ( 1 << WO_LAYER_COLLISION ) );
+	WorldOpen_UnloadSectorLayers( cellX, cellY, WO_LAYER_MASK_ALL );
 }
 
-void WorldOpen_UnloadSectorLayers( int cellX, int cellY, int layerMask ) {
-	if ( layerMask & ( 1 << WO_LAYER_SPRITES ) ) {
+void WorldOpen_UnloadSectorLayers( int cellX, int cellY, worldOpenLayerMask_t layerMask ) {
+	if ( layerMask & WO_LAYER_MASK_SPRITES ) {
 		WorldOpen_UnloadLayer( cellX, cellY, WO_LAYER_SPRITES );
 	}
-	if ( layerMask & ( 1 << WO_LAYER_NAV ) ) {
+	if ( layerMask & WO_LAYER_MASK_NAV ) {
 		WorldOpen_UnloadLayer( cellX, cellY, WO_LAYER_NAV );
 	}
-	if ( layerMask & ( 1 << WO_LAYER_COLLISION ) ) {
+	if ( layerMask & WO_LAYER_MASK_COLLISION ) {
 		WorldOpen_UnloadLayer( cellX, cellY, WO_LAYER_COLLISION );
 	}
 }
@@ -264,7 +263,7 @@ void WorldOpen_UpdateView( const vec3_t viewOrigin, float radius ) {
 	int x, y;
 	float sectorSize;
 	int cellRadius;
-	int layerMask;
+	worldOpenLayerMask_t layerMask = 0;
 
 	if ( !WorldOpen_IsEnabled() || !viewOrigin ) {
 		return;
@@ -278,20 +277,19 @@ void WorldOpen_UpdateView( const vec3_t viewOrigin, float radius ) {
 		radius = r_openWorldRadius ? r_openWorldRadius->value : 12288.0f;
 	}
 
-	layerMask = 0;
 	if ( cm_openWorldCollision && cm_openWorldCollision->integer ) {
-		layerMask |= ( 1 << WO_LAYER_COLLISION );
+		layerMask |= WO_LAYER_MASK_COLLISION;
 	}
 	if ( r_openWorldNav && r_openWorldNav->integer ) {
-		layerMask |= ( 1 << WO_LAYER_NAV );
+		layerMask |= WO_LAYER_MASK_NAV;
 	}
 	if ( r_openWorldSprites && r_openWorldSprites->integer ) {
-		layerMask |= ( 1 << WO_LAYER_SPRITES );
+		layerMask |= WO_LAYER_MASK_SPRITES;
 	}
 
 	if ( r_openWorldStream && r_openWorldStream->integer ) {
 		CM_Stream_UpdateView( viewOrigin, radius, sectorSize,
-			( cm_openWorldCollision && cm_openWorldCollision->integer ) ? qtrue : qfalse );
+			cm_openWorldCollision && cm_openWorldCollision->integer );
 	}
 
 	CM_Stream_WorldToCell( viewOrigin, sectorSize, &centerX, &centerY );

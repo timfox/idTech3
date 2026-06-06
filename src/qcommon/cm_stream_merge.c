@@ -279,7 +279,7 @@ void CM_Stream_UnmergeSector( int cellX, int cellY ) {
 }
 
 qboolean CM_Stream_IsSectorMerged( int cellX, int cellY ) {
-	return CM_Stream_FindPatch( cellX, cellY ) >= 0 ? qtrue : qfalse;
+	return CM_Stream_FindPatch( cellX, cellY ) >= 0;
 }
 
 int CM_Stream_MergedCount( void ) {
