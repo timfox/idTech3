@@ -124,14 +124,14 @@ def pack_dsurface(
 
 
 def axial_box_planes(mins: Tuple[float, float, float], maxs: Tuple[float, float, float]) -> List[Tuple[float, float, float, float]]:
-    """Six outward-facing axial planes enclosing [mins, maxs]."""
+    """Six brush sides in CM_BoundBrush order (even=min, odd=max per axis)."""
     return [
-        (1.0, 0.0, 0.0, mins[0]),
-        (-1.0, 0.0, 0.0, -maxs[0]),
-        (0.0, 1.0, 0.0, mins[1]),
-        (0.0, -1.0, 0.0, -maxs[1]),
-        (0.0, 0.0, 1.0, mins[2]),
-        (0.0, 0.0, -1.0, -maxs[2]),
+        (-1.0, 0.0, 0.0, -mins[0]),
+        (1.0, 0.0, 0.0, maxs[0]),
+        (0.0, -1.0, 0.0, -mins[1]),
+        (0.0, 1.0, 0.0, maxs[1]),
+        (0.0, 0.0, -1.0, -mins[2]),
+        (0.0, 0.0, 1.0, maxs[2]),
     ]
 
 

@@ -6,6 +6,7 @@ set(DEMO_BOOTSTRAP_DIR "${CMAKE_SOURCE_DIR}/examples/demo_game/bootstrap_media")
 set(DEMO_INTER_PACK_FONT "${CMAKE_SOURCE_DIR}/fonts/Inter_28pt-Regular.ttf")
 set(DEMO_PK3 "${CMAKE_BINARY_DIR}/idtech3_demo.pk3")
 set(DEMO_PACK_STAGING "${CMAKE_BINARY_DIR}/idtech3_demo_pack_staging")
+set(DEMO_SQZ_OUT "${CMAKE_BINARY_DIR}/demo_sqz_pack/sqz/demo.sqz")
 
 set(DEMO_BOOTSTRAP_GFX2D "${DEMO_BOOTSTRAP_DIR}/gfx/2d/bigchars.png")
 set(DEMO_BOOTSTRAP_GFX_DEMO
@@ -69,7 +70,6 @@ set(DEMO_MOD_FILES
 	"${DEMO_MOD_DIR}/grtx/demo.grtx"
 	"${DEMO_MOD_DIR}/mgs/demo.mgs"
 	"${DEMO_MOD_DIR}/wsp/demo.wsp"
-	"${CMAKE_BINARY_DIR}/demo_sqz_pack/sqz/demo.sqz"
 	"${CMAKE_SOURCE_DIR}/examples/demo_game/loc/en.loc"
 	"${DEMO_MOD_DIR}/models/parity_geom_mesh.usda"
 	"${DEMO_MOD_DIR}/models/parity_shade_preview.usda"
@@ -112,6 +112,17 @@ if(NOT ANDROID)
 	set(DEMO_UI_DOT_ZIP "vm/ui.${DEMO_UI_ARCH}${CMAKE_SHARED_LIBRARY_SUFFIX}")
 endif()
 
+# Generated at build time (not shipped in mod/ tree).
+add_custom_command(
+	OUTPUT "${DEMO_SQZ_OUT}"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/demo_sqz_pack/sqz"
+	COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/scripts/sqz_pack_demo.py"
+		"${DEMO_SQZ_OUT}"
+	DEPENDS "${CMAKE_SOURCE_DIR}/scripts/sqz_pack_demo.py"
+	COMMENT "Generating demo.sqz for idtech3_demo.pk3"
+	VERBATIM
+)
+
 # Staging tree + zip so vm/ui*.so ships inside idtech3_demo.pk3 (pk3 is a zip).
 add_custom_command(
 	OUTPUT "${DEMO_PK3}"
@@ -145,9 +156,6 @@ add_custom_command(
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/mgs"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/wsp"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/sqz"
-	COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/demo_sqz_pack/sqz"
-	COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/scripts/sqz_pack_demo.py"
-		"${CMAKE_BINARY_DIR}/demo_sqz_pack/sqz/demo.sqz"
 	COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/scripts/tools/gen_hub_bsp.py"
 		"${DEMO_PACK_STAGING}/maps/open_void.bsp"
 	COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/scripts/tools/gen_sector_bsp.py"
@@ -186,6 +194,7 @@ add_custom_command(
 		"${DEMO_MOD_DIR}/demo_audio.cfg" "${DEMO_PACK_STAGING}/demo_audio.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/demo_sp_slice.cfg" "${DEMO_PACK_STAGING}/demo_sp_slice.cfg"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/gpu_golden_capture.cfg" "${DEMO_PACK_STAGING}/gpu_golden_capture.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/sound/soundevents.txt" "${DEMO_PACK_STAGING}/sound/soundevents.txt"
@@ -199,7 +208,9 @@ add_custom_command(
 		"${DEMO_MOD_DIR}/nslm/demo.nslm" "${DEMO_PACK_STAGING}/nslm/demo.nslm"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/nist/demo.nist" "${DEMO_PACK_STAGING}/nist/demo.nist"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/nvc/demo.nvc" "${DEMO_PACK_STAGING}/nvc/demo.nvc"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/fsa/demo.fsa" "${DEMO_PACK_STAGING}/fsa/demo.fsa"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/vfgi/demo.vfgi" "${DEMO_PACK_STAGING}/vfgi/demo.vfgi"
@@ -214,7 +225,7 @@ add_custom_command(
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/wsp/demo.wsp" "${DEMO_PACK_STAGING}/wsp/demo.wsp"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
-		"${CMAKE_BINARY_DIR}/demo_sqz_pack/sqz/demo.sqz" "${DEMO_PACK_STAGING}/sqz/demo.sqz"
+		"${DEMO_SQZ_OUT}" "${DEMO_PACK_STAGING}/sqz/demo.sqz"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/demo_squeezeme.cfg" "${DEMO_PACK_STAGING}/demo_squeezeme.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -307,7 +318,7 @@ add_custom_command(
 		fonts/demo_console_sdf.fnt
 		"${DEMO_UI_IN_ZIP}"
 		"${DEMO_UI_DOT_ZIP}"
-	DEPENDS ${DEMO_MOD_FILES} demo_ui_skeleton
+	DEPENDS ${DEMO_MOD_FILES} demo_ui_skeleton "${DEMO_SQZ_OUT}"
 	COMMENT "Packaging idtech3_demo.pk3 (configs + native UI stub)"
 	VERBATIM
 	COMMAND_EXPAND_LISTS

@@ -27,6 +27,7 @@ typedef struct {
 
 static bspStreamPatch_t s_bspPatches[BSP_STREAM_MAX_PATCHES];
 static cvar_t *r_bspStream;
+static cvar_t *r_bspStreamResident;
 
 static int R_BspStream_FindPatch( int cellX, int cellY ) {
 	int i;
@@ -62,56 +63,29 @@ static int R_BspStream_AllocPatch( int cellX, int cellY ) {
 static qboolean R_BspStream_BoundsFromBrush( dplane_t *planes, int numPlanes,
 	dbrushside_t *sides, int numSides, int firstSide, int brushSides,
 	vec3_t outMins, vec3_t outMaxs ) {
-	int i, planeNum;
-	qboolean haveMins[3], haveMaxs[3];
-	float nx, ny, nz, pdist;
+	int axis, planeNum;
+	float dmin, dmax;
 
 	if ( firstSide < 0 || brushSides < 6 || firstSide + brushSides > numSides ) {
 		return qfalse;
 	}
 
-	VectorSet( outMins, 0, 0, 0 );
-	VectorSet( outMaxs, 0, 0, 0 );
-	memset( haveMins, 0, sizeof( haveMins ) );
-	memset( haveMaxs, 0, sizeof( haveMaxs ) );
-
-	for ( i = 0; i < brushSides; i++ ) {
-		dbrushside_t *side = &sides[firstSide + i];
-		dplane_t *plane;
-
-		planeNum = LittleLong( side->planeNum );
+	for ( axis = 0; axis < 3; axis++ ) {
+		planeNum = LittleLong( sides[firstSide + axis * 2].planeNum );
 		if ( planeNum < 0 || planeNum >= numPlanes ) {
 			return qfalse;
 		}
-		plane = &planes[planeNum];
-		nx = LittleFloat( plane->normal[0] );
-		ny = LittleFloat( plane->normal[1] );
-		nz = LittleFloat( plane->normal[2] );
-		pdist = LittleFloat( plane->dist );
-		if ( nx == 1.0f && !haveMins[0] ) {
-			outMins[0] = pdist;
-			haveMins[0] = qtrue;
-		} else if ( nx == -1.0f && !haveMaxs[0] ) {
-			outMaxs[0] = -pdist;
-			haveMaxs[0] = qtrue;
-		} else if ( ny == 1.0f && !haveMins[1] ) {
-			outMins[1] = pdist;
-			haveMins[1] = qtrue;
-		} else if ( ny == -1.0f && !haveMaxs[1] ) {
-			outMaxs[1] = -pdist;
-			haveMaxs[1] = qtrue;
-		} else if ( nz == 1.0f && !haveMins[2] ) {
-			outMins[2] = pdist;
-			haveMins[2] = qtrue;
-		} else if ( nz == -1.0f && !haveMaxs[2] ) {
-			outMaxs[2] = -pdist;
-			haveMaxs[2] = qtrue;
+		dmin = LittleFloat( planes[planeNum].dist );
+		planeNum = LittleLong( sides[firstSide + axis * 2 + 1].planeNum );
+		if ( planeNum < 0 || planeNum >= numPlanes ) {
+			return qfalse;
 		}
+		dmax = LittleFloat( planes[planeNum].dist );
+		outMins[axis] = -dmin;
+		outMaxs[axis] = dmax;
 	}
 
-	return haveMins[0] && haveMaxs[0] && haveMins[1] && haveMaxs[1] &&
-		haveMins[2] && haveMaxs[2] &&
-		outMaxs[0] > outMins[0] && outMaxs[1] > outMins[1] && outMaxs[2] > outMins[2];
+	return outMaxs[0] > outMins[0] && outMaxs[1] > outMins[1] && outMaxs[2] > outMins[2];
 }
 
 static srfSurfaceFace_t *R_BspStream_AllocTopFace( const vec3_t wmins, const vec3_t wmaxs ) {
@@ -305,11 +279,17 @@ static int R_BspStream_LoadSurfaceLumps( bspStreamPatch_t *patch, dheader_t *hea
 	loaded = 0;
 	for ( i = 0; i < numSurfaces && patch->numFaces < BSP_STREAM_MAX_FACES; i++ ) {
 		const dsurface_t *ds = &surfs[i];
+		int surfaceType = LittleLong( ds->surfaceType );
 		int firstVert = LittleLong( ds->firstVert );
 		int numSurfVerts = LittleLong( ds->numVerts );
 		int firstIndex = LittleLong( ds->firstIndex );
 		int numSurfIndexes = LittleLong( ds->numIndexes );
 
+		if ( surfaceType == MST_PATCH ) {
+			ri.Printf( PRINT_DEVELOPER,
+				"[bsp_stream] skip patch surface %d (MST_PATCH residency not implemented)\n", i );
+			continue;
+		}
 		if ( firstVert < 0 || numSurfVerts <= 0 || firstVert + numSurfVerts > numVerts ) {
 			continue;
 		}
@@ -329,8 +309,34 @@ void R_BspStream_Init( void ) {
 	r_bspStream = ri.Cvar_Get( "r_bspStream", "1", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_bspStream,
 		"Merge sector BSP brush tops as visual overlay (open-world renderer streaming)." );
+	r_bspStreamResident = ri.Cvar_Get( "r_bspStreamResident", "1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_bspStreamResident,
+		"Log streamed sector face residency (planar surfaces / brush-top fallback; VBO deferred)." );
 	Com_Memset( s_bspPatches, 0, sizeof( s_bspPatches ) );
 	ri.Printf( PRINT_ALL, "[bsp_stream] visual sector overlay initialized (r_bspStream 1)\n" );
+}
+
+void RE_BspStream_ClearAll( void ) {
+	Com_Memset( s_bspPatches, 0, sizeof( s_bspPatches ) );
+	ri.Printf( PRINT_DEVELOPER, "[bsp_stream] cleared sector visual overlays\n" );
+}
+
+static void R_BspStream_LogResidency( int cellX, int cellY, const char *mapName, const char *path,
+	bspStreamPatch_t *patch ) {
+	int f, verts = 0, indexes = 0;
+
+	if ( !r_bspStreamResident || !r_bspStreamResident->integer || !patch ) {
+		return;
+	}
+	for ( f = 0; f < patch->numFaces; f++ ) {
+		if ( patch->faces[f].face ) {
+			verts += patch->faces[f].face->numPoints;
+			indexes += patch->faces[f].face->numIndices;
+		}
+	}
+	ri.Printf( PRINT_ALL,
+		"[bsp_stream] residency %d,%d %s (%s): %d faces, %d verts, %d indexes (hunk, vbo deferred)\n",
+		cellX, cellY, mapName, path, patch->numFaces, verts, indexes );
 }
 
 qboolean RE_BspStream_MergeSector( int cellX, int cellY, float sectorSize ) {
@@ -411,6 +417,7 @@ qboolean RE_BspStream_MergeSector( int cellX, int cellY, float sectorSize ) {
 
 	if ( R_BspStream_LoadSurfaceLumps( patch, &header, base, worldOrigin ) > 0 ) {
 		ri.FS_FreeFile( buf );
+		R_BspStream_LogResidency( cellX, cellY, mapName, "surfaces", patch );
 		ri.Printf( PRINT_ALL, "[bsp_stream] merged visual sector %d,%d (%s, %d surfaces)\n",
 			cellX, cellY, mapName, patch->numFaces );
 		return qtrue;
@@ -455,6 +462,7 @@ qboolean RE_BspStream_MergeSector( int cellX, int cellY, float sectorSize ) {
 		return qfalse;
 	}
 
+	R_BspStream_LogResidency( cellX, cellY, mapName, "brush-top", patch );
 	ri.Printf( PRINT_ALL, "[bsp_stream] merged visual sector %d,%d (%s, brush-top)\n", cellX, cellY, mapName );
 	return qtrue;
 }

@@ -15,7 +15,7 @@ static cvar_t *com_openWorldSmoke;
 
 static void Com_OpenWorld_Smoke_f( void ) {
 	trace_t trace;
-	vec3_t start, end, mins, maxs;
+	vec3_t start, end, probe;
 	int contents;
 	qboolean sectorOk;
 
@@ -26,6 +26,11 @@ static void Com_OpenWorld_Smoke_f( void ) {
 
 	Cvar_Set( "cm_stream", "1" );
 	Cvar_Set( "cm_streamMerge", "1" );
+
+	{
+		int checksum;
+		CM_LoadMap( "maps/open_void.bsp", qfalse, &checksum );
+	}
 
 	sectorOk = CM_Stream_LoadSector( 0, 0 );
 	if ( !sectorOk ) {
@@ -50,9 +55,8 @@ static void Com_OpenWorld_Smoke_f( void ) {
 		return;
 	}
 
-	VectorSet( mins, 2048.0f, 2048.0f, 64.0f );
-	VectorSet( maxs, 2048.0f, 2048.0f, 64.0f );
-	contents = CM_PointContents( mins, 0 );
+	VectorSet( probe, 2048.0f, 2048.0f, 64.0f );
+	contents = CM_PointContents( probe, 0 );
 	if ( !( contents & CONTENTS_SOLID ) ) {
 		Com_Printf( "OPENWORLD_SMOKE: FAIL point not solid at platform (contents 0x%x)\n", contents );
 		return;

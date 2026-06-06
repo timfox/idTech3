@@ -121,12 +121,14 @@ void SV_SetConfigstring (int index, const char *val) {
 	}
 
 	// don't bother broadcasting an update if no change
-	if ( !strcmp( val, sv.configstrings[ index ] ) ) {
+	if ( sv.configstrings[index] && !strcmp( val, sv.configstrings[ index ] ) ) {
 		return;
 	}
 
 	// change the string in sv
-	Z_Free( sv.configstrings[index] );
+	if ( sv.configstrings[index] ) {
+		Z_Free( sv.configstrings[index] );
+	}
 	sv.configstrings[index] = CopyString( val );
 
 	// send it to all the clients if we aren't

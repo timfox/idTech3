@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_local.h"
 #ifdef USE_VULKAN
 #include "vk.h"
+#include "tr_bsp_stream.h"
 #include "tr_sprite_props.h"
 #include "tr_decal_props.h"
 #include "vk_ndgi.h"
@@ -2722,6 +2723,7 @@ void RE_LoadWorldMap( const char *name ) {
 	}
 
 	R_SpriteProps_Clear();
+	RE_BspStream_ClearAll();
 
 	// set default sun direction to be used if it isn't
 	// overridden by a shader

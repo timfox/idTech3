@@ -34,7 +34,12 @@ rg -q 'misc_billboard' tests/data/openworld/sprites/sector_0_0.ents
 
 echo "[test_openworld] sector BSP fixture..."
 test -f tests/data/openworld/maps/sector_0_0.bsp
+test -f tests/data/openworld/maps/open_void.bsp
+test -f scripts/tools/gen_hub_bsp.py
 test -f scripts/tools/gen_sector_bsp.py
+test -f tests/data/openworld/base/default.cfg
+test -f scripts/bake_openworld_nav.sh
+rg -q 'openworld_smoke' src/qcommon/com_openworld_smoke.c
 
 echo "[test_openworld] demo cfg..."
 test -f examples/demo_game/mod/demo_openworld.cfg

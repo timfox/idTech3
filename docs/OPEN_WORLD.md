@@ -64,6 +64,8 @@ Demo mod: `exec demo_openworld.cfg`.
 | `cm_stream` | `0` | Required for sector pk3 prefetch/load |
 | `cl_sectorPrefetch` | `1` | Adjacent sector HTTP prefetch |
 | `sv_sectorURL` | `` | Base URL for `sector_X_Y.pk3` autodownload |
+| `sv_openWorldSync` | `1` | Server publishes loaded sector cells to clients |
+| `cl_openWorldSync` | `1` | Client applies server sector list (collision + nav) |
 
 Startup log: `[world_open] open-world streaming layer initialized`.
 
@@ -142,7 +144,7 @@ With **`cm_streamMerge 1`** (set by `openworld_start` and `demo_openworld.cfg`),
 python3 scripts/tools/gen_sector_bsp.py maps/sector_0_0.bsp --cell-x 0 --cell-y 0 --visual
 ```
 
-Emits a minimal IBSP v46 with one solid platform brush in local sector space. **`--visual`** adds drawVerts/surfaces so **`r_bspStream`** renders authored geometry; without it, the renderer infers brush-top quads. `ctest -R test_cm_stream_merge` validates the merge API wiring and BSP lump layout.
+Emits a minimal IBSP v46 with one solid platform brush in local sector space. **`--visual`** adds drawVerts/surfaces so **`r_bspStream`** renders authored geometry; without it, the renderer infers brush-top quads. Brush planes use the same side order as **`CM_BoundBrush`** (even side = min, odd = max per axis). `ctest -R test_cm_stream_merge` validates the merge API wiring and BSP lump layout.
 
 Requirements:
 
@@ -159,7 +161,7 @@ Traces and `CM_PointContents` query merged sector brushes after the base BSP tre
 - **Hub map required**: Load `maps/open_void.bsp` (or your playfield) before sector merge; generator: `scripts/tools/gen_hub_bsp.py`.
 - **Collision default off on client**: Enable `cm_openWorldCollision 1` for view-driven merge (`openworld_start` / `demo_openworld.cfg` do this).
 - **MP sync scope**: `CS_ENGINE_OPENWORLD_SECTORS` is driven by **server collision residency**; clients also load **nav** when `r_openWorldNav 1` + `cl_openWorldSync 1`. Scatter/sprites remain view-driven unless loaded locally.
-- **Renderer overlay**: `r_bspStream` draws planar faces / brush-top quads; patches, lightmaps, and VBO residency for full Radiant sector art are not complete yet.
+- **Renderer overlay**: `r_bspStream` draws planar faces / brush-top quads from hunk memory (`r_bspStreamResident 1` logs face counts). Patches (`MST_PATCH`), lightmap atlasing, and world-VBO residency for streamed sectors are not implemented yet — streamed faces use the immediate tessellation path (`vboItemIndex=0`). Overlays clear on hub map load via `RE_BspStream_ClearAll`.
 - **Districts**: With `r_openWorld 1`, `district_load_full` streams through **WorldOpen** (collision + nav + scatter). With `r_openWorld 0`, districts use **cm_stream collision only** (legacy).
 
 ## Related
@@ -169,3 +171,17 @@ Traces and `CM_PointContents` query merged sector brushes after the base BSP tre
 - Billboard map props: `r_spriteProps`, `misc_billboard` in [AGENTS.md](../AGENTS.md)
 
 `ctest -R test_openworld` validates wiring and fixtures.
+
+**Runtime validation** (requires built `idtech3_server`):
+
+```bash
+ctest -R test_openworld_runtime -V
+```
+
+Loads `maps/open_void.bsp`, merges `sector_0_0`, traces platform at `(2048,2048)` expecting hit z ≈ 128. Nav fixture size is checked when `tests/data/openworld/nav/sector_0_0.nav` exists.
+
+**Demo pk3** (open-world assets ship in `idtech3_demo.pk3` when built with `--target demo_game_pk3`):
+
+```bash
+ctest -R test_demo_openworld_pk3 -V
+```

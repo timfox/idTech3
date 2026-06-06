@@ -117,6 +117,23 @@ extern "C" int    Nav_BSP_GetVertCount(void);
 extern "C" int    Nav_BSP_GetTriCount(void);
 extern "C" qboolean Nav_BSP_ExtractFromSectorMap( int cellX, int cellY, float sectorSize );
 
+static void Nav_AdaptRecastCellSize( float *cs, float *ch, const float bmin[3], const float bmax[3] ) {
+	int width = 0;
+	int height = 0;
+	const int maxGrid = 512;
+
+	if ( !cs || !ch || !bmin || !bmax ) {
+		return;
+	}
+
+	rcCalcGridSize( bmin, bmax, *cs, &width, &height );
+	while ( ( width > maxGrid || height > maxGrid ) && *cs < 64.0f ) {
+		*cs *= 2.0f;
+		*ch *= 2.0f;
+		rcCalcGridSize( bmin, bmax, *cs, &width, &height );
+	}
+}
+
 static qboolean Nav_BuildTileBlob( int tileX, int tileY, float tileWorldWidth, float tileWorldHeight,
 	const navMeshParams_t *params, unsigned char **outData, int *outDataSize ) {
 	navMeshParams_t p;
@@ -173,6 +190,9 @@ static qboolean Nav_BuildTileBlob( int tileX, int tileY, float tileWorldWidth, f
 	memset( &cfg, 0, sizeof( cfg ) );
 	cfg.cs = p.cellSize;
 	cfg.ch = p.cellHeight;
+	rcVcopy( cfg.bmin, bmin );
+	rcVcopy( cfg.bmax, bmax );
+	Nav_AdaptRecastCellSize( &cfg.cs, &cfg.ch, cfg.bmin, cfg.bmax );
 	cfg.walkableSlopeAngle = p.agentMaxSlope;
 	cfg.walkableHeight = (int)ceilf( p.agentHeight / cfg.ch );
 	cfg.walkableClimb = (int)floorf( p.agentMaxClimb / cfg.ch );
@@ -184,8 +204,6 @@ static qboolean Nav_BuildTileBlob( int tileX, int tileY, float tileWorldWidth, f
 	cfg.maxVertsPerPoly = p.vertsPerPoly;
 	cfg.detailSampleDist = p.detailSampleDist < 0.9f ? 0 : cfg.cs * p.detailSampleDist;
 	cfg.detailSampleMaxError = cfg.ch * p.detailSampleMaxError;
-	rcVcopy( cfg.bmin, bmin );
-	rcVcopy( cfg.bmax, bmax );
 	rcCalcGridSize( cfg.bmin, cfg.bmax, cfg.cs, &cfg.width, &cfg.height );
 
 	solid = rcAllocHeightfield();
