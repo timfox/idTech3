@@ -11,6 +11,7 @@ extern "C" {
 #include "cl_engine_sprites.h"
 #include "../world/world_open.h"
 #include "../world/world_proc.h"
+#include "../world/world_residency.h"
 #include "../navigation/nav_recast.h"
 #include "../qcommon/engine_sprite_map.h"
 #include "../qcommon/cm_stream.h"
@@ -503,8 +504,10 @@ static void CL_OpenWorld_LoadSector_f( void ) {
 
 extern "C" void CL_OpenWorld_OnConfigstring( const char *sectorList ) {
 	clOpenWorldCell_t newCells[CL_OPENWORLD_SYNC_MAX];
+	worldResidencyCell_t allowCells[CL_OPENWORLD_SYNC_MAX];
 	int newCount;
 	worldOpenLayerMask_t layerMask = 0;
+	int i;
 
 	if ( !cl_openWorldSync || !cl_openWorldSync->integer ) {
 		return;
@@ -520,18 +523,27 @@ extern "C" void CL_OpenWorld_OnConfigstring( const char *sectorList ) {
 	}
 
 	newCount = CL_OpenWorld_ParseSectorList( sectorList, newCells, CL_OPENWORLD_SYNC_MAX );
+	for ( i = 0; i < newCount; i++ ) {
+		allowCells[i].cellX = newCells[i].cellX;
+		allowCells[i].cellY = newCells[i].cellY;
+	}
+	WorldResidency_SetServerCollisionAllowList( allowCells, newCount );
+
 	CL_OpenWorld_SyncUnloadRemoved( newCells, newCount );
 
 	if ( Cvar_VariableIntegerValue( "cm_openWorldCollision" ) ) {
 		layerMask |= WO_LAYER_MASK_COLLISION;
 	}
 	if ( Cvar_VariableIntegerValue( "r_openWorldNav" ) ) {
-		layerMask |= WO_LAYER_MASK_NAV;
+		qboolean residencyNavLocal = Cvar_VariableIntegerValue( "cl_openWorldResidencyNavLocal" ) != 0;
+		if ( !WorldResidency_IsEnabled() || residencyNavLocal ) {
+			layerMask |= WO_LAYER_MASK_NAV;
+		}
 	}
 	CL_OpenWorld_LoadSectorCells( sectorList, layerMask );
 
 	Q_strncpyz( cl_openWorldLastSync, sectorList, sizeof( cl_openWorldLastSync ) );
-	Com_DPrintf( "[world_open] MP sector sync: %s\n", sectorList );
+	Com_DPrintf( "[world_open] MP sector sync: %s (residency allow=%d)\n", sectorList, newCount );
 }
 
 extern "C" void CL_OpenWorld_Init( void ) {

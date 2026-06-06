@@ -8,10 +8,12 @@ Works alongside [DISTRICTS.md](DISTRICTS.md) (USD world partition) and [cm_strea
 
 ```
 View position
-    └── WorldOpen_UpdateView (r_openWorldRadius)
-            ├── cm_stream: prefetch sector_X_Y.pk3 / optional CM_LoadMap
-            ├── nav/sector_X_Y.nav → Detour addTile (per-chunk walk mesh)
-            └── sprites/sector_X_Y.ents → misc_billboard scatter
+    └── WorldOpen_UpdateView
+            ├── r_openWorldResidency 0: legacy radius disk (r_openWorldRadius)
+            └── r_openWorldResidency 1: WorldResidency (value + budget + bounded delta)
+                    ├── cm_stream: collision merge
+                    ├── nav/sector_X_Y.nav → Detour addTile
+                    └── sprites/sector_X_Y.ents → scatter
 ```
 
 | Layer | Asset path | Default |
@@ -66,6 +68,9 @@ Demo mod: `exec demo_openworld.cfg`.
 | `sv_sectorURL` | `` | Base URL for `sector_X_Y.pk3` autodownload |
 | `sv_openWorldSync` | `1` | Server publishes loaded sector cells to clients |
 | `cl_openWorldSync` | `1` | Client applies server sector list (collision + nav) |
+| `r_openWorldResidency` | `0` | Consistent value-aware residency (see [WORLD_RESIDENCY.md](WORLD_RESIDENCY.md)) |
+| `sv_openWorldResidency` | `0` | Server-side collision residency planner for MP |
+| `cl_openWorldResidencyNavLocal` | `0` | Client nav beyond server list when residency on |
 
 Startup log: `[world_open] open-world streaming layer initialized`.
 
@@ -129,6 +134,8 @@ set cm_openWorldCollision 1
 ### Multiplayer sector sync
 
 When **`sv_openWorldSync 1`** (default), the server publishes loaded sector cells via **`CS_ENGINE_OPENWORLD_SECTORS`** (`0_0,1_0,...`). Clients with **`cl_openWorldSync 1`** merge authoritative **collision** for those cells, load **nav tiles** when **`r_openWorldNav 1`**, and **unload** layers dropped from the server list.
+
+With **`sv_openWorldResidency 1`**, the server uses consistent cardinality selection (union over player origins) before publishing. Clients with **`r_openWorldResidency 1`** clamp collision to the server list and apply local residency for nav/sprites subject to **`cl_openWorldResidencyNavLocal`**. See [WORLD_RESIDENCY.md](WORLD_RESIDENCY.md).
 
 ### Renderer visual overlay
 
