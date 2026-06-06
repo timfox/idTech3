@@ -71,6 +71,8 @@ Demo mod: `exec demo_openworld.cfg`.
 | `r_openWorldResidency` | `0` | Consistent value-aware residency (see [WORLD_RESIDENCY.md](WORLD_RESIDENCY.md)) |
 | `sv_openWorldResidency` | `0` | Server-side collision residency planner for MP |
 | `cl_openWorldResidencyNavLocal` | `0` | Client nav beyond server list when residency on |
+| `r_graphStreamReach` | `0` | k-hop sector graph filter for residency (see [GRAPH_COMPUTE.md](GRAPH_COMPUTE.md)) |
+| `r_graphStreamHops` | `8` | Max hops for graph reachability |
 
 Startup log: `[world_open] open-world streaming layer initialized`.
 
@@ -136,6 +138,10 @@ set cm_openWorldCollision 1
 When **`sv_openWorldSync 1`** (default), the server publishes loaded sector cells via **`CS_ENGINE_OPENWORLD_SECTORS`** (`0_0,1_0,...`). Clients with **`cl_openWorldSync 1`** merge authoritative **collision** for those cells, load **nav tiles** when **`r_openWorldNav 1`**, and **unload** layers dropped from the server list.
 
 With **`sv_openWorldResidency 1`**, the server uses consistent cardinality selection (union over player origins) before publishing. Clients with **`r_openWorldResidency 1`** clamp collision to the server list and apply local residency for nav/sprites subject to **`cl_openWorldResidencyNavLocal`**. See [WORLD_RESIDENCY.md](WORLD_RESIDENCY.md).
+
+### Graph reachability filter
+
+With **`r_graphStreamReach 1`**, residency candidates must lie within **k** hops on the sector grid from player origin(s) (`r_graphStreamHops`, default 8). Optional GPU path: **`r_graphCompute 1`** (client). See [GRAPH_COMPUTE.md](GRAPH_COMPUTE.md).
 
 ### Renderer visual overlay
 

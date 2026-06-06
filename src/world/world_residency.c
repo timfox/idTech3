@@ -10,6 +10,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #include "world_open.h"
 #include "world_proc.h"
 #include "world_residency.h"
+#include "sector_graph.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -206,9 +207,11 @@ void WorldResidency_Init( void ) {
 	s_serverAllowCount = 0;
 	s_scheduleShift = com_frameTime & 4095;
 	s_loggedEnable = qfalse;
+	SectorGraph_Init();
 }
 
 void WorldResidency_Shutdown( void ) {
+	SectorGraph_Shutdown();
 	Com_Memset( s_layers, 0, sizeof( s_layers ) );
 	s_serverAllowCount = 0;
 	s_districtFilterActive = qfalse;
@@ -684,6 +687,9 @@ static void WR_EnumerateCandidatesAround( const vec3_t viewOrigin, float loadRad
 			if ( layer == WR_LAYER_COLLISION && !WR_ServerAllows( x, y ) ) {
 				continue;
 			}
+			if ( SectorGraph_StreamReachEnabled() && !SectorGraph_IsReachable( x, y ) ) {
+				continue;
+			}
 
 			regionId = WorldProc_RegionAtSector( x, y, sectorSize );
 			score = WorldResidency_ScoreCell( layer, x, y, viewOrigin, loadRadius, sectorSize, sticky );
@@ -923,6 +929,11 @@ void WorldResidency_UpdateView( const vec3_t viewOrigin, float radius, worldOpen
 	useMatroid = r_openWorldResidencyMatroid && r_openWorldResidencyMatroid->integer
 		&& Cvar_VariableIntegerValue( "r_proc" );
 
+	if ( SectorGraph_StreamReachEnabled() || SectorGraph_ComputeEnabled() ) {
+		SectorGraph_UpdateReachability( viewOrigin, NULL, 0, sectorSize,
+			unloadRadius, Cvar_VariableIntegerValue( "r_graphStreamHops" ) );
+	}
+
 	if ( enabledLayers & WO_LAYER_MASK_COLLISION ) {
 		WR_UpdateLayer( WR_LAYER_COLLISION, viewOrigin, NULL, 0, loadRadius, unloadRadius, sectorSize,
 			WO_LAYER_MASK_COLLISION, useMatroid, qfalse );
@@ -990,6 +1001,11 @@ void WorldResidency_UpdateServerOrigins( const vec3_t *origins, int originCount,
 
 	useMatroid = r_openWorldResidencyMatroid && r_openWorldResidencyMatroid->integer
 		&& Cvar_VariableIntegerValue( "r_proc" );
+
+	if ( SectorGraph_StreamReachEnabled() || SectorGraph_ComputeEnabled() ) {
+		SectorGraph_UpdateReachability( centroid, origins, originCount, sectorSize,
+			unloadRadius, Cvar_VariableIntegerValue( "r_graphStreamHops" ) );
+	}
 
 	WorldResidency_ClearServerCollisionAllowList();
 

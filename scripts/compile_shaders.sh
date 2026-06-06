@@ -364,6 +364,7 @@ compile_shader("comp", "vksplat/vksplat_adam.comp", "vksplat_adam_cs", binding_e
 compile_shader("comp", "curast/curast_clear.comp", "curast_clear_cs", binding_expr="vk.modules.curast_clear_cs")
 compile_shader("comp", "curast/curast_stage1.comp", "curast_stage1_cs", binding_expr="vk.modules.curast_stage1_cs")
 compile_shader("comp", "curast/curast_resolve.comp", "curast_resolve_cs", binding_expr="vk.modules.curast_resolve_cs")
+compile_shader("comp", "graph/graph_bfs_expand.comp", "graph_bfs_expand_cs", binding_expr="vk.modules.graph_bfs_expand_cs")
 compile_shader("comp", "mimir/mimir_clear.comp", "mimir_clear_cs", binding_expr="vk.modules.mimir_clear_cs")
 compile_shader("comp", "mimir/mimir_brownian.comp", "mimir_brownian_cs", binding_expr="vk.modules.mimir_brownian_cs")
 compile_shader("comp", "mimir/mimir_splat.comp", "mimir_splat_cs", binding_expr="vk.modules.mimir_splat_cs")

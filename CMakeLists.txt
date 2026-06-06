@@ -1221,6 +1221,7 @@ list(APPEND QCOMMON_SRCS src/iris/iris_model.c src/iris/iris_console.c src/iris/
 list(APPEND QCOMMON_SRCS src/world/world_district.c)
 list(APPEND QCOMMON_SRCS src/world/world_open.c)
 list(APPEND QCOMMON_SRCS src/world/world_residency.c)
+list(APPEND QCOMMON_SRCS src/world/sector_graph.c)
 list(APPEND QCOMMON_SRCS src/world/world_proc.c)
 list(APPEND QCOMMON_SRCS src/qcommon/cm_stream_merge.c)
 list(APPEND QCOMMON_SRCS src/qcommon/com_openworld_smoke.c)
@@ -2816,6 +2817,13 @@ set_tests_properties(test_openworld_residency PROPERTIES
 	LABELS "scripts;validation"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_openworld_residency.sh;${CMAKE_SOURCE_DIR}/src/world/world_residency.c;${CMAKE_SOURCE_DIR}/src/world/world_residency.h")
 
+add_test(NAME test_graph_compute
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_graph_compute.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_graph_compute PROPERTIES
+	LABELS "scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_graph_compute.sh;${CMAKE_SOURCE_DIR}/src/world/sector_graph.c;${CMAKE_SOURCE_DIR}/src/renderers/vulkan/vk_graph_bfs.c")
+
 add_test(NAME test_init_optional_submodules
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_init_optional_submodules.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -3178,6 +3186,21 @@ if(BUILD_UNIT_TESTS)
 	endif()
 	add_test(NAME unit_world_residency COMMAND unit_world_residency)
 	set_tests_properties(unit_world_residency PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_sector_graph
+		tests/unit/test_sector_graph.c
+		tests/stub_qcommon_min.c
+		tests/stub_sector_graph_deps.c
+		src/world/sector_graph.c
+		src/qcommon/q_shared.c
+		src/qcommon/q_math.c)
+	target_compile_definitions(unit_sector_graph PRIVATE SECTOR_GRAPH_UNIT_TEST)
+	target_include_directories(unit_sector_graph PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_sector_graph PRIVATE m)
+	endif()
+	add_test(NAME unit_sector_graph COMMAND unit_sector_graph)
+	set_tests_properties(unit_sector_graph PROPERTIES LABELS "unit;validation")
 endif()
 
 # Example mod pack (config-only .pk3); optional - see examples/demo_game/README.md
