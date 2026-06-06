@@ -9,6 +9,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #include "../qcommon/cm_stream.h"
 #include "world_district.h"
 #include "world_open.h"
+#include "world_residency.h"
 
 static worldDistrict_t districts[WORLD_DISTRICT_MAX];
 static int districtCount;
@@ -247,6 +248,22 @@ static void WorldDistrict_StreamSectors( const worldDistrict_t *d ) {
 		}
 		if ( Cvar_VariableIntegerValue( "r_openWorldSprites" ) ) {
 			layerMask |= WO_LAYER_MASK_SPRITES;
+		}
+		if ( WorldResidency_IsEnabled() ) {
+			vec3_t origin;
+
+			WorldResidency_SetDistrictFilter( qtrue, d->sectorX0, d->sectorY0, d->sectorX1, d->sectorY1 );
+			VectorSet( origin,
+				( (float)d->sectorX0 + (float)d->sectorX1 + 1.0f ) * 0.5f *
+					( r_districtSectorSize ? r_districtSectorSize->value : 4096.0f ),
+				( (float)d->sectorY0 + (float)d->sectorY1 + 1.0f ) * 0.5f *
+					( r_districtSectorSize ? r_districtSectorSize->value : 4096.0f ),
+				d->boundsMin[2] );
+			WorldResidency_UpdateView( origin, r_districtLoadRadius ? r_districtLoadRadius->value : 8192.0f,
+				layerMask );
+			Com_DPrintf( "[world_district] %s streamed via WorldOpen residency (%d,%d..%d,%d)\n",
+				d->name, d->sectorX0, d->sectorY0, d->sectorX1, d->sectorY1 );
+			return;
 		}
 		for ( y = d->sectorY0; y <= d->sectorY1; y++ ) {
 			for ( x = d->sectorX0; x <= d->sectorX1; x++ ) {

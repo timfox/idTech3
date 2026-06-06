@@ -8,6 +8,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #include "sv_openworld.h"
 #include "../qcommon/cm_stream.h"
 #include "../game/bg_public.h"
+#include "../world/world_residency.h"
 
 static cvar_t *sv_openWorld;
 static cvar_t *sv_openWorldCollision;
@@ -29,6 +30,8 @@ void SV_OpenWorld_Init( void ) {
 	sv_openWorldSync = Cvar_Get( "sv_openWorldSync", "1", CVAR_ARCHIVE );
 	Cvar_SetDescription( sv_openWorldSync,
 		"Publish loaded sector cells to clients via CS_ENGINE_OPENWORLD_SECTORS (collision authority; clients also load nav when r_openWorldNav 1)." );
+	(void)Cvar_Get( "sv_openWorldResidency", "0", CVAR_ARCHIVE );
+	WorldResidency_Init();
 	sv_openWorldSectorList[0] = '\0';
 	SV_SetConfigstring( CS_ENGINE_OPENWORLD_SECTORS, "" );
 	Com_Printf( "[sv_openworld] sector collision streaming initialized (sv_openWorld 0)\n" );
@@ -59,9 +62,10 @@ Updates cm_stream residency from each active in-game client origin.
 */
 void SV_OpenWorld_Frame( void ) {
 	int i;
+	int originCount = 0;
+	vec3_t origins[MAX_CLIENTS];
 	float sectorSize;
 	float radius;
-	qboolean mergeCollision;
 
 	if ( !sv_openWorld || !sv_openWorld->integer || !com_sv_running->integer ) {
 		return;
@@ -78,17 +82,28 @@ void SV_OpenWorld_Frame( void ) {
 	if ( radius <= 0.0f ) {
 		radius = 12288.0f;
 	}
-	mergeCollision = sv_openWorldCollision && sv_openWorldCollision->integer;
 
-	for ( i = 0; i < sv.maxclients; i++ ) {
+	for ( i = 0; i < sv.maxclients && originCount < MAX_CLIENTS; i++ ) {
 		client_t *cl = &svs.clients[i];
-		vec3_t origin;
 
 		if ( cl->state != CS_ACTIVE || !cl->gentity ) {
 			continue;
 		}
-		VectorCopy( cl->gentity->r.currentOrigin, origin );
-		CM_Stream_UpdateView( origin, radius, sectorSize, mergeCollision );
+		VectorCopy( cl->gentity->r.currentOrigin, origins[originCount] );
+		originCount++;
+	}
+
+	if ( originCount <= 0 ) {
+		return;
+	}
+
+	if ( WorldResidency_ServerEnabled() && sv_openWorldCollision && sv_openWorldCollision->integer ) {
+		WorldResidency_UpdateServerOrigins( origins, originCount, radius );
+	} else {
+		qboolean mergeCollision = sv_openWorldCollision && sv_openWorldCollision->integer;
+		for ( i = 0; i < originCount; i++ ) {
+			CM_Stream_UpdateView( origins[i], radius, sectorSize, mergeCollision );
+		}
 	}
 
 	SV_OpenWorld_SyncConfigstring();

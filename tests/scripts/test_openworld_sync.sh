@@ -31,5 +31,8 @@ rg -q 'R_BspStream_AddSurfaces' src/renderers/vulkan/tr_main.c
 rg -q 'BspStreamMergeSector' src/renderers/common/tr_public.h
 rg -q 'RE_BspStream_ClearAll' src/renderers/vulkan/tr_bsp_stream.c
 rg -q 'r_bspStreamResident' src/renderers/vulkan/tr_bsp_stream.c
+rg -q 'WorldResidency_SetServerCollisionAllowList' src/client/cl_openworld.cpp
+rg -q 'WorldResidency_UpdateServerOrigins' src/server/sv_openworld.c
+rg -q 'r_openWorldResidency' src/world/world_residency.c
 
 echo "[test_openworld_sync] ok"

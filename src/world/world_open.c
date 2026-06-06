@@ -9,6 +9,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #include "../qcommon/cm_stream.h"
 #include "world_open.h"
 #include "world_proc.h"
+#include "world_residency.h"
 
 static worldOpenSector_t sectors[WORLD_OPEN_SECTOR_MAX];
 static int sectorCount;
@@ -83,6 +84,7 @@ void WorldOpen_Init( void ) {
 	sectorLoadFn = NULL;
 	sectorUnloadFn = NULL;
 	Com_Memset( sectors, 0, sizeof( sectors ) );
+	WorldResidency_Init();
 	Com_Printf( "[world_open] open-world streaming layer initialized\n" );
 }
 
@@ -96,6 +98,7 @@ void WorldOpen_Shutdown( void ) {
 	}
 	sectorCount = 0;
 	openWorldEnabled = qfalse;
+	WorldResidency_Shutdown();
 }
 
 void WorldOpen_SetSectorLoad( worldOpenSectorLoad_f fn ) {
@@ -288,8 +291,15 @@ void WorldOpen_UpdateView( const vec3_t viewOrigin, float radius ) {
 	}
 
 	if ( r_openWorldStream && r_openWorldStream->integer ) {
-		CM_Stream_UpdateView( viewOrigin, radius, sectorSize,
-			cm_openWorldCollision && cm_openWorldCollision->integer );
+		if ( !WorldResidency_IsEnabled() ) {
+			CM_Stream_UpdateView( viewOrigin, radius, sectorSize,
+				cm_openWorldCollision && cm_openWorldCollision->integer );
+		}
+	}
+
+	if ( WorldResidency_IsEnabled() ) {
+		WorldResidency_UpdateView( viewOrigin, radius, layerMask );
+		return;
 	}
 
 	CM_Stream_WorldToCell( viewOrigin, sectorSize, &centerX, &centerY );

@@ -1220,6 +1220,7 @@ list(APPEND QCOMMON_SRCS src/mimir/mimir_model.c src/mimir/mimir_console.c)
 list(APPEND QCOMMON_SRCS src/iris/iris_model.c src/iris/iris_console.c src/iris/iris_io.c)
 list(APPEND QCOMMON_SRCS src/world/world_district.c)
 list(APPEND QCOMMON_SRCS src/world/world_open.c)
+list(APPEND QCOMMON_SRCS src/world/world_residency.c)
 list(APPEND QCOMMON_SRCS src/world/world_proc.c)
 list(APPEND QCOMMON_SRCS src/qcommon/cm_stream_merge.c)
 list(APPEND QCOMMON_SRCS src/qcommon/com_openworld_smoke.c)
@@ -2808,6 +2809,13 @@ set_tests_properties(test_openworld_runtime PROPERTIES
 	LABELS "scripts;validation"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_openworld_runtime.sh;${CMAKE_SOURCE_DIR}/scripts/tools/gen_hub_bsp.py;${CMAKE_SOURCE_DIR}/scripts/tools/gen_sector_bsp.py;${CMAKE_SOURCE_DIR}/src/qcommon/com_openworld_smoke.c")
 
+add_test(NAME test_openworld_residency
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_openworld_residency.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_openworld_residency PROPERTIES
+	LABELS "scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_openworld_residency.sh;${CMAKE_SOURCE_DIR}/src/world/world_residency.c;${CMAKE_SOURCE_DIR}/src/world/world_residency.h")
+
 add_test(NAME test_init_optional_submodules
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_init_optional_submodules.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -3155,6 +3163,21 @@ if(BUILD_UNIT_TESTS)
 				${CMAKE_BINARY_DIR}/sector_0_0_test.nav)
 		set_tests_properties(unit_openworld_nav PROPERTIES LABELS "unit;validation")
 	endif()
+
+	add_executable(unit_world_residency
+		tests/unit/test_world_residency.c
+		tests/stub_qcommon_min.c
+		tests/stub_world_residency_deps.c
+		src/world/world_residency.c
+		src/qcommon/q_shared.c
+		src/qcommon/q_math.c)
+	target_compile_definitions(unit_world_residency PRIVATE WORLD_RESIDENCY_UNIT_TEST)
+	target_include_directories(unit_world_residency PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_world_residency PRIVATE m)
+	endif()
+	add_test(NAME unit_world_residency COMMAND unit_world_residency)
+	set_tests_properties(unit_world_residency PROPERTIES LABELS "unit;validation")
 endif()
 
 # Example mod pack (config-only .pk3); optional - see examples/demo_game/README.md
