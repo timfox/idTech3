@@ -10,8 +10,24 @@
 #include "qcommon/cm_stream.h"
 #include "world/world_open.h"
 #include "world/world_proc.h"
+#include "world/sector_graph.h"
 
 int com_frameTime = 0;
+
+void SectorGraph_Init( void ) {}
+void SectorGraph_Shutdown( void ) {}
+void SectorGraph_SetGpuReachFn( sectorGraphGpuReach_f fn ) { (void)fn; }
+qboolean SectorGraph_StreamReachEnabled( void ) { return qfalse; }
+qboolean SectorGraph_ComputeEnabled( void ) { return qfalse; }
+qboolean SectorGraph_VerifyEnabled( void ) { return qfalse; }
+void SectorGraph_UpdateReachability( const vec3_t viewOrigin, const vec3_t *extraOrigins,
+	int extraOriginCount, float sectorSize, float unloadRadius, int maxHops ) {
+	(void)viewOrigin; (void)extraOrigins; (void)extraOriginCount;
+	(void)sectorSize; (void)unloadRadius; (void)maxHops;
+}
+qboolean SectorGraph_IsReachable( int cellX, int cellY ) { (void)cellX; (void)cellY; return qtrue; }
+void SectorGraph_ReachTest_f( void ) {}
+void SectorGraph_Status_f( void ) {}
 
 static cvar_t s_cvars[32];
 static char s_cvarNames[32][64];

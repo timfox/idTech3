@@ -46,6 +46,10 @@ Startup log when enabled: `[world_residency] enabled epsilon=… k_col=… max_s
 - **Clients clamp collision** to the server allow list (`WorldResidency_SetServerCollisionAllowList` from configstring parse).
 - **Nav:** when residency is on and `cl_openWorldResidencyNavLocal 0`, nav tiles load only from the server sector list. Sprites remain view-driven locally.
 
+## Graph reachability pre-filter
+
+When **`r_graphStreamReach 1`**, [`WorldResidency`](src/world/world_residency.c) intersects candidates with the sector graph k-hop mask from [`SectorGraph_UpdateReachability`](src/world/sector_graph.c). MP server path uses the union of all active player origins as BFS sources. See [GRAPH_COMPUTE.md](GRAPH_COMPUTE.md).
+
 ## District integration
 
 When `WorldDistrict_StreamSectors` runs with `r_openWorldResidency 1`, it sets a district candidate filter (`WorldResidency_SetDistrictFilter`) and calls `WorldResidency_UpdateView` at the district centroid instead of brute-force loading every cell.

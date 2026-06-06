@@ -1,0 +1,52 @@
+#version 450
+
+/*
+ * Sector graph BFS expand — one hop over CSR adjacency (frontier ping-pong).
+ */
+layout( local_size_x = 64, local_size_y = 1, local_size_z = 1 ) in;
+
+layout( std430, set = 0, binding = 0 ) readonly buffer RowPtrSSBO {
+	uint rowPtr[];
+} csrRow;
+
+layout( std430, set = 0, binding = 1 ) readonly buffer ColIdxSSBO {
+	uint colIdx[];
+} csrCol;
+
+layout( std430, set = 0, binding = 2 ) buffer FrontierInSSBO {
+	uint frontierIn[];
+} fin;
+
+layout( std430, set = 0, binding = 3 ) buffer FrontierOutSSBO {
+	uint frontierOut[];
+} fout;
+
+layout( std430, set = 0, binding = 4 ) buffer VisitedSSBO {
+	uint visited[];
+} vis;
+
+layout( push_constant ) uniform Push {
+	uint nodeCount;
+} pc;
+
+void main() {
+	uint id = gl_GlobalInvocationID.x;
+	uint e;
+	uint nb;
+
+	if ( id >= pc.nodeCount ) {
+		return;
+	}
+	if ( fin.frontierIn[id] == 0u ) {
+		return;
+	}
+
+	vis.visited[id] = 1u;
+	fout.frontierOut[id] = 0u;
+
+	for ( e = csrRow.rowPtr[id]; e < csrRow.rowPtr[id + 1u]; e++ ) {
+		nb = csrCol.colIdx[e];
+		vis.visited[nb] = 1u;
+		fout.frontierOut[nb] = 1u;
+	}
+}

@@ -32,6 +32,8 @@ rg -q 'WorldResidency_UpdateServerOrigins' src/server/sv_openworld.c
 rg -q 'WorldResidency_SetServerCollisionAllowList' src/client/cl_openworld.cpp
 rg -q 'WorldResidency_SetDistrictFilter' src/world/world_district.c
 rg -q 'world_residency.c' CMakeLists.txt
+rg -q 'SectorGraph_IsReachable' src/world/world_residency.c
+rg -q 'sector_graph.c' CMakeLists.txt
 
 if [[ -x "${ROOT}/build-vk-Release/unit_world_residency" ]]; then
 	echo "[test_openworld_residency] running unit_world_residency..."

@@ -39,6 +39,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_vuda.h"
 #include "vk_vksplat.h"
 #include "vk_curast.h"
+#include "vk_graph_bfs.h"
 #include "vk_mimir.h"
 #include "vk_iris.h"
 #include "vk_grtx.h"
@@ -4287,6 +4288,7 @@ void R_Init( void ) {
 	R_MGS_Init();
 	R_VKSplat_Init();
 	R_CuRast_Init();
+	R_GraphBfs_Init();
 	R_Mimir_Init();
 	R_Iris_Init();
 	R_SQZ_Init();
@@ -4413,6 +4415,7 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	R_SQZ_Shutdown();
 	R_MGS_Shutdown();
 	R_VKSplat_Shutdown();
+	R_GraphBfs_Shutdown();
 	R_CuRast_Shutdown();
 	R_Mimir_Shutdown();
 	R_Iris_Shutdown();

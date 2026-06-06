@@ -431,6 +431,8 @@ void vk_bind_generated_shaders( void ){
     vk_set_shader_name( vk.modules.curast_stage1_cs, "curast_stage1_cs" );
     vk.modules.curast_resolve_cs = SHADER_MODULE( curast_resolve_cs );
     vk_set_shader_name( vk.modules.curast_resolve_cs, "curast_resolve_cs" );
+    vk.modules.graph_bfs_expand_cs = SHADER_MODULE( graph_bfs_expand_cs );
+    vk_set_shader_name( vk.modules.graph_bfs_expand_cs, "graph_bfs_expand_cs" );
     vk.modules.mimir_clear_cs = SHADER_MODULE( mimir_clear_cs );
     vk_set_shader_name( vk.modules.mimir_clear_cs, "mimir_clear_cs" );
     vk.modules.mimir_brownian_cs = SHADER_MODULE( mimir_brownian_cs );

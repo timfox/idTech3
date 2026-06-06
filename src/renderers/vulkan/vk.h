@@ -1497,6 +1497,7 @@ typedef struct {
 		VkShaderModule curast_clear_cs;
 		VkShaderModule curast_stage1_cs;
 		VkShaderModule curast_resolve_cs;
+		VkShaderModule graph_bfs_expand_cs;
 		VkShaderModule mimir_clear_cs;
 		VkShaderModule mimir_brownian_cs;
 		VkShaderModule mimir_splat_cs;
