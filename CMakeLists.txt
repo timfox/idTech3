@@ -2633,6 +2633,13 @@ set_tests_properties(test_demo_game_pk3 PROPERTIES
 	LABELS "scripts;validation;examples"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_demo_game_pk3.sh")
 
+add_test(NAME test_demo_openworld_pk3
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_demo_openworld_pk3.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_demo_openworld_pk3 PROPERTIES
+	LABELS "scripts;validation;examples"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_demo_openworld_pk3.sh;${CMAKE_SOURCE_DIR}/examples/demo_game/mod/demo_openworld.cfg;${CMAKE_SOURCE_DIR}/scripts/bake_staged_openworld_nav.sh")
+
 add_test(NAME test_check_loc
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_check_loc.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -2785,7 +2792,7 @@ add_test(NAME test_nav_bake
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_nav_bake PROPERTIES
 	LABELS "scripts;validation"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_nav_bake.sh;${CMAKE_SOURCE_DIR}/src/navigation/nav_recast.cpp;${CMAKE_SOURCE_DIR}/tests/data/openworld/maps/sector_0_0.bsp")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_nav_bake.sh;${CMAKE_SOURCE_DIR}/src/navigation/nav_recast.cpp;${CMAKE_SOURCE_DIR}/tests/data/openworld/maps/sector_0_0.bsp;${CMAKE_SOURCE_DIR}/tests/data/openworld/nav/sector_0_0.nav;${CMAKE_SOURCE_DIR}/scripts/bake_openworld_nav.sh")
 
 add_test(NAME test_openworld_sync
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_openworld_sync.sh

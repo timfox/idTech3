@@ -131,7 +131,7 @@ qboolean CM_Stream_LoadSector( int cellX, int cellY ) {
 	}
 
 	Com_sprintf( mapName, sizeof( mapName ), "maps/sector_%d_%d.bsp", cellX, cellY );
-	if ( !FS_FileExists( mapName ) ) {
+	if ( FS_ReadFile( mapName, NULL ) <= 0 ) {
 		if ( sv_sectorURL && sv_sectorURL->string[0] ) {
 			Com_Printf( "[cm_stream] sector %d,%d missing — prefetch via sv_sectorURL (see cl_sectorPrefetch)\n",
 				cellX, cellY );

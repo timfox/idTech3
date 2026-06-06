@@ -67,65 +67,31 @@ static void Nav_BSP_AddBrushTopQuad( const vec3_t mins, const vec3_t maxs ) {
 static qboolean Nav_BSP_BoundsFromBrush( dplane_t *planes, int numPlanes,
 	dbrushside_t *sides, int numSides, int firstSide, int brushNumSides,
 	vec3_t outMins, vec3_t outMaxs ) {
-	int i, planeNum;
-	vec3_t mins, maxs;
-	qboolean haveMins[3], haveMaxs[3];
+	int axis, planeNum;
+	float dmin, dmax;
 
 	if ( firstSide < 0 || brushNumSides < 6 || firstSide + brushNumSides > numSides ) {
 		return qfalse;
 	}
 
-	VectorSet( mins, 0, 0, 0 );
-	VectorSet( maxs, 0, 0, 0 );
-	memset( haveMins, 0, sizeof( haveMins ) );
-	memset( haveMaxs, 0, sizeof( haveMaxs ) );
-
-	for ( i = 0; i < brushNumSides; i++ ) {
-		dbrushside_t *side = &sides[firstSide + i];
-		dplane_t *plane;
-
-		planeNum = LittleLong( side->planeNum );
+	for ( axis = 0; axis < 3; axis++ ) {
+		planeNum = LittleLong( sides[firstSide + axis * 2].planeNum );
 		if ( planeNum < 0 || planeNum >= numPlanes ) {
 			return qfalse;
 		}
-		float nx, ny, nz, pdist;
-
-		plane = &planes[planeNum];
-		nx = LittleFloat( plane->normal[0] );
-		ny = LittleFloat( plane->normal[1] );
-		nz = LittleFloat( plane->normal[2] );
-		pdist = LittleFloat( plane->dist );
-		if ( nx == 1.0f && !haveMins[0] ) {
-			mins[0] = pdist;
-			haveMins[0] = qtrue;
-		} else if ( nx == -1.0f && !haveMaxs[0] ) {
-			maxs[0] = -pdist;
-			haveMaxs[0] = qtrue;
-		} else if ( ny == 1.0f && !haveMins[1] ) {
-			mins[1] = pdist;
-			haveMins[1] = qtrue;
-		} else if ( ny == -1.0f && !haveMaxs[1] ) {
-			maxs[1] = -pdist;
-			haveMaxs[1] = qtrue;
-		} else if ( nz == 1.0f && !haveMins[2] ) {
-			mins[2] = pdist;
-			haveMins[2] = qtrue;
-		} else if ( nz == -1.0f && !haveMaxs[2] ) {
-			maxs[2] = -pdist;
-			haveMaxs[2] = qtrue;
+		dmin = LittleFloat( planes[planeNum].dist );
+		planeNum = LittleLong( sides[firstSide + axis * 2 + 1].planeNum );
+		if ( planeNum < 0 || planeNum >= numPlanes ) {
+			return qfalse;
 		}
+		dmax = LittleFloat( planes[planeNum].dist );
+		outMins[axis] = -dmin;
+		outMaxs[axis] = dmax;
 	}
 
-	if ( !haveMins[0] || !haveMaxs[0] || !haveMins[1] || !haveMaxs[1] ||
-		!haveMins[2] || !haveMaxs[2] ) {
+	if ( outMaxs[0] <= outMins[0] || outMaxs[1] <= outMins[1] || outMaxs[2] <= outMins[2] ) {
 		return qfalse;
 	}
-	if ( maxs[0] <= mins[0] || maxs[1] <= mins[1] || maxs[2] <= mins[2] ) {
-		return qfalse;
-	}
-
-	VectorCopy( mins, outMins );
-	VectorCopy( maxs, outMaxs );
 	return qtrue;
 }
 

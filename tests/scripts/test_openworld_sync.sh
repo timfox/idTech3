@@ -29,6 +29,7 @@ rg -q 'RE_BspStream_MergeSector' src/renderers/vulkan/tr_bsp_stream.c
 rg -q 'R_BspStream_LoadSurfaceLumps' src/renderers/vulkan/tr_bsp_stream.c
 rg -q 'R_BspStream_AddSurfaces' src/renderers/vulkan/tr_main.c
 rg -q 'BspStreamMergeSector' src/renderers/common/tr_public.h
-rg -q 'r_bspStream' src/renderers/vulkan/tr_bsp_stream.c
+rg -q 'RE_BspStream_ClearAll' src/renderers/vulkan/tr_bsp_stream.c
+rg -q 'r_bspStreamResident' src/renderers/vulkan/tr_bsp_stream.c
 
 echo "[test_openworld_sync] ok"
