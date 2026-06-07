@@ -294,6 +294,34 @@ cd build-vk-Release && ctest -C Release --output-on-failure
 ctest --preset test-vulkan-release
 ```
 
+### Open-world / residency / graph compute
+
+After a Release build, these script tests validate wiring without a GPU client:
+
+```bash
+cd build-vk-Release
+ctest -R 'test_openworld|test_openworld_sync|test_openworld_residency|test_graph_compute|test_cm_stream_merge|test_nav_bake' -V
+```
+
+| Test | What it checks |
+|------|----------------|
+| `test_openworld` | Sector fixtures, scatter `.ents`, `world_open.c` symbols |
+| `test_openworld_sync` | MP configstring path (`sv_openworld.c`, `tr_bsp_stream.c`) |
+| `test_openworld_residency` | Residency planner cvars and source wiring |
+| `test_graph_compute` | `sector_graph.c` + `vk_graph_bfs.c` integration |
+| `test_cm_stream_merge` | Sector BSP merge API + `gen_sector_bsp.py` layout |
+| `test_nav_bake` | Recast sector tile bake from sector BSP |
+| `unit_world_residency` | Cardinality selection + symmetric difference (no engine link) |
+| `unit_sector_graph` | CPU BFS reachability (no engine link) |
+
+**Runtime collision smoke** (requires built `idtech3_server`):
+
+```bash
+ctest -R test_openworld_runtime -V
+```
+
+See [OPEN_WORLD.md](OPEN_WORLD.md), [WORLD_RESIDENCY.md](WORLD_RESIDENCY.md), and [GRAPH_COMPUTE.md](GRAPH_COMPUTE.md).
+
 ## IDE Setup
 
 ### VS Code / Cursor

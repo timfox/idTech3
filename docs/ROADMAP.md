@@ -65,6 +65,14 @@ Priorities that keep **CI green** and **README/build truth** aligned:
 - [x] Multiple model formats (glTF primary on Vulkan for GPU path; CPU tess fallback - see `docs/GLTF.md`)
 - [x] 6 image formats (EXR, PNG, TGA, JPG, PCX, BMP)
 
+### Open worlds -- In progress
+- [x] Sector streaming scaffold (`r_openWorld`, `cm_stream`, `cm_streamMerge`, nav tiles, scatter)
+- [x] Consistent submodular residency planner (`r_openWorldResidency`, per-layer budgets)
+- [x] Sector graph k-hop reachability filter + optional Vulkan compute BFS (`r_graphStreamReach`, `r_graphCompute`)
+- [x] MP sector sync (`sv_openWorldSync`, `CS_ENGINE_OPENWORLD_SECTORS`)
+- [ ] Streamed sector renderer VBO residency (overlay uses immediate tess path today)
+- See [OPEN_WORLD.md](OPEN_WORLD.md), [WORLD_RESIDENCY.md](WORLD_RESIDENCY.md), [GRAPH_COMPUTE.md](GRAPH_COMPUTE.md)
+
 ### Integration -- Complete
 - [x] All 16 systems wired into game loop
 - [x] 64 Lua-callable engine functions

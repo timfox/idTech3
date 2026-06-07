@@ -34,6 +34,12 @@ src/
 ├── navigation/          Pathfinding
 │   ├── nav_recast.cpp/h          Recast/Detour navmesh + crowd
 │   └── nav_bsp_extract.c         BSP triangle extraction
+├── world/               Open-world streaming (sector residency)
+│   ├── world_open.c/h            Sector load/unload coordinator (collision, nav, sprites)
+│   ├── world_residency.c/h       Value-aware cardinality selection under per-layer budgets
+│   ├── world_district.c/h        USD district → sector streaming bridge
+│   ├── world_proc.c/h            Procedural sector typing (region/palette)
+│   └── sector_graph.c/h          Grid CSR + k-hop reachability (CPU BFS, optional GPU)
 ├── audio/               Audio
 │   ├── backends/                  OpenAL, SDL, null
 │   ├── codecs/                    WAV, MP3, Opus, FLAC, WebM
@@ -63,6 +69,8 @@ src/
 │   │   ├── vk_volumetric_pipelines.c Volumetric fog / fluid / luminance / CBT / veg-wind pipeline setup (split from vk.c)
 │   │   ├── vk_volumetric_internal.c/h MSAA depth resolve, fluid sim dispatch, volumetric perf queries (split from vk.c)
 │   │   ├── vk_volumetric_pass_compute.c Local volumetric shadows, froxel compute, composite, SMAA (split from vk.c)
+│   │   ├── vk_graph_bfs.c/h      Optional Vulkan compute BFS for sector graph reachability
+│   │   ├── tr_bsp_stream.c/h     Streamed sector BSP visual overlay (`r_bspStream`)
 │   │   ├── vk_shutdown.c          vk_shutdown, wait-idle, release_resources (split from vk.c)
 │   │   ├── vk_postfx_passes.c     Bloom, SSAO/HBAO, OIT, SSR passes (split from vk.c)
 │   │   ├── vk_clear_attachments.c In-pass color/depth clear + dynamic color write mask (split from vk.c)
@@ -116,9 +124,36 @@ CL_Frame(msec)
   │   ├── Choreo_Update
   │   ├── Horde_Update
   │   ├── BgMap_Frame
-  │   └── WinTitle_Update
+  │   ├── WinTitle_Update
+  │   └── CL_OpenWorld_Frame (when `r_openWorld` 1)
+  │       ├── WorldOpen_UpdateView → WorldResidency_UpdateView (when `r_openWorldResidency` 1)
+  │       │   └── SectorGraph_UpdateReachability (when `r_graphStreamReach` / `r_graphCompute`)
+  │       ├── BSP stream overlay sync (`r_bspStream`)
+  │       └── Billboard scatter draw for loaded sprite sectors
   └── Con_RunConsole()
 ```
+
+Dedicated server: `SV_OpenWorld_Frame` (when `sv_openWorld` 1) plans collision residency from player origins and publishes `CS_ENGINE_OPENWORLD_SECTORS` when `sv_openWorldSync` 1.
+
+## Open-world streaming
+
+View-driven **sector residency** for infinite worlds: modular BSP collision merge, per-chunk Detour nav tiles, and billboard scatter. Three cooperating layers:
+
+| Module | Role |
+|--------|------|
+| `world_open.c` | Sector table, layer load/unload callbacks, legacy radius disk or delegate to residency |
+| `world_residency.c` | Consistent submodular cardinality selection (`r_openWorldResidency` 1) |
+| `sector_graph.c` | k-hop reachability pre-filter (`r_graphStreamReach` 1); optional GPU via `vk_graph_bfs.c` |
+| `cl_openworld.cpp` | Client bridge: nav tile load, scatter parse, MP configstring sync |
+| `sv_openworld.c` | Server collision residency + sector list replication |
+| `cm_stream.c` / `cm_stream_merge.c` | Sector pk3 prefetch and BSP brush overlay merge |
+
+**Planner selection** (`WorldOpen_UpdateView` in `world_open.c`):
+
+1. `r_openWorldResidency 0` — load all cells inside `r_openWorldRadius` (legacy disk).
+2. `r_openWorldResidency 1` — `WorldResidency_UpdateView` scores candidates in a hysteresis annulus (`r_openWorldLoadRadius` / `r_openWorldUnloadRadius`), applies per-layer budgets, and bounds swaps per frame.
+
+Full usage, cvars, authoring, and MP rules: [OPEN_WORLD.md](OPEN_WORLD.md), [WORLD_RESIDENCY.md](WORLD_RESIDENCY.md), [GRAPH_COMPUTE.md](GRAPH_COMPUTE.md).
 
 ## Renderer Pipeline (Vulkan)
 

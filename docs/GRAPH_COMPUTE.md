@@ -54,6 +54,21 @@ Player origin(s) → SectorGraph_UpdateReachability (CPU BFS)
                  → WorldOpen load/unload
 ```
 
+## Vulkan compute path
+
+Shader: `src/renderers/vulkan/shaders/glsl/graph/graph_bfs_expand.comp` (compiled via `scripts/compile_shaders.sh` as `graph_bfs_expand_cs`).
+
+| Step | Action |
+|------|--------|
+| Enable | `set r_graphCompute 1` then **`vid_restart`** (pipeline created at renderer init) |
+| Verify | `graph_bfs_status` — reports `compute=on` when `R_GraphBfs_Active` |
+| Bench | `graph_bfs_bench` — 5×5 toy grid CPU vs GPU timing |
+| Debug mismatch | `set r_graphStreamVerify 1` — logs CPU vs GPU bitset differences (disables per-frame cache) |
+
+If `graph_bfs_bench` prints `pipeline not ready`, toggle `r_graphCompute 1` and run **`vid_restart`**. GPU path is **client-only**; dedicated server uses CPU BFS.
+
+`r_graphBlockUnloaded 1` treats edges into sectors without loaded collision as blocked — useful when walkable corridors must follow merged BSP, not the full grid.
+
 ## Phase 1 follow-ons (not implemented)
 
 - Nav influence heatmaps from sector reachability

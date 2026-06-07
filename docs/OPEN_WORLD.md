@@ -49,6 +49,8 @@ Demo mod: `exec demo_openworld.cfg`.
 | `openworld_status` | Cvars + loaded sector table |
 | `openworld_list` | List active sectors and layers |
 | `openworld_sector <x> <y>` | Force-load nav + scatter (+ collision if enabled) |
+| `nav_bake_sector <x> <y>` | Recast-bake `nav/sector_X_Y.nav` from sector BSP collision |
+| `nav_bake_view` | Bake nav tile for the sector under the current view |
 
 ## Cvars
 

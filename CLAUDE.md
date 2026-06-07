@@ -457,6 +457,9 @@ All significant changes require architectural review:
 - **[QUICKSTART.md](docs/QUICKSTART.md)**: End-user quick start (download, game data, run)
 - **[MINIMAL_GAME_SHELL.md](docs/MINIMAL_GAME_SHELL.md)**: Smallest valid `base/` + `.pk3` bootstrap (engine-only / tech demo)
 - **[RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md)**: Pre-release validation and release steps
+- **[OPEN_WORLD.md](docs/OPEN_WORLD.md)**: Infinite open-world sector streaming (collision, nav, scatter)
+- **[WORLD_RESIDENCY.md](docs/WORLD_RESIDENCY.md)**: Consistent submodular sector residency planner
+- **[GRAPH_COMPUTE.md](docs/GRAPH_COMPUTE.md)**: Sector graph k-hop reachability (CPU + optional Vulkan BFS)
 
 ### Build Scripts
 - `./scripts/compile_engine.sh` - Primary build script

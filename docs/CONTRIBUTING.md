@@ -42,6 +42,7 @@ Tests include:
 - `smoke_test` - Binary checks, server startup, shader validation
 - `check_artifacts` - Artifact format verification
 - `unit_macros` - PAD, PADLEN, MAX_QPATH, MAX_STRING_CHARS
+- Open-world wiring: `test_openworld`, `test_openworld_sync`, `test_openworld_residency`, `test_graph_compute`, `unit_world_residency`, `unit_sector_graph` (see [DEVELOPMENT_SETUP.md](DEVELOPMENT_SETUP.md#open-world--residency--graph-compute))
 
 ### Before Submitting
 
