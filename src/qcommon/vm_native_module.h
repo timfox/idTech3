@@ -11,4 +11,15 @@
  */
 int VM_BuildNativeModuleCandidates( const char *moduleName, char out[][MAX_QPATH], int maxCandidates );
 
+enum {
+	VM_MAX_NATIVE_MODULE_LOAD_NAMES = 3
+};
+
+/*
+ * Builds logical native VM module names in probe order for the built-in game,
+ * cgame, and UI aliases. Non-generic module names return zero so loadNative()
+ * preserves the legacy platform-specific fallback path for custom modules.
+ */
+int VM_BuildNativeModuleLoadOrder( const char *moduleName, char out[][MAX_QPATH], int maxModules );
+
 #endif

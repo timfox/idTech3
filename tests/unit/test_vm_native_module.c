@@ -64,6 +64,78 @@ static int test_candidate_limit(void) {
 	return 0;
 }
 
+static int test_load_order_empty_inputs(void) {
+	char out[VM_MAX_NATIVE_MODULE_LOAD_NAMES][MAX_QPATH];
+
+	ASSERT(VM_BuildNativeModuleLoadOrder(NULL, out, VM_MAX_NATIVE_MODULE_LOAD_NAMES) == 0, "NULL load-order moduleName");
+	ASSERT(VM_BuildNativeModuleLoadOrder("", out, VM_MAX_NATIVE_MODULE_LOAD_NAMES) == 0, "empty load-order moduleName");
+	ASSERT(VM_BuildNativeModuleLoadOrder("qagame", NULL, VM_MAX_NATIVE_MODULE_LOAD_NAMES) == 0, "NULL load-order output buffer");
+	ASSERT(VM_BuildNativeModuleLoadOrder("qagame", out, 0) == 0, "zero load-order maxModules");
+
+	return 0;
+}
+
+static int assert_load_order(const char *moduleName, const char *expected0, const char *expected1, const char *expected2) {
+	char out[VM_MAX_NATIVE_MODULE_LOAD_NAMES][MAX_QPATH];
+	int expectedCount = 0;
+	int count;
+
+	if ( expected0 ) {
+		expectedCount++;
+	}
+	if ( expected1 ) {
+		expectedCount++;
+	}
+	if ( expected2 ) {
+		expectedCount++;
+	}
+
+	count = VM_BuildNativeModuleLoadOrder(moduleName, out, VM_MAX_NATIVE_MODULE_LOAD_NAMES);
+	ASSERT(count == expectedCount, "load-order count");
+	if ( expected0 ) {
+		ASSERT(strcmp(out[0], expected0) == 0, "load-order primary");
+	}
+	if ( expected1 ) {
+		ASSERT(strcmp(out[1], expected1) == 0, "load-order first alias");
+	}
+	if ( expected2 ) {
+		ASSERT(strcmp(out[2], expected2) == 0, "load-order second alias");
+	}
+
+	return 0;
+}
+
+static int test_load_order_aliases(void) {
+	ASSERT(assert_load_order("qagame", "qagame", "game", "server") == 0, "qagame load order");
+	ASSERT(assert_load_order("game", "game", "server", NULL) == 0, "game load order");
+	ASSERT(assert_load_order("server", "server", "game", NULL) == 0, "server load order");
+	ASSERT(assert_load_order("cgame", "cgame", "client", NULL) == 0, "cgame load order");
+	ASSERT(assert_load_order("client", "client", "cgame", NULL) == 0, "client load order");
+	ASSERT(assert_load_order("ui", "ui", "frontend", NULL) == 0, "ui load order");
+	ASSERT(assert_load_order("frontend", "frontend", "ui", NULL) == 0, "frontend load order");
+
+	return 0;
+}
+
+static int test_load_order_case_and_limits(void) {
+	char out[VM_MAX_NATIVE_MODULE_LOAD_NAMES][MAX_QPATH];
+	int count;
+
+	count = VM_BuildNativeModuleLoadOrder("QAGAME", out, 2);
+	ASSERT(count == 2, "limited qagame load-order count");
+	ASSERT(strcmp(out[0], "QAGAME") == 0, "primary load-order name preserves input case");
+	ASSERT(strcmp(out[1], "game") == 0, "limited qagame first alias");
+
+	count = VM_BuildNativeModuleLoadOrder("FrontEnd", out, VM_MAX_NATIVE_MODULE_LOAD_NAMES);
+	ASSERT(count == 2, "mixed-case frontend load-order count");
+	ASSERT(strcmp(out[0], "FrontEnd") == 0, "frontend primary preserves input case");
+	ASSERT(strcmp(out[1], "ui") == 0, "frontend reverse alias");
+
+	ASSERT(VM_BuildNativeModuleLoadOrder("renderer", out, VM_MAX_NATIVE_MODULE_LOAD_NAMES) == 0, "custom modules keep legacy fallback path");
+
+	return 0;
+}
+
 int main(void) {
 	if (test_empty_inputs() != 0) {
 		return 1;
@@ -72,6 +144,15 @@ int main(void) {
 		return 1;
 	}
 	if (test_candidate_limit() != 0) {
+		return 1;
+	}
+	if (test_load_order_empty_inputs() != 0) {
+		return 1;
+	}
+	if (test_load_order_aliases() != 0) {
+		return 1;
+	}
+	if (test_load_order_case_and_limits() != 0) {
 		return 1;
 	}
 

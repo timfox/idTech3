@@ -2648,8 +2648,14 @@ if(BUILD_UNIT_TESTS)
 
 	add_executable(unit_vm_native_module
 		tests/unit/test_vm_native_module.c
-		src/qcommon/vm_native_module.c)
+		tests/stub_qcommon_min.c
+		src/qcommon/vm_native_module.c
+		src/qcommon/q_shared.c
+		src/qcommon/q_math.c)
 	target_include_directories(unit_vm_native_module PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	if(NOT MSVC)
+		target_link_libraries(unit_vm_native_module PRIVATE m)
+	endif()
 	add_test(NAME unit_vm_native_module COMMAND unit_vm_native_module)
 	set_tests_properties(unit_vm_native_module PROPERTIES LABELS "unit;validation")
 endif()
