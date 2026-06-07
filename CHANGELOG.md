@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Vulkan PBR: **anisotropic visibility** for direct light; optional **IBL roughness stretch** from the anisotropy map (`r_pbr_iblAnisoStretch`); **clearcoat** base attenuation and **Charlie sheen** with optional fourth `sheenScale` roughness token.
 
 ### Removed
+- Vulkan renderer: stale compile-time gates `USE_VBO_GRID` and `USE_TESS_NEEDS_*` (always-on or never-enabled); dead non-PBR `#else` in `vk_shader_modules.c` (`USE_VK_PBR` is unconditional).
+- No-op OpenGL extension cvars on Vulkan builds: `r_allowExtensions`, `r_ext_compressed_textures`, `r_ext_compiled_vertex_array` (only referenced by dead `R_InitExtensions` behind `#ifndef USE_VULKAN`).
 - Legacy `r_vfog*` engine cvars and `vk_vfog.c`/`vk_vfog.h`: volumetric fog is configured only via `r_volumetricFog*` (and map/`r_fog*` as documented). Editor `worldspawn` keys `vfog_*` remain separate map data, not console cvars.
 
 ### Security
