@@ -390,17 +390,6 @@ void RB_BeginSurface( shader_t *shader, int fogNum ) {
 		tess.dlightUpdateParams = qtrue;
 	}
 
-#ifdef USE_TESS_NEEDS_NORMAL
-	tess.needsNormal = state->needsNormal || tess.dlightPass || r_shownormals->integer ||
-		( backEnd.currentEntity == &tr.worldEntity &&
-		( ( r_shDebugView && r_shDebugView->integer ) ||
-		( r_shWorldLighting && r_shWorldLighting->integer && r_shLighting && r_shLighting->integer ) ) );
-#endif
-
-#ifdef USE_TESS_NEEDS_ST2
-	tess.needsST2 = state->needsST2;
-#endif
-
 	tess.numIndexes = 0;
 	tess.numVertexes = 0;
 	tess.sdfUiEdge = -1.0f;
@@ -1289,15 +1278,12 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 
 	is_pbr_surface = qfalse;
 
-#ifdef USE_FOG_COLLAPSE
 	if ( fogCollapse ) {
 		VK_SetFogParams( &uniform, &fog_stage );
 		VectorCopy( backEnd.or.viewOrigin, uniform.eyePos );
 		vk_update_descriptor( VK_DESC_FOG_COLLAPSE, tr.fogImage->descriptor );
 		pushUniform = qtrue;
-	} else
-#endif
-	{
+	} else {
 		fog_stage = 0;
 		if ( tess_flags & TESS_VPOS ) {
 			VectorCopy( backEnd.or.viewOrigin, uniform.eyePos );
@@ -1961,9 +1947,7 @@ void RB_StageIteratorGeneric( void )
 		return;
 	}
 
-#ifdef USE_FOG_COLLAPSE
 	fogCollapse = tess.fogNum && tess.shader->fogPass && tess.shader->fogCollapse;
-#endif
 	worldShOverride = ( r_shDebugView && r_shDebugView->integer == 3 );
 
 	// call shader function

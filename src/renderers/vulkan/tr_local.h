@@ -35,7 +35,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #endif
 
 #define USE_VBO				// store static world geometry in VBO
-#define USE_FOG_COLLAPSE	// not compatible with legacy dlights
+/* fog collapse path (not compatible with legacy dlights) */
 #define MAX_REAL_DLIGHTS	(MAX_DLIGHTS*2)
 #define MAX_LITSURFS		(MAX_DRAWSURFS)
 #define	MAX_FLARES			256
@@ -45,9 +45,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifdef USE_VBO
 #define USE_VBO_GRID		/* put SF_GRID to VBO */
 #endif
-
-//#define USE_TESS_NEEDS_NORMAL
-//#define USE_TESS_NEEDS_ST2
 
 #define SH_COEFF_COUNT 9
 
@@ -545,11 +542,6 @@ typedef struct shader_s {
 	unsigned	noVLcollapse:1;			// ignore vertexlight mode
 
 	fogPass_t	fogPass;				// draw a blended pass, possibly with depth test equals
-
-	qboolean	needsNormal;			// not all shaders will need all data to be gathered
-	//qboolean	needsST1;
-	qboolean	needsST2;
-	//qboolean	needsColor;
 
 	int			numDeforms;
 	deformStage_t	deforms[MAX_SHADER_DEFORMS];
@@ -2112,14 +2104,6 @@ typedef struct shaderCommands_s
 	int		gltfGpuMorphCount;
 	float		gltfGpuMorphWeights[IQM_MORPH_TOP_K];
 #endif
-#endif
-
-	// info extracted from current shader
-#ifdef USE_TESS_NEEDS_NORMAL
-	int			needsNormal;
-#endif
-#ifdef USE_TESS_NEEDS_ST2
-	int			needsST2;
 #endif
 
 	int			numPasses;
