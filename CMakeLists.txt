@@ -2469,6 +2469,13 @@ set_tests_properties(test_demo_game_pk3 PROPERTIES
 	LABELS "scripts;validation;examples"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_demo_game_pk3.sh")
 
+add_test(NAME test_renderer_regression_maps
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_renderer_regression_maps.sh ${CMAKE_SOURCE_DIR}/scripts/renderer_regression_maps.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_renderer_regression_maps PROPERTIES
+	LABELS "unit;scripts;validation;renderer"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_renderer_regression_maps.sh")
+
 add_test(NAME test_compile_engine_lto
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_compile_engine_lto.sh ${CMAKE_SOURCE_DIR}/scripts/compile_engine.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
