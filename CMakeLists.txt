@@ -2476,6 +2476,13 @@ set_tests_properties(test_compile_engine_lto PROPERTIES
 	LABELS "unit;scripts;validation"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_compile_engine_lto.sh")
 
+add_test(NAME test_client_demo_regressions
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_client_demo_regressions.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_client_demo_regressions PROPERTIES
+	LABELS "unit;scripts;validation;client"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_client_demo_regressions.sh")
+
 add_test(NAME test_vk_vegetation_dispatch_order
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_vk_vegetation_dispatch_order.sh
 		${CMAKE_SOURCE_DIR}/src/renderers/vulkan/tr_shade.c
