@@ -73,6 +73,12 @@ assert_contains_literal "$VK_INSTANCE" "device_desc.pNext = &mesh_shader_feature
 assert_contains_literal "$VK_INIT_DEVICE" "PBR IBL: runtime cubemap convolution is disabled on Vulkan; using fallback IBL." "runtime cubemap fallback warning"
 assert_not_matches_regex "$VK_INIT_DEVICE" "vk\\.cubemapActive[[:space:]]*=[[:space:]]*qtrue" "runtime cubemap convolution remains disabled"
 
+# PBR shader init must not retain dead non-PBR fallback (USE_VK_PBR is always on for Vulkan).
+assert_contains_literal "$PROJECT_ROOT/src/renderers/vulkan/vk_shader_modules.c" "vk_bind_generated_shaders();" "PBR generated shader bind is active path"
+assert_not_matches_regex "$PROJECT_ROOT/src/renderers/vulkan/vk_shader_modules.c" "#else[[:space:]]*$" "non-PBR shader init fallback removed from vk_shader_modules.c"
+assert_not_matches_regex "$PROJECT_ROOT/src/renderers/vulkan/tr_local.h" "^#define USE_VBO_GRID" "stale USE_VBO_GRID compile gate removed"
+assert_not_matches_regex "$PROJECT_ROOT/src/renderers/vulkan/tr_local.h" "USE_TESS_NEEDS_NORMAL" "stale USE_TESS_NEEDS_NORMAL compile gate removed"
+
 # Validation builds need debug-report procs, and pool resets must invalidate cached Forward+ sets.
 assert_contains_literal "$VK_PROCS" "#ifdef USE_VK_VALIDATION" "validation proc declarations use feature flag"
 assert_contains_literal "$VK_SHUTDOWN" "vk_forward_plus_on_descriptor_pool_destroyed();" "descriptor-pool reset invalidates Forward+ cache"

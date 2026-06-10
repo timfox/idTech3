@@ -405,14 +405,9 @@ static void RB_SurfaceTriangles( const srfTriangles_t *srf ) {
 		xyz[1] = dv->xyz[1];
 		xyz[2] = dv->xyz[2];
 
-#ifdef USE_TESS_NEEDS_NORMAL
-		if ( tess.needsNormal )
-#endif
-		{
-			normal[0] = dv->normal[0];
-			normal[1] = dv->normal[1];
-			normal[2] = dv->normal[2];
-		}
+		normal[0] = dv->normal[0];
+		normal[1] = dv->normal[1];
+		normal[2] = dv->normal[2];
 
 #ifdef USE_VK_PBR
 		if( vk.pbrActive ) {
@@ -433,14 +428,9 @@ static void RB_SurfaceTriangles( const srfTriangles_t *srf ) {
 		texCoords0[0] = dv->st[0];
 		texCoords0[1] = dv->st[1];
 
-#ifdef USE_TESS_NEEDS_ST2
-		if ( tess.needsST2 )
-#endif
-		{
-			texCoords1[0] = dv->lightmap[0];
-			texCoords1[1] = dv->lightmap[1];
-			texCoords1 += 2;
-		}
+		texCoords1[0] = dv->lightmap[0];
+		texCoords1[1] = dv->lightmap[1];
+		texCoords1 += 2;
 
 		*color = dv->color.u32;
 	}
@@ -988,18 +978,13 @@ static void RB_SurfaceFace( const srfSurfaceFace_t *surf ) {
 
 	numPoints = surf->numPoints;
 
-#ifdef USE_TESS_NEEDS_NORMAL
-	if ( tess.needsNormal )
-#endif
-	{
-		if ( surf->normals ) {
-			// per-vertex normals for non-coplanar faces
-			memcpy( &tess.normal[ tess.numVertexes ], surf->normals, numPoints * sizeof( vec4_t ) );
-		} else {
-			normal = surf->plane.normal;
-			for ( i = 0, ndx = tess.numVertexes; i < numPoints; i++, ndx++ ) {
-				VectorCopy( normal, tess.normal[ndx] );
-			}
+	if ( surf->normals ) {
+		// per-vertex normals for non-coplanar faces
+		memcpy( &tess.normal[ tess.numVertexes ], surf->normals, numPoints * sizeof( vec4_t ) );
+	} else {
+		normal = surf->plane.normal;
+		for ( i = 0, ndx = tess.numVertexes; i < numPoints; i++, ndx++ ) {
+			VectorCopy( normal, tess.normal[ndx] );
 		}
 	}
 
@@ -1017,13 +1002,8 @@ static void RB_SurfaceFace( const srfSurfaceFace_t *surf ) {
 #ifdef USE_VK_PBR
 		tess.texCoords[0][ndx][0] = v[6];
 		tess.texCoords[0][ndx][1] = v[7];
-#ifdef USE_TESS_NEEDS_ST2
-		if ( tess.needsST2 )
-#endif
-		{
-			tess.texCoords[1][ndx][0] = v[8];
-			tess.texCoords[1][ndx][1] = v[9];
-		}
+		tess.texCoords[1][ndx][0] = v[8];
+		tess.texCoords[1][ndx][1] = v[9];
 		{
 			uint32_t color;
 			Com_Memcpy( &color, &v[10], sizeof( color ) );
@@ -1032,13 +1012,8 @@ static void RB_SurfaceFace( const srfSurfaceFace_t *surf ) {
 #else
 		tess.texCoords[0][ndx][0] = v[3];
 		tess.texCoords[0][ndx][1] = v[4];
-#ifdef USE_TESS_NEEDS_ST2
-		if ( tess.needsST2 )
-#endif
-		{
-			tess.texCoords[1][ndx][0] = v[5];
-			tess.texCoords[1][ndx][1] = v[6];
-		}
+		tess.texCoords[1][ndx][0] = v[5];
+		tess.texCoords[1][ndx][1] = v[6];
 		{
 			uint32_t color;
 			Com_Memcpy( &color, &v[7], sizeof( color ) );
@@ -1083,7 +1058,6 @@ static float LodErrorForVolume( vec3_t local, float radius ) {
 	return r_lodCurveError->value / d;
 }
 
-#ifdef USE_VBO_GRID
 void RB_SurfaceGridEstimate( srfGridMesh_t *cv, int *numVertexes, int *numIndexes )
 {
 	int		lodWidth, lodHeight;
@@ -1147,7 +1121,6 @@ void RB_SurfaceGridEstimate( srfGridMesh_t *cv, int *numVertexes, int *numIndexe
 	tess.numVertexes = 0;
 	tess.numIndexes = 0;
 }
-#endif // USE_VBO_GRID
 
 /*
 =============
@@ -1178,7 +1151,6 @@ static void RB_SurfaceGrid( srfGridMesh_t *cv ) {
 	int		dlightBits;
 	int		*vDlightBits;
 
-#ifdef USE_VBO_GRID
 	if ( tess.allowVBO && cv->vboItemIndex && !cv->dlightBits ) {
 		// transition to vbo render list
 		if ( tess.vboIndex == 0 ) {
@@ -1196,23 +1168,16 @@ static void RB_SurfaceGrid( srfGridMesh_t *cv ) {
 	}
 
 	VBO_Flush();
-#else
-#ifdef USE_VBO
-	VBO_Flush();
-#endif
-#endif
 
 	dlightBits = cv->dlightBits;
 	tess.dlightBits |= dlightBits;
 
-#ifdef USE_VBO_GRID
 	tess.surfType = SF_GRID;
 
 	// determine the allowable discrepance
 	if ( cv->vboItemIndex && ( tr.mapLoading || ( tess.dlightPass && tess.shader->isStaticShader ) ) )
 		lodError = r_lodCurveError->value; // fixed quality for VBO
 	else
-#endif // USE_VBO_GRID
 		lodError = LodErrorForVolume( cv->lodOrigin, cv->lodRadius );
 
 	// determine which rows and columns of the subdivision
@@ -1253,13 +1218,11 @@ static void RB_SurfaceGrid( srfGridMesh_t *cv ) {
 			if ( vrows < 2 || irows < 1 ) {
 				if ( tr.mapLoading ) {
 					// estimate and flush
-#ifdef USE_VBO_GRID
 					if ( cv->vboItemIndex ) {
 						VBO_PushData( cv->vboItemIndex, &tess );
 						tess.numIndexes = 0;
 						tess.numVertexes = 0;
 					} else
-#endif // USE_VBO_GRID
 						ri.Error( ERR_DROP, "Unexpected grid flush during map loading!\n" );
 				} else {
 					RB_EndSurface();
@@ -1300,23 +1263,13 @@ static void RB_SurfaceGrid( srfGridMesh_t *cv ) {
 				xyz[2] = dv->xyz[2];
 				texCoords0[0] = dv->st[0];
 				texCoords0[1] = dv->st[1];
-#ifdef USE_TESS_NEEDS_ST2
-				if ( tess.needsST2 )
-#endif
-				{
-					texCoords1[0] = dv->lightmap[0];
-					texCoords1[1] = dv->lightmap[1];
-					texCoords1 += 2;
-				}
-#ifdef USE_TESS_NEEDS_NORMAL
-				if ( tess.needsNormal )
-#endif
-				{
-					normal[0] = dv->normal[0];
-					normal[1] = dv->normal[1];
-					normal[2] = dv->normal[2];
-					normal += 4;
-				}
+				texCoords1[0] = dv->lightmap[0];
+				texCoords1[1] = dv->lightmap[1];
+				texCoords1 += 2;
+				normal[0] = dv->normal[0];
+				normal[1] = dv->normal[1];
+				normal[2] = dv->normal[2];
+				normal += 4;
 
 #ifdef USE_VK_PBR
 				if( vk.pbrActive ) {
