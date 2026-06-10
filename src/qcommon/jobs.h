@@ -50,6 +50,34 @@ int         Jobs_WorkerCount( void );
 
 jobHandle_t Jobs_Submit( const jobDesc_t *desc );
 
+/* C23 designated-initialiser helpers (defined after Jobs_Submit). */
+static inline jobDesc_t Jobs_MakeDesc( jobFunc_t func, void *data, jobPriority_t priority )
+{
+	return (jobDesc_t){
+		.func     = func,
+		.data     = data,
+		.priority = priority,
+		.parent   = JOBS_INVALID_HANDLE,
+	};
+}
+
+static inline jobDesc_t Jobs_MakeDescChild( jobFunc_t func, void *data, jobPriority_t priority,
+	jobHandle_t parent )
+{
+	return (jobDesc_t){
+		.func     = func,
+		.data     = data,
+		.priority = priority,
+		.parent   = parent,
+	};
+}
+
+static inline jobHandle_t Jobs_SubmitWork( jobFunc_t func, void *data, jobPriority_t priority )
+{
+	const jobDesc_t desc = Jobs_MakeDesc( func, data, priority );
+	return Jobs_Submit( &desc );
+}
+
 jobHandle_t Jobs_ParallelFor( jobFunc_t func, void *data, uint32_t count, uint32_t batchSize, jobPriority_t priority );
 
 void        Jobs_Wait( jobHandle_t handle );
@@ -57,6 +85,10 @@ void        Jobs_Wait( jobHandle_t handle );
 void        Jobs_WaitAll( void );
 
 qboolean    Jobs_IsComplete( jobHandle_t handle );
+
+int         Jobs_PendingCount( void );
+
+void        Jobs_Pump( int maxJobs );
 
 uint32_t    Jobs_GetThreadId( void );
 

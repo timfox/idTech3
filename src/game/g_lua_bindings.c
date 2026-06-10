@@ -43,6 +43,8 @@ Usage from Lua:
 #include "g_response.h"
 #include "ecs.h"
 #include "../physics/phys_bullet.h"
+#include "../world/fog_biology.h"
+#include "../world/genetic_gan.h"
 #include "../physics/phys_procedural_anim.h"
 #include "../physics/phys_ik.h"
 #include "../navigation/nav_recast.h"
@@ -308,6 +310,339 @@ static int l_vdb_bindAsFog(lua_State *L) {
 }
 static int l_vdb_getGridCount(lua_State *L) {
 	lua_pushinteger(L, VDB_GetGridCount());
+	return 1;
+}
+
+/* ========== Fog bioaerosol ecology bindings (Evans et al. 2019) ========== */
+
+static void l_fogBio_pushCommunity( lua_State *L, const fogBioCommunity_t *c )
+{
+	int i;
+
+	lua_newtable( L );
+	lua_pushnumber( L, c->shannonDiversity );
+	lua_setfield( L, -2, "shannon" );
+	lua_pushnumber( L, c->marineFraction );
+	lua_setfield( L, -2, "marine" );
+	lua_pushnumber( L, c->oceanOtuFraction );
+	lua_setfield( L, -2, "oceanOtu" );
+	lua_pushnumber( L, c->depositionMultiplier );
+	lua_setfield( L, -2, "deposition" );
+	lua_pushnumber( L, c->culturableRichness );
+	lua_setfield( L, -2, "richness" );
+	lua_pushnumber( L, c->gramNegativeFraction );
+	lua_setfield( L, -2, "gramNegative" );
+	lua_pushnumber( L, c->rhodospirillalesFraction );
+	lua_setfield( L, -2, "rhodospirillales" );
+	lua_pushnumber( L, c->pathogenTaxaScore );
+	lua_setfield( L, -2, "pathogenTaxa" );
+
+	lua_newtable( L );
+	for ( i = 0; i < FOG_BIO_PHYLUM_COUNT; i++ ) {
+		lua_pushnumber( L, c->phylum[i] );
+		lua_setfield( L, -2, FogBiology_PhylumName( (fogBioPhylum_t)i ) );
+	}
+	lua_setfield( L, -2, "phyla" );
+}
+
+static int l_fogBio_enabled( lua_State *L )
+{
+	(void)L;
+	lua_pushboolean( L, FogBiology_Enabled() );
+	return 1;
+}
+
+static int l_fogBio_getPhase( lua_State *L )
+{
+	(void)L;
+	lua_pushstring( L, FogBiology_PhaseName( FogBiology_GetPhase() ) );
+	return 1;
+}
+
+static int l_fogBio_getMarineInfluence( lua_State *L )
+{
+	(void)L;
+	lua_pushnumber( L, FogBiology_GetMarineInfluence() );
+	return 1;
+}
+
+static int l_fogBio_getPathogenRisk( lua_State *L )
+{
+	(void)L;
+	lua_pushnumber( L, FogBiology_GetPathogenDepositionRisk() );
+	return 1;
+}
+
+static int l_fogBio_getCommunity( lua_State *L )
+{
+	fogBioCommunity_t comm;
+	const char *phaseArg;
+
+	if ( lua_gettop( L ) >= 1 && lua_isstring( L, 1 ) ) {
+		phaseArg = luaL_checkstring( L, 1 );
+		if ( !Q_stricmp( phaseArg, "fog" ) ) {
+			FogBiology_GetCommunity( FOG_BIO_PHASE_FOG, &comm );
+		} else if ( !Q_stricmp( phaseArg, "post_fog" ) ) {
+			FogBiology_GetCommunity( FOG_BIO_PHASE_POST_FOG, &comm );
+		} else {
+			FogBiology_GetCommunity( FOG_BIO_PHASE_CLEAR, &comm );
+		}
+	} else {
+		FogBiology_GetCurrentCommunity( &comm );
+	}
+	l_fogBio_pushCommunity( L, &comm );
+	return 1;
+}
+
+static int l_fogBio_setSite( lua_State *L )
+{
+	if ( lua_isstring( L, 1 ) ) {
+		const char *site = luaL_checkstring( L, 1 );
+		if ( !Q_stricmp( site, "namib" ) ) {
+			FogBiology_SetSite( FOG_BIO_SITE_NAMIB );
+		} else {
+			FogBiology_SetSite( FOG_BIO_SITE_MAINE );
+		}
+	} else {
+		FogBiology_SetSite( (int)luaL_checkinteger( L, 1 ) ? FOG_BIO_SITE_NAMIB : FOG_BIO_SITE_MAINE );
+	}
+	return 0;
+}
+
+static int l_fogBio_setCoastKm( lua_State *L )
+{
+	FogBiology_SetCoastDistanceKm( (float)luaL_checknumber( L, 1 ) );
+	return 0;
+}
+
+static int l_fogBio_setMarineWind( lua_State *L )
+{
+	FogBiology_SetMarineWind( (float)luaL_checknumber( L, 1 ) );
+	return 0;
+}
+
+static int l_fogBio_setFogActive( lua_State *L )
+{
+	FogBiology_SetFogActive( lua_toboolean( L, 1 ) );
+	return 0;
+}
+
+static int l_fogBio_getCoastKm( lua_State *L )
+{
+	(void)L;
+	lua_pushnumber( L, FogBiology_GetCoastDistanceKm() );
+	return 1;
+}
+
+static int l_fogBio_poll( lua_State *L )
+{
+	fogBioCommunity_t comm;
+
+	(void)L;
+	lua_newtable( L );
+	lua_pushstring( L, FogBiology_PhaseName( FogBiology_GetPhase() ) );
+	lua_setfield( L, -2, "phase" );
+	lua_pushnumber( L, FogBiology_GetMarineInfluence() );
+	lua_setfield( L, -2, "marine" );
+	lua_pushnumber( L, FogBiology_GetCoastDistanceKm() );
+	lua_setfield( L, -2, "coastKm" );
+	FogBiology_GetCurrentCommunity( &comm );
+	lua_pushnumber( L, comm.shannonDiversity );
+	lua_setfield( L, -2, "shannon" );
+	lua_pushnumber( L, comm.depositionMultiplier );
+	lua_setfield( L, -2, "deposition" );
+	lua_pushnumber( L, FogBiology_GetPathogenDepositionRisk() );
+	lua_setfield( L, -2, "pathogen" );
+	lua_pushnumber( L, comm.pathogenTaxaScore );
+	lua_setfield( L, -2, "pathogenTaxa" );
+	lua_pushnumber( L, comm.gramNegativeFraction );
+	lua_setfield( L, -2, "gramNegative" );
+	lua_pushnumber( L, comm.oceanOtuFraction );
+	lua_setfield( L, -2, "oceanOtu" );
+	return 1;
+}
+
+/* ========== Engine.Genome — genetic + GAN procedural body evolution ========== */
+
+static int l_genome_enabled( lua_State *L )
+{
+	(void)L;
+	lua_pushboolean( L, GeneticGan_Enabled() );
+	return 1;
+}
+
+static int l_genome_getDim( lua_State *L )
+{
+	(void)L;
+	lua_pushinteger( L, GeneticGan_GetDim() );
+	return 1;
+}
+
+static int l_genome_create( lua_State *L )
+{
+	const char *label;
+	int slot;
+
+	label = lua_isstring( L, 1 ) ? luaL_checkstring( L, 1 ) : NULL;
+	slot = GeneticGan_CreateRandom( label );
+	if ( slot < 0 ) {
+		lua_pushnil( L );
+		return 1;
+	}
+	lua_pushinteger( L, slot );
+	return 1;
+}
+
+static int l_genome_breed( lua_State *L )
+{
+	int a = (int)luaL_checkinteger( L, 1 );
+	int b = (int)luaL_checkinteger( L, 2 );
+	float rate = lua_isnumber( L, 3 ) ? (float)lua_tonumber( L, 3 ) : -1.0f;
+	const char *label = lua_isstring( L, 4 ) ? luaL_checkstring( L, 4 ) : NULL;
+	int child = GeneticGan_Breed( a, b, rate, label );
+	if ( child < 0 ) {
+		lua_pushnil( L );
+		return 1;
+	}
+	lua_pushinteger( L, child );
+	return 1;
+}
+
+static int l_genome_mutate( lua_State *L )
+{
+	int slot = (int)luaL_checkinteger( L, 1 );
+	float rate = lua_isnumber( L, 2 ) ? (float)lua_tonumber( L, 2 ) : -1.0f;
+	float strength = lua_isnumber( L, 3 ) ? (float)lua_tonumber( L, 3 ) : 0.15f;
+	slot = GeneticGan_Mutate( slot, rate, strength );
+	if ( slot < 0 ) {
+		lua_pushnil( L );
+		return 1;
+	}
+	lua_pushinteger( L, slot );
+	return 1;
+}
+
+static int l_genome_setFitness( lua_State *L )
+{
+	GeneticGan_SetFitness( (int)luaL_checkinteger( L, 1 ), (float)luaL_checknumber( L, 2 ) );
+	return 0;
+}
+
+static int l_genome_getFitness( lua_State *L )
+{
+	lua_pushnumber( L, GeneticGan_GetFitness( (int)luaL_checkinteger( L, 1 ) ) );
+	return 1;
+}
+
+static int l_genome_getGene( lua_State *L )
+{
+	lua_pushnumber( L, GeneticGan_GetGene( (int)luaL_checkinteger( L, 1 ), (int)luaL_checkinteger( L, 2 ) ) );
+	return 1;
+}
+
+static int l_genome_setGene( lua_State *L )
+{
+	qboolean ok = GeneticGan_SetGene( (int)luaL_checkinteger( L, 1 ), (int)luaL_checkinteger( L, 2 ),
+		(float)luaL_checknumber( L, 3 ) );
+	lua_pushboolean( L, ok );
+	return 1;
+}
+
+static int l_genome_selectBest( lua_State *L )
+{
+	int best = GeneticGan_SelectBest();
+	if ( best < 0 ) {
+		lua_pushnil( L );
+		return 1;
+	}
+	lua_pushinteger( L, best );
+	return 1;
+}
+
+static int l_genome_selectTournament( lua_State *L )
+{
+	int k = lua_isnumber( L, 1 ) ? (int)lua_tonumber( L, 1 ) : 3;
+	int pick = GeneticGan_SelectTournament( k );
+	if ( pick < 0 ) {
+		lua_pushnil( L );
+		return 1;
+	}
+	lua_pushinteger( L, pick );
+	return 1;
+}
+
+static int l_genome_count( lua_State *L )
+{
+	(void)L;
+	lua_pushinteger( L, GeneticGan_Count() );
+	return 1;
+}
+
+static int l_genome_getPhenotype( lua_State *L )
+{
+	geneticGanPhenotype_t pheno;
+	int slot = (int)luaL_checkinteger( L, 1 );
+	int i;
+
+	GeneticGan_GetPhenotype( slot, &pheno );
+	if ( !GeneticGan_IsActive( slot ) ) {
+		lua_pushnil( L );
+		return 1;
+	}
+	lua_newtable( L );
+	lua_pushnumber( L, pheno.bodyScale );
+	lua_setfield( L, -2, "bodyScale" );
+	lua_pushnumber( L, pheno.limbLength );
+	lua_setfield( L, -2, "limbLength" );
+	lua_pushnumber( L, pheno.headSize );
+	lua_setfield( L, -2, "headSize" );
+	lua_pushnumber( L, pheno.torsoWidth );
+	lua_setfield( L, -2, "torsoWidth" );
+	lua_pushnumber( L, pheno.agility );
+	lua_setfield( L, -2, "agility" );
+	lua_pushnumber( L, pheno.mass );
+	lua_setfield( L, -2, "mass" );
+	lua_newtable( L );
+	for ( i = 0; i < pheno.morphCount; i++ ) {
+		lua_pushnumber( L, pheno.morphWeights[i] );
+		lua_rawseti( L, -2, i + 1 );
+	}
+	lua_setfield( L, -2, "morphWeights" );
+	return 1;
+}
+
+static int l_genome_jobStatus( lua_State *L )
+{
+	(void)L;
+	switch ( GeneticGan_GetJobStatus() ) {
+	case GENETIC_GAN_JOB_RUNNING:
+		lua_pushstring( L, "running" );
+		break;
+	case GENETIC_GAN_JOB_COMPLETED:
+		lua_pushstring( L, "completed" );
+		break;
+	case GENETIC_GAN_JOB_FAILED:
+		lua_pushstring( L, "failed" );
+		break;
+	default:
+		lua_pushstring( L, "idle" );
+		break;
+	}
+	return 1;
+}
+
+static int l_genome_decode( lua_State *L )
+{
+	const char *cmd;
+	int slot = (int)luaL_checkinteger( L, 1 );
+
+	if ( !GeneticGan_Enabled() ) {
+		lua_pushboolean( L, qfalse );
+		return 1;
+	}
+	cmd = va( "genome_generate %d\n", slot );
+	Cbuf_AddText( cmd );
+	lua_pushboolean( L, qtrue );
 	return 1;
 }
 
@@ -1323,6 +1658,42 @@ void LuaBindings_RegisterAll(void *luaState) {
 		{NULL, NULL}
 	};
 	registerTable(L, "VDB", vdbFuncs);
+
+	static const luaL_Reg fogBioFuncs[] = {
+		{"enabled", l_fogBio_enabled},
+		{"getPhase", l_fogBio_getPhase},
+		{"getMarineInfluence", l_fogBio_getMarineInfluence},
+		{"getCoastKm", l_fogBio_getCoastKm},
+		{"getPathogenRisk", l_fogBio_getPathogenRisk},
+		{"getCommunity", l_fogBio_getCommunity},
+		{"setSite", l_fogBio_setSite},
+		{"setCoastKm", l_fogBio_setCoastKm},
+		{"setMarineWind", l_fogBio_setMarineWind},
+		{"setFogActive", l_fogBio_setFogActive},
+		{"poll", l_fogBio_poll},
+		{NULL, NULL}
+	};
+	registerTable(L, "FogBiology", fogBioFuncs);
+
+	static const luaL_Reg genomeFuncs[] = {
+		{"enabled", l_genome_enabled},
+		{"getDim", l_genome_getDim},
+		{"create", l_genome_create},
+		{"breed", l_genome_breed},
+		{"mutate", l_genome_mutate},
+		{"setFitness", l_genome_setFitness},
+		{"getFitness", l_genome_getFitness},
+		{"getGene", l_genome_getGene},
+		{"setGene", l_genome_setGene},
+		{"selectBest", l_genome_selectBest},
+		{"selectTournament", l_genome_selectTournament},
+		{"count", l_genome_count},
+		{"getPhenotype", l_genome_getPhenotype},
+		{"jobStatus", l_genome_jobStatus},
+		{"decode", l_genome_decode},
+		{NULL, NULL}
+	};
+	registerTable(L, "Genome", genomeFuncs);
 
 	static const luaL_Reg spriteFuncs[] = {
 		{"spawnLocal", l_sprite_spawnLocal},

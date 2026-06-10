@@ -31,6 +31,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "infernux/infernux_console.h"
 #include "mimir/mimir_console.h"
 #include "iris/iris_console.h"
+#include "radiusfps/radiusfps_console.h"
+#include "gccfer/gccfer_console.h"
+#include "dax/dax_console.h"
+#include "x3dpra/x3dpra_console.h"
 #include "jobs.h"
 #include "defer.h"
 #ifdef USE_DUKTAPE
@@ -4220,6 +4224,10 @@ void Com_Init( char *commandLine ) {
 	Infernux_ConsoleInit();
 	Mimir_ConsoleInit();
 	Iris_ConsoleInit();
+	RadiusFPS_ConsoleInit();
+	Gccfer_ConsoleInit();
+	Dax_ConsoleInit();
+	X3dpra_ConsoleInit();
 
 	Com_Printf( "--- Common Initialization Complete ---\n" );
 
@@ -4452,6 +4460,8 @@ void Com_Frame( qboolean noDelay ) {
 
 	/* Run deferred callbacks from job workers / AI before frame logic */
 	Defer_Flush();
+
+	Jobs_Pump( Cvar_VariableIntegerValue( "jobs_mainPump" ) );
 
 	minMsec = 0; // silent compiler warning
 

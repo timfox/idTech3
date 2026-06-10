@@ -39,6 +39,35 @@ function demo_engine_scaffold()
   end
 end
 
+-- Console: lua_run demo_fog_biology()
+function demo_fog_biology()
+  if not Engine or not Engine.FogBiology then
+    print("[idtech3_demo] Engine.FogBiology unavailable (USE_LUA build required)")
+    return
+  end
+  if not Engine.FogBiology.enabled() then
+    print("[idtech3_demo] exec demo_fog_biology.cfg or: set r_fogBiology 1")
+    return
+  end
+  local phase = Engine.FogBiology.getPhase()
+  local risk = Engine.FogBiology.getPathogenRisk()
+  local marine = Engine.FogBiology.getMarineInfluence()
+  local c = Engine.FogBiology.getCommunity()
+  local snap = Engine.FogBiology.poll and Engine.FogBiology.poll() or nil
+  if snap then
+    print(string.format(
+      "[idtech3_demo] fog bio poll phase=%s marine=%.2f shannon=%.2f dep=%.1fx pathogen=%.2f",
+      snap.phase, snap.marine, snap.shannon, snap.deposition, snap.pathogen))
+  else
+    "[idtech3_demo] fog bio phase=%s marine=%.2f shannon=%.2f dep=%.1fx risk=%.2f",
+    phase, marine, c.shannon, c.deposition, risk))
+  end
+  if Engine.Telemetry then
+    print("[idtech3_demo] telemetry pathogen=" ..
+      tostring(Engine.Telemetry.get("fog_bio_pathogen_risk")))
+  end
+end
+
 local function demo_sp_slice()
   if Engine and Engine.AnimGraph then
     if Engine.AnimGraph.load("animgraph/idle_run.txt") then

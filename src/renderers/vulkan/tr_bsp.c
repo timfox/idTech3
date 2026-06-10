@@ -349,9 +349,234 @@ int R_GetLightmapPixelOffset( int lightmapIndex, int *pixelX, int *pixelY )
 
 /*
 ===============
-R_LoadMergedLightmaps
+Stream sector lightmap atlas (r_bspStream) — append tiles without touching hub map data.
 ===============
 */
+static struct {
+	image_t *atlas;
+	image_t *deluxeAtlas;
+	int     atlasIndex;
+	int     nextTile;
+	int     tileCapacity;
+} s_bspStreamLm = {
+	.atlasIndex = -1,
+};
+
+
+void R_BspStreamLightmap_Reset( void )
+{
+	s_bspStreamLm.nextTile = 0;
+	s_bspStreamLm.atlasIndex = -1;
+	s_bspStreamLm.atlas = NULL;
+	s_bspStreamLm.deluxeAtlas = NULL;
+	s_bspStreamLm.tileCapacity = 0;
+}
+
+
+void R_BspStreamLightmap_ResetTiles( void )
+{
+	s_bspStreamLm.nextTile = 0;
+}
+
+
+static int R_BspStreamLightmap_TileCapacity( void )
+{
+	if ( tr.mergeLightmaps ) {
+		return lightmapCountX * lightmapCountY;
+	}
+	return 1;
+}
+
+
+int R_BspStreamLightmap_RegisterAtlas( void )
+{
+	int w, h;
+
+	if ( s_bspStreamLm.atlasIndex >= 0 ) {
+		return s_bspStreamLm.atlasIndex;
+	}
+
+	if ( tr.mergeLightmaps ) {
+		w = lightmapWidth;
+		h = lightmapHeight;
+	} else {
+		w = LIGHTMAP_SIZE;
+		h = LIGHTMAP_SIZE;
+	}
+
+	s_bspStreamLm.atlas = R_CreateImage( "*bspStreamLightmap0", NULL, NULL,
+		w, h, lightmapFlags | IMGFLAG_CLAMPTOBORDER, 0, 0 );
+
+	{
+		const int oldCount = tr.numLightmaps;
+		image_t **newMaps = ri.Hunk_Alloc( ( oldCount + 1 ) * sizeof( image_t * ), h_low );
+
+		if ( tr.lightmaps && oldCount > 0 ) {
+			Com_Memcpy( newMaps, tr.lightmaps, (size_t)oldCount * sizeof( image_t * ) );
+		}
+		newMaps[oldCount] = s_bspStreamLm.atlas;
+		tr.lightmaps = newMaps;
+		s_bspStreamLm.atlasIndex = oldCount;
+		tr.numLightmaps = oldCount + 1;
+	}
+
+	if ( tr.worldDeluxeMapping ) {
+		image_t **newDeluxe;
+		const int oldCount = tr.numLightmaps - 1;
+
+		s_bspStreamLm.deluxeAtlas = R_CreateImage( "*bspStreamDeluxemap0", NULL, NULL,
+			w, h, lightmapFlags | IMGFLAG_CLAMPTOBORDER, 0, 0 );
+
+		if ( tr.deluxemaps && oldCount > 0 ) {
+			newDeluxe = ri.Hunk_Alloc( tr.numLightmaps * sizeof( image_t * ), h_low );
+			Com_Memcpy( newDeluxe, tr.deluxemaps, (size_t)oldCount * sizeof( image_t * ) );
+		} else {
+			newDeluxe = ri.Hunk_Alloc( tr.numLightmaps * sizeof( image_t * ), h_low );
+		}
+		newDeluxe[oldCount] = s_bspStreamLm.deluxeAtlas;
+		tr.deluxemaps = newDeluxe;
+	}
+
+	s_bspStreamLm.tileCapacity = R_BspStreamLightmap_TileCapacity();
+	s_bspStreamLm.nextTile = 0;
+
+	ri.Printf( PRINT_DEVELOPER,
+		"[bsp_stream] registered stream lightmap atlas index %d (%dx%d, %d tiles%s)\n",
+		s_bspStreamLm.atlasIndex, w, h, s_bspStreamLm.tileCapacity,
+		tr.worldDeluxeMapping ? ", deluxe paired" : "" );
+
+	return s_bspStreamLm.atlasIndex;
+}
+
+
+qboolean R_BspStreamLightmap_AllocSlot( bspStreamLightmapSlot_t *slot )
+{
+	int cN, cX, cY;
+	int w, h;
+
+	if ( !slot ) {
+		return qfalse;
+	}
+
+	if ( s_bspStreamLm.atlasIndex < 0 ) {
+		R_BspStreamLightmap_RegisterAtlas();
+	}
+	if ( s_bspStreamLm.nextTile >= s_bspStreamLm.tileCapacity ) {
+		ri.Printf( PRINT_WARNING, "[bsp_stream] stream lightmap atlas full (%d tiles)\n",
+			s_bspStreamLm.tileCapacity );
+		return qfalse;
+	}
+
+	cN = s_bspStreamLm.nextTile++;
+	cX = cN % lightmapCountX;
+	cY = cN / lightmapCountX;
+
+	if ( tr.mergeLightmaps ) {
+		w = lightmapWidth;
+		h = lightmapHeight;
+		slot->uvX = (float)( LIGHTMAP_BORDER + cX * LIGHTMAP_LEN ) / (float)w;
+		slot->uvY = (float)( LIGHTMAP_BORDER + cY * LIGHTMAP_LEN ) / (float)h;
+	} else {
+		slot->uvX = 0.0f;
+		slot->uvY = 0.0f;
+	}
+
+	slot->pixelX = cX * LIGHTMAP_LEN;
+	slot->pixelY = cY * LIGHTMAP_LEN;
+
+	return qtrue;
+}
+
+
+void R_BspStreamLightmap_UploadTile( const bspStreamLightmapSlot_t *slot, const byte *rgb128 )
+{
+	byte image[LIGHTMAP_LEN * LIGHTMAP_LEN * 4];
+
+	if ( !slot || !rgb128 || !s_bspStreamLm.atlas ) {
+		return;
+	}
+
+	if ( tr.mergeLightmaps ) {
+		(void)R_ProcessLightmap( image, rgb128, 0.0f );
+#ifdef USE_VULKAN
+		vk_upload_image_data( s_bspStreamLm.atlas, slot->pixelX, slot->pixelY,
+			LIGHTMAP_LEN, LIGHTMAP_LEN, 1, image, LIGHTMAP_LEN * LIGHTMAP_LEN * 4, qtrue );
+#else
+		R_UploadSubImage( image, slot->pixelX, slot->pixelY, LIGHTMAP_LEN, LIGHTMAP_LEN, s_bspStreamLm.atlas );
+#endif
+	} else {
+		const byte *src = rgb128;
+
+		for ( int y = 0; y < LIGHTMAP_SIZE; y++ ) {
+			for ( int x = 0; x < LIGHTMAP_SIZE; x++ ) {
+				byte *dst = &image[( y * LIGHTMAP_SIZE + x ) * 4];
+				R_ColorShiftLightingBytes( src, dst, qfalse );
+				dst[3] = 255;
+				src += 3;
+			}
+		}
+#ifdef USE_VULKAN
+		vk_upload_image_data( s_bspStreamLm.atlas, 0, 0,
+			LIGHTMAP_SIZE, LIGHTMAP_SIZE, 1, image, LIGHTMAP_SIZE * LIGHTMAP_SIZE * 4, qtrue );
+#else
+		R_UploadSubImage( image, 0, 0, LIGHTMAP_SIZE, LIGHTMAP_SIZE, s_bspStreamLm.atlas );
+#endif
+	}
+}
+
+
+void R_BspStreamLightmap_UploadDeluxeTile( const bspStreamLightmapSlot_t *slot, const byte *rgb128 )
+{
+	byte image[LIGHTMAP_LEN * LIGHTMAP_LEN * 4];
+
+	if ( !slot || !rgb128 || !s_bspStreamLm.deluxeAtlas || !tr.worldDeluxeMapping ) {
+		return;
+	}
+
+	if ( tr.mergeLightmaps ) {
+		(void)R_ProcessDeluxemap( image, rgb128 );
+#ifdef USE_VULKAN
+		vk_upload_image_data( s_bspStreamLm.deluxeAtlas, slot->pixelX, slot->pixelY,
+			LIGHTMAP_LEN, LIGHTMAP_LEN, 1, image, LIGHTMAP_LEN * LIGHTMAP_LEN * 4, qtrue );
+#else
+		R_UploadSubImage( image, slot->pixelX, slot->pixelY, LIGHTMAP_LEN, LIGHTMAP_LEN, s_bspStreamLm.deluxeAtlas );
+#endif
+	} else {
+		const byte *src = rgb128;
+		int x, y;
+
+		for ( y = 0; y < LIGHTMAP_SIZE; y++ ) {
+			for ( x = 0; x < LIGHTMAP_SIZE; x++ ) {
+				byte *dst = &image[( y * LIGHTMAP_SIZE + x ) * 4];
+				byte r = src[0];
+				byte g = src[1];
+				byte b = src[2];
+
+				if ( r == 0 && g == 0 && b == 0 ) {
+					r = g = b = 127;
+				}
+				dst[0] = r;
+				dst[1] = g;
+				dst[2] = b;
+				dst[3] = 255;
+				src += 3;
+			}
+		}
+#ifdef USE_VULKAN
+		vk_upload_image_data( s_bspStreamLm.deluxeAtlas, 0, 0,
+			LIGHTMAP_SIZE, LIGHTMAP_SIZE, 1, image, LIGHTMAP_SIZE * LIGHTMAP_SIZE * 4, qtrue );
+#else
+		R_UploadSubImage( image, 0, 0, LIGHTMAP_SIZE, LIGHTMAP_SIZE, s_bspStreamLm.deluxeAtlas );
+#endif
+	}
+}
+
+
+/*
+===============
+R_LoadMergedLightmaps
+===============
+ */
 static void R_LoadMergedLightmaps( const lump_t *l, byte *image )
 {
 	const byte	*buf;
@@ -652,11 +877,15 @@ static void vk_generate_light_directions( void )
 }
 #endif
 
-static void GenerateNormals( srfSurfaceFace_t *face )
+void R_BspGenerateFaceNormals( srfSurfaceFace_t *face )
 {
 	vec3_t ba, ca, cross;
 	float *v1, *v2, *v3, *n1, *n2, *n3;
 	int i, *indices, i0, i1, i2;
+
+	if ( !face ) {
+		return;
+	}
 
 	indices = ((int *)((byte *)face + face->ofsIndices));
 
@@ -690,6 +919,11 @@ static void GenerateNormals( srfSurfaceFace_t *face )
 			n1[i0] = R_ClampDenorm( n1[i0] );
 		}
 	}
+}
+
+static void GenerateNormals( srfSurfaceFace_t *face )
+{
+	R_BspGenerateFaceNormals( face );
 }
 
 

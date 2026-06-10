@@ -286,47 +286,133 @@ static int vk_get_current_entity_motion_index( void )
 	return (int)( ent - base );
 }
 
-static qboolean vk_entity_requires_no_motion( const trRefEntity_t *ent, int motion_index )
+static qboolean vk_entity_has_rigid_prev_model( const trRefEntity_t *ent, int motion_index )
 {
-	qboolean markUnreliable = qfalse;
-	qboolean rigidPrevModel = qfalse;
+	if ( !ent || motion_index < 0 ) {
+		return qfalse;
+	}
+	return ( ent->e.reType == RT_MODEL &&
+		vk_prev_entity_model_valid[motion_index] &&
+		vk_prev_entity_model_handles[motion_index] == ent->e.hModel &&
+		vk_prev_entity_types[motion_index] == (int)ent->e.reType ) ? qtrue : qfalse;
+}
 
+static qboolean vk_entity_animates_this_frame( const trRefEntity_t *ent )
+{
 	if ( !ent ) {
 		return qfalse;
 	}
-	if ( ent->e.reType == RT_MODEL && motion_index >= 0 &&
-		vk_prev_entity_model_valid[motion_index] &&
-		vk_prev_entity_model_handles[motion_index] == ent->e.hModel &&
-		vk_prev_entity_types[motion_index] == (int)ent->e.reType ) {
-		rigidPrevModel = qtrue;
+	if ( ent->e.frame != ent->e.oldframe ) {
+		return qtrue;
 	}
-	if ( !rigidPrevModel ) {
-		if ( ent->e.frame != ent->e.oldframe ) {
-			markUnreliable = qtrue;
-		}
-		if ( !markUnreliable && ent->e.backlerp > 0.001f ) {
-			markUnreliable = qtrue;
-		}
-	}
-	if ( !markUnreliable && ent->e.customShader &&
-		( !r_temporalCustomShaderMotion || !r_temporalCustomShaderMotion->integer ) ) {
-		markUnreliable = qtrue;
-	}
-	/* View weapon / first-person geometry: model matrix is view-relative; per-entity
-	 * prev-model history does not represent prior screen motion. Use current MVP as prev. */
-	if ( !markUnreliable && ( ent->e.renderfx & RF_FIRST_PERSON ) ) {
-		markUnreliable = qtrue;
-	}
-	if ( markUnreliable ) {
-		if ( !vk.temporal.unreliableMotionThisFrame && r_temporalDebug && r_temporalDebug->integer >= 2 ) {
-			ri.Printf( PRINT_DEVELOPER, "[VK][temporal] unreliable motion for entity type=%d customShader=%d frame=%d oldframe=%d backlerp=%.3f rf_fp=%d\n",
-				ent->e.reType, ent->e.customShader, ent->e.frame, ent->e.oldframe, ent->e.backlerp,
-				( ent->e.renderfx & RF_FIRST_PERSON ) ? 1 : 0 );
-		}
-		vk.temporal.unreliableMotionThisFrame = qtrue;
+	if ( ent->e.backlerp > 0.001f ) {
 		return qtrue;
 	}
 	return qfalse;
+}
+
+static qboolean vk_draw_uses_gpu_deform_motion( void )
+{
+	if ( tess.gltfUseGpuPipeline ) {
+		return qtrue;
+	}
+	if ( vk.cmd && vk.cmd->iqm_skin_offset != 0 ) {
+		return qtrue;
+	}
+	return qfalse;
+}
+
+static qboolean vk_entity_likely_gpu_deform_motion( const trRefEntity_t *ent )
+{
+	if ( !ent || ent->e.reType != RT_MODEL || !tr.currentModel ) {
+		return qfalse;
+	}
+	if ( tr.currentModel->type == MOD_GLTF && r_gltfGpu && r_gltfGpu->integer ) {
+		return qtrue;
+	}
+	if ( tr.currentModel->type == MOD_IQM && ent->morphActiveCount > 0 ) {
+		const iqmData_t *data = (const iqmData_t *)tr.currentModel->modelData;
+		return ( data && data->num_poses > 0 ) ? qtrue : qfalse;
+	}
+	return qfalse;
+}
+
+static qboolean vk_entity_has_gpu_deform_motion( const trRefEntity_t *ent )
+{
+	if ( vk_draw_uses_gpu_deform_motion() ) {
+		return qtrue;
+	}
+	return vk_entity_likely_gpu_deform_motion( ent );
+}
+
+static qboolean vk_entity_poison_global_motion( const trRefEntity_t *ent, int motion_index )
+{
+	if ( !ent ) {
+		return qfalse;
+	}
+	if ( ent->e.renderfx & RF_FIRST_PERSON ) {
+		return qtrue;
+	}
+	if ( ent->e.customShader &&
+		( !r_temporalCustomShaderMotion || !r_temporalCustomShaderMotion->integer ) ) {
+		return qtrue;
+	}
+	if ( r_temporalCpuSkinPrev && r_temporalCpuSkinPrev->integer ) {
+		return qfalse;
+	}
+	if ( !vk_entity_has_rigid_prev_model( ent, motion_index ) &&
+		vk_entity_animates_this_frame( ent ) &&
+		!vk_entity_has_gpu_deform_motion( ent ) ) {
+		return qtrue;
+	}
+	return qfalse;
+}
+
+static qboolean vk_entity_skip_rigid_prev_model( const trRefEntity_t *ent, int motion_index )
+{
+	if ( !ent ) {
+		return qfalse;
+	}
+	if ( ent->e.renderfx & RF_FIRST_PERSON ) {
+		return qtrue;
+	}
+	if ( ent->e.customShader &&
+		( !r_temporalCustomShaderMotion || !r_temporalCustomShaderMotion->integer ) ) {
+		return qtrue;
+	}
+	if ( !vk_entity_has_rigid_prev_model( ent, motion_index ) &&
+		vk_entity_animates_this_frame( ent ) &&
+		!vk_entity_has_gpu_deform_motion( ent ) ) {
+		return qtrue;
+	}
+	return qfalse;
+}
+
+static void vk_entity_note_motion_reliability( const trRefEntity_t *ent, int motion_index )
+{
+	qboolean poisonGlobal;
+	qboolean skipRigidPrev;
+
+	if ( !ent ) {
+		return;
+	}
+
+	poisonGlobal = vk_entity_poison_global_motion( ent, motion_index );
+	skipRigidPrev = vk_entity_skip_rigid_prev_model( ent, motion_index );
+
+	if ( poisonGlobal ) {
+		if ( !vk.temporal.unreliableMotionThisFrame && r_temporalDebug && r_temporalDebug->integer >= 2 ) {
+			ri.Printf( PRINT_DEVELOPER, "[VK][temporal] global unreliable motion entity type=%d customShader=%d frame=%d oldframe=%d backlerp=%.3f rf_fp=%d gpuDeform=%d\n",
+				ent->e.reType, ent->e.customShader, ent->e.frame, ent->e.oldframe, ent->e.backlerp,
+				( ent->e.renderfx & RF_FIRST_PERSON ) ? 1 : 0,
+				vk_entity_has_gpu_deform_motion( ent ) ? 1 : 0 );
+		}
+		vk.temporal.unreliableMotionThisFrame = qtrue;
+	} else if ( skipRigidPrev && r_temporalDebug && r_temporalDebug->integer >= 2 ) {
+		ri.Printf( PRINT_DEVELOPER, "[VK][temporal] per-entity motion fallback (prev MVP = current) type=%d frame=%d oldframe=%d gpuDeform=%d\n",
+			ent->e.reType, ent->e.frame, ent->e.oldframe,
+			vk_entity_has_gpu_deform_motion( ent ) ? 1 : 0 );
+	}
 }
 
 static void vk_get_prev_mvp_transform( float *prev_mvp )
@@ -352,8 +438,10 @@ static void vk_get_prev_mvp_transform( float *prev_mvp )
 			vk_curr_entity_model_valid[motion_index] = qtrue;
 		}
 
+		vk_entity_note_motion_reliability( backEnd.currentEntity, motion_index );
+
 		/* Rigid entity motion: previous model matrix. GPU skin deformation uses prev pose in the skin SSBO. */
-		if ( !vk_entity_requires_no_motion( backEnd.currentEntity, motion_index ) &&
+		if ( !vk_entity_skip_rigid_prev_model( backEnd.currentEntity, motion_index ) &&
 			vk_prev_entity_model_valid[motion_index] &&
 			vk_prev_entity_model_handles[motion_index] == backEnd.currentEntity->e.hModel &&
 			vk_prev_entity_types[motion_index] == (int)backEnd.currentEntity->e.reType ) {
@@ -492,4 +580,14 @@ void vk_update_depth_range( Vk_Depth_Range depth_range )
 			vk_scene_src_rect_valid = qtrue;
 		}
 	}
+}
+
+void vk_read_mvp_transform( float *mvp )
+{
+	vk_get_mvp_transform( mvp );
+}
+
+void vk_read_prev_mvp_transform( float *prev_mvp )
+{
+	vk_get_prev_mvp_transform( prev_mvp );
 }

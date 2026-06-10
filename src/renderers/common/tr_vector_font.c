@@ -12,11 +12,13 @@ Lengyel (JCGT 2017) GPU vector font path.
 #include "../../qcommon/q_utf8.h"
 #include "tr_public.h"
 #include "tr_vector_font.h"
+#include "tr_vector_font_glyphlet.h"
 
 #if defined(RENDERER_VULKAN)
 #include "../vulkan/tr_common.h"
 #include "../vulkan/tr_local.h"
 #include "../vulkan/vk_texture_image.h"
+#include "../vulkan/vk_vector_font.h"
 #else
 #error "tr_vector_font.c requires RENDERER_VULKAN"
 #endif
@@ -30,6 +32,7 @@ extern FT_Library ftLibrary;
 #endif
 
 static vectorFont_t vectorFont;
+static vectorGlyphletAtlas_t vectorGlyphletAtlas;
 static qhandle_t vectorFontShaderHandle = 0;
 static cvar_t *r_vectorFontMode;
 
@@ -322,6 +325,10 @@ static qboolean R_VectorFont_BuildFromFace( FT_Face face, const char *ttfPath ) 
 		g->emRight = emRight;
 		g->emTop = emTop;
 		g->valid = qtrue;
+
+		if ( R_VectorFont_EffectiveMode() == VECTOR_FONT_MODE_LOOP_BLINN ) {
+			(void)R_VectorGlyphlet_BuildFromSlot( slot, &vectorGlyphletAtlas, &g->glyphlet );
+		}
 	}
 
 	width = VECTOR_CURVE_TEX_WIDTH;
@@ -337,11 +344,19 @@ static qboolean R_VectorFont_BuildFromFace( FT_Face face, const char *ttfPath ) 
 	vectorFont.totalCurves = texelCount / VECTOR_TEXELS_PER_CURVE;
 	vectorFont.loaded = qtrue;
 
-	ri.Printf( PRINT_ALL, "Vector font: loaded %s (%d curves, %dx%d curve texture, mode %d Lengyel)\n",
-		ttfPath, vectorFont.totalCurves, width, height, VECTOR_FONT_MODE_LENGYEL );
 	if ( R_VectorFont_EffectiveMode() == VECTOR_FONT_MODE_LOOP_BLINN ) {
-		ri.Printf( PRINT_WARNING,
-			"Vector font: r_vectorFontMode 2 (Loop&Blinn mesh) not implemented; using Lengyel — see docs/VECTOR_FONT.md\n" );
+		if ( !VK_VectorFont_UploadAtlas( &vectorGlyphletAtlas, vectorFont.glyphs ) ) {
+			ri.Printf( PRINT_WARNING,
+				"Vector font: mode 2 glyphlet upload failed; set r_vectorFontMode 0 for Lengyel fallback\n" );
+		} else {
+			ri.Printf( PRINT_ALL,
+				"Vector font: loaded %s (%u glyphlet tris, %ux%u curve texture, mode 2 Loop&Blinn%s)\n",
+				ttfPath, vectorGlyphletAtlas.primCount, width, height,
+				VK_VectorFont_MeshReady() ? " + NV mesh dispatch" : " vertex fallback" );
+		}
+	} else {
+		ri.Printf( PRINT_ALL, "Vector font: loaded %s (%d curves, %dx%d curve texture, mode %d Lengyel)\n",
+			ttfPath, vectorFont.totalCurves, width, height, VECTOR_FONT_MODE_LENGYEL );
 	}
 
 	ri.Free( texels );
@@ -354,8 +369,10 @@ void R_VectorFont_Init( void ) {
 	r_vectorFontMode = ri.Cvar_Get( "r_vectorFontMode", "0", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_vectorFontMode,
 		"Vector font algorithm when r_vectorFont 1: 0 = Lengyel JCGT 2017 (curve texture + winding), "
-		"2 = Loop & Blinn + mesh glyphlets (AMD GPUOpen; not implemented, falls back to 0)." );
+		"2 = Loop & Blinn glyphlets (AMD GPUOpen; NV mesh dispatch when r_vk_meshShaderNV 1). reloadTtf after change." );
+	R_VectorGlyphletAtlas_Init( &vectorGlyphletAtlas );
 	R_VectorFont_Clear();
+	VK_VectorFont_Init();
 }
 
 int R_VectorFont_Mode( void ) {
@@ -363,6 +380,8 @@ int R_VectorFont_Mode( void ) {
 }
 
 void R_VectorFont_Shutdown( void ) {
+	VK_VectorFont_Shutdown();
+	R_VectorGlyphletAtlas_Shutdown( &vectorGlyphletAtlas );
 	R_VectorFont_Clear();
 }
 
@@ -371,6 +390,8 @@ qboolean R_VectorFont_IsEnabled( void ) {
 }
 
 void R_VectorFont_Clear( void ) {
+	VK_VectorFont_ClearGpu();
+	R_VectorGlyphletAtlas_Clear( &vectorGlyphletAtlas );
 	Com_Memset( &vectorFont, 0, sizeof( vectorFont ) );
 }
 
@@ -492,6 +513,10 @@ qboolean R_VectorFont_DrawString( float x, float y, float scale, const char *tex
 
 	if ( !R_VectorFont_IsEnabled() || !text || !text[0] || scale <= 0.0f ) {
 		return qfalse;
+	}
+
+	if ( R_VectorFont_EffectiveMode() == VECTOR_FONT_MODE_LOOP_BLINN ) {
+		return RE_QueueVectorFontString( x, y, scale, text, color, shadowOff );
 	}
 
 	if ( shadowOff > 0.0f ) {

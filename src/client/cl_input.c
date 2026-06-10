@@ -81,6 +81,8 @@ static cvar_t *cl_anglespeedkey;
 static cvar_t *cl_maxpackets;
 static cvar_t *cl_packetdup;
 
+cvar_t *cl_debugMove;
+
 static cvar_t *m_pitch;
 static cvar_t *m_yaw;
 static cvar_t *m_forward;

@@ -22,9 +22,30 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // sv_client.c -- server code for dealing with clients
 
 #include "server.h"
+#include "sv_auth.h"
+#include "sv_app_crdt.h"
 #include "../qcommon/script_emit.h"
 
 static void SV_CloseDownload( client_t *cl );
+
+/*
+===============
+SV_Auth_CheckClient
+===============
+*/
+qboolean SV_Auth_CheckClient( client_t *cl )
+{
+	const char *token;
+	int clientNum;
+
+	if ( !cl || cl->netchan.remoteAddress.type == NA_BOT ) {
+		return qtrue;
+	}
+
+	clientNum = (int)( cl - svs.clients );
+	token = Info_ValueForKey( cl->userinfo, SV_Auth_UserinfoKey() );
+	return SV_AuthVerifyToken( token, clientNum );
+}
 
 //
 // Server-side Stateless Challenges
@@ -781,6 +802,12 @@ gotnewcl:
 
 	SV_UserinfoChanged( newcl, qtrue, qfalse ); // update userinfo, do not run filter
 
+	if ( !SV_Auth_CheckClient( newcl ) ) {
+		NET_OutOfBandPrint( NS_SERVER, from, "print\nInvalid or missing auth token\n" );
+		Com_Printf( "Rejected connection from %s: auth token failed\n", ip );
+		return;
+	}
+
 	if ( sv_clientTLD->integer ) {
 		SV_SaveSequences();
 	}
@@ -1176,6 +1203,10 @@ void SV_ClientEnterWorld( client_t *client ) {
 
 	// call the game begin function
 	VM_Call( gvm, 1, GAME_CLIENT_BEGIN, clientNum );
+
+#ifdef USE_LUA
+	SV_AppCrdt_ClientEnterWorld( client );
+#endif
 }
 
 
@@ -1913,6 +1944,13 @@ void SV_UserinfoChanged( client_t *cl, qboolean updateUserinfo, qboolean runFilt
 		if ( *val != '\0' )
 		{
 			SV_DropClient( cl, val );
+			return;
+		}
+
+		if ( !SV_Auth_CheckClient( cl ) )
+		{
+			SV_DropClient( cl, "Invalid auth token" );
+			return;
 		}
 	}
 }
@@ -2065,6 +2103,12 @@ qboolean SV_ExecuteClientCommand( client_t *cl, const char *s ) {
 	qboolean isBot;
 
 	Cmd_TokenizeString( s );
+
+#ifdef USE_LUA
+	if ( SV_AppCrdt_TryClientCommand( cl, s ) ) {
+		return qtrue;
+	}
+#endif
 
 	// malicious users may try using too many string commands
 	// to lag other players.  If we decide that we want to stall

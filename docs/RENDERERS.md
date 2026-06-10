@@ -2,6 +2,18 @@
 
 For a **build + manual validation checklist** (CI parity, shader coverage, GPU passes), see [RENDERER_CONFIDENCE.md](RENDERER_CONFIDENCE.md).
 
+## Renderer backends (id Tech 7–style)
+
+| Backend | Status | Notes |
+|---------|--------|-------|
+| **Vulkan** | **Shipping** | Only production renderer (`idtech3_vulkan.so` / static on Windows) |
+| **Vulkan RTX** | Experimental | `-DUSE_VULKAN_RTX=ON` / `./scripts/compile_engine.sh vulkan rtx` |
+| **DXR** | Roadmap scaffold | Windows plugin stub (`USE_DXR_RENDERER`); see [DXR_RENDERER.md](DXR_RENDERER.md) |
+| **WebGPU** | Roadmap | Browser/Wasm target; portable compute shaders validated on Vulkan today — [WEBGPU_ROADMAP.md](WEBGPU_ROADMAP.md) |
+| **OpenGL** | **Removed** | No `idtech3_opengl` target, no fallback; `cl_renderer opengl` maps to Vulkan with a warning |
+
+Build: `./scripts/compile_engine.sh vulkan` (OpenGL/`opengl` arg is rejected).
+
 ## Vulkan Renderer (Primary)
 
 The Vulkan 1.4 renderer is the primary rendering backend, built as a shared library (`idtech3_vulkan.so`). Requests Vulkan 1.4 when available; validation layers (Khronos, then LUNARG fallback) are enabled in debug builds on all platforms.
@@ -193,6 +205,7 @@ Code: `src/renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar regist
 | `r_deferredLighting` | 0 | Experimental deferred diffuse (Forward+ tiles, point+spot). Replaces scene color after geometry. Latches `r_forwardPlusShade` 0 with `vid_restart`. |
 | `r_deferredUnlitBase` | 1 | Additive dynamic on static-lit scene copy; skips classic lit-surf pass. **0** = legacy multiply composite. |
 | `r_deferredLightingStrength` | 1 | Scale deferred dynamic diffuse (0–4). |
+| `r_deferredSpecular` | 1 | Blinn-Phong specular on dynamic lights in deferred pass (0=diffuse only). |
 | `r_volumetricFog` | 0 | Volumetric fog enable (0=off, 1=on) |
 | `r_vdbFog` | 0 | Blend GPU-uploaded bound VDB density (`vdb_bind_fog`) into global volumetric density (requires `r_volumetricFog` 1 and `VDB_UploadToGPU`) |
 | `r_vdbFogBlend` | 0.5 | VDB density blend weight when `r_vdbFog` 1 |
@@ -300,7 +313,8 @@ See [RENDERERS_FUTURE.md](RENDERERS_FUTURE.md) for architecture and implementati
 - **Path trace experiment (C6)**: `r_pathtrace` + `r_pathtrace_arch` (`megakernel` / `wavefront`) over shared RTX world TLAS — requires `r_rtx 1`, `r_rtxDemo 1`, `USE_VULKAN_RTX`. Not SP ship lighting. See [PATHTRACE_ARCH_BENCHMARK.md](PATHTRACE_ARCH_BENCHMARK.md).
 - **Mobile-GS**: `r_mgs` tiered compute splatting (Android-friendly; no RTX). See [MOBILE_GAUSSIAN_SPLATTING.md](MOBILE_GAUSSIAN_SPLATTING.md).
 - **WebSplatter**: `r_wsp` tile-binned splats (WebGPU-portable compute layout). See [WEB_SPLATTER.md](WEB_SPLATTER.md).
-- **Metal**: Native Metal renderer for macOS/iOS (Apple Silicon). Option `USE_METAL_RENDERER` reserved.
-- **DXR**: DirectX 12 + DirectX Raytracing for Windows. Option `USE_DXR_RENDERER` reserved.
+- **Metal**: Roadmap scaffold — `USE_METAL_RENDERER=ON` (Apple) builds `idtech3_metal` dlopen plugin; native backend TBD. See `docs/METAL_RENDERER.md`.
+- **DXR**: Roadmap scaffold — `USE_DXR_RENDERER=ON` (Windows) builds `idtech3_dxr` dlopen plugin; DX12 backend TBD. See `docs/DXR_RENDERER.md`.
+- **WebGPU (Wasm)**: No native plugin; portable `wsp`/`mgs` compute on Vulkan today. See `docs/WEBGPU_ROADMAP.md`.
 
 For practical renderer direction and priority order, see [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_2026_ARCHITECTURE_PASS.md).

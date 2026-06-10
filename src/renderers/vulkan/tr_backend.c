@@ -34,6 +34,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_wpt.h"
 #include "vk_mgs.h"
 #include "vk_squeezeme.h"
+#include "vk_vector_font.h"
 #include "vk_wsp.h"
 #include "vk_fp64_points.h"
 #endif
@@ -1308,6 +1309,35 @@ static const void *RB_StretchPic( const void *data ) {
 	return (const void *)(cmd + 1);
 }
 
+/*
+=============
+RB_VectorFontString
+=============
+*/
+static const void *RB_VectorFontString( const void *data ) {
+	const vectorFontStringCommand_t *cmd;
+
+	cmd = (const vectorFontStringCommand_t *)data;
+
+	if ( !backEnd.projection2D ) {
+		if ( tess.numIndexes ) {
+			RB_EndSurface();
+		}
+		RB_SetGL2D();
+	}
+
+#ifdef USE_VBO
+	VBO_UnBind();
+#endif
+
+	if ( cmd->color[3] > 0.0f ) {
+		RE_SetColor( cmd->color );
+	}
+	VK_VectorFont_DrawString( cmd->x, cmd->y, cmd->scale, cmd->text, cmd->color, cmd->shadowOff );
+	RE_SetColor( NULL );
+	return (const void *)(cmd + 1);
+}
+
 
 static void RB_LightingPass( void )
 {
@@ -2288,6 +2318,9 @@ void RB_ExecuteRenderCommands( const void *data ) {
 			break;
 		case RC_STRETCH_PIC:
 			data = RB_StretchPic( data );
+			break;
+		case RC_VECTOR_FONT_STRING:
+			data = RB_VectorFontString( data );
 			break;
 		case RC_DRAW_SURFS:
 			data = RB_DrawSurfs( data );

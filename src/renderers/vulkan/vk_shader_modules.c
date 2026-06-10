@@ -48,6 +48,10 @@ void vk_create_shader_modules( void )
 	SET_OBJECT_NAME( vk.modules.frag.ui_sdf_text, "ui sdf text fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	vk.modules.frag.ui_vector_text = SHADER_MODULE( frag_ui_vector_text_frag_spv );
 	SET_OBJECT_NAME( vk.modules.frag.ui_vector_text, "ui vector text fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	vk.modules.frag.ui_vector_glyphlet_vert = SHADER_MODULE( vert_ui_vector_glyphlet_vert_spv );
+	SET_OBJECT_NAME( vk.modules.frag.ui_vector_glyphlet_vert, "ui vector glyphlet vertex module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	vk.modules.frag.ui_vector_glyphlet_frag = SHADER_MODULE( frag_ui_vector_glyphlet_frag_spv );
+	SET_OBJECT_NAME( vk.modules.frag.ui_vector_glyphlet_frag, "ui vector glyphlet fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	vk.modules.frag.ui_subpixel_text = SHADER_MODULE( frag_ui_subpixel_text_frag_spv );
 	SET_OBJECT_NAME( vk.modules.frag.ui_subpixel_text, "ui subpixel text fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 

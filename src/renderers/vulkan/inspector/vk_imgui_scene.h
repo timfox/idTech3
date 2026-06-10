@@ -3,7 +3,7 @@
 Copyright (C) 2026 Gopex LLC. All rights reserved.
 
 Read-only snapshots of tr.refdef / tr.world for Dear ImGui panels.
-Implemented in C so tr_local.h (C-only friendly) is not parsed as C++.
+Compiled as C++ with -fno-operator-names (tr_local.h uses `or` as a field name).
 ===========================================================================
 */
 

@@ -1,0 +1,8 @@
+# Generated IDE / local build (s&box template.gitignore analogue)
+.vscode/
+.idea/
+*.pk3
+*.zip
+build/
+obj/
+bin/

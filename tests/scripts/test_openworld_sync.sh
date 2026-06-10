@@ -24,15 +24,17 @@ rg -q 'CL_OpenWorld_OnConfigstring' src/client/cl_openworld.cpp
 rg -q 'cl_openWorldSync' src/client/cl_openworld.cpp
 rg -q 'CL_OpenWorld_SyncUnloadRemoved' src/client/cl_openworld.cpp
 rg -q 'cl_openWorldLastSync' src/client/cl_openworld.cpp
-rg -q 'WorldOpen_UnloadSectorLayers' src/world/world_open.c
+rg -q 'WorldOpen_UnloadSectorLayers' src/world/world_open.cpp
 rg -q 'RE_BspStream_MergeSector' src/renderers/vulkan/tr_bsp_stream.c
 rg -q 'R_BspStream_LoadSurfaceLumps' src/renderers/vulkan/tr_bsp_stream.c
 rg -q 'R_BspStream_AddSurfaces' src/renderers/vulkan/tr_main.c
 rg -q 'BspStreamMergeSector' src/renderers/common/tr_public.h
 rg -q 'RE_BspStream_ClearAll' src/renderers/vulkan/tr_bsp_stream.c
+rg -q 'R_BspStream_RebuildVbo' src/renderers/vulkan/tr_bsp_stream.c
+rg -q 'R_BspStream_CompactLightmaps' src/renderers/vulkan/tr_bsp_stream.c
 rg -q 'r_bspStreamResident' src/renderers/vulkan/tr_bsp_stream.c
 rg -q 'WorldResidency_SetServerCollisionAllowList' src/client/cl_openworld.cpp
 rg -q 'WorldResidency_UpdateServerOrigins' src/server/sv_openworld.c
-rg -q 'r_openWorldResidency' src/world/world_residency.c
+rg -q 'r_openWorldResidency' src/world/world_residency.cpp
 
 echo "[test_openworld_sync] ok"

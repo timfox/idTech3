@@ -1,0 +1,11 @@
+path,culture,expression
+fixture:0,caucasian,happy
+fixture:1,caucasian,sad
+fixture:2,east_asian,happy
+fixture:3,east_asian,angry
+fixture:4,south_asian,neutral
+fixture:5,south_asian,fear
+fixture:6,african,surprise
+fixture:7,african,disgust
+fixture:8,caucasian,neutral
+fixture:9,east_asian,happy

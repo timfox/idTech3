@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<!-- s&box-style staged builds: Draft (fast) → Test in engine → Final -->
+<project version="2.0">
+
+  <var name="MapBakerThreads">8</var>
+  <var name="MapBakerGPUFlags"></var>
+  <var name="q3map2">&quot;[RadiantPath]q3map2.[ExecutableType]&quot; -v<cond value="[MonitorAddress]"> -connect [MonitorAddress]</cond> -game quake3 -fs_basepath &quot;[EnginePath]&quot; -fs_homepath &quot;[UserEnginePath]&quot;<cond value="[GameName]"> -fs_game [GameName]</cond></var>
+  <var name="idtech3">&quot;[EnginePath]/idtech3&quot; +set fs_basepath &quot;[EnginePath]&quot;<cond value="[GameName]"> +set fs_game [GameName]</cond> +set r_studio_tools 1 +set com_scriptWatch 1</var>
+
+  <build name="Draft: BSP only">
+    <command>[q3map2] -threads [MapBakerThreads] -bsp -meta "[MapFile]"</command>
+    <command>cp &quot;[BspFile]&quot; &quot;[MapDir]/../maps/&quot;</command>
+  </build>
+
+  <build name="Draft: Fast compile + copy">
+    <command>[q3map2] -threads [MapBakerThreads] -bsp -meta -maxarea -samplesize 16 "[MapFile]"</command>
+    <command>[q3map2] -threads [MapBakerThreads] -vis -fast -saveprt "[MapFile]"</command>
+    <command>[q3map2] -threads [MapBakerThreads] -light [MapBakerGPUFlags] -lightmapsize 512 -samples 2 -fill "[MapFile]"</command>
+    <command>cp &quot;[BspFile]&quot; &quot;[MapDir]/../maps/&quot;</command>
+  </build>
+
+  <separator />
+
+  <build name="Test: Launch engine (current map)">
+    <command>[idtech3] +map [MapName]</command>
+  </build>
+
+  <build name="Test: Launch engine (studio tools)">
+    <command>[idtech3] +devmap [MapName]</command>
+  </build>
+
+  <separator />
+
+  <build name="Entities: Update BSP only">
+    <command>[q3map2] -threads [MapBakerThreads] -onlyents "[MapFile]"</command>
+    <command>cp &quot;[BspFile]&quot; &quot;[MapDir]/../maps/&quot;</command>
+  </build>
+
+  <build name="Entities: Export to .ents">
+    <command>[q3map2] -threads [MapBakerThreads] -exportents "[MapFile]"</command>
+  </build>
+
+</project>

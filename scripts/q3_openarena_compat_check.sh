@@ -52,8 +52,18 @@ else
 fi
 
 # Optional generative hooks must default off (no impact on classic play).
-if grep -q 'cl_trellis_enable' "$PROJECT_ROOT/src/client/cl_main.c" && \
-   grep -q '"cl_trellis_enable", "0"' "$PROJECT_ROOT/src/client/cl_main.c"; then
+_trellis_default_ok=0
+for _trellis_src in \
+	"$PROJECT_ROOT/src/client/cl_trellis.c" \
+	"$PROJECT_ROOT/src/client/cl_main.c"; do
+	if [ -f "$_trellis_src" ] && \
+	   grep -q 'cl_trellis_enable' "$_trellis_src" && \
+	   grep -q '"cl_trellis_enable", "0"' "$_trellis_src"; then
+		_trellis_default_ok=1
+		break
+	fi
+done
+if [ "$_trellis_default_ok" -eq 1 ]; then
 	pass "cl_trellis_enable defaults to 0"
 else
 	fail "cl_trellis_enable default not 0"

@@ -26,6 +26,51 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_draw_state.h"
 #include <math.h>
 
+#ifdef USE_VBO
+/*
+===============
+RB_QueueSurfaceVBO
+===============
+*/
+static qboolean RB_QueueSurfaceVBO( int vboItemIndex, surfaceType_t surfType )
+{
+	if ( !tess.allowVBO || !vboItemIndex ) {
+		return qfalse;
+	}
+
+	if ( VBO_ItemIsStream( vboItemIndex ) ) {
+		const stream_vbo_item_t *item = VBO_StreamGetItem( VBO_ItemStreamIndex( vboItemIndex ) );
+
+		if ( !item ) {
+			return qfalse;
+		}
+		if ( tess.vboIndex == 0 ) {
+			RB_EndSurface();
+			RB_BeginSurface( tess.shader, tess.fogNum );
+			tess.numIndexes = 1;
+			tess.numVertexes = 0;
+		}
+		tess.surfType = surfType;
+		tess.vboIndex = vboItemIndex;
+		tess.vboStreamItem = item;
+		return qtrue;
+	}
+
+	if ( tess.vboIndex == 0 ) {
+		RB_EndSurface();
+		RB_BeginSurface( tess.shader, tess.fogNum );
+		tess.numIndexes = 1;
+		tess.numVertexes = 0;
+		VBO_ClearQueue();
+	}
+	tess.surfType = surfType;
+	tess.vboIndex = vboItemIndex;
+	tess.vboStreamItem = NULL;
+	VBO_QueueItem( vboItemIndex );
+	return qtrue;
+}
+#endif
+
 /*
 
   THIS ENTIRE FILE IS BACK END
@@ -354,20 +399,9 @@ static void RB_SurfaceTriangles( const srfTriangles_t *srf ) {
 	int			dlightBits;
 
 #ifdef USE_VBO
-	if ( tess.allowVBO && srf->vboItemIndex && !srf->dlightBits ) {
-		// transition to vbo render list
-		if ( tess.vboIndex == 0 ) {
-			RB_EndSurface();
-			RB_BeginSurface( tess.shader, tess.fogNum );
-			// set some dummy parameters for RB_EndSurface
-			tess.numIndexes = 1;
-			tess.numVertexes = 0;
-			VBO_ClearQueue();
-		}
-		tess.surfType = SF_TRIANGLES;
-		tess.vboIndex = srf->vboItemIndex;
-		VBO_QueueItem( srf->vboItemIndex );
-		return; // no need to tesselate anything
+	if ( tess.allowVBO && srf->vboItemIndex && !srf->dlightBits &&
+		RB_QueueSurfaceVBO( srf->vboItemIndex, SF_TRIANGLES ) ) {
+		return;
 	}
 
 	VBO_Flush();
@@ -948,20 +982,9 @@ static void RB_SurfaceFace( const srfSurfaceFace_t *surf ) {
 	int			dlightBits;
 
 #ifdef USE_VBO
-	if ( tess.allowVBO && surf->vboItemIndex && !surf->dlightBits ) {
-		// transition to vbo render list
-		if ( tess.vboIndex == 0 ) {
-			RB_EndSurface();
-			RB_BeginSurface( tess.shader, tess.fogNum );
-			// set some dummy parameters for RB_EndSurface
-			tess.numIndexes = 1;
-			tess.numVertexes = 0;
-			VBO_ClearQueue();
-		}
-		tess.surfType = SF_FACE;
-		tess.vboIndex = surf->vboItemIndex;
-		VBO_QueueItem( surf->vboItemIndex );
-		return; // no need to tesselate anything
+	if ( tess.allowVBO && surf->vboItemIndex && !surf->dlightBits &&
+		RB_QueueSurfaceVBO( surf->vboItemIndex, SF_FACE ) ) {
+		return;
 	}
 
 	VBO_Flush();
@@ -1179,20 +1202,9 @@ static void RB_SurfaceGrid( srfGridMesh_t *cv ) {
 	int		*vDlightBits;
 
 #ifdef USE_VBO_GRID
-	if ( tess.allowVBO && cv->vboItemIndex && !cv->dlightBits ) {
-		// transition to vbo render list
-		if ( tess.vboIndex == 0 ) {
-			RB_EndSurface();
-			RB_BeginSurface( tess.shader, tess.fogNum );
-			// set some dummy parameters for RB_EndSurface
-			tess.numIndexes = 1;
-			tess.numVertexes = 0;
-			VBO_ClearQueue();
-		}
-		tess.surfType = SF_GRID;
-		tess.vboIndex = cv->vboItemIndex;
-		VBO_QueueItem( cv->vboItemIndex );
-		return; // no need to tesselate anything
+	if ( tess.allowVBO && cv->vboItemIndex && !cv->dlightBits &&
+		RB_QueueSurfaceVBO( cv->vboItemIndex, SF_GRID ) ) {
+		return;
 	}
 
 	VBO_Flush();

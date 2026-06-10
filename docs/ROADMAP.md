@@ -95,8 +95,8 @@ Priorities that keep **CI green** and **README/build truth** aligned:
 
 ### Renderer 2026 Architecture Pass
 - [x] Lighting scalability (incremental): clustered Forward+ packs **64** GPU lights; classic projector/`dlightBits` remain **32**; `r_renderMode 2` latches Forward+ shade. See `docs/RENDERER_2026_ARCHITECTURE_PASS.md`.
-- [ ] Temporal robustness (incremental in progress): shared reset policy + optional **`r_taa`** with motion-vector path; per-entity unreliable motion and full skinned motion coverage still open. See `docs/RENDERER_2026_ARCHITECTURE_PASS.md`.
-  - On `main`: TAA skips portals/camera cuts/`unreliableMotionThisFrame`; `taa.frag` neighborhood clamp; RTX demo uses Vulkan projection + render-target extent.
+- [ ] Temporal robustness (incremental in progress): shared reset policy + optional **`r_taa`** with motion-vector path; **per-entity motion policy** (`r_temporalCpuSkinPrev`, GPU deform detect) landed — CPU-skinned prev-vertex tess and reactive debug overlays still open. See `docs/RENDERER_2026_ARCHITECTURE_PASS.md`.
+  - On `main`: TAA runs with per-frame history confidence (`taaParams`); portals/camera cuts still hard-skip; `r_temporalCpuSkinPrev 0` restores conservative whole-frame invalidation for spawning animated entities.
 - [ ] Platform strategy: Vulkan as the supported renderer; prioritize Metal ahead of DXR; treat RTX as a Vulkan feature tier. See `docs/RENDERER_2026_ARCHITECTURE_PASS.md`.
 
 ### Short-Term (completed)
@@ -119,7 +119,7 @@ Priorities that keep **CI green** and **README/build truth** aligned:
 
 ### Long-Term (future work, not in active development)
 - [x] **Hybrid Rendering 1** (Granja/Pereira 2021) — separate shadow/spec/diffuse RT, SVGF temporal + A-trous, IBL, composite. See `docs/HYBRID_RENDERING1.md`.
-- [ ] Vulkan RTX - VK_KHR_ray_tracing_pipeline integration (BLAS/TLAS, raygen/miss/closest-hit). See docs/RENDERERS_FUTURE.md.
-- [ ] Metal renderer - native Metal backend for macOS/iOS (Apple Silicon). See docs/RENDERERS_FUTURE.md.
-- [ ] DXR renderer - DirectX 12 + DirectX Raytracing for Windows. See docs/RENDERERS_FUTURE.md.
-- [ ] WebAssembly + WebGPU - browser deployment via Emscripten + WebGPU
+- [ ] Vulkan RTX - VK_KHR_ray_tracing_pipeline integration (BLAS/TLAS, raygen/miss/closest-hit). **Incremental:** world BLAS map cache, entity TLAS UPDATE (`r_rtxTlasUpdate`), `rtx_status`, instance-aware closest-hit. See docs/RENDERERS_FUTURE.md.
+- [ ] Metal renderer - native Metal backend for macOS/iOS (Apple Silicon). **Scaffold:** `USE_METAL_RENDERER=ON` → `idtech3_metal` dlopen plugin. See docs/METAL_RENDERER.md.
+- [ ] DXR renderer - DirectX 12 + DirectX Raytracing for Windows. **Scaffold:** `USE_DXR_RENDERER=ON` → `idtech3_dxr` dlopen plugin. See docs/DXR_RENDERER.md.
+- [ ] WebAssembly + WebGPU - browser deployment via Emscripten + WebGPU. **Manifest:** `scripts/check_webgpu_shader_portability.sh`. See docs/WEBGPU_ROADMAP.md.

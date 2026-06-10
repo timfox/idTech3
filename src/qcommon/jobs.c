@@ -28,6 +28,8 @@ Thread safety:
 #include "qcommon.h"
 #include "jobs.h"
 
+_Static_assert( JOB_PRIORITY_COUNT == 3, "job priority queue count must match enum" );
+
 #if defined(_MSC_VER)
 /* CONDITION_VARIABLE / WakeConditionVariable require Vista+; q_platform.h defaults older. */
 #if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
@@ -37,12 +39,19 @@ Thread safety:
 /* Win32 threading via CreateThread + CRITICAL_SECTION + CONDITION_VARIABLE */
 #include <windows.h>
 
-typedef enum { SLOT_FREE=0, SLOT_PENDING, SLOT_RUNNING, SLOT_COMPLETE } slotState_t;
+typedef enum {
+	SLOT_FREE = 0,
+	SLOT_PENDING,
+	SLOT_RUNNING,
+	SLOT_COMPLETE
+} slotState_t;
 
 typedef struct {
 	jobFunc_t       func;
 	void            *data;
 	uint32_t        count;
+	uint32_t        rangeEnd;
+	jobFunc_t       parallelFunc;
 	jobPriority_t   priority;
 	jobHandle_t     parent;
 	volatile LONG   unfinished;
@@ -70,7 +79,33 @@ static struct {
 
 static cvar_t *jobs_threads;
 static cvar_t *jobs_enabled;
+static cvar_t *jobs_mainPump;
 static __declspec(thread) uint32_t tls_threadId = 0;
+
+static void run_slot_job( jobSlot_t *s ) {
+	if ( s->parallelFunc ) {
+		for ( uint32_t i = s->count; i < s->rangeEnd; i++ ) {
+			s->parallelFunc( s->data, i );
+		}
+	} else if ( s->func ) {
+		s->func( s->data, s->count );
+	}
+}
+
+static jobSlot_t *slot_get( jobHandle_t h ) {
+	return ( h < JOBS_MAX_PENDING ) ? &js.slots[h] : NULL;
+}
+
+static void parallel_group_child_done( jobHandle_t groupHandle ) {
+	jobSlot_t *p = slot_get( groupHandle );
+
+	if ( !p ) {
+		return;
+	}
+	if ( InterlockedDecrement( &p->unfinished ) == 0 ) {
+		InterlockedExchange( &p->state, SLOT_COMPLETE );
+	}
+}
 
 static qboolean queue_push( jobQueue_t *q, jobHandle_t h ) {
 	LONG tail, next;
@@ -98,19 +133,25 @@ static qboolean queue_pop( jobQueue_t *q, jobHandle_t *out ) {
 	}
 }
 
-static jobSlot_t *slot_get( jobHandle_t h ) {
-	return ( h < JOBS_MAX_PENDING ) ? &js.slots[h] : NULL;
-}
-
 static jobHandle_t alloc_slot( void ) {
-	uint32_t attempt;
-	for ( attempt = 0; attempt < JOBS_MAX_PENDING; attempt++ ) {
+	for ( uint32_t attempt = 0; attempt < JOBS_MAX_PENDING; attempt++ ) {
 		uint32_t idx = (uint32_t)InterlockedIncrement( &js.nextSlot ) % JOBS_MAX_PENDING;
 		if ( InterlockedCompareExchange( &js.slots[idx].state, SLOT_PENDING, SLOT_FREE ) == SLOT_FREE ) {
 			return (jobHandle_t)idx;
 		}
 	}
 	return JOBS_INVALID_HANDLE;
+}
+
+static int clamp_job_priority( jobPriority_t priority ) {
+	int pri = (int)priority;
+	if ( pri < 0 ) {
+		pri = 0;
+	}
+	if ( pri >= JOB_PRIORITY_COUNT ) {
+		pri = JOB_PRIORITY_COUNT - 1;
+	}
+	return pri;
 }
 
 static void wake_workers( int n ) {
@@ -136,13 +177,16 @@ static void finish_job( jobHandle_t h ) {
 }
 
 static qboolean try_execute_one( void ) {
-	jobHandle_t h; int p;
-	for ( p = JOB_PRIORITY_HIGH; p >= JOB_PRIORITY_LOW; p-- ) {
+	jobHandle_t h;
+
+	for ( int p = JOB_PRIORITY_HIGH; p >= JOB_PRIORITY_LOW; p-- ) {
 		if ( queue_pop( &js.queues[p], &h ) ) {
 			jobSlot_t *s = slot_get( h );
-			if ( !s || s->state != SLOT_PENDING ) return qtrue;
+			if ( !s || s->state != SLOT_PENDING ) {
+				return qtrue;
+			}
 			InterlockedExchange( &s->state, SLOT_RUNNING );
-			if ( s->func ) s->func( s->data, s->count );
+			run_slot_job( s );
 			finish_job( h );
 			return qtrue;
 		}
@@ -153,12 +197,17 @@ static qboolean try_execute_one( void ) {
 static DWORD WINAPI worker_main( LPVOID arg ) {
 	uint32_t id = (uint32_t)(uintptr_t)arg;
 	int spins = 0;
+
 	tls_threadId = id;
 	while ( !js.shutdownRequested ) {
-		if ( try_execute_one() ) { spins = 0; continue; }
+		if ( try_execute_one() ) {
+			spins = 0;
+			continue;
+		}
 		spins++;
-		if ( spins < 64 ) { SwitchToThread(); }
-		else {
+		if ( spins < 64 ) {
+			SwitchToThread();
+		} else {
 			EnterCriticalSection( &js.wakeMutex );
 			SleepConditionVariableCS( &js.wakeCond, &js.wakeMutex, 1 );
 			LeaveCriticalSection( &js.wakeMutex );
@@ -169,114 +218,267 @@ static DWORD WINAPI worker_main( LPVOID arg ) {
 }
 
 qboolean Jobs_Init( void ) {
-	int numCores, i;
+	int numCores;
 	SYSTEM_INFO si;
-	if ( js.initialized ) return qtrue;
-	memset( &js, 0, sizeof( js ) );
+
+	if ( js.initialized ) {
+		return qtrue;
+	}
+
+	Com_Memset( &js, 0, sizeof( js ) );
+
 	jobs_enabled = Cvar_Get( "jobs_enabled", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	Cvar_SetDescription( jobs_enabled, "Enable the engine job system (0 = disabled, 1 = enabled)." );
 	jobs_threads = Cvar_Get( "jobs_threads", "0", CVAR_ARCHIVE | CVAR_LATCH );
-	if ( !jobs_enabled->integer ) { Com_Printf( "Job system: disabled by cvar\n" ); return qfalse; }
+	Cvar_SetDescription( jobs_threads, "Number of worker threads (0 = auto-detect based on CPU cores)." );
+	jobs_mainPump = Cvar_Get( "jobs_mainPump", "4", CVAR_ARCHIVE );
+	Cvar_SetDescription( jobs_mainPump, "Main thread helps drain the job queue each frame (0 = disabled)." );
+
+	if ( !jobs_enabled->integer ) {
+		Com_Printf( "Job system: disabled by cvar\n" );
+		return qfalse;
+	}
+
 	GetSystemInfo( &si );
 	numCores = (int)si.dwNumberOfProcessors;
-	js.workerCount = jobs_threads->integer > 0 ? jobs_threads->integer : numCores - 1;
-	if ( js.workerCount < 1 ) js.workerCount = 1;
-	if ( js.workerCount > JOBS_MAX_WORKERS ) js.workerCount = JOBS_MAX_WORKERS;
-	for ( i = 0; i < (int)JOBS_MAX_PENDING; i++ ) {
+	if ( numCores < 1 ) {
+		numCores = 1;
+	}
+
+	js.workerCount = jobs_threads->integer;
+	if ( js.workerCount <= 0 ) {
+		js.workerCount = numCores - 1;
+	}
+	if ( js.workerCount < 1 ) {
+		js.workerCount = 1;
+	}
+	if ( js.workerCount > JOBS_MAX_WORKERS ) {
+		js.workerCount = JOBS_MAX_WORKERS;
+	}
+
+	for ( uint32_t i = 0; i < JOBS_MAX_PENDING; i++ ) {
 		js.slots[i].state = SLOT_FREE;
 		js.slots[i].parent = JOBS_INVALID_HANDLE;
 	}
+
 	InitializeCriticalSection( &js.wakeMutex );
 	InitializeConditionVariable( &js.wakeCond );
-	for ( i = 0; i < js.workerCount; i++ ) {
-		js.workers[i] = CreateThread( NULL, 0, worker_main, (LPVOID)(uintptr_t)(i + 1), 0, NULL );
-		if ( !js.workers[i] ) { js.workerCount = i; break; }
+
+	for ( int i = 0; i < js.workerCount; i++ ) {
+		js.workers[i] = CreateThread( NULL, 0, worker_main, (LPVOID)(uintptr_t)( i + 1 ), 0, NULL );
+		if ( !js.workers[i] ) {
+			js.workerCount = i;
+			break;
+		}
 	}
+
 	js.initialized = qtrue;
-	Com_Printf( "Job system: %d worker threads (%d cores detected, Win32)\n", js.workerCount, numCores );
+	Com_Printf( "Job system: %d worker threads (%d cores detected, mainPump %d, Win32)\n",
+		js.workerCount, numCores, jobs_mainPump ? jobs_mainPump->integer : 0 );
 	return qtrue;
 }
 
 void Jobs_Shutdown( void ) {
-	int i;
-	if ( !js.initialized ) return;
+	if ( !js.initialized ) {
+		return;
+	}
+
 	InterlockedExchange( &js.shutdownRequested, 1 );
 	WakeAllConditionVariable( &js.wakeCond );
-	for ( i = 0; i < js.workerCount; i++ ) {
+
+	for ( int i = 0; i < js.workerCount; i++ ) {
 		WaitForSingleObject( js.workers[i], INFINITE );
 		CloseHandle( js.workers[i] );
 	}
+
 	DeleteCriticalSection( &js.wakeMutex );
 	js.initialized = qfalse;
 	Com_Printf( "Job system: shut down\n" );
 }
 
-int Jobs_WorkerCount( void ) { return js.workerCount; }
+int Jobs_WorkerCount( void ) {
+	return js.workerCount;
+}
 
 jobHandle_t Jobs_Submit( const jobDesc_t *desc ) {
-	jobHandle_t h; jobSlot_t *s; int pri;
-	if ( !js.initialized || !desc || !desc->func ) return JOBS_INVALID_HANDLE;
-	h = alloc_slot();
-	if ( h == JOBS_INVALID_HANDLE ) { desc->func( desc->data, 0 ); return JOBS_INVALID_HANDLE; }
-	s = slot_get( h );
-	s->func = desc->func; s->data = desc->data; s->count = 0;
-	s->priority = desc->priority; s->parent = desc->parent;
+	if ( !js.initialized || !desc || !desc->func ) {
+		return JOBS_INVALID_HANDLE;
+	}
+
+	jobHandle_t h = alloc_slot();
+	if ( h == JOBS_INVALID_HANDLE ) {
+		Com_DPrintf( S_COLOR_YELLOW "Job system: queue full, executing inline\n" );
+		desc->func( desc->data, 0 );
+		return JOBS_INVALID_HANDLE;
+	}
+
+	jobSlot_t *s = slot_get( h );
+	s->func = desc->func;
+	s->data = desc->data;
+	s->count = 0;
+	s->rangeEnd = 0;
+	s->parallelFunc = NULL;
+	s->priority = desc->priority;
+	s->parent = desc->parent;
 	InterlockedExchange( &s->unfinished, 1 );
 	InterlockedExchange( &s->state, SLOT_PENDING );
+
 	if ( desc->parent != JOBS_INVALID_HANDLE ) {
 		jobSlot_t *p = slot_get( desc->parent );
-		if ( p ) InterlockedIncrement( &p->unfinished );
+		if ( p ) {
+			InterlockedIncrement( &p->unfinished );
+		}
 	}
-	pri = (int)desc->priority;
-	if ( pri < 0 ) pri = 0; if ( pri >= JOB_PRIORITY_COUNT ) pri = JOB_PRIORITY_COUNT - 1;
+
+	const int pri = clamp_job_priority( desc->priority );
 	if ( !queue_push( &js.queues[pri], h ) ) {
 		InterlockedExchange( &s->state, SLOT_RUNNING );
-		s->func( s->data, s->count );
+		run_slot_job( s );
 		finish_job( h );
 		return h;
 	}
+
 	InterlockedIncrement( &js.pendingJobCount );
 	wake_workers( 1 );
 	return h;
 }
 
-jobHandle_t Jobs_ParallelFor( jobFunc_t func, void *data, uint32_t count, uint32_t batchSize, jobPriority_t priority ) {
-	uint32_t i;
+static jobHandle_t parallel_for_internal( jobFunc_t func, void *data, uint32_t count, uint32_t batchSize, jobPriority_t priority ) {
+	jobHandle_t groupHandle;
+	jobSlot_t *group;
+	uint32_t numBatches;
+
 	if ( !js.initialized || !func || count == 0 ) {
-		if ( func ) for ( i = 0; i < count; i++ ) func( data, i );
+		if ( func ) {
+			for ( uint32_t i = 0; i < count; i++ ) {
+				func( data, i );
+			}
+		}
 		return JOBS_INVALID_HANDLE;
 	}
-	for ( i = 0; i < count; i++ ) {
-		jobDesc_t d; d.func = func; d.data = data; d.priority = priority; d.parent = JOBS_INVALID_HANDLE;
-		Jobs_Submit( &d );
+
+	if ( batchSize == 0 ) {
+		batchSize = 1;
 	}
-	(void)batchSize;
-	return JOBS_INVALID_HANDLE;
+	numBatches = ( count + batchSize - 1 ) / batchSize;
+
+	groupHandle = alloc_slot();
+	if ( groupHandle == JOBS_INVALID_HANDLE ) {
+		for ( uint32_t i = 0; i < count; i++ ) {
+			func( data, i );
+		}
+		return JOBS_INVALID_HANDLE;
+	}
+
+	group = slot_get( groupHandle );
+	group->func = NULL;
+	group->parallelFunc = NULL;
+	group->data = NULL;
+	group->count = 0;
+	group->rangeEnd = 0;
+	group->priority = priority;
+	group->parent = JOBS_INVALID_HANDLE;
+	InterlockedExchange( &group->unfinished, (LONG)numBatches );
+
+	const int pri = clamp_job_priority( priority );
+
+	for ( uint32_t b = 0; b < numBatches; b++ ) {
+		uint32_t start = b * batchSize;
+		uint32_t end = start + batchSize;
+
+		if ( end > count ) {
+			end = count;
+		}
+
+		jobHandle_t bh = alloc_slot();
+		if ( bh == JOBS_INVALID_HANDLE ) {
+			for ( uint32_t i = start; i < end; i++ ) {
+				func( data, i );
+			}
+			parallel_group_child_done( groupHandle );
+			continue;
+		}
+
+		jobSlot_t *bs = slot_get( bh );
+		bs->func = NULL;
+		bs->parallelFunc = func;
+		bs->data = data;
+		bs->count = start;
+		bs->rangeEnd = end;
+		bs->priority = priority;
+		bs->parent = groupHandle;
+		InterlockedExchange( &bs->unfinished, 1 );
+
+		if ( !queue_push( &js.queues[pri], bh ) ) {
+			InterlockedExchange( &bs->state, SLOT_RUNNING );
+			run_slot_job( bs );
+			finish_job( bh );
+		} else {
+			InterlockedIncrement( &js.pendingJobCount );
+		}
+	}
+
+	wake_workers( js.workerCount );
+	return groupHandle;
+}
+
+jobHandle_t Jobs_ParallelFor( jobFunc_t func, void *data, uint32_t count, uint32_t batchSize, jobPriority_t priority ) {
+	return parallel_for_internal( func, data, count, batchSize, priority );
+}
+
+void Jobs_Pump( int maxJobs ) {
+	if ( !js.initialized || maxJobs <= 0 ) {
+		return;
+	}
+	for ( int i = 0; i < maxJobs; i++ ) {
+		if ( !try_execute_one() ) {
+			break;
+		}
+	}
+}
+
+int Jobs_PendingCount( void ) {
+	return (int)js.pendingJobCount;
 }
 
 void Jobs_Wait( jobHandle_t handle ) {
-	jobSlot_t *s;
-	if ( handle == JOBS_INVALID_HANDLE ) return;
-	s = slot_get( handle );
-	if ( !s ) return;
+	if ( handle == JOBS_INVALID_HANDLE ) {
+		return;
+	}
+
+	jobSlot_t *s = slot_get( handle );
+	if ( !s ) {
+		return;
+	}
+
 	while ( s->state != SLOT_COMPLETE ) {
-		if ( !try_execute_one() ) SwitchToThread();
+		if ( !try_execute_one() ) {
+			SwitchToThread();
+		}
 	}
 	InterlockedExchange( &s->state, SLOT_FREE );
 }
 
 void Jobs_WaitAll( void ) {
 	while ( js.pendingJobCount > 0 ) {
-		if ( !try_execute_one() ) SwitchToThread();
+		if ( !try_execute_one() ) {
+			SwitchToThread();
+		}
 	}
 }
 
 qboolean Jobs_IsComplete( jobHandle_t handle ) {
-	if ( handle == JOBS_INVALID_HANDLE ) return qtrue;
+	if ( handle == JOBS_INVALID_HANDLE ) {
+		return qtrue;
+	}
+
 	jobSlot_t *s = slot_get( handle );
 	return ( !s || s->state == SLOT_COMPLETE ) ? qtrue : qfalse;
 }
 
-uint32_t Jobs_GetThreadId( void ) { return tls_threadId; }
+uint32_t Jobs_GetThreadId( void ) {
+	return tls_threadId;
+}
 
 #else /* POSIX (includes MinGW/MSYS2) */
 
@@ -303,6 +505,8 @@ typedef struct {
 	jobFunc_t               func;
 	void                    *data;
 	uint32_t                count;
+	uint32_t                rangeEnd;
+	jobFunc_t               parallelFunc;
 	jobPriority_t           priority;
 	jobHandle_t             parent;
 	_Atomic(int32_t)        unfinished;
@@ -371,14 +575,45 @@ static struct {
 
 static cvar_t *jobs_threads;
 static cvar_t *jobs_enabled;
+static cvar_t *jobs_mainPump;
 
 static __thread uint32_t tls_threadId = 0;
-
-/* ---------- helpers ---------- */
 
 static jobSlot_t *slot_get( jobHandle_t h ) {
 	if ( h >= JOBS_MAX_PENDING ) return NULL;
 	return &js.slots[h];
+}
+
+static int clamp_job_priority( jobPriority_t priority ) {
+	int pri = (int)priority;
+	if ( pri < 0 ) {
+		pri = 0;
+	}
+	if ( pri >= JOB_PRIORITY_COUNT ) {
+		pri = JOB_PRIORITY_COUNT - 1;
+	}
+	return pri;
+}
+
+static void run_slot_job( jobSlot_t *s ) {
+	if ( s->parallelFunc ) {
+		for ( uint32_t i = s->count; i < s->rangeEnd; i++ ) {
+			s->parallelFunc( s->data, i );
+		}
+	} else if ( s->func ) {
+		s->func( s->data, s->count );
+	}
+}
+
+static void parallel_group_child_done( jobHandle_t groupHandle ) {
+	jobSlot_t *p = slot_get( groupHandle );
+	if ( !p ) {
+		return;
+	}
+	int32_t remaining = atomic_fetch_sub_explicit( &p->unfinished, 1, memory_order_acq_rel ) - 1;
+	if ( remaining == 0 ) {
+		atomic_store_explicit( &p->state, SLOT_COMPLETE, memory_order_release );
+	}
 }
 
 static jobHandle_t alloc_slot( void ) {
@@ -438,9 +673,7 @@ static qboolean try_execute_one( void ) {
 			}
 
 			atomic_store_explicit( &s->state, SLOT_RUNNING, memory_order_release );
-			if ( s->func ) {
-				s->func( s->data, s->count );
-			}
+			run_slot_job( s );
 			finish_job( h );
 			return qtrue;
 		}
@@ -499,6 +732,9 @@ qboolean Jobs_Init( void ) {
 	jobs_threads = Cvar_Get( "jobs_threads", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	Cvar_SetDescription( jobs_threads, "Number of worker threads (0 = auto-detect based on CPU cores)." );
 
+	jobs_mainPump = Cvar_Get( "jobs_mainPump", "4", CVAR_ARCHIVE );
+	Cvar_SetDescription( jobs_mainPump, "Main thread helps drain the job queue each frame (0 = disabled)." );
+
 	if ( !jobs_enabled->integer ) {
 		Com_Printf( "Job system: disabled by cvar\n" );
 		return qfalse;
@@ -552,7 +788,8 @@ qboolean Jobs_Init( void ) {
 
 	js.initialized = qtrue;
 
-	Com_Printf( "Job system: %d worker threads (%d cores detected)\n", js.workerCount, numCores );
+	Com_Printf( "Job system: %d worker threads (%d cores detected, mainPump %d)\n",
+		js.workerCount, numCores, jobs_mainPump ? jobs_mainPump->integer : 0 );
 
 	return qtrue;
 }
@@ -597,6 +834,8 @@ jobHandle_t Jobs_Submit( const jobDesc_t *desc ) {
 	s->func     = desc->func;
 	s->data     = desc->data;
 	s->count    = 0;
+	s->rangeEnd = 0;
+	s->parallelFunc = NULL;
 	s->priority = desc->priority;
 	s->parent   = desc->parent;
 	atomic_store_explicit( &s->unfinished, 1, memory_order_release );
@@ -609,14 +848,12 @@ jobHandle_t Jobs_Submit( const jobDesc_t *desc ) {
 		}
 	}
 
-	int pri = (int)desc->priority;
-	if ( pri < 0 ) pri = 0;
-	if ( pri >= JOB_PRIORITY_COUNT ) pri = JOB_PRIORITY_COUNT - 1;
+	int pri = clamp_job_priority( desc->priority );
 
 	if ( !queue_push( &js.queues[pri], h ) ) {
 		Com_DPrintf( S_COLOR_YELLOW "Job system: priority queue %d full, executing inline\n", pri );
 		atomic_store_explicit( &s->state, SLOT_RUNNING, memory_order_release );
-		s->func( s->data, s->count );
+		run_slot_job( s );
 		finish_job( h );
 		return h;
 	}
@@ -627,7 +864,11 @@ jobHandle_t Jobs_Submit( const jobDesc_t *desc ) {
 	return h;
 }
 
-jobHandle_t Jobs_ParallelFor( jobFunc_t func, void *data, uint32_t count, uint32_t batchSize, jobPriority_t priority ) {
+static jobHandle_t parallel_for_internal( jobFunc_t func, void *data, uint32_t count, uint32_t batchSize, jobPriority_t priority ) {
+	uint32_t numBatches;
+	jobHandle_t groupHandle;
+	jobSlot_t *group;
+
 	if ( !js.initialized || !func || count == 0 ) {
 		if ( func ) {
 			for ( uint32_t i = 0; i < count; i++ ) {
@@ -637,10 +878,12 @@ jobHandle_t Jobs_ParallelFor( jobFunc_t func, void *data, uint32_t count, uint32
 		return JOBS_INVALID_HANDLE;
 	}
 
-	if ( batchSize == 0 ) batchSize = 1;
-	uint32_t numBatches = ( count + batchSize - 1 ) / batchSize;
+	if ( batchSize == 0 ) {
+		batchSize = 1;
+	}
+	numBatches = ( count + batchSize - 1 ) / batchSize;
 
-	jobHandle_t groupHandle = alloc_slot();
+	groupHandle = alloc_slot();
 	if ( groupHandle == JOBS_INVALID_HANDLE ) {
 		for ( uint32_t i = 0; i < count; i++ ) {
 			func( data, i );
@@ -648,62 +891,48 @@ jobHandle_t Jobs_ParallelFor( jobFunc_t func, void *data, uint32_t count, uint32
 		return JOBS_INVALID_HANDLE;
 	}
 
-	jobSlot_t *group = slot_get( groupHandle );
-	group->func    = NULL;
-	group->data    = NULL;
-	group->count   = 0;
+	group = slot_get( groupHandle );
+	group->func = NULL;
+	group->parallelFunc = NULL;
+	group->data = NULL;
+	group->count = 0;
+	group->rangeEnd = 0;
 	group->priority = priority;
-	group->parent  = JOBS_INVALID_HANDLE;
+	group->parent = JOBS_INVALID_HANDLE;
 	atomic_store_explicit( &group->unfinished, (int32_t)numBatches, memory_order_release );
 
-	typedef struct {
-		jobFunc_t       func;
-		void            *data;
-		uint32_t        start;
-		uint32_t        end;
-	} batchCtx_t;
-
-	static batchCtx_t batchPool[JOBS_QUEUE_CAPACITY];
-	static _Atomic(uint32_t) batchPoolIdx = 0;
+	int pri = clamp_job_priority( priority );
 
 	for ( uint32_t b = 0; b < numBatches; b++ ) {
-		uint32_t bidx = atomic_fetch_add_explicit( &batchPoolIdx, 1, memory_order_relaxed ) % JOBS_QUEUE_CAPACITY;
-		batchPool[bidx].func  = func;
-		batchPool[bidx].data  = data;
-		batchPool[bidx].start = b * batchSize;
-		batchPool[bidx].end   = ( b + 1 ) * batchSize;
-		if ( batchPool[bidx].end > count ) batchPool[bidx].end = count;
+		uint32_t start = b * batchSize;
+		uint32_t end = start + batchSize;
+		if ( end > count ) {
+			end = count;
+		}
 
 		jobHandle_t bh = alloc_slot();
 		if ( bh == JOBS_INVALID_HANDLE ) {
-			for ( uint32_t i = batchPool[bidx].start; i < batchPool[bidx].end; i++ ) {
+			for ( uint32_t i = start; i < end; i++ ) {
 				func( data, i );
 			}
-			int32_t remaining = atomic_fetch_sub_explicit( &group->unfinished, 1, memory_order_acq_rel ) - 1;
-			if ( remaining <= 0 ) {
-				atomic_store_explicit( &group->state, SLOT_COMPLETE, memory_order_release );
-			}
+			parallel_group_child_done( groupHandle );
 			continue;
 		}
 
 		jobSlot_t *bs = slot_get( bh );
-		bs->func    = func;
-		bs->data    = &batchPool[bidx];
-		bs->count   = batchPool[bidx].start;
+		bs->func = NULL;
+		bs->parallelFunc = func;
+		bs->data = data;
+		bs->count = start;
+		bs->rangeEnd = end;
 		bs->priority = priority;
-		bs->parent  = groupHandle;
+		bs->parent = groupHandle;
 		atomic_store_explicit( &bs->unfinished, 1, memory_order_release );
 		atomic_store_explicit( &bs->state, SLOT_PENDING, memory_order_release );
 
-		int pri = (int)priority;
-		if ( pri < 0 ) pri = 0;
-		if ( pri >= JOB_PRIORITY_COUNT ) pri = JOB_PRIORITY_COUNT - 1;
-
 		if ( !queue_push( &js.queues[pri], bh ) ) {
 			atomic_store_explicit( &bs->state, SLOT_RUNNING, memory_order_release );
-			for ( uint32_t i = batchPool[bidx].start; i < batchPool[bidx].end; i++ ) {
-				func( data, i );
-			}
+			run_slot_job( bs );
 			finish_job( bh );
 		} else {
 			atomic_fetch_add_explicit( &js.pendingJobCount, 1, memory_order_relaxed );
@@ -712,6 +941,25 @@ jobHandle_t Jobs_ParallelFor( jobFunc_t func, void *data, uint32_t count, uint32
 
 	wake_workers( js.workerCount );
 	return groupHandle;
+}
+
+jobHandle_t Jobs_ParallelFor( jobFunc_t func, void *data, uint32_t count, uint32_t batchSize, jobPriority_t priority ) {
+	return parallel_for_internal( func, data, count, batchSize, priority );
+}
+
+void Jobs_Pump( int maxJobs ) {
+	if ( !js.initialized || maxJobs <= 0 ) {
+		return;
+	}
+	for ( int i = 0; i < maxJobs; i++ ) {
+		if ( !try_execute_one() ) {
+			break;
+		}
+	}
+}
+
+int Jobs_PendingCount( void ) {
+	return (int)atomic_load_explicit( &js.pendingJobCount, memory_order_acquire );
 }
 
 void Jobs_Wait( jobHandle_t handle ) {

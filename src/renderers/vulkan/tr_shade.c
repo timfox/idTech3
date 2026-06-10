@@ -1950,7 +1950,9 @@ void RB_StageIteratorGeneric( void )
 
 #ifdef USE_VBO
 	if ( tess.vboIndex != 0 ) {
-		VBO_PrepareQueues();
+		if ( !VBO_ItemIsStream( tess.vboIndex ) ) {
+			VBO_PrepareQueues();
+		}
 		tess.vboStage = 0;
 	} else
 #endif
@@ -2201,6 +2203,7 @@ void RB_EndSurface( void ) {
 
 #ifdef USE_VBO
 	tess.vboIndex = 0;
+	tess.vboStreamItem = NULL;
 	//VBO_ClearQueue();
 #endif
 }

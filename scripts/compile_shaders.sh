@@ -192,6 +192,12 @@ def compile_individual_shaders():
             array_name = f"{base}_{stage}_spv"
             compile_shader(stage, path.name, array_name, defines="")
 
+    # NV mesh font shader (optional; requires glslang with GL_NV_mesh_shader varyings)
+    try:
+        compile_shader("mesh", "mesh_nv_ui_vector_font.mesh", "mesh_nv_ui_vector_font_mesh")
+    except subprocess.CalledProcessError:
+        print("WARN: mesh_nv_ui_vector_font.mesh skipped (NV mesh varyings unsupported by this glslang)")
+
 def compile_template_shaders():
     print("Compiling template-driven shaders...")
     compile_shader("frag", "gen_frag.tmpl", "frag_tx0_df", defines="-DUSE_CLX_IDENT -DUSE_ATEST -DUSE_DF")

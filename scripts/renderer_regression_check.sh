@@ -212,17 +212,20 @@ else
 fi
 
 echo ""
-echo "TAA frame gating (unreliable motion, motion barrier):"
+echo "TAA frame gating (history confidence, motion barrier):"
 VK_FRAME_END="$PROJECT_ROOT/src/renderers/vulkan/vk_frame_end.c"
-if ! grep -q '!vk.temporal.unreliableMotionThisFrame' "$VK_FRAME_END" 2>/dev/null; then
-  fail "vk_frame_end.c must skip TAA when unreliableMotionThisFrame"
+VK_POSTFX="$PROJECT_ROOT/src/renderers/vulkan/vk_postfx_params.c"
+if ! grep -q 'taaParams\[0\]' "$VK_POSTFX" 2>/dev/null || \
+   ! awk '/taaParams\[0\]/,0' "$VK_POSTFX" | grep -q 'unreliableMotionThisFrame'; then
+  fail "vk_postfx_params.c must gate TAA history confidence (taaParams[0]) on unreliableMotionThisFrame"
+elif grep -q '!vk.temporal.unreliableMotionThisFrame' "$VK_FRAME_END" 2>/dev/null; then
+  fail "vk_frame_end.c must not skip the whole TAA pass on unreliableMotionThisFrame (use taaParams confidence)"
 elif ! grep -q 'vk_barrier_motion_vector_for_sampling' "$VK_FRAME_END" 2>/dev/null; then
   fail "vk_frame_end.c missing motion-vector barrier before TAA"
-elif ! grep -q 'vk_reset_taa_history' "$PROJECT_ROOT/src/renderers/vulkan/vk_temporal.c" 2>/dev/null || \
-     ! awk '/vk_temporal_commit_frame_state/,/^}/' "$PROJECT_ROOT/src/renderers/vulkan/vk_temporal.c" | grep -q 'unreliableMotionThisFrame'; then
-  fail "vk_temporal_commit_frame_state should reset TAA history on unreliable motion"
+elif ! grep -q 'vk_entity_note_motion_reliability' "$PROJECT_ROOT/src/renderers/vulkan/vk_view_state.c" 2>/dev/null; then
+  fail "vk_view_state.c missing per-entity motion reliability notes"
 else
-  pass "TAA gated on unreliable motion; motion barrier + history reset present"
+  pass "TAA uses per-frame history confidence; per-entity motion policy wired"
 fi
 
 echo ""
@@ -276,6 +279,12 @@ elif ! grep -q 'deferred_unlit_base_strength' "$PROJECT_ROOT/src/renderers/vulka
   fail "gen_frag.tmpl missing deferred_unlit_base_strength fragment spec constant"
 elif ! grep -q 'deferred_unlit_base_strength' "$PROJECT_ROOT/src/renderers/vulkan/vk_create_pipeline.c" 2>/dev/null; then
   fail "vk_create_pipeline.c missing deferred_unlit_base_strength specialization"
+elif ! grep -q 'r_deferredSpecular = ri.Cvar_Get' "$TR_INIT_VK" 2>/dev/null; then
+  fail "tr_init.c missing r_deferredSpecular cvar"
+elif ! grep -q 'sceneBaseTex' "$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/deferred_lighting_composite.frag" 2>/dev/null; then
+  fail "deferred_lighting_composite.frag missing sceneBaseTex additive blend"
+elif ! grep -q 'pc.specular' "$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/deferred_lighting.comp" 2>/dev/null; then
+  fail "deferred_lighting.comp missing specular toggle"
 else
   pass "deferred lighting compute + composite wired"
 fi
@@ -290,6 +299,47 @@ elif ! grep -q 'deferred_gbuffer_albedo' "$VK_ATTACH" 2>/dev/null; then
   fail "vk_attachments.c missing deferred_gbuffer_albedo destroy path"
 else
   pass "r_deferredGBuffer cvar + deferred G-buffer scaffold alloc/teardown"
+fi
+
+echo ""
+echo "Conditional #else stubs (RTX / FreeType / experimental / Steam):"
+CMAKE_ROOT="$PROJECT_ROOT/CMakeLists.txt"
+if ! grep -q 'USE_EXPERIMENTAL_RENDERERS' "$CMAKE_ROOT" 2>/dev/null; then
+  fail "CMakeLists.txt missing USE_EXPERIMENTAL_RENDERERS"
+elif ! grep -q 'vk_experimental_renderer_stubs.c' "$CMAKE_ROOT" 2>/dev/null; then
+  fail "CMakeLists.txt missing vk_experimental_renderer_stubs.c wiring"
+elif ! grep -q 'tr_vector_font_stub.c' "$CMAKE_ROOT" 2>/dev/null; then
+  fail "CMakeLists.txt missing tr_vector_font_stub.c wiring"
+elif ! grep -q 'USE_VULKAN_RTX=ON' "$PROJECT_ROOT/src/renderers/vulkan/vk_rtx.c" 2>/dev/null; then
+  fail "vk_rtx.c missing RTX-off stub log"
+elif ! grep -q 'BUILD_FREETYPE=ON' "$PROJECT_ROOT/src/renderers/common/tr_font_stub.c" 2>/dev/null; then
+  fail "tr_font_stub.c missing FreeType-off stub log"
+elif ! grep -q '#else /\* !USE_STEAM \*/' "$PROJECT_ROOT/src/client/cl_steam.c" 2>/dev/null; then
+  fail "cl_steam.c missing USE_STEAM off stub branch"
+else
+  pass "conditional stub paths wired (RTX, FreeType, experimental, Steam)"
+fi
+
+echo ""
+echo "Platform renderer roadmap scaffolds (Metal / DXR / WebGPU):"
+if ! grep -q 'tr_platform_renderer_stub.c' "$CMAKE_ROOT" 2>/dev/null; then
+  fail "CMakeLists.txt missing tr_platform_renderer_stub.c wiring"
+elif ! grep -q 'renderer_backend.h' "$PROJECT_ROOT/src/client/cl_ref.c" 2>/dev/null; then
+  fail "cl_ref.c missing renderer_backend.h include"
+elif ! grep -q 'WEBGPU_ROADMAP.md' "$PROJECT_ROOT/src/client/cl_ref.c" 2>/dev/null; then
+  fail "cl_ref.c missing WebGPU roadmap fallback message"
+elif ! "$PROJECT_ROOT/scripts/check_webgpu_shader_portability.sh" >/dev/null 2>&1; then
+  fail "check_webgpu_shader_portability.sh failed"
+else
+  pass "Metal/DXR scaffold + WebGPU shader manifest wired"
+fi
+
+echo ""
+echo "Client modularization (cl_main.c split):"
+if ! "$PROJECT_ROOT/tests/scripts/test_client_modular.sh" >/dev/null 2>&1; then
+  fail "test_client_modular.sh failed"
+else
+  pass "cl_main.c slim + lifecycle/frame/cvars modules wired"
 fi
 
 echo ""
@@ -411,6 +461,20 @@ elif ! grep -q 'vk_get_render_target_width' "$RTX_C" 2>/dev/null; then
   fail "vk_rtx.c missing vk_get_render_target_width (RT dispatch must match FBO depth size)"
 else
   pass "vk_rtx.c uses Vulkan projection flip and render-target extent"
+fi
+
+echo ""
+echo "Vulkan RTX BLAS/TLAS + hybrid frame path:"
+if ! grep -q 'r_rtxTlasUpdate' "$RTX_C" 2>/dev/null; then
+  fail "vk_rtx.c missing r_rtxTlasUpdate TLAS update path"
+elif ! grep -q 'VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR' "$RTX_C" 2>/dev/null; then
+  fail "vk_rtx.c missing TLAS UPDATE build mode"
+elif ! grep -q 'rtx_status' "$RTX_C" 2>/dev/null; then
+  fail "vk_rtx.c missing rtx_status command"
+elif ! grep -q 'gl_InstanceCustomIndexEXT' "$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/rtx_demo.rchit" 2>/dev/null; then
+  fail "rtx_demo.rchit missing instance-aware closest-hit"
+else
+  pass "RTX world/entity BLAS + TLAS update + hybrid hit tint wired"
 fi
 
 echo ""

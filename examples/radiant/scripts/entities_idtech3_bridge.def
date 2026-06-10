@@ -1,0 +1,130 @@
+/*
+ * idTech3 engine ↔ idTech3Radiant bridge entities.
+ * Single source: docs/EDITOR_BRIDGE.md (sync via scripts/sync_editor_bridge.sh).
+ * Install: ./scripts/install_radiant_gamepack.sh <mod_dir>
+ */
+
+/*QUAKED misc_billboard (0.2 0.8 0.2) (-8 -8 -8) (8 8 8)
+Engine-native sprite billboard. Parsed by engine_sprite_map.c at runtime.
+-------- KEYS --------
+"shader" : material qpath (scripts/...)
+"radius" : sprite size in world units
+"angles" : yaw on Z (degrees)
+*/
+
+/*QUAKED misc_flipbook (0.2 0.6 0.9) (-8 -8 -8) (8 8 8)
+Animated flipbook sprite.
+-------- KEYS --------
+"shader" : material qpath
+"radius" : sprite size
+"cols" : columns in atlas (default 1)
+"rows" : rows in atlas (default 1)
+"fps" : animation frames per second
+*/
+
+/*QUAKED misc_imposter (0.5 0.5 0.2) (-8 -8 -8) (8 8 8)
+Imposter / distant sprite proxy.
+-------- KEYS --------
+"shader" : material qpath
+"radius" : sprite size
+"angles" : yaw (degrees)
+*/
+
+/*QUAKED misc_decal (0.8 0.4 0.2) (-8 -8 -8) (8 8 8)
+Projected decal. Parsed by engine_decal_map.c.
+-------- KEYS --------
+"shader" : decal material qpath
+"radius" : decal radius
+"pitch" : orientation pitch (degrees)
+"yaw" : orientation yaw (degrees)
+"fade" : optional fade duration (ticks)
+*/
+
+/*QUAKED info_director_zone (0.9 0.2 0.2) ?
+Director spawn zone (AABB brush or point helper).
+-------- KEYS --------
+"targetname" : zone name
+"mins" : AABB minimum "x y z"
+"maxs" : AABB maximum "x y z"
+"threat" : 0=none 1=low 2=medium 3=high 4=extreme
+"budget_mult" : spawn budget multiplier
+*/
+
+/*QUAKED func_destructible (0.6 0.3 0.1) ?
+Destructible brush volume (DMM).
+-------- KEYS --------
+"dmm_material" : 0=wood 1=glass 2=thin_metal 3=thick_metal 4=concrete 5=stone 6=ice 7=plastic 8=cloth 9=rubber 10=flesh
+"dmm_health" : hit points before fracture
+"dmm_fracture_mode" : 0=voronoi 1=radial 2=splinter 3=shatter 4=slice 5=crumble 6=tear 7=peel
+"dmm_min_fragments" : minimum fragment count
+"dmm_max_fragments" : maximum fragment count
+"dmm_break_sound" : sound on destruction
+"dmm_stress_sound" : sound on stress
+*/
+
+/*QUAKED light_projected (1 1 0.5) (-8 -8 -8) (8 8 8)
+Projected spotlight with optional volumetric cone.
+-------- KEYS --------
+"_color" : RGB 0-1 "r g b"
+"light" : intensity
+"cone_angle" : spotlight cone (degrees)
+"range" : light range
+"cast_shadows" : 0 or 1
+"volumetric" : 0 or 1
+"volumetric_density" : fog density in cone
+"cookie" : projected texture shader path
+*/
+
+/*QUAKED func_cloth (0.4 0.6 0.8) ?
+Cloth simulation grid (brush bounds).
+-------- KEYS --------
+"width" : grid width (particles)
+"height" : grid height
+"spacing" : particle spacing
+"pin_edge" : 0=top 1=bottom 2=left 3=right
+"wind_strength" : wind force
+"wind_dir" : "x y z"
+"material" : cloth shader
+*/
+
+/*QUAKED info_navmesh_config (0.2 0.8 0.2) (-8 -8 -8) (8 8 8)
+Navigation mesh bake settings.
+-------- KEYS --------
+"cell_size" : raster cell size (default 0.3)
+"cell_height" : raster cell height (default 0.2)
+"agent_height" : agent height (default 2.0)
+"agent_radius" : agent radius (default 0.6)
+"agent_max_climb" : max step height (default 0.9)
+"agent_max_slope" : max walkable slope degrees (default 45)
+*/
+
+/*QUAKED info_bgmap_camera (0.3 0.7 1) (-8 -8 -8) (8 8 8)
+Background map camera point.
+-------- KEYS --------
+"fov" : field of view
+"time" : time in cycle (seconds)
+"target" : next camera point targetname
+*/
+
+/*QUAKED info_director_spawn (0.8 0.5 0.2) (-8 -8 -8) (8 8 8)
+Director spawn point.
+-------- KEYS --------
+"spawn_type" : director spawn type name
+"min_intensity" : min director intensity
+"max_intensity" : max director intensity
+*/
+
+/*QUAKED info_choreo_mark (0.9 0.6 0.9) (-8 -8 -8) (8 8 8)
+Choreography scene mark.
+-------- KEYS --------
+"targetname" : reference name
+"scene" : scene name
+"actor" : actor name at this position
+*/
+
+/*QUAKED trigger_response (0.5 0.9 0.5) ?
+Response rule trigger volume.
+-------- KEYS --------
+"concept" : response concept to trigger
+"zone" : zone name for context
+*/

@@ -14,6 +14,7 @@ extern "C" {
 
 #ifdef USE_FREEUSD
 
+#include "cl_freeusd_util.hpp"
 #include <memory>
 #include <string>
 
@@ -44,17 +45,6 @@ static cvar_t *com_freeusd;
 static cvar_t *com_usdEntities;
 static cvar_t *com_usdShaders;
 
-static std::string CL_USD_OSPath( const char *qpath ) {
-	const char *base = Cvar_VariableString( "fs_basepath" );
-	const char *game = Cvar_VariableString( "fs_game" );
-	char *os = FS_BuildOSPath( base, game, qpath );
-
-	if ( !os || !os[0] ) {
-		return {};
-	}
-	return std::string( os );
-}
-
 static std::shared_ptr<freeusd::usd::Stage> CL_USD_OpenArg( void ) {
 	if ( Cmd_Argc() < 2 ) {
 		Com_Printf( "Usage: %s <path.usda>\n", Cmd_Argv( 0 ) );
@@ -67,7 +57,7 @@ static std::shared_ptr<freeusd::usd::Stage> CL_USD_OpenArg( void ) {
 
 	{
 		const char *qpath = Cmd_Argv( 1 );
-		std::string os = CL_USD_OSPath( qpath );
+		std::string os = Cl_FreeusdBuildOsPath( qpath );
 		std::string err;
 
 		if ( os.empty() ) {

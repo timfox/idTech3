@@ -9,6 +9,7 @@ USD / USDA mesh tessellation via FreeUSD (C++ only; no tr_local.h).
 #include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -77,8 +78,9 @@ static const freeusd::usdUtils::EngineSceneNode *R_Freeusd_FindNode(
 
 static int R_Freeusd_CountMeshTris( const freeusd::usdGeom::Mesh &mesh, double time ) {
 	const std::vector<int> faceCounts = mesh.GetFaceVertexCounts( time );
+	const std::span<const int> faces( faceCounts );
 	int tris = 0;
-	for ( int c : faceCounts ) {
+	for ( int c : faces ) {
 		if ( c >= 3 ) {
 			tris += c - 2;
 		}

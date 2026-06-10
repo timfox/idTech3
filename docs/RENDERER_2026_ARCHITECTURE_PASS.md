@@ -26,7 +26,7 @@ The objective is not "add every modern rendering acronym." The objective is to m
 - The Vulkan renderer is still **forward-only**. `r_renderMode 1` is a deferred placeholder; **`r_renderMode 2`** enables clustered **Forward+** (`r_forwardPlus`, `r_forwardPlusShade`, up to **64** GPU lights via `VK_FP_MAX_GPU_LIGHTS`).
 - Dynamic lighting on the **classic** path still uses **`MAX_DLIGHTS == 32`** surface **`dlightBits`**; Forward+ packs **`refdef.dlights`** separately (see [FORWARD_PLUS_PIPELINE_AUDIT.md](FORWARD_PLUS_PIPELINE_AUDIT.md)).
 - Temporal behavior is fragmented. Volumetric fog, exposure, motion vectors, occlusion visibility, and post effects each track history differently.
-- Platform strategy is incomplete. Vulkan is primary, OpenGL is fallback, Vulkan RTX is only extension scaffolding, and Metal/DXR are not started.
+- Platform strategy: **Vulkan-only shipping** (OpenGL removed); Vulkan RTX experimental; DXR/WebGPU roadmap scaffolds — see [RENDERERS.md](RENDERERS.md).
 
 ---
 
@@ -48,7 +48,7 @@ Keep **forward rendering** as the main architecture, but move Vulkan toward **cl
 
 - Vulkan path supports significantly more than 32 local lights through clustered or tiled light lists.
 - Light influence for Vulkan is decoupled from surface bit flags.
-- The engine keeps a compatibility forward path for OpenGL and for low-feature Vulkan fallback.
+- The engine keeps a low-feature Vulkan fallback path for constrained GPUs (no OpenGL backend).
 - Shadowing remains budgeted: a small set of shadowed key lights, many unshadowed fill lights.
 
 ### Required work
@@ -102,6 +102,7 @@ Treat temporal stability as a first-class renderer subsystem instead of a set of
 - **`VK_TEMPORAL_RESET_RENDER_SIZE_CHANGE`** in `vk_temporal.c` compares the **effective render target** size from **`vk_get_render_target_width()` / `vk_get_render_target_height()`** (FBO / `r_renderScale`), not `glConfig` alone, so internal resolution changes still clear motion, TAA, volumetric, exposure, and occlusion history consistently with the color pass.
 - When **`vk.fboActive`**, those helpers prefer **`vk.mainColorWidth` / `vk.mainColorHeight`** (set when the main scene color attachment is created in `vk_attachments.c`) so **Forward+**, **post params**, and **temporal** paths do not read transient **`vk.renderWidth`** overrides from shadow or atlas passes.
 - **GPU IQM morph motion:** the first GPU-morph draw of each Vulkan frame seeds **`prevWeights`** from current active weights (per-entity **`morphGpuWeightsPrimedSingleUse`**, cleared in **`vk_prime_gpu_morph_weights_current`**) so the first visible frame after spawn or after a temporal reset does not imply a full morph delta from zero.
+- **Per-entity motion policy (`r_temporalCpuSkinPrev`, default 1):** animated RT_MODEL entities without GPU deform motion use a local prev-MVP fallback (current model matrix) instead of marking the whole frame **`unreliableMotionThisFrame`**. Global invalidation remains for **`RF_FIRST_PERSON`**, **`customShader`** (unless **`r_temporalCustomShaderMotion 1`**), or when **`r_temporalCpuSkinPrev 0`**. TAA keeps running; **`taaParams.x`** drops history confidence for globally unreliable frames only.
 - **SSAO / HBAO push texels** use **`vk_get_render_target_width/height`** (same cached main-color extent as post/temporal) so screen-space noise and **`vk_copy_color_to_fog_scene`** stay aligned with the SSAO attachment when **`vk.renderWidth`** is not the main scene size.
 - **SSR resolve → color copy** uses the same **`vk_get_render_target_*`** extent so the **`vkCmdCopyImage`** region matches **`vk.ssr_image`** / **`vk.color_image`** when auxiliary passes have overridden **`vk.renderWidth`**.
 
@@ -116,7 +117,7 @@ Treat temporal stability as a first-class renderer subsystem instead of a set of
 
 ### Decision
 
-Use **Vulkan as the primary renderer architecture**, freeze OpenGL as compatibility-only, prioritize **Metal before DXR**, and treat RTX as a Vulkan feature tier rather than a separate product direction.
+Use **Vulkan as the only shipping renderer**, invest in **DXR + WebGPU** as roadmap backends (Metal optional on Apple), and treat RTX as a Vulkan feature tier rather than a separate product direction.
 
 ### Why
 
@@ -129,7 +130,8 @@ Use **Vulkan as the primary renderer architecture**, freeze OpenGL as compatibil
 
 - Windows/Linux: Vulkan primary.
 - macOS/iOS: native Metal backend is the next serious platform expansion.
-- OpenGL: compatibility renderer with no expectation of feature parity.
+- **DXR**: Windows native RT roadmap (`idtech3_dxr` scaffold).
+- **WebGPU**: browser/Wasm roadmap; compute shaders validated on Vulkan today.
 - Ray tracing: hybrid Vulkan RT for selective effects after Forward+ and temporal cleanup.
 
 ### Required work
@@ -144,7 +146,7 @@ Use **Vulkan as the primary renderer architecture**, freeze OpenGL as compatibil
 ### Explicit non-goals
 
 - Do not build a standalone DXR renderer first.
-- Do not promise full feature parity across Vulkan, OpenGL, Metal, and future DXR simultaneously.
+- Do not promise full feature parity across Vulkan, DXR, WebGPU, and Metal simultaneously.
 
 ---
 
@@ -166,7 +168,7 @@ Use **Vulkan as the primary renderer architecture**, freeze OpenGL as compatibil
 
 - Clean up shader portability assumptions.
 - Define the backend seam needed for Metal resource binding and pipeline creation.
-- Freeze OpenGL expectations to compatibility support.
+- OpenGL backend removed (id Tech 7–style Vulkan-only shipping).
 
 ## Phase 4: Feature Expansion
 
@@ -183,7 +185,7 @@ By 2026 expectations, the renderer should be able to claim all of the following 
 - Vulkan is a stable shipping path, not just a feature lab.
 - Lighting scale is no longer capped by legacy dynamic-light assumptions.
 - Temporal behavior is predictable across fog, exposure, motion blur, and future temporal systems.
-- OpenGL is clearly positioned as fallback.
+- Vulkan is the only shipping renderer; DXR/WebGPU are roadmap plugins.
 - Metal is the next backend investment; DXR and hybrid RT remain optional extensions, not architectural distractions.
 
 ---

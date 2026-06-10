@@ -515,7 +515,9 @@ qboolean vk_ssao_pass( void );
 
 #ifdef USE_VBO
 void vk_release_vbo( void );
+void vk_release_stream_vbo( void );
 qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size );
+qboolean vk_upload_stream_vbo( const byte *vbo_data, int vbo_size );
 #endif
 void vk_update_mvp( const float *m );
 
@@ -523,6 +525,7 @@ void vk_update_post_process_pipelines( void );
 
 void VBO_PrepareQueues( void );
 void VBO_RenderIBOItems( void );
+void VBO_RenderStreamItem( void );
 void VBO_ClearQueue( void );
 
 /* glTF primitive VBO: creates device-local vertex+index buffers from packed data */
@@ -1307,6 +1310,8 @@ typedef struct {
 	struct {
 		VkBuffer vertex_buffer;
 		VkDeviceMemory	buffer_memory;
+		VkBuffer stream_vertex_buffer;
+		VkDeviceMemory stream_buffer_memory;
 	} vbo;
 
 	// host visible memory that holds vertex, index and uniform data
@@ -1374,6 +1379,8 @@ typedef struct {
 			VkShaderModule gen0_df;
 			VkShaderModule ui_sdf_text;
 			VkShaderModule ui_vector_text;
+			VkShaderModule ui_vector_glyphlet_vert;
+			VkShaderModule ui_vector_glyphlet_frag;
 			VkShaderModule ui_subpixel_text;
 			VkShaderModule flowmap[2];      // fog[0,1] - water flowmap
 #ifdef USE_VK_PBR

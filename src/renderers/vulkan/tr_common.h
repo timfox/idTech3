@@ -122,6 +122,8 @@ qboolean RE_DrawVectorString( float x, float y, float scale, const char *text,
 void RE_DrawVectorGlyph( float x, float y, float w, float h,
 	float emS1, float emT1, float emS2, float emT2,
 	int curveStart, int curveCount );
+qboolean RE_QueueVectorFontString( float x, float y, float scale, const char *text,
+	const float *color, float shadowOff );
 
 /*
 =============================================================

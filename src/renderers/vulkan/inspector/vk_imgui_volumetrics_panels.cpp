@@ -208,6 +208,64 @@ extern "C" void VkImgui_DrawVolumetricsPanel(void) {
 		}
 	}
 
+	if (ImGui::CollapsingHeader("Bioaerosol Ecology")) {
+		int bioOn = ri.Cvar_VariableIntegerValue( "r_fogBiology" );
+		bool bioEnabled = ( bioOn != 0 );
+		if ( ImGui::Checkbox( "Enable Fog Biology", &bioEnabled ) ) {
+			ri.Cvar_Set( "r_fogBiology", bioEnabled ? "1" : "0" );
+		}
+		int site = ri.Cvar_VariableIntegerValue( "r_fogBiologySite" );
+		const char *sites[] = { "Maine coastal", "Namib inland" };
+		if ( ImGui::Combo( "Site preset", &site, sites, 2 ) ) {
+			ri.Cvar_Set( "r_fogBiologySite", va( "%d", site ) );
+		}
+		int autoFog = ri.Cvar_VariableIntegerValue( "r_fogBiologyAuto" );
+		bool autoOn = ( autoFog != 0 );
+		if ( ImGui::Checkbox( "Auto-sync with r_volumetricFog", &autoOn ) ) {
+			ri.Cvar_Set( "r_fogBiologyAuto", autoOn ? "1" : "0" );
+		}
+		int coastAuto = ri.Cvar_VariableIntegerValue( "r_fogBiologyCoastAuto" );
+		bool coastAutoOn = ( coastAuto != 0 );
+		if ( ImGui::Checkbox( "Coast km from player position", &coastAutoOn ) ) {
+			ri.Cvar_Set( "r_fogBiologyCoastAuto", coastAutoOn ? "1" : "0" );
+		}
+		if ( coastAutoOn ) {
+			float coastOrigin = VkImgui_CvarFloat( "r_fogBiologyCoastOrigin" );
+			float unitsPerKm = VkImgui_CvarFloat( "r_fogBiologyCoastUnitsPerKm" );
+			int coastAxis = ri.Cvar_VariableIntegerValue( "r_fogBiologyCoastAxis" );
+			const char *axes[] = { "X", "Y" };
+			if ( ImGui::Combo( "Coast axis", &coastAxis, axes, 2 ) ) {
+				ri.Cvar_Set( "r_fogBiologyCoastAxis", va( "%d", coastAxis ) );
+			}
+			VkImgui_VolumetricsSlider( "Coast origin", "r_fogBiologyCoastOrigin", coastOrigin, -65536.0f, 65536.0f, "%.0f" );
+			VkImgui_VolumetricsSlider( "Units per km", "r_fogBiologyCoastUnitsPerKm", unitsPerKm, 64.0f, 4096.0f, "%.0f" );
+		} else {
+			float coastKm = VkImgui_CvarFloat( "r_fogBiologyCoastKm" );
+			VkImgui_VolumetricsSlider( "Coast distance (km)", "r_fogBiologyCoastKm", coastKm, 0.0f, 80.0f, "%.1f" );
+		}
+		float windMarine = VkImgui_CvarFloat( "r_fogBiologyWindMarine" );
+		VkImgui_VolumetricsSlider( "Marine wind", "r_fogBiologyWindMarine", windMarine, 0.0f, 1.0f );
+		if ( bioEnabled ) {
+			const char *phase = ri.Cvar_VariableString( "r_fogBiologySyncPhase" );
+			float coastLive = VkImgui_CvarFloat( "r_fogBiologySyncCoastKm" );
+			float marine = VkImgui_CvarFloat( "r_fogBiologySyncMarine" );
+			float shannon = VkImgui_CvarFloat( "r_fogBiologySyncShannon" );
+			float deposition = VkImgui_CvarFloat( "r_fogBiologySyncDeposition" );
+			float pathogen = VkImgui_CvarFloat( "r_fogBiologySyncPathogen" );
+			float oceanOtu = VkImgui_CvarFloat( "r_fogBiologySyncOceanOtu" );
+			float gramNeg = VkImgui_CvarFloat( "r_fogBiologySyncGramNeg" );
+			ImGui::Separator();
+			ImGui::Text( "Live: phase=%s  coast=%.1f km", phase ? phase : "?", coastLive );
+			ImGui::Text( "marine=%.2f  ocean_otu=%.0f%%  gram_neg=%.0f%%",
+				marine, oceanOtu * 100.0f, gramNeg * 100.0f );
+			ImGui::Text( "shannon=%.2f  deposition=%.1fx  pathogen=%.2f",
+				shannon, deposition, pathogen );
+		}
+		ImGui::TextDisabled( "Console: fog_biology_paper, fog_biology_genera, fog_biology_poll, fog_biology_sweep" );
+		ImGui::TextDisabled( "Lua: Engine.FogBiology.getCommunity()" );
+		ImGui::TextDisabled( "Telemetry: fog_bio_marine, fog_bio_pathogen_risk" );
+	}
+
 	if (ImGui::CollapsingHeader("Temporal")) {
 		float temporalWeight = VkImgui_CvarFloat( "r_volumetricFogTemporalWeight" );
 		float temporalStability = VkImgui_CvarFloat( "r_volumetricFogTemporalStability" );

@@ -29,6 +29,14 @@ namespace Game
 
 		static void OnFrameEvent( string s0, string s1, int i0, int i1 )
 		{
+			if ( ( s_frameCount % 600 ) != 0 )
+				return;
+			string fb = Engine.CvarGet( "r_fogBiology" );
+			if ( fb != "1" )
+				return;
+			string phase = Engine.CvarGet( "r_fogBiologySyncPhase" );
+			string risk = Engine.CvarGet( "r_fogBiologySyncPathogen" );
+			Engine.Print( "C# fog bio phase=" + phase + " pathogen=" + risk );
 		}
 	}
 }

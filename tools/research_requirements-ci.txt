@@ -1,0 +1,4 @@
+# Minimal Python deps for research-module CI smokes (no GPU torch).
+numpy>=1.24
+scipy>=1.11
+scikit-learn>=1.3

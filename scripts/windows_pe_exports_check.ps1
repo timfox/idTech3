@@ -1,5 +1,5 @@
 # Verify PE export tables for shipped Windows native modules (compat harness).
-# - Renderer plugins (MinGW/CMake dlopen): idtech3_vulkan.dll / idtech3_opengl.dll must export GetRefAPI
+# - Renderer plugins (MinGW/CMake dlopen): idtech3_vulkan.dll must export GetRefAPI
 # - Game native DLLs (if present): qagame*.dll / cgame*.dll / ui*.dll must export vmMain and dllEntry
 #
 # Usage:
@@ -176,23 +176,17 @@ Write-Host "=== PE export compatibility check ($BinDir) ==="
 # Renderer plugins (CMake USE_RENDERER_DLOPEN on Windows MinGW)
 if (-not $SkipRendererDlls) {
     $vk = Join-Path $BinDir 'idtech3_vulkan.dll'
-    $gl = Join-Path $BinDir 'idtech3_opengl.dll'
     $haveVk = Test-Path -LiteralPath $vk
-    $haveGl = Test-Path -LiteralPath $gl
     if ($ExpectRendererDlls) {
-        if (-not $haveVk -or -not $haveGl) {
-            throw "Expected idtech3_vulkan.dll and idtech3_opengl.dll in $BinDir (USE_RENDERER_DLOPEN build). Missing: $(@($(if(-not $haveVk){'vulkan'}), $(if(-not $haveGl){'opengl'})) -join ', ')"
+        if (-not $haveVk) {
+            throw "Expected idtech3_vulkan.dll in $BinDir (USE_RENDERER_DLOPEN build)."
         }
     }
     if ($haveVk) {
         Assert-Exports -Path $vk -Required @('GetRefAPI')
         Write-Host "OK: $vk exports GetRefAPI"
     }
-    if ($haveGl) {
-        Assert-Exports -Path $gl -Required @('GetRefAPI')
-        Write-Host "OK: $gl exports GetRefAPI"
-    }
-    if (-not $ExpectRendererDlls -and -not $haveVk -and -not $haveGl) {
+    if (-not $ExpectRendererDlls -and -not $haveVk) {
         Write-Host "(No renderer DLLs in bin - static renderer build; skipped GetRefAPI check)"
     }
 }

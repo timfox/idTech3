@@ -316,9 +316,6 @@ void vk_temporal_commit_frame_state( void )
 	vk.temporal.noWorldModel = noWorldModel;
 	vk.temporal.stableGameplayState = ( clientState == CA_ACTIVE ) ? qtrue : qfalse;
 	vk.temporal.firstPersonProjectionLastFrame = vk.temporal.firstPersonProjectionThisFrame;
-	if ( vk.temporal.unreliableMotionThisFrame ) {
-		vk_reset_taa_history();
-	}
 	vk.temporal.lastRenderWidth = vk_get_render_target_width();
 	vk.temporal.lastRenderHeight = vk_get_render_target_height();
 	vk.temporal.lastSwapchainWidth = vk.swapchain_extent_valid ? vk.swapchain_extent.width : 0u;

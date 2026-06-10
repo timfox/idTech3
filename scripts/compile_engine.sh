@@ -492,9 +492,9 @@ copy_to_release() {
     echo "Copied server -> $dest/${GAME_NAME}_server"
   fi
 
-  # Renderers (Vulkan only)
+  # Renderers (Vulkan + optional roadmap scaffolds)
   shopt -s nullglob
-  for sofile in "$BUILD_DIR"/idtech3_vulkan*.so; do
+  for sofile in "$BUILD_DIR"/idtech3_vulkan*.so "$BUILD_DIR"/idtech3_metal*.so "$BUILD_DIR"/idtech3_dxr*.so; do
     base="$(basename "$sofile")"
     cp -f "$sofile" "$dest/$base"
     echo "Copied renderer -> $dest/$base"
@@ -531,6 +531,12 @@ copy_to_release() {
     cp -f "$PROJECT_ROOT/scripts/trellis_image_to_glb.py" "$dest/trellis_image_to_glb.py"
     chmod +x "$dest/trellis_image_to_glb.py"
     echo "Copied trellis_image_to_glb.py -> $dest/trellis_image_to_glb.py"
+  fi
+
+  if [ -f "$PROJECT_ROOT/scripts/genetic_gan_decode.py" ]; then
+    cp -f "$PROJECT_ROOT/scripts/genetic_gan_decode.py" "$dest/genetic_gan_decode.py"
+    chmod +x "$dest/genetic_gan_decode.py"
+    echo "Copied genetic_gan_decode.py -> $dest/genetic_gan_decode.py"
   fi
 }
 

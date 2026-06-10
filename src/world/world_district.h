@@ -34,6 +34,7 @@ typedef struct worldDistrict_s {
 	char                  manifestPath[WORLD_DISTRICT_PATH_MAX];
 	char                  proxyMeshPath[WORLD_DISTRICT_PATH_MAX];
 	char                  fullMeshPath[WORLD_DISTRICT_PATH_MAX];
+	vec3_t                origin;
 	vec3_t                boundsMin;
 	vec3_t                boundsMax;
 	int                   sectorX0;

@@ -5,7 +5,14 @@
 ```
 src/
 ├── client/              Client systems
-│   ├── cl_main.c                 Client init + frame loop
+│   ├── cl_main.c                 Globals, reliable cmds, init glue (~240 LOC)
+│   ├── cl_lifecycle.c/h          Shutdown, memory flush, map load, hunk users
+│   ├── cl_frame.c/h              Per-frame loop (CL_Frame)
+│   ├── cl_cvars.c/h              Client cvar registration
+│   ├── cl_connect.c/h            Connect/disconnect, timeout, rcon
+│   ├── cl_cmds.c/h               Misc client console commands
+│   ├── cl_download.c/h           Download state + pk3 fetch
+│   ├── cl_ref.c/h                Renderer dlopen + vid_restart
 │   ├── cl_gameframe.c/h          Game loop (ticks all subsystems)
 │   ├── cl_cin.c                  ROQ cinematic + modern codec dispatch
 │   ├── cl_cin_modern.c/h         Modern video codec dispatcher
@@ -33,7 +40,7 @@ src/
 │   └── phys_cloth.c/h            XPBD cloth simulation
 ├── navigation/          Pathfinding
 │   ├── nav_recast.cpp/h          Recast/Detour navmesh + crowd
-│   └── nav_bsp_extract.c         BSP triangle extraction
+│   └── nav_bsp_extract.cpp       BSP triangle extraction
 ├── audio/               Audio
 │   ├── backends/                  OpenAL, SDL, null
 │   ├── codecs/                    WAV, MP3, Opus, FLAC, WebM

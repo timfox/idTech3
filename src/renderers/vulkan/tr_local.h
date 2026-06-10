@@ -1563,6 +1563,7 @@ extern cvar_t	*r_deferredGBufferDebug;
 extern cvar_t	*r_deferredLighting;
 extern cvar_t	*r_deferredUnlitBase;
 extern cvar_t	*r_deferredLightingStrength;
+extern cvar_t	*r_deferredSpecular;
 void R_ApplyRenderModeLatch( void );
 extern cvar_t	*r_hdr;
 extern cvar_t	*r_bloom;
@@ -1622,6 +1623,7 @@ extern cvar_t	*r_forwardPlusDistanceSort;
 extern cvar_t	*r_forwardPlusDepthCull;
 extern cvar_t	*r_rtxEntities;
 extern cvar_t	*r_rtxEntityCap;
+extern cvar_t	*r_rtxTlasUpdate;
 extern cvar_t	*r_pathtrace;
 extern cvar_t	*r_pathtrace_arch;
 extern cvar_t	*r_pathtrace_bounces;
@@ -1673,6 +1675,7 @@ extern cvar_t	*r_renderHeight;
 extern cvar_t	*r_renderScale;
 extern cvar_t	*r_temporalDebug;
 extern cvar_t	*r_temporalCustomShaderMotion;
+extern cvar_t	*r_temporalCpuSkinPrev;
 #endif
 
 extern cvar_t	*r_dlightBacks;			// dlight non-facing surfaces for continuity
@@ -2090,6 +2093,7 @@ typedef struct shaderCommands_s
 	int			vboIndex;
 	int			vboStage;
 	qboolean	allowVBO;
+	const struct stream_vbo_item_s *vboStreamItem;
 #endif
 
 	shader_t	*shader;
@@ -2417,6 +2421,18 @@ typedef struct {
 	int		vectorCurveCount;
 } stretchPicCommand_t;
 
+#define VECTOR_FONT_CMD_MAX_TEXT 512
+
+typedef struct {
+	int		commandId;
+	float	x;
+	float	y;
+	float	scale;
+	float	color[4];
+	float	shadowOff;
+	char	text[VECTOR_FONT_CMD_MAX_TEXT];
+} vectorFontStringCommand_t;
+
 typedef struct drawSurfsCommand_s {
 	int		commandId;
 	trRefdef_t	refdef;
@@ -2446,6 +2462,7 @@ typedef enum {
 	RC_END_OF_LIST,
 	RC_SET_COLOR,
 	RC_STRETCH_PIC,
+	RC_VECTOR_FONT_STRING,
 	RC_DRAW_SURFS,
 	RC_DRAW_BUFFER,
 	RC_SWAP_BUFFERS,
@@ -2526,6 +2543,36 @@ void		R_IssueRenderCommands( void );
 #endif
 
 #ifdef USE_VBO
+#define VBO_STREAM_ITEM_FLAG	0x40000000u
+#define VBO_STREAM_MAX_ITEMS	1024
+
+typedef struct stream_vbo_stage_s {
+	int rgb_offset[3];
+	int tex_offset[3];
+} stream_vbo_stage_t;
+
+typedef struct stream_vbo_item_s {
+	int iboOffset;
+	int vboOffset;
+	int normalOffset;
+#ifdef USE_VK_PBR
+	int qtangentOffset;
+	int lightdirOffset;
+#endif
+	stream_vbo_stage_t stages[MAX_SHADER_STAGES];
+	int numStages;
+	int num_indexes;
+	int num_vertexes;
+} stream_vbo_item_t;
+
+static inline qboolean VBO_ItemIsStream( int vboItemIndex ) {
+	return ( vboItemIndex & VBO_STREAM_ITEM_FLAG ) != 0;
+}
+
+static inline int VBO_ItemStreamIndex( int vboItemIndex ) {
+	return vboItemIndex & (int)~VBO_STREAM_ITEM_FLAG;
+}
+
 // VBO functions
 extern void R_BuildWorldVBO( msurface_t *surf, int surfCount );
 
@@ -2536,9 +2583,29 @@ extern void VBO_Cleanup( void );
 extern void VBO_QueueItem( int itemIndex );
 extern void VBO_ClearQueue( void );
 extern void VBO_Flush( void );
+
+extern void VBO_StreamClear( void );
+extern qboolean VBO_StreamUploadSurface( surfaceType_t *surface, shader_t *shader, int *outVboItemIndex );
+extern qboolean VBO_StreamFlushGpu( void );
+extern const stream_vbo_item_t *VBO_StreamGetItem( int itemIndex );
 #endif
 
 int R_GetLightmapCoords( int lightmapIndex, float *x, float *y );
 int R_GetLightmapPixelOffset( int lightmapIndex, int *pixelX, int *pixelY );
+
+typedef struct bspStreamLightmapSlot_s {
+	float uvX;
+	float uvY;
+	int pixelX;
+	int pixelY;
+} bspStreamLightmapSlot_t;
+
+void     R_BspStreamLightmap_Reset( void );
+void     R_BspStreamLightmap_ResetTiles( void );
+int      R_BspStreamLightmap_RegisterAtlas( void );
+qboolean R_BspStreamLightmap_AllocSlot( bspStreamLightmapSlot_t *slot );
+void     R_BspStreamLightmap_UploadTile( const bspStreamLightmapSlot_t *slot, const byte *rgb128 );
+void     R_BspStreamLightmap_UploadDeluxeTile( const bspStreamLightmapSlot_t *slot, const byte *rgb128 );
+void     R_BspGenerateFaceNormals( srfSurfaceFace_t *face );
 
 #endif //TR_LOCAL_H

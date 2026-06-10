@@ -7,6 +7,7 @@ Contents:
   - gameinfo.txt - window title "Gopex Engine Demo"
   - scripts/demo_bootstrap.shader + gfx/* + fonts/Inter_28pt-Regular.ttf (repo fonts/) - HUD / init without retail pak0
   - demo_features.cfg - renderer cvar toggles (PBR, volumetric fog, etc.)
+  - demo_fog_biology.cfg / demo_fog_biology_namib.cfg / demo_fog_biology_openworld.cfg - Evans et al. 2019 bioaerosol presets
   - demo_physics.cfg - Bullet middleware + active ragdoll motor layer
   - scripts/js/demo_hooks.js - Duktape hooks (map_load, frame, HUD text)
   - demo_gameplay.cfg - hints for buildnavmesh / cl_* subsystem cvars

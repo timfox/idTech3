@@ -187,6 +187,7 @@ void vk_shutdown( refShutdownCode_t code )
 
 #ifdef USE_VBO
 	vk_release_vbo();
+	vk_release_stream_vbo();
 #endif
 
 	vk_clean_staging_buffer();
@@ -344,6 +345,8 @@ for (i = 0; i < 2; i++) {
 	qvkDestroyShaderModule( vk.device, vk.modules.frag.gen0_df, NULL );
 	qvkDestroyShaderModule( vk.device, vk.modules.frag.ui_sdf_text, NULL );
 	qvkDestroyShaderModule( vk.device, vk.modules.frag.ui_vector_text, NULL );
+	qvkDestroyShaderModule( vk.device, vk.modules.frag.ui_vector_glyphlet_vert, NULL );
+	qvkDestroyShaderModule( vk.device, vk.modules.frag.ui_vector_glyphlet_frag, NULL );
 	qvkDestroyShaderModule( vk.device, vk.modules.frag.ui_subpixel_text, NULL );
 
 	for ( i = 0; i < 2; i++ ) {

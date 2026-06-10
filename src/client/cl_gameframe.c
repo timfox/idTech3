@@ -22,6 +22,7 @@ Ticks all gameplay subsystems each client frame:
 #include "cl_district.h"
 #include "cl_openworld.h"
 #include "../world/world_open.h"
+#include "../world/fog_biology.h"
 #include "cl_particles.h"
 #include "cl_map_background.h"
 #include "cl_window_title.h"
@@ -216,6 +217,7 @@ void CL_InitGameSystems(void) {
 	g_ecsMotion = Cvar_Get( "g_ecsMotion", "1", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( g_ecsMotion, "When 1, integrate ECS velocity into position each client frame." );
 	MobileFog_Init();
+	FogBiology_Init();
 	BgMap_Init();
 	WinTitle_Init();
 
@@ -251,6 +253,7 @@ void CL_ShutdownGameSystems(void) {
 	EDA_Shutdown();
 	BT_Shutdown();
 	ECS_Shutdown();
+	FogBiology_Shutdown();
 	BgMap_Shutdown();
 
 	activeNavMesh = -1;
@@ -274,6 +277,25 @@ void CL_GameFrame(float frametime) {
 
 	CL_District_Frame();
 	CL_OpenWorld_Frame();
+	if ( FogBiology_Enabled() && cls.state == CA_ACTIVE && cl.snap.valid ) {
+		FogBiology_SetPlayerOrigin( cl.snap.ps.origin );
+	} else {
+		FogBiology_SetPlayerOrigin( NULL );
+	}
+	FogBiology_Frame();
+	if ( FogBiology_Enabled() ) {
+		fogBioCommunity_t fogBioComm;
+		FogBiology_GetCurrentCommunity( &fogBioComm );
+		EngineTelemetry_Record( "fog_bio_phase", (double)FogBiology_GetPhase() );
+		EngineTelemetry_Record( "fog_bio_coast_km", (double)FogBiology_GetCoastDistanceKm() );
+		EngineTelemetry_Record( "fog_bio_marine", (double)FogBiology_GetMarineInfluence() );
+		EngineTelemetry_Record( "fog_bio_shannon", (double)fogBioComm.shannonDiversity );
+		EngineTelemetry_Record( "fog_bio_deposition", (double)fogBioComm.depositionMultiplier );
+		EngineTelemetry_Record( "fog_bio_ocean_otu", (double)fogBioComm.oceanOtuFraction );
+		EngineTelemetry_Record( "fog_bio_gram_neg", (double)fogBioComm.gramNegativeFraction );
+		EngineTelemetry_Record( "fog_bio_pathogen_risk", (double)FogBiology_GetPathogenDepositionRisk() );
+		EngineTelemetry_Record( "fog_bio_pathogen_taxa", (double)fogBioComm.pathogenTaxaScore );
+	}
 
 	if ( g_ecsMotion && g_ecsMotion->integer ) {
 		ECS_StepMotion( frametime );

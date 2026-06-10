@@ -1,0 +1,27 @@
+{
+  "num_folds": 20,
+  "num_test_splits": 5,
+  "val_splits_per_test": 4,
+  "patients": [
+    {"patient_id": "P000", "fold": 0},
+    {"patient_id": "P001", "fold": 1},
+    {"patient_id": "P002", "fold": 2},
+    {"patient_id": "P003", "fold": 3},
+    {"patient_id": "P004", "fold": 4},
+    {"patient_id": "P005", "fold": 5},
+    {"patient_id": "P006", "fold": 6},
+    {"patient_id": "P007", "fold": 7},
+    {"patient_id": "P008", "fold": 8},
+    {"patient_id": "P009", "fold": 9},
+    {"patient_id": "P010", "fold": 10},
+    {"patient_id": "P011", "fold": 11},
+    {"patient_id": "P012", "fold": 12},
+    {"patient_id": "P013", "fold": 13},
+    {"patient_id": "P014", "fold": 14},
+    {"patient_id": "P015", "fold": 15},
+    {"patient_id": "P016", "fold": 16},
+    {"patient_id": "P017", "fold": 17},
+    {"patient_id": "P018", "fold": 18},
+    {"patient_id": "P019", "fold": 19}
+  ]
+}

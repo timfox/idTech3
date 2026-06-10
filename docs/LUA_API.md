@@ -202,3 +202,21 @@ Engine.Dialogue.start("Speaker", "Line of dialogue")
 Engine.Dialogue.clear()
 local n = Engine.Dialogue.count()
 ```
+
+## Engine.FogBiology
+
+Coastal fog bioaerosol ecology (Evans et al. 2019). See [FOG_BIOLOGY.md](FOG_BIOLOGY.md).
+
+```lua
+Engine.FogBiology.enabled()                    -- boolean (r_fogBiology)
+Engine.FogBiology.getPhase()                   -- "clear" | "fog" | "post_fog"
+Engine.FogBiology.getMarineInfluence()         -- 0..1
+Engine.FogBiology.getCoastKm()                 -- current coast distance km
+Engine.FogBiology.getPathogenRisk()            -- 0..1 deposition/pathogen heuristic
+Engine.FogBiology.getCommunity([phase])       -- { shannon, marine, oceanOtu, deposition, richness, gramNegative, rhodospirillales, pathogenTaxa, phyla={...} }
+Engine.FogBiology.setSite("maine"|"namib")     -- or 0/1
+Engine.FogBiology.setCoastKm(km)
+Engine.FogBiology.setMarineWind(0..1)
+Engine.FogBiology.setFogActive(bool)
+Engine.FogBiology.poll()                     -- { phase, marine, coastKm, shannon, deposition, pathogen }
+```

@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "description": "Synthetic 10-task mini-bench for CI (replace with DaX benchboard assets when public)",
+  "tasks": [
+    {"id": "task_00", "name": "brca_er_status", "domain": "biomarker_molecular", "task_type": "classification", "metric": "auroc", "num_classes": 2},
+    {"id": "task_01", "name": "brca_her2", "domain": "biomarker_molecular", "task_type": "classification", "metric": "auroc", "num_classes": 2},
+    {"id": "task_02", "name": "luad_subtype", "domain": "diagnostic_pathology", "task_type": "classification", "metric": "balanced_accuracy", "num_classes": 3},
+    {"id": "task_03", "name": "crc_msi", "domain": "biomarker_molecular", "task_type": "classification", "metric": "auroc", "num_classes": 2},
+    {"id": "task_04", "name": "prad_gleason", "domain": "diagnostic_pathology", "task_type": "classification", "metric": "balanced_accuracy", "num_classes": 4},
+    {"id": "task_05", "name": "skcm_breslow", "domain": "diagnostic_pathology", "task_type": "regression", "metric": "c_index", "num_classes": 1},
+    {"id": "task_06", "name": "gbm_idh", "domain": "biomarker_molecular", "task_type": "classification", "metric": "auroc", "num_classes": 2},
+    {"id": "task_07", "name": "hnsc_p16", "domain": "biomarker_molecular", "task_type": "classification", "metric": "auroc", "num_classes": 2},
+    {"id": "task_08", "name": "ucec_grade", "domain": "diagnostic_pathology", "task_type": "classification", "metric": "balanced_accuracy", "num_classes": 3},
+    {"id": "task_09", "name": "lgg_survival", "domain": "risk_response_prognosis", "task_type": "survival", "metric": "c_index", "num_classes": 1}
+  ]
+}

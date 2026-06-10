@@ -31,6 +31,7 @@ See docs/VECTOR_FONT.md and docs/research/amd-gpuopen-loop-blinn-mesh-fonts.md
 typedef struct {
 	unsigned int vertexBaseIndex;
 	unsigned int triangleBaseIndex;
+	unsigned int primBaseIndex;
 	unsigned int vertexCount;
 	unsigned int primitiveCount;
 } vectorGlyphletInfo_t;

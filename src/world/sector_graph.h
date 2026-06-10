@@ -47,10 +47,15 @@ void SectorGraph_UpdateReachability( const vec3_t viewOrigin, const vec3_t *extr
 	int extraOriginCount, float sectorSize, float unloadRadius, int maxHops );
 
 qboolean SectorGraph_IsReachable( int cellX, int cellY );
+int      SectorGraph_GetHopDistance( int cellX, int cellY );
+float    SectorGraph_GetInfluence( int cellX, int cellY );
+qboolean SectorGraph_NavInfluenceEnabled( void );
 qboolean SectorGraph_ReachTest( int srcX, int srcY, int dstX, int dstY, int maxHops );
 
 void     SectorGraph_ReachTest_f( void );
 void     SectorGraph_Status_f( void );
+void     SectorGraph_InfluenceList_f( void );
+void     SectorGraph_CrossoverBench_f( void );
 
 int  SectorGraph_GetNodeCount( void );
 void SectorGraph_GetReachBits( const uint32_t **bits, int *bitWords );
@@ -60,6 +65,7 @@ void SectorGraph_ResetForTest( void );
 void SectorGraph_EnableForTest( qboolean enable );
 qboolean SectorGraph_RunBfsCpuSources( const int *sourceNodes, int sourceCount, int maxHops );
 int  SectorGraph_CellToNode( int cellX, int cellY );
+int  SectorGraph_GetHopDistanceNode( int nodeId );
 void SectorGraph_BuildWindowForTest( int centerCellX, int centerCellY, int radiusCells, qboolean diagonals );
 #endif
 

@@ -12,6 +12,7 @@ extern "C" {
 
 void CL_District_Init( void );
 void CL_District_Frame( void );
+void CL_District_AddRefEntitiesToScene( void );
 
 #ifdef __cplusplus
 }

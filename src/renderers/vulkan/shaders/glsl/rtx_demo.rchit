@@ -16,8 +16,14 @@ void main()
 	/* Base diffuse-style albedo (no texture fetch yet). */
 	vec3 base = vec3( 0.72, 0.70, 0.66 );
 	int mode = int( clamp( floor( rtx.outputSize.z + 0.5 ), 0.0, 3.0 ) );
+	uint inst = gl_InstanceCustomIndexEXT & 0xFFu;
 
-	/* r_rtx: 1=shadows (darken), 2=reflections (cool tint), 3=full (warm accent). */
+	/* Entity proxy BLAS (r_rtxEntities 1) uses instanceCustomIndex 1. */
+	if ( inst == 1u ) {
+		base = mix( base, vec3( 0.55, 0.82, 0.62 ), 0.45 );
+	}
+
+	/* r_rtx hybrid modes: 1=shadows (darken), 2=reflections (cool tint), 3=full (warm accent). */
 	if ( mode == 1 ) {
 		hitValue = base * 0.35;
 	} else if ( mode == 2 ) {

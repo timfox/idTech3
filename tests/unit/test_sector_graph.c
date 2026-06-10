@@ -96,6 +96,24 @@ static int test_grid_3x3_component( void )
 	return 0;
 }
 
+static int test_hop_influence( void )
+{
+	int sources[1];
+
+	SectorGraph_ResetForTest();
+	SectorGraph_EnableForTest( qtrue );
+	SectorGraph_BuildWindowForTest( 0, 0, 2, qfalse );
+
+	sources[0] = SectorGraph_CellToNode( 0, 0 );
+	ASSERT( SectorGraph_RunBfsCpuSources( sources, 1, 4 ), "hop bfs" );
+	ASSERT( SectorGraph_GetHopDistance( 0, 0 ) == 0, "source hops" );
+	ASSERT( SectorGraph_GetHopDistance( 2, 0 ) == 2, "cell (2,0) hops" );
+	ASSERT( SectorGraph_GetHopDistance( 9, 9 ) == -1, "out of window" );
+	ASSERT( SectorGraph_GetInfluence( 0, 0 ) > 0.99f, "source influence" );
+	ASSERT( SectorGraph_GetInfluence( 2, 0 ) > 0.4f, "decayed influence" );
+	return 0;
+}
+
 int main( int argc, char **argv )
 {
 	(void)argc;
@@ -110,6 +128,7 @@ int main( int argc, char **argv )
 	if ( test_event_to_base() ) return 1;
 	if ( test_multi_source() ) return 1;
 	if ( test_grid_3x3_component() ) return 1;
+	if ( test_hop_influence() ) return 1;
 
 	printf( "OK: sector_graph unit tests passed\n" );
 	return 0;

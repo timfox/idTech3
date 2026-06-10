@@ -1,0 +1,92 @@
+#version 450
+#extension GL_NV_mesh_shader : require
+
+layout(local_size_x = 1) in;
+layout(triangles) out;
+layout(max_vertices = 128, max_primitives = 128) out;
+
+struct GlyphletInfo {
+	uint vertexBaseIndex;
+	uint triangleBaseIndex;
+	uint primBaseIndex;
+	uint vertexCount;
+	uint primitiveCount;
+};
+
+struct CharacterRenderInfo {
+	float posX;
+	float posY;
+	float scale;
+	uint codePoint;
+	vec4 color;
+};
+
+layout(set = 0, binding = 0, std430) readonly buffer GlyphletVertices {
+	vec4 data[];
+} glyphVerts;
+
+layout(set = 0, binding = 1, std430) readonly buffer GlyphletIndices {
+	uint data[];
+} glyphIndices;
+
+layout(set = 0, binding = 2, std430) readonly buffer GlyphletPrimTypes {
+	uint data[];
+} glyphPrimTypes;
+
+layout(set = 0, binding = 3, std430) readonly buffer GlyphletTable {
+	GlyphletInfo data[];
+} glyphTable;
+
+layout(set = 0, binding = 4, std430) readonly buffer CharacterInfos {
+	CharacterRenderInfo data[];
+} characters;
+
+layout(push_constant) uniform Transform {
+	mat4 mvp;
+	mat4 prevMvp;
+} pc;
+
+out gl_MeshPerVertexNV {
+	vec4 color;
+	vec2 canon;
+	float triType;
+} gl_MeshVerticesNV[];
+
+void main() {
+	uint charIdx = gl_WorkGroupID.x;
+	CharacterRenderInfo ch = characters.data[charIdx];
+	uint glyphIdx = ch.codePoint & 255u;
+	GlyphletInfo gi = glyphTable.data[glyphIdx];
+	uint vCount = gi.vertexCount;
+	uint pCount = gi.primitiveCount;
+	uint i;
+	uint p;
+
+	if ( vCount == 0u || pCount == 0u || vCount > 128u || pCount > 128u ) {
+		SetMeshOutputsNV( 0, 0 );
+		return;
+	}
+
+	for ( i = 0u; i < vCount; i++ ) {
+		vec4 src = glyphVerts.data[gi.vertexBaseIndex + i];
+		vec2 screen = vec2( ch.posX + src.x * ch.scale, ch.posY - src.y * ch.scale );
+		gl_MeshVerticesNV[i].gl_Position = pc.mvp * vec4( screen, 0.0, 1.0 );
+		gl_MeshVerticesNV[i].color = ch.color;
+		gl_MeshVerticesNV[i].canon = src.zw;
+		gl_MeshVerticesNV[i].triType = 0.0;
+	}
+
+	for ( p = 0u; p < pCount; p++ ) {
+		uint ib = gi.triangleBaseIndex + p * 3u;
+		uint i0 = glyphIndices.data[ib + 0u] - gi.vertexBaseIndex;
+		uint i1 = glyphIndices.data[ib + 1u] - gi.vertexBaseIndex;
+		uint i2 = glyphIndices.data[ib + 2u] - gi.vertexBaseIndex;
+		float pType = float( glyphPrimTypes.data[gi.primBaseIndex + p] );
+		gl_PrimitiveIndicesNV[p] = uvec3( i0, i1, i2 );
+		gl_MeshVerticesNV[i0].triType = pType;
+		gl_MeshVerticesNV[i1].triType = pType;
+		gl_MeshVerticesNV[i2].triType = pType;
+	}
+
+	SetMeshOutputsNV( vCount, pCount );
+}

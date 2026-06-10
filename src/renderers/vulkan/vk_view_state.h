@@ -16,3 +16,6 @@ void vk_begin_motion_frame( void );
 void vk_snap_gpu_morph_weights_for_motion( void );
 void vk_get_scissor_rect( VkRect2D *r );
 void vk_update_depth_range( Vk_Depth_Range depth_range );
+void vk_update_mvp( const float *m );
+void vk_read_mvp_transform( float *mvp );
+void vk_read_prev_mvp_transform( float *prev_mvp );

@@ -319,6 +319,49 @@ void RE_StretchPicSubpixel( float x, float y, float w, float h,
 
 /*
 =============
+RE_QueueVectorFontString
+Loop & Blinn glyphlet string (r_vectorFontMode 2).
+=============
+*/
+qboolean RE_QueueVectorFontString( float x, float y, float scale, const char *text,
+	const float *color, float shadowOff ) {
+	vectorFontStringCommand_t *cmd;
+	size_t len;
+
+	if ( !tr.registered || !text || !text[0] || scale <= 0.0f ) {
+		return qfalse;
+	}
+	cmd = R_GetCommandBuffer( sizeof( *cmd ) );
+	if ( !cmd ) {
+		return qfalse;
+	}
+	cmd->commandId = RC_VECTOR_FONT_STRING;
+	cmd->x = x;
+	cmd->y = y;
+	cmd->scale = scale;
+	cmd->shadowOff = shadowOff;
+	if ( color ) {
+		cmd->color[0] = color[0];
+		cmd->color[1] = color[1];
+		cmd->color[2] = color[2];
+		cmd->color[3] = color[3];
+	} else {
+		cmd->color[0] = 1.0f;
+		cmd->color[1] = 1.0f;
+		cmd->color[2] = 1.0f;
+		cmd->color[3] = 1.0f;
+	}
+	len = strlen( text );
+	if ( len >= sizeof( cmd->text ) ) {
+		len = sizeof( cmd->text ) - 1;
+	}
+	Com_Memcpy( cmd->text, text, len );
+	cmd->text[len] = '\0';
+	return qtrue;
+}
+
+/*
+=============
 RE_DrawVectorGlyph
 =============
 */
