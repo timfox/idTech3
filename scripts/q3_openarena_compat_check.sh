@@ -94,6 +94,14 @@ else
 	fail "r_vdbFog default not 0"
 fi
 
+if grep -q '#ifdef USE_OPENGL_API' "$PROJECT_ROOT/src/client/cl_main.c" && \
+   awk '/CL_InitGLimp_Cvars/,/^}/ { if ($0 ~ /r_allowSoftwareGL = Cvar_Get/ && prev !~ /USE_OPENGL_API/) bad=1 } { prev=$0 } END { exit bad ? 1 : 0 }' \
+	"$PROJECT_ROOT/src/client/cl_main.c"; then
+	pass "r_allowSoftwareGL registration gated behind USE_OPENGL_API"
+else
+	fail "r_allowSoftwareGL must be registered only when USE_OPENGL_API is defined"
+fi
+
 if grep -qE 'cs_autoInit[[:space:]]*=[[:space:]]*Cvar_Get\([[:space:]]*"cs_autoInit"[[:space:]]*,[[:space:]]*"0"' \
 	"$PROJECT_ROOT/src/qcommon/csharp_debug.c"; then
 	pass "cs_autoInit defaults to 0 (C# runtime manual until cs_reload)"

@@ -879,9 +879,11 @@ cvar_t	*vid_xpos;			// X coordinate of window position
 cvar_t	*vid_ypos;			// Y coordinate of window position
 cvar_t	*r_noborder;
 
-cvar_t *r_allowSoftwareGL;	// don't abort out if the pixelformat claims software
 cvar_t *r_swapInterval;
+#ifdef USE_OPENGL_API
+cvar_t *r_allowSoftwareGL;	// don't abort out if the pixelformat claims software
 cvar_t *r_glDriver;
+#endif
 cvar_t *r_displayRefresh;
 cvar_t *r_fullscreen;
 cvar_t *r_mode;
@@ -4000,13 +4002,15 @@ static void CL_ToggleImgui_f( void )
 
 static void CL_InitGLimp_Cvars( void )
 {
-	// shared with GLimp
-	r_allowSoftwareGL = Cvar_Get( "r_allowSoftwareGL", "0", CVAR_LATCH );
-	Cvar_SetDescription( r_allowSoftwareGL, "Legacy cvar (ignored). OpenGL renderer removed; Vulkan only." );
+	// shared with GLimp / VKimp
 	r_swapInterval = Cvar_Get( "r_swapInterval", "0", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( r_swapInterval, "V-blanks to wait before swapping buffers.\n 0: No V-Sync\n 1: Synced to the monitor's refresh rate." );
+#ifdef USE_OPENGL_API
+	r_allowSoftwareGL = Cvar_Get( "r_allowSoftwareGL", "0", CVAR_LATCH );
+	Cvar_SetDescription( r_allowSoftwareGL, "Toggle the use of the default software OpenGL driver supplied by the Operating System." );
 	r_glDriver = Cvar_Get( "r_glDriver", OPENGL_DRIVER_NAME, CVAR_ARCHIVE_ND | CVAR_LATCH );
-	Cvar_SetDescription( r_glDriver, "Legacy cvar (ignored). OpenGL renderer removed; Vulkan only." );
+	Cvar_SetDescription( r_glDriver, "Specifies the OpenGL driver to use, will revert back to default if driver name set is invalid." );
+#endif
 
 	r_displayRefresh = Cvar_Get( "r_displayRefresh", "0", CVAR_LATCH );
 	Cvar_CheckRange( r_displayRefresh, "0", "500", CV_INTEGER );
