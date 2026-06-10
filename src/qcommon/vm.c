@@ -2077,15 +2077,10 @@ intptr_t QDECL VM_Call( vm_t *vm, int nargs, int callnum, ... )
 	// if we have a dll loaded, call it directly
 	if ( vm->entryPoint )
 	{
-		/* Pass three arg slots: native vmMain only receives nargs from varargs; zero the rest
-		 * so e.g. UI_GETAPIVERSION (nargs=0) does not read stack garbage. */
 		int32_t args[MAX_VMMAIN_CALL_ARGS-1];
-		Com_Memset( args, 0, sizeof( args ) );
 		va_list ap;
 		va_start( ap, callnum );
-		for ( i = 0; i < nargs; i++ ) {
-			args[i] = va_arg( ap, int32_t );
-		}
+		VM_BuildNativeModuleCallArgs( nargs, args, (int)ARRAY_LEN( args ), ap );
 		va_end( ap );
 
 		// add more arguments if you're changed MAX_VMMAIN_CALL_ARGS:

@@ -1,5 +1,6 @@
 #include "vm_native_module.h"
 #include <stdio.h>
+#include <string.h>
 
 int VM_BuildNativeModuleCandidates( const char *moduleName, char out[][MAX_QPATH], int maxCandidates ) {
 	int count = 0;
@@ -23,4 +24,24 @@ int VM_BuildNativeModuleCandidates( const char *moduleName, char out[][MAX_QPATH
 	}
 
 	return count;
+}
+
+void VM_BuildNativeModuleCallArgs( int nargs, int32_t *out, int maxArgs, va_list ap ) {
+	int i;
+	int copyCount;
+
+	if ( !out || maxArgs <= 0 ) {
+		return;
+	}
+
+	memset( out, 0, (size_t)maxArgs * sizeof( out[0] ) );
+
+	copyCount = nargs;
+	if ( copyCount > maxArgs ) {
+		copyCount = maxArgs;
+	}
+
+	for ( i = 0; i < copyCount; i++ ) {
+		out[i] = va_arg( ap, int32_t );
+	}
 }

@@ -2,6 +2,8 @@
  * Unit test: VM native module candidate naming
  * Run: ctest -R unit_vm_native_module
  */
+#include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -64,6 +66,60 @@ static int test_candidate_limit(void) {
 	return 0;
 }
 
+static void build_call_args(int nargs, int32_t out[3], ...) {
+	va_list ap;
+
+	va_start(ap, out);
+	VM_BuildNativeModuleCallArgs(nargs, out, 3, ap);
+	va_end(ap);
+}
+
+static int test_native_call_args_zero_fill(void) {
+	int32_t out[3] = { 0x11111111, 0x22222222, 0x33333333 };
+
+	build_call_args(0, out);
+	ASSERT(out[0] == 0, "zero-arg call should clear arg0");
+	ASSERT(out[1] == 0, "zero-arg call should clear arg1");
+	ASSERT(out[2] == 0, "zero-arg call should clear arg2");
+
+	build_call_args(1, out, 1234);
+	ASSERT(out[0] == 1234, "one-arg call should copy arg0");
+	ASSERT(out[1] == 0, "one-arg call should clear arg1");
+	ASSERT(out[2] == 0, "one-arg call should clear arg2");
+
+	return 0;
+}
+
+static int test_native_call_args_copy_all_slots(void) {
+	int32_t out[3] = { 0 };
+
+	build_call_args(3, out, -1, 0x12345678, 42);
+	ASSERT(out[0] == -1, "three-arg call should copy arg0");
+	ASSERT(out[1] == 0x12345678, "three-arg call should copy arg1");
+	ASSERT(out[2] == 42, "three-arg call should copy arg2");
+
+	return 0;
+}
+
+static void build_call_args_limited(int nargs, int32_t out[3], int maxArgs, ...) {
+	va_list ap;
+
+	va_start(ap, maxArgs);
+	VM_BuildNativeModuleCallArgs(nargs, out, maxArgs, ap);
+	va_end(ap);
+}
+
+static int test_native_call_args_respect_limit(void) {
+	int32_t out[3] = { 77, 88, 99 };
+
+	build_call_args_limited(3, out, 2, 10, 20, 30);
+	ASSERT(out[0] == 10, "limited native args should copy arg0");
+	ASSERT(out[1] == 20, "limited native args should copy arg1");
+	ASSERT(out[2] == 99, "limited native args should not write past maxArgs");
+
+	return 0;
+}
+
 int main(void) {
 	if (test_empty_inputs() != 0) {
 		return 1;
@@ -72,6 +128,15 @@ int main(void) {
 		return 1;
 	}
 	if (test_candidate_limit() != 0) {
+		return 1;
+	}
+	if (test_native_call_args_zero_fill() != 0) {
+		return 1;
+	}
+	if (test_native_call_args_copy_all_slots() != 0) {
+		return 1;
+	}
+	if (test_native_call_args_respect_limit() != 0) {
 		return 1;
 	}
 
